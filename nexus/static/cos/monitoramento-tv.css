@@ -1,0 +1,112 @@
+/* O videowall do Monitoramento do COS (09/11/2026, templates/cos/monitoramento_tv.html).
+
+   - A página inteira cabe na tela, sem rolagem: a letra base segue a altura da tela (1,6vh: 17 px em 1080 e 35 px em
+     2160), e a do cartão segue o próprio cartão (container query: cqh), cujo tamanho o JavaScript acha para caberem todas.
+   - A usina normal é neutra: superfície, nome e kW na tinta da casa, e a curva no verde de texto (o dado). Só a anormal
+     ganha cor, e sempre com a palavra junto: parada (crítico), sem comunicação (o roxo da casa) e sem leitura nova
+     (alerta). Cor só por token, nos dois temas. */
+/* `--escala` vem do ?escala= (a parede de vários monitores: 2 x 2 de 1080 é uma tela de 2160 com o dobro do tamanho
+   físico, e 0,5 devolve a letra ao tamanho de um monitor só) */
+html.cos-tv-html{height:100%;overflow:hidden;font-size:calc(1.6vh * var(--escala, 1))}
+body.cos-tv{margin:0;height:100%;overflow:hidden;background:var(--fundo);color:var(--tinta);font-family:var(--font-sans);
+  display:grid;grid-template-rows:auto minmax(0,1fr);padding:1.2rem 1.4rem 1rem;box-sizing:border-box;gap:.8rem}
+body.cos-tv.cos-tv-quieto{cursor:none}
+
+.cos-tv-cab{display:flex;align-items:flex-end;justify-content:space-between;gap:2rem}
+.cos-tv-titulo .gc-eyebrow{margin:0;font-size:.75rem}
+.cos-tv-titulo h1{margin:.1rem 0 0;font:800 2rem/1.05 var(--font-display);color:var(--tinta)}
+.cos-tv-titulo h1 span{color:var(--tinta-2);font-weight:700}
+.cos-tv-relogio{text-align:right;line-height:1}
+.cos-tv-relogio time{display:block;font:600 2.4rem/1 var(--font-mono);font-variant-numeric:tabular-nums;color:var(--tinta)}
+.cos-tv-relogio span{font-size:.85rem;color:var(--mudo)}
+
+.cos-tv-corpo{display:grid;grid-template-rows:auto minmax(0,1fr) auto;gap:.8rem;min-height:0}
+.cos-tv-vazio{align-self:center;justify-self:center;max-width:40rem;text-align:center;font-size:1.3rem;color:var(--tinta-2)}
+
+/* os números do alto */
+.cos-tv-numeros{display:grid;grid-template-columns:1.6fr repeat(4,1fr);gap:.8rem}
+.cos-tv-num{background:var(--superficie);border:1px solid var(--linha);border-radius:var(--raio-md);padding:.6rem .9rem;
+  display:flex;flex-direction:column;gap:.15rem}
+.cos-tv-num .r{font:700 .7rem/1 var(--font-sans);letter-spacing:.08em;text-transform:uppercase;color:var(--mudo)}
+.cos-tv-num .v{font:600 2rem/1.05 var(--font-sans);font-variant-numeric:tabular-nums;color:var(--tinta)}
+.cos-tv-num .v small{font-size:1rem;font-weight:500;color:var(--mudo)}
+.cos-tv-num--hero .v{font-size:2.6rem;color:var(--verde-texto)}
+.cos-tv-num--parada{background:var(--critico-suave);border-color:var(--critico-cheio)}
+.cos-tv-num--parada .v,.cos-tv-num--parada .r{color:var(--critico)}
+.cos-tv-num--semcom{background:var(--semcom-suave);border-color:var(--semcom)}
+.cos-tv-num--semcom .v,.cos-tv-num--semcom .r{color:var(--semcom)}
+.cos-tv-num--velha{background:var(--alerta-suave);border-color:var(--alerta-cheio)}
+.cos-tv-num--velha .v,.cos-tv-num--velha .r{color:var(--alerta)}
+
+/* a grade: as colunas e a altura da linha vêm do JavaScript (--cols, --linha), para todas caberem */
+.cos-tv-grade{display:grid;gap:.45rem;grid-template-columns:repeat(var(--cols,10),minmax(0,1fr));grid-auto-rows:var(--linha,6rem);
+  align-content:start;min-height:0;overflow:hidden}
+/* O cartão é o CONTÊINER (as unidades cq dos filhos são dele); o espaçamento fica no miolo (.i), porque no próprio
+   contêiner o cq se mede pelo de fora: o padding em cqh do cartão comia a altura dele (09/11/2026, na prova). */
+.cos-tv-u{container-type:size;position:relative;overflow:hidden;box-sizing:border-box;background:var(--superficie);
+  border:1px solid var(--linha);border-radius:var(--raio-md)}
+.cos-tv-u .i{position:absolute;inset:0;padding:7cqh 6cqw 0;display:flex;flex-direction:column;gap:2cqh}
+.cos-tv-u[hidden]{display:none}
+.cos-tv-u header{display:flex;align-items:baseline;justify-content:space-between;gap:4cqw;min-width:0}
+.cos-tv-u .n{font:600 12.5cqh/1.15 var(--font-sans);color:var(--tinta);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.cos-tv-u .c{flex:none;font:500 9cqh/1 var(--font-sans);color:var(--mudo);white-space:nowrap}
+.cos-tv-u .kw{font:600 25cqh/1 var(--font-sans);font-variant-numeric:tabular-nums;color:var(--tinta);position:relative;z-index:1}
+.cos-tv-u .st{font:600 9.5cqh/1.1 var(--font-sans);color:var(--mudo);position:relative;z-index:1;white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis}
+.cos-tv-cv{position:absolute;left:0;right:0;bottom:0;width:100%;height:36cqh;display:block}
+.cos-tv-semcurva{position:absolute;left:6cqw;bottom:6cqh;font:500 8.5cqh/1 var(--font-sans);color:var(--mudo)}
+
+.cos-tv-u--parada{background:var(--critico-suave);border-color:var(--critico-cheio);box-shadow:inset .3rem 0 0 var(--critico-cheio)}
+.cos-tv-u--parada .st{color:var(--critico);font-weight:700;text-transform:uppercase;letter-spacing:.04em}
+.cos-tv-u--semcom{background:var(--semcom-suave);border-color:var(--semcom);box-shadow:inset .3rem 0 0 var(--semcom)}
+.cos-tv-u--semcom .st{color:var(--semcom);font-weight:700;text-transform:uppercase;letter-spacing:.04em}
+.cos-tv-u--velha{border-color:var(--alerta-cheio);box-shadow:inset .3rem 0 0 var(--alerta-cheio)}
+.cos-tv-u--velha .st{color:var(--alerta);font-weight:700}
+.cos-tv-u--parada .i,.cos-tv-u--semcom .i,.cos-tv-u--velha .i{padding-left:9cqw}
+
+/* o cartão do cliente abre o grupo dele: o nome do cliente sai de dentro de cada usina, e o nome da usina ganha a largura */
+.cos-tv-cli{background:var(--superficie-2);border-color:var(--linha-forte)}
+.cos-tv-cli .n{font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--verde-texto)}
+.cos-tv-cli .st b{color:var(--alerta);font-weight:700}
+/* no cartão pequeno, os inversores da usina normal saem: fica o nome, o kW e a curva */
+@container (max-height: 115px){.cos-tv-u .st--normal{display:none}}
+
+/* a coluna "Atenção agora": sempre à vista, com a letra de quem lê de longe */
+.cos-tv-meio{display:grid;grid-template-columns:minmax(0,1fr);gap:.8rem;min-height:0}
+.cos-tv-meio--atencao{grid-template-columns:minmax(0,1fr) 22rem}
+.cos-tv-atencao{min-height:0;overflow:hidden;background:var(--superficie);border:1px solid var(--linha-forte);
+  border-radius:var(--raio-md);padding:.8rem;display:flex;flex-direction:column;gap:.6rem}
+.cos-tv-atencao h2{margin:0;display:flex;justify-content:space-between;align-items:baseline;
+  font:700 .8rem/1 var(--font-sans);letter-spacing:.08em;text-transform:uppercase;color:var(--tinta-2)}
+.cos-tv-atencao h2 b{font-size:1.3rem;color:var(--tinta)}
+.cos-tv-atencao ol{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:.5rem;overflow:hidden}
+.cos-tv-at{border-radius:var(--raio-controle);padding:.55rem .7rem .6rem 1rem;background:var(--superficie-2);
+  box-shadow:inset .3rem 0 0 var(--linha-forte)}
+.cos-tv-at .t{display:flex;justify-content:space-between;align-items:baseline;gap:.6rem}
+.cos-tv-at .n{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font:600 1.05rem/1.2 var(--font-sans);color:var(--tinta)}
+.cos-tv-at .kw{flex:none;font:600 1.05rem/1 var(--font-sans);font-variant-numeric:tabular-nums;color:var(--tinta)}
+.cos-tv-at .d{display:flex;justify-content:space-between;gap:.6rem;margin-top:.2rem;font-size:.8rem;color:var(--mudo)}
+.cos-tv-at .d b{flex:none;white-space:nowrap;text-transform:uppercase;letter-spacing:.04em;font-weight:700}
+.cos-tv-at .d span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cos-tv-at--parada{background:var(--critico-suave);box-shadow:inset .3rem 0 0 var(--critico-cheio)}
+.cos-tv-at--parada .d b{color:var(--critico)}
+.cos-tv-at--semcom{background:var(--semcom-suave);box-shadow:inset .3rem 0 0 var(--semcom)}
+.cos-tv-at--semcom .d b{color:var(--semcom)}
+.cos-tv-at--velha{box-shadow:inset .3rem 0 0 var(--alerta-cheio)}
+.cos-tv-at--velha .d b{color:var(--alerta)}
+
+/* o rodapé: a legenda (cor e palavra), as fontes e a página */
+.cos-tv-rodape{display:flex;align-items:center;justify-content:space-between;gap:1.5rem;font-size:.75rem;color:var(--mudo)}
+.cos-tv-legenda{display:flex;align-items:center;gap:1rem;flex-wrap:wrap}
+.cos-tv-l{display:inline-flex;align-items:center;gap:.4rem;font-weight:600;color:var(--tinta-2)}
+.cos-tv-l::before{content:"";width:.8rem;height:.8rem;border-radius:.2rem;border:2px solid currentColor}
+.cos-tv-l--parada::before{border-color:var(--critico-cheio);background:var(--critico-suave)}
+.cos-tv-l--semcom::before{border-color:var(--semcom);background:var(--semcom-suave)}
+.cos-tv-l--velha::before{border-color:var(--alerta-cheio)}
+.cos-tv-fontes b{color:var(--alerta);font-weight:600}
+.cos-tv-pagina{font:600 .85rem/1 var(--font-mono);color:var(--tinta-2)}
+
+/* os controles: só ao mexer o mouse (o JavaScript tira o quieto) */
+.cos-tv-controles{position:fixed;top:1rem;right:1.4rem;display:flex;gap:.6rem;z-index:5;transition:opacity .2s}
+.cos-tv-quieto .cos-tv-controles{opacity:0;pointer-events:none}
+@media (prefers-reduced-motion: reduce){.cos-tv-controles{transition:none}}

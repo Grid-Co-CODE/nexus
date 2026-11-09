@@ -21,7 +21,8 @@
       <p><b>Como funciona.</b> A tela se atualiza sozinha a cada 30 segundos, sem recarregar a página. Clique no nome da usina
       para abrir a ficha dela.</p>{% endcall %}</div>
       <p class="cn-pergunta">{{ tela.pergunta }}</p></div>
-    <div class="cn-frescor">Andamento da Ronda COS<br><span id="cos-mon-lido">{% if lido %}lido às <b>{{ lido }}</b>{% endif %}</span></div>
+    <div class="cn-frescor"><a class="gc-btn gc-btn--contorno cos-mon-tv" href="{{ url(tv='1', situacao=None, q=None) }}">Abrir no videowall</a>
+      <br>Andamento da Ronda COS<br><span id="cos-mon-lido">{% if lido %}lido às <b>{{ lido }}</b>{% endif %}</span></div>
   </div>
   <div id="cos-mon-corpo">{% include "cos/_monitoramento_corpo.html" %}</div>
 </div>

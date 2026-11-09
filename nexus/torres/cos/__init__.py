@@ -514,16 +514,25 @@ def monitoramento():
     grupo = a.get("situacao", "") if a.get("situacao") in (*MO.GRUPOS, "velhas") else ""
     cliente = a.get("cliente", "")
     busca = " ".join((a.get("q") or "").split())[:MO.BUSCA_MAX]
+    # o videowall (?tv=1, 09/11/2026; o dono: "preciso de uma tela de monitoramento adequada pra videowall"): a mesma
+    # leitura e a mesma conta, sem a casca, na ordem fixa e só com o cliente (cada tela da parede pode ter o seu)
+    tv = a.get("tv") == "1"
+    escala = MO.escala_pedida(a.get("escala"))
+    if tv:
+        grupo, busca = "", ""
     geracao = AND.ler_geracao(cfg) if fonte.ligada else AND.Leitura("", None)
     curvas = AND.ler_curvas(cfg) if fonte.ligada else AND.Leitura("", None)
-    p = MO.painel(geracao, curvas, AND.agora(), cliente, grupo, busca)
+    agora = AND.agora()
+    p = MO.painel(geracao, curvas, agora, cliente, grupo, busca, fixa=tv)
     lido = _lido([x for x in (geracao,) if x.dados])
     ctx = dict(torre=TORRE, tela=TORRE.tela("monitoramento"), ligada=fonte.ligada, geracao=geracao, curvas=curvas, p=p,
                cliente=cliente, grupo=grupo, busca=busca, grupos=MO.GRUPOS, kw_txt=MO.kw_txt, largura=MO.LARGURA,
                altura=MO.ALTURA, curva_de=MO.CURVA_DE_H, curva_ate=MO.CURVA_ATE_H, passo=AND.PASSO_DAS_CURVAS_MIN,
-               lido=lido, url=_url_da_pagina)
+               lido=lido, url=_url_da_pagina, agora=agora, parede=MO.parede(p) if tv and p else None,
+               anormal=MO.anormal, escala=escala)
+    corpo = "cos/_monitoramento_tv_corpo.html" if tv else "cos/_monitoramento_corpo.html"
     if a.get("parcial") == "1":
-        resp = jsonify(html=render_template("cos/_monitoramento_corpo.html", **ctx), lido=lido)
+        resp = jsonify(html=render_template(corpo, **ctx), lido=lido)
         resp.headers["Cache-Control"] = "private, no-store"
         return resp
-    return render_template("cos/monitoramento.html", **ctx)
+    return render_template("cos/monitoramento_tv.html" if tv else "cos/monitoramento.html", **ctx)

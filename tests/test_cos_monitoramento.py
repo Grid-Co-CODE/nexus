@@ -174,3 +174,40 @@ def test_a_tela_e_do_setor_cos_e_entra_no_menu_sem_mexer_na_ordem():
     ids = [t.id for t in TORRE.telas]
     # o Acompanhamento segue a 1ª tela (o cartão do COS no Início), e a Mesa e o Desempenho logo depois
     assert ids[:4] == ["acompanhamento", "mesa", "desempenho", "monitoramento"]
+
+
+# --- o videowall (?tv=1) -----------------------------------------------------------------------------------------------
+
+def test_o_videowall_tem_ordem_fixa_os_clientes_e_a_atencao():
+    g = _geracao()
+    g["usinas"].append(_u("scada-d1", "EX-QUA100", "Usina Exemplo Quatro", "Cliente B", kw=None, chave="SEM_COMUNICACAO",
+                          texto="Sem comunicação"))
+    p = MO.painel(_leitura(g), None, AGORA, fixa=True)
+    # a ordem da parede é sempre a mesma (cliente e nome): a que cai não troca de lugar
+    assert [x["id"] for x in p.itens] == ["scada-b1", "scada-a1", "scada-d1", "sunop-mro100", "scada-c1"]
+    w = MO.parede(p)
+    assert [(c["cliente"], len(c["itens"]), c["anormais"]) for c in w["clientes"]] == [("Cliente A", 2, 1), ("Cliente B", 3, 2)]
+    assert w["clientes"][0]["kw_agora"] == pytest.approx(812.4)
+    # a atenção: a parada, depois a sem comunicação, depois a sem leitura nova
+    assert [(x["id"], MO.anormal(x)) for x in w["atencao"]] == [("scada-b1", "parada"), ("scada-d1", "semcom"),
+                                                               ("scada-c1", "velha")]
+
+
+def test_a_escala_da_parede_fica_entre_os_limites():
+    assert MO.escala_pedida("0,5") == 0.5 and MO.escala_pedida("1.25") == 1.25
+    assert MO.escala_pedida(None) == 1 and MO.escala_pedida("abc") == 1 and MO.escala_pedida("0") == 1
+    assert MO.escala_pedida("9") == MO.ESCALA_MAX and MO.escala_pedida("0.1") == MO.ESCALA_MIN
+
+
+def test_a_tela_do_videowall_sem_a_casca_e_o_corpo_que_se_atualiza(tela):
+    r = tela.get("/t/cos/monitoramento?tv=1&escala=0.5")
+    html = r.get_data(as_text=True)
+    assert r.status_code == 200 and 'class="cos-tv-html"' in html and 'style="--escala:0.5"' in html
+    # sem o menu e o topo do Nexus; com a coluna da atenção, o relógio e o JavaScript da parede
+    assert 'class="topo"' not in html and "Atenção agora" in html and 'id="cos-tv-hora"' in html
+    assert "cos/monitoramento-tv.js" in html and "Usina Exemplo Dois" in html and "Parada" in html
+    d = tela.get("/t/cos/monitoramento?tv=1&parcial=1").get_json()
+    assert "cos-tv-grade" in d["html"] and "<html" not in d["html"] and 'id="cos-tv-hora"' not in d["html"]
+    # a página normal leva à parede, e a parede volta para ela
+    assert "tv=1" in tela.get("/t/cos/monitoramento").get_data(as_text=True)
+    assert 'href="?"' in html or "Sair do videowall" in html

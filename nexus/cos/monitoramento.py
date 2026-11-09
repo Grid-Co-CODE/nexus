@@ -133,10 +133,14 @@ def _linha(u: dict, c: Curva | None, agora: datetime) -> dict:
     }
 
 
-def painel(geracao, curvas, agora: datetime, cliente: str = "", grupo: str = "", busca: str = "") -> Painel | None:
+def painel(geracao, curvas, agora: datetime, cliente: str = "", grupo: str = "", busca: str = "",
+           fixa: bool = False) -> Painel | None:
     """A tela: as usinas (a parada e a sem comunicação primeiro, depois por cliente e nome), filtradas pelo cliente, pela
     situação e pela busca. As contagens das opções contam ANTES dos filtros delas (um contador que encolhe ao filtrar não
-    diz mais quanto existe); a faixa conta a lista filtrada."""
+    diz mais quanto existe); a faixa conta a lista filtrada.
+
+    `fixa` é a ordem do videowall: por cliente e nome, sempre a mesma. Na parede o operador aprende onde cada usina fica,
+    e a que cai não pode trocar de lugar com as outras; quem chama a atenção é a cor dela, não a posição."""
     d = geracao.dados if geracao else None
     if not d:
         return None
@@ -145,7 +149,8 @@ def painel(geracao, curvas, agora: datetime, cliente: str = "", grupo: str = "",
     por_id = {str(x.get("id")): x.get("kw") or [] for x in c.get("curvas") or []}
     todas = [_linha(u, curva(por_id[str(u.get("id"))], inicio, passo) if str(u.get("id")) in por_id else None, agora)
              for u in d.get("usinas") or []]
-    todas.sort(key=lambda x: (_ORDEM_DO_GRUPO[x["grupo"]], x["cliente"].lower(), x["nome"].lower(), x["sub_usina"] or 0))
+    todas.sort(key=lambda x: (0 if fixa else _ORDEM_DO_GRUPO[x["grupo"]], x["cliente"].lower(), x["nome"].lower(),
+                              x["sub_usina"] or 0))
 
     contagem_cliente: dict[str, int] = {}
     for x in todas:
@@ -174,6 +179,8 @@ def painel(geracao, curvas, agora: datetime, cliente: str = "", grupo: str = "",
             "kw_agora": sum(x["kw"] for x in frescas) if frescas else None,
             "gerando": sum(1 for x in lista if x["grupo"] == "gerando"),
             "paradas": sum(1 for x in lista if x["grupo"] in ("parada", "sem_comunicacao")),
+            "parada": sum(1 for x in lista if x["grupo"] == "parada"),
+            "sem_comunicacao": sum(1 for x in lista if x["grupo"] == "sem_comunicacao"),
             "velhas": sum(1 for x in lista if not x["fresca"]),
         },
         contagem=contagem,
@@ -182,3 +189,46 @@ def painel(geracao, curvas, agora: datetime, cliente: str = "", grupo: str = "",
         gerado_em=AND.instante(d.get("gerado_em")),
         curvas_de=AND.instante(c.get("gerado_em")),
     )
+
+
+# A escala do videowall (`?escala=`): 1 é uma tela só; 0,5 é a parede 2 x 2 (a letra volta ao tamanho de um monitor). O
+# limite segura o endereço digitado errado (escala 0 sumiria com tudo; 10 não caberia nada).
+ESCALA_MIN, ESCALA_MAX = 0.4, 2.0
+
+
+def escala_pedida(v) -> float:
+    try:
+        e = float(str(v).replace(",", "."))
+    except (TypeError, ValueError):
+        return 1
+    return round(min(ESCALA_MAX, max(ESCALA_MIN, e)), 2) if e > 0 else 1
+
+
+def anormal(x: dict) -> str:
+    """O que a usina tem de anormal, para o videowall: "parada", "semcom", "velha" (sem leitura nova) ou "" (normal)."""
+    if x["grupo"] == "parada":
+        return "parada"
+    if x["grupo"] == "sem_comunicacao":
+        return "semcom"
+    return "" if x["fresca"] else "velha"
+
+
+_ORDEM_DA_ATENCAO = {"parada": 0, "semcom": 1, "velha": 2}
+
+
+def parede(p: Painel) -> dict:
+    """O videowall (09/11/2026): as usinas agrupadas por cliente, cada grupo aberto por um cartão do cliente com o total
+    dele, e a coluna "Atenção agora" com as anormais (a parada, depois a sem comunicação, depois a sem leitura nova; a mais
+    antiga primeiro). A coluna fica sempre à vista: quando as usinas não cabem e a grade gira em páginas, nenhum problema
+    fica escondido na página que não está na tela."""
+    grupos: dict[str, list] = {}
+    for x in p.itens:
+        grupos.setdefault(x["cliente"] or "(sem cliente)", []).append(x)
+    clientes = []
+    for nome, itens in grupos.items():
+        frescas = [x for x in itens if x["fresca"] and x["kw"] is not None]
+        clientes.append({"cliente": nome, "itens": itens, "kw_agora": sum(x["kw"] for x in frescas) if frescas else None,
+                         "anormais": sum(1 for x in itens if anormal(x))})
+    atencao = sorted((x for x in p.itens if anormal(x)),
+                     key=lambda x: (_ORDEM_DA_ATENCAO[anormal(x)], -(x["minutos_atras"] or 0), x["nome"].lower()))
+    return {"clientes": clientes, "atencao": atencao}

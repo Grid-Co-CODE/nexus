@@ -1,0 +1,73 @@
+{# O corpo do videowall do Monitoramento (09/11/2026): os números do alto, a grade das usinas por cliente, a coluna
+   "Atenção agora" e o rodapé. A página o pede de novo a cada 30 s (?tv=1&parcial=1) e troca só ele; o relógio fica fora,
+   andando sozinho (static/cos/monitoramento-tv.js).
+
+   O desenho segue a regra das salas de controle (a ISA-101): a usina normal fica neutra, e só a anormal ganha cor E
+   palavra (parada, sem comunicação, sem leitura nova). Numa parede de 150 usinas, o olho tem de ir direto ao problema, e
+   a coluna da atenção não sai da tela mesmo quando a grade gira em páginas. #}
+{% macro curva(c) %}{% if c and c.linha %}<svg class="cos-tv-cv" viewBox="0 0 {{ largura }} {{ altura }}" preserveAspectRatio="none" aria-hidden="true">
+  <path class="cos-curva-area" d="{{ c.area }}"></path><path class="cos-curva-linha" d="{{ c.linha }}"></path></svg>{% endif %}{% endmacro %}
+{% macro palavra(x) %}{% set a = anormal(x) %}{% if a == 'parada' %}Parada{% elif a == 'semcom' %}Sem comunicação{% elif a == 'velha' %}Sem leitura nova{% elif x.grupo == 'outras' %}{{ x.situacao }}{% endif %}{% endmacro %}
+{% if not ligada %}
+<div class="cos-tv-vazio">A fonte do Andamento ainda não está ligada neste servidor. Um administrador liga em Base → Chaves
+  do Nexus.</div>
+{% elif not p %}
+{% set e = geracao.erro or 'sem a leitura da geração agora' %}
+<div class="cos-tv-vazio">{{ e[:1]|upper }}{{ e[1:] }}. A tela tenta de novo sozinha.</div>
+{% else %}
+{% set r = p.resumo %}
+<section class="cos-tv-numeros" aria-label="Agora">
+  <div class="cos-tv-num cos-tv-num--hero"><span class="r">Gerando agora</span><span class="v">{{ kw_txt(r.kw_agora) }}</span></div>
+  <div class="cos-tv-num"><span class="r">Gerando</span><span class="v">{{ r.gerando }}<small> de {{ r.usinas }}</small></span></div>
+  <div class="cos-tv-num{% if r.parada %} cos-tv-num--parada{% endif %}"><span class="r">Paradas</span><span class="v">{{ r.parada }}</span></div>
+  <div class="cos-tv-num{% if r.sem_comunicacao %} cos-tv-num--semcom{% endif %}"><span class="r">Sem comunicação</span><span class="v">{{ r.sem_comunicacao }}</span></div>
+  <div class="cos-tv-num{% if r.velhas %} cos-tv-num--velha{% endif %}"><span class="r">Sem leitura nova</span><span class="v">{{ r.velhas }}</span></div>
+</section>
+
+<div class="cos-tv-meio{% if parede.atencao %} cos-tv-meio--atencao{% endif %}">
+  <section class="cos-tv-grade" id="cos-tv-grade" aria-label="Usinas por cliente">
+    {% for g in parede.clientes %}
+    <article class="cos-tv-u cos-tv-cli"><div class="i">
+      <span class="n">{{ g.cliente }}</span>
+      <span class="kw">{{ kw_txt(g.kw_agora) }}</span>
+      <span class="st">{{ g.itens|length }} {{ 'usina' if g.itens|length == 1 else 'usinas' }}{% if g.anormais %} · <b>{{ g.anormais }} com alerta</b>{% endif %}</span>
+    </div></article>
+    {% for x in g.itens %}
+    {% set a = anormal(x) %}
+    <article class="cos-tv-u{% if a %} cos-tv-u--{{ a }}{% endif %}"><div class="i">
+      <span class="n" title="{{ x.nome }}">{{ x.nome }}{% if x.sub_usina %} · {{ x.sub_usina }}{% endif %}</span>
+      <span class="kw">{{ x.kw_txt }}</span>
+      {% if a or x.grupo == 'outras' %}<span class="st">{{ palavra(x) }}</span>
+      {% elif x.inversores_total %}<span class="st st--normal">{{ x.inversores_online if x.inversores_online is not none else '—' }}/{{ x.inversores_total }} inversores</span>{% endif %}
+      {{ curva(x.curva) }}
+      {% if not x.tem_curva %}<span class="cos-tv-semcurva">{{ x.fonte }} · sem curva</span>{% endif %}
+    </div></article>
+    {% endfor %}
+    {% endfor %}
+  </section>
+
+  {% if parede.atencao %}
+  <aside class="cos-tv-atencao" aria-label="Atenção agora">
+    <h2>Atenção agora <b>{{ parede.atencao|length }}</b></h2>
+    <ol>
+      {% for x in parede.atencao %}
+      {% set a = anormal(x) %}
+      <li class="cos-tv-at cos-tv-at--{{ a }}">
+        <div class="t"><span class="n">{{ x.nome }}{% if x.sub_usina %} · {{ x.sub_usina }}{% endif %}</span><span class="kw">{{ x.kw_txt }}</span></div>
+        <div class="d"><b>{{ palavra(x) }}{% if a == 'velha' and x.minutos_atras %} · {{ x.minutos_atras }} min{% endif %}</b>
+          <span>{{ x.cliente }}{% if x.lido %} · lido às {{ x.lido }}{% endif %}</span></div>
+      </li>
+      {% endfor %}
+    </ol>
+  </aside>
+  {% endif %}
+</div>
+
+<footer class="cos-tv-rodape">
+  <span class="cos-tv-legenda"><b class="cos-tv-l cos-tv-l--parada">Parada</b><b class="cos-tv-l cos-tv-l--semcom">Sem comunicação</b>
+    <b class="cos-tv-l cos-tv-l--velha">Sem leitura nova</b><span>Curva de hoje, das {{ '%02d'|format(curva_de) }}h às {{ curva_ate }}h, na escala de cada usina</span></span>
+  <span class="cos-tv-fontes">{% for a in p.avisos %}<b>{{ a }}.</b> {% endfor %}{% if geracao.velha %}<b>Leitura velha: {{ geracao.erro }}.</b> {% endif %}
+    {% if lido %}Andamento da Ronda COS, lido às {{ lido }}{% endif %}</span>
+  <span class="cos-tv-pagina" id="cos-tv-pagina" hidden></span>
+</footer>
+{% endif %}
