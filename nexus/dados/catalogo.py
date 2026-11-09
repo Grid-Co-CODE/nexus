@@ -183,7 +183,9 @@ FATOS = (
          tipo="sem_medida", chave=("decisao_id",), fontes=("nexus_equipe_piloto · fato_decisao_piloto",),
          janela_origem="o Nexus é a fonte",
          observacao="no_piloto = 1 (entrou) ou 0 (saiu); vale a última decisão de cada pessoa. Quem decidiu só por "
-                    "HMAC (decidida_por_hmac). Só acrescenta: nada se edita nem se apaga"),
+                    "HMAC (decidida_por_hmac). teste = 1 (desde 09/11/2026): pessoa de teste posta pelo administrador, "
+                    "que não é técnica de campo e fica fora da conta dos técnicos; as decisões de antes valem 0. Só "
+                    "acrescenta: nada se edita nem se apaga"),
     Fato("acesso_mapa", "Acesso ao Mapa de equipe", "campo", "nexus_equipe_acessos · fato_acesso_mapa",
          "1 linha = 1 vez que 1 pessoa abriu o mapa ou a rota de 1 técnico",
          _d(data=("id", "data_id (o dia de Brasília do acesso)"),

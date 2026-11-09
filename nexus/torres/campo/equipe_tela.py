@@ -379,7 +379,34 @@ def _equipe(srv, agora):
                      "instantes.")
     except S.AindaLendo:
         piloto, aviso = None, "O piloto está sendo lido do banco agora; atualize a página em instantes."
-    return b, tecnicos, piloto or frozenset(), aviso
+    return b, _com_teste(b, tecnicos, piloto), piloto or frozenset(), aviso
+
+
+def _com_teste(b, tecnicos: dict, piloto) -> dict:
+    """Os técnicos de campo e as pessoas de teste do piloto (09/11/2026, pedido do Levi pela sessão Nexus Field: testar
+    com o próprio usuário, que não é técnico de campo). A de teste entra com o nome do cadastro, sem equipe e com a marca
+    `teste`: o painel a mostra marcada e o resumo dos técnicos não a conta. O vínculo dela no cadastro não muda."""
+    teste = set(getattr(piloto, "teste", ()) or ()) - set(tecnicos)
+    if not teste:
+        return tecnicos
+    nomes = b.nomes(teste)
+    out = dict(tecnicos)
+    for pid in teste:
+        out[pid] = {"nome": nomes.get(pid) or f"Pessoa {pid}", "equipe_id": None, "cargo": "", "hmac": "", "teste": True}
+    return out
+
+
+def _pessoas_para_teste(b, tecnicos: dict) -> list:
+    """As pessoas do cadastro que o administrador pode pôr no piloto como teste: as que não são técnicas de campo (essas
+    entram pelo caminho de sempre) nem estão excluídas, pelo nome padrão. Escolhe-se pelo pessoa_id; nome nenhum vai ao
+    livro do piloto."""
+    ids = set()
+    for p in b.pessoas:
+        pid = visao.D._id(p.get("pessoa_id"))
+        if pid and pid not in tecnicos and str(p.get("excluido") or "").strip().lower() != "sim":
+            ids.add(pid)
+    nomes = b.nomes(ids)
+    return sorted(((pid, nomes.get(pid) or f"Pessoa {pid}") for pid in ids), key=lambda x: chave_texto(x[1]))
 
 
 def _quem_abriu(srv) -> tuple:
@@ -457,6 +484,7 @@ def _linhas(srv, b, tecnicos, piloto, coords, nomes_usina, agora):
         inteiro = s["base"] == "fora_usina"
         linhas.append({
             "pid": pid, "nome": t["nome"], "equipe": b.nome_equipe.get(t["equipe_id"]) or "", "s": s,
+            "teste": bool(t.get("teste")),
             "hora": _hora(s["ultima"], agora), "onde": _onde(s),
             "perto": SI.texto_perto(perto[1], nomes_usina.get(perto[0]) or f"usina {perto[0]}", inteiro=inteiro)
                      if perto else "",
@@ -478,7 +506,8 @@ def _grupos(linhas: list) -> list:
 
 
 def _resumo(linhas: list) -> list:
-    n = Counter(l["s"]["chave"] for l in linhas)
+    # a pessoa de teste (09/11/2026) fica fora da conta dos técnicos: aparece no painel, com a marca, mas não no resumo
+    n = Counter(l["s"]["chave"] for l in linhas if not l.get("teste"))
     return [(n[k], um if n[k] == 1 else varios, SI.TOM[k]) for k, um, varios in RESUMO if n[k]]
 
 
@@ -590,7 +619,7 @@ def equipe():
     todos = []
     if admin:
         todos = sorted(({"pid": pid, "nome": t["nome"], "equipe": b.nome_equipe.get(t["equipe_id"]) or "",
-                         "no_piloto": pid in piloto} for pid, t in tecnicos.items()),
+                         "no_piloto": pid in piloto, "teste": bool(t.get("teste"))} for pid, t in tecnicos.items()),
                        key=lambda t: (not t["no_piloto"], chave_texto(t["nome"])))
     return _tela({
         "linhas": linhas, "grupos": _grupos(linhas), "resumo": _resumo(linhas), "mapa": mapa, "sel": sel,
@@ -598,7 +627,10 @@ def equipe():
         "opcoes_rota": sorted(((uid, nomes_usina.get(uid) or f"Usina {uid}") for uid in coords),
                               key=lambda x: chave_texto(x[1])),
         "filtro": filtro,
-        "avisos": avisos, "admin": admin, "todos": todos, "no_piloto": sum(1 for t in todos if t["no_piloto"]),
+        "avisos": avisos, "admin": admin, "todos": todos,
+        "no_piloto": sum(1 for t in todos if t["no_piloto"] and not t["teste"]),
+        # quem o administrador pode pôr no piloto como pessoa de teste (09/11/2026): só para ele
+        "pessoas_teste": _pessoas_para_teste(b, tecnicos) if admin else [],
         # se a gravação está ligada nesta máquina (09/11/2026, a chave da tela Base → Chaves): só para o administrador
         "grava": G.ativo(current_app.config) if admin else None,
         "piloto_msg": PILOTO_MSG.get(str(request.args.get("piloto") or "")),
@@ -667,6 +699,8 @@ def equipe_piloto():
         abort(403)
     pedido = str(request.form.get("pessoa_id") or "").strip()
     quer = str(request.form.get("no_piloto") or "").strip().lower()
+    # a pessoa de teste (09/11/2026): marcada no livro do piloto, entra sem ser técnica de campo
+    teste = str(request.form.get("teste") or "").strip() == "1"
     if not _ID.fullmatch(pedido) or quer not in ("sim", "nao"):
         abort(400)
     pid = int(pedido)
@@ -675,16 +709,21 @@ def equipe_piloto():
         return _texto(503, aviso)
     try:
         from ...pcm.tecnicos_usina import pessoas_de_campo
-        tecnicos = pessoas_de_campo(visao._Base(), current_app.config)
+        b = visao._Base()
+        tecnicos = pessoas_de_campo(b, current_app.config)
     except Exception as e:      # noqa: BLE001
         _log.warning("equipe: não consegui ler o cadastro para o piloto (%s)", type(e).__name__)
         return redirect(url_for("torre_campo.equipe", piloto="erro"), code=303)
-    if pid not in tecnicos:
+    if teste:
+        # qualquer pessoa do cadastro que exista e não esteja excluída; o técnico de campo segue sem a marca
+        if pid in tecnicos or pid not in {i for i, _n in _pessoas_para_teste(b, tecnicos)}:
+            abort(400)
+    elif pid not in tecnicos:
         abort(400)              # só técnico de campo ativo é coletado: pôr outro no piloto não teria efeito
     email, _nome = _usuario()
     quem = codigo_da_pessoa(current_app.config.get("NEXUS_PESSOA_HMAC"), email) or ""
     try:
-        PI.decidir(current_app.config, pid, quer == "sim", quem, S._agora())
+        PI.decidir(current_app.config, pid, quer == "sim", quem, S._agora(), teste=teste)
         resultado = "ok"
     except PI.Recusada:
         resultado = "sem_token"
@@ -694,6 +733,6 @@ def equipe_piloto():
     finally:
         srv.esquecer_piloto()   # gravou (ou pode ter gravado antes de a conferência falhar): o próximo pedido relê
     if resultado == "ok":
-        _log.info("equipe: a pessoa %s %s o piloto (decisão de um administrador)", pid,
-                  "entrou no" if quer == "sim" else "saiu do")
+        _log.info("equipe: a pessoa %s %s o piloto%s (decisão de um administrador)", pid,
+                  "entrou no" if quer == "sim" else "saiu do", " como teste" if teste else "")
     return redirect(url_for("torre_campo.equipe", piloto=resultado), code=303)

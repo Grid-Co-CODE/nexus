@@ -30,7 +30,9 @@ CAB_APARELHOS = ("evento_id", "instante", "data_id", "pessoa_id", "aparelho", "e
 
 # Quem entrou no piloto (ou saiu) e quem decidiu; o decisor só por HMAC
 LIVRO_PILOTO, ABA_PILOTO = "nexus_equipe_piloto", "fato_decisao_piloto"
-CAB_PILOTO = ("decisao_id", "instante", "data_id", "pessoa_id", "no_piloto", "decidida_por_hmac")
+# `teste` (09/11/2026): 1 = pessoa de teste posta pelo administrador (não é técnica de campo; fica fora da conta dos
+# técnicos). As decisões de antes não têm a coluna: valem como 0
+CAB_PILOTO = ("decisao_id", "instante", "data_id", "pessoa_id", "no_piloto", "decidida_por_hmac", "teste")
 
 # Auditoria (LGPD): quem abriu o mapa ou a rota de quem (`acao` = abriu_mapa | abriu_rota)
 LIVRO_ACESSOS, ABA_ACESSOS = "nexus_equipe_acessos", "fato_acesso_mapa"

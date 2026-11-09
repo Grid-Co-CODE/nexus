@@ -29,7 +29,7 @@ class Recusada(ValueError):
     """Nada foi gravado: o texto diz por quê, para a tela mostrar."""
 
 
-def decidir(cfg, pessoa_id: int, no_piloto: bool, quem_hmac: str, agora) -> dict:
+def decidir(cfg, pessoa_id: int, no_piloto: bool, quem_hmac: str, agora, teste: bool = False) -> dict:
     """Acrescenta a decisão ao livro do piloto e devolve a linha gravada. Sem a chave de gravação do banco: `Recusada`.
     O banco que falha (na leitura ou na gravação) sobe a exceção dele: nada foi gravado."""
     token = cfg.get("GRIDCO_SQL_TOKEN")
@@ -38,14 +38,16 @@ def decidir(cfg, pessoa_id: int, no_piloto: bool, quem_hmac: str, agora) -> dict
     nova = {"decisao_id": "L" + secrets.token_hex(6)[:11],      # letra + hexadecimal: o banco infere o tipo da coluna
             "instante": agora.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
             "data_id": int(agora.astimezone(_BRT).strftime("%Y%m%d")), "pessoa_id": int(pessoa_id),
-            "no_piloto": 1 if no_piloto else 0, "decidida_por_hmac": quem_hmac or None}
+            "no_piloto": 1 if no_piloto else 0, "decidida_por_hmac": quem_hmac or None, "teste": 1 if teste else 0}
     from nexus.campo import visao
     from nexus.dados import livros
     with _TRAVA:
         base, sessao = visao._base(), visao._sessao()
         a = livros.abas_conferidas(base, sessao, LIVRO_PILOTO, ())
         antes = livros._linhas(base, sessao, a[ABA_PILOTO]) if ABA_PILOTO in a else []
-        linhas = [[r.get(c) for c in CAB_PILOTO] for r in antes] + [[nova[c] for c in CAB_PILOTO]]
+        # a decisão de antes da coluna `teste` (09/11/2026) não era de teste: 0, e não vazio
+        linhas = ([[(r.get(c) or 0) if c == "teste" else r.get(c) for c in CAB_PILOTO] for r in antes]
+                  + [[nova[c] for c in CAB_PILOTO]])
         livros.publicar(LIVRO_PILOTO, NOME_LIVRO, {ABA_PILOTO: (list(CAB_PILOTO), linhas)}, base=base, token=token,
                         sessao=sessao)
     return nova

@@ -550,7 +550,10 @@ def test_o_piloto_so_o_admin_muda(app, cliente, banco, pontos, setor):
     r = cliente.post(URL_PILOTO, data={"pessoa_id": FORA_DO_PILOTO, "no_piloto": "sim"})
     assert r.status_code == 303 and r.headers["Location"].endswith("/t/campo/equipe?piloto=ok")
     depois = banco.linhas(LIVRO_PILOTO, ABA_PILOTO)
-    assert len(depois) == len(antes) + 1 and depois[:-1] == antes
+    # as decisões de antes ficam como estavam; ganham só a coluna `teste` (09/11/2026), com 0
+    assert len(depois) == len(antes) + 1
+    assert [{k: v for k, v in r.items() if k != "teste"} for r in depois[:-1]] == antes
+    assert all(r["teste"] == 0 for r in depois)
     nova = depois[-1]
     assert nova["pessoa_id"] == FORA_DO_PILOTO and nova["no_piloto"] == 1 and nova["data_id"] == 20261108
     assert nova["decidida_por_hmac"] == codigo_da_pessoa(CHAVE_HMAC, EMAIL[ADMIN])
@@ -564,6 +567,38 @@ def test_o_piloto_so_o_admin_muda(app, cliente, banco, pontos, setor):
     r = cliente.post(URL_PILOTO, data={"pessoa_id": FORA_DO_PILOTO, "no_piloto": "nao"})
     assert r.status_code == 303 and banco.linhas(LIVRO_PILOTO, ABA_PILOTO)[-1]["no_piloto"] == 0
     assert pontos.coleta_vale(FORA_DO_PILOTO, AGORA) is False
+
+
+def test_o_admin_poe_no_piloto_uma_pessoa_de_teste_que_nao_e_de_campo(app, cliente, banco, pontos, setor):
+    """09/11/2026, pedido do Levi pela sessão Nexus Field ("use meu usuário para testes"): ele não é Colaborador de campo.
+    O administrador põe no piloto, MARCADA COMO TESTE, qualquer pessoa do cadastro (pelo pessoa_id, sem mexer no vínculo
+    dela): a coleta dela vale, o painel a mostra com a marca de teste e o resumo dos técnicos não a conta."""
+    def sem_posicao(html):
+        m = re.search(r'(\d+) sem posição hoje</span>', html)
+        return int(m.group(1)) if m else 0
+    _entrar(cliente, EMAIL[ADMIN], admin=True)
+    _, html = _html(cliente)
+    bloco = html.split("eq-piloto", 1)[1]
+    # a escolha da pessoa de teste: as pessoas do cadastro que não são técnicas de campo (as de campo já estão acima)
+    assert 'name="teste" value="1"' in bloco and f'<option value="{PCM}">Analista Teste</option>' in bloco
+    assert f'<option value="{FORA_DO_PILOTO}">' not in bloco.split('name="teste"', 1)[1].split("</form>", 1)[0]
+    antes = sem_posicao(html)
+    assert pontos.coleta_vale(PCM, AGORA) is False
+    r = cliente.post(URL_PILOTO, data={"pessoa_id": PCM, "no_piloto": "sim", "teste": "1"})
+    assert r.status_code == 303 and r.headers["Location"].endswith("/t/campo/equipe?piloto=ok")
+    nova = banco.linhas(LIVRO_PILOTO, ABA_PILOTO)[-1]
+    assert (nova["pessoa_id"], nova["no_piloto"], nova["teste"]) == (PCM, 1, 1)
+    assert pontos.coleta_vale(PCM, AGORA) is True                  # sem ser técnica de campo, pela marca de teste
+    _, html = _html(cliente)
+    lado = html.split('class="eq-lado"', 1)[1]
+    assert "Analista Teste" in lado and 'class="eq-teste"' in lado      # no painel, com a marca
+    assert sem_posicao(html) == antes                               # e fora da conta dos técnicos
+    # a pessoa que não existe no cadastro não entra nem como teste; o técnico de campo segue pelo caminho de sempre
+    assert cliente.post(URL_PILOTO, data={"pessoa_id": "999999", "no_piloto": "sim", "teste": "1"}).status_code == 400
+    # e sai
+    r = cliente.post(URL_PILOTO, data={"pessoa_id": PCM, "no_piloto": "nao", "teste": "1"})
+    assert r.status_code == 303 and banco.linhas(LIVRO_PILOTO, ABA_PILOTO)[-1]["no_piloto"] == 0
+    assert pontos.coleta_vale(PCM, AGORA) is False
 
 
 def test_a_leitura_do_piloto_que_cruzou_a_decisao_nao_fica_como_fresca():

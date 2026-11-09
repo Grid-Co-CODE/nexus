@@ -1692,7 +1692,13 @@ Nada liga sozinho; tudo inerte sem a configuração (as rotas respondem 503).
 - **O desenho supõe UM processo do Nexus no servidor**: as chaves ativas, o diário, as filas e as cópias do piloto moram
   na memória dele (e no disco da pasta de dados). Dois processos (dois workers) teriam chaves diferentes e respostas
   diferentes para o mesmo celular.
-- O piloto: o administrador escolhe os técnicos na própria tela. Padrão: ninguém é coletado.
+- O piloto: o administrador escolhe os técnicos na própria tela. Padrão: ninguém é coletado. **Pessoa de teste
+  (09/11/2026, pedido do Levi pela sessão Nexus Field: testar com o próprio usuário, que não é técnico de campo):** no
+  fim do controle do piloto, o administrador põe no piloto qualquer pessoa do cadastro (pelo pessoa_id; as que não são
+  técnicas de campo nem estão excluídas), sem mexer no vínculo dela. A decisão leva `teste` = 1 no livro do piloto
+  (a coluna nova; as de antes valem 0, e a 1ª regravação as escreve com 0); a coleta dela vale sem o cadastro de campo
+  (`aparelhos.piloto_teste`, `servico.Piloto.teste`); o painel a mostra com a marca "teste" e o resumo e a conta do
+  piloto não a contam. A identidade do celular continua pelo e-mail exato da ficha.
 - Os livros: ver `nexus/dados/CLAUDE.md`. A limpeza do banco é pedido à T.I.: `docs/mapa-equipe-pedido-ti.md`.
 
 ### Como provar

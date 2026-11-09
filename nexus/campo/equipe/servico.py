@@ -86,6 +86,16 @@ def _email_normal(email) -> str:
     return str(email or "").strip().lower()
 
 
+class Piloto(frozenset):
+    """Quem está no piloto (o conjunto, como sempre) e, em `teste`, quem dele é pessoa de teste (09/11/2026): quem lê só
+    o conjunto segue igual."""
+
+    def __new__(cls, ids=(), teste=()):
+        p = super().__new__(cls, ids)
+        p.teste = frozenset(teste) & p
+        return p
+
+
 def pessoa_pelo_email(email, fichas) -> int | None:
     """Quem registra o aparelho: o `pessoa_id` da ÚNICA ficha com este e-mail (sem diferença de maiúscula nem de espaço
     nas pontas). `fichas` = (pessoa_id, e-mail da ficha), já decifradas. Nenhuma ou duas fichas = None.
@@ -212,7 +222,8 @@ class Servico:
             return livros._linhas(base, sessao, a[aba]) if aba in a else []
 
     def _ler_piloto(self) -> frozenset:
-        return frozenset(AP.piloto_atual(self._ler_livro(LIVRO_PILOTO, ABA_PILOTO)))
+        decisoes = self._ler_livro(LIVRO_PILOTO, ABA_PILOTO)
+        return Piloto(AP.piloto_atual(decisoes), AP.piloto_teste(decisoes))
 
     def _ler_tecnicos(self) -> frozenset:
         from nexus.campo import visao
@@ -290,8 +301,11 @@ class Servico:
         piloto = self._piloto.valor(ts)
         if pessoa_id not in piloto:
             return False
+        teste = getattr(piloto, "teste", frozenset())
+        if pessoa_id in teste:                  # a pessoa de teste (09/11/2026) não passa pelo cadastro de campo
+            return True
         tecnicos = self._tecnicos.valor(ts)
-        return AP.coleta_vale(pessoa_id, tecnicos, piloto)
+        return AP.coleta_vale(pessoa_id, tecnicos, piloto, teste)
 
     def piloto(self, agora: datetime | None = None) -> frozenset | None:
         """Quem está no piloto agora: a MESMA cópia de 1 min que decide a coleta (a tela do mapa não mostra quem o

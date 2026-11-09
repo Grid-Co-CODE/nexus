@@ -128,10 +128,11 @@ class Chaveiro:
                     continue
 
 
-def coleta_vale(pessoa_id: int, tecnicos: dict, piloto: set) -> bool:
+def coleta_vale(pessoa_id: int, tecnicos: dict, piloto: set, teste=frozenset()) -> bool:
     """Só se coleta técnico de campo ativo (o dict de `pessoas_de_campo`) que esteja no piloto; fora da fase de
-    piloto ainda não existe "todos", então piloto vazio = ninguém."""
-    return pessoa_id in tecnicos and pessoa_id in piloto
+    piloto ainda não existe "todos", então piloto vazio = ninguém. A pessoa de teste (09/11/2026, `piloto_teste`) vale
+    sem ser técnica de campo: o administrador a pôs no piloto marcada como teste."""
+    return pessoa_id in piloto and (pessoa_id in tecnicos or pessoa_id in teste)
 
 
 def _sim(v) -> bool:
@@ -139,6 +140,21 @@ def _sim(v) -> bool:
     if isinstance(v, str):
         return v.strip().lower() in ("1", "true", "sim", "s", "t", "yes")
     return bool(v)
+
+
+def piloto_teste(decisoes: list[dict]) -> set:
+    """Quem está no piloto como pessoa de teste (09/11/2026, pedido do Levi: testar com o próprio usuário, que não é
+    técnico de campo): a última decisão dela é de entrar, com `teste` = 1. Sem a coluna (as decisões de antes) = 0."""
+    ultima: dict[int, tuple[str, bool]] = {}
+    for d in decisoes:
+        try:
+            pid = int(d.get("pessoa_id"))
+        except (TypeError, ValueError):
+            continue
+        inst = str(d.get("instante") or "")
+        if pid not in ultima or inst >= ultima[pid][0]:
+            ultima[pid] = (inst, _sim(d.get("no_piloto")) and _sim(d.get("teste")))
+    return {pid for pid, (_, sim) in ultima.items() if sim}
 
 
 def piloto_atual(decisoes: list[dict]) -> set:

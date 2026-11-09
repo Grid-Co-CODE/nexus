@@ -95,3 +95,17 @@ def test_coleta_so_para_tecnico_ativo_e_no_piloto():
     assert coleta_vale(3, tecnicos, {3}) is False      # no piloto, mas fora do cadastro/desligado/não técnico
     assert coleta_vale(1, tecnicos, set()) is False    # piloto vazio: ninguém
     assert coleta_vale(1, {}, {1}) is False
+
+
+def test_a_pessoa_de_teste_vale_pela_ultima_decisao_e_so_no_piloto():
+    """09/11/2026: a pessoa de teste (não é técnica de campo) é coletada se a última decisão dela é entrar com teste = 1;
+    as decisões de antes da coluna valem 0; a saída tira."""
+    from nexus.campo.equipe import aparelhos as AP
+    d = [{"pessoa_id": 7, "instante": "2026-11-09T15:00:00Z", "no_piloto": 1, "teste": 1},
+         {"pessoa_id": 8, "instante": "2026-11-09T15:00:00Z", "no_piloto": 1},            # sem a coluna: técnico
+         {"pessoa_id": 9, "instante": "2026-11-09T15:00:00Z", "no_piloto": 1, "teste": "1"},
+         {"pessoa_id": 9, "instante": "2026-11-09T16:00:00Z", "no_piloto": 0, "teste": 1}]
+    assert AP.piloto_teste(d) == {7} and AP.piloto_atual(d) == {7, 8}
+    assert AP.coleta_vale(7, {}, AP.piloto_atual(d), AP.piloto_teste(d)) is True       # sem ser de campo
+    assert AP.coleta_vale(8, {}, AP.piloto_atual(d), AP.piloto_teste(d)) is False      # de campo? não: fora
+    assert AP.coleta_vale(9, {}, AP.piloto_atual(d), AP.piloto_teste(d)) is False      # saiu

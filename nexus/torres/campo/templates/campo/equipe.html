@@ -150,7 +150,7 @@
         <ul class="eq-lista">
           {% for l in lista %}
           <li><a href="{{ url_for('torre_campo.equipe', tecnico=l.pid, **filtro.q) }}">
-            <span class="eq-lin"><b>{{ l.nome }}</b><small>{{ l.equipe or 'sem equipe' }}{% if chave == 'fora' and l.onde %} · {{ l.onde }}{% endif %}{% if chave in ('mapa', 'fora') and l.perto %} · {{ l.perto }}{% endif %}{% if l.hora %} · {{ l.hora }}{% endif %}</small></span>
+            <span class="eq-lin"><b>{{ l.nome }}{% if l.teste %} <span class="eq-teste">teste</span>{% endif %}</b><small>{{ l.equipe or 'sem equipe' }}{% if chave == 'fora' and l.onde %} · {{ l.onde }}{% endif %}{% if chave in ('mapa', 'fora') and l.perto %} · {{ l.perto }}{% endif %}{% if l.hora %} · {{ l.hora }}{% endif %}</small></span>
             <span class="cn-pill cn-{{ l.s.tom }}">{{ l.s.rotulo }}</span></a></li>
           {% endfor %}
         </ul>
@@ -171,15 +171,27 @@
     <p class="eq-nota"><b>Gravação nesta máquina: {{ 'ligada' if grava else 'desligada' }}.</b> {{ 'O celular manda e o Nexus guarda.' if grava else 'O celular recebe 503 e guarda os pontos dele até ligar.' }} Liga e desliga em Base → Chaves → Nexus (NEXUS_EQUIPE_GRAVA = 1 ou 0), numa máquina só.</p>
     <ul class="eq-piloto-lista">
       {% for t in todos %}
-      <li><span class="eq-lin"><b>{{ t.nome }}</b><small>{{ t.equipe or 'sem equipe' }}</small></span>
+      <li><span class="eq-lin"><b>{{ t.nome }}{% if t.teste %} <span class="eq-teste">teste</span>{% endif %}</b><small>{{ 'pessoa de teste, fora da conta dos técnicos' if t.teste else (t.equipe or 'sem equipe') }}</small></span>
         <form method="post" action="{{ url_for('torre_campo.equipe_piloto') }}">
           <input type="hidden" name="pessoa_id" value="{{ t.pid }}">
           <input type="hidden" name="no_piloto" value="{{ 'nao' if t.no_piloto else 'sim' }}">
+          {% if t.teste %}<input type="hidden" name="teste" value="1">{% endif %}
           {% if t.no_piloto %}<span class="cn-pill cn-ok">no piloto</span>{% endif %}
           <button class="gc-btn gc-btn--contorno" type="submit">{{ 'Tirar do piloto' if t.no_piloto else 'Pôr no piloto' }}</button>
         </form></li>
       {% else %}<li class="eq-vazio">Nenhum técnico de campo ativo no cadastro.</li>{% endfor %}
     </ul>
+    {# a pessoa de teste (09/11/2026, pedido do Levi: testar com o próprio usuário, que não é técnico de campo): qualquer
+       pessoa do cadastro, pelo pessoa_id, marcada como teste no livro do piloto; o vínculo dela no cadastro não muda #}
+    {% if pessoas_teste %}
+    <form class="eq-teste-form" method="post" action="{{ url_for('torre_campo.equipe_piloto') }}">
+      <input type="hidden" name="no_piloto" value="sim">
+      <input type="hidden" name="teste" value="1">
+      <label class="gc-rotulo" for="eq-teste-pessoa">Pessoa de teste (não é técnica de campo; fica fora da conta dos técnicos)</label>
+      <select class="gc-campo" id="eq-teste-pessoa" name="pessoa_id">{% for pid, nome in pessoas_teste %}<option value="{{ pid }}">{{ nome }}</option>{% endfor %}</select>
+      <button class="gc-btn gc-btn--contorno" type="submit">Pôr no piloto como teste</button>
+    </form>
+    {% endif %}
   </details>
   {% endif %}
   {% endif %}
