@@ -20,7 +20,7 @@
 {% set ROT = {'fazer': 'A fazer', 'execucao': 'Em execução', 'verificacao': 'Em verificação', 'concluida': 'Concluída', 'cancelada': 'Cancelada'} %}
 <div class="campo-nativa eg-os eg-ac">
   {% if not o %}
-  <a class="eg-ac-volta" href="{{ volta_href }}">← {{ volta_texto }}</a>
+  <a class="eg-ac-volta" href="{{ volta_href|na_raiz }}">← {{ volta_texto }}</a>
   <h1 class="cn-titulo">OS {{ folio }}</h1>
   {% if nao_achou %}<p class="cn-erro" role="status"><b>Não achei a OS {{ folio }} no Fracttal.</b> Confira o número.</p>
   {% else %}<p class="cn-erro" role="status"><b>O Fracttal não respondeu ({{ erro_fracttal }}).</b> Tente de novo em instantes.</p>
@@ -34,7 +34,7 @@
      local, o tipo e o status no Fracttal; à direita, no lugar do "Abrir a OS", o "Solicitar OS" #}
   <div class="eg-ac-head">
     <div class="eg-ac-esq">
-      <div class="eg-ac-tit"><a class="eg-ac-volta" href="{{ volta_href }}">← {{ volta_texto }}</a>
+      <div class="eg-ac-tit"><a class="eg-ac-volta" href="{{ volta_href|na_raiz }}">← {{ volta_texto }}</a>
         <span class="eg-ac-tag eg-ac-tag--{{ topo.cor }}">{{ topo.texto }}</span>
         <h1>{{ o.titulo or ('OS ' ~ o.os) }}</h1></div>
       {# Levi, 24/10/2026: "No título invés de OS e ativo bote o título da OS, no lugar do título da OS bote OS e ativo";
