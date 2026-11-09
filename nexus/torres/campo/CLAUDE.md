@@ -1653,11 +1653,17 @@ Nada liga sozinho; tudo inerte sem a configuração (as rotas respondem 503).
 - `NEXUS_CHAVE_CADASTRO` (a do cadastro; sem ela não há técnico nem usina para casar).
 - `NEXUS_EQUIPE_MS_CLIENT_ID` e `NEXUS_EQUIPE_MS_TENANT_ID` em Base → Chaves: o ID do aplicativo do App de Campo e o ID do
   diretório da Grid no Entra ID (os GUIDs não são segredo mas ficam fora do repositório público).
-- `NEXUS_EQUIPE_GRAVA=1` **numa máquina só** (o PC e o servidor não gravam juntos): liga o gravador em lote. Nunca em teste.
-  **Vai ao servidor ANTES de alguém entrar no piloto:** as três rotas do celular respondem 503 ("o Mapa de equipe não
-  grava nesta máquina") onde ela não vale, porque quem recebe tem de ser quem grava (a chave e os pontos ficariam só no
-  disco de uma máquina que nunca os publica). As três variáveis (e os dois IDs do Entra) entram pelo `.env` desde a
-  revisão final de 08/11/2026 (`config.OPCIONAIS`; antes só a tela Base → Chaves chegava ao app).
+- `NEXUS_EQUIPE_GRAVA` = 1 **numa máquina só** (o PC e o servidor não gravam juntos): liga o gravador em lote. Nunca em
+  teste. **Desde 09/11/2026 pela tela Base → Chaves → Nexus** (pedido da sessão Nexus Field: a variável só existia no
+  `.env` do servidor, que o Levi não alcança): o chaves.json é da máquina (a pasta de dados), então gravada na tela do
+  servidor ela vale só lá; a da tela vence a do `.env` ("0" desliga mesmo com o `.env` em 1; Apagar volta ao `.env`); a
+  conferência aceita só 1 ou 0. **Vale sem reiniciar:** `gravador.ativo` lê a chave a cada pedido das rotas (a cópia de
+  30 s do chaves.json, zerada ao gravar) e o laço do gravador sobe em toda máquina e confere a cada rodada (desligado, só
+  dorme). O administrador vê na própria tela (o bloco do piloto) se a gravação está ligada nesta máquina. **Liga ANTES de
+  alguém entrar no piloto e DEPOIS de a T.I. confirmar a limpeza dos 7 dias no banco**: as três rotas do celular
+  respondem 503 ("o Mapa de equipe não grava nesta máquina") onde ela não vale, porque quem recebe tem de ser quem grava;
+  e sem a limpeza da T.I. os pontos ficam no banco além dos 7 dias do aviso ao técnico (o Nexus não apaga livro do banco:
+  `so_cresce`, regra do nexus/dados). A variável do `.env` (`config.OPCIONAIS`) continua valendo como reserva.
 - **O desenho supõe UM processo do Nexus no servidor**: as chaves ativas, o diário, as filas e as cópias do piloto moram
   na memória dele (e no disco da pasta de dados). Dois processos (dois workers) teriam chaves diferentes e respostas
   diferentes para o mesmo celular.

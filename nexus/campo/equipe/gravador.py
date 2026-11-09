@@ -16,8 +16,10 @@ inteiro, sempre pela UNIÃO com o que o banco já tem (nada some por uma rodada 
 Cada passo é isolado (regra 13 de nexus/dados/CLAUDE.md): o erro de um vai ao log (só o TIPO) e os outros seguem. Nada de
 coordenada nem de chave no log.
 
-Só roda onde `NEXUS_EQUIPE_GRAVA=1` (uma máquina por vez: o PC e o servidor não gravam juntos); nunca em teste. As rotas
-do celular respondem 503 na máquina em que ele não roda (quem recebe tem de ser quem grava).
+Só grava onde `NEXUS_EQUIPE_GRAVA` é "1" (uma máquina por vez: o PC e o servidor não gravam juntos); nunca em teste.
+Desde 09/11/2026 a chave vem da tela Base → Chaves (o chaves.json da máquina, que vence o .env; `ativo`): o laço sobe em
+toda máquina e confere a cada rodada, então ligar e desligar pela tela vale sem reiniciar. As rotas do celular respondem
+503 na máquina em que ele não grava (quem recebe tem de ser quem grava).
 """
 import hashlib
 import logging
@@ -46,7 +48,15 @@ def _assinatura(ids) -> str:
 
 
 def ativo(config) -> bool:
-    return str(config.get("NEXUS_EQUIPE_GRAVA") or "").strip() == "1"
+    """A gravação ligada NESTA máquina: a chave da tela Base → Chaves (relida a cada 30 s e logo depois de gravar) e, sem
+    ela, a do .env. A leitura que quebra (o chaves.json ilegível) não liga: sem saber, não grava."""
+    from ...auth import chaves
+    try:
+        v = chaves.valor("NEXUS_EQUIPE_GRAVA", config)
+    except Exception as e:      # noqa: BLE001
+        log.warning("equipe: a chave da gravação não abriu (%s); fica desligada", type(e).__name__)
+        return False
+    return str(v or "").strip() == "1"
 
 
 class Gravador:
@@ -188,16 +198,19 @@ def _laco(app) -> None:
     g = None
     while True:
         try:
-            if g is None:
-                g = Gravador(app, servico.do_app(app))
-            g.rodada(datetime.now(timezone.utc))
+            # desligada nesta máquina (a tela ou o .env), a rodada não sai; ligada pela tela, a próxima já grava
+            if ativo(app.config):
+                if g is None:
+                    g = Gravador(app, servico.do_app(app))
+                g.rodada(datetime.now(timezone.utc))
         except Exception as e:      # noqa: BLE001 — sem a chave do cadastro, por exemplo: tenta de novo na próxima
             log.warning("equipe: a rodada do gravador não rodou (%s)", type(e).__name__)
         time.sleep(A_CADA_S)
 
 
 def ligar(app) -> None:
-    """Liga o laço em fundo, só onde NEXUS_EQUIPE_GRAVA=1 e nunca em teste."""
-    if app.config.get("TESTING") or not ativo(app.config):
+    """Liga o laço em fundo em toda máquina, nunca em teste: cada rodada confere se a gravação está ligada NESTA máquina
+    (`ativo`), para a tela Base → Chaves valer sem reiniciar. Desligado, o laço só dorme."""
+    if app.config.get("TESTING"):
         return
     threading.Thread(target=_laco, args=(app,), daemon=True, name="nexus-equipe-gravador").start()

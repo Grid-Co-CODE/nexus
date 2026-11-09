@@ -4,7 +4,7 @@ Texto para o Levi enviar à T.I. Data da decisão: 08/11/2026.
 
 ---
 
-**Assunto:** Nexus, Mapa de equipe: limpeza periódica de dois grupos de planilhas no banco da API e uma variável no servidor
+**Assunto:** Nexus, Mapa de equipe: limpeza periódica de dois grupos de planilhas no banco da API
 
 Olá, pessoal da T.I.,
 
@@ -32,10 +32,8 @@ Peço que confirmem que o backup e o histórico de versões do banco não guarda
 guarda acima (7 dias para os pontos, 12 meses para os deslocamentos). Se guardarem, por favor me avisem o prazo real e
 me digam como encurtar ou excluir esses itens também, porque a guarda só vale se valer nas cópias.
 
-**Uma variável no servidor.**
-Quando o Mapa de equipe for ao ar, o Nexus do servidor precisa de `NEXUS_EQUIPE_GRAVA=1`. Ela liga a gravação no banco e
-**deve ficar ligada em uma máquina só** (o servidor), nunca no PC e no servidor ao mesmo tempo, para os dois não gravarem
-por cima um do outro. Avisarei antes da data de subir; por enquanto, não ativem.
+Nada muda no servidor de vocês: a gravação do Mapa de equipe é ligada por mim, pela tela do próprio Nexus. Peço só que
+me avisem quando a limpeza estiver rodando, porque eu só ligo a gravação depois disso.
 
 Se preferirem outra forma de fazer a limpeza (um agendamento seu, por exemplo), sem problema: o que importa é o prazo.
 Podem me confirmar quando a rotina estiver rodando?
@@ -49,7 +47,8 @@ Levi
 
 - A origem da regra está em `nexus/dados/catalogo.py` (fatos `ponto_equipe` e `deslocamento_equipe`, e as famílias de livro) e
   em `nexus/torres/campo/CLAUDE.md`, seção "Mapa de equipe".
-- Os livros ainda não existem no banco: nascem com a primeira gravação depois do deploy. A limpeza só tem o que apagar
-  depois disso.
+- Os livros ainda não existem no banco: nascem com a primeira gravação, quando a gravação for ligada em Base → Chaves →
+  Nexus (`NEXUS_EQUIPE_GRAVA` = 1, no servidor; desde 09/11/2026 pela tela, sem variável da T.I.). A limpeza só tem o que
+  apagar depois disso, e a gravação só deve ser ligada depois de a T.I. confirmar a limpeza.
 - Para conferir depois da primeira rodada de limpeza: listar as abas do banco e ver que nenhum
   `nexus_equipe_pontos_*` tem mais de 7 dias.

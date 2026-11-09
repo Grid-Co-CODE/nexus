@@ -167,6 +167,8 @@
     <summary><b>Piloto da coleta</b> <span>{{ no_piloto }} técnico{{ 's' if no_piloto != 1 }} no piloto · só administradores</span></summary>
     <p class="eq-nota">O Nexus Field só coleta o técnico de campo ativo do cadastro que está no piloto (padrão: ninguém). A
       decisão vai ao livro do piloto com o código de quem decidiu, e vale para o celular no próximo envio.</p>
+    {# a gravação desta máquina (09/11/2026): a chave de Base → Chaves → Nexus, que liga sem reiniciar #}
+    <p class="eq-nota"><b>Gravação nesta máquina: {{ 'ligada' if grava else 'desligada' }}.</b> {{ 'O celular manda e o Nexus guarda.' if grava else 'O celular recebe 503 e guarda os pontos dele até ligar.' }} Liga e desliga em Base → Chaves → Nexus (NEXUS_EQUIPE_GRAVA = 1 ou 0), numa máquina só.</p>
     <ul class="eq-piloto-lista">
       {% for t in todos %}
       <li><span class="eq-lin"><b>{{ t.nome }}</b><small>{{ t.equipe or 'sem equipe' }}</small></span>
