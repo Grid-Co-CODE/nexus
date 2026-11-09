@@ -20,9 +20,11 @@ from urllib.parse import urlencode
 
 from flask import Response, abort, current_app, redirect, render_template, request, session
 
+from ...auth import setor_telas as ST
 from ...cos import acionamentos as AC
 from ...cos import andamento as AND
 from ...cos import desempenho as DE
+from ...cos import ficha as FI
 from ...cos import mesa as ME
 from ...cos import normalizacoes as NO
 from ...cos import ocorrencias as OC
@@ -435,3 +437,53 @@ def desempenho():
         "cos/desempenho.html", torre=TORRE, tela=TORRE.tela("desempenho"), ligada=fonte.ligada, p=p, dias=dias,
         dias_opcoes=DE.DIAS_OPCOES, turnos=TU.TURNOS, prazos=OC.PRAZOS, carteiras=carteiras,
         erro_clientes=erro_clientes if fonte.ligada else "", lido=_lido(leituras), url=_url)
+
+
+# ── Ficha da usina (09/11/2026) ──────────────────────────────────────────────────────────────────────────────────────
+def _ve(tela_id: str) -> bool:
+    """A pessoa abre esta tela do COS? Cada bloco da ficha segue a marca da tela dona (Base → Acessos): a ficha abre
+    para quem tem ao menos uma tela do COS (setor_telas.pode), e o "quem aciono", com os telefones, só para quem
+    abre Acionamentos. Ninguém vê na ficha o que a própria tela não lhe mostraria."""
+    a = ST.acesso()
+    return bool(a["tudo"] or ST.chave(TORRE.id, tela_id) in a["telas"])
+
+
+@bp.route("/usina")
+@bp.route("/usina/<codigo>")
+def usina(codigo: str = ""):
+    """A ficha da usina (nexus/cos/ficha.py): tudo o que as telas do COS sabem de UMA usina, numa página. O nome da usina
+    em cada tela do COS leva aqui. Não é tela do menu (não tem marca própria): abre para quem tem ao menos uma tela do
+    COS. Sem código, ou com um código que o Andamento não tem, a lista de usinas com a busca. Só lê."""
+    cfg = current_app.config
+    fonte = AND.fonte(cfg)
+    clientes, erro_clientes = AND.clientes(cfg)
+    fotos = [AND.ler(cfg, c) for c in clientes] if fonte.ligada else []
+    busca = " ".join((request.args.get("q") or "").split())[:FI.BUSCA_MAX]
+    foto, u = FI.achar(fotos, codigo) if codigo else (None, None)
+    comum = dict(torre=TORRE, ligada=fonte.ligada, erro_clientes=erro_clientes if fonte.ligada else "",
+                 erros=[(lt.cliente, lt.erro, lt.velha) for lt in fotos if lt.erro], lido=_lido(fotos))
+    if u is None:
+        return render_template("cos/usinas.html", usinas=FI.lista(fotos, busca), busca=busca, pedido=codigo,
+                               **comum), (404 if codigo and fonte.ligada and any(lt.dados for lt in fotos) else 200)
+    agora = AND.agora()
+    ve = {t: _ve(t) for t in ("ronda", "ocorrencias", "religamentos", "eventos", "os-abertas", "normalizacoes",
+                              "acionamentos")}
+    ciclo = AND.ler_ocorrencias(cfg, foto.cliente, FI.DIAS_DO_CICLO) \
+        if ve["ocorrencias"] or ve["religamentos"] or ve["ronda"] else None
+    f = FI.painel(foto, u, ciclo, AND.ler_os_abertas(cfg) if ve["os-abertas"] else None,
+                  NO.ler(cfg, agora) if ve["normalizacoes"] else None, agora, fonte.url)
+    acionar, erro_cadastro = None, ""
+    chave = cfg.get("NEXUS_CHAVE_CADASTRO")
+    if ve["acionamentos"]:
+        try:
+            from ...cadastro.cifra import Cofre
+            from ...campo import visao
+            acionar = FI.acionar(visao._Base(), Cofre(chave) if chave else None,
+                                 AND.ler_distribuidoras(cfg, foto.cliente), agora, u.get("nome"), u.get("codigo"))
+        except Exception as e:      # noqa: BLE001 — cadastro fora: o bloco diz, a ficha segue
+            _log.exception("Ficha da usina: o cadastro não foi lido")
+            erro_cadastro = f"Não consegui ler o cadastro do Nexus ({type(e).__name__})"
+    return render_template(
+        "cos/usina.html", f=f, ve=ve, acionar=acionar, erro_cadastro=erro_cadastro, com_chave=bool(chave),
+        confianca=AC.CONFIANCA, prazos=OC.PRAZOS, etapas=OC.ETAPAS, desfechos=RE.DESFECHOS,
+        dias=FI.DIAS_DO_CICLO, agora=agora, **comum)

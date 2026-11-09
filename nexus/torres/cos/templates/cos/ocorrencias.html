@@ -2,6 +2,7 @@
 {% block titulo %}{{ tela.nome }}{% endblock %}
 {% block conteudo %}
 {% from "_explica.html" import explica %}
+{% from "cos/_usina.html" import usina_link with context %}
 <link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='cos.css') }}">
 <noscript><meta http-equiv="refresh" content="60"></noscript>
@@ -69,7 +70,7 @@
     <tbody>
     {% for x in p.itens %}
       <tr>
-        <td class="cos-esq cos-usina"><b>{{ x.usina }}</b>{% if x.equipamentos %}<span class="det">{{ x.equipamentos }}</span>{% endif %}
+        <td class="cos-esq cos-usina"><b>{{ usina_link(x.o.usina_codigo, x.usina) }}</b>{% if x.equipamentos %}<span class="det">{{ x.equipamentos }}</span>{% endif %}
           <div class="cos-oc-pe">{% if x.severidade %}<span class="cn-pill cn-{{ x.severidade_tom }}">{{ x.severidade }}</span>{% endif %}
             <span class="det">{{ x.tipo }} · {{ x.estado }}{% if x.os %} · OS {{ x.os }}{% else %} · sem OS{% endif %}</span></div>
           {% if x.link_plataforma %}<a class="cn-link cos-abrir" href="{{ x.link_plataforma }}" target="_blank" rel="noopener">abrir na Ronda COS</a>{% endif %}</td>

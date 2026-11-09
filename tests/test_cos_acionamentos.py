@@ -4,6 +4,7 @@ Quem aciono vem do cadastro do Nexus (o banco falso do Campo, test_campo_visao.p
 03, com a Supervisora Campo; Coração 1 é da Sul 01, com a vaga aberta); a UC, o canal e os chamados à concessionária, do
 Andamento (`GET /api/nexus/<cliente>/distribuidoras`). Nada vai à rede; pessoas, telefones e UCs são fictícios."""
 import json
+import re
 
 import pytest
 from test_campo_visao import CHAVE_CADASTRO, USINAS, _aba, _pessoas, banco  # noqa: F401  (banco é fixture)
@@ -16,9 +17,18 @@ from nexus.cos import andamento as AND
 CHAVE = "chave-de-teste-do-andamento"
 
 
+def _nome(usina):
+    """O nome da usina na tabela, em negrito; desde 09/11/2026 ele é o link da ficha da usina (cos/_usina.html)."""
+    return re.compile(rf"<b>(?:<a [^>]*>)?{re.escape(usina)}(?:</a>)?</b>")
+
+
+def _tem(html, usina):
+    return bool(_nome(usina).search(html))
+
+
 def _linha(html, usina):
     """A linha da usina na tabela, até o fim dela."""
-    i = html.index(f"<b>{usina}</b>")
+    i = _nome(usina).search(html).start()
     return html[i:html.index("</tr>", i)]
 
 
@@ -139,11 +149,11 @@ def test_quem_aciono_e_a_distribuidora_de_cada_usina(tela):
 
 def test_filtros_de_cliente_uf_e_busca(tela):
     html = tela.get("/t/cos/acionamentos?cliente=Outro Cliente").get_data(as_text=True)
-    assert "<b>Coração 1</b>" in html and "<b>Altair</b>" not in html and "998877" not in html
+    assert _tem(html, "Coração 1") and not _tem(html, "Altair") and "998877" not in html
     html = tela.get("/t/cos/acionamentos?q=altair").get_data(as_text=True)
-    assert "<b>Altair</b>" in html and "<b>Coração 1</b>" not in html and "998877" in html
+    assert _tem(html, "Altair") and not _tem(html, "Coração 1") and "998877" in html
     html = tela.get("/t/cos/acionamentos?uf=SC").get_data(as_text=True)
-    assert "<b>Coração 1</b>" in html and "<b>Brodowski 1</b>" not in html
+    assert _tem(html, "Coração 1") and not _tem(html, "Brodowski 1")
 
 
 def test_andamento_sem_a_rota_ou_desligado_mostra_so_o_cadastro(tela, app):

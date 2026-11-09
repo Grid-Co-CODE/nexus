@@ -1,0 +1,227 @@
+{% extends "base.html" %}
+{% block titulo %}{{ f.usina.nome }}{% endblock %}
+{% block conteudo %}
+{% from "_explica.html" import explica %}
+<link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='cos.css') }}">
+<noscript><meta http-equiv="refresh" content="120"></noscript>
+{# A ficha da usina (09/11/2026, nexus/cos/ficha.py): o que cada tela do COS sabe desta usina, numa página. Cada bloco
+   usa a conta da tela dona e segue a marca dela em Base → Acessos (`ve`); o link de cada bloco abre a tela inteira. #}
+{% macro plural(n, um, varios) %}{{ n }} {{ um if n == 1 else varios }}{% endmacro %}
+{% macro etapa(e) %}<span class="{{ 'cn-pill cn-' ~ e.tom if e.tom != 'neutro' else 'cos-neutro' }}">{{ e.rotulo }}</span>{% if e.detalhe %}<span class="det">{{ e.detalhe }}</span>{% endif %}{% endmacro %}
+{% macro canal(c) %}{% if c %}
+  {% if c.sms %}<span class="cos-canal"><span class="det">SMS</span> <b>{{ c.sms.numero }}</b> · <code>{{ c.sms.formato }}</code> <span class="det">{{ confianca.get(c.sms.confianca, c.sms.confianca) }}</span></span>{% endif %}
+  {% if c.contato %}<span class="cos-canal"><span class="det">À mão</span> {{ c.contato }}</span>{% endif %}
+  {% if not c.sms and not c.contato %}<span class="det">canal não levantado na Ronda COS</span>{% endif %}
+{% else %}<span class="det">canal não levantado na Ronda COS</span>{% endif %}{% endmacro %}
+{% set u = f.usina %}
+{% set r = f.resumo %}
+<div class="campo-nativa">
+  <div class="cn-cab">
+    <div><p class="gc-eyebrow">{{ torre.nome }} · <a class="cn-link" href="{{ raiz }}/t/cos/usina">Usinas</a></p>
+      <div class="gc-titulo-explica"><h1 class="cn-titulo">{{ u.nome }}</h1>
+      {% call explica('Entenda esta ficha') %}<p><b>O que é.</b> Tudo o que as telas do COS sabem desta usina, numa página. Cada
+      bloco é a mesma conta da tela de onde ele vem, só recortada por esta usina, e o link do bloco abre a tela inteira:
+      a ficha e a tela dizem sempre a mesma coisa.</p>
+      <p><b>De onde vem.</b> Do Andamento da Ronda COS (a fotografia, o ciclo das ocorrências dos últimos {{ dias }} dias, as OS
+      em aberto e as normalizações do mês) e do cadastro do Nexus (quem acionar). A ficha só lê: agir na ocorrência é na
+      Ronda COS, pelo link de cada uma.</p>
+      <p><b>Quem vê cada bloco.</b> A ficha abre para quem tem alguma tela do COS, e cada bloco aparece para quem abre a tela
+      dele (Base → Acessos): o bloco de quem acionar, com os telefones, só para quem abre Acionamentos.</p>{% endcall %}</div>
+      <p class="cn-pergunta">{{ u.codigo or u.cod }} · {{ f.cliente }}{% if u.cidade %} · {{ u.cidade }}{% if u.uf %}/{{ u.uf }}{% endif %}{% endif %}</p></div>
+    <div class="cn-frescor">Andamento da Ronda COS{% if lido %}<br>lido às <b>{{ lido }}</b>{% endif %}</div>
+  </div>
+
+  {% for c, erro, velha in f.erros %}<div class="cn-erro{% if velha %} cn-aviso{% endif %}" role="alert"><b>{{ c }}: {{ erro }}.</b>
+    {% if velha %}O bloco mostra a última leitura boa.{% else %}O bloco fica de fora agora.{% endif %}</div>{% endfor %}
+
+  <div class="cn-numeros">
+    <span><span class="gc-rotulo">Agora</span><span class="v"><span class="cn-pill cn-{{ f.tom }}">{{ u.status_rotulo or '—' }}</span></span>
+      <span class="d">{% if r.abertas %}{{ plural(r.abertas, 'ocorrência aberta', 'ocorrências abertas') }}{% else %}sem ocorrência aberta{% endif %}</span></span>
+    {% if ve.religamentos %}
+    <span><span class="gc-rotulo">Religamentos em {{ dias }} dias</span><span class="v{% if r.reincidente %} ruim{% endif %}">{{ r.religamentos }}</span>
+      <span class="d">{% if r.reincidente %}um equipamento reincidente{% elif r.repete %}um equipamento repete{% else %}nenhum equipamento repete{% endif %}</span></span>
+    {% endif %}
+    {% if ve['os-abertas'] %}
+    <span><span class="gc-rotulo">OS em aberto</span><span class="v{% if r.os_em_alerta %} ruim{% endif %}">{{ r.os if f.completo.os else '—' }}</span>
+      <span class="d">{% if not f.completo.os %}sem a leitura das OS{% elif r.os_em_alerta %}{{ r.os_em_alerta }} em alerta{% else %}no Fracttal, que o COS abriu{% endif %}</span></span>
+    {% endif %}
+    {% if ve.normalizacoes %}
+    <span><span class="gc-rotulo">Normalizações no mês</span><span class="v">{{ r.normalizacoes if f.completo.normalizacoes else '—' }}</span>
+      <span class="d">a usina voltou, pela hora do COS</span></span>
+    {% endif %}
+  </div>
+
+  {% if ve.ronda %}
+  <h2 class="cos-sub">Aberto agora</h2>
+  {% if f.abertas %}
+  <div class="cos-ficha-abertas">
+    {% for o in f.abertas %}
+    <div class="cos-oc">
+      <div class="cos-oc-cab"><span class="cn-st cn-t-{{ o.tom }}">{{ o.severidade }}</span>
+        <span class="cos-os">{{ o.os_rotulo }}</span>
+        <span class="mudo">{{ o.problema_nome }}{% if o.equipamentos %} · {{ o.equipamentos|join(', ') }}{% endif %}</span>
+        {% if o.dias_aberta is not none %}<span class="mudo">· {{ 'aberta hoje' if o.dias_aberta == 0 else 'aberta há ' ~ plural(o.dias_aberta, 'dia', 'dias') }}</span>{% endif %}</div>
+      <div class="cos-oc-falha">{{ o.falha }}</div>
+      <div class="cos-oc-pe"><span class="cn-tag">{{ o.etapa }}</span>{% for a in o.aguardando %}<span class="cn-tag">Aguardando {{ a }}</span>{% endfor %}
+        {% if o.impacto %}<span class="mudo">{{ o.impacto }}</span>{% endif %}</div>
+      {% if o.linha %}<div class="cos-ficha-prazo">
+        <span class="det">Cliente informado (até {{ prazos.informado.minutos }} min)</span> {{ etapa(o.linha.etapas.informado) }}
+        <span class="det">Campo acionado (até {{ prazos.campo.minutos }} min)</span> {{ etapa(o.linha.etapas.campo) }}
+        {% if o.linha.link_plataforma %}<a class="cn-fora" href="{{ o.linha.link_plataforma }}" target="_blank" rel="noopener">abrir na Ronda COS</a>{% endif %}</div>{% endif %}
+      {% if o.nota %}<div class="cos-oc-nota"><span class="m">{{ o.nota.quando }}</span> {{ o.nota.texto }}</div>{% endif %}
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}<p class="cn-vazio">Nenhuma ocorrência aberta nesta usina na fotografia de agora.</p>{% endif %}
+  {% endif %}
+
+  {% if ve.acionamentos %}
+  <h2 class="cos-sub">Quem acionar e a distribuidora <a class="cn-link cos-sub-link" href="{{ raiz }}/t/cos/acionamentos?q={{ u.nome|urlencode }}">ver em Acionamentos</a></h2>
+  {% if erro_cadastro %}<div class="cn-erro" role="alert"><b>{{ erro_cadastro }}.</b> Sem o cadastro, a ficha não diz quem acionar.</div>
+  {% elif not acionar or not acionar.uid %}<p class="cn-vazio">Esta usina do Andamento não liga a uma usina do cadastro do Nexus pelo código: o conserto é no cadastro (Base → Ligações).</p>
+  {% else %}
+  {% if not com_chave %}<div class="cn-erro cn-aviso" role="status"><b>Este Nexus não tem a chave do cadastro.</b> Sem ela, os nomes saem como o papel com o número da pessoa, e os contatos não abrem.</div>{% endif %}
+  {% set x = acionar.linha %}
+  {% if x %}
+  <div class="cn-duas">
+    <section class="cn-cartao">
+      <h3>Quem aciono</h3>
+      {% for c in x.contatos %}
+      <div class="cos-quem-aciono"><span class="det">{{ c.papel }}{% if c.detalhe %} · {{ c.detalhe }}{% endif %}</span>
+        <b>{{ c.nome }}</b>{% if c.contato %}{% if c.discar %} <a class="cn-link cos-tel" href="tel:{{ c.discar }}">{{ c.contato }}</a>{% else %} {{ c.contato }}{% endif %}{% endif %}</div>
+      {% else %}<p class="mudo">Ninguém no cadastro.</p>{% endfor %}
+    </section>
+    <section class="cn-cartao">
+      <h3>Distribuidora</h3>
+      {% for d in x.distribuidoras %}
+      <div class="cos-dist"><b>{{ d.nome }}</b>{% if d.parte %} <span class="det">{{ d.parte }}</span>{% endif %}
+        <span class="det">{% if d.uc %}UC {{ d.uc }}{% elif d.de == 'cadastro' %}UC não está na Ronda COS{% endif %}</span>
+        {{ canal(d.canal) }}</div>
+      {% else %}<p class="mudo">Sem concessionária no cadastro.</p>{% endfor %}
+    </section>
+  </div>
+  {% else %}<p class="cn-vazio">A usina está no cadastro, mas fora de operação: Acionamentos só lista as em operação.</p>{% endif %}
+  {% if acionar.chamados %}
+  <div class="cn-tab cos-tab"><table>
+    <thead><tr><th class="cos-esq">Chamado à distribuidora</th><th class="cos-esq">Situação</th><th class="cos-esq">Protocolo</th></tr></thead>
+    <tbody>
+    {% for c in acionar.chamados[:10] %}
+      <tr><td class="cos-esq">{{ c.criado.strftime('%d/%m %H:%M') if c.criado else '—' }}<span class="det">{{ c.parte or '' }}{% if c.uc %}{{ ' · ' if c.parte else '' }}UC {{ c.uc }}{% endif %}{% if c.os %} · OS {{ c.os }}{% endif %}</span></td>
+        <td class="cos-esq"><span class="cn-pill cn-{{ c.tom }}">{{ c.estado_rotulo }}</span></td>
+        <td class="cos-esq">{% if c.protocolo %}<span class="cos-os">{{ c.protocolo }}</span>{% else %}<span class="mudo">—</span>{% endif %}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+  {% endif %}
+  {% endif %}
+  {% endif %}
+
+  {% if ve.ocorrencias %}
+  <h2 class="cos-sub">Ocorrências dos últimos {{ dias }} dias <a class="cn-link cos-sub-link" href="{{ raiz }}/t/cos/ocorrencias?cliente={{ f.cliente|urlencode }}&amp;dias={{ dias }}">ver em Ocorrências</a></h2>
+  {% if not f.completo.ciclo %}<p class="cn-vazio">Sem a leitura do ciclo das ocorrências agora.</p>
+  {% elif f.ciclo %}
+  <div class="cn-tab cos-tab cos-ciclo"><table>
+    <thead><tr><th class="cos-esq">Ocorrência</th>{% for id, nome in etapas if id != 'detectada' %}<th class="cos-esq">{{ nome }}{% if prazos.get(id) %}<span class="det">até {{ prazos[id].minutos }} min</span>{% endif %}</th>{% endfor %}</tr></thead>
+    <tbody>
+    {% for x in f.ciclo %}
+      <tr><td class="cos-esq"><b>{{ x.tipo }}</b>
+          <div class="cos-oc-pe">{% if x.severidade %}<span class="cn-pill cn-{{ x.severidade_tom }}">{{ x.severidade }}</span>{% endif %}
+            <span class="det">{{ x.estado }}{% if x.os %} · OS {{ x.os }}{% else %} · sem OS{% endif %}{% if x.equipamentos %} · {{ x.equipamentos }}{% endif %}</span></div></td>
+        {% for id, nome in etapas if id != 'detectada' %}<td class="cos-esq cos-etapa">{{ etapa(x.etapas[id]) }}</td>{% endfor %}</tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+  {% if f.ciclo_total > f.ciclo|length %}<p class="mudo">Mostrando as {{ f.ciclo|length }} mais recentes de {{ f.ciclo_total }}.</p>{% endif %}
+  {% else %}<p class="cn-vazio">Nenhuma ocorrência registrada nesta usina nos últimos {{ dias }} dias.</p>{% endif %}
+  {% endif %}
+
+  {% if ve.religamentos and f.religamentos %}
+  <h2 class="cos-sub">Religamentos em {{ dias }} dias <a class="cn-link cos-sub-link" href="{{ raiz }}/t/cos/religamentos?cliente={{ f.cliente|urlencode }}&amp;ver=todos">ver em Religamentos</a></h2>
+  <div class="cn-tab cos-tab"><table>
+    <thead><tr><th class="cos-esq">Equipamento</th><th>Religamentos</th>{% for k, d in desfechos.items() %}<th>{{ d[0] }}</th>{% endfor %}<th class="cos-esq">Último</th></tr></thead>
+    <tbody>
+    {% for e in f.religamentos %}
+      <tr><td class="cos-esq"><b>{{ e.rotulo }}</b>{% if e.tag and e.tag != e.rotulo %}<span class="det">{{ e.tag }}</span>{% endif %}</td>
+        <td>{% if e.reincidente %}<span class="cn-pill cn-critico">{{ e.total }}</span>{% elif e.repete %}<span class="cn-pill cn-alerta">{{ e.total }}</span>{% else %}{{ e.total }}{% endif %}</td>
+        {% for k, d in desfechos.items() %}<td>{% if e.desfechos.get(k) %}<span class="cn-pill cn-{{ d[1] }}">{{ e.desfechos[k] }}</span>{% else %}<span class="mudo">—</span>{% endif %}</td>{% endfor %}
+        <td class="cos-esq">{{ e.ultima.strftime('%d/%m %H:%M') if e.ultima else '—' }}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+  {% endif %}
+
+  {% if ve['os-abertas'] and f.os_abertas %}
+  <h2 class="cos-sub">OS em aberto no Fracttal <a class="cn-link cos-sub-link" href="{{ raiz }}/t/cos/os-abertas?situacao=todas&amp;q={{ (u.codigo or u.cod)|urlencode }}">ver em OS em aberto</a></h2>
+  <div class="cn-tab cos-tab"><table>
+    <thead><tr><th class="cos-esq">Aberta há</th><th class="cos-esq">OS</th><th class="cos-esq">Ativo</th><th class="cos-esq">Tipo</th><th>Feito</th><th class="cos-esq">Alerta</th></tr></thead>
+    <tbody>
+    {% for o in f.os_abertas %}
+      <tr class="cos-os" tabindex="0" data-wo="{{ o.id_wo or '' }}" data-folio="{{ o.folio }}" data-status="{{ o.status_card }}" title="Abrir o card da OS {{ o.folio }}">
+        <td class="cos-esq"><b class="cos-idade{% if o.dias >= 30 %} cn-t-critico{% elif o.dias >= 7 %} cn-t-alerta{% endif %}">{{ o.aberta_ha }}</b></td>
+        <td class="cos-esq"><b class="cos-folio">{{ o.folio }}</b><span class="det">{{ o.status }}</span></td>
+        <td class="cos-esq">{{ o.ativo or '—' }}{% if o.mais_ativos %} <span class="mudo">e mais {{ o.mais_ativos }}</span>{% endif %}</td>
+        <td class="cos-esq">{{ o.tipo or '—' }}</td>
+        <td>{% if o.situacao == 'concluida' %}<span class="cn-pill cn-ok">100%</span>{% else %}{{ o.pct }}%{% endif %}</td>
+        <td class="cos-esq">{% if o.em_alerta %}<span class="cn-pill cn-critico">Em alerta</span>{% else %}<span class="mudo">—</span>{% endif %}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+  {% endif %}
+
+  {% if ve.normalizacoes and f.normalizacoes %}
+  <h2 class="cos-sub">Normalizações do mês <a class="cn-link cos-sub-link" href="{{ raiz }}/t/cos/normalizacoes?q={{ (u.codigo or u.cod)|urlencode }}">ver em Normalizações</a></h2>
+  <div class="cn-tab cos-tab"><table>
+    <thead><tr><th class="cos-esq">OS</th><th>Indisp.</th><th class="cos-esq">Normalização</th><th class="cos-esq">Falha</th><th class="cos-esq">No Fracttal</th></tr></thead>
+    <tbody>
+    {% for n in f.normalizacoes %}
+      <tr{% if n.os %} class="cos-os" tabindex="0" data-folio="{{ n.os }}" data-status="{{ n.status_card }}" title="Abrir o card da OS {{ n.os }}"{% endif %}>
+        <td class="cos-esq">{% if n.os %}<b class="cos-folio">{{ n.os }}</b>{% else %}<span class="mudo">sem OS</span>{% endif %}</td>
+        <td>{% if n.hora_real %}<b>{{ n.fora_txt }}</b>{% else %}<span class="cn-pill cn-neutro">sem hora real</span>{% endif %}</td>
+        <td class="cos-esq">{{ n.volta.strftime('%d/%m %H:%M') if n.volta else '—' }}<span class="det">{{ n.declarada_por }}</span></td>
+        <td class="cos-esq">{{ n.falha }}{% if n.equipamentos %}<span class="det">{{ n.equipamentos[:2]|join(', ') }}</span>{% endif %}</td>
+        <td class="cos-esq">{% if n.aberta %}<span class="cn-pill cn-{{ 'critico' if (n.aberta_ha_dias or 0) >= 7 else 'alerta' }}">{{ n.status }} {{ n.pct }}%</span>{% else %}<span class="cn-pill cn-ok">Fechada</span>{% endif %}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+  {% if f.normalizacoes_total > f.normalizacoes|length %}<p class="mudo">Mostrando as {{ f.normalizacoes|length }} mais recentes de {{ f.normalizacoes_total }}.</p>{% endif %}
+  {% endif %}
+
+  {% if ve.eventos and f.eventos %}
+  <h2 class="cos-sub">O que aconteceu em 7 dias <a class="cn-link cos-sub-link" href="{{ raiz }}/t/cos/eventos?cliente={{ f.cliente|urlencode }}&amp;janela=7d">ver na Parede de eventos</a></h2>
+  <div class="cn-tab cos-tab"><table>
+    <thead><tr><th>Quando</th><th>Situação</th><th>OS</th><th class="cos-esq">O que aconteceu</th></tr></thead>
+    <tbody>
+    {% for e in f.eventos %}
+      <tr><td class="m">{{ e.hora }}<span class="det">{{ e.dia }}</span></td>
+        <td><span class="cn-pill cn-{{ e.tom }}">{{ e.situacao_rotulo }}</span></td>
+        <td class="m">{{ e.os }}</td>
+        <td class="cos-esq cos-texto">{{ e.texto }}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+  {% if f.eventos_total > f.eventos|length %}<p class="mudo">Mostrando os {{ f.eventos|length }} mais recentes de {{ f.eventos_total }}.</p>{% endif %}
+  {% endif %}
+
+  <form class="cn-filtros cos-ficha-busca" method="get" action="{{ raiz }}/t/cos/usina">
+    <input class="gc-campo" type="search" name="q" placeholder="Abrir outra usina: nome, código ou cidade" aria-label="Buscar outra usina">
+    <button class="gc-btn gc-btn--contorno" type="submit">Buscar</button>
+  </form>
+</div>
+{% include "oscreator/card_os_abrir.html" %}
+<script>
+  // a linha da OS abre o card do OS Creator por cima, como em OS em aberto e Normalizações
+  (function () {
+    function abrir(tr) {
+      if (!window.NexusOsCard) { return; }
+      var wo = tr.getAttribute('data-wo'), folio = tr.getAttribute('data-folio');
+      var op = {status: tr.getAttribute('data-status') || '', folio: folio};
+      if (wo) { NexusOsCard.abrir(wo, op); } else { NexusOsCard.abrirFolio(folio, op); }
+    }
+    document.querySelectorAll('tr.cos-os').forEach(function (tr) {
+      tr.addEventListener('click', function (e) { if (!e.target.closest('a')) { abrir(tr); } });
+      tr.addEventListener('keydown', function (e) { if (e.key === 'Enter') { abrir(tr); } });
+    });
+  })();
+</script>
+{% endblock %}

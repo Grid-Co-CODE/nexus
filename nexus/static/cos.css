@@ -6,7 +6,7 @@
 .cos-sub{font:700 13px/18px var(--font-sans);letter-spacing:.04em;text-transform:uppercase;color:var(--mudo);margin:26px 0 0}
 
 /* Ronda padronizada: o quadro por problema e o das fotografias lado a lado; um embaixo do outro se faltar espaço */
-.cos-duas{display:grid;grid-template-columns:repeat(auto-fit,minmax(420px,1fr));gap:0 24px}
+.cos-duas{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(420px,100%),1fr));gap:0 24px}
 .cos-tab-curta table{min-width:0}
 .cn-tab td.cos-esq,.cn-tab th.cos-esq{text-align:left}
 .cn-tab td.cos-usina b{font-weight:600}
@@ -115,3 +115,14 @@ tr.cos-os:focus-visible{outline:2px solid var(--verde);outline-offset:-2px}
 .cos-mesa-clientes b{color:var(--tinta)}
 tr.cos-total td{border-top:1px solid var(--linha-forte)}
 tr.cos-turno td:first-child{padding-left:28px;color:var(--tinta-2)}
+
+/* A ficha da usina (09/11/2026): o nome da usina em toda tela do COS leva a ela. O link herda a cor do nome (a tabela
+   não vira um mar de verde) e se mostra no sublinhado pontilhado; no foco e no hover, o verde de texto da casa. */
+.cos-usina-link{color:inherit;text-decoration:none;border-bottom:1px dotted var(--linha-forte)}
+.cos-usina-link:hover,.cos-usina-link:focus-visible{color:var(--verde-texto);border-bottom-color:currentColor}
+.cos-sub-link{margin-left:10px;font-size:12px;letter-spacing:0;text-transform:none}
+.cos-ficha-abertas{display:flex;flex-direction:column;gap:10px;margin-top:10px}
+.cos-ficha-abertas .cos-oc{background:var(--superficie);border:1px solid var(--linha);border-radius:var(--raio-md);padding:12px 14px}
+.cos-ficha-prazo{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;margin-top:8px}
+.cos-ficha-busca{margin-top:28px}
+.cos-ficha-busca input[type=search]{flex:1 1 280px;max-width:420px}
