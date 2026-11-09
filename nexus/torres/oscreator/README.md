@@ -1292,6 +1292,11 @@ concluir e cancelar!".
     dobrariam.
   - `POST /os/api/os/<id>/tarefa/<tid>/respostas`: grava as respostas (`salvar_subtarefas`) sem lançar execução e diz
     quantas obrigatórias faltam, relidas.
+  - Os registros (09/11/2026): `GET /os/api/os/<id>/tarefa/<tid>/registros` (as execuções, o `historico_execucao`) e
+    `POST /os/api/os/<id>/tarefa/<tid>/registro/<rid>` ({inicio, fim} na hora de Brasília): o `editar_execucao`
+    (`tasks.wo_tasks_execution_update` com o id do registro, o `initial_date` e o `final_date` em UTC, `to_pause` False
+    e `to_stop` True, a captura do Levi), só no registro encerrado e da tarefa, sem fim antes do início nem futuro, e
+    relido depois. Provado no TESTE - PA (OS 19013): o início e o fim gravam, e o Fracttal recalcula o tempo.
   - O Incluir anexo aceita `tarefa`: o arquivo vai para a aba Anexos daquela tarefa, e não para a 1ª. A contagem
     (`/os/os/<id>/anexos`) passa a trazer `arquivos_por_tarefa` (o `get_os_anexos` diz a tarefa de cada arquivo); o
     `por_tarefa` segue sendo o das fotos das subtarefas, que o botão dos anexos da tarefa no card mostra.
@@ -2688,6 +2693,34 @@ tarefa e dê para baixar tudo de uma vez, o download sai com o nome do ativo!"; 
   "Vários (N)" no Exportar); a de um ativo, o nome curto de sempre.
 - Prova: `tests/test_oscreator_card_ativos_anexos_04_11.py`; os 2 testes de `test_oscreator_card_por_ativo_28_10.py`
   aceitam o `data-ativo` novo na tarefa.
+
+## O anexo que é observação, o Abrir e o Baixar que falham, e o PDF que demora (09/11/2026)
+
+Levi, pela OS 8159: o anexo com a observação "Não há cabine de medição 02..." mostrava `{"erro":"Falha ao baixar a imagem
+(HTTP 404)."}` no Abrir e baixava esse JSON no Baixar ("o abrir e baixar deve ser personalizado para cada tipo de arquivo");
+o PDF da mesma OS dizia "O servidor não respondeu... A gravação pode ter sido feita", e na Aprovação de OS, "A sua sessão do
+Nexus acabou".
+- **A observação é nota de texto** (`os_anexos.get_os_anexos`): o Fracttal guarda o texto escrito na aba Anexos da tarefa no
+  campo do arquivo (`value`). Arquivo é o que tem a URL ou um CAMINHO no S3 (com "/", como nas subtarefas) e não é do tipo
+  nota (3); o resto é nota, lida como texto no card (sem Abrir nem Baixar), no .zip (.txt) e no PDF (nas notas).
+- **O Abrir que falha** (`rotas_os_acoes._falha_anexo`): aberto na aba, a página de aviso do OS Creator com o motivo ("O
+  arquivo X não está mais no Fracttal"); pedido em JSON, o JSON. **O Baixar** (`os_acoes.baixarArquivo`) pede o arquivo pela
+  tela e só salva quando veio o arquivo; o erro vira a frase no rodapé dos anexos. A pré-assinada do S3 segue direto.
+- **O PDF responde sempre em JSON**, inclusive o erro inesperado (o motivo à tela, a pilha ao log), e **as fotos têm prazo**
+  (`PRAZO_FOTOS_S`, 45 s): passado o prazo, as que faltam saem no PDF como "não veio".
+- **A causa da OS 8159 era o `LayoutError`** (o JSON novo a mostrou: "Não consegui montar o PDF desta OS (LayoutError)"):
+  um bloco maior que uma página derruba o PDF inteiro no reportlab, e ele não quebra linha de tabela entre páginas.
+  Reproduzido com a resposta longa de uma subtarefa e com a legenda longa de uma foto. Agora as tabelas quebram a linha
+  entre páginas (`splitInRow`), a legenda da foto tem teto (`LEGENDA_FOTO_MAX`) e, se ainda assim um bloco não couber, o PDF
+  sai de novo com os textos longos cortados e dizendo (`cortar_textos`), em vez de não sair. **Provado com a OS 8159 real**
+  (cópia local com o Fracttal de verdade, 09/11/2026): o PDF saiu com 5 páginas e as 14 fotos, e a observação virou nota.
+  A 1ª subida (17fa3bb) foi sem essa prova: o Levi achou o LayoutError no ar.
+- **O POST que só lê** (o PDF e o "Baixar todos") tem o aviso de leitura no `carga.js` (`SO_LEITURA`): "O servidor não
+  respondeu a tempo... Nada foi gravado no Fracttal", e não o da gravação.
+- A Aprovação de OS (Usinas 360°) passa a separar a sessão que acabou (o redirect) do servidor que não respondeu: combinado
+  com o chat da torre, que muda a `aprovacao.html`.
+- Prova: `tests/test_oscreator_anexo_pdf_09_11.py`; o diálogo dos anexos conferido na bancada (a nota como texto, o Baixar e
+  o Abrir do arquivo que sumiu).
 
 ## Os chamados em aberto para o App de Campo e o pacote 1.3.0 (08/11/2026)
 

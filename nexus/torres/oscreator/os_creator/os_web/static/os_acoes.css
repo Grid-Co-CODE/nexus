@@ -197,3 +197,5 @@
 .det-acoes-os{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0 0}
 /* o colado à espera do "Anexar à OS" (06/11/2026): o nome e os dois botões numa linha, embaixo do Incluir anexo */
 .det-anx-colado{display:flex;align-items:center;flex-wrap:wrap;gap:6px 10px;margin:8px 0 0}
+/* a resposta de texto do Fazer a tarefa quebra a linha e cresce (09/11/2026: "está rolando infinito para o lado") */
+.acoes-ta.acoes-resp{min-height:44px;max-height:40vh;margin-top:0;field-sizing:content;overflow-wrap:anywhere}

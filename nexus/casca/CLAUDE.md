@@ -783,6 +783,11 @@ que só reordenava o menu) saiu: no lugar dela o topo mostra "Setor: X". O códi
   `decisao_tela_setor`): só acrescenta, e vale a última decisão de cada setor × tela; a tela é `torre/tela`, o endereço
   do menu. Setor novo nasce sem nada marcado. O Salvar relê o banco, grava só o que mudou e troca a aba inteira (o
   `livros.publicar` confere a contagem). O portão e a tela leem com cópia de 1 minuto.
+- **A página da OS da Engenharia abre por três telas (09/11/2026).** O Quadro da Performance e a tela do chamado de
+  Garantias abrem a página da OS (`/t/engenharia/equipe/os/<nº>`); quem tem `engenharia/equipe`, `performance/equipe` ou
+  `chamados/garantias` abre a página e as rotas dela (`setor_telas.PAGINA_DA_OS` e `TELAS_DA_PAGINA_DA_OS`, no `pode`),
+  sem ganhar o Quadro da Engenharia nem a OS de ETM. Caso que criou: quem faz Chamados é do setor Performance, que não
+  tem a tela da Engenharia, e tomava 403. O que a pessoa faz na página é da torre (`nexus/torres/engenharia/CLAUDE.md`).
 - **Tela que mudou de endereço e tela de dentro (13/10/2026, os relatórios na Central de emissão).** A decisão gravada
   com o nome antigo vale para o novo (`setor_telas.RENOMEADAS`: `performance/relatorio` → `relatorios/relatorio`, e o
   semanal), e a mais nova ganha, como sempre; quem já via o relatório na Performance continua vendo. A tela que abre por

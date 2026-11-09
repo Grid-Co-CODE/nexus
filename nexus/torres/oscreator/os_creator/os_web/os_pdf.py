@@ -265,8 +265,34 @@ def _linhas(v) -> str:
     return "<br/>".join(_texto(x) for x in str(v or "").splitlines())
 
 
+LEGENDA_FOTO_MAX = 280                      # a legenda de uma foto no PDF (o resto está na OS)
+TEXTO_SEGURO_MAX = 1500                     # o teto de cada texto na 2ª tentativa (`gerar`)
+
+
+def cortar_textos(m, teto: int = TEXTO_SEGURO_MAX):
+    """Uma cópia do modelo com todo texto acima de `teto` cortado e marcado: a 2ª tentativa do `gerar`."""
+    if isinstance(m, str):
+        return m if len(m) <= teto else m[:teto].rstrip() + " … (texto cortado no PDF: o inteiro está na OS)"
+    if isinstance(m, dict):
+        return {k: cortar_textos(v, teto) for k, v in m.items()}
+    if isinstance(m, (list, tuple)):
+        return type(m)(cortar_textos(v, teto) for v in m)
+    return m
+
+
 def gerar(m: dict, *, fotos=(), gerado_em: str = "", quem: str = "", logo: str | None = None) -> bytes:
-    """O PDF de `modelo()`. `fotos` = uma por `m["fotos"]`, na mesma ordem: o `reduzir()` dela, ou None (não veio)."""
+    """O PDF de `modelo()`. `fotos` = uma por `m["fotos"]`, na mesma ordem: o `reduzir()` dela, ou None (não veio).
+    A REDE DE SEGURANÇA (09/11/2026, OS 8159: "Não consegui montar o PDF... (LayoutError)"): o bloco que não cabe numa
+    página derruba o PDF inteiro no reportlab. As tabelas quebram a linha entre páginas e a legenda da foto tem teto; se
+    ainda assim um bloco não couber, o PDF sai de novo com os textos longos cortados (e dizendo), em vez de não sair."""
+    from reportlab.platypus.doctemplate import LayoutError
+    try:
+        return _gerar(m, fotos=fotos, gerado_em=gerado_em, quem=quem, logo=logo)
+    except LayoutError:
+        return _gerar(cortar_textos(m), fotos=fotos, gerado_em=gerado_em, quem=quem, logo=logo)
+
+
+def _gerar(m: dict, *, fotos=(), gerado_em: str = "", quem: str = "", logo: str | None = None) -> bytes:
     from reportlab import rl_config
     from reportlab.lib import colors
     from reportlab.lib.pagesizes import A4
@@ -360,7 +386,7 @@ def gerar(m: dict, *, fotos=(), gerado_em: str = "", quem: str = "", logo: str |
         par = pares[i:i + 2] + [("", "")] * (2 - len(pares[i:i + 2]))
         linhas.append([c for k, v in par for c in (Paragraph(_texto(k), e["k"]), Paragraph(_texto(v), e["base"]))])
     if linhas:
-        t = Table(linhas, colWidths=[28 * mm, 63 * mm, 28 * mm, 63 * mm])
+        t = Table(linhas, colWidths=[28 * mm, 63 * mm, 28 * mm, 63 * mm], splitInRow=1)
         t.setStyle(TableStyle([("BOX", (0, 0), (-1, -1), 0.6, linha), ("LINEBELOW", (0, 0), (-1, -2), 0.4, linha),
                                ("BACKGROUND", (0, 0), (0, -1), fundo), ("BACKGROUND", (2, 0), (2, -1), fundo),
                                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"), ("TOPPADDING", (0, 0), (-1, -1), 3),
@@ -385,7 +411,7 @@ def gerar(m: dict, *, fotos=(), gerado_em: str = "", quem: str = "", logo: str |
             cab.append([Paragraph(_texto(" · ".join(meta + datas)), e["mudo"])])
         if tf.get("total"):
             cab.append([Paragraph(_texto(f"{tf['feitas']} de {tf['total']} subtarefas feitas"), e["mudo"])])
-        ct = Table(cab, colWidths=[larg_util])
+        ct = Table(cab, colWidths=[larg_util], splitInRow=1)
         ct.setStyle(TableStyle([("BACKGROUND", (0, 0), (-1, -1), fundo),
                                 ("LINEBEFORE", (0, 0), (0, -1), 3, tom.get(tf.get("tom"), tom["neutro"])),
                                 ("LEFTPADDING", (0, 0), (-1, -1), 8), ("TOPPADDING", (0, 0), (-1, -1), 3),
@@ -401,7 +427,9 @@ def gerar(m: dict, *, fotos=(), gerado_em: str = "", quem: str = "", logo: str |
                 rows.append([Paragraph(str(i), e["mudo"]), Paragraph(_texto(s["descricao"]), e["base"]),
                              Paragraph(_texto(s["tipo"]), e["mudo"]), Paragraph(_linhas(s["resposta"]), e["base"]),
                              Paragraph(feita, e["base"])])
-            st = Table(rows, colWidths=[8 * mm, 86 * mm, 22 * mm, 52 * mm, 14 * mm], repeatRows=1)
+            # splitInRow (09/11/2026, OS 8159: "Não consegui montar o PDF... (LayoutError)"): a resposta longa de uma subtarefa
+            # fazia a linha passar de uma página inteira, e o reportlab não quebra linha de tabela entre páginas sem ele
+            st = Table(rows, colWidths=[8 * mm, 86 * mm, 22 * mm, 52 * mm, 14 * mm], repeatRows=1, splitInRow=1)
             st.setStyle(TableStyle([("LINEBELOW", (0, 0), (-1, -1), 0.4, linha), ("VALIGN", (0, 0), (-1, -1), "TOP"),
                                     ("TOPPADDING", (0, 0), (-1, -1), 2.5), ("BOTTOMPADDING", (0, 0), (-1, -1), 2.5)]))
             bloco += [Spacer(1, 1.5 * mm), st]
@@ -434,7 +462,7 @@ def gerar(m: dict, *, fotos=(), gerado_em: str = "", quem: str = "", logo: str |
             if com_custo:
                 linha_r.append(Paragraph(_texto(dinheiro(r.get("custo_total")) or "—"), e["base"]))
             rows.append(linha_r)
-        rt = Table(rows, colWidths=larguras, repeatRows=1)
+        rt = Table(rows, colWidths=larguras, repeatRows=1, splitInRow=1)
         rt.setStyle(TableStyle([("LINEBELOW", (0, 0), (-1, -1), 0.4, linha), ("VALIGN", (0, 0), (-1, -1), "TOP"),
                                 ("TOPPADDING", (0, 0), (-1, -1), 2.5), ("BOTTOMPADDING", (0, 0), (-1, -1), 2.5)]))
         story.append(rt)
@@ -469,7 +497,10 @@ def gerar(m: dict, *, fotos=(), gerado_em: str = "", quem: str = "", logo: str |
                                         ("TOPPADDING", (0, 0), (-1, -1), 0), ("BOTTOMPADDING", (0, 0), (-1, -1), 0)]
                                        + ([] if pronta else [("BACKGROUND", (0, 0), (-1, -1), fundo),
                                                              ("BOX", (0, 0), (-1, -1), 0.6, linha)])))
-            leg = (f"<b>{_texto(f['de'])}</b><br/>" if f.get("de") else "") + _texto(f.get("legenda") or "")
+            texto_leg = str(f.get("legenda") or "")
+            if len(texto_leg) > LEGENDA_FOTO_MAX:              # a legenda longa não cabia no quadro da foto (LayoutError)
+                texto_leg = texto_leg[:LEGENDA_FOTO_MAX].rstrip() + " …"
+            leg = (f"<b>{_texto(f['de'][:LEGENDA_FOTO_MAX])}</b><br/>" if f.get("de") else "") + _texto(texto_leg)
             celulas.append([quadro, Spacer(1, 1.2 * mm), Paragraph(leg, e["legenda"])])
         rows = [celulas[i:i + 2] + [""] * (2 - len(celulas[i:i + 2])) for i in range(0, len(celulas), 2)]
         ft = Table(rows, colWidths=[larg_util / 2] * 2)

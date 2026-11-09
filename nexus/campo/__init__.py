@@ -56,7 +56,8 @@ def instalar(app):
         from . import zeladoria_banco
         zeladoria_banco.ligar(app)
     # o gravador em lote do Mapa de equipe (08/11/2026): pontos, deslocamentos, aparelhos e acessos ao banco a cada
-    # 5 min, só onde NEXUS_EQUIPE_GRAVA=1 (uma máquina por vez: o PC e o servidor não gravam juntos)
+    # 5 min, só onde NEXUS_EQUIPE_GRAVA é 1 (uma máquina por vez: o PC e o servidor não gravam juntos); desde 09/11/2026
+    # a chave vem da tela Base → Chaves e o laço confere a cada rodada (liga sem reiniciar)
     from .equipe import gravador as equipe_gravador
     equipe_gravador.ligar(app)
     # o relatório de cada rodada (só contagens) vai para o log do processo: sem isto, um 429 ou um erro de gravação

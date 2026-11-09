@@ -80,11 +80,15 @@
         aoFechar: function (mudou) { if (mudou) location.reload(); else contar(); }});
       return;
     }
-    if (e.target.closest('[data-incluir-anexo]') && inp) { inp.value = ''; inp.click(); }
+    // o Incluir anexo abre o cartão do anexo (09/11/2026): colar, soltar ou o "faça o upload do anexo"
+    if (e.target.closest('[data-incluir-anexo]') && inp) {
+      window.egCartaoAnexo({alvo: 'na OS ' + (caixa.dataset.folio || ''), aceitar: inp.getAttribute('accept') || '',
+        regra: btn.getAttribute('title') || '', enviar: enviar});
+    }
   });
   if (!inp) return;
   inp.addEventListener('change', function () {
-    var fs = Array.prototype.slice.call(inp.files || []); if (fs.length) enviar(fs);
+    var fs = Array.prototype.slice.call(inp.files || []); if (fs.length) enviar(fs).catch(function () {});
   });
   // colar para anexar (06/11/2026: "No anexo pode ser possível anexar com CTRL + V OU WINDOWS + V"): o arquivo da área de
   // transferência espera o "Anexar à OS" (colar sem querer não sobe nada); colar num campo de texto segue sendo texto. A
@@ -98,6 +102,7 @@
   }
   document.addEventListener('paste', function (e) {
     var t = e.target;
+    if (document.querySelector('dialog.eg-anx[open]')) return;        // o cartão do anexo aberto recebe o colar
     if (t && t.closest && t.closest('input, textarea, select, [contenteditable="true"]')) return;
     var fs = Array.prototype.slice.call((e.clipboardData && e.clipboardData.files) || []).map(nomeColado);
     if (!fs.length) return;
@@ -111,7 +116,7 @@
     sim.type = nao.type = 'button';
     sim.className = 'eg-ac-btn eg-ac-btn--g eg-ac-btn--p'; sim.textContent = 'Anexar à OS';
     nao.className = 'eg-ac-btn eg-ac-btn--o eg-ac-btn--p'; nao.textContent = 'Descartar';
-    sim.addEventListener('click', function () { linha.remove(); enviar(fs); });
+    sim.addEventListener('click', function () { linha.remove(); enviar(fs).catch(function () {}); });
     nao.addEventListener('click', function () { linha.remove(); });
     linha.appendChild(txt); linha.appendChild(sim); linha.appendChild(nao);
     caixa.querySelector('[data-grupo-anexos]').appendChild(linha);
@@ -122,15 +127,20 @@
     fd.append('folio', caixa.dataset.folio || '');
     btn.disabled = true;
     dizer(fs.length === 1 ? 'Enviando o anexo para o Fracttal…' : 'Enviando ' + fs.length + ' anexos para o Fracttal…');
-    fetch(caixa.dataset.incluirUrl, {method: 'POST', credentials: 'same-origin', headers: {'Accept': 'application/json'}, body: fd})
-      .then(function (r) { return r.json().catch(function () { return {}; }).then(function (j) { return {r: r, j: j}; }); })
+    // devolve a promessa (o cartão do anexo diz o resultado nele): a mensagem, ou o erro com o login quando falta
+    return fetch(caixa.dataset.incluirUrl, {method: 'POST', credentials: 'same-origin', headers: {'Accept': 'application/json'}, body: fd})
+      .then(function (r) { return r.json().catch(function () { return {}; }).then(function (j) { return {r: r, j: j}; }); },
+        function () { btn.disabled = false; var m = 'Não consegui falar com o OS Creator. Tente de novo.'; dizer(m, true); throw new Error(m); })
       .then(function (x) {
         btn.disabled = false;
-        if (x.r.status === 401 || x.j.login) { dizer('Para incluir anexo, entre pelo Fracttal.', true, caixa.dataset.login); return; }
-        if (x.j.mensagem) { dizer(x.j.mensagem, !x.j.ok); contar(); return; }
-        dizer(x.j.erro || ('O OS Creator não gravou (HTTP ' + x.r.status + '). Nada mudou; tente de novo.'), true);
-      })
-      .catch(function () { btn.disabled = false; dizer('Não consegui falar com o OS Creator. Tente de novo.', true); });
+        if (x.r.status === 401 || x.j.login) {
+          dizer('Para incluir anexo, entre pelo Fracttal.', true, caixa.dataset.login);
+          var e = new Error('Para incluir anexo, entre pelo Fracttal.'); e.login = caixa.dataset.login; throw e;
+        }
+        if (x.j.mensagem) { dizer(x.j.mensagem, !x.j.ok); contar(); if (!x.j.ok) throw new Error(x.j.mensagem); return x.j.mensagem; }
+        var m = x.j.erro || ('O OS Creator não gravou (HTTP ' + x.r.status + '). Nada mudou; tente de novo.');
+        dizer(m, true); throw new Error(m);
+      });
   }
 })();
 
@@ -183,7 +193,7 @@
       else if (e.estado === 'pausada') partes.push('pausada' + (e.motivo ? ' (' + esc(e.motivo) + ')' : ''));
       var bts = '';
       if (pode) {
-        bts = botao('Subtarefas', 'subtarefas') + botao('Anexar', 'anexar');
+        bts = botao('Subtarefas', 'subtarefas') + botao('Anexar', 'anexar') + botao('Registros', 'registros');
         if (!t.feita && e.estado === 'parada') bts += botao('Iniciar', 'iniciar', 'eg-ac-btn--g');
         if (e.estado === 'rodando') bts += botao('Pausar', 'pausar');
         if (e.estado === 'pausada') bts += botao('Retomar', 'retomar', 'eg-ac-btn--g');
@@ -230,10 +240,14 @@
     if ((c.opcoes || []).length) {
       ctrl = '<select class="eg-ac-campo" data-fid="' + esc(c.id_form_item) + '" id="' + id + '"><option value="">— selecione —</option>'
         + c.opcoes.map(function (o) { return '<option value="' + esc(o.valor) + '"' + (String(o.valor) === String(c.valor) ? ' selected' : '') + '>' + esc(o.rotulo) + '</option>'; }).join('') + '</select>';
-    } else {
+    } else if (c.tipo_nome === 'num') {
       // o número com vírgula (o teclado do Brasil): campo de texto com o teclado numérico, e a vírgula vira ponto no envio,
       // que é o que o campo numérico do card manda (o type=number recusava "7,9" e a resposta saía vazia)
-      ctrl = '<input class="eg-ac-campo" type="text"' + (c.tipo_nome === 'num' ? ' inputmode="decimal" data-num' : '') + ' data-fid="' + esc(c.id_form_item) + '" id="' + id + '" value="' + esc(c.valor) + '">';
+      ctrl = '<input class="eg-ac-campo" type="text" inputmode="decimal" data-num data-fid="' + esc(c.id_form_item) + '" id="' + id + '" value="' + esc(c.valor) + '">';
+    } else {
+      // o texto numa caixa que quebra a linha e cresce (09/11/2026: "tem que abrir uma caixa de texto que quebra o texto,
+      // está rolando infinito para o lado")
+      ctrl = '<textarea class="eg-ac-campo eg-ac-texto" rows="2" data-fid="' + esc(c.id_form_item) + '" id="' + id + '">' + esc(c.valor) + '</textarea>';
     }
     return '<label class="eg-dlg-campo" for="' + id + '"><span>' + esc(c.descricao) + req + '</span>' + ctrl + '</label>';
   }
@@ -258,7 +272,20 @@
         });
       }).catch(falhou);
     },
-    anexar: function (t) { inp.value = ''; inp.setAttribute('data-tarefa', t.id); inp.click(); },
+    // o Anexar da tarefa abre o cartão do anexo (09/11/2026); o arquivo vai para a aba Anexos desta tarefa
+    anexar: function (t) {
+      window.egCartaoAnexo({alvo: 'na tarefa ' + (t.ativo || t.titulo || t.n), aceitar: inp ? inp.getAttribute('accept') || '' : '',
+        enviar: function (fs) {
+          var fd = new FormData();
+          fs.forEach(function (f) { fd.append('anexos', f, f.name); });
+          fd.append('folio', caixa.dataset.folio || ''); fd.append('tarefa', t.id);
+          return pedir(caixa.dataset.incluirUrl, fd).then(function (j) {
+            dizer(j.mensagem, !j.ok); carregar();
+            if (!j.ok) throw new Error(j.mensagem);
+            return j.mensagem;
+          }, function (e) { falhou(e); if (e.login) e.login = caixa.dataset.login; throw e; });
+        }});
+    },
     iniciar: function (t) { return pedir(url(t.id, 'cronometro'), {acao: 'iniciar'}).then(depois).catch(falhou); },
     retomar: function (t) { return pedir(url(t.id, 'cronometro'), {acao: 'retomar'}).then(depois).catch(falhou); },
     // o check sai da tarefa relida (a data de fim que o Fracttal grava na tarefa), não do "concluída" da rota: se o tempo
@@ -267,6 +294,44 @@
       return pedir(url(t.id, 'cronometro'), {acao: 'concluir'}).then(depois).then(function () {
         var agora = tarefas.filter(function (x) { return String(x.id) === String(t.id); })[0];
         if (agora && !agora.feita) dizer('O tempo foi encerrado no Fracttal, mas a tarefa ainda não aparece como finalizada lá.', true);
+      }).catch(falhou);
+    },
+    // os registros da tarefa (09/11/2026: "A ideia é poder editar o início e fim da atividade!"): cada execução com o
+    // início e o fim na hora de quem olha; o Salvar manda só os que mudaram, um por vez, e o Fracttal relê cada um
+    registros: function (t) {
+      return pedir(url(t.id, 'registros')).then(function (j) {
+        var rs = j.registros || [];
+        if (!rs.length) { dizer('Esta tarefa ainda não tem registro de execução: use o Iniciar.'); return; }
+        function local(iso) {
+          if (!iso) return '';
+          var d = new Date(iso); if (isNaN(d.getTime())) return '';
+          function p(n) { return String(n).padStart(2, '0'); }
+          return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + 'T' + p(d.getHours()) + ':' + p(d.getMinutes());
+        }
+        function dur(s) { var h = Math.floor(s / 3600), m = Math.round((s % 3600) / 60); return h ? h + ' h ' + m + ' min' : m + ' min'; }
+        var corpo = rs.map(function (r) {
+          var trava = r.aberta ? ' disabled' : '';
+          return '<fieldset class="eg-reg" data-reg="' + esc(r.id) + '" data-ini="' + esc(local(r.inicio)) + '" data-fim="' + esc(local(r.fim)) + '">'
+            + '<legend>' + esc(r.quem || 'Registro') + (r.aberta ? ' · em andamento' : ' · ' + dur(r.trabalhado_s || 0)) + '</legend>'
+            + '<label class="eg-dlg-campo"><span>Início</span><input class="eg-ac-campo" type="datetime-local" data-reg-ini value="' + esc(local(r.inicio)) + '"' + trava + '></label>'
+            + '<label class="eg-dlg-campo"><span>Fim</span><input class="eg-ac-campo" type="datetime-local" data-reg-fim value="' + esc(local(r.fim)) + '"' + trava + '></label>'
+            + (r.aberta ? '<p class="eg-dica">Ainda em andamento: encerre a atividade para editar.</p>' : '') + '</fieldset>';
+        }).join('');
+        dialogo('Registros · ' + (t.ativo || t.titulo), corpo, 'Salvar registros', function (d) {
+          var mudou = [].slice.call(d.querySelectorAll('[data-reg]')).filter(function (f) {
+            var i = f.querySelector('[data-reg-ini]'), fi = f.querySelector('[data-reg-fim]');
+            return !i.disabled && (i.value !== f.dataset.ini || fi.value !== f.dataset.fim);
+          });
+          if (!mudou.length) return Promise.reject(new Error('Nenhum registro mudou.'));
+          return mudou.reduce(function (p, f) {
+            return p.then(function () {
+              return pedir(caixa.dataset.tarefaUrl + '/' + encodeURIComponent(t.id) + '/registro/' + encodeURIComponent(f.dataset.reg),
+                {inicio: f.querySelector('[data-reg-ini]').value, fim: f.querySelector('[data-reg-fim]').value});
+            });
+          }, Promise.resolve()).then(function () {
+            return depois({mensagem: mudou.length === 1 ? 'Registro alterado no Fracttal.' : mudou.length + ' registros alterados no Fracttal.'});
+          });
+        });
       }).catch(falhou);
     },
     pausar: function (t) {
@@ -290,14 +355,6 @@
     var fn = ACOES[b.getAttribute('data-tarefa-acao')]; if (!fn) return;
     b.disabled = true;
     Promise.resolve(fn(t)).then(function () { b.disabled = false; }, function () { b.disabled = false; });
-  });
-  if (inp) inp.addEventListener('change', function () {
-    var fs = Array.prototype.slice.call(inp.files || []); if (!fs.length) return;
-    var fd = new FormData();
-    fs.forEach(function (f) { fd.append('anexos', f, f.name); });
-    fd.append('folio', caixa.dataset.folio || ''); fd.append('tarefa', inp.getAttribute('data-tarefa') || '');
-    dizer(fs.length === 1 ? 'Enviando o anexo para a tarefa…' : 'Enviando ' + fs.length + ' anexos para a tarefa…');
-    pedir(caixa.dataset.incluirUrl, fd).then(function (j) { dizer(j.mensagem, !j.ok); return carregar(); }).catch(falhou);
   });
 })();
 
@@ -335,10 +392,89 @@
       .then(function (r) { return r.json().catch(function () { return {}; }).then(function (j) { return {r: r, j: j}; }); })
       .then(function (x) {
         btn.disabled = false;
-        if (x.r.ok && x.j.ok) { location.replace(location.pathname + '?' + new URLSearchParams({ok: x.j.mensagem || 'Feito.'}).toString()); return; }
+        if (x.r.ok && x.j.ok) { window.egVoltarComOk(x.j.mensagem || 'Feito.'); return; }
         if (x.j.login) { diz(x.j.erro || 'Para ir à nota da OS, entre pelo Fracttal.', true, x.j.login); return; }
         diz(x.j.erro || ('O Nexus não levou (HTTP ' + x.r.status + '). Nada mudou; tente de novo.'), true);
       })
       .catch(function () { btn.disabled = false; diz('Não consegui falar com o Nexus. Tente de novo.', true); });
   });
 })();
+
+/* O cartão do anexo (09/11/2026, Levi: "ao clicar em anexar aparecesse uma tela card sobrepondo porém sem blur de fundo
+   aparecendo um ícone de imagem a mensagem 'Cole ou faça o upload do anexo' o 'faça upload do anexo' será clicável em
+   verde grid"). O Anexar da tarefa e o Incluir anexo da OS o abrem com o `enviar` deles (que devolve a promessa); o link
+   abre o seletor de arquivos, o Ctrl+V (ou o Win+V) cola e o arrastar solta. Sem véu nem desfoque atrás; o clique fora,
+   o Esc e o x fecham. A imagem colada ("image.png") ganha o nome com a data e a hora. */
+(function () {
+  function nomeColado(f, i) {
+    if (f.name && !/^image\.(png|jpe?g|gif|webp|bmp)$/i.test(f.name)) return f;
+    function p(n) { return String(n).padStart(2, '0'); }
+    var a = new Date(), ext = ((f.type || '').split('/')[1] || 'png').replace('jpeg', 'jpg');
+    return new File([f], 'colado ' + a.getFullYear() + '-' + p(a.getMonth() + 1) + '-' + p(a.getDate()) + ' ' + p(a.getHours())
+      + 'h' + p(a.getMinutes()) + 'm' + p(a.getSeconds()) + 's' + (i ? ' ' + (i + 1) : '') + '.' + ext, {type: f.type});
+  }
+  window.egCartaoAnexo = function (op) {
+    var d = document.createElement('dialog');
+    d.className = 'eg-anx'; d.setAttribute('aria-label', 'Anexar ' + (op.alvo || ''));
+    d.innerHTML = '<button type="button" class="eg-anx-x" data-fechar aria-label="Fechar">×</button>'
+      + '<svg class="eg-anx-ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4.5" width="18" height="15" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.6"/>'
+      + '<circle cx="9" cy="10" r="1.8" fill="none" stroke="currentColor" stroke-width="1.6"/>'
+      + '<path d="M3.8 17.8 9.3 12.3l4 4 2.6-2.6 4.3 4.3" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/></svg>'
+      + '<p class="eg-anx-t">Cole ou <button type="button" class="eg-anx-up" data-upload>faça o upload do anexo</button></p>'
+      + '<p class="eg-anx-s"></p><input type="file" multiple hidden>'
+      + '<p class="eg-anx-msg" role="status" hidden></p>';
+    document.body.appendChild(d);
+    var up = d.querySelector('[data-upload]'), inp = d.querySelector('input[type=file]'), msg = d.querySelector('.eg-anx-msg');
+    d.querySelector('.eg-anx-s').textContent = op.alvo || '';
+    if (op.aceitar) inp.setAttribute('accept', op.aceitar);
+    if (op.regra) up.title = op.regra;
+    var ocupado = false;
+    function dizer(texto, ruim, link) {
+      msg.replaceChildren(document.createTextNode(texto || ''));
+      if (link) { var a = document.createElement('a'); a.href = link; a.textContent = 'Entrar pelo Fracttal'; msg.appendChild(document.createTextNode(' ')); msg.appendChild(a); }
+      msg.hidden = !texto; msg.classList.toggle('eg-anx-msg--ruim', !!ruim);
+    }
+    function mandar(fs) {
+      if (ocupado || !fs.length) return;
+      ocupado = true; up.disabled = true;
+      dizer(fs.length === 1 ? 'Enviando ' + fs[0].name + '…' : 'Enviando ' + fs.length + ' arquivos…');
+      Promise.resolve().then(function () { return op.enviar(fs); }).then(function (m) {
+        dizer(m || 'Anexo incluído.'); setTimeout(function () { if (d.open) d.close(); }, 1400);
+      }, function (e) {
+        ocupado = false; up.disabled = false; dizer((e && e.message) || 'Não consegui anexar. Tente de novo.', true, e && e.login);
+      });
+    }
+    function colar(e) {
+      var fs = Array.prototype.slice.call((e.clipboardData && e.clipboardData.files) || []).map(nomeColado);
+      if (!fs.length) return;
+      e.preventDefault(); mandar(fs);
+    }
+    up.addEventListener('click', function () { inp.value = ''; inp.click(); });
+    inp.addEventListener('change', function () { mandar(Array.prototype.slice.call(inp.files || [])); });
+    d.querySelector('[data-fechar]').addEventListener('click', function () { d.close(); });
+    d.addEventListener('click', function (e) {       // o clique fora do cartão (no fundo) fecha
+      if (e.target !== d) return;
+      var r = d.getBoundingClientRect();
+      if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) d.close();
+    });
+    d.addEventListener('dragover', function (e) { e.preventDefault(); d.classList.add('eg-anx--sobre'); });
+    d.addEventListener('dragleave', function () { d.classList.remove('eg-anx--sobre'); });
+    d.addEventListener('drop', function (e) {
+      e.preventDefault(); d.classList.remove('eg-anx--sobre');
+      mandar(Array.prototype.slice.call((e.dataTransfer && e.dataTransfer.files) || []));
+    });
+    document.addEventListener('paste', colar);
+    d.addEventListener('close', function () { document.removeEventListener('paste', colar); d.remove(); });
+    d.showModal(); up.focus();
+    return d;
+  };
+})();
+
+/* A página relida com o aviso (09/11/2026): o mesmo endereço, o `ok` novo e o resto da busca (o `?de=` de quem veio do
+   Quadro da Performance ou de Garantias segue, e a volta continua sendo a de lá). */
+window.egVoltarComOk = function (texto) {
+  var q = new URLSearchParams(location.search);
+  q.delete('erro'); q.set('ok', texto || 'Feito.');
+  location.replace(location.pathname + '?' + q.toString());
+};
+

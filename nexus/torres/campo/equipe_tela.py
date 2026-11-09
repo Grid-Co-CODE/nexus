@@ -105,8 +105,8 @@ def _configurado(cfg) -> None:
     dela e nunca chegariam ao banco; a casca recebe 503 (visível, e nenhuma chave se perde). Nos testes o gravador nunca
     liga, e as rotas valem."""
     if not cfg.get("TESTING") and not G.ativo(cfg):
-        raise _Recusa(503, "o Mapa de equipe não grava nesta máquina (NEXUS_EQUIPE_GRAVA=1 só no servidor que grava): "
-                           "nada é recebido aqui")
+        raise _Recusa(503, "o Mapa de equipe não grava nesta máquina (Base → Chaves → Nexus: NEXUS_EQUIPE_GRAVA = 1, "
+                           "só no servidor que grava): nada é recebido aqui")
     falta = [f"{nome} ({onde})" for nome, onde in _CONFIG
              if not (str(cfg.get(nome) or "").strip() if nome == "NEXUS_CHAVE_CADASTRO" else chaves.valor(nome, cfg))]
     if falta:
@@ -599,6 +599,8 @@ def equipe():
                               key=lambda x: chave_texto(x[1])),
         "filtro": filtro,
         "avisos": avisos, "admin": admin, "todos": todos, "no_piloto": sum(1 for t in todos if t["no_piloto"]),
+        # se a gravação está ligada nesta máquina (09/11/2026, a chave da tela Base → Chaves): só para o administrador
+        "grava": G.ativo(current_app.config) if admin else None,
         "piloto_msg": PILOTO_MSG.get(str(request.args.get("piloto") or "")),
         "agora": f"{agora.astimezone(_BRT):%H:%M}"})
 

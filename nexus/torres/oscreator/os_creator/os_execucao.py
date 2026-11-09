@@ -235,6 +235,9 @@ RPC_EXEC_FINISH = "tasks.work_orders_tasks_execution_finish"
 RPC_EXEC_GET = "tasks.wo_task_get_execution"
 RPC_EXEC_LIST = "tasks.wo_tasks_execution_list"
 RPC_EXEC_TYPES = "tasks.wo_tasks_execution_types_list"
+# editar um registro de execução (o início e o fim): capturado no Fracttal web pelo Levi em 09/11/2026 (o id do registro,
+# o início em UTC com o Z, `to_pause` False e `to_stop` True: o registro segue encerrado)
+RPC_EXEC_UPDATE = "tasks.wo_tasks_execution_update"
 
 _PAUSA_CACHE = []       # UMA lista, que nunca é religada: o `api._PAUSA_CACHE` é este mesmo objeto (o `motivos_pausa` muda o conteúdo)
 
@@ -381,6 +384,22 @@ def finalizar_execucao(id_work_order_task) -> dict:
     if isinstance(res, dict) and res.get("success") is False:
         return {"ok": False, "erro": str(res.get("message") or "nao consegui concluir")}
     return {"ok": True, "raw": res}
+
+
+def editar_execucao(id_execucao, inicio, fim=None) -> dict:
+    """Muda o início (e o fim) de um registro de execução já encerrado, como o "editar registro" do Fracttal web
+    (09/11/2026, Levi: "A ideia é poder editar o início e fim da atividade!"). `inicio`/`fim` são datetime COM fuso; vão
+    em UTC com o Z. Quem chama relê o registro: o Fracttal pode aceitar calado."""
+    if not id_execucao or inicio is None:
+        return {"ok": False, "erro": "Falta o registro ou o início."}
+    params = {"id": id_execucao, "initial_date": api._iso_z(inicio)}
+    if fim is not None:
+        params["final_date"] = api._iso_z(fim)
+    params.update(to_pause=False, to_stop=True)
+    res = api._rpc_call(RPC_EXEC_UPDATE, params)
+    if isinstance(res, dict) and res.get("success") is False:
+        return {"ok": False, "erro": str(res.get("message") or "o Fracttal recusou a edição do registro").replace("_", " ")}
+    return {"ok": True}
 
 
 def execucoes_abertas(id_work_order_task) -> list:

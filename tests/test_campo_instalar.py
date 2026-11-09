@@ -31,6 +31,10 @@ def chamadas(monkeypatch):
     monkeypatch.setattr(chamados_acompanhamento, "ligar", lambda app: feitas.append("Fracttal: chamados no banco"))
     # o laço das tarefas das OS (18/10/2026) é outra thread do mesmo jeito: marcador, nunca a rede
     monkeypatch.setattr(tarefas_os, "ligar", lambda app: feitas.append("Fracttal: tarefas das OS no banco"))
+    # o laço do gravador do Mapa de equipe sobe em toda máquina desde 09/11/2026 (confere a chave da tela a cada rodada):
+    # com o app falso, que não é de teste, ele leria o chaves.json da pasta de dados de verdade do PC
+    from nexus.campo.equipe import gravador as equipe_gravador
+    monkeypatch.setattr(equipe_gravador, "ligar", lambda app: None)
     # a cópia em disco das fotos da ronda: o app falso não tem TESTING e apontava a pasta para a dados/ de verdade do
     # PC, onde os testes seguintes gravavam as fotos falsas (13/10/2026)
     monkeypatch.setattr(ronda_fotos, "configurar", lambda pasta: None)

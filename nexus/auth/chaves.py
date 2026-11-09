@@ -165,6 +165,15 @@ def _conferir_guid(rotulo: str):
     return conferir
 
 
+def _conferir_grava(valor: str) -> str:
+    """O NEXUS_EQUIPE_GRAVA (09/11/2026): só "1" (o Mapa de equipe grava nesta máquina) ou "0" (não grava). A tela não
+    mostra o valor de nenhuma chave; o aviso de gravar diz qual ficou, e a tela do Mapa de equipe mostra ao administrador
+    se a gravação está ligada nesta máquina."""
+    if valor not in ("1", "0"):
+        raise Recusada("Mapa de equipe, gravar nesta máquina: use 1 (liga) ou 0 (desliga): nada foi gravado.")
+    return "1: o Mapa de equipe grava nesta máquina" if valor == "1" else "0: o Mapa de equipe não grava nesta máquina"
+
+
 # nome da variável → o que é, para que serve, e a conferência antes de gravar
 CHAVES = {
     "NEXUS_CONTESTACAO_CHAVE_PRIVADA": {
@@ -236,6 +245,19 @@ CHAVES = {
         "dica": "o ID do diretório (tenant id) da Grid Co. no Entra ID, um GUID de 8-4-4-4-12 caracteres (o da "
                 "authority do msalConfig do campo.html), não o domínio",
         "conferir": _conferir_guid("ID do diretório da Grid Co."),
+    },
+    # a gravação do Mapa de equipe (09/11/2026, pedido da sessão Nexus Field: a variável só existia no .env do servidor,
+    # que o Levi não alcança). O chaves.json é da MÁQUINA (a pasta de dados): gravada na tela do servidor, vale só lá, e
+    # a regra "uma máquina por vez" continua. Vale sem reiniciar (`gravador.ativo` a lê a cada pedido e a cada rodada)
+    "NEXUS_EQUIPE_GRAVA": {
+        "nome": "Mapa de equipe: gravar nesta máquina",
+        "para": "ligar (1) ou desligar (0) o Mapa de equipe NESTA máquina: as rotas do celular recebem e o gravador põe "
+                "no banco os pontos, os deslocamentos, as chaves dos aparelhos e o registro de quem viu. Uma máquina só "
+                "(o servidor): o PC e o servidor nunca gravam juntos. A guarda de 7 dias no banco é a limpeza da "
+                "T.I. (docs/mapa-equipe-pedido-ti.md)",
+        "arquivo": "",
+        "dica": "1 para ligar, 0 para desligar; Apagar volta ao .env do servidor (sem ele, desligado)",
+        "conferir": _conferir_grava,
     },
 }
 

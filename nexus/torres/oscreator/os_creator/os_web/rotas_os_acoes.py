@@ -7,6 +7,7 @@ rota aponta a linha do desktop). As rotas devolvem JSON sob `/os/api/os/<wid>/..
 antes de escrever e recarrega o fragmento do card (`/os/os/<wid>?parcial=1`) ao terminar. Erro do Fracttal sobe para o
 `app_errorhandler` do rotas.py (sessão morta → 401 com `login`; recusa → 502 com a mensagem)."""
 from __future__ import annotations
+import logging
 import mimetypes
 import os
 import secrets
@@ -15,7 +16,7 @@ import threading
 import time
 from urllib.parse import quote
 
-from flask import Blueprint, Response, jsonify, request, send_file, session
+from flask import Blueprint, Response, jsonify, render_template, request, send_file, session
 
 import api
 import ativos_central
@@ -26,6 +27,8 @@ from . import solic_eng_web as regra_anexo
 from . import rotas as _rotas
 from . import tradicional_web as trad
 from .rotas import exige_sessao
+
+log = logging.getLogger(__name__)
 
 bp = Blueprint("os_web_os_acoes", __name__, url_prefix="/os")
 
@@ -177,6 +180,15 @@ def api_anexos_incluir(wid):
         200 if incluidos else 502
 
 
+def _falha_anexo(msg: str, status: int):
+    """O erro do Abrir e do Baixar de um anexo (09/11/2026, OS 8159: o Abrir mostrava '{"erro":"Falha ao baixar a imagem
+    (HTTP 404)."}' e o Baixar salvava esse JSON como arquivo). Aberto numa aba (o Abrir, `abrir=1`), a página de aviso do OS
+    Creator; pedido pela tela (o Baixar, que pede JSON e não salva o erro), o JSON de sempre."""
+    if request.args.get("abrir") and "application/json" not in (request.headers.get("Accept") or ""):
+        return render_template("erro.html", conta=session.get("conta") or {}, aba="", mensagem=msg), status
+    return _erro(msg, status)
+
+
 @bp.route("/api/os/<int:wid>/anexo")
 @exige_sessao
 def api_anexo_baixar(wid):
@@ -187,12 +199,19 @@ def api_anexo_baixar(wid):
     requisição sem cabeçalhos de auth do S3 que a galeria usa (documentos.py faz o mesmo GET por conta própria)."""
     value = (request.args.get("value") or "").strip()
     if not value:
-        return _erro("Anexo sem caminho no S3.")
+        return _falha_anexo("Este anexo não tem arquivo no Fracttal.", 404)
     nome = regra.fname(request.args.get("nome") or "") or regra.fname(value) or "anexo"
     url = api.s3_get_url(value)
     if not url:
-        return _erro("Não consegui renovar o link deste anexo no Fracttal (reabra os anexos e tente de novo).", 404)
-    dados = api.baixar_imagem(url)                                   # FracttalError sobe → 502 JSON
+        return _falha_anexo("Não consegui renovar o link deste anexo no Fracttal (reabra os anexos e tente de novo).", 404)
+    try:
+        dados = api.baixar_imagem(url)
+    except api.SessionExpired:
+        raise
+    except api.FracttalError as e:
+        if "HTTP 404" in str(e) or "HTTP 403" in str(e):
+            return _falha_anexo("O arquivo \"%s\" não está mais no Fracttal: abra a OS no Fracttal para conferir." % nome, 404)
+        return _falha_anexo("Não consegui baixar o anexo \"%s\" do Fracttal agora: tente de novo em instantes." % nome, 502)
     tipo = mimetypes.guess_type(nome)[0] or "application/octet-stream"
     ascii_ = nome.encode("ascii", "ignore").decode() or "anexo"
     # abrir=1: mostra ali mesmo (o PDF no leitor do navegador, a foto na galeria) — o link do anexo que veio sem a
@@ -321,11 +340,29 @@ def _recursos_ou_none(wid):
         return None
 
 
+# as fotos do PDF têm prazo (09/11/2026, OS 8159: "Não consegui montar o PDF... O servidor não respondeu"): a OS com muitas
+# fotos baixava todas, 6 de cada vez e até 30 s cada, e o pedido passava do tempo que o caminho até o servidor espera; a
+# tela recebia a página de erro do caminho, e não a resposta. Passado o prazo, as fotos que faltam saem no PDF dizendo que
+# não vieram (como a foto que o Fracttal não entrega), e o PDF chega
+PRAZO_FOTOS_S = 45
+
+
 @bp.route("/api/os/pdf", methods=["POST"])
 @exige_sessao
 def api_os_pdf():
     """O PDF de UMA OS: pelo `wid` quando a tela já o sabe, senão pelo nº (`folio`, a OS de campo e a inspeção da
-    cadeia do chamado)."""
+    cadeia do chamado). O erro responde sempre em JSON, com o motivo (09/11/2026: o erro sem JSON virava, na tela, "o
+    servidor não respondeu, a gravação pode ter sido feita" no card e "a sua sessão do Nexus acabou" na Aprovação de OS)."""
+    try:
+        return _os_pdf()
+    except api.FracttalError:
+        raise                                               # a sessão caída e o erro do Fracttal: o tratador de sempre (JSON)
+    except Exception as e:                                  # noqa: BLE001 — o motivo vai à tela e a pilha ao log
+        log.exception("PDF da OS: não montou")
+        return _erro("Não consegui montar o PDF desta OS (%s): tente de novo em instantes." % type(e).__name__, 500)
+
+
+def _os_pdf():
     from datetime import datetime
 
     from . import os_pdf
@@ -354,8 +391,11 @@ def api_os_pdf():
     local = cat.local_por_codigo.get(str(d.get("code") or "")) if cat is not None else None
     m = os_pdf.modelo(d, recursos=recursos, anexos_sub=subs, anexos_os=oss, local=local)
     pasta_fotos = os.path.join(api._data_dir(), "os_pdf_fotos")    # a cópia reduzida de cada foto (os_pdf)
+    inicio = time.monotonic()
 
     def _foto(f):
+        if time.monotonic() - inicio > PRAZO_FOTOS_S:      # passou do prazo: esta sai no PDF como "não veio"
+            return None
         try:
             return os_pdf.reduzir_guardada(_baixar_anexo(f["item"]), pasta_fotos)
         except Exception:                                   # noqa: BLE001 — a que não vem sai no PDF dizendo isso
@@ -658,6 +698,82 @@ def api_cronometro(wid, tid):
     return jsonify({"ok": True, "estado": esperado, "mensagem": feito + " no Fracttal.",
                     "execucao": {"estado": esperado, "inicio": agora.get("inicio") or "",
                                  "trabalhado_s": agora.get("trabalhado_s") or 0}})
+
+
+# ── os registros da tarefa: editar o início e o fim (09/11/2026) ──────────────────────────────────────────────────────
+# Levi: "Gostaria que nas subtarefas fosse possível também editar registros [...] A ideia é poder editar o início e fim
+# da atividade!". Os registros são as execuções da tarefa (`historico_execucao`, o `tasks.wo_tasks_execution_list`); o
+# editar é o `editar_execucao` (o `tasks.wo_tasks_execution_update` da captura dele). Só o registro encerrado: o
+# `to_stop` encerraria o que está rodando. O registro é relido depois (o Fracttal aceita calado).
+def _quando_utc(v):
+    """O `initial_date`/`final_date` do Fracttal (UTC; com ou sem o Z) → datetime aware em UTC, ou None."""
+    from datetime import datetime, timezone
+    t = str(v or "").strip()
+    if not t or t.lower() == "none":
+        return None
+    try:
+        d = datetime.fromisoformat(t.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return d if d.tzinfo else d.replace(tzinfo=timezone.utc)
+
+
+def _um_registro(e: dict) -> dict:
+    ini, fim = _quando_utc(e.get("initial_date")), _quando_utc(e.get("final_date"))
+    return {"id": e.get("id"), "inicio": ini.isoformat() if ini else "", "fim": fim.isoformat() if fim else "",
+            "aberta": fim is None,
+            "quem": str(e.get("name") or e.get("personnel_description") or "").strip(),
+            "trabalhado_s": int(e.get("total_active_seconds") or 0)}
+
+
+@bp.route("/api/os/<int:wid>/tarefa/<int:tid>/registros")
+@exige_sessao
+def api_registros(wid, tid):
+    if not _tarefa_da_os(wid, tid):
+        return _erro("Esta tarefa não é da OS.", 404)
+    regs = [_um_registro(e) for e in (api.historico_execucao(tid) or []) if isinstance(e, dict) and e.get("id")]
+    return jsonify({"registros": regs})
+
+
+@bp.route("/api/os/<int:wid>/tarefa/<int:tid>/registro/<int:rid>", methods=["POST"])
+@exige_sessao
+def api_registro_editar(wid, tid, rid):
+    """{inicio, fim}: o que o <input type=datetime-local> manda, na hora de Brasília. O fim é opcional (fica o que era)."""
+    from datetime import datetime, timedelta
+    if not _tarefa_da_os(wid, tid):
+        return _erro("Esta tarefa não é da OS.", 404)
+    c = _corpo()
+    antes = {e.get("id"): e for e in (api.historico_execucao(tid) or []) if isinstance(e, dict)}
+    if rid not in antes:
+        return _erro("Este registro não é da tarefa.", 404)
+    if _quando_utc(antes[rid].get("final_date")) is None:
+        return _erro("Encerre a atividade antes de editar o registro (ele ainda está aberto).")
+    try:
+        if not str(c.get("inicio") or "").strip():
+            raise ValueError
+        ini = trad.data_brt(c.get("inicio"))
+        fim = trad.data_brt(c.get("fim")) if str(c.get("fim") or "").strip() else None
+    except (ValueError, TypeError):
+        return _erro("Informe o início (e o fim, se quiser) com a data e a hora.")
+    if fim is not None and fim < ini:
+        return _erro("O fim não pode ser antes do início.")
+    if max(ini, fim or ini) > datetime.now(trad.BRT) + timedelta(minutes=5):
+        return _erro("O registro não pode ficar no futuro.")
+    res = api.editar_execucao(rid, ini, fim)
+    if not (isinstance(res, dict) and res.get("ok")):
+        return _erro((res or {}).get("erro") or "O Fracttal não gravou o registro.", 502)
+    depois = {e.get("id"): e for e in (api.historico_execucao(tid) or []) if isinstance(e, dict)}
+    novo = depois.get(rid) or {}
+
+    def bate(lido, pedido):
+        d = _quando_utc(lido)
+        return d is not None and abs((d - pedido).total_seconds()) < 60
+    if not bate(novo.get("initial_date"), ini) or (fim is not None and not bate(novo.get("final_date"), fim)):
+        return _erro("O Fracttal aceitou, mas o registro não ficou com o horário pedido. Confira no Fracttal.", 502)
+    lista_central.mudou(wid)
+    f = lambda d: d.astimezone(trad.BRT).strftime("%d/%m %H:%M")     # noqa: E731
+    return jsonify({"ok": True, "mensagem": "Registro alterado no Fracttal: início %s%s." % (
+        f(ini), (", fim %s" % f(fim)) if fim is not None else "")})
 
 
 @bp.route("/api/os/<int:wid>/tarefa/<int:tid>/respostas", methods=["POST"])

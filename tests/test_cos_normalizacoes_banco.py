@@ -305,13 +305,14 @@ def test_aberta_sem_nome_nem_texto_livre():
     assert not {"falha", "impacto", "ultima_nota", "aguardando", "equipamentos", "usina"} & set(NB.CAB_ABERTA)
 
 
-def test_grava_as_abertas_e_na_falha_da_fotografia_o_retrato_de_antes_fica(app, banco):
+def test_grava_as_abertas_e_na_falha_da_fotografia_o_retrato_de_antes_fica(app, banco, monkeypatch):
+    monkeypatch.setattr(NB, "COMENTARIOS_SO_DAS_USINAS", frozenset({"TSTE-AAA100"}))
     ab = NB.abertas(_foto(("TSTE-AAA100", [_oc("a1")])), [], [], USINAS)
     with app.app_context():
         rel = NB.publicar(app.config, banco, agora=AGORA, forcar=True, leitura=_leitura([_n("r1")]),
                           abertas_lidas=(ab[0], "2026-10-29T15:21:00-03:00", ab[1]))
-    # a aberta desde 12/07 tem comentário em cada dia que a memória guarda (01/10 a 29/10)
-    assert rel["gravado"] == {NB.ABA: 1, NB.ABA_ABERTAS: 1, NB.ABA_COMENTARIOS: 29, "atualizacao": 1}
+    # a aberta desde 12/07 NÃO vira comentário (09/11/2026: repetida em todo dia, o dono mandou tirar), nem na usina liberada
+    assert rel["gravado"] == {NB.ABA: 1, NB.ABA_ABERTAS: 1, NB.ABA_COMENTARIOS: 0, "atualizacao": 1}
     a = banco.linhas(NB.LIVRO, "atualizacao")[0]
     assert (a["abertas_em"], a["abertas_qtd"]) == ("2026-10-29T15:21:00-03:00", 1)
     with app.app_context():
@@ -407,7 +408,21 @@ def test_a_aberta_em_atendimento_com_o_equipamento_citado():
     assert d["2026-11-09"]["relato_do_dia"] == "Continuação: Cabine 2 desligada desde 08/11 às 10:15, em atendimento pelo COS."
 
 
-def test_a_gravacao_leva_o_comentario_do_dia(app, banco):
+def test_o_comentario_do_dia_so_da_aparecida_do_taboado(app, banco):
+    """09/11/2026, o dono: "VOLTA TUDO AO NORMAL URGENTE" e "deixe somente as de aparecida do taboado". A outra usina
+    fica sem linha (a Plataforma volta à dela); a Aparecida (ADT100) mantém o comentário; a aba continua no livro."""
+    assert NB.COMENTARIOS_SO_DAS_USINAS == frozenset({"ADT100"})
+    with app.app_context():
+        rel = NB.publicar(app.config, banco, agora=AGORA, forcar=True,
+                          leitura=_leitura([_n("r1", relato_cliente=REL, relato_continuacao=CONT),
+                                            _n("r2", usina_codigo="ADT100", relato_cliente=REL, relato_continuacao=CONT)]))
+    gravadas = banco.linhas(NB.LIVRO, NB.ABA_COMENTARIOS)
+    assert [(g["usina_codigo"], g["dia"]) for g in gravadas] == [("ADT100", "2026-10-27")]
+    assert rel["comentarios_dias"] == 1 and rel["gravado"][NB.ABA] == 2
+
+
+def test_a_gravacao_leva_o_comentario_do_dia(app, banco, monkeypatch):
+    monkeypatch.setattr(NB, "COMENTARIOS_SO_DAS_USINAS", frozenset({"TSTE-AAA100"}))
     with app.app_context():
         rel = NB.publicar(app.config, banco, agora=AGORA, forcar=True,
                           leitura=_leitura([_n("r1", relato_cliente=REL, relato_continuacao=CONT)]))

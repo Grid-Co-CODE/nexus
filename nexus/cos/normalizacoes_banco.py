@@ -75,6 +75,11 @@ CAB_ABERTA = ("registro", "os", "cliente", "usina_codigo", "usina_id", "usina_li
               "dias_aberta_qtd", "geracao_parou", "protecoes")
 # o comentário de cada dia para a Plataforma de Performance (09/11/2026): ver `comentarios_do_dia`
 ABA_COMENTARIOS = "fato_comentario_dia"
+# SÓ A APARECIDA DO TABOADO desde 09/11/2026. O dono, ao ver na Plataforma as abertas antigas repetidas em todo dia da
+# Mandaguaçu: "VOLTA TUDO AO NORMAL URGENTE" e "deixe somente as de aparecida do taboado". As outras usinas ficam sem
+# linha, e a Plataforma volta à linha dela; as ABERTAS não entram em nenhuma (era delas a repetição). A aba continua no
+# livro. Abrir para outra usina, ou voltar com as abertas, só com o OK do dono.
+COMENTARIOS_SO_DAS_USINAS = frozenset({"ADT100"})
 TIPO_COMENTARIOS = "snapshot_acumulado"
 GRAO_COMENTARIOS = ("1 linha = 1 usina (o código do Fracttal) × 1 dia de Brasília em que uma ocorrência da Ronda COS "
                     "tocou o horário de sol (06h às 18h)")
@@ -460,7 +465,7 @@ def publicar(config, sessao=None, *, agora=None, forcar=False, leitura=None, abe
         # a fotografia não veio: o retrato de antes fica, com a hora dele (o livro é trocado inteiro a cada gravação)
         ab = [[r.get(c, "") for c in CAB_ABERTA] for r in livros.ler(base, s, LIVRO, ABA_ABERTAS) if r.get("registro")]
         ab_em = next((str(r.get("abertas_em") or "") for r in livros.ler(base, s, LIVRO, "atualizacao")), "")
-    comentarios = comentarios_do_dia(todas, ab, agora, desde)
+    comentarios = [c for c in comentarios_do_dia(todas, [], agora, desde) if c[0] in COMENTARIOS_SO_DAS_USINAS]
     rel["comentarios_dias"] = len(comentarios)
     atu = [agora.isoformat(timespec="seconds"), len(todas), desde.date().isoformat(), rel["ligadas"] + sum(
         1 for l in antes if l[5]), ab_em, len(ab)]

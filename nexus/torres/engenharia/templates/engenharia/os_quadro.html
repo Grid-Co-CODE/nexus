@@ -20,21 +20,21 @@
 {% set ROT = {'fazer': 'A fazer', 'execucao': 'Em execução', 'verificacao': 'Em verificação', 'concluida': 'Concluída', 'cancelada': 'Cancelada'} %}
 <div class="campo-nativa eg-os eg-ac">
   {% if not o %}
-  <a class="eg-ac-volta" href="{{ url_for(volta_endpoint) }}">← {{ volta_texto }}</a>
+  <a class="eg-ac-volta" href="{{ volta_href }}">← {{ volta_texto }}</a>
   <h1 class="cn-titulo">OS {{ folio }}</h1>
   {% if nao_achou %}<p class="cn-erro" role="status"><b>Não achei a OS {{ folio }} no Fracttal.</b> Confira o número.</p>
   {% else %}<p class="cn-erro" role="status"><b>O Fracttal não respondeu ({{ erro_fracttal }}).</b> Tente de novo em instantes.</p>
   {# o botão de tentar de novo (Levi, 05/11/2026: "Deixa um botão para a pessoa tentar novamente"): a recusa costuma ser a
      cota de 200 pedidos por minuto da empresa toda (às 23h30 de 04/11/2026 o App de Campo e esta página levaram 429 juntos),
      e dentro de um clique o Nexus não espera o minuto. Um link para a própria página: vale sem JavaScript #}
-  <p class="eg-ac-tentar"><a class="eg-ac-btn eg-ac-btn--g" href="{{ url_for(rota_os, folio=folio) }}">Tentar novamente</a></p>{% endif %}
+  <p class="eg-ac-tentar"><a class="eg-ac-btn eg-ac-btn--g" href="{{ url_for(rota_os, folio=folio, de=de or None) }}">Tentar novamente</a></p>{% endif %}
   {% else %}
   {# o topo da tela do chamado da Garantia (Levi, 24/10/2026: "essa parte de cima quero na mesma estrutura e fonte os
      botões quero nas mesmas posições"): numa linha a volta, a pílula do estado e o título com o ativo em verde; embaixo o
      local, o tipo e o status no Fracttal; à direita, no lugar do "Abrir a OS", o "Solicitar OS" #}
   <div class="eg-ac-head">
     <div class="eg-ac-esq">
-      <div class="eg-ac-tit"><a class="eg-ac-volta" href="{{ url_for(volta_endpoint) }}">← {{ volta_texto }}</a>
+      <div class="eg-ac-tit"><a class="eg-ac-volta" href="{{ volta_href }}">← {{ volta_texto }}</a>
         <span class="eg-ac-tag eg-ac-tag--{{ topo.cor }}">{{ topo.texto }}</span>
         <h1>{{ o.titulo or ('OS ' ~ o.os) }}</h1></div>
       {# Levi, 24/10/2026: "No título invés de OS e ativo bote o título da OS, no lugar do título da OS bote OS e ativo";
@@ -97,6 +97,7 @@
         <div class="eg-bloco-h"><h2>Status e prioridade</h2></div>
         {% if pode %}
         <form class="eg-ac-form" method="post" action="{{ url_for('torre_engenharia.equipe_os_classificar', folio=o.os) }}">
+          {% if de %}<input type="hidden" name="de" value="{{ de }}">{% endif %}
           <label><span class="eg-ac-lbl">Status</span>
             <select class="eg-ac-campo" name="status_id">{% if not est.status_id %}<option value="">Escolha o status</option>{% endif %}
               {% for i, n in status %}<option value="{{ i }}"{% if i == est.status_id %} selected{% endif %}>{{ n }}</option>{% endfor %}</select></label>
@@ -117,7 +118,7 @@
         {# a OS da engenharia como OS pai das OS de campo que nascem do Solicitar OS (Levi: "o ideal é que essa OS da
            engenharia se torne OS pai de OSs de campo futuramente") #}
         <ol class="eg-cadeia">
-          <li class="aqui"><span class="i">1</span><span class="t">OS da engenharia</span><a href="{{ url_for(rota_os, folio=o.os) }}">{{ o.os }}</a>{{ seta_pdf(o.os, o.wid) }}</li>
+          <li class="aqui"><span class="i">1</span><span class="t">OS da engenharia</span><a href="{{ url_for(rota_os, folio=o.os, de=de or None) }}">{{ o.os }}</a>{{ seta_pdf(o.os, o.wid) }}</li>
           {% for f in filhas %}<li><span class="i">{{ loop.index + 1 }}</span><span class="t">OS de campo{% if f.coluna in ('concluida', 'cancelada') %} · {{ ROT.get(f.coluna) }}{% endif %}</span><a href="{{ url_for('torre_engenharia.equipe_os', folio=f.os) }}">{{ f.os }}</a>{{ seta_pdf(f.os, f.wid) }}</li>{% endfor %}
         </ol>
         {% if erro_filhas %}<p class="eg-dica">Não consegui ler as OS de campo ({{ erro_filhas }}).</p>
@@ -132,7 +133,7 @@
           <dt>Usina</dt><dd>{{ o.usina or '—' }}</dd>
           {# o nome é o botão de trocar (Levi, 06/11/2026: "tire esse botão trocar e a troca pode ser feita ao clicar no nome
              do responsável") #}
-          <dt>Responsável</dt><dd class="eg-resp">{% if pode %}<button type="button" class="eg-resp-nome" data-resp-nome data-trocar-resp data-wid="{{ o.wid }}" data-folio="{{ o.os }}" data-volta="{{ url_for(volta_endpoint, atualizar=1) }}" title="Clique para atribuir esta OS a outra pessoa">{{ o.pessoa or '—' }}</button>{% else %}<span data-resp-nome>{{ o.pessoa or '—' }}</span>{% endif %}</dd>
+          <dt>Responsável</dt><dd class="eg-resp">{% if pode %}<button type="button" class="eg-resp-nome" data-resp-nome data-trocar-resp data-wid="{{ o.wid }}" data-folio="{{ o.os }}" data-volta="{{ volta_atualizar }}" title="Clique para atribuir esta OS a outra pessoa">{{ o.pessoa or '—' }}</button>{% else %}<span data-resp-nome>{{ o.pessoa or '—' }}</span>{% endif %}</dd>
           <dt>Criado por</dt><dd>{{ o.criado_por or '—' }}</dd>
           <dt>Criada em</dt><dd>{{ o.criada or '—' }}</dd>
           <dt>Etiquetas</dt><dd>{% for e in o.etiquetas %}{{ tag(e.nome, 'neutro') }} {% else %}—{% endfor %}</dd>
@@ -385,7 +386,7 @@
       .then(function (r) { return r.json().catch(function () { return {}; }).then(function (j) { return {r: r, j: j}; }); })
       .then(function (x) {
         btn.disabled = false;
-        if (x.r.ok && x.j.ok) { location.replace(location.pathname + '?' + new URLSearchParams({ok: x.j.mensagem || 'Comentário salvo.'}).toString()); return; }
+        if (x.r.ok && x.j.ok) { window.egVoltarComOk(x.j.mensagem || 'Comentário salvo.'); return; }
         // a sessão do Nexus que acabou (o portão responde com "login": true e o endereço do Entrar): de volta a ele
         if (x.j.login === true || x.j.sessao_encerrada) { location.href = x.j.entrar || location.href; return; }
         if (x.j.login) { diz(x.j.erro || 'Para ir à nota da OS, entre pelo Fracttal.', true, x.j.login); return; }
@@ -413,7 +414,7 @@
       .then(function (r) { return r.json().catch(function () { return {}; }).then(function (j) { return {r: r, j: j}; }); })
       .then(function (x) {
         b.disabled = false;
-        if (x.r.ok && x.j.ok) { location.replace(location.pathname + '?' + new URLSearchParams({ok: x.j.mensagem}).toString()); return; }
+        if (x.r.ok && x.j.ok) { window.egVoltarComOk(x.j.mensagem); return; }
         if (x.j.login === true || x.j.sessao_encerrada) { location.href = x.j.entrar || location.href; return; }
         falou(x.j.erro || ('O Nexus não gravou (HTTP ' + x.r.status + '). Nada mudou; tente de novo.'), x.j.login);
       })

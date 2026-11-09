@@ -1218,10 +1218,11 @@ from os_anexos import (  # noqa: E402,F401
     get_os_subtarefa_anexos, get_solic_anexos)
 from os_execucao import (  # noqa: E402,F401
     ACAO_PAUSADA, ACAO_RODANDO, EXEC_ENCERRADA, LABEL_EM_EXECUCAO, RPC_EXEC_FINISH, RPC_EXEC_GET, RPC_EXEC_INSERT,
-    RPC_EXEC_LIST, RPC_EXEC_PAUSE, RPC_EXEC_RESUME, RPC_EXEC_TYPES, RPC_WO_EXEC_GET, RPC_WO_EXEC_INSERT,
+    RPC_EXEC_LIST, RPC_EXEC_PAUSE, RPC_EXEC_RESUME, RPC_EXEC_TYPES, RPC_EXEC_UPDATE, RPC_WO_EXEC_GET, RPC_WO_EXEC_INSERT,
     RPC_WO_EXEC_LIST, RPC_WO_FORMIT_VALUES, RPC_WO_SEC_VALIDATE, RPC_WO_TASKS_NEW, SIMNAO_OPCOES, TIPO_CAMPO,
     VERIF_OPCOES, _CHECKLIST_SEM_PERMISSAO, _PAUSA_CACHE, _dono_execucao, execucao_atual, execucoes_abertas,
-    execucoes_da_tarefa, fechar_execucoes_abertas, finalizar_execucao, finalizar_execucao_os, historico_execucao,
+    editar_execucao, execucoes_da_tarefa, fechar_execucoes_abertas, finalizar_execucao, finalizar_execucao_os,
+    historico_execucao,
     id_tarefa_da_os, iniciar_execucao, iniciar_execucao_os, marcar_em_execucao, motivos_pausa, pausar_execucao,
     registrar_execucao, retomar_execucao, salvar_subtarefas, subtarefas_da_tarefa, tempo_trabalhado,
     tempo_trabalhado_em_massa, validar_seguranca_tarefa)
