@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block titulo %}{{ tela.nome }}{% endblock %}
+{% block conteudo %}
+{% from "_explica.html" import explica %}
+<link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='cos.css') }}">
+<noscript><meta http-equiv="refresh" content="60"></noscript>
+{# Monitoramento (09/11/2026, nexus/cos/monitoramento.py): a geração em kW ao vivo e a curva do dia de cada usina com logger
+   (SCADA Grid) e do SunOP, pelo Andamento da Ronda COS. Só lê. O corpo se atualiza sozinho (static/cos/monitoramento.js). #}
+<div class="campo-nativa">
+  <div class="cn-cab">
+    <div><p class="gc-eyebrow">{{ torre.nome }}</p><div class="gc-titulo-explica"><h1 class="cn-titulo">{{ tela.nome }}</h1>
+      {% call explica('Entenda esta tela') %}<p><b>De onde vem.</b> Da tela de monitoramento da Ronda COS, pelo Andamento: cada
+      usina com logger do SCADA Grid e cada usina do SunOP, uma linha por cartão (a usina dividida aparece uma vez por
+      parte). O kW, a situação e a hora da leitura são os do cartão de lá; o Nexus não recalcula nada.</p>
+      <p><b>Como se conta.</b> <b>Gerando agora</b> soma o kW das usinas da lista com leitura nova; a que está sem leitura nova
+      fica fora da soma, para um número parado não inflar o total. A <b>curva de hoje</b> é a média, de 15 em 15 minutos, das
+      amostras de 5 minutos que a Ronda COS grava do SCADA, das {{ '%02d'|format(curva_de) }}h às {{ curva_ate }}h; cada curva
+      vai de zero ao máximo da própria usina (a plataforma não guarda a potência instalada). O SunOP não guarda a série:
+      a usina dele aparece sem curva. Passe o mouse na curva para ver o kW de cada horário.</p>
+      <p><b>Como funciona.</b> A tela se atualiza sozinha a cada 30 segundos, sem recarregar a página. Clique no nome da usina
+      para abrir a ficha dela.</p>{% endcall %}</div>
+      <p class="cn-pergunta">{{ tela.pergunta }}</p></div>
+    <div class="cn-frescor">Andamento da Ronda COS<br><span id="cos-mon-lido">{% if lido %}lido às <b>{{ lido }}</b>{% endif %}</span></div>
+  </div>
+  <div id="cos-mon-corpo">{% include "cos/_monitoramento_corpo.html" %}</div>
+</div>
+<div class="cos-dica" id="cos-dica" role="tooltip" hidden></div>
+<script src="{{ url_for('static', filename='cos/monitoramento.js') }}" defer></script>
+{% endblock %}

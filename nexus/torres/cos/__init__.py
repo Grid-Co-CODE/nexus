@@ -18,14 +18,16 @@ import logging
 from datetime import datetime
 from urllib.parse import urlencode
 
-from flask import Response, abort, current_app, redirect, render_template, request, session
+from flask import Response, abort, current_app, jsonify, redirect, render_template, request, session
 
 from ...auth import setor_telas as ST
+from ...cadastro import setor_ids as SID
 from ...cos import acionamentos as AC
 from ...cos import andamento as AND
 from ...cos import desempenho as DE
 from ...cos import ficha as FI
 from ...cos import mesa as ME
+from ...cos import monitoramento as MO
 from ...cos import normalizacoes as NO
 from ...cos import ocorrencias as OC
 from ...cos import os_abertas as OA
@@ -58,6 +60,12 @@ TORRE = Torre(
         Tela("desempenho", "Desempenho da equipe",
              "As mesas estão dentro do MTTA e do aviso no prazo?",
              "Andamento da Ronda COS (o ciclo das ocorrências, com a hora em que o COS viu)"),
+        # 09/11/2026 (o dono: "geração em kw ao vivo com a curva de cada usina atualizando constantemente, somente as que
+        # tem logger e as que são sunop"): o cartão da tela de monitoramento da Ronda COS, pelo Andamento. Do setor COS sem
+        # marca em Base → Acessos (Tela.do_setor), para os operadores a verem no dia em que ela entra.
+        Tela("monitoramento", "Monitoramento",
+             "Quanto cada usina com logger ou do SunOP está gerando agora, e como foi a curva do dia?",
+             "Andamento da Ronda COS (o kW ao vivo do SCADA Grid e do SunOP, e a curva do dia)", do_setor=SID.COS),
         # As duas do Andamento (22/10/2026) vêm DEPOIS do Acompanhamento de propósito: o cartão do COS na página inicial
         # leva à primeira tela pronta, e o Acompanhamento (com a porta ligada) continua sendo ela. A Ronda e a Parede
         # contam como prontas mesmo antes de a fonte ser ligada no servidor (a conta de telas_com_conteudo é pela rota).
@@ -487,3 +495,35 @@ def usina(codigo: str = ""):
         "cos/usina.html", f=f, ve=ve, acionar=acionar, erro_cadastro=erro_cadastro, com_chave=bool(chave),
         confianca=AC.CONFIANCA, prazos=OC.PRAZOS, etapas=OC.ETAPAS, desfechos=RE.DESFECHOS,
         dias=FI.DIAS_DO_CICLO, agora=agora, **comum)
+
+
+# ── Monitoramento (09/11/2026) ───────────────────────────────────────────────────────────────────────────────────────
+def _url_da_pagina(**mudar) -> str:
+    """O `_url` sem o `parcial`: o corpo pedido pelo JavaScript leva os links da página, e não o do pedaço."""
+    return _url(parcial=None, **mudar)
+
+
+@bp.route("/monitoramento")
+def monitoramento():
+    """Monitoramento: a geração em kW ao vivo e a curva do dia de cada usina com logger (SCADA Grid) e do SunOP, o cartão
+    da tela de monitoramento da Ronda COS, pelo Andamento (nexus/cos/monitoramento.py). Só lê. `?parcial=1` devolve só o
+    corpo, em JSON, para a página se atualizar sozinha a cada 30 s (static/cos/monitoramento.js)."""
+    cfg = current_app.config
+    fonte = AND.fonte(cfg)
+    a = request.args
+    grupo = a.get("situacao", "") if a.get("situacao") in (*MO.GRUPOS, "velhas") else ""
+    cliente = a.get("cliente", "")
+    busca = " ".join((a.get("q") or "").split())[:MO.BUSCA_MAX]
+    geracao = AND.ler_geracao(cfg) if fonte.ligada else AND.Leitura("", None)
+    curvas = AND.ler_curvas(cfg) if fonte.ligada else AND.Leitura("", None)
+    p = MO.painel(geracao, curvas, AND.agora(), cliente, grupo, busca)
+    lido = _lido([x for x in (geracao,) if x.dados])
+    ctx = dict(torre=TORRE, tela=TORRE.tela("monitoramento"), ligada=fonte.ligada, geracao=geracao, curvas=curvas, p=p,
+               cliente=cliente, grupo=grupo, busca=busca, grupos=MO.GRUPOS, kw_txt=MO.kw_txt, largura=MO.LARGURA,
+               altura=MO.ALTURA, curva_de=MO.CURVA_DE_H, curva_ate=MO.CURVA_ATE_H, passo=AND.PASSO_DAS_CURVAS_MIN,
+               lido=lido, url=_url_da_pagina)
+    if a.get("parcial") == "1":
+        resp = jsonify(html=render_template("cos/_monitoramento_corpo.html", **ctx), lido=lido)
+        resp.headers["Cache-Control"] = "private, no-store"
+        return resp
+    return render_template("cos/monitoramento.html", **ctx)

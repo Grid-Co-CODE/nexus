@@ -408,6 +408,80 @@ def ler_carteiras(config) -> Leitura:
     return Leitura("", dados, lido_em=time.time())
 
 
+# A geração ao vivo (09/11/2026, a aba Monitoramento): o kW de agora e a curva do dia das usinas com logger (SCADA Grid) e
+# do SunOP. O Andamento repassa a API da Ronda COS (`GET /api/nexus/geracao` e `/geracao/curvas`), que monta o mesmo cartão
+# da tela de monitoramento de lá. A montagem fria (logo depois de um deploy de lá) passou de 7 s; aquecida, ~1 s; o
+# Andamento espera a API até 12 s (o agora) e 20 s (as curvas), e o Nexus espera um pouco mais que isso. A cópia daqui é
+# curta (o kW muda a cada leitura) e, na falha, a última leitura boa fica na tela, dita velha.
+VERSAO_DA_GERACAO = 1
+TTL_GERACAO_S = 20
+TTL_CURVAS_S = 60
+TIMEOUT_GERACAO_S = 15
+TIMEOUT_CURVAS_S = 25
+PASSO_DAS_CURVAS_MIN = 15
+
+
+def validar_geracao(d) -> dict:
+    if not isinstance(d, dict):
+        raise FonteErro("a resposta do Andamento não é um objeto")
+    if d.get("versao") != VERSAO_DA_GERACAO:
+        raise FonteErro(f"o Andamento fala a versão {d.get('versao')!r} da geração, e o Nexus entende a {VERSAO_DA_GERACAO}")
+    if not isinstance(d.get("usinas"), list) or not isinstance(d.get("fontes"), dict):
+        raise FonteErro("a resposta do Andamento não tem a geração das usinas")
+    return d
+
+
+def validar_curvas(d) -> dict:
+    if not isinstance(d, dict):
+        raise FonteErro("a resposta do Andamento não é um objeto")
+    if d.get("versao") != VERSAO_DA_GERACAO:
+        raise FonteErro(f"o Andamento fala a versão {d.get('versao')!r} das curvas, e o Nexus entende a {VERSAO_DA_GERACAO}")
+    if not isinstance(d.get("curvas"), list) or not isinstance(d.get("passo_min"), int):
+        raise FonteErro("a resposta do Andamento não tem as curvas do dia")
+    return d
+
+
+def _ler_geracao(config, nome: str, caminho: str, validar, ttl: int, timeout: float) -> Leitura:
+    f = fonte(config)
+    if not f.ligada:
+        return Leitura("", None, erro="a fonte do Andamento não está ligada neste servidor")
+    chave = (f.url, "|" + nome)
+    agora = time.monotonic()
+    with _trava:
+        em_cache = _cache.get(chave)
+        if em_cache and agora - em_cache[0] < ttl:
+            return Leitura("", em_cache[1], lido_em=em_cache[2])
+    try:
+        try:
+            dados = validar(_pedir(f, caminho, timeout=timeout))
+        except FonteErro as ex:
+            if ex.codigo == 404:
+                raise FonteErro("o Andamento ainda não tem a rota da geração, ou a rota do Nexus está desligada lá",
+                                404) from None
+            if ex.codigo == 503:
+                raise FonteErro("a API da Ronda COS não respondeu ao Andamento", 503) from None
+            raise
+    except FonteErro as ex:
+        if em_cache:
+            return Leitura("", em_cache[1], lido_em=em_cache[2], erro=str(ex), velha=True)
+        return Leitura("", None, erro=str(ex))
+    with _trava:
+        _cache[chave] = (agora, dados, time.time())
+    return Leitura("", dados, lido_em=time.time())
+
+
+def ler_geracao(config) -> Leitura:
+    """O kW de agora de cada usina com logger ou do SunOP (uma linha por cartão da tela de monitoramento da Ronda COS)."""
+    return _ler_geracao(config, "geracao", "/api/nexus/geracao", validar_geracao, TTL_GERACAO_S, TIMEOUT_GERACAO_S)
+
+
+def ler_curvas(config) -> Leitura:
+    """As curvas do dia de todas as usinas com logger, de PASSO_DAS_CURVAS_MIN em PASSO_DAS_CURVAS_MIN minutos (a média das
+    janelas de 5 min gravadas). O SunOP não grava série: a usina dele vem sem curva (`tem_curva` falso)."""
+    return _ler_geracao(config, "curvas", f"/api/nexus/geracao/curvas?passo={PASSO_DAS_CURVAS_MIN}", validar_curvas,
+                        TTL_CURVAS_S, TIMEOUT_CURVAS_S)
+
+
 def limpar_cache() -> None:
     with _trava:
         _cache.clear()

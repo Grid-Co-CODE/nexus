@@ -126,3 +126,16 @@ tr.cos-turno td:first-child{padding-left:28px;color:var(--tinta-2)}
 .cos-ficha-prazo{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;margin-top:8px}
 .cos-ficha-busca{margin-top:28px}
 .cos-ficha-busca input[type=search]{flex:1 1 280px;max-width:420px}
+
+/* O Monitoramento (09/11/2026): a curva de hoje de cada usina, uma série só por linha (sem legenda: a linha da tabela diz
+   de quem é). O traço é o verde de texto da casa, que passa os 3:1 de contraste nos dois temas (o validador do dataviz);
+   a área embaixo é o mesmo verde, bem fraca, e a linha de base, a divisória. */
+.cos-mon td{vertical-align:middle}
+.cos-mon-kw{font-size:15px}
+.cos-curva{display:block;width:160px;height:36px;overflow:visible;cursor:crosshair}
+.cos-curva-linha{fill:none;stroke:var(--verde-texto);stroke-width:2;stroke-linejoin:round;stroke-linecap:round;vector-effect:non-scaling-stroke}
+.cos-curva-area{fill:var(--verde-texto);fill-opacity:.12;stroke:none}
+.cos-curva-base{stroke:var(--linha);stroke-width:1;vector-effect:non-scaling-stroke}
+.cos-curva-mira{stroke:var(--tinta-2);stroke-width:1;vector-effect:non-scaling-stroke}
+.cos-dica{position:fixed;z-index:60;pointer-events:none;padding:4px 8px;border-radius:var(--raio-tag);font:600 12px/16px var(--font-sans);
+  background:var(--superficie-3);color:var(--tinta);border:1px solid var(--linha-forte);white-space:nowrap}

@@ -363,6 +363,39 @@ ela repete, abria Religamentos e escolhia o cliente de novo; para ver a OS, abri
 - De quebra (09/11/2026): a Ronda rolava 61 px de lado no celular (as duas colunas de "Por problema" e "Fotografias"
   com 420 px de mínimo); a coluna agora encolhe até a largura da tela.
 
+## Monitoramento: o kW ao vivo e a curva do dia das usinas com logger e do SunOP (09/11/2026)
+
+*"Quanto cada usina com logger ou do SunOP está gerando agora, e como foi a curva do dia?"* O dono: "geração em kw ao vivo
+com a curva de cada usina atualizando constantemente, somente as que tem logger e as que são sunop, as da plataforma.
+Ignora esse monitoramento que já existe no nexus" (a Performance › Tempo real é a Plataforma de Performance, outra fonte).
+
+- **De onde:** o cartão da tela de monitoramento da Ronda COS. A API de lá ganhou, em 09/11/2026, três rotas de máquina
+  só de leitura (`/geracao/*`, abertas só no próprio servidor e com a chave do Andamento); o Andamento as repassa:
+  `GET <Andamento>/api/nexus/geracao` (`ler_geracao`, uma linha por cartão: `id`, `fonte` SCADA/SUNOP, `usina_codigo`,
+  `nome`, `sub_usina`, `cliente`, `kw`, inversores, `situacao{chave,texto}`, `lido_em`, `minutos_atras`, `fresca`,
+  `tem_curva`) e `GET <Andamento>/api/nexus/geracao/curvas?passo=15` (`ler_curvas`: `inicio`, `passo_min` e o `kw` de cada
+  passo, a média das amostras de 5 min gravadas). Contrato `versao: 1`. O contrato da Ronda COS está em
+  `docs/NEXUS-TORRE-COS.md` de lá.
+- **A espera:** a montagem fria do cartão (logo depois de um deploy da Ronda COS) passou de 7 s e, aquecida, fica em
+  ~1 s; o Andamento espera a API até 12 s (agora) e 20 s (curvas). O Nexus espera 15 s e 25 s (`TIMEOUT_GERACAO_S`,
+  `TIMEOUT_CURVAS_S`, e não os 5 s das outras rotas), guarda 20 s e 60 s, e na falha a última leitura boa fica, dita
+  velha. O 503 do Andamento é a API da Ronda COS fora: a tela diz isso.
+- **Nada de regra de geração aqui** (`nexus/cos/monitoramento.py`): o kW, a situação e o frescor são os do cartão. Daqui
+  são os filtros (cliente, situação, busca), a faixa e o desenho da curva. **Gerando agora** soma só as usinas com leitura
+  nova (`fresca`): um número parado não infla o total. `kw` nulo é "—", nunca zero.
+- **A curva** (`monitoramento.curva`): das 05h às 19h, no mesmo eixo para todas; a escala vai de zero ao máximo da
+  própria usina (a plataforma não guarda o kWp, e um teto inventado mentiria); onde falta amostra a linha quebra, sem
+  ponte. O SunOP não grava série: a usina dele vem "sem curva". Uma série por linha, sem legenda; o traço é o
+  `--verde-texto` (3:1 de contraste nos dois temas, pelo validador do dataviz). A dica do mouse mostra o kW de cada horário
+  (`static/cos/monitoramento.js`).
+- **Ao vivo:** a página pede `?parcial=1` a cada 30 s pelo `nexusPedir` e troca só o corpo (`_monitoramento_corpo.html`),
+  sem recarregar nem perder a rolagem; com a aba escondida ou um campo em uso, espera. Os links do corpo saem sem o
+  `parcial` (`_url_da_pagina`).
+- **Quem vê:** `Tela.do_setor = COS`: o setor COS a vê sem marca em Base → Acessos. No menu, logo depois do Desempenho (o
+  Acompanhamento segue a 1ª tela pronta, `test_casca_inicio`).
+- Testes: `tests/test_cos_monitoramento.py`. Controle positivo: a soma com a leitura velha, a ponte por cima da falta de
+  amostra, a gerando antes da parada, os links do corpo com o `parcial` e o teto de 5 s, todos vermelhos.
+
 ## Regras desta torre
 
 - Prazo e meta (15 min, 30 min, horários de ronda) são **dado**, e não número solto no código: um só lugar, com o

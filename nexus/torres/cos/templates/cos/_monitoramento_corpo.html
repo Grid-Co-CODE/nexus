@@ -1,0 +1,75 @@
+{# O corpo do Monitoramento (09/11/2026): a faixa, os filtros e a tabela. A página o pede de novo a cada 30 s
+   (?parcial=1, nexusPedir) e troca só ele, sem recarregar a página nem perder a rolagem (cos/monitoramento.html). #}
+{% from "cos/_usina.html" import usina_link with context %}
+{% if not ligada %}
+<div class="cn-vazio cos-aviso">A fonte do Andamento ainda não está ligada neste servidor: faltam o endereço e a chave
+  (<code>NEXUS_COS_ANDAMENTO_URL</code> e <code>NEXUS_COS_ANDAMENTO_CHAVE</code>), que um administrador grava em Base →
+  Chaves do Nexus. O resto do Nexus segue igual.</div>
+{% else %}
+{% if geracao.erro %}<div class="cn-erro{% if geracao.velha %} cn-aviso{% endif %}" role="alert"><b>{{ geracao.erro[:1]|upper }}{{ geracao.erro[1:] }}.</b>
+  {% if geracao.velha %}A tela mostra a última leitura boa, das {{ lido }}: os kW podem estar parados.{% endif %}</div>{% endif %}
+{% if curvas.erro and not curvas.velha %}<div class="cn-erro cn-aviso" role="status"><b>As curvas do dia não vieram agora.</b> {{ curvas.erro[:1]|upper }}{{ curvas.erro[1:] }}.</div>{% endif %}
+{% if p %}
+{% for a in p.avisos %}<div class="cn-erro cn-aviso" role="status"><b>{{ a }}.</b></div>{% endfor %}
+{% set r = p.resumo %}
+<div class="cn-numeros">
+  <span><span class="gc-rotulo">Gerando agora</span><span class="v gc-num">{{ kw_txt(r.kw_agora) }}</span>
+    <span class="d">a soma das usinas com leitura nova{% if cliente or grupo or busca %}, no filtro{% endif %}</span></span>
+  <span><span class="gc-rotulo">Usinas gerando</span><span class="v gc-num">{{ r.gerando }}</span>
+    <span class="d">de {{ r.usinas }} {{ 'usina' if r.usinas == 1 else 'usinas' }} na lista</span></span>
+  <span><span class="gc-rotulo">Paradas ou sem comunicação</span><span class="v gc-num{% if r.paradas %} ruim{% endif %}">{{ r.paradas }}</span>
+    <span class="d">pela situação do cartão da Ronda COS</span></span>
+  <span><span class="gc-rotulo">Sem leitura nova</span><span class="v gc-num{% if r.velhas %} ruim{% endif %}">{{ r.velhas }}</span>
+    <span class="d">o número delas pode estar parado</span></span>
+</div>
+
+<form class="cn-filtros" method="get" action="{{ raiz }}/t/cos/monitoramento">
+  {% if grupo %}<input type="hidden" name="situacao" value="{{ grupo }}">{% endif %}
+  <label class="cn-filtro-par"><span class="gc-rotulo">Cliente</span>
+  <select class="gc-campo" name="cliente" onchange="this.form.submit()">
+    <option value="">Todos</option>{% for c, n in p.clientes %}<option value="{{ c }}"{% if c == cliente %} selected{% endif %}>{{ c }} ({{ n }})</option>{% endfor %}
+  </select></label>
+  <input class="gc-campo" type="search" name="q" value="{{ busca }}" placeholder="Usina ou código" aria-label="Buscar usina">
+</form>
+<div class="cn-chips" aria-label="Situação">
+  <a href="{{ url(situacao=None) }}"{% if not grupo %} aria-current="page"{% endif %}>Todas<b>{{ p.contagem.todas }}</b></a>
+  {% for g, rot in grupos.items() if p.contagem.get(g) %}
+  <a href="{{ url(situacao=g) }}"{% if g == grupo %} aria-current="page"{% endif %}>{{ rot }}<b>{{ p.contagem[g] }}</b></a>
+  {% endfor %}
+  {% if p.contagem.velhas %}<a href="{{ url(situacao='velhas') }}"{% if grupo == 'velhas' %} aria-current="page"{% endif %}>Sem leitura nova<b>{{ p.contagem.velhas }}</b></a>{% endif %}
+</div>
+
+{% if p.itens %}
+<div class="cn-tab cos-tab cos-mon"><table>
+  <thead><tr><th class="cos-esq">Usina</th><th class="cos-esq">Agora</th><th class="cos-esq">Situação</th>
+    <th class="cos-esq">Curva de hoje<span class="det">das {{ '%02d'|format(curva_de) }}h às {{ curva_ate }}h, de 15 em 15 min</span></th><th class="cos-esq">Lido</th></tr></thead>
+  <tbody>
+  {% for x in p.itens %}
+    <tr>
+      <td class="cos-esq cos-usina"><b>{{ usina_link(x.codigo, x.nome) }}</b>{% if x.sub_usina %} <span class="mudo">parte {{ x.sub_usina }}</span>{% endif %}
+        <span class="det">{{ [x.cliente, x.fonte]|select|join(' · ') }}</span></td>
+      <td class="cos-esq"><b class="gc-num cos-mon-kw">{{ x.kw_txt }}</b>
+        {% if x.inversores_total %}<span class="det">{{ x.inversores_online if x.inversores_online is not none else '—' }} de {{ x.inversores_total }} inversores</span>{% endif %}</td>
+      <td class="cos-esq"><span class="cn-pill cn-{{ x.tom }}">{{ x.situacao }}</span></td>
+      <td class="cos-esq">{% set c = x.curva %}
+        {% if c and c.linha %}
+        <svg class="cos-curva" viewBox="0 0 {{ largura }} {{ altura }}" preserveAspectRatio="none" role="img"
+          aria-label="Curva de hoje de {{ x.nome }}: máximo de {{ kw_txt(c.maximo) }} às {{ c.maximo_em }}"
+          data-de="{{ c.pontos[0][0] if c.pontos else '' }}" data-passo="{{ passo }}" data-janela="{{ curva_de * 60 }}-{{ curva_ate * 60 }}"
+          data-kw="{% for _h, v in c.pontos %}{{ '' if v is none else v|round|int }}{{ '|' if not loop.last }}{% endfor %}">
+          <line class="cos-curva-base" x1="0" y1="{{ altura }}" x2="{{ largura }}" y2="{{ altura }}"></line>
+          <path class="cos-curva-area" d="{{ c.area }}"></path>
+          <path class="cos-curva-linha" d="{{ c.linha }}"></path>
+          <line class="cos-curva-mira" x1="0" y1="0" x2="0" y2="{{ altura }}" hidden></line>
+        </svg>
+        <span class="det">máx. {{ kw_txt(c.maximo) }} às {{ c.maximo_em }}</span>
+        {% elif not x.tem_curva %}<span class="det">sem curva: o SunOP não guarda a série</span>
+        {% else %}<span class="det">sem amostra hoje</span>{% endif %}</td>
+      <td class="cos-esq">{{ x.lido or '—' }}{% if x.minutos_atras is not none %}<span class="det{% if not x.fresca %} cn-t-alerta{% endif %}">{% if x.minutos_atras == 0 %}agora{% else %}há {{ x.minutos_atras }} min{% endif %}</span>{% endif %}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table></div>
+{% else %}<p class="cn-vazio">{% if cliente or grupo or busca %}Nenhuma usina com estes filtros.{% else %}O Andamento não mandou nenhuma usina com logger ou do SunOP.{% endif %}</p>{% endif %}
+{% endif %}
+{% endif %}
