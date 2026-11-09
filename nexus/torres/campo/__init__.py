@@ -145,9 +145,14 @@ def _gestor() -> str:
 
 
 def _responsavel() -> str:
-    """O Responsável O&M escolhido na Central (Levi, 12/10/2026: "Precisamos deixar filtrado por responsável"): o da
-    ficha da usina. Sem padrão pelo login; "Todos" vai como "*"."""
-    v = request.args.get("responsavel") or ""
+    """O Responsável O&M escolhido (Levi, 12/10/2026: "Precisamos deixar filtrado por responsável"): o da ficha da
+    usina. Sem escolha, o Responsável UFV que entrou (Levi, 09/11/2026, pelo Scrum master: "Se o usuário do nexus for
+    algum responsável por usina sempre que ele for acessar essas telas serão filtradas no nome dele"; até então não
+    havia padrão pelo login); quem não é responsável de usina (o administrador, o coordenador) abre em todas. O filtro
+    continua trocável; "Todos" vai como "*"."""
+    v = request.args.get("responsavel")
+    if v is None:
+        return _responsavel_logado_pelo_cadastro()
     return "" if v == TODOS else v
 
 
@@ -284,7 +289,9 @@ def _modo(equipe, historico=False) -> str:
 # gestor de contrato e responsável O&M. Deixe responsável UFV, cliente, UFV, equipe e o canto para escrever"; "Mesma coisa
 # do 3 só que em rondas pendentes!"), na ordem dele e no padrão de Extintores (18/10/2026): em cascata, e ninguém abre
 # filtrado pelo login (o Supervisor de Campo abria na região dele). O "Responsável UFV" é o Responsável O&M da ficha da
-# usina; "*" (o "Todos" de antes) vale como todos.
+# usina; "*" (o "Todos" de antes) vale como todos. Desde 09/11/2026 o Responsável UFV que entrou abre nas usinas dele
+# (Levi, pelo Scrum master: "sempre que ele for acessar essas telas serão filtradas no nome dele"), como na Visão do
+# responsável, na Aprovação e nas Ocorrências; o filtro continua trocável e o "Todos" dele vai como "*".
 FILTROS_CENTRAL = (("responsavel", "Responsável UFV"), ("cliente", "Cliente"), ("usina", "UFV"), ("equipe", "Equipe"))
 CAMPOS_DA_BUSCA_CENTRAL = ("usina", "cidade", "equipe", "obs", "feito_por", "solicitante", "os", "numero", "tarefa")
 
@@ -332,6 +339,8 @@ def atencao():
     vista = request.args.get("vista") if request.args.get("vista") in ids else "pendentes"
     f = request.args.get("f", "")
     fl = {c: request.args.get(c, "").strip() for c, _rot in FILTROS_CENTRAL}
+    if request.args.get("responsavel") is None:          # sem escolha: o Responsável UFV que entrou (09/11/2026)
+        fl["responsavel"] = _responsavel_logado_pelo_cadastro()
     if fl["responsavel"] == TODOS:
         fl["responsavel"] = ""
     responsavel, equipe = fl["responsavel"], fl["equipe"]

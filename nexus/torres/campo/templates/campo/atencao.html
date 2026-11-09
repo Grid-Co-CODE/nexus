@@ -60,7 +60,8 @@
     {% for campo, rot in filtros_central %}
     <label class="cn-filtro-par" for="cn-{{ campo }}"><span class="gc-rotulo">{{ rot }}</span>
     <select class="gc-campo" id="cn-{{ campo }}" name="{{ campo }}" onchange="this.form.submit()">
-      <option value="">{{ 'Todas' if campo in ('usina', 'equipe') else 'Todos' }}</option>{% for v in fl.opcoes[campo] %}<option value="{{ v }}"{% if v == fl[campo] %} selected{% endif %}>{{ v }}</option>{% endfor %}
+      {# o "Todos" do responsável vai como "*" (09/11/2026): sem escolha, a tela abre no Responsável UFV que entrou #}
+      <option value="{{ '*' if campo == 'responsavel' else '' }}">{{ 'Todas' if campo in ('usina', 'equipe') else 'Todos' }}</option>{% for v in fl.opcoes[campo] %}<option value="{{ v }}"{% if v == fl[campo] %} selected{% endif %}>{{ v }}</option>{% endfor %}
     </select></label>
     {% endfor %}
     <input class="gc-campo" type="search" name="q" value="{{ q }}" placeholder="usina, equipe, cidade{{ ', OS ou técnico' if vista != 'pendentes' else '' }}" aria-label="Buscar">
@@ -102,7 +103,7 @@
   <div class="cn-kb-cab">
     <div><span class="gc-rotulo">Responsável UFV</span><b>{{ responsavel }}</b>
       <span class="mudo">{{ n_kb }} usina{{ 's' if n_kb != 1 }} mobilizada{{ 's' if n_kb != 1 }}{% if fl.cliente or fl.usina or fl.equipe or q %}, com os outros filtros{% endif %}</span></div>
-    <a class="cn-filtro-ativo" href="{{ url(responsavel=None, modo='responsaveis') }}" title="Voltar aos cartões dos responsáveis">Todos os responsáveis <span aria-hidden="true">×</span></a>
+    <a class="cn-filtro-ativo" href="{{ url(responsavel='*', modo='responsaveis') }}" title="Voltar aos cartões dos responsáveis">Todos os responsáveis <span aria-hidden="true">×</span></a>
   </div>
   <div class="cn-kanban">
     {% for col, rot, cor in colunas_kanban %}{% set itens = colunas[col] %}
