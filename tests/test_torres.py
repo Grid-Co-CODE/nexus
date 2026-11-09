@@ -19,6 +19,10 @@ def test_toda_tela_responde_logado(logado):
         assert torre.telas, torre.id
         for tela in torre.telas:
             resp = logado.get(f"/t/{torre.id}/{tela.id}")
+            if tela.so_do_cliente:
+                # a tela só do cliente (a Visão do cliente, 09/11/2026) leva quem é da Grid à Visão do responsável
+                assert resp.status_code == 302 and resp.headers["Location"].endswith("/t/campo/responsaveis"), tela.id
+                continue
             assert resp.status_code == 200, (torre.id, tela.id)
             assert tela.nome in resp.get_data(as_text=True)
 

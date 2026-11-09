@@ -269,8 +269,9 @@ def test_a_secao_mostra_os_setores_e_a_arvore_do_menu(app, setores, logado):
     assert "Telas por setor" in html and 'id="ace-matriz"' in html
     assert re.search(r'class="ace-setor ativo"[^>]*>\s*<span class="nome">Administrador</span>', html)  # o 1º pelo nome
     assert '<span class="det">vê tudo' not in html and "1 de " in html            # nenhum setor "vê tudo"; a Caixa é de todos
-    # a Caixa de entrada é de todo setor (03/11/2026): marcada e presa, como a do dono
-    assert html.count('<input type="checkbox" name="tela"') + html.count('<input type="checkbox" data-do-setor')         == sum(len(t.telas) for t in app.extensions["nexus_torres"])
+    # a Caixa de entrada é de todo setor (03/11/2026): marcada e presa, como a do dono. A tela só do cliente (a Visão do
+    # cliente, 09/11/2026) não se marca para um setor da Grid
+    assert html.count('<input type="checkbox" name="tela"') + html.count('<input type="checkbox" data-do-setor')         == sum(len([s for s in t.telas if not s.so_do_cliente]) for t in app.extensions["nexus_torres"])
     assert "Todo setor vê esta tela sem marcar" in html
     assert 'value="performance/clima/mapa"' in html and 'value="cos/mesa"' in html
     adm = logado.get(URL + f"?setor={ADMINISTRADOR}").get_data(as_text=True)                  # o setor "Administrador": caixas
@@ -367,7 +368,8 @@ def test_acessos_enxuta_07_11(app, setores, logado):
         # depois: "recolha todos os setores mesmo... pode ter um botão de expandir todos também!"
         visiveis = caixa.split('<details class="ace-mais">')[0]
         assert visiveis.count("<li>") == 0 and '<details class="ace-mais">' in caixa
-        assert f"Ver {len(t.telas)} tela" in caixa and caixa.count("<li") == len(t.telas)
+        n = len([s for s in t.telas if not s.so_do_cliente])        # a só do cliente fica fora (09/11/2026)
+        assert f"Ver {n} tela" in caixa and caixa.count("<li") == n
     adm = html[html.index('aria-labelledby="ace-admins"') - 60:]
     assert adm.startswith('<details class="cad-secao ace-secao ace-recolhe"', adm.index("<details")) and " open" not in adm[:120]
     assert 'class="ace-recolhe-n"' in adm[:400] and "Registro de mudanças" not in html and "Tirar" not in html

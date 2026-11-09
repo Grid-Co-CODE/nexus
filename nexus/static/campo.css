@@ -356,7 +356,6 @@ table.cn-expande tr.cn-linha[aria-expanded="true"] td{background:var(--superfici
 .cn-idade--4{background:var(--critico-cheio)}
 .cn-idade:hover,.cn-idade.ativa{outline:2px solid var(--tinta);outline-offset:1px}
 
-
 /* histórico da usina: a evolução de sujidade e vegetação (1 a 5) */
 .cn-evolucao svg{width:100%;height:auto;display:block;margin-top:6px}
 .cn-evolucao{position:relative}
@@ -870,72 +869,13 @@ tr.rk-linha[aria-expanded="true"] .rk-seta{transform:rotate(180deg)}
   .rk-medalha{font-size:22px}
 }
 
-/* ── O Ranking das equipes na Visão do responsável (18/10/2026): os quatro números do painel do App, a régua numa frase
-   e um cartão por equipe (o cartão v2 do protótipo aprovado pelo Levi), por cima do `cn-equipe` dos cartões ── */
-.cr-rk-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-top:18px}
-.cr-rk-kpi{display:grid;gap:2px;align-content:start;padding:10px 12px;background:var(--superficie);border:1px solid var(--linha);
-  border-radius:var(--raio-md);min-width:0}
-.cr-rk-kpi > span{font-size:11.5px;color:var(--mudo)}
-.cr-rk-kpi b{font:700 20px/26px var(--font-sans);font-variant-numeric:tabular-nums}
-.cr-rk-kpi small{font-size:12px;color:var(--mudo);overflow-wrap:anywhere}
-.cr-rk-regua{margin:12px 0 0;font-size:12.5px;line-height:1.5;color:var(--mudo)}
-.cr-rk-regua b{color:var(--tinta-2)}
-.cr-rk-leg{margin:8px 0 0;font-size:12.5px;color:var(--mudo)}
-.cr-rk-topo{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
-.cr-rk-pos{font:700 26px/1 var(--font-sans);font-variant-numeric:tabular-nums}
-.cr-rk-pos small{font:500 12px/1 var(--font-sans);color:var(--mudo)}
-.cr-rk-seta{display:block;margin-top:6px;font:600 11.5px/16px var(--font-sans)}
-.cr-rk-seta--sobe{color:var(--ok)}
-.cr-rk-seta--desce{color:var(--critico)}
-.cr-rk-seta--igual,.cr-rk-seta--sem{color:var(--mudo)}
-.cr-rk-nota{font:700 26px/1 var(--font-sans);text-align:right;font-variant-numeric:tabular-nums}
-.cr-rk-nota small{display:block;margin-top:6px;font:500 11px/14px var(--font-sans);color:var(--mudo)}
-.cr-rk-comp{margin:0;font-size:12px;color:var(--mudo)}
-.cr-rk-comp b{color:var(--tinta-2)}
-.cr-rk-mini{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
-.cr-rk-mini > div{display:grid;gap:2px;padding:6px 4px;text-align:center;font-size:11px;color:var(--mudo);
-  background:var(--superficie-2);border-radius:8px;min-width:0}
-.cr-rk-mini > div > span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.cr-rk-mini b{font:600 13px/18px var(--font-sans);font-variant-numeric:tabular-nums}
-.cr-rk-mini i{font-style:normal}
-.cr-rk-etqs{display:flex;flex-wrap:wrap;gap:5px;align-items:center}
-.cr-rk-etqs .cr-tag{margin-left:0;white-space:normal}
-.cr-rk-rot{flex-basis:100%;font:700 11px/14px var(--font-sans);letter-spacing:.06em;text-transform:uppercase;color:var(--mudo)}
+/* ── O que ficou do Ranking das equipes (que saiu em 09/11/2026) e outras telas usam: a pílula positiva da Visão e a
+   tabela da janela das OSs em verificação do Painel ── */
+
 /* o positivo como a pílula positiva da Visão (`cr-v--ok`): texto verde Grid no escuro, o musgo no claro */
 .cr-tag--ok{color:var(--verde);background:var(--verde-suave)}
 :root[data-tema="claro"] .cr-tag--ok{color:var(--verde-texto)}
-.cr-rk-ir{font-size:12.5px;font-weight:600;color:var(--verde-texto)}
-/* a janela da equipe no Ranking (18/10/2026, Levi: "ao resumido e direto onde o supervisor bata o olho e possa cobrar
-   o técnico com dados!"): Focar e Acompanhar item a item com a prova (uma linha por prova) e a nota do App, com onde
-   perdeu pontos e as OS mais baixas com os pontos de cada critério. A cor do título vem do `cn-t-*` (nível e palavra) */
-.cr-rk-j-bloco{margin:0 0 14px}
-.cr-rk-j-nivel{display:flex;align-items:baseline;flex-wrap:wrap;gap:4px 8px;margin:0 0 6px;
-  font:700 11.5px/16px var(--font-sans);letter-spacing:.06em;text-transform:uppercase}
-.cr-rk-j-nivel b{font:700 18px/1 var(--font-sans);letter-spacing:0;font-variant-numeric:tabular-nums}
-.cr-rk-j-nivel span{font-weight:600;letter-spacing:0;text-transform:none;color:var(--mudo)}
-/* Focar e Acompanhar encolhem (19/10/2026): o título é o botão, com a seta que gira */
-.cr-rk-j-dobra > summary{cursor:pointer;list-style:none}
-.cr-rk-j-dobra > summary::-webkit-details-marker{display:none}
-.cr-rk-j-dobra > summary::before{content:"\25B8";display:inline-block;margin-right:2px;transition:transform .15s}
-.cr-rk-j-dobra[open] > summary::before{transform:rotate(90deg)}
-.cr-rk-j-itens,.cr-rk-j-os{display:grid;margin:0;padding:0;list-style:none;border:1px solid var(--linha);
-  border-radius:var(--raio-md)}
-.cr-rk-j-itens li{display:grid;grid-template-columns:130px minmax(0,1fr);gap:2px 12px;padding:8px 12px;font-size:13px;
-  border-bottom:1px solid var(--linha)}
-.cr-rk-j-itens li > div{display:grid;gap:2px;min-width:0}
-.cr-rk-j-itens span{overflow-wrap:anywhere}
-.cr-rk-j-cab{font-weight:700}
-.cr-rk-j-itens li:last-child,.cr-rk-j-os li:last-child{border-bottom:0}
-/* o "e mais N" que abre o resto (28/10/2026): o resumo é o botão, as provas aparecem embaixo dele */
-.cr-rk-j-mais{display:grid;gap:2px}
-.cr-rk-j-mais > summary{cursor:pointer;width:max-content;color:var(--verde-texto);font-size:12.5px;font-weight:600;
-  list-style:none}
-.cr-rk-j-mais > summary::-webkit-details-marker{display:none}
-/* aberto, o "e mais" some e cada prova fica na sua linha (29/10/2026: "o e mais 2 não sumiu, os mais dois não quebraram
-   como os demais"): o <details> não faz grade dos filhos no Chrome, então a grade é a da lista de dentro */
-.cr-rk-j-mais[open] > summary{display:none}
-.cr-rk-j-mais-lista{display:grid;gap:2px}
-.cr-rk-j-mais-lista > span{display:block;overflow-wrap:anywhere}
+
 /* o Focar em tabela (28/10/2026, "Usinas em linhas e essas linhas em coluna"): a usina na 1ª coluna, presa ao rolar
    para o lado; a célula da usina em crítico naquela área com a borda vermelha à esquerda */
 .cr-rk-j-mat{overflow-x:auto;border:1px solid var(--linha);border-radius:var(--raio-md)}
@@ -947,41 +887,9 @@ tr.rk-linha[aria-expanded="true"] .rk-seta{transform:rotate(180deg)}
 .cr-rk-j-mat td{min-width:120px}
 .cr-rk-j-mat td > b,.cr-rk-j-mat td > span{display:block;overflow-wrap:anywhere}
 .cr-rk-j-mat tbody tr:last-child > *{border-bottom:0}
-.cr-rk-j-crit{box-shadow:inset 3px 0 0 var(--critico-cheio)}
-/* a prova com OS ("OS 15539 · há 21 d") não quebra no meio; a longa (a PT, o título da meta) quebra como sempre */
-.cr-rk-j-mat .cr-rk-j-pos{white-space:nowrap}
+
 /* com a tabela do Focar, a janela fica mais larga (7 colunas não cabem nos 1.000 px das outras janelas) */
 .cr-modal:has(.cr-rk-j-mat){width:min(1320px,calc(100vw - 32px))}
-.cr-rk-j-ok,.cr-rk-j-txt{margin:0 0 10px;font-size:13px}
-/* as perdas da nota em linhas (29/10/2026, "-1 oq?"): o quanto à esquerda, o critério e o que fazer à direita */
-.cr-rk-j-perdas{display:grid;margin:0 0 10px;padding:0;list-style:none;border:1px solid var(--linha);
-  border-radius:var(--raio-md)}
-.cr-rk-j-perdas li{display:grid;grid-template-columns:96px minmax(0,1fr);gap:2px 12px;align-items:start;padding:8px 12px;
-  font-size:13px;border-bottom:1px solid var(--linha)}
-.cr-rk-j-perdas li:last-child{border-bottom:0}
-.cr-rk-j-perdas li > div{display:grid;gap:2px;min-width:0}
-.cr-rk-j-menos{color:var(--critico);font-variant-numeric:tabular-nums;white-space:nowrap}
-.cr-rk-j-perdas small{color:var(--mudo);font-size:12.5px;overflow-wrap:anywhere}
-/* a pontuação do mês (29/10/2026): a conta da nota numa linha, três números e o placar do ciclo por técnico */
-.cr-rk-j-formula{margin:0 0 8px;font-size:14px}
-.cr-rk-j-formula b{font-variant-numeric:tabular-nums}
-.cr-rk-j-fatos{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:0 0 10px;padding:0;
-  list-style:none}
-.cr-rk-j-fatos li{display:grid;gap:2px;padding:8px 12px;background:var(--superficie-2);border:1px solid var(--linha);
-  border-radius:var(--raio-md)}
-.cr-rk-j-fatos b{font-size:13.5px;font-variant-numeric:tabular-nums}
-.cr-rk-j-fatos small{font-size:12px;color:var(--mudo)}
-.cr-rk-j-placar td small{display:block;font-size:11.5px;color:var(--mudo)}
-.cr-rk-j-placar td{min-width:90px;font-variant-numeric:tabular-nums}
-@media (max-width:640px){.cr-rk-j-fatos{grid-template-columns:1fr}.cr-rk-j-perdas li{grid-template-columns:1fr}}
-.cr-rk-j-sub{margin:4px 0 6px;font:700 13px/1.3 var(--font-sans)}
-.cr-rk-j-os li{display:grid;grid-template-columns:auto minmax(0,1fr);gap:10px;align-items:start;padding:8px 12px;
-  border-bottom:1px solid var(--linha)}
-.cr-rk-j-os .cr-v{font-size:13px;line-height:22px}
-.cr-rk-j-os b{display:block;font-size:13px;font-weight:600;overflow-wrap:anywhere}
-.cr-rk-j-os small{display:block;margin-top:2px;font-size:12.5px;color:var(--mudo);overflow-wrap:anywhere}
-@media (max-width:640px){.cr-rk-j-itens li{grid-template-columns:1fr}}
-@media (max-width:640px){.cr-rk-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
 
 /* O centro das colunas (Levi, 18/10/2026: "centralize o cabeçalho e todas as colunas exceto Usina"): o cabeçalho e as
    células `cr-col-*` das tabelas dos blocos e da Visão geral; a Usina (o 1º span, sem `cr-col-`) fica à esquerda */
@@ -1455,24 +1363,22 @@ a.cr-gr-atn:hover,a.cr-gr-chip:hover,a.cr-gr-kpi:hover{border-color:var(--linha-
 .pn-lista::-webkit-scrollbar-thumb{background:var(--rolagem);border-radius:8px}
 .pn-lista::-webkit-scrollbar-thumb:hover{background:var(--rolagem-hover)}
 .pn-lista:focus-visible{outline:2px solid var(--foco);outline-offset:2px;border-radius:6px}
-.pn-it,.pn-rk-it{all:unset;box-sizing:border-box;display:flex;align-items:center;gap:12px;width:100%;
+.pn-it{all:unset;box-sizing:border-box;display:flex;align-items:center;gap:12px;width:100%;
   height:var(--pn-linha);padding:3px 8px;border-radius:8px;cursor:pointer}
 span.pn-it{cursor:default}
-button.pn-it:hover,.pn-rk-it:hover{background:var(--superficie-2)}
-.pn-it:focus-visible,.pn-rk-it:focus-visible{outline:2px solid var(--foco);outline-offset:-2px}
-.pn-it-nome,.pn-rk-nome{display:grid;min-width:0;flex:1}
-.pn-it-nome b,.pn-rk-nome b{font:600 13px/17px var(--font-sans);color:var(--tinta);overflow:hidden;text-overflow:ellipsis;
+button.pn-it:hover{background:var(--superficie-2)}
+.pn-it:focus-visible{outline:2px solid var(--foco);outline-offset:-2px}
+.pn-it-nome{display:grid;min-width:0;flex:1}
+.pn-it-nome b{font:600 13px/17px var(--font-sans);color:var(--tinta);overflow:hidden;text-overflow:ellipsis;
   white-space:nowrap}
-.pn-it-nome small,.pn-rk-nome small{font-size:11.5px;line-height:15px;color:var(--mudo);overflow:hidden;
+.pn-it-nome small{font-size:11.5px;line-height:15px;color:var(--mudo);overflow:hidden;
   text-overflow:ellipsis;white-space:nowrap}
 .pn-v{font:600 13px/18px var(--font-mono);white-space:nowrap;text-align:right;min-width:52px}
 .pn-barra{flex:0 0 90px;height:6px;border-radius:999px;background:var(--superficie-3);overflow:hidden}
 .pn-barra i{display:block;height:100%;border-radius:999px}
 .pn-barra .o{background:var(--ok-cheio)} .pn-barra .a{background:var(--alerta-cheio)}
 .pn-barra .c{background:var(--critico-cheio)} .pn-barra .n{background:var(--linha-forte)}
-.pn-barra--rk{flex:0 1 72px}
-.pn-rk-pos{min-width:34px;font:600 13px/18px var(--font-mono);color:var(--tinta-2)}
-.pn-rk-nome{flex:1 1 auto}
+
 /* Os chamados por usina (28/10/2026, Levi: "pode só botar o nome da UFV uma vez e dizer qual os ativos daquela UFV"):
    o nome da usina fica preso no alto do quadro enquanto os ativos dela rolam, e o da próxima o empurra */
 .pn-grupo{display:flex;flex-direction:column;gap:2px}
@@ -1483,8 +1389,8 @@ button.pn-it:hover,.pn-rk-it:hover{background:var(--superficie-2)}
 .pn-grupo-cab span{margin-left:auto;font-size:11.5px;color:var(--mudo);white-space:nowrap}
 .pn-it--ch{padding-left:16px}
 .pn-it-nome small i{font-style:normal;color:var(--mudo);opacity:.8}
-.pn-rk-seta{min-width:36px;font:600 11px/16px var(--font-mono);color:var(--mudo)}
-.pn-rk-seta--sobe{color:var(--ok)} .pn-rk-seta--desce{color:var(--critico)}
+
+ 
 .pn-vazio{padding:10px 8px;font-size:13px;color:var(--mudo)}
 /* a Performance larga (29/10/2026): por usina, a meta do mês (a barra e o número), o PR contra o previsto, a
    disponibilidade e a última sujidade e vegetação em colunas, com o rótulo de cada coluna em cima */

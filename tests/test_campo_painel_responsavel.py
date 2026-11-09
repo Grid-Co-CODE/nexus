@@ -279,7 +279,8 @@ def test_o_css_da_rolagem_e_da_altura_do_quadro():
     lista = re.search(r"\.pn-lista\{([^}]*)\}", css).group(1)
     assert "overflow-y:auto" in lista and "scrollbar-color:var(--rolagem)" in lista
     # 6 linhas por vez (Levi, 28/10/2026: "Limite de 6 em 6 com um scroll"), cada uma com a altura fixa
-    assert "max-height:calc(6 * var(--pn-linha)" in lista and re.search(r"\.pn-it,\.pn-rk-it\{[^}]*height:var\(--pn-linha\)", css)
+    # a linha do ranking (`.pn-rk-it`) saiu com o quadro dele em 09/11/2026: a altura fica só na `.pn-it`
+    assert "max-height:calc(6 * var(--pn-linha)" in lista and re.search(r"\.pn-it\{[^}]*height:var\(--pn-linha\)", css)
     assert ".pn-lista::-webkit-scrollbar-thumb{background:var(--rolagem)" in css
     # o nome da usina preso no alto dos chamados; a janela do chamado só com display quando aberta
     assert re.search(r"\.pn-grupo-cab\{[^}]*position:sticky", css)
