@@ -55,3 +55,12 @@ def motivo(nota, composicao) -> str:
         return "o App não guardou a composição desta nota"
     return "; ".join(f"{x['rot']} perdeu {num(perdeu(x))} de {num(x['peso'])}" + (f" ({x['det']})" if x["det"] else "")
                      for x in perdas)
+
+
+def frase(nota, composicao) -> str:
+    """"Nota do App 55%, abaixo de 80%: Fotos perdeu 25 de 25 (0 de 4 pedidas); ..." — a mesma frase no destaque do
+    cartão da Aprovação, na barra lateral e no aviso; nota de 80 para cima = ""."""
+    q = int(nota or 0)
+    if q >= NOTA_OK:
+        return ""
+    return f"Nota do App {q}%, abaixo de {NOTA_OK}%: {motivo(q, composicao)}"

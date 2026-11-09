@@ -282,7 +282,11 @@ def fila_toda(params: dict) -> Leitura:
             pag += 1
         crua = {w.get("id_work_orders_tasks") or w.get("id_work_order"): w for w in regras_app._FILA_CACHE.get("linhas") or []}
         fechado = _ultimo_fechamento_no_app()
+        comp = _composicao_da_nota()
         for x in todas:
+            # o porquê da nota (09/11/2026): a Composição da nota do fechamento da mesma nota, só nas tarefas do App
+            x["nota_itens"] = (_composicao_de(comp, x.get("os"), x.get("qualidade"))
+                               if x.get("pelo_app") and not x.get("ronda") else "")
             # o último fechamento da OS no App (o pré-filtro por fatos, 05/11/2026: foto anexada mais de 24 h depois
             # dele é Não OK); fechada fora do App, vazio (a anexação não é julgada)
             x["fechado_app"] = fechado.get(str(x.get("os") or "").strip(), "")
@@ -327,6 +331,32 @@ def _ultimo_fechamento_no_app() -> dict[str, str]:
     return {k: v.isoformat(timespec="seconds") for k, v in out.items()}
 
 
+def _composicao_da_nota() -> dict[str, list[tuple[str, int, str]]]:
+    """{folio: [(chegada, nota, composição)]}: cada fechamento da OS no registro do App (`qualidadelog`, `nota_itens`, a
+    "Composição da nota" que o App grava), para o motivo da nota abaixo de 80 (09/11/2026). O registro que não abre deixa
+    tudo vazio: a nota baixa segue com "o App não guardou a composição", nunca com um porquê inventado."""
+    out: dict[str, list[tuple[str, int, str]]] = {}
+    try:
+        for e in regras_app.tabela_qlog().query_entities("PartitionKey eq 'q'"):
+            folio = str(e.get("os") or e.get("fx_folio") or "").strip()
+            if folio:
+                out.setdefault(folio, []).append((str(e.get("server_ts") or ""), int(e.get("qualidade") or 0),
+                                                  str(e.get("nota_itens") or "")))
+    except Exception as ex:      # noqa: BLE001 — o registro fora: a fila segue, sem o porquê da nota
+        logging.warning("aprovação: o registro do App não abriu para a composição da nota (%s)", str(ex)[:160])
+        return {}
+    return out
+
+
+def _composicao_de(comp: dict, folio: str, nota) -> str:
+    """A composição do fechamento da OS com a MESMA nota que a fila mostra, o mais novo deles (a cópia do App guarda um
+    fechamento por OS; a OS fechada duas vezes no App tem duas composições). Sem um da mesma nota = ""."""
+    if nota is None:
+        return ""
+    mesmas = [c for c in comp.get(str(folio or "").strip(), ()) if c[1] == int(nota)]
+    return max(mesmas)[2] if mesmas else ""
+
+
 def motivos(x) -> list[tuple[str, str]]:
     """Por que a tarefa caiu no grupo dela (Levi, 05/10: "pq precisa do meu olho?"): a regra do App (`_triagem`), na
     mesma ordem, mas mostrando TODOS os motivos que valem, não só o primeiro. Mais o que explica o tempo sem pesar
@@ -336,8 +366,10 @@ def motivos(x) -> list[tuple[str, str]]:
                            "Olhe a OS no Fracttal antes de aprovar.")]
     m, q = [], x.get("qualidade")
     if q is None or int(q) < regras_app.TRIAGEM_NOTA_OK:
-        m.append(("alerta", f"Nota do registro {int(q or 0)}%: abaixo de {regras_app.TRIAGEM_NOTA_OK}% "
-                            "(subtarefas, fotos, descrição, assinatura, observação e GPS)"))
+        # com o porquê (09/11/2026, Levi: "tem que ter 'motivo da nota abaixo de 80'"): os critérios da Composição da
+        # nota do App em que a tarefa perdeu pontos (`nota_app`); era a lista fixa dos seis critérios
+        from . import nota_app
+        m.append(("alerta", nota_app.frase(q, x.get("nota_itens"))))
     if x.get("ronda") and x.get("falhas"):
         m.append(("alerta", "Ronda com pendências: " + "; ".join(str(f) for f in x["falhas"])))
     if x.get("foi_devolvida"):

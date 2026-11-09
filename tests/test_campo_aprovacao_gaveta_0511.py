@@ -76,7 +76,7 @@ def test_a_barra_detalha_a_pendencia_em_que_tarefa_e_com_a_prova(quadro, logado)
     tarefas = duvida[duvida.index('class="apq-g-tarefas"'):]
     for t in ("Tarefa 1 da OS 15088", "Tarefa 2 da OS 15088"):
         assert t in tarefas, t
-    assert "Nota do registro 71%" in duvida
+    assert "Nota do App 71%, abaixo de 80%" in duvida
     fora = logado.get("/t/campo/aprovacao/15002/detalhe").get_data(as_text=True)
     assert "fechada fora do App" in fora and "Tarefa 1 da OS 15002" in fora
     assert "Fotos não lidas" in fora                               # a OS inteira fora do App não tem as fotos lidas

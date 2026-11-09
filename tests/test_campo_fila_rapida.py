@@ -159,7 +159,7 @@ def test_linha_da_fila_diz_por_que_do_grupo_e_aprova_pelo_os_creator(fila_e_cada
     assert "fora do App" in aprovacao.motivos({"pelo_app": False})[0][1]
     html = logado.get("/t/campo/aprovacao").get_data(as_text=True)
     # o porquê do grupo fica no selo da OS; a OS abre o card do OS Creator, cujo Concluir aprova (Levi, 18/10/2026)
-    assert "Nota do registro 71%" in html and 'data-wo="15088"' in html and "NexusOsCard.abrir(" in html
+    assert "Nota do App 71%, abaixo de 80%" in html and 'data-wo="15088"' in html and "NexusOsCard.abrir(" in html
     assert "nexusRota('/os/api/os/')" in html and "/os/_nexus/aprovacao/" not in html   # o Aprovar é o Concluir do OS Creator
     # o voltar do login do Fracttal (o da assinatura da PT) só leva a telas do Campo
     assert logado.get("/os/_nexus/voltar?para=/t/campo/aprovacao%3Fver%3DSudeste%2B03").headers["Location"].endswith("/t/campo/aprovacao?ver=Sudeste+03")

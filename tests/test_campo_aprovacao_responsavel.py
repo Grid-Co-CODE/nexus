@@ -121,12 +121,13 @@ def test_o_cartao_traz_o_score_os_avisos_e_logo_depois_o_aprovar(quadro, logado)
     score = c[c.index('class="apq-score'):c.index('class="apq-avisos"')]
     assert "Nota do App" in score and ">71<" in score
     avisos = c[c.index('class="apq-avisos"'):c.index("data-apq-aprovar")]
-    for texto in ("Nota do registro 71%", "Já foi devolvida"):
-        assert texto in avisos, texto
+    assert "Já foi devolvida" in avisos
     # o fato que decide a coluna fica no motivo em destaque, no topo (2ª rodada, 05/11/2026); o nome das fotos fica na
-    # barra lateral da OS (3ª rodada: "poupa informação inicial e vai aprofundando")
+    # barra lateral da OS (3ª rodada: "poupa informação inicial e vai aprofundando"). A nota do App abaixo de 80 é um
+    # desses motivos desde 09/11/2026 (o caso da OS 8159), com o porquê, e não se repete nos avisos
     motivo = c[c.index('class="apq-motivo"'):c.index('class="apq-score')]
-    assert "Foto repetida: p03 é a mesma imagem de p01" in motivo
+    assert "Foto repetida: p03 é a mesma imagem de p01" in motivo and "Nota do App 71%, abaixo de 80%" in motivo
+    assert "Nota do App 71%" not in avisos
     assert "<img" not in c and "/t/campo/aprovacao/foto/" not in c and 'class="apq-foto"' not in c
     nao_ok = _cartao(html, "15102")
     assert "1 foto anexada 2 dias depois do fechamento no App" in nao_ok and "data-apq-aprovar" in nao_ok

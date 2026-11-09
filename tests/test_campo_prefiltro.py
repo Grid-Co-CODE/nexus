@@ -151,10 +151,15 @@ def test_os_inteira_fora_do_app_nao_espera_as_fotos():
 
 
 def test_avisos_da_regra_do_app_nao_mudam_a_coluna():
+    # a devolvida (e a foto divergente, a ronda com pendência) é aviso; a coluna é dos fatos
+    r = prefiltro.classificar(_os(_tarefa(qualidade=90, foi_devolvida=True)), _fatos([]), FECHADO, P)
+    assert r["coluna"] == "pronta" and any("devolvida" in a["texto"] for a in r["avisos"])
+    # a nota do App abaixo de 80 deixou de ser só aviso em 09/11/2026 (o caso da OS 8159, em Pronta com nota 50): é
+    # motivo de Em dúvida, com o porquê (test_campo_aprovacao_nota_0911)
     r = prefiltro.classificar(_os(_tarefa(qualidade=60, foi_devolvida=True)), _fatos([]), FECHADO, P)
-    assert r["coluna"] == "pronta"
     textos = [a["texto"] for a in r["avisos"]]
-    assert any("Nota do registro 60%" in t for t in textos) and any("devolvida" in t for t in textos)
+    assert r["coluna"] == "duvida" and any(t.startswith("Nota do App 60%, abaixo de 80%") for t in textos)
+    assert any("devolvida" in t for t in textos)
 
 
 def test_sem_hora_de_fechamento_nao_julga_a_anexacao():
@@ -238,7 +243,8 @@ def test_cada_aviso_diz_o_tipo_e_a_repetida_traz_os_pares():
                "anexada": _anexada(30 if i == 4 else 0)} for i in range(1, 5)]
     o = _os(_tarefa(qualidade=60, id_wt=1), _tarefa(pelo_app=False, qualidade=None, id_wt=2))     # as fotos da tarefa do App
     r = prefiltro.classificar(o, _fatos(anexos, [("a1", "a3")]), FECHADO, P)
-    assert [a["tipo"] for a in r["avisos"]] == ["tarde", "repetida", "fora_app", "app"]
+    # a nota 60 da tarefa do App é o aviso "nota" desde 09/11/2026 (era um "app")
+    assert [a["tipo"] for a in r["avisos"]] == ["tarde", "repetida", "fora_app", "nota"]
     assert r["avisos"][1]["pares"] == [{"a": "a1", "b": "a3", "ra": "p01", "rb": "p03", "da": "Inversor", "db": ""}]
     sem_fotos = prefiltro.classificar(_os(_tarefa(pelo_app=False, qualidade=None, id_wt=1), _tarefa(id_wt=2)), None,
                                       FECHADO, P)

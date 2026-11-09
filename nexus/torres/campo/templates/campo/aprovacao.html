@@ -170,6 +170,11 @@
       nexusRota('/os/login') + '" target="_blank" rel="noopener">entrar no Fracttal</a>.';
     // sem a sessão do Nexus, o portão responde 302 para /entrar, o fetch segue e recebe 200 em HTML: isso não é aprovada
     var SESSAO = 'A sua sessão do Nexus acabou: recarregue a página e entre de novo.';
+    // a resposta que não é JSON e não foi para o /entrar (09/11/2026, com o chat OS Creator: o PDF da OS 8159 dizia
+    // "sessão acabou" quando o servidor ou o caminho até ele não respondeu a tempo). No PDF nada é gravado; no Aprovar
+    // pode ter sido, então a frase manda conferir no Fracttal
+    var SEM_RESPOSTA_PDF = 'O servidor não respondeu a tempo: tente de novo em instantes. Nada foi gravado no Fracttal.';
+    var SEM_RESPOSTA_APROVAR = 'O servidor não respondeu a tempo: confira a OS no Fracttal antes de tentar de novo, a aprovação pode ter sido gravada.';
     var RECUSA = 'O Fracttal recusou agora: tente daqui a alguns minutos.';
     var lote = document.querySelector('[data-apq-lote]'), loteN = document.querySelector('[data-apq-lote-n]');
     var loteMsg = document.querySelector('[data-apq-lote-msg]');
@@ -233,7 +238,7 @@
           msg(c, r.j.erro || (r.status === 403 ? 'O seu acesso não deixa concluir OS pelo OS Creator.' : RECUSA), 'critico');
           return 'recusa';
         }
-        if (!r.json) { msg(c, SESSAO, 'critico'); return 'sessao'; }
+        if (!r.json) { msg(c, SEM_RESPOSTA_APROVAR, 'critico'); return 'sem_resposta'; }
         msg(c, r.j.erro || ('Não consegui aprovar a OS ' + folio + '.'), 'critico');
         return 'erro';
       }).catch(function (e) {
@@ -309,7 +314,8 @@
           pdf.disabled = false; pdf.innerHTML = rotPdf;
           if (r.ok && !r.redirected && r.j.url) { location.href = nexusRota(r.j.url); return; }
           if (r.status === 401) { dizer(ENTRAR, true); return; }
-          if (r.redirected || !r.json) { dizer(SESSAO); return; }
+          if (r.redirected) { dizer(SESSAO); return; }
+          if (!r.json) { dizer(SEM_RESPOSTA_PDF); return; }
           dizer(r.j.erro || ('Não consegui gerar o PDF da OS ' + folioPdf + '.'));
         }).catch(function (e) { pdf.disabled = false; pdf.innerHTML = rotPdf; dizer('Não consegui gerar o PDF (' + e.message + ').'); });
         return;
@@ -367,7 +373,9 @@
         andando = false;
         loteMsg.textContent = 'Parei na OS ' + c.getAttribute('data-folio') + ' (' + aprovadas() + ' antes). ';
         var resto = document.createElement('span');
-        if (r === 'login') { resto.innerHTML = ENTRAR; } else { resto.textContent = r === 'sessao' ? SESSAO : RECUSA; }
+        if (r === 'login') { resto.innerHTML = ENTRAR; } else {
+          resto.textContent = r === 'sessao' ? SESSAO : (r === 'sem_resposta' ? SEM_RESPOSTA_APROVAR : RECUSA);
+        }
         loteMsg.appendChild(resto);
         contar();
       }
@@ -382,7 +390,7 @@
         var c = cartoes[i++];
         loteMsg.textContent = 'Aprovando ' + i + ' de ' + cartoes.length + '… (uma OS a cada ' + (PAUSA_LOTE_MS / 1000) + ' s)';
         aprovar(c).then(function (r) {
-          if (r === 'login' || r === 'sessao' || r === 'recusa') { parar(c, r); return; }
+          if (r === 'login' || r === 'sessao' || r === 'recusa' || r === 'sem_resposta') { parar(c, r); return; }
           if (r === 'ok') { feitas++; seguidos = 0; } else { erros++; seguidos++; }
           if (seguidos >= 3) {
             andando = false;

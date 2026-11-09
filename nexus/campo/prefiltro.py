@@ -34,7 +34,7 @@ COLUNAS = ("pronta", "duvida", "nao_ok")
 ETIQUETAS_FORA = ("PERFORMANCE", "CHAMADOS", "CHAMADO")
 # o fato que decide a coluna (o motivo em destaque no cartão, 05/11/2026: "Sempre destacar o motivo de estar em dúvida ou
 # não OK!"); os outros avisos (a regra do App, as fotos por ler) não mudam a coluna
-TIPOS_DO_MOTIVO = ("tarde", "repetida", "nao_abriu", "fora_app")
+TIPOS_DO_MOTIVO = ("tarde", "repetida", "nao_abriu", "fora_app", "nota")
 # o hash: 16 x 16 diferenças de brilho (256 bits) da parte de CIMA da foto; o carimbo do App (data, GPS, nome, campo) é
 # uma faixa no pé que muda a cada anexo (medido nas fotos da medição: até ~21% da altura)
 LADO, CORTE = 16, 0.75
@@ -167,9 +167,22 @@ def classificar(o: dict, fatos: dict | None, fechado_app: str, p: dict) -> dict:
     # fechada inteira fora do App não espera foto nenhuma (05/11/2026: 522 OS assim seguravam a leitura de fundo)
     if fatos is None and (nao_ok or duvida) and any(t.get("pelo_app") for t in tarefas):
         avisos.append({"tipo": "faltam", "nivel": "neutro", "texto": "Faltam fotos por ler", "fotos": []})
-    # a regra do App de antes (nota, devolvida, foto divergente, ronda com pendência) vira só aviso: a coluna é dos fatos
-    from .aprovacao import motivos
+    # a nota do App abaixo de 80 (09/11/2026, Levi, pelo Scrum master: "Em OS 8159 aprovação de OS diz que está aprovado
+    # porém a OS tem nota 50 no app, o interessante é ele saber o motivo da nota, tem que ter 'motivo da nota abaixo de
+    # 80'"): era só aviso e a OS caía em Pronta; agora é motivo de Em dúvida, com o porquê pela Composição da nota do App.
+    # Só a tarefa do App que não é ronda: a ronda tem a nota dela com as falhas (outro aviso)
+    from . import nota_app
     vistos = set()
+    baixas = [t for t in tarefas if t.get("pelo_app") and not t.get("ronda") and t.get("qualidade") is not None
+              and int(t["qualidade"]) < nota_app.NOTA_OK]
+    if baixas:
+        pior = min(baixas, key=lambda t: int(t["qualidade"]))
+        duvida, texto = True, nota_app.frase(pior["qualidade"], pior.get("nota_itens"))
+        vistos.add(texto)
+        avisos.append({"tipo": "nota", "nivel": "alerta", "texto": texto, "fotos": []})
+    # o resto da regra do App de antes (devolvida, foto divergente, ronda com pendência) vira só aviso: a coluna é dos
+    # fatos
+    from .aprovacao import motivos
     for t in o.get("tarefas") or []:
         if not t.get("pelo_app"):
             continue
