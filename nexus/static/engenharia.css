@@ -269,7 +269,7 @@
 .kb-param-tudo{border:0;background:transparent;color:var(--verde-texto);font:500 12.5px var(--font-sans);cursor:pointer;padding:4px 2px}
 .kb-param-tudo:hover{text-decoration:underline}
 .kb-super[hidden]{display:none}
-@media (max-width:560px){.kb-param-grade{grid-template-columns:1fr}.kb-param-painel{left:auto;right:0}}
+@media (max-width:640px){.kb-param-grade{grid-template-columns:1fr}.kb-param-painel{left:auto;right:0}}
 .kb-limpar{font:600 12.5px var(--font-sans);color:var(--verde-texto);background:transparent;border:1px solid var(--verde);
   border-radius:999px;padding:6px 14px;cursor:pointer}
 
