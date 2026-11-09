@@ -2,6 +2,7 @@
 {% block titulo %}{{ tela.nome }}{% endblock %}
 {% block conteudo %}
 {% from "_explica.html" import explica %}
+{% from "cos/_usina.html" import usina_link with context %}
 <link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='cos.css') }}">
 <noscript><meta http-equiv="refresh" content="60"></noscript>
@@ -81,7 +82,7 @@
     <thead><tr><th>Usina</th><th>Situação</th><th>Ocorrências</th></tr></thead>
     <tbody>
     {% for u in r.usinas %}
-      <tr><td class="cos-esq cos-usina"><b>{{ u.nome }}</b><span class="det">{{ u.cod }}{% if u.cidade %} · {{ u.cidade }}{% if u.uf %}/{{ u.uf }}{% endif %}{% endif %}</span></td>
+      <tr><td class="cos-esq cos-usina"><b>{{ usina_link(u.codigo or u.cod, u.nome) }}</b><span class="det">{{ u.cod }}{% if u.cidade %} · {{ u.cidade }}{% if u.uf %}/{{ u.uf }}{% endif %}{% endif %}</span></td>
         <td><span class="cn-pill cn-{{ u.tom }}">{{ u.status_rotulo }}</span>{% if u.problema_nome %}<span class="det">{{ u.problema_nome }}</span>{% endif %}</td>
         <td class="cos-esq">
           {% for o in u.ocorrencias %}

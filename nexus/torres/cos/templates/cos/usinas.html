@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block titulo %}Usinas do COS{% endblock %}
+{% block conteudo %}
+{% from "_explica.html" import explica %}
+{% from "cos/_usina.html" import usina_link with context %}
+<link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='cos.css') }}">
+{# A lista das usinas do COS (09/11/2026): a entrada da ficha de cada uma quando não se chega pelo nome numa tela, e o
+   que a ficha mostra quando o código pedido não está no Andamento (nexus/cos/ficha.py). #}
+<div class="campo-nativa">
+  <div class="cn-cab">
+    <div><p class="gc-eyebrow">{{ torre.nome }}</p><div class="gc-titulo-explica"><h1 class="cn-titulo">Usinas</h1>
+      {% call explica('Entenda esta tela') %}<p><b>O que é.</b> As usinas que o Andamento da Ronda COS acompanha, de todos os
+      clientes, com a cor da pior ocorrência aberta (a mesma da Ronda padronizada). Escolha uma para abrir a ficha dela:
+      o que está aberto, o prazo de cada ocorrência, os religamentos, as OS, as normalizações e quem acionar, numa página.
+      O nome da usina em qualquer tela do COS também leva à ficha.</p>{% endcall %}</div>
+      <p class="cn-pergunta">Qual usina você quer ver por inteiro?</p></div>
+    <div class="cn-frescor">Andamento da Ronda COS{% if lido %}<br>lido às <b>{{ lido }}</b>{% endif %}</div>
+  </div>
+
+  {% if not ligada %}
+  <div class="cn-vazio cos-aviso">A fonte do Andamento ainda não está ligada neste servidor: faltam o endereço e a chave
+    (<code>NEXUS_COS_ANDAMENTO_URL</code> e <code>NEXUS_COS_ANDAMENTO_CHAVE</code>), que um administrador grava em Base →
+    Chaves do Nexus. O resto do Nexus segue igual.</div>
+  {% else %}
+  {% if erro_clientes %}<div class="cn-erro" role="alert"><b>{{ erro_clientes[:1]|upper }}{{ erro_clientes[1:] }}.</b></div>{% endif %}
+  {% for c, erro, velha in erros %}<div class="cn-erro{% if velha %} cn-aviso{% endif %}" role="alert"><b>{{ c }}: {{ erro }}.</b>
+    {% if velha %}A lista mostra a última leitura boa.{% else %}As usinas deste cliente ficam de fora agora.{% endif %}</div>{% endfor %}
+  {% if pedido %}<div class="cn-erro cn-aviso" role="status"><b>A usina {{ pedido }} não está no Andamento da Ronda COS.</b>
+    Ela pode estar fora de operação ou num cliente que o COS não acompanha. Procure pelo nome abaixo.</div>{% endif %}
+
+  <form class="cn-filtros" method="get" action="{{ raiz }}/t/cos/usina">
+    <input class="gc-campo" type="search" name="q" value="{{ busca }}" placeholder="Nome, código ou cidade da usina"
+      aria-label="Buscar usina" autofocus>
+    <button class="gc-btn gc-btn--contorno" type="submit">Buscar</button>
+  </form>
+
+  {% if usinas %}
+  <div class="cn-tab cos-tab"><table>
+    <thead><tr><th class="cos-esq">Usina</th><th class="cos-esq">Cliente</th><th class="cos-esq">Situação</th><th>Abertas</th></tr></thead>
+    <tbody>
+    {% for x in usinas %}
+      <tr><td class="cos-esq cos-usina"><b>{{ usina_link(x.codigo, x.nome) }}</b><span class="det">{{ x.codigo }}{% if x.cidade %} · {{ x.cidade }}{% if x.uf %}/{{ x.uf }}{% endif %}{% endif %}</span></td>
+        <td class="cos-esq">{{ x.cliente }}</td>
+        <td class="cos-esq"><span class="cn-pill cn-{{ x.tom }}">{{ x.status_rotulo or '—' }}</span></td>
+        <td>{{ x.abertas or '—' }}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+  {% else %}<p class="cn-vazio">{% if busca %}Nenhuma usina com "{{ busca }}".{% else %}O Andamento não mandou nenhuma usina.{% endif %}</p>{% endif %}
+  {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,7 @@
+{# O nome da usina leva à ficha dela (09/11/2026, nexus/cos/ficha.py): a usina aparecia em oito telas do COS e em nenhuma
+   dava para abri-la. Importe COM o contexto, para o {{ raiz }} valer:
+   {% from "cos/_usina.html" import usina_link with context %} #}
+{% macro usina_link(codigo, nome) -%}
+{%- if codigo -%}<a class="cos-usina-link" href="{{ raiz }}/t/cos/usina/{{ codigo|urlencode }}" title="Abrir a ficha da usina">{{ nome }}</a>
+{%- else -%}{{ nome }}{%- endif -%}
+{%- endmacro %}

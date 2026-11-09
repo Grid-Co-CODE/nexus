@@ -2,6 +2,7 @@
 {% block titulo %}{{ tela.nome }}{% endblock %}
 {% block conteudo %}
 {% from "_explica.html" import explica %}
+{% from "cos/_usina.html" import usina_link with context %}
 <link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='cos.css') }}">
 <noscript><meta http-equiv="refresh" content="120"></noscript>
@@ -86,7 +87,7 @@
         <td class="cos-esq"><b class="cos-idade{% if o.dias >= 30 %} cn-t-critico{% elif o.dias >= 7 %} cn-t-alerta{% endif %}">{{ o.aberta_ha }}</b>
           <span class="det">{{ o.criada.strftime('%d/%m/%Y %H:%M') if o.criada else '—' }}</span></td>
         <td class="cos-esq"><b class="cos-folio">{{ o.folio }}</b><span class="det">{{ o.status }}</span></td>
-        <td class="cos-esq cos-usina"><b>{{ o.usina }}</b><span class="det">{{ o.cliente }}{% if o.usina_codigo %} · {{ o.usina_codigo }}{% endif %}</span></td>
+        <td class="cos-esq cos-usina"><b>{{ usina_link(o.usina_codigo, o.usina) }}</b><span class="det">{{ o.cliente }}{% if o.usina_codigo %} · {{ o.usina_codigo }}{% endif %}</span></td>
         <td class="cos-esq">{{ o.ativo or '—' }}{% if o.mais_ativos %} <span class="mudo">e mais {{ o.mais_ativos }}</span>{% endif %}</td>
         <td class="cos-esq">{{ o.tipo or '—' }}{% if o.classificacao or o.prioridade %}<span class="det">{{ [o.classificacao, o.prioridade]|select|join(' · ') }}</span>{% endif %}</td>
         <td>{% if o.situacao == 'concluida' %}<span class="cn-pill cn-ok">100%</span>{% else %}{{ o.pct }}%{% endif %}</td>
@@ -120,7 +121,8 @@
     document.querySelectorAll('tr.cos-os').forEach(function (tr) {
       var wo = tr.getAttribute('data-wo');
       if (wo && window.NexusOsCard) { NexusOsCard.prepararAoParar(tr, wo); }
-      tr.addEventListener('click', function () { abrir(tr); });
+      // o nome da usina leva à ficha dela: o clique nele não abre o card da OS
+      tr.addEventListener('click', function (e) { if (!e.target.closest('a')) { abrir(tr); } });
       tr.addEventListener('keydown', function (e) { if (e.key === 'Enter') { abrir(tr); } });
     });
   })();

@@ -2,6 +2,7 @@
 {% block titulo %}{{ tela.nome }}{% endblock %}
 {% block conteudo %}
 {% from "_explica.html" import explica %}
+{% from "cos/_usina.html" import usina_link with context %}
 <link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='cos.css') }}">
 <noscript><meta http-equiv="refresh" content="60"></noscript>
@@ -62,7 +63,7 @@
       <tr{% if e.desde_a_anterior %} class="cos-recente"{% endif %}>
         <td class="m">{{ e.hora }}{% if not e.hoje %}<span class="det">{{ e.dia }}</span>{% endif %}</td>
         {% if not cliente and clientes|length > 1 %}<td>{{ e.cliente }}</td>{% endif %}
-        <td class="cos-esq cos-usina"><b>{{ e.nome }}</b><span class="det">{{ e.cod }} · {{ e.problema_nome }}</span></td>
+        <td class="cos-esq cos-usina"><b>{{ usina_link(e.codigo or e.cod, e.nome) }}</b><span class="det">{{ e.cod }} · {{ e.problema_nome }}</span></td>
         <td><span class="cn-pill cn-{{ e.tom }}">{{ e.situacao_rotulo }}</span>{% if e.retro %}<span class="det">aberta {{ e.retro.strftime('%d/%m %H:%M') }}</span>{% endif %}</td>
         <td class="m">{{ e.os }}</td>
         <td class="cos-esq cos-texto">{{ e.texto }}</td></tr>

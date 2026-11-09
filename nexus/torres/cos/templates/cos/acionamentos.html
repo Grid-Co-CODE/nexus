@@ -2,6 +2,7 @@
 {% block titulo %}{{ tela.nome }}{% endblock %}
 {% block conteudo %}
 {% from "_explica.html" import explica %}
+{% from "cos/_usina.html" import usina_link with context %}
 <link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='cos.css') }}">
 {# Acionamentos e distribuidoras (26/10/2026): quem aciono e qual o canal da distribuidora desta UF. Quem aciono é do
@@ -74,7 +75,7 @@
     <tbody>
     {% for x in p.linhas %}
       <tr>
-        <td class="cos-esq cos-usina"><b>{{ x.usina }}</b><span class="det">{{ [x.cidade ~ ('/' ~ x.uf if x.uf else ''), x.cliente]|select|join(' · ') }}</span>
+        <td class="cos-esq cos-usina"><b>{{ usina_link(x.codigo, x.usina) }}</b><span class="det">{{ [x.cidade ~ ('/' ~ x.uf if x.uf else ''), x.cliente]|select|join(' · ') }}</span>
           {% if x.regiao_campo %}<span class="det">{{ x.regiao_campo }}</span>{% endif %}
           {% if x.chamados_pedem_acao %}<span class="cn-pill cn-alerta">{{ x.chamados_pedem_acao }} chamado{{ '' if x.chamados_pedem_acao == 1 else 's' }} pede{{ '' if x.chamados_pedem_acao == 1 else 'm' }} ação</span>{% endif %}</td>
         <td class="cos-esq">{% for d in x.distribuidoras %}
@@ -100,7 +101,7 @@
     <tbody>
     {% for c in p.chamados[:100] %}
       <tr>
-        <td class="cos-esq cos-usina"><b>{{ c.usina }}</b><span class="det">{{ c.parte or '' }}{% if c.uc %}{{ ' · ' if c.parte else '' }}UC {{ c.uc }}{% endif %} · {{ c.concessionaria or 'concessionária não informada' }}</span>
+        <td class="cos-esq cos-usina"><b>{{ usina_link(c.usina_codigo, c.usina) }}</b><span class="det">{{ c.parte or '' }}{% if c.uc %}{{ ' · ' if c.parte else '' }}UC {{ c.uc }}{% endif %} · {{ c.concessionaria or 'concessionária não informada' }}</span>
           <span class="det">{{ c.cliente }}{% if c.os %} · OS {{ c.os }}{% endif %}</span></td>
         <td class="cos-esq"><span class="cn-pill cn-{{ c.tom }}">{{ c.estado_rotulo }}</span></td>
         <td class="cos-esq">{{ c.criado.strftime('%d/%m %H:%M') if c.criado else '—' }}

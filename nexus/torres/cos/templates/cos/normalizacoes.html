@@ -2,6 +2,7 @@
 {% from "hseq/_legenda.html" import aviso, termo %}
 {% block titulo %}{{ tela.nome }}{% endblock %}
 {% block conteudo %}
+{% from "cos/_usina.html" import usina_link with context %}
 <link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='cos.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='hseq.css') }}">
@@ -120,7 +121,7 @@
         <td class="cos-esq"><b>{{ n.volta.strftime('%d/%m %H:%M') if n.volta else '—' }}</b>
           <span class="det">{% if n.fim_corrigido %}hora corrigida · {% endif %}{{ n.declarada_por }}</span></td>
         <td class="cos-esq">{{ n.cliente }}</td>
-        <td class="cos-esq cos-usina cos-texto"><b>{{ n.usina }}</b>
+        <td class="cos-esq cos-usina cos-texto"><b>{{ usina_link(n.usina_codigo, n.usina) }}</b>
           <span class="det">{{ n.falha }}{% if n.equipamentos %} · {{ n.equipamentos[:2]|join(', ') }}{% if n.equipamentos|length > 2 %} e mais {{ n.equipamentos|length - 2 }}{% endif %}{% endif %}</span></td>
         <td class="cos-esq cos-protecoes">{{ n.protecoes|join(', ') if n.protecoes else '—' }}</td>
         <td class="cos-esq">{% if n.geracao_parou is true %}<span class="cn-pill cn-critico">Sim</span>{% elif n.geracao_parou is false %}<span class="cn-pill cn-ok">Não</span>{% else %}<span class="mudo">—</span>{% endif %}</td>
@@ -166,7 +167,7 @@
       NexusOsCard.abrirFolio(folio, {status: tr.getAttribute('data-status') || '', folio: folio});
     }
     document.querySelectorAll('tr.cos-os').forEach(function (tr) {
-      tr.addEventListener('click', function (e) { if (!e.target.closest('.cos-det-bt')) { abrir(tr); } });
+      tr.addEventListener('click', function (e) { if (!e.target.closest('.cos-det-bt, a')) { abrir(tr); } });
       tr.addEventListener('keydown', function (e) { if (e.key === 'Enter' && !e.target.closest('.cos-det-bt')) { abrir(tr); } });
     });
     // o botão Detalhes abre e fecha a linha de baixo (sem abrir o card da OS)

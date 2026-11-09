@@ -2,6 +2,7 @@
 {% block titulo %}{{ tela.nome }}{% endblock %}
 {% block conteudo %}
 {% from "_explica.html" import explica %}
+{% from "cos/_usina.html" import usina_link with context %}
 <link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='cos.css') }}">
 <noscript><meta http-equiv="refresh" content="120"></noscript>
@@ -74,7 +75,7 @@
     <tbody>
     {% for e in p.itens %}
       <tr>
-        <td class="cos-esq cos-usina"><b>{{ e.usina }}</b><span class="det">{{ e.rotulo }}{% if e.tag and e.tag != e.rotulo %} · {{ e.tag }}{% endif %}</span>
+        <td class="cos-esq cos-usina"><b>{{ usina_link(e.usina_codigo, e.usina) }}</b><span class="det">{{ e.rotulo }}{% if e.tag and e.tag != e.rotulo %} · {{ e.tag }}{% endif %}</span>
           {% if e.tipos %}<span class="det">{{ e.tipos|join(', ') }}</span>{% endif %}</td>
         <td>{% if e.reincidente %}<span class="cn-pill cn-critico">{{ e.total }}</span>{% elif e.repete %}<span class="cn-pill cn-alerta">{{ e.total }}</span>{% else %}{{ e.total }}{% endif %}</td>
         {% for k, d in desfechos.items() %}<td>{% if e.desfechos.get(k) %}<span class="cn-pill cn-{{ d[1] }}">{{ e.desfechos[k] }}</span>{% else %}<span class="mudo">—</span>{% endif %}</td>{% endfor %}

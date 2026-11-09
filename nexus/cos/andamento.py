@@ -482,6 +482,10 @@ def eventos(leituras: list[Leitura], agora: datetime, janela: str = JANELA_PADRA
             continue
         nomes = nomes_dos_problemas(lt.dados)
         anterior = instante(lt.dados.get("fotografia_anterior"))
+        # o evento traz só o código curto ("VER100"); o código inteiro ("EX-VER100", o das outras rotas) vem da usina da
+        # mesma fotografia, para o nome levar à ficha da usina certa (09/11/2026, nexus/cos/ficha.py)
+        codigo_do_cod = {str(u.get("cod")): str(u.get("codigo")) for u in lt.dados.get("usinas") or []
+                         if u.get("cod") and u.get("codigo")}
         for e in lt.dados.get("eventos") or []:
             q = instante(e.get("quando"))
             if q is None or q < desde or q > agora + timedelta(minutes=5):
@@ -497,6 +501,7 @@ def eventos(leituras: list[Leitura], agora: datetime, janela: str = JANELA_PADRA
                 "hoje": q.date() == agora.date(),
                 "retro": retro,
                 "cod": e.get("cod") or "",
+                "codigo": codigo_do_cod.get(str(e.get("cod") or ""), ""),
                 "nome": e.get("nome") or "",
                 "os": str(e.get("os") or ""),
                 "problema": str(e.get("problema") or ""),

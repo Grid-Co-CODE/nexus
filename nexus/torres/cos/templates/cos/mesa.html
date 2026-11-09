@@ -2,6 +2,7 @@
 {% block titulo %}{{ tela.nome }}{% endblock %}
 {% block conteudo %}
 {% from "_explica.html" import explica %}
+{% from "cos/_usina.html" import usina_link with context %}
 <link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='cos.css') }}">
 <noscript><meta http-equiv="refresh" content="60"></noscript>
@@ -16,7 +17,7 @@
       <tr>
         <td class="cos-esq"><span class="cn-pill cn-{{ i.etapa.tom }}">{{ 'Atrasada' if i.etapa.estado == 'atrasada' else 'Correndo' }}</span>
           <span class="det">{{ i.etapa.detalhe }}</span></td>
-        <td class="cos-esq cos-usina"><b>{{ i.linha.usina }}</b><span class="det">{{ i.cliente }}{% if i.linha.equipamentos %} · {{ i.linha.equipamentos }}{% endif %}</span></td>
+        <td class="cos-esq cos-usina"><b>{{ usina_link(i.linha.o.usina_codigo, i.linha.usina) }}</b><span class="det">{{ i.cliente }}{% if i.linha.equipamentos %} · {{ i.linha.equipamentos }}{% endif %}</span></td>
         <td class="cos-esq">{{ i.linha.tipo }}{% if i.linha.severidade %}<span class="det cn-t-{{ i.linha.severidade_tom }}">{{ i.linha.severidade }}</span>{% endif %}</td>
         <td class="cos-esq">{{ i.inicio.strftime('%d/%m %H:%M') if i.inicio else '—' }}<span class="det">{{ i.linha.estado }}</span></td>
         <td class="cos-esq">{{ i.linha.os or '—' }}</td>

@@ -328,6 +328,41 @@ prazo e religamento remoto". As duas leem o Andamento e só leem. Logo depois do
   pendente contado como no prazo, o e-mail sem normalizar no HMAC e o turno de 06h na noite, vermelhos; tirar o filtro "só
   abertas" da Mesa não muda nada, porque a etapa da ocorrência fechada nunca fica correndo nem atrasada).
 
+## Ficha da usina: tudo o que o COS sabe de uma usina, numa página (09/11/2026)
+
+*"O que está acontecendo nesta usina, quem eu aciono e isso já aconteceu antes?"* Por que existe: a mesma usina aparecia
+em oito telas (Ronda, Ocorrências, Mesa, Parede, Religamentos, Acionamentos, OS em aberto, Normalizações) e em nenhuma
+dava para abri-la. Das dez telas próprias do COS, só duas tinham link para outra tela do COS. A Mesa dizia "Campo a
+acionar · atrasada", e para saber quem chamar o operador abria Acionamentos e procurava a usina de novo; para saber se
+ela repete, abria Religamentos e escolhia o cliente de novo; para ver a OS, abria OS em aberto e filtrava de novo.
+
+- **Endereço:** `/t/cos/usina/<código>` (o `codigo` da fotografia, o mesmo `usina_codigo` das outras rotas do Andamento:
+  `THPN-ALT100`). `/t/cos/usina` sem código, ou com um código que o Andamento não tem (404), é a lista das usinas de
+  todos os clientes com a busca (nome, código ou cidade), as vermelhas primeiro.
+- **Não é tela do menu**, de propósito: não tem marca própria em Base → Acessos e abre para quem tem ao menos uma tela do
+  COS (`setor_telas.pode`, "o resto da torre"). Uma `Tela` nova nasceria sem marca em nenhum setor, e o link nas telas
+  daria 403 aos operadores até alguém marcar.
+- **Cada bloco segue a marca da tela dona** (`_ve` em `__init__.py`): o "Aberto agora" pela Ronda, o ciclo pelas
+  Ocorrências, os religamentos, as OS em aberto, as normalizações, a linha do tempo pela Parede e o "quem acionar", com os
+  telefones, só para quem abre Acionamentos. Ninguém vê na ficha o que a tela não lhe mostraria. O bloco que a pessoa não
+  vê nem é lido (os telefones não são decifrados).
+- **Nenhuma conta nova** (`nexus/cos/ficha.py`): cada bloco passa pela conta da tela dona (`ocorrencias.painel`,
+  `religamentos.painel(..., "todos")`, `os_abertas.painel(..., "todas")`, `normalizacoes.painel`, `acionamentos.painel`)
+  e só recorta pela usina. As leituras são as mesmas cópias das telas (o ciclo de 30 dias é o da tela Religamentos). A
+  ficha e a tela dizem sempre a mesma coisa.
+- **A chave:** `ficha.mesma(a, b)` casa o código inteiro; sem o prefixo de um dos lados (o `cod` dos eventos, "VER100"),
+  casa pelo sufixo. Dois prefixos diferentes são dois clientes. `ficha.achar` procura o código inteiro em todos os
+  clientes antes de tentar o sufixo. Os eventos trazem só o `cod`: `andamento.eventos` passou a mandar também o
+  `codigo` da usina da mesma fotografia, para o link sair com o código inteiro.
+- **O "quem acionar"** liga a usina do Andamento ao cadastro pelo `Ligador` (`ficha.acionar`). Sem ligação, a ficha diz
+  ("o conserto é no cadastro"); fora de operação no cadastro, também.
+- **O link do nome:** a macro `usina_link` de `templates/cos/_usina.html` (importada `with context`, para o `{{ raiz }}`).
+  Nas linhas que abrem o card da OS (OS em aberto, Normalizações), o clique no nome não abre o card.
+- Testes: `tests/test_cos_ficha.py`. Controle positivo: o prefixo ignorado na chave, a ficha sem a marca por bloco, o
+  evento sem o código inteiro e os religamentos sem o recorte, todos vermelhos.
+- De quebra (09/11/2026): a Ronda rolava 61 px de lado no celular (as duas colunas de "Por problema" e "Fotografias"
+  com 420 px de mínimo); a coluna agora encolhe até a largura da tela.
+
 ## Regras desta torre
 
 - Prazo e meta (15 min, 30 min, horários de ronda) são **dado**, e não número solto no código: um só lugar, com o
