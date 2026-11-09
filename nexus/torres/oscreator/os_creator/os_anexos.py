@@ -186,6 +186,13 @@ def get_os_anexos(id_work_order) -> list:
             val = str(d.get("value") or "").strip()
             url = api._img_url(d)
             desc = str(d.get("description") or "").strip()
+            # A NOTA DE TEXTO QUE VEM NO `value` (09/11/2026, OS 8159): o Fracttal guarda a observação escrita na aba Anexos
+            # da tarefa com o texto no lugar do caminho ("Não há cabine de medição 02 na UFV Parelhas"); como "tem value",
+            # ela virava DOCUMENTO, o Abrir pedia ao S3 um arquivo com esse nome (HTTP 404) e mostrava o erro cru, e o Baixar
+            # baixava o erro. Arquivo é o que tem a URL ou um CAMINHO no S3 (com "/", como nas subtarefas) e não é do tipo
+            # nota (3); o resto é nota, com o texto
+            if val and not url and ("/" not in val or str(d.get("type")) == "3"):
+                desc, val = (f"{desc}: {val}" if desc and desc != val else val), ""
             if not val and not url and not desc:          # nada útil
                 continue
             nome = (val.rsplit("/", 1)[-1] if val else (desc or "anexo"))

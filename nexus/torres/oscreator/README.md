@@ -2689,6 +2689,29 @@ tarefa e dê para baixar tudo de uma vez, o download sai com o nome do ativo!"; 
 - Prova: `tests/test_oscreator_card_ativos_anexos_04_11.py`; os 2 testes de `test_oscreator_card_por_ativo_28_10.py`
   aceitam o `data-ativo` novo na tarefa.
 
+## O anexo que é observação, o Abrir e o Baixar que falham, e o PDF que demora (09/11/2026)
+
+Levi, pela OS 8159: o anexo com a observação "Não há cabine de medição 02..." mostrava `{"erro":"Falha ao baixar a imagem
+(HTTP 404)."}` no Abrir e baixava esse JSON no Baixar ("o abrir e baixar deve ser personalizado para cada tipo de arquivo");
+o PDF da mesma OS dizia "O servidor não respondeu... A gravação pode ter sido feita", e na Aprovação de OS, "A sua sessão do
+Nexus acabou".
+- **A observação é nota de texto** (`os_anexos.get_os_anexos`): o Fracttal guarda o texto escrito na aba Anexos da tarefa no
+  campo do arquivo (`value`). Arquivo é o que tem a URL ou um CAMINHO no S3 (com "/", como nas subtarefas) e não é do tipo
+  nota (3); o resto é nota, lida como texto no card (sem Abrir nem Baixar), no .zip (.txt) e no PDF (nas notas).
+- **O Abrir que falha** (`rotas_os_acoes._falha_anexo`): aberto na aba, a página de aviso do OS Creator com o motivo ("O
+  arquivo X não está mais no Fracttal"); pedido em JSON, o JSON. **O Baixar** (`os_acoes.baixarArquivo`) pede o arquivo pela
+  tela e só salva quando veio o arquivo; o erro vira a frase no rodapé dos anexos. A pré-assinada do S3 segue direto.
+- **O PDF responde sempre em JSON**, inclusive o erro inesperado (o motivo à tela, a pilha ao log), e **as fotos têm prazo**
+  (`PRAZO_FOTOS_S`, 45 s): passado o prazo, as que faltam saem no PDF como "não veio", e o PDF chega antes do tempo que o
+  caminho até o servidor espera. A causa exata da OS 8159 não foi vista (sem acesso ao log do servidor): o prazo cobre a OS
+  de muitas fotos, e o JSON cobre o erro de montar.
+- **O POST que só lê** (o PDF e o "Baixar todos") tem o aviso de leitura no `carga.js` (`SO_LEITURA`): "O servidor não
+  respondeu a tempo... Nada foi gravado no Fracttal", e não o da gravação.
+- A Aprovação de OS (Usinas 360°) passa a separar a sessão que acabou (o redirect) do servidor que não respondeu: combinado
+  com o chat da torre, que muda a `aprovacao.html`.
+- Prova: `tests/test_oscreator_anexo_pdf_09_11.py`; o diálogo dos anexos conferido na bancada (a nota como texto, o Baixar e
+  o Abrir do arquivo que sumiu).
+
 ## Os chamados em aberto para o App de Campo e o pacote 1.3.0 (08/11/2026)
 
 O desenho "o chamado do tracker na ronda" (Levi, 08/11/2026: "segue!"; o texto mora na pasta do App de Campo,

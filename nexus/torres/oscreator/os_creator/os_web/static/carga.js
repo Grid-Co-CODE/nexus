@@ -119,27 +119,37 @@
   // como vieram.
   const SEM_RESPOSTA = 'O servidor não respondeu (pode ter sido reiniciado agora). A gravação pode ter sido feita: '
     + 'confira no Fracttal antes de tentar de novo.';
+  // O POST QUE SÓ LÊ (09/11/2026, o PDF da OS 8159: "...A gravação pode ter sido feita" num pedido que não grava nada):
+  // montar o PDF e juntar os anexos num .zip vão por POST, mas não mexem no Fracttal. Sem resposta, o aviso é outro
+  const SEM_RESPOSTA_LEITURA = 'O servidor não respondeu a tempo (pode ter sido reiniciado agora): tente de novo em '
+    + 'instantes. Nada foi gravado no Fracttal.';
+  const SO_LEITURA = [/\/api\/os\/pdf$/, /\/anexos-zip$/];
   function gravacao(opcoes) {
     const m = String((opcoes && opcoes.method) || 'GET').toUpperCase();
     return m !== 'GET' && m !== 'HEAD';
   }
-  function semResposta(status) {
-    return new Response(JSON.stringify({ok: false, erro: SEM_RESPOSTA, sem_resposta: true}),
+  function soLeitura(url) {
+    const caminho = String(url || '').split('?')[0];
+    return SO_LEITURA.some(function (rx) { return rx.test(caminho); });
+  }
+  function semResposta(status, leitura) {
+    return new Response(JSON.stringify({ok: false, erro: leitura ? SEM_RESPOSTA_LEITURA : SEM_RESPOSTA, sem_resposta: true}),
                         {status: status >= 400 ? status : 502, headers: {'Content-Type': 'application/json'}});
   }
-  async function conferida(pedido, opcoes) {
+  async function conferida(pedido, opcoes, url) {
     if (!gravacao(opcoes)) return pedido;
+    const leitura = soLeitura(url);
     let r;
-    try { r = await pedido; } catch (e) { return semResposta(502); }          // a rede caiu no meio
+    try { r = await pedido; } catch (e) { return semResposta(502, leitura); }          // a rede caiu no meio
     const tipo = (r.headers && r.headers.get('Content-Type')) || '';
     if (tipo.indexOf('json') >= 0) return r;                                   // a resposta da rota
-    if (!r.ok) return semResposta(r.status);                                   // o erro do proxy ou do servidor
+    if (!r.ok) return semResposta(r.status, leitura);                          // o erro do proxy ou do servidor
     if (tipo && tipo.indexOf('text/') !== 0) return r;                         // um arquivo (o PDF da OS)
     const corpo = await r.clone().text().catch(function () { return ''; });
-    return corpo.trim() ? r : semResposta(502);                                // 200 sem corpo: não se sabe se gravou
+    return corpo.trim() ? r : semResposta(502, leitura);                       // 200 sem corpo: não se sabe se gravou
   }
 
-  function buscar(url, opcoes, texto) { return durante(conferida(fetch(url, opcoes), opcoes), texto); }
+  function buscar(url, opcoes, texto) { return durante(conferida(fetch(url, opcoes), opcoes, url), texto); }
 
   function mostrar(t, repetir) {
     montar(); clearTimeout(atraso); clearInterval(relogio);

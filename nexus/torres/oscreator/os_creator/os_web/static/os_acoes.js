@@ -494,7 +494,7 @@
       corpo.insertAdjacentHTML('beforeend', '<div class="acoes-fotos">'
         + imgs.map((x, k) => '<figure class="acoes-foto"><figcaption title="' + esc(x.legenda) + '">' + esc(x.legenda) + '</figcaption>'
           + '<a class="img" href="' + esc(x.url) + '" target="_blank" rel="noopener" data-foto="' + k + '"><img src="' + esc(x.url) + '" alt="" loading="lazy"></a>'
-          + (x.baixar ? '<a class="acoes-baixar" href="' + esc(x.baixar) + '" download="' + esc(x.nome) + '">Baixar</a>' : '') + '</figure>').join('')
+          + (x.baixar ? '<a class="acoes-baixar" href="' + esc(x.baixar) + '" download="' + esc(x.nome) + '" data-baixar-arq>Baixar</a>' : '') + '</figure>').join('')
         + notas.map((x) => '<details class="acoes-nota"><summary>' + esc(x.legenda || 'nota') + '</summary><pre>' + esc(x.texto || '(nota vazia)') + '</pre></details>').join('')
         + '</div>');
     }
@@ -504,9 +504,34 @@
         return '<div class="acoes-doc"><span class="acoes-ext">' + esc(x.ext || 'ARQ') + '</span><div class="acoes-doc-t"><div>' + esc(x.nome) + '</div>'
           + (sub ? '<small>' + esc(sub) + '</small>' : '') + '</div>'
           + '<a class="det-b ghost acoes-mini" href="' + esc(x.url) + '" target="_blank" rel="noopener">Abrir</a>'
-          + (x.baixar ? '<a class="det-b ghost acoes-mini" href="' + esc(x.baixar) + '" download="' + esc(x.nome) + '">Baixar</a>' : '') + '</div>';
+          + (x.baixar ? '<a class="det-b ghost acoes-mini" href="' + esc(x.baixar) + '" download="' + esc(x.nome) + '" data-baixar-arq>Baixar</a>' : '') + '</div>';
       }).join('') + '</div>');
     }
+    corpo.onclick = (e) => { const a = e.target.closest('a[data-baixar-arq]'); if (a) baixarArquivo(e, dlg, a); };
+  }
+
+  // O BAIXAR DE UM ANEXO (09/11/2026, OS 8159: o Baixar salvava o erro do servidor como um arquivo .json). Pela rota do
+  // Nexus, o arquivo vem por fetch e só é salvo quando veio o arquivo; o erro vira a frase no rodapé dos anexos. O link
+  // de fora (a pré-assinada do S3) segue como sempre: o navegador baixa direto
+  async function baixarArquivo(e, dlg, a) {
+    if (a.origin !== location.origin) return;
+    e.preventDefault();
+    const nome = a.getAttribute('download') || 'anexo';
+    msgAnexos(dlg, 'Baixando "' + nome + '"…');
+    try {
+      const r = await fetch(a.href, {credentials: 'same-origin', headers: {'Accept': 'application/json, */*'}});
+      const tipo = r.headers.get('Content-Type') || '';
+      if (!r.ok || tipo.indexOf('json') >= 0) {
+        const j = await r.json().catch(() => ({}));
+        msgAnexos(dlg, 'Não consegui baixar "' + nome + '": ' + (j.erro || ('o servidor respondeu ' + r.status + '.')), true);
+        return;
+      }
+      const u = URL.createObjectURL(await r.blob());
+      const t = document.createElement('a'); t.href = u; t.download = nome;
+      document.body.appendChild(t); t.click(); t.remove();
+      setTimeout(() => URL.revokeObjectURL(u), 60000);
+      msgAnexos(dlg, '');
+    } catch (err) { msgAnexos(dlg, 'Não consegui baixar "' + nome + '": ' + err.message, true); }
   }
 
   document.addEventListener('click', (e) => {
