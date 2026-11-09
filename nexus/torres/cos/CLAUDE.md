@@ -238,6 +238,18 @@ em que a ocorrência aparece, e a continuação nos dias seguintes, no lugar da 
 proteção e a OS. Não é texto livre: a Ronda COS monta o relato por regras fixas, sem copiar as notas, e a regra 8 segue
 valendo para `impacto`, `detalhes` e `informe`. As colunas são calculadas na leitura da API, então valem para todas as
 normalizações desde 01/10/2026 depois que o processo relê a memória (no deploy).
+**O comentário do dia pronto (09/11/2026**, o dono: "Eu só preciso que os comentários cheguem ao cliente pra
+explicar corretamente porque a disponibilidade está baixa naquele dia"): a Plataforma de Performance monta o Comentário
+dela com o tipo, as horas, a proteção e a OS, e o código dela não é deste repositório. Para a mudança de lá ser uma
+linha só ("se o Nexus tem o comentário desta usina e deste dia, mostra"), o Nexus monta o texto inteiro:
+`fato_comentario_dia` no mesmo livro (`comentarios_do_dia`), 1 linha = usina × dia de Brasília em que a parada tocou o
+horário de sol (`JANELA_DO_SOL_H`, 06h–18h: a parada da noite não explica o dia; a OS 15789 de Primavera, de 07/10 19:27 a
+08/10 07:40, é de 08/10). A coluna `relato_do_dia` leva o relato no 1º dia da ocorrência e a continuação nos
+seguintes; a ainda aberta vai como "<evento> desde <início>, em atendimento pelo COS" (o evento pelo tipo e pela
+referência curta citada: CAB2 → Cabine 2); várias no mesmo dia, uma por linha (`\n`), pela hora de início, com
+`registros` e `os` dizendo quais. A normalizada sem relato não entra (o dia fica sem comentário do Nexus, e a
+Plataforma usa a linha dela). O nome da coluna não é "comentario": é nome proibido na governança (`PROIBIDAS`, texto
+pessoal), e o relato não é texto pessoal. Mexe em `nexus/dados/` (catálogo e `explica.py`): o pedido sai da área do COS.
 
 - **De onde:** `GET <Andamento>/api/normalizacoes?desde=&limite=` (contrato `versao: 1`, a mesma chave `X-Nexus-Chave`). A
   API é **incremental**: devolve `cursor` e `mais`. O Nexus guarda em memória (`nexus/cos/normalizacoes.py`) desde o
