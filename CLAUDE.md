@@ -163,3 +163,7 @@ PerformancePainel.
   e tudo. O programador do COS ficou admin por decisão do
   Levi (27/10/2026): para ele a conferência só avisa.
 - Antes de dar algo por pronto: testes passando e a tela conferida no navegador (desktop e 375 px).
+- Teste com data fixa (`AGORA = datetime(...)`) que passa por código que lê `datetime.now` **congela esse relógio no
+  teste** (monkeypatch do `datetime` do módulo, só o `now` parado em AGORA). Com o relógio real ele vira bomba-relógio:
+  `test_o_pulso_conta_so_o_fracttal` quebrou sozinho em 09/11/2026, quando a OS "nova" do teste (02/11) passou dos 7 dias
+  do pulso. Para provar, simule hoje + 30 dias.

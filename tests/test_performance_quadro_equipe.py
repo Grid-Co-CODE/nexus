@@ -77,7 +77,18 @@ def test_o_estado_e_separado_do_quadro_da_engenharia():
     Q.limpar()
 
 
+class _RelogioParado(datetime):
+    """O relógio da tela parado em AGORA. A rota calcula o pulso ("parada", sem atualização há mais de 7 dias) com
+    `datetime.now`, e as OS do teste nascem de AGORA: com o relógio real, a OS "nova" (criada em AGORA - 2 dias, 02/11)
+    passou dos 7 dias em 09/11/2026 e o teste quebrou sem nada mudar na tela. Só o `now` para; o resto é o datetime."""
+
+    @classmethod
+    def now(cls, tz=None):
+        return AGORA.astimezone(tz) if tz else AGORA.astimezone().replace(tzinfo=None)
+
+
 def _tela(logado, monkeypatch, oss, faltam=()):
+    monkeypatch.setattr("nexus.torres.performance.datetime", _RelogioParado)
     monkeypatch.setattr(Q, "pedir_releitura", lambda app=None, esperar=False, forcar=False: None)
     monkeypatch.setattr(Q, "dados", lambda: {"os": oss, "equipe": [{"id": 10, "nome": "Paula Teste",
                                                                     "nome_fracttal": "Paula Teste"}],
