@@ -406,6 +406,12 @@ resposta de "Descreva a atividade realizada" da OS filha. Desenho em
   seletor; o Ctrl+V (ou o Win+V) e o arrastar também mandam. Com ele aberto, o colar da página cede a ele.
 - **A resposta de texto da subtarefa quebra a linha** (09/11/2026: "está rolando infinito para o lado"): caixa de várias
   linhas que cresce com o texto (`.eg-ac-texto`); o número segue numa linha. O mesmo no Fazer a tarefa do card.
+- **Os registros da tarefa: editar o início e o fim** (09/11/2026, Levi: "Gostaria que nas subtarefas fosse possível
+  também editar registros [...] A ideia é poder editar o início e fim da atividade!"): o botão Registros de cada tarefa
+  lista as execuções (o `tasks.wo_tasks_execution_list`) com o início e o fim na hora de Brasília; o Salvar manda só as
+  que mudaram, pelo `tasks.wo_tasks_execution_update` da captura dele (o fim também vai, `final_date`), e cada uma é
+  relida. A execução aberta não se edita (o `to_stop` a encerraria). **Provado no TESTE - PA** (OS 19013, 09/11/2026):
+  o registro passou de 14:05 às 14:05 para 13:05 às 14:03, e o Fracttal recalculou o tempo trabalhado (58 min).
 - **As tarefas da OS, uma a uma** (Levi, 06/11/2026, pela OS 16289, de seis inversores: o check no ativo da tarefa
   concluída, abrir e responder as subtarefas de cada ativo, "Iniciar atividade" com pausa, "Anexar" e "x anexos" ao lado
   do ativo): o bloco Ativos vira o painel `[data-tarefas-os]` (`engenharia-os.js`) quando a sessão do Fracttal lê as

@@ -193,7 +193,7 @@
       else if (e.estado === 'pausada') partes.push('pausada' + (e.motivo ? ' (' + esc(e.motivo) + ')' : ''));
       var bts = '';
       if (pode) {
-        bts = botao('Subtarefas', 'subtarefas') + botao('Anexar', 'anexar');
+        bts = botao('Subtarefas', 'subtarefas') + botao('Anexar', 'anexar') + botao('Registros', 'registros');
         if (!t.feita && e.estado === 'parada') bts += botao('Iniciar', 'iniciar', 'eg-ac-btn--g');
         if (e.estado === 'rodando') bts += botao('Pausar', 'pausar');
         if (e.estado === 'pausada') bts += botao('Retomar', 'retomar', 'eg-ac-btn--g');
@@ -294,6 +294,44 @@
       return pedir(url(t.id, 'cronometro'), {acao: 'concluir'}).then(depois).then(function () {
         var agora = tarefas.filter(function (x) { return String(x.id) === String(t.id); })[0];
         if (agora && !agora.feita) dizer('O tempo foi encerrado no Fracttal, mas a tarefa ainda não aparece como finalizada lá.', true);
+      }).catch(falhou);
+    },
+    // os registros da tarefa (09/11/2026: "A ideia é poder editar o início e fim da atividade!"): cada execução com o
+    // início e o fim na hora de quem olha; o Salvar manda só os que mudaram, um por vez, e o Fracttal relê cada um
+    registros: function (t) {
+      return pedir(url(t.id, 'registros')).then(function (j) {
+        var rs = j.registros || [];
+        if (!rs.length) { dizer('Esta tarefa ainda não tem registro de execução: use o Iniciar.'); return; }
+        function local(iso) {
+          if (!iso) return '';
+          var d = new Date(iso); if (isNaN(d.getTime())) return '';
+          function p(n) { return String(n).padStart(2, '0'); }
+          return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + 'T' + p(d.getHours()) + ':' + p(d.getMinutes());
+        }
+        function dur(s) { var h = Math.floor(s / 3600), m = Math.round((s % 3600) / 60); return h ? h + ' h ' + m + ' min' : m + ' min'; }
+        var corpo = rs.map(function (r) {
+          var trava = r.aberta ? ' disabled' : '';
+          return '<fieldset class="eg-reg" data-reg="' + esc(r.id) + '" data-ini="' + esc(local(r.inicio)) + '" data-fim="' + esc(local(r.fim)) + '">'
+            + '<legend>' + esc(r.quem || 'Registro') + (r.aberta ? ' · em andamento' : ' · ' + dur(r.trabalhado_s || 0)) + '</legend>'
+            + '<label class="eg-dlg-campo"><span>Início</span><input class="eg-ac-campo" type="datetime-local" data-reg-ini value="' + esc(local(r.inicio)) + '"' + trava + '></label>'
+            + '<label class="eg-dlg-campo"><span>Fim</span><input class="eg-ac-campo" type="datetime-local" data-reg-fim value="' + esc(local(r.fim)) + '"' + trava + '></label>'
+            + (r.aberta ? '<p class="eg-dica">Ainda em andamento: encerre a atividade para editar.</p>' : '') + '</fieldset>';
+        }).join('');
+        dialogo('Registros · ' + (t.ativo || t.titulo), corpo, 'Salvar registros', function (d) {
+          var mudou = [].slice.call(d.querySelectorAll('[data-reg]')).filter(function (f) {
+            var i = f.querySelector('[data-reg-ini]'), fi = f.querySelector('[data-reg-fim]');
+            return !i.disabled && (i.value !== f.dataset.ini || fi.value !== f.dataset.fim);
+          });
+          if (!mudou.length) return Promise.reject(new Error('Nenhum registro mudou.'));
+          return mudou.reduce(function (p, f) {
+            return p.then(function () {
+              return pedir(caixa.dataset.tarefaUrl + '/' + encodeURIComponent(t.id) + '/registro/' + encodeURIComponent(f.dataset.reg),
+                {inicio: f.querySelector('[data-reg-ini]').value, fim: f.querySelector('[data-reg-fim]').value});
+            });
+          }, Promise.resolve()).then(function () {
+            return depois({mensagem: mudou.length === 1 ? 'Registro alterado no Fracttal.' : mudou.length + ' registros alterados no Fracttal.'});
+          });
+        });
       }).catch(falhou);
     },
     pausar: function (t) {

@@ -1022,3 +1022,12 @@ def test_o_de_segue_no_salvar_da_pagina(pagina, cliente):
     assert "window.egVoltarComOk = function" in js and "new URLSearchParams(location.search)" in js
     assert tpl.count("window.egVoltarComOk(") == 2 and js.count("window.egVoltarComOk(") == 1    # comentar, mudar e levar
 
+
+def test_o_painel_tem_os_registros_com_o_inicio_e_o_fim():
+    """09/11/2026: "A ideia é poder editar o início e fim da atividade!": o botão Registros de cada tarefa abre a lista
+    dos registros de execução com o início e o fim (datetime-local, a hora de Brasília)."""
+    from pathlib import Path
+    js = Path("nexus/static/engenharia-os.js").read_text(encoding="utf-8")
+    assert "botao('Registros', 'registros')" in js and "registros: function (t)" in js
+    assert 'type="datetime-local"' in js and "'/registro/'" in js
+

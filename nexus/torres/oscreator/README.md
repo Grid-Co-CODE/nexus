@@ -1292,6 +1292,11 @@ concluir e cancelar!".
     dobrariam.
   - `POST /os/api/os/<id>/tarefa/<tid>/respostas`: grava as respostas (`salvar_subtarefas`) sem lançar execução e diz
     quantas obrigatórias faltam, relidas.
+  - Os registros (09/11/2026): `GET /os/api/os/<id>/tarefa/<tid>/registros` (as execuções, o `historico_execucao`) e
+    `POST /os/api/os/<id>/tarefa/<tid>/registro/<rid>` ({inicio, fim} na hora de Brasília): o `editar_execucao`
+    (`tasks.wo_tasks_execution_update` com o id do registro, o `initial_date` e o `final_date` em UTC, `to_pause` False
+    e `to_stop` True, a captura do Levi), só no registro encerrado e da tarefa, sem fim antes do início nem futuro, e
+    relido depois. Provado no TESTE - PA (OS 19013): o início e o fim gravam, e o Fracttal recalcula o tempo.
   - O Incluir anexo aceita `tarefa`: o arquivo vai para a aba Anexos daquela tarefa, e não para a 1ª. A contagem
     (`/os/os/<id>/anexos`) passa a trazer `arquivos_por_tarefa` (o `get_os_anexos` diz a tarefa de cada arquivo); o
     `por_tarefa` segue sendo o das fotos das subtarefas, que o botão dos anexos da tarefa no card mostra.

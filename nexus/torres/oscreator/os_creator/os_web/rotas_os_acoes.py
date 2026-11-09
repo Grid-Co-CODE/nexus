@@ -700,6 +700,82 @@ def api_cronometro(wid, tid):
                                  "trabalhado_s": agora.get("trabalhado_s") or 0}})
 
 
+# ── os registros da tarefa: editar o início e o fim (09/11/2026) ──────────────────────────────────────────────────────
+# Levi: "Gostaria que nas subtarefas fosse possível também editar registros [...] A ideia é poder editar o início e fim
+# da atividade!". Os registros são as execuções da tarefa (`historico_execucao`, o `tasks.wo_tasks_execution_list`); o
+# editar é o `editar_execucao` (o `tasks.wo_tasks_execution_update` da captura dele). Só o registro encerrado: o
+# `to_stop` encerraria o que está rodando. O registro é relido depois (o Fracttal aceita calado).
+def _quando_utc(v):
+    """O `initial_date`/`final_date` do Fracttal (UTC; com ou sem o Z) → datetime aware em UTC, ou None."""
+    from datetime import datetime, timezone
+    t = str(v or "").strip()
+    if not t or t.lower() == "none":
+        return None
+    try:
+        d = datetime.fromisoformat(t.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return d if d.tzinfo else d.replace(tzinfo=timezone.utc)
+
+
+def _um_registro(e: dict) -> dict:
+    ini, fim = _quando_utc(e.get("initial_date")), _quando_utc(e.get("final_date"))
+    return {"id": e.get("id"), "inicio": ini.isoformat() if ini else "", "fim": fim.isoformat() if fim else "",
+            "aberta": fim is None,
+            "quem": str(e.get("name") or e.get("personnel_description") or "").strip(),
+            "trabalhado_s": int(e.get("total_active_seconds") or 0)}
+
+
+@bp.route("/api/os/<int:wid>/tarefa/<int:tid>/registros")
+@exige_sessao
+def api_registros(wid, tid):
+    if not _tarefa_da_os(wid, tid):
+        return _erro("Esta tarefa não é da OS.", 404)
+    regs = [_um_registro(e) for e in (api.historico_execucao(tid) or []) if isinstance(e, dict) and e.get("id")]
+    return jsonify({"registros": regs})
+
+
+@bp.route("/api/os/<int:wid>/tarefa/<int:tid>/registro/<int:rid>", methods=["POST"])
+@exige_sessao
+def api_registro_editar(wid, tid, rid):
+    """{inicio, fim}: o que o <input type=datetime-local> manda, na hora de Brasília. O fim é opcional (fica o que era)."""
+    from datetime import datetime, timedelta
+    if not _tarefa_da_os(wid, tid):
+        return _erro("Esta tarefa não é da OS.", 404)
+    c = _corpo()
+    antes = {e.get("id"): e for e in (api.historico_execucao(tid) or []) if isinstance(e, dict)}
+    if rid not in antes:
+        return _erro("Este registro não é da tarefa.", 404)
+    if _quando_utc(antes[rid].get("final_date")) is None:
+        return _erro("Encerre a atividade antes de editar o registro (ele ainda está aberto).")
+    try:
+        if not str(c.get("inicio") or "").strip():
+            raise ValueError
+        ini = trad.data_brt(c.get("inicio"))
+        fim = trad.data_brt(c.get("fim")) if str(c.get("fim") or "").strip() else None
+    except (ValueError, TypeError):
+        return _erro("Informe o início (e o fim, se quiser) com a data e a hora.")
+    if fim is not None and fim < ini:
+        return _erro("O fim não pode ser antes do início.")
+    if max(ini, fim or ini) > datetime.now(trad.BRT) + timedelta(minutes=5):
+        return _erro("O registro não pode ficar no futuro.")
+    res = api.editar_execucao(rid, ini, fim)
+    if not (isinstance(res, dict) and res.get("ok")):
+        return _erro((res or {}).get("erro") or "O Fracttal não gravou o registro.", 502)
+    depois = {e.get("id"): e for e in (api.historico_execucao(tid) or []) if isinstance(e, dict)}
+    novo = depois.get(rid) or {}
+
+    def bate(lido, pedido):
+        d = _quando_utc(lido)
+        return d is not None and abs((d - pedido).total_seconds()) < 60
+    if not bate(novo.get("initial_date"), ini) or (fim is not None and not bate(novo.get("final_date"), fim)):
+        return _erro("O Fracttal aceitou, mas o registro não ficou com o horário pedido. Confira no Fracttal.", 502)
+    lista_central.mudou(wid)
+    f = lambda d: d.astimezone(trad.BRT).strftime("%d/%m %H:%M")     # noqa: E731
+    return jsonify({"ok": True, "mensagem": "Registro alterado no Fracttal: início %s%s." % (
+        f(ini), (", fim %s" % f(fim)) if fim is not None else "")})
+
+
 @bp.route("/api/os/<int:wid>/tarefa/<int:tid>/respostas", methods=["POST"])
 @exige_sessao
 def api_respostas(wid, tid):

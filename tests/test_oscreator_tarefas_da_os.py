@@ -165,3 +165,100 @@ def test_a_contagem_traz_os_arquivos_de_cada_tarefa(monkeypatch):
     j = _cliente().get(f"/os/os/{WID}/anexos").get_json()
     assert j["por_tarefa"] == {str(T1): 1} and j["os"] == 2
     assert j["arquivos_por_tarefa"] == {str(T2): 2}
+
+
+# ── os registros da tarefa: editar o início e o fim (09/11/2026) ──────────────────────────────────────────────────────
+# Levi: "Gostaria que nas subtarefas fosse possível também editar registros [...] A ideia é poder editar o início e fim da
+# atividade!". O caminho do Fracttal web (a captura dele): ler pelo `tasks.wo_tasks_execution_list` (o
+# `historico_execucao`) e gravar pelo `tasks.wo_tasks_execution_update` com o id do registro, o início em UTC,
+# `to_pause` False e `to_stop` True. O registro é relido depois: o Fracttal aceita calado.
+REG1, REG2 = 53183439, 53183440
+
+
+@pytest.fixture
+def registros(monkeypatch):
+    hist = [{"id": REG2, "initial_date": "2026-11-09T12:00:00", "final_date": None, "name": "Pessoa Teste",
+             "total_active_seconds": 0},
+            {"id": REG1, "initial_date": "2026-11-08T19:32:00", "final_date": "2026-11-08T21:02:00", "name": "Pessoa Teste",
+             "total_active_seconds": 5400}]
+    chamadas, estado = [], {"calado": False}
+    monkeypatch.setattr(api, "_ids_tarefas_da_os", lambda wid: [T1, T2])
+    monkeypatch.setattr(api, "historico_execucao", lambda tid: [dict(x) for x in hist] if tid == T1 else [])
+
+    from datetime import timezone
+
+    def editar(rid, inicio, fim=None):
+        chamadas.append((rid, inicio, fim))
+        if not estado["calado"]:
+            for x in hist:
+                if x["id"] == rid:
+                    x["initial_date"] = inicio.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S")
+                    if fim is not None:
+                        x["final_date"] = fim.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S")
+        return {"ok": True}
+    monkeypatch.setattr(api, "editar_execucao", editar)
+    return {"chamadas": chamadas, "estado": estado, "hist": hist}
+
+
+def _reg(rid, **corpo):
+    return _cliente().post(f"/os/api/os/{WID}/tarefa/{T1}/registro/{rid}", json=corpo)
+
+
+def test_os_registros_da_tarefa(registros):
+    j = _cliente().get(f"/os/api/os/{WID}/tarefa/{T1}/registros").get_json()
+    r1, r2 = sorted(j["registros"], key=lambda r: r["id"])
+    assert (r1["id"], r1["aberta"], r1["trabalhado_s"], r1["quem"]) == (REG1, False, 5400, "Pessoa Teste")
+    assert r1["inicio"].startswith("2026-11-08T19:32") and r1["fim"].startswith("2026-11-08T21:02")
+    assert r2["aberta"] is True
+
+
+def test_editar_o_registro_grava_em_utc_e_le_de_volta(registros):
+    # 16:00 de Brasília = 19:00 UTC; o fim também vai
+    r = _reg(REG1, inicio="2026-11-08T16:00", fim="2026-11-08T18:30")
+    j = r.get_json()
+    assert r.status_code == 200 and j["ok"] and "Registro alterado" in j["mensagem"]
+    from datetime import timezone
+    (rid, ini, fim), = registros["chamadas"]
+    assert rid == REG1
+    assert ini.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M") == "2026-11-08T19:00"
+    assert fim.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M") == "2026-11-08T21:30"
+
+
+def test_o_registro_aberto_nao_se_edita(registros):
+    r = _reg(REG2, inicio="2026-11-09T08:00")
+    assert r.status_code == 400 and "Encerre" in r.get_json()["erro"] and not registros["chamadas"]
+
+
+def test_o_registro_tem_de_ser_da_tarefa(registros):
+    assert _reg(999, inicio="2026-11-08T16:00").status_code == 404 and not registros["chamadas"]
+    r = _cliente().post(f"/os/api/os/{WID}/tarefa/99999/registro/{REG1}", json={"inicio": "2026-11-08T16:00"})
+    assert r.status_code == 404 and not registros["chamadas"]
+
+
+def test_fim_antes_do_inicio_e_futuro_sao_recusados(registros):
+    assert _reg(REG1, inicio="2026-11-08T16:00", fim="2026-11-08T15:00").status_code == 400
+    assert _reg(REG1, inicio="2099-01-01T08:00").status_code == 400
+    assert _reg(REG1, inicio="").status_code == 400
+    assert not registros["chamadas"]
+
+
+def test_o_fracttal_que_aceita_e_nao_grava_e_dito(registros):
+    registros["estado"]["calado"] = True
+    r = _reg(REG1, inicio="2026-11-08T16:00")
+    assert r.status_code == 502 and "não ficou" in r.get_json()["erro"]
+
+
+def test_editar_execucao_manda_o_metodo_da_captura(monkeypatch):
+    """O `editar_execucao` manda o `tasks.wo_tasks_execution_update` como o Fracttal web: o id do registro, o início (e o
+    fim) em UTC com o Z, `to_pause` False e `to_stop` True."""
+    import os_execucao
+    from datetime import datetime, timedelta, timezone
+    mandados = []
+    monkeypatch.setattr(api, "_rpc_call", lambda m, p, *a, **k: mandados.append((m, p)) or {"success": True})
+    brt = timezone(timedelta(hours=-3))
+    r = os_execucao.editar_execucao(REG1, datetime(2026, 11, 8, 16, 32, tzinfo=brt), datetime(2026, 11, 8, 18, 2, tzinfo=brt))
+    (m, p), = mandados
+    assert r["ok"] and m == "tasks.wo_tasks_execution_update"
+    assert p == {"id": REG1, "initial_date": "2026-11-08T19:32:00.000Z", "final_date": "2026-11-08T21:02:00.000Z",
+                 "to_pause": False, "to_stop": True}
+
