@@ -130,7 +130,8 @@ def test_grava_o_fato_e_a_atualizacao_e_mantem_o_que_a_memoria_nao_guarda(app, b
     with app.app_context():
         rel = NB.publicar(app.config, banco, agora=AGORA, forcar=True,
                           leitura=_leitura([_n("r1"), _n("r2", usina_codigo="TSTE-BBB200")]))
-    assert rel["gravado"] == {NB.ABA: 3, NB.ABA_ABERTAS: 0, "atualizacao": 1} and rel["antes_mantidas"] == 1
+    assert rel["gravado"] == {NB.ABA: 3, NB.ABA_ABERTAS: 0, NB.ABA_COMENTARIOS: 0, "atualizacao": 1}
+    assert rel["antes_mantidas"] == 1
     assert [(r["registro"], r["usina_id"]) for r in banco.linhas(NB.LIVRO, NB.ABA)] == [("r0", 1), ("r1", 1), ("r2", 2)]
     a = banco.linhas(NB.LIVRO, "atualizacao")[0]
     assert (a["linhas_qtd"], a["desde"], a["ligadas_qtd"]) == (3, NO.inicio_da_guarda(AGORA).date().isoformat(), 3)
@@ -189,7 +190,10 @@ def test_catalogo_bate_com_o_modulo():
     f = catalogo.POR_ID["normalizacao"]
     assert f.conformado_em == f"{NB.LIVRO} · {NB.ABA}" and f.chave == NB.CHAVE and f.tipo == NB.TIPO
     assert f.grao == NB.GRAO and {(m.coluna, m.unidade, m.soma) for m in f.medidas} == set(NB.MEDIDAS)
-    assert catalogo.LIVRO_POR_NOME[NB.LIVRO].abas == (NB.ABA, NB.ABA_ABERTAS, "atualizacao")
+    assert catalogo.LIVRO_POR_NOME[NB.LIVRO].abas == (NB.ABA, NB.ABA_ABERTAS, NB.ABA_COMENTARIOS, "atualizacao")
+    c = catalogo.POR_ID["comentario_dia"]
+    assert c.conformado_em == f"{NB.LIVRO} · {NB.ABA_COMENTARIOS}" and c.tipo == NB.TIPO_COMENTARIOS
+    assert c.grao == NB.GRAO_COMENTARIOS and c.chave == ("usina_codigo", "data_id")
     a = catalogo.POR_ID["ocorrencia_aberta"]
     assert a.conformado_em == f"{NB.LIVRO} · {NB.ABA_ABERTAS}" and a.chave == NB.CHAVE and a.tipo == NB.TIPO_ABERTAS
     assert a.grao == NB.GRAO_ABERTAS and {(m.coluna, m.unidade, m.soma) for m in a.medidas} == set(NB.MEDIDAS_ABERTAS)
@@ -306,7 +310,8 @@ def test_grava_as_abertas_e_na_falha_da_fotografia_o_retrato_de_antes_fica(app, 
     with app.app_context():
         rel = NB.publicar(app.config, banco, agora=AGORA, forcar=True, leitura=_leitura([_n("r1")]),
                           abertas_lidas=(ab[0], "2026-10-29T15:21:00-03:00", ab[1]))
-    assert rel["gravado"] == {NB.ABA: 1, NB.ABA_ABERTAS: 1, "atualizacao": 1}
+    # a aberta desde 12/07 tem comentário em cada dia que a memória guarda (01/10 a 29/10)
+    assert rel["gravado"] == {NB.ABA: 1, NB.ABA_ABERTAS: 1, NB.ABA_COMENTARIOS: 29, "atualizacao": 1}
     a = banco.linhas(NB.LIVRO, "atualizacao")[0]
     assert (a["abertas_em"], a["abertas_qtd"]) == ("2026-10-29T15:21:00-03:00", 1)
     with app.app_context():
@@ -334,3 +339,78 @@ def test_os_equipamentos_citados_pelo_nome_viram_referencia_curta():
     assert NB.citados(["Inversor 2.7", "inv 1.10", "Cabine 2", "SKID 3", "QGBT 1", "Inversor 2.7", "Relé 1"]) == (
         "INV2.7;INV1.10;CAB2;CAB3;CAB1")
     assert NB.citados(None) == "" and NB.citados(["Datalogger"]) == ""
+
+
+# --- o comentário de cada dia para a Plataforma de Performance (09/11/2026) -------------------------------------------
+
+DESDE = datetime(2026, 10, 1, tzinfo=NB._BRT)
+AGORA_DIA = datetime(2026, 11, 9, 12, 0, tzinfo=NB._BRT)
+REL = "Cabine 1 desligada de 25/10 às 12:41 a 27/10 às 11:25 (1 dia e 22 h). A Cabine 1 voltou a gerar em 27/10 às 11:25."
+CONT = "Continuação: Cabine 1 desligada de 25/10 às 12:41 a 27/10 às 11:25."
+
+
+def _fato(*ns):
+    idx = NB.EQ.IndiceUsinas(USINAS)
+    return [NB.linha(n, idx) for n in ns]
+
+
+def _por_dia(linhas):
+    return {r["dia"]: r for r in (dict(zip(NB.CAB_COMENTARIO, l)) for l in linhas)}
+
+
+def test_o_relato_no_primeiro_dia_e_a_continuacao_nos_seguintes():
+    """A ocorrência de 25/10 12:41 a 27/10 11:25: o relato inteiro em 25/10, a linha curta em 26 e 27/10."""
+    linhas = NB.comentarios_do_dia(_fato(_n("r1", os="17470", inicio="2026-10-25T12:41:00-03:00",
+                                             normalizado_em="2026-10-27T11:25:00-03:00", relato_cliente=REL,
+                                             relato_continuacao=CONT)), [], AGORA_DIA, DESDE)
+    d = _por_dia(linhas)
+    assert list(d) == ["2026-10-25", "2026-10-26", "2026-10-27"]
+    assert d["2026-10-25"]["relato_do_dia"] == REL and d["2026-10-26"]["relato_do_dia"] == CONT
+    assert d["2026-10-27"]["relato_do_dia"] == CONT
+    assert (d["2026-10-25"]["usina_codigo"], d["2026-10-25"]["usina_id"], d["2026-10-25"]["data_id"]) == \
+        ("TSTE-AAA100", 1, 20261025)
+    assert (d["2026-10-26"]["registros"], d["2026-10-26"]["os"], d["2026-10-26"]["ocorrencias_qtd"]) == ("r1", "17470", 1)
+
+
+def test_a_parada_da_noite_nao_explica_o_dia():
+    """De 07/10 19:27 a 08/10 07:40 (a OS 15789 de Primavera): só 08/10 tem sol parado."""
+    linhas = NB.comentarios_do_dia(_fato(_n("r1", inicio="2026-10-07T19:27:00-03:00",
+                                             normalizado_em="2026-10-08T07:40:00-03:00", relato_cliente="Relato.",
+                                             relato_continuacao="Continuação.")), [], AGORA_DIA, DESDE)
+    d = _por_dia(linhas)
+    assert list(d) == ["2026-10-08"] and d["2026-10-08"]["relato_do_dia"] == "Relato."
+
+
+def test_duas_no_mesmo_dia_uma_por_linha_pela_hora_e_sem_relato_nao_entra():
+    """O 25/10 da Aparecida: o fim da 17393 e o começo da 17470, na ordem; a normalizada sem relato fica de fora."""
+    linhas = NB.comentarios_do_dia(_fato(
+        _n("r2", os="17470", inicio="2026-10-25T12:41:00-03:00", normalizado_em="2026-10-27T11:25:00-03:00",
+           relato_cliente="Segunda.", relato_continuacao="Segunda, continuação."),
+        _n("r1", os="17393", inicio="2026-10-23T16:55:00-03:00", normalizado_em="2026-10-25T12:04:00-03:00",
+           relato_cliente="Primeira.", relato_continuacao="Primeira, continuação."),
+        _n("r3", os="17999", inicio="2026-10-25T09:00:00-03:00", normalizado_em="2026-10-25T10:00:00-03:00"),
+    ), [], AGORA_DIA, DESDE)
+    d = _por_dia(linhas)["2026-10-25"]
+    assert d["relato_do_dia"] == "Primeira, continuação.\nSegunda."
+    assert (d["registros"], d["os"], d["ocorrencias_qtd"]) == ("r1;r2", "17393;17470", 2)
+
+
+def test_a_aberta_em_atendimento_com_o_equipamento_citado():
+    """A aberta não tem relato (falta a volta): o evento, desde quando, e que segue em atendimento, até hoje."""
+    aberta = dict.fromkeys(NB.CAB_ABERTA, "")
+    aberta.update(registro="a1", os="18001", cliente="THOPEN", usina_codigo="TSTE-AAA100", usina_id=1,
+                  tipo_falha="DESLIGAMENTO_CABINE", equipamentos_citados="CAB2", inicio="2026-11-08T10:15:00-03:00")
+    linhas = NB.comentarios_do_dia([], [[aberta[c] for c in NB.CAB_ABERTA]], AGORA_DIA, DESDE)
+    d = _por_dia(linhas)
+    assert list(d) == ["2026-11-08", "2026-11-09"]
+    assert d["2026-11-08"]["relato_do_dia"] == "Cabine 2 desligada desde 08/11 às 10:15, em atendimento pelo COS."
+    assert d["2026-11-09"]["relato_do_dia"] == "Continuação: Cabine 2 desligada desde 08/11 às 10:15, em atendimento pelo COS."
+
+
+def test_a_gravacao_leva_o_comentario_do_dia(app, banco):
+    with app.app_context():
+        rel = NB.publicar(app.config, banco, agora=AGORA, forcar=True,
+                          leitura=_leitura([_n("r1", relato_cliente=REL, relato_continuacao=CONT)]))
+    gravadas = banco.linhas(NB.LIVRO, NB.ABA_COMENTARIOS)
+    assert rel["comentarios_dias"] == len(gravadas) == 1
+    assert (gravadas[0]["usina_codigo"], gravadas[0]["dia"], gravadas[0]["relato_do_dia"]) == ("TSTE-AAA100", "2026-10-27", REL)

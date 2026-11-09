@@ -1253,7 +1253,9 @@ FATOS = (
                     "fora_min é a conta da Ronda COS. Desfeita (normalizada 0) e sem hora real (hora_real 0) ficam, "
                     "marcadas: quem conta as tira (o guia da API, seção 8). geracao_parou só na falha de comunicação "
                     "(vazio nos outros tipos). As proteções em códigos curtos (protecoes, separadas por ;). Os dois "
-                    "nomes de pessoa e o texto livre da API (impacto, detalhes, informe) não entram (regra 8)"),
+                    "nomes de pessoa e o texto livre da API (impacto, detalhes, informe) não entram (regra 8). Desde 09/11/2026 "
+                    "entram relato_cliente e relato_continuacao, o relato ao cliente que a Ronda COS monta por "
+                    "regras fixas sem copiar as notas (não é texto livre: sem nome nem telefone)"),
     # as ocorrências ainda abertas da Ronda COS (30/10/2026, Levi: "para as em aberto contar na disponibilidade
     # precisamos puxar os dados dessa fonte"): o retrato da hora, no mesmo livro das normalizações
     Fato("ocorrencia_aberta", "Ocorrência aberta da Ronda COS", "cos",
@@ -1278,6 +1280,31 @@ FATOS = (
                     "o COS cita pelo nome em referência curta (Inversor 2.7 → INV2.7, Cabine 2 → CAB2). O tipo pelo rótulo vira código "
                     "pelas normalizações. abertas_em na atualizacao é a hora do retrato: na falha da leitura, o de "
                     "antes fica. Impacto, falha (texto livre), a última nota e o que se aguarda não entram (regra 8)"),
+    # o comentário de cada dia para a Plataforma de Performance (09/11/2026, o dono: "Eu só preciso que os comentários
+    # cheguem ao cliente pra explicar corretamente porque a disponibilidade está baixa naquele dia"): derivado, no mesmo
+    # livro, dos dois fatos acima
+    Fato("comentario_dia", "Comentário do dia da Ronda COS", "cos",
+         "derivado no Nexus do fato_normalizacao e do fato_ocorrencia_aberta (nexus/cos/normalizacoes_banco.py)",
+         "1 linha = 1 usina (o código do Fracttal) × 1 dia de Brasília em que uma ocorrência da Ronda COS tocou o "
+         "horário de sol (06h às 18h)",
+         _d(data=("id", "data_id (o dia de Brasília)"),
+            usina=("id", "usina_id (o código do Fracttal da usina contra o código do Registro mestre; só o código de "
+                         "uma usina liga); usina_codigo, o código da Ronda COS"),
+            cliente=("cod", "cliente (o nome da Ronda COS)"),
+            os=("cod", "os (as OS das ocorrências do dia, separadas por ;)")),
+         tipo="snapshot_acumulado", chave=("usina_codigo", "data_id"),
+         medidas=_m((("ocorrencias_qtd", "qtd", "nao"),)),
+         fontes=("Ronda COS (API de normalizações) · normalizacoes",
+                 "Ronda COS (API do Andamento) · ocorrências abertas"),
+         janela_origem="desde 01/10/2026 (a memória das normalizações do Nexus)",
+         estado="conformado", conformado_em="nexus_cos_normalizacoes · fato_comentario_dia",
+         observacao="o texto pronto para o Comentário do dia na Plataforma de Performance, no lugar da linha montada só "
+                    "com o tipo, as horas, a proteção e a OS. No 1º dia da ocorrência vai o relato_cliente; nos "
+                    "seguintes, o relato_continuacao (a coluna relato_do_dia); a aberta vai como \"<evento> desde <início>, em atendimento pelo "
+                    "COS\". Várias ocorrências no mesmo dia: uma por linha (\\n), pela hora de início; registros e os "
+                    "dizem quais. O dia é o que a parada tocou entre 06h e 18h (a parada da noite não explica a "
+                    "disponibilidade). A normalizada sem relato (sem hora real da volta) não entra: o dia fica sem "
+                    "comentário do Nexus. Trocado inteiro a cada gravação, com as normalizações e as abertas"),
     # o uso das telas do OS Creator e os pedidos do Nexus ao Fracttal, por hora (31/10/2026, etapa 0 do canto central do OS
     # Creator): o servidor mede na memória (casca/uso_os.py e casca/fracttal_conta.py) e leva as horas fechadas ao banco.
     # O Nexus é a FONTE; registrado antes da 1ª gravação. Só contagens: nada de pessoa nem de setor (regra 8)
@@ -1425,7 +1452,8 @@ LIVROS = (
           "nexus/cos/turno.py, pela tela COS > Passagem de turno", False,
           "registrado em 26/10/2026 antes da 1ª gravação (regra 10): nasce na 1ª passagem registrada",
           so_cresce=True),
-    Livro("nexus_cos_normalizacoes", ("fato_normalizacao", "fato_ocorrencia_aberta", "atualizacao"),
+    Livro("nexus_cos_normalizacoes", ("fato_normalizacao", "fato_ocorrencia_aberta", "fato_comentario_dia",
+                                  "atualizacao"),
           "de hora em hora (entre :22 e :27), só na máquina que lê a API da Ronda COS (o servidor)",
           "nexus/cos/normalizacoes_banco.py (laço do app.py e do servir.py; NEXUS_NORMALIZACOES_PUBLICAR=0 desliga)",
           False,

@@ -73,6 +73,15 @@ CAB_ABERTA = ("registro", "os", "cliente", "usina_codigo", "usina_id", "usina_li
               "equipamentos_qtd", "equipamentos_de", "equipamentos_citados", "tipo_falha", "severidade", "etapa", "inicio",
               "data_id_inicio",
               "dias_aberta_qtd", "geracao_parou", "protecoes")
+# o comentário de cada dia para a Plataforma de Performance (09/11/2026): ver `comentarios_do_dia`
+ABA_COMENTARIOS = "fato_comentario_dia"
+TIPO_COMENTARIOS = "snapshot_acumulado"
+GRAO_COMENTARIOS = ("1 linha = 1 usina (o código do Fracttal) × 1 dia de Brasília em que uma ocorrência da Ronda COS "
+                    "tocou o horário de sol (06h às 18h)")
+CAB_COMENTARIO = ("usina_codigo", "usina_id", "usina_ligada_por", "cliente", "data_id", "dia", "relato_do_dia",
+                  "registros", "os", "ocorrencias_qtd")
+# O horário de sol do comentário: a parada que fica toda fora dele (a noite) não explica a disponibilidade do dia
+JANELA_DO_SOL_H = (6, 18)
 MEDIDAS_ABERTAS = (("equipamentos_qtd", "qtd", "nao"), ("dias_aberta_qtd", "dias", "nao"),
                    ("geracao_parou", "1/0", "aditiva"))
 # Só a Thopen (a disponibilidade pelo COS é só dela, decisão do Levi em 29/10/2026); o nome é o da rota do Andamento
@@ -269,6 +278,103 @@ def ler_abertas(config, normalizacoes, usinas, agora) -> tuple[list | None, str,
     return linhas, lida.isoformat(timespec="seconds"), rel
 
 
+# O evento da ocorrência ainda aberta, em palavras (a aberta não tem relato: o relato precisa da volta)
+_EVENTO_ABERTO = {
+    "DESLIGAMENTO_USINA": "Usina desligada", "DESLIGAMENTO_CABINE": "Cabine desligada",
+    "DESLIGAMENTO_SKID": "SKID desligado", "DESLIGAMENTO_QGBT": "QGBT desligado",
+    "DESLIGAMENTO_INVERSOR": "Inversor desligado", "FALHA_COMUNICACAO": "Perda de comunicação com a usina",
+    "ATUACAO_PROTECAO": "Usina desligada por atuação de proteção",
+    "FALHA_CONCESSIONARIA": "Usina desligada por falta de energia da concessionária",
+}
+_PARTES = ("DESLIGAMENTO_CABINE", "DESLIGAMENTO_SKID", "DESLIGAMENTO_QGBT", "DESLIGAMENTO_INVERSOR")
+_CITADO = ((re.compile(r"^CAB(\d+)$"), "Cabine {}"), (re.compile(r"^INV(.+)$"), "Inversor {}"),
+           (re.compile(r"^SKID(\d+)$"), "SKID {}"), (re.compile(r"^QGBT(\d*)$"), "QGBT {}"))
+
+
+def _evento_aberto(r: dict) -> str:
+    """"Cabine 2 desligada" pela referência curta que o COS citou (CAB2); sem ela, o tipo ("Cabine desligada")."""
+    tipo = str(r.get("tipo_falha") or "").upper()
+    base = _EVENTO_ABERTO.get(tipo, "Ocorrência")
+    citados = [c for c in str(r.get("equipamentos_citados") or "").split(";") if c]
+    if tipo in _PARTES and citados:
+        nomes = []
+        for c in citados:
+            for padrao, modelo in _CITADO:
+                m = padrao.match(c)
+                if m:
+                    nomes.append(" ".join(modelo.format(m.group(1)).split()))
+                    break
+        if nomes:
+            fim = base.split(" ", 1)[1] + ("s" if len(nomes) > 1 else "")
+            return " e ".join(nomes) + " " + fim
+    return base
+
+
+def _dias_no_sol(inicio: datetime, fim: datetime, desde: datetime) -> list:
+    """Os dias de Brasília em que [inicio, fim) toca o horário de sol, a partir de `desde`."""
+    de_h, ate_h = JANELA_DO_SOL_H
+    dias, d = [], max(inicio, desde).astimezone(_BRT).date()
+    while d <= fim.astimezone(_BRT).date():
+        sol_de = datetime(d.year, d.month, d.day, de_h, tzinfo=_BRT)
+        sol_ate = datetime(d.year, d.month, d.day, ate_h, tzinfo=_BRT)
+        if inicio < sol_ate and fim > sol_de:
+            dias.append(d)
+        d += timedelta(days=1)
+    return dias
+
+
+def comentarios_do_dia(fato_linhas, abertas_linhas, agora: datetime, desde: datetime) -> list:
+    """O COMENTÁRIO DE CADA DIA para a Plataforma de Performance (09/11/2026). O dono: "Eu só preciso que os comentários
+    cheguem ao cliente pra explicar corretamente porque a disponibilidade está baixa naquele dia". A Plataforma montava
+    o comentário só com o tipo, as horas, a proteção e a OS ("Desligamento Usina de 25/10 às 12:41h a 27/10 às 11:25h;
+    Proteção: Sem proteção ativa; OS 17470"); aqui ele sai PRONTO, por usina e por dia, e a Plataforma só mostra.
+
+    - O dia da ocorrência é o dia de Brasília em que a parada tocou o horário de sol (`JANELA_DO_SOL_H`): a parada da
+      noite não explica a disponibilidade do dia (a OS 15789 de Primavera, de 07/10 19:27 a 08/10 07:40, é de 08/10).
+    - No 1º dia da ocorrência vai o `relato_cliente` (o parágrafo da Ronda COS); nos seguintes, o `relato_continuacao`.
+      A normalizada sem relato (sem hora real da volta, ou gravada antes de 09/11/2026) não entra: o dia fica sem
+      comentário do Nexus, e a Plataforma usa a linha dela.
+    - A ocorrência ainda aberta entra com "<evento> desde <início>, em atendimento pelo COS".
+    - Várias no mesmo dia: uma por linha, pela hora de início. Só a partir de `desde` (o que a memória guarda)."""
+    por_dia: dict = {}
+
+    def junta(r, d, texto, inicio):
+        k = (str(r.get("usina_codigo") or ""), d)
+        if not k[0] or not texto:
+            return
+        g = por_dia.setdefault(k, {"usina_id": r.get("usina_id") or "", "ligada_por": r.get("usina_ligada_por") or "",
+                                   "cliente": r.get("cliente") or "", "itens": []})
+        g["itens"].append((inicio, str(r.get("registro") or ""), str(r.get("os") or ""), texto))
+
+    for linha in fato_linhas or ():
+        r = dict(zip(CAB, linha))
+        if str(r.get("normalizada")) in ("0", "False") or not r.get("relato_cliente"):
+            continue
+        ini, fim = AND.instante(r.get("inicio")), AND.instante(r.get("normalizado_em"))
+        if not ini or not fim or fim <= ini:
+            continue
+        for i, d in enumerate(_dias_no_sol(ini, fim, desde)):
+            junta(r, d, r["relato_cliente"] if i == 0 else (r.get("relato_continuacao") or r["relato_cliente"]), ini)
+    for linha in abertas_linhas or ():
+        r = dict(zip(CAB_ABERTA, linha))
+        ini = AND.instante(r.get("inicio"))
+        if not ini:
+            continue
+        evento = _evento_aberto(r)
+        quando = f"{ini.strftime('%d/%m')} às {ini.strftime('%H:%M')}"
+        for i, d in enumerate(_dias_no_sol(ini, agora, desde)):
+            texto = (f"{evento} desde {quando}, em atendimento pelo COS." if i == 0
+                     else f"Continuação: {evento} desde {quando}, em atendimento pelo COS.")
+            junta(r, d, texto, ini)
+    linhas = []
+    for (cod, d), g in sorted(por_dia.items(), key=lambda kv: (kv[0][0], kv[0][1])):
+        itens = sorted(g["itens"], key=lambda x: (x[0], x[1]))
+        linhas.append([cod, g["usina_id"], g["ligada_por"], g["cliente"], int(d.strftime("%Y%m%d")), d.isoformat(),
+                       "\n".join(x[3] for x in itens), ";".join(x[1] for x in itens),
+                       ";".join(dict.fromkeys(x[2] for x in itens if x[2])), len(itens)])
+    return linhas
+
+
 def _do_banco_antes(linhas_banco, desde_id: int) -> list:
     """As linhas já gravadas de antes do que a memória guarda (pela volta ou, sem ela, pelo início): ficam como estão."""
     out = []
@@ -354,9 +460,12 @@ def publicar(config, sessao=None, *, agora=None, forcar=False, leitura=None, abe
         # a fotografia não veio: o retrato de antes fica, com a hora dele (o livro é trocado inteiro a cada gravação)
         ab = [[r.get(c, "") for c in CAB_ABERTA] for r in livros.ler(base, s, LIVRO, ABA_ABERTAS) if r.get("registro")]
         ab_em = next((str(r.get("abertas_em") or "") for r in livros.ler(base, s, LIVRO, "atualizacao")), "")
+    comentarios = comentarios_do_dia(todas, ab, agora, desde)
+    rel["comentarios_dias"] = len(comentarios)
     atu = [agora.isoformat(timespec="seconds"), len(todas), desde.date().isoformat(), rel["ligadas"] + sum(
         1 for l in antes if l[5]), ab_em, len(ab)]
     rel["gravado"] = livros.publicar(LIVRO, NOME_LIVRO, {ABA: (CAB, todas), ABA_ABERTAS: (CAB_ABERTA, ab),
+                                                         ABA_COMENTARIOS: (CAB_COMENTARIO, comentarios),
                                                          "atualizacao": (CAB_ATUALIZACAO, [atu])},
                                      base=base, token=config["GRIDCO_SQL_TOKEN"], sessao=s)
     return rel

@@ -36,6 +36,7 @@ RESUMO = {
     "passagem_turno": "Quem passou cada turno do COS, o que deixou pendente e quem assumiu",
     "normalizacao": "Quando cada usina voltou pela hora do COS, o tipo e as proteções",
     "ocorrencia_aberta": "As paradas que o COS ainda não normalizou, com o começo e o ativo",
+    "comentario_dia": "O comentário de cada dia de parada, pronto para o cliente",
     "acompanhamento_ativo": "Quem acompanha cada ativo com sinal, o diagnóstico e os comentários",
     "acompanhamento_os": "O status, a prioridade e os comentários da Engenharia em cada OS",
     "marcacao_etm": "O diagnóstico e as marcações da Engenharia em cada OS de ETM",
@@ -171,6 +172,11 @@ PARA_QUE = {
     "tratamento_contestacao": "Guarda o acompanhamento de cada contestação do cliente: quem pegou a demanda (\"Pegar "
                               "para mim\") e cada atualização que o responsável escreveu, com o dia e a hora. Quem e o "
                               "texto vão cifrados; a tela Contratos e clientes → Contestações mostra.",
+    "comentario_dia": "Guarda, por usina e por dia, o comentário que explica ao cliente a parada daquele dia: o "
+                      "relato da Ronda COS (a causa, os chamados com a concessionária, a religada que não "
+                      "segurou e a volta) no primeiro dia, a continuação nos seguintes e as paradas ainda em "
+                      "atendimento. A Plataforma de Performance o mostra no Comentário do dia, ao lado da "
+                      "disponibilidade.",
     "ocorrencia_aberta": "Guarda, de hora em hora, as ocorrências da Thopen que a Ronda COS ainda não normalizou: "
                          "quando a falha começou, o tipo, o equipamento, a etapa (aguardando peça, técnico acionado) e "
                          "há quantos dias está aberta. É o que faz a parada que segue aberta contar na disponibilidade "
