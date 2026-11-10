@@ -44,6 +44,7 @@ from ...cadastro.servico import chave_texto
 from ...campo import equipe as E
 from ...campo import mapa_responsaveis as MR
 from ...campo import visao
+from ...campo.equipe import eventos as EV
 from ...campo.equipe import gravador as G
 from ...campo.equipe import municipios as MU
 from ...campo.equipe import piloto as PI
@@ -609,6 +610,29 @@ def _percurso(srv, sel, pedido, coords, nomes_usina, agora) -> dict:
             "itens": _itens_do_percurso(desenho, trilha, coords, nomes_usina)}
 
 
+def _eventos_do_dia(srv, linhas: list, coords: dict, nomes_usina: dict, filtro: dict, agora) -> list:
+    """Os eventos de hoje dos técnicos que a tela mostra (no piloto e no filtro), do mais novo ao mais velho
+    (`eventos.da_equipe`; 10/11/2026, Levi: "Quero que apareça tipo ocorrências"). Cada um ganha, só para a tela, o
+    nome do técnico e o endereço do clique: o percurso do dia dele (o sem permissão, o painel dele), com o filtro."""
+    hoje = agora.astimezone(_BRT).date()
+    meia_noite = datetime.combine(hoje, time(0), tzinfo=_BRT)
+    pontos = {l["pid"]: srv.percurso(l["pid"], meia_noite, agora, agora) for l in linhas}
+    estados = {l["pid"]: srv.estado_de(l["pid"], agora) for l in linhas}
+    cidade_uf = _cidade_de()
+
+    def cidade(lat, lon):
+        uf = SI.uf_do_ponto(lat, lon)
+        return cidade_uf(lat, lon, uf) if uf and cidade_uf is not None else None
+    nome = {l["pid"]: l["nome"] for l in linhas}
+    periodo = {"de": datetime.combine(hoje, time(E.JANELA_H[0]), tzinfo=_BRT).strftime(_PERIODO),
+               "ate": agora.astimezone(_BRT).strftime(_PERIODO)}
+    out = []
+    for e in EV.da_equipe(pontos, coords, nomes_usina, agora, estados=estados, cidade=cidade):
+        q = {"tecnico": e["pessoa_id"], **({} if e["tipo"] == "sem_permissao" else periodo), **filtro["q"]}
+        out.append({**e, "nome": nome.get(e["pessoa_id"]) or f"Pessoa {e['pessoa_id']}", "q": q})
+    return out
+
+
 def _supervisor_da_equipe(b, equipe_id):
     """O Supervisor de Campo da região de campo da equipe (`equipes.regiao_campo_id` -> `regioes_campo.
     supervisor_campo_id`), ou None (equipe sem região, vaga aberta). É assim que o cadastro diz quem lidera o técnico
@@ -718,6 +742,8 @@ def equipe():
     # o registro da LGPD: quem abriu, quando e, com um técnico escolhido no painel, de quem; antes de a página sair
     elif not _registrar_acesso(srv, "abriu_mapa", sel["pid"] if sel else None, None, agora):
         return _tela({"erro": SEM_REGISTRO}, 503)
+    # os eventos do dia (10/11/2026): com o mapa de todos; com o percurso aberto, a gaveta lista os pontos dele
+    eventos = _eventos_do_dia(srv, linhas, coords, nomes_usina, filtro, agora) if perc is None else []
     avisos = [a for a in (aviso_piloto,) if a]
     if erro_coords:
         avisos.append(f"Sem as coordenadas das usinas neste servidor ({erro_coords}): ninguém conta como na usina, e o "
@@ -736,6 +762,7 @@ def equipe():
         "filtro": filtro,
         # o Ver percurso: o percurso aberto (ou None), o erro do período e os valores do formulário do técnico
         "perc": perc, "erro_periodo": periodo.get("erro", "") if periodo else "",
+        "eventos": eventos, "eventos_resumo": EV.resumo(eventos),
         "form_perc": _form_do_percurso(sel, agora, periodo) if sel else None,
         "avisos": avisos, "admin": admin, "todos": todos,
         "no_piloto": sum(1 for t in todos if t["no_piloto"] and not t["teste"]),

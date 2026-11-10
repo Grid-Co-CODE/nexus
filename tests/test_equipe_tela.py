@@ -322,9 +322,9 @@ def test_o_parado_fora_de_usina_mostra_a_cidade_e_o_estado(app, cliente, pontos,
     _, html = _html(cliente, query_string={"tecnico": FORA})
     lado = html.split('class="eq-lado"', 1)[1]
     assert "<dt>Cidade</dt><dd>Cidade Um Teste/GO</dd>" in lado
-    # quem está na usina não ganha cidade nenhuma (está no mapa)
+    # quem está na usina não ganha cidade nenhuma no painel dele (a cidade do outro está no quadro de eventos)
     _, html = _html(cliente, query_string={"tecnico": NA_USINA})
-    assert "Cidade Um Teste" not in html
+    assert "Cidade Um Teste" not in html.split('class="eq-lado"', 1)[1].split("</aside>", 1)[0]
 
 
 def test_a_pagina_nunca_baixa_do_ibge_e_a_cidade_vem_na_proxima(cliente, pontos, setor, monkeypatch):
@@ -643,6 +643,52 @@ def test_sem_gravar_o_registro_o_percurso_nao_abre(cliente, manha, setor, monkey
     st, html = _html(_entrar(cliente, EMAIL[PCM]),
                      query_string={"tecnico": ANDANDO, "de": "2026-11-08T06:00", "ate": "2026-11-08T12:00"})
     assert st == 503 and "eq-perc-linha" not in html and "registro" in html
+
+
+# ── os eventos do dia (10/11/2026) ─────────────────────────────────────────────────────────────────────────────
+def _eventos_da_tela(html):
+    ev = html.split('<section class="eq-ev"', 1)[1].split("</section>", 1)[0]
+    itens = re.findall(r'<time>(\d\d:\d\d)</time>.*?href="([^"]+)".*?<b>([^<]+)</b> · ([^<]+)</span>', ev, flags=re.S)
+    return ev, itens
+
+
+def test_os_eventos_do_dia_no_estilo_do_quadro_de_ocorrencias(cliente, pontos, setor):
+    """Levi, 10/11/2026, com a imagem do quadro de eventos do COS: "Quero que apareça tipo ocorrências: Algo nesse
+    estilo". Abaixo do mapa, os eventos de hoje do mais novo ao mais velho: a hora, o técnico, o que aconteceu e a
+    etiqueta; a faixa "Agora" e o resumo no alto. O clique leva ao percurso do dia do técnico (o sem permissão, ao painel
+    dele). Nenhuma coordenada."""
+    from html import unescape
+    from urllib.parse import parse_qs, urlsplit
+    _, html = _html(_entrar(cliente, EMAIL[PCM]))
+    ev, itens = _eventos_da_tela(html)
+    assert "Eventos do dia" in ev and "Agora · 12:00" in ev
+    assert "4 inícios do dia · 1 sem sinal · 1 sem permissão" in ev
+    assert [(h, n, t) for h, _href, n, t in itens] == [
+        ("11:59", NOME[ANDANDO], "primeira posição do dia, fora de usina"),
+        ("11:57", NOME[NA_USINA], "primeira posição do dia, na Usina Alfa Teste"),
+        ("11:55", NOME[FORA], "primeira posição do dia, fora de usina"),
+        ("11:50", NOME[SEM_SINAL], "sem sinal desde 11:20"),
+        ("11:20", NOME[SEM_SINAL], "primeira posição do dia, na Usina Bravo Teste"),
+        ("11:00", NOME[SEM_PERMISSAO], "sem permissão de localização no celular")]
+    assert ev.count("<small>Nexus Field</small>") == 6 and "cn-pill cn-alerta" in ev and "cn-pill cn-critico" in ev
+    links = {n: parse_qs(urlsplit(unescape(href)).query) for _h, href, n, _t in itens}
+    assert links[NOME[ANDANDO]] == {"tecnico": [str(ANDANDO)], "de": ["2026-11-08T06:00"], "ate": ["2026-11-08T12:00"]}
+    assert links[NOME[SEM_PERMISSAO]] == {"tecnico": [str(SEM_PERMISSAO)]}
+    assert not [d for d in DIGITOS if d in ev]
+    # o filtro vale para os eventos, e vai junto no link
+    _, html = _html(cliente, query_string={"equipe": LESTE})
+    ev, itens = _eventos_da_tela(html)
+    assert [n for _h, _href, n, _t in itens] == [NOME[SEM_PERMISSAO]] and f"equipe={LESTE}" in itens[0][1]
+    # com o percurso aberto o quadro sai (a gaveta lista os pontos dele)
+    _, html = _html(cliente, query_string={"tecnico": ANDANDO, "de": "2026-11-08T06:00", "ate": "2026-11-08T12:00"})
+    assert '<section class="eq-ev"' not in html
+
+
+def test_sem_evento_hoje_o_quadro_diz(cliente, banco, setor):
+    S.do_app(cliente.application).registro.novos()
+    _, html = _html(_entrar(cliente, EMAIL[PCM]))
+    ev, itens = _eventos_da_tela(html)
+    assert itens == [] and "Nenhum evento hoje." in ev
 
 
 # ── o piloto ─────────────────────────────────────────────────────────────────────────────────────────────────────────

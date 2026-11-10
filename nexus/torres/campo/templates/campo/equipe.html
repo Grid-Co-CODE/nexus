@@ -200,6 +200,30 @@
     </aside>
   </div>
 
+  {# os eventos do dia (10/11/2026, Levi, com a imagem do quadro de eventos do COS: "Quero que apareça tipo ocorrências:
+     Algo nesse estilo"): do mais novo ao mais velho, a hora, o técnico, o que aconteceu e a etiqueta; o clique abre o
+     percurso do dia dele. Com o percurso aberto o quadro sai (a gaveta lista os pontos). Regra em campo/equipe/eventos.py #}
+  {% if not perc %}
+  <section class="eq-ev" aria-labelledby="eq-ev-titulo">
+    <div class="eq-ev-cab">
+      <div><p class="gc-eyebrow">Nexus Field</p><h2 class="eq-ev-titulo" id="eq-ev-titulo">Eventos do dia</h2></div>
+      <p class="eq-ev-resumo">{{ eventos_resumo or 'Nenhum evento hoje.' }}</p>
+    </div>
+    <p class="eq-ev-agora"><span>Agora · {{ agora }}</span></p>
+    {% if eventos %}
+    <ol class="eq-ev-lista">
+      {% for e in eventos %}
+      <li class="eq-ev-item">
+        <time>{{ e.hora }}</time><span class="eq-ev-ponto eq-ev-ponto--{{ e.tom }}" aria-hidden="true"></span>
+        <a class="eq-ev-cartao" href="{{ url_for('torre_campo.equipe', **e.q) }}">
+          <span class="eq-ev-texto"><span class="eq-ev-linha"><b>{{ e.nome }}</b> · {{ e.texto }}</span><small>Nexus Field</small></span>
+          <span class="cn-pill cn-{{ e.tom }}">{{ e.rotulo }}</span></a></li>
+      {% endfor %}
+    </ol>
+    {% endif %}
+  </section>
+  {% endif %}
+
   {% if admin %}
   {# o piloto (só administradores): no piloto, o Nexus Field só coleta quem foi escolhido aqui (padrão: ninguém) #}
   <details class="eq-piloto"{% if piloto_msg %} open{% endif %}>

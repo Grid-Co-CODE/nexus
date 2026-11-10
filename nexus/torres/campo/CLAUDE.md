@@ -1524,6 +1524,7 @@ percurso" abaixo), pedido do Levi pela sessão Nexus Field; sobe com o OK dele.
 | Situação e desenho | `campo/equipe/situacao.py` | a situação de cada técnico pelo último ponto, o desenho do mapa e o do percurso (só x/y), a UF pelo contorno do IBGE, o link da rota |
 | Cidade | `campo/equipe/municipios.py` | a cidade de quem está parado fora de usina e os municípios de fundo do percurso (`na_caixa`), pela malha do IBGE do ESTADO inteiro |
 | Piloto | `campo/equipe/piloto.py` | grava quem entra e quem sai do piloto (`nexus_equipe_piloto`) |
+| Eventos do dia | `campo/equipe/eventos.py` | a primeira posição, as saídas e chegadas, o sem sinal e o sem permissão de hoje, dos pontos, no formato que outra tela pode ler |
 | Registro da LGPD | `campo/equipe/acessos.py` | quem abriu o mapa, a rota ou o percurso de quem (o percurso com o período) |
 | Jornal das filas | `campo/equipe/jornal.py` | os eventos de chave e os acessos esperando o gravador, cifrados em disco (`equipe/fila_*.jsonl`): o reinício antes da rodada não perde nada |
 | Estado do processo | `campo/equipe/servico.py` | junta chaves, diário, piloto e cadastro por trás das rotas; nada daqui grava no banco |
@@ -1700,6 +1701,24 @@ O Levi viu a tela na bancada: "Gostei bastante! ... inclua também essas melhori
   `_quem_ve` dos cinco setores e dos administradores, conferido antes do botão. O clique na usina leva à página dela no Clima
   e risco da Performance (`/t/performance/clima/usina/<id>`), que segue com o portão dela.
 
+### Os eventos do dia (10/11/2026)
+
+Pedido do Levi pela sessão Nexus Field, com a imagem do quadro "COS · Timeline, Eventos do dia": "Quero que apareça tipo
+ocorrências: Algo nesse estilo". Abaixo do mapa (com o percurso aberto, sai: a gaveta lista os pontos dele), os eventos
+de hoje dos técnicos que a tela mostra (piloto e filtro), do mais novo ao mais velho: a hora, o ponto colorido na linha
+do tempo, o cartão "<técnico> · <o que aconteceu>" com a origem "Nexus Field" e a etiqueta; no alto a faixa "Agora" e o
+resumo ("2 deslocamentos · 1 chegada · ..."). O clique abre o percurso do dia do técnico (o sem permissão, o painel
+dele), com o filtro. A regra mora em `campo/equipe/eventos.py`, **sem régua nova**: a usina é o raio de 1 km, a saída da
+usina é o último ponto nela e a chegada o 1º ponto na outra (a regra dos deslocamentos), o sem sinal é 30 min, e
+andando/parado é o `mov` do celular. Os eventos: primeira posição do dia (na usina, na cidade ou "fora de usina"); saiu
+da usina; saiu do lugar do início do dia (os pontos parados do começo; a parada no meio do caminho não vira evento);
+chegou na usina, com a duração desde a última saída; sem sinal (na hora em que virou, "desde" o último ponto; não com o
+sem permissão); sem permissão (na hora do aviso, se hoje). **"Saiu de casa" não existe** (seria dedução: pode ser o
+hotel; "sem dado não se inventa", 06/11): é "saiu de <cidade>", ou "de um ponto fora de usina" sem a malha do IBGE.
+**"Para <usina>" e "chegada prevista" ficam para quando houver o destino** (a programação do PCM ou a OS). O evento é um
+dict com `instante` (UTC), `hora`, `pessoa_id`, `tipo`, `texto`, `rotulo`, `tom` e `usina_id`, sem coordenada: o
+videowall do COS pode ler os mesmos (`eventos.da_equipe`), pela área dele.
+
 ### Quem vê
 
 Os setores **PCM, COS, Performance, Supervisão Campo e Responsáveis UFV** e os administradores. É conferido **dentro de
@@ -1748,7 +1767,8 @@ diretório, o prazo, o 401 e o 503), `test_equipe_aparelhos.py` (a chave só com
 `test_equipe_rotas.py` (o contrato das três rotas, os códigos, o CORS, os limites, a chave e a revogação que sobrevivem
 ao reinício sem gravação, o 503 sem leitura boa e na máquina que não grava), `test_equipe_gravador.py` (a união, o que
 nunca encolhe o banco, a fila que volta, o jornal aparado, o corte pelo instante), `test_equipe_situacao.py`,
-`test_equipe_municipios.py` (IBGE injetado, nunca a rede), `test_equipe_percurso.py` (o percurso do período no serviço,
+`test_equipe_municipios.py` (IBGE injetado, nunca a rede), `test_equipe_eventos.py` (os eventos do dia pela regra
+dos deslocamentos, sem "casa", o sem sinal e o sem permissão, a ordem e o resumo), `test_equipe_percurso.py` (o percurso do período no serviço,
 os 7 dias, o período no registro até o livro, a linha da fila de antes da coluna, os municípios só do disco) e
 `test_equipe_tela.py` (quem vê, a rota, o registro pelo
 e-mail exato, o piloto, nenhuma coordenada na página nem no JSON, a pré-carga que não abre o mapa; desde a bancada de
