@@ -1424,6 +1424,35 @@ todas**; as telas sensíveis (Mapa de equipe, FMEA, Incidentes) ganham **versão
 Prova: `tests/test_clientes_acesso.py` (o cartão da OS 901 abre e o da 902, de outro cliente, dá 404; o mês escolhido
 no topo; as Rondas só das usinas dele e a sub-rota 403) e a prévia local na porta 5215.
 
+**Entrega 2 (10/11/2026, Levi pelo Scrum master: "pode dar o cartão verde para a visão do cliente").** Quatro telas de
+outras torres ganharam `do_cliente=True` e a versão do cliente, todas com a conta em `campo/versao_cliente.py` (funções
+puras, que recebem o dado já lido da tela da Grid) e a mesma regra: a usina vem da sessão, só leitura, sem nome de
+pessoa, custo, horas nem comentário interno; tudo montado no servidor, porque o portão do cliente só abre o endereço
+exato da tela (as sub-rotas que o JS das telas da Grid busca dão 403).
+
+- **Quadro da semana** (`/t/pcm/quadro`, `pcm/quadro_cliente.html`, `versao_cliente.quadro`): as OS que a programação
+  publicada pôs no mês do topo, por usina e por OS (data, tipo, nº de tarefas, situação). A usina da linha do
+  `banco_dados.json` ("Thopen - Altair 1 - SP") liga pelo `campo.responsaveis.Nomes` (a ligação da Visão do cliente).
+  A tarefa que rolou de semana conta uma vez, com o estado da mais nova. O arquivo guarda só **4 semanas**: o mês com
+  dia útil antes da mais antiga leva o aviso "a programação guarda as semanas a partir de ...". Medido em 10/11/2026 com
+  o arquivo real: 127 dos 138 nomes ligam; os que não ligam (Colíder 1 e 2 da RenoGrid, Pharmas da Thopen, Apolo, E1,
+  Qair) somem do cliente até ganharem de-para no Nexus.
+- **Extintores** (`/t/hseq/extintores`, `hseq/extintores_cliente.html`, `versao_cliente.extintores`): os extintores de
+  cada usina (local, classe, peso, validades, última conferência, a situação e o status da TST de agora). O mês conta as
+  conferências feitas nele e as validades que vencem nele (o livro guarda só a última conferência de cada extintor).
+  Fora: quem conferiu, técnicos, responsável, a informação do técnico, fotos, relatórios, não reconhecidos e botões.
+- **EPI e EPC** (`/t/hseq/epi`, `hseq/epi_cliente.html`, `versao_cliente.epi`): as luvas isolantes de cada usina (a
+  situação e a última resposta de agora, com a OS da ronda) e as verificações do mês, pelo `por_mes` que o
+  `hseq.epi.luvas` passou a dar (todas as respostas da janela do livro; o histórico da linha só leva 8).
+- **Almoxarifado** (`/t/pcm/pecas`, `pcm/almoxarifado_cliente.html`, `versao_cliente.almoxarifado`): o saldo de agora
+  das peças no almoxarifado de cada usina (1 almoxarifado = 1 usina no Fracttal) e as saídas lançadas nas OS no mês.
+  Fora: custo, valor, criticidade, curva, avariadas, recusas e o inventário.
+- **Laudos MPS/MPA** (Engenharia) ficou fora: a tela é só o lugar reservado da casca, sem rota nem dado de laudo (o
+  `engenharia.json` é a Confiabilidade). Fazer a versão do cliente pede antes a tela da Grid e a fonte (decisão do Levi).
+
+Prova: `tests/test_clientes_versoes_entrega2.py` (a conta de cada uma, a tela logado como cliente sem os campos da Grid
+e as sub-rotas 403) e a prévia local na porta 5216.
+
 ## Mapa de equipe (08/11/2026)
 
 **O que é e quem pediu.** Ver onde está cada técnico que tem o Nexus Field e abrir a rota dele até uma usina. Pedido do

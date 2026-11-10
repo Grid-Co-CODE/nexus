@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block titulo %}Extintores{% endblock %}
+{% block conteudo %}
+<link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
+{# Os Extintores na versão do cliente (10/11/2026, entrega 2; nexus/campo/versao_cliente.extintores): os extintores das
+   usinas dele, com a situação de agora e o mês do topo nas conferências e nas validades. Sem quem conferiu, técnico,
+   responsável, a informação do técnico, fotos, relatórios nem os botões da Segurança. #}
+<div class="campo-nativa">
+  <div class="cn-cab"><div><p class="gc-eyebrow">Extintores · {{ mes_nome }}</p>
+    <h1 class="cn-titulo">Extintores nas suas usinas</h1>
+    <p class="cn-pergunta">A validade de cada extintor e a última conferência feita em campo.</p></div></div>
+  {% if erro %}<div class="cn-erro cn-aviso" role="status"><span>Parte das informações não carregou agora. Tente de novo em instantes.</span></div>{% endif %}
+  <div class="vc-numeros">
+    <section class="vc-num"><p class="vc-num-t"><i class="ph ph-fire-extinguisher" aria-hidden="true"></i>Extintores</p><p class="vc-num-v"><b>{{ r.n }}</b> em {{ r.usinas }} {{ 'usina' if r.usinas == 1 else 'usinas' }}</p><p class="vc-num-d">agora</p></section>
+    <section class="vc-num"><p class="vc-num-t"><i class="ph ph-warning-octagon" aria-hidden="true"></i>Validade vencida</p><p class="vc-num-v"><b{% if r.atrasados %} class="cn-t-critico"{% endif %}>{{ r.atrasados }}</b> {{ 'extintor' if r.atrasados == 1 else 'extintores' }}</p><p class="vc-num-d">agora</p></section>
+    <section class="vc-num"><p class="vc-num-t"><i class="ph ph-clock-countdown" aria-hidden="true"></i>Vencem em 30 dias</p><p class="vc-num-v"><b{% if r.perto %} class="cn-t-alerta"{% endif %}>{{ r.perto }}</b> {{ 'extintor' if r.perto == 1 else 'extintores' }}</p><p class="vc-num-d">agora</p></section>
+    <section class="vc-num"><p class="vc-num-t"><i class="ph ph-clipboard-text" aria-hidden="true"></i>Conferidos em {{ mes_nome }}</p><p class="vc-num-v"><b>{{ r.conferidos_mes }}</b> de {{ r.n }}</p></section>
+  </div>
+  <section class="vc-q cli-tab" aria-labelledby="cli-ext-t">
+    <div class="vc-q-cab"><h2 id="cli-ext-t">Extintores por usina</h2><span class="mudo">{% if r.vencem_mes %}{{ r.vencem_mes }} {{ 'validade vence' if r.vencem_mes == 1 else 'validades vencem' }} em {{ mes_nome }}{% else %}abra a usina para ver os extintores{% endif %}</span></div>
+    {% for u in r.linhas %}
+    <details class="cli-us">
+      <summary><b class="cli-us-nome">{{ u.usina or 'Usina' }}</b>
+        <span class="cli-us-n">{{ u.n }} {{ 'extintor' if u.n == 1 else 'extintores' }}</span>
+        {% if u.atrasados %}<span class="cn-pill cn-critico">{{ u.atrasados }} {{ 'vencido' if u.atrasados == 1 else 'vencidos' }}</span>{% endif %}
+        {% if u.perto %}<span class="cn-pill cn-alerta">{{ u.perto }} perto de vencer</span>{% endif %}
+        {% if u.sem_validade %}<span class="cn-pill cn-neutro">{{ u.sem_validade }} sem validade</span>{% endif %}
+        {% if not u.atrasados and not u.perto and not u.sem_validade %}<span class="cn-pill cn-ok">em dia</span>{% endif %}
+        <span class="mudo cli-us-prox">{% if u.ultima %}última conferência em {{ u.ultima.strftime('%d/%m/%Y') }}{% else %}sem conferência registrada{% endif %}</span></summary>
+      <div class="cn-tab"><table>
+        <thead><tr><th>Extintor</th><th>Local</th><th>Classe</th><th>Peso</th><th>Recarga até</th><th>Hidrostático até</th><th>Última conferência</th><th>Validade</th><th>Resultado da conferência</th></tr></thead>
+        <tbody>{% for i in u.itens %}
+          <tr><td><b>{{ i.ext }}</b></td><td>{{ i.local or '—' }}{% if i.posicao %} · {{ i.posicao }}{% endif %}</td>
+            <td>{{ i.classe or '—' }}</td><td>{% if i.peso %}{{ '%g'|format(i.peso) }} kg{% else %}—{% endif %}</td>
+            <td>{{ i.recarga }}</td><td>{{ i.hidrostatico }}</td>
+            <td>{{ i.conferencia.strftime('%d/%m/%Y') if i.conferencia else '—' }}</td>
+            <td><span class="cn-pill cn-{{ i.tom }}">{{ i.situacao }}</span></td>
+            <td>{% if i.status %}<span class="cn-pill cn-{{ i.status_tom }}">{{ i.status }}</span>{% else %}—{% endif %}</td></tr>
+        {% endfor %}</tbody></table></div>
+    </details>
+    {% else %}<p class="mudo vc-vazio">Nenhum extintor cadastrado nas suas usinas.</p>{% endfor %}
+  </section>
+</div>
+{% endblock %}

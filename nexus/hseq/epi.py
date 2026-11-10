@@ -61,6 +61,17 @@ def _situacao(verifs, hoje) -> dict:
             "desde": None}
 
 
+def por_mes(verifs) -> dict:
+    """{"AAAA-MM": {"n": verificações, "nao": com Não}} de TODAS as respostas da janela do livro: a versão do cliente
+    (10/11/2026) conta as do mês do topo, e o histórico da linha só leva as 8 últimas."""
+    out: dict[str, dict] = {}
+    for v in verifs:
+        m = out.setdefault(f"{v['dia'].year}-{v['dia'].month:02d}", {"n": 0, "nao": 0})
+        m["n"] += 1
+        m["nao"] += v["luvas"] is False
+    return out
+
+
 def luvas() -> leitura.Leitura:
     """Uma linha por usina mobilizada (e por usina com resposta, mesmo fora dela), com a situação das luvas, a última
     verificação e o histórico das últimas respostas. Cópia de 5 min, renovada em segundo plano (`visao._ler`)."""
@@ -93,7 +104,7 @@ def luvas() -> leitura.Leitura:
                            **{k: o.get(k, "") for k in visao._PAPEIS},
                            "mobilizada": o.get("usina_id") in b.mobilizadas, **_situacao(verifs, hoje),
                            "historico": verifs[:HISTORICO], "verificacoes": len(verifs),
-                           "nao": sum(1 for v in verifs if v["luvas"] is False)})
+                           "nao": sum(1 for v in verifs if v["luvas"] is False), "por_mes": por_mes(verifs)})
         rank = {s: i for i, s in enumerate(SITUACOES)}
         linhas.sort(key=lambda x: (rank[x["situacao"]], x["desde"] or hoje, -(x["dias"] if x["dias"] is not None
                                                                                else 10 ** 6), x["usina"]))

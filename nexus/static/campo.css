@@ -2014,6 +2014,23 @@ tr.rd-linha--ativa td{background:var(--verde-suave)}
 /* a OS só leitura do cliente (08/11/2026) e o número clicável na Visão do cliente */
 .vc-os{color:inherit;text-decoration:underline;text-decoration-color:var(--linha-forte);text-underline-offset:3px}
 .vc-os:hover{color:var(--verde-texto);text-decoration-color:currentColor}
+/* as versões do cliente agrupadas por usina (09/11/2026, entrega 2: o Quadro da semana): uma linha por usina que abre
+   a tabela dela; a linha de baixo separa, sem outra superfície (à la Nexus, um nível só) */
+.cli-us{border-top:1px solid var(--linha)}
+.cli-us:first-of-type{margin-top:10px}
+.cli-us > summary{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;padding:10px 4px;cursor:pointer;list-style:none}
+.cli-us > summary::-webkit-details-marker{display:none}
+.cli-us > summary::before{content:"";width:6px;height:6px;margin:0 2px;border-right:2px solid var(--mudo);border-bottom:2px solid var(--mudo);
+  transform:rotate(-45deg);flex:none}
+.cli-us[open] > summary::before{transform:rotate(45deg)}
+.cli-us > summary:hover .cli-us-nome{color:var(--verde-texto)}
+.cli-us > summary:focus-visible{outline:2px solid var(--verde);outline-offset:-2px}
+.cli-us-nome{font:600 13.5px/20px var(--font-sans);color:var(--tinta)}
+.cli-us-n{font:600 12.5px/18px var(--font-sans);color:var(--tinta-2);font-variant-numeric:tabular-nums}
+.cli-us-prox{margin-left:auto;font-size:12.5px}
+.cli-us .cn-tab{margin:0 0 12px}
+/* a tabela da usina cabe no quadro (o min-width de 980 px das tabelas do Campo abria a barra de rolagem por 20 px) */
+.cli-us .cn-tab table{min-width:640px}
 .cos-pagina{max-width:860px}
 .cos-volta{margin:0 0 6px}
 .cos-volta a{color:var(--tinta-2);text-decoration:none;font-size:13px}

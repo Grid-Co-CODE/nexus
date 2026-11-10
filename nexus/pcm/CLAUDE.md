@@ -618,6 +618,18 @@ PCM"; a prévia com os dados reais foi aprovada no mesmo dia. Desenho e plano: `
   a partir de uma cópia da tabela do App (fora do repositório) e o cadastro real por GET (25/10: 12 almoxarifados, 218
   peças com saldo, 54 no limite, 22 sem mínimo, 5 avariadas, 3 lançadas e 13 recusadas).
 
+## A versão do cliente do Quadro e do Almoxarifado (10/11/2026)
+
+O setor Clientes (o cliente logado, ou o administrador no Modo cliente) abre `/t/pcm/quadro` e `/t/pcm/pecas` na versão
+dele (`do_cliente=True` nas duas telas): `telas.quadro` e a tela do `almoxarifado.registrar` desviam para
+`_quadro_do_cliente` e `pcm/almoxarifado_cliente.html` quando `setor_telas.visao_de_cliente()`. A conta é de
+`nexus/campo/versao_cliente.py` (`quadro` e `almoxarifado`), com as regras na seção "O cliente olhando a tela" de
+`nexus/torres/campo/CLAUDE.md`: só as usinas do cliente, o mês do topo, só leitura, sem equipe, responsável, horas,
+reprogramação, motivos, custo, valor, criticidade, curva, avariadas, recusas nem o inventário. As sub-rotas das duas
+telas (a reprogramação, os motivos, o "Ver peças", o Inventário) continuam da Grid: o portão do cliente só abre o
+endereço exato. Mudou o formato do `banco_dados.json` (`rows`: usina, os_id, dia, tipo, tarefa, codigo, status_bd) ou o
+da conta do Almoxarifado (`linhas`, `consumo`)? A versão do cliente muda junto (`tests/test_clientes_versoes_entrega2.py`).
+
 ## Inventário do almoxarifado: o fluxo, as regras, a chave de teste e como provar (`inventario/`; 26/10/2026)
 
 Levi, 26/10/2026: o técnico conta as peças no App, o PCM revisa e aprova no Nexus, e o Nexus grava o saldo contado no

@@ -32,6 +32,7 @@ from ..campo import _lido, _url
 from ...cadastro import setor_ids as SID
 from ..modelo import Tela, Torre
 from ...prefixo import na_raiz
+from ...auth import setor_telas
 
 TORRE = Torre(
     id="hseq",
@@ -48,10 +49,14 @@ TORRE = Torre(
         Tela("extintores", "Extintores",
              "Que extintor está vencido, perto de vencer ou sem conferência há mais de 30 dias, em que cliente e usina, "
              "e com qual responsável?",
-             "Ronda de extintores do App de Campo (livro extintores_app_campo) + cadastro do Nexus"),
+             "Ronda de extintores do App de Campo (livro extintores_app_campo) + cadastro do Nexus",
+             # do_cliente (10/11/2026): o cliente vê a versão dele (campo/versao_cliente.extintores)
+             do_cliente=True),
         Tela("epi", "EPI e EPC",
              "Que usina está sem as luvas isolantes, segundo a última ronda diária?",
-             "Rondas diárias do App de Campo (o item das luvas isolantes do checklist) + cadastro do Nexus"),
+             "Rondas diárias do App de Campo (o item das luvas isolantes do checklist) + cadastro do Nexus",
+             # do_cliente (10/11/2026): o cliente vê a versão dele (campo/versao_cliente.epi)
+             do_cliente=True),
         Tela("riscos", "Riscos da semana",
              "Que atividade da semana está liberada, condicionada ou bloqueada?",
              "Programação do PCM + Semanal de Segurança"),
@@ -387,6 +392,31 @@ def mesa_planilha():
     return Response(xlsx, mimetype=PLA.MIME, headers={"Content-Disposition": f'attachment; filename="{nome}.xlsx"'})
 
 
+def _extintores_do_cliente():
+    """Os Extintores na versão do cliente (10/11/2026, entrega 2): só as usinas dele, a situação de agora e o mês do topo
+    nas conferências e nas validades (`campo.versao_cliente.extintores`). Sem os filtros, os botões, as fotos, os
+    relatórios nem os não reconhecidos: é a gestão da Segurança."""
+    from ...campo import versao_cliente as VCL
+    leitura = EXT.extintores()
+    d = leitura.dados or {}
+    todas, _seguem, _excluidos = DEC.separar(d.get("extintores") or [], d.get("nao_reconhecidos") or [], _decisoes())
+    mes = setor_telas.mes_do_cliente()
+    return render_template("hseq/extintores_cliente.html",
+                           r=VCL.extintores(todas, setor_telas.usinas_do_cliente() or set(), mes),
+                           mes_nome=setor_telas.nome_do_mes(mes), erro=bool(leitura.erro))
+
+
+def _epi_do_cliente():
+    """O EPI e EPC na versão do cliente (10/11/2026, entrega 2): as luvas isolantes das usinas dele pela ronda diária,
+    com as verificações do mês do topo (`campo.versao_cliente.epi`). Sem técnico, responsável nem as fotos da ronda."""
+    from ...campo import versao_cliente as VCL
+    leitura = EPI.luvas()
+    mes = setor_telas.mes_do_cliente()
+    linhas = (leitura.dados or {}).get("usinas") or []
+    return render_template("hseq/epi_cliente.html", r=VCL.epi(linhas, setor_telas.usinas_do_cliente() or set(), mes),
+                           mes_nome=setor_telas.nome_do_mes(mes), erro=bool(leitura.erro), pergunta=EPI.PERGUNTA)
+
+
 @bp.route("/extintores")
 def extintores():
     """A tabela, que abre por cliente (Levi, 18/10/2026: "Quero agrupado por Cliente, abrindo o cliente terá as usinas
@@ -395,6 +425,8 @@ def extintores():
     (atrasado, perto de vencer, sem validade, em dia, sem atualização e não reconhecido). Os não reconhecidos em campo
     ganham a caixa deles logo abaixo da faixa, que aponta para a usina, e é na usina que a Segurança os aceita (24/10/2026:
     "ao ir para a usina a TST resolve"). Os filtros ficam logo acima da tabela e valem em tudo."""
+    if setor_telas.visao_de_cliente():
+        return _extintores_do_cliente()
     leitura, d, todas, base, nao_rec, fl = _filtrados()
     f = _status()
     pedido = request.args.get("modo")
@@ -662,6 +694,8 @@ def epi():
     usinas dele (24/10/2026: "tem que ser por responsável da usina, aí mostra as usinas"; até ali, por região de campo e
     por gestor de contrato) e em tabela. Filtros: região do Brasil, cliente, responsável UFV e busca; ninguém abre
     filtrado pelo login. A faixa de números filtra a tabela."""
+    if setor_telas.visao_de_cliente():
+        return _epi_do_cliente()
     leitura = EPI.luvas()
     d = leitura.dados
     regiao, cliente = request.args.get("regiao", ""), request.args.get("cliente", "")

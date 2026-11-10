@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block titulo %}EPI e EPC{% endblock %}
+{% block conteudo %}
+<link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
+{# O EPI e EPC na versão do cliente (10/11/2026, entrega 2; nexus/campo/versao_cliente.epi): as luvas isolantes das
+   usinas dele pela ronda diária, a situação de agora e as verificações do mês do topo. Sem técnico, responsável,
+   equipe nem as fotos da ronda. #}
+<div class="campo-nativa">
+  <div class="cn-cab"><div><p class="gc-eyebrow">EPI e EPC · {{ mes_nome }}</p>
+    <h1 class="cn-titulo">Luvas isolantes nas suas usinas</h1>
+    <p class="cn-pergunta">A ronda diária confere se as luvas isolantes estão na usina. Aqui estão a última resposta de cada usina e as verificações de {{ mes_nome }}.</p></div></div>
+  {% if erro %}<div class="cn-erro cn-aviso" role="status"><span>Parte das informações não carregou agora. Tente de novo em instantes.</span></div>{% endif %}
+  <div class="vc-numeros">
+    <section class="vc-num"><p class="vc-num-t"><i class="ph ph-hand" aria-hidden="true"></i>Com luvas</p><p class="vc-num-v"><b class="cn-t-ok">{{ r.com_luvas }}</b> de {{ r.usinas }}</p><p class="vc-num-d">agora</p></section>
+    <section class="vc-num"><p class="vc-num-t"><i class="ph ph-warning-octagon" aria-hidden="true"></i>Sem luvas</p><p class="vc-num-v"><b{% if r.sem_luvas %} class="cn-t-critico"{% endif %}>{{ r.sem_luvas }}</b> {{ 'usina' if r.sem_luvas == 1 else 'usinas' }}</p><p class="vc-num-d">agora</p></section>
+    <section class="vc-num"><p class="vc-num-t"><i class="ph ph-question" aria-hidden="true"></i>Sem verificação há 7 dias</p><p class="vc-num-v"><b>{{ r.sem_verificacao }}</b> {{ 'usina' if r.sem_verificacao == 1 else 'usinas' }}</p><p class="vc-num-d">agora</p></section>
+    <section class="vc-num"><p class="vc-num-t"><i class="ph ph-clipboard-text" aria-hidden="true"></i>Verificações em {{ mes_nome }}</p><p class="vc-num-v"><b>{{ r.verificacoes_mes }}</b> {{ 'verificação' if r.verificacoes_mes == 1 else 'verificações' }}</p></section>
+  </div>
+  <section class="vc-q cli-tab" aria-labelledby="cli-epi-t">
+    <div class="vc-q-cab"><h2 id="cli-epi-t">Luvas isolantes por usina</h2><span class="mudo">a pergunta da ronda: {{ pergunta }}</span></div>
+    {% if r.linhas %}
+    <div class="cn-tab"><table>
+      <thead><tr><th>Usina</th><th>Situação</th><th>Última verificação</th><th>Resposta</th><th>OS da ronda</th><th>Verificações em {{ mes_nome }}</th></tr></thead>
+      <tbody>{% for u in r.linhas %}
+        <tr><td><b>{{ u.usina }}</b></td>
+          <td><span class="cn-pill cn-{{ u.tom }}">{{ u.situacao }}</span>{% if u.desde %}<br><span class="mudo">desde {{ u.desde.strftime('%d/%m') }}</span>{% endif %}</td>
+          <td>{{ u.ultima.strftime('%d/%m/%Y') if u.ultima else 'nenhuma registrada' }}</td>
+          <td>{% if u.luvas is sameas true %}Sim{% elif u.luvas is sameas false %}Não{% else %}—{% endif %}</td>
+          <td>{% if u.os %}<a class="vc-os" href="{{ raiz }}/t/campo/cliente/os/{{ u.os }}?volta=/t/hseq/epi">OS {{ u.os }}</a>{% else %}—{% endif %}</td>
+          <td>{{ u.mes_n }}{% if u.mes_nao %} <span class="cn-pill cn-critico">{{ u.mes_nao }} com Não</span>{% endif %}</td></tr>
+      {% endfor %}</tbody></table></div>
+    {% else %}<p class="mudo vc-vazio">Nenhuma usina sua com ronda diária registrada.</p>{% endif %}
+  </section>
+</div>
+{% endblock %}

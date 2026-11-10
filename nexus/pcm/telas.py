@@ -412,10 +412,35 @@ def gestao():
 
 
 def quadro():
+    if ST.visao_de_cliente():
+        return _quadro_do_cliente()
     ctx = _ctx_quadro(current_app.config, request.args)
     if ctx is None:
         abort(404)
     return render_template("pcm/quadro.html", **ctx)
+
+
+def _quadro_do_cliente():
+    """O Quadro da semana na versão do cliente (09/11/2026, entrega 2): a programação do mês do topo só nas usinas dele,
+    por usina e por OS, sem equipe, responsável, horas nem reprogramação (`campo.versao_cliente.quadro`). A semana do
+    endereço não vale aqui: o mês é o do topo, e o resto do Quadro (filtros, janela, motivos) é da Grid."""
+    from ..campo import responsaveis as campo_resp
+    from ..campo import versao_cliente as VCL
+    from ..campo import visao
+    leitura = fonte.ler(current_app.config)
+    mes = ST.mes_do_cliente()
+    usinas = ST.usinas_do_cliente() or set()
+    try:
+        b = visao._Base()
+        nomes = campo_resp.Nomes(b)
+        nome_de = {uid: str(u.get("nome") or "") for uid, u in b.por_id.items()}
+    except Exception:            # noqa: BLE001 — sem o cadastro, nenhuma usina liga: a tela diz que não carregou
+        nomes, nome_de = None, {}
+    semanas = [s for s in (leitura.dados or {}).get("semanas") or [] if isinstance(s, dict)]
+    r = VCL.quadro(semanas, (lambda n: nomes.usina(n, fracttal=n)[0]) if nomes else (lambda n: None), usinas, mes,
+                   Q.hoje(), nome_de)
+    return render_template("pcm/quadro_cliente.html", r=r, mes_nome=ST.nome_do_mes(mes),
+                           erro=leitura.dados is None or nomes is None)
 
 
 def quadro_reprogramar():

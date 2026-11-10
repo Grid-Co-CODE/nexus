@@ -423,6 +423,18 @@ sem luvas**, 34 sem verificação, 76 com luvas.
 **Como provar.** `python -m pytest -q tests/test_hseq_epi.py` (a resposta pelo texto, a situação por usina, o Sim antigo,
 os cartões por responsável com as usinas, os filtros, a tabela com o botão de fotos, o aviso quando a pergunta some).
 
+## A versão do cliente de Extintores e EPI e EPC (10/11/2026)
+
+O setor Clientes (o cliente logado, ou o administrador no Modo cliente) abre `/t/hseq/extintores` e `/t/hseq/epi` na
+versão dele (`do_cliente=True`; `_extintores_do_cliente` e `_epi_do_cliente` no `__init__`, templates
+`extintores_cliente.html` e `epi_cliente.html`). A conta é de `nexus/campo/versao_cliente.py` (`extintores` e `epi`),
+fora da área da Segurança, com as regras na seção "O cliente olhando a tela" de `nexus/torres/campo/CLAUDE.md`: só as
+usinas do cliente, a situação de agora e o mês do topo (conferências e validades que vencem; verificações das luvas
+pelo `por_mes` de `epi.luvas`), sem quem conferiu, técnico, responsável, a informação do técnico, fotos, relatórios,
+não reconhecidos, edições nem botões. As sub-rotas (a usina, a foto, a informação, os relatórios) continuam da Grid: o
+portão do cliente só abre o endereço exato. Mudou a linha de `extintores.linha` ou de `epi.luvas`? A versão do cliente
+muda junto (`tests/test_clientes_versoes_entrega2.py`).
+
 ## APR e PT
 
 Levi, 09/10/2026: "quero que esse visual e caminho vá para APR e PT de Segurança · HSEQ ... precisamos ter a visão

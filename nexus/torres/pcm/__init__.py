@@ -37,7 +37,8 @@ TORRE = Torre(
         Tela("quadro", "Quadro da semana",
              "O que cada equipe faz em cada dia, e o que reprogramar?",
              "banco_dados.json do painel PCM e as gerações do Nexus",
-             do_setor=(SID.PCM, SID.RESPONSAVEL_UFV)),
+             # do_cliente (09/11/2026): o cliente vê a versão dele (campo/versao_cliente.quadro, pcm/quadro_cliente.html)
+             do_setor=(SID.PCM, SID.RESPONSAVEL_UFV), do_cliente=True),
         # as tarefas que saíram da programação por um motivo de espera e o cadastro dos motivos (16/10/2026, Levi:
         # "temos que montar um painel de acompanhamento as OSs que saíram da programação por esses motivos!" e "Também
         # temos que ter um canto no PCM onde podemos controlar todos esses motivos"); dos mesmos setores do Quadro
@@ -80,7 +81,8 @@ TORRE = Torre(
         Tela("pecas", "Almoxarifado",
              "Que peça está abaixo do mínimo ou no limite, em que almoxarifado, e o que saiu nas OS?",
              "Fracttal (inventário), pela varredura diária do App de Campo",
-             do_setor=SID.PCM),
+             # do_cliente (10/11/2026): o cliente vê a versão dele (campo/versao_cliente.almoxarifado)
+             do_setor=SID.PCM, do_cliente=True),
     ],
 )
 

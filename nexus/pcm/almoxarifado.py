@@ -444,6 +444,15 @@ def registrar(bp) -> None:
     def tela():
         g = montar()
         d = g.dados or {}
+        from ..auth import setor_telas as ST
+        if ST.visao_de_cliente():
+            # a versão do cliente (10/11/2026, entrega 2): o almoxarifado das usinas dele, sem custo nem a gestão do PCM
+            from ..campo import versao_cliente as VCL
+            mes = ST.mes_do_cliente()
+            ok = d.get("estado") == "ok"
+            return render_template("pcm/almoxarifado_cliente.html",
+                                   r=VCL.almoxarifado(d if ok else {}, ST.usinas_do_cliente() or set(), mes),
+                                   mes_nome=ST.nome_do_mes(mes), erro=bool(g.erro) or not ok)
         # quantas contagens do inventário esperam o PCM (o número da aba Inventário) e a última contagem gravada de cada
         # almoxarifado; fora da conta guardada de 5 min, porque o estado vem dos eventos e muda a cada revisão. UMA chamada ao
         # `revisao.resumo` por abertura: a falha de leitura não fica guardada, e duas chamadas leriam o livro duas vezes justo

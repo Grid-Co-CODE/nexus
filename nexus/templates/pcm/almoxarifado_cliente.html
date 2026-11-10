@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block titulo %}Almoxarifado{% endblock %}
+{% block conteudo %}
+<link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
+{# O Almoxarifado na versão do cliente (10/11/2026, entrega 2; nexus/campo/versao_cliente.almoxarifado): o saldo de agora
+   das peças no almoxarifado de cada usina dele e as peças que saíram nas OS no mês do topo. Sem custo, valor,
+   criticidade, curva, avariadas, recusas nem o inventário (a gestão do PCM). #}
+<div class="campo-nativa">
+  <div class="cn-cab"><div><p class="gc-eyebrow">Almoxarifado · {{ mes_nome }}</p>
+    <h1 class="cn-titulo">Peças nas suas usinas</h1>
+    <p class="cn-pergunta">O saldo de cada peça no almoxarifado da usina e o que saiu nas OS em {{ mes_nome }}.</p></div></div>
+  {% if erro %}<div class="cn-erro cn-aviso" role="status"><span>Parte das informações não carregou agora. Tente de novo em instantes.</span></div>{% endif %}
+  <div class="vc-numeros">
+    <section class="vc-num"><p class="vc-num-t"><i class="ph ph-warehouse" aria-hidden="true"></i>Almoxarifados</p><p class="vc-num-v"><b>{{ r.n }}</b> com {{ r.pecas }} {{ 'peça' if r.pecas == 1 else 'peças' }}</p>{% if r.saldo_de %}<p class="vc-num-d">saldo de {{ r.saldo_de }}</p>{% endif %}</section>
+    <section class="vc-num"><p class="vc-num-t"><i class="ph ph-arrow-fat-line-down" aria-hidden="true"></i>Abaixo do mínimo</p><p class="vc-num-v"><b{% if r.abaixo %} class="cn-t-critico"{% endif %}>{{ r.abaixo }}</b> {{ 'peça' if r.abaixo == 1 else 'peças' }}</p><p class="vc-num-d">agora</p></section>
+    <section class="vc-num"><p class="vc-num-t"><i class="ph ph-equals" aria-hidden="true"></i>No limite</p><p class="vc-num-v"><b{% if r.no_limite %} class="cn-t-alerta"{% endif %}>{{ r.no_limite }}</b> {{ 'peça' if r.no_limite == 1 else 'peças' }}</p><p class="vc-num-d">agora</p></section>
+    <section class="vc-num"><p class="vc-num-t"><i class="ph ph-package" aria-hidden="true"></i>Saídas em {{ mes_nome }}</p><p class="vc-num-v"><b>{{ r.saidas_mes }}</b> {{ 'saída' if r.saidas_mes == 1 else 'saídas' }}</p></section>
+  </div>
+  <section class="vc-q cli-tab" aria-labelledby="cli-alm-t">
+    <div class="vc-q-cab"><h2 id="cli-alm-t">Almoxarifado de cada usina</h2><span class="mudo">abra a usina para ver as peças e as saídas</span></div>
+    {% for a in r.almoxarifados %}
+    <details class="cli-us">
+      <summary><b class="cli-us-nome">{{ a.usina or a.nome }}</b>
+        <span class="cli-us-n">{{ a.pecas|length }} {{ 'peça' if a.pecas|length == 1 else 'peças' }}</span>
+        {% if a.abaixo %}<span class="cn-pill cn-critico">{{ a.abaixo }} abaixo do mínimo</span>{% endif %}
+        {% if a.no_limite %}<span class="cn-pill cn-alerta">{{ a.no_limite }} no limite</span>{% endif %}
+        <span class="mudo cli-us-prox">{{ a.saidas|length }} {{ 'saída' if a.saidas|length == 1 else 'saídas' }} em {{ mes_nome }}</span></summary>
+      <div class="cn-tab"><table>
+        <thead><tr><th>Código</th><th>Peça</th><th>Unidade</th><th>Saldo</th><th>Mínimo</th><th>Situação</th></tr></thead>
+        <tbody>{% for p in a.pecas %}
+          <tr><td><b>{{ p.codigo }}</b></td><td>{{ p.nome or '—' }}</td>
+            <td>{{ p.unidade or '—' }}</td>
+            <td>{% if p.saldo is not none %}{{ '%g'|format(p.saldo) }}{% else %}—{% endif %}</td>
+            <td>{% if p.minimo %}{{ '%g'|format(p.minimo) }}{% else %}—{% endif %}</td>
+            <td><span class="cn-pill cn-{{ p.tom }}">{{ p.situacao }}</span></td></tr>
+        {% endfor %}</tbody></table></div>
+      {% if a.saidas %}
+      <div class="cn-tab"><table>
+        <thead><tr><th>Saiu em</th><th>OS</th><th>Código</th><th>Peça</th><th>Quantidade</th></tr></thead>
+        <tbody>{% for s in a.saidas %}
+          <tr><td>{{ s.dia[8:10] }}/{{ s.dia[5:7] }}</td>
+            <td>{% if s.os %}<a class="vc-os" href="{{ raiz }}/t/campo/cliente/os/{{ s.os }}?volta=/t/pcm/pecas">OS {{ s.os }}</a>{% else %}—{% endif %}</td>
+            <td>{{ s.codigo }}</td><td>{{ s.nome or '—' }}</td>
+            <td>{% if s.quantidade is not none %}{{ '%g'|format(s.quantidade) }}{% else %}—{% endif %}</td></tr>
+        {% endfor %}</tbody></table></div>
+      {% endif %}
+    </details>
+    {% else %}<p class="mudo vc-vazio">Nenhum almoxarifado ligado às suas usinas.</p>{% endfor %}
+  </section>
+</div>
+{% endblock %}

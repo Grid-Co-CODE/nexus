@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block titulo %}Quadro da semana{% endblock %}
+{% block conteudo %}
+<link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
+{# O Quadro da semana na versão do cliente (09/11/2026, entrega 2; nexus/campo/versao_cliente.quadro): as OS que a
+   programação pôs no mês escolhido no topo, só nas usinas dele, por usina. Sem equipe, responsável, horário, horas,
+   reprogramação nem os filtros da Grid. Cada OS abre o cartão só leitura. #}
+<div class="campo-nativa">
+  <div class="cn-cab"><div><p class="gc-eyebrow">Quadro da semana · {{ mes_nome }}</p>
+    <h1 class="cn-titulo">Programação nas suas usinas</h1>
+    <p class="cn-pergunta">As OS que a programação semanal pôs em {{ mes_nome }} e como está cada uma.</p></div></div>
+  {% if erro %}<div class="cn-erro cn-aviso" role="status"><span>Parte das informações não carregou agora. Tente de novo em instantes.</span></div>{% endif %}
+  {% if r.desde %}<div class="cn-erro cn-aviso" role="status"><span>A programação guarda as semanas a partir de <b>{{ r.desde.strftime('%d/%m/%Y') }}</b>: o que foi programado antes disso não aparece aqui.</span></div>{% endif %}
+  <div class="vc-numeros">
+    <section class="vc-num"><p class="vc-num-t"><i class="ph ph-calendar-check" aria-hidden="true"></i>OS programadas no mês</p><p class="vc-num-v"><b>{{ r.n }}</b> OS</p></section>
+    <section class="vc-num"><p class="vc-num-t"><i class="ph ph-check-circle" aria-hidden="true"></i>Concluídas</p><p class="vc-num-v"><b class="cn-t-ok">{{ r.feitas }}</b> de {{ r.n }}</p></section>
+    <section class="vc-num"><p class="vc-num-t"><i class="ph ph-hourglass-medium" aria-hidden="true"></i>Em aberto</p><p class="vc-num-v"><b>{{ r.abertas }}</b> OS</p></section>
+    <section class="vc-num"><p class="vc-num-t"><i class="ph ph-solar-panel" aria-hidden="true"></i>Usinas com programação</p><p class="vc-num-v"><b>{{ r.usinas }}</b> {{ 'usina' if r.usinas == 1 else 'usinas' }}</p></section>
+  </div>
+  <section class="vc-q cli-tab" aria-labelledby="cli-quadro-t">
+    <div class="vc-q-cab"><h2 id="cli-quadro-t">OS de {{ mes_nome }} por usina</h2><span class="mudo">abra a usina para ver as OS</span></div>
+    {% for u in r.linhas %}
+    <details class="cli-us">
+      <summary><b class="cli-us-nome">{{ u.usina or 'Usina' }}</b>
+        <span class="cli-us-n">{{ u.n }} OS</span>
+        <span class="cn-pill cn-ok">{{ u.feitas }} {{ 'concluída' if u.feitas == 1 else 'concluídas' }}</span>
+        {% if u.abertas %}<span class="cn-pill cn-alerta">{{ u.abertas }} em aberto</span>{% endif %}
+        {% if u.proxima %}<span class="mudo cli-us-prox">próxima em {{ u.proxima.strftime('%d/%m') }}</span>{% endif %}</summary>
+      <div class="cn-tab"><table>
+        <thead><tr><th>Data</th><th>Tipo</th><th>OS</th><th>Tarefas</th><th>Situação</th></tr></thead>
+        <tbody>{% for o in u.oss %}
+          <tr><td>{{ o.dia.strftime('%d/%m') if o.dia else '—' }}{% if o.ate %} a {{ o.ate.strftime('%d/%m') }}{% endif %}</td>
+            <td>{{ o.tipo or '—' }}</td>
+            <td><a class="vc-os" href="{{ raiz }}/t/campo/cliente/os/{{ o.os }}?volta=/t/pcm/quadro">OS {{ o.os }}</a></td>
+            <td>{{ o.tarefas }}</td>
+            <td><span class="cn-pill cn-{{ o.cor }}">{{ o.situacao }}</span></td></tr>
+        {% endfor %}</tbody></table></div>
+    </details>
+    {% else %}<p class="mudo vc-vazio">Nenhuma OS programada nas suas usinas em {{ mes_nome }}.</p>{% endfor %}
+  </section>
+</div>
+{% endblock %}
