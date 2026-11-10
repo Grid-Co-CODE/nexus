@@ -1272,6 +1272,17 @@ concluir e cancelar!".
   também). Ele só muda o status: o diálogo (`verificacao`, como o do Concluir) mostra as subtarefas sem resposta e
   oferece o "Fazer a tarefa" antes (o executar sozinho não muda o status). No card, o botão sai na OS que não está Em
   Verificação, Concluída nem Cancelada.
+- **Retornar para responsável** (10/11/2026, Levi: "tirar uma OS de verificação e devolver para OSs em processo"; "Só quem
+  criou ou o supervisor/responsável/gestor de contrato"): `POST /os/api/os/<id>/retornar` põe a OS Em Verificação em Em
+  Processo pelo `api.mudar_status_os(wid, 1, verificar_gatilhos=False)`, o mesmo pedido que a tela do Fracttal manda nessa
+  volta (capturado nela, `verify_triggers` False). Pode: quem criou a OS (o `id_created_by` do cabeçalho, a CONTA do
+  Fracttal), o administrador do Nexus e o Responsável UFV, o Supervisor de Campo (o Coordenador, com a vaga aberta) e o
+  gestor de contrato da usina do ativo, os papéis da assinatura da PT. Esses três vêm do cadastro do Nexus, que o clone não
+  conhece: a ponte põe no pedido, só nesta rota, a função de `retornar_os.py` com quem pede (a sessão do Nexus), e o clone
+  a chama com os códigos dos ativos (`RETORNAR`). Fora do Nexus, só quem criou. O botão nasce escondido na OS Em
+  Verificação e aparece quando o `GET` da mesma rota diz que quem vê pode (depois que o card abre: o cadastro nunca é lido
+  na frente do card); o `POST` confere de novo, lê o status antes e depois e avisa o quadro de Garantias. Quem não pode
+  lê no erro quem pode, com os nomes da usina.
 - **Na tela do chamado de Garantias** (`acomp_os.html`, que recebe o `d` da OS): a caixa "Ações da OS" com os anexos (a
   contagem do card), o Incluir anexo, o Enviar para verificação (OS em processo) e o Cancelar (OS aberta), com
   `data-os-acoes data-no-lugar`. Sem o Concluir: o "Finalizar chamado" do topo já conclui a OS no Fracttal e ajusta o

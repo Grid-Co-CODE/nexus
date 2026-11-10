@@ -838,6 +838,87 @@ def api_verificacao(wid):
     return jsonify({"ok": True, "mensagem": "OS %s enviada para verificação no Fracttal." % folio})
 
 
+# Retornar para responsável (Levi, 10/11/2026: "Esses proxys servem para tirar uma OS de verificação e devolver para OSs
+# em processo, tem que ter essa opção no card da OS no Histórico de OSs"): o status 1 pelo mesmo
+# `tasks.work_orders_change_status` que a tela do Fracttal manda nessa volta (capturado nela, com `verify_triggers` False).
+# Quem pode (Levi: "Só quem criou ou o responsável pela pessoa que pode mover para em processo", e no quiz "o
+# supervisor/responsável/gestor de contrato/quem criou"): quem criou a OS (o `id_created_by` do cabeçalho, a CONTA do
+# Fracttal, a mesma do "criadas por mim"), o administrador do Nexus e, pelo cadastro do Nexus, o Responsável UFV, o
+# Supervisor de Campo (o Coordenador, com a vaga aberta) e o gestor de contrato da usina do ativo: os mesmos papéis que
+# assinam a PT (`nexus/campo/decisao_pt.aprovadores`). O clone não conhece o cadastro: o Nexus põe no pedido a função que
+# diz o papel de quem pede (`RETORNAR`, ligada pela ponte, `nexus/torres/oscreator/retornar_os.py`). Fora do Nexus, só
+# quem criou. O card pergunta (GET) antes de mostrar o botão; o POST confere de novo e lê o status antes e depois.
+RETORNAR = "os_web.retornar_os"
+
+
+def _codigos_da_os(wid) -> list:
+    """Os códigos dos ativos das tarefas da OS (a usina sai do código, como no fato do chamado)."""
+    tarefas = api._leitura_da_os(api.RPC_WO_TASKS, wid, {"id_work_order": wid, "sort": []})
+    cods = []
+    for t in tarefas or []:
+        c = (str(t.get("code_item") or "").strip() or api._extrai_code(str(t.get("items_description") or "")))
+        if c and c not in cods:
+            cods.append(c)
+    return cods
+
+
+def _quem_pode_retornar(wid) -> tuple:
+    """({"pode", "papel" ou "motivo"}, o cabeçalho da OS lido agora)."""
+    cab = api._cabecalho_os(wid) or {}
+    nexus = request.environ.get(RETORNAR)
+    if nexus is not None and getattr(nexus, "admin", False):
+        return {"pode": True, "papel": "administrador"}, cab
+    eu = api._current_user_ids()[1]
+    criador = cab.get("id_created_by")
+    if eu not in (None, "") and criador not in (None, "") and str(criador) == str(eu):
+        return {"pode": True, "papel": "quem criou"}, cab
+    if nexus is None:
+        return {"pode": False, "motivo": "Só quem criou a OS a retorna para o responsável."}, cab
+    r = nexus(_codigos_da_os(wid)) or {}
+    if r.get("pode"):
+        return {"pode": True, "papel": r.get("papel") or ""}, cab
+    if r.get("erro"):
+        return {"pode": False, "motivo": r["erro"]}, cab
+    texto = "quem a criou" + ((", " + r["texto"]) if r.get("texto") else "")
+    return {"pode": False, "motivo": "Quem retorna esta OS para o responsável: %s." % texto}, cab
+
+
+@bp.route("/api/os/<int:wid>/retornar", methods=["GET"])
+@exige_sessao
+def api_retornar_pode(wid):
+    """O card pergunta antes de mostrar o botão: só na OS Em Verificação e para quem pode."""
+    q, cab = _quem_pode_retornar(wid)
+    st = cab.get("id_status_work_order")
+    em_verificacao = st is not None and int(st) == 2
+    return jsonify({"ok": True, "pode": bool(q["pode"] and em_verificacao), "papel": q.get("papel") or "",
+                    "motivo": q.get("motivo") or ("" if em_verificacao else "A OS não está em verificação.")})
+
+
+@bp.route("/api/os/<int:wid>/retornar", methods=["POST"])
+@exige_sessao
+def api_retornar(wid):
+    q, cab = _quem_pode_retornar(wid)
+    folio = _corpo().get("folio") or cab.get("wo_folio") or wid
+    if not q["pode"]:
+        return _erro(q["motivo"], 403)
+    antes = cab.get("id_status_work_order")
+    if antes is None or int(antes) != 2:
+        return _erro("A OS %s está %s no Fracttal: só a OS em verificação volta para o responsável."
+                     % (folio, api.WO_STATUS.get(int(antes), "fora da verificação").lower() if antes is not None
+                        else "sem status lido"))
+    res = api.mudar_status_os(wid, 1, verificar_gatilhos=False)
+    if not (isinstance(res, dict) and res.get("ok")):
+        return _erro((res or {}).get("erro") or "O Fracttal não mudou o status da OS.", 502)
+    lista_central.mudou(wid)
+    depois = api.status_da_os(wid)
+    if depois is not None and int(depois) != 1:
+        return _erro("O Fracttal aceitou o pedido, mas a OS %s seguiu %s." % (
+            folio, api.WO_STATUS.get(int(depois), "como estava").lower()), 502)
+    _no_quadro_de_garantias(wid, 1)
+    log.info("OS %s retornada para o responsável (%s)", folio, q.get("papel"))
+    return jsonify({"ok": True, "mensagem": "OS %s retornou para o responsável: está Em Processo no Fracttal." % folio})
+
+
 @bp.route("/api/os/<int:wid>/cancelar", methods=["POST"])
 @exige_sessao
 def api_cancelar(wid):

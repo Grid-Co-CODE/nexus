@@ -304,6 +304,8 @@ body.os-modal-aberto{overflow:hidden}
 .det-reg{margin:-4px 0 0;color:#c4cbdb;font-size:13.5px;display:flex;flex-wrap:wrap;align-items:center;gap:8px}.det-reg b{color:var(--f-green)}
 .det-foot{position:sticky;bottom:0;z-index:3;display:flex;align-items:center;gap:10px;padding:12px 22px;background:var(--f-bg);border-top:1px solid #1a2236;flex-wrap:wrap}
 .det-b{display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:0 16px;border-radius:10px;font-weight:700;font-size:14px;border:1px solid transparent;text-decoration:none;cursor:pointer;font-family:inherit}
+/* o botão que espera a rota dizer se a pessoa pode (o "Retornar para responsável", 10/11/2026) */
+.det-b[hidden]{display:none}
 .det-b:disabled{cursor:not-allowed}
 .det-b.verde{background:var(--f-green);color:var(--f-ink)}
 .det-b.ambar{background:rgba(224,166,58,.14);color:#e0a63a;border-color:rgba(224,166,58,.5)}

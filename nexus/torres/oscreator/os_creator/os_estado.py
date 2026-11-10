@@ -142,18 +142,20 @@ RPC_WO_CHANGE_STATUS = "tasks.work_orders_change_status"        # muda o status 
 RPC_WO_RECALCULATE   = "tasks.work_orders_recalculate_new"     # confirma o fechamento (irreversível)
 
 
-def mudar_status_os(id_work_order, id_status: int = 1) -> dict:
+def mudar_status_os(id_work_order, id_status: int = 1, verificar_gatilhos: bool = True) -> dict:
     """Muda o status da OS SEM fechá-la (1 Em Processo · 2 Em Verificação). É a única escrita que
     a API permite numa OS já criada além de etiqueta/anexo — e é o que a equipe de chamados pediu:
     'quando eu abrir o chamado, eu não vou concluir ela, vou colocar como em progresso'.
-    NÃO usar com 3 (Concluída): fechar exige o recalculate e é irreversível → `concluir_os`."""
+    NÃO usar com 3 (Concluída): fechar exige o recalculate e é irreversível → `concluir_os`.
+    `verificar_gatilhos` False é o que a tela do Fracttal manda ao devolver uma OS da Verificação para Em Processo
+    (capturado nela em 10/11/2026: `verify_triggers` e `update_readings_after` False): o "Retornar para responsável"."""
     if not id_work_order:
         return {"ok": False, "erro": "OS sem id."}
     if int(id_status) not in (1, 2):
         return {"ok": False, "erro": "Status inválido aqui (use 1 Em Processo ou 2 Em Verificação)."}
     res = api._rpc_call(RPC_WO_CHANGE_STATUS, {"id_work_order": id_work_order,
                                            "id_status_work_order": int(id_status),
-                                           "verify_triggers": True, "update_readings_after": False})
+                                           "verify_triggers": bool(verificar_gatilhos), "update_readings_after": False})
     if isinstance(res, dict) and res.get("success") is False:
         return {"ok": False, "erro": str(res.get("message") or "o Fracttal recusou a mudança "
                                          "(sua conta tem permissão?)")}

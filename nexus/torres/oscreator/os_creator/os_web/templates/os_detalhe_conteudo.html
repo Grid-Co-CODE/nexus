@@ -187,6 +187,10 @@
     {# sem o status no endereço (a página da OS da Engenharia abre o card assim), vale o do Fracttal: a prova no ar de
        06/11/2026 mostrou o botão na OS concluída (a rota recusa, mas o botão não serve) #}
     {% set pode_verificar = (d.status_id == 1) if (not status and d.status_id) else (status not in ('Em Verificação', 'Concluída', 'Cancelada')) %}
+    {# o "Retornar para responsável" (10/11/2026): só na OS Em Verificação, e escondido até a rota dizer que quem está vendo
+       pode (quem criou, o administrador, o Responsável UFV, o Supervisor de Campo ou o gestor de contrato da usina) #}
+    {% set em_verificacao = (d.status_id == 2) if (not status and d.status_id) else (status == 'Em Verificação') %}
+    {% if em_verificacao %}<button type="button" class="det-b ambar" data-acao="retornar" data-retornar-pode="/os/api/os/{{ wid }}/retornar" hidden title="Tira a OS de Em Verificação e devolve para Em Processo, com o responsável dela">{{ icone('history', 'currentColor', 16) }}Retornar para responsável</button>{% endif %}
     {% if pode_verificar %}<button type="button" class="det-b ambar" data-acao="verificacao" title="Muda a OS para Em Verificação no Fracttal (precisa de permissão na sua conta)">Enviar para verificação</button>{% endif %}
     <button type="button" class="det-b ok" data-acao="concluir" title="Fecha a OS no Fracttal (irreversível — precisa de permissão na sua conta)">Concluir OS</button>
     <button type="button" class="det-b perigo" data-acao="cancelar" title="Cancela a OS no Fracttal (precisa de permissão na sua conta)">Cancelar OS</button>

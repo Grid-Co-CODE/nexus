@@ -34,7 +34,18 @@
   }
 
   // contagem dos dois cards de anexos — chega depois do detalhe, como no app (o Histórico faz o mesmo na 1ª abertura)
+  // o "Retornar para responsável" (10/11/2026) só aparece para quem pode: a rota diz, depois que o card abre (o cadastro
+  // das usinas não é lido na frente do card). Erro ou "não pode": o botão segue escondido
+  function retornarPode(d) {
+    const b = q(d, '[data-retornar-pode]'); if (!b) return;
+    fetch(b.getAttribute('data-retornar-pode'), {credentials: 'same-origin', headers: {'Accept': 'application/json'}})
+      .then((r) => r.ok ? r.json() : null)
+      .then((j) => { b.hidden = !(j && j.pode); })
+      .catch(() => { b.hidden = true; });
+  }
+
   function contagem(d) {
+    retornarPode(d);
     const el = q(d, '[data-anexos]'); if (!el) return;
     fetch(el.getAttribute('data-anexos'), {credentials: 'same-origin', headers: {'Accept': 'application/json'}})
       .then((r) => r.ok ? r.json() : null)
@@ -309,6 +320,22 @@
           if (d.hasAttribute('data-no-lugar')) { relerPagina(d, j.mensagem); return; }
           await recarregar(d, urlCard(d, 'Em Verificação'), j.mensagem);
         } catch (e) { trava(ok, false, 'Enviar para verificação'); hint(dlg, 'Não foi possível enviar: ' + e.message); }
+      });
+    },
+
+    // Retornar para responsável (10/11/2026): a OS volta de Em Verificação para Em Processo pela rota /retornar, que
+    // confere de novo quem pode e lê o status antes e depois
+    retornar(d) {
+      const dlg = dialogo(d, 'retornar'); if (!dlg) return;
+      const ok = q(dlg.caixa, '[data-conf="retornar"]');
+      ok.addEventListener('click', async () => {
+        trava(ok, true, 'retornando…');
+        try {
+          const j = await pedir('/os/api/os/' + d.dataset.wid + '/retornar', {folio: d.dataset.folio});
+          alterou(d); dlg.fechar();
+          if (d.hasAttribute('data-no-lugar')) { relerPagina(d, j.mensagem); return; }
+          await recarregar(d, urlCard(d, 'Em Processo'), j.mensagem);
+        } catch (e) { trava(ok, false, 'Retornar para responsável'); hint(dlg, 'Não foi possível retornar: ' + e.message); }
       });
     },
 

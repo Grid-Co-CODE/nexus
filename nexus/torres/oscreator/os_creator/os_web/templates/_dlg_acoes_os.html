@@ -94,6 +94,14 @@
     <div class="acoes-bts"><button type="button" class="det-b ghost" data-fechar>Voltar</button><button type="button" class="det-b ambar" data-conf="verificacao">Enviar para verificação</button></div>
   </template>
 
+  {# Retornar para responsável (10/11/2026): a OS sai de Em Verificação e volta para Em Processo (`api.mudar_status_os(wid, 1)`) #}
+  <template data-dlg="retornar">
+    <div class="acoes-cab"><span class="acoes-tile">{{ icone('history', '#A6E22E', 25) }}</span>
+      <div><div class="acoes-t">Retornar a OS {{ d.folio }} para o responsável?</div><div class="acoes-s">A OS sai de Em Verificação e volta para Em Processo no Fracttal{% if d.responsavel %}, com {{ d.responsavel }}{% endif %}, para ser refeita ou completada.</div></div></div>
+    <div class="acoes-hint" data-hint></div>
+    <div class="acoes-bts"><button type="button" class="det-b ghost" data-fechar>Voltar</button><button type="button" class="det-b ambar" data-conf="retornar">Retornar para responsável</button></div>
+  </template>
+
   {# CancelarOSDialog: motivo (status custom) + observação; tipo fixo 'Cancelar OS'; a autorização é a do usuário no Fracttal #}
   <template data-dlg="cancelar">
     <div class="acoes-t">Cancelar a OS {{ d.folio }}</div>

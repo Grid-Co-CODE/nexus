@@ -518,6 +518,8 @@ def area_pcm() -> dict:
 OBS_CHAMADOS = "os_web.obs_chamados"
 SETOR_OBS_GARANTIAS = SID.PERFORMANCE
 _ROTA_OBS = re.compile(r"chamados/acompanhamento/\d+|api/acomp/\d+/obs/[^/]+/(?:editar|excluir)")
+# o "Retornar para responsável" do card (10/11/2026): só esta rota lê o cadastro, e só quando alguém pergunta ou aperta
+_ROTA_RETORNAR = re.compile(r"api/os/\d+/retornar")
 
 
 # A OS na tela do chamado de Garantias abre a página da OS da Engenharia (09/11/2026, Levi, pelo chat do scrum master:
@@ -622,6 +624,9 @@ def encaminhar(resto: str):
     if _ROTA_OBS.fullmatch(resto):              # só a tela de um chamado e o editar/excluir: o quadro não lê o setor
         environ[OBS_CHAMADOS] = obs_chamados()  # editar e excluir as observações (ver `obs_chamados`)
         environ[PAGINA_DA_OS] = pagina_da_os()  # a OS abre a página da OS da Engenharia (ver `pagina_da_os`)
+    if _ROTA_RETORNAR.fullmatch(resto):         # quem retorna a OS em verificação para o responsável (retornar_os.py)
+        from . import retornar_os
+        environ[retornar_os.CHAVE] = retornar_os.no_pedido(app)
     base = raiz()
     ajusta_js = resto == "static/abas.js"
     # debaixo do prefixo todo .js do clone sai reescrito, e a pergunta "mudou?" vale para a versão reescrita (abaixo)
