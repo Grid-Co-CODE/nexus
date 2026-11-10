@@ -57,9 +57,7 @@ def _reler(app):
             if st.get("erro") and not st.get("decisoes"):
                 raise RuntimeError(f"setores não lidos: {st['erro']}")
             fids = ids_do_setor(st)
-            if time.time() - a["pessoas_ts"] > PESSOAS_S or not a["pessoas"]:
-                a["pessoas"] = OE._paginas("personnel?x=1")
-                a["pessoas_ts"] = time.time()
+            OE.pessoas_do_fracttal(a)
             por_id = {str(p.get("id_personnel")): p for p in a["pessoas"]}
             agora = datetime.now(timezone.utc)
             todas, faltam, equipe, recusadas, motivo = [], [], [], [], ""

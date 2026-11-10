@@ -111,3 +111,28 @@ def test_a_1a_releitura_do_boot_parte_da_copia_do_disco(app, monkeypatch, tmp_pa
         rest.recusar = set()
     E.limpar()
     Q.limpar()
+
+
+def test_sem_a_lista_de_pessoas_o_quadro_usa_a_do_os_creator(app, monkeypatch):
+    """O 1º pedido da leitura é a lista de pessoas do Fracttal (para casar os nomes), e logo depois do deploy, com a cota
+    cheia do aquecimento, era ela que levava o 429: o quadro seguia vazio até a lista passar (10/11/2026, 13:15, no ar). A
+    reserva é a lista que o OS Creator guarda em disco (o catálogo de pessoas); a do Fracttal segue a primeira."""
+    rest = _preparar(app, monkeypatch)
+    real = rest.__call__
+
+    def sem_pessoal(path):
+        if path.startswith("personnel?"):
+            raise fracttal.Recusado("o Fracttal recusou por excesso de pedidos (HTTP 429)")
+        return real(path)
+    monkeypatch.setattr(E, "_ler_fracttal", sem_pessoal)
+    monkeypatch.setattr(E, "_pessoas_do_os_creator", lambda: [dict(p) for p in PESSOAS])
+    for quadro in (E, Q):
+        quadro._reler(app)
+        assert _oss(quadro._EST) == ["100", "200"], f"{quadro.__name__}: sem a lista do Fracttal o quadro ficou vazio"
+    monkeypatch.setattr(E, "_pessoas_do_os_creator", lambda: [])         # sem a reserva: fica a lista de antes
+    for quadro in (E, Q):
+        quadro._EST.update(pessoas_ts=0.0, erro_em=0.0)                    # a lista venceu (24 h) e o Fracttal recusa a nova
+        quadro._reler(app)
+        assert _oss(quadro._EST) == ["100", "200"] and quadro._EST["pessoas"], f"{quadro.__name__}: perdeu a lista de antes"
+    E.limpar()
+    Q.limpar()

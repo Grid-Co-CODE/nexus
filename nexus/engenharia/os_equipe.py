@@ -115,6 +115,34 @@ def _do_disco(app=None) -> None:
     carregar_do_disco(app, _EST, ARQUIVO)
 
 
+def _pessoas_do_os_creator() -> list[dict]:
+    """A reserva da lista de pessoas: a que o OS Creator guarda em disco (o catálogo de pessoas, `pessoas_guardadas`, sem ler
+    o Fracttal), pelo MESMO módulo das telas dele (`ponte.modulo_do_clone`)."""
+    try:
+        from ..torres.oscreator.ponte import modulo_do_clone
+        linhas, _fonte = modulo_do_clone("catalogos").pessoas_guardadas()
+    except Exception:       # noqa: BLE001 — sem o catálogo, sem a reserva
+        return []
+    return [dict(p) for p in (linhas or []) if isinstance(p, dict) and p.get("id_personnel") is not None]
+
+
+def pessoas_do_fracttal(est: dict) -> list[dict]:
+    """A lista de pessoas do Fracttal para casar os nomes (`personnel`, guardada PESSOAS_S). É o 1º pedido da leitura, e
+    logo depois do deploy, com a cota cheia do aquecimento, era ela que levava o 429 e deixava o quadro vazio (10/11/2026,
+    no ar às 13:15). Recusada, fica a lista de antes; sem nenhuma, a do OS Creator (a hora fica zerada: a próxima volta pede
+    a do Fracttal de novo)."""
+    if est["pessoas"] and time.time() - est["pessoas_ts"] <= PESSOAS_S:
+        return est["pessoas"]
+    try:
+        est.update(pessoas=_paginas("personnel?x=1"), pessoas_ts=time.time())
+    except Exception:
+        if not est["pessoas"]:
+            est["pessoas"] = _pessoas_do_os_creator()
+            if not est["pessoas"]:
+                raise
+    return est["pessoas"]
+
+
 def linhas_da_pessoa(nome: str, p: dict) -> list[dict]:
     """As linhas do REST de uma pessoa, por cada grafia do nome (`grafias`), sem repetir a mesma linha. O 429 sobe."""
     linhas, vistas = [], set()
@@ -374,9 +402,7 @@ def _reler(app):
     try:
         with app.app_context():
             lista = nomes(app.config)
-            if time.time() - a["pessoas_ts"] > PESSOAS_S or not a["pessoas"]:
-                a["pessoas"] = _paginas("personnel?x=1")
-                a["pessoas_ts"] = time.time()
+            pessoas_do_fracttal(a)
             agora = datetime.now(timezone.utc)
             todas, faltam, recusadas, motivo = [], [], [], ""
             equipe = []
