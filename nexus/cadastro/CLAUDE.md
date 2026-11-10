@@ -171,6 +171,17 @@ caso que criou cada uma (as três primeiras são decisões do Levi no mesmo dia)
 **Onde grava:** no cadastro da máquina em que a tela abre (`NEXUS_ARMAZEM_LOCAL`: o do servidor em app.gridco.com.br; o do
 PC em `C:\GridcoAuto\nexus\cadastro_ensaio.json`). Os dois e a cópia no banco (`cadastro_nexus`) são donos
 separados: aplicar no servidor não muda o PC nem o banco (os "dois donos do ID": equipe criada num não existe no outro).
+**A perda no de-para trava o "Publicar no banco" (10/11/2026; `banco.perdas_de_para`).** O caso: em 09/11/2026, 16:44, o
+botão do SERVIDOR (para levar ao banco a ficha 138, criada no servidor) recalculou o de-para com as bases que o servidor
+lera em 07/10, sem as abas do BD_Thopen e do BD_Performance, e trocou o do banco (o `sync` é `replace=true`): o de-para foi
+de 1.090 para 876 linhas, 187 ligações a usinas sumiram (BD_Thopen aba 100, BD_Performance aba 57, Base UFV 4, Fracttal
+42), e a geração do Nexus, que acha a usina SÓ por elas, foi remontada no dia seguinte às 08:42 com as 47.485 linhas sem
+usina. O resto das "770 alteradas" era reenvio igual (pessoas, equipes) e 36 usinas editadas no servidor. Consertado em
+10/11 com o OK do Levi: o de-para devolvido ao estado de antes pelo histórico de linha da API
+(`GET /api/sheets/{id}/rows/{n}/history`; as outras abas como estavam) e a geração remontada. Agora o botão lê o de-para
+do banco antes de publicar e **não publica** se alguma chave ligada a uma usina sumiria ou ficaria sem usina: a tela diz
+quantas e de que sistema e manda usar "Ler as bases de novo"; a leitura do banco que falha também não publica. A troca de
+usina de uma chave não conta como perda (é decisão da tela Ligações).
 **As telas de campo leem o BANCO** (`campo/visao.py`, chamados, Acessos → Pessoas e setores: `cadastro_nexus`), não o arquivo:
 para o responsável novo chegar nelas, aplique no PC e publique (`ferramentas/publicar_cadastro.py --bases-guardadas`,
 com `--ensaio` e a comparação com o banco antes). Foi o caminho de 16/10/2026 (Levi: "mude logo pois precisamos da

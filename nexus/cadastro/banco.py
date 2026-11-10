@@ -439,6 +439,50 @@ def ler_anteriores(base: str, sessao=None) -> dict:
     return out
 
 
+def ler_de_para(base: str, sessao=None) -> list[dict]:
+    """As linhas do de-para que o banco tem agora (`cadastro_nexus · de_para`); o livro sem a aba = []. A leitura que
+    falha SOBE: sem saber o que o banco tem, a publicação não compara e não sai."""
+    import requests
+    s = sessao or requests
+    base = base.rstrip("/")
+    sid = next((x["id"] for x in s.get(f"{base}/api/sheets", timeout=60).json()
+                if x.get("workbook_key") == WORKBOOK and x.get("sheet_name") == "de_para"), None)
+    if sid is None:
+        return []
+    out, offset = [], 0
+    while True:
+        r = s.get(f"{base}/api/sheets/{sid}/rows", params={"limit": 1000, "offset": offset}, timeout=60)
+        r.raise_for_status()
+        rows = r.json()
+        rows = rows.get("rows", rows) if isinstance(rows, dict) else rows
+        out += [dict(zip(x.get("headers") or [], x.get("values") or [])) for x in rows]
+        if len(rows) < 1000:
+            return out
+        offset += 1000
+
+
+def _ligada(v) -> bool:
+    return v not in (None, "", "None")
+
+
+def perdas_de_para(novas: list[list], no_banco: list[dict]):
+    """As ligações que o banco tem (a chave ligada a uma usina) e que a publicação `novas` (linhas de CAB_DE_PARA)
+    perderia: a chave some, ou fica sem usina. Counter {sistema: quantas}. A troca de usina não conta aqui (é decisão da
+    tela Ligações). O caso que criou a regra: 09/11/2026, 16:44, o "Publicar no banco" do servidor recalculou o de-para
+    com as bases que ele lera em 07/10, sem as abas do BD_Thopen e do BD_Performance, e 187 ligações sumiram do banco;
+    a geração do Nexus, que acha a usina só por elas, ficou sem usina em todas as linhas na remontagem seguinte."""
+    from collections import Counter
+    nova = {(str(l[1]), str(l[2])): l[0] for l in novas}
+    perdas = Counter()
+    for d in no_banco:
+        if not _ligada(d.get("usina_id")):
+            continue
+        chave = (str(d.get("sistema")), str(d.get("chave_externa")))
+        if not _ligada(nova.get(chave)):
+            perdas[chave[0]] += 1
+    return perdas
+
+
 def sincronizar(conteudo: bytes, *, base: str, token: str, sessao=None) -> dict:
     """Cria o workbook só se faltar (a API não apaga workbook) e sincroniza com replace=true."""
     import requests

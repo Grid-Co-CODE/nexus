@@ -252,3 +252,46 @@ def test_usina_da_arvore_liga_a_mao_na_tela(app_lig, cli):
     with app_lig.app_context():
         linhas = L.ler(app_lig.config)["linhas"]
     assert [3, FR, "Faro - Pedra do Sal 1 - PI"] in [l[:3] for l in linhas]
+
+
+# ── a publicação que perde ligação do de-para não sai (10/11/2026) ───────────────────────────────────────────────
+def _publicar_com(cli, monkeypatch, no_banco):
+    """O "Publicar no banco" com o banco de mentira: `no_banco` = as linhas do de-para que o banco tem agora."""
+    from nexus.cadastro import banco as B
+    enviados = []
+    cli.application.config["GRIDCO_SQL_TOKEN"] = "token-de-teste"
+    monkeypatch.setattr(B, "ler_anteriores", lambda base, sessao=None: {})
+    monkeypatch.setattr(B, "ler_de_para", lambda base, sessao=None: no_banco)
+    monkeypatch.setattr(B, "sincronizar", lambda conteudo, base, token, sessao=None: enviados.append(conteudo)
+                        or {"inserted": 0, "updated": 1})
+    r = cli.post("/t/base/ligacoes/publicar", data={})
+    return parse_qs(urlparse(r.headers["Location"]).query), enviados
+
+
+def test_a_publicacao_que_perde_ligacao_do_de_para_nao_sai(cli, monkeypatch):
+    """09/11/2026: o "Publicar no banco" do SERVIDOR recalculou o de-para com as bases que ele tinha lido em 07/10, sem as
+    abas do BD_Thopen e do BD_Performance, e trocou o do banco: 187 ligações sumiram, e a geração do Nexus (que acha a
+    usina só por elas) ficou sem usina em todas as linhas. A publicação que perde ligação que o banco tem (a chave some
+    ou fica sem usina) não sai: a tela diz quantas e de que sistema, e manda ler as bases de novo."""
+    perdida = {"usina_id": 1, "sistema": "BD_Thopen · aba", "chave_externa": "Brodowski", "casou_por": "nome da aba"}
+    q, enviados = _publicar_com(cli, monkeypatch, [perdida])
+    assert enviados == []
+    erro = q["erro"][0]
+    assert "perderia 1 ligação" in erro and "BD_Thopen · aba" in erro and "Ler as bases" in erro
+
+
+def test_a_publicacao_sem_perda_sai(cli, monkeypatch, app_lig):
+    """Sem ligação perdida (o banco igual, ou só com chaves que a publicação também liga), publica como sempre."""
+    from nexus.cadastro import banco as B
+    from nexus.cadastro.telas import servico
+    with app_lig.app_context():
+        novas = B.de_para(servico(), L.ler(app_lig.config)["fontes"], L.carregar_regras(app_lig.config))
+    no_banco = [dict(zip(B.CAB_DE_PARA, l)) for l in novas]
+    q, enviados = _publicar_com(cli, monkeypatch, no_banco)
+    assert len(enviados) == 1 and "Publicado no banco" in q["ok"][0]
+    # a leitura do banco que falha também não publica: sem comparar, não sai
+    def quebra(base, sessao=None):
+        raise ConnectionError("banco fora")
+    monkeypatch.setattr(B, "ler_de_para", quebra)
+    r = cli.post("/t/base/ligacoes/publicar", data={})
+    assert "não consegui ler o de-para do banco" in parse_qs(urlparse(r.headers["Location"]).query)["erro"][0]

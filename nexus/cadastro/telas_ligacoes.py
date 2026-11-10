@@ -96,6 +96,22 @@ def registrar_ligacoes(bp):
         base = (cfg.get("GRIDCO_DB_API") or L.BASE_API).rstrip("/")
         try:
             t = B.montar(srv, srv.cofre, atual["fontes"], B.ler_anteriores(base), L.carregar_regras(cfg))
+        except Exception as ex:          # noqa: BLE001
+            return _volta(erro=f"O banco recusou: {type(ex).__name__}: {str(ex)[:160]}")
+        # a perda no de-para trava a publicação (10/11/2026; o caso em banco.perdas_de_para): o arquivo de cadastro e as
+        # bases lidas são DESTA máquina, e as bases velhas (ou sem as abas dos BDs) apagariam ligações que o banco tem
+        try:
+            perdas = B.perdas_de_para(t["de_para"][1], B.ler_de_para(base))
+        except Exception as ex:          # noqa: BLE001
+            return _volta(erro=f"Não publiquei: não consegui ler o de-para do banco para comparar "
+                               f"({type(ex).__name__}). Tente de novo em instantes.")
+        if perdas:
+            n = sum(perdas.values())
+            por = ", ".join(f"{s}: {q}" for s, q in perdas.most_common())
+            return _volta(erro=f"Não publiquei: a publicação perderia {n} ligaç{'ões' if n > 1 else 'ão'} do de-para "
+                               f"que o banco tem ({por}). As bases desta máquina estão velhas ou sem essas fontes: use "
+                               f"\"Ler as bases de novo\" e confira as Ligações antes de publicar.")
+        try:
             r = B.sincronizar(B.xlsx_bytes(t), base=base, token=cfg["GRIDCO_SQL_TOKEN"])
         except Exception as ex:          # noqa: BLE001
             return _volta(erro=f"O banco recusou: {type(ex).__name__}: {str(ex)[:160]}")
