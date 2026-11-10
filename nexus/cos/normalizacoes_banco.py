@@ -75,11 +75,15 @@ CAB_ABERTA = ("registro", "os", "cliente", "usina_codigo", "usina_id", "usina_li
               "dias_aberta_qtd", "geracao_parou", "protecoes")
 # o comentário de cada dia para a Plataforma de Performance (09/11/2026): ver `comentarios_do_dia`
 ABA_COMENTARIOS = "fato_comentario_dia"
-# SÓ A APARECIDA DO TABOADO desde 09/11/2026. O dono, ao ver na Plataforma as abertas antigas repetidas em todo dia da
-# Mandaguaçu: "VOLTA TUDO AO NORMAL URGENTE" e "deixe somente as de aparecida do taboado". As outras usinas ficam sem
-# linha, e a Plataforma volta à linha dela; as ABERTAS não entram em nenhuma (era delas a repetição). A aba continua no
-# livro. Abrir para outra usina, ou voltar com as abertas, só com o OK do dono.
-COMENTARIOS_SO_DAS_USINAS = frozenset({"ADT100"})
+# QUEM GANHA O COMENTÁRIO. 09/11/2026: só a Aparecida do Taboado — o dono, ao ver na Plataforma as abertas antigas
+# repetidas em todo dia da Mandaguaçu: "VOLTA TUDO AO NORMAL URGENTE" e "deixe somente as de aparecida do taboado".
+# 10/11/2026: TODAS AS USINAS, com o texto do Haiku que a Ronda COS passou a mandar no `relato_cliente` (o dono aprovou
+# as simulações e escolheu: todas, automático, de hoje em diante). As outras usinas só com as ocorrências que COMEÇARAM
+# a partir de `COMENTARIOS_DAS_OUTRAS_DESDE`: os dias de antes delas continuam sem linha, e a Plataforma usa a linha
+# dela, como estava. A Aparecida continua desde o começo da memória. As ABERTAS seguem fora de todas (era delas a
+# repetição). Mudar o corte, ou voltar com as abertas, só com o OK do dono.
+COMENTARIOS_DESDE_SEMPRE = frozenset({"ADT100"})
+COMENTARIOS_DAS_OUTRAS_DESDE = datetime(2026, 11, 10, tzinfo=timezone(timedelta(hours=-3)))
 TIPO_COMENTARIOS = "snapshot_acumulado"
 GRAO_COMENTARIOS = ("1 linha = 1 usina (o código do Fracttal) × 1 dia de Brasília em que uma ocorrência da Ronda COS "
                     "tocou o horário de sol (06h às 18h)")
@@ -393,6 +397,16 @@ def _do_banco_antes(linhas_banco, desde_id: int) -> list:
     return out
 
 
+def entra_no_comentario(linha) -> bool:
+    """A linha do fato (CAB) entra no comentário do dia? A da Aparecida (`COMENTARIOS_DESDE_SEMPRE`), sempre; a das
+    outras usinas, só a ocorrência que começou a partir de `COMENTARIOS_DAS_OUTRAS_DESDE` (10/11/2026)."""
+    r = dict(zip(CAB, linha))
+    if str(r.get("usina_codigo") or "") in COMENTARIOS_DESDE_SEMPRE:
+        return True
+    ini = AND.instante(r.get("inicio"))
+    return ini is not None and ini >= COMENTARIOS_DAS_OUTRAS_DESDE
+
+
 def _base(config) -> str:
     from ..cadastro.ligacoes import BASE_API
     return (config.get("GRIDCO_DB_API") or BASE_API).rstrip("/")
@@ -465,7 +479,7 @@ def publicar(config, sessao=None, *, agora=None, forcar=False, leitura=None, abe
         # a fotografia não veio: o retrato de antes fica, com a hora dele (o livro é trocado inteiro a cada gravação)
         ab = [[r.get(c, "") for c in CAB_ABERTA] for r in livros.ler(base, s, LIVRO, ABA_ABERTAS) if r.get("registro")]
         ab_em = next((str(r.get("abertas_em") or "") for r in livros.ler(base, s, LIVRO, "atualizacao")), "")
-    comentarios = [c for c in comentarios_do_dia(todas, [], agora, desde) if c[0] in COMENTARIOS_SO_DAS_USINAS]
+    comentarios = comentarios_do_dia([l for l in todas if entra_no_comentario(l)], [], agora, desde)
     rel["comentarios_dias"] = len(comentarios)
     atu = [agora.isoformat(timespec="seconds"), len(todas), desde.date().isoformat(), rel["ligadas"] + sum(
         1 for l in antes if l[5]), ab_em, len(ab)]
