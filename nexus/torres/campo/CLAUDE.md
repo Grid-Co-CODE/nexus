@@ -1479,6 +1479,18 @@ sem a sessão do Nexus) e só aceitam a chave do aparelho ou o login Microsoft c
   recentes, Forçar parada) para até a próxima abertura e aparece como sem sinal, sem o "sem". Resposta `200 {aceitos, coleta}` (`coleta: false` faz a casca parar até a próxima carga), `401` chave
   inválida ou revogada (a casca apaga a chave e para), `413` lote grande, `400` corpo fora do contrato, `503`.
 - **`POST /t/campo/equipe/aparelho/revogar`** (nativo, no Sair): `Authorization: Bearer <chave>`, `{aparelho}`, `204`.
+- **Os `ajustes` do celular (10/11/2026, a casca 1.2.2):** cada lote de `/posicoes` (e o aviso `permissao: "sem"`) leva
+  `"ajustes": {"termo": "4" | ... | null, "localizacao": "precisa" | "aproximada" | "sem", "tempoTodo", "bateriaSemRestricao",
+  "notificacao"}` (os três últimos booleanos), só depois do termo aceito. A 1.2.1 e as de antes não mandam o campo: o
+  contrato segue compatível, e o lote nunca cai por ele (o torto não vale e não apaga o que se sabia). É o **Celular
+  pronto** do Piloto da coleta (Levi, pela sessão Nexus Field: "tem como sabermos qual o técnico não aceitou tudo? no caso
+  de aceitar tudo e tirar a restrição da bateria"; `campo/equipe/celulares.py`): **"Celular pronto"** com os cinco (o termo
+  na versão atual `TERMO_ATUAL` = "4", a localização precisa, o "Permitir o tempo todo", a bateria sem restrição e a
+  notificação); senão **"Falta:"** e o que falta, nas palavras da casca; o lote sem o campo, **"Versão antiga do app"**;
+  a chave emitida sem lote, **"Não aceitou o termo ou não abriu o app"**; sem chave, **"Nunca abriu o app"**. Mora no disco
+  da pasta de dados (`equipe/celulares.json`, cifrado com a chave do cadastro, como o diário), **não no banco**: é a
+  configuração do aparelho, e o reinício não a apaga; grava só quando muda. Mudou o termo na casca, muda o `TERMO_ATUAL`
+  no mesmo trabalho. O Início automático do Xiaomi não vem (o Android não deixa nenhum app lê-lo).
 - **Os códigos são o que a casca faz com eles.** Só o **401 apaga a chave** no celular. **Qualquer 5xx é como sem rede**: a
   fila e a chave ficam, e a casca tenta de novo. Por isso o banco fora ou o servidor sem configuração respondem **503, nunca
   401**, e nenhuma resposta é 500 (o que quebrar vira 503 e o log leva só o TIPO do erro). A casca confirmou o contrato
@@ -1717,7 +1729,8 @@ diretório, o prazo, o 401 e o 503), `test_equipe_aparelhos.py` (a chave só com
 `test_equipe_rotas.py` (o contrato das três rotas, os códigos, o CORS, os limites, a chave e a revogação que sobrevivem
 ao reinício sem gravação, o 503 sem leitura boa e na máquina que não grava), `test_equipe_gravador.py` (a união, o que
 nunca encolhe o banco, a fila que volta, o jornal aparado, o corte pelo instante), `test_equipe_situacao.py`,
-`test_equipe_municipios.py` (IBGE injetado, nunca a rede), `test_equipe_eventos.py` (os eventos do dia pela regra
+`test_equipe_municipios.py` (IBGE injetado, nunca a rede), `test_equipe_celular_pronto.py` (os ajustes do lote, o que
+falta, o reinício que relê do disco, o Piloto), `test_equipe_eventos.py` (os eventos do dia pela regra
 dos deslocamentos, sem "casa", o sem sinal e o sem permissão, a ordem e o resumo), `test_equipe_percurso.py` (o percurso do período no serviço,
 os 7 dias, o período no registro até o livro, a linha da fila de antes da coluna, os municípios só do disco) e
 `test_equipe_tela.py` (quem vê, a rota, o registro pelo

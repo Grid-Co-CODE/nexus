@@ -44,6 +44,7 @@ from ...cadastro.servico import chave_texto
 from ...campo import equipe as E
 from ...campo import mapa_responsaveis as MR
 from ...campo import visao
+from ...campo.equipe import celulares as CE
 from ...campo.equipe import eventos as EV
 from ...campo.equipe import gravador as G
 from ...campo.equipe import municipios as MU
@@ -813,8 +814,12 @@ def equipe():
     admin = bool(session.get("admin"))
     todos = []
     if admin:
+        # o "Celular pronto" (10/11/2026): de quem está no piloto, pelos ajustes que o celular manda
+        com_chave = srv.chaveiro.pessoas()
         todos = sorted(({"pid": pid, "nome": t["nome"], "equipe": b.nome_equipe.get(t["equipe_id"]) or "",
-                         "no_piloto": pid in piloto, "teste": bool(t.get("teste"))} for pid, t in tecnicos.items()),
+                         "no_piloto": pid in piloto, "teste": bool(t.get("teste")),
+                         "celular": CE.situacao(pid in com_chave, srv.celulares.de(pid)) if pid in piloto else None}
+                        for pid, t in tecnicos.items()),
                        key=lambda t: (not t["no_piloto"], chave_texto(t["nome"])))
     return _tela({
         "linhas": linhas, "grupos": _grupos(linhas), "resumo": _resumo(linhas), "mapa": mapa, "sel": sel,

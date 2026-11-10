@@ -80,6 +80,11 @@ class Chaveiro:
         with self._trava:
             return self._ativas.get(h)
 
+    def pessoas(self) -> set:
+        """Quem tem chave ativa (o "Celular pronto" do Piloto separa "nunca abriu o app" de "não aceitou o termo")."""
+        with self._trava:
+            return {pid for pid, _aparelho in self._ativas.values()}
+
     def revogar(self, chave, agora) -> bool:
         if not isinstance(chave, str) or not chave:
             return False

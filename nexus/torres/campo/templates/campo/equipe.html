@@ -238,6 +238,11 @@
     <summary><b>Piloto da coleta</b> <span>{{ no_piloto }} técnico{{ 's' if no_piloto != 1 }} no piloto · só administradores</span></summary>
     <p class="eq-nota">O Nexus Field só coleta o técnico de campo ativo do cadastro que está no piloto (padrão: ninguém). A
       decisão vai ao livro do piloto com o código de quem decidiu, e vale para o celular no próximo envio.</p>
+    {# o Celular pronto (10/11/2026, Levi: "tem como sabermos qual o técnico não aceitou tudo?"): pelos ajustes que o Nexus
+       Field 1.2.2 manda em cada envio (campo/equipe/celulares.py) #}
+    <p class="eq-nota"><b>Celular pronto</b>: o termo novo aceito, a localização precisa, o "Permitir o tempo todo", a bateria
+      sem restrição e a notificação do Nexus Field ligados. Senão, diz o que falta. "Versão antiga do app": o celular manda
+      posição sem dizer os ajustes (antes da 1.2.2). O Início automático do Xiaomi o Android não deixa ler.</p>
     {# a gravação desta máquina (09/11/2026): a chave de Base → Chaves → Nexus, que liga sem reiniciar #}
     <p class="eq-nota"><b>Gravação nesta máquina: {{ 'ligada' if grava else 'desligada' }}.</b> {{ 'O celular manda e o Nexus guarda.' if grava else 'O celular recebe 503 e guarda os pontos dele até ligar.' }} Liga e desliga em Base → Chaves → Nexus (NEXUS_EQUIPE_GRAVA = 1 ou 0), numa máquina só.</p>
     <ul class="eq-piloto-lista">
@@ -247,6 +252,7 @@
           <input type="hidden" name="pessoa_id" value="{{ t.pid }}">
           <input type="hidden" name="no_piloto" value="{{ 'nao' if t.no_piloto else 'sim' }}">
           {% if t.teste %}<input type="hidden" name="teste" value="1">{% endif %}
+          {% if t.celular %}<span class="cn-pill cn-{{ t.celular.tom }} eq-celular">{{ t.celular.texto }}</span>{% endif %}
           {% if t.no_piloto %}<span class="cn-pill cn-ok">no piloto</span>{% endif %}
           <button class="gc-btn gc-btn--contorno" type="submit">{{ 'Tirar do piloto' if t.no_piloto else 'Pôr no piloto' }}</button>
         </form></li>

@@ -43,6 +43,7 @@ from pathlib import Path
 from nexus.campo.equipe import (ABA_APARELHOS, ABA_PILOTO, GUARDA_PONTOS_DIAS, LIVRO_APARELHOS, LIVRO_PILOTO)
 from nexus.campo.equipe import acessos as AC
 from nexus.campo.equipe import aparelhos as AP
+from nexus.campo.equipe import celulares as CE
 from nexus.campo.equipe import pontos as PT
 from nexus.campo.equipe import token_ms as T
 from nexus.campo.equipe.jornal import Fila
@@ -203,6 +204,8 @@ class Servico:
         # quem abriu o mapa: a tela acrescenta (antes de abrir), o gravador leva ao banco
         self.registro = AC.Registro(Fila(dir_ / "fila_acessos.jsonl", cofre, "equipe/fila/acessos"))
         self.diario = PT.Diario(pasta, cofre, agora)
+        # o "Celular pronto" do Piloto (10/11/2026): os ajustes que o lote traz, no disco, cifrados (celulares.py)
+        self.celulares = CE.Celulares(dir_ / "celulares.json", cofre)
         self._trava = threading.Lock()
         self._ultimo: dict[int, dict] = self.diario.ultimos(agora)
         self._estado: dict[int, dict] = {}            # pessoa_id -> {"permissao", "desde"}
@@ -350,6 +353,12 @@ class Servico:
         if pontos:
             self.diario.acrescentar(pontos)
         permissao = "sem" if lote.get("permissao") == "sem" else "ok"
+        # os ajustes do celular (10/11/2026, a casca 1.2.2): sem o campo = versão antiga do app; o torto não vale e não
+        # apaga o que já se sabia
+        if "ajustes" not in lote:
+            self.celulares.anotar(pessoa_id, None, agora)
+        elif (aj := CE.ler(lote.get("ajustes"))) is not None:
+            self.celulares.anotar(pessoa_id, aj, agora)
         with self._trava:
             if pontos:
                 novo = max(pontos, key=lambda p: p["instante"])
