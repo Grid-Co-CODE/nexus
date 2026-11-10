@@ -1965,12 +1965,44 @@ tr.rd-linha--ativa td{background:var(--verde-suave)}
 .eq-p--ok{fill:var(--ok-cheio)}
 .eq-p--alerta{fill:var(--alerta-cheio)}
 .eq-p--critico{fill:var(--critico)}
+.eq-p--neutro{fill:var(--mudo)}
+/* a última posição de outro dia (10/11/2026): só o contorno, na cor do texto mudo; o centro é o do cartão */
+.eq-p--velho{fill:var(--superficie);stroke:var(--mudo);stroke-width:3px}
 .eq-p--sel{stroke:var(--eq-anel);stroke-width:4px}
 /* 8 px atrás dos 4 px do anel: sobram 2 px de escuro por fora; não pega o clique (o ponto é o link) */
 .eq-halo{fill:none;stroke:var(--eq-halo);stroke-width:8px;vector-effect:non-scaling-stroke;pointer-events:none;
   transform-box:fill-box;transform-origin:center}
 .eq-pontos a:focus-visible .eq-p{stroke:var(--foco);stroke-width:3.5px}
 .eq-leg{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;margin:8px 4px 2px;font-size:12px}
+/* o Ver percurso (10/11/2026): os municípios do IBGE de fundo, a linha na ordem dos pontos e a hora onde não amontoa */
+.eq-mun path{fill:none;stroke:var(--linha);stroke-width:1px;stroke-linejoin:round;vector-effect:non-scaling-stroke}
+/* o nome da cidade e a hora em lados opostos da linha (situacao.desenho_percurso põe o x/y e a âncora de cada um) */
+.eq-mun-nomes text{font:500 12px var(--font-sans);fill:var(--mudo);pointer-events:none;
+  paint-order:stroke;stroke:var(--superficie);stroke-width:3px;stroke-linejoin:round}
+.eq-perc-linha{fill:none;stroke:var(--info-cheio);stroke-width:3px;stroke-linejoin:round;stroke-linecap:round;
+  vector-effect:non-scaling-stroke;opacity:.85}
+.eq-perc-p{stroke:var(--superficie);stroke-width:1.5px;vector-effect:non-scaling-stroke}
+.eq-perc-p--mov{fill:var(--info-cheio)}
+.eq-perc-p--parado{fill:var(--mudo)}
+.eq-perc-p--ini,.eq-perc-p--fim{stroke:var(--tinta);stroke-width:2.5px}
+.eq-perc-horas text{font:600 13px var(--font-sans);fill:var(--tinta);paint-order:stroke;stroke:var(--superficie);
+  stroke-width:3px;stroke-linejoin:round;pointer-events:none}
+.eq-leg-linha{display:inline-block;width:22px;height:0;border-top:3px solid var(--info-cheio);border-radius:2px}
+.eq-perc{display:grid;gap:8px;padding-top:12px;border-top:1px solid var(--linha)}
+.eq-perc-titulo{margin:0;font:700 11px/16px var(--font-sans);letter-spacing:.06em;text-transform:uppercase;color:var(--mudo)}
+.eq-perc-resumo{margin:0;color:var(--tinta)}
+.eq-perc-cidades{margin:0;font-size:12.5px;color:var(--tinta-2);overflow-wrap:anywhere}
+.eq-perc-cidades span{color:var(--mudo)}
+.eq-perc-lista{list-style:none;margin:0;padding:0;display:grid;gap:2px;max-height:320px;overflow:auto;
+  font-variant-numeric:tabular-nums}
+.eq-perc-item{display:grid;grid-template-columns:auto minmax(0,1fr);gap:10px;padding:4px 0;border-bottom:1px solid var(--linha)}
+.eq-perc-item b{font-weight:600;color:var(--tinta)}
+.eq-perc-item span{color:var(--mudo);overflow-wrap:anywhere}
+.eq-perc-item--mov span{color:var(--tinta-2)}
+.eq-perc-form{display:grid;gap:8px;padding-top:12px;border-top:1px solid var(--linha)}
+.eq-perc-form .gc-campo{width:100%;min-width:0}
+.eq-perc-form .gc-btn{justify-content:center}
+.eq-perc-form-titulo{margin:0}
 .eq-lado{display:grid;gap:16px;min-width:0;padding:14px 16px 16px;background:var(--superficie);border:1px solid var(--linha);
   border-radius:var(--raio-md);font-size:13px}
 .eq-grupo h2{display:flex;align-items:center;gap:8px;margin:0 0 6px;font:700 11px/16px var(--font-sans);

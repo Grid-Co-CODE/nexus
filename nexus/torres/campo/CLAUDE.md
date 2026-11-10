@@ -1508,8 +1508,9 @@ essencial", e só dentro da LGPD. A coleta é da casca Android (repositório do 
 (`/t/campo/equipe`), na Usinas 360°, logo depois da Visão do cliente. O plano está em
 `docs/superpowers/plans/2026-11-08-mapa-de-equipe.md`.
 
-**Estado (08/11/2026):** construído e testado, **ainda fora do ar** (nada sobe sem o OK do Levi). Os livros só nascem com a
-primeira gravação depois do deploy, e a coleta só vale para quem o administrador pôs no piloto.
+**Estado:** no ar desde 08/11/2026 (Nexus `36b19a9`), gravação ligada no servidor em 09/11/2026; a coleta só vale para
+quem o administrador pôs no piloto. **10/11/2026:** o ponto exato para todos e o Ver percurso (ver "O ponto exato e o
+percurso" abaixo), pedido do Levi pela sessão Nexus Field; sobe com o OK dele.
 
 ### As peças
 
@@ -1520,10 +1521,10 @@ primeira gravação depois do deploy, e a coleta só vale para quem o administra
 | Chaves dos aparelhos | `campo/equipe/aparelhos.py` | a chave própria de cada aparelho (só o hash vai ao banco), quem é coletado, o piloto |
 | Pontos | `campo/equipe/pontos.py` | valida o ponto, filtra a janela NA HORA DO TÉCNICO, cifra a coordenada (Cofre) e guarda o dia em disco cifrado |
 | Deslocamentos | `campo/equipe/deslocamentos.py` | fecha "saiu da usina A, chegou na B" dos pontos, sem coordenada na saída |
-| Situação e desenho | `campo/equipe/situacao.py` | a situação de cada técnico pelo último ponto, o desenho do mapa (só x/y), a UF pelo contorno do IBGE, o link da rota |
-| Cidade | `campo/equipe/municipios.py` | a cidade de quem está parado fora de usina, pela malha do IBGE do ESTADO inteiro |
+| Situação e desenho | `campo/equipe/situacao.py` | a situação de cada técnico pelo último ponto, o desenho do mapa e o do percurso (só x/y), a UF pelo contorno do IBGE, o link da rota |
+| Cidade | `campo/equipe/municipios.py` | a cidade de quem está parado fora de usina e os municípios de fundo do percurso (`na_caixa`), pela malha do IBGE do ESTADO inteiro |
 | Piloto | `campo/equipe/piloto.py` | grava quem entra e quem sai do piloto (`nexus_equipe_piloto`) |
-| Registro da LGPD | `campo/equipe/acessos.py` | quem abriu o mapa ou a rota de quem |
+| Registro da LGPD | `campo/equipe/acessos.py` | quem abriu o mapa, a rota ou o percurso de quem (o percurso com o período) |
 | Jornal das filas | `campo/equipe/jornal.py` | os eventos de chave e os acessos esperando o gravador, cifrados em disco (`equipe/fila_*.jsonl`): o reinício antes da rodada não perde nada |
 | Estado do processo | `campo/equipe/servico.py` | junta chaves, diário, piloto e cadastro por trás das rotas; nada daqui grava no banco |
 | Gravador em lote | `campo/equipe/gravador.py` | a cada 5 min leva ao banco o que está nas filas e no diário, e apara o jornal |
@@ -1580,11 +1581,20 @@ sem a sessão do Nexus) e só aceitam a chave do aparelho ou o login Microsoft c
 - **Deslocamento só dentro do mesmo dia de Brasília** (decisão da construção): sair de A às 17h e chegar em B às 7h do dia
   seguinte viraria uma viagem de 14 h que não existiu. Voltar à mesma usina não é deslocamento, e o id é um hash do
   trecho, então recalcular o mês não duplica linha.
-- **Parado fora de usina (a casa, o hotel) nunca vai ao mapa e não tem Abrir rota** (Levi: o mapa não mostra onde o
-  técnico mora). O painel diz a cidade e a distância até a usina mais perto, **em km inteiro** (revisão final de
-  08/11/2026: com a casa decimal, a distância a duas usinas já cercava a casa). Vale também para o "sem sinal" e o "sem
-  permissão" cujo último ponto era parado fora de usina: senão a casa apareceria meia hora depois, em âmbar.
-- **Sem permissão nunca tem rota**: quem negou a localização não tem a posição mandada ao Google.
+- **A última posição de cada técnico vai ao mapa no lugar exato, em toda situação (10/11/2026, decisão do Levi que trocou
+  a de 08/11).** De 08 a 09/11 o parado fora de usina (a casa, o hotel) nunca ia ao mapa nem tinha rota, e a distância
+  dele ia em km inteiro. O Levi, pela sessão Nexus Field, depois de ver que o trajeto de teste de 09/11 chegou inteiro
+  ao banco e o mapa não mostrou nada: "Isso precisa ser visual, se tem dados de localização tem
+  que estar mostrando no nexus" e "mostra só o ponto de localização e caso a pessoa queira, consegue ver o percurso que
+  aquela pessoa fez em determinado período de dias e horas!". Agora (`situacao.situacao`): `no_mapa` = há um último ponto
+  dos 7 dias; o parado fora de usina no cinza (`--mudo`), o sem permissão no vermelho (o último ponto de hoje, de antes de
+  negar), o sem sinal no âmbar, qualquer que fosse a base; **o ponto de outro dia vai só com o contorno** (`velho`,
+  `.eq-p--velho`), com a hora no título. O painel sem técnico escolhido é um grupo por situação, só os que têm alguém. A
+  distância volta a ter a casa decimal. O termo do Nexus Field passa à versão 2 (todos aceitam de novo), com o texto novo
+  da sessão Nexus Field.
+- **O Abrir rota sai do último ponto de HOJE em qualquer situação (10/11/2026), menos do "sem permissão"**: quem negou a
+  localização não tem a posição mandada ao Google. O ponto de outro dia também não dá rota (não é de onde o técnico sai
+  hoje); a rota recusada é 404 com o texto `NAO_HA_ROTA`.
 - **Identidade só pelo e-mail exato da ficha.** O registro do aparelho acha a pessoa pelo e-mail do token, sem o nome tirado
   do e-mail e sem desempate: um funcionário de nome igual poderia registrar um celular como técnico do piloto. E-mail de
   duas fichas = ninguém. Ficha excluída não conta. Técnico sem e-mail no cadastro fica de fora até o cadastro ter o e-mail.
@@ -1622,6 +1632,35 @@ sem a sessão do Nexus) e só aceitam a chave do aparelho ou o login Microsoft c
   ficha do e-mail, `pessoa_id` vazio e o código HMAC identifica.
 - **A pré-carga nunca abre o Mapa de equipe** (`pre_carga.SEM_PRE_CARGA`): ela abre as telas com uma sessão interna de
   administrador, e cada abertura grava uma linha na trilha da LGPD.
+
+### O ponto exato e o percurso (10/11/2026)
+
+Pedido do Levi pela sessão Nexus Field (ver a 1ª regra acima). **Ver percurso**, na gaveta do técnico escolhido:
+- **O período em dias e horas de Brasília** (`?tecnico=<id>&de=AAAA-MM-DDTHH:MM&ate=...`, os dois `datetime-local` do
+  formulário; o filtro vai junto). O formulário já vem com o dia da última posição do técnico, das 6h às 22h (ou até agora),
+  com o `min` nos 7 dias e o `max` em agora. **Fica dentro da guarda:** o início antes dos 7 dias vai para o limite e a tela
+  diz ("o início foi para ..."); o fim depois de agora vira agora; o período torto (texto, dia que não existe, só um dos
+  dois) ou ao contrário é dito na gaveta, sem 500, e o painel de sempre abre (o registro é o `abriu_mapa` de sempre, porque
+  nenhum percurso foi visto). Só do técnico que o painel abre (no piloto e no filtro).
+- **De onde vem:** `Servico.percurso` lê o diário de 7 dias deste processo (o mesmo que recebe e grava: o desenho supõe UM
+  processo), só da pessoa, no período fechado [de, até], na ordem do instante; o ponto com mais de 7 dias nunca entra.
+- **O desenho é do servidor, só com x/y** (`situacao.desenho_percurso`): o recorte é o do percurso (no mínimo 0,05 grau,
+  ~5 km, de lado: parado o dia inteiro a caixa teria 0), com os **municípios do IBGE de fundo** (`municipios.na_caixa`: a
+  mesma malha do "Cidade/UF", só a da memória ou do disco; a UF sem malha manda a ida ao IBGE para o fundo e sai sem os
+  municípios desta vez; o contorno de todos, o **nome só dos que têm ponto do percurso**, porque na bancada os 124 nomes
+  do recorte se sobrepunham, e a gaveta diz "Passou por" com eles na ordem), as usinas do recorte, a polilinha na ordem e
+  cada ponto (azul andando, cinza parado; o 1º e o último maiores) com a hora no `<title>`. **A hora escrita vai a um
+  lado do trecho (na perpendicular dele) e o nome da cidade ao lado oposto**, e perto das bordas o texto cresce para
+  dentro: na bancada a hora da borda saía cortada ("16:5") e o nome, num lado fixo, caía em cima da linha diagonal. A hora vai escrita no desenho só no 1º, no último e no ponto a 40 unidades (de
+  1000) do último escrito (`ROTULO_MIN`): parado, os pontos caem uns sobre os outros. Percurso de mais de um dia leva o
+  dia na hora ("09/11 16:52"). Os outros técnicos saem do desenho enquanto o percurso está aberto.
+- **A gaveta** lista cada ponto na ordem com a hora, "em deslocamento" ou "parado" (e "parado na <usina>" a até 1 km de
+  uma), o resumo (quantos pontos, de quando a quando, a distância em linha reta somada entre os pontos) e o "Fechar o
+  percurso". Período sem ponto: "Nenhum ponto de <nome> neste período", e o mapa de sempre.
+- **Cada abertura do percurso vai ao registro da LGPD ANTES de a trilha ser lida** (`abriu_percurso`, o técnico e o período
+  em `periodo_de`/`periodo_ate`, colunas novas do `nexus_equipe_acessos`); sem o registro gravado, 503 e nada abre. A fila
+  em disco com linhas de antes das colunas (8 colunas) vai ao banco com o período vazio (`gravador._acrescentar` completa a
+  linha): sem isso a publicação travaria e as linhas voltariam à fila para sempre.
 - **Ritmo e economia:** o celular manda a cada 2 min em deslocamento e mais espaçado parado; o Nexus recebe, não pede.
 
 ### As melhorias da bancada (Levi, 08/11/2026)
@@ -1666,7 +1705,7 @@ O Levi viu a tela na bancada: "Gostei bastante! ... inclua também essas melhori
 Os setores **PCM, COS, Performance, Supervisão Campo e Responsáveis UFV** e os administradores. É conferido **dentro de
 cada rota** (`_quem_ve`), além do portão por setor da Tela: o portão fica desligado sem a `NEXUS_PESSOA_HMAC`, e a marca de
 outro setor em Base → Acessos abriria a tela. Sessão de cliente: 403. Quem põe o técnico no piloto é só o administrador
-(`POST /t/campo/equipe/piloto`, na própria tela). Cada abertura do mapa e de cada rota vai ao registro da LGPD
+(`POST /t/campo/equipe/piloto`, na própria tela). Cada abertura do mapa, de cada rota e de cada percurso (com o período) vai ao registro da LGPD
 (`nexus_equipe_acessos`, quem abriu só pelo código HMAC do e-mail). O nome do técnico aparece na tela e nunca vai ao banco
 nem ao log.
 
@@ -1709,10 +1748,13 @@ diretório, o prazo, o 401 e o 503), `test_equipe_aparelhos.py` (a chave só com
 `test_equipe_rotas.py` (o contrato das três rotas, os códigos, o CORS, os limites, a chave e a revogação que sobrevivem
 ao reinício sem gravação, o 503 sem leitura boa e na máquina que não grava), `test_equipe_gravador.py` (a união, o que
 nunca encolhe o banco, a fila que volta, o jornal aparado, o corte pelo instante), `test_equipe_situacao.py`,
-`test_equipe_municipios.py` (IBGE injetado, nunca a rede) e `test_equipe_tela.py` (quem vê, a rota, o registro pelo
+`test_equipe_municipios.py` (IBGE injetado, nunca a rede), `test_equipe_percurso.py` (o percurso do período no serviço,
+os 7 dias, o período no registro até o livro, a linha da fila de antes da coluna, os municípios só do disco) e
+`test_equipe_tela.py` (quem vê, a rota, o registro pelo
 e-mail exato, o piloto, nenhuma coordenada na página nem no JSON, a pré-carga que não abre o mapa; desde a bancada de
 08/11/2026, o filtro por supervisor e equipe, o anel branco pelo contraste nos dois temas e o botão Usinas: o mesmo
-`montar` da Performance, os links de volta, nenhum técnico e nenhum "abriu_mapa").
+`montar` da Performance, os links de volta, nenhum técnico e nenhum "abriu_mapa"; desde 10/11/2026, o ponto de todos,
+o de outro dia com o contorno e sem rota, e o Ver percurso: a ordem, a hora, o período torto, o registro e o 503).
 Cada regra de segurança foi provada por quebra de propósito. A bancada só leitura (um técnico falso mandando um lote
 pelo `test_client`, o mapa a 1440 px e 375 px sem rolagem de lado) é o passo final da prova.
 

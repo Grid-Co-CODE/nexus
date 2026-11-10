@@ -187,14 +187,16 @@ FATOS = (
                     "que não é técnica de campo e fica fora da conta dos técnicos; as decisões de antes valem 0. Só "
                     "acrescenta: nada se edita nem se apaga"),
     Fato("acesso_mapa", "Acesso ao Mapa de equipe", "campo", "nexus_equipe_acessos · fato_acesso_mapa",
-         "1 linha = 1 vez que 1 pessoa abriu o mapa ou a rota de 1 técnico",
+         "1 linha = 1 vez que 1 pessoa abriu o mapa, a rota ou o percurso de 1 técnico",
          _d(data=("id", "data_id (o dia de Brasília do acesso)"),
             pessoa=("id", "pessoa_id de quem abriu (e o pessoa_hmac); alvo_pessoa_id é o técnico visto"),
             usina=("id", "usina_id: a usina de destino da rota aberta (vazio no abriu_mapa)")),
          tipo="sem_medida", chave=("acesso_id",), fontes=("nexus_equipe_acessos · fato_acesso_mapa",),
          janela_origem="o Nexus é a fonte",
-         observacao="trilha da LGPD: quem abriu o mapa ou a rota (acao = abriu_mapa ou abriu_rota) e de quem. Só "
-                    "acrescenta: nada se edita nem se apaga"),
+         observacao="trilha da LGPD: quem abriu o mapa, a rota ou o percurso (acao = abriu_mapa, abriu_rota ou "
+                    "abriu_percurso) e de quem; no percurso (10/11/2026), periodo_de e periodo_ate dizem o período visto "
+                    "(instantes UTC; vazios nas outras ações e nas linhas de antes da coluna). Só acrescenta: nada se "
+                    "edita nem se apaga"),
     # 03/11/2026 (Fase 2 dos setores conversando): a conversa presa ao objeto (insight, OS, usina) com @menção de pessoa
     # e de área. Registrado antes da 1ª gravação
     Fato("mensagem_conversa", "Mensagem de conversa com menção", "base", "nexus_conversas · fato_mensagem",

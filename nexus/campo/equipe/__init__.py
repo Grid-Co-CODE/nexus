@@ -34,9 +34,12 @@ LIVRO_PILOTO, ABA_PILOTO = "nexus_equipe_piloto", "fato_decisao_piloto"
 # técnicos). As decisões de antes não têm a coluna: valem como 0
 CAB_PILOTO = ("decisao_id", "instante", "data_id", "pessoa_id", "no_piloto", "decidida_por_hmac", "teste")
 
-# Auditoria (LGPD): quem abriu o mapa ou a rota de quem (`acao` = abriu_mapa | abriu_rota)
+# Auditoria (LGPD): quem abriu o mapa, a rota ou o percurso de quem (`acao` = abriu_mapa | abriu_rota | abriu_percurso).
+# `periodo_de` e `periodo_ate` (10/11/2026, o percurso): o período visto, em UTC; vazios nas outras ações e nas linhas de
+# antes da coluna
 LIVRO_ACESSOS, ABA_ACESSOS = "nexus_equipe_acessos", "fato_acesso_mapa"
-CAB_ACESSOS = ("acesso_id", "instante", "data_id", "pessoa_id", "pessoa_hmac", "acao", "alvo_pessoa_id", "usina_id")
+CAB_ACESSOS = ("acesso_id", "instante", "data_id", "pessoa_id", "pessoa_hmac", "acao", "alvo_pessoa_id", "usina_id",
+               "periodo_de", "periodo_ate")
 
 # As réguas do desenho, num lugar só
 JANELA_H = (6, 22)            # só se rastreia no expediente: [6h, 22h) na hora do técnico (o `fuso` do lote)

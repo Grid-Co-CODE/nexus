@@ -372,6 +372,24 @@ class Servico:
                 del self._ultimo[pid]
 
     # ── para a tela do mapa ──────────────────────────────────────────────────────────────────────────────────────
+    def percurso(self, pessoa_id, de_utc: datetime, ate_utc: datetime, agora_utc: datetime | None = None) -> list:
+        """Os pontos da pessoa no período [de, até], na ordem do instante (10/11/2026, o "Ver percurso" do Mapa de
+        equipe), com a lat/lon só em memória, do diário de 7 dias deste processo (o mesmo que recebe e grava). O ponto
+        com mais de 7 dias nunca entra, mesmo pedido."""
+        agora = agora_utc or _agora()
+        self.podar(agora)
+        corte = max(de_utc, agora - timedelta(days=GUARDA_PONTOS_DIAS))
+        if ate_utc < corte:
+            return []
+        de, ate = _instante(corte), _instante(ate_utc)
+        brt = timezone(timedelta(hours=-3))
+        dia, fim = corte.astimezone(brt).date(), ate_utc.astimezone(brt).date()
+        out = []
+        while dia <= fim:
+            out += [p for p in self.diario.do_dia(dia) if p["pessoa_id"] == pessoa_id and de <= p["instante"] <= ate]
+            dia += timedelta(days=1)
+        return sorted(out, key=lambda p: p["instante"])
+
     def estado_de(self, pessoa_id, agora_utc: datetime | None = None) -> dict:
         """{"ultimo": o último ponto (com lat/lon, só em memória) ou None, "permissao": "ok" | "sem", "desde": quando a
         permissão atual começou a ser dita, ou None}. O ponto com mais de 7 dias não é usado. A permissão vive só na

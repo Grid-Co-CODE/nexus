@@ -184,7 +184,10 @@ class Gravador:
         try:
             no_banco = self._ler(livro, aba)
             tem = {str(r.get(cab[0])) for r in no_banco}
-            faltam = [l for l in novas if str(l[0]) not in tem]
+            # a linha da fila gravada com o cabeçalho de antes de uma coluna nova (10/11/2026, o período do percurso no
+            # registro de acessos: o deploy acha linhas de 8 colunas no jornal) vai com as colunas novas vazias; sem
+            # isto ela travaria a publicação e voltaria à fila para sempre
+            faltam = [list(l) + [None] * (len(cab) - len(l)) for l in novas if str(l[0]) not in tem]
             if faltam:
                 self._publicar(livro, nome, aba, cab, [_linha(r, cab) for r in no_banco] + faltam)
         except Exception:

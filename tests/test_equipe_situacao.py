@@ -1,9 +1,13 @@
 """A situação de cada técnico no Mapa de equipe (08/11/2026; `nexus/campo/equipe/situacao.py`).
 
 As decisões do Levi (08/11/2026): "na usina" é parado a até 1 km da usina; "sem sinal" a partir de 30 min sem ponto; as
-cores (deslocamento = info, na usina = ok, fora de usina = neutro, sem sinal = alerta, sem permissão = crítico); "parado
-fora de usina" nunca vai ao mapa nem tem rota (o painel diz o estado e a distância até a usina mais perto); o Abrir rota
-é o link do Google Maps montado no servidor. Ponto com mais de 7 dias nunca é usado nem mostrado.
+cores (deslocamento = info, na usina = ok, fora de usina = neutro, sem sinal = alerta, sem permissão = crítico); o Abrir
+rota é o link do Google Maps montado no servidor. Ponto com mais de 7 dias nunca é usado nem mostrado.
+
+10/11/2026 (Levi, pela sessão Nexus Field: "se tem dados de localização tem que estar mostrando no nexus"): o mapa mostra a
+última posição de cada técnico no lugar exato em TODAS as situações, também o parado fora de usina e o ponto de outro dia
+(este marcado `velho`); a decisão de 08/11 ("o mapa não mostra onde o técnico mora") foi trocada por ele. O percurso de um
+período sai desenhado no servidor (`desenho_percurso`), só com x/y.
 
 Coordenadas inventadas, com casas incomuns: se alguma aparecer num texto, o teste acha. Nada vai à rede."""
 from datetime import datetime, timedelta, timezone
@@ -42,9 +46,9 @@ def test_a_situacao_de_cada_tecnico():
     assert (s["chave"], s["tom"], s["no_mapa"], s["rota"]) == ("na_usina", "ok", True, True)
     uid, km = s["usina_perto"]
     assert uid == "7" and SI.texto_perto(km, "Usina Alfa Teste") == "a 0,8 km da Usina Alfa Teste"
-    # parado a 5 km: fora de usina, com o estado e sem o ponto (nem no mapa, nem na rota)
+    # parado a 5 km: fora de usina, com o estado; desde 10/11/2026 no mapa e com rota, como os outros
     s = SI.situacao(_estado(_ponto(*FORA)), USINAS, AGORA)
-    assert (s["chave"], s["tom"], s["no_mapa"], s["rota"]) == ("fora_usina", "neutro", False, False)
+    assert (s["chave"], s["tom"], s["no_mapa"], s["rota"], s["velho"]) == ("fora_usina", "neutro", True, True, False)
     assert s["uf"] == "GO" and s["rotulo"] == "Parado fora de usina"
     assert s["usina_perto"][0] == "7" and SI.km_texto(s["usina_perto"][1]) == "5,0 km"
     assert not {"lat", "lon"} & set(s) and not any(d in repr(s) for d in DIGITOS)
@@ -71,21 +75,23 @@ def test_sem_sinal_a_partir_de_30_min():
 
 
 def test_sem_sinal_guarda_o_que_o_ultimo_ponto_era():
-    """O ponto que ficou velho não muda de natureza: na usina ou andando, ele vai ao mapa (no âmbar) e a rota sai dele;
-    parado fora de usina, segue fora do mapa e sem rota, para o mapa não mostrar a casa nem o hotel."""
+    """O ponto que ficou velho não muda de natureza (a `base`), e vai ao mapa no âmbar com a rota saindo dele, qualquer
+    que fosse: desde 10/11/2026 também o parado fora de usina."""
     s = SI.situacao(_estado(_ponto(*NA_USINA, minutos=40)), USINAS, AGORA)
     assert (s["chave"], s["base"], s["no_mapa"], s["rota"]) == ("sem_sinal", "na_usina", True, True)
     s = SI.situacao(_estado(_ponto(*NA_ESTRADA, minutos=40, mov=True)), USINAS, AGORA)
     assert (s["chave"], s["base"], s["no_mapa"], s["rota"]) == ("sem_sinal", "deslocamento", True, True)
     s = SI.situacao(_estado(_ponto(*FORA, minutos=40)), USINAS, AGORA)
-    assert (s["chave"], s["base"], s["no_mapa"], s["rota"]) == ("sem_sinal", "fora_usina", False, False)
+    assert (s["chave"], s["base"], s["no_mapa"], s["rota"]) == ("sem_sinal", "fora_usina", True, True)
     assert s["uf"] == "GO"
 
 
-def test_sem_permissao_nunca_tem_rota_e_so_vai_ao_mapa_do_ponto_de_usina_ou_estrada():
-    for ponto, no_mapa in ((_ponto(*NA_USINA), True), (_ponto(*NA_ESTRADA, mov=True), True), (_ponto(*FORA), False)):
+def test_sem_permissao_nunca_tem_rota_e_o_ultimo_ponto_vai_ao_mapa():
+    """Quem negou a localização não tem a posição mandada ao Google (sem rota), mas o último ponto de hoje, de antes da
+    negação, aparece no mapa no vermelho (10/11/2026), seja na usina, na estrada ou fora de usina."""
+    for ponto in (_ponto(*NA_USINA), _ponto(*NA_ESTRADA, mov=True), _ponto(*FORA)):
         s = SI.situacao(_estado(ponto, permissao="sem", desde=AGORA), USINAS, AGORA)
-        assert (s["chave"], s["no_mapa"], s["rota"]) == ("sem_permissao", no_mapa, False), ponto
+        assert (s["chave"], s["tom"], s["no_mapa"], s["rota"]) == ("sem_permissao", "critico", True, False), ponto
 
 
 def test_o_ponto_de_ontem_e_sem_posicao_hoje():
@@ -93,13 +99,16 @@ def test_o_ponto_de_ontem_e_sem_posicao_hoje():
     dele (dentro dos 7 dias) aparece; a usina e o mapa, não."""
     ontem = _ponto(*NA_USINA, minutos=14 * 60)                       # 22:00 de ontem em Brasília
     s = SI.situacao(_estado(ontem), USINAS, AGORA)
-    assert (s["chave"], s["no_mapa"], s["rota"], s["usina_perto"]) == ("sem_posicao", False, False, None)
+    assert (s["chave"], s["rota"], s["usina_perto"]) == ("sem_posicao", False, None)
     assert s["ultima"] == AGORA - timedelta(hours=14)
+    # desde 10/11/2026 a última posição de outro dia (dentro dos 7) vai ao mapa, marcada `velho`, sem rota (o ponto de
+    # ontem não é de onde o técnico sai hoje): o trajeto de teste de 09/11 chegou ao banco e o mapa não mostrou nada
+    assert (s["no_mapa"], s["velho"], s["tom"]) == (True, True, "neutro")
 
 
-def test_sem_as_usinas_ninguem_esta_na_usina_e_o_parado_fica_fora_do_mapa():
+def test_sem_as_usinas_ninguem_esta_na_usina_e_o_parado_vai_ao_mapa_como_fora_de_usina():
     s = SI.situacao(_estado(_ponto(*NA_USINA)), {}, AGORA)
-    assert (s["chave"], s["no_mapa"], s["usina_perto"]) == ("fora_usina", False, None)
+    assert (s["chave"], s["no_mapa"], s["usina_perto"]) == ("fora_usina", True, None)
     assert SI.situacao(_estado(_ponto(*NA_ESTRADA, mov=True)), {}, AGORA)["no_mapa"] is True
 
 
@@ -135,16 +144,109 @@ def test_a_distancia_e_o_tempo_em_texto():
     assert SI.km_texto(0.7975) == "0,8 km" and SI.km_texto(9.96) == "10 km" and SI.km_texto(23.4) == "23 km"
     assert SI.tempo_texto(31) == "31 min" and SI.tempo_texto(60) == "1 h 00" and SI.tempo_texto(125) == "2 h 05"
     assert SI.texto_perto(haversine_km(*NA_USINA, *USINAS["7"][:2]), "UFV Teste") == "a 0,8 km da UFV Teste"
-    # o parado fora de usina leva o km inteiro: a casa não sai do painel pela distância com casa decimal
-    assert SI.texto_perto(4.96, "UFV Teste", inteiro=True) == "a 5 km da UFV Teste"
-    assert SI.texto_perto(1.4, "UFV Teste", inteiro=True) == "a 1 km da UFV Teste"
+    # o km inteiro do parado fora de usina (que escondia a casa) saiu em 10/11/2026: o ponto está no mapa
+    assert SI.texto_perto(4.96, "UFV Teste") == "a 5,0 km da UFV Teste"
 
 
 def test_o_desenho_so_tem_x_e_y():
-    d = SI.desenho(USINAS, [(1, *NA_USINA, "ok"), (2, *NA_ESTRADA, "info"), (3, *NA_USINA, "critico")])
+    d = SI.desenho(USINAS, [(1, *NA_USINA, "ok", False), (2, *NA_ESTRADA, "info", False),
+                            (3, *NA_USINA, "critico", False), (4, *FORA, "neutro", True)])
     assert d["viewbox"].startswith("0 0 1000 ") and {f["sigla"] for f in d["ufs"]} >= {"GO"}
     assert [u["usina_id"] for u in d["usinas"]] == ["7", "8"]
-    assert [p["pessoa_id"] for p in d["pontos"]] == [2, 1, 3]            # o crítico por último, desenhado por cima
-    assert all(set(p) == {"pessoa_id", "x", "y", "tom"} for p in d["pontos"])
+    # o de outro dia primeiro (embaixo), o crítico por último, desenhado por cima
+    assert [p["pessoa_id"] for p in d["pontos"]] == [4, 2, 1, 3]
+    assert all(set(p) == {"pessoa_id", "x", "y", "tom", "velho"} for p in d["pontos"])
+    assert [p["velho"] for p in d["pontos"]] == [True, False, False, False]
     assert not any(dg in repr(d) for dg in DIGITOS)
     assert SI.desenho({}, [])["viewbox"] is None
+
+
+# ── o percurso (10/11/2026) ──────────────────────────────────────────────────────────────────────────────────────────
+def _trilha(*pares, inicio=AGORA - timedelta(hours=2), passo_min=10):
+    return [{**_ponto(lat, lon, mov=i % 2 == 0),
+             "instante": (inicio + timedelta(minutes=passo_min * i)).strftime("%Y-%m-%dT%H:%M:%SZ")}
+            for i, (lat, lon) in enumerate(pares)]
+
+
+def test_o_desenho_do_percurso_so_tem_x_e_y_e_a_hora_de_cada_ponto():
+    """O percurso de um período (Levi, 10/11/2026: "consegue ver o percurso que aquela pessoa fez em determinado período
+    de dias e horas"): a linha na ordem dos pontos e a hora de Brasília de cada um, projetados no servidor; a página nunca
+    tem a coordenada. O recorte é o do percurso (com uma folga), não o do Brasil."""
+    trilha = _trilha(NA_USINA, NA_ESTRADA, FORA)
+    d = SI.desenho_percurso(USINAS, trilha)
+    assert d["viewbox"].startswith("0 0 1000 ")
+    assert [m["hora"] for m in d["marcas"]] == ["10:00", "10:10", "10:20"]       # Brasília, na ordem
+    assert [m["mov"] for m in d["marcas"]] == [True, False, True]
+    assert d["marcas"][0]["rotulo"] and d["marcas"][-1]["rotulo"]               # o 1º e o último sempre com a hora
+    # a linha passa pelos pontos na ordem: o mesmo x/y das marcas
+    assert d["linha"] == " ".join(f"{m['x']},{m['y']}" for m in d["marcas"])
+    assert all(set(m) == {"x", "y", "hora", "mov", "rotulo", "n", "tx", "ty", "ancora"} for m in d["marcas"])
+    assert [m["n"] for m in d["marcas"]] == [1, 2, 3]
+    assert {u["usina_id"] for u in d["usinas"]} >= {"7"}
+    assert not any(dg in repr(d) for dg in DIGITOS)
+    # o percurso de mais de um dia leva o dia na hora
+    trilha = _trilha(NA_USINA, NA_ESTRADA, inicio=AGORA - timedelta(days=1, hours=2), passo_min=24 * 60)
+    assert [m["hora"] for m in SI.desenho_percurso(USINAS, trilha)["marcas"]] == ["07/11 10:00", "08/11 10:00"]
+    assert SI.desenho_percurso(USINAS, [])["viewbox"] is None
+
+
+def test_as_horas_do_percurso_nao_se_amontoam():
+    """Parado, o celular manda vários pontos no mesmo lugar: a hora sai escrita só no 1º deles (e no 1º e no último do
+    percurso); a de todos fica na lista do painel e no título de cada ponto."""
+    trilha = _trilha(NA_USINA, NA_USINA, NA_USINA, NA_ESTRADA, NA_ESTRADA)
+    d = SI.desenho_percurso(USINAS, trilha)
+    assert [m["rotulo"] for m in d["marcas"]] == [True, False, False, True, True]
+
+
+def test_a_distancia_do_percurso():
+    trilha = _trilha(NA_USINA, NA_ESTRADA, FORA)
+    esperado = haversine_km(*NA_USINA, *NA_ESTRADA) + haversine_km(*NA_ESTRADA, *FORA)
+    assert SI.distancia_km(trilha) == pytest.approx(esperado)
+    assert SI.distancia_km(trilha[:1]) == 0 and SI.distancia_km([]) == 0
+
+
+def test_o_fundo_do_percurso_nomeia_so_os_municipios_por_onde_ele_passa():
+    """Na bancada de 10/11/2026 os 124 municípios do recorte com o nome escrito se sobrepunham. O contorno de todos fica
+    (o fundo), mas o nome só dos que têm ponto do percurso, e a lista deles, na ordem da 1ª passagem, vai à gaveta."""
+    def municipio(nome, lon0, lat0, lon1, lat1):
+        anel = ((lon0, lat0), (lon1, lat0), (lon1, lat1), (lon0, lat1), (lon0, lat0))
+        return (nome, ((anel,),), (lon0, lat0, lon1, lat1))
+    municipios = [municipio("Norte Teste", -49.3, -16.7, -49.0, -16.5),        # tem o NA_USINA e o FORA
+                  municipio("Sul Teste", -49.0, -17.1, -48.8, -16.7),          # tem o NA_ESTRADA
+                  municipio("Vizinho Teste", -49.26, -16.7, -49.19, -16.5)]    # no recorte, sem ponto
+    trilha = _trilha(NA_USINA, NA_ESTRADA, FORA)
+    d = SI.desenho_percurso(USINAS, trilha, municipios)
+    nomes = {m["nome"]: m for m in d["municipios"]}
+    assert set(nomes) == {"Norte Teste", "Sul Teste", "Vizinho Teste"} and all(m["d"] for m in nomes.values())
+    assert nomes["Vizinho Teste"]["x"] is None and nomes["Norte Teste"]["x"] is not None
+    assert d["cidades"] == ["Norte Teste", "Sul Teste"]                    # a ordem da 1ª passagem, sem repetir
+
+
+def test_a_hora_e_a_cidade_vao_em_lados_opostos_da_linha_e_nunca_saem_pela_borda():
+    """Na bancada de 10/11/2026 a hora do ponto na borda direita saía cortada ("16:5"), e o nome da cidade, posto num lado
+    fixo, caía em cima da linha diagonal e das horas. A hora vai a um lado do trecho (na perpendicular dele) e o nome da
+    cidade ao outro; perto das bordas, o texto cresce para dentro."""
+    import math
+    trilha = _trilha(NA_USINA, NA_ESTRADA, FORA)
+    d = SI.desenho_percurso(USINAS, trilha)
+    m1, m2 = d["marcas"][0], d["marcas"][1]
+    # a hora fica fora da linha: longe do ponto, na perpendicular do trecho (o produto escalar com a direção é ~0)
+    dx, dy = float(m2["x"]) - float(m1["x"]), float(m2["y"]) - float(m1["y"])
+    ox, oy = float(m1["tx"]) - float(m1["x"]), float(m1["ty"]) - float(m1["y"])
+    assert math.hypot(ox, oy) >= 10 and abs(ox * dx + oy * dy) / (math.hypot(dx, dy) * math.hypot(ox, oy)) < 0.2
+    # perto da borda direita, o texto termina no ponto (cresce para a esquerda); perto da esquerda, começa nele
+    for m in d["marcas"]:
+        if float(m["x"]) > 820:
+            assert m["ancora"] == "end"
+        elif float(m["x"]) < 180:
+            assert m["ancora"] == "start"
+    # o nome da cidade no lado oposto ao da hora do 1º ponto dela
+    def municipio(nome, lon0, lat0, lon1, lat1):
+        anel = ((lon0, lat0), (lon1, lat0), (lon1, lat1), (lon0, lat1), (lon0, lat0))
+        return (nome, ((anel,),), (lon0, lat0, lon1, lat1))
+    d = SI.desenho_percurso(USINAS, trilha, [municipio("Sul Teste", -49.0, -17.1, -48.8, -16.7)])
+    (cid,) = [m for m in d["municipios"] if m["x"] is not None]
+    m2 = d["marcas"][1]                                       # o NA_ESTRADA, o único ponto dele
+    hora = (float(m2["tx"]) - float(m2["x"]), float(m2["ty"]) - float(m2["y"]))
+    nome = (float(cid["x"]) - float(m2["x"]), float(cid["y"]) - float(m2["y"]))
+    assert hora[0] * nome[0] + hora[1] * nome[1] < 0 and cid["ancora"] in ("start", "middle", "end")

@@ -22,12 +22,18 @@ rota: o servidor monta o link do Google Maps e redireciona; a página nunca tem 
 (`_quem_ve`), além do portão por setor: o portão fica desligado sem a NEXUS_PESSOA_HMAC, e a marca de outro setor em
 Base → Acessos abriria a tela. Cada abertura do mapa e de cada rota vai ao registro da LGPD (`servico.registro`). O
 nome do técnico aparece na tela (é para isso que ela existe), decifrado do cadastro, e nunca vai ao banco nem ao log.
+
+O Ver percurso (10/11/2026, Levi pela sessão Nexus Field: "mostra só o ponto de localização e caso a pessoa queira,
+consegue ver o percurso que aquela pessoa fez em determinado período de dias e horas!"): `GET /t/campo/equipe?tecnico=
+<id>&de=<AAAA-MM-DDTHH:MM>&ate=<...>` (horas de Brasília, dentro dos 7 dias) desenha no mapa a linha do percurso, com os
+pontos em ordem e a hora de cada um, projetados no servidor (`situacao.desenho_percurso`). Cada abertura do percurso vai
+ao registro da LGPD como `abriu_percurso`, com o período, antes de a página sair.
 """
 import json
 import logging
 import re
 from collections import Counter
-from datetime import timedelta, timezone
+from datetime import datetime, time, timedelta, timezone
 
 from flask import Response, abort, current_app, jsonify, redirect, render_template, request, session, url_for
 from werkzeug.exceptions import RequestEntityTooLarge
@@ -284,9 +290,8 @@ _BRT = timezone(timedelta(hours=-3))
 # o nome de cada setor que vê o mapa, para a recusa dizer a regra; quem vê de verdade é o `do_setor` da Tela
 NOME_DO_SETOR = {SID.PCM: "PCM", SID.COS: "COS", SID.PERFORMANCE: "Performance",
                  SID.SUPERVISAO_CAMPO: "Supervisão Campo", SID.RESPONSAVEL_UFV: "Responsáveis UFV"}
-NAO_HA_ROTA = ("A rota não abre para este técnico agora: ela só sai do ponto em deslocamento ou na usina (não do "
-               "parado fora de usina, de quem está sem permissão de localização nem de quem está sem posição hoje). "
-               "Volte ao Mapa de equipe e atualize a página.")
+NAO_HA_ROTA = ("A rota não abre para este técnico agora: ela só sai do ponto de hoje (não de quem está sem permissão "
+               "de localização nem do ponto de outro dia). Volte ao Mapa de equipe e atualize a página.")
 # o resumo do topo, na ordem de quem pede atenção: (chave da situação, singular, plural)
 RESUMO = (("sem_permissao", "sem permissão", "sem permissão"), ("sem_sinal", "sem sinal", "sem sinal"),
           ("deslocamento", "em deslocamento", "em deslocamento"), ("na_usina", "na usina", "na usina"),
@@ -426,12 +431,12 @@ def _quem_abriu(srv) -> tuple:
     return pid, codigo
 
 
-def _registrar_acesso(srv, acao, alvo, usina_id, agora) -> bool:
-    """A linha da LGPD, no jornal em disco ANTES de o mapa ou a rota abrir. O disco que falha = False: a tela não abre
-    sem a trilha."""
+def _registrar_acesso(srv, acao, alvo, usina_id, agora, periodo=None) -> bool:
+    """A linha da LGPD, no jornal em disco ANTES de o mapa, a rota ou o percurso abrir (o percurso leva o `periodo`
+    visto). O disco que falha = False: a tela não abre sem a trilha."""
     quem_pid, quem_hmac = _quem_abriu(srv)
     try:
-        srv.registro.acrescentar(acao, quem_pid, quem_hmac, alvo, usina_id, agora)
+        srv.registro.acrescentar(acao, quem_pid, quem_hmac, alvo, usina_id, agora, periodo=periodo)
         return True
     except OSError as e:
         _log.error("equipe: o registro de acesso não foi para o disco (%s)", type(e).__name__)
@@ -453,7 +458,7 @@ def _hora(inst, agora) -> str:
 
 
 def _onde(s: dict) -> str:
-    """O lugar do parado fora de usina, sem o ponto: "Cidade/UF" pela malha do IBGE; sem a cidade, só a UF."""
+    """O lugar do parado fora de usina: "Cidade/UF" pela malha do IBGE; sem a cidade, só a UF."""
     if s.get("cidade") and s.get("uf"):
         return f"{s['cidade']}/{s['uf']}"
     return s.get("uf") or ""
@@ -471,44 +476,137 @@ def _cidade_de():
 
 
 def _linhas(srv, b, tecnicos, piloto, coords, nomes_usina, agora):
-    """As linhas do painel (uma por técnico do piloto, pelo nome) e os pontos do mapa [(pessoa_id, lat, lon, tom)],
-    estes só de quem vai ao mapa. A coordenada fica aqui, na memória do processo: a página recebe o x/y do `desenho`."""
+    """As linhas do painel (uma por técnico do piloto, pelo nome) e os pontos do mapa [(pessoa_id, lat, lon, tom,
+    velho)]: desde 10/11/2026 a última posição de todo técnico que tem ponto nos 7 dias, também o parado fora de usina e
+    o de outro dia (`velho`). A coordenada fica aqui, na memória do processo: a página recebe o x/y do `desenho`."""
     linhas, pontos, cidade = [], [], _cidade_de()
     for pid in sorted((p for p in tecnicos if p in piloto), key=lambda p: chave_texto(tecnicos[p]["nome"])):
         t = tecnicos[pid]
         est = srv.estado_de(pid, agora)
         s = SI.situacao(est, coords, agora, cidade=cidade)
         perto = s["usina_perto"]
-        # o parado fora de usina leva o km inteiro (revisão final de 08/11/2026): com a casa decimal, a distância a
-        # duas usinas já cercava a casa ou o hotel que o mapa não mostra
-        inteiro = s["base"] == "fora_usina"
         linhas.append({
             "pid": pid, "nome": t["nome"], "equipe": b.nome_equipe.get(t["equipe_id"]) or "", "s": s,
             "teste": bool(t.get("teste")),
             "hora": _hora(s["ultima"], agora), "onde": _onde(s),
-            "perto": SI.texto_perto(perto[1], nomes_usina.get(perto[0]) or f"usina {perto[0]}", inteiro=inteiro)
-                     if perto else "",
+            "perto": SI.texto_perto(perto[1], nomes_usina.get(perto[0]) or f"usina {perto[0]}") if perto else "",
             "desde": _hora(s["desde"], agora) if s["chave"] == "sem_permissao" else ""})
         if s["no_mapa"]:
             u = est["ultimo"]
-            pontos.append((pid, u["lat"], u["lon"], s["tom"]))
+            pontos.append((pid, u["lat"], u["lon"], s["tom"], s["velho"]))
     return linhas, pontos
 
 
+# os grupos do painel sem técnico escolhido, na ordem do resumo (quem pede atenção primeiro); o título no plural
+GRUPOS = (("sem_permissao", "Sem permissão de localização"), ("sem_sinal", "Sem sinal"),
+          ("deslocamento", "Em deslocamento"), ("na_usina", "Na usina"), ("fora_usina", "Parados fora de usina"),
+          ("sem_posicao", "Sem posição hoje"))
+
+
 def _grupos(linhas: list) -> list:
-    """O painel sem técnico escolhido: quem está no mapa, e os três grupos que ficam só na lista."""
-    no_mapa = [l for l in linhas if l["s"]["no_mapa"]]
-    fora = [l for l in linhas if not l["s"]["no_mapa"] and l["s"]["chave"] in ("fora_usina", "sem_sinal")]
-    sem_perm = [l for l in linhas if not l["s"]["no_mapa"] and l["s"]["chave"] == "sem_permissao"]
-    sem_pos = [l for l in linhas if l["s"]["chave"] == "sem_posicao"]
-    return [("mapa", "No mapa", no_mapa), ("sem_permissao", "Sem permissão de localização", sem_perm),
-            ("fora", "Parados fora de usina", fora), ("sem_posicao", "Sem posição hoje", sem_pos)]
+    """O painel sem técnico escolhido: um grupo por situação, só os que têm alguém (10/11/2026: todo técnico com ponto
+    está no mapa, e o grupo "No mapa" deixou de separar quem está e quem não está)."""
+    return [(chave, titulo, lista) for chave, titulo in GRUPOS
+            if (lista := [l for l in linhas if l["s"]["chave"] == chave])]
 
 
 def _resumo(linhas: list) -> list:
     # a pessoa de teste (09/11/2026) fica fora da conta dos técnicos: aparece no painel, com a marca, mas não no resumo
     n = Counter(l["s"]["chave"] for l in linhas if not l.get("teste"))
     return [(n[k], um if n[k] == 1 else varios, SI.TOM[k]) for k, um, varios in RESUMO if n[k]]
+
+
+# ── o Ver percurso (10/11/2026) ──────────────────────────────────────────────────────────────────────────────────
+_PERIODO = "%Y-%m-%dT%H:%M"         # o valor do <input type="datetime-local">, na hora de Brasília
+PERIODO_TORTO = "Período fora do formato: escolha o dia e a hora do início e do fim."
+PERIODO_AO_CONTRARIO = "O fim do período tem de ser depois do início."
+
+
+def _ler_hora(texto: str):
+    texto = str(texto or "").strip()[:19]
+    for formato in (_PERIODO, _PERIODO + ":%S"):        # há navegador que manda os segundos
+        try:
+            return datetime.strptime(texto, formato).replace(tzinfo=_BRT).astimezone(timezone.utc)
+        except ValueError:
+            continue
+    return None
+
+
+def _periodo(agora) -> dict | None:
+    """O período pedido (`?de=&ate=`, horas de Brasília): None sem pedido; {"erro"} torto; {"de", "ate", "aviso"} em UTC.
+    Fica dentro da guarda: o início antes dos 7 dias vai para o limite (e a tela diz), o fim depois de agora vira agora."""
+    de_txt, ate_txt = request.args.get("de"), request.args.get("ate")
+    if not str(de_txt or "").strip() and not str(ate_txt or "").strip():
+        return None
+    de, ate = _ler_hora(de_txt), _ler_hora(ate_txt)
+    if de is None or ate is None:
+        return {"erro": PERIODO_TORTO}
+    limite, aviso = agora - timedelta(days=E.GUARDA_PONTOS_DIAS), ""
+    if de < limite:
+        de = limite
+        aviso = (f"O percurso guarda só os últimos {E.GUARDA_PONTOS_DIAS} dias: o início foi para "
+                 f"{de.astimezone(_BRT):%d/%m às %H:%M}.")
+    ate = min(ate, agora)
+    if ate <= de:
+        return {"erro": PERIODO_AO_CONTRARIO}
+    return {"de": de, "ate": ate, "aviso": aviso}
+
+
+def _form_do_percurso(sel: dict, agora, pedido: dict | None) -> dict:
+    """Os valores do formulário do Ver percurso: o período aberto, ou o dia da última posição do técnico das 6h até as
+    22h (ou até agora), dentro do limite dos 7 dias."""
+    minimo = agora - timedelta(days=E.GUARDA_PONTOS_DIAS)
+    if pedido and "de" in pedido:
+        de, ate = pedido["de"], pedido["ate"]
+    else:
+        dia = (sel["s"]["ultima"] or agora).astimezone(_BRT).date()
+        de = max(datetime.combine(dia, time(E.JANELA_H[0]), tzinfo=_BRT), minimo)
+        ate = min(datetime.combine(dia, time(E.JANELA_H[1]), tzinfo=_BRT), agora)
+    def fmt(x):
+        return x.astimezone(_BRT).strftime(_PERIODO)
+    return {"de": fmt(de), "ate": fmt(ate), "min": fmt(minimo), "max": fmt(agora)}
+
+
+def _itens_do_percurso(desenho: dict, trilha: list, coords: dict, nomes_usina: dict) -> list:
+    """A lista do painel: cada ponto na ordem, com a hora (a mesma do desenho), andando ou parado e, parado a até 1 km de
+    uma usina, o nome dela. Sem coordenada."""
+    itens = []
+    for m, p in zip(desenho["marcas"], trilha):
+        usina = ""
+        if not p.get("mov"):
+            perto = SI.usina_mais_perto(p["lat"], p["lon"], coords)
+            if perto and perto[1] <= E.RAIO_USINA_KM:
+                usina = nomes_usina.get(perto[0]) or f"Usina {perto[0]}"
+        itens.append({"n": m["n"], "hora": m["hora"], "mov": m["mov"], "usina": usina})
+    return itens
+
+
+def _percurso(srv, sel, pedido, coords, nomes_usina, agora) -> dict:
+    """O percurso aberto: {"desenho", "itens", "resumo", "vazio"} (a trilha com lat/lon fica aqui). O fundo é a malha de
+    municípios do IBGE que já está no disco (`municipios.na_caixa`, nunca espera o IBGE)."""
+    trilha = srv.percurso(sel["pid"], pedido["de"], pedido["ate"], agora)
+    if not trilha:
+        return {"desenho": None, "itens": [], "resumo": "", "vazio": f"Nenhum ponto de {sel['nome']} neste período."}
+    from ...cadastro.ligacoes import pasta_dados
+    caixa = (min(p["lon"] for p in trilha), min(p["lat"] for p in trilha), max(p["lon"] for p in trilha),
+             max(p["lat"] for p in trilha))
+    try:
+        municipios = MU.na_caixa(caixa, pasta=pasta_dados(current_app.config))
+    except Exception as e:      # noqa: BLE001 — o fundo é enfeite: sem ele, o percurso vale
+        _log.warning("equipe: os municípios do percurso não abriram (%s)", type(e).__name__)
+        municipios = []
+    try:
+        desenho = SI.desenho_percurso(coords, trilha, municipios)
+    except ValueError as e:     # o contorno do IBGE que não abre: a lista do painel continua valendo
+        _log.warning("equipe: o desenho do percurso não abriu (%s)", type(e).__name__)
+        desenho = {"viewbox": None, "marcas": [{"n": i, "hora": _hora(SI._instante(p["instante"]), agora),
+                                                "mov": bool(p.get("mov"))} for i, p in enumerate(trilha, 1)]}
+    n = len(trilha)
+    marcas = desenho["marcas"]
+    resumo = (f"{n} ponto{'s' if n != 1 else ''} · de {marcas[0]['hora']} a {marcas[-1]['hora']} · "
+              f"{SI.km_texto(SI.distancia_km(trilha))} em linha reta entre os pontos")
+    return {"desenho": desenho if desenho.get("viewbox") else None, "resumo": resumo, "vazio": "",
+            "itens": _itens_do_percurso(desenho, trilha, coords, nomes_usina)}
 
 
 def _supervisor_da_equipe(b, equipe_id):
@@ -608,8 +706,17 @@ def equipe():
         mapa = {"viewbox": None, "ufs": [], "usinas": [], "pontos": []}
     pedido = str(request.args.get("tecnico") or "").strip()
     sel = next((l for l in linhas if _ID.fullmatch(pedido) and l["pid"] == int(pedido)), None)
+    # o Ver percurso (10/11/2026): só do técnico que o painel abre; o período torto é dito e o painel de sempre abre
+    periodo = _periodo(agora) if sel else None
+    perc = None
+    if periodo and "de" in periodo:
+        # o registro da LGPD do percurso, com o período, ANTES de a trilha ser lida e a página sair
+        if not _registrar_acesso(srv, "abriu_percurso", sel["pid"], None, agora, (periodo["de"], periodo["ate"])):
+            return _tela({"erro": SEM_REGISTRO}, 503)
+        perc = _percurso(srv, sel, periodo, coords, nomes_usina, agora)
+        perc["aviso"] = periodo["aviso"]
     # o registro da LGPD: quem abriu, quando e, com um técnico escolhido no painel, de quem; antes de a página sair
-    if not _registrar_acesso(srv, "abriu_mapa", sel["pid"] if sel else None, None, agora):
+    elif not _registrar_acesso(srv, "abriu_mapa", sel["pid"] if sel else None, None, agora):
         return _tela({"erro": SEM_REGISTRO}, 503)
     avisos = [a for a in (aviso_piloto,) if a]
     if erro_coords:
@@ -627,6 +734,9 @@ def equipe():
         "opcoes_rota": sorted(((uid, nomes_usina.get(uid) or f"Usina {uid}") for uid in coords),
                               key=lambda x: chave_texto(x[1])),
         "filtro": filtro,
+        # o Ver percurso: o percurso aberto (ou None), o erro do período e os valores do formulário do técnico
+        "perc": perc, "erro_periodo": periodo.get("erro", "") if periodo else "",
+        "form_perc": _form_do_percurso(sel, agora, periodo) if sel else None,
         "avisos": avisos, "admin": admin, "todos": todos,
         "no_piloto": sum(1 for t in todos if t["no_piloto"] and not t["teste"]),
         # quem o administrador pode pôr no piloto como pessoa de teste (09/11/2026): só para ele

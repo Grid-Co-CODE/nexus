@@ -203,6 +203,27 @@ def _malha(uf: str, pasta, baixar, iniciar, agora: datetime):
     return m["lista"] if m is not None else None
 
 
+def na_caixa(caixa: tuple, *, pasta: Path | None, baixar=None, iniciar=None) -> list:
+    """[(nome, polígonos, caixa)] dos municípios que a `caixa` (lon mín., lat mín., lon máx., lat máx.) toca, nos estados
+    cuja caixa ela toca: o fundo do desenho do percurso (10/11/2026). Como a `cidade`, responde na hora com o que há na
+    memória ou no disco; a UF sem a malha manda a ida ao IBGE para o fundo (só a sigla vai ao endereço) e fica de fora
+    desta vez."""
+    def cruza(a, b):
+        return not (a[2] < b[0] or a[0] > b[2] or a[3] < b[1] or a[1] > b[3])
+    try:
+        ufs = [e.sigla for e in M.estados() if cruza(e.caixa, caixa)]
+    except ValueError:                  # o contorno dos estados que não abre: sem fundo, o percurso vale
+        return []
+    agora, out = datetime.now(timezone.utc), []
+    for uf in ufs:
+        if uf not in SIGLAS:
+            continue
+        for nome, poligonos, cx in _malha(uf, pasta, baixar or _baixador(), iniciar or _em_fundo, agora) or ():
+            if cruza(cx, caixa):
+                out.append((nome, poligonos, cx))
+    return out
+
+
 def cidade(lat: float, lon: float, uf: str, *, pasta: Path | None, baixar=None, iniciar=None) -> str | None:
     """O nome do município onde o ponto cai, na malha do IBGE da `uf`, ou None (fora de todos, a UF que não é UF, a
     malha ainda não baixada). Responde na hora: sem a malha, manda a ida ao IBGE para o fundo e devolve None (a próxima

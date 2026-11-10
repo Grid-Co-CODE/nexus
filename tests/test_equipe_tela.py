@@ -3,8 +3,9 @@ registro de quem abriu (LGPD) e o piloto, que só o administrador muda.
 
 Quem vê é a regra escrita ao técnico: os setores PCM, COS, Performance, Supervisão Campo e Responsáveis UFV, e os
 administradores, conferido DENTRO da rota (o portão por setor fica desligado nos testes, e a marca de outro setor em
-Base → Acessos não abre a tela). A coordenada (do técnico ou da usina) nunca vai à página: o mapa leva só o x/y do
-SVG, e o "parado fora de usina" nem isso.
+Base → Acessos não abre a tela). A coordenada (do técnico ou da usina) nunca vai à página: o mapa e o percurso levam
+só o x/y do SVG. Desde 10/11/2026 (Levi, pela sessão Nexus Field) a última posição de cada técnico vai ao mapa em toda
+situação, também o parado fora de usina e o ponto de outro dia, e o "Ver percurso" desenha o período pedido.
 
 Banco de mentira (`ApiPGFalsa`), relógio parado, coordenadas e pessoas inventadas; nada vai à rede."""
 import json
@@ -153,7 +154,7 @@ def _html(cliente, url=URL, **kw):
 
 
 def _svg(html):
-    return html.split('<svg class="eq-svg"', 1)[1].split("</svg>", 1)[0]
+    return html.split('<svg class="eq-svg', 1)[1].split("</svg>", 1)[0]          # o do mapa ou o do percurso
 
 
 def _acessos(srv):
@@ -227,7 +228,7 @@ def test_a_pagina_e_o_json_nao_tem_coordenada(cliente, pontos, setor):
             for v in c[:2]:
                 assert f"{abs(v):.4f}" not in html and f"{abs(v):.4f}".replace(".", ",") not in html, (pid, v)
     # as recusas da rota também não dizem coordenada nenhuma
-    for pid in (FORA, SEM_POSICAO, SEM_PERMISSAO):
+    for pid in (SEM_POSICAO, SEM_PERMISSAO):
         r = cliente.get(URL_ROTA, query_string={"tecnico": pid, "usina": USINA_A})
         assert r.status_code == 404 and not [d for d in DIGITOS if d in r.get_data(as_text=True)]
     # o x/y do desenho dá o lugar aproximado: o "!" diz isso, e não promete o que o SVG não cumpre (revisão final de
@@ -254,12 +255,15 @@ def test_a_pre_carga_nunca_abre_o_mapa(app):
     assert "campo/equipe" in PC.SEM_PRE_CARGA and "campo/equipe" not in PC.aqueciveis(app)
 
 
-def test_o_mapa_desenha_quem_esta_na_usina_andando_e_sem_sinal(cliente, pontos, setor):
+def test_o_mapa_desenha_a_ultima_posicao_de_quem_tem_ponto_tambem_o_parado_fora_de_usina(cliente, pontos, setor):
+    """10/11/2026 (Levi: "se tem dados de localização tem que estar mostrando no nexus"): toda última posição dos 7 dias
+    vai ao mapa, no lugar exato e na cor da situação; o parado fora de usina no cinza. Quem não tem ponto (o sem
+    permissão que nunca mandou, o sem posição) fica só na lista."""
     _, html = _html(_entrar(cliente, EMAIL[PCM]))
     svg = _svg(html)
-    for pid, tom in ((NA_USINA, "ok"), (ANDANDO, "info"), (SEM_SINAL, "alerta")):
-        assert f"tecnico={pid}\"" in svg and f"eq-p--{tom}" in svg, pid
-    for pid in (FORA, SEM_PERMISSAO, SEM_POSICAO, FORA_DO_PILOTO):
+    for pid, tom in ((NA_USINA, "ok"), (ANDANDO, "info"), (SEM_SINAL, "alerta"), (FORA, "neutro")):
+        assert re.search(rf'tecnico={pid}"><circle class="eq-p eq-p--{tom}"', svg), pid
+    for pid in (SEM_PERMISSAO, SEM_POSICAO, FORA_DO_PILOTO):
         assert f"tecnico={pid}\"" not in svg, pid
     assert svg.count('class="eq-u"') == 2                              # as duas usinas, como marca discreta
     # os nomes vêm decifrados do cadastro, a equipe e a hora de Brasília
@@ -287,20 +291,19 @@ def test_o_painel_do_tecnico_tem_a_equipe_a_hora_e_a_usina_mais_perto(cliente, p
     assert "Sem sinal há 40 min" in lado and 'action="/t/campo/equipe/rota"' in lado
 
 
-def test_parado_fora_de_usina_sem_ponto_e_sem_rota(cliente, pontos, setor):
+def test_parado_fora_de_usina_no_mapa_com_a_rota(cliente, pontos, setor):
+    """Até 09/11/2026 o parado fora de usina ficava fora do mapa e sem rota ("o mapa não mostra onde o técnico mora");
+    o Levi trocou a decisão em 10/11/2026: ele vai ao mapa no cinza, com a distância de uma casa e o Abrir rota."""
     _, html = _html(_entrar(cliente, EMAIL[PCM]))
-    assert f"tecnico={FORA}\"" not in _svg(html)                        # não está no mapa
+    assert f"tecnico={FORA}\"" in _svg(html)
     lado = html.split('class="eq-lado"', 1)[1]
     fora = lado.split("Parados fora de usina", 1)[1].split("</section>", 1)[0]
-    # a distância do parado fora de usina vai em km inteiro (revisão final de 08/11/2026): com a casa decimal, a
-    # distância a duas usinas já cercava a casa no mapa
-    assert NOME[FORA] in fora and "GO" in fora and "a 5 km da Usina Alfa Teste" in fora and "5,0 km" not in html
-    # o painel dele: o estado e a distância, sem o Abrir rota
+    assert NOME[FORA] in fora and "GO" in fora and "a 5,0 km da Usina Alfa Teste" in fora
+    # o painel dele: o estado, a distância e o Abrir rota
     _, html = _html(cliente, query_string={"tecnico": FORA})
     lado = html.split('class="eq-lado"', 1)[1]
     assert NOME[FORA] in lado and "Parado fora de usina" in lado and "GO" in lado
-    assert "/t/campo/equipe/rota" not in html and "Abrir rota" not in lado
-    assert f"tecnico={FORA}\"" not in _svg(html)
+    assert 'action="/t/campo/equipe/rota"' in lado and "eq-p--sel" in _svg(html)
 
 
 def test_o_parado_fora_de_usina_mostra_a_cidade_e_o_estado(app, cliente, pontos, setor):
@@ -386,7 +389,7 @@ def test_o_escolhido_tem_o_halo_e_vai_por_cima_dos_outros(cliente, pontos, setor
     svg = _svg(_html(cliente, query_string={"tecnico": NA_USINA})[1])
     pontos_svg = svg.split('<g class="eq-pontos">', 1)[1]
     links = re.findall(r"<a href=[^>]*>.*?</a>", pontos_svg, flags=re.S)
-    assert len(links) == 3 and f"tecnico={NA_USINA}\"" in links[-1]        # o escolhido por último
+    assert len(links) == 4 and f"tecnico={NA_USINA}\"" in links[-1]        # o escolhido por último
     assert re.search(r'<circle class="eq-halo" cx="[^"]+" cy="[^"]+" r="11"/><circle class="eq-p eq-p--ok eq-p--sel"',
                      links[-1])
     assert svg.count("eq-halo") == 1 and svg.count("eq-p--sel") == 1
@@ -435,11 +438,11 @@ def test_o_filtro_estreita_o_mapa_a_lista_e_o_resumo(cliente, pontos, setor):
     # o técnico de fora do filtro não abre o painel dele
     _, html = _html(cliente, query_string={"equipe": LESTE, "tecnico": NA_USINA})
     assert "eq-det" not in html and NOME[NA_USINA] not in html
-    # o supervisor da Centro: os quatro dela, e os três que estão no mapa
+    # o supervisor da Centro: os quatro dela, todos no mapa (desde 10/11/2026 o parado fora de usina também)
     _, html = _html(cliente, query_string={"supervisor": SUP_CENTRO})
     assert _no_painel(html) == {NA_USINA, ANDANDO, FORA, SEM_SINAL}
     svg = _svg(html)
-    assert all(f"tecnico={p}&amp;supervisor={SUP_CENTRO}\"" in svg for p in (NA_USINA, ANDANDO, SEM_SINAL))
+    assert all(f"tecnico={p}&amp;supervisor={SUP_CENTRO}\"" in svg for p in (NA_USINA, ANDANDO, SEM_SINAL, FORA))
     assert f'<option value="{SUP_CENTRO}" selected>' in html
     # os dois juntos valem juntos: o supervisor da Centro e a equipe Leste não têm ninguém, e a tela diz
     _, html = _html(cliente, query_string={"supervisor": SUP_CENTRO, "equipe": LESTE})
@@ -472,14 +475,13 @@ def test_abrir_rota_redireciona_para_o_google_e_registra_o_acesso(cliente, ponto
     assert [(a["acao"], a["alvo_pessoa_id"], a["usina_id"]) for a in acesso] == [("abriu_rota", NA_USINA, USINA_B)]
     assert acesso[0]["pessoa_id"] == PCM and acesso[0]["pessoa_hmac"] == codigo_da_pessoa(CHAVE_HMAC, EMAIL[PCM])
     assert EMAIL[PCM] not in repr(acesso) and "Teste" not in repr(acesso)
-    # andando e sem sinal (do último ponto, que era na usina): a rota abre
-    for pid in (ANDANDO, SEM_SINAL):
+    # andando, sem sinal (do último ponto, que era na usina) e, desde 10/11/2026, parado fora de usina: a rota abre
+    for pid in (ANDANDO, SEM_SINAL, FORA):
         r = cliente.get(URL_ROTA, query_string={"tecnico": pid, "usina": USINA_A})
         assert r.status_code == 302 and r.headers["Location"].startswith("https://www.google.com/maps/dir/"), pid
     pontos.registro.novos()
-    # parado fora de usina, sem permissão, sem posição, fora do piloto, usina ou técnico que não existe: 404, sem
-    # registro
-    for pid, uid in ((FORA, USINA_A), (SEM_PERMISSAO, USINA_A), (SEM_POSICAO, USINA_A), (FORA_DO_PILOTO, USINA_A),
+    # sem permissão, sem posição, fora do piloto, usina ou técnico que não existe: 404, sem registro
+    for pid, uid in ((SEM_PERMISSAO, USINA_A), (SEM_POSICAO, USINA_A), (FORA_DO_PILOTO, USINA_A),
                      (NA_USINA, 99), (NA_USINA, "x"), ("x", USINA_A)):
         assert cliente.get(URL_ROTA, query_string={"tecnico": pid, "usina": uid}).status_code == 404, (pid, uid)
     assert _acessos(pontos) == []
@@ -525,6 +527,122 @@ def test_sem_gravar_o_registro_o_mapa_e_a_rota_nao_abrem(cliente, pontos, setor,
     assert st == 503 and NOME[NA_USINA] not in html and "registro" in html
     r = cliente.get(URL_ROTA, query_string={"tecnico": NA_USINA, "usina": USINA_B})
     assert r.status_code == 503 and "Location" not in r.headers
+
+
+# ── o ponto de outro dia e o Ver percurso (10/11/2026) ───────────────────────────────────────────────────────────
+# o percurso da manhã do técnico andando (além do ponto de há 1 min), com casas incomuns: se alguma virar texto, o teste
+# acha
+MANHA = (((-16.913579, -48.924681), 3 * 60, True), ((-16.957913, -48.946813), 2 * 60, False),
+         ((-16.968024, -48.951357), 60, True))
+DIGITOS_MANHA = ("913579", "924681", "957913", "946813", "968024", "951357")
+
+
+def _receber(srv, pid, pares, agora=AGORA):
+    lote = {"fuso": -180, "pontos": [{"t": int((agora - timedelta(minutes=m)).timestamp() * 1000), "lat": lat,
+                                      "lon": lon, "prec": 8.0, "mov": mov} for (lat, lon), m, mov in pares]}
+    assert srv.receber(pid, lote, agora) == len(pares)
+
+
+@pytest.fixture
+def manha(pontos):
+    _receber(pontos, ANDANDO, MANHA)
+    pontos.registro.novos()
+    return pontos
+
+
+def test_o_ponto_de_outro_dia_vai_ao_mapa_marcado_e_sem_rota(cliente, pontos, setor):
+    """O trajeto de teste de 09/11 chegou ao banco e a tela de 10/11 não mostrou nada: o ponto de ontem era só
+    "sem posição hoje" na lista. Desde 10/11/2026 a última posição de outro dia (até 7 dias) vai ao mapa marcada (o
+    contorno), com a hora; a rota não sai dela (não é de onde o técnico sai hoje)."""
+    _receber(pontos, SEM_POSICAO, [((-16.712468, -49.013579), 16 * 60, False)])     # ontem às 20:00 de Brasília
+    pontos.registro.novos()
+    _, html = _html(_entrar(cliente, EMAIL[PCM]))
+    assert re.search(rf'tecnico={SEM_POSICAO}"><circle class="eq-p eq-p--neutro eq-p--velho"', _svg(html))
+    _, html = _html(cliente, query_string={"tecnico": SEM_POSICAO})
+    lado = html.split('class="eq-lado"', 1)[1]
+    assert "Sem posição hoje" in lado and "07/11 às 20:00" in lado
+    assert 'action="/t/campo/equipe/rota"' not in lado and 'name="de"' in lado          # sem rota, com o percurso
+    assert cliente.get(URL_ROTA, query_string={"tecnico": SEM_POSICAO, "usina": USINA_A}).status_code == 404
+    assert "712468" not in html and "013579" not in html
+
+
+def test_ver_percurso_desenha_o_periodo_na_ordem_com_a_hora_e_registra(cliente, manha, setor):
+    """Levi, 10/11/2026: "consegue ver o percurso que aquela pessoa fez em determinado período de dias e horas!". O
+    período vai em dias e horas de Brasília (`de` e `ate`); o mapa desenha só o percurso (a linha na ordem, os pontos e a
+    hora), o painel lista cada ponto com a hora, e a abertura entra no registro da LGPD com o período, antes de a página
+    sair. Nenhuma coordenada na página."""
+    _entrar(cliente, EMAIL[PCM])
+    # o painel do técnico já traz o formulário, com o dia dele de 6h até agora e o limite dos 7 dias
+    _, html = _html(cliente, query_string={"tecnico": ANDANDO})
+    form = re.search(r'<form class="eq-perc-form".*?</form>', html, flags=re.S).group(0)
+    assert 'name="de" value="2026-11-08T06:00"' in form and 'name="ate" value="2026-11-08T12:00"' in form
+    assert 'min="2026-11-01T12:00"' in form and 'max="2026-11-08T12:00"' in form
+    assert f'name="tecnico" value="{ANDANDO}"' in form and "Ver percurso" in form
+    manha.registro.novos()
+    st, html = _html(cliente, query_string={"tecnico": ANDANDO, "de": "2026-11-08T06:00", "ate": "2026-11-08T12:00"})
+    assert st == 200
+    svg = _svg(html)
+    assert svg.count('<polyline class="eq-perc-linha"') == 1
+    assert svg.count('class="eq-perc-p') == 4                           # os 3 da manhã e o de há 1 min
+    assert "tecnico=" not in svg                                        # os outros técnicos saem do desenho
+    # a hora de cada ponto: no título de cada um e na lista do painel, na ordem
+    assert [h for h in re.findall(r"<title>(\d\d:\d\d)", svg)] == ["09:00", "10:00", "11:00", "11:59"]
+    lado = html.split('class="eq-lado"', 1)[1]
+    assert re.findall(r'<li class="eq-perc-item[^"]*"><b>(\d\d:\d\d)</b>', lado) == ["09:00", "10:00", "11:00", "11:59"]
+    assert "4 pontos" in lado and "Fechar o percurso" in lado
+    assert not [d for d in (*DIGITOS, *DIGITOS_MANHA) if d in html]
+    (a,) = _acessos(manha)
+    assert (a["acao"], a["alvo_pessoa_id"], a["pessoa_id"], a["periodo_de"], a["periodo_ate"]) == \
+        ("abriu_percurso", ANDANDO, PCM, "2026-11-08T09:00:00Z", "2026-11-08T15:00:00Z")
+    # o período sem ponto: a tela diz, o mapa de sempre volta, e a abertura também fica registrada
+    _, html = _html(cliente, query_string={"tecnico": ANDANDO, "de": "2026-11-07T06:00", "ate": "2026-11-07T22:00"})
+    assert "Nenhum ponto de Andre Teste neste período" in html and "eq-perc-linha" not in html
+    assert [x["acao"] for x in _acessos(manha)] == ["abriu_percurso"]
+
+
+@pytest.mark.parametrize("de, ate, aviso, abre", [
+    ("2026-10-01T06:00", "2026-11-08T12:00", "o início foi para 01/11 às 12:00", True),       # antes dos 7 dias
+    ("2026-11-08T06:00", "2026-11-09T22:00", "", True),                                         # o fim depois de agora
+    ("2026-11-08T11:00", "2026-11-08T09:00", "O fim do período tem de ser depois do início", False),
+    ("ontem", "2026-11-08T12:00", "Período fora do formato", False),
+    ("2026-11-08T06:00", "", "Período fora do formato", False),
+    ("2026-02-30T06:00", "2026-11-08T12:00", "Período fora do formato", False),
+], ids=["antes_dos_7_dias", "fim_no_futuro", "fim_antes_do_inicio", "texto", "sem_fim", "dia_que_nao_existe"])
+def test_o_periodo_do_percurso_cabe_nos_7_dias_e_o_torto_e_dito(cliente, manha, setor, de, ate, aviso, abre):
+    """O período fica dentro da guarda (o início que passa dos 7 dias vai para o limite, e a tela diz; o fim depois de
+    agora vira agora). O período torto não é 500: a tela diz e mostra o painel do técnico, e o registro é o de sempre
+    (abriu_mapa), porque nenhum percurso foi visto."""
+    st, html = _html(_entrar(cliente, EMAIL[PCM]), query_string={"tecnico": ANDANDO, "de": de, "ate": ate})
+    assert st == 200 and (aviso in html)
+    assert ("eq-perc-linha" in html) is abre
+    (a,) = _acessos(manha)
+    if abre:
+        assert a["acao"] == "abriu_percurso"
+        assert a["periodo_de"] == ("2026-11-01T15:00:00Z" if de.startswith("2026-10") else "2026-11-08T09:00:00Z")
+        assert a["periodo_ate"] == "2026-11-08T15:00:00Z"                 # o fim nunca passa de agora
+    else:
+        assert (a["acao"], a["alvo_pessoa_id"], a["periodo_de"]) == ("abriu_mapa", ANDANDO, None)
+
+
+def test_o_percurso_so_de_quem_a_tela_mostra(cliente, manha, setor):
+    """O percurso abre só para o técnico que o painel abre (no piloto e no filtro): o de fora não vira percurso nem
+    alvo no registro."""
+    _entrar(cliente, EMAIL[PCM])
+    periodo = {"de": "2026-11-08T06:00", "ate": "2026-11-08T12:00"}
+    _, html = _html(cliente, query_string={"tecnico": FORA_DO_PILOTO, **periodo})
+    assert "eq-perc-linha" not in html and NOME[FORA_DO_PILOTO] not in html
+    _, html = _html(cliente, query_string={"tecnico": ANDANDO, "equipe": LESTE, **periodo})
+    assert "eq-perc-linha" not in html
+    assert [(a["acao"], a["alvo_pessoa_id"]) for a in _acessos(manha)] == [("abriu_mapa", None)] * 2
+
+
+def test_sem_gravar_o_registro_o_percurso_nao_abre(cliente, manha, setor, monkeypatch):
+    def disco_cheio(*a, **k):
+        raise OSError("disco cheio (teste)")
+    monkeypatch.setattr(manha.registro, "acrescentar", disco_cheio)
+    st, html = _html(_entrar(cliente, EMAIL[PCM]),
+                     query_string={"tecnico": ANDANDO, "de": "2026-11-08T06:00", "ate": "2026-11-08T12:00"})
+    assert st == 503 and "eq-perc-linha" not in html and "registro" in html
 
 
 # ── o piloto ─────────────────────────────────────────────────────────────────────────────────────────────────────────

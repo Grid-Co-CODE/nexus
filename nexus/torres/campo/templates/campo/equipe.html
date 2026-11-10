@@ -13,13 +13,10 @@
 {% endif %}
 {# O Mapa de equipe (08/11/2026; nexus/torres/campo/equipe_tela.py, a regra em nexus/campo/equipe/situacao.py). O desenho é o
    da Visão geral (campo/responsaveis.html, o mapa das usinas): o contorno dos estados do IBGE e cada técnico como um ponto,
-   com o x/y JÁ projetado no servidor. A latitude e a longitude nunca chegam aqui, nem a do técnico nem a da usina; o parado
-   fora de usina nem o x/y (o mapa não mostra a casa nem o hotel): ele fica só na lista, com o estado e a distância até a
-   usina mais perto. O Abrir rota é um formulário que vai ao servidor, e o servidor manda ao Google. #}
-{% set vazio = {'mapa': 'Ninguém em deslocamento nem na usina agora.',
-                'sem_permissao': 'Todos com a permissão de localização ligada.',
-                'fora': 'Ninguém parado fora de usina.',
-                'sem_posicao': 'Todos os técnicos do piloto mandaram posição hoje.'} %}
+   com o x/y JÁ projetado no servidor. A latitude e a longitude nunca chegam aqui, nem a do técnico nem a da usina. Desde
+   10/11/2026 (Levi: "se tem dados de localização tem que estar mostrando no nexus") a última posição de todo técnico vai ao
+   mapa, também o parado fora de usina e a de outro dia (com o contorno), e o Ver percurso desenha o período pedido, também
+   só com o x/y. O Abrir rota é um formulário que vai ao servidor, e o servidor manda ao Google. #}
 <div class="campo-nativa">
   <div class="cn-cab">
     <div><p class="gc-eyebrow">{{ torre.nome }}</p>
@@ -30,18 +27,20 @@
           primeira abertura do app no dia até as 22h na hora do técnico, a cada 2 minutos em deslocamento e mais espaçado parado. Só o técnico
           de campo ativo do cadastro e escolhido para o piloto é coletado.</p>
           <p><b>Quem vê.</b> Os setores PCM, COS, Performance, Supervisão Campo e Responsáveis UFV, e os administradores do
-          Nexus. Cada abertura do mapa e de cada rota fica registrada (quem abriu, quando e de quem), para responder a um
-          pedido da LGPD.</p>
+          Nexus. Cada abertura do mapa, de cada rota e de cada percurso fica registrada (quem abriu, quando, de quem e, no
+          percurso, de que período), para responder a um pedido da LGPD.</p>
           <p><b>Por quanto tempo.</b> 7 dias os pontos de posição; 1 ano os deslocamentos entre usinas (de onde, para onde,
           a saída, a chegada e a duração, sem a coordenada). Ponto com mais de 7 dias nunca aparece.</p>
-          <p><b>Parado fora de usina</b> (a casa, o hotel): o mapa não mostra o ponto. O painel diz só a cidade e o estado,
-          e a distância até a usina mais perto, em km inteiro; a rota não sai dele. A cidade sai da malha de municípios do
-          IBGE, baixada pelo estado inteiro: a posição do técnico não vai ao IBGE.</p>
-          <p><b>As situações.</b> Em deslocamento, em azul; na usina (parado a até 1 km dela), em verde; sem sinal (o último
-          ponto há 30 minutos ou mais), em âmbar, no último ponto; sem permissão de localização, em vermelho. Parado fora de
-          usina e sem posição hoje ficam só na lista do painel.</p>
-          <p><b>Abrir rota.</b> O servidor monta o link do Google Maps, do último ponto do técnico até a usina escolhida: a
-          posição sai só nesse clique, para o Google.</p>
+          <p><b>As situações.</b> O mapa mostra a última posição de cada técnico, onde ele estiver: em deslocamento, em azul;
+          na usina (parado a até 1 km dela), em verde; parado fora de usina, em cinza; sem sinal (o último ponto há 30
+          minutos ou mais), em âmbar; sem permissão de localização, em vermelho, no último ponto de hoje. A última posição de
+          outro dia aparece só com o contorno. O painel diz a cidade de quem está parado fora de usina, pela malha de
+          municípios do IBGE baixada pelo estado inteiro: a posição do técnico não vai ao IBGE.</p>
+          <p><b>Ver percurso.</b> No painel do técnico, escolha o dia e a hora do início e do fim (dentro dos últimos 7 dias):
+          o mapa desenha a linha do percurso, com os pontos na ordem e a hora de cada um, e o painel lista cada ponto.</p>
+          <p><b>Abrir rota.</b> O servidor monta o link do Google Maps, do último ponto de hoje do técnico até a usina
+          escolhida: a posição sai só nesse clique, para o Google. Não sai de quem está sem permissão de localização nem do
+          ponto de outro dia.</p>
           <p><b>O ponto no mapa é aproximado</b>: é o lugar no desenho dos estados, não o endereço. A página não traz a
           coordenada em texto.</p>
           <p>As horas são as de Brasília.</p>
@@ -94,7 +93,20 @@
 
   <div class="eq-corpo">
     <div class="eq-quadro">
-      {% if mapa.viewbox %}
+      {% set d = perc.desenho if perc else none %}
+      {% if d %}
+      {# o percurso aberto (10/11/2026): o recorte é o dele, com os municípios do IBGE de fundo, a linha na ordem, cada
+         ponto com a hora no título e a hora escrita onde não se amontoa (situacao.desenho_percurso) #}
+      <svg class="eq-svg eq-svg--perc" viewBox="{{ d.viewbox }}" role="img" aria-label="O percurso de {{ sel.nome }}">
+        <g class="eq-mun">{% for m in d.municipios %}<path d="{{ m.d }}"/>{% endfor %}</g>
+        <g class="eq-ufs">{% for f in d.ufs %}<path d="{{ f.d }}"/>{% endfor %}</g>
+        <g class="eq-mun-nomes" aria-hidden="true">{% for m in d.municipios if m.x is not none %}<text x="{{ m.x }}" y="{{ m.y }}" dy="4" text-anchor="{{ m.ancora }}">{{ m.nome }}</text>{% endfor %}</g>
+        <g class="eq-usinas">{% for u in d.usinas %}<circle class="eq-u" cx="{{ u.x }}" cy="{{ u.y }}" r="5"><title>{{ nomes_usina.get(u.usina_id) or ('Usina ' ~ u.usina_id) }}</title></circle>{% endfor %}</g>
+        <polyline class="eq-perc-linha" points="{{ d.linha }}"/>
+        <g class="eq-perc-marcas">{% for m in d.marcas %}<circle class="eq-perc-p eq-perc-p--{{ 'mov' if m.mov else 'parado' }}{% if loop.first %} eq-perc-p--ini{% elif loop.last %} eq-perc-p--fim{% endif %}" cx="{{ m.x }}" cy="{{ m.y }}" r="{{ 8 if loop.first or loop.last else 5 }}"><title>{{ m.hora }} · {{ 'em deslocamento' if m.mov else 'parado' }}</title></circle>{% endfor %}</g>
+        <g class="eq-perc-horas" aria-hidden="true">{% for m in d.marcas if m.rotulo %}<text x="{{ m.tx }}" y="{{ m.ty }}" dy="4" text-anchor="{{ m.ancora }}">{{ m.hora }}</text>{% endfor %}</g>
+      </svg>
+      {% elif mapa.viewbox %}
       <svg class="eq-svg" viewBox="{{ mapa.viewbox }}" role="img" aria-label="Os técnicos de campo no mapa">
         <g class="eq-ufs">{% for f in mapa.ufs %}<path d="{{ f.d }}"/>{% endfor %}</g>
         <g class="eq-siglas" aria-hidden="true">{% for f in mapa.ufs if f.x %}<text x="{{ f.x }}" y="{{ f.y }}">{{ f.sigla }}</text>{% endfor %}</g>
@@ -102,13 +114,17 @@
         {# o escolhido vai por último, com o halo escuro atrás do anel branco (08/11/2026): dois técnicos na mesma usina
            caem no mesmo lugar, e o anel ficaria embaixo do outro #}
         {% set sel_pid = sel.pid if sel else none %}
-        {% macro ponto(p, escolhido) %}{% set l = nome_de[p.pessoa_id] %}<a href="{{ url_for('torre_campo.equipe', tecnico=p.pessoa_id, **filtro.q) }}">{% if escolhido %}<circle class="eq-halo" cx="{{ p.x }}" cy="{{ p.y }}" r="11"/>{% endif %}<circle class="eq-p eq-p--{{ p.tom }}{% if escolhido %} eq-p--sel{% endif %}" cx="{{ p.x }}" cy="{{ p.y }}" r="11"><title>{{ l.nome }}: {{ l.s.rotulo }}</title></circle></a>{% endmacro %}
+        {% macro ponto(p, escolhido) %}{% set l = nome_de[p.pessoa_id] %}<a href="{{ url_for('torre_campo.equipe', tecnico=p.pessoa_id, **filtro.q) }}">{% if escolhido %}<circle class="eq-halo" cx="{{ p.x }}" cy="{{ p.y }}" r="11"/>{% endif %}<circle class="eq-p eq-p--{{ p.tom }}{% if p.velho %} eq-p--velho{% endif %}{% if escolhido %} eq-p--sel{% endif %}" cx="{{ p.x }}" cy="{{ p.y }}" r="11"><title>{{ l.nome }}: {{ l.s.rotulo }}{% if p.velho %} (última posição {{ l.hora }}){% endif %}</title></circle></a>{% endmacro %}
         <g class="eq-pontos">{% for p in mapa.pontos if p.pessoa_id != sel_pid %}{{ ponto(p, false) }}{% endfor %}{% for p in mapa.pontos if p.pessoa_id == sel_pid %}{{ ponto(p, true) }}{% endfor %}</g>
       </svg>
       {% else %}
       <p class="mudo eq-vazio">Sem usina com coordenada no cadastro e sem técnico no mapa agora: não há o que desenhar.</p>
       {% endif %}
-      <p class="eq-leg"><span class="cn-pill cn-info">em deslocamento</span><span class="cn-pill cn-ok">na usina, até 1 km</span><span class="cn-pill cn-alerta">sem sinal há 30 min ou mais</span><span class="cn-pill cn-critico">sem permissão</span><span class="mudo">O cinza é a usina. Parado fora de usina e sem posição hoje ficam só na lista.</span></p>
+      {% if d %}
+      <p class="eq-leg"><span class="eq-leg-linha" aria-hidden="true"></span><span class="mudo">o percurso, na ordem dos pontos</span><span class="cn-pill cn-info">em deslocamento</span><span class="cn-pill cn-neutro">parado</span><span class="mudo">O ponto maior é o início e o fim; a hora de cada ponto está no painel e ao passar o mouse. O cinza pequeno é a usina.</span></p>
+      {% else %}
+      <p class="eq-leg"><span class="cn-pill cn-info">em deslocamento</span><span class="cn-pill cn-ok">na usina, até 1 km</span><span class="cn-pill cn-neutro">parado fora de usina</span><span class="cn-pill cn-alerta">sem sinal há 30 min ou mais</span><span class="cn-pill cn-critico">sem permissão</span><span class="mudo">Só o contorno: a última posição é de outro dia. O cinza pequeno é a usina.</span></p>
+      {% endif %}
     </div>
 
     <aside class="eq-lado" aria-label="Os técnicos do piloto">
@@ -122,6 +138,19 @@
           {% if sel.onde %}<dt>{{ 'Cidade' if s.cidade else 'Estado' }}</dt><dd>{{ sel.onde }}</dd>{% endif %}
           {% if sel.desde %}<dt>Sem permissão desde</dt><dd>{{ sel.desde }}</dd>{% endif %}
         </dl>
+        {% if erro_periodo %}<p class="cn-erro" role="alert">{{ erro_periodo }}</p>{% endif %}
+        {% if perc %}
+        <section class="eq-perc" aria-label="O percurso">
+          <h3 class="eq-perc-titulo">Percurso</h3>
+          {% if perc.aviso %}<p class="eq-nota eq-perc-aviso">{{ perc.aviso }}</p>{% endif %}
+          {% if perc.vazio %}<p class="eq-vazio">{{ perc.vazio }}</p>{% else %}
+          <p class="eq-perc-resumo">{{ perc.resumo }}</p>
+          {% if perc.desenho and perc.desenho.cidades %}<p class="eq-perc-cidades"><span>Passou por</span> {{ perc.desenho.cidades|join(' → ') }}</p>{% endif %}
+          <ol class="eq-perc-lista">{% for i in perc.itens %}<li class="eq-perc-item eq-perc-item--{{ 'mov' if i.mov else 'parado' }}"><b>{{ i.hora }}</b><span>{{ 'em deslocamento' if i.mov else ('parado na ' ~ i.usina if i.usina else 'parado') }}</span></li>{% endfor %}</ol>
+          {% endif %}
+          <a class="cn-link" href="{{ url_for('torre_campo.equipe', tecnico=sel.pid, **filtro.q) }}">Fechar o percurso</a>
+        </section>
+        {% endif %}
         {% if s.rota %}
         <form class="eq-rota" method="get" action="{{ url_for('torre_campo.equipe_rota') }}" target="_blank" rel="noopener noreferrer">
           <input type="hidden" name="tecnico" value="{{ sel.pid }}">
@@ -133,29 +162,39 @@
           <button class="gc-btn gc-btn--primario" type="submit"><i class="ph ph-navigation-arrow" aria-hidden="true"></i>Abrir rota no Google Maps</button>
           <p class="eq-nota">{% if s.chave == 'sem_sinal' %}A rota sai do último ponto conhecido ({{ sel.hora }}). {% endif %}O Google recebe a posição do técnico e a da usina só neste clique, e o clique fica registrado.</p>
         </form>
-        {% elif s.base == 'fora_usina' %}
-        <p class="eq-nota">Parado fora de usina: o mapa não mostra o ponto e a rota não sai daqui (pode ser a casa ou o hotel).</p>
         {% elif s.chave == 'sem_permissao' %}
         <p class="eq-nota">Sem a permissão de localização "o tempo todo" no celular, o Nexus Field não manda a posição. Quem resolve com o técnico é o supervisor.</p>
         {% elif s.chave == 'sem_posicao' %}
-        <p class="eq-nota">O celular não mandou posição hoje: o Nexus Field não foi aberto hoje, ou a coleta não ligou.</p>
+        <p class="eq-nota">O celular não mandou posição hoje: o Nexus Field não foi aberto hoje, ou a coleta não ligou.{% if s.no_mapa %} O ponto com contorno no mapa é a última posição ({{ sel.hora }}); a rota não sai dele.{% endif %}</p>
         {% endif %}
+        {# o Ver percurso (10/11/2026): o período em dias e horas de Brasília, dentro dos 7 dias; o filtro vai junto #}
+        <form class="eq-perc-form" method="get" action="{{ url_for('torre_campo.equipe') }}">
+          <input type="hidden" name="tecnico" value="{{ sel.pid }}">
+          {% for k, v in filtro.q.items() %}<input type="hidden" name="{{ k }}" value="{{ v }}">{% endfor %}
+          <p class="gc-rotulo eq-perc-form-titulo">Percurso num período</p>
+          <label class="gc-rotulo" for="eq-perc-de">De</label>
+          <input class="gc-campo" type="datetime-local" id="eq-perc-de" name="de" value="{{ form_perc.de }}" min="{{ form_perc.min }}" max="{{ form_perc.max }}" required>
+          <label class="gc-rotulo" for="eq-perc-ate">Até</label>
+          <input class="gc-campo" type="datetime-local" id="eq-perc-ate" name="ate" value="{{ form_perc.ate }}" min="{{ form_perc.min }}" max="{{ form_perc.max }}" required>
+          <button class="gc-btn gc-btn--contorno" type="submit"><i class="ph ph-path" aria-hidden="true"></i>Ver percurso</button>
+          <p class="eq-nota">Dentro dos últimos 7 dias, na hora de Brasília. Cada abertura do percurso fica registrada: quem viu, de quem e de que período.</p>
+        </form>
         <a class="cn-link eq-voltar" href="{{ url_for('torre_campo.equipe', **filtro.q) }}">Ver todos os técnicos</a>
       </section>
       {% else %}
       {% for chave, titulo, lista in grupos %}
       <section class="eq-grupo">
         <h2>{{ titulo }} <span>{{ lista|length }}</span></h2>
-        {% if lista %}
         <ul class="eq-lista">
           {% for l in lista %}
           <li><a href="{{ url_for('torre_campo.equipe', tecnico=l.pid, **filtro.q) }}">
-            <span class="eq-lin"><b>{{ l.nome }}{% if l.teste %} <span class="eq-teste">teste</span>{% endif %}</b><small>{{ l.equipe or 'sem equipe' }}{% if chave == 'fora' and l.onde %} · {{ l.onde }}{% endif %}{% if chave in ('mapa', 'fora') and l.perto %} · {{ l.perto }}{% endif %}{% if l.hora %} · {{ l.hora }}{% endif %}</small></span>
+            <span class="eq-lin"><b>{{ l.nome }}{% if l.teste %} <span class="eq-teste">teste</span>{% endif %}</b><small>{{ l.equipe or 'sem equipe' }}{% if l.onde %} · {{ l.onde }}{% endif %}{% if l.perto %} · {{ l.perto }}{% endif %}{% if l.hora %} · {{ l.hora }}{% endif %}</small></span>
             <span class="cn-pill cn-{{ l.s.tom }}">{{ l.s.rotulo }}</span></a></li>
           {% endfor %}
         </ul>
-        {% else %}<p class="eq-vazio">{{ vazio[chave] }}</p>{% endif %}
       </section>
+      {% else %}
+      <p class="eq-vazio">Nenhum técnico no piloto da coleta{{ ' neste filtro' if filtro.q }}.</p>
       {% endfor %}
       {% endif %}
     </aside>

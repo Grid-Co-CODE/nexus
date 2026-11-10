@@ -385,9 +385,11 @@ Regra de uso e do porquê: `nexus/torres/campo/CLAUDE.md`, "Mapa de equipe".
   releem ao subir o servidor. Só acrescenta (`so_cresce`).
 - **`nexus_equipe_piloto`** · `fato_decisao_piloto`: 1 linha = 1 decisão de pôr um técnico no piloto da coleta ou tirá-lo
   (`no_piloto` 1 ou 0); vale a última de cada pessoa. Quem decidiu só pelo código HMAC. Só acrescenta.
-- **`nexus_equipe_acessos`** · `fato_acesso_mapa`: a trilha da LGPD, 1 linha = 1 vez que alguém abriu o mapa ou a rota de um
-  técnico (`acao` = `abriu_mapa` ou `abriu_rota`, o técnico visto, a usina). Quem abriu só por `pessoa_hmac` (o e-mail
-  nunca vai ao banco). Só acrescenta.
+- **`nexus_equipe_acessos`** · `fato_acesso_mapa`: a trilha da LGPD, 1 linha = 1 vez que alguém abriu o mapa, a rota ou o
+  percurso de um técnico (`acao` = `abriu_mapa`, `abriu_rota` ou `abriu_percurso`, o técnico visto, a usina). Desde
+  10/11/2026 (o Ver percurso) as colunas `periodo_de` e `periodo_ate` dizem o período do percurso visto, em UTC; vazias nas
+  outras ações e nas linhas de antes delas (a linha da fila gravada antes da coluna vai com elas vazias). Quem abriu só
+  por `pessoa_hmac` (o e-mail nunca vai ao banco). Só acrescenta.
 
 ## As regras (valem para todo dado novo)
 
