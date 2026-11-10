@@ -1522,8 +1522,9 @@ sem a sessão do Nexus) e só aceitam a chave do aparelho ou o login Microsoft c
   no mesmo trabalho. **Parte 2 (10/11/2026, a casca 1.2.3):** o 6º campo `inicioAutomatico` (true, false ou null; null =
   não é Xiaomi/Redmi/POCO ou não se sabe): só o false entra no "Falta:" ("Início automático"); o caso, no celular do Levi
   pelo cabo, é o Android barrando o app depois de atualizar sem o Início automático do HyperOS. E o termo vale pela
-  VERSÃO, número e não menor que o `TERMO_ATUAL` (a ordem da subida não importa; o `TERMO_ATUAL` sobe para "5" quando a
-  sessão Nexus Field avisar que a 1.2.3 saiu).
+  VERSÃO, número e não menor que o `TERMO_ATUAL` (a ordem da subida não importa). **O `TERMO_ATUAL` é "5" desde
+  10/11/2026**, quando a 1.2.3 (versionCode 32) saiu: o celular ainda na 1.2.2 (termo "4") mostra "Falta: termo novo"
+  até atualizar e aceitar.
 - **Os códigos são o que a casca faz com eles.** Só o **401 apaga a chave** no celular. **Qualquer 5xx é como sem rede**: a
   fila e a chave ficam, e a casca tenta de novo. Por isso o banco fora ou o servidor sem configuração respondem **503, nunca
   401**, e nenhuma resposta é 500 (o que quebrar vira 503 e o log leva só o TIPO do erro). A casca confirmou o contrato

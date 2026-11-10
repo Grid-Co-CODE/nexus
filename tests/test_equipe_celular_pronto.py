@@ -22,7 +22,7 @@ PRONTO = {"termo": TERMO_ATUAL, "localizacao": "precisa", "tempoTodo": True, "ba
 
 
 def test_a_leitura_dos_ajustes_e_o_que_falta():
-    assert TERMO_ATUAL == "4"                       # a versão do termo que a casca mostra hoje (a seção 2 fala dos ajustes)
+    assert TERMO_ATUAL == "5"                       # o termo da 1.2.3 (10/11/2026: a seção 2 declara o Início automático)
     assert CE.ler(PRONTO) == PRONTO and CE.faltas(PRONTO) == []
     meio = {**PRONTO, "termo": "3", "localizacao": "aproximada", "bateriaSemRestricao": False}
     assert CE.faltas(CE.ler(meio)) == ["termo novo", "localização precisa", "bateria sem restrição"]
@@ -111,7 +111,9 @@ def test_o_inicio_automatico_do_xiaomi_entra_no_falta():
 def test_o_termo_vale_pela_versao_igual_ou_maior():
     """O termo aceito vale quando é número e não é menor que o TERMO_ATUAL: a ordem da subida não importa (o Nexus no "4"
     já aceita o "5" da 1.2.3; quando o TERMO_ATUAL subir para "5", a 1.2.2 passa a "Falta: termo novo")."""
-    assert CE.faltas(CE.ler({**PRONTO, "termo": "5"})) == []
+    assert CE.faltas(CE.ler({**PRONTO, "termo": "5"})) == [] and CE.faltas(CE.ler({**PRONTO, "termo": "6"})) == []
+    # desde a 1.2.3 (TERMO_ATUAL "5"), o celular ainda na 1.2.2 (termo "4") falta o termo novo
+    assert CE.faltas(CE.ler({**PRONTO, "termo": "4"})) == ["termo novo"]
     assert CE.faltas(CE.ler({**PRONTO, "termo": "3"})) == ["termo novo"]
     assert CE.faltas(CE.ler({**PRONTO, "termo": "beta"})) == ["termo novo"]     # não é número: não vale
     assert CE.faltas(CE.ler({**PRONTO, "termo": None})) == ["termo novo"]

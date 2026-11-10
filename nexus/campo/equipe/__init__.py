@@ -49,9 +49,10 @@ MAX_PONTOS = 200              # teto de pontos por envio do celular
 SEM_SINAL_MIN = 30            # sem ponto há mais que isto = "sem sinal" no mapa
 RAIO_USINA_KM = 1.0           # até onde o técnico conta como "dentro" da usina (confirmado pelo Levi em 08/11/2026)
 ORIGEM_APP = "https://gridco-campo-mw.azurewebsites.net"
-# a versão do termo que a casca mostra hoje (a "4", de 10/11/2026: a seção 2 diz que os ajustes do celular vão ao Nexus);
-# o "Celular pronto" do Piloto pede esta (campo/equipe/celulares.py). Mudou o termo na casca, muda aqui no mesmo trabalho
-TERMO_ATUAL = "4"
+# a versão do termo que a casca mostra hoje: a "5" da 1.2.3 (versionCode 32, publicada em 10/11/2026: a seção 2 declara o
+# Início automático do Xiaomi); a "4" (a 1.2.2) dizia que os ajustes do celular vão ao Nexus. O "Celular pronto" do
+# Piloto pede esta ou mais nova (campo/equipe/celulares.py). Mudou o termo na casca, muda aqui no mesmo trabalho
+TERMO_ATUAL = "5"
 
 
 def livro_pontos(dia: date) -> str:
