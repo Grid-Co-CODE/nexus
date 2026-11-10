@@ -92,3 +92,26 @@ def test_o_piloto_mostra_o_celular_pronto_de_cada_um(app, cliente, banco, ms, mo
     html = cliente.get("/t/campo/equipe", query_string={"painel": "tecnicos"}).get_data(as_text=True)
     piloto = html.split('class="eq-piloto"', 1)[1].split("</details>", 1)[0]
     assert '<span class="cn-pill cn-ok eq-celular">Celular pronto</span>' in piloto
+
+
+# ── parte 2 (10/11/2026): o Início automático do Xiaomi e o termo pela versão ─────────────────────────────────────
+def test_o_inicio_automatico_do_xiaomi_entra_no_falta():
+    """A casca 1.2.3 manda o 6º campo, `inicioAutomatico` (true, false ou null; null = não é Xiaomi/Redmi/POCO ou não se
+    sabe). O caso, no celular do Levi pelo cabo: sem o Início automático do HyperOS o Android barra o app depois de
+    atualizar ("process is not permitted to auto start") e a coleta não volta. Só o false falta."""
+    assert CE.ler({**PRONTO, "inicioAutomatico": True}) == {**PRONTO, "inicioAutomatico": True}
+    assert CE.faltas(CE.ler({**PRONTO, "inicioAutomatico": None})) == []
+    assert CE.faltas(CE.ler({**PRONTO, "inicioAutomatico": False})) == ["Início automático"]
+    assert CE.situacao(True, {"ajustes": CE.ler({**PRONTO, "inicioAutomatico": False, "notificacao": False})})[
+        "texto"] == "Falta: notificação, Início automático"
+    assert CE.ler({**PRONTO, "inicioAutomatico": "sim"}) is None              # fora do contrato
+    assert CE.ler(PRONTO) == PRONTO                                            # a 1.2.2, sem o campo, segue valendo
+
+
+def test_o_termo_vale_pela_versao_igual_ou_maior():
+    """O termo aceito vale quando é número e não é menor que o TERMO_ATUAL: a ordem da subida não importa (o Nexus no "4"
+    já aceita o "5" da 1.2.3; quando o TERMO_ATUAL subir para "5", a 1.2.2 passa a "Falta: termo novo")."""
+    assert CE.faltas(CE.ler({**PRONTO, "termo": "5"})) == []
+    assert CE.faltas(CE.ler({**PRONTO, "termo": "3"})) == ["termo novo"]
+    assert CE.faltas(CE.ler({**PRONTO, "termo": "beta"})) == ["termo novo"]     # não é número: não vale
+    assert CE.faltas(CE.ler({**PRONTO, "termo": None})) == ["termo novo"]

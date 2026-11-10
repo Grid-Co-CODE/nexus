@@ -7,11 +7,17 @@ os `ajustes` do aparelho (só depois do termo aceito: antes dele a casca não ma
     "ajustes": {"termo": "4" | ... | null, "localizacao": "precisa" | "aproximada" | "sem", "tempoTodo": bool,
                 "bateriaSemRestricao": bool, "notificacao": bool}
 
-A 1.2.1 e as de antes não mandam o campo, e o Nexus de antes o ignorava: o contrato segue compatível. O Início automático
-do Xiaomi não vem (o Android não deixa nenhum app lê-lo).
+A 1.2.1 e as de antes não mandam o campo, e o Nexus de antes o ignorava: o contrato segue compatível.
 
-**Pronto** = os cinco: o termo na versão atual (`TERMO_ATUAL`), a localização precisa, o "Permitir o tempo todo", a
-bateria sem restrição e a notificação. Senão, "Falta:" e o que falta, nas palavras da casca. Sem os ajustes, o porquê: o
+**Parte 2 (10/11/2026, a casca 1.2.3; Levi: "quando o cara instala já tem que ter tudo pronto"):** o 6º campo,
+`inicioAutomatico` (true, false ou null; null = não é Xiaomi, Redmi nem POCO, ou não se sabe). O caso, no celular do Levi
+pelo cabo: sem o Início automático do HyperOS o Android barra o app depois de atualizar ("MY_PACKAGE_REPLACED: process
+is not permitted to auto start") e a coleta não volta. Só o false entra no "Falta:" ("Início automático"); a 1.2.2, sem o
+campo, segue valendo. E o termo vale pela VERSÃO: número e não menor que o `TERMO_ATUAL` (a ordem da subida não importa:
+o Nexus no "4" já aceita o "5" da 1.2.3; quando o `TERMO_ATUAL` subir para "5", a 1.2.2 passa a "Falta: termo novo").
+
+**Pronto** = o termo na versão atual ou mais nova (`TERMO_ATUAL`), a localização precisa, o "Permitir o tempo todo", a
+bateria sem restrição, a notificação e, no Xiaomi, o Início automático. Senão, "Falta:" e o que falta, nas palavras da casca. Sem os ajustes, o porquê: o
 lote sem o campo é a versão antiga do app; a chave emitida sem lote nenhum, "não aceitou o termo ou não abriu o app"; sem
 chave, "nunca abriu o app".
 
@@ -35,24 +41,41 @@ _CTX = "equipe/celulares"
 _UTC = "%Y-%m-%dT%H:%M:%SZ"
 # o que falta, na ordem e nas palavras da casca (o que o técnico vê no celular)
 _FALTA = (("termo", "termo novo"), ("localizacao", "localização precisa"), ("tempoTodo", "Permitir o tempo todo"),
-          ("bateriaSemRestricao", "bateria sem restrição"), ("notificacao", "notificação"))
+          ("bateriaSemRestricao", "bateria sem restrição"), ("notificacao", "notificação"),
+          ("inicioAutomatico", "Início automático"))
+_OPCIONAIS = ("inicioAutomatico",)      # da 1.2.3 em diante; a 1.2.2 não manda
 
 
 def ler(bruto) -> dict | None:
     """Os `ajustes` do lote, conferidos contra o contrato; None se não seguem (o que veio do aparelho é entrada hostil)."""
-    if not isinstance(bruto, dict) or set(bruto) != {"termo", "localizacao", *_BOOLS}:
+    obrigatorias = {"termo", "localizacao", *_BOOLS}
+    if not isinstance(bruto, dict) or not obrigatorias <= set(bruto) <= obrigatorias | set(_OPCIONAIS):
         return None
     termo = bruto["termo"]
     if termo is not None and not (isinstance(termo, str) and 0 < len(termo) <= 12):
         return None
     if bruto["localizacao"] not in LOCALIZACOES or not all(isinstance(bruto[k], bool) for k in _BOOLS):
         return None
-    return {"termo": termo, "localizacao": bruto["localizacao"], **{k: bruto[k] for k in _BOOLS}}
+    out = {"termo": termo, "localizacao": bruto["localizacao"], **{k: bruto[k] for k in _BOOLS}}
+    if "inicioAutomatico" in bruto:
+        if bruto["inicioAutomatico"] not in (True, False, None):
+            return None
+        out["inicioAutomatico"] = bruto["inicioAutomatico"]
+    return out
+
+
+def _versao(termo):
+    try:
+        return int(str(termo).strip())
+    except (TypeError, ValueError):
+        return None
 
 
 def faltas(aj: dict) -> list[str]:
-    ok = {"termo": aj["termo"] == TERMO_ATUAL, "localizacao": aj["localizacao"] == "precisa",
-          **{k: aj[k] is True for k in _BOOLS}}
+    v = _versao(aj["termo"])
+    ok = {"termo": v is not None and v >= int(TERMO_ATUAL), "localizacao": aj["localizacao"] == "precisa",
+          **{k: aj[k] is True for k in _BOOLS},
+          "inicioAutomatico": aj.get("inicioAutomatico") is not False}     # só o false falta (null = não é Xiaomi)
     return [palavra for chave, palavra in _FALTA if not ok[chave]]
 
 

@@ -1490,7 +1490,11 @@ sem a sessão do Nexus) e só aceitam a chave do aparelho ou o login Microsoft c
   a chave emitida sem lote, **"Não aceitou o termo ou não abriu o app"**; sem chave, **"Nunca abriu o app"**. Mora no disco
   da pasta de dados (`equipe/celulares.json`, cifrado com a chave do cadastro, como o diário), **não no banco**: é a
   configuração do aparelho, e o reinício não a apaga; grava só quando muda. Mudou o termo na casca, muda o `TERMO_ATUAL`
-  no mesmo trabalho. O Início automático do Xiaomi não vem (o Android não deixa nenhum app lê-lo).
+  no mesmo trabalho. **Parte 2 (10/11/2026, a casca 1.2.3):** o 6º campo `inicioAutomatico` (true, false ou null; null =
+  não é Xiaomi/Redmi/POCO ou não se sabe): só o false entra no "Falta:" ("Início automático"); o caso, no celular do Levi
+  pelo cabo, é o Android barrando o app depois de atualizar sem o Início automático do HyperOS. E o termo vale pela
+  VERSÃO, número e não menor que o `TERMO_ATUAL` (a ordem da subida não importa; o `TERMO_ATUAL` sobe para "5" quando a
+  sessão Nexus Field avisar que a 1.2.3 saiu).
 - **Os códigos são o que a casca faz com eles.** Só o **401 apaga a chave** no celular. **Qualquer 5xx é como sem rede**: a
   fila e a chave ficam, e a casca tenta de novo. Por isso o banco fora ou o servidor sem configuração respondem **503, nunca
   401**, e nenhuma resposta é 500 (o que quebrar vira 503 e o log leva só o TIPO do erro). A casca confirmou o contrato
