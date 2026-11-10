@@ -11,11 +11,9 @@ ela vira a pessoa do Fracttal pelo id, sem casar nome (homônimo não confunde).
 O estado é deste quadro (a cópia, a releitura por trás e o "pronto antes de abrir"), separado do da Engenharia: um não
 espera nem apaga a leitura do outro. Nada vai para o banco.
 """
-import json
 import threading
 import time
 from datetime import datetime, timezone
-from urllib.parse import quote
 
 from ..cadastro import setor_ids as SID
 from ..engenharia import os_equipe as OE
@@ -29,7 +27,8 @@ USO_S = OE.USO_S
 QUENTE_S = OE.QUENTE_S
 COLUNAS = OE.COLUNAS
 _EST = {"ts": 0.0, "pessoas_ts": 0.0, "pessoas": [], "os": [], "lendo": False, "erro": "", "erro_em": 0.0, "faltam": [],
-        "usado": 0.0, "equipe": []}
+        "usado": 0.0, "equipe": [], "disco": False}
+ARQUIVO = "quadro_equipe_performance.json.gz"   # a última leitura no disco, como a do quadro da Engenharia (OE.ARQUIVO)
 _TRAVA = threading.Lock()
 
 
@@ -63,7 +62,7 @@ def _reler(app):
                 a["pessoas_ts"] = time.time()
             por_id = {str(p.get("id_personnel")): p for p in a["pessoas"]}
             agora = datetime.now(timezone.utc)
-            todas, faltam, equipe = [], [], []
+            todas, faltam, equipe, recusadas, motivo = [], [], [], [], ""
             for fid in fids:
                 p = por_id.get(fid)
                 if not p:
@@ -75,17 +74,14 @@ def _reler(app):
                     continue
                 pessoa = {"id": p.get("id_personnel"), "nome": nome, "nome_fracttal": nome}
                 equipe.append(pessoa)
-                linhas, vistas = [], set()
-                for g in OE.grafias(nome, p):
-                    for w in OE._paginas(f"work_orders?personnel_description={quote(g)}"):
-                        chave = json.dumps(w, sort_keys=True, default=str)   # a mesma linha por dois trechos entra uma vez
-                        if chave not in vistas:
-                            vistas.add(chave)
-                            linhas.append(w)
-                    time.sleep(0.3)
-                todas += OE.montar(linhas, pessoa, agora)
+                try:              # cada pessoa à parte: o 429 de uma não derruba as outras (OE, "A LEITURA QUE NÃO SOME")
+                    todas += OE.montar(OE.linhas_da_pessoa(nome, p), pessoa, agora)
+                except Exception as e:      # noqa: BLE001 — a leitura anterior dela fica
+                    recusadas.append(nome)
+                    motivo = str(e)
+                    todas += [o for o in a["os"] if str(o.get("pid")) == str(pessoa["id"])]
             equipe.sort(key=lambda p: _norm(p["nome"]))
-            a.update(os=todas, equipe=equipe, faltam=faltam, ts=time.time(), erro="", erro_em=0.0)
+            OE.concluir_leitura(app, a, ARQUIVO, todas, equipe, faltam, recusadas, motivo)
     except Exception as e:      # noqa: BLE001 — 429, rede ou banco fora: fica a leitura anterior
         a.update(erro=str(e)[:160], erro_em=time.time())
     finally:
@@ -95,6 +91,7 @@ def _reler(app):
 def pedir_releitura(app=None, esperar=False, forcar=False):
     """Relê se a cópia tem mais de 5 min (`forcar`: mais de FORCAR_S, depois que o card do OS Creator mudou uma OS). Sem
     nenhuma cópia ainda, `esperar` lê na hora. A mesma regra do quadro da Engenharia (`os_equipe.pedir_releitura`)."""
+    _do_disco(app)
     if time.time() - _EST["ts"] < (FORCAR_S if forcar else VALIDADE_S):
         return
     with _TRAVA:
@@ -140,11 +137,21 @@ def manter_quente(app):
     threading.Thread(target=laco, daemon=True, name="nexus-os-equipe-performance-quente").start()
 
 
+def _do_disco(app=None) -> None:
+    if app is None:
+        from flask import current_app, has_app_context
+        if not has_app_context():
+            return
+        app = current_app._get_current_object()
+    OE.carregar_do_disco(app, _EST, ARQUIVO)
+
+
 def dados() -> dict:
+    _do_disco()
     return {"os": list(_EST["os"]), "equipe": list(_EST.get("equipe") or []), "faltam": list(_EST["faltam"]),
             "lido": _EST["ts"], "lendo": _EST["lendo"], "erro": _EST["erro"]}
 
 
 def limpar():
     _EST.update(ts=0.0, pessoas_ts=0.0, pessoas=[], os=[], equipe=[], lendo=False, erro="", erro_em=0.0, faltam=[],
-                usado=0.0)
+                usado=0.0, disco=False)

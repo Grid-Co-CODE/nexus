@@ -40,7 +40,7 @@ Confiabilidade sai com `|na_raiz` e o do cartão do Quadro da equipe com `nexusR
   (conta em "Críticos com <pessoa>", o antigo "Com <pessoa>"; Levi: "Não deve contar duas vezes"). O "abrir o quadro" leva
   `?pessoa=<id do Fracttal>`, e o Quadro abre filtrado nela. O Quadro lê só os responsáveis do `.env`
   (`OS_WEB_ENGENHARIA_RESPONSAVEIS`), não o setor: quem é do setor e está fora dessa lista vê "não está na equipe do
-  Quadro da equipe" no lugar de um zero falso; a leitura velha (o Fracttal não respondeu) diz a hora.
+  Quadro da equipe" no lugar de um zero falso. **A leitura não some** (10/11/2026, desempenho; Levi: "temos frequentemente esses problemas com o Fractall"): cada pessoa é lida à parte, e a que o Fracttal recusou (429) fica com as OS da leitura anterior, com o aviso dizendo quem; o "lidas às" segue a hora da última leitura inteira. A última leitura vai ao disco (`<dados>/engenharia/quadro_equipe.json.gz`, cópia do Fracttal, fora do git e do banco) e volta no 1º uso depois do reinício com a hora que tinha: o deploy não zera mais o quadro. Prova: `tests/test_engenharia_equipe_robusto.py`.
 - **Críticos sem dono (30/10/2026):** 6 à vista e o resto rola na própria caixa (`data-eg-max`, a altura dos 6 medida
   no navegador pelo `limita()` do `engenharia-gaveta.js`, que o `egGaveta.ligar()` chama; o mesmo dos 20 da
   Confiabilidade); os botões Pegar e Encaminhar na linha do "Crit." (no celular, embaixo) e o cartão mais baixo.

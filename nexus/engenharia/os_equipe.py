@@ -17,6 +17,7 @@ As linhas do REST são por TAREFA; o quadro é por OS (o número), com as tarefa
 - status 1: Em execução se alguma tarefa já começou e não terminou; senão A fazer (a data programada diz se atrasou,
   se vence logo ou se ainda vai abrir: "que serão abertas").
 """
+import gzip
 import json
 import os
 import threading
@@ -43,13 +44,100 @@ STATUS_OS = {1: "Em Processo", 2: "Em Verificação", 3: "Concluída", 4: "Cance
 COLUNAS = (("fazer", "A fazer"), ("execucao", "Em execução"), ("verificacao", "Em verificação"),
            ("concluida", "Concluídas"), ("cancelada", "Canceladas"))
 _EST = {"ts": 0.0, "pessoas_ts": 0.0, "pessoas": [], "os": [], "lendo": False, "erro": "", "erro_em": 0.0, "faltam": [],
-        "usado": 0.0}
+        "usado": 0.0, "disco": False}
 _TRAVA = threading.Lock()
+# A LEITURA QUE NÃO SOME (Desempenho, 10/11/2026; Levi: "em engenharia > quadro de equipe temos frequentemente esses
+# problemas com o Fractall"). O quadro zerado, "lidas às —", com o 429 à vista. O laço do quadro pede 250 a 570 por dia
+# ao Fracttal (~3% do Nexus) e é recusado em 6% a 15% deles: a cota cheia é do resto do Nexus e do App de Campo. Mas a
+# leitura era tudo ou nada (um 429 em qualquer página de qualquer pessoa jogava a leitura inteira fora) e só na memória
+# (cada deploy zerava o quadro, e a 1ª visita esperava uma leitura inteira dar certo). Agora cada pessoa é lida à parte: a
+# que o Fracttal recusou fica com as OS da leitura anterior, o aviso diz quem, e o "lidas às" segue a hora da última
+# leitura inteira (a próxima volta tenta de novo, depois do minuto de espera). E a última leitura vai ao disco (a pasta de
+# dados, fora do git e do banco: é cópia do Fracttal, com nomes), de volta no 1º uso depois do reinício com a hora que
+# tinha. Prova: tests/test_engenharia_equipe_robusto.py.
+ARQUIVO = "quadro_equipe.json.gz"
+_NO_DISCO = ("ts", "os", "equipe", "faltam", "pessoas", "pessoas_ts")
 
 
 def _ler_fracttal(path):
     from ..campo import fracttal
     return fracttal.ler(path)
+
+
+def _arquivo(app, nome):
+    from ..cadastro.ligacoes import pasta_dados
+    try:
+        return pasta_dados(app.config) / "engenharia" / nome
+    except RuntimeError:              # teste sem pasta de dados: só a memória
+        return None
+
+
+def gravar_no_disco(app, est: dict, nome: str) -> None:
+    """A última leitura no disco, trocada de uma vez. Falhar aqui não derruba a leitura: o quadro segue na memória."""
+    arq = _arquivo(app, nome)
+    if arq is None:
+        return
+    try:
+        arq.parent.mkdir(parents=True, exist_ok=True)
+        tmp = arq.with_name(f"{arq.name}.{os.getpid()}.tmp")
+        with gzip.open(tmp, "wt", encoding="utf-8") as f:
+            json.dump({k: est.get(k) for k in _NO_DISCO}, f, ensure_ascii=False)
+        os.replace(tmp, arq)
+    except OSError:
+        pass
+
+
+def carregar_do_disco(app, est: dict, nome: str) -> None:
+    """Uma vez por processo, com a memória vazia: a última leitura do disco, com a hora que tinha (a cópia ilegível
+    começa vazio, como antes)."""
+    if est.get("disco") or est.get("ts"):
+        return
+    est["disco"] = True
+    arq = _arquivo(app, nome)
+    if arq is None or not arq.exists():
+        return
+    try:
+        with gzip.open(arq, "rt", encoding="utf-8") as f:
+            d = json.load(f)
+    except (OSError, ValueError):
+        return
+    if not est.get("ts"):                 # uma leitura nova pode ter chegado no meio
+        est.update({k: d[k] for k in ("os", "equipe", "faltam", "pessoas") if isinstance(d.get(k), list)},
+                   ts=float(d.get("ts") or 0), pessoas_ts=float(d.get("pessoas_ts") or 0))
+
+
+def _do_disco(app=None) -> None:
+    if app is None:
+        from flask import current_app, has_app_context
+        if not has_app_context():
+            return
+        app = current_app._get_current_object()
+    carregar_do_disco(app, _EST, ARQUIVO)
+
+
+def linhas_da_pessoa(nome: str, p: dict) -> list[dict]:
+    """As linhas do REST de uma pessoa, por cada grafia do nome (`grafias`), sem repetir a mesma linha. O 429 sobe."""
+    linhas, vistas = [], set()
+    for g in grafias(nome, p):
+        for w in _paginas(f"work_orders?personnel_description={quote(g)}"):
+            chave = json.dumps(w, sort_keys=True, default=str)   # a mesma linha por dois trechos entra uma vez
+            if chave not in vistas:
+                vistas.add(chave)
+                linhas.append(w)
+        time.sleep(0.3)
+    return linhas
+
+
+def concluir_leitura(app, est: dict, nome: str, todas: list, equipe: list, faltam: list, recusadas: list,
+                     motivo: str) -> None:
+    """Fecha uma volta: inteira, a hora é agora; com recusas, a hora fica a da última leitura inteira e o aviso diz quem
+    ficou com a leitura anterior. As duas vão ao disco."""
+    if recusadas:
+        est.update(os=todas, equipe=equipe, faltam=faltam, erro=f"{motivo[:100]}; ficou a leitura anterior de "
+                   f"{', '.join(recusadas)}", erro_em=time.time())
+    else:
+        est.update(os=todas, equipe=equipe, faltam=faltam, ts=time.time(), erro="", erro_em=0.0)
+    gravar_no_disco(app, est, nome)
 
 
 def nomes(config) -> list[str]:
@@ -290,7 +378,7 @@ def _reler(app):
                 a["pessoas"] = _paginas("personnel?x=1")
                 a["pessoas_ts"] = time.time()
             agora = datetime.now(timezone.utc)
-            todas, faltam = [], []
+            todas, faltam, recusadas, motivo = [], [], [], ""
             equipe = []
             for n in lista:
                 p = casar(n, a["pessoas"])
@@ -300,16 +388,13 @@ def _reler(app):
                 pessoa = {"id": p.get("id_personnel"), "nome": n,
                           "nome_fracttal": " ".join(str(p.get("name") or p.get("full_name") or n).split())}
                 equipe.append(pessoa)
-                linhas, vistas = [], set()
-                for g in grafias(n, p):
-                    for w in _paginas(f"work_orders?personnel_description={quote(g)}"):
-                        chave = json.dumps(w, sort_keys=True, default=str)   # a mesma linha por dois trechos entra uma vez
-                        if chave not in vistas:
-                            vistas.add(chave)
-                            linhas.append(w)
-                    time.sleep(0.3)
-                todas += montar(linhas, pessoa, agora)
-            a.update(os=todas, equipe=equipe, faltam=faltam, ts=time.time(), erro="", erro_em=0.0)
+                try:
+                    todas += montar(linhas_da_pessoa(n, p), pessoa, agora)
+                except Exception as e:      # noqa: BLE001 — 429 ou rede numa pessoa: a leitura anterior dela fica
+                    recusadas.append(n)
+                    motivo = str(e)
+                    todas += [o for o in a["os"] if str(o.get("pid")) == str(pessoa["id"])]
+            concluir_leitura(app, a, ARQUIVO, todas, equipe, faltam, recusadas, motivo)
     except Exception as e:      # noqa: BLE001 — 429 ou rede: fica a leitura anterior
         a.update(erro=str(e)[:160], erro_em=time.time())
     finally:
@@ -322,6 +407,7 @@ def pedir_releitura(app=None, esperar=False, forcar=False):
     `forcar`: relê mesmo com a cópia nova (se tiver mais de FORCAR_S). É o que o quadro pede depois que alguém mudou uma
     OS pelo card do OS Creator aberto nele (concluir, trocar o responsável...): sem isso, a OS ficaria até 5 min na
     coluna velha."""
+    _do_disco(app)                      # o 1º uso depois do reinício: a última leitura do disco (ver ARQUIVO)
     if time.time() - _EST["ts"] < (FORCAR_S if forcar else VALIDADE_S):
         return
     with _TRAVA:
@@ -371,10 +457,11 @@ def manter_quente(app):
 
 
 def dados() -> dict:
+    _do_disco()                         # a visita que chega antes de qualquer leitura acha a do disco
     return {"os": list(_EST["os"]), "equipe": list(_EST.get("equipe") or []), "faltam": list(_EST["faltam"]),
             "lido": _EST["ts"], "lendo": _EST["lendo"], "erro": _EST["erro"]}
 
 
 def limpar():
     _EST.update(ts=0.0, pessoas_ts=0.0, pessoas=[], os=[], equipe=[], lendo=False, erro="", erro_em=0.0, faltam=[],
-                usado=0.0)
+                usado=0.0, disco=False)
