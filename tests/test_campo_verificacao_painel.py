@@ -218,5 +218,7 @@ def test_o_resumo_e_o_que_cobrar_primeiro_do_pdf():
 def test_o_css_do_mais_e_das_perdas():
     from pathlib import Path
     css = Path(__file__).resolve().parents[1].joinpath("nexus", "static", "campo.css").read_text(encoding="utf-8")
-    assert ".cr-rk-j-mais[open] > summary{display:none}" in css and ".cr-rk-j-mais-lista{display:grid" in css
+    # o "mais" e a lista das perdas eram do Ranking das equipes, que saiu da Visão do responsável em 09/11/2026 (Levi,
+    # pelo Scrum master): o CSS dele saiu junto (`cr-rk-*`)
+    assert ".cr-rk-j-mais" not in css
     assert ".pv-tab tbody tr:hover .pv-pdf" in css and ".cn-filtros .pn-exportar{margin-left:auto" in css
