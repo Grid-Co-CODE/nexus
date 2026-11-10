@@ -1166,8 +1166,12 @@ adicionar anexos como PDFS e fotos. E quando o PCM gere uma OS pela fila de PCM 
 - **O card** (`os_detalhe_conteudo.html`): o "Ordem de serviço" usava a classe `det-sub`, a mesma da caixa de cada
   subtarefa, e herdava a borda e o fundo dela; agora é `det-num-sub`, só o texto. O botão "PDF" (`.det-pdf`, a seta de
   baixar) fica à esquerda da pílula da Solicitação e usa o mesmo PDF da cadeia do chamado (`[data-os-pdf]` no
-  `os_acoes.js`, `POST /os/api/os/pdf`); o aviso vai para o `[data-pdf-msg]` do card. Saíram do rodapé o "Clonar esta OS"
-  (a Clonagem segue no menu) e o "Abrir chamado".
+  `os_acoes.js`, `POST /os/api/os/pdf`); o aviso vai para o `[data-pdf-msg]` do card. Saiu do rodapé o "Clonar esta OS"
+  (a Clonagem segue no menu). O "Abrir chamado" saiu junto e **voltou em 10/11/2026** (Levi: "Quero que no card da OS do
+  histórico de OS do OS Creator tenha um botão de 'Abri Chamado' no extremo esquerdo lá em baixo"): o 1º do rodapé, leva à
+  Inspeção de chamados com `?pai=<nº>`, e a tela carrega o ativo, a data do incidente e o responsável daquela OS; as abas do
+  OS Creator o abrem na aba de Chamados. No mesmo trabalho, o "ATIVOS (N)" do topo do card deixou de passar da tela a 375 px
+  (a linha inteira no celular, e o nome do ativo quebra).
 - **Os anexos do card** (a pergunta do Levi): `.mp4` e PDF entram em "documentos", com "Abrir" (o vídeo toca e o PDF abre
   no navegador) e "Baixar" (a rota renova o link do Fracttal); o "Baixar todos" os põe no .zip.
 - **A Zeladoria:** o `create_os_rpc` resolvia o tipo pelo NOME só na lista fixa `TASK_TYPE_MAIN` (Corretiva, Preventiva,

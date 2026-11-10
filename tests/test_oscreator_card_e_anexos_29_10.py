@@ -1,7 +1,8 @@
 """O card da OS, a Zeladoria na Fila e os anexos da Nova solicitação (Levi, 29/10/2026).
 
-- o card: "Ordem de serviço" sem a borda (a classe era a da caixa de subtarefa), sem "Abrir chamado" ("ele não servirá
-  mais") e sem "Clonar esta OS", e com a seta de baixar o PDF da OS ao lado esquerdo da Solicitação;
+- o card: "Ordem de serviço" sem a borda (a classe era a da caixa de subtarefa), sem "Clonar esta OS", e com a seta de
+  baixar o PDF da OS ao lado esquerdo da Solicitação (o "Abrir chamado", que saiu junto, voltou em 10/11/2026:
+  tests/test_oscreator_card_abrir_chamado_10_11.py);
 - a Fila do PCM: "Não consegui aprovar a solicitação 4126. Falha ao criar as tarefas: ?: Tipo de tarefa desconhecido:
   Zeladoria" — o tipo vinha pelo NOME e só a lista fixa do código era lida; agora o catálogo vivo do Fracttal também;
 - a Nova solicitação: "quero que seja possível adicionar anexos como PDFS e fotos. E quando o PCM gere uma OS pela fila
@@ -24,11 +25,11 @@ JPG = b"\xff\xd8\xff\xe0" + b"0" * 64
 
 
 # ── o card ──────────────────────────────────────────────────────────────────────────────────────────────────────────
-def test_o_card_sem_abrir_chamado_e_clonar_e_com_o_pdf(monkeypatch):
+def test_o_card_sem_clonar_e_com_o_pdf(monkeypatch):
     monkeypatch.setattr(api, "_rpc_call", Fracttal([_tarefa(1)], [_item(1, 1), _item(1, 2)]).rpc)
     h = _card()
     assert '<div class="det-num-sub">Ordem de serviço</div>' in h and 'class="det-sub">Ordem de serviço' not in h
-    assert "Abrir chamado" not in h and "Clonar esta OS" not in h
+    assert "Clonar esta OS" not in h
     topo = h[h.index('class="det-top"'):h.index("</header>")]
     assert topo.index('data-os-pdf="15900"') < topo.index("Solicitação")
     assert 'data-wid="%d"' % WID in topo and "data-pdf-caixa" in h and "data-pdf-msg" in h

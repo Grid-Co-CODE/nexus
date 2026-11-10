@@ -8,8 +8,8 @@
 
    As AÇÕES (trocar responsável, etiquetas, Editar notas, Concluir, Cancelar, Fluxo, anexos) vivem em static/os_acoes.js, por
    delegação de eventos — o card chega por innerHTML. Cada QDialog do app virou um <template data-dlg> aqui embaixo, com o
-   MESMO texto, que o JS clona por cima do card. O "Clonar esta OS" e o "Abrir chamado" saíram do rodapé em 29/10/2026
-   (Levi: "tire o botão abrir chamado ele não servirá mais"; "Tire o botão clonar esta OS"); a Clonagem segue no menu. #}
+   MESMO texto, que o JS clona por cima do card. O "Clonar esta OS" saiu do rodapé em 29/10/2026 (Levi: "Tire o botão
+   clonar esta OS"); a Clonagem segue no menu. O "Abrir chamado" saiu junto e VOLTOU em 10/11/2026, no canto esquerdo. #}
 {% set n_sub = d.subtarefas|length %}
 {% set n_feitas = d.subtarefas|selectattr('feito')|list|length %}
 {% set pct = ((100 * n_feitas / n_sub)|round|int) if n_sub else 0 %}
@@ -177,6 +177,11 @@
   </div>
 
   <footer class="det-foot">
+    {# o "Abrir chamado" (10/11/2026, Levi: "Quero que no card da OS do histórico de OS do OS Creator tenha um botão de 'Abri
+       Chamado' no extremo esquerdo lá em baixo"): leva à Inspeção de chamados com esta OS de pai, e a tela carrega o ativo, a
+       data do incidente e o responsável dela (o `?pai=` do insp.js). Link simples: as abas do OS Creator o abrem na aba de
+       Chamados (abas.js), e fora delas a página vai até lá #}
+    {% if d.folio %}<a class="det-b ambar det-chamado" href="/os/chamados/inspecao?pai={{ d.folio }}" title="Abre a Inspeção de chamados com esta OS de pai: o ativo, a data do incidente e o responsável vêm preenchidos">{{ icone('ticket', 'currentColor', 16) }}Abrir chamado</a>{% endif %}
     <span class="det-ajuda">{{ n_sub }} subtarefa(s){% if grupos %} em {{ n_tarefas }} tarefas{% endif %}</span><span class="os-cresce"></span>
     <button type="button" class="det-b verde" data-acao="fluxo" title="Mostra esta OS encadeada com as outras — pais, filhas e todo o histórico do ativo">{{ icone('branch', '#0B1020', 16) }}Fluxo</button>
     {# sem o status no endereço (a página da OS da Engenharia abre o card assim), vale o do Fracttal: a prova no ar de

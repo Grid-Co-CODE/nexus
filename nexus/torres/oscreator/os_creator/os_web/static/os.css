@@ -187,7 +187,11 @@ body.os-modal-aberto{overflow:hidden}
 .det-banner-ativo{font-size:15px;font-weight:600}
 .det-banner-campo .det-banner-code{margin-left:0;font-size:13px}
 @media (max-width:560px){.det-banner-campo{flex-basis:100%;padding:0}
-  .det-banner-campo+.det-banner-campo{border-left:0;border-top:1px solid var(--f-border);padding-top:10px}}
+  .det-banner-campo+.det-banner-campo{border-left:0;border-top:1px solid var(--f-border);padding-top:10px}
+  /* os ativos no celular (10/11/2026: o "ATIVOS (N)" e as etiquetas passavam 19 px da tela a 375 px): a linha inteira, e a
+     etiqueta do ativo quebra o nome em vez de empurrar a página */
+  .det-banner>.det-banner-ativos{flex:1 1 100%;max-width:100%}
+  .det-banner-ativos .det-ativo{white-space:normal;overflow-wrap:anywhere}}
 /* os ativos recolhidos (05/11/2026: "Está ocupando muito espaço na tela"; "Quero os ativos fiquem recolhidos e que seja
    expansível!"): o "ATIVOS (N)" do tamanho do "USINA", e as etiquetas no clique */
 .det-banner-ativos>summary{display:inline-flex;align-items:center;gap:8px;cursor:pointer;list-style:none;user-select:none}

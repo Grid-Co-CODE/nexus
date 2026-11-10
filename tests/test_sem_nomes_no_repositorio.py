@@ -88,17 +88,21 @@ def _fontes():
     if not pessoas:
         pytest.skip("o cadastro de pessoas veio vazio do banco")
     nomes, emails = set(), set()
+    ident = json.loads(ident_arq.read_text(encoding="utf-8"))
+    admins = {str(e).strip().lower() for e in ident.get("adminEmails") or []}
     cofre = Cofre(env["NEXUS_CHAVE_CADASTRO"])
     for p in pessoas:
         try:
             d = json.loads(cofre.decifrar(p["sensivel_cifrado"], f"banco/pessoas/{int(float(p['pessoa_id']))}"))
         except (CifraErro, ValueError, KeyError, TypeError):
             continue
+        # o administrador do App também é exceção no cadastro (10/11/2026: ele entrou no `cadastro_nexus · pessoas`, e o
+        # teste passou a acusar o nome do dono do repositório em quase todo arquivo, a começar do CLAUDE.md)
+        if str(d.get("email") or "").strip().lower() in admins:
+            continue
         nomes.update({_norm(d.get("nome")), _norm(d.get("nome_padrao"))})
         if d.get("email"):
             emails.add(str(d["email"]).strip().lower())
-    ident = json.loads(ident_arq.read_text(encoding="utf-8"))
-    admins = {str(e).strip().lower() for e in ident.get("adminEmails") or []}
     for em, p in (ident.get("porEmail") or {}).items():
         if str(em).strip().lower() in admins:
             continue
