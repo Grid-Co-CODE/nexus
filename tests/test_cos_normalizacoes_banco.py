@@ -306,7 +306,7 @@ def test_aberta_sem_nome_nem_texto_livre():
 
 
 def test_grava_as_abertas_e_na_falha_da_fotografia_o_retrato_de_antes_fica(app, banco, monkeypatch):
-    monkeypatch.setattr(NB, "COMENTARIOS_SO_DAS_USINAS", frozenset({"TSTE-AAA100"}))
+    monkeypatch.setattr(NB, "COMENTARIOS_DESDE_SEMPRE", frozenset({"TSTE-AAA100"}))
     ab = NB.abertas(_foto(("TSTE-AAA100", [_oc("a1")])), [], [], USINAS)
     with app.app_context():
         rel = NB.publicar(app.config, banco, agora=AGORA, forcar=True, leitura=_leitura([_n("r1")]),
@@ -408,21 +408,39 @@ def test_a_aberta_em_atendimento_com_o_equipamento_citado():
     assert d["2026-11-09"]["relato_do_dia"] == "Continuação: Cabine 2 desligada desde 08/11 às 10:15, em atendimento pelo COS."
 
 
-def test_o_comentario_do_dia_so_da_aparecida_do_taboado(app, banco):
-    """09/11/2026, o dono: "VOLTA TUDO AO NORMAL URGENTE" e "deixe somente as de aparecida do taboado". A outra usina
-    fica sem linha (a Plataforma volta à dela); a Aparecida (ADT100) mantém o comentário; a aba continua no livro."""
-    assert NB.COMENTARIOS_SO_DAS_USINAS == frozenset({"ADT100"})
+def test_o_comentario_do_dia_todas_as_usinas_de_10_11_em_diante_e_a_aparecida_desde_sempre(app, banco):
+    """10/11/2026, o dono (ao aprovar o texto do Haiku): todas as usinas, de hoje em diante. A ocorrência de outra usina
+    que começou antes de 10/11 fica sem linha (a Plataforma usa a dela, como estava) — mesmo a que começou às 23h de
+    09/11; a que começou a partir de 10/11 ganha o comentário; a Aparecida (ADT100) continua desde o começo."""
+    assert NB.COMENTARIOS_DESDE_SEMPRE == frozenset({"ADT100"})
+    assert NB.COMENTARIOS_DAS_OUTRAS_DESDE.isoformat() == "2026-11-10T00:00:00-03:00"
+    novo = "Usina desligada de 10/11 às 07:08 a 10/11 às 07:13 (5 min). Causa: oscilação na rede da concessionária."
     with app.app_context():
         rel = NB.publicar(app.config, banco, agora=AGORA, forcar=True,
                           leitura=_leitura([_n("r1", relato_cliente=REL, relato_continuacao=CONT),
-                                            _n("r2", usina_codigo="ADT100", relato_cliente=REL, relato_continuacao=CONT)]))
+                                            _n("r2", usina_codigo="ADT100", relato_cliente=REL, relato_continuacao=CONT),
+                                            _n("r3", relato_cliente=novo, inicio="2026-11-10T07:08:00-03:00",
+                                               normalizado_em="2026-11-10T07:13:00-03:00"),
+                                            _n("r4", relato_cliente=REL, inicio="2026-11-09T23:00:00-03:00",
+                                               normalizado_em="2026-11-10T07:30:00-03:00")]))
     gravadas = banco.linhas(NB.LIVRO, NB.ABA_COMENTARIOS)
-    assert [(g["usina_codigo"], g["dia"]) for g in gravadas] == [("ADT100", "2026-10-27")]
-    assert rel["comentarios_dias"] == 1 and rel["gravado"][NB.ABA] == 2
+    assert [(g["usina_codigo"], g["dia"]) for g in gravadas] == [("ADT100", "2026-10-27"), ("TSTE-AAA100", "2026-11-10")]
+    assert [g["relato_do_dia"] for g in gravadas][1] == novo
+    assert rel["comentarios_dias"] == 2 and rel["gravado"][NB.ABA] == 4
+
+
+def test_entra_no_comentario_pelo_inicio_da_ocorrencia():
+    linha = lambda **kw: [kw.get(c, "") for c in NB.CAB]
+    assert NB.entra_no_comentario(linha(usina_codigo="ADT100", inicio="2026-10-01T08:00:00-03:00"))
+    assert NB.entra_no_comentario(linha(usina_codigo="TSTE-AAA100", inicio="2026-11-10T00:00:00-03:00"))
+    assert not NB.entra_no_comentario(linha(usina_codigo="TSTE-AAA100", inicio="2026-11-09T23:59:00-03:00"))
+    # 10/11 00:30 em UTC ainda é 09/11 em Brasília
+    assert not NB.entra_no_comentario(linha(usina_codigo="TSTE-AAA100", inicio="2026-11-10T00:30:00+00:00"))
+    assert not NB.entra_no_comentario(linha(usina_codigo="TSTE-AAA100", inicio=""))
 
 
 def test_a_gravacao_leva_o_comentario_do_dia(app, banco, monkeypatch):
-    monkeypatch.setattr(NB, "COMENTARIOS_SO_DAS_USINAS", frozenset({"TSTE-AAA100"}))
+    monkeypatch.setattr(NB, "COMENTARIOS_DESDE_SEMPRE", frozenset({"TSTE-AAA100"}))
     with app.app_context():
         rel = NB.publicar(app.config, banco, agora=AGORA, forcar=True,
                           leitura=_leitura([_n("r1", relato_cliente=REL, relato_continuacao=CONT)]))
