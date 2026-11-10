@@ -1704,19 +1704,35 @@ O Levi viu a tela na bancada: "Gostei bastante! ... inclua também essas melhori
 ### Os eventos do dia (10/11/2026)
 
 Pedido do Levi pela sessão Nexus Field, com a imagem do quadro "COS · Timeline, Eventos do dia": "Quero que apareça tipo
-ocorrências: Algo nesse estilo". Abaixo do mapa (com o percurso aberto, sai: a gaveta lista os pontos dele), os eventos
-de hoje dos técnicos que a tela mostra (piloto e filtro), do mais novo ao mais velho: a hora, o ponto colorido na linha
-do tempo, o cartão "<técnico> · <o que aconteceu>" com a origem "Nexus Field" e a etiqueta; no alto a faixa "Agora" e o
-resumo ("2 deslocamentos · 1 chegada · ..."). O clique abre o percurso do dia do técnico (o sem permissão, o painel
-dele), com o filtro. A regra mora em `campo/equipe/eventos.py`, **sem régua nova**: a usina é o raio de 1 km, a saída da
+ocorrências: Algo nesse estilo". **No painel AO LADO do mapa, à direita, que abre neles** (Levi, no mesmo dia: "A parte
+de eventos deve ficar ao lado do mapa do lado direito essa visão de técnico e rotas pode ficar em uma botão do eventos
+como 'Técnico e Rotas' ... vai até o limite do mapa e vai tendo a barra de rolagem"): o botão **Técnico e Rotas** leva à
+lista de técnicos de antes (`?painel=tecnicos`, com o botão "Eventos do dia" de volta); o técnico escolhido abre a gaveta
+dele (o "Ver todos os técnicos" volta à lista). No computador (≥ 1180 px) o painel tem 420 px e a altura do mapa: ele
+fica por cima da coluna (`position:absolute`, não a estica) e a lista rola dentro (`.eq-corpo--ev`); no celular a lista
+rola numa altura própria (60vh). Os eventos de hoje dos técnicos que a tela mostra (piloto e filtro), do mais novo ao mais
+velho: a hora, o ponto colorido na linha do tempo, o cartão "<técnico> · <o que aconteceu>" com a origem "Nexus Field" e a
+etiqueta (abaixo do texto, no painel estreito); no alto a faixa "Agora" e o resumo ("2 deslocamentos · 1 chegada ·
+..."). O clique abre o percurso do dia do técnico (o sem permissão, o painel dele), com o filtro. A regra mora em `campo/equipe/eventos.py`, **sem régua nova**: a usina é o raio de 1 km, a saída da
 usina é o último ponto nela e a chegada o 1º ponto na outra (a regra dos deslocamentos), o sem sinal é 30 min, e
 andando/parado é o `mov` do celular. Os eventos: primeira posição do dia (na usina, na cidade ou "fora de usina"); saiu
 da usina; saiu do lugar do início do dia (os pontos parados do começo; a parada no meio do caminho não vira evento);
 chegou na usina, com a duração desde a última saída; sem sinal (na hora em que virou, "desde" o último ponto; não com o
 sem permissão); sem permissão (na hora do aviso, se hoje). **"Saiu de casa" não existe** (seria dedução: pode ser o
 hotel; "sem dado não se inventa", 06/11): é "saiu de <cidade>", ou "de um ponto fora de usina" sem a malha do IBGE.
-**"Para <usina>" e "chegada prevista" ficam para quando houver o destino** (a programação do PCM ou a OS). O evento é um
-dict com `instante` (UTC), `hora`, `pessoa_id`, `tipo`, `texto`, `rotulo`, `tom` e `usina_id`, sem coordenada: o
+**O destino (10/11/2026, Levi: "Pode subir o destino do técnico"):** a saída diz "para <usina>; chegada prevista
+HH:MM". O destino é o próximo bloco de HOJE da programação do PCM da equipe do técnico ainda não feito, numa usina
+diferente da que ele deixa (`eventos._destino`); a programação é a das telas do PCM (`pcm.fonte.ler`, o
+`banco_dados.json` do App, a semana ativa e só se for a de hoje; o `cluster` do bloco = o nome da equipe do cadastro; a
+usina pelo de-para do Fracttal, `tecnicos_usina._fracttal`; `equipe_tela._programa_do_dia`). **A chegada prevista é a
+régua do motor do PCM**: a distância em linha reta do ponto da saída até a usina / 70 km/h x 1,2 (`TRAVEL_KMH` e
+`TRAVEL_FACTOR` de `pcm/motor/programacao_v7.py`, copiados em `eventos.VELOCIDADE_KMH`/`FATOR_ROTA`; o teste lê o motor e
+avisa se mudar lá): nenhum número novo. A chegada diz "programada às HH:MM" (o 1º bloco da usina hoje). A gaveta do
+técnico mostra o Destino enquanto ele não chegou em usina depois da última saída. Sem programação (sábado, domingo, a
+semana da virada ainda não publicada, a fonte fora do ar) a saída vai sem destino; a usina do bloco sem coordenada (ou
+sem de-para) vai pelo nome, sem a chegada prevista. O evento é um
+dict com `instante` (UTC), `hora`, `pessoa_id`, `tipo`, `texto`, `rotulo`, `tom`, `usina_id`, `destino_usina_id`,
+`destino` e `chegada_prevista`, sem coordenada: o
 videowall do COS pode ler os mesmos (`eventos.da_equipe`), pela área dele.
 
 ### Quem vê

@@ -56,7 +56,8 @@ def test_o_dia_de_um_tecnico_vira_eventos_com_a_regra_dos_deslocamentos():
     assert [e["tom"] for e in ev] == ["neutro", "info", "ok", "info", "ok"]
     assert ev[2]["usina_id"] == "7" and ev[1]["usina_id"] is None
     # o formato que outra tela (o videowall do COS) pode ler: só texto, hora e ids, nenhuma coordenada
-    assert all(set(e) == {"instante", "hora", "pessoa_id", "tipo", "texto", "rotulo", "tom", "usina_id"} for e in ev)
+    assert all(set(e) == {"instante", "hora", "pessoa_id", "tipo", "texto", "rotulo", "tom", "usina_id",
+                          "destino_usina_id", "destino", "chegada_prevista"} for e in ev)
     assert not any(str(c) in repr(ev) for c in (*CASA, *NA_A, *ESTRADA, *NA_B))
 
 
@@ -107,3 +108,64 @@ def test_so_a_saida_do_lugar_do_inicio_vira_saiu_de_cidade():
     ev = _eventos([_p(6, 40, CASA), _p(7, 0, ESTRADA, mov=True), _p(7, 5, ESTRADA), _p(7, 10, ESTRADA, mov=True)],
                   agora=_as(7, 15))
     assert [e["tipo"] for e in ev] == ["inicio", "saiu"]
+
+
+# ── o destino pela programação do PCM (10/11/2026, Levi: "Pode subir o destino do técnico") ────────────────────────
+# os blocos de hoje da equipe do técnico, na ordem da hora (o que `equipe_tela._programa_do_dia` monta do
+# banco_dados.json do PCM): a usina (o id pelo de-para do Fracttal), a hora de início e se a tarefa já foi feita
+PROG = [{"usina_id": "7", "usina": "Usina Alfa Teste", "h_ini": "07:10", "feita": False},
+        {"usina_id": "8", "usina": "Usina Bravo Teste", "h_ini": "13:12", "feita": False}]
+
+
+def _eta(saida, de, usina):
+    from nexus.campo.equipe.deslocamentos import haversine_km
+    horas = haversine_km(*de, *USINAS[usina][:2]) / 70.0 * 1.2
+    return (saida + timedelta(hours=horas)).astimezone(timezone(timedelta(hours=-3))).strftime("%H:%M")
+
+
+def test_a_saida_leva_o_destino_da_programacao_e_a_chegada_prevista_pela_regua_do_pcm():
+    """O destino é o próximo bloco da programação de hoje da equipe do técnico que ainda não foi feito, numa usina
+    diferente da que ele deixa; a chegada prevista é a régua do motor do PCM (a distância em linha reta / 70 km/h x
+    1,2), da hora e do ponto da saída. A chegada diz a hora programada da usina."""
+    pontos = [_p(6, 40, CASA), _p(6, 50, CASA), _p(7, 0, ESTRADA, mov=True), _p(7, 30, NA_A), _p(9, 0, NA_A),
+              _p(9, 10, ESTRADA, mov=True), _p(10, 5, NA_B)]
+    ev = EV.do_tecnico(1, pontos, USINAS, NOMES, _as(10, 10), estado={}, cidade=_cidade, programa=PROG)
+    saidas = [e for e in ev if e["tipo"] == "saiu"]
+    assert saidas[0]["texto"] == ("saiu de Cidade Um Teste para Usina Alfa Teste; chegada prevista "
+                                  + _eta(_as(6, 50), CASA, "7"))
+    assert saidas[1]["texto"] == ("saiu da Usina Alfa Teste para Usina Bravo Teste; chegada prevista "
+                                  + _eta(_as(9, 0), NA_A, "8"))
+    assert [e["destino_usina_id"] for e in saidas] == ["7", "8"] and all(e["chegada_prevista"] for e in saidas)
+    assert [e["destino"] for e in saidas] == ["Usina Alfa Teste", "Usina Bravo Teste"]
+    chegadas = [e["texto"] for e in ev if e["tipo"] == "chegou"]
+    assert chegadas == ["chegou na Usina Alfa Teste, depois de 40 min de deslocamento; programada às 07:10",
+                        "chegou na Usina Bravo Teste, depois de 1 h 05 de deslocamento; programada às 13:12"]
+
+
+def test_o_destino_pula_o_bloco_feito_e_sem_programacao_nao_ha_destino():
+    pontos = [_p(6, 40, CASA), _p(7, 0, ESTRADA, mov=True)]
+    feita = [{**PROG[0], "feita": True}, PROG[1]]
+    (s,) = [e for e in EV.do_tecnico(1, pontos, USINAS, NOMES, _as(7, 10), estado={}, cidade=_cidade, programa=feita)
+            if e["tipo"] == "saiu"]
+    assert s["texto"].startswith("saiu de Cidade Um Teste para Usina Bravo Teste; chegada prevista ")
+    # sem programação (a equipe sem bloco hoje, o arquivo do PCM fora do ar): a saída sem destino, nada inventado
+    (s,) = [e for e in EV.do_tecnico(1, pontos, USINAS, NOMES, _as(7, 10), estado={}, cidade=_cidade)
+            if e["tipo"] == "saiu"]
+    assert s["texto"] == "saiu de Cidade Um Teste" and s["destino_usina_id"] is None and s["chegada_prevista"] is None
+    # a usina do bloco sem coordenada no cadastro (ou sem de-para): o destino pelo nome, sem a chegada prevista
+    sem = [{"usina_id": None, "usina": "Usina Sem Ligacao", "h_ini": "08:00", "feita": False}]
+    (s,) = [e for e in EV.do_tecnico(1, pontos, USINAS, NOMES, _as(7, 10), estado={}, cidade=_cidade, programa=sem)
+            if e["tipo"] == "saiu"]
+    assert s["texto"] == "saiu de Cidade Um Teste para Usina Sem Ligacao" and s["chegada_prevista"] is None
+
+
+def test_a_regua_da_chegada_prevista_e_a_do_motor_do_pcm():
+    """Uma régua só: a velocidade e o fator de rota são os do motor do PCM (`programacao_v7.py`, cópia idêntica do
+    repositório do PCM, que não se importa aqui por ser o script do motor). Mudou lá, este teste avisa."""
+    import re
+    from pathlib import Path
+    motor = (Path(__file__).resolve().parent.parent / "nexus" / "pcm" / "motor" / "programacao_v7.py").read_text(
+        encoding="utf-8")
+    kmh = float(re.search(r"^TRAVEL_KMH\s*=\s*([\d.]+)", motor, flags=re.M).group(1))
+    fator = float(re.search(r"^TRAVEL_FACTOR\s*=\s*([\d.]+)", motor, flags=re.M).group(1))
+    assert (EV.VELOCIDADE_KMH, EV.FATOR_ROTA) == (kmh, fator)

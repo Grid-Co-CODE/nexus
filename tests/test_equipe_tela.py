@@ -34,6 +34,8 @@ AGORA = datetime(2026, 11, 8, 15, 0, tzinfo=timezone.utc)          # 12:00 em Br
 URL = "/t/campo/equipe"
 URL_ROTA = "/t/campo/equipe/rota"
 URL_PILOTO = "/t/campo/equipe/piloto"
+# a lista de técnicos (o botão Técnico e Rotas): desde 10/11/2026 o painel ao lado do mapa abre nos Eventos do dia
+TECNICOS = {"painel": "tecnicos"}
 
 # as usinas, com casas incomuns: se alguma virar texto na página, o teste acha
 USINA_A, USINA_B = 7, 8
@@ -259,7 +261,7 @@ def test_o_mapa_desenha_a_ultima_posicao_de_quem_tem_ponto_tambem_o_parado_fora_
     """10/11/2026 (Levi: "se tem dados de localização tem que estar mostrando no nexus"): toda última posição dos 7 dias
     vai ao mapa, no lugar exato e na cor da situação; o parado fora de usina no cinza. Quem não tem ponto (o sem
     permissão que nunca mandou, o sem posição) fica só na lista."""
-    _, html = _html(_entrar(cliente, EMAIL[PCM]))
+    _, html = _html(_entrar(cliente, EMAIL[PCM]), query_string=TECNICOS)
     svg = _svg(html)
     for pid, tom in ((NA_USINA, "ok"), (ANDANDO, "info"), (SEM_SINAL, "alerta"), (FORA, "neutro")):
         assert re.search(rf'tecnico={pid}"><circle class="eq-p eq-p--{tom}"', svg), pid
@@ -294,7 +296,7 @@ def test_o_painel_do_tecnico_tem_a_equipe_a_hora_e_a_usina_mais_perto(cliente, p
 def test_parado_fora_de_usina_no_mapa_com_a_rota(cliente, pontos, setor):
     """Até 09/11/2026 o parado fora de usina ficava fora do mapa e sem rota ("o mapa não mostra onde o técnico mora");
     o Levi trocou a decisão em 10/11/2026: ele vai ao mapa no cinza, com a distância de uma casa e o Abrir rota."""
-    _, html = _html(_entrar(cliente, EMAIL[PCM]))
+    _, html = _html(_entrar(cliente, EMAIL[PCM]), query_string=TECNICOS)
     assert f"tecnico={FORA}\"" in _svg(html)
     lado = html.split('class="eq-lado"', 1)[1]
     fora = lado.split("Parados fora de usina", 1)[1].split("</section>", 1)[0]
@@ -316,7 +318,7 @@ def test_o_parado_fora_de_usina_mostra_a_cidade_e_o_estado(app, cliente, pontos,
     assert MU.cidade(-16.8123, -49.8321, "GO", pasta=pasta, baixar=IBGE(), iniciar=lambda alvo: alvo()) is None
     assert (pasta / "equipe" / "ibge" / "GO.json").exists()
     MU.limpar()
-    _, html = _html(_entrar(cliente, EMAIL[PCM]))
+    _, html = _html(_entrar(cliente, EMAIL[PCM]), query_string=TECNICOS)
     fora = html.split('class="eq-lado"', 1)[1].split("Parados fora de usina", 1)[1].split("</section>", 1)[0]
     assert NOME[FORA] in fora and "Cidade Um Teste/GO" in fora
     _, html = _html(cliente, query_string={"tecnico": FORA})
@@ -334,14 +336,14 @@ def test_a_pagina_nunca_baixa_do_ibge_e_a_cidade_vem_na_proxima(cliente, pontos,
     ibge, fundo = IBGE(), Fundo()
     monkeypatch.setattr(MU, "_baixador", lambda: ibge)
     monkeypatch.setattr(MU, "_em_fundo", fundo)
-    _, html = _html(_entrar(cliente, EMAIL[PCM]))
+    _, html = _html(_entrar(cliente, EMAIL[PCM]), query_string=TECNICOS)
     fora = html.split('class="eq-lado"', 1)[1].split("Parados fora de usina", 1)[1].split("</section>", 1)[0]
     assert NOME[FORA] in fora and "· GO ·" in fora and "/GO" not in fora
     assert ibge.pedidos == [] and len(fundo.alvos) == 1               # a página não baixou; uma ida em fundo
     _html(cliente, query_string={"tecnico": FORA})                     # a ida corre: não dispara outra
     assert len(fundo.alvos) == 1
     fundo.terminar()
-    _, html = _html(cliente)
+    _, html = _html(cliente, query_string=TECNICOS)
     assert "Cidade Um Teste/GO" in html.split('class="eq-lado"', 1)[1] and len(ibge.pedidos) == 2
 
 
@@ -424,9 +426,9 @@ def test_os_filtros_listam_so_o_supervisor_e_a_equipe_de_quem_esta_no_piloto(cli
 
 def test_o_filtro_estreita_o_mapa_a_lista_e_o_resumo(cliente, pontos, setor):
     _entrar(cliente, EMAIL[PCM])
-    assert _no_painel(_html(cliente)[1]) == set(PILOTO)                  # sem filtro: todos
+    assert _no_painel(_html(cliente, query_string=TECNICOS)[1]) == set(PILOTO)   # sem filtro: todos
     # a Equipe Leste: os dois de lá, nenhum no mapa (sem permissão e sem posição ficam só na lista)
-    _, html = _html(cliente, query_string={"equipe": LESTE})
+    _, html = _html(cliente, query_string={"equipe": LESTE, **TECNICOS})
     assert _no_painel(html) == {SEM_PERMISSAO, SEM_POSICAO} and "tecnico=" not in _svg(html)
     resumo = html.split('class="eq-resumo"', 1)[1].split("</p>", 1)[0]
     assert "1 sem permissão" in resumo and "1 sem posição hoje" in resumo and "na usina" not in resumo
@@ -434,18 +436,18 @@ def test_o_filtro_estreita_o_mapa_a_lista_e_o_resumo(cliente, pontos, setor):
     # o link do técnico leva o filtro junto, e o "Ver todos" do painel dele volta ao filtro, não a todos
     assert f'href="/t/campo/equipe?tecnico={SEM_POSICAO}&amp;equipe={LESTE}"' in html
     _, html = _html(cliente, query_string={"equipe": LESTE, "tecnico": SEM_POSICAO})
-    assert f'href="/t/campo/equipe?equipe={LESTE}">Ver todos os técnicos' in html
+    assert f'href="/t/campo/equipe?painel=tecnicos&amp;equipe={LESTE}">Ver todos os técnicos' in html
     # o técnico de fora do filtro não abre o painel dele
     _, html = _html(cliente, query_string={"equipe": LESTE, "tecnico": NA_USINA})
     assert "eq-det" not in html and NOME[NA_USINA] not in html
     # o supervisor da Centro: os quatro dela, todos no mapa (desde 10/11/2026 o parado fora de usina também)
-    _, html = _html(cliente, query_string={"supervisor": SUP_CENTRO})
+    _, html = _html(cliente, query_string={"supervisor": SUP_CENTRO, **TECNICOS})
     assert _no_painel(html) == {NA_USINA, ANDANDO, FORA, SEM_SINAL}
     svg = _svg(html)
     assert all(f"tecnico={p}&amp;supervisor={SUP_CENTRO}\"" in svg for p in (NA_USINA, ANDANDO, SEM_SINAL, FORA))
     assert f'<option value="{SUP_CENTRO}" selected>' in html
     # os dois juntos valem juntos: o supervisor da Centro e a equipe Leste não têm ninguém, e a tela diz
-    _, html = _html(cliente, query_string={"supervisor": SUP_CENTRO, "equipe": LESTE})
+    _, html = _html(cliente, query_string={"supervisor": SUP_CENTRO, "equipe": LESTE, **TECNICOS})
     assert _no_painel(html) == set() and "Nenhum técnico do piloto neste filtro." in html
 
 
@@ -457,7 +459,7 @@ def test_o_filtro_estreita_o_mapa_a_lista_e_o_resumo(cliente, pontos, setor):
 def test_id_desconhecido_no_filtro_mostra_todos_sem_erro(cliente, pontos, setor, pedido):
     """O id que não está nas opções (não existe, é de quem está fora do piloto, ou vem torto) não filtra: a tela mostra
     todos, sem 500 e sem nada marcado no select."""
-    st, html = _html(_entrar(cliente, EMAIL[PCM]), query_string=pedido)
+    st, html = _html(_entrar(cliente, EMAIL[PCM]), query_string={**pedido, **TECNICOS})
     assert st == 200 and _no_painel(html) == set(PILOTO)
     assert " selected>" not in html.split('class="cn-filtros eq-filtros"', 1)[1].split("</form>", 1)[0]
 
@@ -691,6 +693,90 @@ def test_sem_evento_hoje_o_quadro_diz(cliente, banco, setor):
     assert itens == [] and "Nenhum evento hoje." in ev
 
 
+# ── o painel ao lado do mapa: os eventos e o botão Técnico e Rotas (10/11/2026) ─────────────────────────────────
+def _lado(html):
+    return html.split('class="eq-lado', 1)[1].split("</aside>", 1)[0]
+
+
+def _q(href):
+    from html import unescape
+    from urllib.parse import parse_qs, urlsplit
+    return parse_qs(urlsplit(unescape(href)).query)
+
+
+def test_o_painel_ao_lado_do_mapa_abre_nos_eventos_e_o_botao_leva_a_tecnico_e_rotas(cliente, pontos, setor):
+    """Levi, 10/11/2026: "A parte de eventos deve ficar ao lado do mapa do lado direito essa visão de técnico e rotas
+    pode ficar em uma botão do eventos como 'Técnico e Rotas' se clicar vai para essa visão, mas a ideia é fica abrindo
+    os eventos, vai até o limite do mapa e vai tendo a barra de rolagem"."""
+    _, html = _html(_entrar(cliente, EMAIL[PCM]))
+    assert 'class="eq-corpo eq-corpo--ev"' in html
+    lado = _lado(html)
+    assert '<section class="eq-ev"' in lado and 'class="eq-grupo"' not in lado
+    assert html.count('<section class="eq-ev"') == 1                    # o quadro de baixo saiu
+    (href,) = re.findall(r'<a class="[^"]*eq-ev-botao[^"]*" href="([^"]+)">[^<]*(?:<[^>]+>[^<]*)*Técnico e Rotas</a>',
+                         lado)
+    assert _q(href) == {"painel": ["tecnicos"]}
+    # Técnico e Rotas: a lista de sempre, com o botão de volta aos eventos
+    _, html = _html(cliente, query_string={"painel": "tecnicos"})
+    lado = _lado(html)
+    assert 'class="eq-grupo"' in lado and '<section class="eq-ev"' not in lado and "eq-corpo--ev" not in html
+    (volta,) = re.findall(r'<a class="[^"]*eq-ev-botao[^"]*" href="([^"]+)">[^<]*(?:<[^>]+>[^<]*)*Eventos do dia</a>',
+                          lado)
+    assert _q(volta) == {}
+    # o filtro vai junto no botão; o "Ver todos os técnicos" do técnico volta à lista de técnicos
+    _, html = _html(cliente, query_string={"equipe": LESTE})
+    (href,) = re.findall(r'eq-ev-botao[^"]*" href="([^"]+)"', _lado(html))
+    assert _q(href) == {"painel": ["tecnicos"], "equipe": [str(LESTE)]}
+    _, html = _html(cliente, query_string={"tecnico": NA_USINA})
+    (ver,) = re.findall(r'href="([^"]+)">Ver todos os técnicos', html)
+    assert _q(ver) == {"painel": ["tecnicos"]}
+
+
+def test_os_eventos_rolam_dentro_da_altura_do_mapa():
+    """O painel dos eventos não passa da altura do mapa: ele fica por cima da coluna (não a estica) e a lista rola."""
+    css = (Path(__file__).resolve().parent.parent / "nexus" / "static" / "campo.css").read_text(encoding="utf-8")
+    assert re.search(r"\.eq-corpo--ev\{[^}]*align-items:stretch", css)
+    assert re.search(r"\.eq-corpo--ev \.eq-ev\{[^}]*position:absolute", css)
+    assert re.search(r"\.eq-ev-lista\{[^}]*overflow:auto", css)
+
+
+def test_o_destino_vem_da_programacao_do_dia_da_equipe(app, cliente, banco, pontos, setor, relogio, tmp_path):
+    """Levi, 10/11/2026: "Pode subir o destino do técnico". O destino é o próximo bloco de hoje da programação do PCM
+    da equipe dele (o banco_dados.json do App), com a usina pelo de-para do Fracttal; a chegada prevista é a régua do
+    motor do PCM. A gaveta do técnico diz o destino."""
+    seg = AGORA + timedelta(days=1)          # segunda-feira, 09/11, 12:00 de Brasília (a programação é de seg. a sex.)
+    relogio.agora = seg
+    _aba(banco, "cadastro_nexus", "de_para", [{"usina_id": USINA_B, "sistema": "Fracttal · Classificação 1",
+                                                "chave_externa": "UFV Bravo do Fracttal"}])
+    visao.limpar()
+    prog = {"semana_ativa": "2026-W46", "semanas": [{"week": "2026-W46", "rows": [
+        {"cluster": EQUIPE[CENTRO], "dia": "Segunda-feira", "h_ini": "13:00", "h_fim": "15:00",
+         "usina": "UFV Bravo do Fracttal", "status": "Não Iniciada"},
+        {"cluster": EQUIPE[CENTRO], "dia": "Terça-feira", "h_ini": "07:00", "h_fim": "09:00",
+         "usina": "Outra do Fracttal", "status": "Não Iniciada"}]}]}
+    arq = tmp_path / "banco_dados.json"
+    arq.write_text(json.dumps(prog), encoding="utf-8")
+    app.config["NEXUS_PCM_FONTE"] = str(arq)
+    # parado fora de usina às 09:00 e andando às 09:10 (Brasília, segunda)
+    _receber(pontos, ANDANDO, [((-16.712468, -49.013579), 3 * 60, False), ((-16.756789, -48.998765), 170, True)],
+             agora=seg)
+    pontos.registro.novos()
+    _, html = _html(_entrar(cliente, EMAIL[PCM]))
+    _ev, itens = _eventos_da_tela(html)
+    (saida,) = [t for _h, _href, n, t in itens if n == NOME[ANDANDO] and t.startswith("saiu")]
+    assert saida.startswith("saiu de um ponto fora de usina para Usina Bravo Teste; chegada prevista ")
+    # a gaveta dele diz o destino e a chegada prevista
+    _, html = _html(cliente, query_string={"tecnico": ANDANDO})
+    lado = _lado(html)
+    assert "<dt>Destino</dt>" in lado and "Usina Bravo Teste" in lado and "chegada prevista" in lado
+    # sem a programação (o arquivo do PCM que não abre), a saída sem destino e nenhum erro na tela
+    app.config["NEXUS_PCM_FONTE"] = str(tmp_path / "nao_existe.json")
+    st, html = _html(cliente)
+    _ev, itens = _eventos_da_tela(html)
+    assert st == 200 and [t for _h, _href, n, t in itens if n == NOME[ANDANDO] and t.startswith("saiu")] == [
+        "saiu de um ponto fora de usina"]
+
+
 # ── o piloto ─────────────────────────────────────────────────────────────────────────────────────────────────────────
 def test_o_piloto_so_o_admin_muda(app, cliente, banco, pontos, setor):
     antes = banco.linhas(LIVRO_PILOTO, ABA_PILOTO)
@@ -724,7 +810,7 @@ def test_o_piloto_so_o_admin_muda(app, cliente, banco, pontos, setor):
     assert nova["instante"] == "2026-11-08T15:00:00Z" and str(nova["decisao_id"])[0].isalpha()
     assert EMAIL[ADMIN] not in repr(depois)
     # vale já: o mapa mostra o técnico novo sem esperar o minuto da cópia, e a coleta dele vale
-    _, html = _html(cliente, query_string={"piloto": "ok"})
+    _, html = _html(cliente, query_string={"piloto": "ok", **TECNICOS})
     assert NOME[FORA_DO_PILOTO] in html.split('class="eq-lado"', 1)[1] and "Decisão do piloto gravada" in html
     assert pontos.coleta_vale(FORA_DO_PILOTO, AGORA) is True
     # e tira
@@ -753,7 +839,7 @@ def test_o_admin_poe_no_piloto_uma_pessoa_de_teste_que_nao_e_de_campo(app, clien
     nova = banco.linhas(LIVRO_PILOTO, ABA_PILOTO)[-1]
     assert (nova["pessoa_id"], nova["no_piloto"], nova["teste"]) == (PCM, 1, 1)
     assert pontos.coleta_vale(PCM, AGORA) is True                  # sem ser técnica de campo, pela marca de teste
-    _, html = _html(cliente)
+    _, html = _html(cliente, query_string=TECNICOS)
     lado = html.split('class="eq-lado"', 1)[1]
     assert "Analista Teste" in lado and 'class="eq-teste"' in lado      # no painel, com a marca
     assert sem_posicao(html) == antes                               # e fora da conta dos técnicos

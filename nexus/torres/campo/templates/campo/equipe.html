@@ -91,7 +91,7 @@
   </form>
   <p class="eq-resumo">{% for n, rot, tom in resumo %}<span class="cn-pill cn-{{ tom }}">{{ n }} {{ rot }}</span>{% else %}<span class="mudo">{{ 'Nenhum técnico do piloto neste filtro.' if filtro.q else 'Nenhum técnico no piloto da coleta agora.' }}</span>{% endfor %}</p>
 
-  <div class="eq-corpo">
+  <div class="eq-corpo{% if painel_ev %} eq-corpo--ev{% endif %}">
     <div class="eq-quadro">
       {% set d = perc.desenho if perc else none %}
       {% if d %}
@@ -127,7 +127,11 @@
       {% endif %}
     </div>
 
-    <aside class="eq-lado" aria-label="Os técnicos do piloto">
+    {# o painel ao lado do mapa (10/11/2026, Levi: "A parte de eventos deve ficar ao lado do mapa do lado direito essa
+       visão de técnico e rotas pode ficar em uma botão do eventos como 'Técnico e Rotas'... vai até o limite do mapa e
+       vai tendo a barra de rolagem"): abre nos eventos; o botão leva à lista de técnicos (?painel=tecnicos); o técnico
+       escolhido abre a gaveta dele #}
+    <aside class="eq-lado{% if painel_ev %} eq-lado--ev{% endif %}" aria-label="{{ 'Os eventos do dia' if painel_ev else 'Os técnicos do piloto' }}">
       {% if sel %}{% set s = sel.s %}
       <section class="eq-det">
         <div class="eq-det-cab"><h2 class="eq-det-nome">{{ sel.nome }}</h2><span class="cn-pill cn-{{ s.tom }}">{{ s.rotulo }}</span></div>
@@ -137,6 +141,7 @@
           {% if sel.perto %}<dt>Usina mais perto</dt><dd>{{ sel.perto }}</dd>{% endif %}
           {% if sel.onde %}<dt>{{ 'Cidade' if s.cidade else 'Estado' }}</dt><dd>{{ sel.onde }}</dd>{% endif %}
           {% if sel.desde %}<dt>Sem permissão desde</dt><dd>{{ sel.desde }}</dd>{% endif %}
+          {% if destino_sel %}<dt>Destino</dt><dd>{{ destino_sel }}</dd>{% endif %}
         </dl>
         {% if erro_periodo %}<p class="cn-erro" role="alert">{{ erro_periodo }}</p>{% endif %}
         {% if perc %}
@@ -179,9 +184,33 @@
           <button class="gc-btn gc-btn--contorno" type="submit"><i class="ph ph-path" aria-hidden="true"></i>Ver percurso</button>
           <p class="eq-nota">Dentro dos últimos 7 dias, na hora de Brasília. Cada abertura do percurso fica registrada: quem viu, de quem e de que período.</p>
         </form>
-        <a class="cn-link eq-voltar" href="{{ url_for('torre_campo.equipe', **filtro.q) }}">Ver todos os técnicos</a>
+        <a class="cn-link eq-voltar" href="{{ url_for('torre_campo.equipe', painel='tecnicos', **filtro.q) }}">Ver todos os técnicos</a>
+      </section>
+      {% elif painel_ev %}
+      {# os eventos do dia (10/11/2026, Levi, com a imagem do quadro de eventos do COS: "Quero que apareça tipo
+         ocorrências: Algo nesse estilo"): do mais novo ao mais velho, a hora, o técnico, o que aconteceu e a etiqueta; o
+         clique abre o percurso do dia dele. Regra em campo/equipe/eventos.py #}
+      <section class="eq-ev" aria-labelledby="eq-ev-titulo">
+        <div class="eq-ev-cab">
+          <div><p class="gc-eyebrow">Nexus Field</p><h2 class="eq-ev-titulo" id="eq-ev-titulo">Eventos do dia</h2></div>
+          <a class="gc-btn gc-btn--contorno eq-ev-botao" href="{{ url_for('torre_campo.equipe', painel='tecnicos', **filtro.q) }}"><i class="ph ph-users-three" aria-hidden="true"></i>Técnico e Rotas</a>
+        </div>
+        <p class="eq-ev-resumo">{{ eventos_resumo or 'Nenhum evento hoje.' }}</p>
+        <p class="eq-ev-agora"><span>Agora · {{ agora }}</span></p>
+        {% if eventos %}
+        <ol class="eq-ev-lista">
+          {% for e in eventos %}
+          <li class="eq-ev-item">
+            <time>{{ e.hora }}</time><span class="eq-ev-ponto eq-ev-ponto--{{ e.tom }}" aria-hidden="true"></span>
+            <a class="eq-ev-cartao" href="{{ url_for('torre_campo.equipe', **e.q) }}">
+              <span class="eq-ev-texto"><span class="eq-ev-linha"><b>{{ e.nome }}</b> · {{ e.texto }}</span><small>Nexus Field</small></span>
+              <span class="cn-pill cn-{{ e.tom }}">{{ e.rotulo }}</span></a></li>
+          {% endfor %}
+        </ol>
+        {% endif %}
       </section>
       {% else %}
+      <div class="eq-lado-cab"><a class="gc-btn gc-btn--contorno eq-ev-botao" href="{{ url_for('torre_campo.equipe', **filtro.q) }}"><i class="ph ph-list-bullets" aria-hidden="true"></i>Eventos do dia</a></div>
       {% for chave, titulo, lista in grupos %}
       <section class="eq-grupo">
         <h2>{{ titulo }} <span>{{ lista|length }}</span></h2>
@@ -199,30 +228,6 @@
       {% endif %}
     </aside>
   </div>
-
-  {# os eventos do dia (10/11/2026, Levi, com a imagem do quadro de eventos do COS: "Quero que apareça tipo ocorrências:
-     Algo nesse estilo"): do mais novo ao mais velho, a hora, o técnico, o que aconteceu e a etiqueta; o clique abre o
-     percurso do dia dele. Com o percurso aberto o quadro sai (a gaveta lista os pontos). Regra em campo/equipe/eventos.py #}
-  {% if not perc %}
-  <section class="eq-ev" aria-labelledby="eq-ev-titulo">
-    <div class="eq-ev-cab">
-      <div><p class="gc-eyebrow">Nexus Field</p><h2 class="eq-ev-titulo" id="eq-ev-titulo">Eventos do dia</h2></div>
-      <p class="eq-ev-resumo">{{ eventos_resumo or 'Nenhum evento hoje.' }}</p>
-    </div>
-    <p class="eq-ev-agora"><span>Agora · {{ agora }}</span></p>
-    {% if eventos %}
-    <ol class="eq-ev-lista">
-      {% for e in eventos %}
-      <li class="eq-ev-item">
-        <time>{{ e.hora }}</time><span class="eq-ev-ponto eq-ev-ponto--{{ e.tom }}" aria-hidden="true"></span>
-        <a class="eq-ev-cartao" href="{{ url_for('torre_campo.equipe', **e.q) }}">
-          <span class="eq-ev-texto"><span class="eq-ev-linha"><b>{{ e.nome }}</b> · {{ e.texto }}</span><small>Nexus Field</small></span>
-          <span class="cn-pill cn-{{ e.tom }}">{{ e.rotulo }}</span></a></li>
-      {% endfor %}
-    </ol>
-    {% endif %}
-  </section>
-  {% endif %}
 
   {% if admin %}
   {# o piloto (só administradores): no piloto, o Nexus Field só coleta quem foi escolhido aqui (padrão: ninguém) #}

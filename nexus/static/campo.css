@@ -2003,13 +2003,22 @@ tr.rd-linha--ativa td{background:var(--verde-suave)}
 .eq-perc-form .gc-campo{width:100%;min-width:0}
 .eq-perc-form .gc-btn{justify-content:center}
 .eq-perc-form-titulo{margin:0}
-/* os eventos do dia (10/11/2026): o quadro de eventos do COS (a hora, o ponto na linha do tempo, o cartão e a etiqueta) */
-.eq-ev{margin-top:18px;padding:14px 16px 16px;background:var(--superficie);border:1px solid var(--linha);
-  border-radius:var(--raio-md)}
-.eq-ev-cab{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:6px 16px}
+/* os eventos do dia (10/11/2026): o quadro de eventos do COS (a hora, o ponto na linha do tempo, o cartão e a etiqueta),
+   no painel ao lado do mapa, que abre nele; o botão Técnico e Rotas leva à lista de técnicos */
+.eq-ev{display:grid;gap:0;min-width:0}
+.eq-ev-cab{display:flex;flex-wrap:wrap;align-items:flex-start;justify-content:space-between;gap:8px 12px}
+.eq-ev-botao{flex:none}
+.eq-lado-cab{display:flex;justify-content:flex-end}
+/* a lista rola: no computador, dentro da altura do mapa (o painel fica por cima da coluna e não a estica); no celular,
+   numa altura própria */
+.eq-ev-lista{overflow:auto;max-height:60vh;padding-right:4px}
+@media (min-width:1180px){.eq-corpo--ev{grid-template-columns:minmax(0,1fr) 420px;align-items:stretch}
+  .eq-corpo--ev .eq-lado{position:relative;top:0;max-height:none;overflow:hidden}
+  .eq-corpo--ev .eq-ev{position:absolute;inset:14px 16px 16px;display:flex;flex-direction:column}
+  .eq-corpo--ev .eq-ev-lista{flex:1;min-height:0;max-height:none}}
 .eq-ev-cab .gc-eyebrow{margin:0}
 .eq-ev-titulo{margin:2px 0 0;font:700 20px/1.25 var(--font-display);color:var(--tinta)}
-.eq-ev-resumo{margin:0;font-size:12.5px;color:var(--mudo)}
+.eq-ev-resumo{margin:6px 0 0;font-size:12.5px;color:var(--mudo)}
 .eq-ev-agora{display:flex;justify-content:center;margin:12px 0 8px}
 .eq-ev-agora span{padding:3px 12px;border-radius:999px;background:var(--verde);color:var(--sobre-verde);
   font:700 11px/18px var(--font-sans);letter-spacing:.08em;text-transform:uppercase}
@@ -2035,6 +2044,8 @@ tr.rd-linha--ativa td{background:var(--verde-suave)}
 .eq-ev-linha b{font-weight:700}
 .eq-ev-texto small{font-size:12px;color:var(--mudo)}
 .eq-ev-cartao .cn-pill{flex:none}
+/* no painel (estreito) a etiqueta vai abaixo do texto: ao lado, ela apertava a frase */
+.eq-lado .eq-ev-cartao{flex-direction:column;gap:6px}
 /* no celular a etiqueta vai abaixo do texto: ao lado, ela apertava a frase em três palavras por linha */
 @media (max-width:640px){.eq-ev-item{grid-template-columns:40px 12px minmax(0,1fr);gap:6px}
   .eq-ev-item::before{left:51px}

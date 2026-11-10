@@ -610,7 +610,66 @@ def _percurso(srv, sel, pedido, coords, nomes_usina, agora) -> dict:
             "itens": _itens_do_percurso(desenho, trilha, coords, nomes_usina)}
 
 
-def _eventos_do_dia(srv, linhas: list, coords: dict, nomes_usina: dict, filtro: dict, agora) -> list:
+def _programa_do_dia(b, linhas: list, agora) -> dict:
+    """{pessoa_id: os blocos de HOJE da programação do PCM da equipe dele, na ordem da hora} (10/11/2026, Levi: "Pode
+    subir o destino do técnico"). A fonte é a das telas do PCM: o `banco_dados.json` do App (`pcm.fonte.ler`, cópia de
+    5 min), a semana ativa, e só se ela for a semana de hoje (a da virada ainda não publicada não vale). A equipe do
+    bloco é o `cluster` (o nome da aba do PCM, o mesmo da equipe do cadastro); a usina, o nome do Fracttal, ligado ao
+    `usina_id` pelo de-para do cadastro (`tecnicos_usina._fracttal`). Sábado, domingo ou a fonte que não abre: vazio
+    (o evento sai sem destino; nada inventado)."""
+    from ...pcm import fonte as PF
+    from ...pcm import semana as PS
+    from ...pcm.tecnicos_usina import _fracttal
+    hoje = agora.astimezone(_BRT).date()
+    if hoje.weekday() >= len(PS.DIAS):
+        return {}
+    dia = PS.DIAS[hoje.weekday()]
+    try:
+        leitura = PF.ler(current_app.config)
+        sem = PS.achar(leitura.dados) if leitura.dados else None
+        ano, num, _ = hoje.isocalendar()
+        if not sem or str(sem.get("week")) != f"{ano}-W{num:02d}":
+            return {}
+        usina_de = {}
+        for uid, nomes in _fracttal(b, do_app=None).items():
+            for n in nomes:
+                usina_de.setdefault(PS._norm(n), str(uid))
+        por_equipe: dict = {}
+        for r in sem.get("rows") or []:
+            if PS.dia_curto(r.get("dia")) != dia:
+                continue
+            nome = " ".join(str(r.get("usina") or "").split())
+            por_equipe.setdefault(PS._norm(r.get("cluster")), []).append(
+                {"usina_id": usina_de.get(PS._norm(nome)), "usina": nome, "h_ini": str(r.get("h_ini") or ""),
+                 "feita": PS.situacao(r) == "feita"})
+    except Exception as e:      # noqa: BLE001 — a programação é o destino: sem ela, o evento segue sem
+        _log.warning("equipe: não consegui ler a programação do PCM (%s)", type(e).__name__)
+        return {}
+    for blocos in por_equipe.values():
+        blocos.sort(key=lambda x: x["h_ini"])
+    return {l["pid"]: por_equipe.get(PS._norm(l["equipe"]), []) for l in linhas if l.get("equipe")}
+
+
+def _destino_atual(eventos: list, pid) -> str:
+    """O destino do técnico agora: a última saída de hoje com destino, se ele não chegou em usina depois dela
+    ("Usina X · chegada prevista 13:40"). `eventos` do mais novo ao mais velho."""
+    for e in eventos:
+        if e["pessoa_id"] != pid:
+            continue
+        if e["tipo"] == "chegou":
+            return ""
+        if e["tipo"] == "saiu":
+            if not e.get("destino"):
+                return ""
+            texto = e["destino"]
+            if e.get("chegada_prevista"):
+                prevista = datetime.strptime(e["chegada_prevista"], "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
+                texto += f" · chegada prevista {prevista.astimezone(_BRT):%H:%M}"
+            return texto
+    return ""
+
+
+def _eventos_do_dia(srv, linhas: list, coords: dict, nomes_usina: dict, filtro: dict, agora, programas=None) -> list:
     """Os eventos de hoje dos técnicos que a tela mostra (no piloto e no filtro), do mais novo ao mais velho
     (`eventos.da_equipe`; 10/11/2026, Levi: "Quero que apareça tipo ocorrências"). Cada um ganha, só para a tela, o
     nome do técnico e o endereço do clique: o percurso do dia dele (o sem permissão, o painel dele), com o filtro."""
@@ -627,7 +686,7 @@ def _eventos_do_dia(srv, linhas: list, coords: dict, nomes_usina: dict, filtro: 
     periodo = {"de": datetime.combine(hoje, time(E.JANELA_H[0]), tzinfo=_BRT).strftime(_PERIODO),
                "ate": agora.astimezone(_BRT).strftime(_PERIODO)}
     out = []
-    for e in EV.da_equipe(pontos, coords, nomes_usina, agora, estados=estados, cidade=cidade):
+    for e in EV.da_equipe(pontos, coords, nomes_usina, agora, estados=estados, cidade=cidade, programas=programas):
         q = {"tecnico": e["pessoa_id"], **({} if e["tipo"] == "sem_permissao" else periodo), **filtro["q"]}
         out.append({**e, "nome": nome.get(e["pessoa_id"]) or f"Pessoa {e['pessoa_id']}", "q": q})
     return out
@@ -742,8 +801,11 @@ def equipe():
     # o registro da LGPD: quem abriu, quando e, com um técnico escolhido no painel, de quem; antes de a página sair
     elif not _registrar_acesso(srv, "abriu_mapa", sel["pid"] if sel else None, None, agora):
         return _tela({"erro": SEM_REGISTRO}, 503)
-    # os eventos do dia (10/11/2026): com o mapa de todos; com o percurso aberto, a gaveta lista os pontos dele
-    eventos = _eventos_do_dia(srv, linhas, coords, nomes_usina, filtro, agora) if perc is None else []
+    # os eventos do dia (10/11/2026), com o destino da programação do PCM: o painel ao lado do mapa os mostra quando
+    # ninguém está escolhido e não se pediu a lista de técnicos (`?painel=tecnicos`, o botão Técnico e Rotas); a gaveta
+    # do escolhido usa o destino dele
+    eventos = _eventos_do_dia(srv, linhas, coords, nomes_usina, filtro, agora, _programa_do_dia(b, linhas, agora))
+    painel = "tecnicos" if str(request.args.get("painel") or "").strip() == "tecnicos" else "eventos"
     avisos = [a for a in (aviso_piloto,) if a]
     if erro_coords:
         avisos.append(f"Sem as coordenadas das usinas neste servidor ({erro_coords}): ninguém conta como na usina, e o "
@@ -762,7 +824,8 @@ def equipe():
         "filtro": filtro,
         # o Ver percurso: o percurso aberto (ou None), o erro do período e os valores do formulário do técnico
         "perc": perc, "erro_periodo": periodo.get("erro", "") if periodo else "",
-        "eventos": eventos, "eventos_resumo": EV.resumo(eventos),
+        "eventos": eventos, "eventos_resumo": EV.resumo(eventos), "painel_ev": sel is None and painel == "eventos",
+        "destino_sel": _destino_atual(eventos, sel["pid"]) if sel else "",
         "form_perc": _form_do_percurso(sel, agora, periodo) if sel else None,
         "avisos": avisos, "admin": admin, "todos": todos,
         "no_piloto": sum(1 for t in todos if t["no_piloto"] and not t["teste"]),
