@@ -38,6 +38,7 @@ def _fila_lenta(monkeypatch, chamadas):
     monkeypatch.setattr(regras_app, "_fila_supervisao", lenta)
     monkeypatch.setattr(regras_app, "_FILA_CACHE", {"t": time.time(), "ts": time.time(), "linhas": [{"id_work_orders_tasks": 1}]})
     monkeypatch.setattr(aprovacao, "_ultimo_fechamento_no_app", lambda: {})
+    monkeypatch.setattr(aprovacao, "_composicao_da_nota", lambda: {})      # o registro do App de mentira
     monkeypatch.setattr(aprovacao, "_PRONTA", {})
     leitura.limpar()
 
