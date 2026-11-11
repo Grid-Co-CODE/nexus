@@ -183,26 +183,54 @@ def eventos():
 def ocorrencias():
     """Ocorrências (22/10/2026): o ciclo de cada ocorrência registrada no período — detectada, cliente informado, campo
     acionado, normalizada, encerrada — com o prazo da spec R04. Os fatos vêm do Andamento; o veredito, de
-    nexus/cos/ocorrencias.py. Só lê: agir na ocorrência é na Ronda COS (o link de cada linha)."""
+    nexus/cos/ocorrencias.py. Só lê: agir na ocorrência é na Ronda COS (o link de cada linha).
+
+    11/11/2026 (pedido da Ana Barros): `?cliente=todos` junta os clientes numa tabela só, cada linha diz o que aconteceu
+    (causa, ação, informe, descrição e notas, como na tela Normalizações) e `?formato=csv` baixa a lista com os filtros."""
     cfg = current_app.config
     fonte = AND.fonte(cfg)
     clientes, erro_clientes = AND.clientes(cfg)
     cliente = request.args.get("cliente", "")
-    if cliente not in clientes:
+    todos = cliente == OC.TODOS and len(clientes) > 1
+    if not todos and cliente not in clientes:
         cliente = clientes[0] if clientes else ""
     dias = OC.dias_pedidos(request.args.get("dias"))
-    leitura = AND.ler_ocorrencias(cfg, cliente, dias) if cliente else AND.Leitura("", None, erro=erro_clientes or (
-        "" if not fonte.ligada else "o Andamento não informou nenhum cliente"))
+    if todos:
+        # Uma leitura por cliente, cada uma com o próprio cache de 60 s (a mesma da aba de cada um).
+        leituras = [AND.ler_ocorrencias(cfg, c, dias) for c in clientes]
+        erros = [f"{x.cliente}: {x.erro}" for x in leituras if x.erro]
+        leitura = AND.Leitura(OC.TODOS, None, erro="; ".join(erros), velha=any(x.velha for x in leituras))
+    else:
+        leitura = AND.Leitura("", None, erro=erro_clientes or (
+            "" if not fonte.ligada else "o Andamento não informou nenhum cliente"))
+        if cliente:
+            leitura = AND.ler_ocorrencias(cfg, cliente, dias)
+        leituras = [leitura]
     if not fonte.ligada:
         leitura.erro = ""
     situacao = request.args.get("situacao", "")
     if situacao not in OC.SITUACOES:
         situacao = ""
+    p = OC.painel(leituras if todos else leitura, AND.agora(), situacao, fonte.url)
+    if request.args.get("formato") == "csv":
+        if not p:
+            abort(404)
+        buf = io.StringIO()
+        w = csv.writer(buf, delimiter=";")
+        w.writerow(OC.CSV_COLUNAS)
+        w.writerows([[_celula_csv(v) for v in linha] for linha in OC.csv_linhas(p)])
+        # com o BOM, o Excel abre os acentos certos (o mesmo da tela Normalizações)
+        resp = Response("﻿" + buf.getvalue(), mimetype="text/csv; charset=utf-8")
+        nome = "todos" if todos else "".join(ch if ch.isalnum() else "-" for ch in cliente).strip("-").lower()
+        resp.headers["Content-Disposition"] = f'attachment; filename="ocorrencias-{nome}-{dias}d.csv"'
+        resp.headers["Cache-Control"] = "private, no-store"
+        return resp
     return render_template(
         "cos/ocorrencias.html", torre=TORRE, tela=TORRE.tela("ocorrencias"), ligada=fonte.ligada, clientes=clientes,
-        cliente=cliente, leitura=leitura, p=OC.painel(leitura, AND.agora(), situacao, fonte.url), dias=dias,
+        cliente=OC.TODOS if todos else cliente, todos=todos, leitura=leitura, p=p, dias=dias,
         dias_opcoes=AND.DIAS_DAS_OCORRENCIAS, situacao=situacao, situacoes=OC.SITUACOES, etapas=OC.ETAPAS,
-        prazos=OC.PRAZOS, lido=_lido([leitura]), url=_url)
+        prazos=OC.PRAZOS, lido=_lido(leituras), url=_url, o_que_aconteceu=OC.o_que_aconteceu,
+        status_da_os=OC.status_da_os)
 
 
 @bp.route("/religamentos")
