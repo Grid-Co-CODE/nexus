@@ -200,6 +200,8 @@ def codigo_do_equipamento(c) -> str | None:
 
 
 SEM_PAR = "sem par no cadastro"
+# a chave que só liga pela decisão da tela (`so_decisao` no item: os projetos da FAMA, 11/11/2026, `ligacao_fama.py`)
+A_DECIDIR = "a decidir na tela (só a ligação decidida vale)"
 
 
 def ignorado(regras, sistema, chave) -> str | None:
@@ -336,6 +338,8 @@ def de_para(srv, fontes: dict, regras=None) -> list[list]:
                     como = "manual aponta usina que não existe mais"
             elif como:
                 pass
+            elif it.get("so_decisao"):              # a FAMA (11/11/2026): a proposta pelo nome é só sugestão na tela
+                como = A_DECIDIR
             elif ids_ref:                           # a mesma usina de uma chave já casada: herda (1 ou 2 usinas)
                 ids, como = list(ids_ref), f"igual a {ref[0]}"
             elif como_ref and como_ref.startswith("ignorado"):

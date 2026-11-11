@@ -50,7 +50,8 @@
   {% for b in buracos %}
   <tr>
     <td class="lig-base">{{ b.sistema.split(' · ')[0] }}</td>
-    <td><strong class="lig-chave">{{ b.chave }}</strong>{% if b.tarefas %}<span class="mudo gc-num"> · {{ b.tarefas }} tarefas</span>{% endif %}{% if b.cidade %}<div class="mudo">{{ b.cidade }}</div>{% endif %}</td>
+    {# a chave que é um id (o projeto da FAMA, 11/11/2026) aparece pelo rótulo, com o id e as OS ao lado #}
+    <td><strong class="lig-chave">{{ b.rotulo or b.chave }}</strong>{% if b.rotulo %}<span class="mudo gc-num"> · id {{ b.chave }}</span>{% endif %}{% if b.os %}<span class="mudo gc-num"> · {{ b.os }} OS</span>{% endif %}{% if b.tarefas %}<span class="mudo gc-num"> · {{ b.tarefas }} tarefas</span>{% endif %}{% if b.cidade %}<div class="mudo">{{ b.cidade }}</div>{% endif %}</td>
     <td class="mudo">{{ b.motivo }}</td>
     <td>
       {% for g in b.sugestoes %}
@@ -89,7 +90,7 @@
   {% for x in por_nome %}
   <tr>
     <td class="lig-base">{{ x.sistema.split(' · ')[0] }}</td>
-    <td><strong class="lig-chave">{{ x.chave }}</strong></td>
+    <td><strong class="lig-chave">{{ x.rotulo or x.chave }}</strong>{% if x.rotulo %}<span class="mudo gc-num"> · id {{ x.chave }}</span>{% endif %}</td>
     <td><span class="id">{{ x.usina_id }}</span> {{ x.usina }}</td>
     <td class="mudo">{{ x.como }}</td>
     <td class="lig-botoes">

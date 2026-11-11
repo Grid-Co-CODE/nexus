@@ -28,6 +28,7 @@ pendência "Valores parecidos na mesma lista" aparece na Qualidade sem link (nã
 | `banco.py` | publica o cadastro no PostgreSQL com ID e ligação por ID (`ferramentas/publicar_cadastro.py`) |
 | `casamento.py` | casa o nome de uma base sem código (BD_Thopen) com a usina do cadastro |
 | `ligacoes.py` + `telas_ligacoes.py` | seção Ligações entre bases, no fim de Base → Governança de dados (até 11/10/2026 era a tela Base → Ligações): lê as bases, mostra os buracos, grava as decisões |
+| `ligacao_fama.py` | os projetos da FAMA nas Ligações (sistema `FAMA · Projetos`, 11/11/2026): as chaves da `dim_projeto_fama`, o normalizador próprio da FAMA e a proposta pelo nome, que nunca liga sozinha |
 | `importar.py` | importa o `BD_Operacoes.xlsx` (por comando desde 14/10/2026: a tela saiu) e monta a prévia do que muda antes de gravar |
 | `importar_csv.py` | Base → Registro mestre → Atualizar pelo CSV: o CSV do BD_Operações novo, usina a usina pela ficha, com prévia por coluna (15/10/2026) |
 | `estrutura_campo.py` | a carga única da estrutura de O&M de 10/2026 (regiões de campo, código e região das equipes) e a conferência dela (`ferramentas/importar_estrutura_campo.py`) |
@@ -755,6 +756,22 @@ colunas (a maioria escondida: o seletor de colunas mostra sem recarregar), e a p
   Gerais dava 2 usinas e o ciclo decide uma. A lista das abas que o ciclo não fecha, com o motivo: `C:\GridcoAuto\nexus\
   geracao_de_para_faltando.csv` (fora do git). Os sistemas antigos saem idênticos (876 linhas, 0 diferenças contra o
   publicado). **Ainda não publicado** (é do Levi, passo 1/decisão 8): até lá o `usina_id` da geração fica 0%.
+- **Os projetos da FAMA: sistema `FAMA · Projetos` (11/11/2026, `ligacao_fama.py`).** As OS que os clientes abrem na
+  FAMA vão ao banco de hora em hora (`nexus_os_fama`, `nexus/dados/CLAUDE.md`), e cada projeto da FAMA é uma usina.
+  "Ler as bases de novo" lê a `nexus_os_fama · dim_projeto_fama` do banco (sem o livro, antes da 1ª volta do servidor, a
+  FAMA não aparece). A **chave é o id do projeto na FAMA** (o nome pode mudar lá; o id, não), e a seção mostra o nome
+  (`rotulo`), o id e quantas OS ele tem; a aba Decisões também diz o nome. **Nunca liga sozinho** (`so_decisao` no item):
+  o de-para põe a linha sem usina e `casou_por` = `banco.A_DECIDIR`, e a **proposta pelo nome** aparece em "Sugestões do
+  Nexus", um clique para ligar (o `decidir` de sempre, que grava "manual (dd/mm)"). O fato das OS liga SÓ pela linha
+  "manual" do de-para publicado: decidir aqui e **Publicar no banco**, e a OS ganha a usina na volta seguinte. A proposta
+  usa o normalizador da FAMA (`nome_fama`), e não o `banco.norm` nem o `ligacao_campo._norm`, que servem ao de-para
+  inteiro e aos fatos: sem acento e sem caixa, o romano vira arábico (I a XXXIX, só a palavra inteira: "Vivi" e "Civil"
+  ficam), o zero à esquerda, "UFV" e as preposições caem, a sigla do estado no fim cai (só as 27 UFs: "II" não é estado)
+  e, do lado do cadastro e do Fracttal, o cliente da frente também ("<Cliente> - Usina 2 - UF" casa com "Usina II"). O
+  nome igual é procurado no nome da usina, no título "<Cliente> - <Usina>" e nas chaves do Fracttal ligadas a ela; mais de
+  uma usina (o mesmo nome em dois clientes), todas aparecem, divididas, e quem escolhe é a pessoa. A FAMA só cobre os
+  clientes que a usam, sem lista no código: não tem a aba "Usinas fora" (`ligacoes.SEM_AUSENCIA`). Prova:
+  `tests/test_cadastro_ligacoes_fama.py`.
 - **A regra de ignorar "Grid Co." do Fracttal pega "RenoGrid - Colíder 1/2" por acaso** (`ignorado` compara texto
   normalizado contido: "renoGRID COlider"). Desde 27/10/2026 as duas chaves estão ligadas à mão (a decisão da tela vence
   a regra); trocar a regra por chave exata na tela Ligações continua a fazer.

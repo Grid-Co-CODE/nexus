@@ -21,6 +21,11 @@ from pathlib import Path
 
 from . import banco as B
 from . import casamento as K
+from . import ligacao_fama
+# o `fato_os_fama` só importa o calendário no topo, nada do cadastro: sem ciclo
+from ..dados import fato_os_fama as FAMA
+
+SISTEMA_FAMA = FAMA.SISTEMA
 
 _BRT = timezone(timedelta(hours=-3))
 DADOS_PADRAO = Path(r"C:\GridcoAuto\nexus") if os.name == "nt" else Path(__file__).resolve().parents[2] / "dados"
@@ -46,6 +51,9 @@ SO_DO_CLIENTE = {"BD_Thopen · Dados Gerais Usinas": "Thopen", "BD_Thopen · aba
 # Base que não cobre um cliente: as abas do BD_Performance não têm usina da Thopen (0 de 47 usinas ligadas em 08/10; a
 # geração delas está no BD_Thopen). Sem isto, a aba "Usinas fora" listaria as 80 da Thopen em operação.
 SEM_O_CLIENTE = {"BD_Performance · aba": "Thopen"}
+# Base que só cobre os clientes que a usam, sem lista fixa no código: a FAMA (11/11/2026, `ligacao_fama.py`). Usina fora
+# dela não é buraco, e a aba "Usinas fora" listaria a carteira inteira
+SEM_AUSENCIA = frozenset({SISTEMA_FAMA})
 # A tabela de equipamentos do BD_Performance fecha o ciclo da aba de geração (Levi, 08/10/2026: "usa a tabela
 # equipamentos da BD_Performance como base de de-para, se liga ao fractall e aí você ligaria o fractal as usinas do
 # BD_Operações e fecharia esse ciclo"). Uma linha por equipamento (a "UFV", as UGs, os inversores), com a "Usina" (o
@@ -212,6 +220,10 @@ def fontes(config) -> dict:
         if (wb, ref) not in lidas:
             lidas[(wb, ref)] = _linhas_api(base, abas[(wb, ref)]) if (wb, ref) in abas else []
         out[sistema] = itens_abas(sistema, _primeiras_linhas(base, ids), lidas[(wb, ref)], dicas, equipamentos)
+    # os projetos da FAMA (11/11/2026): a dimensão que a leitura de hora em hora das OS grava no banco; sem o livro (antes
+    # da 1ª volta do servidor), a FAMA não aparece
+    if (FAMA.LIVRO, FAMA.ABA_DIM) in abas:
+        out[SISTEMA_FAMA] = ligacao_fama.itens(_linhas_api(base, abas[(FAMA.LIVRO, FAMA.ABA_DIM)]))
     return out
 
 
@@ -512,6 +524,15 @@ def _por_nome(como: str) -> bool:
     return any(como.startswith(p) for p in POR_NOME)
 
 
+def _indice_fama(usinas: list[dict], linhas_de_para: list) -> dict:
+    """O índice da proposta da FAMA (`ligacao_fama.indice`) com as chaves do Fracttal já ligadas a cada usina."""
+    fracttal = defaultdict(list)
+    for uid, sistema, chave, _como in linhas_de_para:
+        if sistema == FRACTTAL and uid is not None:
+            fracttal[uid].append(str(chave))
+    return ligacao_fama.indice(usinas, fracttal)
+
+
 def panorama(srv, atual: dict | None, regras: dict) -> dict:
     """Os números por base e as quatro listas da tela."""
     usinas = _usinas(srv)
@@ -522,6 +543,7 @@ def panorama(srv, atual: dict | None, regras: dict) -> dict:
     itens = {(s, str(it["chave"])): it for s, its in atual["fontes"].items() for it in its}
     est = defaultdict(lambda: {"ligadas": set(), "buracos": set(), "ignoradas": set(), "usinas": set()})
     buracos, por_nome = [], []
+    fama = {}                               # o índice da proposta da FAMA, montado uma vez (só se houver buraco dela)
     for uid, sistema, chave, como in atual["linhas"]:
         e, chave = est[sistema], str(chave)
         if como.startswith("ignorado"):
@@ -529,18 +551,26 @@ def panorama(srv, atual: dict | None, regras: dict) -> dict:
         elif uid is None:
             e["buracos"].add(chave)
             it = itens.get((sistema, chave), {"chave": chave})
+            if it.get("propor") == "fama":
+                if not fama:
+                    fama["idx"] = _indice_fama(usinas, atual["linhas"])
+                sug = ligacao_fama.sugestoes(it, fama["idx"], por_id)
+            else:
+                sug = sugestoes(it, usinas)
+            # `rotulo` e `os`: o que a seção mostra no lugar da chave quando ela é um id (o projeto da FAMA)
             buracos.append({"sistema": sistema, "chave": chave, "motivo": como, "tarefas": it.get("tarefas"),
-                            "nome": it.get("nome"), "cidade": it.get("cidade"),
-                            "sugestoes": sugestoes(it, usinas)})
+                            "nome": it.get("nome"), "cidade": it.get("cidade"), "rotulo": it.get("rotulo"),
+                            "os": it.get("os"), "sugestoes": sug})
         else:
             e["ligadas"].add(chave)
             e["usinas"].add(uid)
             if _por_nome(como):
                 por_nome.append({"sistema": sistema, "chave": chave, "usina_id": uid, "como": como,
-                                 "usina": por_id.get(uid, {}).get("titulo", uid)})
+                                 "usina": por_id.get(uid, {}).get("titulo", uid),
+                                 "rotulo": itens.get((sistema, chave), {}).get("rotulo")})
     ausencias, n_aus = {}, {}
     for sistema, e in est.items():
-        if sistema == "BD_Operações":
+        if sistema == "BD_Operações" or sistema in SEM_AUSENCIA:
             continue
         so, sem = SO_DO_CLIENTE.get(sistema), SEM_O_CLIENTE.get(sistema)
         esperadas = {(d.get("usina_id"), d.get("cliente_id")) for d in regras["ausencia"] if d.get("sistema") == sistema}
@@ -567,8 +597,8 @@ def panorama(srv, atual: dict | None, regras: dict) -> dict:
             elif tipo == "ausencia":
                 alvo = (por_id.get(d.get("usina_id"), {}).get("titulo") if d.get("usina_id") is not None
                         else f"todas do cliente {next((u['cliente'] for u in usinas if u['cliente_id'] == d.get('cliente_id')), d.get('cliente_id'))}")
-            else:
-                alvo = d.get("chave")
+            else:                           # a chave que é um id (o projeto da FAMA) aparece pelo nome
+                alvo = itens.get((d.get("sistema"), str(d.get("chave"))), {}).get("rotulo") or d.get("chave")
             decisoes.append({"tipo": tipo, "sistema": d.get("sistema") or "todas", "alvo": alvo,
                              "usina": por_id.get(d.get("usina_id"), {}).get("titulo") if tipo in ("ligar", "desligar") else "",
                              "motivo": d.get("motivo", ""), "quem": d.get("quem", ""), "quando": d.get("quando", ""),
