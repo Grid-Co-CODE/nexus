@@ -1562,6 +1562,19 @@ button.pn-it:hover{background:var(--superficie-2)}
 .rd-etiqueta{display:inline-flex;align-items:center;gap:6px;padding:4px 6px 4px 11px;border:1px solid var(--linha-forte);
   border-radius:999px;font-size:12.5px;color:var(--tinta-2);text-decoration:none}
 .rd-etiqueta b{color:var(--tinta);font-weight:600}
+/* o filtro suspenso das outras telas da Usinas 360° (10/11/2026, campo-filtros.js): o mesmo painel das Rondas, preso ao
+   formulário da tela; a etiqueta é um botão (tira o filtro e aplica) */
+.fs-barra{position:relative}
+.fs-barra .rd-campo input{width:230px}
+/* a dica do ponto do técnico no mapa (10/11/2026, campo-equipe.js): o nome, a equipe e a situação */
+.eq-dica{position:absolute;z-index:3;display:grid;gap:1px;max-width:260px;padding:8px 11px;pointer-events:none;
+  border:1px solid var(--linha-forte);border-radius:var(--raio-controle);background:var(--superficie-2);
+  box-shadow:0 10px 28px var(--sombra);font-size:12.5px;line-height:1.35}
+.eq-dica[hidden]{display:none}
+.eq-dica b{font-weight:700;color:var(--tinta)}
+.eq-dica span{color:var(--tinta-2)}
+.eq-dica small{font-size:12px;color:var(--mudo)}
+button.rd-etiqueta{background:transparent;font-family:inherit;cursor:pointer}
 .rd-etiqueta .rd-x{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;
   color:var(--mudo);font-size:14px}
 .rd-etiqueta:hover{border-color:var(--verde)}
@@ -1880,19 +1893,38 @@ tr.rd-linha--ativa td{background:var(--verde-suave)}
   transform-box:fill-box;transform-origin:center}
 .eq-pontos a:focus-visible .eq-p{stroke:var(--foco);stroke-width:3.5px}
 .eq-leg{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;margin:8px 4px 2px;font-size:12px}
-/* o Ver percurso (10/11/2026): os municípios do IBGE de fundo, a linha na ordem dos pontos e a hora onde não amontoa */
+/* o Ver percurso (10/11/2026): o mapa inteiro com zoom (campo-percurso.js troca o viewBox e põe o --eq-zt = 1 / zoom, que
+   segura o texto e os pontos do tamanho de sempre na tela, como o --mp-zt do Mapa de risco). O que tem data-n aparece no
+   nível de zoom dele: sem o script, só o nível 0 (o início e o fim) */
+.eq-quadro{position:relative}
+.eq-svg--perc{--eq-zt:1;--eq-k:1;touch-action:none;cursor:grab;user-select:none}
+.eq-svg--perc.eq-arrastando{cursor:grabbing}
+.eq-svg--perc [data-n]:not([data-n="0"]){display:none}
+/* o --eq-k (do script) cresce o texto e os pontos quando o mapa é estreito na tela (o desenho tem 1000 unidades de largura) */
+.eq-svg--perc text{font-size:calc(14px * var(--eq-zt) * var(--eq-k))}
+.eq-svg--perc .eq-u,.eq-svg--perc .eq-perc-p{transform-box:fill-box;transform-origin:center;
+  transform:scale(calc(var(--eq-zt) * var(--eq-k)))}
 .eq-mun path{fill:none;stroke:var(--linha);stroke-width:1px;stroke-linejoin:round;vector-effect:non-scaling-stroke}
-/* o nome da cidade e a hora em lados opostos da linha (situacao.desenho_percurso põe o x/y e a âncora de cada um) */
-.eq-mun-nomes text{font:500 12px var(--font-sans);fill:var(--mudo);pointer-events:none;
-  paint-order:stroke;stroke:var(--superficie);stroke-width:3px;stroke-linejoin:round}
+.eq-mun-nomes text{font-weight:500;font-family:var(--font-sans);fill:var(--mudo);pointer-events:none;
+  paint-order:stroke;stroke:var(--superficie);stroke-width:calc(3px * var(--eq-zt));stroke-linejoin:round}
+.eq-mun-nomes .eq-mun-rota{fill:var(--tinta-2);font-weight:600}
 .eq-perc-linha{fill:none;stroke:var(--info-cheio);stroke-width:3px;stroke-linejoin:round;stroke-linecap:round;
   vector-effect:non-scaling-stroke;opacity:.85}
 .eq-perc-p{stroke:var(--superficie);stroke-width:1.5px;vector-effect:non-scaling-stroke}
 .eq-perc-p--mov{fill:var(--info-cheio)}
 .eq-perc-p--parado{fill:var(--mudo)}
 .eq-perc-p--ini,.eq-perc-p--fim{stroke:var(--tinta);stroke-width:2.5px}
-.eq-perc-horas text{font:600 13px var(--font-sans);fill:var(--tinta);paint-order:stroke;stroke:var(--superficie);
-  stroke-width:3px;stroke-linejoin:round;pointer-events:none}
+.eq-perc-horas text{font-weight:600;font-family:var(--font-sans);fill:var(--tinta);paint-order:stroke;
+  stroke:var(--superficie);stroke-width:calc(3px * var(--eq-zt));stroke-linejoin:round;pointer-events:none}
+/* os botões do zoom, no canto do mapa */
+.eq-zoom{position:absolute;z-index:2;top:14px;left:14px;display:flex;flex-wrap:wrap;gap:6px}
+.eq-zoom-bt{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-width:34px;height:34px;padding:0 9px;
+  border:1px solid var(--linha-forte);border-radius:var(--raio-controle);background:var(--superficie);color:var(--tinta);
+  font:600 12.5px/1 var(--font-sans);cursor:pointer}
+.eq-zoom-bt:hover{border-color:var(--verde)}
+.eq-zoom-bt:focus-visible{outline:2px solid var(--foco);outline-offset:2px}
+.eq-zoom-bt:disabled{opacity:.45;cursor:default}
+.eq-zoom-bt--txt{padding:0 11px}
 .eq-leg-linha{display:inline-block;width:22px;height:0;border-top:3px solid var(--info-cheio);border-radius:2px}
 .eq-perc{display:grid;gap:8px;padding-top:12px;border-top:1px solid var(--linha)}
 .eq-perc-titulo{margin:0;font:700 11px/16px var(--font-sans);letter-spacing:.06em;text-transform:uppercase;color:var(--mudo)}
@@ -1903,6 +1935,7 @@ tr.rd-linha--ativa td{background:var(--verde-suave)}
   font-variant-numeric:tabular-nums}
 .eq-perc-item{display:grid;grid-template-columns:auto minmax(0,1fr);gap:10px;padding:4px 0;border-bottom:1px solid var(--linha)}
 .eq-perc-item b{font-weight:600;color:var(--tinta)}
+.eq-perc-quando{color:var(--mudo);white-space:nowrap}
 .eq-perc-item span{color:var(--mudo);overflow-wrap:anywhere}
 .eq-perc-item--mov span{color:var(--tinta-2)}
 .eq-perc-form{display:grid;gap:8px;padding-top:12px;border-top:1px solid var(--linha)}

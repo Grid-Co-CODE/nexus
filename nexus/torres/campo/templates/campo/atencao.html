@@ -48,7 +48,7 @@
     {% for v, nome, n in vistas %}<a href="{{ url(vista=v, f=None) }}"{% if v == vista %} aria-current="page"{% endif %}>{{ nome }}<i>{{ n }}</i></a>{% endfor %}
   </nav>
 
-  <form class="cn-filtros" method="get">
+  <form class="cn-filtros" method="get" data-fs>
     <input type="hidden" name="vista" value="{{ vista }}">
     <div class="cn-seg" aria-label="Visão">
       <a href="{{ url(modo=None) }}"{% if modo in ('responsaveis', 'kanban') %} aria-current="page"{% endif %}>Por responsável</a>
@@ -67,6 +67,8 @@
     <input class="gc-campo" type="search" name="q" value="{{ q }}" placeholder="usina, equipe, cidade{{ ', OS ou técnico' if vista != 'pendentes' else '' }}" aria-label="Buscar">
     {% for k in ('f', 'modo') %}{% if request.args.get(k) %}<input type="hidden" name="{{ k }}" value="{{ request.args.get(k) }}">{% endif %}{% endfor %}
   </form>
+  {# o filtro suspenso (10/11/2026, Levi: "a estrutura de filtros usando como referência os filtros de histórico de OS, um filtro suspenso e simples"): o campo-filtros.js monta o botão Filtros, o painel com o Aplicar e as etiquetas com as listas deste formulário #}
+  <script src="{{ url_for('static', filename='campo-filtros.js') }}"></script>
 
   {% if vista == 'pt' %}
   {% include 'campo/_pt_esperando.html' %}

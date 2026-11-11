@@ -1614,6 +1614,25 @@ sem a sessão do Nexus) e só aceitam a chave do aparelho ou o login Microsoft c
 - **A pré-carga nunca abre o Mapa de equipe** (`pre_carga.SEM_PRE_CARGA`): ela abre as telas com uma sessão interna de
   administrador, e cada abertura grava uma linha na trilha da LGPD.
 
+### O filtro suspenso (10/11/2026)
+
+Levi: "Quero que o visual dos filtros de todas as seções do usinas 360° tenha a estrutura de filtros usando como
+referência os filtros de histórico de OS, um filtro suspenso e simples". É o modelo A do Histórico do OS Creator Web
+(a barra com a visão, a busca e o botão **Filtros** com quantos estão aplicados; as listas num **painel suspenso que só
+vale no Aplicar**, fechar sem aplicar descarta; **uma etiqueta por filtro aplicado**, e o × tira só aquele), que as
+Rondas já tinham no próprio template desde 03/11 (as classes `rd-*`). **As outras telas ganham o mesmo pelo
+`static/campo-filtros.js`**: o formulário leva `data-fs` (Central de atenção, Ocorrências, Mapa de equipe, Visão do
+responsável, Aprovação de OS e Ranking de pontos) e o script, posto logo depois dele, monta o botão, o painel e as
+etiquetas com as `<select>` que já estão no formulário (o rótulo é o da tela; o `onchange` de cada uma sai). O HTML do
+servidor e as regras de cada filtro não mudam, e sem o script a tela segue como era. O padrão de cada lista é a 1ª opção
+(ou `data-padrao`); a lista com `data-fs-fora` fica na barra (o **mês** do Ranking, que é o período da tela); a lista sem
+`name` filtra na própria página e vale na hora (o cliente da Aprovação). **A busca da barra entra no mesmo campo**
+(Levi, no mesmo dia: "o campo buscar e as cores também tem que estar no mesmo padrão viu!"): o script a põe no
+`rd-campo rd-busca` (a lupa, a mesma borda, o mesmo fundo e a mesma altura do botão Filtros) e ANTES do botão, como no
+Histórico de OS; as cores são as do filtro das Rondas (os tokens do Nexus: o verde no lugar do azul do OS Creator). A Visão do cliente fica de fora (a única lista
+dela é o próprio cliente, o assunto da tela). Prova: `tests/test_campo_filtro_suspenso.py` e a bancada (aplicar, a
+etiqueta, tirar pela etiqueta).
+
 ### O ponto exato e o percurso (10/11/2026)
 
 Pedido do Levi pela sessão Nexus Field (ver a 1ª regra acima). **Ver percurso**, na gaveta do técnico escolhido:
@@ -1625,19 +1644,37 @@ Pedido do Levi pela sessão Nexus Field (ver a 1ª regra acima). **Ver percurso*
   nenhum percurso foi visto). Só do técnico que o painel abre (no piloto e no filtro).
 - **De onde vem:** `Servico.percurso` lê o diário de 7 dias deste processo (o mesmo que recebe e grava: o desenho supõe UM
   processo), só da pessoa, no período fechado [de, até], na ordem do instante; o ponto com mais de 7 dias nunca entra.
-- **O desenho é do servidor, só com x/y** (`situacao.desenho_percurso`): o recorte é o do percurso (no mínimo 0,05 grau,
-  ~5 km, de lado: parado o dia inteiro a caixa teria 0), com os **municípios do IBGE de fundo** (`municipios.na_caixa`: a
-  mesma malha do "Cidade/UF", só a da memória ou do disco; a UF sem malha manda a ida ao IBGE para o fundo e sai sem os
-  municípios desta vez; o contorno de todos, o **nome só dos que têm ponto do percurso**, porque na bancada os 124 nomes
-  do recorte se sobrepunham, e a gaveta diz "Passou por" com eles na ordem), as usinas do recorte, a polilinha na ordem e
-  cada ponto (azul andando, cinza parado; o 1º e o último maiores) com a hora no `<title>`. **A hora escrita vai a um
-  lado do trecho (na perpendicular dele) e o nome da cidade ao lado oposto**, e perto das bordas o texto cresce para
-  dentro: na bancada a hora da borda saía cortada ("16:5") e o nome, num lado fixo, caía em cima da linha diagonal. A hora vai escrita no desenho só no 1º, no último e no ponto a 40 unidades (de
-  1000) do último escrito (`ROTULO_MIN`): parado, os pontos caem uns sobre os outros. Percurso de mais de um dia leva o
-  dia na hora ("09/11 16:52"). Os outros técnicos saem do desenho enquanto o percurso está aberto.
-- **A gaveta** lista cada ponto na ordem com a hora, "em deslocamento" ou "parado" (e "parado na <usina>" a até 1 km de
-  uma), o resumo (quantos pontos, de quando a quando, a distância em linha reta somada entre os pontos) e o "Fechar o
-  percurso". Período sem ponto: "Nenhum ponto de <nome> neste período", e o mapa de sempre.
+- **O mapa inteiro primeiro, e a pessoa aproxima** (Levi, 10/11/2026, depois de ver o percurso no recorte dele: "pode
+  mostrar o mapa inteiro primeiro, e aí a pessoa pode ir dando zoom e mostrando as cidades e municípios de forma leve e
+  fluída, pode estudar como os setores fazem"). O percurso é desenhado no MESMO recorte do mapa dos técnicos
+  (`situacao._vista_do_mapa`) e o zoom é do `static/campo-percurso.js`, no modelo do Mapa de risco da Performance
+  (`clima-mapa.js`): troca só o `viewBox`; a roda, o arrasto e os dois dedos seguem na hora; os botões (+, -, **Ir ao
+  percurso**, **Mapa inteiro**) levam a vista andando (curto com os efeitos de animação do Windows desligados: encurta,
+  não some); o texto e os pontos não crescem com o zoom (`--eq-zt` = 1 / zoom; `--eq-k` cresce os dois quando o mapa é
+  estreito na tela). **O que aparece em cada zoom vem do servidor, por NÍVEL** (`data-n` em cada ponto, hora e
+  município): um nível é uma largura da vista em km (`NIVEIS_KM` = 1.200, 500, 150, 40 e 8; 0 = o mapa inteiro). O 1º e o
+  último ponto aparecem sempre; os do meio e as horas, no primeiro nível em que ficam longe o bastante dos vizinhos já
+  mostrados (`_niveis`: 1,2% da largura da vista para o ponto, 4% para a hora; parado no mesmo lugar, o ponto só no
+  último nível e a hora só na lista); o contorno dos municípios e o nome dos do percurso (espaçados, 9%) a partir da
+  vista de 500 km (`NIVEL_CIDADES`; com 250 km o percurso de 261 km da bancada, enquadrado, não mostrava cidade
+  nenhuma), e o nome dos vizinhos um nível depois. A menor vista é de 1,5 km (`VISTA_MIN_KM`). No mapa inteiro uma
+  unidade vale ~4 km: os pontos vão com 3 casas (~4 m) e os municípios com 2 (`_fino`, `_caminho_fino`), senão a linha
+  serrilharia de perto. Os municípios são só os da caixa do percurso com folga (metade do lado, no mínimo 0,3 grau): o
+  mapa inteiro com todos pesaria a página.
+- **O clique na pessoa no mapa já abre o percurso, e o mouse diz quem é** (Levi, 10/11/2026: "Quero que ao clicar na
+  pessoa no mapa já apareça o percurso e ao passar o mouse o nome da pessoa e a equipe!"). O link do ponto leva o período
+  do dia da última posição dela, das 6h às 22h ou até agora (`equipe_tela._percurso_do_dia`; sem posição ou com menos de
+  um minuto de período, abre só a gaveta): cada clique é uma abertura de percurso no registro da LGPD. A dica
+  (`static/campo-equipe.js`, o `.eq-dica`) mostra o nome, a equipe e a situação, lidos dos `data-eq-*` do link, com o
+  mouse e com o foco do teclado; o `<title>` do ponto saiu (a dica o substitui; o `aria-label` do link diz o mesmo). A
+  lista do painel (Técnico e Rotas) segue abrindo a gaveta.
+- **A lista da gaveta agrupa o resultado que se repete** (Levi, 10/11/2026: "quando o resultado do ponto se repetir
+  gostaria que apenas agrupasse as datas ao invés de vários pontos repetindo 'parado' poderia ter: de 10:28 a 16:38
+  parado"): pontos seguidos com o mesmo resultado (em deslocamento, parado, parado na <usina>) viram uma linha, "de
+  HH:MM a HH:MM <resultado>" (`equipe_tela._itens_do_percurso`).
+- **A gaveta** traz o resumo (quantos pontos, de quando a quando, a distância em linha reta somada entre os pontos), o
+  "Passou por" com os municípios na ordem e o "Fechar o percurso". Período sem ponto: "Nenhum ponto de <nome> neste
+  período", e o mapa de sempre.
 - **Cada abertura do percurso vai ao registro da LGPD ANTES de a trilha ser lida** (`abriu_percurso`, o técnico e o período
   em `periodo_de`/`periodo_ate`, colunas novas do `nexus_equipe_acessos`); sem o registro gravado, 503 e nada abre. A fila
   em disco com linhas de antes das colunas (8 colunas) vai ao banco com o período vazio (`gravador._acrescentar` completa a

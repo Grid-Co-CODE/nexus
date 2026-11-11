@@ -77,9 +77,9 @@
     calculado lá e chega ao Nexus de hora em hora, aos 25 minutos, a partir da versão do App que o publica.</td></tr>
   </tbody></table></div>
   {% else %}
-  <form class="cn-barra-filtros" method="get">
+  <form class="cn-barra-filtros" method="get" data-fs>
     <span class="gc-rotulo">Mês</span>
-    <select class="gc-campo" name="mes" aria-label="Mês da classificação" onchange="this.form.submit()">
+    <select class="gc-campo" name="mes" aria-label="Mês da classificação" onchange="this.form.submit()" data-fs-fora>
       {% for m in meses %}<option value="{{ m.mes }}"{% if m.mes == atual.mes %} selected{% endif %}>{{ nome_do_mes(m.mes) }}</option>{% endfor %}
     </select>
     <select class="gc-campo" name="regiao" aria-label="Região" onchange="this.form.submit()">
@@ -87,6 +87,8 @@
     </select>
     <span class="cn-barra-fonte">livro do ranking do App · lido às {{ lido }}</span>
   </form>
+  {# o filtro suspenso (10/11/2026, Levi: "a estrutura de filtros usando como referência os filtros de histórico de OS, um filtro suspenso e simples"): o campo-filtros.js monta o botão Filtros, o painel com o Aplicar e as etiquetas com as listas deste formulário #}
+  <script src="{{ url_for('static', filename='campo-filtros.js') }}"></script>
   {% if atual.vale and atual.vale != 'ligado' %}
   <div class="cn-erro cn-aviso" role="status">A régua deste placar está <b>{{ atual.vale }}</b> no App: os técnicos ainda
     veem a pontuação de antes.</div>

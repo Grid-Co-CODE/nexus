@@ -104,7 +104,7 @@
   {# na Central da usina, a busca da usina fica à direita, na linha das abas (05/11/2026, Levi: "Quero o 'Buscar usinas'
      do lado direito paralelizando com os botões a visão dos responsáveis!") #}
   {% if modo == 'usina' %}<div class="cu-topo">{% endif %}
-  <form class="cn-filtros" method="get">
+  <form class="cn-filtros" method="get" data-fs>
     {# o responsável que entrou pelo Fracttal não vê os cartões dos outros: vai direto para a Visão geral, que desde
        18/10/2026 ocupa o lugar de Onde focar. O Ranking das equipes saiu em 09/11/2026 (Levi, pelo Scrum master: "Pode
        remover o ranking das equipes de 'Visão do Responsável'"): o endereço antigo (modo=ranking) abre o Painel #}
@@ -139,6 +139,8 @@
        id="pn-rel-temas">, fora deste <form>) #}
     {% if modo == 'painel' and painel %}<button type="button" class="gc-btn gc-btn--contorno pn-exportar" data-pn-rel aria-haspopup="dialog" title="Escolher os temas e baixar o relatório do Painel em PDF"><i class="ph ph-file-pdf" aria-hidden="true"></i> Exportar relatório</button>{% endif %}
   </form>
+  {# o filtro suspenso (10/11/2026, Levi: "a estrutura de filtros usando como referência os filtros de histórico de OS, um filtro suspenso e simples"): o campo-filtros.js monta o botão Filtros, o painel com o Aplicar e as etiquetas com as listas deste formulário #}
+  <script src="{{ url_for('static', filename='campo-filtros.js') }}"></script>
   {% if modo == 'usina' %}
   <div class="cu-busca">{% with busca_usinas=central.busca, busca_rota='torre_campo.responsaveis', busca_ocultos={'modo': 'usina'}, busca_valor=central.nome, busca_rotulo='Buscar a usina' %}{% include 'campo/_busca_usina.html' %}{% endwith %}</div>
   </div>

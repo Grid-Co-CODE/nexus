@@ -159,6 +159,11 @@ def _svg(html):
     return html.split('<svg class="eq-svg', 1)[1].split("</svg>", 1)[0]          # o do mapa ou o do percurso
 
 
+def _no_svg(svg, pid) -> bool:
+    """O ponto do técnico está no desenho? O link dele abre o percurso do dia (10/11/2026): `tecnico=N&de=...&ate=...`."""
+    return bool(re.search(rf'tecnico={pid}(?:&amp;|")', svg))
+
+
 def _acessos(srv):
     return [dict(zip(CAB_ACESSOS, linha)) for linha in srv.registro.novos()]
 
@@ -264,9 +269,9 @@ def test_o_mapa_desenha_a_ultima_posicao_de_quem_tem_ponto_tambem_o_parado_fora_
     _, html = _html(_entrar(cliente, EMAIL[PCM]), query_string=TECNICOS)
     svg = _svg(html)
     for pid, tom in ((NA_USINA, "ok"), (ANDANDO, "info"), (SEM_SINAL, "alerta"), (FORA, "neutro")):
-        assert re.search(rf'tecnico={pid}"><circle class="eq-p eq-p--{tom}"', svg), pid
+        assert re.search(rf'tecnico={pid}&amp;[^"]*"[^>]*><circle class="eq-p eq-p--{tom}"', svg), pid
     for pid in (SEM_PERMISSAO, SEM_POSICAO, FORA_DO_PILOTO):
-        assert f"tecnico={pid}\"" not in svg, pid
+        assert not _no_svg(svg, pid), pid
     assert svg.count('class="eq-u"') == 2                              # as duas usinas, como marca discreta
     # os nomes vêm decifrados do cadastro, a equipe e a hora de Brasília
     assert NOME[NA_USINA] in html and "Equipe Centro Teste" in html
@@ -297,7 +302,7 @@ def test_parado_fora_de_usina_no_mapa_com_a_rota(cliente, pontos, setor):
     """Até 09/11/2026 o parado fora de usina ficava fora do mapa e sem rota ("o mapa não mostra onde o técnico mora");
     o Levi trocou a decisão em 10/11/2026: ele vai ao mapa no cinza, com a distância de uma casa e o Abrir rota."""
     _, html = _html(_entrar(cliente, EMAIL[PCM]), query_string=TECNICOS)
-    assert f"tecnico={FORA}\"" in _svg(html)
+    assert _no_svg(_svg(html), FORA)
     lado = html.split('class="eq-lado"', 1)[1]
     fora = lado.split("Parados fora de usina", 1)[1].split("</section>", 1)[0]
     assert NOME[FORA] in fora and "GO" in fora and "a 5,0 km da Usina Alfa Teste" in fora
@@ -391,7 +396,7 @@ def test_o_escolhido_tem_o_halo_e_vai_por_cima_dos_outros(cliente, pontos, setor
     svg = _svg(_html(cliente, query_string={"tecnico": NA_USINA})[1])
     pontos_svg = svg.split('<g class="eq-pontos">', 1)[1]
     links = re.findall(r"<a href=[^>]*>.*?</a>", pontos_svg, flags=re.S)
-    assert len(links) == 4 and f"tecnico={NA_USINA}\"" in links[-1]        # o escolhido por último
+    assert len(links) == 4 and _no_svg(links[-1], NA_USINA)                # o escolhido por último
     assert re.search(r'<circle class="eq-halo" cx="[^"]+" cy="[^"]+" r="11"/><circle class="eq-p eq-p--ok eq-p--sel"',
                      links[-1])
     assert svg.count("eq-halo") == 1 and svg.count("eq-p--sel") == 1
@@ -444,7 +449,8 @@ def test_o_filtro_estreita_o_mapa_a_lista_e_o_resumo(cliente, pontos, setor):
     _, html = _html(cliente, query_string={"supervisor": SUP_CENTRO, **TECNICOS})
     assert _no_painel(html) == {NA_USINA, ANDANDO, FORA, SEM_SINAL}
     svg = _svg(html)
-    assert all(f"tecnico={p}&amp;supervisor={SUP_CENTRO}\"" in svg for p in (NA_USINA, ANDANDO, SEM_SINAL, FORA))
+    assert all(re.search(rf'tecnico={p}&amp;[^"]*supervisor={SUP_CENTRO}"', svg)
+               for p in (NA_USINA, ANDANDO, SEM_SINAL, FORA))
     assert f'<option value="{SUP_CENTRO}" selected>' in html
     # os dois juntos valem juntos: o supervisor da Centro e a equipe Leste não têm ninguém, e a tela diz
     _, html = _html(cliente, query_string={"supervisor": SUP_CENTRO, "equipe": LESTE, **TECNICOS})
@@ -559,7 +565,8 @@ def test_o_ponto_de_outro_dia_vai_ao_mapa_marcado_e_sem_rota(cliente, pontos, se
     _receber(pontos, SEM_POSICAO, [((-16.712468, -49.013579), 16 * 60, False)])     # ontem às 20:00 de Brasília
     pontos.registro.novos()
     _, html = _html(_entrar(cliente, EMAIL[PCM]))
-    assert re.search(rf'tecnico={SEM_POSICAO}"><circle class="eq-p eq-p--neutro eq-p--velho"', _svg(html))
+    assert re.search(rf'tecnico={SEM_POSICAO}&amp;[^"]*"[^>]*><circle class="eq-p eq-p--neutro eq-p--velho"',
+                     _svg(html))
     _, html = _html(cliente, query_string={"tecnico": SEM_POSICAO})
     lado = html.split('class="eq-lado"', 1)[1]
     assert "Sem posição hoje" in lado and "07/11 às 20:00" in lado
@@ -587,10 +594,20 @@ def test_ver_percurso_desenha_o_periodo_na_ordem_com_a_hora_e_registra(cliente, 
     assert svg.count('<polyline class="eq-perc-linha"') == 1
     assert svg.count('class="eq-perc-p') == 4                           # os 3 da manhã e o de há 1 min
     assert "tecnico=" not in svg                                        # os outros técnicos saem do desenho
-    # a hora de cada ponto: no título de cada um e na lista do painel, na ordem
+    # a hora de cada ponto no título de cada um, na ordem
     assert [h for h in re.findall(r"<title>(\d\d:\d\d)", svg)] == ["09:00", "10:00", "11:00", "11:59"]
+    # o mapa inteiro primeiro, com o zoom do navegador (Levi, 10/11/2026): o svg diz o foco, a escala e os níveis, e a
+    # tela traz os botões e o script do zoom
+    cab = html.split('<svg class="eq-svg', 1)[1].split(">", 1)[0]
+    assert all(a in cab for a in ("data-eq-perc", "data-foco=", "data-km=", "data-niveis=", "data-min="))
+    assert all(f'data-eq-zoom="{z}"' in html for z in ("mais", "menos", "percurso", "inteiro"))
+    assert "campo-percurso.js" in html
     lado = html.split('class="eq-lado"', 1)[1]
-    assert re.findall(r'<li class="eq-perc-item[^"]*"><b>(\d\d:\d\d)</b>', lado) == ["09:00", "10:00", "11:00", "11:59"]
+    # a lista agrupa o resultado que se repete (Levi, 10/11/2026: "apenas agrupasse as datas ao invés de vários pontos
+    # repetindo 'parado' poderia ter: de 10:28 a 16:38 parado"): andando às 9h, parado às 10h, andando das 11:00 às 11:59
+    itens = re.findall(r'<li class="eq-perc-item[^"]*">(.*?)</li>', lado, flags=re.S)
+    assert [re.sub(r"<[^>]+>", "", i).strip() for i in itens] == [
+        "09:00 em deslocamento", "10:00 parado", "de 11:00 a 11:59 em deslocamento"]
     assert "4 pontos" in lado and "Fechar o percurso" in lado
     assert not [d for d in (*DIGITOS, *DIGITOS_MANHA) if d in html]
     (a,) = _acessos(manha)
@@ -775,6 +792,46 @@ def test_o_destino_vem_da_programacao_do_dia_da_equipe(app, cliente, banco, pont
     _ev, itens = _eventos_da_tela(html)
     assert st == 200 and [t for _h, _href, n, t in itens if n == NOME[ANDANDO] and t.startswith("saiu")] == [
         "saiu de um ponto fora de usina"]
+
+
+# ── o clique na pessoa abre o percurso, e o mouse diz quem é (10/11/2026) ──────────────────────────────────────
+def test_o_clique_na_pessoa_no_mapa_ja_abre_o_percurso_do_dia(cliente, pontos, setor):
+    """Levi, 10/11/2026: "Quero que ao clicar na pessoa no mapa já apareça o percurso e ao passar o mouse o nome da
+    pessoa e a equipe!". O link do ponto leva o período do dia da última posição dela (das 6h até agora, ou até as 22h
+    do dia dela): abre o percurso direto, e a abertura fica no registro da LGPD como todo percurso. A dica (o
+    campo-equipe.js) lê o nome, a equipe e a situação do próprio link; nada de coordenada."""
+    from html import unescape
+    from urllib.parse import parse_qs, urlsplit
+    _receber(pontos, SEM_POSICAO, [((-16.712468, -49.013579), 16 * 60, False)])     # ontem às 20:00 de Brasília
+    pontos.registro.novos()
+    _, html = _html(_entrar(cliente, EMAIL[PCM]))
+    svg = _svg(html)
+    a = re.search(rf'<a href="([^"]*tecnico={ANDANDO}[^"]*)"([^>]*)>', svg)
+    assert parse_qs(urlsplit(unescape(a.group(1))).query) == {
+        "tecnico": [str(ANDANDO)], "de": ["2026-11-08T06:00"], "ate": ["2026-11-08T12:00"]}
+    # o ponto de ontem abre o dia DELE, das 6h às 22h
+    ontem = re.search(rf'<a href="([^"]*tecnico={SEM_POSICAO}[^"]*)"', svg)
+    assert parse_qs(urlsplit(unescape(ontem.group(1))).query) == {
+        "tecnico": [str(SEM_POSICAO)], "de": ["2026-11-07T06:00"], "ate": ["2026-11-07T22:00"]}
+    # a dica: o nome, a equipe e a situação no próprio link; o título do navegador saiu (a dica o substitui)
+    attrs = unescape(a.group(2))
+    assert f'data-eq-nome="{NOME[ANDANDO]}"' in attrs and 'data-eq-equipe="Equipe Centro Teste"' in attrs
+    assert 'data-eq-sit="Em deslocamento"' in attrs and f'aria-label="{NOME[ANDANDO]}, Equipe Centro Teste' in attrs
+    assert "<title>" not in svg.split('<g class="eq-pontos">', 1)[1]
+    assert 'class="eq-dica"' in html and "campo-equipe.js" in html
+    # o clique abre o percurso (e registra)
+    st, html = _html(cliente, query_string=parse_qs(urlsplit(unescape(a.group(1))).query))
+    assert st == 200 and 'class="eq-perc-linha"' in html
+    assert [x["acao"] for x in _acessos(pontos)][-1] == "abriu_percurso"
+
+
+def test_a_busca_da_barra_entra_no_padrao_do_filtro_suspenso():
+    """Levi, 10/11/2026: "o campo buscar e as cores também tem que estar no mesmo padrão viu!". O script do filtro
+    suspenso põe a busca da barra no campo do modelo (o das Rondas: a lupa, a mesma borda e o mesmo fundo do botão
+    Filtros) e a deixa antes do botão, como no Histórico de OS."""
+    js = (Path(__file__).resolve().parent.parent / "nexus" / "static" / "campo-filtros.js").read_text(encoding="utf-8")
+    assert 'input[type="search"]' in js and "rd-campo rd-busca" in js and "ph-magnifying-glass" in js
+    assert 'classList.remove("gc-campo")' in js
 
 
 # ── o piloto ─────────────────────────────────────────────────────────────────────────────────────────────────────────

@@ -23,7 +23,7 @@
     <span{% if numeros.atrasadas %} class="oc-atrasada"{% endif %}><b>{{ numeros.atrasadas }}</b> com ação atrasada</span>
     <span><b>{{ numeros.sem_plano }}</b> sem ação em aberto</span></p>{% endif %}
 
-  <form class="cn-filtros oc-filtros" method="get" action="{{ url_for('torre_campo.ocorrencias') }}">
+  <form class="cn-filtros oc-filtros" method="get" action="{{ url_for('torre_campo.ocorrencias') }}" data-fs>
     <div class="cn-seg" aria-label="Ver as ocorrências"><a href="{{ url(ver=None) }}"{% if ver == 'lista' %} aria-current="page"{% endif %}>Lista</a><a href="{{ url(ver='quadro') }}"{% if ver == 'quadro' %} aria-current="page"{% endif %}>Quadro</a></div>
     {% if ver == 'quadro' %}<input type="hidden" name="ver" value="quadro">{% endif %}
     <label><span class="gc-rotulo">Responsável O&amp;M</span>
@@ -36,6 +36,8 @@
       <select class="gc-campo" name="criticidade" onchange="this.form.submit()"><option value="">Todas</option>{% for c, rot in criticidades.items() %}<option value="{{ c }}"{% if f.criticidade == c %} selected{% endif %}>{{ rot }}</option>{% endfor %}</select></label>
     <noscript><button class="gc-btn gc-btn--contorno" type="submit">Filtrar</button></noscript>
   </form>
+  {# o filtro suspenso (10/11/2026, Levi: "a estrutura de filtros usando como referência os filtros de histórico de OS, um filtro suspenso e simples"): o campo-filtros.js monta o botão Filtros, o painel com o Aplicar e as etiquetas com as listas deste formulário #}
+  <script src="{{ url_for('static', filename='campo-filtros.js') }}"></script>
 
   {% if ver == 'lista' %}
   <div class="oc-lista">

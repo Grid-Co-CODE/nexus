@@ -108,7 +108,7 @@
 
   {# o responsável vai ao servidor (Levi, 18/10/2026: "quero apenas por responsável da UFV"); cliente e busca filtram na
      página, sem recarregar #}
-  <form class="cn-barra-filtros apq-filtros" method="get" data-apq-filtros>
+  <form class="cn-barra-filtros apq-filtros" method="get" data-apq-filtros data-fs>
     {# cada rótulo junto do seu campo: quando a linha quebra, o par desce junto #}
     <span class="apq-filtro"><label class="gc-rotulo" for="apq-responsavel">Responsável O&amp;M</label>
     <select class="gc-campo" id="apq-responsavel" name="responsavel" onchange="this.form.submit()">
@@ -122,6 +122,8 @@
     <input class="gc-campo apq-busca" id="apq-busca" type="search" data-apq-busca placeholder="OS, UFV ou técnico" autocomplete="off"></span>
     <a class="cn-link cn-barra-fonte" href="{{ url(csv='1') }}">Exportar CSV</a>
   </form>
+  {# o filtro suspenso (10/11/2026, Levi: "a estrutura de filtros usando como referência os filtros de histórico de OS, um filtro suspenso e simples"): o campo-filtros.js monta o botão Filtros, o painel com o Aplicar e as etiquetas com as listas deste formulário #}
+  <script src="{{ url_for('static', filename='campo-filtros.js') }}"></script>
 
   <div class="apq-lote" role="region" aria-label="Aprovar várias OS de uma vez">
     <p class="apq-lote-total"><b class="gc-num">{{ n_os }}</b> OS esperando aprovação{% if responsavel %} nas usinas de {{ responsavel }}{% else %}, a fila inteira{% endif %}</p>

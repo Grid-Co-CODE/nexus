@@ -39,16 +39,19 @@ KM_POR_GRAU = 6371.0088 * math.pi / 180          # o mesmo raio da Terra do `hav
 # sem estado.
 FOLGA_UF_KM = 20.0
 MIN_GRAUS = 3.0                         # o recorte de uma usina só não vira um zoom de rua (o mesmo da Visão geral)
-# O percurso (10/11/2026) é desenhado no recorte DELE: parado o dia inteiro na usina, a caixa teria 0 grau; com
-# 0,05 grau (~5 km) de lado no mínimo, a linha da cidade ainda se lê. A hora escrita no desenho só quando o ponto está a
-# ROTULO_MIN unidades do SVG (de 1000 de largura) do último escrito: parado, os pontos caem uns sobre os outros
-MIN_GRAUS_PERCURSO = 0.05
-ROTULO_MIN = 40.0
-# Na bancada de 10/11/2026 a hora do ponto da borda saía cortada ("16:5") e o nome da cidade, num lado fixo, caía em cima
-# da linha diagonal: a hora vai a ROTULO_AFASTA unidades do ponto, na perpendicular do trecho, e o nome da cidade ao lado
-# oposto; a menos de ROTULO_BORDA da largura de uma borda, o texto cresce para dentro
-ROTULO_AFASTA = 16.0
-ROTULO_BORDA = 0.18
+# O percurso (10/11/2026) abre no MAPA INTEIRO, o mesmo recorte do mapa dos técnicos, e a pessoa aproxima (Levi: "pode
+# mostrar o mapa inteiro primeiro, e aí a pessoa pode ir dando zoom e mostrando as cidades e municípios de forma leve e
+# fluída"). O zoom é do navegador (troca o viewBox, como o Mapa de risco da Performance); o servidor diz, de cada ponto,
+# hora e município, o NÍVEL em que aparece. Um nível é uma largura da vista em km: 0 = qualquer vista (o mapa inteiro);
+# o nível i vale quando a vista tem até NIVEIS_KM[i-1] km de largura.
+NIVEIS_KM = (1200.0, 500.0, 150.0, 40.0, 8.0)
+NIVEL_CIDADES = 2                # o contorno dos municípios e o nome dos do percurso: a vista de até 500 km (na bancada de
+                                 # 10/11/2026, com 250 km, o percurso de 261 km enquadrado ainda não mostrava cidade nenhuma)
+NOME_FRACAO = 0.09               # dois nomes de município do percurso ficam a pelo menos 9% da largura da vista
+VISTA_MIN_KM = 1.5               # a menor vista (o zoom máximo): um bairro; mais perto, o contorno do IBGE só pixela
+ROTULO_FRACAO = 0.04             # duas horas escritas ficam a pelo menos 4% da largura da vista uma da outra
+PONTO_FRACAO = 0.012             # e dois pontos, a 1,2%
+ROTULO_AFASTA_EM = 1.1           # a hora fica a 1,1 "em" do ponto, na perpendicular do trecho (o texto não cresce com o zoom)
 
 CHAVES = ("deslocamento", "na_usina", "fora_usina", "sem_sinal", "sem_permissao", "sem_posicao")
 TOM = {"deslocamento": "info", "na_usina": "ok", "fora_usina": "neutro", "sem_sinal": "alerta",
@@ -227,6 +230,23 @@ def url_da_rota(origem: tuple, destino: tuple) -> str:
 
 
 # ── o desenho ────────────────────────────────────────────────────────────────────────────────────────────────────────
+def _vista_do_mapa(usinas: dict, pontos: list):
+    """O recorte do mapa (o dos técnicos e o do percurso): os estados com usina e todo ponto (lat, lon) desenhado."""
+    ufs = {c[2] for c in usinas.values() if len(c) > 2 and c[2]}
+    caixas = [e.caixa for e in M.estados() if e.sigla in ufs]
+    caixas += [(c[1], c[0], c[1], c[0]) for c in usinas.values()]
+    caixas += [(lon, lat, lon, lat) for lat, lon in pontos]
+    lon0, lat0 = min(x[0] for x in caixas), min(x[1] for x in caixas)
+    lon1, lat1 = max(x[2] for x in caixas), max(x[3] for x in caixas)
+    if lon1 - lon0 < MIN_GRAUS:
+        meio = (lon0 + lon1) / 2
+        lon0, lon1 = meio - MIN_GRAUS / 2, meio + MIN_GRAUS / 2
+    if lat1 - lat0 < MIN_GRAUS:
+        meio = (lat0 + lat1) / 2
+        lat0, lat1 = meio - MIN_GRAUS / 2, meio + MIN_GRAUS / 2
+    return M.vista_de_caixa("equipe", "Mapa de equipe", lon0, lat0, lon1, lat1, margem=0.06)
+
+
 def desenho(usinas: dict, pontos: list) -> dict:
     """O mapa no padrão da Visão geral (`mapa_responsaveis.desenho`): o contorno dos estados do IBGE, as usinas como
     marca discreta e cada técnico como um ponto já projetado. `usinas` = {usina_id: (lat, lon, uf)}; `pontos` =
@@ -237,19 +257,7 @@ def desenho(usinas: dict, pontos: list) -> dict:
     vazio = {"viewbox": None, "ufs": [], "usinas": [], "pontos": []}
     if not usinas and not pontos:
         return vazio
-    ufs = {c[2] for c in usinas.values() if len(c) > 2 and c[2]}
-    caixas = [e.caixa for e in M.estados() if e.sigla in ufs]
-    caixas += [(c[1], c[0], c[1], c[0]) for c in usinas.values()]
-    caixas += [(p[2], p[1], p[2], p[1]) for p in pontos]
-    lon0, lat0 = min(x[0] for x in caixas), min(x[1] for x in caixas)
-    lon1, lat1 = max(x[2] for x in caixas), max(x[3] for x in caixas)
-    if lon1 - lon0 < MIN_GRAUS:
-        meio = (lon0 + lon1) / 2
-        lon0, lon1 = meio - MIN_GRAUS / 2, meio + MIN_GRAUS / 2
-    if lat1 - lat0 < MIN_GRAUS:
-        meio = (lat0 + lat1) / 2
-        lat0, lat1 = meio - MIN_GRAUS / 2, meio + MIN_GRAUS / 2
-    v = M.vista_de_caixa("equipe", "Mapa de equipe", lon0, lat0, lon1, lat1, margem=0.06)
+    v = _vista_do_mapa(usinas, [(p[1], p[2]) for p in pontos])
 
     def xy(lat, lon):
         x, y = v.ponto(lat, lon)
@@ -273,39 +281,79 @@ def distancia_km(trilha: list) -> float:
     return sum(haversine_km(a["lat"], a["lon"], b["lat"], b["lon"]) for a, b in zip(trilha, trilha[1:]))
 
 
+def _fino(v: float, casas: int = 3) -> str:
+    """Número do SVG do percurso: no mapa inteiro uma unidade vale ~4 km, e o `numero_svg` (uma casa, ~400 m) serrilharia a
+    linha de um percurso de cidade quando a vista aproxima. Três casas (~4 m) nos pontos, duas (~40 m) nos municípios."""
+    t = f"{v:.{casas}f}".rstrip("0").rstrip(".")
+    return "0" if t in ("", "-0") else t
+
+
+def _caminho_fino(aneis, v) -> str:
+    partes = []
+    for anel in aneis:
+        pts = []
+        for lon, lat in anel:
+            x, y = v.ponto(lat, lon)
+            p = (round(x, 2), round(y, 2))
+            if not pts or p != pts[-1]:
+                pts.append(p)
+        if len(pts) >= 3:
+            partes.append("M" + " ".join(f"{_fino(x, 2)},{_fino(y, 2)}" for x, y in pts) + "Z")
+    return "".join(partes)
+
+
+def _niveis(pts: list, km_un: float, fracao: float) -> list:
+    """O nível de zoom em que cada ponto do percurso aparece: o 1º e o último no 0 (sempre); os outros, no primeiro nível
+    em que ficam a pelo menos `fracao` da largura da vista dos vizinhos já mostrados (o anterior e o seguinte na ordem do
+    percurso); o que nunca se separa (parado no mesmo lugar) fica None."""
+    import bisect
+    n = len(pts)
+    nivel = [None] * n
+    for i in {0, n - 1}:
+        nivel[i] = 0
+    mostrados = sorted({0, n - 1})
+    for L, largura in enumerate(NIVEIS_KM, start=1):
+        minimo = fracao * largura / km_un                    # em unidades do desenho
+        for i in range(n):
+            if nivel[i] is not None:
+                continue
+            j = bisect.bisect(mostrados, i)
+            vizinhos = [mostrados[k] for k in (j - 1, j) if 0 <= k < len(mostrados)]
+            if all(math.hypot(pts[i][0] - pts[k][0], pts[i][1] - pts[k][1]) >= minimo for k in vizinhos):
+                nivel[i] = L
+                mostrados.insert(j, i)
+    return nivel
+
+
 def desenho_percurso(usinas: dict, trilha: list, municipios=()) -> dict:
     """O percurso de um técnico num período (Levi, 10/11/2026: "consegue ver o percurso que aquela pessoa fez em
-    determinado período de dias e horas"), desenhado no servidor como o mapa: `trilha` = os pontos do período em ordem
-    (`Servico.percurso`, com lat/lon só na memória); `municipios` = [(nome, polígonos, caixa)] da malha do IBGE já no
-    disco (`municipios.na_caixa`), o fundo que dá a cidade. O recorte é o do percurso, com uma folga.
+    determinado período de dias e horas"), desenhado no servidor NO MAPA INTEIRO (o recorte do mapa dos técnicos): a
+    pessoa aproxima pelo navegador ("pode mostrar o mapa inteiro primeiro, e aí a pessoa pode ir dando zoom e mostrando
+    as cidades e municípios de forma leve e fluída"). `trilha` = os pontos do período em ordem (`Servico.percurso`, com
+    lat/lon só na memória); `municipios` = [(nome, polígonos, caixa)] da malha do IBGE já no disco
+    (`municipios.na_caixa`).
 
-    Devolve {"viewbox", "ufs", "municipios": [{"d", "nome", "x", "y"}], "cidades", "usinas": [{"usina_id", "x", "y"}]
-    (só as do recorte), "linha": "x,y x,y ..." (a polilinha na ordem), "marcas": [{"n", "x", "y", "hora", "mov",
-    "rotulo", "tx", "ty", "ancora"}]}: `hora` é a de Brasília ("16:52", ou "09/11 16:52" quando o percurso passa de um
-    dia); `rotulo` diz se a hora vai escrita no desenho (o 1º, o último e o ponto a ROTULO_MIN do último escrito: parado,
-    os pontos caem uns sobre os outros); `tx`/`ty`/`ancora`, onde ela vai (um lado do trecho, na perpendicular dele) e
-    para que lado cresce. O contorno de todo município do recorte é o fundo, mas o nome (`x` não None, já no lado oposto
-    ao da hora, com a `ancora`) só dos que têm ponto do percurso: na bancada de 10/11/2026 os 124 nomes do recorte se
-    sobrepunham. `cidades` = esses municípios na ordem da 1ª passagem. Sem ponto, `viewbox` None. Nenhuma coordenada sai
-    daqui."""
-    vazio = {"viewbox": None, "ufs": [], "municipios": [], "cidades": [], "usinas": [], "linha": "", "marcas": []}
+    Devolve {"viewbox", "ufs", "usinas", "linha" (a polilinha na ordem), "marcas": [{"n", "x", "y", "hora", "mov", "np",
+    "nr", "ox", "oy", "ancora"}], "municipios": [{"d", "nome", "x", "y", "n", "rota"}], "cidades", "foco", "km", "min",
+    "niveis"}:
+    - `hora` é a de Brasília ("16:52", ou "09/11 16:52" quando o percurso passa de um dia);
+    - `np` e `nr`: o nível de zoom em que o ponto e a hora escrita aparecem (`_niveis`; 0 = sempre; o ponto que nunca se
+      separa aparece só no último nível, e a hora dele não é escrita: fica na lista do painel e no título do ponto);
+    - `ox`, `oy`, `ancora`: onde a hora fica em relação ao ponto, em "em" do texto (que não cresce com o zoom), num lado
+      do trecho; o nome do município do percurso vai ao lado oposto;
+    - `municipios`: o contorno aparece no nível `nb` (NIVEL_CIDADES) e o nome no `n` (os do percurso a partir do
+      NIVEL_CIDADES, sem se amontoar; os vizinhos um nível depois);
+    - `cidades`: os municípios do percurso na ordem da 1ª passagem; `foco`: a caixa do percurso ("x0 y0 x1 y1"); `km`: km
+      por unidade do desenho; `min`: a menor largura da vista; `niveis`: as larguras em km de cada nível.
+    Sem ponto, `viewbox` None. Nenhuma coordenada sai daqui: só o x/y do desenho."""
+    vazio = {"viewbox": None, "ufs": [], "municipios": [], "cidades": [], "usinas": [], "linha": "", "marcas": [],
+             "foco": "", "km": 0.0, "min": 0.0, "niveis": ""}
     if not trilha:
         return vazio
-    lats, lons = [p["lat"] for p in trilha], [p["lon"] for p in trilha]
-    lon0, lat0, lon1, lat1 = min(lons), min(lats), max(lons), max(lats)
-    if lon1 - lon0 < MIN_GRAUS_PERCURSO:
-        meio = (lon0 + lon1) / 2
-        lon0, lon1 = meio - MIN_GRAUS_PERCURSO / 2, meio + MIN_GRAUS_PERCURSO / 2
-    if lat1 - lat0 < MIN_GRAUS_PERCURSO:
-        meio = (lat0 + lat1) / 2
-        lat0, lat1 = meio - MIN_GRAUS_PERCURSO / 2, meio + MIN_GRAUS_PERCURSO / 2
-    v = M.vista_de_caixa("percurso", "Percurso", lon0, lat0, lon1, lat1, margem=0.12)
-
-    def xy(lat, lon):
-        x, y = v.ponto(lat, lon)
-        return round(x, 1), round(y, 1)
-
-    pts = [xy(p["lat"], p["lon"]) for p in trilha]
+    v = _vista_do_mapa(usinas, [(p["lat"], p["lon"]) for p in trilha])
+    km_un = KM_POR_GRAU / v.escala
+    pts = [v.ponto(p["lat"], p["lon"]) for p in trilha]
+    pts = [(round(x, 3), round(y, 3)) for x, y in pts]
 
     def normal(i0, i1):
         """A perpendicular (unitária) do trecho de pts[i0] a pts[i1], o lado da hora; parado, para cima."""
@@ -313,55 +361,59 @@ def desenho_percurso(usinas: dict, trilha: list, municipios=()) -> dict:
         tam = math.hypot(dx, dy)
         return (0.0, -1.0) if tam == 0 else (dy / tam, -dx / tam)
 
-    def do_ponto(i):
-        return normal(max(i - 1, 0), min(i + 1, len(pts) - 1))
-
-    def ancora(x, nx):
-        if x > v.largura * (1 - ROTULO_BORDA):
-            return "end"
-        if x < v.largura * ROTULO_BORDA:
-            return "start"
+    def ancora(nx):
         return "start" if nx > 0.3 else "end" if nx < -0.3 else "middle"
 
     marcas_u = []
     for uid, (lat, lon, *_resto) in usinas.items():
-        x, y = xy(lat, lon)
-        if v.dentro(x, y):
-            marcas_u.append({"usina_id": uid, "x": M._n(x), "y": M._n(y)})
+        x, y = v.ponto(lat, lon)
+        marcas_u.append({"usina_id": uid, "x": _fino(x), "y": _fino(y)})
     fundo, primeira = [], {}
     for nome, poligonos, caixa in municipios:
         if not v.cruza(caixa):
             continue
-        d = M.caminho([anel for pol in poligonos for anel in pol], v)
+        d = _caminho_fino([anel for pol in poligonos for anel in pol], v)
         if not d:
             continue
         dentro = [i for i, p in enumerate(trilha) if perto_da_caixa(p["lon"], p["lat"], caixa, 0)
                   and any(no_poligono(p["lon"], p["lat"], pol) for pol in poligonos)]
-        x = y = lado = None
         if dentro:
             primeira.setdefault(nome, dentro[0])
-            # o nome no meio dos pontos dele (o meio da caixa pode cair longe do percurso, ou fora do recorte), do lado
-            # oposto ao da hora: a perpendicular do trecho que passa por ele
-            mx = sum(pts[i][0] for i in dentro) / len(dentro)
-            my = sum(pts[i][1] for i in dentro) / len(dentro)
-            nx, ny = normal(dentro[0], dentro[-1]) if dentro[0] != dentro[-1] else do_ponto(dentro[0])
-            cx, cy = mx - ROTULO_AFASTA * nx, my - ROTULO_AFASTA * ny
-            x, y, lado = M._n(round(cx, 1)), M._n(round(cy, 1)), ancora(cx, -nx)
-        fundo.append({"d": d, "nome": nome, "x": x, "y": y, "ancora": lado})
+            # o nome no meio dos pontos dele, do lado oposto ao da hora (a perpendicular do trecho que passa por ele)
+            x = sum(pts[i][0] for i in dentro) / len(dentro)
+            y = sum(pts[i][1] for i in dentro) / len(dentro)
+            nx, ny = normal(dentro[0], dentro[-1]) if dentro[0] != dentro[-1] else normal(
+                max(dentro[0] - 1, 0), min(dentro[0] + 1, len(pts) - 1))
+            ox, oy, anc = -ROTULO_AFASTA_EM * nx, -ROTULO_AFASTA_EM * ny, ancora(-nx)
+        else:
+            x, y = v.ponto((caixa[1] + caixa[3]) / 2, (caixa[0] + caixa[2]) / 2)      # o meio da caixa do município
+            ox, oy, anc = 0.0, 0.0, "middle"
+        fundo.append({"d": d, "nome": nome, "x": _fino(x), "y": _fino(y), "ox": round(ox, 2), "oy": round(oy + 0.35, 2),
+                      "ancora": anc, "rota": bool(dentro), "nb": NIVEL_CIDADES, "n": NIVEL_CIDADES + 1,
+                      "_xy": (x, y)})
+    # o nome dos municípios do percurso aparece com o contorno, sem se amontoar: na ordem da passagem, cada um no nível em
+    # que fica longe o bastante dos vizinhos já escritos; os que nunca cabem, e os vizinhos do percurso, um nível depois
+    da_rota = sorted((m for m in fundo if m["rota"]), key=lambda m: primeira[m["nome"]])
+    if da_rota:
+        for m, nv in zip(da_rota, _niveis([m["_xy"] for m in da_rota], km_un, NOME_FRACAO)):
+            m["n"] = max(NIVEL_CIDADES, nv) if nv is not None else len(NIVEIS_KM)
+    for m in fundo:
+        del m["_xy"]
     instantes = [_instante(p["instante"]) for p in trilha]
     dias = {i.astimezone(_BRT).date() for i in instantes if i is not None}
     formato = "%d/%m %H:%M" if len(dias) > 1 else "%H:%M"
-    marcas, ultimo_escrito = [], None
+    np_, nr_ = _niveis(pts, km_un, PONTO_FRACAO), _niveis(pts, km_un, ROTULO_FRACAO)
+    marcas = []
     for n, (p, inst) in enumerate(zip(trilha, instantes), start=1):
-        x, y = pts[n - 1]
-        nx, ny = do_ponto(n - 1)
-        escreve = (n in (1, len(trilha)) or ultimo_escrito is None
-                   or math.hypot(x - ultimo_escrito[0], y - ultimo_escrito[1]) >= ROTULO_MIN)
-        if escreve:
-            ultimo_escrito = (x, y)
-        marcas.append({"n": n, "x": M._n(x), "y": M._n(y), "hora": inst.astimezone(_BRT).strftime(formato) if inst else "",
-                       "mov": bool(p.get("mov")), "rotulo": escreve, "tx": M._n(round(x + ROTULO_AFASTA * nx, 1)),
-                       "ty": M._n(round(y + ROTULO_AFASTA * ny, 1)), "ancora": ancora(x, nx)})
+        nx, ny = normal(max(n - 2, 0), min(n, len(pts) - 1))
+        marcas.append({"n": n, "x": _fino(pts[n - 1][0]), "y": _fino(pts[n - 1][1]),
+                       "hora": inst.astimezone(_BRT).strftime(formato) if inst else "", "mov": bool(p.get("mov")),
+                       "np": len(NIVEIS_KM) if np_[n - 1] is None else np_[n - 1], "nr": nr_[n - 1],
+                       "ox": round(ROTULO_AFASTA_EM * nx, 2), "oy": round(ROTULO_AFASTA_EM * ny + 0.35, 2),
+                       "ancora": ancora(nx)})
+    xs, ys = [q[0] for q in pts], [q[1] for q in pts]
     return {"viewbox": v.viewbox, "municipios": fundo, "cidades": sorted(primeira, key=primeira.get), "usinas": marcas_u,
             "linha": " ".join(f"{m['x']},{m['y']}" for m in marcas), "marcas": marcas,
+            "foco": " ".join(_fino(c) for c in (min(xs), min(ys), max(xs), max(ys))),
+            "km": round(km_un, 6), "min": VISTA_MIN_KM / km_un, "niveis": ",".join(str(int(n)) for n in NIVEIS_KM),
             "ufs": [{"d": f.d, "sigla": f.sigla, "x": f.x, "y": f.y} for f in M.ufs_da_vista(v)]}

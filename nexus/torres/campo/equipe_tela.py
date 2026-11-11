@@ -554,6 +554,17 @@ def _periodo(agora) -> dict | None:
     return {"de": de, "ate": ate, "aviso": aviso}
 
 
+def _percurso_do_dia(linha: dict, agora) -> dict:
+    """O período que o clique no ponto do técnico abre (Levi, 10/11/2026: "Quero que ao clicar na pessoa no mapa já
+    apareça o percurso"): o dia da última posição dele, das 6h às 22h (ou até agora), nos valores do formulário
+    ({"de", "ate"}). Sem posição, ou com menos de um minuto de período (o 1º ponto das 6h): {} (abre só a gaveta)."""
+    ultima = linha["s"]["ultima"]
+    if ultima is None:
+        return {}
+    f = _form_do_percurso(linha, agora, None)
+    return {"de": f["de"], "ate": f["ate"]} if f["ate"] > f["de"] else {}
+
+
 def _form_do_percurso(sel: dict, agora, pedido: dict | None) -> dict:
     """Os valores do formulário do Ver percurso: o período aberto, ou o dia da última posição do técnico das 6h até as
     22h (ou até agora), dentro do limite dos 7 dias."""
@@ -570,8 +581,10 @@ def _form_do_percurso(sel: dict, agora, pedido: dict | None) -> dict:
 
 
 def _itens_do_percurso(desenho: dict, trilha: list, coords: dict, nomes_usina: dict) -> list:
-    """A lista do painel: cada ponto na ordem, com a hora (a mesma do desenho), andando ou parado e, parado a até 1 km de
-    uma usina, o nome dela. Sem coordenada."""
+    """A lista do painel, na ordem: andando ou parado e, parado a até 1 km de uma usina, o nome dela. O resultado que se
+    repete em pontos seguidos vira UMA linha com o intervalo (Levi, 10/11/2026: "quando o resultado do ponto se repetir
+    gostaria que apenas agrupasse as datas ao invés de vários pontos repetindo 'parado' poderia ter: de 10:28 a 16:38
+    parado"): {"de", "ate" (iguais num ponto só), "mov", "usina", "n" (quantos pontos)}. Sem coordenada."""
     itens = []
     for m, p in zip(desenho["marcas"], trilha):
         usina = ""
@@ -579,7 +592,10 @@ def _itens_do_percurso(desenho: dict, trilha: list, coords: dict, nomes_usina: d
             perto = SI.usina_mais_perto(p["lat"], p["lon"], coords)
             if perto and perto[1] <= E.RAIO_USINA_KM:
                 usina = nomes_usina.get(perto[0]) or f"Usina {perto[0]}"
-        itens.append({"n": m["n"], "hora": m["hora"], "mov": m["mov"], "usina": usina})
+        if itens and (itens[-1]["mov"], itens[-1]["usina"]) == (m["mov"], usina):
+            itens[-1]["ate"], itens[-1]["n"] = m["hora"], itens[-1]["n"] + 1
+        else:
+            itens.append({"de": m["hora"], "ate": m["hora"], "mov": m["mov"], "usina": usina, "n": 1})
     return itens
 
 
@@ -590,8 +606,11 @@ def _percurso(srv, sel, pedido, coords, nomes_usina, agora) -> dict:
     if not trilha:
         return {"desenho": None, "itens": [], "resumo": "", "vazio": f"Nenhum ponto de {sel['nome']} neste período."}
     from ...cadastro.ligacoes import pasta_dados
-    caixa = (min(p["lon"] for p in trilha), min(p["lat"] for p in trilha), max(p["lon"] for p in trilha),
-             max(p["lat"] for p in trilha))
+    lons, lats = [p["lon"] for p in trilha], [p["lat"] for p in trilha]
+    # os municípios do fundo: os da caixa do percurso e os vizinhos (a folga é metade do lado, no mínimo ~30 km), para a
+    # pessoa aproximar e ver as cidades em volta; o mapa inteiro com todos os municípios pesaria a página
+    folga = max(0.3, (max(lons) - min(lons)) / 2, (max(lats) - min(lats)) / 2)
+    caixa = (min(lons) - folga, min(lats) - folga, max(lons) + folga, max(lats) + folga)
     try:
         municipios = MU.na_caixa(caixa, pasta=pasta_dados(current_app.config))
     except Exception as e:      # noqa: BLE001 — o fundo é enfeite: sem ele, o percurso vale
@@ -783,6 +802,9 @@ def equipe():
     # das linhas). O controle do piloto, não: é quem o administrador põe e tira da coleta, filtro nenhum o esconde
     vistos = {pid: t for pid, t in tecnicos.items() if _no_filtro(b, t, filtro)}
     linhas, pontos = _linhas(srv, b, vistos, piloto, coords, nomes_usina, agora)
+    # o endereço do clique no ponto de cada um: o percurso do dia da última posição, com o filtro da tela
+    for l in linhas:
+        l["q_ponto"] = {"tecnico": l["pid"], **_percurso_do_dia(l, agora), **filtro["q"]}
     try:
         mapa = SI.desenho(coords, pontos)
     except ValueError as e:     # o contorno do IBGE que não abre: a lista continua valendo

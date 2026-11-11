@@ -168,21 +168,32 @@ def _trilha(*pares, inicio=AGORA - timedelta(hours=2), passo_min=10):
             for i, (lat, lon) in enumerate(pares)]
 
 
-def test_o_desenho_do_percurso_so_tem_x_e_y_e_a_hora_de_cada_ponto():
-    """O percurso de um período (Levi, 10/11/2026: "consegue ver o percurso que aquela pessoa fez em determinado período
-    de dias e horas"): a linha na ordem dos pontos e a hora de Brasília de cada um, projetados no servidor; a página nunca
-    tem a coordenada. O recorte é o do percurso (com uma folga), não o do Brasil."""
+def _municipio(nome, lon0, lat0, lon1, lat1):
+    anel = ((lon0, lat0), (lon1, lat0), (lon1, lat1), (lon0, lat1), (lon0, lat0))
+    return (nome, ((anel,),), (lon0, lat0, lon1, lat1))
+
+
+def test_o_percurso_abre_no_mapa_inteiro_e_so_tem_x_e_y():
+    """Levi, 10/11/2026: "No deslocamento pode mostrar o mapa inteiro primeiro, e aí a pessoa pode ir dando zoom e
+    mostrando as cidades e municípios de forma leve e fluída". O desenho do percurso usa o MESMO recorte do mapa dos
+    técnicos (os estados com usina), com a linha na ordem dos pontos e a hora de cada um; o zoom é do navegador (troca o
+    viewBox), e o servidor diz o foco (a caixa do percurso), quantos km vale cada unidade e a menor vista. Só x/y."""
     trilha = _trilha(NA_USINA, NA_ESTRADA, FORA)
     d = SI.desenho_percurso(USINAS, trilha)
-    assert d["viewbox"].startswith("0 0 1000 ")
+    assert d["viewbox"] == SI.desenho(USINAS, [])["viewbox"]                     # o mapa inteiro, o mesmo dos técnicos
+    assert [u["usina_id"] for u in d["usinas"]] == ["7", "8"] and {f["sigla"] for f in d["ufs"]} >= {"GO"}
     assert [m["hora"] for m in d["marcas"]] == ["10:00", "10:10", "10:20"]       # Brasília, na ordem
-    assert [m["mov"] for m in d["marcas"]] == [True, False, True]
-    assert d["marcas"][0]["rotulo"] and d["marcas"][-1]["rotulo"]               # o 1º e o último sempre com a hora
-    # a linha passa pelos pontos na ordem: o mesmo x/y das marcas
+    assert [m["mov"] for m in d["marcas"]] == [True, False, True] and [m["n"] for m in d["marcas"]] == [1, 2, 3]
     assert d["linha"] == " ".join(f"{m['x']},{m['y']}" for m in d["marcas"])
-    assert all(set(m) == {"x", "y", "hora", "mov", "rotulo", "n", "tx", "ty", "ancora"} for m in d["marcas"])
-    assert [m["n"] for m in d["marcas"]] == [1, 2, 3]
-    assert {u["usina_id"] for u in d["usinas"]} >= {"7"}
+    # o foco é a caixa do percurso, em unidades do desenho, dentro do mapa
+    x0, y0, x1, y1 = (float(v) for v in d["foco"].split())
+    xs, ys = [float(m["x"]) for m in d["marcas"]], [float(m["y"]) for m in d["marcas"]]
+    assert (x0, y0, x1, y1) == (min(xs), min(ys), max(xs), max(ys))
+    # a escala: os dois pontos a 0,8 km + 4,2 km... a distância no desenho x km por unidade bate com o haversine
+    km = d["km"]
+    dist = ((xs[0] - xs[2]) ** 2 + (ys[0] - ys[2]) ** 2) ** 0.5 * km
+    assert dist == pytest.approx(haversine_km(*NA_USINA, *FORA), rel=0.02)
+    assert d["min"] == pytest.approx(SI.VISTA_MIN_KM / km) and d["niveis"] == ",".join(str(int(n)) for n in SI.NIVEIS_KM)
     assert not any(dg in repr(d) for dg in DIGITOS)
     # o percurso de mais de um dia leva o dia na hora
     trilha = _trilha(NA_USINA, NA_ESTRADA, inicio=AGORA - timedelta(days=1, hours=2), passo_min=24 * 60)
@@ -190,12 +201,38 @@ def test_o_desenho_do_percurso_so_tem_x_e_y_e_a_hora_de_cada_ponto():
     assert SI.desenho_percurso(USINAS, [])["viewbox"] is None
 
 
-def test_as_horas_do_percurso_nao_se_amontoam():
-    """Parado, o celular manda vários pontos no mesmo lugar: a hora sai escrita só no 1º deles (e no 1º e no último do
-    percurso); a de todos fica na lista do painel e no título de cada ponto."""
-    trilha = _trilha(NA_USINA, NA_USINA, NA_USINA, NA_ESTRADA, NA_ESTRADA)
+def test_os_pontos_e_as_horas_aparecem_por_nivel_de_zoom():
+    """No mapa inteiro, um percurso de cidade cabe em poucas unidades: desenhar todos os pontos e todas as horas viraria
+    um borrão. Cada ponto e cada hora dizem o NÍVEL de zoom em que aparecem (0 = o mapa inteiro; os níveis são larguras
+    da vista em km, `NIVEIS_KM`): o 1º e o último sempre; os do meio, quando a vista aproxima o bastante para caberem
+    sem se amontoar. Parado no mesmo lugar, a hora sai escrita só no 1º (as outras ficam na lista do painel)."""
+    trilha = _trilha(NA_USINA, NA_USINA, NA_USINA, NA_ESTRADA, FORA)
     d = SI.desenho_percurso(USINAS, trilha)
-    assert [m["rotulo"] for m in d["marcas"]] == [True, False, False, True, True]
+    m = d["marcas"]
+    assert (m[0]["np"], m[0]["nr"], m[-1]["np"], m[-1]["nr"]) == (0, 0, 0, 0)
+    assert all(0 <= x["np"] <= len(SI.NIVEIS_KM) for x in m)
+    # a ~42 km dos outros, o ponto da estrada aparece cedo (a vista de 1.200 km já o separa)
+    assert m[3]["np"] <= 2 and m[3]["nr"] is not None and m[3]["nr"] >= m[3]["np"]
+    # os dois repetidos no mesmo lugar: o ponto só no último nível, e a hora nunca escrita no desenho
+    assert m[1]["np"] == m[2]["np"] == len(SI.NIVEIS_KM) and m[1]["nr"] is None and m[2]["nr"] is None
+    # a hora vai a um lado do trecho (em "em" do texto, que não cresce com o zoom) e diz para que lado cresce
+    assert all({"ox", "oy", "ancora"} <= set(x) and x["ancora"] in ("start", "middle", "end") for x in m)
+
+
+def test_os_municipios_do_fundo_aparecem_com_o_zoom():
+    """O contorno dos municípios (a malha do IBGE já no disco) só aparece com a vista perto (o nível das cidades), e o
+    nome: o dos municípios por onde o percurso passa primeiro, o dos vizinhos um nível depois. "Passou por" na ordem."""
+    municipios = [_municipio("Norte Teste", -49.3, -16.7, -49.0, -16.5),        # tem o NA_USINA e o FORA
+                  _municipio("Sul Teste", -49.0, -17.1, -48.8, -16.7),          # tem o NA_ESTRADA
+                  _municipio("Vizinho Teste", -49.6, -16.7, -49.3, -16.5)]      # perto, sem ponto do percurso
+    d = SI.desenho_percurso(USINAS, _trilha(NA_USINA, NA_ESTRADA, FORA), municipios)
+    por = {m["nome"]: m for m in d["municipios"]}
+    assert set(por) == {"Norte Teste", "Sul Teste", "Vizinho Teste"} and all(m["d"].startswith("M") for m in por.values())
+    assert all(m["nb"] == SI.NIVEL_CIDADES for m in por.values())                 # o contorno de todos no nível das cidades
+    assert (por["Norte Teste"]["n"], por["Vizinho Teste"]["n"]) == (SI.NIVEL_CIDADES, SI.NIVEL_CIDADES + 1)
+    assert por["Norte Teste"]["rota"] and not por["Vizinho Teste"]["rota"]
+    assert all(m["x"] is not None for m in por.values())                         # todo município tem onde escrever o nome
+    assert d["cidades"] == ["Norte Teste", "Sul Teste"]
 
 
 def test_a_distancia_do_percurso():
@@ -203,50 +240,3 @@ def test_a_distancia_do_percurso():
     esperado = haversine_km(*NA_USINA, *NA_ESTRADA) + haversine_km(*NA_ESTRADA, *FORA)
     assert SI.distancia_km(trilha) == pytest.approx(esperado)
     assert SI.distancia_km(trilha[:1]) == 0 and SI.distancia_km([]) == 0
-
-
-def test_o_fundo_do_percurso_nomeia_so_os_municipios_por_onde_ele_passa():
-    """Na bancada de 10/11/2026 os 124 municípios do recorte com o nome escrito se sobrepunham. O contorno de todos fica
-    (o fundo), mas o nome só dos que têm ponto do percurso, e a lista deles, na ordem da 1ª passagem, vai à gaveta."""
-    def municipio(nome, lon0, lat0, lon1, lat1):
-        anel = ((lon0, lat0), (lon1, lat0), (lon1, lat1), (lon0, lat1), (lon0, lat0))
-        return (nome, ((anel,),), (lon0, lat0, lon1, lat1))
-    municipios = [municipio("Norte Teste", -49.3, -16.7, -49.0, -16.5),        # tem o NA_USINA e o FORA
-                  municipio("Sul Teste", -49.0, -17.1, -48.8, -16.7),          # tem o NA_ESTRADA
-                  municipio("Vizinho Teste", -49.26, -16.7, -49.19, -16.5)]    # no recorte, sem ponto
-    trilha = _trilha(NA_USINA, NA_ESTRADA, FORA)
-    d = SI.desenho_percurso(USINAS, trilha, municipios)
-    nomes = {m["nome"]: m for m in d["municipios"]}
-    assert set(nomes) == {"Norte Teste", "Sul Teste", "Vizinho Teste"} and all(m["d"] for m in nomes.values())
-    assert nomes["Vizinho Teste"]["x"] is None and nomes["Norte Teste"]["x"] is not None
-    assert d["cidades"] == ["Norte Teste", "Sul Teste"]                    # a ordem da 1ª passagem, sem repetir
-
-
-def test_a_hora_e_a_cidade_vao_em_lados_opostos_da_linha_e_nunca_saem_pela_borda():
-    """Na bancada de 10/11/2026 a hora do ponto na borda direita saía cortada ("16:5"), e o nome da cidade, posto num lado
-    fixo, caía em cima da linha diagonal e das horas. A hora vai a um lado do trecho (na perpendicular dele) e o nome da
-    cidade ao outro; perto das bordas, o texto cresce para dentro."""
-    import math
-    trilha = _trilha(NA_USINA, NA_ESTRADA, FORA)
-    d = SI.desenho_percurso(USINAS, trilha)
-    m1, m2 = d["marcas"][0], d["marcas"][1]
-    # a hora fica fora da linha: longe do ponto, na perpendicular do trecho (o produto escalar com a direção é ~0)
-    dx, dy = float(m2["x"]) - float(m1["x"]), float(m2["y"]) - float(m1["y"])
-    ox, oy = float(m1["tx"]) - float(m1["x"]), float(m1["ty"]) - float(m1["y"])
-    assert math.hypot(ox, oy) >= 10 and abs(ox * dx + oy * dy) / (math.hypot(dx, dy) * math.hypot(ox, oy)) < 0.2
-    # perto da borda direita, o texto termina no ponto (cresce para a esquerda); perto da esquerda, começa nele
-    for m in d["marcas"]:
-        if float(m["x"]) > 820:
-            assert m["ancora"] == "end"
-        elif float(m["x"]) < 180:
-            assert m["ancora"] == "start"
-    # o nome da cidade no lado oposto ao da hora do 1º ponto dela
-    def municipio(nome, lon0, lat0, lon1, lat1):
-        anel = ((lon0, lat0), (lon1, lat0), (lon1, lat1), (lon0, lat1), (lon0, lat0))
-        return (nome, ((anel,),), (lon0, lat0, lon1, lat1))
-    d = SI.desenho_percurso(USINAS, trilha, [municipio("Sul Teste", -49.0, -17.1, -48.8, -16.7)])
-    (cid,) = [m for m in d["municipios"] if m["x"] is not None]
-    m2 = d["marcas"][1]                                       # o NA_ESTRADA, o único ponto dele
-    hora = (float(m2["tx"]) - float(m2["x"]), float(m2["ty"]) - float(m2["y"]))
-    nome = (float(cid["x"]) - float(m2["x"]), float(cid["y"]) - float(m2["y"]))
-    assert hora[0] * nome[0] + hora[1] * nome[1] < 0 and cid["ancora"] in ("start", "middle", "end")
