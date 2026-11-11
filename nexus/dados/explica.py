@@ -21,6 +21,7 @@ RESUMO = {
     "evento_ocorrencia": "Cada ocorrência das usinas, o plano de ação e o andamento",
     "sugestao": "As sugestões que as pessoas mandam para melhorar o Nexus",
     "status_sugestao": "Cada mudança de status das sugestões, de Iniciada a Concluída",
+    "resposta_sugestao": "As respostas dos administradores às sugestões",
     "evento_insight": "Quem assumiu ou concluiu cada insight do motor de regras",
     # ── Mapa de equipe (08/11/2026) ──
     "ponto_equipe": "Os pontos de posição do técnico no expediente, só cifrados",
@@ -159,6 +160,8 @@ PARA_QUE = {
                    "com o prazo que quem pediu escolheu, e cada resposta da área (recebido, em andamento, resolvido). "
                    "Serve para quem pediu acompanhar, para a área ver o que está atrasado e para medir quanto tempo "
                    "cada área leva para responder e se resolve no prazo.",
+    "resposta_sugestao": "Guarda cada resposta que um administrador escreveu a uma sugestão, com o dia e a hora. Serve "
+                         "para a pessoa que sugeriu ler a resposta em Minhas sugestões.",
     "status_sugestao": "Guarda cada vez que um administrador mudou o status de uma sugestão (Iniciada, Em "
                        "verificação ou Concluída), com o dia e a hora. Serve para a pessoa acompanhar em Minhas "
                        "sugestões e para contar as que ainda não foram concluídas.",

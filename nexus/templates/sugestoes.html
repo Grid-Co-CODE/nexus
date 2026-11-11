@@ -72,7 +72,9 @@
         <span class="sug-quando">{{ m.quando_txt }}</span></div>
       <p class="sug-minhas-titulo">{{ m.titulo or 'Sem o título (texto ilegível)' }}</p>
       {% if m.area %}<span class="atu-area">{{ m.area_nome }}</span>{% endif %}
-      {% if m.status_em_txt %}<p class="mudo sug-minhas-st">{{ m.status_rotulo }} em {{ m.status_em_txt }}</p>{% endif %}</li>
+      {% if m.status_em_txt %}<p class="mudo sug-minhas-st">{{ m.status_rotulo }} em {{ m.status_em_txt }}</p>{% endif %}
+      {% for r in m.respostas %}<div class="sug-resposta"><p class="sug-resposta-cab"><i class="ph ph-arrow-bend-down-right" aria-hidden="true"></i> Resposta{% if r.nome %} de {{ r.nome }}{% endif %}{% if r.quando_txt %} em {{ r.quando_txt }}{% endif %}</p>
+        <p class="sug-resposta-texto">{{ r.texto if r.legivel else 'O texto desta resposta não abriu.' }}</p></div>{% endfor %}</li>
     {% endfor %}
   </ol>
   {% elif not faltam %}
@@ -83,7 +85,7 @@
 </div>
 
 {% if admin %}
-<section class="sug-bloco" aria-labelledby="sug-recebidas">
+<section class="sug-bloco sug-bloco--recebidas" aria-labelledby="sug-recebidas">
   <h2 class="ui-kicker" id="sug-recebidas">Sugestões recebidas{% if recebidas %} ({{ recebidas|length }}){% endif %}</h2>
   <p class="gc-ajuda sug-so-admin">Só os administradores veem esta lista. As que faltam concluir vêm primeiro; clique numa para abrir.</p>
   {% if aviso_status %}<p class="sug-aviso sug-aviso--{{ aviso_status[0] }}" role="{{ 'status' if aviso_status[0] == 'ok' else 'alert' }}"><i class="ph {{ 'ph-check-circle' if aviso_status[0] == 'ok' else 'ph-warning' }}" aria-hidden="true"></i> {{ aviso_status[1] }}</p>{% endif %}
@@ -93,15 +95,24 @@
   {% else %}
   {# recolhidas (28/10/2026, Levi: "As sugestões recebidas devem ficar recolhidas"): a linha diz o status, o título, quem
      pediu e quando; ao abrir, o texto, os anexos e a troca do status #}
+  {# o contador por setor ao lado da lista (11/11/2026, Levi: "Ao lado das sugestões tem que ter um contador por setor,
+     eu clico e filtra"): o setor é a área que a pessoa escolheu ao sugerir; o clique filtra na própria página #}
+  <div class="sug-recebidas">
+  <nav class="sug-setores" aria-label="Sugestões por setor">
+    <button type="button" class="sug-setor" data-sug-area="" aria-pressed="true">Todas <b>{{ recebidas|length }}</b></button>
+    {% for k, nome, n in por_area %}<button type="button" class="sug-setor" data-sug-area="{{ k }}" aria-pressed="false">{{ nome }} <b>{{ n }}</b></button>{% endfor %}
+  </nav>
   <ol class="sug-lista">
     {% for s in recebidas %}
-    <li class="sug-item" id="sug-{{ s.id }}"><details class="sug-dobra">
+    <li class="sug-item" id="sug-{{ s.id }}" data-sug-area="{{ s.area or '_sem' }}"><details class="sug-dobra">
+      {# a linha (11/11/2026, Levi: "O nome de quem sugeriu tem que vir primeiro. A ordem fica: Data, Nome e "-" e
+         título"); o setor e o status depois #}
       <summary class="sug-cab">
-        <span class="gc-status gc-status--{{ s.status_tom }}">{{ s.status_rotulo }}</span>
-        <span class="sug-resumo-titulo">{{ s.titulo or 'Sem o título (texto ilegível)' }}</span>
-        <span class="sug-quem">{{ s.nome }}</span>
-        {% if s.area %}<span class="atu-area">{{ s.area_nome }}</span>{% endif %}
         <span class="sug-quando">{{ s.quando_txt }}</span>
+        <span class="sug-resumo-titulo"><b class="sug-quem">{{ s.nome or 'Sem o nome' }}</b> - {{ s.titulo or 'Sem o título (texto ilegível)' }}</span>
+        {% if s.respostas %}<span class="sug-n-resp" title="Respostas"><i class="ph ph-chat-circle-text" aria-hidden="true"></i> {{ s.respostas|length }}</span>{% endif %}
+        {% if s.area %}<span class="atu-area">{{ s.area_nome }}</span>{% endif %}
+        <span class="gc-status gc-status--{{ s.status_tom }}">{{ s.status_rotulo }}</span>
       </summary>
       <div class="sug-corpo">
       {% if s.legivel %}
@@ -122,6 +133,19 @@
       {% else %}
       <p class="mudo">O texto desta sugestão não abriu (a chave do cadastro deste Nexus não é a que gravou).</p>
       {% endif %}
+      {# as respostas (11/11/2026, Levi: "Gostaria de conseguir responder as sugestões"): quem sugeriu lê em Minhas
+         sugestões #}
+      {% for r in s.respostas %}<div class="sug-resposta"><p class="sug-resposta-cab"><i class="ph ph-arrow-bend-down-right" aria-hidden="true"></i> Resposta{% if r.nome %} de {{ r.nome }}{% endif %}{% if r.quando_txt %} em {{ r.quando_txt }}{% endif %}</p>
+        <p class="sug-resposta-texto">{{ r.texto if r.legivel else 'O texto desta resposta não abriu.' }}</p></div>{% endfor %}
+      <form class="sug-responder" method="post" action="{{ url_for('casca.inicio', aba='sugestoes', acao='responder') }}">
+        <input type="hidden" name="codigo" value="{{ codigo }}">
+        <input type="hidden" name="sugestao" value="{{ s.id }}">
+        <input type="hidden" name="novo_id" value="{{ novo_resposta_id() }}">
+        <label class="gc-rotulo" for="rp-{{ s.id }}">Responder a {{ s.nome or 'quem sugeriu' }}</label>
+        <textarea class="gc-campo" id="rp-{{ s.id }}" name="resposta" rows="3" maxlength="{{ resposta_max }}" required
+                  placeholder="A resposta aparece para quem sugeriu, em Minhas sugestões"></textarea>
+        <button class="gc-btn gc-btn--ui gc-btn--primario" type="submit"><i class="ph ph-paper-plane-tilt" aria-hidden="true"></i> Responder</button>
+      </form>
       {# o status (28/10/2026, Levi: "deve ter a opção de mudar o status da solicitação: Iniciada, Em verificação e
          Conclusão") #}
       <form class="sug-status" method="post" action="{{ url_for('casca.inicio', aba='sugestoes', acao='status') }}">
@@ -138,11 +162,27 @@
     </details></li>
     {% endfor %}
   </ol>
+  </div>
   {% endif %}
 </section>
 {% endif %}
 
 <script>
+/* o filtro por setor (11/11/2026): o botão do setor mostra só as sugestões dele; "Todas" volta. Na própria página, sem ir
+   ao servidor */
+(function () {
+  var nav = document.querySelector('.sug-setores');
+  if (!nav) return;
+  nav.addEventListener('click', function (e) {
+    var b = e.target.closest('button[data-sug-area]');
+    if (!b) return;
+    var area = b.getAttribute('data-sug-area');
+    nav.querySelectorAll('button[data-sug-area]').forEach(function (x) { x.setAttribute('aria-pressed', x === b ? 'true' : 'false'); });
+    document.querySelectorAll('.sug-lista > li[data-sug-area]').forEach(function (li) {
+      li.hidden = !!area && li.getAttribute('data-sug-area') !== area;
+    });
+  });
+})();
 /* confere os anexos ANTES de enviar (o servidor confere de novo): sem isto, 40 MB subiam inteiros só para voltar
    recusados */
 (function () {

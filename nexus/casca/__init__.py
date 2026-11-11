@@ -133,6 +133,8 @@ def _sugestoes():
     # das sugestões tiraria dela a recusa do pedido grande sem ler
     if request.method == "POST" and request.args.get("acao") == "status":
         return _mudar_status_sugestao(S, admin)
+    if request.method == "POST" and request.args.get("acao") == "responder":
+        return _responder_sugestao(S, admin)
     if request.method == "POST":
         erro, form = _enviar_sugestao(S, areas)
         if not erro:
@@ -159,6 +161,8 @@ def _sugestoes():
                            tem_login=bool(str(usuario.get("email") or "").strip()), faltam=S.faltam_chaves(),
                            admin=admin, recebidas=recebidas, minhas=minhas, erro_lista=erro_lista,
                            aceitos=S.aceitos(), status_mudaveis=[(k, S.STATUS[k][0]) for k in S.STATUS_MUDAVEIS],
+                           novo_resposta_id=S.novo_resposta_id, resposta_max=S.RESPOSTA_MAX,
+                           por_area=_contar_por_area(recebidas),
                            aviso_status=session.pop(_CHAVE_AVISO_STATUS, None),
                            sug_abertas=_sugestoes_abertas(),
                            max_mb=S.MAX_MB_ARQUIVO, max_arquivos=S.MAX_ARQUIVOS, max_total=S.MAX_MB_TOTAL,
@@ -220,6 +224,43 @@ def _mudar_status_sugestao(S, admin: bool):
         current_app.logger.exception("status da sugestão não gravado")
         session[_CHAVE_AVISO_STATUS] = ("erro", f"Não consegui gravar agora ({type(ex).__name__}). O status não mudou.")
     return redirect(url_for("casca.inicio", aba="sugestoes") + f"#sug-{sid}")
+
+
+def _responder_sugestao(S, admin: bool):
+    """`POST /?aba=sugestoes&acao=responder` (11/11/2026, Levi: "Gostaria de conseguir responder as sugestões"): o
+    administrador escreve a resposta; a pessoa que sugeriu lê em Minhas sugestões. Volta à sugestão, com o aviso."""
+    from ..auth.origem import de_outro_site as _de_outro_site
+    if not admin:
+        abort(403)
+    sid = request.form.get("sugestao") or ""
+    volta = redirect(url_for("casca.inicio", aba="sugestoes") + f"#sug-{sid}")
+    certo = session.get(_CHAVE_CODIGO) or ""
+    enviado = request.form.get("codigo") or ""
+    if _de_outro_site() or not certo or not hmac.compare_digest(enviado.encode(), certo.encode()):
+        session[_CHAVE_AVISO_STATUS] = ("erro", "O formulário venceu (a sessão mudou desde que a tela abriu): abra a aba "
+                                                "de novo. A resposta não foi gravada.")
+        return volta
+    usuario = session.get("usuario") if isinstance(session.get("usuario"), dict) else {}
+    try:
+        S.responder(sid, request.form.get("resposta"), usuario, request.form.get("novo_id"))
+        session[_CHAVE_AVISO_STATUS] = ("ok", "Resposta gravada. Quem sugeriu lê em Minhas sugestões.")
+    except S.Recusada as ex:
+        session[_CHAVE_AVISO_STATUS] = ("erro", f"{ex}. A resposta não foi gravada.")
+    except Exception as ex:      # noqa: BLE001 — banco fora: a pessoa sabe que não foi
+        current_app.logger.exception("resposta da sugestão não gravada")
+        session[_CHAVE_AVISO_STATUS] = ("erro", f"Não consegui gravar agora ({type(ex).__name__}). A resposta não foi "
+                                                "gravada.")
+    return volta
+
+
+def _contar_por_area(recebidas: list[dict]) -> list[tuple[str, str, int]]:
+    """(chave, nome, quantas) por área das sugestões recebidas, para o contador ao lado da lista (11/11/2026, Levi: "Ao
+    lado das sugestões tem que ter um contador por setor, eu clico e filtra"). A sugestão sem área vai em "Sem área"."""
+    conta: dict[str, list] = {}
+    for s in recebidas:
+        k = s.get("area") or "_sem"
+        conta.setdefault(k, [s.get("area_nome") or "Sem área", 0])[1] += 1
+    return sorted(((k, nome, n) for k, (nome, n) in conta.items()), key=lambda x: (x[0] == "_sem", -x[2], x[1]))
 
 
 def _anexo_da_sugestao(S, admin: bool):

@@ -222,8 +222,13 @@ def test_as_tres_abas_do_inicio_e_o_post_so_na_de_sugestoes(app, banco, dados):
 
 def test_o_livro_esta_no_catalogo_antes_da_1a_gravacao():
     l = catalogo.LIVRO_POR_NOME[S.LIVRO]
-    # 28/10/2026: a 2ª aba, a do status, registrada antes da 1ª mudança; o livro já existe (a 1ª sugestão foi mandada)
-    assert l.abas == (S.ABA, S.ABA_STATUS) and l.so_cresce == (S.ABA, S.ABA_STATUS) and l.no_banco
+    # 28/10/2026: a 2ª aba, a do status, registrada antes da 1ª mudança; o livro já existe (a 1ª sugestão foi mandada).
+    # 11/11/2026: a 3ª, a das respostas, registrada antes da 1ª resposta
+    abas = (S.ABA, S.ABA_STATUS, S.ABA_RESPOSTA)
+    assert l.abas == abas and l.so_cresce == abas and l.no_banco
+    rp = catalogo.POR_ID["resposta_sugestao"]
+    assert rp.livro == f"{S.LIVRO} · {S.ABA_RESPOSTA}" and rp.chave == ("id",) and rp.chave[0] == S.CAB_RESPOSTA[0]
+    assert "resposta_sugestao" in explica.RESUMO and "resposta_sugestao" in explica.PARA_QUE
     st = catalogo.POR_ID["status_sugestao"]
     assert st.livro == f"{S.LIVRO} · {S.ABA_STATUS}" and st.chave == ("id",) and st.chave[0] == S.CAB_STATUS[0]
     assert "status_sugestao" in explica.RESUMO and "status_sugestao" in explica.PARA_QUE
@@ -366,3 +371,72 @@ def test_o_contador_nunca_segura_o_inicio_sem_banco(app, logado):
     S.limpar()
     r = logado.get("/")
     assert r.status_code == 200 and "sug-contador" not in r.get_data(as_text=True)
+
+
+
+# ── 11/11/2026: responder, o contador por setor e a ordem da linha ─────────────────────────────────────────────────────
+def _responder(c, sid, texto, novo_id="r00000000001", **kw):
+    return c.post(URL + "&acao=responder", data=dict({"codigo": _codigo(c), "sugestao": sid, "resposta": texto,
+                                                      "novo_id": novo_id}, **kw))
+
+
+def test_o_administrador_responde_e_quem_sugeriu_le_em_minhas_sugestoes(app, banco, dados):
+    """Levi, 11/11/2026: "Gostaria de conseguir responder as sugestões"."""
+    c = _cliente(app)
+    _mandar(c, "Primeira ideia", "s00000000001")
+    adm = _admin(app)
+    r = _responder(adm, "s00000000001", "Boa ideia!\nVai na próxima versão.")
+    assert r.status_code == 302 and r.headers["Location"].endswith("#sug-s00000000001")
+    linhas = banco.linhas(S.LIVRO, S.ABA_RESPOSTA)
+    assert [(l["id"], l["sugestao_id"]) for l in linhas] == [("r00000000001", "s00000000001")]
+    assert linhas[0]["pessoa_hmac"] and "Boa ideia" not in str(linhas[0]) and "Chefe" not in str(linhas[0])
+    assert len(banco.linhas(S.LIVRO, S.ABA)) == 1                                     # a sugestão ficou
+    _responder(adm, "s00000000001", "Boa ideia!")                                    # o mesmo formulário: não grava
+    assert len(banco.linhas(S.LIVRO, S.ABA_RESPOSTA)) == 1
+    _responder(adm, "s00000000001", "Já está no ar.", novo_id="r00000000002")
+    assert len(banco.linhas(S.LIVRO, S.ABA_RESPOSTA)) == 2
+    # o status depois da resposta não perde a aba das respostas (as três vão juntas)
+    _status(adm, "s00000000001", "concluida")
+    assert len(banco.linhas(S.LIVRO, S.ABA_RESPOSTA)) == 2 and len(banco.linhas(S.LIVRO, S.ABA_STATUS)) == 1
+    html = adm.get(URL).get_data(as_text=True)
+    lista = html.split('class="sug-lista"', 1)[1].split("</ol>", 1)[0]
+    assert lista.index("Vai na próxima versão.") < lista.index("Já está no ar.") and "Resposta de Chefe de Teste" in lista
+    assert 'action="/?aba=sugestoes&amp;acao=responder"' in lista
+    minhas = c.get(URL).get_data(as_text=True).split('class="sug-minhas"', 1)[1].split("</aside>", 1)[0]
+    assert "Vai na próxima versão." in minhas and "Já está no ar." in minhas and "Resposta de Chefe de Teste" in minhas
+
+
+def test_so_o_administrador_responde_e_a_resposta_vazia_nao_grava(app, banco, dados):
+    c = _cliente(app)
+    _mandar(c, "Ideia", "s00000000001")
+    assert _responder(c, "s00000000001", "eu mesma respondo").status_code == 403
+    adm = _admin(app)
+    _responder(adm, "s00000000001", "   ")
+    assert "Escreva a resposta" in adm.get(URL).get_data(as_text=True)
+    _responder(adm, "s00000000009", "para a que não existe")
+    _responder(adm, "s00000000001", "formulário velho", codigo="outro")
+    assert banco.linhas(S.LIVRO, S.ABA_RESPOSTA) == []
+
+
+def test_a_linha_comeca_pela_data_e_pelo_nome_e_o_contador_por_setor(app, banco, dados):
+    """Levi, 11/11/2026: "O nome de quem sugeriu tem que vir primeiro. A ordem fica: Data, Nome e "-" e título" e "Ao
+    lado das sugestões tem que ter um contador por setor, eu clico e filtra"."""
+    c = _cliente(app)
+    _mandar(c, "Ideia do PCM", "s00000000001")
+    _mandar(c, "Outra do PCM", "s00000000002")
+    c2 = _cliente(app, usuario=OUTRA)
+    assert c2.post(URL, data=_form(c2, titulo="Ideia sem área", area="", novo_id="s00000000003")).status_code == 302
+    html = _admin(app).get(URL).get_data(as_text=True)
+    cab = html.split('class="sug-cab"', 1)[1].split("</summary>", 1)[0]
+    assert cab.index('class="sug-quando"') < cab.index("Beltrana de Teste") < cab.index(" - Ideia sem área")
+    setores = html.split('class="sug-setores"', 1)[1].split("</nav>", 1)[0]
+    assert 'aria-pressed="true">Todas <b>3</b>' in setores
+    assert 'data-sug-area="pcm"' in setores and "<b>2</b>" in setores and "Sem área <b>1</b>" in setores
+    assert 'data-sug-area="pcm"><details' in html and 'data-sug-area="_sem"><details' in html
+
+
+def test_o_inicio_no_verde_da_grid():
+    """Levi, 11/11/2026: "Pinte o Início de verde grid"."""
+    from pathlib import Path
+    css = (Path(__file__).resolve().parents[1] / "nexus" / "static" / "nexus.css").read_text(encoding="utf-8")
+    assert ".item-inicio,.item-inicio i{color:var(--verde-texto)}" in css

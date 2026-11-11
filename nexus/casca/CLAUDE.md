@@ -909,6 +909,7 @@ atualizações dos commits e o que mudou! Ao clicar em versão no ar já leva pa
   do `/saude`) e "no ar desde" (a hora em que este processo subiu, o import da casca; cada deploy reinicia o Nexus, então
   é a hora em que a versão entrou). O cartão inteiro é o link para as Atualizações. Saíram o semáforo com o GitHub (e a
   conferência por trás dele: API do GitHub e `git ls-remote`), o assunto do commit e os pedidos presos.
+- **O Início no menu** (`.item-inicio`, nexus.css; 11/11/2026, Levi: "Pinte o Início de verde grid"): o texto e o ícone no verde da Grid (`--verde-texto`), como a torre com tela pronta.
 - **As abas do Início** (`gc-subabas`, um só `_inicio_abas.html` incluído em `inicio.html`, `atualizacoes.html` e `sugestoes.html`): Visão geral | Atualizações | Sugestões.
 - **A aba Atualizações** (`/?aba=atualizacoes`, exige login como o Início; era `/atualizacoes`, que no servidor ia à plataforma, ver "Regras que já custaram caro"): **só as novidades, as correções e as melhorias de desempenho (`feat`, `fix` e `perf`) dos últimos 60 dias** (o
   `perf` desde 24/10/2026: o Levi não achou ali a correção da lentidão do dia, um `perf`; 19/10/2026,
@@ -965,8 +966,17 @@ server".
     **As duas abas vão juntas em toda gravação** (livro que só cresce recusa gravar sem uma aba que o banco tem);
   - **Minhas sugestões**, à direita do formulário (embaixo no celular): as da pessoa pelo `pessoa_hmac` (o código do
     e-mail, em claro no livro), com o status;
-  - as recebidas vêm **recolhidas** (`<details>`): a linha diz o status, o título, quem e quando; aberta, o texto, os
-    anexos e a troca do status. As que faltam concluir primeiro;
+  - as recebidas vêm **recolhidas** (`<details>`); aberta, o texto, os anexos, as respostas, o Responder e a troca do
+    status. As que faltam concluir primeiro. **A linha** (11/11/2026, Levi: "O nome de quem sugeriu tem que vir primeiro.
+    A ordem fica: Data, Nome e "-" e título"): a data, "Nome - Título", o número de respostas, o setor e o status;
+  - **o contador por setor ao lado** (11/11/2026, Levi: "Ao lado das sugestões tem que ter um contador por setor, eu clico
+    e filtra"): o setor é a área que a pessoa escolheu ao sugerir (a sem área, "Sem área"); "Todas" e um botão por setor
+    com a conta (`casca._contar_por_area`), e o clique filtra na própria página (o script do `sugestoes.html`);
+  - **a resposta** (11/11/2026, Levi: "Gostaria de conseguir responder as sugestões"): a 3ª aba do livro,
+    `fato_resposta_sugestao` (1 linha por resposta, só acrescenta, várias por sugestão; o texto e o nome cifrados), pelo
+    `POST /?aba=sugestoes&acao=responder`, só administrador. O id vem do formulário (`r` + 11 hexadecimais): o 2º envio
+    não grava outra. A pessoa lê a resposta em **Minhas sugestões**. A aba só entra na gravação depois da 1ª resposta;
+    dali em diante as três vão juntas;
   - o **contador** ao lado de "Sugestões" nas três abas do Início = as não concluídas: de todos para o administrador, as
     da pessoa para ela. Sai da cópia de 1 minuto; velha ou ausente, a releitura vai **por trás** (`contador`) e a aba
     sai sem número: o Início é a primeira página de todos e nunca espera o banco por causa dele.

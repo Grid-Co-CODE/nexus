@@ -14,7 +14,12 @@ O status (28/10/2026, Levi: "No sugestões recebidas deve ter a opção de mudar
 verificação e Conclusão"): a 2ª aba do mesmo livro, `fato_status_sugestao`, 1 linha por MUDANÇA de status feita por um
 administrador (só acrescenta; vale a última de cada sugestão; sem linha = Nova). Em claro o código do status, a
 sugestão e quem mudou por código; o nome de quem mudou, cifrado. As duas abas vão juntas em toda gravação: livro que
-só cresce não grava sem uma aba que o banco tem (`livros.publicar`)."""
+só cresce não grava sem uma aba que o banco tem (`livros.publicar`).
+
+A resposta (11/11/2026, Levi: "Gostaria de conseguir responder as sugestões"): a 3ª aba, `fato_resposta_sugestao`, 1 linha
+por resposta de um administrador (só acrescenta; a sugestão pode ter várias, na ordem da gravação). Em claro a sugestão,
+o dia e quem respondeu por código; o texto e o nome, cifrados. A pessoa que sugeriu lê em Minhas sugestões. As três abas
+vão juntas em toda gravação."""
 import io
 import json
 import os
@@ -37,6 +42,9 @@ LIVRO, NOME_LIVRO, ABA = "nexus_sugestoes", "Nexus · sugestões", "fato_sugesta
 CAB = ("id", "registrado_em", "data_id", "area", "pessoa_id", "pessoa_hmac", "dados_cifrados")
 ABA_STATUS = "fato_status_sugestao"
 CAB_STATUS = ("id", "registrado_em", "data_id", "sugestao_id", "status", "pessoa_id", "pessoa_hmac", "dados_cifrados")
+ABA_RESPOSTA = "fato_resposta_sugestao"
+CAB_RESPOSTA = ("id", "registrado_em", "data_id", "sugestao_id", "pessoa_id", "pessoa_hmac", "dados_cifrados")
+RESPOSTA_MAX = 2000
 # o código vai ao banco; o rótulo e o tom, à tela (o semáforo da casa). "nova" não se grava: é a sugestão sem mudança
 STATUS = {"nova": ("Nova", "info"), "iniciada": ("Iniciada", "neutro"), "verificacao": ("Em verificação", "alerta"),
           "concluida": ("Concluída", "ok")}
@@ -58,6 +66,7 @@ _OLE = b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1"
 # o id: a letra do que é e 11 hexadecimais (a API do banco infere o tipo da coluna: só algarismos voltaria número)
 ID_RE = re.compile(r"s[0-9a-f]{11}")
 ID_STATUS_RE = re.compile(r"t[0-9a-f]{11}")
+ID_RESPOSTA_RE = re.compile(r"r[0-9a-f]{11}")
 TTL_S = 60
 CHAVES = ("NEXUS_CHAVE_CADASTRO", "NEXUS_PESSOA_HMAC", "GRIDCO_SQL_TOKEN")
 _BRT = timezone(timedelta(hours=-3))
@@ -75,6 +84,10 @@ def limpar() -> None:
 
 def novo_id() -> str:
     return "s" + uuid.uuid4().hex[:11]
+
+
+def novo_resposta_id() -> str:
+    return "r" + uuid.uuid4().hex[:11]
 
 
 def faltam_chaves() -> list[str]:
@@ -284,25 +297,28 @@ def _texto(texto, maximo: int, falta: str, nome: str) -> str:
     return t
 
 
-def _ler_abas() -> tuple[list[dict], list[dict]]:
-    """As duas abas numa listagem só (as sugestões, as mudanças de status). Aba que não existe = vazia."""
+def _ler_abas() -> tuple[list[dict], list[dict], list[dict]]:
+    """As três abas numa listagem só (as sugestões, as mudanças de status, as respostas). Aba que não existe = vazia."""
     base, sessao = _banco()
     a = livros.abas(base, sessao, LIVRO)
-    return tuple(livros._linhas(base, sessao, a[x]) if a.get(x) else [] for x in (ABA, ABA_STATUS))
+    return tuple(livros._linhas(base, sessao, a[x]) if a.get(x) else [] for x in (ABA, ABA_STATUS, ABA_RESPOSTA))
 
 
-def _reler() -> tuple[list[dict], list[dict]]:
+def _reler() -> tuple[list[dict], list[dict], list[dict]]:
     """O livro relido agora, sem a cópia: gravar sobre uma leitura velha apagaria a sugestão de outra pessoa."""
     return _ler_abas()
 
 
-def _publicar(linhas: list[dict], status: list[dict]) -> None:
+def _publicar(linhas: list[dict], status: list[dict], respostas: list[dict]) -> None:
+    """As três abas juntas (livro que só cresce não grava sem uma aba que o banco tem). A aba das respostas só vai
+    quando há resposta: até a 1ª, o livro do banco segue com as duas de antes."""
     base, sessao = _banco()
+    abas = {ABA: (list(CAB), [[l.get(c) for c in CAB] for l in linhas]),
+            ABA_STATUS: (list(CAB_STATUS), [[l.get(c) for c in CAB_STATUS] for l in status])}
+    if respostas:
+        abas[ABA_RESPOSTA] = (list(CAB_RESPOSTA), [[l.get(c) for c in CAB_RESPOSTA] for l in respostas])
     try:
-        livros.publicar(LIVRO, NOME_LIVRO, {ABA: (list(CAB), [[l.get(c) for c in CAB] for l in linhas]),
-                                            ABA_STATUS: (list(CAB_STATUS),
-                                                         [[l.get(c) for c in CAB_STATUS] for l in status])},
-                        base=base, token=current_app.config["GRIDCO_SQL_TOKEN"], sessao=sessao)
+        livros.publicar(LIVRO, NOME_LIVRO, abas, base=base, token=current_app.config["GRIDCO_SQL_TOKEN"], sessao=sessao)
     finally:
         limpar()
 
@@ -322,7 +338,7 @@ def criar(form: dict, arquivos, usuario, areas: dict) -> dict:
     sid = _txt(form.get("novo_id"))
     sid = sid if ID_RE.fullmatch(sid) else novo_id()
     with _TRAVA:
-        lido, status_lido = _reler()
+        lido, status_lido, respostas_lido = _reler()
         ja = next((l for l in lido if _txt(l.get("id")) == sid), None)
         if ja:
             return ja
@@ -335,7 +351,7 @@ def criar(form: dict, arquivos, usuario, areas: dict) -> dict:
                  "anexos": feitos}
         linha["dados_cifrados"] = cofre.cifrar(json.dumps(dados, ensure_ascii=False), _ctx(linha))
         try:
-            _publicar(lido + [linha], status_lido)
+            _publicar(lido + [linha], status_lido, respostas_lido)
         except Exception:
             # o banco recusou: os arquivos não ficam órfãos no disco (o 2º envio grava de novo, com o mesmo id)
             if feitos:
@@ -346,17 +362,18 @@ def criar(form: dict, arquivos, usuario, areas: dict) -> dict:
 
 # ── ler ──────────────────────────────────────────────────────────────────────────────────────────────────────────────
 def ler(forcar: bool = False) -> dict:
-    """{"linhas", "status", "erro"}, guardado por 1 minuto. Leitura que falha devolve a última boa com o erro."""
+    """{"linhas", "status", "respostas", "erro"}, guardado por 1 minuto. Leitura que falha devolve a última boa com o
+    erro."""
     agora = time.time()
     g = _CACHE.get("livro")
     if g and not forcar and agora - g["lido_em"] < TTL_S:
         return g
     try:
-        linhas, status = _ler_abas()
+        linhas, status, respostas = _ler_abas()
     except Exception as ex:      # noqa: BLE001 — banco fora, rede: a tela diz e segue
         erro = f"{type(ex).__name__}: {str(ex)[:160]}"
-        return dict(g, erro=erro) if g else {"linhas": [], "status": [], "lido_em": None, "erro": erro}
-    _CACHE["livro"] = {"linhas": linhas, "status": status, "lido_em": agora, "erro": ""}
+        return dict(g, erro=erro) if g else {"linhas": [], "status": [], "respostas": [], "lido_em": None, "erro": erro}
+    _CACHE["livro"] = {"linhas": linhas, "status": status, "respostas": respostas, "lido_em": agora, "erro": ""}
     return _CACHE["livro"]
 
 
@@ -377,6 +394,7 @@ def lista(areas_nome: dict | None = None) -> list[dict]:
     areas_nome = areas_nome or {}
     lido = ler()
     st = estado_status(lido.get("status") or [], cofre)
+    resp = respostas_por_sugestao(lido.get("respostas") or [], cofre)
     out = []
     for l in lido["linhas"]:
         sid = _txt(l.get("id"))
@@ -396,7 +414,8 @@ def lista(areas_nome: dict | None = None) -> list[dict]:
                     "area": area, "area_nome": areas_nome.get(area, area), "titulo": _txt(dados.get("titulo")),
                     "descricao": _txt(dados.get("descricao")), "nome": _txt((dados.get("quem") or {}).get("nome")),
                     "email": _txt((dados.get("quem") or {}).get("email")), "anexos": anexos_, "legivel": bool(dados),
-                    "pessoa_hmac": _txt(l.get("pessoa_hmac")).lower(), **st.get(sid, _SEM_STATUS)})
+                    "pessoa_hmac": _txt(l.get("pessoa_hmac")).lower(), "respostas": resp.get(sid, []),
+                    **st.get(sid, _SEM_STATUS)})
     out.sort(key=lambda x: x["quando"] or datetime.min.replace(tzinfo=_BRT), reverse=True)
     return out
 
@@ -449,7 +468,7 @@ def mudar_status(sid, status, usuario) -> dict:
     else:
         quem = {"nome": "senha de administrador", "email": "", "hmac": None, "pessoa_id": None}
     with _TRAVA:
-        lido, status_lido = _reler()
+        lido, status_lido, respostas_lido = _reler()
         if not any(_txt(l.get("id")) == sid for l in lido):
             raise Recusada("Não achei esta sugestão: recarregue a página")
         if estado_status(status_lido).get(sid, {}).get("status", "nova") == status:
@@ -461,7 +480,70 @@ def mudar_status(sid, status, usuario) -> dict:
                 "pessoa_id": quem["pessoa_id"], "pessoa_hmac": quem["hmac"]}
         nova["dados_cifrados"] = cofre.cifrar(json.dumps({"quem": {"nome": quem["nome"], "email": quem["email"]}},
                                                          ensure_ascii=False), _ctx_status(nova))
-        _publicar(lido, status_lido + [nova])
+        _publicar(lido, status_lido + [nova], respostas_lido)
+    return nova
+
+
+# ── a resposta (11/11/2026) ─────────────────────────────────────────────────────────────────────────────────────────
+def _ctx_resposta(l: dict) -> str:
+    return (f"banco/sugestoes/resposta/{_txt(l.get('id'))}/{_txt(l.get('sugestao_id'))}/"
+            f"{_txt(l.get('pessoa_hmac')) or '-'}")
+
+
+def respostas_por_sugestao(linhas: list[dict], cofre=None) -> dict:
+    """{sugestão: as respostas, da mais antiga para a mais nova}, com o texto e o nome de quem respondeu decifrados (sem
+    a chave, a resposta aparece sem o texto e a tela diz)."""
+    out: dict[str, list[dict]] = {}
+    for l in linhas:
+        sid = _txt(l.get("sugestao_id"))
+        if not ID_RE.fullmatch(sid) or not ID_RESPOSTA_RE.fullmatch(_txt(l.get("id"))):
+            continue
+        dados = {}
+        if cofre and l.get("dados_cifrados"):
+            try:
+                dados = json.loads(cofre.decifrar(l["dados_cifrados"], _ctx_resposta(l)))
+            except Exception:    # noqa: BLE001 — linha mexida ou chave trocada: fica a resposta, sem o texto
+                dados = {}
+        q = _quando(l.get("registrado_em"))
+        out.setdefault(sid, []).append({"id": _txt(l.get("id")), "quando": q,
+                                        "quando_txt": q.strftime("%d/%m/%Y às %H:%M") if q else "",
+                                        "texto": _txt(dados.get("texto")),
+                                        "nome": _txt((dados.get("quem") or {}).get("nome")), "legivel": bool(dados)})
+    for lst in out.values():
+        lst.sort(key=lambda r: r["quando"] or datetime.min.replace(tzinfo=_BRT))
+    return out
+
+
+def responder(sid, texto, usuario, novo_id=None) -> dict:
+    """Um administrador responde a uma sugestão (a tela confere quem é administrador). O `novo_id` do formulário vira o
+    id: o 2º envio do mesmo formulário (o duplo clique, o F5) acha a resposta no livro e não grava outra. A senha de
+    administrador responde também: vai sem pessoa e diz isso."""
+    sid = _txt(sid)
+    if not ID_RE.fullmatch(sid):
+        raise Recusada("Não achei esta sugestão: recarregue a página")
+    texto = _texto(texto, RESPOSTA_MAX, "Escreva a resposta", "A resposta")
+    if not current_app.config.get("GRIDCO_SQL_TOKEN"):
+        raise Recusada("Este Nexus não tem a chave de gravação do banco (GRIDCO_SQL_TOKEN)")
+    cofre = _cofre()
+    email = str((usuario or {}).get("email") or "").strip().lower()
+    quem = _quem(usuario) if email else {"nome": "senha de administrador", "email": "", "hmac": None, "pessoa_id": None}
+    rid = _txt(novo_id)
+    rid = rid if ID_RESPOSTA_RE.fullmatch(rid) else "r" + uuid.uuid4().hex[:11]
+    with _TRAVA:
+        lido, status_lido, respostas_lido = _reler()
+        if not any(_txt(l.get("id")) == sid for l in lido):
+            raise Recusada("Não achei esta sugestão: recarregue a página")
+        ja = next((l for l in respostas_lido if _txt(l.get("id")) == rid), None)
+        if ja:
+            return ja
+        agora = datetime.now(timezone.utc)
+        nova = {"id": rid, "registrado_em": agora.strftime("%Y-%m-%dT%H:%M:%S.") + f"{agora.microsecond // 1000:03d}Z",
+                "data_id": int(agora.astimezone(_BRT).strftime("%Y%m%d")), "sugestao_id": sid,
+                "pessoa_id": quem["pessoa_id"], "pessoa_hmac": quem["hmac"]}
+        nova["dados_cifrados"] = cofre.cifrar(json.dumps({"texto": texto, "quem": {"nome": quem["nome"],
+                                                                                   "email": quem["email"]}},
+                                                         ensure_ascii=False), _ctx_resposta(nova))
+        _publicar(lido, status_lido, respostas_lido + [nova])
     return nova
 
 

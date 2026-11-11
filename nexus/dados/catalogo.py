@@ -259,6 +259,16 @@ FATOS = (
                     "resposta é o do 1º respondeu e o até resolver, o do 1º resolvido. No prazo = resolvido até o fim "
                     "do dia do prazo (Brasília). O nome de quem fez, a mensagem e o retorno só cifrados (Cofre). Só "
                     "acrescenta: nada se edita nem se apaga"),
+    # 11/11/2026 (Levi: "Gostaria de conseguir responder as sugestões"): a resposta de um administrador a uma sugestão.
+    # Registrado antes da 1ª resposta
+    Fato("resposta_sugestao", "Resposta à sugestão", "base", "nexus_sugestoes · fato_resposta_sugestao",
+         "1 linha = 1 resposta de 1 administrador a 1 sugestão",
+         _d(data=("id", "data_id (o dia de Brasília da resposta)"),
+            pessoa=("id", "pessoa_id de quem respondeu (e o pessoa_hmac); vazio quando foi pela senha de administrador")),
+         tipo="sem_medida", chave=("id",), fontes=("nexus_sugestoes · fato_resposta_sugestao",),
+         janela_origem="o Nexus é a fonte",
+         observacao="sugestao_id liga à fato_sugestao; a sugestão pode ter várias respostas, na ordem da gravação. O "
+                    "texto e o nome de quem respondeu só cifrados (Cofre). Só acrescenta: nada se edita nem se apaga"),
     # 28/10/2026 (Levi: "No sugestões recebidas deve ter a opção de mudar o status da solicitação: Iniciada, Em
     # verificação e Conclusão"): o status de cada sugestão, por evento. Registrado antes da 1ª mudança
     Fato("status_sugestao", "Status da sugestão", "base", "nexus_sugestoes · fato_status_sugestao",
@@ -1569,11 +1579,12 @@ LIVROS = (
           "(perf_web.SUBTAREFAS_PADRAO)", False,
           "registrado em 05/11/2026 antes da 1ª gravação (regra 10): nasce no 1º padrão salvo",
           so_cresce=True),
-    Livro("nexus_sugestoes", ("fato_sugestao", "fato_status_sugestao"),
-          "a cada sugestão mandada e a cada mudança de status (Início > Sugestões)",
+    Livro("nexus_sugestoes", ("fato_sugestao", "fato_status_sugestao", "fato_resposta_sugestao"),
+          "a cada sugestão mandada, a cada mudança de status e a cada resposta (Início > Sugestões)",
           "nexus/casca/sugestoes.py, pela aba Início > Sugestões", True,
           "registrado em 24/10/2026 antes da 1ª gravação (regra 10); a aba do status registrada em 28/10/2026 antes "
-          "da 1ª mudança. As duas abas vão juntas a cada gravação, sobre o livro relido do banco",
+          "da 1ª mudança; a das respostas em 11/11/2026 antes da 1ª resposta (nasce nela). As abas vão juntas a cada "
+          "gravação, sobre o livro relido do banco",
           so_cresce=True),
     Livro("nexus_pt_decisoes", ("fato_decisao_pt",), "a cada decisão no Nexus", "nexus/campo/decisao_pt.py", False,
           "o livro não existe no banco (GET em 11/10/2026): nenhuma decisão gravada. A aba era 'decisoes' até a "
