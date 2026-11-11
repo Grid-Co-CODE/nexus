@@ -15,6 +15,7 @@ mesma rota (ela vence a genérica), por exemplo:
 import csv
 import io
 import logging
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from urllib.parse import urlencode
 
@@ -30,6 +31,7 @@ from ...cos import mesa as ME
 from ...cos import monitoramento as MO
 from ...cos import normalizacoes as NO
 from ...cos import ocorrencias as OC
+from ...cos import ocorrencias_planilha as OP
 from ...cos import os_abertas as OA
 from ...cos import religamentos as RE
 from ...cos import turno as TU
@@ -196,8 +198,10 @@ def ocorrencias():
         cliente = clientes[0] if clientes else ""
     dias = OC.dias_pedidos(request.args.get("dias"))
     if todos:
-        # Uma leitura por cliente, cada uma com o próprio cache de 60 s (a mesma da aba de cada um).
-        leituras = [AND.ler_ocorrencias(cfg, c, dias) for c in clientes]
+        # Uma leitura por cliente, cada uma com o próprio cache de 60 s (a mesma da aba de cada um), pedidas JUNTAS
+        # (11/11/2026): uma depois da outra, a página esperava a soma das sete — a Thopen de 30 dias sozinha tem ~1 MB.
+        with ThreadPoolExecutor(max_workers=min(8, len(clientes))) as ex:
+            leituras = list(ex.map(lambda c: AND.ler_ocorrencias(cfg, c, dias), clientes))
         erros = [f"{x.cliente}: {x.erro}" for x in leituras if x.erro]
         leitura = AND.Leitura(OC.TODOS, None, erro="; ".join(erros), velha=any(x.velha for x in leituras))
     else:
@@ -227,12 +231,40 @@ def ocorrencias():
         resp.headers["Content-Disposition"] = f'attachment; filename="ocorrencias-{nome}-{dias}d.csv"'
         resp.headers["Cache-Control"] = "private, no-store"
         return resp
+    if request.args.get("formato") == "xlsx":
+        # O Excel (11/11/2026, o dono: "melhora a exportação do CSV, está muito feia") — nexus/cos/ocorrencias_planilha.py
+        if not p:
+            abort(404)
+        nome = "todos" if todos else "".join(ch if ch.isalnum() else "-" for ch in cliente).strip("-").lower()
+        resp = Response(OP.gerar(p, titulo="Ocorrências do COS", topo=_topo_da_planilha(p, todos, cliente, dias,
+                                                                                         situacao, filtros)),
+                        mimetype=OP.MIME)
+        resp.headers["Content-Disposition"] = f'attachment; filename="ocorrencias-{nome}-{dias}d.xlsx"'
+        resp.headers["Cache-Control"] = "private, no-store"
+        return resp
     return render_template(
         "cos/ocorrencias.html", torre=TORRE, tela=TORRE.tela("ocorrencias"), ligada=fonte.ligada, clientes=clientes,
         cliente=OC.TODOS if todos else cliente, todos=todos, leitura=leitura, p=p, dias=dias,
         dias_opcoes=AND.DIAS_DAS_OCORRENCIAS, situacao=situacao, situacoes=OC.SITUACOES, etapas=OC.ETAPAS,
         prazos=OC.PRAZOS, lido=_lido(leituras), url=_url, o_que_aconteceu=OC.o_que_aconteceu,
         status_da_os=OC.status_da_os, filtros=filtros, status_filtro=OC.STATUS_FILTRO)
+
+
+def _topo_da_planilha(p, todos: bool, cliente: str, dias: int, situacao: str, filtros: dict) -> list[str]:
+    """As linhas de cima da planilha das Ocorrências: quando, o recorte (o mesmo da tela) e de onde os prazos contam."""
+    rotulos = {"falha": "Falha", "usina": "Usina", "criado_por": "Criado por", "tecnico": "Técnico",
+               "status": "Status Fracttal", "q": "Busca"}
+    ativos = [f"{rotulos[k]}: {OC.STATUS_FILTRO.get(v, v) if k == 'status' else v}" for k, v in filtros.items() if v]
+    if situacao:
+        ativos.insert(0, f"Situação: {OC.SITUACOES[situacao]}")
+    periodo = "último dia" if dias == 1 else f"últimos {dias} dias"
+    return [
+        f"Gerada em {AND.agora():%d/%m/%Y %H:%M} · {periodo}"
+        + (f" (registradas desde {p.desde:%d/%m/%Y %H:%M})" if p.desde else ""),
+        f"Cliente: {'todos os clientes' if todos else cliente}",
+        "Filtros: " + (" · ".join(ativos) if ativos else "nenhum"),
+        f"Os prazos contam do {OC.RELOGIO}. {len(p.itens)} ocorrência{'s' if len(p.itens) != 1 else ''}.",
+    ]
 
 
 @bp.route("/religamentos")

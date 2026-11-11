@@ -59,7 +59,7 @@ def ligada(app):
 def _servir(monkeypatch, respostas: dict):
     pedidos = []
 
-    def pedir(f, caminho):
+    def pedir(f, caminho, timeout=AND.TIMEOUT_S):
         pedidos.append(caminho)
         r = respostas.get(caminho)
         if isinstance(r, Exception):
@@ -293,7 +293,8 @@ def test_a_tela_de_todos_os_clientes_mostra_o_que_aconteceu_e_exporta(ligada, lo
     assert 'aria-current="page">Todos os clientes<' in html
     assert "Usina Exemplo Um" in html and "Usina Exemplo Dois" in html and "Cliente B" in html
     assert "Oscilação na rede da concessionária · Religamento Remoto" in html and "Trip 27 no relé" in html
-    assert "(Em verificação)" in html and "formato=csv" in html
+    # o botão leva ao Excel desde 11/11/2026; o `?formato=csv` continua respondendo (abaixo)
+    assert "(Em verificação)" in html and "formato=xlsx" in html
     r = logado.get("/t/cos/ocorrencias?cliente=todos&formato=csv")
     assert r.status_code == 200 and r.mimetype == "text/csv"
     assert 'filename="ocorrencias-todos-7d.csv"' in r.headers["Content-Disposition"]
@@ -360,3 +361,55 @@ def test_a_tela_tem_os_filtros_e_o_csv_segue_os_filtros(ligada, logado, monkeypa
     assert "Usina Exemplo Dois" in html and "OS 90001" not in html
     csv_ = logado.get("/t/cos/ocorrencias?cliente=Cliente%20A&criado_por=Operadora%20Dois&formato=csv").get_data(as_text=True)
     assert "Operadora Dois" in csv_ and "Operadora Um" not in csv_
+
+
+# --- o Excel e o prazo da leitura (11/11/2026) -----------------------------------------------------------------------
+# O dono: "melhora a exportação do CSV, está muito feia" e "Thopen: o Andamento não respondeu (TimeoutError)".
+
+def test_a_leitura_do_ciclo_espera_20_s_e_nao_os_5_das_outras(ligada, monkeypatch):
+    prazos = []
+
+    def pedir(f, caminho, timeout=AND.TIMEOUT_S):
+        prazos.append(timeout)
+        return _dados([_oc()])
+    monkeypatch.setattr(AND, "_pedir", pedir)
+    AND.ler_ocorrencias(ligada.config, "Cliente A", 30)
+    assert prazos == [AND.TIMEOUT_OCORRENCIAS_S] and AND.TIMEOUT_OCORRENCIAS_S == 20 > AND.TIMEOUT_S
+
+
+def test_o_excel_tem_o_recorte_em_cima_as_horas_como_data_e_o_veredito_em_palavras(ligada, logado, monkeypatch):
+    import io
+    from datetime import datetime as dt
+
+    from openpyxl import load_workbook
+
+    from nexus.cos import ocorrencias_planilha as OP
+    _servir(monkeypatch, {"/api/nexus/Cliente%20A/ocorrencias?dias=7": _dados(_variadas())})
+    monkeypatch.setattr(AND, "agora", lambda: AGORA)
+    r = logado.get("/t/cos/ocorrencias?cliente=Cliente%20A&tecnico=Tecnico%20Um&formato=xlsx")
+    assert r.status_code == 200 and r.mimetype == OP.MIME
+    assert 'filename="ocorrencias-cliente-a-7d.xlsx"' in r.headers["Content-Disposition"]
+    ws = load_workbook(io.BytesIO(r.data)).active
+    linhas = [[c.value for c in row] for row in ws.iter_rows()]
+    assert linhas[0][0] == "Ocorrências do COS"
+    assert any("Técnico: Tecnico Um" in str(x[0]) for x in linhas[:5])          # o filtro da tela, escrito em cima
+    assert any("início da falha" in str(x[0]) for x in linhas[:5])              # de onde os prazos contam
+    cab = next(i for i, x in enumerate(linhas) if x[0] == "Cliente")
+    col = dict(zip(linhas[cab], linhas[cab + 1]))
+    assert len(linhas) == cab + 2                                               # só a linha do filtro
+    assert col["OS"] == 90001 and col["Técnico"] == "Tecnico Um"
+    assert isinstance(col["Início da falha"], dt) and col["Início da falha"] == dt(2026, 10, 22, 9, 0)
+    assert col["Prazo do aviso (15 min)"] == "No prazo" and col["Minutos até informar"] == 6
+    assert col["Notas"] == "Trip 27 no relé\nReligada remotamente"
+    assert ws.freeze_panes == f"A{cab + 2}" and ws.auto_filter.ref.startswith(f"A{cab + 1}:")
+    assert "formato=xlsx" in logado.get("/t/cos/ocorrencias?cliente=Cliente%20A").get_data(as_text=True)
+
+
+def test_o_texto_que_parece_formula_vai_como_texto_no_excel(ligada, logado, monkeypatch):
+    import io
+
+    from openpyxl import load_workbook
+    _servir(monkeypatch, {"/api/nexus/Cliente%20A/ocorrencias?dias=7": _dados([_com_texto(notas=["=HYPERLINK(1)"])])})
+    ws = load_workbook(io.BytesIO(logado.get("/t/cos/ocorrencias?cliente=Cliente%20A&formato=xlsx").data)).active
+    celulas = [c for row in ws.iter_rows() for c in row if c.value == "=HYPERLINK(1)"]
+    assert celulas and all(c.data_type == "s" for c in celulas)

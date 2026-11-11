@@ -90,7 +90,7 @@ def _servir(monkeypatch, respostas: dict):
     """Troca o pedido HTTP: `respostas` diz o que cada caminho devolve (um dict, ou uma exceção a lançar)."""
     pedidos = []
 
-    def pedir(f, caminho):
+    def pedir(f, caminho, timeout=AND.TIMEOUT_S):
         pedidos.append(caminho)
         r = respostas.get(caminho)
         if isinstance(r, Exception):
@@ -278,7 +278,7 @@ def _andamento_falso(monkeypatch, chave_certa=CHAVE, fora_do_ar=False, codigo=No
     """O Andamento dublado para a conferência: 200 com a chave certa, 401 com outra, sem resposta fora do ar."""
     vistos = []
 
-    def pedir(f, caminho):
+    def pedir(f, caminho, timeout=AND.TIMEOUT_S):
         vistos.append((f.url, caminho))
         if fora_do_ar:
             raise AND.FonteErro("o Andamento não respondeu (URLError)")

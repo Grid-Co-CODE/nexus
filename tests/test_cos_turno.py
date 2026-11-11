@@ -248,7 +248,7 @@ def test_tela_mostra_o_que_esta_aberto_no_andamento(banco, app, cliente, relogio
     resposta = {"versao": 1, "placar": {}, "problemas": [], "eventos": [], "fotografias": [],
                 "usinas": [{"ocorrencias": [{"severidade_classe": "crit"}, {"severidade_classe": "medio"}]}]}
 
-    def pedir(f, caminho):
+    def pedir(f, caminho, timeout=AND.TIMEOUT_S):
         if caminho.endswith("Cliente%20B"):
             raise AND.FonteErro("o Andamento não respondeu (TimeoutError)")
         return resposta

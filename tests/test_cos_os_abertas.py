@@ -124,7 +124,7 @@ def ligada(app):
 def _servir(monkeypatch, resposta):
     pedidos = []
 
-    def pedir(f, caminho):
+    def pedir(f, caminho, timeout=AND.TIMEOUT_S):
         pedidos.append(caminho)
         if isinstance(resposta, Exception):
             raise resposta

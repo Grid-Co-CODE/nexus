@@ -231,6 +231,11 @@ DIAS_DAS_OCORRENCIAS = (1, 7, 30)
 DIAS_PADRAO = 7
 # O ciclo muda devagar (um envio, uma transição): 60 s de cópia por cliente e período.
 TTL_OCORRENCIAS_S = 60
+# ⚠ O PRAZO DA LEITURA DO CICLO É 20 s, e não os 5 s das outras rotas (11/11/2026, o dono com a tela dizendo "Thopen: o
+# Andamento não respondeu (TimeoutError)"). Desde 11/11 a resposta leva o que aconteceu (descrição, notas): a Thopen de
+# 30 dias passou a ~1 MB e 2,6 s no servidor parado, e a viagem pela internet mais um pico de carga passavam dos 5 s. É
+# leitura de tela, com a cópia de 60 s na frente: esperar mais não segura ninguém, e a falha mostrava a cópia velha.
+TIMEOUT_OCORRENCIAS_S = 20
 
 
 def validar_ocorrencias(d) -> dict:
@@ -258,7 +263,8 @@ def ler_ocorrencias(config, cliente: str, dias: int) -> Leitura:
         if em_cache and agora - em_cache[0] < TTL_OCORRENCIAS_S:
             return Leitura(cliente, em_cache[1], lido_em=em_cache[2])
     try:
-        dados = validar_ocorrencias(_pedir(f, f"/api/nexus/{urllib.parse.quote(cliente, safe='')}/ocorrencias?dias={dias}"))
+        dados = validar_ocorrencias(_pedir(f, f"/api/nexus/{urllib.parse.quote(cliente, safe='')}/ocorrencias?dias={dias}",
+                                           timeout=TIMEOUT_OCORRENCIAS_S))
     except FonteErro as ex:
         if em_cache:
             return Leitura(cliente, em_cache[1], lido_em=em_cache[2], erro=str(ex), velha=True)
