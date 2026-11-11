@@ -63,7 +63,7 @@
   {# o chamado de garantia no Raio X da OS (11/11/2026, etapa 2): a tela do chamado do OS Creator no modo "blocos", com o
      ticket, o status do chamado, as observações e o Finalizar; a altura vem dela (postMessage) #}
   {% if chamado_url %}<section class="eg-chamado" aria-label="Chamado de garantia">
-    <iframe class="eg-chamado-fr" src="{{ chamado_url }}" title="Chamado de garantia da OS {{ o.os }}" loading="eager" data-chamado></iframe>
+    <iframe class="eg-chamado-fr" src="{{ chamado_url|na_raiz }}" title="Chamado de garantia da OS {{ o.os }}" loading="eager" data-chamado></iframe>
   </section>
   <script>
     (function () {
