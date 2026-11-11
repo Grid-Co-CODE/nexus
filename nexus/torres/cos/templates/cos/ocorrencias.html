@@ -10,7 +10,7 @@
    acionado (30 min), normalizada, encerrada. Os fatos vêm do Andamento da Ronda COS; o prazo e o veredito, de
    nexus/cos/ocorrencias.py. Só lê. #}
 {% macro placar(nome, r, prazo) %}
-<span><span class="gc-rotulo">{{ nome }} em até {{ prazo.minutos }} min</span>
+<span><span class="gc-rotulo">{{ nome }} no prazo</span>
   <span class="v{% if r.pct is not none and r.pct < 100 %} ruim{% endif %}">{% if r.pct is none %}—{% else %}{{ r.pct }}%{% endif %}</span>
   <span class="d">{{ r.cumpriu }} no prazo · {{ r.nao_cumpriu }} fora{% if r.pendente %} · {{ r.pendente }} correndo{% endif %}{% if r.automatico %} · {{ r.automatico }} só automático{% endif %}</span></span>
 {% endmacro %}
@@ -18,9 +18,11 @@
   <div class="cn-cab">
     <div><p class="gc-eyebrow">{{ torre.nome }}</p><div class="gc-titulo-explica"><h1 class="cn-titulo">{{ tela.nome }}</h1>
       {% call explica('Entenda esta tela') %}<p><b>De onde vem.</b> Do Andamento da Ronda COS: as ocorrências registradas no período, abertas ou
-    não, e quando cada etapa aconteceu. Os prazos são os da spec R04 ({{ prazos.informado.minutos }} min para o cliente
-    saber, {{ prazos.campo.minutos }} min para acionar o campo) e contam do <b>início da falha</b>, o mesmo relógio do
-    escalonamento a campo da Ronda COS. <b>Cliente informado</b> é o primeiro flash ou a primeira fotografia que nomeou a
+    não, e quando cada etapa aconteceu. <b>De onde os prazos contam</b> (desde 11/11/2026): da hora em que o <b>COS
+    viu</b> a falha, que a Ronda COS pergunta a quem abre a ocorrência; sem ela, da hora do registro na Ronda COS (a linha
+    diz "do registro"). A demora entre o início da falha e o COS ver fica na etapa <b>Detectada</b> e no número
+    <b>Até o COS ver</b>. <b>Os prazos:</b> o cliente sabe em até {{ prazos.informado.texto }}; o campo é acionado em até
+    {{ prazos.campo.texto }} (spec R04). <b>Cliente informado</b> é o primeiro flash ou a primeira fotografia que nomeou a
     ocorrência ao grupo do cliente (a ocorrência sem OS não é nomeada); antes de o Andamento mandar ao cliente, não se
     mede. <b>Campo acionado</b> é a primeira passagem a "Técnico acionado" feita por pessoa ou pela OS aberta com
     religamento local; a passagem automática da Ronda COS, quando a tratativa remota passa do tempo, aparece como
@@ -90,6 +92,10 @@
     <span><span class="gc-rotulo">Ocorrências</span><span class="v">{{ p.total }}</span><span class="d">registradas {% if p.desde %}desde {{ p.desde.strftime('%d/%m %H:%M') }}{% endif %}</span></span>
     {{ placar('Cliente informado', p.resumo.informado, prazos.informado) }}
     {{ placar('Campo acionado', p.resumo.campo, prazos.campo) }}
+    {# A demora até o COS ver (11/11/2026): saiu de dentro dos prazos quando eles passaram a contar da detecção, e fica
+       aqui à vista — só onde a hora foi digitada. #}
+    <span><span class="gc-rotulo">Até o COS ver</span><span class="v">{{ p.resumo.deteccao.mediana }}</span>
+      <span class="d">mediana do início da falha à detecção · {{ p.resumo.deteccao.n }} com a hora{% if p.resumo.deteccao.sem %}, {{ p.resumo.deteccao.sem }} sem{% endif %}</span></span>
     <span><span class="gc-rotulo">Abertas agora</span><span class="v">{{ p.contagem.abertas }}</span><span class="d">das {{ p.total }} do período</span></span>
   </div>
   {% if p.truncado %}<p class="mudo">O Andamento mandou só as mais recentes: o período tem mais ocorrências do que cabem numa resposta.</p>{% endif %}
@@ -103,7 +109,7 @@
 
   {% if p.itens %}
   <div class="cn-tab cos-tab cos-ciclo"><table>
-    <thead><tr><th class="cos-esq">Ocorrência</th>{% for id, nome in etapas %}<th class="cos-esq">{{ nome }}{% if prazos.get(id) %}<span class="det">até {{ prazos[id].minutos }} min</span>{% endif %}</th>{% endfor %}</tr></thead>
+    <thead><tr><th class="cos-esq">Ocorrência</th>{% for id, nome in etapas %}<th class="cos-esq">{{ nome }}{% if id == 'informado' %}<span class="det">15 min no flash · 60 na fotografia</span>{% elif prazos.get(id) %}<span class="det">até {{ prazos[id].minutos }} min</span>{% endif %}</th>{% endfor %}</tr></thead>
     <tbody>
     {% for x in p.itens %}
       <tr>

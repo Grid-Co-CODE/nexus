@@ -29,19 +29,59 @@ _NUNCA = datetime.min.replace(tzinfo=timezone.utc)
 class Prazo:
     minutos: int
     porque: str
+    # O prazo em palavras, para as telas (11/11/2026: o do aviso deixou de ser um número só).
+    texto: str = ""
 
 
 # Os prazos da spec R04 (Nexus, "COS como visão global": o ciclo da ocorrência em cinco etapas). Um lugar só.
 PRAZOS = {
-    "informado": Prazo(15, "R04: o cliente fica sabendo da ocorrência em até 15 min"),
-    "campo": Prazo(30, "R04: o campo é acionado em até 30 min"),
+    "informado": Prazo(15, "R04: o cliente fica sabendo da ocorrência em até 15 min",
+                       "15 min (desligamento, que vai no flash) ou 60 min (o resto, que vai na fotografia)"),
+    "campo": Prazo(30, "R04: o campo é acionado em até 30 min", "30 min"),
 }
-# De onde os prazos contam: o INÍCIO da falha, o mesmo relógio do escalonamento a campo e do MTTA da Ronda COS. A outra
-# leitura possível é a hora em que a Ronda COS registrou a ocorrência ("registrada_em"), que deixaria de fora a demora em
-# registrar — medida em 22/10/2026 na Thopen: mediana de 24 min entre o início e o registro.
+
+# ⚠ OS TIPOS QUE VÃO AO CLIENTE PELO FLASH, e por isso têm os 15 min (11/11/2026, decisão do dono: "segue, com prazo de
+# 60 min para os da fotografia"). É a regra do Andamento (`regras/flash.ts`, TIPOS_DO_FLASH_DA_RONDA_COS: a fonte das
+# ocorrências é a Ronda COS desde 19/10/2026): o desligamento de usina, cabine, QGBT, SKID e inversor. Os outros tipos
+# (falha de comunicação, inversor offline, string, tracker...) só chegam ao cliente na fotografia de hora em hora — os
+# 15 min eram impossíveis por desenho (em 30 dias, 86 falhas de comunicação e 11 inversores offline "fora" só por isso),
+# e eles são julgados pela fotografia seguinte: 60 min. Sem o código do tipo (Andamento antigo), os 15 min de antes.
+TIPOS_COM_FLASH = frozenset({"DESLIGAMENTO_USINA", "DESLIGAMENTO_CABINE", "DESLIGAMENTO_QGBT", "DESLIGAMENTO_SKID",
+                             "DESLIGAMENTO_INVERSOR"})
+PRAZO_DA_FOTOGRAFIA = 60
+
+
+def prazo_do_aviso(o: dict) -> int:
+    """O prazo do aviso ao cliente desta ocorrência: 15 min se o tipo vai no flash, 60 se só vai na fotografia."""
+    codigo = o.get("tipo_falha_codigo")
+    if codigo and codigo not in TIPOS_COM_FLASH:
+        return PRAZO_DA_FOTOGRAFIA
+    return PRAZOS["informado"].minutos
+
+
+# ⚠ DE ONDE OS PRAZOS CONTAM: DE QUANDO O COS VIU A FALHA (11/11/2026, decisão do dono). Até ali contavam do INÍCIO da
+# falha, escolha minha de 22/10 sem decisão do dono, e o placar dizia "27% informado no prazo" com 520 dos 530 "fora"
+# avisados — a falha levava 25 min (mediana) até ser registrada, e o cliente era avisado ~2 min depois da abertura da
+# OS. A spec R04 diz "detectada → cliente informado em 15 min": o relógio é a detecção.
+# - `detectada_em`: a hora em que o COS viu, digitada por quem abre o desvio na tela (desde 03/11/2026);
+# - sem ela, `registrada_em`: a hora em que a Ronda COS registrou — na ocorrência que veio do Fracttal pela sincronização,
+#   DEPOIS de alguém ter visto, e por isso o número sai melhor do que foi (cada linha diz qual relógio valeu);
+# - sem as duas, o início.
+# A demora até o COS ver NÃO some: é a etapa "Detectada" (do início) e o número "Até o COS ver" do placar.
+# `CONTA_DE` continua sendo o INÍCIO da falha: é o relógio da Detectada, da Normalizada (o tempo fora), do turno e do
+# MTTA do Desempenho, que não mudaram.
 CONTA_DE = "inicio"
-# O relógio em palavras, para a planilha dizer de onde os minutos contam.
-RELOGIO = "início da falha"
+RELOGIO = "momento em que o COS viu a falha (sem essa hora, do registro na Ronda COS)"
+BASES = {"detectada": "da hora em que o COS viu", "registro": "do registro na Ronda COS", "inicio": "do início da falha"}
+
+
+def quando_o_cos_viu(o: dict) -> tuple[datetime | None, str]:
+    """O relógio dos prazos (ver acima) e qual valeu: "detectada", "registro" ou "inicio"."""
+    for campo, base in (("detectada_em", "detectada"), ("registrada_em", "registro"), ("inicio", "inicio")):
+        t = AND.instante(o.get(campo))
+        if t:
+            return t, base
+    return None, ""
 
 # A Ronda COS (a plataforma) atende no mesmo servidor do Andamento, na porta 3000: o link "abrir na Ronda COS" sai do
 # endereço do Andamento, como o painel do próprio Andamento faz. O endereço não entra no repositório.
@@ -100,6 +140,8 @@ class Linha:
     etapas: dict = field(default_factory=dict)
     # O cliente da ocorrência — a coluna que aparece em "Todos os clientes" e no CSV.
     cliente: str = ""
+    # De qual relógio os prazos contaram (`quando_o_cos_viu`): "detectada", "registro" ou "inicio".
+    relogio: str = ""
 
 
 @dataclass
@@ -149,12 +191,19 @@ def link_da_plataforma(url_do_andamento: str, registro: str) -> str:
     return f"{p.scheme}://{p.hostname}:{PORTA_DA_PLATAFORMA}/console?registro={quote(registro, safe='')}"
 
 
-def _informado(o: dict, origem: datetime | None, envio: dict, agora: datetime) -> Etapa:
-    prazo = PRAZOS["informado"].minutos
+def _do_registro(base: str) -> str:
+    """O aviso, na linha, de que o relógio foi o registro (e não a hora em que o COS viu)."""
+    return " · do registro" if base == "registro" else (" · do início" if base == "inicio" else "")
+
+
+def _informado(o: dict, origem: datetime | None, envio: dict, agora: datetime, base: str = "") -> Etapa:
+    """O cliente informado no prazo: `origem` é a hora em que o COS viu (`quando_o_cos_viu`), e o prazo é o do tipo
+    (`prazo_do_aviso`: 15 min no flash, 60 na fotografia)."""
+    prazo = prazo_do_aviso(o)
     if o.get("estado") == "DETECTADO":
         return Etapa("nao_medido", "—", detalhe="alarme ainda não confirmado: não vai ao cliente")
     if not origem:
-        return Etapa("nao_medido", "—", detalhe="sem a hora de início")
+        return Etapa("nao_medido", "—", detalhe="sem a hora em que o COS viu")
     desde = AND.instante(envio.get("desde"))
     if envio.get("grupos") == "nenhum":
         return Etapa("nao_medido", "—", detalhe="o Andamento não manda a este cliente")
@@ -174,8 +223,9 @@ def _informado(o: dict, origem: datetime | None, envio: dict, agora: datetime) -
         m = _min(origem, em)
         via = ("flash" if aviso.get("por") == "flash" else "fotografia") + (" da volta" if da_volta else "")
         if m <= prazo:
-            return Etapa("no_prazo", hora(em, agora), "ok", f"{via} · em {duracao(m)}")
-        return Etapa("fora", hora(em, agora), "critico", f"{via} · em {duracao(m)} (prazo {prazo} min)")
+            return Etapa("no_prazo", hora(em, agora), "ok", f"{via} · em {duracao(m)}{_do_registro(base)}")
+        return Etapa("fora", hora(em, agora), "critico",
+                     f"{via} · em {duracao(m)} (prazo {prazo} min){_do_registro(base)}")
     sem_os = "ainda sem OS: o Andamento só nomeia ao cliente a ocorrência com OS" if not o.get("os") else ""
     if not o.get("aberta"):
         return Etapa("nao_informado", "não avisado", "critico", sem_os or "fechou sem aviso ao cliente")
@@ -185,18 +235,20 @@ def _informado(o: dict, origem: datetime | None, envio: dict, agora: datetime) -
     return Etapa("atrasada", "não avisado", "critico", sem_os or f"há {duracao(m)} (prazo {prazo} min)")
 
 
-def _campo(o: dict, origem: datetime | None, agora: datetime) -> Etapa:
+def _campo(o: dict, origem: datetime | None, agora: datetime, base: str = "") -> Etapa:
+    """O campo acionado no prazo, contado de quando o COS viu (`quando_o_cos_viu`)."""
     prazo = PRAZOS["campo"].minutos
     c = o.get("campo") or {}
     acionado = AND.instante(c.get("acionado_em"))
     if not origem:
-        return Etapa("nao_medido", "—", detalhe="sem a hora de início")
+        return Etapa("nao_medido", "—", detalhe="sem a hora em que o COS viu")
     if acionado:
         m = _min(origem, acionado)
         quem = ORIGENS.get(c.get("acionado_por") or "", "")
         if m <= prazo:
-            return Etapa("no_prazo", hora(acionado, agora), "ok", f"{quem} · em {duracao(m)}")
-        return Etapa("fora", hora(acionado, agora), "critico", f"{quem} · em {duracao(m)} (prazo {prazo} min)")
+            return Etapa("no_prazo", hora(acionado, agora), "ok", f"{quem} · em {duracao(m)}{_do_registro(base)}")
+        return Etapa("fora", hora(acionado, agora), "critico",
+                     f"{quem} · em {duracao(m)} (prazo {prazo} min){_do_registro(base)}")
     escalonado = AND.instante(c.get("escalonado_em"))
     if escalonado:
         return Etapa("so_automatico", "só automático", "alerta",
@@ -216,8 +268,13 @@ def _campo(o: dict, origem: datetime | None, agora: datetime) -> Etapa:
 
 
 def _detectada(o: dict, origem: datetime | None, agora: datetime) -> Etapa:
+    """A etapa Detectada, contada do INÍCIO da falha: é aqui que a demora até o COS ver aparece (11/11/2026: desde que
+    os prazos contam de quando o COS viu, ela não está mais dentro deles)."""
     reg = AND.instante(o.get("registrada_em"))
+    viu = AND.instante(o.get("detectada_em"))
     partes = []
+    if origem and viu and _min(origem, viu) >= 1:
+        partes.append(f"COS viu {duracao(_min(origem, viu))} depois")
     if origem and reg and _min(origem, reg) >= 1:
         partes.append(f"registrada {duracao(_min(origem, reg))} depois")
     os_em = AND.instante(o.get("os_aberta_em"))
@@ -257,11 +314,14 @@ def _encerrada(o: dict, agora: datetime) -> Etapa:
 
 
 def linha(o: dict, envio: dict, agora: datetime, url_do_andamento: str = "", cliente: str = "") -> Linha:
+    # Dois relógios (11/11/2026): o INÍCIO da falha para a Detectada e a Normalizada; QUANDO O COS VIU para os prazos.
     origem = AND.instante(o.get(CONTA_DE))
+    viu, base = quando_o_cos_viu(o)
     sev = o.get("severidade") or ""
     return Linha(
         o=o,
         cliente=cliente,
+        relogio=base,
         usina=o.get("usina") or o.get("usina_codigo") or "",
         equipamentos=", ".join(o.get("equipamentos") or []),
         tipo=o.get("tipo_falha") or "Ocorrência",
@@ -272,8 +332,8 @@ def linha(o: dict, envio: dict, agora: datetime, url_do_andamento: str = "", cli
         link_plataforma=link_da_plataforma(url_do_andamento, o.get("registro") or ""),
         etapas={
             "detectada": _detectada(o, origem, agora),
-            "informado": _informado(o, origem, envio, agora),
-            "campo": _campo(o, origem, agora),
+            "informado": _informado(o, viu, envio, agora, base),
+            "campo": _campo(o, viu, agora, base),
             "normalizada": _normalizada(o, origem, agora),
             "encerrada": _encerrada(o, agora),
         },
@@ -293,6 +353,19 @@ def _resumo(linhas: list, etapa: str) -> dict:
         "medidas": medidas,
         "pct": round(100 * cumpriu / medidas) if medidas else None,
     }
+
+
+def _deteccao(linhas: list) -> dict:
+    """ATÉ O COS VER A FALHA (11/11/2026): a mediana do início da falha à hora em que o COS viu, só onde ela foi
+    digitada (`detectada_em`). É a demora que saiu de dentro dos prazos quando eles passaram a contar da detecção — e que
+    não pode sumir da tela. `sem` conta as que não têm a hora (vieram do sync, de carga ou de antes de 03/11/2026)."""
+    ms = []
+    for x in linhas:
+        ini, viu = AND.instante(x.o.get("inicio")), AND.instante(x.o.get("detectada_em"))
+        if ini and viu:
+            ms.append(max(0.0, (viu - ini).total_seconds() / 60))
+    ms.sort()
+    return {"mediana": duracao(ms[len(ms) // 2]) if ms else "—", "n": len(ms), "sem": len(linhas) - len(ms)}
 
 
 def _na_situacao(x: Linha, situacao: str) -> bool:
@@ -341,7 +414,8 @@ def painel(leitura, agora: datetime, situacao: str = "", url_do_andamento: str =
         itens=[x for x in recorte if _na_situacao(x, situacao)],
         total=len(recorte),
         contagem={s: sum(_na_situacao(x, s) for x in recorte) for s in SITUACOES},
-        resumo={"informado": _resumo(recorte, "informado"), "campo": _resumo(recorte, "campo")},
+        resumo={"informado": _resumo(recorte, "informado"), "campo": _resumo(recorte, "campo"),
+                "deteccao": _deteccao(recorte)},
         envio=(um.get("envio_ao_cliente") or {}) if um else {},
         desde=min(desdes) if desdes else None,
         gerado_em=min(gerados) if gerados else None,

@@ -39,7 +39,9 @@ def _ciclo(cliente, ocs, **mudar):
 
 A = _ciclo("Cliente A", [
     _oc("a1", "2026-11-04T08:00:00-03:00", viu=4, informado_min=10, remoto=True),     # dia
-    _oc("a2", "2026-11-04T14:00:00-03:00", viu=10, informado_min=25),                 # dia: aviso fora do prazo
+    # dia: aviso fora do prazo — 20 min depois de o COS ver (desde 11/11/2026 o prazo conta da hora em que o COS viu;
+    # com o aviso aos 25 min, como era, ficaria no prazo: 15 min depois de ver)
+    _oc("a2", "2026-11-04T14:00:00-03:00", viu=10, informado_min=30),
     _oc("a3", "2026-11-04T20:00:00-03:00", viu=30, informado_min=12, remoto=True),    # noite
     _oc("a4", "2026-11-05T02:00:00-03:00", informado_min=5),                          # noite, sem a hora em que viu
     _oc("a5", "2026-11-05T09:55:00-03:00", viu=-5, aberta=True),                      # dia, correndo; viu "antes"
@@ -66,7 +68,7 @@ def test_mtta_e_a_mediana_ate_o_cos_ver_sem_os_que_nao_tem_a_hora_nem_a_espera_n
 
 def test_informado_no_prazo_so_sobre_as_decididas():
     a = next(c for c in _painel().clientes if c["cliente"] == "Cliente A")["total"]
-    # a1, a3 e a4 no prazo; a2 fora (25 min); a5 ainda corre os 15 min e fica fora da conta
+    # a1, a3 e a4 no prazo; a2 fora (20 min depois de o COS ver); a5 ainda corre os 15 min e fica fora da conta
     assert (a["informado_cumpriu"], a["informado_fora"], a["informado_correndo"], a["informado_pct"]) == (3, 1, 1, 75)
 
 

@@ -28,6 +28,9 @@ def _oc(registro="r1", **mudar):
         "encerrada_em": None,
     }
     o.update(mudar)
+    # Desde 11/11/2026 os prazos contam de quando o COS viu (`detectada_em`): sem dizer, o caso a viu no início da falha,
+    # e os vereditos destes testes medem o mesmo de antes. Os casos do relógio novo dizem a hora (mais abaixo).
+    o.setdefault("detectada_em", o.get("inicio"))
     return o
 
 
@@ -393,13 +396,14 @@ def test_o_excel_tem_o_recorte_em_cima_as_horas_como_data_e_o_veredito_em_palavr
     linhas = [[c.value for c in row] for row in ws.iter_rows()]
     assert linhas[0][0] == "Ocorrências do COS"
     assert any("Técnico: Tecnico Um" in str(x[0]) for x in linhas[:5])          # o filtro da tela, escrito em cima
-    assert any("início da falha" in str(x[0]) for x in linhas[:5])              # de onde os prazos contam
+    assert any("momento em que o COS viu" in str(x[0]) for x in linhas[:5])     # de onde os prazos contam
     cab = next(i for i, x in enumerate(linhas) if x[0] == "Cliente")
     col = dict(zip(linhas[cab], linhas[cab + 1]))
     assert len(linhas) == cab + 2                                               # só a linha do filtro
     assert col["OS"] == 90001 and col["Técnico"] == "Tecnico Um"
     assert isinstance(col["Início da falha"], dt) and col["Início da falha"] == dt(2026, 10, 22, 9, 0)
-    assert col["Prazo do aviso (15 min)"] == "No prazo" and col["Minutos até informar"] == 6
+    assert col["Aviso no prazo?"] == "No prazo" and col["Minutos até informar"] == 6 and col["Prazo do aviso (min)"] == 15
+    assert col["Prazos contam"] == "da hora em que o COS viu"
     assert col["Notas"] == "Trip 27 no relé\nReligada remotamente"
     assert ws.freeze_panes == f"A{cab + 2}" and ws.auto_filter.ref.startswith(f"A{cab + 1}:")
     assert "formato=xlsx" in logado.get("/t/cos/ocorrencias?cliente=Cliente%20A").get_data(as_text=True)
@@ -413,3 +417,46 @@ def test_o_texto_que_parece_formula_vai_como_texto_no_excel(ligada, logado, monk
     ws = load_workbook(io.BytesIO(logado.get("/t/cos/ocorrencias?cliente=Cliente%20A&formato=xlsx").data)).active
     celulas = [c for row in ws.iter_rows() for c in row if c.value == "=HYPERLINK(1)"]
     assert celulas and all(c.data_type == "s" for c in celulas)
+
+
+# --- o relógio dos prazos: quando o COS viu (11/11/2026, decisão do dono) ----------------------------------------------
+# Contando do início da falha, o placar dizia 27% "informado no prazo" com 520 dos 530 "fora" avisados: a falha levava
+# 25 min até ser registrada e o cliente era avisado ~2 min depois da abertura da OS. O dono: "segue, com prazo de 60 min
+# para os da fotografia". ⚠ Controle positivo, feito à mão: com `quando_o_cos_viu` devolvendo o início, o primeiro caso
+# fica vermelho; com `prazo_do_aviso` sempre 15, o terceiro.
+
+def test_o_prazo_conta_de_quando_o_cos_viu_e_nao_do_inicio():
+    o = _oc(detectada_em="2026-10-22T09:20:00-03:00",
+            cliente_informado={"em": "2026-10-22T09:30:00-03:00", "por": "flash"},
+            campo={"acionado_em": "2026-10-22T09:45:00-03:00", "acionado_por": "pessoa", "escalonado_em": None})
+    x = OC.linha(o, ENVIO, AGORA)
+    assert x.relogio == "detectada"
+    assert x.etapas["informado"].estado == "no_prazo"                            # 10 min depois de ver (eram 30)
+    assert x.etapas["campo"].estado == "no_prazo"                                # 25 min depois de ver (eram 45)
+    assert "COS viu 20 min depois" in x.etapas["detectada"].detalhe              # a demora até ver fica à vista
+
+
+def test_sem_a_hora_em_que_o_cos_viu_vale_o_registro_e_a_linha_diz():
+    o = _oc(detectada_em=None, registrada_em="2026-10-22T09:10:00-03:00",
+            cliente_informado={"em": "2026-10-22T09:14:00-03:00", "por": "flash"})
+    x = OC.linha(o, ENVIO, AGORA)
+    assert x.relogio == "registro" and x.etapas["informado"].estado == "no_prazo"
+    assert "do registro" in x.etapas["informado"].detalhe
+
+
+def test_o_que_so_vai_na_fotografia_tem_60_min_e_o_desligamento_15():
+    def veredito(codigo, minutos):
+        o = _oc(tipo_falha_codigo=codigo, cliente_informado={"em": f"2026-10-22T09:{minutos:02d}:00-03:00", "por": "fotografia"})
+        return OC.prazo_do_aviso(o), OC.linha(o, ENVIO, AGORA).etapas["informado"].estado
+    assert veredito("FALHA_COMUNICACAO", 45) == (60, "no_prazo")
+    assert veredito("INVERSOR_OFFLINE", 59) == (60, "no_prazo")
+    assert veredito("DESLIGAMENTO_USINA", 45) == (15, "fora")
+    assert veredito("DESLIGAMENTO_INVERSOR", 14) == (15, "no_prazo")
+    assert veredito(None, 45) == (15, "fora")                                     # Andamento antigo, sem o código
+
+
+def test_o_placar_tem_a_demora_ate_o_cos_ver():
+    ocs = [_oc("r1", detectada_em="2026-10-22T09:10:00-03:00"), _oc("r2", detectada_em="2026-10-22T09:30:00-03:00"),
+           _oc("r3", detectada_em=None)]
+    d = OC.painel(AND.Leitura("Cliente A", _dados(ocs)), AGORA).resumo["deteccao"]
+    assert (d["n"], d["sem"]) == (2, 1) and d["mediana"] == OC.duracao(30)       # a mediana alta de 10 e 30

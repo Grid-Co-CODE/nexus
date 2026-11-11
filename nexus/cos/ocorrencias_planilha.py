@@ -51,6 +51,13 @@ def _minutos(de, ate) -> int | None:
     return round((b - a).total_seconds() / 60) if a and b else None
 
 
+def _do_cos(o: dict, ate) -> int | None:
+    """Os minutos de quando o COS viu (o relógio dos prazos, `ocorrencias.quando_o_cos_viu`) até `ate`."""
+    viu, _base = OC.quando_o_cos_viu(o)
+    b = AND.instante(ate)
+    return round((b - viu).total_seconds() / 60) if viu and b else None
+
+
 def _aviso(o: dict) -> dict | None:
     return o.get("cliente_informado")
 
@@ -75,11 +82,15 @@ COLUNAS = (
     ("OS aberta", 16, lambda x: _hora(x.o.get("os_aberta_em"))),
     ("Cliente informado", 16, lambda x: _hora((_aviso(x.o) or {}).get("em"))),
     ("Informado por", 12, lambda x: (_aviso(x.o) or {}).get("por") or ""),
-    ("Minutos até informar", 11, lambda x: _minutos(x.o.get(OC.CONTA_DE), (_aviso(x.o) or {}).get("em"))),
-    ("Prazo do aviso (15 min)", 18, lambda x: VEREDITO.get(x.etapas["informado"].estado, x.etapas["informado"].estado)),
+    # os prazos contam de quando o COS viu (11/11/2026); a coluna diz qual relógio valeu na linha
+    ("Prazos contam", 18, lambda x: OC.BASES.get(x.relogio, "")),
+    ("Minutos até o COS ver", 11, lambda x: _minutos(x.o.get("inicio"), x.o.get("detectada_em"))),
+    ("Minutos até informar", 11, lambda x: _do_cos(x.o, (_aviso(x.o) or {}).get("em"))),
+    ("Prazo do aviso (min)", 9, lambda x: OC.prazo_do_aviso(x.o)),
+    ("Aviso no prazo?", 18, lambda x: VEREDITO.get(x.etapas["informado"].estado, x.etapas["informado"].estado)),
     ("Campo acionado", 16, lambda x: _hora(_acionamento(x.o))),
-    ("Minutos até o campo", 11, lambda x: _minutos(x.o.get(OC.CONTA_DE), _acionamento(x.o))),
-    ("Prazo do campo (30 min)", 18, lambda x: VEREDITO.get(x.etapas["campo"].estado, x.etapas["campo"].estado)),
+    ("Minutos até o campo", 11, lambda x: _do_cos(x.o, _acionamento(x.o))),
+    ("Campo no prazo? (30 min)", 18, lambda x: VEREDITO.get(x.etapas["campo"].estado, x.etapas["campo"].estado)),
     ("Normalizada (volta)", 16, lambda x: _hora((x.o.get("normalizada") or {}).get("fim"))),
     ("Encerrada", 16, lambda x: _hora(x.o.get("encerrada_em"))),
     ("Causa", 26, lambda x: (x.o.get("causa") or {}).get("rotulo") or ""),

@@ -36,8 +36,8 @@
       gestão, como na Ronda COS) vê todas as mesas, e qualquer um pode trocar para "Todas as mesas".</p>
       <p><b>De onde vem.</b> O que está aberto é a fotografia do Andamento, a mesma da Ronda padronizada. O que falta avisar e o
       campo a acionar são as ocorrências abertas dos últimos {{ dias }} dias, com os prazos da tela Ocorrências: o cliente
-      informado em até {{ prazos.informado.minutos }} min e o campo acionado em até {{ prazos.campo.minutos }} min, contados do
-      início da falha. <b>Correndo</b> ainda está no prazo; <b>atrasada</b> já passou dele.</p>
+      informado em até {{ prazos.informado.texto }} e o campo acionado em até {{ prazos.campo.texto }}, contados da hora em
+      que o COS viu a falha (sem ela, do registro; desde 11/11/2026). <b>Correndo</b> ainda está no prazo; <b>atrasada</b> já passou dele.</p>
       <p><b>Só lê.</b> Avisar o cliente e acionar o campo são na Ronda COS, pelo link de cada linha.</p>{% endcall %}</div>
       <p class="cn-pergunta">{{ tela.pergunta }}</p></div>
     <div class="cn-frescor">Andamento da Ronda COS{% if lido %}<br>lido às <b>{{ lido }}</b>{% endif %}</div>
@@ -68,7 +68,7 @@
     <span><span class="gc-rotulo">Abertas na mesa</span><span class="v">{{ '—' if p.resumo.abertas is none else p.resumo.abertas }}</span>
       <span class="d">{% if p.resumo.criticas %}{{ p.resumo.criticas }} crítica{{ '' if p.resumo.criticas == 1 else 's' }} ou alta{{ '' if p.resumo.criticas == 1 else 's' }}{% elif p.resumo.abertas is none %}falta a leitura de um cliente{% else %}na fotografia de agora{% endif %}</span></span>
     <span><span class="gc-rotulo">Falta avisar o cliente</span><span class="v{% if p.resumo.avisar_atrasadas %} ruim{% endif %}">{{ p.resumo.falta_avisar }}</span>
-      <span class="d">{{ p.resumo.avisar_atrasadas }} fora dos {{ prazos.informado.minutos }} min</span></span>
+      <span class="d">{{ p.resumo.avisar_atrasadas }} fora do prazo</span></span>
     <span><span class="gc-rotulo">Campo a acionar</span><span class="v{% if p.resumo.campo_atrasadas %} ruim{% endif %}">{{ p.resumo.campo }}</span>
       <span class="d">{{ p.resumo.campo_atrasadas }} fora dos {{ prazos.campo.minutos }} min</span></span>
   </div>

@@ -18,8 +18,8 @@
       <p><b>MTTA</b> é a mediana do tempo entre o início da falha e a hora em que o COS viu, que a Ronda COS pergunta a quem
       abre o desvio na tela desde 03/11/2026. O desvio que veio do sync ou de antes disso não tem essa hora e fica fora da
       conta: a amostra está ao lado.</p>
-      <p><b>Informado no prazo</b> é o veredito da tela Ocorrências: o cliente avisado em até {{ prazos.informado.minutos }}
-      min do início, contado sobre as ocorrências já decididas. As que ainda correm o prazo, e as que não se medem (antes de o
+      <p><b>Informado no prazo</b> é o veredito da tela Ocorrências: o cliente avisado em até {{ prazos.informado.texto }},
+      contados da hora em que o COS viu (sem ela, do registro; desde 11/11/2026), sobre as ocorrências já decididas. As que ainda correm o prazo, e as que não se medem (antes de o
       Andamento mandar ao cliente, alarme não confirmado), ficam fora.</p>
       <p><b>Religamento remoto</b> é a parte das normalizadas que teve religamento remoto, a regra da tela Religamentos.</p>
       <p><b>O turno</b> é o da hora do início da falha: dia das 06h, noite das 18h, os da Ronda COS. <b>A mesa</b> é o conjunto
@@ -52,7 +52,7 @@
     <span><span class="gc-rotulo">MTTA</span><span class="v">{{ '—' if p.total.mtta is none else p.total.mtta ~ ' min' }}</span>
       <span class="d">mediana de {{ p.total.mtta_amostra }} de {{ p.total.ocorrencias }} ocorrências</span></span>
     <span><span class="gc-rotulo">Informado no prazo</span><span class="v{% if p.total.informado_fora %} ruim{% endif %}">{{ '—' if p.total.informado_pct is none else p.total.informado_pct ~ '%' }}</span>
-      <span class="d">{{ p.total.informado_fora }} fora dos {{ prazos.informado.minutos }} min{% if not p.completo %} · falta um cliente{% endif %}</span></span>
+      <span class="d">{{ p.total.informado_fora }} fora do prazo{% if not p.completo %} · falta um cliente{% endif %}</span></span>
     <span><span class="gc-rotulo">Religamento remoto</span><span class="v">{{ '—' if p.total.remoto_pct is none else p.total.remoto_pct ~ '%' }}</span>
       <span class="d">{{ p.total.remoto }} de {{ p.total.normalizadas }} normalizadas</span></span>
   </div>
