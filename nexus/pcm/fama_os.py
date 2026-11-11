@@ -13,7 +13,6 @@ para o motor (o log do motor imprime o texto das tarefas).
 Os valores da FAMA (o catálogo de lá, em inglês) ficam como vieram no dado; a tela fala português pelas tabelas abaixo, e
 valor que a tabela não conhece aparece como veio (dado é dado).
 """
-import importlib.util
 import re
 from datetime import date
 
@@ -81,15 +80,33 @@ def _linhas_fama(config) -> list[dict]:
     """A ÚNICA entrada das OS da FAMA no PCM: todas as linhas do `fato_os_fama` (qualquer situação: o Quadro escolhe as
     da semana e o adaptador do motor acha nelas as usinas da FAMA), cada uma um dict com `fama_os_id`, `usina_id` (None
     = sem usina ligada em Base → Ligações), `status`, `tipo`, `severidade`, `data_id_prevista`, `data_id_criacao` e
-    `titulo` (decifrado, só em memória). Sem o leitor da parte A (`nexus/dados/fama.py`) nesta máquina, nenhuma linha. No
+    `titulo` (decifrado, só em memória). Sem o livro no banco (antes da 1ª leitura do servidor), nenhuma linha. No
     teste, as linhas de `NEXUS_FAMA_LINHAS_TESTE` (teste não vai ao banco). Erro de leitura sobe: quem chama decide (o
-    Quadro avisa; a rodada com `NEXUS_FAMA_PROGRAMA=1` não sai). Quem junta as partes ajusta só esta função."""
+    Quadro avisa; a rodada com `NEXUS_FAMA_PROGRAMA=1` não sai). Lê o livro `nexus_os_fama` pela parte A
+    (`nexus/dados/fama.ler_banco`) e decifra só o título, em memória; a descrição nunca sai do banco."""
     if config.get("TESTING"):
         return [dict(l) for l in config.get("NEXUS_FAMA_LINHAS_TESTE") or []]
-    if importlib.util.find_spec("nexus.dados.fama") is None:
-        return []
+    from ..cadastro.cifra import CifraErro, Cofre
     from ..dados import conexao, fama
-    return [dict(l) for l in fama.ler_banco(*conexao.banco_de(config)) or []]
+    from ..dados import fato_os_fama as FO
+    livro = fama.ler_banco(*conexao.banco_de(config)) or {}
+    try:                         # sem a chave do cadastro (ou com outra), a OS vale sem o título: o Quadro nunca cai
+        chave = (config.get("NEXUS_CHAVE_CADASTRO") or "").strip()
+        cofre = Cofre(chave) if chave else None
+    except Exception:           # noqa: BLE001 — chave que não abre o Cofre
+        cofre = None
+    out = []
+    for linha in livro.get(FO.ABA) or []:
+        d = {k: v for k, v in linha.items() if k not in ("titulo_cifrado", "descricao_cifrada")}
+        d["fama_os_id"] = FO.id_fama(linha.get("fama_os_id"))     # o banco pode devolver "10.0" ou um código em texto
+        for c in ("usina_id", "data_id_prevista", "data_id_criacao", "data_id_fim"):
+            d[c] = inteiro(linha.get(c))
+        try:
+            d["titulo"] = FO.textos(cofre, linha)["titulo"] if cofre else None
+        except (CifraErro, ValueError, TypeError):
+            d["titulo"] = None
+        out.append(d)
+    return out
 
 
 # ── a usina de cada OS: o cadastro do banco ──────────────────────────────────────────────────────────────────────

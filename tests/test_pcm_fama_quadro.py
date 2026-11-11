@@ -7,11 +7,8 @@ execução, "em andamento"; as outras situações e a previsão depois do doming
 cartão; a sem data prevista também; os filtros do Quadro valem para elas; a etiqueta de repetição só na preventiva do
 Fracttal da usina com preventiva da FAMA na semana; a semana que acabou fica sem a FAMA; e a tela (cartão só de leitura,
 o aviso, o "!", a contagem das tarefas que não muda). A FAMA e o banco são de mentira: nenhum teste vai à rede."""
-import importlib.machinery
 import json
 import re
-import sys
-import types
 from datetime import date
 from pathlib import Path
 
@@ -72,28 +69,13 @@ def _cartoes_fama(q):
 
 
 # ── a porta única ────────────────────────────────────────────────────────────────────────────────────────────────
-def test_a_porta_unica_sem_o_leitor_da_parte_a_nao_traz_nada(monkeypatch):
+def test_a_porta_unica_no_teste_devolve_copias_das_linhas_dadas():
+    """No teste a porta não vai ao banco: devolve cópias das linhas da configuração. A leitura do livro de verdade (a parte
+    A) está em tests/test_pcm_fama_juncao.py."""
     assert FO._linhas_fama({"TESTING": True}) == []
     linha = {"fama_os_id": 1}
     lidas = FO._linhas_fama({"TESTING": True, "NEXUS_FAMA_LINHAS_TESTE": [linha]})
     assert lidas == [linha] and lidas[0] is not linha                 # uma cópia: a tela não muda o dado de ninguém
-    # fora do teste, sem o nexus/dados/fama.py nesta máquina: nenhuma linha (e nada vai ao banco)
-    monkeypatch.setattr(FO.importlib.util, "find_spec", lambda nome: None)
-    assert FO._linhas_fama({}) == []
-
-
-def test_a_porta_unica_chama_o_leitor_da_parte_a_quando_ele_existe(monkeypatch):
-    pedidos = []
-    falso = types.ModuleType("nexus.dados.fama")
-    falso.__spec__ = importlib.machinery.ModuleSpec("nexus.dados.fama", None)
-    falso.ler_banco = lambda base, sessao: pedidos.append((base, sessao)) or [{"fama_os_id": 7, "usina_id": 10}]
-    monkeypatch.setitem(sys.modules, "nexus.dados.fama", falso)
-    import nexus.dados as dados
-    monkeypatch.setattr(dados, "fama", falso, raising=False)
-    from nexus.dados import conexao
-    monkeypatch.setattr(conexao, "banco_de", lambda cfg: ("http://banco.de.mentira", "sessao"))
-    assert FO._linhas_fama({}) == [{"fama_os_id": 7, "usina_id": 10}]
-    assert pedidos == [("http://banco.de.mentira", "sessao")]
 
 
 def test_vocabulario_da_fama():
