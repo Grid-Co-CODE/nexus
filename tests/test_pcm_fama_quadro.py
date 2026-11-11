@@ -1,15 +1,16 @@
 """As OS da FAMA no Quadro da semana (Levi, 11/11/2026: o cliente cria a OS na FAMA e ela aparece para o programador; "a
 ideia é não ficarmos criando e editando e sim acompanhando"). Fase 1, SOMBRA: o Quadro mostra, nada muda na programação.
 
-O que estes testes seguram: a porta única (`fama_os._linhas_fama`: sem o leitor da parte A, nenhuma linha); quais OS entram
-na semana (as abertas no dia da previsão; a aberta de antes da segunda vai na segunda, "atrasada"; em mobilização e em
-execução, "em andamento"; as outras situações e a previsão depois do domingo, não); a OS sem usina ligada vira aviso, não
-cartão; a sem data prevista também; os filtros do Quadro valem para elas; a etiqueta de repetição só na preventiva do
-Fracttal da usina com preventiva da FAMA na semana; a semana que acabou fica sem a FAMA; e a tela (cartão só de leitura,
-o aviso, o "!", a contagem das tarefas que não muda). A FAMA e o banco são de mentira: nenhum teste vai à rede."""
+O que estes testes seguram: quais OS entram na semana (as abertas no dia da previsão; a aberta de antes da segunda vai na
+segunda, "atrasada", num bloco recolhido; em mobilização e em execução, "em andamento"; as outras situações e a previsão
+depois do domingo, não); a OS sem usina ligada vira aviso, não cartão; a sem data prevista também; os cartões da FAMA vêm
+depois das tarefas oficiais, com o mesmo teto do Quadro; os filtros valem para elas (o responsável da usina sem tarefa
+pela volta do cadastro) e as listas contam as OS da FAMA à parte; o "lidas em" e o aviso da leitura parada; a etiqueta de
+repetição só na preventiva do Fracttal da usina com preventiva da FAMA na semana, dita no rótulo do cartão; a semana que
+acabou fica sem a FAMA; e a tela. O caminho de produção (a cópia por trás, sem ler o banco no pedido) está em
+`tests/test_pcm_fama_copia.py`. A FAMA e o banco são de mentira: nenhum teste vai à rede."""
 import json
-import re
-from datetime import date
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 from nexus.pcm import fama_os as FO
@@ -17,7 +18,12 @@ from nexus.pcm import fama_quadro as FQ
 from nexus.pcm import quadro as Q
 from test_pcm_quadro import _r
 
+RAIZ = Path(__file__).resolve().parents[1]
+BRT = timezone(timedelta(hours=-3))
 TITULO_SIGILOSO = "Inversor parado no bloco norte"     # o título vem cifrado no livro: só a tela o mostra
+AGORA = datetime(2026, 10, 7, 12, 0, tzinfo=BRT)
+LIDO = "2026-10-07T10:40:00-03:00"                      # o batimento da carga, 1h20 antes de AGORA
+REPETICAO = "A FAMA também tem preventiva desta usina nesta semana"
 
 
 def _semana():
@@ -31,9 +37,14 @@ def _semana():
             "dates": {"seg": "05/10", "ter": "06/10", "qua": "07/10", "qui": "08/10", "sex": "09/10"}}
 
 
-CADASTRO = {10: {"nomes": ["Cliente A - Usina 1 - SP"], "nome": "Usina 1", "cliente": "Cliente A", "equipe": "SP Leste 02"},
-            20: {"nomes": ["Cliente B - Usina 2 - RN"], "nome": "Usina 2", "cliente": "Cliente B", "equipe": "RN Sul 01"},
-            30: {"nomes": ["Cliente C - Usina 3 - MG"], "nome": "Usina 3", "cliente": "Cliente C", "equipe": "MG Sul 01"}}
+# a usina 3 não tem tarefa do Fracttal na semana: a equipe, o cliente e o responsável saem do cadastro (o responsável,
+# o gestor de contrato da ficha, escrito no cadastro de outro jeito que na semana)
+CADASTRO = {10: {"nomes": ["Cliente A - Usina 1 - SP"], "nome": "Usina 1", "cliente": "Cliente A", "equipe": "SP Leste 02",
+                 "responsavel": "Pessoa A"},
+            20: {"nomes": ["Cliente B - Usina 2 - RN"], "nome": "Usina 2", "cliente": "Cliente B", "equipe": "RN Sul 01",
+                 "responsavel": "Pessoa B"},
+            30: {"nomes": ["Cliente C - Usina 3 - MG"], "nome": "Usina 3", "cliente": "Cliente C", "equipe": "MG Sul 01",
+                 "responsavel": "PESSOA  A"}}
 
 
 def _f(i, usina, status, tipo="Corrective", prevista=20261006, severidade="Routine", titulo="Tarefa da FAMA"):
@@ -52,30 +63,33 @@ LINHAS = [_f(101, 10, "created", severidade="Critical", titulo=TITULO_SIGILOSO),
           _f(109, 99, "created")]                                                     # usina fora do cadastro
 
 
-def _fama(hoje=date(2026, 10, 7), linhas=LINHAS):
-    return FQ.da_semana(linhas, _semana(), CADASTRO, hoje)
+def _fama(hoje=date(2026, 10, 7), linhas=LINHAS, gerado_em=LIDO):
+    return FQ.da_semana(linhas, _semana(), CADASTRO, hoje, gerado_em=gerado_em, agora=AGORA)
 
 
-def _quadro(filtros=None, hoje=date(2026, 10, 7)):
-    sem, fama = _semana(), _fama(hoje)
+def _quadro(filtros=None, hoje=date(2026, 10, 7), linhas=LINHAS, todos=False, gerado_em=LIDO):
+    sem, fama = _semana(), _fama(hoje, linhas, gerado_em)
     sem = FQ.marcar_repeticao(sem, fama)
-    q = Q.montar(sem, [], filtros or {}, outras_opcoes=fama["linhas"])
-    FQ.no_quadro(q, sem, fama, filtros or {})
+    q = Q.montar(sem, [], filtros or {}, todos=todos, outras_opcoes=fama["linhas"])
+    FQ.no_quadro(q, sem, fama, filtros or {}, todos=todos)
     return q
 
 
 def _cartoes_fama(q):
-    return {c["id"]: [f["num"] for f in c.get("fama") or []] for c in q["colunas"] if c.get("fama")}
+    """{dia: [FAMA-<id>]}, as do dia e as atrasadas do bloco da segunda."""
+    out = {c["id"]: [f["num"] for f in (c.get("fama") or []) + (c.get("fama_atrasadas") or [])] for c in q["colunas"]}
+    return {d: v for d, v in out.items() if v}
 
 
-# ── a porta única ────────────────────────────────────────────────────────────────────────────────────────────────
-def test_a_porta_unica_no_teste_devolve_copias_das_linhas_dadas():
-    """No teste a porta não vai ao banco: devolve cópias das linhas da configuração. A leitura do livro de verdade (a parte
-    A) está em tests/test_pcm_fama_juncao.py."""
-    assert FO._linhas_fama({"TESTING": True}) == []
+# ── a porta única no teste e o cadastro ──────────────────────────────────────────────────────────────────────────
+def test_a_porta_unica_no_teste_devolve_copias_das_linhas_dadas_e_o_batimento():
+    """No teste a porta não vai ao banco: devolve cópias das linhas da configuração e o batimento dela. A leitura do livro
+    de verdade (a parte A) está em tests/test_pcm_fama_juncao.py."""
+    assert FO._linhas_fama({"TESTING": True}).linhas == []
     linha = {"fama_os_id": 1}
-    lidas = FO._linhas_fama({"TESTING": True, "NEXUS_FAMA_LINHAS_TESTE": [linha]})
-    assert lidas == [linha] and lidas[0] is not linha                 # uma cópia: a tela não muda o dado de ninguém
+    lido = FO._linhas_fama({"TESTING": True, "NEXUS_FAMA_LINHAS_TESTE": [linha], "NEXUS_FAMA_GERADO_EM_TESTE": LIDO})
+    assert lido.linhas == [linha] and lido.linhas[0] is not linha       # uma cópia: a tela não muda o dado de ninguém
+    assert lido.gerado_em == LIDO
 
 
 def test_vocabulario_da_fama():
@@ -87,33 +101,52 @@ def test_vocabulario_da_fama():
     assert FO.data_de(None) is None and FO.data_de("") is None and FO.data_de(20261399) is None
 
 
-def test_usinas_do_cadastro_pelo_de_para_do_fracttal():
-    usinas = [{"usina_id": "10", "nome": "Usina 1", "cliente_id": 1, "equipe_id": 5},
+def test_usinas_do_cadastro_pelo_de_para_do_fracttal_com_o_gestor_de_contrato():
+    usinas = [{"usina_id": "10", "nome": "Usina 1", "cliente_id": 1, "equipe_id": 5, "gestor_contrato_id": "9.0"},
               {"usina_id": 11, "nome": "Usina velha", "excluido": "Sim"}]
     de_para = [{"usina_id": 10, "sistema": FO.SISTEMA_FRACTTAL, "chave_externa": "(sem Classificação 1) Usina 1"},
                {"usina_id": 10, "sistema": FO.SISTEMA_FRACTTAL, "chave_externa": "Cliente A -  Usina 1 - SP"},
                {"usina_id": 10, "sistema": "Outro sistema", "chave_externa": "U1"},
                {"usina_id": 11, "sistema": FO.SISTEMA_FRACTTAL, "chave_externa": "Usina velha"}]
     cad = FO.usinas_do_cadastro(usinas, de_para, [{"equipe_id": 5, "nome": "SP Leste 02"}],
-                                [{"cliente_id": 1, "nome": "Cliente A"}])
+                                [{"cliente_id": 1, "nome": "Cliente A"}], gestores={9: "Pessoa A"})
     assert cad == {10: {"nomes": ["Cliente A - Usina 1 - SP", "(sem Classificação 1) Usina 1"], "nome": "Usina 1",
-                        "cliente": "Cliente A", "equipe": "SP Leste 02"}}
+                        "cliente": "Cliente A", "equipe": "SP Leste 02", "gestor_id": 9, "responsavel": "Pessoa A"}}
 
 
 # ── as OS da semana ──────────────────────────────────────────────────────────────────────────────────────────────
-def test_entram_as_abertas_no_dia_da_previsao_e_a_atrasada_na_segunda():
+def test_entram_as_abertas_no_dia_da_previsao_e_a_atrasada_no_bloco_da_segunda():
     q = _quadro()
     assert _cartoes_fama(q) == {"seg": ["FAMA-102"], "ter": ["FAMA-101"], "qui": ["FAMA-103"], "sab": ["FAMA-107"]}
+    seg = q["colunas"][0]
+    assert seg["fama"] == [] and [f["num"] for f in seg["fama_atrasadas"]] == ["FAMA-102"]
+    assert seg["fama_atrasadas_n"] == 1
     # o sábado não tinha tarefa do Fracttal: a coluna aparece pela FAMA, na ordem dos dias
     assert [c["id"] for c in q["colunas"]] == ["seg", "ter", "qua", "qui", "sab"]
     sab = q["colunas"][-1]
     assert (sab["nome"], sab["data"], sab["n"], sab["cartoes"]) == ("Sábado", "10/10", 0, [])
-    f = {f["num"]: f for c in q["colunas"] for f in c.get("fama") or []}
+    f = {f["num"]: f for c in q["colunas"] for f in (c.get("fama") or []) + (c.get("fama_atrasadas") or [])}
     assert (f["FAMA-102"]["marca"], f["FAMA-102"]["marcat"], f["FAMA-102"]["prev"]) == ("Atrasada", "critico", "28/09")
     assert (f["FAMA-103"]["marca"], f["FAMA-103"]["st"]) == ("Em andamento", "Em execução")
     assert f["FAMA-101"]["marca"] == "" and f["FAMA-107"]["st"] == "Pausada"
     # a OS sem usina ligada (ou com a usina fora do cadastro) e a sem data prevista viram aviso, não cartão
     assert (q["fama"]["sem_usina"], q["fama"]["sem_data"], q["fama"]["total_semana"]) == (2, 1, 4)
+
+
+def test_o_teto_de_cartoes_vale_para_a_fama_e_ela_vem_depois_das_tarefas(monkeypatch):
+    """Revisão de 11/11/2026, item 3: o mesmo teto do Quadro (40 por coluna; aqui 2), com o "+N"; as atrasadas num bloco
+    recolhido da segunda; os cartões da FAMA depois das tarefas oficiais, nunca por cima."""
+    monkeypatch.setattr(Q, "TETO_CARTOES", 2)
+    linhas = (LINHAS + [_f(200 + i, 10, "created", prevista=20261006) for i in range(3)]
+              + [_f(300 + i, 20, "planned", prevista=20260920 + i) for i in range(3)])
+    q = _quadro(linhas=linhas)
+    seg, ter = q["colunas"][0], q["colunas"][1]
+    assert (len(ter["fama"]), ter["fama_ocultos"]) == (2, 2)                 # 4 na terça: 2 à vista e "+2"
+    assert (len(seg["fama_atrasadas"]), seg["fama_atrasadas_n"], seg["fama_atrasadas_ocultas"]) == (2, 4, 2)
+    assert [f["num"] for f in seg["fama_atrasadas"]] == ["FAMA-300", "FAMA-301"]      # a mais velha primeiro
+    q = _quadro(linhas=linhas, todos=True)                                  # "mostrar todas"
+    assert (len(q["colunas"][1]["fama"]), q["colunas"][1]["fama_ocultos"]) == (4, 0)
+    assert len(q["colunas"][0]["fama_atrasadas"]) == 4
 
 
 def test_o_cartao_mostra_numero_usina_tipo_severidade_previsao_status_e_titulo():
@@ -139,7 +172,6 @@ def test_as_os_da_fama_nao_contam_nas_tarefas_nem_nas_horas_do_dia():
 def test_os_filtros_do_quadro_valem_para_as_os_da_fama():
     assert _cartoes_fama(_quadro({"equipe": "RN Sul 01"})) == {"qui": ["FAMA-103"]}      # a equipe da usina na semana
     assert _cartoes_fama(_quadro({"cliente": "Cliente C"})) == {"sab": ["FAMA-107"]}     # sem tarefa: a do cadastro
-    assert _cartoes_fama(_quadro({"resp": "Pessoa A"})) == {"seg": ["FAMA-102"], "ter": ["FAMA-101"]}
     assert _cartoes_fama(_quadro({"tipo": "Corretiva"})) == {"ter": ["FAMA-101"]}
     assert _cartoes_fama(_quadro({"estado": "Em progresso"})) == {"qui": ["FAMA-103"]}
     assert _cartoes_fama(_quadro({"estado": "Pausada|Não iniciada"})) == {"seg": ["FAMA-102"], "ter": ["FAMA-101"],
@@ -149,10 +181,26 @@ def test_os_filtros_do_quadro_valem_para_as_os_da_fama():
     assert _cartoes_fama(_quadro({"q": "fama-107"})) == {"sab": ["FAMA-107"]}
     q = _quadro({"equipe": "RN Sul 01"})
     assert (q["fama"]["total"], q["fama"]["total_semana"]) == (1, 4)
-    # os tipos da FAMA entram na lista do filtro, contados; a corretiva soma com a do Fracttal
-    tipos = dict(_quadro()["opcoes"]["tipo"])
-    assert tipos["Limpeza de módulos"] == 1 and tipos["Controle de vegetação"] == 1 and tipos["Preventiva/Preditiva"] == 1
-    assert tipos["Corretiva"] == 3
+
+
+def test_o_gestor_ve_a_os_da_fama_da_usina_sem_tarefa_na_semana():
+    """Revisão de 11/11/2026, item 5: a usina 3 não tem tarefa do Fracttal na semana; o responsável dela vem do cadastro
+    (o gestor de contrato), escrito como a semana escreve o mesmo nome, e a OS não some no filtro do gestor."""
+    assert _cartoes_fama(_quadro({"resp": "Pessoa A"})) == {"seg": ["FAMA-102"], "ter": ["FAMA-101"], "sab": ["FAMA-107"]}
+    assert _cartoes_fama(_quadro({"resp": "Pessoa B"})) == {"qui": ["FAMA-103"]}
+
+
+def test_as_listas_dos_filtros_contam_as_os_da_fama_a_parte():
+    """Revisão de 11/11/2026, item 6: o número de cada opção é o das tarefas; as OS da FAMA têm a conta delas."""
+    q = _quadro()
+    tipos = dict(q["opcoes"]["tipo"])
+    assert (tipos["Corretiva"], tipos["MPM"]) == (2, 2)                     # só as tarefas do Fracttal
+    assert tipos["Limpeza de módulos"] == 0 and tipos["Controle de vegetação"] == 0
+    assert q["opcoes_fora"]["tipo"] == {"Corretiva": 1, "Preventiva/Preditiva": 1, "Limpeza de módulos": 1,
+                                        "Controle de vegetação": 1}
+    assert q["opcoes_fora"]["resp"] == {"Pessoa A": 3, "Pessoa B": 1}
+    # sem a FAMA, as listas são as de sempre (a ordem e a conta)
+    assert Q.montar(_semana(), [], {})["opcoes"] == Q.opcoes(_semana()["rows"], {})
 
 
 def test_a_etiqueta_de_repeticao_so_na_preventiva_do_fracttal_da_usina_com_preventiva_da_fama():
@@ -171,6 +219,17 @@ def test_a_etiqueta_de_repeticao_so_na_preventiva_do_fracttal_da_usina_com_preve
     assert not any(r.get("fama_rep") for r in FQ.marcar_repeticao(_semana(), _fama(linhas=so_corretiva))["rows"])
 
 
+def test_o_quadro_diz_quando_leu_a_fama_e_avisa_a_leitura_parada():
+    """Revisão de 11/11/2026, item 4: o batimento da carga (o `gerado_em` da aba `atualizacao`) vira "lidas em"; com mais
+    de 26 h, a leitura da FAMA parou e o Quadro avisa."""
+    q = _quadro()
+    assert (q["fama"]["lidas_em"], q["fama"]["velho"]) == ("07/10 10:40", False)
+    q = _quadro(gerado_em="2026-10-06T09:59:00-03:00")                    # 26 h e 1 min antes de AGORA
+    assert (q["fama"]["lidas_em"], q["fama"]["velho"]) == ("06/10 09:59", True)
+    assert _quadro(gerado_em=None)["fama"]["velho"] is True                 # sem batimento: não se sabe, avisa
+    assert FO.velho("2026-10-06T10:01:00-03:00", AGORA) is False and FO.velho("lixo", AGORA) is True
+
+
 def test_a_semana_que_acabou_fica_sem_a_fama():
     """A situação da FAMA é a de agora: aplicada a uma semana passada, ela diria o que não aconteceu naquela semana."""
     fama = _fama(hoje=date(2026, 10, 12))
@@ -180,20 +239,38 @@ def test_a_semana_que_acabou_fica_sem_a_fama():
     assert _fama(hoje=date(2026, 10, 11))["ativa"]
 
 
+def test_os_textos_dizem_que_a_porta_le_o_livro_da_parte_a():
+    """Revisão de 11/11/2026, item 8: depois da junção, nenhum texto diz mais que o leitor da parte A pode faltar na
+    máquina (a porta lê o livro no banco)."""
+    velhos = ("nexus/dados/fama.py na máquina", "sem a parte A nesta máquina", "está nesta máquina?")
+    for arq in ("nexus/pcm/CLAUDE.md", "nexus/pcm/fama_quadro.py", "nexus/pcm/fama_motor.py", "nexus/pcm/fama_os.py"):
+        texto = (RAIZ / arq).read_text(encoding="utf-8").replace("`", "")
+        assert not any(v in texto for v in velhos), arq
+
+
 # ── a tela ───────────────────────────────────────────────────────────────────────────────────────────────────────
-def _tela(app, logado, tmp_path, monkeypatch, **cfg):
+def _tela(app, logado, tmp_path, monkeypatch, url="/t/pcm/quadro?semana=2026-W41", **cfg):
     monkeypatch.setattr(Q, "hoje", lambda: date(2026, 10, 7))
     banco = tmp_path / "banco_dados.json"
     banco.write_text(json.dumps({"geradoEm": "2026-10-07T12:00:00Z", "semana_ativa": "2026-W41",
                                  "semanas": [_semana()]}), encoding="utf-8")
     app.config.update(NEXUS_PCM_FONTE=str(banco), NEXUS_PCM_TRABALHO=str(tmp_path / "trab"), **cfg)
-    r = logado.get("/t/pcm/quadro?semana=2026-W41")
+    r = logado.get(url)
     assert r.status_code == 200
     return r.get_data(as_text=True)
 
 
+def _agora_menos(horas: float) -> str:
+    return (datetime.now(BRT) - timedelta(hours=horas)).isoformat(timespec="seconds")
+
+
+def _com_fama(**k):
+    return {"NEXUS_FAMA_LINHAS_TESTE": LINHAS, "NEXUS_FAMA_CADASTRO_TESTE": CADASTRO,
+            "NEXUS_FAMA_GERADO_EM_TESTE": _agora_menos(1), **k}
+
+
 def test_tela_quadro_com_as_os_da_fama(app, logado, tmp_path, monkeypatch):
-    html = _tela(app, logado, tmp_path, monkeypatch, NEXUS_FAMA_LINHAS_TESTE=LINHAS, NEXUS_FAMA_CADASTRO_TESTE=CADASTRO)
+    html = _tela(app, logado, tmp_path, monkeypatch, **_com_fama())
     # os quatro cartões da FAMA, só de leitura (sem a janela de reprogramar), com a marca FAMA
     assert html.count('class="q-cartao q-fama') == 4 and html.count('class="q-fama-marca">FAMA<') == 4
     for num in ("FAMA-101", "FAMA-102", "FAMA-103", "FAMA-107"):
@@ -201,29 +278,48 @@ def test_tela_quadro_com_as_os_da_fama(app, logado, tmp_path, monkeypatch):
     assert "FAMA-105" not in html and "FAMA-106" not in html
     assert html.count("data-cartao=") == 4                               # os do Fracttal, como antes
     assert TITULO_SIGILOSO in html and "Atrasada" in html and "Em andamento" in html and "Sábado" in html
+    # as atrasadas num bloco recolhido da segunda, depois das tarefas oficiais
+    seg = html.split('aria-label="Segunda 05/10"', 1)[1].split("</section>", 1)[0]
+    assert '<details class="q-fama-atrasadas">' in seg and "<details class=\"q-fama-atrasadas\" open" not in seg
+    resumo = seg.split('<details class="q-fama-atrasadas">', 1)[1].split("</summary>", 1)[0]
+    assert '<b class="gc-num">1</b>' in resumo and "OS da FAMA atrasada" in resumo
+    assert seg.index("data-cartao=") < seg.index("q-fama-atrasadas")
+    ter = html.split('aria-label="Terça 06/10"', 1)[1].split("</section>", 1)[0]
+    assert ter.index("data-cartao=") < ter.index('class="q-cartao q-fama')    # a FAMA depois das tarefas
     # o aviso das sem usina, com o caminho da ligação; o das sem data prevista
     assert "2 OS da FAMA sem usina ligada" in html and "/t/base/ligacoes" in html and "Base → Ligações" in html
     assert "1 OS da FAMA sem data prevista" in html
-    # a etiqueta de repetição numa preventiva só, com a frase inteira para quem lê pelo leitor de tela
+    # a etiqueta de repetição numa preventiva só
     assert html.count('class="q-c-frep"') == 1
-    assert "a FAMA também tem preventiva desta usina nesta semana" in html
     dados = json.loads(html.split('id="q-dados">', 1)[1].split("</script>", 1)[0])
     assert [i["os"] for i in dados["itens"] if i.get("frep")] == ["2"]
     assert TITULO_SIGILOSO not in json.dumps(dados, ensure_ascii=False)  # o título não vai para os dados da página
-    # a explicação no "!" do título (nada solto na tela), e a conta do topo com as OS da FAMA
+    # a explicação no "!" do título (nada solto na tela), e a conta do topo com as OS da FAMA e quando foram lidas
     topo = html.split('class="q-barra"', 1)[0]
     caixa = topo.split('class="gc-explica"', 1)[1].split("</details>", 1)[0]
     assert "OS da FAMA" in caixa and "Atrasada" in caixa and "FAMA também" in caixa
-    assert "4</b> OS da FAMA" in html
+    assert "4</b> OS da FAMA lidas em" in html and "leitura da FAMA parou" not in html
+    # a conta da FAMA à parte na lista do filtro de tipo
+    assert '<span>Limpeza de módulos</span><small class="gc-num">0</small><small class="q-ms-fama">+1 FAMA</small>' in html
 
 
-def test_a_etiqueta_de_repeticao_prende_o_texto_do_leitor_de_tela():
-    """Prova no navegador de 11/11/2026, a 375 px: o texto do leitor de tela da etiqueta "FAMA também" (`inv-so-leitor`,
-    absoluto) escapava da rolagem do quadro, porque nenhum ancestral do cartão é posicionado, e alargava a página de 375
-    para 708 px. A etiqueta é o bloco que o prende."""
-    css = (Path(__file__).resolve().parents[1] / "nexus" / "static" / "pcm.css").read_text(encoding="utf-8")
-    regra = re.search(r"\.q-c-frep\{([^}]*)\}", css)
-    assert regra and "position:relative" in regra.group(1)
+def test_a_etiqueta_de_repeticao_e_dita_no_rotulo_do_cartao():
+    """Revisão de 11/11/2026, item 7: a frase vai no aria-label do cartão (o leitor de tela lê o rótulo do botão), e o
+    texto escondido sai (ele escapava da rolagem do quadro e alargava a página a 375 px)."""
+    html = (RAIZ / "nexus" / "templates" / "pcm" / "quadro.html").read_text(encoding="utf-8")
+    assert "inv-so-leitor" not in html
+    assert "{% if k.frep %}. " + REPETICAO + "{% endif %}" in html
+
+
+def test_tela_a_frase_da_repeticao_no_rotulo_do_cartao(app, logado, tmp_path, monkeypatch):
+    html = _tela(app, logado, tmp_path, monkeypatch, **_com_fama())
+    assert f'aria-label="Abrir a OS 2: [Grid Co.] - MPM - Cabine. {REPETICAO}"' in html
+    assert 'aria-label="Abrir a OS 1: Tarefa"' in html
+
+
+def test_tela_avisa_a_leitura_da_fama_parada(app, logado, tmp_path, monkeypatch):
+    html = _tela(app, logado, tmp_path, monkeypatch, **_com_fama(NEXUS_FAMA_GERADO_EM_TESTE=_agora_menos(30)))
+    assert "A leitura da FAMA parou: o que aparece pode estar velho (OS da FAMA lidas em" in html
 
 
 def test_tela_quadro_sem_a_fama_fica_como_era(app, logado, tmp_path, monkeypatch):

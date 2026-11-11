@@ -33,11 +33,13 @@
       {% endif %}
       {# as OS da FAMA (11/11/2026, fase 1: só aparecem; nexus/pcm/fama_quadro.py) #}
       {% if q and q.fama and q.fama.mostra %}
-      {{ termo('OS da FAMA', 'info') }}<dd>As OS que os clientes abrem na FAMA, lidas do banco de hora em hora. Por enquanto
-        elas só aparecem: não entram na programação, não se reprogramam aqui e não contam nas tarefas nem nas horas do dia.
-        Entram as abertas (criada, planejada, pausada) e as em andamento, no dia da data prevista; os filtros valem para
-        elas.</dd>
-      {{ termo('Atrasada', 'critico') }}<dd>A OS aberta da FAMA com a data prevista antes da segunda: vai na segunda.</dd>
+      {{ termo('OS da FAMA', 'info') }}<dd>As OS que os clientes abrem na FAMA, lidas do banco de hora em hora ("lidas em" diz
+        a última leitura). Por enquanto elas só aparecem: não entram na programação, não se reprogramam aqui e não contam nas
+        tarefas nem nas horas do dia. Entram as abertas (criada, planejada, pausada) e as em andamento, no dia da data
+        prevista, depois das tarefas, com o mesmo limite de cartões; os filtros valem para elas, com a conta delas à parte
+        ("+N FAMA").</dd>
+      {{ termo('Atrasada', 'critico') }}<dd>A OS aberta da FAMA com a data prevista antes da segunda: vai no bloco recolhido
+        da segunda.</dd>
       {{ termo('Em andamento', 'alerta') }}<dd>A OS da FAMA em mobilização ou em execução.</dd>
       {{ termo('FAMA também', 'info') }}<dd>A preventiva do Fracttal de uma usina em que a FAMA também tem preventiva nesta
         semana: confira se não é a mesma manutenção.</dd>
@@ -64,8 +66,13 @@
   agora ({{ motivos_erro }}): o quadro sai sem eles e não dá para marcar até a leitura voltar.</div></div>{% endif %}
 {# as OS da FAMA que não viram cartão: o que falta para elas aparecerem (11/11/2026) #}
 {% if q and q.fama %}
+{% if q.fama.lendo %}<div class="pcm-aviso" role="status"><i class="ph ph-hourglass-medium"></i><div>
+  Lendo as OS da FAMA: recarregue em alguns segundos.</div></div>{% endif %}
 {% if q.fama.erro %}<div class="pcm-aviso pcm-aviso--alerta"><i class="ph ph-warning"></i><div>
   As OS da FAMA não abriram agora ({{ q.fama.erro }}): o quadro sai sem elas.</div></div>{% endif %}
+{% if q.fama.velho %}<div class="pcm-aviso pcm-aviso--alerta"><i class="ph ph-clock-countdown"></i><div>
+  A leitura da FAMA parou: o que aparece pode estar velho{% if q.fama.lidas_em %} (OS da FAMA lidas em
+  {{ q.fama.lidas_em }}){% endif %}.</div></div>{% endif %}
 {% if q.fama.sem_usina %}<div class="pcm-aviso pcm-aviso--alerta"><i class="ph ph-link-break"></i><div>
   {{ q.fama.sem_usina }} OS da FAMA sem usina ligada
   (<a class="pcm-link" href="{{ raiz }}/t/base/ligacoes">Base → Ligações</a>): ficam fora do quadro até a ligação.</div></div>{% endif %}
@@ -89,9 +96,10 @@
   <details class="q-ms{% if sel %} q-ms--ativo{% endif %}" data-ms>
     <summary><span class="q-ms-r">{{ rot }}</span><span class="q-ms-v">{% if not sel %}{{ todos }}{% elif sel|length == 1 %}{{ sel[0] }}{% else %}{{ sel|length }} escolhidos{% endif %}</span><i class="ph ph-caret-down"></i></summary>
     <div class="q-ms-caixa" role="group" aria-label="{{ rot }}">
+      {% set da_fama = (q.opcoes_fora or {}).get(campo) or {} %}
       {% for v, n in q.opcoes[campo] %}
       <label class="q-ms-op"><input type="checkbox" name="{{ campo }}" value="{{ v }}"{% if v in sel %} checked{% endif %}>
-        <span>{{ v }}</span><small class="gc-num">{{ n }}</small></label>
+        <span>{{ v }}</span><small class="gc-num">{{ n }}</small>{% if da_fama.get(v) %}<small class="q-ms-fama">+{{ da_fama[v] }} FAMA</small>{% endif %}</label>
       {% else %}<p class="q-ms-vazio">Nada para escolher com os outros filtros.</p>{% endfor %}
       <div class="q-ms-pe"><button type="button" class="q-ms-nenhum" data-ms-nenhum>Desmarcar</button>
         <button type="submit" class="gc-btn gc-btn--ui gc-btn--primario">Aplicar</button></div>
@@ -101,7 +109,7 @@
   {% if tem_filtro %}<a class="q-limpar" href="{{ (url_limpar)|na_raiz }}"><i class="ph ph-x"></i> Limpar</a>{% endif %}
   <p class="pcm-conta q-conta"><b class="gc-num">{{ q.total }}</b>{% if q.total != q.total_semana %} de {{ q.total_semana }}{% endif %}
     tarefas · {{ q.horas }}{% if q.novas is not none %} · <b class="gc-num">{{ q.novas }}</b>
-    {{ 'criada' if q.novas == 1 else 'criadas' }} após o plano{% endif %}{% if q.sem_dia %} · {{ q.sem_dia }} sem dia{% endif %}{% if q.fama and q.fama.total_semana %} · <b class="gc-num">{{ q.fama.total }}</b>{% if q.fama.total != q.fama.total_semana %} de {{ q.fama.total_semana }}{% endif %} OS da FAMA{% endif %}{% if filtro_gestor %} · filtrado em
+    {{ 'criada' if q.novas == 1 else 'criadas' }} após o plano{% endif %}{% if q.sem_dia %} · {{ q.sem_dia }} sem dia{% endif %}{% if q.fama and q.fama.total_semana %} · <b class="gc-num">{{ q.fama.total }}</b>{% if q.fama.total != q.fama.total_semana %} de {{ q.fama.total_semana }}{% endif %} OS da FAMA{% if q.fama.lidas_em %} lidas em {{ q.fama.lidas_em }}{% endif %}{% endif %}{% if filtro_gestor %} · filtrado em
     {{ filtros.resp }}, o gestor de contrato que entrou{% endif %}</p>
   {% if rp_url %}<a class="gc-btn gc-btn--ui gc-btn--contorno q-rp-link" href="#reprogramacoes" data-rp-abrir
      title="Reprogramações da semana em curso"><i class="ph ph-list-checks"></i> Reprogramações</a>{% endif %}
@@ -130,27 +138,10 @@
   })();
 </script>
 
-<div class="q-rolo" tabindex="0" aria-label="Quadro da semana, rolagem horizontal">
-  <div class="q-quadro" style="--cols:{{ q.colunas|length or 1 }}">
-  {% for c in q.colunas %}
-    <section class="q-col" aria-label="{{ c.nome }} {{ c.data }}">
-      <header class="q-col-cab">
-        <div class="q-col-dia">{{ c.nome }} <span>{{ c.data }}</span></div>
-        <div class="q-col-n gc-num">{{ c.n }}</div>
-        <div class="q-col-h">{{ c.horas }} programadas</div>
-        {% if c.novas is not none %}
-        <div class="q-col-novas{% if not c.novas %} q-zero{% endif %}"
-             title="OS criadas a partir do sábado {{ q.janela[0].strftime('%d/%m') }} 00:00, depois que o plano da semana fechou"><b class="gc-num">{{ c.novas }}</b>
-          {{ 'criada' if c.novas == 1 else 'criadas' }} após o plano</div>
-        {% endif %}
-        {% if c.fama %}<div class="q-col-fama"><b class="gc-num">{{ c.fama|length }}</b> OS da FAMA</div>{% endif %}
-        <div class="q-carga" title="{{ c.n }} tarefas{% if c.pico %}: o dia mais cheio{% endif %}"><i class="{% if c.pico %}q-pico{% endif %}" style="width:{{ c.carga }}%"></i></div>
-      </header>
-      <div class="q-cartoes">
-      {# As OS da FAMA do dia (11/11/2026, fase 1): no alto da coluna, só de leitura (sem a janela de reprogramar, que é da
-         programação), com a borda tracejada de quem não está na programação, a marca FAMA e a severidade em cor e palavra.
-         Não contam no número nem nas horas do dia (nexus/pcm/fama_quadro.py). #}
-      {% for f in c.fama or [] %}
+{# O cartão da OS da FAMA (11/11/2026, fase 1): só de leitura (sem a janela de reprogramar, que é da programação), com a
+   borda tracejada de quem não está na programação, a marca FAMA e a severidade em cor e palavra. Não conta no número nem
+   nas horas do dia (nexus/pcm/fama_quadro.py). #}
+{% macro cartao_fama(f) %}
         <article class="q-cartao q-fama q-t--{{ f.tc }}" aria-label="{{ f.num }}, OS da FAMA (só leitura)">
           <div class="q-c-topo">
             <span class="q-c-os gc-num">{{ f.num }}</span>
@@ -165,10 +156,27 @@
             {% if f.marca %}<span class="q-fama-situ q-fama-situ--{{ f.marcat }}">{{ f.marca }}</span>{% endif %}
           </div>
         </article>
-      {% endfor %}
+{% endmacro %}
+<div class="q-rolo" tabindex="0" aria-label="Quadro da semana, rolagem horizontal">
+  <div class="q-quadro" style="--cols:{{ q.colunas|length or 1 }}">
+  {% for c in q.colunas %}
+    <section class="q-col" aria-label="{{ c.nome }} {{ c.data }}">
+      <header class="q-col-cab">
+        <div class="q-col-dia">{{ c.nome }} <span>{{ c.data }}</span></div>
+        <div class="q-col-n gc-num">{{ c.n }}</div>
+        <div class="q-col-h">{{ c.horas }} programadas</div>
+        {% if c.novas is not none %}
+        <div class="q-col-novas{% if not c.novas %} q-zero{% endif %}"
+             title="OS criadas a partir do sábado {{ q.janela[0].strftime('%d/%m') }} 00:00, depois que o plano da semana fechou"><b class="gc-num">{{ c.novas }}</b>
+          {{ 'criada' if c.novas == 1 else 'criadas' }} após o plano</div>
+        {% endif %}
+        {% if c.fama_n %}<div class="q-col-fama"><b class="gc-num">{{ c.fama_n }}</b> OS da FAMA</div>{% endif %}
+        <div class="q-carga" title="{{ c.n }} tarefas{% if c.pico %}: o dia mais cheio{% endif %}"><i class="{% if c.pico %}q-pico{% endif %}" style="width:{{ c.carga }}%"></i></div>
+      </header>
+      <div class="q-cartoes">
       {% for k in c.cartoes %}
         <div class="q-cartao q-t--{{ k.tc }}" data-cartao="{{ k.i }}" data-os="{{ k.os }}" role="button" tabindex="0"
-             aria-label="Abrir a OS {{ k.os }}: {{ k.t }}">
+             aria-label="Abrir a OS {{ k.os }}: {{ k.t }}{% if k.frep %}. A FAMA também tem preventiva desta usina nesta semana{% endif %}">
           <div class="q-c-topo">
             <span class="q-c-os gc-num">OS {{ k.os }}</span>
             <span class="q-st q-st--{{ {'Finalizada': 'feita', 'Em progresso': 'andamento', 'Pausada': 'pausada'}.get(k.st, 'nao') }}">{{ k.st }}</span>
@@ -178,8 +186,9 @@
              (quando há, cortado em "…", inteiro ao passar o mouse) na mesma linha; a usina numa só; o título em até duas #}
           <div class="q-c-tipo"><i class="q-ponto"></i><span class="q-c-tp">{{ k.tp or 'Sem tipo' }}</span>
             {% if k.rep %}<span class="q-c-rep"><i class="ph ph-arrow-clockwise"></i> Reprog.</span>{% endif %}
-            {# a possível repetição com a FAMA (11/11/2026): só informação, para o PCM conferir antes da fase 2 #}
-            {% if k.frep %}<span class="q-c-frep" title="A FAMA também tem preventiva desta usina nesta semana"><i class="ph ph-copy" aria-hidden="true"></i> FAMA também<span class="inv-so-leitor">: a FAMA também tem preventiva desta usina nesta semana</span></span>{% endif %}
+            {# a possível repetição com a FAMA (11/11/2026): só informação, para o PCM conferir antes da fase 2. A frase inteira
+               vai no rótulo do cartão (o leitor de tela lê o do botão), e o título dela aparece ao passar o mouse #}
+            {% if k.frep %}<span class="q-c-frep" title="A FAMA também tem preventiva desta usina nesta semana"><i class="ph ph-copy" aria-hidden="true"></i> FAMA também</span>{% endif %}
             <span class="q-c-mp" data-mp-slot{% if not k.mp %} hidden{% endif %}{% if k.mp %} title="{{ k.mp }}"{% endif %}>{% if k.mp %}<span class="q-mp{% if k.mpt %} q-mp--tira{% endif %}"><i class="ph ph-{{ 'prohibit' if k.mpt else 'tag' }}"></i>{{ k.mp }}</span>{% endif %}</span></div>
           <div class="q-c-usina" title="{{ k.uc }}">{{ k.uc }}</div>
           <div class="q-c-tarefa" title="{{ k.t }}">{{ k.t }}</div>
@@ -191,9 +200,21 @@
           </div>
         </div>
       {% else %}
-        {% if not c.fama %}<p class="q-vazio">Nenhuma tarefa com esses filtros.</p>{% endif %}
+        {% if not c.fama_n %}<p class="q-vazio">Nenhuma tarefa com esses filtros.</p>{% endif %}
       {% endfor %}
       {% if c.ocultos %}<a class="q-mais" href="{{ (url_todos)|na_raiz }}">+{{ c.ocultos }} não {{ 'exibida' if c.ocultos == 1 else 'exibidas' }} · mostrar todas</a>{% endif %}
+      {# as OS da FAMA do dia, DEPOIS das tarefas oficiais (revisão de 11/11/2026: no alto, 30 atrasadas empurravam a
+         programação para fora da vista), com o mesmo teto de cartões; as atrasadas num bloco recolhido da segunda #}
+      {% for f in c.fama or [] %}{{ cartao_fama(f) }}{% endfor %}
+      {% if c.fama_ocultos %}<a class="q-mais" href="{{ (url_todos)|na_raiz }}">+{{ c.fama_ocultos }} OS da FAMA não {{ 'exibida' if c.fama_ocultos == 1 else 'exibidas' }} · mostrar todas</a>{% endif %}
+      {% if c.fama_atrasadas_n %}
+      <details class="q-fama-atrasadas">
+        <summary><i class="ph ph-caret-right q-seta" aria-hidden="true"></i> <b class="gc-num">{{ c.fama_atrasadas_n }}</b>
+          OS da FAMA {{ 'atrasada' if c.fama_atrasadas_n == 1 else 'atrasadas' }}</summary>
+        {% for f in c.fama_atrasadas %}{{ cartao_fama(f) }}{% endfor %}
+        {% if c.fama_atrasadas_ocultas %}<a class="q-mais" href="{{ (url_todos)|na_raiz }}">+{{ c.fama_atrasadas_ocultas }} não {{ 'exibida' if c.fama_atrasadas_ocultas == 1 else 'exibidas' }} · mostrar todas</a>{% endif %}
+      </details>
+      {% endif %}
       </div>
     </section>
   {% else %}

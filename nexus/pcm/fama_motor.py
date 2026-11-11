@@ -214,18 +214,28 @@ def aplicar_no_cache(pasta: Path, linhas: list[dict], cadastro: dict) -> dict:
     return rel
 
 
-def entrada(config, ler_o_fracttal: bool) -> dict:
+def entrada(config, ler_o_fracttal: bool) -> dict | None:
     """As OS da FAMA e o cadastro das usinas para a rodada, lidos agora (no pedido de gerar, antes da rodada começar).
-    Sem OS da FAMA, a rodada com a variável ligada não sai: tirar a preventiva sem pôr a da FAMA seria pior."""
+
+    O portão é o FRESCOR do livro, não a contagem (revisão de 11/11/2026): a leitura da FAMA parada (o batimento da carga
+    com mais de `fama_os.FRESCOR_H`, ou nenhum) = a rodada ligada não sai, porque tirar a preventiva do Fracttal e pôr OS
+    da FAMA que já podem ter andado lá seria pior que a semana de sempre; o livro fresco e sem OS (a FAMA não tem nada para
+    a Grid) = None, a semana de sempre."""
     try:
-        linhas = F._linhas_fama(config)
-        cadastro = F.cadastro_das_usinas(config) if linhas else {}
+        lido = F._linhas_fama(config)
     except Exception as ex:      # noqa: BLE001 — o nome do erro, nunca a mensagem (pode trazer endereço)
         raise FamaErro(f"não consegui ler as OS da FAMA ({type(ex).__name__})") from ex
-    if not linhas:
-        raise FamaErro("nenhuma OS da FAMA foi lida (o leitor da FAMA, nexus/dados/fama.py, está nesta máquina?); com "
-                       f"{VARIAVEL}=1 a rodada não sai sem elas")
-    return {"linhas": linhas, "cadastro": cadastro, "ler_o_fracttal": ler_o_fracttal}
+    if F.velho(lido.gerado_em):
+        quando = F.quando(lido.gerado_em)
+        raise FamaErro(f"a leitura da FAMA parou ({f'a última é de {quando}' if quando else 'nenhuma leitura no livro'}): "
+                       f"com {VARIAVEL}=1 a rodada não sai com o livro velho")
+    if not lido.linhas:
+        return None
+    try:
+        cadastro = F.cadastro_das_usinas(config)
+    except Exception as ex:      # noqa: BLE001
+        raise FamaErro(f"não consegui ler o cadastro das usinas ({type(ex).__name__})") from ex
+    return {"linhas": lido.linhas, "cadastro": cadastro, "ler_o_fracttal": ler_o_fracttal}
 
 
 def antes_do_motor(pasta: Path, st: dict, env: dict, motor: Path, fama: dict, log, timeout: int) -> dict:

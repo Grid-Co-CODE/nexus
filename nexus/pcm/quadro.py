@@ -579,6 +579,28 @@ def opcoes(rows: list[dict], filtros: dict | None = None) -> dict:
     return out
 
 
+def opcoes_com_outras(rows: list[dict], outras: list[dict], filtros: dict | None = None) -> tuple[dict, dict]:
+    """As `opcoes` das tarefas com os valores que só as `outras` linhas têm (as OS da FAMA, `fama_quadro`), e a conta delas
+    à parte: ({filtro: [(valor, tarefas)]}, {filtro: {valor: outras}}). O número de cada opção continua sendo o das
+    tarefas (revisão de 11/11/2026: somadas, a OS da FAMA virava "tarefa" na lista); a mesma ordem e a mesma regra do
+    escolhido sempre na lista."""
+    filtros = filtros or {}
+    op, fora = opcoes(rows, filtros), opcoes(outras, filtros)
+    out, contas = {}, {}
+    for campo, lst in op.items():
+        f = {v: n for v, n in fora[campo] if n}
+        contas[campo] = f
+        tarefas = dict(lst)
+        valores = {v for v, n in lst if n} | set(f)
+        ordem = {"estado": ESTADOS, "turno": TURNOS_CARTAO}.get(campo)
+        lista = [v for v in ordem if v in valores] if ordem else sorted(valores, key=_norm)
+        for escolhido in sorted(varios(filtros.get(campo)), key=_norm):
+            if escolhido not in lista:
+                lista.append(escolhido)
+        out[campo] = [(v, tarefas.get(v, 0)) for v in lista]
+    return out, contas
+
+
 # Vários valores por filtro (27/10/2026, Levi: "nos filtros também quero poder escolher mais de uma opção"): cada um aceita
 # valores, separados por "|" no valor (a tela manda `equipe=A&equipe=B`, e o `telas._ctx_quadro` junta). O "|" não
 # aparece em equipe, responsável, cliente, tipo, situação nem turno; os links e a fila de reprogramação levam o valor
@@ -714,7 +736,7 @@ def montar(sem: dict, publicadas: list[dict], filtros: dict, todos: bool = False
     linha a linha só até TETO_PENDENTES ou a pedido (`mostrar_pendentes=True`); as tarefas de cada OS (o "a OS inteira
     (N tarefas)" da janela) vão uma vez por OS, em `oss`, e não em cada cartão. `outras_opcoes`: linhas que não são da
     programação mas aparecem no quadro e passam pelos mesmos filtros (as OS da FAMA, `fama_quadro`): entram só nas
-    listas dos filtros, não nas contas."""
+    listas dos filtros, com a conta delas à parte (`opcoes_fora`), nunca nas contas das tarefas."""
     rows = sem.get("rows") or []
     week = sem["week"]
     janela = janela_do_plano(week)
@@ -799,13 +821,14 @@ def montar(sem: dict, publicadas: list[dict], filtros: dict, todos: bool = False
                for p in grupos[u]]
         pendentes.append({"usina": u, "uc": usina_curta(u), "itens": lst})
 
+    op, op_fora = opcoes_com_outras(rows, list(outras_opcoes), filtros) if outras_opcoes else (opcoes(rows, filtros), {})
     return {"colunas": colunas, "itens": itens, "oss": oss, "pendentes": pendentes, "pend_mostradas": mostra_pend,
             "total": len(sel), "total_semana": len(rows),
             "sem_dia": sum(1 for r in sel if not dia_de(r.get("dia"))),
             "pend_total": len(sem.get("pendentes") or []), "pend_sel": len(pend),
             "horas": _horas(sum(_num(r.get("duracao")) for r in sel)), "tem_criacao": tem_criacao,
             "novas": sum(1 for r in sel if criada_apos_o_plano(r, janela)) if tem_criacao else None,
-            "janela": janela, "opcoes": opcoes(rows + list(outras_opcoes or []), filtros)}
+            "janela": janela, "opcoes": op, "opcoes_fora": op_fora}
 
 
 # ── a fila que volta da página ──────────────────────────────────────────────────────────────────────────────

@@ -1737,8 +1737,11 @@ details.inv-card:not([open])>summary{border-bottom:0}
 /* ── As OS da FAMA no Quadro (11/11/2026, fase 1: só aparecem; nexus/pcm/fama_quadro.py) ──────────────────────────────
    O cartão da FAMA é o cartão do Quadro (a mesma altura e as mesmas linhas), só de leitura: a borda tracejada diz que ele
    não está na programação, a marca FAMA vai na linha do tipo e a severidade é cor e palavra; sem cursor de clique (não
-   abre a janela de reprogramar). A coluna diz quantas OS da FAMA tem no dia, à parte das tarefas. A preventiva do Fracttal
-   da usina em que a FAMA também tem preventiva na semana leva o "FAMA também" na linha do tipo, como o "Reprog.". */
+   abre a janela de reprogramar). Vem depois das tarefas da coluna; as atrasadas, num bloco recolhido da segunda. A coluna
+   diz quantas OS da FAMA tem no dia, e a lista de cada filtro conta as da FAMA à parte ("+N FAMA"). A preventiva do
+   Fracttal da usina em que a FAMA também tem preventiva na semana leva o "FAMA também" na linha do tipo, como o "Reprog."
+   (a frase inteira vai no rótulo do cartão, para o leitor de tela: o texto escondido dentro da etiqueta escapava da
+   rolagem do quadro e alargava a página a 375 px, 708 px na prova de 11/11/2026). */
 .q-cartao.q-fama,.q-cartao.q-fama:hover{cursor:default;border-style:dashed;border-left-style:solid;border-color:var(--info-a42);
   border-left-color:var(--q-cor,var(--linha-forte))}
 .q-fama-marca{flex:none;padding:0 5px;border:1px solid var(--info-a42);border-radius:var(--raio-tag);color:var(--info);
@@ -1752,9 +1755,14 @@ details.inv-card:not([open])>summary{border-bottom:0}
 .q-col-fama{justify-self:start;display:inline-flex;gap:5px;align-items:baseline;margin-top:4px;padding:3px 9px;
   border:1px solid var(--info-a42);border-radius:var(--raio-tag);font-size:12px;color:var(--info);background:var(--info-a10)}
 .q-col-fama b{font-weight:700}
-/* position:relative: o texto do leitor de tela (`inv-so-leitor`, absoluto) fica preso à etiqueta. Sem isso ele escapava da
-   rolagem do quadro (nenhum ancestral do cartão é posicionado) e alargava a página a 375 px (708 px na prova de 11/11) */
-.q-cartao .q-c-tipo .q-c-frep{position:relative;flex:none;display:inline-flex;align-items:center;gap:3px;margin-left:6px;
-  padding:0 5px;border-radius:var(--raio-tag);color:var(--info);background:var(--info-a10);font:600 8.4px/12px var(--font-sans);
+.q-cartao .q-c-tipo .q-c-frep{flex:none;display:inline-flex;align-items:center;gap:3px;margin-left:6px;padding:0 5px;
+  border-radius:var(--raio-tag);color:var(--info);background:var(--info-a10);font:600 8.4px/12px var(--font-sans);
   text-transform:none;letter-spacing:0}
 .q-frep-nota{display:flex;gap:6px;align-items:baseline;color:var(--info)}
+.q-fama-atrasadas{display:grid;gap:8px;border:1px dashed var(--critico-a35);border-radius:8px;padding:6px 8px}
+.q-fama-atrasadas>summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:6px;font-size:12px;
+  color:var(--critico)}
+.q-fama-atrasadas>summary::-webkit-details-marker{display:none}
+.q-fama-atrasadas>summary:focus-visible{outline:2px solid var(--foco);outline-offset:2px}
+.q-fama-atrasadas>summary b{font-weight:700}
+.q-ms-op .q-ms-fama{flex:none;color:var(--info);font-size:11px}

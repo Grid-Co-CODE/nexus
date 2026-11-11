@@ -228,8 +228,15 @@ def _motor_e_leitor(tmp_path, cache_deve_existir: bool):
     return d / "programacao_v7.py"
 
 
+def _lido_ha(horas: float) -> str:
+    """O batimento da carga da FAMA (o `gerado_em` da aba `atualizacao`) de `horas` atrás."""
+    from datetime import datetime, timedelta, timezone
+    return (datetime.now(timezone(timedelta(hours=-3))) - timedelta(hours=horas)).isoformat(timespec="seconds")
+
+
 def _com_fama(config, **extra):
-    return dict(config, NEXUS_FAMA_LINHAS_TESTE=FAMA, NEXUS_FAMA_CADASTRO_TESTE=CADASTRO, **extra)
+    return dict(config, **{"NEXUS_FAMA_LINHAS_TESTE": FAMA, "NEXUS_FAMA_CADASTRO_TESTE": CADASTRO,
+                           "NEXUS_FAMA_GERADO_EM_TESTE": _lido_ha(1), **extra})
 
 
 def test_com_a_variavel_desligada_a_rodada_e_a_de_hoje(config, tmp_path, monkeypatch):
@@ -261,12 +268,36 @@ def test_com_a_variavel_ligada_as_os_da_fama_entram_e_a_preventiva_do_fracttal_s
     assert st["resumo"]["linhas"] == 6
 
 
-def test_ligada_sem_os_da_fama_a_rodada_nao_sai(config):
+def test_ligada_sem_leitura_da_fama_a_rodada_nao_sai(config):
+    """Sem o livro (nenhuma leitura da FAMA, nenhum batimento), a rodada ligada não sai."""
     cfg = dict(config, NEXUS_FAMA_PROGRAMA="1")
     with pytest.raises(G.NaoPronto) as erro:
         G.iniciar(cfg, "2026-W41")
     assert "FAMA" in str(erro.value)
     assert not list((G.pasta_trabalho(cfg) / "geracoes").iterdir())        # a pasta da rodada não fica para trás
+
+
+def test_ligada_com_o_livro_velho_a_rodada_nao_sai(config):
+    """Revisão de 11/11/2026, item 4: o portão é o frescor, não a contagem. A leitura da FAMA parada há mais de 26 h (o
+    batimento é diário) = a rodada ligada não sai, mesmo com OS no livro: elas podem já ter andado na FAMA."""
+    cfg = _com_fama(config, NEXUS_FAMA_PROGRAMA="1", NEXUS_FAMA_GERADO_EM_TESTE=_lido_ha(27))
+    with pytest.raises(G.NaoPronto) as erro:
+        G.iniciar(cfg, "2026-W41")
+    assert "a leitura da FAMA parou" in str(erro.value)
+    assert not list((G.pasta_trabalho(cfg) / "geracoes").iterdir())
+
+
+def test_ligada_com_o_livro_fresco_e_vazio_e_a_semana_de_sempre(config, tmp_path, monkeypatch):
+    """O livro fresco e sem OS (a FAMA não tem nada para a Grid): a rodada é a de sempre, sem o adaptador."""
+    def nao(*a, **k):
+        raise AssertionError("o adaptador rodou sem OS da FAMA")
+    for nome in ("antes_do_motor", "aplicar_no_cache", "depois_do_motor"):
+        monkeypatch.setattr(FM, nome, nao)
+    cfg = _com_fama(config, NEXUS_FAMA_PROGRAMA="1", NEXUS_FAMA_LINHAS_TESTE=[],
+                    NEXUS_PCM_MOTOR=str(_motor_e_leitor(tmp_path, cache_deve_existir=False)))
+    st = G.aguardar(cfg, G.iniciar(cfg, "2026-W41")["id"], 60)
+    assert st["estado"] == "ok", st
+    assert "fama" not in st and st["resumo"]["linhas"] == 2
 
 
 def _foto_de_verdade(origem):
@@ -325,8 +356,7 @@ def test_o_motor_de_verdade_programa_as_os_da_fama(config, origem):
         pickle.dump({"v": 1, "df": _df(fr)}, f)
     dia = lambda n: int((seg + timedelta(days=n)).strftime("%Y%m%d"))      # noqa: E731
     fama = [_f(201, 10, prevista=dia(1)), _f(202, 10, "paused", "Preventive/Predictive", dia(2)), _f(203, 40, prevista=dia(3))]
-    cfg = dict(config, NEXUS_PCM_MOTOR=str(G.MOTOR), NEXUS_FAMA_PROGRAMA="1", NEXUS_FAMA_LINHAS_TESTE=fama,
-               NEXUS_FAMA_CADASTRO_TESTE=CADASTRO)
+    cfg = _com_fama(config, NEXUS_PCM_MOTOR=str(G.MOTOR), NEXUS_FAMA_PROGRAMA="1", NEXUS_FAMA_LINHAS_TESTE=fama)
     st = G.gerar_com_foto(cfg, semana)
     assert st["estado"] == "ok", G.log(cfg, st["id"], 30)
     assert st["foto"]["intacta"] and st["fama"]["os_fama"] == 3 and st["fama"]["preventivas_tiradas"] == 2

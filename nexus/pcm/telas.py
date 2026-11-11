@@ -1304,13 +1304,14 @@ def _ctx_quadro(cfg, args, erro: str | None = None) -> dict | None:
         if g:
             filtros["resp"], filtro_gestor = g, True
     todos = args.get("todos") == "1"
-    # as OS da FAMA da semana (11/11/2026, fase 1: só aparecem; `fama_quadro.py`): os cartões só de leitura, os avisos e
-    # a etiqueta de repetição nas preventivas do Fracttal das usinas com preventiva da FAMA na semana
+    # as OS da FAMA da semana (11/11/2026, fase 1: só aparecem; `fama_quadro.py`): os cartões só de leitura depois das
+    # tarefas, os avisos e a etiqueta de repetição nas preventivas do Fracttal das usinas com preventiva da FAMA na semana.
+    # Pela cópia em memória: este pedido nunca lê o banco (a renovação vai por trás)
     fama = FQ.para_o_quadro(cfg, sem, base["dia"])
     sem = FQ.marcar_repeticao(sem, fama)
     q = Q.montar(sem, base["publicadas"], filtros, todos=todos, mostrar_pendentes=True if args.get("pend") == "1" else None,
                  outras_opcoes=fama["linhas"])
-    FQ.no_quadro(q, sem, fama, filtros)
+    FQ.no_quadro(q, sem, fama, filtros, todos=todos)
     mot = _motivos_no_quadro(cfg, q)
     dest = _destino_quadro(cfg, base)
     pode = pode_programar()
