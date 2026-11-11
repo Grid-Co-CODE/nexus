@@ -111,7 +111,11 @@ OPCIONAIS = ("NEXUS_CHAVE_CADASTRO", "NEXUS_ARMAZEM_LOCAL",
              # do App de Campo ao registrar o celular (também pela tela Base → Chaves do Nexus) e o gravador em lote, que
              # só liga onde vale "1" (uma máquina; as rotas do celular respondem 503 onde ele não roda). Sem estarem
              # aqui, o .env nunca chegava ao app.config (revisão final de 08/11/2026)
-             "NEXUS_EQUIPE_MS_CLIENT_ID", "NEXUS_EQUIPE_MS_TENANT_ID", "NEXUS_EQUIPE_GRAVA")
+             "NEXUS_EQUIPE_MS_CLIENT_ID", "NEXUS_EQUIPE_MS_TENANT_ID", "NEXUS_EQUIPE_GRAVA",
+             # as OS que os clientes abrem na FAMA (11/11/2026): a chave da API (api.fama.energy, cabeçalho
+             # X-Contractor-Key), posta pela T.I. no .env do servidor; por ora só a leitura de teste de Base
+             # (nexus/cadastro/fama_teste.py)
+             "NEXUS_FAMA_CHAVE")
 
 
 class ConfigErro(RuntimeError):

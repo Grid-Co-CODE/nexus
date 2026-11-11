@@ -14,6 +14,7 @@ from ...cadastro.telas import registrar_base
 from ...cadastro.telas_equipamentos import registrar_equipamentos
 from ...cadastro.telas_fracttal import registrar_fracttal
 from ...cadastro.telas_ligacoes import registrar_ligacoes
+from ...cadastro.fama_teste import registrar_fama_teste
 from ...dados.telas import registrar_governanca
 from ..modelo import Tela, Torre
 from ..moldura import registrar_molduras
@@ -110,6 +111,7 @@ registrar_ligacoes(bp)
 registrar_governanca(bp)
 registrar_acessos(bp)
 registrar_chaves(bp)
+registrar_fama_teste(bp)    # /t/base/fama-teste: a leitura de TESTE da API da FAMA (11/11/2026), só administrador, sai depois
 registrar_raio_x(bp)        # /t/base/raio-x: o que o processo faz agora (14/10/2026), só administrador, fora do menu
 registrar_molduras(bp, TORRE, abas={"chaves-fontes": {"primeira": "Fontes da Performance",
                                                          "outras": [("nexus", "Nexus", aba_nexus)]}})
