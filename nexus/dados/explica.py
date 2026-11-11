@@ -100,6 +100,7 @@ RESUMO = {
     # ── PCM ──
     "programacao": "A agenda semanal de manutenção montada pelo PCM",
     "tarefa_os": "Cada tarefa das OS abertas no Fracttal e a zeladoria feita",
+    "os_fama": "Cada OS que o cliente abriu na FAMA para a Grid, com a usina do Nexus",
     # ── OS Creator ──
     "uso_os_hora": "O uso de cada tela do OS Creator, hora a hora",
     "fracttal_hora": "Os pedidos do Nexus ao Fracttal, por hora e por quem pediu",
@@ -390,6 +391,11 @@ PARA_QUE = {
                  "últimos 90 dias, lidas pelo próprio Nexus de hora em hora: a usina, o equipamento, o tipo, a data "
                  "programada e em que pé está. É de onde a Visão do responsável conta as OS abertas e atrasadas e a "
                  "zeladoria de cada usina.",
+    "os_fama": "Guarda cada OS que um cliente abriu na FAMA (a plataforma do cliente) e atribuiu à Grid, desde 2023, "
+               "lida pelo Nexus de hora em hora: o projeto da FAMA, a usina do Nexus (quando a ligação foi decidida na "
+               "seção Ligações entre bases), as datas de criação, prevista e de fim, o status, o tipo e a severidade. O "
+               "título e a descrição só existem cifrados, e quem criou ou aprovou não é guardado. Serve para o PCM "
+               "acompanhar as OS do cliente sem redigitar nada.",
     "uso_os_hora": "Guarda, de hora em hora, quantas vezes cada tela do OS Creator foi aberta, por quantas pessoas "
                    "diferentes, quanto demorou (a mediana e o p95), quantos erros deu, quantas vezes o Nexus respondeu "
                    "\"ocupado\" e quantos pedidos fez ao Fracttal, separando o clique da pessoa do que a tela pede "

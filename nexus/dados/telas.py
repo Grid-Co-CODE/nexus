@@ -27,7 +27,7 @@ from datetime import datetime
 from flask import abort, current_app, render_template, request, session, url_for
 
 from . import carga, catalogo, equipamento, explica, fato_almoxarifado, fato_inventario, fato_tarefa_os, historico, livros
-from . import previa
+from . import fato_os_fama, previa
 from . import programacao, radar
 
 _CACHE = {"t": 0.0, "v": None}
@@ -58,6 +58,8 @@ def _ultima_qualidade():
         q.update({l.get("fato"): l for l in livros.ler(base, s, fato_almoxarifado.LIVRO, "qualidade")})
         # o inventário do almoxarifado (26/10/2026, `nexus_almoxarifado_inventario`): os eventos, a régua e a curadoria
         q.update({l.get("fato"): l for l in livros.ler(base, s, fato_inventario.LIVRO, "qualidade")})
+        # as OS do cliente pela FAMA (11/11/2026, `nexus_os_fama`): a parte das OS com a usina decidida na tela
+        q.update({l.get("fato"): l for l in livros.ler(base, s, fato_os_fama.LIVRO, "qualidade")})
         at = next(iter(livros.ler(base, s, carga.LIVRO_FATOS, "atualizacao")), {})
         hq = livros.ler(base, s, carga.LIVRO_DIM, historico.ABA_QUALIDADE)
         eq = {(l.get("grupo"), l.get("item")): l for l in livros.ler(base, s, equipamento.LIVRO, "qualidade")}
@@ -193,6 +195,8 @@ QUEM_GRAVA_ORIGEM = (
     ("igual", "Ronda COS (API do Andamento)", "Ronda COS (o Nexus lê a fotografia do Andamento, só leitura)"),
     # os chamados em aberto para o App (08/11/2026): o Nexus lê da memória do OS Creator (a lista central de OS e o quadro)
     ("prefixo", "OS Creator (", "OS Creator (o Nexus lê a lista central de OS e o quadro, da memória)"),
+    # as OS do cliente pela FAMA (11/11/2026): o Nexus lê a lista da prestadora (só GET) e grava o fato (nexus/dados/fama.py)
+    ("igual", "FAMA (API da prestadora)", "FAMA (o Nexus lê a lista das OS atribuídas à Grid, só leitura)"),
     ("prefixo", "nexus_", "Nexus"),                              # livro do Nexus fora do LIVROS: viola a regra 10
 )
 A_DECLARAR = "a declarar"

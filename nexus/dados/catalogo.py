@@ -34,7 +34,7 @@ import re
 from dataclasses import dataclass
 
 from . import almoxarifado, fato_chamado, fato_chamado_aberto, fato_inventario, fato_pt, fato_ronda, fato_tarefa_os, fato_uso_os, fatos, geracao
-from . import programacao
+from . import fato_os_fama, programacao
 from ..zeladoria import tabelas as zeladoria_tabelas
 
 # o modelo (Fato, Livro, as dimensões e as regras) mora em modelo.py desde 05/11/2026; o catálogo o reexporta
@@ -1249,6 +1249,24 @@ FATOS = (
                     "cancelada fica fora. O nome da tarefa vira tarefa_chave (a mesma conta da programação e dos "
                     "motivos); o responsável da OS só vira do_backoffice (1/0, pelo HMAC do nome contra a lista do "
                     "PCM), nunca o nome (regra 8). Leitura do Fracttal incompleta não grava"),
+    # As OS que os clientes abrem na FAMA (11/11/2026, Levi: "A ideia é não ficarmos criando e editando e sim
+    # acompanhando"): a fase 1 é sombra (o Nexus lê, grava, liga as usinas e mostra; nada muda no campo). Registrado antes
+    # da 1ª gravação, que é a do servidor (só ele tem as três chaves: nexus/dados/fama.py)
+    Fato("os_fama", "OS do cliente pela FAMA", "pcm",
+         "fora do banco: API da FAMA (rota da prestadora, a lista inteira das OS atribuídas à Grid)", fato_os_fama.GRAO,
+         _d(data=("id", "data_id_criacao, data_id_prevista (expected_execution_date) e data_id_fim (dia de Brasília)"),
+            usina=("id", "usina_id (só a ligação decidida em Base → Ligações entre bases, sistema FAMA · Projetos, "
+                         "chave = o id do projeto; a proposta pelo nome não liga)"),
+            os=("cod", "fama_os_id (o id da OS na FAMA) e fama_projeto_id (o projeto, em dim_projeto_fama)")),
+         tipo=fato_os_fama.TIPO, chave=fato_os_fama.CHAVE, medidas=_m(fato_os_fama.MEDIDAS),
+         fontes=_fontes(fato_os_fama.FONTES), janela_origem=fato_os_fama.JANELA_ORIGEM,
+         estado="conformado", conformado_em=f"{fato_os_fama.LIVRO} · {fato_os_fama.ABA}",
+         observacao="foto acumulada: a OS anda de created a closed e a linha muda. O status, o tipo, a severidade, a "
+                    "especialidade e o tipo de equipe vão pelo id e pelo nome do catálogo da FAMA (status, tipo e "
+                    "severidade com a lista medida em 11/11/2026: fora dela, vazio e conta), e o contract_id. O título e "
+                    "a descrição (texto livre do cliente) só cifrados, amarrados à linha; quem criou, o responsável, "
+                    "quem aprovou e a empresa parceira não entram (regra 8). A leitura com menos de 95% das linhas do "
+                    "banco não grava (a lista da FAMA só cresce); grava só quando o sha muda"),
     # as normalizações da Ronda COS (29/10/2026, Levi: "calcule a disponibilidade por lá usando o de-para como
     # referência"): o Nexus grava, a plataforma faz a régua da disponibilidade da Thopen (só ela, decisão dele). Os
     # valores repetem os de nexus/cos/normalizacoes_banco.py (o teste confere): importar o módulo daqui seria circular
@@ -1601,6 +1619,17 @@ LIVROS = (
           "nasceu na 1ª gravação, à mão depois do ensaio (ferramentas/ensaio_tarefas_os.py --gravar, 18/10/2026: "
           "8.746 tarefas, conferidas por GET depois de gravar); grava só a leitura inteira do Fracttal e se a "
           "última gravação tiver mais de 50 min"),
+    # as OS do cliente pela FAMA (11/11/2026, fase 1: sombra): o fato, os projetos da FAMA (a dimensão que a tela Base →
+    # Ligações entre bases lê para ligar cada um à usina) e a qualidade. A dimensão só cresce: o projeto que some da FAMA
+    # fica, com a ligação decidida dele; o fato segue a FAMA (até 5% a menos; abaixo disso é leitura incompleta)
+    Livro(fato_os_fama.LIVRO, (fato_os_fama.ABA, fato_os_fama.ABA_DIM, "qualidade", "atualizacao"),
+          "de hora em hora, na volta da carga de dados (:40), só onde há as três chaves (o servidor); grava só quando o "
+          "sha do fato e da dimensão muda",
+          "nexus/dados/fama.py (a volta da carga de dados, nexus/dados/carga.py) + nexus/dados/fato_os_fama.py", False,
+          "registrado em 11/11/2026 antes da 1ª gravação (regra 10): nasce na 1ª volta do servidor depois do deploy. "
+          "Lê a FAMA uma vez por volta (GET, 90 s); erro, 401 ou resposta que não é lista não grava; o livro do banco "
+          "que não vem inteiro, o de-para lido vazio e a leitura com menos de 95% das linhas do banco também não",
+          so_cresce=(fato_os_fama.ABA_DIM,)),
     # a Zeladoria pronta para o dashboard do cliente (26/10/2026, Levi: "agora faz a mesma tela no dashboard do
     # cliente"; a decisão dele, pelo chat do Dashboard Thopen: o Nexus publica a visão e o 5080 só mostra). É VISÃO, não
     # fato: a conta da tela Zeladoria (nexus/campo/zeladoria.py) sobre o checklist das rondas, que só o Nexus lê

@@ -8,6 +8,7 @@ O que esta cópia NÃO faz, de propósito:
 - a carga de hora em hora no banco (`NEXUS_CARGA_DADOS=0`): a do PC do Levi e a do servidor já disputam a hora;
 - as leituras do Fracttal ao subir (`NEXUS_CAMPO_AQUECER=0`): a cota é de 200/min para a empresa inteira;
 - os laços que leem o Fracttal para gravar no banco (`NEXUS_CHAMADOS_PUBLICAR=0`, `NEXUS_OS_PUBLICAR=0`);
+- a leitura da FAMA (`NEXUS_FAMA_CHAVE` vazia, 11/11/2026: a trava abaixo deixaria sair o GET);
 - nenhum pedido sai para a SunOp ou a API PV, e nenhum pedido que não seja GET/HEAD/OPTIONS sai da máquina (gravação
   no banco, no Fracttal, no GitHub do PCM): a trava abaixo recusa com `ConnectionError`, e a tela mostra a falha. Por
   isso o login pelo Fracttal (um POST) não funciona aqui: entre pela senha de administrador (`/entrar?admin=1`, a
@@ -94,6 +95,9 @@ def main() -> None:
     os.environ["NEXUS_OS_PUBLICAR"] = "0"
     # a leitura das fotos da Aprovação de OS (05/11/2026): 1 pedido por OS ao Fracttal e as fotos pelo S3, ~2.000 OS
     os.environ["NEXUS_PREFILTRO"] = "0"
+    # as OS do cliente pela FAMA (11/11/2026): vazia, a variável vence o .env e some da configuração (a carga já não
+    # liga aqui; isto segura também a chave que um dia estiver no .env do PC)
+    os.environ["NEXUS_FAMA_CHAVE"] = ""
     if args.plataforma is not None:
         # "" também vale: vence o .env (a moldura da porta única só abre na mesma origem; nexus/torres/moldura.py)
         os.environ["NEXUS_PLATAFORMA_URL"] = args.plataforma

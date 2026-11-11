@@ -16,7 +16,7 @@ from nexus.campo import decisao_pt, ronda_avulsa
 from nexus.cos import normalizacoes_banco
 from nexus.dados import calendario, carga, catalogo, equipamento, fato_pt, fato_ronda, fatos, geracao, historico, livros
 from nexus.dados import fato_almoxarifado, fato_chamado, fato_inventario, fato_tarefa_os, fato_uso_os, programacao
-from nexus.dados import fato_chamado_aberto
+from nexus.dados import fato_chamado_aberto, fato_os_fama
 from nexus.dados import telas as telas_dados
 
 BASE = "http://pg.falso"
@@ -90,7 +90,9 @@ CABS = {"fechamento": fatos.CAB_FECHAMENTO, "ronda": fato_ronda.CAB_RONDA, "pt":
         "uso_os_hora": fato_uso_os.CAB_USO, "fracttal_hora": fato_uso_os.CAB_FRACTTAL,
         "fracttal_total_hora": fato_uso_os.CAB_FRACTTAL_TOTAL,
         # os chamados em aberto para o App de Campo (08/11/2026): o servidor grava de 10 em 10 min, desligado até a prova
-        "chamado_aberto": fato_chamado_aberto.CAB}
+        "chamado_aberto": fato_chamado_aberto.CAB,
+        # as OS do cliente pela FAMA (11/11/2026, fase 1: sombra): o servidor grava de hora em hora, só com as três chaves
+        "os_fama": fato_os_fama.CAB_OS_FAMA}
 PROIBIDAS = ("nome", "email", "tecnico", "observacao", "comentario", "motivo", "tarefa", "relatorio", "atividades")
 
 
@@ -126,7 +128,7 @@ def test_livros_do_nexus_registrados_antes_de_existir_e_na_regra_10():
         assert l.abas and all(catalogo.aba_segue_a_regra(a) for a in l.abas), l.nome
     for nome in (carga.LIVRO_DIM, carga.LIVRO_FATOS, equipamento.LIVRO, equipamento.LIVRO_FOTO, programacao.LIVRO,
                  geracao.LIVRO, ronda_avulsa.LIVRO, decisao_pt.LIVRO, "nexus_rondas_checklist", fato_chamado.LIVRO,
-                 fato_tarefa_os.LIVRO, fato_almoxarifado.LIVRO):
+                 fato_tarefa_os.LIVRO, fato_almoxarifado.LIVRO, fato_os_fama.LIVRO):
         assert nome in catalogo.LIVRO_POR_NOME, nome
     assert ronda_avulsa.ABA in catalogo.LIVRO_POR_NOME[ronda_avulsa.LIVRO].abas
     assert equipamento.ABA_FOTO in catalogo.LIVRO_POR_NOME[equipamento.LIVRO_FOTO].abas

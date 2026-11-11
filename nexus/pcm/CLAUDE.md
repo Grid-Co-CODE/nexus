@@ -90,6 +90,18 @@ do PCM: os números batiam cliente a cliente, o nome não.
   novo em 5 min. O mapa fica 10 min em memória por app. **Medido em 18/10:** 17 nomes em 1,6 s; a única troca pelo site
   é "Utragaz"; os arquivos lidos já saem só com os nomes do cadastro.
 
+## OS do cliente pela FAMA (11/11/2026)
+
+Levi: o cliente cria a OS na FAMA, ela aparece para o programador automático e cai no App de Campo; as retroativas
+também entram. "A ideia é não ficarmos criando e editando e sim acompanhando."
+- **Fase 1, sombra (no código):** o Nexus lê a lista das OS da FAMA de hora em hora, grava no banco
+  (`nexus_os_fama · fato_os_fama`, com os projetos em `dim_projeto_fama`; regras em `nexus/dados/CLAUDE.md`) e liga cada
+  projeto à usina pela decisão do Levi em Base → Ligações entre bases (`FAMA · Projetos`, `nexus/cadastro/CLAUDE.md`).
+  Nada muda no campo nem nesta pasta: o motor, o Gerar, o Quadro e o Publicar no App não leem a FAMA.
+- **Fase 2 (parte B, ainda não feita), liga com `NEXUS_FAMA_PROGRAMA=1`:** as OS da FAMA entram no programador e no
+  Quadro e vão ao App; e, nas usinas da FAMA, a preventiva do Fracttal sai da programação, porque nelas a preventiva passa
+  a ser a da FAMA (decisão do Levi). Sem a variável, tudo segue como a fase 1.
+
 ## Horas por tarefa e zeladoria no motor (15/10/2026)
 
 Levi: "as tarefas estão vindo com horas previstas para a mesma quantidade de horas da OS [...] a OS 15596 de Elias

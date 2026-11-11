@@ -4,7 +4,9 @@ De hora em hora, aos :40 (os livros do App chegam aos :25), dentro do processo d
 `banco_dados.json` público do PCM, o mesmo arquivo nas duas máquinas) e grava no banco: não toca em Fracttal, API PV
 nem SunOp. Duas máquinas com o Nexus no ar (o PC do Levi e o servidor) não gravam em dobro: a carga só grava se a
 última tiver mais de `INTERVALO_MIN` minutos (a hora fica no próprio livro, aba `atualizacao`); a que chegar depois,
-pula. `NEXUS_CARGA_DADOS=0` desliga numa máquina.
+pula. `NEXUS_CARGA_DADOS=0` desliga numa máquina. A volta do laço (`ligar`) roda também, depois desta carga, a geração,
+o almoxarifado e, por último, as OS do cliente pela FAMA (`fama.py`, 11/11/2026): a única peça que lê uma API de fora,
+uma vez por volta e só onde há as três chaves dela (o servidor); a falha de cada uma não segura as outras.
 
 Livros que esta carga mantém (registrados em `catalogo.LIVROS`):
 - `nexus_dimensoes`: `dim_data` (o calendário), `feriados_locais`, `pessoas_historico` e `usinas_historico` (o
@@ -837,6 +839,24 @@ def _espera_s(agora=None) -> float:
     return (alvo - agora).total_seconds() + (ATRASO_DO_PC_S if _maquina() == "pc" else 0)
 
 
+def _volta_fama(app) -> None:
+    """As OS do cliente pela FAMA (11/11/2026, fase 1: sombra; `fama.py`), a última peça da volta: só liga onde há as três
+    chaves (o servidor) e a falha dela fica no estado e no log, nunca sobe (as outras cargas da hora já rodaram). A chave
+    da FAMA nunca vai ao log: o relatório, o erro e o traceback passam pelo `sem_chave` (o de `fama.py`, repetido aqui)."""
+    import traceback
+
+    def sem_chave(texto) -> str:            # aqui, e não importado: nem o módulo da FAMA quebrado derruba o laço
+        chave = str(app.config.get("NEXUS_FAMA_CHAVE") or "").strip()
+        return str(texto).replace(chave, "[chave]") if len(chave) >= 4 else str(texto)
+    try:
+        from . import fama
+        _LACO["fama"] = fama.gerar_fama(app.config)
+        log.info("fama: %s", sem_chave(fama.para_o_log(_LACO["fama"])))
+    except Exception as e:      # noqa: BLE001 — a FAMA não segura nada
+        _LACO["fama"] = {"erro": sem_chave(f"{type(e).__name__}: {e}")[:300]}
+        log.error("fama: %s", sem_chave(traceback.format_exc()))
+
+
 def ligar(app):
     """O laço de hora em hora. Quem chama é o `nexus.dados.instalar` (app.py e servir.py), nunca o create_app."""
     if _LACO["thread"] is not None:
@@ -872,6 +892,8 @@ def ligar(app):
                 except Exception as e:      # noqa: BLE001
                     _LACO["almoxarifado"] = {"erro": f"{type(e).__name__}: {e}"[:300]}
                     log.exception("almoxarifado")
+                # as OS da FAMA (11/11/2026): uma leitura por volta, depois das outras; só onde há as três chaves
+                _volta_fama(app)
 
     _LACO["thread"] = threading.Thread(target=laco, name="nexus-carga-dados", daemon=True)
     _LACO["thread"].start()
