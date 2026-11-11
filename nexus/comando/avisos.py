@@ -55,11 +55,16 @@ EVENTOS = ("gerou_os", "leu")
 JANELA_DIAS = 7
 EXECUTADA = {2: "Em Verificação", 3: "Concluída"}
 ATRIBUIDAS_DESDE = "2026-11-08"   # o aviso de OS criada para a pessoa vale para as criadas deste dia em diante (sem enxurrada)
+# a solicitação lida no Fracttal e o acompanhamento da OS que ela gerou (11/11/2026) valem para as OS criadas deste dia em
+# diante: sem isso, a 1ª leitura depois de subir avisaria de uma vez as solicitações do mês e os cancelamentos já sabidos
+SEGUIR_DESDE = "2026-11-11"
+CANCELADA = 4
 LOTE_MIN = 3                      # tantas OS da mesma pessoa no mesmo minuto viram um aviso só
 # E:<id da OS>:<data de fim, AAAAMMDDHHMM> (a OS executada de novo é outro aviso), S:<código da solicitação>, A:<id da OS> (a
-# OS criada para a pessoa) ou L:<quem criou>:<minuto da criação, AAAAMMDDHHMM> (o lote)
-AVISO_RE = re.compile(r"E:\d{1,12}:\d{12}|S:[A-Za-z0-9_\-]{1,40}|A:\d{1,12}|L:[0-9a-f]{1,12}:\d{12}")
-TIPO_DO_PREFIXO = {"E": "execucao", "S": "solicitacao", "A": "atribuida", "L": "atribuida"}
+# OS criada para a pessoa), L:<quem criou>:<minuto da criação, AAAAMMDDHHMM> (o lote) ou C:<id da OS> (a OS da solicitação
+# da pessoa que foi cancelada, 11/11/2026)
+AVISO_RE = re.compile(r"E:\d{1,12}:\d{12}|S:[A-Za-z0-9_\-]{1,40}|A:\d{1,12}|L:[0-9a-f]{1,12}:\d{12}|C:\d{1,12}")
+TIPO_DO_PREFIXO = {"E": "execucao", "S": "solicitacao", "A": "atribuida", "L": "atribuida", "C": "cancelada"}
 MAX_POR_VEZ = 200            # quantos avisos um "Marcar todas" grava de uma vez
 TTL_S = 60
 _BRT = timezone(timedelta(hours=-3))
@@ -377,6 +382,77 @@ def solicitacoes(nome, linhas: list[dict], agora: datetime | None = None, cofre=
     return list(out.values())
 
 
+def _minhas(rest, id_account, email, nomes) -> list[dict]:
+    """As solicitações do Fracttal (`solicitacoes_fracttal`) desta pessoa: pela conta do Fracttal; pelo e-mail de quem pediu;
+    pelo nome só quando a pessoa não tem a conta no catálogo (o nome de duas pessoas não pode dar o aviso de uma à outra)."""
+    e = _txt(email).lower()
+    meus = {c for c in (codigo_do_nome(n) for n in nomes or ()) if c} if id_account is None else set()
+    return [s for s in rest or [] if (id_account is not None and s.get("id_account") == id_account)
+            or (e and s.get("email") == e) or (meus and codigo_do_nome(s.get("nome")) in meus)]
+
+
+def da_solicitacao(id_account, email, nomes, eventos: list[dict], rest: list[dict], cancel: dict,
+                   agora: datetime | None = None) -> list[dict]:
+    """O que a pessoa recebe das OS que as solicitações DELA geraram (Levi, 11/11/2026: "deve mostrar quando uma solicitação
+    feita gera OS e deve chegar todas as notificações dessa OS!"): o "Sua solicitação gerou uma OS" das lidas no Fracttal
+    (a aprovada direto no Fracttal também), e, de cada OS gerada (as do Fracttal e as dos `eventos` da aprovação no OS
+    Creator), a ida para Em Verificação, a conclusão e o cancelamento (com o motivo), como quem cria a OS recebe. Só as OS
+    criadas de SEGUIR_DESDE em diante; o estado da OS sai da lista central (nada vai ao Fracttal aqui)."""
+    agora = agora or datetime.now(_BRT)
+    try:
+        lista = _os_central().atual()
+    except Exception:            # noqa: BLE001 — sem a lista central: sem estes avisos
+        log.debug("avisos: a lista central de OS não respondeu (solicitações)", exc_info=True)
+        return []
+    if lista is None:
+        return []
+    desde = datetime.fromisoformat(SEGUIR_DESDE).replace(tzinfo=_BRT)
+    janela = timedelta(days=JANELA_DIAS)
+    meus_nomes = {_norm(n) for n in nomes or () if _txt(n)}
+    out, seguidas = {}, {}
+    for s in _minhas(rest, id_account, email, nomes):
+        rec = lista.por_id.get(s["wid"])
+        criada = _quando(rec.data) if rec is not None else None
+        if criada is None or criada < desde:
+            continue
+        seguidas[s["wid"]] = s["codigo"]
+        aid = f"S:{s['codigo']}"
+        if agora - criada <= janela and AVISO_RE.fullmatch(aid):
+            folio = _txt(s.get("folio")) or _txt(rec.folio)
+            out[aid] = {"id": aid, "tipo": "solicitacao", "wid": s["wid"], "folio": folio,
+                        "status": EXECUTADA.get(rec.status_id, "Em Processo"), "quando": criada,
+                        "titulo": "Sua solicitação gerou uma OS",
+                        "detalhe": " · ".join(x for x in (f"Solicitação {s['codigo']}", f"OS {folio}" if folio else "",
+                                                           _txt(s.get("aprovador"))) if x)}
+    for a in eventos or []:
+        if a.get("wid") and a.get("quando") and a["quando"] >= desde:
+            seguidas.setdefault(a["wid"], a["id"].partition(":")[2])
+    for wid, sol in seguidas.items():
+        rec = lista.por_id.get(wid)
+        if rec is None:
+            continue
+        folio, descr = _txt(rec.folio), _txt(rec.descricao)[:70]
+        if rec.status_id in EXECUTADA:
+            fim, executor = _quando(rec.data_fim), _txt(rec.atribuido_a)
+            if fim is None or agora - fim > janela or _norm(executor) in meus_nomes:
+                continue
+            aid = f"E:{wid}:{fim.strftime('%Y%m%d%H%M')}"
+            out[aid] = {"id": aid, "tipo": "execucao", "wid": wid, "folio": folio, "status": EXECUTADA[rec.status_id],
+                        "quando": fim, "titulo": f"OS {folio} da sua solicitação concluída pelo técnico",
+                        "detalhe": " · ".join(x for x in (executor, EXECUTADA[rec.status_id], f"Solicitação {sol}", descr)
+                                              if x)}
+        elif rec.status_id == CANCELADA and wid in (cancel or {}):
+            c = cancel[wid]
+            if agora - c["visto"] > janela:
+                continue
+            aid = f"C:{wid}"
+            out[aid] = {"id": aid, "tipo": "cancelada", "wid": wid, "folio": folio, "status": "Cancelada",
+                        "quando": c["visto"], "titulo": f"OS {folio} da sua solicitação foi cancelada",
+                        "detalhe": " · ".join(x for x in (f"Motivo: {c['motivo']}" if c.get("motivo") else "",
+                                                           f"Solicitação {sol}", descr) if x)}
+    return list(out.values())
+
+
 def lidos(linhas: list[dict], meu_hmac: str) -> set:
     """Os avisos que esta pessoa já marcou como lidos."""
     meu = _txt(meu_hmac).lower()
@@ -387,14 +463,19 @@ def lidos(linhas: list[dict], meu_hmac: str) -> set:
 
 
 def da_pessoa(nome: str, meu_hmac: str, linhas: list[dict], agora: datetime | None = None, cofre=None,
-              id_personnel=None, id_account=None, outros_nomes=()) -> list[dict]:
+              id_personnel=None, id_account=None, outros_nomes=(), email: str = "", rest=None, cancel=None) -> list[dict]:
     """Os avisos NÃO lidos da pessoa, do mais novo para o mais velho. `nome` é o do Fracttal quando o catálogo o tem;
-    `outros_nomes`, o da sessão (a solicitação aprovada casa por qualquer um dos dois)."""
+    `outros_nomes`, o da sessão (a solicitação aprovada casa por qualquer um dos dois). `rest` e `cancel` são a última
+    leitura das solicitações do Fracttal (`solicitacoes_fracttal.atuais`). O mesmo aviso por dois caminhos (a OS que a pessoa
+    criou e que também é da solicitação dela; a aprovada no OS Creator e lida no Fracttal) sai uma vez."""
     ja = lidos(linhas, meu_hmac)
     nomes = list(dict.fromkeys(n for n in (nome, *outros_nomes) if _txt(n)))
-    todos = (execucoes(nome, agora, id_account) + atribuidas(id_personnel, id_account, nome, agora)
-             + solicitacoes(nomes, linhas, agora, cofre))
-    return sorted((a for a in todos if a["id"] not in ja), key=lambda a: a["quando"], reverse=True)
+    eventos = solicitacoes(nomes, linhas, agora, cofre)
+    todos = {}
+    for a in (execucoes(nome, agora, id_account) + atribuidas(id_personnel, id_account, nome, agora) + eventos
+              + da_solicitacao(id_account, email, nomes, eventos, rest or [], cancel or {}, agora)):
+        todos.setdefault(a["id"], a)
+    return sorted((a for a in todos.values() if a["id"] not in ja), key=lambda a: a["quando"], reverse=True)
 
 
 def para_o_sino(usuario) -> list[dict]:
@@ -410,8 +491,14 @@ def para_o_sino(usuario) -> list[dict]:
     except ES.Recusada:
         cofre = None
     idp, ida, nome_fracttal = _do_fracttal(email)
+    try:
+        from . import solicitacoes_fracttal as SF
+        rest, cancel = SF.atuais(current_app._get_current_object())
+    except Exception:            # noqa: BLE001 — sem o leitor: os avisos de antes seguem
+        log.debug("avisos: as solicitações do Fracttal não responderam", exc_info=True)
+        rest, cancel = [], {}
     itens = da_pessoa(nome_fracttal or nome, _codigo(email), copia(), cofre=cofre, id_personnel=idp, id_account=ida,
-                      outros_nomes=(nome,))
+                      outros_nomes=(nome,), email=email, rest=rest, cancel=cancel)
     for a in itens:
         a["quando_txt"] = a["quando"].strftime("%d/%m %H:%M")
     return itens

@@ -25,7 +25,8 @@ muito boa"; e "construa o que você sugere"). PRD e tarefas no formato do Taskma
 | `conversa.py` | A conversa presa ao objeto com @menção: o livro `nexus_conversas · fato_mensagem`, as menções não lidas (`para_mim`) e a lista do @ (`pessoas_mencionaveis`) |
 | `../torres/comando/templates/comando/_conversa.html` + `static/comando/conversa.js` | O componente da conversa (dentro de cada insight e na página da OS e da usina) e o @ |
 | `../casca/__init__.py` (`_sino`) + `base.html` | O sino do topo |
-| `avisos.py` + `../casca/__init__.py` (`_avisos_do_sino`, `POST /t/comando/aviso/lida`) | Os avisos das OS de cada pessoa no sino ("OS x concluída pelo técnico", "Sua solicitação gerou uma OS" e, desde 08/11/2026, "OS x criada para você") e o Marcar como lida: o livro `nexus_avisos · fato_evento_aviso` |
+| `avisos.py` + `../casca/__init__.py` (`_avisos_do_sino`, `POST /t/comando/aviso/lida`) | Os avisos das OS de cada pessoa no sino ("OS x concluída pelo técnico", "Sua solicitação gerou uma OS" e, desde 08/11/2026, "OS x criada para você"; desde 11/11/2026, tudo da OS da solicitação, com a cancelada) e o Marcar como lida: o livro `nexus_avisos · fato_evento_aviso` |
+| `solicitacoes_fracttal.py` | As solicitações do Fracttal que viraram OS (REST `work_requests`, por trás, a cada 5 min, na memória) e o motivo das OS delas canceladas, para os avisos de quem pediu (11/11/2026) |
 
 ## As regras da Fase 1 (e de onde cada uma lê)
 | Regra | Torre dona | Fonte |
@@ -96,10 +97,20 @@ download do pdf da OS". No quiz, "resposta" é o técnico executar a OS.
   `os_central.filtrar`) que foram para Em Verificação ou Concluída nos últimos 7 dias, pela data de fim; quem executou é o
   atribuído, e a OS que a própria pessoa executou não avisa. Vem da lista central de OS do OS Creator: nenhum pedido ao
   Fracttal, com o atraso dela (minutos). Nunca é gravado: só o lido dele.
-- **"Sua solicitação gerou uma OS":** o evento `gerou_os`, gravado quando o PCM aprova na Fila do OS Creator
-  (`rotas_solic.AO_APROVAR`, que a ponte liga; por trás, no contexto do Nexus). Para quem pediu pelo código do NOME (a
-  solicitação do Fracttal só traz o nome; prefixo `nome:`, separado do código do e-mail). A aprovada direto no Fracttal
-  não avisa (decisão de 04/11/2026: custaria ler no Fracttal as solicitações de cada pessoa).
+- **"Sua solicitação gerou uma OS":** por dois caminhos, que dão o mesmo aviso (`S:<código da solicitação>`, uma vez só).
+  O evento `gerou_os`, gravado na hora em que o PCM aprova na Fila do OS Creator (`rotas_solic.AO_APROVAR`, que a ponte
+  liga; por trás, no contexto do Nexus), para quem pediu pelo código do NOME (prefixo `nome:`, separado do código do
+  e-mail). E, desde 11/11/2026 (Levi: "também deve mostrar quando uma solicitação feita gera OS e deve chegar todas as
+  notificações dessa OS!"), as solicitações lidas no Fracttal pelo REST (`solicitacoes_fracttal.py`: `GET
+  /api/work_requests?since=`, os últimos 30 dias, a cada 5 min, POR TRÁS, na memória; nada vai ao banco): a aprovada
+  direto no Fracttal também avisa, com até ~10 min de atraso (a leitura e a lista central). Quem pediu, pela conta do
+  Fracttal (`id_account`), pelo e-mail de quem pediu ou, sem a conta no catálogo, pelo nome. A hora é a da criação da OS.
+- **Tudo da OS da solicitação chega a quem pediu** (11/11/2026, `avisos.da_solicitacao`): a ida para Em Verificação e a
+  conclusão ("OS x da sua solicitação concluída pelo técnico", o mesmo `E:` de quem criou) e o cancelamento ("OS x da sua
+  solicitação foi cancelada", `C:<id da OS>`, selo "Cancelada", com o motivo, que o leitor lê uma vez por OS pelo REST da
+  OS; o Fracttal não guarda a hora do cancelamento, e o aviso leva a hora em que o leitor o viu). Vale para as OS geradas
+  de `SEGUIR_DESDE` (11/11/2026) em diante: sem isso a 1ª leitura avisaria o mês de uma vez. A solicitação pedida há mais
+  de 30 dias e aprovada agora fica de fora. Nos testes o leitor não vai ao Fracttal (`NEXUS_SOLICITACOES_FRACTTAL=1` liga).
 - **"OS x criada para você"** (08/11/2026, a sugestão de uma colega do PCM, "Criação de OS direcionada ao usuário", que o
   Levi aprovou): as OS em processo atribuídas à pessoa (pelo id dela no Fracttal) e criadas por OUTRA pessoa, de
   `ATRIBUIDAS_DESDE` (08/11/2026) em diante e nos últimos 7 dias, da mesma lista central (nada vai ao Fracttal). A que a

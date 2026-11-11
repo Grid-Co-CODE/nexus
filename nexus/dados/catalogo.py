@@ -239,7 +239,9 @@ FATOS = (
          observacao="aviso_id em claro: E:<id da OS>:<data de fim AAAAMMDDHHMM> (a OS executada, lida da lista central "
                     "de OS e nunca gravada aqui: só o leu dela), S:<código da solicitação>, A:<id da OS> (a OS criada "
                     "para a pessoa, 08/11/2026) ou L:<id de quem criou, ou um código curto do nome>:<minuto da criação> "
-                    "(o lote de OS criadas para a pessoa); tipo execucao, solicitacao ou atribuida; os_id e folio da OS; destino_hmac = o código do NOME de quem pediu a solicitação (o "
+                    "(o lote de OS criadas para a pessoa) ou C:<id da OS> (a OS da solicitação da pessoa que foi cancelada, "
+                    "11/11/2026; como o S: lido das solicitações do Fracttal pelo REST, nunca gravado aqui: só o leu); "
+                    "tipo execucao, solicitacao, atribuida ou cancelada; os_id e folio da OS; destino_hmac = o código do NOME de quem pediu a solicitação (o "
                     "Fracttal só traz o nome; prefixo nome:, separado do código do e-mail). Os nomes (quem pediu, quem "
                     "aprovou) só cifrados (Cofre). Só acrescenta: nada se edita nem se apaga"),
     # 03/11/2026 (Fase 3 dos setores conversando): o pedido a uma área, com o prazo que quem pede escolhe, e o retorno
