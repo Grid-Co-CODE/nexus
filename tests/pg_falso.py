@@ -31,6 +31,9 @@ class ApiPGFalsa:
         # livros cujas abas a listagem (/api/sheets) deixa de fora, como se a API falhasse por um instante; o
         # /api/workbooks continua dizendo quantas abas o livro tem (sheet_count, como a API real)
         self.omitir = set()
+        # o `updated_at` de cada livro, que a API real anda a cada sync-xlsx (conferido em 11/11/2026: a estrutura das
+        # usinas com a última linha alterada às 08:57:18 e o livro às 08:57:21); `paginas_lidas` conta as páginas de linhas lidas
+        self.marcas, self.paginas_lidas = {}, 0
 
     def _id(self, wb, aba):
         if (wb, aba) not in self.abas:
@@ -40,12 +43,13 @@ class ApiPGFalsa:
     def get(self, url, params=None, headers=None, timeout=None):
         if url.endswith("/api/workbooks"):
             self.tokens.append((headers or {}).get("Authorization"))
-            return Resposta(200, [{"key": k, "sheet_count": sum(1 for (wb, _a) in self.abas if wb == k)}
-                                  for k in self.workbooks])
+            return Resposta(200, [{"key": k, "sheet_count": sum(1 for (wb, _a) in self.abas if wb == k),
+                                   "updated_at": self.marcas.get(k)} for k in self.workbooks])
         if url.endswith("/api/sheets"):
             return Resposta(200, [{"id": v["id"], "workbook_key": wb, "sheet_name": aba, "row_count": len(v["linhas"])}
                                   for (wb, aba), v in self.abas.items() if wb not in self.omitir])
         m = re.search(r"/api/sheets/(\d+)/rows$", url)
+        self.paginas_lidas += 1
         aba = next(v for v in self.abas.values() if v["id"] == int(m.group(1)))
         ini, lim = int((params or {}).get("offset", 0)), int((params or {}).get("limit", 1000))
         return Resposta(200, aba["linhas"][ini:ini + lim])
@@ -68,6 +72,7 @@ class ApiPGFalsa:
             conv = (lambda v: None if v is None else str(v)) if self.como_texto else (lambda v: v)
             self._id(wb, ws.title)["linhas"] = [{"headers": cab, "values": [conv(v) for v in l]} for l in corpo]
         self.syncs += 1
+        self.marcas[wb] = f"2026-11-11T08:00:{self.syncs:02d}-03:00"
         return Resposta(200, {"ok": True})
 
     def linhas(self, wb, aba):

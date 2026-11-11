@@ -455,8 +455,10 @@ def _recusa_json(motivo: str, status: int, usina_id=None, usina_supervisorio: st
 
 def _depara_estado(srv):
     """`GET /t/base/equipamentos/depara/estado?chaves=A|B` (ou `?usinas=93,108`): a usina inteira de cada chave, com o
-    selo, o kWp do Registro mestre e de onde veio, as chaves, as cabines e os inversores. Relê o banco (nunca a cópia de
-    1 minuto): o selo que sai daqui é o que o salvar confere, e a cópia de outra máquina daria 409 em seguida."""
+    selo, o kWp do Registro mestre e de onde veio, as chaves, as cabines e os inversores. O livro como o banco tem agora
+    (nunca a cópia de 1 minuto): o selo que sai daqui é o que o salvar confere, e a cópia de antes de uma gravação de
+    outra máquina daria 409 em seguida. Conferido pela marca do livro (`E.ler_conferido`, 11/11/2026): as linhas só são
+    relidas quando ele mudou."""
     if _de_outro_site():
         return _recusa_json("Pedido de outro site.", 403)
     chaves = [E.texto(c) for c in str(request.args.get("chaves") or "").split("|") if E.texto(c)]
@@ -467,7 +469,7 @@ def _depara_estado(srv):
         return _recusa_json(f"No máximo {E.MAX_DEPARA} chaves e {E.MAX_DEPARA} usinas por pedido.", 400)
     try:
         base, sessao = _banco()
-        est = E.ler(base, sessao, forcar=True)
+        est = E.ler_conferido(base, sessao)
     except Exception as ex:      # noqa: BLE001 — sem banco
         return _recusa_json(f"Não consegui ler a estrutura no banco ({type(ex).__name__}).", 503)
     if est.get("erro"):

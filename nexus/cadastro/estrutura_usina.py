@@ -246,6 +246,43 @@ def ler(base: str, sessao, forcar: bool = False) -> dict:
     return c
 
 
+def _marca(base: str, sessao):
+    """O `updated_at` do livro no banco (o /api/workbooks), que anda a cada gravação (sync-xlsx), ou None (sem a marca,
+    ou o banco não respondeu). Conferido em 11/11/2026: a última linha alterada às 08:57:18 de 06/11 e o livro às
+    08:57:21."""
+    try:
+        r = sessao.get(f"{base}/api/workbooks", timeout=60)
+        r.raise_for_status()
+        w = next((x for x in r.json() if x.get("key") == LIVRO), None)
+    except Exception:            # noqa: BLE001 — sem a marca, lê como antes
+        return None
+    return (w or {}).get("updated_at") or None
+
+
+def ler_conferido(base: str, sessao) -> dict:
+    """O livro como o banco tem AGORA, sem reler as linhas quando o banco diz que ele não mudou (Desempenho, 11/11/2026).
+
+    É o que o estado do de-para usa: o selo que sai dele é o que o salvar confere, e a cópia de 1 minuto podia ser de
+    antes de uma gravação de outra máquina (o Nexus do PC e o do servidor gravam o mesmo livro). Até aqui cada pedido
+    relia o livro inteiro (1.932 inversores; de 1,5 a 12 s), e uma abertura da Base → De-para de equipamentos faz 4,
+    um atrás do outro: 12,6 dos 14 s da tela, medido no ar. A marca do livro (`_marca`) custa um pedido pequeno:
+    - igual à da cópia: a cópia vale, conferida agora;
+    - diferente, ou sem marca (o banco não deu): relê como antes.
+    A marca é lida ANTES das linhas e guardada com elas: a gravação que acontecer durante a leitura (páginas de antes e
+    de depois dela) anda a marca do banco, e o pedido seguinte relê. Lida depois, ela esconderia essa leitura misturada."""
+    marca = _marca(base, sessao)
+    c = _CACHE.get("livro")
+    if marca and c and not c.get("erro") and c.get("marca") == marca:
+        c = dict(c, lido_em=time.time())
+        _CACHE["livro"] = c
+        return c
+    est = ler(base, sessao, forcar=True)
+    if marca and not est.get("erro"):
+        est = dict(est, marca=marca)
+        _CACHE["livro"] = est
+    return est
+
+
 def da_usina(est: dict, usina_id: int) -> dict:
     """O que a usina tem de pé (sem os excluídos): as chaves do supervisório, as cabines e os inversores, na ordem."""
     def vivos(itens):

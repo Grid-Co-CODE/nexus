@@ -452,8 +452,15 @@ de entender para você, quando eu for fazer não vou entender nada".
     substitui_aba}], cabines: [{cabine_id, nome, codigo_fracttal, potencia_kwp, potencia_regra}], inversores:
     [{inversor_id, supervisorio_id, usina_supervisorio, nome, equipamento_supervisorio, cabine_id,
     strings_esperadas_qtd, potencia_kwp, codigo_fracttal, equipamento_id, potencia_regra, fracttal_ligado_por,
-    conferido_em}]}], chaves_sem_usina, usinas_fora_do_registro, gravando}`: a usina INTEIRA de cada chave, relida do
-    banco (o selo que sai daqui é o que o salvar confere; a cópia de 1 minuto de outra máquina daria 409 em seguida).
+    conferido_em}]}], chaves_sem_usina, usinas_fora_do_registro, gravando}`: a usina INTEIRA de cada chave, como o
+    banco tem AGORA (o selo que sai daqui é o que o salvar confere; a cópia de 1 minuto de antes de uma gravação de outra
+    máquina daria 409 em seguida). **Conferida pela marca do livro** (`estrutura_usina.ler_conferido`, 11/11/2026): o
+    `updated_at` do /api/workbooks anda a cada gravação (a última linha às 08:57:18 de 06/11 e o livro às 08:57:21); igual
+    ao da cópia, vale a cópia; diferente ou sem marca, relê o livro inteiro. A marca é lida ANTES das linhas, para a
+    gravação que acontecer no meio da leitura fazer o pedido seguinte reler. Caso: a abertura da Base → De-para de
+    equipamentos levava ~14 s, e 12,6 s eram os 4 pedidos a esta rota, um atrás do outro, relendo o livro inteiro cada um
+    (1.932 inversores; nenhum pedido ao Fracttal: as árvores saem da foto dos ativos que a leitura do OS Creator renova
+    toda noite). Prova: `tests/test_base_depara_estado_conferido.py` e 5 mutações.
     `gravando` (2ª revisão final, 21/10/2026) = há um salvar do de-para em curso neste processo (da chegada do pedido à
     resposta, `estrutura_usina.em_curso`) ou a trava do livro ocupada: no estouro de 180 s e no 502/504 do proxy o pedido
     abandonado continua aqui (o waitress serve em threads), e o estado relido na hora devolvia o selo de antes (provado com
