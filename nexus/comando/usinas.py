@@ -5,7 +5,9 @@ passa o dado já lido, e o teste prova a conta.
 De onde vem cada coluna (a fonte da tela dona; nada se inventa):
 - usina, cliente e cluster: a linha da Visão do responsável (`campo.responsaveis.visao_responsaveis`, a cópia de 5 min);
   código, MWp (a potência contratual, a única preenchida nas 138) e tipologia ("SOLO TRACKER" = Tracker): o cadastro;
-- Agora: a linha do tempo real (a mesma ponte da Visão do cliente), nos estados do mockup;
+- Agora: o COS > OS em aberto (11/11/2026, Levi: "Coluna Agora pelo COS"; até ali, o tempo real): a pior OS que o COS
+  tem pendente na usina, na situação do registro da Ronda COS (detectada, em campo, tratativa remota...), com o tipo e
+  há quanto tempo; sem OS pendente, "Sem OS aberta";
 - Atingimento e PR / meta: a meta do mês da Visão (o Gerencial);
 - OS abertas e atrasadas: o bloco Manutenção da Visão (as tarefas das OS do Fracttal no banco);
 - Insights: os do Nexus Insights que não foram concluídos, pelo nome da usina;
@@ -13,18 +15,20 @@ De onde vem cada coluna (a fonte da tela dona; nada se inventa):
   isolantes na última ronda (o EPC, `hseq.epi.luvas`).
 
 O Score de saúde do mockup ficou FORA (Levi, 11/11/2026: "Fora por agora"): o Nexus não tem essa nota e criar uma é regra
-nova. A ordem é o estado de agora (o mais grave primeiro) e, dentro dele, o atingimento (o pior primeiro).
+nova. A ordem é o estado de agora (o mais grave primeiro), dentro dele a OS do COS mais antiga e depois o atingimento (o
+pior primeiro).
 """
 import unicodedata
 
-# os estados do mockup: (rótulo, tom, ordem). "Sem leitura" é a usina que o tempo real não trouxe; "Sem sol", a que
-# está ok mas sem irradiância (fora do horário): nenhum dos dois é um problema da usina
-ESTADOS = {"sem_producao": ("Sem produção", "critico", 0), "critico": ("Crítico", "critico", 1),
-           "sem_comm": ("Sem comunicação", "neutro", 2), "atencao": ("Atenção", "alerta", 3),
-           "sem_leitura": ("Sem leitura", "neutro", 4), "sem_sol": ("Sem sol", "neutro", 5), "ok": ("Normal", "ok", 6)}
-# a legenda da faixa, como no mockup (o crítico e o sem produção juntos)
-LEGENDA = (("ok", "Normal"), ("atencao", "Atenção"), ("critico", "Crítico / sem produção"),
-           ("sem_comm", "Sem comunicação"), ("sem_leitura", "Sem leitura ou sem sol"))
+# os grupos do estado de agora (a faixa, a legenda e o filtro): (rótulo, tom, ordem). O tom de cada OS é o do registro
+# da Ronda COS (`cos.os_abertas.ESTADOS_DO_REGISTRO`: detectada e confirmada críticas; em campo, em execução, bloqueada e
+# sem registro em alerta; tratativa remota em info; normalizada e encerrada ok) e a OS em alerta (o alerta de 1 h da
+# Ronda COS) é crítica. Atenção junta o alerta e o info; Normal é a usina sem OS pendente do COS (ou só com a
+# normalizada, que falta fechar). "Sem leitura": o Andamento não respondeu (nunca "Normal" no escuro)
+ESTADOS = {"critico": ("Crítico", "critico", 0), "atencao": ("Atenção", "alerta", 1),
+           "sem_leitura": ("Sem leitura", "neutro", 2), "normal": ("Normal", "ok", 3)}
+LEGENDA = (("normal", "Normal"), ("atencao", "Atenção"), ("critico", "Crítico"), ("sem_leitura", "Sem leitura do COS"))
+_TOM_ORDEM = {"critico": 0, "alerta": 1, "info": 2, "ok": 3, "neutro": 4}
 
 
 def _norm(s) -> str:
@@ -32,16 +36,51 @@ def _norm(s) -> str:
     return " ".join(t.split())
 
 
-def estado_agora(tr: dict | None) -> str:
-    """A chave do estado pela linha do tempo real (None = o tempo real não trouxe a usina)."""
-    if not tr:
-        return "sem_leitura"
-    st = str(tr.get("status") or "")
-    if st == "ok" and str(tr.get("causa") or "").lower().startswith("sem sol"):
-        return "sem_sol"
-    if st in ("sem_producao", "desligada"):
-        return "sem_producao"
-    return st if st in ESTADOS else "sem_leitura"
+def os_do_cos_por_usina(itens: list[dict] | None, usina_de) -> dict[int, list[dict]] | None:
+    """{usina_id: as OS do COS > OS em aberto da usina} (`itens` = `cos.os_abertas._item` de cada OS do Andamento;
+    `usina_de(nome, codigo)` = o usina_id do cadastro). None = o Andamento não respondeu."""
+    if itens is None:
+        return None
+    out: dict[int, list[dict]] = {}
+    for i in itens:
+        uid = usina_de(i.get("usina"), i.get("usina_codigo"))
+        if uid:
+            out.setdefault(uid, []).append(i)
+    return out
+
+
+def _tom_da_os(i: dict) -> str:
+    return "critico" if i.get("em_alerta") else (i.get("registro") or ("", "neutro"))[1]
+
+
+def agora_pelo_cos(os_da_usina: list[dict] | None) -> dict:
+    """O estado de agora da usina pelas OS do COS (`None` = sem leitura do Andamento). A que manda é a pendente de tom
+    mais grave e, no empate, a mais antiga; as feitas que só falta finalizar não mudam o estado (o Panorama as separa:
+    dívida administrativa, não operação parada) e vão no detalhe."""
+    if os_da_usina is None:
+        rot, tom, ordem = ESTADOS["sem_leitura"]
+        return {"estado": "sem_leitura", "estado_rot": rot, "estado_tom": tom, "ordem": ordem, "horas": 0, "os_cos": [],
+                "detalhe": ""}
+    pend = [i for i in os_da_usina if i.get("situacao") == "pendente"]
+    feitas = len(os_da_usina) - len(pend)
+    pend.sort(key=lambda i: (_TOM_ORDEM.get(_tom_da_os(i), 9), -(i.get("horas") or 0)))
+    falta = f"{feitas} {'feita' if feitas == 1 else 'feitas'}, falta finalizar" if feitas else ""
+    if not pend:
+        rot, tom, ordem = ESTADOS["normal"]
+        return {"estado": "normal", "estado_rot": "Sem OS aberta", "estado_tom": tom, "ordem": ordem, "horas": 0,
+                "os_cos": list(os_da_usina), "detalhe": falta}
+    pior = pend[0]
+    tom = _tom_da_os(pior)
+    grupo = "critico" if tom == "critico" else ("normal" if tom == "ok" else "atencao")
+    rot = "Em alerta" if pior.get("em_alerta") else (pior.get("registro") or ("Aberta",))[0]
+    partes = [pior.get("tipo") or "OS", f"OS {pior.get('folio')}", f"há {pior.get('aberta_ha')}"]
+    if len(pend) > 1:
+        partes.append(f"+{len(pend) - 1} {'pendente' if len(pend) == 2 else 'pendentes'}")
+    if falta:
+        partes.append(falta)
+    return {"estado": grupo, "estado_rot": rot, "estado_tom": tom if tom != "neutro" else ESTADOS[grupo][1],
+            "ordem": ESTADOS[grupo][2], "horas": pior.get("horas") or 0,
+            "os_cos": pend + [i for i in os_da_usina if i not in pend], "detalhe": " · ".join(partes)}
 
 
 def tipologia(v) -> str:
@@ -74,10 +113,10 @@ def insights_por_usina(insights: list[dict] | None, est: dict, nome_para_uid: di
     return out
 
 
-def montar(linhas_visao: list[dict], cadastro: dict, tempo_real: dict | None, insights: dict | None,
+def montar(linhas_visao: list[dict], cadastro: dict, cos: dict | None, insights: dict | None,
            sem_luvas: set | None, com_os: bool = True) -> list[dict]:
-    """Uma linha por usina da Visão do responsável. `cadastro`: {usina_id: a ficha}; `tempo_real`: {usina_id: a linha}
-    (None = a ponte não respondeu: todas "Sem leitura"); `insights`: {usina_id: n} (None = o motor ainda calcula);
+    """Uma linha por usina da Visão do responsável. `cadastro`: {usina_id: a ficha}; `cos`: {usina_id: as OS do COS > OS
+    em aberto} (`os_do_cos_por_usina`; None = o Andamento não respondeu: todas "Sem leitura"); `insights`: {usina_id: n} (None = o motor ainda calcula);
     `sem_luvas`: os usina_id sem luvas na última ronda (None = a leitura das rondas falhou); `com_os`: as OS do Fracttal
     chegaram ao banco (sem elas, a coluna diz "sem leitura", nunca 0)."""
     out = []
@@ -87,8 +126,7 @@ def montar(linhas_visao: list[dict], cadastro: dict, tempo_real: dict | None, in
         meta = u.get("meta") or {}
         man = u.get("manutencao") or {}
         ext = u.get("extintores")
-        chave = estado_agora((tempo_real or {}).get(uid))
-        rot, tom, ordem = ESTADOS[chave]
+        ag = agora_pelo_cos(None if cos is None else cos.get(uid, []))
         conf = []
         if ext and ext.get("vencidos"):
             n = ext["vencidos"]
@@ -96,13 +134,11 @@ def montar(linhas_visao: list[dict], cadastro: dict, tempo_real: dict | None, in
         if sem_luvas is not None and uid in sem_luvas:
             conf.append(("sem luvas", "critico"))
         sem_fonte = ext is None and sem_luvas is None
-        tr = (tempo_real or {}).get(uid) or {}
         out.append({
             "usina_id": uid, "usina": u.get("usina") or "", "codigo": str(ficha.get("codigo") or "").strip(),
             "cliente": u.get("cliente") or "", "cluster": u.get("cluster") or "",
             "mwp": mwp(ficha.get("potencia_contratual")), "tipologia": tipologia(ficha.get("tipologia")),
-            "estado": chave, "estado_rot": rot, "estado_tom": tom, "ordem": ordem,
-            "lido": str(tr.get("ultima_leitura") or "")[11:16],
+            **ag,
             "atingimento": meta.get("atingimento"), "pr": meta.get("pr"), "pr_meta": meta.get("pr_meta"),
             "os_abertas": man.get("os_abertas", 0) if com_os else None,
             "os_atrasadas": man.get("atrasadas_os", 0) if com_os else None,
@@ -111,14 +147,14 @@ def montar(linhas_visao: list[dict], cadastro: dict, tempo_real: dict | None, in
         x = out[-1]
         # o que a busca da página olha (`filtro-local.js` compara sem acento e sem caixa)
         x["busca"] = _norm(" ".join([x["usina"], x["codigo"], x["cliente"], x["cluster"], x["tipologia"]]))
-    out.sort(key=lambda x: (x["ordem"], x["atingimento"] if x["atingimento"] is not None else 1e9, x["usina"]))
+    out.sort(key=lambda x: (x["ordem"], -x["horas"], x["atingimento"] if x["atingimento"] is not None else 1e9,
+                            x["usina"]))
     return out
 
 
 def resumo(linhas: list[dict]) -> dict:
     """As contas da faixa e da legenda: quantas usinas em cada estado da legenda."""
-    grupo = {"sem_producao": "critico", "critico": "critico", "sem_sol": "sem_leitura"}
     n = {k: 0 for k, _ in LEGENDA}
     for x in linhas:
-        n[grupo.get(x["estado"], x["estado"])] += 1
+        n[x["estado"]] += 1
     return {"por_estado": n, "total": len(linhas), "clientes": sorted({x["cliente"] for x in linhas if x["cliente"]})}

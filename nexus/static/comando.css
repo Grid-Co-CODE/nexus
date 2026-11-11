@@ -186,3 +186,5 @@ a.ins-titulo:hover{color:var(--verde-texto)}
 .cmu-tab tbody tr[data-fl-linha]{cursor:pointer}
 .cmu-tab tbody tr[data-fl-linha]:hover td{background:var(--superficie-2)}
 .cmu-tab tbody tr[data-fl-linha]:hover .cmu-usina b{color:var(--verde-texto)}
+/* a coluna Agora pelo COS (11/11/2026): a situação da pior OS e, embaixo, o tipo, a OS e há quanto tempo */
+.cmu-agora small{display:block;max-width:240px;margin-top:4px;font-size:11.5px;line-height:1.4;color:var(--tinta-2)}

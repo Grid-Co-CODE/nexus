@@ -169,8 +169,9 @@ def _usinas_montadas() -> dict:
     (`nexus/comando/usinas.py`), o que não leu (`avisos`) e os insights vivos de cada usina."""
     from ...campo import responsaveis as campo_resp
     from ...campo import visao
-    from ...campo import visao_cliente as VC
     from ...comando import usinas as CU
+    from ...cos import andamento as AND
+    from ...cos import os_abertas as OA
     from ...hseq import epi as EPI
     leitura = campo_resp.visao_responsaveis()
     d = leitura.dados or {}
@@ -181,12 +182,22 @@ def _usinas_montadas() -> dict:
     except Exception:            # noqa: BLE001 — sem o cadastro, a tabela segue sem código, MWp e tipologia
         b, cadastro = None, {}
         avisos.append("o cadastro (código, MWp e tipologia)")
-    tempo_real = None
-    tr = VC.ler_tempo_real(current_app.config)
-    if tr["erro"] or b is None:
-        avisos.append("o tempo real (a coluna Agora)")
+    # a coluna Agora pelo COS > OS em aberto (11/11/2026, Levi: "Coluna Agora pelo COS"): o mesmo Panorama da Ronda COS
+    # que a tela do COS lê (cópia de 60 s), cada OS ligada à usina pelo código do Andamento ("THPN-ALT100"), como os
+    # Acionamentos. A leitura velha (o Andamento caiu depois de uma boa) vale, com a hora dela na tela
+    cos, cos_ts = None, ""
+    cfg = current_app.config
+    lei_cos = AND.ler_os_abertas(cfg) if AND.fonte(cfg).ligada else None
+    if lei_cos is None or not lei_cos.dados or b is None:
+        avisos.append("o COS > OS em aberto (a coluna Agora)")
     else:
-        tempo_real = VC.juntar_tempo_real(tr["usinas"], campo_resp.Nomes(b))
+        agora = AND.agora()
+        itens = [OA._item(o, agora) for o in lei_cos.dados.get("os") or []]
+        cos = CU.os_do_cos_por_usina(itens, lambda nome, codigo: b.lig.usina(nome or "", codigo or "")[0])
+        varr = AND.instante(lei_cos.dados.get("varredura_em"))
+        cos_ts = varr.strftime("%H:%M") if varr else ""
+        if lei_cos.erro:
+            avisos.append(f"o COS agora (a coluna Agora é a da leitura das {cos_ts or 'última vez'})")
     lei_ins = MO.sem_esperar()
     insights, vivos = None, {}
     if lei_ins is not None and b is not None:
@@ -207,8 +218,8 @@ def _usinas_montadas() -> dict:
         sem_luvas = {x["usina_id"] for x in (luv.dados or {}).get("usinas") or [] if x.get("situacao") == "sem_luvas"}
     erros = d.get("erros") or {}
     com_os = "manut" not in erros and ((d.get("info") or {}).get("manut") or {}).get("publicado", True) is not False
-    linhas = CU.montar(d.get("usinas") or [], cadastro, tempo_real, insights, sem_luvas, com_os=com_os)
-    return {"linhas": linhas, "avisos": avisos, "erro": leitura.erro, "tr_ts": tr.get("cache_ts") or "",
+    linhas = CU.montar(d.get("usinas") or [], cadastro, cos, insights, sem_luvas, com_os=com_os)
+    return {"linhas": linhas, "avisos": avisos, "erro": leitura.erro, "cos_ts": cos_ts,
             "insights_calculando": insights is None, "vivos": vivos, "visao": d}
 
 
@@ -223,7 +234,7 @@ def usinas():
     m = _usinas_montadas()
     return render_template("comando/usinas.html", torre=TORRE, tela=TORRE.tela("usinas"), linhas=m["linhas"], r=CU.resumo(m["linhas"]), legenda=CU.LEGENDA,
                            estados=CU.ESTADOS, erro=m["erro"], avisos=m["avisos"],
-                           insights_calculando=m["insights_calculando"], tr_ts=m["tr_ts"],
+                           insights_calculando=m["insights_calculando"], cos_ts=m["cos_ts"],
                            cliente=request.args.get("cliente", ""), estado=request.args.get("estado", ""),
                            q=request.args.get("q", ""))
 

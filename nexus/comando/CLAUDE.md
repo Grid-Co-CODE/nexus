@@ -148,11 +148,13 @@ Levi: "Em comando quero a mesma visão de Início > Usinas do mockup" (o R18). A
 com uma barra por usina na cor do estado de agora, a legenda, os filtros na própria página (`filtro-local.js`: cliente,
 estado e a busca) e a tabela das 138 mobilizadas, que ordena pelo cabeçalho. Cada coluna vem da tela dona, nada se
 inventa: usina, cliente e cluster da Visão do responsável; código, MWp (`potencia_contratual`, a única preenchida nas
-138) e tipologia ("SOLO TRACKER" = Tracker) do cadastro; Agora do tempo real (a ponte da Visão do cliente); Atingimento
+138) e tipologia ("SOLO TRACKER" = Tracker) do cadastro; Agora do COS > OS em aberto (ver abaixo); Atingimento
 e PR / meta da meta do mês da Visão; OS abertas e atrasadas do bloco Manutenção dela; Insights = os do motor que não
 foram concluídos, ligados pelo nome da usina; Conformidade = extintores vencidos (o PPCI) e sem luvas na última ronda (o
 EPC). A fonte que não lê vira "sem leitura" na coluna dela, nunca 0. A ordem: o estado mais grave agora e, dentro dele,
 o pior atingimento.
+
+**A coluna Agora pelo COS (11/11/2026, Levi: "Coluna Agora pelo COS"; até ali era o tempo real):** o Panorama da Ronda COS que a tela COS > OS em aberto lê (`cos.andamento.ler_os_abertas`, cópia de 60 s), cada OS ligada à usina pelo código do Andamento (`b.lig.usina(nome, codigo)`, como os Acionamentos). Manda a pendente de tom mais grave (o do registro da Ronda COS: detectada e confirmada críticas; em campo, em execução, bloqueada e sem registro em alerta; tratativa remota em info; normalizada ok; a OS em alerta de 1 h, crítica) e, no empate, a mais antiga; a célula diz o tipo, a OS, há quanto tempo e quantas mais. A feita que só falta finalizar não muda o estado (dívida administrativa, como o Panorama separa) e vai no detalhe. Sem OS pendente: "Sem OS aberta" (Normal); sem o Andamento: "Sem leitura", nunca Normal no escuro. O prontuário ganhou o quadro "No COS agora".
 
 **Fora, por decisão do Levi (11/11/2026):** o Score de saúde do mockup ("Fora por agora": o Nexus não tem essa nota, e
 criar uma é regra nova). **O clique na usina** abre o prontuário no próprio Comando ("No próprio Comando"),

@@ -65,6 +65,17 @@
       {% if cu.graf_ger %}{{ geracao(cu.graf_ger) }}{% endif %}
     </section>
   </div><div class="cu-col">
+    <section class="cu-q" aria-labelledby="cmu-cos">
+      <header class="pn-cab"><h2 id="cmu-cos"><i class="ph ph-broadcast" aria-hidden="true"></i>No COS agora</h2><a class="pn-ver" href="{{ raiz }}/t/cos/os-abertas?situacao=todas&amp;q={{ x.codigo|urlencode }}">abrir as OS em aberto</a></header>
+      {% if x.estado == 'sem_leitura' %}<p class="mudo">O COS > OS em aberto não respondeu agora.</p>
+      {% elif x.os_cos %}
+      <ul class="cmu-ins">
+        {% for o in x.os_cos %}
+        <li><span class="cn-pill cn-{{ 'critico' if o.em_alerta else o.registro[1] }}">{{ 'Em alerta' if o.em_alerta else o.registro[0] }}</span><div><b>OS {{ o.folio }} · {{ o.tipo or 'OS' }}</b><small>{% if o.situacao == 'concluida' %}feita, falta finalizar{% else %}pendente{% endif %} · aberta há {{ o.aberta_ha }}{% if o.ativo %} · {{ o.ativo }}{% endif %}</small></div></li>
+        {% endfor %}
+      </ul>
+      {% else %}<p class="cn-t-ok">Nenhuma OS do COS aberta nesta usina.</p>{% endif %}
+    </section>
     <section class="cu-q" aria-labelledby="cmu-pend">
       <header class="pn-cab"><h2 id="cmu-pend"><i class="ph ph-list-checks" aria-hidden="true"></i>Pendências</h2></header>
       {% if cu.ronda_pendente %}{{ linhas(cu.ronda_pendente) }}{% else %}<dl class="cr-dl"><dt class="cu-dt cu-dt--ok">Ronda</dt><dd class="cn-t-ok">em dia</dd></dl>{% endif %}

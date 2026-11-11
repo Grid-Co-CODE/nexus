@@ -11,14 +11,14 @@
   <div class="cn-cab">
     <div><p class="gc-eyebrow">{{ torre.nome }}</p><h1 class="cn-titulo">{{ tela.nome }}</h1>
       <p class="cn-pergunta">{{ r.total }} usinas mobilizadas, da mais grave agora para a melhor. Clique na usina para abrir o prontuário dela.</p></div>
-    <div class="cn-frescor">{% if tr_ts %}tempo real das <b>{{ tr_ts[:5] }}</b>{% endif %}</div>
+    <div class="cn-frescor">{% if cos_ts %}COS: varredura das <b>{{ cos_ts }}</b>{% endif %}</div>
   </div>
   {% if erro %}<div class="cn-erro" role="alert"><span>A Visão do responsável não carregou agora ({{ erro }}). Tente de novo em instantes.</span></div>{% endif %}
   {% if avisos %}<div class="cn-erro cn-aviso" role="status"><span>Sem leitura agora: {{ avisos|join(', ') }}. O resto da tabela vale.</span></div>{% endif %}
 
   <section class="cmu-quadro" aria-label="Usinas">
     <div class="cmu-faixa" role="img" aria-label="Uma barra por usina, na cor do estado de agora">
-      {% for x in linhas %}<span class="cmu-seg cmu-seg--{{ x.estado_tom }}" data-cmu-seg="{{ x.usina_id }}" title="{{ x.usina }}: {{ x.estado_rot }}"></span>{% endfor %}
+      {% for x in linhas %}<span class="cmu-seg cmu-seg--{{ estados[x.estado][1] }}" data-cmu-seg="{{ x.usina_id }}" title="{{ x.usina }}: {{ x.estado_rot }}"></span>{% endfor %}
     </div>
     <ul class="cmu-legenda">
       {% for chave, rot in legenda %}<li><i class="cmu-ponto cmu-ponto--{{ estados[chave][1] if chave in estados else 'neutro' }}" aria-hidden="true"></i>{{ rot }} <b class="gc-num">{{ r.por_estado[chave] }}</b></li>{% endfor %}
@@ -63,7 +63,7 @@
           <td class="cmu-esq">{{ x.cluster or '—' }}</td>
           <td class="gc-num">{% if x.mwp is not none %}{{ ('%.1f'|format(x.mwp))|replace('.', ',') }}{% else %}—{% endif %}</td>
           <td>{{ x.tipologia or '—' }}</td>
-          <td class="cmu-esq"><span class="cn-pill cn-{{ x.estado_tom }}">{{ x.estado_rot }}</span></td>
+          <td class="cmu-esq cmu-agora"><span class="cn-pill cn-{{ x.estado_tom }}">{{ x.estado_rot }}</span>{% if x.detalhe %}<small>{{ x.detalhe }}</small>{% endif %}</td>
           <td class="gc-num">{{ pct(x.atingimento) }}</td>
           <td class="gc-num">{% if x.pr is none and x.pr_meta is none %}—{% else %}{{ pct(x.pr) }} / {{ pct(x.pr_meta) }}{% endif %}</td>
           <td class="gc-num">{% if x.os_abertas is none %}<span class="mudo">sem leitura</span>{% else %}{{ x.os_abertas }}{% if x.os_atrasadas %} <span class="cn-pill cn-alerta">{{ x.os_atrasadas }} {{ 'atrasada' if x.os_atrasadas == 1 else 'atrasadas' }}</span>{% endif %}{% endif %}</td>
