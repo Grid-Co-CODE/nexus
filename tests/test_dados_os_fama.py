@@ -657,7 +657,13 @@ def test_o_laco_de_hora_em_hora_roda_a_fama_depois_das_outras_cargas_e_segue(mon
         raise RuntimeError(f"caiu levando {CHAVE_FAMA}")
     monkeypatch.setattr(fama, "gerar_fama", fama_que_cai)
     carga.ligar(_App())
-    carga._LACO["thread"].join(10)
+    try:
+        carga._LACO["thread"].join(10)
+    finally:
+        # se a FAMA nunca for chamada, a thread (com _espera_s = 0) seguiria girando depois que o monkeypatch se desfaz,
+        # já chamando o `rodar` de verdade: parar e esperar sempre (re-revisão de 11/11/2026)
+        carga._LACO["parar"].set()
+        carga._LACO["thread"].join(10)
     assert not carga._LACO["thread"].is_alive()
     assert ordem == ["carga", "geracao", "almoxarifado", "fama"] * 2
     assert carga._LACO["fama"]["erro"].startswith("RuntimeError") and CHAVE_FAMA not in carga._LACO["fama"]["erro"]
