@@ -834,6 +834,19 @@ def test_a_busca_da_barra_entra_no_padrao_do_filtro_suspenso():
     assert 'classList.remove("gc-campo")' in js
 
 
+def test_a_barra_do_mapa_aproveita_a_linha_e_a_hora_da_leitura_vai_ao_explica(cliente, pontos, setor):
+    """Levi, 10/11/2026: "Filtros pode ficar do lado dos botões de técnico e usina, pense que precisamos aproveitar ao
+    máximo o espaço na tela, essa informação de Lida em x horas pode ficar na exclamação do mapa de equipe!". O Técnicos
+    | Usinas, o formulário dos filtros e o resumo ficam numa linha só (`eq-barra`), e o "Lido às" sai do cabeçalho e
+    entra no "!" do título."""
+    _, html = _html(_entrar(cliente, EMAIL[PCM]))
+    barra = html.split('<div class="eq-barra">', 1)[1].split('<div class="eq-corpo', 1)[0]
+    assert barra.index('class="cn-seg eq-ver"') < barra.index("data-fs") < barra.index('class="eq-resumo"')
+    assert "cn-frescor" not in html
+    explica = html.split('class="gc-explica-caixa"', 1)[1].split("</section>", 1)[0]
+    assert "Lido às <b>12:00</b> de Brasília" in explica
+
+
 # ── o piloto ─────────────────────────────────────────────────────────────────────────────────────────────────────────
 def test_o_piloto_so_o_admin_muda(app, cliente, banco, pontos, setor):
     antes = banco.linhas(LIVRO_PILOTO, ABA_PILOTO)

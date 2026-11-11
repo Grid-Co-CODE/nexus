@@ -1860,6 +1860,10 @@ tr.rd-linha--ativa td{background:var(--verde-suave)}
 /* o botão Técnicos | Usinas (08/11/2026) logo abaixo do título; no Usinas, a hora da leitura do Mapa de risco (a pílula do
    clima.css) fica na linha dela, do tamanho do texto, antes do mapa */
 .eq-ver{margin-top:14px}
+/* a barra do Mapa de equipe numa linha só (10/11/2026): o Técnicos | Usinas, os filtros com as etiquetas e o resumo */
+.eq-barra{display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px;margin-top:14px}
+.eq-barra .eq-ver,.eq-barra .cn-filtros,.eq-barra .rd-etiquetas{margin-top:0}
+.eq-barra .eq-resumo{margin:0 0 0 auto}
 .eq-usinas-hora{display:inline-block;margin:14px 0 0}
 .eq-filtros .gc-campo{min-width:220px}
 .eq-resumo{display:flex;flex-wrap:wrap;gap:6px;margin:16px 0 0}

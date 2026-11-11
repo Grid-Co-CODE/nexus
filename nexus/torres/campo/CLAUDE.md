@@ -1626,7 +1626,11 @@ responsável, Aprovação de OS e Ranking de pontos) e o script, posto logo depo
 etiquetas com as `<select>` que já estão no formulário (o rótulo é o da tela; o `onchange` de cada uma sai). O HTML do
 servidor e as regras de cada filtro não mudam, e sem o script a tela segue como era. O padrão de cada lista é a 1ª opção
 (ou `data-padrao`); a lista com `data-fs-fora` fica na barra (o **mês** do Ranking, que é o período da tela); a lista sem
-`name` filtra na própria página e vale na hora (o cliente da Aprovação). **A busca da barra entra no mesmo campo**
+`name` filtra na própria página e vale na hora (o cliente da Aprovação). **No Mapa de equipe a barra é uma linha só** (Levi, 10/11/2026: "Filtros
+pode ficar do lado dos botões de técnico e usina, pense que precisamos aproveitar ao máximo o espaço na tela, essa
+informação de Lida em x horas pode ficar na exclamação do mapa de equipe!"): o Técnicos | Usinas, os filtros (com as
+etiquetas) e o resumo ficam na `eq-barra`, e o "Lido às" saiu do cabeçalho e mora no "!" do título. **A busca da barra
+entra no mesmo campo**
 (Levi, no mesmo dia: "o campo buscar e as cores também tem que estar no mesmo padrão viu!"): o script a põe no
 `rd-campo rd-busca` (a lupa, a mesma borda, o mesmo fundo e a mesma altura do botão Filtros) e ANTES do botão, como no
 Histórico de OS; as cores são as do filtro das Rondas (os tokens do Nexus: o verde no lugar do azul do OS Creator). A Visão do cliente fica de fora (a única lista

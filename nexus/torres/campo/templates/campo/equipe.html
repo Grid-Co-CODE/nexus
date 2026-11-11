@@ -44,16 +44,41 @@
           ponto de outro dia.</p>
           <p><b>O ponto no mapa é aproximado</b>: é o lugar no desenho dos estados, não o endereço. A página não traz a
           coordenada em texto.</p>
-          <p>As horas são as de Brasília.</p>
+          {# a hora da leitura mora aqui desde 10/11/2026 (Levi: "essa informação de Lida em x horas pode ficar na
+             exclamação do mapa de equipe"): o cabeçalho ganha a linha #}
+          <p>{% if agora %}Lido às <b>{{ agora }}</b> de Brasília. {% endif %}As horas são as de Brasília.</p>
         {% endcall %}{% endif %}
       </div>
       <p class="cn-pergunta">{{ tela_risco.pergunta if usinas else tela.pergunta }}</p></div>
-    {% if agora %}<p class="cn-frescor">Lido às <b>{{ agora }}</b> de Brasília</p>{% endif %}
   </div>
   {# Técnicos | Usinas (Levi, 08/11/2026: "Tendo um botão de técnico e usina, quando clica em usinas aparece os alertas das
      UFVs, quando é técnico mostra só essa tela padrão!"); quem não vê o mapa não vê o botão #}
   {% if not recusa %}
-  <nav class="cn-seg eq-ver" aria-label="O que o mapa mostra"><a href="{{ url_for('torre_campo.equipe') }}"{% if not usinas %} aria-current="page"{% endif %}>Técnicos</a><a href="{{ url_for('torre_campo.equipe', ver='usinas') }}"{% if usinas %} aria-current="page"{% endif %}>Usinas</a></nav>
+  {# uma linha só (Levi, 10/11/2026: "Filtros pode ficar do lado dos botões de técnico e usina, pense que precisamos
+     aproveitar ao máximo o espaço na tela"): o Técnicos | Usinas, os filtros (com as etiquetas) e o resumo #}
+  <div class="eq-barra">
+    <nav class="cn-seg eq-ver" aria-label="O que o mapa mostra"><a href="{{ url_for('torre_campo.equipe') }}"{% if not usinas %} aria-current="page"{% endif %}>Técnicos</a><a href="{{ url_for('torre_campo.equipe', ver='usinas') }}"{% if usinas %} aria-current="page"{% endif %}>Usinas</a></nav>
+    {% if not usinas and not erro and filtro is defined %}
+    {# o filtro por supervisor e por equipe (Levi, 08/11/2026): as opções são de quem está no piloto; a troca do select já
+       envia (sem JavaScript, o botão), e o filtro vai junto em todo link de técnico #}
+    <form class="cn-filtros eq-filtros" method="get" action="{{ url_for('torre_campo.equipe') }}" data-fs>
+      <label class="gc-rotulo" for="eq-supervisor">Supervisor</label>
+      <select class="gc-campo" id="eq-supervisor" name="supervisor" onchange="this.form.submit()">
+        <option value="">Todos os supervisores</option>
+        {% for i, nome in filtro.opcoes_supervisor %}<option value="{{ i }}"{% if i == filtro.supervisor %} selected{% endif %}>{{ nome }}</option>{% endfor %}
+      </select>
+      <label class="gc-rotulo" for="eq-equipe">Equipe</label>
+      <select class="gc-campo" id="eq-equipe" name="equipe" onchange="this.form.submit()">
+        <option value="">Todas as equipes</option>
+        {% for i, nome in filtro.opcoes_equipe %}<option value="{{ i }}"{% if i == filtro.equipe %} selected{% endif %}>{{ nome }}</option>{% endfor %}
+      </select>
+      <noscript><button class="gc-btn gc-btn--contorno" type="submit">Filtrar</button></noscript>
+    </form>
+    {# o filtro suspenso (10/11/2026, Levi: "a estrutura de filtros usando como referência os filtros de histórico de OS, um filtro suspenso e simples"): o campo-filtros.js monta o botão Filtros, o painel com o Aplicar e as etiquetas com as listas deste formulário #}
+    <script src="{{ url_for('static', filename='campo-filtros.js') }}"></script>
+    <p class="eq-resumo">{% for n, rot, tom in resumo %}<span class="cn-pill cn-{{ tom }}">{{ n }} {{ rot }}</span>{% else %}<span class="mudo">{{ 'Nenhum técnico do piloto neste filtro.' if filtro.q else 'Nenhum técnico no piloto da coleta agora.' }}</span>{% endfor %}</p>
+    {% endif %}
+  </div>
   {% endif %}
 
   {% if recusa %}
@@ -75,25 +100,6 @@
   {% else %}
   {% if piloto_msg %}<div class="cn-erro eq-msg eq-msg--{{ piloto_msg[0] }}" role="status">{{ piloto_msg[1] }}</div>{% endif %}
   {% for a in avisos %}<div class="cn-erro cn-aviso" role="status">{{ a }}</div>{% endfor %}
-  {# o filtro por supervisor e por equipe (Levi, 08/11/2026): as opções são de quem está no piloto; a troca do select já
-     envia (sem JavaScript, o botão), e o filtro vai junto em todo link de técnico #}
-  <form class="cn-filtros eq-filtros" method="get" action="{{ url_for('torre_campo.equipe') }}" data-fs>
-    <label class="gc-rotulo" for="eq-supervisor">Supervisor</label>
-    <select class="gc-campo" id="eq-supervisor" name="supervisor" onchange="this.form.submit()">
-      <option value="">Todos os supervisores</option>
-      {% for i, nome in filtro.opcoes_supervisor %}<option value="{{ i }}"{% if i == filtro.supervisor %} selected{% endif %}>{{ nome }}</option>{% endfor %}
-    </select>
-    <label class="gc-rotulo" for="eq-equipe">Equipe</label>
-    <select class="gc-campo" id="eq-equipe" name="equipe" onchange="this.form.submit()">
-      <option value="">Todas as equipes</option>
-      {% for i, nome in filtro.opcoes_equipe %}<option value="{{ i }}"{% if i == filtro.equipe %} selected{% endif %}>{{ nome }}</option>{% endfor %}
-    </select>
-    <noscript><button class="gc-btn gc-btn--contorno" type="submit">Filtrar</button></noscript>
-  </form>
-  {# o filtro suspenso (10/11/2026, Levi: "a estrutura de filtros usando como referência os filtros de histórico de OS, um filtro suspenso e simples"): o campo-filtros.js monta o botão Filtros, o painel com o Aplicar e as etiquetas com as listas deste formulário #}
-  <script src="{{ url_for('static', filename='campo-filtros.js') }}"></script>
-  <p class="eq-resumo">{% for n, rot, tom in resumo %}<span class="cn-pill cn-{{ tom }}">{{ n }} {{ rot }}</span>{% else %}<span class="mudo">{{ 'Nenhum técnico do piloto neste filtro.' if filtro.q else 'Nenhum técnico no piloto da coleta agora.' }}</span>{% endfor %}</p>
-
   <div class="eq-corpo{% if painel_ev %} eq-corpo--ev{% endif %}">
     <div class="eq-quadro">
       {% set d = perc.desenho if perc else none %}
