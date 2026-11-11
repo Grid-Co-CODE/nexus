@@ -1868,22 +1868,94 @@ tr.rd-linha--ativa td{background:var(--verde-suave)}
 .eq-filtros .gc-campo{min-width:220px}
 .eq-resumo{display:flex;flex-wrap:wrap;gap:6px;margin:16px 0 0}
 .eq-msg--ok{border-color:var(--ok);background:var(--ok-suave)}
-.eq-corpo{display:grid;grid-template-columns:minmax(0,1fr);gap:14px;align-items:start;margin-top:14px}
-@media (min-width:1180px){.eq-corpo{grid-template-columns:minmax(0,1fr) 360px}
-  .eq-lado{position:sticky;top:16px;max-height:calc(100vh - 32px);overflow:auto}}
-.eq-quadro{min-width:0;background:var(--superficie);border:1px solid var(--linha);border-radius:var(--raio-md);padding:8px}
-.eq-svg{display:block;width:100%;height:auto;max-height:72vh;
+/* o corpo do Mapa de equipe (11/11/2026, Levi: "a barra lateral tem que ser do mesmo tamanho da barra do mapa, pode aumentar
+   a altura do card do mapa"): o cartão do mapa tem a altura da janela (--eq-alt), o painel ao lado e o do clima têm a
+   mesma, e o que não cabe rola dentro deles. Estreito, o mapa vem primeiro e os painéis descem */
+.eq-corpo{--eq-alt:min(64vh,520px);display:grid;grid-template-columns:minmax(0,1fr);gap:14px;align-items:start;margin-top:14px}
+.eq-quadro{order:-1}
+@media (min-width:1180px){
+  .eq-corpo{--eq-alt:clamp(520px,calc(100vh - 256px),1500px);grid-template-columns:minmax(0,1fr) 380px}
+  .eq-corpo--clima{grid-template-columns:290px minmax(0,1fr) 360px}
+  .eq-quadro{order:0}
+  .eq-quadro,.eq-lado,.eq-clima{height:var(--eq-alt)}
+  .eq-lado,.eq-clima{overflow:auto}}
+@media (min-width:1560px){.eq-corpo{grid-template-columns:minmax(0,1fr) 420px}
+  .eq-corpo--clima{grid-template-columns:330px minmax(0,1fr) 420px}}
+/* o cartão do mapa: o verde da Grid no fundo (um clarão de leve no alto), nas divisas, nas usinas e no percurso (Levi,
+   11/11/2026: "deixa ele com mais qualidade, quero mais cores da grid nesse mapa!"). O --eq-verde é o verde das linhas:
+   no tema claro o verde da marca some sobre o cartão cinza, e ele escurece */
+.eq-quadro{position:relative;display:flex;flex-direction:column;min-width:0;padding:8px;border:1px solid var(--linha);
+  border-radius:var(--raio-md);--eq-verde:var(--verde);
+  background:radial-gradient(120% 80% at 50% 0%,var(--verde-suave),transparent 62%),var(--superficie)}
+:root[data-tema="claro"] .eq-quadro{--eq-verde:color-mix(in srgb,var(--verde) 40%,var(--verde-texto))}
+.eq-palco{position:relative;height:var(--eq-alt);min-height:0;overflow:hidden;border-radius:var(--raio-controle)}
+@media (min-width:1180px){.eq-palco{flex:1;height:auto}}
+/* o desenho ocupa o palco inteiro; o campo-percurso.js põe a vista na proporção dele e diz no --eq-un quantas unidades
+   do desenho valem um pixel da tela (Levi, 11/11/2026: "mesmo eu dando um zoom os municípios ficam bem pequenos, tem que
+   ser responsivo!": o desenho é mais alto que largo, o cartão é largo, e os 14 px do texto viravam 7). O texto e os
+   pontos são escritos em pixels da tela: o --eq-fs é o tamanho do texto; sem o script, vale o 1.4 do mapa inteiro */
+.eq-svg{display:block;width:100%;height:100%;--eq-un:1.4;--eq-fs:13px;touch-action:none;cursor:grab;user-select:none;
+  --eq-terra:color-mix(in srgb,var(--eq-verde) 5%,var(--superficie-2));
+  --eq-borda:color-mix(in srgb,var(--eq-verde) 34%,var(--linha-forte));
   /* o anel do técnico escolhido (Levi, 08/11/2026: "o círculo que fica em volta do técnico ser branco, esse verde não
      está dando contraste!"): BRANCO nos dois temas, com um halo escuro fino por fora (o .eq-halo, um círculo atrás do
      ponto: o SVG não faz dois contornos num círculo só), que o deixa visível no claro, onde o branco sobre o cartão
      cinza some. Cor fixa no CSS é proibida (test_tema): o branco é o --papel e o escuro, o --papel-tinta, o par que o
      Nexus mantém igual nos dois temas (a folha de papel é sempre branca, com a tinta escura) */
   --eq-anel:var(--papel);--eq-halo:var(--papel-tinta)}
-.eq-ufs path{fill:none;stroke:var(--linha-forte);stroke-width:1px;stroke-linejoin:round;vector-effect:non-scaling-stroke}
-.eq-siglas text{font:600 13px var(--font-sans);fill:var(--mudo);text-anchor:middle;pointer-events:none}
-.eq-u{fill:var(--mudo);opacity:.6;transform-box:fill-box;transform-origin:center}
+@media (max-width:640px){.eq-svg{--eq-fs:12.5px}}
+@media (min-width:1700px){.eq-svg{--eq-fs:14px}}
+.eq-svg.eq-arrastando{cursor:grabbing}
+.eq-svg text{font-family:var(--font-sans);font-size:calc(var(--eq-fs) * var(--eq-un));pointer-events:none}
+.eq-svg .eq-u,.eq-svg .eq-perc-p,.eq-svg .eq-foco-anel{transform-box:fill-box;transform-origin:center;
+  transform:scale(var(--eq-un))}
+/* a usina é um losango (o quadrado do desenho, de pé): o técnico é o círculo, e a forma os separa quando o clima pinta os
+   dois com as cores do semáforo */
+.eq-svg .eq-u{transform:scale(var(--eq-un)) rotate(45deg)}
+/* a terra e as divisas: a cor vem de variáveis porque o brilho (abaixo) redesenha este mesmo grupo com as dele */
+.eq-ufs path{fill:var(--eq-terra);stroke:var(--eq-borda);stroke-width:var(--eq-borda-l,1px);stroke-linejoin:round;
+  vector-effect:non-scaling-stroke}
+/* as linhas do mapa pulsando de leve em verde Grid (Levi, 11/11/2026: "Talvez a linha dos mapas poderia ficar pulsando
+   levemente em verde grid"): o contorno dos estados redesenhado por cima (um <use> do grupo, que herda as variáveis
+   daqui: sem terra, a divisa verde e mais grossa), numa camada própria em que só a opacidade anima, sem redesenhar o
+   mapa a cada quadro. O Nexus para toda animação com os efeitos do Windows desligados (nexus.css, o caso do Levi):
+   esta foi pedida por ele, e a regra de baixo a mantém (o mesmo trato do cartão parado da Engenharia) */
+.eq-brilho{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;will-change:opacity;opacity:.5;
+  --eq-terra:none;--eq-borda:var(--eq-verde);--eq-borda-l:1.6px;animation:eq-pulso 2.6s ease-in-out infinite alternate}
+@keyframes eq-pulso{from{opacity:.1}to{opacity:.85}}
+@media (prefers-reduced-motion:reduce){.eq-brilho{animation:eq-pulso 2.6s ease-in-out infinite alternate!important}}
+.eq-siglas text{font-weight:700;letter-spacing:.04em;fill:color-mix(in srgb,var(--eq-verde) 42%,var(--mudo));
+  text-anchor:middle;dominant-baseline:central;paint-order:stroke;stroke:var(--eq-terra);
+  stroke-width:calc(3px * var(--eq-un));stroke-linejoin:round}
+/* a usina: um losango vazado e discreto no Técnicos e no percurso; cheio no Usinas (ela é o assunto); com o clima, a
+   cor é o nível do alerta dela (o semáforo do Nexus; cinza = sem leitura completa, nunca verde) */
+.eq-u{fill:var(--superficie);stroke:var(--eq-verde);stroke-width:1.6px;vector-effect:non-scaling-stroke}
+.eq-u--dest{fill:var(--eq-verde);stroke:var(--superficie);stroke-width:1.5px}
+.eq-u--agir,.eq-u--atencao,.eq-u--regiao,.eq-u--sem,.eq-u--nx{stroke:var(--superficie);stroke-width:1.5px}
+.eq-u--agir{fill:var(--critico)}
+.eq-u--atencao{fill:var(--alerta-cheio)}
+.eq-u--regiao{fill:var(--info-cheio)}
+.eq-u--sem{fill:var(--ok-cheio)}
+.eq-u--nx{fill:var(--mudo)}
+/* o clima no desenho (11/11/2026, o Incluir clima): a área de cada aviso do INMET, com a transparência no GRUPO do
+   nível (os polígonos do mesmo nível não se somam onde se cruzam; o trato do Mapa de risco), o que ainda vai começar só
+   no contorno; os focos da última hora, e o anel no foco a até 5 km de uma usina */
+.eq-av{opacity:.24}
+.eq-av path{fill:currentColor}
+.eq-av-1{color:var(--alerta-cheio)}
+.eq-av-2{color:var(--severo)}
+.eq-av-3{color:var(--critico)}
+.eq-av--futuro{opacity:1}
+.eq-av--futuro path{fill:none;stroke:currentColor;stroke-opacity:.85;stroke-width:1.5px;stroke-dasharray:6 4;
+  vector-effect:non-scaling-stroke}
+.eq-focos{fill:none;stroke:var(--severo);stroke-opacity:.75;stroke-width:3px;stroke-linecap:round;
+  vector-effect:non-scaling-stroke}
+.eq-foco-anel{fill:var(--critico-a12);stroke:var(--critico);stroke-width:2px;vector-effect:non-scaling-stroke;
+  pointer-events:none}
+/* o ponto do técnico tem r=11 no desenho: uns 8 px na tela, em qualquer zoom (a escala da tela, o --eq-un); o halo do
+   escolhido tem a mesma escala, senão ficaria dentro do ponto */
 .eq-p{stroke:var(--superficie);stroke-width:2px;vector-effect:non-scaling-stroke;cursor:pointer;
-  transform-box:fill-box;transform-origin:center}
+  transform-box:fill-box;transform-origin:center;transform:scale(calc(var(--eq-un) * .75))}
 .eq-p--info{fill:var(--info-cheio)}
 .eq-p--ok{fill:var(--ok-cheio)}
 .eq-p--alerta{fill:var(--alerta-cheio)}
@@ -1894,32 +1966,42 @@ tr.rd-linha--ativa td{background:var(--verde-suave)}
 .eq-p--sel{stroke:var(--eq-anel);stroke-width:4px}
 /* 8 px atrás dos 4 px do anel: sobram 2 px de escuro por fora; não pega o clique (o ponto é o link) */
 .eq-halo{fill:none;stroke:var(--eq-halo);stroke-width:8px;vector-effect:non-scaling-stroke;pointer-events:none;
-  transform-box:fill-box;transform-origin:center}
+  transform-box:fill-box;transform-origin:center;transform:scale(calc(var(--eq-un) * .75))}
 .eq-pontos a:focus-visible .eq-p{stroke:var(--foco);stroke-width:3.5px}
 .eq-leg{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;margin:8px 4px 2px;font-size:12px}
-/* o Ver percurso (10/11/2026): o mapa inteiro com zoom (campo-percurso.js troca o viewBox e põe o --eq-zt = 1 / zoom, que
-   segura o texto e os pontos do tamanho de sempre na tela, como o --mp-zt do Mapa de risco). O que tem data-n aparece no
-   nível de zoom dele: sem o script, só o nível 0 (o início e o fim) */
-.eq-quadro{position:relative}
-.eq-svg--perc{--eq-zt:1;--eq-k:1;touch-action:none;cursor:grab;user-select:none}
-.eq-svg--perc.eq-arrastando{cursor:grabbing}
+.eq-leg--clima{margin-top:4px}
+.eq-leg-item{display:inline-flex;align-items:center;gap:6px;color:var(--tinta-2)}
+.eq-leg-item .eq-leg-usina{margin:0 2px}
+.eq-leg-aviso{width:14px;height:10px;border-radius:2px;background:var(--alerta-cheio);opacity:.5}
+.eq-leg-foco{width:6px;height:6px;border-radius:50%;background:var(--severo)}
+.eq-leg-usina{display:inline-block;width:9px;height:9px;margin:0 7px 0 3px;border-radius:2px;background:var(--eq-verde);
+  transform:rotate(45deg)}
+.eq-leg-usina--anel{background:var(--superficie);border:1.5px solid var(--eq-verde)}
+.eq-leg-nivel{display:inline-flex;align-items:center;gap:5px;color:var(--tinta-2)}
+.eq-leg-nivel::before{content:"";width:10px;height:10px;border-radius:50%;background:var(--mudo)}
+.eq-leg-nivel--agir::before{background:var(--critico)}
+.eq-leg-nivel--atencao::before{background:var(--alerta-cheio)}
+.eq-leg-nivel--regiao::before{background:var(--info-cheio)}
+.eq-leg-nivel--sem::before{background:var(--ok-cheio)}
+/* o Ver percurso (10/11/2026): o mapa inteiro com zoom. O que tem data-n aparece no nível de zoom dele: sem o script, só
+   o nível 0 (o início e o fim) */
 .eq-svg--perc [data-n]:not([data-n="0"]){display:none}
-/* o --eq-k (do script) cresce o texto e os pontos quando o mapa é estreito na tela (o desenho tem 1000 unidades de largura) */
-.eq-svg--perc text{font-size:calc(14px * var(--eq-zt) * var(--eq-k))}
-.eq-svg--perc .eq-u,.eq-svg--perc .eq-perc-p{transform-box:fill-box;transform-origin:center;
-  transform:scale(calc(var(--eq-zt) * var(--eq-k)))}
-.eq-mun path{fill:none;stroke:var(--linha);stroke-width:1px;stroke-linejoin:round;vector-effect:non-scaling-stroke}
-.eq-mun-nomes text{font-weight:500;font-family:var(--font-sans);fill:var(--mudo);pointer-events:none;
-  paint-order:stroke;stroke:var(--superficie);stroke-width:calc(3px * var(--eq-zt));stroke-linejoin:round}
-.eq-mun-nomes .eq-mun-rota{fill:var(--tinta-2);font-weight:600}
-.eq-perc-linha{fill:none;stroke:var(--info-cheio);stroke-width:3px;stroke-linejoin:round;stroke-linecap:round;
-  vector-effect:non-scaling-stroke;opacity:.85}
+.eq-mun path{fill:none;stroke:color-mix(in srgb,var(--eq-verde) 14%,var(--linha));stroke-width:1px;stroke-linejoin:round;
+  vector-effect:non-scaling-stroke}
+.eq-mun-nomes text{font-weight:500;fill:var(--tinta-2);paint-order:stroke;stroke:var(--superficie);
+  stroke-width:calc(3.5px * var(--eq-un));stroke-linejoin:round}
+.eq-mun-nomes .eq-mun-rota{fill:var(--tinta);font-weight:700;font-size:calc((var(--eq-fs) + 1px) * var(--eq-un))}
+/* a linha do percurso em verde Grid, com um halo largo e claro por baixo (as larguras são em pixels da tela) */
+.eq-perc-halo{fill:none;stroke:var(--eq-verde);stroke-opacity:.2;stroke-width:10px;stroke-linejoin:round;
+  stroke-linecap:round;vector-effect:non-scaling-stroke}
+.eq-perc-linha{fill:none;stroke:var(--eq-verde);stroke-width:3px;stroke-linejoin:round;stroke-linecap:round;
+  vector-effect:non-scaling-stroke}
 .eq-perc-p{stroke:var(--superficie);stroke-width:1.5px;vector-effect:non-scaling-stroke}
 .eq-perc-p--mov{fill:var(--info-cheio)}
 .eq-perc-p--parado{fill:var(--mudo)}
 .eq-perc-p--ini,.eq-perc-p--fim{stroke:var(--tinta);stroke-width:2.5px}
-.eq-perc-horas text{font-weight:600;font-family:var(--font-sans);fill:var(--tinta);paint-order:stroke;
-  stroke:var(--superficie);stroke-width:calc(3px * var(--eq-zt));stroke-linejoin:round;pointer-events:none}
+.eq-perc-horas text{font-weight:600;fill:var(--tinta);paint-order:stroke;stroke:var(--superficie);
+  stroke-width:calc(3.5px * var(--eq-un));stroke-linejoin:round}
 /* os botões do zoom, no canto do mapa */
 .eq-zoom{position:absolute;z-index:2;top:14px;left:14px;display:flex;flex-wrap:wrap;gap:6px}
 .eq-zoom-bt{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-width:34px;height:34px;padding:0 9px;
@@ -1929,7 +2011,29 @@ tr.rd-linha--ativa td{background:var(--verde-suave)}
 .eq-zoom-bt:focus-visible{outline:2px solid var(--foco);outline-offset:2px}
 .eq-zoom-bt:disabled{opacity:.45;cursor:default}
 .eq-zoom-bt--txt{padding:0 11px}
-.eq-leg-linha{display:inline-block;width:22px;height:0;border-top:3px solid var(--info-cheio);border-radius:2px}
+.eq-leg-linha{display:inline-block;width:22px;height:0;border-top:3px solid var(--eq-verde);border-radius:2px}
+/* o botão Incluir clima (11/11/2026), na barra: ligado, fica cheio no verde */
+.eq-clima-bt--on{background:var(--verde);border-color:var(--verde);color:var(--sobre-verde)}
+/* o painel do clima, à esquerda do mapa: os alertas por usina; uma superfície só, as linhas separadas por um fio e a
+   cor do nível na borda */
+.eq-clima{display:grid;align-content:start;gap:12px;min-width:0;padding:14px 16px 16px;background:var(--superficie);
+  border:1px solid var(--linha);border-radius:var(--raio-md);font-size:13px;max-height:72vh;overflow:auto}
+@media (min-width:1180px){.eq-clima{max-height:none}}
+.eq-clima-cab .gc-eyebrow{margin:0}
+.eq-clima-conta{display:flex;flex-wrap:wrap;gap:6px;margin:0}
+.eq-clima-falta{padding:8px 10px;border:1px solid var(--alerta);border-radius:var(--raio-controle);color:var(--tinta)}
+.eq-clima-lista{list-style:none;margin:0;padding:0;display:grid}
+.eq-clima-item{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;padding:9px 0 9px 10px;
+  border-left:3px solid var(--mudo);border-bottom:1px solid var(--linha)}
+.eq-clima-item--agir{border-left-color:var(--critico)}
+.eq-clima-item--atencao{border-left-color:var(--alerta-cheio)}
+.eq-clima-item--regiao{border-left-color:var(--info-cheio)}
+.eq-clima-item .cn-pill{flex:none}
+.eq-clima-motivo{color:var(--tinta-2);line-height:1.4;overflow-wrap:anywhere}
+.eq-clima-mais summary{cursor:pointer;font-weight:600;color:var(--tinta-2);padding:2px 0 6px}
+.eq-clima-fontes summary{cursor:pointer;font-size:12px;color:var(--mudo)}
+.eq-clima-fontes ul{display:grid;gap:4px;margin:8px 0;padding-left:16px;font-size:12px;color:var(--tinta-2)}
+.eq-clima-fontes li span{color:var(--mudo)}
 .eq-perc{display:grid;gap:8px;padding-top:12px;border-top:1px solid var(--linha)}
 .eq-perc-titulo{margin:0;font:700 11px/16px var(--font-sans);letter-spacing:.06em;text-transform:uppercase;color:var(--mudo)}
 .eq-perc-resumo{margin:0;color:var(--tinta)}
@@ -1952,13 +2056,11 @@ tr.rd-linha--ativa td{background:var(--verde-suave)}
 .eq-ev-cab{display:flex;flex-wrap:wrap;align-items:flex-start;justify-content:space-between;gap:8px 12px}
 .eq-ev-botao{flex:none}
 .eq-lado-cab{display:flex;justify-content:flex-end}
-/* a lista rola: no computador, dentro da altura do mapa (o painel fica por cima da coluna e não a estica); no celular,
-   numa altura própria */
+/* a lista rola: no computador, dentro do painel, que tem a altura do cartão do mapa; no celular, numa altura própria */
 .eq-ev-lista{overflow:auto;max-height:60vh;padding-right:4px}
-@media (min-width:1180px){.eq-corpo--ev{grid-template-columns:minmax(0,1fr) 420px;align-items:stretch}
-  .eq-corpo--ev .eq-lado{position:relative;top:0;max-height:none;overflow:hidden}
-  .eq-corpo--ev .eq-ev{position:absolute;inset:14px 16px 16px;display:flex;flex-direction:column}
-  .eq-corpo--ev .eq-ev-lista{flex:1;min-height:0;max-height:none}}
+@media (min-width:1180px){.eq-lado--ev{display:flex;overflow:hidden}
+  .eq-lado--ev .eq-ev{display:flex;flex-direction:column;flex:1;min-height:0}
+  .eq-lado--ev .eq-ev-lista{flex:1;min-height:0;max-height:none}}
 .eq-ev-cab .gc-eyebrow{margin:0}
 .eq-ev-titulo{margin:2px 0 0;font:700 20px/1.25 var(--font-display);color:var(--tinta)}
 .eq-ev-resumo{margin:6px 0 0;font-size:12.5px;color:var(--mudo)}
@@ -1993,8 +2095,11 @@ tr.rd-linha--ativa td{background:var(--verde-suave)}
 @media (max-width:640px){.eq-ev-item{grid-template-columns:40px 12px minmax(0,1fr);gap:6px}
   .eq-ev-item::before{left:51px}
   .eq-ev-cartao{flex-direction:column;gap:6px}}
-.eq-lado{display:grid;gap:16px;min-width:0;padding:14px 16px 16px;background:var(--superficie);border:1px solid var(--linha);
-  border-radius:var(--raio-md);font-size:13px}
+.eq-lado{display:grid;align-content:start;gap:16px;min-width:0;padding:14px 16px 16px;background:var(--superficie);
+  border:1px solid var(--linha);border-radius:var(--raio-md);font-size:13px}
+.eq-lista-item{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;padding:7px 0;
+  border-bottom:1px solid var(--linha)}
+.eq-lista-item .cn-pill{flex:none}
 .eq-grupo h2{display:flex;align-items:center;gap:8px;margin:0 0 6px;font:700 11px/16px var(--font-sans);
   letter-spacing:.06em;text-transform:uppercase;color:var(--mudo)}
 .eq-grupo h2 span{font-weight:600;letter-spacing:0;color:var(--tinta-2)}
@@ -2044,9 +2149,7 @@ tr.rd-linha--ativa td{background:var(--verde-suave)}
 /* no celular, o nome numa linha e o botão na de baixo em TODAS as linhas (o nome curto e o longo quebravam diferente) */
 @media (max-width:480px){.eq-piloto-lista li{display:grid;justify-content:stretch;gap:6px}
   .eq-filtros .gc-campo{min-width:0;width:100%}}
-/* no celular o SVG tem uns 340 px, não 1000: o ponto do técnico e a marca da usina crescem para dar para ver e tocar */
-@media (max-width:640px){.eq-p,.eq-halo{transform:scale(1.8)}.eq-u{transform:scale(1.5)}
-  .eq-dl{grid-template-columns:minmax(0,1fr);gap:2px}.eq-dl dd{margin-bottom:6px}}
+@media (max-width:640px){.eq-dl{grid-template-columns:minmax(0,1fr);gap:2px}.eq-dl dd{margin-bottom:6px}}
 
 /* a OS só leitura do cliente (08/11/2026) e o número clicável na Visão do cliente */
 .vc-os{color:inherit;text-decoration:underline;text-decoration-color:var(--linha-forte);text-underline-offset:3px}

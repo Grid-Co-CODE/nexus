@@ -48,6 +48,8 @@ NIVEIS_KM = (1200.0, 500.0, 150.0, 40.0, 8.0)
 NIVEL_CIDADES = 2                # o contorno dos municípios e o nome dos do percurso: a vista de até 500 km (na bancada de
                                  # 10/11/2026, com 250 km, o percurso de 261 km enquadrado ainda não mostrava cidade nenhuma)
 NOME_FRACAO = 0.09               # dois nomes de município do percurso ficam a pelo menos 9% da largura da vista
+VISTA_MIN_MAPA_KM = 8.0          # a menor vista do mapa dos técnicos e das usinas (11/11/2026, quando ele ganhou o zoom):
+#                                  sem os municípios no fundo, mais perto que isso só sobra o ponto
 VISTA_MIN_KM = 1.5               # a menor vista (o zoom máximo): um bairro; mais perto, o contorno do IBGE só pixela
 ROTULO_FRACAO = 0.04             # duas horas escritas ficam a pelo menos 4% da largura da vista uma da outra
 PONTO_FRACAO = 0.012             # e dois pontos, a 1,2%
@@ -230,8 +232,12 @@ def url_da_rota(origem: tuple, destino: tuple) -> str:
 
 
 # ── o desenho ────────────────────────────────────────────────────────────────────────────────────────────────────────
-def _vista_do_mapa(usinas: dict, pontos: list):
-    """O recorte do mapa (o dos técnicos e o do percurso): os estados com usina e todo ponto (lat, lon) desenhado."""
+def vista_do_mapa(usinas: dict, pontos: list):
+    """O recorte do mapa (o dos técnicos, o das usinas e o do percurso): os estados com usina e todo ponto (lat, lon)
+    desenhado. É pública desde 11/11/2026: a tela pede o clima (`clima.mapa.montar`) nesta mesma vista, e a mesma
+    entrada dá a mesma vista. Sem usina e sem ponto, ValueError (não há o que enquadrar)."""
+    if not usinas and not pontos:
+        raise ValueError("sem usina e sem ponto: não há o que enquadrar")
     ufs = {c[2] for c in usinas.values() if len(c) > 2 and c[2]}
     caixas = [e.caixa for e in M.estados() if e.sigla in ufs]
     caixas += [(c[1], c[0], c[1], c[0]) for c in usinas.values()]
@@ -252,12 +258,13 @@ def desenho(usinas: dict, pontos: list) -> dict:
     marca discreta e cada técnico como um ponto já projetado. `usinas` = {usina_id: (lat, lon, uf)}; `pontos` =
     [(pessoa_id, lat, lon, tom, velho)] de quem vai ao mapa (`situacao.no_mapa`; `velho` = o ponto é de outro dia). O
     recorte cobre os estados com usina e todo ponto desenhado. Devolve {"viewbox", "ufs": [{"d", "sigla", "x", "y"}],
-    "usinas": [{"usina_id", "x", "y"}], "pontos": [{"pessoa_id", "x", "y", "tom", "velho"}]}, só com o x/y do SVG; sem
-    nada a desenhar, `viewbox` None. O ponto de outro dia vai embaixo, e o que pede ação por cima."""
-    vazio = {"viewbox": None, "ufs": [], "usinas": [], "pontos": []}
+    "usinas": [{"usina_id", "x", "y"}], "pontos": [{"pessoa_id", "x", "y", "tom", "velho"}], "km", "min"}, só com o
+    x/y do SVG; sem nada a desenhar, `viewbox` None. O ponto de outro dia vai embaixo, e o que pede ação por cima. `km`
+    (km por unidade do desenho) e `min` (a menor largura da vista) são do zoom do navegador (11/11/2026)."""
+    vazio = {"viewbox": None, "ufs": [], "usinas": [], "pontos": [], "km": 0.0, "min": 0.0}
     if not usinas and not pontos:
         return vazio
-    v = _vista_do_mapa(usinas, [(p[1], p[2]) for p in pontos])
+    v = vista_do_mapa(usinas, [(p[1], p[2]) for p in pontos])
 
     def xy(lat, lon):
         x, y = v.ponto(lat, lon)
@@ -271,7 +278,9 @@ def desenho(usinas: dict, pontos: list) -> dict:
     for pid, lat, lon, tom, velho in sorted(pontos, key=lambda p: (not p[4], ORDEM_TOM.get(p[3], 0))):
         x, y = xy(lat, lon)
         tecnicos.append({"pessoa_id": pid, "x": x, "y": y, "tom": tom, "velho": bool(velho)})
-    return {"viewbox": v.viewbox, "usinas": marcas, "pontos": tecnicos,
+    km_un = KM_POR_GRAU / v.escala
+    return {"viewbox": v.viewbox, "usinas": marcas, "pontos": tecnicos, "km": round(km_un, 6),
+            "min": VISTA_MIN_MAPA_KM / km_un,
             "ufs": [{"d": f.d, "sigla": f.sigla, "x": f.x, "y": f.y} for f in M.ufs_da_vista(v)]}
 
 
@@ -350,7 +359,7 @@ def desenho_percurso(usinas: dict, trilha: list, municipios=()) -> dict:
              "foco": "", "km": 0.0, "min": 0.0, "niveis": ""}
     if not trilha:
         return vazio
-    v = _vista_do_mapa(usinas, [(p["lat"], p["lon"]) for p in trilha])
+    v = vista_do_mapa(usinas, [(p["lat"], p["lon"]) for p in trilha])
     km_un = KM_POR_GRAU / v.escala
     pts = [v.ponto(p["lat"], p["lon"]) for p in trilha]
     pts = [(round(x, 3), round(y, 3)) for x, y in pts]

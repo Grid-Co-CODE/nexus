@@ -382,9 +382,9 @@ def test_o_anel_do_escolhido_e_branco_com_halo_escuro_e_se_ve_nos_dois_temas():
         assert _razao(branco, escuro) >= 3, tema
         assert max(_razao(branco, cartao), _razao(escuro, cartao)) >= 3, tema
     assert _razao(_rgba(_tokens(SELETOR_CLARO)[halo_tok]), _rgba(_tokens(SELETOR_CLARO)["--superficie"])) >= 3
-    # no celular o ponto cresce 1,8 vez: o halo cresce junto, senão ficaria dentro do ponto. A largura é a do padrão
-    # (DESIGN.md, seção 4; `test_larguras_de_quebra`): era 700 px e virou 640 px no rebase de 08/11/2026
-    assert re.search(r"@media \(max-width:640px\)\{[^}]*\.eq-halo[^}]*transform:scale\(1\.8\)", css)
+    # o ponto e o halo têm a MESMA escala, a da tela (11/11/2026: o --eq-un do campo-percurso.js no lugar do 1,8 vez do
+    # celular): o halo cresce junto com o ponto em qualquer tela e em qualquer zoom, senão ficaria dentro dele
+    assert all("transform:scale(calc(var(--eq-un) * .75))" in regra(r) for r in (".eq-p", ".eq-halo"))
 
 
 def test_o_escolhido_tem_o_halo_e_vai_por_cima_dos_outros(cliente, pontos, setor):
@@ -749,12 +749,49 @@ def test_o_painel_ao_lado_do_mapa_abre_nos_eventos_e_o_botao_leva_a_tecnico_e_ro
     assert _q(ver) == {"painel": ["tecnicos"]}
 
 
-def test_os_eventos_rolam_dentro_da_altura_do_mapa():
-    """O painel dos eventos não passa da altura do mapa: ele fica por cima da coluna (não a estica) e a lista rola."""
+def test_o_painel_ao_lado_tem_a_altura_do_cartao_do_mapa():
+    """Levi, 11/11/2026: "a barra lateral tem que ser do mesmo tamanho da barra do mapa, pode aumentar a altura do card
+    do mapa". O cartão do mapa tem uma altura só (`--eq-alt`, a da janela), o painel ao lado e o do clima têm a mesma, e
+    o que não cabe rola dentro deles (os eventos, a lista de técnicos, a gaveta do técnico)."""
     css = (Path(__file__).resolve().parent.parent / "nexus" / "static" / "campo.css").read_text(encoding="utf-8")
-    assert re.search(r"\.eq-corpo--ev\{[^}]*align-items:stretch", css)
-    assert re.search(r"\.eq-corpo--ev \.eq-ev\{[^}]*position:absolute", css)
+    assert re.search(r"\.eq-corpo\{[^}]*--eq-alt:", css)
+    assert re.search(r"\.eq-quadro,\.eq-lado,\.eq-clima\{[^}]*height:var\(--eq-alt\)", css)
+    assert re.search(r"\.eq-lado,\.eq-clima\{[^}]*overflow:auto", css)
     assert re.search(r"\.eq-ev-lista\{[^}]*overflow:auto", css)
+    # o desenho ocupa o palco inteiro: não é mais cortado pela altura dele (era height:auto com max-height:72vh)
+    assert re.search(r"\.eq-svg\{display:block;width:100%;height:100%", css)
+
+
+def test_o_texto_e_os_pontos_do_mapa_seguem_a_tela_e_nao_o_desenho():
+    """Levi, 11/11/2026, com a imagem do percurso: "mesmo eu dando um zoom os municípios ficam bem pequenos, tem que ser
+    responsivo!". O desenho é mais alto que largo e o cartão é largo: a escala de verdade saía da altura, e os 14 px do
+    texto viravam 7 na tela. O script mede a tela (a largura da vista sobre a do elemento) e o CSS escreve o texto e os
+    pontos em pixels dela (`--eq-un` = unidades do desenho por pixel)."""
+    raiz = Path(__file__).resolve().parent.parent / "nexus" / "static"
+    css = (raiz / "campo.css").read_text(encoding="utf-8")
+    js = (raiz / "campo-percurso.js").read_text(encoding="utf-8")
+    assert re.search(r"\.eq-svg text\{[^}]*font-size:calc\(var\(--eq-fs\) \* var\(--eq-un\)\)", css)
+    assert re.search(r"\.eq-svg \.eq-u,[^{]*\{[^}]*transform:scale\(var\(--eq-un\)\)", css)
+    assert '"--eq-un"' in js and "clientWidth" in js and "ResizeObserver" in js
+    assert "--eq-zt" not in css and "--eq-k" not in css and "--eq-zt" not in js
+
+
+def test_as_linhas_do_mapa_pulsam_em_verde_grid(cliente, pontos, setor):
+    """Levi, 11/11/2026: "quero mais cores da grid nesse mapa! Talvez a linha dos mapas poderia ficar pulsando levemente
+    em verde grid". O contorno dos estados é redesenhado numa camada por cima (`eq-brilho`, um <use> do mesmo desenho),
+    em verde, e só a opacidade dela anima. Com os efeitos de animação do Windows desligados (o caso do Levi) o Nexus
+    para toda animação: esta foi pedida, e a regra a mantém."""
+    _, html = _html(_entrar(cliente, EMAIL[PCM]))
+    assert '<g class="eq-ufs" id="eq-ufs">' in _svg(html)
+    brilho = html.split('<svg class="eq-brilho"', 1)[1].split("</svg>", 1)[0]
+    assert '<use href="#eq-ufs"/>' in brilho and 'aria-hidden="true"' in brilho
+    css = (Path(__file__).resolve().parent.parent / "nexus" / "static" / "campo.css").read_text(encoding="utf-8")
+    assert "@keyframes eq-pulso" in css and re.search(r"\.eq-brilho\{[^}]*animation:eq-pulso", css)
+    assert re.search(r"prefers-reduced-motion:reduce\)\{\.eq-brilho\{animation:eq-pulso[^}]*!important", css)
+    # o mapa dos técnicos também aproxima (o mesmo script do percurso), sem o botão do percurso
+    cab = html.split('<svg class="eq-svg', 1)[1].split(">", 1)[0]
+    assert "data-eq-mapa" in cab and "data-min=" in cab and "campo-percurso.js" in html
+    assert all(f'data-eq-zoom="{z}"' in html for z in ("mais", "menos", "inteiro")) and 'data-eq-zoom="percurso"' not in html
 
 
 def test_o_destino_vem_da_programacao_do_dia_da_equipe(app, cliente, banco, pontos, setor, relogio, tmp_path):
@@ -937,11 +974,11 @@ def test_a_leitura_do_piloto_que_cruzou_a_decisao_nao_fica_como_fresca():
     assert copia.valor(1002.0) == frozenset({2}) and len(lidas) == 2       # agora, sim, fresca
 
 
-# ── o botão Técnicos | Usinas: o Mapa de risco dentro do Mapa de equipe (08/11/2026) ─────────────────────────────────
+# ── o botão Técnicos | Usinas e o Incluir clima (08/11/2026; refeito em 11/11/2026) ─────────────────────────────────
 @pytest.fixture
 def risco(monkeypatch):
-    """O Mapa de risco da Performance no mundo inventado dele (`clima_mapa_mundo`): o cadastro das usinas do clima
-    (`usinas.do_app`) e as leituras prontas no lugar das fontes. Nada vai à rede."""
+    """O clima no mundo inventado do Mapa de risco (`clima_mapa_mundo`): o cadastro das usinas do clima
+    (`usinas.do_app`, seis usinas) e as leituras prontas no lugar das fontes. Nada vai à rede."""
     from clima_mapa_mundo import REF as REF_RISCO
     from clima_mapa_mundo import cadastro, instalar_leituras, mundo_completo, mundo_de_usinas
     from nexus.performance.clima import usinas as U
@@ -951,57 +988,180 @@ def risco(monkeypatch):
     mundo_completo(instalar_leituras(monkeypatch))
 
 
-def _hrefs(html, classe):
-    return re.findall(r'<a class="' + re.escape(classe) + r'"[^>]*href="([^"]*)"', html)
+@pytest.fixture
+def clima_das_usinas(monkeypatch):
+    """O clima das duas usinas DESTE arquivo (as de `COORDS`, as que o mapa dos técnicos desenha): um Vendaval em Grande
+    Perigo em cima da Alfa e nada na Bravo. As leituras prontas no lugar das fontes; nada vai à rede."""
+    from clima_mapa_mundo import REF as REF_RISCO
+    from clima_mapa_mundo import aviso, cadastro, dias, instalar_leituras, lei_avisos, lei_risco, tudo_instalado, usina
+    from nexus.performance.clima import usinas as U
+    from nexus.performance.clima import visao as V
+    duas = [usina(str(u), NOME_USINA[u], COORDS[str(u)][:2], uf="GO") for u in (USINA_A, USINA_B)]
+    monkeypatch.setattr(U, "do_app", lambda: cadastro(*duas))
+    monkeypatch.setattr(V, "agora", lambda: REF_RISCO)
+    tudo_instalado(instalar_leituras(monkeypatch), avisos=lei_avisos(aviso(3, "Vendaval", COORDS[str(USINA_A)][:2])),
+                   risco=lei_risco({str(u): dias(0.1, 0.1, 0.1, 0.1) for u in (USINA_A, USINA_B)}))
 
 
-def test_o_botao_usinas_mostra_o_mapa_de_risco_dentro_da_tela_sem_tecnico(cliente, pontos, setor, risco):
-    """Levi, 08/11/2026: "Consegue incluir as informações de performance clima e risco? ... aí vai ser possível ver
-    tempestades e pontos de fogo! Tendo um botão de técnico e usina, quando clica em usinas aparece os alertas das UFVs,
-    quando é técnico mostra só essa tela padrão!". O mesmo SVG e o mesmo modelo da tela da Performance, nesta página
-    (moldura nenhuma), e nada de técnico: nem nome, nem ponto, nem o filtro de supervisor."""
+def _botao_clima(html):
+    """(classes, endereço, o resto dos atributos) do botão Incluir clima."""
+    return re.search(r'<a class="([^"]*eq-clima-bt[^"]*)" href="([^"]*)"([^>]*)>', html).groups()
+
+
+def _painel_do_clima(html):
+    return html.split('<aside class="eq-clima"', 1)[1].split("</aside>", 1)[0]
+
+
+def _conteudo(html):
+    """O que a tela põe dentro do <main> (o topo do base.html tem o recolher do menu pela preferência guardada)."""
+    return html.split("<main", 1)[1].split("</main>", 1)[0]
+
+
+def _seg(html):
+    seg = re.search(r'<nav class="cn-seg eq-ver"[^>]*>(.*?)</nav>', html, flags=re.S).group(1)
+    return re.findall(r'<a href="([^"]*)"( aria-current="page")?>([^<]*)</a>', seg)
+
+
+def test_o_botao_usinas_mostra_so_as_usinas_no_mapa(cliente, pontos, setor, risco, monkeypatch):
+    """Levi, 11/11/2026: "esse botão usinas poderia mostrar só as usinas no mapa". O botão Usinas deixou de trazer a
+    tela do Mapa de risco da Performance (08/11/2026) para dentro desta: é o MESMO mapa do Técnicos, só com as usinas em
+    destaque e a lista delas ao lado. Nada de técnico (nem nome, nem ponto, nem o filtro de supervisor), e sem o clima
+    pedido a página nem vai às fontes do clima."""
+    from nexus.performance.clima import mapa as M
+
+    def proibido(*a, **k):
+        raise AssertionError("o modo Usinas sem o clima foi às fontes do clima")
+    monkeypatch.setattr(M, "montar", proibido)
     _entrar(cliente, EMAIL[PCM])
     r = cliente.get(URL, query_string={"ver": "usinas"})
     html = r.get_data(as_text=True)
     assert r.status_code == 200 and r.headers["Cache-Control"] == "no-store"
-    assert "<iframe" not in html and "data-mapa" in html and 'class="mp-svg' in html
-    assert "Usina Alfa" in html and "Vendaval" in html and "clima-mapa.js" in html and "clima-mapa.css" in html
-    assert not [n for n in NOME.values() if n in html] and "eq-pontos" not in html and 'name="supervisor"' not in html
-    seg = re.search(r'<nav class="cn-seg eq-ver"[^>]*>(.*?)</nav>', html, flags=re.S).group(1)
-    assert re.findall(r'<a href="([^"]*)"( aria-current="page")?>([^<]*)</a>', seg) == [
-        ("/t/campo/equipe", "", "Técnicos"), ("/t/campo/equipe?ver=usinas", ' aria-current="page"', "Usinas")]
+    assert "data-mapa" not in html and "mp-svg" not in html and "clima-mapa.js" not in html and "<iframe" not in html
+    svg = _svg(html)
+    assert svg.count('class="eq-u eq-u--dest"') == 6 and "eq-pontos" not in svg and "tecnico=" not in svg
+    assert 'data-eq-nome="Usina Alfa"' in svg and 'data-eq-equipe="Cliente X · PI"' in svg
+    assert not [n for n in NOME.values() if n in html] and 'name="supervisor"' not in html
+    lado = _lado(html)
+    assert all(f"Usina {n}" in lado for n in ("Alfa", "Beta", "Gama", "Delta", "Epsilon", "Teta"))
+    assert "Cliente X · PI" in lado and "6 usinas" in lado
+    assert '<aside class="eq-clima"' not in html and 'class="eq-avisos"' not in html
+    assert _seg(html) == [("/t/campo/equipe", "", "Técnicos"), ("/t/campo/equipe?ver=usinas", ' aria-current="page"',
+                                                                 "Usinas")]
     # o "Técnicos" é a tela de sempre, com o botão marcado do outro lado; o ver que não é "usinas" também
     for ver in (None, "tecnicos", "lixo"):
         _, html = _html(cliente, query_string={"ver": ver} if ver else None)
-        assert NOME[NA_USINA] in html and "data-mapa" not in html and 'name="supervisor"' in html, ver
+        assert NOME[NA_USINA] in html and "eq-u--dest" not in html and 'name="supervisor"' in html, ver
         assert re.search(r'<a href="/t/campo/equipe" aria-current="page">Técnicos</a>', html), ver
 
 
-def test_os_links_do_mapa_de_risco_voltam_ao_mapa_de_equipe(cliente, banco, setor, risco):
-    """A região, a camada, o "Mostrar", o nível e o cliente levam a /t/campo/equipe?ver=usinas&...: o `ver` daqui é o
-    botão Técnicos | Usinas, e as camadas de cima do mapa (o `ver` da tela da Performance) vão em `camadas`."""
+def test_o_incluir_clima_recolhe_o_menu_e_mostra_os_alertas_por_usina(cliente, pontos, setor, risco, monkeypatch):
+    """Levi, 11/11/2026: 'poderia ter um botão "incluir clima" se apertar vai recolher a barra lateral esquerda e vai
+    mostrar os climas os alertas, tanto por usina ou por técnico, por mais que mostre os técnicos os avisos tem que ser
+    por usina'. O botão liga o `?clima=1`: a página recolhe o menu (só nela, sem gravar a preferência), o mapa ganha a
+    área dos avisos e os focos e pinta cada usina pelo nível, e um painel à esquerda lista os alertas POR USINA. É o
+    modelo do Mapa de risco (`clima.mapa.montar`), pedido na vista deste mapa: regra nenhuma copiada."""
+    from nexus.performance.clima import mapa as M
+    chamadas, montar = [], M.montar
+
+    def espiao(config, **kw):
+        chamadas.append(kw)
+        return montar(config, **kw)
+    monkeypatch.setattr(M, "montar", espiao)
     _entrar(cliente, EMAIL[PCM])
+    # sem o clima: o botão o liga, e nada do clima na página
     _, html = _html(cliente, query_string={"ver": "usinas"})
-    regioes = _hrefs(html, "mp-regiao")
-    assert regioes == ["/t/campo/equipe?ver=usinas"] + [f"/t/campo/equipe?ver=usinas&amp;regiao={r}"
-                                                       for r in ("norte", "nordeste", "centro-oeste", "sudeste", "sul")]
-    estado = re.findall(r'data-acao="estado"[^>]*href="([^"]*)"|href="([^"]*)"[^>]*data-acao="estado"', html)
-    links = [a or b for a, b in estado]
-    assert len(links) > 10 and all(h == "/t/campo/equipe?ver=usinas" or h.startswith("/t/campo/equipe?ver=usinas&amp;")
-                                   for h in links), links
-    assert "/t/performance/clima/mapa" not in html.split("data-mapa", 1)[1]       # o menu, sim; o mapa, nunca
-    focos = re.search(r'id="mp-sobre-focos"[^>]*href="([^"]*)"', html).group(1)
-    assert "camadas=usinas" in focos and "&amp;ver=" not in focos
-    cliente_form = re.search(r'<form class="cl-filtro mp-cliente"[^>]*action="([^"]*)"(.*?)</form>', html, flags=re.S)
-    assert cliente_form.group(1) == "/t/campo/equipe"
-    assert '<input type="hidden" name="ver" value="usinas">' in cliente_form.group(2)
-    # o endereço manda: as camadas pedidas em `camadas` valem, e o `tv` da Performance não liga aqui
-    _, html = _html(cliente, query_string={"ver": "usinas", "camadas": "usinas", "tv": "1", "regiao": "nordeste"})
-    raiz = re.search(r'<div class="cl mp([^"]*)" data-mapa', html).group(1)
-    assert "mp-sem-focos" in raiz and "mp-sem-siglas" in raiz and "mp-sem-usinas" not in raiz
-    corpo = html.split("data-mapa", 1)[1]
-    assert 'class="mp-tv' not in corpo and "tv=1" not in corpo                  # o tema do topo leva o endereço inteiro
-    assert f'href="/t/campo/equipe?ver=usinas&amp;regiao=nordeste&amp;camadas=usinas' in html
+    classes, href, resto = _botao_clima(html)
+    assert _q(href) == {"ver": ["usinas"], "clima": ["1"]} and "aria-current" not in resto
+    assert 'classList.add("menu-recolhido")' not in _conteudo(html) and chamadas == []
+    # com o clima
+    st, html = _html(cliente, query_string={"ver": "usinas", "clima": "1"})
+    assert st == 200
+    (kw,) = chamadas
+    assert kw["vista_propria"] is not None and kw["fundo"] == "avisos" and kw["cadastro"] is not None
+    conteudo = _conteudo(html)
+    # só nesta página: a preferência guardada do menu (o localStorage do base.html) não é tocada
+    assert 'classList.add("menu-recolhido")' in conteudo and "localStorage" not in conteudo
+    classes, href, resto = _botao_clima(html)
+    assert _q(href) == {"ver": ["usinas"]} and 'aria-current="true"' in resto and "eq-clima-bt--on" in classes
+    assert 'class="eq-corpo eq-corpo--clima"' in html
+    svg = _svg(html)
+    assert '<g class="eq-avisos"' in svg and 'class="eq-u eq-u--dest eq-u--agir"' in svg
+    assert 'class="eq-u eq-u--dest eq-u--sem"' in svg
+    clima = _painel_do_clima(html)
+    assert "Agir agora" in clima and "Vendaval" in clima
+    # quem pede ação primeiro; quem não tem alerta não vira linha, só a conta
+    linhas = re.findall(r'<li class="eq-clima-item eq-clima-item--(\w+)">.*?<b>([^<]*)</b>', clima, flags=re.S)
+    assert linhas[0] == ("agir", "Usina Alfa") and all(n != "sem" for n, _ in linhas)
+    assert "Usina Teta" not in "".join(nome for _, nome in linhas) and "Sem alerta" in clima
+    assert not [n for n in NOME.values() if n in html]                     # nada de técnico
+    assert _seg(html) == [("/t/campo/equipe?clima=1", "", "Técnicos"),
+                          ("/t/campo/equipe?ver=usinas&amp;clima=1", ' aria-current="page"', "Usinas")]
+    assert _acessos(pontos) == []                                          # sem dado pessoal, sem linha na trilha
+
+
+def test_o_clima_no_modo_tecnicos_mostra_os_tecnicos_e_os_avisos_por_usina(cliente, pontos, setor, clima_das_usinas):
+    """'tanto por usina ou por técnico, por mais que mostre os técnicos os avisos tem que ser por usina' (Levi,
+    11/11/2026): no Técnicos com o clima, os técnicos seguem no mapa e no painel da direita, e o painel do clima fala
+    das USINAS (nome de técnico nenhum nele). O `clima=1` segue em todo link da tela, e a abertura grava a trilha da
+    LGPD como sempre."""
+    _, html = _html(_entrar(cliente, EMAIL[PCM]), query_string={"clima": "1"})
+    svg = _svg(html)
+    assert all(_no_svg(svg, pid) for pid in (NA_USINA, ANDANDO, SEM_SINAL, FORA))
+    assert '<g class="eq-avisos"' in svg
+    assert svg.count('class="eq-u eq-u--agir"') == 1 and svg.count('class="eq-u eq-u--sem"') == 1
+    clima = _painel_do_clima(html)
+    assert NOME_USINA[USINA_A] in clima and "Agir agora" in clima and "Vendaval" in clima
+    assert not [n for n in NOME.values() if n in clima]
+    assert 'class="eq-corpo eq-corpo--ev eq-corpo--clima"' in html
+    assert 'classList.add("menu-recolhido")' in _conteudo(html)
+    # o clima segue nos links: o ponto do técnico, o botão do painel, o Técnicos | Usinas e o formulário do filtro
+    ponto = re.search(rf'<a href="([^"]*tecnico={ANDANDO}[^"]*)"', svg).group(1)
+    assert _q(ponto)["clima"] == ["1"]
+    (href,) = re.findall(r'eq-ev-botao[^"]*" href="([^"]+)"', _lado(html))
+    assert _q(href) == {"painel": ["tecnicos"], "clima": ["1"]}
+    assert _seg(html) == [("/t/campo/equipe?clima=1", ' aria-current="page"', "Técnicos"),
+                          ("/t/campo/equipe?ver=usinas&amp;clima=1", "", "Usinas")]
+    filtros = re.search(r'<form class="cn-filtros eq-filtros".*?</form>', html, flags=re.S).group(0)
+    assert '<input type="hidden" name="clima" value="1">' in filtros
+    assert "neste filtro" not in html                                      # o clima não é filtro de técnico
+    assert [a["acao"] for a in _acessos(pontos)] == ["abriu_mapa"]
+    # com o percurso aberto, o clima vai no desenho do percurso, e o Fechar o percurso o leva
+    _, html = _html(cliente, query_string={"tecnico": ANDANDO, "de": "2026-11-08T06:00", "ate": "2026-11-08T12:00",
+                                           "clima": "1"})
+    svg = _svg(html)
+    assert 'class="eq-perc-linha"' in svg and '<g class="eq-avisos"' in svg and 'class="eq-u eq-u--agir"' in svg
+    (fechar,) = re.findall(r'href="([^"]+)">Fechar o percurso', html)
+    assert _q(fechar) == {"tecnico": [str(ANDANDO)], "clima": ["1"]}
+    assert not [d for d in DIGITOS if d in html]                           # a coordenada segue fora da página
+
+
+def test_o_clima_sem_leitura_nao_pinta_a_usina_de_verde(cliente, pontos, setor, clima_das_usinas, monkeypatch):
+    """A honestidade do Mapa de risco vale aqui: com uma fonte fora, a usina que ficaria "Sem alerta" fica cinza ("Sem
+    leitura completa") e o painel diz qual fonte falta. Sem dado não se inventa."""
+    from clima_mapa_mundo import instalar_leituras
+    instalar_leituras(monkeypatch)()                                       # os avisos, os focos e o risco fora
+    _, html = _html(_entrar(cliente, EMAIL[PCM]), query_string={"clima": "1"})
+    svg = _svg(html)
+    assert svg.count('class="eq-u eq-u--nx"') == 2 and "eq-u--sem" not in svg and "eq-avisos" not in svg
+    clima = _painel_do_clima(html)
+    assert "O clima não inclui" in clima and "Sem leitura completa" in clima
+
+
+def test_o_clima_sem_o_cadastro_diz_por_que_e_o_mapa_dos_tecnicos_continua(cliente, pontos, setor, clima_das_usinas,
+                                                                          monkeypatch):
+    from nexus.performance.clima import usinas as U
+
+    def sem():
+        raise U.SemCadastro("o cadastro não está nesta máquina")
+    monkeypatch.setattr(U, "do_app", sem)
+    st, html = _html(_entrar(cliente, EMAIL[PCM]), query_string={"clima": "1"})
+    assert st == 200 and all(_no_svg(_svg(html), pid) for pid in (NA_USINA, ANDANDO))
+    assert "Cadastro indisponível: o cadastro não está nesta máquina" in _painel_do_clima(html)
+    assert svg_sem_nivel(_svg(html))
+
+
+def svg_sem_nivel(svg) -> bool:
+    return svg.count('class="eq-u"') == 2 and "eq-u--" not in svg
 
 
 def test_o_modo_usinas_nao_grava_na_trilha_nem_sobe_o_servico_da_equipe(cliente, pontos, setor, risco, monkeypatch):
@@ -1017,21 +1177,6 @@ def test_o_modo_usinas_nao_grava_na_trilha_nem_sobe_o_servico_da_equipe(cliente,
         raise AssertionError("o modo Usinas subiu o serviço das posições")
     monkeypatch.setattr(S, "do_app", sem_servico)
     assert _html(cliente, query_string={"ver": "usinas"})[0] == 200
-
-
-def test_o_modo_usinas_e_o_montar_da_performance_com_o_endereco_daqui(cliente, banco, setor, risco, monkeypatch):
-    from nexus.performance.clima import mapa as M
-    chamadas, montar = [], M.montar
-
-    def espiao(config, **kw):
-        chamadas.append(kw)
-        return montar(config, **kw)
-    monkeypatch.setattr(M, "montar", espiao)
-    _entrar(cliente, EMAIL[PCM])
-    _html(cliente, query_string={"ver": "usinas", "fundo": "densidade"})
-    (kw,) = chamadas
-    assert kw["endereco"].rota == "torre_campo.equipe" and kw["fundo"] == "densidade" and kw["tv"] is False
-    assert kw["cadastro"] is not None and kw["erro_cadastro"] is None
 
 
 def test_quem_nao_ve_o_mapa_de_equipe_nao_ve_as_usinas_dele(app, cliente, banco, setor, risco):

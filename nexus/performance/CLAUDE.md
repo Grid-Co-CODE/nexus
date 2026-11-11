@@ -580,18 +580,17 @@ do JavaScript, no node) e o mundo inventado de `tests/clima_mapa_mundo.py`. O id
 placeholder `/<tela_id>` não casa com barra, e a view própria responde); por isso a vitrine estática exporta
 `t/performance/clima/mapa/index.html`, um nível abaixo, e o teste da vitrine conta `t/**/index.html`.
 
-**O mesmo mapa no Mapa de equipe da Usinas 360° (08/11/2026).** Levi, na bancada do Mapa de equipe: "Consegue incluir as
-informações de performance clima e risco? ... aí vai ser possível ver tempestades e pontos de fogo! Tendo um botão de técnico
-e usina, quando clica em usinas aparece os alertas das UFVs". O botão Usinas de `/t/campo/equipe?ver=usinas` mostra ESTE mapa
-dentro daquela página, sem moldura e sem regra copiada: `mapa_tela.modelo(args, endereco)` (o cadastro, o `estado_da_tela` e o
-`montar`) é o da rota daqui e o de lá, e o corpo da página (a raiz `data-mapa`, o palco, as fontes, o rodapé) saiu do
-`mapa.html` para `_mapa_corpo.html`, que as duas incluem (o cabeçalho de cada uma vai em `cabecalho_do_mapa`). **Para onde os
-links voltam é o `mapa.Endereco`**: a rota do `url_for` (o modelo leva `v.rota`, que os pedaços `_mapa_*.html` usam), os
-parâmetros que vão em todo link (`fixos`) e o nome do parâmetro das camadas de cima (`camadas`). O padrão, `PERFORMANCE`, é esta
-tela como sempre foi (`ver` para as camadas, nada fixo). No Mapa de equipe o `ver` é o botão Técnicos | Usinas (o `?ver=` dos
-botões de vista do Campo), então as camadas vão em `camadas` e todo link leva `ver=usinas` na frente. Fora daqui o modo TV não
-liga (`modelo` zera `tv` e `girar`: o video wall é desta tela). Provas: `tests/test_equipe_tela.py` (o mesmo `montar` com o
-endereço de lá, os links de volta, nenhum técnico, sem moldura) e os testes desta tela, que seguem iguais.
+**O clima no Mapa de equipe da Usinas 360° (08/11/2026; refeito em 11/11/2026).** De 08/11 a 10/11 o botão Usinas de
+`/t/campo/equipe?ver=usinas` trazia ESTA tela inteira para dentro daquela página. Em 11/11/2026 o Levi mudou o pedido ("esse
+botão usinas poderia mostrar só as usinas no mapa" e 'um botão "incluir clima" ... os avisos tem que ser por usina'): lá o
+Usinas mostra só as usinas, e o **Incluir clima** desenha o clima POR USINA no mapa de lá. O que o Mapa de equipe usa daqui é o
+**`mapa.montar(..., vista_propria=<Vista>)`**: o mesmo modelo (as mesmas fontes, o mesmo cache, a mesma regra de nível), com a
+usina, a área do aviso e o foco nas unidades do recorte de quem pede; sem a `vista_propria`, vale a região do endereço, como
+sempre. Ele lê `tabela`, `contagem`, `camada_avisos`, `camada_focos`, `fontes`, `faltando`, `lendo` e `rotulo_sem`: mudou um
+desses, confira `torres/campo/equipe_tela.py` (`_clima`) no mesmo trabalho. O `mapa.Endereco`, o `mapa_tela.modelo(args,
+endereco)` e o `_mapa_corpo.html` (feitos em 08/11 para a tela inteira morar em outra rota) seguem valendo só para esta tela:
+ninguém de fora os usa hoje. Provas: `tests/test_clima_mapa_camadas.py` (o `montar` na vista de quem pede) e
+`tests/test_equipe_tela.py` (o Incluir clima).
 
 **O contorno: fonte e licença.** IBGE, Malhas territoriais, API de malhas v3, divisão por UF, resolução mínima:
 `https://servicodados.ibge.gov.br/api/v3/malhas/paises/BR?formato=application/vnd.geo+json&qualidade=minima&intrarregiao=UF`

@@ -713,11 +713,13 @@ def _fontes_que_pesaram(avisos, foco, dias, ref, sem_leitura_de: str, completa: 
 
 def montar(config, *, cadastro=None, erro_cadastro=None, regiao="", ref=None, sessao=None, fundo=FUNDO_PADRAO, ver=None,
            dia=None, cliente="", ocultar=frozenset(), sem_eventos=frozenset(), tv=False, girar=None,
-           endereco: Endereco = PERFORMANCE) -> dict:
+           endereco: Endereco = PERFORMANCE, vista_propria: Vista | None = None) -> dict:
     """Tudo o que o template do mapa precisa. `cadastro` é o `usinas.Cadastro` (ou None com `erro_cadastro` dizendo por quê); o
     resto é o estado da tela (`estado_da_tela`): a camada de fundo, as de cima, o dia do risco de fogo, o cliente, os níveis e os
     eventos escondidos, e o modo TV com o giro das camadas. O `endereco` (08/11/2026) diz para onde os links voltam: a rota vai
-    em `rota`, e os templates a usam no `url_for` (o Mapa de equipe mostra este mesmo mapa dentro dele).
+    em `rota`, e os templates a usam no `url_for`. A `vista_propria` (11/11/2026) é o recorte de quem pede: o Mapa de equipe
+    da Usinas 360° (o botão Incluir clima) desenha o clima no mapa DELE, e a usina, a área do aviso e o foco saem nas unidades
+    daquele desenho; sem ela, vale a região do endereço.
 
     O mapa lê as MESMAS três fontes da tela principal, pelo mesmo cache (uma visita a uma e outra não vai duas vezes à rede), e
     o nível de cada usina vem da mesma regra (`alertas.nivel_da_usina`). O painel de frescor é o mesmo código da tela principal
@@ -731,7 +733,7 @@ def montar(config, *, cadastro=None, erro_cadastro=None, regiao="", ref=None, se
     """
     ref = ref or V.agora()
     try:
-        v = vista(regiao)
+        v = vista_propria or vista(regiao)
         ufs = ufs_da_vista(v)
         aneis = aneis_do_brasil()
         erro_contorno = ""

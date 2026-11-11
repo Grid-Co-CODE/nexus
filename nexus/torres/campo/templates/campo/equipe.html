@@ -4,13 +4,10 @@
 {% from "_explica.html" import explica %}
 <link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
 {% set usinas = ver == 'usinas' %}
-{% if usinas %}
-{# o botão Usinas (Levi, 08/11/2026): o Mapa de risco da Performance dentro desta página, com o CSS e o JavaScript dele; sem
-   JavaScript, a página se relê sozinha como a da Performance #}
-<link rel="stylesheet" href="{{ url_for('static', filename='clima.css') }}">
-<link rel="stylesheet" href="{{ url_for('static', filename='clima-mapa.css') }}">
-<noscript><meta http-equiv="refresh" content="{{ v.recarrega_em }}"></noscript>
-{% endif %}
+{# o Incluir clima (11/11/2026, Levi: "se apertar vai recolher a barra lateral esquerda e vai mostrar os climas os
+   alertas"): com o clima, a página recolhe o menu do Nexus para o painel do clima caber. Só nesta página: a preferência
+   guardada do menu não muda, e tirar o clima devolve o menu como estava #}
+{% if clima_on and not recusa %}<script>document.documentElement.classList.add("menu-recolhido");</script>{% endif %}
 {# O Mapa de equipe (08/11/2026; nexus/torres/campo/equipe_tela.py, a regra em nexus/campo/equipe/situacao.py). O desenho é o
    da Visão geral (campo/responsaveis.html, o mapa das usinas): o contorno dos estados do IBGE e cada técnico como um ponto,
    com o x/y JÁ projetado no servidor. A latitude e a longitude nunca chegam aqui, nem a do técnico nem a da usina. Desde
@@ -21,7 +18,22 @@
   <div class="cn-cab">
     <div><p class="gc-eyebrow">{{ torre.nome }}</p>
       <div class="gc-titulo-explica"><h1 class="cn-titulo">{{ tela.nome }}</h1>
-        {% if usinas %}{% if not v.erro_cadastro and not v.sem_usinas %}{% with tela = tela_risco %}{% include "performance/_mapa_ajuda.html" %}{% endwith %}{% endif %}{% else %}
+        {% if usinas %}
+        {% call explica('O que este mapa mostra') %}
+          <p><b>Usinas.</b> As usinas em operação com coordenada no cadastro do Nexus, no mesmo mapa do Técnicos e sem
+          técnico nenhum: esta visão não lê a posição de ninguém e não grava nada na trilha de acessos.</p>
+          <p><b>Incluir clima.</b> O botão põe no mapa os alertas de clima POR USINA, pela mesma regra e pelas mesmas
+          fontes do Mapa de risco da Performance (os avisos do INMET, os focos do INPE, o risco de fogo e o fogo das
+          últimas 24 h da NASA): a cor da usina é o nível do alerta, a mancha é a área do aviso e o ponto laranja é o
+          foco. Com uma fonte sem leitura, a usina sem alerta fica cinza, nunca verde. O menu do Nexus recolhe para o
+          painel caber; tirar o clima o devolve.</p>
+          <p><b>O mapa aproxima.</b> Com a roda do mouse, os botões do canto ou dois dedos, e arrastando para andar. No
+          percurso, as cidades e as horas aparecem conforme a vista chega perto. O losango é a usina; o círculo, o
+          técnico.</p>
+          <p><b>O ponto no mapa é aproximado</b>: é o lugar no desenho dos estados, não o endereço. A página não traz a
+          coordenada em texto.</p>
+        {% endcall %}
+        {% else %}
         {% call explica('O que é coletado, quem vê e por quanto tempo') %}
           <p><b>O que é coletado.</b> A posição do celular de cada técnico de campo do piloto, pelo Nexus Field: da
           primeira abertura do app no dia até as 22h na hora do técnico, a cada 2 minutos em deslocamento e mais espaçado parado. Só o técnico
@@ -42,6 +54,14 @@
           <p><b>Abrir rota.</b> O servidor monta o link do Google Maps, do último ponto de hoje do técnico até a usina
           escolhida: a posição sai só nesse clique, para o Google. Não sai de quem está sem permissão no celular nem do
           ponto de outro dia.</p>
+          <p><b>Incluir clima.</b> O botão põe no mapa os alertas de clima POR USINA, pela mesma regra e pelas mesmas
+          fontes do Mapa de risco da Performance (os avisos do INMET, os focos do INPE, o risco de fogo e o fogo das
+          últimas 24 h da NASA): a cor da usina é o nível do alerta, a mancha é a área do aviso e o ponto laranja é o
+          foco. Com uma fonte sem leitura, a usina sem alerta fica cinza, nunca verde. O menu do Nexus recolhe para o
+          painel caber; tirar o clima o devolve.</p>
+          <p><b>O mapa aproxima.</b> Com a roda do mouse, os botões do canto ou dois dedos, e arrastando para andar. No
+          percurso, as cidades e as horas aparecem conforme a vista chega perto. O losango é a usina; o círculo, o
+          técnico.</p>
           <p><b>O ponto no mapa é aproximado</b>: é o lugar no desenho dos estados, não o endereço. A página não traz a
           coordenada em texto.</p>
           {# a hora da leitura mora aqui desde 10/11/2026 (Levi: "essa informação de Lida em x horas pode ficar na
@@ -49,7 +69,7 @@
           <p>{% if agora %}Lido às <b>{{ agora }}</b> de Brasília. {% endif %}As horas são as de Brasília.</p>
         {% endcall %}{% endif %}
       </div>
-      <p class="cn-pergunta">{{ tela_risco.pergunta if usinas else tela.pergunta }}</p></div>
+      <p class="cn-pergunta">{{ 'Onde está cada usina, e qual delas tem alerta de clima agora?' if usinas else tela.pergunta }}</p></div>
   </div>
   {# Técnicos | Usinas (Levi, 08/11/2026: "Tendo um botão de técnico e usina, quando clica em usinas aparece os alertas das
      UFVs, quando é técnico mostra só essa tela padrão!"); quem não vê o mapa não vê o botão #}
@@ -57,7 +77,11 @@
   {# uma linha só (Levi, 10/11/2026: "Filtros pode ficar do lado dos botões de técnico e usina, pense que precisamos
      aproveitar ao máximo o espaço na tela"): o Técnicos | Usinas, os filtros (com as etiquetas) e o resumo #}
   <div class="eq-barra">
-    <nav class="cn-seg eq-ver" aria-label="O que o mapa mostra"><a href="{{ url_for('torre_campo.equipe') }}"{% if not usinas %} aria-current="page"{% endif %}>Técnicos</a><a href="{{ url_for('torre_campo.equipe', ver='usinas') }}"{% if usinas %} aria-current="page"{% endif %}>Usinas</a></nav>
+    <nav class="cn-seg eq-ver" aria-label="O que o mapa mostra"><a href="{{ url_for('torre_campo.equipe', **q_clima) }}"{% if not usinas %} aria-current="page"{% endif %}>Técnicos</a><a href="{{ url_for('torre_campo.equipe', ver='usinas', **q_clima) }}"{% if usinas %} aria-current="page"{% endif %}>Usinas</a></nav>
+    {# o Incluir clima (Levi, 11/11/2026: 'poderia ter um botão "incluir clima" se apertar vai recolher a barra lateral
+       esquerda e vai mostrar os climas os alertas, tanto por usina ou por técnico'): liga e desliga o `?clima=1`, e
+       guarda o que está aberto (o técnico, o percurso, o filtro) #}
+    <a class="gc-btn gc-btn--contorno eq-clima-bt{% if clima_on %} eq-clima-bt--on{% endif %}" href="{{ url_clima }}"{% if clima_on %} aria-current="true" title="Tirar o clima do mapa"{% else %} title="Mostra os alertas de clima por usina e recolhe o menu"{% endif %}><i class="ph ph-{{ 'check-circle' if clima_on else 'cloud-lightning' }}" aria-hidden="true"></i>Incluir clima</a>
     {% if not usinas and not erro and filtro is defined %}
     {# o filtro por supervisor e por equipe (Levi, 08/11/2026): as opções são de quem está no piloto; a troca do select já
        envia (sem JavaScript, o botão), e o filtro vai junto em todo link de técnico #}
@@ -72,11 +96,12 @@
         <option value="">Todas as equipes</option>
         {% for i, nome in filtro.opcoes_equipe %}<option value="{{ i }}"{% if i == filtro.equipe %} selected{% endif %}>{{ nome }}</option>{% endfor %}
       </select>
+      {% if clima_on %}<input type="hidden" name="clima" value="1">{% endif %}
       <noscript><button class="gc-btn gc-btn--contorno" type="submit">Filtrar</button></noscript>
     </form>
     {# o filtro suspenso (10/11/2026, Levi: "a estrutura de filtros usando como referência os filtros de histórico de OS, um filtro suspenso e simples"): o campo-filtros.js monta o botão Filtros, o painel com o Aplicar e as etiquetas com as listas deste formulário #}
     <script src="{{ url_for('static', filename='campo-filtros.js') }}"></script>
-    <p class="eq-resumo">{% for n, rot, tom in resumo %}<span class="cn-pill cn-{{ tom }}">{{ n }} {{ rot }}</span>{% else %}<span class="mudo">{{ 'Nenhum técnico do piloto neste filtro.' if filtro.q else 'Nenhum técnico no piloto da coleta agora.' }}</span>{% endfor %}</p>
+    <p class="eq-resumo">{% for n, rot, tom in resumo %}<span class="cn-pill cn-{{ tom }}">{{ n }} {{ rot }}</span>{% else %}<span class="mudo">{{ 'Nenhum técnico do piloto neste filtro.' if filtro.tem else 'Nenhum técnico no piloto da coleta agora.' }}</span>{% endfor %}</p>
     {% endif %}
   </div>
   {% endif %}
@@ -89,47 +114,103 @@
       <p class="mudo">É a regra do aviso que o técnico lê antes de ligar a coleta. Quem põe a pessoa no setor é o
         administrador, em Base → Acessos → Pessoas e setores.</p></div>
   </section>
-  {% elif usinas %}
-  {# o mesmo corpo da tela da Performance (performance/_mapa_corpo.html), com os links voltando aqui (v.rota); a hora da
-     leitura vai dentro da raiz do mapa, que a releitura troca #}
-  {% set cabecalho_do_mapa %}<p class="cl-atualizada eq-usinas-hora" data-parte="hora">Tela atualizada às {{ v.atualizada }}</p>{% endset %}
-  {% include "performance/_mapa_corpo.html" %}
-  <script src="{{ url_for('static', filename='clima-mapa.js') }}" defer></script>
   {% elif erro %}
   <div class="cn-erro" role="alert"><b>{{ erro }}</b></div>
   {% else %}
   {% if piloto_msg %}<div class="cn-erro eq-msg eq-msg--{{ piloto_msg[0] }}" role="status">{{ piloto_msg[1] }}</div>{% endif %}
   {% for a in avisos %}<div class="cn-erro cn-aviso" role="status">{{ a }}</div>{% endfor %}
-  <div class="eq-corpo{% if painel_ev %} eq-corpo--ev{% endif %}">
+  {% if usinas and erro_usinas %}<div class="cn-erro" role="alert"><b>Cadastro indisponível: {{ erro_usinas }}</b></div>{% endif %}
+  {% set d = perc.desenho if perc else none %}
+  {# a usina no desenho (11/11/2026): um LOSANGO (o técnico é o círculo: com o clima os dois usam as cores do semáforo,
+     e a forma é que os separa). No Usinas ela é o assunto (`eq-u--dest`); com o clima, a cor é o nível do alerta dela. O
+     nome, o cliente e o motivo vão na dica (campo-equipe.js), nunca a coordenada: o x/y é o do desenho #}
+  {% macro usina(u) %}{% set ul = usina_de.get(u.usina_id) if usina_de else none %}{% set c = clima.por_id.get(u.usina_id) if clima else none %}{% set r = 5 if ver == 'usinas' or c else 4 %}<rect class="eq-u{% if ver == 'usinas' %} eq-u--dest{% endif %}{% if c %} eq-u--{{ c.nivel }}{% endif %}" x="{{ '%.3f'|format(u.x|float - r) }}" y="{{ '%.3f'|format(u.y|float - r) }}" width="{{ 2 * r }}" height="{{ 2 * r }}" rx="1.5" data-eq-nome="{{ ul.nome if ul else 'Usina ' ~ u.usina_id }}" data-eq-equipe="{{ c.onde if c and ver != 'usinas' else (ul.onde if ul else 'Usina') }}" data-eq-sit="{% if c %}{{ c.rotulo }}: {{ c.motivo_curto }}{% endif %}"/>{% endmacro %}
+  {# as camadas do clima no desenho, atrás das usinas: a área de cada aviso do INMET (a cor é o nível do aviso; o que
+     ainda vai começar, só o contorno) e os focos da última hora do INPE, com o anel nos que estão a até 5 km de uma
+     usina. Vêm do modelo do Mapa de risco, já nas unidades deste desenho #}
+  {% macro clima_no_mapa() %}{% if clima and clima.avisos %}<g class="eq-avisos">{% for g in clima.avisos.grupos %}<g class="eq-av eq-av-{{ g.nivel }}{% if g.futuro %} eq-av--futuro{% endif %}">{% for a in g.itens if not a.oculto %}<path fill-rule="evenodd" d="{{ a.d }}"><title>{{ a.titulo }}</title></path>{% endfor %}</g>{% endfor %}</g>{% endif %}{% if clima and clima.focos %}{% if clima.focos.d %}<path class="eq-focos" d="{{ clima.focos.d }}"/>{% endif %}<g class="eq-focos-aneis">{% for a in clima.focos.aneis %}<circle class="eq-foco-anel" cx="{{ a.x }}" cy="{{ a.y }}" r="9"/>{% endfor %}</g>{% endif %}{% endmacro %}
+  <div class="eq-corpo{% if painel_ev %} eq-corpo--ev{% endif %}{% if clima %} eq-corpo--clima{% endif %}">
+    {% if clima %}{% set cm = clima.m %}
+    {# o painel do clima (11/11/2026): os alertas POR USINA, de quem pede ação para baixo; quem não tem alerta não vira
+       linha, só a conta. A honestidade é a do Mapa de risco: a fonte fora é dita, e sem leitura não há "sem alerta" #}
+    <aside class="eq-clima" aria-label="Clima e alertas por usina">
+      <div class="eq-clima-cab"><p class="gc-eyebrow">Clima e risco</p><h2 class="eq-ev-titulo">Alertas por usina</h2></div>
+      {% if cm.erro_cadastro %}
+      <p class="cn-erro" role="alert">Cadastro indisponível: {{ cm.erro_cadastro }}</p>
+      {% elif cm.sem_usinas %}
+      <p class="eq-vazio">Nenhuma usina em operação com coordenada no cadastro.</p>
+      {% else %}
+      <p class="eq-clima-conta">{% for nivel, rot, tom, n in clima.contagem %}<span class="cn-pill cn-{{ tom }}">{{ n }} {{ rot }}</span>{% endfor %}</p>
+      {% if cm.faltando %}<p class="eq-nota eq-clima-falta" role="status">O clima não inclui: {{ cm.faltando|join(", ") }}. A fonte está fora agora.</p>{% endif %}
+      {% if cm.lendo %}<p class="eq-nota eq-clima-falta" role="status">Lendo agora: {{ cm.lendo|join(", ") }}. O clima ainda não inclui essa leitura: atualize a página em instantes.</p>{% endif %}
+      {# a fonte lida mas fora do dia (o arquivo de ontem, a leitura parcial): é ela que faz o "nas fontes lidas" #}
+      {% for f in cm.fontes if f.estado != 'ok' and not cm.faltando and not cm.lendo %}<p class="eq-nota eq-clima-falta" role="status">Fonte fora do dia: {{ f.texto }}.</p>{% endfor %}
+      {% if cm.contagem.nx %}<p class="eq-nota">Sem leitura completa: sem leitura de {{ cm.sem_leitura_de }}, não dá para dizer que não há alerta. Essas usinas ficam em cinza no mapa.</p>{% endif %}
+      {% macro linha_do_clima(u) %}<li class="eq-clima-item eq-clima-item--{{ u.nivel }}">
+          <span class="eq-lin"><b>{{ u.nome }}</b><small>{{ u.onde }}</small><span class="eq-clima-motivo">{{ u.motivo_curto }}</span></span>
+          <span class="cn-pill cn-{{ u.tom }}">{{ u.rotulo }}</span></li>{% endmacro %}
+      {% if clima.urgentes %}
+      <ol class="eq-clima-lista">
+        {% for u in clima.urgentes %}{{ linha_do_clima(u) }}
+        {% endfor %}
+      </ol>
+      {% else %}
+      <p class="eq-vazio">Nenhuma usina pede ação agora{{ '' if cm.completa else ' nas fontes lidas' }}.</p>
+      {% endif %}
+      {# o "Acompanhar" (o risco na região, sem nada em cima da usina) costuma ser a maioria: fica recolhido, para não
+         afogar quem pede ação #}
+      {% if clima.acompanhar %}
+      <details class="eq-clima-mais"><summary>{{ clima.acompanhar|length }} para acompanhar</summary>
+        <ol class="eq-clima-lista">
+          {% for u in clima.acompanhar %}{{ linha_do_clima(u) }}
+          {% endfor %}
+        </ol>
+      </details>
+      {% endif %}
+      <details class="eq-clima-fontes"><summary>Fontes e hora de cada leitura</summary>
+        <ul>{% for f in cm.fontes %}<li>{{ f.texto }}{% if f.detalhe %} <span>{{ f.detalhe }}</span>{% endif %}</li>{% endfor %}</ul>
+        <p class="eq-nota">Dados: {{ cm.nomes.inmet }}, {{ cm.nomes.inpe }} (Programa Queimadas) e {{ cm.nomes.nasa_firms }}. A regra de cada nível é a do Mapa de risco da Performance.</p>
+      </details>
+      {% endif %}
+    </aside>
+    {% endif %}
     <div class="eq-quadro">
-      {% set d = perc.desenho if perc else none %}
-      {% if d %}
-      {# o percurso aberto (10/11/2026): o MAPA INTEIRO primeiro, e a pessoa aproxima (Levi: "pode mostrar o mapa inteiro
-         primeiro, e aí a pessoa pode ir dando zoom e mostrando as cidades e municípios de forma leve e fluída"). O zoom é
-         do campo-percurso.js (troca o viewBox, como o Mapa de risco da Performance); cada ponto, hora e município diz no
-         data-n o nível em que aparece (situacao.desenho_percurso). Só x/y: nenhuma coordenada #}
+      {% set dm = d or (mapa if mapa.viewbox else none) %}
+      {% if dm %}
+      {# o zoom (campo-percurso.js) vale no mapa dos técnicos, no das usinas e no percurso (11/11/2026): troca o viewBox,
+         na proporção do cartão, e diz ao CSS quantas unidades do desenho valem um pixel da tela (--eq-un), para o texto
+         e os pontos terem o tamanho certo em qualquer zoom e em qualquer tela #}
       <div class="eq-zoom" role="group" aria-label="Zoom do mapa">
         <button type="button" class="eq-zoom-bt" data-eq-zoom="mais" aria-label="Aproximar" title="Aproximar (+)"><i class="ph ph-plus" aria-hidden="true"></i></button>
         <button type="button" class="eq-zoom-bt" data-eq-zoom="menos" aria-label="Afastar" title="Afastar (-)"><i class="ph ph-minus" aria-hidden="true"></i></button>
-        <button type="button" class="eq-zoom-bt eq-zoom-bt--txt" data-eq-zoom="percurso" title="Aproxima até o percurso inteiro caber na vista"><i class="ph ph-path" aria-hidden="true"></i>Ir ao percurso</button>
+        {% if d %}<button type="button" class="eq-zoom-bt eq-zoom-bt--txt" data-eq-zoom="percurso" title="Aproxima até o percurso inteiro caber na vista"><i class="ph ph-path" aria-hidden="true"></i>Ir ao percurso</button>{% endif %}
         <button type="button" class="eq-zoom-bt eq-zoom-bt--txt" data-eq-zoom="inteiro" title="Volta ao mapa inteiro"><i class="ph ph-arrows-out" aria-hidden="true"></i>Mapa inteiro</button>
       </div>
+      <div class="eq-palco">
+      {% if d %}
+      {# o percurso aberto (10/11/2026): o MAPA INTEIRO primeiro, e a pessoa aproxima (Levi: "pode mostrar o mapa inteiro
+         primeiro, e aí a pessoa pode ir dando zoom e mostrando as cidades e municípios de forma leve e fluída"). Cada
+         ponto, hora e município diz no data-n o nível em que aparece (situacao.desenho_percurso). Só x/y: nenhuma
+         coordenada #}
       <svg class="eq-svg eq-svg--perc" viewBox="{{ d.viewbox }}" role="img" aria-label="O percurso de {{ sel.nome }}" data-eq-perc data-foco="{{ d.foco }}" data-km="{{ d.km }}" data-niveis="{{ d.niveis }}" data-min="{{ '%.4f'|format(d.min) }}">
+        <g class="eq-ufs" id="eq-ufs">{% for f in d.ufs %}<path d="{{ f.d }}"/>{% endfor %}</g>
         <g class="eq-mun">{% for m in d.municipios %}<path d="{{ m.d }}" data-n="{{ m.nb }}"/>{% endfor %}</g>
-        <g class="eq-ufs">{% for f in d.ufs %}<path d="{{ f.d }}"/>{% endfor %}</g>
         <g class="eq-siglas" aria-hidden="true">{% for f in d.ufs if f.x %}<text x="{{ f.x }}" y="{{ f.y }}">{{ f.sigla }}</text>{% endfor %}</g>
         <g class="eq-mun-nomes" aria-hidden="true">{% for m in d.municipios %}<text x="{{ m.x }}" y="{{ m.y }}" dx="{{ m.ox }}em" dy="{{ m.oy }}em" text-anchor="{{ m.ancora }}" data-n="{{ m.n }}"{% if m.rota %} class="eq-mun-rota"{% endif %}>{{ m.nome }}</text>{% endfor %}</g>
-        <g class="eq-usinas">{% for u in d.usinas %}<circle class="eq-u" cx="{{ u.x }}" cy="{{ u.y }}" r="4"><title>{{ nomes_usina.get(u.usina_id) or ('Usina ' ~ u.usina_id) }}</title></circle>{% endfor %}</g>
+        {{ clima_no_mapa() }}
+        <g class="eq-usinas">{% for u in d.usinas %}{{ usina(u) }}{% endfor %}</g>
+        <polyline class="eq-perc-halo" points="{{ d.linha }}"/>
         <polyline class="eq-perc-linha" points="{{ d.linha }}"/>
         <g class="eq-perc-marcas">{% for m in d.marcas %}<circle class="eq-perc-p eq-perc-p--{{ 'mov' if m.mov else 'parado' }}{% if loop.first %} eq-perc-p--ini{% elif loop.last %} eq-perc-p--fim{% endif %}" cx="{{ m.x }}" cy="{{ m.y }}" r="{{ 8 if loop.first or loop.last else 5 }}" data-n="{{ m.np }}"><title>{{ m.hora }} · {{ 'em deslocamento' if m.mov else 'parado' }}</title></circle>{% endfor %}</g>
         <g class="eq-perc-horas" aria-hidden="true">{% for m in d.marcas if m.nr is not none %}<text x="{{ m.x }}" y="{{ m.y }}" dx="{{ m.ox }}em" dy="{{ m.oy }}em" text-anchor="{{ m.ancora }}" data-n="{{ m.nr }}">{{ m.hora }}</text>{% endfor %}</g>
       </svg>
-      <script src="{{ url_for('static', filename='campo-percurso.js') }}"></script>
-      {% elif mapa.viewbox %}
-      <svg class="eq-svg" viewBox="{{ mapa.viewbox }}" role="img" aria-label="Os técnicos de campo no mapa">
-        <g class="eq-ufs">{% for f in mapa.ufs %}<path d="{{ f.d }}"/>{% endfor %}</g>
+      {% else %}
+      <svg class="eq-svg" viewBox="{{ mapa.viewbox }}" role="img" aria-label="{{ 'As usinas no mapa' if usinas else 'Os técnicos de campo no mapa' }}" data-eq-mapa data-km="{{ mapa.km }}" data-min="{{ '%.4f'|format(mapa.min) }}">
+        <g class="eq-ufs" id="eq-ufs">{% for f in mapa.ufs %}<path d="{{ f.d }}"/>{% endfor %}</g>
         <g class="eq-siglas" aria-hidden="true">{% for f in mapa.ufs if f.x %}<text x="{{ f.x }}" y="{{ f.y }}">{{ f.sigla }}</text>{% endfor %}</g>
-        <g class="eq-usinas">{% for u in mapa.usinas %}<circle class="eq-u" cx="{{ u.x }}" cy="{{ u.y }}" r="4"><title>{{ nomes_usina.get(u.usina_id) or ('Usina ' ~ u.usina_id) }}</title></circle>{% endfor %}</g>
+        {{ clima_no_mapa() }}
+        <g class="eq-usinas">{% for u in mapa.usinas %}{{ usina(u) }}{% endfor %}</g>
+        {% if not usinas %}
         {# o escolhido vai por último, com o halo escuro atrás do anel branco (08/11/2026): dois técnicos na mesma usina
            caem no mesmo lugar, e o anel ficaria embaixo do outro #}
         {% set sel_pid = sel.pid if sel else none %}
@@ -137,17 +218,31 @@
            percurso e ao passar o mouse o nome da pessoa e a equipe"); a dica é do campo-equipe.js, que lê os data-eq-* #}
         {% macro ponto(p, escolhido) %}{% set l = nome_de[p.pessoa_id] %}<a href="{{ url_for('torre_campo.equipe', **l.q_ponto) }}" data-eq-nome="{{ l.nome }}" data-eq-equipe="{{ l.equipe or 'sem equipe' }}" data-eq-sit="{{ l.s.rotulo }}{% if p.velho %} · última posição {{ l.hora }}{% endif %}" aria-label="{{ l.nome }}, {{ l.equipe or 'sem equipe' }}: {{ l.s.rotulo }}">{% if escolhido %}<circle class="eq-halo" cx="{{ p.x }}" cy="{{ p.y }}" r="11"/>{% endif %}<circle class="eq-p eq-p--{{ p.tom }}{% if p.velho %} eq-p--velho{% endif %}{% if escolhido %} eq-p--sel{% endif %}" cx="{{ p.x }}" cy="{{ p.y }}" r="11"/></a>{% endmacro %}
         <g class="eq-pontos">{% for p in mapa.pontos if p.pessoa_id != sel_pid %}{{ ponto(p, false) }}{% endfor %}{% for p in mapa.pontos if p.pessoa_id == sel_pid %}{{ ponto(p, true) }}{% endfor %}</g>
+        {% endif %}
       </svg>
-      {# a dica do ponto: o nome, a equipe e a situação de quem está sob o mouse (ou com o foco do teclado) #}
+      {% endif %}
+      {# as linhas do mapa pulsando de leve em verde Grid (Levi, 11/11/2026): o contorno dos estados redesenhado por
+         cima (um <use> do mesmo desenho, sem repetir o caminho), numa camada própria em que só a opacidade anima #}
+      <svg class="eq-brilho" viewBox="{{ dm.viewbox }}" aria-hidden="true" focusable="false"><use href="#eq-ufs"/></svg>
+      {# a dica: o nome, a equipe e a situação de quem está sob o mouse (ou com o foco do teclado); a usina também #}
       <div class="eq-dica" role="status" hidden></div>
+      </div>
+      <script src="{{ url_for('static', filename='campo-percurso.js') }}"></script>
       <script src="{{ url_for('static', filename='campo-equipe.js') }}"></script>
       {% else %}
-      <p class="mudo eq-vazio">Sem usina com coordenada no cadastro e sem técnico no mapa agora: não há o que desenhar.</p>
+      <p class="mudo eq-vazio">{{ 'Sem usina com coordenada no cadastro: não há o que desenhar.' if usinas else 'Sem usina com coordenada no cadastro e sem técnico no mapa agora: não há o que desenhar.' }}</p>
       {% endif %}
+      {# a legenda é só a chave das cores e das formas (11/11/2026): num cartão estreito as frases comiam a altura do mapa;
+         o como aproximar está no "!" do título #}
       {% if d %}
-      <p class="eq-leg"><span class="eq-leg-linha" aria-hidden="true"></span><span class="mudo">o percurso, na ordem dos pontos</span><span class="cn-pill cn-info">em deslocamento</span><span class="cn-pill cn-neutro">parado</span><span class="mudo">O ponto maior é o início e o fim. Aproxime com a roda do mouse, os botões ou dois dedos, e arraste para andar: as cidades e as horas aparecem conforme a vista chega perto. O cinza pequeno é a usina.</span></p>
+      <p class="eq-leg"><span class="eq-leg-item"><span class="eq-leg-linha" aria-hidden="true"></span>percurso</span><span class="cn-pill cn-info">em deslocamento</span><span class="cn-pill cn-neutro">parado</span><span class="mudo">Ponto maior: o início e o fim.</span><span class="eq-leg-item"><span class="eq-leg-usina eq-leg-usina--anel" aria-hidden="true"></span>usina</span></p>
+      {% elif usinas %}
+      <p class="eq-leg"><span class="eq-leg-item"><span class="eq-leg-usina" aria-hidden="true"></span>usina em operação</span><span class="mudo">Passe o mouse para ver o nome.</span></p>
       {% else %}
-      <p class="eq-leg"><span class="cn-pill cn-info">em deslocamento</span><span class="cn-pill cn-ok">na usina, até 1 km</span><span class="cn-pill cn-neutro">parado fora de usina</span><span class="cn-pill cn-alerta">sem sinal há 30 min ou mais</span><span class="cn-pill cn-critico">sem permissão</span><span class="mudo">Só o contorno: a última posição é de outro dia. O cinza pequeno é a usina.</span></p>
+      <p class="eq-leg"><span class="cn-pill cn-info">em deslocamento</span><span class="cn-pill cn-ok">na usina, até 1 km</span><span class="cn-pill cn-neutro">parado fora de usina</span><span class="cn-pill cn-alerta">sem sinal há 30 min ou mais</span><span class="cn-pill cn-critico">sem permissão</span><span class="mudo">Só o contorno: posição de outro dia.</span><span class="eq-leg-item"><span class="eq-leg-usina eq-leg-usina--anel" aria-hidden="true"></span>usina</span></p>
+      {% endif %}
+      {% if clima and dm %}
+      <p class="eq-leg eq-leg--clima"><span class="mudo">Clima, a cor da usina:</span>{% for nivel, rot, tom, n in clima.contagem %}<span class="eq-leg-nivel eq-leg-nivel--{{ nivel }}">{{ rot }}</span>{% endfor %}<span class="eq-leg-item"><span class="eq-leg-aviso" aria-hidden="true"></span>aviso do INMET</span><span class="eq-leg-item"><span class="eq-leg-foco" aria-hidden="true"></span>foco de fogo</span></p>
       {% endif %}
     </div>
 
@@ -155,8 +250,19 @@
        visão de técnico e rotas pode ficar em uma botão do eventos como 'Técnico e Rotas'... vai até o limite do mapa e
        vai tendo a barra de rolagem"): abre nos eventos; o botão leva à lista de técnicos (?painel=tecnicos); o técnico
        escolhido abre a gaveta dele #}
-    <aside class="eq-lado{% if painel_ev %} eq-lado--ev{% endif %}" aria-label="{{ 'Os eventos do dia' if painel_ev else 'Os técnicos do piloto' }}">
-      {% if sel %}{% set s = sel.s %}
+    <aside class="eq-lado{% if painel_ev %} eq-lado--ev{% endif %}" aria-label="{{ 'As usinas no mapa' if usinas else ('Os eventos do dia' if painel_ev else 'Os técnicos do piloto') }}">
+      {% if usinas %}
+      {# o Usinas (11/11/2026): a lista das usinas do mapa, pelo nome; com o clima, a etiqueta do nível de cada uma #}
+      <section class="eq-grupo eq-usinas-lista">
+        <h2>Usinas no mapa <span>{{ usinas_lista|length }} usina{{ 's' if usinas_lista|length != 1 }}</span></h2>
+        <ul class="eq-lista">
+          {% for u in usinas_lista %}{% set c = clima.por_id.get(u.id) if clima else none %}
+          <li class="eq-lista-item"><span class="eq-lin"><b>{{ u.nome }}</b><small>{{ u.onde }}</small></span>{% if c %}<span class="cn-pill cn-{{ c.tom }}">{{ c.rotulo }}</span>{% endif %}</li>
+          {% else %}<li class="eq-vazio">Nenhuma usina em operação com coordenada no cadastro.</li>
+          {% endfor %}
+        </ul>
+      </section>
+      {% elif sel %}{% set s = sel.s %}
       <section class="eq-det">
         <div class="eq-det-cab"><h2 class="eq-det-nome">{{ sel.nome }}</h2><span class="cn-pill cn-{{ s.tom }}">{{ s.rotulo }}</span></div>
         <p class="eq-det-eq">{{ sel.equipe or 'Sem equipe no cadastro' }}</p>
@@ -250,13 +356,13 @@
         </ul>
       </section>
       {% else %}
-      <p class="eq-vazio">Nenhum técnico no piloto da coleta{{ ' neste filtro' if filtro.q }}.</p>
+      <p class="eq-vazio">Nenhum técnico no piloto da coleta{{ ' neste filtro' if filtro.tem }}.</p>
       {% endfor %}
       {% endif %}
     </aside>
   </div>
 
-  {% if admin %}
+  {% if admin and not usinas %}
   {# o piloto (só administradores): no piloto, o Nexus Field só coleta quem foi escolhido aqui (padrão: ninguém) #}
   <details class="eq-piloto"{% if piloto_msg %} open{% endif %}>
     <summary><b>Piloto da coleta</b> <span>{{ no_piloto }} técnico{{ 's' if no_piloto != 1 }} no piloto · só administradores</span></summary>

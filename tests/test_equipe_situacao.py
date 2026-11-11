@@ -159,6 +159,11 @@ def test_o_desenho_so_tem_x_e_y():
     assert [p["velho"] for p in d["pontos"]] == [True, False, False, False]
     assert not any(dg in repr(d) for dg in DIGITOS)
     assert SI.desenho({}, [])["viewbox"] is None
+    # 11/11/2026: o mapa dos técnicos também aproxima; o desenho diz quantos km vale a unidade e a menor vista
+    assert d["km"] > 0 and d["min"] == pytest.approx(SI.VISTA_MIN_MAPA_KM / d["km"])
+    # a vista é pública e a mesma do desenho: o clima (o `montar` do Mapa de risco) desenha nela
+    v = SI.vista_do_mapa(USINAS, [NA_USINA, NA_ESTRADA, NA_USINA, FORA])
+    assert v.viewbox == d["viewbox"] and SI.desenho(USINAS, [])["viewbox"] == SI.vista_do_mapa(USINAS, []).viewbox
 
 
 # ── o percurso (10/11/2026) ──────────────────────────────────────────────────────────────────────────────────────────

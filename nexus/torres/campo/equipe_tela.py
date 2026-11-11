@@ -600,7 +600,8 @@ def _itens_do_percurso(desenho: dict, trilha: list, coords: dict, nomes_usina: d
 
 
 def _percurso(srv, sel, pedido, coords, nomes_usina, agora) -> dict:
-    """O percurso aberto: {"desenho", "itens", "resumo", "vazio"} (a trilha com lat/lon fica aqui). O fundo é a malha de
+    """O percurso aberto: {"desenho", "itens", "resumo", "vazio", "vista"} (a trilha com lat/lon fica aqui; a `vista` é
+    o recorte do desenho, para o clima, e não vai à página). O fundo é a malha de
     municípios do IBGE que já está no disco (`municipios.na_caixa`, nunca espera o IBGE)."""
     trilha = srv.percurso(sel["pid"], pedido["de"], pedido["ate"], agora)
     if not trilha:
@@ -616,8 +617,10 @@ def _percurso(srv, sel, pedido, coords, nomes_usina, agora) -> dict:
     except Exception as e:      # noqa: BLE001 — o fundo é enfeite: sem ele, o percurso vale
         _log.warning("equipe: os municípios do percurso não abriram (%s)", type(e).__name__)
         municipios = []
+    vista = None
     try:
         desenho = SI.desenho_percurso(coords, trilha, municipios)
+        vista = SI.vista_do_mapa(coords, [(q["lat"], q["lon"]) for q in trilha])     # a mesma do desenho: a do clima
     except ValueError as e:     # o contorno do IBGE que não abre: a lista do painel continua valendo
         _log.warning("equipe: o desenho do percurso não abriu (%s)", type(e).__name__)
         desenho = {"viewbox": None, "marcas": [{"n": i, "hora": _hora(SI._instante(p["instante"]), agora),
@@ -627,6 +630,7 @@ def _percurso(srv, sel, pedido, coords, nomes_usina, agora) -> dict:
     resumo = (f"{n} ponto{'s' if n != 1 else ''} · de {marcas[0]['hora']} a {marcas[-1]['hora']} · "
               f"{SI.km_texto(SI.distancia_km(trilha))} em linha reta entre os pontos")
     return {"desenho": desenho if desenho.get("viewbox") else None, "resumo": resumo, "vazio": "",
+            "vista": vista if desenho.get("viewbox") else None,
             "itens": _itens_do_percurso(desenho, trilha, coords, nomes_usina)}
 
 
@@ -749,42 +753,127 @@ def _no_filtro(b, t: dict, f: dict) -> bool:
             and (f["supervisor"] is None or _supervisor_da_equipe(b, t["equipe_id"]) == f["supervisor"]))
 
 
+# o que diz qual tela está aberta: o botão Incluir clima troca só o clima e guarda o resto
+_CHAVES_DA_TELA = ("ver", "tecnico", "de", "ate", "painel", "supervisor", "equipe")
+
+
+def _com_clima() -> bool:
+    return str(request.args.get("clima") or "").strip() == "1"
+
+
+def _url_do_clima(ligado: bool) -> str:
+    """O endereço do botão Incluir clima: a mesma tela (o Usinas, o técnico, o percurso, o painel e o filtro abertos),
+    com o clima trocado."""
+    q = {k: str(request.args.get(k) or "").strip() for k in _CHAVES_DA_TELA}
+    q = {k: v for k, v in q.items() if v and (k != "ver" or v == "usinas")}
+    if not ligado:
+        q["clima"] = "1"
+    return url_for("torre_campo.equipe", **q)
+
+
 def _tela(contexto: dict, status: int = 200):
     tela = TORRE.tela("equipe")
+    clima = _com_clima()
+    # o Incluir clima (11/11/2026): o botão, e o `clima=1` que o Técnicos | Usinas leva de um lado para o outro
+    contexto = {"clima_on": clima, "q_clima": {"clima": "1"} if clima else {}, "url_clima": _url_do_clima(clima),
+                **contexto}
     r = current_app.make_response((render_template("campo/equipe.html", torre=TORRE, tela=tela, **contexto), status))
     r.headers["Cache-Control"] = "no-store"         # a posição de pessoas não fica na cópia do navegador nem de proxy
     return r
 
 
-# o botão Usinas: o Mapa de risco da Performance com os links voltando aqui. O `ver` desta tela é o botão Técnicos |
-# Usinas (o `?ver=` dos botões de vista do Campo, como Lista | Quadro das Ocorrências): as camadas de cima do mapa, que
-# na tela da Performance vão em `ver`, aqui vão em `camadas`
-ENDERECO_USINAS = RISCO.Endereco(rota="torre_campo.equipe", fixos=(("ver", "usinas"),), camadas="camadas")
+# ── o clima por usina (o botão Incluir clima, 11/11/2026) ────────────────────────────────────────────────────────────
+# a cor de cada nível do Mapa de risco nas etiquetas daqui (o semáforo do Nexus) e a ordem do desenho: quem pede ação
+# por último, para ficar por cima
+TOM_DO_NIVEL = {RISCO.A.AGIR: "critico", RISCO.A.ATENCAO: "alerta", RISCO.A.REGIAO: "info", RISCO.A.SEM_ALERTA: "ok",
+                RISCO.NX: "neutro"}
+CLIMA_FORA = "O clima não abriu agora (o motivo está no log do servidor); o mapa segue sem ele."
 
 
-def _tela_usinas():
-    """O botão Usinas (Levi, 08/11/2026: "Consegue incluir as informações de performance clima e risco? dando certo a
-    gente deixa tudo em mapa de equipe... aí vai ser possível ver tempestades e pontos de fogo! Tendo um botão de técnico
-    e usina, quando clica em usinas aparece os alertas das UFVs, quando é técnico mostra só essa tela padrão!"): o Mapa de
-    risco da Performance DENTRO desta página, do mesmo modelo (`mapa_tela.modelo` -> `clima.mapa.montar`) e do mesmo SVG,
-    sem moldura e sem regra copiada. Nada de técnico aqui: o serviço das posições nem sobe, e a abertura não grava
-    "abriu_mapa" na trilha da LGPD (não há dado pessoal); a releitura sozinha do mapa (clima-mapa.js) pede esta mesma
-    página. Quem vê é o mesmo do Técnicos (`_quem_ve`, conferido antes)."""
-    from ..performance import TORRE as TORRE_PERFORMANCE
-    from ..performance import mapa_tela
-    v, eventos = mapa_tela.modelo(request.args, ENDERECO_USINAS)
-    return _tela({"ver": "usinas", "v": v, "eventos": eventos, "tela_risco": TORRE_PERFORMANCE.tela("clima/mapa")})
+def _cadastro_do_clima() -> tuple:
+    """(o cadastro das usinas do clima, None) ou (None, o porquê): o mesmo que o Mapa de risco lê (`usinas.do_app`)."""
+    from ...performance.clima import usinas as CU
+    try:
+        return CU.do_app(), None
+    except CU.SemCadastro as e:
+        return None, str(e)
+    except Exception:           # noqa: BLE001 — o arquivo do cadastro corrompido, por exemplo: a tela diz, e o log guarda
+        _log.exception("equipe: o cadastro das usinas não abriu (clima)")
+        return None, "o cadastro não abriu (o motivo está no log do servidor)."
+
+
+def _clima(vista, cadastro, erro) -> dict:
+    """O clima POR USINA no desenho deste mapa (Levi, 11/11/2026: 'vai mostrar os climas os alertas, tanto por usina ou
+    por técnico, por mais que mostre os técnicos os avisos tem que ser por usina'). É o modelo do Mapa de risco da
+    Performance (`clima.mapa.montar`: as mesmas fontes, o mesmo cache, a mesma regra de nível), pedido na `vista` daqui:
+    regra nenhuma copiada. A camada de fundo é a dos avisos (as de calor nem são lidas). Devolve {"m" (o modelo), "por_id"
+    {usina_id: a linha da usina, com o `tom` da etiqueta}, "urgentes" (Agir agora e Atenção, quem pede ação primeiro),
+    "acompanhar" (o risco na região: o painel as recolhe), "contagem" [(nível, rótulo, tom, quantas)], "avisos" e "focos"
+    (as camadas lidas, ou None)}. Sem a vista (não há mapa), o modelo sai no Brasil inteiro e só o painel o usa."""
+    m = RISCO.montar(current_app.config, cadastro=cadastro, erro_cadastro=erro, vista_propria=vista, fundo="avisos",
+                     ver=frozenset({"usinas", "focos"}))
+    rotulo = {**RISCO.A.ROTULO_NIVEL, RISCO.A.SEM_ALERTA: m["rotulo_sem"], RISCO.NX: RISCO.ROTULO_NX}
+    linhas = [{**u, "tom": TOM_DO_NIVEL[u["nivel"]]} for u in m["tabela"]]
+
+    def lida(camada):
+        return camada if vista is not None and camada and camada.get("estado") == "ok" else None
+    return {"m": m, "por_id": {str(u["id"]): u for u in linhas},
+            "urgentes": [u for u in linhas if u["nivel"] in (RISCO.A.AGIR, RISCO.A.ATENCAO)],
+            "acompanhar": [u for u in linhas if u["nivel"] == RISCO.A.REGIAO],
+            "contagem": [(n, rotulo[n], TOM_DO_NIVEL[n], m["contagem"][n]) for n in RISCO.NIVEIS if m["contagem"][n]],
+            "avisos": lida(m["camada_avisos"]), "focos": lida(m["camada_focos"])}
+
+
+def _clima_no_desenho(desenho: dict | None, clima: dict | None) -> None:
+    """Com o clima, a usina que pede ação é desenhada por último (por cima), como no Mapa de risco."""
+    if desenho and clima:
+        nivel = {uid: u["nivel"] for uid, u in clima["por_id"].items()}
+        desenho["usinas"] = sorted(desenho["usinas"],
+                                   key=lambda u: RISCO.ORDEM_DE_DESENHO.get(nivel.get(str(u["usina_id"])), 0))
+
+
+def _tela_usinas(com_clima: bool):
+    """O botão Usinas (Levi, 11/11/2026: "esse botão usinas poderia mostrar só as usinas no mapa"): o MESMO mapa do
+    Técnicos, só com as usinas em operação do cadastro (em destaque, com o nome na dica) e a lista delas ao lado. De
+    08/11 a 10/11/2026 este botão trazia a tela inteira do Mapa de risco da Performance para dentro desta; o clima
+    passou ao botão Incluir clima, que vale aqui e no Técnicos (`_clima`). Nada de técnico: o serviço das posições nem
+    sobe, e a abertura não grava "abriu_mapa" na trilha da LGPD (não há dado pessoal). Quem vê é o mesmo do Técnicos
+    (`_quem_ve`, conferido antes). Sem o clima pedido, a página nem vai às fontes do clima."""
+    cad, erro = _cadastro_do_clima()
+    do_cadastro = cad.usinas if cad else []
+    lista = sorted(({"id": str(u.id), "nome": u.nome, "onde": f"{u.cliente} · {u.uf}" if u.uf else u.cliente}
+                    for u in do_cadastro), key=lambda u: chave_texto(u["nome"]))
+    coords = {str(u.id): (u.lat, u.lon, u.uf) for u in do_cadastro}
+    vista, avisos = None, []
+    try:
+        mapa = SI.desenho(coords, [])
+        vista = SI.vista_do_mapa(coords, []) if coords else None
+    except ValueError as e:     # o contorno do IBGE que não abre: a lista continua valendo
+        _log.warning("equipe: o contorno dos estados não abriu (%s)", type(e).__name__)
+        mapa = {"viewbox": None, "ufs": [], "usinas": [], "pontos": []}
+    clima = None
+    if com_clima:
+        try:
+            clima = _clima(vista, cad, erro)
+            _clima_no_desenho(mapa, clima)
+        except Exception:       # noqa: BLE001 — o clima é uma camada a mais: sem ele, o mapa das usinas vale
+            _log.exception("equipe: o clima não abriu (usinas)")
+            avisos.append(CLIMA_FORA)
+    return _tela({"ver": "usinas", "mapa": mapa, "usinas_lista": lista, "usina_de": {u["id"]: u for u in lista},
+                  "erro_usinas": erro, "clima": clima, "avisos": avisos, "perc": None, "sel": None,
+                  "painel_ev": False, "admin": False, "piloto_msg": None})
 
 
 @bp.route("/equipe", endpoint="equipe")
 def equipe():
     """O mapa: os técnicos do piloto com a situação de cada um, o painel ao lado e, para o administrador, o piloto. Com
-    `?ver=usinas`, o Mapa de risco das usinas (`_tela_usinas`)."""
+    `?ver=usinas`, só as usinas (`_tela_usinas`); com `?clima=1`, o clima por usina por cima (`_clima`)."""
     quem = _quem_ve()
     if not quem["pode"]:
         return _tela({"recusa": quem["aviso"]}, 403)
+    com_clima = _com_clima()
     if str(request.args.get("ver") or "").strip() == "usinas":
-        return _tela_usinas()
+        return _tela_usinas(com_clima)
     srv, aviso = _servico_da_tela()
     if srv is None:
         return _tela({"erro": aviso})
@@ -798,6 +887,10 @@ def equipe():
     coords, erro_coords = MR.coordenadas()
     nomes_usina = {str(uid): str(u.get("nome") or "").strip() for uid, u in b.por_id.items()}
     filtro = _filtro(b, tecnicos, piloto)
+    # o `q` vai em todo link da tela; o clima (11/11/2026) vai junto, e o `tem` diz se há filtro de técnico de verdade
+    filtro["tem"] = bool(filtro["q"])
+    if com_clima:
+        filtro["q"] = {**filtro["q"], "clima": "1"}
     # o filtro vale para tudo o que mostra técnico: os pontos, as listas, o resumo e o painel do escolhido (que sai
     # das linhas). O controle do piloto, não: é quem o administrador põe e tira da coleta, filtro nenhum o esconde
     vistos = {pid: t for pid, t in tecnicos.items() if _no_filtro(b, t, filtro)}
@@ -830,6 +923,19 @@ def equipe():
     eventos = _eventos_do_dia(srv, linhas, coords, nomes_usina, filtro, agora, _programa_do_dia(b, linhas, agora))
     painel = "tecnicos" if str(request.args.get("painel") or "").strip() == "tecnicos" else "eventos"
     avisos = [a for a in (aviso_piloto,) if a]
+    # o clima por usina (11/11/2026), na vista do desenho que a página mostra: a do percurso aberto, ou a do mapa
+    clima = None
+    if com_clima:
+        try:
+            vista = perc.get("vista") if perc and perc.get("desenho") else None
+            if vista is None and not (perc and perc.get("desenho")) and mapa["viewbox"]:
+                vista = SI.vista_do_mapa(coords, [(q[1], q[2]) for q in pontos])
+            clima = _clima(vista, *_cadastro_do_clima())
+            _clima_no_desenho(perc.get("desenho") if perc else None, clima)
+            _clima_no_desenho(mapa, clima)
+        except Exception:       # noqa: BLE001 — o clima é uma camada a mais: sem ele, o mapa dos técnicos vale
+            _log.exception("equipe: o clima não abriu (técnicos)")
+            avisos.append(CLIMA_FORA)
     if erro_coords:
         avisos.append(f"Sem as coordenadas das usinas neste servidor ({erro_coords}): ninguém conta como na usina, e o "
                       "parado fica fora do mapa.")
@@ -846,6 +952,9 @@ def equipe():
     return _tela({
         "linhas": linhas, "grupos": _grupos(linhas), "resumo": _resumo(linhas), "mapa": mapa, "sel": sel,
         "nome_de": {l["pid"]: l for l in linhas}, "nomes_usina": nomes_usina,
+        # a dica da usina no mapa (o nome), e o clima por usina quando pedido
+        "usina_de": {uid: {"nome": nomes_usina.get(uid) or f"Usina {uid}", "onde": "Usina"} for uid in coords},
+        "clima": clima,
         "opcoes_rota": sorted(((uid, nomes_usina.get(uid) or f"Usina {uid}") for uid in coords),
                               key=lambda x: chave_texto(x[1])),
         "filtro": filtro,

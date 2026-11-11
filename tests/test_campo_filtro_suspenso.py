@@ -67,3 +67,24 @@ def test_as_contas_do_zoom_do_percurso():
     fx, fy, fw, fh = r["foco"]
     assert fx <= 100 and fx + fw >= 104 and fy <= 100 and fy + fh >= 101 and fw / fh == pytest.approx(1.25)
     assert r["niveis"] == [0, 1, 2, 3, 4, 5]
+
+
+def test_a_vista_do_zoom_segue_a_proporcao_do_cartao():
+    """11/11/2026 (Levi: "mesmo eu dando um zoom os municípios ficam bem pequenos, tem que ser responsivo!"): o desenho é
+    mais alto que largo e o cartão do mapa é largo. A vista passa a ter a proporção do CARTÃO (o 4º/7º argumento), e o
+    mapa inteiro fica no meio dela; sem a proporção, vale a do desenho (as contas de antes)."""
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("sem node nesta máquina")
+    js = RAIZ / "static/campo-percurso.js"
+    codigo = ("const m=require(process.argv[1]);const b=[0,0,1000,1200];"
+              "console.log(JSON.stringify({inteiro:m.limitar([0,0,99999,0],b,5,2),perto:m.limitar([400,500,100,0],b,5,2),"
+              "zoom:m.zoomEm([-700,0,2400,1200],b,5,500,600,2,2),foco:m.enquadrar([100,100,104,101],b,5,2),"
+              "largo:m.larguraInteira(b,2),alto:m.larguraInteira(b,0.5)}))")
+    r = json.loads(subprocess.run([node, "-e", codigo, str(js)], capture_output=True, text=True, check=True).stdout)
+    assert r["inteiro"] == [-700, 0, 2400, 1200]                       # o mapa inteiro no meio do cartão largo
+    assert r["perto"] == [400, 500, 100, 50]
+    assert r["zoom"] == [-100, 300, 1200, 600]                         # mais larga que o mapa: fica no meio dele
+    fx, fy, fw, fh = r["foco"]
+    assert fx <= 100 and fx + fw >= 104 and fy <= 100 and fy + fh >= 101 and fw / fh == pytest.approx(2)
+    assert r["largo"] == 2400 and r["alto"] == 1000

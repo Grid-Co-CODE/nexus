@@ -484,3 +484,19 @@ def test_os_limites_do_mapa_sem_contorno_cobrem_o_continente_sem_sobrar_muito():
     lon0, lat0, lon1, lat1 = M.LIMITES_BRASIL
     assert lon0 <= x0 and lat0 <= y0 and lon1 >= x1 and lat1 >= y1
     assert x0 - lon0 < 1.0 and y0 - lat0 < 1.0 and lon1 - x1 < 1.0 and lat1 - y1 < 1.0
+
+
+def test_o_montar_desenha_na_vista_de_quem_pede(leituras):
+    """11/11/2026: o Mapa de equipe da Usinas 360° (o botão Incluir clima) pede este mesmo modelo no recorte DELE
+    (`vista_propria`): a usina, a área do aviso e o foco saem nas unidades daquele desenho, e o que cai fora do recorte
+    conta como fora. Sem ela, vale a região do endereço, como sempre."""
+    mundo_completo(leituras)
+    v = M.vista_de_caixa("equipe", "Mapa de equipe", -46.0, -24.0, -36.0, -4.0)
+    m = montar(vista_propria=v)
+    assert m["viewbox"] == v.viewbox and m["regiao"] == "equipe"
+    x, y = v.ponto(*ALFA)
+    alfa = por_nome(m)["Usina Alfa"]
+    assert (alfa["x"], alfa["y"]) == (M._n(x), M._n(y)) and alfa["nivel"] == A.AGIR
+    assert set(por_nome(m)) == {"Usina Alfa", "Usina Beta", "Usina Delta", "Usina Teta"}       # a do Sul e a do Norte, fora
+    assert m["fora_do_recorte"] == 2 and m["camada_avisos"]["estado"] == "ok"
+    assert montar()["viewbox"] == M.vista("").viewbox

@@ -1484,7 +1484,7 @@ percurso" abaixo), pedido do Levi pela sessão Nexus Field; sobe com o OK dele.
 | Jornal das filas | `campo/equipe/jornal.py` | os eventos de chave e os acessos esperando o gravador, cifrados em disco (`equipe/fila_*.jsonl`): o reinício antes da rodada não perde nada |
 | Estado do processo | `campo/equipe/servico.py` | junta chaves, diário, piloto e cadastro por trás das rotas; nada daqui grava no banco |
 | Gravador em lote | `campo/equipe/gravador.py` | a cada 5 min leva ao banco o que está nas filas e no diário, e apara o jornal |
-| Rotas e tela | `torres/campo/equipe_tela.py`, `templates/campo/equipe.html`, `static/campo.css` (bloco `eq-*`) | as três rotas do celular, o mapa, o Abrir rota, o piloto, o filtro por supervisor e equipe e o botão Usinas (o Mapa de risco da Performance dentro da tela, por `torres/performance/mapa_tela.modelo` e `performance/_mapa_corpo.html`) |
+| Rotas e tela | `torres/campo/equipe_tela.py`, `templates/campo/equipe.html`, `static/campo.css` (bloco `eq-*`) | as três rotas do celular, o mapa, o Abrir rota, o piloto, o filtro por supervisor e equipe, o botão Usinas (só as usinas, no mesmo mapa) e o Incluir clima (o clima por usina, pelo `clima.mapa.montar` na vista deste mapa) |
 
 ### De onde vem o dado: o contrato com o Nexus Field
 
@@ -1651,11 +1651,20 @@ Pedido do Levi pela sessão Nexus Field (ver a 1ª regra acima). **Ver percurso*
 - **O mapa inteiro primeiro, e a pessoa aproxima** (Levi, 10/11/2026, depois de ver o percurso no recorte dele: "pode
   mostrar o mapa inteiro primeiro, e aí a pessoa pode ir dando zoom e mostrando as cidades e municípios de forma leve e
   fluída, pode estudar como os setores fazem"). O percurso é desenhado no MESMO recorte do mapa dos técnicos
-  (`situacao._vista_do_mapa`) e o zoom é do `static/campo-percurso.js`, no modelo do Mapa de risco da Performance
+  (`situacao.vista_do_mapa`) e o zoom é do `static/campo-percurso.js`, no modelo do Mapa de risco da Performance
   (`clima-mapa.js`): troca só o `viewBox`; a roda, o arrasto e os dois dedos seguem na hora; os botões (+, -, **Ir ao
   percurso**, **Mapa inteiro**) levam a vista andando (curto com os efeitos de animação do Windows desligados: encurta,
-  não some); o texto e os pontos não crescem com o zoom (`--eq-zt` = 1 / zoom; `--eq-k` cresce os dois quando o mapa é
-  estreito na tela). **O que aparece em cada zoom vem do servidor, por NÍVEL** (`data-n` em cada ponto, hora e
+  não some). **O texto e os pontos são escritos em pixels da TELA** (Levi, 11/11/2026, com a imagem do percurso: "mesmo
+  eu dando um zoom os municípios ficam bem pequenos, tem que ser responsivo!"): o desenho é mais alto que largo e o
+  cartão é largo, então a escala de verdade saía da altura e os 14 px do texto viravam 7. Desde então a vista tem a
+  proporção do CARTÃO (o mapa inteiro fica no meio dela) e o script diz no `--eq-un` quantas unidades do desenho valem
+  um pixel da tela (a largura da vista sobre a do palco, refeita pelo `ResizeObserver`): o CSS escreve
+  `calc(var(--eq-fs) * var(--eq-un))` (13 px; 12,5 no celular; 14 de 1.700 px para cima) e escala o ponto pelo mesmo
+  número. Os nomes que se cobrem saem da frente quando a vista assenta (`arrumar`: fica a hora, depois o município do
+  percurso, a sigla e o vizinho). **O mesmo zoom vale no mapa dos técnicos e no das usinas** (`data-eq-mapa`; o desenho
+  manda `km` e `min`, a menor vista de `VISTA_MIN_MAPA_KM` = 8 km): o ponteiro só é preso depois de andar 3 px, então o
+  clique no ponto do técnico continua abrindo o percurso e o que foi arrasto não abre nada; no mapa inteiro a roda para
+  baixo rola a página. **O que aparece em cada zoom vem do servidor, por NÍVEL** (`data-n` em cada ponto, hora e
   município): um nível é uma largura da vista em km (`NIVEIS_KM` = 1.200, 500, 150, 40 e 8; 0 = o mapa inteiro). O 1º e o
   último ponto aparecem sempre; os do meio e as horas, no primeiro nível em que ficam longe o bastante dos vizinhos já
   mostrados (`_niveis`: 1,2% da largura da vista para o ponto, 4% para a hora; parado no mesmo lugar, o ponto só no
@@ -1708,19 +1717,47 @@ O Levi viu a tela na bancada: "Gostei bastante! ... inclua também essas melhori
   (`test_tema`): os dois apontam para o `--papel` (#fff) e o `--papel-tinta`, o par que o Nexus mantém igual nos dois temas.
   O escolhido é desenhado por último (dois técnicos na mesma usina caem no mesmo lugar). Prova: o teste do contraste de
   componente (3:1) nos dois temas, pelos tokens do `nexus.css`.
-- **O botão Técnicos | Usinas** ("Consegue incluir as informações de performance clima e risco? dando certo a gente deixa tudo
-  em mapa de equipe... aí vai ser possível ver tempestades e pontos de fogo! Tendo um botão de técnico e usina, quando clica em
-  usinas aparece os alertas das UFVs, quando é técnico mostra só essa tela padrão!"). `?ver=tecnicos` (o padrão; qualquer
-  outro valor também) é a tela de sempre. **`?ver=usinas` é o Mapa de risco da Performance DENTRO desta página**: o mesmo
-  modelo (`torres/performance/mapa_tela.modelo` → `clima.mapa.montar`) e o mesmo corpo (`performance/_mapa_corpo.html`, com o
-  `_mapa_svg.html`), o CSS e o `clima-mapa.js` dele (camadas, zoom, dica, releitura sozinha), sem moldura (o
-  `test_torre_campo` proíbe iframe) e sem regra copiada. Os links e filtros do mapa voltam a `/t/campo/equipe?ver=usinas&...`
-  (`ENDERECO_USINAS`, um `clima.mapa.Endereco`): aqui o `ver` é o botão, então as camadas de cima do mapa ("Mostrar"), que na
-  Performance vão em `ver`, vão em `camadas`. O modo TV não liga aqui. `Cache-Control: no-store`, como lá. **Nada de técnico
-  no Usinas**: o serviço das posições nem sobe, o filtro de supervisor e equipe some, e a abertura (e a releitura sozinha,
-  que pede a mesma página) **não grava "abriu_mapa"** na trilha da LGPD: não há dado pessoal ali. Quem vê é o mesmo
-  `_quem_ve` dos cinco setores e dos administradores, conferido antes do botão. O clique na usina leva à página dela no Clima
-  e risco da Performance (`/t/performance/clima/usina/<id>`), que segue com o portão dela.
+- **O botão Técnicos | Usinas mostra só as usinas** (Levi, 11/11/2026: "esse botão usinas poderia mostrar só as usinas
+  no mapa"). `?ver=usinas` é o MESMO mapa do Técnicos (`situacao.desenho` sem ponto de técnico), com as usinas em
+  operação do cadastro em destaque (`eq-u--dest`, o nome e o "cliente · UF" na dica) e a lista delas no painel ao lado.
+  De 08/11 a 10/11/2026 este botão trazia a tela inteira do Mapa de risco da Performance para dentro desta (o pedido de
+  08/11: "quando clica em usinas aparece os alertas das UFVs"); o clima passou ao botão Incluir clima, abaixo, e a tela
+  inteira segue em Performance → Clima e risco → Mapa de risco. `?ver=tecnicos` (o padrão; qualquer outro valor também)
+  é a tela de sempre. **Nada de técnico no Usinas**: o serviço das posições nem sobe, o filtro de supervisor e equipe e
+  o piloto somem, e a abertura **não grava "abriu_mapa"** na trilha da LGPD: não há dado pessoal ali. Sem o clima pedido
+  a página nem vai às fontes do clima. Quem vê é o mesmo `_quem_ve` dos cinco setores e dos administradores, conferido
+  antes do botão. A usina é um **losango** nos três desenhos e o técnico é o círculo: com o clima os dois usam as cores
+  do semáforo, e a forma é que os separa.
+- **O Incluir clima** (Levi, 11/11/2026: 'poderia ter um botão "incluir clima" se apertar vai recolher a barra lateral
+  esquerda e vai mostrar os climas os alertas, tanto por usina ou por técnico, por mais que mostre os técnicos os avisos
+  tem que ser por usina'). O botão da barra liga e desliga o `?clima=1` e guarda o que está aberto (o Usinas, o técnico,
+  o percurso, o painel, o filtro: `_url_do_clima`); o `clima=1` segue em todo link da tela (vai no `filtro.q`; o
+  `filtro.tem` é que diz se há filtro de técnico de verdade). Com ele: **(1) o menu do Nexus recolhe** (a página põe
+  `menu-recolhido` na raiz, só nela: a preferência guardada em `nexus.menu` não é tocada, e tirar o clima devolve o menu
+  como estava); **(2) o desenho ganha o clima**: a área de cada aviso do INMET, os focos da última hora do INPE (o anel
+  no foco a até 5 km de uma usina) e cada usina na cor do nível do alerta dela; **(3) um painel à esquerda do mapa lista
+  os alertas POR USINA** (`eq-clima`): a conta por nível, o Agir agora e a Atenção em linha (quem pede ação primeiro), o
+  Acompanhar recolhido (costuma ser a maioria e afogaria o resto) e as fontes com a hora de cada leitura. Nome de
+  técnico nenhum nele, também no Técnicos. **Regra nenhuma copiada**: `_clima` chama o `clima.mapa.montar` do Mapa de
+  risco (as mesmas fontes, o mesmo cache, a mesma regra de nível) com a `vista_propria` daqui (`situacao.vista_do_mapa`,
+  a do mapa ou a do percurso aberto), e a usina, o aviso e o foco saem nas unidades deste desenho; a camada de fundo é
+  a dos avisos (as de calor nem são lidas). **A honestidade é a de lá**: a fonte fora é dita ("O clima não inclui"), a
+  fonte lida mas fora do dia também ("Fonte fora do dia"), e com uma fonte sem leitura a usina que ficaria sem alerta
+  fica cinza ("Sem leitura completa"), nunca verde. Sem o cadastro do clima o painel diz por quê e o mapa dos técnicos
+  segue; se o `montar` quebrar, a tela avisa e segue sem o clima. As cores dos níveis são as do semáforo do Nexus
+  (`TOM_DO_NIVEL`). O clima não muda a trilha da LGPD: o Técnicos grava como sempre e o Usinas não grava.
+- **O cartão do mapa e os painéis têm a mesma altura** (Levi, 11/11/2026: "a barra lateral tem que ser do mesmo tamanho
+  da barra do mapa, pode aumentar a altura do card do mapa e deixa ele com mais qualidade, quero mais cores da grid nesse
+  mapa! Talvez a linha dos mapas poderia ficar pulsando levemente em verde grid"). No computador (≥ 1180 px) o cartão do
+  mapa, o painel ao lado e o do clima têm a altura da janela (`--eq-alt` = 100vh menos o cabeçalho, no mínimo 520 px) e
+  o que não cabe rola dentro de cada um; estreito, o mapa vem primeiro e os painéis descem. O desenho ocupa o palco
+  inteiro (`eq-palco`). O verde da Grid está no fundo do cartão, nas divisas, nas usinas e na linha do percurso
+  (`--eq-verde`, que escurece no tema claro). **As divisas pulsam de leve**: o contorno dos estados é redesenhado por
+  cima numa camada própria (`eq-brilho`, um `<use>` do grupo `#eq-ufs`, que herda as variáveis dela: sem terra, a divisa
+  verde), e só a OPACIDADE dessa camada anima, sem redesenhar o mapa a cada quadro. O Nexus para toda animação com os
+  efeitos do Windows desligados (o caso do Levi); esta foi pedida por ele, e uma regra própria a mantém (o mesmo trato do
+  cartão parado da Engenharia). A legenda embaixo do mapa é só a chave das cores e das formas; o como aproximar está no
+  "!" do título.
 
 ### Os eventos do dia (10/11/2026)
 
@@ -1729,9 +1766,8 @@ ocorrências: Algo nesse estilo". **No painel AO LADO do mapa, à direita, que a
 de eventos deve ficar ao lado do mapa do lado direito essa visão de técnico e rotas pode ficar em uma botão do eventos
 como 'Técnico e Rotas' ... vai até o limite do mapa e vai tendo a barra de rolagem"): o botão **Técnico e Rotas** leva à
 lista de técnicos de antes (`?painel=tecnicos`, com o botão "Eventos do dia" de volta); o técnico escolhido abre a gaveta
-dele (o "Ver todos os técnicos" volta à lista). No computador (≥ 1180 px) o painel tem 420 px e a altura do mapa: ele
-fica por cima da coluna (`position:absolute`, não a estica) e a lista rola dentro (`.eq-corpo--ev`); no celular a lista
-rola numa altura própria (60vh). Os eventos de hoje dos técnicos que a tela mostra (piloto e filtro), do mais novo ao mais
+dele (o "Ver todos os técnicos" volta à lista). No computador (≥ 1180 px) o painel tem a altura do cartão do mapa
+(`--eq-alt`, acima) e a lista rola dentro dele (`.eq-lado--ev`); no celular a lista rola numa altura própria (60vh). Os eventos de hoje dos técnicos que a tela mostra (piloto e filtro), do mais novo ao mais
 velho: a hora, o ponto colorido na linha do tempo, o cartão "<técnico> · <o que aconteceu>" com a origem "Nexus Field" e a
 etiqueta (abaixo do texto, no painel estreito); no alto a faixa "Agora" e o resumo ("2 deslocamentos · 1 chegada ·
 ..."). O clique abre o percurso do dia do técnico (o sem permissão, o painel dele), com o filtro. A regra mora em `campo/equipe/eventos.py`, **sem régua nova**: a usina é o raio de 1 km, a saída da
@@ -1810,8 +1846,10 @@ dos deslocamentos, sem "casa", o sem sinal e o sem permissão, a ordem e o resum
 os 7 dias, o período no registro até o livro, a linha da fila de antes da coluna, os municípios só do disco) e
 `test_equipe_tela.py` (quem vê, a rota, o registro pelo
 e-mail exato, o piloto, nenhuma coordenada na página nem no JSON, a pré-carga que não abre o mapa; desde a bancada de
-08/11/2026, o filtro por supervisor e equipe, o anel branco pelo contraste nos dois temas e o botão Usinas: o mesmo
-`montar` da Performance, os links de volta, nenhum técnico e nenhum "abriu_mapa"; desde 10/11/2026, o ponto de todos,
+08/11/2026, o filtro por supervisor e equipe, o anel branco pelo contraste nos dois temas e o botão Usinas: nenhum
+técnico e nenhum "abriu_mapa"; desde 11/11/2026, o Usinas só com as usinas, o Incluir clima nos dois modos (o `montar`
+na vista daqui, o menu recolhido, os alertas por usina, o clima em todo link, a fonte fora que não pinta de verde), a
+altura do painel, o texto na escala da tela e o pulso das divisas; desde 10/11/2026, o ponto de todos,
 o de outro dia com o contorno e sem rota, e o Ver percurso: a ordem, a hora, o período torto, o registro e o 503).
 Cada regra de segurança foi provada por quebra de propósito. A bancada só leitura (um técnico falso mandando um lote
 pelo `test_client`, o mapa a 1440 px e 375 px sem rolagem de lado) é o passo final da prova.
