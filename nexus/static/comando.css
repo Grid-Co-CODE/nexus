@@ -182,3 +182,7 @@ a.ins-titulo:hover{color:var(--verde-texto)}
 .cmu-tab table{min-width:0;font-size:12.5px}
 .cmu-tab th,.cmu-tab td{padding-left:8px;padding-right:8px}
 .cmu-conf{display:flex;flex-direction:column;align-items:flex-start;gap:4px}
+/* a linha inteira abre o prontuário (comando-usinas.js): o cursor e o fundo da linha dizem isso */
+.cmu-tab tbody tr[data-fl-linha]{cursor:pointer}
+.cmu-tab tbody tr[data-fl-linha]:hover td{background:var(--superficie-2)}
+.cmu-tab tbody tr[data-fl-linha]:hover .cmu-usina b{color:var(--verde-texto)}
