@@ -785,10 +785,3 @@ colunas (a maioria escondida: o seletor de colunas mostra sem recarregar), e a p
   pendência, as telas e o abrir-e-salvar sem mudar nada, os rótulos dos vínculos, a região na RESPONSÁVEL O&M que vira
   vaga com a prévia, a equipe que não perde a região na importação, o banco sem nome em claro e com as colunas novas no
   fim, a carga única: exato, normalizado, ambíguo, excluída, código de outra equipe, rodar de novo, e a conferência).
-
-## Leitura de teste da FAMA (11/11/2026, TEMPORÁRIA)
-
-`/t/base/fama-teste` (`nexus/cadastro/fama_teste.py`): só o administrador, fora do menu, só GET na API da FAMA com a
-`NEXUS_FAMA_CHAVE` (que a T.I. pôs no `.env` do servidor), com teto de 40 chamadas e pausa entre elas, guardada 15 min.
-Devolve só contagens, nomes de campo, catálogos e as usinas (id e nome): nunca pessoa, texto da OS nem a chave. Serve para
-desenhar a ligação das OS que os clientes abrem na FAMA com a programação semanal; sai depois do teste.

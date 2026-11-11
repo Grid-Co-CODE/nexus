@@ -113,8 +113,8 @@ OPCIONAIS = ("NEXUS_CHAVE_CADASTRO", "NEXUS_ARMAZEM_LOCAL",
              # aqui, o .env nunca chegava ao app.config (revisão final de 08/11/2026)
              "NEXUS_EQUIPE_MS_CLIENT_ID", "NEXUS_EQUIPE_MS_TENANT_ID", "NEXUS_EQUIPE_GRAVA",
              # as OS que os clientes abrem na FAMA (11/11/2026): a chave da API (api.fama.energy, cabeçalho
-             # X-Contractor-Key), posta pela T.I. no .env do servidor; por ora só a leitura de teste de Base
-             # (nexus/cadastro/fama_teste.py)
+             # X-Contractor-Key), posta pela T.I. no .env do servidor; é de PRESTADORA: só abre /v2/contractor/. Ainda
+             # sem uso: a ligação das OS da FAMA com a programação semanal está em desenho (a leitura de teste saiu)
              "NEXUS_FAMA_CHAVE")
 
 
