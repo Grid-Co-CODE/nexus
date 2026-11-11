@@ -53,6 +53,10 @@ if __name__ == "__main__":
     # as telas quentes depois de cada deploy (13/10/2026: a 1ª abertura do servidor recém-subido levou 27 s; 5 min)
     from nexus.auth import pre_carga
     pre_carga.aquecer_ao_subir(app)
+    # as OS da FAMA do Quadro da semana, por trás e na hora (11/11/2026: só o banco, sem os 5 min da volta acima;
+    # sem ela, quem abria o Quadro depois do deploy via "Lendo as OS da FAMA")
+    from nexus.pcm import fama_quadro
+    fama_quadro.aquecer_ao_subir(app)
     # o que cada pedido esperava quando o Nexus parou de responder (13/10/2026: das 16:50 às 16:53 nem o /saude
     # respondia, e de fora não dava para ver esperando o quê); o administrador vê no cartão da versão do Início
     # o OS Creator com teto de threads (14/10/2026, Levi: "pq depende da TI se o OS Creator Web faz parte do Nexus???"):

@@ -3,13 +3,16 @@
 hora em hora, `fama.gerar_fama`, com uma FAMA de mentira).
 
 O que estes testes seguram: o pedido da tela nunca lê o banco; a 1ª visita depois de subir abre sem a FAMA, com o aviso, e
-não espera; a cópia vencida volta na hora e a renovação vai por trás, uma de cada vez (o voo único); o livro que não mudou
-(o `updated_at` da listagem) não tem as páginas relidas; o livro que mudou é relido; e a falha do banco não trava (com a
-cópia boa, ela fica). Projetos, usinas, títulos e pessoas inventados; nenhum teste vai à rede."""
+não espera; a cópia vencida volta na hora e a renovação vai por trás, uma de cada vez (o voo único, também com duas
+visitas na mesma expiração); o livro que não mudou (o `updated_at` da listagem) não tem as páginas relidas, e sem o
+livro no banco a renovação só confere a listagem; o livro que mudou é relido; a subida do Nexus aquece a cópia por trás
+(nunca nos testes nem na cópia de prova); e a falha do banco não trava (com a cópia boa, ela fica). Projetos, usinas,
+títulos e pessoas inventados; nenhum teste vai à rede."""
 import json
 import threading
 import time
 from datetime import date, datetime, timedelta, timezone
+from pathlib import Path
 
 import pytest
 import requests
@@ -78,6 +81,15 @@ class Fora:
         raise requests.ConnectionError("banco de mentira fora do ar")
 
 
+def _app(api):
+    app = create_app({"NEXUS_SECRET_KEY": "chave-de-teste-da-copia", "NEXUS_SENHA_ADMIN": SENHA,
+                      "GRIDCO_DB_API": BASE, "NEXUS_CHAVE_CADASTRO": CHAVE})
+    app.config["SESSION_COOKIE_SECURE"] = False
+    app.extensions["nexus_dados_sessao"] = api
+    assert not app.config.get("TESTING")                              # o caminho de produção
+    return app
+
+
 @pytest.fixture
 def producao(monkeypatch):
     monkeypatch.setattr(fama, "_maquina", lambda: "servidor")         # a carga da parte A só grava no servidor
@@ -86,12 +98,20 @@ def producao(monkeypatch):
     api = ApiPGFalsa()
     _cadastro(api)
     _carga(api, [_aberta(1), _os(2, status=("closed", 9))])
-    app = create_app({"NEXUS_SECRET_KEY": "chave-de-teste-da-copia", "NEXUS_SENHA_ADMIN": SENHA,
-                      "GRIDCO_DB_API": BASE, "NEXUS_CHAVE_CADASTRO": CHAVE})
-    app.config["SESSION_COOKIE_SECURE"] = False
-    app.extensions["nexus_dados_sessao"] = api
-    assert not app.config.get("TESTING")                              # o caminho de produção
-    yield app, api
+    yield _app(api), api
+    FQ.esperar(10)
+    FQ.limpar()
+    visao.limpar()
+
+
+@pytest.fixture
+def sem_livro():
+    """O banco antes da 1ª carga do servidor: o cadastro está lá, o livro da FAMA não."""
+    FQ.limpar()
+    visao.limpar()
+    api = ApiPGFalsa()
+    _cadastro(api)
+    yield _app(api), api
     FQ.esperar(10)
     FQ.limpar()
     visao.limpar()
@@ -156,6 +176,117 @@ def test_o_livro_que_mudou_e_relido_por_tras(producao, monkeypatch):
     assert [l["fama_os_id"] for l in _ler(app)["linhas"]] == [1, 2, 3]
 
 
+def test_duas_visitas_na_mesma_expiracao_abrem_uma_renovacao_so(producao, monkeypatch):
+    """Re-revisão de 11/11/2026, item 1: o `start()` da thread roda fora da trava, e a thread criada e ainda não
+    começada diz `is_alive()` False. Sem a marca "rodando", posta e tirada dentro da trava, a visita que chegava nesse
+    intervalo abria a 2ª renovação da mesma expiração."""
+    app, api = producao
+    _carregada(app)
+    monkeypatch.setattr(FQ, "COPIA_S", 0)
+    no_intervalo, solta = threading.Event(), threading.Event()
+
+    class Lerda(threading.Thread):
+        """A 1ª renovação para entre soltar a trava e começar de verdade: o intervalo da corrida."""
+
+        def start(self):
+            if not no_intervalo.is_set():
+                no_intervalo.set()
+                assert solta.wait(10)
+            super().start()
+
+    monkeypatch.setattr(FQ, "_novo_fio", lambda cfg, a: Lerda(target=FQ._rodar, args=(cfg, a), daemon=True))
+
+    def primeira():
+        with app.test_request_context("/"):
+            FQ.ler(app.config)
+    a = threading.Thread(target=primeira, daemon=True)
+    a.start()
+    assert no_intervalo.wait(10)                               # a 1ª visita abriu a renovação e ainda não a começou
+    assert _ler(app)["estado"] == "ok"                         # a 2ª, na mesma expiração: a cópia, na hora
+    solta.set()
+    a.join(10)
+    assert FQ.esperar(10)
+    assert FQ.voltas() == 2                                    # a 1ª leitura e UMA renovação
+
+
+def test_a_renovacao_que_nem_comeca_nao_prende_a_vez(producao, monkeypatch):
+    """A marca "rodando" só sai no fim do `_rodar`: a thread que nem começa (sem recurso para outra) a tira na hora, senão
+    a cópia não se renovaria mais até o Nexus reiniciar."""
+    app, api = producao
+
+    class Quebrada(threading.Thread):
+        def start(self):
+            raise RuntimeError("sem thread")
+
+    novo = FQ._novo_fio
+    monkeypatch.setattr(FQ, "_novo_fio", lambda cfg, a: Quebrada())
+    with app.test_request_context("/"), pytest.raises(RuntimeError):
+        FQ.ler(app.config)
+    monkeypatch.setattr(FQ, "_novo_fio", novo)
+    assert _ler(app)["estado"] == "lendo" and FQ.voltas() == 2   # a próxima visita começa a leitura
+    assert FQ.esperar(10) and _ler(app)["estado"] == "ok"
+
+
+def test_sem_o_livro_no_banco_a_renovacao_so_confere_a_listagem(sem_livro, monkeypatch):
+    """Re-revisão de 11/11/2026, item 2: antes da 1ª carga do servidor o livro não existe e o `updated_at` vem None.
+    None igual a None é o livro igual até o `COMPLETA_S`: a renovação de 2 em 2 min confere a listagem e não relê as
+    outras duas (a do livro e a das abas, dentro do `fama.ler_banco`)."""
+    app, api = sem_livro
+    r = _carregada(app)
+    assert (r["linhas"], r["gerado_em"]) == ([], None)
+    monkeypatch.setattr(FQ, "COPIA_S", 0)
+    conta = Lento(api)
+    conta.solta.set()
+    app.extensions["nexus_dados_sessao"] = conta
+    _ler(app)
+    assert FQ.esperar(10)
+    assert len(conta.pedidos) == 1 and conta.pedidos[0].endswith("/api/workbooks"), conta.pedidos
+    # passado o COMPLETA_S, a leitura inteira volta (o livro pode ter nascido sem a listagem dizer)
+    monkeypatch.setattr(FQ, "COMPLETA_S", 0)
+    conta.pedidos.clear()
+    _ler(app)
+    assert FQ.esperar(10)
+    assert any(u.endswith("/api/sheets") for u in conta.pedidos), conta.pedidos
+    assert FQ.voltas() == 3
+
+
+def test_o_nexus_aquece_a_copia_ao_subir_sem_segurar_a_subida(producao):
+    """Re-revisão de 11/11/2026, item 3: cada deploy reinicia o Nexus e a cópia começa vazia; sem o aquecimento,
+    quem abria o Quadro depois do deploy via "Lendo as OS da FAMA". A subida liga a renovação por trás e segue; a 1ª
+    visita já acha a cópia (o aviso fica só para quem chega nos primeiros segundos)."""
+    app, api = producao
+    lento = Lento(api)
+    app.extensions["nexus_dados_sessao"] = lento
+    t0 = time.monotonic()
+    assert FQ.aquecer_ao_subir(app) is True
+    assert time.monotonic() - t0 < 0.5, "o aquecimento segurou a subida"
+    assert _ler(app)["estado"] == "lendo" and FQ.voltas() == 1  # nos primeiros segundos, o aviso; sem 2ª leitura
+    lento.solta.set()
+    assert FQ.esperar(10)
+    r = _ler(app)
+    assert r["estado"] == "ok" and [l["fama_os_id"] for l in r["linhas"]] == [1, 2]
+    assert FQ.voltas() == 1
+
+
+def test_o_aquecimento_nao_roda_nos_testes_nem_com_a_pre_carga_desligada(producao):
+    app, api = producao
+    app.config["NEXUS_PRE_CARGA"] = "0"                        # a máquina que desligou a pré-carga
+    assert FQ.aquecer_ao_subir(app) is False
+    app.config.update(TESTING=True, NEXUS_PRE_CARGA="1")       # o teste nunca aquece, nem com a pré-carga pedida
+    assert FQ.aquecer_ao_subir(app) is False
+    assert FQ.voltas() == 0
+
+
+def test_quem_aquece_e_a_subida_do_servidor_e_do_pc_nunca_o_create_app_nem_a_copia_de_prova():
+    """O gancho é o do `pre_carga.aquecer_ao_subir`: o `servir.py` e o `app.py` chamam; o `create_app` (os testes) e a
+    cópia de prova (`ferramentas/subir_copia_de_prova.py`) não."""
+    raiz = Path(__file__).resolve().parents[1]
+    for arq in ("servir.py", "app.py"):
+        assert "fama_quadro.aquecer_ao_subir(app)" in (raiz / arq).read_text(encoding="utf-8"), arq
+    for arq in ("nexus/__init__.py", "ferramentas/subir_copia_de_prova.py"):
+        assert "fama_quadro" not in (raiz / arq).read_text(encoding="utf-8"), arq
+
+
 def test_a_falha_do_banco_nao_trava_e_a_copia_boa_fica(producao, monkeypatch):
     app, api = producao
     app.extensions["nexus_dados_sessao"] = Fora()
@@ -192,5 +323,5 @@ def test_a_tela_abre_na_hora_com_o_aviso_e_depois_mostra_a_os(producao, tmp_path
     assert "Lendo as OS da FAMA: recarregue em alguns segundos" in html and "FAMA-1<" not in html
     assert FQ.esperar(10)
     html = c.get("/t/pcm/quadro").get_data(as_text=True)
-    assert 'class="q-c-os gc-num">FAMA-1<' in html and "OS da FAMA lidas em" in html and TITULO in html
+    assert 'class="q-c-os gc-num">FAMA-1<' in html and "livro da FAMA gravado em" in html and TITULO in html
     assert "Lendo as OS da FAMA" not in html

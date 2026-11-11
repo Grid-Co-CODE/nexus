@@ -1818,17 +1818,23 @@ livro `nexus_os_fama · fato_os_fama` e o de-para em Ligações são da parte A 
   (`fama_os.cadastro_das_usinas`: o nome do Fracttal pelo de-para "Fracttal · Classificação 1", o cliente, a equipe e o
   gestor de contrato, decifrado da ficha da pessoa).
 - **O frescor:** mais de `fama_os.FRESCOR_H` (26 h) sem batimento é a leitura da FAMA parada (`fama_os.velho`; sem
-  batimento, também). O Quadro diz "OS da FAMA lidas em DD/MM HH:MM" e, parada, avisa "A leitura da FAMA parou: o que
-  aparece pode estar velho"; a rodada ligada não sai (abaixo).
+  batimento, também). O Quadro diz "livro da FAMA gravado em DD/MM HH:MM": a última gravação do livro, não a última
+  leitura (a carga lê a FAMA de hora em hora e só regrava o livro quando a FAMA muda ou uma vez por dia; o "!" diz isso;
+  o "lidas em" de antes parecia a FAMA sem leitura havia horas, re-revisão de 11/11/2026). Parada, o Quadro avisa "A
+  leitura da FAMA parou: o que aparece pode estar velho"; a rodada ligada não sai (abaixo).
 - **Por que a FAMA não passa pelo motor na fase 1:** ocuparia as horas das equipes, e a semana oficial do Fracttal mudaria
   mesmo sem publicar.
 - **A velocidade:** o pedido do Quadro NUNCA lê o banco (revisão de 11/11/2026: o livro tem ~4.700 linhas em páginas). As
   OS e o cadastro ficam numa cópia em memória, servida na hora (`fama_quadro.ler`); vencida (2 min), a visita seguinte a
-  renova por trás, uma renovação de cada vez (o voo único, como o `_renovar` da `campo/visao.py`), e recebe a cópia de
-  antes. A renovação confere antes o `updated_at` do livro (o `livros.atualizado_em`): se não mudou, a cópia fica sem
-  reler as páginas (de hora em hora ela é relida inteira, pelo cadastro). Sem cópia (a 1ª visita depois de subir), o
-  Quadro abre sem a FAMA, com "Lendo as OS da FAMA: recarregue em alguns segundos". A falha não trava: com a cópia boa,
-  ela fica; sem cópia, o aviso do erro, e a próxima tentativa só depois de 60 s.
+  renova por trás, uma renovação de cada vez (o voo único: a marca "rodando", posta e tirada dentro da trava, como o
+  `_RENOVANDO` da `campo/visao.py`; pelo `is_alive()` da thread, duas visitas na mesma expiração abriam duas), e recebe
+  a cópia de antes. A renovação confere antes o `updated_at` do livro (o `livros.atualizado_em`): se não mudou (sem o
+  livro no banco, None igual a None), a cópia fica sem reler as páginas (de hora em hora ela é relida inteira, pelo
+  cadastro). A subida aquece a cópia: o `servir.py` e o `app.py` chamam o `fama_quadro.aquecer_ao_subir`, por trás e na
+  hora (só o banco, sem os 5 min da pré-carga, que espaçam o Fracttal); o `create_app` (os testes) e a cópia de prova
+  não, e `NEXUS_PRE_CARGA=0` desliga junto. Sem cópia (só nos primeiros segundos depois de subir), o Quadro abre sem a
+  FAMA, com "Lendo as OS da FAMA: recarregue em alguns segundos". A falha não trava: com a cópia boa, ela fica; sem
+  cópia, o aviso do erro, e a próxima tentativa só depois de 60 s.
 - **No Quadro** (`fama_quadro.py`, pelo `telas._ctx_quadro`): o cartão com a marca FAMA, só de leitura (sem a janela de
   reprogramar; borda tracejada), com o número FAMA-<id>, a usina, o tipo, a severidade (cor e palavra), a previsão, a
   situação e o título. Entram as abertas (criada, planejada, pausada) no dia da `data_id_prevista`; a aberta com a previsão
@@ -1836,15 +1842,15 @@ livro `nexus_os_fama · fato_os_fama` e o de-para em Ligações são da parte A 
   andamento"; a previsão depois do domingo é de outra semana. Os cartões da FAMA vêm DEPOIS das tarefas oficiais da
   coluna, com o mesmo `TETO_CARTOES` e o "+N" (revisão de 11/11/2026: no alto, 30 atrasadas empurravam a programação para
   fora da vista). O dia que só a FAMA tem (sábado) ganha a coluna. Não contam nas tarefas nem nas horas do dia; a conta do
-  topo diz "N OS da FAMA lidas em ...". Os filtros valem para elas pela mesma conta (`quadro.filtrar`), e as listas contam
-  as OS da FAMA à parte ("+N FAMA", `quadro.opcoes_com_outras`, o `opcoes_fora` do `montar`): equipe, responsável e
-  cliente vêm das tarefas do Fracttal da usina na semana e, sem tarefa, do cadastro (o responsável é o gestor de contrato,
-  escrito como a semana escreve o mesmo nome: o gestor que entra filtrado não perde a OS da usina sem tarefa); tipo é o da
-  FAMA em português; situação, a do Fracttal que cada uma é; turno, "Sem horário"; a busca acha o número e o título. Só
-  na semana que não acabou (a situação da FAMA é a de agora). A OS sem usina ligada (ou com a usina fora do cadastro) e a
-  sem data prevista viram aviso ("N OS da FAMA sem usina ligada (Base → Ligações)"), nunca cartão; a leitura que falha
-  vira aviso, e o Quadro sai sem elas. A explicação está no "!" do título. O título só vai para o cartão (nem para os
-  dados da página nem para log).
+  topo diz "N OS da FAMA · livro da FAMA gravado em ...". Os filtros valem para elas pela mesma conta
+  (`quadro.filtrar`), e as listas contam as OS da FAMA à parte ("+N FAMA", `quadro.opcoes_com_outras`, o `opcoes_fora`
+  do `montar`): equipe, responsável e cliente vêm das tarefas do Fracttal da usina na semana e, sem tarefa, do cadastro
+  (o responsável é o gestor de contrato, escrito como a semana escreve o mesmo nome: o gestor que entra filtrado não
+  perde a OS da usina sem tarefa); tipo é o da FAMA em português; situação, a do Fracttal que cada uma é; turno, "Sem
+  horário"; a busca acha o número e o título. Só na semana que não acabou (a situação da FAMA é a de agora). A OS sem
+  usina ligada (ou com a usina fora do cadastro) e a sem data prevista viram aviso ("N OS da FAMA sem usina ligada
+  (Base → Ligações)"), nunca cartão; a leitura que falha vira aviso, e o Quadro sai sem elas. A explicação está no "!"
+  do título. O título só vai para o cartão (nem para os dados da página nem para log).
 - **A possível repetição:** a preventiva do Fracttal (MPA, MPS, MPM, MPQ, MPT, MPW, Preventiva) da usina em que a FAMA tem
   preventiva (o tipo Preventive/Predictive; limpeza e roçada não contam) na semana ganha "FAMA também" na linha do tipo;
   a frase inteira vai no `aria-label` do cartão (o leitor de tela lê o rótulo do botão), no `title` e na janela da OS. Só
@@ -1879,8 +1885,9 @@ livro `nexus_os_fama · fato_os_fama` e o de-para em Ligações são da parte A 
   - o robô e o App precisam aceitar "FAMA-<id>" no "OSs ID" e "OS da FAMA <id>" na tarefa.
 - **Provar:** `tests/test_pcm_fama_quadro.py` (as regras, o teto e o bloco das atrasadas, os filtros e as contas à
   parte, o frescor, a repetição e a tela), `tests/test_pcm_fama_copia.py` (o caminho de produção, com o banco de mentira e
-  o livro gravado pela carga da parte A: a 1ª visita não espera, a cópia vencida volta na hora, o livro igual não é
-  relido, a falha não trava), `tests/test_pcm_fama_juncao.py` (a porta lendo o livro: só o título) e
+  o livro gravado pela carga da parte A: a 1ª visita não espera, a cópia vencida volta na hora, duas visitas na mesma
+  expiração abrem uma renovação só, o livro igual não é relido e sem o livro só a listagem é conferida, a subida aquece
+  a cópia, a falha não trava), `tests/test_pcm_fama_juncao.py` (a porta lendo o livro: só o título) e
   `tests/test_pcm_fama_motor.py` (desligada = a rodada de hoje; ligada = as colunas e a preventiva que sai, o portão do
   frescor e o motor de verdade com a foto de mentira). Ver a tela: uma cópia de prova com o banco de mentira e o livro da
   FAMA gravado pela carga da parte A (desktop e 375 px, escuro e claro), sem rolagem lateral a 375 px.

@@ -33,11 +33,13 @@
       {% endif %}
       {# as OS da FAMA (11/11/2026, fase 1: só aparecem; nexus/pcm/fama_quadro.py) #}
       {% if q and q.fama and q.fama.mostra %}
-      {{ termo('OS da FAMA', 'info') }}<dd>As OS que os clientes abrem na FAMA, lidas do banco de hora em hora ("lidas em" diz
-        a última leitura). Por enquanto elas só aparecem: não entram na programação, não se reprogramam aqui e não contam nas
-        tarefas nem nas horas do dia. Entram as abertas (criada, planejada, pausada) e as em andamento, no dia da data
-        prevista, depois das tarefas, com o mesmo limite de cartões; os filtros valem para elas, com a conta delas à parte
-        ("+N FAMA").</dd>
+      {{ termo('OS da FAMA', 'info') }}<dd>As OS que os clientes abrem na FAMA. A carga do servidor lê a FAMA de
+        hora em hora, mas o livro da FAMA no banco só é regravado quando a FAMA muda ou uma vez por dia: o "livro da
+        FAMA gravado em" diz essa última gravação, que sem mudança na FAMA pode ter horas. Mais de 26 h sem gravação é
+        a leitura da FAMA parada, e o quadro avisa. Por enquanto elas só aparecem: não entram na programação, não se
+        reprogramam aqui e não contam nas tarefas nem nas horas do dia. Entram as abertas (criada, planejada, pausada) e
+        as em andamento, no dia da data prevista, depois das tarefas, com o mesmo limite de cartões; os filtros valem
+        para elas, com a conta delas à parte ("+N FAMA").</dd>
       {{ termo('Atrasada', 'critico') }}<dd>A OS aberta da FAMA com a data prevista antes da segunda: vai no bloco recolhido
         da segunda.</dd>
       {{ termo('Em andamento', 'alerta') }}<dd>A OS da FAMA em mobilização ou em execução.</dd>
@@ -71,8 +73,8 @@
 {% if q.fama.erro %}<div class="pcm-aviso pcm-aviso--alerta"><i class="ph ph-warning"></i><div>
   As OS da FAMA não abriram agora ({{ q.fama.erro }}): o quadro sai sem elas.</div></div>{% endif %}
 {% if q.fama.velho %}<div class="pcm-aviso pcm-aviso--alerta"><i class="ph ph-clock-countdown"></i><div>
-  A leitura da FAMA parou: o que aparece pode estar velho{% if q.fama.lidas_em %} (OS da FAMA lidas em
-  {{ q.fama.lidas_em }}){% endif %}.</div></div>{% endif %}
+  A leitura da FAMA parou: o que aparece pode estar velho{% if q.fama.gravado_em %} (livro da FAMA gravado em
+  {{ q.fama.gravado_em }}){% endif %}.</div></div>{% endif %}
 {% if q.fama.sem_usina %}<div class="pcm-aviso pcm-aviso--alerta"><i class="ph ph-link-break"></i><div>
   {{ q.fama.sem_usina }} OS da FAMA sem usina ligada
   (<a class="pcm-link" href="{{ raiz }}/t/base/ligacoes">Base → Ligações</a>): ficam fora do quadro até a ligação.</div></div>{% endif %}
@@ -109,7 +111,7 @@
   {% if tem_filtro %}<a class="q-limpar" href="{{ (url_limpar)|na_raiz }}"><i class="ph ph-x"></i> Limpar</a>{% endif %}
   <p class="pcm-conta q-conta"><b class="gc-num">{{ q.total }}</b>{% if q.total != q.total_semana %} de {{ q.total_semana }}{% endif %}
     tarefas · {{ q.horas }}{% if q.novas is not none %} · <b class="gc-num">{{ q.novas }}</b>
-    {{ 'criada' if q.novas == 1 else 'criadas' }} após o plano{% endif %}{% if q.sem_dia %} · {{ q.sem_dia }} sem dia{% endif %}{% if q.fama and q.fama.total_semana %} · <b class="gc-num">{{ q.fama.total }}</b>{% if q.fama.total != q.fama.total_semana %} de {{ q.fama.total_semana }}{% endif %} OS da FAMA{% if q.fama.lidas_em %} lidas em {{ q.fama.lidas_em }}{% endif %}{% endif %}{% if filtro_gestor %} · filtrado em
+    {{ 'criada' if q.novas == 1 else 'criadas' }} após o plano{% endif %}{% if q.sem_dia %} · {{ q.sem_dia }} sem dia{% endif %}{% if q.fama and q.fama.total_semana %} · <b class="gc-num">{{ q.fama.total }}</b>{% if q.fama.total != q.fama.total_semana %} de {{ q.fama.total_semana }}{% endif %} OS da FAMA{% if q.fama.gravado_em %} · livro da FAMA gravado em {{ q.fama.gravado_em }}{% endif %}{% endif %}{% if filtro_gestor %} · filtrado em
     {{ filtros.resp }}, o gestor de contrato que entrou{% endif %}</p>
   {% if rp_url %}<a class="gc-btn gc-btn--ui gc-btn--contorno q-rp-link" href="#reprogramacoes" data-rp-abrir
      title="Reprogramações da semana em curso"><i class="ph ph-list-checks"></i> Reprogramações</a>{% endif %}

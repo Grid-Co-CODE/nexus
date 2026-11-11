@@ -26,13 +26,16 @@ o número FAMA-<id> e o título.
 
 A velocidade (revisão de 11/11/2026, item 1): o pedido da tela NUNCA lê o banco. As OS e o cadastro ficam numa cópia em
 memória, servida na hora; vencida (`COPIA_S`), a visita seguinte a renova por trás, uma renovação de cada vez (o voo
-único, como o `_renovar` da `campo/visao.py`), e recebe a cópia de antes. A renovação confere antes o `updated_at` do livro
-(a listagem do banco): se não mudou, a cópia fica e nenhuma página é relida. Sem cópia nenhuma (a 1ª visita depois de
-subir), o Quadro abre sem a FAMA, com o aviso `LENDO`. A falha não trava: com a cópia boa, ela fica; sem cópia, o aviso
-de erro, e a próxima tentativa só depois de `FALHA_S`.
+único: a marca "rodando" dentro da trava, como o `_RENOVANDO` da `campo/visao.py`), e recebe a cópia de antes. A
+renovação confere antes o `updated_at` do livro (a listagem do banco): se não mudou (sem o livro no banco, None igual a
+None), a cópia fica e nenhuma página é relida. Sem cópia nenhuma (os primeiros segundos depois de subir: a subida aquece
+a cópia por trás, `aquecer_ao_subir`), o Quadro abre sem a FAMA, com o aviso `LENDO`. A falha não trava: com a cópia
+boa, ela fica; sem cópia, o aviso de erro, e a próxima tentativa só depois de `FALHA_S`.
 
-O frescor: o batimento da carga (`fama_os.Lido.gerado_em`) vira "OS da FAMA lidas em DD/MM HH:MM"; com mais de
-`fama_os.FRESCOR_H`, o aviso "a leitura da FAMA parou: o que aparece pode estar velho".
+O frescor: o batimento da carga (`fama_os.Lido.gerado_em`) vira "livro da FAMA gravado em DD/MM HH:MM". É a última
+gravação do livro, não a última leitura (re-revisão de 11/11/2026, item 4: o "lidas em" de antes dizia horas atrás com
+a carga lendo de hora em hora): a carga só regrava o livro quando a FAMA muda ou uma vez por dia, e o "!" diz isso. Com
+mais de `fama_os.FRESCOR_H`, o aviso "a leitura da FAMA parou: o que aparece pode estar velho".
 
 A possível repetição: a preventiva do Fracttal (MPA, MPS, MPM, MPQ, MPT, MPW, Preventiva) da usina em que a FAMA tem
 preventiva (Preventive/Predictive) na mesma semana ganha a etiqueta "a FAMA também tem preventiva desta usina nesta
@@ -79,12 +82,13 @@ class _Copia:
 
 
 _TRAVA = threading.Lock()
-_ESTADO: dict = {"copia": None, "erro": None, "erro_em": 0.0, "fio": None, "voltas": 0}
+_PAROU = threading.Condition(_TRAVA)      # avisa o `esperar` quando a renovação acaba
+_ESTADO: dict = {"copia": None, "erro": None, "erro_em": 0.0, "rodando": False, "voltas": 0}
 
 
 def limpar() -> None:
     with _TRAVA:
-        _ESTADO.update(copia=None, erro=None, erro_em=0.0, fio=None, voltas=0)
+        _ESTADO.update(copia=None, erro=None, erro_em=0.0, rodando=False, voltas=0)
 
 
 def voltas() -> int:
@@ -94,26 +98,54 @@ def voltas() -> int:
 
 def esperar(timeout: float) -> bool:
     """Espera a renovação em andamento (os testes e a ferramenta de prova). True quando não há nenhuma rodando."""
-    fio = _ESTADO["fio"]
-    if fio is not None:
-        fio.join(timeout)
-        return not fio.is_alive()
-    return True
+    with _PAROU:
+        return _PAROU.wait_for(lambda: not _ESTADO["rodando"], timeout)
+
+
+def _novo_fio(cfg, app) -> threading.Thread:
+    return threading.Thread(target=_rodar, args=(cfg, app), daemon=True, name="nexus-pcm-fama")
+
+
+def _parou() -> None:
+    with _PAROU:
+        _ESTADO["rodando"] = False
+        _PAROU.notify_all()
 
 
 def _renovar(cfg, app) -> bool:
-    """Uma renovação de cada vez, por trás; a que falhou só se repete depois de `FALHA_S`. True = esta chamada a começou."""
+    """Uma renovação de cada vez, por trás; a que falhou só se repete depois de `FALHA_S`. True = esta chamada a
+    começou.
+
+    A vez é a marca "rodando", posta aqui e tirada no fim do `_rodar`, as duas dentro da trava (como o `_RENOVANDO` da
+    `campo/visao.py`). Re-revisão de 11/11/2026, item 1: a vez era o `is_alive()` da thread, e o `start()` roda fora da
+    trava; a thread criada e ainda não começada diz False, e a visita que chegava nesse intervalo abria a 2ª renovação
+    da mesma expiração. A thread que nem começa tira a marca (senão a cópia não se renovaria mais até reiniciar)."""
     with _TRAVA:
-        fio = _ESTADO["fio"]
-        if fio is not None and fio.is_alive():
+        if _ESTADO["rodando"]:
             return False
         if _ESTADO["erro"] and time.time() - _ESTADO["erro_em"] < FALHA_S:
             return False
-        fio = threading.Thread(target=_rodar, args=(cfg, app), daemon=True, name="nexus-pcm-fama")
-        _ESTADO["fio"] = fio
-        _ESTADO["voltas"] += 1
-    fio.start()
+        fio = _novo_fio(cfg, app)
+        _ESTADO.update(rodando=True, voltas=_ESTADO["voltas"] + 1)
+    try:
+        fio.start()
+    except BaseException:
+        _parou()
+        raise
     return True
+
+
+def aquecer_ao_subir(app) -> bool:
+    """A cópia aquecida quando o Nexus sobe (re-revisão de 11/11/2026, item 3): cada deploy reinicia o Nexus e a
+    cópia começa vazia, e quem abria o Quadro depois via "Lendo as OS da FAMA". É a renovação de sempre, por trás e na
+    hora: ela só lê o banco, então não espera os 5 min da `pre_carga.aquecer_ao_subir` (que espaçam as leituras do
+    Fracttal). A subida não espera por ela, e o aviso fica para quem chega nos primeiros segundos. Quem chama é o
+    `servir.py` e o `app.py`, ao lado da pré-carga, nunca o `create_app` (os testes) nem a cópia de prova;
+    `NEXUS_PRE_CARGA=0` desliga junto. True = a renovação começou."""
+    from ..auth import pre_carga
+    if app.config.get("TESTING") or not pre_carga.ligada(app.config):
+        return False
+    return _renovar(app.config, app)
 
 
 def _rodar(cfg, app) -> None:
@@ -125,8 +157,11 @@ def _rodar(cfg, app) -> None:
             base, sessao = conexao.banco_de(cfg)
             versao = livros.atualizado_em(base, sessao, FOF.LIVRO)
             c = _ESTADO["copia"]
-            if c is not None and versao and versao == c.versao and agora - c.lida_em < COMPLETA_S:
-                c.conferida_em = agora           # o livro não mudou: a cópia fica, sem reler as páginas
+            # o livro não mudou: a cópia fica, sem reler as páginas. Sem o livro no banco (antes da 1ª carga do
+            # servidor) a versão é None, e None igual a None também é o livro igual (re-revisão de 11/11/2026, item 2:
+            # senão as 3 listagens eram relidas a cada 2 min); de hora em hora (`COMPLETA_S`), a leitura inteira
+            if c is not None and versao == c.versao and agora - c.lida_em < COMPLETA_S:
+                c.conferida_em = agora
             else:
                 lido = F._linhas_fama(cfg)
                 usinas = {F.inteiro(l.get("usina_id")) for l in lido.linhas} - {None}
@@ -136,6 +171,8 @@ def _rodar(cfg, app) -> None:
     except Exception as ex:      # noqa: BLE001 — o nome do erro, nunca a mensagem (pode trazer endereço)
         log.warning("Quadro: as OS da FAMA não abriram (%s)", type(ex).__name__)
         _ESTADO["erro"], _ESTADO["erro_em"] = type(ex).__name__, time.time()
+    finally:
+        _parou()
 
 
 def ler(cfg, app=None) -> dict:
@@ -161,7 +198,7 @@ def ler(cfg, app=None) -> dict:
 # ── as OS da semana ──────────────────────────────────────────────────────────────────────────────────────────────
 def _vazio(ativa=False, erro=None, lendo=False) -> dict:
     return {"ativa": ativa, "linhas": [], "sem_usina": 0, "sem_data": 0, "preventivas": set(), "erro": erro,
-            "lendo": lendo, "lidas_em": "", "velho": False}
+            "lendo": lendo, "gravado_em": "", "velho": False}
 
 
 def para_o_quadro(cfg, sem: dict, dia) -> dict:
@@ -201,13 +238,14 @@ def _como_na_semana(nome, da_semana: set) -> str:
 def da_semana(linhas: list[dict], sem: dict, cadastro: dict, hoje, gerado_em=None, agora=None) -> dict:
     """{"ativa", "linhas": uma linha por OS da FAMA que vira cartão, nas chaves das linhas da semana (as que os filtros
     leem) e com o cartão em "fama", "sem_usina", "sem_data", "preventivas": os nomes (normalizados) das usinas com
-    preventiva da FAMA na semana, "lidas_em" e "velho": o frescor do batimento}. As regras estão no docstring do módulo."""
+    preventiva da FAMA na semana, "gravado_em" e "velho": o frescor do batimento}. As regras estão no docstring do
+    módulo."""
     seg = HB.segunda(sem["week"])
     dom = seg + timedelta(days=6)
     out = _vazio(hoje <= dom)
     if not out["ativa"]:
         return out
-    out.update(lidas_em=F.quando(gerado_em), velho=F.velho(gerado_em, agora))
+    out.update(gravado_em=F.quando(gerado_em), velho=F.velho(gerado_em, agora))
     # as tarefas do Fracttal de cada usina na semana (agenda e pendentes), pelo nome do Fracttal
     por_nome: dict[str, list[dict]] = {}
     for r in (sem.get("rows") or []) + (sem.get("pendentes") or []):
@@ -303,5 +341,5 @@ def no_quadro(q: dict, sem: dict, fama: dict, filtros: dict, todos: bool = False
     q["colunas"] = novas
     q["fama"] = {"total": len(sel), "total_semana": len(linhas), "sem_usina": fama.get("sem_usina", 0),
                  "sem_data": fama.get("sem_data", 0), "erro": fama.get("erro"), "lendo": fama.get("lendo", False),
-                 "lidas_em": fama.get("lidas_em", ""), "velho": fama.get("velho", False),
+                 "gravado_em": fama.get("gravado_em", ""), "velho": fama.get("velho", False),
                  "mostra": bool(linhas or fama.get("sem_usina") or fama.get("sem_data"))}

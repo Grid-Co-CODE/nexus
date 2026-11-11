@@ -58,6 +58,8 @@ if __name__ == "__main__":
     relatorios_pcm.ligar(app)                # os relatórios do PCM nos horários de lá (14/10/2026; 0 = desliga)
     from nexus.auth import pre_carga
     pre_carga.aquecer_ao_subir(app)          # as telas quentes depois de subir (13/10/2026; 5 min, ver a função)
+    from nexus.pcm import fama_quadro
+    fama_quadro.aquecer_ao_subir(app)        # as OS da FAMA do Quadro, na hora e por trás (11/11/2026; só o banco)
     plataforma = (ler_ambiente().get("NEXUS_PLATAFORMA_LOCAL") or "").strip()
     # a plataforma tem pedidos longos (trackers de um dia passam de minutos): mais threads para eles não segurarem o Nexus
     threads = 32 if plataforma else 8

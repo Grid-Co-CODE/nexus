@@ -5,11 +5,12 @@ O que estes testes seguram: quais OS entram na semana (as abertas no dia da prev
 segunda, "atrasada", num bloco recolhido; em mobilização e em execução, "em andamento"; as outras situações e a previsão
 depois do domingo, não); a OS sem usina ligada vira aviso, não cartão; a sem data prevista também; os cartões da FAMA vêm
 depois das tarefas oficiais, com o mesmo teto do Quadro; os filtros valem para elas (o responsável da usina sem tarefa
-pela volta do cadastro) e as listas contam as OS da FAMA à parte; o "lidas em" e o aviso da leitura parada; a etiqueta de
-repetição só na preventiva do Fracttal da usina com preventiva da FAMA na semana, dita no rótulo do cartão; a semana que
-acabou fica sem a FAMA; e a tela. O caminho de produção (a cópia por trás, sem ler o banco no pedido) está em
-`tests/test_pcm_fama_copia.py`. A FAMA e o banco são de mentira: nenhum teste vai à rede."""
+pela volta do cadastro) e as listas contam as OS da FAMA à parte; o "livro da FAMA gravado em" e o aviso da leitura
+parada; a etiqueta de repetição só na preventiva do Fracttal da usina com preventiva da FAMA na semana, dita no rótulo
+do cartão; a semana que acabou fica sem a FAMA; e a tela. O caminho de produção (a cópia por trás, sem ler o banco no
+pedido) está em `tests/test_pcm_fama_copia.py`. A FAMA e o banco são de mentira: nenhum teste vai à rede."""
 import json
+import re
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
@@ -219,13 +220,14 @@ def test_a_etiqueta_de_repeticao_so_na_preventiva_do_fracttal_da_usina_com_preve
     assert not any(r.get("fama_rep") for r in FQ.marcar_repeticao(_semana(), _fama(linhas=so_corretiva))["rows"])
 
 
-def test_o_quadro_diz_quando_leu_a_fama_e_avisa_a_leitura_parada():
-    """Revisão de 11/11/2026, item 4: o batimento da carga (o `gerado_em` da aba `atualizacao`) vira "lidas em"; com mais
-    de 26 h, a leitura da FAMA parou e o Quadro avisa."""
+def test_o_quadro_diz_quando_o_livro_da_fama_foi_gravado_e_avisa_a_leitura_parada():
+    """Revisão de 11/11/2026, item 4: o batimento da carga (o `gerado_em` da aba `atualizacao`) é a última gravação
+    do livro (re-revisão, item 4: "gravado em", não "lidas em": a carga lê de hora em hora e só regrava quando a FAMA
+    muda ou uma vez por dia); com mais de 26 h, a leitura da FAMA parou e o Quadro avisa."""
     q = _quadro()
-    assert (q["fama"]["lidas_em"], q["fama"]["velho"]) == ("07/10 10:40", False)
+    assert (q["fama"]["gravado_em"], q["fama"]["velho"]) == ("07/10 10:40", False)
     q = _quadro(gerado_em="2026-10-06T09:59:00-03:00")                    # 26 h e 1 min antes de AGORA
-    assert (q["fama"]["lidas_em"], q["fama"]["velho"]) == ("06/10 09:59", True)
+    assert (q["fama"]["gravado_em"], q["fama"]["velho"]) == ("06/10 09:59", True)
     assert _quadro(gerado_em=None)["fama"]["velho"] is True                 # sem batimento: não se sabe, avisa
     assert FO.velho("2026-10-06T10:01:00-03:00", AGORA) is False and FO.velho("lixo", AGORA) is True
 
@@ -294,11 +296,12 @@ def test_tela_quadro_com_as_os_da_fama(app, logado, tmp_path, monkeypatch):
     dados = json.loads(html.split('id="q-dados">', 1)[1].split("</script>", 1)[0])
     assert [i["os"] for i in dados["itens"] if i.get("frep")] == ["2"]
     assert TITULO_SIGILOSO not in json.dumps(dados, ensure_ascii=False)  # o título não vai para os dados da página
-    # a explicação no "!" do título (nada solto na tela), e a conta do topo com as OS da FAMA e quando foram lidas
+    # a explicação no "!" do título (nada solto na tela), e a conta do topo com as OS da FAMA e a gravação do livro
     topo = html.split('class="q-barra"', 1)[0]
     caixa = topo.split('class="gc-explica"', 1)[1].split("</details>", 1)[0]
     assert "OS da FAMA" in caixa and "Atrasada" in caixa and "FAMA também" in caixa
-    assert "4</b> OS da FAMA lidas em" in html and "leitura da FAMA parou" not in html
+    assert "4</b> OS da FAMA · livro da FAMA gravado em " in html and "lidas em" not in html
+    assert "leitura da FAMA parou" not in html
     # a conta da FAMA à parte na lista do filtro de tipo
     assert '<span>Limpeza de módulos</span><small class="gc-num">0</small><small class="q-ms-fama">+1 FAMA</small>' in html
 
@@ -317,9 +320,34 @@ def test_tela_a_frase_da_repeticao_no_rotulo_do_cartao(app, logado, tmp_path, mo
     assert 'aria-label="Abrir a OS 1: Tarefa"' in html
 
 
+def test_tela_diz_quando_o_livro_da_fama_foi_gravado_e_o_exclama_diz_quando_ele_e_regravado(app, logado, tmp_path,
+                                                                                          monkeypatch):
+    """Re-revisão de 11/11/2026, item 4: a hora da tela é a da última gravação do livro (o batimento), e a carga só
+    regrava o livro quando a FAMA muda ou uma vez por dia: "lidas em" parecia dizer que a FAMA não era lida havia
+    horas. O "!" diz por quê, e o aviso das 26 h continua."""
+    gravado = (datetime.now(BRT) - timedelta(hours=5)).replace(second=0, microsecond=0)
+    html = _tela(app, logado, tmp_path, monkeypatch,
+                 **_com_fama(NEXUS_FAMA_GERADO_EM_TESTE=gravado.isoformat(timespec="seconds")))
+    assert f"OS da FAMA · livro da FAMA gravado em {gravado.strftime('%d/%m %H:%M')}<" in html
+    assert "lidas em" not in html and "leitura da FAMA parou" not in html          # 5 h: sem o aviso
+    caixa = html.split('class="q-barra"', 1)[0].split('class="gc-explica"', 1)[1].split("</details>", 1)[0]
+    explica = " ".join(caixa.split())
+    assert "só é regravado quando a FAMA muda ou uma vez por dia" in explica and "26 h" in explica
+
+
+def test_a_conta_do_topo_quebra_a_linha_quando_nao_cabe():
+    """Com o "livro da FAMA gravado em" (re-revisão de 11/11/2026, item 4), a conta presa numa linha (nowrap) alargava o
+    quadro de 641 a 673 px e com o menu ao lado, e a página rolava de lado (medido no navegador com o filtro do
+    responsável: "N de M tarefas · ... · N de M OS da FAMA · livro da FAMA gravado em ..."). Ela quebra só quando não
+    cabe."""
+    css = (RAIZ / "nexus" / "static" / "pcm.css").read_text(encoding="utf-8")
+    assert "nowrap" not in re.search(r"^\.q-conta\{([^}]*)\}", css, re.M).group(1)
+
+
 def test_tela_avisa_a_leitura_da_fama_parada(app, logado, tmp_path, monkeypatch):
     html = _tela(app, logado, tmp_path, monkeypatch, **_com_fama(NEXUS_FAMA_GERADO_EM_TESTE=_agora_menos(30)))
-    assert "A leitura da FAMA parou: o que aparece pode estar velho (OS da FAMA lidas em" in html
+    texto = " ".join(html.split())
+    assert "A leitura da FAMA parou: o que aparece pode estar velho (livro da FAMA gravado em " in texto
 
 
 def test_tela_quadro_sem_a_fama_fica_como_era(app, logado, tmp_path, monkeypatch):
