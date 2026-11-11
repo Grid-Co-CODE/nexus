@@ -49,9 +49,41 @@
     <div class="cn-seg" aria-label="Período">
       {% for d in dias_opcoes %}<a href="{{ url(dias=d) }}"{% if d == dias %} aria-current="page"{% endif %}>{{ 'Último dia' if d == 1 else 'Últimos ' ~ d ~ ' dias' }}</a>{% endfor %}
     </div>
-    {# A lista com os filtros de agora, em CSV (11/11/2026), como a tela Normalizações. #}
-    <a class="cn-link" href="{{ url(formato='csv') }}" download>Exportar CSV</a>
   </div>
+
+  {# Os filtros da tela Normalizações (11/11/2026, pedido da Ana Barros), com os mesmos nomes no endereço. O cliente é a
+     aba de cima. Cada escolha relê a página (o servidor filtra); a lupa vale no Enter. A contagem de cada opção é do
+     período inteiro, antes dos filtros. #}
+  <form class="cn-filtros cos-norm-filtros" method="get" id="cos-oc-filtros">
+    <input type="hidden" name="cliente" value="{{ cliente }}"><input type="hidden" name="dias" value="{{ dias }}">
+    {% if situacao %}<input type="hidden" name="situacao" value="{{ situacao }}">{% endif %}
+    <label class="cn-filtro-par"><span class="gc-rotulo">Tipo de falha</span>
+    <select class="gc-campo" name="falha" data-oc-filtro>
+      <option value="">Todos</option>{% for f, n in p.opcoes.falha.items() %}<option value="{{ f }}"{% if f == filtros.falha %} selected{% endif %}>{{ f }} ({{ n }})</option>{% endfor %}
+    </select></label>
+    <label class="cn-filtro-par"><span class="gc-rotulo">Usina</span>
+    <select class="gc-campo" name="usina" data-oc-filtro>
+      <option value="">Todas</option>{% for u, n in p.opcoes.usina.items() %}<option value="{{ u }}"{% if u == filtros.usina %} selected{% endif %}>{{ u }} ({{ n }})</option>{% endfor %}
+    </select></label>
+    <label class="cn-filtro-par"><span class="gc-rotulo">Criado por</span>
+    <select class="gc-campo" name="criado_por" data-oc-filtro>
+      <option value="">Todos</option>{% for c, n in p.opcoes.criado_por.items() %}<option value="{{ c }}"{% if c == filtros.criado_por %} selected{% endif %}>{{ c }} ({{ n }})</option>{% endfor %}
+    </select></label>
+    <label class="cn-filtro-par"><span class="gc-rotulo">Técnico</span>
+    <select class="gc-campo" name="tecnico" data-oc-filtro>
+      <option value="">Todos</option>{% for c, n in p.opcoes.tecnico.items() %}<option value="{{ c }}"{% if c == filtros.tecnico %} selected{% endif %}>{{ c }} ({{ n }})</option>{% endfor %}
+    </select></label>
+    <label class="cn-filtro-par"><span class="gc-rotulo">Status Fracttal</span>
+    <select class="gc-campo" name="status" data-oc-filtro>
+      <option value="">Todos</option>{% for k, rot in status_filtro.items() %}<option value="{{ k }}"{% if k == filtros.status %} selected{% endif %}>{{ rot }} ({{ p.opcoes.status[k] }})</option>{% endfor %}
+    </select></label>
+    <input class="gc-campo cos-norm-busca" type="search" name="q" value="{{ filtros.q }}" placeholder="OS, usina, falha, causa, nota..." aria-label="Buscar nas ocorrências">
+    <button class="gc-btn gc-btn--ui" type="submit">Filtrar</button>
+    {# A lista com os filtros de agora, em CSV (11/11/2026), como a tela Normalizações. #}
+    <a class="gc-btn gc-btn--ui cos-norm-csv" href="{{ url(formato='csv') }}" download><i class="ph ph-download-simple" aria-hidden="true"></i> Exportar CSV</a>
+  </form>
+  {% set filtrado = filtros.falha or filtros.usina or filtros.criado_por or filtros.tecnico or filtros.status or filtros.q %}
+  {% if filtrado %}<div class="cn-chips"><a href="{{ url(falha=None, usina=None, criado_por=None, tecnico=None, status=None, q=None) }}">Limpar os filtros</a></div>{% endif %}
 
   <div class="cn-numeros">
     <span><span class="gc-rotulo">Ocorrências</span><span class="v">{{ p.total }}</span><span class="d">registradas {% if p.desde %}desde {{ p.desde.strftime('%d/%m %H:%M') }}{% endif %}</span></span>
@@ -105,5 +137,9 @@
     if (document.querySelector('details.cos-oq[open]')) return;
     if (!a || !/^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName)) location.reload();
   }, 60000);
+  // Os filtros (11/11/2026): escolher uma opção já filtra, sem precisar do botão.
+  document.querySelectorAll('[data-oc-filtro]').forEach(function (s) {
+    s.addEventListener('change', function () { s.form.submit(); });
+  });
 </script>
 {% endblock %}
