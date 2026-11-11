@@ -287,7 +287,7 @@ def get_os_subtarefa_anexos(id_work_order) -> list:
                 is_image = any(low.endswith(e) for e in (".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp"))
                 out.append({"url": None, "thumb": None, "descricao": legenda or nome, "nome": nome,
                             "value": val, "subtarefa": sub_desc, "is_image": is_image,
-                            "is_text": False, "raw": d, "id_tarefa": wid})
+                            "is_text": False, "raw": d, "id_tarefa": wid, "id_form_item": fid})
             else:                                               # nota de texto (type 3)
                 out.append({"url": None, "thumb": None, "descricao": legenda or att_desc or val,
                             "nome": att_desc or val or "nota", "value": "", "subtarefa": sub_desc,

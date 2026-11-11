@@ -1225,7 +1225,8 @@ from os_execucao import (  # noqa: E402,F401
     historico_execucao,
     id_tarefa_da_os, iniciar_execucao, iniciar_execucao_os, marcar_em_execucao, motivos_pausa, pausar_execucao,
     registrar_execucao, retomar_execucao, salvar_subtarefas, subtarefas_da_tarefa, tempo_trabalhado,
-    tempo_trabalhado_em_massa, validar_seguranca_tarefa)
+    tempo_trabalhado_em_massa, validar_seguranca_tarefa, anexos_do_item, anexar_no_item, tirar_do_item,
+    excluir_anexo_da_tarefa, _arquivos_da_tarefa, _gravar_valores, _linha_valor)
 from os_planos import (  # noqa: E402,F401
     RPC_TASK_DETAILS, RPC_TASK_EVENTS, RPC_TASK_TEMPLATE_ITEMS, SUBTAREFAS_EXTRA, TIPO_SUB_ID, TIPO_TAREFA_DO_PLANO,
     _DURACAO_PLANO, _MARCA_EXTRA, _PERF_PLANOS, _TIPO_ITEM_DESC, _duracao_do_modelo, _find_subtasks, _norm_txt,

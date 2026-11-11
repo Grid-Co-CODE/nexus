@@ -114,7 +114,23 @@
 
   {# GaleriaDialog + DocumentosDialog numa janela: fotos em grade, arquivos com Abrir/Baixar, notas de texto clicáveis #}
   <template data-dlg="anexos">
-    <div class="acoes-cab2"><div><div class="acoes-t" data-anx-titulo></div><div class="acoes-s" data-anx-sub></div></div><span class="os-cresce"></span><button type="button" class="det-b verde" data-baixar-todos hidden>Baixar todos</button><button type="button" class="det-b ghost" data-fechar>Fechar</button></div>
+    <div class="acoes-cab2"><div><div class="acoes-t" data-anx-titulo></div><div class="acoes-s" data-anx-sub></div></div><span class="os-cresce"></span><button type="button" class="det-b ghost" data-anx-editar hidden title="Mostra o X em cada anexo para excluir">Editar</button><button type="button" class="det-b verde" data-baixar-todos hidden>Baixar todos</button><button type="button" class="det-b ghost" data-fechar>Fechar</button></div>
     <div class="acoes-anx-msg" data-anx-msg role="status" hidden></div>
     <div class="acoes-anx-corpo" data-anx-corpo><div class="acoes-hint i">carregando anexos…</div></div>
   </template>
+
+{# O Fazer OS (11/11/2026): cada tarefa com as subtarefas abertas, o controle de cada tipo, a foto na subtarefa e o anexo na
+   OS; no pé, o início e o fim da OS e o Enviar para verificação, que só libera com as obrigatórias e as fotos obrigatórias #}
+<template data-dlg="fazer">
+  <div class="acoes-cab2"><div><div class="acoes-t grande">Fazer a OS {{ d.folio }}</div><div class="acoes-s">Responda as subtarefas, anexe as fotos e envie para verificação.</div></div><span class="os-cresce"></span><button type="button" class="det-b ghost" data-fechar>Fechar</button></div>
+  <div class="fz-prog"><div class="fz-prog-bar"><div data-fazer-barra></div></div><span data-fazer-conta>—</span></div>
+  <div class="fz-corpo" data-fazer-corpo><div class="acoes-hint i">carregando as tarefas…</div></div>
+  <div class="fz-pe">
+    <div class="fz-datas">
+      <label class="os-campo"><span class="os-lbl">Início da OS</span><input type="datetime-local" data-fazer-ini></label>
+      <label class="os-campo"><span class="os-lbl">Fim da OS</span><input type="datetime-local" data-fazer-fim></label>
+    </div>
+    <div class="acoes-hint" data-hint role="status"></div>
+    <div class="acoes-bts"><button type="button" class="det-b ghost" data-fazer-salvar>Salvar respostas</button><button type="button" class="det-b ambar" data-conf="fazer" disabled>Enviar para verificação</button></div>
+  </div>
+</template>

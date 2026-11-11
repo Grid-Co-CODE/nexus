@@ -400,6 +400,94 @@
       });
     },
 
+    // O Fazer OS (11/11/2026, Levi: "eles devem preencher com o rigor da OS então a pessoa vai expandir as subtarefas,
+    // responder, se tiver anexo obrigatório deve ter a opção de anexar na OS ... e de anexar na subtarefa também"; "editar
+    // a ocorrência com a data de início e data fim da OS e mandar para 'Em verificação'"). As respostas de cada tarefa vão
+    // pelo /respostas (as fotos que a subtarefa tem vão junto, no servidor); a foto da subtarefa, pelo /item/<id>/anexo; o
+    // envio, pelo /fazer, que confere de novo o que falta
+    async fazer(d) {
+      const dlg = dialogo(d, 'fazer'); if (!dlg) return;
+      const corpo = q(dlg.caixa, '[data-fazer-corpo]'), ok = q(dlg.caixa, '[data-conf="fazer"]');
+      const salvar = q(dlg.caixa, '[data-fazer-salvar]'), ini = q(dlg.caixa, '[data-fazer-ini]'), fim = q(dlg.caixa, '[data-fazer-fim]');
+      const base = '/os/api/os/' + d.dataset.wid;
+      fim.value = agoraLocal();
+      let tarefas = [];
+      try {
+        tarefas = (await pedir(base + '/tarefas', undefined, 'Abrindo as tarefas…')).tarefas || [];
+        const cks = await Promise.all(tarefas.map((t) => pedir(base + '/tarefa/' + t.id + '/checklist', undefined, 'Abrindo as subtarefas…')));
+        tarefas.forEach((t, i) => { t.campos = cks[i].campos || []; });
+      } catch (e) { corpo.innerHTML = '<div class="acoes-hint">' + esc('Não consegui abrir as tarefas: ' + e.message) + '</div>'; return; }
+      const inis = tarefas.map((t) => (t.execucao || {}).inicio).filter(Boolean).sort();
+      if (inis.length) ini.value = String(inis[0]).slice(0, 16);
+      corpo.innerHTML = tarefas.map((t) => fzTarefaHTML(t, tarefas.length > 1)).join('') || '<div class="acoes-hint">A OS não tem tarefas.</div>';
+      const conta = () => fzConta(dlg, ok, ini, fim);
+      corpo.addEventListener('click', (e) => {
+        const op = e.target.closest('.fz-op');
+        if (op) {
+          const g = op.closest('[data-fid]');
+          g.querySelectorAll('.fz-op').forEach((x) => x.classList.toggle('on', x === op && !op.classList.contains('on')));
+          const on = g.querySelector('.fz-op.on'); g.dataset.valor = on ? (on.dataset.v || '') : '';
+          g.closest('.fz-sub').classList.add('mexida'); conta(); return;
+        }
+        const fb = e.target.closest('[data-fazer-foto]');
+        if (fb) { fb.parentElement.querySelector('input[type=file]').click(); return; }
+        const ab = e.target.closest('[data-fazer-anexo-os]');
+        if (ab) ab.parentElement.querySelector('input[type=file]').click();
+      });
+      corpo.addEventListener('input', (e) => { const s = e.target.closest('.fz-sub'); if (s) s.classList.add('mexida'); conta(); });
+      corpo.addEventListener('change', async (e) => {
+        const inp = e.target; if (!(inp.matches && inp.matches('input[type=file]')) || !inp.files.length) return;
+        const f = inp.files[0]; inp.value = '';
+        const sub = inp.closest('.fz-sub'), tarefa = inp.closest('.fz-tarefa');
+        const fd = new FormData(); fd.append('anexos', f, f.name);
+        let url;
+        if (sub) { url = base + '/tarefa/' + tarefa.dataset.tid + '/item/' + sub.dataset.fid + '/anexo'; fd.append('valor', fzValor(sub)); }
+        else { url = base + '/anexos'; fd.append('folio', d.dataset.folio || ''); fd.append('tarefa', tarefa.dataset.tid); }
+        const alvo = sub || tarefa;
+        const st = inp.parentElement.querySelector('[data-fazer-fotos]');
+        st.textContent = 'enviando ' + f.name + '…'; st.classList.remove('ruim');
+        try {
+          const r = await OsCarga.buscar(url, {method: 'POST', credentials: 'same-origin', headers: {'Accept': 'application/json'}, body: fd}, 'Enviando para o Fracttal…');
+          let j = null; try { j = await r.json(); } catch (x) { j = null; }
+          if (!r.ok) throw new Error(apiErro(j, r));
+          if (sub) { sub.dataset.anexos = String(j.n_anexos || (Number(sub.dataset.anexos || 0) + 1)); }
+          else { tarefa.dataset.anexos = String(Number(tarefa.dataset.anexos || 0) + 1); }
+          const n = Number(alvo.dataset.anexos || 0);
+          st.textContent = n === 1 ? '1 anexo' : n + ' anexos'; anexosCache.delete(d); alterou(d); conta();
+        } catch (x) { st.textContent = 'Não subiu: ' + x.message; st.classList.add('ruim'); }
+      });
+      [ini, fim].forEach((x) => x.addEventListener('input', conta));
+      conta();
+      const gravar = async () => {
+        let n = 0;
+        for (const t of corpo.querySelectorAll('.fz-tarefa')) {
+          const valores = {};
+          t.querySelectorAll('.fz-sub.mexida').forEach((s) => { const v = fzValor(s).trim(); if (v) valores[s.dataset.fid] = v; });
+          if (!Object.keys(valores).length) continue;
+          await pedir(base + '/tarefa/' + t.dataset.tid + '/respostas', {valores}, 'Gravando as respostas no Fracttal…');
+          t.querySelectorAll('.fz-sub.mexida').forEach((s) => s.classList.remove('mexida'));
+          n += Object.keys(valores).length;
+        }
+        return n;
+      };
+      salvar.addEventListener('click', async () => {
+        trava(salvar, true, 'salvando…');
+        try { const n = await gravar(); alterou(d); hint(dlg, n ? (n === 1 ? '1 resposta gravada no Fracttal.' : n + ' respostas gravadas no Fracttal.') : 'Nada novo para gravar.'); }
+        catch (e) { hint(dlg, 'Não consegui gravar: ' + e.message); }
+        finally { trava(salvar, false, 'Salvar respostas'); }
+      });
+      ok.addEventListener('click', async () => {
+        trava(ok, true, 'enviando…');
+        try {
+          await gravar();
+          const j = await pedir(base + '/fazer', {inicio: ini.value, fim: fim.value, folio: d.dataset.folio}, 'Enviando para verificação…');
+          alterou(d); dlg.fechar();
+          if (d.hasAttribute('data-no-lugar')) { relerPagina(d, j.mensagem); return; }
+          await recarregar(d, urlCard(d, 'Em Verificação'), j.mensagem);
+        } catch (e) { trava(ok, false, 'Enviar para verificação'); conta(); hint(dlg, 'Não foi possível enviar: ' + e.message); }
+      });
+    },
+
     // FluxoDialog: só a cadeia; clicar num nó abre o card daquela OS no lugar deste (como o app fecha um e abre o outro)
     async fluxo(d) {
       const dlg = dialogo(d, 'fluxo'); if (!dlg) return;
@@ -446,6 +534,7 @@
 
   async function abrirAnexos(d, chave, titulo, vazio, tarefa) {
     const dlg = dialogo(d, 'anexos'); if (!dlg) return;
+    dlg.d = d;                                           // o X do Editar exclui na OS deste card
     q(dlg.caixa, '[data-anx-titulo]').textContent = titulo;
     const corpo = q(dlg.caixa, '[data-anx-corpo]');
     try {
@@ -510,6 +599,57 @@
     m.hidden = !texto; m.textContent = texto || ''; m.classList.toggle('ruim', !!ruim);
   }
 
+  // ── o Fazer OS: o HTML de cada tarefa e de cada subtarefa, o valor e a conta do que falta ──
+  const FZ_TIPO = {verif: 'Verificação', simnao: 'Sim/Não', lista: 'Lista', num: 'Número', texto: 'Texto'};
+  function fzTarefaHTML(t, varias) {
+    const cab = varias ? '<div class="fz-t-cab"><b>' + esc(t.titulo || t.ativo || ('Tarefa ' + t.n)) + '</b>' + (t.ativo && t.ativo !== t.titulo ? '<span>' + esc(t.ativo) + '</span>' : '') + '</div>' : '';
+    return '<section class="fz-tarefa" data-tid="' + esc(t.id) + '" data-anexos="0">' + cab
+      + (t.campos.length ? t.campos.map(fzSubHTML).join('') : '<div class="acoes-hint">Esta tarefa não tem subtarefas.</div>')
+      + '<div class="fz-anexo-os"><button type="button" class="det-b ghost acoes-mini" data-fazer-anexo-os>Anexar na OS</button>'
+      + '<input type="file" hidden accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt"><span class="fz-fotos" data-fazer-fotos></span></div></section>';
+  }
+  function fzSubHTML(c) {
+    const v = c.valor == null ? '' : String(c.valor), fid = esc(c.id_form_item);
+    let ctrl;
+    if ((c.opcoes || []).length && (c.tipo_nome !== 'lista' || c.opcoes.length <= 6)) {
+      ctrl = '<div class="fz-opcoes" data-fid="' + fid + '" data-valor="' + esc(v) + '">' + c.opcoes.map((o) =>
+        '<button type="button" class="fz-op' + (String(o.valor) === v ? ' on' : '') + '" data-v="' + esc(o.valor) + '">' + esc(o.rotulo) + '</button>').join('') + '</div>';
+    } else if ((c.opcoes || []).length) {
+      ctrl = '<select class="fz-campo" data-fid="' + fid + '"><option value="">— selecione —</option>' + c.opcoes.map((o) =>
+        '<option value="' + esc(o.valor) + '"' + (String(o.valor) === v ? ' selected' : '') + '>' + esc(o.rotulo) + '</option>').join('') + '</select>';
+    } else if (c.tipo_nome === 'num') {
+      ctrl = '<input class="fz-campo" type="number" step="any" inputmode="decimal" data-fid="' + fid + '" value="' + esc(v) + '">';
+    } else {
+      ctrl = '<textarea class="fz-campo acoes-ta" rows="2" data-fid="' + fid + '">' + esc(v) + '</textarea>';
+    }
+    const n = Number(c.n_anexos || 0);
+    return '<div class="fz-sub" data-fid="' + fid + '" data-anexos="' + n + '" data-req="' + (c.obrigatorio ? 1 : 0) + '" data-foto="' + (c.anexo_obrigatorio ? 1 : 0) + '">'
+      + '<div class="fz-sub-cab"><span class="fz-sub-t">' + esc(c.descricao) + '</span><span class="fz-selos">'
+      + (c.obrigatorio ? '<span class="fz-selo req">obrigatória</span>' : '') + (c.anexo_obrigatorio ? '<span class="fz-selo foto">foto obrigatória</span>' : '')
+      + '<span class="fz-selo">' + esc(FZ_TIPO[c.tipo_nome] || 'Texto') + '</span></span></div>' + ctrl
+      + '<div class="fz-foto-l"><button type="button" class="det-b ghost acoes-mini" data-fazer-foto>Anexar foto</button>'
+      + '<input type="file" hidden accept="image/*,.pdf" capture="environment"><span class="fz-fotos" data-fazer-fotos>' + (n ? (n === 1 ? '1 anexo' : n + ' anexos') : '') + '</span></div></div>';
+  }
+  function fzValor(sub) {
+    const g = sub.querySelector('[data-fid]'); if (!g) return '';
+    return g.classList.contains('fz-opcoes') ? (g.dataset.valor || '') : (g.value || '');
+  }
+  function fzConta(dlg, ok, ini, fim) {
+    let total = 0, feitas = 0;
+    dlg.caixa.querySelectorAll('.fz-sub').forEach((s) => {
+      const resp = !!fzValor(s).trim(), foto = Number(s.dataset.anexos || 0) > 0;
+      s.classList.toggle('ok', resp && (s.dataset.foto !== '1' || foto));
+      if (s.dataset.req === '1') { total++; if (resp) feitas++; }
+      if (s.dataset.foto === '1') { total++; if (foto) feitas++; }
+    });
+    const pct = total ? Math.round(feitas * 100 / total) : 100;
+    q(dlg.caixa, '[data-fazer-barra]').style.width = pct + '%';
+    q(dlg.caixa, '[data-fazer-conta]').textContent = total ? feitas + ' de ' + total + ' obrigatórias' : 'sem obrigatórias';
+    const pronta = feitas === total && ini.value && fim.value && fim.value >= ini.value;
+    ok.disabled = !pronta;
+    ok.title = pronta ? '' : (feitas < total ? 'Faltam ' + (total - feitas) + ' obrigatória(s)' : 'Informe o início e o fim da OS');
+  }
+
   // GaleriaDialog + DocumentosDialog: fotos e notas de texto juntas (saem da MESMA subtarefa), arquivos com Abrir/Baixar
   function pintarAnexos(dlg, itens, vazio) {
     const imgs = itens.filter((x) => x.tipo === 'imagem'), docs = itens.filter((x) => x.tipo === 'documento'), notas = itens.filter((x) => x.tipo === 'nota');
@@ -520,7 +660,7 @@
     if (imgs.length || notas.length) {
       corpo.insertAdjacentHTML('beforeend', '<div class="acoes-hint">Clique numa foto para ver em tamanho cheio e passar pelas outras (setas do teclado também) · clique numa nota para ler o texto.</div>');
       corpo.insertAdjacentHTML('beforeend', '<div class="acoes-fotos">'
-        + imgs.map((x, k) => '<figure class="acoes-foto"><figcaption title="' + esc(x.legenda) + '">' + esc(x.legenda) + '</figcaption>'
+        + imgs.map((x, k) => '<figure class="acoes-foto"' + xAttr(x) + '>' + xBotao(x) + '<figcaption title="' + esc(x.legenda) + '">' + esc(x.legenda) + '</figcaption>'
           + '<a class="img" href="' + esc(x.url) + '" target="_blank" rel="noopener" data-foto="' + k + '"><img src="' + esc(x.url) + '" alt="" loading="lazy"></a>'
           + (x.baixar ? '<a class="acoes-baixar" href="' + esc(x.baixar) + '" download="' + esc(x.nome) + '" data-baixar-arq>Baixar</a>' : '') + '</figure>').join('')
         + notas.map((x) => '<details class="acoes-nota"><summary>' + esc(x.legenda || 'nota') + '</summary><pre>' + esc(x.texto || '(nota vazia)') + '</pre></details>').join('')
@@ -529,13 +669,36 @@
     if (docs.length) {
       corpo.insertAdjacentHTML('beforeend', '<div class="acoes-docs">' + docs.map((x) => {
         const sub = [x.quem, (x.legenda && x.legenda !== x.nome) ? x.legenda : ''].filter(Boolean).join(' · ');
-        return '<div class="acoes-doc"><span class="acoes-ext">' + esc(x.ext || 'ARQ') + '</span><div class="acoes-doc-t"><div>' + esc(x.nome) + '</div>'
+        return '<div class="acoes-doc"' + xAttr(x) + '>' + xBotao(x) + '<span class="acoes-ext">' + esc(x.ext || 'ARQ') + '</span><div class="acoes-doc-t"><div>' + esc(x.nome) + '</div>'
           + (sub ? '<small>' + esc(sub) + '</small>' : '') + '</div>'
           + '<a class="det-b ghost acoes-mini" href="' + esc(x.url) + '" target="_blank" rel="noopener">Abrir</a>'
           + (x.baixar ? '<a class="det-b ghost acoes-mini" href="' + esc(x.baixar) + '" download="' + esc(x.nome) + '" data-baixar-arq>Baixar</a>' : '') + '</div>';
       }).join('') + '</div>');
     }
-    corpo.onclick = (e) => { const a = e.target.closest('a[data-baixar-arq]'); if (a) baixarArquivo(e, dlg, a); };
+    corpo.onclick = (e) => {
+      const x = e.target.closest('[data-anx-x]'); if (x) { excluirAnexo(e, dlg, x); return; }
+      const a = e.target.closest('a[data-baixar-arq]'); if (a) baixarArquivo(e, dlg, a);
+    };
+    // o Editar (11/11/2026): mostra o X nos anexos que se podem excluir
+    const ed = q(dlg.caixa, '[data-anx-editar]');
+    if (ed) {
+      ed.hidden = !itens.some((x) => x.excluir);
+      ed.onclick = () => { const on = dlg.caixa.classList.toggle('editando'); ed.textContent = on ? 'Concluir edição' : 'Editar'; };
+    }
+  }
+  const xAttr = (x) => x.excluir ? ' data-excluir="' + esc(JSON.stringify(x.excluir)) + '"' : '';
+  const xBotao = (x) => x.excluir ? '<button type="button" class="acoes-x" data-anx-x title="Excluir ' + esc(x.nome) + '" aria-label="Excluir ' + esc(x.nome) + '">×</button>' : '';
+  // o X: pergunta, exclui no Fracttal e tira o anexo da tela (a contagem do card é relida)
+  async function excluirAnexo(e, dlg, b) {
+    e.preventDefault(); e.stopPropagation();
+    const box = b.closest('[data-excluir]'); if (!box || !dlg.d) return;
+    const nome = (box.querySelector('figcaption, .acoes-doc-t div') || {}).textContent || 'este anexo';
+    if (!confirm('Excluir "' + nome + '" da OS no Fracttal?\nIsto não se desfaz.')) return;
+    b.disabled = true; msgAnexos(dlg, 'Excluindo…');
+    try {
+      const j = await pedir('/os/api/os/' + dlg.d.dataset.wid + '/anexo/excluir', JSON.parse(box.dataset.excluir), 'Excluindo o anexo no Fracttal…');
+      box.remove(); anexosCache.delete(dlg.d); alterou(dlg.d); contagem(dlg.d); msgAnexos(dlg, j.mensagem || 'Anexo excluído.');
+    } catch (x) { b.disabled = false; msgAnexos(dlg, 'Não consegui excluir: ' + x.message, true); }
   }
 
   // O BAIXAR DE UM ANEXO (09/11/2026, OS 8159: o Baixar salvava o erro do servidor como um arquivo .json). Pela rota do

@@ -160,6 +160,10 @@ def itens_subtarefas(anexos_sub, wid) -> list:
     # a tarefa de cada anexo (04/11/2026): a OS de vários ativos mostra no ativo os anexos da tarefa dele
     for item, a in zip(out, imgs + docs + cru):
         item["tarefa"] = None if a.get("id_tarefa") is None else str(a.get("id_tarefa"))
+        # o X do Editar (11/11/2026): o arquivo da subtarefa sai da lista dela (a nota de texto fica)
+        if item["tipo"] != "nota" and a.get("id_form_item") is not None and a.get("value"):
+            item["excluir"] = {"tipo": "sub", "tarefa": str(a.get("id_tarefa")), "item": str(a.get("id_form_item")),
+                               "value": str(a.get("value"))}
     return out
 
 
@@ -176,6 +180,11 @@ def itens_os(anexos_os_unicos, wid) -> list:
     for a in cru:
         texto = str(a.get("desc") or a.get("nome") or "").strip()
         out.append(_item("nota", wid, a, str(a.get("nome") or "nota"), str(a.get("nome") or "nota"), str(a.get("user") or ""), texto))
+    # o X do Editar (11/11/2026): o anexo da tarefa sai pelo id dele (o `files_delete`)
+    for item, a in zip(out, fotos + docs + cru):
+        raw = a.get("raw") if isinstance(a.get("raw"), dict) else {}
+        if item["tipo"] != "nota" and str(raw.get("id") or "").isdigit():
+            item["excluir"] = {"tipo": "os", "id": str(raw.get("id"))}
     return out
 
 

@@ -1272,6 +1272,29 @@ concluir e cancelar!".
   também). Ele só muda o status: o diálogo (`verificacao`, como o do Concluir) mostra as subtarefas sem resposta e
   oferece o "Fazer a tarefa" antes (o executar sozinho não muda o status). No card, o botão sai na OS que não está Em
   Verificação, Concluída nem Cancelada.
+- **Fazer OS** (11/11/2026, Levi: "Ao lado esquerdo de PDF se a OS estiver fora de em verificação deve ter a opção 'fazer
+  OS'"; "devem preencher com o rigor da OS"; "editar a ocorrência com a data de início e data fim da OS e mandar para 'Em
+  verificação'"): o botão no topo do card, só na OS em processo, abre a tela de preencher (`_dlg_acoes_os.html`, `fazer`
+  no os_acoes.js): cada tarefa com as subtarefas abertas e o controle do tipo (Verificação e Sim/Não em botões, Lista em
+  botões até 6 opções, Número, Texto), os selos "obrigatória" e "foto obrigatória", o "Anexar foto" em cada subtarefa e o
+  "Anexar na OS" de cada tarefa. A conta "X de Y obrigatórias" conta a resposta e a foto obrigatória; o Enviar para
+  verificação só libera com tudo e com o início e o fim. As respostas vão pelo `/respostas`; o envio, pelo `POST
+  /os/api/os/<id>/fazer`, que confere de novo o que falta, recusa com o cronômetro rodando, lança a execução de cada
+  tarefa com as datas ou corrige as da execução que a tarefa já tem (as horas não dobram) e põe a OS Em Verificação, lida
+  de volta.
+- **A foto na subtarefa** (11/11/2026): `POST /os/api/os/<id>/tarefa/<t>/item/<i>/anexo`, o caminho do App de Campo: o
+  arquivo sobe como anexo da tarefa (o `files_insert` ignora o item) e entra na lista `attachments` da subtarefa, com os
+  que ela já tinha, na gravação do valor (`os_execucao.anexar_no_item`).
+- **As respostas nunca apagam a foto da subtarefa** (11/11/2026): a gravação (`work_orders_task_form_items_values_insert`)
+  TROCA a lista de anexos da subtarefa pela que vai junto, e o OS Creator mandava `[]`: regravar pelo Nexus uma resposta
+  com foto posta pelo App apagava a foto. Agora a subtarefa com anexo (`n_anexos`) vai com a lista dela
+  (`os_execucao.anexos_do_item`); sem conseguir ler a lista, nada se grava.
+- **Editar e o X nos anexos** (11/11/2026, Levi: "um botão de 'Editar' que ao ativar esse botão aparece um 'X' no canto
+  superior direito das imagens"): no diálogo dos anexos do card, o Editar mostra o X nos arquivos; o X pergunta e exclui
+  (`POST /os/api/os/<id>/anexo/excluir`): o anexo da tarefa pelo `tasks.work_orders_tasks_files_delete` (o id dele,
+  conferido na OS), o da subtarefa saindo da lista dela e dos anexos da tarefa. A nota de texto não tem X.
+- **A Solicitação no topo do card** só aparece quando a OS nasceu de uma (11/11/2026: "Se não foi criada com solicitação
+  não precisa ter o card").
 - **Retornar para responsável** (10/11/2026, Levi: "tirar uma OS de verificação e devolver para OSs em processo"; "Só quem
   criou ou o supervisor/responsável/gestor de contrato"): `POST /os/api/os/<id>/retornar` põe a OS Em Verificação em Em
   Processo pelo `api.mudar_status_os(wid, 1, verificar_gatilhos=False)`, o mesmo pedido que a tela do Fracttal manda nessa

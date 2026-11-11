@@ -31,7 +31,8 @@ def test_o_card_sem_clonar_e_com_o_pdf(monkeypatch):
     assert '<div class="det-num-sub">Ordem de serviço</div>' in h and 'class="det-sub">Ordem de serviço' not in h
     assert "Clonar esta OS" not in h
     topo = h[h.index('class="det-top"'):h.index("</header>")]
-    assert topo.index('data-os-pdf="15900"') < topo.index("Solicitação")
+    # a pílula da Solicitação só quando a OS nasceu de uma (11/11/2026): esta não nasceu
+    assert 'data-os-pdf="15900"' in topo and "criada sem solicitação" not in topo
     assert 'data-wid="%d"' % WID in topo and "data-pdf-caixa" in h and "data-pdf-msg" in h
     css = (WEB / "static" / "os.css").read_text(encoding="utf-8")
     assert ".det-num-sub{" in css and ".det-pdf{" in css

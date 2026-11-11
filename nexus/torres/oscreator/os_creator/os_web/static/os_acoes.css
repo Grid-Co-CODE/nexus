@@ -199,3 +199,49 @@
 .det-anx-colado{display:flex;align-items:center;flex-wrap:wrap;gap:6px 10px;margin:8px 0 0}
 /* a resposta de texto do Fazer a tarefa quebra a linha e cresce (09/11/2026: "está rolando infinito para o lado") */
 .acoes-ta.acoes-resp{min-height:44px;max-height:40vh;margin-top:0;field-sizing:content;overflow-wrap:anywhere}
+
+/* o X do Editar nos anexos (11/11/2026): só aparece com o Editar ligado */
+.acoes-foto,.acoes-doc{position:relative}
+.acoes-x{display:none;position:absolute;top:4px;right:4px;z-index:2;width:26px;height:26px;border-radius:50%;border:1px solid var(--f-border);
+  background:var(--f-bg);color:var(--osc-critico, #ff6b6b);font:700 16px/1 inherit;cursor:pointer;align-items:center;justify-content:center}
+.editando .acoes-x{display:inline-flex}
+.acoes-x:hover,.acoes-x:focus-visible{border-color:var(--osc-critico, #ff6b6b);outline:none}
+.acoes-x:disabled{opacity:.5;cursor:progress}
+.acoes-doc .acoes-x{top:50%;right:auto;left:-10px;transform:translateY(-50%)}
+/* o Fazer OS (11/11/2026) */
+.det-fazer{color:var(--f-green);border-color:var(--f-green)}
+.acoes-dlg-fazer{width:min(860px,96vw);padding:18px 20px 14px}
+.fz-prog{display:flex;align-items:center;gap:10px}
+.fz-prog-bar{flex:1;height:8px;border-radius:6px;background:var(--f-input);overflow:hidden}
+.fz-prog-bar>div{height:100%;width:0;background:var(--f-green);transition:width .2s}
+.fz-prog span{font-size:12px;color:var(--f-muted);white-space:nowrap}
+.fz-corpo{display:flex;flex-direction:column;gap:14px;overflow-y:auto;min-height:120px;max-height:58vh;padding-right:4px}
+.fz-tarefa{display:flex;flex-direction:column;gap:10px}
+.fz-t-cab{display:flex;gap:8px;align-items:baseline;font-size:13.5px}
+.fz-t-cab span{color:var(--f-muted);font-size:12px}
+.fz-sub{display:flex;flex-direction:column;gap:8px;padding:12px 14px;border:1px solid var(--f-border);border-radius:12px;background:var(--f-card)}
+.fz-sub.ok{border-color:var(--osc-musgo-borda, var(--f-green))}
+.fz-sub-cab{display:flex;gap:10px;align-items:flex-start;justify-content:space-between}
+.fz-sub-t{font-weight:600;font-size:13px;line-height:1.35}
+.fz-selos{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;flex:none}
+.fz-selo{font-size:11px;padding:2px 8px;border-radius:10px;border:1px solid var(--f-border);color:var(--f-muted);white-space:nowrap}
+.fz-selo.req{color:var(--txt);border-color:var(--muted);font-weight:600}
+.fz-selo.foto{color:var(--f-green);border-color:var(--f-green)}
+.fz-opcoes{display:flex;gap:8px;flex-wrap:wrap}
+.fz-op{min-height:38px;padding:0 14px;border-radius:10px;border:1px solid var(--f-border);background:var(--f-input);color:inherit;font:600 13px/1 inherit;cursor:pointer}
+.fz-op.on{background:var(--f-green);border-color:var(--f-green);color:var(--osc-sobre-lima, #0b1020)}
+.fz-op:focus-visible{outline:2px solid var(--f-green);outline-offset:1px}
+.fz-campo{width:100%;min-height:38px;padding:8px 10px;border-radius:10px;border:1px solid var(--f-border);background:var(--f-input);color:inherit;font:inherit;box-sizing:border-box}
+.fz-foto-l,.fz-anexo-os{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.fz-fotos{font-size:12px;color:var(--f-muted)}
+.fz-fotos.ruim{color:var(--osc-critico, #ff6b6b)}
+.fz-pe{display:flex;flex-direction:column;gap:8px;border-top:1px solid var(--f-border);padding-top:10px}
+.fz-datas{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media (max-width:560px){
+  .acoes-dlg-fazer{padding:14px 12px}
+  .fz-datas{grid-template-columns:1fr}
+  .fz-sub-cab{flex-direction:column}
+  .fz-selos{justify-content:flex-start}
+  .fz-corpo{max-height:52vh}
+}
+:where(html[data-tema="claro"]) .fz-op.on{background:var(--osc-lima);border-color:var(--osc-lima);color:var(--osc-sobre-lima)}

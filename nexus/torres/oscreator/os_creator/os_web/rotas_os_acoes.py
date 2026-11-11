@@ -587,7 +587,7 @@ def api_executar(wid, tid):
             return _erro(regra.ERRO_FIM_ANTES)
     por_id = {str(x.get("id_form_item")): x for x in campos}
     a_gravar = [{"id_form_item": por_id[k]["id_form_item"], "valor": v,
-                 "tipo": por_id[k].get("tipo") or 1}
+                 "tipo": por_id[k].get("tipo") or 1, "n_anexos": por_id[k].get("n_anexos") or 0}
                 for k, v in valores.items() if k in por_id and str(v or "").strip()]
     n = 0
     if a_gravar:
@@ -797,7 +797,8 @@ def api_respostas(wid, tid):
     valores = _corpo().get("valores") or {}
     campos = api.subtarefas_da_tarefa(tid)
     por_id = {str(x.get("id_form_item")): x for x in campos}
-    a_gravar = [{"id_form_item": por_id[k]["id_form_item"], "valor": v, "tipo": por_id[k].get("tipo") or 1}
+    a_gravar = [{"id_form_item": por_id[k]["id_form_item"], "valor": v, "tipo": por_id[k].get("tipo") or 1,
+                 "n_anexos": por_id[k].get("n_anexos") or 0}
                 for k, v in valores.items() if k in por_id and str(v or "").strip()]
     if not a_gravar:
         return _erro("Responda ao menos uma subtarefa.")
@@ -809,6 +810,145 @@ def api_respostas(wid, tid):
     if faltam:
         texto += " Faltam as obrigatórias: %s." % "; ".join(faltam[:4])
     return jsonify({"ok": True, "mensagem": texto, "n": n, "pendentes": len(faltam)})
+
+
+# ── o Fazer OS (Levi, 11/11/2026, no card do Histórico: "Ao clicar em fazer OS eles devem preencher com o rigor da OS ...
+# se tiver anexo obrigatório deve ter a opção de anexar na OS ... e de anexar na subtarefa também"; "Ao preencher
+# subtarefas, anexos obrigatórios quero que a pessoa consiga editar a ocorrência com a data de início e data fim da OS e
+# mandar para 'Em verificação'"). As respostas de cada tarefa vão pelo /respostas; a foto da subtarefa, pelo /item/.../anexo
+# (o caminho do App de Campo); o envio final, pelo /fazer: confere as obrigatórias e as fotos obrigatórias, lança a
+# execução de cada tarefa com o início e o fim (ou corrige as datas da execução que a tarefa já tem, para as horas não
+# dobrarem) e põe a OS Em Verificação, lida de volta.
+def _campo(tid, fid):
+    return next((c for c in (api.subtarefas_da_tarefa(tid) or []) if str(c.get("id_form_item")) == str(fid)), None)
+
+
+@bp.route("/api/os/<int:wid>/tarefa/<int:tid>/item/<int:fid>/anexo", methods=["POST"])
+@exige_sessao
+def api_anexo_no_item(wid, tid, fid):
+    """A foto (ou o arquivo) na subtarefa, com as regras dos anexos da OS (tipos, tamanho, conteúdo que bate)."""
+    try:
+        request.max_content_length = regra_anexo.LIMITE_PEDIDO
+    except AttributeError:
+        pass
+    if not _tarefa_da_os(wid, tid):
+        return _erro("Esta tarefa não é da OS.", 404)
+    c = _campo(tid, fid)
+    if c is None:
+        return _erro("Esta subtarefa não é da tarefa.", 404)
+    brutos = [(f.filename or "", f.read()) for f in request.files.getlist("anexos")][:1]
+    ok, erro = regra_anexo.anexos(brutos, nada=" Nada foi anexado.")
+    if erro:
+        return _erro(erro)
+    if not ok:
+        return _erro("Escolha a foto ou o arquivo da subtarefa.")
+    nome = regra_anexo._sem_repetir(ok[0]["nome"], _nomes_na_os(wid))
+    valor = request.form.get("valor")
+    valor = c.get("valor") if valor is None else valor        # a resposta que está na tela vai junto (a gravação a pede)
+    api.anexar_no_item(wid, tid, c["id_form_item"], c.get("tipo") or 1, valor, ok[0]["bytes"], nome)
+    depois = _campo(tid, fid) or {}
+    n = int(depois.get("n_anexos") or 0)
+    if n < int(c.get("n_anexos") or 0) + 1:
+        return _erro("O Fracttal aceitou o envio, mas a foto não apareceu na subtarefa. Confira no Fracttal.", 502)
+    lista_central.mudou(wid)
+    return jsonify({"ok": True, "mensagem": "Foto anexada na subtarefa.", "nome": nome, "n_anexos": n})
+
+
+@bp.route("/api/os/<int:wid>/anexo/excluir", methods=["POST"])
+@exige_sessao
+def api_anexo_excluir(wid):
+    """O X do Editar nos anexos (11/11/2026, Levi: "um botão de 'Editar' que ao ativar esse botão aparece um 'X' no canto
+    superior direito das imagens de forma que o técnico possa excluir"). {tipo: "os", id} exclui o anexo da tarefa;
+    {tipo: "sub", tarefa, item, value} tira o anexo da subtarefa (e o arquivo dos anexos da tarefa)."""
+    c = _corpo()
+    if c.get("tipo") == "sub":
+        tid, fid, value = c.get("tarefa"), c.get("item"), str(c.get("value") or "")
+        if not (str(tid).isdigit() and str(fid).isdigit() and value) or not _tarefa_da_os(wid, tid):
+            return _erro("Este anexo não é desta OS: reabra os anexos.", 404)
+        campo = _campo(int(tid), int(fid))
+        if campo is None:
+            return _erro("Esta subtarefa não é da tarefa.", 404)
+        api.tirar_do_item(wid, int(tid), campo["id_form_item"], campo.get("tipo") or 1, campo.get("valor"), value)
+    else:
+        aid = c.get("id")
+        if not str(aid or "").isdigit():
+            return _erro("Anexo sem id: reabra os anexos.")
+        if int(aid) not in {int(a["raw"]["id"]) for a in (api.get_os_anexos(wid) or [])
+                            if isinstance(a.get("raw"), dict) and str(a["raw"].get("id") or "").isdigit()}:
+            return _erro("Este anexo não é desta OS (ou já saiu): reabra os anexos.", 404)
+        api.excluir_anexo_da_tarefa(int(aid))
+        api.esquecer_os(wid)
+    lista_central.mudou(wid)
+    return jsonify({"ok": True, "mensagem": "Anexo excluído no Fracttal."})
+
+
+def _faltas_da_tarefa(campos) -> list:
+    """O que falta numa tarefa para ir à verificação: a obrigatória sem resposta e a foto obrigatória sem anexo."""
+    faltam = list(regra.faltando_obrigatorias(campos, {str(x.get("id_form_item")): x.get("valor") for x in campos}))
+    faltam += ["%s (falta a foto)" % (x.get("descricao") or "subtarefa") for x in campos
+               if x.get("anexo_obrigatorio") and not int(x.get("n_anexos") or 0)]
+    return faltam
+
+
+@bp.route("/api/os/<int:wid>/fazer", methods=["POST"])
+@exige_sessao
+def api_fazer_os(wid):
+    """{inicio, fim, folio}: as respostas e as fotos já gravadas (o /respostas e o /item/.../anexo de cada tarefa)."""
+    c = _corpo()
+    folio = c.get("folio") or wid
+    antes = api.status_da_os(wid)
+    if antes is not None and int(antes) != 1:
+        return _erro("A OS %s está %s no Fracttal: só a OS em processo vai para verificação."
+                     % (folio, api.WO_STATUS.get(int(antes), "fora de processo").lower()))
+    try:
+        if not str(c.get("inicio") or "").strip():
+            raise ValueError
+        ini = trad.data_brt(c.get("inicio"))
+        fim = trad.data_brt(c.get("fim")) if str(c.get("fim") or "").strip() else None
+    except (ValueError, TypeError):
+        return _erro("Informe a data e a hora de início e de fim da OS.")
+    if fim is None:
+        return _erro("Informe a data e a hora de fim da OS.")
+    if fim < ini:
+        return _erro(regra.ERRO_FIM_ANTES)
+    from datetime import datetime, timedelta
+    if fim > datetime.now(trad.BRT) + timedelta(minutes=5):
+        return _erro("A data de fim não pode ficar no futuro.")
+    tids = [int(t) for t in (api._ids_tarefas_da_os(wid) or []) if str(t).isdigit()]
+    if not tids:
+        return _erro("Não achei as tarefas da OS no Fracttal.", 502)
+    campos = {t: api.subtarefas_da_tarefa(t) or [] for t in tids}
+    faltam = [f for t in tids for f in _faltas_da_tarefa(campos[t])]
+    if faltam:
+        return _erro("Antes de enviar, falta: %s." % "; ".join(faltam[:5]))
+    for t in tids:
+        e = api.execucao_atual(t) or {}
+        if (e.get("estado") or "parada") != "parada":
+            return _erro("Uma atividade da OS está %s no cronômetro: conclua-a antes de enviar."
+                         % _ESTADO_TXT.get(e.get("estado"), e.get("estado")))
+    for t in tids:
+        regs = [x for x in (api.historico_execucao(t) or []) if isinstance(x, dict) and x.get("id")]
+        if regs:
+            # a tarefa já tem execução (o cronômetro, o Fazer a tarefa): corrige as datas da última, não lança outra
+            ultimo = max(regs, key=lambda x: str(x.get("initial_date") or ""))
+            res = api.editar_execucao(ultimo["id"], ini, fim)
+            if not (isinstance(res, dict) and res.get("ok")):
+                return _erro((res or {}).get("erro") or "O Fracttal não gravou as datas da execução.", 502)
+        else:
+            res = api.registrar_execucao(t, ini, fim, note="")
+            if not (res or {}).get("confirmado"):
+                return _erro("O Fracttal não confirmou a execução da tarefa: confira no Fracttal antes de tentar de novo.",
+                             502)
+    res = api.mudar_status_os(wid, 2)
+    if not (isinstance(res, dict) and res.get("ok")):
+        return _erro((res or {}).get("erro") or "As datas foram gravadas, mas o Fracttal não mudou o status da OS.", 502)
+    lista_central.mudou(wid)
+    depois = api.status_da_os(wid)
+    if depois is not None and int(depois) != 2:
+        return _erro("As datas foram gravadas, mas a OS %s seguiu %s no Fracttal." % (
+            folio, api.WO_STATUS.get(int(depois), "como estava").lower()), 502)
+    _no_quadro_de_garantias(wid, 2)
+    return jsonify({"ok": True, "mensagem": "OS %s feita e enviada para verificação no Fracttal." % folio})
 
 
 def _no_quadro_de_garantias(wid, st) -> None:

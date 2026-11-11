@@ -136,7 +136,8 @@ def test_responder_as_subtarefas_grava_e_le_de_volta(fracttal):
     r = _cliente().post(f"/os/api/os/{WID}/tarefa/{T1}/respostas", json={"valores": {"1": "12,5"}})
     j = r.get_json()
     assert r.status_code == 200 and j["ok"] and "1 resposta" in j["mensagem"] and j["pendentes"] == 0
-    assert fracttal.pedidos == [("salvar", T1, [{"id_form_item": 1, "valor": "12,5", "tipo": 1}])]
+    # o n_anexos vai junto (11/11/2026): a subtarefa com foto é regravada com a lista dela, e não com `[]`
+    assert fracttal.pedidos == [("salvar", T1, [{"id_form_item": 1, "valor": "12,5", "tipo": 1, "n_anexos": 0}])]
 
 
 def test_os_motivos_da_pausa(fracttal):
