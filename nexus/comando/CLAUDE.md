@@ -141,6 +141,30 @@ download do pdf da OS". No quiz, "resposta" é o técnico executar a OS.
 - O sino só lê a cópia de 1 minuto do livro (`avisos.copia`) e a conta da lista central da pessoa (1 minuto, por versão
   da lista): nenhuma página espera o banco.
 
+## Comando > Usinas e o prontuário (11/11/2026)
+
+Levi: "Em comando quero a mesma visão de Início > Usinas do mockup" (o R18). A tela era o lugar reservado da casca; virou
+`/t/comando/usinas` (`usinas.py` + `torres/comando/templates/comando/usinas.html`, `static/comando-usinas.js`): a faixa
+com uma barra por usina na cor do estado de agora, a legenda, os filtros na própria página (`filtro-local.js`: cliente,
+estado e a busca) e a tabela das 138 mobilizadas, que ordena pelo cabeçalho. Cada coluna vem da tela dona, nada se
+inventa: usina, cliente e cluster da Visão do responsável; código, MWp (`potencia_contratual`, a única preenchida nas
+138) e tipologia ("SOLO TRACKER" = Tracker) do cadastro; Agora do tempo real (a ponte da Visão do cliente); Atingimento
+e PR / meta da meta do mês da Visão; OS abertas e atrasadas do bloco Manutenção dela; Insights = os do motor que não
+foram concluídos, ligados pelo nome da usina; Conformidade = extintores vencidos (o PPCI) e sem luvas na última ronda (o
+EPC). A fonte que não lê vira "sem leitura" na coluna dela, nunca 0. A ordem: o estado mais grave agora e, dentro dele,
+o pior atingimento.
+
+**Fora, por decisão do Levi (11/11/2026):** o Score de saúde do mockup ("Fora por agora": o Nexus não tem essa nota, e
+criar uma é regra nova). **O clique na usina** abre o prontuário no próprio Comando ("No próprio Comando"),
+`/t/comando/usinas/<id>`: a linha dela, a Central da usina da Usinas 360° em leitura (a mesma conta,
+`torres.campo._central_da_usina(todas, usina_id)`), no desenho dela, e os insights vivos da usina. As janelas da Central
+(o dia a dia, a ronda, a PT, o relatório) são sub-rotas da Usinas 360°: o pé do prontuário leva até lá para quem tem
+acesso. A linha do tempo e o "Em três frases" do mockup não estão: o Nexus ainda não junta os eventos de todas as
+fontes numa linha só. O CSS da tela usa o prefixo `cmu-` (o `cu-` é da Central, no campo.css).
+
+Prova: `tests/test_comando_usinas.py` (as colunas, a fonte que falta sem 0, os insights vivos, a lista e o prontuário) e a
+renderização com o banco de produção, só leitura, pelo cliente de teste (138 usinas, prontuário sem erro).
+
 ## O visual
 Uma lista numa superfície só, uma linha por insight que abre ao clicar (Levi: "não sou muito fã dessa barra lateral em
 vermelho, temos muito dela... poderia fazer algo diferente?"): a gravidade é um selo (ponto + palavra), sem faixa nem

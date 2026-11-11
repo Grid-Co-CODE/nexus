@@ -130,3 +130,55 @@ a.ins-titulo:hover{color:var(--verde-texto)}
 .ped-linha input[name=nota]{flex:1 1 220px;min-width:0}
 .ped-pagina{margin-bottom:22px}
 .tr-tab td.num,.tr-tab th.num{text-align:right;font-variant-numeric:tabular-nums}
+
+/* Comando > Usinas (11/11/2026, a tela "Início > Usinas" do mockup): a faixa com uma barra por usina na cor do estado de
+   agora, a legenda, os filtros da própria página e a tabela que ordena pelo cabeçalho. Um nível de superfície só (à la
+   Nexus): o quadro é a superfície, a tabela não ganha outra. */
+.cmu-quadro{margin-top:16px;padding:16px 18px 18px;background:var(--superficie);border:1px solid var(--linha);border-radius:var(--raio-md)}
+.cmu-faixa{display:flex;gap:3px;height:12px}
+.cmu-seg{flex:1 1 0;min-width:2px;border-radius:2px;background:var(--mudo)}
+.cmu-seg[hidden]{display:none}
+.cmu-seg--ok{background:var(--ok)}
+.cmu-seg--alerta{background:var(--alerta)}
+.cmu-seg--critico{background:var(--critico)}
+.cmu-seg--neutro{background:var(--superficie-3)}
+.cmu-legenda{display:flex;flex-wrap:wrap;gap:4px 18px;margin:10px 0 0;padding:0;list-style:none;font-size:12.5px;color:var(--tinta-2)}
+.cmu-legenda li{display:inline-flex;align-items:center;gap:6px}
+.cmu-legenda b{color:var(--tinta)}
+.cmu-ponto{width:9px;height:9px;border-radius:2px;background:var(--mudo)}
+.cmu-ponto--ok{background:var(--ok)}
+.cmu-ponto--alerta{background:var(--alerta)}
+.cmu-ponto--critico{background:var(--critico)}
+.cmu-ponto--neutro{background:var(--superficie-3)}
+.cmu-filtros{display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px;margin-top:14px}
+.cmu-busca{position:relative;flex:1 1 260px;max-width:420px}
+.cmu-busca .ph{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--mudo);pointer-events:none}
+.cmu-busca input{width:100%;padding-left:32px}
+.cmu-conta{margin-left:auto;font-size:12.5px}
+.cmu-tab{border:0;background:transparent}
+.cmu-tab th{background:transparent;border-bottom:1px solid var(--linha)}
+.cmu-tab th button{all:unset;cursor:pointer;font:inherit;color:inherit;white-space:nowrap}
+.cmu-tab th button:focus-visible{outline:2px solid var(--verde);outline-offset:2px;border-radius:2px}
+.cmu-tab th button[aria-sort="ascending"]::after{content:" \2191";color:var(--verde-texto)}
+.cmu-tab th button[aria-sort="descending"]::after{content:" \2193";color:var(--verde-texto)}
+.cmu-tab .cmu-esq{text-align:left}
+.cmu-usina{display:flex;flex-direction:column;color:inherit;text-decoration:none}
+.cmu-usina:hover b{color:var(--verde-texto)}
+.cmu-cod{font:500 11.5px/16px var(--font-mono);color:var(--mudo)}
+.cmu-tab td .cn-pill + .cn-pill{margin-top:4px}
+.cmu-nota{margin:10px 0 0;font-size:12.5px}
+@media (max-width:640px){.cmu-quadro{padding:14px 12px}.cmu-conta{margin-left:0}}
+/* o prontuário da usina no Comando (11/11/2026): o desenho da Central da usina (campo.css, cu-*), com a volta à lista,
+   o estado de agora ao lado do nome e os insights vivos */
+.cmu-volta{margin:4px 0 0;font-size:13px}
+.cmu-volta .ph{vertical-align:-2px}
+.cmu-nome{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px}
+.cmu-ins{display:flex;flex-direction:column;gap:10px;margin:0;padding:0;list-style:none}
+.cmu-ins li{display:flex;align-items:flex-start;gap:10px}
+.cmu-ins b{display:block;font:600 13.5px/1.4 var(--font-sans);color:var(--tinta)}
+.cmu-ins small{display:block;font-size:12.5px;line-height:1.45;color:var(--tinta-2)}
+.cmu-pe{margin:18px 0 0;font-size:13px;color:var(--tinta-2)}
+/* 11 colunas: a tabela não herda o mínimo de 980 px das do Campo e aperta o respiro lateral; a conformidade empilha */
+.cmu-tab table{min-width:0;font-size:12.5px}
+.cmu-tab th,.cmu-tab td{padding-left:8px;padding-right:8px}
+.cmu-conf{display:flex;flex-direction:column;align-items:flex-start;gap:4px}

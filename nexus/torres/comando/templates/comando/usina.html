@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% from "campo/_graficos.html" import geracao %}
+{% block titulo %}{{ x.usina }}{% endblock %}
+{% block conteudo %}
+<link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='comando.css') }}">
+{# O prontuário da usina no Comando (11/11/2026, Levi: o clique na usina "No próprio Comando", como o prontuário do
+   mockup): a linha dela na lista do Comando > Usinas, a Central da usina da Usinas 360° (a mesma conta,
+   `_central_da_usina`) em leitura, no desenho dela, e os insights do Nexus vivos na usina. Sem as janelas da Central (o
+   dia a dia, a ronda, a PT): elas são sub-rotas da Usinas 360°, e o link do pé leva até lá para quem tem acesso. #}
+{% macro linhas(ls, marca=none) %}
+  <dl class="cr-dl">
+    {% for i in ls %}<dt{% if marca and marca.get(i.rot) %} class="cu-dt cu-dt--{{ marca[i.rot] }}"{% endif %}>{{ i.rot }}</dt>
+    <dd>{% if i.forte %}<b>{{ i.forte }}</b> · {% endif %}{{ i.resto }}{% if i.get('ronda') %} · {{ i.ronda.txt }}{% endif %}{% if i.get('alerta') %} · <span class="cn-t-alerta">{{ i.alerta }}</span>{% endif %}
+      {% for it in i.itens %}<span class="it">{% if it.get('agora') %}<span class="cr-agora">Agora</span>{% endif %}<b>{{ it.forte }}</b>{% if it.txt %} · {{ it.txt }}{% endif %}{% if it.get('sem_decisao') %} · <span class="cn-t-critico">{{ it.sem_decisao }}</span>{% endif %}</span>{% endfor %}
+      {% if i.get('mais') %}<span class="it mudo">e mais {{ i.mais }}</span>{% endif %}</dd>{% endfor %}
+  </dl>
+{% endmacro %}
+{% macro pessoa(papel, nome, vazio='—') %}<li><span class="cn-avatar">{{ iniciais(nome) if nome else '—' }}</span><span><small>{{ papel }}</small><b{% if not nome %} class="mudo"{% endif %}>{{ nome or vazio }}</b></span></li>{% endmacro %}
+<div class="campo-nativa">
+  <p class="cmu-volta"><a class="cn-link" href="{{ raiz }}/t/comando/usinas"><i class="ph ph-arrow-left" aria-hidden="true"></i> Usinas</a></p>
+  {% if avisos %}<div class="cn-erro cn-aviso" role="status"><span>Sem leitura agora: {{ avisos|join(', ') }}. O resto vale.</span></div>{% endif %}
+  {% for f, e in cu.erros.items() %}<div class="cn-erro cn-aviso" role="status"><span>Não consegui ler {{ e }}: essa parte ficou de fora, o resto da página vale.</span></div>{% endfor %}
+  {% set u = cu.u %}{% set pv, mv, av = u.perf.valores, u.manut.valores, u.acomp.valores %}
+  <header class="cu-cab">
+    <div class="cu-id">
+      <p class="gc-eyebrow">Prontuário da usina</p>
+      <h1 class="cu-nome cmu-nome">{{ x.usina }} <span class="cn-pill cn-{{ x.estado_tom }}">{{ x.estado_rot }}</span></h1>
+      <p class="cu-onde">{{ x.cliente or '—' }}{% if x.cluster %} · {{ x.cluster }}{% endif %}{% if x.tipologia %} · {{ x.tipologia }}{% endif %}{% if x.mwp is not none %} · {{ ('%.1f'|format(x.mwp))|replace('.', ',') }} MWp{% endif %}{% if u.cidade %} · {{ u.cidade }}{% if u.uf %}/{{ u.uf }}{% endif %}{% endif %}{% if x.codigo %} · <span class="cmu-cod">{{ x.codigo }}</span>{% endif %}</p>
+    </div>
+  </header>
+  <ul class="cu-gente" aria-label="Pessoas da usina">
+    {{ pessoa('Responsável O&M', u.responsavel if u.responsavel != sem_responsavel else '', 'sem responsável') }}
+    {{ pessoa('Supervisor de Campo', cu.pessoas.supervisor if cu.pessoas.supervisor != 'vaga' else '', 'vaga') }}
+    {{ pessoa('Gestor do contrato', cu.pessoas.gestor) }}
+    {% for t in cu.pessoas.tecnicos %}{{ pessoa('Técnico na usina', t) }}{% else %}{{ pessoa('Técnico na usina', '', 'nenhum no PCM') }}{% endfor %}
+  </ul>
+  <div class="cn-numeros cu-numeros">
+    {% for k, rot in (('meta', 'Meta do mês'), ('pr', 'PR'), ('disp', 'Disponibilidade')) %}{% set v = pv[k] %}
+    <span><span class="d">{{ rot }}</span><b class="v cn-t-{{ v.cls }}">{{ v.txt }}{{ '%' if k == 'pr' and v.txt != '—' }}</b>{% if v.sub %}<span class="d">{{ 'previsto ' ~ v.sub[2:] ~ '%' if k == 'pr' else v.sub }}</span>{% endif %}</span>
+    {% endfor %}
+    <span><span class="d">OS abertas</span><b class="v">{{ '—' if x.os_abertas is none else x.os_abertas }}</b></span>
+    {% set v = mv.atrasadas %}<span><span class="d">OS atrasadas</span><b class="v cn-t-{{ v.cls }}">{{ v.txt }}</b>{% if v.sub %}<span class="d">a mais antiga há {{ v.sub }}</span>{% endif %}</span>
+    {% for k, rot in (('ronda', 'Ronda'), ('chamados', 'Chamados'), ('pt', 'PT')) %}{% set v = av[k] %}
+    <span><span class="d">{{ rot }}</span><b class="v cn-t-{{ v.cls }}">{{ v.txt }}</b></span>
+    {% endfor %}
+    <span><span class="d">Insights abertos</span><b class="v{% if insights %} cn-t-alerta{% endif %}">{{ insights|length if x.insights is not none else '—' }}</b></span>
+  </div>
+  {% set marca = {'Atrasadas': mv.atrasadas.cls, 'Pausadas': 'alerta'} %}
+  <div class="cu-grade"><div class="cu-col">
+    <section class="cu-q" aria-labelledby="cmu-ins">
+      <header class="pn-cab"><h2 id="cmu-ins"><i class="ph ph-lightbulb" aria-hidden="true"></i>Insights do Nexus</h2><a class="pn-ver" href="{{ raiz }}/t/comando/insights">abrir os Insights</a></header>
+      {% if x.insights is none %}<p class="mudo">Os Insights ainda estão sendo calculados.</p>
+      {% elif insights %}
+      <ul class="cmu-ins">
+        {% for i in insights %}{% set s = severidades[i.sev] %}
+        <li><span class="cn-pill cn-{{ s[1] }}">{{ s[0] }}</span><div><b>{{ i.titulo }}</b><small>{{ regras[i.regra].nome }}{% if i.acao %} · {{ i.acao }}{% endif %}</small></div></li>
+        {% endfor %}
+      </ul>
+      {% else %}<p class="cn-t-ok">Nenhum insight aberto nesta usina.</p>{% endif %}
+    </section>
+    <section class="cu-q" aria-labelledby="cmu-perf">
+      <header class="pn-cab"><h2 id="cmu-perf"><i class="ph ph-chart-line-up" aria-hidden="true"></i>Performance do mês</h2></header>
+      {% if u.perf.det %}{{ linhas(u.perf.det) }}{% else %}<p class="mudo">Sem meta, PR ou disponibilidade publicados para a usina neste mês.</p>{% endif %}
+      {% if cu.graf_ger %}{{ geracao(cu.graf_ger) }}{% endif %}
+    </section>
+  </div><div class="cu-col">
+    <section class="cu-q" aria-labelledby="cmu-pend">
+      <header class="pn-cab"><h2 id="cmu-pend"><i class="ph ph-list-checks" aria-hidden="true"></i>Pendências</h2></header>
+      {% if cu.ronda_pendente %}{{ linhas(cu.ronda_pendente) }}{% else %}<dl class="cr-dl"><dt class="cu-dt cu-dt--ok">Ronda</dt><dd class="cn-t-ok">em dia</dd></dl>{% endif %}
+      {% if cu.os_pendentes %}{{ linhas(cu.os_pendentes, marca) }}{% else %}<dl class="cr-dl"><dt class="cu-dt cu-dt--ok">OS</dt><dd class="cn-t-ok">nenhuma atrasada ou pausada</dd></dl>{% endif %}
+      <dl class="cr-dl">
+        <dt class="cu-dt cu-dt--{{ 'critico' if cu.ocorrencias|selectattr('cor', 'equalto', 'critico')|list else ('alerta' if cu.ocorrencias else 'ok') }}">Ocorrências</dt>
+        <dd>{% for o in cu.ocorrencias %}<span class="it"><em class="cr-tag cr-tag--{{ o.cor }}">{{ o.crit_txt }}</em> {{ o.titulo or ('ativo ' ~ o.cod if o.cod else 'sem título') }}{% if o.inicio %} · desde {{ o.inicio.strftime('%d/%m') }}{% endif %}</span>{% else %}<span class="cn-t-ok">nenhuma aberta</span>{% endfor %}</dd>
+        <dt class="cu-dt cu-dt--{{ 'critico' if cu.seguranca|selectattr('chave', 'in', ['pts', 'vencidos', 'sem_luvas'])|list else ('alerta' if cu.seguranca else 'ok') }}">Segurança</dt>
+        <dd>{% for g in cu.seguranca %}<span class="it"><b class="{{ 'cn-t-critico' if g.chave in ('pts', 'vencidos', 'sem_luvas') else 'cn-t-alerta' }}">{{ g.rot }}{% if g.n > 1 %} ({{ g.n }}){% endif %}</b>{% for it in g.itens %}{{ ' · ' if loop.first else '' }}{% if it.forte %}{{ it.forte }}{% endif %}{% if it.txt %}{{ ' · ' if it.forte else '' }}{{ it.txt }}{% endif %}{{ '; ' if not loop.last else '' }}{% endfor %}</span>{% else %}<span class="cn-t-ok">nada pendente</span>{% endfor %}</dd>
+      </dl>
+    </section>
+    <section class="cu-q" aria-labelledby="cmu-os">
+      <header class="pn-cab"><h2 id="cmu-os"><i class="ph ph-wrench" aria-hidden="true"></i>OS e manutenção</h2></header>
+      {% if cu.os_linhas %}{{ linhas(cu.os_linhas) }}{% else %}<p class="mudo">Nenhuma OS aberta nesta usina.</p>{% endif %}
+    </section>
+    <section class="cu-q" aria-labelledby="cmu-ronda">
+      <header class="pn-cab"><h2 id="cmu-ronda"><i class="ph ph-path" aria-hidden="true"></i>Rondas e limpeza</h2></header>
+      {% if cu.ronda_limpeza %}{{ linhas(cu.ronda_limpeza) }}{% else %}<p class="mudo">Nenhuma ronda lida nos últimos 90 dias.</p>{% endif %}
+    </section>
+  </div></div>
+  <p class="cmu-pe"><a class="cn-link" href="{{ raiz }}/t/campo/responsaveis?modo=usina&amp;usina={{ x.usina_id }}">Abrir na Central da usina (Usinas 360°)</a>, com o dia a dia, as rondas, as PT e o relatório em PDF.</p>
+</div>
+{% endblock %}

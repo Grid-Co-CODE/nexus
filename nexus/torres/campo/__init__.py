@@ -424,7 +424,7 @@ def _ocorrencias_abertas() -> dict:
         return {}
 
 
-def _central_da_usina(todas: list[dict]) -> dict:
+def _central_da_usina(todas: list[dict], usina_id: int | None = None) -> dict:
     """A aba Central da usina (Levi, 04/11/2026: "pesquisar a usina e ter uma central de informações daquela usina"; "como
     aba alternativa"): a busca com todas as usinas da Visão (decisão dele: as 131, para quem abre a tela) e, com uma
     escolhida (`usina`, o id; sem o script, `nome`), a linha dela na Visão e o que a linha não traz, cada coisa da tela
@@ -433,7 +433,8 @@ def _central_da_usina(todas: list[dict]) -> dict:
     from ...campo import central_usina as CU
     from ...campo import painel_responsavel as campo_painel
     nome = request.args.get("nome", "").strip()
-    uid = visao.D._id(request.args.get("usina")) or CU.achar(todas, nome)
+    # `usina_id`: o prontuário do Comando > Usinas (11/11/2026) pede a usina pelo endereço dele, /t/comando/usinas/<id>
+    uid = usina_id or visao.D._id(request.args.get("usina")) or CU.achar(todas, nome)
     u = next((x for x in todas if x["usina_id"] == uid), None)
     out = {"busca": [(i, n, s, url_for("torre_campo.responsaveis", modo="usina", usina=i))
                      for i, n, s in CU.busca(todas, _ordem_do_nome)],

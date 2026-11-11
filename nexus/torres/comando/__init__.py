@@ -45,9 +45,10 @@ TORRE = Torre(
         Tela("tempo-de-resposta", "Tempo de resposta",
              "Que área responde no prazo, e quais pedidos estão atrasados?",
              "Pedidos entre áreas, com prazo (nexus_pedidos)"),
+        # a tela do mockup "Início > Usinas" (11/11/2026, nexus/comando/usinas.py)
         Tela("usinas", "Usinas",
-             "Qual é o prontuário de cada usina, com todos os apelidos?",
-             "Registro mestre (BD_Performance, BD_Thopen e de-para, via API)"),
+             "Como está cada usina agora, e o que cada setor diz dela?",
+             "Visão do responsável, tempo real, Nexus Insights, extintores e luvas das rondas + cadastro do Nexus"),
         Tela("metas", "Metas do book",
              "Quais KPIs do book R02 estão fora da meta e piorando?",
              "Aba KPIs do Plano de Documentação"),
@@ -161,6 +162,92 @@ def insights():
         gerado=gerado, sev=sev, regra=regra, torre_f=torre, ver_concluidos=ver_concluidos, severidades=RG.SEVERIDADES,
         calculando=lei is None,
         regras=RG.REGRAS, erro_estado=ES.ler()["erro"]))
+
+
+def _usinas_montadas() -> dict:
+    """A conta do Comando > Usinas (a lista e o prontuário leem a mesma, cada fonte na cópia de 5 min dela): as linhas
+    (`nexus/comando/usinas.py`), o que não leu (`avisos`) e os insights vivos de cada usina."""
+    from ...campo import responsaveis as campo_resp
+    from ...campo import visao
+    from ...campo import visao_cliente as VC
+    from ...comando import usinas as CU
+    from ...hseq import epi as EPI
+    leitura = campo_resp.visao_responsaveis()
+    d = leitura.dados or {}
+    avisos = []
+    try:
+        b = visao._Base()
+        cadastro = b.por_id
+    except Exception:            # noqa: BLE001 — sem o cadastro, a tabela segue sem código, MWp e tipologia
+        b, cadastro = None, {}
+        avisos.append("o cadastro (código, MWp e tipologia)")
+    tempo_real = None
+    tr = VC.ler_tempo_real(current_app.config)
+    if tr["erro"] or b is None:
+        avisos.append("o tempo real (a coluna Agora)")
+    else:
+        tempo_real = VC.juntar_tempo_real(tr["usinas"], campo_resp.Nomes(b))
+    lei_ins = MO.sem_esperar()
+    insights, vivos = None, {}
+    if lei_ins is not None and b is not None:
+        nome_para_uid = {CU._norm(f.get("nome")): uid for uid, f in cadastro.items() if f.get("nome")}
+        nome_para_uid.update({CU._norm(f.get("codigo")): uid for uid, f in cadastro.items() if f.get("codigo")})
+        est = ES.atual()
+        todos = (lei_ins.dados or {}).get("insights") or []
+        insights = CU.insights_por_usina(todos, est, nome_para_uid)
+        for i in todos:
+            uid = nome_para_uid.get(CU._norm(i.get("usina")))
+            if uid and ((est.get(i.get("id")) or {}).get("evento")) != "concluiu":
+                vivos.setdefault(uid, []).append(i)
+    sem_luvas = None
+    luv = EPI.luvas()
+    if luv.erro:
+        avisos.append("as luvas isolantes das rondas")
+    else:
+        sem_luvas = {x["usina_id"] for x in (luv.dados or {}).get("usinas") or [] if x.get("situacao") == "sem_luvas"}
+    erros = d.get("erros") or {}
+    com_os = "manut" not in erros and ((d.get("info") or {}).get("manut") or {}).get("publicado", True) is not False
+    linhas = CU.montar(d.get("usinas") or [], cadastro, tempo_real, insights, sem_luvas, com_os=com_os)
+    return {"linhas": linhas, "avisos": avisos, "erro": leitura.erro, "tr_ts": tr.get("cache_ts") or "",
+            "insights_calculando": insights is None, "vivos": vivos, "visao": d}
+
+
+@bp.route("/usinas")
+def usinas():
+    """Comando > Usinas (11/11/2026, Levi: "Em comando quero a mesma visão de Início > Usinas do mockup"): todas as usinas
+    mobilizadas, com o estado de agora e o que cada tela dona diz delas (`nexus/comando/usinas.py`). Sem o Score de saúde
+    do mockup (Levi: "Fora por agora"). Os filtros de cliente, estado e a busca são da própria página (filtro-local.js);
+    a ordem das colunas, do comando-usinas.js. Cada fonte que não responde vira "sem leitura" na coluna dela. O clique na
+    usina abre o prontuário aqui mesmo, no Comando (Levi: "No próprio Comando")."""
+    from ...comando import usinas as CU
+    m = _usinas_montadas()
+    return render_template("comando/usinas.html", torre=TORRE, tela=TORRE.tela("usinas"), linhas=m["linhas"], r=CU.resumo(m["linhas"]), legenda=CU.LEGENDA,
+                           estados=CU.ESTADOS, erro=m["erro"], avisos=m["avisos"],
+                           insights_calculando=m["insights_calculando"], tr_ts=m["tr_ts"],
+                           cliente=request.args.get("cliente", ""), estado=request.args.get("estado", ""),
+                           q=request.args.get("q", ""))
+
+
+@bp.route("/usinas/<int:usina_id>")
+def usina(usina_id):
+    """O prontuário da usina no Comando (11/11/2026, Levi: o clique na usina "No próprio Comando", como o prontuário do
+    mockup): a linha dela na lista, a Central da usina (a mesma conta da Usinas 360°, `_central_da_usina`) em leitura e
+    os insights do Nexus que estão vivos nela. Sem a linha do tempo e o resumo em três frases do mockup (o Nexus ainda
+    não junta os eventos de todas as fontes numa linha só)."""
+    from ...campo import responsaveis as campo_resp
+    from ...campo import visao
+    from ...campo.manutencao import LIMITE_PADRAO
+    from ..campo import _central_da_usina, _iniciais
+    m = _usinas_montadas()
+    x = next((l for l in m["linhas"] if l["usina_id"] == usina_id), None)
+    if x is None:
+        abort(404)
+    todas = campo_resp.com_manutencao(m["visao"].get("usinas") or [], LIMITE_PADRAO)
+    cu = _central_da_usina(todas, usina_id)
+    vivos = sorted(m["vivos"].get(usina_id) or [], key=lambda i: (RG.ORDEM_SEV.get(i.get("sev"), 9), i.get("titulo") or ""))
+    return render_template("comando/usina.html", torre=TORRE, tela=TORRE.tela("usinas"), x=x, cu=cu, insights=vivos, severidades=RG.SEVERIDADES,
+                           regras=RG.REGRAS, avisos=m["avisos"], iniciais=_iniciais,
+                           sem_responsavel=visao.SEM_RESPONSAVEL)
 
 
 @bp.route("/caixa-de-entrada")
