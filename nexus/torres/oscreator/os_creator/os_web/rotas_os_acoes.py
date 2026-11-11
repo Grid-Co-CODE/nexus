@@ -85,6 +85,17 @@ def _erro(msg, status=400):
 
 
 # ── leituras ──────────────────────────────────────────────────────────────────────────────────────────
+@bp.route("/api/os/<int:wid>/solicitacao")
+@exige_sessao
+def api_solicitacao_da_os(wid):
+    """A solicitação que gerou a OS e quem a pediu (11/11/2026, o "Solicitante" nos Dados do Raio X da OS): o
+    `requests_list` filtrado pela OS, na sessão de quem vê (o REST das solicitações não filtra pela OS). Sem solicitação,
+    `codigo` vazio: a OS foi criada direto."""
+    s = api.get_solicitacao_por_os(wid) or {}
+    return jsonify({"ok": True, "codigo": s.get("id_code") or "", "solicitante": s.get("criado_por") or "",
+                    "data": s.get("data") or ""})
+
+
 @bp.route("/api/os/<int:wid>/fluxo")
 @exige_sessao
 def api_fluxo(wid):

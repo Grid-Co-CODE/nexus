@@ -34,12 +34,17 @@
      local, o tipo e o status no Fracttal; à direita, no lugar do "Abrir a OS", o "Solicitar OS" #}
   <div class="eg-ac-head">
     <div class="eg-ac-esq">
+      {# o Raio X da OS (Levi, 11/11/2026: "vamos chamar de 'Raio X da OS' e pode até botar a nomeação nessas páginas"): a
+         mesma página para a Engenharia, a Performance e, a seguir, Garantias #}
+      <p class="eg-ac-raiox">Raio X da OS</p>
       <div class="eg-ac-tit"><a class="eg-ac-volta" href="{{ volta_href|na_raiz }}">← {{ volta_texto }}</a>
         <span class="eg-ac-tag eg-ac-tag--{{ topo.cor }}">{{ topo.texto }}</span>
         <h1>{{ o.titulo or ('OS ' ~ o.os) }}</h1></div>
       {# Levi, 24/10/2026: "No título invés de OS e ativo bote o título da OS, no lugar do título da OS bote OS e ativo";
          com mais de um ativo, a conta (a lista fica no bloco Ativos) #}
-      <p class="eg-ac-titulo">OS {{ o.os }} <span>{{ (o.ativos|length ~ ' ativos') if o.ativos|length > 1 else (o.ativo or o.codigo) }}</span></p>
+      {# o nº abre o card da OS do Histórico do OS Creator por cima da página (11/11/2026, Levi: "O n° da OS lá no topo
+         do raio-x deve ser clicável e já abre o card da OS"); sem JavaScript, a página da OS no OS Creator #}
+      <p class="eg-ac-titulo"><a class="eg-ac-num" href="{{ ('/os/os/' ~ o.wid)|na_raiz }}" data-os-card data-wid="{{ o.wid }}" data-folio="{{ o.os }}" data-status="{{ o.status or '' }}" title="Abrir o card da OS {{ o.os }}">OS {{ o.os }}</a> <span>{{ (o.ativos|length ~ ' ativos') if o.ativos|length > 1 else (o.ativo or o.codigo) }}</span></p>
       <p class="eg-ac-sub">{{ topo.local }}{% if o.tipo %} · <b>{{ o.tipo }}</b>{% endif %}{% if o.status %} · {{ o.status }} no Fracttal{% endif %}</p>
     </div>
     <div class="eg-ac-acoes"><a class="eg-ac-btn eg-ac-btn--o" href="{{ solicitar_url|na_raiz }}" title="A Nova solicitação com o ativo desta OS e ela como OS pai">Solicitar OS</a><a class="eg-ac-btn eg-ac-btn--o" href="{{ criar_url|na_raiz }}" title="O Criar OS do zero com o ativo desta OS, ela como OS pai e as subtarefas Descreva a atividade realizada e Ficou alguma pendência">Criar OS</a></div>
@@ -114,13 +119,29 @@
       </section>
       {% endif %}
       <section class="eg-bloco" data-pdf-caixa data-login-fracttal="{{ login_fracttal }}">
-        <div class="eg-bloco-h"><h2>A cadeia da OS</h2></div>
+        <div class="eg-bloco-h"><h2>A cadeia da OS</h2>
+          {# o Incluir OS (Levi, 11/11/2026: "um campo na mesma altura de 'A cadeia do chamado' ... no tamanho de 6
+             dígitos, dentro dele terá um subtexto de 'Incluir OS'"): a OS digitada entra na cadeia desta OS, com o nome
+             "OS incluída", que se troca no Renomear (engenharia/cadeia_os.py) #}
+          {% if pode and not erro_cadeia %}<form class="eg-cadeia-incluir" method="post" action="{{ url_for('torre_engenharia.equipe_os_cadeia', folio=o.os) }}">
+            <input type="hidden" name="acao" value="incluir"><input type="hidden" name="rota" value="{{ rota_os }}"><input type="hidden" name="de" value="{{ de }}">
+            <input class="eg-cadeia-num" name="os" inputmode="numeric" pattern="[0-9]{1,6}" maxlength="6" placeholder="Incluir OS" aria-label="Incluir OS na cadeia: o nº, até 6 dígitos" required autocomplete="off">
+            <button type="submit" class="eg-ac-btn eg-ac-btn--o">Incluir</button>
+          </form>{% endif %}</div>
         {# a OS da engenharia como OS pai das OS de campo que nascem do Solicitar OS (Levi: "o ideal é que essa OS da
            engenharia se torne OS pai de OSs de campo futuramente") #}
         <ol class="eg-cadeia">
           <li class="aqui"><span class="i">1</span><span class="t">OS da engenharia</span><a href="{{ url_for(rota_os, folio=o.os, de=de or None) }}">{{ o.os }}</a>{{ seta_pdf(o.os, o.wid) }}</li>
           {% for f in filhas %}<li><span class="i">{{ loop.index + 1 }}</span><span class="t">OS de campo{% if f.coluna in ('concluida', 'cancelada') %} · {{ ROT.get(f.coluna) }}{% endif %}</span><a href="{{ url_for('torre_engenharia.equipe_os', folio=f.os) }}">{{ f.os }}</a>{{ seta_pdf(f.os, f.wid) }}</li>{% endfor %}
+          {% for x in incluidas %}<li class="incluida"><span class="i">{{ filhas|length + loop.index + 1 }}</span><span class="t">{{ x.rotulo }}</span><a href="{{ url_for(rota_os, folio=x.folio, de=de or None) }}">{{ x.folio }}</a>{{ seta_pdf(x.folio, x.incluida_id or '') }}
+            {% if pode and not erro_cadeia %}<details class="eg-cadeia-mudar"><summary>Renomear</summary>
+              <form method="post" action="{{ url_for('torre_engenharia.equipe_os_cadeia', folio=o.os) }}"><input type="hidden" name="acao" value="renomear"><input type="hidden" name="id" value="{{ x.id }}"><input type="hidden" name="rota" value="{{ rota_os }}"><input type="hidden" name="de" value="{{ de }}">
+                <input name="rotulo" value="{{ x.rotulo }}" maxlength="60" required aria-label="Nome da OS {{ x.folio }} na cadeia"><button type="submit" class="eg-ac-btn eg-ac-btn--o">Salvar</button></form>
+              <form method="post" action="{{ url_for('torre_engenharia.equipe_os_cadeia', folio=o.os) }}"><input type="hidden" name="acao" value="tirar"><input type="hidden" name="id" value="{{ x.id }}"><input type="hidden" name="rota" value="{{ rota_os }}"><input type="hidden" name="de" value="{{ de }}">
+                <button type="submit" class="eg-cadeia-tirar">Tirar da cadeia</button></form>
+            </details>{% endif %}</li>{% endfor %}
         </ol>
+        {% if erro_cadeia %}<p class="eg-dica">Não consegui ler as OS incluídas na cadeia ({{ erro_cadeia }}); recarregue em instantes.</p>{% endif %}
         {% if erro_filhas %}<p class="eg-dica">Não consegui ler as OS de campo ({{ erro_filhas }}).</p>
         {% elif not filhas %}<p class="eg-dica">As OS de campo que nascerem do Solicitar OS entram aqui, com o PDF e as fotos.</p>{% endif %}
         <p class="eg-pdf-msg" data-pdf-msg hidden></p>
@@ -135,6 +156,9 @@
              do responsável") #}
           <dt>Responsável</dt><dd class="eg-resp">{% if pode %}<button type="button" class="eg-resp-nome" data-resp-nome data-trocar-resp data-wid="{{ o.wid }}" data-folio="{{ o.os }}" data-volta="{{ volta_atualizar }}" title="Clique para atribuir esta OS a outra pessoa">{{ o.pessoa or '—' }}</button>{% else %}<span data-resp-nome>{{ o.pessoa or '—' }}</span>{% endif %}</dd>
           <dt>Criado por</dt><dd>{{ o.criado_por or '—' }}</dd>
+          {# quem pediu, quando a OS nasceu de uma solicitação (11/11/2026). Sem a leitura das solicitações dos últimos 30
+             dias, a linha nasce escondida e o OS Creator responde depois que a página abre #}
+          <dt data-solicitante{% if not solicitacao %} hidden{% endif %}>Solicitante</dt><dd data-solicitante{% if not solicitacao %} hidden data-solicitante-url="{{ solicitante_url }}"{% endif %}>{% if solicitacao %}{{ solicitacao.nome or '—' }} <span class="eg-dica-in">· Solicitação {{ solicitacao.codigo }}</span>{% endif %}</dd>
           <dt>Criada em</dt><dd>{{ o.criada or '—' }}</dd>
           <dt>Etiquetas</dt><dd>{% for e in o.etiquetas %}{{ tag(e.nome, 'neutro') }} {% else %}—{% endfor %}</dd>
         </dl>

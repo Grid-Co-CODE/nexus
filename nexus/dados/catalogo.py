@@ -342,6 +342,19 @@ FATOS = (
                     "comentario_editado, o comentario_apagado ou o comentario_na_nota aponta. Quem, o texto e a linha "
                     "da nota só cifrados "
                     "(Cofre, a chave do cadastro). Só acrescenta: editar e apagar um comentário são eventos novos"),
+    # 11/11/2026 (Levi: "a pessoa digita a OS e ela é incluída na cadeia das OSs, a pessoa pode renomear como ficará a
+    # nomenclatura dessa OS na cadeia"): o Raio X da OS. Registrado antes da 1ª gravação
+    Fato("os_na_cadeia", "OS incluída na cadeia do Raio X da OS", "engenharia", "nexus_cadeia_os · fato_os_na_cadeia",
+         "1 linha = 1 evento (incluiu, renomeou ou tirou) de 1 OS incluída à mão na cadeia de 1 OS",
+         _d(data=("id", "data_id (o dia de Brasília do evento)"),
+            pessoa=("cod", "pessoa_hmac (quem fez)")),
+         tipo="sem_medida", chave=("id",), fontes=("nexus_cadeia_os · fato_os_na_cadeia",),
+         janela_origem="o Nexus é a fonte",
+         observacao="os_id e os_folio são a OS da página (o id do Fracttal e o nº); incluida_id e incluida_folio, a OS "
+                    "incluída (conferida no Fracttal ao incluir). alvo_id é a inclusão que o renomeou ou o tirou aponta; "
+                    "o estado de agora sai dos eventos, na ordem da gravação, e a incluída aparece só na cadeia da OS em "
+                    "que entrou. O nome dado na cadeia e quem fez só cifrados (Cofre). Só acrescenta: nada se edita nem "
+                    "se apaga"),
     Fato("marcacao_etm", "O que a Engenharia marca nas OS de ETM", "engenharia",
          "nexus_engenharia_etm · fato_marcacao_etm",
          "1 linha = 1 marcação (diagnostico, status_pos, etiqueta, acompanhamento ou finalizado) da Engenharia sobre 1 "
@@ -1482,6 +1495,11 @@ LIVROS = (
           "registrado em 24/10/2026 antes da 1ª gravação (regra 10): nasce no 1º status, prioridade ou comentário. As "
           "três abas vão juntas a cada gravação, sobre o livro relido do banco; as duas dim são as listas fixas do "
           "código",
+          so_cresce=True),
+    Livro("nexus_cadeia_os", ("fato_os_na_cadeia",),
+          "a cada Incluir OS, Renomear e Tirar da cadeia no Raio X da OS",
+          "nexus/engenharia/cadeia_os.py, pela página da OS (o Raio X da OS)", False,
+          "registrado em 11/11/2026 antes da 1ª gravação (regra 10): nasce na 1ª OS incluída",
           so_cresce=True),
     Livro("nexus_engenharia_etm", ("dim_diagnostico_etm", "dim_status_pos_etm", "dim_etiqueta_etm",
                                    "fato_marcacao_etm"),

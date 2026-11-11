@@ -655,7 +655,7 @@ def test_titulo_da_os_em_cima_e_a_os_e_o_ativo_embaixo(pagina, cliente):
     from test_engenharia_acompanhamento import _como
     html = _como(cliente, ANA).get(URL).get_data(as_text=True)
     esq = html.split('<div class="eg-ac-esq">', 1)[1].split('<div class="eg-ac-acoes">', 1)[0]
-    assert (esq.index("<h1>Análise 16502</h1>") < esq.index('<p class="eg-ac-titulo">OS 16502 <span>Inversor 1.1</span></p>')
+    assert (esq.index("<h1>Análise 16502</h1>") < esq.index('data-folio="16502" data-status="Em Processo" title="Abrir o card da OS 16502">OS 16502</a> <span>Inversor 1.1</span></p>')
             < esq.index("eg-ac-sub"))
 
 
@@ -681,7 +681,7 @@ def test_cadeia_da_os_com_o_numero_e_o_pdf_de_cada_uma(pagina, cliente):
     # do chamado da Garantia
     from test_engenharia_acompanhamento import _como
     html = _como(cliente, ANA).get(URL).get_data(as_text=True)
-    cadeia = _secao(html, "A cadeia da OS")
+    cadeia = _secao(html, "A cadeia da OS").split("</form>", 1)[-1]   # depois do Incluir OS do título (11/11/2026)
     itens = re.findall(r'<li( class="aqui")?>.*?</li>', cadeia, re.S)
     assert len(itens) == 3 and itens[0] == ' class="aqui"'
     assert cadeia.index("OS da engenharia") < cadeia.index("16502") < cadeia.index("OS de campo") < cadeia.index("16510")
@@ -769,7 +769,7 @@ def test_os_de_varios_ativos_tem_o_bloco_ativos_em_cima_da_nota(pagina, cliente,
     ativos = _secao(html, "Ativos")
     assert "X-INV1.1" in ativos and "X-INV2.1" in ativos and "Inversor 2.1" in ativos
     assert html.index(">Ativos</h2>") < html.index(">Na nota da OS</h2>")
-    assert '<p class="eg-ac-titulo">OS 16502 <span>2 ativos</span></p>' in html
+    assert '>OS 16502</a> <span>2 ativos</span></p>' in html
     assert re.search(r"<dt>Ativo</dt><dd[^>]*>2 ativos</dd>", _secao(html, "Dados"))
 
 

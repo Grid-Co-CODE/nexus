@@ -538,6 +538,34 @@ ol.eg-cadeia li.aqui .i{background:var(--verde);color:var(--sobre-verde)}
 ol.eg-cadeia .t{font-size:12.5px;color:var(--mudo)}
 ol.eg-cadeia a{font:700 13px var(--fonte-ac);color:var(--tinta);text-decoration:none;font-variant-numeric:tabular-nums}
 ol.eg-cadeia a:hover{color:var(--verde-texto)}
+/* o Raio X da OS (11/11/2026): o nome da página, o nº que abre o card, o Incluir OS na altura do título da cadeia e as
+   OS incluídas, com o Renomear e o Tirar debaixo de cada uma */
+.eg-ac-raiox{margin:0 0 4px;font:700 10.5px var(--fonte-ac);letter-spacing:.08em;text-transform:uppercase;color:var(--verde-texto)}
+.eg-ac-num{color:inherit;text-decoration:underline;text-decoration-color:var(--linha-forte);text-underline-offset:3px;cursor:pointer}
+.eg-ac-num:hover{color:var(--verde-texto);text-decoration-color:var(--verde)}
+.eg-bloco-h .eg-cadeia-incluir{margin-left:auto;display:flex;gap:6px;align-items:center}
+.eg-cadeia-num{width:96px;padding:6px 9px;border:1px solid var(--linha-forte);border-radius:8px;background:transparent;
+  color:var(--tinta);font:600 12.5px var(--fonte-ac);font-variant-numeric:tabular-nums}
+.eg-cadeia-num:focus{outline:2px solid var(--verde);outline-offset:1px}
+.eg-cadeia-incluir .eg-ac-btn{padding:6px 12px}
+ol.eg-cadeia li.incluida .t{color:var(--tinta)}
+ol.eg-cadeia li.incluida details{grid-column:1/-1;margin:-2px 0 0 34px}
+.eg-cadeia-mudar summary{display:inline-block;cursor:pointer;font-size:11.5px;color:var(--mudo);list-style:none}
+.eg-cadeia-mudar summary::-webkit-details-marker{display:none}
+.eg-cadeia-mudar summary:hover{color:var(--verde-texto)}
+.eg-cadeia-mudar form{display:flex;gap:6px;align-items:center;margin-top:6px;flex-wrap:wrap}
+.eg-cadeia-mudar input[name=rotulo]{flex:1 1 160px;min-width:0;padding:6px 9px;border:1px solid var(--linha-forte);
+  border-radius:8px;background:transparent;color:var(--tinta);font-size:12.5px}
+.eg-cadeia-tirar{background:transparent;border:0;padding:4px 0;color:var(--mudo);font-size:11.5px;cursor:pointer;
+  text-decoration:underline}
+.eg-cadeia-tirar:hover{color:var(--critico)}
+.eg-ac-dados [hidden]{display:none}
+.eg-dica-in{color:var(--mudo);font-size:11.5px}
+@media (max-width:560px){
+  .eg-bloco-h:has(.eg-cadeia-incluir){flex-wrap:wrap}
+  .eg-bloco-h .eg-cadeia-incluir{margin-left:0;width:100%}
+  .eg-cadeia-num{flex:1 1 auto;width:auto}
+}
 .eg-cad-pdf{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;padding:0;border-radius:6px;
   border:1px solid var(--linha-forte);background:transparent;color:var(--mudo);cursor:pointer}
 .eg-cad-pdf:hover,.eg-cad-pdf:focus-visible{color:var(--verde);border-color:var(--verde)}

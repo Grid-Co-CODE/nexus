@@ -39,6 +39,7 @@ RESUMO = {
     "comentario_dia": "O comentário de cada dia de parada, pronto para o cliente",
     "acompanhamento_ativo": "Quem acompanha cada ativo com sinal, o diagnóstico e os comentários",
     "acompanhamento_os": "O status, a prioridade e os comentários da Engenharia em cada OS",
+    "os_na_cadeia": "As OS que alguém incluiu à mão na cadeia do Raio X de uma OS",
     "marcacao_etm": "O diagnóstico e as marcações da Engenharia em cada OS de ETM",
     "relatorio_falha": "Cada FMEA e cada causa raiz emitidos pela Engenharia, com as revisões",
     "contestacao_cliente": "O que o cliente contestou no Dashboard Thopen, por setor",
@@ -196,6 +197,9 @@ PARA_QUE = {
                             "cada ativo e, com o tempo, quais diagnósticos se repetem por família, usina e cliente, "
                             "quanto leva uma análise e se o ativo voltou a falhar depois dela. Quem e o texto vão "
                             "cifrados; a tela Engenharia → Confiabilidade mostra.",
+    "os_na_cadeia": "Guarda as OS que alguém juntou à cadeia de uma OS no Raio X da OS (o Incluir OS), com o nome que deu a "
+                     "cada uma, para quem abre a OS ver as OS ligadas a ela que o Fracttal não liga sozinho (a OS pai e as "
+                     "filhas ele já liga).",
     "acompanhamento_os": "Guarda o que a Engenharia diz de cada OS no Quadro da equipe: o status da análise (os oito "
                          "do time, como Diagnóstico em Andamento ou Stand-By), a prioridade (média, alta ou urgente) "
                          "e cada comentário, com o dia e a hora; o comentário vai também para a nota da OS no "

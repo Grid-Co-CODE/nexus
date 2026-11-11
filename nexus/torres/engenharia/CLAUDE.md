@@ -481,9 +481,24 @@ resposta de "Descreva a atividade realizada" da OS filha. Desenho em
   `id_parent_wo` (medido em 24/10/2026; a leitura para em 3 páginas, para um filtro ignorado não virar o Fracttal
   inteiro), e de cada filha a resposta de "Descreva a atividade realizada" (`work_orders_subtasks`; toda OS que nasce
   de solicitação tem a subtarefa; a da filha concluída fica guardada 10 min, a aberta é relida).
+- **O Raio X da OS** (Levi, 11/11/2026: "vamos chamar de 'Raio X da OS' e pode até botar a nomeação nessas páginas"; no
+  quiz, "uma página só": esta página, que a Performance já abre e que Garantias passa a abrir na etapa 2, com os blocos do
+  chamado). A etapa 1 trouxe:
+  - o nome "Raio X da OS" no alto e o **nº da OS clicável**, que abre o card do Histórico do OS Creator por cima da página
+    (`data-os-card`, o `NexusOsCard`; sem JavaScript, a página da OS no OS Creator);
+  - o **Solicitante** nos Dados, quando a OS nasceu de uma solicitação: da leitura das solicitações do Fracttal que o sino
+    já faz (`comando/solicitacoes_fracttal.da_os`, os últimos 30 dias, na memória); a OS mais velha pergunta ao OS Creator
+    depois que a página abre (`GET /os/api/os/<id>/solicitacao`, o `requests_list` pela OS na sessão da pessoa; o REST das
+    solicitações não filtra pela OS, sondado em 11/11/2026). Sem solicitação, a linha não aparece;
+  - o **Incluir OS** na altura do título da cadeia (até 6 dígitos): a OS digitada, conferida no Fracttal, entra depois das
+    filhas como "OS incluída", com o Renomear e o Tirar da cadeia (`POST /t/engenharia/equipe/os/<nº>/cadeia`, `acao`
+    incluir, renomear ou tirar). Aparece **só no Raio X da OS em que foi incluída** (quiz de 11/11/2026). O livro
+    `nexus_cadeia_os · fato_os_na_cadeia` (`nexus/engenharia/cadeia_os.py`, no catálogo antes da 1ª gravação): eventos que
+    só se acrescentam, com o nome dado e quem fez só cifrados.
 - **Quem mexe:** o setor Engenharia e o administrador, com login de pessoa; os demais leem, sem formulários.
 - **Como provar:** `python -m pytest -q tests/test_engenharia_os_quadro.py tests/test_engenharia_equipe.py
-  tests/test_oscreator_solic_pcm.py -k "os_quadro or quadro or sugestao"` e a página na cópia de prova.
+  tests/test_engenharia_raio_x_11_11.py tests/test_oscreator_solic_pcm.py -k "os_quadro or quadro or sugestao or raio"` e
+  a página na cópia de prova.
 
 ## ETMs (26/10/2026)
 

@@ -153,3 +153,14 @@ def atuais(app=None) -> tuple:
         preparar(app)
     with _TRAVA:
         return list(_ESTADO["linhas"] or []), dict(_CANCEL)
+
+
+def da_os(wid, app=None) -> dict | None:
+    """A solicitação que gerou a OS `wid` (o id do Fracttal), da última leitura (as feitas nos últimos DIAS); None sem ela.
+    O Raio X da OS mostra quem pediu por aqui sem pedido a mais; a OS mais velha pergunta ao Fracttal depois que a página
+    abre (`/os/api/os/<id>/solicitacao`, na sessão da pessoa)."""
+    w = _int(wid)
+    if w is None:
+        return None
+    linhas, _cancel = atuais(app)
+    return next((l for l in linhas if l["wid"] == w), None)

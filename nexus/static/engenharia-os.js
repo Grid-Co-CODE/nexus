@@ -40,6 +40,22 @@
       .catch(function () { dizer('Não consegui falar com o Nexus. Tente de novo.', true); })
       .then(function () { b.removeAttribute('aria-busy'); });
   });
+  // o Solicitante do Raio X da OS (11/11/2026): a OS mais velha que a leitura das solicitações (30 dias) pergunta ao OS
+  // Creator, na sessão do Fracttal da pessoa. Sem sessão, sem solicitação ou com erro, a linha segue escondida
+  function solicitante() {
+    var dd = document.querySelector('dd[data-solicitante-url]'); if (!dd) return;
+    fetch(dd.getAttribute('data-solicitante-url'), {credentials: 'same-origin', headers: {'Accept': 'application/json'}})
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (j) {
+        if (!j || !j.codigo) return;
+        dd.textContent = (j.solicitante || '—') + ' ';
+        var s = document.createElement('span'); s.className = 'eg-dica-in'; s.textContent = '· Solicitação ' + j.codigo;
+        dd.appendChild(s);
+        document.querySelectorAll('[data-solicitante]').forEach(function (x) { x.hidden = false; });
+      })
+      .catch(function () {});
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', solicitante); else solicitante();
   document.addEventListener('click', function (e) {
     var b = e.target.closest('[data-os-card]'); if (!b) return;
     e.preventDefault();

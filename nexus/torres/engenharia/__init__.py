@@ -14,7 +14,7 @@ import time
 from datetime import date, datetime, timedelta, timezone
 from urllib.parse import urlencode
 
-from flask import abort, jsonify, redirect, render_template, request, session, url_for
+from flask import abort, current_app, jsonify, redirect, render_template, request, session, url_for
 
 from ...cadastro import setor_ids as SID
 from ..modelo import Tela, Torre
@@ -1151,6 +1151,17 @@ def _pagina_da_os(folio: int, tela_id: str):
                 f["atividade"] = None
     except Exception as e:      # noqa: BLE001
         fs, erro_filhas = [], type(e).__name__
+    # a cadeia do Raio X da OS (11/11/2026): as OS incluídas à mão, depois das filhas
+    from ...engenharia import cadeia_os as C
+    incluidas, erro_cadeia = C.do_banco(o["wid"])
+    # quem pediu (11/11/2026, Levi: "se a OS tiver sido criada por solicitação deve ter quem foi o solicitante!"): a
+    # leitura das solicitações do Fracttal que o sino já faz (as dos últimos 30 dias, sem pedido a mais); a OS mais
+    # velha pergunta ao OS Creator depois que a página abre (engenharia-os.js, `data-solicitante-url`)
+    try:
+        from ...comando import solicitacoes_fracttal as SF
+        solicitacao = SF.da_os(o["wid"], current_app._get_current_object())
+    except Exception:           # noqa: BLE001 — sem a leitura: a página pergunta depois
+        solicitacao = None
     # Levi, 24/10/2026: "Ao clicar em criar Solicitar OS a data do incidente deve ser a mesma da OS pai". O "Criar OS"
     # (25/10/2026: "Fará os mesmos preenchimentos automáticos que já faz na solicitação") leva a mesma sugestão ao Criar
     # OS do zero, que abre com as subtarefas padrão (`tradicional_web.SUBS_PADRAO`)
@@ -1158,6 +1169,8 @@ def _pagina_da_os(folio: int, tela_id: str):
                           "data": o.get("evento_local") or ""})
     return render_template(
         "engenharia/os_quadro.html", o=o, est=est, filhas=fs, erro_filhas=erro_filhas, erro_livro=erro_livro,
+        incluidas=incluidas, erro_cadeia=erro_cadeia, solicitacao=solicitacao,
+        solicitante_url=na_raiz(f"/os/api/os/{o['wid']}/solicitacao"),
         velha_em=datetime.fromtimestamp(lido["lido_em"], BRT).strftime("%H:%M") if lido.get("velha") else "",
         kpis=kpis, pode=pode and not erro_livro, **extra,
         topo=_topo_da_os(o, est, datetime.now(BRT), sem_livro=bool(erro_livro)),
@@ -1289,6 +1302,57 @@ def equipe_os_classificar(folio: int):
         return redirect(volta + "?" + urlencode({"erro": str(e), **de}), 303)
     except Exception as e:      # noqa: BLE001 — banco ou Fracttal fora: nada mudou (a trava recusa antes de gravar)
         logging.exception("quadro da equipe: o status da OS %s não gravou", folio)
+        return redirect(volta + "?" + urlencode({"erro": FALHOU_BANCO.format(type(e).__name__), **de}), 303)
+
+
+# A cadeia do Raio X da OS (Levi, 11/11/2026: "a pessoa digita a OS e ela é incluída na cadeia das OSs, a pessoa pode
+# renomear como ficará a nomenclatura dessa OS na cadeia"): incluir, renomear e tirar, com quem pode mexer na página (o
+# mesmo do status). A OS incluída é conferida no Fracttal antes de gravar; a volta é a da tela de onde veio (o Quadro da
+# equipe ou ETMs, com o `de`)
+_ROTAS_DA_OS = ("torre_engenharia.equipe_os", "torre_engenharia.etm_os")
+
+
+@bp.route("/equipe/os/<int:folio>/cadeia", methods=["POST"])
+def equipe_os_cadeia(folio: int):
+    import logging
+    from urllib.parse import urlencode
+
+    from ...engenharia import cadeia_os as C
+    from ...engenharia import os_equipe
+    from ...auth.origem import de_outro_site as _de_outro_site
+    if _de_outro_site():
+        abort(403)
+    pode, _meu = _quem_pode_na_os()
+    rota = request.form.get("rota") if request.form.get("rota") in _ROTAS_DA_OS else _ROTAS_DA_OS[0]
+    volta = url_for(rota, folio=folio)
+    de = str(request.form.get("de") or "").strip()
+    de = {"de": de} if _volta_de(de) else {}
+    acao = request.form.get("acao")
+    try:
+        o = os_equipe.ler_os(folio)
+        if not o:
+            raise C.Recusada(f"Não achei a OS {folio} no Fracttal")
+        osg = _os_para_gravar(o)
+        if acao == "incluir":
+            n = C.numero(request.form.get("os"))
+            inc = os_equipe.ler_os(int(n))                # a OS incluída existe? (e o id dela, para o PDF da cadeia)
+            if not inc:
+                raise C.Recusada(f"Não achei a OS {n} no Fracttal")
+            C.incluir(osg, n, inc.get("wid"), session.get("usuario"), pode, request.form.get("rotulo"))
+            msg = f"OS {n} incluída na cadeia."
+        elif acao == "renomear":
+            C.renomear(osg, request.form.get("id"), request.form.get("rotulo"), session.get("usuario"), pode)
+            msg = "Nome na cadeia salvo."
+        elif acao == "tirar":
+            C.tirar(osg, request.form.get("id"), session.get("usuario"), pode)
+            msg = "OS tirada da cadeia."
+        else:
+            raise C.Recusada("Ação desconhecida na cadeia")
+        return redirect(volta + "?" + urlencode({"ok": msg, **de}), 303)
+    except C.Recusada as e:
+        return redirect(volta + "?" + urlencode({"erro": str(e), **de}), 303)
+    except Exception as e:      # noqa: BLE001 — banco ou Fracttal fora: nada mudou (a trava recusa antes de gravar)
+        logging.exception("Raio X da OS: a cadeia da OS %s não gravou", folio)
         return redirect(volta + "?" + urlencode({"erro": FALHOU_BANCO.format(type(e).__name__), **de}), 303)
 
 
