@@ -11,7 +11,7 @@
   <div class="cn-cab">
     <div><p class="gc-eyebrow">{{ torre.nome }}</p><h1 class="cn-titulo">{{ tela.nome }}</h1>
       <p class="cn-pergunta">{{ r.total }} usinas mobilizadas, da mais grave agora para a melhor. Clique na usina para abrir o prontuário dela.</p></div>
-    <div class="cn-frescor">{% if cos_ts %}COS: varredura das <b>{{ cos_ts }}</b>{% endif %}</div>
+    <div class="cn-frescor">{% if cos_ts %}COS: fotografia das <b>{{ cos_ts }}</b>{% endif %}</div>
   </div>
   {% if erro %}<div class="cn-erro" role="alert"><span>A Visão do responsável não carregou agora ({{ erro }}). Tente de novo em instantes.</span></div>{% endif %}
   {% if avisos %}<div class="cn-erro cn-aviso" role="status"><span>Sem leitura agora: {{ avisos|join(', ') }}. O resto da tabela vale.</span></div>{% endif %}

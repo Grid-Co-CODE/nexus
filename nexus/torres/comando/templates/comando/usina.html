@@ -66,15 +66,15 @@
     </section>
   </div><div class="cu-col">
     <section class="cu-q" aria-labelledby="cmu-cos">
-      <header class="pn-cab"><h2 id="cmu-cos"><i class="ph ph-broadcast" aria-hidden="true"></i>No COS agora</h2><a class="pn-ver" href="{{ raiz }}/t/cos/os-abertas?situacao=todas&amp;q={{ x.codigo|urlencode }}">abrir as OS em aberto</a></header>
-      {% if x.estado == 'sem_leitura' %}<p class="mudo">O COS > OS em aberto não respondeu agora.</p>
+      <header class="pn-cab"><h2 id="cmu-cos"><i class="ph ph-broadcast" aria-hidden="true"></i>No COS agora</h2>{% if x.os_cos %}<a class="pn-ver" href="{{ raiz }}/t/cos/ronda?cliente={{ x.os_cos[0].cliente_cos|urlencode }}">abrir a Ronda padronizada</a>{% endif %}</header>
+      {% if x.estado == 'sem_leitura' %}<p class="mudo">A Ronda COS não trouxe esta usina agora.</p>
       {% elif x.os_cos %}
       <ul class="cmu-ins">
         {% for o in x.os_cos %}
-        <li><span class="cn-pill cn-{{ 'critico' if o.em_alerta else o.registro[1] }}">{{ 'Em alerta' if o.em_alerta else o.registro[0] }}</span><div><b>OS {{ o.folio }} · {{ o.tipo or 'OS' }}</b><small>{% if o.situacao == 'concluida' %}feita, falta finalizar{% else %}pendente{% endif %} · aberta há {{ o.aberta_ha }}{% if o.ativo %} · {{ o.ativo }}{% endif %}</small></div></li>
+        <li><span class="cn-pill cn-{{ o.tom }}">{{ o.rotulo }}</span><div><b>{{ o.os_rotulo }}{% if o.tipo_tarefa %} · {{ o.tipo_tarefa }}{% endif %}{% if o.tipo_falha %} · {{ o.tipo_falha }}{% endif %}</b><small>aberta há {{ o.ha }}{% if o.etapa %} · {{ o.etapa }}{% endif %}{% if o.falha %} · {{ o.falha }}{% endif %}</small></div></li>
         {% endfor %}
       </ul>
-      {% else %}<p class="cn-t-ok">Nenhuma OS do COS aberta nesta usina.</p>{% endif %}
+      {% else %}<p class="cn-t-ok">Nenhuma ocorrência aberta na Ronda COS.</p>{% endif %}
     </section>
     <section class="cu-q" aria-labelledby="cmu-pend">
       <header class="pn-cab"><h2 id="cmu-pend"><i class="ph ph-list-checks" aria-hidden="true"></i>Pendências</h2></header>

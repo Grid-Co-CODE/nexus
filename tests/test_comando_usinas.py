@@ -1,22 +1,34 @@
 """Comando > Usinas (11/11/2026, Levi: "Em comando quero a mesma visão de Início > Usinas do mockup"; o Score de saúde
 "Fora por agora"; o clique na usina "No próprio Comando"). O que estes testes seguram: a conta de cada coluna
 (`nexus/comando/usinas.py`) com a fonte que falta virando "sem leitura" e nunca 0, a ordem do mais grave agora, e as
-duas telas (a lista e o prontuário) pela Visão do responsável falsa. Desde 11/11/2026 (Levi: "Coluna Agora pelo COS") a
-coluna Agora segue o COS > OS em aberto: as OS de teste são as do test_cos_os_abertas."""
+duas telas (a lista e o prontuário) pela Visão do responsável falsa. Desde 11/11/2026 (Levi: "Coluna Agora pelo COS" e a
+régua dele: religamento em campo crítico, inversor desligado atenção, falha de comunicação sem comunicação) a coluna Agora
+segue as ocorrências abertas na fotografia da Ronda COS de cada cliente do Andamento."""
 import pytest
 from test_campo_visao import banco  # noqa: F401  (fixture)
-from test_cos_os_abertas import AGORA, _dados, _os
 
 from nexus.campo import leitura as LE
 from nexus.comando import usinas as CU
 from nexus.cos import andamento as AND
-from nexus.cos import os_abertas as OA
+
+AGORA = AND.instante("2026-11-11T10:00:00-03:00")
+IDS = {"THPN-ALT100": 1, "THPN-BWK100": 2, "THPN-COR100": 3}
 
 
-def _cos(*os_):
-    """{usina_id: as OS do COS} com o código da usina dando o id (THPN-ALT100 = 1, THPN-BWK100 = 2)."""
-    ids = {"THPN-ALT100": 1, "THPN-BWK100": 2}
-    return CU.os_do_cos_por_usina([OA._item(o, AGORA) for o in os_], lambda nome, cod: ids.get(cod))
+def _oc(os_="90001", tarefa="Corretiva", falha="Inversor desligado", problema="inv", abertura="2026-11-11T08:00:00-03:00",
+        etapa="Técnico acionado"):
+    return {"os": os_, "registro": "r" + os_, "severidade": "Médio", "tipo_tarefa": tarefa, "tipo_falha": falha,
+            "problema": problema, "equipamentos": [], "falha": "texto do operador", "abertura": abertura,
+            "dias_aberta": 0, "etapa": etapa}
+
+
+def _foto(cliente, *usinas):
+    """A fotografia de um cliente: (código, [ocorrências]) por usina."""
+    return AND.Leitura(cliente, {"usinas": [{"nome": c, "codigo": c, "ocorrencias": ocs} for c, ocs in usinas]})
+
+
+def _cos(*leituras):
+    return CU.cos_por_usina(list(leituras), lambda nome, cod: IDS.get(cod))
 
 
 def _visao(uid, usina, cliente="Thopen", ating=None, pr=None, prm=None, os_=None, vencidos=0):
@@ -35,39 +47,52 @@ def test_as_colunas_e_a_ordem():
     linhas = [_visao(1, "Altair", ating=96.4, pr=78.0, prm=80.0, os_={"os_abertas": 4, "atrasadas_os": 1}, vencidos=2),
               _visao(2, "Brodowski 1", ating=101.2, pr=82.0, prm=80.0),
               _visao(3, "Coração 1", cliente="Outro Cliente")]
-    # Brodowski 1: uma detectada (crítica) e uma em campo; Altair: só uma feita que falta finalizar; Coração 1: nada
-    cos = _cos(_os(101, codigo="THPN-BWK100", registro="EM_CAMPO", criada="2026-10-20T08:00:00-03:00"),
-               _os(102, codigo="THPN-BWK100", registro="DETECTADO", tipo="Corretiva emergencial"),
-               _os(103, codigo="THPN-ALT100", situacao="concluida", registro="NORMALIZADO"))
-    r = CU.montar(linhas, CAD, cos, {1: 2}, {2}, com_os=True)
-    assert [x["usina"] for x in r] == ["Brodowski 1", "Altair", "Coração 1"]       # crítico, depois os normais
-    alt = r[1]
-    assert (alt["estado"], alt["estado_rot"], alt["detalhe"]) == ("normal", "Sem OS aberta", "1 feita, falta finalizar")
+    # Brodowski 1: um inversor desligado antigo e um religamento em campo; Altair: nada aberto; Coração 1: o cliente
+    # dela não respondeu (sem leitura, nunca normal)
+    cos = _cos(_foto("Thopen", ("THPN-BWK100", [_oc("90001", abertura="2026-11-01T08:00:00-03:00"),
+                                               _oc("90002", tarefa="Religamento", falha="Desligamento de usina",
+                                                   problema="rede")]),
+                     ("THPN-ALT100", [])),
+               AND.Leitura("Outro Cliente", None, erro="caiu"))
+    r = CU.montar(linhas, CAD, cos, {1: 2}, {2}, com_os=True, agora=AGORA)
+    assert [x["usina"] for x in r] == ["Brodowski 1", "Coração 1", "Altair"]       # crítico, sem leitura, normal
+    alt = r[2]
+    assert (alt["estado"], alt["estado_rot"], alt["detalhe"]) == ("normal", "Sem ocorrência", "")
     assert (alt["mwp"], alt["tipologia"], alt["codigo"]) == (5.012, "Tracker", "THPN-ALT100")
     assert (alt["atingimento"], alt["pr"], alt["pr_meta"], alt["os_abertas"], alt["os_atrasadas"]) == (96.4, 78.0, 80.0, 4, 1)
     assert alt["insights"] == 2 and alt["conformidade"] == [("2 extintores vencidos", "critico")]
     bwk = r[0]
-    # a pior manda (a detectada, mesmo mais nova que a em campo), e o detalhe diz o tipo, a OS, a idade e quantas mais
-    assert (bwk["estado"], bwk["estado_rot"], bwk["estado_tom"]) == ("critico", "Detectada", "critico")
-    assert bwk["detalhe"] == "Corretiva emergencial · OS 102 · há 2 h · +1 pendente"
-    assert [o["folio"] for o in bwk["os_cos"]] == [102, 101]
+    # o religamento em campo manda (crítico), mesmo mais novo que o inversor; o detalhe diz a OS, a idade, a etapa e mais
+    assert (bwk["estado"], bwk["estado_rot"], bwk["estado_tom"]) == ("critico", "Religamento em campo", "critico")
+    assert bwk["detalhe"] == "OS 90002 · há 2 h · Técnico acionado · +1 ocorrência"
+    assert [o["os"] for o in bwk["os_cos"]] == ["90002", "90001"]
     assert bwk["conformidade"] == [("sem luvas", "critico")]
     assert bwk["os_abertas"] == 0 and bwk["insights"] == 0          # sem OS nem insight na usina: 0, com a fonte lida
-    cor = r[2]
-    assert cor["estado_rot"] == "Sem OS aberta" and cor["detalhe"] == ""
+    cor = r[1]
+    assert cor["estado"] == "sem_leitura" and cor["detalhe"] == ""
     assert cor["tipologia"] == "" and cor["mwp"] is None and cor["conformidade_ok"]
     assert "thpn-alt100" in alt["busca"] and "tracker" in alt["busca"]
-    assert CU.resumo(r)["por_estado"] == {"normal": 2, "atencao": 0, "critico": 1, "sem_leitura": 0}
+    assert CU.resumo(r)["por_estado"] == {"normal": 1, "atencao": 0, "critico": 1, "sem_com": 0, "sem_leitura": 1}
 
 
-def test_o_tom_do_cos():
-    """O alerta de 1 h da Ronda COS é crítico; tratativa remota é atenção (info); só a normalizada pendente é normal."""
-    assert CU.agora_pelo_cos(_cos(_os(1, codigo="THPN-ALT100", registro="TRATATIVA_REMOTA"))[1])["estado"] == "atencao"
-    x = CU.agora_pelo_cos(_cos(_os(1, codigo="THPN-ALT100", registro="TRATATIVA_REMOTA", em_alerta=True))[1])
-    assert (x["estado"], x["estado_rot"]) == ("critico", "Em alerta")
-    assert CU.agora_pelo_cos(_cos(_os(1, codigo="THPN-ALT100", registro=None))[1])["estado_rot"] == "Sem registro"
-    assert CU.agora_pelo_cos(_cos(_os(1, codigo="THPN-ALT100", registro="NORMALIZADO"))[1])["estado"] == "normal"
-    assert CU.agora_pelo_cos(None)["estado"] == "sem_leitura"
+def test_a_regua_do_levi():
+    """11/11/2026: "religamento com OS aberta em campo tem que estar como crítico", "atenção vai ser inversor desligado",
+    "falha de comunicação é sem comunicação e etc"."""
+    assert CU.classificar(_oc(tarefa="Religamento", falha="Desligamento de usina")) == ("critico", "Religamento em campo")
+    assert CU.classificar(_oc(falha="Inversor desligado", problema="inv")) == ("atencao", "Inversor desligado")
+    assert CU.classificar(_oc(falha="Perda de comunicação com a usina", problema="com")) == ("sem_com", "Sem comunicação")
+    # o etc: o que para a usina é crítico; o religamento remoto e o ainda sem OS vão pela falha; o resto é atenção
+    assert CU.classificar(_oc(falha="Atuação de proteção", problema="rede"))[0] == "critico"
+    assert CU.classificar(_oc(falha="Desligamento de SKID", problema="x"))[0] == "critico"
+    assert CU.classificar(_oc(tarefa="Religamento remoto", falha="Desligamento de usina", problema="rede")) == (
+        "critico", "Desligamento de usina")
+    assert CU.classificar(_oc(os_="R-77", tarefa="Religamento", falha="Inversor desligado"))[0] == "atencao"
+    assert CU.classificar(_oc(falha="Tracker travado", problema="trk")) == ("atencao", "Tracker travado")
+    # a pior manda: crítico > atenção > sem comunicação; nada aberto é normal; sem leitura nunca é normal
+    x = CU.agora_pelo_cos([_oc(falha="Perda de comunicação", problema="com"), _oc(falha="Inversor desligado")], AGORA)
+    assert (x["estado"], x["estado_rot"]) == ("atencao", "Inversor desligado")
+    assert CU.agora_pelo_cos([], AGORA)["estado"] == "normal" and CU.agora_pelo_cos(None)["estado"] == "sem_leitura"
+    assert CU.cos_por_usina([AND.Leitura("X", None, erro="caiu")], IDS.get) is None
 
 
 def test_a_fonte_que_falta_e_sem_leitura_nunca_zero():
@@ -97,8 +122,15 @@ def telas(monkeypatch, banco):
                       _visao(3, "Coração 1", cliente="Outro Cliente")], "erros": {}, "info": {}}
     monkeypatch.setattr(R, "visao_responsaveis", lambda: LE.Leitura(vis, 0))
     monkeypatch.setattr(AND, "fonte", lambda cfg: AND.Fonte(url="http://andamento.falso", chave="chave-de-teste"))
-    monkeypatch.setattr(AND, "ler_os_abertas", lambda cfg: AND.Leitura("", _dados([
-        _os(7001, usina="Altair", codigo="THPN-ALT100", registro="DETECTADO", tipo="Corretiva emergencial")])))
+    monkeypatch.setattr(AND, "clientes", lambda cfg: (["Thopen", "Outro Cliente"], ""))
+    fotos = {"Thopen": {"gerado_em": "2026-11-11T09:00:00-03:00", "usinas": [
+        {"nome": "Altair", "codigo": "THPN-ALT100", "ocorrencias": [
+            _oc("7001", tarefa="Religamento", falha="Desligamento de usina", problema="rede")]},
+        {"nome": "Brodowski 1", "codigo": "THPN-BWK100", "ocorrencias": []}]},
+        "Outro Cliente": {"gerado_em": "2026-11-11T09:00:00-03:00", "usinas": [
+            {"nome": "Coração 1", "codigo": "THPN-COR100", "ocorrencias": [
+                _oc("7002", falha="Perda de comunicação", problema="com")]}]}}
+    monkeypatch.setattr(AND, "ler", lambda cfg, c: AND.Leitura(c, fotos[c]))
     monkeypatch.setattr(AND, "agora", lambda: AGORA)
     monkeypatch.setattr(MO, "sem_esperar", lambda: LE.Leitura({"insights": [
         {"id": "R07:1", "regra": "R07", "sev": "critico", "titulo": "Altair sem geração há 2 dias", "acao": "Acionar o COS",
@@ -111,7 +143,7 @@ def test_a_lista_e_o_prontuario(logado, telas, monkeypatch):
     html = logado.get("/t/comando/usinas?cliente=Thopen").get_data(as_text=True)
     assert "3 usinas mobilizadas" in html and "Score" not in html
     assert html.index(">Altair<") < html.index(">Brodowski 1<")                # o crítico antes do normal
-    assert ">Detectada<" in html and "Corretiva emergencial · OS 7001" in html and "varredura das" in html
+    assert ">Religamento em campo<" in html and "OS 7001 · há 2 h" in html and "fotografia das" in html
     assert 'href="/t/comando/usinas/1"' in html and "THPN-ALT100" in html
     assert '<option value="Thopen" data-rotulo="Thopen" selected>' in html      # o filtro do endereço já vem escolhido
     assert "1 extintor vencido" in html and ">sem luvas<" in html
@@ -128,6 +160,7 @@ def test_a_lista_e_o_prontuario(logado, telas, monkeypatch):
         "ronda_pendente": [], "os_pendentes": [], "os_linhas": [], "ronda_limpeza": [], "graf_ger": None})
     p = logado.get("/t/comando/usinas/1").get_data(as_text=True)
     assert "Prontuário da usina" in p and "Altair sem geração há 2 dias" in p and "Crítico" in p
-    assert "No COS agora" in p and "OS 7001 · Corretiva emergencial" in p
+    assert "No COS agora" in p and "OS 7001 · Religamento · Desligamento de usina" in p
+    assert "/t/cos/ronda?cliente=Thopen" in p
     assert 'href="/t/comando/usinas"' in p and "/t/campo/responsaveis?modo=usina&amp;usina=1" in p
     assert logado.get("/t/comando/usinas/999").status_code == 404
