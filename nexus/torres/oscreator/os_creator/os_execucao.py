@@ -94,26 +94,26 @@ def subtarefas_da_tarefa(id_work_order_task) -> list:
 
 
 RPC_FORMIT_ATTACH = "tasks.wo_tasks_form_items_attachments_list"   # os anexos de UMA subtarefa (pelo id do item)
+RPC_FORMIT_ATTACH_DELETE = "tasks.wo_tasks_form_items_attachments_delete"   # tira um anexo da subtarefa (o id do vínculo)
 RPC_FILES_DELETE = "tasks.work_orders_tasks_files_delete"            # exclui um anexo da tarefa (pelo id dele)
+# O QUE O FRACTTAL FAZ (medido na OS de teste 19259, TESTE - PA, 11/11/2026): a gravação das respostas
+# (`work_orders_task_form_items_values_insert`) ACRESCENTA os anexos que vão no `attachments` (cada um vira um registro de
+# arquivo e um vínculo com a subtarefa) e não mexe nos que a subtarefa já tem: regravar com a lista inteira DUPLICOU a
+# foto, e mandar `[]` não apaga nada. Tirar um anexo da subtarefa é o `wo_tasks_form_items_attachments_delete` com o id do
+# vínculo (o `files_delete` do arquivo antes dele dá FOREIGN_KEY_VIOLATION); depois sai o arquivo do vínculo.
 
 
 def anexos_do_item(id_work_order_task, id_form_item) -> list:
-    """Os anexos que a subtarefa tem hoje, no formato do `attachments` da gravação: {value, size, type, description}, o
-    que o App de Campo manda (function_app `_anexos_por_item`). A gravação das respostas TROCA a lista de anexos da
-    subtarefa pela que vai junto: mandar `[]` apagava a foto que o técnico pôs pelo App (11/11/2026). O erro sobe: sem
-    saber o que há, nada se grava por cima."""
+    """Os vínculos de anexo da subtarefa: [{id, id_arquivo, value, description}]. O erro sobe."""
     res = api._rpc_call(RPC_FORMIT_ATTACH, {"page": 1, "limit": 200, "start": 0, "is_tree": False, "node": None,
                                             "id_work_order_task": id_work_order_task,
                                             "id_work_orders_tasks_form_items": id_form_item, "link_attachment": True})
     if isinstance(res, dict) and res.get("success") is False:
-        raise FracttalError("Não consegui ler os anexos da subtarefa no Fracttal; nada foi gravado.")
+        raise FracttalError("Não consegui ler os anexos da subtarefa no Fracttal.")
     d = res.get("data") if isinstance(res, dict) else res
-    out = []
-    for a in (d if isinstance(d, list) else []):
-        if isinstance(a, dict) and str(a.get("value") or "").strip():
-            out.append({"value": a.get("value"), "size": a.get("size") or 0, "type": a.get("type") or 1,
-                        "description": a.get("description") or ""})
-    return out
+    return [{"id": a.get("id"), "id_arquivo": a.get("id_work_orders_tasks_files"), "value": a.get("value"),
+             "description": a.get("description") or ""}
+            for a in (d if isinstance(d, list) else []) if isinstance(a, dict) and a.get("id")]
 
 
 def _gravar_valores(params: list) -> object:
@@ -134,37 +134,45 @@ def _linha_valor(id_work_order, id_work_order_task, fid, tipo, valor, anexos) ->
 
 def anexar_no_item(id_work_order, id_work_order_task, id_form_item, tipo, valor, dados: bytes, nome: str) -> dict:
     """A foto (ou arquivo) NA SUBTAREFA, como o App de Campo faz: o arquivo sobe como anexo da tarefa (S3 +
-    `files_insert`, que ignora o item: medido pelo App na OS 10597) e entra na lista `attachments` da subtarefa, com os
-    que ela já tinha, na gravação do valor dela."""
-    antes = api.anexos_do_item(id_work_order_task, id_form_item)
+    `files_insert`, que ignora o item: medido pelo App na OS 10597) e vai, SÓ ELE, no `attachments` da gravação do valor
+    da subtarefa (a gravação acrescenta: ver acima). Provado na OS 19259."""
     up = api.attach_imagem_os(id_work_order, id_work_order_task, dados, nome)
     novo = {"value": up["value"], "size": len(dados), "type": 1, "description": nome}
-    api._gravar_valores([api._linha_valor(id_work_order, id_work_order_task, id_form_item, tipo, valor, antes + [novo])])
+    api._gravar_valores([api._linha_valor(id_work_order, id_work_order_task, id_form_item, tipo, valor, [novo])])
     api.esquecer_os(id_work_order)
-    return {"ok": True, "value": up["value"], "n": len(antes) + 1}
+    return {"ok": True, "value": up["value"]}
 
 
-def tirar_do_item(id_work_order, id_work_order_task, id_form_item, tipo, valor, value: str) -> dict:
-    """Tira um anexo da subtarefa: a lista dela vai de novo sem ele (e o arquivo sai dos anexos da tarefa, onde a subida
-    o pôs)."""
-    antes = api.anexos_do_item(id_work_order_task, id_form_item)
-    resta = [a for a in antes if str(a.get("value")) != str(value)]
-    if len(resta) == len(antes):
+def tirar_do_item(id_work_order, id_work_order_task, id_form_item, id_vinculo) -> dict:
+    """Tira um anexo da subtarefa pelo id do vínculo e, depois, o arquivo dele (o que sobra do arquivo é limpeza: a falha
+    não desfaz o que saiu). Provado na OS 19259."""
+    vinc = next((a for a in api.anexos_do_item(id_work_order_task, id_form_item) if str(a["id"]) == str(id_vinculo)), None)
+    if vinc is None:
         raise FracttalError("Este anexo não está mais na subtarefa: reabra os anexos.")
-    api._gravar_valores([api._linha_valor(id_work_order, id_work_order_task, id_form_item, tipo, valor, resta)])
-    for a in api._arquivos_da_tarefa(id_work_order_task):
-        if str(a.get("value")) == str(value) and a.get("id"):
-            api.excluir_anexo_da_tarefa(a.get("id"))
+    res = api._rpc_call(RPC_FORMIT_ATTACH_DELETE, {"id": vinc["id"]})
+    if isinstance(res, dict) and res.get("success") is False:
+        raise FracttalError(str(res.get("message") or "O Fracttal recusou tirar o anexo da subtarefa."))
+    if vinc.get("id_arquivo"):
+        try:
+            api.excluir_anexo_da_tarefa(vinc["id_arquivo"])
+        except FracttalError:
+            pass
+    # a subida pôs o arquivo também nos anexos da tarefa (o caminho do App): sem o vínculo, ele apareceria como anexo da
+    # OS (visto na OS 19259). Sai junto, se nenhuma outra subtarefa da tarefa o usa
+    try:
+        if not any(str(a.get("value")) == str(vinc.get("value")) for a in api.anexos_do_item(id_work_order_task, id_form_item)):
+            for a in api._arquivos_da_tarefa(id_work_order_task):
+                if str(a.get("value")) == str(vinc.get("value")) and str(a.get("id") or "").isdigit():
+                    api.excluir_anexo_da_tarefa(int(a["id"]))
+    except FracttalError:
+        pass
     api.esquecer_os(id_work_order)
-    return {"ok": True, "n": len(resta)}
+    return {"ok": True}
 
 
 def _arquivos_da_tarefa(id_work_order_task) -> list:
-    try:
-        r = api._rpc_call("tasks.work_orders_tasks_files_list", {"page": 1, "limit": 500, "start": 0, "is_tree": False,
-                                                                  "node": None, "id_work_order_task": id_work_order_task})
-    except FracttalError:
-        return []
+    r = api._rpc_call("tasks.work_orders_tasks_files_list", {"page": 1, "limit": 500, "start": 0, "is_tree": False,
+                                                              "node": None, "id_work_order_task": id_work_order_task})
     d = r.get("data") if isinstance(r, dict) else r
     return [a for a in (d if isinstance(d, list) else []) if isinstance(a, dict)]
 
@@ -182,8 +190,8 @@ def excluir_anexo_da_tarefa(id_anexo) -> dict:
 
 
 def salvar_subtarefas(id_work_order, id_work_order_task, valores: list) -> dict:
-    """Grava os valores do checklist. `valores` = [{'id_form_item','valor','tipo','n_anexos'}]. A subtarefa que já tem
-    anexo (`n_anexos`) vai com a lista dele (`anexos_do_item`): a gravação troca a lista, e `[]` apagava a foto.
+    """Grava os valores do checklist. `valores` = [{'id_form_item','valor','tipo'}]. O `attachments` vai vazio: a gravação
+    ACRESCENTA anexos e não mexe nos que a subtarefa tem (medido na OS 19259; a lista inteira duplicava a foto).
 
     SÓ VAI O QUE TEM VALOR, e é assim de propósito: na captura, o campo que a pessoa esvaziou
     simplesmente saiu da lista da segunda gravação. Mandar `value:""` seria inventar um contrato
@@ -202,12 +210,7 @@ def salvar_subtarefas(id_work_order, id_work_order_task, valores: list) -> dict:
             tipo = int(v.get("tipo") or 1)
         except (TypeError, ValueError):
             tipo = 1
-        try:
-            n_anexos = int(v.get("n_anexos") or 0)
-        except (TypeError, ValueError):
-            n_anexos = 0
-        anexos = api.anexos_do_item(id_work_order_task, fid) if n_anexos > 0 else []
-        params.append(api._linha_valor(id_work_order, id_work_order_task, fid, tipo, val, anexos))
+        params.append(api._linha_valor(id_work_order, id_work_order_task, fid, tipo, val, []))
     if not params:
         return {"ok": False, "n": 0, "erro": "Nenhum campo preenchido para gravar."}
     res = api._gravar_valores(params)

@@ -1281,18 +1281,20 @@ concluir e cancelar!".
   verificação só libera com tudo e com o início e o fim. As respostas vão pelo `/respostas`; o envio, pelo `POST
   /os/api/os/<id>/fazer`, que confere de novo o que falta, recusa com o cronômetro rodando, lança a execução de cada
   tarefa com as datas ou corrige as da execução que a tarefa já tem (as horas não dobram) e põe a OS Em Verificação, lida
-  de volta.
+  de volta. Sem o "confirmado" na resposta da execução, vale o registro relido com as mesmas datas (na OS 19259 o Fracttal
+  gravou certo e não confirmou). Provado na OS de teste 19259 (TESTE - PA, 11/11/2026): foto na subtarefa, regravar sem
+  duplicar, tirar da subtarefa e da tarefa, envio com a execução corrigida e a OS Em Verificação, depois cancelada.
 - **A foto na subtarefa** (11/11/2026): `POST /os/api/os/<id>/tarefa/<t>/item/<i>/anexo`, o caminho do App de Campo: o
-  arquivo sobe como anexo da tarefa (o `files_insert` ignora o item) e entra na lista `attachments` da subtarefa, com os
-  que ela já tinha, na gravação do valor (`os_execucao.anexar_no_item`).
-- **As respostas nunca apagam a foto da subtarefa** (11/11/2026): a gravação (`work_orders_task_form_items_values_insert`)
-  TROCA a lista de anexos da subtarefa pela que vai junto, e o OS Creator mandava `[]`: regravar pelo Nexus uma resposta
-  com foto posta pelo App apagava a foto. Agora a subtarefa com anexo (`n_anexos`) vai com a lista dela
-  (`os_execucao.anexos_do_item`); sem conseguir ler a lista, nada se grava.
+  arquivo sobe como anexo da tarefa (o `files_insert` ignora o item) e vai, só ele, no `attachments` da gravação do valor
+  da subtarefa (`os_execucao.anexar_no_item`). **A gravação ACRESCENTA** (medido na OS de teste 19259, TESTE - PA): cada
+  anexo do `attachments` vira um arquivo e um vínculo com a subtarefa, e os que ela tem ficam. Regravar a resposta com a
+  lista inteira DUPLICOU a foto; com `[]` (o que o OS Creator sempre mandou) nada se apaga. Tirar o anexo da subtarefa é
+  o `tasks.wo_tasks_form_items_attachments_delete` com o id do vínculo e, depois, o `files_delete` do arquivo dele (antes
+  do vínculo sair, ele dá FOREIGN_KEY_VIOLATION).
 - **Editar e o X nos anexos** (11/11/2026, Levi: "um botão de 'Editar' que ao ativar esse botão aparece um 'X' no canto
   superior direito das imagens"): no diálogo dos anexos do card, o Editar mostra o X nos arquivos; o X pergunta e exclui
   (`POST /os/api/os/<id>/anexo/excluir`): o anexo da tarefa pelo `tasks.work_orders_tasks_files_delete` (o id dele,
-  conferido na OS), o da subtarefa saindo da lista dela e dos anexos da tarefa. A nota de texto não tem X.
+  conferido na OS); o da subtarefa pelo id do vínculo (acima). A nota de texto não tem X.
 - **A Solicitação no topo do card** só aparece quando a OS nasceu de uma (11/11/2026: "Se não foi criada com solicitação
   não precisa ter o card").
 - **Retornar para responsável** (10/11/2026, Levi: "tirar uma OS de verificação e devolver para OSs em processo"; "Só quem

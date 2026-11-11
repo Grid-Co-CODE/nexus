@@ -14,12 +14,13 @@ import os_execucao  # noqa: E402
 from os_web import os_acoes_web as regra  # noqa: E402
 
 TID, FID = 70001, 81001
-FOTO = {"value": ".ot/%d/antiga.jpg" % WID, "size": 10, "type": 1, "description": "antiga.jpg"}
+VINC = {"id": 39957833, "id_work_orders_tasks_files": 91725217, "value": ".ot/%d/antiga.jpg" % WID, "type": 1,
+        "description": "antiga.jpg"}
 PNG = b"\x89PNG\r\n\x1a\n" + b"0" * 64
 
 
 class Rpc:
-    """O RPC do Fracttal de mentira: guarda o que foi mandado; a subtarefa tem a foto `FOTO`."""
+    """O RPC do Fracttal de mentira: guarda o que foi mandado; a subtarefa tem os vínculos de `anexos`."""
 
     def __init__(self, anexos=None, arquivos=None):
         self.pedidos, self.anexos, self.arquivos = [], list(anexos or []), list(arquivos or [])
@@ -36,46 +37,42 @@ class Rpc:
         return [p for m, p in self.pedidos if m == os_execucao.RPC_WO_FORMIT_VALUES]
 
 
-def test_regravar_a_resposta_leva_a_foto_que_a_subtarefa_tem(monkeypatch):
-    rpc = Rpc(anexos=[FOTO])
+def test_regravar_a_resposta_nao_manda_anexo(monkeypatch):
+    # a gravação ACRESCENTA anexos (OS de teste 19259): a lista inteira duplicava a foto; `[]` não apaga nada
+    rpc = Rpc(anexos=[VINC])
     monkeypatch.setattr(api, "_rpc_call", rpc)
-    os_execucao.salvar_subtarefas(WID, TID, [{"id_form_item": FID, "valor": "Sim", "tipo": 2, "n_anexos": 1},
-                                             {"id_form_item": FID + 1, "valor": "12", "tipo": 3, "n_anexos": 0}])
+    os_execucao.salvar_subtarefas(WID, TID, [{"id_form_item": FID, "valor": "Sim", "tipo": 2, "n_anexos": 1}])
     (linhas,) = rpc.gravacoes()
-    assert linhas[0]["attachments"] == [FOTO] and linhas[1]["attachments"] == []
-    assert [m for m, _ in rpc.pedidos].count(os_execucao.RPC_FORMIT_ATTACH) == 1    # só a que tem anexo é lida
+    assert linhas[0]["attachments"] == [] and not any(m == os_execucao.RPC_FORMIT_ATTACH for m, _ in rpc.pedidos)
 
 
-def test_sem_ler_as_fotos_nada_se_grava(monkeypatch):
-    def recusa(metodo, params):
-        if metodo == os_execucao.RPC_FORMIT_ATTACH:
-            return {"success": False, "message": "ERRO"}
-        raise AssertionError("gravou sem saber das fotos")
-    monkeypatch.setattr(api, "_rpc_call", recusa)
-    with pytest.raises(api.FracttalError):
-        os_execucao.salvar_subtarefas(WID, TID, [{"id_form_item": FID, "valor": "Sim", "tipo": 2, "n_anexos": 1}])
-
-
-def test_a_foto_na_subtarefa_vai_com_as_que_ela_ja_tinha(monkeypatch):
-    rpc = Rpc(anexos=[FOTO])
+def test_a_foto_na_subtarefa_vai_sozinha_na_gravacao(monkeypatch):
+    rpc = Rpc(anexos=[VINC])
     monkeypatch.setattr(api, "_rpc_call", rpc)
     monkeypatch.setattr(api, "attach_imagem_os", lambda wid, tid, dados, nome: {"ok": True, "value": f".ot/{wid}/{nome}"})
-    r = os_execucao.anexar_no_item(WID, TID, FID, 2, "Sim", PNG, "nova.png")
+    os_execucao.anexar_no_item(WID, TID, FID, 2, "Sim", PNG, "nova.png")
     (linhas,) = rpc.gravacoes()
-    assert r["n"] == 2 and linhas[0]["value"] == "Sim"
-    assert [a["value"] for a in linhas[0]["attachments"]] == [FOTO["value"], ".ot/%d/nova.png" % WID]
+    assert linhas[0]["value"] == "Sim" and [a["value"] for a in linhas[0]["attachments"]] == [".ot/%d/nova.png" % WID]
 
 
-def test_tirar_a_foto_da_subtarefa_e_dos_anexos_da_tarefa(monkeypatch):
-    outra = dict(FOTO, value=".ot/%d/outra.jpg" % WID)
-    rpc = Rpc(anexos=[FOTO, outra], arquivos=[{"id": 555, "value": FOTO["value"]}, {"id": 556, "value": "x"}])
+def test_tirar_a_foto_da_subtarefa_pelo_vinculo_e_depois_o_arquivo(monkeypatch):
+    outra = dict(VINC, id=39957999, id_work_orders_tasks_files=91725999, value=".ot/%d/outra.jpg" % WID)
+    rpc = Rpc(anexos=[VINC, outra], arquivos=[{"id": "91725207", "value": VINC["value"]}, {"id": "91726000", "value": "x"}])
     monkeypatch.setattr(api, "_rpc_call", rpc)
-    os_execucao.tirar_do_item(WID, TID, FID, 2, "Sim", FOTO["value"])
-    (linhas,) = rpc.gravacoes()
-    assert linhas[0]["attachments"] == [outra]
-    assert ("tasks.work_orders_tasks_files_delete", {"id": 555}) in rpc.pedidos
+
+    def depois_de_tirar(metodo, params):            # a lista do item já sem o vínculo tirado
+        if metodo == os_execucao.RPC_FORMIT_ATTACH_DELETE:
+            rpc.anexos = [outra]
+        return rpc(metodo, params)
+    monkeypatch.setattr(api, "_rpc_call", depois_de_tirar)
+    os_execucao.tirar_do_item(WID, TID, FID, 39957833)
+    apagados = [(m, p) for m, p in rpc.pedidos if m.endswith("_delete")]
+    # o vínculo antes do arquivo dele; e o arquivo que a subida pôs nos anexos da tarefa (OS 19259)
+    assert apagados == [(os_execucao.RPC_FORMIT_ATTACH_DELETE, {"id": 39957833}),
+                        (os_execucao.RPC_FILES_DELETE, {"id": 91725217}),
+                        (os_execucao.RPC_FILES_DELETE, {"id": 91725207})]
     with pytest.raises(api.FracttalError):
-        os_execucao.tirar_do_item(WID, TID, FID, 2, "Sim", ".ot/nao/existe.jpg")
+        os_execucao.tirar_do_item(WID, TID, FID, 123)
 
 
 def test_o_x_do_anexo_da_tarefa_so_exclui_o_que_e_da_os(monkeypatch):
@@ -93,8 +90,8 @@ def test_os_anexos_dizem_o_que_o_x_exclui():
     os_ = regra.itens_os([{"value": ".ot/1/a.jpg", "nome": "a.jpg", "is_image": True, "raw": {"id": 555}}], WID)
     assert os_[0]["excluir"] == {"tipo": "os", "id": "555"}
     sub = regra.itens_subtarefas([{"value": ".ot/1/b.jpg", "nome": "b.jpg", "is_image": True, "url": "u", "subtarefa": "S",
-                                   "id_tarefa": TID, "id_form_item": FID}], WID)
-    assert sub[0]["excluir"] == {"tipo": "sub", "tarefa": str(TID), "item": str(FID), "value": ".ot/1/b.jpg"}
+                                   "id_tarefa": TID, "id_form_item": FID, "raw": {"id": 39957833}}], WID)
+    assert sub[0]["excluir"] == {"tipo": "sub", "tarefa": str(TID), "item": str(FID), "id": "39957833"}
 
 
 # ── o envio do Fazer OS ──
@@ -137,6 +134,21 @@ def test_fazer_os_lanca_a_execucao_e_manda_para_verificacao(monkeypatch):
     r = _enviar()
     assert r.status_code == 200 and "enviada para verificação" in r.get_json()["mensagem"]
     assert o.pedidos == [("registrar", TID), ("status", 2)]
+
+
+def test_sem_o_confirmado_vale_o_registro_lido_de_volta(monkeypatch):
+    # OS de teste 19259: o Fracttal gravou a execução certa e a resposta não veio "confirmada"
+    o = Os().ligar(monkeypatch)
+    lidos = []
+    monkeypatch.setattr(api, "registrar_execucao", lambda tid, ini, fim, note="": (
+        lidos.append({"id": 7, "initial_date": "2026-11-10T11:00:00Z", "final_date": "2026-11-10T13:00:00Z"})
+        or {"confirmado": False}))
+    monkeypatch.setattr(api, "historico_execucao", lambda tid: list(lidos))
+    assert _enviar().status_code == 200 and o.pedidos == [("status", 2)]
+    lidos.clear()
+    monkeypatch.setattr(api, "registrar_execucao", lambda tid, ini, fim, note="": {"confirmado": False})
+    o.st = 1
+    assert _enviar().status_code == 502
 
 
 def test_a_tarefa_que_ja_tem_execucao_tem_as_datas_corrigidas(monkeypatch):

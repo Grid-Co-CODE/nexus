@@ -848,7 +848,7 @@ def api_anexo_no_item(wid, tid, fid):
     api.anexar_no_item(wid, tid, c["id_form_item"], c.get("tipo") or 1, valor, ok[0]["bytes"], nome)
     depois = _campo(tid, fid) or {}
     n = int(depois.get("n_anexos") or 0)
-    if n < int(c.get("n_anexos") or 0) + 1:
+    if n != int(c.get("n_anexos") or 0) + 1:
         return _erro("O Fracttal aceitou o envio, mas a foto não apareceu na subtarefa. Confira no Fracttal.", 502)
     lista_central.mudou(wid)
     return jsonify({"ok": True, "mensagem": "Foto anexada na subtarefa.", "nome": nome, "n_anexos": n})
@@ -859,16 +859,15 @@ def api_anexo_no_item(wid, tid, fid):
 def api_anexo_excluir(wid):
     """O X do Editar nos anexos (11/11/2026, Levi: "um botão de 'Editar' que ao ativar esse botão aparece um 'X' no canto
     superior direito das imagens de forma que o técnico possa excluir"). {tipo: "os", id} exclui o anexo da tarefa;
-    {tipo: "sub", tarefa, item, value} tira o anexo da subtarefa (e o arquivo dos anexos da tarefa)."""
+    {tipo: "sub", tarefa, item, id} tira o anexo da subtarefa pelo id do vínculo (e o arquivo dele)."""
     c = _corpo()
     if c.get("tipo") == "sub":
-        tid, fid, value = c.get("tarefa"), c.get("item"), str(c.get("value") or "")
-        if not (str(tid).isdigit() and str(fid).isdigit() and value) or not _tarefa_da_os(wid, tid):
+        tid, fid, vid = c.get("tarefa"), c.get("item"), c.get("id")
+        if not (str(tid).isdigit() and str(fid).isdigit() and str(vid or "").isdigit()) or not _tarefa_da_os(wid, tid):
             return _erro("Este anexo não é desta OS: reabra os anexos.", 404)
-        campo = _campo(int(tid), int(fid))
-        if campo is None:
+        if _campo(int(tid), int(fid)) is None:
             return _erro("Esta subtarefa não é da tarefa.", 404)
-        api.tirar_do_item(wid, int(tid), campo["id_form_item"], campo.get("tipo") or 1, campo.get("valor"), value)
+        api.tirar_do_item(wid, int(tid), int(fid), int(vid))
     else:
         aid = c.get("id")
         if not str(aid or "").isdigit():
@@ -888,6 +887,15 @@ def _faltas_da_tarefa(campos) -> list:
     faltam += ["%s (falta a foto)" % (x.get("descricao") or "subtarefa") for x in campos
                if x.get("anexo_obrigatorio") and not int(x.get("n_anexos") or 0)]
     return faltam
+
+
+def _execucao_com(tid, ini, fim) -> bool:
+    """A tarefa tem um registro de execução com este início e este fim (1 minuto de folga)."""
+    def bate(lido, pedido):
+        d = _quando_utc(lido)
+        return d is not None and abs((d - pedido).total_seconds()) < 60
+    return any(bate(e.get("initial_date"), ini) and bate(e.get("final_date"), fim)
+               for e in (api.historico_execucao(tid) or []) if isinstance(e, dict))
 
 
 @bp.route("/api/os/<int:wid>/fazer", methods=["POST"])
@@ -936,7 +944,9 @@ def api_fazer_os(wid):
                 return _erro((res or {}).get("erro") or "O Fracttal não gravou as datas da execução.", 502)
         else:
             res = api.registrar_execucao(t, ini, fim, note="")
-            if not (res or {}).get("confirmado"):
+            # sem o "confirmado" na resposta, vale o registro lido de volta com estas datas (na OS de teste 19259 o
+            # Fracttal gravou a execução certa e a resposta não confirmou)
+            if not (res or {}).get("confirmado") and not _execucao_com(t, ini, fim):
                 return _erro("O Fracttal não confirmou a execução da tarefa: confira no Fracttal antes de tentar de novo.",
                              502)
     res = api.mudar_status_os(wid, 2)

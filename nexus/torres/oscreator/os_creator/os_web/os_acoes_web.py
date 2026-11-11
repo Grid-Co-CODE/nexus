@@ -161,9 +161,10 @@ def itens_subtarefas(anexos_sub, wid) -> list:
     for item, a in zip(out, imgs + docs + cru):
         item["tarefa"] = None if a.get("id_tarefa") is None else str(a.get("id_tarefa"))
         # o X do Editar (11/11/2026): o arquivo da subtarefa sai da lista dela (a nota de texto fica)
-        if item["tipo"] != "nota" and a.get("id_form_item") is not None and a.get("value"):
+        raw = a.get("raw") if isinstance(a.get("raw"), dict) else {}
+        if item["tipo"] != "nota" and a.get("id_form_item") is not None and str(raw.get("id") or "").isdigit():
             item["excluir"] = {"tipo": "sub", "tarefa": str(a.get("id_tarefa")), "item": str(a.get("id_form_item")),
-                               "value": str(a.get("value"))}
+                               "id": str(raw.get("id"))}
     return out
 
 
