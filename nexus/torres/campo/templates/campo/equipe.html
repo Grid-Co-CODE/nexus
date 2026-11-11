@@ -81,7 +81,7 @@
     {# o Incluir clima (Levi, 11/11/2026: 'poderia ter um botão "incluir clima" se apertar vai recolher a barra lateral
        esquerda e vai mostrar os climas os alertas, tanto por usina ou por técnico'): liga e desliga o `?clima=1`, e
        guarda o que está aberto (o técnico, o percurso, o filtro) #}
-    <a class="gc-btn gc-btn--contorno eq-clima-bt{% if clima_on %} eq-clima-bt--on{% endif %}" href="{{ url_clima }}"{% if clima_on %} aria-current="true" title="Tirar o clima do mapa"{% else %} title="Mostra os alertas de clima por usina e recolhe o menu"{% endif %}><i class="ph ph-{{ 'check-circle' if clima_on else 'cloud-lightning' }}" aria-hidden="true"></i>Incluir clima</a>
+    <a class="gc-btn gc-btn--contorno eq-clima-bt{% if clima_on %} eq-clima-bt--on{% endif %}" href="{{ url_for('torre_campo.equipe', **q_botao_clima) }}"{% if clima_on %} aria-current="true" title="Tirar o clima do mapa"{% else %} title="Mostra os alertas de clima por usina e recolhe o menu"{% endif %}><i class="ph ph-{{ 'check-circle' if clima_on else 'cloud-lightning' }}" aria-hidden="true"></i>Incluir clima</a>
     {% if not usinas and not erro and filtro is defined %}
     {# o filtro por supervisor e por equipe (Levi, 08/11/2026): as opções são de quem está no piloto; a troca do select já
        envia (sem JavaScript, o botão), e o filtro vai junto em todo link de técnico #}

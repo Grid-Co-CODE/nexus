@@ -761,21 +761,21 @@ def _com_clima() -> bool:
     return str(request.args.get("clima") or "").strip() == "1"
 
 
-def _url_do_clima(ligado: bool) -> str:
-    """O endereço do botão Incluir clima: a mesma tela (o Usinas, o técnico, o percurso, o painel e o filtro abertos),
-    com o clima trocado."""
+def _q_do_clima(ligado: bool) -> dict:
+    """Os parâmetros do botão Incluir clima (o template monta o endereço pelo `url_for`): a mesma tela (o Usinas, o
+    técnico, o percurso, o painel e o filtro abertos), com o clima trocado."""
     q = {k: str(request.args.get(k) or "").strip() for k in _CHAVES_DA_TELA}
     q = {k: v for k, v in q.items() if v and (k != "ver" or v == "usinas")}
     if not ligado:
         q["clima"] = "1"
-    return url_for("torre_campo.equipe", **q)
+    return q
 
 
 def _tela(contexto: dict, status: int = 200):
     tela = TORRE.tela("equipe")
     clima = _com_clima()
     # o Incluir clima (11/11/2026): o botão, e o `clima=1` que o Técnicos | Usinas leva de um lado para o outro
-    contexto = {"clima_on": clima, "q_clima": {"clima": "1"} if clima else {}, "url_clima": _url_do_clima(clima),
+    contexto = {"clima_on": clima, "q_clima": {"clima": "1"} if clima else {}, "q_botao_clima": _q_do_clima(clima),
                 **contexto}
     r = current_app.make_response((render_template("campo/equipe.html", torre=TORRE, tela=tela, **contexto), status))
     r.headers["Cache-Control"] = "no-store"         # a posição de pessoas não fica na cópia do navegador nem de proxy

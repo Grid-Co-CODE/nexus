@@ -1659,7 +1659,7 @@ Pedido do Levi pela sessão Nexus Field (ver a 1ª regra acima). **Ver percurso*
   cartão é largo, então a escala de verdade saía da altura e os 14 px do texto viravam 7. Desde então a vista tem a
   proporção do CARTÃO (o mapa inteiro fica no meio dela) e o script diz no `--eq-un` quantas unidades do desenho valem
   um pixel da tela (a largura da vista sobre a do palco, refeita pelo `ResizeObserver`): o CSS escreve
-  `calc(var(--eq-fs) * var(--eq-un))` (13 px; 12,5 no celular; 14 de 1.700 px para cima) e escala o ponto pelo mesmo
+  `calc(var(--eq-fs) * var(--eq-un))` (de 12,5 px no celular a 14 px na tela larga, por `clamp`, sem largura de quebra nova) e escala o ponto pelo mesmo
   número. Os nomes que se cobrem saem da frente quando a vista assenta (`arrumar`: fica a hora, depois o município do
   percurso, a sigla e o vizinho). **O mesmo zoom vale no mapa dos técnicos e no das usinas** (`data-eq-mapa`; o desenho
   manda `km` e `min`, a menor vista de `VISTA_MIN_MAPA_KM` = 8 km): o ponteiro só é preso depois de andar 3 px, então o
@@ -1731,7 +1731,7 @@ O Levi viu a tela na bancada: "Gostei bastante! ... inclua também essas melhori
 - **O Incluir clima** (Levi, 11/11/2026: 'poderia ter um botão "incluir clima" se apertar vai recolher a barra lateral
   esquerda e vai mostrar os climas os alertas, tanto por usina ou por técnico, por mais que mostre os técnicos os avisos
   tem que ser por usina'). O botão da barra liga e desliga o `?clima=1` e guarda o que está aberto (o Usinas, o técnico,
-  o percurso, o painel, o filtro: `_url_do_clima`); o `clima=1` segue em todo link da tela (vai no `filtro.q`; o
+  o percurso, o painel, o filtro: `_q_do_clima`); o `clima=1` segue em todo link da tela (vai no `filtro.q`; o
   `filtro.tem` é que diz se há filtro de técnico de verdade). Com ele: **(1) o menu do Nexus recolhe** (a página põe
   `menu-recolhido` na raiz, só nela: a preferência guardada em `nexus.menu` não é tocada, e tirar o clima devolve o menu
   como estava); **(2) o desenho ganha o clima**: a área de cada aviso do INMET, os focos da última hora do INPE (o anel

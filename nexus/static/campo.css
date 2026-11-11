@@ -1874,13 +1874,11 @@ tr.rd-linha--ativa td{background:var(--verde-suave)}
 .eq-corpo{--eq-alt:min(64vh,520px);display:grid;grid-template-columns:minmax(0,1fr);gap:14px;align-items:start;margin-top:14px}
 .eq-quadro{order:-1}
 @media (min-width:1180px){
-  .eq-corpo{--eq-alt:clamp(520px,calc(100vh - 256px),1500px);grid-template-columns:minmax(0,1fr) 380px}
-  .eq-corpo--clima{grid-template-columns:290px minmax(0,1fr) 360px}
+  .eq-corpo{--eq-alt:clamp(520px,calc(100vh - 256px),1500px);grid-template-columns:minmax(0,1fr) clamp(360px,26vw,420px)}
+  .eq-corpo--clima{grid-template-columns:clamp(280px,20vw,330px) minmax(0,1fr) clamp(340px,24vw,420px)}
   .eq-quadro{order:0}
   .eq-quadro,.eq-lado,.eq-clima{height:var(--eq-alt)}
   .eq-lado,.eq-clima{overflow:auto}}
-@media (min-width:1560px){.eq-corpo{grid-template-columns:minmax(0,1fr) 420px}
-  .eq-corpo--clima{grid-template-columns:330px minmax(0,1fr) 420px}}
 /* o cartão do mapa: o verde da Grid no fundo (um clarão de leve no alto), nas divisas, nas usinas e no percurso (Levi,
    11/11/2026: "deixa ele com mais qualidade, quero mais cores da grid nesse mapa!"). O --eq-verde é o verde das linhas:
    no tema claro o verde da marca some sobre o cartão cinza, e ele escurece */
@@ -1894,7 +1892,7 @@ tr.rd-linha--ativa td{background:var(--verde-suave)}
    do desenho valem um pixel da tela (Levi, 11/11/2026: "mesmo eu dando um zoom os municípios ficam bem pequenos, tem que
    ser responsivo!": o desenho é mais alto que largo, o cartão é largo, e os 14 px do texto viravam 7). O texto e os
    pontos são escritos em pixels da tela: o --eq-fs é o tamanho do texto; sem o script, vale o 1.4 do mapa inteiro */
-.eq-svg{display:block;width:100%;height:100%;--eq-un:1.4;--eq-fs:13px;touch-action:none;cursor:grab;user-select:none;
+.eq-svg{display:block;width:100%;height:100%;--eq-un:1.4;--eq-fs:clamp(12.5px,calc(10px + .22vw),14px);touch-action:none;cursor:grab;user-select:none;
   --eq-terra:color-mix(in srgb,var(--eq-verde) 5%,var(--superficie-2));
   --eq-borda:color-mix(in srgb,var(--eq-verde) 34%,var(--linha-forte));
   /* o anel do técnico escolhido (Levi, 08/11/2026: "o círculo que fica em volta do técnico ser branco, esse verde não
@@ -1903,8 +1901,6 @@ tr.rd-linha--ativa td{background:var(--verde-suave)}
      cinza some. Cor fixa no CSS é proibida (test_tema): o branco é o --papel e o escuro, o --papel-tinta, o par que o
      Nexus mantém igual nos dois temas (a folha de papel é sempre branca, com a tinta escura) */
   --eq-anel:var(--papel);--eq-halo:var(--papel-tinta)}
-@media (max-width:640px){.eq-svg{--eq-fs:12.5px}}
-@media (min-width:1700px){.eq-svg{--eq-fs:14px}}
 .eq-svg.eq-arrastando{cursor:grabbing}
 .eq-svg text{font-family:var(--font-sans);font-size:calc(var(--eq-fs) * var(--eq-un));pointer-events:none}
 .eq-svg .eq-u,.eq-svg .eq-perc-p,.eq-svg .eq-foco-anel{transform-box:fill-box;transform-origin:center;
