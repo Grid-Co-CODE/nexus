@@ -1178,6 +1178,10 @@ def ligar_pela_aba(proposta: dict, aba_chaves: dict, cfg, base, sessao, quem_ema
 # "Itaja 1 (551)" no cadastro), e strings, cabine e ativo do Fracttal só mudavam editando a aba Equipamentos. A ponte da
 # fonte para a chave continua no livro da plataforma (`nexus_depara`): um escritor por livro.
 MAX_DEPARA = 50
+# o estado (o GET) leva a frota inteira num pedido (11/11/2026): a tela pedia em lotes de 50, um atrás do outro, e cada
+# pedido no servidor custa a conferência da marca do livro no banco (0,6 a 2,3 s no ar); são 263 chaves no livro e 301
+# na aba. O salvar segue com MAX_DEPARA
+MAX_ESTADO = 400
 _CABN = re.compile(r"CABN0*(\d+)$")
 _INVR = re.compile(r"INVR(\d+(?:\.\d+)?)$")
 # a regra do kWp diz de qual potência do Registro mestre saiu (decisão 3 do Levi, alterada em 20/10/2026: "onde não tem

@@ -460,7 +460,10 @@ de entender para você, quando eu for fazer não vou entender nada".
     gravação que acontecer no meio da leitura fazer o pedido seguinte reler. Caso: a abertura da Base → De-para de
     equipamentos levava ~14 s, e 12,6 s eram os 4 pedidos a esta rota, um atrás do outro, relendo o livro inteiro cada um
     (1.932 inversores; nenhum pedido ao Fracttal: as árvores saem da foto dos ativos que a leitura do OS Creator renova
-    toda noite). Prova: `tests/test_base_depara_estado_conferido.py` e 5 mutações.
+    toda noite). Prova: `tests/test_base_depara_estado_conferido.py` e 5 mutações. **Até 400 chaves e 400 usinas por
+    pedido** (`MAX_ESTADO`, 11/11/2026; o salvar segue com 50, `MAX_DEPARA`): a tela pedia em lotes de 50, um atrás do
+    outro, e cada pedido no servidor custa a conferência da marca (0,6 a 2,3 s no ar); a plataforma manda tudo de uma vez e,
+    recusada com 400 por um Nexus de antes, volta aos lotes de 50.
     `gravando` (2ª revisão final, 21/10/2026) = há um salvar do de-para em curso neste processo (da chegada do pedido à
     resposta, `estrutura_usina.em_curso`) ou a trava do livro ocupada: no estouro de 180 s e no 502/504 do proxy o pedido
     abandonado continua aqui (o waitress serve em threads), e o estado relido na hora devolvia o selo de antes (provado com

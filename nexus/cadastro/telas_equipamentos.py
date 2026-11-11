@@ -465,8 +465,8 @@ def _depara_estado(srv):
     pedidas = [x.strip() for x in str(request.args.get("usinas") or "").split(",") if x.strip()]
     if not chaves and not pedidas:
         return _recusa_json("Diga as chaves do supervisório (?chaves=A|B) ou as usinas (?usinas=93,108).", 400)
-    if len(chaves) > E.MAX_DEPARA or len(pedidas) > E.MAX_DEPARA:
-        return _recusa_json(f"No máximo {E.MAX_DEPARA} chaves e {E.MAX_DEPARA} usinas por pedido.", 400)
+    if len(chaves) > E.MAX_ESTADO or len(pedidas) > E.MAX_ESTADO:
+        return _recusa_json(f"No máximo {E.MAX_ESTADO} chaves e {E.MAX_ESTADO} usinas por pedido.", 400)
     try:
         base, sessao = _banco()
         est = E.ler_conferido(base, sessao)

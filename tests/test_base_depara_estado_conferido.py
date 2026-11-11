@@ -70,3 +70,16 @@ def test_sem_a_marca_do_banco_le_o_livro_a_cada_pedido_como_antes(cli, cfg, banc
     lidas = banco.paginas_lidas
     _itaja(cli)
     assert banco.paginas_lidas > lidas
+
+
+def test_a_abertura_pede_todas_as_chaves_num_pedido_so(cli, cfg, banco):
+    """A tela pedia o estado em lotes de 50 chaves, um atrás do outro (3 pedidos para as ~150 chaves da Base), e cada
+    pedido no servidor custa a conferência da marca no banco (0,6 a 2,3 s no ar, 11/11/2026). O estado aceita a frota
+    inteira num pedido; o salvar segue com 50."""
+    _monta_itaja(cfg, banco)
+    chaves = [CH1] + [f"Chave sem usina {n} ({n})" for n in range(1, 300)]
+    j = _estado(cli, chaves="|".join(chaves))
+    assert [u["usina_id"] for u in j["usinas"]] == [ITAJA] and len(j["chaves_sem_usina"]) == 299
+    r = cli.get("/t/base/equipamentos/depara/estado", query_string={"usinas": ",".join(str(n) for n in range(E.MAX_ESTADO + 1))})
+    assert r.status_code == 400 and not r.get_json()["ok"]
+    assert E.MAX_DEPARA == 50                                           # o salvar não muda
