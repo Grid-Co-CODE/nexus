@@ -22,6 +22,7 @@ from . import fonte, geracao, gestao as G, historico_banco as HB, insumos as I, 
 from . import gestao_confiab as GC, observacoes as O
 from ..cadastro import setor_ids as SID
 from . import atribuicoes as AT, tecnicos_usina as TU
+from . import fama_quadro as FQ
 from . import nota_os as NO, publicar as PB, quadro as Q, semana as S
 from ..auth import setor_telas as ST
 from ..prefixo import na_raiz
@@ -1303,7 +1304,13 @@ def _ctx_quadro(cfg, args, erro: str | None = None) -> dict | None:
         if g:
             filtros["resp"], filtro_gestor = g, True
     todos = args.get("todos") == "1"
-    q = Q.montar(sem, base["publicadas"], filtros, todos=todos, mostrar_pendentes=True if args.get("pend") == "1" else None)
+    # as OS da FAMA da semana (11/11/2026, fase 1: só aparecem; `fama_quadro.py`): os cartões só de leitura, os avisos e
+    # a etiqueta de repetição nas preventivas do Fracttal das usinas com preventiva da FAMA na semana
+    fama = FQ.para_o_quadro(cfg, sem, base["dia"])
+    sem = FQ.marcar_repeticao(sem, fama)
+    q = Q.montar(sem, base["publicadas"], filtros, todos=todos, mostrar_pendentes=True if args.get("pend") == "1" else None,
+                 outras_opcoes=fama["linhas"])
+    FQ.no_quadro(q, sem, fama, filtros)
     mot = _motivos_no_quadro(cfg, q)
     dest = _destino_quadro(cfg, base)
     pode = pode_programar()

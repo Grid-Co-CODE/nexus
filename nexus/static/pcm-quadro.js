@@ -383,6 +383,9 @@
       "<div><span>Semanas na fila</span><b class=\"" + (t.rol >= 3 ? "q-mal" : "") + "\">" + (t.rol || 1) + "ª semana</b></div>" +
       "<div><span>Reprogramada</span><b class=\"" + (t.rep ? "q-mal" : "") + "\">" + (t.rep ? "Sim" : "Não") + "</b></div></div>" +
       (t.pend && t.mot ? "<p class=\"q-nota\">Não coube na semana: " + esc(t.mot) + "</p>" : "") +
+      // a possível repetição com a FAMA (11/11/2026, nexus/pcm/fama_quadro.py): só informação, para o PCM conferir
+      (t.frep ? "<p class=\"q-nota q-frep-nota\"><i class=\"ph ph-copy\" aria-hidden=\"true\"></i> A FAMA também tem " +
+        "preventiva desta usina nesta semana: confira se não é a mesma manutenção.</p>" : "") +
       "<div class=\"q-lado\"><section><h3>Onde</h3><dl>" + dl("Usina", t.uc) + dl("Cliente", t.cli) +
       dl("Equipe cluster", t.cl) + dl("Código do ativo", t.cod) + "</dl></section>" +
       "<section><h3>Quem</h3><dl>" + dl("Responsável O&M", t.resp) + dl("Responsável da OS", t.ros) + "</dl></section></div>" +

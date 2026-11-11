@@ -683,7 +683,9 @@ def _item(r, pend: bool, tl: list[dict], dia_data: dict) -> dict:
             "dfim": _d(r.get("dataFinal")), "sp": str(r.get("statusPai") or ""), "nova": str(r.get("nova_os") or ""),
             "par": str(r.get("paralelo") or ""), "termo": str(r.get("termo") or ""),
             "rol_txt": str(r.get("rolagem") or ""), "rel": str(r.get("relatorio") or "")[:600],
-            "mot": str(r.get("motivo") or ""), "pend": pend, "tl": tl if len(tl) > 1 else []}
+            "mot": str(r.get("motivo") or ""), "pend": pend, "tl": tl if len(tl) > 1 else [],
+            # a preventiva da usina em que a FAMA também tem preventiva na semana (`fama_quadro.marcar_repeticao`)
+            "frep": bool(r.get("fama_rep"))}
     return {k: v for k, v in x.items() if k in ("os", "t") or v not in ("", None, [], False, 0)}
 
 
@@ -705,12 +707,14 @@ TETO_PENDENTES = 150         # acima disso a lista de pendentes só abre a pedid
 
 
 def montar(sem: dict, publicadas: list[dict], filtros: dict, todos: bool = False,
-           mostrar_pendentes: bool | None = None) -> dict:
+           mostrar_pendentes: bool | None = None, outras_opcoes: list[dict] | None = None) -> dict:
     """O quadro de uma semana. `sem`: {week, rows, pendentes, dates, ...}; `publicadas`: as semanas do arquivo do App
     (para a trajetória). As contas do cabeçalho de cada dia saem do conjunto FILTRADO, como no painel (senão o
     cabeçalho diria 289 com 4 cartões na coluna); as colunas, dos dias que a semana inteira tem. As pendentes vão
     linha a linha só até TETO_PENDENTES ou a pedido (`mostrar_pendentes=True`); as tarefas de cada OS (o "a OS inteira
-    (N tarefas)" da janela) vão uma vez por OS, em `oss`, e não em cada cartão."""
+    (N tarefas)" da janela) vão uma vez por OS, em `oss`, e não em cada cartão. `outras_opcoes`: linhas que não são da
+    programação mas aparecem no quadro e passam pelos mesmos filtros (as OS da FAMA, `fama_quadro`): entram só nas
+    listas dos filtros, não nas contas."""
     rows = sem.get("rows") or []
     week = sem["week"]
     janela = janela_do_plano(week)
@@ -775,7 +779,8 @@ def montar(sem: dict, publicadas: list[dict], filtros: dict, todos: bool = False
                             "uc": usina_curta(r.get("usina")), "tp": str(r.get("tipo") or ""),
                             "tc": classe_tipo(r.get("tipo")), "st": estado(r), "ini": str(r.get("h_ini") or ""),
                             "tur": turno(r.get("h_ini")), "h": _horas(r.get("duracao")),
-                            "rep": _norm(r.get("reprog")) == "sim", "rol": int(_num(r.get("vezes")))})
+                            "rep": _norm(r.get("reprog")) == "sim", "rol": int(_num(r.get("vezes"))),
+                            "frep": bool(r.get("fama_rep"))})
         n = len(todos_d)
         colunas.append({"id": d, "nome": NOMES_DIA[d], "data": dia_data[d], "n": n,
                         "horas": _horas(sum(_num(r.get("duracao")) for r in todos_d)),
@@ -800,7 +805,7 @@ def montar(sem: dict, publicadas: list[dict], filtros: dict, todos: bool = False
             "pend_total": len(sem.get("pendentes") or []), "pend_sel": len(pend),
             "horas": _horas(sum(_num(r.get("duracao")) for r in sel)), "tem_criacao": tem_criacao,
             "novas": sum(1 for r in sel if criada_apos_o_plano(r, janela)) if tem_criacao else None,
-            "janela": janela, "opcoes": opcoes(rows, filtros)}
+            "janela": janela, "opcoes": opcoes(rows + list(outras_opcoes or []), filtros)}
 
 
 # ── a fila que volta da página ──────────────────────────────────────────────────────────────────────────────
