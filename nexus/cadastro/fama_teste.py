@@ -7,7 +7,8 @@ teste roda no servidor, por esta página: só o administrador, fora do menu, só
 as páginas (a API é de outra empresa), e o resultado guardado por 15 min.
 
 Nada de pessoa nem de texto livre na saída: dos usuários, só quantos são; das OS, contagens, datas e quanto cada campo vem
-preenchido, nunca o título, a descrição ou o registro; das usinas (os "projetos" da FAMA), o id e o nome. A chave nunca
+preenchido, nunca o título, a descrição ou o registro; das usinas (os "projetos" da FAMA), o nome. A chave é de
+PRESTADORA: só abre as rotas /v2/contractor/ (as gerais pedem o login de um usuário e deram 401). A chave nunca
 aparece. Página TEMPORÁRIA: sai depois do teste (nexus/cadastro/CLAUDE.md)."""
 from __future__ import annotations
 
@@ -19,21 +20,12 @@ import requests
 from flask import current_app, jsonify, request, session
 
 BASE = "https://api.fama.energy"
-TETO_CHAMADAS = 40          # a leitura inteira faz umas 30; o teto segura o laço que der errado
+TETO_CHAMADAS = 10          # a leitura faz 2 (a lista e um detalhe); o teto segura o laço que der errado
 TETO_S = 75
 PAUSA_S = 0.3               # entre uma chamada e outra: "sem gritar alto" (Levi, 11/11/2026)
-POR_PAGINA = 100
-PAGINAS_DA_AMOSTRA = 5
 GUARDA_S = 15 * 60
 _CACHE: dict = {}
 _TRAVA = threading.Lock()
-
-# os campos da OS cuja presença interessa ao desenho (quanto vem preenchido, nunca o valor)
-CAMPOS_OS = ("project_id", "status_id", "type_id", "severity_id", "specialty_id", "management_team_type_id",
-             "responsible_id", "company_id", "partner_company_id", "assets", "tasks", "logs", "creation_date",
-             "activation_date", "schedule_start_date", "expected_execution_date", "start_date", "finish_date",
-             "description", "title")
-
 
 def _vazio(v) -> bool:
     return v is None or v == "" or v == [] or v == {}
@@ -89,75 +81,58 @@ def _itens(corpo) -> list:
     return []
 
 
-def _nomes(corpo, teto: int = 60) -> list[dict]:
-    """Os catálogos (status, tipos, severidades, pendências): o id e o nome, cortado."""
-    out = []
-    for x in _itens(corpo)[:teto]:
-        if isinstance(x, dict):
-            nome = x.get("name") or x.get("description") or x.get("title") or ""
-            out.append({"id": x.get("id"), "nome": str(nome)[:60]})
-    return out
+def _detalhe(info: dict, corpo) -> str | None:
+    """A frase de erro da FAMA ("Could not validate credentials"), cortada; não é dado de pessoa."""
+    if info.get("status") != 200 and isinstance(corpo, dict) and isinstance(corpo.get("detail"), str):
+        return corpo["detail"][:120]
+    return None
+
+
+def _nome(obj, campo: str) -> str:
+    if isinstance(obj, dict):
+        return str(obj.get(campo) or obj.get("name") or obj.get("id") or "(vazio)")[:60]
+    return "(vazio)"
+
+
+def _data(v) -> str:
+    return str(v or "")[:10]
 
 
 def ler(chave: str, sessao=None) -> dict:
+    """As rotas da PRESTADORA, as únicas que a chave abre (a FAMA recusou as outras com 401 em 11/11/2026): a lista das OS
+    atribuídas à Grid, inteira (a rota não tem filtro nem página), e o detalhe da mais nova, só a forma."""
     L = _Leitor(chave, sessao)
     out: dict = {"quando": time.strftime("%d/%m/%Y %H:%M:%S")}
-
-    info, corpo = L.get("/mcp/whoami/")
-    out["quem_e_a_chave"] = {**info, "forma": _forma(corpo)}
-
-    catalogos = {}
-    for nome, caminho in (("status", "/service-orders/status/"), ("tipos", "/service-orders/types/"),
-                          ("severidades", "/service-orders/severities/"), ("especialidades", "/service-orders/specialties/"),
-                          ("equipes", "/service-orders/team-types/"), ("pendencias", "/service-orders/pendencies/")):
-        info, corpo = L.get(caminho)
-        catalogos[nome] = {**info, "itens": _nomes(corpo)}
-    out["catalogos"] = catalogos
-
-    info, corpo = L.get("/mcp/projects/", {"limit": 500})
-    projetos = [{"id": p.get("id"), "nome": str(p.get("name") or p.get("title") or "")[:80]}
-                for p in _itens(corpo) if isinstance(p, dict)]
-    out["usinas"] = {**info, "total": corpo.get("total") if isinstance(corpo, dict) else None, "lista": projetos,
-                     "campos": _forma(_itens(corpo)).get("campos")}
-
-    info, corpo = L.get("/users/")
-    out["usuarios"] = {**info, "quantos": len(_itens(corpo))}           # só a conta: nome e e-mail não saem
-
-    info, corpo = L.get("/assets/")
-    out["ativos"] = {**info, "quantos": len(_itens(corpo)), "campos": _forma(_itens(corpo)).get("campos")}
-
-    # as OS: o total, a mais antiga e a mais nova, uma amostra para ver o que vem preenchido e o total de cada status e tipo
-    os_: dict = {}
-    info, corpo = L.get("/v2/service-orders/", {"limit": 1, "offset": 0})
-    os_["total"] = corpo.get("total") if isinstance(corpo, dict) else None
-    os_["leitura"] = info
-    for ponta, ordem in (("mais_antiga", "asc"), ("mais_nova", "desc")):
-        info, corpo = L.get("/v2/service-orders/", {"limit": 1, "offset": 0, "sort": "creation_date", "order": ordem})
-        linha = (_itens(corpo) or [{}])[0]
-        os_[ponta] = {"status": info.get("status"), "criada_em": str(linha.get("creation_date") or "")[:19] or None}
-    amostra: list = []
-    for pagina in range(PAGINAS_DA_AMOSTRA):
-        info, corpo = L.get("/v2/service-orders/", {"limit": POR_PAGINA, "offset": pagina * POR_PAGINA,
-                                                    "sort": "creation_date", "order": "desc"})
-        linhas = [x for x in _itens(corpo) if isinstance(x, dict)]
-        amostra += linhas
-        if len(linhas) < POR_PAGINA:
-            break
-    os_["amostra"] = len(amostra)
-    os_["campos_que_vem"] = sorted({k for x in amostra for k in x})[:120]
-    os_["preenchido_pct"] = {c: round(100 * sum(not _vazio(x.get(c)) for x in amostra) / len(amostra))
-                             for c in CAMPOS_OS if amostra and any(c in x for x in amostra)}
-    os_["tarefas_por_os"] = Counter(min(len(x.get("tasks") or []), 10) for x in amostra)
-    os_["ativos_por_os"] = Counter(min(len(x.get("assets") or []), 10) for x in amostra)
-    os_["por_usina_na_amostra"] = Counter(str(x.get("project_id")) for x in amostra).most_common(50)
-    os_["por_ano_na_amostra"] = Counter(str(x.get("creation_date") or "")[:4] for x in amostra)
-    for nome, campo in (("por_status", "status_id"), ("por_tipo", "type_id")):
-        totais = {}
-        for item in catalogos.get("status" if campo == "status_id" else "tipos", {}).get("itens", [])[:15]:
-            info, corpo = L.get("/v2/service-orders/", {"limit": 1, "offset": 0, campo: item["id"]})
-            totais[f'{item["id"]} {item["nome"]}'] = corpo.get("total") if isinstance(corpo, dict) else info.get("status")
-        os_[nome] = totais
-    out["os"] = os_
+    info, corpo = L.get("/v2/contractor/service-orders/")
+    linhas = [x for x in _itens(corpo) if isinstance(x, dict)]
+    lst: dict = {**info, "erro_da_fama": _detalhe(info, corpo), "total": len(linhas),
+                 "campos": sorted({k for x in linhas for k in x})[:120]}
+    if linhas:
+        lst["preenchido_pct"] = {c: round(100 * sum(not _vazio(x.get(c)) for x in linhas) / len(linhas))
+                                 for c in lst["campos"]}
+        for nome, campo, sub in (("por_status", "status", "service_status"), ("por_tipo", "type", "service_type"),
+                                 ("por_severidade", "severity", "service_severity"),
+                                 ("por_especialidade", "specialty", "specialty"),
+                                 ("por_equipe", "management_team_type", "name")):
+            lst[nome] = Counter(_nome(x.get(campo), sub) for x in linhas)
+        lst["por_usina"] = Counter(_nome(x.get("project"), "name") for x in linhas).most_common(300)
+        lst["por_ano"] = Counter(_data(x.get("creation_date"))[:4] or "(sem data)" for x in linhas)
+        criadas = sorted(d for d in (_data(x.get("creation_date")) for x in linhas) if d)
+        lst["criacao"] = {"mais_antiga": criadas[0] if criadas else None, "mais_nova": criadas[-1] if criadas else None}
+        previstas = sorted(d for d in (_data(x.get("expected_execution_date")) for x in linhas) if d)
+        lst["previstas"] = {"com_data": len(previstas), "primeira": previstas[0] if previstas else None,
+                            "ultima": previstas[-1] if previstas else None}
+    out["lista"] = lst
+    if linhas:
+        nova = max(linhas, key=lambda x: str(x.get("creation_date") or ""))
+        info, corpo = L.get(f"/v2/contractor/service-orders/{nova.get('id')}")
+        det: dict = {**info, "erro_da_fama": _detalhe(info, corpo)}
+        if isinstance(corpo, dict):          # só a forma: os campos e, das listas e objetos, os campos de dentro
+            det["campos"] = sorted(corpo)
+            det["listas"] = {k: {"itens": len(v), "campos": sorted(v[0]) if v and isinstance(v[0], dict) else []}
+                             for k, v in corpo.items() if isinstance(v, list)}
+            det["objetos"] = {k: sorted(v) for k, v in corpo.items() if isinstance(v, dict)}
+        out["detalhe_da_mais_nova"] = det
     out["chamadas"] = L.chamadas
     out["segundos"] = round(time.monotonic() - L.inicio, 1)
     return out
