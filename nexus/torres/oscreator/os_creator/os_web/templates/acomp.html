@@ -13,11 +13,16 @@
    estética do da engenharia porém o card de KPIS eu gostei mais do de chamados"): a faixa de números fica como estava.
    O cartão: o nº da OS e o estado no topo, o ativo, onde (código · cliente · usina), as etiquetas (fornecedor, tipo de
    ativo, inspeção de origem, ticket) e o responsável. O cartão inteiro é o link do chamado, como antes. #}
+{# o chamado abre o Raio X da OS do Nexus (11/11/2026, "uma página só"), na página inteira, com a volta para Garantias;
+   o OS Creator sozinho (sem a ponte) segue abrindo a tela do chamado #}
+{% macro abrir(folio) -%}
+{% if pagina_os %}{{ pagina_os.os }}{{ folio }}?de=garantias{% else %}/os/chamados/acompanhamento/{{ folio }}{% endif %}
+{%- endmacro %}
 {% macro cartao(c) -%}
 {% set cls = {'chegou': 'cr', 'ticket': 'ca', 'fim': 'cg'}[c.col] %}
 {% set titulo = c.ativo_nome or c.code or '—' %}
 {% set onde = [c.code if c.code != titulo else '', c.local]|select|join(' · ') %}
-<a class="card {{ cls }} k-{{ c.urg }}{% if c.col == 'fim' %} fim{% endif %}{% if c.parada %} parada{% endif %}" href="/os/chamados/acompanhamento/{{ c.folio }}" title="{{ c.tempo }}{% if c.parada %} · 5 dias ou mais sem comentário{% endif %}"
+<a class="card {{ cls }} k-{{ c.urg }}{% if c.col == 'fim' %} fim{% endif %}{% if c.parada %} parada{% endif %}" href="{{ abrir(c.folio) }}"{% if pagina_os %} target="_top"{% endif %} title="{{ c.tempo }}{% if c.parada %} · 5 dias ou mais sem comentário{% endif %}"
    data-marca="{{ c.marca }}" data-cliente="{{ c.cliente }}" data-tipo="{{ c.tipo }}" data-geral="{{ c.geral }}" data-st="{{ c.status_ch }}" data-ufv="{{ c.resp_ufv }}" data-busca="{{ c.busca }}">
   <div class="k-cab"><span class="k-os">OS {{ c.folio }}</span>{% if c.tempo_curto %}<span class="tag u-{{ c.urg }}">{{ c.tempo_curto }}</span>{% endif %}</div>
   <div class="k-tit">{{ titulo }}</div>
@@ -137,8 +142,8 @@
      na linha abre o chamado, e a parada tem o ponto que pulsa #}
   <div class="tabela"><table class="tq"><thead><tr><th>OS</th><th>Ativo</th><th>Usina</th><th>Fornecedor</th><th>Geral</th><th>Status</th><th>Ticket</th><th>Situação</th><th>Responsável</th></tr></thead><tbody>
   {%- for chave, nome in (('chegou', 'Sem ticket'), ('ticket', 'Com o fornecedor'), ('fim', 'Finalizado')) %}{% for c in q.colunas[chave] %}
-    <tr data-linha data-href="/os/chamados/acompanhamento/{{ c.folio }}"{% if c.parada %} class="parada"{% endif %} data-folio="{{ c.folio }}" data-marca="{{ c.marca }}" data-cliente="{{ c.cliente }}" data-tipo="{{ c.tipo }}" data-geral="{{ c.geral }}" data-st="{{ c.status_ch }}" data-ufv="{{ c.resp_ufv }}" data-busca="{{ c.busca }}">
-      <td class="t-os"><a href="/os/chamados/acompanhamento/{{ c.folio }}">{{ c.folio }}</a></td><td class="t-at">{{ c.ativo_nome or c.code or '—' }}</td>
+    <tr data-linha data-href="{{ abrir(c.folio) }}"{% if pagina_os %} data-topo{% endif %}{% if c.parada %} class="parada"{% endif %} data-folio="{{ c.folio }}" data-marca="{{ c.marca }}" data-cliente="{{ c.cliente }}" data-tipo="{{ c.tipo }}" data-geral="{{ c.geral }}" data-st="{{ c.status_ch }}" data-ufv="{{ c.resp_ufv }}" data-busca="{{ c.busca }}">
+      <td class="t-os"><a href="{{ abrir(c.folio) }}"{% if pagina_os %} target="_top"{% endif %}>{{ c.folio }}</a></td><td class="t-at">{{ c.ativo_nome or c.code or '—' }}</td>
       <td>{{ c.usina or '—' }}</td><td>{{ c.marca or '—' }}</td><td>{{ c.geral or '—' }}</td><td>{{ c.status_ch or '—' }}</td><td class="t-tk">{{ c.ticket or '—' }}</td>
       <td class="t-sit" title="{{ c.tempo }}"><span class="tag u-{{ c.urg }}">{{ c.situacao }}</span></td>
       <td class="t-quem{% if not c.da_equipe %} a{% endif %}">{{ c.responsavel or '—' }}</td></tr>

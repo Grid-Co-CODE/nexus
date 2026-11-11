@@ -27,16 +27,22 @@
 <a{% if classe %} class="{{ classe }}"{% endif %} href="{% if pagina_os %}{{ pagina_os.os }}{{ folio }}?de={{ (pagina_os.volta ~ c.folio)|urlencode }}{% elif wid %}/os/os/{{ wid }}{% else %}/os/os/folio/{{ folio }}{% endif %}"{% if pagina_os %} target="_top"{% endif %}>{{ texto or folio }}</a>
 {%- endmacro %}
 {% set eb = {'chegou': 'u-r', 'ticket': 'u-a', 'fim': 'u-g', '': 'u-m'}[c.col] %}
-<section class="ac" id="acomp-os" data-folio="{{ c.folio }}" data-wid="{{ wid }}" data-ativo="{{ c.code }}" data-pode-obs="{{ '1' if pode_obs else '0' }}">
+{# O MODO "BLOCOS" (11/11/2026, o Raio X da OS: Levi, "Em tudo que for Raio X da OS eu gostaria que tivesse o mesmo padrão
+   ... A única coisa que muda são pontos específicos como n° de ticket ou status fora do comum"; no quiz, "uma página só"):
+   o Raio X da OS do Nexus (a página da OS da Engenharia) mostra esta tela numa moldura, só com o que é do chamado (o
+   estado, o Finalizar, os números do fornecedor, o ticket, o status do chamado, como abrir, a cadeia do chamado, para
+   abrir o ticket, as observações e os outros chamados). O título, os Dados, as Ações da OS, a nota e as respostas do
+   técnico o Raio X já tem. A altura vai para a página de fora (postMessage), que ajusta a moldura #}
+<section class="ac{% if blocos %} ac-blocos{% endif %}" id="acomp-os" data-folio="{{ c.folio }}" data-wid="{{ wid }}" data-ativo="{{ c.code }}" data-pode-obs="{{ '1' if pode_obs else '0' }}">
   <div class="ac-head">
     <div style="min-width:0">
-      <div class="ac-tit"><a class="ac-volta" href="/os/chamados/acompanhamento">← Acompanhamento</a>
+      <div class="ac-tit">{% if not blocos %}<a class="ac-volta" href="/os/chamados/acompanhamento">← Acompanhamento</a>{% endif %}
         <span class="tag {{ eb }}">{% if c.col == 'chegou' %}Sem ticket · há {{ c.dias }} dia{{ '' if c.dias == 1 else 's' }}{% elif c.col == 'ticket' %}Com o fornecedor · {{ c.tempo }}{% elif c.col == 'fim' %}{{ 'Em verificação' if c.status_id == 2 else 'Finalizado' }}{% if c.fim %} em {{ c.fim }}{% endif %}{% else %}Cancelada{% endif %}</span>
-        <h1>OS {{ c.folio }} <span>{{ c.ativo_nome or c.code }}</span></h1></div>
-      <p class="ac-sub">{{ c.local or '—' }}{% if c.marca %} · <b>{{ c.marca }}</b>{% endif %}{% if c.status %} · {{ c.status }} no Fracttal{% endif %}</p>
+        {% if not blocos %}<h1>OS {{ c.folio }} <span>{{ c.ativo_nome or c.code }}</span></h1>{% else %}<b class="ac-blocos-t">Chamado de garantia</b>{% endif %}</div>
+      {% if not blocos %}<p class="ac-sub">{{ c.local or '—' }}{% if c.marca %} · <b>{{ c.marca }}</b>{% endif %}{% if c.status %} · {{ c.status }} no Fracttal{% endif %}</p>{% endif %}
     </div>
     <div class="ac-acoes">
-      {{ link_os(c.folio, wid, 'btn btn-o', 'Abrir a OS') }}
+      {% if not blocos %}{{ link_os(c.folio, wid, 'btn btn-o', 'Abrir a OS') }}{% endif %}
       {% if c.col in ('chegou', 'ticket') %}<button type="button" class="btn btn-i" id="b_finalizar">Finalizar chamado</button>{% endif %}
     </div>
   </div>
@@ -109,7 +115,7 @@
          responsável dê para alterar o responsável da OS que nem fazemos no card da OS no histórico de OS Creator!"). As
          ações são as do os_acoes.js, que acha esta caixa pelo data-os-acoes; o data-no-lugar troca o nome na tela, em vez
          de recarregar um card que aqui não existe. #}
-      <section class="bloco" data-os-acoes data-no-lugar data-wid="{{ wid }}" data-folio="{{ c.folio }}">
+      {% if not blocos %}<section class="bloco" data-os-acoes data-no-lugar data-wid="{{ wid }}" data-folio="{{ c.folio }}">
         <div class="bloco-h"><h2>Dados</h2></div>
         <dl class="dados">
           <dt>Ativo</dt><dd class="mono">{{ c.code or '—' }}</dd>
@@ -139,11 +145,12 @@
         <div class="msg ok" data-msg hidden></div>
         {% include "_dlg_acoes_os.html" %}
       </section>{% endif %}
+    {% endif %}
     </aside>
     <div>
       {# o resto do cabeçalho da nota (a OS criada à mão para um chamado que já existia, 20/10/2026: Status atual, Ticket,
          S/N, Título do e-mail…). A nota do App não tem essas linhas, e o bloco não aparece. #}
-      {% if n.info %}<section class="bloco" data-recolhe="nota">
+      {% if n.info and not blocos %}<section class="bloco" data-recolhe="nota">
         <div class="bloco-h"><h2>Na nota da OS</h2><span class="n">{{ n.info|length }}</span>
           <div class="bloco-a">{{ recolher('corpo_nota') }}</div></div>
         <div class="bloco-c" id="corpo_nota">
@@ -164,7 +171,7 @@
         {% else %}<p class="vazio-l">A nota desta OS não traz os campos do formulário do fornecedor.</p>{% endif %}
         </div>
       </section>
-      <section class="bloco" data-recolhe="demais">
+      {% if not blocos %}<section class="bloco" data-recolhe="demais">
         <div class="bloco-h"><h2>Demais respostas do técnico</h2><span class="n">{{ n.demais|length }}</span>
           <div class="bloco-a">{{ recolher('corpo_demais') }}</div></div>
         <div class="bloco-c" id="corpo_demais">
@@ -175,7 +182,7 @@
         {% else %}<p class="vazio-l">Nenhuma outra resposta na nota.</p>{% endif %}
         {% if c.inspecao %}<p class="dica">Foto e vídeo não vão para a nota: ficam anexados na inspeção {{ c.inspecao }}.</p>{% endif %}
         </div>
-      </section>
+      </section>{% endif %}
       {# a escolha de esconder volta ANTES da 1ª pintura: pelo acomp.js, que vem no fim da página, o bloco abriria e fecharia
          na frente da pessoa. O clique e a gravação da escolha moram no acomp.js (mesma chave). #}
       <script>try{document.querySelectorAll("#acomp-os [data-recolhe]").forEach(function(b){if(localStorage.getItem("acomp.recolhe."+b.dataset.recolhe)==="1"){b.classList.add("recolhido");b.querySelector("[data-recolher]").setAttribute("aria-expanded","false")}})}catch(e){}</script>
@@ -208,6 +215,15 @@
 </section>
 {% endblock %}
 {% block scripts %}<script src="{{ estatico('acomp.js') }}"></script>
+{% if blocos %}<script>
+  // a altura do chamado para o Raio X da OS ajustar a moldura (11/11/2026): na carga e a cada mudança de tamanho
+  (function () {
+    function diz() { try { window.parent.postMessage({nexusChamado: 1, tipo: 'altura', h: document.documentElement.scrollHeight}, location.origin); } catch (e) {} }
+    window.addEventListener('load', diz);
+    if (window.ResizeObserver) new ResizeObserver(diz).observe(document.body);
+    diz();
+  })();
+</script>{% endif %}
 <script src="{{ estatico('os_acoes.js') }}"></script>
 <script>
   // a contagem dos anexos da caixa Ações da OS, como o card faz ao abrir

@@ -60,6 +60,21 @@
     </span></div></div>{% endfor %}
   </div>
 
+  {# o chamado de garantia no Raio X da OS (11/11/2026, etapa 2): a tela do chamado do OS Creator no modo "blocos", com o
+     ticket, o status do chamado, as observações e o Finalizar; a altura vem dela (postMessage) #}
+  {% if chamado_url %}<section class="eg-chamado" aria-label="Chamado de garantia">
+    <iframe class="eg-chamado-fr" src="{{ chamado_url }}" title="Chamado de garantia da OS {{ o.os }}" loading="eager" data-chamado></iframe>
+  </section>
+  <script>
+    (function () {
+      var fr = document.querySelector('iframe[data-chamado]'); if (!fr) return;
+      window.addEventListener('message', function (e) {
+        if (e.origin !== location.origin || e.source !== fr.contentWindow || !e.data || e.data.nexusChamado !== 1) return;
+        if (e.data.tipo === 'altura' && e.data.h > 0) fr.style.height = Math.ceil(e.data.h) + 'px';
+      });
+    })();
+  </script>{% endif %}
+
   {# o corpo da tela do chamado (Levi, 24/10/2026: "quero quase idêntico na estrutura"): à esquerda o que a engenharia FAZ
      (o status e a prioridade, no lugar do ticket; a cadeia da OS; os Dados), à direita o que ela LÊ (a nota da OS, a
      resposta do técnico nas OS de campo e os comentários, na linha do tempo das Observações de lá) #}

@@ -495,6 +495,13 @@ resposta de "Descreva a atividade realizada" da OS filha. Desenho em
     incluir, renomear ou tirar). Aparece **só no Raio X da OS em que foi incluída** (quiz de 11/11/2026). O livro
     `nexus_cadeia_os · fato_os_na_cadeia` (`nexus/engenharia/cadeia_os.py`, no catálogo antes da 1ª gravação): eventos que
     só se acrescentam, com o nome dado e quem fez só cifrados.
+  A etapa 2 (11/11/2026) trouxe **Garantias para o Raio X**: o quadro de Garantias abre esta página na janela inteira
+  (`?de=garantias`, a volta "← Garantias"), e a OS de chamado (veio de Garantias, ou o livro `nexus_chamados ·
+  fato_chamado` a tem) ganha, logo abaixo dos números, o bloco do chamado: a tela do chamado do OS Creator no modo
+  "blocos" (`/os/chamados/acompanhamento/<nº>?blocos=1`), numa moldura que ajusta a altura pelo `postMessage` (`tipo:
+  'altura'`). Só o que é do chamado vem nela: o estado, o Finalizar chamado, os números do fornecedor, o ticket, o status
+  do chamado, como abrir, a cadeia do chamado, para abrir o ticket, as observações e os outros chamados; o resto é o do Raio
+  X. O banco dos chamados fora não derruba a página (vale só o `de`).
 - **Quem mexe:** o setor Engenharia e o administrador, com login de pessoa; os demais leem, sem formulários.
 - **Como provar:** `python -m pytest -q tests/test_engenharia_os_quadro.py tests/test_engenharia_equipe.py
   tests/test_engenharia_raio_x_11_11.py tests/test_oscreator_solic_pcm.py -k "os_quadro or quadro or sugestao or raio"` e

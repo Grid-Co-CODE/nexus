@@ -1272,6 +1272,11 @@ concluir e cancelar!".
   também). Ele só muda o status: o diálogo (`verificacao`, como o do Concluir) mostra as subtarefas sem resposta e
   oferece o "Fazer a tarefa" antes (o executar sozinho não muda o status). No card, o botão sai na OS que não está Em
   Verificação, Concluída nem Cancelada.
+- **Garantias abre o Raio X da OS** (11/11/2026, a etapa 2 do Raio X, "uma página só"): no Nexus, o cartão e a linha do
+  quadro (`acomp.html`, o `abrir`) levam à página da OS do Nexus na janela inteira (`target="_top"`; a linha, pelo
+  `data-topo` no acomp.js), com `?de=garantias`; a ponte passa a página da OS também ao quadro. A tela do chamado ganhou o
+  modo "blocos" (`?blocos=1`): só o que é do chamado, para a moldura do Raio X, que recebe a altura por `postMessage`
+  (`nexusChamado: 1, tipo: 'altura'`). Sozinho (sem a ponte), o quadro segue abrindo a tela do chamado inteira.
 - **Fazer OS** (11/11/2026, Levi: "Ao lado esquerdo de PDF se a OS estiver fora de em verificação deve ter a opção 'fazer
   OS'"; "devem preencher com o rigor da OS"; "editar a ocorrência com a data de início e data fim da OS e mandar para 'Em
   verificação'"): o botão no topo do card, só na OS em processo, abre a tela de preencher (`_dlg_acoes_os.html`, `fazer`

@@ -315,11 +315,27 @@ def _volta_de(de) -> tuple[str, str] | None:
     de = str(de or "").strip()
     if de == "performance":
         return url_for("torre_performance.equipe"), "Quadro da equipe"
+    if de == "garantias":                                 # o quadro de Garantias abre o Raio X da OS (11/11/2026)
+        from ...prefixo import na_raiz
+        return na_raiz("/t/chamados/garantias"), "Garantias"
     m = _DE_CHAMADO.match(de)
     if m:
         from ...prefixo import na_raiz
         return na_raiz(de), "Chamado " + m.group(1)
     return None
+
+
+def _e_chamado(folio, de) -> bool:
+    """A OS é de chamado de garantia: veio do quadro de Garantias (ou da tela de um chamado) ou o livro dos chamados a tem
+    (`nexus_chamados · fato_chamado`, o mesmo do quadro). O banco fora não derruba a página: vale só o `de`."""
+    de = str(de or "").strip()
+    if de == "garantias" or _DE_CHAMADO.match(de):
+        return True
+    try:
+        alvo = str(folio)
+        return any(str(r.get("os") or "").split(".")[0] == alvo for r in (_ler_chamados() or []))
+    except Exception:           # noqa: BLE001
+        return False
 
 
 def _pessoas(pode: bool) -> list[dict]:
@@ -1151,6 +1167,11 @@ def _pagina_da_os(folio: int, tela_id: str):
                 f["atividade"] = None
     except Exception as e:      # noqa: BLE001
         fs, erro_filhas = [], type(e).__name__
+    # a OS de chamado de garantia mostra o chamado no Raio X (11/11/2026, etapa 2, "uma página só"): a tela do chamado do
+    # OS Creator no modo "blocos", numa moldura. É chamado quem veio de Garantias ou a OS que o livro dos chamados tem
+    chamado_url = ""
+    if _e_chamado(o["os"], request.args.get("de")):
+        chamado_url = na_raiz(f"/os/chamados/acompanhamento/{o['os']}") + "?blocos=1"
     # a cadeia do Raio X da OS (11/11/2026): as OS incluídas à mão, depois das filhas
     from ...engenharia import cadeia_os as C
     incluidas, erro_cadeia = C.do_banco(o["wid"])
@@ -1169,7 +1190,7 @@ def _pagina_da_os(folio: int, tela_id: str):
                           "data": o.get("evento_local") or ""})
     return render_template(
         "engenharia/os_quadro.html", o=o, est=est, filhas=fs, erro_filhas=erro_filhas, erro_livro=erro_livro,
-        incluidas=incluidas, erro_cadeia=erro_cadeia, solicitacao=solicitacao,
+        incluidas=incluidas, erro_cadeia=erro_cadeia, solicitacao=solicitacao, chamado_url=chamado_url,
         solicitante_url=na_raiz(f"/os/api/os/{o['wid']}/solicitacao"),
         velha_em=datetime.fromtimestamp(lido["lido_em"], BRT).strftime("%H:%M") if lido.get("velha") else "",
         kpis=kpis, pode=pode and not erro_livro, **extra,

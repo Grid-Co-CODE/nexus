@@ -299,7 +299,8 @@
     quadro.querySelectorAll("tr[data-linha]").forEach(function (tr) {
       tr.addEventListener("click", function (ev) {
         if (ev.target && ev.target.closest && ev.target.closest("a")) return;   // o nº da OS já é o link
-        location.href = tr.dataset.href;
+        if ("topo" in tr.dataset) window.top.location.href = tr.dataset.href;   // o Raio X da OS, fora da moldura
+        else location.href = tr.dataset.href;
       });
     });
     // os avisos na exclamação (28/10/2026, como em Segurança > Extintores): o clique fora e o Esc fecham

@@ -467,3 +467,8 @@ html[data-tema="claro"]{--bg:var(--osc-pagina);--sf:var(--osc-cartao);--sf2:var(
 .tl-e[data-obs-id] .tl-x{cursor:pointer}
 .tl-conf{font-size:12px;color:var(--mu)}
 .tl-x textarea.obs{margin-top:6px;min-height:72px}
+
+/* o modo "blocos" (11/11/2026): a tela do chamado dentro do Raio X da OS */
+html.os-embutido body .ac-blocos{padding-top:0}
+.ac-blocos .ac-head{padding-top:0}
+.ac-blocos-t{font-size:15px}

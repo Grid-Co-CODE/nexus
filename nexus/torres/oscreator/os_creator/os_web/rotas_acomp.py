@@ -623,7 +623,7 @@ def quadro():
     m = _montar(request.args.get("atualizar") == "1")
     return render_template("acomp.html", conta=_conta(), aba="criar", q=m["q"], quando=m["d"].get("quando") or "",
                            erro=m["erro"], erro_obs=m["erro_obs"], equipe=aw.equipe()[1], renovando=m["por_tras"],
-                           status_geral=aw.STATUS_GERAL)
+                           status_geral=aw.STATUS_GERAL, pagina_os=_pagina_da_os())
 
 
 def _cartoes_do_quadro(q: dict) -> list:
@@ -894,7 +894,9 @@ def detalhe(folio):
                            menos7=aw.menos_7d(n["data_falha"], hoje), copiar=aw.copiar_tudo(n["campos"]),
                            erro_obs=erro_obs, pode_gravar=ga.pode_gravar(), equipe=aw.equipe()[1],
                            opcoes_status=aw.STATUS_CHAMADO, pode_obs=_pode_mexer_obs().get("pode", True),
-                           pagina_os=_pagina_da_os())
+                           pagina_os=_pagina_da_os(),
+                           # o modo "blocos" (11/11/2026): só o que é do chamado, dentro do Raio X da OS do Nexus
+                           blocos=request.args.get("blocos") == "1")
 
 
 def _status_trocado(obs):

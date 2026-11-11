@@ -624,6 +624,8 @@ def encaminhar(resto: str):
     if _ROTA_OBS.fullmatch(resto):              # só a tela de um chamado e o editar/excluir: o quadro não lê o setor
         environ[OBS_CHAMADOS] = obs_chamados()  # editar e excluir as observações (ver `obs_chamados`)
         environ[PAGINA_DA_OS] = pagina_da_os()  # a OS abre a página da OS da Engenharia (ver `pagina_da_os`)
+    if resto == "chamados/acompanhamento":      # o quadro de Garantias abre o Raio X da OS (11/11/2026)
+        environ[PAGINA_DA_OS] = pagina_da_os()
     if _ROTA_RETORNAR.fullmatch(resto):         # quem retorna a OS em verificação para o responsável (retornar_os.py)
         from . import retornar_os
         environ[retornar_os.CHAVE] = retornar_os.no_pedido(app)
