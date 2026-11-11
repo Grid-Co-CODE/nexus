@@ -469,6 +469,18 @@ def _ligada(v) -> bool:
     return v not in (None, "", "None")
 
 
+def _chave_comparavel(v) -> str:
+    """A chave externa como o banco pode devolvê-la: o número inteiro em qualquer forma ("10.0", 10, " 10 ") é "10", a
+    regra do `fato_os_fama.id_fama` (a chave da FAMA é o id do projeto, 11/11/2026: com "10.0" de volta do banco, toda
+    publicação depois da 1ª ligação travaria em "perderia N ligações"). Nome e código ficam exatamente como eram."""
+    s = str(v)
+    try:
+        f = float(s)
+    except ValueError:
+        return s
+    return str(int(f)) if f.is_integer() else s
+
+
 def perdas_de_para(novas: list[list], no_banco: list[dict]):
     """As ligações que o banco tem (a chave ligada a uma usina) e que a publicação `novas` (linhas de CAB_DE_PARA)
     perderia: a chave some, ou fica sem usina. Counter {sistema: quantas}. A troca de usina não conta aqui (é decisão da
@@ -476,12 +488,12 @@ def perdas_de_para(novas: list[list], no_banco: list[dict]):
     com as bases que ele lera em 07/10, sem as abas do BD_Thopen e do BD_Performance, e 187 ligações sumiram do banco;
     a geração do Nexus, que acha a usina só por elas, ficou sem usina em todas as linhas na remontagem seguinte."""
     from collections import Counter
-    nova = {(str(l[1]), str(l[2])): l[0] for l in novas}
+    nova = {(str(l[1]), _chave_comparavel(l[2])): l[0] for l in novas}
     perdas = Counter()
     for d in no_banco:
         if not _ligada(d.get("usina_id")):
             continue
-        chave = (str(d.get("sistema")), str(d.get("chave_externa")))
+        chave = (str(d.get("sistema")), _chave_comparavel(d.get("chave_externa")))
         if not _ligada(nova.get(chave)):
             perdas[chave[0]] += 1
     return perdas

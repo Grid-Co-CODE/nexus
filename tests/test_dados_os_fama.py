@@ -86,15 +86,23 @@ def test_uma_linha_por_os_com_os_ids_as_datas_de_brasilia_e_o_catalogo_da_fama()
 
 def test_as_datas_sem_fuso_a_meia_noite_e_o_dia_so():
     """A FAMA pode mandar a data com fuso, sem fuso ou só o dia (medido só em contagens): com fuso, o dia de Brasília;
-    sem fuso, UTC como o resto do Nexus; a meia-noite exata sem fuso é o dia escolhido num calendário (não vira o dia
-    anterior); o dia só, ele mesmo. A qualidade conta cada jeito."""
+    sem fuso, UTC como o resto do Nexus; a meia-noite exata (sem fuso, ou em UTC: "Z" e "+00:00") é o dia escolhido num
+    calendário e vale o dia ESCRITO (em Brasília viraria o dia anterior); o dia só, ele mesmo. A qualidade conta cada
+    jeito por campo (criação, prevista, fim), para a 1ª leitura do servidor confirmar qual a FAMA usa."""
     itens = [_os(1, criada="2026-10-01T02:00:00", prevista="2026-10-05T00:00:00", fim="2026-10-06"),
-             _os(2, criada="2026-10-01T02:00:00-03:00", prevista="não é data", fim="2026-10-06T00:00:00+00:00")]
+             _os(2, criada="2026-10-01T02:00:00-03:00", prevista="não é data", fim="2026-10-06T00:00:00+00:00"),
+             _os(3, criada="2026-10-03T01:00:00Z", prevista="2026-10-05T00:00:00Z", fim="2026-10-07T00:00:00.000+00:00")]
     linhas, rel, _ = _montar(itens)
     d = _por_os(linhas)
     assert (d[1]["data_id_criacao"], d[1]["data_id_prevista"], d[1]["data_id_fim"]) == (20260930, 20261005, 20261006)
-    assert (d[2]["data_id_criacao"], d[2]["data_id_prevista"], d[2]["data_id_fim"]) == (20261001, None, 20261005)
-    assert rel["datas"] == {"sem_fuso": 1, "meia_noite": 1, "dia": 1, "com_fuso": 2, "invalida": 1}
+    assert (d[2]["data_id_criacao"], d[2]["data_id_prevista"], d[2]["data_id_fim"]) == (20261001, None, 20261006)
+    # 01:00Z é 22:00 do dia anterior em Brasília; a meia-noite UTC, o dia escrito
+    assert (d[3]["data_id_criacao"], d[3]["data_id_prevista"], d[3]["data_id_fim"]) == (20261002, 20261005, 20261007)
+    assert rel["datas"] == {"criacao": {"sem_fuso": 1, "com_fuso": 2},
+                            "prevista": {"meia_noite": 1, "invalida": 1, "com_fuso_meia_noite": 1},
+                            "fim": {"dia": 1, "com_fuso_meia_noite": 2}}
+    # meia-noite com outro fuso não é a meia-noite UTC: vira o dia de Brasília, como qualquer hora com fuso
+    assert F.dia("2026-10-05T00:00:00+02:00") == (datetime(2026, 10, 4).date(), "com_fuso")
     # o fim antes da criação não vira medida negativa: fica vazio e conta
     linhas, rel, _ = _montar([_os(3, criada="2026-10-09T12:00:00", fim="2026-10-02T12:00:00")])
     assert _por_os(linhas)[3]["dias_ate_fim_qtd"] is None and rel["fim_antes_da_criacao"] == 1
@@ -111,12 +119,19 @@ def test_o_dominio_da_fama_e_o_que_fica_fora_dele():
     assert rel["fora_do_dominio"] == {"status": 1, "tipo": 1, "severidade": 1}
 
 
-def test_nenhum_texto_livre_nem_pessoa_em_claro_em_linha_nenhuma():
-    linhas, _rel, por_os = _montar([_os(1), _os(2, projeto=11, nome="Morro Inventado IV")], ligacao={10: 37})
+def test_nenhum_texto_livre_nem_pessoa_em_claro_em_linha_nenhuma(banco):
+    itens = [_os(1), _os(2, projeto=11, nome="Morro Inventado IV")]
+    linhas, _rel, por_os = _montar(itens, ligacao={10: 37})
     dim = F.dim_projetos(por_os, [])
-    texto = json.dumps([linhas, dim], ensure_ascii=False, default=str)
-    for proibido in (TITULO, DESCRICAO, "fusível", "portal", *PESSOAS, "exemplo.com"):
-        assert proibido not in texto, proibido
+    # o que vai ao banco: as QUATRO abas que a carga grava, lidas de volta do banco de mentira
+    r = _gerar(banco, FamaFalsa(itens))
+    assert set(r["gravado"]) == {F.ABA, F.ABA_DIM, "qualidade", "atualizacao"}
+    no_banco = {a: banco.linhas(F.LIVRO, a) for a in r["gravado"]}
+    assert all(no_banco.values())
+    for texto in (json.dumps([linhas, dim], ensure_ascii=False, default=str),
+                  *(json.dumps(ls, ensure_ascii=False, default=str) for ls in no_banco.values())):
+        for proibido in (TITULO, DESCRICAO, "fusível", "portal", *PESSOAS, "exemplo.com"):
+            assert proibido not in texto, proibido
     # o nome da usina (o projeto) pode ir em claro: é o que a dimensão guarda
     assert dim == [[10, "Lagoa Fictícia II", 1], [11, "Morro Inventado IV", 1]]
     # o cabeçalho também não tem coluna de pessoa nem de texto em claro
@@ -215,38 +230,82 @@ def test_o_radar_da_governanca_ve_o_livro_como_fato():
 
 
 # ── o leitor da FAMA e a carga de hora em hora ────────────────────────────────────────────────────────────────────
-class RespostaFama:
-    def __init__(self, status, corpo):
-        self.status_code, self._corpo = status, corpo
+class Relogio:
+    """O relógio monotônico de mentira: a FAMA de mentira o anda a cada bloco que manda."""
 
-    def json(self):
-        if isinstance(self._corpo, Exception):
-            raise self._corpo
-        return self._corpo
+    def __init__(self):
+        self.t = 1000.0
+
+    def __call__(self):
+        return self.t
+
+
+class CorpoFalso:
+    """O `raw` (urllib3) de mentira: `read1` entrega um bloco por vez, como chega, e anda o relógio `passo_s`; `shutdown`
+    corta a leitura (o que o vigia do prazo chama); `ao_ler(n)` roda antes da n-ésima leitura."""
+
+    def __init__(self, blocos, relogio=None, passo_s=0.0, ao_ler=None):
+        self.blocos, self.relogio, self.passo_s, self.ao_ler = list(blocos), relogio, passo_s, ao_ler
+        self.leituras, self.cortado = 0, False
+
+    def read1(self, amt=None, decode_content=None):
+        self.leituras += 1
+        if self.ao_ler:
+            self.ao_ler(self.leituras)
+        if self.relogio is not None:
+            self.relogio.t += self.passo_s
+        if self.cortado or not self.blocos:
+            return b""
+        b = self.blocos.pop(0)
+        if amt and len(b) > amt:
+            self.blocos.insert(0, b[amt:])
+            b = b[:amt]
+        return b
+
+    def shutdown(self):
+        self.cortado = True
+
+
+class RespostaFama:
+    def __init__(self, status, corpo, relogio=None, passo_s=0.0, bloco=None, ao_ler=None):
+        self.status_code, self.fechada = status, False
+        dados = bytes(corpo) if isinstance(corpo, (bytes, bytearray)) else json.dumps(corpo).encode("utf-8")
+        tam = bloco or max(1, len(dados))
+        self.raw = CorpoFalso([dados[i:i + tam] for i in range(0, len(dados), tam)], relogio, passo_s, ao_ler)
+
+    def close(self):
+        self.fechada = True
 
 
 class FamaFalsa:
-    """A FAMA de mentira: guarda cada pedido (método, endereço, cabeçalhos, timeout) e responde o que o teste mandar."""
+    """A FAMA de mentira: guarda cada pedido e responde o que o teste mandar. Exige `stream=True` e
+    `allow_redirects=False` (revisão de 11/11/2026): sem eles o teste FALHA, e não vira um "não li" calado."""
 
-    def __init__(self, corpo=None, status=200, erro=None):
-        self.corpo, self.status, self.erro, self.pedidos = corpo, status, erro, []
+    def __init__(self, corpo=None, status=200, erro=None, relogio=None, passo_s=0.0, bloco=None, ao_ler=None):
+        self.corpo, self.status, self.erro, self.pedidos, self.respostas = corpo, status, erro, [], []
+        self.relogio, self.passo_s, self.bloco, self.ao_ler = relogio, passo_s, bloco, ao_ler
 
-    def get(self, url, headers=None, timeout=None, params=None):
+    def get(self, url, headers=None, timeout=None, params=None, stream=None, allow_redirects=True):
         self.pedidos.append({"metodo": "GET", "url": url, "headers": dict(headers or {}), "timeout": timeout,
-                             "params": params})
+                             "params": params, "stream": stream, "allow_redirects": allow_redirects})
+        if stream is not True or allow_redirects is not False:
+            pytest.fail("o leitor da FAMA tem de pedir stream=True e allow_redirects=False")
         if self.erro is not None:
             raise self.erro
-        return RespostaFama(self.status, self.corpo)
+        r = RespostaFama(self.status, self.corpo, self.relogio, self.passo_s, self.bloco, self.ao_ler)
+        self.respostas.append(r)
+        return r
 
     def __getattr__(self, nome):                 # post, put, patch, delete: o leitor nunca chama
-        raise AssertionError(f"o leitor da FAMA chamou {nome}")
+        pytest.fail(f"o leitor da FAMA chamou {nome}")
 
 
 class NadaDeRede:
-    """Sessão que falha se alguém a usar: a carga sem as três chaves não fala com o banco nem com a FAMA."""
+    """Sessão que falha se alguém a usar: a carga sem as três chaves (ou fora do servidor) não fala com o banco nem com a
+    FAMA."""
 
     def __getattr__(self, nome):
-        raise AssertionError(f"chamou {nome} sem as três chaves")
+        pytest.fail(f"chamou {nome} sem poder")
 
 
 CHAVE_CADASTRO = gerar_chave()          # a mesma em todas as voltas de um teste: a cifra de antes abre
@@ -270,6 +329,12 @@ DE_PARA = [{"usina_id": 37, "sistema": F.SISTEMA, "chave_externa": "10", "casou_
             "casou_por": "nome"}]
 
 
+@pytest.fixture(autouse=True)
+def no_servidor(monkeypatch):
+    """A carga só roda no servidor (revisão de 11/11/2026, uma máquina só): estes testes fazem de conta que são ele."""
+    monkeypatch.setattr(fama, "_maquina", lambda: "servidor")
+
+
 @pytest.fixture
 def banco():
     api = ApiPGFalsa()
@@ -281,12 +346,85 @@ def _gerar(api, fama_falsa, config=None, **k):
     return fama.gerar_fama(config or _config(), api, fama=fama_falsa, agora=k.pop("agora", AGORA), **k)
 
 
-def test_o_leitor_so_faz_get_na_rota_com_a_chave_no_cabecalho_e_timeout_de_90_s():
+class _Contexto:
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *a):
+        return False
+
+
+class _App:
+    def __init__(self, config=None):
+        self.config = config or _config()
+
+    def app_context(self):
+        return _Contexto()
+
+
+def test_o_leitor_so_faz_get_na_rota_com_a_chave_no_cabecalho_em_blocos_e_sem_redirecionar():
     f = FamaFalsa([_os(1)])
     assert fama.ler(CHAVE_FAMA, f) == [_os(1)]
     assert f.pedidos == [{"metodo": "GET", "url": "https://api.fama.energy/v2/contractor/service-orders/",
-                          "headers": {"X-Contractor-Key": CHAVE_FAMA, "Accept": "application/json"}, "timeout": 90,
-                          "params": None}]
+                          "headers": {"X-Contractor-Key": CHAVE_FAMA, "Accept": "application/json"},
+                          "timeout": (fama.CONEXAO_S, fama.PRAZO_S), "params": None, "stream": True,
+                          "allow_redirects": False}]
+    assert fama.PRAZO_S == 90 and fama.TETO_BYTES == 50 * 2 ** 20 and f.respostas[0].fechada
+
+
+def test_a_resposta_que_pinga_devagar_passa_do_prazo_inteiro_e_nada_se_grava(banco, monkeypatch):
+    """O timeout do requests vale por leitura do socket: a resposta que pinga um bloco a cada 10 s nunca fica 90 s
+    parada e seguraria a volta sem limite. O prazo é da resposta INTEIRA (relógio monotônico): passou, "não li"."""
+    rel = Relogio()
+    monkeypatch.setattr(fama, "RELOGIO", rel)
+    itens = [_os(i) for i in range(1, 40)]
+    f = FamaFalsa(itens, relogio=rel, passo_s=10.0, bloco=200)
+    r = _gerar(banco, f)
+    assert "nao_li" in r and "90 s" in r["nao_li"] and banco.syncs == 0
+    assert f.respostas[0].fechada and f.respostas[0].raw.leituras == 10      # parou no bloco que passou dos 90 s
+    # a mesma resposta, mais depressa, cabe no prazo
+    rel.t = 1000.0
+    assert len(fama.ler(CHAVE_FAMA, FamaFalsa(itens, relogio=rel, passo_s=1.0, bloco=2000))) == 39
+
+
+def test_o_vigia_corta_a_leitura_no_prazo_e_o_corpo_pela_metade_nao_passa(monkeypatch):
+    """O bloco que não chega nunca (a leitura parada no socket) não é visto pelo laço: um vigia corta a resposta no prazo
+    (`raw.shutdown`), e o corpo que chegou até ali vira "não li", nunca uma lista pela metade."""
+    vigias = []
+
+    class TimerFalso:
+        def __init__(self, intervalo, funcao):
+            self.intervalo, self.funcao, self.cancelado, self.daemon = intervalo, funcao, False, False
+            vigias.append(self)
+
+        def start(self):
+            pass
+
+        def cancel(self):
+            self.cancelado = True
+    monkeypatch.setattr(fama, "_Timer", TimerFalso)
+    rel = Relogio()
+    monkeypatch.setattr(fama, "RELOGIO", rel)
+    # o vigia dispara antes da 3ª leitura (o prazo venceu com o socket parado); o relógio de mentira não andou
+    f = FamaFalsa([_os(1), _os(2), _os(3)], bloco=50, ao_ler=lambda n: n == 3 and vigias[0].funcao())
+    with pytest.raises(fama.NaoLi, match="90 s"):
+        fama.ler(CHAVE_FAMA, f)
+    assert vigias[0].intervalo == fama.PRAZO_S and vigias[0].cancelado and f.respostas[0].fechada
+
+
+def test_a_resposta_maior_que_o_teto_nao_se_le(banco, monkeypatch):
+    monkeypatch.setattr(fama, "TETO_BYTES", 3000)
+    f = FamaFalsa([_os(i) for i in range(1, 20)], bloco=500)
+    r = _gerar(banco, f)
+    assert "nao_li" in r and "teto" in r["nao_li"] and banco.syncs == 0 and f.respostas[0].fechada
+    assert f.respostas[0].raw.leituras == 7          # parou no bloco que passou do teto, sem ler o resto
+
+
+def test_o_redirecionamento_nao_e_seguido_e_a_chave_nao_sai_para_outro_endereco(banco):
+    f = FamaFalsa(status=302, corpo=b"")
+    r = _gerar(banco, f)
+    assert "nao_li" in r and "302" in r["nao_li"] and "redireciona" in r["nao_li"] and banco.syncs == 0
+    assert [p["url"] for p in f.pedidos] == [fama.URL] and fama.URL.startswith("https://")
 
 
 def test_a_carga_grava_o_livro_inteiro_e_confere(banco):
@@ -298,26 +436,29 @@ def test_a_carga_grava_o_livro_inteiro_e_confere(banco):
     assert (fato[1]["usina_id"], fato[3]["usina_id"]) == (37, None)
     q = banco.linhas(F.LIVRO, "qualidade")[0]
     assert (q["fato"], q["linhas"], q["pct_usina"]) == ("os_fama", 3, 66.7)
+    assert json.loads(q["extra"])["datas"]["prevista"] == {"dia": 3}           # o formato de cada campo, contado
     at = banco.linhas(F.LIVRO, "atualizacao")[0]
-    assert at["linhas"] == 3 and at["sha_linhas"] == r["sha_linhas"]
+    assert (at["linhas"], at["sha_linhas"], at["situacao"]) == (3, r["sha_linhas"], "mudou")
 
 
 @pytest.mark.parametrize("fama_falsa", [
     FamaFalsa(status=401, corpo={"detail": "Could not validate credentials"}),
     FamaFalsa(status=500, corpo={"detail": "erro interno"}),
+    FamaFalsa(status=302, corpo=b""),
     FamaFalsa(corpo={"rows": [_os(1)]}),                       # resposta que não é lista
-    FamaFalsa(corpo=ValueError("não é JSON")),
+    FamaFalsa(corpo=b"<html>nao e JSON</html>"),
     FamaFalsa(erro=requests.Timeout("passou de 90 s")),
     FamaFalsa(erro=requests.ConnectionError("sem rede")),
-], ids=["401", "500", "objeto", "nao_json", "timeout", "sem_rede"])
+], ids=["401", "500", "302", "objeto", "nao_json", "timeout", "sem_rede"])
 def test_erro_401_ou_resposta_que_nao_e_lista_vira_nao_li_e_nada_se_grava(banco, fama_falsa):
     r = _gerar(banco, fama_falsa)
     assert "nao_li" in r and "gravado" not in r
     assert banco.syncs == 0 and F.LIVRO not in banco.workbooks
     assert len(fama_falsa.pedidos) == 1                    # sem repetir em laço: a hora seguinte tenta de novo
+    assert all(x.fechada for x in fama_falsa.respostas)
 
 
-def test_a_chave_fica_fora_de_toda_saida(banco, caplog):
+def test_a_chave_fica_fora_de_toda_saida(banco, caplog, monkeypatch):
     """A chave nunca vai ao relatório, ao log nem à mensagem de erro, nem quando o erro (ou a FAMA) a repete."""
     caplog.set_level(logging.DEBUG)
     # 1ª camada: a mensagem do "não li" é montada no leitor, sem o texto do erro (que pode trazer o pedido)
@@ -330,14 +471,9 @@ def test_a_chave_fica_fora_de_toda_saida(banco, caplog):
               FamaFalsa([_os(1), _os(2)])):
         saidas.append(json.dumps(_gerar(banco, f), ensure_ascii=False, default=str))
     # a falha que sobe do meio da carga (o banco que caiu) vai ao log da volta sem a chave
-    app = type("App", (), {"config": _config(), "app_context": lambda self: _Contexto()})()
     erro = RuntimeError(f"o banco caiu levando {CHAVE_FAMA}")
-    original = fama.gerar_fama
-    try:
-        fama.gerar_fama = lambda *a, **k: (_ for _ in ()).throw(erro)
-        carga._volta_fama(app)
-    finally:
-        fama.gerar_fama = original
+    monkeypatch.setattr(fama, "gerar_fama", lambda *a, **k: (_ for _ in ()).throw(erro))
+    carga._volta_fama(_App())
     saidas.append(json.dumps(carga._LACO["fama"], ensure_ascii=False))
     gravado = json.dumps({a: banco.linhas(F.LIVRO, a) for a in (F.ABA, F.ABA_DIM, "qualidade", "atualizacao")},
                          ensure_ascii=False, default=str)
@@ -345,14 +481,6 @@ def test_a_chave_fica_fora_de_toda_saida(banco, caplog):
         assert CHAVE_FAMA not in texto
     # a frase da FAMA e o erro que subiu ficam, com a chave trocada por [chave]
     assert "[chave]" in saidas[1] and "[chave]" in saidas[-1] and "[chave]" in caplog.text
-
-
-class _Contexto:
-    def __enter__(self):
-        return self
-
-    def __exit__(self, *a):
-        return False
 
 
 def test_a_trava_contra_encolher_recusa_a_leitura_com_menos_de_95_por_cento(banco):
@@ -390,6 +518,22 @@ def test_so_grava_quando_a_fama_ou_a_ligacao_muda(banco):
         1: 37, 2: 52}
 
 
+def test_o_batimento_grava_uma_vez_por_dia_mesmo_sem_mudanca(banco):
+    """Sem o batimento, "sem novidade na FAMA" e "a leitura quebrada há dias" eram o mesmo `gerado_em` velho: a
+    `atualizacao` é regravada uma vez por dia, mesmo sem mudança ("li, nada mudou")."""
+    itens = [_os(1)]
+    _gerar(banco, FamaFalsa(itens))
+    r = _gerar(banco, FamaFalsa(itens), agora=AGORA + timedelta(hours=1))
+    assert r["mudou"] is False and "gravado" not in r and banco.syncs == 1
+    amanha = AGORA + timedelta(days=1)
+    r = _gerar(banco, FamaFalsa(itens), agora=amanha)
+    assert r["mudou"] is False and r["gravado"][F.ABA] == 1 and banco.syncs == 2
+    at = banco.linhas(F.LIVRO, "atualizacao")[0]
+    assert at["situacao"] == "li, nada mudou" and str(at["gerado_em"]).startswith("2026-11-12")
+    r = _gerar(banco, FamaFalsa(itens), agora=amanha + timedelta(hours=1))
+    assert "gravado" not in r and banco.syncs == 2                      # um batimento por dia, não por hora
+
+
 def test_a_outra_maquina_que_gravou_ha_pouco_segura_a_volta(banco):
     _gerar(banco, FamaFalsa([_os(1)]))
     f = FamaFalsa([_os(1), _os(2)])
@@ -412,14 +556,73 @@ def test_a_carga_so_liga_com_as_tres_chaves(falta):
     assert falta in r["pulou"] and not f.pedidos
 
 
-def test_teste_e_copia_de_prova_nunca_leem_a_fama_de_verdade():
+def test_so_o_servidor_le_a_fama(monkeypatch):
+    """Uma máquina só: o PC com a chave no .env nunca dá o segundo GET da hora (o critério do Nexus: o servidor é o
+    Linux, `_maquina`)."""
+    monkeypatch.setattr(fama, "_maquina", lambda: "pc")
+    f = FamaFalsa([_os(1)])
+    r = fama.gerar_fama(_config(), NadaDeRede(), fama=f, agora=AGORA)
+    assert "servidor" in r["pulou"] and not f.pedidos
+
+
+def test_teste_nunca_le_a_fama_de_verdade():
+    """Sem a FAMA de mentira, o teste (TESTING) não lê: pula antes de qualquer pedido."""
     r = fama.gerar_fama(_config(TESTING=True), NadaDeRede(), agora=AGORA)
-    assert "pulou" in r
+    assert "teste" in r["pulou"]
+
+
+def test_a_copia_de_prova_nunca_liga_a_fama(monkeypatch):
+    """A cópia de prova (`ferramentas/subir_copia_de_prova.py`) não é TESTING: quem a protege é o ambiente que ela monta,
+    a carga de dados desligada (NEXUS_CARGA_DADOS=0) e a NEXUS_FAMA_CHAVE vazia, que vence o .env e some da
+    configuração. Exercido aqui: o ambiente, a configuração que sai dele, a carga que não liga e a FAMA que pula."""
+    import importlib.util
+    import os
+    from pathlib import Path
+
+    from nexus import dados
+    from nexus.config import OBRIGATORIAS, carregar_config
+    caminho = Path(__file__).resolve().parent.parent / "ferramentas" / "subir_copia_de_prova.py"
+    spec = importlib.util.spec_from_file_location("copia_de_prova_teste", caminho)
+    copia = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(copia)
+    monkeypatch.setattr(os, "environ", dict(os.environ, NEXUS_FAMA_CHAVE=CHAVE_FAMA, NEXUS_CARGA_DADOS="1"))
+    copia.preparar_ambiente()
+    assert os.environ["NEXUS_FAMA_CHAVE"] == "" and os.environ["NEXUS_CARGA_DADOS"] == "0"
+    env = {**{k: "valor-de-teste" for k in OBRIGATORIAS}, "NEXUS_FAMA_CHAVE": CHAVE_FAMA,
+           "GRIDCO_SQL_TOKEN": "token-de-teste", "NEXUS_CHAVE_CADASTRO": CHAVE_CADASTRO}
+    env.update({k: v for k, v in os.environ.items() if k.startswith("NEXUS_")})     # o ambiente vence o .env
+    cfg = carregar_config(env)
+    assert "NEXUS_FAMA_CHAVE" not in cfg and cfg["NEXUS_CARGA_DADOS"] == "0"
+    monkeypatch.setattr(carga, "ligar", lambda app: pytest.fail("a cópia de prova ligou a carga de dados"))
+    dados.instalar(_App(dict(cfg, GRIDCO_SQL_TOKEN="token-de-teste")))
+    f = FamaFalsa([_os(1)])
+    assert "NEXUS_FAMA_CHAVE" in fama.gerar_fama(cfg, NadaDeRede(), fama=f, agora=AGORA)["pulou"] and not f.pedidos
+
+
+def test_a_sessao_da_fama_fecha(banco, monkeypatch):
+    """Sem a sessão de mentira, o leitor abre a dele e a fecha (`with`), mesmo quando lê."""
+    abertas = []
+
+    class SessaoFalsa(FamaFalsa):
+        def __init__(self, corpo):
+            super().__init__(corpo)
+            self.fechada = False
+
+        def __enter__(self):
+            abertas.append(self)
+            return self
+
+        def __exit__(self, *a):
+            self.fechada = True
+            return False
+    monkeypatch.setattr(requests, "Session", lambda: SessaoFalsa([_os(1)]))
+    r = fama.gerar_fama(_config(), banco, agora=AGORA)
+    assert r["mudou"] is True and len(abertas) == 1 and abertas[0].fechada and len(abertas[0].pedidos) == 1
 
 
 def test_a_falha_da_fama_nao_derruba_a_volta(monkeypatch):
     """A FAMA é a última peça da volta de hora em hora, e o que ela levanta fica no estado e no log, nunca sobe."""
-    app = type("App", (), {"config": _config(), "app_context": lambda self: _Contexto()})()
+    app = _App()
     monkeypatch.setattr(fama, "gerar_fama", lambda config: (_ for _ in ()).throw(RuntimeError("banco fora")))
     carga._volta_fama(app)
     assert carga._LACO["fama"]["erro"].startswith("RuntimeError")
@@ -435,7 +638,26 @@ def test_a_falha_da_fama_nao_derruba_a_volta(monkeypatch):
     assert carga._LACO["fama"]["erro"].startswith(("ImportError", "ModuleNotFoundError"))
 
 
-def test_o_laco_de_hora_em_hora_chama_a_fama_depois_das_outras_cargas():
-    import inspect
-    corpo = inspect.getsource(carga.ligar)
-    assert corpo.index("gerar_almoxarifado(") < corpo.index("_volta_fama(app)")
+def test_o_laco_de_hora_em_hora_roda_a_fama_depois_das_outras_cargas_e_segue(monkeypatch):
+    """O laço de verdade (`carga.ligar`), uma volta: a carga, a geração, o almoxarifado e, por último, a FAMA; a FAMA que
+    cai fica no estado, sem a chave, e o laço continua vivo até mandarem parar."""
+    import threading
+    ordem = []
+    monkeypatch.setitem(carga._LACO, "thread", None)
+    monkeypatch.setitem(carga._LACO, "parar", threading.Event())
+    monkeypatch.setattr(carga, "_espera_s", lambda agora=None: 0)
+    monkeypatch.setattr(carga, "rodar", lambda config: ordem.append("carga") or {})
+    monkeypatch.setattr(carga, "gerar_geracao", lambda config: ordem.append("geracao") or {})
+    monkeypatch.setattr(carga, "gerar_almoxarifado", lambda config: ordem.append("almoxarifado") or {})
+
+    def fama_que_cai(config):
+        ordem.append("fama")
+        if ordem.count("fama") == 2:
+            carga._LACO["parar"].set()                  # a 2ª volta prova que a 1ª queda não matou o laço
+        raise RuntimeError(f"caiu levando {CHAVE_FAMA}")
+    monkeypatch.setattr(fama, "gerar_fama", fama_que_cai)
+    carga.ligar(_App())
+    carga._LACO["thread"].join(10)
+    assert not carga._LACO["thread"].is_alive()
+    assert ordem == ["carga", "geracao", "almoxarifado", "fama"] * 2
+    assert carga._LACO["fama"]["erro"].startswith("RuntimeError") and CHAVE_FAMA not in carga._LACO["fama"]["erro"]

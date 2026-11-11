@@ -39,7 +39,10 @@ CAB_OS_FAMA = ["fama_os_id", "fama_projeto_id", "usina_id", "usina_ligada_por", 
                "fama_especialidade_id", "especialidade", "fama_tipo_equipe_id", "tipo_equipe", "contract_id",
                "dias_ate_fim_qtd", "titulo_cifrado", "descricao_cifrada"]
 CAB_DIM = ["fama_projeto_id", "nome", "os_qtd"]
-CAB_ATUALIZACAO = ["gerado_em", "maquina", "duracao_s", "linhas", "como_ler", "sha_linhas", "lido_em"]
+# `situacao`: "mudou" (a FAMA ou uma ligação mudou) ou "li, nada mudou" (o batimento do dia: a leitura está viva). O
+# `gerado_em` com mais de um dia é a leitura parada, e não "sem novidade" (revisão de 11/11/2026)
+CAB_ATUALIZACAO = ["gerado_em", "maquina", "duracao_s", "linhas", "como_ler", "sha_linhas", "lido_em", "situacao"]
+SITUACAO_MUDOU, SITUACAO_BATIMENTO = "mudou", "li, nada mudou"
 COMO_LER = ("1 linha = 1 OS da FAMA atribuída à Grid, no estado da leitura mais recente; usina_id só pela ligação "
             "decidida em Base → Ligações entre bases (FAMA · Projetos); título e descrição só cifrados")
 TIPO = "snapshot_acumulado"
@@ -88,9 +91,11 @@ def _ordem(v) -> tuple:
 
 
 def dia(v) -> tuple[date | None, str]:
-    """(o dia de Brasília, como veio). Com fuso: o dia em Brasília (regra 7). Sem fuso: UTC, como o resto do Nexus
-    (`fatos.data_do_registro`), salvo a meia-noite exata, que é o dia escolhido num calendário e viraria o dia anterior.
-    O dia só: ele mesmo. A qualidade conta cada jeito (a 1ª leitura do servidor diz qual a FAMA usa)."""
+    """(o dia, como veio). Com fuso: o dia em Brasília (regra 7). Sem fuso: UTC, como o resto do Nexus
+    (`fatos.data_do_registro`). A meia-noite exata sem fuso, ou à meia-noite UTC ("Z", "+00:00"), é o dia escolhido num
+    calendário e vale o dia ESCRITO: em Brasília viraria o dia anterior (revisão de 11/11/2026: a prevista
+    "2026-10-05T00:00:00Z" é o dia 5, não o 4). O dia só: ele mesmo. A qualidade conta cada jeito por campo (a 1ª leitura
+    do servidor diz qual a FAMA usa)."""
     s = str(v or "").strip()
     if not s:
         return None, "vazia"
@@ -103,9 +108,12 @@ def dia(v) -> tuple[date | None, str]:
         d = datetime.fromisoformat(s.replace("Z", "+00:00").replace(" ", "T", 1))
     except ValueError:
         return None, "invalida"
+    meia_noite = (d.hour, d.minute, d.second, d.microsecond) == (0, 0, 0, 0)
     if d.tzinfo is not None:
+        if meia_noite and d.utcoffset() == timedelta(0):
+            return d.date(), "com_fuso_meia_noite"
         return d.astimezone(_BRT).date(), "com_fuso"
-    if (d.hour, d.minute, d.second, d.microsecond) == (0, 0, 0, 0):
+    if meia_noite:
         return d.date(), "meia_noite"
     return d.replace(tzinfo=timezone.utc).astimezone(_BRT).date(), "sem_fuso"
 
@@ -179,23 +187,27 @@ def _projeto(x) -> dict:
     return x.get("project") if isinstance(x.get("project"), dict) else {}
 
 
+# as três datas da OS: (o nome no fato, o campo da FAMA)
+_DATAS = (("criacao", "creation_date"), ("prevista", "expected_execution_date"), ("fim", "finish_date"))
+
+
 def linhas(por_os: dict, ligacao: dict, cofre, anteriores: dict | None = None) -> tuple[list[list], dict]:
     """As linhas do fato (CAB_OS_FAMA), pela OS, e um relatório só de contagens. `por_os` = `validas`; `ligacao` =
     `ligacao_decidida` ({fama_projeto_id: usina_id}); `cofre` = o Cofre do cadastro; `anteriores` = {fama_os_id: linha do
     banco}, para manter a cifra do texto que não mudou."""
     anteriores = {id_fama(k): v for k, v in (anteriores or {}).items()}
-    fora, datas, cifras = Counter(), Counter(), Counter()
+    fora, cifras = Counter(), Counter()
+    datas = {col: Counter() for col, _c in _DATAS}         # o formato de cada campo, à parte (revisão de 11/11/2026)
     fim_antes, out = 0, []
     for oid in sorted(por_os, key=_ordem):
         x = por_os[oid]
         pid = id_fama(_projeto(x).get("id"))
         uid = ligacao.get(pid) if pid is not None else None
         dias = {}
-        for col, campo in (("criacao", "creation_date"), ("prevista", "expected_execution_date"),
-                           ("fim", "finish_date")):
+        for col, campo in _DATAS:
             d, como = dia(x.get(campo))
             if como != "vazia":
-                datas[como] += 1
+                datas[col][como] += 1
             dias[col] = d
         lag = None
         if dias["criacao"] and dias["fim"]:
@@ -212,8 +224,9 @@ def linhas(por_os: dict, ligacao: dict, cofre, anteriores: dict | None = None) -
                     *(_data_id(dias[c]) if dias[c] else None for c in ("criacao", "prevista", "fim")),
                     *st, *tp, *sv, *es, *eq, id_fama(x.get("contract_id")), lag, *cif])
     i_p = CAB_OS_FAMA.index("fama_projeto_id")
-    rel = {"fora_do_dominio": dict(fora), "datas": dict(datas), "fim_antes_da_criacao": fim_antes,
-           "cifras": dict(cifras), "sem_projeto": sum(1 for l in out if l[i_p] is None)}
+    rel = {"fora_do_dominio": dict(fora), "datas": {col: dict(c) for col, c in datas.items() if c},
+           "fim_antes_da_criacao": fim_antes, "cifras": dict(cifras),
+           "sem_projeto": sum(1 for l in out if l[i_p] is None)}
     return out, rel
 
 

@@ -76,16 +76,10 @@ def instalar_trava() -> None:
     urllib.request.urlopen = urlopen
 
 
-def main() -> None:
-    p = argparse.ArgumentParser(description="Cópia de prova do Nexus noutra porta (sem carga, sem Fracttal ao subir).")
-    p.add_argument("--porta", type=int, default=5170)
-    p.add_argument("--plataforma", help="NEXUS_PLATAFORMA_URL desta cópia (ex.: http://127.0.0.1:5150). Vazio (\"\") = a "
-                                        "MESMA origem, como no servidor: a moldura da Performance, atrás da porta_local.py")
-    p.add_argument("--prefixo", help="NEXUS_PREFIXO desta cópia (ex.: /nexus, como no servidor; atrás da porta_local.py)")
-    args = p.parse_args()
-    if args.porta == 5070:
-        sys.exit("A 5070 é o Nexus do Levi: use outra porta.")
-
+def preparar_ambiente(plataforma: str | None = None, prefixo: str | None = None) -> None:
+    """O ambiente da cópia, ANTES de importar o Nexus: a variável NEXUS_* do ambiente vence o .env (`nexus/config.py`).
+    É o que protege a cópia (a cópia não é TESTING): a carga de dados desligada e a FAMA sem chave (11/11/2026, provado
+    em `tests/test_dados_os_fama.py::test_a_copia_de_prova_nunca_liga_a_fama`)."""
     os.environ["NEXUS_CARGA_DADOS"] = "0"
     os.environ["NEXUS_CAMPO_AQUECER"] = "0"
     os.environ["NEXUS_PCM_RELATORIOS_AUTO"] = "0"       # a emissão automática dos relatórios do PCM
@@ -98,11 +92,24 @@ def main() -> None:
     # as OS do cliente pela FAMA (11/11/2026): vazia, a variável vence o .env e some da configuração (a carga já não
     # liga aqui; isto segura também a chave que um dia estiver no .env do PC)
     os.environ["NEXUS_FAMA_CHAVE"] = ""
-    if args.plataforma is not None:
+    if plataforma is not None:
         # "" também vale: vence o .env (a moldura da porta única só abre na mesma origem; nexus/torres/moldura.py)
-        os.environ["NEXUS_PLATAFORMA_URL"] = args.plataforma
-    if args.prefixo is not None:
-        os.environ["NEXUS_PREFIXO"] = args.prefixo
+        os.environ["NEXUS_PLATAFORMA_URL"] = plataforma
+    if prefixo is not None:
+        os.environ["NEXUS_PREFIXO"] = prefixo
+
+
+def main() -> None:
+    p = argparse.ArgumentParser(description="Cópia de prova do Nexus noutra porta (sem carga, sem Fracttal ao subir).")
+    p.add_argument("--porta", type=int, default=5170)
+    p.add_argument("--plataforma", help="NEXUS_PLATAFORMA_URL desta cópia (ex.: http://127.0.0.1:5150). Vazio (\"\") = a "
+                                        "MESMA origem, como no servidor: a moldura da Performance, atrás da porta_local.py")
+    p.add_argument("--prefixo", help="NEXUS_PREFIXO desta cópia (ex.: /nexus, como no servidor; atrás da porta_local.py)")
+    args = p.parse_args()
+    if args.porta == 5070:
+        sys.exit("A 5070 é o Nexus do Levi: use outra porta.")
+
+    preparar_ambiente(args.plataforma, args.prefixo)
     instalar_trava()
 
     sys.path.insert(0, str(RAIZ))

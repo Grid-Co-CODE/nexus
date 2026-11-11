@@ -146,6 +146,21 @@ def test_ligar_pela_tela_vale_para_o_fato(app_fama, cli):
     assert "Lagoa Fictícia II" in dec
 
 
+def test_a_chave_da_fama_que_volta_do_banco_como_numero_nao_trava_a_publicacao():
+    """A trava da publicação (`perdas_de_para`) compara a chave do de-para; a da FAMA é o id do projeto, e o banco pode
+    devolvê-la como número ("10.0", 10). Sem normalizar, toda publicação depois da 1ª ligação travaria em "perderia N
+    ligações" (revisão de 11/11/2026). A perda de verdade continua travando."""
+    novas = [[1, F.SISTEMA, "10", "manual (11/11)"], [2, F.SISTEMA, "11", "manual (11/11)"],
+             [5, FR, "Cliente Alfa - Serra Exemplo 3 - SC", "código"]]
+    no_banco = [{"usina_id": "1.0", "sistema": F.SISTEMA, "chave_externa": "10.0", "casou_por": "manual (11/11)"},
+                {"usina_id": 2, "sistema": F.SISTEMA, "chave_externa": 11, "casou_por": "manual (11/11)"},
+                {"usina_id": 5, "sistema": FR, "chave_externa": "Cliente Alfa - Serra Exemplo 3 - SC",
+                 "casou_por": "código"}]
+    assert not B.perdas_de_para(novas, no_banco)
+    sem_a_10 = [[None, F.SISTEMA, "10", B.A_DECIDIR]] + novas[1:]
+    assert B.perdas_de_para(sem_a_10, no_banco) == {F.SISTEMA: 1}
+
+
 def test_ler_as_bases_traz_os_projetos_da_fama_do_banco(monkeypatch, tmp_path):
     """O "Ler as bases de novo" (fora do teste) lê a `dim_projeto_fama` do banco; sem o livro, a FAMA não aparece."""
     import requests

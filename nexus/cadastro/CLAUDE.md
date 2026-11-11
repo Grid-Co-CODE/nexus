@@ -763,7 +763,7 @@ colunas (a maioria escondida: o seletor de colunas mostra sem recarregar), e a p
   (`rotulo`), o id e quantas OS ele tem; a aba Decisões também diz o nome. **Nunca liga sozinho** (`so_decisao` no item):
   o de-para põe a linha sem usina e `casou_por` = `banco.A_DECIDIR`, e a **proposta pelo nome** aparece em "Sugestões do
   Nexus", um clique para ligar (o `decidir` de sempre, que grava "manual (dd/mm)"). O fato das OS liga SÓ pela linha
-  "manual" do de-para publicado: decidir aqui e **Publicar no banco**, e a OS ganha a usina na volta seguinte. A proposta
+  "manual" do de-para publicado: decidir aqui e **Publicar no banco**, e a OS ganha a usina na volta seguinte. A trava da publicação (`banco.perdas_de_para`) compara a chave numérica normalizada (`_chave_comparavel`: "10.0", 10 e "10" são a mesma; revisão de 11/11/2026), senão o id do projeto devolvido pelo banco como número travaria toda publicação depois da 1ª ligação em "perderia N ligações"; nome e código seguem comparados como sempre. A proposta
   usa o normalizador da FAMA (`nome_fama`), e não o `banco.norm` nem o `ligacao_campo._norm`, que servem ao de-para
   inteiro e aos fatos: sem acento e sem caixa, o romano vira arábico (I a XXXIX, só a palavra inteira: "Vivi" e "Civil"
   ficam), o zero à esquerda, "UFV" e as preposições caem, a sigla do estado no fim cai (só as 27 UFs: "II" não é estado)

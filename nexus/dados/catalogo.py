@@ -1266,7 +1266,8 @@ FATOS = (
                     "severidade com a lista medida em 11/11/2026: fora dela, vazio e conta), e o contract_id. O título e "
                     "a descrição (texto livre do cliente) só cifrados, amarrados à linha; quem criou, o responsável, "
                     "quem aprovou e a empresa parceira não entram (regra 8). A leitura com menos de 95% das linhas do "
-                    "banco não grava (a lista da FAMA só cresce); grava só quando o sha muda"),
+                    "banco não grava (a lista da FAMA só cresce); grava quando o sha muda e, sem mudança, uma vez por dia (o "
+                    "batimento)"),
     # as normalizações da Ronda COS (29/10/2026, Levi: "calcule a disponibilidade por lá usando o de-para como
     # referência"): o Nexus grava, a plataforma faz a régua da disponibilidade da Thopen (só ela, decisão dele). Os
     # valores repetem os de nexus/cos/normalizacoes_banco.py (o teste confere): importar o módulo daqui seria circular
@@ -1623,11 +1624,12 @@ LIVROS = (
     # Ligações entre bases lê para ligar cada um à usina) e a qualidade. A dimensão só cresce: o projeto que some da FAMA
     # fica, com a ligação decidida dele; o fato segue a FAMA (até 5% a menos; abaixo disso é leitura incompleta)
     Livro(fato_os_fama.LIVRO, (fato_os_fama.ABA, fato_os_fama.ABA_DIM, "qualidade", "atualizacao"),
-          "de hora em hora, na volta da carga de dados (:40), só onde há as três chaves (o servidor); grava só quando o "
-          "sha do fato e da dimensão muda",
+          "de hora em hora, na volta da carga de dados (:40), só no servidor e com as três chaves; grava quando o sha do "
+          "fato e da dimensão muda e uma vez por dia mesmo sem mudança (o batimento: atualizacao.situacao)",
           "nexus/dados/fama.py (a volta da carga de dados, nexus/dados/carga.py) + nexus/dados/fato_os_fama.py", False,
           "registrado em 11/11/2026 antes da 1ª gravação (regra 10): nasce na 1ª volta do servidor depois do deploy. "
-          "Lê a FAMA uma vez por volta (GET, 90 s); erro, 401 ou resposta que não é lista não grava; o livro do banco "
+          "Lê a FAMA uma vez por volta (GET em blocos, 90 s para a resposta inteira, teto de 50 MB, sem seguir "
+          "redirecionamento); erro, 401, 3xx ou resposta que não é lista não grava; o livro do banco "
           "que não vem inteiro, o de-para lido vazio e a leitura com menos de 95% das linhas do banco também não",
           so_cresce=(fato_os_fama.ABA_DIM,)),
     # a Zeladoria pronta para o dashboard do cliente (26/10/2026, Levi: "agora faz a mesma tela no dashboard do
