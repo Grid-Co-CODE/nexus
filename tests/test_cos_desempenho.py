@@ -125,7 +125,7 @@ def test_a_tela(ligada, cliente, monkeypatch):
     }
     pedidos = []
 
-    def pedir(f, caminho):
+    def pedir(f, caminho, timeout=AND.TIMEOUT_S):
         pedidos.append(caminho)
         return respostas[caminho]
     monkeypatch.setattr(AND, "_pedir", pedir)

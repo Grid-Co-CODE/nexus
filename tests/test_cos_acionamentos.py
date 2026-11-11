@@ -113,7 +113,7 @@ def tela(banco, app, logado, monkeypatch):
                       NEXUS_COS_ANDAMENTO_CLIENTES="Thopen")
     respostas = {"/api/nexus/Thopen/distribuidoras": _distribuidoras()}
 
-    def pedir(f, caminho):
+    def pedir(f, caminho, timeout=AND.TIMEOUT_S):
         r = respostas.get(caminho)
         if r is None:
             raise AND.FonteErro("o Andamento não tem este cliente, ou a rota do Nexus está desligada lá", 404)

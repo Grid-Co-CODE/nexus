@@ -40,6 +40,8 @@ PRAZOS = {
 # leitura possível é a hora em que a Ronda COS registrou a ocorrência ("registrada_em"), que deixaria de fora a demora em
 # registrar — medida em 22/10/2026 na Thopen: mediana de 24 min entre o início e o registro.
 CONTA_DE = "inicio"
+# O relógio em palavras, para a planilha dizer de onde os minutos contam.
+RELOGIO = "início da falha"
 
 # A Ronda COS (a plataforma) atende no mesmo servidor do Andamento, na porta 3000: o link "abrir na Ronda COS" sai do
 # endereço do Andamento, como o painel do próprio Andamento faz. O endereço não entra no repositório.
