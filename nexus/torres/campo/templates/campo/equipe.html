@@ -281,8 +281,9 @@
           {% if perc.vazio %}<p class="eq-vazio">{{ perc.vazio }}</p>{% else %}
           <p class="eq-perc-resumo">{{ perc.resumo }}</p>
           {% if perc.desenho and perc.desenho.cidades %}<p class="eq-perc-cidades"><span>Passou por</span> {{ perc.desenho.cidades|join(' → ') }}</p>{% endif %}
-          {# o resultado que se repete em pontos seguidos vira uma linha só, com o intervalo (Levi, 10/11/2026) #}
-          <ol class="eq-perc-lista">{% for i in perc.itens %}<li class="eq-perc-item eq-perc-item--{{ 'mov' if i.mov else 'parado' }}"><span class="eq-perc-quando">{% if i.de != i.ate %}de <b>{{ i.de }}</b> a <b>{{ i.ate }}</b>{% else %}<b>{{ i.de }}</b>{% endif %}</span> <span>{{ 'em deslocamento' if i.mov else ('parado na ' ~ i.usina if i.usina else 'parado') }}</span></li>{% endfor %}</ol>
+          {# o percurso contado por usina (Levi, 11/11/2026: "deve ser mais generalista por exemplo 'Chegou na UFV X',
+             'Saiu da Usina X'"): a saída, a chegada, a parada fora de usina com o intervalo (eventos.do_percurso) #}
+          <ol class="eq-perc-lista">{% for i in perc.itens %}<li class="eq-perc-item eq-perc-item--{{ i.tipo }}"><span class="eq-perc-quando">{% if i.de != i.ate %}de <b>{{ i.de }}</b> a <b>{{ i.ate }}</b>{% else %}<b>{{ i.de }}</b>{% endif %}</span> <span>{{ i.texto }}</span></li>{% endfor %}</ol>
           {% endif %}
           <a class="cn-link" href="{{ url_for('torre_campo.equipe', tecnico=sel.pid, **filtro.q) }}">Fechar o percurso</a>
         </section>

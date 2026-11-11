@@ -580,23 +580,14 @@ def _form_do_percurso(sel: dict, agora, pedido: dict | None) -> dict:
     return {"de": fmt(de), "ate": fmt(ate), "min": fmt(minimo), "max": fmt(agora)}
 
 
-def _itens_do_percurso(desenho: dict, trilha: list, coords: dict, nomes_usina: dict) -> list:
-    """A lista do painel, na ordem: andando ou parado e, parado a até 1 km de uma usina, o nome dela. O resultado que se
-    repete em pontos seguidos vira UMA linha com o intervalo (Levi, 10/11/2026: "quando o resultado do ponto se repetir
-    gostaria que apenas agrupasse as datas ao invés de vários pontos repetindo 'parado' poderia ter: de 10:28 a 16:38
-    parado"): {"de", "ate" (iguais num ponto só), "mov", "usina", "n" (quantos pontos)}. Sem coordenada."""
-    itens = []
-    for m, p in zip(desenho["marcas"], trilha):
-        usina = ""
-        if not p.get("mov"):
-            perto = SI.usina_mais_perto(p["lat"], p["lon"], coords)
-            if perto and perto[1] <= E.RAIO_USINA_KM:
-                usina = nomes_usina.get(perto[0]) or f"Usina {perto[0]}"
-        if itens and (itens[-1]["mov"], itens[-1]["usina"]) == (m["mov"], usina):
-            itens[-1]["ate"], itens[-1]["n"] = m["hora"], itens[-1]["n"] + 1
-        else:
-            itens.append({"de": m["hora"], "ate": m["hora"], "mov": m["mov"], "usina": usina, "n": 1})
-    return itens
+def _cidade_do_ponto():
+    """A cidade de um ponto (lat, lon) pela malha do IBGE no disco, ou None: a dos eventos e a do percurso."""
+    cidade_uf = _cidade_de()
+
+    def cidade(lat, lon):
+        uf = SI.uf_do_ponto(lat, lon)
+        return cidade_uf(lat, lon, uf) if uf and cidade_uf is not None else None
+    return cidade
 
 
 def _percurso(srv, sel, pedido, coords, nomes_usina, agora) -> dict:
@@ -631,7 +622,7 @@ def _percurso(srv, sel, pedido, coords, nomes_usina, agora) -> dict:
               f"{SI.km_texto(SI.distancia_km(trilha))} em linha reta entre os pontos")
     return {"desenho": desenho if desenho.get("viewbox") else None, "resumo": resumo, "vazio": "",
             "vista": vista if desenho.get("viewbox") else None,
-            "itens": _itens_do_percurso(desenho, trilha, coords, nomes_usina)}
+            "itens": EV.do_percurso(trilha, coords, nomes_usina, cidade=_cidade_do_ponto())}
 
 
 def _programa_do_dia(b, linhas: list, agora) -> dict:
@@ -701,11 +692,7 @@ def _eventos_do_dia(srv, linhas: list, coords: dict, nomes_usina: dict, filtro: 
     meia_noite = datetime.combine(hoje, time(0), tzinfo=_BRT)
     pontos = {l["pid"]: srv.percurso(l["pid"], meia_noite, agora, agora) for l in linhas}
     estados = {l["pid"]: srv.estado_de(l["pid"], agora) for l in linhas}
-    cidade_uf = _cidade_de()
-
-    def cidade(lat, lon):
-        uf = SI.uf_do_ponto(lat, lon)
-        return cidade_uf(lat, lon, uf) if uf and cidade_uf is not None else None
+    cidade = _cidade_do_ponto()
     nome = {l["pid"]: l["nome"] for l in linhas}
     periodo = {"de": datetime.combine(hoje, time(E.JANELA_H[0]), tzinfo=_BRT).strftime(_PERIODO),
                "ate": agora.astimezone(_BRT).strftime(_PERIODO)}

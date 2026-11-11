@@ -1681,10 +1681,17 @@ Pedido do Levi pela sessão Nexus Field (ver a 1ª regra acima). **Ver percurso*
   (`static/campo-equipe.js`, o `.eq-dica`) mostra o nome, a equipe e a situação, lidos dos `data-eq-*` do link, com o
   mouse e com o foco do teclado; o `<title>` do ponto saiu (a dica o substitui; o `aria-label` do link diz o mesmo). A
   lista do painel (Técnico e Rotas) segue abrindo a gaveta.
-- **A lista da gaveta agrupa o resultado que se repete** (Levi, 10/11/2026: "quando o resultado do ponto se repetir
-  gostaria que apenas agrupasse as datas ao invés de vários pontos repetindo 'parado' poderia ter: de 10:28 a 16:38
-  parado"): pontos seguidos com o mesmo resultado (em deslocamento, parado, parado na <usina>) viram uma linha, "de
-  HH:MM a HH:MM <resultado>" (`equipe_tela._itens_do_percurso`).
+- **A lista da gaveta conta o percurso por usina** (Levi, 11/11/2026: "O percurso do técnico deve ser mais generalista
+  por exemplo 'Chegou na UFV X', 'Saiu da Usina X', 'Chegou na UFV X'"; antes, de 10/11, era ponto a ponto agrupado:
+  "de 10:28 a 16:38 parado"). `eventos.do_percurso`, pela MESMA regra dos eventos do dia (a usina é o raio de 1 km, a
+  saída é o último ponto nela, a chegada o 1º ponto na outra): a primeira posição, "Saiu da UFV X, depois de 1 h 30 na
+  usina" (o tempo só quando a chegada está no período), "Chegou na UFV Y, depois de 40 min de deslocamento", cada parada
+  fora de usina no caminho ("Parado em <cidade>", de HH:MM a HH:MM: os pontos parados seguidos, sem régua de tempo
+  mínimo) e, se o período termina andando, "Última posição, em deslocamento". O trecho andando fica implícito. O nome
+  ganha "UFV" na frente quando o do cadastro não diz UFV nem Usina.
+- **O losango da usina cresce com o zoom** (Levi, 11/11/2026: "O quadrado da UFV continua do mesmo tamanho mesmo eu
+  dando zoom"): o `--eq-uz` do `campo-percurso.js` é a raiz quarta do zoom (2x com 16x, 3x com 81x), até 3,2 vezes o
+  tamanho do mapa inteiro. O texto e o ponto do técnico seguem do mesmo tamanho na tela.
 - **A gaveta** traz o resumo (quantos pontos, de quando a quando, a distância em linha reta somada entre os pontos), o
   "Passou por" com os municípios na ordem e o "Fechar o percurso". Período sem ponto: "Nenhum ponto de <nome> neste
   período", e o mapa de sempre.

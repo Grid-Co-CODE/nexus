@@ -88,3 +88,21 @@ def test_a_vista_do_zoom_segue_a_proporcao_do_cartao():
     fx, fy, fw, fh = r["foco"]
     assert fx <= 100 and fx + fw >= 104 and fy <= 100 and fy + fh >= 101 and fw / fh == pytest.approx(2)
     assert r["largo"] == 2400 and r["alto"] == 1000
+
+
+def test_o_losango_da_usina_cresce_com_o_zoom():
+    """Levi, 11/11/2026: "O quadrado da UFV continua do mesmo tamanho mesmo eu dando zoom". O losango cresce com a raiz
+    quarta do zoom (2x com 16x de zoom, 3x com 81x), até 3,2 vezes o tamanho do mapa inteiro: aproximar mostra a usina
+    maior sem ela cobrir a cidade. O script diz o fator ao CSS no --eq-uz."""
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("sem node nesta máquina")
+    js = RAIZ / "static/campo-percurso.js"
+    codigo = ("const m=require(process.argv[1]);"
+              "console.log(JSON.stringify([1,2,16,81,1000,0.5].map(z=>m.crescimentoDaUsina(z))))")
+    r = json.loads(subprocess.run([node, "-e", codigo, str(js)], capture_output=True, text=True, check=True).stdout)
+    assert r[0] == 1 and r[1] == pytest.approx(2 ** 0.25) and r[2] == pytest.approx(2) and r[3] == pytest.approx(3)
+    assert r[4] == 3.2 and r[5] == 1
+    css = (RAIZ / "static/campo.css").read_text(encoding="utf-8")
+    assert "transform:scale(calc(var(--eq-un) * var(--eq-uz,1))) rotate(45deg)" in css
+    assert '"--eq-uz"' in js.read_text(encoding="utf-8")

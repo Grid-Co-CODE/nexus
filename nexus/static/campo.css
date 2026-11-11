@@ -1892,7 +1892,7 @@ tr.rd-linha--ativa td{background:var(--verde-suave)}
    do desenho valem um pixel da tela (Levi, 11/11/2026: "mesmo eu dando um zoom os municípios ficam bem pequenos, tem que
    ser responsivo!": o desenho é mais alto que largo, o cartão é largo, e os 14 px do texto viravam 7). O texto e os
    pontos são escritos em pixels da tela: o --eq-fs é o tamanho do texto; sem o script, vale o 1.4 do mapa inteiro */
-.eq-svg{display:block;width:100%;height:100%;--eq-un:1.4;--eq-fs:clamp(12.5px,calc(10px + .22vw),14px);touch-action:none;cursor:grab;user-select:none;
+.eq-svg{display:block;width:100%;height:100%;--eq-un:1.4;--eq-uz:1;--eq-fs:clamp(12.5px,calc(10px + .22vw),14px);touch-action:none;cursor:grab;user-select:none;
   --eq-terra:color-mix(in srgb,var(--eq-verde) 5%,var(--superficie-2));
   --eq-borda:color-mix(in srgb,var(--eq-verde) 34%,var(--linha-forte));
   /* o anel do técnico escolhido (Levi, 08/11/2026: "o círculo que fica em volta do técnico ser branco, esse verde não
@@ -1906,8 +1906,9 @@ tr.rd-linha--ativa td{background:var(--verde-suave)}
 .eq-svg .eq-u,.eq-svg .eq-perc-p,.eq-svg .eq-foco-anel{transform-box:fill-box;transform-origin:center;
   transform:scale(var(--eq-un))}
 /* a usina é um losango (o quadrado do desenho, de pé): o técnico é o círculo, e a forma os separa quando o clima pinta os
-   dois com as cores do semáforo */
-.eq-svg .eq-u{transform:scale(var(--eq-un)) rotate(45deg)}
+   dois com as cores do semáforo. Ele cresce com o zoom (Levi, 11/11/2026: "O quadrado da UFV continua do mesmo tamanho
+   mesmo eu dando zoom"): o --eq-uz do campo-percurso.js, a raiz quarta do zoom, até 3,2 vezes */
+.eq-svg .eq-u{transform:scale(calc(var(--eq-un) * var(--eq-uz,1))) rotate(45deg)}
 /* a terra e as divisas: a cor vem de variáveis porque o brilho (abaixo) redesenha este mesmo grupo com as dele */
 .eq-ufs path{fill:var(--eq-terra);stroke:var(--eq-borda);stroke-width:var(--eq-borda-l,1px);stroke-linejoin:round;
   vector-effect:non-scaling-stroke}
@@ -2041,7 +2042,9 @@ tr.rd-linha--ativa td{background:var(--verde-suave)}
 .eq-perc-item b{font-weight:600;color:var(--tinta)}
 .eq-perc-quando{color:var(--mudo);white-space:nowrap}
 .eq-perc-item span{color:var(--mudo);overflow-wrap:anywhere}
-.eq-perc-item--mov span{color:var(--tinta-2)}
+/* a chegada e a saída da usina são o que importa no percurso (11/11/2026): a cor do texto; a chegada com o verde */
+.eq-perc-item--chegou span,.eq-perc-item--saiu span{color:var(--tinta)}
+.eq-perc-item--chegou b{color:var(--verde-texto)}
 .eq-perc-form{display:grid;gap:8px;padding-top:12px;border-top:1px solid var(--linha)}
 .eq-perc-form .gc-campo{width:100%;min-width:0}
 .eq-perc-form .gc-btn{justify-content:center}

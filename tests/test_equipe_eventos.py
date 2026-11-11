@@ -169,3 +169,58 @@ def test_a_regua_da_chegada_prevista_e_a_do_motor_do_pcm():
     kmh = float(re.search(r"^TRAVEL_KMH\s*=\s*([\d.]+)", motor, flags=re.M).group(1))
     fator = float(re.search(r"^TRAVEL_FACTOR\s*=\s*([\d.]+)", motor, flags=re.M).group(1))
     assert (EV.VELOCIDADE_KMH, EV.FATOR_ROTA) == (kmh, fator)
+
+
+# ── o percurso contado por usina (11/11/2026) ────────────────────────────────────────────────────────────────────────
+def _percurso(pontos):
+    return [(i["tipo"], i["de"], i["ate"], i["texto"]) for i in EV.do_percurso(pontos, USINAS, NOMES, cidade=_cidade)]
+
+
+def test_o_percurso_conta_o_dia_por_usina_com_a_regra_dos_eventos():
+    """Levi, 11/11/2026: "O percurso do técnico deve ser mais generalista por exemplo 'Chegou na UFV X', 'Saiu da Usina X',
+    'Chegou na UFV X'". A lista do Ver percurso deixa de ser ponto a ponto ("em deslocamento", "parado") e conta o que
+    aconteceu, pela MESMA regra dos eventos do dia: a usina é o raio de 1 km, a saída é o último ponto nela, a chegada o
+    1º ponto na outra. A parada fora de usina no meio do caminho fica (com a cidade, quando há), o trecho andando fica
+    implícito, e a saída diz quanto tempo ficou na usina."""
+    pontos = [_p(6, 40, CASA), _p(6, 50, CASA), _p(7, 0, ESTRADA, mov=True), _p(7, 30, NA_A),
+              _p(9, 0, NA_A), _p(9, 10, ESTRADA, mov=True), _p(9, 20, ESTRADA), _p(9, 25, ESTRADA),
+              _p(9, 30, ESTRADA, mov=True), _p(10, 5, NA_B)]
+    assert _percurso(pontos) == [
+        ("inicio", "06:40", "06:40", "Primeira posição, em Cidade Um Teste"),
+        ("saiu", "06:50", "06:50", "Saiu de Cidade Um Teste"),
+        ("chegou", "07:30", "07:30", "Chegou na Usina Alfa Teste, depois de 40 min de deslocamento"),
+        ("saiu", "09:00", "09:00", "Saiu da Usina Alfa Teste, depois de 1 h 30 na usina"),
+        ("parado", "09:20", "09:25", "Parado fora de usina"),
+        ("chegou", "10:05", "10:05", "Chegou na Usina Bravo Teste, depois de 1 h 05 de deslocamento"),
+    ]
+
+
+def test_o_percurso_chama_de_ufv_a_usina_sem_ufv_no_nome_e_fecha_no_ultimo_ponto():
+    """O nome do cadastro em geral não diz "UFV" ("Altair", "Ipixuna 1 e 2"): o texto diz "Chegou na UFV Altair". O
+    nome que já diz UFV ou Usina fica como está. Começar na usina é "Primeira posição, na UFV X"; o período que termina
+    andando fecha com a última posição; a parada fora de usina diz a cidade."""
+    nomes = {"7": "Altair Teste", "8": "UFV Bravo Teste"}
+    pontos = [_p(8, 0, NA_A), _p(8, 30, NA_A), _p(8, 40, ESTRADA, mov=True), _p(9, 0, CASA), _p(9, 5, CASA),
+              _p(9, 10, ESTRADA, mov=True), _p(10, 0, NA_B), _p(10, 30, NA_B), _p(10, 40, ESTRADA, mov=True)]
+    itens = [(i["tipo"], i["de"], i["ate"], i["texto"])
+             for i in EV.do_percurso(pontos, USINAS, nomes, cidade=_cidade)]
+    assert itens == [
+        ("inicio", "08:00", "08:00", "Primeira posição, na UFV Altair Teste"),
+        ("saiu", "08:30", "08:30", "Saiu da UFV Altair Teste"),
+        ("parado", "09:00", "09:05", "Parado em Cidade Um Teste"),
+        ("chegou", "10:00", "10:00", "Chegou na UFV Bravo Teste, depois de 1 h 30 de deslocamento"),
+        ("saiu", "10:30", "10:30", "Saiu da UFV Bravo Teste, depois de 30 min na usina"),
+        ("ultimo", "10:40", "10:40", "Última posição, em deslocamento"),
+    ]
+    # cada linha só com tipo, horas, texto e a usina: nenhuma coordenada
+    assert all(set(i) == {"tipo", "de", "ate", "texto", "usina_id"} for i in EV.do_percurso(pontos, USINAS, nomes))
+
+
+def test_o_percurso_de_mais_de_um_dia_leva_a_data_e_sem_ponto_e_vazio():
+    pontos = [_p(8, 0, NA_A), {**_p(8, 0, NA_B), "instante": "2026-11-11T12:00:00Z"}]
+    itens = EV.do_percurso(pontos, USINAS, NOMES)
+    # quem sai já no 1º ponto não ganha a "Primeira posição" no mesmo minuto: a saída diz de onde ele partiu
+    assert [(i["de"], i["texto"]) for i in itens] == [
+        ("10/11 08:00", "Saiu da Usina Alfa Teste"),
+        ("11/11 09:00", "Chegou na Usina Bravo Teste, depois de 25 h 00 de deslocamento")]
+    assert EV.do_percurso([], USINAS, NOMES) == []

@@ -603,11 +603,12 @@ def test_ver_percurso_desenha_o_periodo_na_ordem_com_a_hora_e_registra(cliente, 
     assert all(f'data-eq-zoom="{z}"' in html for z in ("mais", "menos", "percurso", "inteiro"))
     assert "campo-percurso.js" in html
     lado = html.split('class="eq-lado"', 1)[1]
-    # a lista agrupa o resultado que se repete (Levi, 10/11/2026: "apenas agrupasse as datas ao invés de vários pontos
-    # repetindo 'parado' poderia ter: de 10:28 a 16:38 parado"): andando às 9h, parado às 10h, andando das 11:00 às 11:59
-    itens = re.findall(r'<li class="eq-perc-item[^"]*">(.*?)</li>', lado, flags=re.S)
-    assert [re.sub(r"<[^>]+>", "", i).strip() for i in itens] == [
-        "09:00 em deslocamento", "10:00 parado", "de 11:00 a 11:59 em deslocamento"]
+    # a lista conta o percurso por usina (Levi, 11/11/2026: "deve ser mais generalista por exemplo 'Chegou na UFV X',
+    # 'Saiu da Usina X'"; `eventos.do_percurso`): andando às 9h, parado fora de usina às 10h, andando até as 11:59
+    itens = re.findall(r'<li class="eq-perc-item eq-perc-item--(\w+)">(.*?)</li>', lado, flags=re.S)
+    assert [(t, re.sub(r"\s+", " ", re.sub(r"<[^>]+>", "", i)).strip()) for t, i in itens] == [
+        ("inicio", "09:00 Primeira posição, em deslocamento"), ("parado", "10:00 Parado fora de usina"),
+        ("ultimo", "11:59 Última posição, em deslocamento")]
     assert "4 pontos" in lado and "Fechar o percurso" in lado
     assert not [d for d in (*DIGITOS, *DIGITOS_MANHA) if d in html]
     (a,) = _acessos(manha)

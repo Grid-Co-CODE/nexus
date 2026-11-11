@@ -41,6 +41,11 @@
     if (w / h > prop) h = w / prop; else w = h * prop;
     return limitar([(caixa[0] + caixa[2]) / 2 - w / 2, (caixa[1] + caixa[3]) / 2 - h / 2, w, h], base, minimo, prop);
   }
+  function crescimentoDaUsina(zoom) {
+    // o losango da usina cresce com o zoom (Levi, 11/11/2026: "O quadrado da UFV continua do mesmo tamanho mesmo eu
+    // dando zoom"): a raiz quarta do zoom (2x com 16x, 3x com 81x), entre 1 e 3,2 vezes o tamanho do mapa inteiro
+    return Math.min(3.2, Math.max(1, Math.pow(zoom, 0.25)));
+  }
   function nivelDa(larguraKm, niveis) {
     // 0 = o mapa inteiro; o nível i vale quando a vista tem até niveis[i-1] km de largura
     var n = 0;
@@ -49,7 +54,7 @@
   }
   if (typeof module !== "undefined" && module.exports) {      // as contas, para o teste no node
     module.exports = { limitar: limitar, zoomEm: zoomEm, enquadrar: enquadrar, nivelDa: nivelDa,
-                       larguraInteira: larguraInteira };
+                       larguraInteira: larguraInteira, crescimentoDaUsina: crescimentoDaUsina };
     return;
   }
 
@@ -92,6 +97,7 @@
       if (brilho) brilho.setAttribute("viewBox", texto);
       // quantas unidades do desenho valem um pixel da tela: o texto e os pontos são escritos em pixels dela
       s.style.setProperty("--eq-un", (vb[2] / largura).toFixed(5));
+      s.style.setProperty("--eq-uz", crescimentoDaUsina(larguraInteira(base, prop) / vb[2]).toFixed(3));
       var n = nivelDa(vb[2] * km, niveis);
       if (n !== nivel) {
         nivel = n;
