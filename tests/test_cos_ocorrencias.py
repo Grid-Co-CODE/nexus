@@ -228,3 +228,81 @@ def test_a_tela_com_o_andamento_fora_do_ar(ligada, logado, monkeypatch):
     _servir(monkeypatch, {})
     html = logado.get("/t/cos/ocorrencias").get_data(as_text=True)
     assert "O Andamento não tem este cliente" in html and CHAVE not in html
+
+
+# --- o que aconteceu, todos os clientes e o CSV (11/11/2026, pedido da Ana Barros) --------------------------------------
+# "ajustarmos a visão da aba de ocorrências pra ficar similar a de normalizações (com possibilidade de exportação) … não
+# consigo exportar ou ver de bate pronto qq rolou". O Andamento manda o texto com o corte da API das normalizações; aqui
+# ele vira a linha curta, o "o que aconteceu" aberto no clique e as colunas do CSV.
+
+def _com_texto(registro="r1", **mudar):
+    texto = dict(descricao="UFV: Usina Exemplo Um | Proteção: 27 | Ação: Religamento Remoto | Falha: Usina desligada",
+               acao="Religamento Remoto", notas=["Trip 27 no relé", "Religada remotamente"],
+               causa={"codigo": "OSCILACAO_REDE_CONCESSIONARIA", "rotulo": "Oscilação na rede da concessionária"},
+               informe="Religamento remoto", os_fracttal={"status": 2, "concluida_pct": 40})
+    texto.update(mudar)
+    return _oc(registro, **texto)
+
+
+def test_o_que_aconteceu_e_o_status_da_os():
+    o = _com_texto()
+    assert OC.o_que_aconteceu(o) == "Oscilação na rede da concessionária · Religamento Remoto · Religamento remoto"
+    assert OC.status_da_os(o) == "Em verificação"
+    assert OC.status_da_os(_oc(os_fracttal=None)) == "Fechada"                   # fora do espelho das abertas
+    assert OC.status_da_os(_oc(os=None)) == ""
+    # Andamento antigo, sem os campos novos: tudo vazio, e a tela segue como era
+    assert OC.o_que_aconteceu(_oc()) == ""
+
+
+def test_todos_os_clientes_junta_as_leituras_com_o_envio_de_cada_um():
+    a = AND.Leitura("Cliente A", _dados([_oc("r1", registrada_em="2026-10-22T09:10:00-03:00")]))
+    b = AND.Leitura("Cliente B", _dados([_oc("r2", registrada_em="2026-10-22T11:00:00-03:00")], cliente="Cliente B",
+                                        envio_ao_cliente={"grupos": "nenhum", "desde": None}))
+    p = OC.painel([a, b], AGORA)
+    assert [x.o["registro"] for x in p.itens] == ["r2", "r1"]                    # a registrada mais recente primeiro
+    assert [x.cliente for x in p.itens] == ["Cliente B", "Cliente A"]
+    # o Cliente B não recebe envio: o aviso dele não se mede; o do A, sim (o envio de cada cliente)
+    assert p.itens[0].etapas["informado"].estado != p.itens[1].etapas["informado"].estado
+    # a leitura que falhou fica de fora, e as outras seguem
+    assert [x.o["registro"] for x in OC.painel([a, AND.Leitura("Cliente C", None, erro="fora")], AGORA).itens] == ["r1"]
+
+
+def test_o_csv_leva_o_cliente_as_etapas_e_o_que_aconteceu():
+    p = OC.painel(AND.Leitura("Cliente A", _dados([_com_texto()])), AGORA)
+    [linha] = OC.csv_linhas(p)
+    col = dict(zip(OC.CSV_COLUNAS, linha))
+    assert col["Cliente"] == "Cliente A" and col["OS"] == "90001" and col["Aberta"] == "não"
+    assert col["Início"] == "22/10/2026 09:00" and col["Normalizada"] == "22/10/2026 09:18"
+    assert col["Causa"] == "Oscilação na rede da concessionária" and col["Ação"] == "Religamento Remoto"
+    assert col["Status no Fracttal"] == "Em verificação" and col["% concluída"] == 40
+    assert col["Notas"] == "Trip 27 no relé | Religada remotamente"
+    assert len(linha) == len(OC.CSV_COLUNAS)
+
+
+def test_a_tela_de_todos_os_clientes_mostra_o_que_aconteceu_e_exporta(ligada, logado, monkeypatch):
+    _servir(monkeypatch, {
+        "/api/nexus/Cliente%20A/ocorrencias?dias=7": _dados([_com_texto("r1")]),
+        "/api/nexus/Cliente%20B/ocorrencias?dias=7": _dados([_oc("r2", usina="Usina Exemplo Dois", aberta=True,
+                                                                   estado="EM_CAMPO", estado_rotulo="Técnico acionado",
+                                                                   normalizada=None)], cliente="Cliente B"),
+    })
+    monkeypatch.setattr(AND, "agora", lambda: AGORA)
+    html = logado.get("/t/cos/ocorrencias?cliente=todos").get_data(as_text=True)
+    assert 'aria-current="page">Todos os clientes<' in html
+    assert "Usina Exemplo Um" in html and "Usina Exemplo Dois" in html and "Cliente B" in html
+    assert "Oscilação na rede da concessionária · Religamento Remoto" in html and "Trip 27 no relé" in html
+    assert "(Em verificação)" in html and "formato=csv" in html
+    r = logado.get("/t/cos/ocorrencias?cliente=todos&formato=csv")
+    assert r.status_code == 200 and r.mimetype == "text/csv"
+    assert 'filename="ocorrencias-todos-7d.csv"' in r.headers["Content-Disposition"]
+    texto = r.get_data(as_text=True)
+    assert texto.startswith("﻿Cliente;OS;") and "Cliente B" in texto and "Trip 27 no relé | Religada" in texto
+    # a situação filtra o CSV como filtra a tela
+    so_abertas = logado.get("/t/cos/ocorrencias?cliente=todos&situacao=abertas&formato=csv").get_data(as_text=True)
+    assert "Usina Exemplo Dois" in so_abertas and "Usina Exemplo Um" not in so_abertas
+
+
+def test_a_formula_no_texto_sai_neutralizada_no_csv(ligada, logado, monkeypatch):
+    _servir(monkeypatch, {"/api/nexus/Cliente%20A/ocorrencias?dias=7": _dados([_com_texto(notas=["=HYPERLINK(1)"])])})
+    texto = logado.get("/t/cos/ocorrencias?cliente=Cliente%20A&formato=csv").get_data(as_text=True)
+    assert "'=HYPERLINK(1)" in texto

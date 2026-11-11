@@ -35,6 +35,8 @@
   {% else %}
   {% if clientes|length > 1 %}
   <nav class="cn-abas" aria-label="Clientes">
+    {# "Todos os clientes" (11/11/2026, pedido da Ana Barros): a visão consolidada, como a das Normalizações. #}
+    <a href="{{ url(cliente='todos', situacao=None) }}"{% if todos %} aria-current="page"{% endif %}>Todos os clientes</a>
     {% for c in clientes %}<a href="{{ url(cliente=c, situacao=None) }}"{% if c == cliente %} aria-current="page"{% endif %}>{{ c }}</a>{% endfor %}
   </nav>
   {% endif %}
@@ -47,6 +49,8 @@
     <div class="cn-seg" aria-label="Período">
       {% for d in dias_opcoes %}<a href="{{ url(dias=d) }}"{% if d == dias %} aria-current="page"{% endif %}>{{ 'Último dia' if d == 1 else 'Últimos ' ~ d ~ ' dias' }}</a>{% endfor %}
     </div>
+    {# A lista com os filtros de agora, em CSV (11/11/2026), como a tela Normalizações. #}
+    <a class="cn-link" href="{{ url(formato='csv') }}" download>Exportar CSV</a>
   </div>
 
   <div class="cn-numeros">
@@ -70,9 +74,15 @@
     <tbody>
     {% for x in p.itens %}
       <tr>
-        <td class="cos-esq cos-usina"><b>{{ usina_link(x.o.usina_codigo, x.usina) }}</b>{% if x.equipamentos %}<span class="det">{{ x.equipamentos }}</span>{% endif %}
+        <td class="cos-esq cos-usina">{% if todos and x.cliente %}<span class="det">{{ x.cliente }}</span>{% endif %}<b>{{ usina_link(x.o.usina_codigo, x.usina) }}</b>{% if x.equipamentos %}<span class="det">{{ x.equipamentos }}</span>{% endif %}
           <div class="cos-oc-pe">{% if x.severidade %}<span class="cn-pill cn-{{ x.severidade_tom }}">{{ x.severidade }}</span>{% endif %}
-            <span class="det">{{ x.tipo }} · {{ x.estado }}{% if x.os %} · OS {{ x.os }}{% else %} · sem OS{% endif %}</span></div>
+            <span class="det">{{ x.tipo }} · {{ x.estado }}{% if x.os %} · OS {{ x.os }}{% set st = status_da_os(x.o) %}{% if st %} ({{ st }}){% endif %}{% else %} · sem OS{% endif %}</span></div>
+          {# O que aconteceu (11/11/2026): a linha curta para ler de bate pronto, e o texto inteiro aberto no clique. #}
+          {% set oq = o_que_aconteceu(x.o) %}{% if oq %}<span class="det"><b>{{ oq }}</b></span>{% endif %}
+          {% if x.o.descricao or x.o.notas %}<details class="cos-oq"><summary class="cn-link">o que aconteceu</summary>
+            {% if x.o.descricao %}<p class="det">{{ x.o.descricao }}</p>{% endif %}
+            {% if x.o.notas %}<ul class="det">{% for n in x.o.notas %}<li>{{ n }}</li>{% endfor %}</ul>{% endif %}
+          </details>{% endif %}
           {% if x.link_plataforma %}<a class="cn-link cos-abrir" href="{{ x.link_plataforma }}" target="_blank" rel="noopener">abrir na Ronda COS</a>{% endif %}</td>
         {% for id, nome in etapas %}{% set e = x.etapas[id] %}
         <td class="cos-esq cos-etapa"><span class="{{ 'cn-pill cn-' ~ e.tom if e.tom != 'neutro' else 'cos-neutro' }}">{{ e.rotulo }}</span>{% if e.detalhe %}<span class="det">{{ e.detalhe }}</span>{% endif %}</td>
@@ -88,9 +98,11 @@
   {% endif %}
 </div>
 <script>
-  // Relê a cada minuto; nunca com um campo em uso.
+  // Relê a cada minuto; nunca com um campo em uso, nem com um "o que aconteceu" aberto (11/11/2026: a releitura o
+  // fecharia no meio da leitura).
   setInterval(function () {
     var a = document.activeElement;
+    if (document.querySelector('details.cos-oq[open]')) return;
     if (!a || !/^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName)) location.reload();
   }, 60000);
 </script>

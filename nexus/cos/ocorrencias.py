@@ -11,10 +11,17 @@ O que o Andamento já separou, e esta tela não junta de volta:
   ninguém acionando o campo: fica à parte, em âmbar, e não conta como cumprido nem como perdido.
 """
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from urllib.parse import quote, urlsplit
 
 from . import andamento as AND
+from . import normalizacoes as NO
+
+# "Todos os clientes" (11/11/2026, pedido da Ana Barros: "a visão consolidada"): o valor do `?cliente=` que junta as
+# ocorrências de todos os clientes do Andamento numa tabela só. Nenhum cliente do Andamento se chama assim.
+TODOS = "todos"
+# A ocorrência sem hora de registro vai para o fim da tabela juntada.
+_NUNCA = datetime.min.replace(tzinfo=timezone.utc)
 
 
 @dataclass(frozen=True)
@@ -88,6 +95,8 @@ class Linha:
     os: str
     link_plataforma: str
     etapas: dict = field(default_factory=dict)
+    # O cliente da ocorrência — a coluna que aparece em "Todos os clientes" e no CSV.
+    cliente: str = ""
 
 
 @dataclass
@@ -242,11 +251,12 @@ def _encerrada(o: dict, agora: datetime) -> Etapa:
     return Etapa("aberta", "—")
 
 
-def linha(o: dict, envio: dict, agora: datetime, url_do_andamento: str = "") -> Linha:
+def linha(o: dict, envio: dict, agora: datetime, url_do_andamento: str = "", cliente: str = "") -> Linha:
     origem = AND.instante(o.get(CONTA_DE))
     sev = o.get("severidade") or ""
     return Linha(
         o=o,
+        cliente=cliente,
         usina=o.get("usina") or o.get("usina_codigo") or "",
         equipamentos=", ".join(o.get("equipamentos") or []),
         tipo=o.get("tipo_falha") or "Ocorrência",
@@ -295,22 +305,89 @@ def _na_situacao(x: Linha, situacao: str) -> bool:
 
 def painel(leitura, agora: datetime, situacao: str = "", url_do_andamento: str = "") -> Painel | None:
     """O que a tela mostra: as linhas (filtradas pela situação), as contagens de cada situação (antes do filtro) e o
-    placar das duas etapas com prazo (sobre todas, antes do filtro)."""
-    d = leitura.dados if leitura else None
-    if not d:
+    placar das duas etapas com prazo (sobre todas, antes do filtro).
+
+    `leitura` é a de um cliente ou, desde 11/11/2026, a LISTA das leituras de todos ("Todos os clientes"): cada
+    ocorrência é julgada com o `envio_ao_cliente` do PRÓPRIO cliente (desde quando ele recebe), e a tabela junta todas,
+    da registrada mais recente para a mais antiga. A leitura que falhou fica de fora (o aviso de erro é da tela)."""
+    leituras = list(leitura) if isinstance(leitura, (list, tuple)) else [leitura]
+    validas = [x for x in leituras if x and x.dados]
+    if not validas:
         return None
-    envio = d.get("envio_ao_cliente") or {}
-    todas = [linha(o, envio, agora, url_do_andamento) for o in d.get("ocorrencias") or []]
+    todas = []
+    for lei in validas:
+        d = lei.dados
+        envio = d.get("envio_ao_cliente") or {}
+        cliente = d.get("cliente") or getattr(lei, "cliente", "") or ""
+        todas += [linha(o, envio, agora, url_do_andamento, cliente) for o in d.get("ocorrencias") or []]
+    if len(validas) > 1:
+        todas.sort(key=lambda x: AND.instante(x.o.get("registrada_em")) or _NUNCA, reverse=True)
+    um = validas[0].dados if len(validas) == 1 else None
+    desdes = [t for t in (AND.instante(x.dados.get("desde")) for x in validas) if t]
+    gerados = [t for t in (AND.instante(x.dados.get("gerado_em")) for x in validas) if t]
     return Painel(
         itens=[x for x in todas if _na_situacao(x, situacao)],
         total=len(todas),
         contagem={s: sum(_na_situacao(x, s) for x in todas) for s in SITUACOES},
         resumo={"informado": _resumo(todas, "informado"), "campo": _resumo(todas, "campo")},
-        envio=envio,
-        desde=AND.instante(d.get("desde")),
-        gerado_em=AND.instante(d.get("gerado_em")),
-        truncado=bool(d.get("truncado")),
+        envio=(um.get("envio_ao_cliente") or {}) if um else {},
+        desde=min(desdes) if desdes else None,
+        gerado_em=min(gerados) if gerados else None,
+        truncado=any(bool(x.dados.get("truncado")) for x in validas),
     )
+
+
+# ── O que aconteceu (11/11/2026) ──────────────────────────────────────────────────────────────────────────────────────
+# Pedido da Ana Barros: "ajustarmos a visão da aba de ocorrências pra ficar similar a de normalizações (com
+# possibilidade de exportação) … não consigo exportar ou ver de bate pronto qq rolou". O Andamento manda, por
+# ocorrência, a descrição (sem o planejamento do PCM), a "Ação:" do molde, as notas de pessoa (sem autor nem hora), a
+# causa escolhida pelo COS, o resumo do informe e a OS no espelho do Fracttal — o MESMO corte da API das normalizações.
+# Andamento antigo, sem os campos: tudo vazio, e a tela segue como era.
+
+def status_da_os(o: dict) -> str:
+    """O status da OS no Fracttal, com as palavras da tela Normalizações: "Em processo", "Em verificação" — ou "Fechada"
+    quando a OS não está mais no espelho das abertas. Sem OS, vazio."""
+    if not o.get("os"):
+        return ""
+    f = o.get("os_fracttal")
+    if not f:
+        return "Fechada"
+    return NO.STATUS_OS.get(f.get("status"), (f"status {f.get('status')}", ""))[0]
+
+
+def o_que_aconteceu(o: dict) -> str:
+    """A linha curta do que aconteceu, para ler de bate pronto: a causa, a ação e o resumo do informe, nesta ordem."""
+    causa = (o.get("causa") or {}).get("rotulo") or ""
+    partes = [causa, o.get("acao") or "", o.get("informe") or ""]
+    return " · ".join(p.strip() for p in partes if p and p.strip())
+
+
+CSV_COLUNAS = ("Cliente", "OS", "Usina", "Código da usina", "Equipamentos", "Falha", "Severidade", "Estado", "Aberta",
+               "Início", "Registrada", "Detectada pelo COS", "Cliente informado", "Prazo do aviso", "Campo acionado",
+               "Prazo do campo", "Normalizada", "Encerrada", "Causa", "Ação", "Informe", "Status no Fracttal",
+               "% concluída", "Descrição da ocorrência", "Notas")
+
+
+def csv_linhas(p: Painel) -> list[list]:
+    """As linhas do CSV, na ordem da tabela e com o filtro da tela. A hora sai em Brasília, como na tela."""
+    def h(campo, o):
+        t = AND.instante(o.get(campo))
+        return t.strftime("%d/%m/%Y %H:%M") if t else ""
+
+    linhas = []
+    for x in p.itens:
+        o = x.o
+        f = o.get("os_fracttal") or {}
+        norm = o.get("normalizada") or {}
+        linhas.append([
+            x.cliente, x.os, x.usina, o.get("usina_codigo") or "", x.equipamentos, x.tipo, x.severidade, x.estado,
+            "sim" if o.get("aberta") else "não", h("inicio", o), h("registrada_em", o), h("detectada_em", o),
+            x.etapas["informado"].rotulo, x.etapas["informado"].estado, x.etapas["campo"].rotulo,
+            x.etapas["campo"].estado, h("fim", norm), h("encerrada_em", o), (o.get("causa") or {}).get("rotulo") or "",
+            o.get("acao") or "", o.get("informe") or "", status_da_os(o),
+            f.get("concluida_pct", "") if f else "", o.get("descricao") or "", " | ".join(o.get("notas") or []),
+        ])
+    return linhas
 
 
 def dias_pedidos(v) -> int:
