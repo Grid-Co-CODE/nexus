@@ -41,6 +41,7 @@ from dotenv import dotenv_values
 
 from . import auxiliar as A
 from . import comparar
+from . import fama_motor as FM
 from . import fonte
 from . import historico_banco as HB
 from . import insumos as I
@@ -329,6 +330,17 @@ def _preparar(config, semana: str, pasta: Path, trabalho: Path, origem: Path | N
     return insumos
 
 
+def _fama(config, ler_o_fracttal: bool) -> dict | None:
+    """As OS da FAMA para a rodada (a fase 2, `fama_motor.py`), só com `NEXUS_FAMA_PROGRAMA=1`. Sem a variável, None, e a
+    rodada é a de sempre: nem a leitura do Fracttal antes do motor nem o adaptador rodam."""
+    if not FM.ligado(config):
+        return None
+    try:
+        return FM.entrada(config, ler_o_fracttal)
+    except FM.FamaErro as ex:
+        raise NaoPronto(f"OS da FAMA: {ex}") from ex
+
+
 def iniciar(config, semana: str) -> dict:
     if not SEMANA_RE.match(semana or ""):
         raise ValueError("semana inválida")
@@ -347,6 +359,7 @@ def iniciar(config, semana: str) -> dict:
         origem = pasta_origem(config)
         try:
             insumos = _preparar(config, semana, pasta, trabalho, origem)
+            fama = _fama(config, ler_o_fracttal=True)
         except NaoPronto:
             shutil.rmtree(pasta, ignore_errors=True)
             raise
@@ -356,21 +369,27 @@ def iniciar(config, semana: str) -> dict:
         _gravar(pasta, st)
         saida = pasta / "saida" / "sombra.xlsx"
         t = threading.Thread(target=_executar, name=f"pcm-{rid}", daemon=True,
-                             args=(pasta, st, _ambiente(cred, pasta, saida), caminho_motor(config), origem, saida))
+                             args=(pasta, st, _ambiente(cred, pasta, saida), caminho_motor(config), origem, saida, fama))
         _rodando[chave] = (rid, t)
         t.start()
     return st
 
 
-def _executar(pasta: Path, st: dict, env: dict, motor: Path, origem: Path, saida: Path) -> None:
+def _executar(pasta: Path, st: dict, env: dict, motor: Path, origem: Path, saida: Path, fama: dict | None = None) -> None:
+    """Roda o motor e confere a planilha. `fama` (só com NEXUS_FAMA_PROGRAMA=1, `_fama`): antes do motor, as OS da FAMA
+    no cache do Fracttal da rodada; depois, a planilha volta a dizer FAMA-<id>. Sem ela, a rodada de sempre."""
     t0 = time.monotonic()
     log = pasta / "log_motor.txt"
     try:
         with open(log, "wb") as f:
+            if fama is not None:
+                env = FM.antes_do_motor(pasta, st, env, motor, fama, f, TEMPO_MAX_S)
             r = subprocess.run([sys.executable, str(motor), "--semana", st["semana"]], cwd=str(pasta), env=env,
                                stdout=f, stderr=subprocess.STDOUT, timeout=TEMPO_MAX_S)
         st["codigo"] = r.returncode
         if r.returncode == 0 and saida.exists():
+            if fama is not None:
+                st["fama"]["planilha"] = FM.depois_do_motor(saida)
             # as tarefas tiradas da semana uma a uma (o "sem:"): falhar aqui derruba a rodada, porque publicar a semana
             # com a tarefa que o PCM tirou seria pior que não ter a semana
             st["sem"] = aplicar_sem(pasta / I.OBSERVACOES, saida)
@@ -491,6 +510,7 @@ def gerar_com_foto(config, semana: str, foto: Path | None = None, historico: str
     (pasta / "saida").mkdir(parents=True, exist_ok=False)
     try:
         insumos = _preparar(config, semana, pasta, trabalho, origem, historico)
+        fama = _fama(config, ler_o_fracttal=False)
     except NaoPronto:
         shutil.rmtree(pasta, ignore_errors=True)
         raise
@@ -506,8 +526,11 @@ def gerar_com_foto(config, semana: str, foto: Path | None = None, historico: str
           "foto": {"pasta": str(foto), "arquivos": copiados}}
     _gravar(pasta, st)
     saida = pasta / "saida" / "sombra.xlsx"
-    _executar(pasta, st, _ambiente_foto(pasta, saida), caminho_motor(config), origem, saida)
-    # a prova de que o Fracttal não foi lido: o motor regrava o cache quando lê, e aqui ele saiu como entrou
+    _executar(pasta, st, _ambiente_foto(pasta, saida), caminho_motor(config), origem, saida, fama)
+    # a prova de que o Fracttal não foi lido: o motor regrava o cache quando lê, e aqui ele saiu como entrou (com a FAMA
+    # ligada, como ele entrou no motor: a foto com as OS da FAMA)
+    if (st.get("fama") or {}).get("cache_sha"):
+        copiados[FOTO_OBRIGATORIA]["sha"] = st["fama"]["cache_sha"]
     st["foto"]["intacta"] = all(_sha(pasta / n) == c["sha"] for n, c in copiados.items())
     _gravar(pasta, st)
     return st

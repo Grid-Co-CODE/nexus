@@ -112,6 +112,10 @@ OPCIONAIS = ("NEXUS_CHAVE_CADASTRO", "NEXUS_ARMAZEM_LOCAL",
              # só liga onde vale "1" (uma máquina; as rotas do celular respondem 503 onde ele não roda). Sem estarem
              # aqui, o .env nunca chegava ao app.config (revisão final de 08/11/2026)
              "NEXUS_EQUIPE_MS_CLIENT_ID", "NEXUS_EQUIPE_MS_TENANT_ID", "NEXUS_EQUIPE_GRAVA",
+             # a fase 2 das OS da FAMA (11/11/2026, nexus/pcm/fama_motor.py): "1" põe as OS da FAMA na geração da semana e
+             # tira a preventiva do Fracttal das usinas da FAMA. Vazia (o padrão), a rodada é a de sempre e a FAMA só
+             # aparece no Quadro da semana; ligar só depois de combinar com o App de Campo
+             "NEXUS_FAMA_PROGRAMA",
              # as OS que os clientes abrem na FAMA (11/11/2026): a chave da API (api.fama.energy, cabeçalho
              # X-Contractor-Key), posta pela T.I. no .env do servidor; é de PRESTADORA: só abre /v2/contractor/. A volta
              # de hora em hora da carga de dados lê a lista das OS e grava o nexus_os_fama (nexus/dados/fama.py, fase 1:
