@@ -211,7 +211,9 @@ def ocorrencias():
     situacao = request.args.get("situacao", "")
     if situacao not in OC.SITUACOES:
         situacao = ""
-    p = OC.painel(leituras if todos else leitura, AND.agora(), situacao, fonte.url)
+    # Os filtros da tela Normalizações (11/11/2026): falha, usina, criado por, técnico, status no Fracttal e a lupa.
+    filtros = OC.filtros_pedidos(request.args)
+    p = OC.painel(leituras if todos else leitura, AND.agora(), situacao, fonte.url, filtros)
     if request.args.get("formato") == "csv":
         if not p:
             abort(404)
@@ -220,7 +222,7 @@ def ocorrencias():
         w.writerow(OC.CSV_COLUNAS)
         w.writerows([[_celula_csv(v) for v in linha] for linha in OC.csv_linhas(p)])
         # com o BOM, o Excel abre os acentos certos (o mesmo da tela Normalizações)
-        resp = Response("﻿" + buf.getvalue(), mimetype="text/csv; charset=utf-8")
+        resp = Response(BOM + buf.getvalue(), mimetype="text/csv; charset=utf-8")
         nome = "todos" if todos else "".join(ch if ch.isalnum() else "-" for ch in cliente).strip("-").lower()
         resp.headers["Content-Disposition"] = f'attachment; filename="ocorrencias-{nome}-{dias}d.csv"'
         resp.headers["Cache-Control"] = "private, no-store"
@@ -230,7 +232,7 @@ def ocorrencias():
         cliente=OC.TODOS if todos else cliente, todos=todos, leitura=leitura, p=p, dias=dias,
         dias_opcoes=AND.DIAS_DAS_OCORRENCIAS, situacao=situacao, situacoes=OC.SITUACOES, etapas=OC.ETAPAS,
         prazos=OC.PRAZOS, lido=_lido(leituras), url=_url, o_que_aconteceu=OC.o_que_aconteceu,
-        status_da_os=OC.status_da_os)
+        status_da_os=OC.status_da_os, filtros=filtros, status_filtro=OC.STATUS_FILTRO)
 
 
 @bp.route("/religamentos")
@@ -387,6 +389,11 @@ def os_abertas():
 
 
 # ── Normalizações (27/10/2026) ────────────────────────────────────────────────────────────────────────────────────────
+# O BOM do UTF-8 na frente do CSV: com ele, o Excel abre os acentos certos (escrito pelo código, e não como o caractere
+# invisível no meio do texto, que um editor pode perder sem ninguém ver).
+BOM = "\ufeff"
+
+
 def _celula_csv(v):
     """O texto que o Excel leria como fórmula (=, +, -, @ no começo) vai com um apóstrofo na frente."""
     t = "" if v is None else str(v)

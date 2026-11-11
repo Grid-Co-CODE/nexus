@@ -221,7 +221,9 @@ def test_a_tela_mostra_o_ciclo_o_placar_e_o_link(ligada, logado, monkeypatch):
     assert "50%" in html                                                         # 1 de 2 avisadas a tempo
     assert 'aria-current="page">Cliente A<' in html and CHAVE not in html
     fora = logado.get("/t/cos/ocorrencias?situacao=fora").get_data(as_text=True)
-    assert "Usina Exemplo Dois" in fora and "Usina Exemplo Um" not in fora
+    # na TABELA: desde 11/11/2026 as usinas do período também aparecem como opção do filtro "Usina"
+    tabela = fora.split("<table>", 1)[1]
+    assert "Usina Exemplo Dois" in tabela and "Usina Exemplo Um" not in tabela
 
 
 def test_a_tela_com_o_andamento_fora_do_ar(ligada, logado, monkeypatch):
@@ -306,3 +308,55 @@ def test_a_formula_no_texto_sai_neutralizada_no_csv(ligada, logado, monkeypatch)
     _servir(monkeypatch, {"/api/nexus/Cliente%20A/ocorrencias?dias=7": _dados([_com_texto(notas=["=HYPERLINK(1)"])])})
     texto = logado.get("/t/cos/ocorrencias?cliente=Cliente%20A&formato=csv").get_data(as_text=True)
     assert "'=HYPERLINK(1)" in texto
+
+
+# --- os filtros da tela Normalizações (11/11/2026, pedido da Ana Barros) ---------------------------------------------
+# "os filtros que existem em Normalizações, tipo de falha, cliente, usina, criado por, tecnico, status fracttal, lupa de
+# pesquisa". Os mesmos nomes no endereço; o cliente é a aba. Os dois nomes vêm da Ronda COS (f860dc3).
+
+def _variadas():
+    return [
+        _com_texto("r1", os_aberta_por="Operadora Um", tecnico="Tecnico Um"),
+        _oc("r2", usina="Usina Exemplo Dois", tipo_falha="Falha de comunicação", os="90002", os_fracttal=None,
+            os_aberta_por="Operadora Dois", tecnico="Tecnico Dois", aberta=True, normalizada=None,
+            notas=["Roteador reiniciado"]),
+        _oc("r3", usina="Usina Exemplo Dois", os=None, os_aberta_por=None, tecnico=None),
+    ]
+
+
+def test_os_filtros_recortam_e_as_opcoes_contam_o_periodo_inteiro():
+    lt = AND.Leitura("Cliente A", _dados(_variadas()))
+    def ids(**f):
+        return [x.o["registro"] for x in OC.painel(lt, AGORA, filtros=f).itens]
+    assert ids() == ["r1", "r2", "r3"]
+    assert ids(falha="Falha de comunicação") == ["r2"]
+    assert ids(usina="Usina Exemplo Dois") == ["r2", "r3"]
+    assert ids(criado_por="Operadora Um") == ["r1"] and ids(tecnico="Tecnico Dois") == ["r2"]
+    assert ids(status="verificacao") == ["r1"] and ids(status="fechada") == ["r2"] and ids(status="sem_os") == ["r3"]
+    assert ids(q="roteador") == ["r2"] and ids(q="90002") == ["r2"] and ids(q="oscilação") == ["r1"]
+    assert ids(status="inventado") == ["r1", "r2", "r3"]                         # fora das opções: sem filtro
+    p = OC.painel(lt, AGORA, filtros={"usina": "Usina Exemplo Dois"})
+    # as opções não encolhem com o filtro; o placar e os números contam o recorte
+    assert p.opcoes["usina"] == {"Usina Exemplo Dois": 2, "Usina Exemplo Um": 1}
+    assert p.opcoes["criado_por"] == {"Operadora Dois": 1, "Operadora Um": 1}
+    assert p.opcoes["status"] == {"processo": 0, "verificacao": 1, "fechada": 1, "sem_os": 1}
+    assert p.total == 2 and p.contagem["abertas"] == 1
+
+
+def test_o_csv_leva_quem_abriu_a_os_e_o_tecnico():
+    p = OC.painel(AND.Leitura("Cliente A", _dados(_variadas())), AGORA, filtros={"tecnico": "Tecnico Um"})
+    [linha] = OC.csv_linhas(p)
+    col = dict(zip(OC.CSV_COLUNAS, linha))
+    assert col["Aberta por (operador)"] == "Operadora Um" and col["Técnico"] == "Tecnico Um"
+
+
+def test_a_tela_tem_os_filtros_e_o_csv_segue_os_filtros(ligada, logado, monkeypatch):
+    _servir(monkeypatch, {"/api/nexus/Cliente%20A/ocorrencias?dias=7": _dados(_variadas())})
+    monkeypatch.setattr(AND, "agora", lambda: AGORA)
+    html = logado.get("/t/cos/ocorrencias?cliente=Cliente%20A&criado_por=Operadora%20Dois").get_data(as_text=True)
+    for rotulo in ("Tipo de falha", "Usina", "Criado por", "Técnico", "Status Fracttal", "Limpar os filtros"):
+        assert rotulo in html
+    assert '<option value="Operadora Dois" selected>' in html
+    assert "Usina Exemplo Dois" in html and "OS 90001" not in html
+    csv_ = logado.get("/t/cos/ocorrencias?cliente=Cliente%20A&criado_por=Operadora%20Dois&formato=csv").get_data(as_text=True)
+    assert "Operadora Dois" in csv_ and "Operadora Um" not in csv_

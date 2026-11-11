@@ -10,6 +10,7 @@ O que o Andamento já separou, e esta tela não junta de volta:
 - a entrada automática em "Técnico acionado" (o escalonamento da Ronda COS quando a tratativa remota passa do tempo) não é
   ninguém acionando o campo: fica à parte, em âmbar, e não conta como cumprido nem como perdido.
 """
+from collections import Counter
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from urllib.parse import quote, urlsplit
@@ -109,6 +110,8 @@ class Painel:
     desde: datetime | None
     gerado_em: datetime | None
     truncado: bool
+    # As opções de cada filtro, com quantas ocorrências cada uma tem no período (11/11/2026, ver `FILTROS`).
+    opcoes: dict = field(default_factory=dict)
 
 
 def duracao(minutos: float) -> str:
@@ -303,13 +306,18 @@ def _na_situacao(x: Linha, situacao: str) -> bool:
     return True
 
 
-def painel(leitura, agora: datetime, situacao: str = "", url_do_andamento: str = "") -> Painel | None:
-    """O que a tela mostra: as linhas (filtradas pela situação), as contagens de cada situação (antes do filtro) e o
-    placar das duas etapas com prazo (sobre todas, antes do filtro).
+def painel(leitura, agora: datetime, situacao: str = "", url_do_andamento: str = "",
+           filtros: dict | None = None) -> Painel | None:
+    """O que a tela mostra: as linhas (filtradas pela situação), as contagens de cada situação (antes do filtro de
+    situação) e o placar das duas etapas com prazo.
 
     `leitura` é a de um cliente ou, desde 11/11/2026, a LISTA das leituras de todos ("Todos os clientes"): cada
     ocorrência é julgada com o `envio_ao_cliente` do PRÓPRIO cliente (desde quando ele recebe), e a tabela junta todas,
-    da registrada mais recente para a mais antiga. A leitura que falhou fica de fora (o aviso de erro é da tela)."""
+    da registrada mais recente para a mais antiga. A leitura que falhou fica de fora (o aviso de erro é da tela).
+
+    `filtros` (11/11/2026, os da tela Normalizações — ver `FILTROS`): recortam ANTES de tudo, e o placar, os números e as
+    situações contam o recorte, como a faixa das Normalizações conta a lista filtrada. As opções de cada filtro contam o
+    período inteiro, antes dos filtros (um contador que encolhe ao filtrar não diz mais quanto existe)."""
     leituras = list(leitura) if isinstance(leitura, (list, tuple)) else [leitura]
     validas = [x for x in leituras if x and x.dados]
     if not validas:
@@ -325,16 +333,90 @@ def painel(leitura, agora: datetime, situacao: str = "", url_do_andamento: str =
     um = validas[0].dados if len(validas) == 1 else None
     desdes = [t for t in (AND.instante(x.dados.get("desde")) for x in validas) if t]
     gerados = [t for t in (AND.instante(x.dados.get("gerado_em")) for x in validas) if t]
+    f = filtros_pedidos(filtros or {})
+    recorte = [x for x in todas if _no_filtro(x, f)]
     return Painel(
-        itens=[x for x in todas if _na_situacao(x, situacao)],
-        total=len(todas),
-        contagem={s: sum(_na_situacao(x, s) for x in todas) for s in SITUACOES},
-        resumo={"informado": _resumo(todas, "informado"), "campo": _resumo(todas, "campo")},
+        itens=[x for x in recorte if _na_situacao(x, situacao)],
+        total=len(recorte),
+        contagem={s: sum(_na_situacao(x, s) for x in recorte) for s in SITUACOES},
+        resumo={"informado": _resumo(recorte, "informado"), "campo": _resumo(recorte, "campo")},
         envio=(um.get("envio_ao_cliente") or {}) if um else {},
         desde=min(desdes) if desdes else None,
         gerado_em=min(gerados) if gerados else None,
         truncado=any(bool(x.dados.get("truncado")) for x in validas),
+        opcoes=_opcoes(todas),
     )
+
+
+# ── Os filtros (11/11/2026) ───────────────────────────────────────────────────────────────────────────────────────────
+# Pedido da Ana Barros: "os filtros que existem em Normalizações, tipo de falha, cliente, usina, criado por, tecnico,
+# status fracttal, lupa de pesquisa". Os MESMOS nomes de parâmetro da tela Normalizações (`falha`, `usina`,
+# `criado_por`, `tecnico`, `status`, `q`), para o endereço de uma valer na outra. O cliente é a aba de cima ("Todos os
+# clientes" ou um). "Criado por" e "Técnico" são os dois nomes que a Ronda COS manda (os da API das normalizações).
+FILTROS = ("falha", "usina", "criado_por", "tecnico", "status", "q")
+STATUS_FILTRO = {**NO.STATUS_FILTRO, "sem_os": "Sem OS"}
+BUSCA_MAX = NO.BUSCA_MAX
+
+
+def filtros_pedidos(args) -> dict:
+    """Os filtros válidos de um pedido (`request.args` ou um dict): o status fora das opções e a busca longa demais não
+    passam — o mesmo trato da tela Normalizações."""
+    f = {k: " ".join(str(args.get(k) or "").split()) for k in FILTROS}
+    if f["status"] not in STATUS_FILTRO:
+        f["status"] = ""
+    f["q"] = f["q"][:BUSCA_MAX]
+    return f
+
+
+def status_filtro(o: dict) -> str:
+    """A chave do status da OS para o filtro: processo, verificacao, fechada (fora do espelho das abertas) ou sem_os."""
+    if not o.get("os"):
+        return "sem_os"
+    f = o.get("os_fracttal")
+    if not f:
+        return "fechada"
+    return {1: "processo", 2: "verificacao"}.get(f.get("status"), "")
+
+
+def alvo_da_busca(x: Linha) -> str:
+    """O texto em que a lupa procura: a OS, o cliente, a usina, a falha, os equipamentos, os dois nomes, o que
+    aconteceu (causa, ação, informe, descrição, notas) e o status — como a busca da tela Normalizações."""
+    o = x.o
+    return " ".join([x.os, x.cliente, x.usina, o.get("usina_codigo") or "", x.tipo, x.equipamentos,
+                     o.get("os_aberta_por") or "", o.get("tecnico") or "", (o.get("causa") or {}).get("rotulo") or "",
+                     o.get("acao") or "", o.get("informe") or "", status_da_os(o), o.get("descricao") or "",
+                     *(o.get("notas") or [])]).lower()
+
+
+def _no_filtro(x: Linha, f: dict) -> bool:
+    o = x.o
+    if f["falha"] and x.tipo != f["falha"]:
+        return False
+    if f["usina"] and x.usina != f["usina"]:
+        return False
+    if f["criado_por"] and (o.get("os_aberta_por") or "") != f["criado_por"]:
+        return False
+    if f["tecnico"] and (o.get("tecnico") or "") != f["tecnico"]:
+        return False
+    if f["status"] and status_filtro(o) != f["status"]:
+        return False
+    q = f["q"].lower()
+    if q and not (q.isdigit() and x.os == q) and q not in alvo_da_busca(x):
+        return False
+    return True
+
+
+def _opcoes(todas: list) -> dict:
+    """As opções de cada filtro, com a contagem do período inteiro (antes dos filtros)."""
+    def conta(valores):
+        return dict(sorted(Counter(v for v in valores if v).items()))
+    return {
+        "falha": dict(Counter(x.tipo for x in todas).most_common()),
+        "usina": conta(x.usina for x in todas),
+        "criado_por": conta(x.o.get("os_aberta_por") for x in todas),
+        "tecnico": conta(x.o.get("tecnico") for x in todas),
+        "status": {k: sum(1 for x in todas if status_filtro(x.o) == k) for k in STATUS_FILTRO},
+    }
 
 
 # ── O que aconteceu (11/11/2026) ──────────────────────────────────────────────────────────────────────────────────────
@@ -364,8 +446,8 @@ def o_que_aconteceu(o: dict) -> str:
 
 CSV_COLUNAS = ("Cliente", "OS", "Usina", "Código da usina", "Equipamentos", "Falha", "Severidade", "Estado", "Aberta",
                "Início", "Registrada", "Detectada pelo COS", "Cliente informado", "Prazo do aviso", "Campo acionado",
-               "Prazo do campo", "Normalizada", "Encerrada", "Causa", "Ação", "Informe", "Status no Fracttal",
-               "% concluída", "Descrição da ocorrência", "Notas")
+               "Prazo do campo", "Normalizada", "Encerrada", "Causa", "Ação", "Informe", "Aberta por (operador)",
+               "Técnico", "Status no Fracttal", "% concluída", "Descrição da ocorrência", "Notas")
 
 
 def csv_linhas(p: Painel) -> list[list]:
@@ -384,8 +466,9 @@ def csv_linhas(p: Painel) -> list[list]:
             "sim" if o.get("aberta") else "não", h("inicio", o), h("registrada_em", o), h("detectada_em", o),
             x.etapas["informado"].rotulo, x.etapas["informado"].estado, x.etapas["campo"].rotulo,
             x.etapas["campo"].estado, h("fim", norm), h("encerrada_em", o), (o.get("causa") or {}).get("rotulo") or "",
-            o.get("acao") or "", o.get("informe") or "", status_da_os(o),
-            f.get("concluida_pct", "") if f else "", o.get("descricao") or "", " | ".join(o.get("notas") or []),
+            o.get("acao") or "", o.get("informe") or "", o.get("os_aberta_por") or "", o.get("tecnico") or "",
+            status_da_os(o), f.get("concluida_pct", "") if f else "", o.get("descricao") or "",
+            " | ".join(o.get("notas") or []),
         ])
     return linhas
 
