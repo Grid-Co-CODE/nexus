@@ -184,6 +184,55 @@ def ler(forcar: bool = False) -> dict:
     return _CACHE["livro"]
 
 
+def copia() -> dict | None:
+    """Só a cópia guardada, sem esperar o banco (o sininho de toda página): velha, relê por trás; sem cópia (o Nexus
+    acabou de subir), começa a leitura por trás e devolve None, e a página abre sem o número. Nos testes, lê na hora."""
+    if current_app.config.get("TESTING"):
+        return ler()
+    g = _CACHE.get("livro")
+    if not g or time.time() - g["lido_em"] >= TTL_S:
+        from ..auth import setor_telas as ST
+        app = current_app._get_current_object()
+
+        def reler():
+            with app.app_context():
+                ler(forcar=True)
+        ST._em_fundo("demandas", reler)
+    return g
+
+
+def avisos_do_sino(meu_hmac: str, meu_setor: int | None, hoje: date | None = None) -> list[dict]:
+    """Os avisos do sininho (demandas_regras.avisos) pela cópia: a situação de cada demanda sai dos ids e dos passos, em
+    claro; só as que viram aviso são decifradas (o título e quem pediu)."""
+    lido = copia()
+    if not lido or not (meu_hmac or meu_setor is not None):
+        return []
+    hoje = hoje or datetime.now(_BRT).date()
+    eventos: dict[str, list[dict]] = {}
+    for e in lido["eventos"]:
+        eventos.setdefault(_txt(e.get("demanda_id")), []).append(e)
+    base, por = [], {}
+    for l in lido["demandas"]:
+        did = _txt(l.get("demanda_id"))
+        if not ID_DEMANDA.fullmatch(did):
+            continue
+        d = {"demanda_id": did, "para_hmac": _txt(l.get("para_hmac")).lower(), "de_hmac": _txt(l.get("de_hmac")).lower(),
+             "para_setor_id": _int(l.get("para_setor_id")),
+             "estado": R.estado(l, eventos.get(did, []), _int(l.get("prazo_dias_uteis")) or 0, hoje)}
+        base.append(d)
+        por[did] = l
+    av = R.avisos(base, (meu_hmac or "").lower(), meu_setor, hoje)
+    try:
+        cofre = _cofre()
+    except Recusada:
+        cofre = None
+    for a in av:
+        dados = _decifrar(cofre, ABA_DEMANDA, por[a["demanda_id"]])
+        a.update(titulo_curto=_txt(dados.get("titulo")), de_nome=_txt(dados.get("de_nome")),
+                 para_nome=_txt(dados.get("para_nome")))
+    return av
+
+
 # ── os temas do setor ────────────────────────────────────────────────────────────────────────────────────────────────
 def _temas_de(linhas: list[dict], cofre) -> dict[str, dict]:
     """{tema_id: a última versão}, com o nome decifrado."""

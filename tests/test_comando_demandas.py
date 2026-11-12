@@ -388,3 +388,32 @@ def test_os_temas_do_setor_cada_setor_mexe_nos_seus(app, cena):
     # quem não tem setor vê o aviso, sem o formulário
     html = _cliente(app, SEM).get("/t/comando/temas-do-setor").get_data(as_text=True)
     assert "ainda não tem setor no Nexus" in html and "temas-do-setor/salvar" not in html
+
+
+# ── o sininho ────────────────────────────────────────────────────────────────────────────────────────────────────────
+def _sino(html):
+    return html.split('class="sino-topo sino-dem"', 1)[1].split("</details>", 1)[0]
+
+
+def test_o_sininho_avisa_quem_recebe_quem_pediu_e_o_setor_na_vencida(app, cena):
+    from datetime import timedelta
+    did = _abrir_pela_api(app, cena)
+    s = _sino(_cliente(app, JU).get(CAIXA).get_data(as_text=True))
+    assert 'class="sino-n sino-n--dem">1<' in s and ">Nova</span> Coração 2 sem meta" in s and "de Ana Souza" in s
+    assert f"/t/comando/caixa-de-entrada?dem=para&amp;d={did}#demandas" in s
+    # o colega do setor só é avisado na vencida; quem não tem nada a ver, nada
+    assert "Nenhuma demanda pede você agora." in _sino(_cliente(app, BRUNO).get(CAIXA).get_data(as_text=True))
+    with app.test_request_context():
+        depois = date.today() + timedelta(days=10)
+        av = D.avisos_do_sino(_h(BRUNO["email"]), 1, hoje=depois)
+        assert [(a["tipo"], a["para_nome"]) for a in av] == [("vencida", "Juliana Prado")]
+        assert D.avisos_do_sino(_h(SEM["email"]), None, hoje=depois) == []
+        D.registrar(did, "respondeu", "Ligado.", JU)
+    D.limpar()
+    s = _sino(_cliente(app, ANA).get(CAIXA).get_data(as_text=True))
+    assert ">Respondida</span> Coração 2 sem meta" in s and "para Juliana Prado" in s and "dem=pedi" in s
+    # o administrador pela senha (sem pessoa) não tem o sininho das demandas
+    c = app.test_client()
+    with c.session_transaction() as ss:
+        ss.update(logado=True, admin=True)
+    assert "sino-dem" not in c.get(CAIXA).get_data(as_text=True)

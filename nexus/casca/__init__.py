@@ -502,6 +502,41 @@ def _sino():
         return None
 
 
+_DEM_ROTULO = {"vencida": "Vencida", "vence_hoje": "Vence hoje", "devolvida": "Devolvida", "nova": "Nova",
+               "informacao": "Pediram informação", "respondida": "Respondida"}
+
+
+def _sino_demandas():
+    """O sininho das demandas entre setores (12/11/2026; nexus/comando/demandas.py): para quem recebeu, a nova, o prazo
+    apertando (faltam 2 dias, falta 1, vence hoje), a vencida e a devolvida; para o setor de quem recebeu, a vencida (Levi,
+    12/11: "quem recebeu + todo o setor"); para quem pediu, a respondida (o ok ou a devolução) e o pedido de informação.
+    Só da cópia do livro: nenhuma página espera o banco por causa dele. O administrador pela senha (sem pessoa) não tem."""
+    if not session.get("logado") or session.get("via") == "cliente" or setor_telas.em_modo_cliente():
+        return None
+    try:
+        from ..comando import demandas as D
+        from ..torres.comando import _meu_hmac
+        from ..torres.comando.demandas_tela import _meu_setor
+        if D.faltam_chaves():
+            return None
+        meu, setor = _meu_hmac(), _meu_setor()
+        if not meu:
+            return None
+        itens = []
+        for a in D.avisos_do_sino(meu, (setor or {}).get("id")):
+            aba = "para" if a["para_mim"] else ("pedi" if a["pedi"] else "setor")
+            rot = _DEM_ROTULO.get(a["tipo"]) or ("Falta 1 dia" if a["dias_restantes"] == 1 else
+                                                 f"Faltam {a['dias_restantes']} dias")
+            quem = (f"para {a['para_nome']}" if (a["pedi"] or not a["para_mim"]) and a["para_nome"]
+                    else f"de {a['de_nome']}" if a["de_nome"] else "")
+            itens.append({"link": f"/t/comando/caixa-de-entrada?dem={aba}&d={a['demanda_id']}#demandas", "rotulo": rot,
+                          "tom": a["tom"], "titulo": a["titulo_curto"] or "Demanda", "detalhe": quem})
+        return {"n": len(itens), "criticos": sum(1 for i in itens if i["tom"] == "critico"), "itens": itens[:8]}
+    except Exception:            # noqa: BLE001 — o sininho nunca derruba uma página
+        current_app.logger.exception("sininho das demandas")
+        return None
+
+
 def _avisos_do_sino() -> list:
     """Os avisos não lidos das OS da pessoa (04/11/2026, `comando/avisos.py`): "OS x concluída pelo técnico" e "Sua
     solicitação gerou uma OS". A falha aqui não tira o resto do sino."""
@@ -568,6 +603,8 @@ def instalar_contexto(app) -> None:
             "raiz": raiz(),
             # o sino dos insights (03/11/2026), só das cópias: ver `_sino`
             "sino": _sino(),
+            # o sininho das demandas entre setores (12/11/2026), ao lado: ver `_sino_demandas`
+            "sino_dem": _sino_demandas(),
             # o Modo cliente do administrador (07/11/2026): o cliente que ele está vendo, e o código dos formulários
             # (`cliente_modo`, não `modo_cliente`: a Visão do cliente passa o seu próprio `modo_cliente`, que venceria)
             "cliente_modo": session.get("modo_cliente") if setor_telas.em_modo_cliente() else None,

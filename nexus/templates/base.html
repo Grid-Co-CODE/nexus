@@ -54,6 +54,18 @@
      de mil e escondiam o resto; ficam na Caixa. O botão leva o ícone do OS Creator do menu lateral, e não o sino (Levi,
      04/11/2026: "quero que troque esse símbolo de sino pelo símbolo do OS Creator"). Ícone da fonte (sem <svg> no topo,
      ver o comentário do tema) #}
+  {# o sininho das demandas entre setores (12/11/2026; casca._sino_demandas): o que pede você nas demandas, com o prazo;
+     leva direto à demanda na Caixa de entrada. Ícone de bandeja, ao lado do botão do OS Creator (a prévia aprovada) #}
+  {% if sino_dem is not none %}<details class="sino-topo sino-dem">
+    <summary class="gc-btn gc-btn--ui gc-btn--fantasma sino-bt" aria-label="Demandas: {{ sino_dem.n }}" title="Demandas: o que outros setores pediram para você e o que você pediu">
+      <i class="ph ph-tray" aria-hidden="true"></i>{% if sino_dem.n %}<b class="sino-n sino-n--dem{% if sino_dem.criticos %} sino-n--critico{% endif %}">{{ sino_dem.n }}</b>{% endif %}</summary>
+    <div class="sino-caixa" role="region" aria-label="Demandas">
+      {% if sino_dem.n %}<p class="sino-t"><b>{{ sino_dem.n }} {{ 'demanda pede você' if sino_dem.n == 1 else 'demandas pedem você' }}</b></p>
+      <ul>{% for a in sino_dem.itens %}<li><a href="{{ raiz }}{{ a.link }}"><span class="sino-sev sino-sev--{{ a.tom }}">{{ a.rotulo }}</span> {{ a.titulo }}{% if a.detalhe %}<small class="sino-aviso-d">{{ a.detalhe }}</small>{% endif %}</a></li>{% endfor %}</ul>
+      {% else %}<p class="sino-vazio">Nenhuma demanda pede você agora.</p>{% endif %}
+      <a class="gc-btn gc-btn--ui gc-btn--contorno sino-todos" href="{{ raiz }}/t/comando/caixa-de-entrada#demandas">Abrir as demandas</a>
+    </div>
+  </details>{% endif %}
   {% if sino is not none %}<details class="sino-topo">
     <summary class="gc-btn gc-btn--ui gc-btn--fantasma sino-bt" aria-label="Avisos: {{ sino.n }}" title="Avisos das suas OS, menções e pedidos para o seu setor">
       <i class="ph ph-{{ sino.icone_os or 'clipboard-text' }}" aria-hidden="true"></i>{% if sino.n %}<b class="sino-n{% if sino.criticos %} sino-n--critico{% endif %}">{{ sino.n }}</b>{% endif %}</summary>
