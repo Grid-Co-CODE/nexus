@@ -54,6 +54,8 @@ ESCURO_DE_SEMPRE = {
     "--erro-a42": "rgba(255,122,122,.42)", "--erro-a55": "rgba(255,122,122,.55)", "--info": "#7fb8ff",
     "--info-suave": "rgba(91,157,255,.14)", "--info-a10": "rgba(127,184,255,.10)",
     "--info-a42": "rgba(127,184,255,.42)", "--semcom": "#b39dff", "--semcom-suave": "rgba(179,157,255,.14)",
+    # Coletas > Furos (11/11/2026): as categorias do relatório de furos, tokens novos (nenhum valor antigo mudou)
+    "--anomalo": "#f472b6", "--esperado": "#2dd4bf", "--critico-escuro": "#8a1c2a",
     "--ok-cheio": "#4ade80", "--lima-cheio": "#a8e05f", "--alerta-cheio": "#ffd83d", "--severo-cheio": "#ff8f3c",
     "--critico-cheio": "#ff5b6e", "--info-cheio": "#7fb8ff", "--sobre-cheio": "#0b1220", "--serie-sujidade": "#7fb8ff",
     "--serie-vegetacao": "#a3d900", "--serie-nasa": "#c3cad7", "--serie-etm": "#6ec1e4", "--mapa-mar": "#0d1526",

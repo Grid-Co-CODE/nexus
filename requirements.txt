@@ -17,3 +17,6 @@ pillow==12.2.0
 reportlab==5.0.0
 # a assinatura do técnico na APR feita no App, lida do PDF que ele anexa na OS (nexus/campo/pt_fracttal.py, 26/10/2026)
 pypdf==6.14.2
+# o .xls BIFF do relatório NeoWind da Cascavel (Sunpower) na tela Coletas (nexus/performance/coletas, 11/11/2026): o motor
+# do Conversor o importa só ao ler um .xls; sem ele, só esse formato dá erro no cartão
+xlrd==2.0.1

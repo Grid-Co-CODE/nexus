@@ -1903,6 +1903,15 @@ CONHECIDAS = (
               "os dados mensais das usinas do BD_Performance, ainda sem fato no catálogo"),
     Conhecida("bd_performance", ("Ibirapuã I - Backup", "Falhas", "Trackers", "PVSyst", "Acumulado Anual"), "apoio",
               "abas ocultas da planilha (cópia de segurança, falhas antigas, PVSyst, acumulado)"),
+    # o mapa de fórmulas dos BDs (11/11/2026, a tela Coletas da Performance; Levi: "Aceito também sua recomendação"): o
+    # bd_performance e o bd_thopen sobem só valores (27/08/2026), e o Conversor não pode escrever por cima de fórmula.
+    # Registrado ANTES de existir; quem grava é a coleta, na mesma subida do BD (nexus/performance/coletas/CLAUDE.md)
+    Conhecida("bd_formulas", ("formulas_bd_performance", "abas_bd_performance", "formulas_bd_thopen", "abas_bd_thopen"),
+              "apoio",
+              "o mapa de fórmulas do BD_Performance e do BD_Thopen, que a coleta sobe junto com cada BD (o banco recebe "
+              "só valores): formulas_<bd> = 1 linha por célula que é fórmula no Excel (aba, linha do Excel, coluna "
+              "1-based, cabeçalho, o texto da fórmula, subida_em); abas_<bd> = 1 linha por aba do Excel naquela subida "
+              "(as abas renomeadas ficam velhas no banco). A tela Coletas só usa o BD do banco com o mapa da mesma subida"),
     Conhecida("os_creator", ("temas", "plataforma", "chamados_obs"), "apoio",
               "a configuração do OS Creator (temas, plataforma, observações dos chamados)"),
     Conhecida("thopen_acessos", ("senhas",), "apoio",
