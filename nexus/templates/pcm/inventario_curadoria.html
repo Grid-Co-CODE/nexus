@@ -23,7 +23,9 @@
    novas, mostra o cartão de hoje. O endereço da
    foto leva a versão do arquivo (`?v=`): a foto refeita com a mesma chave não fica na cópia de 1 h do navegador. Os três dados
    NÃO vão ao Fracttal pela API (31/10/2026: o `description` do `item_insert` não foi provado): o cadastrar lembra de completá-
-   los na tela do Fracttal, junto do grupo, da criticidade e da Curva ABC, e a peça já cadastrada lembra em "Já decididas". #}
+   los na tela do Fracttal, junto do grupo, da criticidade e da Curva ABC, e a peça já cadastrada lembra em "Já decididas".
+   A sigla sugerida (11/11/2026, o PCM: "sugerir o código baseado nas famílias já criadas") vem escolhida no select do
+   cadastrar, com as peças parecidas do catálogo do App; o PCM pode trocar. #}
 {% set falta_a_foto = 'foto ainda não chegou' if app_com_fotos else 'o App ainda não envia as fotos' %}
 <div class="pg alm inv cu">
 <p class="gc-eyebrow">PCM · Almoxarifado</p>
@@ -32,7 +34,11 @@
     está no catálogo, nas contagens que ainda não foram gravadas. Decidir não grava no estoque: a quantidade entra no lote da contagem (as unidades achadas somam ao contado da peça, e o
     total substitui o saldo no Fracttal quando você gravar). Cadastrar cria a peça no Fracttal agora, com o seu login.</p>
 <p><b>Grupo, criticidade e Curva ABC da peça nova</b> não se gravam pela API: complete na tela de Peças e
-  Suprimentos do Fracttal depois de cadastrar.</p>{% endcall %}</div>
+  Suprimentos do Fracttal depois de cadastrar.</p>
+<p><b>A sigla sugerida.</b> O Nexus compara o nome que o técnico escreveu com o catálogo do App: as peças com palavras em comum
+  são as parecidas, e a palavra rara pesa mais que a comum. As 5 mais parecidas votam na sigla do código delas (a de código
+  antigo, na sigla mais comum da Família dela). Sem peça parecida, nada é sugerido. O código continua sendo o próximo livre da
+  sigla que você escolher.</p>{% endcall %}</div>
 {# as partes do almoxarifado: a fila das abas, com as quatro do inventário juntas (pcm/_almox_abas.html) #}
 {% set aba_inventario = 'curadoria' %}
 {% include "pcm/_almox_abas.html" %}
@@ -127,13 +133,19 @@
       </form></details>
     {% elif not x.av_repetido %}<p class="alm-det">Sem o código da peça boa não há o -AV para cadastrar: diga qual é a peça ou descarte.</p>{% endif %}
     {% else %}
-    <details class="cu-op"><summary>Cadastrar peça nova no Fracttal</summary>
+    {# a sigla sugerida (11/11/2026): pelo nome que o técnico escreveu, contra o catálogo do App (`curadoria.sugerir`). Vem escolhida
+       e marcada "sugerida", e o PCM troca; a reserva de uma tentativa anterior vale mais (os mesmos dados, senão o servidor recusa) #}
+    {% set sug = x.sugestao.sigla if x.sugestao else '' %}
+    <details class="cu-op"><summary>Cadastrar peça nova no Fracttal{% if sug %} · sigla sugerida {{ sug }}{% endif %}</summary>
       <form method="post" action="{{ raiz }}/os/_nexus/inventario/curadoria/cadastrar" data-ponte class="cu-form">
         <input type="hidden" name="contagem" value="{{ x.contagem_id }}"><input type="hidden" name="linha" value="{{ x.chave_linha }}">
         <label class="gc-rotulo" for="cu-sigla-{{ n }}">Sigla do código</label>
-        <select class="gc-campo" id="cu-sigla-{{ n }}" name="sigla">
-          {% for s in siglas_de(x.id_almox) %}<option value="{{ s }}"{% if x.reserva and x.reserva.sigla == s %} selected{% endif %}>{{ s }}</option>{% endfor %}
+        <select class="gc-campo" id="cu-sigla-{{ n }}" name="sigla"{% if sug %} aria-describedby="cu-sug-{{ n }}"{% endif %}>
+          {% for s in siglas_de(x.id_almox) %}<option value="{{ s }}"{% if (x.reserva and x.reserva.sigla == s) or (not x.reserva and sug == s) %} selected{% endif %}>{{ s }}{% if sug == s %} (sugerida){% endif %}</option>{% endfor %}
         </select>
+        {% if sug %}<p class="alm-det cu-sugestao" id="cu-sug-{{ n }}">Sugerida {{ 'pelas peças parecidas do catálogo' if x.sugestao.por == 'parecidas' else 'pela Família ' ~ x.sugestao.familia ~ ', a das peças parecidas' }}. Troque se a peça for de outra família.</p>{% endif %}
+        {% if x.sugestao and x.sugestao.parecidas %}<p class="alm-det">As mais parecidas no catálogo: {% for q in x.sugestao.parecidas %}<span class="alm-cod">{{ q.codigo }}</span> {{ q.nome }}{% if not loop.last %} · {% endif %}{% endfor %}</p>
+        {% elif x.sugestao %}<p class="alm-det">Nenhuma peça parecida no catálogo: escolha a sigla.</p>{% endif %}
         <label class="gc-rotulo" for="cu-nome-{{ n }}">Nome da peça</label>
         <input class="gc-campo" id="cu-nome-{{ n }}" name="nome" maxlength="120" required value="{{ x.reserva.nome if x.reserva and x.reserva.nome else x.descricao }}">
         <label class="gc-rotulo" for="cu-un-{{ n }}">Unidade</label>

@@ -1330,6 +1330,21 @@ branco não é pendência, nem a avariada sem o ID E sem o Código da peça boa 
 - **O código:** `SP-<sigla>-NNN`, o número seguinte ao maior que existe (`Estoque.codigos` traz as peças DESATIVADAS também: a lista
   de Peças e Suprimentos do Fracttal as mostra com "Não" em "Habilitado", então o código de peça desativada não é reaproveitado;
   `-AV` no fim não tira o número). As siglas são as 12 do catálogo; `TST` só no almoxarifado de teste (`ids_de_teste`).
+- **A sigla sugerida (11/11/2026, item 1 da 2ª rodada; o PCM: "Curadoria: sugerir o código baseado nas famílias já
+  criadas"):** no achado fora do catálogo, o select do cadastrar vem com a sigla sugerida escolhida e marcada "(sugerida)", com
+  as 3 peças mais parecidas do catálogo (código e nome) como contexto; o PCM troca, e o código continua saindo do
+  `proximo_codigo` com a sigla que ele mandar (a sugestão não grava nada). A conta (`curadoria.sugerir`, sobre o `indice` do
+  catálogo do App, o `_catalogo()` com a Família; nunca planilha de fora): as palavras do nome que o técnico escreveu
+  (`palavras`: sem acento nem caixa, a palavra inteira e os pedaços da que mistura letra e número, sem a de ligação nem o
+  caractere solto) contra as de cada peça, pela semelhança de cosseno com o peso da raridade (IDF: a palavra de uma peça só pesa
+  o máximo, a de todas não pesa); a avariada fica de fora (dobraria o voto da boa). As 5 mais parecidas (semelhança de ao menos
+  `PARECIDA_MIN`, 0,1) votam, cada uma com o quanto se parece, na sigla do código dela; a de código antigo, sem a sigla, vota na
+  sigla mais comum da Família dela no catálogo ("pela Família X"). **Por que o voto pesa:** pela contagem simples, "Conector
+  MC4 fêmea" iria para a sigla das duas peças de aterramento que só dividem o "conector" (2 a 1). Só vale a sigla do
+  almoxarifado (`siglas`: a `TST` só no de teste). Sem parecida ou sem voto, nada é sugerido ("Nenhuma peça parecida no
+  catálogo"). A reserva de uma tentativa anterior vale mais que a sugestão (os mesmos dados, senão 409), e quem só olha não vê
+  a sugestão (sai do que o técnico escreveu). Prova: `test_a_sigla_mais_comum_das_parecidas` e seguintes de
+  `tests/test_pcm_inventario_curadoria.py`, com um catálogo de mentira.
 - **O destino da peça** ("é a peça X", "confirmar") tem de existir no catálogo do App (ou ter sido cadastrado por aqui: a varredura
   diária ainda não o viu); a tela aceita o CÓDIGO (o PCM conhece o código, não o ID) e converte. Sem o catálogo inteiro, não decide.
 - **O motivo** (texto livre) só cifrado, em `dados={"motivo": ...}` (o Cofre do cadastro; a API do banco é aberta); descartar o exige.
