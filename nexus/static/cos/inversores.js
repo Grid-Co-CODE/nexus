@@ -70,6 +70,9 @@
   }
   function pedir(caminho, deNovo) {
     if (!API) { return Promise.reject({ fora: true }); }
+    // CFG.pelaPorta (12/11/2026, o Nexus): quem lê a Ronda COS é o servidor do Nexus, pela chave do Andamento
+    // (`/t/cos/monitoramento/ronda-api/...`, a sessão do Nexus na mesma origem); sem login da Ronda COS
+    if (CFG.pelaPorta) { return pedirPelaPorta(caminho); }
     var s = sessao();
     // CFG.semLogin (só o protótipo): o outro PC pede sem o próprio login, e o repassador do notebook completa
     if (!s.accessToken && !CFG.semLogin) { return Promise.reject({ login: true }); }
@@ -82,6 +85,21 @@
       if (!r.ok) { throw { erro: "a Ronda COS respondeu " + r.status }; }
       return r.json();
     }, function (e) { clearTimeout(prazo); throw { erro: e && e.name === "AbortError" ? "a Ronda COS não respondeu em 15 s" : "sem rede" }; });
+  }
+
+  function pedirPelaPorta(caminho) {
+    var ctl = window.AbortController ? new AbortController() : null, prazo = ctl ? setTimeout(function () { ctl.abort(); }, 15000) : 0;
+    return fetch(API + caminho, { credentials: "same-origin", headers: { Accept: "application/json" },
+      signal: ctl ? ctl.signal : undefined }).then(function (r) {
+      clearTimeout(prazo);
+      // a sessão do Nexus que venceu volta como a página de entrar (HTML), e não JSON
+      var tipo = r.headers.get("content-type") || "";
+      if (r.status === 401 || r.status === 403 || (r.ok && tipo.indexOf("json") < 0)) { throw { login: true }; }
+      if (!r.ok) {
+        return r.json().catch(function () { return {}; }).then(function (d) { throw { erro: d.error || ("o Nexus respondeu " + r.status) }; });
+      }
+      return r.json();
+    }, function (e) { clearTimeout(prazo); throw { erro: e && e.name === "AbortError" ? "a leitura não respondeu em 15 s" : "sem rede" }; });
   }
 
   // ── tempo e números (conta, não Intl, no que roda a cada 3 s) ────────────────────────────────────────────────────
@@ -349,6 +367,7 @@
     if (document.getElementById("cos-inv-nota")) { return; }
     var n = document.createElement("div"); n.id = "cos-inv-nota"; n.className = "cos-inv-nota";
     if (e && e.fora) { n.textContent = "O ao vivo dos inversores está desligado: falta o endereço da API da Ronda COS (NEXUS_COS_API_URL)."; }
+    else if (CFG.pelaPorta) { n.textContent = "A sessão do Nexus venceu: recarregue a página para entrar de novo e voltar ao tempo real."; }
     else {
       n.appendChild(document.createTextNode(CFG.semLogin
         ? "Para o tempo real, alguém precisa entrar uma vez no Console no notebook do protótipo (ou aqui, no "
@@ -560,6 +579,7 @@
     }).catch(function (e) {
       if (!aberta || aberta.getAttribute("data-gid") !== gid) { return; }
       if (e && e.fora) { aviso("Os inversores ao vivo precisam do endereço da API da Ronda COS (NEXUS_COS_API_URL), que este Nexus ainda não tem."); }
+      else if (e && e.login && CFG.pelaPorta) { aviso("A sessão do Nexus venceu: recarregue a página e clique na usina de novo."); }
       else if (e && e.login) { aviso("Falta o login da Ronda COS neste navegador: entre uma vez no Console (no desenho final o login vem do Nexus) e clique na usina de novo."); }
       else { aviso("Não deu para ler os inversores: " + ((e && e.erro) || e) + "."); }
     });

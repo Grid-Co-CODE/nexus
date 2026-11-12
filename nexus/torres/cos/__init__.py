@@ -15,6 +15,7 @@ mesma rota (ela vence a genérica), por exemplo:
 import csv
 import io
 import logging
+import re
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from urllib.parse import urlencode
@@ -666,6 +667,35 @@ def _inversores_abertos(cfg) -> dict:
     return MO.abertas_de_inversor([x.dados for x in (AND.ler(cfg, c) for c in lista) if x.dados])
 
 
+# Os inversores ao vivo pelo servidor do Nexus (12/11/2026): a janela dos inversores (static/cos/inversores.js) pede os
+# mesmos caminhos que pediria à API da Ronda COS, e daqui saem só estes dois, lidos do Andamento com a chave de máquina.
+# Debaixo de /t/cos/monitoramento/: o portão de setores dá a quem vê o Monitoramento (auth/setor_telas.py).
+_CURVA_DOS_INVERSORES = re.compile(r"scada/curva/([A-Za-z0-9_-]{1,40}(?:,[A-Za-z0-9_-]{1,40}){0,7})")
+_DIA = re.compile(r"\d{4}-\d{2}-\d{2}")
+
+
+@bp.route("/monitoramento/ronda-api/<path:caminho>")
+def monitoramento_ronda_api(caminho):
+    """Os inversores ao vivo: `scada/monitoramento` (os cartões do SCADA com os inversores, 2 s de cópia) e
+    `scada/curva/<loggers>?dia=` (a curva com a série de cada inversor, 60 s). O resto, 404. Só lê."""
+    cfg = current_app.config
+    if caminho == "scada/monitoramento":
+        dados, erro = AND.ler_ao_vivo(cfg, "/api/nexus/geracao/scada", AND.TTL_AO_VIVO_S)
+    elif m := _CURVA_DOS_INVERSORES.fullmatch(caminho):
+        dia = request.args.get("dia", "")
+        if dia and not _DIA.fullmatch(dia):
+            abort(400)
+        q = urlencode({"ids": m.group(1), **({"dia": dia} if dia else {})})
+        dados, erro = AND.ler_ao_vivo(cfg, f"/api/nexus/geracao/scada-curva?{q}", AND.TTL_CURVA_INVERSORES_S)
+    else:
+        abort(404)
+    resp = jsonify(dados) if dados is not None else jsonify(error=erro or "a leitura ao vivo falhou")
+    if dados is None:
+        resp.status_code = 503
+    resp.headers["Cache-Control"] = "private, no-store"
+    return resp
+
+
 def _url_da_pagina(**mudar) -> str:
     """O `_url` sem o `parcial`: o corpo pedido pelo JavaScript leva os links da página, e não o do pedaço."""
     return _url(parcial=None, **mudar)
@@ -701,7 +731,10 @@ def monitoramento():
                # 12/11/2026, os inversores de cada usina ao clicar no cartão (cos/_inversores.html): o navegador lê a API
                # da Ronda COS direto, com o login da pessoa. Sem o endereço (NEXUS_COS_API_URL), a janela não entra e o
                # cartão não é botão. As ocorrências abertas de inversor só se leem quando a janela entra.
-               cos_api=AND.api_da_ronda(cfg), cos_console=_console_da_ronda(fonte),
+               # o ao vivo pelo servidor do Nexus (a rota abaixo), sem login da Ronda COS; com NEXUS_COS_API_URL, o
+               # navegador lê a API direto, com o login da pessoa
+               cos_api=AND.api_da_ronda(cfg) or (na_raiz("/t/cos/monitoramento/ronda-api") if fonte.ligada else ""),
+               cos_pela_porta=fonte.ligada and not AND.api_da_ronda(cfg), cos_console=_console_da_ronda(fonte),
                cos_inversores_abertos=lambda: _inversores_abertos(cfg) if fonte.ligada else {})
     corpo = "cos/_monitoramento_tv_corpo.html" if tv else "cos/_monitoramento_corpo.html"
     if a.get("parcial") == "1":

@@ -445,10 +445,7 @@ Ignora esse monitoramento que já existe no nexus" (a Performance › Tempo real
   e a curva do dia), agrupado por cliente, e em cima a **"Atenção agora"** (a mesma conta do videowall, `MO.parede`, agora
   também na tela normal). Clicar no cartão abre a janela dos inversores (`cos/_inversores.html`,
   `static/cos/inversores.js`): a curva da usina e a de cada inversor, o estado de cada um ao vivo de 3 em 3 s, e "aberto
-  no COS" no inversor com ocorrência (`MO.abertas_de_inversor`). **Quem lê é o navegador, direto na API da Ronda COS**,
-  com o login da pessoa (`NEXUS_COS_API_URL`, `AND.api_da_ronda`). Sem o endereço (hoje), a janela não entra e o cartão
-  não é botão: a tela fica com o que o Andamento manda, de 30 em 30 s. Para ligar falta, na Ronda COS, o CORS para o
-  endereço do Nexus e o login pelo passe.
+  no COS" no inversor com ocorrência (`MO.abertas_de_inversor`). **Quem lê, desde 12/11/2026 à tarde, é o SERVIDOR do Nexus** (o dono: "o monitoramento do nexus ainda não ta igual do prototipo, corrija"): a janela pede `/t/cos/monitoramento/ronda-api/scada/monitoramento` e `.../scada/curva/<loggers>?dia=`, os mesmos caminhos da API da Ronda COS, e a rota `monitoramento_ronda_api` lê o Andamento (`/api/nexus/geracao/scada` e `/scada-curva`, a chave de máquina) com `AND.ler_ao_vivo`: 2 s de cópia para o ao vivo (60 s para a curva) e um pedido só por leitura no ar, então dez pessoas com a janela aberta são uma leitura a cada 2 s. Sem login da Ronda COS; o portão de setores dá a rota a quem vê o Monitoramento (ela mora debaixo dele). Com `NEXUS_COS_API_URL`, o navegador volta a ler a API direto, com o login da pessoa.
 - **As usinas da assistida da Thopen** (o dono, 12/11/2026: "é THOPEN - Operação Assistida"; "atualizar somente o
   monitoramento. Ela não entra em nenhum outro lugar"): as 4 usinas com logger que a Ronda COS manda sem cliente (sem
   usina no cadastro dela) vão para o grupo "Thopen - Operação Assistida" (`MO.CLIENTE_SEM_CADASTRO`, pelo id do cartão).
