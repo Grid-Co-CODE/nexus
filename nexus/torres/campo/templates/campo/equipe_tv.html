@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="pt-BR" class="eqtv-html" data-nexus data-tema="{{ tema }}">
+<head>
+  <meta charset="utf-8">
+  <script>
+    // O Nexus nunca fica dentro de moldura (o mesmo guarda do base.html): o vídeo wall também não.
+    try { if (window.top !== window.self) window.top.location.href = location.href; } catch (e) {}
+    {% include "_entrar_de_novo_js.html" %}
+  </script>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ tela.nome }} · vídeo wall · Grid Co.</title>
+  {% include "_icone.html" %}
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Raleway:wght@700;800&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css">
+  <link rel="stylesheet" href="{{ url_for('static', filename='nexus.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
+  <script>{% include "_tema_cabeca.html" %}{% include "_raiz_js.html" %}</script>
+  {# a tela se relê sozinha a cada 2 minutos (Levi, 12/11/2026, a escolha dele): sem JavaScript, por este refresh; com ele,
+     pelo campo-videowall.js, que antes confere se o Nexus responde. Cada releitura é um acesso no registro da LGPD #}
+  <noscript><meta http-equiv="refresh" content="{{ recarrega_s }}"></noscript>
+</head>
+{# O vídeo wall do Mapa de equipe (Levi, 12/11/2026: "Prepare um modo vídeo wall que apareça informações como no anexo 1 do
+   lado esquerdo do mapa!"; o anexo é o mockup "COS · Ocorrências abertas · Usinas com problema agora"). Sem a casca do
+   Nexus (sem menu e sem topo), como o modo TV do Mapa de risco: à esquerda as ocorrências abertas da Ronda COS por grupo
+   (`campo/equipe/parede.py`, a mesma fotografia que pinta as usinas), à direita o mapa de verdade. As letras seguem a
+   altura da tela (o mesmo desenho em 1920 x 1080 e em 3840 x 2160). A rota é a do mapa: o mesmo portão, quem vê é o
+   mesmo, e cada abertura vai ao registro da LGPD. #}
+<body class="eqtv-pagina">
+<div class="eqtv" data-eq-tv data-recarrega-s="{{ recarrega_s }}" data-saude="{{ url_for('casca.saude') }}">
+  <header class="eqtv-cab">
+    <div class="eqtv-titulo">
+      <p class="gc-eyebrow">Nexus · {{ torre.nome }}</p>
+      <h1>{{ tela.nome }}</h1>
+    </div>
+    <p class="eqtv-estado" role="status" hidden></p>
+    <div class="eqtv-relogio" aria-label="Hora de agora">
+      <time class="eqtv-hora">{{ hora }}</time>
+      <span class="eqtv-data">{{ data }}</span>
+      {% if prazo %}<span class="eqtv-prazo">sessão de {{ prazo.nome }} até {{ prazo.ate }}</span>{% endif %}
+    </div>
+    <a class="gc-btn gc-btn--contorno eqtv-sair" href="{{ url_for('torre_campo.equipe', **q_sair) }}">Sair do vídeo wall</a>
+  </header>
+  <main class="eqtv-meio">
+    <section class="eqtv-cos" aria-label="Ocorrências abertas no COS">
+      <header class="eqtv-cos-cab">
+        <div><p class="gc-eyebrow">COS · Ocorrências abertas</p><h2>Usinas com problema agora</h2></div>
+        {% if p.leitura %}<span class="eqtv-leitura">leitura {{ p.leitura }}</span>{% endif %}
+      </header>
+      {% if not p.ligada %}
+      <p class="eqtv-sem" role="status">Sem a leitura do COS agora (a fonte da Ronda COS não respondeu ou não está ligada neste
+        servidor). O mapa segue com os técnicos, e as usinas ficam sem a cor de agora.</p>
+      {% else %}
+      <div class="eqtv-kpis">
+        {% for k in p.kpis %}<div class="eqtv-kpi{% if k.tom %} eqtv-kpi--{{ k.tom }}{% endif %}{% if not k.n and k.tom %} eqtv-kpi--zero{% endif %}"><span>{{ k.rotulo }}</span><strong>{{ k.n }}</strong></div>{% endfor %}
+      </div>
+      {% set icone = {"parada": "power", "inversor": "lightning-slash", "rede": "plugs", "com": "wifi-slash", "outras": "warning"} %}
+      <div class="eqtv-lista" data-eqtv-rola>
+        <div class="eqtv-trilho">
+          {% for g in p.grupos %}
+          <section class="eqtv-grupo" aria-label="{{ g.nome }}">
+            <h3 class="eqtv-grupo-tit"><i class="ph ph-{{ icone[g.id] }}" aria-hidden="true"></i><span>{{ g.nome }}</span><span class="eqtv-grupo-n">{{ g.cartoes|length }}</span></h3>
+            {% for c in g.cartoes %}
+            <article class="eqtv-card eqtv-card--{{ g.tom }}">
+              <div class="eqtv-card-corpo">
+                <p class="eqtv-card-l1">{% if c.codigo %}<b class="eqtv-cod">{{ c.codigo }}</b>{% endif %}<span class="eqtv-nome">{{ c.nome }}{% if c.mwp %} · {{ c.mwp }}{% endif %}</span></p>
+                <p class="eqtv-card-l2">{{ c.falha }}</p>
+                <p class="eqtv-card-l3">{% if c.nota %}{{ c.nota }} · {% endif %}{{ c.os }}{% if c.mais %} · e mais {{ c.mais }} {{ 'ocorrência' if c.mais == 1 else 'ocorrências' }}{% endif %}</p>
+              </div>
+              <div class="eqtv-card-lado">
+                <span class="eqtv-dur">{{ c.dur }}</span>
+                {% if c.etapa %}<span class="cn-pill cn-{{ c.etapa_tom }}">{{ c.etapa }}</span>{% endif %}
+              </div>
+            </article>
+            {% endfor %}
+          </section>
+          {% else %}
+          <p class="eqtv-vazio">Nenhuma ocorrência aberta na Ronda COS agora.</p>
+          {% endfor %}
+        </div>
+      </div>
+      {% set r = p.rodape %}
+      <footer class="eqtv-ok"><i class="ph ph-check-circle" aria-hidden="true"></i><span>{{ r.sem_ocorrencia }} {{ 'usina sem ocorrência aberta' if r.sem_ocorrencia == 1 else 'usinas sem ocorrência aberta' }} no COS{% if r.sem_leitura %} · {{ r.sem_leitura }} sem leitura do COS{% endif %}</span></footer>
+      {% endif %}
+    </section>
+    <section class="eqtv-mapa" aria-label="O mapa">
+      <div class="eq-quadro eqtv-quadro">
+        {% include "campo/_equipe_mapa_ml.html" %}
+      </div>
+    </section>
+  </main>
+</div>
+<script src="{{ url_for('static', filename='campo-videowall.js') }}"></script>
+{% if session.usuario %}
+<script>
+{% include "_confere_sessao_js.html" %}
+</script>
+{% endif %}
+</body>
+</html>

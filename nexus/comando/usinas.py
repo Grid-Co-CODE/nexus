@@ -103,7 +103,8 @@ def cos_por_usina(leituras: list | None, usina_de) -> dict | None:
                 continue
             lidas.add(uid)
             for o in u.get("ocorrencias") or []:
-                ocs.setdefault(uid, []).append(dict(o, cliente_cos=lt.cliente))
+                # `usina_cod`: o código curto da usina no Andamento ("APR100"), o do cartão do vídeo wall
+                ocs.setdefault(uid, []).append(dict(o, cliente_cos=lt.cliente, usina_cod=str(u.get("cod") or "")))
     return {"ocs": ocs, "lidas": lidas}
 
 

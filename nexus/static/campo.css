@@ -2235,3 +2235,75 @@ tr.rd-linha--ativa td{background:var(--verde-suave)}
 .mb-barra{height:8px;border-radius:999px;background:var(--superficie-2);overflow:hidden}
 .mb-barra span{display:block;height:100%;width:0;background:var(--verde)}
 .mb-progresso[hidden]{display:none}
+
+/* ── o vídeo wall do Mapa de equipe (12/11/2026, Levi: "Prepare um modo vídeo wall que apareça informações como no anexo
+   1 do lado esquerdo do mapa!"). Sem a casca do Nexus, como o modo TV do Mapa de risco: as letras seguem a ALTURA da tela
+   (--eqtv-f), o mesmo desenho em 1920 x 1080 e em 3840 x 2160, e nada rola a página (a lista rola sozinha por dentro) */
+.eqtv-html,.eqtv-pagina{height:100%;margin:0;background:var(--fundo);overflow:hidden}
+.eqtv{--eqtv-f:clamp(13px,1.45vh,40px);font-size:var(--eqtv-f);height:100vh;box-sizing:border-box;padding:1.6vh 1.2vw;
+  display:grid;grid-template-rows:auto minmax(0,1fr);gap:1.4vh;color:var(--tinta);font-family:var(--font-sans)}
+.eqtv-cab{display:flex;align-items:center;gap:1.2vw;min-width:0}
+.eqtv-titulo{min-width:0}
+.eqtv-titulo .gc-eyebrow{margin:0;font-size:.78em}
+.eqtv-titulo h1{margin:.1em 0 0;font:800 1.9em/1.1 var(--font-display);letter-spacing:-.01em}
+.eqtv-estado{margin:0 0 0 auto;padding:.5em .9em;border:1px solid var(--alerta);border-radius:var(--raio-controle);
+  color:var(--alerta);font-size:.9em;font-weight:600}
+.eqtv-estado[hidden]{display:none}
+.eqtv-relogio{margin-left:auto;display:grid;justify-items:end;line-height:1.15}
+.eqtv-estado:not([hidden]) + .eqtv-relogio{margin-left:0}
+.eqtv-hora{font:600 2.2em/1 var(--font-mono);color:var(--tinta)}
+.eqtv-data{color:var(--tinta-2);font-size:.9em;text-transform:capitalize}
+.eqtv-prazo{color:var(--mudo);font-size:.75em}
+/* os controles só ao mexer o mouse (campo-videowall.js): o Sair, o zoom, os focos e o fundo */
+.eqtv-sair{display:none}
+.eqtv--mexeu .eqtv-sair{display:inline-flex}
+.eqtv .eq-topo-mapa{opacity:0;transition:opacity .2s}
+.eqtv--mexeu .eq-topo-mapa,.eqtv .eq-topo-mapa:focus-within{opacity:1}
+.eqtv-meio{display:grid;grid-template-columns:clamp(380px,32vw,1240px) minmax(0,1fr);gap:1.2vw;min-height:0}
+/* o painel do COS: o mockup do Levi */
+.eqtv-cos{display:flex;flex-direction:column;gap:1.2vh;min-height:0;padding:1.4vh 1vw;background:var(--superficie);
+  border:1px solid var(--linha);border-radius:var(--raio-md)}
+.eqtv-cos-cab{display:flex;align-items:flex-start;justify-content:space-between;gap:1vw}
+.eqtv-cos-cab .gc-eyebrow{margin:0;font-size:.78em}
+.eqtv-cos-cab h2{margin:.15em 0 0;font:800 1.45em/1.15 var(--font-display)}
+.eqtv-leitura{color:var(--tinta-2);font:500 .85em var(--font-mono);white-space:nowrap}
+.eqtv-sem{margin:0;padding:1em;border:1px dashed var(--linha-forte);border-radius:var(--raio-controle);color:var(--tinta-2)}
+.eqtv-kpis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.7vh .5vw}
+.eqtv-kpi{display:grid;gap:.25em;padding:.7em .8em;background:var(--fundo);border:1px solid var(--linha);border-radius:var(--raio-controle)}
+.eqtv-kpi span{color:var(--tinta-2);font-size:.72em;font-weight:600;letter-spacing:.06em;text-transform:uppercase}
+.eqtv-kpi strong{font:700 1.9em/1 var(--font-mono);color:var(--tinta)}
+.eqtv-kpi--critico strong{color:var(--critico)}
+.eqtv-kpi--alerta strong{color:var(--alerta)}
+.eqtv-kpi--neutro strong{color:var(--tinta-2)}
+.eqtv-kpi--zero strong{color:var(--mudo)}
+.eqtv-lista{position:relative;flex:1;min-height:0;overflow:hidden}
+.eqtv-trilho{display:grid;gap:1.4vh;will-change:transform}
+.eqtv-grupo{display:grid;gap:.8vh}
+.eqtv-grupo-tit{display:flex;align-items:center;gap:.5em;margin:0;color:var(--tinta-2);font:700 .8em/1.2 var(--font-sans);
+  letter-spacing:.08em;text-transform:uppercase}
+.eqtv-grupo-tit .ph{font-size:1.25em}
+.eqtv-grupo-n{margin-left:auto;font-family:var(--font-mono)}
+.eqtv-card{--tom:var(--mudo);display:grid;grid-template-columns:minmax(0,1fr) auto;gap:.9vw;align-items:start;
+  padding:.8em .9em;background:var(--fundo);border:1px solid var(--linha);border-left:.32em solid var(--tom);
+  border-radius:var(--raio-controle)}
+.eqtv-card--critico{--tom:var(--critico)}
+.eqtv-card--alerta{--tom:var(--alerta)}
+.eqtv-card--neutro{--tom:var(--mudo)}
+.eqtv-card-corpo{display:grid;gap:.25em;min-width:0}
+.eqtv-card-corpo p{margin:0;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.eqtv-card-l1{display:flex;align-items:baseline;gap:.6em}
+.eqtv-cod{font:700 1.05em var(--font-sans);color:var(--tinta)}
+.eqtv-nome{overflow:hidden;text-overflow:ellipsis;color:var(--tinta-2);font:500 .9em var(--font-mono)}
+.eqtv-card-l2{color:var(--tinta);font-size:.9em}
+.eqtv-card-l3{color:var(--tinta-2);font-size:.82em}
+.eqtv-card-lado{display:grid;justify-items:end;gap:.45em}
+.eqtv-dur{font:700 1.35em/1 var(--font-mono);color:var(--tinta);white-space:nowrap}
+.eqtv-card-lado .cn-pill{font-size:.75em;white-space:nowrap}
+.eqtv-vazio{margin:0;color:var(--tinta-2)}
+.eqtv-ok{display:flex;align-items:center;gap:.6em;padding:.75em .9em;border:1px solid var(--ok);border-radius:var(--raio-controle);
+  color:var(--ok);font-size:.9em;font-weight:600}
+.eqtv-ok .ph{font-size:1.3em}
+/* o mapa ocupa o resto da altura (o cartão do mapa de verdade da tela, sem a altura fixa dela) */
+.eqtv-mapa{min-height:0;min-width:0}
+.eqtv .eq-quadro{height:100%;box-sizing:border-box}
+.eqtv .eq-palco{flex:1;height:auto}

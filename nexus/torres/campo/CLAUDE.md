@@ -1479,6 +1479,7 @@ percurso" abaixo), pedido do Levi pela sessão Nexus Field; sobe com o OK dele.
 | Situação e desenho | `campo/equipe/situacao.py` | a situação de cada técnico pelo último ponto, o desenho do mapa e o do percurso (só x/y), a UF pelo contorno do IBGE, o link da rota |
 | Cidade | `campo/equipe/municipios.py` | a cidade de quem está parado fora de usina e os municípios de fundo do percurso (`na_caixa`), pela malha do IBGE do ESTADO inteiro |
 | Piloto | `campo/equipe/piloto.py` | grava quem entra e quem sai do piloto (`nexus_equipe_piloto`) |
+| Painel do vídeo wall | `campo/equipe/parede.py` | as ocorrências abertas da Ronda COS por grupo (a régua de Comando > Usinas), um cartão por usina, os números de cima e o rodapé; puro |
 | Eventos do dia | `campo/equipe/eventos.py` | a primeira posição, as saídas e chegadas, o sem sinal e o sem permissão de hoje, dos pontos, no formato que outra tela pode ler |
 | Registro da LGPD | `campo/equipe/acessos.py` | quem abriu o mapa, a rota ou o percurso de quem (o percurso com o período) |
 | Jornal das filas | `campo/equipe/jornal.py` | os eventos de chave e os acessos esperando o gravador, cifrados em disco (`equipe/fila_*.jsonl`): o reinício antes da rodada não perde nada |
@@ -1718,6 +1719,44 @@ e não foram feitas.
   verdade): Brasil, rua (São Paulo no zoom 14,5), percurso (o voo, o desenho, a reprodução no meio), clima, os dois focos,
   as cores do Agora (simuladas no navegador: a bancada não tem o Andamento), o satélite (Campinas no zoom 13) e o
   celular (375 px, sem rolagem de lado), e o tema claro.
+
+### O vídeo wall (12/11/2026)
+
+Levi, com o mockup do COS ("COS · Ocorrências abertas · Usinas com problema agora"): "Prepare um modo vídeo wall que apareça
+informações como no anexo 1 do lado esquerdo do mapa!". As escolhas dele no mesmo dia (perguntadas, por serem filtro e
+parâmetro): **todas as ocorrências abertas, agrupadas**; a tela se atualiza **a cada 2 minutos**; a lista que não cabe
+**rola sozinha, devagar**.
+
+- **Onde:** o botão **Vídeo wall** na barra do Mapa de equipe (só no Técnicos e só com o mapa base) abre, em outra aba,
+  `/t/campo/equipe?tv=1` (com o filtro e o clima de agora). É a MESMA rota: o mesmo portão, o mesmo `_quem_ve` e o mesmo
+  registro da LGPD ("abriu_mapa", antes de a página sair); o vídeo wall não abre técnico nem percurso (o `tecnico` do
+  endereço é ignorado). Sem o mapa base, o `?tv=1` é ignorado e a tela é a de sempre.
+- **O desenho** (`campo/equipe_tv.html`, `static/campo-videowall.js`, bloco `eqtv-*` do `campo.css`): sem a casca do Nexus,
+  como o modo TV do Mapa de risco (`performance/mapa_tv.html`, o modelo): título, relógio de Brasília, o prazo da sessão
+  de quem abriu (`moldura._prazo_da_tv`) e as letras pela ALTURA da tela (`--eqtv-f`, o mesmo desenho em 1080p e em 4K).
+  À esquerda o painel do COS; à direita o mapa de verdade inteiro (o mesmo parcial da tela, `campo/_equipe_mapa_ml.html`).
+  O Sair, o zoom, os focos e o fundo aparecem ao mexer o mouse e somem em 4 s. O foco começa em **Foco usina** (o painel
+  é das usinas; a escolha do vídeo wall fica à parte, `nexus.equipe.foco.tv`).
+- **O painel** (`parede.montar`): a MESMA fotografia da Ronda COS que pinta as usinas (`_cos_por_usina`), na régua de
+  Comando > Usinas (`classificar`), em cinco grupos, na ordem do mockup: **Usina parada** (o crítico), **Inversores
+  desligados**, **Rede concessionária** (o crítico com o problema `rede` do placar da própria Ronda COS, ou a falha de
+  concessionária; o religamento de uma usina que a rede derrubou também é dela), **Sem comunicação** e **Outras
+  ocorrências** (furto, outra corretiva). **Uma usina é um cartão**, no grupo da pior ocorrência dela (a parada, a rede,
+  o inversor, as outras e a comunicação, nessa ordem; no empate, a mais antiga), com "e mais N" quando há outras; no
+  grupo, a mais antiga primeiro. O cartão: o código curto do Andamento (`usina_cod`), o nome e o MWp do cadastro, a
+  falha (e o equipamento), a última nota da Ronda COS com a hora, a OS (ou "ainda sem OS"), há quanto tempo ("12 min",
+  "2 h 12", "1 d 4 h", "6 d") e a etapa (esperando alguém = âmbar; técnico acionado = azul; identificada = vermelho).
+  Em cima: Abertas e um número por grupo; embaixo: as usinas sem ocorrência aberta e as sem leitura do COS. Só as
+  usinas do mapa (com coordenada) entram, para os números baterem com ele. O PR médio de hoje do mockup ficou FORA: o
+  Nexus não tem o PR do dia (sem dado não se inventa). Sem a fotografia, o painel diz "Sem a leitura do COS" e o mapa segue.
+- **A releitura**: a cada 2 minutos (`RECARREGA_TV_S`) a página confere o `/saude` e se recarrega; com o Nexus fora, fica
+  com o que tem e diz desde quando. Sem JavaScript, o `<meta refresh>`. **Cada releitura é um "abriu_mapa"** no registro da
+  LGPD (~30 por hora com a TV ligada): a tela mostra técnicos. A sessão que cai leva ao Entrar (`_confere_sessao_js`).
+- **A lista rola** (`campo-videowall.js`): uma altura da caixa a cada 25 s, parando 5 s em cima e embaixo; roda também
+  com os efeitos de animação do Windows desligados (sem ela, a lista ficaria cortada).
+- **Prova:** `tests/test_equipe_parede.py` (os grupos, a duração, o cartão da pior, a ordem, sem o COS; a rota sem a
+  casca, o painel, o refresh de 120 s, o registro da LGPD, o botão, sem o mapa base). Na bancada (`perc_bancada.py`, com
+  a fotografia do COS FALSA só nela): 1920 x 1080, 24 cartões rolando, o mapa colorido, os controles ao mexer o mouse.
 
 ### O filtro suspenso (10/11/2026)
 

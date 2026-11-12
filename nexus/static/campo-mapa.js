@@ -332,7 +332,9 @@
     try { return localStorage.getItem(chave) || padrao; } catch (e) { return padrao; }
   }
   function guardar(chave, v) { try { localStorage.setItem(chave, v); } catch (e) { /* sem armazenamento */ } }
-  var foco = D.modo === "tecnicos" ? guardado("nexus.equipe.foco", "tecnico") : "usina";
+  // no vídeo wall (12/11/2026) o foco começa na usina: o painel ao lado é das usinas com problema, e a cor delas é a dele
+  var foco = D.modo === "tecnicos" ? guardado(D.tv ? "nexus.equipe.foco.tv" : "nexus.equipe.foco", D.tv ? "usina" : "tecnico")
+                                   : "usina";
   var fundoBase = D.satelite ? guardado("nexus.equipe.base", "mapa") : "mapa";
 
   var brasilGeo = null;
@@ -605,7 +607,7 @@
   });
   quadro.addEventListener("click", function (e) {
     var f = e.target.closest("[data-eq-foco]");
-    if (f) { foco = f.getAttribute("data-eq-foco"); guardar("nexus.equipe.foco", foco); aplicarFoco(); return; }
+    if (f) { foco = f.getAttribute("data-eq-foco"); guardar(D.tv ? "nexus.equipe.foco.tv" : "nexus.equipe.foco", foco); aplicarFoco(); return; }
     var bb = e.target.closest("[data-eq-base]");
     if (bb && bb.hasAttribute("data-eq-sem-chave")) {
       // sem a chave da Esri: o botão diz o que falta (Levi, 12/11/2026: "CADÊ A OPÇÃO MAPA/SATÉLITE??")
