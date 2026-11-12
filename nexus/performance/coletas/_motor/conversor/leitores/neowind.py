@@ -16,8 +16,9 @@ conversão .xlsx feita no Excel também é lida.
 De-para por S/N — "SunPower, se localiza pela geração!" (Levi, 29/10/2026): os 7 do NeoWind bateram 175/175 dias em
 01-25/10 e a geração de ago e set ao kWh; o 181201123B140125 (4.2) 25/25 em outubro. Os quatro da UFV 5 e 6 foram
 achados em 10/11/2026 nas outras abas do mesmo History Report: 25/25 dias de 01-25/10 iguais ao BD, e nenhum outro
-inversor da aba bate mais de 1 dia. A UFV 6 tem mais três S/N no relatório, todos sem nenhum dia — o 6,2 do BD vem de
-outra fonte e não sai daqui.
+inversor da aba bate mais de 1 dia. O 6,2 apareceu no History Report de 12/11/2026 (S/N 118222226050049, aba
+própria): 11/11 dias de 29/10 a 08/11 iguais ao 6,2 que a equipe tinha colado de outra fonte, e nenhuma outra coluna
+bate em dia nenhum.
 
 Não usa nucleo.num() para o kWh: o NeoWind escreve "1186797.5" e o History .csv "331,4"; num() leria um "1.234" de
 três casas como milhar. Dia sem número no arquivo não vira célula (nada de 0 deduzido). O portal não diz a hora em que
@@ -44,6 +45,7 @@ SN_COLUNA = {
     "11022221B090461": "Inversor 5.2",   # Sun Power UFV 5
     "110162214080035": "Inversor 6.1",   # Sun Power UFV 6
     "1103D221B090006": "Inversor 6.3",   # Sun Power UFV 6
+    "118222226050049": "Inversor 6.2",   # Sun Power UFV 6 (achado em 12/11/2026; no BD a coluna é "Inversor 6,2")
 }
 SN_FORA = {                              # aparecem nos relatórios e ficam de fora de propósito
     "GFD9942009": "parou em abril/2026; o 1.2 é o GCD0844005",
