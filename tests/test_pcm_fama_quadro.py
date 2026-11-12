@@ -222,7 +222,7 @@ def test_a_etiqueta_de_repeticao_so_na_preventiva_do_fracttal_da_usina_com_preve
 
 def test_o_quadro_diz_quando_o_livro_da_fama_foi_gravado_e_avisa_a_leitura_parada():
     """Revisão de 11/11/2026, item 4: o batimento da carga (o `gerado_em` da aba `atualizacao`) é a última gravação
-    do livro (re-revisão, item 4: "gravado em", não "lidas em": a carga lê de hora em hora e só regrava quando a FAMA
+    do livro (re-revisão, item 4: "gravado em", não "lidas em": a carga lê de 10 em 10 min e só regrava quando a FAMA
     muda ou uma vez por dia); com mais de 26 h, a leitura da FAMA parou e o Quadro avisa."""
     q = _quadro()
     assert (q["fama"]["gravado_em"], q["fama"]["velho"]) == ("07/10 10:40", False)

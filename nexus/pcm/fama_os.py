@@ -4,8 +4,8 @@ Levi, 11/11/2026: o cliente cria a OS na FAMA, ela aparece para o programador e 
 também entram ("a ideia é não ficarmos criando e editando e sim acompanhando"). A FASE 1 é sombra: as OS da FAMA aparecem
 no Quadro da semana (`fama_quadro.py`) e o adaptador do motor (`fama_motor.py`) fica pronto e desligado.
 
-De onde vem: o livro `nexus_os_fama · fato_os_fama` (com o `dim_projeto_fama`), que a carga de hora em hora mantém a
-partir da API da FAMA (`nexus/dados/fama.py`, a parte A). O PCM não lê a FAMA nem o livro por conta própria: tudo entra
+De onde vem: o livro `nexus_os_fama · fato_os_fama` (com o `dim_projeto_fama`), que a volta de 10 em 10 minutos mantém
+a partir da API da FAMA (`nexus/dados/fama.py`, a parte A). O PCM não lê a FAMA nem o livro por conta própria: tudo entra
 por `_linhas_fama(config)`, que lê o livro pelo `fama.ler_banco`. O título e a descrição moram cifrados no livro (Cofre do
 cadastro): só o TÍTULO das OS abertas e em andamento é decifrado aqui, só em memória, para a tela; a descrição nunca, e
 nada disso vai para log nem para o motor (o log do motor imprime o texto das tarefas).
@@ -26,7 +26,7 @@ from ..cadastro.ligacao_campo import SISTEMA_FRACTTAL      # o de-para do Fractt
 from .semana import _norm
 
 _BRT = timezone(timedelta(hours=-3))
-# o batimento da carga é diário (`nexus/dados/fama.py`): 24 h e uma folga de 2 h para a volta da hora atrasar
+# o batimento da carga é diário (`nexus/dados/fama.py`): 24 h e uma folga de 2 h para a volta atrasar
 FRESCOR_H = 26
 
 # a situação da OS na FAMA (o `status` do catálogo de lá)

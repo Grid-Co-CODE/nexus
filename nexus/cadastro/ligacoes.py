@@ -234,8 +234,8 @@ def fontes(config) -> dict:
         if (wb, ref) not in lidas:
             lidas[(wb, ref)] = _linhas_api(base, abas[(wb, ref)]) if (wb, ref) in abas else []
         out[sistema] = itens_abas(sistema, _primeiras_linhas(base, ids), lidas[(wb, ref)], dicas, equipamentos)
-    # os projetos da FAMA (11/11/2026): a dimensão que a leitura de hora em hora das OS grava no banco; sem o livro (antes
-    # da 1ª volta do servidor), a FAMA não aparece
+    # os projetos da FAMA (11/11/2026): a dimensão que a leitura das OS, de 10 em 10 minutos, grava no banco; sem o livro
+    # (antes da 1ª volta do servidor), a FAMA não aparece
     if (FAMA.LIVRO, FAMA.ABA_DIM) in abas:
         out[SISTEMA_FAMA] = ligacao_fama.itens(_linhas_api(base, abas[(FAMA.LIVRO, FAMA.ABA_DIM)]))
     # o plant_id das fontes da plataforma (12/11/2026): pelas abas de falhas e pela estrutura das usinas

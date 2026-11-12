@@ -777,7 +777,7 @@ colunas (a maioria escondida: o seletor de colunas mostra sem recarregar), e a p
   geracao_de_para_faltando.csv` (fora do git). Os sistemas antigos saem idênticos (876 linhas, 0 diferenças contra o
   publicado). **Ainda não publicado** (é do Levi, passo 1/decisão 8): até lá o `usina_id` da geração fica 0%.
 - **Os projetos da FAMA: sistema `FAMA · Projetos` (11/11/2026, `ligacao_fama.py`).** As OS que os clientes abrem na
-  FAMA vão ao banco de hora em hora (`nexus_os_fama`, `nexus/dados/CLAUDE.md`), e cada projeto da FAMA é uma usina.
+  FAMA vão ao banco de 10 em 10 minutos (`nexus_os_fama`, `nexus/dados/CLAUDE.md`), e cada projeto da FAMA é uma usina.
   "Ler as bases de novo" lê a `nexus_os_fama · dim_projeto_fama` do banco (sem o livro, antes da 1ª volta do servidor, a
   FAMA não aparece). A **chave é o id do projeto na FAMA** (o nome pode mudar lá; o id, não), e a seção mostra o nome
   (`rotulo`), o id e quantas OS ele tem; a aba Decisões também diz o nome. **Nunca liga sozinho** (`so_decisao` no item):

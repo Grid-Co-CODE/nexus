@@ -4,9 +4,10 @@ De hora em hora, aos :40 (os livros do App chegam aos :25), dentro do processo d
 `banco_dados.json` público do PCM, o mesmo arquivo nas duas máquinas) e grava no banco: não toca em Fracttal, API PV
 nem SunOp. Duas máquinas com o Nexus no ar (o PC do Levi e o servidor) não gravam em dobro: a carga só grava se a
 última tiver mais de `INTERVALO_MIN` minutos (a hora fica no próprio livro, aba `atualizacao`); a que chegar depois,
-pula. `NEXUS_CARGA_DADOS=0` desliga numa máquina. A volta do laço (`ligar`) roda também, depois desta carga, a geração,
-o almoxarifado e, por último, as OS do cliente pela FAMA (`fama.py`, 11/11/2026): a única peça que lê uma API de fora,
-uma vez por volta e só onde há as três chaves dela (o servidor); a falha de cada uma não segura as outras.
+pula. `NEXUS_CARGA_DADOS=0` desliga numa máquina. A volta do laço (`ligar`) roda também, depois desta carga, a geração
+e o almoxarifado; a falha de cada uma não segura as outras. As OS do cliente pela FAMA (`fama.py`, 11/11/2026), a única
+peça que lê uma API de fora, têm a volta delas desde 12/11/2026 (`ligar_fama`): de 10 em 10 minutos, numa thread própria,
+só onde há as três chaves (o servidor).
 
 Livros que esta carga mantém (registrados em `catalogo.LIVROS`):
 - `nexus_dimensoes`: `dim_data` (o calendário), `feriados_locais`, `pessoas_historico` e `usinas_historico` (o
@@ -66,6 +67,16 @@ CAB_ATUALIZACAO = ["gerado_em", "maquina", "duracao_s", "linhas", "como_ler"]
 _BRT = timezone(timedelta(hours=-3))
 log = logging.getLogger("nexus.dados")
 _LACO = {"thread": None, "parar": threading.Event(), "ultimo": None}
+# A volta da FAMA (12/11/2026, Levi: "pode estar fazendo requisição na OS da FAMA de 10 em 10 minutos [...] para os PCMs
+# é melhor estar acompanhando sempre"): uma thread própria, e não um passo da volta da hora, para uma não atrasar a
+# outra (a leitura da FAMA tem 90 s de prazo; a volta da hora roda a carga, a geração e o almoxarifado em fila). Uma
+# grade fixa, aos :05, :15, ..., :55: o deploy que reinicia o Nexus várias vezes por dia não vira uma leitura a mais a
+# cada subida, e a volta fica longe dos :40 da carga. A cota: UMA chamada à FAMA por volta, que lista tudo: 6 por hora,
+# longe de qualquer limite.
+FAMA_INTERVALO_S = 600
+FAMA_DESLOCAMENTO_S = 300
+# `lendo`: uma volta de cada vez. A thread já é uma só, mas a trava vale também para quem chamar `_volta_fama` por fora
+_FAMA = {"thread": None, "parar": threading.Event(), "lendo": threading.Lock()}
 
 
 def _agora():
@@ -839,15 +850,29 @@ def _espera_s(agora=None) -> float:
     return (alvo - agora).total_seconds() + (ATRASO_DO_PC_S if _maquina() == "pc" else 0)
 
 
-def _volta_fama(app) -> None:
-    """As OS do cliente pela FAMA (11/11/2026, fase 1: sombra; `fama.py`), a última peça da volta: só liga onde há as três
-    chaves (o servidor) e a falha dela fica no estado e no log, nunca sobe (as outras cargas da hora já rodaram). A chave
-    da FAMA nunca vai ao log: o relatório, o erro e o traceback passam pelo `sem_chave` (o de `fama.py`, repetido aqui)."""
+def _espera_fama_s(agora=None) -> float:
+    """Até a próxima volta da FAMA na grade (aos :05, :15, ..., :55), de 1 s a `FAMA_INTERVALO_S` + 1 s. A espera que
+    acorda um triz antes da hora (o relógio do sistema ajustado) não emenda uma segunda volta no mesmo horário: a menos
+    de 1 s da grade, vale a próxima."""
+    agora = agora or _agora()
+    s = agora.minute * 60 + agora.second + agora.microsecond / 1e6
+    espera = FAMA_INTERVALO_S - (s - FAMA_DESLOCAMENTO_S) % FAMA_INTERVALO_S
+    return espera if espera >= 1 else espera + FAMA_INTERVALO_S
+
+
+def _volta_fama(app) -> bool:
+    """Uma volta das OS do cliente pela FAMA (11/11/2026, fase 1: sombra; `fama.py`). Uma de cada vez: a que chega com
+    outra lendo (a leitura tem 90 s de prazo) pula sem ler e devolve False. A falha fica no estado e no log, nunca sobe. A
+    chave da FAMA nunca vai ao log: o relatório, o erro e o traceback passam pelo `sem_chave` (o de `fama.py`, repetido
+    aqui)."""
     import traceback
 
-    def sem_chave(texto) -> str:            # aqui, e não importado: nem o módulo da FAMA quebrado derruba o laço
+    def sem_chave(texto) -> str:            # aqui, e não importado: nem o módulo da FAMA quebrado derruba a volta
         chave = str(app.config.get("NEXUS_FAMA_CHAVE") or "").strip()
         return str(texto).replace(chave, "[chave]") if len(chave) >= 4 else str(texto)
+    if not _FAMA["lendo"].acquire(blocking=False):
+        log.info("fama: a volta anterior ainda está lendo; esta pula")
+        return False
     try:
         from . import fama
         _LACO["fama"] = fama.gerar_fama(app.config)
@@ -855,6 +880,34 @@ def _volta_fama(app) -> None:
     except Exception as e:      # noqa: BLE001 — a FAMA não segura nada
         _LACO["fama"] = {"erro": sem_chave(f"{type(e).__name__}: {e}")[:300]}
         log.error("fama: %s", sem_chave(traceback.format_exc()))
+    finally:
+        _FAMA["lendo"].release()
+    return True
+
+
+def ligar_fama(app):
+    """A volta das OS da FAMA, de 10 em 10 minutos, numa thread própria. Quem chama é o `nexus.dados.instalar` (app.py e
+    servir.py, com as mesmas chaves da carga: `NEXUS_CARGA_DADOS=0` desliga as duas), nunca o create_app. Só liga com a
+    porta da FAMA aberta (`fama.porta`: as três chaves e o servidor); fechada, nem a thread nasce, e o estado diz por quê."""
+    if _FAMA["thread"] is not None:
+        return
+    try:
+        from . import fama
+        motivo = fama.porta(app.config)
+    except Exception as e:      # noqa: BLE001 — o módulo da FAMA quebrado não derruba a subida
+        motivo = f"{type(e).__name__}: {e}"[:300]
+    if motivo:
+        _LACO["fama"] = {"pulou": motivo}
+        log.info("fama: a volta de 10 em 10 min não liga nesta máquina: %s", motivo)
+        return
+
+    def laco():
+        while not _FAMA["parar"].wait(_espera_fama_s()):
+            with app.app_context():
+                _volta_fama(app)
+
+    _FAMA["thread"] = threading.Thread(target=laco, name="nexus-fama", daemon=True)
+    _FAMA["thread"].start()
 
 
 def _volta_conferencia(app) -> None:
@@ -904,8 +957,7 @@ def ligar(app):
                 except Exception as e:      # noqa: BLE001
                     _LACO["almoxarifado"] = {"erro": f"{type(e).__name__}: {e}"[:300]}
                     log.exception("almoxarifado")
-                # as OS da FAMA (11/11/2026): uma leitura por volta, depois das outras; só onde há as três chaves
-                _volta_fama(app)
+                # as OS da FAMA têm a volta delas, de 10 em 10 min (`ligar_fama`, 12/11/2026)
                 # a conferência das ligações (12/11/2026): uma vez por dia, por último, sobre o que ficou gravado
                 _volta_conferencia(app)
 

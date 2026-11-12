@@ -33,9 +33,10 @@
       {% endif %}
       {# as OS da FAMA (11/11/2026, fase 1: só aparecem; nexus/pcm/fama_quadro.py) #}
       {% if q and q.fama and q.fama.mostra %}
-      {{ termo('OS da FAMA', 'info') }}<dd>As OS que os clientes abrem na FAMA. A carga do servidor lê a FAMA de
-        hora em hora, mas o livro da FAMA no banco só é regravado quando a FAMA muda ou uma vez por dia: o "livro da
-        FAMA gravado em" diz essa última gravação, que sem mudança na FAMA pode ter horas. Mais de 26 h sem gravação é
+      {{ termo('OS da FAMA', 'info') }}<dd>As OS que os clientes abrem na FAMA. O servidor lê a FAMA de 10 em 10
+        minutos, e a OS nova ou mudada aparece aqui em até 10 minutos e mais 2 da cópia desta tela. O livro da FAMA no
+        banco só é regravado quando a FAMA muda ou uma vez por dia: o "livro da FAMA gravado em" diz essa última
+        gravação, que sem mudança na FAMA pode ter horas. Mais de 26 h sem gravação é
         a leitura da FAMA parada, e o quadro avisa. Por enquanto elas só aparecem: não entram na programação, não se
         reprogramam aqui e não contam nas tarefas nem nas horas do dia. Entram as abertas (criada, planejada, pausada) e
         as em andamento, no dia da data prevista, depois das tarefas, com o mesmo limite de cartões; os filtros valem

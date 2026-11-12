@@ -98,7 +98,8 @@ do PCM: os números batiam cliente a cliente, o nome não.
 
 Levi: o cliente cria a OS na FAMA, ela aparece para o programador automático e cai no App de Campo; as retroativas
 também entram. "A ideia é não ficarmos criando e editando e sim acompanhando."
-- **Fase 1, sombra (no código):** o Nexus lê a lista das OS da FAMA de hora em hora, grava no banco
+- **Fase 1, sombra (no código):** o Nexus lê a lista das OS da FAMA de 10 em 10 minutos (12/11/2026, Levi: "para
+  os PCMs é melhor estar acompanhando sempre"; era de hora em hora), grava no banco
   (`nexus_os_fama · fato_os_fama`, com os projetos em `dim_projeto_fama`; regras em `nexus/dados/CLAUDE.md`) e liga cada
   projeto à usina pela decisão do Levi em Base → Ligações entre bases (`FAMA · Projetos`, `nexus/cadastro/CLAUDE.md`).
   Nada muda no campo: o Quadro da semana só MOSTRA as OS da FAMA (seção "OS da FAMA no Quadro e no programador (parte
@@ -2101,7 +2102,8 @@ livro `nexus_os_fama · fato_os_fama` e o de-para em Ligações são da parte A 
   gestor de contrato, decifrado da ficha da pessoa).
 - **O frescor:** mais de `fama_os.FRESCOR_H` (26 h) sem batimento é a leitura da FAMA parada (`fama_os.velho`; sem
   batimento, também). O Quadro diz "livro da FAMA gravado em DD/MM HH:MM": a última gravação do livro, não a última
-  leitura (a carga lê a FAMA de hora em hora e só regrava o livro quando a FAMA muda ou uma vez por dia; o "!" diz isso;
+  leitura (o servidor lê a FAMA de 10 em 10 minutos e só regrava o livro quando a FAMA muda ou uma vez por dia; o
+  Quadro relê o livro inteiro de 10 em 10 minutos também, `fama_quadro.COMPLETA_S`; o "!" diz isso;
   o "lidas em" de antes parecia a FAMA sem leitura havia horas, re-revisão de 11/11/2026). Parada, o Quadro avisa "A
   leitura da FAMA parou: o que aparece pode estar velho"; a rodada ligada não sai (abaixo).
 - **Por que a FAMA não passa pelo motor na fase 1:** ocuparia as horas das equipes, e a semana oficial do Fracttal mudaria

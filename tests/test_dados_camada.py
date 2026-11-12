@@ -91,7 +91,7 @@ CABS = {"fechamento": fatos.CAB_FECHAMENTO, "ronda": fato_ronda.CAB_RONDA, "pt":
         "fracttal_total_hora": fato_uso_os.CAB_FRACTTAL_TOTAL,
         # os chamados em aberto para o App de Campo (08/11/2026): o servidor grava de 10 em 10 min, desligado até a prova
         "chamado_aberto": fato_chamado_aberto.CAB,
-        # as OS do cliente pela FAMA (11/11/2026, fase 1: sombra): o servidor grava de hora em hora, só com as três chaves
+        # as OS do cliente pela FAMA (11/11/2026, fase 1: sombra): o servidor lê de 10 em 10 min, só com as três chaves
         "os_fama": fato_os_fama.CAB_OS_FAMA}
 PROIBIDAS = ("nome", "email", "tecnico", "observacao", "comentario", "motivo", "tarefa", "relatorio", "atividades")
 # a coluna com nome de texto que só leva CIFRA, com o leitor e a chave declarados: o motivo da recontagem para o técnico no

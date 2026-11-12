@@ -1,6 +1,6 @@
 """As OS da FAMA no Quadro sem esperar o banco (revisão de 11/11/2026, item 1: a velocidade). O caminho de PRODUÇÃO
-(TESTING desligado), com o banco de mentira (`ApiPGFalsa`) e o livro da FAMA gravado pelo caminho da parte A (a carga de
-hora em hora, `fama.gerar_fama`, com uma FAMA de mentira).
+(TESTING desligado), com o banco de mentira (`ApiPGFalsa`) e o livro da FAMA gravado pelo caminho da parte A (a volta de
+10 em 10 minutos, `fama.gerar_fama`, com uma FAMA de mentira).
 
 O que estes testes seguram: o pedido da tela nunca lê o banco; a 1ª visita depois de subir abre sem a FAMA, com o aviso, e
 não espera; a cópia vencida volta na hora e a renovação vai por trás, uma de cada vez (o voo único, também com duas
@@ -56,7 +56,7 @@ def _aberta(i, prevista="2026-10-06"):
 
 
 def _carga(api, itens):
-    """A carga de hora em hora da parte A, com a FAMA de mentira: o livro vai ao banco pelo caminho do servidor."""
+    """A volta de 10 em 10 minutos da parte A, com a FAMA de mentira: o livro vai ao banco pelo caminho do servidor."""
     cfg = {"NEXUS_FAMA_CHAVE": "chave-da-fama-de-teste", "GRIDCO_SQL_TOKEN": "token-de-teste",
            "NEXUS_CHAVE_CADASTRO": CHAVE, "GRIDCO_DB_API": BASE}
     r = fama.gerar_fama(cfg, api, fama=FamaFalsa(itens), agora=datetime.now(BRT), forcar=True)
@@ -325,3 +325,10 @@ def test_a_tela_abre_na_hora_com_o_aviso_e_depois_mostra_a_os(producao, tmp_path
     html = c.get("/t/pcm/quadro").get_data(as_text=True)
     assert 'class="q-c-os gc-num">FAMA-1<' in html and "livro da FAMA gravado em" in html and TITULO in html
     assert "Lendo as OS da FAMA" not in html
+
+
+def test_a_releitura_inteira_acompanha_a_volta_da_fama():
+    """12/11/2026: a FAMA é lida de 10 em 10 minutos, e a cópia do Quadro é relida inteira no mesmo ritmo (era de hora em
+    hora): o que muda só no cadastro chega ao Quadro em até 10 min. A cópia de 2 min continua por cima."""
+    from nexus.dados import carga
+    assert FQ.COMPLETA_S == carga.FAMA_INTERVALO_S == 600 and FQ.COPIA_S < FQ.COMPLETA_S

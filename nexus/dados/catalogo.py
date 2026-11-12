@@ -1717,9 +1717,10 @@ LIVROS = (
     # Ligações entre bases lê para ligar cada um à usina) e a qualidade. A dimensão só cresce: o projeto que some da FAMA
     # fica, com a ligação decidida dele; o fato segue a FAMA (até 5% a menos; abaixo disso é leitura incompleta)
     Livro(fato_os_fama.LIVRO, (fato_os_fama.ABA, fato_os_fama.ABA_DIM, "qualidade", "atualizacao"),
-          "de hora em hora, na volta da carga de dados (:40), só no servidor e com as três chaves; grava quando o sha do "
-          "fato e da dimensão muda e uma vez por dia mesmo sem mudança (o batimento: atualizacao.situacao)",
-          "nexus/dados/fama.py (a volta da carga de dados, nexus/dados/carga.py) + nexus/dados/fato_os_fama.py", False,
+          "de 10 em 10 min (:05, :15, ..., :55), numa volta própria, só no servidor e com as três chaves; grava "
+          "quando o sha do fato e da dimensão muda e uma vez por dia mesmo sem mudança (o batimento: "
+          "atualizacao.situacao)",
+          "nexus/dados/fama.py (a volta da FAMA, nexus/dados/carga.py ligar_fama) + nexus/dados/fato_os_fama.py", False,
           "registrado em 11/11/2026 antes da 1ª gravação (regra 10): nasce na 1ª volta do servidor depois do deploy. "
           "Lê a FAMA uma vez por volta (GET em blocos, 90 s para a resposta inteira, teto de 50 MB, sem seguir "
           "redirecionamento); erro, 401, 3xx ou resposta que não é lista não grava; o livro do banco "

@@ -34,7 +34,8 @@ boa, ela fica; sem cópia, o aviso de erro, e a próxima tentativa só depois de
 
 O frescor: o batimento da carga (`fama_os.Lido.gerado_em`) vira "livro da FAMA gravado em DD/MM HH:MM". É a última
 gravação do livro, não a última leitura (re-revisão de 11/11/2026, item 4: o "lidas em" de antes dizia horas atrás com
-a carga lendo de hora em hora): a carga só regrava o livro quando a FAMA muda ou uma vez por dia, e o "!" diz isso. Com
+a carga lendo a FAMA a toda volta): a carga, de 10 em 10 minutos desde 12/11/2026, só regrava o livro quando a FAMA muda
+ou uma vez por dia, e o "!" diz isso. Com
 mais de `fama_os.FRESCOR_H`, o aviso "a leitura da FAMA parou: o que aparece pode estar velho".
 
 A possível repetição: a preventiva do Fracttal (MPA, MPS, MPM, MPQ, MPT, MPW, Preventiva) da usina em que a FAMA tem
@@ -57,8 +58,13 @@ from .semana import _norm
 
 log = logging.getLogger("nexus.pcm")
 COPIA_S = 120            # a cópia vale 2 min: vencida, a visita seguinte a renova por trás e recebe a de antes na hora
-COMPLETA_S = 3600        # mesmo com o livro igual, de hora em hora a cópia é relida inteira (o cadastro muda: o de-para,
-                         # o gestor; o batimento diário do livro sozinho deixaria o cadastro um dia sem renovar)
+COMPLETA_S = 600         # mesmo com o livro igual, de 10 em 10 min a cópia é relida inteira: o que muda só no cadastro
+                         # (o de-para, o gestor) não muda o livro, e o batimento diário dele sozinho deixaria o cadastro
+                         # um dia sem renovar. Era de hora em hora; desde 12/11/2026 acompanha a volta da FAMA
+                         # (`carga.FAMA_INTERVALO_S`). A OS nova e a ligação publicada chegam pelo livro (a volta da FAMA
+                         # o regrava, e a cópia o relê em até `COPIA_S`). O custo, medido em 12/11 do PC do Levi: o
+                         # livro inteiro (as 4.749 OS, 5 páginas) em 3 a 19 s de GET e ~20 MB de pico, por trás (a tela
+                         # recebe a cópia de antes) e só com alguém no Quadro: até 6 por hora
 FALHA_S = 60             # a renovação que falhou não se repete antes disso: o banco fora não vira laço
 LENDO = "Lendo as OS da FAMA: recarregue em alguns segundos."
 
@@ -159,7 +165,7 @@ def _rodar(cfg, app) -> None:
             c = _ESTADO["copia"]
             # o livro não mudou: a cópia fica, sem reler as páginas. Sem o livro no banco (antes da 1ª carga do
             # servidor) a versão é None, e None igual a None também é o livro igual (re-revisão de 11/11/2026, item 2:
-            # senão as 3 listagens eram relidas a cada 2 min); de hora em hora (`COMPLETA_S`), a leitura inteira
+            # senão as 3 listagens eram relidas a cada 2 min); de 10 em 10 min (`COMPLETA_S`), a leitura inteira
             if c is not None and versao == c.versao and agora - c.lida_em < COMPLETA_S:
                 c.conferida_em = agora
             else:

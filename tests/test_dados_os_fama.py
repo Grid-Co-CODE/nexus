@@ -1,5 +1,5 @@
 """As OS do cliente pela FAMA (11/11/2026, fase 1: sombra): o fato `nexus_os_fama · fato_os_fama`, a dimensão
-`dim_projeto_fama`, o leitor da FAMA e a carga de hora em hora. Uma FAMA de mentira e a `ApiPGFalsa` no lugar do banco:
+`dim_projeto_fama`, o leitor da FAMA e a volta de 10 em 10 minutos. Uma FAMA de mentira e a `ApiPGFalsa` no lugar do banco:
 nenhum teste vai à rede. Projetos, usinas, textos e pessoas inventados."""
 import json
 import logging
@@ -229,7 +229,7 @@ def test_o_radar_da_governanca_ve_o_livro_como_fato():
     assert sorted(t["aba"] for t in c["fato"]) == sorted(a for _l, a in abas) and not c["nova"]
 
 
-# ── o leitor da FAMA e a carga de hora em hora ────────────────────────────────────────────────────────────────────
+# ── o leitor da FAMA e a volta de 10 em 10 minutos ────────────────────────────────────────────────────────────────────
 class Relogio:
     """O relógio monotônico de mentira: a FAMA de mentira o anda a cada bloco que manda."""
 
@@ -518,6 +518,22 @@ def test_so_grava_quando_a_fama_ou_a_ligacao_muda(banco):
         1: 37, 2: 52}
 
 
+def test_de_10_em_10_minutos_sem_mudanca_a_fama_e_lida_e_o_livro_nao_regrava(banco):
+    """A volta de 10 em 10 min (12/11/2026) lê a FAMA a cada volta, e o livro só é regravado quando a FAMA ou a ligação
+    muda (ou uma vez por dia, o batimento): seis voltas por hora não viram seis gravações."""
+    itens = [_os(1), _os(2, projeto=11, nome="Morro Inventado IV")]
+    _gerar(banco, FamaFalsa(itens))
+    assert banco.syncs == 1
+    for m in (10, 20, 30, 40, 50):
+        f = FamaFalsa(itens)
+        r = _gerar(banco, f, agora=AGORA + timedelta(minutes=m))
+        assert len(f.pedidos) == 1 and r["mudou"] is False and "gravado" not in r, m      # leu, e não gravou
+    assert banco.syncs == 1
+    # a OS que anda na FAMA chega ao banco na volta seguinte (em até 10 min), e não na hora seguinte
+    r = _gerar(banco, FamaFalsa([_os(1, status=("closed", 9)), itens[1]]), agora=AGORA + timedelta(minutes=60))
+    assert r["mudou"] is True and banco.syncs == 2
+
+
 def test_o_batimento_grava_uma_vez_por_dia_mesmo_sem_mudanca(banco):
     """Sem o batimento, "sem novidade na FAMA" e "a leitura quebrada há dias" eram o mesmo `gerado_em` velho: a
     `atualizacao` é regravada uma vez por dia, mesmo sem mudança ("li, nada mudou")."""
@@ -535,9 +551,12 @@ def test_o_batimento_grava_uma_vez_por_dia_mesmo_sem_mudanca(banco):
 
 
 def test_a_outra_maquina_que_gravou_ha_pouco_segura_a_volta(banco):
+    """Duas voltas no mesmo intervalo (dois processos no servidor, a troca do deploy) não gravam em dobro. O portão é
+    menor que a volta de 10 min (`INTERVALO_MIN`): a gravação da volta anterior nunca barra a seguinte."""
+    assert fama.INTERVALO_MIN < carga.FAMA_INTERVALO_S / 60
     _gerar(banco, FamaFalsa([_os(1)]))
     f = FamaFalsa([_os(1), _os(2)])
-    r = _gerar(banco, f, agora=AGORA + timedelta(minutes=20))
+    r = _gerar(banco, f, agora=AGORA + timedelta(minutes=5))
     assert "pulou" in r and not f.pedidos and banco.syncs == 1          # nem lê a FAMA
 
 
@@ -557,7 +576,7 @@ def test_a_carga_so_liga_com_as_tres_chaves(falta):
 
 
 def test_so_o_servidor_le_a_fama(monkeypatch):
-    """Uma máquina só: o PC com a chave no .env nunca dá o segundo GET da hora (o critério do Nexus: o servidor é o
+    """Uma máquina só: o PC com a chave no .env nunca dá o segundo GET da volta (o critério do Nexus: o servidor é o
     Linux, `_maquina`)."""
     monkeypatch.setattr(fama, "_maquina", lambda: "pc")
     f = FamaFalsa([_os(1)])
@@ -594,6 +613,7 @@ def test_a_copia_de_prova_nunca_liga_a_fama(monkeypatch):
     cfg = carregar_config(env)
     assert "NEXUS_FAMA_CHAVE" not in cfg and cfg["NEXUS_CARGA_DADOS"] == "0"
     monkeypatch.setattr(carga, "ligar", lambda app: pytest.fail("a cópia de prova ligou a carga de dados"))
+    monkeypatch.setattr(carga, "ligar_fama", lambda app: pytest.fail("a cópia de prova ligou a volta da FAMA"))
     dados.instalar(_App(dict(cfg, GRIDCO_SQL_TOKEN="token-de-teste")))
     f = FamaFalsa([_os(1)])
     assert "NEXUS_FAMA_CHAVE" in fama.gerar_fama(cfg, NadaDeRede(), fama=f, agora=AGORA)["pulou"] and not f.pedidos
@@ -621,7 +641,7 @@ def test_a_sessao_da_fama_fecha(banco, monkeypatch):
 
 
 def test_a_falha_da_fama_nao_derruba_a_volta(monkeypatch):
-    """A FAMA é a última peça da volta de hora em hora, e o que ela levanta fica no estado e no log, nunca sobe."""
+    """O que a volta da FAMA levanta fica no estado e no log, nunca sobe."""
     app = _App()
     monkeypatch.setattr(fama, "gerar_fama", lambda config: (_ for _ in ()).throw(RuntimeError("banco fora")))
     carga._volta_fama(app)
@@ -638,9 +658,9 @@ def test_a_falha_da_fama_nao_derruba_a_volta(monkeypatch):
     assert carga._LACO["fama"]["erro"].startswith(("ImportError", "ModuleNotFoundError"))
 
 
-def test_o_laco_de_hora_em_hora_roda_a_fama_depois_das_outras_cargas_e_segue(monkeypatch):
-    """O laço de verdade (`carga.ligar`), uma volta: a carga, a geração, o almoxarifado e, por último, a FAMA; a FAMA que
-    cai fica no estado, sem a chave, e o laço continua vivo até mandarem parar."""
+def test_o_laco_de_hora_em_hora_nao_roda_mais_a_fama(monkeypatch):
+    """O laço de verdade (`carga.ligar`), duas voltas: a carga, a geração e o almoxarifado. A FAMA saiu dele (12/11/2026):
+    tem a volta dela, de 10 em 10 min, que não atrasa a carga da hora nem é atrasada por ela."""
     import threading
     ordem = []
     monkeypatch.setitem(carga._LACO, "thread", None)
@@ -648,22 +668,114 @@ def test_o_laco_de_hora_em_hora_roda_a_fama_depois_das_outras_cargas_e_segue(mon
     monkeypatch.setattr(carga, "_espera_s", lambda agora=None: 0)
     monkeypatch.setattr(carga, "rodar", lambda config: ordem.append("carga") or {})
     monkeypatch.setattr(carga, "gerar_geracao", lambda config: ordem.append("geracao") or {})
-    monkeypatch.setattr(carga, "gerar_almoxarifado", lambda config: ordem.append("almoxarifado") or {})
 
-    def fama_que_cai(config):
-        ordem.append("fama")
-        if ordem.count("fama") == 2:
-            carga._LACO["parar"].set()                  # a 2ª volta prova que a 1ª queda não matou o laço
-        raise RuntimeError(f"caiu levando {CHAVE_FAMA}")
-    monkeypatch.setattr(fama, "gerar_fama", fama_que_cai)
+    def almoxarifado(config):
+        ordem.append("almoxarifado")
+        if ordem.count("almoxarifado") == 2:
+            carga._LACO["parar"].set()
+        return {}
+    monkeypatch.setattr(carga, "gerar_almoxarifado", almoxarifado)
+    monkeypatch.setattr(fama, "gerar_fama", lambda config: ordem.append("fama") or {})
     carga.ligar(_App())
     try:
         carga._LACO["thread"].join(10)
     finally:
-        # se a FAMA nunca for chamada, a thread (com _espera_s = 0) seguiria girando depois que o monkeypatch se desfaz,
-        # já chamando o `rodar` de verdade: parar e esperar sempre (re-revisão de 11/11/2026)
+        # com a espera zerada, a thread seguiria girando depois do monkeypatch desfeito: parar e esperar sempre
         carga._LACO["parar"].set()
         carga._LACO["thread"].join(10)
     assert not carga._LACO["thread"].is_alive()
-    assert ordem == ["carga", "geracao", "almoxarifado", "fama"] * 2
+    assert ordem == ["carga", "geracao", "almoxarifado"] * 2
+
+
+@pytest.fixture
+def volta_fama(monkeypatch):
+    """O estado da volta da FAMA limpo para o teste, e a thread parada e esperada no fim (com a espera zerada, ela
+    giraria depois do monkeypatch desfeito, já chamando a FAMA de verdade)."""
+    import threading
+    monkeypatch.setitem(carga._FAMA, "thread", None)
+    monkeypatch.setitem(carga._FAMA, "parar", threading.Event())
+    monkeypatch.setitem(carga._FAMA, "lendo", threading.Lock())
+    yield carga._FAMA
+    carga._FAMA["parar"].set()
+    if carga._FAMA["thread"] is not None:
+        carga._FAMA["thread"].join(10)
+
+
+def test_a_fama_tem_a_volta_dela_de_10_em_10_minutos(volta_fama):
+    """De 10 em 10 min, numa grade fixa (aos :05, :15, ..., :55): o deploy que reinicia o Nexus não lê a FAMA a mais,
+    e a volta fica longe dos :40 da carga da hora."""
+    assert carga.FAMA_INTERVALO_S == 600
+    h = datetime(2026, 11, 12, 10, 0, tzinfo=BRT)
+    assert carga._espera_fama_s(h + timedelta(minutes=4, seconds=30)) == 30
+    assert carga._espera_fama_s(h + timedelta(minutes=5)) == 600
+    assert carga._espera_fama_s(h + timedelta(minutes=13, seconds=20)) == 100
+    assert carga._espera_fama_s(h + timedelta(minutes=59, seconds=59)) == 301
+    assert all(1 <= carga._espera_fama_s(h + timedelta(seconds=x)) <= 601 for x in range(0, 3600, 7))
+    # a espera que acordou um triz antes da hora não emenda outra volta no mesmo horário
+    assert carga._espera_fama_s(h + timedelta(minutes=4, seconds=59, microseconds=998000)) > 600
+
+
+def test_a_volta_da_fama_roda_na_thread_dela_e_segue_depois_da_queda(volta_fama, monkeypatch):
+    """A volta própria (`carga.ligar_fama`): a FAMA que cai fica no estado, sem a chave, e a volta continua; a carga da
+    hora nunca roda nela."""
+    chamadas = []
+    monkeypatch.setattr(carga, "_espera_fama_s", lambda agora=None: 0)
+    monkeypatch.setattr(carga, "rodar", lambda config: pytest.fail("a volta da FAMA rodou a carga da hora"))
+
+    def fama_que_cai(config):
+        chamadas.append(1)
+        if len(chamadas) == 2:
+            carga._FAMA["parar"].set()
+        raise RuntimeError(f"caiu levando {CHAVE_FAMA}")
+    monkeypatch.setattr(fama, "gerar_fama", fama_que_cai)
+    carga.ligar_fama(_App())
+    assert carga._FAMA["thread"].name == "nexus-fama"
+    carga._FAMA["thread"].join(10)
+    assert not carga._FAMA["thread"].is_alive() and len(chamadas) == 2
     assert carga._LACO["fama"]["erro"].startswith("RuntimeError") and CHAVE_FAMA not in carga._LACO["fama"]["erro"]
+
+
+def test_uma_volta_da_fama_de_cada_vez(volta_fama, monkeypatch):
+    """A leitura que demora (o prazo é de 90 s) não é sobreposta: a volta que chega no meio dela pula, sem ler."""
+    import threading
+    entrou, solta, chamadas = threading.Event(), threading.Event(), []
+
+    def fama_lenta(config):
+        chamadas.append(1)
+        entrou.set()
+        solta.wait(10)
+        return {"pulou": "nada mudou"}
+    monkeypatch.setattr(fama, "gerar_fama", fama_lenta)
+    t = threading.Thread(target=carga._volta_fama, args=(_App(),))
+    t.start()
+    try:
+        assert entrou.wait(10)
+        assert carga._volta_fama(_App()) is False and len(chamadas) == 1        # a segunda nem chama a FAMA
+    finally:
+        solta.set()
+        t.join(10)
+    assert carga._volta_fama(_App()) is True and len(chamadas) == 2              # acabada a primeira, a próxima lê
+
+
+@pytest.mark.parametrize("falta", fama.CHAVES)
+def test_sem_as_tres_chaves_a_volta_da_fama_nem_liga(volta_fama, falta):
+    carga.ligar_fama(_App(_config(**{falta: ""})))
+    assert carga._FAMA["thread"] is None and falta in carga._LACO["fama"]["pulou"]
+
+
+def test_fora_do_servidor_a_volta_da_fama_nem_liga(volta_fama, monkeypatch):
+    monkeypatch.setattr(fama, "_maquina", lambda: "pc")
+    carga.ligar_fama(_App())
+    assert carga._FAMA["thread"] is None and "servidor" in carga._LACO["fama"]["pulou"]
+
+
+def test_instalar_liga_a_carga_da_hora_e_a_volta_da_fama(monkeypatch):
+    from nexus import dados
+    ligadas = []
+    monkeypatch.setattr(carga, "ligar", lambda app: ligadas.append("carga"))
+    monkeypatch.setattr(carga, "ligar_fama", lambda app: ligadas.append("fama"))
+    dados.instalar(_App(_config()))
+    assert ligadas == ["carga", "fama"]
+    ligadas.clear()
+    dados.instalar(_App(_config(NEXUS_CARGA_DADOS="0")))             # desligada nesta máquina: nenhuma das duas
+    assert ligadas == []

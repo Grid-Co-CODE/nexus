@@ -6,7 +6,10 @@ X-Contractor-Key. É chave de PRESTADORA: só abre as rotas /v2/contractor/ (as 
 `GET /v2/contractor/service-orders/` devolve UMA lista JSON com todas as OS atribuídas à Grid, de uma vez, sem filtro nem
 página: 4.749 em 11/11 (de 08/2023 a hoje), em 42 usinas, em ~27 s. O detalhe da OS e o PATCH do status não entram aqui.
 
-A leitura: só GET nessa rota, UMA vez por hora (a volta da carga de dados, `carga.ligar`, aos :40) e sem repetir em laço.
+A leitura: só GET nessa rota, de 10 em 10 minutos, numa volta própria (`carga.ligar_fama`, aos :05, :15, ..., :55;
+12/11/2026, Levi: "pode estar fazendo requisição na OS da FAMA de 10 em 10 minutos [...] para os PCMs é melhor estar
+acompanhando sempre"), uma volta de cada vez e sem repetir em laço. A cota: é UMA chamada, que lista tudo, por volta: 6
+por hora, 144 por dia, longe de qualquer limite (a lista inteira levava ~27 s em 11/11/2026, dentro do prazo abaixo).
 O prazo de 90 s é da resposta INTEIRA (relógio monotônico), e não por leitura do socket, que é o que o `timeout` do
 requests mede: a resposta lida em blocos (`stream=True`, `raw.read1`, que devolve o que chegou) confere o prazo e o teto
 de tamanho (50 MB) a cada bloco, e um vigia corta a conexão no prazo (`raw.shutdown`) se a leitura ficar parada no socket.
@@ -14,24 +17,25 @@ Caso que criou a regra (revisão de 11/11/2026): a resposta que pinga devagar, s
 volta da carga sem limite. O redirecionamento NÃO é seguido (`allow_redirects=False`): o 3xx é "não li", e o
 X-Contractor-Key nunca vai a outro endereço nem a `http://`. Erro de rede, resposta que não é 200 (o 401 da chave
 recusada), que passa do prazo ou do teto, que não é JSON ou que não é lista vira "não li" (`NaoLi`), e nada se grava: a
-hora seguinte tenta de novo. A chave nunca vai ao log nem à mensagem: o texto que sai daqui é montado aqui (o tipo do erro,
+volta seguinte tenta de novo. A chave nunca vai ao log nem à mensagem: o texto que sai daqui é montado aqui (o tipo do erro,
 o código HTTP e a frase de erro da FAMA, cortada), e tudo passa por `sem_chave`. A sessão que o leitor abre, ele fecha.
 
 Liga só onde há as três chaves (`CHAVES`: a da FAMA, o token de escrita do banco e a do cadastro, que cifra o texto do
 cliente) E só no servidor (`_maquina`, o critério do Nexus: o servidor é o Linux), para o PC com a chave no .env nunca dar
-o segundo GET da hora. O teste (TESTING) nunca lê sem uma FAMA de mentira. A cópia de prova não chega aqui: o
+o segundo GET da volta (`porta`; a volta nem liga sem ela). O teste (TESTING) nunca lê sem uma FAMA de mentira. A cópia de prova não chega aqui: o
 `ferramentas/subir_copia_de_prova.py` (`preparar_ambiente`) desliga a carga de dados (NEXUS_CARGA_DADOS=0) e apaga a
 NEXUS_FAMA_CHAVE do ambiente.
 
 Não grava (o relatório diz por quê, só com contagens):
-- outra máquina gravou há menos de 50 min (regra 11; conferido antes de ler a FAMA e de novo antes de gravar);
+- outra máquina (ou outro processo) gravou há menos de `INTERVALO_MIN` (8 min, menos que a volta de 10: a gravação da
+  volta anterior nunca barra a seguinte; regra 11; conferido antes de ler a FAMA e de novo antes de gravar);
 - o livro do banco que não vem inteiro (`LeituraCurta`: a aba fora da listagem, menos linhas que o `row_count`): gravar
   por cima perderia as linhas e as cifras;
 - o de-para do cadastro lido vazio (a usina não ligaria em nada);
 - a trava contra encolher: a lista da FAMA só cresce, então a leitura com menos de 95% das linhas que o banco tem é
   "leitura incompleta". A OS que a FAMA tirar da Grid (até 5%) sai do fato, que é "a OS atribuída à Grid";
 - nada mudou (o sha do fato e da dimensão é o da última gravação) e o batimento de hoje já foi gravado: o livro não é
-  regravado a cada hora à toa, mas uma vez por dia sim, com a `atualizacao` dizendo "li, nada mudou" (o batimento: sem
+  regravado a cada volta à toa (seis voltas por hora não são seis gravações), mas uma vez por dia sim, com a `atualizacao` dizendo "li, nada mudou" (o batimento: sem
   ele, "sem novidade" e "a leitura quebrada há dias" eram o mesmo `gerado_em` velho).
 """
 import json
@@ -55,13 +59,15 @@ BLOCO = 64 * 1024
 DETALHE_BYTES = 4096            # do corpo de uma resposta de erro, só o começo (a frase da FAMA)
 RELOGIO = time.monotonic        # o relógio do prazo (o teste põe um de mentira)
 _Timer = threading.Timer        # o vigia do prazo (o teste põe um de mentira)
-INTERVALO_MIN = 50
+# a gravação de há menos disto (outra máquina ou outro processo: a troca do deploy) segura a volta; menor que os 10 min
+# da volta (`carga.FAMA_INTERVALO_S`), senão a gravação de uma volta barrava as seguintes e a FAMA nova esperava a hora
+INTERVALO_MIN = 8
 MINIMO_DO_BANCO = 0.95
 DETALHE_MAX = 120
 CHAVES = ("NEXUS_FAMA_CHAVE", "GRIDCO_SQL_TOKEN", "NEXUS_CHAVE_CADASTRO")
 LIVRO_CADASTRO = "cadastro_nexus"
 _BRT = timezone(timedelta(hours=-3))
-# o que a volta de hora em hora leva ao log (só contagens e os motivos)
+# o que a volta de 10 em 10 minutos leva ao log (só contagens e os motivos)
 PARA_O_LOG = ("pulou", "nao_li", "nao_grava", "erro", "lidas", "repetidas", "sem_id", "no_banco", "linhas", "projetos",
               "decididas", "ambiguas", "mudou", "situacao", "gravado", "fora_do_dominio", "datas", "leitura_s",
               "duracao_s")
@@ -246,17 +252,25 @@ def _mesmo_dia(gerado_em, agora: datetime) -> bool:
     return u.astimezone(_BRT).date() == agora.astimezone(_BRT).date()
 
 
+def porta(config) -> str | None:
+    """Por que a leitura da FAMA não roda nesta máquina, ou None: só com as três chaves (`CHAVES`) e só no servidor. A
+    volta de 10 em 10 min (`carga.ligar_fama`) nem liga sem ela, e o `gerar_fama` confere de novo."""
+    faltam = [k for k in CHAVES if not str(config.get(k) or "").strip()]
+    if faltam:
+        return f"a leitura da FAMA só liga com as três chaves ({', '.join(CHAVES)}); falta {', '.join(faltam)}"
+    if _maquina() != "servidor":
+        return ("a leitura da FAMA só roda no servidor (uma máquina só: o PC com a chave no .env não dá o segundo GET "
+                "da volta)")
+    return None
+
+
 def gerar_fama(config, sessao=None, *, fama=None, agora=None, gravar=True, forcar=False) -> dict:
     """Uma volta: confere o banco, lê a FAMA uma vez, monta o fato e a dimensão e grava o livro inteiro, conferido
     (`livros.publicar`). Devolve o relatório, só com contagens e motivos. `fama` = a sessão da FAMA (a de mentira nos
-    testes; sem ela, o leitor abre a dele e a fecha); `forcar` pula o portão dos 50 min e o "nada mudou" (nunca a trava
+    testes; sem ela, o leitor abre a dele e a fecha); `forcar` pula o portão do `INTERVALO_MIN` e o "nada mudou" (nunca a trava
     contra encolher)."""
-    faltam = [k for k in CHAVES if not str(config.get(k) or "").strip()]
-    if faltam:
-        return {"pulou": f"a leitura da FAMA só liga com as três chaves ({', '.join(CHAVES)}); falta {', '.join(faltam)}"}
-    if _maquina() != "servidor":
-        return {"pulou": "a leitura da FAMA só roda no servidor (uma máquina só: o PC com a chave no .env não dá o "
-                         "segundo GET da hora)"}
+    if motivo := porta(config):
+        return {"pulou": motivo}
     if config.get("TESTING") and fama is None:
         # a cópia de prova não chega aqui: o ferramentas/subir_copia_de_prova.py (preparar_ambiente) desliga a carga de
         # dados (NEXUS_CARGA_DADOS=0) e apaga a NEXUS_FAMA_CHAVE
@@ -270,7 +284,8 @@ def gerar_fama(config, sessao=None, *, fama=None, agora=None, gravar=True, forca
         cofre = Cofre(config["NEXUS_CHAVE_CADASTRO"])
     except CifraErro:
         return {"nao_grava": "a NEXUS_CHAVE_CADASTRO não abre o Cofre: sem cifrar o título e a descrição, nada se grava"}
-    # o banco ANTES da FAMA (a leitura dela leva ~27 s): a FAMA só é lida quando o resto da volta pode terminar
+    # o banco ANTES da FAMA (a leitura dela leva ~27 s): a FAMA só é lida quando o resto da volta pode terminar, e a
+    # gravação de há menos de `INTERVALO_MIN` (outro processo) segura antes de qualquer GET na FAMA
     try:
         banco = ler_banco(base, s)
     except LeituraCurta as e:

@@ -118,8 +118,9 @@ OPCIONAIS = ("NEXUS_CHAVE_CADASTRO", "NEXUS_ARMAZEM_LOCAL",
              "NEXUS_FAMA_PROGRAMA",
              # as OS que os clientes abrem na FAMA (11/11/2026): a chave da API (api.fama.energy, cabeçalho
              # X-Contractor-Key), posta pela T.I. no .env do servidor; é de PRESTADORA: só abre /v2/contractor/. A volta
-             # de hora em hora da carga de dados lê a lista das OS e grava o nexus_os_fama (nexus/dados/fama.py, fase 1:
-             # sombra), só onde há também o GRIDCO_SQL_TOKEN e a NEXUS_CHAVE_CADASTRO
+             # de 10 em 10 minutos (nexus/dados/carga.ligar_fama, 12/11/2026) lê a lista das OS e grava o nexus_os_fama
+             # (nexus/dados/fama.py, fase 1: sombra), só no servidor e só onde há também o GRIDCO_SQL_TOKEN e a
+             # NEXUS_CHAVE_CADASTRO
              "NEXUS_FAMA_CHAVE")
 
 
