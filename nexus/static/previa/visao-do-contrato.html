@@ -1,0 +1,680 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Visão do contrato · Nexus</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css">
+<style>
+/* Mockup da Visão do contrato (pedido da Ana, 12/11/2026), para a avaliação de Contratos e dos setores. Tokens do
+   nexus.css (tema escuro navy, verde Grid). Dados ilustrativos: cliente, CNPJ, pessoas e usinas são fictícios.
+
+   Enxuta desde 12/11/2026 à noite (Levi: "É quase a tela inteira, só de nada com nada [...] A gente está vendo o quê?
+   Regras do contrato. Então, tem que mostrar regras do contrato. Aí tem um filtro para isso, um filtro para aquilo. Aí
+   uma porrada de KPI. Aí tem outro filtro lá em cima de contrato. Aí tem um botão de nova regra. Se decida, enxugue";
+   o Prontuário da usina saiu: "não tem nada a ver"). A regra que ficou, para toda aba:
+   - o contrato em DUAS linhas (o nome, que é também a troca de contrato, e uma linha de fatos); a ficha inteira só no
+     clique em "Dados do contrato";
+   - a aba não repete o título nem explica a si mesma: abre no conteúdo;
+   - no máximo UM controle por aba, e só quando muda o que se vê (Todas | Acordadas; Por usina | Por cliente);
+   - o que acrescenta (regra nova, entrada nova) é a última linha da tabela, não um botão no alto;
+   - um nível de superfície: a tabela é a única caixa. */
+:root{
+  --fundo:#090d18;--superficie:#161d30;--superficie-2:#1c2640;--superficie-3:#243154;--barra:#0d1526;
+  --tinta:#e9eef6;--tinta-2:#c3cad7;--mudo:#96a0b4;--fraco:#767d92;
+  --linha:rgba(255,255,255,.09);--linha-forte:rgba(255,255,255,.16);
+  --verde:#a3d900;--verde-suave:rgba(163,217,0,.12);--verde-texto:#c4e755;--sobre-verde:#10170a;
+  --ok:#4ade80;--ok-suave:rgba(74,222,128,.14);--alerta:#ffd83d;--alerta-suave:rgba(255,216,61,.14);
+  --severo:#ff8f3c;--severo-suave:rgba(255,143,60,.15);--critico:#ff5b6e;--critico-suave:rgba(255,91,110,.14);
+  --info:#7fb8ff;--info-suave:rgba(91,157,255,.14);
+  --font-sans:"Poppins",system-ui,sans-serif;--font-mono:"IBM Plex Mono",Consolas,monospace;
+  --raio-tag:6px;--raio-controle:8px;--raio-md:10px;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--fundo);color:var(--tinta);font:400 13.5px/1.5 var(--font-sans)}
+button,input,select,textarea{font:inherit;color:inherit}
+a{color:var(--verde-texto)}
+.num{font-family:var(--font-mono);font-variant-numeric:tabular-nums}
+.mudo{color:var(--mudo)}
+.so-leitor{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+:focus-visible{outline:2px solid var(--verde);outline-offset:2px}
+
+/* a casca só existe fora do Nexus (tela cheia): dentro da moldura o topo é o do Nexus */
+.topo{display:flex;align-items:center;gap:14px;height:52px;padding:0 24px;background:var(--barra);border-bottom:1px solid var(--linha)}
+.marca{font:700 16px/1 var(--font-sans);letter-spacing:-.01em}.marca b{color:var(--verde)}
+.marca span{margin-left:12px;padding-left:12px;border-left:1px solid var(--linha-forte);font-weight:600}
+.selo-mock{margin-left:auto;font:500 11.5px/1 var(--font-sans);color:var(--mudo)}
+main{padding:20px 24px 56px;max-width:1240px;margin:0 auto}
+html.embutido .topo{display:none}
+html.embutido main{padding:16px 2px 40px;max-width:none}
+
+/* o contrato em duas linhas */
+.ct-linha{display:flex;align-items:baseline;gap:6px 14px;flex-wrap:wrap}
+.ct-nome{position:relative;display:inline-flex;align-items:center;max-width:100%}
+.ct-nome select{appearance:none;-webkit-appearance:none;border:0;background:transparent;padding:0 26px 0 0;margin:0;cursor:pointer;
+  font:700 22px/1.25 var(--font-sans);letter-spacing:-.02em;color:var(--tinta);max-width:100%;text-overflow:ellipsis;border-radius:6px;field-sizing:content}
+.ct-nome select option{font:400 14px var(--font-sans);background:var(--superficie);color:var(--tinta)}
+.ct-nome .ph{position:absolute;right:4px;top:50%;margin-top:-8px;font-size:16px;color:var(--mudo);pointer-events:none}
+.ct-cod{color:var(--tinta-2);font-size:13px}
+.ct-tipo{color:var(--mudo);font-size:13px}
+.ct-mais{margin-left:auto}
+.fatos{display:flex;flex-wrap:wrap;gap:4px 30px;margin:8px 0 0;padding:0}
+.fatos div{display:flex;align-items:baseline;gap:8px;min-width:0}
+.fatos dt{color:var(--mudo);font-size:12px}
+.fatos dd{margin:0;font-weight:500;color:var(--tinta)}
+.fatos dd small{font-weight:400;color:var(--mudo);font-size:12px;margin-left:6px}
+.ficha{margin:14px 0 0;padding:14px 0 2px;border-top:1px solid var(--linha);display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px 32px}
+.ficha dt{color:var(--mudo);font-size:11.5px}
+.ficha dd{margin:1px 0 0;color:var(--tinta-2)}
+.ficha dd b{color:var(--tinta);font-weight:600}
+.ficha .larga{grid-column:1 / -1}
+.usinas{list-style:none;display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 0;padding:0}
+.usinas li{font-size:12px;padding:3px 9px;border-radius:999px;border:1px solid var(--linha);color:var(--tinta-2)}
+.usinas .num{color:var(--mudo);margin-left:5px}
+
+/* as abas: presas no alto enquanto a tabela rola */
+.abas{display:flex;gap:2px;margin:16px 0 0;border-bottom:1px solid var(--linha);overflow-x:auto;position:sticky;top:0;z-index:5;background:var(--fundo)}
+.abas a{padding:10px 14px;color:var(--mudo);text-decoration:none;font-weight:600;font-size:13px;border-bottom:2px solid transparent;white-space:nowrap}
+.abas a:hover{color:var(--tinta)}
+.abas a[aria-current="page"]{color:var(--tinta);border-color:var(--verde)}
+.abas a b{margin-left:7px;font:600 11px/1 var(--font-mono);color:var(--critico)}
+
+/* a régua de cada aba: o período ou a contagem à esquerda, o único controle à direita */
+.regua{display:flex;align-items:center;justify-content:space-between;gap:10px 16px;flex-wrap:wrap;margin:16px 0 12px;min-height:32px}
+h2{margin:0;font:600 15px/1.3 var(--font-sans)}
+h3{margin:0;font:600 13.5px/1.3 var(--font-sans)}
+.seg{display:inline-flex;border:1px solid var(--linha-forte);border-radius:var(--raio-controle);overflow:hidden}
+.seg button{border:0;background:transparent;padding:6px 13px;cursor:pointer;font-size:12.5px;font-weight:600;color:var(--tinta-2)}
+.seg button b{margin-left:6px;font:500 11.5px/1 var(--font-mono);color:var(--mudo)}
+.seg button[aria-pressed="true"]{background:var(--verde-suave);color:var(--tinta)}
+.seg button[aria-pressed="true"] b{color:var(--verde-texto)}
+.seg button+button{border-left:1px solid var(--linha-forte)}
+.linkbtn{display:inline-flex;align-items:center;gap:5px;border:0;background:none;padding:0;color:var(--verde-texto);cursor:pointer;font-size:12.5px;font-weight:600}
+.linkbtn:hover{text-decoration:underline}
+.btn{display:inline-flex;align-items:center;gap:8px;padding:7px 13px;border-radius:var(--raio-controle);border:1px solid var(--linha-forte);background:transparent;cursor:pointer;font-weight:600;font-size:12.5px;white-space:nowrap}
+.btn:hover{background:var(--superficie-2)}
+.btn--prim{background:var(--verde);border-color:var(--verde);color:var(--sobre-verde)}
+.btn--prim:hover{background:#8bbf00}
+.nota{font-size:12px;color:var(--mudo);margin:10px 0 0;max-width:86ch}
+.nota b{color:var(--tinta-2)}
+.bloco{margin-top:26px}
+.bloco > h3{margin-bottom:10px}
+
+/* a tabela (a única superfície) */
+.rolavel{overflow-x:auto;border-radius:var(--raio-md)}
+.tab{width:100%;border-collapse:collapse;background:var(--superficie);border:1px solid var(--linha);border-radius:var(--raio-md);overflow:hidden;font-size:13px}
+.tab th{text-align:left;font:500 11.5px/1.2 var(--font-sans);color:var(--mudo);padding:9px 14px;border-bottom:1px solid var(--linha);background:var(--barra);white-space:nowrap}
+.tab td{padding:11px 14px;border-bottom:1px solid var(--linha);vertical-align:top}
+.tab tr:last-child td{border-bottom:0}
+.tab td.c,.tab th.c{text-align:center}
+.tab td.r,.tab th.r{text-align:right}
+.tab tr.grupo td{background:var(--barra);font:600 12px/1 var(--font-sans);color:var(--verde-texto);padding:9px 14px}
+.tab tr.grupo td span{float:right;font:500 11.5px/1 var(--font-mono);color:var(--mudo)}
+.tab tr.mais td{padding:0}
+.tab tr.mais button{display:flex;align-items:center;gap:8px;width:100%;border:0;background:transparent;padding:12px 14px;cursor:pointer;color:var(--mudo);font-size:12.5px;font-weight:600;text-align:left}
+.tab tr.mais button:hover{color:var(--verde-texto);background:var(--superficie-2)}
+.nome{font-weight:600}
+.sub{display:block;color:var(--mudo);font-size:11.5px;margin-top:2px}
+.antes{display:block;color:var(--mudo);font-size:12px;margin-top:3px}
+.antes s{color:var(--fraco);text-decoration-color:rgba(255,255,255,.3)}
+.vazio-c{color:var(--fraco)}
+.hist{list-style:none;margin:0;padding:2px 0 2px 14px;border-left:2px solid var(--linha-forte);font-size:12.5px;display:grid;gap:10px}
+.hist li span{display:block;color:var(--tinta-2);margin-top:2px}
+tr.hist-l td{background:var(--barra)}
+
+/* selos */
+.pill{display:inline-flex;align-items:center;gap:6px;font:600 11px/16px var(--font-sans);padding:2px 8px;border-radius:var(--raio-tag);white-space:nowrap;vertical-align:1px}
+.t-ok{color:var(--ok);background:var(--ok-suave)}.t-alerta{color:var(--alerta);background:var(--alerta-suave)}
+.t-severo{color:var(--severo);background:var(--severo-suave)}.t-info{color:var(--info);background:var(--info-suave)}
+.t-neutro{color:var(--mudo);background:var(--superficie-2)}.t-verde{color:var(--verde-texto);background:var(--verde-suave)}
+.c-ok{color:var(--ok)}.c-alerta{color:var(--alerta)}.c-critico{color:var(--critico)}
+.ponto{display:inline-block;width:9px;height:9px;border-radius:50%;vertical-align:1px}
+.p-ok{background:var(--ok)}.p-alerta{background:var(--alerta)}.p-critico{background:var(--critico)}.p-severo{background:var(--severo)}
+.p-neutro{background:var(--superficie-3);box-shadow:inset 0 0 0 1px var(--linha-forte)}
+.legenda{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--mudo)}
+.legenda span{display:inline-flex;align-items:center;gap:6px}
+
+/* calendário */
+.cal{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));border:1px solid var(--linha);border-radius:var(--raio-md);overflow:hidden;background:var(--superficie)}
+.cal .dsem{padding:8px 10px;font:500 11.5px/1 var(--font-sans);color:var(--mudo);background:var(--barra);border-bottom:1px solid var(--linha)}
+.cal .dia{min-height:96px;padding:7px 7px 8px;border-right:1px solid var(--linha);border-bottom:1px solid var(--linha);display:flex;flex-direction:column;gap:4px;min-width:0}
+.cal .dia:nth-child(7n){border-right:0}
+.cal .dia.fora{background:rgba(0,0,0,.18)}
+.cal .dia.hoje{box-shadow:inset 0 0 0 1px var(--verde)}
+.cal .n{font:600 12px/1 var(--font-mono);color:var(--tinta-2);margin-bottom:2px}
+.cal .dia.hoje .n{color:var(--verde-texto)}
+.cal .fer{font-size:10.5px;color:var(--mudo)}
+.ev{display:block;font-size:11px;line-height:1.3;padding:3px 6px;border-radius:5px;border-left:3px solid;background:var(--superficie-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ev.ok{border-color:var(--ok)}.ev.alerta{border-color:var(--alerta)}.ev.critico{border-color:var(--critico)}.ev.neutro{border-color:var(--superficie-3);color:var(--tinta-2)}
+.grade2{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:24px;align-items:start}
+.lista-lat h3{margin-bottom:8px}
+.lista-lat ul{list-style:none;margin:0 0 18px;padding:0;border-top:1px solid var(--linha)}
+.lista-lat li{display:grid;grid-template-columns:auto minmax(0,1fr);gap:10px;padding:9px 0;border-bottom:1px solid var(--linha);font-size:12.5px}
+.lista-lat li .ponto{margin-top:5px}
+.lista-lat small{display:block;color:var(--mudo)}
+.ano td,.ano th{text-align:center;padding:7px 4px}
+.ano td:first-child,.ano th:first-child{text-align:left;white-space:nowrap;padding-left:14px}
+.cel{display:inline-block;width:100%;max-width:38px;height:14px;border-radius:4px}
+
+/* entregáveis */
+.barra-prog{height:6px;border-radius:999px;background:var(--superficie-3);overflow:hidden;width:120px}
+.barra-prog i{display:block;height:100%;background:var(--ok)}
+.check{display:inline-flex;align-items:center;gap:7px;cursor:pointer;font-size:12.5px}
+.check input{width:16px;height:16px;accent-color:var(--verde);cursor:pointer}
+.carimbo{display:block;color:var(--mudo);font-size:11.5px;margin-top:3px;white-space:nowrap}
+
+/* metas */
+.kpis{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));background:var(--superficie);border:1px solid var(--linha);border-radius:var(--raio-md);overflow:hidden}
+.kpi{border:0;border-right:1px solid var(--linha);background:transparent;padding:12px 14px 10px;cursor:pointer;text-align:left;min-width:0}
+.kpi:last-child{border-right:0}
+.kpi:hover{background:var(--superficie-2)}
+.kpi[aria-pressed="true"]{box-shadow:inset 0 -2px 0 var(--verde);background:var(--superficie-2)}
+.kpi small{color:var(--mudo);font-size:11.5px;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.kpi .v{font:600 22px/1.15 var(--font-mono);margin:5px 0 1px;display:block}
+.kpi .d{font-size:11.5px;color:var(--mudo);display:block}
+.kpi svg{display:block;width:100%;height:22px;margin-top:6px}
+.grafico{margin-top:16px}
+.grafico-cab{display:flex;justify-content:space-between;gap:10px 16px;align-items:center;flex-wrap:wrap;margin-bottom:6px}
+/* o gráfico para em 860 px: esticado na tela larga, as barras e os números dobravam de tamanho */
+.grafico svg{display:block;width:100%;max-width:860px;height:auto}
+.fonte{font-size:11.5px;color:var(--mudo)}
+
+/* financeiro */
+.resumo{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));margin:0;border-top:1px solid var(--linha);border-bottom:1px solid var(--linha)}
+.resumo div{padding:12px 16px;border-right:1px solid var(--linha)}
+.resumo div:first-child{padding-left:0}
+.resumo div:last-child{border-right:0}
+.resumo dt{color:var(--mudo);font-size:11.5px}
+.resumo dd{margin:3px 0 0;font:600 18px/1.3 var(--font-mono)}
+.resumo dd small{display:block;font:400 11.5px/1.4 var(--font-sans);color:var(--mudo)}
+tr.extra td:first-child{box-shadow:inset 3px 0 0 var(--info)}
+
+/* diálogo e aviso */
+dialog{width:min(540px,94vw);background:var(--superficie);color:var(--tinta);border:1px solid var(--linha-forte);border-radius:12px;padding:22px}
+dialog::backdrop{background:rgba(5,8,16,.65)}
+dialog h2{font-size:17px}
+.campo{display:grid;gap:5px;margin-top:12px}
+.campo label{font:500 12px/1 var(--font-sans);color:var(--mudo)}
+.campo input,.campo select,.campo textarea{width:100%;padding:8px 10px;border-radius:var(--raio-controle);border:1px solid var(--linha-forte);background:var(--superficie-2)}
+.dupla{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.acoes{display:flex;gap:8px;margin-top:18px;padding-top:14px;border-top:1px solid var(--linha)}
+.toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:var(--superficie-3);border:1px solid var(--linha-forte);padding:10px 16px;border-radius:var(--raio-controle);font-size:12.5px;z-index:60;box-shadow:0 10px 30px rgba(0,0,0,.4)}
+.rodape{margin-top:36px;color:var(--fraco);font-size:11.5px}
+
+@media (max-width:1100px){.grade2{grid-template-columns:minmax(0,1fr)}.kpis{grid-template-columns:repeat(3,minmax(0,1fr))}.kpi:nth-child(3){border-right:0}.kpi:nth-child(-n+3){border-bottom:1px solid var(--linha)}.ficha{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:820px){main{padding:14px 16px 40px}.resumo{grid-template-columns:repeat(2,minmax(0,1fr))}.resumo div:nth-child(2){border-right:0}.resumo div:nth-child(3){padding-left:0}.cal .dia{min-height:64px}.ev{font-size:10px}.ct-mais{margin-left:0}}
+@media (max-width:640px){.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.kpi{border-bottom:1px solid var(--linha)}.kpi:nth-child(3){border-right:1px solid var(--linha)}.kpi:nth-child(2n){border-right:0}.ficha{grid-template-columns:minmax(0,1fr)}.ct-nome select{font-size:18px}.dupla{grid-template-columns:1fr}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;scroll-behavior:auto!important}}
+</style>
+</head>
+<body>
+<header class="topo">
+  <div class="marca"><b>Grid</b> Co.<span>Nexus</span></div>
+  <span class="selo-mock">Mockup, dados ilustrativos</span>
+</header>
+<main id="main" tabindex="-1"></main>
+<dialog id="dlg" aria-labelledby="dlg-t"></dialog>
+
+<script>
+"use strict";
+// na moldura do Nexus (a tela Contratos e clientes › Prévia), sem o topo próprio
+if (window.self !== window.top) document.documentElement.classList.add("embutido");
+/* ── os dados (fictícios) ────────────────────────────────────────────────────────────────────────────────────── */
+var HOJE = new Date(2026, 10, 13);
+var EU = "Marina Alves";
+var MESES = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
+var ULT12 = ["dez/25", "jan/26", "fev/26", "mar/26", "abr/26", "mai/26", "jun/26", "jul/26", "ago/26", "set/26", "out/26", "nov/26"];
+var USINAS = [
+  {id: "HZ1", nome: "UFV Horizonte I", mwp: 5.2, cidade: "Janaúba/MG"},
+  {id: "HZ2", nome: "UFV Horizonte II", mwp: 5.2, cidade: "Janaúba/MG"},
+  {id: "HZ3", nome: "UFV Horizonte III", mwp: 3.8, cidade: "Janaúba/MG"},
+  {id: "SA1", nome: "UFV Serra Azul 1", mwp: 4.5, cidade: "Pirapora/MG"},
+  {id: "SA2", nome: "UFV Serra Azul 2", mwp: 4.5, cidade: "Pirapora/MG"},
+  {id: "LC", nome: "UFV Lagoa Clara", mwp: 2.9, cidade: "Bom Jesus da Lapa/BA"}];
+var CONTRATOS = [
+  {cod: "CT-2025-014", nome: "Full O&M", cliente: "Solar Horizonte Energia S.A.", cnpj: "12.345.678/0001-90"},
+  {cod: "CT-2024-031", nome: "O&M Básico", cliente: "Vale do Sol Geração Ltda.", cnpj: "98.765.432/0001-10"},
+  {cod: "CT-2026-002", nome: "Full O&M", cliente: "Cerrado GD Participações S.A.", cnpj: "45.678.912/0001-34"}];
+
+var REGRAS = [
+  {cat: "Entregáveis por setor", nome: "Relatório mensal de operação (RMO)", setor: "Engenharia de O&M", cl: "7.2", contratual: "Até o 5º dia útil do mês seguinte", hist: []},
+  {cat: "Entregáveis por setor", nome: "Boletim de medição", setor: "Contratos", cl: "9.1", contratual: "Até o 10º dia útil do mês seguinte", acordada: "Até o 8º dia útil do mês seguinte",
+   hist: [{quem: "Marina Alves", setor: "Contratos", quando: "14/08/2026 16:20", de: "Até o 10º dia útil (contratual)", para: "Até o 8º dia útil", origem: "Ata da reunião mensal de julho", motivo: "O cliente fecha o caixa no dia 15 e pediu o boletim antes."}]},
+  {cat: "Entregáveis por setor", nome: "Relatório semanal de ocorrências", setor: "COS", cl: "", contratual: "", acordada: "Toda segunda-feira, até 12 h",
+   hist: [{quem: "Rafael Costa", setor: "COS", quando: "02/04/2025 09:10", de: "Não estava no contrato", para: "Toda segunda-feira, até 12 h", origem: "E-mail do cliente", motivo: "Pedido no kick-off do contrato."}]},
+  {cat: "Entregáveis por setor", nome: "Termografia anual", setor: "Engenharia de O&M", cl: "7.5", contratual: "Uma por usina por ano, entregue até 31/10", hist: []},
+  {cat: "SLA", nome: "Chegada em falha crítica (usina parada)", setor: "Supervisão de Campo", cl: "11.1", contratual: "Até 4 h", acordada: "Até 6 h na UFV Lagoa Clara; 4 h nas demais",
+   hist: [{quem: "Marina Alves", setor: "Contratos", quando: "10/01/2026 11:02", de: "Até 4 h (contratual)", para: "Até 6 h na UFV Lagoa Clara; 4 h nas demais", origem: "Aditivo 1", motivo: "A base mais próxima da Lagoa Clara fica a 230 km."}]},
+  {cat: "SLA", nome: "Atendimento a falha não crítica", setor: "Supervisão de Campo", cl: "11.2", contratual: "Até 48 h", hist: []},
+  {cat: "SLA", nome: "Disponibilidade mínima", setor: "Performance", cl: "12.1", contratual: "98,5% no mês, por usina", hist: []},
+  {cat: "Rotinas", nome: "Manutenção preventiva", setor: "PCM", cl: "8.1", contratual: "Semestral (abril e outubro)", hist: []},
+  {cat: "Rotinas", nome: "Inspeção de trackers", setor: "PCM", cl: "8.2", contratual: "Trimestral", hist: []},
+  {cat: "Rotinas", nome: "Limpeza de módulos", setor: "Zeladoria", cl: "8.3", contratual: "2 por ano", acordada: "3 por ano (maio, agosto e outubro)",
+   hist: [{quem: "Paula Nunes", setor: "Contratos", quando: "21/10/2026 15:45", de: "2 por ano + 1 extra sob demanda", para: "3 por ano (maio, agosto e outubro)", origem: "Aditivo 2", motivo: "Sujidade alta na estiagem; a extra virou fixa."},
+          {quem: "Paula Nunes", setor: "Contratos", quando: "05/06/2026 10:12", de: "2 por ano (contratual)", para: "2 por ano + 1 extra sob demanda", origem: "Ata da reunião mensal de maio", motivo: "Teste de uma limpeza extra antes do aditivo."}]},
+  {cat: "Rotinas", nome: "Roçagem", setor: "Zeladoria", cl: "8.4", contratual: "Bimestral", hist: []},
+  {cat: "Rotinas", nome: "Zeladoria (área, drenagem e cercas)", setor: "Zeladoria", cl: "8.4", contratual: "Mensal", hist: []},
+  {cat: "Penalidades", nome: "Disponibilidade abaixo da mínima", setor: "Performance", cl: "12.3", contratual: "Desconto de 1% da mensalidade a cada 0,5 p.p. abaixo de 98,5%, até 10%", hist: []},
+  {cat: "Penalidades", nome: "Atraso no RMO", setor: "Engenharia de O&M", cl: "7.4", contratual: "Multa de 0,2% da mensalidade por dia útil de atraso, até 2%", hist: []},
+  {cat: "Benefícios", nome: "Bônus de disponibilidade", setor: "Performance", cl: "12.4", contratual: "1,5% da mensalidade com disponibilidade igual ou acima de 99,5% no mês", hist: []},
+  {cat: "Medição e faturamento", nome: "Data limite de medição", setor: "Contratos", cl: "9.1", contratual: "Dia 10 de cada mês", hist: []},
+  {cat: "Medição e faturamento", nome: "Hora extra", setor: "Contratos", cl: "9.4", contratual: "R$ 185,00 por hora de técnico, com aprovação prévia por e-mail", hist: []},
+  {cat: "Medição e faturamento", nome: "Reajuste", setor: "Contratos", cl: "14.1", contratual: "IPCA acumulado em 12 meses, no aniversário (01/03)", hist: []}];
+var CATS = ["Entregáveis por setor", "SLA", "Rotinas", "Penalidades", "Benefícios", "Medição e faturamento"];
+
+// o calendário de novembro/2026: dia, rotina, frequência, setor, entregue em
+var CAL = [
+  {d: 3, nome: "Relatório semanal", freq: "Semanal", setor: "COS", ent: "03/11"},
+  {d: 9, nome: "Relatório semanal", freq: "Semanal", setor: "COS", ent: "09/11"},
+  {d: 16, nome: "Relatório semanal", freq: "Semanal", setor: "COS"},
+  {d: 23, nome: "Relatório semanal", freq: "Semanal", setor: "COS"},
+  {d: 30, nome: "Relatório semanal", freq: "Semanal", setor: "COS"},
+  {d: 6, nome: "Zeladoria · Horizonte III", freq: "Mensal", setor: "Zeladoria"},
+  {d: 9, nome: "RMO de outubro", freq: "Mensal", setor: "Engenharia de O&M", ent: "09/11"},
+  {d: 10, nome: "Medição de outubro", freq: "Mensal", setor: "Contratos", ent: "10/11"},
+  {d: 12, nome: "Boletim de medição", freq: "Mensal", setor: "Contratos", ent: "11/11"},
+  {d: 18, nome: "Reunião mensal com o cliente", freq: "Mensal", setor: "Contratos"},
+  {d: 20, nome: "Roçagem · Serra Azul 1 e 2", freq: "Mensal", setor: "Zeladoria"},
+  {d: 25, nome: "Zeladoria mensal · 5 usinas", freq: "Mensal", setor: "Zeladoria"},
+  {d: 27, nome: "Inspeção de trackers", freq: "Trimestral", setor: "PCM"}];
+var ATRASADAS_ANTES = [{nome: "Termografia anual · UFV Lagoa Clara", quando: "venceu em 31/10", setor: "Engenharia de O&M"}];
+// o ano: rotina x mês (ok entregue, critico atrasada, alerta vence em até 1 semana, neutro prevista, vazio)
+var ANO = [
+  {nome: "Manutenção preventiva", freq: "Semestral", m: {3: "ok", 9: "ok"}},
+  {nome: "Inspeção de trackers", freq: "Trimestral", m: {1: "ok", 4: "ok", 7: "ok", 10: "neutro"}},
+  {nome: "Limpeza de módulos", freq: "3 por ano", m: {4: "ok", 7: "ok", 9: "ok"}},
+  {nome: "Termografia anual", freq: "Anual", m: {9: "critico"}},
+  {nome: "Reajuste (IPCA)", freq: "Anual", m: {2: "ok"}},
+  {nome: "Relatório anual", freq: "Anual", m: {11: "neutro"}}];
+
+// o atendimento de novembro por usina, na ordem das colunas
+var COLS_AT = ["RMO", "Boletim", "Semanais", "Zeladoria", "Roçagem", "Inspeção de trackers"];
+var AT = {
+  HZ1: ["ok", "ok", "2/5", "neutro", "na", "neutro"],
+  HZ2: ["ok", "ok", "2/5", "neutro", "na", "neutro"],
+  HZ3: ["ok", "ok", "2/5", "critico", "na", "na"],
+  SA1: ["ok", "ok", "2/5", "neutro", "alerta", "neutro"],
+  SA2: ["ok", "ok", "2/5", "neutro", "alerta", "neutro"],
+  LC: ["ok", "ok", "2/5", "neutro", "na", "na"]};
+var POR_CLIENTE = [
+  {c: CONTRATOS[0], usinas: 6, ent: "18 de 19", sla: "100%", rot: "11 de 12", pend: "1 atrasada", pct: 94},
+  {c: CONTRATOS[1], usinas: 4, ent: "9 de 11", sla: "92%", rot: "7 de 8", pend: "2 atrasadas", pct: 86},
+  {c: CONTRATOS[2], usinas: 11, ent: "30 de 30", sla: "97%", rot: "21 de 21", pend: "nenhuma", pct: 98}];
+
+// os marcos do mês (entregáveis), por usina: true entregue, false pendente, null não se aplica
+var MARCOS = [
+  {nome: "RMO de outubro", setor: "Engenharia de O&M", u: {HZ1: true, HZ2: true, HZ3: true, SA1: true, SA2: true, LC: true}},
+  {nome: "Boletim de medição", setor: "Contratos", u: {HZ1: true, HZ2: true, HZ3: true, SA1: true, SA2: true, LC: true}},
+  {nome: "Zeladoria mensal", setor: "Zeladoria", u: {HZ1: false, HZ2: false, HZ3: false, SA1: false, SA2: false, LC: false}},
+  {nome: "Roçagem bimestral", setor: "Zeladoria", u: {HZ1: null, HZ2: null, HZ3: null, SA1: false, SA2: false, LC: null}},
+  {nome: "Inspeção de trackers", setor: "PCM", u: {HZ1: false, HZ2: false, HZ3: null, SA1: false, SA2: false, LC: null}}];
+var CARIMBO = {"RMO de outubro": "Lúcia Ramos · 09/11 17:40", "Boletim de medição": "Marina Alves · 11/11 10:15"};
+
+var KPIS = [
+  {id: "disp", nome: "Disponibilidade", meta: 98.5, unid: "%", fonte: "Performance › Gerencial",
+   h: [99.3, 98.9, 99.6, 99.2, 98.1, 99.0, 99.4, 99.5, 98.2, 99.2, 99.3, 99.1]},
+  {id: "pr", nome: "PR", meta: 78.0, unid: "%", fonte: "Performance › Gerencial",
+   h: [79.1, 78.4, 77.2, 79.8, 80.2, 80.6, 80.1, 79.5, 78.8, 78.1, 79.0, 79.4]},
+  {id: "ger", nome: "Geração sobre a meta", meta: 100, unid: "%", fonte: "Performance › Gerencial",
+   h: [101.2, 98.4, 95.1, 102.3, 104.0, 99.2, 100.8, 101.5, 97.3, 96.0, 98.7, 96.2]},
+  {id: "sla", nome: "Falha crítica no SLA", meta: 95, unid: "%", fonte: "COS › Ocorrências",
+   h: [100, 100, 92, 100, 100, 88, 100, 100, 95, 100, 100, 100]},
+  {id: "prev", nome: "Preventivas no prazo", meta: 100, unid: "%", fonte: "PCM › Acompanhamento",
+   h: [100, 100, 100, 100, 96, 100, 100, 100, 100, 92, 92, 92]},
+  {id: "ronda", nome: "Rondas feitas", meta: 100, unid: "%", fonte: "Usinas 360° › Rondas",
+   h: [100, 96, 100, 100, 100, 92, 100, 100, 100, 100, 96, 97]}];
+
+// o financeiro de 2026: competência (0-11), referente a, valor, medição prevista, status, nota, extra
+var FIN = [];
+(function () {
+  var base = 186400, reaj = 195347.20;
+  var st = ["paga", "paga", "paga", "paga", "paga", "paga", "paga", "atencao", "paga", "aprovacao", "futura", "futura"];
+  for (var m = 0; m < 12; m++) {
+    var mesMed = m + 1, ano = mesMed > 11 ? 2027 : 2026;
+    FIN.push({comp: m, ref: "Mensalidade " + MESES[m] + "/26" + (m === 2 ? ", a 1ª com o reajuste (IPCA 4,8%)" : ""),
+              valor: m < 2 ? base : reaj, med: "10/" + String((mesMed % 12) + 1).padStart(2, "0") + "/" + ano, st: st[m],
+              nota: m === 7 ? "Paga com desconto de 1% (R$ 1.953,47): disponibilidade de 98,2% em agosto na UFV Serra Azul 2" : m === 9 ? "Boletim entregue em 11/11; aguardando o aceite do cliente" : ""});
+  }
+  FIN.push({comp: 9, ref: "Hora extra: atendimento emergencial na UFV Serra Azul 2 (12 h)", valor: 2220, med: "10/11/2026", st: "aprovada", extra: true, quem: "Rafael Costa · 04/11/2026", nota: "Aprovada pelo cliente por e-mail em 03/11"});
+  FIN.push({comp: 11, ref: "Limpeza extra de módulos na UFV Horizonte III (aditivo 2)", valor: 14800, med: "11/01/2027", st: "futura", extra: true, quem: "Paula Nunes · 21/10/2026", nota: ""});
+})();
+var STATUS_FIN = {paga: ["Paga", "t-ok"], aprovada: ["Aprovada", "t-verde"], aprovacao: ["Em aprovação do cliente", "t-alerta"],
+  atencao: ["Ponto de atenção", "t-severo"], futura: ["Lançamento futuro", "t-neutro"]};
+
+/* ── utilidades ─────────────────────────────────────────────────────────────────────────────────────────────── */
+var ABAS = [["regras", "Regras"], ["calendario", "Calendário"], ["atendimento", "Atendimento"], ["entregaveis", "Entregáveis"], ["metas", "Metas"], ["financeiro", "Financeiro"]];
+var estado = {aba: "regras", soAcordadas: false, abertoHist: {}, ficha: false, atModo: "usina", entModo: "usina", kpi: "disp", agrup: "mes"};
+function esc(s) { return String(s == null ? "" : s).replace(/[&<>"]/g, function (c) { return {"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"}[c]; }); }
+function brl(v) { return v.toLocaleString("pt-BR", {style: "currency", currency: "BRL"}); }
+function pct(v, casas) { return v.toLocaleString("pt-BR", {minimumFractionDigits: casas == null ? 1 : casas, maximumFractionDigits: casas == null ? 1 : casas}); }
+function agoraTxt() { var d = new Date(); return "13/11/2026 " + String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0"); }
+function toast(t) {
+  var el = document.createElement("div"); el.className = "toast"; el.setAttribute("role", "status"); el.textContent = t;
+  document.body.appendChild(el); setTimeout(function () { el.remove(); }, 3200);
+}
+function seg(rotulo, atributo, atual, opcoes) {
+  return '<span class="seg" role="group" aria-label="' + rotulo + '">' + opcoes.map(function (o) {
+    return "<button " + atributo + '="' + o[0] + '" aria-pressed="' + (atual === o[0]) + '">' + o[1] + (o[2] != null ? "<b>" + o[2] + "</b>" : "") + "</button>";
+  }).join("") + "</span>";
+}
+function tomCal(e) {
+  if (e.ent) return "ok";
+  var dias = Math.round((new Date(2026, 10, e.d) - HOJE) / 864e5);
+  if (dias < 0) return "critico";
+  return dias <= 7 ? "alerta" : "neutro";
+}
+// a linha de tendência curta (12 meses): a cor do último ponto diz se está na meta
+function spark(h, meta, w, hh) {
+  var min = Math.min.apply(null, h.concat([meta])), max = Math.max.apply(null, h.concat([meta]));
+  if (max === min) { max += 1; min -= 1; }
+  var px = function (i) { return 2 + i * (w - 4) / (h.length - 1); }, py = function (v) { return hh - 3 - (v - min) * (hh - 6) / (max - min); };
+  var ult = h[h.length - 1];
+  return '<svg viewBox="0 0 ' + w + " " + hh + '" preserveAspectRatio="none" aria-hidden="true">' +
+    '<line x1="0" x2="' + w + '" y1="' + py(meta).toFixed(1) + '" y2="' + py(meta).toFixed(1) + '" stroke="rgba(255,255,255,.22)" stroke-dasharray="3 3"/>' +
+    '<polyline points="' + h.map(function (v, i) { return px(i).toFixed(1) + "," + py(v).toFixed(1); }).join(" ") + '" fill="none" stroke="#96a0b4" stroke-width="1.5" vector-effect="non-scaling-stroke"/>' +
+    '<circle cx="' + px(h.length - 1).toFixed(1) + '" cy="' + py(ult).toFixed(1) + '" r="2.6" fill="' + (ult >= meta ? "#4ade80" : "#ff5b6e") + '"/></svg>';
+}
+
+/* ── o contrato: duas linhas, as abas e a parte escolhida ──────────────────────────────────────────────────────── */
+function vContrato() {
+  var c = CONTRATOS[0], mwp = USINAS.reduce(function (s, u) { return s + u.mwp; }, 0);
+  var atrasadas = CAL.filter(function (e) { return tomCal(e) === "critico"; }).length + ATRASADAS_ANTES.length;
+  // o nome do cliente É a troca de contrato: um controle a menos no alto da tela
+  var h = '<div class="ct-linha"><label class="ct-nome"><span class="so-leitor">Contrato</span><select id="selCt">' +
+    CONTRATOS.map(function (k, i) { return '<option value="' + i + '">' + esc(k.cliente) + "</option>"; }).join("") +
+    '</select><i class="ph ph-caret-down" aria-hidden="true"></i></label><span class="ct-cod num">' + c.cod + '</span><span class="ct-tipo">' + c.nome + "</span>" +
+    '<button class="linkbtn ct-mais" data-ficha aria-expanded="' + estado.ficha + '">Dados do contrato<i class="ph ph-caret-' + (estado.ficha ? "up" : "down") + '" aria-hidden="true"></i></button></div>';
+  h += '<dl class="fatos"><div><dt>Vigência</dt><dd>até 28/02/2028<small>faltam 15 meses</small></dd></div>' +
+    '<div><dt>Mensalidade</dt><dd class="num">' + brl(195347.20) + "</dd></div>" +
+    '<div><dt>Usinas</dt><dd><span class="num">' + USINAS.length + '</span><small class="num">' + pct(mwp) + " MWp</small></dd></div>" +
+    "<div><dt>Gestora</dt><dd>Marina Alves</dd></div></dl>";
+  if (estado.ficha) {
+    h += '<dl class="ficha"><div><dt>Contrato</dt><dd><b class="num">' + c.cod + "</b>, " + c.nome + ". 2 aditivos, o último em 21/10/2026</dd></div>" +
+      '<div><dt>CNPJ do contrato</dt><dd><b class="num">' + c.cnpj + "</b></dd></div>" +
+      "<div><dt>Vigência</dt><dd><b>01/03/2025 a 28/02/2028</b>. Aviso de renovação em 30/11/2027</dd></div>" +
+      '<div><dt>Valor mensal vigente</dt><dd><b class="num">' + brl(195347.20) + "</b>. Reajuste pelo IPCA em 01/03, aplicado em 2026</dd></div>" +
+      "<div><dt>Gestão</dt><dd><b>Marina Alves</b>, Contratos. Substituta: Paula Nunes</dd></div>" +
+      "<div><dt>Onde</dt><dd>Minas Gerais e Bahia</dd></div>" +
+      '<div class="larga"><dt>Usinas</dt><dd><ul class="usinas">' + USINAS.map(function (u) { return "<li>" + esc(u.nome) + '<span class="num">' + pct(u.mwp) + " MWp</span></li>"; }).join("") + "</ul></dd></div></dl>";
+  }
+  h += '<nav class="abas" aria-label="Partes do contrato">' + ABAS.map(function (a) {
+    return '<a href="#/' + a[0] + '"' + (estado.aba === a[0] ? ' aria-current="page"' : "") + ">" + a[1] +
+      (a[0] === "calendario" && atrasadas ? '<b title="' + atrasadas + ' atrasadas">' + atrasadas + "</b>" : "") + "</a>";
+  }).join("") + "</nav>";
+  return h + ({regras: pRegras, calendario: pCalendario, atendimento: pAtendimento, entregaveis: pEntregaveis, metas: pMetas, financeiro: pFinanceiro}[estado.aba])();
+}
+
+/* Regras: o que VALE hoje em cada regra. A acordada aparece no lugar da contratual, com a do contrato riscada embaixo;
+   a regra que nunca mudou não leva selo nem autor (14 das 18: a linha fica limpa) */
+function pRegras() {
+  var acordadas = REGRAS.filter(function (r) { return r.acordada; }).length;
+  var h = '<div class="regua">' + seg("Quais regras", "data-regras", estado.soAcordadas ? "acordadas" : "todas", [["todas", "Todas", REGRAS.length], ["acordadas", "Acordadas depois da assinatura", acordadas]]) + "</div>";
+  h += '<div class="rolavel"><table class="tab"><thead><tr><th style="width:30%">Regra</th><th>Vale hoje</th><th style="width:22%">Última mudança</th><th style="width:76px"><span class="so-leitor">Ajustar</span></th></tr></thead><tbody>';
+  CATS.forEach(function (cat) {
+    var rs = REGRAS.filter(function (r) { return r.cat === cat && (!estado.soAcordadas || r.acordada); });
+    if (!rs.length) return;
+    h += '<tr class="grupo"><td colspan="4">' + esc(cat) + "<span>" + rs.length + "</span></td></tr>";
+    rs.forEach(function (r) {
+      var i = REGRAS.indexOf(r), ult = r.hist[0];
+      h += '<tr><td><span class="nome">' + esc(r.nome) + '</span><span class="sub">' + esc(r.setor) + (r.cl ? ", cláusula " + r.cl : "") + "</span></td>" +
+        "<td>" + esc(r.acordada || r.contratual) + (r.acordada ? ' <span class="pill t-verde">acordada</span><span class="antes">' +
+          (r.contratual ? "No contrato: <s>" + esc(r.contratual) + "</s>" : "Não estava no contrato") + "</span>" : "") + "</td>" +
+        "<td>" + (ult ? esc(ult.quem) + ', <span class="num">' + esc(ult.quando.slice(0, 10)) + "</span>" +
+          '<span class="sub"><button class="linkbtn" data-hist="' + i + '" aria-expanded="' + !!estado.abertoHist[i] + '">' + (estado.abertoHist[i] ? "Fechar o histórico" : "Histórico (" + r.hist.length + ")") + "</button></span>" : "") + "</td>" +
+        '<td class="r"><button class="linkbtn" data-ajustar="' + i + '" aria-label="Ajustar ' + esc(r.nome) + '">Ajustar</button></td></tr>';
+      if (estado.abertoHist[i] && r.hist.length) {
+        h += '<tr class="hist-l"><td colspan="4"><ol class="hist">' + r.hist.map(function (x) {
+          return '<li><b class="num">' + esc(x.quando) + "</b> " + esc(x.quem) + ", " + esc(x.setor) + ". " + esc(x.origem) +
+            "<span>De “" + esc(x.de) + "” para “" + esc(x.para) + "”. " + esc(x.motivo) + "</span></li>";
+        }).join("") + '<li class="mudo"><b class="num">01/03/2025</b> Contrato assinado' + (r.cl ? ", cláusula " + esc(r.cl) : ": a regra não estava nele") + "</li></ol></td></tr>";
+      }
+    });
+  });
+  // a regra nova é a última linha da tabela: no alto, o botão verde disputava a tela com as regras (12/11/2026)
+  h += '<tr class="mais"><td colspan="4"><button data-nova-regra><i class="ph ph-plus" aria-hidden="true"></i>Acrescentar uma regra acordada que não está no contrato</button></td></tr>';
+  return h + '</tbody></table></div><p class="nota">A regra acordada vale no lugar da contratual. Toda mudança guarda quem fez, quando, a origem (ata, e-mail, aditivo) e o motivo.</p>';
+}
+
+function pCalendario() {
+  var h = '<div class="regua"><h2>Novembro de 2026</h2><div class="legenda"><span><i class="ponto p-ok"></i>entregue</span><span><i class="ponto p-alerta"></i>vence em até 1 semana</span><span><i class="ponto p-critico"></i>atrasada</span><span><i class="ponto p-neutro"></i>prevista</span></div></div>';
+  h += '<div class="grade2"><div class="cal" role="grid" aria-label="Novembro de 2026">' + ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"].map(function (d) { return '<div class="dsem">' + d + "</div>"; }).join("");
+  // novembro/2026 começa num domingo; 30 dias; mais 5 de dezembro para fechar a grade
+  for (var i = 0; i < 35; i++) {
+    var dia = i + 1, fora = dia > 30, n = fora ? dia - 30 : dia, hoje = !fora && dia === 13;
+    var doDia = fora ? [] : CAL.filter(function (e) { return e.d === dia; });
+    h += '<div class="dia' + (fora ? " fora" : "") + (hoje ? " hoje" : "") + '"><span class="n">' + n + (hoje ? " hoje" : "") + "</span>" +
+      (!fora && (dia === 2 || dia === 15 || dia === 20) ? '<span class="fer">' + (dia === 2 ? "Finados" : dia === 15 ? "Proclamação da República" : "Consciência Negra") + "</span>" : "") +
+      doDia.map(function (e) { return '<span class="ev ' + tomCal(e) + '" title="' + esc(e.nome + ", " + e.setor + (e.ent ? ", entregue em " + e.ent : "")) + '">' + esc(e.nome) + "</span>"; }).join("") + "</div>";
+  }
+  h += "</div>";
+  var proximas = CAL.filter(function (e) { return !e.ent && tomCal(e) !== "critico"; }).sort(function (a, b) { return a.d - b.d; });
+  var atrasadas = CAL.filter(function (e) { return tomCal(e) === "critico"; });
+  h += '<aside class="lista-lat"><h3>Atrasadas</h3><ul>' + atrasadas.map(function (e) {
+    return '<li><i class="ponto p-critico"></i><span>' + esc(e.nome) + "<small>venceu em " + String(e.d).padStart(2, "0") + "/11, " + esc(e.setor) + "</small></span></li>";
+  }).join("") + ATRASADAS_ANTES.map(function (e) {
+    return '<li><i class="ponto p-critico"></i><span>' + esc(e.nome) + "<small>" + esc(e.quando) + ", " + esc(e.setor) + "</small></span></li>";
+  }).join("") + "</ul><h3>Próximas</h3><ul>" + proximas.map(function (e) {
+    return '<li><i class="ponto p-' + tomCal(e) + '"></i><span>' + esc(e.nome) + "<small>" + String(e.d).padStart(2, "0") + "/11, " + esc(e.setor) + "</small></span></li>";
+  }).join("") + "</ul></aside></div>";
+  h += '<div class="bloco"><h3>No ano: as rotinas trimestrais, semestrais e anuais</h3><div class="rolavel"><table class="tab ano"><thead><tr><th>Rotina</th>' +
+    MESES.map(function (m) { return "<th>" + m + "</th>"; }).join("") + "</tr></thead><tbody>" + ANO.map(function (r) {
+      return "<tr><td>" + esc(r.nome) + ' <span class="mudo">' + esc(r.freq.toLowerCase()) + "</span></td>" + MESES.map(function (_m, k) {
+        var t = r.m[k]; return "<td>" + (t ? '<span class="cel p-' + t + '" title="' + esc(r.nome + ", " + MESES[k] + "/26") + '"></span>' : "") + "</td>";
+      }).join("") + "</tr>";
+    }).join("") + "</tbody></table></div></div>";
+  return h;
+}
+
+function celAt(v) {
+  if (v === "na") return '<span class="vazio-c">—</span>';
+  if (/\//.test(v)) return '<span class="num">' + v + "</span>";
+  var r = {ok: ["p-ok", "entregue"], critico: ["p-critico", "atrasada"], alerta: ["p-alerta", "esta semana"], neutro: ["p-neutro", "prevista"]}[v];
+  return '<i class="ponto ' + r[0] + '"></i> <span style="font-size:12px">' + r[1] + "</span>";
+}
+function pAtendimento() {
+  var h = '<div class="regua"><h2>Novembro de 2026</h2>' + seg("Agrupar", "data-at", estado.atModo, [["usina", "Por usina"], ["cliente", "Por cliente"]]) + "</div>";
+  if (estado.atModo === "usina") {
+    h += '<div class="rolavel"><table class="tab"><thead><tr><th>Usina</th>' + COLS_AT.map(function (c) { return "<th>" + c + "</th>"; }).join("") + '<th class="r">Atendido</th></tr></thead><tbody>' +
+      USINAS.map(function (u) {
+        var v = AT[u.id], ok = v.filter(function (x) { return x === "ok"; }).length + 0.4, tot = v.filter(function (x) { return x !== "na" && x !== "neutro"; }).length + 1;
+        var p = Math.round(ok / tot * 100), tom = v.indexOf("critico") >= 0 ? "c-critico" : p >= 90 ? "c-ok" : "c-alerta";
+        return '<tr><td><span class="nome">' + esc(u.nome) + '</span><span class="sub">' + esc(u.cidade) + "</span></td>" + v.map(function (x) { return "<td>" + celAt(x) + "</td>"; }).join("") +
+          '<td class="r"><b class="num ' + tom + '">' + p + "%</b></td></tr>";
+      }).join("") + "</tbody></table></div>";
+  } else {
+    h += '<div class="rolavel"><table class="tab"><thead><tr><th>Cliente</th><th class="c">Usinas</th><th>Entregáveis</th><th>SLA no prazo</th><th>Rotinas</th><th>Pendências</th><th class="r">Atendido</th></tr></thead><tbody>' +
+      POR_CLIENTE.map(function (x) {
+        var tom = x.pct >= 95 ? "c-ok" : x.pct >= 90 ? "c-alerta" : "c-critico";
+        return '<tr><td><span class="nome">' + esc(x.c.cliente) + '</span><span class="sub"><span class="num">' + x.c.cod + "</span>, " + x.c.nome + '</span></td><td class="c num">' + x.usinas +
+          '</td><td class="num">' + x.ent + '</td><td class="num">' + x.sla + '</td><td class="num">' + x.rot + "</td><td>" + (x.pend === "nenhuma" ? '<span class="c-ok">nenhuma</span>' : '<span class="c-critico">' + x.pend + "</span>") +
+          '</td><td class="r"><b class="num ' + tom + '">' + x.pct + "%</b></td></tr>";
+      }).join("") + "</tbody></table></div>";
+  }
+  return h + '<p class="nota">O atendido conta só o que já venceu: a rotina prevista para o fim do mês não pesa antes da data.' + (estado.atModo === "usina" ? " Em Semanais, 2/5 são 2 relatórios entregues de 5 no mês." : "") + "</p>";
+}
+
+function pEntregaveis() {
+  var modo = estado.entModo;
+  var h = '<div class="regua"><h2>Marcos de novembro de 2026</h2>' + seg("Registro", "data-ent", modo, [["usina", "Por usina"], ["contrato", "Contrato inteiro"]]) + "</div>";
+  if (modo === "usina") {
+    h += '<div class="rolavel"><table class="tab"><thead><tr><th>Marco</th>' + USINAS.map(function (u) { return '<th class="c">' + esc(u.nome.replace("UFV ", "")) + "</th>"; }).join("") + '<th class="r">Concluído</th></tr></thead><tbody>' +
+      MARCOS.map(function (m, i) {
+        var apl = USINAS.filter(function (u) { return m.u[u.id] !== null; }), feitos = apl.filter(function (u) { return m.u[u.id]; }).length;
+        return '<tr><td><span class="nome">' + esc(m.nome) + '</span><span class="sub">' + esc(m.setor) + (CARIMBO[m.nome] ? ". Marcado por " + esc(CARIMBO[m.nome]) : "") + "</span></td>" +
+          USINAS.map(function (u) {
+            var v = m.u[u.id];
+            return '<td class="c">' + (v === null ? '<span class="vazio-c">—</span>' : '<label class="check"><input type="checkbox" data-marco="' + i + '" data-u="' + u.id + '"' + (v ? " checked" : "") + ' aria-label="' + esc(m.nome + ", " + u.nome) + '"></label>') + "</td>";
+          }).join("") + '<td class="r"><span class="num">' + feitos + " de " + apl.length + '</span><div class="barra-prog" style="margin:5px 0 0 auto"><i style="width:' + Math.round(feitos / apl.length * 100) + '%"></i></div></td></tr>';
+      }).join("") + "</tbody></table></div>";
+  } else {
+    h += '<div class="rolavel"><table class="tab"><thead><tr><th>Marco</th><th>Usinas</th><th>Registro</th><th class="r">No contrato</th></tr></thead><tbody>' +
+      MARCOS.map(function (m, i) {
+        var apl = USINAS.filter(function (u) { return m.u[u.id] !== null; }), feitos = apl.filter(function (u) { return m.u[u.id]; }).length, tudo = feitos === apl.length;
+        return '<tr><td><span class="nome">' + esc(m.nome) + '</span><span class="sub">' + esc(m.setor) + '</span></td><td class="num">' + apl.length + " de " + USINAS.length + "</td>" +
+          '<td><label class="check"><input type="checkbox" data-marco-todo="' + i + '"' + (tudo ? " checked" : "") + "> Concluído em todas as usinas</label>" + (CARIMBO[m.nome] ? '<span class="carimbo">' + esc(CARIMBO[m.nome]) + "</span>" : "") + "</td>" +
+          '<td class="r"><span class="pill ' + (tudo ? "t-ok" : feitos ? "t-alerta" : "t-neutro") + '">' + (tudo ? "concluído" : feitos ? feitos + " de " + apl.length : "a fazer") + "</span></td></tr>";
+      }).join("") + "</tbody></table></div>";
+  }
+  return h + '<p class="nota">Marcar guarda o nome e a hora de quem marcou. No Nexus pede a evidência (o arquivo ou o link) e pinta o calendário de verde.</p>';
+}
+
+function agrupa(h, modo) {
+  // h: 12 meses (dez/25 a nov/26). Trimestre e semestre do ano de 2026; ano: a média de 2026
+  var a26 = h.slice(1), med = function (xs) { return xs.reduce(function (s, x) { return s + x; }, 0) / xs.length; };
+  if (modo === "tri") return {rot: ["1º tri", "2º tri", "3º tri", "4º tri (parcial)"], v: [med(a26.slice(0, 3)), med(a26.slice(3, 6)), med(a26.slice(6, 9)), med(a26.slice(9))]};
+  if (modo === "sem") return {rot: ["1º semestre", "2º semestre (parcial)"], v: [med(a26.slice(0, 6)), med(a26.slice(6))]};
+  if (modo === "ano") return {rot: ["2026 até novembro"], v: [med(a26)]};
+  return {rot: ULT12, v: h};
+}
+function grafico(k) {
+  var g = agrupa(k.h, estado.agrup), W = 760, H = 210, pe = 30, top = 14;
+  var vals = g.v.concat([k.meta]), min = Math.floor(Math.min.apply(null, vals) - 2), max = Math.ceil(Math.max.apply(null, vals) + 1);
+  var y = function (v) { return top + (max - v) * (H - pe - top) / (max - min); }, n = g.v.length, slot = (W - 50) / n, bw = Math.min(46, slot * .55);
+  var s = '<svg viewBox="0 0 ' + W + " " + H + '" role="img" aria-label="' + esc(k.nome) + ' por período, com a meta">';
+  for (var t = 0; t <= 4; t++) { var v = min + (max - min) * t / 4; s += '<line x1="44" x2="' + W + '" y1="' + y(v) + '" y2="' + y(v) + '" stroke="rgba(255,255,255,.06)"/><text x="38" y="' + (y(v) + 4) + '" fill="#767d92" font-size="10.5" text-anchor="end" font-family="IBM Plex Mono">' + pct(v, 0) + "</text>"; }
+  g.v.forEach(function (v, i) {
+    var x = 50 + i * slot + (slot - bw) / 2;
+    s += '<rect x="' + x + '" y="' + y(v) + '" width="' + bw + '" height="' + (H - pe - y(v)) + '" rx="3" fill="' + (v >= k.meta ? "#2f8f5b" : "#ff5b6e") + '" opacity="' + (i === n - 1 ? 1 : .85) + '"><title>' + esc(g.rot[i] + ": " + pct(v) + k.unid) + "</title></rect>" +
+      '<text x="' + (x + bw / 2) + '" y="' + (y(v) - 5) + '" fill="#c3cad7" font-size="10.5" text-anchor="middle" font-family="IBM Plex Mono">' + pct(v) + "</text>" +
+      '<text x="' + (x + bw / 2) + '" y="' + (H - 10) + '" fill="#96a0b4" font-size="10.5" text-anchor="middle">' + esc(g.rot[i]) + "</text>";
+  });
+  return s + '<line x1="44" x2="' + W + '" y1="' + y(k.meta) + '" y2="' + y(k.meta) + '" stroke="#ffd83d" stroke-dasharray="5 4"/><text x="' + (W - 2) + '" y="' + (y(k.meta) - 5) + '" fill="#ffd83d" font-size="10.5" text-anchor="end">meta ' + pct(k.meta) + k.unid + "</text></svg>";
+}
+/* Metas: aqui os indicadores SÃO o conteúdo. Seis numa faixa só (uma caixa, não seis); o clique escolhe o do gráfico,
+   e o agrupamento fica no gráfico, que é o que ele muda */
+function pMetas() {
+  var h = '<div class="regua"><h2>Novembro de 2026, até o dia 12</h2><span class="fonte">Cada número é lido da tela do Nexus que o calcula</span></div>';
+  h += '<div class="kpis">' + KPIS.map(function (k) {
+    var v = k.h[11];
+    return '<button class="kpi" data-kpi="' + k.id + '" aria-pressed="' + (estado.kpi === k.id) + '" title="Fonte: ' + esc(k.fonte) + '"><small>' + esc(k.nome) + '</small><span class="v ' + (v >= k.meta ? "c-ok" : "c-critico") + '">' + pct(v) + k.unid + "</span>" +
+      '<span class="d">meta ' + pct(k.meta) + k.unid + "</span>" + spark(k.h, k.meta, 120, 22) + "</button>";
+  }).join("") + "</div>";
+  var k = KPIS.filter(function (x) { return x.id === estado.kpi; })[0];
+  h += '<div class="grafico"><div class="grafico-cab"><h3>' + esc(k.nome) + ' <span class="fonte">' + esc(k.fonte) + ", as 6 usinas</span></h3>" +
+    seg("Agrupar", "data-agrup", estado.agrup, [["mes", "Mês a mês"], ["tri", "Trimestre"], ["sem", "Semestre"], ["ano", "Ano"]]) + "</div>" + grafico(k) + "</div>";
+  h += '<div class="bloco"><h3>Por usina, no mês</h3><div class="rolavel"><table class="tab"><thead><tr><th>Usina</th><th class="r">Disponibilidade</th><th class="r">PR</th><th class="r">Geração sobre a meta</th><th>Efeito no contrato</th></tr></thead><tbody>' +
+    [["UFV Horizonte I", 99.6, 80.2, 99.1, ""], ["UFV Horizonte II", 99.4, 79.8, 97.6, ""], ["UFV Horizonte III", 99.8, 81.0, 98.3, "bônus de 1,5% se fechar acima de 99,5%"], ["UFV Serra Azul 1", 99.0, 78.6, 95.2, ""], ["UFV Serra Azul 2", 98.7, 78.9, 96.2, "a 0,2 p.p. do desconto"], ["UFV Lagoa Clara", 98.1, 77.2, 91.8, "desconto de 1% se fechar assim"]].map(function (r) {
+      return '<tr><td><span class="nome">' + r[0] + '</span></td><td class="r num ' + (r[1] >= 98.5 ? "c-ok" : "c-critico") + '">' + pct(r[1]) + '%</td><td class="r num ' + (r[2] >= 78 ? "c-ok" : "c-critico") + '">' + pct(r[2]) + '%</td><td class="r num ' + (r[3] >= 97 ? "c-ok" : r[3] >= 93 ? "c-alerta" : "c-critico") + '">' + pct(r[3]) + "%</td><td>" +
+        (r[4] ? '<span class="' + (/desconto de/.test(r[4]) ? "c-critico" : /bônus/.test(r[4]) ? "c-ok" : "c-alerta") + '">' + r[4] + "</span>" : "") + "</td></tr>";
+    }).join("") + '</tbody></table></div><p class="nota">O efeito sai das regras vigentes: a penalidade de disponibilidade (cláusula 12.3) e o bônus (cláusula 12.4).</p></div>';
+  return h;
+}
+
+function pFinanceiro() {
+  var tot = FIN.reduce(function (s, p) { return s + p.valor; }, 0);
+  var recebido = FIN.filter(function (p) { return p.st === "paga"; }).reduce(function (s, p) { return s + p.valor; }, 0) - 1953.47;
+  var aReceber = FIN.filter(function (p) { return /aprovacao|aprovada/.test(p.st); }).reduce(function (s, p) { return s + p.valor; }, 0);
+  var futuro = FIN.filter(function (p) { return p.st === "futura"; }).reduce(function (s, p) { return s + p.valor; }, 0);
+  var extras = FIN.filter(function (p) { return p.extra; }).length;
+  var h = '<div class="regua"><h2>Entradas de 2026</h2><a class="linkbtn" href="#/regras">Ver as regras de medição e faturamento</a></div>';
+  h += '<dl class="resumo"><div><dt>Previsto no ano</dt><dd>' + brl(tot) + "<small>12 mensalidades e " + extras + " extras</small></dd></div>" +
+    '<div><dt>Recebido</dt><dd class="c-ok">' + brl(recebido) + "<small>9 parcelas, 1 com desconto</small></dd></div>" +
+    '<div><dt>A receber, já medido</dt><dd class="c-alerta">' + brl(aReceber) + "<small>em aprovação ou aprovado</small></dd></div>" +
+    "<div><dt>Lançamentos futuros</dt><dd>" + brl(futuro) + "<small>novembro, dezembro e a limpeza extra</small></dd></div></dl>";
+  // as barras por competência, na cor do status
+  var W = 760, H = 140, max = 220000, slot = (W - 20) / 12, bw = slot * .55;
+  var s = '<div class="grafico"><div class="grafico-cab"><h3>Por competência</h3><div class="legenda">' + [["paga", "p-ok"], ["atencao", "p-severo"], ["aprovacao", "p-alerta"], ["futura", "p-neutro"]].map(function (k) {
+    return '<span><i class="ponto ' + k[1] + '"></i>' + STATUS_FIN[k[0]][0].toLowerCase() + "</span>";
+  }).join("") + '<span><i class="ponto" style="background:transparent;box-shadow:inset 0 0 0 1.5px var(--info)"></i>entrada extra</span></div></div><svg viewBox="0 0 ' + W + " " + H + '" role="img" aria-label="Entradas de 2026 por mês">';
+  for (var m = 0; m < 12; m++) {
+    var ps = FIN.filter(function (p) { return p.comp === m; }), acum = 0, x = 10 + m * slot + (slot - bw) / 2;
+    ps.forEach(function (p) {
+      var a = p.valor / max * (H - 30), cor = {paga: "#2f8f5b", atencao: "#ff8f3c", aprovacao: "#ffd83d", aprovada: "#4ade80", futura: "#3a4766"}[p.st] || "#3a4766";
+      s += '<rect x="' + x + '" y="' + (H - 22 - acum - a) + '" width="' + bw + '" height="' + a + '" rx="2" fill="' + cor + '"' + (p.extra ? ' stroke="#7fb8ff" stroke-width="1.5"' : "") + "><title>" + esc(p.ref + ": " + brl(p.valor)) + "</title></rect>";
+      acum += a;
+    });
+    s += '<text x="' + (x + bw / 2) + '" y="' + (H - 6) + '" fill="#96a0b4" font-size="10.5" text-anchor="middle">' + MESES[m] + "</text>";
+  }
+  h += s + "</svg></div>";
+  h += '<div class="bloco rolavel"><table class="tab"><thead><tr><th>Competência</th><th>Referente a</th><th class="r">Valor</th><th>Medição prevista</th><th>Status</th><th>Ponto de atenção</th></tr></thead><tbody>' +
+    FIN.slice().sort(function (a, b) { return a.comp - b.comp || (a.extra ? 1 : 0) - (b.extra ? 1 : 0); }).map(function (p) {
+      var st = STATUS_FIN[p.st];
+      return '<tr class="' + (p.extra ? "extra" : "") + '"><td class="num">' + MESES[p.comp] + "/26</td><td>" + esc(p.ref) + (p.quem ? '<span class="sub">Cadastrada por ' + esc(p.quem) + "</span>" : "") + '</td><td class="r num">' + brl(p.valor) + '</td><td class="num">' + p.med +
+        '</td><td><span class="pill ' + st[1] + '">' + st[0] + "</span></td><td>" + esc(p.nota) + "</td></tr>";
+    }).join("") + '<tr class="mais"><td colspan="6"><button data-nova-entrada><i class="ph ph-plus" aria-hidden="true"></i>Acrescentar uma entrada além do previsto (hora extra, serviço extra, aditivo)</button></td></tr></tbody></table></div>';
+  return h;
+}
+
+/* ── os diálogos ─────────────────────────────────────────────────────────────────────────────────────────────── */
+var dlg = document.getElementById("dlg");
+function abrirDlg(html) { dlg.innerHTML = html; dlg.showModal(); var f = dlg.querySelector("input,select,textarea"); if (f) f.focus(); }
+function rodapeDlg(rot) { return '<p class="nota">Fica registrado: <b>' + EU + "</b>, " + agoraTxt() + '.</p><div class="acoes"><button class="btn btn--prim" data-salvar>' + rot + '</button><button class="btn" data-fechar>Cancelar</button></div>'; }
+function dlgRegra(i) {
+  var r = i == null ? null : REGRAS[i];
+  abrirDlg('<h2 id="dlg-t">' + (r ? "Ajustar: " + esc(r.nome) : "Regra acordada que não está no contrato") + "</h2>" +
+    (r ? '<p class="nota">No contrato: <b>' + esc(r.contratual || "não está") + "</b>" + (r.acordada ? ". Acordada hoje: <b>" + esc(r.acordada) + "</b>" : "") + "</p>" : "") +
+    (r ? "" : '<div class="dupla"><div class="campo"><label for="f-cat">Categoria</label><select id="f-cat">' + CATS.map(function (c) { return "<option>" + c + "</option>"; }).join("") + '</select></div><div class="campo"><label for="f-setor">Setor responsável</label><select id="f-setor"><option>Contratos</option><option>COS</option><option>Engenharia de O&M</option><option>Performance</option><option>PCM</option><option>Supervisão de Campo</option><option>Zeladoria</option></select></div></div><div class="campo"><label for="f-nome">Regra</label><input id="f-nome" placeholder="Ex.: Relatório de chuvas depois de evento extremo"></div>') +
+    '<div class="campo"><label for="f-val">Como fica a regra</label><textarea id="f-val" rows="2" placeholder="Ex.: Até o 6º dia útil do mês seguinte">' + (r && r.acordada ? esc(r.acordada) : "") + "</textarea></div>" +
+    '<div class="dupla"><div class="campo"><label for="f-orig">Origem</label><select id="f-orig"><option>Ata de reunião</option><option>E-mail do cliente</option><option>Aditivo</option><option>Ofício</option></select></div><div class="campo"><label for="f-desde">Vale a partir de</label><input id="f-desde" type="date" value="2026-11-13"></div></div>' +
+    '<div class="campo"><label for="f-mot">Motivo</label><input id="f-mot" placeholder="Por que mudou"></div>' + rodapeDlg(r ? "Salvar o ajuste" : "Cadastrar a regra"));
+  dlg.querySelector("[data-salvar]").onclick = function () {
+    var val = dlg.querySelector("#f-val").value.trim(), orig = dlg.querySelector("#f-orig").value, mot = dlg.querySelector("#f-mot").value.trim() || "Sem motivo escrito.";
+    if (!val) { toast("Escreva como fica a regra."); return; }
+    if (r) {
+      r.hist.unshift({quem: EU, setor: "Contratos", quando: agoraTxt(), de: (r.acordada || r.contratual || "Não estava no contrato") + (r.acordada ? "" : " (contratual)"), para: val, origem: orig, motivo: mot});
+      r.acordada = val; estado.abertoHist[i] = true;
+    } else {
+      REGRAS.push({cat: dlg.querySelector("#f-cat").value, nome: dlg.querySelector("#f-nome").value.trim() || "Regra nova", setor: dlg.querySelector("#f-setor").value, cl: "", contratual: "", acordada: val,
+                   hist: [{quem: EU, setor: "Contratos", quando: agoraTxt(), de: "Não estava no contrato", para: val, origem: orig, motivo: mot}]});
+    }
+    dlg.close(); render(); toast(r ? "Regra ajustada: a acordada passa a valer e a anterior fica no histórico." : "Regra cadastrada: vale a partir de hoje.");
+  };
+}
+function dlgEntrada() {
+  abrirDlg('<h2 id="dlg-t">Entrada além do previsto</h2>' +
+    '<div class="campo"><label for="f-ref">Referente a</label><input id="f-ref" placeholder="Ex.: Lavagem extra de módulos da UFV Serra Azul 1"></div>' +
+    '<div class="dupla"><div class="campo"><label for="f-vl">Valor (R$)</label><input id="f-vl" inputmode="decimal" placeholder="0,00"></div><div class="campo"><label for="f-comp">Competência</label><select id="f-comp">' + MESES.map(function (m, i) { return '<option value="' + i + '"' + (i === 11 ? " selected" : "") + ">" + m + "/26</option>"; }).join("") + "</select></div></div>" +
+    '<div class="campo"><label for="f-med">Previsão de medição</label><input id="f-med" type="date" value="2027-01-11"></div>' + rodapeDlg("Cadastrar a entrada"));
+  dlg.querySelector("[data-salvar]").onclick = function () {
+    var ref = dlg.querySelector("#f-ref").value.trim(), vl = parseFloat((dlg.querySelector("#f-vl").value || "0").replace(/\./g, "").replace(",", "."));
+    if (!ref || !(vl > 0)) { toast("Diga a que a entrada se refere e o valor."); return; }
+    var dt = dlg.querySelector("#f-med").value.split("-");
+    FIN.push({comp: +dlg.querySelector("#f-comp").value, ref: ref, valor: vl, med: dt[2] + "/" + dt[1] + "/" + dt[0], st: "futura", extra: true, quem: EU + " · 13/11/2026", nota: ""});
+    dlg.close(); render(); toast("Entrada cadastrada como lançamento futuro.");
+  };
+}
+dlg.addEventListener("click", function (e) { if (e.target.closest("[data-fechar]")) dlg.close(); });
+
+/* ── rotas e eventos ─────────────────────────────────────────────────────────────────────────────────────────── */
+var main = document.getElementById("main");
+function render() {
+  // "#/regras"; o endereço antigo ("#/contrato/regras") segue abrindo a mesma aba
+  var r = (location.hash || "#/regras").replace("#/", "").split("/"), aba = r[0] === "contrato" ? r[1] : r[0];
+  estado.aba = ABAS.some(function (a) { return a[0] === aba; }) ? aba : "regras";
+  main.innerHTML = vContrato() + '<p class="rodape">Mockup para avaliação: o cliente, o CNPJ, as pessoas e as usinas são fictícios, “hoje” é 13/11/2026 e nada aqui grava.</p>';
+}
+var ultimaAba = "";
+window.addEventListener("hashchange", function () { render(); if (estado.aba !== ultimaAba) window.scrollTo(0, 0); ultimaAba = estado.aba; });
+main.addEventListener("click", function (e) {
+  var b;
+  if ((b = e.target.closest("[data-regras]"))) { estado.soAcordadas = b.getAttribute("data-regras") === "acordadas"; render(); }
+  else if (e.target.closest("[data-ficha]")) { estado.ficha = !estado.ficha; render(); }
+  else if ((b = e.target.closest("[data-hist]"))) { var i = b.getAttribute("data-hist"); estado.abertoHist[i] = !estado.abertoHist[i]; render(); }
+  else if ((b = e.target.closest("[data-ajustar]"))) dlgRegra(+b.getAttribute("data-ajustar"));
+  else if (e.target.closest("[data-nova-regra]")) dlgRegra(null);
+  else if ((b = e.target.closest("[data-at]"))) { estado.atModo = b.getAttribute("data-at"); render(); }
+  else if ((b = e.target.closest("[data-ent]"))) { estado.entModo = b.getAttribute("data-ent"); render(); }
+  else if ((b = e.target.closest("[data-kpi]"))) { estado.kpi = b.getAttribute("data-kpi"); render(); }
+  else if ((b = e.target.closest("[data-agrup]"))) { estado.agrup = b.getAttribute("data-agrup"); render(); }
+  else if (e.target.closest("[data-nova-entrada]")) dlgEntrada();
+});
+main.addEventListener("change", function (e) {
+  var t = e.target;
+  if (t.id === "selCt" && t.value !== "0") { t.value = "0"; toast("No mockup só o contrato CT-2025-014 tem dados."); }
+  else if (t.hasAttribute("data-marco")) {
+    var m = MARCOS[+t.getAttribute("data-marco")]; m.u[t.getAttribute("data-u")] = t.checked;
+    CARIMBO[m.nome] = EU + " · " + agoraTxt().slice(0, 5) + " " + agoraTxt().slice(11); render();
+    toast(t.checked ? "Marcado como concluído no mês, com o seu nome e a hora." : "Desmarcado; o registro fica no histórico.");
+  } else if (t.hasAttribute("data-marco-todo")) {
+    var mm = MARCOS[+t.getAttribute("data-marco-todo")];
+    Object.keys(mm.u).forEach(function (k) { if (mm.u[k] !== null) mm.u[k] = t.checked; });
+    CARIMBO[mm.nome] = EU + " · " + agoraTxt().slice(0, 5) + " " + agoraTxt().slice(11) + ", contrato inteiro"; render();
+    toast(t.checked ? "Concluído em todas as usinas do contrato." : "Desmarcado em todas as usinas.");
+  }
+});
+render();
+</script>
+</body>
+</html>

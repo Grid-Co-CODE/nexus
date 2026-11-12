@@ -3,11 +3,31 @@
 Torre do menu "Contratos e clientes". Telas vivas: **Contestações** (13/10/2026) e **Acessos dos clientes** (14/10/2026).
 Clientes, Onboarding, Comunicação por cliente e Portal ainda são placeholder (a view com a mesma rota vence a genérica).
 
-**Prévia: contrato e prontuário** (12/11/2026, `/t/contratos/previa`, de todos): o mockup que a Ana pediu para a
-avaliação de Contratos (Danuth, Camila, Fred) e dos setores, `nexus/static/previa/contratos-e-prontuario.html` (a mesma
-página do `docs/mockups/contratos-e-prontuario` da plataforma), numa moldura; dentro do Nexus ele esconde o topo e o menu
-dele. Dados fictícios, nada grava. Quando a visão do contrato virar tela de verdade, ela entra na tela Clientes (a
-"Gestão de contratos (a estruturar)") e a prévia sai.
+**Prévia: visão do contrato** (12/11/2026, `/t/contratos/previa`, de todos): o mockup que a Ana pediu para a
+avaliação de Contratos (Danuth, Camila, Fred) e dos setores, `nexus/static/previa/visao-do-contrato.html` (a mesma
+página do `docs/mockups/visao-do-contrato` da plataforma), numa moldura; dentro do Nexus ele esconde o topo dele. Dados
+fictícios, nada grava. Quando a visão do contrato virar tela de verdade, ela entra na tela Clientes (a "Gestão de
+contratos (a estruturar)") e a prévia sai.
+
+**Enxuta desde a noite de 12/11/2026** (Levi: "pode tirar o prontuário, tá? Não tem nada a ver" e "É quase a tela
+inteira, só de nada com nada [...] A gente está vendo o quê? Regras do contrato. Então, tem que mostrar regras do
+contrato. Aí tem um filtro para isso, um filtro para aquilo. Aí uma porrada de KPI. Aí tem outro filtro lá em cima de
+contrato. Aí tem um botão de nova regra. Se decida, enxugue"). Antes, a 1ª regra aparecia a 780 px do alto de uma tela de
+853; hoje, a uns 330. O Prontuário da usina saiu do mockup (o de verdade mora no Comando > Usinas). **A regra para toda
+aba da visão do contrato, que vale também quando ela virar tela de verdade:**
+- o contrato em **duas linhas**: o nome do cliente (que é a troca de contrato: não há seletor à parte), o código e o
+  tipo; e uma linha de fatos (vigência, mensalidade, usinas, gestora). A ficha inteira (CNPJ, aditivos, reajuste,
+  substituta, as usinas) só no clique em "Dados do contrato";
+- a aba **não repete o título nem se explica**: abre no conteúdo. O período ou a contagem à esquerda da régua;
+- **no máximo um controle por aba**, e só quando muda o que se vê: Todas | Acordadas (Regras), Por usina | Por cliente
+  (Atendimento), Por usina | Contrato inteiro (Entregáveis), o agrupamento no próprio gráfico (Metas). Saíram os oito
+  filtros por categoria (a tabela já vem agrupada), o filtro de frequência do calendário e os seletores de mês e de ano
+  que não faziam nada;
+- **Regras mostra o que VALE hoje**: uma coluna só, com a acordada no lugar da contratual, o selo "acordada" e a do
+  contrato riscada embaixo; a regra que nunca mudou não leva selo nem autor (14 das 18);
+- **o que acrescenta é a última linha da tabela** (a regra nova, a entrada nova), não um botão verde no alto;
+- o cabeçalho da moldura no Nexus é **uma linha**: o título e o aviso de dados fictícios; sem a pergunta e sem a faixa
+  amarela. Prova: `tests/test_contratos_previa.py`.
 As regras moram em `nexus/contratos/` (`contestacoes.py`, `acessos_clientes.py`); a view e o template, aqui.
 
 ## Contestações

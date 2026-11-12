@@ -45,9 +45,10 @@ TORRE = Torre(
              "Texto público das ocorrências e relatórios"),
         # a prévia para avaliação (12/11/2026; Ana: "pedir avaliação da Danuth, Camila e Fred da parte de contratos e
         # demais setores a parte de prontuário da usina"): no fim da lista (o cartão do Início segue levando às
-        # Contestações) e de todos, para cada setor avaliar sem liberar um por um
-        Tela("previa", "Prévia: contrato e prontuário",
-             "Como ficam a visão do contrato e o prontuário da usina?",
+        # Contestações) e de todos, para cada setor avaliar sem liberar um por um. Só o contrato desde a noite de
+        # 12/11/2026 (Levi: "pode tirar o prontuário, tá? Não tem nada a ver"; o prontuário de verdade mora no Comando)
+        Tela("previa", "Prévia: visão do contrato",
+             "Como fica a visão do contrato?",
              "Mockup para avaliação, com dados fictícios: nada grava", de_todos=True),
     ],
 )
@@ -60,8 +61,8 @@ _log = logging.getLogger(__name__)
 
 @bp.route("/previa")
 def previa():
-    """Contratos e clientes › Prévia (12/11/2026): o mockup da visão do contrato e do prontuário da usina
-    (static/previa/contratos-e-prontuario.html) numa moldura, para Contratos e os setores avaliarem. Dados fictícios."""
+    """Contratos e clientes › Prévia (12/11/2026): o mockup da visão do contrato (static/previa/visao-do-contrato.html)
+    numa moldura, para Contratos e os setores avaliarem. Dados fictícios."""
     return render_template("contratos/previa.html", torre=TORRE, tela=TORRE.tela("previa"))
 _AVISO, _ERRO = "contestacoes_aviso", "contestacoes_erro"
 

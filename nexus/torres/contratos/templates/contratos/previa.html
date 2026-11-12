@@ -2,15 +2,19 @@
 {% block titulo %}{{ tela.nome }}{% endblock %}
 {% block conteudo %}
 <link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
-{# A prévia da visão do contrato e do prontuário da usina (12/11/2026): o mockup estático numa moldura, com o aviso de
-   que os dados são fictícios. O mockup esconde o topo e o menu dele quando está dentro do Nexus. #}
-<div class="campo-nativa">
+{# A prévia da visão do contrato (12/11/2026): o mockup estático numa moldura. O mockup esconde o topo dele quando está
+   dentro do Nexus. O cabeçalho é uma linha só (12/11/2026 à noite, Levi: "É quase a tela inteira, só de nada com nada"):
+   o título e, na mesma linha, o aviso de que os dados são fictícios; a pergunta da tela e a faixa amarela saíram, e a
+   moldura ocupa o resto da tela, para a página não rolar por fora e por dentro ao mesmo tempo. A página para em 1280 px
+   (na tela larga a tabela de regras abria um vão entre as colunas e os gráficos dobravam de tamanho), e a moldura não
+   tem caixa: só a linha de cima, onde o que rola some. #}
+<div class="campo-nativa" style="max-width:1280px">
   <div class="cn-cab">
-    <div><p class="gc-eyebrow">{{ torre.nome }}</p><h1 class="cn-titulo">{{ tela.nome }}</h1><p class="cn-pergunta">{{ tela.pergunta }}</p></div>
-    <div class="cn-frescor"><a class="gc-btn gc-btn--ui gc-btn--contorno" href="{{ url_for('static', filename='previa/contratos-e-prontuario.html') }}" target="_blank" rel="noopener"><i class="ph ph-arrow-square-out" aria-hidden="true"></i> Abrir em tela cheia</a></div>
+    <div><p class="gc-eyebrow">{{ torre.nome }}</p><h1 class="cn-titulo">{{ tela.nome }}</h1></div>
+    <p class="mudo" style="margin:0 0 3px auto;font-size:12.5px;text-align:right">Dados <b>fictícios</b>: nada aqui grava. O que mudar, mande para a Ana ou o Levi.
+      <a class="cn-link" href="{{ url_for('static', filename='previa/visao-do-contrato.html') }}" target="_blank" rel="noopener">Abrir em tela cheia</a></p>
   </div>
-  <div class="cn-erro cn-aviso" role="status"><span>Prévia para avaliação de Contratos e dos setores: o cliente, o CNPJ, as pessoas e as usinas são <b>fictícios</b>, e nada aqui grava. O que mudar, mande para a Ana ou o Levi.</span></div>
-  <iframe class="previa-moldura" title="Prévia: visão do contrato e prontuário da usina" src="{{ url_for('static', filename='previa/contratos-e-prontuario.html') }}"
-          style="display:block;width:100%;height:calc(100vh - 230px);min-height:640px;margin-top:12px;border:1px solid var(--linha);border-radius:var(--raio-md);background:var(--fundo)"></iframe>
+  <iframe class="previa-moldura" title="Prévia: visão do contrato" src="{{ url_for('static', filename='previa/visao-do-contrato.html') }}"
+          style="display:block;width:100%;height:calc(100vh - 192px);min-height:480px;margin-top:12px;border:0;border-top:1px solid var(--linha);background:var(--fundo)"></iframe>
 </div>
 {% endblock %}
