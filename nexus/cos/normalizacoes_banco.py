@@ -29,6 +29,10 @@ quando a usina voltava (a OS 16958 de Santarém, inversor parado desde 12/07 agu
 `fato_ocorrencia_aberta` é o retrato da hora das abertas da Thopen, pela fotografia do Andamento
 (`GET /api/nexus/<cliente>`, a lista `ocorrencias` de cada usina, a mesma da tela Ronda); as tags dos equipamentos, o
 código do tipo e o início da falha vêm dela ou, quando ela não manda, da rota das ocorrências de 30 dias, pelo registro.
+Desde 12/11/2026 a API das normalizações também manda as abertas (`abertas=sim`, `normalizacoes.ABERTAS`), no formato da
+normalização: elas vencem a fotografia nas tags, no código do tipo, no início e na "geração parou?" (a fotografia
+mandava a OS 16956 de Ribeirão Cascalheiras como "Desligamento", sem a tag, e a plataforma a deixava fora da conta), e
+a aberta que só a API traz entra também. A fotografia segue dando a etapa e os dias em aberto.
 Quando a ocorrência normaliza, sai daqui e entra no `fato_normalizacao` (a mesma chave, o registro). Na falha da leitura,
 o retrato de antes fica, com a hora dele (`abertas_em` na `atualizacao`): quem conta sabe de quando é.
 
@@ -177,7 +181,9 @@ def fato(itens, usinas) -> tuple[list, dict]:
     """(linhas, relatório). `usinas`: a aba `usinas` do cadastro. Ordenado pelo registro: o mesmo conteúdo dá a mesma
     gravação em qualquer máquina (regra 11)."""
     idx = EQ.IndiceUsinas(usinas)
-    linhas = sorted((linha(n, idx) for n in itens or () if isinstance(n, dict) and n.get("registro")),
+    # a aberta (`abertas=sim`, 12/11/2026) não é normalização: vai para a aba das abertas, nunca para este grão
+    linhas = sorted((linha(n, idx) for n in itens or ()
+                     if isinstance(n, dict) and n.get("registro") and n.get("aberta") is not True),
                     key=lambda l: l[0])
     ligadas = sum(1 for l in linhas if l[5])
     sem = sorted({l[4] or "(sem código)" for l in linhas if not l[5]})
@@ -220,41 +226,57 @@ def citados(nomes) -> str:
     return ";".join(out)
 
 
-def linha_aberta(u: dict, o: dict, extra: dict, idx, tipos: dict) -> list:
-    """A linha (CAB_ABERTA) de uma ocorrência aberta da fotografia: `u` a usina dela, `extra` a mesma ocorrência na
-    rota de 30 dias ({} quando não está lá)."""
-    cod = _txt(u.get("codigo") or o.get("usina_codigo") or extra.get("usina_codigo"))
+def linha_aberta(u: dict, o: dict, extra: dict, idx, tipos: dict, n: dict | None = None) -> list:
+    """A linha (CAB_ABERTA) de uma ocorrência aberta: `u` a usina dela e `o` a ocorrência na fotografia ({} quando só a
+    API traz), `extra` a mesma na rota de 30 dias ({} quando não está lá) e `n` a mesma na API das normalizações
+    (`abertas=sim`, 12/11/2026; None sem ela), que vence nas tags, no tipo, no início e na "geração parou?"."""
+    n = n or {}
+    cod = _txt(u.get("codigo") or o.get("usina_codigo") or n.get("usina_codigo") or extra.get("usina_codigo"))
     uid, por = EQ.usina_do_codigo(cod, idx) if cod else (None, EQ.SEM_CODIGO_USINA)
     equip, de = [], ""
-    for origem, tags in (("fotografia", o.get("ativos")), ("ocorrencias", extra.get("ativos"))):
+    da_api = [e.get("codigo") for e in n.get("equipamentos") or () if isinstance(e, dict)]
+    for origem, tags in (("normalizacoes", da_api), ("fotografia", o.get("ativos")),
+                         ("ocorrencias", extra.get("ativos"))):
         equip = [c for c in (EQ.canon(t) for t in (tags if isinstance(tags, list) else ())) if c]
         if equip:
             de = origem
             break
-    inicio = AND.instante(extra.get("inicio")) or AND.instante(o.get("inicio")) or AND.instante(o.get("abertura"))
+    inicio = (AND.instante(n.get("inicio")) or AND.instante(extra.get("inicio")) or AND.instante(o.get("inicio"))
+              or AND.instante(o.get("abertura")))
     prot = o.get("protecoes") if isinstance(o.get("protecoes"), list) else [o.get("protecao")]
-    gp = o.get("geracao_parou") if isinstance(o.get("geracao_parou"), bool) else extra.get("geracao_parou")
-    os_ = _txt(o.get("os") or extra.get("os"))
+    prot = [*(prot or ()), *(n.get("protecoes") if isinstance(n.get("protecoes"), list) else ())]
+    gp = next((v for v in (n.get("geracao_parou"), o.get("geracao_parou")) if isinstance(v, bool)),
+              extra.get("geracao_parou"))
+    os_ = _txt(o.get("os") or n.get("os") or extra.get("os"))
+    nomes = o.get("equipamentos") if isinstance(o.get("equipamentos"), list) else extra.get("equipamentos")
     try:
         dias = int(o.get("dias_aberta")) if o.get("dias_aberta") is not None else ""
     except (TypeError, ValueError):
         dias = ""
-    return [str(o.get("registro")), os_ if os_.isdigit() else "", CLIENTE_ABERTAS.upper(), cod, uid or "",
-            (por if uid else ""), ";".join(equip), len(equip), de,
-            citados(o.get("equipamentos") if isinstance(o.get("equipamentos"), list) else extra.get("equipamentos")),
-            _tipo_aberta(o, extra, tipos),
-            _txt(o.get("severidade")).upper(), _txt(o.get("etapa")), _iso(inicio), _data_id(inicio), dias,
-            _um_zero(gp), protecoes([*(prot or ()), *(extra.get("protecoes") or ())])]
+    return [str(o.get("registro") or n.get("registro")), os_ if os_.isdigit() else "", CLIENTE_ABERTAS.upper(), cod,
+            uid or "", (por if uid else ""), ";".join(equip), len(equip), de, citados(nomes),
+            _txt(n.get("tipo_falha")).upper() or _tipo_aberta(o, extra, tipos),
+            _txt(o.get("severidade") or n.get("severidade")).upper(),
+            _txt(o.get("etapa") or n.get("estado_rotulo") or n.get("estado")), _iso(inicio), _data_id(inicio), dias,
+            _um_zero(gp), protecoes([*prot, *(extra.get("protecoes") or ())])]
 
 
-def abertas(fotografia: dict | None, ocorrencias, normalizacoes, usinas) -> tuple[list, dict]:
-    """(linhas, relatório) das ocorrências abertas da fotografia. A que já está normalizada na memória sai (a
-    fotografia pode estar um minuto atrás): a ocorrência conta uma vez, pela normalização. Sem registro não entra."""
+def _do_cliente(n: dict) -> bool:
+    return _rotulo(n.get("cliente")) == _rotulo(CLIENTE_ABERTAS)
+
+
+def abertas(fotografia: dict | None, ocorrencias, normalizacoes, usinas, abertas_api=None) -> tuple[list, dict]:
+    """(linhas, relatório) das ocorrências abertas da fotografia e das abertas da API das normalizações (`abertas_api`,
+    só as do cliente; 12/11/2026). A que já está normalizada na memória sai (a fotografia pode estar um minuto atrás): a
+    ocorrência conta uma vez, pela normalização. Sem registro não entra."""
     idx = EQ.IndiceUsinas(usinas)
     tipos = tipos_por_rotulo(normalizacoes)
     fechadas = {str(n.get("registro")) for n in normalizacoes or ()
-                if isinstance(n, dict) and n.get("registro") and n.get("normalizada") is not False}
+                if isinstance(n, dict) and n.get("registro") and n.get("normalizada") is not False
+                and n.get("aberta") is not True}
     extra = {str(o.get("registro")): o for o in ocorrencias or () if isinstance(o, dict) and o.get("registro")}
+    api = {str(n["registro"]): n for n in abertas_api or ()
+           if isinstance(n, dict) and n.get("registro") and n.get("aberta") is True and _do_cliente(n)}
     linhas, vistos, ja = [], set(), 0
     for u in (fotografia or {}).get("usinas") or ():
         for o in (u.get("ocorrencias") or ()) if isinstance(u, dict) else ():
@@ -265,22 +287,33 @@ def abertas(fotografia: dict | None, ocorrencias, normalizacoes, usinas) -> tupl
             if reg in fechadas:
                 ja += 1
                 continue
-            linhas.append(linha_aberta(u, o, extra.get(reg, {}), idx, tipos))
+            linhas.append(linha_aberta(u, o, extra.get(reg, {}), idx, tipos, api.get(reg)))
+    so_api = 0
+    for reg, n in sorted(api.items()):
+        if reg in vistos:
+            continue
+        if reg in fechadas:
+            ja += 1
+            continue
+        so_api += 1
+        linhas.append(linha_aberta({}, {}, extra.get(reg, {}), idx, tipos, n))
     linhas.sort(key=lambda l: l[0])
     de = Counter(l[8] or "sem" for l in linhas)
     return linhas, {"abertas": len(linhas), "abertas_ligadas": sum(1 for l in linhas if l[4]),
-                    "abertas_ja_normalizadas": ja, "abertas_equipamentos_de": dict(de)}
+                    "abertas_ja_normalizadas": ja, "abertas_equipamentos_de": dict(de),
+                    "abertas_da_api": sum(1 for r in api if r not in fechadas), "abertas_so_da_api": so_api}
 
 
-def ler_abertas(config, normalizacoes, usinas, agora) -> tuple[list | None, str, dict]:
+def ler_abertas(config, normalizacoes, usinas, agora, abertas_api=None) -> tuple[list | None, str, dict]:
     """(linhas, quando a fotografia foi lida, relatório) ou (None, "", relatório com o motivo): a fotografia velha ou
-    que falhou não grava retrato novo. A rota de 30 dias que falhar só deixa de completar (fica no relatório)."""
+    que falhou não grava retrato novo. A rota de 30 dias que falhar só deixa de completar (fica no relatório).
+    `abertas_api`: as abertas da API das normalizações (`normalizacoes.ler`, `dados["abertas"]`)."""
     foto = AND.ler(config, CLIENTE_ABERTAS)
     if foto.velha or not foto.dados:
         return None, "", {"abertas_mantidas": f"a fotografia do Andamento: {foto.erro or 'sem dados'}"}
     oc = AND.ler_ocorrencias(config, CLIENTE_ABERTAS, DIAS_COMPLEMENTO)
     linhas, rel = abertas(foto.dados, (oc.dados or {}).get("ocorrencias") if not oc.velha else None, normalizacoes,
-                          usinas)
+                          usinas, abertas_api)
     if oc.velha or not oc.dados:
         rel["abertas_sem_complemento"] = oc.erro or "sem dados"
     lida = datetime.fromtimestamp(foto.lido_em, _BRT) if foto.lido_em else agora
@@ -473,7 +506,8 @@ def publicar(config, sessao=None, *, agora=None, forcar=False, leitura=None, abe
         return dict(rel, pulou=pulou)
     todas = sorted(antes + linhas, key=lambda l: str(l[0]))
     rel["antes_mantidas"] = len(antes)
-    ab, ab_em, rel_ab = abertas_lidas or ler_abertas(config, leitura.dados.get("itens"), usinas, agora)
+    ab, ab_em, rel_ab = abertas_lidas or ler_abertas(config, leitura.dados.get("itens"), usinas, agora,
+                                                     leitura.dados.get("abertas"))
     rel.update(rel_ab)
     if ab is None:
         # a fotografia não veio: o retrato de antes fica, com a hora dele (o livro é trocado inteiro a cada gravação)

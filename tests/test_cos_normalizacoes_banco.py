@@ -267,7 +267,7 @@ def test_aberta_com_o_codigo_do_tipo_pelas_normalizacoes_e_a_usina_pelo_codigo()
     assert (l["equipamentos_codigos"], l["equipamentos_qtd"], l["equipamentos_de"]) == ("", 0, "")
     assert l["equipamentos_citados"] == "INV2.7"
     assert rel == {"abertas": 1, "abertas_ligadas": 1, "abertas_ja_normalizadas": 0,
-                   "abertas_equipamentos_de": {"sem": 1}}
+                   "abertas_equipamentos_de": {"sem": 1}, "abertas_da_api": 0, "abertas_so_da_api": 0}
 
 
 def test_aberta_completa_pela_rota_de_30_dias_e_o_rotulo_sem_normalizacao_vira_codigo():
@@ -447,3 +447,63 @@ def test_a_gravacao_leva_o_comentario_do_dia(app, banco, monkeypatch):
     gravadas = banco.linhas(NB.LIVRO, NB.ABA_COMENTARIOS)
     assert rel["comentarios_dias"] == len(gravadas) == 1
     assert (gravadas[0]["usina_codigo"], gravadas[0]["dia"], gravadas[0]["relato_do_dia"]) == ("TSTE-AAA100", "2026-10-27", REL)
+
+
+# ── as abertas pela API das normalizações (`abertas=sim`, 12/11/2026) ────────────────────────────────────────────────
+def _aberta_api(registro, **kw):
+    """A aberta como a API das normalizações manda com `abertas=sim`: o formato da normalização, `aberta: true` e sem a
+    volta."""
+    return _n(registro, aberta=True, normalizada=False, normalizado_em=None, fora_min=None, hora_real=False,
+              estado="EM_CAMPO", relato_cliente="em andamento", **kw)
+
+
+def test_a_aberta_da_api_vence_a_fotografia_nas_tags_no_tipo_e_no_inicio():
+    """O caso que criou a regra: a OS 16956 de Ribeirão Cascalheiras vinha da fotografia como "Desligamento", sem a tag,
+    e a plataforma a deixava fora da conta (aberta desde 09/09; a usina saía 100% em outubro e a Thopen dizia 0%)."""
+    foto = _foto(("TSTE-AAA100", [_oc("a1", tipo_falha="Desligamento", equipamentos=[], os="16956",
+                                      abertura="2026-09-09T13:40:00-03:00")]))
+    api = [_aberta_api("a1", os="16956", tipo_falha="DESLIGAMENTO_USINA", inicio="2026-09-09T13:32:00-03:00",
+                       equipamentos=[{"codigo": "tste-aaa100"}], geracao_parou=True, protecoes=["27ABC"])]
+    linhas, rel = NB.abertas(foto, [], [], USINAS, api)
+    l = dict(zip(NB.CAB_ABERTA, linhas[0]))
+    assert (l["tipo_falha"], l["equipamentos_codigos"], l["equipamentos_de"]) == ("DESLIGAMENTO_USINA", "TSTE-AAA100",
+                                                                                  "normalizacoes")
+    assert (l["inicio"], l["data_id_inicio"], l["geracao_parou"]) == ("2026-09-09T13:32:00-03:00", 20260909, 1)
+    # a etapa e os dias em aberto seguem da fotografia; as proteções das duas, sem repetir
+    assert (l["etapa"], l["dias_aberta_qtd"], l["protecoes"]) == ("Aguardando peça", 110, "27ABC")
+    assert (rel["abertas"], rel["abertas_da_api"], rel["abertas_so_da_api"]) == (1, 1, 0)
+
+
+def test_a_aberta_so_da_api_entra_e_a_de_outro_cliente_nao():
+    api = [_aberta_api("b1", os="", usina_codigo="TSTE-BBB200", tipo_falha="FALHA_COMUNICACAO",
+                       equipamentos=[{"codigo": "TSTE-BBB200-INVR1.3"}], geracao_parou=True),
+           _aberta_api("c1", cliente="OUTRO CLIENTE"), _n("d1")]          # outro cliente; a normalizada não é aberta
+    linhas, rel = NB.abertas(_foto(), [], [], USINAS, api)
+    assert [l[0] for l in linhas] == ["b1"]
+    l = dict(zip(NB.CAB_ABERTA, linhas[0]))
+    assert (l["cliente"], l["usina_id"], l["os"], l["equipamentos_codigos"], l["etapa"], l["dias_aberta_qtd"]) == (
+        "THOPEN", 2, "", "TSTE-BBB200-INVR1.3", "EM_CAMPO", "")
+    assert (rel["abertas_so_da_api"], rel["abertas_ligadas"]) == (1, 1)
+    # a que a memória já tem normalizada sai (conta uma vez, pela volta), venha da fotografia ou só da API
+    linhas, rel = NB.abertas(_foto(), [], [_n("b1")], USINAS, api)
+    assert linhas == [] and rel["abertas_ja_normalizadas"] == 1
+
+
+def test_a_aberta_nao_entra_no_fato_das_normalizacoes_nem_tira_a_da_fotografia():
+    linhas, rel = NB.fato([_n("r1"), _aberta_api("a1")], USINAS)
+    assert [l[0] for l in linhas] == ["r1"] and rel["linhas"] == 1
+    # a aberta misturada na lista das normalizadas não conta como "já normalizada"
+    assert [l[0] for l in NB.abertas(_foto(("TSTE-AAA100", [_oc("a1")])), [], [_aberta_api("a1")], USINAS)[0]] == ["a1"]
+
+
+def test_a_gravacao_le_as_abertas_da_memoria(app, banco, monkeypatch):
+    vistos = []
+    monkeypatch.setattr(NB, "ler_abertas", lambda config, normalizacoes, usinas, agora, abertas_api=None: (
+        vistos.append(([n["registro"] for n in normalizacoes], [n["registro"] for n in abertas_api or ()])) or
+        NB.abertas(_foto(), [], normalizacoes, usinas, abertas_api)[0], "2026-10-29T15:21:00-03:00", {}))
+    leitura = AND.Leitura("", {"itens": [_n("r1")], "abertas": [_aberta_api("a1")], "carregando": False})
+    with app.app_context():
+        rel = NB.publicar(app.config, banco, agora=AGORA, forcar=True, leitura=leitura)
+    assert vistos == [(["r1"], ["a1"])]
+    assert rel["gravado"][NB.ABA] == 1 and rel["gravado"][NB.ABA_ABERTAS] == 1
+    assert [r["registro"] for r in banco.linhas(NB.LIVRO, NB.ABA_ABERTAS)] == ["a1"]

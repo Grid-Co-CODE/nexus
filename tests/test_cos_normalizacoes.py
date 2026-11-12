@@ -209,8 +209,9 @@ def test_a_primeira_carga_pagina_e_depois_so_o_que_mudou(ligada, monkeypatch):
                       _resp([_n("r1", aberta=ABERTA)], "c3"))
     l = NO.ler(ligada.config, AGORA)
     assert len(l.dados["itens"]) == 6 and not l.dados["carregando"]
-    # a 1ª carga desde 01/10/2026 (o 1º mês da tela), a página seguinte já pelo cursor
-    assert pedidos[0][0] == "/api/normalizacoes" and pedidos[0][1] == "2026-10-01T00:00:00-03:00"
+    # a 1ª carga desde 01/08/2026 (12/11/2026: a releitura que traz as abertas de agosto e setembro), a página seguinte
+    # já pelo cursor
+    assert pedidos[0][0] == "/api/normalizacoes" and pedidos[0][1] == "2026-08-01T00:00:00-03:00"
     assert [p[1] for p in pedidos[1:]] == ["c1"] and pedidos[0][2] == NO.TIMEOUT_S
     # dentro do minuto não pergunta de novo
     assert NO.ler(ligada.config, AGORA) and len(pedidos) == 2
@@ -249,6 +250,33 @@ def test_a_falha_guarda_o_que_ja_veio_e_explica_o_404(ligada, monkeypatch):
 def test_o_que_passou_da_janela_sai_da_memoria(ligada, monkeypatch):
     _servir(monkeypatch, _resp(ITENS + [_n("velha", volta="2026-07-31T23:00:00-03:00")]))
     assert {n["registro"] for n in NO.ler(ligada.config, AGORA).dados["itens"]} == {f"r{i}" for i in range(1, 7)}
+
+
+def test_pede_as_abertas_e_a_aberta_fica_na_memoria_fora_das_normalizadas(ligada, monkeypatch):
+    """12/11/2026, o dono da Ronda COS: "é só acrescentar abertas=sim na consulta. Elas vêm com aberta: true,
+    normalizado_em: null". A aberta de qualquer data fica (a de julho, que o corte da guarda tiraria), e sai da lista das
+    normalizadas: a tela, o Comando e o fato do banco seguem só com elas; a aba das abertas lê `abertas`."""
+    consultas = []
+    aberta = _n("ab1", volta=None, inicio="2026-07-12T06:00:00-03:00", fora=None, aberta=None)
+    aberta.update(aberta=True, normalizada=False, estado="EM_CAMPO", relato_cliente="em andamento")
+    fechou = dict(aberta, aberta=False, normalizada=True, estado="NORMALIZADO",
+                  normalizado_em="2026-10-27T09:00:00-03:00")
+
+    def pedir(f, caminho, timeout=AND.TIMEOUT_S):
+        consultas.append(urllib.parse.parse_qs(urllib.parse.urlsplit(caminho).query))
+        return _resp(ITENS + [aberta], "c1") if len(consultas) == 1 else _resp([fechou], "c2")
+    monkeypatch.setattr(AND, "_pedir", pedir)
+    l = NO.ler(ligada.config, AGORA)
+    assert consultas[0]["abertas"] == ["sim"] and consultas[0]["limite"] == [str(NO.PAGINA)]
+    assert [n["registro"] for n in l.dados["abertas"]] == ["ab1"]
+    assert "ab1" not in {n["registro"] for n in l.dados["itens"]} and len(l.dados["itens"]) == 6
+    # a tela das normalizadas não a mostra
+    assert "ab1" not in {i["registro"] for i in NO.painel(l, AGORA).itens}
+    # normalizou: volta pelo cursor com a volta e passa para as normalizadas (o mesmo registro substitui)
+    monkeypatch.setattr(NO.time, "monotonic", lambda: 10 ** 9)
+    l = _relida(ligada.config)
+    assert consultas[-1]["desde"] == ["c1"] and consultas[-1]["abertas"] == ["sim"]
+    assert l.dados["abertas"] == [] and "ab1" in {n["registro"] for n in l.dados["itens"]}
 
 
 # --- a tela ----------------------------------------------------------------------------------------------------------

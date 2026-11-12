@@ -47,6 +47,15 @@ TTL_S = 60
 PAGINA = 500
 PAGINAS_POR_PEDIDO = 4
 TIMEOUT_S = 15
+# As ocorrências AINDA ABERTAS vêm na mesma API (12/11/2026, o dono da Ronda COS: "é só acrescentar abertas=sim na
+# consulta. Elas vêm com aberta: true, normalizado_em: null e o comentário 'em andamento'. Ao ligar, releia uma vez desde
+# 2026-08-01, depois siga o cursor"). Até ali a API só mandava a normalizada, e a aberta chegava só pela fotografia do
+# Andamento, sem a tag do equipamento nem o código do tipo: na conferência de outubro da Thopen, 46 dias com a parada
+# aberta na Ronda ficavam fora da disponibilidade (a OS 16956 de Ribeirão Cascalheiras, "Desligamento" sem dizer o quê,
+# aberta desde 09/09, saía 100% o mês todo). A aberta fica na memória enquanto estiver aberta, de qualquer data, e sai
+# da lista das normalizadas (`_leitura`): a tela e o fato das normalizações seguem só com as normalizadas.
+ABERTAS = "sim"
+RELER_DESDE = (2026, 8, 1)
 
 # O status da OS aberta no Fracttal (o mesmo das OS em aberto). O segundo valor é o que o card da OS espera.
 STATUS_OS = {1: ("Em processo", "Em Processo"), 2: ("Em verificação", "Em Verificação")}
@@ -144,6 +153,18 @@ def _data_da(n: dict) -> datetime | None:
     return AND.instante(n.get("normalizado_em")) or AND.instante(n.get("inicio"))
 
 
+def eh_aberta(n) -> bool:
+    """A ocorrência ainda aberta na Ronda COS (`aberta: true`, sem a volta), que a API manda com `abertas=sim`."""
+    return isinstance(n, dict) and n.get("aberta") is True
+
+
+def primeira_carga_desde(agora: datetime) -> datetime:
+    """De onde a memória vazia começa: o mais antigo entre o 1º mês da tela e `RELER_DESDE` (a aberta de agosto e
+    setembro só vem se a leitura passar por ela; a normalizada de antes da guarda sai no corte)."""
+    ini = inicio_da_guarda(agora)
+    return min(ini, ini.replace(year=RELER_DESDE[0], month=RELER_DESDE[1], day=RELER_DESDE[2]))
+
+
 def ler(config, agora: datetime | None = None) -> AND.Leitura:
     """As normalizações guardadas (`dados = {"itens": [...], "carregando": bool}`), postas em dia se a última pergunta
     tem mais de 1 minuto. Na falha, a memória continua, dita velha.
@@ -185,11 +206,11 @@ def _buscar(f, agora: datetime) -> AND.Leitura:
             if st and (st["completo"] or st.get("erro")) and time.monotonic() - st["perguntado"] < TTL_S:
                 return _leitura(st)
             st = st or {"itens": {}, "cursor": "", "completo": False, "perguntado": 0.0, "lido_em": None}
-        desde = st["cursor"] or inicio_da_guarda(agora).isoformat()
+        desde = st["cursor"] or primeira_carga_desde(agora).isoformat()
         itens, cursor, completo, erro = dict(st["itens"]), st["cursor"], False, ""
         try:
             for _ in range(PAGINAS_POR_PEDIDO):
-                q = urllib.parse.urlencode({"desde": desde, "limite": PAGINA})
+                q = urllib.parse.urlencode({"desde": desde, "limite": PAGINA, "abertas": ABERTAS})
                 d = validar(AND._pedir(f, "/api/normalizacoes?" + q, timeout=TIMEOUT_S))
                 for n in d["normalizacoes"]:
                     if isinstance(n, dict) and n.get("registro"):
@@ -202,7 +223,8 @@ def _buscar(f, agora: datetime) -> AND.Leitura:
             erro = ("o Andamento ainda não tem a rota das normalizações, ou ela está desligada lá"
                     if ex.codigo == 404 else str(ex))
         corte = inicio_da_guarda(agora)
-        itens = {k: n for k, n in itens.items() if (_data_da(n) or agora) >= corte}
+        # a aberta fica enquanto estiver aberta, de qualquer data (a Santarém desde julho); a normalizada, pela guarda
+        itens = {k: n for k, n in itens.items() if eh_aberta(n) or (_data_da(n) or agora) >= corte}
         with _trava:
             if erro and not st["itens"] and not itens:
                 return AND.Leitura("", None, erro=erro)
@@ -213,8 +235,12 @@ def _buscar(f, agora: datetime) -> AND.Leitura:
 
 
 def _leitura(st: dict) -> AND.Leitura:
+    """`itens`: só as normalizadas (a tela, o Comando e o fato das normalizações); `abertas`: as ainda abertas, para a
+    aba das abertas do banco (`normalizacoes_banco.abertas`)."""
     erro = st.get("erro", "")
-    return AND.Leitura("", {"itens": list(st["itens"].values()), "carregando": not st["completo"]},
+    todos = list(st["itens"].values())
+    return AND.Leitura("", {"itens": [n for n in todos if not eh_aberta(n)],
+                            "abertas": [n for n in todos if eh_aberta(n)], "carregando": not st["completo"]},
                        lido_em=st["lido_em"], erro=erro, velha=bool(erro))
 
 

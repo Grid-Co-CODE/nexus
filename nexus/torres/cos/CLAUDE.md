@@ -250,7 +250,17 @@ COS cita pelo nome vai em referência curta (`equipamentos_citados`: "Inversor 2
 tinha o nome, e a régua contava um inversor médio na usina errada). O tipo pelo rótulo vira código
 pelas normalizações (a API delas manda os dois). A que já está normalizada na memória não entra: conta uma vez, pela
 normalização. Na falha da fotografia, o retrato de antes fica, com a hora dele (`abertas_em` na `atualizacao`). Impacto,
-falha em texto, a última nota e o que se aguarda não vão. **O Atualizar do Dashboard Thopen (03/11/2026**, Levi: "fiz
+falha em texto, a última nota e o que se aguarda não vão. **Desde 12/11/2026 a API das normalizações manda as abertas**
+(o dono da Ronda COS: "é só acrescentar `abertas=sim` na consulta. Elas vêm com `aberta: true`, `normalizado_em: null`
+[...]. Ao ligar, releia uma vez desde 2026-08-01, depois siga o cursor"): a conferência de outubro da Thopen achou 46 dias
+com a parada aberta na Ronda fora da disponibilidade (a OS 16956 de Ribeirão Cascalheiras vinha da fotografia como
+"Desligamento", sem a tag, e a plataforma a deixava fora; a usina saía 100% em outubro). O pedido leva `abertas=sim`, a
+memória vazia começa em `RELER_DESDE` (01/08/2026) e a aberta fica nela enquanto estiver aberta, de qualquer data; a
+leitura separa `itens` (só as normalizadas: a tela, o Comando, o `fato_normalizacao`) de `abertas`. No
+`fato_ocorrencia_aberta`, a aberta da API vence a fotografia nas tags (`equipamentos_de` = `normalizacoes`), no código do
+tipo, no início e na `geracao_parou`; a fotografia segue com a etapa e os dias em aberto, e a aberta só da API entra
+também (só a da Thopen). O relatório da volta conta `abertas_da_api` e `abertas_so_da_api`. A plataforma não muda: lê as
+duas abas como antes. **O Atualizar do Dashboard Thopen (03/11/2026**, Levi: "fiz
 umas alterações nas normalizações e precisava trazer"): a correção feita no Andamento esperava a volta da hora. O 5080
 grava o pedido em `thopen_pedidos · atualizacao` (1 linha por clique da conta da Grid, só a hora) e o laço confere de
 minuto em minuto pela versão do livro (uma leitura da listagem): o pedido mais novo que a última gravação faz a volta na
