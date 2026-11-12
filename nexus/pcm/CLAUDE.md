@@ -1428,41 +1428,21 @@ branco não é pendência, nem a avariada sem o ID E sem o Código da peça boa 
   a sugestão (sai do que o técnico escreveu). Prova: `test_a_sigla_mais_comum_das_parecidas` e seguintes de
   `tests/test_pcm_inventario_curadoria.py`, com um catálogo de mentira.
 - **O Tipo e as duas Classificações (12/11/2026, item 3 da 2ª rodada; o PCM: "com base nos que já existem e são parecidos ele
-  indicasse e colocasse automaticamente como sugestão"; `inventario/classificacao.py`):** até ali a tela dizia que o grupo, a
-  criticidade e a Curva ABC "não se gravam pela API" (o teste do PCM de 09/10); a prova de 12/11/2026 no Fracttal de verdade
-  mostrou que o `item_insert` grava os três (o adaptador, seção acima). No cadastrar (o achado e a avariada), três seleções:
-  Tipo, Classificação 1 (criticidade) e Classificação 2 (Rank), com "sem" em cada uma.
-  - **As opções** são as do Fracttal, com o id, lidas das peças pela ponte (`GET /os/_nexus/inventario/classificacoes`, uma cópia de
-    1 h na memória do processo, `classificacao.guardadas`; o erro não fica guardado), com as recusas de toda rota da ponte (403
-    outro site ou setor, 409 a senha de administrador e a conta do Fracttal de outra pessoa, 401 sem o login, 429 e 502 do
-    Fracttal). A página as enche por `fetch` (`static/pcm-curadoria-grupos.js`); as seleções nascem escondidas e desligadas
-    (não vão no formulário), e sem as opções a linha diz que o Tipo e a Classificação ficam para a tela do Fracttal. Quem entrou
-    pela senha de administrador nem pede: a tela já diz isso (ele não cadastra).
-  - **A sugestão** (`curadoria.sugerir_classificacao`, pura): as MESMAS 5 parecidas da sigla (`_parecidas`, o mesmo peso) votam
-    na Família (o Tipo), na Criticidade (a Classificação 1) e na letra da Curva ABC (a Classificação 2) delas, as três do
-    catálogo do App (o `_catalogo()` as traz); vence o mais votado de cada campo. A Classificação 1 ou a 2 sem voto vem da mais
-    comum na Família sugerida, no catálogo inteiro ("pela Família X"); sem parecida, nada. Na avariada (`classificacao_da_boa`), o
-    Tipo e a Classificação 1 da peça boa (pelo ID e, sem ele, pelo Código); o Rank não se sugere (o da boa não é o da avariada).
-    A sugerida vem escolhida e marcada "(sugerida)", como a sigla, e o texto diz de onde veio; a reserva de uma tentativa
-    anterior vale mais (`data-reserva`).
-  - **O casamento com a opção** é pela chave (`classificacao.chave`, calculada no servidor dos dois lados; o script só compara): o
-    Tipo pelo texto sem acento e sem caixa, a Classificação 1 pelo número do nível ("1.Essencial" é o 1; o livro que ainda diga
-    "1.Crítico" cai no mesmo nível), a Classificação 2 pela letra (`letra_do_rank`: a opção é "2. Rank A", a Curva do livro é "A";
-    o "1.Avariado" não é curva e nunca é escolhido sozinho). Duas opções com a mesma chave no mesmo campo perdem a chave.
-  - **Gravar:** o cadastrar da ponte recebe `tipo`, `classificacao_1` e `classificacao_2` (o id, ou vazio), confere cada um contra
-    as opções (a mesma cópia de 1 h) ANTES de reservar o código ou de qualquer pedido de gravação (`classificacao.conferir`: o id
-    fora delas é 400, nada vai ao Fracttal), e o `criar_peca` manda só os que vieram. A reserva do código guarda os ids
-    (`grupos`), e a nova tentativa com outros é 409, como o nome e a unidade; o -AV que já existia vira "é a peça" e fica com os
-    dele. A decisão guarda as DESCRIÇÕES do que foi (`dados["grupos"]`, cifrado ao lado da unidade; sem nenhum, a chave não vai).
-    **Onde as descrições moram:** na linha da curadoria (`fato_curadoria_inventario`), e não no evento `curadoria` da auditoria:
-    o `dados` no evento faria a Auditoria dizer "motivo cifrado" numa decisão sem motivo.
-  - **O lembrete fica só para o que ficou "sem":** o texto do cadastrar ("Complete no Fracttal: Classificação 1.") e a linha em
-    "Já decididas" (`completar_no_fracttal`: os dados da peça e o Tipo e as Classificações que faltam; a decisão de antes, sem o
-    registro, lembra os três).
-  - **Prova:** `tests/test_pcm_inventario_classificacao.py` (a letra, a chave, as opções, a conferência, o adaptador e o falso, a
-    cópia de 1 h, a sugestão pelas parecidas, pela Família e pela peça boa, o cadastrar com os ids, a recusa do id de fora, a
-    reserva, a avariada, as recusas da ponte e a tela com e sem a ponte). No Fracttal de verdade, falta o cadastrar pela tela do
-    Nexus com os três (a prova de 12/11/2026 foi do `item_insert` direto).
+  indicasse e colocasse automaticamente como sugestão"; `inventario/classificacao.py`):** a regra antiga ("não se gravam pela
+  API", 09/10) caiu com a prova de 12/11/2026 (o `item_insert` grava os três). O cadastrar (o achado e a avariada) tem três
+  seleções com "sem": Tipo, Classificação 1 (criticidade) e Classificação 2 (Rank).
+  - **Tudo sai das peças do Fracttal**, numa leitura só pela ponte (`GET /os/_nexus/inventario/classificacoes`, cópia de 1 h): as
+    opções com o id e o mapa por código, de onde vem a sugestão de cada linha. **Não do catálogo do App:** a "Curva ABC" de lá
+    vem VAZIA para os Ranks ("2. Rank A"; o `_almox_curva` do App só aceita a letra sozinha, a revisão do item 3), e a Família
+    dele é só a reserva do Tipo. As parecidas são as mesmas da sigla; votam pela chave (o nível "1" junta "1.Crítico" e
+    "1.Essencial"; a letra do Rank; o "1.Avariado" não vota), e a classificação sem voto vem da mais comum no Tipo sugerido. Na
+    avariada, o Tipo e a Classificação 1 da peça boa, sem o Rank.
+  - **Gravar:** cada id é conferido contra as opções antes de qualquer pedido (o de fora é 400) e só os que vieram vão; a reserva
+    guarda os ids (outros na nova tentativa: 409) e, sem os campos (a página sem as opções), o cadastro repete os dela; a reserva
+    de antes, sem os ids, não registra grupos que não foram. As descrições ficam cifradas na linha da curadoria (no evento, a
+    Auditoria diria "motivo cifrado"), e o lembrete de completar no Fracttal é só do que ficou "sem".
+  - **A tela:** o "Sugeridos" diz só o que a seleção mostra; sem as opções, as seleções somem e a linha diz que ficam para o
+    Fracttal. Prova: `tests/test_pcm_inventario_classificacao.py`; no Fracttal de verdade, falta o cadastrar pela tela.
 - **O destino da peça** ("é a peça X", "confirmar") tem de existir no catálogo do App (ou ter sido cadastrado por aqui: a varredura
   diária ainda não o viu); a tela aceita o CÓDIGO (o PCM conhece o código, não o ID) e converte. Sem o catálogo inteiro, não decide.
 - **O motivo** (texto livre) só cifrado, em `dados={"motivo": ...}` (o Cofre do cadastro; a API do banco é aberta); descartar o exige.

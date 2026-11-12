@@ -53,8 +53,10 @@ Regras com o caso que as criou:
   (qualquer chave cabe num nome de arquivo). A descrição do técnico e a foto só aparecem para quem decide (`pode_programar`).
 - **O Tipo e as duas Classificações vão ao Fracttal no cadastrar** (12/11/2026, item 3 da 2ª rodada; até ali a tela dizia que
   "não se gravam pela API", pelo teste do PCM de 09/10, e a prova de 12/11/2026 no Fracttal de verdade mostrou que o
-  `item_insert` grava os três): a tela os sugere pelas mesmas parecidas da sigla (`sugerir_classificacao`; na avariada, os da
-  peça boa), as opções são as do Fracttal com o id (`classificacao.py`, pela ponte), o cadastrar confere cada id contra elas,
+  `item_insert` grava os três): a tela os sugere pelas mesmas parecidas da sigla, com o Tipo e as Classificações DAS PEÇAS DO
+  FRACTTAL pelo código (`sugerir_classificacao` sobre o mapa da `classificacao.mapa_guardado`; a "Curva ABC" do catálogo do App
+  vem vazia para os Ranks; na avariada, os da peça boa), as opções são as do Fracttal com o id (`classificacao.py`, pela
+  ponte, que também manda as sugestões), o cadastrar confere cada id contra elas,
   manda só os que vieram, e a decisão guarda as descrições do que foi (`dados["grupos"]`, cifrado). O lembrete de completar no
   Fracttal fica só para o que o PCM deixou "sem". **O fabricante, o modelo e o número de série NÃO vão** (revisão final de
   31/10/2026): o `item_insert` responde o `description` como "<nome>    { CODE }" (o passo 0), um campo de exibição, e ninguém
@@ -172,8 +174,7 @@ def indice(catalogo: dict | None) -> dict:
     (`regua.avariada`): ela é a boa com "[AVARIADO]" na frente e dobraria o voto da boa. O peso de cada palavra é o da raridade
     (IDF, log(peças / peças com ela)): a palavra que está em todas pesa 0, a de uma peça só pesa o máximo; a que o catálogo não
     tem pesa como a de uma peça só (deixa o nome perguntado mais específico, e a semelhança menor). `sigla_da_familia`:
-    {Família: as siglas dos códigos dela, contadas}; `grupos_da_familia` (12/11/2026): {Família: {campo: as Classificações 1 e 2
-    das peças dela, contadas}}, a reserva da `sugerir_classificacao`."""
+    {Família: as siglas dos códigos dela, contadas}."""
     pecas = []
     for iid, v in (catalogo or {}).items():
         if v.get("avariado") or regua.avariada(v.get("codigo")):
@@ -181,8 +182,7 @@ def indice(catalogo: dict | None) -> dict:
         ps = palavras(v.get("nome"))
         if ps:
             pecas.append({"id": iid, "codigo": _txt(v.get("codigo")), "nome": _txt(v.get("nome")),
-                          "familia": _txt(v.get("familia")), "criticidade": _txt(v.get("criticidade")),
-                          "curva": _txt(v.get("curva")), "palavras": ps})
+                          "familia": _txt(v.get("familia")), "palavras": ps})
     n = len(pecas)
     peso = {p: math.log(n / k) for p, k in Counter(p for x in pecas for p in x["palavras"]).items()}
     for x in pecas:
@@ -192,15 +192,7 @@ def indice(catalogo: dict | None) -> dict:
         sigla = _sigla_do_codigo(x["codigo"])
         if sigla and x["familia"]:
             por_familia.setdefault(x["familia"], Counter())[sigla] += 1
-    grupos: dict[str, dict[str, Counter]] = {}
-    for x in pecas:
-        if x["familia"]:
-            g = grupos.setdefault(x["familia"], {"classificacao_1": Counter(), "classificacao_2": Counter()})
-            for campo, v in (("classificacao_1", x["criticidade"]), ("classificacao_2", x["curva"])):
-                if v:
-                    g[campo][v] += 1
-    return {"pecas": pecas, "peso": peso, "desconhecida": math.log(n) if n else 0.0, "sigla_da_familia": por_familia,
-            "grupos_da_familia": grupos}
+    return {"pecas": pecas, "peso": peso, "desconhecida": math.log(n) if n else 0.0, "sigla_da_familia": por_familia}
 
 
 def _sigla_da_familia(idx: dict, familia: str, validas) -> str:
@@ -264,57 +256,112 @@ def sugerir(nome, idx: dict, validas) -> dict:
 
 # ── o Tipo e as Classificações sugeridos (12/11/2026, item 3 da 2ª rodada do Almoxarifado) ────────────────────────────
 # O PCM: "se você conseguisse que eu colocasse pelo Nexus ou com base nos que já existem e são parecidos ele indicasse e
-# colocasse automaticamente como sugestão". O catálogo do App já traz, de cada peça, a Família (o Tipo do Fracttal), a
-# Criticidade (a Classificação 1) e a Curva ABC (a letra do Rank, a Classificação 2): as mesmas parecidas da sigla votam.
+# colocasse automaticamente como sugestão". As parecidas são as da sigla (o catálogo do App, pelo nome), e o Tipo e as
+# Classificações de cada uma vêm DA PEÇA NO FRACTTAL, pelo código (o mapa da lista de peças, `classificacao.mapa_guardado`): a
+# "Curva ABC" do catálogo do App vem vazia para os Ranks do Fracttal ("2. Rank A"; o `_almox_curva` do App só aceita a letra
+# sozinha, a revisão do item 3), e a Família do catálogo fica só como reserva do Tipo.
 def _mais_votado(votos: dict) -> str:
     """O valor com mais peso (empate: o primeiro em ordem alfabética), ou vazio."""
     return min(votos, key=lambda k: (-votos[k], k)) if votos else ""
 
 
-def sugerir_classificacao(nome, idx: dict) -> dict:
-    """O Tipo, a Classificação 1 e a Classificação 2 sugeridos para a peça de nome `nome` (o que o técnico escreveu):
-    `{"campos": {campo: {"valor", "chave", "por"}}, "familia"}`, só com os campos que têm sugestão.
+def _pela_chave(votos: dict, campo: str) -> tuple[str, str]:
+    """(a chave vencedora, o texto que mais pesou nela): os votos somam pela `classificacao.chave` ("1.Crítico" e
+    "1.Essencial" são o nível 1 e somam juntos; a revisão, M1), e a tela mostra o texto mais votado da chave que venceu. O texto
+    sem chave (o "1.Avariado" no Rank) não vota."""
+    por: dict[str, dict] = {}
+    for texto, peso in votos.items():
+        k = CL.chave(campo, texto)
+        if k:
+            g = por.setdefault(k, {"peso": 0.0, "textos": {}})
+            g["peso"] += peso
+            g["textos"][texto] = g["textos"].get(texto, 0.0) + peso
+    if not por:
+        return "", ""
+    k = min(por, key=lambda c: (-por[c]["peso"], c))
+    return k, _mais_votado(por[k]["textos"])
 
-    As 5 mais parecidas (as da sigla, `_parecidas`) votam, cada uma com a sua semelhança, na Família, na Criticidade e na Curva
-    dela; vence o mais votado de cada campo (`por` "parecidas"). A Classificação 1 ou a 2 sem voto (nenhuma parecida a tem) vem
-    da mais comum na Família sugerida, no catálogo inteiro (`por` "familia"). Sem parecida, nada é sugerido: chutar seria pior
-    que deixar o PCM escolher. `valor` é o texto do catálogo do App; `chave`, o que casa com a opção do Fracttal
-    (`classificacao.chave`)."""
+
+def _da_peca(mapa: dict | None, codigo) -> dict:
+    return (mapa or {}).get("".join(_txt(codigo).split()).upper()) or {}
+
+
+def grupos_por_tipo(mapa: dict | None) -> dict[str, dict[str, dict[str, int]]]:
+    """{chave do Tipo: {campo: {texto: quantas peças}}} das Classificações 1 e 2 das peças do Fracttal: a reserva da
+    `sugerir_classificacao` (a classificação mais comum no Tipo sugerido). Uma vez por tela."""
+    out: dict = {}
+    for g in (mapa or {}).values():
+        k = CL.chave("tipo", g.get("tipo"))
+        if not k:
+            continue
+        for campo in ("classificacao_1", "classificacao_2"):
+            v = g.get(campo)
+            if v:
+                c = out.setdefault(k, {}).setdefault(campo, {})
+                c[v] = c.get(v, 0) + 1
+    return out
+
+
+def sugerir_classificacao(nome, idx: dict, mapa: dict | None, por_tipo: dict | None = None) -> dict:
+    """O Tipo, a Classificação 1 e a Classificação 2 sugeridos para a peça de nome `nome` (o que o técnico escreveu):
+    `{"campos": {campo: {"valor", "chave", "por"}}, "tipo"}`, só com os campos que têm sugestão.
+
+    As 5 mais parecidas (as da sigla, `_parecidas`) votam, cada uma com a sua semelhança, no Tipo e nas Classificações DA PEÇA
+    NO FRACTTAL (`mapa`, pelo código; a Família do catálogo só quando o Fracttal não diz o Tipo); a chave mais votada vence
+    (`_pela_chave`, `por` "parecidas"). A Classificação 1 ou a 2 sem voto vem da mais comum no Tipo sugerido, nas peças do
+    Fracttal (`por_tipo`, `grupos_por_tipo`; `por` "tipo"). Sem parecida, nada é sugerido: chutar seria pior que deixar o PCM
+    escolher."""
     votos: dict[str, dict] = {c: {} for c in CL.CAMPOS}
     for s, x in _parecidas(nome, idx)[:PARECIDAS_VOTAM]:
-        for campo, v in (("tipo", x["familia"]), ("classificacao_1", x["criticidade"]), ("classificacao_2", x["curva"])):
-            if v and CL.chave(campo, v):
+        g = _da_peca(mapa, x["codigo"])
+        for campo, v in (("tipo", g.get("tipo") or x["familia"]), ("classificacao_1", g.get("classificacao_1")),
+                         ("classificacao_2", g.get("classificacao_2"))):
+            if v:
                 votos[campo][v] = votos[campo].get(v, 0.0) + s
     campos = {}
     for campo, vs in votos.items():
-        v = _mais_votado(vs)
-        if v:
-            campos[campo] = {"valor": v, "chave": CL.chave(campo, v), "por": "parecidas"}
-    familia = campos.get("tipo", {}).get("valor", "")
-    for campo in ("classificacao_1", "classificacao_2"):
-        if campo not in campos and familia:
-            contadas = (idx.get("grupos_da_familia", {}).get(familia) or {}).get(campo) or {}
-            v = _mais_votado({k: n for k, n in contadas.items() if CL.chave(campo, k)})
-            if v:
-                campos[campo] = {"valor": v, "chave": CL.chave(campo, v), "por": "familia"}
-    return {"campos": campos, "familia": familia}
+        k, v = _pela_chave(vs, campo)
+        if k:
+            campos[campo] = {"valor": v, "chave": k, "por": "parecidas"}
+    tipo = campos.get("tipo")
+    if tipo:
+        por_tipo = grupos_por_tipo(mapa) if por_tipo is None else por_tipo
+        for campo in ("classificacao_1", "classificacao_2"):
+            if campo not in campos:
+                k, v = _pela_chave(dict((por_tipo.get(tipo["chave"]) or {}).get(campo) or {}), campo)
+                if k:
+                    campos[campo] = {"valor": v, "chave": k, "por": "tipo"}
+    return {"campos": campos, "tipo": tipo["valor"] if tipo else ""}
 
 
-def classificacao_da_boa(l: dict, catalogo: dict) -> dict:
-    """Na avariada sem cadastro, o Tipo e a Classificação 1 sugeridos são os da PEÇA BOA (o -AV é a mesma peça, avariada),
-    pelo ID dela no catálogo do App e, sem ele, pelo Código. A Classificação 2 não se sugere: o Rank da boa não é o da
-    avariada. O formato da `sugerir_classificacao`, com `por` "boa"."""
+def classificacao_da_boa(l: dict, catalogo: dict, mapa: dict | None) -> dict:
+    """Na avariada sem cadastro, o Tipo e a Classificação 1 sugeridos são os da PEÇA BOA no Fracttal (o -AV é a mesma
+    peça, avariada), pelo código dela (o do catálogo do App pelo ID e, sem ele, o Código da linha); a Família do catálogo é a
+    reserva do Tipo. A Classificação 2 não se sugere: o Rank da boa não é o da avariada. O formato da `sugerir_classificacao`,
+    com `por` "boa"."""
     iid = A.id_ou_vazio(l.get("ID do item"))
     boa = catalogo.get(iid) if iid else None
+    codigo = _txt((boa or {}).get("codigo")) or avariados.codigo_da_linha(l)
     if boa is None:
-        codigo = "".join(avariados.codigo_da_linha(l).split()).upper()
-        boa = next((v for v in catalogo.values() if codigo and "".join(_txt(v.get("codigo")).split()).upper() == codigo),
-                   None)
+        alvo = "".join(codigo.split()).upper()
+        boa = next((v for v in catalogo.values() if alvo and "".join(_txt(v.get("codigo")).split()).upper() == alvo), None)
+    g = _da_peca(mapa, codigo)
     campos = {}
-    for campo, v in (("tipo", _txt((boa or {}).get("familia"))), ("classificacao_1", _txt((boa or {}).get("criticidade")))):
+    for campo, v in (("tipo", g.get("tipo") or _txt((boa or {}).get("familia"))), ("classificacao_1", g.get("classificacao_1"))):
         if v and CL.chave(campo, v):
             campos[campo] = {"valor": v, "chave": CL.chave(campo, v), "por": "boa"}
-    return {"campos": campos, "familia": campos.get("tipo", {}).get("valor", "")}
+    return {"campos": campos, "tipo": campos.get("tipo", {}).get("valor", "")}
+
+
+def sugestoes_de_classificacao(cfg, mapa: dict | None) -> dict[str, dict]:
+    """{"<contagem>|<linha>": a sugestão} das pendências que cadastram (o achado e a avariada), para a ponte mandar junto
+    das opções: o mapa das peças do Fracttal só existe lá (o login dele). O livro que não se lê agora não derruba as opções:
+    sem sugestões."""
+    try:
+        return {f"{p['contagem_id']}|{p['chave_linha']}": p["classificacao"] for p in pendencias(cfg, mapa=mapa)
+                if p["classificacao"] is not None and p["decisao"] is None}
+    except (F.Recusada, visao.SemBanco, OSError):
+        return {}
 
 
 # ── o que o livro e o catálogo dizem ─────────────────────────────────────────────────────────────────────────────────
@@ -407,17 +454,16 @@ def decisoes(cfg, contagem_id: str) -> dict[str, dict]:
 
 
 def _catalogo() -> dict[str, dict] | None:
-    """{id_item: {"codigo", "nome", "familia", "criticidade", "curva", "avariado"}} do catálogo do App (a varredura diária, a
-    tela do Almoxarifado; `avariado` é a definição da casa, `regua.avariada`: o código -AV ou a marca do catálogo; a Família é a
-    da sigla sugerida, `sugerir`, e com a Criticidade e a letra da Curva ABC, a classificação sugerida,
-    `sugerir_classificacao`); None quando o saldo do App não chegou inteiro (número pela metade não vai para a tela, nem vira
-    destino de peça)."""
+    """{id_item: {"codigo", "nome", "familia", "avariado"}} do catálogo do App (a varredura diária, a tela do Almoxarifado;
+    `avariado` é a definição da casa, `regua.avariada`: o código -AV ou a marca do catálogo; a Família é a da sigla sugerida,
+    `sugerir`, e a reserva do Tipo da classificação sugerida); None quando o saldo do App não chegou inteiro (número pela
+    metade não vai para a tela, nem vira destino de peça). Sem a criticidade e a curva: a classificação sugerida sai das peças
+    do Fracttal (a "Curva ABC" daqui vem vazia para os Ranks)."""
     from .. import almoxarifado
     d = almoxarifado.montar().dados or {}
     if d.get("estado") != "ok":
         return None
     return {_id(c.get("id")): {"codigo": _txt(c.get("codigo")), "nome": _txt(c.get("nome")), "familia": _txt(c.get("familia")),
-                               "criticidade": _txt(c.get("criticidade")), "curva": _txt(c.get("curva")),
                                "avariado": bool(c.get("avariado"))}
             for c in d.get("catalogo", [])}
 
@@ -496,9 +542,9 @@ def _os_dados(l: dict, separador: str) -> str:
 
 
 def descricao_dos_dados(l: dict) -> str:
-    """"Fabricante: X · Modelo: Y · Série: Z", o que o cartão lembra de completar na tela do Fracttal depois de cadastrar (com o
-    Tipo e a Classificação que o PCM deixar "sem": desde 12/11/2026 esses vão pela API). NÃO vai ao Fracttal pela API (revisão
-    final de 31/10/2026): o `item_insert` não tem campo próprio para eles, e o `description` que ele tem é o de exibição
+    """"Fabricante: X · Modelo: Y · Série: Z", o que o cartão lembra de completar na tela do Fracttal depois de cadastrar (só
+    os três dados: o Tipo e a Classificação que ficarem "sem", quem lembra é o quadro das seleções e o `completar_no_fracttal`).
+    NÃO vai ao Fracttal pela API (revisão final de 31/10/2026): o `item_insert` não tem campo próprio para eles, e o `description` que ele tem é o de exibição
     ("<nome>    { CODE }" na resposta do passo 0), sem prova do que escrevê-lo faz. O "n/a" e o vazio saem; sem nenhum, vazio
     (e o cartão não lembra nada a mais)."""
     return _os_dados(l, ": ")
@@ -555,7 +601,7 @@ def _reservas_da_contagem(cfg, cid: str) -> dict:
         return {}
 
 
-def pendencias(cfg) -> list[dict]:
+def pendencias(cfg, mapa: dict | None = None) -> list[dict]:
     """As linhas `fora_do_catalogo`, `identificar` e `avariado` das contagens que não foram gravadas, na ordem em que a
     contagem as trouxe (a mais antiga primeiro), cada uma com a foto e a decisão que já tem (`decisao`: None se pende).
     `contado` já é número. No genérico, o específico que o técnico escolheu vem com o código e o nome do catálogo do App
@@ -575,12 +621,14 @@ def pendencias(cfg) -> list[dict]:
     técnico escreveu e as peças parecidas do catálogo do App (`sugerir`); nos outros, None.
 
     Desde 12/11/2026, `classificacao`: o Tipo e as Classificações sugeridos para o cadastrar (`sugerir_classificacao` no achado;
-    na avariada, os da peça boa, `classificacao_da_boa`); no genérico, None. E a decisão `cadastrar` traz em `grupos` as
+    na avariada, os da peça boa, `classificacao_da_boa`), só com o `mapa` das peças do Fracttal (a ponte o tem; a página, não:
+    ela recebe as sugestões junto das opções); no genérico e sem o mapa, None. E a decisão `cadastrar` traz em `grupos` as
     descrições do que foi ao Fracttal (o `dados` cifrado da decisão; None na decisão de antes, sem o registro)."""
     abertas = contagens_abertas(cfg)
     decididas = _decisoes_do_livro(F.ler(cfg)[F.ABA_CURADORIA])
     catalogo = _catalogo() or {}
     idx = indice(catalogo)                      # uma vez por tela: o peso das palavras é do catálogo inteiro
+    por_tipo = grupos_por_tipo(mapa) if mapa is not None else None
     out = []
     for cid, linhas in sorted(abertas.items(), key=lambda kv: (_txt(kv[1][0].get("Contada em")), kv[0])):
         reservas = _reservas_da_contagem(cfg, cid)
@@ -611,8 +659,8 @@ def pendencias(cfg) -> list[dict]:
                 "fotos": _fotos_da_linha(cfg, l),
                 "sugestao": sugerir(l.get("Descrição"), idx, siglas(cfg, l.get("ID do almoxarifado")))
                 if tipo == "fora_do_catalogo" else None,
-                "classificacao": sugerir_classificacao(l.get("Descrição"), idx) if tipo == "fora_do_catalogo"
-                else classificacao_da_boa(l, catalogo) if tipo == "avariado" else None,
+                "classificacao": None if mapa is None else sugerir_classificacao(l.get("Descrição"), idx, mapa, por_tipo)
+                if tipo == "fora_do_catalogo" else classificacao_da_boa(l, catalogo, mapa) if tipo == "avariado" else None,
                 "decisao": None if d is None else {
                     "decisao": _txt(d.get("decisao")), "id_item": _id(d.get("id_item")),
                     "codigo_criado": _txt(d.get("codigo_criado")), "quando": _txt(d.get("decidida_em")),
@@ -771,6 +819,18 @@ def _unidade_do_cadastro(unidade, da_boa="") -> str:
     return (_txt(unidade) or _txt(da_boa)).upper() or "UNIDADE"
 
 
+def _reserva_da_linha(cfg, contagem_id: str, chave: str) -> dict | None:
+    """A reserva de uma tentativa anterior desta linha, ou None (sem pasta de dados, sem arquivo ou ilegível: o `_cadastrar`
+    acha o erro de verdade)."""
+    try:
+        arq = _arquivo_reserva(cfg, contagem_id)
+        with _ARQUIVO.de(arq.name):
+            r = _ler_reservas(arq).get(chave)
+    except (F.Recusada, OSError):
+        return None
+    return r if isinstance(r, dict) else None
+
+
 def _ids_dos_grupos(grupos: dict | None) -> dict[str, str]:
     """`{campo: id}` dos grupos conferidos (`classificacao.conferir`): o que vai ao `criar_peca` e à reserva."""
     return {c: v["id"] for c, v in (grupos or {}).items()}
@@ -816,6 +876,7 @@ def _cadastrar(cfg, contagem_id, chave, almox, sigla, nome, unidade, estoque, gr
             with _ARQUIVO.de(arq.name):
                 reservas = _ler_reservas(arq)
                 reservas[chave] = {"codigo": codigo, "sigla": sigla, "nome": nome, "unidade": unidade, "grupos": ids,
+                                   "grupos_desc": {c: v["descricao"] for c, v in (grupos or {}).items()},
                                    "reservado_em": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")}
                 _gravar_reservas(arq, reservas)      # ANTES de criar: se a resposta se perder, a nova tentativa sabe qual era
     try:
@@ -907,7 +968,8 @@ def decidir(cfg, contagem_id: str, chave_linha: str, decisao: str, *, id_item: s
     `motivo` também vai (cifrado) nas outras decisões, quando vem. No `cadastrar`, `grupos` (12/11/2026) é o Tipo e as
     Classificações que a página mandou (`{campo: id}`, o vazio é "sem"), conferidos contra `opcoes_grupos` (as opções do
     Fracttal, `classificacao.guardadas`, ou a função que as dá) antes de qualquer pedido: o id que não está nelas é
-    `ValueError`. Só os que vieram vão ao `criar_peca`, e a decisão guarda as descrições (`dados["grupos"]`, cifrado).
+    `ValueError`. Só os que vieram vão ao `criar_peca`, e a decisão guarda as descrições (`dados["grupos"]`, cifrado). `grupos`
+    None (a página que não teve as opções e não mandou os campos) repete os da reserva de uma tentativa anterior, se houver.
 
     `ValueError`: o pedido não faz sentido (nada foi feito). `Conflito`: a linha já foi decidida ou a contagem já não está
     aberta. `Recusada`: o livro (ou o controle do código) não deixou. O Fracttal levanta `Limite`, `SemLogin` e `ErroFracttal`.
@@ -933,9 +995,16 @@ def decidir(cfg, contagem_id: str, chave_linha: str, decisao: str, *, id_item: s
         almox = _id(l.get("ID do almoxarifado"))
         cadastradas = {_id(r.get("id_item")): _txt(r.get("codigo_criado")) for r in livro[F.ABA_CURADORIA]
                        if _txt(r.get("decisao")) == "cadastrar" and _id(r.get("id_item"))}
-        codigo, criada, texto, escolhidos = "", False, "", {}
+        codigo, criada, texto, escolhidos, reserva = "", False, "", {}, None
         if decisao == "cadastrar":
-            escolhidos = CL.conferir(grupos, opcoes_grupos)      # antes do Fracttal: o id chutado nem vai
+            reserva = _reserva_da_linha(cfg, cid, chave) if tipo != "avariado" else None
+            if grupos is None and isinstance(reserva, dict) and isinstance(reserva.get("grupos"), dict):
+                # a página sem as opções (o Fracttal instável) não manda os campos: repete os da tentativa anterior (a revisão, M3;
+                # pedir à pessoa os mesmos dados sem ela poder vê-los dava um 409 que enganava)
+                escolhidos = {c: {"id": i, "descricao": (reserva.get("grupos_desc") or {}).get(c, "")}
+                              for c, i in reserva["grupos"].items()}
+            else:
+                escolhidos = CL.conferir(grupos, opcoes_grupos)  # antes do Fracttal: o id chutado nem vai
         if decisao == "cadastrar" and tipo == "avariado":
             id_final, codigo, criada = _cadastrar_avariado(l, nome, unidade, estoque, escolhidos)
             if criada:
@@ -950,6 +1019,10 @@ def decidir(cfg, contagem_id: str, chave_linha: str, decisao: str, *, id_item: s
             id_final, codigo, criada = _cadastrar(cfg, cid, chave, almox, sigla, nome, unidade, estoque, escolhidos)
             texto = (f"Peça cadastrada no Fracttal: {codigo}." if criada else
                      f"A peça {codigo} já estava no Fracttal (a tentativa anterior a criou): usei ela, sem criar outra.")
+            if not criada and isinstance(reserva, dict) and "grupos" not in reserva:
+                # a reserva de antes de 12/11/2026 (sem a chave): a peça achada foi criada sem o Tipo e as Classificações, e
+                # registrar os desta tentativa seria um fato falso (a revisão, M4)
+                escolhidos = {}
         elif decisao == "descartar":
             id_final = ""
             texto = ("Avariadas descartadas: não entram na contagem." if tipo == "avariado"

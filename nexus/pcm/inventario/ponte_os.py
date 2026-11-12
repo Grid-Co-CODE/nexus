@@ -196,7 +196,8 @@ def curadoria_cadastrar():
     para "sem"), conferidos contra as opções do Fracttal (a mesma cópia de 1 h da rota `classificacoes`) antes de criar: o id que
     não está nelas é 400 e nada vai ao Fracttal."""
     f = request.form
-    grupos = {c: f.get(c) for c in CL.CAMPOS if f.get(c) is not None}
+    # sem nenhum dos três campos (a página sem as opções), None: o cadastro repete os da reserva, se houver (a revisão, M3)
+    grupos = {c: f.get(c) for c in CL.CAMPOS if f.get(c) is not None} or None
     r = _com_o_fracttal(CURADORIA, lambda est: curadoria.decidir(
         current_app.config, str(f.get("contagem") or "").strip(), str(f.get("linha") or "").strip(), "cadastrar",
         sigla=f.get("sigla"), nome=f.get("nome"), unidade=f.get("unidade"), estoque=est, pessoa=quem.do_pedido(),
@@ -207,15 +208,18 @@ def curadoria_cadastrar():
 @bp.route("/classificacoes")
 def curadoria_classificacoes():
     """As opções do Tipo e das Classificações da peça (12/11/2026, item 3 da 2ª rodada), para a página da curadoria encher as
-    três seleções do cadastrar: `{"ok", "opcoes": {campo: [{"id", "descricao", "chave"}]}}` (`classificacao.guardadas`, as das
-    próprias peças do Fracttal, numa cópia de 1 h na memória do processo). As recusas de toda rota da ponte (`_com_o_fracttal`):
+    três seleções do cadastrar: `{"ok", "opcoes": {campo: [{"id", "descricao", "chave"}]}, "sugestoes": {"<contagem>|<linha>":
+    a sugestão}}` (`classificacao.guardadas`, as das próprias peças do Fracttal, numa cópia de 1 h na memória do processo; a
+    sugestão sai do mapa das mesmas peças, `curadoria.sugestoes_de_classificacao`). As recusas de toda rota da ponte (`_com_o_fracttal`):
     403 de outro site ou de outro setor, 409 a senha de administrador (não é uma pessoa) e a conta do Fracttal de outra pessoa,
     401 sem o login do Fracttal, 429 e 502 do Fracttal. A página que não consegue as opções esconde as seleções e diz que o
     Tipo e a Classificação ficam para o Fracttal."""
-    r = _com_o_fracttal(CURADORIA, lambda est: {"opcoes": CL.guardadas(est)})
+    cfg = current_app.config
+    r = _com_o_fracttal(CURADORIA, lambda est: {"opcoes": CL.guardadas(est), "sugestoes": curadoria.sugestoes_de_classificacao(
+        cfg, CL.mapa_guardado(est))})
     if not isinstance(r, dict):
         return r
-    return _json({"ok": True, "opcoes": r["opcoes"]}, 200)
+    return _json({"ok": True, "opcoes": r["opcoes"], "sugestoes": r["sugestoes"]}, 200)
 
 
 # ── as requisições de material: a fila, aceitar, recusar e o automático (12/11/2026, item 6 da 2ª rodada) ───────────────
