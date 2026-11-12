@@ -239,7 +239,8 @@ adar_2026-11-11\`).
 
 O HEAD da zeladoria (quem criou o Radar) programa a Zeladoria no Nexus desde 11/11/2026, com o papel **admin** no
 GitHub, por decisão do Levi ("Direto na main"): sobe direto na `main`, sem pull request, e a `main` vai para produção
-sozinha em ~2 min, com o servidor reiniciando. Antes de subir:
+sozinha em ~2 min, com o servidor reiniciando. O passo a passo no Windows (instalar, baixar, rodar a cópia de prova,
+subir, desfazer) está em `GUIA_GITHUB.md`, nesta pasta. Antes de subir:
 1. Leia este `CLAUDE.md` e o `CLAUDE.md` da raiz (as regras do Nexus inteiro).
 2. `python -m pytest tests/test_zeladoria_*.py -q` passando (com o `.env`, para a trava de nomes rodar junto), e a tela
    conferida no navegador, no computador e a 375 px.
