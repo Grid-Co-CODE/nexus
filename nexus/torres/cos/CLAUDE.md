@@ -476,6 +476,22 @@ Ignora esse monitoramento que já existe no nexus" (a Performance › Tempo real
   - Ao vivo como a tela normal (o corpo a cada 30 s pelo `nexusPedir`), com o relógio de Brasília, a tela acesa (Wake
     Lock, onde o navegador deixa) e os controles (tela cheia, sair) só ao mexer o mouse.
 
+## Console e Conferência de OS: a Ronda COS dentro do Nexus (12/11/2026)
+
+O dono, no protótipo do COS: as duas telas da Ronda COS no menu do COS, dentro do Nexus. **Só a moldura**
+(`cos/moldura_ronda.html`, as rotas `/console` e `/conferencia-os`): tudo o que se faz nelas é a Ronda COS, com o login
+dela (na 1ª vez em cada navegador; o login pelo passe do Nexus é o passo seguinte).
+- **O site em HTTPS** (`AND.web_da_ronda`): o Nexus é HTTPS e o navegador barra página HTTP dentro dele. O site vem pelo
+  Caddy do servidor da Ronda COS; sem `NEXUS_COS_WEB_URL`, o endereço sai do do Andamento por IP
+  (`https://console.<IP com hífens>.sslip.io`, o provisório até o DNS). O endereço completo vai na variável
+  `plataforma_ronda` (o `test_prefixo` só aceita URL de outro sistema com "plataforma" no nome).
+- **Lá na Ronda COS** (o ramo `conc/console-no-nexus`): a página aberta pelo HTTPS fala com a API pelo HTTPS, a API aceita
+  as duas origens, e numa moldura o site põe o tema do Nexus e tira a barra lateral. A voz do alarme de queda fica nele
+  (a do Nexus ainda não está no ar).
+- **O tema** vai por postMessage `{tipo: "nexus-tema", tema}` só para a origem do site; o site avisa `console-pronto`.
+- O Console aceita `?registro=` (abre com a ocorrência). As duas são do setor COS (`do_setor`) e vêm logo depois do
+  Acompanhamento. Testes: `tests/test_cos_console_na_moldura.py`.
+
 ## O COS mais rápido e fluido (12/11/2026, o checkup do dono: "Quero que seja a aba mais fluida e tecnológica do nexus")
 
 - **As telas não esperam a Ronda COS** (`nexus/cos/andamento.py`, `_com_copia`): a cópia vencida há pouco (até

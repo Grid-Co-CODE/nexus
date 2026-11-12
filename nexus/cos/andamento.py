@@ -128,6 +128,24 @@ def api_da_ronda(config) -> str:
     return _valor(config, API_RONDA).rstrip("/")
 
 
+# O SITE da Ronda COS em HTTPS (12/11/2026): o Console e a Conferência de OS dentro do Nexus, numa moldura. O Nexus é
+# HTTPS e o navegador barra página HTTP dentro dele, então o site vem pelo Caddy do servidor da Ronda COS. Sem a variável,
+# o endereço sai do do Andamento: o servidor dele por IP vira `https://console.<IP com hífens>.sslip.io` (o provisório
+# até a TI criar o DNS). Com um nome (não IP), só pela variável.
+WEB_RONDA = "NEXUS_COS_WEB_URL"
+
+
+def web_da_ronda(config) -> str:
+    v = _valor(config, WEB_RONDA).rstrip("/")
+    if v:
+        return v
+    host = urllib.parse.urlsplit(fonte(config).url).hostname or ""
+    partes = host.split(".")
+    if len(partes) == 4 and all(x.isdigit() and int(x) < 256 for x in partes):
+        return f"https://console.{'-'.join(partes)}.sslip.io"
+    return ""
+
+
 def fonte(config) -> Fonte:
     return Fonte(
         url=_valor(config, URL).rstrip("/"),
