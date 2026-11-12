@@ -14,10 +14,14 @@
 {% if aviso %}<p class="sug-aviso sug-aviso--ok" role="status"><i class="ph ph-check-circle" aria-hidden="true"></i> {{ aviso }}</p>{% endif %}
 {% if erro %}<p class="sug-aviso sug-aviso--erro" role="alert"><i class="ph ph-warning" aria-hidden="true"></i> {{ erro }}</p>{% endif %}
 
-{# o formulário à esquerda e, à direita, o que a pessoa já mandou com o status (28/10/2026) #}
+{# o formulário à esquerda e, à direita, o que a pessoa já mandou com o status (28/10/2026). A página inteira numa
+   grade só (12/11/2026, Levi: "to achando essa página meio torta e feia mas não sei explicar o motivo"): as duas faixas
+   (o formulário com as Minhas sugestões; as recebidas com o Por setor) usam a MESMA coluna principal e a MESMA coluna
+   do lado, de 300 px, e acabam na mesma borda; a sugestão é sempre a mesma linha-cartão, nas duas listas; o título de
+   seção (sug-secao) fica acima do rótulo de campo #}
 <div class="sug-topo">
 <section class="sug-bloco sug-nova" aria-labelledby="sug-nova">
-  <h2 class="ui-kicker" id="sug-nova">Nova sugestão</h2>
+  <h2 class="sug-secao" id="sug-nova">Nova sugestão</h2>
   {% if faltam %}
   <p class="aviso">Este Nexus ainda não grava sugestões: faltam as chaves {{ faltam|join(', ') }} no .env do servidor.</p>
   {% elif not tem_login %}
@@ -64,7 +68,7 @@
 <aside class="sug-minhas" aria-labelledby="sug-minhas-t">
   {# Levi, 28/10/2026: "Do lado direito tem um espaço para 'Minhas sugestões' - a pessoa consegue ver o que mandou e
      qual status está" #}
-  <h2 class="ui-kicker" id="sug-minhas-t">Minhas sugestões{% if minhas %} ({{ minhas|length }}){% endif %}</h2>
+  <h2 class="sug-secao" id="sug-minhas-t">Minhas sugestões{% if minhas %} <span class="sug-secao-n">({{ minhas|length }})</span>{% endif %}</h2>
   {% if minhas %}
   <ol class="sug-minhas-lista">
     {# cada uma abre no clique (12/11/2026, Levi: "nos cardzinhos de concluída, eu quero conseguir clicar no que foi
@@ -72,7 +76,7 @@
        linha diz o status, a data, quantas respostas e o título; aberta, o que a pessoa pediu e cada resposta, ou que
        não houve resposta #}
     {% for m in minhas %}
-    <li><details class="sug-dobra sug-minha">
+    <li class="sug-item"><details class="sug-dobra sug-minha">
       <summary class="sug-minhas-cab" title="Abrir para ver a resposta"><span class="gc-status gc-status--{{ m.status_tom }}">{{ m.status_rotulo }}</span>
         {% if m.respostas %}<span class="sug-n-resp" title="{{ m.respostas|length }} {{ 'resposta' if m.respostas|length == 1 else 'respostas' }}"><i class="ph ph-chat-circle-text" aria-hidden="true"></i> {{ m.respostas|length }}</span>{% endif %}
         <span class="sug-quando">{{ m.quando_txt }}</span>
@@ -97,7 +101,7 @@
 
 {% if admin %}
 <section class="sug-bloco sug-bloco--recebidas" aria-labelledby="sug-recebidas">
-  <h2 class="ui-kicker" id="sug-recebidas">Sugestões recebidas{% if recebidas %} ({{ recebidas|length }}){% endif %}</h2>
+  <h2 class="sug-secao" id="sug-recebidas">Sugestões recebidas{% if recebidas %} <span class="sug-secao-n">({{ recebidas|length }})</span>{% endif %}</h2>
   <p class="gc-ajuda sug-so-admin">Só os administradores veem esta lista. As que faltam concluir vêm primeiro; clique numa para abrir.</p>
   {% if aviso_status %}<p class="sug-aviso sug-aviso--{{ aviso_status[0] }}" role="{{ 'status' if aviso_status[0] == 'ok' else 'alert' }}"><i class="ph {{ 'ph-check-circle' if aviso_status[0] == 'ok' else 'ph-warning' }}" aria-hidden="true"></i> {{ aviso_status[1] }}</p>{% endif %}
   {% if erro_lista %}<p class="sug-aviso sug-aviso--erro">Não consegui ler as sugestões do banco agora ({{ erro_lista }}){% if recebidas %}: a lista é a da última leitura{% endif %}.</p>{% endif %}
@@ -107,10 +111,13 @@
   {# recolhidas (28/10/2026, Levi: "As sugestões recebidas devem ficar recolhidas"): a linha diz o status, o título, quem
      pediu e quando; ao abrir, o texto, os anexos e a troca do status #}
   {# o contador por setor ao lado da lista (11/11/2026, Levi: "Ao lado das sugestões tem que ter um contador por setor,
-     eu clico e filtra"): o setor é a área que a pessoa escolheu ao sugerir; o clique filtra na própria página #}
+     eu clico e filtra"): o setor é a área que a pessoa escolheu ao sugerir; o clique filtra na própria página. Desde
+     12/11/2026 na coluna do lado direito, a mesma das Minhas sugestões (antes à esquerda: eram duas grades na página) #}
   {# o setor e quem solicitou no padrão dos filtros do Nexus (12/11/2026, Levi: "Em sugestões, eu gostaria que desse
      para filtrar por setor e por quem solicitou"; static/filtros-os.js, o modelo do Histórico de OS). A página filtra
      sozinha (data-fo="local"); o contador por setor ao lado marca o mesmo filtro e conta só as da pessoa escolhida #}
+  <div class="sug-recebidas">
+  <div class="sug-recebidas-principal">
   <form class="sug-filtros" method="get" data-fo="local">
     <label class="atu-filtro"><span class="gc-rotulo">Setor</span>
       <select class="gc-campo" name="setor" multiple data-todos="Todos os setores" data-sug-filtro="area">
@@ -121,11 +128,6 @@
     <span class="mudo sug-conta"><b class="gc-num" data-sug-conta>{{ recebidas|length }}</b> de {{ recebidas|length }} {{ 'sugestão' if recebidas|length == 1 else 'sugestões' }}</span>
   </form>
   <script src="{{ url_for('static', filename='filtros-os.js') }}"></script>
-  <div class="sug-recebidas">
-  <nav class="sug-setores" aria-label="Sugestões por setor">
-    <button type="button" class="sug-setor" data-sug-area="" aria-pressed="true">Todas <b>{{ recebidas|length }}</b></button>
-    {% for k, nome, n in por_area %}<button type="button" class="sug-setor" data-sug-area="{{ k }}" aria-pressed="false">{{ nome }} <b>{{ n }}</b></button>{% endfor %}
-  </nav>
   <ol class="sug-lista">
     {% for s in recebidas %}
     <li class="sug-item" id="sug-{{ s.id }}" data-sug-quem="{{ quem_de.get(s.id, '') }}" data-sug-area="{{ s.area or '_sem' }}"><details class="sug-dobra">
@@ -189,6 +191,12 @@
     {% endfor %}
     <li class="mudo sug-vazio" data-sug-vazio hidden>Nenhuma sugestão com esses filtros.</li>
   </ol>
+  </div>
+  <nav class="sug-setores" aria-labelledby="sug-setores-t">
+    <h3 class="sug-secao sug-secao--lado" id="sug-setores-t">Por setor</h3>
+    <button type="button" class="sug-setor" data-sug-area="" aria-pressed="true">Todas <b>{{ recebidas|length }}</b></button>
+    {% for k, nome, n in por_area %}<button type="button" class="sug-setor" data-sug-area="{{ k }}" aria-pressed="false">{{ nome }} <b>{{ n }}</b></button>{% endfor %}
+  </nav>
   </div>
   {% endif %}
 </section>

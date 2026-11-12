@@ -1010,6 +1010,17 @@ server".
     **Nova**). Só o administrador muda, pelo `POST /?aba=sugestoes&acao=status` (a ação no endereço, e não no corpo: ler o
     corpo antes tiraria do envio das sugestões a recusa do pedido grande sem ler). A mesma mudança repetida não grava.
     **As duas abas vão juntas em toda gravação** (livro que só cresce recusa gravar sem uma aba que o banco tem);
+  - **a página numa grade só** (12/11/2026, Levi: "to achando essa página meio torta e feia mas não sei explicar o
+    motivo"). Medido na tela: três bordas direitas (o formulário em 760 px, as Minhas em 1132 e as recebidas em 1140),
+    duas grades que não conversavam (760 + 340 em cima, 200 + 924 embaixo, com vãos de 32 e de 16), o título de seção
+    (10 px) menor que o rótulo de campo (11 px), as Minhas num cartão e o formulário solto, e o setor da linha começando
+    em três lugares (empurrado pela largura do status). A regra que ficou: **as duas faixas usam a mesma grade**
+    (`.sug-topo,.sug-recebidas`: coluna principal + 300 px do lado, vão de 24, até 1240 px; a aba Atualizações usa a
+    mesma, `.atu-grade`), o **Por setor foi para a coluna do lado** (embaixo das Minhas, alinhado à barra dos filtros),
+    **a sugestão é sempre a linha-cartão** (`.sug-item`, nas recebidas e nas Minhas; o resto fica direto na página), o
+    **título de seção é o `.sug-secao`** (15 px, acima do rótulo) e **a linha das recebidas tem colunas fixas** (data,
+    nome e título, respostas, setor, status, seta: `.sug-lista .sug-cab`), que voltam a quebrar no celular. Seção nova
+    nesta página entra na grade e usa esses três; nada de largura própria. Prova: `test_a_pagina_numa_grade_so`;
   - **Minhas sugestões**, à direita do formulário (embaixo no celular): as da pessoa pelo `pessoa_hmac` (o código do
     e-mail, em claro no livro), com o status. **Cada uma abre no clique** (12/11/2026, Levi: "nos cardzinhos de
     concluída, eu quero conseguir clicar no que foi concluído e ver se teve alguma resposta [...] se a pessoa respondeu
@@ -1028,7 +1039,8 @@ server".
     nas etiquetas) e conta só as sugestões de quem está escolhido;
   - **o contador por setor ao lado** (11/11/2026, Levi: "Ao lado das sugestões tem que ter um contador por setor, eu clico
     e filtra"): o setor é a área que a pessoa escolheu ao sugerir (a sem área, "Sem área"); "Todas" e um botão por setor
-    com a conta (`casca._contar_por_area`), e o clique filtra na própria página (o script do `sugestoes.html`);
+    com a conta (`casca._contar_por_area`), e o clique filtra na própria página (o script do `sugestoes.html`). Desde
+    12/11/2026 na coluna do lado DIREITO (era à esquerda);
   - **a resposta** (11/11/2026, Levi: "Gostaria de conseguir responder as sugestões"): a 3ª aba do livro,
     `fato_resposta_sugestao` (1 linha por resposta, só acrescenta, várias por sugestão; o texto e o nome cifrados), pelo
     `POST /?aba=sugestoes&acao=responder`, só administrador. O id vem do formulário (`r` + 11 hexadecimais): o 2º envio

@@ -190,7 +190,7 @@ def test_so_o_administrador_ve_a_lista_e_baixa_os_anexos(app, banco, dados):
     app.config["NEXUS_ADMINS"] = "chefe@exemplo.test"      # o portão segue a lista de administradores a cada pedido
     adm = _cliente(app, admin=True, usuario={"email": "chefe@exemplo.test", "nome": "Chefe"})
     html = adm.get(URL).get_data(as_text=True)
-    assert "Sugestões recebidas (1)" in html and "Fulana de Teste" in html and "fulana@exemplo.test" in html
+    assert 'Sugestões recebidas <span class="sug-secao-n">(1)</span>' in html and "Fulana de Teste" in html and "fulana@exemplo.test" in html
     assert "Filtro por usina no relatório" in html and "PCM" in html and "Plano.pdf" in html
     assert f"anexo={sid}&amp;n=2" in html
     r = adm.get(f"{URL}&anexo={sid}&n=1")
@@ -504,3 +504,21 @@ def test_minhas_sugestoes_abrem_no_clique_e_dizem_se_teve_resposta(app, banco, d
     assert "sug-n-resp" not in cab and "Concluída sem resposta escrita." in corpo
     cab, corpo = cartoes["Ainda nova"]
     assert "Nova" in cab and "Ainda sem resposta." in corpo
+
+
+def test_a_pagina_numa_grade_so():
+    """Levi, 12/11/2026: "to achando essa página meio torta e feia mas não sei explicar o motivo". Medido: três bordas
+    direitas (760, 1132 e 1140 px) e duas grades (760 + 340 em cima, 200 + 924 embaixo). As duas faixas passam a usar a
+    mesma grade; o contador por setor vai para a coluna do lado, depois da lista; a sugestão é a mesma linha-cartão nas
+    duas listas; e o setor e o status da linha ficam em colunas fixas."""
+    from pathlib import Path
+    raiz = Path(__file__).resolve().parents[1] / "nexus"
+    css = (raiz / "static" / "nexus.css").read_text(encoding="utf-8")
+    assert (".sug-topo,.sug-recebidas{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:8px 24px;"
+            "align-items:start;max-width:1240px}") in css
+    assert ".sug-lista .sug-cab{display:grid;grid-template-columns:auto minmax(0,1fr) 28px 140px 116px 12px" in css
+    assert ".sug-secao{margin:28px 0 12px;font:600 15px/20px var(--font-sans)" in css
+    html = (raiz / "templates" / "sugestoes.html").read_text(encoding="utf-8")
+    assert html.index('<ol class="sug-lista">') < html.index('<nav class="sug-setores"')      # a lista, depois o lado
+    assert '<li class="sug-item"><details class="sug-dobra sug-minha">' in html
+    assert 'class="ui-kicker"' not in html

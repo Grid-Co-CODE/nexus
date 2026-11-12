@@ -276,7 +276,9 @@ a{color:inherit}
    os commits do mês, que filtra no clique */
 .atu-filtros,.sug-filtros{margin-top:14px}
 .atu-filtro{display:grid;gap:4px}
-.atu-grade{display:grid;grid-template-columns:minmax(0,920px) minmax(220px,280px);gap:8px 32px;align-items:start}
+/* a mesma grade das Sugestões (coluna principal + 300 px do lado, até 1240 px): o lado não pula ao trocar de aba */
+.atu-grade{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:8px 24px;align-items:start;max-width:1240px}
+.atu-grade .atualizacoes{max-width:none}
 .atu-pessoas{display:grid;gap:8px;margin-top:18px;position:sticky;top:12px}
 .atu-pessoas .ui-kicker{margin:12px 0 2px}
 .atu-pessoa{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:baseline;gap:6px 12px;padding:12px 14px;
@@ -293,15 +295,18 @@ a{color:inherit}
   .atu-pessoas .ui-kicker,.atu-pessoas-nota{grid-column:1 / -1}}
 .gc-status--info{color:var(--info);background:var(--info-suave)}
 /* Sugestões (24/10/2026): o formulário de todos e a lista do administrador, na mesma superfície das Atualizações */
-.sug-bloco{max-width:920px}
+/* 12/11/2026 (Levi: "essa página meio torta e feia"): a página numa grade só. As duas faixas têm a mesma coluna principal
+   e a mesma coluna do lado (300 px), com o mesmo vão, e acabam na mesma borda (1240 px); antes eram 760 + 340 em cima e
+   200 + 924 embaixo, com três bordas direitas. A sugestão é sempre a linha-cartão (.sug-item), nas recebidas e nas
+   Minhas; o resto fica direto na página. O título de seção (.sug-secao, 15 px) fica acima do rótulo de campo (11 px) */
+.sug-secao{margin:28px 0 12px;font:600 15px/20px var(--font-sans);color:var(--tinta)}
+.sug-secao-n{font-weight:400;color:var(--mudo)}
 /* 28/10/2026: o formulário e, à direita, as Minhas sugestões; a lista recebida recolhida; o contador da aba */
-.sug-topo{display:grid;grid-template-columns:minmax(0,760px) minmax(260px,340px);gap:8px 32px;align-items:start}
-.sug-minhas{background:var(--superficie);border:1px solid var(--linha);border-radius:var(--raio-md);padding:0 16px 14px;margin-top:16px}
-.sug-minhas .ui-kicker{margin:14px 0 10px}
-.sug-minhas-lista{list-style:none;margin:0;padding:0;display:grid;gap:12px;max-height:520px;overflow:auto}
-.sug-minhas-lista li + li{border-top:1px solid var(--linha);padding-top:12px}
+.sug-topo,.sug-recebidas{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:8px 24px;align-items:start;max-width:1240px}
+/* as Minhas sugestões na altura do formulário: a lista rola por dentro, e o formulário não fica com um buraco embaixo */
+.sug-minhas-lista{list-style:none;margin:0;padding:0;display:grid;gap:10px;max-height:380px;overflow:auto}
 .sug-minhas-cab{display:flex;align-items:center;gap:8px}
-.sug-minhas-titulo{margin:6px 0 4px;font-weight:600;color:var(--tinta);font-size:13.5px;line-height:1.4;overflow-wrap:anywhere}
+.sug-minhas-titulo{margin:6px 0 4px;color:var(--tinta);font-size:13.5px;line-height:1.4;overflow-wrap:anywhere}
 .sug-minhas-st{margin:4px 0 0;font-size:12px}
 .sug-dobra > summary{cursor:pointer;list-style:none}
 .sug-dobra > summary::-webkit-details-marker{display:none}
@@ -316,8 +321,9 @@ a{color:inherit}
 .sug-status .gc-campo{width:auto;min-width:170px}
 .sug-contador{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;padding:0 5px;margin-left:6px;
   border-radius:999px;background:var(--alerta);color:var(--sobre-cheio);font:700 11px/1 var(--font-sans);font-variant-numeric:tabular-nums}
-@media (max-width:900px){.sug-topo{grid-template-columns:minmax(0,1fr)}}
-.sug-form{display:grid;gap:16px;max-width:760px}
+@media (max-width:900px){.sug-topo,.sug-recebidas{grid-template-columns:minmax(0,1fr)}.sug-minhas-lista{max-height:none}
+  .sug-setores{position:static;flex-direction:row;flex-wrap:wrap;order:-1}.sug-setores .sug-secao--lado{flex-basis:100%;height:auto}}
+.sug-form{display:grid;gap:16px}
 .sug-linha{display:grid;grid-template-columns:minmax(0,1fr) 240px;gap:16px}
 .sug-campo{display:grid;gap:6px;min-width:0}
 .sug-campo .gc-campo{width:100%;box-sizing:border-box}
@@ -335,7 +341,7 @@ a{color:inherit}
 .sug-aviso .ph{font-size:18px;flex:none;margin-top:1px}
 .sug-aviso--ok .ph{color:var(--ok)}
 .sug-aviso--erro .ph{color:var(--critico)}
-.sug-so-admin{margin:-6px 0 12px}
+.sug-so-admin{margin:-6px 0 14px}
 .sug-lista{list-style:none;margin:0;padding:0;display:grid;gap:10px}
 .sug-item{background:var(--superficie);border:1px solid var(--linha);border-radius:var(--raio-md);padding:12px 16px}
 .sug-cab{display:flex;flex-wrap:wrap;align-items:center;gap:8px;font-size:13px}
@@ -353,9 +359,23 @@ a{color:inherit}
 @media (max-width:640px){.sug-linha{grid-template-columns:1fr}.sug-quando{margin-left:0;flex-basis:100%}}
 /* as recebidas (11/11/2026, Levi): o contador por setor ao lado, que filtra; a linha começa pela data e pelo nome; as
    respostas e o responder no corpo */
-.sug-bloco--recebidas{max-width:1140px}
-.sug-recebidas{display:grid;grid-template-columns:200px minmax(0,1fr);gap:16px;align-items:start}
+.sug-bloco--recebidas{max-width:1240px}
 .sug-setores{display:flex;flex-direction:column;gap:4px;position:sticky;top:12px}
+/* o "Por setor" na altura da barra dos filtros: o 1º setor fica na linha da 1ª sugestão */
+.sug-setores .sug-secao--lado{display:flex;align-items:center;height:36px;margin:0 0 4px}
+/* a linha das recebidas em colunas fixas: as respostas, o setor e o status começam no mesmo ponto em toda linha (antes
+   vinham empurrados pela largura do status, e o setor começava em três lugares) */
+.sug-lista .sug-cab{display:grid;grid-template-columns:auto minmax(0,1fr) 28px 140px 116px 12px;gap:8px 10px}
+.sug-lista .sug-cab > *,.sug-lista .sug-dobra > summary::after{grid-row:1}
+.sug-lista .sug-cab > .sug-quando{grid-column:1;font-variant-numeric:tabular-nums}
+.sug-lista .sug-cab > .sug-resumo-titulo{grid-column:2}
+.sug-lista .sug-cab > .sug-n-resp{grid-column:3}
+.sug-lista .sug-cab > .atu-area{grid-column:4;justify-self:start;max-width:100%;box-sizing:border-box;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sug-lista .sug-cab > .gc-status{grid-column:5;justify-self:start}
+.sug-lista .sug-dobra > summary::after{grid-column:6;margin:0;justify-self:end}
+/* a coluna da lista estreita (o celular, o notebook pequeno): a linha volta a quebrar. Pela largura da COLUNA, não da
+   tela: as colunas fixas somam 451 px e o título precisa de uns 240 */
+@container sug (max-width:720px){.sug-lista .sug-cab{display:flex}.sug-lista .sug-dobra > summary::after{margin-left:auto}}
 .sug-setor{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 10px;border:1px solid transparent;
   border-radius:var(--raio-controle);background:transparent;color:var(--tinta-2);font:500 13px/18px var(--font-sans);
   text-align:left;cursor:pointer}
@@ -368,7 +388,8 @@ a{color:inherit}
 /* 12/11/2026 (Levi): quem solicitou no verde da Grid; nem o nome nem o título em negrito */
 .sug-cab > .sug-resumo-titulo{font-weight:400}
 .sug-resumo-titulo .sug-quem{font-weight:400;color:var(--verde-texto)}
-.sug-filtros{margin-bottom:12px}
+.sug-filtros{margin:0 0 8px}
+.sug-recebidas-principal{min-width:0;container:sug / inline-size}
 .sug-conta{font-size:12.5px}
 .sug-vazio{padding:10px 2px}
 /* Minhas sugestões abrem no clique (12/11/2026): a linha com o status, as respostas e a data; o título embaixo; a seta
@@ -387,9 +408,6 @@ a{color:inherit}
 .sug-responder{display:grid;gap:6px;margin-top:14px;max-width:640px}
 .sug-responder .gc-campo{width:100%;box-sizing:border-box;resize:vertical;font-family:var(--font-sans)}
 .sug-responder .gc-btn{justify-self:start}
-@media (max-width:820px){.sug-recebidas{grid-template-columns:minmax(0,1fr)}
-  .sug-setores{position:static;flex-direction:row;flex-wrap:wrap}
-}
 
 /* Tipografia da casca */
 .titulo-pagina{font:800 30px/36px var(--font-display);letter-spacing:-.01em;margin:6px 0 10px}
