@@ -6,13 +6,15 @@ Plano e registro: `docs/superpowers/plans/2026-11-03-zeladoria-etapas-1-e-2.md`.
 
 ## Como funciona
 
-- **O app é um clone:** `clone/radar.html`, o Radar como estava no ar em 06/11/2026, limpo de nomes e do Supabase
-  (`clone/ORIGEM.md`). O Radar não congelou (o desenho previa congelar ao fim da etapa 2): enquanto ele mudar, o clone se
-  refaz pela `ferramentas/zeladoria_limpar_clone.py` sobre o Radar baixado do ar, nunca à mão.
+- **O app é um clone:** `clone/radar.html`, o Radar como estava no ar em 11/11/2026, limpo de nomes, e-mails e do
+  Supabase (`clone/ORIGEM.md`). O Radar congelou nesse dia, junto com o Supabase (seção "A troca"): desde então **o clone
+  é a casa da zeladoria e se edita direto**, como o OS Creator desde 31/10. A `ferramentas/zeladoria_limpar_clone.py`
+  fica como registro de como ele nasceu.
 - **Telas:** cada uma das 18 abas do Radar é uma tela no menu do Nexus (`ABAS`: id da tela → id da aba do clone).
   - A tela é a moldura da porta única (`.porta`) com o clone num iframe (`/t/zeladoria/app?aba=...`).
   - A barra lateral do clone some; o menu é o do Nexus.
-  - Quem vê a torre é o setor (Base → Acessos). Dentro dela, o papel e as permissões por aba do Radar decidem, como lá.
+  - Quem vê a torre é o setor (Base → Acessos) e, desde 11/11/2026, quem está aprovado no Radar (seção "A troca").
+    Dentro dela, o papel e as permissões por aba do Radar decidem, como lá.
 - **A ponte** (`nexus/static/zeladoria/ponte.js`) é o `window.supabase` do clone e fala com as rotas da torre:
   - `GET /api/rf/<view>` aceita `eq`/`neq`/`order`;
   - `GET /api/eu` devolve `{"user": {"id", "email"}}`;
@@ -66,8 +68,9 @@ cliente, lugar). Por quê: a API do banco tem leitura aberta, e fornecedor MEI t
 
 ## A gravação (etapa 4, 03/11/2026; desligada até a troca)
 
-Liga só onde `NEXUS_ZELADORIA_GRAVA=1`: o servidor, no dia da troca. Uma máquina grava; dois Nexus com estados
-diferentes apagariam um ao outro. Levi escolheu "Salvo em 1 s, banco logo depois": gravar e conferir o livro do app leva
+Liga pelo botão da página da troca (`/t/zeladoria/troca`, só o administrador; seção "A troca"), que guarda a escolha na
+pasta de dados da máquina. A variável `NEXUS_ZELADORIA_GRAVA` vence o botão onde existir (`1` liga, `0` desliga). Uma
+máquina grava; dois Nexus com estados diferentes apagariam um ao outro. Levi escolheu "Salvo em 1 s, banco logo depois": gravar e conferir o livro do app leva
 ~8 s (medido), e esperar isso a cada clique travaria a tela.
 - **Na hora** (`nexus/zeladoria/gravacao.py`, `Gravador.aplicar`): a mudança entra no estado em memória e no diário
   `<NEXUS_DADOS>/zeladoria/diario.jsonl`, cifrado linha a linha, e o "Salvo" do app acende. Diário que não gravou = 503,
@@ -194,7 +197,60 @@ O Radar tinha duas funções no Supabase que não são do app: a `fracttal-sync`
     trocar de endereço. Quem for ler recebe o endereço do Nexus e a chave; perguntar ao supervisor que pediu o link quem
     é o app central. Prova com o dado real: o retrato do banco do Nexus deu 91 usinas.
 
-## O que falta (etapas do desenho)
+## A troca (11/11/2026)
 
-- **6:** as usinas ligadas ao cadastro, e a troca (congelar o Radar, a última cópia, `NEXUS_ZELADORIA_GRAVA=1` no
-  servidor, que liga também as rondas do Fracttal, e o endereço `zeladoria.gridco.com.br` apontando para o Nexus).
+O Supabase do Radar estourou a cota de arquivos grátis (3,1 GB de 1,1 GB, pelas fotos e vídeos dos outros apps da mesma
+organização) e passou a recusar todo pedido (402) até 10/12/2026: login, banco e arquivos. O site
+`zeladoria.gridco.com.br` ainda abre, mas não entra. O painel do Supabase continua lendo o banco pelo SQL Editor.
+- **A última cópia:** a exportação de 12/11/2026 às 02:29 UTC, pelo SQL Editor, no Chrome do Levi: 6.210 linhas nas 41
+  tabelas mais 121 últimas rondas (em 06/11 eram 5.148), sem tabela nova; o cronograma tinha sido publicado às 19:40 UTC
+  de 11/11, minutos antes de o Supabase parar. A exportação e o Radar original desse dia ficam fora do repositório
+  (`Downloads\Deploy
+adar_2026-10-28
+  (`Downloads\Deploy
+adar_2026-10-28
+  (`Downloads\Deploy\radar_2026-10-28\radar_exportacao_2026-11-11.json` e `Downloads\Deploy\radar_2026-11-11\`).
+adar_2026-11-11\`).
+adar_2026-11-11\`).
+- **O nome que a trava pegou:** a cópia parou num investimento do financeiro com o nome de uma pessoa ("… (anual)", 12
+  parcelas), num campo que ia em claro. O `investimento` passou a cifrado (`tabelas._CLARO`); a leitura aceita o texto em
+  claro da cópia antiga (só decifra o que está cifrado), então o código novo sobe ANTES da cópia nova.
+- **O Radar de 11/11 no clone:** o Financeiro abre na Visão executiva, o relatório dos primarizados, o lançar no
+  financeiro, a vala de drenagem e a mudança de nível na Criticidade, entre outros (1.181 linhas novas). Duas trocas novas
+  na ferramenta: a lista de e-mails que mostrava o "Mês a mês - Geral" a uma pessoa virou "só o HEAD" (o e-mail não entra
+  no repositório; a ferramenta para se sobrar e-mail da empresa), e a cor de reserva em `rgb()` sai como a em `#hex`.
+- **A função nova do financeiro:** `fin_editar_motivo` (corrigir o motivo de uma alteração já feita; o 1º motivo fica em
+  `motivo_original`; quem fez edita a dela, o HEAD qualquer uma), em `financeiro.py`, com a mesma regra e a mesma
+  mensagem do banco. As outras três foram conferidas com o banco de 11/11: iguais às portadas.
+- **A página da troca** (`/t/zeladoria/troca`, só o administrador, com o atalho "Ligar a gravação" na faixa da tela): a
+  gravação nesta máquina, a cópia do banco (de quando é o dado) e o estado do gravador. Ligar exige a cópia inteira e
+  legível, e sobe o gravador na hora (com ele, as rondas do Fracttal). Ligue no servidor, não na 5070.
+- **Quem entra** (Levi, 11/11/2026: "Aprovado no Radar entra"): quem está aprovado no `perfis` da cópia vê a Zeladoria
+  no Nexus sem precisar de setor (`nexus/zeladoria/acesso.py`, chamado pelo portão em `nexus/auth/setor_telas.acesso`):
+  sem setor, vale como do setor Zeladoria; com outro setor, ganha as telas da Zeladoria. O HEAD aprova na tela Usuários,
+  como no Radar. O portão nunca espera o banco: usa a cópia em memória e recarrega por trás (15 min sem a gravação).
+  Ainda depende de a pessoa entrar no Nexus (login do Fracttal, ou a conta Microsoft quando a T.I. ligar).
+- **A ordem do dia:** subir o código; gravar a cópia de 11/11 (`copiar_zeladoria.py --arquivo ... --gravar`, na máquina
+  do Levi); o administrador liga a gravação em app.gridco.com.br/t/zeladoria/troca.
+
+## Como entregar (quem programa a Zeladoria)
+
+O HEAD da zeladoria (quem criou o Radar) programa a Zeladoria no Nexus desde 11/11/2026, com o papel **admin** no
+GitHub, por decisão do Levi ("Direto na main"): sobe direto na `main`, sem pull request, e a `main` vai para produção
+sozinha em ~2 min, com o servidor reiniciando. Antes de subir:
+1. Leia este `CLAUDE.md` e o `CLAUDE.md` da raiz (as regras do Nexus inteiro).
+2. `python -m pytest tests/test_zeladoria_*.py -q` passando (com o `.env`, para a trava de nomes rodar junto), e a tela
+   conferida no navegador, no computador e a 375 px.
+3. O repositório é público: nada de nome de colega, e-mail, dado de cliente ou segredo em arquivo versionado (cite pelo
+   papel: "o HEAD", "o supervisor da equipe"); cor só por token; sem emoji; tudo em pt-BR.
+4. O clone (`clone/radar.html`) agora se edita direto. O dado mora no banco do Nexus (os três livros `nexus_zeladoria_*`,
+   pelo gravador): nada de Supabase, planilha ou JSON como banco. Tabela nova entra em `nexus/zeladoria/tabelas.py` e no
+   catálogo antes da 1ª gravação (`nexus/dados/CLAUDE.md`).
+
+## O que falta
+
+- **Usinas ligadas ao cadastro** (a etapa 6 do desenho): a usina do Radar casada com a do `cadastro_nexus` pelo ID.
+- **O endereço antigo:** `zeladoria.gridco.com.br` ainda serve o Radar, que não entra mais. Quem cuida da hospedagem dele
+  (o HEAD da zeladoria) troca a página por um redirecionamento para `app.gridco.com.br/t/zeladoria/visao-geral`.
+- **Pessoa nova do time:** quem nunca abriu a Zeladoria não está no `perfis`; sem setor no Nexus, não chega à torre para
+  pedir acesso. Por enquanto o administrador põe o setor Zeladoria em Base → Acessos.

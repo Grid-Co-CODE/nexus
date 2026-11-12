@@ -785,7 +785,10 @@ que só reordenava o menu) saiu: no lugar dela o topo mostra "Setor: X". O códi
 
 - **O setor da pessoa** é o da tela Base → Acessos → Pessoas e setores (`nexus/cadastro/setores.py`, livro `nexus_setores`). A
   pessoa do login se acha pelo código do e-mail (`pessoa_hmac`, com a `NEXUS_PESSOA_HMAC`), o mesmo que a decisão de
-  setor grava; nome e e-mail nunca vão ao banco (regra 8).
+  setor grava; nome e e-mail nunca vão ao banco (regra 8). **Exceção da Zeladoria** (11/11/2026, Levi: "Aprovado no Radar
+  entra"): quem está aprovado no `perfis` do Radar (a cópia em memória; `nexus/zeladoria/acesso.py`) e não tem setor
+  vale como do setor Zeladoria; com outro setor, ganha as telas da Zeladoria. O portão nunca espera o banco por isso: sem
+  a cópia em memória, responde "não" e a carrega por trás.
 - **A matriz** setor × tela mora no livro `nexus_setor_telas · fato_decisao_tela_setor` (catálogo: fato
   `decisao_tela_setor`): só acrescenta, e vale a última decisão de cada setor × tela; a tela é `torre/tela`, o endereço
   do menu. Setor novo nasce sem nada marcado. O Salvar relê o banco, grava só o que mudou e troca a aba inteira (o

@@ -53,6 +53,15 @@ def trocar_nomes(texto: str, de_para: dict) -> str:
 
 
 def limpar(texto: str, de_para: dict) -> str:
+    # O "Mês a mês - Geral" do Financeiro passou a aparecer só para um e-mail colado no código (Radar de 10/11/2026). O
+    # repositório é público: o e-mail sai ANTES da troca de nomes (que estragava o e-mail e deixava o sobrenome), e a
+    # página fica para o HEAD, que foi quem pediu
+    if "FIN_GERAL_EMAILS" in texto:
+        texto = _uma_vez(texto, r"var FIN_GERAL_EMAILS = \[[^\]]*\];", "var FIN_GERAL_EMAILS = [];",
+                         "a lista de e-mails do Mês a mês - Geral", regex=True)
+        texto = _uma_vez(texto, "function finGeralVisivel(){ return FIN_GERAL_EMAILS.indexOf(String(whoami() || '')"
+                                ".toLowerCase()) !== -1; }", "function finGeralVisivel(){ return finEhHead(); }",
+                         "quem vê o Mês a mês - Geral")
     texto = trocar_nomes(texto, de_para)
     # o cronograma importado (arquivo do PCM) escreve "Rota do <supervisor>" com o nome de verdade: a rota se
     # reconhece pelo começo do texto, sem depender do nome
@@ -215,6 +224,8 @@ def _cores_do_js(texto: str) -> str:
     for padrao in COR_DE_DADO:
         texto = re.sub(padrao, guardar, texto)
     texto = re.sub(r"var\((--[a-z0-9-]+),\s*#[0-9a-fA-F]{3,8}\)", r"var(\1)", texto)
+    # a reserva em rgb() também sai (o Radar de 10/11/2026: 'var(--critical, rgb(196,61,48))' na seta da criticidade)
+    texto = re.sub(r"var\((--[a-z0-9-]+),\s*rgba?\([^()]*\)\)", r"var(\1)", texto)
     for var, fixas in JS_CORES.items():
         for fixa in sorted(fixas, key=len, reverse=True):
             c = re.escape(fixa)
@@ -285,6 +296,11 @@ def main(argv=None) -> int:
         print(f"parei: {e}", file=sys.stderr)
         return 1
     linhas = sobras(limpo, de_para)
+    # e-mail da empresa não entra no clone (o repositório é público); o de exemplo do login é voce@empresa.com.br
+    emails = [i for i, linha in enumerate(limpo.splitlines(), 1) if re.search(r"[\w.+-]+@gridco\.com\.br", linha, re.I)]
+    if emails:
+        print(f"parei: sobrou e-mail da empresa em {len(emails)} linha(s): {emails[:30]}", file=sys.stderr)
+        return 1
     if linhas:
         print(f"parei: sobraram nomes em {len(linhas)} linha(s): {linhas[:30]}", file=sys.stderr)
         return 1

@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% from "_explica.html" import explica %}
+{% block titulo %}A troca da Zeladoria{% endblock %}
+{% block conteudo %}
+{# O dia da troca (11/11/2026): o Supabase do Radar parou (cota estourada, pedidos recusados até 10/12) e o
+   administrador liga a gravação pelo Nexus nesta máquina, sem a T.I. (nexus/zeladoria/gravacao.py, `ligar`). #}
+<p class="gc-eyebrow">Zeladoria</p>
+<div class="gc-titulo-explica">
+  <h1 class="titulo-pagina">A troca: o Nexus passa a gravar</h1>
+  {% call explica("Entenda esta tela") %}
+    <p>Até a troca, a Zeladoria do Nexus só lê a cópia do Radar. Ligada a gravação, o Nexus vira a casa da zeladoria:
+      quem está aprovado no Radar edita aqui, o financeiro roda pelo Nexus e as rondas passam a vir do Fracttal a cada
+      2 horas.</p>
+    <p><b>Ligue só no servidor</b> (app.gridco.com.br). A escolha fica na pasta de dados desta máquina: ligar aqui não
+      liga outro Nexus, e dois Nexus gravando ao mesmo tempo apagariam um ao outro.</p>
+    <p>Depois da 1ª gravação, a cópia do Supabase recusa passar por cima do que o Nexus gravou. Desligar volta a torre a
+      só leitura; o que já foi gravado fica.</p>
+  {% endcall %}
+</div>
+
+{% if erro %}<p class="aviso" role="alert">{{ erro }}</p>{% endif %}
+
+<div class="zt-quadro">
+  <div class="zt-cel">
+    <span class="zt-rot">Gravação nesta máquina</span>
+    <b class="{{ 'zt-ok' if grava else 'zt-nao' }}">{{ "Ligada" if grava else "Desligada" }}</b>
+    <span class="mudo">
+      {% if forcada %}pela variável NEXUS_ZELADORIA_GRAVA do .env
+      {% elif chave.em %}{{ "ligada" if chave.ligada else "desligada" }} em {{ chave.em[8:10] }}/{{ chave.em[5:7] }} às
+        {{ chave.em[11:16] }} (UTC){% if chave.por %} por {{ chave.por }}{% endif %}
+      {% else %}nunca ligada aqui{% endif %}
+    </span>
+  </div>
+  <div class="zt-cel">
+    <span class="zt-rot">Cópia do Radar no banco</span>
+    {% if estado %}
+    <b>{{ (estado.exportado_em or "")[8:10] }}/{{ (estado.exportado_em or "")[5:7] }} às {{ (estado.exportado_em or "")[11:16] }} (UTC)</b>
+    <span class="mudo">exportada do Supabase; versão {{ estado.versao }} do Nexus</span>
+    {% else %}<b class="zt-nao">Não legível</b>{% endif %}
+  </div>
+  <div class="zt-cel">
+    <span class="zt-rot">Máquina</span>
+    <b>{{ maquina }}</b>
+    {% if situacao %}<span class="mudo">{% if situacao.erro %}banco atrasado: {{ situacao.erro }}{% elif situacao.pendente %}gravando no banco…{% else %}em dia com o banco{% endif %}</span>{% endif %}
+  </div>
+</div>
+
+<form method="post" class="zt-acoes">
+  {% if grava %}
+  <input type="hidden" name="ligar" value="0">
+  <button class="gc-btn" type="submit" {% if forcada %}disabled{% endif %}>Desligar a gravação</button>
+  {% else %}
+  <input type="hidden" name="ligar" value="1">
+  <button class="gc-btn gc-btn--primario" type="submit" {% if forcada or not estado %}disabled{% endif %}>Ligar a gravação</button>
+  {% endif %}
+</form>
+<style>
+  .zt-quadro{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin:16px 0}
+  .zt-cel{display:flex;flex-direction:column;gap:4px;padding:14px 16px;border-radius:12px;background:var(--superficie);
+    border:1px solid var(--linha)}
+  .zt-rot{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--mudo)}
+  .zt-cel b{font-size:16px}
+  .zt-ok{color:var(--ok)}
+  .zt-nao{color:var(--alerta)}
+  .zt-acoes{margin:8px 0 24px}
+</style>
+{% endblock %}

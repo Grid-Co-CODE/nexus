@@ -1,14 +1,13 @@
 # De onde veio o `radar.html`
 
-É o app do Radar de Fornecedores (a plataforma de zeladoria) como estava no ar em 06/11/2026 (baixado de
-zeladoria.gridco.com.br; a 1ª versão foi a `f0b4cac`, do pacote de 28/10/2026). O Radar não congelou como o desenho
-previa: entre as duas ganhou o painel dos contratos por cliente (Visão Geral), os PDFs dos contratos e a consulta da OS
-no Fracttal. O Radar original de cada versão fica fora do repositório, em `Downloads\Deploy\radar_<data>`. Desenho:
-`docs/superpowers/specs/2026-11-03-zeladoria-no-nexus-design.md`.
+É o app do Radar de Fornecedores (a plataforma de zeladoria) como estava no ar em 11/11/2026, o último dia dele (baixado
+de zeladoria.gridco.com.br; a 1ª versão foi a `f0b4cac`, do pacote de 28/10/2026, e a de 06/11 trouxe o painel dos
+contratos por cliente, os PDFs dos contratos e a consulta da OS no Fracttal). O Radar original de cada versão fica fora
+do repositório, em `Downloads\Deploy\radar_<data>`. Desenho: `docs/superpowers/specs/2026-11-03-zeladoria-no-nexus-design.md`.
 
-**Não edite à mão antes do congelamento.** O arquivo sai do `ferramentas/zeladoria_limpar_clone.py`. Depois que o Radar
-congelar (fim da etapa 2), este arquivo passa a ser a casa da zeladoria e se edita direto, como o OS Creator desde
-31/10.
+**Congelado em 11/11/2026:** o Supabase do Radar parou (a cota estourou, e os pedidos são recusados até 10/12), e o Radar
+parou junto. Desde então este arquivo é a casa da zeladoria e **se edita direto**, como o OS Creator desde 31/10 (quem
+programa: o HEAD da zeladoria; ver "Como entregar" no `CLAUDE.md` da torre). A ferramenta abaixo fica como registro.
 
 ## O que a ferramenta trocou
 
@@ -29,7 +28,8 @@ congelar (fim da etapa 2), este arquivo passa a ser a casa da zeladoria e se edi
 
 ## Rodar de novo
 
-Para trazer o que o time do Radar mudou até o congelamento:
+Só se o Radar voltar a ser editado fora do Nexus (depois de 11/11 não há por quê; editar o clone direto e depois rodar a
+ferramenta apaga o que foi editado). Para trazer o que o time do Radar mudou:
 
 ```
 python -I ferramentas/zeladoria_limpar_clone.py --origem <index.html novo> --nomes <de_para_nomes.json> --saida nexus/torres/zeladoria/clone/radar.html

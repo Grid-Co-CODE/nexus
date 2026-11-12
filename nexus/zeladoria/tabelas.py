@@ -114,7 +114,9 @@ _CLARO = {
     "de_inicio", "de_fim", "para_inicio", "para_fim",
     # estado, tipo e classificação
     "status", "status_manual", "tipo", "servico", "servicos", "papel", "origem", "escopo", "prioridade", "nivel",
-    "criticidade", "categoria", "unidade", "via", "forma_pagamento", "investimento", "alinhamento_semanal",
+    # (o `investimento` do financeiro saiu daqui em 11/11/2026: a exportação final trouxe um investimento com o nome de
+    # uma pessoa, e a trava de nomes da cópia parou; texto livre que pode ter nome vai cifrado)
+    "criticidade", "categoria", "unidade", "via", "forma_pagamento", "alinhamento_semanal",
     # onde: usina, cliente e lugar (o que liga ao cadastro do Nexus)
     "usina", "usinas", "ufv", "cliente", "estado", "uf", "regiao", "cluster", "base_equipe", "equipe_cluster",
     "cidade", "concessionaria", "fabricante_modulos",

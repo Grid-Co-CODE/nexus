@@ -9,9 +9,10 @@
    Performance (.porta), para coisa parecida ter o mesmo desenho. #}
 <div class="porta">
   {% if estado and not grava %}
-  <p class="porta-alerta" role="status">Cópia do Radar, só para leitura: edite no Radar até a troca.
-    {% if estado.copiado_em %}Copiado em {{ estado.copiado_em[8:10] }}/{{ estado.copiado_em[5:7] }}/{{ estado.copiado_em[0:4] }}
-    às {{ estado.copiado_em[11:16] }} (UTC).{% endif %}</p>
+  <p class="porta-alerta" role="status">Cópia do Radar, só para leitura até o Nexus passar a gravar.
+    {% if estado.exportado_em %}Dado do Radar de {{ estado.exportado_em[8:10] }}/{{ estado.exportado_em[5:7] }}/{{ estado.exportado_em[0:4] }}
+    às {{ estado.exportado_em[11:16] }} (UTC).{% endif %}
+    {% if session.admin %}<a href="{{ url_for('.troca') }}">Ligar a gravação</a>{% endif %}</p>
   {% endif %}
   {% if estado %}
   <iframe class="porta-moldura" src="{{ url_for('.app_radar', aba=aba) }}" title="{{ tela.nome }} (Zeladoria)"></iframe>

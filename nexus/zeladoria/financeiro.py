@@ -1,11 +1,11 @@
-"""As três funções do financeiro do Radar, em Python (etapa 4, 03/11/2026).
+"""As funções do financeiro do Radar, em Python (etapa 4, 03/11/2026; a quarta, `fin_editar_motivo`, em 11/11/2026).
 
 No Supabase elas eram funções do banco (`fin_promover`, `fin_definir_fornecedor`, `fin_editar_provisao`, em
 `docs/financeiro/*.sql` do Radar), porque mexem em várias tabelas de uma vez e têm de ser tudo ou nada. Aqui cada uma lê o
 estado do gravador, confere a mesma regra com a mesma mensagem e devolve os pedidos de gravação mais a resposta que o app
 espera; o gravador aplica os pedidos num salvamento só (`Gravador.chamar`), então continua tudo ou nada.
 
-Só o HEAD aprovado chama qualquer uma das três, como no banco do Radar.
+Só o HEAD aprovado chama as três primeiras; a de editar o motivo, quem fez a alteração ou o HEAD, como no banco do Radar.
 """
 import re
 from datetime import datetime, timezone
@@ -245,5 +245,45 @@ def fin_editar_provisao(est: dict, quem: dict, args: dict, agora: str | None = N
                  "total_novo": round(tot_novo, 2), "quem": eu, "em": agora}
 
 
+def fin_editar_motivo(est: dict, quem: dict, args: dict, agora: str | None = None):
+    """Corrige o motivo de alterações já feitas (o Radar ganhou em 10/11/2026, pedido do HEAD da zeladoria: "posso errar
+    sem querer ou mudar a escrita"). O motivo antigo fica guardado no `motivo_original` (o 1º, uma vez só), com quem e
+    quando editou. Quem fez a alteração edita a dela; o HEAD edita qualquer uma. Sem o `_head`: aqui basta estar aprovado,
+    como na função do banco do Radar."""
+    nome = "fin_editar_motivo"
+    if quem.get("status") != "aprovado":
+        raise FinErro(f"{nome}: usuário não aprovado")
+    eu, chefe = quem.get("email"), quem.get("papel") == "HEAD"
+    agora = agora or datetime.now(timezone.utc).isoformat(timespec="seconds")
+    origem, motivo = args.get("p_origem"), str(args.get("p_motivo") or "").strip()
+    ids = {str(i) for i in (args.get("p_ids") or []) if i is not None}
+    if not motivo:
+        raise FinErro(f"{nome}: o motivo não pode ficar vazio")
+    if not ids:
+        raise FinErro(f"{nome}: nenhuma alteração informada")
+    aba = {"provisao": "fin_provisao_historico", "parcela": "financeiro_historico"}.get(origem)
+    if aba is None:
+        raise FinErro(f"{nome}: origem inválida ({origem})")
+    alvo = [h for h in est["abas"].get(aba, []) if str(h.get("id")) in ids]
+    if not chefe and any(h.get("quem") != eu for h in alvo):
+        raise FinErro(f"{nome}: só quem fez a alteração ou o HEAD pode editar o motivo")
+    linhas = []
+    for h in alvo:
+        if origem == "provisao":
+            linhas.append({"id": h["id"], "motivo_original": h.get("motivo_original") or h.get("motivo"),
+                           "motivo": motivo, "motivo_editado_por": eu, "motivo_editado_em": agora})
+            continue
+        campos = h.get("campos") if isinstance(h.get("campos"), dict) else None
+        if campos is None or "_motivo" not in campos:          # o `campos ? '_motivo'` do banco
+            continue
+        original = campos.get("_motivo_original")
+        linhas.append({"id": h["id"], "campos": {**campos, "_motivo": motivo,
+                                                 "_motivo_original": original if original is not None else campos.get("_motivo"),
+                                                 "_motivo_editado_por": eu, "_motivo_editado_em": agora}})
+    if not linhas:
+        raise FinErro(f"{nome}: alteração não encontrada")
+    return [_upsert(f"rf_{aba}", linhas)], len(linhas)
+
+
 FUNCOES = {"fin_promover": fin_promover, "fin_definir_fornecedor": fin_definir_fornecedor,
-           "fin_editar_provisao": fin_editar_provisao}
+           "fin_editar_provisao": fin_editar_provisao, "fin_editar_motivo": fin_editar_motivo}

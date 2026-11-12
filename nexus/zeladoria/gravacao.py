@@ -69,8 +69,65 @@ class Recusa(ValueError):
     """Pedido que a regra não deixa (sem aprovação, sem papel, dado inválido). A mensagem volta ao app como erro."""
 
 
+# ── o interruptor da troca ────────────────────────────────────────────────────────────────────────────────────────
+# Levi, 11/11/2026: a gravação liga por um botão do administrador na própria torre (/t/zeladoria/troca), e não pela T.I.
+# no .env do servidor, onde ele não tem acesso. A escolha mora num arquivo da pasta de dados DA MÁQUINA (configuração da
+# instalação, como os administradores de Base → Acessos): ligar no servidor não liga a 5070 do Levi nem a cópia de prova,
+# que têm a pasta delas. Uma máquina grava; dois Nexus com estados diferentes apagariam um ao outro. A variável
+# NEXUS_ZELADORIA_GRAVA vence o arquivo: "1" liga e "0" desliga, onde ela existir.
+INTERRUPTOR = "gravacao.json"
+_INTERRUPTOR = {"em": 0.0, "caminho": None, "valor": None}
+INTERRUPTOR_TTL_S = 5
+
+
+def _arquivo_interruptor(config) -> Path | None:
+    if config.get("TESTING") and not config.get("NEXUS_DADOS"):
+        return None                           # teste sem pasta de rascunho não lê a pasta de dados real da máquina
+    from ..cadastro.ligacoes import pasta_dados
+    return Path(pasta_dados(config)) / "zeladoria" / INTERRUPTOR
+
+
+def interruptor(config) -> dict:
+    """{"ligada": bool, "por", "em"} do arquivo da pasta de dados (sem arquivo: desligada), relido a cada 5 s."""
+    arq = _arquivo_interruptor(config)
+    if arq is None:
+        return {"ligada": False}
+    if _INTERRUPTOR["caminho"] == str(arq) and time.time() - _INTERRUPTOR["em"] < INTERRUPTOR_TTL_S:
+        return _INTERRUPTOR["valor"]
+    try:
+        valor = json.loads(arq.read_text(encoding="utf-8")) if arq.exists() else {"ligada": False}
+    except (OSError, ValueError):
+        log.exception("zeladoria: o interruptor da gravação não abre (%s); fica desligada", arq)
+        valor = {"ligada": False}
+    _INTERRUPTOR.update(em=time.time(), caminho=str(arq), valor=valor)
+    return valor
+
+
+def ligar(config, ligada: bool, quem: str) -> dict:
+    arq = _arquivo_interruptor(config)
+    if arq is None:
+        raise Recusa("sem pasta de dados nesta máquina")
+    arq.parent.mkdir(parents=True, exist_ok=True)
+    valor = {"ligada": bool(ligada), "por": quem, "em": _agora_iso()}
+    tmp = arq.with_suffix(".tmp")
+    tmp.write_text(json.dumps(valor, ensure_ascii=False), encoding="utf-8")
+    os.replace(tmp, arq)
+    _INTERRUPTOR.update(em=time.time(), caminho=str(arq), valor=valor)
+    log.warning("zeladoria: gravação %s por %s", "LIGADA" if ligada else "desligada", quem)
+    return valor
+
+
+def forcada(config) -> str:
+    """"1" ou "0" quando a variável NEXUS_ZELADORIA_GRAVA decide nesta máquina; "" quando vale o botão."""
+    v = str(config.get("NEXUS_ZELADORIA_GRAVA") or os.environ.get("NEXUS_ZELADORIA_GRAVA") or "").strip()
+    return v if v in ("0", "1") else ""
+
+
 def ativo(config) -> bool:
-    return str(config.get("NEXUS_ZELADORIA_GRAVA") or os.environ.get("NEXUS_ZELADORIA_GRAVA") or "").strip() == "1"
+    v = forcada(config)
+    if v:
+        return v == "1"
+    return bool(interruptor(config).get("ligada"))
 
 
 def _agora_iso() -> str:

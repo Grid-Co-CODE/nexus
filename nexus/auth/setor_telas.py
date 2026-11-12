@@ -313,11 +313,21 @@ def acesso() -> dict:
         try:
             base, sessao = _banco()
             setor = setor_da_pessoa(cfg, _email(), base, sessao)
+            # quem está aprovado no Radar entra na Zeladoria (11/11/2026, na troca; `nexus/zeladoria/acesso.py`): sem
+            # setor no Nexus, vale como do setor Zeladoria; com outro setor, ganha as telas da Zeladoria além das dele
+            from ..zeladoria import acesso as ZA
+            do_radar = ZA.aprovado(current_app, _email())
+            if not setor and do_radar:
+                setor = next(({"id": x["setor_id"], "nome": x["nome"]} for x in S.ativos(_setores_no_clique(base, sessao)
+                              .get("setores") or []) if x["setor_id"] == SID.ZELADORIA),
+                             {"id": SID.ZELADORIA, "nome": "Zeladoria"})
             if setor:
                 d = _telas_no_clique(base, sessao)
                 # erro só quando nunca houve leitura boa: com a cópia velha, vale ela
                 # as marcas do setor, as telas que são DELE (Tela.do_setor) e a de fora de cada uma
                 telas = vigentes(d["decisoes"]).get(setor["id"], set()) | das_do_setor(setor)
+                if do_radar:
+                    telas = telas | ZA.telas(current_app)
                 r = {"tudo": False, "telas": com_as_de_fora(telas), "setor": setor,
                      "erro": d["erro"] if not d.get("lido_em") else ""}
             else:

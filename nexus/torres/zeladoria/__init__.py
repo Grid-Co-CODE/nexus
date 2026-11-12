@@ -15,7 +15,8 @@ import json
 import re
 from pathlib import Path
 
-from flask import Response, abort, current_app, jsonify, render_template, request, send_file, session, url_for
+from flask import (Response, abort, current_app, jsonify, redirect, render_template, request, send_file, session,
+                   url_for)
 
 from ...casca import tema_do_pedido
 from ...prefixo import na_raiz
@@ -373,6 +374,40 @@ def contratos_pdf_pagina():
     cp, _c = _contratos(est)
     return render_template("zeladoria/contratos_pdf.html", torre=TORRE, itens=cp.situacao(current_app.config, est),
                            erro=None, max_mb=cp.MAX_MB)
+
+
+@bp.route("/troca", methods=["GET", "POST"])
+def troca():
+    """O dia da troca (11/11/2026): o administrador liga a gravação pelo Nexus nesta máquina, sem a T.I.
+    (`gravacao.ligar`; a regra no CLAUDE.md da torre, "A troca")."""
+    if not session.get("admin"):
+        abort(403)
+    cfg = current_app.config
+    erro = None
+    if request.method == "POST":
+        if _de_outro_site():
+            abort(403)
+        quer = request.form.get("ligar") == "1"
+        quem = str((session.get("usuario") or {}).get("email") or "administrador")
+        if gravacao.forcada(cfg):
+            erro = "Nesta máquina quem decide é a variável NEXUS_ZELADORIA_GRAVA do .env; o botão não muda nada aqui."
+        elif quer:
+            est, erro = _estado()                 # liga só com a cópia inteira e legível no banco
+            if est is not None:
+                gravacao.ligar(cfg, True, quem)
+                try:
+                    gravacao.do_app(cfg)          # sobe o gravador agora (e as rondas do Fracttal), não no 1º clique
+                except Exception as e:            # noqa: BLE001 — fica ligada; a tela mostra o motivo
+                    erro = f"Ligada, mas o gravador não subiu agora: {e}"
+        else:
+            gravacao.ligar(cfg, False, quem)
+        if not erro:
+            return redirect(url_for(".troca"))
+    est, erro_copia = _estado()
+    g = gravacao._DO_APP.get("g") if _grava() else None
+    return render_template("zeladoria/troca.html", torre=TORRE, grava=_grava(), forcada=gravacao.forcada(cfg),
+                           chave=gravacao.interruptor(cfg), estado=est, erro=erro or erro_copia,
+                           situacao=g.situacao() if g else None, maquina=request.host)
 
 
 @bp.route("/api/contratos/enviar", methods=["POST"])
