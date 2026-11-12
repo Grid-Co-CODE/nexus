@@ -83,6 +83,7 @@ def rq(cur, monkeypatch):
     RQ.limpar()
     CL.limpar()
     monkeypatch.setattr(RQ, "AUTO_DESDE", "2026-01-01T00:00:00-03:00")
+    monkeypatch.setitem(cur.config, "NEXUS_INVENTARIO_GRAVAR", "1")      # o servidor (a revisão final, I1)
     yield cur
     RQ.aguardar(30)
     RQ.limpar()
@@ -1004,3 +1005,69 @@ def test_a_os_sem_zero_a_esquerda_e_cada_numero_do_document(os_, texto):
 def test_o_zero_a_esquerda_nao_acha_outro_numero(os_, texto):
     movs = [{"id_item": "2", "referencia": texto, "documento": "", "tipo": 5, "folio": "M1", "quando": "q"}]
     assert E.primeira_com_a_os(movs, os_, ["2"]) is None, (os_, texto)
+
+
+
+# ── a revisão final do ramo: só no servidor (I1) e o automático que sobe desligado (C1) ─────────────────────────────
+
+def test_requisicao_so_se_grava_no_servidor(rq, monkeypatch):
+    """Um Nexus no PC (sem a NEXUS_INVENTARIO_GRAVAR=1) não aceita, não recusa nem começa o automático: 409 antes de qualquer
+    leitura (nem o responsável nem as peças), como a gravação da contagem (`gravacao._so_no_servidor`)."""
+    monkeypatch.setitem(rq.config, "NEXUS_INVENTARIO_GRAVAR", "")
+    falso = _falso()
+    c = _pcm(rq, monkeypatch, falso)
+    for rota, corpo in ((f"{LISTA}/{A_RANK_A}/aceitar", {}), (f"{LISTA}/{A_RANK_A}/recusar", {"comentario": "x"}),
+                        (f"{LISTA}/automatico", {})):
+        r = c.post(rota, json=corpo)
+        assert r.status_code == 409 and "só roda no servidor" in r.get_json()["erro"], rota
+    assert falso.chamadas == [] and falso.decisoes == [] and falso.saidas == []
+    for chamar in (lambda: _aceitar(rq, falso, A_RANK_A),
+                   lambda: RQ.recusar(rq.config, falso, str(A_RANK_A), ctx={}, quem_={}, conta=CONTA, comentario="x"),
+                   lambda: RQ.iniciar_automatico(rq.config, falso, [str(B_E_C)], ctx={}, quem_={}, conta=CONTA,
+                                                 responsavel=RESPONSAVEL)):
+        with pytest.raises(Conflito, match="só roda no servidor"):
+            chamar()
+    assert falso.decisoes == [] and falso.saidas == []
+    assert c.get(LISTA).status_code == 200                                   # a lista (só leitura) abre no PC
+
+
+def test_o_automatico_sobe_desligado():
+    """O valor do código é None: o aceite automático das de Rank B e C sobe desligado (ligar é trocar o None pela data)."""
+    assert RQ.AUTO_DESDE is None
+
+
+def test_desligado_nenhuma_vai_sozinha(rq, monkeypatch):
+    """Desligado: as de Rank B e C ficam em "Para o PCM aceitar", com o selo delas; nenhuma vai sozinha; o botão "Aceitar
+    agora" e o grupo das sozinhas somem; o automático e o aceite "sozinha" recusam; a tela diz, no "!" e numa linha curta."""
+    monkeypatch.setattr(RQ, "AUTO_DESDE", None)
+    falso = _falso()
+    d = RQ.montar(rq.config, falso, _ctx(rq, falso))
+    assert d["ids_sozinhas"] == [] and d["sozinhas"] == [] and d["auto_ligado"] is False
+    b_c = next(x for x in d["para_pcm"] if x["id"] == str(B_E_C))
+    assert b_c["de_quem"] == "sozinha" and not b_c["antiga"]
+    with pytest.raises(Conflito, match="ainda está desligado"):
+        _aceitar(rq, falso, B_E_C, por="sozinha")
+    with pytest.raises(Conflito, match="ainda está desligado"):
+        RQ.iniciar_automatico(rq.config, falso, [str(B_E_C)], ctx=_ctx(rq, falso), quem_={}, conta=CONTA,
+                              responsavel=RESPONSAVEL)
+    c = _pcm(rq, monkeypatch, _falso())
+    html = c.get(LISTA).get_data(as_text=True)
+    assert "Aceitar agora" not in html and "a aceitar sozinhas" not in html and 'data-rq-auto-n="0"' in html
+    assert 'inv-selo--info">Rank B e C</span>' in html and "Criada antes do automático" not in html
+    tela = c.get(TELA).get_data(as_text=True)
+    explica = " ".join(re.sub(r"<[^>]+>", "", tela.split("gc-explica-caixa")[1].split("</section>")[0]).split())
+    assert "aceite automático das de Rank B e C ainda está desligado" in explica
+    fora_do_explica = tela.split("</section>", 1)[1] if "</section>" in tela else tela
+    assert "O aceite automático das de Rank B e C ainda está desligado" in fora_do_explica
+    assert falso.decisoes == [] and _aceitar(rq, falso, B_E_C)["confirmada"]          # o PCM aceita com o clique
+
+
+def test_ligado_as_de_b_e_c_vao_sozinhas(rq, monkeypatch):
+    """Ligado (a data no lugar do None): as de Rank B e C criadas a partir dela vão sozinhas, com o botão; a linha do desligado
+    some."""
+    falso = _falso()
+    d = RQ.montar(rq.config, falso, _ctx(rq, falso))
+    assert d["auto_ligado"] is True and d["ids_sozinhas"] == [str(B_E_C)]
+    c = _pcm(rq, monkeypatch, falso)
+    assert "Aceitar agora as 1 de Rank B e C" in c.get(LISTA).get_data(as_text=True)
+    assert "ainda está desligado" not in c.get(TELA).get_data(as_text=True)

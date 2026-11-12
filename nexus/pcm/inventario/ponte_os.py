@@ -280,6 +280,7 @@ def requisicao_aceitar(id_req):
     corpo = corpo if isinstance(corpo, dict) else {}
 
     def fazer(est):
+        RQ.so_no_servidor(cfg)                      # antes de qualquer leitura (a revisão final, I1)
         conta, resp = _dono(est)
         try:
             return RQ.aceitar(cfg, est, id_req, por="pcm", ctx=RQ.contexto(cfg, CL.mapa_guardado(est)),
@@ -299,6 +300,7 @@ def requisicao_recusar(id_req):
     corpo = corpo if isinstance(corpo, dict) else {}
 
     def fazer(est):
+        RQ.so_no_servidor(cfg)
         conta, _resp = _dono(est, responsavel=False)
         try:
             return RQ.recusar(cfg, est, id_req, ctx=RQ.contexto(cfg, CL.mapa_guardado(est)),
@@ -319,6 +321,9 @@ def requisicoes_automatico():
     cfg = current_app.config
 
     def fazer(est):
+        RQ.so_no_servidor(cfg)
+        if not RQ.auto_ligado():
+            raise erros.Conflito(RQ.DESLIGADO)
         ctx = RQ.contexto(cfg, CL.mapa_guardado(est))
         d = RQ.montar(cfg, est, ctx)
         if not d["livro_lido"]:

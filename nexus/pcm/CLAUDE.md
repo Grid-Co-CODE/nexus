@@ -1705,8 +1705,8 @@ Levi (12/11/2026): **Rank A** o PCM aceita no Nexus com um clique; **B e C** o N
       tem), a compra, a devolução, a transferência e o ajuste. A linha sem o tipo conta: na dúvida, a OS basta.
     - Achou: nada vai, e a requisição fica em Falhas, travada: "o PCM já deu a saída da OS N em <data>: aprove e mude o status
       no Fracttal". E o **automático só vale para a requisição
-    criada a partir de `AUTO_DESDE`** (o dia da entrada no ar, uma constante em `requisicoes.py`, posta no push): as de antes,
-    do tempo da Saída Geral, ficam para o PCM, com o aviso;
+    criada a partir de `AUTO_DESDE`** (uma constante em `requisicoes.py`): as de antes, do tempo da Saída Geral, ficam para o
+    PCM, com o aviso;
   - **a saída do Nexus:** a requisição com o aceite no livro (a saída feita) ou com a saída de resposta incerta não recebe
     outra. Fica em Falhas, travada, sem o botão ("confira no Fracttal").
     - A falha travada é o evento próprio `requisicao_travada`: vale pelo tipo, mesmo sem a chave do cadastro para abrir o
@@ -1733,7 +1733,15 @@ Levi (12/11/2026): **Rank A** o PCM aceita no Nexus com um clique; **B e C** o N
   memória; o "não achei", 5 min) e a aprovação a conta (o `id_account` pelo catálogo de pessoas do OS Creator,
   `comando.avisos._do_fracttal`). Sem um deles, 409. A vez do almoxarifado presa por uma gravação de inventário, ou ele fora do
   modo 0, 409. O Recusar não lê os responsáveis.
-- **O automático:** o Nexus não tem conta de serviço no Fracttal; quando alguém do PCM com o login do Fracttal abre a aba, a
+- **O automático SOBE DESLIGADO** (a revisão final do ramo, 12/11/2026): `AUTO_DESDE = None`. Desligado, nenhuma vai sozinha: as
+  de Rank B e C ficam em "Para o PCM aceitar", com o selo "Rank B e C", o grupo das sozinhas e o botão "Aceitar agora" somem,
+  o aceite "sozinha" e o automático recusam (409), e a tela diz, no "!" e numa linha curta, "o aceite automático das de Rank
+  B e C ainda está desligado". **Ligar é trocar o None pela data (e hora) da ligação, num commit.**
+- **Só no servidor** (`NEXUS_INVENTARIO_GRAVAR=1`, o mesmo portão da gravação da contagem, `gravacao._so_no_servidor`; a
+  revisão final do ramo, I1): sem a chave, o Aceitar, o Recusar e o automático levam 409 antes de qualquer leitura (nem o
+  responsável nem as peças). A trava de cada requisição e a memória das saídas moram no processo: um Nexus no PC, com o
+  login do Fracttal de verdade, aceitaria por cima do servidor. A lista (só leitura) abre em qualquer um.
+- **O automático (ligado):** o Nexus não tem conta de serviço no Fracttal; quando alguém do PCM com o login do Fracttal abre a aba, a
   página pede o automático, e o Nexus aceita em segundo plano, **na sessão dessa pessoa**, as pendentes só de B e C conhecidas,
   de depois de `AUTO_DESDE` e sem falha nem trava (uma thread, o controle `requisicoes-auto.json` só com texto do Nexus, que o
   deploy espera; o 429 e o login que expira param o resto). O automático que não começa diz por quê na tela. Há o botão "Aceitar

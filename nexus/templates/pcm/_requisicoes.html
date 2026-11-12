@@ -29,7 +29,7 @@
 <div data-rq-raiz data-rq-auto-n="{{ d.ids_sozinhas|length }}" data-rq-auto-pode="{{ 1 if d.livro_lido and not andando else 0 }}">
 <div class="inv-tiles" aria-label="Resumo das requisições">
   <div class="inv-tile inv-tile--info"><b class="inv-tile-v">{{ d.para_pcm|length }}</b><span class="inv-tile-r">Para o PCM aceitar</span></div>
-  <div class="inv-tile"><b class="inv-tile-v">{{ d.sozinhas|length }}</b><span class="inv-tile-r">Rank B e C a aceitar sozinhas</span></div>
+  {% if d.auto_ligado %}<div class="inv-tile"><b class="inv-tile-v">{{ d.sozinhas|length }}</b><span class="inv-tile-r">Rank B e C a aceitar sozinhas</span></div>{% endif %}
   <div class="inv-tile"><b class="inv-tile-v">{{ d.falhas|length }}</b><span class="inv-tile-r">Falhas</span></div>
   <div class="inv-tile"><b class="inv-tile-v">{{ d.parciais|length }}</b><span class="inv-tile-r">Entrega parcial</span></div>
   <div class="inv-tile inv-tile--ok"><b class="inv-tile-v">{{ d.aceitas_sozinhas|length }}</b><span class="inv-tile-r">Aceitas sozinhas (30 dias)</span></div>
@@ -38,10 +38,10 @@
 {% if auto and auto.estado != 'gravando' and auto.texto %}<p class="alm-det rq-auto-fim">Último automático ({{ auto.fim_txt }}): {{ auto.texto }}</p>{% endif %}
 
 <section class="inv-card">
-<div class="inv-card-cab"><h3>Para o PCM aceitar ({{ d.para_pcm|length }})</h3><span class="inv-card-nota">Rank A ou curva desconhecida, não entregues</span></div>
+<div class="inv-card-cab"><h3>Para o PCM aceitar ({{ d.para_pcm|length }})</h3><span class="inv-card-nota">{{ 'Rank A ou curva desconhecida' if d.auto_ligado else 'todas: o aceite automático das de Rank B e C está desligado' }}, não entregues</span></div>
 {% for x in d.para_pcm %}
 <article class="rq-card" aria-label="Requisição {{ x.os or x.id }}">
-  <p class="cu-tit">{% if x.rank_a %}<span class="inv-selo inv-selo--alerta">Rank A</span>{% else %}<span class="inv-selo inv-selo--info">Curva desconhecida</span>{% endif %} {{ a_os(x) }}</p>
+  <p class="cu-tit">{% if x.rank_a %}<span class="inv-selo inv-selo--alerta">Rank A</span>{% elif x.de_quem == 'sozinha' %}<span class="inv-selo inv-selo--info">Rank B e C</span>{% else %}<span class="inv-selo inv-selo--info">Curva desconhecida</span>{% endif %} {{ a_os(x) }}</p>
   <p class="alm-det">{{ x.almox }}{% if x.usina %} · {{ x.usina }}{% endif %} · criada em {{ x.criada_txt or '?' }} · {{ x.estado_txt }}{% if x.aprovada %} · aprovada, falta a saída{% endif %}</p>
   {% if x.antiga and x.de_quem == 'sozinha' %}<p class="alm-det rq-aviso">Criada antes do automático ({{ d.auto_desde }}): confira se a Saída Geral já foi dada no Fracttal.</p>{% endif %}
   {{ pecas(x) }}
@@ -53,6 +53,7 @@
 {% endfor %}
 </section>
 
+{% if d.auto_ligado %}
 <section class="inv-card">
 <div class="inv-card-cab"><h3>Rank B e C, a aceitar sozinhas ({{ d.sozinhas|length }})</h3>
   {% if d.sozinhas %}<button type="button" class="gc-btn gc-btn--ui gc-btn--contorno" data-rq-auto-agora{% if andando or not d.livro_lido %} disabled{% endif %}>Aceitar agora as {{ d.sozinhas|length }} de Rank B e C</button>{% endif %}</div>
@@ -67,6 +68,7 @@
   {% endfor %}</tbody></table></div>
 {% else %}<div class="inv-vazio"><p>Nenhuma de Rank B e C esperando.</p></div>{% endif %}
 </section>
+{% endif %}
 
 {% if d.falhas %}
 <section class="inv-card">

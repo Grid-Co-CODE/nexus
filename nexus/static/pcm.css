@@ -1639,6 +1639,7 @@ details.inv-card:not([open])>summary{border-bottom:0}
 .rq-motivo{margin:6px 0 0;font-size:13px;color:var(--tinta)}
 .rq-saldo{display:block}
 .rq-auto-fim{margin:10px 0 0}
+.rq-desligado{margin:8px 0 0}
 /* Os dados da peça e as fotos ampliadas (30/10/2026, itens 2 e 3 das melhorias): o fabricante, o modelo e o número de série
    numa lista de rótulo e valor, cada um com a miniatura da foto dele (40 px), e a da peça à esquerda (96 px). A miniatura é
    um <button> sem a cara de botão (a foto é o botão; o foco é o anel do Nexus). A caixa (<dialog>, pcm-fotos.js) usa o véu e

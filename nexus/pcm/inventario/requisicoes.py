@@ -17,8 +17,9 @@ Regras, com o caso que as criou:
   - a do PCM: antes de qualquer saída, o histórico do almoxarifado desde a requisição é lido atrás de um movimento da mesma
     peça com a OS no `document` ou na `description` (a Saída "Geral" que o PCM fazia; `estoque.saida_com_a_os`). Achou: nada
     vai, e a requisição fica em Falhas ("o PCM já deu a saída da OS N em <data>: aprove e mude o status no Fracttal"). E o
-    automático só vale para a requisição criada a partir de `AUTO_DESDE` (o dia da entrada no ar): as de antes, do tempo da
-    Saída Geral, ficam para o PCM;
+    automático só vale para a requisição criada a partir de `AUTO_DESDE` (o dia da ligação): as de antes, do tempo da
+    Saída Geral, ficam para o PCM. O automático SOBE DESLIGADO (`AUTO_DESDE` None: todas ficam para o PCM), e tudo o que grava
+    (aceitar, recusar, o automático) só roda no servidor (`so_no_servidor`);
   - a do Nexus: a requisição que já tem a saída do Nexus no livro (o evento do aceite), ou uma saída de resposta incerta (a
     rede, ou o Fracttal sem o id), não recebe outra: fica em Falhas, "confira no Fracttal", sem o botão; a memória do
     processo guarda a saída feita também, para o livro que não gravou;
@@ -69,14 +70,18 @@ GERAL_DIAS = 7          # a busca da Saída Geral do PCM começa 7 dias antes da
 PECAS_TTL_S, RESPONSAVEL_TTL_S, SEM_RESPONSAVEL_TTL_S = 600, 3600, 300
 COMENTARIO_MAX = 300
 # O automático só vale para a requisição criada a partir daqui (a revisão do item 6, C1): as de antes são do tempo em que o PCM
-# dava a Saída "Geral" à mão, e uma saída do Nexus por cima baixaria o saldo duas vezes. VALOR DE TESTE: o coordenador troca
-# pela data (e hora) da entrada no ar, no push. ISO com o fuso.
-AUTO_DESDE = "2026-11-12T00:00:00-03:00"
+# dava a Saída "Geral" à mão, e uma saída do Nexus por cima baixaria o saldo duas vezes. ISO com o fuso. None = DESLIGADO (a
+# revisão final do ramo, 12/11/2026: o aceite automático das de Rank B e C sobe desligado, e todas vão para o PCM aceitar com
+# um clique). Ligar é trocar o None pela data (e hora) da ligação, num commit.
+AUTO_DESDE = None
 ESTADO_TXT = {E.NAO_ENTREGUE: "não entregue", E.ENTREGA_PARCIAL: "entrega parcial", E.ENTREGA_TOTAL: "entrega total",
               E.CANCELADA: "cancelada"}
 CURVAS_SOZINHAS = ("B", "C")
 ARQUIVO_AUTO = "requisicoes-auto.json"          # o deploy o espera vivo (`gravacao.com_lote_aberto`, o mesmo nome)
 TELA = "/t/pcm/pecas/requisicoes"
+DESLIGADO = "O aceite automático das de Rank B e C ainda está desligado: é o PCM que aceita, com um clique. Nada foi enviado."
+SO_NO_SERVIDOR = ("O aceite e a recusa das requisições só roda no servidor do Nexus (NEXUS_INVENTARIO_GRAVAR): nada foi "
+                  "enviado ao Fracttal.")
 SEM_RESPONSAVEL = ("Não achei você na lista de responsáveis do Fracttal (pelo seu e-mail): a saída precisa de um responsável, e "
                    "o Nexus não grava sem dono. Peça ao administrador do Fracttal para cadastrar o seu e-mail. Nada foi enviado.")
 SEM_CONTA = ("Não achei a sua conta do Fracttal (o catálogo de pessoas do OS Creator, pelo seu e-mail): a aprovação vai no nome "
@@ -119,15 +124,37 @@ def _num(v) -> float | None:
     return A.numero(v)
 
 
+def auto_ligado() -> bool:
+    """O aceite automático das de Rank B e C está ligado (`AUTO_DESDE` com a data; None = desligado)."""
+    return AUTO_DESDE is not None
+
+
 def auto_desde_txt() -> str:
+    if not auto_ligado():
+        return ""
     try:
         return E.instante(AUTO_DESDE).astimezone(_BRT).strftime("%d/%m/%Y")
     except ValueError:
-        return AUTO_DESDE
+        return str(AUTO_DESDE)
+
+
+def so_no_servidor(cfg) -> None:
+    """Aceitar, recusar e o automático gravam no Fracttal: só no servidor (`NEXUS_INVENTARIO_GRAVAR=1`, o mesmo portão da
+    gravação da contagem, `gravacao._so_no_servidor`), antes de qualquer leitura. Um Nexus no PC, com o login do Fracttal de
+    verdade, aceitaria uma requisição que o servidor não sabe que está em curso: a trava de cada requisição e a memória das
+    saídas feitas moram no processo (a revisão final do ramo, I1). `Conflito` (409)."""
+    from .gravacao import Recusada, _so_no_servidor
+    try:
+        _so_no_servidor(cfg)
+    except Recusada:
+        raise Conflito(SO_NO_SERVIDOR) from None
 
 
 def depois_do_corte(r: dict) -> bool:
-    """A requisição criada a partir de `AUTO_DESDE` (a que pode ir sozinha). A data ilegível não é: vai ao PCM."""
+    """A requisição criada a partir de `AUTO_DESDE` (a que pode ir sozinha). A data ilegível não é: vai ao PCM. Desligado
+    (None), nenhuma."""
+    if not auto_ligado():
+        return False
     try:
         return E.instante(r["criada_em"]) >= E.instante(AUTO_DESDE)
     except ValueError:
@@ -326,7 +353,7 @@ def montar(cfg, estoque, ctx: dict, agora: datetime | None = None) -> dict:
         x = dict(r, almox=a.get("nome") or r["almox_nome"] or f"Almoxarifado {r['id_almox']}", usina=a.get("usina") or "",
                  estado_txt=ESTADO_TXT.get(r["estado"], f"estado {r['estado']}"), criada_txt=_quando_txt(r["criada_em"]),
                  decidida_txt=_quando_txt(r["decidida_em"]), recusada=recusada(r), pecas=None, erro_pecas="", falha=falha,
-                 antiga=not depois_do_corte(r))
+                 antiga=auto_ligado() and not depois_do_corte(r))
         if pendente(r):
             try:
                 x["pecas"] = pecas_com_curva(pecas_guardadas(estoque, r["id"]), ctx["curvas"])
@@ -334,7 +361,7 @@ def montar(cfg, estoque, ctx: dict, agora: datetime | None = None) -> dict:
                 x["erro_pecas"] = f"não consegui ler as peças agora ({type(ex).__name__})"
             x["de_quem"] = de_quem(x["pecas"])
             x["rank_a"] = any(p["curva"] == "A" for p in x["pecas"] or [])
-            sozinha = x["de_quem"] == "sozinha" and not x["antiga"]
+            sozinha = x["de_quem"] == "sozinha" and depois_do_corte(r)
             grupos["falhas" if falha else "sozinhas" if sozinha else "para_pcm"].append(x)
         elif r["estado"] == E.ENTREGA_PARCIAL and not recusada(r):
             grupos["parciais"].append(x)
@@ -351,7 +378,8 @@ def montar(cfg, estoque, ctx: dict, agora: datetime | None = None) -> dict:
         a = almoxes.get(g["almox"]) or {}
         g["almox_nome"] = a.get("nome") or f"Almoxarifado {g['almox']}"
     return {**grupos, "aceitas_sozinhas": livro["sozinhas"][:20], "livro_lido": livro_lido,
-            "ids_sozinhas": [x["id"] for x in grupos["sozinhas"]], "n_total": len(reqs), "auto_desde": auto_desde_txt()}
+            "ids_sozinhas": [x["id"] for x in grupos["sozinhas"]], "n_total": len(reqs), "auto_desde": auto_desde_txt(),
+            "auto_ligado": auto_ligado()}
 
 
 # ── o dono: a conta e o responsável no Fracttal ─────────────────────────────────────────────────────────────────────────
@@ -486,10 +514,13 @@ def aceitar(cfg, estoque, id_requisicao, *, por: str, ctx: dict, quem_: dict, co
     Então aprova (se falta) e faz a saída: o "não" do Fracttal e a resposta incerta registram a falha (a incerta da saída
     trava: o Nexus não a repete); a pausa e o login não registram nada. Cada peça aceita vira um evento (`requisicao_aceita` ou
     `requisicao_aceita_sozinha`) com o saldo antes e depois e a curva."""
+    so_no_servidor(cfg)
     rid = _id_da_requisicao(id_requisicao)
     texto = " ".join(str(comentario or "").split())
     if len(texto) > COMENTARIO_MAX:
         raise ValueError(f"O comentário passa de {COMENTARIO_MAX} letras.")
+    if por == "sozinha" and not auto_ligado():
+        raise Conflito(DESLIGADO)
     with _tomar(rid):
         return _aceitar(cfg, estoque, rid, por, ctx, quem_, conta, responsavel, texto, agora)
 
@@ -618,6 +649,7 @@ def recusar(cfg, estoque, id_requisicao, *, ctx: dict, quem_: dict, conta: dict 
     """Recusa (`outputs_orders_update` com `approved: false`, o comentário obrigatório e a conta), sem saída: o técnico já usou
     a peça, e a recusa só registra. PROVA PENDENTE no Fracttal de verdade. A aprovada não se recusa (409). O evento
     `requisicao_recusada` leva o comentário e as peças com a curva cifrados. Uma de cada vez por requisição (`_tomar`)."""
+    so_no_servidor(cfg)
     rid = _id_da_requisicao(id_requisicao)
     texto = " ".join(str(comentario or "").split())
     if not texto:
@@ -700,6 +732,9 @@ def iniciar_automatico(cfg, estoque, ids: list[str], *, ctx: dict, quem_: dict, 
     conhecidas, criadas a partir de `AUTO_DESDE`, sem falha nem trava). Uma de cada vez no processo (`_AUTO`: 409 com outra
     andando). O controle `requisicoes-auto.json` ("gravando", salvo a cada requisição) é o que o deploy espera
     (`gravacao.com_lote_aberto`) e a tela acompanha (`estado_automatico`). Sem o responsável ou a conta, nada começa (409)."""
+    so_no_servidor(cfg)
+    if not auto_ligado():
+        raise Conflito(DESLIGADO)
     ids = [A._id(i) for i in ids if A._id(i).isdigit()]
     if not ids:
         raise Conflito("Nenhuma requisição de Rank B e C a aceitar agora.")
@@ -806,7 +841,7 @@ def registrar(bp) -> None:
         email = quem.do_pedido().get("email")
         return render_template("pcm/requisicoes.html", pode=telas.pode_programar(), com_pessoa=bool(email),
                                aviso=session.pop("pcm_requisicoes_aviso", None), auto=estado_automatico(current_app.config),
-                               auto_desde=auto_desde_txt())
+                               auto_desde=auto_desde_txt(), auto_ligado=auto_ligado())
 
     @bp.route("/pecas/requisicoes/automatico.json", endpoint="requisicoes_automatico")
     def requisicoes_automatico():
