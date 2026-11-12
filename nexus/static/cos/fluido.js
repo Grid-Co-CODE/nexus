@@ -11,7 +11,7 @@
 (function () {
   "use strict";
   var CFG = window.NexusCosFluido || {};
-  var raiz = typeof window.nexusRota === "function" ? window.nexusRota("/t/cos/") : "/t/cos/";
+  var raiz = nexusRota("/t/cos/");                       // o Nexus pode estar num subcaminho (/nexus): sempre pelo nexusRota
   var padrao = CFG.endereco || (raiz + "*");
   var fora = ["*formato=*", "*parcial=*", "*tv=1*"];
 
