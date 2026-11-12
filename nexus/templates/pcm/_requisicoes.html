@@ -43,6 +43,7 @@
 <article class="rq-card" aria-label="Requisição {{ x.os or x.id }}">
   <p class="cu-tit">{% if x.rank_a %}<span class="inv-selo inv-selo--alerta">Rank A</span>{% else %}<span class="inv-selo inv-selo--info">Curva desconhecida</span>{% endif %} {{ a_os(x) }}</p>
   <p class="alm-det">{{ x.almox }}{% if x.usina %} · {{ x.usina }}{% endif %} · criada em {{ x.criada_txt or '?' }} · {{ x.estado_txt }}{% if x.aprovada %} · aprovada, falta a saída{% endif %}</p>
+  {% if x.antiga and x.de_quem == 'sozinha' %}<p class="alm-det rq-aviso">Criada antes do automático ({{ d.auto_desde }}): confira se a Saída Geral já foi dada no Fracttal.</p>{% endif %}
   {{ pecas(x) }}
   {{ aceitar(x) }}
   {% if not x.aprovada %}{{ recusar(x) }}{% endif %}
@@ -72,11 +73,13 @@
 <div class="inv-card-cab"><h3>Falhas ({{ d.falhas|length }})</h3><span class="inv-card-nota">o Nexus não tenta de novo sozinho</span></div>
 {% for x in d.falhas %}
 <article class="rq-card" aria-label="Requisição {{ x.os or x.id }} com falha">
-  <p class="cu-tit"><span class="inv-selo inv-selo--critico">{{ 'Aprovada, saída falhou' if x.aprovada else 'Não aceita' }}</span> {{ a_os(x) }}</p>
+  <p class="cu-tit"><span class="inv-selo inv-selo--critico">{{ 'Confira no Fracttal' if x.falha.travada else 'Aprovada, saída falhou' if x.aprovada else 'Não aceita' }}</span> {{ a_os(x) }}</p>
   <p class="alm-det">{{ x.almox }}{% if x.usina %} · {{ x.usina }}{% endif %} · criada em {{ x.criada_txt or '?' }}</p>
-  <p class="rq-motivo"><b>{{ x.falha.motivo }}</b> <span class="alm-det">({{ 'automático' if x.falha.por == 'sozinha' else 'PCM' }}, {{ x.falha.quando_txt or '?' }})</span></p>
+  <p class="rq-motivo"><b>{{ x.falha.motivo }}</b>{% if x.falha.quando_txt %} <span class="alm-det">({{ 'automático' if x.falha.por == 'sozinha' else 'PCM' }}, {{ x.falha.quando_txt }})</span>{% endif %}</p>
   {{ pecas(x) }}
-  {{ aceitar(x, 'Tentar de novo') }}
+  {# a travada (a saída do Nexus já feita ou de resposta incerta, a Saída Geral do PCM achada) não se tenta de novo pelo Nexus:
+     o que falta se faz no Fracttal (a revisão do item 6, C1 e C2) #}
+  {% if x.falha.travada %}<p class="alm-det">O Nexus não faz outra saída desta requisição: conclua no Fracttal.</p>{% else %}{{ aceitar(x, 'Tentar de novo') }}{% endif %}
 </article>
 {% endfor %}
 </section>

@@ -119,7 +119,7 @@ class EstoqueFalso(Estoque):
         self._modos[str(id_almox)] = int(modo)
 
     def mover(self, id_almox: str, id_item: str, tipo: str, qtd: float, *, quando=None, referencia: str = "",
-              ajuste: bool = False) -> None:
+              ajuste: bool = False, documento: str = "") -> None:
         """Um movimento real (uma OS lançou a peça, entrou uma compra): mexe no saldo e entra em `.movimentos`. `ajuste`: o
         movimento é um ajuste de inventário (tipo 15) feito por fora (outra tela), e não uma entrada ou saída comum."""
         if tipo not in ("entrada", "saida"):
@@ -128,8 +128,9 @@ class EstoqueFalso(Estoque):
             raise Recusado("o almoxarifado trava entradas e saídas enquanto está em ajuste ou inventário", "mover")
         item = self._item(id_almox, id_item)
         item["saldo"] = (item["saldo"] or 0.0) + (qtd if tipo == "entrada" else -qtd)
-        self._movimento(id_almox, id_item, tipo, qtd, referencia, self._iso(quando),
-                        TIPO_AJUSTE if ajuste else (1 if tipo == "entrada" else 2))
+        m = self._movimento(id_almox, id_item, tipo, qtd, referencia, self._iso(quando),
+                            TIPO_AJUSTE if ajuste else (1 if tipo == "entrada" else 2))
+        m["documento"] = documento
 
     def mudar_requisicao(self, id_requisicao, **campos) -> None:
         """A requisição mudada por fora (alguém aprovou ou cancelou na tela do Fracttal)."""
@@ -370,21 +371,32 @@ class EstoqueFalso(Estoque):
             raise Recusado("o almoxarifado trava as saídas enquanto está em ajuste ou inventário", "saida_da_requisicao")
         baixas = []
         for p in pecas:
-            item = self._itens.get(almox, {}).get(str(p.get("id_item")))
+            # o id da peça no catálogo é o `id_item_original` (o `id_item` da linha é o da peça no almoxarifado; 12/11/2026)
+            id_item = str(p.get("id_item_original") or p.get("id_item"))
+            item = self._itens.get(almox, {}).get(id_item)
             qtd = float(p.get("qty") or 0)
             if item is None or item["saldo"] is None or item["saldo"] < qtd:
                 raise Recusado("INSUFFICIENT_STOCK (de mentira)", "saida_da_requisicao")
-            baixas.append((str(p.get("id_item")), item, qtd))
+            baixas.append((id_item, item, qtd))
         quando = self._iso(agora)
         for id_item, item, qtd in baixas:
             item["saldo"] -= qtd
-            self._movimento(almox, id_item, "saida", qtd, str(mov.get("document") or ""), quando, 2)
+            m = self._movimento(almox, id_item, "saida", qtd, "", quando, 4)
+            m["documento"] = str(mov.get("document") or "")
         mov["id_movement_state"] = _E.ENTREGA_TOTAL
         nova = str(70_000_000 + len(self.saidas) + 1)
         self.saidas.append({"id": nova, "id_movement_reference": int(str(requisicao["id"])), "id_warehouse_source": int(almox),
                             "id_responsible": int(str(resp["id"])), "document": str(requisicao.get("os") or ""),
                             "items": [dict(p) for p in pecas]})
         return nova
+
+    @_operacao
+    def saida_com_a_os(self, id_almox: str, os_: str, ids_itens: list[str], desde_iso: str) -> dict | None:
+        desde = instante(desde_iso)
+        movs = [{"id_item": m["id_item"], "referencia": m["referencia"], "documento": m.get("documento", ""),
+                 "tipo": m["tipo_fracttal"], "folio": m["folio"], "quando": m["quando"]}
+                for m in reversed(self.movimentos) if m["id_almox"] == str(id_almox) and instante(m["quando"]) >= desde]
+        return _E.primeira_com_a_os(movs, os_, ids_itens)
 
     @_operacao
     def responsavel(self, email: str) -> dict | None:

@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import abc
 import math
+import re
 import threading
 import time
 import unicodedata
@@ -252,8 +253,11 @@ def mapa_das_pecas(linhas) -> dict[str, dict[str, str]]:
     """O Tipo e as Classificações de cada peça pelo CÓDIGO (sem espaço, em maiúsculas): `{código: {campo: descrição}}`, só
     com os campos que a peça tem. É de onde sai o Rank (a Classificação 2, "2. Rank A") das requisições e o voto das parecidas
     da Curadoria: a "Curva ABC" do catálogo do App vem vazia para os Ranks do Fracttal (o `_almox_curva` do App só aceita a
-    letra sozinha; a revisão do item 3, 12/11/2026), e a peça do Fracttal é a fonte."""
+    letra sozinha; a revisão do item 3, 12/11/2026), e a peça do Fracttal é a fonte. O código que aparece em mais de uma peça (a
+    lista traz as inativas também) fica com a 1ª; com Classificações 2 DIFERENTES, sem a Classificação 2: a curva desconhecida,
+    e o automático não trata como B uma peça que também é A (a revisão do item 6, M6)."""
     out: dict[str, dict[str, str]] = {}
+    ranks: dict[str, set] = {}
     for l in linhas:
         if not isinstance(l, dict):
             continue
@@ -266,7 +270,28 @@ def mapa_das_pecas(linhas) -> dict[str, dict[str, str]]:
             if desc:
                 g[campo] = desc
         out.setdefault(codigo, g)
+        ranks.setdefault(codigo, set()).add(g.get("classificacao_2", ""))
+    for codigo, vistos in ranks.items():
+        if len(vistos) > 1:
+            out[codigo].pop("classificacao_2", None)
     return out
+
+
+def primeira_com_a_os(movimentos, os_, ids_itens) -> dict | None:
+    """O 1º movimento (`{"id_item", "referencia", "documento", "tipo", "folio", "quando"}`) de uma das peças com o número da OS
+    no `documento` ou na `referencia`, como número inteiro (a OS 452 não acha a 4521); o ajuste de inventário (tipo 15) não
+    conta. `{"folio", "quando"}` ou None. A regra que o adaptador e o falso dividem."""
+    alvo = str(os_ or "").strip()
+    ids = {str(i) for i in ids_itens or () if str(i).strip()}
+    if not alvo or not ids:
+        return None
+    numero = re.compile(rf"(?<![0-9A-Za-z]){re.escape(alvo)}(?![0-9A-Za-z])")
+    for m in movimentos:
+        if m.get("tipo") == TIPO_AJUSTE or str(m.get("id_item") or "") not in ids:
+            continue
+        if numero.search(str(m.get("documento") or "")) or numero.search(str(m.get("referencia") or "")):
+            return {"folio": str(m.get("folio") or ""), "quando": m.get("quando")}
+    return None
 
 
 def corpo_dos_grupos(grupos: dict | None) -> dict:
@@ -443,6 +468,13 @@ class Estoque(abc.ABC):
         requisição sozinha à Entrega total. `requisicao` é a da `requisicao_da_linha`, `pecas` as linhas do
         `pecas_da_requisicao` (vão como vieram) e `responsavel` o `{"id", "descricao"}` do `responsavel`. Devolve o id da saída.
         O saldo que não dá (o almoxarifado não aceita estoque negativo) é `Recusado`."""
+
+    @abc.abstractmethod
+    def saida_com_a_os(self, id_almox: str, os_: str, ids_itens: list[str], desde_iso: str) -> dict | None:
+        """O 1º movimento do histórico do almoxarifado, desde `desde_iso`, de uma das peças `ids_itens` com o número da OS
+        `os_` no `document` ou na `description` (a Saída "Geral" que o PCM dava à mão; a revisão do item 6, C1): `{"folio",
+        "quando"}`, ou None. O ajuste de inventário não conta. Onde a Saída Geral grava a OS é PROVA PENDENTE: por isso os dois
+        campos."""
 
     @abc.abstractmethod
     def responsavel(self, email: str) -> dict | None:
@@ -665,6 +697,7 @@ class EstoqueFracttal(Estoque):
                     pass
             yield {"folio": str(l.get("folio") or l.get("id_movements") or ""), "id_item": str(l.get("id_item") or ""),
                    "quando": l.get("date_create"), "referencia": str(l.get("description") or "").strip(),
+                   "documento": str(l.get("document") or "").strip(),
                    "id": _inteiro(l.get("id_movements")), "tipo": _inteiro(l.get("id_movement_type"))}
 
     def achar_movimento(self, id_almox: str, referencia: str, desde_iso: str | None = None) -> str | None:
@@ -818,6 +851,9 @@ class EstoqueFracttal(Estoque):
             "id_third_party": None, "third_parties_name": "", "id_cost_center": None, "warehouses_target_description": "",
             "costs_center_description": "", "description": "", "status_display": "", "items": [dict(p) for p in pecas]})
         return self._id_do_dado(r, SAIDA)
+
+    def saida_com_a_os(self, id_almox: str, os_: str, ids_itens: list[str], desde_iso: str) -> dict | None:
+        return primeira_com_a_os(self._historico(id_almox, instante(desde_iso)), os_, ids_itens)
 
     def responsavel(self, email: str) -> dict | None:
         """Pela coluna do e-mail da lista de responsáveis (o pedido é o da tela de Saídas: a lista com o `noShowDisabled`).

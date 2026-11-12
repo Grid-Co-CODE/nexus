@@ -6,39 +6,52 @@ nasce sozinha no almoxarifado da usina (o movimento OUTPUT_ORDER, tipo 13), e o 
 esse caminho, não ter que fazer saída, deixar mais automatizado". Decisões do Levi (12/11/2026): a requisição com peça **Rank A**
 o PCM aceita no Nexus com UM clique; as de **Rank B e C** o Nexus aceita **sozinho** e registra na auditoria.
 
-O caminho (provado no TESTE - PA em 12/11/2026, lido de volta; o adaptador em `estoque.py`): aprovar (`aprovar_requisicao`, só no
-estado 3; depois da entrega o Fracttal diz `STATE_CHANGED`), a saída LIGADA à requisição (`saida_da_requisicao`, o tipo "Ordem
-de Serviço" da tela de Saídas: baixa o saldo e leva a requisição sozinha a 5, Entrega total) e reler (a requisição e o saldo).
+O caminho do Fracttal (provado no TESTE - PA em 12/11/2026, pela tela e pelo RPC, lido de volta; o adaptador em `estoque.py`):
+aprovar (`aprovar_requisicao`, só no estado 3; depois da entrega o Fracttal diz `STATE_CHANGED`), a saída LIGADA à requisição
+(`saida_da_requisicao`, com as linhas da requisição cruas: baixa o saldo e leva a requisição sozinha a 5, Entrega total) e reler.
 
 Regras, com o caso que as criou:
-- **Uma função só aceita** (`aceitar`), para o clique do PCM e para o automático: relê antes (estado 3, nem cancelada, nem
-  recusada), aprova se ainda não está aprovada, faz a saída e relê. Cada passo que falha para ali e vira um evento
-  `requisicao_falha`; a aprovada sem saída fica "aprovada, saída falhou", e a próxima tentativa pula a aprovação.
+- **Uma função só aceita** (`aceitar`), para o clique do PCM e para o automático: relê (estado 3, nem cancelada, nem recusada),
+  confere, aprova se ainda não está aprovada, faz a saída e relê a requisição e o saldo, cada um à parte.
+- **A saída nunca sai em dobro** (a revisão do item 6, os Críticos):
+  - a do PCM: antes de qualquer saída, o histórico do almoxarifado desde a requisição é lido atrás de um movimento da mesma
+    peça com a OS no `document` ou na `description` (a Saída "Geral" que o PCM fazia; `estoque.saida_com_a_os`). Achou: nada
+    vai, e a requisição fica em Falhas ("o PCM já deu a saída da OS N em <data>: aprove e mude o status no Fracttal"). E o
+    automático só vale para a requisição criada a partir de `AUTO_DESDE` (o dia da entrada no ar): as de antes, do tempo da
+    Saída Geral, ficam para o PCM;
+  - a do Nexus: a requisição que já tem a saída do Nexus no livro (o evento do aceite), ou uma saída de resposta incerta (a
+    rede, ou o Fracttal sem o id), não recebe outra: fica em Falhas, "confira no Fracttal", sem o botão; a memória do
+    processo guarda a saída feita também, para o livro que não gravou;
+  - o mesmo aceite duas vezes ao mesmo tempo (duas abas, o automático e o clique): uma trava por requisição em memória (o Nexus
+    roda num processo só), e a segunda leva 409.
+- **O id da peça é o `id_item_original`** (o do catálogo, o do saldo e da dimensão; provado em 12/11/2026: na linha da
+  requisição, o `id_item` é o id da peça naquele almoxarifado, outro número). As linhas vão cruas na saída.
+- **O que fica na Falhas e o que tenta de novo:** o "não" do Fracttal (`Recusado`) e a resposta incerta tiram a requisição do
+  automático e ficam à vista; a pausa (429) e o login vencido não registram falha (nada foi feito) e a próxima abertura tenta.
+  O saldo é conferido ANTES de aprovar (a peça que não tem o bastante não chega a "aprovada, saída falhou").
 - **O estado 4 (entrega parcial) não entra**, nem no clique: a saída do pendente não foi provada ("conclua no Fracttal").
-- **Saldo insuficiente**: o Fracttal recusa a saída (o almoxarifado não aceita estoque negativo); a tela mostra o motivo, e o
-  automático não tenta de novo sozinho (a requisição com falha registrada vai para "Falhas", e só o clique a tenta).
 - **O dono**: a saída precisa do responsável do Fracttal de quem está na ponte (`estoque.responsavel`, pelo e-mail) e a
   aprovação da conta dele (o id e o nome, pelo catálogo de pessoas do OS Creator, como os avisos do Comando). Sem um deles,
   nada vai (409): não se grava sem dono.
 - **O automático (B e C)**: o Nexus não tem conta de serviço no Fracttal e grava só com o login de quem está na ponte. Quando
   alguém do PCM com o login do Fracttal abre Almoxarifado → Requisições, a página pede o automático, e o Nexus aceita em
   segundo plano, NA SESSÃO DESSA PESSOA, as pendentes cujas peças são TODAS Rank B ou C conhecidas. Uma thread com o
-  controle "gravando" (`requisicoes-auto.json`), que o deploy espera (`gravacao.com_lote_aberto`). Para ir sem ninguém abrir a
-  tela, precisa de uma conta de serviço (decisão do Levi).
+  controle "gravando" (`requisicoes-auto.json`, só texto do Nexus), que o deploy espera (`gravacao.com_lote_aberto`). Para ir
+  sem ninguém abrir a tela, precisa de uma conta de serviço (decisão do Levi).
 - **O Rank é o da peça no Fracttal** (a Classificação 2, "2. Rank A"), pelo código, no mapa da lista de peças inteira
-  (`classificacao.mapa_guardado`, a cópia de 1 h da Curadoria): a "Curva ABC" do catálogo do App vem VAZIA para os Ranks do
-  Fracttal (o `_almox_curva` do App só aceita a letra sozinha; a revisão do item 3, 12/11/2026), e a fila "com Rank A" pelo
-  catálogo nasceria vazia. A peça fora do mapa, sem a Classificação 2 ou "1.Avariado" é a curva desconhecida, e vai para o PCM.
+  (`classificacao.mapa_guardado`): a "Curva ABC" do catálogo do App vem VAZIA para os Ranks. A peça fora do mapa, sem a
+  Classificação 2, "1.Avariado" ou com duas Classificações 2 diferentes no mesmo código é a curva desconhecida, e vai ao PCM.
 - **A gravação do inventário**: com a vez do almoxarifado presa (uma contagem gravando ou parada no meio) ou ele fora do modo 0,
   nada vai (a saída seria recusada depois da aprovação).
 - **Nome de gente**: o `accounts_log_name` (quem decidiu no Fracttal) e a descrição do responsável só passam pela memória e
-  pela tela do PCM; o livro guarda a pessoa como `pessoa_hmac`/`pessoa_id`, e o comentário e a OS só cifrados.
+  pela tela do PCM; o livro guarda a pessoa como `pessoa_hmac`/`pessoa_id`, e o comentário, a OS e as peças só cifrados.
 """
 from __future__ import annotations
 
 import logging
 import threading
 import time
+from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 
 from flask import current_app, jsonify, render_template, session
@@ -52,8 +65,12 @@ from . import quem
 from .erros import Conflito
 
 JANELA_DIAS, DECIDIDAS_DIAS, SOZINHAS_DIAS = 90, 30, 30
-PECAS_TTL_S, RESPONSAVEL_TTL_S = 600, 3600
+PECAS_TTL_S, RESPONSAVEL_TTL_S, SEM_RESPONSAVEL_TTL_S = 600, 3600, 300
 COMENTARIO_MAX = 300
+# O automático só vale para a requisição criada a partir daqui (a revisão do item 6, C1): as de antes são do tempo em que o PCM
+# dava a Saída "Geral" à mão, e uma saída do Nexus por cima baixaria o saldo duas vezes. VALOR DE TESTE: o coordenador troca
+# pela data (e hora) da entrada no ar, no push. ISO com o fuso.
+AUTO_DESDE = "2026-11-12T00:00:00-03:00"
 ESTADO_TXT = {E.NAO_ENTREGUE: "não entregue", E.ENTREGA_PARCIAL: "entrega parcial", E.ENTREGA_TOTAL: "entrega total",
               E.CANCELADA: "cancelada"}
 CURVAS_SOZINHAS = ("B", "C")
@@ -64,16 +81,19 @@ SEM_RESPONSAVEL = ("Não achei você na lista de responsáveis do Fracttal (pelo
 SEM_CONTA = ("Não achei a sua conta do Fracttal (o catálogo de pessoas do OS Creator, pelo seu e-mail): a aprovação vai no nome "
              "de quem decide. Nada foi enviado.")
 JA_ANDANDO = "O Nexus já está aceitando as de Rank B e C agora: acompanhe nesta página."
+EM_CURSO = "Outra pessoa (ou o automático) está aceitando esta requisição agora: espere e recarregue a página. Nada foi enviado."
+SEM_LIVRO = ("Não consegui ler o livro do inventário agora: sem ele não sei se o Nexus já fez a saída desta requisição. Nada foi "
+             "enviado; tente de novo em instantes.")
 _BRT = timezone(timedelta(hours=-3))
 log = logging.getLogger(__name__)
 
 
 class Falhou(Exception):
-    """Um passo do aceite (ou da recusa) que o Fracttal não fez: já registrado no livro (`requisicao_falha`). `mensagem` é a da
-    tela (o que ficou feito e o que não), `status` o HTTP da ponte (409 a recusa do Fracttal, 429 a pausa, 401 o login, 502 a
-    rede) e `causa` o erro do Fracttal (o automático para no 429 e no login)."""
+    """Um passo do aceite (ou da recusa) que o Fracttal não fez, ou cuja resposta não veio. `mensagem` é a da tela (o que ficou
+    feito e o que não), `status` o HTTP da ponte (409 o "não" do Fracttal ou a recusa do Nexus, 429 a pausa, 401 o login, 502 a
+    resposta incerta) e `causa` o erro do Fracttal, ou None (o automático para no 429 e no login)."""
 
-    def __init__(self, mensagem: str, status: int, causa: Exception):
+    def __init__(self, mensagem: str, status: int, causa: Exception | None):
         super().__init__(mensagem)
         self.mensagem, self.status, self.causa = mensagem, status, causa
 
@@ -98,16 +118,34 @@ def _num(v) -> float | None:
     return A.numero(v)
 
 
+def auto_desde_txt() -> str:
+    try:
+        return E.instante(AUTO_DESDE).astimezone(_BRT).strftime("%d/%m/%Y")
+    except ValueError:
+        return AUTO_DESDE
+
+
+def depois_do_corte(r: dict) -> bool:
+    """A requisição criada a partir de `AUTO_DESDE` (a que pode ir sozinha). A data ilegível não é: vai ao PCM."""
+    try:
+        return E.instante(r["criada_em"]) >= E.instante(AUTO_DESDE)
+    except ValueError:
+        return False
+
+
 # ── as peças e a curva ──────────────────────────────────────────────────────────────────────────────────────────────────
 def pecas_com_curva(linhas: list[dict], curvas: dict | None) -> list[dict]:
-    """As peças da requisição (as linhas do `movements_details_list`) para a tela e a regra: o código, o nome, a quantidade, o
-    pendente e a CURVA, a letra do Rank da peça no Fracttal pelo código (`curvas`, do `contexto`: "A", "B" ou "C"; "" é a curva
-    desconhecida: a peça fora do mapa, sem a Classificação 2 ou "1.Avariado"). A desconhecida nunca é A nem B nem C."""
+    """As peças da requisição (as linhas do `movements_details_list`) para a tela e a regra: o id da peça NO CATÁLOGO (o
+    `id_item_original`, com o `id_item` só de reserva; a revisão, I2: o `id_item` da linha é o da peça naquele almoxarifado), o
+    código, o nome, a quantidade, o pendente e a CURVA, a letra do Rank da peça no Fracttal pelo código (`curvas`, do
+    `contexto`; "" é a curva desconhecida). A desconhecida nunca é A nem B nem C. As linhas em si não mudam (a saída as manda
+    cruas)."""
     out = []
     for l in linhas:
         codigo = " ".join(str(l.get("code") or "").split())
         curva = (curvas or {}).get(_chave(codigo), "") if codigo else ""
-        out.append({"id_item": A._id(l.get("id_item")), "codigo": codigo,
+        out.append({"id_item": A.id_ou_vazio(l.get("id_item_original")) or A.id_ou_vazio(l.get("id_item")),
+                    "id_linha": A.id_ou_vazio(l.get("id_item")), "codigo": codigo,
                     "nome": " ".join(str(l.get("items_description") or "").split()),
                     "unidade": " ".join(str(l.get("units_description") or "").split()).lower(), "qtd": _num(l.get("qty")),
                     "pendente": _num(l.get("qty_pending")), "curva": curva if curva in ("A", "B", "C") else ""})
@@ -120,6 +158,12 @@ def de_quem(pecas: list[dict] | None) -> str:
     return "sozinha" if pecas and all(p["curva"] in CURVAS_SOZINHAS for p in pecas) else "pcm"
 
 
+def _pecas_do_evento(pecas: list[dict]) -> list[dict]:
+    """As peças como vão no `dados` cifrado da falha e da recusa (a revisão, M2): o código, o id do catálogo, a quantidade e
+    a curva."""
+    return [{"codigo": p["codigo"], "id_item": p["id_item"], "qtd": p["qtd"], "curva": p["curva"]} for p in pecas]
+
+
 def recusada(r: dict) -> bool:
     """A não aprovada COM a data da decisão foi recusada (o que o Fracttal grava; 12/11/2026)."""
     return not r["aprovada"] and bool(r["decidida_em"])
@@ -130,11 +174,18 @@ def pendente(r: dict) -> bool:
     return r["estado"] == E.NAO_ENTREGUE and not recusada(r)
 
 
-# ── o que o Nexus já fez (o livro do inventário) ──────────────────────────────────────────────────────────────────────────
-def _do_livro(cfg, eventos: list[dict], agora: datetime) -> tuple[dict, list[dict]]:
-    """({requisição: a última falha}, as aceitas sozinhas dos últimos 30 dias), pelos eventos. A falha decifra o porquê (o texto
-    do Fracttal ou o nosso); a aceita sozinha junta as peças da mesma requisição, com o saldo antes e depois."""
-    falhas, sozinhas = {}, {}
+# ── o que o Nexus já fez (o livro do inventário, e a memória do processo) ─────────────────────────────────────────────────
+# a saída feita nesta vida do processo (a revisão, C2): segura a repetição mesmo quando o livro não gravou o aceite
+_SAIDAS_FEITAS: dict[str, str] = {}
+_TRAVA_SAIDAS = threading.Lock()
+
+
+def _do_livro(cfg, eventos: list[dict], agora: datetime) -> dict:
+    """O que o livro diz das requisições: `falhas` {requisição: a última falha, com o porquê decifrado e `travada` quando ela
+    não pode ser tentada de novo pelo Nexus}, `travas` {requisição: por que o Nexus não faz outra saída} (a saída do Nexus já
+    feita, pelo evento do aceite; a saída de resposta incerta; a Saída Geral do PCM achada) e `sozinhas` (as aceitas sozinhas
+    dos últimos 30 dias, com o saldo antes e depois). O aceite tira a falha de antes; a trava da saída feita fica."""
+    falhas, travas, sozinhas = {}, {}, {}
     corte = agora - timedelta(days=SOZINHAS_DIAS)
     for i, e in enumerate(eventos):
         t, rid = A._txt(e.get("tipo")), A._id(e.get("movimento_fracttal"))
@@ -144,11 +195,18 @@ def _do_livro(cfg, eventos: list[dict], agora: datetime) -> tuple[dict, list[dic
         if t == "requisicao_falha":
             if rid not in falhas or (quando, i) >= falhas[rid]["_marca"]:
                 d = F.decifrar(cfg, F.ABA_EVENTO, e)
+                travada = d.get("travada") is True
                 falhas[rid] = {"_marca": (quando, i), "quando": quando, "quando_txt": _quando_txt(quando),
                                "motivo": A._txt(d.get("motivo")) or "o motivo não se lê agora", "passo": A._txt(d.get("passo")),
-                               "por": A._txt(d.get("por")), "os": A._txt(d.get("os"))}
+                               "por": A._txt(d.get("por")), "os": A._txt(d.get("os")), "travada": travada}
+                if travada:
+                    travas[rid] = falhas[rid]["motivo"]
         elif t in ("requisicao_aceita", "requisicao_aceita_sozinha", "requisicao_recusada"):
             falhas.pop(rid, None)                  # o livro está na ordem da gravação: a falha de antes do aceite já passou
+        if t in ("requisicao_aceita", "requisicao_aceita_sozinha") and rid not in travas:
+            saida = A._txt(F.decifrar(cfg, F.ABA_EVENTO, e).get("saida"))
+            travas[rid] = (f"o Nexus já fez a saída{' ' + saida if saida else ''} em {_quando_txt(quando)}, e a requisição não "
+                           "foi à Entrega total: confira no Fracttal (o Nexus não faz outra)")
         if t == "requisicao_aceita_sozinha":
             try:
                 recente = E.instante(quando) >= corte
@@ -169,7 +227,23 @@ def _do_livro(cfg, eventos: list[dict], agora: datetime) -> tuple[dict, list[dic
         g["quando_txt"] = _quando_txt(g["quando"])
     for f in falhas.values():
         f.pop("_marca", None)
-    return falhas, lista
+    with _TRAVA_SAIDAS:
+        for rid, texto in _SAIDAS_FEITAS.items():
+            travas.setdefault(rid, texto)
+    return {"falhas": falhas, "travas": travas, "sozinhas": lista}
+
+
+def _trava_da_saida(cfg, rid: str) -> str:
+    """Por que o Nexus não faz outra saída desta requisição ("" se pode), pelo livro de agora e pela memória do processo. O livro
+    que não se lê não deixa passar (`Conflito`): sem ele não se sabe se a saída já foi feita."""
+    with _TRAVA_SAIDAS:
+        if rid in _SAIDAS_FEITAS:
+            return _SAIDAS_FEITAS[rid]
+    try:
+        eventos = F.ler(cfg)[F.ABA_EVENTO]
+    except F.Recusada as ex:
+        raise Conflito(SEM_LIVRO) from ex
+    return _do_livro(cfg, [e for e in eventos if A._id(e.get("movimento_fracttal")) == rid], _agora())["travas"].get(rid, "")
 
 
 # ── a lista (a tela) ────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -196,6 +270,10 @@ def limpar() -> None:
         _PECAS.clear()
     with _TRAVA_RESP:
         _RESPONSAVEIS.clear()
+    with _TRAVA_SAIDAS:
+        _SAIDAS_FEITAS.clear()
+    with _TRAVA_CURSO:
+        _EM_CURSO.clear()
 
 
 def contexto(cfg, mapa: dict | None) -> dict:
@@ -217,9 +295,10 @@ def contexto(cfg, mapa: dict | None) -> dict:
 def montar(cfg, estoque, ctx: dict, agora: datetime | None = None) -> dict:
     """A fila para a tela: as requisições dos últimos 90 dias (`estoque.requisicoes`), com as peças das pendentes (a cópia de 10
     min) e a curva de cada uma, em grupos:
-    - `para_pcm`: as pendentes com peça Rank A ou de curva desconhecida (o "Aceitar" e o "Recusar");
-    - `sozinhas`: as pendentes só de B e C conhecidas, que o automático aceita (`ids_sozinhas`, sem as que já falharam);
-    - `falhas`: as pendentes com uma falha registrada (o motivo; a aprovada sem saída diz "aprovada, saída falhou");
+    - `para_pcm`: as pendentes com peça Rank A ou de curva desconhecida, e as de B e C criadas antes de `AUTO_DESDE` (`antiga`);
+    - `sozinhas`: as pendentes só de B e C conhecidas, criadas a partir de `AUTO_DESDE` e sem falha nem trava (`ids_sozinhas`);
+    - `falhas`: as pendentes com uma falha registrada ou com a saída do Nexus já feita (`travada`: sem o botão, "confira no
+      Fracttal");
     - `parciais`: as de entrega parcial (estado 4: "conclua no Fracttal");
     - `aceitas_sozinhas`: as que o automático aceitou nos últimos 30 dias, com o saldo antes e depois (o livro);
     - `decididas`: as aprovadas e recusadas nos últimos 30 dias (o Fracttal: quem, o comentário, quando).
@@ -228,19 +307,23 @@ def montar(cfg, estoque, ctx: dict, agora: datetime | None = None) -> dict:
     agora = agora or _agora()
     reqs = [r for r in estoque.requisicoes(JANELA_DIAS, agora) if r["id_almox"] not in ctx["teste"]]
     try:
-        falhas, aceitas_sozinhas = _do_livro(cfg, F.ler(cfg)[F.ABA_EVENTO], agora)
+        livro = _do_livro(cfg, F.ler(cfg)[F.ABA_EVENTO], agora)
         livro_lido = True
     except F.Recusada:
-        falhas, aceitas_sozinhas, livro_lido = {}, [], False
+        livro, livro_lido = {"falhas": {}, "travas": {}, "sozinhas": []}, False
     almoxes = ctx["almoxes"]
     grupos = {"para_pcm": [], "sozinhas": [], "falhas": [], "parciais": [], "decididas": []}
     corte = agora - timedelta(days=DECIDIDAS_DIAS)
     for r in reqs:
         a = almoxes.get(r["id_almox"]) or {}
+        falha = livro["falhas"].get(r["id"])
+        trava = livro["travas"].get(r["id"])
+        if trava and not (falha and falha["travada"]):
+            falha = {"motivo": trava, "quando_txt": "", "passo": "saida", "por": "", "travada": True}
         x = dict(r, almox=a.get("nome") or r["almox_nome"] or f"Almoxarifado {r['id_almox']}", usina=a.get("usina") or "",
                  estado_txt=ESTADO_TXT.get(r["estado"], f"estado {r['estado']}"), criada_txt=_quando_txt(r["criada_em"]),
-                 decidida_txt=_quando_txt(r["decidida_em"]), recusada=recusada(r), pecas=None, erro_pecas="",
-                 falha=falhas.get(r["id"]))
+                 decidida_txt=_quando_txt(r["decidida_em"]), recusada=recusada(r), pecas=None, erro_pecas="", falha=falha,
+                 antiga=not depois_do_corte(r))
         if pendente(r):
             try:
                 x["pecas"] = pecas_com_curva(pecas_guardadas(estoque, r["id"]), ctx["curvas"])
@@ -248,7 +331,8 @@ def montar(cfg, estoque, ctx: dict, agora: datetime | None = None) -> dict:
                 x["erro_pecas"] = f"não consegui ler as peças agora ({type(ex).__name__})"
             x["de_quem"] = de_quem(x["pecas"])
             x["rank_a"] = any(p["curva"] == "A" for p in x["pecas"] or [])
-            grupos["falhas" if x["falha"] else "sozinhas" if x["de_quem"] == "sozinha" else "para_pcm"].append(x)
+            sozinha = x["de_quem"] == "sozinha" and not x["antiga"]
+            grupos["falhas" if falha else "sozinhas" if sozinha else "para_pcm"].append(x)
         elif r["estado"] == E.ENTREGA_PARCIAL and not recusada(r):
             grupos["parciais"].append(x)
         if r["decidida_em"] and not pendente(r):
@@ -260,12 +344,11 @@ def montar(cfg, estoque, ctx: dict, agora: datetime | None = None) -> dict:
     for g in grupos.values():
         g.sort(key=lambda x: (x["criada_em"], int(x["id"] or 0)), reverse=True)
     grupos["decididas"].sort(key=lambda x: x["decidida_em"], reverse=True)
-    for g in aceitas_sozinhas:
+    for g in livro["sozinhas"]:
         a = almoxes.get(g["almox"]) or {}
         g["almox_nome"] = a.get("nome") or f"Almoxarifado {g['almox']}"
-    return {**grupos, "aceitas_sozinhas": aceitas_sozinhas[:20], "livro_lido": livro_lido,
-            "ids_sozinhas": [x["id"] for x in grupos["sozinhas"]],
-            "n_total": len(reqs)}
+    return {**grupos, "aceitas_sozinhas": livro["sozinhas"][:20], "livro_lido": livro_lido,
+            "ids_sozinhas": [x["id"] for x in grupos["sozinhas"]], "n_total": len(reqs), "auto_desde": auto_desde_txt()}
 
 
 # ── o dono: a conta e o responsável no Fracttal ─────────────────────────────────────────────────────────────────────────
@@ -285,21 +368,40 @@ def conta_do_fracttal(email: str, nome_da_sessao: str = "") -> dict | None:
 
 def responsavel_de(estoque, email: str, relogio=time.monotonic) -> dict | None:
     """O responsável do Fracttal de quem está na ponte (`estoque.responsavel`, pelo e-mail), guardado 1 h na memória do processo
-    (a lista de responsáveis são páginas da cota de todos). Só o achado fica guardado; nada em arquivo nem em log."""
+    (a lista de responsáveis são páginas da cota de todos); o "não achei" fica 5 min (sem ele, cada abertura da aba relia a lista
+    inteira; a revisão, M5). Nada em arquivo nem em log."""
     e = str(email or "").strip().lower()
     agora = relogio()
     with _TRAVA_RESP:
         g = _RESPONSAVEIS.get(e)
-        if g and agora - g[0] < RESPONSAVEL_TTL_S:
-            return dict(g[1])
+        if g and agora - g[0] < (RESPONSAVEL_TTL_S if g[1] else SEM_RESPONSAVEL_TTL_S):
+            return dict(g[1]) if g[1] else None
     achado = estoque.responsavel(e)
-    if achado:
-        with _TRAVA_RESP:
-            _RESPONSAVEIS[e] = (agora, dict(achado))
+    with _TRAVA_RESP:
+        _RESPONSAVEIS[e] = (agora, dict(achado) if achado else None)
     return achado
 
 
 # ── aceitar e recusar ───────────────────────────────────────────────────────────────────────────────────────────────────
+_EM_CURSO: set = set()
+_TRAVA_CURSO = threading.Lock()
+
+
+@contextmanager
+def _tomar(rid: str):
+    """Uma requisição de cada vez no processo (a revisão, I1): o segundo aceite (ou recusa) da mesma requisição, enquanto o
+    primeiro anda, leva 409. O Nexus roda num processo só, então a trava em memória fecha a janela."""
+    with _TRAVA_CURSO:
+        if rid in _EM_CURSO:
+            raise Conflito(EM_CURSO)
+        _EM_CURSO.add(rid)
+    try:
+        yield
+    finally:
+        with _TRAVA_CURSO:
+            _EM_CURSO.discard(rid)
+
+
 def _id_da_requisicao(id_requisicao) -> str:
     rid = A._id(id_requisicao)
     if not rid.isdigit():
@@ -335,43 +437,69 @@ def _quem_cols(ctx: dict, quem_: dict, id_almox: str) -> dict:
             **(quem_ or {})}
 
 
-def _falha(cfg, ctx, r, quem_, por: str, passo: str, ex: Exception) -> str:
-    """Registra a falha de um passo (o evento `requisicao_falha`, com o porquê cifrado) e devolve o texto para a tela. O livro
-    que não grava agora não esconde a falha do Fracttal: só vai ao log (o tipo)."""
-    motivo = (ex.mensagem if isinstance(ex, E.ErroFracttal) else
-              "o Fracttal pediu uma pausa (o limite de pedidos da empresa)" if isinstance(ex, E.Limite) else
-              "o login do Fracttal expirou" if isinstance(ex, E.SemLogin) else
-              f"o Fracttal não respondeu ({type(ex).__name__}): pode ter gravado; confira antes de repetir")
+def _certo(ex: Exception) -> bool:
+    """O Fracttal não fez nada, com certeza: o "não" dele (`Recusado`), a pausa (429) e o login recusado. O resto (a rede, a
+    resposta sem corpo ou sem o id) pode ter vindo DEPOIS de ele gravar."""
+    return isinstance(ex, (E.Recusado, E.Limite, E.SemLogin))
+
+
+def _motivo(ex: Exception) -> str:
+    return (ex.mensagem if isinstance(ex, E.ErroFracttal) else
+            "o Fracttal pediu uma pausa (o limite de pedidos da empresa)" if isinstance(ex, E.Limite) else
+            "o login do Fracttal expirou" if isinstance(ex, E.SemLogin) else
+            f"o Fracttal não respondeu ({type(ex).__name__})")
+
+
+def _status(ex: Exception | None) -> int:
+    if isinstance(ex, E.Limite):
+        return 429
+    if isinstance(ex, E.SemLogin):
+        return 401
+    return 409 if ex is None or isinstance(ex, E.Recusado) else 502
+
+
+def _falha(cfg, ctx, r, quem_, por: str, passo: str, motivo: str, pecas: list[dict], travada: bool = False) -> None:
+    """Registra a falha de um passo (o evento `requisicao_falha`, com o porquê, as peças com a curva e o `travada` cifrados). O
+    livro que não grava agora não esconde a falha do Fracttal: só vai ao log (o tipo)."""
     try:
         F.acrescentar(cfg, F.ABA_EVENTO, [{"tipo": "requisicao_falha", "movimento_fracttal": r["id"],
                                            **_quem_cols(ctx, quem_, r["id_almox"]),
-                                           "dados": {"motivo": motivo, "passo": passo, "por": por, "os": r["os"]}}])
+                                           "dados": {"motivo": motivo, "passo": passo, "por": por, "os": r["os"],
+                                                     "pecas": _pecas_do_evento(pecas), "travada": travada}}])
     except (F.Recusada, ValueError) as ex2:
         log.warning("requisições: a falha da requisição %s não foi ao livro (%s)", r["id"], type(ex2).__name__)
-    return motivo
-
-
-def _status(ex: Exception) -> int:
-    return 429 if isinstance(ex, E.Limite) else 401 if isinstance(ex, E.SemLogin) else 409 if isinstance(ex, E.Recusado)         else 502
 
 
 def aceitar(cfg, estoque, id_requisicao, *, por: str, ctx: dict, quem_: dict, conta: dict | None,
             responsavel: dict | None, comentario: str = "", agora: datetime | None = None) -> dict:
-    """Aceita UMA requisição (o clique do PCM, `por` "pcm", e o automático, `por` "sozinha"): relê, aprova se ainda não está
-    aprovada (o comentário do PCM ou "Aceita pelo Nexus por <nome>"), faz a saída ligada e relê a requisição e o saldo de cada
-    peça. `{"ok", "confirmada", "mensagem", "saida"}`.
+    """Aceita UMA requisição (o clique do PCM, `por` "pcm", e o automático, `por` "sozinha"), uma de cada vez por requisição
+    (`_tomar`). `{"ok", "confirmada", "mensagem", "saida"}`.
 
-    Recusa (`Conflito`, 409, nada vai) a que não está a aceitar (`_conferir_estado`), a sem responsável, a sem conta quando
-    precisa aprovar, a sem peças, no automático a que tem peça Rank A ou desconhecida, e o almoxarifado com a vez presa por uma
-    gravação de inventário ou fora do modo 0. O passo que falha no Fracttal para ali, vira o evento `requisicao_falha` e sobe
-    (a rota o diz com o status de sempre); a aprovada sem saída, a próxima tentativa pula a aprovação. Cada peça aceita vira um
-    evento (`requisicao_aceita` ou `requisicao_aceita_sozinha`) com o saldo antes e depois e a curva."""
-    from . import gravacao
+    Recusa (`Conflito`, 409, nada vai): a que não está a aceitar (`_conferir_estado`); no automático, a criada antes de
+    `AUTO_DESDE` e a que tem peça Rank A ou desconhecida; a que já tem a saída do Nexus (`_trava_da_saida`); a sem responsável, a
+    sem conta quando precisa aprovar, a sem peças; o almoxarifado com a vez presa ou fora do modo 0. Depois de ler o saldo, as
+    que não vão e ficam em Falhas (`Falhou`, 409, com o evento): a Saída Geral do PCM achada no histórico e o saldo que não dá.
+    Então aprova (se falta) e faz a saída: o "não" do Fracttal e a resposta incerta registram a falha (a incerta da saída
+    trava: o Nexus não a repete); a pausa e o login não registram nada. Cada peça aceita vira um evento (`requisicao_aceita` ou
+    `requisicao_aceita_sozinha`) com o saldo antes e depois e a curva."""
     rid = _id_da_requisicao(id_requisicao)
     texto = " ".join(str(comentario or "").split())
     if len(texto) > COMENTARIO_MAX:
         raise ValueError(f"O comentário passa de {COMENTARIO_MAX} letras.")
+    with _tomar(rid):
+        return _aceitar(cfg, estoque, rid, por, ctx, quem_, conta, responsavel, texto, agora)
+
+
+def _aceitar(cfg, estoque, rid, por, ctx, quem_, conta, responsavel, texto, agora) -> dict:
+    from . import gravacao
     r = _conferir_estado(estoque.reler_requisicao(rid, JANELA_DIAS, agora), rid, ctx)
+    os_ = f" da OS {r['os']}" if r["os"] else ""
+    if por == "sozinha" and not depois_do_corte(r):
+        raise Conflito(f"A requisição{os_} é de antes do automático ({auto_desde_txt()}): é o PCM que aceita, conferindo se a "
+                       "Saída Geral já foi dada. Nada foi enviado.")
+    trava = _trava_da_saida(cfg, rid)
+    if trava:
+        raise Conflito(f"Nada foi enviado: {trava}.")
     if not responsavel:
         raise Conflito(SEM_RESPONSAVEL)
     if not r["aprovada"] and not conta:
@@ -390,30 +518,74 @@ def aceitar(cfg, estoque, id_requisicao, *, por: str, ctx: dict, quem_: dict, co
     if modo != 0:
         raise Conflito(f"Nada foi enviado: o almoxarifado está no modo {modo} no Fracttal (ajuste ou inventário aberto); a "
                        "saída não passa. Tente depois de fechado.")
+    # a Saída Geral do PCM (a revisão, C1): um movimento da mesma peça com a OS, desde a requisição (com um dia de folga de relógio)
+    try:
+        desde = E.instante(r["criada_em"]) - timedelta(days=1)
+    except ValueError:
+        desde = (agora or _agora()) - timedelta(days=JANELA_DIAS)
+    ids = {p["id_item"] for p in pecas if p["id_item"]} | {p["id_linha"] for p in pecas if p["id_linha"]}
+    geral = estoque.saida_com_a_os(almox, r["os"], sorted(ids), desde.isoformat()) if r["os"] else None
+    if geral:
+        motivo = (f"o PCM já deu a saída da OS {r['os']} em {_quando_txt(geral.get('quando')) or 'data não lida'}: aprove e mude "
+                  "o status no Fracttal")
+        _falha(cfg, ctx, r, quem_, por, "saida_geral", motivo, pecas, travada=True)
+        raise Falhou(f"Nada foi enviado: {motivo}.", 409, None)
     antes = estoque.ler(almox)
-    passo = "aprovar"
+    faltam = [p for p in pecas if p["id_item"] not in antes
+              or (antes[p["id_item"]].get("saldo") is not None and p["qtd"] is not None
+                  and antes[p["id_item"]]["saldo"] < p["qtd"] - 1e-9)]
+    if faltam:
+        # o saldo conferido ANTES de aprovar (a revisão, M8): a peça sem o bastante não chega a "aprovada, saída falhou"
+        motivo = "; ".join((f"{p['codigo'] or p['id_item']} não está ligada ao almoxarifado" if p["id_item"] not in antes else
+                            f"{p['codigo']} tem {antes[p['id_item']]['saldo']:g} e a requisição pede {p['qtd']:g}")
+                           for p in faltam)
+        motivo = f"saldo insuficiente ({motivo}): dê entrada antes"
+        _falha(cfg, ctx, r, quem_, por, "saldo", motivo, pecas)
+        raise Falhou(f"Nada foi enviado: {motivo}.", 409, None)
     try:
         if not r["aprovada"]:
             padrao = (f"Aceita pelo Nexus por {conta['nome']}" if por == "pcm"
                       else f"Aceita pelo Nexus (Rank B ou C), na sessão de {conta['nome']}")
             estoque.aprovar_requisicao(rid, texto or padrao, conta)
-        passo = "saida"
+    except (E.ErroFracttal, E.Limite, E.SemLogin, OSError) as ex:
+        log.warning("requisições: a requisição %s parou ao aprovar (%s)", rid, type(ex).__name__)
+        if not isinstance(ex, (E.Limite, E.SemLogin)):
+            _falha(cfg, ctx, r, quem_, por, "aprovar", _motivo(ex), pecas)
+        raise Falhou((f"Não aceitei a requisição{os_}: o Fracttal não aprovou ({_motivo(ex)}). Nada mudou nela." if _certo(ex) else
+                      f"A aprovação da requisição{os_} não teve resposta ({_motivo(ex)}): ela pode ter sido aprovada. "
+                      "Confira no Fracttal; a próxima tentativa relê e pula a aprovação feita."), _status(ex), ex) from ex
+    try:
         saida = estoque.saida_da_requisicao(r, linhas, responsavel)
     except (E.ErroFracttal, E.Limite, E.SemLogin, OSError) as ex:
-        motivo = _falha(cfg, ctx, r, quem_, por, passo, ex)
-        log.warning("requisições: a requisição %s parou no passo %s (%s)", rid, passo, type(ex).__name__)
-        os_ = f" da OS {r['os']}" if r["os"] else ""
-        texto_ = (f"Não aceitei a requisição{os_}: o Fracttal não aprovou ({motivo}). Nada mudou nela." if passo == "aprovar" else
-                  f"A requisição{os_} ficou aprovada, mas a saída não passou ({motivo}). Ela está em Falhas; a próxima "
-                  "tentativa pula a aprovação.")
-        raise Falhou(texto_, _status(ex), ex) from ex
-    # reler: a requisição (5 e aprovada) e o saldo de cada peça. A releitura que falha não desfaz nada: diz que não confirmou
+        log.warning("requisições: a requisição %s parou na saída (%s)", rid, type(ex).__name__)
+        incerta = not _certo(ex)
+        if not isinstance(ex, (E.Limite, E.SemLogin)):
+            _falha(cfg, ctx, r, quem_, por, "saida", _motivo(ex) + (": a saída pode ter sido feita" if incerta else ""), pecas,
+                   travada=incerta)
+        if incerta:
+            with _TRAVA_SAIDAS:
+                _SAIDAS_FEITAS[rid] = "a resposta da saída não veio (ela pode ter sido feita): confira no Fracttal"
+        raise Falhou((f"A requisição{os_} ficou aprovada, e a resposta da saída não veio ({_motivo(ex)}): ela pode ter sido "
+                      "feita. Confira no Fracttal; o Nexus não repete esta saída." if incerta else
+                      f"A requisição{os_} ficou aprovada, mas a saída não passou ({_motivo(ex)}). A próxima tentativa pula a "
+                      "aprovação."), _status(ex), ex) from ex
+    with _TRAVA_SAIDAS:
+        _SAIDAS_FEITAS[rid] = (f"o Nexus já fez a saída {saida} em {_quando_txt(agora or _agora())}, e a requisição não foi à "
+                               "Entrega total: confira no Fracttal (o Nexus não faz outra)")
+    # reler: a requisição (5 e aprovada) e o saldo de cada peça, cada leitura à parte (a revisão, M7). Não desfaz nada
     try:
         depois_r = estoque.reler_requisicao(rid, JANELA_DIAS, agora)
+        relida = True
+    except (E.ErroFracttal, E.Limite, E.SemLogin, OSError):
+        depois_r, relida = None, False
+    try:
         depois = estoque.ler(almox)
     except (E.ErroFracttal, E.Limite, E.SemLogin, OSError):
-        depois_r, depois = None, {}
+        depois = {}
     confirmada = bool(depois_r) and depois_r["estado"] == E.ENTREGA_TOTAL and depois_r["aprovada"]
+    if confirmada:
+        with _TRAVA_SAIDAS:
+            _SAIDAS_FEITAS.pop(rid, None)          # na Entrega total ela nem é mais pendente; o livro guarda o aceite
     tipo = "requisicao_aceita" if por == "pcm" else "requisicao_aceita_sozinha"
     base = _quem_cols(ctx, quem_, almox)
     eventos = [{"tipo": tipo, "movimento_fracttal": rid, **base, "id_item": p["id_item"] or None,
@@ -422,11 +594,12 @@ def aceitar(cfg, estoque, id_requisicao, *, por: str, ctx: dict, quem_: dict, co
                 "dados": {"os": r["os"], "curva": p["curva"], "saida": str(saida), "por": por, "confirmada": confirmada,
                           **({"comentario": texto} if texto else {})}}
                for p in pecas]
-    os_ = f" da OS {r['os']}" if r["os"] else ""
     hora = _quando_txt(agora or _agora())
     mensagem = (f"Requisição{os_} aceita às {hora.split(' às ')[-1]}: aprovada, saída feita e entrega total." if confirmada else
                 f"A requisição{os_} foi aprovada e a saída feita, mas a releitura não mostra a entrega total: confira na tela do "
-                "Fracttal antes de repetir.")
+                "Fracttal. O Nexus não faz outra saída dela." if relida else
+                f"A requisição{os_} foi aprovada e a saída feita, mas não consegui reler a requisição: confira na tela do "
+                "Fracttal. O Nexus não faz outra saída dela.")
     try:
         F.acrescentar(cfg, F.ABA_EVENTO, eventos)
     except (F.Recusada, ValueError) as ex:
@@ -438,40 +611,45 @@ def recusar(cfg, estoque, id_requisicao, *, ctx: dict, quem_: dict, conta: dict 
             agora: datetime | None = None) -> dict:
     """Recusa (`outputs_orders_update` com `approved: false`, o comentário obrigatório e a conta), sem saída: o técnico já usou
     a peça, e a recusa só registra. PROVA PENDENTE no Fracttal de verdade. A aprovada não se recusa (409). O evento
-    `requisicao_recusada` leva o comentário cifrado."""
+    `requisicao_recusada` leva o comentário e as peças com a curva cifrados. Uma de cada vez por requisição (`_tomar`)."""
     rid = _id_da_requisicao(id_requisicao)
     texto = " ".join(str(comentario or "").split())
     if not texto:
         raise ValueError("Recusar pede o comentário (vai ao Fracttal e fica cifrado no Nexus).")
     if len(texto) > COMENTARIO_MAX:
         raise ValueError(f"O comentário passa de {COMENTARIO_MAX} letras.")
-    r = _conferir_estado(estoque.reler_requisicao(rid, JANELA_DIAS, agora), rid, ctx)
-    if r["aprovada"]:
-        raise Conflito("A requisição já foi aprovada: não se recusa. Nada foi enviado.")
-    if not conta:
-        raise Conflito(SEM_CONTA)
-    try:
-        estoque.recusar_requisicao(rid, texto, conta)
-    except (E.ErroFracttal, E.Limite, E.SemLogin, OSError) as ex:
-        motivo = _falha(cfg, ctx, r, quem_, "pcm", "recusar", ex)
-        raise Falhou(f"Não recusei: o Fracttal não aceitou a recusa ({motivo}). Nada mudou na requisição.", _status(ex),
-                     ex) from ex
-    try:
-        depois = estoque.reler_requisicao(rid, JANELA_DIAS, agora)
-    except (E.ErroFracttal, E.Limite, E.SemLogin, OSError):
-        depois = None
-    confirmada = bool(depois) and recusada(depois)
-    os_ = f" da OS {r['os']}" if r["os"] else ""
-    mensagem = (f"Requisição{os_} recusada no Fracttal." if confirmada else
-                f"O Fracttal aceitou a recusa da requisição{os_}, mas a releitura não a mostra recusada: confira na tela do "
-                "Fracttal.")
-    try:
-        F.acrescentar(cfg, F.ABA_EVENTO, [{"tipo": "requisicao_recusada", "movimento_fracttal": rid,
-                                           **_quem_cols(ctx, quem_, r["id_almox"]),
-                                           "dados": {"motivo": texto, "os": r["os"], "confirmada": confirmada}}])
-    except (F.Recusada, ValueError) as ex:
-        mensagem += f" Não consegui anotar no livro do Nexus ({ex})."
-    return {"ok": True, "confirmada": confirmada, "mensagem": mensagem}
+    with _tomar(rid):
+        r = _conferir_estado(estoque.reler_requisicao(rid, JANELA_DIAS, agora), rid, ctx)
+        if r["aprovada"]:
+            raise Conflito("A requisição já foi aprovada: não se recusa. Nada foi enviado.")
+        if not conta:
+            raise Conflito(SEM_CONTA)
+        pecas = pecas_com_curva(estoque.pecas_da_requisicao(rid), ctx["curvas"])
+        try:
+            estoque.recusar_requisicao(rid, texto, conta)
+        except (E.ErroFracttal, E.Limite, E.SemLogin, OSError) as ex:
+            if not isinstance(ex, (E.Limite, E.SemLogin)):
+                _falha(cfg, ctx, r, quem_, "pcm", "recusar", _motivo(ex), pecas)
+            raise Falhou((f"Não recusei: o Fracttal não aceitou a recusa ({_motivo(ex)}). Nada mudou na requisição."
+                          if _certo(ex) else f"A recusa não teve resposta ({_motivo(ex)}): ela pode ter sido feita. Confira "
+                          "no Fracttal."), _status(ex), ex) from ex
+        try:
+            depois = estoque.reler_requisicao(rid, JANELA_DIAS, agora)
+        except (E.ErroFracttal, E.Limite, E.SemLogin, OSError):
+            depois = None
+        confirmada = bool(depois) and recusada(depois)
+        os_ = f" da OS {r['os']}" if r["os"] else ""
+        mensagem = (f"Requisição{os_} recusada no Fracttal." if confirmada else
+                    f"O Fracttal aceitou a recusa da requisição{os_}, mas a releitura não a mostra recusada: confira na tela "
+                    "do Fracttal.")
+        try:
+            F.acrescentar(cfg, F.ABA_EVENTO, [{"tipo": "requisicao_recusada", "movimento_fracttal": rid,
+                                               **_quem_cols(ctx, quem_, r["id_almox"]),
+                                               "dados": {"motivo": texto, "os": r["os"], "confirmada": confirmada,
+                                                         "pecas": _pecas_do_evento(pecas)}}])
+        except (F.Recusada, ValueError) as ex:
+            mensagem += f" Não consegui anotar no livro do Nexus ({ex})."
+        return {"ok": True, "confirmada": confirmada, "mensagem": mensagem}
 
 
 # ── o automático das de Rank B e C ──────────────────────────────────────────────────────────────────────────────────────
@@ -513,9 +691,9 @@ def aguardar(timeout: float = 30) -> None:
 def iniciar_automatico(cfg, estoque, ids: list[str], *, ctx: dict, quem_: dict, conta: dict | None,
                        responsavel: dict | None) -> dict:
     """Aceita em segundo plano, na sessão de quem pediu, as requisições `ids` (as `ids_sozinhas` da lista: só de B e C
-    conhecidas e sem falha registrada). Uma de cada vez no processo (`_AUTO`: 409 com outra andando). O controle
-    `requisicoes-auto.json` ("gravando", salvo a cada requisição) é o que o deploy espera (`gravacao.com_lote_aberto`) e a tela
-    acompanha (`estado_automatico`). Sem o responsável ou a conta, nada começa (409)."""
+    conhecidas, criadas a partir de `AUTO_DESDE`, sem falha nem trava). Uma de cada vez no processo (`_AUTO`: 409 com outra
+    andando). O controle `requisicoes-auto.json` ("gravando", salvo a cada requisição) é o que o deploy espera
+    (`gravacao.com_lote_aberto`) e a tela acompanha (`estado_automatico`). Sem o responsável ou a conta, nada começa (409)."""
     ids = [A._id(i) for i in ids if A._id(i).isdigit()]
     if not ids:
         raise Conflito("Nenhuma requisição de Rank B e C a aceitar agora.")
@@ -548,23 +726,24 @@ def iniciar_automatico(cfg, estoque, ids: list[str], *, ctx: dict, quem_: dict, 
 
 def _rodar(cfg, estoque, ids, ctx, quem_, conta, responsavel, arq, ctrl) -> None:
     """A thread: uma requisição de cada vez, pela `aceitar` (a mesma regra do clique). A que já não está a aceitar (alguém
-    aceitou no meio, ou ganhou peça A) é pulada; a falha do Fracttal fica registrada e a próxima segue; o 429 e o login que
-    expira param tudo (o resto fica para a próxima abertura da tela)."""
+    aceitou no meio, ou ganhou peça A) é pulada; a falha fica registrada no livro e a próxima segue; o 429 e o login que
+    expira param tudo (o resto fica para a próxima abertura da tela). O controle leva só texto do Nexus (a revisão, M4: o texto
+    do Fracttal fica cifrado no livro)."""
     from .gravacao import _iso
     try:
         for rid in ids:
             item = {"id": rid, "resultado": "", "texto": ""}
             try:
                 r = aceitar(cfg, estoque, rid, por="sozinha", ctx=ctx, quem_=quem_, conta=conta, responsavel=responsavel)
-                item.update(resultado="aceita" if r["confirmada"] else "sem_confirmar", texto=r["mensagem"])
+                item.update(resultado="aceita" if r["confirmada"] else "sem_confirmar",
+                            texto="aceita" if r["confirmada"] else "saída feita, sem a entrega total na releitura")
                 ctrl["aceitas"] += 1
-            except Conflito as ex:
-                item.update(resultado="pulada", texto=str(ex))
+            except Conflito:
+                item.update(resultado="pulada", texto="pulada: já não estava para aceitar sozinha (veja na lista)")
                 ctrl["puladas"] += 1
             except (Falhou, E.Limite, E.SemLogin, E.ErroFracttal, OSError, F.Recusada, ValueError) as ex:
                 causa = ex.causa if isinstance(ex, Falhou) else ex
-                item.update(resultado="falha", texto=ex.mensagem if isinstance(ex, (Falhou, E.ErroFracttal)) else
-                            f"{type(ex).__name__}: {ex}"[:200])
+                item.update(resultado="falha", texto="não aceita (o porquê em Falhas)")
                 ctrl["falhas"] += 1
                 if isinstance(causa, (E.Limite, E.SemLogin)):
                     # o resto fica para a próxima abertura da tela: insistir gastaria a cota da empresa (ou o login morto)
@@ -620,7 +799,8 @@ def registrar(bp) -> None:
         isso e nem pede. Os outros setores que veem a tela leem que ela é do PCM."""
         email = quem.do_pedido().get("email")
         return render_template("pcm/requisicoes.html", pode=telas.pode_programar(), com_pessoa=bool(email),
-                               aviso=session.pop("pcm_requisicoes_aviso", None), auto=estado_automatico(current_app.config))
+                               aviso=session.pop("pcm_requisicoes_aviso", None), auto=estado_automatico(current_app.config),
+                               auto_desde=auto_desde_txt())
 
     @bp.route("/pecas/requisicoes/automatico.json", endpoint="requisicoes_automatico")
     def requisicoes_automatico():

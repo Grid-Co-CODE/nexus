@@ -229,16 +229,17 @@ def curadoria_classificacoes():
 REQUISICOES = "/t/pcm/pecas/requisicoes"
 
 
-def _dono(est) -> tuple[dict | None, dict | None]:
+def _dono(est, responsavel: bool = True) -> tuple[dict | None, dict | None]:
     """(a conta, o responsável) do Fracttal de quem está no pedido: a aprovação vai no nome da conta, e a saída leva o
-    responsável. Achados pelo e-mail da sessão do Nexus (que a ponte já conferiu ser o da conta do Fracttal do cookie)."""
+    responsável. Achados pelo e-mail da sessão do Nexus (que a ponte já conferiu ser o da conta do Fracttal do cookie). O
+    recusar não faz saída e não lê a lista de responsáveis (`responsavel` falso; a revisão do item 6, M5)."""
     from ...torres.oscreator import ponte
     from . import requisicoes as RQ
     try:
         nome = str((ponte.sessao_do_os(current_app._get_current_object()).get("conta") or {}).get("nome") or "")
     except Exception:        # noqa: BLE001 — o nome da sessão só completa o do catálogo
         nome = ""
-    return RQ.conta_do_fracttal(_email(), nome), RQ.responsavel_de(est, _email())
+    return RQ.conta_do_fracttal(_email(), nome), (RQ.responsavel_de(est, _email()) if responsavel else None)
 
 
 def _falhou_ou(r, volta: str, chave_aviso: str):
@@ -298,7 +299,7 @@ def requisicao_recusar(id_req):
     corpo = corpo if isinstance(corpo, dict) else {}
 
     def fazer(est):
-        conta, _resp = _dono(est)
+        conta, _resp = _dono(est, responsavel=False)
         try:
             return RQ.recusar(cfg, est, id_req, ctx=RQ.contexto(cfg, CL.mapa_guardado(est)),
                               quem_=quem.colunas(cfg, quem.do_pedido()), conta=conta,

@@ -84,8 +84,10 @@
       body: "{}"
     }).then(json).then(function (x) {
       if (x.r.ok && x.d.ok) { mostrarAuto(x.d.mensagem || ""); acompanhar(); return; }
-      if (clicado) erroNaLista(x.d.erro || ("O automático não começou (HTTP " + x.r.status + ")."), x.d.login);
-    }).catch(function () {});
+      // o automático que não começa diz por quê, também ao abrir (sem o responsável ou a conta, o PCM nunca saberia por que
+      // nada vai sozinho; a revisão do item 6, M5); a lista fica à vista
+      mostrarAuto("O automático das de Rank B e C não começou: " + (x.d.erro || ("HTTP " + x.r.status)));
+    }).catch(function () { mostrarAuto("O automático das de Rank B e C não começou: não consegui falar com o Nexus agora."); });
   }
 
   function enviar(form, pergunta) {

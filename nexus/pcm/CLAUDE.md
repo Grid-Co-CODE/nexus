@@ -781,8 +781,9 @@ inventario-almoxarifado.md`; o que o Fracttal aceita de verdade (métodos, corpo
   os pares distintos (id, descrição) de cada campo, lidos das próprias peças (`items_list`, todas as páginas,
   `classificacoes_das_pecas`), porque o `groups_1_list` mistura as classificações dos ativos (nomes de usina). Provado no
   Fracttal de verdade em 12/11/2026 (o `item_insert` com os três, lido de volta igual). A requisição de material (12/11/2026):
-  `requisicoes`, `reler_requisicao`, `pecas_da_requisicao`, `aprovar_requisicao`, `recusar_requisicao`, `saida_da_requisicao`
-  e `responsavel`, e o `pecas_com_grupos` que dá as opções e o mapa por código (a seção Requisições). Todo id é texto; `ler` devolve
+  `requisicoes`, `reler_requisicao`, `pecas_da_requisicao`, `aprovar_requisicao`, `recusar_requisicao`, `saida_da_requisicao`,
+  `saida_com_a_os` (a Saída Geral no histórico, que agora projeta também o `document`) e `responsavel`, e o `pecas_com_grupos`
+  que dá as opções e o mapa por código (a seção Requisições). Todo id é texto; `ler` devolve
   `{id_item: {saldo, minimo, maximo, ligacao, codigo}}`,
   com o que o Fracttal não disse como None, nunca 0. A `criticidade` (27/10/2026, a coluna Crit. da aprovação) é o
   `groups_1_description` da linha de saldo ("1.Crítico", "2.Necessário", "3.Importante"), vazia quando ele não diz. **Não foi
@@ -1639,37 +1640,59 @@ inventário físico). Tudo no módulo existe para nunca deixar um almoxarifado t
 O PCM (reunião de 04/11): a requisição nasce sozinha quando o técnico põe a peça na tarefa da OS, e ele fazia três passos no
 Fracttal (Saída "Geral" com a OS, aprovar, Entrega total); pediu "não ter que fazer saída, deixar mais automatizado". Decisão do
 Levi (12/11/2026): **Rank A** o PCM aceita no Nexus com um clique; **B e C** o Nexus aceita sozinho e registra.
-- **O Aceitar** (`aceitar`, a regra única do clique e do automático): relê (só o estado 3, nem cancelada nem recusada), aprova
-  se falta (`outputs_orders_update` com a conta de quem decide), faz a **saída ligada** (`outputs_insert`, o corpo capturado da
-  tela: baixa o saldo e leva a requisição sozinha a 5) e relê a requisição e o saldo. Provado no TESTE - PA em 12/11/2026, lido de
-  volta. O passo que falha para ali e vira `requisicao_falha`; a aprovada sem saída fica em "Falhas" e a nova tentativa pula a
-  aprovação. Saldo insuficiente: o Fracttal recusa a saída e o Nexus não tenta de novo sozinho. **O estado 4 (parcial) não
-  entra:** "conclua no Fracttal" (a saída do pendente não foi provada).
+- **Com o Nexus no ar, o PCM NÃO faz mais a Saída "Geral" da requisição.** Se fizer, o Nexus a acha (abaixo) e não faz outra.
+- **O Aceitar** (`aceitar`, a regra única do clique e do automático): relê (só o estado 3, nem cancelada nem recusada), confere,
+  aprova se falta (`outputs_orders_update` com a conta de quem decide), faz a **saída ligada** (`outputs_insert` com as linhas da
+  requisição cruas: baixa o saldo e leva a requisição sozinha a 5) e relê a requisição e o saldo, cada um à parte. **O estado 4
+  (parcial) não entra:** "conclua no Fracttal".
+- **A saída nunca sai em dobro** (a revisão do item 6, os dois Críticos):
+  - **a Saída Geral do PCM:** antes de qualquer saída (e de aprovar), o histórico do almoxarifado desde a requisição (um dia de
+    folga) é lido atrás de um movimento da peça com o número da OS no `document` ou na `description`
+    (`estoque.saida_com_a_os`; o ajuste de inventário não conta). Achou: nada vai, e a requisição fica em Falhas, travada: "o
+    PCM já deu a saída da OS N em <data>: aprove e mude o status no Fracttal". E o **automático só vale para a requisição
+    criada a partir de `AUTO_DESDE`** (o dia da entrada no ar, uma constante em `requisicoes.py`, posta no push): as de antes,
+    do tempo da Saída Geral, ficam para o PCM, com o aviso;
+  - **a saída do Nexus:** a requisição com o aceite no livro (a saída feita) ou com a saída de resposta incerta (a rede, ou o
+    Fracttal sem o id) não recebe outra: fica em Falhas, travada, sem o botão ("confira no Fracttal"); a memória do processo
+    guarda a saída feita também, para o livro que não gravou. O livro que não se lê não deixa aceitar;
+  - **o mesmo aceite duas vezes ao mesmo tempo:** uma trava por requisição em memória (um processo só): 409 "outra pessoa está
+    aceitando esta requisição agora".
+- **O id da peça é o `id_item_original`** (o do catálogo, o do saldo e da dimensão), com o `id_item` só de reserva: na linha da
+  requisição, o `id_item` é o da peça NAQUELE almoxarifado (provado em 12/11/2026: 47887778 contra 53750352).
+- **O saldo é conferido antes de aprovar:** a peça sem o bastante (ou não ligada) vai para Falhas sem aprovação ("dê entrada
+  antes"); o "Tentar de novo" aceita depois. O "não" do Fracttal (`Recusado`) e a resposta incerta tiram do automático; a pausa
+  (429) e o login vencido não registram nada (nada foi feito) e a próxima abertura tenta. Só o `Recusado` diz "não passou".
 - **O Rank é o da peça no Fracttal** (a Classificação 2, "2. Rank A"), pelo código, no mapa da lista de peças inteira
-  (`classificacao.mapa_guardado`, a cópia de 1 h da Curadoria). A "Curva ABC" do catálogo do App vem VAZIA para os Ranks (o
-  `_almox_curva` do App só aceita a letra sozinha; a revisão do item 3): pelo catálogo, a fila nasceria vazia. A peça fora do
-  mapa, sem a Classificação 2 ou "1.Avariado" é a curva desconhecida e vai para o PCM, como a A.
-- **O dono:** a saída leva o responsável do Fracttal de quem está na ponte (`personnel.responsibles_list` pelo e-mail, guardado 1
-  h na memória) e a aprovação a conta (o `id_account` pelo catálogo de pessoas do OS Creator, `comando.avisos._do_fracttal`). Sem
-  um deles, 409: não se grava sem dono. A vez do almoxarifado presa por uma gravação de inventário, ou ele fora do modo 0, 409.
+  (`classificacao.mapa_guardado`, a cópia de 1 h da Curadoria). A "Curva ABC" do catálogo do App vem VAZIA para os Ranks.
+  A peça fora do mapa, sem a Classificação 2, "1.Avariado" ou com duas Classificações 2 diferentes no mesmo código (a lista
+  traz as inativas) é a curva desconhecida e vai para o PCM, como a A.
+- **O dono:** a saída leva o responsável do Fracttal de quem está na ponte (`personnel.responsibles_list` pelo e-mail, 1 h na
+  memória; o "não achei", 5 min) e a aprovação a conta (o `id_account` pelo catálogo de pessoas do OS Creator,
+  `comando.avisos._do_fracttal`). Sem um deles, 409. A vez do almoxarifado presa por uma gravação de inventário, ou ele fora do
+  modo 0, 409. O Recusar não lê os responsáveis.
 - **O automático:** o Nexus não tem conta de serviço no Fracttal; quando alguém do PCM com o login do Fracttal abre a aba, a
-  página pede o automático, e o Nexus aceita em segundo plano, **na sessão dessa pessoa**, as pendentes só de B e C conhecidas
-  e sem falha (uma thread, o controle `requisicoes-auto.json` que o deploy espera, `gravacao.com_lote_aberto`; o 429 e o login
-  que expira param o resto). Há o botão "Aceitar agora as N de Rank B e C". **Para ir sem ninguém abrir a tela, precisa de uma
-  conta de serviço** (decisão do Levi).
+  página pede o automático, e o Nexus aceita em segundo plano, **na sessão dessa pessoa**, as pendentes só de B e C conhecidas,
+  de depois de `AUTO_DESDE` e sem falha nem trava (uma thread, o controle `requisicoes-auto.json` só com texto do Nexus, que o
+  deploy espera; o 429 e o login que expira param o resto). O automático que não começa diz por quê na tela. Há o botão "Aceitar
+  agora as N de Rank B e C". **Para ir sem ninguém abrir a tela, precisa de uma conta de serviço** (decisão do Levi). **O clique
+  roda no pedido e o deploy não o espera:** o restart no meio deixa, no pior caso, a aprovada sem a saída (recuperável) ou a
+  saída sem o evento (a memória se perde; a releitura da requisição em 5 a tira da fila).
 - **Na tela** (pela ponte `/os/_nexus/inventario/requisicoes`, com as recusas de sempre): "Para o PCM aceitar" (Aceitar, com o
   comentário opcional e a confirmação; e Recusar), "Rank B e C, a aceitar sozinhas", "Falhas", "Entrega parcial", "Aceitas
-  sozinhas" (o saldo antes e depois, do livro) e, recolhidas, "Decididas nos últimos 30 dias" (do Fracttal: quem, o comentário,
-  quando). O link da OS abre o Raio X da OS só para quem o abre (`telas._pode_ver`). O nome de quem decidiu no Fracttal e o do
-  responsável só passam pela memória e pela tela do PCM.
+  sozinhas" (o saldo antes e depois, do livro) e, recolhidas, "Decididas nos últimos 30 dias". O link da OS abre o Raio X da OS
+  só para quem o abre (`telas._pode_ver`). O nome de quem decidiu no Fracttal e o do responsável só passam pela memória e pela
+  tela do PCM.
 - **O livro:** `requisicao_aceita` e `requisicao_aceita_sozinha` (uma linha por peça: `de_qtd`/`para_qtd` o saldo antes e depois,
-  `contado_qtd` a quantidade, `movimento_fracttal` a requisição; a OS e a curva no `dados` cifrado, sem "motivo cifrado" na
-  Auditoria), `requisicao_recusada` e `requisicao_falha` (o porquê cifrado).
-- **Prova pendente no Fracttal de verdade:** o Recusar (`approved: false`, lido no script da tela; na tela, com o aviso de que o
-  técnico já usou a peça e a recusa só registra), o corpo da lista de responsáveis e a coluna `email` (o padrão das listas), e o
-  automático de ponta a ponta.
-- **Provar:** `tests/test_pcm_inventario_requisicoes.py` (os corpos, a ordem, o `STATE_CHANGED`, a aprovada sem saída e a nova
-  tentativa, o saldo insuficiente, o parcial, o automático só com B e C, o dono, as recusas da ponte, o deploy e a tela).
+  `contado_qtd` a quantidade, `movimento_fracttal` a requisição; a OS, a curva e a saída no `dados` cifrado, sem "motivo cifrado"
+  na Auditoria), `requisicao_recusada` e `requisicao_falha` (o porquê, as peças com a curva e o `travada`, cifrados).
+- **Provado no Fracttal de verdade (12/11/2026, TESTE - PA):** o caminho pela tela e pelo RPC; o corpo da saída com as linhas
+  cruas do `movements_details_list` (o saldo de 1 para 0, a requisição a 5); a aprovação com a requisição no estado 3; o
+  `STATE_CHANGED` depois da entrega. **Falta:** o Recusar; o responsável pelo e-mail (o corpo da lista e a coluna `email`); o
+  clique e o automático de ponta a ponta pelo Nexus; onde a Saída Geral grava a OS (`document` ou `description`); o que o
+  Fracttal responde à segunda aprovação e à segunda saída.
+- **Provar:** `tests/test_pcm_inventario_requisicoes.py` (os corpos, a ordem, o `STATE_CHANGED`, a Saída Geral e o corte, a
+  saída do Nexus que não se repete, a resposta incerta, os dois aceites juntos, o `id_item_original`, o saldo antes de aprovar,
+  a pausa, o Rank em conflito, o dono, as recusas da ponte, o deploy e a tela).
 
 ## Inventário do almoxarifado: a auditoria (`revisao.montar_auditoria`, `templates/pcm/inventario_auditoria.html`; 26/10/2026)
 
