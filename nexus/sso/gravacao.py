@@ -59,6 +59,8 @@ class GravadorSSO(Z.Gravador):
     CTX_DIARIO = "sso/diario"
     PREFIXO = "sso"
     CIFRADA = staticmethod(T.coluna_cifrada)
+    regravacao = None           # o último "Regravar cifrado" pedido: {"versao", "em", "por"}
+    gravado_em = None           # a última gravação no banco que terminou (para a página do administrador dizer)
 
     def _nomes_livros(self) -> dict:
         return T.NOMES_LIVROS
@@ -183,15 +185,30 @@ class GravadorSSO(Z.Gravador):
         """Marca os sete livros para o lote regravar com a regra de cifra de agora (a usina em claro da 1ª cópia,
         12/11/2026). Uma versão nova, sem mudança de linha, no diário: reiniciar antes do lote não perde o pedido."""
         with self._trava:
+            if self.regravacao and not self.regravacao_concluida():
+                return self.regravacao["versao"]           # já está regravando: o 2º clique não pede outra
             versao = self.estado["versao"] + 1
-            self._escrever_diario([{"versao": versao, "efeitos": [], "quem": quem, "em": _agora()}], acrescentar=True)
+            em = _agora()
+            self._escrever_diario([{"versao": versao, "efeitos": [], "quem": quem, "em": em}], acrescentar=True)
             self.estado["versao"] = versao
             for livro in T.LIVROS:
                 self._sujo[livro] = versao
+            self.regravacao = {"versao": versao, "em": em, "por": quem}
             self.ultima_mudanca = time.time()
             return versao
 
+    def regravacao_concluida(self) -> bool:
+        """A regravação pedida já está no banco (os sete livros gravados e conferidos na versão dela ou depois)."""
+        return bool(self.regravacao) and self.versao_banco >= self.regravacao["versao"]
+
+    def persistir(self) -> dict:
+        r = super().persistir()
+        if r.get("gravados"):
+            self.gravado_em = _agora()
+        return r
+
     def carregar(self, est: dict) -> None:
+        self.regravacao, self.gravado_em = None, None
         super().carregar(est)
         # o pedido de regravar que ficou no diário (a versão sem efeito) volta a marcar os livros
         with self._trava:
@@ -199,6 +216,7 @@ class GravadorSSO(Z.Gravador):
                 if not r["efeitos"] and r["versao"] > min((est.get("versoes") or {0: 0}).values()):
                     for livro in T.LIVROS:
                         self._sujo[livro] = max(self._sujo.get(livro, 0), r["versao"])
+                    self.regravacao = {"versao": r["versao"], "em": r.get("em"), "por": r.get("quem")}
 
     def linha(self, aba: str, chave) -> dict | None:
         k = _txt(chave)

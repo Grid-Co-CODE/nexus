@@ -25,8 +25,8 @@
   <div><div class="r">Gravação nesta máquina</div><div class="v">{{ "Ligada" if grava else "Desligada" }}</div>
     <div class="d">{% if forcada %}pela variável NEXUS_SSO_GRAVA{% else %}a mesma da Zeladoria{% endif %}</div></div>
   <div><div class="r">Banco</div>
-    {% if situacao %}<div class="v">versão {{ situacao.versao }}</div>
-      <div class="d">{% if situacao.erro %}atrasado: {{ situacao.erro }}{% elif situacao.pendente %}gravando…{% else %}em dia (versão {{ situacao.versao_banco }} no banco){% endif %}</div>
+    {% if situacao %}<div class="v" id="sso-banco-v">versão {{ situacao.versao_banco }}</div>
+      <div class="d" id="sso-banco-d">{% if situacao.erro %}não gravou agora: {{ situacao.erro }} (tenta de novo sozinho){% elif situacao.pendente %}gravando no banco…{% else %}em dia{% endif %}</div>
     {% else %}<div class="v">—</div><div class="d">o gravador não subiu aqui</div>{% endif %}</div>
   <div><div class="r">Disco livre</div><div class="v">{{ arquivos.livre_gb if arquivos.livre_gb is not none else "—" }} GB</div>
     <div class="d">o envio para abaixo de 2 GB</div></div>
@@ -35,12 +35,62 @@
 </div>
 
 {% if situacao %}
+{% set rg = situacao.regravacao %}
 <form method="post" action="{{ url_for('sso.admin_regravar') }}" class="sso-regravar">
-  <button class="gc-btn gc-btn--contorno" type="submit">Regravar cifrado</button>
+  <button class="gc-btn gc-btn--contorno" type="submit" id="sso-regravar-bt"
+          {% if rg and not rg.concluida %}disabled{% endif %}>Regravar cifrado</button>
   <span class="mudo">Regrava os sete livros do SSO com a cifra de agora. A 1ª cópia (12/11/2026) deixou a usina em claro,
-    e um fornecedor digitou o nome de uma pessoa nela. Use uma vez depois de subir; o histórico de cada linha na API
-    ainda guarda o valor antigo (só a T.I. apaga).</span>
+    e um fornecedor digitou o nome de uma pessoa nela. Uma vez basta; o histórico de cada linha na API ainda guarda o valor
+    antigo (só a T.I. apaga).</span>
 </form>
+{# o resultado da regravação, relido a cada 3 s enquanto o gravador grava (o Levi ficou sem saber se tinha terminado) #}
+<p id="sso-regravar-estado" class="sso-estado" role="status" aria-live="polite">
+  {%- if rg -%}
+    {%- if rg.concluida -%}<span class="gc-status gc-status--ok">Pronto</span> os sete livros foram regravados cifrados
+      (versão {{ rg.versao }}). Não precisa clicar de novo.
+    {%- elif situacao.erro -%}<span class="gc-status gc-status--alerta">Ainda não gravou</span> {{ situacao.erro }}. O
+      Nexus tenta de novo sozinho; não precisa clicar de novo.
+    {%- else -%}<span class="gc-status gc-status--info">Regravando</span> os sete livros no banco (cerca de 1 minuto). Não
+      precisa clicar de novo: esta linha avisa quando terminar.
+    {%- endif -%}
+  {%- endif -%}
+</p>
+<script>
+(function () {
+  var pendente = {{ "true" if situacao.pendente else "false" }};
+  if (!pendente) return;
+  var d = document.getElementById("sso-banco-d"), v = document.getElementById("sso-banco-v");
+  var est = document.getElementById("sso-regravar-estado"), bt = document.getElementById("sso-regravar-bt");
+  function texto(s) {
+    var rg = s.regravacao;
+    d.textContent = s.erro ? "não gravou agora: " + s.erro + " (tenta de novo sozinho)"
+      : (s.pendente ? "gravando no banco…" : "em dia");
+    v.textContent = "versão " + s.versao_banco;
+    if (!rg) return;
+    est.innerHTML = "";
+    var marca = document.createElement("span"), resto = document.createElement("span");
+    if (rg.concluida) {
+      marca.className = "gc-status gc-status--ok"; marca.textContent = "Pronto";
+      resto.textContent = " os sete livros foram regravados cifrados (versão " + rg.versao + "). Não precisa clicar de novo.";
+      bt.disabled = false;
+    } else if (s.erro) {
+      marca.className = "gc-status gc-status--alerta"; marca.textContent = "Ainda não gravou";
+      resto.textContent = " " + s.erro + ". O Nexus tenta de novo sozinho; não precisa clicar de novo.";
+    } else {
+      marca.className = "gc-status gc-status--info"; marca.textContent = "Regravando";
+      resto.textContent = " os sete livros no banco (cerca de 1 minuto). Não precisa clicar de novo: esta linha avisa quando terminar.";
+    }
+    est.appendChild(marca); est.appendChild(resto);
+  }
+  function olhar() {
+    fetch(nexusRota("/t/sso/admin/situacao"), {credentials: "same-origin", cache: "no-store"})
+      .then(function (r) { return r.json(); })
+      .then(function (s) { if (!s.carregado) return setTimeout(olhar, 3000); texto(s); if (s.pendente) setTimeout(olhar, 3000); })
+      .catch(function () { setTimeout(olhar, 5000); });
+  }
+  setTimeout(olhar, 2000);
+})();
+</script>
 {% endif %}
 
 <h2 class="sso-sub">O vídeo da integração</h2>
@@ -130,6 +180,7 @@
   .sso-regravar{display:flex;gap:12px;align-items:center;flex-wrap:wrap;font-size:13px}
   .sso-regravar .mudo{flex:1;min-width:240px}
   .sso-nota{font-size:13px;max-width:880px}
+  .sso-estado{font-size:13px;margin:8px 0 0;min-height:20px}
   .sso-usinas{list-style:none;padding:0;margin:8px 0 24px;display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:4px 16px}
   .sso-usinas li{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:4px 0;border-bottom:1px solid var(--linha);font-size:13px}
   .sso-usinas form{margin:0}

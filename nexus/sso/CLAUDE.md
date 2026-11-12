@@ -86,7 +86,11 @@ em claro; a revisão do mesmo dia achou a mesma porta no número da OS, no servi
 certificado). Em claro só ids, datas e o que é lista fechada e conferida: os estados, a origem, a fase da vistoria e o
 serviço do EPI. A leitura aceita o texto em claro da cópia antiga (só
 decifra o que está cifrado), e o botão "Regravar cifrado" da página do administrador regrava os sete livros com a regra
-de agora: **use uma vez depois de subir**. O histórico de cada linha na API ainda guarda o valor antigo (só a T.I. apaga).
+de agora. **Feito no servidor em 12/11/2026** (os sete livros na versão 1; conferido no banco por GET: a usina, o número
+da OS, o serviço, o número do certificado e a lista de usinas do diário, 0 em claro). A página diz "Regravando" enquanto o
+lote grava, relê a situação a cada 3 s (`/t/sso/admin/situacao`) e diz "Pronto" ou o erro; o 2º clique durante a
+regravação não pede outra. Caso: na 1ª vez a página ficou em "gravando…" sem se atualizar, e o Levi não soube que tinha
+terminado. O histórico de cada linha na API ainda guarda o valor antigo (só a T.I. apaga).
 A assinatura grande passa de 32 mil caracteres e vai partida em colunas `__p2`, `__p3`...
 
 ## O que está no banco do Nexus
@@ -157,7 +161,6 @@ Contagens da exportação de 12/11/2026: sessões 1, visualizações 52, presen�
 
 - **O HEAD publicar o arquivo novo no site** (`site/LEIA.md`). Até lá, o site segue falando com o Supabase parado.
 - **O vídeo da integração** no Nexus (página do administrador): sem ele, a integração não passa do vídeo.
-- **"Regravar cifrado"** uma vez no servidor, depois de subir (a usina em claro da 1ª cópia).
 - **Os gestores entrarem no Nexus:** o login é o do Fracttal (ou a conta Microsoft, quando a T.I. ligar); quem não tem
   conta lá não chega à Gestão.
 - **Os arquivos antigos:** resgatar se o Storage do Supabase voltar, pelo inventário.

@@ -526,3 +526,24 @@ def test_administrador_tira_da_lista_de_usinas_do_diario(sso, logado):
     assert r.status_code == 302
     assert G.do_app(sso.config).linha("diario_usinas", "Usina Teste") is None
     assert sso.test_client().post("/t/sso/admin/usina-diario", data={"nome": "x"}).status_code == 302   # sem login: Entrar
+
+
+def test_regravar_diz_o_resultado_e_o_segundo_clique_nao_pede_outra(sso, logado):
+    """12/11/2026: o Levi clicou em "Regravar cifrado" e a página ficou em "gravando…" sem dizer que tinha terminado (tinha).
+    Agora ela diz "Regravando" enquanto o lote não grava, relê a situação, e diz "Pronto" quando os sete livros estão no
+    banco; o 2º clique durante a regravação não pede outra."""
+    with sso.app_context():
+        g = G.do_app(sso.config)
+    assert logado.post("/t/sso/admin/regravar").status_code == 302
+    v = g.regravacao["versao"]
+    assert logado.post("/t/sso/admin/regravar").status_code == 302
+    assert g.regravacao["versao"] == v                                  # o 2º clique não pediu outra
+    s = logado.get("/t/sso/admin/situacao").get_json()
+    assert s["pendente"] is True and s["regravacao"]["concluida"] is False
+    pagina = logado.get("/t/sso/admin").get_data(as_text=True)
+    assert "Regravando" in pagina and "disabled" in pagina.split('id="sso-regravar-bt"')[1][:80]
+    assert set(g.persistir()["gravados"]) == set(T.LIVROS)
+    s = logado.get("/t/sso/admin/situacao").get_json()
+    assert s["pendente"] is False and s["regravacao"]["concluida"] is True and s["gravado_em"]
+    assert "Pronto" in logado.get("/t/sso/admin").get_data(as_text=True)
+    assert sso.test_client().get("/t/sso/admin/situacao").status_code == 302          # sem login: Entrar

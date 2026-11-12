@@ -477,8 +477,31 @@ def admin():
     usinas = sorted((str(u.get("nome") or "") for u in (est or {}).get("abas", {}).get("diario_usinas", [])),
                     key=str.lower)
     return render_template("sso/admin.html", grava=G.ativo(cfg), forcada=G.forcada(cfg), erro=erro,
-                           situacao=g.situacao() if g else None, estado=est, arquivos=sit, sessoes=sessoes,
+                           situacao=_situacao(g), estado=est, arquivos=sit, sessoes=sessoes,
                            origens=origens(), maquina=request.host, usinas_diario=usinas)
+
+
+def _situacao(g) -> dict | None:
+    """O que a página do administrador mostra do gravador, e relê a cada poucos segundos enquanto ele grava (12/11/2026:
+    o Levi clicou em "Regravar cifrado", a página ficou em "gravando…" para sempre e ele não soube se tinha terminado;
+    tinha, em menos de um minuto, mas a página não se atualizava)."""
+    if g is None:
+        return None
+    sit = g.situacao()
+    rg = g.regravacao
+    return {**sit, "gravado_em": g.gravado_em,
+            "regravacao": ({**rg, "concluida": g.regravacao_concluida()} if rg else None)}
+
+
+@_rota("/admin/situacao")
+def admin_situacao():
+    if not session.get("admin"):
+        return jsonify(erro="Só o administrador."), 403
+    try:
+        g = G.do_app(current_app.config)
+    except G.ForaDoAr as e:
+        return jsonify(carregado=False, erro=str(e))
+    return jsonify(carregado=True, **_situacao(g))
 
 
 @_rota("/admin/regravar", methods=["POST"])
