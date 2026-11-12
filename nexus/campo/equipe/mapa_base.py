@@ -67,8 +67,12 @@ def _gravar(p: Path, dado: dict) -> None:
 
 
 def estado(cfg) -> dict:
-    """{"pronto": {tamanho, sha256, enviado_em, por, zoom} | None, "parcial": {tamanho, sha256, recebido} | None}."""
-    p = pasta(cfg)
+    """{"pronto": {tamanho, sha256, enviado_em, por, zoom} | None, "parcial": {tamanho, sha256, recebido} | None}. Sem
+    pasta de dados (o teste sem NEXUS_DADOS), nada no ar e nada pela metade: a tela abre e diz "Sem mapa base"."""
+    try:
+        p = pasta(cfg)
+    except RuntimeError:
+        return {"pronto": None, "parcial": None}
     pronto = None
     if (p / NOME).is_file():
         pronto = _ler(p / FICHA) or {}
