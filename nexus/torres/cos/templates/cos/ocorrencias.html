@@ -54,7 +54,7 @@
   {# Os filtros da tela Normalizações (11/11/2026, pedido da Ana Barros), com os mesmos nomes no endereço. O cliente é a
      aba de cima. Cada escolha relê a página (o servidor filtra); a lupa vale no Enter. A contagem de cada opção é do
      período inteiro, antes dos filtros. #}
-  <form class="cn-filtros cos-norm-filtros" method="get" id="cos-oc-filtros">
+  <form class="cn-filtros cos-norm-filtros" method="get" id="cos-oc-filtros" data-fo>
     <input type="hidden" name="cliente" value="{{ cliente }}"><input type="hidden" name="dias" value="{{ dias }}">
     {% if situacao %}<input type="hidden" name="situacao" value="{{ situacao }}">{% endif %}
     <label class="cn-filtro-par"><span class="gc-rotulo">Tipo de falha</span>
@@ -78,13 +78,17 @@
       <option value="">Todos</option>{% for k, rot in status_filtro.items() %}<option value="{{ k }}"{% if k == filtros.status %} selected{% endif %}>{{ rot }} ({{ p.opcoes.status[k] }})</option>{% endfor %}
     </select></label>
     <input class="gc-campo cos-norm-busca" type="search" name="q" value="{{ filtros.q }}" placeholder="OS, usina, falha, causa, nota..." aria-label="Buscar nas ocorrências">
-    <button class="gc-btn gc-btn--ui" type="submit">Filtrar</button>
+    <button class="gc-btn gc-btn--ui" type="submit" data-fo-some>Filtrar</button>
     {# A lista com os filtros de agora, em Excel (11/11/2026: o CSV "está muito feia", o dono) — nexus/cos/ocorrencias_planilha.py.
        O `?formato=csv` continua respondendo, para quem já o usa. #}
     <a class="gc-btn gc-btn--ui cos-norm-csv" href="{{ url(formato='xlsx') }}" download><i class="ph ph-microsoft-excel-logo" aria-hidden="true"></i> Exportar Excel</a>
   </form>
   {% set filtrado = filtros.falha or filtros.usina or filtros.criado_por or filtros.tecnico or filtros.status or filtros.q %}
-  {% if filtrado %}<div class="cn-chips"><a href="{{ url(falha=None, usina=None, criado_por=None, tecnico=None, status=None, q=None) }}">Limpar os filtros</a></div>{% endif %}
+  {# os filtros no padrão do Histórico de OS (12/11/2026, Levi: "Para todas as abas do COS que tiver filtro, eu quero esse
+     padrão"): o static/filtros-os.js monta a barra, o painel com as listas digitáveis, o Aplicar e as etiquetas com as
+     <select> deste formulário #}
+  <script src="{{ url_for('static', filename='filtros-os.js') }}"></script>
+  {% if filtrado %}<div class="cn-chips" data-fo-some><a href="{{ url(falha=None, usina=None, criado_por=None, tecnico=None, status=None, q=None) }}">Limpar os filtros</a></div>{% endif %}
 
   <div class="cn-numeros">
     <span><span class="gc-rotulo">Ocorrências</span><span class="v">{{ p.total }}</span><span class="d">registradas {% if p.desde %}desde {{ p.desde.strftime('%d/%m %H:%M') }}{% endif %}</span></span>

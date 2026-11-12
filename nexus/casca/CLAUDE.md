@@ -935,6 +935,33 @@ atualizações dos commits e o que mudou! Ao clicar em versão no ar já leva pa
   enxuto (`{"ok", "commit"}`: o `deploy/atualizar.sh` lê o commit dele).
 - **Prova:** `tests/test_casca_versao.py` (o git dublado).
 
+## Os filtros no padrão do Histórico de OS (`static/filtros-os.js`, `fo-*` no `nexus.css`; 12/11/2026)
+
+Levi: "em todas as partes do nexo, eu quero que os filtros sejam no padrão de nexos, OS Creator, histórico de OS [...] Com
+o mesmo estilo, as mesmas funcionalidades [...] Não é só um cartão suspenso". É UM componente para o Nexus inteiro, o
+modelo A do Histórico (os.css, `fl-*`) com os tokens da casa:
+
+- a barra de uma linha (a busca com a lupa e o botão **Filtros** com o número do que está aplicado);
+- o painel suspenso com uma lista por filtro, **todas digitáveis** (a caixa no topo filtra sem acento e sem caixa; as setas
+  andam; o Enter escolhe quando sobra uma);
+- o ponto verde no campo que mudou, o **Aplicar** que só acende com mudança ("2 alterações"), o Limpar, e fechar (×, Esc,
+  clique fora) que descarta;
+- embaixo, uma etiqueta por filtro APLICADO: o × tira aquele e aplica na hora; "Limpar tudo" tira todos e a busca.
+
+**Como uma tela entra:** o formulário GET dela leva `data-fo` e inclui o script logo depois (`<script src="...
+filtros-os.js">`); o script monta tudo com as `<select>` que já estão no formulário (o rótulo é o `gc-rotulo` da tela).
+As `<select>` continuam no formulário, escondidas, guardando o valor: é o que o servidor, os testes e o script da tela
+leem, e nada vai para elas antes do Aplicar. `<select>` = lista de um valor (como o Criado por do Histórico); `<select
+multiple>` = lista de marcar (como o Cliente; vai ao servidor como `a=1&a=2`, lido com `getlist`); `data-fo="local"` = a
+tela filtra na própria página (o Aplicar grava as `<select>` e dispara o `change` de cada uma que mudou, na ordem do
+formulário, sem enviar); `data-fo-fora` deixa a `<select>` na barra; `data-padrao` diz o valor "sem filtro";
+`data-fo-some` marca o que o padrão substitui (o "Filtrar", o "Limpar os filtros" antigo), que some pelo CSS. O corpo
+trocado depois (o Monitoramento do COS) é montado de novo sozinho. Sem o script, a tela segue com as `<select>` à vista.
+
+**Quem já usa:** o Comando > Usinas e as seis telas do COS com filtro. As outras torres ainda estão no "cartão suspenso"
+de 10/11 (`campo-filtros.js`, `rd-*`, a Usinas 360°) ou nas `<select>` soltas: entram neste padrão trocando o `data-fs`
+por `data-fo`, tela a tela. Prova: `tests/test_filtros_os.py`.
+
 ## Sugestões no Início (24/10/2026)
 
 Levi: "em início quero uma sub aba chamada 'Sugestões'. Vai ter uma tela para a pessoa sugerir, os administradores verão

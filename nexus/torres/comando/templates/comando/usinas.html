@@ -6,24 +6,11 @@
 {# Comando > Usinas (11/11/2026, Levi: "Em comando quero a mesma visão de Início > Usinas do mockup"): a faixa com uma
    barra por usina (todas as mobilizadas) na cor do estado de agora, com a dica da usina e do motivo; os filtros no modelo
    do Histórico de OS do OS Creator Web (12/11/2026, Levi: "Quero os filtros conforme referência Histórico de OS" e "que
-   nos filtros o cliente seja digitável tal qual é em histórico de OS [...] no mesmo estilo e mesmas funções"): a busca,
-   o botão Filtros com o painel de listas digitáveis de marcar, o Aplicar que só acende com mudança e uma etiqueta por
-   filtro aplicado; e a tabela que ordena pelo cabeçalho, com o cabeçalho mais escuro e as linhas alternadas
+   nos filtros o cliente seja digitável tal qual é em histórico de OS [...] no mesmo estilo e mesmas funções"), pelo
+   padrão do Nexus (static/filtros-os.js monta a barra, o painel, o Aplicar e as etiquetas com as <select multiple>
+   deste formulário); e a tabela que ordena pelo cabeçalho, com o cabeçalho mais escuro e as linhas alternadas
    (comando-usinas.js). A conta mora em nexus/comando/usinas.py; o Score de saúde do mockup ficou fora. #}
 {% macro pct(x) %}{% if x is none %}—{% else %}{{ ('%.0f'|format(x)) }}%{% endif %}{% endmacro %}
-{% macro multi(nome, rotulo, todos, opcoes) -%}
-<div class="cmu-fl-cel" data-filtro="{{ nome }}">
-  <span class="cmu-fl-rot" id="cmu-rot-{{ nome }}">{{ rotulo }}</span>
-  <details class="cmu-fl-multi" data-nome="{{ nome }}" data-rotulo="{{ rotulo }}" data-todos="{{ todos }}">
-    <summary aria-labelledby="cmu-rot-{{ nome }} cmu-val-{{ nome }}"><span class="cmu-fl-txt" id="cmu-val-{{ nome }}">{{ todos }}</span><i class="ph ph-caret-down" aria-hidden="true"></i></summary>
-    <div class="cmu-fl-lista">
-      <input type="search" class="cmu-fl-procura" placeholder="Digite para filtrar" aria-label="Filtrar {{ rotulo|lower }}" autocomplete="off">
-      {% for v, rot in opcoes %}<label><input type="checkbox" value="{{ v }}"{% if v in escolhidos.get(nome, []) %} checked{% endif %}> <span>{{ rot }}</span></label>{% endfor %}
-      <p class="cmu-fl-vazio mudo" hidden>Nada com esse texto.</p>
-    </div>
-  </details>
-</div>
-{%- endmacro %}
 <div class="campo-nativa">
   <div class="cn-cab">
     <div><p class="gc-eyebrow">{{ torre.nome }}</p><h1 class="cn-titulo">{{ tela.nome }}</h1>
@@ -43,29 +30,20 @@
       {% for chave, rot in legenda %}<li><i class="cmu-ponto cmu-ponto--{{ estados[chave][1] if chave in estados else 'neutro' }}" aria-hidden="true"></i>{{ rot }} <b class="gc-num">{{ r.por_estado[chave] }}</b></li>{% endfor %}
     </ul>
 
-    <div class="cmu-fl" data-cmu-fl>
-      <div class="cmu-fl-barra">
-        <label class="cmu-fl-campo cmu-fl-busca"><i class="ph ph-magnifying-glass" aria-hidden="true"></i>
-          <input type="search" value="{{ q }}" placeholder="Filtrar por usina, código, cliente ou cluster" aria-label="Filtrar as usinas" autocomplete="off" data-cmu-busca></label>
-        <button type="button" class="cmu-fl-btn" data-cmu-fl-abrir aria-haspopup="dialog" aria-expanded="false" aria-controls="cmu-fl-painel"><i class="ph ph-funnel-simple" aria-hidden="true"></i>Filtros<span class="cmu-fl-badge" data-cmu-fl-badge hidden></span></button>
-        <span class="mudo cmu-conta"><b class="gc-num" data-cmu-conta>{{ linhas|length }}</b> de {{ r.total }} usinas</span>
-        <div class="cmu-fl-painel" id="cmu-fl-painel" role="dialog" aria-label="Filtros" hidden>
-          <div class="cmu-fl-topo"><h4>Filtros</h4><button type="button" class="cmu-fl-fechar" data-cmu-fl-fechar aria-label="Fechar sem aplicar" title="Fechar sem aplicar">&times;</button></div>
-          <div class="cmu-fl-grade">
-            {{ multi('cliente', 'Cliente', 'Todos os clientes', op_clientes) }}
-            {{ multi('responsavel', 'Responsável da UFV', 'Todos os responsáveis', op_responsaveis) }}
-            {{ multi('estado', 'Agora', 'Todos os estados', op_estados) }}
-            {{ multi('meta', 'Meta do mês', 'Todas as faixas', op_meta) }}
-            {{ multi('conformidade', 'Conformidade', 'Todas', op_conformidade) }}
-          </div>
-          <div class="cmu-fl-rodape">
-            <button type="button" class="cmu-fl-btn cmu-fl-fantasma" data-cmu-fl-limpar>Limpar</button>
-            <div class="cmu-fl-dir"><span data-cmu-fl-nalt aria-live="polite">Sem alterações</span><button type="button" class="cmu-fl-btn cmu-fl-aplicar" data-cmu-fl-aplicar disabled>Aplicar</button></div>
-          </div>
-        </div>
-      </div>
-      <div class="cmu-fl-etiquetas" data-cmu-fl-etiquetas role="group" aria-label="Filtros aplicados" hidden></div>
-    </div>
+    <form class="cn-filtros cmu-filtros" method="get" data-fo>
+      <input type="search" name="q" value="{{ q }}" placeholder="Filtrar por usina, código, cliente ou cluster" aria-label="Filtrar as usinas" autocomplete="off" data-cmu-busca>
+      {% for nome, rotulo, todos, opcoes in (('cliente', 'Cliente', 'Todos os clientes', op_clientes),
+                                              ('responsavel', 'Responsável da UFV', 'Todos os responsáveis', op_responsaveis),
+                                              ('estado', 'Agora', 'Todos os estados', op_estados),
+                                              ('meta', 'Meta do mês', 'Todas as faixas', op_meta),
+                                              ('conformidade', 'Conformidade', 'Todas', op_conformidade)) %}
+      <label class="cn-filtro-par"><span class="gc-rotulo">{{ rotulo }}</span>
+        <select class="gc-campo" name="{{ nome }}" multiple data-todos="{{ todos }}">
+          {% for v, rot in opcoes %}<option value="{{ v }}"{% if v in escolhidos.get(nome, []) %} selected{% endif %}>{{ rot }}</option>{% endfor %}</select></label>
+      {% endfor %}
+      <span class="mudo cmu-conta"><b class="gc-num" data-cmu-conta>{{ linhas|length }}</b> de {{ r.total }} usinas</span>
+    </form>
+    <script src="{{ url_for('static', filename='filtros-os.js') }}"></script>
 
     <div class="cn-tab cmu-tab"><table data-cmu-tabela>
       <thead><tr>

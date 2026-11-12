@@ -150,11 +150,6 @@ a.ins-titulo:hover{color:var(--verde-texto)}
 .cmu-ponto--alerta{background:var(--alerta)}
 .cmu-ponto--critico{background:var(--critico)}
 .cmu-ponto--neutro{background:var(--superficie-3)}
-.cmu-filtros{display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px;margin-top:14px}
-.cmu-busca{position:relative;flex:1 1 260px;max-width:420px}
-.cmu-busca .ph{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--mudo);pointer-events:none}
-.cmu-busca input{width:100%;padding-left:32px}
-.cmu-conta{margin-left:auto;font-size:12.5px}
 .cmu-tab{border:0;background:transparent}
 .cmu-tab th{background:transparent;border-bottom:1px solid var(--linha)}
 .cmu-tab th button{all:unset;cursor:pointer;font:inherit;color:inherit;white-space:nowrap}
@@ -195,9 +190,6 @@ a.ins-titulo:hover{color:var(--verde-texto)}
 .cmu-tab thead th{background:var(--barra)}
 .cmu-tab tbody tr.cmu-par td{background:var(--superficie-2)}
 .cmu-tab tbody tr[data-cmu-uid]:hover td{background:var(--superficie-3)}
-.cmu-barra{display:flex;flex-wrap:wrap;align-items:flex-start;gap:8px 16px;margin-top:14px}
-.cmu-barra .cmu-filtros{flex:1 1 auto;margin:0}
-.cmu-barra .cmu-conta{margin-left:auto;padding-top:9px}
 
 /* ── 12/11/2026, 2ª rodada (Levi, com o print da tabela) ─────────────────────────────────────────────────────────────
    O Agora e a Conformidade centralizados (o cabeçalho e o valor); o Agora com o grupo (Normal, Atenção, Crítico, Sem
@@ -216,83 +208,10 @@ a.ins-titulo:hover{color:var(--verde-texto)}
 .cmu-dica b{display:block;color:var(--tinta)}
 .cmu-dica span{color:var(--tinta-2)}
 
-/* os filtros no modelo do Histórico de OS do OS Creator Web (o modelo A de 03/11/2026): a barra de uma linha (a busca, o
-   Filtros com o número do que está aplicado), o painel suspenso preso ao botão, as listas digitáveis de marcar, o Aplicar
-   que só acende com mudança e as etiquetas dos filtros aplicados. As cores são as da casa: o verde é a ação (o Aplicar, o
-   número, o ponto do que mudou) e o azul (info) é o que está escolhido (as etiquetas, a marca nas listas) */
-.cmu-fl{margin-top:14px}
-.cmu-fl-barra{position:relative;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-.cmu-fl-campo{display:flex;align-items:center;gap:8px;height:36px;padding:0 12px;border-radius:10px;background:var(--barra);
-  border:1px solid var(--linha-forte);color:var(--mudo);font-size:13px;min-width:0}
-.cmu-fl-campo:focus-within{border-color:var(--info-a42);box-shadow:0 0 0 3px var(--info-a10)}
-.cmu-fl-campo input{flex:1;min-width:0;height:34px;padding:0;border:0;background:transparent;color:var(--tinta);font:inherit;outline:none}
-.cmu-fl-campo input::placeholder{color:var(--mudo);opacity:1}
-.cmu-fl-busca{flex:1 1 280px;max-width:460px}
-.cmu-fl-btn{height:36px;padding:0 14px;border-radius:10px;border:1px solid var(--linha-forte);background:var(--barra);color:var(--tinta);
-  font:inherit;font-size:13px;display:inline-flex;align-items:center;gap:8px;white-space:nowrap;cursor:pointer}
-.cmu-fl-btn:hover{border-color:var(--mudo)}
-.cmu-fl-btn[aria-expanded="true"]{border-color:var(--info-a42)}
-.cmu-fl-btn:focus-visible,.cmu-fl-chip-x:focus-visible,.cmu-fl-link:focus-visible,.cmu-fl-multi summary:focus-visible{outline:2px solid var(--info);outline-offset:2px}
-.cmu-fl-fantasma{background:transparent;border-color:transparent;color:var(--mudo)}
-.cmu-fl-fantasma:hover{color:var(--tinta);border-color:transparent}
-.cmu-fl-aplicar{background:var(--verde);border-color:var(--verde);color:var(--fundo);font-weight:650}
-.cmu-fl-aplicar:hover{background:var(--verde-hover);border-color:var(--verde-hover)}
-.cmu-fl-aplicar:disabled{opacity:.45;cursor:not-allowed}
-.cmu-fl-badge{min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:var(--verde);color:var(--fundo);font-size:11px;
-  font-weight:700;display:inline-grid;place-items:center}
-.cmu-fl-badge[hidden]{display:none}
-.cmu-fl-barra .cmu-conta{margin-left:auto;font-size:12.5px}
-.cmu-fl-painel{position:absolute;top:calc(100% + 8px);left:0;z-index:40;width:560px;max-width:100%;padding:16px;border-radius:14px;
-  background:var(--superficie-2);border:1px solid var(--linha-forte);box-shadow:0 18px 50px var(--sombra);color:var(--tinta)}
-.cmu-fl-painel[hidden]{display:none}
-.cmu-fl-topo{display:flex;align-items:center;justify-content:space-between;margin:0 0 12px}
-.cmu-fl-topo h4{margin:0;font-size:13px;font-weight:600;color:var(--mudo)}
-.cmu-fl-fechar{width:30px;height:30px;padding:0;border:0;border-radius:8px;background:transparent;color:var(--mudo);font-size:20px;cursor:pointer}
-.cmu-fl-fechar:hover{color:var(--tinta);background:var(--superficie-3)}
-.cmu-fl-grade{display:grid;grid-template-columns:1fr 1fr;gap:12px 14px}
-.cmu-fl-cel{position:relative;min-width:0}
-.cmu-fl-rot{display:block;margin-bottom:5px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--mudo)}
-.cmu-fl-cel.mudou > .cmu-fl-multi::after{content:"";position:absolute;top:-3px;right:-3px;width:8px;height:8px;border-radius:50%;
-  background:var(--verde);box-shadow:0 0 0 2px var(--superficie-2);pointer-events:none}
-.cmu-fl-multi{position:relative}
-.cmu-fl-multi summary{height:36px;padding:0 12px;border-radius:10px;background:var(--barra);border:1px solid var(--linha-forte);color:var(--mudo);
-  font-size:13px;display:flex;align-items:center;justify-content:space-between;gap:8px;cursor:pointer;list-style:none}
-.cmu-fl-multi summary::-webkit-details-marker{display:none}
-.cmu-fl-multi summary:hover{border-color:var(--mudo)}
-.cmu-fl-multi.cmu-fl-tem summary{color:var(--tinta)}
-.cmu-fl-multi[open] summary{border-color:var(--info-a42)}
-.cmu-fl-multi[open] summary .ph{transform:rotate(180deg)}
-.cmu-fl-txt{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.cmu-fl-lista{position:absolute;left:0;right:0;top:calc(100% + 6px);z-index:20;display:flex;flex-direction:column;gap:2px;max-height:260px;
-  overflow:auto;padding:6px;border-radius:12px;background:var(--barra);border:1px solid var(--linha-forte);box-shadow:0 14px 34px var(--sombra)}
-.cmu-fl-procura{position:sticky;top:0;z-index:1;flex:none;height:34px;margin-bottom:4px;padding:0 10px;border-radius:8px;background:var(--superficie-2);
-  border:1px solid var(--linha-forte);color:var(--tinta);font:inherit;font-size:13px;outline:none;box-shadow:0 0 0 6px var(--barra)}
-.cmu-fl-procura:focus{border-color:var(--info-a42)}
-.cmu-fl-procura::placeholder{color:var(--mudo)}
-.cmu-fl-lista label{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:8px;color:var(--tinta);font-size:13px;cursor:pointer}
-.cmu-fl-lista label[hidden]{display:none}
-.cmu-fl-lista label:hover{background:var(--superficie-3)}
-.cmu-fl-lista label.on{background:var(--info-suave)}
-.cmu-fl-lista input{flex:none;width:16px;height:16px;margin:0;accent-color:var(--info)}
-.cmu-fl-lista input.cmu-fl-procura{width:auto;height:34px}
-.cmu-fl-vazio{margin:6px 8px;font-size:12.5px}
-.cmu-fl-rodape{display:flex;align-items:center;gap:10px;margin-top:16px;padding-top:14px;border-top:1px solid var(--linha-forte)}
-.cmu-fl-dir{margin-left:auto;display:flex;gap:10px;align-items:center}
-.cmu-fl-dir span{color:var(--mudo);font-size:12.5px}
-.cmu-fl-etiquetas{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px}
-.cmu-fl-etiquetas[hidden]{display:none}
-.cmu-fl-chip{display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 6px 0 11px;border-radius:999px;background:var(--info-suave);
-  border:1px solid var(--info-a42);color:var(--tinta);font-size:12.5px;max-width:100%}
-.cmu-fl-chip i{font-style:normal;color:var(--mudo)}
-.cmu-fl-chip-v{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:320px}
-.cmu-fl-chip-x{width:20px;height:20px;padding:0;border:0;border-radius:50%;display:grid;place-items:center;background:transparent;
-  color:var(--mudo);font-size:15px;line-height:1;cursor:pointer;flex:none}
-.cmu-fl-chip-x:hover{background:var(--info);color:var(--fundo)}
-.cmu-fl-link{padding:4px 2px;border:0;background:transparent;color:var(--info);font:inherit;font-size:12.5px;cursor:pointer}
-.cmu-fl-link:hover{text-decoration:underline}
-@media (max-width:640px){.cmu-fl-painel{position:fixed;left:0!important;right:0;bottom:0;top:auto;width:auto;max-height:88vh;overflow:auto;
-  border-radius:16px 16px 0 0}.cmu-fl-grade{grid-template-columns:1fr}.cmu-fl-lista{position:static;margin-top:6px;box-shadow:none}
-  .cmu-fl-barra .cmu-conta{margin-left:0}}
+/* os filtros são os do padrão do Nexus (static/filtros-os.js, fo-* no nexus.css; 12/11/2026): aqui só o lugar da barra e
+   a conta das usinas à direita */
+.cmu-filtros{margin-top:14px}
+.cmu-filtros .cmu-conta{margin-left:auto;font-size:12.5px}
 
 /* Comando → Caixa de entrada: as demandas entre setores (12/11/2026; comando/_demandas.html, a prévia aprovada em
    docs/mockups/demandas-entre-setores). Uma superfície só (a lista e o detalhe), sem faixa colorida na linha: o prazo é o

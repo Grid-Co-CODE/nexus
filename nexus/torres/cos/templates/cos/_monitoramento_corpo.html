@@ -25,7 +25,7 @@
     <span class="d">o número delas pode estar parado</span></span>
 </div>
 
-<form class="cn-filtros" method="get" action="{{ raiz }}/t/cos/monitoramento">
+<form class="cn-filtros" method="get" action="{{ raiz }}/t/cos/monitoramento" data-fo>
   {% if grupo %}<input type="hidden" name="situacao" value="{{ grupo }}">{% endif %}
   <label class="cn-filtro-par"><span class="gc-rotulo">Cliente</span>
   <select class="gc-campo" name="cliente" onchange="this.form.submit()">

@@ -71,7 +71,7 @@
 
   {# o filtro é da página desde 29/10/2026 (static/cos/normalizacoes.js): as linhas do mês vêm todas, e escolher um filtro
      só mostra e esconde, refaz a faixa e troca o endereço, sem ir ao servidor. O mês continua indo ao servidor. #}
-  <form class="cn-filtros cos-norm-filtros" method="get" id="cos-norm-filtros">
+  <form class="cn-filtros cos-norm-filtros" method="get" id="cos-norm-filtros" data-fo="local">
     <input type="hidden" name="mes" value="{{ mes }}">
     {% if p.com_andamento %}<label class="cn-filtro-par"><span class="gc-rotulo">Situação</span>
     <select class="gc-campo" name="situacao">
@@ -106,7 +106,11 @@
     <a class="gc-btn gc-btn--ui cos-norm-csv" href="{{ url(formato='csv') }}" data-norm-csv download><i class="ph ph-download-simple" aria-hidden="true"></i> Exportar CSV</a>
   </form>
   {% set filtrado = cliente or usina or status or busca or operador or tecnico or falha or situacao %}
-  <div class="cn-chips"{% if not filtrado %} hidden{% endif %} data-norm-limpar-caixa><a href="{{ url(cliente=None, usina=None, status=None, q=None, criado_por=None, tecnico=None, falha=None, situacao=None) }}" data-norm-limpar>Limpar os filtros</a></div>
+  {# os filtros no padrão do Histórico de OS (12/11/2026, Levi: "Para todas as abas do COS que tiver filtro, eu quero esse
+     padrão"): o static/filtros-os.js monta a barra, o painel com as listas digitáveis, o Aplicar e as etiquetas com as
+     <select> deste formulário #}
+  <script src="{{ url_for('static', filename='filtros-os.js') }}"></script>
+  <div class="cn-chips"{% if not filtrado %} hidden{% endif %} data-norm-limpar-caixa data-fo-some><a href="{{ url(cliente=None, usina=None, status=None, q=None, criado_por=None, tecnico=None, falha=None, situacao=None) }}" data-norm-limpar>Limpar os filtros</a></div>
 
   {% if p.todos %}
   <div class="cn-tab cos-tab"><table>

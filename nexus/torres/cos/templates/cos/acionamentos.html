@@ -41,7 +41,7 @@
   {% for c, erro, velha in p.erros %}<div class="cn-erro{% if velha %} cn-aviso{% endif %}" role="alert"><b>{{ c }}: {{ erro }}.</b>
     {% if velha %}A tela mostra a última leitura boa.{% else %}A UC, o canal e os chamados deste cliente ficam de fora agora.{% endif %}</div>{% endfor %}
 
-  <form class="cn-filtros" method="get">
+  <form class="cn-filtros" method="get" data-fo>
     <label class="cn-filtro-par"><span class="gc-rotulo">Cliente</span>
     <select class="gc-campo" name="cliente" onchange="this.form.submit()">
       <option value="">Todos</option>{% for c, n in p.clientes %}<option value="{{ c }}"{% if c == cliente %} selected{% endif %}>{{ c }} ({{ n }})</option>{% endfor %}
@@ -52,6 +52,10 @@
     </select></label>
     <input class="gc-campo" type="search" name="q" value="{{ busca }}" placeholder="Usina, cidade ou código" aria-label="Buscar usina">
   </form>
+  {# os filtros no padrão do Histórico de OS (12/11/2026, Levi: "Para todas as abas do COS que tiver filtro, eu quero esse
+     padrão"): o static/filtros-os.js monta a barra, o painel com as listas digitáveis, o Aplicar e as etiquetas com as
+     <select> deste formulário #}
+  <script src="{{ url_for('static', filename='filtros-os.js') }}"></script>
 
   <div class="cn-numeros">
     <span><span class="gc-rotulo">Usinas</span><span class="v">{{ p.resumo.usinas }}</span>

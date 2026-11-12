@@ -29,6 +29,10 @@
       <br>Andamento da Ronda COS<br><span id="cos-mon-lido">{% if lido %}lido às <b>{{ lido }}</b>{% endif %}</span></div>
   </div>
   <div id="cos-mon-corpo">{% include "cos/_monitoramento_corpo.html" %}</div>
+  {# os filtros no padrão do Histórico de OS (12/11/2026, Levi: "Para todas as abas do COS que tiver filtro, eu quero esse
+     padrão"): o static/filtros-os.js monta a barra, o painel com as listas digitáveis, o Aplicar e as etiquetas com as
+     <select> deste formulário #}
+  <script src="{{ url_for('static', filename='filtros-os.js') }}"></script>
 </div>
 <div class="cos-dica" id="cos-dica" role="tooltip" hidden></div>
 <script src="{{ url_for('static', filename='cos/monitoramento.js') }}" defer></script>

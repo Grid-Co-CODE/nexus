@@ -507,6 +507,19 @@ dela (na 1ª vez em cada navegador; o login pelo passe do Nexus é o passo segui
   `static/cos/fluido.css` e `fluido.js`): o topo e o menu parados e só o miolo troca (view transitions), e a tela do link
   em que o mouse para é buscada antes do clique (speculation rules). Nunca o que baixa arquivo, o `parcial` ou o videowall.
 
+## Os filtros do COS no padrão do Histórico de OS (12/11/2026)
+
+Levi: "Para todas as abas do COS que tiver filtro, eu quero esse padrão" (o do Histórico de OS do OS Creator: "o mesmo
+estilo, as mesmas funcionalidades [...] Não é só um cartão suspenso"). Toda tela do COS com `<select>` de filtro usa o
+componente do Nexus (`static/filtros-os.js`; a regra e as funções estão em `nexus/casca/CLAUDE.md`): o formulário leva
+`data-fo` e o script vem logo depois. Ocorrências (`normalizacoes.html`) é `data-fo="local"`: o `cos/normalizacoes.js`
+continua filtrando na página pelo `change` das `<select>`, que agora só chega no Aplicar. Prazos da R04, OS em aberto,
+Acionamentos, Parede de eventos e Monitoramento vão ao servidor no Aplicar. No Monitoramento o script fica na
+`monitoramento.html` (o corpo trocado a cada 30 s é montado de novo sozinho) e o painel aberto segura a troca do corpo
+(`monitoramento.js`, `emUso`). As visões (`cn-seg`: mês, período, janela) e as pílulas com a contagem (`cn-chips`)
+continuam como estão: são atalhos de um clique, não listas. **Tela nova com `<select>` de filtro já nasce com `data-fo`**
+(o `tests/test_filtros_os.py` cobra).
+
 ## Regras desta torre
 
 - Prazo e meta (15 min, 30 min, horários de ronda) são **dado**, e não número solto no código: um só lugar, com o

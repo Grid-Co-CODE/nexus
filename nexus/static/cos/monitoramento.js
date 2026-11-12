@@ -12,6 +12,9 @@
 
   function emUso() {
     var a = document.activeElement;
+    // o painel dos Filtros aberto também segura a troca do corpo (12/11/2026, static/filtros-os.js): a lista não some
+    // no meio da escolha
+    if (corpo.querySelector(".fo-painel:not([hidden])")) { return true; }
     return !!(a && corpo.contains(a) && /^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName));
   }
 

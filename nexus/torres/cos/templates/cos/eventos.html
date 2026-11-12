@@ -27,7 +27,7 @@
   {% for c, erro, velha in erros %}<div class="cn-erro" role="alert"><b>{{ c }}: {{ erro }}.</b>
     {% if velha %}Os eventos dele são os da última leitura boa.{% else %}Os eventos dele ficam de fora.{% endif %}</div>{% endfor %}
 
-  <form class="cn-filtros" method="get">
+  <form class="cn-filtros" method="get" data-fo>
     <div class="cn-seg" aria-label="Janela">
       {% for j in janelas %}<a href="{{ url(janela=j) }}"{% if j == p.janela %} aria-current="page"{% endif %}>Últimas {{ '7 dias' if j == '7d' else j.replace('h', ' h') }}</a>{% endfor %}
     </div>
@@ -39,6 +39,10 @@
     {% endif %}
     {% for k in ('janela', 'problema', 'situacao') %}{% if request.args.get(k) %}<input type="hidden" name="{{ k }}" value="{{ request.args.get(k) }}">{% endif %}{% endfor %}
   </form>
+  {# os filtros no padrão do Histórico de OS (12/11/2026, Levi: "Para todas as abas do COS que tiver filtro, eu quero esse
+     padrão"): o static/filtros-os.js monta a barra, o painel com as listas digitáveis, o Aplicar e as etiquetas com as
+     <select> deste formulário #}
+  <script src="{{ url_for('static', filename='filtros-os.js') }}"></script>
 
   <div class="cn-chips" aria-label="Situação">
     <a href="{{ url(situacao=None) }}"{% if not situacao %} aria-current="page"{% endif %}>Todas<b>{{ p.total }}</b></a>

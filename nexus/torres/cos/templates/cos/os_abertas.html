@@ -54,7 +54,7 @@
       <span class="d">pendentes há mais de {{ p.horas_para_alerta }} h, sem ninguém assumir</span></span>
   </div>
 
-  <form class="cn-filtros" method="get">
+  <form class="cn-filtros" method="get" data-fo>
     <input type="hidden" name="situacao" value="{{ situacao }}">
     {% if sem_registro %}<input type="hidden" name="sem_registro" value="1">{% endif %}
     <label class="cn-filtro-par"><span class="gc-rotulo">Cliente</span>
@@ -71,6 +71,10 @@
     </select></label>
     <input class="gc-campo" type="search" name="q" value="{{ busca }}" placeholder="Nº da OS, usina ou ativo" aria-label="Buscar OS">
   </form>
+  {# os filtros no padrão do Histórico de OS (12/11/2026, Levi: "Para todas as abas do COS que tiver filtro, eu quero esse
+     padrão"): o static/filtros-os.js monta a barra, o painel com as listas digitáveis, o Aplicar e as etiquetas com as
+     <select> deste formulário #}
+  <script src="{{ url_for('static', filename='filtros-os.js') }}"></script>
 
   <div class="cn-chips" aria-label="Recorte">
     <a href="{{ url(sem_registro=None if sem_registro else '1') }}"{% if sem_registro %} aria-current="page"{% endif %}>Só sem registro na Ronda COS<i>{{ p.resumo.sem_registro }}</i></a>

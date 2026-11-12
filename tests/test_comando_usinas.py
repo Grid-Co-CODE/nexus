@@ -150,13 +150,14 @@ def test_a_lista_e_o_prontuario(logado, telas, monkeypatch):
     assert 'data-dica-usina="Altair" data-dica-motivo="Crítico: Desligamento"' in html
     assert ">ALT100<" in html and ">THPN-ALT100<" not in html                   # só o código da UFV
     assert 'href="/t/comando/usinas/1"' in html and ">ALT100<" in html
-    assert '<input type="checkbox" value="Thopen" checked>' in html            # o filtro do endereço já vem marcado
+    assert '<option value="Thopen" selected>' in html                           # o filtro do endereço já vem marcado
     # 12/11/2026 (o modelo do Histórico de OS): o cliente filtra a tabela no servidor; a faixa segue com todas
     tabela = html.split("data-cmu-tabela", 1)[1]
     assert ">Coração 1<" not in tabela and "Coração 1:" in html.split("data-cmu-tabela", 1)[0]
-    assert "data-cmu-fl" in html and "cmu-fl-procura" in html and "data-cmu-busca" in html
+    # os filtros no padrão do Nexus (static/filtros-os.js): o formulário com `data-fo` e as listas de marcar
+    assert "data-fo" in html and "filtros-os.js" in html and "data-cmu-busca" in html
     for nome in ("cliente", "responsavel", "estado", "meta", "conformidade"):
-        assert f'data-nome="{nome}"' in html
+        assert f'name="{nome}" multiple' in html
     assert "1 extintor vencido" in html and ">sem luvas<" in html
     # o prontuário, no próprio Comando, com a Central da usina em leitura
     from nexus.campo import responsaveis as R
