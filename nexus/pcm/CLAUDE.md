@@ -1241,8 +1241,9 @@ para usar:
   `dados_cifrados` não se passa pronto. Na recontagem (`recontagem_pedida` e `recontagem_item_pedida`), o módulo põe também
   a cópia para o técnico, `motivo_tecnico` (`motivo_para_o_tecnico`; a prova do contrato com o App é `motivo_do_tecnico`).
   Ela é cifrada com a `NEXUS_PESSOA_HMAC`, não com a chave do cadastro, e fica vazia sem ela. A recontagem antiga ganha a
-  cópia na gravação seguinte, pelo `dados_cifrados`; o que não é cifra na coluna (o texto posto por fora) também é trocado,
-  e a cifra que já está não é refeita. Essa coluna também não se passa pronta, e nunca vai em claro: nem na tela, nem no log,
+  cópia na gravação seguinte, pelo `dados_cifrados`, e a cifra que já está não é refeita. O que não é cifra na coluna (o
+  texto posto por fora) é trocado pela cifra quando dá (a recontagem com o motivo que se abre, e a chave do técnico); quando
+  não dá, ou fora da recontagem, sai da coluna (não é publicado de novo), e a qualidade conta (`motivo_tecnico_em_claro_tirado`). Essa coluna também não se passa pronta, e nunca vai em claro: nem na tela, nem no log,
   nem em controle. A qualidade conta as recontagens abrindo a cópia: `com` (o App abre), `nao_abre` (a cifra de outra chave),
   `sem` (vazia) e a marca `motivo_tecnico_sem_chave`. `motivo=`, nome, e-mail, `dados` que não é dicionário ou
   `dados_cifrados` como coluna é `ValueError` (erro de quem chama); o `dados` de outro formato já no livro lê como `{}` e não

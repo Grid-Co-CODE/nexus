@@ -986,3 +986,21 @@ def test_a_trava_nao_depende_de_decifrar(rq, monkeypatch):
     with pytest.raises(Conflito):
         _aceitar(rq, falso, A_RANK_A)
     assert len(falso.saidas) == 1
+
+
+
+# ── a re-revisão 2 do item 6, N6: o zero à esquerda e o document com mais de um número ──────────────────────────────
+
+@pytest.mark.parametrize("os_,texto", [("018524", "OS 18524"), ("18524", "OS 018524"), ("018524", "OS0018524"),
+                                       ("OT-2026-4522", "OS 4522"), ("4522-1", "OS 4522"), ("4522-1", "saída 1")])
+def test_a_os_sem_zero_a_esquerda_e_cada_numero_do_document(os_, texto):
+    """A OS compara sem os zeros à esquerda, dos dois lados ("018524" acha a 18524), e o `document` da requisição com mais de
+    um número procura cada um: na dúvida, uma recusa a mais para o PCM conferir, nunca uma saída em dobro (o ruling)."""
+    movs = [{"id_item": "2", "referencia": texto, "documento": "", "tipo": 5, "folio": "M1", "quando": "q"}]
+    assert E.primeira_com_a_os(movs, os_, ["2"]) == {"folio": "M1", "quando": "q"}, (os_, texto)
+
+
+@pytest.mark.parametrize("os_,texto", [("18524", "OS 185240"), ("018524", "OS 118524"), ("4522", "OS 45221")])
+def test_o_zero_a_esquerda_nao_acha_outro_numero(os_, texto):
+    movs = [{"id_item": "2", "referencia": texto, "documento": "", "tipo": 5, "folio": "M1", "quando": "q"}]
+    assert E.primeira_com_a_os(movs, os_, ["2"]) is None, (os_, texto)

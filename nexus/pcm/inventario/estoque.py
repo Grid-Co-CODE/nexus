@@ -288,34 +288,41 @@ def mapa_das_pecas(linhas) -> dict[str, dict[str, str]]:
     return out
 
 
-def numero_da_os(os_) -> str:
-    """O número da OS para procurar no histórico: só os dígitos quando o texto tem um número só ("OT-4522" é a 4522); sem
-    dígito, ou com mais de um número, o texto inteiro."""
+def numeros_da_os(os_) -> list[str]:
+    """Os números da OS para procurar no histórico: cada número do texto, sem os zeros à esquerda ("OT-4522" é a 4522,
+    "018524" é a 18524, "OT-2026-4522" procura o 2026 e o 4522); sem dígito nenhum, o texto inteiro. Com mais de um número,
+    qualquer um que case trava (a re-revisão 2 do item 6, N6: na dúvida, uma recusa a mais para o PCM conferir, nunca uma
+    saída em dobro)."""
     alvo = str(os_ or "").strip()
-    numeros = re.findall(r"[0-9]+", alvo)
-    return numeros[0] if len(numeros) == 1 else alvo
+    numeros = [n.lstrip("0") or "0" for n in re.findall(r"[0-9]+", alvo)]
+    if numeros:
+        return list(dict.fromkeys(numeros))
+    return [alvo] if alvo else []
 
 
 def primeira_com_a_os(movimentos, os_, ids_itens) -> dict | None:
     """O 1º movimento (`{"id_item", "referencia", "documento", "tipo", "folio", "quando"}`) de uma das peças que é a Saída Geral
     da OS: a saída GENERAL (tipo 5) com o número da OS no `documento` ou na `referencia`. `{"folio", "quando"}` ou None. A regra
     que o adaptador e o falso dividem.
-    - O número vale colado em letra ("OS4522", "OT-4522", "ref 4522/2026") e nunca dentro de outro número (14522, 45221): a
-      fronteira é só por dígito (a re-revisão do item 6, C1: "OS4522" passava, e a saída saía em dobro).
+    - O número vale colado em letra ("OS4522", "OT-4522", "ref 4522/2026"), com zeros à esquerda dos dois lados ("OS 018524"
+      é a 18524) e nunca dentro de outro número (14522, 45221): a fronteira é só por dígito (a re-revisão do item 6, C1:
+      "OS4522" passava, e a saída saía em dobro). O `document` da requisição com mais de um número procura cada um
+      (`numeros_da_os`).
     - Só a saída GENERAL conta (ruling do coordenador, a re-revisão, N1): a saída ligada (4, WORK_ORDER: a do Nexus ou a da tela
       "Ordem de Serviço") é de OUTRA requisição da mesma OS, que esta não entregou; a compra, a devolução, a transferência e o
       ajuste não tiram a peça pela OS. A linha que vem SEM o tipo conta: na dúvida, a OS na referência basta, para não dar
       saída em dobro (o pior que acontece é uma recusa a mais para o PCM conferir)."""
-    alvo = numero_da_os(os_)
+    alvos = numeros_da_os(os_)
     ids = {str(i) for i in ids_itens or () if str(i).strip()}
-    if not alvo or not ids:
+    if not alvos or not ids:
         return None
-    borda = r"[0-9]" if alvo.isdigit() else r"[0-9A-Za-z]"
-    numero = re.compile(rf"(?<!{borda}){re.escape(alvo)}(?!{borda})")
+    padroes = [re.compile(rf"(?<![0-9])0*{re.escape(a)}(?![0-9])") if a.isdigit()
+               else re.compile(rf"(?<![0-9A-Za-z]){re.escape(a)}(?![0-9A-Za-z])") for a in alvos]
     for m in movimentos:
         if m.get("tipo") not in (TIPO_SAIDA_GERAL, None) or str(m.get("id_item") or "") not in ids:
             continue
-        if numero.search(str(m.get("documento") or "")) or numero.search(str(m.get("referencia") or "")):
+        textos = (str(m.get("documento") or ""), str(m.get("referencia") or ""))
+        if any(p.search(t) for p in padroes for t in textos):
             return {"folio": str(m.get("folio") or ""), "quando": m.get("quando")}
     return None
 

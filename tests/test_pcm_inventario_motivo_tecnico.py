@@ -298,3 +298,46 @@ def test_a_qualidade_separa_o_que_abre_o_que_nao_abre_e_o_sem_chave(cfg):
     assert sem["motivo_tecnico_sem_chave"] == 1 and sem["recontagem_sem_motivo_tecnico"] == 1
     # a da outra chave não é refeita (já preenchida), e abre com a chave dela
     assert F.motivo_do_tecnico(outra, ev[0]) == "da outra chave" and F.motivo_do_tecnico(cfg, ev[0]) == ""
+
+
+
+# ── a re-revisão do motivo, N1: o texto em claro que não se recifra não é republicado ───────────────────────────────
+
+@pytest.mark.parametrize("tipo,dados_json,com_chave", [
+    ("peca_tirada", '{"motivo": "da peça tirada"}', True),          # fora da recontagem: a coluna não é dela
+    ("recontagem_pedida", '["x"]', True),                             # o dados fora do formato: nada a recifrar
+    ("recontagem_pedida", '{"outro": "campo"}', True),               # sem o motivo
+    ("recontagem_pedida", '{"motivo": "o de verdade"}', False),      # sem a chave do técnico neste Nexus
+])
+def test_o_texto_em_claro_que_nao_se_recifra_sai_da_coluna(cfg, tipo, dados_json, com_chave):
+    """Quem tem o token de escrita põe texto em claro na `motivo_tecnico`, e o módulo não consegue trocá-lo pela cifra: a
+    gravação seguinte o tira (a coluna fica vazia) em vez de republicá-lo (a qualidade conta o caso: o teste abaixo)."""
+    _linha_velha(cfg, tipo, dados_json, motivo_tecnico="texto em claro posto por fora")
+    c = cfg if com_chave else {k: v for k, v in cfg.items() if k != "NEXUS_PESSOA_HMAC"}
+    F.acrescentar(c, F.ABA_EVENTO, [_ev("contagem_recebida", contagem_id="C-2")])
+    assert not _eventos(cfg)[0].get("motivo_tecnico")
+    assert "texto em claro" not in Path(cfg["NEXUS_ALMOX_INVENTARIO_ARQUIVO"]).read_text(encoding="utf-8")
+
+
+def test_a_qualidade_conta_o_texto_tirado(app):
+    """No banco (falso), a qualidade da gravação que tirou o texto em claro o conta no `extra`."""
+    api = ApiPGFalsa(como_texto=True)
+    app.extensions["nexus_dados_sessao"] = api
+    cfg = {"GRIDCO_DB_API": BASE, "GRIDCO_SQL_TOKEN": "tk", "NEXUS_CHAVE_CADASTRO": gerar_chave(),
+           "NEXUS_PESSOA_HMAC": CHAVE_HMAC}
+    F.limpar()
+    try:
+        with app.app_context():
+            F.acrescentar(cfg, F.ABA_EVENTO, [_ev("peca_tirada", dados={"motivo": "x"})])
+            linhas = api.linhas(F.LIVRO, F.ABA_EVENTO)
+            # quem tem o token põe texto na coluna: aqui, pelo próprio banco falso
+            api._id(F.LIVRO, F.ABA_EVENTO)["linhas"][0]["values"][F.CAB_EVENTO.index("motivo_tecnico")] = "texto em claro"
+            assert linhas
+            F.limpar()
+            F.acrescentar(cfg, F.ABA_EVENTO, [_ev("contagem_recebida", contagem_id="C-2")])
+            q = {l["fato"]: l for l in api.linhas(F.LIVRO, "qualidade")}["evento_inventario"]
+            assert json.loads(q["extra"])["motivo_tecnico_em_claro_tirado"] == 1
+            assert api.linhas(F.LIVRO, F.ABA_EVENTO)[0]["motivo_tecnico"] in (None, "")
+    finally:
+        app.extensions.pop("nexus_dados_sessao", None)
+        F.limpar()

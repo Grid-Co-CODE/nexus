@@ -393,19 +393,28 @@ def _abre(aead, l: dict) -> bool:
         return False
 
 
-def _com_o_motivo_tecnico(cfg, eventos: list[dict]) -> None:
+def _com_o_motivo_tecnico(cfg, eventos: list[dict]) -> int:
     """O retroativo, na montagem de cada gravação (o livro é trocado inteiro): a recontagem que está sem a cópia para o
-    técnico a ganha, com o motivo tirado do `dados_cifrados` (a chave do cadastro). A que já tem não é recifrada, e o
-    `dados_cifrados` não muda. Sem a NEXUS_PESSOA_HMAC, ou sem como abrir o motivo, a coluna segue vazia."""
+    técnico a ganha, com o motivo tirado do `dados_cifrados` (a chave do cadastro). A que já tem a cifra não é recifrada, e o
+    `dados_cifrados` não muda. Sem a NEXUS_PESSOA_HMAC, ou sem como abrir o motivo, a coluna segue vazia. O que está na
+    coluna e não é a cifra (o texto em claro posto por quem tem o token de escrita) é trocado pela cifra quando dá; quando não
+    dá, ou fora da recontagem, sai da coluna, e não é publicado de novo (a re-revisão do motivo, N1). Devolve quantos saíram,
+    para a qualidade."""
     aead = _aead_do_tecnico(cfg)
-    if aead is None:
-        return
+    tirados = 0
     for l in eventos:
-        if l.get("tipo") not in TIPOS_MOTIVO_TECNICO or _tem_motivo_tecnico(l):
+        recontagem = l.get("tipo") in TIPOS_MOTIVO_TECNICO
+        if recontagem and _tem_motivo_tecnico(l):
             continue
-        cifra = _cifrar_para_o_tecnico(aead, l.get("evento_id"), decifrar(cfg, ABA_EVENTO, l).get("motivo"))
+        cifra = None
+        if recontagem and aead is not None:
+            cifra = _cifrar_para_o_tecnico(aead, l.get("evento_id"), decifrar(cfg, ABA_EVENTO, l).get("motivo"))
         if cifra:
             l["motivo_tecnico"] = cifra
+        elif not _vazio(l.get("motivo_tecnico")):
+            l["motivo_tecnico"] = None
+            tirados += 1
+    return tirados
 
 
 # ── a linha que entra ─────────────────────────────────────────────────────────────────────────────────────────
@@ -552,18 +561,19 @@ def _pct(n: int, total: int):
     return round(100.0 * n / total, 1) if total else None
 
 
-def linha_qualidade(aba: str, linhas: list[dict], agora: str, cfg=None) -> list:
+def linha_qualidade(aba: str, linhas: list[dict], agora: str, cfg=None, tirados: int = 0) -> list:
     """A linha da aba `qualidade` no cabeçalho da casa (`fatos.CAB_QUALIDADE`), preenchida pelo nome da coluna: quanto do
     fato liga a data, a usina e a pessoa (a Governança mostra as barras), quantas usinas ligaram pela de-para (a única
     linhagem que o almoxarifado tem) e, no `extra`, quantos de cada tipo de evento ou decisão (só número e texto: a tela
     não mostra o que é lista). No evento, as recontagens pela cópia do motivo para o técnico (`_conta_do_tecnico`, com o
-    `cfg` da gravação)."""
+    `cfg` da gravação) e os textos em claro que a gravação tirou da cópia (`tirados`)."""
     cab, n = CABS[aba], len(linhas)
     com = {c: sum(1 for l in linhas if not _vazio(l.get(c))) for c in ("data_id", "usina_id", "pessoa_id") if c in cab}
     quando = "quando" if aba == ABA_EVENTO else "decidida_em"
     if aba == ABA_EVENTO:
         extra = {f"tipo_{t}": sum(1 for l in linhas if l.get("tipo") == t) for t in TIPOS_EVENTO}
         extra.update(_conta_do_tecnico(cfg or {}, linhas))
+        extra["motivo_tecnico_em_claro_tirado"] = tirados
     elif aba == ABA_CURADORIA:
         extra = {f"decisao_{d}": sum(1 for l in linhas if l.get("decisao") == d) for d in DECISOES_CURADORIA}
     else:
@@ -606,7 +616,7 @@ def acrescentar(cfg, aba: str, linhas: list[dict]) -> None:
         except Exception as ex:      # noqa: BLE001
             raise Recusada(f"Não consegui ler o livro do inventário no banco ({type(ex).__name__}): nada foi gravado, "
                            "para não apagar o que já está lá.") from ex
-        _com_o_motivo_tecnico(cfg, cru[ABA_EVENTO])
+        tirados = _com_o_motivo_tecnico(cfg, cru[ABA_EVENTO])
         if aba == ABA_EVENTO:
             vistos = {str(x.get("evento_id")) for x in cru[ABA_EVENTO]}
             for n in novas:
@@ -615,7 +625,7 @@ def acrescentar(cfg, aba: str, linhas: list[dict]) -> None:
                 vistos.add(n["evento_id"])
         cru[aba] = cru[aba] + novas
         iso = _iso(agora)
-        q = [linha_qualidade(a, cru[a], iso, cfg) for a in ABAS_FATO]
+        q = [linha_qualidade(a, cru[a], iso, cfg, tirados if a == ABA_EVENTO else 0) for a in ABAS_FATO]
         total = sum(len(cru[a]) for a in ABAS_FATO)
         _gravar_cru(cfg, cru, q, [iso, _maquina(), round(_relogio() - t0, 1), total, COMO_LER])
         # o que acabou de ser lido (e gravado) vale como a leitura de agora: a tela não volta ao banco em seguida; e a
