@@ -65,6 +65,13 @@ TORRE = Torre(
              "Quem da performance está com o quê, o que atrasou e o que vem por aí?",
              "OS do Fracttal das pessoas do setor Performance (Base → Acessos → Pessoas e setores)",
              do_setor=SID.PERFORMANCE),
+        # Coletas (11/11/2026, Levi: "Quero uma aba na performance do nexus de controle de coleta! monte com base no .exe"):
+        # o Conversor Grid Co. do backoffice dentro do Nexus, com o BD lido do banco e o mapa de fórmulas que a coleta sobe
+        # (nexus/performance/coletas/CLAUDE.md); a saída segue sendo a planilha para colar, nada vai ao BD por aqui
+        Tela("coletas", "Coletas",
+             "O que este relatório de portal, SCADA ou datalogger traz que ainda falta no BD, e onde colar?",
+             "os arquivos que a pessoa solta; BD_Performance e BD_Thopen do banco (com o mapa de fórmulas da coleta) ou "
+             "o Excel solto junto; o relatório de furos gerado fora"),
         # O nome de cada fonte por extenso, de fontes.NOMES (Levi, 09/10/2026: "Quero as fontes por extenso também, não só sigla")
         Tela("clima", "Clima e risco",
              f"Onde há aviso do {F.extenso('inmet')}, foco de queimada ou risco de fogo perto das usinas?",
@@ -212,6 +219,7 @@ def plataforma(caminho: str):
 from . import clima_tela  # noqa: E402,F401
 # Mapa de risco (07/10/2026): a mesma leitura do Clima e risco, num mapa do Brasil (/t/performance/clima/mapa).
 from . import mapa_tela  # noqa: E402,F401
+from . import coletas_tela  # noqa: E402,F401
 
 
 # ── Quadro da equipe (04/11/2026) ───────────────────────────────────────────────────────────────────────────────────

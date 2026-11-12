@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% from "_explica.html" import explica %}
+{% block titulo %}{{ tela.nome }}{% endblock %}
+{% block classe_conteudo %}conteudo--moldura{% endblock %}
+{# Coletas (11/11/2026, Levi: "Quero uma aba na performance do nexus de controle de coleta! monte com base no .exe"): o
+   Conversor Grid Co. do backoffice dentro do Nexus. A página do Conversor (coletas_app.html, GERADA a partir da tela do
+   .exe) roda na moldura, com o CSS dela; aqui, só o título com o "!" e a moldura. Regra: nexus/performance/coletas/. #}
+{% block conteudo %}
+<div class="coletas-casca">
+  <div class="gc-titulo-explica coletas-titulo"><h1 class="titulo-pagina">{{ tela.nome }}</h1>
+  {% call explica('Entenda esta tela') %}
+    <p><b>Para que serve.</b> Você solta os relatórios de portal, SCADA ou datalogger que hoje se digitam à mão; a tela
+      reconhece a fonte e a usina pelo conteúdo e devolve a planilha pronta para colar no BD_Performance ou no BD_Thopen.
+      É o Conversor Grid Co. do backoffice, dentro do Nexus.</p>
+    <p><b>De onde vem o BD.</b> Do banco, da última subida da coleta (a hora está no botão de cada BD), com o mapa das
+      células que são fórmula, que sobe junto. Sem o mapa, o BD do banco não é usado, porque a tela poderia escrever por
+      cima de uma fórmula: solte o BD em Excel junto com os arquivos, ou clique no botão do BD.</p>
+    <p><b>O que entra.</b> Só o que está vazio no BD ou o que vem a mais (dia parcial); 0 nunca cobre dado; fórmula não se
+      toca; só dia fechado. O que foi digitado no Excel depois da última subida não está no banco: confira esses dias antes
+      de colar.</p>
+    <p><b>O que não faz.</b> Não grava no BD nem no banco: a saída é a planilha para colar. Os arquivos que você solta ficam
+      só durante a sua conversão; o formato que a tela não conhece fica guardado para o Levi ensinar o leitor.</p>
+  {% endcall %}</div>
+  <iframe class="os-moldura coletas-moldura" title="{{ tela.nome }}" src="{{ url_for('torre_performance.coletas_app') }}"></iframe>
+</div>
+{% endblock %}

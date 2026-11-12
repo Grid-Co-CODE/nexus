@@ -1,0 +1,850 @@
+<!doctype html>
+<html lang="pt-BR" data-tema="escuro">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Coletas · Nexus</title>
+{# GERADO por ferramentas/portar_tela_conversor.py a partir do ui/index.html do Conversor Grid Co. (o .exe): não edite
+   aqui, mude o .exe e rode `python ferramentas/sincronizar_conversor.py`. #}
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{{ url_for('static', filename='nexus.css') }}">
+<script>window.NX = {base: {{ url_for('torre_performance.coletas')|tojson }}};</script>
+{% raw %}
+<style>
+  /* Tema navy da Grid Co.; cor só para estado (semáforo). Sem animação. */
+  /* As cores e a fonte são as do Nexus (os dois temas; nexus.css, ligado acima): a tela do .exe tinha o navy fixo.
+     Os nomes do .exe apontam para os do Nexus; a página segue o tema da casca de quem abriu (o script no fim). */
+  :root{--sup:var(--superficie);--txt:var(--tinta);--mut:var(--mudo);--fra:var(--fraco);--borda:var(--linha-forte);
+        --borda2:var(--linha-forte);--leve:var(--alerta);--sev:var(--severo);--err:var(--critico)}
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:var(--fundo);color:var(--txt);font-family:var(--font-sans);font-size:13px}
+  body{display:flex;flex-direction:column}
+  button{font:inherit;color:inherit;cursor:pointer}
+  select{font:inherit}
+  /* Coluna central (Levi, 11/11/2026: "quero tudo bem centralizado, quando eu expando ainda fica torto para a
+     esquerda"): o conteúdo tinha max-width sem margem automática e as barras começavam na borda esquerda. As barras
+     seguem de ponta a ponta (o fundo), mas o que vai nelas entra na mesma coluna das três telas; --lado é o recuo que
+     alinha a barra com o conteúdo (o .pad tem 16px por dentro) */
+  :root{--col:1600px;--lado:max(16px,calc((100% - var(--col)) / 2 + 16px))}
+  .top{display:flex;align-items:center;gap:12px;padding:10px var(--lado);background:var(--barra);border-bottom:1px solid var(--linha);flex-wrap:wrap}
+  .logo{font-weight:700;font-size:15px;display:flex;align-items:center;gap:8px}.marca{width:22px;height:22px}.logo span{color:var(--verde-texto)}
+  .pill{border:1px solid var(--borda);border-radius:12px;padding:3px 10px;color:var(--mut);font-size:12px;background:none}
+  .pill b{color:var(--txt);font-weight:600}
+  button.pill:hover{border-color:var(--borda2)}
+  .dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;vertical-align:middle;background:var(--fra)}
+  .dot.g{background:var(--ok)}.dot.r{background:var(--err)}.dot.y{background:var(--leve)}
+  .upd{margin-left:auto;background:var(--verde);color:var(--sobre-verde);border:0;border-radius:4px;padding:6px 12px;font-weight:600}
+  .steps{display:flex;padding:0 var(--lado);border-bottom:1px solid var(--linha);background:var(--barra)}
+  .steps button{background:none;border:0;border-bottom:2px solid transparent;padding:9px 16px;color:var(--fra)}
+  .steps button.on{color:var(--txt);border-bottom-color:var(--verde);font-weight:600}
+  .steps button:disabled{cursor:default;opacity:.6}
+  main{flex:1;overflow:auto}
+  .pad{padding:16px;display:flex;flex-direction:column;gap:10px;max-width:var(--col);width:100%;margin:0 auto}
+  .drop{border:1.5px dashed var(--borda2);border-radius:8px;padding:28px;text-align:center;color:var(--mut);cursor:pointer}
+  .drop:hover,.drop.on{border-color:var(--verde)}
+  .drop b{color:var(--txt);font-size:16px;display:block;margin-bottom:4px}
+  .drop a{color:var(--verde-texto);cursor:pointer;text-decoration:underline}
+  .file{background:var(--sup);border-radius:6px;padding:10px 12px;border-left:3px solid var(--ok);display:grid;grid-template-columns:1.5fr 1.3fr 1.6fr .8fr 24px;gap:12px;align-items:center}
+  .file.wait{border-left-color:var(--borda2)}.file.ask{border-left-color:var(--leve)}.file.bad{border-left-color:var(--err)}.file.sep{border-left-color:var(--fra)}
+  .nm{font-weight:600;word-break:break-all}.nm small{display:block;color:var(--fra);font-weight:400}
+  .k{color:var(--fra);font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;display:block}
+  .ok{color:var(--ok);font-weight:600}.lv{color:var(--leve);font-weight:600}.sv{color:var(--sev);font-weight:600}.er{color:var(--err);font-weight:600}
+  .mut{color:var(--mut)}.f{color:var(--fra)}
+  .x{background:none;border:0;color:var(--fra);font-size:16px;padding:0}
+  .x:hover{color:var(--txt)}
+  .q{grid-column:1/-1;background:var(--fundo);border:1px solid var(--borda);border-radius:6px;padding:10px 12px}
+  .q b{display:block;margin-bottom:8px;font-weight:600}
+  .chips{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+  .chip{background:none;border:1px solid var(--borda2);border-radius:4px;padding:5px 10px}
+  .chip:hover{border-color:var(--txt)}
+  .chip.best{border-color:var(--verde-texto);color:var(--verde-texto)}
+  .sel{border:1px solid var(--borda);border-radius:4px;padding:5px 8px;background:var(--sup);color:var(--txt);min-width:200px}
+  .btn{background:var(--verde);color:var(--sobre-verde);border:0;border-radius:4px;padding:8px 18px;font-weight:600}
+  .btn:disabled{opacity:.4;cursor:default}
+  .btn2{background:none;border:1px solid var(--borda);border-radius:4px;padding:7px 14px}
+  .btn2:hover{border-color:var(--borda2)}
+  .row{display:flex;justify-content:space-between;align-items:center;gap:10px}
+  .vazio{color:var(--fra);text-align:center;padding:20px}
+  /* tela 2 */
+  .body2{display:grid;grid-template-columns:1fr 300px;min-height:100%;max-width:var(--col);width:100%;margin:0 auto}
+  .body2 .right{border-right:1px solid var(--linha)}
+  .main2{padding:14px;display:flex;flex-direction:column;gap:12px;min-width:0}
+  .kpis{display:grid;grid-template-columns:repeat(6,1fr);gap:8px}
+  .kpi{background:var(--sup);border-radius:6px;padding:9px 11px}
+  .kpi .n{font-size:22px;font-weight:600}.kpi .t{color:var(--mut);font-size:11.5px}
+  .box{background:var(--sup);border-radius:6px;padding:11px;min-width:0}
+  .box h4{margin:0 0 9px;font-size:13px;display:flex;justify-content:space-between;gap:10px}
+  .box h4 span{color:var(--mut);font-weight:400;font-size:11.5px}
+  .rol{overflow-x:auto}
+  table{width:100%;border-collapse:collapse}
+  td,th{padding:6px 7px;text-align:left;border-bottom:1px solid var(--linha);white-space:nowrap}
+  th{color:var(--fra);font-weight:500;font-size:11.5px}
+  /* passar o mouse NÃO escurece a linha (Levi, 10/11/2026): só uma borda verde Grid; a linha escolhida ganha a
+     marca verde na ponta, sem segundo tom de fundo */
+  #tabela tr{cursor:pointer}
+  #tabela tr:hover td{box-shadow:inset 0 1px 0 var(--verde),inset 0 -1px 0 var(--verde)}
+  #tabela tr.on td:first-child{box-shadow:inset 3px 0 0 var(--verde)}
+  #tabela tr.on:hover td:first-child{box-shadow:inset 3px 0 0 var(--verde),inset 0 1px 0 var(--verde),inset 0 -1px 0 var(--verde)}
+  .grid td{text-align:right;font-variant-numeric:tabular-nums}.grid td:first-child{text-align:left;color:var(--mut)}
+  .grid th{text-align:right}.grid th:first-child{text-align:left}
+  .amar{background:var(--alerta-cheio);color:var(--sobre-cheio);font-weight:600}
+  .grade{overflow:auto;max-height:52vh;border:1px solid var(--linha);border-radius:4px}
+  .grade thead th{position:sticky;top:0;background:var(--sup);z-index:1}
+  /* a Data fica parada ao rolar para o lado: com 20+ inversores a pessoa perdia de que dia era a linha */
+  .grade tbody td:first-child{position:sticky;left:0;background:var(--sup);z-index:1}
+  .grade thead th:first-child{left:0;z-index:2}
+  /* largura pelo conteúdo: com 100% o Chrome redistribui a sobra e uma coluna inchava depois do clique */
+  .grade table.grid{width:auto;margin:0 auto}
+  /* "marc" e não "sel": .sel é o seletor da tela 1 (min-width 200px) e inchava a coluna selecionada */
+  .grid td.c{cursor:cell;user-select:none}
+  /* conferência célula a célula: a cor é o que aconteceu com o valor (semáforo) */
+  .grid td.e-igual{color:var(--ok)}.grid td.e-mantido{color:var(--sev)}.grid td.e-fora{color:var(--err)}
+  .grid td.e-formula{color:var(--fra);font-style:italic}
+  .resumo{margin:12px 0 6px;font-size:12.5px}.resumo b{color:var(--txt)}
+  .legenda{color:var(--fra);font-size:11.5px;margin-bottom:6px}
+  .legenda i{font-style:normal}.legenda .ok{font-weight:400}.legenda .sv{font-weight:400}.legenda .er{font-weight:400}
+  .grid td.c:hover{box-shadow:inset 0 0 0 1px var(--verde)}
+  .grid td.marc{background:var(--verde-suave);box-shadow:inset 0 0 0 1px var(--verde)}
+  .grid td.amar.marc{background:var(--alerta-cheio);box-shadow:inset 0 0 0 2px var(--verde),inset 0 0 0 3px var(--fundo)}
+  .bloco-tit{color:var(--mut);font-size:12px;margin:10px 0 6px}.bloco-tit:first-child{margin-top:0}
+  .bloco-tit b{color:var(--txt)}
+  .bloco-tit{display:flex;align-items:center;gap:10px}
+  .bloco-tit .btn2{padding:3px 10px;font-size:12px;color:var(--txt);margin-left:auto}
+  .toast{position:fixed;bottom:42px;left:50%;transform:translateX(-50%);background:var(--sup);border:1px solid var(--verde);padding:7px 14px;border-radius:4px;font-size:12.5px;z-index:9}
+  .right{border-left:1px solid var(--linha);padding:14px;display:flex;flex-direction:column;gap:8px;background:var(--fundo)}
+  .lbl{color:var(--fra);font-size:11px;letter-spacing:.06em;text-transform:uppercase}
+  .av{border-left:3px solid var(--borda2);padding:7px 9px;background:var(--sup);border-radius:4px;font-size:12.5px}
+  .av b{display:block;margin-bottom:2px}
+  .av.erro{border-color:var(--err)}.av.severo{border-color:var(--sev)}.av.leve{border-color:var(--leve)}.av.info{border-color:var(--borda2)}
+  .avs{display:flex;flex-direction:column;gap:6px;overflow:auto;max-height:46vh}
+  .bk{display:block;width:100%;text-align:center;margin-top:6px}
+  .foot{display:flex;justify-content:space-between;padding:7px var(--lado);border-top:1px solid var(--linha);background:var(--barra);color:var(--fra);font-size:12px}
+  .notas{position:fixed;inset:0;background:var(--veu);display:none;align-items:center;justify-content:center}
+  .notas.on{display:flex}
+  .notas .box{max-width:560px;width:90%;padding:18px}
+  .notas ul{margin:8px 0 14px;padding-left:18px;color:var(--mut)}
+  /* Barra de rolagem fina e escura, a mesma do Nexus (nexus.css, --rolagem: a padrão do Windows (cinza
+     claro, com setas) destoava do navy (Levi, 10/11/2026: "arrume esses scrolls para ficar estilo nexus").
+     scrollbar-width não é herdada: vai em todo elemento, senão a prévia e os avisos ficavam com a barra grossa */
+  *{scrollbar-width:thin;scrollbar-color:var(--rolagem) transparent}
+  *:hover{scrollbar-color:var(--rolagem-hover) transparent}
+  ::-webkit-scrollbar{width:8px;height:8px}
+  ::-webkit-scrollbar-track,::-webkit-scrollbar-corner{background:transparent}
+  ::-webkit-scrollbar-thumb{background:var(--rolagem);border-radius:8px}
+  ::-webkit-scrollbar-thumb:hover{background:var(--rolagem-hover)}
+  ::-webkit-scrollbar-button{display:none}
+  /* ---- tela 3: furos de coleta (furos.js) — Nexus: um nível de superfície, cor só para estado, tabela centralizada */
+  .fz-topo{display:flex;align-items:flex-end;gap:10px;flex-wrap:wrap}
+  .fz-tit{font-size:16px;font-weight:600}
+  .fz-l{display:flex;flex-direction:column;gap:4px;color:var(--fra);font-size:10.5px;text-transform:uppercase;letter-spacing:.05em}
+  .fz-ctl{background:var(--fundo);border:1px solid var(--borda);border-radius:4px;color:var(--txt);padding:6px 8px;font:inherit;font-size:12.5px;text-transform:none;letter-spacing:0;min-width:0}
+  .fz-ctl:focus{outline:none;border-color:var(--borda2)}
+  .fz-ctl.on{border-color:var(--verde)}
+  .fz-ctl:disabled{opacity:.45}
+  .fz-grade{display:grid;grid-template-columns:2fr repeat(5,minmax(120px,1fr));gap:10px}
+  .fz-linha{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:12px}
+  .fz-sw{display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12.5px;user-select:none}
+  .fz-sw input{display:none}
+  .fz-sw span{width:28px;height:16px;border-radius:8px;background:var(--borda);position:relative;flex:none}
+  .fz-sw span::after{content:"";position:absolute;top:2px;left:2px;width:12px;height:12px;border-radius:50%;background:var(--mut)}
+  .fz-sw input:checked+span{background:var(--verde-a35)}
+  .fz-sw input:checked+span::after{left:14px;background:var(--verde)}
+  .fz-kpis{grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
+  .fz-kpis .kpi{text-align:center}
+  .fz-clients{display:flex;flex-wrap:wrap;gap:6px;justify-content:center}
+  .fz-chip{background:none;border:1px solid var(--borda);border-radius:14px;padding:4px 11px;font-size:12px}
+  .fz-chip:hover{border-color:var(--borda2)}
+  .fz-chip i{font-style:normal;color:var(--sev);font-weight:600}
+  .fz-chip.on{border-color:var(--verde-texto);color:var(--verde-texto)}
+  .fz-tabs{display:flex;border:1px solid var(--borda);border-radius:4px;overflow:hidden}
+  .fz-tab{background:none;border:0;padding:6px 14px;color:var(--mut)}
+  .fz-tab.on{background:var(--sup);color:var(--txt);box-shadow:inset 0 -2px 0 var(--verde)}
+  .fz-legend{display:flex;flex-wrap:wrap;gap:12px;justify-content:center;font-size:11.5px;color:var(--mut)}
+  .fz-legend span{display:inline-flex;align-items:center;gap:5px}
+  .fz-legend i{width:12px;height:12px;border-radius:2px;display:inline-block}
+  .fz-rol{overflow:auto}
+  .fz-tab-wrap{max-height:64vh;border:1px solid var(--linha);border-radius:6px}
+  #fzTb{width:auto;min-width:100%;margin:0 auto}
+  #fzTb th,#fzTb td{text-align:center;vertical-align:middle;white-space:normal}
+  #fzTb thead th{position:sticky;top:0;background:var(--sup);z-index:2;cursor:pointer;color:var(--mut);white-space:nowrap}
+  #fzTb thead th:hover{color:var(--txt)}
+  #fzTb tr.fz-cf td{padding:4px 5px;background:var(--sup)}
+  #fzTb tr.fz-cf input,#fzTb tr.fz-cf select{width:100%;min-width:70px;font:inherit;font-size:11.5px;padding:3px 5px;background:var(--fundo);border:1px solid var(--borda);border-radius:4px;color:var(--txt)}
+  #fzTb tr.fz-cf .on{border-color:var(--verde)}
+  #fzTb tr.pl{cursor:pointer}
+  #fzTb tr.pl:hover td{box-shadow:inset 0 1px 0 var(--verde),inset 0 -1px 0 var(--verde)}
+  #fzTb tr.pl td:first-child{border-left:3px solid transparent}
+  #fzTb tr.gap td:first-child{border-left-color:var(--sev)}
+  #fzTb tr.g-cr td:first-child{border-left-color:var(--err)}
+  #fzTb tr.cf td:first-child{border-left-color:var(--ok)}
+  #fzTb tr.inop td:first-child{border-left-color:var(--mut)}
+  #fzTb tr.nogap{opacity:.55}
+  #fzTb tr.nogap:hover,#fzTb tr.aberta{opacity:1}
+  .fz-falha{min-width:200px;max-width:340px}
+  .fz-ks{display:flex;flex-wrap:wrap;gap:4px;justify-content:center}
+  .fz-k{font-size:11.5px;padding:1px 8px;border-radius:10px;border:1px solid var(--borda2);color:var(--mut);white-space:nowrap;cursor:help}
+  .fz-k.k-cr{color:var(--err);border-color:color-mix(in srgb,var(--critico) 55%,transparent)}.fz-k.k-at{color:var(--sev);border-color:color-mix(in srgb,var(--severo) 45%,transparent)}
+  .fz-k.k-an{color:var(--anomalo);border-color:color-mix(in srgb,var(--anomalo) 45%,transparent)}.fz-k.k-ok{color:var(--ok);border-color:color-mix(in srgb,var(--ok) 35%,transparent)}
+  .fz-k.k-os{color:var(--esperado);border-color:color-mix(in srgb,var(--esperado) 40%,transparent)}
+  .fz-item{min-width:150px}.fz-datas{white-space:nowrap}
+  .fz-falha small{color:var(--fra)}
+  .fz-cr{color:var(--err)}.fz-an{color:var(--anomalo)}.fz-in{color:var(--mut)}.fz-okt{color:var(--ok)}
+  .fz-b{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11.5px;font-weight:600;white-space:nowrap;border:1px solid;margin:1px 0}
+  .fz-b-ok{color:var(--ok);border-color:color-mix(in srgb,var(--ok) 35%,transparent)}
+  .fz-b-cf{color:var(--ok);border-color:var(--ok);background:color-mix(in srgb,var(--ok) 10%,transparent)}
+  .fz-b-at{color:var(--sev);border-color:color-mix(in srgb,var(--severo) 50%,transparent)}
+  .fz-b-cr{color:var(--err);border-color:color-mix(in srgb,var(--critico) 60%,transparent);background:color-mix(in srgb,var(--critico) 10%,transparent)}
+  .fz-b-in{color:var(--mut);border-color:var(--borda2)}
+  .fz-bar{display:inline-block;width:56px;height:6px;background:var(--borda);border-radius:3px;overflow:hidden;vertical-align:middle;margin-right:6px}
+  .fz-bar i{display:block;height:100%;background:var(--ok)}
+  tr.fz-det>td{background:var(--fundo);padding:12px 14px}
+  .fz-tools{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:center;margin:6px 0}
+  .fz-sm{padding:4px 10px;font-size:12px}
+  .fz-it{width:auto;margin:8px auto;border:1px solid var(--linha)}
+  .fz-it th,.fz-it td{text-align:center;white-space:normal;font-size:12px;vertical-align:middle}
+  .fz-sug{color:var(--verde-texto);font-size:12px;max-width:260px}
+  .fz-os{margin:6px 0}.fz-os summary{cursor:pointer;color:var(--mut);font-size:12px;text-align:center}
+  .fz-hm{border-collapse:separate;border-spacing:2px;width:auto;margin:6px auto}
+  .fz-hm td,.fz-hm th{padding:0;border:0;text-align:center;font-size:10px;color:var(--fra);white-space:nowrap}
+  .fz-hm th{width:18px}
+  .fz-hm td.l{text-align:right;padding-right:8px;font-size:12px;color:var(--mut)}
+  .fz-hm td.c{width:18px;height:16px;border-radius:3px}
+  .s-o{background:color-mix(in srgb,var(--ok) 45%,transparent)}.s-v{background:var(--err)}.s-x{background:var(--critico-escuro)}.s-z{background:var(--sev)}
+  .s-d{background:var(--leve)}.s-p{background:var(--borda2)}.s-a{background:var(--anomalo)}.s-e{background:var(--esperado)}
+  .s-w{background:transparent;outline:1px dashed var(--borda2);outline-offset:-1px}
+  .s-c{background:repeating-linear-gradient(135deg,var(--ok) 0 3px,transparent 3px 6px);outline:1px solid var(--ok);outline-offset:-1px}
+  .s-i{background:repeating-linear-gradient(135deg,var(--mut) 0 3px,transparent 3px 6px);outline:1px solid var(--mut);outline-offset:-1px}
+  .lg-at{background:var(--sev)}.lg-cr{background:var(--err)}.lg-cf{background:var(--ok)}.lg-in{background:var(--mut)}
+  .fz-vazio{color:var(--fra);padding:24px}
+  .fz-nota{font-size:11.5px;text-align:center}
+  @media (max-width:1100px){.fz-grade{grid-template-columns:repeat(3,1fr)}}
+  /* observação de status (ETM com buraco etc.): canto laranja na célula, como o comentário do Excel; o texto no mouse */
+  .grid td.obs{background-image:linear-gradient(225deg,var(--sev) 7px,transparent 7px)}
+  .nm .bruto{color:var(--verde-texto);cursor:pointer;text-decoration:underline;font-weight:400}
+  /* dado bruto: o arquivo como veio, separado em colunas */
+  .bruto-box{width:92vw;max-width:1400px;height:86vh;display:flex;flex-direction:column;gap:8px}
+  .bruto-box .grade{flex:1;max-height:none}
+  .bruto-box table.grid td{text-align:left;color:var(--txt)}
+  .bruto-box table.grid td:first-child,.bruto-box table.grid th:first-child{color:var(--fra);text-align:right}
+  .bruto-box table.grid th{text-align:left}
+  .bruto-top{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .bruto-top .sel{min-width:0}
+  [hidden]{display:none!important}
+</style>
+</head>
+<body>
+  <div class="top">
+    <span class="pill" title="a versão do motor do Conversor Grid Co. que esta tela usa">Conversor <b id="versao">-</b></span>
+    <button class="pill" id="bd-perf" title="Clique para usar um Excel do BD no lugar do banco"><span class="dot"></span>BD_Performance <b>lendo…</b></button>
+    <button class="pill" id="bd-thopen" title="Clique para usar um Excel do BD no lugar do banco"><span class="dot"></span>BD_Thopen <b>lendo…</b></button>
+    <button class="upd" id="upd" hidden></button>
+  </div>
+  <div class="steps">
+    <button id="aba1" class="on">1 · Arquivos</button>
+    <button id="aba2" disabled>2 · Resultado</button>
+    <button id="aba3">3 · Furos de coleta</button>
+  </div>
+
+  <main>
+    <section id="tela1">
+      <div class="pad">
+        <div class="drop" id="drop"><b>Solte os arquivos aqui</b>ou clique para escolher · <a id="pasta">escolher uma pasta</a> · xlsx, xls, csv, zip, tar.gz · um ou vários de uma vez · o BD_Performance ou o BD_Thopen em Excel solto junto entra no lugar do banco</div>
+        <div class="av erro" id="bd-aviso" hidden></div>
+        <div id="lista"></div>
+        <div class="vazio" id="semarq">Nenhum arquivo ainda. O app reconhece a fonte e a usina pelo conteúdo; se não tiver certeza, pergunta.</div>
+        <div class="row">
+          <span class="mut" id="contagem"></span>
+          <span><button class="btn2" id="limpar">Limpar</button> <button class="btn" id="converter" disabled>Converter</button></span>
+        </div>
+      </div>
+    </section>
+
+    <section id="tela2" hidden>
+      <div class="body2">
+        <div class="main2">
+          <div class="kpis" id="kpis"></div>
+          <div class="box">
+            <h4>Conferência por aba do BD <span>só entra o que está vazio no BD ou o que vem a mais · 0 nunca cobre dado · fórmula não se toca · só dia fechado</span></h4>
+            <div class="rol"><table>
+              <thead><tr><th>Aba</th><th>BD</th><th>Fonte</th><th>Período</th><th>Colar em</th><th>Dias</th><th>Células</th><th>Trocas</th><th>Fora</th><th>Situação</th></tr></thead>
+              <tbody id="tabela"></tbody>
+            </table></div>
+          </div>
+          <div class="box" id="previa-box">
+            <h4><span style="color:var(--txt);font-weight:600;font-size:13px" id="previa-tit">Prévia</span><span>clique numa célula para copiar · segure o botão do mouse e arraste para copiar várias · amarelo = valor novo</span></h4>
+            <div id="previa"></div>
+            <div class="f" id="previa-nota" style="margin-top:6px"></div>
+          </div>
+        </div>
+        <div class="right">
+          <div class="row"><span class="lbl" id="av-tit">Avisos</span><button class="x" id="av-info" style="font-size:11.5px"></button></div>
+          <div class="avs" id="avisos"></div>
+          <div class="box" style="margin-top:auto">
+            <h4>Planilha pronta</h4>
+            <div id="saidas"></div>
+            <button class="btn2 bk" id="nova">Nova conversão</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="tela3" hidden>
+      <div class="pad fz">
+        <div class="fz-topo">
+          <div><div class="fz-tit">Furos de coleta de geração</div><div class="f" id="fzSub"></div></div>
+          <span style="flex:1"></span>
+          <label class="fz-l">Mês de análise<select id="fzMes" class="fz-ctl"></select></label>
+          <button class="btn2" id="fzNovo" title="Volta para o relatório mais novo que subiu ao Nexus">Mais novo no Nexus</button>
+          <button class="btn2" id="fzAbrir">Abrir relatório…</button>
+        </div>
+        <div class="f" id="fzOrigem"></div>
+        <div class="vazio" id="fzErro" hidden></div>
+        <div id="fzCorpo" hidden style="display:flex;flex-direction:column;gap:10px">
+          <div class="box">
+            <div class="fz-grade">
+              <label class="fz-l">Buscar usina<input type="search" id="fzQ" class="fz-ctl" placeholder="nome da usina…"></label>
+              <label class="fz-l">Cliente<select id="fzCli" class="fz-ctl"></select></label>
+              <label class="fz-l">Carteira (Thopen)<select id="fzCart" class="fz-ctl"></select></label>
+              <label class="fz-l">Fonte<select id="fzSrc" class="fz-ctl"><option value="">Todas</option><option>BD_Performance</option><option>BD_Thopen</option></select></label>
+              <label class="fz-l">Status da usina<select id="fzSt" class="fz-ctl"></select></label>
+              <label class="fz-l">Situação<select id="fzSit" class="fz-ctl"><option value="">Todas (falhas em destaque)</option><option value="falha">Falha pendente</option><option value="conf">Confirmado OK</option><option value="ok">Sem falha</option><option value="os">Com ausência esperada por OS/ticket</option><option value="noos">Com parada sem OS (atenção)</option><option value="ipoa">Sem IPOA pendente</option><option value="ghi">Sem GHI pendente</option><option value="inop">Com equipamento inoperante</option><option value="inv">Inversor com furo pendente</option></select></label>
+            </div>
+            <div class="fz-linha">
+              <label class="fz-sw"><input type="checkbox" id="fzZero" checked><span></span>Contar zerado como furo</label>
+              <label class="fz-sw"><input type="checkbox" id="fzOS" checked><span></span>OS/ticket de desligamento = ausência esperada</label>
+              <label class="fz-sw"><input type="checkbox" id="fzConf" checked><span></span>Confirmados contam como OK</label>
+              <span style="flex:1"></span>
+              <span class="f" id="fzContagem"></span>
+              <button class="btn2" id="fzLimpar" disabled>Limpar filtros</button>
+            </div>
+          </div>
+          <div class="kpis fz-kpis" id="fzKpis"></div>
+          <div class="lbl" style="text-align:center">Resumo por cliente · usinas com falha pendente / total · clique para filtrar</div>
+          <div class="fz-clients" id="fzClients"></div>
+          <div class="row" style="flex-wrap:wrap">
+            <div class="fz-tabs"><button class="fz-tab on" data-t="res">Resumo por usina</button><button class="fz-tab" data-t="det">Detalhe por equipamento</button></div>
+            <span><button class="btn2 fz-sm" id="fzCsv">Exportar CSV</button> <button class="btn2 fz-sm" id="fzExp">Exportar confirmações</button> <button class="btn2 fz-sm" id="fzImp">Importar confirmações</button> <button class="btn2 fz-sm" id="fzHtml">Salvar HTML com as marcações</button></span>
+          </div>
+          <div class="fz-legend" id="fzLegend"></div>
+          <div class="fz-rol fz-tab-wrap"><table id="fzTb"><thead></thead><tbody></tbody></table></div>
+          <div class="f fz-nota">Critério: célula = equipamento × dia. Vazio = sem valor na planilha; zerado = 0 enquanto os demais inversores geraram (ou IPOA/GHI 0 com geração). No mês corrente, os 2 últimos dias totalmente em branco na usina são tratados como coleta pendente (defasagem), não falha. As confirmações ficam salvas neste computador; "Exportar confirmações" gera o confirmacoes_furos.json para o gerador embutir. · <span id="fzNconf"></span></div>
+        </div>
+      </div>
+    </section>
+  </main>
+  <div class="foot"><span id="status">Pronto.</span><span id="pasta-saida"></span></div>
+  <div class="toast" id="toast" hidden></div>
+
+  <div class="notas" id="bruto"><div class="box bruto-box">
+    <div class="bruto-top"><b id="bruto-tit">Dado bruto</b><select class="sel" id="bruto-arq" hidden></select><select class="sel" id="bruto-aba" hidden></select>
+      <span style="flex:1"></span><span class="f" id="bruto-info"></span>
+      <button class="btn2" id="bruto-ant">Anterior</button><button class="btn2" id="bruto-prox">Próxima</button><button class="btn2" id="bruto-fechar">Fechar</button></div>
+    <div class="grade"><table class="grid" id="bruto-tab"></table></div>
+    <div class="f">O arquivo como veio, uma coluna por campo (no CSV, pelo separador do próprio arquivo). Só leitura: nada aqui vai para o BD.</div>
+  </div></div>
+
+  <div class="notas" id="notas"><div class="box">
+    <h4 id="notas-tit">Versão nova</h4>
+    <div class="mut">O que muda:</div>
+    <ul id="notas-lista"></ul>
+    <div class="row"><span class="f">O app fecha, instala e abre de novo sozinho.</span>
+      <span><button class="btn2" id="notas-nao">Agora não</button> <button class="btn" id="notas-sim">Atualizar</button></span></div>
+  </div></div>
+
+{% endraw %}<script src="{{ url_for('static', filename='coletas/furos.js') }}"></script>{% raw %}
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const nf = (v, d) => (v === null || v === undefined || v === "") ? "" :
+  (typeof v === "number" ? v.toLocaleString("pt-BR", {maximumFractionDigits: d ?? 3}) : esc(v));
+const tam = b => b >= 1048576 ? (b/1048576).toLocaleString("pt-BR",{maximumFractionDigits:1}) + " MB" :
+  Math.max(1, Math.round(b/1024)) + " KB";
+// ---- a ponte com o servidor do Nexus (no .exe era o Python da janela; ver ferramentas/portar_tela_conversor.py)
+const NX_BASE = window.NX.base;
+const TETO_ENVIO = 25 * 1024 * 1024;        // o teto de envio do Nexus, por pedido (um arquivo por pedido)
+const CHAVE_CONF = "nexus.coletas.furos.conf";
+async function nxPost(metodo, args, auto) {
+  const h = {"Content-Type": "application/json", "Accept": "application/json"};
+  if (auto) h["X-Nexus-Auto"] = "1";        // a pergunta do estado não conta como uso da pessoa
+  const r = await fetch(NX_BASE + "/api/" + metodo, {method: "POST", credentials: "same-origin", headers: h,
+                                                       body: JSON.stringify({args: args || []})});
+  let d = null; try { d = await r.json(); } catch (e) {}
+  if (r.status === 401) {
+    try { if (d && d.sessao_encerrada && parent.nexusEntrarDeNovo) parent.nexusEntrarDeNovo(d.entrar); } catch (e) {}
+    throw new Error("a sessão do Nexus acabou: entre de novo");
+  }
+  if (!r.ok && !(d && d.erro)) throw new Error("O Nexus respondeu " + r.status + ".");
+  return d;
+}
+function escolher(o) {
+  return new Promise(ok => {
+    const i = document.createElement("input");
+    i.type = "file"; i.multiple = !!o.multiple; if (o.accept) i.accept = o.accept;
+    if (o.pasta) { i.webkitdirectory = true; i.multiple = true; }
+    i.onchange = () => ok([...(i.files || [])]);
+    i.addEventListener("cancel", () => ok([]));
+    i.click();
+  });
+}
+function baixarBlob(nome, blob) {
+  const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = nome;
+  document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+}
+async function enviar(lista) {
+  if (!lista.length) return;
+  const lote = await nxPost("novo_lote", []);
+  const tops = new Set(), grandes = [];
+  let i = 0;
+  for (const {file, rel} of lista) {
+    i++; $("#status").textContent = `Enviando ${i} de ${lista.length}: ${rel}`;
+    if (file.size > TETO_ENVIO) { grandes.push(rel); continue; }
+    const fd = new FormData();
+    fd.append("lote", lote); fd.append("rel", rel); fd.append("modificado", file.lastModified || ""); fd.append("arquivo", file, file.name);
+    const r = await fetch(NX_BASE + "/arquivo", {method: "POST", credentials: "same-origin", body: fd});
+    if (!r.ok) { let d = null; try { d = await r.json(); } catch (e) {} toast("Não consegui enviar " + rel + (d && d.erro ? ": " + d.erro : "")); continue; }
+    tops.add(rel.split("/")[0]);
+  }
+  if (grandes.length) toast(`Ficou de fora (mais de 25 MB, o teto do Nexus): ${grandes.join(", ")}`);
+  aplicarEstado(await nxPost("lote_pronto", [lote, [...tops]]));
+  vigiar();
+}
+async function lerEntrada(ent, pref, out) {
+  if (ent.isFile) { const f = await new Promise((ok, no) => ent.file(ok, no)); out.push({file: f, rel: pref + f.name}); return; }
+  if (!ent.isDirectory) return;
+  const rd = ent.createReader();
+  for (;;) {
+    const lote = await new Promise((ok, no) => rd.readEntries(ok, no));
+    if (!lote.length) break;
+    for (const x of lote) await lerEntrada(x, pref + ent.name + "/", out);
+  }
+}
+function aplicarEstado(e) {
+  if (!e || e.erro) { if (e && e.erro) $("#status").textContent = "Erro: " + e.erro; return; }
+  app.bds(e.bds, e.bd_pronto);
+  app.cards.clear(); app.cartoes(e.itens || []);
+}
+let vigiaT = null;
+function vigiar() {
+  clearTimeout(vigiaT);
+  vigiaT = setTimeout(async () => {
+    let e = null;
+    try { e = await nxPost("estado", [], true); } catch (x) { $("#status").textContent = x.message; return; }
+    aplicarEstado(e);
+    if (!e.bd_pronto || (e.itens || []).some(c => c.estado === "identificando")) vigiar();
+    else $("#status").textContent = "Pronto.";
+  }, 900);
+}
+function lerConf() { try { return JSON.parse(localStorage.getItem(CHAVE_CONF) || "{}") || {}; } catch (e) { return {}; } }
+async function furosLer(r) { const d = await r.json(); if (d && !d.erro) d.conf = lerConf(); return d; }
+const WEB = {
+  async escolher_arquivos() { await enviar((await escolher({multiple: true})).map(f => ({file: f, rel: f.name}))); return true; },
+  async escolher_pasta() { await enviar((await escolher({pasta: true})).map(f => ({file: f, rel: f.webkitRelativePath || f.name}))); return true; },
+  async escolher_bd(destino) {
+    const fs = await escolher({accept: ".xlsx,.xlsm"});
+    // o servidor reconhece o BD pelo nome: "BD_Performance · <arquivo>" entra no lugar do banco
+    if (fs.length) await enviar([{file: fs[0], rel: destino + " · " + fs[0].name}]);
+    return nxPost("estado", []);
+  },
+  abrir() { return true; },
+  mostrar_pasta() { return true; },
+  atualizar() { return {erro: "no Nexus a versão é a do servidor"}; },
+  async furos_carregar() { return furosLer(await fetch(NX_BASE + "/furos", {credentials: "same-origin"})); },
+  async furos_mais_novo() { return WEB.furos_carregar(); },
+  async furos_abrir() {
+    const fs = await escolher({accept: ".html,.htm"});
+    if (!fs.length) return null;
+    const fd = new FormData(); fd.append("arquivo", fs[0], fs[0].name);
+    return furosLer(await fetch(NX_BASE + "/furos", {method: "POST", credentials: "same-origin", body: fd}));
+  },
+  furos_gravar_conf(c) { try { localStorage.setItem(CHAVE_CONF, JSON.stringify(c || {})); } catch (e) {} return true; },
+  furos_salvar(nome, texto) { baixarBlob(nome, new Blob([texto], {type: nome.endsWith(".csv") ? "text/csv" : "application/json"})); return nome; },
+  async furos_importar() {
+    const fs = await escolher({accept: ".json"});
+    if (!fs.length) return null;
+    try { const j = JSON.parse(await fs[0].text()); return j && j.conf ? j.conf : j; } catch (e) { toast("O arquivo não é um JSON de confirmações"); return null; }
+  },
+  async furos_salvar_html(caminho, conf) {
+    const r = await fetch(NX_BASE + "/furos/html", {method: "POST", credentials: "same-origin",
+      headers: {"Content-Type": "application/json"}, body: JSON.stringify({conf})});
+    const nome = caminho || "Furos_Coleta_Performance.html";
+    baixarBlob(nome, await r.blob());
+    return nome;
+  },
+};
+const API = new Proxy({}, {get: (_, m) => WEB[m] || ((...a) => nxPost(m, a))});
+const api = () => API;
+
+const app = {
+  cards: new Map(), res: null, atual: null, mostrarInfo: false,
+
+  cartoes(lista) { for (const c of lista) this.cards.set(c.id, c); this.desenhar(); },
+
+  // o BD vem do banco (a subida do coletor) ou do Excel que a pessoa soltou; sem nenhum, a faixa diz por quê
+  bds(lista, pronto) {
+    const erros = [];
+    for (const b of lista) {
+      const el = b.destino === "BD_Performance" ? $("#bd-perf") : $("#bd-thopen");
+      const lendo = pronto === false;
+      el.querySelector(".dot").className = "dot " + (lendo ? "y" : b.lido ? "g" : "r");
+      el.querySelector("b").textContent = lendo ? "lendo do banco…" : !b.lido ? "sem BD — usar um Excel" :
+        (b.origem === "banco" ? "banco · subida de " : "Excel · ") + b.lido_em;
+      el.title = (b.caminho || "") + (b.erro ? "\n" + b.erro : "") + "\nClique para usar um Excel do BD no lugar do banco";
+      if (!lendo && !b.lido && b.erro) erros.push(b.destino + ": " + b.erro);
+    }
+    $("#bd-aviso").hidden = !erros.length;
+    $("#bd-aviso").innerHTML = erros.map(e => `<div>${esc(e)}</div>`).join("");
+  },
+
+  chegando(a) {
+    const u = $("#upd");
+    u.hidden = false; u.disabled = true;
+    u.textContent = "Versão " + a.versao + " chegando pelo OneDrive…";
+  },
+
+  atualizando(a) {
+    $("#status").textContent = "Atualizando para a versão " + a.versao + "… o app fecha e abre de novo sozinho.";
+    toast("Atualizando para a versão " + a.versao + " — o app fecha e abre de novo sozinho");
+  },
+
+  atualizacao(a) {
+    const u = $("#upd");
+    u.hidden = false; u.disabled = false;
+    u.textContent = "Atualizar para " + a.versao + (a.notas && a.notas.length ? " — " + a.notas[0].slice(0, 60) : "");
+    $("#notas-tit").textContent = "Versão " + a.versao;
+    $("#notas-lista").innerHTML = (a.notas || []).map(n => "<li>" + esc(n) + "</li>").join("") || "<li>Melhorias e correções.</li>";
+  },
+
+  desenhar() {
+    const l = $("#lista");
+    const cs = [...this.cards.values()];
+    $("#semarq").hidden = cs.length > 0;
+    l.innerHTML = cs.map(c => this.card(c)).join("");
+    const prontos = cs.filter(c => c.estado === "ok").length;
+    // usina em aberto não trava (Levi, 10/11/2026: "quando não sabe a usina não precisa apontar usina"): converte
+    // em "Sem usina"; só o formato desconhecido segura o Converter
+    const semUsina = cs.filter(c => c.estado === "pergunta_usina").length;
+    const perg = cs.filter(c => c.estado === "desconhecido").length;
+    const lendo = cs.filter(c => c.estado === "identificando").length;
+    $("#contagem").textContent = cs.length ? `${prontos} de ${cs.length} prontos` +
+      (semUsina ? ` · ${semUsina} sem usina` : "") +
+      (perg ? ` · ${perg} formato${perg > 1 ? "s" : ""} desconhecido${perg > 1 ? "s" : ""}` : "") +
+      (lendo ? ` · ${lendo} identificando` : "") : "";
+    $("#converter").disabled = !(prontos + semUsina > 0 && perg === 0 && lendo === 0);
+    l.querySelectorAll("[data-usina]").forEach(b => b.onclick = () => this.usina(+b.dataset.id, b.dataset.usina));
+    l.querySelectorAll("select[data-outra]").forEach(s => s.onchange = () => s.value && this.usina(+s.dataset.id, s.value));
+    l.querySelectorAll("[data-separar]").forEach(b => b.onclick = () => this.separar(+b.dataset.id,
+      (l.querySelector(`select[data-fonte="${b.dataset.id}"]`) || {}).value || ""));
+    l.querySelectorAll("select[data-fonte]").forEach(s => s.onchange = () => s.value && this.separar(+s.dataset.fonte, s.value));
+    l.querySelectorAll("[data-bruto]").forEach(b => b.onclick = () => bruto.abrir(+b.dataset.bruto));
+    l.querySelectorAll("[data-remover]").forEach(b => b.onclick = async () => {
+      await api().remover(+b.dataset.remover); this.cards.delete(+b.dataset.remover); this.desenhar(); });
+  },
+
+  card(c) {
+    const nm = `<div class="nm">${esc(c.nome)}<small>${tam(c.tamanho)}${c.membros > 1 ? " · " + c.membros + " arquivos dentro" : ""}${c.estado !== "identificando" ? ' · <a class="bruto" data-bruto="' + c.id + '">ver dado bruto</a>' : ""}</small></div>`;
+    const x = `<button class="x" title="Tirar da lista" data-remover="${c.id}">×</button>`;
+    if (c.estado === "identificando")
+      return `<div class="file wait">${nm}<div><span class="k">Fonte</span><span class="mut">lendo o arquivo…</span></div>
+        <div><span class="k">Usina</span><span class="f">—</span></div><div class="mut">identificando</div>${x}</div>`;
+    if (c.estado === "recusado")
+      return `<div class="file ask">${nm}<div><span class="k">Fonte</span>${esc(c.fonte)}</div>
+        <div><span class="k">Não serve</span><span class="lv">${esc(c.recusa)}</span></div><div class="lv">fica de fora</div>${x}</div>`;
+    if (c.estado === "separado")
+      return `<div class="file sep">${nm}<div><span class="k">Fonte</span><span class="f">formato novo${c.fonte ? "" : ""}</span></div>
+        <div><span class="k">Separado em</span><span class="f" title="${esc(c.separado_para || "")}">${esc((c.separado_para || "").split("\\").slice(-2).join("\\"))}</span></div><div class="f">separado para o Levi</div>${x}</div>`;
+    if (c.estado === "desconhecido") {
+      const ops = (c.fontes_conhecidas || []).map(f => `<option>${esc(f)}</option>`).join("");
+      return `<div class="file bad">${nm}<div><span class="k">Fonte</span><span class="er">formato que não conheço</span></div>
+        <div><span class="k">Usina</span><span class="f">—</span></div><div class="er">pergunta</div>${x}
+        <div class="q"><b>Não reconheci o formato${c.erro ? " (" + esc(c.erro) + ")" : ""}. De qual fonte é? O arquivo vai para a pasta do Levi com a fonte no nome, para ele ensinar o app a ler esse layout.</b>
+        <div class="chips"><select class="sel" data-fonte="${c.id}"><option value="">escolher fonte…</option>${ops}</select>
+        <button class="chip" data-separar data-id="${c.id}">Não sei / formato novo — separar para o Levi</button></div></div></div>`;
+    }
+    const fonte = `<div><span class="k">Fonte</span>${esc(c.fonte)}${c.detalhe ? `<span class="f"> · ${esc(c.detalhe)}</span>` : ""}</div>`;
+    if (c.estado === "pergunta_usina") {
+      // sem sugestão de usina: quando o app não sabe, não aponta (Levi, 10/11/2026); a escolha é opcional
+      const todas = [...(c.todas_abas && c.todas_abas.length ? c.todas_abas : c.candidatas || [])]
+        .sort((a, b) => a.localeCompare(b, "pt-BR")).map(u => `<option>${esc(u)}</option>`).join("");
+      return `<div class="file ask">${nm}${fonte}<div><span class="k">Usina${c.periodo ? " · " + esc(c.periodo) : ""}</span><span class="lv">não identificada</span></div>
+        <div class="lv">sem usina</div>${x}
+        <div class="q"><b>Não sei de qual usina é${c.pergunta ? " (" + esc(c.pergunta.replace(/\.$/, "")) + ")" : ""}. Converte assim mesmo: os valores vão por dia numa aba "Sem usina", para você colar onde quiser.</b>
+        <div class="chips"><span class="f">Se souber:</span><select class="sel" data-outra data-id="${c.id}"><option value="">escolher aba do BD (opcional)…</option>${todas}</select></div></div></div>`;
+    }
+    const us = (c.usinas || []).join(", ");
+    return `<div class="file">${nm}${fonte}<div><span class="k">Usina${c.periodo ? " · " + esc(c.periodo) : ""}</span>${esc(us) || '<span class="f">—</span>'}</div>
+      <div class="ok">identificado</div>${x}</div>`;
+  },
+
+  async usina(id, aba) { const c = await api().responder_usina(id, aba); if (c) this.cartoes([c]); },
+  async separar(id, fonte) { const c = await api().separar(id, fonte); if (c) this.cartoes([c]); },
+
+  async converter() {
+    $("#converter").disabled = true;
+    $("#status").textContent = "Convertendo…";
+    const t0 = performance.now();
+    const r = await api().converter();
+    if (r.erro) { $("#status").textContent = "Erro: " + r.erro; $("#converter").disabled = false; return; }
+    this.res = r;
+    const s = ((performance.now() - t0) / 1000).toLocaleString("pt-BR", {maximumFractionDigits: 1});
+    $("#status").textContent = `Pronto às ${r.hora} · ${r.totais.arquivos || 0} arquivo(s) em ${s} s`;
+    $("#pasta-saida").textContent = r.pasta;
+    $("#aba2").disabled = false;
+    this.resultado();
+    this.tela(2);
+    this.desenhar();
+  },
+
+  resultado() {
+    const r = this.res, t = r.totais;
+    const k = (n, txt, cls) => `<div class="kpi"><div class="n ${cls || ""}">${(n || 0).toLocaleString("pt-BR")}</div><div class="t">${txt}</div></div>`;
+    $("#kpis").innerHTML = k(t.arquivos, "arquivos convertidos") + k(t.abas, "abas do BD com algo a colar") +
+      k(t.novo, "células para colar") + k(t.troca, "trocas de dia parcial", t.troca ? "lv" : "") +
+      k(t.fora, "fora do bloco (conferir)", t.fora ? "sv" : "") + k(t.separados, "separados para o Levi", t.separados ? "er" : "");
+    const sit = l => l.situacao === "pronto" ? '<span class="ok">pronto</span>' :
+      l.situacao === "conferir" ? '<span class="sv">conferir avisos</span>' :
+      l.situacao === "erro" ? '<span class="er">erro</span>' :
+      l.situacao === "sem_usina" ? '<span class="lv">sem usina · colar à mão</span>' :
+      `<span class="f">nada a colar${l.iguais ? " · " + l.iguais + " já iguais" : ""}</span>`;
+    const ord = [...r.tabela].sort((a, b) => (b.celulas > 0) - (a.celulas > 0));
+    $("#tabela").innerHTML = ord.map(l => `<tr data-k="${esc(l.destino + "|" + l.aba)}">
+      <td>${esc(l.aba)}</td><td class="mut">${esc(l.destino.replace("BD_", ""))}</td><td class="mut">${esc(l.fonte)}</td>
+      <td>${esc(l.bloco)}</td><td class="mut">${esc(l.colar_em)}</td><td>${l.dias || ""}</td><td>${l.celulas || ""}</td>
+      <td>${l.trocas ? '<span class="lv">' + l.trocas + "</span>" : ""}</td><td>${l.fora ? '<span class="sv">' + l.fora + "</span>" : ""}</td>
+      <td>${sit(l)}</td></tr>`).join("") || '<tr><td colspan="10" class="f">Nenhuma aba.</td></tr>';
+    $("#tabela").querySelectorAll("tr[data-k]").forEach(tr => tr.onclick = () => this.previa(tr.dataset.k));
+    const prim = ord.find(l => l.celulas > 0) || ord.find(l => r.previas[l.destino + "|" + l.aba]);
+    this.previa(prim ? prim.destino + "|" + prim.aba : null);
+    this.avisos();
+    $("#saidas").innerHTML = r.saidas.length ? r.saidas.map((s, i) => `<div style="margin-bottom:10px">
+      <div class="mut" style="word-break:break-all">${esc(s.caminho.split("\\").pop())}</div>
+      <div class="f">${s.abas} aba(s) · uma por aba do BD · Avisos no fim</div>
+      <button class="btn bk" data-abrir="${i}">Baixar a planilha</button></div>`).join("")
+      : '<div class="f">Nada a colar: tudo o que veio já está no BD (ou ficou fora — veja os avisos).</div>';
+    $("#saidas").querySelectorAll("[data-abrir]").forEach(b => b.onclick = () => { location.href = NX_BASE + "/planilha/" + r.saidas[+b.dataset.abrir].indice; });
+    $("#saidas").querySelectorAll("[data-pasta]").forEach(b => b.onclick = () => api().mostrar_pasta(r.saidas[+b.dataset.pasta].caminho));
+  },
+
+  previa(k) {
+    $("#tabela").querySelectorAll("tr").forEach(tr => tr.classList.toggle("on", tr.dataset.k === k));
+    const p = k && this.res.previas[k];
+    $("#previa-box").hidden = !p;
+    if (!p) return;
+    $("#previa-tit").textContent = "Prévia · " + k.split("|")[1];
+    // blocos para colar + a conferência célula a célula (tudo o que o arquivo trouxe e o que aconteceu com cada valor)
+    const conf = p.conferencia;
+    this.blocos = conf ? [...p.blocos, conf] : p.blocos;
+    sel.b = null;
+    const nomeE = {igual: "já igual no BD", novo: "entra", troca: "troca dia parcial", mantido: "ficou o valor do BD",
+                   fora: "ficou fora (ver avisos)", formula: "fórmula no BD, não se toca"};
+    const grade = (b, bi, ehConf) => `<div class="grade"><table class="grid" data-b="${bi}"><thead><tr><th>Data</th>${b.cab.map(h => `<th>${esc(h)}</th>`).join("")}</tr></thead>
+      <tbody>${b.linhas.map((l, r) => `<tr><td>${esc(l.data)}</td>${l.cel.map((c, ci) => {
+        const cls = "c" + (c.novo ? " amar" : "") + (ehConf && c.e && !c.novo ? " e-" + c.e : "") + (c.obs ? " obs" : "");
+        const obs = c.obs ? " · Observação: " + c.obs : "";
+        const tip = ehConf && c.e ? ` title="arquivo: ${nf(c.v)} · BD: ${c.bd === null || c.bd === undefined ? "vazio" : nf(c.bd)} — ${nomeE[c.e]}${esc(obs)}"`
+          : (c.obs ? ` title="Observação: ${esc(c.obs)}"` : "");
+        return `<td class="${cls}" data-r="${r}" data-c="${ci}"${tip}>${nf(c.v)}</td>`; }).join("")}</tr>`).join("")}</tbody></table></div>`;
+    $("#previa").innerHTML = p.blocos.map((b, bi) =>
+      `<div class="bloco-tit"><span>Bloco ${bi + 1} de ${p.blocos.length} · colar na célula <b>${esc(b.colar_em)}</b> do BD</span><button class="btn2" data-copiar-bloco="${bi}">Copiar planilha</button></div>` + grade(b, bi, false)).join("") +
+      (conf ? `<div class="resumo"><b>${esc(conf.resumo)}</b></div>
+        <div class="legenda">Conferência célula a célula (o que veio no arquivo): <i class="ok">verde</i> = já igual no BD ·
+        amarelo = entra · <i class="sv">laranja</i> = ficou o valor do BD · <i class="er">vermelho</i> = ficou fora · canto laranja = observação (dia com buraco etc.) · passe o mouse para ver o BD</div>` +
+        grade(conf, p.blocos.length, true) : "");
+    // "Copiar planilha" (Levi, 11/11/2026): o bloco inteiro de uma vez, sem arrastar — mesma cópia do arrastar
+    $("#previa").querySelectorAll("[data-copiar-bloco]").forEach(bt => bt.onclick = () => {
+      const bi = +bt.dataset.copiarBloco, b = this.blocos[bi];
+      if (!b || !b.linhas.length) return;
+      sel.b = bi; sel.a = [0, 0]; sel.z = [b.linhas.length - 1, b.cab.length - 1];
+      marcar(); copiar();
+    });
+    $("#previa-nota").textContent = "Copiar daqui leva só os valores (a cor de cada célula do BD fica como está). " +
+      "Para levar o amarelo, cole da planilha pronta." + (p.blocos.some(b => b.cortado) ? " Bloco grande: a prévia mostra até 500 linhas." : "");
+  },
+
+  avisos() {
+    const ordem = {erro: 0, severo: 1, leve: 2, info: 3};
+    const todos = [...this.res.avisos].sort((a, b) => ordem[a.nivel] - ordem[b.nivel]);
+    const info = todos.filter(a => a.nivel === "info").length;
+    const vis = todos.filter(a => this.mostrarInfo || a.nivel !== "info");
+    $("#av-tit").textContent = "Avisos · " + (todos.length - info);
+    $("#av-info").textContent = info ? (this.mostrarInfo ? "esconder informativos" : `+ ${info} informativo(s)`) : "";
+    const cls = {erro: "er", severo: "sv", leve: "lv", info: "f"};
+    $("#avisos").innerHTML = vis.map(a => `<div class="av ${a.nivel}"><b class="${cls[a.nivel]}">${esc(a.aba || (a.destino || "Arquivos"))}</b>${esc(a.texto)}</div>`).join("")
+      || '<div class="f">Nenhum aviso.</div>';
+  },
+
+  tela(n) {
+    $("#tela1").hidden = n !== 1; $("#tela2").hidden = n !== 2; $("#tela3").hidden = n !== 3;
+    $("#aba1").classList.toggle("on", n === 1); $("#aba2").classList.toggle("on", n === 2); $("#aba3").classList.toggle("on", n === 3);
+    if (n === 3) furos.abrirTela();
+  },
+
+  async iniciar() {
+    const e = await api().estado();
+    $("#versao").textContent = e.versao;
+    aplicarEstado(e);
+    if (!e.bd_pronto || (e.itens || []).some(c => c.estado === "identificando")) vigiar();
+  },
+};
+
+$("#drop").onclick = ev => { if (ev.target.id === "pasta") return; api().escolher_arquivos(); };
+$("#pasta").onclick = () => api().escolher_pasta();
+["dragenter", "dragover"].forEach(t => document.addEventListener(t, () => $("#drop").classList.add("on")));
+["dragleave", "drop"].forEach(t => document.addEventListener(t, () => $("#drop").classList.remove("on")));
+$("#converter").onclick = () => app.converter();
+$("#limpar").onclick = async () => { await api().limpar(); app.cards.clear(); app.desenhar(); };
+$("#nova").onclick = async () => { await api().limpar(); app.cards.clear(); app.res = null; $("#aba2").disabled = true; app.desenhar(); app.tela(1); };
+$("#aba1").onclick = () => app.tela(1);
+$("#aba2").onclick = () => app.res && app.tela(2);
+$("#aba3").onclick = () => app.tela(3);
+furos.iniciar();
+$("#av-info").onclick = () => { app.mostrarInfo = !app.mostrarInfo; app.avisos(); };
+$("#bd-perf").onclick = async () => aplicarEstado(await api().escolher_bd("BD_Performance"));
+$("#bd-thopen").onclick = async () => aplicarEstado(await api().escolher_bd("BD_Thopen"));
+$("#upd").onclick = () => $("#notas").classList.add("on");
+$("#notas-nao").onclick = () => $("#notas").classList.remove("on");
+$("#notas-sim").onclick = async () => {
+  $("#notas-sim").disabled = true; $("#notas-sim").textContent = "Baixando…";
+  const r = await api().atualizar();
+  if (r.erro) { $("#notas-sim").textContent = "Falhou: " + r.erro; $("#notas-sim").disabled = false; }
+};
+// dado bruto (Levi, 11/11/2026: "se eu quero converter o dado eu quero ver o dado"): o arquivo separado em colunas
+const bruto = {
+  id: null, arq: 0, aba: 0, inicio: 0, r: null,
+  async abrir(id) { this.id = id; this.arq = 0; this.aba = 0; this.inicio = 0; $("#bruto").classList.add("on"); await this.ler(); },
+  async ler() {
+    $("#bruto-info").textContent = "lendo…";
+    const r = this.r = await api().dado_bruto(this.id, this.arq, this.aba, this.inicio);
+    if (r.erro) { $("#bruto-tab").innerHTML = `<tr><td>${esc(r.erro)}</td></tr>`; $("#bruto-info").textContent = ""; return; }
+    const op = (lst, i) => lst.map((n, k) => `<option value="${k}" ${k === i ? "selected" : ""}>${esc(n)}</option>`).join("");
+    $("#bruto-arq").hidden = r.arquivos.length < 2; $("#bruto-arq").innerHTML = op(r.arquivos, r.i_arq);
+    $("#bruto-aba").hidden = r.abas.length < 2; $("#bruto-aba").innerHTML = op(r.abas, r.i_aba);
+    $("#bruto-tit").textContent = r.arquivos[r.i_arq] + (r.abas.length > 1 ? "" : "");
+    const letra = k => { let s = ""; k++; while (k) { const m = (k - 1) % 26; s = String.fromCharCode(65 + m) + s; k = Math.floor((k - 1) / 26); } return s; };
+    const cab = "<thead><tr><th></th>" + Array.from({length: r.ncol}, (_, k) => `<th>${letra(k)}</th>`).join("") + "</tr></thead>";
+    const corpo = r.linhas.map((l, i) => `<tr><td>${r.inicio + i + 1}</td>${l.map(v => `<td>${typeof v === "number" ? nf(v, 6) : esc(v)}</td>`).join("")}</tr>`).join("");
+    $("#bruto-tab").innerHTML = cab + "<tbody>" + corpo + "</tbody>";
+    const fim = Math.min(r.inicio + r.n, r.total);
+    $("#bruto-info").textContent = r.total ? `linhas ${(r.inicio + 1).toLocaleString("pt-BR")}–${fim.toLocaleString("pt-BR")} de ${r.total.toLocaleString("pt-BR")} · ${r.ncol} colunas` : "arquivo vazio";
+    $("#bruto-ant").disabled = r.inicio <= 0; $("#bruto-prox").disabled = fim >= r.total;
+    $("#bruto").querySelector(".grade").scrollTop = 0;
+  },
+};
+$("#bruto-arq").onchange = () => { bruto.arq = +$("#bruto-arq").value; bruto.aba = 0; bruto.inicio = 0; bruto.ler(); };
+$("#bruto-aba").onchange = () => { bruto.aba = +$("#bruto-aba").value; bruto.inicio = 0; bruto.ler(); };
+$("#bruto-ant").onclick = () => { bruto.inicio = Math.max(0, bruto.inicio - 500); bruto.ler(); };
+$("#bruto-prox").onclick = () => { bruto.inicio += 500; bruto.ler(); };
+$("#bruto-fechar").onclick = () => $("#bruto").classList.remove("on");
+// copiar da prévia (Levi, 10/11/2026): clique copia a célula; segurar o botão (esquerdo ou direito) e arrastar copia o
+// retângulo. Vai como texto com TAB entre colunas e vírgula decimal: o Excel em pt-BR cola número, não texto.
+const sel = {b: null, a: null, z: null, arrastando: false};
+const pos = td => [+td.dataset.r, +td.dataset.c];
+function faixa() {
+  return [Math.min(sel.a[0], sel.z[0]), Math.max(sel.a[0], sel.z[0]), Math.min(sel.a[1], sel.z[1]), Math.max(sel.a[1], sel.z[1])];
+}
+function marcar() {
+  document.querySelectorAll("#previa td.marc").forEach(td => td.classList.remove("marc"));
+  if (sel.b === null) return;
+  const [r1, r2, c1, c2] = faixa();
+  document.querySelectorAll(`#previa table[data-b="${sel.b}"] td.c`).forEach(td => {
+    const [r, c] = pos(td);
+    if (r >= r1 && r <= r2 && c >= c1 && c <= c2) td.classList.add("marc");
+  });
+}
+let toastT = null;
+function toast(t) {
+  const el = $("#toast"); el.textContent = t; el.hidden = false;
+  clearTimeout(toastT); toastT = setTimeout(() => { el.hidden = true; }, 2200);
+}
+async function copiar() {
+  const b = app.blocos[sel.b];
+  const [r1, r2, c1, c2] = faixa();
+  const txt = v => v === null || v === undefined ? "" : (typeof v === "number" ? String(v).replace(".", ",") : String(v));
+  const linhas = [];
+  for (let r = r1; r <= r2; r++) linhas.push(b.linhas[r].cel.slice(c1, c2 + 1).map(c => txt(c.v)).join("\t"));
+  const texto = linhas.join("\r\n");
+  let ok = false;
+  try { if (window.pywebview && window.pywebview.api && window.pywebview.api.copiar) ok = await api().copiar(texto); } catch (e) {}
+  if (!ok) { try { await navigator.clipboard.writeText(texto); ok = true; } catch (e) {} }
+  const n = (r2 - r1 + 1) * (c2 - c1 + 1);
+  toast(!ok ? "Não consegui copiar" : n === 1 ? `Copiado: ${txt(b.linhas[r1].cel[c1].v) || "(vazio)"}` :
+    `Copiado: ${r2 - r1 + 1} linha(s) × ${c2 - c1 + 1} coluna(s) — cole no BD com Ctrl+V`);
+}
+// Arrastar até a borda ROLA a grade e a seleção vai junto (Levi, 10/11/2026: "quando eu seleciono as células e elas
+// estão passando para o lado a seleção não passa"): a célula da ponta é a que está sob o mouse, presa à área visível
+// da grade, relida a cada passo da rolagem — o mouseover não dispara quando é a tabela que anda sob o mouse parado.
+const ponteiro = {x: 0, y: 0};
+let rolarT = null;
+const gradeSel = () => { const t = document.querySelector(`#previa table[data-b="${sel.b}"]`); return t && t.closest(".grade"); };
+function pontaSobMouse() {
+  const g = gradeSel();
+  if (!g) return;
+  const R = g.getBoundingClientRect();
+  const th = g.querySelector("thead"), c0 = g.querySelector("tbody td");
+  const topo = R.top + (th ? th.offsetHeight : 0) + 2, esq = R.left + (c0 ? c0.offsetWidth : 0) + 2;
+  const x = Math.min(Math.max(ponteiro.x, esq), R.left + g.clientWidth - 3);
+  const y = Math.min(Math.max(ponteiro.y, topo), R.top + g.clientHeight - 3);
+  const el = document.elementFromPoint(x, y);
+  const td = el && el.closest && el.closest("td.c");
+  if (!td || +td.closest("table").dataset.b !== sel.b) return;
+  const p = pos(td);
+  if (p[0] !== sel.z[0] || p[1] !== sel.z[1]) { sel.z = p; marcar(); }
+}
+function rolarNaBorda() {
+  const g = gradeSel();
+  if (!g || !sel.arrastando) return;
+  const R = g.getBoundingClientRect(), M = 40;
+  const th = g.querySelector("thead"), c0 = g.querySelector("tbody td");
+  const topo = R.top + (th ? th.offsetHeight : 0), esq = R.left + (c0 ? c0.offsetWidth : 0);
+  const dir = R.left + g.clientWidth, baixo = R.top + g.clientHeight;
+  const passo = d => Math.min(48, 6 + d / 2);
+  let dx = 0, dy = 0;
+  if (ponteiro.x > dir - M) dx = passo(ponteiro.x - (dir - M));
+  else if (ponteiro.x < esq + M && g.scrollLeft > 0) dx = -passo(esq + M - ponteiro.x);
+  if (ponteiro.y > baixo - M) dy = passo(ponteiro.y - (baixo - M));
+  else if (ponteiro.y < topo + M && g.scrollTop > 0) dy = -passo(topo + M - ponteiro.y);
+  if (dx) g.scrollLeft += dx;
+  if (dy) g.scrollTop += dy;
+  if (dx || dy) pontaSobMouse();
+}
+$("#previa").addEventListener("mousedown", e => {
+  const td = e.target.closest("td.c");
+  if (!td || (e.button !== 0 && e.button !== 2)) return;
+  e.preventDefault();
+  ponteiro.x = e.clientX; ponteiro.y = e.clientY;
+  sel.b = +td.closest("table").dataset.b; sel.a = sel.z = pos(td); sel.arrastando = true; marcar();
+  clearInterval(rolarT); rolarT = setInterval(rolarNaBorda, 30);
+});
+document.addEventListener("mousemove", e => {
+  if (!sel.arrastando) return;
+  ponteiro.x = e.clientX; ponteiro.y = e.clientY;
+  pontaSobMouse();
+});
+// rolagem pela roda (ou pela barra) com o botão segurado: a ponta acompanha
+$("#previa").addEventListener("scroll", () => { if (sel.arrastando) pontaSobMouse(); }, true);
+document.addEventListener("mouseup", () => {
+  clearInterval(rolarT); rolarT = null;
+  if (sel.arrastando) { sel.arrastando = false; copiar(); }
+});
+$("#previa").addEventListener("contextmenu", e => { if (e.target.closest("td.c")) e.preventDefault(); });
+// o tema é o da casca do Nexus de quem abriu (escuro ou claro), e acompanha a troca feita lá
+(function () {
+  const copiar = () => { try { const t = parent.document.documentElement.getAttribute("data-tema");
+    if (t) document.documentElement.setAttribute("data-tema", t); } catch (e) {} };
+  copiar();
+  try { new MutationObserver(copiar).observe(parent.document.documentElement, {attributes: true, attributeFilter: ["data-tema"]}); } catch (e) {}
+})();
+// soltar arquivos e pastas na tela (no .exe o Python recebia o caminho; aqui o navegador lê e sobe)
+document.addEventListener("dragover", e => e.preventDefault());
+document.addEventListener("drop", async e => {
+  e.preventDefault();
+  const ents = [...(e.dataTransfer.items || [])].map(i => i.webkitGetAsEntry && i.webkitGetAsEntry()).filter(Boolean);
+  const lista = [];
+  if (ents.length) { for (const x of ents) await lerEntrada(x, "", lista); }
+  else lista.push(...[...(e.dataTransfer.files || [])].map(f => ({file: f, rel: f.name})));
+  await enviar(lista);
+});
+app.iniciar();
+</script>
+{% endraw %}
+</body>
+</html>

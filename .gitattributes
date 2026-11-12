@@ -1,2 +1,5 @@
 # Script do servidor (Linux) sai sempre com fim de linha LF: com CRLF, vindo de um clone do Windows, o bash quebra.
 *.sh text eol=lf
+# O motor do Conversor (tela Coletas, 11/11/2026) é cópia byte a byte da pasta da coleta (tests/test_coletas.py compara
+# os bytes): sem conversão de fim de linha, senão o clone do Windows o reescreveria com CRLF e a cópia "divergiria".
+nexus/performance/coletas/_motor/** -text

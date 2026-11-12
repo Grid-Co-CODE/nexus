@@ -41,6 +41,8 @@
   --erro:#ff7a7a; --erro-cheio:#ff7a7a; --erro-a08:rgba(255,122,122,.08); --erro-a42:rgba(255,122,122,.42); --erro-a55:rgba(255,122,122,.55);
   --info:#7fb8ff; --info-suave:rgba(91,157,255,.14); --info-a10:rgba(127,184,255,.10); --info-a42:rgba(127,184,255,.42);
   --semcom:#b39dff; --semcom-suave:rgba(179,157,255,.14);
+  /* Coletas > Furos (11/11/2026): as categorias do relatório de furos (valor anômalo, ausência esperada por OS, falha crítica) */
+  --anomalo:#f472b6; --esperado:#2dd4bf; --critico-escuro:#8a1c2a;
   /* severidade como ÁREA: barra, preenchimento com texto escuro por cima (a idade da fila, a distribuição dos níveis) e a
      borda grossa de destaque do cartão. No claro é o tom médio do matiz: o de texto é escuro demais para área */
   --ok-cheio:#4ade80; --lima-cheio:#a8e05f; --alerta-cheio:#ffd83d; --severo-cheio:#ff8f3c; --critico-cheio:#ff5b6e;
@@ -109,6 +111,7 @@
   --erro:#b42230; --erro-cheio:#ef5d6e; --erro-a08:rgba(220,53,69,.07); --erro-a42:rgba(180,34,48,.38); --erro-a55:rgba(180,34,48,.5);
   --info:#0954ad; --info-suave:rgba(9,105,218,.08); --info-a10:rgba(9,105,218,.07); --info-a42:rgba(10,95,196,.38);
   --semcom:#673ab9; --semcom-suave:rgba(130,80,223,.08);
+  --anomalo:#a3195b; --esperado:#0f766e; --critico-escuro:#8a1c2a;
   --ok-cheio:#3dbb68; --lima-cheio:#a8e05f; --alerta-cheio:#f0b429; --severo-cheio:#f59342; --critico-cheio:#ef5d6e;
   --info-cheio:#5c9cf5; --sobre-cheio:#0b1220;
   --ouro:#e0ac2b; --prata:#b9c1cd; --bronze:#c47f45;
@@ -409,6 +412,11 @@ a{color:inherit}
 .ponte-falta{margin:24px 16px;color:var(--alerta)}
 .ponte-erro{padding:32px 24px;max-width:640px}
 .ponte-erro h1{font:600 20px/1.3 var(--font-display);margin:0 0 12px}
+/* Coletas (11/11/2026): o título com o "!" e, embaixo, a página do Conversor numa moldura que ocupa o resto da altura */
+.coletas-casca{flex:1;min-width:0;display:flex;flex-direction:column;height:calc(100vh - var(--topo))}
+.coletas-titulo{padding:8px 16px 0}
+.coletas-titulo .titulo-pagina{margin:0 0 6px;font-size:22px;line-height:28px}
+.coletas-moldura{flex:1;height:auto;min-height:0}
 /* Porta única (09/10/2026): cada tela da Plataforma de Performance numa moldura, com o login e o menu do Nexus
    (nexus/torres/moldura.py). Faixa fina com o nome e o seletor de usina do Diagnóstico (sem "Abrir em outra aba" desde
    11/10/2026: é só Nexus). */
