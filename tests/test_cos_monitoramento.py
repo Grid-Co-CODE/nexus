@@ -173,8 +173,8 @@ def test_a_tela_e_do_setor_cos_e_entra_no_menu_sem_mexer_na_ordem():
     assert tela.do_setor == SID.COS
     ids = [t.id for t in TORRE.telas]
     # o Acompanhamento segue a 1ª tela (o cartão do COS no Início); desde 12/11/2026 (a reorganização do COS pelo dono)
-    # o Monitoramento abre o que se usa no turno, logo depois dele
-    assert ids[:2] == ["acompanhamento", "monitoramento"]
+    # o que se usa no turno vem logo depois dele: o Console e o Monitoramento
+    assert ids[:3] == ["acompanhamento", "console", "monitoramento"]
 
 
 # --- o videowall (?tv=1) -----------------------------------------------------------------------------------------------

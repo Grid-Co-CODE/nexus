@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block titulo %}{{ tela.nome }}{% endblock %}
+{% block classe_conteudo %}conteudo--moldura{% endblock %}
+{% block conteudo %}
+{# O Console e a Conferência de OS da Ronda COS DENTRO do Nexus (12/11/2026; o dono, no protótipo do COS). Só a moldura:
+   tudo o que se faz nela é a Ronda COS, com o login dela (na 1ª vez em cada navegador). O site vem em HTTPS
+   (`AND.web_da_ronda`), sabe que está numa moldura e põe o tema do Nexus, sem a barra lateral; a voz do alarme de queda
+   fica nele. Aqui só se manda o tema da hora (escuro ou claro), por postMessage, para a origem do site e mais nenhuma. #}
+<div class="porta" id="porta">
+  {% if not plataforma_ronda %}
+  <div class="porta-aviso" role="status">
+    <h1>{{ tela.nome }} da Ronda COS ainda não ligado neste servidor</h1>
+    <p>Esta tela é a da Ronda COS, aberta dentro do Nexus.{% if session.admin %} Para ligar: o endereço do Andamento da
+      Ronda COS (<code>NEXUS_COS_ANDAMENTO_URL</code>), ou o do site dela em HTTPS (<code>NEXUS_COS_WEB_URL</code>), em
+      Base → Chaves do Nexus.{% endif %}</p>
+    <p class="mudo">O resto do Nexus funciona normalmente.</p>
+  </div>
+  {% else %}
+  <iframe class="porta-moldura" id="cos-ronda-moldura" name="cos-ronda-moldura" title="{{ tela.nome }} da Ronda COS"
+    src="{{ plataforma_ronda }}" allow="autoplay; clipboard-read; clipboard-write" referrerpolicy="no-referrer"></iframe>
+  <script>
+    (function () {
+      var raiz = document.documentElement, moldura = document.getElementById("cos-ronda-moldura");
+      var origem = {{ origem|tojson }};
+      function mandarTema() {
+        var tema = raiz.getAttribute("data-tema") === "claro" ? "claro" : "escuro";
+        try { moldura.contentWindow.postMessage({ tipo: "nexus-tema", tema: tema }, origem); } catch (e) {}
+      }
+      window.addEventListener("message", function (ev) {
+        if (ev.source === moldura.contentWindow && ev.origin === origem && ev.data && ev.data.tipo === "console-pronto") {
+          mandarTema();
+        }
+      });
+      moldura.addEventListener("load", mandarTema);
+      new MutationObserver(mandarTema).observe(raiz, { attributes: true, attributeFilter: ["data-tema"] });
+    })();
+  </script>
+  {% endif %}
+</div>
+{% include "cos/_fluido.html" %}
+{% endblock %}

@@ -65,6 +65,15 @@ TORRE = Torre(
         # 09/11/2026 (o dono: "geração em kw ao vivo com a curva de cada usina atualizando constantemente, somente as que
         # tem logger e as que são sunop"): o cartão da tela de monitoramento da Ronda COS, pelo Andamento. Do setor COS sem
         # marca em Base → Acessos (Tela.do_setor), para os operadores a verem no dia em que ela entra.
+        # 12/11/2026 (o dono, no protótipo do COS): o Console e a Conferência de OS da Ronda COS dentro do Nexus, numa
+        # moldura (`cos/moldura_ronda.html`), pelo site dela em HTTPS (`AND.web_da_ronda`). O site sabe que está dentro do
+        # Nexus: o tema dele, sem a barra lateral. O login é o da Ronda COS, na 1ª vez em cada navegador.
+        Tela("console", "Console",
+             "O que está aberto agora, e o que eu faço em cada ocorrência?",
+             "Ronda COS (o Console, dentro do Nexus)", do_setor=SID.COS),
+        Tela("conferencia-os", "Conferência de OS",
+             "As OS do COS estão com a hora certa no Fracttal, e o que falta para finalizar?",
+             "Ronda COS (a Conferência de OS, dentro do Nexus)", do_setor=SID.COS),
         Tela("monitoramento", "Monitoramento",
              "Quanto cada usina com logger ou do SunOP está gerando agora, e como foi a curva do dia?",
              "Andamento da Ronda COS (o kW ao vivo do SCADA Grid e do SunOP, e a curva do dia)", do_setor=SID.COS),
@@ -121,7 +130,7 @@ TORRE = Torre(
 # A ordem do menu (12/11/2026, a reorganização do COS pelo dono): o que se usa no turno (Monitoramento, Passagem de turno,
 # Ronda, Parede), a consulta (Ocorrências) e os indicadores (Mesa, Desempenho, Prazos da R04, Religamentos, Acionamentos).
 # O Acompanhamento segue o 1º: o cartão do COS no Início leva à 1ª tela pronta, e é ele (`test_casca_inicio`).
-_ORDEM_DO_MENU = ("acompanhamento", "monitoramento", "turno", "ronda", "eventos", "normalizacoes", "mesa", "desempenho",
+_ORDEM_DO_MENU = ("acompanhamento", "console", "monitoramento", "conferencia-os", "turno", "ronda", "eventos", "normalizacoes", "mesa", "desempenho",
                   "ocorrencias", "religamentos", "acionamentos", "os-abertas")
 TORRE.telas.sort(key=lambda t: _ORDEM_DO_MENU.index(t.id) if t.id in _ORDEM_DO_MENU else len(_ORDEM_DO_MENU))
 
@@ -611,6 +620,38 @@ def usina(codigo: str = ""):
         "cos/usina.html", f=f, ve=ve, acionar=acionar, erro_cadastro=erro_cadastro, com_chave=bool(chave),
         confianca=AC.CONFIANCA, prazos=OC.PRAZOS, etapas=OC.ETAPAS, desfechos=RE.DESFECHOS,
         dias=FI.DIAS_DO_CICLO, agora=agora, **comum)
+
+
+# ── Console e Conferência de OS: a Ronda COS dentro do Nexus (12/11/2026) ───────────────────────────────────────────
+# O caminho de cada tela no site da Ronda COS. O Console aceita `?registro=` (abre com a ocorrência), como o link
+# "abrir na Ronda COS" das outras telas.
+CAMINHO_NA_RONDA = {"console": "/console", "conferencia-os": "/conferencia-os"}
+
+
+def _moldura_da_ronda(tela_id: str):
+    cfg = current_app.config
+    base = AND.web_da_ronda(cfg)
+    # o endereço completo da tela no site da Ronda COS (de outro sistema: o nome leva "plataforma", test_prefixo)
+    plataforma_ronda = ""
+    if base:
+        plataforma_ronda = base + CAMINHO_NA_RONDA[tela_id]
+        registro = (request.args.get("registro") or "").strip()
+        if tela_id == "console" and registro:
+            plataforma_ronda += "?" + urlencode({"registro": registro[:80]})
+    return render_template("cos/moldura_ronda.html", torre=TORRE, tela=TORRE.tela(tela_id),
+                           plataforma_ronda=plataforma_ronda, origem=base)
+
+
+@bp.route("/console")
+def console():
+    """Console: o da Ronda COS, dentro do Nexus (12/11/2026). Só a moldura: tudo o que se faz nele é a Ronda COS."""
+    return _moldura_da_ronda("console")
+
+
+@bp.route("/conferencia-os")
+def conferencia_os():
+    """Conferência de OS: a da Ronda COS, dentro do Nexus (12/11/2026)."""
+    return _moldura_da_ronda("conferencia-os")
 
 
 # ── Monitoramento (09/11/2026) ───────────────────────────────────────────────────────────────────────────────────────
