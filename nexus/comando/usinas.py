@@ -88,6 +88,24 @@ def motivo(oc: dict) -> str:
     return str(oc.get("tipo_falha") or oc.get("tipo_tarefa") or "Ocorrência aberta")
 
 
+def ligador_do_cos(b):
+    """O `usina_de(nome, codigo)` da fotografia da Ronda COS, para o `cos_por_usina`: o nome do Fracttal pelo de-para e,
+    depois, o código pela regra da casa (`dados.equipamento.usina_do_codigo`, a mesma das normalizações do COS): o
+    código cheio igual ao do cadastro ou a terminação que é de UMA usina, e nunca o código com o prefixo de outro
+    cliente. O caso que criou a regra (12/11/2026, a análise das usinas Sem leitura): o `E1EN-PCN100`, a Poconé da E1
+    (sem código no cadastro), caía na Poconé 1 da Thopen (`THPN-PCN100`) pela terminação — o ligador geral
+    (`Ligador.usina`) não olha o prefixo —, e as ocorrências de uma apareciam na outra. `b` = `visao._Base()`."""
+    from ..dados import equipamento as EQ
+    idx = EQ.IndiceUsinas(b.usinas)
+
+    def usina_de(nome, codigo):
+        uid = b.lig.usina_do_fracttal(nome or "")
+        if uid:
+            return uid
+        return EQ.usina_do_codigo(codigo, idx)[0] if codigo else None
+    return usina_de
+
+
 def cos_por_usina(leituras: list | None, usina_de) -> dict | None:
     """A fotografia da Ronda COS de cada cliente do Andamento (`cos.andamento.ler`, a mesma do COS > Ronda padronizada)
     por usina do cadastro: {"ocs": {usina_id: as ocorrências abertas}, "lidas": os usina_id que alguma fotografia

@@ -171,6 +171,22 @@ prontuário mostra as ocorrências abertas no cartão do COS, com o link para a 
 roxo").** O tom do grupo `sem_com` em `usinas.ESTADOS` é `semcom` (o roxo do semáforo do Nexus, `--semcom`), e não mais o
 azul de informação: o selo, a barra da faixa e a legenda da lista, o ponto do prontuário, o Mapa de equipe
 (`campo-mapa.js`, `a_semcom`) e o vídeo wall (`equipe/parede.py`) pegam a cor daqui.
+**Como a fotografia do COS liga à usina do cadastro (`usinas.ligador_do_cos`, 12/11/2026).** Primeiro o nome do
+Fracttal pelo de-para; depois o código pela regra da casa (`dados.equipamento.usina_do_codigo`, a mesma das
+normalizações do COS): o código cheio igual ao do cadastro, ou a terminação que é de UMA usina, e nunca o código com o
+prefixo de outro cliente. Até aqui a coluna usava o ligador geral (`Ligador.usina`), que só olha a terminação. **O caso
+que criou a regra** (Levi pediu a análise das usinas "Sem leitura"; medido no banco, pelos códigos que o COS mandou nas
+ocorrências desde 01/10): o `E1EN-PCN100`, a Poconé da E1 (sem código no cadastro), caía na Poconé 1 da Thopen
+(`THPN-PCN100`), e as ocorrências de uma apareciam na outra; e as duas Ipixuna (`2C-IPX100` e `THPN-IPX100`, a mesma
+terminação em dois clientes) não ligavam em nenhuma e ficavam "Sem leitura". Comparado código a código nos 129 que o
+COS mandou: 126 iguais, e só esses 3 mudam. O Mapa de equipe usa a mesma função. **Quem ainda usa o ligador geral com a
+fotografia do COS** (outras frentes, não mexi): `campo/visao_cliente.py`, `cos/acionamentos.py` e `cos/ficha.py`.
+**O que continua "Sem leitura" e por quê (12/11/2026):** as 11 usinas SEM CÓDIGO no cadastro (Apolo: Gravatá II, Iramaia
+II, Rio do Peixe I e II; E1: Barra das Garças, Boituva II, Chapada dos Guimarães, Nova Xavantina, Poconé; Elis: Máquinas
+1 a 2; Qair: Aquiraz e Cascavel), que só ligariam pelo nome do Fracttal — o conserto é preencher o código no cadastro (o
+COS já manda `APOL-GVT200`, `APOL-IRM200`, `APOL-RDP100` e `E1EN-PCN100`) —, e as que o COS nunca mandou pelo código do
+cadastro (GD Energy: Sol do Norte 1 e 2; Sal Energia: Cascavel Sunpower), que dependem de o COS confirmar o cadastro
+delas na Ronda COS. A usina cujo cliente não respondeu na hora também fica "Sem leitura" (o aviso amarelo diz qual).
 **Quem mais lê esta régua (12/11/2026):** o Mapa de equipe da Usinas 360° pinta as usinas pelo `agora_pelo_cos` e o vídeo
 wall dele agrupa as ocorrências pelo `classificar` (`campo/equipe/parede.py`); mudou a régua aqui, muda lá sozinho. Cada
 ocorrência do `cos_por_usina` leva também o `usina_cod` (o código curto da usina no Andamento, "APR100"), o do cartão
@@ -239,11 +255,14 @@ cópia de 5 min do Campo (`visao._ler`, a chave `comando_prontuarios`): a 1ª ab
 (`os_verificacao`, `os_em_execucao`, `os_nao_iniciadas`) além das contagens, pela MESMA regra (a contagem é o tamanho
 da lista). Nada aqui lê o Fracttal.
 
-**As ações.** Criar OS = o OS Creator tradicional com a usina escolhida (`/os/tradicional?ativo=<código do ativo da
-usina>`). Criar ticket = os planos do setor Performance do OS Creator (`/os/performance/criar?frase=&usina=<o nome no
-Fracttal>`), em que a OS nasce com o ticket da ocorrência; a lista (`prontuario_dados.PLANOS_TICKET`) é CÓPIA do
-`PLANOS` de `os_creator/os_web/perf_web.py` (o clone não se importa do Nexus) e o teste acusa se divergirem. **Esta foi
-a leitura do "criar ticket" do Levi; se ele quis o chamado de garantia, é outra ação a ligar.** Relatório = o PDF do
+**As ações.** Criar OS abre as cinco formas de criar OS que o OS Creator tem hoje (Levi, 12/11/2026: "na parte de criar
+OS, vai ter as opções que é possível hoje. Então, OS avulsa, OS de performance, OS de engenharia, inspeção de chamados,
+solicitação de OS. E aí o ticket pode tirar o botão de ticket"): a lista é `prontuario_dados.CRIAR_OS`. A **OS avulsa**
+(o "Criar OS do zero" de lá, `/os/tradicional`) e a **Solicitação de OS** (`/os/solicitacao`) abrem com a usina já
+escolhida (`?ativo=<o código da usina no cadastro>`, que é o do ativo dela no Fracttal; `tradicional_web.sugestao`); a
+**OS de Performance** (`/os/performance`, pergunta o plano primeiro), a **OS de Engenharia** (`/os/engenharia`) e a
+**Inspeção de chamados** (`/os/chamados/inspecao`, que pede o ativo pelo id do Fracttal) abrem sem a usina. O botão
+"Criar ticket" da 1ª versão (os planos da Performance direto) saiu no mesmo dia. Relatório = o PDF do
 cliente da Usinas 360° (`campo/relatorio_usina.py`), também pelo endereço do Comando
 (`/t/comando/usinas/<id>/relatorio.pdf`, que chama a rota de lá), para quem tem o Comando e não a Visão do responsável.
 A janela pergunta o mês e **o que entra** (Levi: "eu quero o relatório de forma profissional, que dê para editar os
@@ -256,7 +275,7 @@ janela daquela tela (`cr-modal`, o `data-cr-painel`): o dia a dia da meta, do PR
 tem o `h1`). O card da OS (`oscreator/card_os_abrir.html`) vem de quem inclui, uma vez só.
 
 **O que a pessoa sem a tela não vê** (`prontuario_dados._pode`, a régua do portão, `setor_telas.pode`): sem tela do OS
-Creator, sem o Criar OS e o Criar ticket; sem tela do Comando, sem a conversa; o "abrir" do pé de cada cartão só aparece
+Creator, sem o Criar OS; sem tela do Comando, sem a conversa; o "abrir" do pé de cada cartão só aparece
 para quem abre a tela dele. As demandas são só as que a pessoa pode ver.
 
 **O que o Nexus ainda NÃO tem, e por isso não está na página** (pedidos do mockup da Ana Barros, 12/11/2026): o
@@ -266,8 +285,8 @@ tem as abertas; as concluídas estão no Histórico de OS do OS Creator); as car
 novo no cadastro). Entram quando a fonte existir, cada uma pela tela dona.
 
 **Prova.** `tests/test_comando_prontuario.py` (a conta do parecer, do painel e do cartão das OS; as OS de cada estado na
-tela dona; os planos iguais aos do OS Creator; a página nas duas portas, o relatório pelo Comando e o que a pessoa sem a
-tela não vê), `tests/test_campo_central_usina_0411.py` (a aba) e `tests/test_comando_usinas.py`. E a renderização com o
+tela dona; as formas do Criar OS apontando para rotas que o OS Creator tem; o ligador da fotografia do COS; a página nas
+duas portas, o relatório pelo Comando e o que a pessoa sem a tela não vê), `tests/test_campo_central_usina_0411.py` (a aba) e `tests/test_comando_usinas.py`. E a renderização com o
 banco de produção, só leitura, pelo cliente de teste (12/11/2026: a Mandaguaçu com 55% da meta, PR 54,6% contra 73,2%,
 disponibilidade 58,2%, 41 OS abertas = 8 não iniciadas + 2 em execução + 31 em verificação, 40 tarefas atrasadas em 9
 OS; a Crateús 1 com 18% da meta; os mesmos números da Visão do responsável; tema escuro e claro; a página fechada com

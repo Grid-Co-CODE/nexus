@@ -813,7 +813,7 @@ def _cos_por_usina(b):
         return None
     clientes, _erro = AND.clientes(cfg)
     leituras = [AND.ler(cfg, c) for c in clientes]
-    r = CU.cos_por_usina(leituras, lambda nome, codigo: b.lig.usina(nome or "", codigo or "")[0])
+    r = CU.cos_por_usina(leituras, CU.ligador_do_cos(b))        # a mesma ligação do Comando (o código pela regra da casa)
     if r is not None:
         geradas = [g for g in (AND.instante(lt.dados.get("gerado_em")) for lt in leituras if lt.dados) if g]
         r["leitura"] = min(geradas).strftime("%H:%M") if geradas else ""

@@ -34,7 +34,7 @@
   var h = (location.hash || '').slice(1);
   if (/^pu-[a-z]+$/.test(h)) abrir(h.slice(3), true);
 
-  // o menu do Criar ticket fecha no clique fora e no Esc
+  // o menu do Criar OS fecha no clique fora e no Esc
   var menu = raiz.querySelector('.pu-menu');
   if (menu) {
     document.addEventListener('click', function (ev) { if (menu.open && !menu.contains(ev.target)) menu.open = false; });

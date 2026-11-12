@@ -51,15 +51,14 @@
       {% set T = 'h2' if pu_na_aba else 'h1' %}<{{ T }} class="cu-nome cmu-nome">{{ x.usina }} <span class="cn-pill cn-{{ x.estado_tom }}">{{ x.estado_rot }}</span>{% if x.detalhe %}<span class="pu-motivo">{{ x.detalhe }}</span>{% endif %}</{{ T }}>
       <p class="cu-onde">{{ x.cliente or '—' }}{% if x.cluster %} · {{ x.cluster }}{% endif %}{% if x.tipologia %} · {{ x.tipologia }}{% endif %}{% if x.mwp is not none %} · {{ ('%.1f'|format(x.mwp))|replace('.', ',') }} MWp{% endif %}{% if u.cidade %} · {{ u.cidade }}{% if u.uf %}/{{ u.uf }}{% endif %}{% endif %}{% if x.codigo %} · <span class="cmu-cod">{{ x.codigo }}</span>{% endif %}</p>
     </div>
-    {# as ações: criar a OS e o ticket no OS Creator, já com a usina; o relatório do cliente em PDF; a conversa #}
+    {# as ações: criar a OS pelas formas de hoje do OS Creator (a avulsa e a solicitação já com a usina); o relatório do
+       cliente em PDF; a conversa. O botão do ticket saiu em 12/11/2026 (Levi: "o ticket pode tirar o botão de ticket") #}
     <div class="pu-acoes">
       {% if p.pode.os %}
-      <a class="gc-btn gc-btn--ui gc-btn--primario" href="{{ raiz }}/os/tradicional{% if x.codigo %}?ativo={{ x.codigo|urlencode }}{% endif %}" title="Abre o OS Creator com esta usina já escolhida"><i class="ph ph-plus" aria-hidden="true"></i> Criar OS</a>
       <details class="pu-menu">
-        <summary class="gc-btn gc-btn--ui gc-btn--contorno" title="Abre o OS Creator › Performance: a OS nasce com o ticket"><i class="ph ph-ticket" aria-hidden="true"></i> Criar ticket</summary>
+        <summary class="gc-btn gc-btn--ui gc-btn--primario" title="Criar uma OS para esta usina, pelas formas do OS Creator"><i class="ph ph-plus" aria-hidden="true"></i> Criar OS <i class="ph ph-caret-down pu-menu-seta" aria-hidden="true"></i></summary>
         <div class="pu-menu-caixa">
-          {% for titulo, frase in p.planos %}<a href="{{ raiz }}/os/performance/criar?frase={{ frase|urlencode }}{% if p.site %}&amp;usina={{ p.site|urlencode }}{% endif %}">{{ titulo }}</a>{% endfor %}
-          <small>Os planos da Performance no OS Creator: a OS nasce com o ticket, e a usina já vem escolhida.</small>
+          {% for o in p.criar_os %}<a href="{{ raiz }}{{ o.url }}"><b>{{ o.rot }}</b><span>{{ o.sub }}</span></a>{% endfor %}
         </div>
       </details>
       {% endif %}

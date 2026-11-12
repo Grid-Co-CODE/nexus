@@ -190,7 +190,7 @@ def test_a_lista_e_o_prontuario(logado, telas, monkeypatch):
     assert 'class="pu-parecer pu-parecer--critico"' in p and "Pede ação agora" in p
     assert "No COS: Desligamento" in p and 'data-pu-os="7001"' in p
     assert "/t/cos/ronda?cliente=Thopen" in p
-    assert 'href="/t/comando/usinas"' in p and 'href="/os/tradicional?ativo=THPN-ALT100"' in p
+    assert 'href="/t/comando/usinas"' in p and 'href="/os/tradicional?ativo=THPN-ALT100"><b>OS avulsa</b>' in p
     assert logado.get("/t/comando/usinas/999").status_code == 404
 
 

@@ -8,8 +8,8 @@ visual na frente [...] mesmo dando drill down, a informação direta ali na lata
 aquela informação".
 
 O que estes testes seguram: a conta pura (`nexus/comando/prontuario.py`: o parecer, o painel do alto com as barras, o
-cartão das OS), as OS de cada estado na tela dona (`campo/manutencao.py`), os planos do Criar ticket iguais aos do OS
-Creator, e a mesma página nas duas portas (o que muda entre elas e o que a pessoa sem a tela não vê)."""
+cartão das OS), as OS de cada estado na tela dona (`campo/manutencao.py`), as formas do Criar OS apontando para as rotas do OS
+Creator, o ligador da fotografia do COS, e a mesma página nas duas portas (o que muda entre elas e o que a pessoa sem a tela não vê)."""
 import re
 from pathlib import Path
 
@@ -155,16 +155,48 @@ def test_o_titulo_do_insight_sai_sem_o_nome_da_usina():
     assert PR.sem_o_nome("Altair sem geração há 2 dias", "Altair") == "Altair sem geração há 2 dias"
 
 
-def test_os_planos_do_criar_ticket_sao_os_do_os_creator():
-    """O Criar ticket abre o OS Creator > Performance (a OS nasce com o ticket) com a frase do plano: a lista do
-    prontuário é CÓPIA da de lá (o clone não se importa do Nexus) e tem de seguir igual."""
-    from nexus.torres.comando.prontuario_dados import PLANOS_TICKET
-    fonte = (RAIZ / "nexus" / "torres" / "oscreator" / "os_creator" / "os_web" / "perf_web.py").read_text(encoding="utf-8")
-    coleta = re.search(r'^FRASE_COLETA\s*=\s*"([^"]+)"', fonte, re.M).group(1)
-    bloco = fonte.split("PLANOS = [", 1)[1].split("\n]", 1)[0]
-    la = [(t, coleta if f == "FRASE_COLETA" else f.strip('"'))
-          for t, f in re.findall(r'\{"titulo": "([^"]+)", "frase": (FRASE_COLETA|"[^"]+")', bloco)]
-    assert la and tuple(la) == PLANOS_TICKET
+def test_o_criar_os_leva_as_formas_de_hoje_do_os_creator():
+    """Levi, 12/11/2026: "na parte de criar OS, vai ter as opções que é possível hoje. Então, OS avulsa, OS de
+    performance, OS de engenharia, inspeção de chamados, solicitação de OS. E aí o ticket pode tirar o botão de
+    ticket". Cada opção aponta para uma rota que o OS Creator tem; a avulsa e a solicitação levam a usina (o ativo)."""
+    from nexus.torres.comando.prontuario_dados import CRIAR_OS, criar_os
+    assert [o[0] for o in CRIAR_OS] == ["OS avulsa", "OS de Performance", "OS de Engenharia", "Inspeção de chamados",
+                                        "Solicitação de OS"]
+    web = RAIZ / "nexus" / "torres" / "oscreator" / "os_creator" / "os_web"
+    rotas = "".join((web / f).read_text(encoding="utf-8") for f in ("rotas.py", "rotas_tradicional.py", "rotas_engenharia.py",
+                                                                    "rotas_chamados.py", "rotas_solic.py"))
+    for _rot, _sub, url, _leva in CRIAR_OS:
+        assert f'@bp.route("{url[len("/os"):]}")' in rotas, url          # a rota existe no OS Creator
+    # as telas que aceitam o ativo pelo endereço são as que usam a sugestão (`tradicional_web.sugestao`)
+    for arq, leva in (("rotas_tradicional.py", True), ("rotas_solic.py", True)):
+        assert ("trad.sugestao(assets, request.args)" in (web / arq).read_text(encoding="utf-8")) is leva
+    ops = {o["rot"]: o["url"] for o in criar_os("THPN-ALT100")}
+    assert ops["OS avulsa"] == "/os/tradicional?ativo=THPN-ALT100" and ops["Solicitação de OS"] == "/os/solicitacao?ativo=THPN-ALT100"
+    assert ops["OS de Performance"] == "/os/performance" and ops["Inspeção de chamados"] == "/os/chamados/inspecao"
+    assert all("?" not in o["url"] for o in criar_os(""))               # sem o código no cadastro, sem a usina
+
+
+def test_o_ligador_do_cos_nao_liga_o_codigo_com_o_prefixo_de_outro_cliente():
+    """A análise das usinas Sem leitura (12/11/2026): o `E1EN-PCN100` (a Poconé da E1, sem código no cadastro) caía na
+    Poconé 1 da Thopen (`THPN-PCN100`) pela terminação, e as ocorrências de uma apareciam na outra. A fotografia do COS
+    liga pela regra da casa (a das normalizações): o código cheio, ou a terminação de UMA usina sem prefixo de outro
+    cliente; antes de tudo, o nome do Fracttal pelo de-para."""
+    from nexus.comando import usinas as CU
+    from nexus.dados import fatos as D
+
+    class _B:
+        usinas = [{"usina_id": 1, "nome": "Poconé 1", "codigo": "THPN-PCN100"}, {"usina_id": 2, "nome": "Poconé", "codigo": ""},
+                  {"usina_id": 3, "nome": "Itajá 1 e 2", "codigo": "ITA100"},
+                  {"usina_id": 4, "nome": "Aparecida do Taboado 1 e 2", "codigo": "THPN-ADT100"}]
+        de_para = [{"sistema": D.SISTEMA_FRACTTAL, "chave_externa": "E1 - Poconé - MT", "usina_id": 2}]
+    _B.lig = D.Ligador(_B.usinas, _B.de_para, [], {})
+    assert _B.lig.usina("", "E1EN-PCN100")[0] == 1                    # o ligador geral liga errado (a terminação)
+    usina_de = CU.ligador_do_cos(_B)
+    assert usina_de("Poconé", "E1EN-PCN100") is None                  # o prefixo é de outro cliente: não liga
+    assert usina_de("Poconé 1", "THPN-PCN100") == 1                   # o código cheio
+    assert usina_de("", "THOPEN-ITA100") == 3 and usina_de("", "ADT100") == 4      # a terminação de uma usina só
+    assert usina_de("E1 - Poconé - MT", "E1EN-PCN100") == 2           # o nome do Fracttal, pelo de-para, vem antes
+    assert usina_de("", "") is None and usina_de(None, None) is None
 
 
 # ── a página, nas duas portas ────────────────────────────────────────────────────────────────────────────────────────
@@ -199,8 +231,14 @@ def test_o_prontuario_abre_pelo_parecer_e_pelo_painel_com_os_cartoes_fechados(te
 def test_as_acoes_do_alto_criam_a_os_e_o_ticket_com_a_usina_e_baixam_o_relatorio(tela, logado):
     html = logado.get("/t/comando/usinas/1").get_data(as_text=True)
     acoes = html.split('class="pu-acoes"', 1)[1].split("</header>", 1)[0]
-    assert re.search(r'href="/os/tradicional\?ativo=[A-Z0-9-]+"', acoes)        # o OS Creator abre com a usina escolhida
-    assert acoes.count('href="/os/performance/criar?frase=') == 4               # os quatro planos da Performance
+    # o Criar OS abre as cinco formas de hoje do OS Creator; a avulsa e a solicitação já com a usina; sem o ticket
+    menu = acoes.split('class="pu-menu-caixa"', 1)[1].split("</div>", 1)[0]
+    assert menu.count("<a href=") == 5 and "ticket</b>" not in acoes and "Criar ticket" not in html
+    assert re.search(r'href="/os/tradicional\?ativo=[A-Z0-9-]+"><b>OS avulsa</b>', menu)
+    assert re.search(r'href="/os/solicitacao\?ativo=[A-Z0-9-]+"><b>Solicitação de OS</b>', menu)
+    for url, rot in (("/os/performance", "OS de Performance"), ("/os/engenharia", "OS de Engenharia"),
+                     ("/os/chamados/inspecao", "Inspeção de chamados")):
+        assert f'href="{url}"><b>{rot}</b>' in menu, rot
     assert "data-pu-rel" in acoes and 'href="/t/comando/conversa/usina/1"' in acoes
     # o relatório do cliente em PDF pelo endereço do próprio Comando: o mês (o anterior marcado) e os temas
     jan = html.split('id="pu-rel"', 1)[1].split("</dialog>", 1)[0]
@@ -218,11 +256,11 @@ def test_as_acoes_do_alto_criam_a_os_e_o_ticket_com_a_usina_e_baixam_o_relatorio
 
 def test_a_pessoa_sem_a_tela_nao_ve_o_link_nem_o_botao_dela(tela, logado, monkeypatch):
     """O link da tela que a pessoa não abre não aparece (a Central da usina já fazia assim): sem o OS Creator, sem o
-    Criar OS e o Criar ticket; sem tela do Comando, sem a conversa."""
+    Criar OS; sem tela do Comando, sem a conversa."""
     from nexus.auth import setor_telas
     monkeypatch.setattr(setor_telas, "liberadas_do_menu", lambda: {"campo/responsaveis", "campo/rondas"})
     html = logado.get("/t/campo/responsaveis?modo=usina&usina=1").get_data(as_text=True)
-    assert "/os/tradicional" not in html and "/os/performance/criar" not in html
+    assert "/os/tradicional" not in html and 'href="/os/solicitacao' not in html and "pu-menu-caixa" not in html
     assert "/t/comando/conversa/usina/1" not in html and "Abrir os Insights" not in html
     assert "Abrir a Mesa da Segurança" not in html and "/t/campo/rondas/usina/1" in html
     assert "data-pu-rel" in html                                               # o relatório é da própria tela

@@ -21,14 +21,26 @@ _log = logging.getLogger(__name__)
 CHAVE = ("comando_prontuarios",)
 MESES = 6            # os meses do mês a mês (o banco tem a meta desde 10/2026)
 PT_NA_LISTA = 4
-# o "Criar ticket" do prontuário (Levi, 12/11/2026: "Também deve ser possível criar OS para a UFV, criar ticket!"): os
-# planos do setor Performance do OS Creator, que criam a OS e o ticket da ocorrência juntos. (título, a frase do plano
-# no Fracttal): CÓPIA do `PLANOS` de torres/oscreator/os_creator/os_web/perf_web.py (o clone não se importa daqui); o
-# teste `test_comando_prontuario` acusa se os dois divergirem
-PLANOS_TICKET = (("Geração e ETM", "coleta de dados de geracao"),
-                 ("Inspeção Geral do Inversor", "inspecao geral do inversor"),
-                 ("Recomposição de String", "recomposicao de string"),
-                 ("Verificação de Tracker Parado", "verificacao de tracker parado"))
+# O "Criar OS" do prontuário (Levi, 12/11/2026: "Também deve ser possível criar OS para a UFV"; e, vendo o botão do
+# ticket: "na parte de criar OS, vai ter as opções que é possível hoje. Então, OS avulsa, OS de performance, OS de
+# engenharia, inspeção de chamados, solicitação de OS. E aí o ticket pode tirar o botão de ticket"). As cinco formas de
+# criar OS que o OS Creator tem hoje: (o nome, o que é, o endereço no OS Creator, leva a usina?). A OS avulsa (o "Criar OS
+# do zero" de lá) e a solicitação aceitam o ativo pelo endereço (`?ativo=<o código do ativo da usina>`,
+# `tradicional_web.sugestao`): a tela abre com o cliente e a usina escolhidos. A Performance pergunta o plano primeiro,
+# a Engenharia tem a tela dela e a inspeção pede o ativo pelo id do Fracttal: essas abrem sem a usina.
+CRIAR_OS = (("OS avulsa", "qualquer serviço, do zero, direto no Fracttal", "/os/tradicional", True),
+            ("OS de Performance", "geração e ETM, inversor, string ou tracker; nasce com o ticket", "/os/performance", False),
+            ("OS de Engenharia", "as OS que a Engenharia abre", "/os/engenharia", False),
+            ("Inspeção de chamados", "a inspeção que abre o chamado de garantia", "/os/chamados/inspecao", False),
+            ("Solicitação de OS", "pedir a OS ao PCM e acompanhar o pedido", "/os/solicitacao", True))
+
+
+def criar_os(codigo: str) -> list[dict]:
+    """As opções do Criar OS para a usina de código `codigo` (o do cadastro, que é o do ativo dela no Fracttal): [{rot,
+    sub, url}]. Sem o código no cadastro, todas abrem sem a usina escolhida."""
+    from urllib.parse import quote
+    ativo = f"?ativo={quote(str(codigo).strip())}" if str(codigo or "").strip() else ""
+    return [{"rot": rot, "sub": sub, "url": url + (ativo if leva else "")} for rot, sub, url, leva in CRIAR_OS]
 
 
 def _id(v):
@@ -157,17 +169,16 @@ def contexto(usina_id: int, cu: dict | None = None, rel_url: str = "") -> dict |
     vivos = sorted(m["vivos"].get(usina_id) or [], key=lambda i: (RG.ORDEM_SEV.get(i.get("sev"), 9), i.get("titulo") or ""))
     # o título do insight sem o nome da usina na frente ("Mandaguaçu: 1 extintor vencido"): a página já é dela
     vivos = [dict(i, titulo=PR.sem_o_nome(i.get("titulo"), x.get("usina") or "")) for i in vivos]
-    site = (m["visao"].get("sites_fracttal") or {}).get(usina_id) or ""
     return {"x": x, "cu": cu, "insights": vivos, "severidades": RG.SEVERIDADES, "regras": RG.REGRAS, "avisos": m["avisos"],
             "iniciais": _iniciais, "sem_responsavel": visao.SEM_RESPONSAVEL,
-            "p": montar(usina_id, x, cu, vivos, site=site, rel_url=rel_url)}
+            "p": montar(usina_id, x, cu, vivos, rel_url=rel_url)}
 
 
-def montar(usina_id: int, x: dict, cu: dict, vivos: list[dict], site: str = "", rel_url: str = "") -> dict:
+def montar(usina_id: int, x: dict, cu: dict, vivos: list[dict], rel_url: str = "") -> dict:
     """O que o prontuário mostra além da Central da usina (`cu`) e da linha da lista (`x`): o parecer e o que pede
     atenção, o painel do alto, a linha de cada cartão, o mês a mês, o COS, a zeladoria, as rondas, os equipamentos com OS
-    aberta, os chamados, a segurança, as demandas, a conversa, a composição e a linha do tempo. `site` = o nome da usina
-    no Fracttal (o "Criar ticket" abre o OS Creator com ela); `avisos` = o que não abriu."""
+    aberta, os chamados, a segurança, as demandas, a conversa, a composição e a linha do tempo. `avisos` = o que não
+    abriu."""
     hoje = visao._agora().date()
     lei = _de_todas()
     d = lei.dados or {}
@@ -250,9 +261,9 @@ def montar(usina_id: int, x: dict, cu: dict, vivos: list[dict], site: str = "", 
         "painel": PR.painel(u, x, itens, cos, vivos, resumos, anterior),
         "resumos": resumos,
         "pts_aguardando": pts_aguardando,
-        # as ações do alto: criar a OS (o OS Creator abre com a usina escolhida pelo código do ativo dela), criar o
-        # ticket (os planos da Performance, com a usina pelo nome dela no Fracttal) e o relatório em PDF do cliente
-        "planos": PLANOS_TICKET, "site": site, "rel_url": rel_url,
+        # as ações do alto: criar a OS (as formas de hoje do OS Creator, com a usina escolhida onde a tela de lá aceita) e
+        # o relatório em PDF do cliente
+        "criar_os": criar_os(x.get("codigo") or ""), "rel_url": rel_url,
         "rel_meses": cu.get("rel_meses") or [], "rel_mes": cu.get("rel_mes") or "", "rel_temas": cu.get("rel_temas") or [],
         "rel_campos": cu.get("rel_campos") or [],
         "meses": meses, "cos": cos, "zel": zel,
