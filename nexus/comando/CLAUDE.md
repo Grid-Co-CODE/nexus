@@ -244,6 +244,8 @@ recebe, quem pediu, o colega e quem não tem nada a ver; a Nova demanda pela tel
 o sininho).
 
 ## O visual
+**A ordem da Caixa de entrada (Levi, 13/11/2026):** o título só (sem a pergunta da tela e sem o "todas as torres · conta das HH:MM", "inútil"); os números dos insights no alto, como KPI, antes das demandas ("não faz sentido ter criar demanda de setores e depois seus insights"), cada número leva à sua lista; o **Sem dono vem recolhido**, só com o contador ("senão a rolagem é infinita"), e abre pelo número do alto, pelo clique ou pelo endereço de um insight dele (`insights.js`); o botão "Temas do meu setor" ao lado da Nova demanda ("eu não achei um de cadastro os temas").
+
 Uma lista numa superfície só, uma linha por insight que abre ao clicar (Levi: "não sou muito fã dessa barra lateral em
 vermelho, temos muito dela... poderia fazer algo diferente?"): a gravidade é um selo (ponto + palavra), sem faixa nem
 borda colorida; à direita, com quem está (as áreas avisadas e o retorno, ou o dono). Aberta: o que a regra viu, o que
