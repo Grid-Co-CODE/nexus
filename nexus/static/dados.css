@@ -194,36 +194,39 @@
   .dd-org-raiz-titulo{justify-content:center}
   .dd-org-carga{text-align:center}
   .dd-org-barra--raiz{margin-left:auto;margin-right:auto}
-  .dd-org-setores{position:relative;display:grid;grid-template-columns:repeat(var(--org-trilhas),minmax(0,1fr));column-gap:14px;padding-top:14px}
-  .dd-org-setores::before{content:"";position:absolute;left:50%;top:0;height:14px;border-left:2px solid var(--org-linha)}
-  .dd-org-setor{grid-column:span var(--trilhas);min-width:0;padding:14px 0 0}
-  /* o nome do setor tem lugar para 2 linhas em todos ("Segurança · HSEQ" quebra numa coluna): os nós ficam da mesma
-     altura e os fatos de todos os setores começam na mesma linha */
-  .dd-org-no-cab{min-height:44px}
-  .dd-org-setor::before{left:-7px;right:50%;top:0;bottom:auto;width:auto;height:0;border-left:0;border-top:2px solid var(--org-linha)}
-  .dd-org-setor::after{left:50%;right:-7px;top:0;width:auto;height:14px;border-top:2px solid var(--org-linha);border-left:2px solid var(--org-linha)}
-  .dd-org-setor:first-child::before{display:none}
-  .dd-org-setor:last-child::before{height:0}
-  .dd-org-setor:last-child::after{border-top:0}
-  .dd-org-fatos{position:relative;display:grid;grid-template-columns:repeat(var(--trilhas),minmax(0,1fr));
-    grid-template-rows:repeat(var(--linhas),auto);grid-auto-flow:column;column-gap:14px;padding-top:14px}
-  /* o barramento das colunas de um setor largo: do tronco da 1ª coluna ao da última (largura 0 com uma coluna só) */
-  .dd-org-fatos::before{content:"";position:absolute;top:8px;left:12px;height:0;border-top:2px solid var(--org-linha);
-    width:calc((100% - (var(--trilhas) - 1) * 14px) / var(--trilhas) * (var(--trilhas) - 1) + (var(--trilhas) - 1) * 14px)}
-  .dd-org-fatos>li:last-child::before{bottom:0;height:auto}
-  .dd-org-fatos>li.dd-org-fim::before{bottom:auto;height:27px}
-  .dd-org-fatos>li.dd-org-topo::before{top:-6px}
-  .dd-org-fatos>li:first-child::before{top:-14px}
-  /* as tabelas de origem são o rodapé do setor, da largura da coluna; os cartões ficam nas mesmas colunas e no mesmo
-     recuo dos ativos, sem barramento e sem galho */
-  .dd-org-fontes{margin-left:26px}
-  .dd-org-fatos.dd-org-fatos--fontes{grid-template-rows:none;grid-auto-flow:row;column-gap:14px;padding-top:0;margin-left:-26px}
-  .dd-org-fatos--fontes::before{display:none}
-  .dd-org-fatos--fontes>li{padding-left:26px}
-  .dd-org-barramento{position:relative;grid-template-columns:repeat(var(--org-dims),minmax(0,1fr));padding-top:16px;
+  .dd-org-barramento{position:relative;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));padding-top:16px;
     border-top:3px solid var(--org-linha);margin-top:16px}
-  .dd-org-dim::before{content:"";position:absolute;left:50%;top:-16px;height:16px;border-left:2px solid var(--org-linha)}
 }
+
+/* 12/11/2026 (Levi: "Organograma todo espremido"; "tem que ser fonte de backend"): os 13 setores numa linha só davam
+   ~90 px a cada coluna e o nome do fato quebrava letra a letra. Agora cada setor é um painel, lado a lado, que quebra de
+   linha (no mínimo 340 px); dentro, a árvore do setor (o tronco e os galhos das regras de cima) e o cartão do fato
+   compacto: o nome e o estado numa linha, o livro numa linha, na fonte de código; o resumo fica na gaveta. A raiz desce
+   até a grade pelo tronco */
+.dd-org-setores{position:relative;display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,340px),1fr));
+  gap:14px;padding-top:20px}
+.dd-org-setores::before{content:"";position:absolute;left:50%;top:0;height:20px;border-left:2px solid var(--org-linha)}
+.dd-org-setor{padding:12px 14px 14px;background:var(--superficie);border:1px solid var(--linha);border-radius:var(--raio-md);
+  min-width:0}
+.dd-org-setor::before,.dd-org-setor::after{display:none}
+.dd-org-setor .dd-org-no{background:transparent;border:0;border-bottom:1px solid var(--linha);border-radius:0;padding:0 0 10px}
+.dd-org-setor .dd-org-no:hover{background:transparent}
+.dd-org-setor .dd-org-no:hover .dd-org-no-cab b{color:var(--verde-texto)}
+.dd-org-no-cab b{font-family:var(--font-mono);font-weight:600;letter-spacing:-.01em}
+.dd-org-fatos>li{padding:6px 0 0 22px}
+.dd-org-fatos>li::before{left:9px}
+.dd-org-fatos>li::after{left:9px;top:22px;width:13px}
+.dd-org-fatos>li:last-child::before{height:23px}
+.dd-org-setor .dd-org-fato{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:3px 8px;
+  padding:6px 10px 7px;border-radius:var(--raio-controle);font-family:var(--font-mono)}
+.dd-org-setor .dd-org-fato>*{grid-column:1/-1}
+.dd-org-setor .dd-org-fato>.dd-org-nome{grid-column:1;grid-row:1;font:600 12px/1.35 var(--font-mono);overflow-wrap:anywhere}
+.dd-org-setor .dd-org-fato>.dd-org-linha{grid-column:2;grid-row:1}
+.dd-org-setor .dd-org-fato .dd-org-resumo,.dd-org-setor .dd-org-fato .dd-org-quem{display:none}
+.dd-org-setor .dd-org-livro code{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:10.5px}
+.dd-org-setor .dd-org-de{font:400 10.5px/1.35 var(--font-mono)}
+.dd-org-setor .dd-org-fontes{margin:12px 0 0;padding-top:10px}
+.dd-org-setor .dd-org-fatos--fontes>li{padding:0}
 
 /* o radar do banco (09/10/2026, Levi: "verifique se aparece a cada tabela nova que aparece!"): toda tabela do banco tem
    dono no catálogo; a nova aparece sozinha, com a contagem no alto do organograma, no tom crítico */

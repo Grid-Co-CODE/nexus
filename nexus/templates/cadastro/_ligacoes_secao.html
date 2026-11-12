@@ -44,7 +44,10 @@
 {% if aba == 'buracos' %}
 <p class="lig-ajuda">Chave de uma base que não ligou a usina nenhuma. Ligue a uma usina do cadastro do Nexus ou diga por que ignorar. Ligar grava só no Nexus que essa chave é aquela usina: a base de origem e o Fracttal não mudam. Vai ao banco quando você publicar.</p>
 <div class="cad-rolagem">
-<table class="cad-tabela lig-tabela">
+{# as colunas com largura fixa (12/11/2026, Levi: "Lista toda torta"): o "por quê" quebrava em 5 linhas e os campos de
+   ligar e ignorar dançavam de linha para linha #}
+<table class="cad-tabela lig-tabela lig-buracos">
+  <colgroup><col class="lig-c-base"><col class="lig-c-chave"><col class="lig-c-porque"><col class="lig-c-sug"><col class="lig-c-ligar"><col class="lig-c-ignorar"></colgroup>
   <thead><tr><th>Base</th><th>Chave na base</th><th>Por quê</th><th>Sugestões do Nexus</th><th>Ligar a uma usina do cadastro</th><th>Ignorar</th></tr></thead>
   <tbody>
   {% for b in buracos %}

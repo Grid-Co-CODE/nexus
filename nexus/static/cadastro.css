@@ -280,6 +280,21 @@ details.cad-dif summary{cursor:pointer;padding:9px 12px;color:var(--tinta-2);fon
 .lig-grupo summary{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 14px;cursor:pointer}
 .lig-direita{margin-left:auto}
 @media (max-width:760px){.lig-linha{flex-wrap:wrap}.lig-linha .gc-campo{min-width:0;flex:1}}
+/* a tabela dos buracos (12/11/2026, Levi: "Lista toda torta"): colunas de largura fixa, tudo à esquerda e no meio da
+   linha; os campos de ligar e de ignorar ocupam a coluna, com o botão do lado; a sugestão, um botão por linha, da largura
+   da coluna. Abaixo de 1180 px a tabela rola de lado (cad-rolagem) em vez de espremer */
+.lig-buracos{table-layout:fixed;width:100%;min-width:1080px}
+.lig-buracos th,.lig-buracos td{text-align:left;vertical-align:middle;padding:10px 12px}
+.lig-c-base{width:136px}.lig-c-chave{width:165px}.lig-c-porque{width:auto}.lig-c-sug{width:200px}
+.lig-c-ligar{width:230px}.lig-c-ignorar{width:200px}
+.lig-buracos td:nth-child(3){font-size:12.5px;line-height:1.45;color:var(--tinta-2)}
+.lig-buracos .lig-chave{overflow-wrap:anywhere}
+.lig-buracos .lig-base{overflow:hidden;text-overflow:ellipsis}
+.lig-buracos .lig-form.lig-linha{display:flex;flex-wrap:nowrap;width:100%}
+.lig-buracos .lig-linha .gc-campo{flex:1 1 auto;min-width:0;width:auto}
+.lig-buracos .lig-linha .gc-btn{flex:none}
+.lig-buracos .lig-form:not(.lig-linha){display:block}
+.lig-buracos .lig-sug{margin:0 0 4px}
 
 /* Base → Acessos (11/10/2026): os administradores do Nexus pela tela. O desenho é o do Cadastro; aqui só o encaixe da
    tabela dentro da seção (sem borda dupla), o formulário no alto da seção e a etiqueta "do servidor" no azul de

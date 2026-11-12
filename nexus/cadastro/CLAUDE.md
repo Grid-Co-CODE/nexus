@@ -731,6 +731,7 @@ colunas (a maioria escondida: o seletor de colunas mostra sem recarregar), e a p
 - **Decisões** moram em `C:\GridcoAuto\nexus\de_para_regras.json` (servidor: `dados/de_para_regras.json`), fora do
   git: `ignorar` (regra fixa "contem" ou chave exata da tela), `ligar` e `desligar` (chave → usina_id, vence o
   automático) e `ausencia` (usina ou cliente inteiro que a base não precisa ter). Fixas: teste, "Grid Co." e Porteiras.
+- **A tabela dos buracos das Ligações** (12/11/2026, Levi: "Lista toda torta"): colunas de largura fixa (`lig-buracos` + `<colgroup>`, cadastro.css): base, chave, o por quê (o resto da largura), sugestões, ligar e ignorar; os campos ocupam a coluna com o botão do lado. Abaixo de 1080 px a tabela rola de lado (`cad-rolagem`). Não use `lig-tabela` no nome de outra classe: os testes cortam o HTML por essa palavra.
 - **Ligações entre bases**, a seção do fim de Base → Governança de dados (`/t/base/governanca#ligacoes`; até 11/10/2026 a tela `/t/base/ligacoes`, que hoje redireciona para lá com os filtros — Levi: "essa visão de Base > Ligações entre bases vire uma seção no final de Governança de dados"; só admin com o cadastro ligado, os outros veem o aviso): "Ler as bases de novo" grava `de_para_atual.json` (as
   fontes lidas + o de_para; ~6–11 s); decidir reaplica sem rede; "Publicar no banco" manda ao `cadastro_nexus`. Abas:
   Buracos (com sugestões e ligar/ignorar), Ligado por nome (confirmar/desligar), Usinas fora (ausência esperada por
