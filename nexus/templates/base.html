@@ -9,6 +9,8 @@
     {% include "_entrar_de_novo_js.html" %}
   </script>
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  {# a barra do navegador no celular na cor do fundo do tema (12/11/2026) #}
+  <meta name="theme-color" content="{{ '#ffffff' if tema == 'claro' else '#090d18' }}">
   <title>{% block titulo %}Nexus{% endblock %} · Grid Co.</title>
   {% include "_icone.html" %}
   <link rel="preconnect" href="https://fonts.googleapis.com">

@@ -4,7 +4,7 @@ Levi, 05/10/2026: "quero parar de referenciar o Azure e ter uma visão nossa!". 
 (que mora no Azure) nem aponta para ele: todas leem o banco do Nexus (API db_performace) — os livros que o próprio App
 grava de hora em hora e o cadastro do Nexus. Aprovação e Triagem usam a cópia das regras do painel do App
 (`nexus/campo/regras_app.py`); Central de atenção, PT, Rondas e Zeladoria são contas NOSSAS (`nexus/campo/visao.py`).
-Rotas do dia fica no placeholder: o dado dela ainda não chega ao banco. Ordens de serviço, Imagens da ronda e Ranking
+Rotas do dia saiu do menu em 12/11/2026 (era o placeholder: o dado dela ainda não chega ao banco). Ordens de serviço, Imagens da ronda e Ranking
 saíram em 08/10/2026 (Levi: "ordens de serviço e imagens da ronda e ranking são redundantes"); o endereço antigo leva
 à Central.
 """
@@ -96,8 +96,9 @@ TORRE = Torre(
         # quem calcula é o App, que publica no livro ranking_app_campo (visao.ranking_pontos). Não é o Ranking de 08/10
         Tela("ranking", "Ranking de pontos", "Quem lidera a classificação de pontos do App no mês, e por quê?",
              "Livro ranking_app_campo (o placar do ciclo do App) no banco do Nexus"),
-        Tela("rotas", "Rotas do dia", "Qual a melhor ordem de visitas para cada equipe?",
-             "Programação do PCM + localização das usinas"),
+        # a Rotas do dia saiu do menu em 12/11/2026 (a revisão de desenho; Levi: "Segue pai"): era o lugar reservado, e
+        # quem abria lia "Para construir esta tela, crie a view em nexus/torres/campo/", um aviso para programador. Volta
+        # quando existir (a programação do PCM + a localização das usinas); o endereço guardado leva à Central
     ],
 )
 
@@ -107,7 +108,7 @@ bp.record_once(lambda estado: estado.app.register_blueprint(bp_assinatura))
 
 # Ordens de serviço, Ranking e Imagens da ronda saíram do menu em 08/10/2026: quem guardou o endereço cai na Central. O
 # /ranking voltou em 13/10/2026 com outra tela, o Ranking de pontos (o placar do ciclo do App)
-TELAS_QUE_SAIRAM = ("os", "imagens")
+TELAS_QUE_SAIRAM = ("os", "imagens", "rotas")
 
 
 def _tela_que_saiu():

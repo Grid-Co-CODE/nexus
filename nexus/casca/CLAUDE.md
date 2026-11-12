@@ -74,6 +74,10 @@ na plataforma, e o cookie `session` dos dois sistemas (mesmo nome, mesmo caminho
   --reescrita-do-servidor` a imita. O `/saude` do servidor já respondeu um commit enquanto os estáticos eram de outro: lá ele
   não prova versão sozinho.
 - **O `nexus_tema` fica em `/`** (o botão grava pelo navegador; nome próprio, não colide).
+- **O navegador sabe o tema** (12/11/2026, a revisão da Usinas 360° pelas diretrizes de interface web): `color-scheme`
+  (`dark` no `html`, `light` no `html[data-tema="claro"]`, no `nexus.css`; não no `:root`, cujos blocos de tokens são um só cada) faz a barra de rolagem, os campos e as listas
+  nativas seguirem o tema, e o `<meta name="theme-color">` do `base.html` pinta a barra do navegador no celular com o
+  fundo do tema que o servidor desenhou (a troca pelo botão só muda a barra na próxima página).
 - **Endereço da PLATAFORMA é outra coisa** (porta única, 09/10/2026): as molduras da Performance escrevem, de propósito, endereços da plataforma na raiz (`/painel/nexus/entrar`, `/painel/nexus/sair` e até 11/10/2026 as telas do mapa, como `/tempo-real` no "Abrir em outra aba", que saiu), porque ela mora na raiz ao lado do Nexus. Esses não levam `{{ raiz }}`: no template a variável se chama `plataforma` (`{{ plataforma }}/painel/nexus/entrar`, que o varredor estático aceita) e o rastreador os separa (`da_plataforma`). No JavaScript, a plataforma se pede por URL completa (o calço da camada da T.I. poria `/nexus` num `fetch("/api/...")`). Regra em `nexus/performance/CLAUDE.md`, seção "Porta única".
 - **Prova:** `tests/test_prefixo.py` (o rastreador `tests/rastreador_de_links.py` percorre todas as páginas a partir do
   Início, logado como admin e no OS Creator embutido, nos modos Caddy cortando, sem cortar, `SCRIPT_NAME` por outro meio e

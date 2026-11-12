@@ -80,6 +80,11 @@
   --papel-preencher:#fbfbe8; --papel-sugerido:#eaf6dc;
   --papel-crit-suave:#fde2e2; --papel-alerta-suave:#fdf0d5; --papel-ok-suave:#e3f6ea;
 }
+/* o navegador desenha a barra de rolagem, os campos e as listas nativas no tema da tela (12/11/2026, a revisão pelas
+   diretrizes de interface web: sem isto, a lista nativa abria clara no tema escuro) */
+/* no `html`, e não no `:root`: os blocos de tokens `:root` e `:root[data-tema="claro"]` são um só cada (test_tema.py) */
+html{color-scheme:dark}
+html[data-tema="claro"]{color-scheme:light}
 :root[data-tema="claro"]{
   /* superfícies e texto. O cartão é um cinza claro sobre o fundo branco, o espelho do escuro (fundo escuro, cartão mais
      claro); Levi, 04/11/2026: "o fundo claro podemos ter o fundo claro e os cards um pouco mais escuros, indico um cinza

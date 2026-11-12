@@ -38,7 +38,7 @@ o login do Fracttal de quem clica, como no OS Creator Web; ver "Aprovação de O
 | Rondas | `fato_ronda` (App, checklist da carga única, avulsa) + usinas mobilizadas do cadastro + `fato_fechamento` (última OS da usina) + a validação por foto (só sujidade e vegetação) | `visao.rondas` (conta nossa) |
 | Ronda avulsa (`/t/campo/rondas/avulsa`) | lançada à mão no Nexus, com o login do Fracttal | `campo/ronda_avulsa.py` |
 | **Ranking de pontos** (13/10/2026) | `ranking_app_campo` (o placar do ciclo, que o App publica) | **o App** (`_ciclo_v2`); o Nexus só mostra (ver "Ranking de pontos" abaixo) |
-| Rotas do dia | placeholder: programação do PCM + localização das usinas | — |
+| ~~Rotas do dia~~ | saiu do menu em 12/11/2026 (era o lugar reservado, com um aviso para programador); volta quando existir (programação do PCM + localização das usinas). O endereço leva à Central | — |
 
 **Saíram em 08/10/2026: Ordens de serviço, Imagens da ronda e Ranking** (Levi: "ordens de serviço e imagens da ronda e
 ranking são redundantes"): a nota do fechamento está na Aprovação e na Triagem, a comparação por região, equipe e
@@ -722,6 +722,46 @@ As constantes ficam no topo do arquivo; cada função diz a regra no docstring.
 - Cópia de 5 min por tela; banco fora do ar = a tela avisa "Não consegui ler o banco do Nexus" e não some. Nos testes,
   sem `app.extensions["nexus_dados_sessao"]`, nunca vai à rede.
 
+## A revisão de desenho da Usinas 360° (12/11/2026)
+
+Levi: "Web design guidelines em todas as páginas do usinas 360°. Vamos procurar hierarquias, ver onde dá para enxugar
+informação repetida e deixar mais bonito!". A auditoria olhou as dez telas como estavam em produção, pelas Web
+Interface Guidelines (vercel-labs/web-interface-guidelines) e por três perguntas: o que a pessoa vê primeiro, o que se
+repete e o que dá para tirar. Depois de ver a auditoria e a prévia da 1ª tela: "Segue pai". **As regras que saíram dela
+valem para toda tela daqui:**
+
+1. **A resposta da tela vem primeiro**, não no pé em letra pequena (a pergunta da Visão é "onde focar primeiro").
+2. **Cor só no que pede ação.** Se todo cartão tem a borda vermelha, ela não separa ninguém. Em barra de triagem, só o
+   "focar" é cheio; "acompanhar" e "em dia" são apagados.
+3. **Cada número tem uma tela dona**; as outras mostram o total e levam até lá.
+4. **Rótulo é cabeçalho de coluna**, não texto repetido em cada cartão; a legenda das cores, uma vez por tela.
+5. **Um nível de superfície** (nada de caixa dentro de caixa).
+6. **Procedência e texto técnico moram no "!"** da tela.
+7. **Régua nova se pergunta ao Levi**; a revisão só REARRUMA o que as réguas de sempre já dizem.
+
+A ordem combinada: (1) ajustes técnicos e Rotas do dia fora do menu; (2) Visão do responsável, as três abas; (3) Central
+de atenção e Rondas juntas (cada número com a sua tela dona); (4) Aprovação de OS (a página manda as 1.325 OS de uma
+vez, 3,2 MB); (5) Ranking e Ocorrências. Uma tela por vez. **Feito até aqui (1ª entrega, 12/11/2026):**
+
+- **Ajustes técnicos:** "…" nas mensagens de carregamento das fotos da ronda; o ponto do gráfico de evolução com o foco
+  do teclado à vista; `color-scheme` por tema e `theme-color` (casca: `nexus.css` e `base.html`); `text-wrap: balance`
+  no título e na pergunta.
+- **Rotas do dia saiu do menu** (`TELAS_QUE_SAIRAM`): era o lugar reservado e mostrava "Para construir esta tela, crie a
+  view em nexus/torres/campo/".
+- **Visão do responsável > Por responsável é um QUADRO comparativo** (`cr-quadro`, no lugar dos 8 cartões com 20 números
+  cada): uma linha por pessoa, na ordem de sempre; o **Focar primeiro** (`pior`) ao lado do nome; as três frentes em
+  coluna, cada uma com a barra da triagem (quantas usinas em cada nível, o número dentro do pedaço) e UM número (a meta
+  do mês na cor da régua, as rondas pendentes, as tarefas atrasadas), dito uma vez no cabeçalho; embaixo, em vermelho, só
+  o que a régua de sempre já pintava de crítico (a disponibilidade crítica, a PT parada com parada de hoje, o extintor
+  vencido). **Saíram da frente** e ficam nas usinas da pessoa, que a linha inteira abre: abaixo da meta, a
+  disponibilidade que não é crítica, chamados, tarefas pausadas e semana passada. A PT parada sem nenhuma de hoje também
+  não aparece (a régua de sempre não a pintava). No celular (até 900 px) cada linha vira um bloco com o rótulo de cada
+  frente. Medido com os dados de 12/11: a tela caiu de 1.660 px para ~1.270 px de altura e a legenda das cores, de 24
+  vezes para 1.
+- **A Parada agora numa linha** (ver "O bloco Manutenção, a Limpeza e a faixa Parada agora").
+- **Prova:** `tests/test_campo_design_360_1211.py`; na bancada com o banco de verdade só para leitura, nos dois temas e
+  a 500 px.
+
 ## Visão do responsável (12/10/2026)
 
 Levi: "Precisamos criar uma visão que os supervisores irão usar, uma visão que ele olha as usinas, as metas, os
@@ -1123,7 +1163,10 @@ das usinas dele. Levi, 18/10/2026: o objetivo é os responsáveis largarem os pa
   nível depende de quem olha, ele sai NO PEDIDO (`com_manutencao`, cópias rasas: a cópia de 5 min é comum a todos).
 - **A Limpeza** (Acompanhamento): "S2 V5" na cor do achado mais grave da régua das Rondas (nível 5 ou vala obstruída é
   crítico; nível 4, vala parcial ou sensor sujo é atenção); no detalhe, sujidade, vegetação, vala, sensores e o dia da
-  ronda. A **faixa Parada agora**: as OS de parada abertas nas usinas DO FILTRO, a mais antiga primeiro, 6 e "e mais N".
+  ronda. A **faixa Parada agora**: as OS de parada abertas nas usinas DO FILTRO, a mais antiga primeiro. Desde 12/11/2026
+  (a revisão de desenho), fora do Painel ela é UMA linha: o total, a mais antiga e o "ver as N", que abre a lista inteira
+  ali mesmo (`<details class="cr-parada">`; antes, 6 em texto corrido num bloco vermelho e "e mais N"). No Painel segue
+  com todas à vista até a vez dele na revisão.
 - **Avisos:** sem o `nexus_os` no banco, "As OS do Fracttal ainda não chegaram ao banco" e o bloco não cobra por elas;
   a última leitura do Fracttal desta máquina que falhou ou se recusou a gravar (`tarefas_os.estado()`, lido no pedido)
   aparece no topo, com o motivo e de quando são as OS que valem. A foto das OS diz o dia quando não é de hoje

@@ -234,12 +234,12 @@ def test_o_link_do_email_da_seguranca_abre_o_painel_pelo_numero_da_pessoa(tela, 
     html = logado.get("/t/campo/responsaveis?r=91&modo=painel").get_data(as_text=True)
     assert 'aria-current="page">Painel' in html and '<h1 class="cn-titulo">Ciclano Chefe</h1>' in html
     # o número de quem não é responsável não filtra nada: os cartões de todos
-    assert 'class="cn-equipes"' in logado.get("/t/campo/responsaveis?r=999").get_data(as_text=True)
+    assert 'class="cr-quadro"' in logado.get("/t/campo/responsaveis?r=999").get_data(as_text=True)
 
 
 def test_todos_sem_responsavel_segue_nos_cartoes_e_o_painel_de_todos_abre(tela, logado):
     html = logado.get("/t/campo/responsaveis").get_data(as_text=True)
-    assert 'class="cn-equipes"' in html and 'class="pn"' not in html             # quem não é responsável: os cartões
+    assert 'class="cr-quadro"' in html and 'class="pn"' not in html              # quem não é responsável: o quadro
     html = logado.get("/t/campo/responsaveis?modo=painel&responsavel=*").get_data(as_text=True)
     assert 'class="pn"' in html and "Todos os responsáveis</h1>" in html
 

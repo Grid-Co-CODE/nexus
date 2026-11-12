@@ -33,7 +33,6 @@
 {% macro c_meta(a) %}{{ 'cn-t-neutro' if a is none else ('cn-t-ok' if a >= limites.meta_ok else ('cn-t-alerta' if a >= limites.meta_atencao else 'cn-t-critico')) }}{% endmacro %}
 {% macro c_disp(x) %}{{ 'cn-t-neutro' if x is none else ('cn-t-ok' if x >= limites.disp_ok else ('cn-t-alerta' if x >= limites.disp_critico else 'cn-t-critico')) }}{% endmacro %}
 {% macro triagem(t) %}<div class="cr-triagem" role="img" aria-label="{{ t.critico }} para focar, {{ t.atencao }} para acompanhar e {{ t.ok }} que podem esperar">{% if t.critico %}<span class="c" style="flex: {{ t.critico }}"></span>{% endif %}{% if t.atencao %}<span class="a" style="flex: {{ t.atencao }}"></span>{% endif %}{% if t.ok %}<span class="o" style="flex: {{ t.ok }}"></span>{% endif %}</div>{% endmacro %}
-{% macro triagem_leg(t) %}<div class="cr-tri-leg"><span><b class="cn-t-critico">{{ t.critico }}</b>focar</span><span><b class="cn-t-alerta">{{ t.atencao }}</b>acompanhar</span><span><b class="cn-t-ok">{{ t.ok }}</b>em dia</span></div>{% endmacro %}
 {# o detalhe de um bloco de uma usina, na linha da Visão geral (18/10/2026; era o detalhe dos blocos de Onde focar) #}
 {# as linhas de um bloco (a Central da usina, 04/11/2026, mostra só as que pedem cada quadro, com os mesmos botões) #}
 {% macro det_linhas(u, linhas, perf=false, marca=none) %}
@@ -167,7 +166,17 @@
       <span class="pn-kpi-txt"><small>OSs em verificação</small><span><b data-pn-verif-num>…</b> esperando concluir</span></span>
       <i class="ph ph-caret-right pn-kpi-seta" aria-hidden="true"></i></button>
   {% endif %}
-  {% if faixa and modo != 'usina' %}
+  {# fora do Painel, a Parada agora numa linha (12/11/2026, a revisão de desenho: eram 6 paradas em texto corrido num
+     bloco vermelho): o total, a mais antiga e o "ver as N", que abre a lista inteira ali mesmo #}
+  {% if faixa and modo not in ('usina', 'painel') %}{% set n_par = faixa|length %}{% set u0, p0 = faixa[0] %}
+  <details class="cr-parada">
+    <summary><b>{{ n_par }}</b> <span>parada{{ 's' if n_par != 1 }} agora</span>
+      {% if n_par == 1 %}<span><strong>{{ u0.usina }} · {{ p0.escopo }}</strong> · OS {{ p0.os }} · desde {{ p0.inicio }}</span>
+      {% else %}<span>a mais antiga: <strong>{{ u0.usina }} · {{ p0.escopo }}</strong>, desde {{ p0.inicio }}</span>
+      <span class="cr-parada-ver">ver as {{ n_par }}</span>{% endif %}</summary>
+    {% if n_par > 1 %}<ul class="cr-parada-lista">{% for u, p in faixa %}<li><b>{{ u.usina }}</b> · {{ p.escopo }} · OS {{ p.os }} · desde {{ p.inicio }}</li>{% endfor %}</ul>{% endif %}
+  </details>
+  {% elif faixa and modo == 'painel' %}
   <div class="cr-parada" role="status">
     <b>Parada agora</b>
     {# no Painel, todas (Levi, 28/10/2026: "não podemos deixar nada de fora"); nas outras visões, as 6 mais antigas #}
@@ -327,49 +336,46 @@
     </form>
   </template>
   {% elif modo == 'cartoes' %}
-  {# um cartão por Responsável O&M, com os dois blocos: quantas usinas pedem foco, acompanhamento ou podem esperar em
-     cada um e os números do grupo; o cartão abre as usinas dele #}
-  <div class="cn-equipes">
+  {# o quadro comparativo (12/11/2026, a revisão de desenho; Levi, vendo a prévia: "Segue pai"). Até aqui era um cartão
+     por Responsável O&M com os três blocos, 20 números do mesmo peso e a legenda das cores em cada bloco. Agora uma
+     linha por pessoa: o "Focar primeiro" (o `pior`, a resposta da pergunta da tela) ao lado do nome; cada frente com a
+     barra da triagem (quantas usinas em cada nível, o número dentro) e UM número (a meta do mês, as rondas pendentes,
+     as tarefas atrasadas), dito uma vez no cabeçalho; embaixo, em vermelho, só o que a régua de sempre já pintava de
+     crítico (a disponibilidade crítica, a PT parada de hoje, o extintor vencido). O resto dos números (abaixo da meta,
+     chamados, tarefas pausadas, semana passada) fica nas usinas da pessoa, que a linha abre #}
+  {% macro frente(t, valor, cls, fora) %}{% set tot = t.critico + t.atencao + t.ok %}
+        <div class="cr-qf">
+          <div class="cr-qbar" role="img" aria-label="{{ t.critico }} para focar, {{ t.atencao }} para acompanhar e {{ t.ok }} em dia" title="{{ t.critico }} para focar, {{ t.atencao }} para acompanhar e {{ t.ok }} em dia">{% for k, n in (('c', t.critico), ('a', t.atencao), ('o', t.ok)) if n %}<span class="{{ k }}" style="flex: {{ n }}">{{ n if n * 10 >= tot else '' }}</span>{% endfor %}</div>
+          <b class="cr-qnum {{ cls }}">{{ valor }}</b>
+          {% if fora %}<div class="cr-qfora">{% for f in fora %}<span>{{ f }}</span>{% endfor %}</div>{% endif %}
+        </div>{% endmacro %}
+  {% if cartoes %}
+  <p class="cr-quadro-leg"><span><i class="c"></i>focar</span><span><i class="a"></i>acompanhar</span><span><i class="o"></i>em dia</span></p>
+  <table class="cr-quadro">
+    <colgroup><col class="q1"><col class="q2"><col><col><col><col class="q6"></colgroup>
+    <thead><tr><th scope="col">Responsável</th><th scope="col">Focar primeiro</th>
+      <th scope="col">Performance<small>meta do mês</small></th><th scope="col">Acompanhamento<small>rondas pendentes</small></th>
+      <th scope="col">Manutenção<small>tarefas atrasadas</small></th><th scope="col" aria-hidden="true"></th></tr></thead>
+    <tbody>
     {% for c in cartoes %}
-    <a class="cn-equipe cn-equipe--{{ cor[c.nivel] }} cn-sup{% if c.responsavel == sem_responsavel %} cn-sup--sem{% endif %}" href="{{ url(responsavel=c.responsavel, modo=None, filtro=None, bloco=None) }}">
-      <div class="cn-eq-cab">
-        <div class="cn-eq-titulo"><b>{{ c.responsavel }}</b></div>
-        <span>{{ 'usinas sem responsável O&M no cadastro' if c.responsavel == sem_responsavel else 'Responsável O&M' }} · {{ c.usinas }} usina{{ 's' if c.usinas != 1 }} mobilizada{{ 's' if c.usinas != 1 }}</span>
-      </div>
-      <div class="cr-card-bloco">
-        <div class="cr-card-tit"><span>Performance</span>{{ triagem_leg(c.perf) }}</div>
-        {{ triagem(c.perf) }}
-        <dl class="cr-mini">
-          <div><dt>Meta do mês</dt><dd class="{{ c_meta(c.meta_pct) }}">{{ pct(c.meta_pct, 1) }}</dd></div>
-          <div><dt>Abaixo da meta</dt><dd>{{ c.abaixo_meta }}</dd></div>
-          <div><dt>Disponibilidade</dt><dd class="{{ c_disp(c.disp) }}">{{ pct(c.disp, 1) }}</dd></div>
-        </dl>
-      </div>
-      <div class="cr-card-bloco">
-        <div class="cr-card-tit"><span>Acompanhamento</span>{{ triagem_leg(c.acomp) }}</div>
-        {{ triagem(c.acomp) }}
-        <dl class="cr-mini cr-mini--4">
-          <div><dt>Rondas pendentes</dt><dd>{{ c.rondas }}</dd></div>
-          <div><dt>PT paradas</dt><dd{% if c.agora %} class="cn-t-critico"{% endif %}>{{ c.paradas }}{% if c.agora %} <small>({{ c.agora }} hoje)</small>{% endif %}</dd></div>
-          <div><dt>Chamados</dt><dd>{{ c.chamados }}</dd></div>
-          <div><dt>Extintores vencidos</dt><dd{% if c.ext_vencidos %} class="cn-t-critico"{% endif %}>{{ c.ext_vencidos }}</dd></div>
-        </dl>
-      </div>
-      <div class="cr-card-bloco">
-        <div class="cr-card-tit"><span>Manutenção</span>{{ triagem_leg(c.manut) }}</div>
-        {{ triagem(c.manut) }}
-        <dl class="cr-mini">
-          <div><dt>Tarefas atrasadas</dt><dd>{{ c.atrasadas }}</dd></div>
-          <div><dt>Tarefas pausadas</dt><dd>{{ c.tarefas_paradas }}</dd></div>
-          <div><dt>Semana passada</dt><dd>{{ pct(c.semana_pct, 0) }}</dd></div>
-        </dl>
-      </div>
-      {% if c.pior %}<span class="cr-pior">Primeiro: {{ c.pior|join(', ') }}</span>{% endif %}
-    </a>
-    {% else %}
-    <p class="mudo">Nenhum responsável com esses filtros.</p>
+    {% set fora_perf = ['disponibilidade ' ~ pct(c.disp, 1)] if c_disp(c.disp) == 'cn-t-critico' else [] %}
+    {% set fora_acomp = ([c.paradas ~ ' PT parada' ~ ('s' if c.paradas != 1 else '') ~ ', ' ~ c.agora ~ ' hoje'] if c.agora else [])
+                        + ([c.ext_vencidos ~ (' extintores vencidos' if c.ext_vencidos != 1 else ' extintor vencido')] if c.ext_vencidos else []) %}
+    <tr class="cr-qlin{% if c.responsavel == sem_responsavel %} cr-qlin--sem{% endif %}">
+      <th scope="row"><a class="cr-qquem" href="{{ url(responsavel=c.responsavel, modo=None, filtro=None, bloco=None) }}">{{ c.responsavel }}</a>
+        <small>{{ c.usinas }} usina{{ 's' if c.usinas != 1 }}{{ ' sem responsável no cadastro' if c.responsavel == sem_responsavel }}</small></th>
+      <td class="cr-qfoco" data-rot="Focar primeiro">{{ c.pior|join(', ') if c.pior else '—' }}</td>
+      <td data-rot="Performance · meta do mês">{{ frente(c.perf, pct(c.meta_pct, 1), c_meta(c.meta_pct), fora_perf) }}</td>
+      <td data-rot="Acompanhamento · rondas pendentes">{{ frente(c.acomp, c.rondas, '', fora_acomp) }}</td>
+      <td data-rot="Manutenção · tarefas atrasadas">{{ frente(c.manut, c.atrasadas, '', []) }}</td>
+      <td class="cr-qir" aria-hidden="true"><i class="ph ph-caret-right"></i></td>
+    </tr>
     {% endfor %}
-  </div>
+    </tbody>
+  </table>
+  {% else %}
+  <p class="mudo">Nenhum responsável com esses filtros.</p>
+  {% endif %}
   {% elif modo == 'geral' %}
   {# a Visão geral (18/10/2026, Levi: "uma visão onde unifica todas as usinas"; no mesmo dia, no lugar de Onde focar: "A
      IDEIA É QUE A VISÃO GERAL SEJA UMA MELHORIA DO ONDE FOCAR, ENTÃO PODE TIRAR O ONDE FOCAR"). Os três blocos em cima,

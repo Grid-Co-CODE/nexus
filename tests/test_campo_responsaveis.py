@@ -236,7 +236,8 @@ def test_fonte_que_falha_nao_derruba_as_outras(tela, monkeypatch):
 def test_tela_dos_cartoes_e_a_dos_dois_blocos(tela, logado):
     html = logado.get("/t/campo/responsaveis").get_data(as_text=True)
     assert "Visão do responsável" in html and "Ciclano Chefe" in html and "Beltrano Supervisor" in html
-    assert "responsavel=Ciclano+Chefe" in html and "Extintores vencidos" in html   # o cartão abre as usinas dele
+    # a linha do quadro abre as usinas dele; o extintor vencido aparece porque está fora da régua (12/11/2026)
+    assert "responsavel=Ciclano+Chefe" in html and re.search(r"\d+ extintor(es)? vencidos?<", html)
     # escolhido o responsável, o Painel (Levi, 28/10/2026: "uma tela inicial claro, se for para se aprofundar aí é outro
     # nível"); a Visão geral (18/10/2026, no lugar de Onde focar) é a aba do outro nível
     html = logado.get("/t/campo/responsaveis?responsavel=Ciclano+Chefe").get_data(as_text=True)
@@ -759,10 +760,12 @@ def test_a_ordem_do_bloco_manutencao():
         "A", "B", "C", "J", "D", "E", "F", "I", "G", "H"]
 
 
-def test_cartoes_com_os_tres_blocos(manut, logado):
+def test_o_quadro_com_as_tres_frentes(manut, logado):
+    """Desde 12/11/2026 (a revisão de desenho) os cartões são um quadro: uma linha por responsável, as três frentes em
+    coluna, cada uma com a sua barra."""
     html = logado.get("/t/campo/responsaveis?modo=cartoes&responsavel=*").get_data(as_text=True)
-    cartoes = html[html.index('class="cn-equipes"'):html.index('</main>')]
-    assert cartoes.count("<span>Manutenção</span>") == 2
+    quadro = html[html.index('<table class="cr-quadro"'):html.index('</table>')]
+    assert quadro.count('class="cr-qlin') == 2 and quadro.count('class="cr-qbar"') == 6 and "Manutenção" in quadro
 
 
 def test_a_programacao_e_lida_do_fim(tela, monkeypatch):
@@ -1088,7 +1091,7 @@ def test_todos_os_responsaveis_fica_na_visao_geral(manut, logado):
     todos = re.search(r'href="([^"]*)" title="As usinas de todos os responsáveis"', html).group(1)
     assert "modo=geral" in todos
     html = logado.get("/t/campo/responsaveis?modo=cartoes&responsavel=*&filtro=manut.atrasadas&bloco=perf").get_data(as_text=True)
-    cartoes = re.findall(r'class="cn-equipe[^"]*cn-sup[^"]*" href="([^"]*)"', html)
+    cartoes = re.findall(r'<a class="cr-qquem" href="([^"]*)"', html)
     assert cartoes and all("filtro=" not in h and "bloco=" not in h for h in cartoes)
 
 
@@ -1171,7 +1174,7 @@ def test_o_destaque_do_bloco_e_uma_faixa_verde_do_cabecalho_ao_fim(manut, logado
 def test_as_reguas_ficam_no_ponto_de_exclamacao_ao_lado_do_titulo(manut, logado):
     """Levi (05/11/2026, o padrão do Nexus): "De onde vem cada número, e a régua de cada alerta" mora no "!" amarelo ao
     lado do título (antes, desde 18/10, ficava num "!" abaixo da tabela). Fechado ao abrir a tela; o texto de sempre."""
-    for modo, tabela in (("geral", 'class="cr-gr-lista"'), ("cartoes", 'class="cn-equipes"')):
+    for modo, tabela in (("geral", 'class="cr-gr-lista"'), ("cartoes", '<table class="cr-quadro"')):
         html = logado.get(f"/t/campo/responsaveis?responsavel=*&modo={modo}").get_data(as_text=True)
         i = html.index('<details class="gc-explica">')
         assert html.index('<h1 class="cn-titulo">') < i < html.index(tabela), modo

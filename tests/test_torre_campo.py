@@ -52,9 +52,11 @@ def test_sem_banco_a_tela_avisa_e_nao_some(logado):
     assert "Não consegui ler o banco do Nexus" in html and "Rondas" in html
 
 
-def test_rotas_segue_em_construcao(logado):
-    html = logado.get("/t/campo/rotas").get_data(as_text=True)
-    assert "Em construção" in html and "<iframe" not in html
+def test_rotas_saiu_do_menu_ate_existir(logado):
+    """Até 12/11/2026 a Rotas do dia ficava no menu como lugar reservado ("Em construção", com um aviso para
+    programador). Saiu do menu na revisão de desenho; o endereço guardado leva à Central."""
+    r = logado.get("/t/campo/rotas")
+    assert r.status_code == 302 and r.headers["Location"].endswith("/t/campo/atencao")
 
 
 def test_a_torre_se_chama_usinas_360_e_o_endereco_fica(logado):

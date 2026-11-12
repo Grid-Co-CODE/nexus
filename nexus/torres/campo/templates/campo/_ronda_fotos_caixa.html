@@ -21,7 +21,7 @@
       clearInterval(linha._espera);
       linha.dataset.carregada = '1';
       var td = linha.firstElementChild;
-      td.textContent = 'Buscando as fotos da OS no Fracttal...';
+      td.textContent = 'Buscando as fotos da OS no Fracttal…';
       fetch(b.dataset.url, {credentials: 'same-origin'}).then(function (r) { return r.text(); })
         .then(function (html) {
           td.innerHTML = html;
@@ -68,7 +68,7 @@
     function mostra(k) {
       atual = (k + lista.length) % lista.length;
       var texto = (lista[atual].dataset.legenda || '') + '  (' + (atual + 1) + ' de ' + lista.length + ')';
-      leg.textContent = texto + '  · carregando...';
+      leg.textContent = texto + '  · carregando…';
       img.onload = function () { leg.textContent = texto; };
       img.src = lista[atual].href; img.alt = lista[atual].dataset.legenda || '';
       // a anterior e a próxima já vêm pedidas: andar com as setas não espera
