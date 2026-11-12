@@ -18,8 +18,8 @@ Cada rota daqui: só administrador e setor PCM, pedido só da própria página (
 Fracttal (a régua, o cadastro da curadoria, gravar, continuar, encerrar) confere também a PESSOA (`_estoque_da_pessoa`): a senha de
 administrador não é uma pessoa (409), e a conta do Fracttal do cookie tem de ser a pessoa da sessão do Nexus (409; a revisão final
 de 27/10/2026 achou a régua e o cadastro sem essa conferência). Cada tarefa põe as rotas dela num bloco próprio: o lote da contagem
-(Tasks 5 e 6), a régua (Task 8; desde 11/11/2026 também todos os acordados do almoxarifado de uma vez), a curadoria (Task 9), a
-gravação (Task 7).
+(Tasks 5 e 6), a régua (Task 8; desde 11/11/2026 também todos os acordados do almoxarifado de uma vez), a curadoria (Task 9; desde
+12/11/2026 também as opções do Tipo e das Classificações, com a mesma conferência da pessoa), a gravação (Task 7).
 """
 from __future__ import annotations
 
@@ -31,6 +31,7 @@ from flask import Blueprint, current_app, jsonify, render_template, request, ses
 from ...dados import almoxarifado as A
 from ...prefixo import na_raiz
 from .. import telas
+from . import classificacao as CL
 from . import curadoria, erros, quem, regua
 from . import estoque as E
 
@@ -184,17 +185,37 @@ def regua_gravar_todos():
 
 
 # ── a curadoria: cadastrar a peça nova no Fracttal (Task 9) ─────────────────────────────────────────────────────────────
+CURADORIA = "/t/pcm/pecas/inventario/curadoria"
+
+
 @bp.route("/curadoria/cadastrar", methods=["POST"])
 def curadoria_cadastrar():
     """Cria a peça no Fracttal (`criar_peca`, com o código reservado antes, sem duplicar) e grava a decisão `cadastrar`. As
-    outras decisões da curadoria só gravam no livro e ficam em `/t/pcm/pecas/inventario/curadoria/decidir`."""
+    outras decisões da curadoria só gravam no livro e ficam em `/t/pcm/pecas/inventario/curadoria/decidir`. Desde 12/11/2026 o
+    formulário traz também o Tipo e as Classificações (`tipo`, `classificacao_1`, `classificacao_2`: o id da opção, ou vazio
+    para "sem"), conferidos contra as opções do Fracttal (a mesma cópia de 1 h da rota `classificacoes`) antes de criar: o id que
+    não está nelas é 400 e nada vai ao Fracttal."""
     f = request.form
-    de = "/t/pcm/pecas/inventario/curadoria"
-    r = _com_o_fracttal(de, lambda est: curadoria.decidir(
+    grupos = {c: f.get(c) for c in CL.CAMPOS if f.get(c) is not None}
+    r = _com_o_fracttal(CURADORIA, lambda est: curadoria.decidir(
         current_app.config, str(f.get("contagem") or "").strip(), str(f.get("linha") or "").strip(), "cadastrar",
-        sigla=f.get("sigla"), nome=f.get("nome"), unidade=f.get("unidade"), estoque=est, pessoa=quem.do_pedido())["texto"],
-        ao="cadastro")
-    return r if not isinstance(r, str) else _ok("pcm_curadoria_aviso", r, de)
+        sigla=f.get("sigla"), nome=f.get("nome"), unidade=f.get("unidade"), estoque=est, pessoa=quem.do_pedido(),
+        grupos=grupos, opcoes_grupos=lambda: CL.guardadas(est))["texto"], ao="cadastro")
+    return r if not isinstance(r, str) else _ok("pcm_curadoria_aviso", r, CURADORIA)
+
+
+@bp.route("/classificacoes")
+def curadoria_classificacoes():
+    """As opções do Tipo e das Classificações da peça (12/11/2026, item 3 da 2ª rodada), para a página da curadoria encher as
+    três seleções do cadastrar: `{"ok", "opcoes": {campo: [{"id", "descricao", "chave"}]}}` (`classificacao.guardadas`, as das
+    próprias peças do Fracttal, numa cópia de 1 h na memória do processo). As recusas de toda rota da ponte (`_com_o_fracttal`):
+    403 de outro site ou de outro setor, 409 a senha de administrador (não é uma pessoa) e a conta do Fracttal de outra pessoa,
+    401 sem o login do Fracttal, 429 e 502 do Fracttal. A página que não consegue as opções esconde as seleções e diz que o
+    Tipo e a Classificação ficam para o Fracttal."""
+    r = _com_o_fracttal(CURADORIA, lambda est: {"opcoes": CL.guardadas(est)})
+    if not isinstance(r, dict):
+        return r
+    return _json({"ok": True, "opcoes": r["opcoes"]}, 200)
 
 
 # ── a gravação da contagem no Fracttal: gravar, continuar, encerrar (Task 7) ─────────────────────────────────────────────

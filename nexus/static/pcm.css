@@ -1609,6 +1609,14 @@ details.inv-card:not([open])>summary{border-bottom:0}
 .cu-op .cu-form{margin-top:0;padding:0 12px 12px}
 .cu-form .gc-campo{width:100%;box-sizing:border-box}
 .cu-form button{align-self:flex-start;margin-top:4px}
+/* o Tipo e as Classificações do cadastrar (12/11/2026, item 3 da 2ª rodada): as três seleções num quadro dentro do formulário,
+   que nasce escondido e o pcm-curadoria-grupos.js mostra quando as opções chegam. O display:flex vence o [hidden] do navegador
+   (a armadilha das abas do Almoxarifado): o [hidden] daqui é que esconde */
+.cu-grupos{display:flex;flex-direction:column;gap:6px;min-width:0;margin:4px 0 0;padding:6px 10px 10px;
+  border:1px solid var(--linha);border-radius:10px}
+.cu-grupos[hidden],.cu-grupos-sem[hidden]{display:none}
+.cu-grupos legend{padding:0 4px}
+.cu-grupos p{margin:0}
 /* Os dados da peça e as fotos ampliadas (30/10/2026, itens 2 e 3 das melhorias): o fabricante, o modelo e o número de série
    numa lista de rótulo e valor, cada um com a miniatura da foto dele (40 px), e a da peça à esquerda (96 px). A miniatura é
    um <button> sem a cara de botão (a foto é o botão; o foco é o anel do Nexus). A caixa (<dialog>, pcm-fotos.js) usa o véu e

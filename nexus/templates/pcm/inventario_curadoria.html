@@ -25,16 +25,50 @@
    NÃO vão ao Fracttal pela API (31/10/2026: o `description` do `item_insert` não foi provado): o cadastrar lembra de completá-
    los na tela do Fracttal, junto do grupo, da criticidade e da Curva ABC, e a peça já cadastrada lembra em "Já decididas".
    A sigla sugerida (11/11/2026, o PCM: "sugerir o código baseado nas famílias já criadas") vem escolhida no select do
-   cadastrar, com as peças parecidas do catálogo do App; o PCM pode trocar. #}
+   cadastrar, com as peças parecidas do catálogo do App; o PCM pode trocar.
+   O Tipo e as duas Classificações (12/11/2026, o PCM: "com base nos que já existem e são parecidos ele indicasse e colocasse
+   automaticamente como sugestão"): três seleções no cadastrar (o achado e a avariada), que a página enche pela ponte
+   (pcm-curadoria-grupos.js, `GET /os/_nexus/inventario/classificacoes`: as opções do Fracttal, com o id), com a sugerida já
+   escolhida e marcada "(sugerida)" (a chave dela vem do servidor, `data-sug-*`; a reserva de uma tentativa anterior vale mais,
+   `data-res-*`). Sem a ponte (quem entrou pela senha, sem o login do Fracttal, ou o Fracttal que não respondeu) as seleções
+   não aparecem e a tela diz que o Tipo e a Classificação ficam para o Fracttal. #}
+{% macro grupos_do_cadastro(x, n) %}
+{# as três seleções do Tipo e da Classificação de um cadastrar; a regra e a sugestão em nexus/pcm/inventario/classificacao.py e
+   curadoria.sugerir_classificacao. Nascem desligadas (o que está desligado não vai no formulário) e escondidas, e o script
+   liga as que recebem as opções #}
+{% set cl = x.classificacao or {} %}{% set sug = cl.campos or {} %}
+{% set reservou = x.reserva and x.reserva.grupos is mapping %}
+{% if com_pessoa %}
+<fieldset class="cu-grupos" data-cu-grupos hidden{% if reservou %} data-reserva="1"{% endif %}{% for c, _r in campos_grupo %} data-sug-{{ c }}="{{ sug[c].chave if sug[c] else '' }}" data-res-{{ c }}="{{ x.reserva.grupos[c] if reservou and x.reserva.grupos[c] else '' }}"{% endfor %}>
+  <legend class="gc-rotulo">Tipo e classificação no Fracttal</legend>
+  {% for c, rot in campos_grupo %}
+  <label class="gc-rotulo" for="cu-{{ c }}-{{ n }}">{{ rot }}</label>
+  <select class="gc-campo" id="cu-{{ c }}-{{ n }}" name="{{ c }}" data-campo="{{ c }}" disabled><option value="">sem</option></select>
+  {% endfor %}
+  {% set por = {'parecidas': 'pelas peças parecidas', 'familia': 'pela Família ' ~ cl.familia, 'boa': 'o da peça boa'} %}
+  {% if reservou %}<p class="alm-det">Vêm escolhidos os da tentativa anterior desta linha (a reserva): repita com eles.</p>
+  {% elif sug %}<p class="alm-det cu-sugestao">Sugeridos{% for c, rot in campos_grupo if sug[c] %}{{ ':' if loop.first else ';' }} {{ rot.split(' (')[0] }} <b>{{ 'Rank ' ~ sug[c].valor if c == 'classificacao_2' else sug[c].valor }}</b> ({{ por[sug[c].por] }}){% endfor %}. Troque, se for outro.</p>
+  {% else %}<p class="alm-det">Nenhuma sugestão: o catálogo não tem peça parecida com classificação.</p>{% endif %}
+  <p class="alm-det">O que ficar "sem" você completa depois na tela de Peças e Suprimentos do Fracttal.</p>
+</fieldset>
+<p class="alm-det cu-grupos-sem" data-cu-grupos-sem aria-live="polite">Lendo no Fracttal as opções do Tipo e da Classificação…</p>
+{% else %}
+<p class="alm-det cu-grupos-sem">O Tipo e a Classificação ficam para a tela do Fracttal: as opções vêm com o login do Fracttal de
+  quem cadastra, e a senha de administrador não tem esse login.</p>
+{% endif %}
+{% endmacro %}
 {% set falta_a_foto = 'foto ainda não chegou' if app_com_fotos else 'o App ainda não envia as fotos' %}
-<div class="pg alm inv cu">
+<div class="pg alm inv cu" data-cu-classificacoes="{{ raiz }}/os/_nexus/inventario/classificacoes">
 <p class="gc-eyebrow">PCM · Almoxarifado</p>
 <div class="gc-titulo-explica"><h1 class="titulo-pagina">Curadoria</h1>
 {% call explica('Entenda esta tela') %}<p>O que o campo contou fora do catálogo, o genérico que o técnico identificou e as avariadas de uma peça cujo -AV não
     está no catálogo, nas contagens que ainda não foram gravadas. Decidir não grava no estoque: a quantidade entra no lote da contagem (as unidades achadas somam ao contado da peça, e o
     total substitui o saldo no Fracttal quando você gravar). Cadastrar cria a peça no Fracttal agora, com o seu login.</p>
-<p><b>Grupo, criticidade e Curva ABC da peça nova</b> não se gravam pela API: complete na tela de Peças e
-  Suprimentos do Fracttal depois de cadastrar.</p>
+<p><b>O Tipo e a Classificação da peça nova.</b> O cadastrar manda ao Fracttal o Tipo, a Classificação 1 (a criticidade) e a
+  Classificação 2 (o Rank, a Curva ABC) que você escolher, entre as opções do próprio Fracttal, lidas com o seu login. A
+  sugestão vem das mesmas peças parecidas da sigla: vence o Tipo, a criticidade e a curva mais votados, e a classificação que
+  nenhuma parecida tem vem da mais comum no Tipo sugerido; na avariada, o Tipo e a Classificação 1 da peça boa. O que você
+  deixar "sem" fica para completar na tela de Peças e Suprimentos do Fracttal.</p>
 <p><b>A sigla sugerida.</b> O Nexus compara o nome que o técnico escreveu com o catálogo do App: as peças com palavras em comum
   são as parecidas, e a palavra rara pesa mais que a comum. As 5 mais parecidas votam na sigla do código delas (a de código
   antigo, na sigla mais comum da Família dela). Sem peça parecida, nada é sugerido. O código continua sendo o próximo livre da
@@ -127,8 +161,9 @@
           {% for u in unidades %}<option value="{{ u }}"{% if u == un_av %} selected{% endif %}>{{ u|lower }}</option>{% endfor %}
           {% if un_av not in unidades %}<option value="{{ un_av }}" selected>{{ un_av|lower }}</option>{% endif %}
         </select>
-        <p class="alm-det">Se a {{ x.codigo_av }} já existir no Fracttal, o Nexus usa ela, sem criar outra. A peça é ligada ao almoxarifado e ajustada quando a contagem for gravada.</p>
-        {% if x.lembrar_no_fracttal %}<p class="alm-det cu-lembrar">Depois de cadastrar, complete na tela de Peças e Suprimentos do Fracttal (a API não grava estes dados): <b>{{ x.lembrar_no_fracttal }}</b>, com o grupo, a criticidade e a Curva ABC.</p>{% endif %}
+        {{ grupos_do_cadastro(x, n) }}
+        <p class="alm-det">Se a {{ x.codigo_av }} já existir no Fracttal, o Nexus usa ela, sem criar outra (e o Tipo e a Classificação ficam os dela). A peça é ligada ao almoxarifado e ajustada quando a contagem for gravada.</p>
+        {% if x.lembrar_no_fracttal %}<p class="alm-det cu-lembrar">Depois de cadastrar, complete na tela de Peças e Suprimentos do Fracttal (a API não grava estes dados): <b>{{ x.lembrar_no_fracttal }}</b>.</p>{% endif %}
         <button class="gc-btn gc-btn--ui gc-btn--primario" type="submit">Cadastrar no Fracttal</button>
       </form></details>
     {% elif not x.av_repetido %}<p class="alm-det">Sem o código da peça boa não há o -AV para cadastrar: diga qual é a peça ou descarte.</p>{% endif %}
@@ -152,10 +187,11 @@
         <select class="gc-campo" id="cu-un-{{ n }}" name="unidade">
           {% for u in unidades %}<option value="{{ u }}"{% if x.reserva and x.reserva.unidade == u %} selected{% endif %}>{{ u|lower }}</option>{% endfor %}
         </select>
+        {{ grupos_do_cadastro(x, n) }}
         {% if x.reserva %}<p class="alm-det"><b>Uma tentativa anterior desta linha já reservou o código {{ x.reserva.codigo }}</b> (a peça pode já
           estar no Fracttal). Repita com estes mesmos dados: com outros, o Nexus recusa, para não criar uma segunda peça.</p>{% endif %}
         <p class="alm-det">O código é o próximo livre da sigla (SP-sigla-NNN). A peça é ligada ao almoxarifado e ajustada quando a contagem for gravada.</p>
-        {% if x.lembrar_no_fracttal %}<p class="alm-det cu-lembrar">Depois de cadastrar, complete na tela de Peças e Suprimentos do Fracttal (a API não grava estes dados): <b>{{ x.lembrar_no_fracttal }}</b>, com o grupo, a criticidade e a Curva ABC.</p>{% endif %}
+        {% if x.lembrar_no_fracttal %}<p class="alm-det cu-lembrar">Depois de cadastrar, complete na tela de Peças e Suprimentos do Fracttal (a API não grava estes dados): <b>{{ x.lembrar_no_fracttal }}</b>.</p>{% endif %}
         <button class="gc-btn gc-btn--ui gc-btn--primario" type="submit">Cadastrar no Fracttal</button>
       </form></details>
     {% endif %}
@@ -236,5 +272,6 @@
 {% endif %}
 </div>
 <script src="{{ url_for('static', filename='pcm-ponte-inventario.js') }}"></script>
+{% if pode and com_pessoa and pendentes %}<script src="{{ url_for('static', filename='pcm-curadoria-grupos.js') }}"></script>{% endif %}
 {% if pode %}<script src="{{ url_for('static', filename='pcm-fotos.js') }}"></script>{% endif %}
 {% endblock %}

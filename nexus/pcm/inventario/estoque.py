@@ -53,6 +53,13 @@ CRIAR = "inventories.item_insert"
 PECAS = "inventories.items_list"
 UNIDADES = "companies.units_list"
 
+# O Tipo e as duas Classificações da peça (provado no Fracttal de verdade em 12/11/2026: o `item_insert` com estes três ids
+# grava os três, e o `items_list` os devolve iguais): o campo da peça (o id) e o da descrição, pelo nome que a casa usa. São
+# os rótulos da tela de peças do Fracttal: Tipo, Classificação 1 (a criticidade: "1.Essencial", ...) e Classificação 2 (o
+# Rank: "2. Rank A", ..., e "1.Avariado").
+GRUPOS = {"tipo": ("id_group", "groups_description"), "classificacao_1": ("id_group_1", "groups_1_description"),
+          "classificacao_2": ("id_group_2", "groups_2_description")}
+
 
 class Limite(Exception):
     """HTTP 429: a cota de 200 pedidos por minuto da empresa acabou. Quem grava espera e tenta de novo, ou para."""
@@ -155,6 +162,34 @@ def _nivel_no_corpo(n: float) -> str:
 def _norm(texto) -> str:
     sem_acento = unicodedata.normalize("NFKD", str(texto or "")).encode("ascii", "ignore").decode()
     return " ".join(sem_acento.casefold().split())
+
+
+def classificacoes_das_pecas(linhas) -> dict[str, list[tuple[str, str]]]:
+    """As opções do Tipo e das duas Classificações a partir das linhas da lista de peças: `{campo: [(id, descrição)]}`, os
+    pares distintos, sem os vazios (o id que não é número ou a descrição em branco), em ordem de descrição. Sai das PEÇAS, e
+    não do `groups_1_list` do Fracttal, que mistura as classificações dos ATIVOS (nomes de usina; 12/11/2026). O mesmo id com
+    duas descrições fica com a primeira."""
+    vistos: dict[str, dict[str, str]] = {c: {} for c in GRUPOS}
+    for l in linhas:
+        if not isinstance(l, dict):
+            continue
+        for campo, (cid, cdesc) in GRUPOS.items():
+            i, desc = _inteiro(l.get(cid)), " ".join(str(l.get(cdesc) or "").split())
+            if i is not None and desc:
+                vistos[campo].setdefault(str(i), desc)
+    return {c: sorted(v.items(), key=lambda p: (_norm(p[1]), p[0])) for c, v in vistos.items()}
+
+
+def corpo_dos_grupos(grupos: dict | None) -> dict:
+    """Os campos do Tipo e das Classificações para o `item_insert`: só os que vieram (o vazio não vai), como número.
+    `grupos` é `{campo: id}` pelos nomes da casa (`GRUPOS`); campo que não é dos três é erro de quem chama."""
+    corpo = {}
+    for campo, valor in (grupos or {}).items():
+        if campo not in GRUPOS:
+            raise ValueError(f"campo que a peça não tem: {campo!r} (vale {', '.join(GRUPOS)})")
+        if valor is not None and str(valor).strip():
+            corpo[GRUPOS[campo][0]] = _id(valor)
+    return corpo
 
 
 def _traduzir(erro: Exception) -> Exception | None:
@@ -280,12 +315,19 @@ class Estoque(abc.ABC):
         saldo nem gera movimento."""
 
     @abc.abstractmethod
-    def criar_peca(self, codigo: str, nome: str, unidade: str = "UNIDADE", descricao: str = "") -> str:
+    def criar_peca(self, codigo: str, nome: str, unidade: str = "UNIDADE", descricao: str = "",
+                   grupos: dict | None = None) -> str:
         """Cria a peça (tipo 4) no catálogo do Fracttal. Devolve o id do item. `descricao` vai no `description` do
         `item_insert` (o campo que a tela do passo 0 manda vazio); sem ela, vazio. **Ninguém a usa** (revisão final de
         31/10/2026): a resposta do `item_insert` traz o `description` como "<nome>    { CODE }", um campo de exibição, e não foi
         provado o que escrevê-lo faz com o catálogo do cliente; a curadoria não manda o fabricante, o modelo e a série por aqui
-        (a tela lembra de completá-los no Fracttal)."""
+        (a tela lembra de completá-los no Fracttal). `grupos` (12/11/2026): `{campo: id}` do Tipo e das Classificações
+        (`GRUPOS`), só os que vieram; o vazio não vai (`corpo_dos_grupos`)."""
+
+    @abc.abstractmethod
+    def classificacoes(self) -> dict[str, list[tuple[str, str]]]:
+        """As opções do Tipo e das duas Classificações das peças: `{campo: [(id, descrição)]}` (`classificacoes_das_pecas`
+        sobre a lista de peças inteira, as páginas que houver)."""
 
     @abc.abstractmethod
     def codigos(self, sigla: str) -> list[str]:
@@ -565,17 +607,23 @@ class EstoqueFracttal(Estoque):
             raise ErroFracttal(f"a unidade {nome!r} não existe no Fracttal", UNIDADES)
         return achada
 
-    def criar_peca(self, codigo: str, nome: str, unidade: str = "UNIDADE", descricao: str = "") -> str:
+    def criar_peca(self, codigo: str, nome: str, unidade: str = "UNIDADE", descricao: str = "",
+                   grupos: dict | None = None) -> str:
         codigo, nome, descricao = str(codigo or "").strip(), str(nome or "").strip(), str(descricao or "").strip()
         if not codigo or not nome:
             raise ValueError("a peça precisa de código e de nome")
+        extra = corpo_dos_grupos(grupos)                 # antes de qualquer pedido: o id ruim nem vai
         id_unit, descricao_da_unidade = self._unidade(unidade)
         r = self._rpc(CRIAR, {
             "id_type_item": TIPO_PECA, "field_1": nome, "code": codigo, "id_unit": id_unit,
             "units_description": descricao_da_unidade, "active": True, "description": descricao, "is_serial_control": False,
             "is_lot_control": False, "visible_to_all": False, "ids_batch": [], "associate_warehouses": [],
-            "associate_third_parties": [], "attached": [], "files": [], "custom_fields": []})
+            "associate_third_parties": [], "attached": [], "files": [], "custom_fields": [], **extra})
         return self._id_do_dado(r, CRIAR)
+
+    def classificacoes(self) -> dict[str, list[tuple[str, str]]]:
+        base = {"filter": [], "sort": [], "is_tree": False, "node": 0, "id_type_item": TIPO_PECA}
+        return classificacoes_das_pecas(self._linhas(PECAS, base))
 
     def codigos(self, sigla: str) -> list[str]:
         sigla = str(sigla or "").strip()

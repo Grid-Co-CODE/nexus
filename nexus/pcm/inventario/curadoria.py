@@ -51,11 +51,15 @@ Regras com o caso que as criou:
   disco: nunca no banco, que a API abre a quem quiser). O App as envia pela rota assinada `POST .../pecas/inventario/foto`
   (`fotos_app.py`, 30/10/2026: a "Foto" da peça e as dos dados), com a chave que pôs no livro; o nome é o SHA-1 da chave
   (qualquer chave cabe num nome de arquivo). A descrição do técnico e a foto só aparecem para quem decide (`pode_programar`).
-- **Grupo, criticidade e Curva ABC não se gravam pela API** (testado pelo PCM em 09/10): a tela lembra de completar na tela do
-  Fracttal. **Nem o fabricante, o modelo e o número de série** (revisão final de 31/10/2026): o `item_insert` responde o
-  `description` como "<nome>    { CODE }" (o passo 0), um campo de exibição, e ninguém provou o que escrevê-lo faz com o
-  catálogo do cliente. O cadastrar não os manda (o `criar_peca` guarda o `descricao=""`, sem uso), e o cartão da linha que os
-  tem lembra de completá-los junto do grupo, da criticidade e da Curva ABC (`descricao_dos_dados`).
+- **O Tipo e as duas Classificações vão ao Fracttal no cadastrar** (12/11/2026, item 3 da 2ª rodada; até ali a tela dizia que
+  "não se gravam pela API", pelo teste do PCM de 09/10, e a prova de 12/11/2026 no Fracttal de verdade mostrou que o
+  `item_insert` grava os três): a tela os sugere pelas mesmas parecidas da sigla (`sugerir_classificacao`; na avariada, os da
+  peça boa), as opções são as do Fracttal com o id (`classificacao.py`, pela ponte), o cadastrar confere cada id contra elas,
+  manda só os que vieram, e a decisão guarda as descrições do que foi (`dados["grupos"]`, cifrado). O lembrete de completar no
+  Fracttal fica só para o que o PCM deixou "sem". **O fabricante, o modelo e o número de série NÃO vão** (revisão final de
+  31/10/2026): o `item_insert` responde o `description` como "<nome>    { CODE }" (o passo 0), um campo de exibição, e ninguém
+  provou o que escrevê-lo faz com o catálogo do cliente. O cadastrar não os manda (o `criar_peca` guarda o `descricao=""`, sem
+  uso), e o cartão da linha que os tem lembra de completá-los no Fracttal (`descricao_dos_dados`).
 """
 from __future__ import annotations
 
@@ -79,6 +83,7 @@ from ...dados.dominios import norm
 from ...prefixo import na_raiz
 from .. import telas
 from . import avariados
+from . import classificacao as CL
 from . import contas as C
 from . import erros, leitura, quem, regua, travas
 from . import estoque as E
@@ -167,7 +172,8 @@ def indice(catalogo: dict | None) -> dict:
     (`regua.avariada`): ela é a boa com "[AVARIADO]" na frente e dobraria o voto da boa. O peso de cada palavra é o da raridade
     (IDF, log(peças / peças com ela)): a palavra que está em todas pesa 0, a de uma peça só pesa o máximo; a que o catálogo não
     tem pesa como a de uma peça só (deixa o nome perguntado mais específico, e a semelhança menor). `sigla_da_familia`:
-    {Família: as siglas dos códigos dela, contadas}."""
+    {Família: as siglas dos códigos dela, contadas}; `grupos_da_familia` (12/11/2026): {Família: {campo: as Classificações 1 e 2
+    das peças dela, contadas}}, a reserva da `sugerir_classificacao`."""
     pecas = []
     for iid, v in (catalogo or {}).items():
         if v.get("avariado") or regua.avariada(v.get("codigo")):
@@ -175,7 +181,8 @@ def indice(catalogo: dict | None) -> dict:
         ps = palavras(v.get("nome"))
         if ps:
             pecas.append({"id": iid, "codigo": _txt(v.get("codigo")), "nome": _txt(v.get("nome")),
-                          "familia": _txt(v.get("familia")), "palavras": ps})
+                          "familia": _txt(v.get("familia")), "criticidade": _txt(v.get("criticidade")),
+                          "curva": _txt(v.get("curva")), "palavras": ps})
     n = len(pecas)
     peso = {p: math.log(n / k) for p, k in Counter(p for x in pecas for p in x["palavras"]).items()}
     for x in pecas:
@@ -185,13 +192,40 @@ def indice(catalogo: dict | None) -> dict:
         sigla = _sigla_do_codigo(x["codigo"])
         if sigla and x["familia"]:
             por_familia.setdefault(x["familia"], Counter())[sigla] += 1
-    return {"pecas": pecas, "peso": peso, "desconhecida": math.log(n) if n else 0.0, "sigla_da_familia": por_familia}
+    grupos: dict[str, dict[str, Counter]] = {}
+    for x in pecas:
+        if x["familia"]:
+            g = grupos.setdefault(x["familia"], {"classificacao_1": Counter(), "classificacao_2": Counter()})
+            for campo, v in (("classificacao_1", x["criticidade"]), ("classificacao_2", x["curva"])):
+                if v:
+                    g[campo][v] += 1
+    return {"pecas": pecas, "peso": peso, "desconhecida": math.log(n) if n else 0.0, "sigla_da_familia": por_familia,
+            "grupos_da_familia": grupos}
 
 
 def _sigla_da_familia(idx: dict, familia: str, validas) -> str:
     """A sigla mais comum dos códigos da Família no catálogo, entre as que valem (empate: a primeira em ordem alfabética)."""
     candidatas = [(n, s) for s, n in (idx["sigla_da_familia"].get(familia) or {}).items() if s in validas]
     return min(candidatas, key=lambda c: (-c[0], c[1]))[1] if candidatas else ""
+
+
+def _parecidas(nome, idx: dict) -> list[tuple[float, dict]]:
+    """As peças do catálogo parecidas com o nome, da mais parecida à menos: [(semelhança, peça)], só as de semelhança de ao
+    menos `PARECIDA_MIN` (o cosseno com o peso das palavras raras, `indice`). A conta da sigla e a da classificação usam as
+    mesmas."""
+    q = palavras(nome)
+    norma_q = math.sqrt(sum(idx["peso"].get(p, idx["desconhecida"]) ** 2 for p in q))
+    if not norma_q:
+        return []
+    ranking = []
+    for x in idx["pecas"]:
+        comum = q & x["palavras"]
+        if comum and x["norma"]:
+            s = sum(idx["peso"][p] ** 2 for p in comum) / (norma_q * x["norma"])
+            if s >= PARECIDA_MIN:
+                ranking.append((s, x))
+    ranking.sort(key=lambda r: (-r[0], r[1]["codigo"], r[1]["id"]))
+    return ranking
 
 
 def sugerir(nome, idx: dict, validas) -> dict:
@@ -206,18 +240,9 @@ def sugerir(nome, idx: dict, validas) -> dict:
     sem voto, nada é sugerido (o PCM escolhe): sugerir sem base seria chutar. `parecidas`: as 3 mais parecidas (`codigo`,
     `nome`), o contexto que a tela mostra."""
     vazio = {"sigla": "", "por": "", "familia": "", "parecidas": []}
-    q = palavras(nome)
-    norma_q = math.sqrt(sum(idx["peso"].get(p, idx["desconhecida"]) ** 2 for p in q))
-    if not norma_q:
+    ranking = _parecidas(nome, idx)
+    if not ranking:
         return vazio
-    ranking = []
-    for x in idx["pecas"]:
-        comum = q & x["palavras"]
-        if comum and x["norma"]:
-            s = sum(idx["peso"][p] ** 2 for p in comum) / (norma_q * x["norma"])
-            if s >= PARECIDA_MIN:
-                ranking.append((s, x))
-    ranking.sort(key=lambda r: (-r[0], r[1]["codigo"], r[1]["id"]))
     votos: dict[str, dict] = {}
     for s, x in ranking[:PARECIDAS_VOTAM]:
         sigla, pelo_codigo = _sigla_do_codigo(x["codigo"]), True
@@ -235,6 +260,61 @@ def sugerir(nome, idx: dict, validas) -> dict:
     v = votos[sigla]
     return {"sigla": sigla, "por": "parecidas" if v["pelo_codigo"] else "familia",
             "familia": "" if v["pelo_codigo"] else v["familia"], "parecidas": parecidas}
+
+
+# ── o Tipo e as Classificações sugeridos (12/11/2026, item 3 da 2ª rodada do Almoxarifado) ────────────────────────────
+# O PCM: "se você conseguisse que eu colocasse pelo Nexus ou com base nos que já existem e são parecidos ele indicasse e
+# colocasse automaticamente como sugestão". O catálogo do App já traz, de cada peça, a Família (o Tipo do Fracttal), a
+# Criticidade (a Classificação 1) e a Curva ABC (a letra do Rank, a Classificação 2): as mesmas parecidas da sigla votam.
+def _mais_votado(votos: dict) -> str:
+    """O valor com mais peso (empate: o primeiro em ordem alfabética), ou vazio."""
+    return min(votos, key=lambda k: (-votos[k], k)) if votos else ""
+
+
+def sugerir_classificacao(nome, idx: dict) -> dict:
+    """O Tipo, a Classificação 1 e a Classificação 2 sugeridos para a peça de nome `nome` (o que o técnico escreveu):
+    `{"campos": {campo: {"valor", "chave", "por"}}, "familia"}`, só com os campos que têm sugestão.
+
+    As 5 mais parecidas (as da sigla, `_parecidas`) votam, cada uma com a sua semelhança, na Família, na Criticidade e na Curva
+    dela; vence o mais votado de cada campo (`por` "parecidas"). A Classificação 1 ou a 2 sem voto (nenhuma parecida a tem) vem
+    da mais comum na Família sugerida, no catálogo inteiro (`por` "familia"). Sem parecida, nada é sugerido: chutar seria pior
+    que deixar o PCM escolher. `valor` é o texto do catálogo do App; `chave`, o que casa com a opção do Fracttal
+    (`classificacao.chave`)."""
+    votos: dict[str, dict] = {c: {} for c in CL.CAMPOS}
+    for s, x in _parecidas(nome, idx)[:PARECIDAS_VOTAM]:
+        for campo, v in (("tipo", x["familia"]), ("classificacao_1", x["criticidade"]), ("classificacao_2", x["curva"])):
+            if v and CL.chave(campo, v):
+                votos[campo][v] = votos[campo].get(v, 0.0) + s
+    campos = {}
+    for campo, vs in votos.items():
+        v = _mais_votado(vs)
+        if v:
+            campos[campo] = {"valor": v, "chave": CL.chave(campo, v), "por": "parecidas"}
+    familia = campos.get("tipo", {}).get("valor", "")
+    for campo in ("classificacao_1", "classificacao_2"):
+        if campo not in campos and familia:
+            contadas = (idx.get("grupos_da_familia", {}).get(familia) or {}).get(campo) or {}
+            v = _mais_votado({k: n for k, n in contadas.items() if CL.chave(campo, k)})
+            if v:
+                campos[campo] = {"valor": v, "chave": CL.chave(campo, v), "por": "familia"}
+    return {"campos": campos, "familia": familia}
+
+
+def classificacao_da_boa(l: dict, catalogo: dict) -> dict:
+    """Na avariada sem cadastro, o Tipo e a Classificação 1 sugeridos são os da PEÇA BOA (o -AV é a mesma peça, avariada),
+    pelo ID dela no catálogo do App e, sem ele, pelo Código. A Classificação 2 não se sugere: o Rank da boa não é o da
+    avariada. O formato da `sugerir_classificacao`, com `por` "boa"."""
+    iid = A.id_ou_vazio(l.get("ID do item"))
+    boa = catalogo.get(iid) if iid else None
+    if boa is None:
+        codigo = "".join(avariados.codigo_da_linha(l).split()).upper()
+        boa = next((v for v in catalogo.values() if codigo and "".join(_txt(v.get("codigo")).split()).upper() == codigo),
+                   None)
+    campos = {}
+    for campo, v in (("tipo", _txt((boa or {}).get("familia"))), ("classificacao_1", _txt((boa or {}).get("criticidade")))):
+        if v and CL.chave(campo, v):
+            campos[campo] = {"valor": v, "chave": CL.chave(campo, v), "por": "boa"}
+    return {"campos": campos, "familia": campos.get("tipo", {}).get("valor", "")}
 
 
 # ── o que o livro e o catálogo dizem ─────────────────────────────────────────────────────────────────────────────────
@@ -327,15 +407,17 @@ def decisoes(cfg, contagem_id: str) -> dict[str, dict]:
 
 
 def _catalogo() -> dict[str, dict] | None:
-    """{id_item: {"codigo", "nome", "familia", "avariado"}} do catálogo do App (a varredura diária, a tela do Almoxarifado;
-    `avariado` é a definição da casa, `regua.avariada`: o código -AV ou a marca do catálogo; a Família é a da sigla sugerida,
-    `sugerir`); None quando o saldo do App não chegou inteiro (número pela metade não vai para a tela, nem vira destino de
-    peça)."""
+    """{id_item: {"codigo", "nome", "familia", "criticidade", "curva", "avariado"}} do catálogo do App (a varredura diária, a
+    tela do Almoxarifado; `avariado` é a definição da casa, `regua.avariada`: o código -AV ou a marca do catálogo; a Família é a
+    da sigla sugerida, `sugerir`, e com a Criticidade e a letra da Curva ABC, a classificação sugerida,
+    `sugerir_classificacao`); None quando o saldo do App não chegou inteiro (número pela metade não vai para a tela, nem vira
+    destino de peça)."""
     from .. import almoxarifado
     d = almoxarifado.montar().dados or {}
     if d.get("estado") != "ok":
         return None
     return {_id(c.get("id")): {"codigo": _txt(c.get("codigo")), "nome": _txt(c.get("nome")), "familia": _txt(c.get("familia")),
+                               "criticidade": _txt(c.get("criticidade")), "curva": _txt(c.get("curva")),
                                "avariado": bool(c.get("avariado"))}
             for c in d.get("catalogo", [])}
 
@@ -414,21 +496,24 @@ def _os_dados(l: dict, separador: str) -> str:
 
 
 def descricao_dos_dados(l: dict) -> str:
-    """"Fabricante: X · Modelo: Y · Série: Z", o que o cartão lembra de completar na tela do Fracttal depois de cadastrar, junto
-    do grupo, da criticidade e da Curva ABC. NÃO vai ao Fracttal pela API (revisão final de 31/10/2026): o `item_insert` não tem
-    campo próprio para eles, e o `description` que ele tem é o de exibição ("<nome>    { CODE }" na resposta do passo 0), sem
-    prova do que escrevê-lo faz. O "n/a" e o vazio saem; sem nenhum, vazio (e o cartão não lembra nada a mais)."""
+    """"Fabricante: X · Modelo: Y · Série: Z", o que o cartão lembra de completar na tela do Fracttal depois de cadastrar (com o
+    Tipo e a Classificação que o PCM deixar "sem": desde 12/11/2026 esses vão pela API). NÃO vai ao Fracttal pela API (revisão
+    final de 31/10/2026): o `item_insert` não tem campo próprio para eles, e o `description` que ele tem é o de exibição
+    ("<nome>    { CODE }" na resposta do passo 0), sem prova do que escrevê-lo faz. O "n/a" e o vazio saem; sem nenhum, vazio
+    (e o cartão não lembra nada a mais)."""
     return _os_dados(l, ": ")
 
 
 def completar_no_fracttal(l: dict, decisao: dict | None) -> str:
-    """"Complete no Fracttal: Fabricante X · Modelo Y · Série Z", o lembrete da linha em "Já decididas" (a revisão final de
-    04/11/2026): o do cartão (`descricao_dos_dados`) some quando a linha é decidida, e a API não grava os três. Só na peça
-    CADASTRADA pela curadoria (as outras decisões não criaram peça a completar) e só com algum dado (sem o "n/a" e o vazio)."""
+    """"Complete no Fracttal: Fabricante X · Modelo Y · Série Z · Tipo · Classificação 2", o lembrete da linha em "Já
+    decididas" (a revisão final de 04/11/2026): o do cartão (`descricao_dos_dados`) some quando a linha é decidida, e a API não
+    grava os três dados. Desde 12/11/2026 também o Tipo e as Classificações que o cadastro deixou "sem" (`decisao["grupos"]`,
+    as descrições gravadas; sem o registro, a decisão de antes, os três: nada disso ia pela API). Só na peça CADASTRADA pela
+    curadoria (as outras decisões não criaram peça a completar) e só com algo a completar."""
     if not decisao or _txt(decisao.get("decisao")) != "cadastrar":
         return ""
-    dados = _os_dados(l, " ")
-    return f"Complete no Fracttal: {dados}" if dados else ""
+    partes = [p for p in (_os_dados(l, " "),) if p] + CL.faltam(decisao.get("grupos"))
+    return f"Complete no Fracttal: {' · '.join(partes)}" if partes else ""
 
 
 def _fotos_da_linha(cfg, l: dict) -> list[dict]:
@@ -487,7 +572,11 @@ def pendencias(cfg) -> list[dict]:
     O livro de hoje, sem as colunas novas, dá os três vazios e só a foto da peça: a tela de hoje.
 
     Desde 11/11/2026, `sugestao`: no achado fora do catálogo (o único que cadastra com sigla), a sigla sugerida pelo nome que o
-    técnico escreveu e as peças parecidas do catálogo do App (`sugerir`); nos outros, None."""
+    técnico escreveu e as peças parecidas do catálogo do App (`sugerir`); nos outros, None.
+
+    Desde 12/11/2026, `classificacao`: o Tipo e as Classificações sugeridos para o cadastrar (`sugerir_classificacao` no achado;
+    na avariada, os da peça boa, `classificacao_da_boa`); no genérico, None. E a decisão `cadastrar` traz em `grupos` as
+    descrições do que foi ao Fracttal (o `dados` cifrado da decisão; None na decisão de antes, sem o registro)."""
     abertas = contagens_abertas(cfg)
     decididas = _decisoes_do_livro(F.ler(cfg)[F.ABA_CURADORIA])
     catalogo = _catalogo() or {}
@@ -500,7 +589,9 @@ def pendencias(cfg) -> list[dict]:
                 continue
             chave = _id(l.get("ID da linha"))
             d = decididas.get((cid, chave))
-            como = _id(l.get("Identificado como"))
+            if d is not None:
+                d = dict(d, grupos=_grupos_gravados(cfg, d))
+            como, tipo = _id(l.get("Identificado como")), _txt(l.get("Tipo")).lower()
             out.append({
                 "contagem_id": cid, "chave_linha": chave, "tipo": _txt(l.get("Tipo")).lower(),
                 "id_almox": _id(l.get("ID do almoxarifado")), "usina": _txt(l.get("Usina")),
@@ -519,12 +610,24 @@ def pendencias(cfg) -> list[dict]:
                 "completar_no_fracttal": completar_no_fracttal(l, d),
                 "fotos": _fotos_da_linha(cfg, l),
                 "sugestao": sugerir(l.get("Descrição"), idx, siglas(cfg, l.get("ID do almoxarifado")))
-                if _txt(l.get("Tipo")).lower() == "fora_do_catalogo" else None,
+                if tipo == "fora_do_catalogo" else None,
+                "classificacao": sugerir_classificacao(l.get("Descrição"), idx) if tipo == "fora_do_catalogo"
+                else classificacao_da_boa(l, catalogo) if tipo == "avariado" else None,
                 "decisao": None if d is None else {
                     "decisao": _txt(d.get("decisao")), "id_item": _id(d.get("id_item")),
                     "codigo_criado": _txt(d.get("codigo_criado")), "quando": _txt(d.get("decidida_em")),
-                    "quando_txt": _quando_txt(d.get("decidida_em"))}})
+                    "quando_txt": _quando_txt(d.get("decidida_em")), "grupos": d.get("grupos")}})
     return out
+
+
+def _grupos_gravados(cfg, d: dict) -> dict | None:
+    """As descrições do Tipo e das Classificações que o cadastro mandou ao Fracttal (`{campo: descrição}`, do `dados` cifrado
+    da decisão), ou None: a decisão que não é `cadastrar`, a de antes de 12/11/2026 (sem o registro) e o `dados` que não se
+    abre (aí o lembrete pede os três, o que não engana)."""
+    if _txt(d.get("decisao")) != "cadastrar" or not _txt(d.get("dados_cifrados")):
+        return None
+    g = F.decifrar(cfg, F.ABA_CURADORIA, d).get("grupos")
+    return g if isinstance(g, dict) else None
 
 
 # ── o controle do cadastro: o código reservado antes de criar ───────────────────────────────────────────────────────
@@ -628,11 +731,13 @@ def _nome_igual(a, b) -> bool:
     return " ".join(_txt(a).split()).casefold() == " ".join(_txt(b).split()).casefold()
 
 
-def _conferir_a_reserva(reserva: dict, sigla: str, nome: str, unidade: str) -> None:
+def _conferir_a_reserva(reserva: dict, sigla: str, nome: str, unidade: str, grupos: dict | None = None) -> None:
     """A nova tentativa de uma linha que já reservou código tem de vir com os MESMOS dados: o código reservado é de uma peça com
     aquela sigla, aquele nome e aquela unidade, e uma tentativa com outros dados criaria, se a anterior não chegou ao Fracttal,
     uma peça diferente da que a pessoa pensa ter pedido, ou, se chegou, ligaria a decisão a uma peça com o nome errado. A
-    página já volta preenchida com a reserva (`pendencias`, `reserva`). `Conflito`; nada vai ao Fracttal."""
+    página já volta preenchida com a reserva (`pendencias`, `reserva`). `Conflito`; nada vai ao Fracttal. Desde 12/11/2026 o
+    Tipo e as Classificações também (`grupos`, `{campo: id}`): a peça criada pela tentativa anterior tem os dela, e a decisão
+    registraria os desta. A reserva de antes, sem a chave `grupos`, não confere esse dado."""
     diferencas = []
     if _txt(reserva.get("sigla")) and _txt(reserva.get("sigla")).upper() != sigla:
         diferencas.append(f"a sigla ({_txt(reserva.get('sigla')).upper()}, e não {sigla})")
@@ -640,6 +745,8 @@ def _conferir_a_reserva(reserva: dict, sigla: str, nome: str, unidade: str) -> N
         diferencas.append(f"o nome ({_txt(reserva.get('nome'))!r}, e não {nome!r})")
     if _txt(reserva.get("unidade")) and _txt(reserva.get("unidade")).upper() != unidade:
         diferencas.append(f"a unidade ({_txt(reserva.get('unidade')).lower()}, e não {unidade.lower()})")
+    if isinstance(reserva.get("grupos"), dict) and reserva["grupos"] != (grupos or {}):
+        diferencas.append("o Tipo ou a Classificação")
     if diferencas:
         raise Conflito(f"Uma tentativa anterior desta linha já reservou o código {_txt(reserva.get('codigo'))}, e esta vem com "
                        f"outro dado: {'; '.join(diferencas)}. Repita com os dados da reserva (a página já vem preenchida com "
@@ -664,15 +771,27 @@ def _unidade_do_cadastro(unidade, da_boa="") -> str:
     return (_txt(unidade) or _txt(da_boa)).upper() or "UNIDADE"
 
 
-def _cadastrar(cfg, contagem_id, chave, almox, sigla, nome, unidade, estoque) -> tuple[str, str, bool]:
+def _ids_dos_grupos(grupos: dict | None) -> dict[str, str]:
+    """`{campo: id}` dos grupos conferidos (`classificacao.conferir`): o que vai ao `criar_peca` e à reserva."""
+    return {c: v["id"] for c, v in (grupos or {}).items()}
+
+
+def _criar(estoque, codigo, nome, unidade, ids: dict) -> str:
+    """O `criar_peca` com o Tipo e as Classificações só quando vieram (a assinatura de antes vale para quem não os manda)."""
+    return str(estoque.criar_peca(codigo, nome, unidade, **({"grupos": ids} if ids else {})))
+
+
+def _cadastrar(cfg, contagem_id, chave, almox, sigla, nome, unidade, estoque, grupos=None) -> tuple[str, str, bool]:
     """Cria a peça no Fracttal sem duplicar. Devolve (id do item, código, criou agora).
 
     Linha SEM reserva: escolhe o próximo código da sigla (a lista do Fracttal e as reservas de todas as contagens), RESERVA-O no
     controle (com a sigla, o nome e a unidade pedidos) e só então cria. Linha COM reserva (uma tentativa anterior): confere que os
     dados são os mesmos (`_conferir_a_reserva`); se o código já existe no Fracttal, a peça foi criada e a resposta se perdeu:
     confere o nome (`_conferir_o_nome_da_peca`) e só devolve o ID, sem criar outra; se não existe, cria com o MESMO código.
-    Sem a descrição: o fabricante, o modelo e a série não vão ao Fracttal (ver o cabeçalho)."""
+    Sem a descrição: o fabricante, o modelo e a série não vão ao Fracttal (ver o cabeçalho). `grupos`: o Tipo e as
+    Classificações já conferidos (`classificacao.conferir`), que vão no `criar_peca` e ficam na reserva."""
     sigla = _txt(sigla).upper()
+    ids = _ids_dos_grupos(grupos)
     if sigla not in siglas(cfg, almox):
         raise ValueError(f"A sigla {sigla[:10]!r} não é uma das do catálogo ({', '.join(siglas(cfg, almox))}).")
     nome = " ".join(_txt(nome).split())
@@ -686,7 +805,7 @@ def _cadastrar(cfg, contagem_id, chave, almox, sigla, nome, unidade, estoque) ->
         reserva = _ler_reservas(arq).get(chave)
     if isinstance(reserva, dict) and _txt(reserva.get("codigo")):
         codigo = _txt(reserva["codigo"])             # o código desta linha já foi escolhido numa tentativa anterior
-        _conferir_a_reserva(reserva, sigla, nome, unidade)
+        _conferir_a_reserva(reserva, sigla, nome, unidade, ids)
         achada = estoque.peca(codigo)                # criou e perdeu a resposta? então só falta o ID
         if achada is not None:
             _conferir_o_nome_da_peca(achada, reserva, codigo)
@@ -696,11 +815,11 @@ def _cadastrar(cfg, contagem_id, chave, almox, sigla, nome, unidade, estoque) ->
             codigo = proximo_codigo(list(estoque.codigos(sigla)) + _reservados(cfg, sigla), sigla)
             with _ARQUIVO.de(arq.name):
                 reservas = _ler_reservas(arq)
-                reservas[chave] = {"codigo": codigo, "sigla": sigla, "nome": nome, "unidade": unidade,
+                reservas[chave] = {"codigo": codigo, "sigla": sigla, "nome": nome, "unidade": unidade, "grupos": ids,
                                    "reservado_em": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")}
                 _gravar_reservas(arq, reservas)      # ANTES de criar: se a resposta se perder, a nova tentativa sabe qual era
     try:
-        return str(estoque.criar_peca(codigo, nome, unidade)), codigo, True
+        return _criar(estoque, codigo, nome, unidade, ids), codigo, True
     except E.Recusado:
         # o Fracttal recusou com todas as letras (o `success: false`): nada foi criado. A reserva sai, para a nova tentativa com
         # os dados corrigidos não ficar presa no "repita com os dados da reserva" (a revisão final de 27/10/2026). SÓ o
@@ -741,7 +860,7 @@ def _e_avariada(id_item: str, cadastradas: dict[str, str]) -> bool:
     return regua.avariada(cadastradas.get(id_item, ""))
 
 
-def _cadastrar_avariado(l: dict, nome, unidade, estoque) -> tuple[str, str, bool]:
+def _cadastrar_avariado(l: dict, nome, unidade, estoque, grupos=None) -> tuple[str, str, bool]:
     """O -AV da avariada sem cadastro, sem duplicar. Devolve (id do item, código, criou agora).
 
     O código é FIXO (`avariados.codigo_av` da peça boa, que o `resolver` deixou na linha): nunca o próximo `SP-<sigla>-NNN` (o
@@ -750,7 +869,8 @@ def _cadastrar_avariado(l: dict, nome, unidade, estoque) -> tuple[str, str, bool
     a resposta do criar se perdeu, e a varredura do App ainda não o trouxe). O código fixo é a chave da nova tentativa, então a
     reserva em arquivo dos outros cadastros não é preciso; a trava por código faz duas contagens com a avariada da mesma boa
     procurarem e criarem uma de cada vez. O nome e a unidade são os que o PCM mandou ou, sem eles, os que a tela propõe (o
-    padrão dos -AV e a unidade da boa). Sem a descrição, como no outro cadastro (ver o cabeçalho)."""
+    padrão dos -AV e a unidade da boa). Sem a descrição, como no outro cadastro (ver o cabeçalho). `grupos`: o Tipo e as
+    Classificações conferidos, só no -AV criado agora (o achado já tem os dele)."""
     codigo = _txt(l.get("_codigo_av"))
     if not codigo:
         raise ValueError("Esta avariada veio sem o código da peça boa: não há o -AV para cadastrar. Diga qual é a peça ou "
@@ -769,12 +889,12 @@ def _cadastrar_avariado(l: dict, nome, unidade, estoque) -> tuple[str, str, bool
         achada = estoque.achar_peca(codigo)
         if achada:
             return str(achada), codigo, False
-        return str(estoque.criar_peca(codigo, nome, unidade)), codigo, True
+        return _criar(estoque, codigo, nome, unidade, _ids_dos_grupos(grupos)), codigo, True
 
 
 def decidir(cfg, contagem_id: str, chave_linha: str, decisao: str, *, id_item: str | None = None, sigla: str | None = None,
             nome: str | None = None, unidade: str | None = None, motivo: str | None = None,
-            estoque: E.Estoque | None = None, pessoa: dict | None) -> dict:
+            estoque: E.Estoque | None = None, pessoa: dict | None, grupos: dict | None = None, opcoes_grupos=None) -> dict:
     """Registra a decisão do PCM sobre uma linha da contagem e devolve `{"decisao", "id_item", "codigo", "criada", "texto"}`.
 
     - `cadastrar` (achado fora do catálogo): cria a peça (`estoque.criar_peca`, no login de quem decide) com `sigla`, `nome` e
@@ -784,7 +904,10 @@ def decidir(cfg, contagem_id: str, chave_linha: str, decisao: str, *, id_item: s
     - `e_a_peca` (achado e avariada): `id_item` é a peça do catálogo a que as unidades pertencem;
     - `confirmar` (genérico): `id_item` é o específico (sem ele, o que o técnico escolheu);
     - `descartar` (achado): `motivo` obrigatório, cifrado.
-    `motivo` também vai (cifrado) nas outras decisões, quando vem.
+    `motivo` também vai (cifrado) nas outras decisões, quando vem. No `cadastrar`, `grupos` (12/11/2026) é o Tipo e as
+    Classificações que a página mandou (`{campo: id}`, o vazio é "sem"), conferidos contra `opcoes_grupos` (as opções do
+    Fracttal, `classificacao.guardadas`, ou a função que as dá) antes de qualquer pedido: o id que não está nelas é
+    `ValueError`. Só os que vieram vão ao `criar_peca`, e a decisão guarda as descrições (`dados["grupos"]`, cifrado).
 
     `ValueError`: o pedido não faz sentido (nada foi feito). `Conflito`: a linha já foi decidida ou a contagem já não está
     aberta. `Recusada`: o livro (ou o controle do código) não deixou. O Fracttal levanta `Limite`, `SemLogin` e `ErroFracttal`.
@@ -810,9 +933,11 @@ def decidir(cfg, contagem_id: str, chave_linha: str, decisao: str, *, id_item: s
         almox = _id(l.get("ID do almoxarifado"))
         cadastradas = {_id(r.get("id_item")): _txt(r.get("codigo_criado")) for r in livro[F.ABA_CURADORIA]
                        if _txt(r.get("decisao")) == "cadastrar" and _id(r.get("id_item"))}
-        codigo, criada, texto = "", False, ""
+        codigo, criada, texto, escolhidos = "", False, "", {}
+        if decisao == "cadastrar":
+            escolhidos = CL.conferir(grupos, opcoes_grupos)      # antes do Fracttal: o id chutado nem vai
         if decisao == "cadastrar" and tipo == "avariado":
-            id_final, codigo, criada = _cadastrar_avariado(l, nome, unidade, estoque)
+            id_final, codigo, criada = _cadastrar_avariado(l, nome, unidade, estoque, escolhidos)
             if criada:
                 texto = f"Peça avariada cadastrada no Fracttal: {codigo}. As unidades avariadas contam nela nesta contagem."
             else:
@@ -822,7 +947,7 @@ def decidir(cfg, contagem_id: str, chave_linha: str, decisao: str, *, id_item: s
                 texto = (f"A peça {codigo} já existe no Fracttal: as unidades avariadas contam nela nesta contagem, sem "
                          "criar outra.")
         elif decisao == "cadastrar":
-            id_final, codigo, criada = _cadastrar(cfg, cid, chave, almox, sigla, nome, unidade, estoque)
+            id_final, codigo, criada = _cadastrar(cfg, cid, chave, almox, sigla, nome, unidade, estoque, escolhidos)
             texto = (f"Peça cadastrada no Fracttal: {codigo}." if criada else
                      f"A peça {codigo} já estava no Fracttal (a tentativa anterior a criou): usei ela, sem criar outra.")
         elif decisao == "descartar":
@@ -843,6 +968,9 @@ def decidir(cfg, contagem_id: str, chave_linha: str, decisao: str, *, id_item: s
             texto = ("As unidades saem do genérico e entram na peça escolhida." if decisao == "confirmar"
                      else "As unidades avariadas contam como unidades dessa peça nesta contagem." if tipo == "avariado"
                      else "As unidades achadas contam como unidades dessa peça nesta contagem.")
+        if decisao == "cadastrar" and CL.faltam(escolhidos):
+            # o lembrete fica só para o que o PCM deixou "sem" (o -AV que já existia virou "é a peça": nada a completar)
+            texto += f" Complete no Fracttal: {_em_lista(CL.faltam(escolhidos))}."
         usina = _usina_id(_txt(l.get("Usina")))
         quem_ = quem.colunas(cfg, pessoa)
         # a vez da contagem (`travas.CONTAGEM`) da conferência até a escrita: a aprovação que está lendo o lote termina antes, e
@@ -874,6 +1002,10 @@ def decidir(cfg, contagem_id: str, chave_linha: str, decisao: str, *, id_item: s
             dados = {"motivo": motivo} if motivo else {}
             if decisao == "cadastrar":
                 dados["unidade"] = _unidade_do_cadastro(unidade, l.get("_unidade_av") if tipo == "avariado" else "")
+                # o Tipo e as Classificações que foram ao Fracttal, pelas descrições (12/11/2026): "Já decididas" lembra de
+                # completar só o que ficou "sem" (`completar_no_fracttal`; sem a chave, os três); cifrado com a unidade
+                if escolhidos:
+                    dados["grupos"] = {c: v["descricao"] for c, v in escolhidos.items()}
             if dados:
                 linha["dados"] = dados
             F.acrescentar(cfg, F.ABA_CURADORIA, [linha])
@@ -885,6 +1017,11 @@ def decidir(cfg, contagem_id: str, chave_linha: str, decisao: str, *, id_item: s
             except F.Recusada as ex:
                 raise F.Recusada(f"A decisão ficou registrada, mas não consegui anotá-la na auditoria ({ex}).") from ex
     return {"decisao": decisao, "id_item": id_final, "codigo": codigo, "criada": criada, "texto": texto}
+
+
+def _em_lista(itens: list[str]) -> str:
+    """"A", "A e B", "A, B e C"."""
+    return itens[0] if len(itens) == 1 else f"{', '.join(itens[:-1])} e {itens[-1]}"
 
 
 # ── as telas ─────────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -919,15 +1056,19 @@ def _pagina(*, erro: str = "", status: int = 200):
         # o que o técnico escreveu e a foto dele são de quem decide (podem mostrar gente, placa de equipamento, o que estiver à
         # volta): quem só olha vê que há um achado, a quantidade e a usina. Os dados da peça (fabricante, modelo, série) e as
         # fotos deles também (30/10/2026), como a descrição, e o lembrete de completá-los da peça já cadastrada (04/11/2026)
-        # e a sigla sugerida (11/11/2026), que sai do que o técnico escreveu
+        # e a sigla e a classificação sugeridas (11 e 12/11/2026), que saem do que o técnico escreveu
         lista = [dict(p, descricao="", foto="", foto_id="", tem_foto=False, reserva=None, fabricante="", modelo="", serie="",
-                      lembrar_no_fracttal="", completar_no_fracttal="", fotos=[], sugestao=None) for p in lista]
+                      lembrar_no_fracttal="", completar_no_fracttal="", fotos=[], sugestao=None, classificacao=None)
+                 for p in lista]
     pendentes = [p for p in lista if p["decisao"] is None]
     resp = render_template(
         "pcm/inventario_curadoria.html", pendentes=pendentes, decididas=[p for p in lista if p["decisao"] is not None],
         siglas_de=lambda almox: siglas(cfg, almox), unidades=UNIDADES, fmt=fmt, pode=pode, ok=aviso or "",
         erro=erro, erro_livro=erro_livro, sem_catalogo=sem_catalogo, app_com_fotos=app_com_fotos,
-        pecas=sorted(((v["codigo"], v["nome"]) for v in catalogo.values() if v["codigo"])))
+        pecas=sorted(((v["codigo"], v["nome"]) for v in catalogo.values() if v["codigo"])),
+        # o Tipo e as Classificações (12/11/2026): as opções vêm pela ponte (o login do Fracttal); quem entrou pela senha de
+        # administrador não é uma pessoa, não cadastra, e a tela já diz que eles ficam para o Fracttal
+        campos_grupo=[(c, CL.ROTULO[c]) for c in CL.CAMPOS], com_pessoa=bool(_txt(quem.do_pedido().get("email"))))
     return resp, status
 
 

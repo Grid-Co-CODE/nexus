@@ -748,8 +748,9 @@ def test_tela_lista_as_pendencias_e_lembra_do_fracttal(cur, monkeypatch):
     assert "Cabo azul 6 mm" in html and "Conector estanque" in html and "sem foto" in html.lower()
     assert "SP-4" in html and "SP-2" in html                          # o genérico e o que o técnico escolheu
     assert "Algo que ninguém contou" not in html                      # em branco não é pendência
-    # o lembrete: a API não grava grupo, criticidade nem curva ABC
-    assert "grupo" in html.lower() and "criticidade" in html.lower() and "curva abc" in html.lower()
+    # o Tipo e as Classificações (12/11/2026): as três seleções do cadastrar, que a página enche pela ponte
+    assert "data-cu-grupos" in html and 'name="tipo"' in html and 'name="classificacao_1"' in html
+    assert 'name="classificacao_2"' in html and "criticidade" in html.lower() and "curva abc" in html.lower()
     assert 'name="decisao"' in html and "SP-CAB-013" not in html      # o código novo só aparece depois de cadastrar
     for sigla in CU.SIGLAS:
         assert f'value="{sigla}"' in html
@@ -1302,7 +1303,8 @@ def test_a_foto_que_falta_diz_o_que_o_app_faz(cur, monkeypatch):
 def test_ja_decididas_lembra_de_completar_no_fracttal(cur, monkeypatch):
     """A peça cadastrada pela curadoria cuja linha tem fabricante, modelo ou série: a API não os grava, e o lembrete do cartão
     some com a decisão. Em "Já decididas" ela diz "Complete no Fracttal: Fabricante X · Modelo Y · Série Z", sem as partes
-    "n/a" ou vazias. Só na cadastrada (as outras decisões não criaram peça), e só para quem decide (como os dados)."""
+    "n/a" ou vazias, e (12/11/2026) o Tipo e as Classificações que o cadastro deixou "sem" (aqui, os três: nenhum veio). Só na
+    cadastrada (as outras decisões não criaram peça), e só para quem decide (como os dados)."""
     from nexus.pcm import telas
     descartado = _linha("L-12", Descrição="Peça quebrada sem uso", contado="1", Fabricante="Fabricante Z", Modelo="MZ-1")
     _so(cur, PECA_DA_LISTA, ACHADO_COM_DADOS, CABO, CONECTOR, GENERICO_COM_DADOS, descartado)
@@ -1320,9 +1322,12 @@ def test_ja_decididas_lembra_de_completar_no_fracttal(cur, monkeypatch):
     linhas = {cod: tr for tr in re.findall(r"<tr>\s*<td.*?</tr>", tabela, re.S)
               for cod in ("Disjuntor sem etiqueta", "Cabo azul 6 mm", "Conector estanque", "SP-4", "Peça quebrada sem uso")
               if cod in tr}
-    assert "Complete no Fracttal: Fabricante Fabricante Exemplo · Série SN-0001" in linhas["Disjuntor sem etiqueta"]
+    assert ("Complete no Fracttal: Fabricante Fabricante Exemplo · Série SN-0001 · Tipo · Classificação 1 · Classificação 2"
+            in linhas["Disjuntor sem etiqueta"])
     assert "n/a" not in linhas["Disjuntor sem etiqueta"] and "Modelo" not in linhas["Disjuntor sem etiqueta"]
-    for sem in ("Cabo azul 6 mm", "Conector estanque", "SP-4", "Peça quebrada sem uso"):
+    # o CABO, cadastrado sem os dados e sem o Tipo e as Classificações: só os três grupos
+    assert "Complete no Fracttal: Tipo · Classificação 1 · Classificação 2</span>" in linhas["Cabo azul 6 mm"]
+    for sem in ("Conector estanque", "SP-4", "Peça quebrada sem uso"):
         assert "Complete no Fracttal" not in linhas[sem], sem
     monkeypatch.setattr(telas, "pode_programar", lambda: False)
     assert "Complete no Fracttal" not in c.get(URL).get_data(as_text=True)
@@ -1415,15 +1420,16 @@ def test_a_foto_refeita_muda_o_endereco(cur, monkeypatch):
 def test_cadastrar_nao_manda_os_dados_da_peca_e_a_tela_lembra(cur, monkeypatch):
     """O `item_insert` responde o `description` como "<nome>    { CODE }" (o passo 0): é um campo de exibição, e ninguém provou o
     que escrever nele faz com o catálogo do cliente. Fabricante, modelo e série NÃO vão ao Fracttal: o cadastrar manda o que
-    mandava antes (código, nome, unidade), e o cartão lembra de completar os três na tela do Fracttal, junto do grupo, da
-    criticidade e da Curva ABC (sem as partes "n/a" ou vazias)."""
+    mandava antes (código, nome, unidade), e o cartão lembra de completar os três na tela do Fracttal (sem as partes "n/a" ou
+    vazias). O Tipo e as Classificações vão pela API desde 12/11/2026: o lembrete do cartão não fala mais deles (quem fala é o
+    quadro das três seleções, do que o PCM deixar "sem")."""
     _so(cur, PECA_DA_LISTA, ACHADO_COM_DADOS, CABO, GENERICO_COM_DADOS)
     _no_setor(monkeypatch, SID.PCM)
     html = _pessoa_ms(cur).get(URL).get_data(as_text=True)
     card = _cartao(html, "Disjuntor sem etiqueta")
     lembra = re.search(r'<p class="alm-det cu-lembrar">(.*?)</p>', card, re.S).group(1)
     assert "Fabricante: Fabricante Exemplo · Série: SN-0001" in lembra and "Fracttal" in lembra
-    assert "criticidade" in lembra.lower() and "curva abc" in lembra.lower()
+    assert "criticidade" not in lembra.lower() and "curva abc" not in lembra.lower()
     assert "Vai na descrição" not in html and "cu-lembrar" not in _cartao(html, "Cabo azul 6 mm")   # sem os dados, nada
     falso = _falso()
     r = CU.decidir(cur.config, "C-1", "L-10", "cadastrar", sigla="CAB", nome="Disjuntor", unidade="UNIDADE", estoque=falso,

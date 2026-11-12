@@ -38,14 +38,17 @@ Os defeitos se pedem pelo construtor:
 `id_almox`, `id_item`, `tipo` "entrada" ou "saida", `qtd`, `referencia`, `quando`, `folio`, `id` (o `id_movements`, crescente)
 e `tipo_fracttal` (15 o ajuste do fechamento; 1 a entrada e 2 a saída de `mover`, ou 15 com `ajuste=True`)), do mais velho ao
 mais novo.
+`pecas_do_catalogo` (12/11/2026): as linhas da lista de peças do Fracttal com o Tipo e as Classificações (`id_group`,
+`groups_description`, ...), de onde o `classificacoes` tira as opções, como o de verdade; a peça que `criar_peca` faz com
+`grupos` os guarda em `grupos` no catálogo (só quando vêm).
 `mover` e `definir_modo` não são do contrato (nem contam como chamada): o teste os usa para simular o que acontece fora do
 inventário (uma OS que lança peça, uma compra que entra, um almoxarifado que ficou em inventário físico).
 """
 import functools
 from datetime import datetime, timezone
 
-from nexus.pcm.inventario.estoque import (TIPO_AJUSTE, Estoque, Limite, Recusado, SemLogin, instante, validar_nivel,
-                                          validar_quantidade)
+from nexus.pcm.inventario.estoque import (TIPO_AJUSTE, Estoque, Limite, Recusado, SemLogin, classificacoes_das_pecas,
+                                          corpo_dos_grupos, instante, validar_nivel, validar_quantidade)
 
 
 def _conjunto(valor):
@@ -67,7 +70,8 @@ def _operacao(f):
 
 
 class EstoqueFalso(Estoque):
-    def __init__(self, saldos: dict, *, perder_resposta=(), limite_em=None, expirar_em=None, agora=None):
+    def __init__(self, saldos: dict, *, perder_resposta=(), limite_em=None, expirar_em=None, agora=None,
+                 pecas_do_catalogo=None):
         """`saldos`: `{id_almox: {id_item: saldo}}`, ou o item como `{"saldo", "minimo", "maximo", "codigo", "unidade",
         "criticidade"}` quando o teste precisa da régua, do código, da unidade ou da criticidade (o que falta é None, e o
         código, a unidade e a criticidade, vazios). Todo item de `saldos` já está ligado."""
@@ -86,6 +90,7 @@ class EstoqueFalso(Estoque):
         self._pendentes: set[str] = set()                           # finalizado, modo 0 pendente
         self._sessoes: dict[str, dict[str, float | None]] = {}      # almoxarifado -> {id_item: saldo de quando mexeu}
         self._catalogo: dict[str, dict] = {}                        # as peças que `criar_peca` fez
+        self._pecas_do_catalogo = list(pecas_do_catalogo or [])     # a lista de peças com o Tipo e as Classificações
         self._n_item, self._n_movimento = 53_000_000, 0
         self._perder, self._perdidas = ({perder_resposta} if isinstance(perder_resposta, str)
                                         else set(perder_resposta or ())), set()
@@ -264,17 +269,24 @@ class EstoqueFalso(Estoque):
             item["maximo"] = mx
 
     @_operacao
-    def criar_peca(self, codigo: str, nome: str, unidade: str = "UNIDADE", descricao: str = "") -> str:
+    def criar_peca(self, codigo: str, nome: str, unidade: str = "UNIDADE", descricao: str = "",
+                   grupos: dict | None = None) -> str:
         codigo, nome, descricao = str(codigo or "").strip(), str(nome or "").strip(), str(descricao or "").strip()
         if not codigo or not nome:
             raise ValueError("a peça precisa de código e de nome")
+        corpo = corpo_dos_grupos(grupos)                     # a mesma regra do de verdade: só os que vieram, como número
         if codigo.upper() in {c.upper() for c in self._todos_os_codigos()}:
             raise Recusado("já existe peça com esse código", "criar_peca")
         self._n_item += 1
-        # a descrição só entra quando vem (30/10/2026): a peça de antes, sem ela, fica com as mesmas três chaves
+        # a descrição e os grupos só entram quando vêm (30/10 e 12/11/2026): a peça de antes fica com as mesmas três chaves
         self._catalogo[str(self._n_item)] = {"codigo": codigo, "nome": nome, "unidade": unidade,
-                                             **({"descricao": descricao} if descricao else {})}
+                                             **({"descricao": descricao} if descricao else {}),
+                                             **({"grupos": corpo} if corpo else {})}
         return str(self._n_item)
+
+    @_operacao
+    def classificacoes(self) -> dict[str, list[tuple[str, str]]]:
+        return classificacoes_das_pecas(self._pecas_do_catalogo)
 
     @_operacao
     def codigos(self, sigla: str) -> list[str]:
