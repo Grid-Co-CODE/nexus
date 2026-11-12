@@ -46,11 +46,16 @@ def test_contado_vazio_nao_e_zero():
 
 
 def test_ids_de_teste_da_configuracao():
-    assert A.ids_de_teste({}) == set() and A.ids_de_teste(None) == set()
-    assert A.ids_de_teste({"NEXUS_ALMOX_TESTE_IDS": ""}) == set()
-    assert A.ids_de_teste({"NEXUS_ALMOX_TESTE_IDS": "999"}) == {"999"}
-    assert A.ids_de_teste({"NEXUS_ALMOX_TESTE_IDS": " 999 , 1000,, "}) == {"999", "1000"}
-    assert A.ids_de_teste({"NEXUS_ALMOX_TESTE_IDS": 999}) == {"999"}
+    """Os da chave, mais os fixos do código (12/11/2026): o 2º almoxarifado de teste do Fracttal vale como teste em toda
+    instalação, sem depender do .env do servidor."""
+    fixos = set(A.TESTE_FIXOS)
+    assert fixos == {"146124"}
+    assert A.ids_de_teste({}) == fixos and A.ids_de_teste(None) == fixos
+    assert A.ids_de_teste({"NEXUS_ALMOX_TESTE_IDS": ""}) == fixos
+    assert A.ids_de_teste({"NEXUS_ALMOX_TESTE_IDS": "999"}) == {"999"} | fixos
+    assert A.ids_de_teste({"NEXUS_ALMOX_TESTE_IDS": " 999 , 1000,, "}) == {"999", "1000"} | fixos
+    assert A.ids_de_teste({"NEXUS_ALMOX_TESTE_IDS": 999}) == {"999"} | fixos
+    assert A.ids_de_teste({"NEXUS_ALMOX_TESTE_IDS": "146124"}) == fixos                 # repetido na chave: uma vez só
 
 
 def test_chave_do_almoxarifado_de_teste_e_opcional_e_documentada():
@@ -58,7 +63,7 @@ def test_chave_do_almoxarifado_de_teste_e_opcional_e_documentada():
     assert "NEXUS_ALMOX_TESTE_IDS=" in RAIZ.joinpath(".env.example").read_text("utf-8")
     # o valor chega do .env à configuração do app como qualquer opcional
     cfg = config.carregar_config({"NEXUS_SECRET_KEY": "k", "NEXUS_SENHA_ADMIN": "s", "NEXUS_ALMOX_TESTE_IDS": "999"})
-    assert A.ids_de_teste(cfg) == {"999"}
+    assert A.ids_de_teste(cfg) == {"999"} | set(A.TESTE_FIXOS)
 
 
 # ── o almoxarifado de teste fora das telas e do histórico ────────────────────────────────────────────────────────────

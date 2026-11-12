@@ -332,7 +332,8 @@ def historico(cfg, nomes: dict | None = None, pessoas=None, n: int = HISTORICO_N
     `lote`), com quando, quem (o `pessoa_id`; o nome, só por `pessoas`), a peça, de onde para onde, a quantidade, os saldos
     antes e depois de cada lado, se o vínculo foi criado e a situação. Não fala com o Fracttal: o nome de cada almoxarifado vem
     do `dados` cifrado do evento (o da hora da transferência) e, sem ele, da varredura (`nomes`, o `nomes_do_app`); o da peça,
-    do catálogo do App. O livro que não se lê vira o erro, nunca "nenhuma"."""
+    do catálogo do App. A transferência com um almoxarifado de teste (`ids_de_teste`) não entra. O livro que não se lê vira o
+    erro, nunca "nenhuma"."""
     try:
         eventos = F.ler(cfg)[F.ABA_EVENTO]
     except F.Recusada as ex:
@@ -372,10 +373,17 @@ def historico(cfg, nomes: dict | None = None, pessoas=None, n: int = HISTORICO_N
             g["_dados"] = g["_dados"] or dados
     nomes = nomes or {}
     almox_nomes, itens = nomes.get("almox") or {}, nomes.get("itens") or {}
+    # A prova no Fracttal de verdade é nos almoxarifados de teste: a transferência fica no livro (que só cresce) e fora da
+    # tela do PCM, com o teste na origem ou no destino (12/11/2026: as duas transferências da prova no ar apareciam aqui)
+    teste = A.ids_de_teste(cfg)
     linhas = []
-    for g in sorted(grupos.values(), key=lambda g: (g["quando"], g["i"]), reverse=True)[:n]:
+    for g in sorted(grupos.values(), key=lambda g: (g["quando"], g["i"]), reverse=True):
+        if len(linhas) >= n:
+            break
         dados = g.pop("_dados") or {}
         g["destino"] = g["destino"] or A._id(dados.get("destino"))
+        if g["origem"] in teste or g["destino"] in teste:
+            continue
         ts = g.pop("tipos")
         g["vinculo"] = "transferencia_vinculo" in ts
         if "transferencia_saida" in ts and "transferencia_entrada" in ts and "transferencia_falha" not in ts:

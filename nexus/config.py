@@ -39,7 +39,8 @@ OPCIONAIS = ("NEXUS_CHAVE_CADASTRO", "NEXUS_ARMAZEM_LOCAL",
              # antes do App, em ensaio, e a gravação liga depois do ensaio com o 1º ciclo real)
              "NEXUS_ALMOX_GRAVAR",
              # o almoxarifado de TESTE do inventário (26/10/2026): IDs do Fracttal, separados por vírgula; ficam fora das
-             # telas do PCM e do histórico (a prova das gravações é nele, nunca num almoxarifado de usina)
+             # telas do PCM e do histórico (a prova das gravações é nele, nunca num almoxarifado de usina). O 2º almoxarifado
+             # de teste, o 146124, é fixo no código (`almoxarifado.TESTE_FIXOS`, 12/11/2026) e não depende desta chave
              "NEXUS_ALMOX_TESTE_IDS",
              # o livro do inventário num arquivo (só na cópia de prova e nos testes; no servidor ele vem do banco,
              # `nexus_almoxarifado_inventario`, nexus/dados/fato_inventario.py)

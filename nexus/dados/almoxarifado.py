@@ -18,7 +18,7 @@ O inventário (26/10/2026, desenho docs/superpowers/specs/2026-10-26-inventario-
 as peças no App e o livro das contagens (`LIVRO_CONTAGENS`, o 5º livro do App) chega aqui para o PCM aprovar e gravar no
 Fracttal. O contrato dele mora aqui, do mesmo jeito dos outros: `COLUNAS_CONTAGENS` na ordem, coluna nova só no FIM, dos
 dois lados. O almoxarifado de TESTE (a prova das gravações no Fracttal) fica fora das contas e das telas pelo ID
-(`ids_de_teste`, da `NEXUS_ALMOX_TESTE_IDS`).
+(`ids_de_teste`: os da `NEXUS_ALMOX_TESTE_IDS` e os `TESTE_FIXOS` do código).
 
 As nove melhorias (30/10/2026, docs/superpowers/specs/2026-10-30-almoxarifado-melhorias-design.md): o App passa a trazer,
 do cadastro da peça no Fracttal, a criticidade e a Curva ABC (no Itens) e o custo (no Saldo), e a contagem ganha os dados
@@ -168,11 +168,18 @@ def id_ou_vazio(v) -> str:
     return "" if t.lower() in ("none", "nan") else t
 
 
+# O 2º almoxarifado de teste do Fracttal (TESTE-INVENTARIO-2, criado em 12/11/2026: a transferência pede dois, e o Aceitar
+# das requisições só se prova fora do almoxarifado que a chave já esconde). Vale como teste em TODA instalação, sem a chave:
+# o .env do servidor não é nosso, e depois da prova no ar a requisição e as transferências de teste apareciam nas telas do
+# PCM (Decididas, Auditoria, Últimas transferências). O 1º segue na chave (`NEXUS_ALMOX_TESTE_IDS`).
+TESTE_FIXOS = frozenset({"146124"})
+
+
 def ids_de_teste(config) -> set[str]:
-    """Os IDs dos almoxarifados de TESTE (NEXUS_ALMOX_TESTE_IDS, separados por vírgula). A prova das gravações do
-    inventário no Fracttal é num almoxarifado de teste, nunca num de usina; ele não conta nas telas do PCM nem no
-    histórico (que só cresce: uma linha de teste gravada ficaria para sempre). Sem a chave, nenhum é de teste."""
-    return {_id(p) for p in _txt((config or {}).get("NEXUS_ALMOX_TESTE_IDS")).split(",") if _txt(p)}
+    """Os IDs dos almoxarifados de TESTE: os da chave (NEXUS_ALMOX_TESTE_IDS, separados por vírgula) mais os `TESTE_FIXOS` do
+    código. A prova das gravações no Fracttal é num almoxarifado de teste, nunca num de usina; ele não conta nas telas do
+    PCM nem no histórico (que só cresce: uma linha de teste gravada ficaria para sempre). Sem a chave, só os fixos."""
+    return {_id(p) for p in _txt((config or {}).get("NEXUS_ALMOX_TESTE_IDS")).split(",") if _txt(p)} | set(TESTE_FIXOS)
 
 
 def sem_almoxarifado_de_teste(saldo: list[dict], config) -> list[dict]:

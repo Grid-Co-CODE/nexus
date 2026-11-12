@@ -761,7 +761,9 @@ se aprova; a gravação só roda no servidor (`NEXUS_INVENTARIO_GRAVAR=1`, `DEPL
 27/10/2026): a leitura calcula a substituição a cada vez e não escreve; a Auditoria mostra o que foi gravado.
 
 **A chave de teste: `NEXUS_ALMOX_TESTE_IDS`** (IDs do Fracttal, por vírgula; no servidor, `134082`, o almoxarifado
-`TESTE-INVENTARIO`, com a peça `SP-TST-001`, id 53248312). O almoxarifado de teste fica FORA das telas (o Saldo, a lista do
+`TESTE-INVENTARIO`, com a peça `SP-TST-001`, id 53248312). Desde 12/11/2026 o `TESTE-INVENTARIO-2` (id 146124, o 2º, criado para a prova da transferência e deixado
+inativo no Fracttal) é teste em TODA instalação, sem a chave (`almoxarifado.TESTE_FIXOS`: o `.env` do servidor não é nosso, e
+depois da prova no ar a requisição e as transferências de teste apareciam nas telas do PCM). O almoxarifado de teste fica FORA das telas (o Saldo, a lista do
 Inventário, a régua, a Curadoria e a Auditoria) e do histórico, e a sigla `TST` só vale para ele. Consequência: **a prova no
 Fracttal de verdade não passa pelas telas do servidor**; ela roda numa cópia de prova em que o almoxarifado de teste aparece (o
 script desliga o filtro só na cópia e deixa a sigla `TST` para ele), com o livro do inventário num arquivo
@@ -1820,7 +1822,9 @@ inventário (a peça saía de um almoxarifado sem entrar em nenhum). A aba é pa
 - **Na tela:** a origem (agrupada por cliente), a peça com o saldo, o destino (só os do mesmo cliente), a quantidade, a OS ou
   referência; Conferir, e só então Transferir (mudar um campo fecha o Transferir de novo). Embaixo, as **Últimas transferências**
   (30), do livro, sem falar com o Fracttal: quando, quem (só para o PCM), a peça, de → para (o nome do `dados`), a quantidade,
-  os saldos de cada lado, o vínculo e a situação (Feita, Lançada sem confirmar, Pode ter feito, Não feita). As rotas da ponte:
+  os saldos de cada lado, o vínculo e a situação (Feita, Lançada sem confirmar, Pode ter feito, Não feita). A transferência com
+  um almoxarifado de teste na origem ou no destino (`ids_de_teste`) fica no livro e FORA desta lista (12/11/2026: as duas da
+  prova no ar apareciam); nas listas do formulário o de teste segue, marcado "(teste)", porque a prova é nele. As rotas da ponte:
   `GET /os/_nexus/inventario/transferir/almoxarifados`, `GET .../pecas?origem=`, `POST .../conferir` e `POST .../transferir`.
 - **Não provado:** o custo diferente de zero (vai o `unit_cost` da linha de saldo, e quantidade × custo no `total_cost`; a prova
   foi com custo 0) e o clique de ponta a ponta pelo Nexus no servidor.

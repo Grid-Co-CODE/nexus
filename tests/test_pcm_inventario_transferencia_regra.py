@@ -349,6 +349,20 @@ def test_o_historico_do_mais_novo_ao_mais_velho(tr):
     assert (velho["o_antes"], velho["o_depois"], velho["d_antes"], velho["d_depois"], velho["vinculo"]) == (5, 4, 1, 2, False)
 
 
+def test_o_historico_nao_mostra_a_transferencia_com_almoxarifado_de_teste(tr):
+    """A prova no Fracttal de verdade é nos almoxarifados de teste, e o livro só cresce: a transferência de teste fica no
+    livro, mas não nas Últimas transferências do PCM (12/11/2026: as duas da prova no ar apareciam na aba). Vale o teste na
+    origem ou no destino."""
+    falso = _falso()
+    _tr(tr, falso, qtd="1")                                                # 30 → 31: de verdade
+    tr.config["NEXUS_ALMOX_TESTE_IDS"] = "60"
+    _tr(tr, falso, destino="60", qtd="1")                                  # 30 → 60: o destino é de teste
+    _tr(tr, falso, origem="60", destino="31", qtd="1")                     # 60 → 31: a origem é de teste
+    h = T.historico(tr.config, pessoas={})
+    assert h["erro"] == "" and [(x["origem"], x["destino"]) for x in h["linhas"]] == [("30", "31")]
+    assert len({e["lote"] for e in _eventos(tr)}) == 3                     # o livro guarda as três
+
+
 def test_a_auditoria_mostra_a_transferencia(tr, monkeypatch):
     from nexus.pcm.inventario import revisao as R
     _tr(tr, _falso(), item="2", qtd="1")
