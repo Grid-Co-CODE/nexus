@@ -23,14 +23,20 @@ MESES = 6            # os meses do mês a mês (o banco tem a meta desde 10/2026
 PT_NA_LISTA = 4
 # O "Criar OS" do prontuário (Levi, 12/11/2026: "Também deve ser possível criar OS para a UFV"; e, vendo o botão do
 # ticket: "na parte de criar OS, vai ter as opções que é possível hoje. Então, OS avulsa, OS de performance, OS de
-# engenharia, inspeção de chamados, solicitação de OS. E aí o ticket pode tirar o botão de ticket"). As cinco formas de
-# criar OS que o OS Creator tem hoje: (o nome, o que é, o endereço no OS Creator, leva a usina?). A OS avulsa (o "Criar OS
-# do zero" de lá) e a solicitação aceitam o ativo pelo endereço (`?ativo=<o código do ativo da usina>`,
-# `tradicional_web.sugestao`): a tela abre com o cliente e a usina escolhidos. A Performance pergunta o plano primeiro,
-# a Engenharia tem a tela dela e a inspeção pede o ativo pelo id do Fracttal: essas abrem sem a usina.
+# engenharia, inspeção de chamados, solicitação de OS. E aí o ticket pode tirar o botão de ticket"). As cinco formas:
+# (o nome, o que é, o endereço no OS Creator, leva a usina?).
+# QUEM USA O PRONTUÁRIO É QUEM DEMANDA (o alinhamento dele no mesmo dia: "a OS Performance seria mais o caminho para OS
+# Creator Web Solicitação. Aí tem uma abinha de performance, uma abinha de engenharia. Tendo em conta que quem está
+# mexendo aí vai ser uma pessoa que vai demandar coisas [...] Essa OS de performance tem string, tracker e outras
+# coisas, quem cria [é] a performance"): por isso a OS de Performance e a de Engenharia abrem a aba delas na Nova
+# solicitação (`/os/solicitacao/<setor>`, em que a OS vai direto para a equipe do setor), e NÃO a tela em que o próprio
+# setor cria as OS dele (`/os/performance`, os planos de string, tracker e inversor; `/os/engenharia`).
+# A OS avulsa (o "Criar OS do zero" de lá) e a solicitação ao PCM aceitam o ativo pelo endereço (`?ativo=<o código do
+# ativo da usina>`, `tradicional_web.sugestao`): a tela abre com o cliente e a usina escolhidos. As abas da Performance
+# e da Engenharia e a inspeção (que pede o ativo pelo id do Fracttal) abrem sem a usina.
 CRIAR_OS = (("OS avulsa", "qualquer serviço, do zero, direto no Fracttal", "/os/tradicional", True),
-            ("OS de Performance", "geração e ETM, inversor, string ou tracker; nasce com o ticket", "/os/performance", False),
-            ("OS de Engenharia", "as OS que a Engenharia abre", "/os/engenharia", False),
+            ("OS de Performance", "pedir à Performance: a OS vai direto para a equipe dela", "/os/solicitacao/performance", False),
+            ("OS de Engenharia", "pedir à Engenharia: a OS vai direto para a equipe dela", "/os/solicitacao/engenharia", False),
             ("Inspeção de chamados", "a inspeção que abre o chamado de garantia", "/os/chamados/inspecao", False),
             ("Solicitação de OS", "pedir a OS ao PCM e acompanhar o pedido", "/os/solicitacao", True))
 

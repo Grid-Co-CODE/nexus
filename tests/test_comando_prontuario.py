@@ -165,14 +165,25 @@ def test_o_criar_os_leva_as_formas_de_hoje_do_os_creator():
     web = RAIZ / "nexus" / "torres" / "oscreator" / "os_creator" / "os_web"
     rotas = "".join((web / f).read_text(encoding="utf-8") for f in ("rotas.py", "rotas_tradicional.py", "rotas_engenharia.py",
                                                                     "rotas_chamados.py", "rotas_solic.py"))
+    # quem usa o prontuário é quem DEMANDA ("a OS Performance seria mais o caminho para OS Creator Web Solicitação. Aí tem
+    # uma abinha de performance, uma abinha de engenharia"): a Performance e a Engenharia abrem a aba delas na Nova
+    # solicitação, e não a tela em que o próprio setor cria as OS dele
+    por_nome = {o[0]: o[2] for o in CRIAR_OS}
+    assert por_nome["OS de Performance"] == "/os/solicitacao/performance" and por_nome["OS de Engenharia"] == "/os/solicitacao/engenharia"
+    abas = (web / "templates" / "solic.html").read_text(encoding="utf-8")
+    setores = (web / "rotas_solic_eng.py").read_text(encoding="utf-8")
+    assert '_SETOR = "<any(engenharia, performance):setor>"' in setores and '@bp.route("/solicitacao/" + _SETOR)' in setores
     for _rot, _sub, url, _leva in CRIAR_OS:
-        assert f'@bp.route("{url[len("/os"):]}")' in rotas, url          # a rota existe no OS Creator
+        if url.startswith("/os/solicitacao/"):
+            assert f'href="{url}"' in abas, url                           # a aba existe na Nova solicitação
+        else:
+            assert f'@bp.route("{url[len("/os"):]}")' in rotas, url      # a rota existe no OS Creator
     # as telas que aceitam o ativo pelo endereço são as que usam a sugestão (`tradicional_web.sugestao`)
     for arq, leva in (("rotas_tradicional.py", True), ("rotas_solic.py", True)):
         assert ("trad.sugestao(assets, request.args)" in (web / arq).read_text(encoding="utf-8")) is leva
     ops = {o["rot"]: o["url"] for o in criar_os("THPN-ALT100")}
     assert ops["OS avulsa"] == "/os/tradicional?ativo=THPN-ALT100" and ops["Solicitação de OS"] == "/os/solicitacao?ativo=THPN-ALT100"
-    assert ops["OS de Performance"] == "/os/performance" and ops["Inspeção de chamados"] == "/os/chamados/inspecao"
+    assert ops["OS de Performance"] == "/os/solicitacao/performance" and ops["Inspeção de chamados"] == "/os/chamados/inspecao"
     assert all("?" not in o["url"] for o in criar_os(""))               # sem o código no cadastro, sem a usina
 
 
@@ -236,7 +247,7 @@ def test_as_acoes_do_alto_criam_a_os_e_o_ticket_com_a_usina_e_baixam_o_relatorio
     assert menu.count("<a href=") == 5 and "ticket</b>" not in acoes and "Criar ticket" not in html
     assert re.search(r'href="/os/tradicional\?ativo=[A-Z0-9-]+"><b>OS avulsa</b>', menu)
     assert re.search(r'href="/os/solicitacao\?ativo=[A-Z0-9-]+"><b>Solicitação de OS</b>', menu)
-    for url, rot in (("/os/performance", "OS de Performance"), ("/os/engenharia", "OS de Engenharia"),
+    for url, rot in (("/os/solicitacao/performance", "OS de Performance"), ("/os/solicitacao/engenharia", "OS de Engenharia"),
                      ("/os/chamados/inspecao", "Inspeção de chamados")):
         assert f'href="{url}"><b>{rot}</b>' in menu, rot
     assert "data-pu-rel" in acoes and 'href="/t/comando/conversa/usina/1"' in acoes

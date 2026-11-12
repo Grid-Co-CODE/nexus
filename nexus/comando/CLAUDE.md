@@ -255,14 +255,20 @@ cópia de 5 min do Campo (`visao._ler`, a chave `comando_prontuarios`): a 1ª ab
 (`os_verificacao`, `os_em_execucao`, `os_nao_iniciadas`) além das contagens, pela MESMA regra (a contagem é o tamanho
 da lista). Nada aqui lê o Fracttal.
 
-**As ações.** Criar OS abre as cinco formas de criar OS que o OS Creator tem hoje (Levi, 12/11/2026: "na parte de criar
-OS, vai ter as opções que é possível hoje. Então, OS avulsa, OS de performance, OS de engenharia, inspeção de chamados,
-solicitação de OS. E aí o ticket pode tirar o botão de ticket"): a lista é `prontuario_dados.CRIAR_OS`. A **OS avulsa**
-(o "Criar OS do zero" de lá, `/os/tradicional`) e a **Solicitação de OS** (`/os/solicitacao`) abrem com a usina já
-escolhida (`?ativo=<o código da usina no cadastro>`, que é o do ativo dela no Fracttal; `tradicional_web.sugestao`); a
-**OS de Performance** (`/os/performance`, pergunta o plano primeiro), a **OS de Engenharia** (`/os/engenharia`) e a
-**Inspeção de chamados** (`/os/chamados/inspecao`, que pede o ativo pelo id do Fracttal) abrem sem a usina. O botão
-"Criar ticket" da 1ª versão (os planos da Performance direto) saiu no mesmo dia. Relatório = o PDF do
+**As ações.** Criar OS abre um menu com cinco formas (Levi, 12/11/2026: "na parte de criar OS, vai ter as opções que é
+possível hoje. Então, OS avulsa, OS de performance, OS de engenharia, inspeção de chamados, solicitação de OS. E aí o
+ticket pode tirar o botão de ticket"): a lista é `prontuario_dados.CRIAR_OS`. **Quem usa o prontuário é quem DEMANDA**
+(o alinhamento dele no mesmo dia: "a OS Performance seria mais o caminho para OS Creator Web Solicitação. Aí tem uma
+abinha de performance, uma abinha de engenharia. Tendo em conta que quem está mexendo aí vai ser uma pessoa que vai
+demandar coisas [...] Essa OS de performance tem string, tracker e outras coisas, quem cria [é] a performance"): por
+isso a **OS de Performance** e a **OS de Engenharia** abrem a aba delas na Nova solicitação
+(`/os/solicitacao/performance` e `/os/solicitacao/engenharia`, em que a OS vai direto para a equipe do setor), e não a
+tela em que o próprio setor cria as OS dele (`/os/performance`, com os planos de string, tracker e inversor;
+`/os/engenharia`). A **OS avulsa** (o "Criar OS do zero" de lá, `/os/tradicional`) e a **Solicitação de OS** ao PCM
+(`/os/solicitacao`) abrem com a usina já escolhida (`?ativo=<o código da usina no cadastro>`, que é o do ativo dela no
+Fracttal; `tradicional_web.sugestao`); as abas da Performance e da Engenharia e a **Inspeção de chamados**
+(`/os/chamados/inspecao`, que pede o ativo pelo id do Fracttal) abrem sem a usina. O botão "Criar ticket" da 1ª versão
+(os planos da Performance direto) saiu no mesmo dia. Relatório = o PDF do
 cliente da Usinas 360° (`campo/relatorio_usina.py`), também pelo endereço do Comando
 (`/t/comando/usinas/<id>/relatorio.pdf`, que chama a rota de lá), para quem tem o Comando e não a Visão do responsável.
 A janela pergunta o mês e **o que entra** (Levi: "eu quero o relatório de forma profissional, que dê para editar os
