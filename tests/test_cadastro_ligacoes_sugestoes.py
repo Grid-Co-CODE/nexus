@@ -142,6 +142,18 @@ def test_o_cliente_exato_vale_primeiro():
     assert _ids(_fr("Aurora - Pinhal 1 - BA"), duas[:1]) == [(43, 100)]
 
 
+def test_o_cliente_da_chave_se_escolhe_uma_vez_e_nao_uma_por_usina(monkeypatch):
+    """A seção das Ligações compara cada buraco com o cadastro inteiro a cada visita: escolher o cliente dentro do laço
+    das usinas custava uma varredura do cadastro por usina (medido em 12/11/2026, com dados inventados: 60 chaves contra
+    260 usinas levavam 4,7 s)."""
+    vezes = []
+    de_verdade = L._clientes_da_chave
+    monkeypatch.setattr(L, "_clientes_da_chave", lambda c, us: vezes.append(c) or de_verdade(c, us))
+    usinas = [_u(100 + i, f"Pinhal Alto {i}") for i in range(1, 31)]
+    assert _ids(_fr("Aurora - Pinhal Alto 7 - BA"), usinas)[0] == (107, 100)
+    assert len(vezes) == 1
+
+
 def test_duas_contidas_uma_vetada_pela_cidade_a_outra_fica_abaixo_de_100():
     """A única do cliente conta ANTES das travas de cidade e de potência: a candidata que a cidade tirou ainda é dúvida."""
     usinas = [_u(51, "Pinhal do Norte 1", cidade="Cidade Norte"), _u(52, "Pinhal do Sul 1", cidade="Cidade Sul")]

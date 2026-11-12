@@ -642,8 +642,11 @@ def sugestoes(item: dict, usinas: list[dict], n: int = 3) -> list[dict]:
     cli = B.norm(cliente or "")
     primeiro = K.primeiro_identificador(texto)
     uf = _uf_da_chave(item)
-    # E1 não é Thopen (Levi, 04/10): nem como sugestão; o cliente exato, e sem ele o de nome mais curto (`_clientes_da_chave`)
-    do_cliente = [u for u in usinas if u.get("cliente") in _clientes_da_chave(cliente, usinas)[0]] if cli else usinas
+    # E1 não é Thopen (Levi, 04/10): nem como sugestão; o cliente exato, e sem ele o de nome mais curto
+    # (`_clientes_da_chave`). Escolhido UMA vez por chave: dentro do laço das usinas era uma varredura do cadastro por
+    # usina (12/11/2026, dados inventados: 60 chaves contra 260 usinas levavam 4,7 s)
+    validos = _clientes_da_chave(cliente, usinas)[0] if cli else None
+    do_cliente = [u for u in usinas if u.get("cliente") in validos] if cli else usinas
     # "a ÚNICA do cliente que contém as palavras com o mesmo número" conta antes das travas de cidade e de potência: a
     # outra candidata vetada pela cidade ainda é dúvida
     rel = {u["id"]: K.contencao(termos, u["nome"]) for u in do_cliente}
