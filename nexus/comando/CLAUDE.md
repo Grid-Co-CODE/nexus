@@ -1,4 +1,4 @@
-# CLAUDE.md — Comando: motor de insights, Caixa de entrada e sino
+# CLAUDE.md — Comando: motor de insights, Caixa de entrada, demandas entre setores e sino
 
 Os setores conversando (Levi, 03/11/2026: "Preciso pensar em uma forma dos setores conversarem entre si de forma
 rastreável e clara com chats, notificações..."; sobre a tela de Insights do mockup R18: "essa parte de insights também é
@@ -26,6 +26,7 @@ muito boa"; e "construa o que você sugere"). PRD e tarefas no formato do Taskma
 | `../torres/comando/templates/comando/_conversa.html` + `static/comando/conversa.js` | O componente da conversa (dentro de cada insight e na página da OS e da usina) e o @ |
 | `../casca/__init__.py` (`_sino`) + `base.html` | O sino do topo |
 | `avisos.py` + `../casca/__init__.py` (`_avisos_do_sino`, `POST /t/comando/aviso/lida`) | Os avisos das OS de cada pessoa no sino ("OS x concluída pelo técnico", "Sua solicitação gerou uma OS" e, desde 08/11/2026, "OS x criada para você"; desde 11/11/2026, tudo da OS da solicitação, com a cancelada) e o Marcar como lida: o livro `nexus_avisos · fato_evento_aviso` |
+| `demandas_regras.py` + `demandas.py` + `../torres/comando/demandas_tela.py` | As demandas entre setores (12/11/2026): a regra do prazo e dos avisos, o livro `nexus_demandas` e as telas (o bloco da Caixa, a Nova demanda, os Temas do setor e o sininho); ver a seção abaixo |
 | `solicitacoes_fracttal.py` | As solicitações do Fracttal que viraram OS (REST `work_requests`, por trás, a cada 5 min, na memória) e o motivo das OS delas canceladas, para os avisos de quem pediu (11/11/2026) |
 
 ## As regras da Fase 1 (e de onde cada uma lê)
@@ -185,6 +186,60 @@ fontes numa linha só. O CSS da tela usa o prefixo `cmu-` (o `cu-` é da Central
 
 Prova: `tests/test_comando_usinas.py` (as colunas, a fonte que falta sem 0, os insights vivos, a lista e o prontuário) e a
 renderização com o banco de produção, só leitura, pelo cliente de teste (138 usinas, prontuário sem erro).
+
+## As demandas entre setores (12/11/2026)
+
+Levi: "algo parecido com criação de chamados [...] os setores consigam conversar entre si sem ter que especificamente
+criar um OS". Desenho aprovado depois de uma rodada de perguntas, com a prévia (`docs/mockups/demandas-entre-setores` no
+repositório da plataforma): `docs/superpowers/specs/2026-11-12-demandas-entre-setores-design.md` e o plano em
+`docs/superpowers/plans/2026-11-12-demandas-entre-setores.md`. O modelo é o dos times de serviço (Jira Service
+Management, ServiceNow): catálogo de temas por setor com o prazo por tema, "respondida" separada de "concluída", a
+conclusão sozinha e o vencido que sobe para o setor; no O&M, a demanda fica presa ao que o campo enxerga (a usina e a OS).
+
+**As regras (todas do Levi):**
+- A pessoa e o setor de quem recebe são obrigatórios; um setor só por demanda ("Esquece essa parte de indicar mais de um
+  setor"). O setor vê o que todo mundo dele recebe (a aba "Do meu setor", com o filtro por pessoa e por tema).
+- Cada setor monta os seus temas, cada um com o prazo em dias úteis (1 a 30; sem sábado, domingo e feriado nacional):
+  Comando → Temas do setor (`de_todos`). O prazo da demanda é o do tema na hora em que foi aberta.
+- A OS, as usinas e os anexos são opcionais. A OS tem de existir e ser de uma das usinas escolhidas (o retrato do
+  Fracttal no banco, `nexus_os · fato_tarefa_os`: as abertas e em verificação), e abre o card do OS Creator ao clicar
+  (`NexusOsCard.abrirFolio`). Os anexos seguem a regra das Sugestões (5 arquivos, 5 MB cada, 15 MB juntos, o conteúdo
+  conferido pelo começo do arquivo), no disco do servidor em `demandas/<id>/`.
+- Situações: Nova → Em análise → (Aguardando quem pediu ↔) → Finalizada (quem recebeu respondeu) → Concluída (o ok de quem
+  pediu) ou Devolvida (com justificativa obrigatória; o prazo recomeça do dia da devolução). "Pedir informação" PARA o
+  prazo até quem pediu responder: os dias úteis parados somam ao prazo. Finalizada sem o ok nem a devolução em 3 dias
+  úteis vira "Concluída sozinha" (só na leitura, nada se grava).
+- Quem faz cada passo: quem recebeu (em análise, pedir informação, responder); quem pediu (informar, concluir, devolver).
+  O colega do setor vê e não responde no lugar (`demandas.PASSOS`).
+- A lista: o nome de quem pediu, o setor dele, o título e as 6 primeiras palavras da descrição ("estilo Next, só que
+  limpo"); o tema aparece uma vez só (Levi: "O tema está se repetindo no título e nas linhas de baixo"). O selo da
+  esquerda é o prazo; o da direita, a situação.
+- O sininho (bandeja, ao lado do botão do OS Creator): para quem recebeu, a nova, o prazo apertando (faltam 2 dias,
+  falta 1, vence hoje), a vencida e a devolvida; para o setor de quem recebeu, a vencida ("Quem recebeu + todo o setor");
+  para quem pediu, a respondida e o pedido de informação. A nova vence o prazo de 2 dias na ordem (a prévia mostrava
+  "Nova demanda"). Só da cópia do livro (`demandas.copia`, 1 minuto, relida por trás): nenhuma página espera o banco.
+
+**Os dados** (`nexus_demandas`, registrado no catálogo antes da 1ª gravação; o Nexus é a fonte, só acrescenta):
+`dim_tema` (1 versão de 1 tema; vale a última por `tema_id`), `fato_demanda`, `fato_demanda_usina` e
+`fato_evento_demanda`. Em claro só ids, códigos (`*_hmac`), setores, prazo, OS e datas; o nome do tema, o título, a
+descrição, os textos dos passos, os nomes e os anexos só cifrados (o Cofre, amarrado à linha). O `novo_id` do formulário
+torna o 2º envio (o duplo clique, o F5) inofensivo. O setor da pessoa vem das decisões de Base → Acessos → Pessoas e
+setores (`setor_telas.setor_da_pessoa`), e não do `acesso()`, que só diz o setor com o portão por setor ligado.
+
+**Os arquivos:** `demandas_regras.py` (o prazo, a situação e os avisos, sem Flask nem banco), `demandas.py` (a gravação,
+a leitura decifrada, as três abas e os filtros), `../torres/comando/demandas_tela.py` (as rotas, debaixo de
+`/t/comando/caixa-de-entrada/demandas/...` para herdar a Caixa, que é de todos), `templates/comando/_demandas.html` (o
+bloco no alto da Caixa e a Nova demanda), `temas_setor.html`, `static/comando/demandas.js` (aba, filtro e demanda aberta
+sem recarregar; a pessoa e o tema pelo setor; as OS das usinas marcadas) e o CSS `dm-` no `comando.css`. O sininho é o
+`_sino_demandas` da casca.
+
+**Fora, por agora:** a demanda para mais de um setor; o e-mail; o painel de tempo de resposta por setor (os passos já
+guardam o dia de cada um para medir).
+
+Prova: `tests/test_comando_demandas.py` (o prazo, a pausa, a conclusão sozinha e os avisos com datas inventadas; o livro no
+catálogo; o texto só cifrado; o duplo envio; a OS da usina; o papel e a vez; o anexo; as três abas; a Caixa para quem
+recebe, quem pediu, o colega e quem não tem nada a ver; a Nova demanda pela tela; os passos pela tela; os Temas do setor;
+o sininho).
 
 ## O visual
 Uma lista numa superfície só, uma linha por insight que abre ao clicar (Levi: "não sou muito fã dessa barra lateral em
