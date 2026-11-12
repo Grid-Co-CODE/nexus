@@ -57,14 +57,16 @@ def test_as_colunas_e_a_ordem():
     r = CU.montar(linhas, CAD, cos, {1: 2}, {2}, com_os=True, agora=AGORA)
     assert [x["usina"] for x in r] == ["Brodowski 1", "Coração 1", "Altair"]       # crítico, sem leitura, normal
     alt = r[2]
-    assert (alt["estado"], alt["estado_rot"], alt["detalhe"]) == ("normal", "Sem ocorrência", "")
+    assert (alt["estado"], alt["estado_rot"], alt["detalhe"]) == ("normal", "Normal", "")
     assert (alt["mwp"], alt["tipologia"], alt["codigo"]) == (5.012, "Tracker", "THPN-ALT100")
     assert (alt["atingimento"], alt["pr"], alt["pr_meta"], alt["os_abertas"], alt["os_atrasadas"]) == (96.4, 78.0, 80.0, 4, 1)
     assert alt["insights"] == 2 and alt["conformidade"] == [("2 extintores vencidos", "critico")]
     bwk = r[0]
-    # o religamento em campo manda (crítico), mesmo mais novo que o inversor; o detalhe diz a OS, a idade, a etapa e mais
-    assert (bwk["estado"], bwk["estado_rot"], bwk["estado_tom"]) == ("critico", "Religamento em campo", "critico")
-    assert bwk["detalhe"] == "OS 90002 · há 2 h · Técnico acionado · +1 ocorrência"
+    # o religamento em campo manda (crítico), mesmo mais novo que o inversor. 12/11/2026 (Levi): a etiqueta é o grupo e
+    # embaixo só o motivo numa linha; a OS, a idade e a etapa ficam no prontuário
+    assert (bwk["estado"], bwk["estado_rot"], bwk["estado_tom"]) == ("critico", "Crítico", "critico")
+    assert bwk["detalhe"] == "Desligamento"
+    assert bwk["os_cos"][0]["rotulo"] == "Religamento em campo"
     assert [o["os"] for o in bwk["os_cos"]] == ["90002", "90001"]
     assert bwk["conformidade"] == [("sem luvas", "critico")]
     assert bwk["os_abertas"] == 0 and bwk["insights"] == 0          # sem OS nem insight na usina: 0, com a fonte lida
@@ -90,7 +92,7 @@ def test_a_regua_do_levi():
     assert CU.classificar(_oc(falha="Tracker travado", problema="trk")) == ("atencao", "Tracker travado")
     # a pior manda: crítico > atenção > sem comunicação; nada aberto é normal; sem leitura nunca é normal
     x = CU.agora_pelo_cos([_oc(falha="Perda de comunicação", problema="com"), _oc(falha="Inversor desligado")], AGORA)
-    assert (x["estado"], x["estado_rot"]) == ("atencao", "Inversor desligado")
+    assert (x["estado"], x["estado_rot"], x["detalhe"]) == ("atencao", "Atenção", "Inversor em falha")
     assert CU.agora_pelo_cos([], AGORA)["estado"] == "normal" and CU.agora_pelo_cos(None)["estado"] == "sem_leitura"
     assert CU.cos_por_usina([AND.Leitura("X", None, erro="caiu")], IDS.get) is None
 
@@ -143,13 +145,18 @@ def test_a_lista_e_o_prontuario(logado, telas, monkeypatch):
     html = logado.get("/t/comando/usinas?cliente=Thopen").get_data(as_text=True)
     assert "3 usinas mobilizadas" in html and "Score" not in html
     assert html.index(">Altair<") < html.index(">Brodowski 1<")                # o crítico antes do normal
-    assert ">Religamento em campo<" in html and "OS 7001 · há 2 h" in html and "fotografia das" in html
-    assert 'href="/t/comando/usinas/1"' in html and "THPN-ALT100" in html
-    assert '<option value="Thopen" selected>' in html                           # o filtro do endereço já vem escolhido
+    assert ">Crítico<" in html and "<small>Desligamento</small>" in html and "fotografia das" in html
+    assert "OS 7001" not in html.split("data-cmu-tabela", 1)[1]                 # a OS fica para o prontuário
+    assert 'data-dica-usina="Altair" data-dica-motivo="Crítico: Desligamento"' in html
+    assert ">ALT100<" in html and ">THPN-ALT100<" not in html                   # só o código da UFV
+    assert 'href="/t/comando/usinas/1"' in html and ">ALT100<" in html
+    assert '<input type="checkbox" value="Thopen" checked>' in html            # o filtro do endereço já vem marcado
     # 12/11/2026 (o modelo do Histórico de OS): o cliente filtra a tabela no servidor; a faixa segue com todas
     tabela = html.split("data-cmu-tabela", 1)[1]
     assert ">Coração 1<" not in tabela and "Coração 1:" in html.split("data-cmu-tabela", 1)[0]
-    assert "data-fs" in html and "campo-filtros.js" in html and "data-cmu-busca" in html
+    assert "data-cmu-fl" in html and "cmu-fl-procura" in html and "data-cmu-busca" in html
+    for nome in ("cliente", "responsavel", "estado", "meta", "conformidade"):
+        assert f'data-nome="{nome}"' in html
     assert "1 extintor vencido" in html and ">sem luvas<" in html
     # o prontuário, no próprio Comando, com a Central da usina em leitura
     from nexus.campo import responsaveis as R
@@ -168,3 +175,28 @@ def test_a_lista_e_o_prontuario(logado, telas, monkeypatch):
     assert "/t/cos/ronda?cliente=Thopen" in p
     assert 'href="/t/comando/usinas"' in p and "/t/campo/responsaveis?modo=usina&amp;usina=1" in p
     assert logado.get("/t/comando/usinas/999").status_code == 404
+
+
+
+def test_os_filtros_do_painel_e_o_motivo():
+    """12/11/2026 (Levi): "filtros também de responsável da UFV, filtros de meta, o que está abaixo, os que não tem
+    conformidade"; o motivo numa linha: "Desligamento", "inversor em falha", "Tracker parado", "String sem corrente"."""
+    assert [CU.motivo(_oc(falha=f, problema="x")) for f in ("Desligamento de usina", "Inversor desligado",
+                                                         "Tracker travado", "String sem corrente", "Perda de comunicação")] \
+        == ["Desligamento", "Inversor em falha", "Tracker parado", "String sem corrente", "Falha de comunicação"]
+    assert CU.motivo(_oc(tarefa="Religamento", falha="", problema="")) == "Desligamento"
+    assert [CU.faixa_meta(a) for a in (101.0, 97.0, 93.5, 89.9, None)] == ["na_meta", "na_meta", "atencao", "abaixo",
+                                                                          "sem_meta"]
+    linhas = [dict(_visao(1, "Altair", ating=95.0, vencidos=1), responsavel="Fulano"),
+              dict(_visao(2, "Brodowski 1", ating=101.0), responsavel="Beltrano"),
+              dict(_visao(3, "Coração 1", cliente="Outro Cliente", ating=80.0), extintores=None, responsavel="")]
+    r = CU.montar(linhas, CAD, None, None, set(), com_os=True, agora=AGORA)
+    por = {x["usina"]: x for x in r}
+    assert por["Altair"]["conf_chave"] == "pendencia" and por["Brodowski 1"]["conf_chave"] == "em_dia"
+    assert por["Coração 1"]["responsavel"] == "Sem responsável O&M" and por["Altair"]["codigo_ufv"] == "ALT100"
+    nomes = lambda xs: sorted(x["usina"] for x in xs)
+    assert nomes(CU.filtrar(r, {"meta": ["abaixo", "atencao"]})) == ["Altair", "Coração 1"]
+    assert nomes(CU.filtrar(r, {"conformidade": ["pendencia"]})) == ["Altair"]
+    assert nomes(CU.filtrar(r, {"responsavel": ["Fulano", "Beltrano"], "meta": ["na_meta"]})) == ["Brodowski 1"]
+    assert nomes(CU.filtrar(r, {"cliente": [], "estado": []})) == ["Altair", "Brodowski 1", "Coração 1"]
+    assert CU.resumo(r)["responsaveis"] == ["Beltrano", "Fulano", "Sem responsável O&M"]

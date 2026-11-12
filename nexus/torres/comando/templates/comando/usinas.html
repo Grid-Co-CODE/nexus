@@ -4,12 +4,26 @@
 <link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='comando.css') }}">
 {# Comando > Usinas (11/11/2026, Levi: "Em comando quero a mesma visão de Início > Usinas do mockup"): a faixa com uma
-   barra por usina (todas as mobilizadas) na cor do estado de agora, os filtros no modelo do Histórico de OS do OS Creator
-   Web (12/11/2026, Levi: "Quero os filtros conforme referência Histórico de OS"; o campo-filtros.js monta o botão
-   Filtros, o painel com o Aplicar e as etiquetas: o cliente e o estado vão ao servidor), a busca que filtra enquanto se
-   digita e a tabela que ordena pelo cabeçalho, com o cabeçalho mais escuro e as linhas alternadas (comando-usinas.js).
-   A conta mora em nexus/comando/usinas.py; o Score de saúde do mockup ficou fora. #}
+   barra por usina (todas as mobilizadas) na cor do estado de agora, com a dica da usina e do motivo; os filtros no modelo
+   do Histórico de OS do OS Creator Web (12/11/2026, Levi: "Quero os filtros conforme referência Histórico de OS" e "que
+   nos filtros o cliente seja digitável tal qual é em histórico de OS [...] no mesmo estilo e mesmas funções"): a busca,
+   o botão Filtros com o painel de listas digitáveis de marcar, o Aplicar que só acende com mudança e uma etiqueta por
+   filtro aplicado; e a tabela que ordena pelo cabeçalho, com o cabeçalho mais escuro e as linhas alternadas
+   (comando-usinas.js). A conta mora em nexus/comando/usinas.py; o Score de saúde do mockup ficou fora. #}
 {% macro pct(x) %}{% if x is none %}—{% else %}{{ ('%.0f'|format(x)) }}%{% endif %}{% endmacro %}
+{% macro multi(nome, rotulo, todos, opcoes) -%}
+<div class="cmu-fl-cel" data-filtro="{{ nome }}">
+  <span class="cmu-fl-rot" id="cmu-rot-{{ nome }}">{{ rotulo }}</span>
+  <details class="cmu-fl-multi" data-nome="{{ nome }}" data-rotulo="{{ rotulo }}" data-todos="{{ todos }}">
+    <summary aria-labelledby="cmu-rot-{{ nome }} cmu-val-{{ nome }}"><span class="cmu-fl-txt" id="cmu-val-{{ nome }}">{{ todos }}</span><i class="ph ph-caret-down" aria-hidden="true"></i></summary>
+    <div class="cmu-fl-lista">
+      <input type="search" class="cmu-fl-procura" placeholder="Digite para filtrar" aria-label="Filtrar {{ rotulo|lower }}" autocomplete="off">
+      {% for v, rot in opcoes %}<label><input type="checkbox" value="{{ v }}"{% if v in escolhidos.get(nome, []) %} checked{% endif %}> <span>{{ rot }}</span></label>{% endfor %}
+      <p class="cmu-fl-vazio mudo" hidden>Nada com esse texto.</p>
+    </div>
+  </details>
+</div>
+{%- endmacro %}
 <div class="campo-nativa">
   <div class="cn-cab">
     <div><p class="gc-eyebrow">{{ torre.nome }}</p><h1 class="cn-titulo">{{ tela.nome }}</h1>
@@ -20,24 +34,37 @@
   {% if avisos %}<div class="cn-erro cn-aviso" role="status"><span>Sem leitura agora: {{ avisos|join(', ') }}. O resto da tabela vale.</span></div>{% endif %}
 
   <section class="cmu-quadro" aria-label="Usinas">
-    <div class="cmu-faixa" role="img" aria-label="Uma barra por usina, na cor do estado de agora">
-      {% for x in todas %}<span class="cmu-seg cmu-seg--{{ estados[x.estado][1] }}" title="{{ x.usina }}: {{ x.estado_rot }}"></span>{% endfor %}
+    {# a faixa: uma barra por usina; passar o mouse diz a usina e o motivo da cor (12/11/2026) #}
+    <div class="cmu-faixa" data-cmu-faixa>
+      {% for x in todas %}<span class="cmu-seg cmu-seg--{{ estados[x.estado][1] }}" tabindex="0" data-dica-usina="{{ x.usina }}" data-dica-motivo="{{ estados[x.estado][0] }}{% if x.detalhe %}: {{ x.detalhe }}{% endif %}" aria-label="{{ x.usina }}: {{ estados[x.estado][0] }}{% if x.detalhe %}, {{ x.detalhe }}{% endif %}"></span>{% endfor %}
     </div>
+    <div class="cmu-dica" data-cmu-dica role="tooltip" hidden><b></b><span></span></div>
     <ul class="cmu-legenda">
       {% for chave, rot in legenda %}<li><i class="cmu-ponto cmu-ponto--{{ estados[chave][1] if chave in estados else 'neutro' }}" aria-hidden="true"></i>{{ rot }} <b class="gc-num">{{ r.por_estado[chave] }}</b></li>{% endfor %}
     </ul>
 
-    <div class="cmu-barra">
-    <form class="cn-filtros cmu-filtros" method="get" data-fs>
-      <input class="gc-campo" type="search" name="q" value="{{ q }}" placeholder="usina, código, cliente ou cluster" aria-label="Buscar" autocomplete="off" data-cmu-busca>
-      <label class="cn-filtro-par" for="cmu-cliente"><span class="gc-rotulo">Cliente</span>
-        <select class="gc-campo" id="cmu-cliente" name="cliente"><option value="">Todos</option>
-          {% for c in r.clientes %}<option value="{{ c }}"{% if c == cliente %} selected{% endif %}>{{ c }}</option>{% endfor %}</select></label>
-      <label class="cn-filtro-par" for="cmu-estado"><span class="gc-rotulo">Agora</span>
-        <select class="gc-campo" id="cmu-estado" name="estado"><option value="">Todos</option>
-          {% for chave, e in estados.items() %}<option value="{{ chave }}"{% if chave == estado %} selected{% endif %}>{{ e[0] }}</option>{% endfor %}</select></label>
-    </form>
-    <span class="mudo cmu-conta"><b class="gc-num" data-cmu-conta>{{ linhas|length }}</b> de {{ r.total }} usinas</span>
+    <div class="cmu-fl" data-cmu-fl>
+      <div class="cmu-fl-barra">
+        <label class="cmu-fl-campo cmu-fl-busca"><i class="ph ph-magnifying-glass" aria-hidden="true"></i>
+          <input type="search" value="{{ q }}" placeholder="Filtrar por usina, código, cliente ou cluster" aria-label="Filtrar as usinas" autocomplete="off" data-cmu-busca></label>
+        <button type="button" class="cmu-fl-btn" data-cmu-fl-abrir aria-haspopup="dialog" aria-expanded="false" aria-controls="cmu-fl-painel"><i class="ph ph-funnel-simple" aria-hidden="true"></i>Filtros<span class="cmu-fl-badge" data-cmu-fl-badge hidden></span></button>
+        <span class="mudo cmu-conta"><b class="gc-num" data-cmu-conta>{{ linhas|length }}</b> de {{ r.total }} usinas</span>
+        <div class="cmu-fl-painel" id="cmu-fl-painel" role="dialog" aria-label="Filtros" hidden>
+          <div class="cmu-fl-topo"><h4>Filtros</h4><button type="button" class="cmu-fl-fechar" data-cmu-fl-fechar aria-label="Fechar sem aplicar" title="Fechar sem aplicar">&times;</button></div>
+          <div class="cmu-fl-grade">
+            {{ multi('cliente', 'Cliente', 'Todos os clientes', op_clientes) }}
+            {{ multi('responsavel', 'Responsável da UFV', 'Todos os responsáveis', op_responsaveis) }}
+            {{ multi('estado', 'Agora', 'Todos os estados', op_estados) }}
+            {{ multi('meta', 'Meta do mês', 'Todas as faixas', op_meta) }}
+            {{ multi('conformidade', 'Conformidade', 'Todas', op_conformidade) }}
+          </div>
+          <div class="cmu-fl-rodape">
+            <button type="button" class="cmu-fl-btn cmu-fl-fantasma" data-cmu-fl-limpar>Limpar</button>
+            <div class="cmu-fl-dir"><span data-cmu-fl-nalt aria-live="polite">Sem alterações</span><button type="button" class="cmu-fl-btn cmu-fl-aplicar" data-cmu-fl-aplicar disabled>Aplicar</button></div>
+          </div>
+        </div>
+      </div>
+      <div class="cmu-fl-etiquetas" data-cmu-fl-etiquetas role="group" aria-label="Filtros aplicados" hidden></div>
     </div>
 
     <div class="cn-tab cmu-tab"><table data-cmu-tabela>
@@ -47,12 +74,12 @@
         <th class="cmu-esq"><button type="button" data-cmu-ordem="cluster">Cluster</button></th>
         <th><button type="button" data-cmu-ordem="mwp" data-cmu-num>MWp</button></th>
         <th><button type="button" data-cmu-ordem="tipologia">Tipologia</button></th>
-        <th class="cmu-esq"><button type="button" data-cmu-ordem="agora" data-cmu-num aria-sort="ascending">Agora</button></th>
+        <th><button type="button" data-cmu-ordem="agora" data-cmu-num aria-sort="ascending">Agora</button></th>
         <th><button type="button" data-cmu-ordem="ating" data-cmu-num>Atingimento</button></th>
         <th><button type="button" data-cmu-ordem="pr" data-cmu-num>PR / meta</button></th>
         <th><button type="button" data-cmu-ordem="os" data-cmu-num>OS abertas</button></th>
         <th><button type="button" data-cmu-ordem="insights" data-cmu-num>Insights</button></th>
-        <th class="cmu-esq">Conformidade</th>
+        <th class="cmu-centro">Conformidade</th>
       </tr></thead>
       <tbody>{% for x in linhas %}
         <tr data-busca="{{ x.busca }}"
@@ -60,17 +87,17 @@
             data-o-tipologia="{{ x.tipologia }}" data-o-agora="{{ loop.index0 }}" data-o-ating="{{ x.atingimento if x.atingimento is not none else '' }}"
             data-o-pr="{{ x.pr if x.pr is not none else '' }}" data-o-os="{{ x.os_abertas if x.os_abertas is not none else '' }}"
             data-o-insights="{{ x.insights if x.insights is not none else '' }}" data-cmu-uid="{{ x.usina_id }}">
-          <td class="cmu-esq"><a class="cmu-usina" href="{{ raiz }}/t/comando/usinas/{{ x.usina_id }}"><b>{{ x.usina }}</b>{% if x.codigo %}<span class="cmu-cod">{{ x.codigo }}</span>{% endif %}</a></td>
+          <td class="cmu-esq"><a class="cmu-usina" href="{{ raiz }}/t/comando/usinas/{{ x.usina_id }}"><b>{{ x.usina }}</b>{% if x.codigo_ufv %}<span class="cmu-cod">{{ x.codigo_ufv }}</span>{% endif %}</a></td>
           <td class="cmu-esq">{{ x.cliente or '—' }}</td>
           <td class="cmu-esq">{{ x.cluster or '—' }}</td>
           <td class="gc-num">{% if x.mwp is not none %}{{ ('%.1f'|format(x.mwp))|replace('.', ',') }}{% else %}—{% endif %}</td>
           <td>{{ x.tipologia or '—' }}</td>
-          <td class="cmu-esq cmu-agora"><span class="cn-pill cn-{{ x.estado_tom }}">{{ x.estado_rot }}</span>{% if x.detalhe %}<small>{{ x.detalhe }}</small>{% endif %}</td>
+          <td class="cmu-agora"><span class="cn-pill cn-{{ x.estado_tom }}">{{ x.estado_rot }}</span>{% if x.detalhe %}<small>{{ x.detalhe }}</small>{% endif %}</td>
           <td class="gc-num">{{ pct(x.atingimento) }}</td>
           <td class="gc-num">{% if x.pr is none and x.pr_meta is none %}—{% else %}{{ pct(x.pr) }} / {{ pct(x.pr_meta) }}{% endif %}</td>
-          <td class="gc-num">{% if x.os_abertas is none %}<span class="mudo">sem leitura</span>{% else %}{{ x.os_abertas }}{% if x.os_atrasadas %} <span class="cn-pill cn-alerta">{{ x.os_atrasadas }} {{ 'atrasada' if x.os_atrasadas == 1 else 'atrasadas' }}</span>{% endif %}{% endif %}</td>
+          <td class="gc-num">{% if x.os_abertas is none %}<span class="mudo">sem leitura</span>{% else %}{{ x.os_abertas }}{% if x.os_atrasadas %} <span class="cn-pill cn-alerta" title="OS com tarefa aberta e a data programada vencida há mais de 10 dias (a régua do PCM)">{{ x.os_atrasadas }} {{ 'atrasada' if x.os_atrasadas == 1 else 'atrasadas' }}</span>{% endif %}{% endif %}</td>
           <td class="gc-num">{% if x.insights is none %}<span class="mudo">—</span>{% elif x.insights %}<a class="vc-os" href="{{ raiz }}/t/comando/insights">{{ x.insights }}</a>{% else %}0{% endif %}</td>
-          <td class="cmu-esq"><div class="cmu-conf">{% for txt, tom in x.conformidade %}<span class="cn-pill cn-{{ tom }}">{{ txt }}</span>{% endfor %}{% if x.conformidade_ok %}<span class="cn-pill cn-ok">ok</span>{% elif x.conformidade_sem_fonte %}<span class="mudo">sem leitura</span>{% endif %}</div></td>
+          <td class="cmu-centro"><div class="cmu-conf">{% for txt, tom in x.conformidade %}<span class="cn-pill cn-{{ tom }}">{{ txt }}</span>{% endfor %}{% if x.conformidade_ok %}<span class="cn-pill cn-ok">ok</span>{% elif x.conformidade_sem_fonte %}<span class="mudo">sem leitura</span>{% endif %}</div></td>
         </tr>
       {% endfor %}
         <tr data-cmu-vazio{% if linhas %} hidden{% endif %}><td colspan="11" class="mudo">Nenhuma usina com esses filtros.</td></tr>
@@ -78,6 +105,5 @@
     {% if insights_calculando %}<p class="mudo cmu-nota">Os Insights ainda estão sendo calculados: a coluna aparece na próxima abertura.</p>{% endif %}
   </section>
 </div>
-<script src="{{ url_for('static', filename='campo-filtros.js') }}"></script>
 <script src="{{ url_for('static', filename='comando-usinas.js') }}"></script>
 {% endblock %}

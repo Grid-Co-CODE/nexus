@@ -34,6 +34,19 @@ LEGENDA = (("normal", "Normal"), ("atencao", "Atenção"), ("critico", "Crítico
 # o tipo da falha que para a usina (a Ronda COS escreve "Desligamento de usina", "Atuação de proteção"...; o
 # `problema` "rede" é o grupo "Rede concessionária" do placar dela)
 _PARA_A_USINA = ("usina", "cabine", "skid", "qgbt", "protecao", "concessionaria", "rede")
+# o motivo numa linha embaixo do status (12/11/2026, Levi: "os status generalizem entre (Normal, Atenção, Crítico, sem
+# comunicação e sem leitura. Aí abaixo em apenas uma linha diga o motivo: "Desligamento", "inversor em falha", "Tracker
+# parado", "String sem corrente""): (trecho do tipo da falha, sem acento e sem caixa, o motivo). A 1ª que bate vale
+_MOTIVOS = (("comunica", "Falha de comunicação"), ("inversor", "Inversor em falha"), ("tracker", "Tracker parado"),
+            ("string", "String sem corrente"), ("cabine", "Cabine desligada"), ("skid", "SKID desligado"),
+            ("qgbt", "QGBT desligado"), ("protecao", "Proteção atuou"), ("concessionaria", "Falta de energia da rede"),
+            ("usina", "Desligamento"), ("deslig", "Desligamento"))
+# os filtros da tela (12/11/2026, Levi: "filtros também de responsável da UFV, filtros de meta, o que está abaixo, os que
+# não tem conformidade"). A meta na régua da Visão gerencial (`campo.responsaveis.META_NA_META` e `META_ATENCAO`)
+META_FAIXAS = {"na_meta": "Na meta (97% ou mais)", "atencao": "Atenção (90% a 97%)", "abaixo": "Abaixo (menos de 90%)",
+               "sem_meta": "Sem meta no mês"}
+CONFORMIDADES = {"pendencia": "Com pendência", "em_dia": "Em dia", "sem_leitura": "Sem leitura"}
+FILTROS = ("cliente", "estado", "responsavel", "meta", "conformidade")
 
 
 def _norm(s) -> str:
@@ -55,6 +68,22 @@ def classificar(oc: dict) -> tuple[str, str]:
     if any(p in falha for p in _PARA_A_USINA) or prob == "rede":
         return "critico", str(oc.get("tipo_falha") or "Usina desligada")
     return "atencao", str(oc.get("tipo_falha") or oc.get("tipo_tarefa") or "Ocorrência aberta")
+
+
+def motivo(oc: dict) -> str:
+    """O motivo de UMA ocorrência em poucas palavras, pelo tipo da falha que a Ronda COS manda (sem ele, pelo tipo da
+    tarefa: o religamento é desligamento). O que não está na lista vai com o próprio nome da falha."""
+    falha, prob = _norm(oc.get("tipo_falha")), _norm(oc.get("problema"))
+    for trecho, txt in _MOTIVOS:
+        if trecho in falha:
+            return txt
+    if prob == "com":
+        return "Falha de comunicação"
+    if prob == "inv":
+        return "Inversor em falha"
+    if prob == "rede" or _norm(oc.get("tipo_tarefa")).startswith("religamento"):
+        return "Desligamento"
+    return str(oc.get("tipo_falha") or oc.get("tipo_tarefa") or "Ocorrência aberta")
 
 
 def cos_por_usina(leituras: list | None, usina_de) -> dict | None:
@@ -100,21 +129,18 @@ def agora_pelo_cos(ocs: list[dict] | None, agora=None) -> dict:
         grupo, rot = classificar(o)
         horas, ha = _ha(o, agora)
         os_ = str(o.get("os") or "")
-        itens.append(dict(o, grupo=grupo, rotulo=rot, tom=ESTADOS[grupo][1], horas=horas, ha=ha,
+        itens.append(dict(o, grupo=grupo, rotulo=rot, motivo=motivo(o), tom=ESTADOS[grupo][1], horas=horas, ha=ha,
                           os_rotulo=f"OS {os_}" if os_.isdigit() else "ainda sem OS"))
     if not itens:
         rot, tom, ordem = ESTADOS["normal"]
-        return {"estado": "normal", "estado_rot": "Sem ocorrência", "estado_tom": tom, "ordem": ordem, "horas": 0,
+        return {"estado": "normal", "estado_rot": rot, "estado_tom": tom, "ordem": ordem, "horas": 0,
                 "os_cos": [], "detalhe": ""}
     itens.sort(key=lambda i: (ESTADOS[i["grupo"]][2], -i["horas"]))
     pior = itens[0]
-    partes = [pior["os_rotulo"], f"há {pior['ha']}"]
-    if pior.get("etapa"):
-        partes.append(str(pior["etapa"]))
-    if len(itens) > 1:
-        partes.append(f"+{len(itens) - 1} {'ocorrência' if len(itens) == 2 else 'ocorrências'}")
-    return {"estado": pior["grupo"], "estado_rot": pior["rotulo"], "estado_tom": pior["tom"],
-            "ordem": ESTADOS[pior["grupo"]][2], "horas": pior["horas"], "os_cos": itens, "detalhe": " · ".join(partes)}
+    # a célula diz só o grupo e o motivo (12/11/2026, Levi: "Em agora pode tirar as informações das OSs, isso fica para
+    # quando a pessoa clicar na UFV"); a OS, a idade e a etapa ficam no prontuário
+    return {"estado": pior["grupo"], "estado_rot": ESTADOS[pior["grupo"]][0], "estado_tom": pior["tom"],
+            "ordem": ESTADOS[pior["grupo"]][2], "horas": pior["horas"], "os_cos": itens, "detalhe": pior["motivo"]}
 
 
 def tipologia(v) -> str:
@@ -168,8 +194,14 @@ def montar(linhas_visao: list[dict], cadastro: dict, cos: dict | None, insights:
         if sem_luvas is not None and uid in sem_luvas:
             conf.append(("sem luvas", "critico"))
         sem_fonte = ext is None and sem_luvas is None
+        ating = meta.get("atingimento")
+        codigo = str(ficha.get("codigo") or "").strip()
         out.append({
-            "usina_id": uid, "usina": u.get("usina") or "", "codigo": str(ficha.get("codigo") or "").strip(),
+            "usina_id": uid, "usina": u.get("usina") or "", "codigo": codigo,
+            # só o código da UFV, sem o prefixo do cliente (12/11/2026, Levi): "THPN-FRN100" -> "FRN100"
+            "codigo_ufv": codigo.split("-", 1)[-1] if "-" in codigo else codigo,
+            "responsavel": u.get("responsavel") or "Sem responsável O&M",
+            "faixa_meta": faixa_meta(ating),
             "cliente": u.get("cliente") or "", "cluster": u.get("cluster") or "",
             "mwp": mwp(ficha.get("potencia_contratual")), "tipologia": tipologia(ficha.get("tipologia")),
             **ag,
@@ -177,7 +209,8 @@ def montar(linhas_visao: list[dict], cadastro: dict, cos: dict | None, insights:
             "os_abertas": man.get("os_abertas", 0) if com_os else None,
             "os_atrasadas": man.get("atrasadas_os", 0) if com_os else None,
             "insights": None if insights is None else insights.get(uid, 0),
-            "conformidade": conf, "conformidade_ok": not conf and not sem_fonte, "conformidade_sem_fonte": sem_fonte})
+            "conformidade": conf, "conformidade_ok": not conf and not sem_fonte, "conformidade_sem_fonte": sem_fonte,
+            "conf_chave": "pendencia" if conf else ("sem_leitura" if sem_fonte else "em_dia")})
         x = out[-1]
         # o que a busca da página olha (`filtro-local.js` compara sem acento e sem caixa)
         x["busca"] = _norm(" ".join([x["usina"], x["codigo"], x["cliente"], x["cluster"], x["tipologia"]]))
@@ -186,9 +219,27 @@ def montar(linhas_visao: list[dict], cadastro: dict, cos: dict | None, insights:
     return out
 
 
+def faixa_meta(ating) -> str:
+    """A faixa do atingimento do mês na régua da Visão gerencial (97% e 90%); sem meta publicada, "sem_meta"."""
+    from ..campo.responsaveis import META_ATENCAO, META_NA_META
+    if ating is None:
+        return "sem_meta"
+    return "na_meta" if ating >= META_NA_META else ("atencao" if ating >= META_ATENCAO else "abaixo")
+
+
+def filtrar(linhas: list[dict], escolhidos: dict) -> list[dict]:
+    """As linhas que passam em TODOS os filtros escolhidos ({filtro: [valores]}; lista vazia = sem filtro). Dentro de
+    um filtro, qualquer valor marcado serve (como as listas de marcar do Histórico de OS)."""
+    campo = {"cliente": "cliente", "estado": "estado", "responsavel": "responsavel", "meta": "faixa_meta",
+             "conformidade": "conf_chave"}
+    ativos = {k: set(v) for k, v in (escolhidos or {}).items() if k in campo and v}
+    return [x for x in linhas if all(x[campo[k]] in v for k, v in ativos.items())]
+
+
 def resumo(linhas: list[dict]) -> dict:
-    """As contas da faixa e da legenda: quantas usinas em cada estado da legenda."""
+    """As contas da faixa e da legenda (quantas usinas em cada estado) e as opções dos filtros, de todas as usinas."""
     n = {k: 0 for k, _ in LEGENDA}
     for x in linhas:
         n[x["estado"]] += 1
-    return {"por_estado": n, "total": len(linhas), "clientes": sorted({x["cliente"] for x in linhas if x["cliente"]})}
+    return {"por_estado": n, "total": len(linhas), "clientes": sorted({x["cliente"] for x in linhas if x["cliente"]}),
+            "responsaveis": sorted({x["responsavel"] for x in linhas}, key=lambda r: (r.startswith("Sem "), _norm(r)))}

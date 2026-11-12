@@ -78,4 +78,159 @@
     busca.addEventListener("input", function () { clearTimeout(espera); espera = setTimeout(filtrar, 120); });
   }
   filtrar();
+
+  // ── a dica dos quadradinhos da faixa (12/11/2026, Levi: "ao passar o mouse nos pontos colorido diga a usina e o motivo
+  // da cor"): na hora, sem a espera do title do navegador; o teclado (Tab) também mostra
+  var dica = document.querySelector("[data-cmu-dica]");
+  var faixa = document.querySelector("[data-cmu-faixa]");
+  if (dica && faixa) {
+    var mostra = function (seg) {
+      dica.querySelector("b").textContent = seg.getAttribute("data-dica-usina");
+      dica.querySelector("span").textContent = seg.getAttribute("data-dica-motivo");
+      dica.hidden = false;
+      var r = seg.getBoundingClientRect(), q = faixa.parentNode.getBoundingClientRect(), w = dica.offsetWidth;
+      var x = Math.max(0, Math.min(r.left - q.left + r.width / 2 - w / 2, q.width - w));
+      dica.style.left = x + "px";
+      dica.style.top = (r.bottom - q.top + 8) + "px";
+    };
+    var esconde = function () { dica.hidden = true; };
+    faixa.addEventListener("mouseover", function (e) { var s = e.target.closest(".cmu-seg"); if (s) mostra(s); });
+    faixa.addEventListener("focusin", function (e) { var s = e.target.closest(".cmu-seg"); if (s) mostra(s); });
+    faixa.addEventListener("mouseleave", esconde);
+    faixa.addEventListener("focusout", esconde);
+  }
+
+  // ── os filtros no modelo do Histórico de OS (12/11/2026, Levi: "que nos filtros o cliente seja digitável tal qual é em
+  // histórico de OS [...] no mesmo estilo e mesmas funções"): o botão Filtros abre o painel; cada lista é de marcar, com a
+  // caixa de digitar no topo (sem acento e sem caixa); o campo que mudou ganha o ponto; o Aplicar só acende com mudança e
+  // recarrega a página com os filtros; fechar (×, Esc, clique fora) descarta; Limpar desmarca tudo (ainda pede o
+  // Aplicar). Embaixo, uma etiqueta por filtro aplicado: o × tira aquele filtro e aplica na hora; "Limpar tudo" tira todos
+  var fl = document.querySelector("[data-cmu-fl]");
+  if (!fl) return;
+  var painel = fl.querySelector(".cmu-fl-painel"), abrir = fl.querySelector("[data-cmu-fl-abrir]");
+  var aplicarB = fl.querySelector("[data-cmu-fl-aplicar]"), nalt = fl.querySelector("[data-cmu-fl-nalt]");
+  var badge = fl.querySelector("[data-cmu-fl-badge]"), etiquetas = fl.querySelector("[data-cmu-fl-etiquetas]");
+  var listas = Array.prototype.slice.call(fl.querySelectorAll(".cmu-fl-multi"));
+  var aplicado = {};
+  function caixas(d) { return Array.prototype.slice.call(d.querySelectorAll('input[type="checkbox"]')); }
+  function marcados(d) { return caixas(d).filter(function (c) { return c.checked; }); }
+  function rotuloDe(c) { return c.parentNode.textContent.trim(); }
+  listas.forEach(function (d) { aplicado[d.dataset.nome] = marcados(d).map(function (c) { return c.value; }); });
+  function igual(a, b) { return a.length === b.length && a.every(function (v) { return b.indexOf(v) >= 0; }); }
+  function resumo(d) {
+    var m = marcados(d), t = d.querySelector(".cmu-fl-txt");
+    t.textContent = !m.length ? d.dataset.todos : (m.length === 1 ? rotuloDe(m[0]) : m.length + " selecionados");
+    d.classList.toggle("cmu-fl-tem", m.length > 0);
+    caixas(d).forEach(function (c) { c.parentNode.classList.toggle("on", c.checked); });
+  }
+  function conferir() {
+    var n = 0;
+    listas.forEach(function (d) {
+      var mudou = !igual(marcados(d).map(function (c) { return c.value; }), aplicado[d.dataset.nome]);
+      d.parentNode.classList.toggle("mudou", mudou);
+      if (mudou) n++;
+      resumo(d);
+    });
+    aplicarB.disabled = !n;
+    nalt.textContent = n ? (n === 1 ? "1 alteração" : n + " alterações") : "Sem alterações";
+  }
+  function ir(valores) {
+    var u = new URL(location.href);
+    listas.forEach(function (d) { u.searchParams.delete(d.dataset.nome); });
+    Object.keys(valores).forEach(function (k) { valores[k].forEach(function (v) { u.searchParams.append(k, v); }); });
+    if (busca) { if (busca.value.trim()) u.searchParams.set("q", busca.value.trim()); else u.searchParams.delete("q"); }
+    location.href = u.pathname + u.search;
+  }
+  function escolhidos() {
+    var o = {};
+    listas.forEach(function (d) { o[d.dataset.nome] = marcados(d).map(function (c) { return c.value; }); });
+    return o;
+  }
+  function fechar(descartar) {
+    if (painel.hidden) return;
+    if (descartar) listas.forEach(function (d) {
+      caixas(d).forEach(function (c) { c.checked = aplicado[d.dataset.nome].indexOf(c.value) >= 0; });
+    });
+    listas.forEach(function (d) { d.open = false; });
+    painel.hidden = true;
+    abrir.setAttribute("aria-expanded", "false");
+    conferir();
+  }
+  abrir.addEventListener("click", function () {
+    if (!painel.hidden) { fechar(true); return; }
+    painel.hidden = false;
+    abrir.setAttribute("aria-expanded", "true");
+    conferir();
+  });
+  fl.querySelector("[data-cmu-fl-fechar]").addEventListener("click", function () { fechar(true); abrir.focus(); });
+  fl.querySelector("[data-cmu-fl-limpar]").addEventListener("click", function () {
+    listas.forEach(function (d) { caixas(d).forEach(function (c) { c.checked = false; }); });
+    conferir();
+  });
+  aplicarB.addEventListener("click", function () { ir(escolhidos()); });
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape" && !painel.hidden) { fechar(true); abrir.focus(); } });
+  document.addEventListener("click", function (e) {
+    if (!painel.hidden && !painel.contains(e.target) && !abrir.contains(e.target)) fechar(true);
+  });
+  listas.forEach(function (d) {
+    // uma lista aberta por vez; a caixa de digitar ganha o foco ao abrir
+    d.addEventListener("toggle", function () {
+      if (!d.open) return;
+      listas.forEach(function (o) { if (o !== d) o.open = false; });
+      var p = d.querySelector(".cmu-fl-procura");
+      if (p) { p.value = ""; procurar(d, ""); setTimeout(function () { p.focus(); }, 0); }
+    });
+    d.addEventListener("change", conferir);
+    var p = d.querySelector(".cmu-fl-procura");
+    if (p) p.addEventListener("input", function () { procurar(d, p.value); });
+  });
+  function procurar(d, txt) {
+    var q = sem(txt), n = 0;
+    caixas(d).forEach(function (c) {
+      var ok = !q || sem(rotuloDe(c)).indexOf(q) >= 0;
+      c.parentNode.hidden = !ok;
+      if (ok) n++;
+    });
+    d.querySelector(".cmu-fl-vazio").hidden = n > 0;
+  }
+  // as etiquetas e o número do botão: o que está APLICADO (o que veio no endereço)
+  var ativos = listas.filter(function (d) { return aplicado[d.dataset.nome].length; });
+  badge.hidden = !ativos.length;
+  badge.textContent = ativos.length;
+  etiquetas.hidden = !ativos.length;
+  ativos.forEach(function (d) {
+    var nomes = caixas(d).filter(function (c) { return aplicado[d.dataset.nome].indexOf(c.value) >= 0; }).map(rotuloDe);
+    var chip = document.createElement("span");
+    chip.className = "cmu-fl-chip";
+    var rot = document.createElement("i");
+    rot.textContent = d.dataset.rotulo + ":";
+    var val = document.createElement("span");
+    val.className = "cmu-fl-chip-v";
+    val.textContent = nomes.join(", ");
+    val.title = nomes.join(", ");
+    var x = document.createElement("button");
+    x.type = "button";
+    x.className = "cmu-fl-chip-x";
+    x.setAttribute("aria-label", "Tirar o filtro " + d.dataset.rotulo);
+    x.title = "Tirar este filtro";
+    x.textContent = "×";
+    x.addEventListener("click", function () {
+      var v = {};
+      listas.forEach(function (o) { v[o.dataset.nome] = o === d ? [] : aplicado[o.dataset.nome]; });
+      ir(v);
+    });
+    chip.appendChild(rot);
+    chip.appendChild(val);
+    chip.appendChild(x);
+    etiquetas.appendChild(chip);
+  });
+  if (ativos.length) {
+    var tudo = document.createElement("button");
+    tudo.type = "button";
+    tudo.className = "cmu-fl-link";
+    tudo.textContent = "Limpar tudo";
+    tudo.addEventListener("click", function () { ir({}); });
+    etiquetas.appendChild(tudo);
+  }
+  conferir();
 })();

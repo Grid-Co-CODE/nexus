@@ -230,22 +230,25 @@ def _usinas_montadas() -> dict:
 def usinas():
     """Comando > Usinas (11/11/2026, Levi: "Em comando quero a mesma visão de Início > Usinas do mockup"): todas as usinas
     mobilizadas, com o estado de agora e o que cada tela dona diz delas (`nexus/comando/usinas.py`). Sem o Score de saúde
-    do mockup (Levi: "Fora por agora"). Os filtros no modelo do Histórico de OS (12/11/2026): o cliente e o estado pelo
-    painel (campo-filtros.js, filtram aqui), a busca e a ordem das colunas na página (comando-usinas.js). Cada fonte que não responde vira "sem leitura" na coluna dela. O clique na
-    usina abre o prontuário aqui mesmo, no Comando (Levi: "No próprio Comando")."""
+    do mockup (Levi: "Fora por agora"). Os filtros no modelo do Histórico de OS (12/11/2026): as listas digitáveis do
+    painel (filtram aqui, no Aplicar), a busca e a ordem das colunas na página (comando-usinas.js). Cada fonte que não
+    responde vira "sem leitura" na coluna dela. O clique na usina abre o prontuário aqui mesmo, no Comando (Levi: "No
+    próprio Comando")."""
     from ...comando import usinas as CU
     m = _usinas_montadas()
-    # o cliente e o estado vêm do painel de Filtros (12/11/2026, o modelo do Histórico de OS: só vale no Aplicar, que
-    # recarrega a página); a faixa e a legenda seguem com todas as mobilizadas, e a tabela, com as do filtro
-    cliente, estado = request.args.get("cliente", ""), request.args.get("estado", "")
+    # os filtros do painel (12/11/2026, o modelo do Histórico de OS: listas digitáveis de marcar, que só valem no Aplicar,
+    # que recarrega a página com `filtro=a&filtro=b`): cliente, responsável da UFV, estado de agora, faixa da meta e
+    # conformidade. A faixa e a legenda seguem com todas as mobilizadas; a tabela, com as do filtro
+    escolhidos = {k: [v for v in request.args.getlist(k) if v] for k in CU.FILTROS}
     todas = m["linhas"]
-    linhas = [x for x in todas if (not cliente or x["cliente"] == cliente) and (not estado or x["estado"] == estado)]
-    return render_template("comando/usinas.html", torre=TORRE, tela=TORRE.tela("usinas"), linhas=linhas, todas=todas,
-                           r=CU.resumo(todas), legenda=CU.LEGENDA,
-                           estados=CU.ESTADOS, erro=m["erro"], avisos=m["avisos"],
-                           insights_calculando=m["insights_calculando"], cos_ts=m["cos_ts"],
-                           cliente=request.args.get("cliente", ""), estado=request.args.get("estado", ""),
-                           q=request.args.get("q", ""))
+    r = CU.resumo(todas)
+    return render_template(
+        "comando/usinas.html", torre=TORRE, tela=TORRE.tela("usinas"), linhas=CU.filtrar(todas, escolhidos),
+        todas=todas, r=r, legenda=CU.LEGENDA, estados=CU.ESTADOS, erro=m["erro"], avisos=m["avisos"],
+        insights_calculando=m["insights_calculando"], cos_ts=m["cos_ts"], escolhidos=escolhidos,
+        op_clientes=[(c, c) for c in r["clientes"]], op_responsaveis=[(x, x) for x in r["responsaveis"]],
+        op_estados=[(k, e[0]) for k, e in CU.ESTADOS.items()], op_meta=list(CU.META_FAIXAS.items()),
+        op_conformidade=list(CU.CONFORMIDADES.items()), q=request.args.get("q", ""))
 
 
 @bp.route("/usinas/<int:usina_id>")
