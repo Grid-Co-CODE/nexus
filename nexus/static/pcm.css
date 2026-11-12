@@ -1617,6 +1617,28 @@ details.inv-card:not([open])>summary{border-bottom:0}
 .cu-grupos[hidden],.cu-grupos-sem[hidden]{display:none}
 .cu-grupos legend{padding:0 4px}
 .cu-grupos p{margin:0}
+/* As requisições de material (12/11/2026, item 6 da 2ª rodada; pcm/_requisicoes.html): a requisição para o PCM é um cartão
+   (as peças, o Aceitar e o Recusar); as outras listas são tabelas que viram cartões a 640 px. O Rank A é destacado por token
+   (o âmbar do alerta, com a palavra), e a curva desconhecida pela cor da informação: a cor só reforça a palavra */
+.rq-card{padding:12px 14px;border-top:1px solid var(--linha)}
+.inv-card-cab+.rq-card{border-top:0}
+.rq-card .cu-tit+.alm-det{margin-top:4px}
+.rq-pecas{display:grid;gap:4px;margin:8px 0 0;padding:0;list-style:none;font-size:13px;color:var(--tinta)}
+.rq-curva{display:inline-block;margin-left:4px;padding:0 7px;border-radius:999px;font:600 11.5px/18px var(--font-sans);
+  color:var(--tinta-2);background:var(--superficie-3)}
+.rq-curva--a{color:var(--alerta);background:var(--alerta-suave)}
+.rq-curva--x{color:var(--info);background:var(--info-suave)}
+.rq-acao{display:flex;flex-direction:column;gap:6px;margin-top:10px;max-width:520px}
+.rq-acao .gc-campo{width:100%;box-sizing:border-box}
+.rq-acao button,.rq-card .cu-form button{align-self:flex-start}
+.rq-acao p,.rq-card .cu-form p{margin:0}
+.rq-card .cu-op{max-width:520px}
+.rq-erro{margin:0;color:var(--critico);font-size:13px}
+.rq-erro[hidden],.rq-auto[hidden]{display:none}
+.rq-aviso{color:var(--alerta)}
+.rq-motivo{margin:6px 0 0;font-size:13px;color:var(--tinta)}
+.rq-saldo{display:block}
+.rq-auto-fim{margin:10px 0 0}
 /* Os dados da peça e as fotos ampliadas (30/10/2026, itens 2 e 3 das melhorias): o fabricante, o modelo e o número de série
    numa lista de rótulo e valor, cada um com a miniatura da foto dele (40 px), e a da peça à esquerda (96 px). A miniatura é
    um <button> sem a cara de botão (a foto é o botão; o foco é o anel do Nexus). A caixa (<dialog>, pcm-fotos.js) usa o véu e

@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block titulo %}Requisições · Almoxarifado{% endblock %}
+{% block conteudo %}
+{% from "_explica.html" import explica %}
+<link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='engenharia.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='pcm.css') }}">
+{# PCM → Almoxarifado → Requisições (12/11/2026, item 6 da 2ª rodada; o PCM: "encurtar esse caminho, não ter que fazer saída,
+   deixar mais automatizado"). A casca: a lista (`pcm/_requisicoes.html`) e o que grava vêm da ponte do login do Fracttal
+   (/os/_nexus/inventario/requisicoes, o cookie dele só chega em /os), por pcm-requisicoes.js; ao chegar a lista, a página pede o
+   automático das de Rank B e C (na sessão de quem abriu) e acompanha o andamento por /t/pcm/pecas/requisicoes/automatico.json.
+   As regras estão em nexus/pcm/inventario/requisicoes.py. #}
+<div class="pg alm inv rq">
+<p class="gc-eyebrow">PCM · Almoxarifado</p>
+<div class="gc-titulo-explica"><h1 class="titulo-pagina">Requisições</h1>
+{% call explica('Entenda esta tela') %}<p><b>De onde vem.</b> A requisição de material nasce sozinha no Fracttal quando o técnico
+  põe a peça como recurso na tarefa da OS, no almoxarifado da usina. A lista é a do Fracttal dos últimos 90 dias, lida agora com o
+  seu login.</p>
+<p><b>Aceitar</b> faz de uma vez os três passos que o PCM fazia no Fracttal: aprova (com o seu nome), faz a saída ligada à OS (o
+  saldo baixa) e a requisição vai para Entrega total. Depois o Nexus relê a requisição e o saldo de cada peça.</p>
+<p><b>Quem aceita.</b> A requisição com peça <b>Rank A</b>, ou com peça de curva desconhecida (o catálogo do App não tem a peça,
+  ou a tem sem curva), é do PCM, com um clique. As de <b>Rank B e C</b> o Nexus aceita sozinho, quando alguém do PCM com o login
+  do Fracttal abre esta tela (na sessão dessa pessoa), e cada uma fica na auditoria, com o saldo antes e depois. A curva é a do
+  catálogo do App, pelo código da peça.</p>
+<p><b>Fica com o Fracttal:</b> a entrega parcial (conclua lá) e a que falhou (o motivo fica à vista; o Nexus não tenta de novo
+  sozinho: o saldo que não dá, por exemplo, precisa de entrada antes). <b>Recusar</b> só registra: o técnico já usou a peça.</p>{% endcall %}</div>
+{% set aba_inventario = 'requisicoes' %}
+{% include "pcm/_almox_abas.html" %}
+<div data-ponte-aviso aria-live="polite"></div>
+{% if aviso %}<div class="{{ 'cn-certo' if aviso.ok else 'cn-erro cn-aviso' }}" role="status"><span><b>{{ aviso.texto }}</b></span></div>{% endif %}
+{% if not pode %}
+<div class="inv-vazio"><p><b>As requisições de material são do setor PCM:</b> a lista e o aceite usam o login do Fracttal de quem
+  decide.</p></div>
+{% elif not com_pessoa %}
+<div class="cn-erro cn-aviso" role="status"><span><b>Para ver e aceitar as requisições, entre no Nexus pelo Fracttal.</b> A lista e
+  o aceite usam o login do Fracttal de quem decide, e a senha de administrador não tem esse login.</span></div>
+{% else %}
+<div class="cn-erro cn-aviso rq-auto" role="status" data-rq-auto-estado="{{ raiz }}/t/pcm/pecas/requisicoes/automatico.json"{% if not (auto and auto.estado == 'gravando') %} hidden{% endif %}><span>{{ auto.texto if auto else '' }}</span></div>
+<div data-rq-lista data-rq-fonte="{{ raiz }}/os/_nexus/inventario/requisicoes" data-rq-automatico="{{ raiz }}/os/_nexus/inventario/requisicoes/automatico" aria-live="polite">
+  <div class="inv-vazio"><p>Lendo as requisições no Fracttal…</p></div>
+</div>
+<script src="{{ url_for('static', filename='pcm-requisicoes.js') }}"></script>
+{% endif %}
+</div>
+{% endblock %}

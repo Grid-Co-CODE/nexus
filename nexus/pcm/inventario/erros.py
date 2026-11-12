@@ -33,7 +33,8 @@ def _de_rede(ex: Exception) -> bool:
 
 def resposta(ex: Exception, *, ao: str | None = None) -> tuple[int, str]:
     """(status, texto para a tela) de um erro das telas da régua e da curadoria. `ao` diz o que se fazia quando a rede caiu:
-    "regua" (gravar o acordado no Fracttal), "cadastro" (criar a peça no Fracttal) ou nada (só leitura e livro). O erro que não
+    "regua" (gravar o acordado no Fracttal), "cadastro" (criar a peça no Fracttal), "requisicao" (aceitar ou recusar a
+    requisição de material) ou nada (só leitura e livro). O erro que não
     é de nenhum destes tipos sobe (bug nosso: a tela não o disfarça de mensagem)."""
     if isinstance(ex, Limite):
         return 429, ("O Fracttal pediu para esperar (o limite de pedidos é da empresa inteira): tente de novo em um "
@@ -49,6 +50,9 @@ def resposta(ex: Exception, *, ao: str | None = None) -> tuple[int, str]:
             if ao == "regua":
                 return 502, ("Não consegui falar com o Fracttal agora (rede). Ele pode ter gravado: nada foi anotado como "
                              "gravado; grave de novo, é o mesmo número.")
+            if ao == "requisicao":
+                return 502, ("Não consegui falar com o Fracttal agora (rede). Ele pode ter aprovado ou feito a saída: recarregue "
+                             "a página e confira a requisição antes de repetir.")
             if ao == "cadastro":
                 return 502, ("Não consegui falar com o Fracttal agora (rede). Se a peça chegou a ser criada, o código ficou "
                              "reservado nesta linha e tentar de novo, com os mesmos dados, não cria outra. Nada foi decidido.")

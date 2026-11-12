@@ -2,7 +2,8 @@
    Avariadas desde 30/10/2026; o Consumo nas OS e o Cadastro a corrigir saíram em 11/11/2026, a pedido do PCM) voltam a ela,
    na aba delas (`?aba=`), e as quatro do inventário (Inventário, Mínimo e máximo, Curadoria, Auditoria) ficam juntas logo
    depois, com a de agora marcada (`aba_inventario`, que a página põe antes de incluir; sem ela, o Inventário). A tela
-   principal (almoxarifado.html) troca as suas quatro no lugar, por JavaScript, e põe as do inventário como link. `a_revisar`:
+   principal (almoxarifado.html) troca as suas quatro no lugar, por JavaScript, e põe as do inventário como link. A das
+   Requisições (12/11/2026) vem por último, também como link. `a_revisar`:
    quantas contagens esperam o PCM (a lista do Inventário). #}
 {% set _aba = aba_inventario or 'inventario' %}
 <nav class="alm-abas" role="tablist" aria-label="Partes do almoxarifado">
@@ -13,9 +14,11 @@
   {% for chave, rotulo in (('regua', 'Mínimo e máximo'), ('curadoria', 'Curadoria'), ('auditoria', 'Auditoria')) %}
   <a class="alm-aba" role="tab" aria-selected="{{ 'true' if _aba == chave else 'false' }}" href="{{ raiz }}/t/pcm/pecas/inventario/{{ chave }}">{{ rotulo }}</a>
   {% endfor %}
+  {# as requisições de material (12/11/2026, item 6 da 2ª rodada): o Aceitar pelo Nexus; fora do inventário, por último #}
+  <a class="alm-aba" role="tab" aria-selected="{{ 'true' if _aba == 'requisicoes' else 'false' }}" href="{{ raiz }}/t/pcm/pecas/requisicoes">Requisições</a>
 </nav>
 <script>
-  // no celular a fila das oito abas rola por dentro e a de agora (o Inventário é a 5ª, a Auditoria a 8ª) ficava fora da tela:
+  // no celular a fila das nove abas rola por dentro e a de agora (o Inventário é a 5ª, as Requisições a 9ª) ficava fora da tela:
   // ela vem para o meio da fila ao abrir a página, e de novo quando a fonte chega (as abas alargam e a empurravam para fora)
   (function () {
     var fila = document.currentScript.previousElementSibling, aba = fila && fila.querySelector('[aria-selected="true"]');

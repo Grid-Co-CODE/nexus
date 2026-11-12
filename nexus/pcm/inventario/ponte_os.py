@@ -218,6 +218,117 @@ def curadoria_classificacoes():
     return _json({"ok": True, "opcoes": r["opcoes"]}, 200)
 
 
+# ── as requisições de material: a fila, aceitar, recusar e o automático (12/11/2026, item 6 da 2ª rodada) ───────────────
+# A página fica em /t/pcm/pecas/requisicoes (`requisicoes.registrar`) e busca aqui a lista (HTML pronto) e o que grava. As recusas
+# de toda rota da ponte (`_com_o_fracttal`: 403 outro site ou setor, 409 a senha de administrador e a conta do Fracttal de outra
+# pessoa, 401 sem o login); o passo do aceite que o Fracttal não fez vem como `{"erro"}` com o status dele (`requisicoes.Falhou`).
+REQUISICOES = "/t/pcm/pecas/requisicoes"
+
+
+def _dono(est) -> tuple[dict | None, dict | None]:
+    """(a conta, o responsável) do Fracttal de quem está no pedido: a aprovação vai no nome da conta, e a saída leva o
+    responsável. Achados pelo e-mail da sessão do Nexus (que a ponte já conferiu ser o da conta do Fracttal do cookie)."""
+    from ...torres.oscreator import ponte
+    from . import requisicoes as RQ
+    try:
+        nome = str((ponte.sessao_do_os(current_app._get_current_object()).get("conta") or {}).get("nome") or "")
+    except Exception:        # noqa: BLE001 — o nome da sessão só completa o do catálogo
+        nome = ""
+    return RQ.conta_do_fracttal(_email(), nome), RQ.responsavel_de(est, _email())
+
+
+def _falhou_ou(r, volta: str, chave_aviso: str):
+    """A resposta da ponte para o aceite e a recusa: o passo que o Fracttal não fez (`{"erro"}` com o status dele; 401 com o
+    link do login), ou o ok com o aviso que a página mostra ao recarregar (o `tom`: confirmado pela releitura ou não)."""
+    if not isinstance(r, dict):
+        return r
+    if "falhou" in r:
+        corpo = {"ok": False, "erro": r["falhou"]}
+        if r["status"] == 401:
+            corpo["login"] = _login(volta)
+        return _json(corpo, r["status"])
+    session[chave_aviso] = {"texto": r["mensagem"], "ok": bool(r.get("confirmada"))}
+    return _json({"ok": True, "mensagem": r["mensagem"], "confirmada": bool(r.get("confirmada")), "volta": na_raiz(volta)}, 200)
+
+
+@bp.route("/requisicoes")
+def requisicoes_lista():
+    """A fila das requisições (`requisicoes.montar`), como HTML (`pcm/_requisicoes.html`), para a página buscar por `fetch`."""
+    from . import requisicoes as RQ
+    cfg = current_app.config
+    r = _com_o_fracttal(REQUISICOES, lambda est: {"d": RQ.montar(cfg, est, RQ.contexto(cfg, CL.mapa_guardado(est)))})
+    if not isinstance(r, dict):
+        return r
+    from .. import telas as T
+    return _sem_cache(current_app.make_response(render_template(
+        "pcm/_requisicoes.html", d=r["d"], auto=RQ.estado_automatico(cfg), andando=RQ.andando(),
+        raio_x=T._pode_ver("/t/engenharia/equipe/os/1"))))
+
+
+@bp.route("/requisicoes/<id_req>/aceitar", methods=["POST"])
+def requisicao_aceitar(id_req):
+    """O "Aceitar" do PCM (`requisicoes.aceitar`, `por` "pcm"): `{"comentario"?}`. A aprovação, a saída ligada e a Entrega
+    total de uma vez, no login de quem apertou."""
+    from . import requisicoes as RQ
+    cfg = current_app.config
+    corpo = request.get_json(silent=True)
+    corpo = corpo if isinstance(corpo, dict) else {}
+
+    def fazer(est):
+        conta, resp = _dono(est)
+        try:
+            return RQ.aceitar(cfg, est, id_req, por="pcm", ctx=RQ.contexto(cfg, CL.mapa_guardado(est)),
+                              quem_=quem.colunas(cfg, quem.do_pedido()),
+                              conta=conta, responsavel=resp, comentario=corpo.get("comentario") or "")
+        except RQ.Falhou as ex:
+            return {"falhou": ex.mensagem, "status": ex.status}
+    return _falhou_ou(_com_o_fracttal(REQUISICOES, fazer, ao="requisicao"), REQUISICOES, "pcm_requisicoes_aviso")
+
+
+@bp.route("/requisicoes/<id_req>/recusar", methods=["POST"])
+def requisicao_recusar(id_req):
+    """O "Recusar" (`requisicoes.recusar`): `{"comentario"}` obrigatório; sem saída. PROVA PENDENTE no Fracttal de verdade."""
+    from . import requisicoes as RQ
+    cfg = current_app.config
+    corpo = request.get_json(silent=True)
+    corpo = corpo if isinstance(corpo, dict) else {}
+
+    def fazer(est):
+        conta, _resp = _dono(est)
+        try:
+            return RQ.recusar(cfg, est, id_req, ctx=RQ.contexto(cfg, CL.mapa_guardado(est)),
+                              quem_=quem.colunas(cfg, quem.do_pedido()), conta=conta,
+                              comentario=corpo.get("comentario") or "")
+        except RQ.Falhou as ex:
+            return {"falhou": ex.mensagem, "status": ex.status}
+    return _falhou_ou(_com_o_fracttal(REQUISICOES, fazer, ao="requisicao"), REQUISICOES, "pcm_requisicoes_aviso")
+
+
+@bp.route("/requisicoes/automatico", methods=["POST"])
+def requisicoes_automatico():
+    """Aceita sozinho, em segundo plano e na sessão de quem pediu, as pendentes só de Rank B e C conhecidas
+    (`requisicoes.iniciar_automatico`). A página pede ao abrir (e o botão "Aceitar agora"); a resposta volta logo, e a página
+    acompanha o andamento. Com o livro do inventário que não se lê agora, não começa: sem saber das falhas, tentaria de novo
+    as que o Fracttal já recusou."""
+    from . import requisicoes as RQ
+    cfg = current_app.config
+
+    def fazer(est):
+        ctx = RQ.contexto(cfg, CL.mapa_guardado(est))
+        d = RQ.montar(cfg, est, ctx)
+        if not d["livro_lido"]:
+            raise erros.Conflito("O livro do inventário não se lê agora: o automático espera (sem ele não sei as falhas). "
+                                 "Nada foi enviado.")
+        conta, resp = _dono(est)
+        return {"estado": RQ.iniciar_automatico(cfg, est, d["ids_sozinhas"], ctx=ctx, quem_=quem.colunas(cfg, quem.do_pedido()),
+                                                conta=conta, responsavel=resp)}
+    r = _com_o_fracttal(REQUISICOES, fazer, ao="requisicao")
+    if not isinstance(r, dict):
+        return r
+    return _json({"ok": True, "mensagem": "Aceitando sozinho as de Rank B e C: acompanhe nesta página.",
+                  "estado": r["estado"].get("estado")}, 200)
+
+
 # ── a gravação da contagem no Fracttal: gravar, continuar, encerrar (Task 7) ─────────────────────────────────────────────
 # Respostas em `{"ok", "erro"?, "login"?, "mensagem"?, "estado"?}`. Além do `_barrar` (403), a gravação confere a PESSOA: ela vai
 # no nome de quem aprova (`pessoa_hmac`), então a senha de administrador, que não é uma pessoa, leva 409; e a conta do Fracttal

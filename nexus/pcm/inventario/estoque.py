@@ -31,7 +31,8 @@ import math
 import threading
 import time
 import unicodedata
-from datetime import datetime, timezone
+import uuid
+from datetime import datetime, timedelta, timezone
 
 INTERVALO_S = 1.0           # um pedido por segundo (a cota de 200/min é da empresa)
 PAGINA = 200                # o máximo que a tela do Fracttal pede
@@ -57,6 +58,19 @@ UNIDADES = "companies.units_list"
 # grava os três, e o `items_list` os devolve iguais): o campo da peça (o id) e o da descrição, pelo nome que a casa usa. São
 # os rótulos da tela de peças do Fracttal: Tipo, Classificação 1 (a criticidade: "1.Essencial", ...) e Classificação 2 (o
 # Rank: "2. Rank A", ..., e "1.Avariado").
+# A requisição de material (12/11/2026, item 6 da 2ª rodada; provado no TESTE - PA e lido de volta): o movimento OUTPUT_ORDER
+# (`id_movement_type` 13) que a tarefa da OS gera no almoxarifado da usina; aprovar é o `outputs_orders_update`, e a saída
+# LIGADA a ela (o tipo "Ordem de Serviço" da tela de Saídas, `outputs_insert` com o `id_movement_reference`) baixa o saldo e a
+# leva sozinha à Entrega total (estado 5). O responsável da saída sai do `personnel.responsibles_list`.
+MOVIMENTOS = "inventories.movements_new_list"
+DETALHES = "inventories.movements_details_list"
+DECIDIR_REQUISICAO = "inventories.outputs_orders_update"
+SAIDA = "inventories.outputs_insert"
+RESPONSAVEIS = "personnel.responsibles_list"
+TIPO_REQUISICAO = 13
+NAO_ENTREGUE, ENTREGA_PARCIAL, ENTREGA_TOTAL, CANCELADA = 3, 4, 5, 6
+_BRT = timezone(timedelta(hours=-3))
+
 GRUPOS = {"tipo": ("id_group", "groups_description"), "classificacao_1": ("id_group_1", "groups_1_description"),
           "classificacao_2": ("id_group_2", "groups_2_description")}
 
@@ -178,6 +192,81 @@ def classificacoes_das_pecas(linhas) -> dict[str, list[tuple[str, str]]]:
             if i is not None and desc:
                 vistos[campo].setdefault(str(i), desc)
     return {c: sorted(v.items(), key=lambda p: (_norm(p[1]), p[0])) for c, v in vistos.items()}
+
+
+def _sim(v) -> bool:
+    return v is True or str(v).strip().lower() in ("1", "true", "t", "sim", "yes")
+
+
+def requisicao_da_linha(l: dict) -> dict:
+    """Uma linha do `movements_new_list` (a requisição) como a casa a usa. Só o que a tela e o aceite precisam; o
+    `accounts_log_name` (o nome de quem aprovou ou recusou no Fracttal) vai em `decidida_por` para a tela do PCM e NUNCA é
+    guardado (nem no livro, nem em arquivo, nem em log): é nome de gente. `aprovada` é o `approved` lido como sim ou não; a
+    recusada é a não aprovada COM a `approval_date` (provado em 12/11/2026)."""
+    def txt(c):
+        return " ".join(str(l.get(c) or "").split())
+
+    def num(c):
+        n = _inteiro(l.get(c))
+        return "" if n is None else str(n)
+    return {"id": num("id"), "folio": txt("folio_source"), "os": txt("document"), "data": txt("date"),
+            "criada_em": txt("date_create"), "id_almox": num("id_warehouse_source"), "almox_codigo": txt("warehouses_source_code"),
+            "almox_nome": txt("warehouses_source_description"), "estado": _inteiro(l.get("id_movement_state")),
+            "aprovada": _sim(l.get("approved")), "comentario": txt("approved_comment"),
+            "decidida_em": "" if txt("approval_date").lower() in ("", "none", "null") else txt("approval_date"),
+            "decidida_por": txt("accounts_log_name"), "id_tarefa": num("id_work_orders_tasks"),
+            "n_pecas": _inteiro(l.get("number_details")), "pecas_texto": txt("items_log_description")}
+
+
+def _ate(desde_dias: int, agora) -> datetime:
+    return instante(agora or datetime.now(timezone.utc)) - timedelta(days=desde_dias)
+
+
+def _velha(r: dict, corte: datetime) -> bool:
+    """A requisição criada antes do corte (a lista vem da mais nova à mais velha: dali em diante, só mais velhas). A data
+    ilegível não é velha: segue lendo."""
+    try:
+        return instante(r["criada_em"]) < corte
+    except ValueError:
+        return False
+
+
+def conta_valida(conta: dict | None) -> tuple[int, str]:
+    """(id_accounts, accounts_log_name) de quem decide: os dois, sempre (sem eles o "aprovado por" fica vazio no Fracttal,
+    provado em 12/11/2026). ValueError sem um deles: nada vai."""
+    conta = conta or {}
+    nome = " ".join(str(conta.get("nome") or "").split())
+    if not str(conta.get("id") or "").strip() or not nome:
+        raise ValueError("sem a conta do Fracttal de quem decide (o id e o nome): nada foi enviado")
+    return _id(conta["id"]), nome
+
+
+def comentario_valido(comentario) -> str:
+    texto = " ".join(str(comentario or "").split())
+    if not texto:
+        raise ValueError("o comentário é obrigatório (o Fracttal o exige)")
+    return texto
+
+
+def mapa_das_pecas(linhas) -> dict[str, dict[str, str]]:
+    """O Tipo e as Classificações de cada peça pelo CÓDIGO (sem espaço, em maiúsculas): `{código: {campo: descrição}}`, só
+    com os campos que a peça tem. É de onde sai o Rank (a Classificação 2, "2. Rank A") das requisições e o voto das parecidas
+    da Curadoria: a "Curva ABC" do catálogo do App vem vazia para os Ranks do Fracttal (o `_almox_curva` do App só aceita a
+    letra sozinha; a revisão do item 3, 12/11/2026), e a peça do Fracttal é a fonte."""
+    out: dict[str, dict[str, str]] = {}
+    for l in linhas:
+        if not isinstance(l, dict):
+            continue
+        codigo = "".join(str(l.get("code") or "").split()).upper()
+        if not codigo:
+            continue
+        g = {}
+        for campo, (_cid, cdesc) in GRUPOS.items():
+            desc = " ".join(str(l.get(cdesc) or "").split())
+            if desc:
+                g[campo] = desc
+        out.setdefault(codigo, g)
+    return out
 
 
 def corpo_dos_grupos(grupos: dict | None) -> dict:
@@ -325,9 +414,51 @@ class Estoque(abc.ABC):
         (`GRUPOS`), só os que vieram; o vazio não vai (`corpo_dos_grupos`)."""
 
     @abc.abstractmethod
+    def requisicoes(self, desde_dias: int = 90, agora=None) -> list[dict]:
+        """As requisições de material da empresa inteira (o `movements_new_list` do tipo 13, página a página da mais nova),
+        criadas nos últimos `desde_dias`, como `requisicao_da_linha`."""
+
+    @abc.abstractmethod
+    def reler_requisicao(self, id_requisicao: str, desde_dias: int = 90, agora=None) -> dict | None:
+        """A requisição de agora (a mesma lista, até achá-la ou passar do corte), ou None."""
+
+    @abc.abstractmethod
+    def pecas_da_requisicao(self, id_requisicao: str) -> list[dict]:
+        """As linhas do `movements_details_list` da requisição, COMO VÊM (`id_item`, `id_item_original`, `code`, `qty`,
+        `qty_pending`, `items_description`, `units_description`, ...): a saída ligada as manda de volta assim."""
+
+    @abc.abstractmethod
+    def aprovar_requisicao(self, id_requisicao: str, comentario: str, conta: dict) -> None:
+        """Aprova (`outputs_orders_update` com `approved: true`, o comentário e a conta de quem decide, `{"id", "nome"}`).
+        Só com a requisição ainda não entregue (estado 3): depois, o Fracttal responde `STATE_CHANGED` (`Recusado`)."""
+
+    @abc.abstractmethod
+    def recusar_requisicao(self, id_requisicao: str, comentario: str, conta: dict) -> None:
+        """Recusa (`approved: false`, com o comentário obrigatório e a conta), sem saída. PROVA PENDENTE no Fracttal de
+        verdade: o corpo é o do aprovar com o `false`, lido no script da tela."""
+
+    @abc.abstractmethod
+    def saida_da_requisicao(self, requisicao: dict, pecas: list[dict], responsavel: dict, agora=None) -> str:
+        """A saída LIGADA à requisição (`outputs_insert`, o corpo capturado da tela em 12/11/2026): baixa o saldo e leva a
+        requisição sozinha à Entrega total. `requisicao` é a da `requisicao_da_linha`, `pecas` as linhas do
+        `pecas_da_requisicao` (vão como vieram) e `responsavel` o `{"id", "descricao"}` do `responsavel`. Devolve o id da saída.
+        O saldo que não dá (o almoxarifado não aceita estoque negativo) é `Recusado`."""
+
+    @abc.abstractmethod
+    def responsavel(self, email: str) -> dict | None:
+        """O responsável do Fracttal com este e-mail (`personnel.responsibles_list`): `{"id", "descricao"}` (a descrição como
+        a tela a manda na saída, "<nome>  {<código>}"), ou None. Nada dele é guardado fora da memória."""
+
+    @abc.abstractmethod
     def classificacoes(self) -> dict[str, list[tuple[str, str]]]:
         """As opções do Tipo e das duas Classificações das peças: `{campo: [(id, descrição)]}` (`classificacoes_das_pecas`
         sobre a lista de peças inteira, as páginas que houver)."""
+
+    @abc.abstractmethod
+    def pecas_com_grupos(self) -> list[dict]:
+        """A lista de peças inteira (`items_list`, tipo 4, as páginas que houver), cada linha só com o `code` e os seis
+        campos do Tipo e das Classificações (`GRUPOS`). Uma leitura dá as opções (`classificacoes_das_pecas`) e o mapa por código
+        (`mapa_das_pecas`); a cópia de 1 h é a da `classificacao.guardadas`."""
 
     @abc.abstractmethod
     def codigos(self, sigla: str) -> list[str]:
@@ -622,8 +753,85 @@ class EstoqueFracttal(Estoque):
         return self._id_do_dado(r, CRIAR)
 
     def classificacoes(self) -> dict[str, list[tuple[str, str]]]:
+        return classificacoes_das_pecas(self.pecas_com_grupos())
+
+    def pecas_com_grupos(self) -> list[dict]:
         base = {"filter": [], "sort": [], "is_tree": False, "node": 0, "id_type_item": TIPO_PECA}
-        return classificacoes_das_pecas(self._linhas(PECAS, base))
+        campos = ("code",) + tuple(c for par in GRUPOS.values() for c in par)
+        return [{k: l.get(k) for k in campos} for l in self._linhas(PECAS, base) if isinstance(l, dict)]
+
+    # a requisição de material (12/11/2026)
+    def _requisicoes(self, desde_dias: int, agora):
+        corte = _ate(desde_dias, agora)
+        base = {"id_movement_type": TIPO_REQUISICAO, "sort": [{"property": "id", "direction": "desc"}], "is_tree": False,
+                "node": None}
+        for l in self._linhas(MOVIMENTOS, base):
+            if not isinstance(l, dict):
+                continue
+            r = requisicao_da_linha(l)
+            if _velha(r, corte):
+                return                                    # da mais nova à mais velha: o resto é mais velho (a cota é de todos)
+            yield r
+
+    def requisicoes(self, desde_dias: int = 90, agora=None) -> list[dict]:
+        return list(self._requisicoes(desde_dias, agora))
+
+    def reler_requisicao(self, id_requisicao: str, desde_dias: int = 90, agora=None) -> dict | None:
+        alvo = str(_id(id_requisicao))
+        return next((r for r in self._requisicoes(desde_dias, agora) if r["id"] == alvo), None)
+
+    def pecas_da_requisicao(self, id_requisicao: str) -> list[dict]:
+        return [dict(l) for l in self._linhas(DETALHES, {"id_movement": _id(id_requisicao)}) if isinstance(l, dict)]
+
+    def _decidir_requisicao(self, id_requisicao, aprovar: bool, comentario, conta) -> None:
+        id_conta, nome = conta_valida(conta)
+        self._rpc(DECIDIR_REQUISICAO, {"id": _id(id_requisicao), "approved": aprovar,
+                                       "approved_comment": comentario_valido(comentario), "id_accounts": id_conta,
+                                       "accounts_log_name": nome})
+
+    def aprovar_requisicao(self, id_requisicao: str, comentario: str, conta: dict) -> None:
+        self._decidir_requisicao(id_requisicao, True, comentario, conta)
+
+    def recusar_requisicao(self, id_requisicao: str, comentario: str, conta: dict) -> None:
+        self._decidir_requisicao(id_requisicao, False, comentario, conta)
+
+    def saida_da_requisicao(self, requisicao: dict, pecas: list[dict], responsavel: dict, agora=None) -> str:
+        """O corpo é o que a tela do Fracttal mandou, campo a campo (capturado em 12/11/2026); nada inventado: o `id` e o
+        `idInternal` são o mesmo uuid novo, a `date` é o dia de Brasília e o `date_create` a hora de agora em UTC, como o
+        `toISOString` da tela."""
+        if not pecas or not all(isinstance(p, dict) for p in pecas):
+            raise ValueError("a saída precisa das peças da requisição")
+        resp = responsavel or {}
+        if not str(resp.get("id") or "").strip() or not str(resp.get("descricao") or "").strip():
+            raise ValueError("sem o responsável do Fracttal: a saída não vai sem dono")
+        quando = instante(agora or datetime.now(timezone.utc))
+        u = str(uuid.uuid4())
+        r = self._rpc(SAIDA, {
+            "id": u, "idInternal": u, "id_movement_reference": _id(requisicao["id"]), "is_from_work_order": True,
+            "id_movement_type": 4, "movements_types_description": "WORK_ORDER", "id_movement_state": 2,
+            "movements_states_description": "RETURN", "id_warehouse_source": _id(requisicao["id_almox"]),
+            "id_warehouse_target": None, "id_responsible": _id(resp["id"]), "responsible_description": str(resp["descricao"]),
+            "date": quando.astimezone(_BRT).strftime("%Y-%m-%d"),
+            "date_create": quando.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.")
+            + f"{quando.microsecond // 1000:03d}Z",
+            "document": str(requisicao.get("os") or ""), "folio_source": "", "symbol": "R$", "currency_code": "BRL",
+            "id_third_party": None, "third_parties_name": "", "id_cost_center": None, "warehouses_target_description": "",
+            "costs_center_description": "", "description": "", "status_display": "", "items": [dict(p) for p in pecas]})
+        return self._id_do_dado(r, SAIDA)
+
+    def responsavel(self, email: str) -> dict | None:
+        """Pela coluna do e-mail da lista de responsáveis (o pedido é o da tela de Saídas: a lista com o `noShowDisabled`).
+        Para na primeira página que acha. O corpo da lista e a coluna `email` seguem o padrão das listas do Fracttal: PROVA
+        PENDENTE no Fracttal de verdade (a captura de 12/11/2026 foi a da saída, com o id já escolhido)."""
+        alvo = str(email or "").strip().lower()
+        if not alvo:
+            raise ValueError("sem o e-mail, qualquer responsável seria o achado")
+        base = {"filter": [], "sort": [], "is_tree": False, "node": None, "noShowDisabled": True}
+        for l in self._linhas(RESPONSAVEIS, base):
+            if isinstance(l, dict) and str(l.get("email") or "").strip().lower() == alvo and l.get("id") is not None:
+                descricao = str(l.get("description") or "").strip()
+                return {"id": str(l["id"]), "descricao": descricao} if descricao else None
+        return None
 
     def codigos(self, sigla: str) -> list[str]:
         sigla = str(sigla or "").strip()

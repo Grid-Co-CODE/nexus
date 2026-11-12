@@ -287,10 +287,16 @@ ROTULO_EVENTO = {"contagem_recebida": "Contagem recebida", "aprovada": "Aprovada
                  "conflito": "Conflito", "erro": "Erro", "peca_tirada": "Peça tirada do lote",
                  "recontagem_pedida": "Recontagem pedida", "numero_corrigido": "Número corrigido",
                  "substituida": "Contagem substituída", "curadoria": "Curadoria decidida", "regua_gravada": "Régua gravada",
-                 "recontagem_item_pedida": "Recontagem da peça pedida"}
+                 "recontagem_item_pedida": "Recontagem da peça pedida",
+                 "requisicao_aceita": "Requisição aceita pelo PCM", "requisicao_aceita_sozinha": "Requisição aceita sozinha",
+                 "requisicao_recusada": "Requisição recusada", "requisicao_falha": "Requisição não aceita"}
 # o selo de cada evento, pelas quatro famílias do mockup do Spare Parts (Levi, 27/10/2026): a gravação no Fracttal em verde, a
 # curadoria em âmbar, a aprovação e a revisão em azul, o conflito e o erro em vermelho. A cor só reforça a palavra (o rótulo)
-SELO_EVENTO = {"peca_gravada": "ok", "regua_gravada": "ok", "curadoria": "alerta", "conflito": "critico", "erro": "critico"}
+SELO_EVENTO = {"peca_gravada": "ok", "regua_gravada": "ok", "curadoria": "alerta", "conflito": "critico", "erro": "critico",
+               "requisicao_aceita": "ok", "requisicao_aceita_sozinha": "ok", "requisicao_recusada": "alerta",
+               "requisicao_falha": "critico"}
+# o aceite da requisição leva no `dados` cifrado a OS e a curva, não um motivo (12/11/2026): a linha não diz "motivo cifrado"
+_SEM_MOTIVO = frozenset({"requisicao_aceita", "requisicao_aceita_sozinha"})
 
 
 def _retorno(tipo: str, movimento: str, codigo: str) -> str:
@@ -307,6 +313,12 @@ def _retorno(tipo: str, movimento: str, codigo: str) -> str:
         return "não gravada"
     if tipo == "erro":
         return "não confirmada"
+    if tipo in ("requisicao_aceita", "requisicao_aceita_sozinha"):
+        return f"requisição {movimento}: aprovada, saída feita" if movimento else "aprovada, saída feita"
+    if tipo == "requisicao_recusada":
+        return f"requisição {movimento} recusada" if movimento else "recusada"
+    if tipo == "requisicao_falha":
+        return "não aceita"
     return ""
 
 
@@ -377,7 +389,8 @@ def montar_auditoria(cfg, pode: bool, tipo: str = "", busca: str = "", contagem_
         peca = nomes["itens"].get(item, {})
         codigo = A._txt(e.get("codigo")) or peca.get("codigo", "")
         de, para, contado = _qtd(e.get("de_qtd")), _qtd(e.get("para_qtd")), _qtd(e.get("contado_qtd"))
-        numeros = (f"{'mínimo ' if t == 'regua_gravada' else ''}{_num(de)} para {_num(para)}" if de is not None or para is not None
+        numeros = (f"{'mínimo ' if t == 'regua_gravada' else 'saldo ' if t.startswith('requisicao_') else ''}{_num(de)} para "
+                   f"{_num(para)}" if de is not None or para is not None
                    else f"contado {_num(contado)}" if contado is not None else "")
         situacao = ROTULO_SITUACAO.get(A._txt(e.get("situacao")), "")
         movimento, lote = A._id(e.get("movimento_fracttal")), D._id(e.get("lote"))
@@ -392,7 +405,7 @@ def montar_auditoria(cfg, pode: bool, tipo: str = "", busca: str = "", contagem_
                        "codigo": codigo, "peca": peca.get("nome", ""), "contagem_id": cid, "numeros": numeros,
                        "situacao": situacao, "lote": str(lote) if lote is not None else "", "movimento": movimento,
                        "retorno": _retorno(t, movimento, A._txt(e.get("codigo"))), "quem": quem if pode else "",
-                       "motivo": bool(A._txt(e.get("dados_cifrados"))), "busca": procura,
+                       "motivo": bool(A._txt(e.get("dados_cifrados"))) and t not in _SEM_MOTIVO, "busca": procura,
                        "_achou": not busca_n or busca_n in procura})
     linhas.sort(key=lambda x: (x["quando"], x["n"]), reverse=True)
     for x in linhas:

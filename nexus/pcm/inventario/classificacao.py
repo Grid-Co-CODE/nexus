@@ -99,26 +99,45 @@ def faltam(gravados: dict | None) -> list[str]:
     return [CURTO[c] for c in CAMPOS if not (gravados or {}).get(c)]
 
 
-# ── a cópia de 1 h das opções ───────────────────────────────────────────────────────────────────────────────────────────
-# As opções são da empresa (as mesmas para todo o PCM), e lê-las são algumas páginas da lista de peças: uma cópia na memória do
-# processo, por 1 h. A trava só guarda a troca da cópia, nunca a leitura do Fracttal (o PCM inteiro esperaria por ela); duas
-# primeiras leituras juntas leem as duas, e a última vale. O erro não fica guardado.
-_COPIA: dict = {"quando": None, "opcoes": None}
+# ── a cópia de 1 h das opções e do mapa por código ───────────────────────────────────────────────────────────────────────────────────────────
+# As opções e o mapa são da empresa (os mesmos para todo o PCM), e lê-los são algumas páginas da lista de peças: UMA leitura
+# (`estoque.pecas_com_grupos`) dá os dois, guardados juntos na memória do processo por 1 h. A trava só guarda a troca da cópia,
+# nunca a leitura do Fracttal (o PCM inteiro esperaria por ela); duas primeiras leituras juntas leem as duas, e a última vale.
+# O erro não fica guardado.
+_COPIA: dict = {"quando": None, "opcoes": None, "mapa": None}
 _TRAVA = threading.Lock()
+
+
+def _copia(estoque, relogio) -> dict:
+    agora = relogio()
+    with _TRAVA:
+        if _COPIA["opcoes"] is not None and agora - _COPIA["quando"] < TTL_S:
+            return dict(_COPIA)
+    linhas = estoque.pecas_com_grupos()
+    lidas = {"quando": agora, "opcoes": opcoes(E.classificacoes_das_pecas(linhas)), "mapa": E.mapa_das_pecas(linhas)}
+    with _TRAVA:
+        _COPIA.update(lidas)
+    return lidas
 
 
 def guardadas(estoque, relogio=time.monotonic) -> dict[str, list[dict]]:
     """As opções da tela (`opcoes`), da cópia de 1 h ou lidas agora pelo `estoque` (o login do Fracttal de quem pede)."""
-    agora = relogio()
-    with _TRAVA:
-        if _COPIA["opcoes"] is not None and agora - _COPIA["quando"] < TTL_S:
-            return _COPIA["opcoes"]
-    lidas = opcoes(estoque.classificacoes())
-    with _TRAVA:
-        _COPIA.update(quando=agora, opcoes=lidas)
-    return lidas
+    return _copia(estoque, relogio)["opcoes"]
+
+
+def mapa_guardado(estoque, relogio=time.monotonic) -> dict[str, dict[str, str]]:
+    """O Tipo e as Classificações de cada peça pelo código (`estoque.mapa_das_pecas`), da mesma cópia de 1 h: o Rank das
+    requisições e o voto das parecidas saem daqui, não do catálogo do App (a "Curva ABC" de lá vem vazia para os Ranks)."""
+    return _copia(estoque, relogio)["mapa"]
+
+
+def letra_da_peca(mapa: dict | None, codigo) -> str:
+    """A letra do Rank da peça de código `codigo` pelo mapa ("A", "B", "C"); vazio quando o mapa não tem a peça, ela não
+    tem a Classificação 2, ou é "1.Avariado": a curva desconhecida."""
+    g = (mapa or {}).get("".join(str(codigo or "").split()).upper()) or {}
+    return letra_do_rank(g.get("classificacao_2"))
 
 
 def limpar() -> None:
     with _TRAVA:
-        _COPIA.update(quando=None, opcoes=None)
+        _COPIA.update(quando=None, opcoes=None, mapa=None)

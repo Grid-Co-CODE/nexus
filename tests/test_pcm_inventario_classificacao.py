@@ -164,10 +164,10 @@ def test_a_copia_das_opcoes_vale_1_hora():
     falso, agora = _falso(), [1000.0]
     a = CL.guardadas(falso, relogio=lambda: agora[0])
     agora[0] += CL.TTL_S - 1
-    assert CL.guardadas(falso, relogio=lambda: agora[0]) is a and falso.chamadas == ["classificacoes"]
+    assert CL.guardadas(falso, relogio=lambda: agora[0]) is a and falso.chamadas == ["pecas_com_grupos"]
     agora[0] += 2
     CL.guardadas(falso, relogio=lambda: agora[0])
-    assert falso.chamadas == ["classificacoes", "classificacoes"]
+    assert falso.chamadas == ["pecas_com_grupos", "pecas_com_grupos"]
     assert [o["chave"] for o in a["classificacao_2"]] == ["", "A", "B"]
 
 
@@ -356,7 +356,7 @@ def test_a_ponte_serve_as_opcoes_com_a_chave(cur, monkeypatch):
     assert ops["tipo"][0] == {"id": "318452", "descricao": "Cabos", "chave": "cabos"}
     assert [(o["descricao"], o["chave"]) for o in ops["classificacao_2"]] == [("1.Avariado", ""), ("2. Rank A", "A"),
                                                                               ("3. Rank B", "B")]
-    assert c.get(OPCOES).status_code == 200 and falso.chamadas == ["classificacoes"]     # a cópia de 1 h
+    assert c.get(OPCOES).status_code == 200 and falso.chamadas == ["pecas_com_grupos"]     # a cópia de 1 h
 
 
 def test_a_ponte_das_opcoes_recusa_como_as_outras(cur, monkeypatch, logado):
@@ -392,7 +392,7 @@ def test_a_ponte_cadastra_com_os_ids_e_recusa_o_de_fora(cur, monkeypatch):
     assert r.status_code == 200 and "Complete no Fracttal: Classificação 2." in r.get_json()["mensagem"]
     (criada,) = falso._catalogo.values()
     assert criada["grupos"] == {"id_group": 318452, "id_group_1": 289062}
-    assert falso.chamadas.count("classificacoes") == 1                    # a conferência usa a mesma cópia de 1 h
+    assert falso.chamadas.count("pecas_com_grupos") == 1                    # a conferência usa a mesma cópia de 1 h
 
 
 # ── a tela ───────────────────────────────────────────────────────────────────────────────────────────────────────────

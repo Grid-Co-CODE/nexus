@@ -73,7 +73,10 @@ CAB_EVENTO = ["evento_id", "quando", "data_id", "contagem_id", "tipo", "id_almox
 # no fim da lista
 TIPOS_EVENTO = ("contagem_recebida", "aprovada", "peca_gravada", "conflito", "erro", "peca_tirada",
                 "recontagem_pedida", "numero_corrigido", "substituida", "curadoria", "regua_gravada",
-                "recontagem_item_pedida")
+                "recontagem_item_pedida",
+                # a requisição de material (12/11/2026, item 6 da 2ª rodada do Almoxarifado): aceita pelo PCM (Rank A ou curva
+                # desconhecida) ou sozinha (B e C), uma linha por peça; recusada; e a falha de um passo do aceite
+                "requisicao_aceita", "requisicao_aceita_sozinha", "requisicao_recusada", "requisicao_falha")
 CAB_REGUA = ["decidida_em", "data_id", "id_almoxarifado", "usina_id", "id_item", "codigo", "sugestao_min_qtd",
              "sugestao_max_qtd", "recomendado_min_qtd", "recomendado_max_qtd", "acordado_min_qtd", "acordado_max_qtd",
              "gravado_fracttal", "pessoa_id", "pessoa_hmac", "usina_ligada_por"]

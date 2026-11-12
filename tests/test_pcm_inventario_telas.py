@@ -1296,7 +1296,7 @@ def test_a_aba_inventario_ao_lado_das_quatro(app, inv, falso, monkeypatch):
 
 
 ABAS = ["Reposição", "Por almoxarifado", "Catálogo e saldo", "Avariadas", "Inventário", "Mínimo e máximo", "Curadoria",
-        "Auditoria"]
+        "Auditoria", "Requisições"]                    # as Requisições (12/11/2026) por último, fora do inventário
 
 
 def test_as_abas_do_inventario_ficam_juntas(app, inv, falso, monkeypatch):

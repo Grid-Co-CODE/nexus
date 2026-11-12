@@ -1,0 +1,509 @@
+"""As requisições de material no Almoxarifado (12/11/2026, item 6 da 2ª rodada): o "Aceitar" pelo Nexus. O PCM fazia no
+Fracttal a Saída "Geral" com a OS, aprovar e mudar para Entrega total; o Nexus faz de uma vez (aprovar, a saída ligada, reler),
+com um clique do PCM para as de Rank A (ou de curva desconhecida) e sozinho para as de Rank B e C. O Rank é a Classificação 2 da
+peça no Fracttal, pelo código (o mapa da lista de peças), e não a "Curva ABC" do catálogo do App, que vem vazia para os Ranks.
+
+O Fracttal é o `EstoqueFalso` (a requisição, as peças e os responsáveis como o Fracttal os devolve) e, para os corpos, o gravador
+dos testes do adaptador; o livro do inventário é o arquivo da cópia de prova. As datas são relativas a agora (nada de
+bomba-relógio). Dado de mentira: códigos, ids, OS e nomes inventados, sem nome de gente."""
+import json
+import re
+import time
+import uuid
+from datetime import datetime, timedelta, timezone
+
+import pytest
+from estoque_falso import EstoqueFalso
+from test_campo_visao import banco  # noqa: F401  (banco é fixture)
+from test_pcm_inventario_curadoria import PESSOA, _pessoa_ms, cur  # noqa: F401  (cur é fixture)
+from test_pcm_inventario_estoque import Fracttal, com_o_fracttal, em_paginas, estoque, ok
+from test_pcm_publicar import _no_setor
+
+from nexus.cadastro import setor_ids as SID
+from nexus.dados import fato_inventario as F
+from nexus.pcm.inventario import classificacao as CL
+from nexus.pcm.inventario import estoque as E
+from nexus.pcm.inventario import gravacao as G
+from nexus.pcm.inventario import quem
+from nexus.pcm.inventario import requisicoes as RQ
+from nexus.pcm.inventario.erros import Conflito
+
+AGORA = datetime.now(timezone.utc)
+CONTA = {"id": "77", "nome": "Pessoa Teste"}
+RESPONSAVEL = {"id": "501", "descricao": "Pessoa Teste  {P-01}"}
+LISTA, TELA = "/os/_nexus/inventario/requisicoes", "/t/pcm/pecas/requisicoes"
+
+
+def _iso(dias=0, horas=0):
+    return (AGORA - timedelta(days=dias, hours=horas)).strftime("%Y-%m-%dT%H:%M:%S")
+
+
+def _req(i, os_="4521", almox=10, estado=3, aprovada=False, decidida=None, quem_="", comentario="", dias=1):
+    """Uma linha do `movements_new_list` do jeito que o Fracttal a devolve."""
+    return {"id": i, "folio_source": f"R-{i}", "document": os_, "date": _iso(dias)[:10], "date_create": _iso(dias),
+            "id_warehouse_source": almox, "warehouses_source_code": f"ALM-{almox}",
+            "warehouses_source_description": f"Almoxarifado {almox}", "id_movement_state": estado, "approved": aprovada,
+            "approved_comment": comentario, "approval_date": decidida, "accounts_log_name": quem_,
+            "id_work_orders_tasks": 9000 + i, "number_details": 1, "items_log_description": "peças"}
+
+
+def _det(id_item, code, qty=1):
+    """Uma linha do `movements_details_list`."""
+    return {"id": 600 + id_item, "id_item": id_item, "id_item_original": id_item, "code": code, "qty": qty, "qty_pending": qty,
+            "items_description": f"Peça {code}", "units_description": "UNIDADE"}
+
+
+# as peças do Fracttal com o Rank (a Classificação 2): o mapa por código
+PECAS = [{"code": "SP-1", "id_group_2": 364873, "groups_2_description": "2. Rank A"},
+         {"code": "SP-2", "id_group_2": 364874, "groups_2_description": "3. Rank B"},
+         {"code": "SP-4", "id_group_2": 364875, "groups_2_description": "4. Rank C"},
+         {"code": "SP-5", "id_group_2": 364870, "groups_2_description": "1.Avariado"},
+         {"code": "SP-6", "id_group": 318452, "groups_description": "Cabos"}]
+A_RANK_A, B_E_C, DESCONHECIDA, AVARIADO = 101, 102, 103, 104
+REQS = [_req(A_RANK_A, "4521", dias=1), _req(B_E_C, "4522", dias=2), _req(DESCONHECIDA, "4523", dias=3),
+        _req(AVARIADO, "4524", dias=4)]
+DETALHES = {A_RANK_A: [_det(1, "SP-1")], B_E_C: [_det(2, "SP-2", 2), _det(4, "SP-4")], DESCONHECIDA: [_det(7, "SP-9")],
+            AVARIADO: [_det(5, "SP-5")]}
+SALDOS = {"10": {"1": {"saldo": 5, "codigo": "SP-1"}, "2": {"saldo": 8, "codigo": "SP-2"}, "4": {"saldo": 3, "codigo": "SP-4"},
+                 "5": {"saldo": 1, "codigo": "SP-5"}, "7": {"saldo": 2, "codigo": "SP-9"}}}
+
+
+def _falso(reqs=REQS, detalhes=DETALHES, saldos=None, **kw):
+    return EstoqueFalso(saldos or json.loads(json.dumps(SALDOS)), pecas_do_catalogo=PECAS, requisicoes=reqs,
+                        detalhes=detalhes, responsaveis=[{"id": 501, "email": PESSOA["email"],
+                                                          "description": RESPONSAVEL["descricao"]}], **kw)
+
+
+@pytest.fixture
+def rq(cur):
+    RQ.limpar()
+    CL.limpar()
+    yield cur
+    RQ.aguardar(30)
+    RQ.limpar()
+    CL.limpar()
+
+
+def _ctx(app_, falso):
+    return RQ.contexto(app_.config, CL.mapa_guardado(falso))
+
+
+def _aceitar(app_, falso, rid, por="pcm", **kw):
+    args = dict(ctx=_ctx(app_, falso), quem_=quem.colunas(app_.config, PESSOA), conta=CONTA, responsavel=RESPONSAVEL)
+    args.update(kw)
+    return RQ.aceitar(app_.config, falso, str(rid), por=por, **args)
+
+
+def _eventos(app_, tipo=None):
+    return [e for e in F.ler(app_.config, forcar=True)[F.ABA_EVENTO] if tipo is None or e["tipo"] == tipo]
+
+
+# ── o adaptador: os corpos ───────────────────────────────────────────────────────────────────────────────────────────
+
+def test_a_lista_pede_como_a_tela_e_para_no_corte():
+    """`movements_new_list` do tipo 13, da mais nova (id desc), página a página; para na 1ª mais velha que o corte (a cota é
+    de todos) e devolve a requisição como a casa a usa, com a recusada (não aprovada COM a data) distinguível."""
+    linhas = [_req(9, dias=1), _req(8, dias=10, aprovada="true", decidida=_iso(9), quem_="Alguém"),
+              _req(7, dias=20, aprovada=False, decidida=_iso(19)), _req(6, dias=95), _req(5, dias=96)]
+    fr = Fracttal({E.MOVIMENTOS: em_paginas(linhas)})
+    lidas = estoque(fr, pagina=2).requisicoes(90, AGORA)
+    assert [r["id"] for r in lidas] == ["9", "8", "7"]
+    assert len(fr.pedidos) == 2                                              # a 3ª página nem se pede: a 4ª linha é velha
+    assert fr.pedidos[0] == (E.MOVIMENTOS, {"id_movement_type": 13, "sort": [{"property": "id", "direction": "desc"}],
+                                            "is_tree": False, "node": None, "page": 1, "limit": 2, "start": 0})
+    r = lidas[1]
+    assert (r["os"], r["id_almox"], r["estado"], r["aprovada"], r["decidida_por"]) == ("4521", "10", 3, True, "Alguém")
+    assert RQ.recusada(lidas[2]) and not RQ.recusada(lidas[1]) and not lidas[0]["decidida_em"]
+    fr2 = Fracttal({E.MOVIMENTOS: em_paginas(linhas)})
+    assert estoque(fr2).reler_requisicao("8", 90, AGORA)["id"] == "8" and estoque(fr2).reler_requisicao("6", 90, AGORA) is None
+
+
+def test_os_corpos_do_aprovar_e_do_recusar():
+    """O `outputs_orders_update` com o comentário e a conta de quem decide (os dois: sem eles o "aprovado por" fica vazio);
+    sem a conta ou sem o comentário, nada vai."""
+    fr = Fracttal({E.DECIDIR_REQUISICAO: ok({})})
+    est = estoque(fr)
+    est.aprovar_requisicao("101", " Aceita  pelo Nexus ", CONTA)
+    est.recusar_requisicao("102", "não era esta peça", CONTA)
+    assert fr.pedidos == [
+        (E.DECIDIR_REQUISICAO, {"id": 101, "approved": True, "approved_comment": "Aceita pelo Nexus", "id_accounts": 77,
+                                "accounts_log_name": "Pessoa Teste"}),
+        (E.DECIDIR_REQUISICAO, {"id": 102, "approved": False, "approved_comment": "não era esta peça", "id_accounts": 77,
+                                "accounts_log_name": "Pessoa Teste"})]
+    for comentario, conta in (("ok", None), ("ok", {"id": "77"}), ("", CONTA), (" ", CONTA)):
+        with pytest.raises(ValueError):
+            est.aprovar_requisicao("101", comentario, conta)
+    assert len(fr.pedidos) == 2
+    fr3 = Fracttal({E.DECIDIR_REQUISICAO: {"success": False, "message": "STATE_CHANGED"}})
+    with pytest.raises(E.Recusado, match="STATE_CHANGED"):
+        estoque(fr3).aprovar_requisicao("101", "ok", CONTA)
+
+
+def test_o_corpo_da_saida_ligada(monkeypatch):
+    """O corpo capturado da tela do Fracttal em 12/11/2026, campo a campo: o mesmo uuid no `id` e no `idInternal`, a requisição
+    na referência, o almoxarifado, o responsável, o dia de Brasília e a hora UTC, a OS no `document` e as peças como vieram."""
+    monkeypatch.setattr(uuid, "uuid4", lambda: uuid.UUID("12345678-1234-5678-1234-567812345678"))
+    fr = Fracttal({E.SAIDA: ok({"id": 88001})})
+    req = E.requisicao_da_linha(_req(101, "4521", almox=10))
+    pecas = [_det(1, "SP-1", 2)]
+    quando = datetime(2026, 11, 12, 2, 30, 15, 123000, tzinfo=timezone.utc)          # 23:30 de 11/11 em Brasília
+    assert estoque(fr).saida_da_requisicao(req, pecas, RESPONSAVEL, agora=quando) == "88001"
+    u = "12345678-1234-5678-1234-567812345678"
+    assert fr.pedidos == [(E.SAIDA, {
+        "id": u, "idInternal": u, "id_movement_reference": 101, "is_from_work_order": True, "id_movement_type": 4,
+        "movements_types_description": "WORK_ORDER", "id_movement_state": 2, "movements_states_description": "RETURN",
+        "id_warehouse_source": 10, "id_warehouse_target": None, "id_responsible": 501,
+        "responsible_description": "Pessoa Teste  {P-01}", "date": "2026-11-11", "date_create": "2026-11-12T02:30:15.123Z",
+        "document": "4521", "folio_source": "", "symbol": "R$", "currency_code": "BRL", "id_third_party": None,
+        "third_parties_name": "", "id_cost_center": None, "warehouses_target_description": "", "costs_center_description": "",
+        "description": "", "status_display": "", "items": pecas})]
+    for ruim in ({}, {"id": "501"}, {"id": "", "descricao": "x"}):
+        with pytest.raises(ValueError):
+            estoque(fr).saida_da_requisicao(req, pecas, ruim)
+    with pytest.raises(ValueError):
+        estoque(fr).saida_da_requisicao(req, [], RESPONSAVEL)
+    assert len(fr.pedidos) == 1
+
+
+def test_as_pecas_e_o_responsavel():
+    fr = Fracttal({E.DETALHES: em_paginas([_det(1, "SP-1")]),
+                   E.RESPONSAVEIS: em_paginas([{"id": 9, "email": "outra@exemplo.test", "description": "Outra  {P-09}"},
+                                               {"id": 501, "email": "Pessoa.Teste@Exemplo.com", "description": "Pessoa  {P-01}"},
+                                               {"id": 502, "email": "sem.descricao@exemplo.test", "description": ""}])})
+    est = estoque(fr)
+    assert est.pecas_da_requisicao("101") == [_det(1, "SP-1")]                           # como vêm (a saída as devolve)
+    assert fr.pedidos[0] == (E.DETALHES, {"id_movement": 101, "page": 1, "limit": 200, "start": 0})
+    assert est.responsavel("pessoa.teste@exemplo.com") == {"id": "501", "descricao": "Pessoa  {P-01}"}
+    assert fr.pedidos[1] == (E.RESPONSAVEIS, {"filter": [], "sort": [], "is_tree": False, "node": None, "noShowDisabled": True,
+                                              "page": 1, "limit": 200, "start": 0})
+    assert est.responsavel("ninguem@exemplo.test") is None and est.responsavel("sem.descricao@exemplo.test") is None
+    with pytest.raises(ValueError):
+        est.responsavel(" ")
+
+
+def test_o_rank_sai_das_pecas_do_fracttal():
+    """O mapa por código (a lista de peças inteira) dá a letra do Rank: "2. Rank A" é A; o "1.Avariado", a peça sem a
+    Classificação 2 e a que o mapa não tem são a curva desconhecida."""
+    mapa = E.mapa_das_pecas(PECAS + [{"code": " sp-1 ", "groups_2_description": "4. Rank C"}, {"code": ""}])
+    assert mapa["SP-1"] == {"classificacao_2": "2. Rank A"} and mapa["SP-6"] == {"tipo": "Cabos"}     # o 1º código vale
+    assert [CL.letra_da_peca(mapa, c) for c in ("SP-1", "sp-2 ", "SP-4", "SP-5", "SP-6", "SP-99", "")] == [
+        "A", "B", "C", "", "", "", ""]
+    falso, agora = _falso(), [10.0]
+    assert CL.mapa_guardado(falso, relogio=lambda: agora[0])["SP-2"]["classificacao_2"] == "3. Rank B"
+    CL.guardadas(falso, relogio=lambda: agora[0])                                       # a mesma cópia: as opções e o mapa
+    assert falso.chamadas == ["pecas_com_grupos"]
+
+
+# ── aceitar: a ordem, as falhas e as recusas ────────────────────────────────────────────────────────────────────────────
+
+def test_aceitar_aprova_antes_da_saida_e_rele(rq):
+    falso = _falso()
+    r = _aceitar(rq, falso, A_RANK_A, comentario="conferida no campo")
+    assert r["confirmada"] is True and re.search(r"Requisição da OS 4521 aceita às \d\d:\d\d", r["mensagem"])
+    assert falso.chamadas[falso.chamadas.index("reler_requisicao"):] == [
+        "reler_requisicao", "pecas_da_requisicao", "modo", "ler", "aprovar_requisicao", "saida_da_requisicao",
+        "reler_requisicao", "ler"]
+    assert falso.decisoes == [{"id": A_RANK_A, "approved": True, "approved_comment": "conferida no campo", "id_accounts": 77,
+                               "accounts_log_name": "Pessoa Teste"}]
+    assert falso.saidas[0]["id_movement_reference"] == A_RANK_A and falso.saidas[0]["id_responsible"] == 501
+    assert falso.ler("10")["1"]["saldo"] == 4.0 and falso.reler_requisicao(str(A_RANK_A))["estado"] == 5
+    (ev,) = _eventos(rq, "requisicao_aceita")
+    assert (ev["movimento_fracttal"], ev["id_almoxarifado"], ev["id_item"], ev["codigo"]) == ("101", "10", "1", "SP-1")
+    assert (ev["de_qtd"], ev["para_qtd"], ev["contado_qtd"]) == (5, 4, 1)
+    assert re.fullmatch(r"[0-9a-f]{24}", ev["pessoa_hmac"]) and ev["usina_id"] == 1
+    assert F.decifrar(rq.config, F.ABA_EVENTO, ev) == {"os": "4521", "curva": "A", "saida": falso.saidas[0]["id"], "por": "pcm",
+                                                       "confirmada": True, "comentario": "conferida no campo"}
+    assert "4521" not in json.dumps(ev) and "conferida" not in json.dumps(ev)            # a OS e o comentário só cifrados
+    # sem o comentário do PCM, o padrão com o nome da conta
+    falso2 = _falso()
+    _aceitar(rq, falso2, B_E_C)
+    assert falso2.decisoes[0]["approved_comment"] == "Aceita pelo Nexus por Pessoa Teste"
+
+
+def test_state_changed_registra_a_falha_e_nada_mais(rq):
+    """A requisição entregue no Fracttal entre a releitura e a aprovação: o Fracttal diz `STATE_CHANGED`, o passo para ali e
+    vira o evento `requisicao_falha`, e nenhuma saída sai."""
+    class Entregue(EstoqueFalso):
+        def aprovar_requisicao(self, id_requisicao, comentario, conta):
+            self.mudar_requisicao(id_requisicao, id_movement_state=5)
+            return super().aprovar_requisicao(id_requisicao, comentario, conta)
+    falso = Entregue(json.loads(json.dumps(SALDOS)), pecas_do_catalogo=PECAS, requisicoes=REQS, detalhes=DETALHES)
+    with pytest.raises(RQ.Falhou) as ex:
+        _aceitar(rq, falso, A_RANK_A)
+    assert ex.value.status == 409 and "STATE_CHANGED" in ex.value.mensagem and "Nada mudou" in ex.value.mensagem
+    assert "saida_da_requisicao" not in falso.chamadas and falso.saidas == []
+    (ev,) = _eventos(rq, "requisicao_falha")
+    assert ev["movimento_fracttal"] == "101"
+    assert F.decifrar(rq.config, F.ABA_EVENTO, ev) == {"motivo": "STATE_CHANGED", "passo": "aprovar", "por": "pcm",
+                                                       "os": "4521"}
+
+
+def test_a_aprovada_com_a_saida_falha_e_a_nova_tentativa_pula_a_aprovacao(rq):
+    """O saldo não dá (o almoxarifado não aceita estoque negativo): a requisição fica aprovada, a saída não passa, o motivo do
+    Fracttal fica à vista em Falhas, e o automático não tenta de novo. Com o saldo de volta, a próxima tentativa (o clique) pula a
+    aprovação."""
+    saldos = json.loads(json.dumps(SALDOS))
+    saldos["10"]["2"]["saldo"] = 1                                                      # a B_E_C pede 2 da SP-2
+    falso = _falso(saldos=saldos)
+    with pytest.raises(RQ.Falhou) as ex:
+        _aceitar(rq, falso, B_E_C, por="sozinha")
+    assert ex.value.status == 409 and "ficou aprovada" in ex.value.mensagem and "INSUFFICIENT_STOCK" in ex.value.mensagem
+    r = falso.reler_requisicao(str(B_E_C))
+    assert r["aprovada"] is True and r["estado"] == 3 and falso.saidas == []
+    d = RQ.montar(rq.config, falso, _ctx(rq, falso))
+    (f,) = d["falhas"]
+    assert f["id"] == str(B_E_C) and "INSUFFICIENT_STOCK" in f["falha"]["motivo"] and f["falha"]["passo"] == "saida"
+    assert str(B_E_C) not in d["ids_sozinhas"] and not d["sozinhas"]
+    falso._itens["10"]["2"]["saldo"] = 8.0
+    antes = len(falso.chamadas)
+    r = _aceitar(rq, falso, B_E_C)
+    assert r["confirmada"] and "aprovar_requisicao" not in falso.chamadas[antes:] and len(falso.decisoes) == 1
+    assert RQ.montar(rq.config, falso, _ctx(rq, falso))["falhas"] == []                # aceita, sai das Falhas
+
+
+def test_parcial_cancelada_recusada_e_entregue_ficam_fora(rq):
+    reqs = [_req(201, estado=4), _req(202, estado=6), _req(203, decidida=_iso(1)), _req(204, estado=5, aprovada=True,
+                                                                                           decidida=_iso(1))]
+    falso = _falso(reqs=reqs, detalhes={i: [_det(2, "SP-2")] for i in (201, 202, 203, 204)})
+    textos = {201: "entrega parcial: conclua no Fracttal", 202: "cancelada", 203: "recusada", 204: "já está entregue"}
+    for rid, texto in textos.items():
+        with pytest.raises(Conflito, match=texto):
+            _aceitar(rq, falso, rid)
+    assert falso.decisoes == [] and falso.saidas == []
+    d = RQ.montar(rq.config, falso, _ctx(rq, falso))
+    assert [x["id"] for x in d["parciais"]] == ["201"] and d["ids_sozinhas"] == [] and not d["para_pcm"]
+    assert {x["id"] for x in d["decididas"]} == {"203", "204"}
+
+
+def test_sem_o_dono_nada_vai(rq):
+    """Sem o responsável do Fracttal a saída não vai, e sem a conta a aprovação não vai: 409 antes de qualquer gravação."""
+    falso = _falso()
+    with pytest.raises(Conflito, match="lista de responsáveis"):
+        _aceitar(rq, falso, A_RANK_A, responsavel=None)
+    with pytest.raises(Conflito, match="conta do Fracttal"):
+        _aceitar(rq, falso, A_RANK_A, conta=None)
+    assert falso.decisoes == [] and falso.saidas == [] and _eventos(rq) == []
+    falso.mudar_requisicao(A_RANK_A, approved=True)                                     # aprovada: a conta não faz falta
+    assert _aceitar(rq, falso, A_RANK_A, conta=None)["confirmada"]
+
+
+def test_a_aprovada_nao_se_recusa(rq):
+    """A aprovada (falta só a saída) não se recusa: 409, nada vai; a não aprovada se recusa com o comentário cifrado."""
+    falso = _falso()
+    falso.mudar_requisicao(A_RANK_A, approved=True)
+    ctx, quem_ = _ctx(rq, falso), quem.colunas(rq.config, PESSOA)
+    with pytest.raises(Conflito, match="já foi aprovada"):
+        RQ.recusar(rq.config, falso, str(A_RANK_A), ctx=ctx, quem_=quem_, conta=CONTA, comentario="não era desta OS")
+    assert falso.decisoes == []
+    r = RQ.recusar(rq.config, falso, str(DESCONHECIDA), ctx=ctx, quem_=quem_, conta=CONTA, comentario="não era desta OS")
+    assert r["confirmada"] and falso.decisoes[0]["approved"] is False
+    (ev,) = _eventos(rq, "requisicao_recusada")
+    assert F.decifrar(rq.config, F.ABA_EVENTO, ev)["motivo"] == "não era desta OS" and "desta OS" not in json.dumps(ev)
+
+
+def test_o_automatico_nao_aceita_a_de_rank_a(rq):
+    falso = _falso()
+    for rid in (A_RANK_A, DESCONHECIDA, AVARIADO):
+        with pytest.raises(Conflito, match="é o PCM que aceita"):
+            _aceitar(rq, falso, rid, por="sozinha")
+    assert falso.decisoes == []
+
+
+def test_a_vez_presa_e_o_modo_seguram(rq, monkeypatch):
+    falso = _falso()
+    monkeypatch.setattr(G, "vez_presa", lambda cfg, almox: "uma gravação do inventário está andando neste almoxarifado.")
+    with pytest.raises(Conflito, match="gravação do inventário"):
+        _aceitar(rq, falso, A_RANK_A)
+    monkeypatch.setattr(G, "vez_presa", lambda cfg, almox: "")
+    falso.definir_modo("10", 2)
+    with pytest.raises(Conflito, match="modo 2"):
+        _aceitar(rq, falso, A_RANK_A)
+    assert falso.decisoes == []
+
+
+# ── a fila ───────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+def test_a_fila_pelo_rank(rq):
+    """Para o PCM: a com peça Rank A e a de curva desconhecida (fora do mapa, ou "1.Avariado"); sozinhas: só B e C conhecidas.
+    A mais nova primeiro; o almoxarifado de teste fora."""
+    reqs = REQS + [_req(105, "4525", almox=134082, dias=0)]
+    falso = _falso(reqs=reqs, detalhes={**DETALHES, 105: [_det(2, "SP-2")]})
+    rq.config["NEXUS_ALMOX_TESTE_IDS"] = "134082"
+    d = RQ.montar(rq.config, falso, _ctx(rq, falso))
+    assert [x["id"] for x in d["para_pcm"]] == ["101", "103", "104"]
+    assert d["para_pcm"][0]["rank_a"] and not d["para_pcm"][1]["rank_a"]
+    assert [p["curva"] for p in d["para_pcm"][1]["pecas"]] == [""] and [p["curva"] for p in d["para_pcm"][2]["pecas"]] == [""]
+    assert [x["id"] for x in d["sozinhas"]] == ["102"] and d["ids_sozinhas"] == ["102"]
+    assert [p["curva"] for p in d["sozinhas"][0]["pecas"]] == ["B", "C"]
+    assert d["n_total"] == 4                                                            # sem a do almoxarifado de teste
+    # o mapa que não tem nada: toda peça é desconhecida, e nada vai sozinho
+    assert RQ.montar(rq.config, falso, RQ.contexto(rq.config, {}))["ids_sozinhas"] == []
+
+
+def test_as_pecas_ficam_na_copia_de_10_minutos(rq):
+    falso = _falso()
+    RQ.montar(rq.config, falso, _ctx(rq, falso))
+    RQ.montar(rq.config, falso, _ctx(rq, falso))
+    assert falso.chamadas.count("pecas_da_requisicao") == 4                              # as 4 pendentes, uma vez cada
+
+
+# ── o automático ─────────────────────────────────────────────────────────────────────────────────────────────────────
+
+def test_o_automatico_aceita_so_as_b_e_c(rq):
+    falso = _falso()
+    d = RQ.montar(rq.config, falso, _ctx(rq, falso))
+    ctrl = RQ.iniciar_automatico(rq.config, falso, d["ids_sozinhas"], ctx=_ctx(rq, falso),
+                                 quem_=quem.colunas(rq.config, PESSOA), conta=CONTA, responsavel=RESPONSAVEL)
+    assert ctrl["estado"] == "gravando" and ctrl["total"] == 1
+    RQ.aguardar(30)
+    est = RQ.estado_automatico(rq.config)
+    assert est["estado"] == "concluida" and est["aceitas"] == 1 and "1 aceitas" in est["texto"]
+    evs = _eventos(rq, "requisicao_aceita_sozinha")
+    assert {(e["codigo"], e["de_qtd"], e["para_qtd"]) for e in evs} == {("SP-2", 8, 6), ("SP-4", 3, 2)}
+    assert F.decifrar(rq.config, F.ABA_EVENTO, evs[0])["por"] == "sozinha"
+    for rid in (A_RANK_A, DESCONHECIDA, AVARIADO):                                       # a A e a desconhecida ficam
+        assert falso.reler_requisicao(str(rid))["estado"] == 3
+    d = RQ.montar(rq.config, falso, _ctx(rq, falso))
+    (g,) = d["aceitas_sozinhas"]
+    assert g["id"] == "102" and g["os"] == "4522" and {p["codigo"] for p in g["pecas"]} == {"SP-2", "SP-4"}
+    with pytest.raises(Conflito, match="Nenhuma"):
+        RQ.iniciar_automatico(rq.config, falso, d["ids_sozinhas"], ctx=_ctx(rq, falso), quem_={}, conta=CONTA,
+                              responsavel=RESPONSAVEL)
+
+
+def test_o_automatico_para_no_limite_e_um_de_cada_vez(rq):
+    reqs = [_req(301, dias=1), _req(302, dias=2)]
+    falso = _falso(reqs=reqs, detalhes={301: [_det(2, "SP-2")], 302: [_det(4, "SP-4")]}, limite_em=1)
+    ctx = _ctx(rq, _falso())                            # o mapa de outro falso: a 1ª chamada deste é a do 429
+
+    class Devagar(EstoqueFalso):
+        def reler_requisicao(self, *a, **k):
+            time.sleep(0.3)
+            return super().reler_requisicao(*a, **k)
+    RQ.iniciar_automatico(rq.config, falso, ["301", "302"], ctx=ctx, quem_={}, conta=CONTA, responsavel=RESPONSAVEL)
+    RQ.aguardar(30)
+    est = RQ.estado_automatico(rq.config)
+    assert est["estado"] == "parada" and "pausa" in est["parou"] and est["feitas"] == 1      # o 429 para o resto
+    devagar = Devagar(json.loads(json.dumps(SALDOS)), pecas_do_catalogo=PECAS, requisicoes=reqs,
+                      detalhes={301: [_det(2, "SP-2")], 302: [_det(4, "SP-4")]})
+    RQ.iniciar_automatico(rq.config, devagar, ["301"], ctx=ctx, quem_={}, conta=CONTA, responsavel=RESPONSAVEL)
+    with pytest.raises(Conflito, match="já está aceitando"):
+        RQ.iniciar_automatico(rq.config, devagar, ["302"], ctx=ctx, quem_={}, conta=CONTA, responsavel=RESPONSAVEL)
+    assert RQ.estado_automatico(rq.config)["estado"] == "gravando"
+    RQ.aguardar(30)
+
+
+def test_o_deploy_espera_o_automatico(tmp_path):
+    """O controle "gravando" salvo há menos de 5 min segura o restart (`gravacao.com_lote_aberto`); o velho e o concluído
+    não. O ajudante do deploy importa só a gravação."""
+    pasta = tmp_path / "almox_inventario"
+    pasta.mkdir()
+    agora = datetime(2026, 11, 12, 15, 0, tzinfo=timezone.utc)
+    arq = pasta / RQ.ARQUIVO_AUTO
+    arq.write_text(json.dumps({"estado": "gravando", "atualizado_em": "2026-11-12T14:58:00Z"}), encoding="utf-8")
+    assert "requisicoes" in G.com_lote_aberto(pasta, agora)
+    arq.write_text(json.dumps({"estado": "gravando", "atualizado_em": "2026-11-12T14:50:00Z"}), encoding="utf-8")
+    assert "requisicoes" not in G.com_lote_aberto(pasta, agora)
+    arq.write_text(json.dumps({"estado": "concluida", "atualizado_em": "2026-11-12T14:59:00Z"}), encoding="utf-8")
+    assert "requisicoes" not in G.com_lote_aberto(pasta, agora)
+    assert list(G._controles(pasta)) == []                       # não é controle de contagem
+    assert RQ.ARQUIVO_AUTO == G.ARQUIVO_REQUISICOES_AUTO
+
+
+# ── a ponte e a tela ─────────────────────────────────────────────────────────────────────────────────────────────────
+
+def _pcm(app_, monkeypatch, falso, email=None):
+    monkeypatch.setattr(E, "estoque_da_sessao", lambda app: falso)
+    monkeypatch.setattr(RQ, "conta_do_fracttal", lambda email, nome="": dict(CONTA))
+    _no_setor(monkeypatch, SID.PCM)
+    return com_o_fracttal(app_, _pessoa_ms(app_), email or PESSOA["email"])
+
+
+def test_a_ponte_serve_a_lista(rq, monkeypatch):
+    falso = _falso()
+    c = _pcm(rq, monkeypatch, falso)
+    r = c.get(LISTA)
+    html = r.get_data(as_text=True)
+    assert r.status_code == 200 and r.headers["Cache-Control"] == "no-store"
+    assert "Para o PCM aceitar (3)" in html and "Rank B e C, a aceitar sozinhas (1)" in html
+    assert 'data-rq-auto-n="1"' in html and 'data-rq-auto-pode="1"' in html
+    assert f'data-rq-url="/os/_nexus/inventario/requisicoes/{A_RANK_A}/aceitar"' in html
+    assert 'rq-curva--a">Rank A' in html and "curva desconhecida" in html and "Aceitar agora as 1 de Rank B e C" in html
+
+
+def test_a_ponte_aceita_recusa_e_diz_a_falha(rq, monkeypatch):
+    falso = _falso()
+    c = _pcm(rq, monkeypatch, falso)
+    r = c.post(f"{LISTA}/{A_RANK_A}/aceitar", json={"comentario": ""})
+    assert r.status_code == 200 and r.get_json()["confirmada"] is True and r.get_json()["volta"] == TELA
+    assert falso.decisoes[0]["id_accounts"] == 77 and falso.saidas[0]["id_responsible"] == 501
+    html = c.get(TELA).get_data(as_text=True)
+    assert "Requisição da OS 4521 aceita às" in html and "cn-certo" in html
+    # recusar: o comentário é obrigatório
+    r = c.post(f"{LISTA}/{DESCONHECIDA}/recusar", json={"comentario": " "})
+    assert r.status_code == 400
+    r = c.post(f"{LISTA}/{DESCONHECIDA}/recusar", json={"comentario": "não era peça do estoque"})
+    assert r.status_code == 200 and falso.decisoes[-1]["approved"] is False
+    assert len(_eventos(rq, "requisicao_recusada")) == 1
+    # a falha da saída: o JSON com o motivo e o status do Fracttal
+    falso._itens["10"]["5"]["saldo"] = 0.0
+    r = c.post(f"{LISTA}/{AVARIADO}/aceitar", json={})
+    assert r.status_code == 409 and "ficou aprovada" in r.get_json()["erro"]
+    # a já entregue no meio: 409, nada vai
+    r = c.post(f"{LISTA}/{A_RANK_A}/aceitar", json={})
+    assert r.status_code == 409 and "já está entregue" in r.get_json()["erro"]
+
+
+def test_as_recusas_da_ponte(rq, monkeypatch, logado):
+    falso = _falso()
+    monkeypatch.setattr(E, "estoque_da_sessao", lambda app: falso)
+    monkeypatch.setattr(RQ, "conta_do_fracttal", lambda email, nome="": dict(CONTA))
+    com_o_fracttal(rq, logado, "outra.pessoa@exemplo.test")
+    for rota, metodo in ((LISTA, "get"), (f"{LISTA}/{A_RANK_A}/aceitar", "post"), (f"{LISTA}/automatico", "post")):
+        r = getattr(logado, metodo)(rota, json={})
+        assert r.status_code == 409 and "senha de administrador" in r.get_json()["erro"], rota
+    _no_setor(monkeypatch, SID.PCM)
+    r = _pessoa_ms(rq).post(f"{LISTA}/{A_RANK_A}/aceitar", json={})
+    assert r.status_code == 401 and "/os/login?next=" in r.get_json()["login"]
+    r = com_o_fracttal(rq, _pessoa_ms(rq), "outra.pessoa@exemplo.test").post(f"{LISTA}/{A_RANK_A}/aceitar", json={})
+    assert r.status_code == 409 and "outra conta" in r.get_json()["erro"]
+    _no_setor(monkeypatch, SID.PERFORMANCE)
+    assert com_o_fracttal(rq, _pessoa_ms(rq)).post(f"{LISTA}/{A_RANK_A}/aceitar", json={}).status_code == 403
+    _no_setor(monkeypatch, SID.PCM)
+    r = com_o_fracttal(rq, _pessoa_ms(rq)).post(f"{LISTA}/{A_RANK_A}/aceitar", json={},
+                                                 headers={"Sec-Fetch-Site": "cross-site"})
+    assert r.status_code == 403
+    assert falso.decisoes == [] and falso.saidas == []
+
+
+def test_a_ponte_comeca_o_automatico(rq, monkeypatch):
+    falso = _falso()
+    c = _pcm(rq, monkeypatch, falso)
+    r = c.post(f"{LISTA}/automatico", json={})
+    assert r.status_code == 200 and r.get_json()["ok"] is True
+    RQ.aguardar(30)
+    assert len(_eventos(rq, "requisicao_aceita_sozinha")) == 2
+    j = c.get(f"{TELA}/automatico.json").get_json()
+    assert j["estado"] == "concluida" and j["andando"] is False and "1 aceitas" in j["texto"]
+    r = c.post(f"{LISTA}/automatico", json={})
+    assert r.status_code == 409 and "Nenhuma" in r.get_json()["erro"]
+
+
+def test_a_tela(rq, monkeypatch, logado):
+    _no_setor(monkeypatch, SID.PCM)
+    html = _pessoa_ms(rq).get(TELA).get_data(as_text=True)
+    assert f'data-rq-fonte="{LISTA}"' in html and f'data-rq-automatico="{LISTA}/automatico"' in html
+    assert "pcm-requisicoes.js" in html and "gc-explica" in html and "Rank A" in html
+    nav = html.split('class="alm-abas"')[1].split("</nav>")[0]
+    assert re.search(r'aria-selected="true"[^>]*href="/t/pcm/pecas/requisicoes"', nav)
+    # a senha de administrador: a tela diz que precisa entrar pelo Fracttal, e nem pede a lista
+    html = logado.get(TELA).get_data(as_text=True)
+    assert "entre no Nexus pelo Fracttal" in html and "data-rq-lista" not in html and "pcm-requisicoes.js" not in html
+
+
+def test_a_auditoria_mostra_a_requisicao(rq, monkeypatch, logado):
+    falso = _falso()
+    _aceitar(rq, falso, A_RANK_A)
+    html = logado.get("/t/pcm/pecas/inventario/auditoria").get_data(as_text=True)
+    assert "Requisição aceita pelo PCM" in html and "requisição 101: aprovada, saída feita" in html
+    assert "saldo 5 para 4" in html and "motivo cifrado" not in html

@@ -18,6 +18,7 @@ from ...pcm import acompanhamento, almoxarifado, inventario
 from ...pcm.inventario import curadoria as inventario_curadoria
 from ...pcm.inventario import ponte_os as inventario_ponte
 from ...pcm.inventario import regua as inventario_regua
+from ...pcm.inventario import requisicoes as inventario_requisicoes
 from ...pcm.telas import registrar_pcm
 from ...cadastro import setor_ids as SID
 from ..modelo import Tela, Torre
@@ -98,6 +99,8 @@ inventario.registrar(bp)
 inventario_regua.registrar(bp)
 # a curadoria do fora do catálogo do inventário (nexus/pcm/inventario/curadoria.py)
 inventario_curadoria.registrar(bp)
+# as requisições de material, o Aceitar pelo Nexus (nexus/pcm/inventario/requisicoes.py; a lista e o que grava, na ponte)
+inventario_requisicoes.registrar(bp)
 # a ponte do login do Fracttal do inventário, na raiz do app (/os/_nexus/inventario; nexus/pcm/inventario/ponte_os.py)
 # (idempotente: a aba Inventário também a registra)
 inventario_ponte.registrar(bp)

@@ -900,7 +900,8 @@ FATOS = (
          f"{fato_inventario.LIVRO} · {fato_inventario.ABA_EVENTO}",
          "1 linha = 1 evento do inventário de 1 contagem (recebida, aprovada, peça gravada, conflito, erro, peça tirada do "
          "lote, recontagem pedida, número corrigido, contagem substituída, curadoria, régua gravada ou recontagem de "
-         "uma peça pedida); nunca muda",
+         "uma peça pedida) ou de 1 requisição de material (aceita pelo PCM ou sozinha, uma linha por peça; recusada; "
+         "falha de um passo); nunca muda",
          _d(data=("id", "data_id (o dia de Brasília do evento; quando, a hora em UTC)"),
             usina=("id", "usina_id + usina_ligada_por (o almoxarifado da contagem, só pela de-para do Fracttal; vazio "
                          "quando não liga)"),
@@ -915,7 +916,9 @@ FATOS = (
          fontes=(f"{fato_inventario.LIVRO} · {fato_inventario.ABA_EVENTO}",),
          janela_origem="o Nexus é a fonte (só acrescenta; o estado de cada contagem sai dos eventos, na ordem da gravação)",
          observacao="de_qtd e para_qtd são o saldo do Fracttal antes e depois, no evento peca_gravada; contado_qtd é o que "
-                    "o campo contou (no numero_corrigido, ao lado do corrigido, que é o para_qtd). Soma entre almoxarifados "
+                    "o campo contou (no numero_corrigido, ao lado do corrigido, que é o para_qtd); na requisição aceita, "
+                    "de_qtd e para_qtd são o saldo da peça antes e depois da saída, contado_qtd a quantidade requisitada e "
+                    "movimento_fracttal o id da requisição, com a OS e a curva só em dados_cifrados. Soma entre almoxarifados "
                     "do MESMO item, nunca entre itens nem no tempo. movimento_fracttal é o número do movimento que o "
                     "Fracttal devolveu (dimensão degenerada); lote é o lote de 50 da gravação. O motivo do PCM é texto "
                     "livre e vai só em dados_cifrados (Cofre, amarrado à linha); a pessoa só como pessoa_id e "

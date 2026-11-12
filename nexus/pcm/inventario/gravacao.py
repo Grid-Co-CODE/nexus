@@ -132,6 +132,7 @@ ENCERRADA = "a gravação foi encerrada: {motivo}"
 # a gravação viva salva o controle a cada pedido; a pausa mais longa entre dois salvamentos é a do 429 (62 s, o pedido de
 # novo, mais 62 s antes de fechar). O controle "gravando" mais velho que isto é de uma gravação que o Nexus já não roda
 VIVA_S = 300
+ARQUIVO_REQUISICOES_AUTO = "requisicoes-auto.json"   # o controle do automático das requisições (`requisicoes.py`)
 
 # os motivos que vão cifrados no evento (`dados`), sempre texto do Nexus, nunca o do Fracttal (pode ter nome de gente)
 MEXIDA = "a peça se moveu no Fracttal depois da contagem"
@@ -1253,7 +1254,7 @@ def _controles(pasta: Path):
     if pasta is None or not pasta.is_dir():
         return
     for arq in sorted(pasta.glob("*.json")):
-        if arq.name.startswith(("trava-", "regua-lida-", "regua-lote-")):     # a vez, a releitura e o lote da régua
+        if arq.name.startswith(("trava-", "regua-lida-", "regua-lote-", "requisicoes-")):  # a vez, a régua, as requisições
             continue
         try:
             ctrl = _ler_json(arq)
@@ -1282,7 +1283,9 @@ def com_lote_aberto(pasta: Path | None, agora: datetime | None = None) -> list[s
     min é do `ferramentas/gravacao_aberta.py`. O processo que pergunta não é o do Nexus e não vê a thread: a gravação viva
     salva o controle a cada pedido, e a parada (a que o reinício matou, ou a sem login) não ganha nada com a espera. Desde
     11/11/2026, também o lote dos acordados do botão da régua (`regua.iniciar_lote`, o controle `regua-lote-<almox>.json` salvo a
-    cada peça), como `regua-<almox>`."""
+    cada peça), como `regua-<almox>`. Desde 12/11/2026, também o automático das requisições de Rank B e C
+    (`requisicoes.iniciar_automatico`, o controle `requisicoes-auto.json` salvo a cada requisição), como `requisicoes`: o
+    restart no meio deixaria a requisição aprovada sem a saída, ou a saída feita sem o evento."""
     agora = instante(agora or _agora())
     out = []
     for ctrl in _controles(pasta):
@@ -1304,6 +1307,16 @@ def com_lote_aberto(pasta: Path | None, agora: datetime | None = None) -> list[s
             continue
         if (ctrl or {}).get("estado") == "gravando" and agora - salvo <= timedelta(seconds=VIVA_S):
             out.append(f"regua-{A._id(ctrl.get('id_almox'))}")
+    # o automático das requisições (12/11/2026): a mesma conta, sem importar o módulo dele (o ajudante do deploy importa só
+    # este, e o das requisições puxa a casa inteira do PCM)
+    if pasta is not None and pasta.is_dir():
+        try:
+            ctrl = _ler_json(pasta / ARQUIVO_REQUISICOES_AUTO)
+            salvo = instante((ctrl or {}).get("atualizado_em"))
+        except (Recusada, ValueError):
+            ctrl = None
+        if (ctrl or {}).get("estado") == "gravando" and agora - salvo <= timedelta(seconds=VIVA_S):
+            out.append("requisicoes")
     return out
 
 

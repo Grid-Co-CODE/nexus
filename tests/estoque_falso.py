@@ -41,12 +41,21 @@ mais novo.
 `pecas_do_catalogo` (12/11/2026): as linhas da lista de peças do Fracttal com o Tipo e as Classificações (`id_group`,
 `groups_description`, ...), de onde o `classificacoes` tira as opções, como o de verdade; a peça que `criar_peca` faz com
 `grupos` os guarda em `grupos` no catálogo (só quando vêm).
+As requisições de material (12/11/2026, item 6 da 2ª rodada): `requisicoes=` são as linhas do `movements_new_list` como o
+Fracttal as devolve (`id`, `document`, `id_warehouse_source`, `id_movement_state`, `approved`, `approval_date`, ...),
+`detalhes=` `{id da requisição: as linhas do movements_details_list}` e `responsaveis=` as linhas do
+`personnel.responsibles_list` (`id`, `email`, `description`). O falso SUPÕE (a prova de 12/11/2026 viu só o caminho feliz):
+aprovar e recusar só no estado 3 (fora dele, `STATE_CHANGED`, esse provado); a saída ligada só no estado 3, com o almoxarifado
+no modo 0 e o saldo de cada peça cobrindo a quantidade (senão `Recusado`, e nada muda); ela baixa o saldo, leva a requisição a
+5 e põe a saída em `.movimentos`. `.decisoes` guarda o corpo de cada aprovar e recusar; `.saidas`, o de cada saída.
+`mudar_requisicao` (fora do contrato) muda a linha por fora (a requisição aprovada ou cancelada no meio).
 `mover` e `definir_modo` não são do contrato (nem contam como chamada): o teste os usa para simular o que acontece fora do
 inventário (uma OS que lança peça, uma compra que entra, um almoxarifado que ficou em inventário físico).
 """
 import functools
 from datetime import datetime, timezone
 
+from nexus.pcm.inventario import estoque as _E
 from nexus.pcm.inventario.estoque import (TIPO_AJUSTE, Estoque, Limite, Recusado, SemLogin, classificacoes_das_pecas,
                                           corpo_dos_grupos, instante, validar_nivel, validar_quantidade)
 
@@ -71,7 +80,7 @@ def _operacao(f):
 
 class EstoqueFalso(Estoque):
     def __init__(self, saldos: dict, *, perder_resposta=(), limite_em=None, expirar_em=None, agora=None,
-                 pecas_do_catalogo=None):
+                 pecas_do_catalogo=None, requisicoes=None, detalhes=None, responsaveis=None):
         """`saldos`: `{id_almox: {id_item: saldo}}`, ou o item como `{"saldo", "minimo", "maximo", "codigo", "unidade",
         "criticidade"}` quando o teste precisa da régua, do código, da unidade ou da criticidade (o que falta é None, e o
         código, a unidade e a criticidade, vazios). Todo item de `saldos` já está ligado."""
@@ -91,6 +100,11 @@ class EstoqueFalso(Estoque):
         self._sessoes: dict[str, dict[str, float | None]] = {}      # almoxarifado -> {id_item: saldo de quando mexeu}
         self._catalogo: dict[str, dict] = {}                        # as peças que `criar_peca` fez
         self._pecas_do_catalogo = list(pecas_do_catalogo or [])     # a lista de peças com o Tipo e as Classificações
+        self._movs = {str(r["id"]): dict(r) for r in (requisicoes or [])}
+        self._detalhes = {str(k): [dict(l) for l in v] for k, v in (detalhes or {}).items()}
+        self._responsaveis = [dict(r) for r in (responsaveis or [])]
+        self.decisoes: list[dict] = []
+        self.saidas: list[dict] = []
         self._n_item, self._n_movimento = 53_000_000, 0
         self._perder, self._perdidas = ({perder_resposta} if isinstance(perder_resposta, str)
                                         else set(perder_resposta or ())), set()
@@ -116,6 +130,10 @@ class EstoqueFalso(Estoque):
         item["saldo"] = (item["saldo"] or 0.0) + (qtd if tipo == "entrada" else -qtd)
         self._movimento(id_almox, id_item, tipo, qtd, referencia, self._iso(quando),
                         TIPO_AJUSTE if ajuste else (1 if tipo == "entrada" else 2))
+
+    def mudar_requisicao(self, id_requisicao, **campos) -> None:
+        """A requisição mudada por fora (alguém aprovou ou cancelou na tela do Fracttal)."""
+        self._movs[str(id_requisicao)].update(campos)
 
     # ── as regras do falso ───────────────────────────────────────────────────────────────────────────────────────────────
     def _entrar(self, nome: str) -> None:
@@ -287,6 +305,96 @@ class EstoqueFalso(Estoque):
     @_operacao
     def classificacoes(self) -> dict[str, list[tuple[str, str]]]:
         return classificacoes_das_pecas(self._pecas_do_catalogo)
+
+    @_operacao
+    def pecas_com_grupos(self) -> list[dict]:
+        campos = ("code",) + tuple(c for par in _E.GRUPOS.values() for c in par)
+        return [{k: l.get(k) for k in campos} for l in self._pecas_do_catalogo]
+
+    # ── a requisição de material ──────────────────────────────────────────────────────────────────────────────────────────
+    def _as_requisicoes(self, desde_dias, agora):
+        corte = _E._ate(desde_dias, agora)
+        for linha in sorted(self._movs.values(), key=lambda l: -int(l["id"])):
+            r = _E.requisicao_da_linha(linha)
+            if _E._velha(r, corte):
+                return
+            yield r
+
+    @_operacao
+    def requisicoes(self, desde_dias: int = 90, agora=None) -> list[dict]:
+        return list(self._as_requisicoes(desde_dias, agora))
+
+    @_operacao
+    def reler_requisicao(self, id_requisicao: str, desde_dias: int = 90, agora=None) -> dict | None:
+        alvo = str(int(str(id_requisicao).strip()))
+        return next((r for r in self._as_requisicoes(desde_dias, agora) if r["id"] == alvo), None)
+
+    @_operacao
+    def pecas_da_requisicao(self, id_requisicao: str) -> list[dict]:
+        return [dict(l) for l in self._detalhes.get(str(id_requisicao), [])]
+
+    def _mov_no_estado_3(self, id_requisicao, operacao) -> dict:
+        mov = self._movs.get(str(id_requisicao))
+        if mov is None:
+            raise Recusado("NOT_FOUND", operacao)
+        if int(mov.get("id_movement_state") or 0) != _E.NAO_ENTREGUE:
+            raise Recusado("STATE_CHANGED", operacao)
+        return mov
+
+    def _decidir(self, id_requisicao, aprovar, comentario, conta, operacao) -> None:
+        id_conta, nome = _E.conta_valida(conta)
+        texto = _E.comentario_valido(comentario)
+        mov = self._mov_no_estado_3(id_requisicao, operacao)
+        self.decisoes.append({"id": int(str(id_requisicao)), "approved": aprovar, "approved_comment": texto,
+                              "id_accounts": id_conta, "accounts_log_name": nome})
+        mov.update(approved=aprovar, approved_comment=texto, approval_date=self._iso(), accounts_log_name=nome)
+
+    @_operacao
+    def aprovar_requisicao(self, id_requisicao: str, comentario: str, conta: dict) -> None:
+        self._decidir(id_requisicao, True, comentario, conta, "aprovar_requisicao")
+
+    @_operacao
+    def recusar_requisicao(self, id_requisicao: str, comentario: str, conta: dict) -> None:
+        self._decidir(id_requisicao, False, comentario, conta, "recusar_requisicao")
+
+    @_operacao
+    def saida_da_requisicao(self, requisicao: dict, pecas: list[dict], responsavel: dict, agora=None) -> str:
+        resp = responsavel or {}
+        if not pecas or not all(isinstance(p, dict) for p in pecas):
+            raise ValueError("a saída precisa das peças da requisição")
+        if not str(resp.get("id") or "").strip() or not str(resp.get("descricao") or "").strip():
+            raise ValueError("sem o responsável do Fracttal: a saída não vai sem dono")
+        mov = self._mov_no_estado_3(requisicao["id"], "saida_da_requisicao")
+        almox = str(mov["id_warehouse_source"])
+        if self._modos.get(almox, 0) in (2, 3):
+            raise Recusado("o almoxarifado trava as saídas enquanto está em ajuste ou inventário", "saida_da_requisicao")
+        baixas = []
+        for p in pecas:
+            item = self._itens.get(almox, {}).get(str(p.get("id_item")))
+            qtd = float(p.get("qty") or 0)
+            if item is None or item["saldo"] is None or item["saldo"] < qtd:
+                raise Recusado("INSUFFICIENT_STOCK (de mentira)", "saida_da_requisicao")
+            baixas.append((str(p.get("id_item")), item, qtd))
+        quando = self._iso(agora)
+        for id_item, item, qtd in baixas:
+            item["saldo"] -= qtd
+            self._movimento(almox, id_item, "saida", qtd, str(mov.get("document") or ""), quando, 2)
+        mov["id_movement_state"] = _E.ENTREGA_TOTAL
+        nova = str(70_000_000 + len(self.saidas) + 1)
+        self.saidas.append({"id": nova, "id_movement_reference": int(str(requisicao["id"])), "id_warehouse_source": int(almox),
+                            "id_responsible": int(str(resp["id"])), "document": str(requisicao.get("os") or ""),
+                            "items": [dict(p) for p in pecas]})
+        return nova
+
+    @_operacao
+    def responsavel(self, email: str) -> dict | None:
+        alvo = str(email or "").strip().lower()
+        if not alvo:
+            raise ValueError("sem o e-mail, qualquer responsável seria o achado")
+        for r in self._responsaveis:
+            if str(r.get("email") or "").strip().lower() == alvo and str(r.get("description") or "").strip():
+                return {"id": str(r["id"]), "descricao": str(r["description"]).strip()}
+        return None
 
     @_operacao
     def codigos(self, sigla: str) -> list[str]:

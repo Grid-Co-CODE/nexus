@@ -1,0 +1,128 @@
+{# A fila das requisições de material (12/11/2026, item 6 da 2ª rodada): o pedaço que a ponte do login do Fracttal monta
+   (`/os/_nexus/inventario/requisicoes`, `requisicoes.montar`) e a página `pcm/requisicoes.html` busca por fetch. `d`: os grupos
+   (para_pcm, sozinhas, falhas, parciais, aceitas_sozinhas, decididas); `auto`: o último automático (o controle); `andando`: ele
+   anda agora; `raio_x`: quem abre o Raio X da OS da Engenharia (o link da OS só para quem abre). Tabelas que viram cartões
+   abaixo de 640 px (`data-r`), como o resto do Almoxarifado. #}
+{% macro n(v) %}{{ ('%g'|format(v)) if v is not none else '?' }}{% endmacro %}
+{% macro a_os(x) %}{% if x.os and raio_x and x.os.isdigit() %}<a href="{{ raiz }}/t/engenharia/equipe/os/{{ x.os }}">OS {{ x.os }}</a>{% elif x.os %}OS {{ x.os }}{% else %}<span class="mudo">sem OS</span>{% endif %}{% endmacro %}
+{% macro curva(c) %}<span class="rq-curva rq-curva--{{ c|lower if c else 'x' }}">{{ ('Rank ' ~ c) if c else 'curva desconhecida' }}</span>{% endmacro %}
+{% macro pecas(x) %}{% if x.pecas %}<ul class="rq-pecas">{% for p in x.pecas %}<li><span class="alm-cod">{{ p.codigo or ('peça ' ~ p.id_item) }}</span> {{ p.nome }} · {{ n(p.qtd) }} {{ p.unidade }} {{ curva(p.curva) }}</li>{% endfor %}</ul>{% elif x.erro_pecas %}<p class="alm-det">{{ x.erro_pecas }}</p>{% else %}<p class="alm-det">Sem peças lidas.</p>{% endif %}{% endmacro %}
+{% macro aceitar(x, rotulo='Aceitar') %}
+<form class="rq-acao" data-rq-aceitar data-rq-url="{{ raiz }}/os/_nexus/inventario/requisicoes/{{ x.id }}/aceitar" data-rq-os="{{ x.os }}">
+  <label class="gc-rotulo" for="rq-com-{{ x.id }}">Comentário (opcional)</label>
+  <input class="gc-campo" id="rq-com-{{ x.id }}" name="comentario" maxlength="300" autocomplete="off" placeholder="em branco: Aceita pelo Nexus por você">
+  <button class="gc-btn gc-btn--ui gc-btn--primario" type="submit">{{ rotulo }}</button>
+  <p class="alm-det">{% if x.aprovada %}Já aprovada: falta a saída. {% endif %}O Nexus {{ '' if x.aprovada else 'aprova, ' }}faz a saída ligada à OS e a requisição vai para Entrega total, no Fracttal, com o seu login.</p>
+  <p class="rq-erro" data-rq-erro role="alert" hidden></p>
+</form>
+{% endmacro %}
+{% macro recusar(x) %}
+<details class="cu-op"><summary>Recusar</summary>
+  <form class="cu-form" data-rq-recusar data-rq-url="{{ raiz }}/os/_nexus/inventario/requisicoes/{{ x.id }}/recusar" data-rq-os="{{ x.os }}">
+    <p class="alm-det rq-aviso">O técnico já usou a peça: recusar só registra no Fracttal (a peça não volta). A recusa pelo Nexus ainda não foi provada no Fracttal de verdade.</p>
+    <label class="gc-rotulo" for="rq-rec-{{ x.id }}">Comentário (obrigatório)</label>
+    <input class="gc-campo" id="rq-rec-{{ x.id }}" name="comentario" maxlength="300" required autocomplete="off">
+    <button class="gc-btn gc-btn--ui gc-btn--contorno" type="submit">Recusar</button>
+    <p class="rq-erro" data-rq-erro role="alert" hidden></p>
+  </form></details>
+{% endmacro %}
+<div data-rq-raiz data-rq-auto-n="{{ d.ids_sozinhas|length }}" data-rq-auto-pode="{{ 1 if d.livro_lido and not andando else 0 }}">
+<div class="inv-tiles" aria-label="Resumo das requisições">
+  <div class="inv-tile inv-tile--info"><b class="inv-tile-v">{{ d.para_pcm|length }}</b><span class="inv-tile-r">Para o PCM aceitar</span></div>
+  <div class="inv-tile"><b class="inv-tile-v">{{ d.sozinhas|length }}</b><span class="inv-tile-r">Rank B e C a aceitar sozinhas</span></div>
+  <div class="inv-tile"><b class="inv-tile-v">{{ d.falhas|length }}</b><span class="inv-tile-r">Falhas</span></div>
+  <div class="inv-tile"><b class="inv-tile-v">{{ d.parciais|length }}</b><span class="inv-tile-r">Entrega parcial</span></div>
+  <div class="inv-tile inv-tile--ok"><b class="inv-tile-v">{{ d.aceitas_sozinhas|length }}</b><span class="inv-tile-r">Aceitas sozinhas (30 dias)</span></div>
+</div>
+{% if not d.livro_lido %}<div class="cn-erro cn-aviso" role="status"><span><b>O livro do inventário não se lê agora:</b> as falhas e as aceitas sozinhas não aparecem, e o automático espera.</span></div>{% endif %}
+{% if auto and auto.estado != 'gravando' and auto.texto %}<p class="alm-det rq-auto-fim">Último automático ({{ auto.fim_txt }}): {{ auto.texto }}</p>{% endif %}
+
+<section class="inv-card">
+<div class="inv-card-cab"><h3>Para o PCM aceitar ({{ d.para_pcm|length }})</h3><span class="inv-card-nota">Rank A ou curva desconhecida, não entregues</span></div>
+{% for x in d.para_pcm %}
+<article class="rq-card" aria-label="Requisição {{ x.os or x.id }}">
+  <p class="cu-tit">{% if x.rank_a %}<span class="inv-selo inv-selo--alerta">Rank A</span>{% else %}<span class="inv-selo inv-selo--info">Curva desconhecida</span>{% endif %} {{ a_os(x) }}</p>
+  <p class="alm-det">{{ x.almox }}{% if x.usina %} · {{ x.usina }}{% endif %} · criada em {{ x.criada_txt or '?' }} · {{ x.estado_txt }}{% if x.aprovada %} · aprovada, falta a saída{% endif %}</p>
+  {{ pecas(x) }}
+  {{ aceitar(x) }}
+  {% if not x.aprovada %}{{ recusar(x) }}{% endif %}
+</article>
+{% else %}
+<div class="inv-vazio"><p>Nenhuma requisição de Rank A ou de curva desconhecida esperando o PCM.</p></div>
+{% endfor %}
+</section>
+
+<section class="inv-card">
+<div class="inv-card-cab"><h3>Rank B e C, a aceitar sozinhas ({{ d.sozinhas|length }})</h3>
+  {% if d.sozinhas %}<button type="button" class="gc-btn gc-btn--ui gc-btn--contorno" data-rq-auto-agora{% if andando or not d.livro_lido %} disabled{% endif %}>Aceitar agora as {{ d.sozinhas|length }} de Rank B e C</button>{% endif %}</div>
+{% if d.sozinhas %}
+<div class="inv-tw"><table class="alm-t inv-t">
+  <thead><tr><th>OS</th><th>Almoxarifado</th><th>Peças</th><th>Criada</th></tr></thead>
+  <tbody>{% for x in d.sozinhas %}
+  <tr><td data-r="OS"><span class="alm-v">{{ a_os(x) }}</span></td>
+    <td data-r="Almoxarifado"><span class="alm-v">{{ x.almox }}{% if x.usina %}<span class="alm-det">{{ x.usina }}</span>{% endif %}</span></td>
+    <td data-r="Peças"><span class="alm-v">{{ pecas(x) }}</span></td>
+    <td data-r="Criada"><span class="alm-v">{{ x.criada_txt or '?' }}</span></td></tr>
+  {% endfor %}</tbody></table></div>
+{% else %}<div class="inv-vazio"><p>Nenhuma de Rank B e C esperando.</p></div>{% endif %}
+</section>
+
+{% if d.falhas %}
+<section class="inv-card">
+<div class="inv-card-cab"><h3>Falhas ({{ d.falhas|length }})</h3><span class="inv-card-nota">o Nexus não tenta de novo sozinho</span></div>
+{% for x in d.falhas %}
+<article class="rq-card" aria-label="Requisição {{ x.os or x.id }} com falha">
+  <p class="cu-tit"><span class="inv-selo inv-selo--critico">{{ 'Aprovada, saída falhou' if x.aprovada else 'Não aceita' }}</span> {{ a_os(x) }}</p>
+  <p class="alm-det">{{ x.almox }}{% if x.usina %} · {{ x.usina }}{% endif %} · criada em {{ x.criada_txt or '?' }}</p>
+  <p class="rq-motivo"><b>{{ x.falha.motivo }}</b> <span class="alm-det">({{ 'automático' if x.falha.por == 'sozinha' else 'PCM' }}, {{ x.falha.quando_txt or '?' }})</span></p>
+  {{ pecas(x) }}
+  {{ aceitar(x, 'Tentar de novo') }}
+</article>
+{% endfor %}
+</section>
+{% endif %}
+
+{% if d.parciais %}
+<section class="inv-card">
+<div class="inv-card-cab"><h3>Entrega parcial ({{ d.parciais|length }})</h3><span class="inv-card-nota">conclua no Fracttal</span></div>
+<div class="inv-tw"><table class="alm-t inv-t">
+  <thead><tr><th>OS</th><th>Almoxarifado</th><th>Criada</th></tr></thead>
+  <tbody>{% for x in d.parciais %}
+  <tr><td data-r="OS"><span class="alm-v">{{ a_os(x) }}</span></td>
+    <td data-r="Almoxarifado"><span class="alm-v">{{ x.almox }}</span></td>
+    <td data-r="Criada"><span class="alm-v">{{ x.criada_txt or '?' }}</span></td></tr>
+  {% endfor %}</tbody></table></div>
+<p class="inv-card-pe">A saída do que falta entregar ainda não foi provada pelo Nexus: conclua estas na tela do Fracttal.</p>
+</section>
+{% endif %}
+
+{% if d.aceitas_sozinhas %}
+<section class="inv-card">
+<div class="inv-card-cab"><h3>Aceitas sozinhas, as últimas ({{ d.aceitas_sozinhas|length }})</h3></div>
+<div class="inv-tw"><table class="alm-t inv-t">
+  <thead><tr><th>Quando</th><th>OS</th><th>Almoxarifado</th><th>Saldo antes e depois</th></tr></thead>
+  <tbody>{% for g in d.aceitas_sozinhas %}
+  <tr><td data-r="Quando"><span class="alm-v">{{ g.quando_txt or '?' }}{% if not g.confirmada %}<span class="alm-det">a releitura não confirmou</span>{% endif %}</span></td>
+    <td data-r="OS"><span class="alm-v">{{ ('OS ' ~ g.os) if g.os else '—' }}</span></td>
+    <td data-r="Almoxarifado"><span class="alm-v">{{ g.almox_nome }}</span></td>
+    <td data-r="Saldo"><span class="alm-v">{% for p in g.pecas %}<span class="rq-saldo"><span class="alm-cod">{{ p.codigo }}</span> {{ n(p.antes) }} para {{ n(p.depois) }}</span>{% endfor %}</span></td></tr>
+  {% endfor %}</tbody></table></div>
+</section>
+{% endif %}
+
+<details class="inv-card">
+<summary class="inv-card-cab"><h3>Decididas nos últimos 30 dias ({{ d.decididas|length }})</h3></summary>
+{% if d.decididas %}
+<div class="inv-tw"><table class="alm-t inv-t">
+  <thead><tr><th>OS</th><th>Almoxarifado</th><th>Decisão</th><th>Quem</th><th>Comentário</th><th>Quando</th></tr></thead>
+  <tbody>{% for x in d.decididas %}
+  <tr><td data-r="OS"><span class="alm-v">{{ a_os(x) }}</span></td>
+    <td data-r="Almoxarifado"><span class="alm-v">{{ x.almox }}</span></td>
+    <td data-r="Decisão"><span class="alm-v"><span class="inv-selo inv-selo--{{ 'alerta' if x.recusada else 'ok' }}">{{ 'Recusada' if x.recusada else 'Aprovada' }}</span><span class="alm-det">{{ x.estado_txt }}</span></span></td>
+    <td data-r="Quem"><span class="alm-v">{{ x.decidida_por or '—' }}</span></td>
+    <td data-r="Comentário"><span class="alm-v">{{ x.comentario or '—' }}</span></td>
+    <td data-r="Quando"><span class="alm-v">{{ x.decidida_txt or '?' }}</span></td></tr>
+  {% endfor %}</tbody></table></div>
+{% else %}<div class="inv-vazio"><p>Nenhuma decidida nos últimos 30 dias.</p></div>{% endif %}
+</details>
+</div>
