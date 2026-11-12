@@ -4989,6 +4989,8 @@ function equipeRelDados(de, ate, equipe){
   };
 }
 function equipeRelPct(v, t){ return t ? (v / t * 100).toFixed(1).replace('.', ',') + '%' : '—'; }
+/* CSS dos relatórios para imprimir (Primarizados e Visão executiva; papel branco) */
+function relCss(){ return '@page{size:A4;margin:12mm 11mm}*{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact}' + 'body{margin:0;font-family:Poppins,"Segoe UI",system-ui,sans-serif;color:#1b2130;background:var(--zel-sobre-cor);font-size:10.5px;line-height:1.35}' + '.capa{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:3px solid #1f6f4a;padding-bottom:8px;margin-bottom:6px}.marca{color:#1f6f4a;font-weight:700;font-size:11px;letter-spacing:.04em;text-transform:uppercase}' + 'h1{font-size:19px;margin:2px 0 3px}.sub{color:var(--ink-muted);font-size:11.5px}.ger{color:var(--ink-muted);font-size:9.5px;text-align:right}' + 'h2{font-size:13.5px;margin:16px 0 6px;padding-bottom:3px;border-bottom:1px solid #dfe3e8;color:#1f6f4a;page-break-after:avoid}h3{font-size:11.5px;margin:10px 0 4px;color:#333b48;page-break-after:avoid}' + '.kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}.kpis div{border:1px solid #e1e5ea;border-radius:6px;padding:7px 9px;border-left:4px solid #7FC795}.kpis .bom{border-left-color:var(--good)}.kpis .ruim{border-left-color:var(--critical)}' + '.kpis small{display:block;color:var(--ink-muted);font-size:9.5px;text-transform:uppercase;letter-spacing:.03em}.kpis b{display:block;font-size:15px;margin:2px 0}.kpis em{color:var(--ink-muted);font-style:normal;font-size:9.5px}' + '.dest{margin:8px 0 0;padding-left:16px}.dest li{margin:2px 0}' + '.t{width:100%;border-collapse:collapse;margin:2px 0 4px}.t th{background:#f2f4f7;color:var(--ink-muted);font-weight:600;text-align:left;padding:4px 6px;font-size:9.5px;border-bottom:1px solid #d8dde3}' + '.t td{padding:3px 6px;border-bottom:1px solid var(--border);vertical-align:top}.t tr{page-break-inside:avoid}.n{text-align:right!important;white-space:nowrap;font-variant-numeric:tabular-nums}.sm{font-size:9px}' + '.tot td{font-weight:700;border-top:1.5px solid var(--ink-muted);background:#fafbfc}.dia td{background:#eef6f1;font-weight:600;color:#1f6f4a}.det td{font-size:9.3px}' + '.bar{height:7px;background:var(--border);border-radius:4px;overflow:hidden}.bar span{display:block;height:100%;background:#4fae74}' + '.r{color:var(--critical)}.g{color:#2e7d4f}.mut{color:var(--ink-muted);font-size:9.5px;margin:2px 0 6px}.quebra{page-break-before:always}' + '.rod{margin-top:14px;padding-top:6px;border-top:1px solid #dfe3e8;color:#8a93a0;font-size:9px}'; }
 function equipeRelHtml(R){
   var M = function(v){ return v == null ? '—' : fmtMoney(v); }, P = equipeRelPct;
   var D = function(v){ return v < -0.5 ? '−' + M(-v) : M(v); };
@@ -5063,20 +5065,7 @@ function equipeRelHtml(R){
     h += '<tr class="tot"><td colspan="7">Total do período (' + R.qtd + ' lançamentos)</td><td class="n">' + M(R.total) + '</td><td></td></tr></tbody></table>';
   }
   h += '<div class="rod">Fontes: lançamentos da aba "Acompanhamento de Pagamentos – Primarizados" e provisões primarizadas da simulação do Financeiro (Radar de Fornecedores). Valores em R$.</div>';
-  var css = '@page{size:A4;margin:12mm 11mm}*{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact}' +
-    'body{margin:0;font-family:Poppins,"Segoe UI",system-ui,sans-serif;color:#1b2130;background:var(--zel-sobre-cor);font-size:10.5px;line-height:1.35}' +
-    '.capa{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:3px solid #1f6f4a;padding-bottom:8px;margin-bottom:6px}.marca{color:#1f6f4a;font-weight:700;font-size:11px;letter-spacing:.04em;text-transform:uppercase}' +
-    'h1{font-size:19px;margin:2px 0 3px}.sub{color:var(--ink-muted);font-size:11.5px}.ger{color:var(--ink-muted);font-size:9.5px;text-align:right}' +
-    'h2{font-size:13.5px;margin:16px 0 6px;padding-bottom:3px;border-bottom:1px solid #dfe3e8;color:#1f6f4a;page-break-after:avoid}h3{font-size:11.5px;margin:10px 0 4px;color:#333b48;page-break-after:avoid}' +
-    '.kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}.kpis div{border:1px solid #e1e5ea;border-radius:6px;padding:7px 9px;border-left:4px solid #7FC795}.kpis .bom{border-left-color:var(--good)}.kpis .ruim{border-left-color:var(--critical)}' +
-    '.kpis small{display:block;color:var(--ink-muted);font-size:9.5px;text-transform:uppercase;letter-spacing:.03em}.kpis b{display:block;font-size:15px;margin:2px 0}.kpis em{color:var(--ink-muted);font-style:normal;font-size:9.5px}' +
-    '.dest{margin:8px 0 0;padding-left:16px}.dest li{margin:2px 0}' +
-    '.t{width:100%;border-collapse:collapse;margin:2px 0 4px}.t th{background:#f2f4f7;color:var(--ink-muted);font-weight:600;text-align:left;padding:4px 6px;font-size:9.5px;border-bottom:1px solid #d8dde3}' +
-    '.t td{padding:3px 6px;border-bottom:1px solid var(--border);vertical-align:top}.t tr{page-break-inside:avoid}.n{text-align:right!important;white-space:nowrap;font-variant-numeric:tabular-nums}.sm{font-size:9px}' +
-    '.tot td{font-weight:700;border-top:1.5px solid var(--ink-muted);background:#fafbfc}.dia td{background:#eef6f1;font-weight:600;color:#1f6f4a}.det td{font-size:9.3px}' +
-    '.bar{height:7px;background:var(--border);border-radius:4px;overflow:hidden}.bar span{display:block;height:100%;background:#4fae74}' +
-    '.r{color:var(--critical)}.g{color:#2e7d4f}.mut{color:var(--ink-muted);font-size:9.5px;margin:2px 0 6px}.quebra{page-break-before:always}' +
-    '.rod{margin-top:14px;padding-top:6px;border-top:1px solid #dfe3e8;color:#8a93a0;font-size:9px}';
+  var css = relCss();
   var titulo = 'Relatório Primarizados ' + fmtDate(R.de) + ' a ' + fmtDate(R.ate);
   return '<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>' + esc(titulo) + '</title><style>' + css + '</style></head><body>' + h +
     '<script>window.onload=function(){setTimeout(function(){window.print();},350);};<\/script></body></html>';
@@ -9857,7 +9846,7 @@ function finEhHead(){ return currentUserPapel === 'HEAD'; }
    mudam a tela (subaba, período, filtros, mês) continuam funcionando — lista FIN_NAV_SO_LEITURA. Promover/editar
    provisão continuam só do HEAD. */
 function finVisaoVisivel(){ return finEhHead() || podeVerAba('financeiro'); }
-var FIN_NAV_SO_LEITURA = '[data-fin-sub-aba],[data-fin-escopo],[data-fin-periodo],[data-fin-base],[data-fin-chip],#fin-limpar-filtros,#fin-alt-todas,#fin-busca,#fin-somar-cenario,[data-fin-periodo-modo],[data-fin-periodo-preset],[data-fin-periodo-limpar],#fin-periodo-de,#fin-periodo-ate';
+var FIN_NAV_SO_LEITURA = '[data-fin-sub-aba],[data-fin-escopo],[data-fin-periodo],[data-fin-base],[data-fin-chip],#fin-limpar-filtros,#fin-alt-todas,#fin-busca,#fin-somar-cenario,[data-fin-periodo-modo],[data-fin-periodo-preset],[data-fin-periodo-limpar],#fin-periodo-de,#fin-periodo-ate,#btn-fin-relatorio,#overlay-fin-rel button,#overlay-fin-rel input';
 /* Financeiro abre na Visão executiva (sem o selo beta) desde 2026-11-10. "Mês a mês - Geral" oculto para todos menos o
    Analista (pedido dele, 2026-11-10: o chefe pediu para tirar, mas pode precisar mais na frente) — a página continua no código. */
 var FIN_GERAL_EMAILS = [];
@@ -9907,7 +9896,7 @@ function finRenderExecutivo(){
   /* ordem pedida pelo Analista (2026-11-06): Alterações e motivos sobe; tabela mensal desce e ganha embaixo a lista de pagamentos do mês */
   h += finAlteracoesHtml();
   h += '<div class="fx-grid2"><div style="display:flex;flex-direction:column;gap:16px;">' + finTabelaHtml(info) + finPagamentosMesHtml(sel.mes, op) + '</div>' + finDetalheHtml(sel) + '</div>';
-  h += finProvisoesHtml() + finCenariosHtml();
+  h += finProvisoesHtml() + finCenariosHtml() + finRelModalHtml();
   return h + '</div>';
 }
 function finAvisosHtml(){
@@ -9932,6 +9921,7 @@ function finBarraHtml(){
   h += '<div class="fx-ctl"><span class="fx-lbl">Período</span>' + seg('data-fin-periodo', u.periodo, [['6', '6 meses'], ['12', '12 meses'], ['all', 'Tudo']]) + '</div>';
   h += '<div class="fx-ctl"><span class="fx-lbl">Somar simulação</span><select class="fx-simsel" id="fin-somar-cenario"><option value="">Nenhuma — só previsto</option>' +
     som.map(function(c){ return '<option value="' + esc(c.id) + '"' + (c.id === u.cenarioId ? ' selected' : '') + '>' + esc(c.nome) + '</option>'; }).join('') + '</select></div>';
+  h += '<div class="fx-ctl"><button type="button" class="btn btn-primary btn-sm" id="btn-fin-relatorio" title="Excel detalhado ou PDF executivo: previsto, realizado, a pagar, provisões, conciliação e lançamentos">Exportar relatório</button></div>';
   h += '<div class="fx-legend"><span><i class="fx-sw-real"></i>Realizado (pago)</span><span><i class="fx-sw-aberto"></i>Lançado a pagar</span><span><i class="fx-sw-prov"></i>Provisão · alinhar financeiro</span><span><i class="fx-sw-sim"></i>Simulado</span><span><i class="fx-sw-meta"></i>Meta</span></div>';
   return h + '</div>';
 }
@@ -10746,6 +10736,329 @@ function finModalHistoricoProvisao(){
 /* Quadro "Alterações e motivos" da Visão Executiva (pedido do Analista, 2026-11-04: os motivos das edições
    ficavam escondidos no "Histórico" de cada item). Junta as linhas de fin_provisao_historico de uma mesma
    gravação (item + horário) num evento só: quem, quando, item, o que mudou em cada mês e o motivo. */
+/* ---------- Relatório da Visão executiva para o Financeiro (2026-11-11) ----------
+   Pedido do HEAD da zeladoria: "botão para exportar minuciosamente os dados em detalhes de provisão/previsto, realizado, bem executivo e
+   detalhado, para o pessoal do financeiro extrair e fazer suas análises" (base: o relatório dos primarizados). Botão
+   "Exportar relatório" na barra da Visão executiva → janela com mês inicial/final e "usar os filtros da tela" → Excel
+   (.xlsx, uma aba por quebra + "Base (tabela dinâmica)" com uma linha por valor) ou PDF (A4 deitado, resumo executivo).
+   TODOS os números saem de finMesInfo / finCtx / finSaldoProvisao (mesma conta da tela): a soma da Base bate com a aba
+   "Por mês". Só lê, não grava nada — por isso funciona também para quem só tem "ver" o Financeiro. */
+var FIN_REL_STATUS_PROV = { conciliada: 'Conciliada (já lançada)', parcial: 'Parcialmente lançada', alinhar: 'A alinhar (falta lançar)', alinhada: 'Alinhada (baixada)', cancelada: 'Cancelada' };
+function finRelMeses(de, ate){ var r = []; if (!de || !ate || de > ate) return r; for (var m = de; m <= ate && r.length < 60; m = finAddMes(m, 1)) r.push(m); return r; }
+function finRelFiltrosTexto(){
+  var u = finUi(), V = finValoresFiltro(), t = ['Tipo: ' + ({ G: 'Geral', T: 'Terceirizados', P: 'Primarizados' })[u.escopo || 'G']];
+  if (u.busca) t.push('Busca: "' + u.busca + '"');
+  FIN_FILTROS_MSF.forEach(function(k){ var sel = ui[k[0]]; if (msfTodos(sel)) return; var rot = V[k[1]].rotulos || {}; t.push(k[2] + ': ' + (sel.length ? sel.map(function(v){ return rot[v] || v; }).join(', ') : 'nenhum')); });
+  return t.join(' · ');
+}
+function finRelDados(de, ate, usarFiltros){
+  var meses = finRelMeses(de, ate); if (!meses.length) return null;
+  var u = finUi(), ctx = finCtx();
+  var op = usarFiltros ? finOpcoesTela() : { escopo: 'G', cenarioId: u.cenarioId || null, filtros: null };
+  var F = finFiltrosNorm(op.filtros), escopo = op.escopo || 'G', noPer = {};
+  meses.forEach(function(m){ noPer[m] = true; });
+  var ok = function(t){ return escopo === 'G' || escopo === t; };
+  var tipoTxt = function(t){ return t === 'P' ? 'Primarizado' : 'Terceirizado'; };
+  var cen = op.cenarioId ? finCenariosAtivos().find(function(c){ return c.id === op.cenarioId; }) : null;
+  var itemPorId = {}; (state.finItens || []).forEach(function(it){ itemPorId[it.id] = it; });
+  var cenNome = {}; finCenariosAtivos().forEach(function(c){ cenNome[c.id] = c.nome; });
+  var fin = {}; financeiroAtivos().forEach(function(x){ fin[x.id] = x; });
+  var gj = {}; gastosEquipeAtivos().forEach(function(x){ gj[x.id] = x; });
+  var lancPorChave = {}; ctx.lanc.forEach(function(l){ lancPorChave[l.chave] = l; });
+  /* 1. por mês — fonte única */
+  var porMes = meses.map(function(m){
+    var i = finMesInfo(m, op);
+    return { mes: m, rotulo: finMesNome(m), meta: i.meta, orcamento: i.orcamento, realizado: i.realizado, aPagar: i.aPagar, provisao: i.provisao, previsto: i.previsto,
+      simulado: i.simulado, previstoSimulado: i.previstoSimulado, thopen: i.foraMetaThopen, T: i.porTipo.T, P: i.porTipo.P };
+  });
+  var somaK = function(lista, k){ return r2(lista.reduce(function(a, x){ return a + (Number(x[k]) || 0); }, 0)); };
+  var tot = {};
+  ['meta', 'orcamento', 'realizado', 'aPagar', 'provisao', 'previsto', 'simulado', 'previstoSimulado', 'thopen'].forEach(function(k){ tot[k] = somaK(porMes, k); });
+  ['T', 'P'].forEach(function(t){ tot[t] = {}; ['realizado', 'aPagar', 'provisao', 'simulado'].forEach(function(k){ tot[t][k] = r2(porMes.reduce(function(a, x){ return a + x[t][k]; }, 0)); }); });
+  /* 2. lançamentos (Acompanhamento + gastos das equipes primarizadas) com a ligação às provisões */
+  var provsDoLanc = {};
+  finProvisoesAtivas().forEach(function(pv){ var c = ctx.conc[pv.id]; if (c) c.parcelas.forEach(function(x){ (provsDoLanc[x.chave] = provsDoLanc[x.chave] || []).push({ pv: pv, valor: x.valor }); }); });
+  var lanc = ctx.lanc.filter(function(l){ return noPer[l.mes] && ok(l.tipo) && (!F || finPassaFiltro(finRegistroLanc(l, ctx), F)); }).map(function(l){
+    var p = l.origem === 'pcm' ? (fin[l.id] || {}) : null, g = l.origem === 'equipe' ? (gj[l.id] || {}) : null;
+    var col = g && g.colaboradorId && typeof colaboradorById === 'function' ? colaboradorById(g.colaboradorId) : null;
+    var lig = provsDoLanc[l.chave] || [], conc = r2(lig.reduce(function(a, x){ return a + x.valor; }, 0));
+    return { chave: l.chave, id: l.id, origem: p ? 'Acompanhamento de Pagamentos' : 'Gastos das equipes primarizadas', tipo: tipoTxt(l.tipo), mes: l.mes,
+      data: String(p ? (p.dataPrevistoPagamento || '') : (g.data || '')).slice(0, 10), dataPaga: String(p ? (p.dataRealizadoPagamento || '') : (g.data || '')).slice(0, 10),
+      situacao: l.pago ? 'Realizado (pago)' : 'A pagar', fornecedor: finNomeFornecedor(l.fornecedorId, l.fornecedorNome, l.tipo), usina: l.usina || '', cliente: l.cliente || '',
+      servico: l.investimento || '', parcela: p && p.numeroParcelas ? (p.parcela || '?') + '/' + p.numeroParcelas : '', valorTotal: p && p.valorPrevistoTotal != null ? p.valorPrevistoTotal : null,
+      valor: r2(l.valor), via: l.via, foraMeta: l.via === 'Thopen', conciliado: conc, semProvisao: r2(l.valor - conc),
+      provisoes: lig.map(function(x){ return x.pv.id + ' ' + ((itemPorId[x.pv.itemId] || {}).descricao || ''); }).join('; '),
+      forma: g ? (g.formaPagamento || '') : '', colaborador: col ? col.nome : '', nf: p ? (p.numeroNotaFiscal || '') : '', classe: p ? (p.classeContabil || '') : '',
+      codigo: p ? (p.codigo || '') : '', obs: p ? (p.observacao || '') : (g.descricao || '') };
+  }).sort(function(a, b){ return a.data.localeCompare(b.data) || a.fornecedor.localeCompare(b.fornecedor, 'pt-BR'); });
+  /* 3. provisões (itens promovidos, uma por mês) */
+  var provs = finProvisoesAtivas().filter(function(pv){ return noPer[pv.mes] && ok(pv.tipo) && (!F || finPassaFiltro(finRegistroProvisao(pv, ctx), F)); }).map(function(pv){
+    var it = itemPorId[pv.itemId] || {}, c = ctx.conc[pv.id] || { vinculado: 0, parcelas: [] }, st = finStatusProvisao(pv);
+    return { id: pv.id, itemId: pv.itemId, item: it.descricao || '', cenario: cenNome[pv.cenarioId] || pv.cenarioId || '', tipo: tipoTxt(pv.tipo),
+      fornecedor: finNomeFornecedor(pv.fornecedorId, pv.fornecedorNome, pv.tipo, pv.fornecedorADefinir), aDefinir: !!pv.fornecedorADefinir,
+      usina: it.usina || '', cliente: it.cliente || '', servico: it.servico || '', forma: FIN_FORMA_TXT[it.forma] || it.forma || '', via: pv.via, foraMeta: pv.via === 'Thopen',
+      mes: pv.mes, valor: r2(pv.valor), conciliado: r2(c.vinculado), saldo: finSaldoProvisao(pv), status: FIN_REL_STATUS_PROV[st] || st,
+      promovidoEm: pv.promovidoEm ? String(pv.promovidoEm).slice(0, 10) : '', promovidoPor: pv.promovidoPor || '', fechadoEm: pv.fechadoEm ? String(pv.fechadoEm).slice(0, 10) : '',
+      fechadoPor: pv.fechadoPor || '', obs: pv.observacao || '', parcelas: c.parcelas };
+  }).sort(function(a, b){ return a.mes.localeCompare(b.mes) || b.valor - a.valor; });
+  var conc = [];
+  provs.forEach(function(p){ p.parcelas.forEach(function(x){
+    var l = lancPorChave[x.chave] || {}, f = l.origem === 'pcm' ? (fin[l.id] || {}) : null, g = l.origem === 'equipe' ? (gj[l.id] || {}) : null;
+    conc.push({ prov: p.id, item: p.item, mes: p.mes, valorProv: p.valor, lanc: l.id || x.chave, origem: l.origem === 'pcm' ? 'Acompanhamento' : 'Gasto da equipe',
+      fornecedor: l.tipo ? finNomeFornecedor(l.fornecedorId, l.fornecedorNome, l.tipo) : '', usina: l.usina || '', data: String(f ? (f.dataPrevistoPagamento || '') : (g ? g.data || '' : '')).slice(0, 10),
+      valorLanc: l.valor == null ? null : r2(l.valor), abatido: r2(x.valor), como: x.manual ? 'Confirmado em "Lançar no financeiro"' : 'Automático (rota primarizada / aluguel)' });
+  }); });
+  /* 4. simulado (cenário somado na tela) */
+  var sim = [];
+  if (cen) finItensDoCenario(cen.id).forEach(function(it){
+    if (it.promovidoEm || !ok(it.tipo) || it.via === 'Thopen') return;
+    if (F && !finPassaFiltro(finRegistroItem(it, 'simulado', it.cenarioId, it.fornecedorId, it.fornecedorNome, it.fornecedorADefinir, it.tipo, ctx), F)) return;
+    var d = finDistribuir(it);
+    meses.forEach(function(m){ if (d[m]) sim.push({ itemId: it.id, item: it.descricao || '', tipo: tipoTxt(it.tipo), fornecedor: finNomeFornecedor(it.fornecedorId, it.fornecedorNome, it.tipo, it.fornecedorADefinir),
+      usina: it.usina || '', cliente: it.cliente || '', forma: FIN_FORMA_TXT[it.forma] || it.forma || '', totalItem: finTotalItem(it), mes: m, valor: r2(d[m]) }); });
+  });
+  /* 5. base: uma linha por valor (para tabela dinâmica) */
+  var base = [];
+  lanc.forEach(function(l){ base.push({ mes: l.mes, tipo: l.tipo, situacao: l.situacao, meta: !l.foraMeta, fornecedor: l.fornecedor, usina: l.usina, cliente: l.cliente, servico: l.servico, origem: l.origem, ref: l.id, data: l.data, valor: l.valor }); });
+  provs.forEach(function(p){ if (p.saldo > 0) base.push({ mes: p.mes, tipo: p.tipo, situacao: p.aDefinir ? 'Provisão (fornecedor a definir)' : 'Provisão (falta lançar)', meta: !p.foraMeta, fornecedor: p.fornecedor, usina: p.usina, cliente: p.cliente, servico: p.item, origem: 'Provisão ' + p.cenario, ref: p.id, data: '', valor: p.saldo }); });
+  sim.forEach(function(s){ base.push({ mes: s.mes, tipo: s.tipo, situacao: 'Simulado', meta: true, fornecedor: s.fornecedor, usina: s.usina, cliente: s.cliente, servico: s.item, origem: 'Simulação ' + (cen ? cen.nome : ''), ref: s.itemId, data: '', valor: s.valor }); });
+  var grupo = function(campo){
+    var o = {};
+    base.forEach(function(b){
+      var k = b[campo] || '(sem ' + ({ fornecedor: 'fornecedor', usina: 'usina', cliente: 'cliente', servico: 'serviço' })[campo] + ')';
+      var x = o[k] || (o[k] = { nome: k, realizado: 0, aPagar: 0, provisao: 0, simulado: 0, thopen: 0, qtd: 0 });
+      x.qtd++;
+      if (!b.meta) x.thopen += b.valor;
+      else if (b.situacao === 'Realizado (pago)') x.realizado += b.valor;
+      else if (b.situacao === 'A pagar') x.aPagar += b.valor;
+      else if (b.situacao === 'Simulado') x.simulado += b.valor;
+      else x.provisao += b.valor;
+    });
+    return Object.keys(o).map(function(k){ var x = o[k]; ['realizado', 'aPagar', 'provisao', 'simulado', 'thopen'].forEach(function(c){ x[c] = r2(x[c]); }); x.previsto = r2(x.realizado + x.aPagar + x.provisao); return x; })
+      .sort(function(a, b){ return b.previsto - a.previsto || b.simulado - a.simulado; });
+  };
+  /* fornecedor × mês (previsto, sem simulado e sem Thopen) */
+  var mat = {};
+  base.forEach(function(b){ if (!b.meta || b.situacao === 'Simulado') return; var x = mat[b.fornecedor] || (mat[b.fornecedor] = { nome: b.fornecedor, tipo: b.tipo, meses: {}, total: 0 }); x.meses[b.mes] = r2((x.meses[b.mes] || 0) + b.valor); x.total = r2(x.total + b.valor); });
+  var matriz = Object.keys(mat).map(function(k){ return mat[k]; }).sort(function(a, b){ return b.total - a.total; });
+  /* semanas (segunda a domingo) dos lançamentos */
+  var sem = {};
+  lanc.forEach(function(l){
+    if (!l.data) return;
+    var seg = equipeRelSegunda(l.data), x = sem[seg] || (sem[seg] = { de: seg, ate: equipeRelMais(seg, 6), realizado: 0, aPagar: 0, thopen: 0, qtd: 0 });
+    x.qtd++; if (l.foraMeta) x.thopen = r2(x.thopen + l.valor); else if (l.situacao === 'A pagar') x.aPagar = r2(x.aPagar + l.valor); else x.realizado = r2(x.realizado + l.valor);
+  });
+  var semanas = Object.keys(sem).sort().map(function(k){ var x = sem[k]; x.total = r2(x.realizado + x.aPagar); return x; });
+  /* alterações e motivos feitas dentro do período */
+  var iniP = meses[0] + '-01', fimP = equipeRelUltimoDia(meses[meses.length - 1]) + 'T23:59:59';
+  var alteracoes = finAlteracoes().filter(function(a){ var d = new Date(a.em); if (isNaN(d)) return false; var s = equipeRelIso(d); return s >= iniP && s <= fimP.slice(0, 10); }).map(function(a){
+    var d = new Date(a.em), quando = d.toLocaleDateString('pt-BR') + ' ' + d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    if (a.acomp) {
+      var ids = []; a.linhas.forEach(function(l){ if (ids.indexOf(l.parcela_id) === -1) ids.push(l.parcela_id); });
+      var f0 = (state.financeiro || []).find(function(x){ return x.id === ids[0]; }) || {};
+      var mud = []; a.linhas.forEach(function(l){ mud = mud.concat(finTextoAlteracaoAcomp(l, ids.length > 1)); });
+      return { quando: quando, em: a.em, quem: a.quem, onde: 'Acompanhamento de Pagamentos', alvo: [f0.fornecedor, f0.ufv].filter(Boolean).join(' · ') || ids.join(', '), mudou: mud.join('; '), motivo: a.motivo, original: a.original || '' };
+    }
+    var it = itemPorId[a.itemId] || {};
+    return { quando: quando, em: a.em, quem: a.quem, onde: 'Provisão', alvo: it.descricao || a.itemId || '', mudou: a.linhas.map(finTextoAlteracao).join('; '), motivo: a.motivo, original: a.original || '' };
+  });
+  var porForn = grupo('fornecedor');
+  var mesMaior = porMes.slice().sort(function(a, b){ return (b.previsto - b.meta) - (a.previsto - a.meta); })[0];
+  var aAlinhar = provs.filter(function(p){ return p.saldo > 0 && !p.foraMeta; });
+  return {
+    de: meses[0], ate: meses[meses.length - 1], meses: meses, rotuloPeriodo: finMesNome(meses[0]) + (meses.length > 1 ? ' a ' + finMesNome(meses[meses.length - 1]) : ''),
+    filtros: usarFiltros ? finRelFiltrosTexto() : 'Sem filtros (todos os dados)', usouFiltros: !!usarFiltros, cenario: cen ? cen.nome : '',
+    porMes: porMes, tot: tot, lanc: lanc, provs: provs, conc: conc, sim: sim, base: base, matriz: matriz, semanas: semanas, alteracoes: alteracoes,
+    porFornecedor: porForn, porUsina: grupo('usina'), porCliente: grupo('cliente'), porServico: grupo('servico'),
+    mesMaior: mesMaior, aAlinhar: { qtd: aAlinhar.length, valor: somaK(aAlinhar, 'saldo') }, aDefinir: { qtd: aAlinhar.filter(function(p){ return p.aDefinir; }).length, valor: somaK(aAlinhar.filter(function(p){ return p.aDefinir; }), 'saldo') },
+    lancSemProvisao: somaK(lanc.filter(function(l){ return !l.foraMeta && l.tipo === 'Terceirizado'; }), 'semProvisao'),
+    geradoEm: new Date().toLocaleString('pt-BR'), geradoPor: (typeof whoami === 'function' ? whoami() : '') || ''
+  };
+}
+function finRelPct(v, t){ return t ? r2(v / t * 100) : null; }
+function finRelPlanilhas(R){
+  var abas = [], fd = function(d){ return d ? fmtDate(d) : ''; }, MN = function(m){ return finMesNome(m); };
+  var aba = function(nome, cab, linhas, moeda, larg, pct){ var a = { nome: nome, cab: cab, linhas: linhas, moeda: moeda || [], larg: larg || [], pct: pct || [] }; abas.push(a); return a; };
+  var fc = function(n, ini){ var r = []; for (var i = 0; i < n; i++) r.push(ini + i); return r; };
+  var T = R.tot, difMeta = r2(T.previsto - T.meta);
+  var res = [
+    ['Período', R.rotuloPeriodo + ' (' + R.meses.length + ' mês(es))', 0], ['Filtros', R.filtros, 0], ['Simulação somada', R.cenario || 'Nenhuma (só previsto)', 0],
+    ['Meta do período', T.meta, 1], ['Orçamento do período', T.orcamento, 1],
+    ['Previsto (realizado + a pagar + provisão)', T.previsto, 1], ['   Realizado (pago)', T.realizado, 1], ['   Lançado a pagar', T.aPagar, 1], ['   Provisão (falta lançar no financeiro)', T.provisao, 1],
+    [difMeta > 0 ? 'Previsto ACIMA da meta' : 'Previsto abaixo da meta', Math.abs(difMeta), 1], ['% da meta (previsto ÷ meta)', T.meta ? r2(T.previsto / T.meta * 100) + '%' : '—', 0],
+    ['% já realizado do previsto', T.previsto ? r2(T.realizado / T.previsto * 100) + '%' : '—', 0],
+    ['Simulado (cenário somado)', T.simulado, 1], ['Previsto + simulado', T.previstoSimulado, 1], ['Thopen (fora da meta, não entra no previsto)', T.thopen, 1],
+    ['Terceirizados — previsto', r2(T.T.realizado + T.T.aPagar + T.T.provisao), 1], ['Primarizados — previsto', r2(T.P.realizado + T.P.aPagar + T.P.provisao), 1],
+    ['Provisões em aberto (falta lançar)', R.aAlinhar.qtd + ' provisão(ões) · ' + fmtMoney(R.aAlinhar.valor), 0],
+    ['   com fornecedor a definir', R.aDefinir.qtd + ' · ' + fmtMoney(R.aDefinir.valor), 0],
+    ['Parcelas terceirizadas sem provisão ligada', R.lancSemProvisao, 1],
+    ['Nº de lançamentos', R.lanc.length, 0], ['Nº de provisões (meses)', R.provs.length, 0],
+    ['Maior fornecedor (previsto)', R.porFornecedor[0] ? R.porFornecedor[0].nome + ' (' + fmtMoney(R.porFornecedor[0].previsto) + ')' : '—', 0],
+    ['Mês mais acima da meta', R.mesMaior ? R.mesMaior.rotulo + ' (' + (R.mesMaior.previsto - R.mesMaior.meta >= 0 ? '+' : '−') + fmtMoney(Math.abs(r2(R.mesMaior.previsto - R.mesMaior.meta))) + ')' : '—', 0],
+    ['Alterações com motivo no período', R.alteracoes.length, 0], ['Gerado em', R.geradoEm + (R.geradoPor ? ' por ' + R.geradoPor : ''), 0]
+  ];
+  var aR = aba('Resumo', ['Indicador', 'Valor'], res.map(function(x){ return [x[0], x[1]]; }), [], [48, 70]);
+  aR.moedaLinhas = []; res.forEach(function(x, i){ if (x[2]) aR.moedaLinhas.push(i); });
+  aba('Por mês', ['Mês', 'Meta', 'Orçamento', 'Realizado (pago)', 'A pagar', 'Provisão', 'Previsto', 'Previsto − meta', '% da meta', 'Simulado', 'Previsto + simulado',
+    'Terc. realizado', 'Terc. a pagar', 'Terc. provisão', 'Prim. realizado', 'Prim. a pagar', 'Prim. provisão', 'Thopen (fora da meta)'],
+    R.porMes.map(function(x){ return [x.rotulo, x.meta, x.orcamento, x.realizado, x.aPagar, x.provisao, x.previsto, r2(x.previsto - x.meta), finRelPct(x.previsto, x.meta), x.simulado, x.previstoSimulado,
+      x.T.realizado, x.T.aPagar, x.T.provisao, x.P.realizado, x.P.aPagar, x.P.provisao, x.thopen]; })
+      .concat([['Total', T.meta, T.orcamento, T.realizado, T.aPagar, T.provisao, T.previsto, difMeta, finRelPct(T.previsto, T.meta), T.simulado, T.previstoSimulado,
+        T.T.realizado, T.T.aPagar, T.T.provisao, T.P.realizado, T.P.aPagar, T.P.provisao, T.thopen]]),
+    [1, 2, 3, 4, 5, 6, 7, 9, 10, 11, 12, 13, 14, 15, 16, 17], [12, 14, 14, 16, 14, 14, 15, 15, 10, 14, 16, 14, 14, 14, 14, 14, 14, 16], [8]);
+  aba('Fornecedor x mês', ['Fornecedor', 'Tipo'].concat(R.meses.map(MN)).concat(['Total previsto']),
+    R.matriz.map(function(x){ return [x.nome, x.tipo].concat(R.meses.map(function(m){ return x.meses[m] || 0; })).concat([x.total]); })
+      .concat([['Total', ''].concat(R.meses.map(function(m){ return r2(R.matriz.reduce(function(a, x){ return a + (x.meses[m] || 0); }, 0)); })).concat([r2(R.matriz.reduce(function(a, x){ return a + x.total; }, 0))])]),
+    fc(R.meses.length + 1, 2), [36, 13].concat(R.meses.map(function(){ return 13; })).concat([16]));
+  var quebra = function(nome, titulo, lista){
+    aba(nome, [titulo, 'Realizado (pago)', 'A pagar', 'Provisão', 'Previsto', '% do previsto', 'Simulado', 'Thopen (fora da meta)', 'Nº de linhas'],
+      lista.map(function(x){ return [x.nome, x.realizado, x.aPagar, x.provisao, x.previsto, finRelPct(x.previsto, T.previsto), x.simulado, x.thopen, x.qtd]; }),
+      [1, 2, 3, 4, 6, 7], [40, 16, 14, 14, 15, 12, 14, 16, 10], [5]);
+  };
+  quebra('Por fornecedor', 'Fornecedor / equipe', R.porFornecedor); quebra('Por usina', 'Usina', R.porUsina); quebra('Por cliente', 'Cliente', R.porCliente); quebra('Por serviço', 'Serviço / item', R.porServico);
+  aba('Provisões', ['Provisão', 'Mês', 'Item', 'Cenário de origem', 'Tipo', 'Fornecedor', 'Usina', 'Cliente', 'Serviço', 'Forma', 'Via', 'Valor provisionado', 'Já lançado (conciliado)', 'Saldo (falta lançar)', 'Situação', 'Promovida em', 'Promovida por', 'Baixada/cancelada em', 'Por', 'Observação'],
+    R.provs.map(function(p){ return [p.id, MN(p.mes), p.item, p.cenario, p.tipo, p.fornecedor, p.usina, p.cliente, p.servico, p.forma, p.via + (p.foraMeta ? ' (fora da meta)' : ''), p.valor, p.conciliado, p.saldo, p.status + (p.aDefinir ? ' · fornecedor a definir' : ''), fd(p.promovidoEm), p.promovidoPor, fd(p.fechadoEm), p.fechadoPor, p.obs]; })
+      .concat([['Total', '', '', '', '', '', '', '', '', '', '', r2(R.provs.reduce(function(a, p){ return a + p.valor; }, 0)), r2(R.provs.reduce(function(a, p){ return a + p.conciliado; }, 0)), r2(R.provs.reduce(function(a, p){ return a + p.saldo; }, 0))]]),
+    [11, 12, 13], [10, 10, 36, 22, 12, 28, 24, 16, 16, 18, 16, 16, 18, 16, 24, 12, 26, 14, 22, 30]);
+  aba('Conciliação', ['Provisão', 'Item', 'Mês', 'Valor da provisão', 'Lançamento', 'Origem', 'Fornecedor', 'Usina', 'Data prevista', 'Valor do lançamento', 'Abatido na provisão', 'Como foi ligado'],
+    R.conc.map(function(c){ return [c.prov, c.item, MN(c.mes), c.valorProv, c.lanc, c.origem, c.fornecedor, c.usina, fd(c.data), c.valorLanc, c.abatido, c.como]; }),
+    [3, 9, 10], [10, 34, 10, 16, 12, 16, 28, 24, 12, 16, 16, 34]);
+  aba('Lançamentos', ['Data prevista', 'Data paga', 'Mês', 'Situação', 'Tipo', 'Origem', 'Fornecedor / equipe', 'Usina', 'Cliente', 'Serviço / tipo de gasto', 'Parcela', 'Valor do contrato', 'Valor', 'Via', 'Conta na meta',
+    'Ligado a provisão', 'Sem provisão', 'Provisões ligadas', 'Forma de pagamento', 'Colaborador', 'Nº NF', 'Classe contábil', 'Código', 'ID', 'Observação / descrição'],
+    R.lanc.map(function(l){ return [fd(l.data), l.situacao === 'A pagar' ? '' : fd(l.dataPaga), MN(l.mes), l.situacao, l.tipo, l.origem, l.fornecedor, l.usina, l.cliente, l.servico, l.parcela, l.valorTotal, l.valor, l.via, l.foraMeta ? 'Não (Thopen)' : 'Sim',
+      l.conciliado, l.semProvisao, l.provisoes, l.forma, l.colaborador, l.nf, l.classe, l.codigo, l.id, l.obs]; })
+      .concat([['Total', '', '', '', '', '', '', '', '', '', '', '', r2(R.lanc.reduce(function(a, l){ return a + l.valor; }, 0))]]),
+    [11, 12, 15, 16], [12, 12, 10, 16, 12, 24, 28, 24, 16, 26, 9, 16, 14, 8, 12, 14, 14, 30, 16, 20, 10, 14, 10, 12, 36]);
+  aba('Por semana', ['Semana (seg–dom)', 'Início', 'Fim', 'Realizado (pago)', 'A pagar', 'Total', 'Thopen (fora da meta)', 'Nº de lançamentos'],
+    R.semanas.map(function(s){ return ['Semana de ' + fmtDate(s.de).slice(0, 5), fd(s.de), fd(s.ate), s.realizado, s.aPagar, s.total, s.thopen, s.qtd]; }), [3, 4, 5, 6], [20, 12, 12, 16, 14, 14, 16, 12]);
+  if (R.cenario) aba('Simulação', ['Item', 'Tipo', 'Fornecedor', 'Usina', 'Cliente', 'Forma', 'Total do item', 'Mês', 'Valor no mês'],
+    R.sim.map(function(s){ return [s.item, s.tipo, s.fornecedor, s.usina, s.cliente, s.forma, s.totalItem, MN(s.mes), s.valor]; }), [6, 8], [36, 12, 28, 24, 16, 18, 16, 10, 14]);
+  aba('Alterações e motivos', ['Quando', 'Quem', 'Onde', 'Item / parcela', 'O que mudou', 'Motivo', 'Motivo original (se editado)'],
+    R.alteracoes.map(function(a){ return [a.quando, a.quem, a.onde, a.alvo, a.mudou, a.motivo, a.original]; }), [], [16, 28, 22, 34, 60, 50, 30]);
+  aba('Base (tabela dinâmica)', ['Mês', 'Mês (AAAA-MM)', 'Tipo', 'Situação', 'Conta na meta', 'Fornecedor / equipe', 'Usina', 'Cliente', 'Serviço / item', 'Origem', 'Referência', 'Data', 'Valor'],
+    R.base.map(function(b){ return [MN(b.mes), b.mes, b.tipo, b.situacao, b.meta ? 'Sim' : 'Não (Thopen)', b.fornecedor, b.usina, b.cliente, b.servico, b.origem, b.ref, fd(b.data), b.valor]; }),
+    [12], [10, 10, 12, 26, 12, 28, 24, 16, 30, 26, 12, 12, 14]);
+  return abas;
+}
+function finRelArquivo(R, ext){ return 'relatorio_financeiro_' + R.de + (R.ate !== R.de ? '_a_' + R.ate : '') + '.' + ext; }
+function finRelExcel(R){
+  carregarSheetJS(function(){
+    var wb = XLSX.utils.book_new();
+    finRelPlanilhas(R).forEach(function(a){
+      var ws = XLSX.utils.aoa_to_sheet([a.cab].concat(a.linhas));
+      a.linhas.forEach(function(l, i){
+        l.forEach(function(v, c){
+          if (typeof v !== 'number') return;
+          var ref = XLSX.utils.encode_cell({ r: i + 1, c: c }); if (!ws[ref]) return;
+          var moeda = a.moedaLinhas ? (a.moedaLinhas.indexOf(i) !== -1 && c === 1) : a.moeda.indexOf(c) !== -1;
+          if (moeda) ws[ref].z = '"R$" #,##0.00'; else if (a.pct.indexOf(c) !== -1) ws[ref].z = '0.0"%"';
+        });
+      });
+      ws['!cols'] = a.cab.map(function(_, c){ return { wch: a.larg[c] || 16 }; });
+      if (a.linhas.length && !a.moedaLinhas) ws['!autofilter'] = { ref: XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: a.linhas.length, c: a.cab.length - 1 } }) };
+      XLSX.utils.book_append_sheet(wb, ws, a.nome.slice(0, 31));
+    });
+    XLSX.writeFile(wb, finRelArquivo(R, 'xlsx'));
+    showToast('Planilha baixada: ' + finRelArquivo(R, 'xlsx'));
+  });
+}
+function finRelHtml(R){
+  var M = function(v){ return v == null ? '—' : fmtMoney(v); }, P = function(v, t){ return t ? (v / t * 100).toFixed(1).replace('.', ',') + '%' : '—'; };
+  var D = function(v){ return (v > 0.5 ? '+' : v < -0.5 ? '−' : '') + M(Math.abs(v)); }, T = R.tot, difMeta = r2(T.previsto - T.meta), acima = difMeta > 0.5;
+  var quebra = function(lista, titulo, n){
+    return '<table class="t"><thead><tr><th>' + titulo + '</th><th class="n">Realizado</th><th class="n">A pagar</th><th class="n">Provisão</th><th class="n">Previsto</th><th class="n">%</th>' + (R.cenario ? '<th class="n">Simulado</th>' : '') + '<th class="n">Thopen</th><th style="width:16%"></th></tr></thead><tbody>' +
+      lista.slice(0, n).map(function(x){ return '<tr><td>' + esc(x.nome) + '</td><td class="n">' + M(x.realizado) + '</td><td class="n">' + M(x.aPagar) + '</td><td class="n">' + M(x.provisao) + '</td><td class="n"><b>' + M(x.previsto) + '</b></td><td class="n">' + P(x.previsto, T.previsto) + '</td>' + (R.cenario ? '<td class="n">' + M(x.simulado) + '</td>' : '') + '<td class="n">' + (x.thopen ? M(x.thopen) : '—') + '</td><td><div class="bar"><span style="width:' + (T.previsto ? Math.max(0, Math.min(100, x.previsto / T.previsto * 100)) : 0) + '%"></span></div></td></tr>'; }).join('') +
+      (lista.length > n ? '<tr><td colspan="9" class="mut">… e mais ' + (lista.length - n) + ' (lista completa no Excel)</td></tr>' : '') + '</tbody></table>';
+  };
+  var h = '<div class="capa"><div><div class="marca">GridCo · Zeladoria</div><h1>Relatório Financeiro — Visão executiva</h1>' +
+    '<div class="sub">Período: <b>' + esc(R.rotuloPeriodo) + '</b> · ' + esc(R.filtros) + (R.cenario ? ' · simulação somada: <b>' + esc(R.cenario) + '</b>' : '') + '</div></div>' +
+    '<div class="ger">Gerado em ' + esc(R.geradoEm) + (R.geradoPor ? '<br>por ' + esc(R.geradoPor) : '') + '</div></div>';
+  h += '<h2>1. Resumo executivo</h2><div class="kpis k4">' +
+    '<div><small>Previsto do período</small><b>' + M(T.previsto) + '</b><em>realizado + a pagar + provisão</em></div>' +
+    '<div><small>Meta do período</small><b>' + M(T.meta) + '</b><em>orçamento ' + M(T.orcamento) + '</em></div>' +
+    '<div class="' + (acima ? 'ruim' : 'bom') + '"><small>' + (acima ? 'Acima da meta' : 'Abaixo da meta') + '</small><b>' + M(Math.abs(difMeta)) + '</b><em>previsto = ' + P(T.previsto, T.meta) + ' da meta</em></div>' +
+    '<div><small>Realizado (pago)</small><b>' + M(T.realizado) + '</b><em>' + P(T.realizado, T.previsto) + ' do previsto</em></div>' +
+    '<div><small>Lançado a pagar</small><b>' + M(T.aPagar) + '</b><em>' + P(T.aPagar, T.previsto) + ' do previsto</em></div>' +
+    '<div><small>Provisão (falta lançar)</small><b>' + M(T.provisao) + '</b><em>' + R.aAlinhar.qtd + ' provisão(ões) em aberto</em></div>' +
+    '<div><small>Terceirizados · Primarizados</small><b style="font-size:12.5px">' + M(r2(T.T.realizado + T.T.aPagar + T.T.provisao)) + ' · ' + M(r2(T.P.realizado + T.P.aPagar + T.P.provisao)) + '</b><em>previsto de cada tipo</em></div>' +
+    '<div><small>' + (R.cenario ? 'Previsto + simulado' : 'Thopen (fora da meta)') + '</small><b>' + M(R.cenario ? T.previstoSimulado : T.thopen) + '</b><em>' + (R.cenario ? 'simulado ' + M(T.simulado) : 'não entra no previsto') + '</em></div></div>';
+  var dest = [];
+  dest.push(acima ? '<b class="r">O previsto passa a meta em ' + M(difMeta) + '</b> (' + P(T.previsto, T.meta) + ' da meta).' : 'O previsto está <b class="g">' + M(-difMeta) + ' abaixo da meta</b> (' + P(T.previsto, T.meta) + ' da meta).');
+  if (R.mesMaior && R.meses.length > 1) dest.push('Mês mais pressionado: <b>' + esc(R.mesMaior.rotulo) + '</b> — previsto ' + M(R.mesMaior.previsto) + ' × meta ' + M(R.mesMaior.meta) + ' (' + D(r2(R.mesMaior.previsto - R.mesMaior.meta)) + ').');
+  if (R.porFornecedor[0]) dest.push('Maior fornecedor: <b>' + esc(R.porFornecedor[0].nome) + '</b> — ' + M(R.porFornecedor[0].previsto) + ' (' + P(R.porFornecedor[0].previsto, T.previsto) + ' do previsto).');
+  if (R.aAlinhar.qtd) dest.push('<b>' + R.aAlinhar.qtd + ' provisão(ões)</b> ainda sem lançamento no financeiro: ' + M(R.aAlinhar.valor) + (R.aDefinir.qtd ? ' (' + R.aDefinir.qtd + ' com fornecedor a definir: ' + M(R.aDefinir.valor) + ')' : '') + '.');
+  if (R.lancSemProvisao > 0.5) dest.push('Parcelas terceirizadas sem provisão ligada: ' + M(R.lancSemProvisao) + ' (gastos que não estavam planejados ou ainda não foram ligados).');
+  if (T.thopen) dest.push('Thopen (fora da meta): ' + M(T.thopen) + ' — não entra no previsto.');
+  if (R.alteracoes.length) dest.push(R.alteracoes.length + ' alteração(ões) com motivo no período (seção 6).');
+  h += '<ul class="dest">' + dest.map(function(x){ return '<li>' + x + '</li>'; }).join('') + '</ul>';
+  h += '<h2>2. Mês a mês</h2><table class="t"><thead><tr><th>Mês</th><th class="n">Meta</th><th class="n">Realizado</th><th class="n">A pagar</th><th class="n">Provisão</th><th class="n">Previsto</th><th class="n">Previsto − meta</th><th class="n">% meta</th><th class="n">Terceirizados</th><th class="n">Primarizados</th>' + (R.cenario ? '<th class="n">Simulado</th>' : '') + '<th class="n">Thopen</th></tr></thead><tbody>' +
+    R.porMes.map(function(x){ var d = r2(x.previsto - x.meta); return '<tr><td>' + esc(x.rotulo) + '</td><td class="n">' + M(x.meta) + '</td><td class="n">' + M(x.realizado) + '</td><td class="n">' + M(x.aPagar) + '</td><td class="n">' + M(x.provisao) + '</td><td class="n"><b>' + M(x.previsto) + '</b></td><td class="n ' + (d > 0.5 ? 'r' : 'g') + '">' + D(d) + '</td><td class="n">' + P(x.previsto, x.meta) + '</td><td class="n">' + M(r2(x.T.realizado + x.T.aPagar + x.T.provisao)) + '</td><td class="n">' + M(r2(x.P.realizado + x.P.aPagar + x.P.provisao)) + '</td>' + (R.cenario ? '<td class="n">' + M(x.simulado) + '</td>' : '') + '<td class="n">' + (x.thopen ? M(x.thopen) : '—') + '</td></tr>'; }).join('') +
+    '<tr class="tot"><td>Total</td><td class="n">' + M(T.meta) + '</td><td class="n">' + M(T.realizado) + '</td><td class="n">' + M(T.aPagar) + '</td><td class="n">' + M(T.provisao) + '</td><td class="n">' + M(T.previsto) + '</td><td class="n ' + (acima ? 'r' : 'g') + '">' + D(difMeta) + '</td><td class="n">' + P(T.previsto, T.meta) + '</td><td class="n">' + M(r2(T.T.realizado + T.T.aPagar + T.T.provisao)) + '</td><td class="n">' + M(r2(T.P.realizado + T.P.aPagar + T.P.provisao)) + '</td>' + (R.cenario ? '<td class="n">' + M(T.simulado) + '</td>' : '') + '<td class="n">' + M(T.thopen) + '</td></tr></tbody></table>';
+  h += '<h2>3. Por fornecedor / equipe</h2>' + quebra(R.porFornecedor, 'Fornecedor', 30);
+  if (R.meses.length > 1 && R.meses.length <= 12) h += '<h3>Previsto por fornecedor × mês (15 maiores)</h3><table class="t sm"><thead><tr><th>Fornecedor</th>' + R.meses.map(function(m){ return '<th class="n">' + esc(finMesCurto(m)) + '</th>'; }).join('') + '<th class="n">Total</th></tr></thead><tbody>' +
+    R.matriz.slice(0, 15).map(function(x){ return '<tr><td>' + esc(x.nome) + '</td>' + R.meses.map(function(m){ return '<td class="n">' + (x.meses[m] ? M(x.meses[m]) : '—') + '</td>'; }).join('') + '<td class="n"><b>' + M(x.total) + '</b></td></tr>'; }).join('') + '</tbody></table>';
+  h += '<h2>4. Por usina e por cliente</h2>' + quebra(R.porUsina, 'Usina', 25) + '<h3>Por cliente</h3>' + quebra(R.porCliente, 'Cliente', 15);
+  var abertas = R.provs.filter(function(p){ return p.saldo > 0; });
+  h += '<h2 class="quebra">5. Provisões em aberto (falta lançar no financeiro)</h2>';
+  if (!abertas.length) h += '<p class="mut">Nenhuma provisão em aberto no período.</p>';
+  else h += '<table class="t det"><thead><tr><th>Mês</th><th>Provisão</th><th>Item</th><th>Fornecedor</th><th>Usina</th><th>Tipo</th><th class="n">Provisionado</th><th class="n">Já lançado</th><th class="n">Saldo</th><th>Situação</th></tr></thead><tbody>' +
+    abertas.map(function(p){ return '<tr><td>' + esc(finMesCurto(p.mes)) + '</td><td>' + esc(p.id) + '</td><td>' + esc(p.item) + '</td><td>' + esc(p.fornecedor) + '</td><td>' + esc(p.usina || '—') + '</td><td>' + esc(p.tipo) + '</td><td class="n">' + M(p.valor) + '</td><td class="n">' + M(p.conciliado) + '</td><td class="n"><b>' + M(p.saldo) + '</b></td><td class="sm">' + esc(p.status) + (p.foraMeta ? ' · Thopen' : '') + '</td></tr>'; }).join('') +
+    '<tr class="tot"><td colspan="6">Total (' + abertas.length + ')</td><td class="n">' + M(r2(abertas.reduce(function(a, p){ return a + p.valor; }, 0))) + '</td><td class="n">' + M(r2(abertas.reduce(function(a, p){ return a + p.conciliado; }, 0))) + '</td><td class="n">' + M(r2(abertas.reduce(function(a, p){ return a + p.saldo; }, 0))) + '</td><td></td></tr></tbody></table>';
+  h += '<h2>6. Alterações e motivos</h2>';
+  if (!R.alteracoes.length) h += '<p class="mut">Nenhuma alteração com motivo no período.</p>';
+  else h += '<table class="t det"><thead><tr><th>Quando</th><th>Quem</th><th>Onde</th><th>Item / parcela</th><th>O que mudou</th><th>Motivo</th></tr></thead><tbody>' +
+    R.alteracoes.slice(0, 40).map(function(a){ return '<tr><td>' + esc(a.quando) + '</td><td>' + esc(a.quem) + '</td><td>' + esc(a.onde) + '</td><td>' + esc(a.alvo) + '</td><td>' + esc(a.mudou) + '</td><td>' + esc(a.motivo) + '</td></tr>'; }).join('') +
+    (R.alteracoes.length > 40 ? '<tr><td colspan="6" class="mut">… e mais ' + (R.alteracoes.length - 40) + ' (lista completa no Excel)</td></tr>' : '') + '</tbody></table>';
+  h += '<div class="rod">Fontes: Visão executiva do Financeiro (Zeladoria) — Acompanhamento de Pagamentos, gastos das equipes primarizadas e provisões promovidas da simulação. Previsto = realizado + a pagar + provisão; Thopen fica fora da meta. O detalhe completo (todos os lançamentos, provisões, conciliação e a base para tabela dinâmica) está no Excel. Valores em R$.</div>';
+  var css = relCss() + '@page{size:A4 landscape;margin:10mm}.k4{grid-template-columns:repeat(4,1fr)}.t.sm td,.t.sm th{font-size:8.6px;padding:2px 4px}';
+  return '<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>' + esc('Relatório Financeiro ' + R.rotuloPeriodo) + '</title><style>' + css + '</style></head><body>' + h +
+    '<script>window.onload=function(){setTimeout(function(){window.print();},350);};<\/script></body></html>';
+}
+function finRelPdf(R){
+  var html = finRelHtml(R), w = null;
+  try { w = window.open('', '_blank'); } catch (e) { w = null; }
+  if (w && w.document) { w.document.open(); w.document.write(html); w.document.close(); showToast('Na janela de impressão, escolha "Salvar como PDF".'); }
+  else { baixarArquivo(finRelArquivo(R, 'html'), html, 'text/html;charset=utf-8'); showToast('Baixei o relatório em .html — abra e use Imprimir → Salvar como PDF.'); }
+}
+function finRelModalHtml(){
+  var r = finUi().rel; if (!r) return '';
+  var R = finRelDados(r.de, r.ate, r.filtros);
+  return '<div class="overlay open" id="overlay-fin-rel"><div class="modal" style="max-width:600px;"><div class="modal-head"><h3>Exportar relatório para o Financeiro</h3><button class="modal-close" data-fin-rel-fechar="1">&times;</button></div><div class="modal-body">' +
+    '<div class="chiprow" style="margin:0 0 10px;flex-wrap:wrap;">' +
+      '<button type="button" class="btn btn-ghost btn-sm" data-fin-rel-atalho="mes">Este mês</button>' +
+      '<button type="button" class="btn btn-ghost btn-sm" data-fin-rel-atalho="mesAnt">Mês passado</button>' +
+      '<button type="button" class="btn btn-ghost btn-sm" data-fin-rel-atalho="tela">Meses da tela</button>' +
+      '<button type="button" class="btn btn-ghost btn-sm" data-fin-rel-atalho="ano">Ano todo</button></div>' +
+    '<div style="display:flex;gap:10px;"><label style="flex:1;font-size:12.5px;">Do mês<input type="month" id="fin-rel-de" value="' + esc(r.de || '') + '" style="width:100%;margin-top:4px;"></label><label style="flex:1;font-size:12.5px;">Até o mês<input type="month" id="fin-rel-ate" value="' + esc(r.ate || '') + '" style="width:100%;margin-top:4px;"></label></div>' +
+    '<label style="display:flex;gap:6px;align-items:flex-start;margin-top:10px;font-size:12.5px;"><input type="checkbox" id="fin-rel-filtros"' + (r.filtros ? ' checked' : '') + ' style="margin-top:2px;"> <span>Usar o Tipo e os filtros da tela <span class="cell-muted">(' + esc(finRelFiltrosTexto()) + ')</span></span></label>' +
+    '<div data-fin-rel-previa="1" style="margin:12px 0 0;padding:8px 10px;border-radius:8px;background:var(--surface-2);font-size:12.5px;">' + (R ? 'Previsto <b>' + fmtMoney(R.tot.previsto) + '</b> · realizado ' + fmtMoney(R.tot.realizado) + ' · a pagar ' + fmtMoney(R.tot.aPagar) + ' · provisão ' + fmtMoney(R.tot.provisao) + '<br><b>' + R.lanc.length + '</b> lançamento(s) · <b>' + R.provs.length + '</b> provisão(ões) · ' + R.meses.length + ' mês(es)' + (R.cenario ? ' · simulação somada: ' + esc(R.cenario) : '') : '<span style="color:var(--critical)">Escolha os meses (o inicial antes do final).</span>') + '</div>' +
+    '<p class="cell-muted" style="font-size:11.5px;margin:8px 0 0;">Excel: resumo, mês a mês (meta, realizado, a pagar, provisão, previsto, terceirizados × primarizados), fornecedor × mês, por fornecedor, usina, cliente e serviço, todas as provisões (com o que já foi lançado e o saldo), conciliação (qual parcela abateu qual provisão), todos os lançamentos, por semana, alterações e motivos e uma "Base" com uma linha por valor para tabela dinâmica. PDF: resumo executivo para apresentar.</p>' +
+    '<div class="modal-actions"><button class="btn btn-ghost" data-fin-rel-fechar="1">Fechar</button><button class="btn btn-ghost" id="btn-fin-rel-excel"' + (R ? '' : ' disabled') + '>Baixar Excel</button><button class="btn btn-primary" id="btn-fin-rel-pdf"' + (R ? '' : ' disabled') + '>Gerar PDF</button></div>' +
+    '</div></div></div>';
+}
+function finRelBind(app){
+  var u = finUi();
+  var b = app.querySelector('#btn-fin-relatorio');
+  if (b) b.addEventListener('click', function(){ var ms = finMesesVisiveis(); u.rel = { de: ms[0], ate: ms[ms.length - 1], filtros: true }; render(); });
+  var r = u.rel; if (!r || !app.querySelector('#overlay-fin-rel')) return;
+  app.querySelectorAll('[data-fin-rel-fechar]').forEach(function(x){ x.addEventListener('click', function(){ u.rel = null; render(); }); });
+  var de = app.querySelector('#fin-rel-de'), ate = app.querySelector('#fin-rel-ate'), fl = app.querySelector('#fin-rel-filtros');
+  if (de) de.addEventListener('change', function(){ r.de = de.value; render(); });
+  if (ate) ate.addEventListener('change', function(){ r.ate = ate.value; render(); });
+  if (fl) fl.addEventListener('change', function(){ r.filtros = fl.checked; render(); });
+  app.querySelectorAll('[data-fin-rel-atalho]').forEach(function(x){ x.addEventListener('click', function(){
+    var k = x.getAttribute('data-fin-rel-atalho'), m = finMesAtual();
+    if (k === 'mes') { r.de = m; r.ate = m; }
+    else if (k === 'mesAnt') { r.de = finAddMes(m, -1); r.ate = r.de; }
+    else if (k === 'ano') { r.de = m.slice(0, 4) + '-01'; r.ate = m.slice(0, 4) + '-12'; }
+    else { var ms = finMesesVisiveis(); r.de = ms[0]; r.ate = ms[ms.length - 1]; }
+    render();
+  }); });
+  var x1 = app.querySelector('#btn-fin-rel-excel'); if (x1) x1.addEventListener('click', function(){ var R = finRelDados(r.de, r.ate, r.filtros); if (R) finRelExcel(R); });
+  var x2 = app.querySelector('#btn-fin-rel-pdf'); if (x2) x2.addEventListener('click', function(){ var R = finRelDados(r.de, r.ate, r.filtros); if (R) finRelPdf(R); });
+}
+/* para testes */
+window.__radarFinRel = { dados: function(){ return finRelDados.apply(null, arguments); }, planilhas: function(R){ return finRelPlanilhas(R); }, html: function(R){ return finRelHtml(R); } };
 function finAlteracoes(){
   var g = {};
   (state.finHistProv || []).forEach(function(l){
@@ -10939,6 +11252,7 @@ function finBindEventos(app){
   app.querySelectorAll('[data-fin-editar]').forEach(function(b){ b.addEventListener('click', function(){ finAbrirEdicaoProvisao(b.getAttribute('data-fin-editar')); render(); }); });
   var bAlt = document.getElementById('fin-alt-todas'); if (bAlt) bAlt.addEventListener('click', function(){ u.altTodas = !u.altTodas; render(); });
   finBindMotivoEd();
+  finRelBind(app);
   app.querySelectorAll('[data-fin-ir-alt]').forEach(function(a){ a.addEventListener('click', function(e){ e.preventDefault(); var c = document.getElementById('fin-alteracoes'); if (c) c.scrollIntoView({ behavior: 'smooth', block: 'start' }); }); });
   app.querySelectorAll('[data-fin-hist]').forEach(function(a){ a.addEventListener('click', function(e){ e.preventDefault(); finAbrirHistoricoProvisao(a.getAttribute('data-fin-hist')); }); });
   ['#fin-hist-fechar'].forEach(function(s){ var b = app.querySelector(s); if (b) b.addEventListener('click', function(){ u.historico = null; render(); }); });

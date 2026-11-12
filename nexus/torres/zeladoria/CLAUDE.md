@@ -238,6 +238,19 @@ adar_2026-11-11\`).
   erro (o livro `_fracttal` foi à versão 1). Desde então o Nexus é a casa da zeladoria, e a cópia do Supabase recusa
   passar por cima.
 
+## O relatório da Visão executiva (12/11/2026)
+
+Pedido do HEAD da zeladoria: o Financeiro extrair os dados em detalhe para as próprias análises. O botão "Exportar
+relatório" na barra da Visão executiva abre a janela (mês inicial e final, atalhos, "usar o Tipo e os filtros da tela")
+e gera o Excel (Resumo, Por mês, Fornecedor x mês, por fornecedor/usina/cliente/serviço, Provisões, Conciliação,
+Lançamentos, Por semana, Simulação quando há cenário somado, Alterações e motivos e a "Base" para tabela dinâmica) ou o
+PDF executivo (A4 deitado, o `relCss()` de papel branco, o mesmo do relatório dos primarizados). Os números saem do
+`finMesInfo`, a mesma conta da tela (`finRelDados`; `window.__radarFinRel` para provar). Quem só vê o Financeiro também
+exporta: o botão e a janela estão no `FIN_NAV_SO_LEITURA`. Veio do Radar (o último commit dele antes de congelar) à mão.
+- **Prova com o dado real (12/11/2026, cópia de prova):** set/2026 a ago/2027, previsto igual ao da tela; a Base e o
+  por fornecedor somam o mesmo com diferença de centavos (arredondamento linha a linha); o .xlsx baixou, o PDF abriu, e a
+  janela cabe em 375 px. O texto das provisões migradas tem um emoji que é DADO (o item gravado), não da interface.
+
 ## Como entregar (quem programa a Zeladoria)
 
 O HEAD da zeladoria (quem criou o Radar) programa a Zeladoria no Nexus desde 11/11/2026, com o papel **admin** no
