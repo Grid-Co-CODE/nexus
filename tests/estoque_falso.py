@@ -36,8 +36,8 @@ Os defeitos se pedem pelo construtor:
 
 `.chamadas` guarda o nome de cada operação chamada, em ordem (a que falhou também); `.movimentos`, os movimentos (dicts com
 `id_almox`, `id_item`, `tipo` "entrada" ou "saida", `qtd`, `referencia`, `quando`, `folio`, `id` (o `id_movements`, crescente)
-e `tipo_fracttal` (15 o ajuste do fechamento; 1 a entrada e 2 a saída de `mover`, ou 15 com `ajuste=True`)), do mais velho ao
-mais novo.
+e `tipo_fracttal` (15 o ajuste do fechamento; 1 a entrada (a compra) e 5 a saída (a GENERAL) de `mover`, 15 com `ajuste=True`,
+ou o `tipo_fracttal=` dado; 4 a saída ligada da requisição)), do mais velho ao mais novo.
 `pecas_do_catalogo` (12/11/2026): as linhas da lista de peças do Fracttal com o Tipo e as Classificações (`id_group`,
 `groups_description`, ...), de onde o `classificacoes` tira as opções, como o de verdade; a peça que `criar_peca` faz com
 `grupos` os guarda em `grupos` no catálogo (só quando vêm).
@@ -119,9 +119,11 @@ class EstoqueFalso(Estoque):
         self._modos[str(id_almox)] = int(modo)
 
     def mover(self, id_almox: str, id_item: str, tipo: str, qtd: float, *, quando=None, referencia: str = "",
-              ajuste: bool = False, documento: str = "") -> None:
+              ajuste: bool = False, documento: str = "", tipo_fracttal: int | None = 0) -> None:
         """Um movimento real (uma OS lançou a peça, entrou uma compra): mexe no saldo e entra em `.movimentos`. `ajuste`: o
-        movimento é um ajuste de inventário (tipo 15) feito por fora (outra tela), e não uma entrada ou saída comum."""
+        movimento é um ajuste de inventário (tipo 15) feito por fora (outra tela), e não uma entrada ou saída comum. A saída é a
+        GENERAL (5, a Saída Geral à mão) e a entrada, a compra (1); `tipo_fracttal` dá outro (2 a devolução; None, a linha do
+        histórico que vem sem o tipo)."""
         if tipo not in ("entrada", "saida"):
             raise ValueError(f"tipo de movimento desconhecido: {tipo!r}")
         if self._modos.get(str(id_almox), 0) in (2, 3):
@@ -129,7 +131,9 @@ class EstoqueFalso(Estoque):
         item = self._item(id_almox, id_item)
         item["saldo"] = (item["saldo"] or 0.0) + (qtd if tipo == "entrada" else -qtd)
         m = self._movimento(id_almox, id_item, tipo, qtd, referencia, self._iso(quando),
-                            TIPO_AJUSTE if ajuste else (1 if tipo == "entrada" else 2))
+                            TIPO_AJUSTE if ajuste else (1 if tipo == "entrada" else _E.TIPO_SAIDA_GERAL))
+        if tipo_fracttal != 0 and not ajuste:
+            m["tipo_fracttal"] = tipo_fracttal
         m["documento"] = documento
 
     def mudar_requisicao(self, id_requisicao, **campos) -> None:

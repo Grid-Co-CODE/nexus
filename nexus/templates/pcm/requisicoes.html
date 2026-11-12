@@ -18,14 +18,16 @@
   seu login.</p>
 <p><b>Aceitar</b> faz de uma vez os três passos que o PCM fazia no Fracttal: aprova (com o seu nome), faz a saída ligada à OS (o
   saldo baixa) e a requisição vai para Entrega total. Depois o Nexus relê a requisição e o saldo de cada peça.</p>
-<p><b>Quem aceita.</b> O Rank é a Classificação 2 da peça no Fracttal ("2. Rank A", "3. Rank B", "4. Rank C"), lida com o seu
-  login, pelo código da peça; a peça fora da lista, sem a Classificação 2 ou "1.Avariado" é a curva desconhecida. A requisição
+<p><b>Quem aceita.</b> O Rank é a Classificação 2 da peça no Fracttal ("2. Rank A", "3. Rank B", "4. Rank C"), pelo código da
+  peça, na cópia de até 1 hora da lista de peças do Fracttal (lida no login de quem a pediu por último). A peça fora da lista,
+  sem a Classificação 2, "1.Avariado" ou com o mesmo código em peças de Classificações 2 diferentes é a curva desconhecida. A requisição
   com peça <b>Rank A</b>, ou de curva desconhecida, é do PCM, com um clique. As de <b>Rank B e C</b> criadas a partir de
   {{ auto_desde }} o Nexus aceita sozinho, quando alguém do PCM com o login do Fracttal abre esta tela (na sessão dessa pessoa),
   e cada uma fica na auditoria, com o saldo antes e depois; as mais velhas ficam para o PCM.</p>
 <p><b>Sem saída em dobro.</b> Com o Nexus no ar, o PCM não faz mais a Saída "Geral" da requisição: antes de qualquer saída o Nexus
-  procura no histórico do almoxarifado um movimento da peça com a OS e, se achar, não faz outra (a requisição vai para Falhas:
-  aprove e mude o status no Fracttal). A saída que o Nexus já fez também não se repete.</p>
+  procura no histórico do almoxarifado, desde 7 dias antes da requisição, uma Saída Geral da peça com o número da OS e, se
+  achar, não faz outra (a requisição vai para Falhas: aprove e mude o status no Fracttal). A saída que o Nexus já fez, ou cuja
+  resposta não veio, também não se repete.</p>
 <p><b>Fica com o Fracttal:</b> a entrega parcial (conclua lá) e a que falhou (o motivo fica à vista; o Nexus não tenta de novo
   sozinho: o saldo que não dá, por exemplo, precisa de entrada antes). <b>Recusar</b> só registra: o técnico já usou a peça.</p>{% endcall %}</div>
 {% set aba_inventario = 'requisicoes' %}

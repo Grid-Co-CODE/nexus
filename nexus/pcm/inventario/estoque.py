@@ -41,6 +41,9 @@ PAGINAS_MAX = 1000          # trava de segurança: uma lista que não acaba seri
 TIMEOUT_S = 45              # o mesmo do `_rpc_call` do OS Creator
 TIPO_PECA = 4               # `id_type_item` das peças (o que a tela de Peças e Suprimentos lista)
 TIPO_AJUSTE = 15            # `id_movement_type` do "Ajuste de inventário" (o par que o fechamento da sessão gera)
+# a Saída "Geral" que o PCM dava à mão com a OS (o `MovementTypes` da tela do Fracttal: 4 WORK_ORDER é a saída ligada a uma
+# requisição, 5 GENERAL a geral; 1 a compra, 2 a devolução, 8 a transferência). PROVA PENDENTE no histórico de verdade
+TIPO_SAIDA_GERAL = 5
 
 # Os métodos do Fracttal que o passo 0 provou (um nome só por operação, para o teste e o leitor acharem).
 LISTA = "inventories.warehouses_list"
@@ -82,6 +85,14 @@ class Limite(Exception):
 
 class SemLogin(Exception):
     """O login do Fracttal de quem aprovou falta, foi recusado ou expirou. Quem grava para; outra sessão continua."""
+
+
+class SemResposta(ConnectionError):
+    """A resposta do Fracttal não veio, ou veio de um jeito que não se lê: a rede caiu, o tempo acabou, o HTTP 5xx, a resposta
+    que não é JSON (o `FracttalError` do `_rpc_chamar` do OS Creator, que é `Exception` pura) e qualquer outro erro no caminho
+    do pedido. O pedido PODE ter sido feito. É `ConnectionError` de propósito: quem grava já trata o `OSError` de rede como a
+    resposta incerta (`erros.resposta`, a gravação, as requisições). Caso que criou (a re-revisão do item 6, N2): o erro de rede
+    de verdade escapava de todo o `requisicoes.py`, e a saída de resposta perdida não travava."""
 
 
 class ErroFracttal(Exception):
@@ -277,17 +288,32 @@ def mapa_das_pecas(linhas) -> dict[str, dict[str, str]]:
     return out
 
 
-def primeira_com_a_os(movimentos, os_, ids_itens) -> dict | None:
-    """O 1º movimento (`{"id_item", "referencia", "documento", "tipo", "folio", "quando"}`) de uma das peças com o número da OS
-    no `documento` ou na `referencia`, como número inteiro (a OS 452 não acha a 4521); o ajuste de inventário (tipo 15) não
-    conta. `{"folio", "quando"}` ou None. A regra que o adaptador e o falso dividem."""
+def numero_da_os(os_) -> str:
+    """O número da OS para procurar no histórico: só os dígitos quando o texto tem um número só ("OT-4522" é a 4522); sem
+    dígito, ou com mais de um número, o texto inteiro."""
     alvo = str(os_ or "").strip()
+    numeros = re.findall(r"[0-9]+", alvo)
+    return numeros[0] if len(numeros) == 1 else alvo
+
+
+def primeira_com_a_os(movimentos, os_, ids_itens) -> dict | None:
+    """O 1º movimento (`{"id_item", "referencia", "documento", "tipo", "folio", "quando"}`) de uma das peças que é a Saída Geral
+    da OS: a saída GENERAL (tipo 5) com o número da OS no `documento` ou na `referencia`. `{"folio", "quando"}` ou None. A regra
+    que o adaptador e o falso dividem.
+    - O número vale colado em letra ("OS4522", "OT-4522", "ref 4522/2026") e nunca dentro de outro número (14522, 45221): a
+      fronteira é só por dígito (a re-revisão do item 6, C1: "OS4522" passava, e a saída saía em dobro).
+    - Só a saída GENERAL conta (ruling do coordenador, a re-revisão, N1): a saída ligada (4, WORK_ORDER: a do Nexus ou a da tela
+      "Ordem de Serviço") é de OUTRA requisição da mesma OS, que esta não entregou; a compra, a devolução, a transferência e o
+      ajuste não tiram a peça pela OS. A linha que vem SEM o tipo conta: na dúvida, a OS na referência basta, para não dar
+      saída em dobro (o pior que acontece é uma recusa a mais para o PCM conferir)."""
+    alvo = numero_da_os(os_)
     ids = {str(i) for i in ids_itens or () if str(i).strip()}
     if not alvo or not ids:
         return None
-    numero = re.compile(rf"(?<![0-9A-Za-z]){re.escape(alvo)}(?![0-9A-Za-z])")
+    borda = r"[0-9]" if alvo.isdigit() else r"[0-9A-Za-z]"
+    numero = re.compile(rf"(?<!{borda}){re.escape(alvo)}(?!{borda})")
     for m in movimentos:
-        if m.get("tipo") == TIPO_AJUSTE or str(m.get("id_item") or "") not in ids:
+        if m.get("tipo") not in (TIPO_SAIDA_GERAL, None) or str(m.get("id_item") or "") not in ids:
             continue
         if numero.search(str(m.get("documento") or "")) or numero.search(str(m.get("referencia") or "")):
             return {"folio": str(m.get("folio") or ""), "quando": m.get("quando")}
@@ -307,7 +333,8 @@ def corpo_dos_grupos(grupos: dict | None) -> dict:
 
 
 def _traduzir(erro: Exception) -> Exception | None:
-    """O erro do `_rpc_chamar` do OS Creator como o adaptador o diz; None quando não é limite nem login (segue como veio).
+    """O erro do `_rpc_chamar` do OS Creator como o adaptador o diz: `SemLogin`, `Limite` ou, no resto, a `SemResposta` (o
+    pedido pode ter sido feito); None só para o `OSError`, que já é a resposta incerta da casa e segue como veio.
     O adaptador não importa o `api.py` (só está no caminho depois que o clone sobe): lê o que ele escreve nos erros,
     e o `test_o_marcador_de_sessao_morta_e_o_do_api_de_verdade` cai se o `api.py` mudar. Sessão morta: o marcador
     `session_expired` da `SessionExpired` (HTTP 401/403 ou USER_NOT_LOGIN no corpo) e, sem marcador, as duas frases do
@@ -318,7 +345,9 @@ def _traduzir(erro: Exception) -> Exception | None:
         return SemLogin(texto)
     if "HTTP 429" in texto:
         return Limite(texto)
-    return None
+    if isinstance(erro, OSError):
+        return None
+    return SemResposta(f"o Fracttal não respondeu como se espera ({type(erro).__name__}): {texto}")
 
 
 class Ritmo:
@@ -352,8 +381,9 @@ class Estoque(abc.ABC):
 
     Todo id é texto (`id_almox`, `id_item`, a ligação). Erros: `Limite` (429), `SemLogin` (login faltando, recusado ou
     expirado), `ErroFracttal` (o Fracttal recusou, com a mensagem dele), `ValueError` (o pedido não faz sentido e nem
-    foi ao Fracttal: peça não ligada, número ruim). Qualquer outro erro (rede, 500) passa como veio: a resposta pode ter
-    se perdido DEPOIS do Fracttal gravar, e quem grava confere antes de repetir."""
+    foi ao Fracttal: peça não ligada, número ruim). A rede, o tempo e o HTTP 5xx são `OSError` (a `SemResposta` do
+    adaptador, ou o `ConnectionError` do falso): a resposta pode ter se perdido DEPOIS do Fracttal gravar, e quem grava
+    confere antes de repetir."""
 
     @abc.abstractmethod
     def modo(self, id_almox: str) -> int:
@@ -537,7 +567,7 @@ class EstoqueFracttal(Estoque):
         self._esperar()
         try:
             r = self._chamar_rpc(metodo, params)
-        except Exception as e:                            # noqa: BLE001 — só traduz limite e login; o resto sobe igual
+        except Exception as e:                            # noqa: BLE001 — limite, login e a resposta incerta (`_traduzir`)
             traduzido = _traduzir(e)
             if traduzido is None:
                 raise

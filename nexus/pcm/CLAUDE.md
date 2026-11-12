@@ -809,8 +809,10 @@ inventario-almoxarifado.md`; o que o Fracttal aceita de verdade (métodos, corpo
   `ErroFracttal`. O `success: false` com HTTP 200 (que o `_rpc_call` do OS Creator DEVOLVE em vez de levantar) é o `Recusado`,
   um `ErroFracttal` à parte: o único em que se sabe que nada foi feito (a resposta sem corpo ou o `criar_peca` sem o id podem
   ter vindo DEPOIS de o Fracttal gravar; a curadoria só solta a reserva do código no `Recusado`, re-revisão de 27/10/2026; a mensagem
-  é o código do Fracttal, ex. `ASSET_CANNOT_BE_DESABLED_STOCK`). Rede fora e 500 passam como vieram: a resposta pode ter
-  se perdido depois de gravar, e quem grava decide. **Lista pela metade é `ErroFracttal`:** `data` que não é lista, ou
+  é o código do Fracttal, ex. `ASSET_CANNOT_BE_DESABLED_STOCK`). **A rede, o tempo, o HTTP 5xx e a resposta que não é JSON**
+  (o `FracttalError` do OS Creator, `Exception` pura) viram a `SemResposta`, um `ConnectionError` (12/11/2026, a re-revisão do
+  item 6, N2: o erro de rede de verdade escapava de quem só pegava `OSError` e `ErroFracttal`). O `OSError` passa como veio. A
+  resposta pode ter se perdido depois de gravar, e quem grava decide. **Lista pela metade é `ErroFracttal`:** `data` que não é lista, ou
   página vazia com `start < total` (caso da revisão: `ler` devolvia 1 peça de `total: 5`), nunca uma lista curta; vale
   para `ler`, `codigos`, `achar_movimento`, `mexidas_desde`, `ultimo_movimento`, `ajustes_depois` e `modo`, que passam
   pela mesma paginação. `modo` sem o `mode` também é erro: é a conferência da trava, e vazio nunca é "0 = normal".
@@ -1654,15 +1656,29 @@ Levi (12/11/2026): **Rank A** o PCM aceita no Nexus com um clique; **B e C** o N
   requisição cruas: baixa o saldo e leva a requisição sozinha a 5) e relê a requisição e o saldo, cada um à parte. **O estado 4
   (parcial) não entra:** "conclua no Fracttal".
 - **A saída nunca sai em dobro** (a revisão do item 6, os dois Críticos):
-  - **a Saída Geral do PCM:** antes de qualquer saída (e de aprovar), o histórico do almoxarifado desde a requisição (um dia de
-    folga) é lido atrás de um movimento da peça com o número da OS no `document` ou na `description`
-    (`estoque.saida_com_a_os`; o ajuste de inventário não conta). Achou: nada vai, e a requisição fica em Falhas, travada: "o
-    PCM já deu a saída da OS N em <data>: aprove e mude o status no Fracttal". E o **automático só vale para a requisição
+  - **a Saída Geral do PCM:** antes de qualquer saída (e de aprovar), o Nexus lê o histórico do almoxarifado desde **7 dias
+    antes** da requisição (a peça pode sair pela Geral antes de o técnico lançar o recurso; ruling do coordenador).
+    - Procura a **saída GENERAL** (`id_movement_type` 5) da peça com o número da OS no `document` ou na `description`
+      (`estoque.primeira_com_a_os`).
+    - O número vale colado em letra ("OS4522", "OT-4522") e nunca dentro de outro número (14522): a fronteira é só por dígito.
+      O `document` da requisição com prefixo vale pelos dígitos.
+    - **Não conta:** a saída ligada (4, WORK_ORDER: a do Nexus, ou a de outra requisição da mesma OS, que a OS de duas tarefas
+      tem), a compra, a devolução, a transferência e o ajuste. A linha sem o tipo conta: na dúvida, a OS basta.
+    - Achou: nada vai, e a requisição fica em Falhas, travada: "o PCM já deu a saída da OS N em <data>: aprove e mude o status
+      no Fracttal". E o **automático só vale para a requisição
     criada a partir de `AUTO_DESDE`** (o dia da entrada no ar, uma constante em `requisicoes.py`, posta no push): as de antes,
     do tempo da Saída Geral, ficam para o PCM, com o aviso;
-  - **a saída do Nexus:** a requisição com o aceite no livro (a saída feita) ou com a saída de resposta incerta (a rede, ou o
-    Fracttal sem o id) não recebe outra: fica em Falhas, travada, sem o botão ("confira no Fracttal"); a memória do processo
-    guarda a saída feita também, para o livro que não gravou. O livro que não se lê não deixa aceitar;
+  - **a saída do Nexus:** a requisição com o aceite no livro (a saída feita) ou com a saída de resposta incerta não recebe
+    outra. Fica em Falhas, travada, sem o botão ("confira no Fracttal").
+    - A falha travada é o evento próprio `requisicao_travada`: vale pelo tipo, mesmo sem a chave do cadastro para abrir o
+      `dados`.
+    - A memória do processo guarda a saída feita, para o livro que não gravou. O livro que não se lê não deixa aceitar.
+    - **A resposta incerta** é tudo o que não é o "não" do Fracttal (`Recusado`), a pausa (429) nem o login. O adaptador traduz
+      o `FracttalError` do OS Creator (a rede, o tempo, o HTTP 5xx, a resposta que não é JSON), e qualquer erro do caminho do
+      pedido, na `estoque.SemResposta`, um `ConnectionError`. O `requisicoes.py` trata o resto como incerto também
+      (`except Exception`).
+    - As releituras depois da saída nunca impedem o livro de gravar o aceite. A rede na lista vira mensagem, e nas peças de uma
+      requisição, o "não consegui ler as peças agora".
   - **o mesmo aceite duas vezes ao mesmo tempo:** uma trava por requisição em memória (um processo só): 409 "outra pessoa está
     aceitando esta requisição agora".
 - **O id da peça é o `id_item_original`** (o do catálogo, o do saldo e da dimensão), com o `id_item` só de reserva: na linha da
@@ -1692,15 +1708,21 @@ Levi (12/11/2026): **Rank A** o PCM aceita no Nexus com um clique; **B e C** o N
   tela do PCM.
 - **O livro:** `requisicao_aceita` e `requisicao_aceita_sozinha` (uma linha por peça: `de_qtd`/`para_qtd` o saldo antes e depois,
   `contado_qtd` a quantidade, `movimento_fracttal` a requisição; a OS, a curva e a saída no `dados` cifrado, sem "motivo cifrado"
-  na Auditoria), `requisicao_recusada` e `requisicao_falha` (o porquê, as peças com a curva e o `travada`, cifrados).
+  na Auditoria), `requisicao_recusada`, `requisicao_falha` e `requisicao_travada` (a que o Nexus não tenta de novo: o porquê e
+  as peças com a curva, cifrados).
 - **Provado no Fracttal de verdade (12/11/2026, TESTE - PA):** o caminho pela tela e pelo RPC; o corpo da saída com as linhas
   cruas do `movements_details_list` (o saldo de 1 para 0, a requisição a 5); a aprovação com a requisição no estado 3; o
   `STATE_CHANGED` depois da entrega. **Falta:** o Recusar; o responsável pelo e-mail (o corpo da lista e a coluna `email`); o
-  clique e o automático de ponta a ponta pelo Nexus; onde a Saída Geral grava a OS (`document` ou `description`); o que o
-  Fracttal responde à segunda aprovação e à segunda saída.
+  clique e o automático de ponta a ponta pelo Nexus; onde a Saída Geral grava a OS (`document` ou `description`) e se ela vem
+  com o tipo 5 no histórico; o que o Fracttal responde à segunda aprovação e à segunda saída.
+- **O que a trava ainda não cobre:** a saída que não liga à requisição (ela não vai a 5), com o livro que não gravou o aceite e
+  um restart antes da próxima tentativa. A saída ligada foi provada indo a 5, e então a requisição sai da fila sozinha. A lista
+  não lê o histórico (a cota): a de B e C com a Saída Geral aparece em "a aceitar sozinhas" até o automático a pôr em Falhas,
+  sem saída.
 - **Provar:** `tests/test_pcm_inventario_requisicoes.py` (os corpos, a ordem, o `STATE_CHANGED`, a Saída Geral e o corte, a
   saída do Nexus que não se repete, a resposta incerta, os dois aceites juntos, o `id_item_original`, o saldo antes de aprovar,
-  a pausa, o Rank em conflito, o dono, as recusas da ponte, o deploy e a tela).
+  a pausa, o Rank em conflito, o dono, as recusas da ponte, o deploy e a tela; e, da re-revisão, a fronteira da OS, a janela de 7
+  dias, só a GENERAL, as duas requisições da mesma OS, o erro de rede do OS Creator e a trava sem decifrar).
 
 ## Inventário do almoxarifado: a auditoria (`revisao.montar_auditoria`, `templates/pcm/inventario_auditoria.html`; 26/10/2026)
 

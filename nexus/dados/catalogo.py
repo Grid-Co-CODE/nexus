@@ -901,7 +901,7 @@ FATOS = (
          "1 linha = 1 evento do inventário de 1 contagem (recebida, aprovada, peça gravada, conflito, erro, peça tirada do "
          "lote, recontagem pedida, número corrigido, contagem substituída, curadoria, régua gravada ou recontagem de "
          "uma peça pedida) ou de 1 requisição de material (aceita pelo PCM ou sozinha, uma linha por peça; recusada; "
-         "falha de um passo); nunca muda",
+         "falha de um passo; travada, a que o Nexus não tenta de novo); nunca muda",
          _d(data=("id", "data_id (o dia de Brasília do evento; quando, a hora em UTC)"),
             usina=("id", "usina_id + usina_ligada_por (o almoxarifado da contagem, só pela de-para do Fracttal; vazio "
                          "quando não liga)"),

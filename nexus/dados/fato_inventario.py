@@ -81,7 +81,10 @@ TIPOS_EVENTO = ("contagem_recebida", "aprovada", "peca_gravada", "conflito", "er
                 "recontagem_item_pedida",
                 # a requisição de material (12/11/2026, item 6 da 2ª rodada do Almoxarifado): aceita pelo PCM (Rank A ou curva
                 # desconhecida) ou sozinha (B e C), uma linha por peça; recusada; e a falha de um passo do aceite
-                "requisicao_aceita", "requisicao_aceita_sozinha", "requisicao_recusada", "requisicao_falha")
+                "requisicao_aceita", "requisicao_aceita_sozinha", "requisicao_recusada", "requisicao_falha",
+                # a falha que trava a requisição (a resposta incerta da saída e a Saída Geral achada): pelo tipo, e não só
+                # pelo `dados`, que sem a chave do cadastro não se decifra (12/11/2026, a re-revisão do item 6, N3)
+                "requisicao_travada")
 # os eventos que levam o motivo ao técnico: o App mostra o pedido de recontagem (a da peça e a da contagem inteira); a peça
 # tirada e o número corrigido não voltam ao técnico
 TIPOS_MOTIVO_TECNICO = ("recontagem_pedida", "recontagem_item_pedida")

@@ -65,6 +65,7 @@ from . import quem
 from .erros import Conflito
 
 JANELA_DIAS, DECIDIDAS_DIAS, SOZINHAS_DIAS = 90, 30, 30
+GERAL_DIAS = 7          # a busca da Saída Geral do PCM começa 7 dias antes da requisição (a re-revisão do item 6, C1)
 PECAS_TTL_S, RESPONSAVEL_TTL_S, SEM_RESPONSAVEL_TTL_S = 600, 3600, 300
 COMENTARIO_MAX = 300
 # O automático só vale para a requisição criada a partir daqui (a revisão do item 6, C1): as de antes são do tempo em que o PCM
@@ -192,10 +193,12 @@ def _do_livro(cfg, eventos: list[dict], agora: datetime) -> dict:
         if not rid or not t.startswith("requisicao_"):
             continue
         quando = A._txt(e.get("quando"))
-        if t == "requisicao_falha":
+        if t in ("requisicao_falha", "requisicao_travada"):
             if rid not in falhas or (quando, i) >= falhas[rid]["_marca"]:
                 d = F.decifrar(cfg, F.ABA_EVENTO, e)
-                travada = d.get("travada") is True
+                # a trava pelo TIPO do evento (a re-revisão, N3): o `dados` que não se decifra (a chave do cadastro trocada ou
+                # ausente) não solta a trava depois do restart. A falha travada de antes do tipo próprio vale pelo `dados`
+                travada = t == "requisicao_travada" or d.get("travada") is True
                 falhas[rid] = {"_marca": (quando, i), "quando": quando, "quando_txt": _quando_txt(quando),
                                "motivo": A._txt(d.get("motivo")) or "o motivo não se lê agora", "passo": A._txt(d.get("passo")),
                                "por": A._txt(d.get("por")), "os": A._txt(d.get("os")), "travada": travada}
@@ -327,7 +330,7 @@ def montar(cfg, estoque, ctx: dict, agora: datetime | None = None) -> dict:
         if pendente(r):
             try:
                 x["pecas"] = pecas_com_curva(pecas_guardadas(estoque, r["id"]), ctx["curvas"])
-            except (E.ErroFracttal, OSError) as ex:
+            except Exception as ex:      # noqa: BLE001 — a rede de uma não derruba a lista (N2)
                 x["erro_pecas"] = f"não consegui ler as peças agora ({type(ex).__name__})"
             x["de_quem"] = de_quem(x["pecas"])
             x["rank_a"] = any(p["curva"] == "A" for p in x["pecas"] or [])
@@ -462,7 +465,8 @@ def _falha(cfg, ctx, r, quem_, por: str, passo: str, motivo: str, pecas: list[di
     """Registra a falha de um passo (o evento `requisicao_falha`, com o porquê, as peças com a curva e o `travada` cifrados). O
     livro que não grava agora não esconde a falha do Fracttal: só vai ao log (o tipo)."""
     try:
-        F.acrescentar(cfg, F.ABA_EVENTO, [{"tipo": "requisicao_falha", "movimento_fracttal": r["id"],
+        F.acrescentar(cfg, F.ABA_EVENTO, [{"tipo": "requisicao_travada" if travada else "requisicao_falha",
+                                           "movimento_fracttal": r["id"],
                                            **_quem_cols(ctx, quem_, r["id_almox"]),
                                            "dados": {"motivo": motivo, "passo": passo, "por": por, "os": r["os"],
                                                      "pecas": _pecas_do_evento(pecas), "travada": travada}}])
@@ -518,9 +522,11 @@ def _aceitar(cfg, estoque, rid, por, ctx, quem_, conta, responsavel, texto, agor
     if modo != 0:
         raise Conflito(f"Nada foi enviado: o almoxarifado está no modo {modo} no Fracttal (ajuste ou inventário aberto); a "
                        "saída não passa. Tente depois de fechado.")
-    # a Saída Geral do PCM (a revisão, C1): um movimento da mesma peça com a OS, desde a requisição (com um dia de folga de relógio)
+    # a Saída Geral do PCM (a revisão, C1): a saída GENERAL da mesma peça com a OS, desde 7 dias antes da requisição (a peça pode
+    # sair pela Geral antes de o técnico lançar o recurso no App; ruling do coordenador: a janela larga dá, no pior caso, uma
+    # recusa a mais para o PCM conferir, nunca uma saída em dobro)
     try:
-        desde = E.instante(r["criada_em"]) - timedelta(days=1)
+        desde = E.instante(r["criada_em"]) - timedelta(days=GERAL_DIAS)
     except ValueError:
         desde = (agora or _agora()) - timedelta(days=JANELA_DIAS)
     ids = {p["id_item"] for p in pecas if p["id_item"]} | {p["id_linha"] for p in pecas if p["id_linha"]}
@@ -547,7 +553,7 @@ def _aceitar(cfg, estoque, rid, por, ctx, quem_, conta, responsavel, texto, agor
             padrao = (f"Aceita pelo Nexus por {conta['nome']}" if por == "pcm"
                       else f"Aceita pelo Nexus (Rank B ou C), na sessão de {conta['nome']}")
             estoque.aprovar_requisicao(rid, texto or padrao, conta)
-    except (E.ErroFracttal, E.Limite, E.SemLogin, OSError) as ex:
+    except Exception as ex:          # noqa: BLE001 — fora o "não" do Fracttal, a pausa e o login, a aprovação pode ter passado
         log.warning("requisições: a requisição %s parou ao aprovar (%s)", rid, type(ex).__name__)
         if not isinstance(ex, (E.Limite, E.SemLogin)):
             _falha(cfg, ctx, r, quem_, por, "aprovar", _motivo(ex), pecas)
@@ -556,7 +562,7 @@ def _aceitar(cfg, estoque, rid, por, ctx, quem_, conta, responsavel, texto, agor
                       "Confira no Fracttal; a próxima tentativa relê e pula a aprovação feita."), _status(ex), ex) from ex
     try:
         saida = estoque.saida_da_requisicao(r, linhas, responsavel)
-    except (E.ErroFracttal, E.Limite, E.SemLogin, OSError) as ex:
+    except Exception as ex:          # noqa: BLE001 — fora o "não", a pausa e o login, a saída pode ter sido feita: trava (C2, N2)
         log.warning("requisições: a requisição %s parou na saída (%s)", rid, type(ex).__name__)
         incerta = not _certo(ex)
         if not isinstance(ex, (E.Limite, E.SemLogin)):
@@ -576,11 +582,11 @@ def _aceitar(cfg, estoque, rid, por, ctx, quem_, conta, responsavel, texto, agor
     try:
         depois_r = estoque.reler_requisicao(rid, JANELA_DIAS, agora)
         relida = True
-    except (E.ErroFracttal, E.Limite, E.SemLogin, OSError):
+    except Exception:                # noqa: BLE001 — a saída já foi: qualquer erro aqui não impede o livro de gravar o aceite
         depois_r, relida = None, False
     try:
         depois = estoque.ler(almox)
-    except (E.ErroFracttal, E.Limite, E.SemLogin, OSError):
+    except Exception:                # noqa: BLE001 — idem (a re-revisão, N2: o erro de rede escapava e o aceite não ia ao livro)
         depois = {}
     confirmada = bool(depois_r) and depois_r["estado"] == E.ENTREGA_TOTAL and depois_r["aprovada"]
     if confirmada:
@@ -627,7 +633,7 @@ def recusar(cfg, estoque, id_requisicao, *, ctx: dict, quem_: dict, conta: dict 
         pecas = pecas_com_curva(estoque.pecas_da_requisicao(rid), ctx["curvas"])
         try:
             estoque.recusar_requisicao(rid, texto, conta)
-        except (E.ErroFracttal, E.Limite, E.SemLogin, OSError) as ex:
+        except Exception as ex:      # noqa: BLE001 — fora o "não", a pausa e o login, a recusa pode ter passado
             if not isinstance(ex, (E.Limite, E.SemLogin)):
                 _falha(cfg, ctx, r, quem_, "pcm", "recusar", _motivo(ex), pecas)
             raise Falhou((f"Não recusei: o Fracttal não aceitou a recusa ({_motivo(ex)}). Nada mudou na requisição."
@@ -635,7 +641,7 @@ def recusar(cfg, estoque, id_requisicao, *, ctx: dict, quem_: dict, conta: dict 
                           "no Fracttal."), _status(ex), ex) from ex
         try:
             depois = estoque.reler_requisicao(rid, JANELA_DIAS, agora)
-        except (E.ErroFracttal, E.Limite, E.SemLogin, OSError):
+        except Exception:            # noqa: BLE001 — a recusa já foi: o livro grava
             depois = None
         confirmada = bool(depois) and recusada(depois)
         os_ = f" da OS {r['os']}" if r["os"] else ""

@@ -38,6 +38,11 @@ class SessionExpired(FracttalError):
     session_expired = True           # o marcador que o `api.py` põe na classe para quem não a importa
 
 
+class PedidoInesperado(BaseException):
+    """O pedido que o Fracttal de mentira não esperava. É `BaseException` de propósito: o adaptador traduz TODA `Exception` do
+    caminho do Fracttal na resposta incerta (`SemResposta`), e o erro do teste não pode se esconder ali."""
+
+
 class Relogio:
     """O tempo de mentira: `dormir` só anda o relógio, e o teste nunca espera de verdade."""
 
@@ -62,7 +67,7 @@ class Fracttal:
     def __call__(self, metodo, params):
         self.pedidos.append((metodo, json.loads(json.dumps(params))))
         if metodo not in self.respostas:
-            raise AssertionError(f"pedido que o teste não esperava: {metodo}")
+            raise PedidoInesperado(f"pedido que o teste não esperava: {metodo}")
         r = self.respostas[metodo]
         if isinstance(r, list):
             r = r.pop(0)
@@ -328,12 +333,23 @@ def test_login_recusado_vira_sem_login(erro):
         estoque(Fracttal({SALDOS: erro})).ler(ALMOX)
 
 
-def test_o_resto_dos_erros_passa_como_veio():
-    """Rede fora e 500 não são limite nem login: quem grava decide (a resposta pode ter se perdido DEPOIS de gravar)."""
-    for erro in (FracttalError("RPC x HTTP 500 — erro"), ConnectionError("rede fora"), TimeoutError("demorou")):
+def test_o_erro_de_rede_vira_a_resposta_incerta():
+    """O `_rpc_chamar` do OS Creator faz da rede caída, do tempo esgotado, do HTTP 5xx e da resposta que não é JSON um
+    `FracttalError`, que é `Exception` pura (a re-revisão do item 6, N2): quem recebia só pegava `OSError` e `ErroFracttal`, e o
+    erro de rede de verdade escapava. O adaptador, que é a porta, o traduz na `SemResposta` (um `ConnectionError`: "a resposta
+    não veio, o pedido pode ter sido feito"). O `OSError` passa como veio; o `Recusado` segue só para o `success: false`."""
+    for erro in (FracttalError("Erro de conexão (RPC x): ReadTimeout"), FracttalError("RPC x HTTP 500 — erro"),
+                 FracttalError("RPC x resposta não-JSON: <html>"), RuntimeError("o clone falhou no meio")):
+        with pytest.raises(E.SemResposta) as visto:
+            estoque(Fracttal({SALDOS: erro})).ler(ALMOX)
+        assert visto.value.__cause__ is erro and isinstance(visto.value, ConnectionError)
+        assert not isinstance(visto.value, E.ErroFracttal)
+    for erro in (ConnectionError("rede fora"), TimeoutError("demorou")):
         with pytest.raises(type(erro)) as visto:
             estoque(Fracttal({SALDOS: erro})).ler(ALMOX)
         assert visto.value is erro
+    with pytest.raises(E.Recusado):
+        estoque(Fracttal({SALDOS: {"success": False, "message": "NAO"}})).ler(ALMOX)
 
 
 # ── o ritmo ────────────────────────────────────────────────────────────────────────────────────────────────────────────────

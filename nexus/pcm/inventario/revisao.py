@@ -289,12 +289,13 @@ ROTULO_EVENTO = {"contagem_recebida": "Contagem recebida", "aprovada": "Aprovada
                  "substituida": "Contagem substituída", "curadoria": "Curadoria decidida", "regua_gravada": "Régua gravada",
                  "recontagem_item_pedida": "Recontagem da peça pedida",
                  "requisicao_aceita": "Requisição aceita pelo PCM", "requisicao_aceita_sozinha": "Requisição aceita sozinha",
-                 "requisicao_recusada": "Requisição recusada", "requisicao_falha": "Requisição não aceita"}
+                 "requisicao_recusada": "Requisição recusada", "requisicao_falha": "Requisição não aceita",
+                 "requisicao_travada": "Requisição travada (confira no Fracttal)"}
 # o selo de cada evento, pelas quatro famílias do mockup do Spare Parts (Levi, 27/10/2026): a gravação no Fracttal em verde, a
 # curadoria em âmbar, a aprovação e a revisão em azul, o conflito e o erro em vermelho. A cor só reforça a palavra (o rótulo)
 SELO_EVENTO = {"peca_gravada": "ok", "regua_gravada": "ok", "curadoria": "alerta", "conflito": "critico", "erro": "critico",
                "requisicao_aceita": "ok", "requisicao_aceita_sozinha": "ok", "requisicao_recusada": "alerta",
-               "requisicao_falha": "critico"}
+               "requisicao_falha": "critico", "requisicao_travada": "critico"}
 # o aceite da requisição leva no `dados` cifrado a OS e a curva, não um motivo (12/11/2026): a linha não diz "motivo cifrado"
 _SEM_MOTIVO = frozenset({"requisicao_aceita", "requisicao_aceita_sozinha"})
 
@@ -319,6 +320,8 @@ def _retorno(tipo: str, movimento: str, codigo: str) -> str:
         return f"requisição {movimento} recusada" if movimento else "recusada"
     if tipo == "requisicao_falha":
         return "não aceita"
+    if tipo == "requisicao_travada":
+        return "travada: confira no Fracttal"
     return ""
 
 

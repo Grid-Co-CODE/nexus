@@ -17,6 +17,7 @@ from estoque_falso import EstoqueFalso
 from test_campo_visao import banco  # noqa: F401  (banco é fixture)
 from test_pcm_inventario_curadoria import PESSOA, _pessoa_ms, cur  # noqa: F401  (cur é fixture)
 from test_pcm_inventario_estoque import Fracttal, com_o_fracttal, em_paginas, estoque, ok
+from test_pcm_inventario_estoque import FracttalError as FracttalErrorDoOSCreator
 from test_pcm_publicar import _no_setor
 
 from nexus.cadastro import setor_ids as SID
@@ -529,6 +530,9 @@ def test_a_tela(rq, monkeypatch, logado):
     explica = html.split("gc-explica-caixa")[1].split("</section>")[0]
     assert "Classificação 2 da peça no Fracttal" in explica and "catálogo do App" not in explica
     assert "01/01/2026" in explica and "o PCM não faz mais a Saída" in explica
+    # a cópia de 1 h no login de quem a pediu por último (não "o seu"), o código em conflito e a janela (a re-revisão, N5)
+    assert "lida com o seu" not in explica and "cópia de até 1 hora" in explica
+    assert "Classificações 2 diferentes" in explica and "7 dias antes da requisição" in explica
     nav = html.split('class="alm-abas"')[1].split("</nav>")[0]
     assert re.search(r'aria-selected="true"[^>]*href="/t/pcm/pecas/requisicoes"', nav)
     # a senha de administrador: a tela diz que precisa entrar pelo Fracttal, e nem pede a lista
@@ -576,8 +580,8 @@ def test_a_saida_geral_do_pcm_segura_a_saida(rq):
 
 def test_a_regra_da_os_no_historico():
     movs = [{"id_item": "2", "referencia": "INVENTARIO-x 4522", "documento": "", "tipo": 15, "folio": "M1", "quando": "q1"},
-            {"id_item": "2", "referencia": "", "documento": "OT-4522", "tipo": 2, "folio": "M2", "quando": "q2"},
-            {"id_item": "2", "referencia": "OS 4522", "documento": "", "tipo": 2, "folio": "M3", "quando": "q3"}]
+            {"id_item": "2", "referencia": "", "documento": "OT-4522", "tipo": 5, "folio": "M2", "quando": "q2"},
+            {"id_item": "2", "referencia": "OS 4522", "documento": "", "tipo": 5, "folio": "M3", "quando": "q3"}]
     assert E.primeira_com_a_os(movs, "4522", ["2"]) == {"folio": "M2", "quando": "q2"}    # o ajuste de inventário não conta
     assert E.primeira_com_a_os(movs, "452", ["2"]) is None
     assert E.primeira_com_a_os(movs, "4522", ["9"]) is None and E.primeira_com_a_os(movs, "", ["2"]) is None
@@ -780,3 +784,205 @@ def test_as_recusas_da_rota_do_recusar(rq, monkeypatch, logado):
     _no_setor(monkeypatch, SID.PCM)
     assert com_o_fracttal(rq, _pessoa_ms(rq)).post(rota, json={"comentario": "não era desta OS"}).status_code == 200
     assert "responsavel" not in falso.chamadas
+
+
+# ── a rodada 2 da revisão do item 6 (fix-W2-item6-r2): a fronteira, a janela, só a GENERAL e o erro de rede ──────────
+
+@pytest.mark.parametrize("texto", ["OS4522", "OT4522", "OS-4522", "OS 4522", "4522", "ref 4522/2026", "OS Nº4522",
+                                   "saída geral da OS4522 - usina"])
+def test_a_os_colada_em_letra_e_achada(texto):
+    """A fronteira é só por dígito (a re-revisão, C1): "OS4522" e "OT4522" eram a saída em dobro (a sonda B2)."""
+    for campo in ("referencia", "documento"):
+        movs = [{"id_item": "2", "referencia": "", "documento": "", campo: texto, "tipo": 5, "folio": "M1", "quando": "q"}]
+        assert E.primeira_com_a_os(movs, "4522", ["2"]) == {"folio": "M1", "quando": "q"}, (campo, texto)
+
+
+@pytest.mark.parametrize("texto", ["OS 14522", "OS 45221", "OS145220", "R-45223", "045220"])
+def test_a_os_dentro_de_outro_numero_nao_e_achada(texto):
+    movs = [{"id_item": "2", "referencia": texto, "documento": "", "tipo": 5, "folio": "M1", "quando": "q"}]
+    assert E.primeira_com_a_os(movs, "4522", ["2"]) is None, texto
+
+
+def test_a_os_com_prefixo_na_requisicao_vale_pelos_digitos():
+    """O `document` da requisição com prefixo ("OT-4522", a prova pendente): o alvo são só os dígitos."""
+    movs = [{"id_item": "2", "referencia": "OS 4522", "documento": "", "tipo": 5, "folio": "M1", "quando": "q"}]
+    assert E.primeira_com_a_os(movs, "OT-4522", ["2"]) == {"folio": "M1", "quando": "q"}
+    assert E.primeira_com_a_os(movs, "OT-452", ["2"]) is None
+
+
+@pytest.mark.parametrize("tipo,conta", [(5, True), (None, True), (4, False), (1, False), (2, False), (8, False),
+                                        (15, False), (13, False)])
+def test_so_a_saida_geral_conta(tipo, conta):
+    """Só a saída GENERAL (`id_movement_type` 5) com a OS é a Saída Geral do PCM (a re-revisão, N1; ruling do coordenador). A
+    saída ligada a uma requisição (4, WORK_ORDER: a do Nexus ou a da tela "Ordem de Serviço") é de OUTRA requisição; a compra
+    (1), a devolução (2), a transferência (8), o ajuste (15) e a própria requisição (13) não tiram a peça. A linha sem o tipo
+    conta: na dúvida, a OS basta, para não dar saída em dobro."""
+    movs = [{"id_item": "2", "referencia": "OS 4522", "documento": "", "tipo": tipo, "folio": "M1", "quando": "q"}]
+    assert (E.primeira_com_a_os(movs, "4522", ["2"]) is not None) is conta
+
+
+def test_a_geral_com_a_os_colada_trava(rq):
+    """A Geral com "OS4522" na `description` (a sonda B2): nada vai, e a requisição fica travada em Falhas."""
+    falso = _falso()
+    falso.mover("10", "2", "saida", 2, referencia="OS4522")
+    with pytest.raises(RQ.Falhou, match="o PCM já deu a saída da OS 4522"):
+        _aceitar(rq, falso, B_E_C, por="sozinha")
+    assert falso.saidas == [] and falso.decisoes == []
+
+
+def test_duas_requisicoes_da_mesma_os_e_da_mesma_peca(rq):
+    """A OS com duas tarefas pede a mesma peça duas vezes (a re-revisão, N1; a sonda D): a saída do Nexus da 1ª é ligada (tipo
+    4) e não é Saída Geral; a 2ª passa, e a peça sai das duas."""
+    reqs = REQS + [_req(105, "4522", dias=1)]
+    det = dict(DETALHES)
+    det[105] = [_det(2, "SP-2", 1)]
+    falso = _falso(reqs=reqs, detalhes=det)
+    assert _aceitar(rq, falso, B_E_C, por="sozinha")["confirmada"]
+    assert falso.ler("10")["2"]["saldo"] == 6.0
+    assert _aceitar(rq, falso, 105, por="sozinha")["confirmada"]
+    assert len(falso.saidas) == 2 and falso.ler("10")["2"]["saldo"] == 5.0
+    assert not RQ.montar(rq.config, falso, _ctx(rq, falso))["falhas"]
+
+
+def test_a_devolucao_com_a_os_nao_trava(rq):
+    """A entrada de devolução com a OS no `document` não tira a peça (a sonda E1)."""
+    falso = _falso()
+    falso.mover("10", "2", "entrada", 1, documento="4522", tipo_fracttal=2)
+    assert _aceitar(rq, falso, B_E_C, por="sozinha")["confirmada"]
+
+
+@pytest.mark.parametrize("dias_antes,trava", [(2, True), (6, True), (9, False)])
+def test_a_janela_comeca_7_dias_antes_da_requisicao(rq, dias_antes, trava):
+    """A peça pode sair pela Geral antes de o técnico lançar o recurso no App: a busca começa 7 dias antes da `date_create` da
+    requisição (ruling do coordenador; a sonda B3, com a Geral 2 dias antes, deixava passar)."""
+    falso = _falso()
+    falso.mover("10", "2", "saida", 2, referencia="OS 4522", quando=_iso(2 + dias_antes) + "+00:00")  # a requisição é de 2 dias
+    if trava:
+        with pytest.raises(RQ.Falhou, match="o PCM já deu a saída da OS 4522"):
+            _aceitar(rq, falso, B_E_C)
+        assert falso.saidas == []
+    else:
+        assert _aceitar(rq, falso, B_E_C)["confirmada"] and len(falso.saidas) == 1
+
+
+def _sem_a_os_no_historico(falso, n):
+    """Tira a OS das linhas do histórico que a saída do Nexus deixou (a prova pendente: o `document` pode não vir)."""
+    for m in falso.movimentos[n:]:
+        m["documento"] = ""
+
+
+def test_a_saida_com_o_erro_de_rede_do_os_creator_trava(rq):
+    """A saída feita no Fracttal e a resposta perdida pela rede, com o `FracttalError` do OS Creator (`Exception` pura, que o
+    adaptador de verdade traduz; aqui chega cru, pelo falso: a re-revisão, N2 e as sondas F5 e F6). A 1ª tentativa diz "pode
+    ter sido feita" e trava; a 2ª, sem a OS no histórico, não faz outra saída."""
+    class RedeCaiu(EstoqueFalso):
+        def saida_da_requisicao(self, requisicao, *a, **k):
+            n = len(self.movimentos)
+            try:
+                super().saida_da_requisicao(requisicao, *a, **k)
+            finally:
+                _sem_a_os_no_historico(self, n)
+            self._movs[str(requisicao["id"])]["id_movement_state"] = 3
+            raise FracttalErrorDoOSCreator("Erro de conexão (RPC inventories.outputs_insert): ReadTimeout")
+    falso = RedeCaiu(json.loads(json.dumps(SALDOS)), pecas_do_catalogo=PECAS, requisicoes=REQS, detalhes=DETALHES)
+    with pytest.raises(RQ.Falhou) as ex:
+        _aceitar(rq, falso, A_RANK_A)
+    assert ex.value.status == 502 and "pode ter sido feita" in ex.value.mensagem and "não repete" in ex.value.mensagem
+    (f,) = _eventos(rq, "requisicao_travada")
+    assert F.decifrar(rq.config, F.ABA_EVENTO, f)["passo"] == "saida"
+    with pytest.raises(Conflito, match="pode ter sido feita"):
+        _aceitar(rq, falso, A_RANK_A)
+    RQ.limpar()                                                                          # o Nexus reiniciou: o livro segura
+    with pytest.raises(Conflito, match="pode ter sido feita"):
+        _aceitar(rq, falso, A_RANK_A)
+    assert len(falso.saidas) == 1 and falso.ler("10")["1"]["saldo"] == 4.0
+
+
+def test_a_releitura_com_o_erro_de_rede_grava_o_aceite(rq):
+    """A saída passou e a RELEITURA cai na rede (a sonda F7 a F9): o aceite vai ao livro assim mesmo, e depois do restart o
+    Nexus não faz outra saída."""
+    class ReleituraCai(EstoqueFalso):
+        depois = False
+
+        def saida_da_requisicao(self, requisicao, *a, **k):
+            n = len(self.movimentos)
+            nova = super().saida_da_requisicao(requisicao, *a, **k)
+            _sem_a_os_no_historico(self, n)
+            self._movs[str(requisicao["id"])]["id_movement_state"] = 3
+            self.depois = True
+            return nova
+
+        def reler_requisicao(self, *a, **k):
+            if self.depois:
+                self.depois = False
+                raise FracttalErrorDoOSCreator("Erro de conexão (RPC inventories.movements_new_list): ReadTimeout")
+            return super().reler_requisicao(*a, **k)
+
+        def ler(self, id_almox):
+            if self.depois is False and len(self.saidas):
+                raise FracttalErrorDoOSCreator("RPC inventories.warehouses_items_stock HTTP 503 — fora")
+            return super().ler(id_almox)
+    falso = ReleituraCai(json.loads(json.dumps(SALDOS)), pecas_do_catalogo=PECAS, requisicoes=REQS, detalhes=DETALHES)
+    r = _aceitar(rq, falso, A_RANK_A)
+    assert r["confirmada"] is False and "não consegui reler a requisição" in r["mensagem"]
+    (ev,) = _eventos(rq, "requisicao_aceita")
+    assert ev["de_qtd"] == 5 and ev["para_qtd"] is None
+    RQ.limpar()                                                                          # o Nexus reiniciou
+    with pytest.raises(Conflito, match="o Nexus já fez a saída"):
+        _aceitar(rq, falso, A_RANK_A)
+    assert len(falso.saidas) == 1
+
+
+def test_a_aprovacao_com_o_erro_de_rede_pode_ter_sido_feita(rq):
+    """O erro de rede na aprovação: "pode ter sido aprovada", a falha registrada, sem trava (nada saiu do saldo)."""
+    class AprovaCai(EstoqueFalso):
+        def aprovar_requisicao(self, *a, **k):
+            raise FracttalErrorDoOSCreator("RPC inventories.outputs_orders_update HTTP 500 — erro")
+    falso = AprovaCai(json.loads(json.dumps(SALDOS)), pecas_do_catalogo=PECAS, requisicoes=REQS, detalhes=DETALHES)
+    with pytest.raises(RQ.Falhou) as ex:
+        _aceitar(rq, falso, A_RANK_A)
+    assert ex.value.status == 502 and "pode ter sido aprovada" in ex.value.mensagem
+    (f,) = _eventos(rq, "requisicao_falha")
+    assert F.decifrar(rq.config, F.ABA_EVENTO, f)["passo"] == "aprovar" and falso.saidas == []
+
+
+def test_a_lista_com_o_fracttal_fora_nas_pecas(rq):
+    """A rede na leitura das peças de uma pendente não derruba a lista (a sonda F10): a requisição diz que não leu."""
+    class PecasCai(EstoqueFalso):
+        def pecas_da_requisicao(self, *a, **k):
+            raise FracttalErrorDoOSCreator("Erro de conexão (RPC inventories.movements_details_list): ReadTimeout")
+    falso = PecasCai(json.loads(json.dumps(SALDOS)), pecas_do_catalogo=PECAS, requisicoes=REQS, detalhes=DETALHES)
+    d = RQ.montar(rq.config, falso, _ctx(rq, falso))
+    assert d["para_pcm"] and all(x["erro_pecas"].startswith("não consegui ler as peças agora") for x in d["para_pcm"])
+    assert d["ids_sozinhas"] == []
+
+
+def test_a_ponte_com_o_fracttal_fora_diz_e_nao_cai(rq, monkeypatch):
+    """O GET da lista com o Fracttal fora, pelo adaptador de verdade (o `FracttalError` traduzido): uma mensagem, não um 500."""
+    fr = Fracttal({E.PECAS: em_paginas(PECAS),
+                   E.MOVIMENTOS: FracttalErrorDoOSCreator("Erro de conexão (RPC inventories.movements_new_list): ReadTimeout")})
+    c = _pcm(rq, monkeypatch, estoque(fr))
+    r = c.get(LISTA)
+    assert r.status_code == 502 and "Não consegui falar" in r.get_json()["erro"]
+
+
+def test_a_trava_nao_depende_de_decifrar(rq, monkeypatch):
+    """A falha travada é um evento próprio (`requisicao_travada`), e a trava vale pelo tipo (a re-revisão, N3; a sonda G): sem
+    a chave do cadastro, ou com a de outra instalação, depois do restart, o Nexus não faz outra saída."""
+    class Incerta(EstoqueFalso):
+        def saida_da_requisicao(self, requisicao, *a, **k):
+            n = len(self.movimentos)
+            super().saida_da_requisicao(requisicao, *a, **k)
+            _sem_a_os_no_historico(self, n)
+            self._movs[str(requisicao["id"])]["id_movement_state"] = 3
+            raise ConnectionError("caiu")
+    falso = Incerta(json.loads(json.dumps(SALDOS)), pecas_do_catalogo=PECAS, requisicoes=REQS, detalhes=DETALHES)
+    with pytest.raises(RQ.Falhou):
+        _aceitar(rq, falso, A_RANK_A)
+    RQ.limpar()
+    monkeypatch.setattr(F, "decifrar", lambda cfg, aba, linha: {})
+    (f,) = RQ.montar(rq.config, falso, _ctx(rq, falso))["falhas"]
+    assert f["falha"]["travada"] and f["id"] == str(A_RANK_A)
+    with pytest.raises(Conflito):
+        _aceitar(rq, falso, A_RANK_A)
+    assert len(falso.saidas) == 1
