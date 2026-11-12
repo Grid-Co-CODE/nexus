@@ -1809,7 +1809,7 @@ inventário (a peça saía de um almoxarifado sem entrar em nenhum). A aba é pa
   ANTES de mandar: achou, registra como feita e não manda; não achou, libera. A trava vale pelas colunas em claro (o tipo, o
   almoxarifado, a peça, o lote), nunca pelo `dados`.
 - **A releitura que não bate** é a `transferencia_falha`, e a tela diz o que leu; a entrada só vai ao livro com o destino relido
-  mostrando a peça. **Uma de cada vez** por origem, destino e peça (409). **Só no servidor** (`NEXUS_INVENTARIO_GRAVAR`); o
+  mostrando a peça. **Uma de cada vez** por peça em cada um dos dois almoxarifados (409: a mesma origem para outro destino e a volta também esperam, senão a releitura da primeira não bateria). **Só no servidor** (`NEXUS_INVENTARIO_GRAVAR`); o
   Conferir e as listas só leem e abrem em qualquer um.
 - **O dono:** o responsável é o das requisições (`estoque.responsavel`, pela `personnel_list`); sem ele, 409.
 - **O livro** (`fato_evento_inventario`, nenhuma coluna nova): `transferencia_vinculo` (destino), `transferencia_saida`

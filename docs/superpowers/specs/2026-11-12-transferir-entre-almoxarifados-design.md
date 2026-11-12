@@ -62,7 +62,8 @@ tela é para a peça **guardada** em outra usina: ela mudou de lugar e continua 
 - **A aprovação no destino:** o Fracttal deixa cada almoxarifado exigir a aprovação da transferência que chega. Onde
   exigir, o Nexus aprova logo depois de lançar, com a mesma conta, pela regra do aceite das requisições (um clique faz
   tudo). É escolha de quem desenhou, achada depois da aprovação do desenho: a confirmar com o Levi e na prova.
-- **Uma de cada vez** por par de almoxarifados e peça. Almoxarifado em sessão de ajuste (o inventário gravando) recusa.
+- **Uma de cada vez** por peça em cada um dos dois almoxarifados: outra transferência da mesma peça que toque a origem
+  ou o destino espera, senão a releitura da primeira não bateria. Almoxarifado em sessão de ajuste (o inventário gravando) recusa.
 - **A resposta incerta não se repete:** cada transferência leva um código do Nexus na nota do movimento. Se a resposta
   não vier, o Nexus procura o código no histórico do almoxarifado: achou, registra como feita; não achou, libera de novo.
   Enquanto não souber, a tela diz "pode ter feito: confira no Fracttal" e não manda outra.

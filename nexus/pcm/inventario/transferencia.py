@@ -37,7 +37,9 @@ As regras, com o caso que as criou:
   libera e segue.
 - **A releitura que não bate** (o saldo não mudou como devia) é o evento `transferencia_falha`, e a tela diz o que leu. A entrada
   só vai ao livro quando o destino relido mostra a peça: o livro nunca diz que o Fracttal tem o que não tem.
-- **Uma de cada vez** por origem, destino e peça (a trava em memória; o Nexus roda num processo só) e **só no servidor**
+- **Uma de cada vez** por peça em cada um dos dois almoxarifados (a trava em memória, `_tomar`; o Nexus roda num processo
+  só): a outra transferência da mesma peça que toque a origem ou o destino espera, senão a releitura da primeira não
+  bateria. E **só no servidor**
   (`requisicoes.so_no_servidor`, o mesmo portão do aceite das requisições).
 - **Nome de gente** só passa pela memória e pela tela do PCM; o livro guarda a pessoa como `pessoa_hmac`/`pessoa_id`, e a
   referência do PCM e o outro almoxarifado só cifrados (`dados`).
@@ -403,17 +405,21 @@ _TRAVA_CURSO = threading.Lock()
 
 
 @contextmanager
-def _tomar(chave: tuple):
-    """Uma transferência de cada vez por origem, destino e peça no processo: a segunda, enquanto a primeira anda, leva 409."""
+def _tomar(origem: str, destino: str, item: str):
+    """Uma transferência de cada vez por PEÇA em cada um dos dois almoxarifados, no processo: a segunda que toque a mesma peça
+    na origem ou no destino (o mesmo par, a mesma origem para outro destino, a volta), enquanto a primeira anda, leva 409. A
+    vez era só do par (origem, destino, peça), e a releitura da primeira, que confere o saldo dos dois lados contra o de antes,
+    diria "a releitura não bate" de uma transferência que deu certo (a revisão de 12/11/2026)."""
+    chaves = {(origem, item), (destino, item)}
     with _TRAVA_CURSO:
-        if chave in _EM_CURSO:
+        if chaves & _EM_CURSO:
             raise Conflito(EM_CURSO)
-        _EM_CURSO.add(chave)
+        _EM_CURSO.update(chaves)
     try:
         yield
     finally:
         with _TRAVA_CURSO:
-            _EM_CURSO.discard(chave)
+            _EM_CURSO.difference_update(chaves)
 
 
 def limpar() -> None:
@@ -455,14 +461,14 @@ def _anotar(cfg, eventos: list[dict]) -> str:
 
 def transferir(cfg, estoque, ctx: dict, origem, destino, id_item, qtd, referencia="", *, quem_: dict,
                responsavel: dict | None, agora: datetime | None = None) -> dict:
-    """Transfere uma peça (os passos do módulo), uma de cada vez por origem, destino e peça. `{"ok", "confirmada",
+    """Transfere uma peça (os passos do módulo), uma de cada vez por peça em cada um dos dois almoxarifados. `{"ok", "confirmada",
     "mensagem", "codigo"}`. Recusa antes de qualquer gravação: `so_no_servidor`, as validações do `conferir` (relidas; o
     destino que exige aprovação inclusive), a transferência de antes da mesma peça que ficou sem resposta e se acha agora
     (registrada como feita, sem mandar outra) e a sem responsável. `Falhou` (com o status da ponte) o passo que o Fracttal não
     fez ou cuja resposta não veio."""
     so_no_servidor(cfg)
     o, d, item = _id_almox(origem), _id_almox(destino), _id_item(id_item)
-    with _tomar((o, d, item)):
+    with _tomar(o, d, item):
         return _transferir(cfg, estoque, ctx, o, d, item, qtd, referencia, quem_, responsavel, agora)
 
 

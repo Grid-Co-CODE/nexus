@@ -319,10 +319,22 @@ def test_a_releitura_que_nao_bate_e_erro_e_diz_o_que_leu(tr):
 
 
 def test_duas_transferencias_da_mesma_peca_ao_mesmo_tempo(tr):
-    with T._tomar(("30", "31", "1")):
+    with T._tomar("30", "31", "1"):
         with pytest.raises(Conflito, match="Outra pessoa"):
             _tr(tr, _falso())
         assert _tr(tr, _falso(), item="2", qtd="1")["confirmada"]          # outra peça não espera
+
+
+def test_a_mesma_peca_num_almoxarifado_em_comum_tambem_espera(tr):
+    """A releitura confere o saldo dos dois lados contra o de antes: outra transferência da MESMA peça que toque um dos dois
+    almoxarifados (a mesma origem para outro destino, ou a volta) mudaria esse saldo no meio, e a primeira diria "a releitura
+    não bate" de uma transferência que deu certo. Por isso a vez é da peça em CADA almoxarifado, e não só do par."""
+    with T._tomar("30", "31", "1"):
+        with pytest.raises(Conflito, match="Outra pessoa"):
+            _tr(tr, _falso(), destino="60")                                # a mesma origem, outro destino
+        with pytest.raises(Conflito, match="Outra pessoa"):
+            _tr(tr, _falso(), origem="31", destino="30")                   # a volta
+    assert _tr(tr, _falso(), destino="60", qtd="1")["confirmada"]          # acabada a primeira, passa
 
 
 def test_o_historico_do_mais_novo_ao_mais_velho(tr):

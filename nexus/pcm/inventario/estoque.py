@@ -1036,7 +1036,7 @@ class EstoqueFracttal(Estoque):
 
     # a transferência entre almoxarifados (12/11/2026)
     def transferir(self, id_origem: str, id_destino: str, nome_destino: str, id_item: str, qtd: float, responsavel: dict,
-                   documento: str, nota: str, agora=None) -> str:
+                   documento: str, nota: str, agora=None) -> dict:
         n = validar_quantidade(qtd, "quantidade")
         if n <= 0:
             raise ValueError("a quantidade da transferência precisa ser maior que zero")
