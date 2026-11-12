@@ -736,6 +736,7 @@ colunas (a maioria escondida: o seletor de colunas mostra sem recarregar), e a p
   fontes lidas + o de_para; ~6–11 s); decidir reaplica sem rede; "Publicar no banco" manda ao `cadastro_nexus`. Abas:
   Buracos (com sugestões e ligar/ignorar), Ligado por nome (confirmar/desligar), Usinas fora (ausência esperada por
   cliente) e Decisões (desfazer).
+- **Ligar as sugestões de 100% (11/11/2026, `L.sugestoes_de_100` + `POST /t/base/ligacoes/aceitar-sugestoes`).** Na aba Buracos, com UMA base escolhida, o botão liga de uma vez o buraco com exatamente uma sugestão, de nota 100 (a FAMA tinha 34 assim, o nome igual com o romano em arábico); pula o de duas ou mais sugestões, o abaixo de 100, o sem sugestão e a usina que é o 100% de duas chaves. Pede confirmação (`data-confirmar`, `cadastro-ligacoes.js`), reaplica uma vez e NÃO publica: o N do botão e a rota usam a mesma função. Prova: `tests/test_cadastro_ligacoes_lote.py`.
 - **Geração em linhas (08/10/2026): sistemas `BD_Thopen · aba` e `BD_Performance · aba`** (`ligacoes.FONTES_ABA`;
   chave = o nome da aba de geração, a mesma regra de `nexus.dados.geracao.abas_de_geracao`). "Ler as bases de novo" faz
   +171 leituras de 1 linha (~8 s) e lê a tabela Equipamentos. Os caminhos, nesta ordem:

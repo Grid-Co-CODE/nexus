@@ -246,6 +246,8 @@ details.cad-dif summary{cursor:pointer;padding:9px 12px;color:var(--tinta-2);fon
 /* Base → Ligações entre bases (04/10/2026): os buracos do de_para à vista, e a correção na própria linha */
 .lig-acoes{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-start}
 .lig-acoes form{margin:0}
+.lig-lote{margin:0 0 10px}
+.lig-lote .gc-btn{max-width:100%;white-space:normal;text-align:left}
 .lig-meta{color:var(--mudo);font-size:12.5px;margin:4px 0 12px}
 .lig-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px;margin:14px 0 6px}
 .lig-card{display:flex;flex-direction:column;gap:4px;background:var(--superficie);border:1px solid var(--linha);border-radius:var(--raio-md);

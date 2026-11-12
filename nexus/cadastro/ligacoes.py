@@ -533,6 +533,31 @@ def _indice_fama(usinas: list[dict], linhas_de_para: list) -> dict:
     return ligacao_fama.indice(usinas, fracttal)
 
 
+def sugestoes_de_100(buracos: list[dict], sistema: str) -> dict:
+    """O que o botão "Ligar as sugestões de 100%" liga numa base (11/11/2026: a FAMA tinha 34 buracos com UMA sugestão de
+    100%, e clicar 34 vezes era demais). Só liga o buraco com EXATAMENTE uma sugestão, de nota 100; a mesma usina como
+    100% de duas chaves é ambíguo e as duas ficam para a pessoa. A tela conta o N e a rota liga por esta função só.
+    Devolve {"ligar": [(chave, usina_id)], "pulos": {"varias": n, "abaixo": n, "sem": n, "repetida": n}}."""
+    pulos = {"varias": 0, "abaixo": 0, "sem": 0, "repetida": 0}
+    unicas = []
+    for b in buracos:
+        if b["sistema"] != sistema:
+            continue
+        sug = b.get("sugestoes") or []
+        if not sug:
+            pulos["sem"] += 1
+        elif len(sug) > 1:
+            pulos["varias"] += 1
+        elif sug[0]["nota"] < 100:
+            pulos["abaixo"] += 1
+        else:
+            unicas.append((b["chave"], sug[0]["id"]))
+    por_usina = Counter(u for _, u in unicas)
+    ligar = [(c, u) for c, u in unicas if por_usina[u] == 1]
+    pulos["repetida"] = len(unicas) - len(ligar)
+    return {"ligar": ligar, "pulos": pulos}
+
+
 def panorama(srv, atual: dict | None, regras: dict) -> dict:
     """Os números por base e as quatro listas da tela."""
     usinas = _usinas(srv)
