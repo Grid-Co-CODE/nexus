@@ -299,8 +299,14 @@ def gerar_pagina(index_html: str) -> str:
                   'Operação &gt; 1. Performance">Mais novo da pasta</button>',
                '<button class="btn2" id="fzNovo" title="Volta para o relatório mais novo que subiu ao Nexus">Mais novo no '
                'Nexus</button>', "furos: mais novo")
+    # os filtros dos Furos no modelo do Histórico de OS (12/11/2026): o painel e as etiquetas da Zeladoria (zf-*) e a barra
+    t = _troca(t, "</style>\n</head>",
+               "</style>\n{% endraw %}<link rel=\"stylesheet\" href=\"{{ url_for('static', filename='zeladoria/filtros.css') }}\">\n"
+               "<link rel=\"stylesheet\" href=\"{{ url_for('static', filename='coletas/coletas.css') }}\">{% raw %}\n</head>",
+               "filtros: css")
     t = _troca(t, '<script src="furos.js"></script>',
-               "{% endraw %}<script src=\"{{ url_for('static', filename='coletas/furos.js') }}\"></script>{% raw %}", "furos.js")
+               "{% endraw %}<script src=\"{{ url_for('static', filename='coletas/furos.js') }}\"></script>\n"
+               "<script src=\"{{ url_for('static', filename='coletas/filtros.js') }}\" defer></script>{% raw %}", "furos.js")
     t = _troca(t, "const api = () => window.pywebview.api;", SHIM, "api")
     t = _troca(t, BDS_VELHO, BDS_NOVO, "bds")
     t = _troca(t, INICIAR_VELHO, INICIAR_NOVO, "iniciar")
@@ -321,12 +327,64 @@ $("#bd-thopen").onclick = async () => aplicarEstado(await api().escolher_bd("BD_
     return t
 
 
+FUROS_VARIOS = [
+    ('const FILTROS = ["fzQ", "fzCli", "fzCart", "fzSrc", "fzSt", "fzSit"];',
+     'const FILTROS = ["fzQ", "fzCli", "fzCart", "fzSrc", "fzSt", "fzSit"];\n'
+     '  // Nexus (Coletas): vários valores por filtro, como o Histórico de OS; nenhum marcado = todos\n'
+     '  const vs = i => [...$f(i).options].filter(o => o.selected && o.value !== "").map(o => o.value);\n'
+     '  const sitOk = (x, m) => x === "falha" ? m.sit === "falha" : x === "conf" ? m.sit === "conf" : x === "ok" ? m.sit === "ok" :\n'
+     '    x === "ipoa" ? !!m.ipF : x === "ghi" ? !!m.ghF : x === "inop" ? !!m.inopN : x === "os" ? !!m.ex : x === "noos" ? !!m.noos :\n'
+     '    x === "inv" ? !!m.invF : true;',
+     "furos: vários"),
+    ('const ps = P(), keep = [$f("fzCli").value, $f("fzCart").value, $f("fzSt").value];',
+     'const ps = P(), keep = [vs("fzCli"), vs("fzCart"), vs("fzSt")];', "furos: guardar"),
+    ('$f("fzCli").value = keep[0]; $f("fzCart").value = keep[1]; $f("fzSt").value = keep[2];',
+     '[["fzCli", 0], ["fzCart", 1], ["fzSt", 2]].forEach(([i, k]) => [...$f(i).options].forEach(o => '
+     '{ o.selected = o.value !== "" && keep[k].includes(o.value); }));', "furos: remarcar"),
+    ('let n = FILTROS.filter(i => $f(i).value).length;',
+     'let n = FILTROS.filter(i => i === "fzQ" ? $f(i).value : vs(i).length).length;', "furos: ativos"),
+    ('FILTROS.forEach(i => { $f(i).value = ""; }); cliSel = "";',
+     'FILTROS.forEach(i => { if (i === "fzQ") $f(i).value = ""; else [...$f(i).options].forEach(o => { o.selected = false; }); }); '
+     'cliSel = "";', "furos: limpar"),
+    ('const q = $f("fzQ").value.toLowerCase(), c = $f("fzCli").value, ca = $f("fzCart").value, s = $f("fzSrc").value, '
+     'st = $f("fzSt").value, sit = $f("fzSit").value;',
+     'const q = $f("fzQ").value.toLowerCase(), c = vs("fzCli"), ca = vs("fzCart"), s = vs("fzSrc"), st = vs("fzSt"), '
+     'sit = vs("fzSit");', "furos: ler"),
+    ('      if (c && p.cliente !== c) return false; if (ca && p.carteira !== ca) return false; if (s && p.src !== s) return false;\n'
+     '      if (st && (p.status || "—") !== st) return false; if (q && !p.usina.toLowerCase().includes(q)) return false;\n'
+     '      if (sit === "falha" && m.sit !== "falha") return false; if (sit === "conf" && m.sit !== "conf") return false; '
+     'if (sit === "ok" && m.sit !== "ok") return false;\n'
+     '      if (sit === "ipoa" && !m.ipF) return false; if (sit === "ghi" && !m.ghF) return false; if (sit === "inop" && !m.inopN) '
+     'return false;\n'
+     '      if (sit === "os" && !m.ex) return false; if (sit === "noos" && !m.noos) return false; if (sit === "inv" && !m.invF) '
+     'return false;',
+     '      if (c.length && !c.includes(p.cliente)) return false; if (ca.length && !ca.includes(p.carteira)) return false; '
+     'if (s.length && !s.includes(p.src)) return false;\n'
+     '      if (st.length && !st.includes(p.status || "—")) return false; if (q && !p.usina.toLowerCase().includes(q)) return false;\n'
+     '      if (sit.length && !sit.some(x => sitOk(x, m))) return false;', "furos: filtrar"),
+    ('e.onclick = () => { cliSel = e.dataset.c; $f("fzCli").value = cliSel; render(); });',
+     'e.onclick = () => { cliSel = e.dataset.c; [...$f("fzCli").options].forEach(o => { o.selected = !!cliSel && o.value === cliSel; }); '
+     'render(); });', "furos: chip do cliente"),
+    ('if (i === "fzOS") applyOS(); if (i === "fzCli") cliSel = $f("fzCli").value; render();',
+     'if (i === "fzOS") applyOS(); if (i === "fzCli") { const v = vs("fzCli"); cliSel = v.length === 1 ? v[0] : ""; } render();',
+     "furos: cliente escolhido"),
+    ('    $f("fzContagem").textContent = rr.length + " de " + all.length + " usinas";',
+     '    $f("fzContagem").textContent = rr.length + " de " + all.length + " usinas";\n'
+     '    if (window.coletasFiltros) window.coletasFiltros.atualizar();     // Nexus: a barra no modelo do Histórico de OS',
+     "furos: barra"),
+]
+
+
 def gerar_furos_js(furos_js: str) -> str:
     t = furos_js.replace("\r\n", "\n")
     # no Nexus o CSV e o JSON são baixados pelo navegador (não vão para a "pasta do Conversor")
     t = _troca(t, 'toast("Salvo: " + p.split("\\\\").pop() + " (pasta do Conversor)");',
                'toast("Baixado: " + p.split("\\\\").pop());', "furos: salvar")
     t = _troca(t, 'toast("Salvo: " + p.split("\\\\").pop());', 'toast("Baixado: " + p.split("\\\\").pop());', "furos: html")
+    # os filtros no modelo do Histórico de OS (Levi, 12/11/2026; static/coletas/filtros.js): cada filtro aceita VÁRIOS
+    # valores (os <select> viram multiple; nenhum marcado = todos), e o desenho avisa a barra ao fim de cada render
+    for velho, novo, onde in FUROS_VARIOS:
+        t = _troca(t, velho, novo, onde)
     return ("// GERADO por ferramentas/portar_tela_conversor.py a partir do ui/furos.js do Conversor Grid Co.: não edite aqui.\n"
             + t)
 

@@ -351,3 +351,18 @@ def test_os_furos_sobem_e_todos_veem_o_mesmo(coletas, app, tmp_path):
     assert ruim.status_code == 400
     m = coletas.post("/t/performance/coletas/furos/html", json={"conf": {"a": {"r": "ok"}}})
     assert m.status_code == 200 and '/*CONF0*/{"a": {"r": "ok"}}/*END0*/' in m.get_data(as_text=True)
+
+
+# ── os filtros dos Furos no modelo do Histórico de OS (12/11/2026) ─────────────────────────────────────────────────
+def test_os_furos_usam_o_painel_do_historico_e_varios_valores(coletas):
+    html = coletas.get("/t/performance/coletas/app").get_data(as_text=True)
+    assert "/static/zeladoria/filtros.css" in html and "/static/coletas/filtros.js" in html and "/static/coletas/coletas.css" in html
+    furos = open(os.path.join(RAIZ, "nexus", "static", "coletas", "furos.js"), encoding="utf-8").read()
+    assert 'const vs = i => [...$f(i).options]' in furos                      # cada filtro lê vários valores
+    assert 'if (sit.length && !sit.some(x => sitOk(x, m))) return false;' in furos
+    assert 'p.cliente !== c' not in furos                                      # não sobrou o filtro de um valor só
+    assert "window.coletasFiltros.atualizar()" in furos
+    peca = open(os.path.join(RAIZ, "nexus", "static", "coletas", "filtros.js"), encoding="utf-8").read()
+    for campo in ("fzCli", "fzCart", "fzSrc", "fzSt", "fzSit", "fzZero", "fzOS", "fzConf"):
+        assert '"%s"' % campo in peca                                          # todos os filtros do .exe no painel
+    assert "Aplicar" in peca and "Limpar tudo" in peca and "zf-badge" in peca

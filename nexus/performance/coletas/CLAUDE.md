@@ -65,6 +65,20 @@ só com o Excel solto.
   ficam no navegador dela (como no HTML original); **confirmação compartilhada é dado novo no banco**: catálogo antes e
   decisão do Levi.
 
+## Os filtros dos Furos: o modelo do Histórico de OS (12/11/2026)
+
+Levi: "arrume esses filtros para ficar no padrão exatamente dos filtros de Histórico de OS com o mesmo estilo e
+funcionalidades!". `static/coletas/filtros.js` monta, por fora da tela gerada, o modelo A do Histórico (README do OS Creator,
+"Os filtros do Histórico só valem no Aplicar"), com o CSS da Zeladoria (`static/zeladoria/filtros.css`, as `zf-*`, a cópia do
+Histórico) e a barra em `static/coletas/coletas.css`: a busca na barra (filtra enquanto se digita), o botão Filtros com a
+contagem verde (a busca não conta), o painel suspenso com Aplicar (nada filtra antes), o ponto no campo que mudou, as
+etiquetas azuis com × (aplica na hora) e o Limpar tudo (os filtros, a busca e os da coluna da tabela); Esc e clique fora
+descartam. Cliente, Carteira, Fonte, Status e Situação são **listas digitáveis de marcar vários** (nenhum = todos; a
+Situação passa a usina que cumpre QUALQUER uma das marcadas); as três chaves que mudam a conta (zerado como furo, OS como
+ausência esperada, confirmados como OK) ficam no painel como marcas, com etiqueta quando desligadas. O `furos.js` gerado
+lê os vários valores pelas trocas `FUROS_VARIOS` do `portar_tela_conversor.py` (os `<select>` do .exe viram `multiple`).
+Nenhum filtro novo nem padrão novo: os mesmos campos do .exe.
+
 ## Como provar
 
 - `python -m pytest -q tests/test_coletas.py`. O que importa: `test_o_bd_do_banco_da_a_mesma_conversao_que_o_excel`

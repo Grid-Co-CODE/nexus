@@ -231,6 +231,8 @@
   .bruto-top .sel{min-width:0}
   [hidden]{display:none!important}
 </style>
+{% endraw %}<link rel="stylesheet" href="{{ url_for('static', filename='zeladoria/filtros.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='coletas/coletas.css') }}">{% raw %}
 </head>
 <body>
   <div class="top">
@@ -351,7 +353,8 @@
       <span><button class="btn2" id="notas-nao">Agora não</button> <button class="btn" id="notas-sim">Atualizar</button></span></div>
   </div></div>
 
-{% endraw %}<script src="{{ url_for('static', filename='coletas/furos.js') }}"></script>{% raw %}
+{% endraw %}<script src="{{ url_for('static', filename='coletas/furos.js') }}"></script>
+<script src="{{ url_for('static', filename='coletas/filtros.js') }}" defer></script>{% raw %}
 <script>
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));

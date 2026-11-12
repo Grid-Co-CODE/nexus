@@ -167,30 +167,33 @@ const furos = (() => {
 
   // ---------------------------------------------------------------- filtros
   const FILTROS = ["fzQ", "fzCli", "fzCart", "fzSrc", "fzSt", "fzSit"];
+  // Nexus (Coletas): vários valores por filtro, como o Histórico de OS; nenhum marcado = todos
+  const vs = i => [...$f(i).options].filter(o => o.selected && o.value !== "").map(o => o.value);
+  const sitOk = (x, m) => x === "falha" ? m.sit === "falha" : x === "conf" ? m.sit === "conf" : x === "ok" ? m.sit === "ok" :
+    x === "ipoa" ? !!m.ipF : x === "ghi" ? !!m.ghF : x === "inop" ? !!m.inopN : x === "os" ? !!m.ex : x === "noos" ? !!m.noos :
+    x === "inv" ? !!m.invF : true;
   function fillFilters() {
-    const ps = P(), keep = [$f("fzCli").value, $f("fzCart").value, $f("fzSt").value];
+    const ps = P(), keep = [vs("fzCli"), vs("fzCart"), vs("fzSt")];
     $f("fzCli").innerHTML = '<option value="">Todos</option>' + [...new Set(ps.map(p => p.cliente))].sort().map(c => `<option>${esc(c)}</option>`).join("");
     $f("fzCart").innerHTML = '<option value="">Todas</option>' + [...new Set(ps.filter(p => p.cliente === "Thopen").map(p => p.carteira))].sort().map(c => `<option>${esc(c)}</option>`).join("");
     $f("fzSt").innerHTML = '<option value="">Todos</option>' + [...new Set(ps.map(p => p.status || "—"))].sort().map(c => `<option>${esc(c)}</option>`).join("");
-    $f("fzCli").value = keep[0]; $f("fzCart").value = keep[1]; $f("fzSt").value = keep[2];
+    [["fzCli", 0], ["fzCart", 1], ["fzSt", 2]].forEach(([i, k]) => [...$f(i).options].forEach(o => { o.selected = o.value !== "" && keep[k].includes(o.value); }));
   }
   function ativos() {
-    let n = FILTROS.filter(i => $f(i).value).length;
+    let n = FILTROS.filter(i => i === "fzQ" ? $f(i).value : vs(i).length).length;
     n += Object.values(COLF[TAB]).filter(v => v !== "").length;
     return n;
   }
   function limparFiltros() {
-    FILTROS.forEach(i => { $f(i).value = ""; }); cliSel = ""; COLF.res = {}; COLF.det = {}; render();
+    FILTROS.forEach(i => { if (i === "fzQ") $f(i).value = ""; else [...$f(i).options].forEach(o => { o.selected = false; }); }); cliSel = ""; COLF.res = {}; COLF.det = {}; render();
   }
   const rowsAll = () => P().map(p => ({p, m: calc(p)}));
   function filtered() {
-    const q = $f("fzQ").value.toLowerCase(), c = $f("fzCli").value, ca = $f("fzCart").value, s = $f("fzSrc").value, st = $f("fzSt").value, sit = $f("fzSit").value;
+    const q = $f("fzQ").value.toLowerCase(), c = vs("fzCli"), ca = vs("fzCart"), s = vs("fzSrc"), st = vs("fzSt"), sit = vs("fzSit");
     return rowsAll().filter(({p, m}) => {
-      if (c && p.cliente !== c) return false; if (ca && p.carteira !== ca) return false; if (s && p.src !== s) return false;
-      if (st && (p.status || "—") !== st) return false; if (q && !p.usina.toLowerCase().includes(q)) return false;
-      if (sit === "falha" && m.sit !== "falha") return false; if (sit === "conf" && m.sit !== "conf") return false; if (sit === "ok" && m.sit !== "ok") return false;
-      if (sit === "ipoa" && !m.ipF) return false; if (sit === "ghi" && !m.ghF) return false; if (sit === "inop" && !m.inopN) return false;
-      if (sit === "os" && !m.ex) return false; if (sit === "noos" && !m.noos) return false; if (sit === "inv" && !m.invF) return false;
+      if (c.length && !c.includes(p.cliente)) return false; if (ca.length && !ca.includes(p.carteira)) return false; if (s.length && !s.includes(p.src)) return false;
+      if (st.length && !st.includes(p.status || "—")) return false; if (q && !p.usina.toLowerCase().includes(q)) return false;
+      if (sit.length && !sit.some(x => sitOk(x, m))) return false;
       return true;
     });
   }
@@ -318,7 +321,7 @@ const furos = (() => {
     all.forEach(({p, m}) => { const c = cs[p.cliente] = cs[p.cliente] || {n: 0, f: 0}; c.n++; if (m.sit === "falha") c.f++; });
     $f("fzClients").innerHTML = `<button class="fz-chip ${cliSel === "" ? "on" : ""}" data-c="">Todos <i>${all.filter(x => x.m.sit === "falha").length}</i>/${all.length}</button>` +
       Object.keys(cs).sort().map(k => `<button class="fz-chip ${cliSel === k ? "on" : ""}" data-c="${esc(k)}">${esc(k)} <i>${cs[k].f}</i>/${cs[k].n}</button>`).join("");
-    $f("fzClients").querySelectorAll(".fz-chip").forEach(e => e.onclick = () => { cliSel = e.dataset.c; $f("fzCli").value = cliSel; render(); });
+    $f("fzClients").querySelectorAll(".fz-chip").forEach(e => e.onclick = () => { cliSel = e.dataset.c; [...$f("fzCli").options].forEach(o => { o.selected = !!cliSel && o.value === cliSel; }); render(); });
     const rows = filtered(), n = k => rows.filter(r => r.m.sit === k).length;
     const cT = rows.reduce((a, r) => a + r.m.cellT, 0), cP = rows.reduce((a, r) => a + r.m.cp, 0);
     const emU = f => "em " + rows.filter(f).length + " usina(s)";
@@ -342,6 +345,7 @@ const furos = (() => {
     $f("fzLimpar").textContent = na ? "Limpar filtros (" + na + ")" : "Limpar filtros";
     $f("fzLimpar").disabled = !na;
     $f("fzContagem").textContent = rr.length + " de " + all.length + " usinas";
+    if (window.coletasFiltros) window.coletasFiltros.atualizar();     // Nexus: a barra no modelo do Histórico de OS
     const nc = Object.keys(CONF).length, ne = Object.keys(REL.conf_arquivo || {}).length;
     $f("fzNconf").textContent = "Confirmações: " + nc + (ne ? " (do relatório: " + ne + ")" : "");
   }
@@ -426,7 +430,7 @@ const furos = (() => {
   function iniciar() {
     $f("fzMes").onchange = () => { MONTH = $f("fzMes").value; OPEN.res.clear(); OPEN.det.clear(); SHOWALL.clear(); fillFilters(); subtitulo(); render(); };
     ["fzCli", "fzCart", "fzSrc", "fzSt", "fzSit", "fzZero", "fzConf", "fzOS"].forEach(i => $f(i).onchange = () => {
-      if (i === "fzOS") applyOS(); if (i === "fzCli") cliSel = $f("fzCli").value; render();
+      if (i === "fzOS") applyOS(); if (i === "fzCli") { const v = vs("fzCli"); cliSel = v.length === 1 ? v[0] : ""; } render();
     });
     $f("fzQ").oninput = render;
     $f("fzLimpar").onclick = limparFiltros;
