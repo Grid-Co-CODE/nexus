@@ -14,6 +14,7 @@ from flask import current_app, redirect, request
 
 from . import banco as B
 from . import ligacoes as L
+from ..auth.origem import de_outro_site as _de_outro_site
 from ..prefixo import na_raiz
 from .telas import _quem, _tela
 
@@ -50,7 +51,8 @@ def contexto(srv, cfg, args) -> dict:
             if (not sistema or s == sistema) and g]
     contagem = {"buracos": len(filtra(p["buracos"])), "por-nome": len(filtra(p["por_nome"])),
                 "fora": sum(t for _, t, _ in fora), "decisoes": len(p["decisoes"])}
-    return dict(p=p, aba=aba, abas=ABAS, sistema=sistema, buracos=filtra(p["buracos"]), por_nome=filtra(p["por_nome"]),
+    lote = L.sugestoes_de_100(p["buracos"], sistema) if sistema else {"ligar": []}
+    return dict(p=p, aba=aba, n_sugestoes_100=len(lote["ligar"]), abas=ABAS, sistema=sistema, buracos=filtra(p["buracos"]), por_nome=filtra(p["por_nome"]),
                 fora=fora, contagem=contagem, gerado_em=_hora(p["gerado_em"]), hora=_hora, ok=args.get("ok"),
                 erro=args.get("erro"), pode_publicar=bool(cfg.get("GRIDCO_SQL_TOKEN")))
 
@@ -83,6 +85,40 @@ def registrar_ligacoes(bp):
             return _volta(erro=str(ex))
         L.reaplicar(cfg, srv)
         return _volta(ok="Decisão gravada e aplicada.")
+
+    @bp.route("/ligacoes/aceitar-sugestoes", methods=["POST"])
+    @_tela("Ligações entre bases")
+    def ligacoes_aceitar_sugestoes(srv):
+        """Liga de uma vez, numa base só, os buracos com UMA sugestão de 100% (a regra: `L.sugestoes_de_100`, a mesma que
+        conta o N do botão). Não publica: o "Publicar no banco" segue sendo o passo do administrador."""
+        if _de_outro_site():
+            return "Pedido de outro site: nada foi ligado.", 403
+        cfg = current_app.config
+        sistema = request.form.get("alvo_sistema", "")
+        if not sistema:
+            return _volta(erro="Escolha uma base: o botão vale para uma base por vez.")
+        p = L.panorama(srv, L.ler(cfg), L.carregar_regras(cfg))
+        lote = L.sugestoes_de_100(p["buracos"], sistema)
+        feitas, recusadas = 0, []
+        for chave, usina_id in lote["ligar"]:
+            try:                 # uma recusa não para o lote nem deixa as outras sem o reaplicar do fim
+                L.decidir(cfg, "ligar", sistema, chave=chave, usina_id=usina_id,
+                          motivo="sugestão de 100% aceita em lote", quem=_quem())
+                feitas += 1
+            except L.DecisaoInvalida as ex:
+                recusadas.append(f"{chave} ({str(ex)[:80]})")
+        if feitas:
+            L.reaplicar(cfg, srv)
+        n, pu = feitas, lote["pulos"]
+        msg = f"{n} ligaç{'ões feitas' if n != 1 else 'ão feita'} (as sugestões de 100% sem outra parecida). Publique no banco para valer."
+        por = [f"{q} {txt}" for q, txt in ((pu["varias"], "com mais de uma sugestão"), (pu["abaixo"], "com sugestão abaixo de 100%"),
+                                           (pu["sem"], "sem sugestão"), (pu["repetida"], "com a mesma usina sugerida a duas chaves"))
+               if q]
+        if por:
+            msg += f" Ficaram {sum(pu.values())} para você decidir: " + ", ".join(por) + "."
+        if recusadas:
+            msg += f" {len(recusadas)} recusada(s) pelo de-para: " + "; ".join(recusadas[:5]) + "."
+        return _volta(ok=msg)
 
     @bp.route("/ligacoes/publicar", methods=["POST"])
     @_tela("Ligações entre bases")

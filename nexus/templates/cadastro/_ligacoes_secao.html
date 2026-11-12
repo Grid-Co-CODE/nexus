@@ -3,6 +3,7 @@
    Só admin com o cadastro ligado: o resto vê o aviso da Governança. #}
 {% macro alvo(sistema) %}<input type="hidden" name="alvo_sistema" value="{{ sistema }}"><input type="hidden" name="aba" value="{{ aba }}">{% if request.args.get('sistema') %}<input type="hidden" name="sistema" value="{{ request.args.get('sistema') }}">{% endif %}{% endmacro %}
 <link rel="stylesheet" href="{{ url_for('static', filename='cadastro.css') }}">
+<script src="{{ url_for('static', filename='cadastro-ligacoes.js') }}" defer></script>
 <div class="cad-topo">
   <div>
     <h2 class="dd-h2" style="margin-top:0">Ligações entre bases</h2>
@@ -43,8 +44,16 @@
 
 {% if aba == 'buracos' %}
 <p class="lig-ajuda">Chave de uma base que não ligou a usina nenhuma. Ligue a uma usina do cadastro do Nexus ou diga por que ignorar. Ligar grava só no Nexus que essa chave é aquela usina: a base de origem e o Fracttal não mudam. Vai ao banco quando você publicar.</p>
+{% if sistema and n_sugestoes_100 %}
+<form method="post" action="{{ raiz }}/t/base/ligacoes/aceitar-sugestoes" class="lig-lote" data-confirmar="Ligar {{ n_sugestoes_100 }} chaves de {{ sistema }} às usinas sugeridas (nome igual, 100%)? Só entram as que têm uma sugestão e nenhuma outra parecida. Vale na hora; vai ao banco quando você publicar.">{{ alvo(sistema) }}
+  <button class="gc-btn gc-btn--primario" type="submit"><i class="ph ph-link"></i> Ligar as {{ n_sugestoes_100 }} sugestões de 100%</button>
+</form>
+{% endif %}
 <div class="cad-rolagem">
-<table class="cad-tabela lig-tabela">
+{# as colunas com largura fixa (12/11/2026, Levi: "Lista toda torta"): o "por quê" quebrava em 5 linhas e os campos de
+   ligar e ignorar dançavam de linha para linha #}
+<table class="cad-tabela lig-tabela lig-buracos">
+  <colgroup><col class="lig-c-base"><col class="lig-c-chave"><col class="lig-c-porque"><col class="lig-c-sug"><col class="lig-c-ligar"><col class="lig-c-ignorar"></colgroup>
   <thead><tr><th>Base</th><th>Chave na base</th><th>Por quê</th><th>Sugestões do Nexus</th><th>Ligar a uma usina do cadastro</th><th>Ignorar</th></tr></thead>
   <tbody>
   {% for b in buracos %}
