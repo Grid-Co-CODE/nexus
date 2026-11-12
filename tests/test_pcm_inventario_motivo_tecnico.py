@@ -9,6 +9,7 @@ independente, escrita com o `cryptography` direto (o que o App faz). Dado de men
 import base64
 import json
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 from cryptography.exceptions import InvalidTag
@@ -66,7 +67,7 @@ def _eventos(cfg):
 def test_o_vetor_fixo_do_contrato(cfg, monkeypatch):
     """Com o nonce fixo, a cifra do Nexus é byte a byte a do vetor; a decifração independente (a do App) o lê; e o Nexus
     decifra o que cifrou."""
-    monkeypatch.setattr(cifra.os, "urandom", lambda n: NONCE[:n])
+    monkeypatch.setattr(cifra, "os", SimpleNamespace(urandom=lambda n: NONCE[:n]))
     valor = F.motivo_para_o_tecnico(cfg, EVENTO, MOTIVO)
     assert valor == VETOR
     assert _abrir_como_o_app(CHAVE_HMAC, EVENTO, VETOR) == MOTIVO
@@ -85,8 +86,7 @@ def test_a_cifra_e_amarrada_ao_evento_e_a_chave(cfg):
         _abrir_como_o_app("outra-chave", EVENTO, valor)
     assert F.motivo_do_tecnico(cfg, {"evento_id": "ev-outro", "motivo_tecnico": valor}) == ""
     assert F.motivo_do_tecnico(dict(cfg, NEXUS_PESSOA_HMAC="outra-chave"), {"evento_id": EVENTO, "motivo_tecnico": valor}) == ""
-    # a cifra do técnico NÃO é a do cadastro: o Cofre não a abre, e a chave do cadastro não entra na conta
-    assert F.motivo_para_o_tecnico(dict(cfg, NEXUS_CHAVE_CADASTRO=gerar_chave()), EVENTO, MOTIVO) != valor
+    # a chave do cadastro não entra na conta: sem ela, o App abre do mesmo jeito
     assert _abrir_como_o_app(CHAVE_HMAC, EVENTO,
                              F.motivo_para_o_tecnico(dict(cfg, NEXUS_CHAVE_CADASTRO=""), EVENTO, MOTIVO)) == MOTIVO
 
@@ -226,3 +226,75 @@ def test_no_banco_a_coluna_nova_passa_pela_trava_e_pela_conferencia(app):
     finally:
         app.extensions.pop("nexus_dados_sessao", None)
         F.limpar()
+
+
+
+# ── a revisão do motivo (fix-motivo): os dados fora do formato, a qualidade e o texto em claro na coluna ─────────────
+
+def _linha_velha(cfg, tipo, dados_json, **mais):
+    """Uma linha de recontagem que já está no livro, gravada por fora do `acrescentar` de hoje (um Nexus de antes, ou quem tem
+    o token de escrita): o `dados_cifrados` com o JSON que se quiser."""
+    from nexus.cadastro.cifra import Cofre
+    ev = {"evento_id": mais.pop("evento_id", "ev-velho-0001"), "quando": "2026-11-10T12:00:00Z", "data_id": 20261110,
+          "contagem_id": "C-V", "tipo": tipo, "id_almoxarifado": ALMOX, **mais}
+    ev["dados_cifrados"] = Cofre(cfg["NEXUS_CHAVE_CADASTRO"]).cifrar(dados_json, F._ctx(F.ABA_EVENTO, ev))
+    arq = Path(cfg["NEXUS_ALMOX_INVENTARIO_ARQUIVO"])
+    d = json.loads(arq.read_text(encoding="utf-8")) if arq.exists() else {a: [] for a in F.ABAS_FATO}
+    d[F.ABA_EVENTO].append({c: ev.get(c) for c in F.CAB_EVENTO})
+    arq.write_text(json.dumps(d, ensure_ascii=False), encoding="utf-8")
+    F.limpar()
+
+
+@pytest.mark.parametrize("dados_json", ['["x"]', '"x"', '{"outro": "campo"}', '{"motivo": 7}', "null"])
+def test_a_recontagem_com_dados_fora_do_formato_nao_trava_o_livro(cfg, dados_json):
+    """A revisão reproduziu (I2): uma recontagem com `dados` que não é dict levantava AttributeError em TODA gravação seguinte
+    do livro, de qualquer aba. O retroativo pula a linha, e a qualidade a conta como sem motivo para o técnico."""
+    _linha_velha(cfg, "recontagem_pedida", dados_json)
+    F.acrescentar(cfg, F.ABA_EVENTO, [_ev("contagem_recebida", contagem_id="C-2")])
+    F.acrescentar(cfg, F.ABA_REGUA, [{"id_almoxarifado": ALMOX, "id_item": "5001", "acordado_min_qtd": 1}])
+    ev = _eventos(cfg)
+    assert len(ev) == 2 and not ev[0].get("motivo_tecnico")
+    extra = json.loads(F.linha_qualidade(F.ABA_EVENTO, ev, "2026-11-12T00:00:00Z", cfg)[
+        F.CAB_QUALIDADE.index("extra")])
+    assert extra["recontagem_sem_motivo_tecnico"] == 1 and "recontagem_com_motivo_tecnico" not in extra
+
+
+def test_dados_que_nao_e_dicionario_e_erro_de_quem_chama(cfg):
+    """O `dados` é um dicionário (o `{"motivo": ...}`): a lista ou o texto não entram mais no livro."""
+    for ruim in (["x"], "x"):
+        with pytest.raises(ValueError, match="dados"):
+            F.acrescentar(cfg, F.ABA_EVENTO, [_ev("recontagem_pedida", dados=ruim)])
+    assert _eventos(cfg) == []
+
+
+def test_o_texto_em_claro_na_coluna_vira_cifra_na_gravacao_seguinte(cfg):
+    """Quem tem o token de escrita põe texto em claro na `motivo_tecnico` de uma recontagem (a revisão, M6): na gravação
+    seguinte, o retroativo a troca pela cifra (só a cifra conta como preenchida)."""
+    _linha_velha(cfg, "recontagem_item_pedida", json.dumps({"motivo": "o motivo de verdade"}), id_item="501",
+                 motivo_tecnico="texto em claro posto por fora")
+    F.acrescentar(cfg, F.ABA_EVENTO, [_ev("contagem_recebida", contagem_id="C-2")])
+    velho = _eventos(cfg)[0]
+    assert velho["motivo_tecnico"].startswith("cf1:")
+    assert _abrir_como_o_app(CHAVE_HMAC, velho["evento_id"], velho["motivo_tecnico"]) == "o motivo de verdade"
+    assert "texto em claro" not in Path(cfg["NEXUS_ALMOX_INVENTARIO_ARQUIVO"]).read_text(encoding="utf-8")
+
+
+def test_a_qualidade_separa_o_que_abre_o_que_nao_abre_e_o_sem_chave(cfg):
+    """A qualidade conta abrindo com a chave do técnico (a revisão, M1 e M2): "com" é a que o App abre; a cifra de outra
+    chave conta à parte ("não abre", e o retroativo não a refaz); a vazia é "sem"; e, sem a NEXUS_PESSOA_HMAC no servidor, a
+    marca diz que ninguém pôde conferir nem cifrar."""
+    outra = dict(cfg, NEXUS_PESSOA_HMAC="a-chave-de-outra-instalacao")
+    F.acrescentar(outra, F.ABA_EVENTO, [_ev("recontagem_pedida", dados={"motivo": "da outra chave"})])
+    F.acrescentar(cfg, F.ABA_EVENTO, [_ev("recontagem_item_pedida", id_item="502", dados={"motivo": "desta chave"}),
+                                      _ev("recontagem_item_pedida", id_item="503", dados={"motivo": ""})])
+    ev = _eventos(cfg)
+    q = lambda c: json.loads(F.linha_qualidade(F.ABA_EVENTO, ev, "2026-11-12T00:00:00Z", c)[  # noqa: E731
+        F.CAB_QUALIDADE.index("extra")])
+    extra = q(cfg)
+    assert (extra["recontagem_com_motivo_tecnico"], extra["recontagem_motivo_tecnico_nao_abre"],
+            extra["recontagem_sem_motivo_tecnico"]) == (1, 1, 1)
+    assert "motivo_tecnico_sem_chave" not in extra
+    sem = q({k: v for k, v in cfg.items() if k != "NEXUS_PESSOA_HMAC"})
+    assert sem["motivo_tecnico_sem_chave"] == 1 and sem["recontagem_sem_motivo_tecnico"] == 1
+    # a da outra chave não é refeita (já preenchida), e abre com a chave dela
+    assert F.motivo_do_tecnico(outra, ev[0]) == "da outra chave" and F.motivo_do_tecnico(cfg, ev[0]) == ""

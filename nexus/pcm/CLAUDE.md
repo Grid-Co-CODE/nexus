@@ -1206,9 +1206,12 @@ para usar:
   `dados_cifrados` não se passa pronto. Na recontagem (`recontagem_pedida` e `recontagem_item_pedida`), o módulo põe também
   a cópia para o técnico, `motivo_tecnico` (`motivo_para_o_tecnico`; a prova do contrato com o App é `motivo_do_tecnico`).
   Ela é cifrada com a `NEXUS_PESSOA_HMAC`, não com a chave do cadastro, e fica vazia sem ela. A recontagem antiga ganha a
-  cópia na gravação seguinte, pelo `dados_cifrados`. Essa coluna também não se passa pronta, e nunca vai em claro: nem na
-  tela, nem no log, nem em controle. `motivo=`, nome, e-mail ou `dados_cifrados` como coluna é `ValueError` (erro de quem
-  chama). A pessoa vai como `pessoa_hmac` (sempre, os 24 hexadecimais do `codigo_da_pessoa`) e `pessoa_id` (quando o
+  cópia na gravação seguinte, pelo `dados_cifrados`; o que não é cifra na coluna (o texto posto por fora) também é trocado,
+  e a cifra que já está não é refeita. Essa coluna também não se passa pronta, e nunca vai em claro: nem na tela, nem no log,
+  nem em controle. A qualidade conta as recontagens abrindo a cópia: `com` (o App abre), `nao_abre` (a cifra de outra chave),
+  `sem` (vazia) e a marca `motivo_tecnico_sem_chave`. `motivo=`, nome, e-mail, `dados` que não é dicionário ou
+  `dados_cifrados` como coluna é `ValueError` (erro de quem chama); o `dados` de outro formato já no livro lê como `{}` e não
+  trava a gravação (a revisão do motivo, I2). A pessoa vai como `pessoa_hmac` (sempre, os 24 hexadecimais do `codigo_da_pessoa`) e `pessoa_id` (quando o
   cadastro a acha). Só entra o que cabe na coluna: `situacao` é uma das seis da peça (`dominios.SITUACAO_INVENTARIO`, igual a
   `contas.SITUACOES`), `id_item`, `id_almoxarifado` e `movimento_fracttal` (o folio) são dígitos, `contagem_id`, `chave_linha`
   e `evento_id` não levam espaço.

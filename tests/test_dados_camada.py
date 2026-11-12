@@ -135,12 +135,17 @@ def test_a_coluna_so_cifra_so_leva_cifra(tmp_path):
            "NEXUS_CHAVE_CADASTRO": gerar_chave(), "NEXUS_PESSOA_HMAC": "chave-hmac-de-mentira"}
     fato_inventario.limpar()
     try:
+        # todos os tipos de evento, com e sem motivo: a coluna fica vazia ou com a cifra, nunca com outra coisa
         fato_inventario.acrescentar(cfg, fato_inventario.ABA_EVENTO, [
-            {"tipo": t, "contagem_id": "C-1", "id_almoxarifado": "900", "dados": {"motivo": "texto do PCM de mentira"}}
-            for t in fato_inventario.TIPOS_MOTIVO_TECNICO])
+            {"tipo": t, "contagem_id": f"C-{i}", "id_almoxarifado": "900",
+             **({"dados": {"motivo": "texto do PCM de mentira"}} if i % 2 else {})}
+            for i, t in enumerate(fato_inventario.TIPOS_EVENTO * 2)])
         linhas = json.loads((tmp_path / "inventario.json").read_text(encoding="utf-8"))[fato_inventario.ABA_EVENTO]
         valores = [l[c] for _fid, c in SO_CIFRA for l in linhas]
-        assert len(valores) == 2 and all(str(v).startswith("cf1:") for v in valores)
+        assert valores and all(v in (None, "") or str(v).startswith("cf1:") for v in valores)
+        cifrados = [l for l in linhas if l["motivo_tecnico"]]
+        assert {l["tipo"] for l in cifrados} == set(fato_inventario.TIPOS_MOTIVO_TECNICO)
+        assert all(fato_inventario.motivo_do_tecnico(cfg, l) == "texto do PCM de mentira" for l in cifrados)
         assert "texto do PCM" not in (tmp_path / "inventario.json").read_text(encoding="utf-8")
         with pytest.raises(ValueError, match="motivo_tecnico"):
             fato_inventario.acrescentar(cfg, fato_inventario.ABA_EVENTO, [

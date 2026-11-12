@@ -24,13 +24,12 @@ por vez neste processo (a gravação em segundo plano e a tela do PCM escrevem a
 Regra 8 (a API do banco tem leitura aberta): NENHUMA coluna em claro aceita texto livre. A pessoa vai como `pessoa_id`
 (quando o cadastro a acha) e `pessoa_hmac` (sempre, nunca o e-mail: 24 hexadecimais, o `codigo_da_pessoa`); a `situacao`,
 o `tipo` e a `decisao` são listas fechadas; os IDs do Fracttal são só dígitos; os IDs opacos (evento, contagem, linha)
-não levam espaço. O motivo do PCM, que é texto livre, vai só dentro de `dados_cifrados` (o Cofre do cadastro, amarrado à
-linha), e a coluna NÃO se passa pronta: quem chama passa `dados={"motivo": ...}` e o módulo cifra (um `dados_cifrados`
-com texto em claro foi o furo que a revisão de 26/10/2026 achou). A recontagem leva também uma CÓPIA do motivo para o
-técnico no App, a `motivo_tecnico` (12/11/2026), cifrada numa chave derivada da NEXUS_PESSOA_HMAC: a do cadastro abre CPF,
-telefone e endereço e não vai ao App. O módulo também cifra essa coluna, e ela não se passa pronta. Coluna em claro que
-o livro não tem, e-mail em qualquer coluna e valor fora da lista são erro de quem chama (`ValueError`), nunca texto em
-claro. O estado do trabalho
+não levam espaço. O motivo do PCM, que é texto livre, vai só cifrado: em `dados_cifrados` (o Cofre do cadastro, amarrado à
+linha) e, na recontagem, também na `motivo_tecnico` (12/11/2026), a cópia para o técnico no App, cifrada numa chave
+derivada da NEXUS_PESSOA_HMAC (a do cadastro abre CPF, telefone e endereço e não vai ao App). As duas colunas NÃO se
+passam prontas: quem chama passa `dados={"motivo": ...}` e o módulo cifra (um `dados_cifrados` com texto em claro foi o
+furo que a revisão de 26/10/2026 achou). Coluna em claro que o livro não tem, e-mail em qualquer coluna e valor fora da
+lista são erro de quem chama (`ValueError`), nunca texto em claro. O estado do trabalho
 em andamento (o lote, o ponto de retomada) NÃO mora aqui: é controle, fica na pasta de dados.
 
 Regra 5 (linhagem) e regra 7 (dia de Brasília): o fato com `usina_id` diz por onde a usina ligou (`usina_ligada_por`, o
@@ -313,7 +312,10 @@ def decifrar(cfg, aba: str, linha: dict) -> dict:
         return {}
     try:
         cofre = _cofre(cfg)
-        return json.loads(cofre.decifrar(texto, _ctx(aba, linha))) if cofre else {}
+        d = json.loads(cofre.decifrar(texto, _ctx(aba, linha))) if cofre else {}
+        # o `dados` de outro formato (uma lista, um texto; gravado por fora do `acrescentar` de hoje) vale {}: quem lê faz
+        # `.get` (a revisão do motivo, I2: a recontagem com `dados` em lista travava TODA gravação seguinte do livro)
+        return d if isinstance(d, dict) else {}
     except Exception:    # noqa: BLE001 — cifra de outra chave ou linha mexida: sem o texto
         return {}
 
@@ -360,6 +362,35 @@ def motivo_do_tecnico(cfg, linha: dict) -> str:
 
 def _tem_motivo_tecnico(l: dict) -> bool:
     return str(l.get("motivo_tecnico") or "").startswith("cf1:")
+
+
+def _conta_do_tecnico(cfg, linhas: list[dict]) -> dict:
+    """As recontagens pela cópia do motivo para o técnico (a revisão do motivo, M1 e M2), para o `extra` da qualidade: `com`
+    a que o App abre (conferida com a chave do técnico), `nao_abre` a cifra que esta chave não abre (de outra
+    NEXUS_PESSOA_HMAC: o retroativo não a refaz), `sem` a vazia (sem motivo, ou o `dados` que não se lê). Sem a chave no
+    servidor, ninguém confere: a cifra conta como `com`, e a marca `motivo_tecnico_sem_chave` diz isso."""
+    aead = _aead_do_tecnico(cfg)
+    com = nao_abre = sem = 0
+    for l in linhas:
+        if l.get("tipo") not in TIPOS_MOTIVO_TECNICO:
+            continue
+        if not _tem_motivo_tecnico(l):
+            sem += 1
+        elif aead is None or _abre(aead, l):
+            com += 1
+        else:
+            nao_abre += 1
+    return {"recontagem_com_motivo_tecnico": com, "recontagem_motivo_tecnico_nao_abre": nao_abre,
+            "recontagem_sem_motivo_tecnico": sem, "motivo_tecnico_sem_chave": int(aead is None and com + nao_abre + sem > 0)}
+
+
+def _abre(aead, l: dict) -> bool:
+    from ..cadastro.cifra import decifrar_com
+    try:
+        decifrar_com(aead, l.get("motivo_tecnico"), _ctx_do_tecnico(l.get("evento_id")))
+        return True
+    except Exception:    # noqa: BLE001 — a cifra de outra chave ou de outro evento
+        return False
 
 
 def _com_o_motivo_tecnico(cfg, eventos: list[dict]) -> None:
@@ -448,6 +479,8 @@ def _preparar(cfg, aba: str, x: dict, agora: datetime) -> dict:
                          "o técnico; texto em claro nessa coluna seria lido por quem abre o banco (a API é aberta)")
     if x.get("dados") and "dados_cifrados" not in cab:
         raise ValueError(f"a aba {aba} não tem onde cifrar texto livre (`dados`): ela é só número")
+    if x.get("dados") is not None and not isinstance(x["dados"], dict):
+        raise ValueError("dados é um dicionário (o `{\"motivo\": ...}`), e não uma lista ou um texto: quem lê faz `.get`")
     linha = {}
     for c in cab:
         v = x.get(c)
@@ -519,20 +552,18 @@ def _pct(n: int, total: int):
     return round(100.0 * n / total, 1) if total else None
 
 
-def linha_qualidade(aba: str, linhas: list[dict], agora: str) -> list:
+def linha_qualidade(aba: str, linhas: list[dict], agora: str, cfg=None) -> list:
     """A linha da aba `qualidade` no cabeçalho da casa (`fatos.CAB_QUALIDADE`), preenchida pelo nome da coluna: quanto do
     fato liga a data, a usina e a pessoa (a Governança mostra as barras), quantas usinas ligaram pela de-para (a única
     linhagem que o almoxarifado tem) e, no `extra`, quantos de cada tipo de evento ou decisão (só número e texto: a tela
-    não mostra o que é lista)."""
+    não mostra o que é lista). No evento, as recontagens pela cópia do motivo para o técnico (`_conta_do_tecnico`, com o
+    `cfg` da gravação)."""
     cab, n = CABS[aba], len(linhas)
     com = {c: sum(1 for l in linhas if not _vazio(l.get(c))) for c in ("data_id", "usina_id", "pessoa_id") if c in cab}
     quando = "quando" if aba == ABA_EVENTO else "decidida_em"
     if aba == ABA_EVENTO:
         extra = {f"tipo_{t}": sum(1 for l in linhas if l.get("tipo") == t) for t in TIPOS_EVENTO}
-        # quantas recontagens o técnico vê com o motivo (12/11/2026): o "sem" sobe sem a NEXUS_PESSOA_HMAC no servidor
-        recont = [l for l in linhas if l.get("tipo") in TIPOS_MOTIVO_TECNICO]
-        extra["recontagem_com_motivo_tecnico"] = sum(1 for l in recont if _tem_motivo_tecnico(l))
-        extra["recontagem_sem_motivo_tecnico"] = len(recont) - extra["recontagem_com_motivo_tecnico"]
+        extra.update(_conta_do_tecnico(cfg or {}, linhas))
     elif aba == ABA_CURADORIA:
         extra = {f"decisao_{d}": sum(1 for l in linhas if l.get("decisao") == d) for d in DECISOES_CURADORIA}
     else:
@@ -584,7 +615,7 @@ def acrescentar(cfg, aba: str, linhas: list[dict]) -> None:
                 vistos.add(n["evento_id"])
         cru[aba] = cru[aba] + novas
         iso = _iso(agora)
-        q = [linha_qualidade(a, cru[a], iso) for a in ABAS_FATO]
+        q = [linha_qualidade(a, cru[a], iso, cfg) for a in ABAS_FATO]
         total = sum(len(cru[a]) for a in ABAS_FATO)
         _gravar_cru(cfg, cru, q, [iso, _maquina(), round(_relogio() - t0, 1), total, COMO_LER])
         # o que acabou de ser lido (e gravado) vale como a leitura de agora: a tela não volta ao banco em seguida; e a

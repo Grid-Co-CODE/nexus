@@ -299,10 +299,9 @@ def test_nada_de_nome_no_livro(cfg):
     """A API do banco tem leitura aberta: nome, e-mail e o motivo do PCM (texto livre) não têm coluna em claro. O
     motivo vai só dentro do `dados_cifrados` (o Cofre do cadastro), amarrado à linha."""
     proibidas = ("nome", "email", "e_mail", "motivo", "obs", "descri", "texto", "comentario", "tecnico")
-    # a única exceção é a cópia do motivo da recontagem para o técnico no App (12/11/2026): só cifrada, pelo módulo
-    # (tests/test_pcm_inventario_motivo_tecnico.py)
-    cifradas = {"motivo_tecnico"}
-    for cab in (F.CAB_EVENTO, F.CAB_REGUA, F.CAB_CURADORIA):
+    # a única exceção é a cópia do motivo da recontagem para o técnico no App (12/11/2026), só no evento e só cifrada, pelo
+    # módulo (abaixo, e tests/test_pcm_inventario_motivo_tecnico.py)
+    for cab, cifradas in ((F.CAB_EVENTO, {"motivo_tecnico"}), (F.CAB_REGUA, set()), (F.CAB_CURADORIA, set())):
         assert not [c for c in cab if c not in cifradas and any(p in c for p in proibidas)], cab
     assert "dados_cifrados" in F.CAB_EVENTO and "dados_cifrados" in F.CAB_CURADORIA
     assert "dados_cifrados" not in F.CAB_REGUA                  # a régua é número: não tem texto livre
@@ -311,6 +310,8 @@ def test_nada_de_nome_no_livro(cfg):
                   [_ev("recontagem_pedida", dados={"motivo": "recontar a caixa amarela"})])
     rec = F.ler(cfg, forcar=True)[F.ABA_EVENTO][0]
     assert str(rec["motivo_tecnico"]).startswith("cf1:") and "amarela" not in rec["motivo_tecnico"]
+    from test_pcm_inventario_motivo_tecnico import _abrir_como_o_app
+    assert _abrir_como_o_app("chave-hmac-de-mentira", rec["evento_id"], rec["motivo_tecnico"]) == "recontar a caixa amarela"
     assert "amarela" not in Path(cfg["NEXUS_ALMOX_INVENTARIO_ARQUIVO"]).read_text(encoding="utf-8")
     F.limpar()
     Path(cfg["NEXUS_ALMOX_INVENTARIO_ARQUIVO"]).unlink()

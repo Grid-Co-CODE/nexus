@@ -921,10 +921,10 @@ FATOS = (
                     "movimento_fracttal o id da requisição, com a OS e a curva só em dados_cifrados. Soma entre almoxarifados "
                     "do MESMO item, nunca entre itens nem no tempo. movimento_fracttal é o número do movimento que o "
                     "Fracttal devolveu (dimensão degenerada); lote é o lote de 50 da gravação. O motivo do PCM é texto "
-                    "livre e vai só em dados_cifrados (Cofre, amarrado à linha); na recontagem (recontagem_pedida e "
-                    "recontagem_item_pedida, 12/11/2026), também em motivo_tecnico, a última coluna: a cópia para o técnico "
-                    "no App, cifrada numa chave derivada da NEXUS_PESSOA_HMAC (o App não tem a do cadastro), vazia sem "
-                    "ela; a pessoa só como pessoa_id e "
+                    "livre e vai só cifrado: em dados_cifrados (Cofre, amarrado à linha) e, na recontagem "
+                    "(recontagem_pedida e recontagem_item_pedida, 12/11/2026), a cópia para o técnico em motivo_tecnico, a "
+                    "última coluna, cifrada numa chave derivada da NEXUS_PESSOA_HMAC (o App não tem a do cadastro), vazia "
+                    "sem ela; a pessoa só como pessoa_id e "
                     "pessoa_hmac (24 hexadecimais), nunca nome nem e-mail; situacao é uma das seis da peça no lote "
                     "(dominios.SITUACAO_INVENTARIO). O livro só cresce (so_cresce)"),
     Fato("regua_minimo", "Régua de mínimo e máximo do almoxarifado", "pcm",
