@@ -192,6 +192,12 @@
         {% if mapa_js.percurso %}<button type="button" class="eq-zoom-bt eq-zoom-bt--txt" data-eq-zoom="percurso" title="Aproxima até o percurso inteiro caber na vista"><i class="ph ph-path" aria-hidden="true"></i>Ir ao percurso</button>{% endif %}
         <button type="button" class="eq-zoom-bt eq-zoom-bt--txt" data-eq-zoom="inteiro" title="Volta ao Brasil inteiro"><i class="ph ph-arrows-out" aria-hidden="true"></i>Brasil</button>
       </div>
+      {# os dois focos (Levi, 12/11/2026: "Quero ter dois focos, foco técnico e focos usina, dessa forma dá para focar
+         melhor") e o Mapa | Satélite ("Quero a visão de mapa e satélite"; a Esri, com a chave de Base > Chaves) #}
+      <div class="eq-camadas" role="group" aria-label="O que o mapa destaca">
+        {% if mapa_js.modo == 'tecnicos' %}<div class="cn-seg eq-seg-mapa" role="group" aria-label="Foco"><button type="button" data-eq-foco="tecnico" aria-pressed="true">Foco técnico</button><button type="button" data-eq-foco="usina" aria-pressed="false">Foco usina</button></div>{% endif %}
+        {% if mapa_js.satelite %}<div class="cn-seg eq-seg-mapa" role="group" aria-label="Fundo do mapa"><button type="button" data-eq-base="mapa" aria-pressed="true">Mapa</button><button type="button" data-eq-base="satelite" aria-pressed="false">Satélite</button></div>{% endif %}
+      </div>
       <div class="eq-palco eq-palco--ml">
         <div class="eq-ml" id="eq-mapa" role="region" aria-label="{{ 'As usinas no mapa' if usinas else 'Os técnicos de campo no mapa' }}"></div>
         <div class="eq-dica" role="status" hidden></div>
@@ -306,6 +312,16 @@
           {% if perc.aviso %}<p class="eq-nota eq-perc-aviso">{{ perc.aviso }}</p>{% endif %}
           {% if perc.vazio %}<p class="eq-vazio">{{ perc.vazio }}</p>{% else %}
           <p class="eq-perc-resumo">{{ perc.resumo }}</p>
+          {% if mapa_js and mapa_js.percurso %}
+          {# a reprodução do percurso no mapa (Levi, 12/11/2026: "Cliquei em percurso e não aparece a animação da
+             referência"): tocar, arrastar para voltar no tempo e a velocidade; o campo-mapa.js liga #}
+          <div class="eq-replay" data-eq-replay hidden>
+            <button type="button" class="eq-zoom-bt" data-eq-replay-tocar aria-label="Reproduzir o percurso" title="Reproduzir o percurso"><i class="ph ph-play" aria-hidden="true"></i></button>
+            <input type="range" class="eq-replay-tempo" data-eq-replay-tempo min="0" max="1000" value="1000" step="1" aria-label="Voltar no tempo">
+            <span class="eq-replay-hora" data-eq-replay-hora></span>
+            <select class="gc-campo eq-replay-vel" data-eq-replay-vel aria-label="Velocidade"><option value="120">×120</option><option value="480" selected>×480</option><option value="1200">×1200</option></select>
+          </div>
+          {% endif %}
           {% if perc.desenho and perc.desenho.cidades %}<p class="eq-perc-cidades"><span>Passou por</span> {{ perc.desenho.cidades|join(' → ') }}</p>{% endif %}
           {# o percurso contado por usina (Levi, 11/11/2026: "deve ser mais generalista por exemplo 'Chegou na UFV X',
              'Saiu da Usina X'"): a saída, a chegada, a parada fora de usina com o intervalo (eventos.do_percurso) #}
@@ -337,10 +353,14 @@
           <input type="hidden" name="tecnico" value="{{ sel.pid }}">
           {% for k, v in filtro.q.items() %}<input type="hidden" name="{{ k }}" value="{{ v }}">{% endfor %}
           <p class="gc-rotulo eq-perc-form-titulo">Percurso num período</p>
+          {# De e Até lado a lado (Levi, 12/11/2026: "podem facilmente ficar lado a lado") #}
+          <div class="eq-perc-datas"><div>
           <label class="gc-rotulo" for="eq-perc-de">De</label>
           <input class="gc-campo" type="datetime-local" id="eq-perc-de" name="de" value="{{ form_perc.de }}" min="{{ form_perc.min }}" max="{{ form_perc.max }}" required>
+          </div><div>
           <label class="gc-rotulo" for="eq-perc-ate">Até</label>
           <input class="gc-campo" type="datetime-local" id="eq-perc-ate" name="ate" value="{{ form_perc.ate }}" min="{{ form_perc.min }}" max="{{ form_perc.max }}" required>
+          </div></div>
           <button class="gc-btn gc-btn--contorno" type="submit"><i class="ph ph-path" aria-hidden="true"></i>Ver percurso</button>
           <p class="eq-nota">Dentro dos últimos 7 dias, na hora de Brasília. Cada abertura do percurso fica registrada: quem viu, de quem e de que período.</p>
         </form>

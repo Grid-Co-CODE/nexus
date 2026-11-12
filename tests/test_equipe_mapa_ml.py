@@ -75,11 +75,11 @@ def test_com_o_mapa_base_a_coordenada_vai_so_de_quem_o_mapa_mostra(cliente, pont
 
 
 def test_sem_3d_sem_satelite_e_o_desenho_quando_pedido(cliente, pontos, setor, com_mapa_base):
-    """Levi, 11/11/2026: "Pode tirar a opção 3D, não deve ter pois é muito pesada e sem necessidade". O satélite também
-    fica de fora: o da prévia é de demonstração e o de produção pede licença (o guia). `?mapa=desenho` volta ao SVG."""
+    """Levi, 11/11/2026: "Pode tirar a opção 3D, não deve ter pois é muito pesada e sem necessidade". `?mapa=desenho`
+    volta ao SVG. (O satélite voltou em 12/11/2026, com a chave da Esri: o teste dele é o de baixo.)"""
     _, html = _html(_entrar(cliente, EMAIL[PCM]))
     corpo = html.split("<main", 1)[1]
-    assert not re.search(r">\s*3D\s*<|data-3d|Satélite|satelite", corpo)
+    assert not re.search(r">\s*3D\s*<|data-3d", corpo)
     js = (Path(__file__).resolve().parent.parent / "nexus" / "static" / "campo-mapa.js").read_text(encoding="utf-8")
     assert "setTerrain" not in js and "fill-extrusion" not in js and "maxPitch: 0" in js
     assert "dragRotate: false" in js and "maxBounds" in js                 # só o Brasil, de cima
@@ -122,14 +122,64 @@ def test_o_clima_vai_ao_mapa_em_coordenadas(cliente, pontos, setor, clima_das_us
     assert "Vendaval" in us[str(USINA_A)]["motivo"]
 
 
-def test_a_usina_com_ocorrencia_aberta_leva_a_cor_da_pior(cliente, pontos, setor, com_mapa_base, monkeypatch):
-    """O guia: a cor da usina é o dado; neutra, com a cor da severidade quando há ocorrência aberta (as ocorrências da
-    Usinas 360°, a mesma etiqueta da Visão geral: muito alta = crítico, alta = alerta)."""
-    import nexus.torres.campo as TC
-    monkeypatch.setattr(TC, "_ocorrencias_abertas", lambda: {USINA_A: {"n": 2, "pior": "muito_alta"}})
+def test_a_cor_da_usina_e_o_agora_do_comando_pelo_cos(cliente, pontos, setor, com_mapa_base, monkeypatch):
+    """Levi, 12/11/2026: "Quero as cores das usinas de acordo com o tempo real, OS Abertas do setor COS, as regras estão
+    em 'Comando > Usinas' pode pegar as cores de lá!". A cor é o "Agora" de Comando > Usinas (`comando.usinas`: a
+    fotografia da Ronda COS de cada cliente, na régua do Levi) com o tom de lá; sem a leitura do COS, sem cor."""
+    from nexus.comando import usinas as CU
+    from nexus.torres.campo import equipe_tela as ET
+    monkeypatch.setattr(ET, "_cos_por_usina", lambda b: {"ocs": {USINA_A: [{"os": "18412", "tipo_tarefa": "Religamento",
+                        "tipo_falha": "Desligamento de usina", "abertura": "2026-11-08T12:00:00Z"}]},
+                        "lidas": {USINA_A, USINA_B}})
     _, html = _html(_entrar(cliente, EMAIL[PCM]))
     us = {u["id"]: u for u in _dados(html)["usinas"]}
-    assert us[str(USINA_A)]["oc"] == {"n": 2, "pior": "muito_alta", "tom": "critico"} and us[str(USINA_B)]["oc"] is None
+    assert us[str(USINA_A)]["agora"] == {"estado": "critico", "rotulo": "Crítico", "tom": "critico",
+                                         "motivo": CU.motivo({"tipo_falha": "Desligamento de usina"})}
+    assert us[str(USINA_B)]["agora"]["estado"] == "normal" and us[str(USINA_B)]["agora"]["tom"] == "ok"
+    monkeypatch.setattr(ET, "_cos_por_usina", lambda b: None)
+    _, html = _html(cliente)
+    assert all(u["agora"] is None for u in _dados(html)["usinas"])
+
+
+def test_o_satelite_da_esri_so_com_a_chave(app, cliente, pontos, setor, com_mapa_base):
+    """Levi, 12/11/2026: "Quero a visão de mapa e satélite", e a escolha dele no mesmo dia: a Esri (ArcGIS), com a chave
+    da conta dele em Base > Chaves (NEXUS_ESRI_CHAVE). Sem a chave, o botão não aparece."""
+    _, html = _html(_entrar(cliente, EMAIL[PCM]))
+    assert _dados(html)["satelite"] is None and 'data-eq-base="satelite"' not in html
+    app.config["NEXUS_ESRI_CHAVE"] = "AAPTxy" + "k" * 90
+    _, html = _html(cliente)
+    sat = _dados(html)["satelite"]
+    assert sat["url"].startswith("https://ibasemaps-api.arcgis.com/arcgis/rest/services/World_Imagery/MapServer/tile/")
+    assert "{z}/{y}/{x}" in sat["url"] and sat["url"].endswith("token=AAPTxy" + "k" * 90) and "Esri" in sat["credito"]
+    assert 'data-eq-base="mapa"' in html and 'data-eq-base="satelite"' in html
+
+
+def test_dois_focos_zoom_mais_rapido_e_a_reproducao_do_percurso(cliente, pontos, setor, com_mapa_base):
+    """Levi, 12/11/2026: "Quero ter dois focos, foco técnico e focos usina", "Quero o zoom um pouco mais rápido, pelo
+    menos o dobro", "aumente um pouco o tamanho do círculo dos técnicos" e "Cliquei em percurso e não aparece a animação
+    da referência" (a prévia: a câmera vai ao percurso, a linha com o sentido e o trecho atual andando, e o controle que
+    reproduz o dia)."""
+    _, html = _html(_entrar(cliente, EMAIL[PCM]))
+    assert 'data-eq-foco="tecnico"' in html and 'data-eq-foco="usina"' in html
+    js = (Path(__file__).resolve().parent.parent / "nexus" / "static" / "campo-mapa.js").read_text(encoding="utf-8")
+    assert "setWheelZoomRate" in js and "zoomTo(mapa.getZoom() + 2" in js
+    assert '"circle-radius": ["interpolate", ["linear"], ["zoom"], 3, 10' in js
+    assert "perc-setas" in js and "perc-formigas" in js and "line-gradient" in js
+    _receber(pontos, ANDANDO, MANHA)
+    pontos.registro.novos()
+    _, html = _html(cliente, query_string={"tecnico": ANDANDO, "de": "2026-11-08T06:00", "ate": "2026-11-08T12:00"})
+    assert 'data-eq-replay' in html and 'data-eq-replay-vel' in html
+    p = _dados(html)["percurso"]
+    assert [q["t"] for q in p["pontos"]] == sorted(q["t"] for q in p["pontos"]) and isinstance(p["pontos"][0]["t"], int)
+    # os campos De e Até lado a lado (Levi: "podem facilmente ficar lado a lado")
+    assert 'class="eq-perc-datas"' in html
+
+
+def test_o_mapa_e_mais_alto():
+    """Levi, 12/11/2026: "Pode aumentar a altura do mapa, até para quando for expandir o percurso caber mais para cima!"."""
+    css = (Path(__file__).resolve().parent.parent / "nexus" / "static" / "campo.css").read_text(encoding="utf-8")
+    assert "--eq-alt:clamp(620px,calc(100vh - 140px),1600px)" in css
+    assert ".eq-perc-datas{display:grid;grid-template-columns:1fr 1fr" in css
 
 
 def test_o_script_do_mapa_so_tem_as_cores_do_nexus():
@@ -154,3 +204,11 @@ def test_o_script_do_mapa_so_tem_as_cores_do_nexus():
     assert r["mix"] == "rgb(64, 64, 64)"
     aneis = r["mask"]["geometry"]["coordinates"]
     assert len(aneis) == 3 and aneis[1] == [[0, 0], [1, 0], [1, 1], [0, 0]]       # o mundo e os dois buracos
+
+
+def test_so_o_brasil_a_mascara_cobre_o_resto_por_inteiro():
+    """Levi, 12/11/2026, depois do satélite: "tem como mostrar só Brasil?". A máscara de fora do Brasil era 90% opaca:
+    no satélite (o mundo inteiro) e nas bordas do recorte, os vizinhos e o mar apareciam apagados por baixo. Agora ela é
+    a cor do fundo, cheia."""
+    js = (Path(__file__).resolve().parent.parent / "nexus" / "static" / "campo-mapa.js").read_text(encoding="utf-8")
+    assert re.search(r'fora:\s*t\["--fundo"\]\s*,', js), "a máscara de fora do Brasil tem de ser opaca"

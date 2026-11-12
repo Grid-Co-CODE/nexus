@@ -1874,7 +1874,7 @@ tr.rd-linha--ativa td{background:var(--verde-suave)}
 .eq-corpo{--eq-alt:min(64vh,520px);display:grid;grid-template-columns:minmax(0,1fr);gap:14px;align-items:start;margin-top:14px}
 .eq-quadro{order:-1}
 @media (min-width:1180px){
-  .eq-corpo{--eq-alt:clamp(520px,calc(100vh - 256px),1500px);grid-template-columns:minmax(0,1fr) clamp(360px,26vw,420px)}
+  .eq-corpo{--eq-alt:clamp(620px,calc(100vh - 140px),1600px);grid-template-columns:minmax(0,1fr) clamp(360px,26vw,420px)}
   .eq-corpo--clima{grid-template-columns:clamp(280px,20vw,330px) minmax(0,1fr) clamp(340px,24vw,420px)}
   .eq-quadro{order:0}
   .eq-quadro,.eq-lado,.eq-clima{height:var(--eq-alt)}
@@ -2022,6 +2022,20 @@ tr.rd-linha--ativa td{background:var(--verde-suave)}
 .eq-ml-aviso{position:absolute;z-index:3;left:16px;right:16px;bottom:16px;margin:0;padding:10px 12px;font-size:13px;
   border:1px solid var(--alerta);border-radius:var(--raio-controle);background:var(--superficie);color:var(--tinta)}
 .eq-ml-aviso[hidden]{display:none}
+/* os dois focos e o Mapa | Satélite (12/11/2026), no canto de cima à direita do mapa */
+.eq-camadas{position:absolute;z-index:2;top:14px;right:14px;display:flex;flex-wrap:wrap;justify-content:flex-end;gap:6px}
+.eq-seg-mapa{margin:0;background:var(--superficie)}
+.eq-seg-mapa button{border:0;background:none;color:var(--tinta-2);font:600 12.5px/1 var(--font-sans);padding:9px 12px;
+  border-radius:var(--raio-controle);cursor:pointer}
+.eq-seg-mapa button[aria-pressed="true"]{background:var(--verde);color:var(--sobre-verde)}
+.eq-seg-mapa button:focus-visible{outline:2px solid var(--foco);outline-offset:2px}
+@media (max-width:640px){.eq-camadas{top:auto;bottom:40px;right:10px}}
+/* a reprodução do percurso (12/11/2026, a animação da prévia): tocar, voltar no tempo e a velocidade */
+.eq-replay{display:grid;grid-template-columns:auto minmax(0,1fr) auto auto;align-items:center;gap:8px}
+.eq-replay[hidden]{display:none}
+.eq-replay-tempo{width:100%;accent-color:var(--verde)}
+.eq-replay-hora{font:600 13px var(--font-mono);color:var(--tinta)}
+.eq-replay-vel{width:auto;min-width:0;padding:4px 6px}
 /* o botão Incluir clima (11/11/2026), na barra: ligado, fica cheio no verde */
 .eq-clima-bt--on{background:var(--verde);border-color:var(--verde);color:var(--sobre-verde)}
 /* o painel do clima, à esquerda do mapa: os alertas por usina; uma superfície só, as linhas separadas por um fio e a
@@ -2060,6 +2074,9 @@ tr.rd-linha--ativa td{background:var(--verde-suave)}
 .eq-perc-item--chegou b{color:var(--verde-texto)}
 .eq-perc-form{display:grid;gap:8px;padding-top:12px;border-top:1px solid var(--linha)}
 .eq-perc-form .gc-campo{width:100%;min-width:0}
+/* De e Até lado a lado (Levi, 12/11/2026: "podem facilmente ficar lado a lado, assim evitaria gastar mais espaço") */
+.eq-perc-datas{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.eq-perc-datas > div{display:grid;gap:4px;min-width:0}
 .eq-perc-form .gc-btn{justify-content:center}
 .eq-perc-form-titulo{margin:0}
 /* os eventos do dia (10/11/2026): o quadro de eventos do COS (a hora, o ponto na linha do tempo, o cartão e a etiqueta),
