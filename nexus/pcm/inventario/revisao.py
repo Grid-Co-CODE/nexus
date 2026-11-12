@@ -290,14 +290,21 @@ ROTULO_EVENTO = {"contagem_recebida": "Contagem recebida", "aprovada": "Aprovada
                  "recontagem_item_pedida": "Recontagem da peça pedida",
                  "requisicao_aceita": "Requisição aceita pelo PCM", "requisicao_aceita_sozinha": "Requisição aceita sozinha",
                  "requisicao_recusada": "Requisição recusada", "requisicao_falha": "Requisição não aceita",
-                 "requisicao_travada": "Requisição travada (confira no Fracttal)"}
+                 "requisicao_travada": "Requisição travada (confira no Fracttal)",
+                 "transferencia_vinculo": "Peça vinculada para a transferência", "transferencia_saida": "Transferência: saída",
+                 "transferencia_entrada": "Transferência: entrada", "transferencia_falha": "Transferência não feita",
+                 "transferencia_travada": "Transferência sem resposta (confira no Fracttal)"}
 # o selo de cada evento, pelas quatro famílias do mockup do Spare Parts (Levi, 27/10/2026): a gravação no Fracttal em verde, a
 # curadoria em âmbar, a aprovação e a revisão em azul, o conflito e o erro em vermelho. A cor só reforça a palavra (o rótulo)
 SELO_EVENTO = {"peca_gravada": "ok", "regua_gravada": "ok", "curadoria": "alerta", "conflito": "critico", "erro": "critico",
                "requisicao_aceita": "ok", "requisicao_aceita_sozinha": "ok", "requisicao_recusada": "alerta",
-               "requisicao_falha": "critico", "requisicao_travada": "critico"}
-# o aceite da requisição leva no `dados` cifrado a OS e a curva, não um motivo (12/11/2026): a linha não diz "motivo cifrado"
-_SEM_MOTIVO = frozenset({"requisicao_aceita", "requisicao_aceita_sozinha"})
+               "requisicao_falha": "critico", "requisicao_travada": "critico", "transferencia_vinculo": "ok",
+               "transferencia_saida": "ok", "transferencia_entrada": "ok", "transferencia_falha": "critico",
+               "transferencia_travada": "critico"}
+# o aceite da requisição leva no `dados` cifrado a OS e a curva, não um motivo (12/11/2026), e a transferência o código, o outro
+# almoxarifado e a referência do PCM: a linha não diz "motivo cifrado"
+_SEM_MOTIVO = frozenset({"requisicao_aceita", "requisicao_aceita_sozinha", "transferencia_vinculo", "transferencia_saida",
+                         "transferencia_entrada"})
 
 
 def _retorno(tipo: str, movimento: str, codigo: str) -> str:
@@ -322,7 +329,25 @@ def _retorno(tipo: str, movimento: str, codigo: str) -> str:
         return "não aceita"
     if tipo == "requisicao_travada":
         return "travada: confira no Fracttal"
+    if tipo == "transferencia_vinculo":
+        return "vínculo criado com 0 e 0"
+    if tipo in ("transferencia_saida", "transferencia_entrada"):
+        return f"movimento {movimento}" if movimento else "transferida"
+    if tipo == "transferencia_falha":
+        return "não transferida ou não confirmada"
+    if tipo == "transferencia_travada":
+        return "sem resposta: confira no Fracttal"
     return ""
+
+
+def _lote_txt(tipo: str, lote) -> str:
+    """O lote na tela: o número do lote da gravação ou, na transferência, o código do Nexus que ele guarda (NX-TR-...)."""
+    if lote is None:
+        return ""
+    if tipo.startswith("transferencia_"):
+        from .transferencia import codigo_do_lote
+        return codigo_do_lote(lote)
+    return str(lote)
 
 
 def _qtd(v) -> float | None:
@@ -392,7 +417,7 @@ def montar_auditoria(cfg, pode: bool, tipo: str = "", busca: str = "", contagem_
         peca = nomes["itens"].get(item, {})
         codigo = A._txt(e.get("codigo")) or peca.get("codigo", "")
         de, para, contado = _qtd(e.get("de_qtd")), _qtd(e.get("para_qtd")), _qtd(e.get("contado_qtd"))
-        numeros = (f"{'mínimo ' if t == 'regua_gravada' else 'saldo ' if t.startswith('requisicao_') else ''}{_num(de)} para "
+        numeros = (f"{'mínimo ' if t == 'regua_gravada' else 'saldo ' if t.startswith(('requisicao_', 'transferencia_')) else ''}{_num(de)} para "
                    f"{_num(para)}" if de is not None or para is not None
                    else f"contado {_num(contado)}" if contado is not None else "")
         situacao = ROTULO_SITUACAO.get(A._txt(e.get("situacao")), "")
@@ -406,7 +431,7 @@ def montar_auditoria(cfg, pode: bool, tipo: str = "", busca: str = "", contagem_
         linhas.append({"n": n, "quando": _quando_do_evento(e.get("quando")), "hora": _hora(e.get("quando")), "tipo": t,
                        "rotulo": rotulo, "selo": SELO_EVENTO.get(t, "info"), "almox": nome_almox, "id_item": item,
                        "codigo": codigo, "peca": peca.get("nome", ""), "contagem_id": cid, "numeros": numeros,
-                       "situacao": situacao, "lote": str(lote) if lote is not None else "", "movimento": movimento,
+                       "situacao": situacao, "lote": _lote_txt(t, lote), "movimento": movimento,
                        "retorno": _retorno(t, movimento, A._txt(e.get("codigo"))), "quem": quem if pode else "",
                        "motivo": bool(A._txt(e.get("dados_cifrados"))) and t not in _SEM_MOTIVO, "busca": procura,
                        "_achou": not busca_n or busca_n in procura})

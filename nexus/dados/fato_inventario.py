@@ -83,7 +83,13 @@ TIPOS_EVENTO = ("contagem_recebida", "aprovada", "peca_gravada", "conflito", "er
                 "requisicao_aceita", "requisicao_aceita_sozinha", "requisicao_recusada", "requisicao_falha",
                 # a falha que trava a requisição (a resposta incerta da saída e a Saída Geral achada): pelo tipo, e não só
                 # pelo `dados`, que sem a chave do cadastro não se decifra (12/11/2026, a re-revisão do item 6, N3)
-                "requisicao_travada")
+                "requisicao_travada",
+                # a transferência entre almoxarifados do mesmo cliente (12/11/2026, PCM → Almoxarifado → Transferir): o vínculo
+                # criado no destino (com 0 e 0), a saída na origem e a entrada no destino (cada uma com o saldo antes e
+                # depois e o movimento do Fracttal; a entrada só com o destino relido), a falha e a trava (a resposta que não
+                # veio). As linhas de uma transferência levam o mesmo código do Nexus no `lote`
+                "transferencia_vinculo", "transferencia_saida", "transferencia_entrada", "transferencia_falha",
+                "transferencia_travada")
 # os eventos que levam o motivo ao técnico: o App mostra o pedido de recontagem (a da peça e a da contagem inteira); a peça
 # tirada e o número corrigido não voltam ao técnico
 TIPOS_MOTIVO_TECNICO = ("recontagem_pedida", "recontagem_item_pedida")

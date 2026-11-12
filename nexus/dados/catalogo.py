@@ -901,7 +901,9 @@ FATOS = (
          "1 linha = 1 evento do inventário de 1 contagem (recebida, aprovada, peça gravada, conflito, erro, peça tirada do "
          "lote, recontagem pedida, número corrigido, contagem substituída, curadoria, régua gravada ou recontagem de "
          "uma peça pedida) ou de 1 requisição de material (aceita pelo PCM ou sozinha, uma linha por peça; recusada; "
-         "falha de um passo; travada, a que o Nexus não tenta de novo); nunca muda",
+         "falha de um passo; travada, a que o Nexus não tenta de novo) ou de 1 lado de 1 transferência entre almoxarifados "
+         "(o vínculo criado no destino, a saída na origem, a entrada no destino, a falha, a trava da resposta que não veio); "
+         "nunca muda",
          _d(data=("id", "data_id (o dia de Brasília do evento; quando, a hora em UTC)"),
             usina=("id", "usina_id + usina_ligada_por (o almoxarifado da contagem, só pela de-para do Fracttal; vazio "
                          "quando não liga)"),
@@ -918,9 +920,16 @@ FATOS = (
          observacao="de_qtd e para_qtd são o saldo do Fracttal antes e depois, no evento peca_gravada; contado_qtd é o que "
                     "o campo contou (no numero_corrigido, ao lado do corrigido, que é o para_qtd); na requisição aceita, "
                     "de_qtd e para_qtd são o saldo da peça antes e depois da saída, contado_qtd a quantidade requisitada e "
-                    "movimento_fracttal o id da requisição, com a OS e a curva só em dados_cifrados. Soma entre almoxarifados "
+                    "movimento_fracttal o id da requisição, com a OS e a curva só em dados_cifrados; na transferência "
+                    "(transferencia_saida na origem e transferencia_entrada no destino, a entrada só quando o destino relido "
+                    "mostra a peça), de_qtd e para_qtd são o saldo daquele lado antes e depois, contado_qtd a quantidade "
+                    "transferida e movimento_fracttal o número do folio daquele lado (MOV-21 é 21), com o id do movimento, os "
+                    "folios inteiros, o outro almoxarifado e a referência do "
+                    "PCM só em dados_cifrados. Soma entre almoxarifados "
                     "do MESMO item, nunca entre itens nem no tempo. movimento_fracttal é o número do movimento que o "
-                    "Fracttal devolveu (dimensão degenerada); lote é o lote de 50 da gravação. O motivo do PCM é texto "
+                    "Fracttal devolveu (dimensão degenerada); lote é o lote de 50 da gravação e, na transferência, o "
+                    "código do Nexus (NX-TR- + 8 hexadecimais, como número inteiro), o mesmo nas linhas dela. O motivo do "
+                    "PCM é texto "
                     "livre e vai só cifrado: em dados_cifrados (Cofre, amarrado à linha) e, na recontagem "
                     "(recontagem_pedida e recontagem_item_pedida, 12/11/2026), a cópia para o técnico em motivo_tecnico, a "
                     "última coluna, cifrada numa chave derivada da NEXUS_PESSOA_HMAC (o App não tem a do cadastro), vazia "

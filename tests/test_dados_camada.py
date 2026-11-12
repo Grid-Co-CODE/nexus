@@ -135,10 +135,13 @@ def test_a_coluna_so_cifra_so_leva_cifra(tmp_path):
            "NEXUS_CHAVE_CADASTRO": gerar_chave(), "NEXUS_PESSOA_HMAC": "chave-hmac-de-mentira"}
     fato_inventario.limpar()
     try:
-        # todos os tipos de evento, com e sem motivo: a coluna fica vazia ou com a cifra, nunca com outra coisa
+        # todos os tipos de evento, sem motivo (a 1ª volta) e com ele (a 2ª): a coluna fica vazia ou com a cifra, nunca com outra
+        # coisa. Pela volta, e não pela paridade do índice: com 22 tipos (a transferência, 12/11/2026), a recontagem caía nas
+        # duas vezes sem o motivo
+        n = len(fato_inventario.TIPOS_EVENTO)
         fato_inventario.acrescentar(cfg, fato_inventario.ABA_EVENTO, [
             {"tipo": t, "contagem_id": f"C-{i}", "id_almoxarifado": "900",
-             **({"dados": {"motivo": "texto do PCM de mentira"}} if i % 2 else {})}
+             **({"dados": {"motivo": "texto do PCM de mentira"}} if i >= n else {})}
             for i, t in enumerate(fato_inventario.TIPOS_EVENTO * 2)])
         linhas = json.loads((tmp_path / "inventario.json").read_text(encoding="utf-8"))[fato_inventario.ABA_EVENTO]
         valores = [l[c] for _fid, c in SO_CIFRA for l in linhas]
