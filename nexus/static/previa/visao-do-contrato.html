@@ -20,7 +20,17 @@
    - a aba não repete o título nem explica a si mesma: abre no conteúdo;
    - no máximo UM controle por aba, e só quando muda o que se vê (Todas | Acordadas; Por usina | Por cliente);
    - o que acrescenta (regra nova, entrada nova) é a última linha da tabela, não um botão no alto;
-   - um nível de superfície: a tabela é a única caixa. */
+   - um nível de superfície: a tabela é a única caixa.
+
+   3ª rodada, na mesma noite (Levi: "esse scroll branco aí é zoado [...] deixa no estilo Nexus. E todas essas regras aí,
+   deixa recolhido [...] eu quero ver entregáveis, quero ver SLA, a pessoa vai clicando [...] seria bom se fosse separado
+   para o cliente [...] E aí seria bom para os gestores de contrato [...] recebendo as notificações [...] tem tantos em
+   atraso, isso está sempre para ele [...] Sempre"):
+   - a barra de rolagem é a do Nexus (fina e escura), e os controles do navegador vêm no escuro (color-scheme);
+   - as Regras abrem RECOLHIDAS: uma linha por categoria, com quantas regras e quantas acordadas; o clique abre;
+   - o que está em atraso fica numa linha no cabeçalho do contrato, em TODA aba, com o aviso de que o gestor recebe a
+     notificação no sino do Nexus enquanto houver atraso;
+   - cada cliente tem o contrato dele: o nome no alto troca o contrato (no mockup só o primeiro tem dados). */
 :root{
   --fundo:#090d18;--superficie:#161d30;--superficie-2:#1c2640;--superficie-3:#243154;--barra:#0d1526;
   --tinta:#e9eef6;--tinta-2:#c3cad7;--mudo:#96a0b4;--fraco:#767d92;
@@ -30,8 +40,16 @@
   --severo:#ff8f3c;--severo-suave:rgba(255,143,60,.15);--critico:#ff5b6e;--critico-suave:rgba(255,91,110,.14);
   --info:#7fb8ff;--info-suave:rgba(91,157,255,.14);
   --font-sans:"Poppins",system-ui,sans-serif;--font-mono:"IBM Plex Mono",Consolas,monospace;
-  --raio-tag:6px;--raio-controle:8px;--raio-md:10px;
+  --raio-tag:6px;--raio-controle:8px;--raio-md:10px;--rolagem:#243154;--rolagem-hover:#34426b;
 }
+/* a barra de rolagem do Nexus (a mesma do nexus.css): a padrão do navegador, clara e com setas, destoava do navy dentro
+   da moldura (Levi, 12/11/2026: "esse scroll branco aí é zoado") */
+html{color-scheme:dark;scrollbar-width:thin;scrollbar-color:var(--rolagem) transparent}
+::-webkit-scrollbar{width:8px;height:8px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--rolagem);border-radius:8px}
+::-webkit-scrollbar-thumb:hover{background:var(--rolagem-hover)}
+::-webkit-scrollbar-button{display:none}
 *{box-sizing:border-box}
 body{margin:0;background:var(--fundo);color:var(--tinta);font:400 13.5px/1.5 var(--font-sans)}
 button,input,select,textarea{font:inherit;color:inherit}
@@ -74,6 +92,13 @@ html.embutido main{padding:16px 2px 40px;max-width:none}
 .usinas li{font-size:12px;padding:3px 9px;border-radius:999px;border:1px solid var(--linha);color:var(--tinta-2)}
 .usinas .num{color:var(--mudo);margin-left:5px}
 
+/* o que está em atraso: uma linha no cabeçalho do contrato, em toda aba (o gestor sempre vê) */
+.atraso{display:flex;align-items:center;gap:6px 10px;flex-wrap:wrap;margin:12px 0 0;padding:8px 12px;border-radius:var(--raio-controle);background:var(--critico-suave);font-size:12.5px}
+.atraso b{color:var(--critico);white-space:nowrap}
+.atraso-sino{margin-left:auto;display:inline-flex;align-items:center;gap:6px;color:var(--tinta-2);font-size:12px}
+.vazio{margin:28px 0 0;max-width:62ch}
+.vazio p{color:var(--tinta-2);margin:8px 0 16px}
+
 /* as abas: presas no alto enquanto a tabela rola */
 .abas{display:flex;gap:2px;margin:16px 0 0;border-bottom:1px solid var(--linha);overflow-x:auto;position:sticky;top:0;z-index:5;background:var(--fundo)}
 .abas a{padding:10px 14px;color:var(--mudo);text-decoration:none;font-weight:600;font-size:13px;border-bottom:2px solid transparent;white-space:nowrap}
@@ -110,8 +135,11 @@ h3{margin:0;font:600 13.5px/1.3 var(--font-sans)}
 .tab tr:last-child td{border-bottom:0}
 .tab td.c,.tab th.c{text-align:center}
 .tab td.r,.tab th.r{text-align:right}
-.tab tr.grupo td{background:var(--barra);font:600 12px/1 var(--font-sans);color:var(--verde-texto);padding:9px 14px}
-.tab tr.grupo td span{float:right;font:500 11.5px/1 var(--font-mono);color:var(--mudo)}
+.tab tr.grupo td{padding:0;background:var(--barra)}
+.tab tr.grupo button{display:flex;align-items:center;gap:10px;width:100%;border:0;background:transparent;padding:13px 14px;cursor:pointer;text-align:left;font:600 13.5px/1.2 var(--font-sans);color:var(--tinta)}
+.tab tr.grupo button:hover{background:var(--superficie-2)}
+.tab tr.grupo button .ph{color:var(--mudo);font-size:14px}
+.tab tr.grupo .g-n{margin-left:auto;font:400 12px/1 var(--font-sans);color:var(--mudo)}
 .tab tr.mais td{padding:0}
 .tab tr.mais button{display:flex;align-items:center;gap:8px;width:100%;border:0;background:transparent;padding:12px 14px;cursor:pointer;color:var(--mudo);font-size:12.5px;font-weight:600;text-align:left}
 .tab tr.mais button:hover{color:var(--verde-texto);background:var(--superficie-2)}
@@ -219,7 +247,7 @@ dialog h2{font-size:17px}
 
 <script>
 "use strict";
-// na moldura do Nexus (a tela Contratos e clientes › Prévia), sem o topo próprio
+// na moldura do Nexus (a tela Comando › Prévia: visão do contrato), sem o topo próprio
 if (window.self !== window.top) document.documentElement.classList.add("embutido");
 /* ── os dados (fictícios) ────────────────────────────────────────────────────────────────────────────────────── */
 var HOJE = new Date(2026, 10, 13);
@@ -345,7 +373,7 @@ var STATUS_FIN = {paga: ["Paga", "t-ok"], aprovada: ["Aprovada", "t-verde"], apr
 
 /* ── utilidades ─────────────────────────────────────────────────────────────────────────────────────────────── */
 var ABAS = [["regras", "Regras"], ["calendario", "Calendário"], ["atendimento", "Atendimento"], ["entregaveis", "Entregáveis"], ["metas", "Metas"], ["financeiro", "Financeiro"]];
-var estado = {aba: "regras", soAcordadas: false, abertoHist: {}, ficha: false, atModo: "usina", entModo: "usina", kpi: "disp", agrup: "mes"};
+var estado = {ct: 0, aba: "regras", soAcordadas: false, grupos: {}, abertoHist: {}, ficha: false, atModo: "usina", entModo: "usina", kpi: "disp", agrup: "mes"};
 function esc(s) { return String(s == null ? "" : s).replace(/[&<>"]/g, function (c) { return {"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"}[c]; }); }
 function brl(v) { return v.toLocaleString("pt-BR", {style: "currency", currency: "BRL"}); }
 function pct(v, casas) { return v.toLocaleString("pt-BR", {minimumFractionDigits: casas == null ? 1 : casas, maximumFractionDigits: casas == null ? 1 : casas}); }
@@ -379,13 +407,20 @@ function spark(h, meta, w, hh) {
 
 /* ── o contrato: duas linhas, as abas e a parte escolhida ──────────────────────────────────────────────────────── */
 function vContrato() {
-  var c = CONTRATOS[0], mwp = USINAS.reduce(function (s, u) { return s + u.mwp; }, 0);
-  var atrasadas = CAL.filter(function (e) { return tomCal(e) === "critico"; }).length + ATRASADAS_ANTES.length;
+  var c = CONTRATOS[estado.ct], mwp = USINAS.reduce(function (s, u) { return s + u.mwp; }, 0);
+  var emAtraso = CAL.filter(function (e) { return tomCal(e) === "critico"; }).map(function (e) { return e.nome + " (venceu em " + String(e.d).padStart(2, "0") + "/11)"; })
+    .concat(ATRASADAS_ANTES.map(function (e) { return e.nome + " (" + e.quando + ")"; }));
+  var atrasadas = emAtraso.length;
   // o nome do cliente É a troca de contrato: um controle a menos no alto da tela
   var h = '<div class="ct-linha"><label class="ct-nome"><span class="so-leitor">Contrato</span><select id="selCt">' +
-    CONTRATOS.map(function (k, i) { return '<option value="' + i + '">' + esc(k.cliente) + "</option>"; }).join("") +
+    CONTRATOS.map(function (k, i) { return '<option value="' + i + '"' + (i === estado.ct ? " selected" : "") + ">" + esc(k.cliente) + "</option>"; }).join("") +
     '</select><i class="ph ph-caret-down" aria-hidden="true"></i></label><span class="ct-cod num">' + c.cod + '</span><span class="ct-tipo">' + c.nome + "</span>" +
-    '<button class="linkbtn ct-mais" data-ficha aria-expanded="' + estado.ficha + '">Dados do contrato<i class="ph ph-caret-' + (estado.ficha ? "up" : "down") + '" aria-hidden="true"></i></button></div>';
+    (estado.ct ? "" : '<button class="linkbtn ct-mais" data-ficha aria-expanded="' + estado.ficha + '">Dados do contrato<i class="ph ph-caret-' + (estado.ficha ? "up" : "down") + '" aria-hidden="true"></i></button>') + "</div>";
+  // cada cliente tem o contrato dele (as regras, o calendário, o financeiro); no mockup só o primeiro tem dados
+  if (estado.ct) {
+    return h + '<div class="vazio"><h2>O mockup só tem os dados da ' + esc(CONTRATOS[0].cliente) + '</h2><p>Na tela de verdade cada cliente abre o contrato dele: as regras, o calendário, o atendimento, os entregáveis, as metas e o financeiro são separados por contrato, e o que se acorda com um não muda o do outro.</p>' +
+      '<button class="btn" data-voltar-ct>Voltar para a ' + esc(CONTRATOS[0].cliente) + "</button></div>";
+  }
   h += '<dl class="fatos"><div><dt>Vigência</dt><dd>até 28/02/2028<small>faltam 15 meses</small></dd></div>' +
     '<div><dt>Mensalidade</dt><dd class="num">' + brl(195347.20) + "</dd></div>" +
     '<div><dt>Usinas</dt><dd><span class="num">' + USINAS.length + '</span><small class="num">' + pct(mwp) + " MWp</small></dd></div>" +
@@ -399,6 +434,11 @@ function vContrato() {
       "<div><dt>Onde</dt><dd>Minas Gerais e Bahia</dd></div>" +
       '<div class="larga"><dt>Usinas</dt><dd><ul class="usinas">' + USINAS.map(function (u) { return "<li>" + esc(u.nome) + '<span class="num">' + pct(u.mwp) + " MWp</span></li>"; }).join("") + "</ul></dd></div></dl>";
   }
+  // o gestor do contrato sempre vê o que está em atraso, em toda aba, e recebe o aviso no sino até resolver
+  if (atrasadas) {
+    h += '<p class="atraso" role="status"><i class="ponto p-critico" aria-hidden="true"></i><b>' + atrasadas + " em atraso</b><span>" + esc(emAtraso.join(" e ")) + '</span><a class="linkbtn" href="#/calendario">Ver no calendário</a>' +
+      '<span class="atraso-sino"><i class="ph ph-bell" aria-hidden="true"></i>No sino da gestora, todo dia, até resolver</span></p>';
+  }
   h += '<nav class="abas" aria-label="Partes do contrato">' + ABAS.map(function (a) {
     return '<a href="#/' + a[0] + '"' + (estado.aba === a[0] ? ' aria-current="page"' : "") + ">" + a[1] +
       (a[0] === "calendario" && atrasadas ? '<b title="' + atrasadas + ' atrasadas">' + atrasadas + "</b>" : "") + "</a>";
@@ -411,11 +451,18 @@ function vContrato() {
 function pRegras() {
   var acordadas = REGRAS.filter(function (r) { return r.acordada; }).length;
   var h = '<div class="regua">' + seg("Quais regras", "data-regras", estado.soAcordadas ? "acordadas" : "todas", [["todas", "Todas", REGRAS.length], ["acordadas", "Acordadas depois da assinatura", acordadas]]) + "</div>";
-  h += '<div class="rolavel"><table class="tab"><thead><tr><th style="width:30%">Regra</th><th>Vale hoje</th><th style="width:22%">Última mudança</th><th style="width:76px"><span class="so-leitor">Ajustar</span></th></tr></thead><tbody>';
+  // recolhidas (12/11/2026, Levi: "eu quero ver entregáveis, quero ver SLA, a pessoa vai clicando"): uma linha por
+  // categoria; o clique abre as regras dela. No filtro das acordadas abrem todas: são poucas e é o que se pediu para ver
+  var algumAberto = estado.soAcordadas || CATS.some(function (c) { return estado.grupos[c]; });
+  h += '<div class="rolavel"><table class="tab">' + (algumAberto ? '<thead><tr><th style="width:30%">Regra</th><th>Vale hoje</th><th style="width:22%">Última mudança</th><th style="width:76px"><span class="so-leitor">Ajustar</span></th></tr></thead>' : "") + "<tbody>";
   CATS.forEach(function (cat) {
     var rs = REGRAS.filter(function (r) { return r.cat === cat && (!estado.soAcordadas || r.acordada); });
     if (!rs.length) return;
-    h += '<tr class="grupo"><td colspan="4">' + esc(cat) + "<span>" + rs.length + "</span></td></tr>";
+    var aberto = estado.soAcordadas || !!estado.grupos[cat], ac = rs.filter(function (r) { return r.acordada; }).length;
+    h += '<tr class="grupo"><td colspan="4"><button data-grupo="' + esc(cat) + '" aria-expanded="' + aberto + '"><i class="ph ph-caret-' + (aberto ? "down" : "right") + '" aria-hidden="true"></i>' + esc(cat) +
+      (ac && !estado.soAcordadas ? '<span class="pill t-verde">' + ac + (ac === 1 ? " acordada" : " acordadas") + "</span>" : "") +
+      '<span class="g-n">' + rs.length + (rs.length === 1 ? " regra" : " regras") + "</span></button></td></tr>";
+    if (!aberto) return;
     rs.forEach(function (r) {
       var i = REGRAS.indexOf(r), ult = r.hist[0];
       h += '<tr><td><span class="nome">' + esc(r.nome) + '</span><span class="sub">' + esc(r.setor) + (r.cl ? ", cláusula " + r.cl : "") + "</span></td>" +
@@ -434,7 +481,7 @@ function pRegras() {
   });
   // a regra nova é a última linha da tabela: no alto, o botão verde disputava a tela com as regras (12/11/2026)
   h += '<tr class="mais"><td colspan="4"><button data-nova-regra><i class="ph ph-plus" aria-hidden="true"></i>Acrescentar uma regra acordada que não está no contrato</button></td></tr>';
-  return h + '</tbody></table></div><p class="nota">A regra acordada vale no lugar da contratual. Toda mudança guarda quem fez, quando, a origem (ata, e-mail, aditivo) e o motivo.</p>';
+  return h + '</tbody></table></div><p class="nota">Clique numa categoria para abrir as regras dela. A regra acordada vale no lugar da contratual, e toda mudança guarda quem fez, quando, a origem (ata, e-mail, aditivo) e o motivo.</p>';
 }
 
 function pCalendario() {
@@ -618,6 +665,7 @@ function dlgRegra(i) {
     } else {
       REGRAS.push({cat: dlg.querySelector("#f-cat").value, nome: dlg.querySelector("#f-nome").value.trim() || "Regra nova", setor: dlg.querySelector("#f-setor").value, cl: "", contratual: "", acordada: val,
                    hist: [{quem: EU, setor: "Contratos", quando: agoraTxt(), de: "Não estava no contrato", para: val, origem: orig, motivo: mot}]});
+      estado.grupos[dlg.querySelector("#f-cat").value] = true;      // a regra nova aparece: a categoria dela abre
     }
     dlg.close(); render(); toast(r ? "Regra ajustada: a acordada passa a valer e a anterior fica no histórico." : "Regra cadastrada: vale a partir de hoje.");
   };
@@ -651,6 +699,8 @@ main.addEventListener("click", function (e) {
   var b;
   if ((b = e.target.closest("[data-regras]"))) { estado.soAcordadas = b.getAttribute("data-regras") === "acordadas"; render(); }
   else if (e.target.closest("[data-ficha]")) { estado.ficha = !estado.ficha; render(); }
+  else if ((b = e.target.closest("[data-grupo]"))) { var g = b.getAttribute("data-grupo"); estado.grupos[g] = !estado.grupos[g]; render(); }
+  else if (e.target.closest("[data-voltar-ct]")) { estado.ct = 0; render(); }
   else if ((b = e.target.closest("[data-hist]"))) { var i = b.getAttribute("data-hist"); estado.abertoHist[i] = !estado.abertoHist[i]; render(); }
   else if ((b = e.target.closest("[data-ajustar]"))) dlgRegra(+b.getAttribute("data-ajustar"));
   else if (e.target.closest("[data-nova-regra]")) dlgRegra(null);
@@ -662,7 +712,7 @@ main.addEventListener("click", function (e) {
 });
 main.addEventListener("change", function (e) {
   var t = e.target;
-  if (t.id === "selCt" && t.value !== "0") { t.value = "0"; toast("No mockup só o contrato CT-2025-014 tem dados."); }
+  if (t.id === "selCt") { estado.ct = +t.value; estado.ficha = false; render(); }
   else if (t.hasAttribute("data-marco")) {
     var m = MARCOS[+t.getAttribute("data-marco")]; m.u[t.getAttribute("data-u")] = t.checked;
     CARIMBO[m.nome] = EU + " · " + agoraTxt().slice(0, 5) + " " + agoraTxt().slice(11); render();

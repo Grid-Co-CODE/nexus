@@ -36,7 +36,7 @@
     {% else %}<p class="mudo" style="margin:0">Nenhuma atualização ainda.</p>{% endif %}
 
     {% if sou_resp %}
-    <form class="ct-form" method="post" action="{{ ('/t/contratos/contestacoes/' ~ x.id ~ '/atualizacao')|na_raiz }}" data-ct-atualizar>
+    <form class="ct-form" method="post" action="{{ ('/t/comando/contestacoes/' ~ x.id ~ '/atualizacao')|na_raiz }}" data-ct-atualizar>
       <label class="gc-rotulo" for="ct-texto">Nova atualização (fica com a data e a hora de agora)</label>
       <textarea id="ct-texto" name="texto" class="gc-campo" maxlength="2000" required>{{ texto }}</textarea>
       <div><button class="gc-btn gc-btn--ui gc-btn--primario" type="submit">Salvar atualização</button></div>

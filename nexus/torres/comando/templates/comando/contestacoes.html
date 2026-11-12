@@ -2,7 +2,8 @@
 {% block titulo %}{{ tela.nome }}{% endblock %}
 {% block conteudo %}
 <link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
-{# Contestações dos clientes (Levi, 13/10/2026: "em contratos e clientes no Nexus pode ter um lugar para essas
+{# No Comando desde 12/11/2026 (Levi: "contestações, você vai jogar para o comando"; a torre Contratos e clientes saiu
+   do menu). Contestações dos clientes (Levi, 13/10/2026: "em contratos e clientes no Nexus pode ter um lugar para essas
    contestações separando setores!"). Uma aba por setor que a sessão vê (15/10/2026: "O setor só vê a contestação do
    próprio setor, exceto administrador"); a mais nova em cima. O que é do cliente (nome, contato, mensagem, o que ele via)
    vem cifrado do banco e só abre com a chave privada deste Nexus (nexus/contratos/contestacoes.py).
@@ -62,7 +63,7 @@
     <thead><tr><th>Recebida</th><th>Usina</th><th>Dia contestado</th><th>Contesta</th><th>Cliente</th><th class="ct-esq">Mensagem</th><th class="ct-esq">Na tela do cliente</th><th>Teams</th><th>Responsável</th></tr></thead>
     <tbody>
     {% for x in lista %}{% set t = trat.get(x.id|string) or {} %}{% set r = t.get('responsavel') %}{% set meu_r = r and meu and r.hmac == meu %}
-      <tr data-ct-card="{{ ('/t/contratos/contestacoes/' ~ x.id ~ '/card')|na_raiz }}" tabindex="0" aria-label="Abrir o acompanhamento da contestação de {{ x.usina }}">
+      <tr data-ct-card="{{ ('/t/comando/contestacoes/' ~ x.id ~ '/card')|na_raiz }}" tabindex="0" aria-label="Abrir o acompanhamento da contestação de {{ x.usina }}">
         <td><span class="ext-par"><span class="m">{{ x.quando.strftime('%d/%m/%Y') if x.quando else '—' }}</span><span class="det">{{ x.quando.strftime('%H:%M') if x.quando else '' }}</span></span></td>
         <td class="ct-usina">{{ x.usina }}</td>
         <td class="m">{% if x.ini %}{{ x.ini.strftime('%d/%m/%Y') }}{% if x.fim and x.fim != x.ini %} a {{ x.fim.strftime('%d/%m') }}{% endif %}{% else %}—{% endif %}</td>
@@ -74,9 +75,9 @@
         <td class="ct-resp">{% if trat_erro %}<span class="mudo">—</span>
           {% elif r %}<span>{{ r.nome or 'responsável' }}{% if meu_r %} (você){% endif %}</span>
             <span class="ct-n">{{ t.atualizacoes|length }} atualizaç{{ 'ão' if t.atualizacoes|length == 1 else 'ões' }}</span>
-            {% if admin and not meu_r %}<form method="post" action="{{ ('/t/contratos/contestacoes/' ~ x.id ~ '/pegar')|na_raiz }}" data-ct-pegar>
+            {% if admin and not meu_r %}<form method="post" action="{{ ('/t/comando/contestacoes/' ~ x.id ~ '/pegar')|na_raiz }}" data-ct-pegar>
               <button class="gc-btn gc-btn--ui gc-btn--contorno ct-pegar" type="submit" title="Administrador: a demanda passa para você">Assumir</button></form>{% endif %}
-          {% else %}<form method="post" action="{{ ('/t/contratos/contestacoes/' ~ x.id ~ '/pegar')|na_raiz }}" data-ct-pegar>
+          {% else %}<form method="post" action="{{ ('/t/comando/contestacoes/' ~ x.id ~ '/pegar')|na_raiz }}" data-ct-pegar>
             <button class="gc-btn gc-btn--ui gc-btn--primario ct-pegar" type="submit">Pegar para mim</button></form>{% endif %}</td></tr>
     {% else %}<tr><td colspan="9" class="mudo">Nenhuma contestação para este setor.</td></tr>{% endfor %}
     </tbody>

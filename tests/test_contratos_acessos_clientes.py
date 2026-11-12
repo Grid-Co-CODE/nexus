@@ -1,4 +1,4 @@
-"""Contratos e clientes → Acessos dos clientes (14/10/2026, o login por pessoa do Dashboard Thopen). O Nexus grava as
+"""Base → Acessos dos clientes (14/10/2026, o login por pessoa do Dashboard Thopen). O Nexus grava as
 contas no livro nexus_acessos_clientes com o nome e o e-mail só cifrados (selados para a PÚBLICA do 5080 e no Cofre do
 Nexus) e o link de definir senha só como sha256. Banco falso (tests/pg_falso.py); a abertura destes testes segue a MESMA
 receita do thopen/acessos.py, e com PLATAFORMA_REPO apontando para o clone da plataforma o teste cruzado abre com o
@@ -177,37 +177,37 @@ def test_banco_fora_diz_e_nao_lista_vazio(app):
 
 
 def _codigo(cli):
-    html = cli.get("/t/contratos/acessos").get_data(as_text=True)
+    html = cli.get("/t/base/acessos-clientes").get_data(as_text=True)
     return re.search(r'name="codigo" value="([^"]+)"', html).group(1)
 
 
 def test_tela_cria_e_mostra_o_link_uma_vez(banco, logado):
     cod = _codigo(logado)
-    r = logado.post("/t/contratos/acessos", data={"codigo": cod, "acao": "criar", "nome": "Ana Souza",
+    r = logado.post("/t/base/acessos-clientes", data={"codigo": cod, "acao": "criar", "nome": "Ana Souza",
                                                   "email": "ana@thopen.com.br", "carteira": ["Thopen"], "papel": "cliente"},
                     headers={"Sec-Fetch-Site": "same-origin"})
     assert r.status_code == 303
-    html = logado.get("/t/contratos/acessos").get_data(as_text=True)
+    html = logado.get("/t/base/acessos-clientes").get_data(as_text=True)
     assert "/performance/convite/" in html and "Ana Souza" in html and "link pendente" in html
-    assert "/performance/convite/" not in logado.get("/t/contratos/acessos").get_data(as_text=True)   # uma vez só
+    assert "/performance/convite/" not in logado.get("/t/base/acessos-clientes").get_data(as_text=True)   # uma vez só
 
 
 def test_tela_recusa_sem_codigo_de_outro_site_e_quem_nao_e_admin(banco, logado):
     dados = {"acao": "criar", "nome": "X", "email": "x@y.com", "carteira": ["Thopen"]}
-    assert logado.post("/t/contratos/acessos", data=dados, headers={"Sec-Fetch-Site": "same-origin"}).status_code == 403
+    assert logado.post("/t/base/acessos-clientes", data=dados, headers={"Sec-Fetch-Site": "same-origin"}).status_code == 403
     cod = _codigo(logado)
-    assert logado.post("/t/contratos/acessos", data={**dados, "codigo": cod},
+    assert logado.post("/t/base/acessos-clientes", data={**dados, "codigo": cod},
                        headers={"Sec-Fetch-Site": "cross-site"}).status_code == 403
     with logado.session_transaction() as s:
         s["admin"] = False
-    r = logado.post("/t/contratos/acessos", data={**dados, "codigo": cod}, headers={"Sec-Fetch-Site": "same-origin"})
+    r = logado.post("/t/base/acessos-clientes", data={**dados, "codigo": cod}, headers={"Sec-Fetch-Site": "same-origin"})
     assert r.status_code == 403
     assert banco.linhas(AC.LIVRO, AC.ABA) == []
 
 
 def test_recusa_volta_com_o_que_foi_digitado(banco, logado):
     cod = _codigo(logado)
-    r = logado.post("/t/contratos/acessos", data={"codigo": cod, "acao": "criar", "nome": "Bia", "email": "bia@copel.com",
+    r = logado.post("/t/base/acessos-clientes", data={"codigo": cod, "acao": "criar", "nome": "Bia", "email": "bia@copel.com",
                                                   "papel": "cliente"}, headers={"Sec-Fetch-Site": "same-origin"})
     html = r.get_data(as_text=True)
     assert r.status_code == 400 and "carteira" in html and 'value="bia@copel.com"' in html

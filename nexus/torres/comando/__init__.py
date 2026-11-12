@@ -56,6 +56,15 @@ TORRE = Torre(
         Tela("metas", "Metas do book",
              "Quais KPIs do book R02 estão fora da meta e piorando?",
              "Aba KPIs do Plano de Documentação"),
+        # da torre Contratos e clientes, que saiu do menu (12/11/2026, Levi: "contestações, você vai jogar para o
+        # comando, prévia visão do contrato, você vai jogar no comando"; as views em contestacoes_tela.py). A prévia é de
+        # todos, para cada setor avaliar sem liberar um por um (Ana: "pedir avaliação da Danuth, Camila e Fred")
+        Tela("contestacoes", "Contestações",
+             "O que os clientes contestaram nos dashboards, e para qual setor?",
+             "Dashboard Thopen: a contestação de cada dia, gravada cifrada no banco (livro thopen_contestacoes)"),
+        Tela("visao-do-contrato", "Prévia: visão do contrato",
+             "Como fica a visão do contrato?",
+             "Mockup para avaliação, com dados fictícios: nada grava", de_todos=True),
     ],
 )
 
@@ -595,3 +604,5 @@ def conversa_acao():
 
 # as demandas entre setores (12/11/2026) num módulo à parte; importado no fim porque usa o `bp` e os ajudantes daqui
 from . import demandas_tela  # noqa: E402,F401
+# as Contestações e a Prévia do contrato, vindas da torre Contratos e clientes (12/11/2026)
+from . import contestacoes_tela  # noqa: E402,F401

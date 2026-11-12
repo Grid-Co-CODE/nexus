@@ -63,8 +63,18 @@ LIVRES = frozenset({"auth.entrar", "auth.sair", "casca.tema", "casca.saude", "st
 # Telas que mudaram de endereço: a decisão gravada com o nome antigo vale para o novo (a mais nova de cada setor × tela
 # ganha, pela hora, como sempre). 13/10/2026: o Criador de relatório e o Relatório semanal saíram da Performance para
 # Relatórios → Central de emissão (Levi: "Sai da parte de Performance!"); quem já os via continua vendo.
+# 12/11/2026: a torre Contratos e clientes saiu do menu (Levi: "Essa parte de contrato e clientes aqui vai sumir, vai ser
+# absorvido por outras seções"): as Contestações e a Prévia do contrato foram para o Comando, os Acessos dos clientes
+# para a Base.
 RENOMEADAS = {"performance/relatorio": "relatorios/relatorio",
-              "performance/relatorio-semanal": "relatorios/relatorio-semanal"}
+              "performance/relatorio-semanal": "relatorios/relatorio-semanal",
+              "contratos/contestacoes": "comando/contestacoes",
+              "contratos/previa": "comando/visao-do-contrato",
+              "contratos/acessos": "base/acessos-clientes"}
+# A torre que saiu do menu e só guarda os endereços antigos (nexus/torres/contratos: cada um responde um
+# redirecionamento para a tela nova). O portão deixa passar: sem isto, quem não é administrador recebia a recusa no
+# endereço salvo, em vez de chegar à tela nova, que tem o portão dela.
+TORRES_EXTINTAS = frozenset({"contratos"})
 
 
 class Recusada(ValueError):
@@ -448,7 +458,7 @@ def pode(caminho: str, telas: set[str]) -> bool:
     if PAGINA_DA_OS.match(caminho):
         return any(t in telas for t in TELAS_DA_PAGINA_DA_OS)
     torre_id, tela = _tela_do_caminho(caminho)
-    if torre_id is None:
+    if torre_id is None or torre_id in TORRES_EXTINTAS:
         return True
     if tela:
         return tela in telas

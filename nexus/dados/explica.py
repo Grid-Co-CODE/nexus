@@ -142,7 +142,7 @@ PARA_QUE = {
     "contestacao_cliente": "Guarda cada contestação que o cliente fez no Dashboard Thopen (geração, disponibilidade, "
                            "desligamento, string, tracker ou ronda de um dia), separada pelo setor que responde: "
                            "Performance, COS ou Zeladoria. Quem é o cliente, o contato e a mensagem vão cifrados; só o Nexus "
-                           "abre, na tela Contratos e clientes → Contestações.",
+                           "abre, na tela Comando → Contestações.",
     "observacao_responsavel": "Guarda o que o Responsável O&M escreveu sobre a usina na Visão do responsável, com o dia "
                               "e a hora e se ele cobria outro responsável (férias). O texto e o nome vão cifrados; "
                               "serve para juntar as observações nos relatórios.",
@@ -186,7 +186,7 @@ PARA_QUE = {
                          "escreveu vão cifrados; a tela Usinas 360° → Ocorrências mostra.",
     "tratamento_contestacao": "Guarda o acompanhamento de cada contestação do cliente: quem pegou a demanda (\"Pegar "
                               "para mim\") e cada atualização que o responsável escreveu, com o dia e a hora. Quem e o "
-                              "texto vão cifrados; a tela Contratos e clientes → Contestações mostra.",
+                              "texto vão cifrados; a tela Comando → Contestações mostra.",
     "comentario_dia": "Guarda, por usina e por dia, o comentário que explica ao cliente a parada daquele dia: o "
                       "relato da Ronda COS (a causa, os chamados com a concessionária, a religada que não "
                       "segurou e a volta) no primeiro dia, a continuação nos seguintes e as paradas ainda em "

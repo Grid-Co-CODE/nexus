@@ -17,6 +17,7 @@ from ...cadastro.telas_ligacoes import registrar_ligacoes
 from ...dados.telas import registrar_governanca
 from ..modelo import Tela, Torre
 from ..moldura import registrar_molduras
+from .acessos_clientes_tela import registrar_acessos_clientes
 from .mapa_base_tela import registrar_mapa_base
 
 TORRE = Torre(
@@ -85,6 +86,12 @@ TORRE = Torre(
         Tela("acessos", "Acessos",
              "O que cada setor vê, quem é administrador, quem entrou em 30 dias e o setor de cada pessoa do Fracttal",
              "NEXUS_ADMINS do servidor, a lista da tela, a API do Fracttal (pessoal) e o livro nexus_setores; só administrador"),
+        # Acessos dos clientes (14/10/2026: as contas por pessoa do Dashboard Thopen), da torre Contratos e clientes, que
+        # saiu do menu em 12/11/2026 (Levi: "Joga o acesso cliente lá para bases"). Não é o Acessos de cima (o que cada
+        # setor do Nexus vê). A view: nexus/torres/base/acessos_clientes_tela.py; as regras: nexus/contratos/
+        Tela("acessos-clientes", "Acessos dos clientes",
+             "Quem do cliente entra no Dashboard Thopen, e o que cada um vê?",
+             "Contas por pessoa (livro nexus_acessos_clientes, cifrado); a senha, a pessoa define no painel"),
         # Mapa base (11/11/2026): a subida do mapa do Brasil do Mapa de equipe (o PMTiles de ~2,4 GB não cabe no git; Levi
         # escolheu o "Upload pelo Nexus"). Só administrador. A view: nexus/torres/base/mapa_base_tela.py
         Tela("mapa-base", "Mapa base",
@@ -116,6 +123,7 @@ registrar_ligacoes(bp)
 registrar_governanca(bp)
 registrar_acessos(bp)
 registrar_chaves(bp)
+registrar_acessos_clientes(bp, TORRE)   # /t/base/acessos-clientes: as contas do Dashboard Thopen (12/11/2026)
 registrar_mapa_base(bp)     # /t/base/mapa-base: a subida do mapa do Brasil do Mapa de equipe (11/11/2026)
 registrar_raio_x(bp)        # /t/base/raio-x: o que o processo faz agora (14/10/2026), só administrador, fora do menu
 registrar_molduras(bp, TORRE, abas={"chaves-fontes": {"primeira": "Fontes da Performance",

@@ -173,7 +173,7 @@ def test_setor_sem_nenhuma_tela_ve_o_inicio_com_o_aviso(app, setores):
     assert r.status_code == 200
     html = r.get_data(as_text=True)
     assert "ainda não tem telas liberadas" not in html
-    # a Caixa e os Temas do setor (Comando) e a Prévia do contrato (Contratos e clientes, 12/11/2026) são de todos
+    # a Caixa e os Temas do setor (Comando) e a Prévia do contrato (no Comando desde 12/11/2026) são de todos
     assert set(re.findall(r'data-torre="([^"]+)"', html)) <= {"comando", "contratos"}
     assert c.get("/t/comando/caixa-de-entrada").status_code == 200 and c.get("/t/comando/insights").status_code == 403
 
@@ -189,7 +189,7 @@ def test_setor_nao_da_administrador_e_administrador_com_setor_ve_tudo(app, setor
     app.config["NEXUS_ADMINS"] = ANA                                     # a Ana: Performance E administradora
     c = _como(app, ANA)
     html = c.get("/").get_data(as_text=True)
-    assert html.count('<details class="torre') == 14 and "Setor: <b>Performance</b>" in html
+    assert html.count('<details class="torre') == 13 and "Setor: <b>Performance</b>" in html
     assert c.get("/t/cos/ocorrencias").status_code == 200 and c.get(URL).status_code == 200
     with c.session_transaction() as s:
         assert s["admin"] is True

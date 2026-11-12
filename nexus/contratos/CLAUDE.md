@@ -1,9 +1,29 @@
-# CLAUDE.md — Contratos e clientes
+# CLAUDE.md — Contratos e clientes (as regras; a torre saiu do menu)
 
-Torre do menu "Contratos e clientes". Telas vivas: **Contestações** (13/10/2026) e **Acessos dos clientes** (14/10/2026).
-Clientes, Onboarding, Comunicação por cliente e Portal ainda são placeholder (a view com a mesma rota vence a genérica).
+**A torre "Contratos e clientes" saiu do menu em 12/11/2026** (Levi: "Outro ponto, contratos e clientes. Joga o acesso
+cliente lá para bases, contestações, você vai jogar para o comando, prévia visão do contrato, você vai jogar no comando
+[...] Essa parte de contrato e clientes aqui vai sumir, vai ser absorvido por outras seções"). O que era dela:
 
-**Prévia: visão do contrato** (12/11/2026, `/t/contratos/previa`, de todos): o mockup que a Ana pediu para a
+| Tela | Onde está | View e template |
+|---|---|---|
+| **Contestações** (13/10/2026) | Comando, `/t/comando/contestacoes` | `nexus/torres/comando/contestacoes_tela.py`, `comando/contestacoes.html` e `_contestacao_card.html` |
+| **Prévia: visão do contrato** (12/11/2026) | Comando, `/t/comando/visao-do-contrato`, de todos | o mesmo módulo, `comando/visao_do_contrato.html` |
+| **Acessos dos clientes** (14/10/2026) | Base, `/t/base/acessos-clientes` (logo abaixo do Acessos, que é outra coisa: o que cada setor do Nexus vê) | `nexus/torres/base/acessos_clientes_tela.py`, `nexus/templates/acessos_dos_clientes.html` |
+| Clientes, Onboarding de cliente, Comunicação por cliente, Portal do cliente | saíram: eram só o aviso de "em construção" | — |
+
+- **As regras não mudaram de lugar**: esta pasta (`contestacoes.py`, `tratamento.py`, `acessos_clientes.py`) e este
+  arquivo, que veio de `nexus/torres/contratos/`.
+- **O endereço antigo não vira 404**: `nexus/torres/contratos/__init__.py` ficou só com um `bp` (sem `TORRE`: não entra no
+  menu, no Início nem na lista de telas dos setores) que responde 308 para a tela nova, com o resto do caminho e o
+  filtro (`?setor=`); 308 e não 302 para o formulário de uma aba aberta no endereço antigo ainda gravar. A tela sem
+  sucessora leva ao Início.
+- **A marca do setor vale na tela nova** (`setor_telas.RENOMEADAS`: `contratos/contestacoes` → `comando/contestacoes`,
+  `contratos/previa` → `comando/visao-do-contrato`, `contratos/acessos` → `base/acessos-clientes`): ninguém perdeu o que
+  via, e o banco não foi regravado. O portão por setor deixa o endereço antigo passar (`setor_telas.TORRES_EXTINTAS`);
+  quem decide é a tela de destino.
+- Prova: `tests/test_contratos_torre_saiu.py`. O menu passou de 14 para 13 torres.
+
+**Prévia: visão do contrato** (12/11/2026, `/t/comando/visao-do-contrato`, de todos): o mockup que a Ana pediu para a
 avaliação de Contratos (Danuth, Camila, Fred) e dos setores, `nexus/static/previa/visao-do-contrato.html` (a mesma
 página do `docs/mockups/visao-do-contrato` da plataforma), numa moldura; dentro do Nexus ele esconde o topo dele. Dados
 fictícios, nada grava. Quando a visão do contrato virar tela de verdade, ela entra na tela Clientes (a "Gestão de
@@ -27,7 +47,23 @@ aba da visão do contrato, que vale também quando ela virar tela de verdade:**
   contrato riscada embaixo; a regra que nunca mudou não leva selo nem autor (14 das 18);
 - **o que acrescenta é a última linha da tabela** (a regra nova, a entrada nova), não um botão verde no alto;
 - o cabeçalho da moldura no Nexus é **uma linha**: o título e o aviso de dados fictícios; sem a pergunta e sem a faixa
-  amarela. Prova: `tests/test_contratos_previa.py`.
+  amarela. Prova: `tests/test_comando_visao_do_contrato.py`.
+
+**3ª rodada, na mesma noite** (Levi: "esse scroll branco aí é zoado [...] deixa no estilo Nexus. E todas essas regras aí,
+deixa recolhido [...] eu quero ver entregáveis, quero ver SLA, a pessoa vai clicando [...] seria bom se fosse separado
+para o cliente [...] E aí seria bom para os gestores de contrato [...] recebendo as notificações [...] tem tantos em
+atraso, isso está sempre para ele [...] Sempre"; do calendário: "ótimo também, gostei"):
+- **a barra de rolagem é a do Nexus** (os tokens `--rolagem` do nexus.css copiados no mockup, com `color-scheme:dark`
+  para os controles do navegador): página numa moldura não herda o estilo da casca, tem de trazer o dela;
+- **as Regras abrem recolhidas**: uma linha por categoria, com quantas regras e quantas acordadas; o clique abre. O
+  filtro "Acordadas" abre todas (são poucas e é o que se pediu para ver). O cabeçalho das colunas só aparece com alguma
+  categoria aberta;
+- **cada cliente tem o contrato dele**: o nome no alto troca o contrato (no mockup só o primeiro tem dados, e os outros
+  dizem isso);
+- **o que está em atraso fica numa linha no cabeçalho do contrato, em TODA aba**, com o que é e o atalho para o
+  calendário, e diz que o gestor do contrato recebe o aviso no sino do Nexus, todo dia, até resolver. **Pendente para a
+  tela de verdade:** a notificação ao gestor (o sino e o `nexus/notificacoes/`) e a conta de "tantos em atraso" somando
+  os contratos dele; no mockup isso é só desenho.
 As regras moram em `nexus/contratos/` (`contestacoes.py`, `acessos_clientes.py`); a view e o template, aqui.
 
 ## Contestações

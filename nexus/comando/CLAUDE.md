@@ -329,6 +329,15 @@ catálogo; o texto só cifrado; o duplo envio; a OS da usina; o papel e a vez; o
 recebe, quem pediu, o colega e quem não tem nada a ver; a Nova demanda pela tela; os passos pela tela; os Temas do setor;
 o sininho).
 
+## Contestações e Prévia: visão do contrato (no Comando desde 12/11/2026)
+
+Vieram da torre Contratos e clientes, que saiu do menu (Levi, 12/11/2026: "contestações, você vai jogar para o comando,
+prévia visão do contrato, você vai jogar no comando"). São as duas últimas telas da torre: `/t/comando/contestacoes` e
+`/t/comando/visao-do-contrato` (esta, de todos). As views e os templates moram aqui
+(`nexus/torres/comando/contestacoes_tela.py`, importado no fim do `__init__` como as demandas); **as regras, a chave, o
+que cada setor vê e o desenho da Prévia estão em `nexus/contratos/CLAUDE.md`: leia lá antes de mexer.** Os endereços
+antigos (`/t/contratos/...`) redirecionam e a marca do setor na tela antiga vale na nova (`setor_telas.RENOMEADAS`).
+
 ## O visual
 **A ordem da Caixa de entrada (Levi, 12/11/2026):** o título só (sem a pergunta da tela e sem o "todas as torres · conta das HH:MM", "inútil"); os números dos insights no alto, como KPI, antes das demandas ("não faz sentido ter criar demanda de setores e depois seus insights"), cada número leva à sua lista; o **Sem dono vem recolhido**, só com o contador ("senão a rolagem é infinita"), e abre pelo número do alto, pelo clique ou pelo endereço de um insight dele (`insights.js`); o botão "Temas do meu setor" ao lado da Nova demanda ("eu não achei um de cadastro os temas").
 

@@ -22,7 +22,7 @@ TELAS = ["cos/mesa", "cos/ocorrencias", "pcm/quadro", "campo/aprovacao", "campo/
 QUENTES = {"cos/mesa", "cos/ocorrencias", "pcm/quadro", "campo/rondas", "relatorios/central",
            "comando/caixa-de-entrada",   # a Caixa é de todo setor (03/11/2026)
            "comando/temas-do-setor",     # e os Temas do setor das demandas (12/11/2026)
-           "contratos/previa"}           # e a Prévia do contrato e do prontuário (12/11/2026)
+           "comando/visao-do-contrato"}  # e a Prévia do contrato (12/11/2026)
 
 
 @pytest.fixture
@@ -56,8 +56,10 @@ def test_o_primeiro_clique_de_quem_tem_setor_aquece_as_telas_dele(ligada):
     assert e["ultima_volta"]["telas"] == 8 and not e["ultima_volta"]["erros"] and not e["trabalhando"]
     # a 1ª tela de cada torre primeiro (onde o cartão do Início leva), depois o resto na ordem do menu (a Usinas 360°,
     # id `campo`, logo abaixo de Comando desde 05/11/2026)
-    assert list(e["ultimo"]) == ["comando/caixa-de-entrada", "campo/rondas", "cos/mesa", "pcm/quadro", "contratos/previa",
-                                 "relatorios/central", "comando/temas-do-setor", "cos/ocorrencias"]
+    # 12/11/2026: a Prévia do contrato foi para o Comando (a torre Contratos e clientes saiu do menu): deixou de ser a 1ª
+    # tela de uma torre e entra no resto do Comando
+    assert list(e["ultimo"]) == ["comando/caixa-de-entrada", "campo/rondas", "cos/mesa", "pcm/quadro", "relatorios/central",
+                                 "comando/temas-do-setor", "comando/visao-do-contrato", "cos/ocorrencias"]
 
 
 def test_uma_vez_por_minuto_e_so_o_que_esfriou(ligada):

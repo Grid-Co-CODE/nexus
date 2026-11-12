@@ -186,7 +186,7 @@ def _conferir_esri(valor: str) -> str:
 CHAVES = {
     "NEXUS_CONTESTACAO_CHAVE_PRIVADA": {
         "nome": "Contestações dos clientes (chave privada)",
-        "para": "abrir o nome, o contato e a mensagem do cliente em Contratos e clientes → Contestações",
+        "para": "abrir o nome, o contato e a mensagem do cliente em Comando → Contestações",
         "arquivo": "nexus_contestacao_privada.segredo",
         "conferir": _conferir_contestacao,
     },
@@ -194,7 +194,7 @@ CHAVES = {
     # painel (nexus/contratos/acessos_clientes.py). Trocar o par = as contas de antes não abrem lá: gere o link de novo
     "NEXUS_ACESSOS_5080_PUBLICA": {
         "nome": "Acessos dos clientes ao Dashboard Thopen (chave pública do painel)",
-        "para": "criar as contas em Contratos e clientes → Acessos dos clientes (o painel abre o nome e o e-mail com a "
+        "para": "criar as contas em Base → Acessos dos clientes (o painel abre o nome e o e-mail com a "
                 "privada dele)",
         "arquivo": "thopen_acessos_publica.txt",
         "conferir": _conferir_acessos_publica,

@@ -1,4 +1,4 @@
-"""Contratos e clientes → Contestações (Levi, 13/10/2026: "em contratos e clientes no Nexus pode ter um lugar para essas
+"""Comando → Contestações (Levi, 13/10/2026: "em contratos e clientes no Nexus pode ter um lugar para essas
 contestações separando setores!"). O Dashboard Thopen grava o livro thopen_contestacoes com o que é do cliente cifrado
 pela chave PÚBLICA; aqui só a privada abre. Banco falso (tests/pg_falso.py); a cifra destes testes segue a MESMA receita
 do thopen/contestacao_banco.py, e com PLATAFORMA_REPO apontando para o clone da plataforma o teste cruzado cifra com o
@@ -98,11 +98,11 @@ def test_cifra_copiada_para_outra_linha_nao_abre(banco, app):
 
 
 def test_tela_tem_uma_aba_por_setor(banco, logado):
-    r = logado.get("/t/contratos/contestacoes")
+    r = logado.get("/t/comando/contestacoes")
     html = r.get_data(as_text=True)
     assert r.status_code == 200 and "Performance<i>2</i>" in html and "Zeladoria<i>1</i>" in html
     assert "Ana Souza" in html and "ana@cliente.com.br" in html and "Altair" in html
-    z = logado.get("/t/contratos/contestacoes?setor=zeladoria").get_data(as_text=True)
+    z = logado.get("/t/comando/contestacoes?setor=zeladoria").get_data(as_text=True)
     assert "não recebeu" in z and "Altair" not in z
 
 
@@ -187,41 +187,41 @@ def test_o_setor_so_ve_a_contestacao_dele_e_o_administrador_ve_todas(trat, app, 
     setor = {"v": {"id": SID.ZELADORIA, "nome": "Zeladoria"}}
     monkeypatch.setattr(ST, "acesso", lambda: {"tudo": False, "telas": set(), "setor": setor["v"], "erro": ""})
     _como(cliente, ANA)
-    html = cliente.get("/t/contratos/contestacoes").get_data(as_text=True)
+    html = cliente.get("/t/comando/contestacoes").get_data(as_text=True)
     assert "Zeladoria<i>1</i>" in html and "Performance<i>" not in html and "Altair" not in html
     # a de outro setor nem abre (o servidor barra, não só a tela)
-    assert cliente.get("/t/contratos/contestacoes?setor=performance").get_data(as_text=True).count("Altair") == 0
-    assert cliente.get("/t/contratos/contestacoes/a1/card").status_code == 404
-    assert cliente.post("/t/contratos/contestacoes/a1/pegar", headers={"Sec-Fetch-Site": "same-origin"}).status_code == 404
-    assert cliente.get("/t/contratos/contestacoes/a2/card").status_code == 200
+    assert cliente.get("/t/comando/contestacoes?setor=performance").get_data(as_text=True).count("Altair") == 0
+    assert cliente.get("/t/comando/contestacoes/a1/card").status_code == 404
+    assert cliente.post("/t/comando/contestacoes/a1/pegar", headers={"Sec-Fetch-Site": "same-origin"}).status_code == 404
+    assert cliente.get("/t/comando/contestacoes/a2/card").status_code == 200
     setor["v"] = {"id": SID.ENGENHARIA, "nome": "Engenharia"}                              # setor sem contestação: nenhuma
-    html = cliente.get("/t/contratos/contestacoes").get_data(as_text=True)
+    html = cliente.get("/t/comando/contestacoes").get_data(as_text=True)
     assert "Nenhuma contestação para o seu setor" in html and "o seu setor é Engenharia" in html
     app.config["NEXUS_ADMINS"] = BETO["email"]                              # administrador (a lista de agora): todas
     _como(cliente, BETO, admin=True)
-    html = cliente.get("/t/contratos/contestacoes").get_data(as_text=True)
+    html = cliente.get("/t/comando/contestacoes").get_data(as_text=True)
     assert "Performance<i>2</i>" in html and "Zeladoria<i>1</i>" in html
 
 
 def test_tela_pegar_abrir_o_card_e_escrever(trat, app, cliente):
     _como(cliente, ANA)
-    html = cliente.get("/t/contratos/contestacoes").get_data(as_text=True)
-    assert html.count(">Pegar para mim</button>") == 2 and 'data-ct-card="/t/contratos/contestacoes/a1/card"' in html
-    r = cliente.post("/t/contratos/contestacoes/a1/pegar", headers={"Sec-Fetch-Site": "same-origin"})
-    assert r.status_code == 303 and r.headers["Location"].endswith("/t/contratos/contestacoes?setor=performance")
-    html = cliente.get("/t/contratos/contestacoes").get_data(as_text=True)
+    html = cliente.get("/t/comando/contestacoes").get_data(as_text=True)
+    assert html.count(">Pegar para mim</button>") == 2 and 'data-ct-card="/t/comando/contestacoes/a1/card"' in html
+    r = cliente.post("/t/comando/contestacoes/a1/pegar", headers={"Sec-Fetch-Site": "same-origin"})
+    assert r.status_code == 303 and r.headers["Location"].endswith("/t/comando/contestacoes?setor=performance")
+    html = cliente.get("/t/comando/contestacoes").get_data(as_text=True)
     assert "agora é sua" in html and "Ana Lima (você)" in html and "0 atualizações" in html
-    card = cliente.get("/t/contratos/contestacoes/a1/card").get_data(as_text=True)
+    card = cliente.get("/t/comando/contestacoes/a1/card").get_data(as_text=True)
     assert "data-ct-atualizar" in card and "Nenhuma atualização ainda" in card and "Ana Souza" in card
-    r = cliente.post("/t/contratos/contestacoes/a1/atualizacao", data={"texto": "Liguei para o cliente"},
+    r = cliente.post("/t/comando/contestacoes/a1/atualizacao", data={"texto": "Liguei para o cliente"},
                      headers={"Sec-Fetch-Site": "same-origin"})
     card = r.get_data(as_text=True)
     assert r.status_code == 200 and "Atualização salva" in card and "Liguei para o cliente" in card
     # outra pessoa do setor lê o card, mas não escreve; de outro site, nada grava
     _como(cliente, BETO)
-    card = cliente.get("/t/contratos/contestacoes/a1/card").get_data(as_text=True)
+    card = cliente.get("/t/comando/contestacoes/a1/card").get_data(as_text=True)
     assert "Liguei para o cliente" in card and "data-ct-atualizar" not in card and "Só Ana Lima escreve" in card
-    assert cliente.post("/t/contratos/contestacoes/b1/pegar", headers={"Sec-Fetch-Site": "cross-site"}).status_code == 403
+    assert cliente.post("/t/comando/contestacoes/b1/pegar", headers={"Sec-Fetch-Site": "cross-site"}).status_code == 403
 
 
 def test_catalogo_registra_o_acompanhamento():
@@ -241,7 +241,7 @@ def test_disponibilidade_e_desligamento_sao_do_cos(trat, app, cliente, monkeypat
     from nexus.auth import setor_telas as ST
     monkeypatch.setattr(ST, "acesso", lambda: {"tudo": False, "telas": set(), "setor": {"id": SID.COS, "nome": "COS"}, "erro": ""})
     _como(cliente, ANA)
-    html = cliente.get("/t/contratos/contestacoes").get_data(as_text=True)
+    html = cliente.get("/t/comando/contestacoes").get_data(as_text=True)
     assert "COS<i>1</i>" in html and "Mandaguaçu" in html and "Performance<i>" not in html and "Zeladoria<i>" not in html
 
 
@@ -256,5 +256,5 @@ def test_setor_sem_teams_aparece_so_no_nexus_e_nao_como_recusa(trat, app, client
     from nexus.auth import setor_telas as ST
     monkeypatch.setattr(ST, "acesso", lambda: {"tudo": False, "telas": set(), "setor": {"id": SID.COS, "nome": "COS"}, "erro": ""})
     _como(cliente, ANA)
-    html = cliente.get("/t/contratos/contestacoes").get_data(as_text=True)
+    html = cliente.get("/t/comando/contestacoes").get_data(as_text=True)
     assert "só no Nexus" in html and "não recebeu" not in html and "recusou" not in html

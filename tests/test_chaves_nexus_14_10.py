@@ -159,7 +159,7 @@ def test_as_chaves_moram_na_aba_nexus_das_chaves_das_fontes(app, admin, monkeypa
     # a aba da plataforma (a moldura) mostra as mesmas abas no topo
     h = admin.get("/t/base/chaves-fontes").get_data(as_text=True)
     assert '<a href="/t/base/chaves-fontes" aria-current="page">Fontes da Performance</a>' in h
-    h = admin.get("/t/contratos/contestacoes").get_data(as_text=True)
+    h = admin.get("/t/comando/contestacoes").get_data(as_text=True)
     assert "Este Nexus não tem a chave das contestações." in h and "/t/base/chaves-nexus" in h
 
 

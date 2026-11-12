@@ -249,6 +249,11 @@ Gestor de contrato.
 
 ## Pessoas e setores, a antiga Integração Fracttal (`fracttal_pessoal.py`, `telas_fracttal.py`; 12/10/2026)
 
+**Base → Acessos dos clientes** (`/t/base/acessos-clientes`, na Base desde 12/11/2026; Levi: "Joga o acesso cliente lá
+para bases") é outra tela, logo abaixo do Acessos no menu: as contas por pessoa dos clientes no Dashboard Thopen. Veio
+da torre Contratos e clientes, que saiu do menu; a view é `nexus/torres/base/acessos_clientes_tela.py` e as regras estão
+em `nexus/contratos/CLAUDE.md` (leia lá antes de mexer). Não confundir com o Acessos, que é o que cada setor do Nexus vê.
+
 **Mora em Base → Acessos, aba Pessoas e setores** (`/t/base/acessos?aba=pessoas`, desde 25/10/2026; Levi: "gostaria que
 não tivesse uma tela só para integração fractall e sim fosse para acessos"). O `/t/base/fracttal` leva à aba, com os
 filtros; a aba de telas e administradores não lê o Fracttal. **A busca e os filtros são da própria página** (Levi, no

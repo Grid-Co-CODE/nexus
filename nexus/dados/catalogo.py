@@ -314,12 +314,14 @@ FATOS = (
          observacao="sugestao_id liga à fato_sugestao; status = iniciada, em verificacao (verificacao) ou concluida; "
                     "vale a última de cada sugestão, na ordem da gravação; sem linha, a sugestão é Nova. O nome de quem "
                     "mudou só cifrado (Cofre). Só acrescenta: nada se edita nem se apaga"),
-    # Contratos e clientes → Contestações (Levi, 13/10/2026: "contestação ligada ao Nexus"; "ficaria na API do PG"). O
+    # A área destes dois fatos é "comando" desde 12/11/2026: a torre Contratos e clientes saiu do menu e as Contestações
+    # foram para o Comando (o `area` é o id da torre dona, e é o que agrupa o fato no organograma da Governança).
+    # Comando → Contestações (Levi, 13/10/2026: "contestação ligada ao Nexus"; "ficaria na API do PG"). O
     # Dashboard Thopen (5080) é a FONTE: grava 1 linha por contestação × setor, a mesma divisão das mensagens do Teams.
     # Registrado antes da 1ª gravação. O que é do cliente vai só cifrado com a chave PÚBLICA (o 5080 não abre nada)
     # o acompanhamento de cada contestação (Levi, 15/10/2026: "um botão 'Pegar para mim' (...) onde o responsável poderá
     # inserir atualizações sobre a demanda com data e hora salva"). O Nexus é a FONTE; registrado antes da 1ª gravação
-    Fato("tratamento_contestacao", "Acompanhamento da contestação", "contratos",
+    Fato("tratamento_contestacao", "Acompanhamento da contestação", "comando",
          "nexus_contestacoes_tratamento · fato_tratamento_contestacao",
          "1 linha = 1 evento (responsável que pegou, ou atualização escrita) sobre 1 contestação × 1 setor",
          _d(data=("id", "data_id (o dia de Brasília do evento)"),
@@ -438,7 +440,7 @@ FATOS = (
                     "pelas falhas de 30 dias. O texto da análise, a equipe, os responsáveis, quem emitiu e a foto do "
                     "ativo e das OS só cifrados (Cofre, a chave do cadastro). Só acrescenta: nada se edita nem se "
                     "apaga"),
-    Fato("contestacao_cliente", "Contestação do cliente", "contratos", "thopen_contestacoes · contestacoes",
+    Fato("contestacao_cliente", "Contestação do cliente", "comando", "thopen_contestacoes · contestacoes",
          "1 linha = 1 contestação de 1 cliente sobre 1 dia (ou intervalo) de 1 usina × 1 setor (Performance, COS "
          "ou Zeladoria)",
          _d(data=("cod", "data_id_recebida; data_id_contestada_ini e _fim (papéis)"),
@@ -1580,7 +1582,7 @@ LIVROS = (
           so_cresce=True),
     Livro("nexus_contestacoes_tratamento", ("fato_tratamento_contestacao",),
           "a cada \"Pegar para mim\" e a cada atualização na tela Contestações",
-          "nexus/contratos/tratamento.py, pela tela Contratos e clientes > Contestações", False,
+          "nexus/contratos/tratamento.py, pela tela Comando > Contestações", False,
           "registrado em 15/10/2026 antes da 1ª gravação (regra 10): nasce na 1ª demanda que alguém pega",
           so_cresce=True),
     Livro("nexus_cos_turno", ("fato_passagem_turno",),
@@ -1836,7 +1838,7 @@ LIVROS = (
     # o login por pessoa do Dashboard Thopen (14/10/2026): o Nexus é a fonte das contas; a senha, o 5080 grava no livro
     # dele (thopen_acessos · senhas, em CONHECIDAS)
     Livro("nexus_acessos_clientes", ("dim_conta_cliente",), "a cada ação na tela Acessos dos clientes",
-          "nexus/contratos/acessos_clientes.py, pela tela Contratos e clientes > Acessos dos clientes", False,
+          "nexus/contratos/acessos_clientes.py, pela tela Base > Acessos dos clientes", False,
           "registrado em 14/10/2026 antes de existir: nasce com a 1ª conta criada na tela. 1 linha = 1 conta (o estado "
           "atual; o livro é trocado inteiro sob a trava, relido antes e conferido depois). Nome e e-mail só cifrados, "
           "duas vezes: dados_5080 (selado para a pública do Dashboard Thopen, que lê a cada 2 min) e dados_nexus "
