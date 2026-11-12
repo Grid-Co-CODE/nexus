@@ -188,3 +188,13 @@ a.ins-titulo:hover{color:var(--verde-texto)}
 .cmu-tab tbody tr[data-fl-linha]:hover .cmu-usina b{color:var(--verde-texto)}
 /* a coluna Agora pelo COS (11/11/2026): a situação da pior OS e, embaixo, o tipo, a OS e há quanto tempo */
 .cmu-agora small{display:block;max-width:240px;margin-top:4px;font-size:11.5px;line-height:1.4;color:var(--tinta-2)}
+
+/* 12/11/2026 (Levi, com a referência do mockup): "Gostaria do cabeçalho um pouco mais escuro que as linhas" e "uma cor
+   alterando entre as linhas, uma cor levemente mais clara com a cor principal". A alternância é a das linhas VISÍVEIS
+   (`cmu-par`, refeita pelo comando-usinas.js a cada busca e ordem); o passar do mouse fica um tom acima das duas */
+.cmu-tab thead th{background:var(--barra)}
+.cmu-tab tbody tr.cmu-par td{background:var(--superficie-2)}
+.cmu-tab tbody tr[data-cmu-uid]:hover td{background:var(--superficie-3)}
+.cmu-barra{display:flex;flex-wrap:wrap;align-items:flex-start;gap:8px 16px;margin-top:14px}
+.cmu-barra .cmu-filtros{flex:1 1 auto;margin:0}
+.cmu-barra .cmu-conta{margin-left:auto;padding-top:9px}

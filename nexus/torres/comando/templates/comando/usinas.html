@@ -4,8 +4,11 @@
 <link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='comando.css') }}">
 {# Comando > Usinas (11/11/2026, Levi: "Em comando quero a mesma visão de Início > Usinas do mockup"): a faixa com uma
-   barra por usina na cor do estado de agora, os filtros na própria página (filtro-local.js) e a tabela que ordena pelo
-   cabeçalho (comando-usinas.js). A conta mora em nexus/comando/usinas.py; o Score de saúde do mockup ficou fora. #}
+   barra por usina (todas as mobilizadas) na cor do estado de agora, os filtros no modelo do Histórico de OS do OS Creator
+   Web (12/11/2026, Levi: "Quero os filtros conforme referência Histórico de OS"; o campo-filtros.js monta o botão
+   Filtros, o painel com o Aplicar e as etiquetas: o cliente e o estado vão ao servidor), a busca que filtra enquanto se
+   digita e a tabela que ordena pelo cabeçalho, com o cabeçalho mais escuro e as linhas alternadas (comando-usinas.js).
+   A conta mora em nexus/comando/usinas.py; o Score de saúde do mockup ficou fora. #}
 {% macro pct(x) %}{% if x is none %}—{% else %}{{ ('%.0f'|format(x)) }}%{% endif %}{% endmacro %}
 <div class="campo-nativa">
   <div class="cn-cab">
@@ -18,27 +21,26 @@
 
   <section class="cmu-quadro" aria-label="Usinas">
     <div class="cmu-faixa" role="img" aria-label="Uma barra por usina, na cor do estado de agora">
-      {% for x in linhas %}<span class="cmu-seg cmu-seg--{{ estados[x.estado][1] }}" data-cmu-seg="{{ x.usina_id }}" title="{{ x.usina }}: {{ x.estado_rot }}"></span>{% endfor %}
+      {% for x in todas %}<span class="cmu-seg cmu-seg--{{ estados[x.estado][1] }}" title="{{ x.usina }}: {{ x.estado_rot }}"></span>{% endfor %}
     </div>
     <ul class="cmu-legenda">
       {% for chave, rot in legenda %}<li><i class="cmu-ponto cmu-ponto--{{ estados[chave][1] if chave in estados else 'neutro' }}" aria-hidden="true"></i>{{ rot }} <b class="gc-num">{{ r.por_estado[chave] }}</b></li>{% endfor %}
     </ul>
 
-    <form class="cmu-filtros" method="get" id="cmu-filtros" data-filtro-local>
-      <label class="cmu-busca"><span class="cn-oculto">Filtrar as linhas</span>
-        <i class="ph ph-magnifying-glass" aria-hidden="true"></i>
-        <input name="q" class="gc-campo" value="{{ q }}" placeholder="Filtrar por usina, código, cliente ou cluster" autocomplete="off" data-fl-texto="contem"></label>
-      <label><span class="cn-oculto">Cliente</span>
-        <select name="cliente" class="gc-campo" data-fl><option value="">Todos os clientes</option>
-          {% for c in r.clientes %}<option value="{{ c }}" data-rotulo="{{ c }}"{% if c == cliente %} selected{% endif %}>{{ c }}</option>{% endfor %}</select></label>
-      <label><span class="cn-oculto">Estado agora</span>
-        <select name="estado" class="gc-campo" data-fl><option value="">Todos os estados</option>
-          {% for chave, e in estados.items() %}<option value="{{ chave }}" data-rotulo="{{ e[0] }}"{% if chave == estado %} selected{% endif %}>{{ e[0] }}</option>{% endfor %}</select></label>
-      <a class="gc-btn gc-btn--ui gc-btn--fantasma" href="{{ url_for('torre_comando.usinas') }}" data-fl-limpar{% if not (q or cliente or estado) %} hidden{% endif %}>Limpar</a>
-      <span class="mudo cmu-conta"><b class="gc-num" data-fl-conta="cu">{{ linhas|length }}</b> de {{ r.total }} usinas</span>
+    <div class="cmu-barra">
+    <form class="cn-filtros cmu-filtros" method="get" data-fs>
+      <input class="gc-campo" type="search" name="q" value="{{ q }}" placeholder="usina, código, cliente ou cluster" aria-label="Buscar" autocomplete="off" data-cmu-busca>
+      <label class="cn-filtro-par" for="cmu-cliente"><span class="gc-rotulo">Cliente</span>
+        <select class="gc-campo" id="cmu-cliente" name="cliente"><option value="">Todos</option>
+          {% for c in r.clientes %}<option value="{{ c }}"{% if c == cliente %} selected{% endif %}>{{ c }}</option>{% endfor %}</select></label>
+      <label class="cn-filtro-par" for="cmu-estado"><span class="gc-rotulo">Agora</span>
+        <select class="gc-campo" id="cmu-estado" name="estado"><option value="">Todos</option>
+          {% for chave, e in estados.items() %}<option value="{{ chave }}"{% if chave == estado %} selected{% endif %}>{{ e[0] }}</option>{% endfor %}</select></label>
     </form>
+    <span class="mudo cmu-conta"><b class="gc-num" data-cmu-conta>{{ linhas|length }}</b> de {{ r.total }} usinas</span>
+    </div>
 
-    <div class="cn-tab cmu-tab" data-fl-grupo="cmu-filtros" data-fl-nome="cu"><table data-cmu-tabela>
+    <div class="cn-tab cmu-tab"><table data-cmu-tabela>
       <thead><tr>
         <th class="cmu-esq"><button type="button" data-cmu-ordem="usina">Usina</button></th>
         <th class="cmu-esq"><button type="button" data-cmu-ordem="cliente">Cliente</button></th>
@@ -53,7 +55,7 @@
         <th class="cmu-esq">Conformidade</th>
       </tr></thead>
       <tbody>{% for x in linhas %}
-        <tr data-fl-linha data-f-cliente="{{ x.cliente }}" data-f-estado="{{ x.estado }}" data-f-busca="{{ x.busca }}"
+        <tr data-busca="{{ x.busca }}"
             data-o-usina="{{ x.usina }}" data-o-cliente="{{ x.cliente }}" data-o-cluster="{{ x.cluster }}" data-o-mwp="{{ x.mwp if x.mwp is not none else '' }}"
             data-o-tipologia="{{ x.tipologia }}" data-o-agora="{{ loop.index0 }}" data-o-ating="{{ x.atingimento if x.atingimento is not none else '' }}"
             data-o-pr="{{ x.pr if x.pr is not none else '' }}" data-o-os="{{ x.os_abertas if x.os_abertas is not none else '' }}"
@@ -71,12 +73,11 @@
           <td class="cmu-esq"><div class="cmu-conf">{% for txt, tom in x.conformidade %}<span class="cn-pill cn-{{ tom }}">{{ txt }}</span>{% endfor %}{% if x.conformidade_ok %}<span class="cn-pill cn-ok">ok</span>{% elif x.conformidade_sem_fonte %}<span class="mudo">sem leitura</span>{% endif %}</div></td>
         </tr>
       {% endfor %}
-        <tr data-fl-vazio="cu"{% if linhas %} hidden{% endif %}><td colspan="11" class="mudo">Nenhuma usina com esses filtros.</td></tr>
+        <tr data-cmu-vazio{% if linhas %} hidden{% endif %}><td colspan="11" class="mudo">Nenhuma usina com esses filtros.</td></tr>
       </tbody></table></div>
     {% if insights_calculando %}<p class="mudo cmu-nota">Os Insights ainda estão sendo calculados: a coluna aparece na próxima abertura.</p>{% endif %}
   </section>
 </div>
-{# a ordem e a faixa antes do filtro: o filtro avisa ("filtro-local") já na abertura, e a faixa tem de ouvir #}
+<script src="{{ url_for('static', filename='campo-filtros.js') }}"></script>
 <script src="{{ url_for('static', filename='comando-usinas.js') }}"></script>
-<script src="{{ url_for('static', filename='filtro-local.js') }}"></script>
 {% endblock %}

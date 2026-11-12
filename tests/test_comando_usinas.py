@@ -145,7 +145,11 @@ def test_a_lista_e_o_prontuario(logado, telas, monkeypatch):
     assert html.index(">Altair<") < html.index(">Brodowski 1<")                # o crítico antes do normal
     assert ">Religamento em campo<" in html and "OS 7001 · há 2 h" in html and "fotografia das" in html
     assert 'href="/t/comando/usinas/1"' in html and "THPN-ALT100" in html
-    assert '<option value="Thopen" data-rotulo="Thopen" selected>' in html      # o filtro do endereço já vem escolhido
+    assert '<option value="Thopen" selected>' in html                           # o filtro do endereço já vem escolhido
+    # 12/11/2026 (o modelo do Histórico de OS): o cliente filtra a tabela no servidor; a faixa segue com todas
+    tabela = html.split("data-cmu-tabela", 1)[1]
+    assert ">Coração 1<" not in tabela and "Coração 1:" in html.split("data-cmu-tabela", 1)[0]
+    assert "data-fs" in html and "campo-filtros.js" in html and "data-cmu-busca" in html
     assert "1 extintor vencido" in html and ">sem luvas<" in html
     # o prontuário, no próprio Comando, com a Central da usina em leitura
     from nexus.campo import responsaveis as R

@@ -167,6 +167,8 @@ comunicação; no empate, a mais antiga) com a OS, a idade, a etapa e quantas ma
 (Normal). A usina que nenhuma fotografia trouxe (o cliente cujo Andamento caiu) é "Sem leitura", nunca Normal. O
 prontuário tem o quadro "No COS agora" com as ocorrências e o link para a Ronda padronizada do cliente.
 
+**A faixa, os filtros e a tabela (12/11/2026, Levi, com a referência do mockup).** A faixa do alto é uma barra por usina (todas as mobilizadas, mesmo com filtro) na cor do grupo da coluna Agora, na ordem da tabela; a legenda conta cada grupo. Os filtros seguem o modelo do Histórico de OS do OS Creator Web ("Quero os filtros conforme referência Histórico de OS"): o `campo-filtros.js` monta a busca, o botão Filtros com o painel (Cliente e Agora, que só valem no Aplicar e filtram no servidor) e uma etiqueta por filtro aplicado; a busca filtra as linhas enquanto se digita (`comando-usinas.js`). O cabeçalho da tabela é mais escuro (`--barra`) e as linhas visíveis alternam a cor (`cmu-par`, refeita a cada busca e ordem): "Gostaria do cabeçalho um pouco mais escuro que as linhas" e "uma cor alterando entre as linhas". O `filtro-local.js` saiu desta tela (ele barra o envio do formulário, e o Aplicar envia).
+
 **Fora, por decisão do Levi (11/11/2026):** o Score de saúde do mockup ("Fora por agora": o Nexus não tem essa nota, e
 criar uma é regra nova). **O clique na usina** abre o prontuário no próprio Comando ("No próprio Comando"),
 `/t/comando/usinas/<id>`: a linha dela, a Central da usina da Usinas 360° em leitura (a mesma conta,
