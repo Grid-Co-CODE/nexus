@@ -126,6 +126,29 @@ def test_catalogo_bate_com_o_codigo_de_cada_fato_conformado_ou_montado():
             assert aba in catalogo.LIVRO_POR_NOME[livro].abas, fid
 
 
+def test_a_coluna_so_cifra_so_leva_cifra(tmp_path):
+    """A exceção `SO_CIFRA` vale só se o valor é cifra: a recontagem gravada pelo módulo leva o `motivo_tecnico` com "cf1:",
+    sem o texto, e o texto pronto nessa coluna é recusado."""
+    from nexus.cadastro.cifra import gerar_chave
+    assert {fid for fid, _c in SO_CIFRA} == {"evento_inventario"}
+    cfg = {"TESTING": True, "NEXUS_ALMOX_INVENTARIO_ARQUIVO": str(tmp_path / "inventario.json"),
+           "NEXUS_CHAVE_CADASTRO": gerar_chave(), "NEXUS_PESSOA_HMAC": "chave-hmac-de-mentira"}
+    fato_inventario.limpar()
+    try:
+        fato_inventario.acrescentar(cfg, fato_inventario.ABA_EVENTO, [
+            {"tipo": t, "contagem_id": "C-1", "id_almoxarifado": "900", "dados": {"motivo": "texto do PCM de mentira"}}
+            for t in fato_inventario.TIPOS_MOTIVO_TECNICO])
+        linhas = json.loads((tmp_path / "inventario.json").read_text(encoding="utf-8"))[fato_inventario.ABA_EVENTO]
+        valores = [l[c] for _fid, c in SO_CIFRA for l in linhas]
+        assert len(valores) == 2 and all(str(v).startswith("cf1:") for v in valores)
+        assert "texto do PCM" not in (tmp_path / "inventario.json").read_text(encoding="utf-8")
+        with pytest.raises(ValueError, match="motivo_tecnico"):
+            fato_inventario.acrescentar(cfg, fato_inventario.ABA_EVENTO, [
+                {"tipo": "recontagem_pedida", "contagem_id": "C-2", "id_almoxarifado": "900", "motivo_tecnico": "claro"}])
+    finally:
+        fato_inventario.limpar()
+
+
 def test_livros_do_nexus_registrados_antes_de_existir_e_na_regra_10():
     for l in catalogo.LIVROS:
         assert l.nome.startswith("nexus_"), l.nome

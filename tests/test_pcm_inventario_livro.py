@@ -304,6 +304,14 @@ def test_nada_de_nome_no_livro(cfg):
         assert not [c for c in cab if c not in cifradas and any(p in c for p in proibidas)], cab
     assert "dados_cifrados" in F.CAB_EVENTO and "dados_cifrados" in F.CAB_CURADORIA
     assert "dados_cifrados" not in F.CAB_REGUA                  # a régua é número: não tem texto livre
+    # a exceção só vale com cifra: o motivo_tecnico gravado pelo módulo é "cf1:" e não traz o texto
+    F.acrescentar(dict(cfg, NEXUS_PESSOA_HMAC="chave-hmac-de-mentira"), F.ABA_EVENTO,
+                  [_ev("recontagem_pedida", dados={"motivo": "recontar a caixa amarela"})])
+    rec = F.ler(cfg, forcar=True)[F.ABA_EVENTO][0]
+    assert str(rec["motivo_tecnico"]).startswith("cf1:") and "amarela" not in rec["motivo_tecnico"]
+    assert "amarela" not in Path(cfg["NEXUS_ALMOX_INVENTARIO_ARQUIVO"]).read_text(encoding="utf-8")
+    F.limpar()
+    Path(cfg["NEXUS_ALMOX_INVENTARIO_ARQUIVO"]).unlink()
     F.acrescentar(cfg, F.ABA_EVENTO, [_ev("peca_tirada", dados={"motivo": "peça com defeito do lote azul"})])
     F.acrescentar(cfg, F.ABA_CURADORIA, [_cur(decisao="descartar", dados={"motivo": "duplicada da prateleira cinza"})])
     bruto = Path(cfg["NEXUS_ALMOX_INVENTARIO_ARQUIVO"]).read_text(encoding="utf-8")
