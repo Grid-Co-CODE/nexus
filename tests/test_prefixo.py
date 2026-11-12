@@ -612,12 +612,15 @@ def test_com_a_reescrita_do_servidor_ligada_nada_sai_com_o_prefixo_dobrado(tmp_p
 # ── o varredor estático: o que o rastreador não alcança (telas que só desenham o link com dado do banco) ─────────────
 _PASTAS = [RAIZ / "nexus"]
 _FORA = ("os_creator",)                                # o clone do OS Creator: a ponte reescreve (testes acima)
+# o arquivo que o HEAD da zeladoria põe no site do SSO, fora do Nexus (12/11/2026): fala com o endereço completo do
+# Nexus, sem o nexusRota, que lá não existe
+_FORA_PASTAS = (RAIZ / "nexus" / "sso" / "site",)
 
 
 def _arquivos(sufixo):
     for pasta in _PASTAS:
         for arq in pasta.rglob("*" + sufixo):
-            if not any(p in arq.parts for p in _FORA):
+            if not any(p in arq.parts for p in _FORA) and not any(f in arq.parents for f in _FORA_PASTAS):
                 yield arq
 
 

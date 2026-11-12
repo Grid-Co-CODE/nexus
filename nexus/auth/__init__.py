@@ -48,11 +48,16 @@ log = logging.getLogger(__name__)
 # assinatura HMAC antes de gravar qualquer coisa (`nexus/hseq/fotos.receber`, `nexus/hseq/info_extintor.receber`,
 # `nexus/pcm/motivos_app.conferir`, `nexus/pcm/inventario/fotos_app.receber`); só elas passam sem login, e só por POST.
 # O Mapa de equipe (08/11/2026, `nexus/torres/campo/equipe_tela.py`): o registro do aparelho vale o ID token da Microsoft
-# conferido pela assinatura; as posições e a revogação, a chave do aparelho
+# conferido pela assinatura; as posições e a revogação, a chave do aparelho.
+# O SSO da zeladoria (12/11/2026, `nexus/sso/api.py`): o site dele fica fora do Nexus e fala com a API pelo passe da
+# Gestão (tirado do login do Nexus no `sso.voltar`, que não é público) ou, sem passe, como o fornecedor, que só envia
+# (a regra do anônimo do RLS do Supabase, com limite por IP); os arquivos abrem só com o link assinado
 ROTAS_PUBLICAS = {"auth.entrar", "casca.saude", "static", "torre_hseq.extintores_foto_receber",
                   "torre_hseq.extintores_info_receber", "torre_pcm.motivo_do_app", "torre_pcm.inventario_foto_receber",
                   "torre_zeladoria.cronograma_api", "torre_campo.equipe_aparelho", "torre_campo.equipe_posicoes",
-                  "torre_campo.equipe_revogar"}
+                  "torre_campo.equipe_revogar",
+                  "sso.preflight", "sso.eu", "sso.ler", "sso.gravar", "sso.progresso", "sso.arquivo_enviar",
+                  "sso.funcao_upload", "sso.funcao_assinatura", "sso.arquivo_abrir", "sso.video"}
 
 # Limite de tentativas do Entrar (auditoria A2 da porta única e revisão adversarial, 10/10/2026). Até a A2 era por IP: 5
 # erros de QUALQUER pessoa no mesmo IP trancavam o Entrar de todos por 15 min, inclusive a senha de administrador, e até o

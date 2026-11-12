@@ -57,7 +57,9 @@ _BRT = timezone(timedelta(hours=-3))
 _TRAVA = threading.Lock()
 _CACHE: dict = {}
 # o que abre sem setor: entrar e sair, o tema, a saúde e os arquivos da página
-LIVRES = frozenset({"auth.entrar", "auth.sair", "casca.tema", "casca.saude", "static"})
+# o `sso.voltar` (12/11/2026): a Gestão do SSO da zeladoria, que fica num site fora do Nexus, pega ali o passe com o
+# login do Nexus; quem decide o que ela vê é o perfil do SSO (`nexus/sso/regras.py`), como no site, e não o setor
+LIVRES = frozenset({"auth.entrar", "auth.sair", "casca.tema", "casca.saude", "static", "sso.voltar"})
 # Telas que mudaram de endereço: a decisão gravada com o nome antigo vale para o novo (a mais nova de cada setor × tela
 # ganha, pela hora, como sempre). 13/10/2026: o Criador de relatório e o Relatório semanal saíram da Performance para
 # Relatórios → Central de emissão (Levi: "Sai da parte de Performance!"); quem já os via continua vendo.

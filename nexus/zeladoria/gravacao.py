@@ -145,6 +145,17 @@ def _igual(a, b) -> bool:
 
 
 class Gravador:
+    # o mapa do app que grava: a Zeladoria por padrão. O SSO da zeladoria (12/11/2026, `nexus/sso/gravacao.py`) usa o
+    # mesmo diário, o mesmo lote e a mesma conferência, trocando estes quatro e as regras do `_efeitos`
+    TABELAS = T.TABELAS
+    CTX_DIARIO = CTX_DIARIO
+    PREFIXO = "zeladoria"
+    CIFRADA = None
+
+    def _nomes_livros(self) -> dict:
+        from .copia import NOMES_LIVROS
+        return NOMES_LIVROS
+
     def __init__(self, *, base: str, token: str, sessao, cofre, diario: Path):
         self.base, self.token, self.sessao, self.cofre = base, token, sessao, cofre
         self.diario = Path(diario)
@@ -176,7 +187,7 @@ class Gravador:
             versoes = est.get("versoes") or {}
             for registro in self._ler_diario():
                 v = registro["versao"]
-                efeitos = [e for e in registro["efeitos"] if versoes.get(T.TABELAS[e[1]], 0) < v]
+                efeitos = [e for e in registro["efeitos"] if versoes.get(self.TABELAS[e[1]], 0) < v]
                 if efeitos:
                     self._efetivar(efeitos, v, registro.get("quem"))
                 self._autor[v] = registro.get("quem")
@@ -189,7 +200,7 @@ class Gravador:
         linhas = [l.strip() for l in self.diario.read_text(encoding="utf-8").splitlines() if l.strip()]
         for n, linha in enumerate(linhas):
             try:
-                out.append(json.loads(self.cofre.decifrar(linha, CTX_DIARIO)))
+                out.append(json.loads(self.cofre.decifrar(linha, self.CTX_DIARIO)))
             except Exception:  # noqa: BLE001
                 # a última linha pela metade é um acréscimo que não terminou (queda no meio): o app não recebeu o
                 # "Salvo" dela. Linha ruim no meio é outra coisa, e não se adivinha: a torre não sobe
@@ -201,7 +212,7 @@ class Gravador:
 
     def _escrever_diario(self, registros: list, acrescentar: bool) -> None:
         self.diario.parent.mkdir(parents=True, exist_ok=True)
-        texto = "".join(self.cofre.cifrar(json.dumps(r, ensure_ascii=False, default=str), CTX_DIARIO) + "\n"
+        texto = "".join(self.cofre.cifrar(json.dumps(r, ensure_ascii=False, default=str), self.CTX_DIARIO) +"\n"
                         for r in registros)
         if acrescentar:
             with open(self.diario, "a", encoding="utf-8") as f:
@@ -413,7 +424,7 @@ class Gravador:
             elif i is not None:
                 linhas.pop(i)
             self._mudou[(aba, k)] = (versao, quem)
-            self._sujo[T.TABELAS[aba]] = versao
+            self._sujo[self.TABELAS[aba]] = versao
         self.estado["abas"].update(novas)
 
     def aplicar(self, ops: list, quem: dict, base_versao: int, interno: bool = False) -> dict:
@@ -468,10 +479,11 @@ class Gravador:
     # ── gravar no banco ──────────────────────────────────────────────────────────────────────────────────────────
     def _montar(self, livro: str, versao: int, est: dict) -> dict:
         tabelas, atualizacao = {}, []
-        for aba in (a for a, lv in T.TABELAS.items() if lv == livro):
+        for aba in (a for a, lv in self.TABELAS.items() if lv == livro):
             colunas = list(est["tipos"][aba].items())
             linhas = est["abas"][aba]
-            tabelas[aba] = guardar.para_aba(aba, colunas, linhas, self.cofre, est["chaves"][aba])
+            tabelas[aba] = guardar.para_aba(aba, colunas, linhas, self.cofre, est["chaves"][aba], cifrada=self.CIFRADA,
+                                            prefixo=self.PREFIXO)
             atualizacao += [[aba, c, t, est["chaves"][aba], len(linhas), est.get("copiado_em"), est.get("exportado_em"),
                              versao] for c, t in colunas]
         from .copia import CAB_ATUALIZACAO
@@ -489,10 +501,10 @@ class Gravador:
                 # a fotografia das listas (o `_efetivar` troca a lista, não a muda): cifrar e montar fica fora da trava
                 foto = {**self.estado, "abas": dict(self.estado["abas"])}
             prontos = {livro: self._montar(livro, versao, foto) for livro in sujos}
-            from .copia import NOMES_LIVROS
+            nomes = self._nomes_livros()
             try:
                 for livro in sujos:
-                    livros.publicar(livro, NOMES_LIVROS[livro], prontos[livro], base=self.base, token=self.token,
+                    livros.publicar(livro, nomes[livro], prontos[livro], base=self.base, token=self.token,
                                     sessao=self.sessao)
             except Exception as e:  # noqa: BLE001 — banco fora do ar: o diário segura, a próxima volta tenta de novo
                 with self._trava:

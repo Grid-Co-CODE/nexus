@@ -58,8 +58,11 @@ def create_app(config: dict | None = None) -> Flask:
     from .casca import bp as casca_bp, instalar_contexto
     from .torres import registrar_torres
 
+    from .sso.api import bp as sso_bp
+
     app.register_blueprint(auth_bp)
     app.register_blueprint(casca_bp)
+    app.register_blueprint(sso_bp)           # a API do SSO da zeladoria, para o site dele (12/11/2026, nexus/sso/)
     registrar_torres(app)
     instalar_portao(app)
     instalar_contexto(app)

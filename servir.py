@@ -57,6 +57,8 @@ if __name__ == "__main__":
     # sem ela, quem abria o Quadro depois do deploy via "Lendo as OS da FAMA")
     from nexus.pcm import fama_quadro
     fama_quadro.aquecer_ao_subir(app)
+    from nexus.sso import api as sso_api
+    sso_api.aquecer_ao_subir(app)          # os livros do SSO da zeladoria, por trás (12/11/2026; só onde ele grava)
     # o que cada pedido esperava quando o Nexus parou de responder (13/10/2026: das 16:50 às 16:53 nem o /saude
     # respondia, e de fora não dava para ver esperando o quê); o administrador vê no cartão da versão do Início
     # o OS Creator com teto de threads (14/10/2026, Levi: "pq depende da TI se o OS Creator Web faz parte do Nexus???"):

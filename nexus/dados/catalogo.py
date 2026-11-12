@@ -1714,11 +1714,12 @@ LIVROS = (
     # obra e cronograma), que morava no mesmo Supabase do Radar (Levi, 12/11/2026: "vamos migrar [...] pode pôr no mesmo
     # banco do Nexus"): as tabelas com o nome das views que o app usa, um livro por módulo. Regra em nexus/sso/CLAUDE.md
     *(Livro(nome, tuple(a for a, lv in sso_tabelas.TABELAS.items() if lv == nome) + ("atualizacao",),
-            "sob comando (ferramentas/copiar_sso.py), da exportação do Supabase",
-            "nexus/sso/copia.py (a cópia do Supabase do SSO)", False,
-            "registrado em 12/11/2026 antes de existir: nasce com a cópia da exportação de 12/11 (o Supabase parou em 11/11 "
-            "e ninguém grava no SSO desde então); " + obs,
-            so_cresce=tuple(a for a in sso_tabelas.HISTORICO if sso_tabelas.TABELAS.get(a) == nome))
+            "a cada envio do site do SSO e a cada mudança da Gestão, em lote (desde 12/11/2026); a 1ª vez, a cópia "
+            "sob comando (ferramentas/copiar_sso.py) da exportação do Supabase",
+            "nexus/sso/gravacao.py, pela API do SSO (nexus/sso/api.py); a cópia em nexus/sso/copia.py", True,
+            "registrado em 12/11/2026 e gravado no mesmo dia (a cópia da exportação de 12/11; o Supabase parou em 11/11); "
+            "desde então o site do SSO grava pela API do Nexus; " + obs,
+            so_cresce=tuple(a for a in sso_tabelas.SO_CRESCE if sso_tabelas.TABELAS.get(a) == nome))
       for nome, obs in (
           (sso_tabelas.LIVRO_INTEGRACAO, "a integração por vídeo: a sessão, as visualizações, as presenças (com CPF, "
            "telefone, e-mail e a assinatura, cifrados) e os perfis da gestão"),

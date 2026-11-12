@@ -91,9 +91,11 @@ def test_o_pessoal_vai_cifrado_e_o_que_liga_fica_em_claro():
     bruto = api.linhas(T.LIVRO_INTEGRACAO, "iv_presencas")[0]
     for c in ("nome_completo", "cpf", "email", "telefone", "assinatura_base64"):
         assert Cofre.eh_cifrado(bruto[c]), c
-    assert (bruto["usina"], bruto["status_aprovacao"]) == ("Usina Teste", "pendente")
+    assert bruto["status_aprovacao"] == "pendente"
     assert Cofre.eh_cifrado(api.linhas(T.LIVRO_CRONOGRAMA, "cronograma_fornecedores")[0]["nome"])   # o MEI é pessoa
-    assert api.linhas(T.LIVRO_DIARIO, "diario_usinas")[0]["nome"] == "Usina Teste"                   # usina é lugar
+    # a usina é texto que o fornecedor digita (já veio nome de pessoa nela): cifrada, na linha e na lista do diário
+    assert Cofre.eh_cifrado(bruto["usina"])
+    assert Cofre.eh_cifrado(api.linhas(T.LIVRO_DIARIO, "diario_usinas")[0]["nome"])
     texto = repr(api.linhas(T.LIVRO_APR, "apr_submissoes"))
     assert "Beltrano" not in texto and "Empresa X" not in texto
 

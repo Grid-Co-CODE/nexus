@@ -12,8 +12,9 @@ class CopiaAusente(RuntimeError):
 
 
 def ler_banco(base: str, sessao, cofre) -> dict:
-    """{"abas": {aba: [linha]}, "tipos", "chaves", "exportado_em", "copiado_em", "versao"}."""
-    abas, tipos, chaves, origem = {}, {}, {}, {}
+    """{"abas": {aba: [linha]}, "tipos", "chaves", "exportado_em", "copiado_em", "versao", "versoes"}. `versoes` é a de
+    cada livro: o gravador (`gravacao.py`) reaplica o diário livro a livro, como o da Zeladoria."""
+    abas, tipos, chaves, origem, versoes = {}, {}, {}, {}, {}
     exportado_em = copiado_em = None
     versao = 0
     for livro in T.LIVROS:
@@ -28,6 +29,7 @@ def ler_banco(base: str, sessao, cofre) -> dict:
             exportado_em = l.get("exportado_em") or exportado_em
             copiado_em = l.get("copiado_em") or copiado_em
             versao = max(versao, int(float(l.get("versao") or 0)))
+            versoes[livro] = max(versoes.get(livro, 0), int(float(l.get("versao") or 0)))
         for aba in (a for a, lv in T.TABELAS.items() if lv == livro):
             if aba not in ids or aba not in tipos:
                 raise CopiaAusente(f"a cópia do SSO está incompleta: falta {aba}")
@@ -37,4 +39,4 @@ def ler_banco(base: str, sessao, cofre) -> dict:
             abas[aba] = guardar.de_aba(aba, tipos[aba], linhas, cofre, chaves[aba], cifrada=T.coluna_cifrada,
                                        prefixo=PREFIXO)
     return {"abas": abas, "tipos": tipos, "chaves": chaves, "exportado_em": exportado_em, "copiado_em": copiado_em,
-            "versao": versao}
+            "versao": versao, "versoes": versoes}

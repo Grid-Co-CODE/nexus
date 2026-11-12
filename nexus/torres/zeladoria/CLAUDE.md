@@ -69,7 +69,10 @@ cliente, lugar). Por quê: a API do banco tem leitura aberta, e fornecedor MEI t
 ## A gravação (etapa 4, 03/11/2026; desligada até a troca)
 
 Liga pelo botão da página da troca (`/t/zeladoria/troca`, só o administrador; seção "A troca"), que guarda a escolha na
-pasta de dados da máquina. A variável `NEXUS_ZELADORIA_GRAVA` vence o botão onde existir (`1` liga, `0` desliga). Uma
+pasta de dados da máquina. **O mesmo botão liga a gravação do SSO da zeladoria** (12/11/2026, `nexus/sso/gravacao.py`:
+a casa dos dados da zeladoria é uma máquina só; `NEXUS_SSO_GRAVA` vence onde existir), e o SSO usa este mesmo
+`Gravador`, trocando o mapa (`TABELAS`, `CTX_DIARIO`, `PREFIXO`, `CIFRADA`) e as regras do `_efeitos`: mexeu no
+gravador, rode também `tests/test_sso_api.py`. A variável `NEXUS_ZELADORIA_GRAVA` vence o botão onde existir (`1` liga, `0` desliga). Uma
 máquina grava; dois Nexus com estados diferentes apagariam um ao outro. Levi escolheu "Salvo em 1 s, banco logo depois": gravar e conferir o livro do app leva
 ~8 s (medido), e esperar isso a cada clique travaria a tela.
 - **Na hora** (`nexus/zeladoria/gravacao.py`, `Gravador.aplicar`): a mudança entra no estado em memória e no diário

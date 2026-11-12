@@ -1,0 +1,142 @@
+{% extends "base.html" %}
+{% from "_explica.html" import explica %}
+{% block titulo %}SSO da zeladoria{% endblock %}
+{% block conteudo %}
+{# O SSO da zeladoria no Nexus (12/11/2026): o site fica no Cloudflare do HEAD da zeladoria e fala com a API do Nexus
+   (nexus/sso/api.py). Aqui o administrador vê se esta máquina guarda o SSO e envia os arquivos que ficaram no Supabase. #}
+<p class="gc-eyebrow">Zeladoria</p>
+<div class="gc-titulo-explica">
+  <h1 class="titulo-pagina">SSO da zeladoria: os dados no Nexus</h1>
+  {% call explica("Entenda esta tela") %}
+    <p>O site do SSO (a integração de segurança dos fornecedores: integração por vídeo, APR, EPI, vistoria, diário e a
+      Gestão) continua no endereço dele, fora do Nexus. Desde 12/11/2026 ele guarda e lê os dados pelo Nexus, nos livros
+      <span class="gc-dado">nexus_sso_*</span> do banco, cifrados, no lugar do Supabase.</p>
+    <p><b>Quem grava:</b> a mesma máquina que grava a Zeladoria (o botão da página da troca). Onde não grava, o site
+      recebe "este Nexus não guarda o SSO".</p>
+    <p><b>Os arquivos</b> (fotos, vídeos e os PDFs dos certificados) ficam no disco desta máquina, e só abrem com o link
+      assinado que a Gestão recebe. Os que ficaram travados no Supabase em 11/11/2026 entram por aqui, pelo caminho do
+      inventário: escolha a pasta baixada de um bucket e cada arquivo vai para o caminho que termina igual.</p>
+  {% endcall %}
+</div>
+
+{% if erro %}<p class="aviso" role="alert">{{ erro }}</p>{% endif %}
+
+<div class="gc-numeros">
+  <div><div class="r">Gravação nesta máquina</div><div class="v">{{ "Ligada" if grava else "Desligada" }}</div>
+    <div class="d">{% if forcada %}pela variável NEXUS_SSO_GRAVA{% else %}a mesma da Zeladoria{% endif %}</div></div>
+  <div><div class="r">Banco</div>
+    {% if situacao %}<div class="v">versão {{ situacao.versao }}</div>
+      <div class="d">{% if situacao.erro %}atrasado: {{ situacao.erro }}{% elif situacao.pendente %}gravando…{% else %}em dia (versão {{ situacao.versao_banco }} no banco){% endif %}</div>
+    {% else %}<div class="v">—</div><div class="d">o gravador não subiu aqui</div>{% endif %}</div>
+  <div><div class="r">Disco livre</div><div class="v">{{ arquivos.livre_gb if arquivos.livre_gb is not none else "—" }} GB</div>
+    <div class="d">o envio para abaixo de 2 GB</div></div>
+  <div><div class="r">Site que fala com o Nexus</div><div class="v sso-pequeno">{{ origens|join(", ") }}</div>
+    <div class="d">máquina {{ maquina }}</div></div>
+</div>
+
+{% if situacao %}
+<form method="post" action="{{ url_for('sso.admin_regravar') }}" class="sso-regravar">
+  <button class="gc-btn gc-btn--contorno" type="submit">Regravar cifrado</button>
+  <span class="mudo">Regrava os sete livros do SSO com a cifra de agora. A 1ª cópia (12/11/2026) deixou a usina em claro,
+    e um fornecedor digitou o nome de uma pessoa nela. Use uma vez depois de subir; o histórico de cada linha na API
+    ainda guarda o valor antigo (só a T.I. apaga).</span>
+</form>
+{% endif %}
+
+<h2 class="sso-sub">O vídeo da integração</h2>
+{% if sessoes %}
+<table class="sso-tab">
+  <thead><tr><th>Sessão</th><th>Ativa</th><th>Arquivo</th><th>No Nexus</th><th></th></tr></thead>
+  <tbody>
+  {% for s in sessoes %}
+    <tr>
+      <td>{{ s.titulo }}</td><td>{{ "sim" if s.ativo else "não" }}</td>
+      <td class="gc-dado">{{ s.bucket or "—" }}/{{ s.caminho or "—" }}</td>
+      <td>{% if s.aqui %}<span class="gc-status gc-status--ok">sim</span>{% else %}<span class="gc-status gc-status--alerta">falta</span>{% endif %}</td>
+      <td>{% if s.bucket %}<label class="gc-btn gc-btn--contorno">Enviar o vídeo
+        <input type="file" accept="video/*" hidden data-bucket="{{ s.bucket }}" data-caminho="{{ s.caminho }}"></label>{% endif %}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% else %}<p class="mudo">Sem sessão de integração na cópia.</p>{% endif %}
+
+<h2 class="sso-sub">Os arquivos antigos (o inventário do Supabase)</h2>
+{% if arquivos.buckets %}
+<table class="sso-tab">
+  <thead><tr><th>Bucket</th><th>No inventário</th><th>No Nexus</th><th></th></tr></thead>
+  <tbody>
+  {% for b, d in arquivos.buckets|dictsort %}
+    <tr>
+      <td class="gc-dado">{{ b }}</td><td class="gc-num">{{ d.inventario }}</td><td class="gc-num">{{ d.aqui }}</td>
+      <td><label class="gc-btn gc-btn--contorno">Enviar uma pasta
+        <input type="file" multiple webkitdirectory hidden data-pasta="{{ b }}"></label></td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% else %}<p class="mudo">O inventário não está carregado nesta máquina.</p>{% endif %}
+<p class="mudo" id="sso-andamento" aria-live="polite"></p>
+
+<h2 class="sso-sub" id="usinas-diario">A lista de usinas do diário</h2>
+<p class="mudo sso-nota">O fornecedor escreve a usina no diário sem lista fechada, e o que ele escreve entra nesta lista, que
+  aparece a todo fornecedor no formulário. Tire daqui o que não é usina (um nome de pessoa, um teste); o diário já enviado
+  não muda.</p>
+{% if usinas_diario %}
+<ul class="sso-usinas">
+  {% for u in usinas_diario %}
+  <li><span>{{ u }}</span>
+    <form method="post" action="{{ url_for('sso.admin_usina_diario') }}">
+      <input type="hidden" name="nome" value="{{ u }}">
+      <button class="gc-btn gc-btn--fantasma" type="submit" aria-label="Tirar {{ u }} da lista">Tirar</button>
+    </form></li>
+  {% endfor %}
+</ul>
+{% else %}<p class="mudo">A lista não está carregada nesta máquina.</p>{% endif %}
+
+<script>
+(function () {
+  var andamento = document.getElementById("sso-andamento");
+  function enviar(bucket, caminho, arquivo) {
+    var fd = new FormData();
+    fd.append("bucket", bucket); fd.append("caminho", caminho); fd.append("arquivo", arquivo);
+    return fetch(nexusRota("/t/sso/admin/arquivo"), {method: "POST", body: fd, credentials: "same-origin"})
+      .then(function (r) { return r.json().then(function (j) { if (!r.ok) throw new Error(j.erro || r.status); return j; }); });
+  }
+  document.querySelectorAll("input[data-caminho]").forEach(function (inp) {
+    inp.addEventListener("change", function () {
+      var f = inp.files[0]; if (!f) return;
+      andamento.textContent = "Enviando " + f.name + "…";
+      enviar(inp.dataset.bucket, inp.dataset.caminho, f).then(function (j) {
+        andamento.textContent = "Vídeo no Nexus (" + j.mb + " MB)."; setTimeout(function () { location.reload(); }, 800);
+      }).catch(function (e) { andamento.textContent = "Não foi: " + e.message; });
+    });
+  });
+  document.querySelectorAll("input[data-pasta]").forEach(function (inp) {
+    inp.addEventListener("change", async function () {
+      var b = inp.dataset.pasta, feitos = 0, recusados = 0, lista = Array.from(inp.files);
+      for (var i = 0; i < lista.length; i++) {
+        var rel = (lista[i].webkitRelativePath || lista[i].name).split("/").slice(1).join("/");
+        andamento.textContent = "Enviando " + (i + 1) + " de " + lista.length + "…";
+        try { await enviar(b, rel, lista[i]); feitos++; } catch (e) { recusados++; }
+      }
+      andamento.textContent = feitos + " enviados, " + recusados + " recusados (fora do inventário ou de tipo errado).";
+    });
+  });
+})();
+</script>
+<style>
+  .sso-sub{font-size:16px;margin:28px 0 10px}
+  .sso-regravar{display:flex;gap:12px;align-items:center;flex-wrap:wrap;font-size:13px}
+  .sso-regravar .mudo{flex:1;min-width:240px}
+  .sso-nota{font-size:13px;max-width:880px}
+  .sso-usinas{list-style:none;padding:0;margin:8px 0 24px;display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:4px 16px}
+  .sso-usinas li{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:4px 0;border-bottom:1px solid var(--linha);font-size:13px}
+  .sso-usinas form{margin:0}
+  .sso-tab{width:100%;border-collapse:collapse;font-size:13px}
+  .sso-tab th,.sso-tab td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--linha)}
+  .sso-tab th{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--mudo)}
+  .gc-numeros .v.sso-pequeno{font-size:14px;line-height:20px;word-break:break-all}
+  @media (max-width:640px){.sso-tab{display:block;overflow-x:auto}}
+</style>
+{% endblock %}

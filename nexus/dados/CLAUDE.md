@@ -367,10 +367,14 @@ catálogo antes de existir.
 - **Origem:** as 12 tabelas do SSO no Supabase do Radar, com o nome da view que o app usa (`iv_presencas`,
   `apr_submissoes`...), mais o inventário dos arquivos do Storage (que ficaram travados no Supabase).
 - **Exceção à regra 10**, como a Zeladoria: cópia fiel em `ABAS_FORA_DA_REGRA`; os fatos vêm depois.
-- **Cifra:** todo texto por padrão (CPF, telefone, e-mail, assinaturas em base64), menos o que está em claro em
-  `nexus/sso/tabelas.py` (ids, datas, estados, usina, serviço, fase).
-- **Carga:** cópia sob comando da exportação de 12/11/2026 (`ferramentas/copiar_sso.py`). Regra e passo a passo em
-  `nexus/sso/CLAUDE.md`.
+- **Cifra:** todo texto por padrão (CPF, telefone, e-mail, assinaturas em base64, e todo texto que o fornecedor escreve
+  sem lista fechada: um fornecedor pôs o nome de uma pessoa na usina), menos o que está em claro em
+  `nexus/sso/tabelas.py` (ids, datas e as listas fechadas: estados, origem, a fase da vistoria, o serviço do EPI). A 1ª
+  cópia deixou a usina, o número da OS e o serviço em claro; o "Regravar cifrado" da página `/t/sso/admin` regrava.
+- **Carga:** a 1ª vez, cópia sob comando da exportação de 12/11/2026 (`ferramentas/copiar_sso.py`). Desde então o site
+  do SSO grava pela API do Nexus (`nexus/sso/api.py`), pelo gravador em lote da Zeladoria (`nexus/sso/gravacao.py`), na
+  mesma máquina que grava a Zeladoria; as abas que nunca encolhem têm `so_cresce` (`tabelas.SO_CRESCE`). Regra e passo
+  a passo em `nexus/sso/CLAUDE.md`.
 
 **Mapa de equipe (08/11/2026).** Cinco livros, todos registrados no catálogo ANTES de existir (regra 10). **Ainda não estão
 no banco: aparecem com a primeira gravação depois do deploy** (a primeira posição, a primeira chave emitida, a primeira
