@@ -9,19 +9,23 @@
 <noscript><meta http-equiv="refresh" content="120"></noscript>
 {# Normalizações (27/10/2026): a hora em que cada usina voltou, pela Ronda COS, ao lado da OS que segue aberta no
    Fracttal, por mês. As normalizações vêm do Andamento (nexus/cos/normalizacoes.py); os filtros e as contas são
-   daqui. Só lê. #}
+   daqui. Só lê.
+   12/11/2026: a tela vira "Ocorrências" (o nome é da lista de telas; o id e o endereço ficam): no mês corrente, as em
+   andamento entram no topo da mesma tabela, no mesmo formato de linha, e o filtro Situação separa as duas (o dono:
+   "segue o padrão da tela de Normalizações"). #}
 <div class="campo-nativa cos-norm">
   <div class="cn-cab">
     <div><p class="gc-eyebrow">{{ torre.nome }}</p><div class="hs-titulo"><h1 class="cn-titulo">{{ tela.nome }}</h1>
     {# o "Como se conta" numa exclamação ao lado do título, como em Segurança > Extintores (Levi, 27/10/2026) #}
     {% call aviso('Como se conta', 'Clique na linha para abrir o card da OS, com o seu login do Fracttal. O Exportar CSV baixa a lista com os filtros da tela, com a falha, os equipamentos e a severidade de cada uma.') %}
-      {{ termo('Indisp.') }}<dd>Quanto tempo a usina ficou indisponível: do início da falha até a normalização, em minutos e horas.</dd>
+      {% if p and p.com_andamento %}{{ termo('Situação', 'info') }}<dd><b>Em andamento e normalizadas, numa lista só.</b> No topo, as ocorrências ainda abertas na Ronda COS, de qualquer data (a aberta desde julho aparece), com a pílula azul "Em andamento"; embaixo, as normalizadas do mês. O filtro Situação separa as duas. As em andamento entram só no mês corrente: o mês é o da volta. Os números de Normalizadas, OS ainda aberta, mediana e hora real contam só as normalizadas.</dd>{% endif %}
+      {{ termo('Indisp.') }}<dd>Quanto tempo a usina ficou indisponível: do início da falha até a normalização, em minutos e horas. Na em andamento, do início até agora ("e contando"), em dias depois de 48 h.</dd>
       {{ termo('Início') }}<dd>A hora em que a falha começou.</dd>
-      {{ termo('Normalização') }}<dd>A hora em que a usina voltou, registrada na Ronda COS (a corrigida, quando alguém corrigiu). É esta a hora para MTTR e disponibilidade, e não o fechamento da OS no Fracttal, que acontece quando o técnico fecha, muitas vezes dias depois. Embaixo, por onde a volta foi registrada: pelo COS, pelo sistema, pelo Fracttal, por religamento remoto ou na criação da OS.</dd>
+      {{ termo('Normalização') }}<dd>A hora em que a usina voltou, registrada na Ronda COS (a corrigida, quando alguém corrigiu). É esta a hora para MTTR e disponibilidade, e não o fechamento da OS no Fracttal, que acontece quando o técnico fecha, muitas vezes dias depois. Embaixo, por onde a volta foi registrada: pelo COS, pelo sistema, pelo Fracttal, por religamento remoto ou na criação da OS. Na em andamento, em que pé ela está (técnico acionado, aguardando peça, terceiro...).</dd>
       {{ termo('Operador') }}<dd>Quem abriu a OS, o operador de plantão: pela Ronda COS ou direto no Fracttal. Em branco quando a OS já existia e só foi ligada à ocorrência.</dd>
       {{ termo('Técnico') }}<dd>O responsável atribuído à OS no Fracttal, quem a recebeu. Não prova quem foi ao local: quem iniciou e finalizou a tarefa no aplicativo fica só no Fracttal.</dd>
-      {{ termo('Proteções') }}<dd>As proteções que atuaram, como o time escreve na ocorrência (27ABC, 59C, 86...).</dd>
-      {{ termo('Geração parou') }}<dd>Só na falha de comunicação: a resposta do operador ao normalizar, se a geração parou. Desde 28/10.</dd>
+      {{ termo('Proteções') }}<dd>As proteções que atuaram, como o time escreve na ocorrência (27ABC, 59C, 86...). Na em andamento, as registradas na abertura (o trip).</dd>
+      {{ termo('Geração parou') }}<dd>Só na falha de comunicação: a resposta do operador ao normalizar, se a geração parou. Desde 28/10. Na em andamento, Sim nos desligamentos e na atuação de proteção, pelo próprio tipo; na falha de comunicação e no inversor offline a resposta vem na volta ("a conferir" quando ela foi aberta com a geração interrompida: pela regra de 09/11, é desligamento).</dd>
       {{ termo('No Fracttal', 'alerta') }}<dd>Se a OS ainda estava aberta na última varredura da Ronda COS, que roda de 30 em 30 minutos, e há quantos dias depois da volta. Vermelho a partir de 7 dias. "Fechada" é a OS que não está entre as abertas: finalizada ou cancelada.</dd>
       {{ termo('Conferência da OS', 'alerta') }}<dd>A Ronda COS relê a OS no Fracttal de 10 em 10 minutos e a compara com a normalização: Aguardando técnico (alguma tarefa não concluída), Hora a corrigir (tudo concluído, mas a conclusão ou a Data do Evento difere da hora do COS em mais de 2 minutos; embaixo, quantos minutos), Hora confere (falta só finalizar), Finalizada, Travada (finalizada com a hora errada: finalizada não se edita) ou Ainda não lida. "—" é a OS que não foi criada pela Ronda COS.</dd>
       {{ termo('Detalhes') }}<dd>O "Detalhes da Atividade" do informe: a ação, a descrição da ocorrência e as notas escritas pelo time. O botão Detalhes, embaixo do número da OS, abre a linha; a busca acha o texto, e o CSV o leva.</dd>
@@ -29,7 +33,7 @@
       {{ termo('Desfeita') }}<dd>A normalização foi desfeita e a ocorrência voltou a aberta: sai da lista e é dita embaixo dela.</dd>
     {% endcall %}
     </div><p class="cn-pergunta">{{ tela.pergunta }}</p></div>
-    <div class="cn-frescor">Normalizações da Ronda COS{% if p and p.varredura %}<br>varredura do Fracttal às <b>{{ p.varredura.strftime('%H:%M') }}</b>{% endif %}{% if lido %} · lido às {{ lido }}{% endif %}</div>
+    <div class="cn-frescor">{{ 'Ocorrências' if p and p.com_andamento else 'Normalizações' }} da Ronda COS{% if p and p.varredura %}<br>varredura do Fracttal às <b>{{ p.varredura.strftime('%H:%M') }}</b>{% endif %}{% if lido %} · lido às {{ lido }}{% endif %}</div>
   </div>
 
   {% if not ligada %}
@@ -43,6 +47,8 @@
   {% if p %}
   {% if p.carregando %}<div class="cn-erro cn-aviso" role="status"><b>Carregando o histórico desde {{ meses[-1][1]|lower }}.</b> Já chegaram
     as mais antigas; recarregue em instantes para ver as mais novas.</div>{% endif %}
+  {% if p.com_andamento and erros_andamento %}<div class="cn-erro cn-aviso" role="status"><b>Faltam as em andamento de parte dos clientes.</b>
+    {{ erros_andamento|join('; ') }}. As normalizadas estão completas.</div>{% endif %}
 
   <div class="cn-filtros">
     <div class="cn-seg" aria-label="Mês">
@@ -53,6 +59,8 @@
   <div class="cn-numeros">
     <span><span class="gc-rotulo">Normalizadas</span><span class="v" data-norm-r="total">{{ p.resumo.total }}</span>
       <span class="d">a usina voltou, pela hora do COS</span></span>
+    {% if p.com_andamento %}<span><span class="gc-rotulo">Em andamento</span><span class="v" data-norm-r="andamento">{{ p.resumo.andamento }}</span>
+      <span class="d">abertas agora, de qualquer data · <span data-norm-r="andamento_7d">{{ p.resumo.andamento_7d }}</span> há 7 dias ou mais</span></span>{% endif %}
     <span><span class="gc-rotulo">Com a OS ainda aberta</span><span class="v{% if p.resumo.abertas %} ruim{% endif %}" data-norm-r="abertas">{{ p.resumo.abertas }}</span>
       <span class="d"><span data-norm-r="abertas_pct">{{ p.resumo.abertas_pct }}</span>% das normalizadas · <span data-norm-r="abertas_7d">{{ p.resumo.abertas_7d }}</span> há 7 dias ou mais</span></span>
     <span><span class="gc-rotulo">Indisponível (mediana)</span><span class="v" data-norm-r="mediana">{{ p.resumo.mediana }}</span>
@@ -65,6 +73,10 @@
      só mostra e esconde, refaz a faixa e troca o endereço, sem ir ao servidor. O mês continua indo ao servidor. #}
   <form class="cn-filtros cos-norm-filtros" method="get" id="cos-norm-filtros">
     <input type="hidden" name="mes" value="{{ mes }}">
+    {% if p.com_andamento %}<label class="cn-filtro-par"><span class="gc-rotulo">Situação</span>
+    <select class="gc-campo" name="situacao">
+      <option value="">Todas ({{ p.contagem.situacao.andamento + p.contagem.situacao.normalizada }})</option>{% for k, rot in situacao_filtro.items() %}<option value="{{ k }}"{% if k == situacao %} selected{% endif %}>{{ rot }} ({{ p.contagem.situacao[k] }})</option>{% endfor %}
+    </select></label>{% endif %}
     <label class="cn-filtro-par"><span class="gc-rotulo">Tipo de falha</span>
     <select class="gc-campo" name="falha">
       <option value="">Todos</option>{% for f, n in p.contagem.falha.items() %}<option value="{{ f }}"{% if f == falha %} selected{% endif %}>{{ f }} ({{ n }})</option>{% endfor %}
@@ -89,12 +101,12 @@
     <select class="gc-campo" name="status">
       <option value="">Todos</option>{% for k, rot in status_filtro.items() %}<option value="{{ k }}"{% if k == status %} selected{% endif %}>{{ rot }} ({{ p.contagem.status[k] }})</option>{% endfor %}
     </select></label>
-    <input class="gc-campo cos-norm-busca" type="search" name="q" value="{{ busca }}" placeholder="OS, usina, falha, equipamento..." aria-label="Buscar nas normalizações">
+    <input class="gc-campo cos-norm-busca" type="search" name="q" value="{{ busca }}" placeholder="OS, usina, falha, equipamento..." aria-label="Buscar nas {{ 'ocorrências' if p.com_andamento else 'normalizações' }}">
     <noscript><button class="gc-btn gc-btn--ui" type="submit">Filtrar</button></noscript>
     <a class="gc-btn gc-btn--ui cos-norm-csv" href="{{ url(formato='csv') }}" data-norm-csv download><i class="ph ph-download-simple" aria-hidden="true"></i> Exportar CSV</a>
   </form>
-  {% set filtrado = cliente or usina or status or busca or operador or tecnico or falha %}
-  <div class="cn-chips"{% if not filtrado %} hidden{% endif %} data-norm-limpar-caixa><a href="{{ url(cliente=None, usina=None, status=None, q=None, criado_por=None, tecnico=None, falha=None) }}" data-norm-limpar>Limpar os filtros</a></div>
+  {% set filtrado = cliente or usina or status or busca or operador or tecnico or falha or situacao %}
+  <div class="cn-chips"{% if not filtrado %} hidden{% endif %} data-norm-limpar-caixa><a href="{{ url(cliente=None, usina=None, status=None, q=None, criado_por=None, tecnico=None, falha=None, situacao=None) }}" data-norm-limpar>Limpar os filtros</a></div>
 
   {% if p.todos %}
   <div class="cn-tab cos-tab"><table>
@@ -107,8 +119,38 @@
       <th class="cos-esq" title="A OS do Fracttal contra a normalização do COS">Conferência da OS</th></tr></thead>
     <tbody>
     {% for n in p.todos %}
+      {% if n.situacao == 'andamento' %}
+      {# a em andamento (12/11/2026): a mesma linha, com o tempo até agora, a etapa no lugar da volta, a "Geração parou"
+         pelo tipo e a OS pelo Panorama das abertas; a conferência da OS só começa na normalização #}
       <tr{% if n.os %} class="cos-os" tabindex="0" data-folio="{{ n.os }}" data-status="{{ n.status_card }}" title="Abrir o card da OS {{ n.os }}"{% endif %}
-        data-norm-linha data-f-falha="{{ n.falha }}" data-f-cliente="{{ n.cliente }}" data-f-usina="{{ n.usina }}"
+        data-norm-linha data-f-situacao="andamento" data-f-falha="{{ n.falha }}" data-f-cliente="{{ n.cliente }}" data-f-usina="{{ n.usina }}"
+        data-f-criado_por="{{ n.operador }}" data-f-tecnico="{{ n.tecnico }}" data-f-status="{{ n.status_filtro }}"
+        data-f-busca="{{ n.busca }}" data-os="{{ n.os }}" data-aberta="0" data-dias="" data-fora="" data-hr=""
+        data-dias-andamento="{{ n.dias_andamento }}"{% if n.registro not in p.visiveis %} hidden{% endif %}>
+        <td class="cos-esq">{% if n.os %}<b class="cos-folio">{{ n.os }}</b>{% else %}<span class="mudo">sem OS</span>{% endif %}
+          {% if n.acao or n.descricao or n.notas %}<button class="cos-det-bt" type="button" aria-expanded="false" aria-controls="cos-det-{{ loop.index }}">Detalhes</button>{% endif %}</td>
+        <td class="cos-indisp"><b>{{ n.fora_txt }}</b><span class="det">e contando</span></td>
+        <td class="cos-esq">{{ n.inicio.strftime('%d/%m %H:%M') if n.inicio else '—' }}</td>
+        <td class="cos-esq"><span class="cn-pill cn-info">Em andamento</span>
+          <span class="det">{{ n.etapa }}{% if n.aguardando %} · aguardando {{ n.aguardando }}{% endif %}</span></td>
+        <td class="cos-esq">{{ n.cliente }}</td>
+        <td class="cos-esq cos-usina cos-texto"><b>{{ usina_link(n.usina_codigo, n.usina) }}</b>
+          <span class="det">{{ n.falha }}{% if n.equipamentos %} · {{ n.equipamentos[:2]|join(', ') }}{% if n.equipamentos|length > 2 %} e mais {{ n.equipamentos|length - 2 }}{% endif %}{% endif %}</span></td>
+        <td class="cos-esq cos-protecoes">{{ n.protecoes|join(', ') if n.protecoes else '—' }}</td>
+        <td class="cos-esq">{% if n.geracao == 'sim' %}<span class="cn-pill cn-critico">Sim</span><span class="det">pelo tipo, desde a abertura</span>
+          {% elif n.geracao == 'conferir' %}<span class="cn-pill cn-alerta">a conferir</span><span class="det">aberta como {{ n.falha|lower }} com "{{ n.impacto }}": pela regra de 09/11, é desligamento</span>
+          {% elif n.geracao == 'na_volta' %}<span class="mudo" title="A pergunta é feita na normalização">—</span><span class="det">responde na volta</span>
+          {% else %}<span class="mudo">—</span>{% endif %}</td>
+        <td class="cos-esq">{{ n.operador or '—' }}</td>
+        <td class="cos-esq">{{ n.tecnico or '—' }}</td>
+        {% set f = n.fracttal %}
+        <td class="cos-esq">{% if n.os %}<span class="cn-pill cn-{{ f.tom }}">{{ f.rotulo }}</span>{% if f.det %}<span class="det">{{ f.det }}</span>{% endif %}
+          {% else %}<span class="mudo">sem OS</span>{% endif %}</td>
+        <td class="cos-esq"><span class="mudo" title="A conferência da OS começa na normalização">—</span></td>
+      </tr>
+      {% else %}
+      <tr{% if n.os %} class="cos-os" tabindex="0" data-folio="{{ n.os }}" data-status="{{ n.status_card }}" title="Abrir o card da OS {{ n.os }}"{% endif %}
+        data-norm-linha{% if p.com_andamento %} data-f-situacao="normalizada"{% endif %} data-f-falha="{{ n.falha }}" data-f-cliente="{{ n.cliente }}" data-f-usina="{{ n.usina }}"
         data-f-criado_por="{{ n.operador }}" data-f-tecnico="{{ n.tecnico }}" data-f-status="{{ n.status_filtro }}"
         data-f-busca="{{ n.busca }}" data-os="{{ ([n.os] + n.os_relacionadas)|join('|') }}" data-aberta="{{ 1 if n.aberta else 0 }}"
         data-dias="{{ n.aberta_ha_dias if n.aberta_ha_dias is not none else '' }}" data-fora="{{ n.fora if n.fora is not none else '' }}"
@@ -137,6 +179,7 @@
           {% elif c.tarefas %}<span class="det">{{ c.concluidas }}/{{ c.tarefas }} tarefas concluídas</span>{% endif %}
           {% else %}<span class="mudo" title="A OS não foi criada pela Ronda COS">—</span>{% endif %}</td>
       </tr>
+      {% endif %}
       {# os Detalhes da Atividade do informe (29/10/2026): a linha de baixo, aberta pelo botão da OS #}
       {% if n.acao or n.descricao or n.notas %}
       <tr class="cos-det-linha" id="cos-det-{{ loop.index }}" hidden><td colspan="12">
@@ -150,7 +193,7 @@
     {% endfor %}
     </tbody>
   </table></div>
-  <p class="cn-vazio" data-norm-vazio{% if p.itens %} hidden{% endif %}>Nenhuma normalização com estes filtros.</p>
+  <p class="cn-vazio" data-norm-vazio{% if p.itens %} hidden{% endif %}>{{ 'Nenhuma ocorrência' if p.com_andamento else 'Nenhuma normalização' }} com estes filtros.</p>
   {% else %}<p class="cn-vazio">Nenhuma normalização neste mês.</p>{% endif %}
   {% if p.desfeitas %}<p class="mudo">{{ p.desfeitas }} {{ 'normalização foi desfeita' if p.desfeitas == 1 else 'normalizações foram desfeitas' }} no mês (a ocorrência voltou a aberta) e {{ 'fica' if p.desfeitas == 1 else 'ficam' }} fora da lista.</p>{% endif %}
   {% endif %}
@@ -182,4 +225,5 @@
     });
   })();
 </script>
+{% include "cos/_fluido.html" %}
 {% endblock %}

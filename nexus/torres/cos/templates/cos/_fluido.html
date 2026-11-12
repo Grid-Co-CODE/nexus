@@ -1,0 +1,6 @@
+{# A troca de tela do COS sem piscar (12/11/2026, o checkup do dono: "Quero que seja a aba mais fluida e tecnológica do
+   nexus"): o topo e o menu ficam parados e só o miolo troca (view transitions), e a tela do link em que o mouse para é
+   buscada antes do clique (speculation rules; sem elas, um prefetch no passar do mouse). Nunca o que baixa arquivo, o
+   pedido parcial ou o videowall (static/cos/fluido.js). Incluído no fim de cada tela do COS com a casca. #}
+<link rel="stylesheet" href="{{ url_for('static', filename='cos/fluido.css') }}">
+<script src="{{ url_for('static', filename='cos/fluido.js') }}" defer></script>

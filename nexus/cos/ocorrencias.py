@@ -12,7 +12,7 @@ O que o Andamento já separou, e esta tela não junta de volta:
 """
 from collections import Counter
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from urllib.parse import quote, urlsplit
 
 from . import andamento as AND
@@ -370,13 +370,25 @@ def filtros_pedidos(args) -> dict:
     return f
 
 
+# A OS que ainda não chegou ao espelho das abertas (checkup do COS, 12/11/2026). A varredura do Fracttal na Ronda COS roda
+# de 30 em 30 min; fora do espelho, a tela dizia "Fechada" — e a OS 19377 da Nova Londrina 1, aberta às 10:13, aparecia
+# fechada às 10:19 (5 casos assim naquela leitura). A aberta há menos de OS_NOVA_MIN ainda está "Nova".
+OS_NOVA_MIN = 40
+
+
+def _os_nova(o: dict) -> bool:
+    aberta = AND.instante(o.get("os_aberta_em"))
+    return bool(aberta and AND.agora() - aberta < timedelta(minutes=OS_NOVA_MIN))
+
+
 def status_filtro(o: dict) -> str:
-    """A chave do status da OS para o filtro: processo, verificacao, fechada (fora do espelho das abertas) ou sem_os."""
+    """A chave do status da OS para o filtro: processo, verificacao, fechada (fora do espelho das abertas) ou sem_os. A
+    nova, que a varredura ainda não viu, conta como em processo."""
     if not o.get("os"):
         return "sem_os"
     f = o.get("os_fracttal")
     if not f:
-        return "fechada"
+        return "processo" if _os_nova(o) else "fechada"
     return {1: "processo", 2: "verificacao"}.get(f.get("status"), "")
 
 
@@ -435,7 +447,7 @@ def status_da_os(o: dict) -> str:
         return ""
     f = o.get("os_fracttal")
     if not f:
-        return "Fechada"
+        return "Nova" if _os_nova(o) else "Fechada"
     return NO.STATUS_OS.get(f.get("status"), (f"status {f.get('status')}", ""))[0]
 
 

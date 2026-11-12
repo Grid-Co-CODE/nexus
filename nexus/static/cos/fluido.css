@@ -1,0 +1,16 @@
+/* static/cos/fluido.css — a troca entre as telas do COS sem o "piscar" de página nova (checkup do COS, 12/11/2026; o
+   dono: "quero que seja a aba mais fluida e tecnológica do Nexus").
+
+   Transição entre documentos (View Transitions de navegação, Chrome/Edge 126+): o topo e o menu ficam parados e só o
+   conteúdo troca, num esmaecimento curto. Navegador sem o recurso navega como sempre. Quem pede menos movimento no
+   sistema não tem animação. */
+@view-transition { navigation: auto; }
+.topo { view-transition-name: nexus-topo; }
+.menu { view-transition-name: nexus-menu; }
+::view-transition-old(root), ::view-transition-new(root) { animation-duration: .16s; animation-timing-function: ease-out; }
+::view-transition-group(nexus-topo), ::view-transition-group(nexus-menu) { animation: none; }
+@media (prefers-reduced-motion: reduce) {
+  @view-transition { navigation: none; }
+}
+/* o corpo que se atualiza sozinho (a cada 30 s) não pisca: a troca é dentro do mesmo quadro */
+#cos-mon-corpo, #cos-tv-corpo { contain: content; }

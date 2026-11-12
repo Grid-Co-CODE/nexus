@@ -90,7 +90,10 @@ usina e o que entra nos eventos (só o que já tem OS) são regra do Andamento, 
 - ⚠ **O Andamento fala http**, sem TLS: a chave atravessa a internet em claro até haver HTTPS (ou rede privada) lá. Ela
   só abre leitura.
 
-## Ocorrências: o ciclo de cada ocorrência no prazo da R04 (22/10/2026)
+## Prazos da R04 (até 12/11/2026, "Ocorrências"): o ciclo de cada ocorrência no prazo da R04 (22/10/2026)
+
+Desde 12/11/2026 (a reorganização do COS pelo dono) o nome "Ocorrências" é da lista das em andamento e das
+normalizadas (a tela `normalizacoes`, abaixo); esta tela segue no mesmo id e endereço (`/t/cos/ocorrencias`).
 
 *"Cada ocorrência cumpriu as cinco etapas no prazo?"* — detectada → cliente informado (15 min) → campo acionado (30 min)
 → normalizada → encerrada. Só lê: agir na ocorrência é na Ronda COS, pelo link de cada linha.
@@ -202,7 +205,30 @@ no Nexus, logo depois da Passagem de turno (pedido do dono). Só lê.
 - Testes: `tests/test_cos_os_abertas.py` (controle positivo: a pílula contando depois do filtro, o padrão em "todas", o
   alerta pela situação e o 404 sem a frase própria, vermelhos).
 
-## Normalizações: a hora da volta pela Ronda COS (27/10/2026)
+## Ocorrências (até 12/11/2026, "Normalizações"): as em andamento e a hora da volta pela Ronda COS (27/10/2026)
+
+**12/11/2026, a Ocorrências** (o dono, no protótipo do COS: a tela unificada "segue o padrão da tela de Normalizações"; o
+protótipo desenhado do zero ele recusou). O id e o endereço ficam (`normalizacoes`): as marcas de Base → Acessos e os
+favoritos são pelo id. No mês corrente, as ocorrências **em andamento** entram no topo da mesma tabela, no mesmo formato
+de linha, com a pílula azul "Em andamento", e o filtro **Situação** separa as duas; nos meses de antes, só as
+normalizadas (o mês é o da volta). Os números das normalizadas (total, OS aberta, mediana, hora real) contam só elas; as
+em andamento têm o delas na faixa (e as de 7 dias ou mais).
+- **De onde** (`_andamento_cos` na rota, `normalizacoes.andamento`): a fotografia de cada cliente (o que está aberto
+  agora, de qualquer data: a Santarém aberta desde julho aparece), o ciclo de 7 dias (o início, o tipo, as proteções, as
+  notas, quem abriu a OS) e o Panorama das OS abertas (o status da OS). São as cópias da Ronda e da Prazos da R04. A já
+  normalizada (na memória ou no ciclo) não entra: conta uma vez, pela normalização. O cliente cuja fotografia não veio
+  fica fora, e a tela diz.
+- **A linha:** o Indisp. conta até agora ("e contando"; em dias depois de 48 h); na Normalização, em que pé ela está (a
+  etapa e o que aguarda); as Proteções da abertura (o trip); a **Geração parou** pelo tipo (`PARAM_PELO_TIPO`: Sim nos
+  desligamentos e na atuação de proteção; na falha de comunicação e no inversor offline "responde na volta", e "a
+  conferir" quando foi aberta com a geração interrompida: pela regra do dono de 09/11, é desligamento); No Fracttal pelo
+  Panorama, "Nova" quando a varredura ainda não viu a OS (`OS_NOVA_MIN`, 40 min) e "Fechada" quando a OS saiu das
+  abertas com a ocorrência ainda aberta no COS; a conferência da OS só começa na normalização ("—").
+- O CSV leva a coluna **Situação** no fim (as de antes não mudam de lugar) e se chama `ocorrencias-<mês>.csv`.
+- A **OS em aberto** sai do menu e abre por dentro desta (`dentro_de`): quem a tinha marcada continua vendo.
+- Testes: `tests/test_cos_normalizacoes.py` (as em andamento no formato da normalização, a OS nova, só no mês corrente,
+  a Situação, os números das normalizadas iguais, a tela e o CSV).
+
 
 *"Quando cada usina voltou, e a OS dela já fechou no Fracttal?"* — Levi: "Gostaria de inserir no COS" a API de
 normalizações da Ronda COS (o guia `API-NORMALIZACOES.md`, do dono da Ronda COS). Por que importa: o Fracttal só encerra a
@@ -410,8 +436,23 @@ Ignora esse monitoramento que já existe no nexus" (a Performance › Tempo real
 - **Ao vivo:** a página pede `?parcial=1` a cada 30 s pelo `nexusPedir` e troca só o corpo (`_monitoramento_corpo.html`),
   sem recarregar nem perder a rolagem; com a aba escondida ou um campo em uso, espera. Os links do corpo saem sem o
   `parcial` (`_url_da_pagina`).
-- **Quem vê:** `Tela.do_setor = COS`: o setor COS a vê sem marca em Base → Acessos. No menu, logo depois do Desempenho (o
-  Acompanhamento segue a 1ª tela pronta, `test_casca_inicio`).
+- **Quem vê:** `Tela.do_setor = COS`: o setor COS a vê sem marca em Base → Acessos. No menu, desde 12/11/2026, logo
+  depois do Acompanhamento, que segue a 1ª tela pronta (`test_casca_inicio`), abrindo o que se usa no turno
+  (`_ORDEM_DO_MENU`, a ordem do dono: Monitoramento, Passagem de turno, Ronda, Parede; Ocorrências; Mesa, Desempenho,
+  Prazos da R04, Religamentos, Acionamentos).
+- **A visão por usina** (12/11/2026, o dono: "a visão da usina por gráfico, mas ao clicar quero ver o gráfico dos
+  inversores, e se tiver algum inversor desligado, sinalizar"): no lugar da tabela, um cartão por usina (o kW, a situação
+  e a curva do dia), agrupado por cliente, e em cima a **"Atenção agora"** (a mesma conta do videowall, `MO.parede`, agora
+  também na tela normal). Clicar no cartão abre a janela dos inversores (`cos/_inversores.html`,
+  `static/cos/inversores.js`): a curva da usina e a de cada inversor, o estado de cada um ao vivo de 3 em 3 s, e "aberto
+  no COS" no inversor com ocorrência (`MO.abertas_de_inversor`). **Quem lê é o navegador, direto na API da Ronda COS**,
+  com o login da pessoa (`NEXUS_COS_API_URL`, `AND.api_da_ronda`). Sem o endereço (hoje), a janela não entra e o cartão
+  não é botão: a tela fica com o que o Andamento manda, de 30 em 30 s. Para ligar falta, na Ronda COS, o CORS para o
+  endereço do Nexus e o login pelo passe.
+- **As usinas da assistida da Thopen** (o dono, 12/11/2026: "é THOPEN - Operação Assistida"; "atualizar somente o
+  monitoramento. Ela não entra em nenhum outro lugar"): as 4 usinas com logger que a Ronda COS manda sem cliente (sem
+  usina no cadastro dela) vão para o grupo "Thopen - Operação Assistida" (`MO.CLIENTE_SEM_CADASTRO`, pelo id do cartão).
+  Só aqui; o cliente que a Ronda COS mandar vale primeiro.
 - Testes: `tests/test_cos_monitoramento.py`. Controle positivo: a soma com a leitura velha, a ponte por cima da falta de
   amostra, a gerando antes da parada, os links do corpo com o `parcial` e o teto de 5 s, todos vermelhos.
 - **O videowall** (`?tv=1`, 09/11/2026; o dono: "preciso de uma tela de monitoramento adequada pra videowall, essa está
@@ -434,6 +475,21 @@ Ignora esse monitoramento que já existe no nexus" (a Performance › Tempo real
     tela de 1080, 3 páginas; na 2 x 2 com 0,5, tudo de uma vez.
   - Ao vivo como a tela normal (o corpo a cada 30 s pelo `nexusPedir`), com o relógio de Brasília, a tela acesa (Wake
     Lock, onde o navegador deixa) e os controles (tela cheia, sair) só ao mexer o mouse.
+
+## O COS mais rápido e fluido (12/11/2026, o checkup do dono: "Quero que seja a aba mais fluida e tecnológica do nexus")
+
+- **As telas não esperam a Ronda COS** (`nexus/cos/andamento.py`, `_com_copia`): a cópia vencida há pouco (até
+  `COPIA_MAX_S`, 15 min) vem na hora e a releitura sai por trás, um pedido só por leitura no ar; a falha da leitura de
+  trás aparece na tela (dita velha) sem esconder a cópia. A 1ª leitura fria de um cliente chama a dos outros em paralelo
+  (`_aquecer_irmaos`, `LEITURAS_JUNTAS` de cada vez), e o 1º pedido a uma tela do COS enche as cópias por trás
+  (`AND.aquecer`, pelo `before_request` da torre). Medido com a Ronda COS a 0,8 s por leitura (14 leituras, como a Mesa):
+  fria 11,2 s → 3,2 s; cópia vencida 11,2 s → 0 s; 5 pessoas na mesma leitura fria, 5 pedidos → 1. Nos testes tudo segue
+  síncrono. Testes: `tests/test_cos_andamento_copia.py`.
+- **A OS nova não é "Fechada"** (`nexus/cos/ocorrencias.py`, `OS_NOVA_MIN`): fora do Panorama e aberta há menos de 40 min
+  (a varredura do Fracttal é de 30 em 30 min) é "Nova" e conta como em processo.
+- **A troca de tela sem piscar** (`cos/_fluido.html`, incluído no fim de cada tela do COS com a casca;
+  `static/cos/fluido.css` e `fluido.js`): o topo e o menu parados e só o miolo troca (view transitions), e a tela do link
+  em que o mouse para é buscada antes do clique (speculation rules). Nunca o que baixa arquivo, o `parcial` ou o videowall.
 
 ## Regras desta torre
 

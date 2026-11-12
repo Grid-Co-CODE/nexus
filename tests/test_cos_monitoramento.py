@@ -172,8 +172,9 @@ def test_a_tela_e_do_setor_cos_e_entra_no_menu_sem_mexer_na_ordem():
     tela = TORRE.tela("monitoramento")
     assert tela.do_setor == SID.COS
     ids = [t.id for t in TORRE.telas]
-    # o Acompanhamento segue a 1ª tela (o cartão do COS no Início), e a Mesa e o Desempenho logo depois
-    assert ids[:4] == ["acompanhamento", "mesa", "desempenho", "monitoramento"]
+    # o Acompanhamento segue a 1ª tela (o cartão do COS no Início); desde 12/11/2026 (a reorganização do COS pelo dono)
+    # o Monitoramento abre o que se usa no turno, logo depois dele
+    assert ids[:2] == ["acompanhamento", "monitoramento"]
 
 
 # --- o videowall (?tv=1) -----------------------------------------------------------------------------------------------
@@ -211,3 +212,47 @@ def test_a_tela_do_videowall_sem_a_casca_e_o_corpo_que_se_atualiza(tela):
     # a página normal leva à parede, e a parede volta para ela
     assert "tv=1" in tela.get("/t/cos/monitoramento").get_data(as_text=True)
     assert 'href="?"' in html or "Sair do videowall" in html
+
+
+# --- a visão por usina e os inversores (12/11/2026) --------------------------------------------------------------------
+
+def test_um_cartao_por_usina_com_a_atencao_e_sem_a_api_o_cartao_nao_e_botao(tela):
+    html = tela.get("/t/cos/monitoramento").get_data(as_text=True)
+    assert html.count('<article class="cos-mon-u') == 4 and 'data-gid="scada-a1"' in html
+    assert "Atenção agora" in html and html.index("Atenção agora") < html.index('<article class="cos-mon-u')
+    # sem o endereço da API da Ronda COS (NEXUS_COS_API_URL), sem a janela dos inversores e o cartão não é botão
+    assert "cos-inv-dlg" not in html and "cos/inversores.js" not in html and 'role="button"' not in html
+    assert "cos/fluido.js" in html
+
+
+def test_com_o_endereco_da_api_o_cartao_abre_os_inversores(tela, ligada):
+    ligada.config["NEXUS_COS_API_URL"] = "https://api.exemplo/"
+    html = tela.get("/t/cos/monitoramento").get_data(as_text=True)
+    assert 'id="cos-inv-dlg"' in html and "cos/inversores.js" in html and 'role="button"' in html
+    assert 'api: "https://api.exemplo",' in html and 'console: "http://andamento.exemplo:3000/console",' in html
+    assert "inversoresAbertos: {}" in html
+
+
+def test_as_usinas_da_assistida_da_thopen_que_a_ronda_cos_manda_sem_cliente():
+    """O dono, 12/11/2026: as usinas com logger sem cadastro na Ronda COS (sem cliente) são da "Thopen - Operação
+    Assistida", e só no Monitoramento. O cliente que a Ronda COS mandar vale primeiro."""
+    g = _geracao()
+    g["usinas"] += [_u("scada-noig", None, "Usina Exemplo Assistida", None),
+                    _u("scada-arbr", None, "Usina Exemplo Assistida B", "Cliente C")]
+    p = MO.painel(_leitura(g), None, AGORA)
+    cli = {x["id"]: x["cliente"] for x in p.itens}
+    assert cli["scada-noig"] == "Thopen - Operação Assistida" and cli["scada-arbr"] == "Cliente C"
+
+
+def test_as_abertas_de_inversor_pela_fotografia():
+    foto = {"usinas": [
+        {"codigo": "EX-UM100", "ocorrencias": [
+            {"tipo_falha": "Inversor offline", "equipamentos": ["Inversor 1.2"], "os": "17001",
+             "abertura": "2026-11-09T08:00:00-03:00"},
+            {"tipo_falha": "Desligamento de usina", "equipamentos": [], "os": "17002",
+             "abertura": "2026-11-09T09:00:00-03:00"},
+            {"tipo_falha": "Falha de comunicação", "equipamentos": ["Inversor 1.3"], "os": "R-abc",
+             "abertura": "2026-11-08T10:00:00-03:00"}]},
+        {"codigo": None, "ocorrencias": [{"tipo_falha": "Inversor offline", "equipamentos": [], "os": "1"}]}]}
+    assert MO.abertas_de_inversor([foto]) == {"EX-UM100": [["Inversor 1.2", "Inversor offline", "17001", "2026-11-09"],
+                                                           ["Inversor 1.3", "Falha de comunicação", "", "2026-11-08"]]}

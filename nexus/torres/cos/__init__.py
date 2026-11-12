@@ -75,7 +75,10 @@ TORRE = Torre(
         # verificações da spec R04 ainda não têm de onde ler: a pergunta diz o que a tela responde hoje.
         # 22/10/2026: as Ocorrências também vêm do Andamento (o ciclo de cada uma: quando cada etapa aconteceu); o prazo
         # da spec R04 e o veredito são daqui (nexus/cos/ocorrencias.py).
-        Tela("ocorrencias", "Ocorrências",
+        # 12/11/2026, a reorganização do COS (o dono): a tela do prazo de cada etapa vira "Prazos da R04", e o nome
+        # "Ocorrências" passa à lista das em andamento e das normalizadas (a tela `normalizacoes`). O id fica (o endereço,
+        # os favoritos e as marcas de Base → Acessos são pelo id).
+        Tela("ocorrencias", "Prazos da R04",
              "Cada ocorrência cumpriu as cinco etapas no prazo?",
              "Andamento da Ronda COS (registro, envios ao cliente, mudanças de estado)"),
         Tela("ronda", "Ronda padronizada",
@@ -100,19 +103,41 @@ TORRE = Torre(
              "Passagens registradas no Nexus + o que está aberto no Andamento da Ronda COS"),
         # 27/10/2026: o Panorama da Ronda COS (as OS abertas no Fracttal que o COS abriu), pelo Andamento; depois da
         # Passagem de turno, como o dono pediu.
+        # 12/11/2026: sai do menu (o dono, na reorganização do COS) e abre por dentro da Ocorrências: o status da OS de
+        # cada ocorrência já está lá; quem tinha a tela marcada continua vendo
         Tela("os-abertas", "OS em aberto",
              "Que OS o COS abriu e seguem abertas no Fracttal, e há quanto tempo?",
-             "Andamento da Ronda COS (o Panorama das OS abertas no Fracttal)"),
+             "Andamento da Ronda COS (o Panorama das OS abertas no Fracttal)", dentro_de="normalizacoes"),
         # 27/10/2026 (Levi: "Gostaria de inserir no COS" a API de normalizações): a hora em que cada usina voltou, pela
         # Ronda COS, ao lado da OS que segue aberta no Fracttal. Depois das OS em aberto, que é o outro lado da mesma conta.
-        Tela("normalizacoes", "Normalizações",
-             "Quando cada usina voltou, e a OS dela já fechou no Fracttal?",
-             "Andamento da Ronda COS (as normalizações, com a hora da volta registrada pelo COS)"),
+        # 12/11/2026 (o dono, no protótipo do COS: a tela unificada "segue o padrão da tela de Normalizações"): vira
+        # "Ocorrências", com as em andamento no topo da mesma lista e o filtro Situação. O id fica.
+        Tela("normalizacoes", "Ocorrências",
+             "Quais ocorrências seguem em andamento, quando cada usina voltou, e a OS dela já fechou no Fracttal?",
+             "Andamento da Ronda COS (as ocorrências abertas agora e as normalizações, com a hora da volta registrada "
+             "pelo COS)"),
     ],
 )
+# A ordem do menu (12/11/2026, a reorganização do COS pelo dono): o que se usa no turno (Monitoramento, Passagem de turno,
+# Ronda, Parede), a consulta (Ocorrências) e os indicadores (Mesa, Desempenho, Prazos da R04, Religamentos, Acionamentos).
+# O Acompanhamento segue o 1º: o cartão do COS no Início leva à 1ª tela pronta, e é ele (`test_casca_inicio`).
+_ORDEM_DO_MENU = ("acompanhamento", "monitoramento", "turno", "ronda", "eventos", "normalizacoes", "mesa", "desempenho",
+                  "ocorrencias", "religamentos", "acionamentos", "os-abertas")
+TORRE.telas.sort(key=lambda t: _ORDEM_DO_MENU.index(t.id) if t.id in _ORDEM_DO_MENU else len(_ORDEM_DO_MENU))
 
 bp = TORRE.criar_blueprint(__name__)
 registrar_molduras(bp, TORRE)
+_AQUECIDO = {"feito": False}
+
+
+@bp.before_request
+def _aquecer_uma_vez():
+    """No 1º pedido a uma tela do COS, as cópias das leituras do Andamento enchem por trás (`AND.aquecer`, 12/11/2026):
+    a tela seguinte já abre com a cópia, sem esperar a Ronda COS. Uma vez por processo; no registro do blueprint não dá
+    (lá a config dos testes ainda não tem o TESTING, e a thread subiria nos testes). Nos testes, `aquecer` não faz nada."""
+    if not _AQUECIDO["feito"]:
+        _AQUECIDO["feito"] = True
+        AND.aquecer(current_app.config)
 
 # A Parede mostra até 300 linhas: 7 dias de 3 clientes passam disso em dia agitado, e o filtro afunila.
 LIMITE_EVENTOS = 300
@@ -432,12 +457,31 @@ def _celula_csv(v):
     return "'" + t if t[:1] in ("=", "+", "-", "@") else t
 
 
+def _andamento_cos(cfg, agora):
+    """As ocorrências em andamento de todos os clientes, para a tela Ocorrências: a fotografia de cada um (o que está aberto
+    agora, de qualquer data), o ciclo de 7 dias (o detalhe: início, tipo, proteções, notas, quem abriu a OS) e o Panorama
+    das OS abertas (o status no Fracttal). → (itens, leituras, erros). O cliente cuja fotografia não veio fica fora e é
+    dito na tela; sem o ciclo ou o Panorama a linha só perde o detalhe. As leituras são as cópias das outras telas do COS
+    (a fotografia é a da Ronda, o ciclo o da Prazos da R04), então abrir esta tela quase nunca vai à Ronda COS."""
+    lista, erro_clientes = AND.clientes(cfg)
+    fotos = [(c, AND.ler(cfg, c)) for c in lista]
+    ciclos = [AND.ler_ocorrencias(cfg, c, 7) for c in lista]
+    panorama = AND.ler_os_abertas(cfg)
+    ocorrencias = {str(o.get("registro")): o for x in ciclos if x.dados for o in x.dados.get("ocorrencias") or []
+                   if isinstance(o, dict)}
+    itens = NO.andamento([(c, x.dados) for c, x in fotos if x.dados], ocorrencias, panorama.dados, agora)
+    erros = ([f"a lista de clientes: {erro_clientes}"] if erro_clientes else [])
+    erros += [f"{c}: {x.erro}" for c, x in fotos if x.erro and not x.dados]
+    return itens, [x for _c, x in fotos] + ciclos + [panorama], erros
+
+
 @bp.route("/normalizacoes")
 def normalizacoes():
-    """Normalizações: a hora em que cada usina voltou, registrada pelo COS, e se a OS segue aberta no Fracttal, por mês.
-    As normalizações vêm do Andamento (guardadas em memória pelo cursor, nexus/cos/normalizacoes.py); os filtros e as
-    contas são daqui. Só lê: a OS abre no card do
-    Fracttal. `?formato=csv` baixa a lista com os filtros."""
+    """Ocorrências (até 12/11/2026, Normalizações): no mês corrente, as em andamento no topo e as normalizadas do mês, com o
+    filtro Situação; nos meses de antes, só as normalizadas (o mês é o da volta). A hora em que cada usina voltou,
+    registrada pelo COS, e se a OS segue aberta no Fracttal. As normalizações vêm do Andamento (guardadas em memória pelo
+    cursor, nexus/cos/normalizacoes.py); os filtros e as contas são daqui. Só lê: a OS abre no card do Fracttal.
+    `?formato=csv` baixa a lista com os filtros."""
     cfg = current_app.config
     fonte = AND.fonte(cfg)
     agora = AND.agora()
@@ -445,10 +489,14 @@ def normalizacoes():
     a = request.args
     mes = NO.mes_pedido(a.get("mes"), agora)
     status = a.get("status", "") if a.get("status") in NO.STATUS_FILTRO else ""
+    situacao = a.get("situacao", "") if a.get("situacao") in NO.SITUACAO_FILTRO else ""
     cliente, usina = a.get("cliente", ""), a.get("usina", "")
     operador, tecnico, falha = a.get("criado_por", ""), a.get("tecnico", ""), a.get("falha", "")
     busca = " ".join((a.get("q") or "").split())[:NO.BUSCA_MAX]
-    p = NO.painel(leitura, agora, mes, cliente, usina, status, busca, operador, tecnico, falha)
+    andamento, lidas_andamento, erros_andamento = None, [], []
+    if fonte.ligada and mes == NO.meses(agora)[0][0]:
+        andamento, lidas_andamento, erros_andamento = _andamento_cos(cfg, agora)
+    p = NO.painel(leitura, agora, mes, cliente, usina, status, busca, operador, tecnico, falha, situacao, andamento)
     if a.get("formato") == "csv":
         if not p:
             abort(404)
@@ -457,15 +505,16 @@ def normalizacoes():
         w.writerow(NO.CSV_COLUNAS)
         w.writerows([[_celula_csv(v) for v in linha] for linha in NO.csv_linhas(p)])
         # com o BOM, o Excel abre os acentos certos
-        resp = Response("\ufeff" + buf.getvalue(), mimetype="text/csv; charset=utf-8")
-        resp.headers["Content-Disposition"] = f'attachment; filename="normalizacoes-{mes}.csv"'
+        resp = Response(BOM + buf.getvalue(), mimetype="text/csv; charset=utf-8")
+        resp.headers["Content-Disposition"] = f'attachment; filename="ocorrencias-{mes}.csv"'
         resp.headers["Cache-Control"] = "private, no-store"
         return resp
     return render_template(
         "cos/normalizacoes.html", torre=TORRE, tela=TORRE.tela("normalizacoes"), ligada=fonte.ligada, leitura=leitura,
         p=p, mes=mes, meses=NO.meses(agora), cliente=cliente, usina=usina, status=status, busca=busca,
-        operador=operador, tecnico=tecnico, falha=falha,
-        status_filtro=NO.STATUS_FILTRO, lido=_lido([leitura]), url=_url)
+        operador=operador, tecnico=tecnico, falha=falha, situacao=situacao, situacao_filtro=NO.SITUACAO_FILTRO,
+        erros_andamento=erros_andamento, status_filtro=NO.STATUS_FILTRO, lido=_lido([leitura, *lidas_andamento]),
+        url=_url)
 
 
 # ── Mesa do operador e Desempenho da equipe (05/11/2026) ─────────────────────────────────────────────────────────────
@@ -565,6 +614,17 @@ def usina(codigo: str = ""):
 
 
 # ── Monitoramento (09/11/2026) ───────────────────────────────────────────────────────────────────────────────────────
+def _console_da_ronda(fonte) -> str:
+    """O Console da Ronda COS (o link "Console" da janela dos inversores), no servidor do Andamento."""
+    return OC.link_da_plataforma(fonte.url, "-").split("?", 1)[0] if fonte.ligada else ""
+
+
+def _inversores_abertos(cfg) -> dict:
+    """As ocorrências abertas que citam um inversor, pelas fotografias de cada cliente (as cópias da Ronda padronizada)."""
+    lista, _erro = AND.clientes(cfg)
+    return MO.abertas_de_inversor([x.dados for x in (AND.ler(cfg, c) for c in lista) if x.dados])
+
+
 def _url_da_pagina(**mudar) -> str:
     """O `_url` sem o `parcial`: o corpo pedido pelo JavaScript leva os links da página, e não o do pedaço."""
     return _url(parcial=None, **mudar)
@@ -595,8 +655,13 @@ def monitoramento():
     ctx = dict(torre=TORRE, tela=TORRE.tela("monitoramento"), ligada=fonte.ligada, geracao=geracao, curvas=curvas, p=p,
                cliente=cliente, grupo=grupo, busca=busca, grupos=MO.GRUPOS, kw_txt=MO.kw_txt, largura=MO.LARGURA,
                altura=MO.ALTURA, curva_de=MO.CURVA_DE_H, curva_ate=MO.CURVA_ATE_H, passo=AND.PASSO_DAS_CURVAS_MIN,
-               lido=lido, url=_url_da_pagina, agora=agora, parede=MO.parede(p) if tv and p else None,
-               anormal=MO.anormal, escala=escala)
+               lido=lido, url=_url_da_pagina, agora=agora, parede=MO.parede(p) if p else None,
+               anormal=MO.anormal, escala=escala,
+               # 12/11/2026, os inversores de cada usina ao clicar no cartão (cos/_inversores.html): o navegador lê a API
+               # da Ronda COS direto, com o login da pessoa. Sem o endereço (NEXUS_COS_API_URL), a janela não entra e o
+               # cartão não é botão. As ocorrências abertas de inversor só se leem quando a janela entra.
+               cos_api=AND.api_da_ronda(cfg), cos_console=_console_da_ronda(fonte),
+               cos_inversores_abertos=lambda: _inversores_abertos(cfg) if fonte.ligada else {})
     corpo = "cos/_monitoramento_tv_corpo.html" if tv else "cos/_monitoramento_corpo.html"
     if a.get("parcial") == "1":
         resp = jsonify(html=render_template(corpo, **ctx), lido=lido)

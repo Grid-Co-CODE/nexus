@@ -37,5 +37,6 @@
     <a class="gc-btn gc-btn--contorno" href="{{ url(tv=None, escala=None) }}">Sair do videowall</a>
   </nav>
   <script src="{{ url_for('static', filename='cos/monitoramento-tv.js') }}" defer></script>
+  {% if cos_api %}{% include "cos/_inversores.html" %}{% endif %}
 </body>
 </html>

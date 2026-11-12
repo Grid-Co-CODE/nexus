@@ -19,6 +19,8 @@
     <span class="d">de {{ r.usinas }} {{ 'usina' if r.usinas == 1 else 'usinas' }} na lista</span></span>
   <span><span class="gc-rotulo">Paradas ou sem comunicação</span><span class="v gc-num{% if r.paradas %} ruim{% endif %}">{{ r.paradas }}</span>
     <span class="d">pela situação do cartão da Ronda COS</span></span>
+  <span id="cos-mon-inv" hidden><span class="gc-rotulo">Inversores fora agora</span><span class="v gc-num" data-inv="fora">—</span>
+    <span class="d"><span data-inv="semcom">—</span> sem comunicação · ao vivo, pelo SCADA</span></span>
   <span><span class="gc-rotulo">Sem leitura nova</span><span class="v gc-num{% if r.velhas %} ruim{% endif %}">{{ r.velhas }}</span>
     <span class="d">o número delas pode estar parado</span></span>
 </div>
@@ -40,36 +42,58 @@
 </div>
 
 {% if p.itens %}
-<div class="cn-tab cos-tab cos-mon"><table>
-  <thead><tr><th class="cos-esq">Usina</th><th class="cos-esq">Agora</th><th class="cos-esq">Situação</th>
-    <th class="cos-esq">Curva de hoje<span class="det">das {{ '%02d'|format(curva_de) }}h às {{ curva_ate }}h, de 15 em 15 min</span></th><th class="cos-esq">Lido</th></tr></thead>
-  <tbody>
-  {% for x in p.itens %}
-    <tr>
-      <td class="cos-esq cos-usina"><b>{{ usina_link(x.codigo, x.nome) }}</b>{% if x.sub_usina %} <span class="mudo">parte {{ x.sub_usina }}</span>{% endif %}
-        <span class="det">{{ [x.cliente, x.fonte]|select|join(' · ') }}</span></td>
-      <td class="cos-esq"><b class="gc-num cos-mon-kw">{{ x.kw_txt }}</b>
-        {% if x.inversores_total %}<span class="det">{{ x.inversores_online if x.inversores_online is not none else '—' }} de {{ x.inversores_total }} inversores</span>{% endif %}</td>
-      <td class="cos-esq"><span class="cn-pill cn-{{ x.tom }}">{{ x.situacao }}</span></td>
-      <td class="cos-esq">{% set c = x.curva %}
-        {% if c and c.linha %}
-        <svg class="cos-curva" viewBox="0 0 {{ largura }} {{ altura }}" preserveAspectRatio="none" role="img"
-          aria-label="Curva de hoje de {{ x.nome }}: máximo de {{ kw_txt(c.maximo) }} às {{ c.maximo_em }}"
-          data-de="{{ c.pontos[0][0] if c.pontos else '' }}" data-passo="{{ passo }}" data-janela="{{ curva_de * 60 }}-{{ curva_ate * 60 }}"
-          data-kw="{% for _h, v in c.pontos %}{{ '' if v is none else v|round|int }}{{ '|' if not loop.last }}{% endfor %}">
-          <line class="cos-curva-base" x1="0" y1="{{ altura }}" x2="{{ largura }}" y2="{{ altura }}"></line>
-          <path class="cos-curva-area" d="{{ c.area }}"></path>
-          <path class="cos-curva-linha" d="{{ c.linha }}"></path>
-          <line class="cos-curva-mira" x1="0" y1="0" x2="0" y2="{{ altura }}" hidden></line>
-        </svg>
-        <span class="det">máx. {{ kw_txt(c.maximo) }} às {{ c.maximo_em }}</span>
-        {% elif not x.tem_curva %}<span class="det">sem curva: o SunOP não guarda a série</span>
-        {% else %}<span class="det">sem amostra hoje</span>{% endif %}</td>
-      <td class="cos-esq">{{ x.lido or '—' }}{% if x.minutos_atras is not none %}<span class="det{% if not x.fresca %} cn-t-alerta{% endif %}">{% if x.minutos_atras == 0 %}agora{% else %}há {{ x.minutos_atras }} min{% endif %}</span>{% endif %}</td>
-    </tr>
-  {% endfor %}
-  </tbody>
-</table></div>
+{# A VISÃO POR USINA (12/11/2026, pedido do dono: "a visão da usina por gráfico", e ao clicar o gráfico dos
+   inversores): no lugar da tabela, um cartão por usina com o kW, a situação e a curva do dia, agrupados por cliente, e em
+   cima a "Atenção agora" (a mesma conta do videowall, `MO.parede`). Clicar no cartão abre os inversores
+   (cos/_inversores.html); o nome no pé leva à ficha. O que muda AO VIVO (kW, estado de cada inversor, a ponta da curva)
+   vem do navegador, de 3 em 3 s, pela API da Ronda COS (static/cos/inversores.js). Sem o endereço dela (`cos_api`,
+   NEXUS_COS_API_URL), o cartão não é botão: a tela fica com o que o Andamento manda, de 30 em 30 s. #}
+{% set w = parede %}
+{% macro palavra(x) %}{% set a = anormal(x) %}{% if a == 'parada' %}Parada{% elif a == 'semcom' %}Sem comunicação{% elif a == 'velha' %}Sem leitura nova{% if x.minutos_atras %} · há {{ x.minutos_atras }} min{% endif %}{% elif x.inversores_total %}{{ x.inversores_online if x.inversores_online is not none else '—' }} de {{ x.inversores_total }} inversores{% else %}{{ x.situacao }}{% endif %}{% endmacro %}
+{% macro cartao(x) %}{% set a = anormal(x) %}{% set c = x.curva %}
+<article class="cos-mon-u{% if a %} cos-mon-u--{{ a }}{% endif %}"{% if cos_api %} tabindex="0" role="button"{% endif %} data-gid="{{ x.id }}"
+  data-codigo="{{ x.codigo }}" data-cliente="{{ x.cliente }}" data-fonte="{{ x.fonte }}"
+  {% if cos_api %}aria-label="{{ x.nome }}{% if x.sub_usina %} parte {{ x.sub_usina }}{% endif %}: abrir os inversores"{% endif %}>
+  <div class="cos-mon-u-cab"><b class="n" title="{{ x.nome }}">{{ x.nome }}{% if x.sub_usina %} · {{ x.sub_usina }}{% endif %}</b>
+    <span class="kw gc-num cos-mon-kw">{{ x.kw_txt }}</span></div>
+  <span class="st{% if a %} st--{{ a }}{% endif %}">{{ palavra(x) }}</span>
+  {% if c and c.linha %}
+  <svg class="cos-curva" viewBox="0 0 {{ largura }} {{ altura }}" preserveAspectRatio="none" role="img"
+    aria-label="Curva de hoje de {{ x.nome }}: máximo de {{ kw_txt(c.maximo) }} às {{ c.maximo_em }}"
+    data-de="{{ c.pontos[0][0] if c.pontos else '' }}" data-passo="{{ passo }}" data-janela="{{ curva_de * 60 }}-{{ curva_ate * 60 }}"
+    data-kw="{% for _h, v in c.pontos %}{{ '' if v is none else v|round|int }}{{ '|' if not loop.last }}{% endfor %}">
+    <line class="cos-curva-base" x1="0" y1="{{ altura }}" x2="{{ largura }}" y2="{{ altura }}"></line>
+    <path class="cos-curva-area" d="{{ c.area }}"></path>
+    <path class="cos-curva-linha" d="{{ c.linha }}"></path>
+    <line class="cos-curva-mira" x1="0" y1="0" x2="0" y2="{{ altura }}" hidden></line>
+  </svg>
+  <span class="det">máx. {{ kw_txt(c.maximo) }} às {{ c.maximo_em }}</span>
+  {% elif not x.tem_curva %}<span class="cos-mon-semcurva det">sem curva: o SunOP não guarda a série</span>
+  {% else %}<span class="cos-mon-semcurva det">sem amostra hoje</span>{% endif %}
+  <div class="cos-mon-u-pe"><span class="det">{{ x.fonte }}{% if x.lido %} · lido {{ x.lido }}{% endif %}</span>
+    {% if x.codigo %}{{ usina_link(x.codigo, 'ficha') }}{% endif %}</div>
+</article>{% endmacro %}
+
+{% if w.atencao %}
+<section class="cos-mon-atencao" aria-label="Atenção agora">
+  <h2 class="cos-mon-sec">Atenção agora <b>{{ w.atencao|length }}</b><span class="det">parada, sem comunicação ou sem leitura nova{% if cos_api %}; clique para abrir{% endif %}</span></h2>
+  <ol class="cos-mon-at">
+    {% for x in w.atencao %}{% set a = anormal(x) %}
+    <li class="cos-mon-at-i cos-mon-at-i--{{ a }}"{% if cos_api %} tabindex="0" role="button"{% endif %} data-gid="{{ x.id }}" data-codigo="{{ x.codigo }}"
+      data-cliente="{{ x.cliente }}" data-fonte="{{ x.fonte }}">
+      <b class="n">{{ x.nome }}{% if x.sub_usina %} · {{ x.sub_usina }}{% endif %}</b><span class="kw gc-num">{{ x.kw_txt }}</span>
+      <span class="st st--{{ a }}">{{ palavra(x) }}</span><span class="det">{{ x.cliente }}{% if x.lido %} · lido {{ x.lido }}{% endif %}</span>
+    </li>{% endfor %}
+  </ol>
+</section>
+{% endif %}
+
+{% for g in w.clientes %}
+<section class="cos-mon-cliente" aria-label="{{ g.cliente }}">
+  <h2 class="cos-mon-sec">{{ g.cliente }}<span class="det">{{ kw_txt(g.kw_agora) }} agora · {{ g.itens|length }} {{ 'usina' if g.itens|length == 1 else 'usinas' }}{% if g.anormais %} · <b class="cn-t-critico">{{ g.anormais }} com alerta</b>{% endif %}</span></h2>
+  <div class="cos-mon-grade">{% for x in g.itens %}{{ cartao(x) }}{% endfor %}</div>
+</section>
+{% endfor %}
 {% else %}<p class="cn-vazio">{% if cliente or grupo or busca %}Nenhuma usina com estes filtros.{% else %}O Andamento não mandou nenhuma usina com logger ou do SunOP.{% endif %}</p>{% endif %}
 {% endif %}
 {% endif %}

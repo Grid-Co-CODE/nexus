@@ -294,7 +294,7 @@ def test_a_tela(ligada, logado, monkeypatch):
     NO.limpar()
     r = logado.get("/t/cos/normalizacoes?formato=csv&q=17009")
     corpo = r.data.decode("utf-8")
-    assert r.status_code == 200 and r.mimetype == "text/csv" and "normalizacoes-2026-10.csv" in r.headers["Content-Disposition"]
+    assert r.status_code == 200 and r.mimetype == "text/csv" and "ocorrencias-2026-10.csv" in r.headers["Content-Disposition"]
     assert corpo.startswith("\ufeffOS;") and "17009" in corpo and "'=HYPERLINK(1)" in corpo and "17001" not in corpo
 
 
@@ -303,10 +303,12 @@ def test_a_tela_sem_fonte(ligada, app, logado):
     assert "não está ligada neste servidor" in logado.get("/t/cos/normalizacoes").get_data(as_text=True)
 
 
-def test_a_tela_vem_depois_das_os_em_aberto():
+def test_a_tela_e_a_ocorrencias_e_a_os_em_aberto_abre_por_dentro_dela():
+    """12/11/2026, a reorganização do COS pelo dono: a Normalizações vira "Ocorrências" (o id e o endereço ficam), a
+    Ocorrências de antes vira "Prazos da R04", e a OS em aberto sai do menu e abre por dentro da Ocorrências."""
     from nexus.torres.cos import TORRE
-    ids = [t.id for t in TORRE.telas]
-    assert ids.index("normalizacoes") == ids.index("os-abertas") + 1
+    assert TORRE.tela("normalizacoes").nome == "Ocorrências" and TORRE.tela("ocorrencias").nome == "Prazos da R04"
+    assert TORRE.tela("os-abertas").dentro_de == "normalizacoes"
 
 
 def test_nao_ha_chave_nem_endereco_na_tela(ligada, logado, monkeypatch):
@@ -314,3 +316,89 @@ def test_nao_ha_chave_nem_endereco_na_tela(ligada, logado, monkeypatch):
     _servir(monkeypatch, AND.FonteErro("o Andamento recusou a chave do Nexus", 401))
     html = logado.get("/t/cos/normalizacoes").get_data(as_text=True)
     assert "recusou a chave" in html and CHAVE not in html and "andamento.exemplo" not in html
+
+
+# --- a Ocorrências: as em andamento na mesma lista (12/11/2026) --------------------------------------------------------
+# O dono, no protótipo do COS: a tela unificada "segue o padrão da tela de Normalizações", com as em andamento no topo e o
+# filtro Situação. Elas vêm da fotografia de cada cliente, com o ciclo de 7 dias e o Panorama das OS abertas.
+
+def _aberta(registro, os="18001", tipo="Desligamento de usina", abertura="2026-10-27T06:00:00-03:00", **mudar):
+    o = {"registro": registro, "os": os, "tipo_falha": tipo, "equipamentos": [], "impacto": "",
+         "protecao": "Sem proteção ativa", "abertura": abertura, "etapa": "Técnico acionado", "aguardando": [],
+         "tipo_tarefa": "Religamento"}
+    o.update(mudar)
+    return o
+
+
+def _foto(*ocorrencias):
+    return {"usinas": [{"codigo": "EX-UM100", "nome": "Usina Exemplo Um", "ocorrencias": list(ocorrencias)}]}
+
+
+PANORAMA = {"varredura_em": "2026-10-27T09:30:00-03:00",
+            "os": [{"folio": 18001, "status": 1, "concluida_pct": 0, "criada_em": "2026-10-27T06:05:00-03:00",
+                    "situacao": "pendente"}]}
+CICLO = {"a1": {"inicio": "2026-10-27T05:50:00-03:00", "tipo_falha_codigo": "DESLIGAMENTO_USINA", "protecoes": ["27"],
+                "os_aberta_por": "Fulana Operadora", "estado_rotulo": "Técnico acionado"}}
+
+
+def _em_andamento():
+    return NO.andamento([("Cliente A", _foto(
+        _aberta("a1"),
+        # a sem OS (a fotografia manda o registro curto), aberta há 10 dias, como falha de comunicação com a geração
+        # interrompida: pela regra de 09/11/2026 é desligamento, e a tela diz "a conferir"
+        _aberta("a2", os="R-a2", tipo="Falha de comunicação", impacto="Geração total interrompida",
+                abertura="2026-10-17T06:00:00-03:00", aguardando=["peça"]),
+        _aberta("r1"),                                  # já normalizada na memória: conta uma vez, pela normalização
+        _aberta("a1")))], CICLO, PANORAMA, AGORA)       # a mesma em duas usinas da fotografia: uma vez
+
+
+def test_as_em_andamento_no_formato_da_normalizacao():
+    a1, a2 = (i for i in _em_andamento() if i["registro"] != "r1")
+    assert a1["situacao"] == "andamento" and a1["fora"] == 250 and a1["fora_txt"] == "4 h 10"
+    assert a1["protecoes"] == ["27"] and a1["geracao"] == "sim" and a1["operador"] == "Fulana Operadora"
+    assert a1["fracttal"]["rotulo"] == "Em processo 0%" and a1["status_filtro"] == "processo" and a1["cliente"] == "CLIENTE A"
+    assert a2["os"] == "" and a2["fora_txt"] == "10 dias" and a2["dias_andamento"] == 10 and a2["geracao"] == "conferir"
+    assert a2["aguardando"] == "peça" and a2["status_filtro"] == "outro"
+
+
+def test_a_os_que_a_varredura_ainda_nao_viu_e_nova_e_nao_fechada():
+    ciclo = {"n1": {"os_aberta_em": "2026-10-27T09:45:00-03:00"}, "f1": {"os_aberta_em": "2026-10-26T09:00:00-03:00"}}
+    n1, f1 = NO.andamento([("Cliente A", _foto(_aberta("n1", os="18002"), _aberta("f1", os="18003",
+                                                abertura="2026-10-26T08:00:00-03:00")))], ciclo, PANORAMA, AGORA)
+    assert n1["fracttal"]["rotulo"] == "Nova" and n1["status_filtro"] == "processo"
+    assert f1["fracttal"]["rotulo"] == "Fechada" and f1["status_filtro"] == "fechada"
+
+
+def test_a_ocorrencias_leva_as_em_andamento_so_no_mes_corrente():
+    lt = AND.Leitura("", {"itens": ITENS, "carregando": False}, lido_em=1.0)
+    em = _em_andamento()
+    p = NO.painel(lt, AGORA, andamento=em)
+    assert p.com_andamento and [i["registro"] for i in p.todos[:3]] == ["a1", "a2", "r1"]
+    assert p.contagem["situacao"] == {"andamento": 2, "normalizada": 5}
+    assert p.resumo["andamento"] == 2 and p.resumo["andamento_7d"] == 1
+    # os números das normalizadas são os mesmos de sem as em andamento
+    antes = NO.painel(lt, AGORA)
+    das_normalizadas = ("total", "abertas", "abertas_pct", "abertas_7d", "mediana", "sem_hora_real")
+    assert all(p.resumo[k] == antes.resumo[k] for k in das_normalizadas) and "situacao" not in antes.contagem
+    so = NO.painel(lt, AGORA, situacao="andamento", andamento=em)
+    assert {i["situacao"] for i in so.itens} == {"andamento"} and so.resumo["total"] == 0
+    assert so.visiveis == {"a1", "a2"}
+    # o mês de antes: só as normalizadas, sem a Situação (o mês é o da volta)
+    novembro = AND.instante("2026-11-03T10:00:00-03:00")
+    out = NO.painel(lt, novembro, mes="2026-10", andamento=em)
+    assert not out.com_andamento and not out.andamento and "situacao" not in out.contagem
+
+
+def test_a_tela_ocorrencias_com_as_em_andamento_e_o_csv(ligada, logado, monkeypatch):
+    import nexus.torres.cos as T
+    monkeypatch.setattr(AND, "agora", lambda: AGORA)
+    _servir(monkeypatch, _resp(ITENS))
+    monkeypatch.setattr(T, "_andamento_cos", lambda cfg, agora: (_em_andamento(), [], ["Cliente B: o Andamento falhou"]))
+    html = logado.get("/t/cos/normalizacoes").get_data(as_text=True)
+    assert '<h1 class="cn-titulo">Ocorrências</h1>' in html and 'name="situacao"' in html and "Em andamento (2)" in html
+    assert html.index('data-f-situacao="andamento"') < html.index('data-f-situacao="normalizada"')
+    assert "e contando" in html and "a conferir" in html and "Faltam as em andamento de parte dos clientes" in html
+    r = logado.get("/t/cos/normalizacoes?formato=csv&situacao=andamento")
+    linhas = r.data.decode("utf-8").lstrip("﻿").splitlines()
+    assert linhas[0].endswith(";Situação") and len(linhas) == 3
+    assert all(";Em andamento · Técnico acionado" in x for x in linhas[1:])

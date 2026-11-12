@@ -1,0 +1,28 @@
+{# OS INVERSORES DE CADA USINA, AO VIVO (12/11/2026; incluído pelo Monitoramento e pelo videowall).
+
+   Pedido do dono: "a visão da usina por gráfico, mas ao clicar quero ver o gráfico dos inversores, e se tiver algum
+   inversor desligado, sinalizar", e "é pra ler em tempo real, assim como funciona no ronda cos".
+
+   - Clicar num cartão de usina (data-gid) abre a curva dela e a de cada inversor, na mesma escala, com o estado de cada um.
+   - O ritmo é o da tela de monitoramento da Ronda COS: o cartão do SCADA de 3 em 3 s (depois de cada resposta, parado com a
+     aba escondida) e a curva gravada de 5 em 5 min, com a ponta andando pelas leituras de 3 s.
+   - Quem lê é o NAVEGADOR, direto na API da Ronda COS (`cos_api`, NEXUS_COS_API_URL), com o login da pessoa: um reinício
+     do Nexus não derruba a tela aberta. Sem `cos_api`, a tela fica só com o que o Andamento manda.
+   - "Aberto no COS": as ocorrências abertas que citam um inversor, pela fotografia do Andamento (servidor). #}
+<dialog class="cos-inv-dlg" id="cos-inv-dlg" aria-labelledby="cos-inv-titulo">
+  <header class="cos-inv-topo"><div><h2 class="cos-inv-titulo" id="cos-inv-titulo"></h2><span class="cos-inv-sub"></span></div>
+    <div class="cos-inv-topo-dir"><span class="cos-inv-lido"></span>
+    <button type="button" class="gc-btn gc-btn--ui gc-btn--fantasma cos-inv-fechar" aria-label="Fechar">Fechar</button></div></header>
+  <div class="cos-inv-corpo"></div>
+</dialog>
+<div class="cos-inv-dica" id="cos-inv-dica" role="tooltip" hidden></div>
+<script>
+  window.NexusCos = Object.assign(window.NexusCos || {}, {
+    api: {{ cos_api|tojson }},
+    console: {{ cos_console|tojson }},
+    semLogin: {{ (cos_sem_login or false)|tojson }},
+    inversoresAbertos: {{ cos_inversores_abertos()|tojson }}
+  });
+</script>
+<link rel="stylesheet" href="{{ url_for('static', filename='cos/inversores.css') }}">
+<script src="{{ url_for('static', filename='cos/inversores.js') }}" defer></script>
