@@ -132,7 +132,10 @@ def decidir(config, acao: str, sistema: str, chave=None, usina_id=None, cliente_
             raise DecisaoInvalida("falta a chave ou a usina")
         for t in ("ligar", "desligar", "ignorar"):
             r[t] = [d for d in r[t] if not (d.get("sistema") == sistema and str(d.get("chave")) == chave)]
-        r[acao].append({"sistema": sistema, "chave": chave, "usina_id": int(usina_id), "quem": quem, "quando": _agora()})
+        d = {"sistema": sistema, "chave": chave, "usina_id": int(usina_id), "quem": quem, "quando": _agora()}
+        if motivo.strip():                 # o lote diz que veio dele (a aba Decisões mostra); fica só aqui, no arquivo
+            d["motivo"] = motivo.strip()   # local: o de-para publicado leva "manual (dd/mm)" e nada mais
+        r[acao].append(d)
     elif acao == "ignorar":
         if not chave or not motivo.strip():
             raise DecisaoInvalida("diga por que ignorar")
@@ -716,6 +719,20 @@ def sugestoes_de_100(buracos: list[dict], sistema: str) -> dict:
     ligar = [(c, u) for c, u in unicas if por_usina[u] == 1]
     pulos["repetida"] = len(unicas) - len(ligar)
     return {"ligar": ligar, "pulos": pulos}
+
+
+def sugestoes_de_100_todas(buracos: list[dict]) -> dict:
+    """O que o botão geral "Ligar as N chaves com o nome no cadastro" liga (12/11/2026, Levi: "quando tiver mais de uma
+    chave com nome no cadastro, tem que ter um botão de ligar usina com o cadastro"): a regra do `sugestoes_de_100`,
+    base a base, somada. A mesma usina como 100% de chaves de bases DIFERENTES não é dúvida (a chave do Fracttal e o
+    projeto da FAMA da mesma usina); de duas chaves da mesma base, é, e fica. A tela conta o N e a rota liga por esta
+    função só. Devolve {"ligar": [(sistema, chave, usina_id)], "por_base": {sistema: pulos}}."""
+    ligar, por_base = [], {}
+    for sistema in sorted({b["sistema"] for b in buracos}):
+        r = sugestoes_de_100(buracos, sistema)
+        ligar += [(sistema, c, u) for c, u in r["ligar"]]
+        por_base[sistema] = r["pulos"]
+    return {"ligar": ligar, "por_base": por_base}
 
 
 def _ja_ligada(sug: list[dict], ja_ligada: dict, sistema: str, chave: str, itens: dict) -> str | None:

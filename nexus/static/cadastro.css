@@ -248,6 +248,9 @@ details.cad-dif summary{cursor:pointer;padding:9px 12px;color:var(--tinta-2);fon
 .lig-acoes form{margin:0}
 .lig-lote{margin:0 0 10px}
 .lig-lote .gc-btn{max-width:100%;white-space:normal;text-align:left}
+/* o botão geral, no alto da seção (12/11/2026): o botão e a nota de que vale para todas as bases e não publica */
+.lig-lote--geral{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;margin:4px 0 12px}
+.lig-lote-nota{font-size:12px;color:var(--mudo)}
 .lig-meta{color:var(--mudo);font-size:12.5px;margin:4px 0 12px}
 .lig-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px;margin:14px 0 6px}
 .lig-card{display:flex;flex-direction:column;gap:4px;background:var(--superficie);border:1px solid var(--linha);border-radius:var(--raio-md);

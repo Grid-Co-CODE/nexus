@@ -19,6 +19,12 @@ from ..prefixo import na_raiz
 from .telas import _quem, _tela
 
 ABAS = (("buracos", "Buracos"), ("por-nome", "Ligado por nome"), ("fora", "Usinas fora"), ("decisoes", "Decisões"))
+# o botão geral (12/11/2026): o `alvo_sistema` dele, e a confirmação que só ele manda (um formulário de uma base sem a
+# base não vira "todas": vazio continua erro)
+TODAS, CONFIRMA_TODAS = "todas", "todas as bases"
+MINIMO_GERAL = 2         # Levi: "quando tiver mais de uma chave com nome no cadastro"
+PULOS = (("varias", "com mais de uma sugestão"), ("abaixo", "com sugestão abaixo de 100%"), ("sem", "sem sugestão"),
+         ("repetida", "com a mesma usina sugerida a duas chaves"))
 
 
 def _int(v):
@@ -52,7 +58,10 @@ def contexto(srv, cfg, args) -> dict:
     contagem = {"buracos": len(filtra(p["buracos"])), "por-nome": len(filtra(p["por_nome"])),
                 "fora": sum(t for _, t, _ in fora), "decisoes": len(p["decisoes"])}
     lote = L.sugestoes_de_100(p["buracos"], sistema) if sistema else {"ligar": []}
-    return dict(p=p, aba=aba, n_sugestoes_100=len(lote["ligar"]), abas=ABAS, sistema=sistema, buracos=filtra(p["buracos"]), por_nome=filtra(p["por_nome"]),
+    # o botão geral vale para todas as bases, com ou sem uma escolhida
+    n_geral = len(L.sugestoes_de_100_todas(p["buracos"])["ligar"])
+    return dict(p=p, aba=aba, n_sugestoes_100=len(lote["ligar"]), n_nome_cadastro=n_geral, minimo_geral=MINIMO_GERAL,
+                todas=TODAS, confirma_todas=CONFIRMA_TODAS, abas=ABAS, sistema=sistema, buracos=filtra(p["buracos"]), por_nome=filtra(p["por_nome"]),
                 fora=fora, contagem=contagem, gerado_em=_hora(p["gerado_em"]), hora=_hora, ok=args.get("ok"),
                 erro=args.get("erro"), pode_publicar=bool(cfg.get("GRIDCO_SQL_TOKEN")), sem_par=B.SEM_PAR)
 
@@ -89,33 +98,52 @@ def registrar_ligacoes(bp):
     @bp.route("/ligacoes/aceitar-sugestoes", methods=["POST"])
     @_tela("Ligações entre bases")
     def ligacoes_aceitar_sugestoes(srv):
-        """Liga de uma vez, numa base só, os buracos com UMA sugestão de 100% (a regra: `L.sugestoes_de_100`, a mesma que
-        conta o N do botão). Não publica: o "Publicar no banco" segue sendo o passo do administrador."""
+        """Liga de uma vez os buracos com UMA sugestão de 100%: numa base (o botão da base) ou em todas (o botão geral do
+        alto, `alvo_sistema` = "todas" com a confirmação dele; 12/11/2026). A regra é a mesma função que conta o N do
+        botão (`L.sugestoes_de_100` e `L.sugestoes_de_100_todas`). Grava pelo `L.decidir` uma a uma e reaplica UMA vez no
+        fim. Não publica: o "Publicar no banco" segue sendo o passo do administrador."""
         if _de_outro_site():
             return "Pedido de outro site: nada foi ligado.", 403
-        cfg = current_app.config
-        sistema = request.form.get("alvo_sistema", "")
+        cfg, f = current_app.config, request.form
+        sistema = f.get("alvo_sistema", "")
+        todas = sistema == TODAS
+        if todas and f.get("confirmar") != CONFIRMA_TODAS:
+            return _volta(erro="O botão geral liga todas as bases e pede a confirmação dele: nada foi ligado.")
         if not sistema:
             return _volta(erro="Escolha uma base: o botão vale para uma base por vez.")
         p = L.panorama(srv, L.ler(cfg), L.carregar_regras(cfg))
-        lote = L.sugestoes_de_100(p["buracos"], sistema)
+        if todas:
+            lote = L.sugestoes_de_100_todas(p["buracos"])
+            itens, por_base = lote["ligar"], lote["por_base"]
+            motivo = "nome igual ao do cadastro, ligado em lote"
+        else:
+            lote = L.sugestoes_de_100(p["buracos"], sistema)
+            itens, por_base = [(sistema, c, u) for c, u in lote["ligar"]], {sistema: lote["pulos"]}
+            motivo = "sugestão de 100% aceita em lote"
         feitas, recusadas = 0, []
-        for chave, usina_id in lote["ligar"]:
+        for alvo, chave, usina_id in itens:
             try:                 # uma recusa não para o lote nem deixa as outras sem o reaplicar do fim
-                L.decidir(cfg, "ligar", sistema, chave=chave, usina_id=usina_id,
-                          motivo="sugestão de 100% aceita em lote", quem=_quem())
+                L.decidir(cfg, "ligar", alvo, chave=chave, usina_id=usina_id, motivo=motivo, quem=_quem())
                 feitas += 1
             except L.DecisaoInvalida as ex:
                 recusadas.append(f"{chave} ({str(ex)[:80]})")
         if feitas:
             L.reaplicar(cfg, srv)
-        n, pu = feitas, lote["pulos"]
-        msg = f"{n} ligaç{'ões feitas' if n != 1 else 'ão feita'} (as sugestões de 100% sem outra parecida). Publique no banco para valer."
-        por = [f"{q} {txt}" for q, txt in ((pu["varias"], "com mais de uma sugestão"), (pu["abaixo"], "com sugestão abaixo de 100%"),
-                                           (pu["sem"], "sem sugestão"), (pu["repetida"], "com a mesma usina sugerida a duas chaves"))
-               if q]
-        if por:
-            msg += f" Ficaram {sum(pu.values())} para você decidir: " + ", ".join(por) + "."
+        n = feitas
+        feitas_txt = f"{n} ligaç{'ões feitas' if n != 1 else 'ão feita'}"
+        if todas:
+            msg = f"{feitas_txt}; publique no banco para valer."
+            ficaram = sum(sum(pu.values()) for pu in por_base.values())
+            if ficaram:
+                por = "; ".join(f"{base}: " + ", ".join(f"{pu[k]} {txt}" for k, txt in PULOS if pu[k])
+                                for base, pu in por_base.items() if any(pu.values()))
+                msg += f" Ficaram {ficaram} para você decidir ({por})."
+        else:
+            pu = por_base[sistema]
+            msg = f"{feitas_txt} (as sugestões de 100% sem outra parecida). Publique no banco para valer."
+            por = [f"{pu[k]} {txt}" for k, txt in PULOS if pu[k]]
+            if por:
+                msg += f" Ficaram {sum(pu.values())} para você decidir: " + ", ".join(por) + "."
         if recusadas:
             msg += f" {len(recusadas)} recusada(s) pelo de-para: " + "; ".join(recusadas[:5]) + "."
         return _volta(ok=msg)

@@ -21,6 +21,9 @@
       <p><b>O "por quê" sem sugestão.</b> Diz o que o cadastro tem: a usina com outro número, a de nome certo com a
         cidade ou a potência que não batem, ou nada parecido. Antes de criar no Registro mestre, confira se a usina não
         está lá com outro nome.</p>
+      <p><b>Ligar em lote.</b> O botão do alto liga, em todas as bases de uma vez, só a chave com uma sugestão de 100%
+        e nenhuma outra. A mesma usina como 100% de duas chaves da mesma base fica para você. O botão de uma base faz o
+        mesmo naquela base. Nenhum dos dois publica: a ligação vai ao banco quando você usa "Publicar no banco".</p>
     {% endcall %}</div>
     <p class="cad-sub">Que usina cada base chama de quê, e onde a ligação falta. A correção feita aqui entra no de_para na hora e vai ao banco quando você publicar.</p>
   </div>
@@ -36,6 +39,15 @@
 {% if not gerado_em %}
 <div class="cad-aviso cad-aviso--alerta"><i class="ph ph-info"></i><div><strong>As bases ainda não foram lidas nesta máquina.</strong> Use "Ler as bases de novo": leva alguns segundos (API de dados e a foto do Fracttal do PCM).</div></div>
 {% else %}
+
+{# o botão geral (12/11/2026, Levi: "quando tiver mais de uma chave com nome no cadastro, tem que ter um botão de ligar
+   usina com o cadastro"): no alto, antes das bases, e vale para todas; o N é o que a rota liga (`sugestoes_de_100_todas`) #}
+{% if n_nome_cadastro >= minimo_geral %}
+<form method="post" action="{{ raiz }}/t/base/ligacoes/aceitar-sugestoes" class="lig-lote lig-lote--geral" data-confirmar="Ligar {{ n_nome_cadastro }} chaves de todas as bases às usinas de nome igual no cadastro? Só entram as que têm uma sugestão de 100% e nenhuma outra; a mesma usina sugerida a duas chaves da mesma base fica para você. Vale na hora; vai ao banco quando você publicar.">{{ alvo(todas) }}<input type="hidden" name="confirmar" value="{{ confirma_todas }}">
+  <button class="gc-btn gc-btn--primario" type="submit"><i class="ph ph-link"></i> Ligar as {{ n_nome_cadastro }} chaves com o nome no cadastro</button>
+  <span class="lig-lote-nota">Em todas as bases. Não publica no banco.</span>
+</form>
+{% endif %}
 
 <div class="lig-cards">
   <a class="lig-card{% if not sistema %} sel{% endif %}" href="?{{ {'aba': aba, 'ver': lig_ver}|urlencode }}#ligacoes">
