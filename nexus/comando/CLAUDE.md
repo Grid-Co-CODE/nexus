@@ -166,6 +166,10 @@ o problema "rede") = Crítico, e o resto = Atenção com o nome da falha. A usin
 comunicação; no empate, a mais antiga) com a OS, a idade, a etapa e quantas mais. Sem ocorrência: "Sem ocorrência"
 (Normal). A usina que nenhuma fotografia trouxe (o cliente cujo Andamento caiu) é "Sem leitura", nunca Normal. O
 prontuário tem o quadro "No COS agora" com as ocorrências e o link para a Ronda padronizada do cliente.
+**Quem mais lê esta régua (12/11/2026):** o Mapa de equipe da Usinas 360° pinta as usinas pelo `agora_pelo_cos` e o vídeo
+wall dele agrupa as ocorrências pelo `classificar` (`campo/equipe/parede.py`); mudou a régua aqui, muda lá sozinho. Cada
+ocorrência do `cos_por_usina` leva também o `usina_cod` (o código curto da usina no Andamento, "APR100"), o do cartão
+do vídeo wall.
 
 **A faixa, os filtros e a tabela (12/11/2026, Levi, com a referência do mockup).** A faixa do alto é uma barra por usina (todas as mobilizadas, mesmo com filtro) na cor do grupo da coluna Agora, na ordem da tabela; a legenda conta cada grupo. Os filtros seguem o modelo do Histórico de OS do OS Creator Web ("Quero os filtros conforme referência Histórico de OS"): o `campo-filtros.js` monta a busca, o botão Filtros com o painel (Cliente e Agora, que só valem no Aplicar e filtram no servidor) e uma etiqueta por filtro aplicado; a busca filtra as linhas enquanto se digita (`comando-usinas.js`). O cabeçalho da tabela é mais escuro (`--barra`) e as linhas visíveis alternam a cor (`cmu-par`, refeita a cada busca e ordem): "Gostaria do cabeçalho um pouco mais escuro que as linhas" e "uma cor alterando entre as linhas". O `filtro-local.js` saiu desta tela (ele barra o envio do formulário, e o Aplicar envia).
 

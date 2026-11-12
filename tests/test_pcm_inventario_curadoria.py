@@ -1461,3 +1461,155 @@ def test_sem_cor_fora_de_token_nem_endereco_da_raiz():
     bloco = bloco if proximo < 0 else bloco[:proximo]
     assert ".cu-" in bloco and not re.search(r"#[0-9a-fA-F]{3,8}\b", bloco) and "rgba(" not in bloco
     assert 'action="{{ raiz }}/os/_nexus/inventario/curadoria/cadastrar"' in t and "data-ponte" in t
+
+
+# ── a sigla sugerida (11/11/2026, item 1 da 2ª rodada; o PCM: "Curadoria: sugerir o código baseado nas famílias já criadas") ──
+# O catálogo de mentira: nomes de peça genéricos, códigos e famílias inventados.
+def _peca(codigo, nome, familia, avariado=False):
+    return {"codigo": codigo, "nome": nome, "familia": familia, "avariado": avariado}
+
+
+CATALOGO_DE_MENTIRA = {
+    "101": _peca("SP-CAB-001", "Cabo flexível 6 mm preto", "Cabos"),
+    "102": _peca("SP-CAB-002", "Cabo flexível 10 mm azul", "Cabos"),
+    "103": _peca("SP-CAB-003", "Cabo solar 4 mm vermelho", "Cabos"),
+    "104": _peca("SP-COM-001", "Conector MC4 macho", "Conexões"),
+    "105": _peca("SP-ARM-001", "Conector de aterramento", "Aterramento"),
+    "106": _peca("SP-ARM-002", "Conector de aterramento split bolt", "Aterramento"),
+    "107": _peca("SP-PEL-001", "Fusível NH 10A", "Proteção"),
+    "108": _peca("SP-PEL-002", "Fusível cartucho 16A", "Proteção"),
+    "109": _peca("SP-PEL-002-AV", "[AVARIADO] Fusível cartucho 16A", "Proteção", avariado=True),
+    "110": _peca("INV-0007", "Ventoinha do inversor", "Inversores"),
+    "111": _peca("SP-PEL-010", "Placa de comunicação do inversor", "Inversores"),
+    "112": _peca("SP-PEL-011", "Display do inversor", "Inversores"),
+    "113": _peca("SP-SEN-001", "Sensor de temperatura PT100", "Sensores"),
+}
+
+
+def _sugerir(nome, validas=CU.SIGLAS, catalogo=None):
+    return CU.sugerir(nome, CU.indice(CATALOGO_DE_MENTIRA if catalogo is None else catalogo), validas)
+
+
+def test_as_palavras_do_nome():
+    """Sem acento nem caixa; a palavra que mistura letra e número vale inteira e em pedaços ("6mm" casa com o "mm" de "6 mm"); a
+    palavra de ligação e o pedaço de um caractere (a letra ou o dígito solto) não contam."""
+    assert CU.palavras("Cabo flexível 6mm de Cobre") == {"cabo", "flexivel", "6mm", "mm", "cobre"}
+    assert CU.palavras("Fusível NH 10A") == {"fusivel", "nh", "10a", "10"}
+    assert CU.palavras("Conector MC4") == {"conector", "mc4", "mc"}
+    assert CU.palavras("") == set() and CU.palavras(None) == set()
+
+
+def test_o_peso_da_palavra_rara():
+    """O peso de cada palavra é o da raridade no catálogo: "conector" (em três peças) pesa menos que "mc4" (em uma); a palavra que
+    está em todas as peças não pesa nada."""
+    idx = CU.indice(CATALOGO_DE_MENTIRA)
+    assert idx["peso"]["mc4"] > idx["peso"]["conector"] > 0
+    todas = CU.indice({"1": _peca("SP-CAB-001", "Peça azul", "Cabos"), "2": _peca("SP-CAB-002", "Peça verde", "Cabos")})
+    assert todas["peso"]["peca"] == 0
+
+
+def test_a_sigla_mais_comum_das_parecidas():
+    """O nome que o técnico escreveu acha as parecidas do catálogo, e a sigla delas é a sugerida; a tela mostra as 3 mais
+    parecidas (código e nome)."""
+    s = _sugerir("Cabo azul 6mm")
+    assert (s["sigla"], s["por"]) == ("CAB", "parecidas")
+    assert [p["codigo"] for p in s["parecidas"]] == ["SP-CAB-002", "SP-CAB-001", "SP-CAB-003"]
+    assert s["parecidas"][0]["nome"] == "Cabo flexível 10 mm azul"
+
+
+def test_a_palavra_rara_pesa_mais():
+    """"Conector" está em três peças; "MC4", numa só. Pela contagem das siglas das parecidas, as duas de aterramento (que só
+    dividem o "conector") ganhariam da MC4 por 2 a 1; cada parecida vota com o quanto se parece, e a palavra rara pesa mais: a
+    sugerida é a sigla da MC4."""
+    s = _sugerir("Conector MC4 fêmea")
+    assert s["sigla"] == "COM" and s["parecidas"][0]["codigo"] == "SP-COM-001"
+    assert "SP-ARM-001" in {p["codigo"] for p in s["parecidas"]}
+
+
+def test_a_parecida_sem_sigla_no_codigo_vota_pela_familia():
+    """A parecida de código antigo (sem a sigla, "INV-0007") vota pela sigla mais comum da Família dela no catálogo (os
+    Inversores são SP-PEL): o PCM pediu o código "baseado nas famílias já criadas"."""
+    s = _sugerir("Ventoinha 80 mm")
+    assert (s["sigla"], s["por"], s["familia"]) == ("PEL", "familia", "Inversores")
+    assert s["parecidas"][0]["codigo"] == "INV-0007"
+
+
+def test_sem_nada_parecido_nao_sugere():
+    """Nenhuma palavra em comum com o catálogo: nada a sugerir (o PCM escolhe), e nenhuma parecida."""
+    s = _sugerir("Escada telescópica")
+    assert s == {"sigla": "", "por": "", "familia": "", "parecidas": []}
+    assert _sugerir("")["sigla"] == "" and CU.sugerir("Cabo 6 mm", CU.indice({}), CU.SIGLAS)["sigla"] == ""
+
+
+def test_a_avariada_nao_vota_nem_aparece():
+    """A avariada (`regua.avariada`: o -AV ou a marca) é a boa com "[AVARIADO]" na frente: dobraria o voto da boa."""
+    s = _sugerir("Fusível cartucho 16A")
+    assert s["sigla"] == "PEL" and all(not p["codigo"].endswith("-AV") for p in s["parecidas"])
+
+
+def test_so_vota_a_sigla_que_vale_no_almoxarifado():
+    """A sigla de teste (TST) só vale no almoxarifado de teste: fora dele, a parecida SP-TST não vota."""
+    cat = {"1": _peca("SP-TST-001", "Peça de prova azul", "Teste"), "2": _peca("SP-CAB-009", "Peça de prova verde", "Cabos"),
+           "3": _peca("SP-PEL-001", "Fusível", "Proteção")}
+    assert _sugerir("Peça de prova azul", catalogo=cat)["sigla"] == "CAB"
+    assert _sugerir("Peça de prova azul", CU.SIGLAS + ("TST",), cat)["sigla"] == "TST"
+
+
+def test_a_curadoria_sugere_a_sigla_e_mostra_as_parecidas(cur, banco, monkeypatch):  # noqa: F811
+    """Na tela, a sigla sugerida vem escolhida no select e marcada "sugerida" (o PCM pode trocar), com as parecidas do catálogo
+    do App como contexto. O código continua saindo do `proximo_codigo`, com a sigla que o PCM mandar."""
+    _semear(banco, codigos={1: "SP-PEL-001", 2: "SP-CAB-002", 4: "SP-PEL-004", 5: "SP-CAB-005"})
+    visao.limpar()
+    p = {x["chave_linha"]: x for x in CU.pendencias(cur.config)}
+    assert p["L-2"]["sugestao"]["sigla"] == "CAB" and p["L-2"]["sugestao"]["parecidas"][0]["codigo"] == "SP-CAB-002"
+    assert p["L-3"]["sugestao"]["sigla"] == ""                                 # "Conector estanque": nada parecido
+    assert p["L-4"]["sugestao"] is None                                        # o genérico não cadastra: sem sigla
+    _no_setor(monkeypatch, SID.PCM)
+    c = _pessoa_ms(cur)
+    html = c.get(URL).get_data(as_text=True)
+    assert '<option value="CAB" selected>CAB (sugerida)</option>' in html
+    assert "As mais parecidas no catálogo" in html and "Cabo 6 mm" in html
+    assert html.count("(sugerida)") == 1
+    # a sugestão não grava nada: o PCM manda a sigla que quiser, e o código é o próximo livre DELA
+    r = CU.decidir(cur.config, "C-1", "L-2", "cadastrar", sigla="PEL", nome="Cabo azul 6 mm", unidade="METRO",
+                   estoque=_falso(), pessoa=PESSOA)
+    assert r["codigo"] == "SP-PEL-021"
+
+
+def test_a_reserva_vale_mais_que_a_sugestao(cur, banco, monkeypatch):  # noqa: F811
+    """Uma tentativa anterior reservou um código com outra sigla: a nova tentativa tem de repetir os dados da reserva, e o select
+    vem com a sigla da reserva, não com a sugerida."""
+    _semear(banco, codigos={2: "SP-CAB-002"})
+    visao.limpar()
+    falso = _falso(perder_resposta={"criar_peca"})
+    with pytest.raises(ConnectionError):
+        CU.decidir(cur.config, "C-1", "L-2", "cadastrar", sigla="PEL", nome="Cabo azul 6 mm", unidade="METRO", estoque=falso,
+                   pessoa=PESSOA)
+    _no_setor(monkeypatch, SID.PCM)
+    html = _pessoa_ms(cur).get(URL).get_data(as_text=True)
+    assert '<option value="PEL" selected>' in html and '<option value="CAB">CAB (sugerida)</option>' in html
+
+
+def test_quem_so_olha_nao_ve_a_sugestao(cur, banco, monkeypatch):  # noqa: F811
+    """A sugestão sai do que o técnico escreveu, que é de quem decide: quem só olha não a vê."""
+    from nexus.pcm import telas
+    _semear(banco, codigos={2: "SP-CAB-002"})
+    visao.limpar()
+    _no_setor(monkeypatch, SID.PCM)
+    monkeypatch.setattr(telas, "pode_programar", lambda: False)
+    html = _pessoa_ms(cur).get(URL).get_data(as_text=True)
+    assert "(sugerida)" not in html and "As mais parecidas no catálogo" not in html
+
+
+# ── a re-revisão da onda 1 (11/11/2026) ──────────────────────────────────────────────────────────────────────────────────
+def test_rerevisao_1_o_cadastrar_guarda_a_unidade_na_decisao(cur):
+    """A peça cadastrada hoje só chega ao catálogo do App na varredura seguinte, e a régua (a peça da contagem gravada) a lia sem
+    unidade: o acordado decimal em METRO era recusado. A decisão `cadastrar` guarda a unidade que foi ao Fracttal (cifrada, no
+    `dados`, como o motivo); a da avariada sem cadastro é a da boa, quando o PCM não diz outra."""
+    _cadastrar(cur.config, _falso())
+    d = _livro(cur.config, F.ABA_CURADORIA)[0]
+    assert F.decifrar(cur.config, F.ABA_CURADORIA, d) == {"unidade": "METRO"}
+    _o_bom_sem_av(cur)
+    CU.decidir(cur.config, "C-1", "L-6", "cadastrar", estoque=_falso(), pessoa=PESSOA)
+    d = [x for x in _livro(cur.config, F.ABA_CURADORIA) if x["chave_linha"] == "L-6"][0]
+    assert F.decifrar(cur.config, F.ABA_CURADORIA, d) == {"unidade": "METRO"}

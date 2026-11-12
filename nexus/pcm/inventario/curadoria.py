@@ -61,7 +61,9 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import re
+from collections import Counter
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -73,6 +75,7 @@ from ...cadastro.ligacoes import pasta_dados
 from ...dados import almoxarifado as A
 from ...dados import fato_inventario as F
 from ...dados import fatos as D
+from ...dados.dominios import norm
 from ...prefixo import na_raiz
 from .. import telas
 from . import avariados
@@ -125,6 +128,113 @@ def proximo_codigo(codigos: list[str], sigla: str) -> str:
         if m:
             maior = max(maior, int(m.group(1)))
     return f"SP-{sigla}-{maior + 1:03d}"
+
+
+# ── a sigla sugerida (11/11/2026, item 1 da 2ª rodada do Almoxarifado) ────────────────────────────────────────────────
+# O PCM: "Curadoria: sugerir o código baseado nas famílias já criadas". O PCM escolhia a sigla à mão entre as 12; o Nexus a
+# propõe pelo nome que o técnico escreveu, comparado ao catálogo do App (o livro Itens: o código, o nome e a Família de cada peça;
+# nunca uma planilha de fora: "só Fracttal ou Nexus"). A sugestão não grava nada: o PCM manda a sigla que quiser, e o código
+# continua saindo do `proximo_codigo`, com ela.
+_PALAVRA, _PEDACO = re.compile(r"[a-z0-9]+"), re.compile(r"[a-z]+|\d+")
+_DE_LIGACAO = frozenset(("a", "o", "as", "os", "de", "da", "do", "das", "dos", "e", "em", "na", "no", "nas", "nos", "para",
+                         "por", "com", "sem", "um", "uma"))
+_SIGLA_DO_CODIGO = re.compile(r"SP-([A-Z]{3})-\d+", re.IGNORECASE)
+PARECIDAS_VOTAM, PARECIDAS_NA_TELA = 5, 3
+# a semelhança mínima (o cosseno com o peso das palavras raras) para a peça contar como parecida: abaixo disso, só uma palavra
+# comum em muitas peças é igual (um "conector" que bate com todo conector do catálogo), e o voto dela seria barulho
+PARECIDA_MIN = 0.1
+
+
+def palavras(nome) -> set[str]:
+    """As palavras de um nome de peça, sem acento nem caixa (`dominios.norm`): a palavra inteira e, na que mistura letra e número,
+    os pedaços dela ("MC4" é "mc4" e "mc"; "6mm" é "6mm" e "mm", e casa com o "6 mm" do catálogo). Fica de fora a palavra de
+    ligação e o pedaço de um caractere só (o "A" de "10A", o "4" de "MC4": um dígito solto casaria com qualquer bitola)."""
+    out = set()
+    for w in _PALAVRA.findall(norm(nome)):
+        out.add(w)
+        out.update(_PEDACO.findall(w))
+    return {p for p in out if len(p) > 1 and p not in _DE_LIGACAO}
+
+
+def _sigla_do_codigo(codigo) -> str:
+    """A sigla de um código `SP-<sigla>-NNN` (o -AV no fim não muda a sigla); vazio no código de outro formato."""
+    m = _SIGLA_DO_CODIGO.match(_txt(codigo))
+    return m.group(1).upper() if m else ""
+
+
+def indice(catalogo: dict | None) -> dict:
+    """O catálogo do App pronto para comparar nomes (uma vez por tela, não por pendência). Fica de fora a avariada
+    (`regua.avariada`): ela é a boa com "[AVARIADO]" na frente e dobraria o voto da boa. O peso de cada palavra é o da raridade
+    (IDF, log(peças / peças com ela)): a palavra que está em todas pesa 0, a de uma peça só pesa o máximo; a que o catálogo não
+    tem pesa como a de uma peça só (deixa o nome perguntado mais específico, e a semelhança menor). `sigla_da_familia`:
+    {Família: as siglas dos códigos dela, contadas}."""
+    pecas = []
+    for iid, v in (catalogo or {}).items():
+        if v.get("avariado") or regua.avariada(v.get("codigo")):
+            continue
+        ps = palavras(v.get("nome"))
+        if ps:
+            pecas.append({"id": iid, "codigo": _txt(v.get("codigo")), "nome": _txt(v.get("nome")),
+                          "familia": _txt(v.get("familia")), "palavras": ps})
+    n = len(pecas)
+    peso = {p: math.log(n / k) for p, k in Counter(p for x in pecas for p in x["palavras"]).items()}
+    for x in pecas:
+        x["norma"] = math.sqrt(sum(peso[p] ** 2 for p in x["palavras"]))
+    por_familia: dict[str, Counter] = {}
+    for x in pecas:
+        sigla = _sigla_do_codigo(x["codigo"])
+        if sigla and x["familia"]:
+            por_familia.setdefault(x["familia"], Counter())[sigla] += 1
+    return {"pecas": pecas, "peso": peso, "desconhecida": math.log(n) if n else 0.0, "sigla_da_familia": por_familia}
+
+
+def _sigla_da_familia(idx: dict, familia: str, validas) -> str:
+    """A sigla mais comum dos códigos da Família no catálogo, entre as que valem (empate: a primeira em ordem alfabética)."""
+    candidatas = [(n, s) for s, n in (idx["sigla_da_familia"].get(familia) or {}).items() if s in validas]
+    return min(candidatas, key=lambda c: (-c[0], c[1]))[1] if candidatas else ""
+
+
+def sugerir(nome, idx: dict, validas) -> dict:
+    """A sigla sugerida para cadastrar a peça de nome `nome` (o que o técnico escreveu), pelo catálogo do App (`indice`), só
+    entre as `validas` do almoxarifado (`siglas`: a de teste só no de teste). `{"sigla", "por", "familia", "parecidas"}`.
+
+    As parecidas são as peças do catálogo com palavras em comum, pela semelhança de cosseno com o peso das palavras raras
+    (`indice`): "MC4" decide mais que "conector". As 5 mais parecidas (com a semelhança de ao menos `PARECIDA_MIN`) votam, cada
+    uma com a sua semelhança, na sigla do código dela; a de código sem a sigla (o formato antigo) vota na sigla mais comum da
+    Família dela, e a sem nenhuma das duas não vota. Vence a sigla com mais peso; `por` diz de onde ela veio: "parecidas" (ao
+    menos uma das que votaram nela tem a sigla no código) ou "familia" (só pela Família, que vai em `familia`). Sem parecida, ou
+    sem voto, nada é sugerido (o PCM escolhe): sugerir sem base seria chutar. `parecidas`: as 3 mais parecidas (`codigo`,
+    `nome`), o contexto que a tela mostra."""
+    vazio = {"sigla": "", "por": "", "familia": "", "parecidas": []}
+    q = palavras(nome)
+    norma_q = math.sqrt(sum(idx["peso"].get(p, idx["desconhecida"]) ** 2 for p in q))
+    if not norma_q:
+        return vazio
+    ranking = []
+    for x in idx["pecas"]:
+        comum = q & x["palavras"]
+        if comum and x["norma"]:
+            s = sum(idx["peso"][p] ** 2 for p in comum) / (norma_q * x["norma"])
+            if s >= PARECIDA_MIN:
+                ranking.append((s, x))
+    ranking.sort(key=lambda r: (-r[0], r[1]["codigo"], r[1]["id"]))
+    votos: dict[str, dict] = {}
+    for s, x in ranking[:PARECIDAS_VOTAM]:
+        sigla, pelo_codigo = _sigla_do_codigo(x["codigo"]), True
+        if sigla not in validas:
+            sigla, pelo_codigo = _sigla_da_familia(idx, x["familia"], validas), False
+        if not sigla:
+            continue
+        v = votos.setdefault(sigla, {"peso": 0.0, "pelo_codigo": False, "familia": x["familia"]})
+        v["peso"] += s
+        v["pelo_codigo"] = v["pelo_codigo"] or pelo_codigo
+    parecidas = [{"codigo": x["codigo"], "nome": x["nome"]} for _, x in ranking[:PARECIDAS_NA_TELA]]
+    if not votos:
+        return dict(vazio, parecidas=parecidas)
+    sigla = min(votos, key=lambda k: (-votos[k]["peso"], k))
+    v = votos[sigla]
+    return {"sigla": sigla, "por": "parecidas" if v["pelo_codigo"] else "familia",
+            "familia": "" if v["pelo_codigo"] else v["familia"], "parecidas": parecidas}
 
 
 # ── o que o livro e o catálogo dizem ─────────────────────────────────────────────────────────────────────────────────
@@ -217,14 +327,16 @@ def decisoes(cfg, contagem_id: str) -> dict[str, dict]:
 
 
 def _catalogo() -> dict[str, dict] | None:
-    """{id_item: {"codigo", "nome", "avariado"}} do catálogo do App (a varredura diária, a tela do Almoxarifado; `avariado` é a
-    definição da casa, `regua.avariada`: o código -AV ou a marca do catálogo); None quando o saldo do App não chegou inteiro
-    (número pela metade não vai para a tela, nem vira destino de peça)."""
+    """{id_item: {"codigo", "nome", "familia", "avariado"}} do catálogo do App (a varredura diária, a tela do Almoxarifado;
+    `avariado` é a definição da casa, `regua.avariada`: o código -AV ou a marca do catálogo; a Família é a da sigla sugerida,
+    `sugerir`); None quando o saldo do App não chegou inteiro (número pela metade não vai para a tela, nem vira destino de
+    peça)."""
     from .. import almoxarifado
     d = almoxarifado.montar().dados or {}
     if d.get("estado") != "ok":
         return None
-    return {_id(c.get("id")): {"codigo": _txt(c.get("codigo")), "nome": _txt(c.get("nome")), "avariado": bool(c.get("avariado"))}
+    return {_id(c.get("id")): {"codigo": _txt(c.get("codigo")), "nome": _txt(c.get("nome")), "familia": _txt(c.get("familia")),
+                               "avariado": bool(c.get("avariado"))}
             for c in d.get("catalogo", [])}
 
 
@@ -372,10 +484,14 @@ def pendencias(cfg) -> list[dict]:
     API), `completar_no_fracttal` (o mesmo lembrete na linha de "Já decididas" da peça cadastrada, 04/11/2026) e `fotos`, a da
     peça e as dos dados na ordem da tela: `[{"rotulo": "Peça" | "Fabricante" | "Modelo" | "Número de
     série", "foto_id", "tem", "versao"}]` (`versao`: o instante do arquivo, que vai no endereço como `?v=`).
-    O livro de hoje, sem as colunas novas, dá os três vazios e só a foto da peça: a tela de hoje."""
+    O livro de hoje, sem as colunas novas, dá os três vazios e só a foto da peça: a tela de hoje.
+
+    Desde 11/11/2026, `sugestao`: no achado fora do catálogo (o único que cadastra com sigla), a sigla sugerida pelo nome que o
+    técnico escreveu e as peças parecidas do catálogo do App (`sugerir`); nos outros, None."""
     abertas = contagens_abertas(cfg)
     decididas = _decisoes_do_livro(F.ler(cfg)[F.ABA_CURADORIA])
     catalogo = _catalogo() or {}
+    idx = indice(catalogo)                      # uma vez por tela: o peso das palavras é do catálogo inteiro
     out = []
     for cid, linhas in sorted(abertas.items(), key=lambda kv: (_txt(kv[1][0].get("Contada em")), kv[0])):
         reservas = _reservas_da_contagem(cfg, cid)
@@ -402,6 +518,8 @@ def pendencias(cfg) -> list[dict]:
                 "serie": _dado(l.get("Número de série")), "lembrar_no_fracttal": descricao_dos_dados(l),
                 "completar_no_fracttal": completar_no_fracttal(l, d),
                 "fotos": _fotos_da_linha(cfg, l),
+                "sugestao": sugerir(l.get("Descrição"), idx, siglas(cfg, l.get("ID do almoxarifado")))
+                if _txt(l.get("Tipo")).lower() == "fora_do_catalogo" else None,
                 "decisao": None if d is None else {
                     "decisao": _txt(d.get("decisao")), "id_item": _id(d.get("id_item")),
                     "codigo_criado": _txt(d.get("codigo_criado")), "quando": _txt(d.get("decidida_em")),
@@ -540,6 +658,12 @@ def _conferir_o_nome_da_peca(achada: dict, reserva: dict, codigo: str) -> None:
                        "Fracttal.")
 
 
+def _unidade_do_cadastro(unidade, da_boa="") -> str:
+    """A unidade que vai ao Fracttal no cadastro: a que o PCM mandou ou, sem ela, a `da_boa` (a avariada sem cadastro); sem
+    nenhuma, UNIDADE. A decisão `cadastrar` a guarda (a régua lê dela a unidade da peça que o catálogo do App ainda não traz)."""
+    return (_txt(unidade) or _txt(da_boa)).upper() or "UNIDADE"
+
+
 def _cadastrar(cfg, contagem_id, chave, almox, sigla, nome, unidade, estoque) -> tuple[str, str, bool]:
     """Cria a peça no Fracttal sem duplicar. Devolve (id do item, código, criou agora).
 
@@ -554,7 +678,7 @@ def _cadastrar(cfg, contagem_id, chave, almox, sigla, nome, unidade, estoque) ->
     nome = " ".join(_txt(nome).split())
     if not nome or len(nome) > NOME_MAX:
         raise ValueError(f"Informe o nome da peça (até {NOME_MAX} letras).")
-    unidade = _txt(unidade).upper() or "UNIDADE"
+    unidade = _unidade_do_cadastro(unidade)
     if estoque is None:
         raise ValueError("Cadastrar fala com o Fracttal: é preciso o login do Fracttal de quem decide.")
     arq = _arquivo_reserva(cfg, contagem_id)
@@ -638,7 +762,7 @@ def _cadastrar_avariado(l: dict, nome, unidade, estoque) -> tuple[str, str, bool
     nome = " ".join(_txt(nome or l.get("_nome_av")).split())
     if not nome or len(nome) > NOME_MAX:
         raise ValueError(f"Informe o nome da peça (até {NOME_MAX} letras).")
-    unidade = (_txt(unidade) or _txt(l.get("_unidade_av"))).upper() or "UNIDADE"
+    unidade = _unidade_do_cadastro(unidade, l.get("_unidade_av"))
     if estoque is None:
         raise ValueError("Cadastrar fala com o Fracttal: é preciso o login do Fracttal de quem decide.")
     with _CODIGO_AV.de(codigo.upper()):
@@ -745,8 +869,13 @@ def decidir(cfg, contagem_id: str, chave_linha: str, decisao: str, *, id_item: s
                      "codigo_criado": (codigo or None) if decisao == "cadastrar" else None, "id_almoxarifado": almox,
                      "usina_id": usina,
                      "usina_ligada_por": F.USINA_LIGADA_POR[0] if usina else None, **quem_}
-            if motivo:
-                linha["dados"] = {"motivo": motivo}
+            # a unidade da peça criada (a re-revisão de 11/11/2026): até a varredura seguinte do App, o catálogo não a traz, e a
+            # régua a lê daqui (sem ela, o acordado decimal em METRO da peça nova era recusado)
+            dados = {"motivo": motivo} if motivo else {}
+            if decisao == "cadastrar":
+                dados["unidade"] = _unidade_do_cadastro(unidade, l.get("_unidade_av") if tipo == "avariado" else "")
+            if dados:
+                linha["dados"] = dados
             F.acrescentar(cfg, F.ABA_CURADORIA, [linha])
             try:
                 F.acrescentar(cfg, F.ABA_EVENTO, [{
@@ -790,8 +919,9 @@ def _pagina(*, erro: str = "", status: int = 200):
         # o que o técnico escreveu e a foto dele são de quem decide (podem mostrar gente, placa de equipamento, o que estiver à
         # volta): quem só olha vê que há um achado, a quantidade e a usina. Os dados da peça (fabricante, modelo, série) e as
         # fotos deles também (30/10/2026), como a descrição, e o lembrete de completá-los da peça já cadastrada (04/11/2026)
+        # e a sigla sugerida (11/11/2026), que sai do que o técnico escreveu
         lista = [dict(p, descricao="", foto="", foto_id="", tem_foto=False, reserva=None, fabricante="", modelo="", serie="",
-                      lembrar_no_fracttal="", completar_no_fracttal="", fotos=[]) for p in lista]
+                      lembrar_no_fracttal="", completar_no_fracttal="", fotos=[], sugestao=None) for p in lista]
     pendentes = [p for p in lista if p["decisao"] is None]
     resp = render_template(
         "pcm/inventario_curadoria.html", pendentes=pendentes, decididas=[p for p in lista if p["decisao"] is not None],

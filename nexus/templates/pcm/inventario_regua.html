@@ -10,20 +10,34 @@
    nexus/pcm/inventario/regua.py. Abaixo de 640 px as linhas viram cartões (o data-r é o rótulo de cada valor, como no
    Almoxarifado). O formulário de cada peça fica no fim da linha, e os campos apontam para ele pelo atributo form. Desde
    27/10/2026 com os componentes das outras partes do inventário (o mockup do Spare Parts, no design do Nexus): os números do
-   alto, o cartão com a tabela e o selo do que está no Fracttal; a estrutura é a mesma. #}
+   alto, o cartão com a tabela e o selo do que está no Fracttal; a estrutura é a mesma.
+   11/11/2026 (o PCM: "não está atualizando após a auditoria automaticamente no Fracttal"): o acordado vai ao Fracttal sozinho
+   quando a gravação de uma contagem do almoxarifado termina, e o botão "Gravar no Fracttal todos os acordados deste
+   almoxarifado" faz o mesmo (`regua.gravar_acordados`); a coluna No Fracttal mostra a releitura do Nexus ("no Fracttal
+   agora") até a varredura seguinte do App. A explicação da tela foi para o "!" do título (o padrão do Nexus, _explica.html). #}
+{% from "_explica.html" import explica %}
 <div class="pg alm inv rg">
 <p class="gc-eyebrow">PCM · Almoxarifado</p>
-<h1 class="titulo-pagina">Mínimo e máximo</h1>
+<div class="gc-titulo-explica"><h1 class="titulo-pagina">Mínimo e máximo</h1>
+{% call explica('Entenda esta tela') %}<p><b>A régua.</b> A régua de 14/10: o mínimo é 20% do saldo e o máximo é o dobro; a peça
+  avariada (código com -AV) fica sem mínimo e com o triplo. Unidade inteira arredonda o mínimo para cima; metro e massa têm duas
+  casas. O <b>recomendado</b> é o da Grid e fica só aqui, como histórico. O <b>acordado</b> é o do cliente: é o único que vai ao
+  Fracttal (o mínimo dispara o alarme).</p>
+<p><b>Quando o acordado vai ao Fracttal.</b> No botão de cada peça; no "Gravar no Fracttal todos os acordados deste
+  almoxarifado"; e sozinho, quando a gravação de uma contagem do almoxarifado termina, no login de quem gravou. Vai só o acordado
+  diferente do que o Fracttal tem (a peça que a contagem acabou de ligar, que entra com 0 e 0, inclusive); a peça sem acordado
+  não muda, e o recomendado e a sugestão nunca vão. Cada peça é relida antes de ser anotada como gravada, e a falha de uma não
+  para as outras (fica na Auditoria). O botão de todos manda em segundo plano, um pedido por segundo (a cota do Fracttal é da
+  empresa), e esta página acompanha. Com uma gravação de contagem andando ou parada no meio no almoxarifado, ou com ele em
+  ajuste no Fracttal, nenhum dos dois botões manda nada.</p>
+<p><b>A peça da contagem gravada.</b> A peça que a gravação ligou ao almoxarifado depois do início do ciclo do App aparece aqui
+  logo depois da auditoria, com o saldo da contagem, antes de a varredura lê-la: registre o acordado dela, e o lote seguinte o
+  manda.</p>
+<p><b>No Fracttal.</b> Depois de gravar, o Nexus relê o almoxarifado e mostra o mínimo e o máximo que o Fracttal tem agora, com a
+  hora da leitura, até a varredura seguinte do App (que só traz o mínimo).</p>{% endcall %}</div>
 {# as partes do almoxarifado: a fila das abas, com as quatro do inventário juntas (pcm/_almox_abas.html) #}
 {% set aba_inventario = 'regua' %}
 {% include "pcm/_almox_abas.html" %}
-<div class="inv-tela-cab">
-  <h2>Mínimo e máximo</h2>
-  <p>A régua de 14/10: o mínimo é 20% do saldo e o máximo é o dobro; a peça avariada (código com -AV) fica sem
-    mínimo e com o triplo. Unidade inteira arredonda o mínimo para cima; metro e massa têm duas casas. O
-    <b>recomendado</b> é o da Grid e fica só aqui, como histórico. O <b>acordado</b> é o do cliente: é o único que vai ao
-    Fracttal (o mínimo dispara o alarme), e só quando você manda gravar.</p>
-</div>
 
 <div data-ponte-aviso aria-live="polite"></div>
 {% if ok %}<div class="cn-certo" role="status"><span><b>{{ ok }}</b></span></div>{% endif %}
@@ -43,12 +57,25 @@
 <ul class="rg-almoxes">
   {% for a in almoxes %}
   <li><a href="{{ raiz }}/t/pcm/pecas/inventario/regua?almox={{ a.id }}"{% if almox and almox.id == a.id %} aria-current="page"{% endif %}>
-    <b>{{ a.nome }}</b><span class="alm-det">{{ a.usina or 'usina não ligada' }} · {{ a.pecas }} peças</span></a></li>
+    <b>{{ a.nome }}</b><span class="alm-det">{{ a.usina or 'usina não ligada' }} · {{ 'sem saldo ainda' if a.sem_saldo else a.pecas ~ ' peças' }}</span></a></li>
   {% endfor %}
 </ul>
 
 {% if almox %}
 {% set com_acordo = linhas|rejectattr('acordado', 'equalto', (none, none))|list %}
+{# o lote dos acordados em segundo plano (a revisão de 11/11/2026): andando, a página pergunta o andamento a cada 3 s
+   (pcm-regua.js) e recarrega no fim; parado, diz por quê; terminado há pouco, o resultado na cor dele (o lote com falha não sai
+   na caixa verde de sucesso) #}
+{% if lote and lote.estado == 'gravando' %}
+<div class="cn-erro cn-aviso" role="status" data-rg-lote="gravando" data-url="{{ raiz }}/t/pcm/pecas/inventario/regua/lote.json?almox={{ almox.id }}">
+  <span><b>Mandando os acordados ao Fracttal:</b> <span data-rg-lote-n>{{ lote.feitas or 0 }} de {{ lote.a_mandar or 0 }}</span>
+    peças, um pedido por segundo. Esta página se atualiza sozinha no fim.</span></div>
+{% elif lote and lote.estado == 'parada' %}
+<div class="cn-erro" role="alert" data-rg-resultado><span><b>{{ lote.texto }}</b></span></div>
+{% elif lote %}
+<div class="{{ 'cn-certo' if lote.tom == 'ok' else 'cn-erro cn-aviso' }}" role="status" data-rg-resultado><span><b>{{ lote.texto }}</b>
+  <span class="alm-det">o lote de {{ lote.fim_txt }}</span></span></div>
+{% endif %}
 <div class="inv-tiles" aria-label="Resumo da régua de {{ almox.nome }}">
   <div class="inv-tile"><b class="inv-tile-v">{{ linhas|length }}</b><span class="inv-tile-r">Peças</span></div>
   <div class="inv-tile inv-tile--info"><b class="inv-tile-v">{{ com_acordo|length }}</b><span class="inv-tile-r">Com acordado</span></div>
@@ -59,11 +86,21 @@
   <div class="inv-card-cab"><h3>{{ almox.nome }}</h3>
     <span class="inv-card-nota">O saldo é o da última contagem gravada; sem ela, o da varredura do App. Registrar guarda a decisão no
       Nexus. Gravar no Fracttal manda só o acordado registrado, no seu login, e confere relendo.</span></div>
+  {% if pode and com_acordo and not (lote and lote.estado == 'gravando') %}
+  {# todos os acordados de uma vez (11/11/2026), a mesma regra do botão de cada peça. O lote roda em segundo plano (a revisão de
+     11/11/2026), e a página acompanha; enquanto ele anda, o botão some (o 2º clique só levaria 409) #}
+  <form method="post" action="{{ raiz }}/os/_nexus/inventario/regua/gravar_todos" data-ponte class="rg-todos"
+        data-ponte-espera="Conferindo o almoxarifado no Fracttal e começando o lote dos acordados…">
+    <input type="hidden" name="almox" value="{{ almox.id }}">
+    <button class="gc-btn gc-btn--ui gc-btn--primario" type="submit">Gravar no Fracttal todos os acordados deste almoxarifado</button>
+    <span class="alm-det">Vai só o acordado diferente do que o Fracttal tem; a peça sem acordado não muda.</span>
+  </form>
+  {% endif %}
   {% if linhas %}
   <div class="inv-tw">
   <table class="alm-t inv-t rg-t">
     <thead><tr><th>Peça</th><th class="num">Saldo</th><th>Sugestão</th><th>Recomendado (Grid)</th><th>Acordado (cliente)</th>
-      <th class="num">Mínimo no Fracttal</th><th>Gravar</th></tr></thead>
+      <th class="num">No Fracttal</th><th>Gravar</th></tr></thead>
     <tbody>
     {% for x in linhas %}
     {% set f = 'rg-' ~ x.id_item %}
@@ -88,8 +125,13 @@
         <input class="gc-campo rg-n" name="aco_max" form="{{ f }}" inputmode="decimal" autocomplete="off" placeholder="máx" value="{{ fmt(x.acordado[1]) }}" aria-label="Acordado, máximo de {{ x.codigo }}">
         {% elif x.acordado[0] is none and x.acordado[1] is none %}<span class="mudo">sem acordo</span>
         {% else %}{{ 'mín ' ~ fmt(x.acordado[0]) if x.acordado[0] is not none else 'sem mínimo' }} · máx {{ fmt(x.acordado[1]) }}{% endif %}</span></td>
-      <td class="num" data-r="Mínimo no Fracttal"><span class="alm-v">{% if x.no_fracttal_min is none %}<span class="mudo">—</span>{% else %}{{ fmt(x.no_fracttal_min) }}{% endif %}
-        <span class="alm-det">da varredura do App</span></span></td>
+      {# a releitura do Nexus, mais nova que a varredura (11/11/2026): o mínimo e o máximo de agora, com a hora; sem ela, o mínimo
+         da varredura do App (o App não traz o máximo). A célula não quebra linha (`.alm-t .num`): o "no Fracttal agora" e a hora
+         vão em duas linhas curtas, senão a coluna alargava e espremia a da peça a 1366 px #}
+      <td class="num" data-r="No Fracttal"><span class="alm-v">{% if x.agora_em %}mín {{ fmt(x.agora_min) or '—' }}, máx {{ fmt(x.agora_max) or '—' }}
+        <span class="alm-det">no Fracttal agora</span><span class="alm-det">lido {{ x.agora_em }}</span>
+        {% else %}{% if x.no_fracttal_min is none %}<span class="mudo">—</span>{% else %}mín {{ fmt(x.no_fracttal_min) }}{% endif %}
+        <span class="alm-det">da varredura do App</span>{% endif %}</span></td>
       <td data-r="Gravar"><span class="alm-v rg-acao">
         {% if x.acordado[0] is none and x.acordado[1] is none %}<span class="inv-selo inv-selo--neutro">registre o acordado</span>
         {% elif x.gravado %}<span class="inv-selo inv-selo--ok">gravado no Fracttal</span>

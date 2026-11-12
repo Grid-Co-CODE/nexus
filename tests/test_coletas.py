@@ -351,3 +351,51 @@ def test_os_furos_sobem_e_todos_veem_o_mesmo(coletas, app, tmp_path):
     assert ruim.status_code == 400
     m = coletas.post("/t/performance/coletas/furos/html", json={"conf": {"a": {"r": "ok"}}})
     assert m.status_code == 200 and '/*CONF0*/{"a": {"r": "ok"}}/*END0*/' in m.get_data(as_text=True)
+
+
+# ── os filtros dos Furos no modelo do Histórico de OS (12/11/2026) ─────────────────────────────────────────────────
+def test_os_furos_usam_o_painel_do_historico_e_varios_valores(coletas):
+    html = coletas.get("/t/performance/coletas/app").get_data(as_text=True)
+    assert "/static/zeladoria/filtros.css" in html and "/static/coletas/filtros.js" in html and "/static/coletas/coletas.css" in html
+    furos = open(os.path.join(RAIZ, "nexus", "static", "coletas", "furos.js"), encoding="utf-8").read()
+    assert 'const vs = i => [...$f(i).options]' in furos                      # cada filtro lê vários valores
+    assert 'if (sit.length && !sit.some(x => sitOk(x, m))) return false;' in furos
+    assert 'p.cliente !== c' not in furos                                      # não sobrou o filtro de um valor só
+    assert "window.coletasFiltros.atualizar()" in furos
+    peca = open(os.path.join(RAIZ, "nexus", "static", "coletas", "filtros.js"), encoding="utf-8").read()
+    for campo in ("fzCli", "fzCart", "fzSrc", "fzSt", "fzSit", "fzZero", "fzOS", "fzConf"):
+        assert '"%s"' % campo in peca                                          # todos os filtros do .exe no painel
+    assert "Aplicar" in peca and "Limpar tudo" in peca and "zf-badge" in peca
+
+
+def test_a_leitura_do_banco_em_fundo_nao_tira_o_excel_que_chegou_no_meio(tmp_path):
+    """12/11/2026, o 1º uso do Levi ("usei o subir excel, não prestou nada!"): o BD_Thopen em Excel entrou enquanto o banco
+    era lido em fundo, e a leitura do banco, terminando depois, o tirou ("BD_Thopen não foi lido" ao converter)."""
+    import threading
+    p = _bd_excel(tmp_path)
+    pg._GUARDA.clear()
+    solta = threading.Event()
+
+    class BancoLento(BancoDeMentira):
+        def livros(self):
+            solta.wait(10)                         # o banco responde só depois de o Excel entrar
+            return super().livros()
+
+    s = servico.SessaoNexus(lambda: BancoLento(p, com_mapa=False), str(tmp_path / "sessao"), str(tmp_path / "novos"))
+    try:
+        s.iniciar()
+        lote = s.novo_lote()
+        with open(p, "rb") as f:
+            s.receber(lote, "BD_Performance · meu.xlsx", io.BytesIO(f.read()))
+        s.lote_pronto(lote, ["BD_Performance · meu.xlsx"])
+        assert s.origem_bd["BD_Performance"] == "arquivo"
+        solta.set()
+        assert s.pronto.wait(10)
+        b = {x["destino"]: x for x in s.estado_bds()}["BD_Performance"]
+        assert b["lido"] and b["origem"] == "arquivo" and not b["erro"]   # o Excel ficou
+        assert s.bds["BD_Performance"].aba("Teste") is not None
+        s.limpar()                                                       # o Limpar volta ao banco
+        assert s.origem_bd.get("BD_Performance") is None and "mapa de fórmulas" in s.erros_bd["BD_Performance"]
+    finally:
+        s.fechar()
+        pg._GUARDA.clear()

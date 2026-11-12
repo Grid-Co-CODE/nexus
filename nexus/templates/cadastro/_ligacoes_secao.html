@@ -73,7 +73,7 @@
     <td>
       <form method="post" action="{{ raiz }}/t/base/ligacoes/decidir" class="lig-form lig-linha">{{ alvo(b.sistema) }}
         <input type="hidden" name="acao" value="ligar"><input type="hidden" name="chave" value="{{ b.chave }}">
-        <input class="gc-campo" name="usina" list="lig-usinas" placeholder="usina do cadastro (id ou nome)" required aria-label="Usina do cadastro para ligar">
+        <input class="gc-campo" name="usina" data-lista="lig-usinas-opcoes" placeholder="usina do cadastro (id ou nome)" required aria-label="Usina do cadastro para ligar">
         <button class="gc-btn gc-btn--contorno" type="submit">Ligar</button>
       </form>
     </td>
@@ -163,4 +163,6 @@
 {% endif %}
 {% endif %}
 
-<datalist id="lig-usinas">{% for u in p.usinas %}<option value="{{ u.id }} · {{ u.titulo }}"></option>{% endfor %}</datalist>
+{# as usinas do cadastro para a lista do campo "Ligar" (lista-sugestoes.js; o <datalist> do navegador abria solto e fora do estilo, Levi, 12/11/2026) #}
+<script type="application/json" id="lig-usinas-opcoes">[{% for u in p.usinas %}{{ ('%s · %s' % (u.id, u.titulo))|tojson }}{% if not loop.last %},{% endif %}{% endfor %}]</script>
+<script src="{{ url_for('static', filename='lista-sugestoes.js') }}" defer></script>

@@ -18,7 +18,8 @@ Cada rota daqui: só administrador e setor PCM, pedido só da própria página (
 Fracttal (a régua, o cadastro da curadoria, gravar, continuar, encerrar) confere também a PESSOA (`_estoque_da_pessoa`): a senha de
 administrador não é uma pessoa (409), e a conta do Fracttal do cookie tem de ser a pessoa da sessão do Nexus (409; a revisão final
 de 27/10/2026 achou a régua e o cadastro sem essa conferência). Cada tarefa põe as rotas dela num bloco próprio: o lote da contagem
-(Tasks 5 e 6), a régua (Task 8), a curadoria (Task 9), a gravação (Task 7).
+(Tasks 5 e 6), a régua (Task 8; desde 11/11/2026 também todos os acordados do almoxarifado de uma vez), a curadoria (Task 9), a
+gravação (Task 7).
 """
 from __future__ import annotations
 
@@ -147,7 +148,8 @@ def lote(contagem_id: str):
 def regua_gravar():
     """Manda o acordado registrado ao Fracttal, relê e anota (`regua.gravar_acordado`). Só o que está no livro vai: o formulário
     traz o almoxarifado, a peça e o acordado que a tela MOSTRAVA (`aco_min`, `aco_max`), só para conferir: se o registrado agora é
-    outro, 409 "a régua mudou desde que você abriu a tela"."""
+    outro, 409 "a régua mudou desde que você abriu a tela". Como no botão de todos (a re-revisão de 11/11/2026), 409 com a vez do
+    almoxarifado presa por uma gravação de contagem ou com ele fora do modo 0 no Fracttal."""
     f = request.form
     almox, item = A._id(f.get("almox")), A._id(f.get("item"))
     de = "/t/pcm/pecas/inventario/regua" + ("?" + urlencode({"almox": almox}) if almox else "")
@@ -160,6 +162,25 @@ def regua_gravar():
         return regua.gravar_acordado(current_app.config, almox, item, est, quem.do_pedido(), esperado=esperado)
     r = _com_o_fracttal(de, gravar, ao="regua")
     return r if not isinstance(r, str) else _ok("pcm_regua_aviso", r, de)
+
+
+@bp.route("/regua/gravar_todos", methods=["POST"])
+def regua_gravar_todos():
+    """O "Gravar no Fracttal todos os acordados deste almoxarifado" (11/11/2026, item 2 da 2ª rodada): `regua.iniciar_lote`, no
+    login de quem apertou, com as recusas de sempre da ponte (`_com_o_fracttal`). O lote roda em segundo plano (a revisão de
+    11/11/2026: no pedido, 100 peças levavam uns 2 min e o restart do deploy no meio deixava peças sem o evento): a resposta volta
+    logo, e a página da régua acompanha o andamento. A gravação de contagem e o lote se excluem: com a vez do almoxarifado presa
+    (uma gravação andando, ou parada no meio) ou o almoxarifado fora do modo 0 no Fracttal, 409, e nada é enviado. O controle do
+    lote que o disco não deixa gravar é 503 com o porquê (o `iniciar_lote` não começa; a re-revisão de 11/11/2026: aqui chegava
+    None, e a página levava um 500)."""
+    almox = A._id(request.form.get("almox"))
+    de = "/t/pcm/pecas/inventario/regua" + ("?" + urlencode({"almox": almox}) if almox else "")
+    r = _com_o_fracttal(de, lambda est: regua.iniciar_lote(current_app.config, almox, est,
+                                                           quem.colunas(current_app.config, quem.do_pedido())), ao="regua")
+    if not isinstance(r, dict):
+        return r
+    return _sem_cache(jsonify({"ok": True, "mensagem": "Mandando os acordados ao Fracttal em segundo plano: acompanhe nesta "
+                                                       "página.", "volta": na_raiz(de), "estado": r.get("estado")}))
 
 
 # ── a curadoria: cadastrar a peça nova no Fracttal (Task 9) ─────────────────────────────────────────────────────────────

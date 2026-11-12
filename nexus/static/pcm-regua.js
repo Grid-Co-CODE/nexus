@@ -12,3 +12,33 @@
     });
   });
 })();
+/* O lote dos acordados em segundo plano (a revisão de 11/11/2026): enquanto ele anda, a página pergunta o andamento a cada 3 s
+   (o lote.json, que só lê o controle dele, sem o Fracttal) e recarrega quando ele termina ou para, para mostrar o resultado e o
+   que o Fracttal tem agora. A falha de uma pergunta não para as outras; a sessão que venceu para (a re-revisão de 11/11/2026: o
+   401 do portão, ou o pedido levado à tela de entrar, voltava a cada 3 s sem dizer nada), e a caixa diz o que fazer. */
+(function () {
+  var caixa = document.querySelector('[data-rg-lote="gravando"]');
+  if (!caixa) return;
+  var n = caixa.querySelector("[data-rg-lote-n]");
+  var VENCEU = "A sua sessão do Fracttal venceu.";
+  function sessao(texto) {
+    caixa.setAttribute("role", "alert");
+    caixa.textContent = (texto || VENCEU) + " O lote segue no Nexus: recarregue a página e entre de novo para ver o resultado.";
+  }
+  var vez = setInterval(function () {
+    fetch(window.nexusRota(caixa.getAttribute("data-url")), {credentials: "same-origin"}).then(function (r) {
+      if (r.status === 401 || r.redirected) {
+        clearInterval(vez);
+        return r.json().catch(function () { return null; }).then(function (e) {
+          sessao(e && e.erro);
+          return null;
+        });
+      }
+      return r.ok ? r.json() : null;
+    }).then(function (e) {
+      if (!e) return;
+      if (e.estado !== "gravando") { clearInterval(vez); window.location.reload(); return; }
+      if (n) n.textContent = (e.feitas || 0) + " de " + (e.a_mandar || 0);
+    }).catch(function () {});
+  }, 3000);
+})();

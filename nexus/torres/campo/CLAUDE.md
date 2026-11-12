@@ -1479,6 +1479,7 @@ percurso" abaixo), pedido do Levi pela sessão Nexus Field; sobe com o OK dele.
 | Situação e desenho | `campo/equipe/situacao.py` | a situação de cada técnico pelo último ponto, o desenho do mapa e o do percurso (só x/y), a UF pelo contorno do IBGE, o link da rota |
 | Cidade | `campo/equipe/municipios.py` | a cidade de quem está parado fora de usina e os municípios de fundo do percurso (`na_caixa`), pela malha do IBGE do ESTADO inteiro |
 | Piloto | `campo/equipe/piloto.py` | grava quem entra e quem sai do piloto (`nexus_equipe_piloto`) |
+| Painel do vídeo wall | `campo/equipe/parede.py` | as ocorrências abertas da Ronda COS por grupo (a régua de Comando > Usinas), um cartão por usina, os números de cima e o rodapé; puro |
 | Eventos do dia | `campo/equipe/eventos.py` | a primeira posição, as saídas e chegadas, o sem sinal e o sem permissão de hoje, dos pontos, no formato que outra tela pode ler |
 | Registro da LGPD | `campo/equipe/acessos.py` | quem abriu o mapa, a rota ou o percurso de quem (o percurso com o período) |
 | Jornal das filas | `campo/equipe/jornal.py` | os eventos de chave e os acessos esperando o gravador, cifrados em disco (`equipe/fila_*.jsonl`): o reinício antes da rodada não perde nada |
@@ -1655,7 +1656,11 @@ e não foram feitas.
   com o crédito que a licença pede), e só aparece com a chave **`NEXUS_ESRI_CHAVE`** em Base > Chaves ("Mapa de equipe:
   satélite"; criada pelo Levi em developers.arcgis.com, conta ArcGIS Location Platform, acesso a Basemaps). **A chave
   vai ao navegador** (o bloco é pedido direto à Esri), então ela é **restrita por referenciador a app.gridco.com.br** no
-  painel da Esri; sem a chave, nem o botão aparece. No satélite saem os preenchimentos do nosso mapa (terra, mata, uso,
+  painel da Esri. **O botão fica sempre à vista** (Levi, 12/11/2026, sem a chave cadastrada: "CADÊ A OPÇÃO
+  MAPA/SATÉLITE??"; até ali, sem a chave o botão nem aparecia): sem a chave, o Satélite abre o aviso `eq-sat-falta` com
+  o que falta, e o administrador ganha o link "Cadastrar a chave" (`torre_base.chaves_nexus`, que leva à aba Nexus das
+  Chaves). O zoom fica à esquerda e os focos e o fundo à direita numa faixa só (`eq-topo-mapa`), que quebra de linha
+  em vez de se cobrir no mapa estreito. No satélite saem os preenchimentos do nosso mapa (terra, mata, uso,
   água, prédio) e as rodovias ficam finas; a máscara fora do Brasil, as divisas, os nomes, as usinas e os técnicos
   continuam. A escolha fica no navegador (`localStorage` `nexus.equipe.base`). LGPD: a Esri recebe o bloco da região
   olhada, não a posição de técnico (o mapa base nosso segue sendo o padrão).
@@ -1676,15 +1681,21 @@ e não foram feitas.
   (`comando.usinas.cos_por_usina`), e `comando.usinas.agora_pelo_cos` (religamento em campo = crítico; usina, cabine,
   skid, QGBT, proteção, concessionária ou rede = crítico; inversor = atenção; comunicação = sem comunicação; sem OS =
   normal; a usina que a fotografia não trouxe = sem leitura) no tom de lá: normal verde, atenção amarelo, crítico
-  vermelho (pulsa), sem comunicação cinza, sem leitura só o contorno. Sem a fonte do Andamento ligada, a usina fica sem
+  vermelho, sem comunicação cinza, sem leitura só o contorno. **Sem anel em volta** (Levi, 12/11/2026: "TIRE ESSA
+  BORDA ENORME DAS UFVs em vermelho!": o anel vermelho que pulsava em volta da crítica e da de clima "agir" saiu; só a
+  divisa do Brasil pulsa). Sem a fonte do Andamento ligada, a usina fica sem
   cor (nunca "normal"). Mudou a régua em Comando > Usinas, muda aqui sozinha (é a mesma função). Com o Incluir clima, a
   cor é o nível do alerta de clima, e o selo "!" diz que o COS tem crítico ou atenção. O Usinas sem o COS segue cheio no
   verde.
 - **Dois focos: Foco técnico | Foco usina (12/11/2026**, Levi: "Quero ter dois focos, foco técnico e focos usina, dessa
-  forma dá para focar melhor"). No canto de cima à direita do mapa dos técnicos. Foco técnico (o padrão): o técnico
-  grande e as usinas menores e mais claras, com o nome a partir do zoom 9,5. Foco usina: as usinas 1,25 vez maiores e o
-  nome delas a partir do zoom 6,5, os técnicos pequenos, meio apagados e sem as iniciais. A escolha fica no navegador
-  (`nexus.equipe.foco`). Nada muda no servidor.
+  forma dá para focar melhor"). No canto de cima à direita do mapa dos técnicos. **As cores de cada foco** (Levi, no
+  mesmo dia: "No foco técnico todas as UFVs ficam sem cor exceto desligamento e o resto fica cinza. No modo usina os
+  técnicos ficam cinzas e o foco é na usina!"). Foco técnico (o padrão): o técnico grande, na cor da situação; as usinas
+  menores e mais claras, **todas cinza menos a parada** (o crítico do Agora, "desligamento"), com o nome a partir do zoom
+  9,5; o nível do clima, quando o Incluir clima está ligado, fica (foi pedido de propósito). Foco usina: as usinas na cor
+  do Agora, 1,25 vez maiores e com o nome a partir do zoom 6,5; **os técnicos cinza**, pequenos, meio apagados e sem as
+  iniciais. A conta é pura (`corNoFoco`, testada no node): cada usina leva os dois ícones (`icone` e `icone_t`) e o foco
+  só troca qual vale. A escolha fica no navegador (`nexus.equipe.foco`). Nada muda no servidor.
 - **O círculo do técnico é maior e as iniciais aparecem sempre (12/11/2026**, Levi: "o nome dos técnicos não aparece
   pq os cards estão muito pequenos, aumente um pouco o tamanho do circulo dos técnicos"): raio de 10 px no Brasil
   inteiro a 14 px de perto, as iniciais em 11 px em todo zoom.
@@ -1708,6 +1719,44 @@ e não foram feitas.
   verdade): Brasil, rua (São Paulo no zoom 14,5), percurso (o voo, o desenho, a reprodução no meio), clima, os dois focos,
   as cores do Agora (simuladas no navegador: a bancada não tem o Andamento), o satélite (Campinas no zoom 13) e o
   celular (375 px, sem rolagem de lado), e o tema claro.
+
+### O vídeo wall (12/11/2026)
+
+Levi, com o mockup do COS ("COS · Ocorrências abertas · Usinas com problema agora"): "Prepare um modo vídeo wall que apareça
+informações como no anexo 1 do lado esquerdo do mapa!". As escolhas dele no mesmo dia (perguntadas, por serem filtro e
+parâmetro): **todas as ocorrências abertas, agrupadas**; a tela se atualiza **a cada 2 minutos**; a lista que não cabe
+**rola sozinha, devagar**.
+
+- **Onde:** o botão **Vídeo wall** na barra do Mapa de equipe (só no Técnicos e só com o mapa base) abre, em outra aba,
+  `/t/campo/equipe?tv=1` (com o filtro e o clima de agora). É a MESMA rota: o mesmo portão, o mesmo `_quem_ve` e o mesmo
+  registro da LGPD ("abriu_mapa", antes de a página sair); o vídeo wall não abre técnico nem percurso (o `tecnico` do
+  endereço é ignorado). Sem o mapa base, o `?tv=1` é ignorado e a tela é a de sempre.
+- **O desenho** (`campo/equipe_tv.html`, `static/campo-videowall.js`, bloco `eqtv-*` do `campo.css`): sem a casca do Nexus,
+  como o modo TV do Mapa de risco (`performance/mapa_tv.html`, o modelo): título, relógio de Brasília, o prazo da sessão
+  de quem abriu (`moldura._prazo_da_tv`) e as letras pela ALTURA da tela (`--eqtv-f`, o mesmo desenho em 1080p e em 4K).
+  À esquerda o painel do COS; à direita o mapa de verdade inteiro (o mesmo parcial da tela, `campo/_equipe_mapa_ml.html`).
+  O Sair, o zoom, os focos e o fundo aparecem ao mexer o mouse e somem em 4 s. O foco começa em **Foco usina** (o painel
+  é das usinas; a escolha do vídeo wall fica à parte, `nexus.equipe.foco.tv`).
+- **O painel** (`parede.montar`): a MESMA fotografia da Ronda COS que pinta as usinas (`_cos_por_usina`), na régua de
+  Comando > Usinas (`classificar`), em cinco grupos, na ordem do mockup: **Usina parada** (o crítico), **Inversores
+  desligados**, **Rede concessionária** (o crítico com o problema `rede` do placar da própria Ronda COS, ou a falha de
+  concessionária; o religamento de uma usina que a rede derrubou também é dela), **Sem comunicação** e **Outras
+  ocorrências** (furto, outra corretiva). **Uma usina é um cartão**, no grupo da pior ocorrência dela (a parada, a rede,
+  o inversor, as outras e a comunicação, nessa ordem; no empate, a mais antiga), com "e mais N" quando há outras; no
+  grupo, a mais antiga primeiro. O cartão: o código curto do Andamento (`usina_cod`), o nome e o MWp do cadastro, a
+  falha (e o equipamento), a última nota da Ronda COS com a hora, a OS (ou "ainda sem OS"), há quanto tempo ("12 min",
+  "2 h 12", "1 d 4 h", "6 d") e a etapa (esperando alguém = âmbar; técnico acionado = azul; identificada = vermelho).
+  Em cima: Abertas e um número por grupo; embaixo: as usinas sem ocorrência aberta e as sem leitura do COS. Só as
+  usinas do mapa (com coordenada) entram, para os números baterem com ele. O PR médio de hoje do mockup ficou FORA: o
+  Nexus não tem o PR do dia (sem dado não se inventa). Sem a fotografia, o painel diz "Sem a leitura do COS" e o mapa segue.
+- **A releitura**: a cada 2 minutos (`RECARREGA_TV_S`) a página confere o `/saude` e se recarrega; com o Nexus fora, fica
+  com o que tem e diz desde quando. Sem JavaScript, o `<meta refresh>`. **Cada releitura é um "abriu_mapa"** no registro da
+  LGPD (~30 por hora com a TV ligada): a tela mostra técnicos. A sessão que cai leva ao Entrar (`_confere_sessao_js`).
+- **A lista rola** (`campo-videowall.js`): uma altura da caixa a cada 25 s, parando 5 s em cima e embaixo; roda também
+  com os efeitos de animação do Windows desligados (sem ela, a lista ficaria cortada).
+- **Prova:** `tests/test_equipe_parede.py` (os grupos, a duração, o cartão da pior, a ordem, sem o COS; a rota sem a
+  casca, o painel, o refresh de 120 s, o registro da LGPD, o botão, sem o mapa base). Na bancada (`perc_bancada.py`, com
+  a fotografia do COS FALSA só nela): 1920 x 1080, 24 cartões rolando, o mapa colorido, os controles ao mexer o mouse.
 
 ### O filtro suspenso (10/11/2026)
 

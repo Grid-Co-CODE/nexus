@@ -777,8 +777,9 @@ def _tela(contexto: dict, status: int = 200):
     tela = TORRE.tela("equipe")
     clima = _com_clima()
     # o Incluir clima (11/11/2026): o botão, e o `clima=1` que o Técnicos | Usinas leva de um lado para o outro
+    # o link para Base > Chaves no "falta a chave" do Satélite (12/11/2026): só o administrador cola a chave
     contexto = {"clima_on": clima, "q_clima": {"clima": "1"} if clima else {}, "q_botao_clima": _q_do_clima(clima),
-                **contexto}
+                "link_chaves": bool(session.get("admin")), **contexto}
     r = current_app.make_response((render_template("campo/equipe.html", torre=TORRE, tela=tela, **contexto), status))
     r.headers["Cache-Control"] = "no-store"         # a posição de pessoas não fica na cópia do navegador nem de proxy
     return r
@@ -803,7 +804,8 @@ def _iniciais(nome: str) -> str:
 
 def _cos_por_usina(b):
     """A fotografia da Ronda COS de cada cliente do Andamento por usina, como Comando > Usinas a lê
-    (`comando.usinas.cos_por_usina`, a cópia de 30 s por cliente): {"ocs", "lidas"}, ou None sem a fonte."""
+    (`comando.usinas.cos_por_usina`, a cópia de 30 s por cliente): {"ocs", "lidas", "leitura" (a hora da fotografia
+    mais velha, como o Comando diz)}, ou None sem a fonte."""
     from ...comando import usinas as CU
     from ...cos import andamento as AND
     cfg = current_app.config
@@ -811,7 +813,11 @@ def _cos_por_usina(b):
         return None
     clientes, _erro = AND.clientes(cfg)
     leituras = [AND.ler(cfg, c) for c in clientes]
-    return CU.cos_por_usina(leituras, lambda nome, codigo: b.lig.usina(nome or "", codigo or "")[0])
+    r = CU.cos_por_usina(leituras, lambda nome, codigo: b.lig.usina(nome or "", codigo or "")[0])
+    if r is not None:
+        geradas = [g for g in (AND.instante(lt.dados.get("gerado_em")) for lt in leituras if lt.dados) if g]
+        r["leitura"] = min(geradas).strftime("%H:%M") if geradas else ""
+    return r
 
 
 def _agora_por_usina(b, uids) -> dict:
@@ -848,7 +854,7 @@ def _satelite() -> dict | None:
 
 
 def _dados_do_mapa(modo, coords, nome_de_usina, onde_de_usina, *, linhas=(), pontos=(), sel=None, perc=None,
-                   clima=None, b=None) -> dict:
+                   clima=None, b=None, tv=False) -> dict:
     """O que o campo-mapa.js desenha (11/11/2026, o guia do Willian com o MapLibre): as usinas uma a uma (a coordenada do
     cadastro, a ocorrência aberta e, com o clima, o nível), os técnicos que o mapa mostra (o último ponto, a situação e o
     endereço do clique), o percurso aberto e o clima em coordenadas. A coordenada do técnico vai SÓ de quem está em
@@ -879,7 +885,7 @@ def _dados_do_mapa(modo, coords, nome_de_usina, onde_de_usina, *, linhas=(), pon
             "fontes": url_for("static", filename="mapa/fontes/FONTE/FAIXA.pbf").split("?")[0]
             .replace("FONTE", "{fontstack}").replace("FAIXA", "{range}"),
             "usinas": usinas, "tecnicos": tecnicos, "percurso": (perc or {}).get("js"), "clima": geo,
-            "satelite": _satelite()}
+            "satelite": _satelite(), "tv": bool(tv)}
 
 
 # ── o clima por usina (o botão Incluir clima, 11/11/2026) ────────────────────────────────────────────────────────────
@@ -973,10 +979,45 @@ def _tela_usinas(com_clima: bool):
                   "painel_ev": False, "admin": False, "piloto_msg": None, "mapa_js": mapa_js})
 
 
+# o vídeo wall (12/11/2026): a tela se relê sozinha a cada 2 minutos (Levi, a escolha dele: "2 minutos"); cada releitura
+# é um acesso no registro da LGPD, como a abertura do mapa
+RECARREGA_TV_S = 120
+DIAS = ("segunda", "terça", "quarta", "quinta", "sexta", "sábado", "domingo")
+
+
+def _tela_tv(b, coords, nomes_usina, mapa_js, filtro, agora):
+    """O vídeo wall (Levi, 12/11/2026: "Prepare um modo vídeo wall que apareça informações como no anexo 1 do lado
+    esquerdo do mapa!"): o mapa de verdade em tela cheia, sem a casca do Nexus, com o painel das ocorrências abertas da
+    Ronda COS ao lado (`campo/equipe/parede.py`, a mesma fotografia que pinta as usinas no mapa). Chega aqui DEPOIS do
+    registro da LGPD, como a tela."""
+    from ...campo.equipe import parede as PA
+    from ..moldura import _prazo_da_tv
+    try:
+        cos = _cos_por_usina(b)
+    except Exception:           # noqa: BLE001 — sem o COS, o painel diz e o mapa segue
+        _log.exception("equipe: a fotografia do COS não abriu (o vídeo wall)")
+        cos = None
+
+    def ficha(uid):
+        try:
+            return b.por_id.get(int(uid)) or {}
+        except (TypeError, ValueError):
+            return {}
+    painel = PA.montar(cos, list(coords), lambda uid: nomes_usina.get(str(uid)) or f"Usina {uid}", ficha, agora)
+    local = agora.astimezone(_BRT)
+    r = current_app.make_response(render_template(
+        "campo/equipe_tv.html", torre=TORRE, tela=TORRE.tela("equipe"), p=painel, mapa_js=mapa_js,
+        recarrega_s=RECARREGA_TV_S, hora=local.strftime("%H:%M"), data=f"{DIAS[local.weekday()]}, {local:%d/%m}",
+        prazo=_prazo_da_tv(), q_sair=dict(filtro["q"]), link_chaves=bool(session.get("admin"))))
+    r.headers["Cache-Control"] = "no-store"         # a posição de pessoas não fica na cópia do navegador nem de proxy
+    return r
+
+
 @bp.route("/equipe", endpoint="equipe")
 def equipe():
     """O mapa: os técnicos do piloto com a situação de cada um, o painel ao lado e, para o administrador, o piloto. Com
-    `?ver=usinas`, só as usinas (`_tela_usinas`); com `?clima=1`, o clima por usina por cima (`_clima`)."""
+    `?ver=usinas`, só as usinas (`_tela_usinas`); com `?clima=1`, o clima por usina por cima (`_clima`); com `?tv=1`, o
+    vídeo wall (`_tela_tv`, só com o mapa base: sem ele, a tela de sempre)."""
     quem = _quem_ve()
     if not quem["pode"]:
         return _tela({"recusa": quem["aviso"]}, 403)
@@ -1012,7 +1053,9 @@ def equipe():
     except ValueError as e:     # o contorno do IBGE que não abre: a lista continua valendo
         _log.warning("equipe: o contorno dos estados não abriu (%s)", type(e).__name__)
         mapa = {"viewbox": None, "ufs": [], "usinas": [], "pontos": []}
-    pedido = str(request.args.get("tecnico") or "").strip()
+    # o vídeo wall não abre técnico nem percurso: é o mapa de todos, e o registro é o "abriu_mapa" de sempre
+    tv = str(request.args.get("tv") or "").strip() == "1" and _usa_mapa_base()
+    pedido = "" if tv else str(request.args.get("tecnico") or "").strip()
     sel = next((l for l in linhas if _ID.fullmatch(pedido) and l["pid"] == int(pedido)), None)
     # o Ver percurso (10/11/2026): só do técnico que o painel abre; o período torto é dito e o painel de sempre abre
     periodo = _periodo(agora) if sel else None
@@ -1052,8 +1095,10 @@ def equipe():
     # os dados do mapa de verdade: depois do registro da LGPD, só de quem o mapa mostra
     mapa_js = (_dados_do_mapa("tecnicos", coords, lambda uid: nomes_usina.get(str(uid)) or f"Usina {uid}",
                               lambda uid: "Usina", linhas=linhas, pontos=pontos, sel=sel, perc=perc, clima=clima,
-                              b=b)
+                              b=b, tv=tv)
                if ml else None)
+    if tv:
+        return _tela_tv(b, coords, nomes_usina, mapa_js, filtro, agora)
     admin = bool(session.get("admin"))
     todos = []
     if admin:

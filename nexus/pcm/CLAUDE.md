@@ -540,15 +540,21 @@ PCM"; a prévia com os dados reais foi aprovada no mesmo dia. Desenho e plano: `
   `app-campo-docs/_propostas/almoxarifado-nexus`). O Nexus não chama o Fracttal. As contas e o contrato estão em
   `nexus/dados/almoxarifado.py`, os MESMOS da carga do histórico (`nexus/dados/CLAUDE.md`, linha Almoxarifado).
 - **O que a tela mostra:** 6 números (almoxarifados, peças com saldo, abaixo do mínimo com "e N no limite (+M de saldo
-  unitário)" na nota, sem mínimo, avariadas com saldo, que é um botão para a aba delas, lançadas pelo App com as recusadas) e 6 abas: Reposição, Por almoxarifado, Catálogo e saldo, Consumo nas OS
-  (tudo desde o início, Levi 25/10/2026), Avariadas (30/10/2026) e Cadastro a corrigir. Desde 26/10/2026, as quatro partes do inventário (Inventário, Mínimo e máximo, Curadoria e Auditoria) vêm logo depois, juntas, como links para outras páginas (as seções do inventário, abaixo). Filtro na própria página (`filtro-local.js`). **São dez abas e, a 1366 px com o menu aberto, não cabem** (1341 px de abas para 1068 px de área): a fila rola por dentro e o script da página traz a aba aberta para o meio dela ao carregar e a cada troca (`scrollIntoView({block:'nearest', inline:'center'})`; as páginas do inventário fazem o mesmo em `pcm/_almox_abas.html`). Apertar o `padding` das abas não adiantaria: cortaria 40 px dos 270 que faltam.
+  unitário)" na nota, sem mínimo, avariadas com saldo, que é um botão para a aba delas, lançadas pelo App com as recusadas) e 4
+  abas: Reposição, Por almoxarifado, Catálogo e saldo e Avariadas (30/10/2026). **O Consumo nas OS e o Cadastro a corrigir
+  saíram em 11/11/2026** (o PCM: "Cadastros a corrigir e consumo da OS podem ser tirados"): a conta do consumo FICA (`_consumo`:
+  o número "Lançadas pelo App" do alto e a versão do cliente a usam), e a do cadastro (`d["cadastro"]`) também, sem tela; o
+  `?aba=consumo` e o `?aba=cadastro` de antes abrem a Reposição. Desde 26/10/2026, as quatro partes do inventário (Inventário,
+  Mínimo e máximo, Curadoria e Auditoria) vêm logo depois, juntas, como links para outras páginas (as seções do inventário,
+  abaixo). Filtro na própria página (`filtro-local.js`). **São oito abas:** onde não cabem (no celular), a fila rola por dentro e
+  o script da página traz a aba aberta para o meio dela ao carregar e a cada troca (`scrollIntoView({block:'nearest',
+  inline:'center'})`; as páginas do inventário fazem o mesmo em `pcm/_almox_abas.html`).
 - **O filtro conta a aba à vista (30/10/2026, item 7):** o script das abas disparava `input` no formulário, que o
   `filtro-local.js` não escuta (ele ouve o `change` dos `select` e o `input` do campo de texto): as opções ficavam com os
   números da aba anterior. A troca de aba chama `FiltroLocal['alm-f'].aplicar()` (o filtro se aplica sozinho ao carregar,
-  e o script das abas roda antes dele) e a barra (`data-alm-filtro`) some nas abas sem tabela (Por almoxarifado, Cadastro
-  a corrigir). **Armadilha:** o `.cn-filtros{display:flex}` da casa vence o `[hidden]` do navegador; o `.alm-filtros[hidden]`
+  e o script das abas roda antes dele) e a barra (`data-alm-filtro`) some na aba sem tabela (Por almoxarifado). **Armadilha:** o `.cn-filtros{display:flex}` da casa vence o `[hidden]` do navegador; o `.alm-filtros[hidden]`
   do `pcm.css` é que esconde. Cada tabela leva um `data-fl-nome` próprio, senão a linha "Nenhuma peça com esses filtros"
-  nunca acende (a Reposição, o saldo unitário e as Avariadas têm; o Catálogo e o Consumo ainda não). A tabela das peças de um
+  nunca acende (a Reposição, o saldo unitário e as Avariadas têm; o Catálogo ainda não). A tabela das peças de um
   almoxarifado aberto (Por almoxarifado, abaixo) NÃO leva `data-fl-*`: o filtro da página não a conta, e a barra some nessa aba.
 - **As contas:** abaixo = mínimo > 0 e saldo < mínimo; **no limite** = saldo igual ao mínimo, separado porque o Fracttal
   costuma ter o mínimo igual ao saldo (25/10: 0 abaixo, 54 no limite); sem mínimo = mínimo 0; zerada = saldo 0.
@@ -562,8 +568,8 @@ PCM"; a prévia com os dados reais foi aprovada no mesmo dia. Desenho e plano: `
   quadradinho `.inv-crit` da Aprovação do inventário e Curva a letra, as do cadastro da peça no Fracttal (o Nexus não
   calcula curva, `nexus/dados/almoxarifado.py`); sem valor, "–". **Coluna ausente não é coluna vazia:** o livro do App de
   antes não tem Criticidade, Curva ABC nem Custo unitário (`d["tem_criticidade"]`, `["tem_curva"]`, `["tem_custo"]`), e aí a
-  ordem é a de antes, as colunas mostram "–" e o Cadastro a corrigir não cobra nada; com a coluna, a peça COM saldo e sem
-  curva (ou sem criticidade) dá a linha "N peças com saldo sem Curva ABC no Fracttal" (completar é no Fracttal). O "–" tem duas
+  ordem é a de antes, as colunas mostram "–" e a conta do cadastro (`d["cadastro"]`, sem tela desde 11/11/2026) não cobra
+  nada; com a coluna, ela conta a peça COM saldo e sem curva (ou sem criticidade): completar é no Fracttal. O "–" tem duas
   causas que só o `title` distingue ("sem curva no Fracttal": o PCM completa lá; "o App ainda não traz a curva": nada a cobrar), e
   por isso a ajuda da Reposição diz em UMA FRASE VISÍVEL qual coluna o App ainda não traz (a criticidade, a curva ou as duas, e o
   que a ordem usa então). As células Crit. e Curva são macros de `pcm/_almox_celulas.html`, as mesmas da Reposição e das peças
@@ -595,8 +601,30 @@ PCM"; a prévia com os dados reais foi aprovada no mesmo dia. Desenho e plano: `
   vazios são "–" (o Fracttal não deu o número), nunca 0. Falha: "não consegui abrir as peças agora", e o clique seguinte tenta de
   novo; o cartão aberto ocupa a linha inteira da grade; abaixo de 640 px a tabela vira cartão (`data-r`). ID desconhecido: 404;
   a fonte caída: 503.
-- **A aba Avariadas (30/10/2026, item 6):** a avariada COM saldo não é erro de cadastro, é peça esperando destino; saiu do
-  Cadastro a corrigir e tem aba própria, com a parada de cada uma. Cada linha da conta traz `avariado` (a marca crua do App) e
+- **A lista do Por almoxarifado é a união de três fontes (11/11/2026, item 4 da 2ª rodada; o PCM: "atualizar conforme as
+  usinas forem subindo o almoxarifado e ir aparecendo as usinas"):** o Saldo do ciclo, como antes; os almoxarifados com
+  contagem no livro do App (`almoxarifado_contagens_app_campo`); e os já vistos no histórico (`dim_almoxarifado`). Caso que
+  criou: o almoxarifado de uma usina nova só tem peça ligada no Fracttal depois que a contagem dele é GRAVADA (é a gravação
+  que liga as peças), e até o ciclo do App seguinte ele não aparecia. Mora no `montar` (`_sem_saldo`, a mesma cópia de 5 min,
+  e os livros pela de 2 min), e a régua usa a lista dos cartões (o novo aparece como "sem saldo ainda" e abre sem peça). Cada um
+  vem com a usina pela de-para de hoje, como o saldo (o "Usina" da contagem e o `local` da dimensão; na dimensão, sem ela, a
+  `usina_id` que a carga ligou); sem a dimensão, o nome é "Almoxarifado <ID>". O mesmo almoxarifado nas duas fontes é um cartão
+  só, com o nome da dimensão. **O cartão sem saldo** (o da contagem; tracejado, sem "Ver peças", e os contadores None: zero
+  seria inventado, e "0 peças" diria que foi lido) diz por quê (`_porque_sem_saldo`): "Contagem enviada em dd/mm/aaaa: o saldo
+  vem no próximo ciclo do App depois da gravação"; "Contagem gravada no Fracttal: o saldo vem no próximo ciclo do App"; ou,
+  gravada ANTES do ciclo que a tela mostra (a `peca_gravada` mais nova do almoxarifado, `gravadas_em` do `revisao.resumo`,
+  contra o início do ciclo), "... o ciclo do App de dd/mm não trouxe o saldo: confira no Fracttal as peças ligadas" (não promete
+  o que já não veio). **Os só do histórico vão para "Vistos antes"** (a revisão de 11/11/2026: a dimensão nunca encolhe, e todo
+  almoxarifado dela, o desativado inclusive, virava "sem saldo ainda" para sempre e contava no número do alto): um grupo
+  recolhido depois dos cartões, fora deles, da régua e do número do alto, com o dia em que um ciclo o viu pela última vez
+  (`_vistos_por_ultimo`: o ciclo aplicado e não anulado mais novo com linha dele na foto do mês, lida do mês mais novo para trás
+  até achar todos; sem foto, "sem data no histórico"). O número do alto e a aba contam os cartões ("N sem saldo ainda" na nota,
+  os da contagem). O almoxarifado de teste fica fora das três. O livro das contagens (ou a dimensão) que não se lê não
+  derruba a tela: os cartões dele não aparecem, e o painel diz isso (`avisos_sem_saldo`). A explicação dos cartões mora no
+  "!" do título. Prova: os `test_o_almoxarifado_que_so_tem_contagem_aparece` e seguintes de `tests/test_pcm_almoxarifado.py`
+  e `test_a_regua_lista_o_almoxarifado_sem_saldo_e_nao_quebra`.
+- **A aba Avariadas (30/10/2026, item 6):** a avariada COM saldo não é erro de cadastro, é peça esperando destino; saiu da
+  conta do cadastro e tem aba própria, com a parada de cada uma. Cada linha da conta traz `avariado` (a marca crua do App) e
   `avariada` (a definição da tela): **use sempre `avariada`**, senão o "SP-3-AV" sem a marca vira "não avariada". **Avariada é uma definição só, a do `regua.avariada`** (a
   marca Avariado do catálogo OU o código terminado em `-AV`; o `SP-AVR-001` não): vale na aba, no número do alto (peça ×
   almoxarifado com saldo, nota "com saldo"; antes contava o catálogo inteiro) e na etiqueta do Catálogo. **"Parada"** (`_paradas`)
@@ -613,7 +641,7 @@ PCM"; a prévia com os dados reais foi aprovada no mesmo dia. Desenho e plano: `
 - **Número pela metade não vai:** o saldo é o do ciclo mais novo do App só com Ciclo, Itens e Saldo do mesmo ciclo e 90%
   da lista lidos; senão, o último ciclo aplicado no histórico do Nexus, com o aviso; sem ele (o ensaio), só o aviso.
   Ciclo com mais de 36 h: o aviso com a data. Item com Lido = Não: "não lido neste ciclo", nunca "sem saldo". O consumo
-  vem do `fato_peca_lancada`; enquanto ele não existe, do livro Peças do App (90 dias), com a nota.
+  (o número do alto e a versão do cliente) vem do `fato_peca_lancada`; enquanto ele não existe, do livro Peças do App (90 dias).
 - **A revisão de 25/10/2026** (cada item com teste em `tests/test_pcm_almoxarifado.py`, `test_rev_*`): livros do App que
   chegaram pela metade e o ciclo anulado no Nexus também vão para o último ciclo bom, com o aviso; saldo vazio é "não
   informado" (fora da Reposição e das contas; o cartão conta à parte); na reserva, o catálogo é só o dos itens da foto
@@ -674,7 +702,8 @@ Fracttal aceita de verdade: `...-passo0.md`. Cada parte tem a seção dela abaix
    Gravação acompanha pelo `estado.json` (os números, uma linha por lote e o que aconteceu); a parada mostra o "Continuar" a quem aprovou (e o aviso forte se o almoxarifado ficou travado),
    e o "Encerrar" fecha a que ninguém vai continuar.
 5. **Mínimo e máximo** (`.../regua`): a sugestão, o recomendado (Grid, só no livro) e o acordado (cliente), o único que vai ao
-   Fracttal, pela ponte.
+   Fracttal: pela ponte (uma peça, ou todas as do almoxarifado de uma vez) e, desde 11/11/2026, sozinho no fim da gravação de
+   cada contagem (a seção da régua, "Todos os acordados de uma vez").
 6. **Auditoria** (`.../auditoria`): todos os eventos do livro, com o filtro por tipo e a busca; os de uma contagem, na etapa 4
    dela.
 
@@ -708,9 +737,8 @@ script desliga o filtro só na cópia e deixa a sigla `TST` para ele), com o liv
   `estoque._estoque_do_clone` trocado pelo `EstoqueFalso` e uma rota só da cópia que abre a sessão de uma pessoa do PCM com o cookie
   do Fracttal em `/os` (a cópia recusa todo POST para fora, e o login do Fracttal é um POST).
   A prova de 26/10/2026 achou o `}` do `@media` do fim do inventário perdido no `pcm.css` (a régua e a curadoria sem estilo na
-  tela larga): `test_o_css_do_pcm_fecha_toda_chave`. As dez abas do Almoxarifado não cabem a 1366 px com o menu aberto: a fila
-  rola por dentro (como no celular), a aba de agora vem para o meio ao abrir, e o cartão das Avariadas no alto é o outro caminho
-  para a aba.
+  tela larga): `test_o_css_do_pcm_fecha_toda_chave`. Onde as oito abas do Almoxarifado não cabem (no celular), a fila rola
+  por dentro, a aba de agora vem para o meio ao abrir, e o cartão das Avariadas no alto é o outro caminho para a aba.
 - No Fracttal de verdade: a mesma cópia sem o `EstoqueFalso`, com `NEXUS_INVENTARIO_GRAVAR=1` no ambiente dela (sem a chave a
   gravação recusa com 409, seção da gravação), liberando o POST só para `app.fracttal.com` e `one.fracttal.com`, o
   login do Fracttal de quem prova e a contagem de mentira da `SP-TST-001` (contado 3 contra o saldo 5) mais uma linha
@@ -723,6 +751,10 @@ script desliga o filtro só na cópia e deixa a sigla `TST` para ele), com o liv
   isso sozinhas, pela versão do livro (`leitura._o_que_o_app_faz`); quando o App publicar as cinco colunas, os textos mudam sem
   deploy nem chave.
 - A tela da contagem no App (a sessão do App constrói pelo contrato).
+- A prova no Fracttal de verdade (TESTE - PA, lendo de volta) do lote dos acordados de 11/11/2026: o fim da gravação de uma
+  contagem mandando a régua acordada (a peça recém-ligada, de 0 e 0 para o acordado) e o botão "Gravar no Fracttal todos os
+  acordados deste almoxarifado" em segundo plano (com a recusa da gravação parada e do modo fora do 0). Provado só com o
+  `EstoqueFalso`; fica com o Levi.
 - O que a prova real de 27/10/2026 no almoxarifado de teste NÃO passou (são os caminhos de defeito; o `EstoqueFalso` os supõe):
   voltar ao modo 0 numa sessão aberta sem finalizar; finalizar uma sessão vazia; repetir o `warehouse_change_mode` no 429; ligar
   a peça duas vezes; mover em modo 2; o filtro `code =` e o `field_1` (o nome) da lista de peças (o `Estoque.peca`, só da nova
@@ -979,9 +1011,9 @@ o que não tem contagem na lista: o cartão das recontagens o usa) e o que o App
 ## Inventário do almoxarifado: a aba Inventário (`inventario/revisao.py`, `ponte_os.py` e as rotas em `inventario/__init__.py`; 26/10/2026)
 
 Levi, 26/10/2026: o técnico conta no App e o PCM revisa e aprova no Nexus. A aba é um LINK na fila das abas do Almoxarifado (depois
-das seis), com quantas contagens esperam o PCM; é outra página, `pcm/inventario.html` (a lista) e `pcm/inventario_contagem.html`
+das quatro), com quantas contagens esperam o PCM; é outra página, `pcm/inventario.html` (a lista) e `pcm/inventario_contagem.html`
 (a contagem aberta). **As quatro partes do inventário ficam juntas na fila das abas** (Inventário, Mínimo e máximo, Curadoria e
-Auditoria): as páginas delas incluem `pcm/_almox_abas.html` (as seis voltam à tela principal, em `?aba=`; a de agora é a
+Auditoria): as páginas delas incluem `pcm/_almox_abas.html` (as quatro voltam à tela principal, em `?aba=`; a de agora é a
 `aba_inventario` que a página põe antes de incluir), e a tela principal as põe como links. A régua e a curadoria tinham um menu
 próprio, que saiu. As páginas são sub-rotas
 da tela `pecas`, que é do setor PCM (outros, pela marca em Base → Acessos): `GET /t/pcm/pecas/inventario`, `GET .../<contagem_id>` e
@@ -1190,7 +1222,7 @@ cada almoxarifado, TRÊS números de mínimo e máximo, e só um vai ao Fracttal
   antes do teto.
 - **Recomendado** (a Grid): decisão do PCM, só no livro (`fato_regua_minimo`), é o histórico com que se defende o mínimo.
 - **Acordado** (o cliente): decisão do PCM e o ÚNICO que vai ao Fracttal (`definir_regua`, fora da sessão de ajuste: sem
-  movimento, sem mexer no saldo). Leva os DOIS números; o recomendado pode ficar sem mínimo. Mínimo acima do máximo é
+  movimento, sem mexer no saldo), pelo botão da peça, pelo de todas e no fim da gravação da contagem (abaixo). Leva os DOIS números; o recomendado pode ficar sem mínimo. Mínimo acima do máximo é
   recusado (400) antes de qualquer pedido. **O acordado com casa decimal só em METRO e MASSA** (400): a unidade da varredura vale ao
   registrar, e a que o Fracttal diz (`Estoque.ler()["unidade"]`) vale antes do `definir_regua`; a unidade que ninguém disse é
   inteira.
@@ -1201,9 +1233,16 @@ cada almoxarifado, TRÊS números de mínimo e máximo, e só um vai ao Fracttal
   sob uma trava POR PEÇA (almoxarifado + peça, `travas.Travas`): duas pessoas na mesma peça esperam uma pela outra, e a gravação lenta
   no Fracttal de uma peça não segura as outras (a 1ª versão tinha uma trava do módulo inteiro, segurada durante o pedido ao Fracttal).
 - **De onde vem o saldo:** o da última contagem GRAVADA (o `para_qtd` do evento `peca_gravada` mais novo); sem ela, o da
-  varredura do App (`almoxarifado.montar`). A peça vem do saldo do almoxarifado, nunca do ID que a página mandou (outro
-  almoxarifado ou ID chutado é 400). O almoxarifado de teste não tem linha na varredura (fica fora das telas): a prova dele passa
-  a `varredura=` à mão.
+  varredura do App (`almoxarifado.montar`). A peça vem do saldo do almoxarifado ou da contagem GRAVADA dele, nunca do ID que a
+  página mandou (outro almoxarifado ou ID chutado é 400). **A peça da contagem gravada** (a revisão de 11/11/2026): a que a gravação
+  ligou ao almoxarifado só chega à varredura no ciclo seguinte, e o `decidir` a recusava; a régua a lista já
+  (`_pecas_da_contagem`: o saldo, o código e a usina do `peca_gravada`, o nome e a unidade do catálogo do App), o PCM registra o
+  acordado logo depois da auditoria, e o lote seguinte o manda. **Só a gravada DEPOIS do início do ciclo que a tela mostra** (a
+  re-revisão de 11/11/2026): a gravada antes dele já devia estar na varredura, e a que não está foi desligada ou desativada no
+  Fracttal (voltava à régua com o saldo velho, e o `decidir` a aceitava); sem o início do ciclo, nenhuma. A peça que a curadoria
+  cadastrou e o catálogo ainda não traz leva a unidade da decisão `cadastrar` (cifrada, no `dados`; sem ela, o acordado decimal em
+  METRO da peça nova era recusado). O almoxarifado de teste não tem linha na varredura (fica fora das telas): a prova dele passa a
+  `varredura=` (e o `ciclo_inicio=`) à mão.
 - **Gravar roda na PONTE `/os/_nexus/inventario/regua/gravar` (`ponte_os.py`), não em `/t/pcm`:** o login do Fracttal é o cookie
   `os_sessao`, gravado com `Path=<raiz>/os`, e o navegador não o manda para `/t/pcm/...`; `estoque_da_sessao` numa rota de `/t/pcm`
   seria sempre `SemLogin` em produção (os testes que trocam a função não pegam isso: o teste `test_o_login_do_fracttal_so_chega_na_ponte`
@@ -1218,7 +1257,11 @@ cada almoxarifado, TRÊS números de mínimo e máximo, e só um vai ao Fracttal
   `gravado_fracttal`. A releitura que não bate é um evento `erro` e `NaoConfere` (502): o livro nunca diz que o Fracttal tem o
   que não tem. Uma linha do livro com só um dos números acordados (a API aceita linha à mão) é `Conflito` ("incompleto"), nunca
   um `TypeError` na conferência. O evento sai antes do retrato: se o retrato falhar, a peça segue "não gravada" e o PCM grava de novo (idempotente).
-  Sem acordado, ou peça não ligada ao almoxarifado: `Conflito` (409), nenhum pedido. Quem entrou pela senha de administrador
+  Sem acordado, ou peça não ligada ao almoxarifado: `Conflito` (409), nenhum pedido. **A vez do almoxarifado, como no botão de
+  todos** (a re-revisão de 11/11/2026 fechou a brecha antiga deste botão): `_vez_livre` dá 409 com a gravação de contagem andando
+  ou parada no meio e com o almoxarifado fora do modo 0, antes da leitura; a peça se anuncia antes (`_indo`, uma conta por
+  almoxarifado sob a `gravacao._TRAVA`, e não uma trava: duas peças ainda vão juntas), e a gravação de contagem recusa enquanto
+  ela vai (`lote_andando`). Quem entrou pela senha de administrador
   registra, mas não grava: 409 (não é uma pessoa; o `os_sessao` que estiver no navegador seria o login de outra), e a tela diz por
   quê; a conta do Fracttal do cookie que não é a pessoa da sessão: 409 com o link para entrar de novo; sem o cookie (quem entrou pela
   Microsoft): 401 com o link do `/os/login` e a volta à página. Quem entrou pelo Fracttal e chega à ponte sem o cookie dele tem a
@@ -1230,12 +1273,64 @@ cada almoxarifado, TRÊS números de mínimo e máximo, e só um vai ao Fracttal
   por chave) e `ponte_os.py` (o blueprint `/os/_nexus/inventario`, registrado na raiz do app como o `bp_raiz` do OS Creator, com
   `registrar` idempotente; cada tarefa põe as rotas dela num bloco próprio; `tests/test_pcm_inventario_ponte.py` prova o registro duas
   vezes e as duas rotas debaixo do `NEXUS_PREFIXO=/nexus`). `Estoque.ler` passou a devolver também a `unidade`.
+- **Todos os acordados de uma vez (`gravar_acordados`, 11/11/2026, item 2 da 2ª rodada; o PCM: "Mínimo e máximo: não está
+  atualizando após a auditoria automaticamente no Fracttal"):** decisão do Levi (11/11/2026): vai o ACORDADO registrado, a regra
+  de sempre; a peça sem acordado não muda, e o recomendado e a sugestão nunca vão. Duas portas, a mesma conta: o **fim da
+  gravação de cada contagem** (`gravacao._Trabalho.regua_acordada`, na MESMA sessão do Fracttal de quem gravou, com o
+  almoxarifado já fora do ajuste; a seção da gravação) e o botão **"Gravar no Fracttal todos os acordados deste almoxarifado"**
+  (`POST /os/_nexus/inventario/regua/gravar_todos`, na ponte, com as recusas de sempre: outro setor 403, sem o cookie do Fracttal
+  401, a senha de administrador e a conta de outra pessoa 409; e 409 com uma gravação de contagem andando no almoxarifado, que
+  manda os acordados no fim). Uma leitura do almoxarifado; manda cada peça cujo acordado difere do que o Fracttal tem (a que a
+  gravação acabou de ligar, com 0 e 0, inclusive); relê por lote de 50 (`LOTE_REGUA`) e só então anota o `regua_gravada` (o
+  mínimo de -> para; com o `contagem_id` quando veio da gravação, e a Auditoria da contagem o mostra) e o retrato
+  `gravado_fracttal`, escrevendo o livro uma vez por lote. A peça já igual no Fracttal não gasta pedido; se o livro ainda não a
+  dizia gravada (o lote que o reinício cortou, o livro que recusou o registro, quem gravou à mão), ela ganha um `regua_gravada`
+  de igual para igual e o retrato (a Auditoria não perde quem nem quando), com "já estava igual" no `dados` (o evento leva só o
+  mínimo, e sem a marca ele se confundia com a gravação que mudou só o máximo). **O acordado é relido sob a trava da peça logo
+  antes de cada envio** (o que outra pessoa registrou com o lote andando vai no lugar do de antes, e o `erro` da recusa leva o
+  relido, que foi o que se mandou). **A falha de uma peça não para as outras:** vira um evento `erro` (o porquê cifrado, só texto
+  do Nexus, como na gravação); o `Recusado` não gravou; a resposta perdida talvez gravou, e a releitura decide. O 429 espera 62 s
+  FORA da trava da peça (registrar o acordado dela não espera) e tenta UMA vez; de novo, o lote para e o resto não vai (o texto
+  diz quantas e manda gravar de novo; `feitas` não conta a que não foi); o login que expira também para, e a releitura que não
+  veio deixa as mandadas sem anotação de gravada. O acordado que outra pessoa registra depois do envio não vira "gravado": o
+  retrato é escrito sob a trava de cada peça, conferindo o registrado de agora. Um lote por almoxarifado de cada vez
+  (`Conflito`). Sem acordado nenhum, nem a leitura vai ao Fracttal.
+- **O botão de todos roda em segundo plano** (`iniciar_lote`, a revisão de 11/11/2026: no pedido, 100 peças levavam uns 2 min,
+  574 uns 10, e o restart do deploy no meio deixava peças mandadas sem o evento): uma thread, com o controle
+  `<NEXUS_DADOS>/almox_inventario/regua-lote-<almox>.json` ("gravando", salvo a cada peça; quem mandou só como código, nunca o
+  login), que **o deploy espera como espera a gravação** (`gravacao.com_lote_aberto` devolve `regua-<almox>`) e a tela acompanha
+  (`GET /t/pcm/pecas/inventario/regua/lote.json`, a cada 3 s pelo `pcm-regua.js`, que recarrega no fim; o botão some enquanto
+  ele anda). **O controle do começo que o disco não deixa gravar não começa o lote** (503 com o porquê, nada vai ao Fracttal; a
+  re-revisão de 11/11/2026: a ponte devolvia None, e a página levava um 500 com o lote andando sem o deploy saber); o do andamento
+  que falha só tira o andamento da tela. O `almox` do `lote.json` só vira caminho com números. **A sessão que vence para as
+  perguntas** (o 401 do portão, ou o pedido levado à tela de entrar): a caixa diz que a sessão do Fracttal venceu e manda
+  recarregar e entrar de novo; o lote segue no Nexus. O resultado vem do controle, na cor dele (`_tom_do_lote`: o lote com falha,
+  sem ligação, incompleto ou parado no meio sai na caixa de alerta, nunca na verde), por `RESULTADO_H` (12 h); o "gravando" sem a
+  thread viva é o Nexus que reiniciou no meio: "parada", e o lote seguinte anota de igual para igual a peça que o Fracttal já tem.
+  **A régua e a gravação de contagem se excluem dos dois lados:** o botão de todos toma a vez do lote (`_LOTE`), e o de uma peça
+  se anuncia (`_indo`), e então conferem a da gravação sob a `gravacao._TRAVA` (`_vez_livre` com o `gravacao.vez_presa`: a
+  gravação andando, ou a vez presa por uma contagem que parou no meio, talvez com o almoxarifado travado em ajuste: 409) e o
+  modo do almoxarifado no Fracttal (fora do 0, 409: a régua com o ajuste aberto nunca foi provada); o aprovar e o continuar
+  recusam (409) enquanto o lote anda ou uma peça vai (`gravacao._sem_lote_da_regua`, sob a mesma trava). Sem a pasta de dados
+  nenhuma gravação começa, e a vez só é presa pela viva no processo.
+- **"No Fracttal agora" (11/11/2026):** toda releitura de régua (o botão da peça e o lote) guarda o mínimo e o máximo de cada peça
+  do almoxarifado e a hora (`guardar_lida`, `<NEXUS_DADOS>/almox_inventario/regua-lida-<almox>.json`: a foto do Fracttal para a
+  tela, como o controle da gravação; o rastro de negócio é o evento no banco), e a coluna No Fracttal mostra "mín X, máx Y", com
+  "no Fracttal agora" e "lido às HH:MM" (de outro dia, "lido em dd/mm às HH:MM") em duas linhas curtas (a célula não quebra: numa
+  linha só a coluna espremia a da peça a 1366 px, conferido na cópia de prova), enquanto a releitura for mais nova que a varredura
+  que a tela mostra (`quadro(lida_depois_de=)`, o fim do ciclo do App); depois, volta o mínimo da varredura (o App não traz o
+  máximo). Sem pasta de dados, com o arquivo ilegível ou com o disco que não deixa ler (o `OSError`, que dava 500), vale a
+  varredura. O rótulo longo do botão de todos quebra dentro dele
+  no celular (`.rg-todos .gc-btn`; o `nowrap` da casa o cortava no cartão a 375 px).
 - **Provar:** `tests/test_pcm_inventario_regua.py` (a conta, o quadro, o retrato, só o acordado ao Fracttal, a releitura, o 403
   de quem não é PCM, o 400, o 409, o 401, o 429, a resposta perdida) com mutações nas regras (manda o recomendado, não confere a
   releitura, teto vira piso, avariada com mínimo, gravado sobrevive ao acordado novo, perde o acordado de antes, aceita mínimo
   acima do máximo, ignora a contagem gravada, vale a primeira decisão, peça de qualquer almoxarifado, os dois gates), todas pegas. A
   revisão de 27/10 acrescentou: o acordado que mudou desde que a tela abriu, o decimal em unidade inteira (no registro e na gravação), o
   acordado incompleto, a trava por peça (duas pessoas na mesma peça; a gravação lenta de uma não segura a outra) e o erro de rede.
+  O lote de 11/11/2026: `test_gravar_acordados_manda_so_o_acordado_diferente` e seguintes (a peça sem acordado, a falha de uma, a
+  resposta perdida, a releitura que não bate, o 429, o login, a releitura no quadro, o acordado mudado no meio, a ponte e as
+  recusas dela) e, na gravação, `test_depois_da_gravacao_o_acordado_vai_ao_fracttal` e seguintes.
 
 ## Inventário do almoxarifado: a curadoria (`inventario/curadoria.py`; 26/10/2026)
 
@@ -1269,7 +1364,9 @@ branco não é pendência, nem a avariada sem o ID E sem o Código da peça boa 
   auditoria, e entra no lote pela `contas.contado_efetivo`: "é a peça X" e "cadastrar" SOMAM as achadas ao contado da peça NESSA
   contagem (o total substitui o saldo); o genérico confirmado tira do genérico e põe no específico. `decisoes(cfg, contagem)` devolve
   `{ID da linha: {decisao, id_item, codigo}}`, o formato que `contado_efetivo` e `itens_do_lote` pedem. A peça cadastrada é ligada ao
-  almoxarifado e ajustada na gravação da contagem, não aqui.
+  almoxarifado e ajustada na gravação da contagem, não aqui. **O `cadastrar` guarda a unidade que foi ao Fracttal** (cifrada, no
+  `dados`, ao lado do motivo; a re-revisão de 11/11/2026): o catálogo do App só traz a peça nova na varredura seguinte, e a
+  régua a lê daqui.
 - **Uma linha decidida não se decide de novo** (`Conflito`, 409: dois do PCM com a tela aberta não cadastram a mesma peça duas
   vezes), e **a decisão só vale até a contagem ser gravada**: gravada, aprovada (a gravação começou), com o controle da gravação já
   criado (`gravacao.existe`: o registro da aprovação que falhou no meio deixa os eventos em "nova" com o lote congelado; antes do
@@ -1307,6 +1404,21 @@ branco não é pendência, nem a avariada sem o ID E sem o Código da peça boa 
 - **O código:** `SP-<sigla>-NNN`, o número seguinte ao maior que existe (`Estoque.codigos` traz as peças DESATIVADAS também: a lista
   de Peças e Suprimentos do Fracttal as mostra com "Não" em "Habilitado", então o código de peça desativada não é reaproveitado;
   `-AV` no fim não tira o número). As siglas são as 12 do catálogo; `TST` só no almoxarifado de teste (`ids_de_teste`).
+- **A sigla sugerida (11/11/2026, item 1 da 2ª rodada; o PCM: "Curadoria: sugerir o código baseado nas famílias já
+  criadas"):** no achado fora do catálogo, o select do cadastrar vem com a sigla sugerida escolhida e marcada "(sugerida)", com
+  as 3 peças mais parecidas do catálogo (código e nome) como contexto; o PCM troca, e o código continua saindo do
+  `proximo_codigo` com a sigla que ele mandar (a sugestão não grava nada). A conta (`curadoria.sugerir`, sobre o `indice` do
+  catálogo do App, o `_catalogo()` com a Família; nunca planilha de fora): as palavras do nome que o técnico escreveu
+  (`palavras`: sem acento nem caixa, a palavra inteira e os pedaços da que mistura letra e número, sem a de ligação nem o
+  caractere solto) contra as de cada peça, pela semelhança de cosseno com o peso da raridade (IDF: a palavra de uma peça só pesa
+  o máximo, a de todas não pesa); a avariada fica de fora (dobraria o voto da boa). As 5 mais parecidas (semelhança de ao menos
+  `PARECIDA_MIN`, 0,1) votam, cada uma com o quanto se parece, na sigla do código dela; a de código antigo, sem a sigla, vota na
+  sigla mais comum da Família dela no catálogo ("pela Família X"). **Por que o voto pesa:** pela contagem simples, "Conector
+  MC4 fêmea" iria para a sigla das duas peças de aterramento que só dividem o "conector" (2 a 1). Só vale a sigla do
+  almoxarifado (`siglas`: a `TST` só no de teste). Sem parecida ou sem voto, nada é sugerido ("Nenhuma peça parecida no
+  catálogo"). A reserva de uma tentativa anterior vale mais que a sugestão (os mesmos dados, senão 409), e quem só olha não vê
+  a sugestão (sai do que o técnico escreveu). Prova: `test_a_sigla_mais_comum_das_parecidas` e seguintes de
+  `tests/test_pcm_inventario_curadoria.py`, com um catálogo de mentira.
 - **O destino da peça** ("é a peça X", "confirmar") tem de existir no catálogo do App (ou ter sido cadastrado por aqui: a varredura
   diária ainda não o viu); a tela aceita o CÓDIGO (o PCM conhece o código, não o ID) e converte. Sem o catálogo inteiro, não decide.
 - **O motivo** (texto livre) só cifrado, em `dados={"motivo": ...}` (o Cofre do cadastro; a API do banco é aberta); descartar o exige.
@@ -1467,6 +1579,15 @@ inventário físico). Tudo no módulo existe para nunca deixar um almoxarifado t
   o login:** o JWT e o e-mail vivem só na instância do `Estoque`. Os eventos vão ao livro SEMPRE com a sessão fechada (o banco
   lento não segura o almoxarifado travado), com o `evento_id` tirado da contagem, do tipo e da peça: registrar de novo não
   duplica a auditoria.
+- **A régua acordada no fim (11/11/2026, item 2 da 2ª rodada):** quando a gravação termina (concluída, com ou sem conflitos;
+  a parada não), `_executar` chama a `regua_acordada` antes do `fim`: o `regua.gravar_acordados` do almoxarifado, na MESMA
+  sessão do Fracttal (o `Estoque` de quem aprovou ou continuou), no nome de quem aprovou, com os eventos ligados à contagem. O
+  controle segue "gravando" (o deploy espera; a vez do almoxarifado só se solta no fim), com o andamento em `regua`, e a etapa
+  Gravação diz o resultado antes de "Gravação concluída." ("Régua acordada: N gravados no Fracttal e relidos, ..."; nada quando
+  o almoxarifado não tem acordado, e aí nem um pedido a mais). **Nunca desfaz o saldo:** a falha da régua (o login que expira, o
+  429 de novo, o livro) fica no controle ("A régua acordada não foi ao Fracttal (...): grave pela tela Mínimo e máximo") e a
+  contagem termina "concluída" do mesmo jeito. O arquivo da releitura (`regua-lida-*`) mora na mesma pasta e fica fora dos
+  `_controles`.
 - **O deploy espera a gravação viva** (Levi, 26/10/2026): o `deploy/atualizar.sh` pergunta ao `ferramentas/gravacao_aberta.py`
   (`gravacao.com_lote_aberto`: "gravando" e salvo há menos de 5 min, com um lote aberto OU entre um lote e outro) e deixa o
   restart para a rodada seguinte, por no máximo 10 min contados da 1ª espera (`DEPLOY.md`, seção 8). A 1ª versão só segurava com

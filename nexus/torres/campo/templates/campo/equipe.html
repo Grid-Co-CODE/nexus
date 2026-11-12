@@ -63,9 +63,13 @@
           últimas 24 h da NASA): a cor da usina é o nível do alerta, a mancha é a área do aviso e o ponto laranja é o
           foco. Com uma fonte sem leitura, a usina sem alerta fica cinza, nunca verde. O menu do Nexus recolhe para o
           painel caber; tirar o clima o devolve.</p>
+          <p><b>Vídeo wall.</b> Abre o mapa em tela cheia, sem o menu do Nexus, com as ocorrências abertas da Ronda COS ao
+          lado, por grupo (usina parada, inversores, rede concessionária, comunicação e outras): uma usina é um cartão,
+          no grupo da pior ocorrência dela, a mais antiga primeiro. A tela se atualiza sozinha a cada 2 minutos, e a
+          lista que não cabe rola sozinha. Cada atualização conta como uma abertura do mapa no registro de quem viu.</p>
           <p><b>O mapa aproxima.</b> Com a roda do mouse, os botões do canto ou dois dedos, e arrastando para andar. No
           percurso, as cidades e as horas aparecem conforme a vista chega perto. O losango é a usina; o círculo, o
-          técnico.</p>
+          técnico. A cor da usina é o Agora de Comando &gt; Usinas; no Foco técnico, só a usina parada fica com cor.</p>
           {# a regra da coordenada trocada pelo Levi em 11/11/2026 ("Pode trocar"), com o mapa de verdade #}
           <p><b>A posição no mapa.</b> O ponto é a posição que o celular mandou, com a precisão do GPS. Para desenhar o mapa
           de ruas, a coordenada de quem aparece no mapa vai à página de quem pode ver, depois de gravado o registro de quem
@@ -88,6 +92,10 @@
        esquerda e vai mostrar os climas os alertas, tanto por usina ou por técnico'): liga e desliga o `?clima=1`, e
        guarda o que está aberto (o técnico, o percurso, o filtro) #}
     <a class="gc-btn gc-btn--contorno eq-clima-bt{% if clima_on %} eq-clima-bt--on{% endif %}" href="{{ url_for('torre_campo.equipe', **q_botao_clima) }}"{% if clima_on %} aria-current="true" title="Tirar o clima do mapa"{% else %} title="Mostra os alertas de clima por usina e recolhe o menu"{% endif %}><i class="ph ph-{{ 'check-circle' if clima_on else 'cloud-lightning' }}" aria-hidden="true"></i>Incluir clima</a>
+    {# o vídeo wall (Levi, 12/11/2026: "Prepare um modo vídeo wall que apareça informações como no anexo 1 do lado esquerdo do
+       mapa!"): o mapa em tela cheia, sem a casca do Nexus, com as ocorrências abertas do COS ao lado (`?tv=1`, com o
+       filtro e o clima de agora). Abre em outra aba: é a tela que vai para a TV #}
+    {% if mapa_js and not usinas and not erro and filtro is defined %}<a class="gc-btn gc-btn--contorno eq-tv-bt" data-eq-videowall href="{{ url_for('torre_campo.equipe', tv=1, **filtro.q) }}" target="_blank" rel="noopener" title="Abre o mapa em tela cheia para o vídeo wall, com as ocorrências abertas do COS ao lado"><i class="ph ph-monitor" aria-hidden="true"></i>Vídeo wall</a>{% endif %}
     {% if not usinas and not erro and filtro is defined %}
     {# o filtro por supervisor e por equipe (Levi, 08/11/2026): as opções são de quem está no piloto; a troca do select já
        envia (sem JavaScript, o botão), e o filtro vai junto em todo link de técnico #}
@@ -183,31 +191,7 @@
     <div class="eq-quadro">
       {% set dm = d or (mapa if mapa.viewbox else none) %}
       {% if mapa_js %}
-      {# o mapa de verdade (11/11/2026, o guia e a prévia do Willian; Levi: "sem 3D", "só Brasil", "em estilo Nexus"): o
-         MapLibre sobre o mapa base do Brasil servido pelo próprio Nexus (Base > Mapa base). Os dados vão no JSON abaixo,
-         depois do registro da LGPD, com a coordenada só de quem o mapa mostra (campo-mapa.js) #}
-      <div class="eq-zoom" role="group" aria-label="Zoom do mapa">
-        <button type="button" class="eq-zoom-bt" data-eq-zoom="mais" aria-label="Aproximar" title="Aproximar (+)"><i class="ph ph-plus" aria-hidden="true"></i></button>
-        <button type="button" class="eq-zoom-bt" data-eq-zoom="menos" aria-label="Afastar" title="Afastar (-)"><i class="ph ph-minus" aria-hidden="true"></i></button>
-        {% if mapa_js.percurso %}<button type="button" class="eq-zoom-bt eq-zoom-bt--txt" data-eq-zoom="percurso" title="Aproxima até o percurso inteiro caber na vista"><i class="ph ph-path" aria-hidden="true"></i>Ir ao percurso</button>{% endif %}
-        <button type="button" class="eq-zoom-bt eq-zoom-bt--txt" data-eq-zoom="inteiro" title="Volta ao Brasil inteiro"><i class="ph ph-arrows-out" aria-hidden="true"></i>Brasil</button>
-      </div>
-      {# os dois focos (Levi, 12/11/2026: "Quero ter dois focos, foco técnico e focos usina, dessa forma dá para focar
-         melhor") e o Mapa | Satélite ("Quero a visão de mapa e satélite"; a Esri, com a chave de Base > Chaves) #}
-      <div class="eq-camadas" role="group" aria-label="O que o mapa destaca">
-        {% if mapa_js.modo == 'tecnicos' %}<div class="cn-seg eq-seg-mapa" role="group" aria-label="Foco"><button type="button" data-eq-foco="tecnico" aria-pressed="true">Foco técnico</button><button type="button" data-eq-foco="usina" aria-pressed="false">Foco usina</button></div>{% endif %}
-        {% if mapa_js.satelite %}<div class="cn-seg eq-seg-mapa" role="group" aria-label="Fundo do mapa"><button type="button" data-eq-base="mapa" aria-pressed="true">Mapa</button><button type="button" data-eq-base="satelite" aria-pressed="false">Satélite</button></div>{% endif %}
-      </div>
-      <div class="eq-palco eq-palco--ml">
-        <div class="eq-ml" id="eq-mapa" role="region" aria-label="{{ 'As usinas no mapa' if usinas else 'Os técnicos de campo no mapa' }}"></div>
-        <div class="eq-dica" role="status" hidden></div>
-        <p class="eq-ml-aviso" hidden></p>
-      </div>
-      <script type="application/json" id="eq-dados">{{ mapa_js|tojson }}</script>
-      <link rel="stylesheet" href="{{ url_for('static', filename='vendor/maplibre-gl-4.7.1/maplibre-gl.css') }}">
-      <script src="{{ url_for('static', filename='vendor/maplibre-gl-4.7.1/maplibre-gl.js') }}"></script>
-      <script src="{{ url_for('static', filename='vendor/pmtiles-3.2.1/pmtiles.js') }}"></script>
-      <script src="{{ url_for('static', filename='campo-mapa.js') }}"></script>
+      {% include "campo/_equipe_mapa_ml.html" %}
       {% elif dm %}
       {# o zoom (campo-percurso.js) vale no mapa dos técnicos, no das usinas e no percurso (11/11/2026): troca o viewBox,
          na proporção do cartão, e diz ao CSS quantas unidades do desenho valem um pixel da tela (--eq-un), para o texto

@@ -295,3 +295,18 @@ def test_a_publicacao_sem_perda_sai(cli, monkeypatch, app_lig):
     monkeypatch.setattr(B, "ler_de_para", quebra)
     r = cli.post("/t/base/ligacoes/publicar", data={})
     assert "não consegui ler o de-para do banco" in parse_qs(urlparse(r.headers["Location"]).query)["erro"][0]
+
+
+def test_o_ligar_usa_a_lista_do_nexus_e_nao_o_datalist(cli):
+    """Levi, 12/11/2026: o <datalist> abria solto e fora do estilo ("tem que estar alinhado com o campo")."""
+    html = cli.get("/t/base/governanca?sistema=" + FR).get_data(as_text=True)
+    assert '<datalist id="lig-usinas">' not in html and 'list="lig-usinas"' not in html
+    assert 'data-lista="lig-usinas-opcoes"' in html
+    opcoes = json.loads(html.split('id="lig-usinas-opcoes">')[1].split("</script>")[0])
+    assert "2 · Athon - Matões 100" in opcoes and "1 · Thopen - Brodowski" in opcoes
+    assert "lista-sugestoes.js" in html
+
+
+def test_decidir_recebe_o_mesmo_valor_id_e_titulo(cli, app_lig):
+    q = _decidir(cli, acao="ligar", chave="Athon - Matões 1 - MA", usina="2 · Athon - Matões 100")
+    assert "ok" in q

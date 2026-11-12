@@ -13,10 +13,25 @@
    para um grupo fechado, a Reposição leva a criticidade e a Curva ABC do Fracttal, e as avariadas com saldo ganham a
    aba Avariadas (há quanto tempo cada uma está parada, pelo histórico). Na aba Por almoxarifado, cada cartão mostra a última
    contagem gravada do inventário e o valor em estoque por curva, e o botão "Ver peças" busca, no 1º clique, as peças daquele
-   almoxarifado (a rota `pecas_almox`, o pedaço _almox_pecas.html), da mesma conta guardada de 5 min. #}
+   almoxarifado (a rota `pecas_almox`, o pedaço _almox_pecas.html), da mesma conta guardada de 5 min.
+   11/11/2026 (o PCM: "atualizar conforme as usinas forem subindo o almoxarifado e ir aparecendo as usinas"): o Por almoxarifado
+   é a união do saldo do ciclo, das contagens do App e do histórico do Nexus, e o cartão sem saldo diz por quê, sem número. A
+   explicação dos cartões mora no "!" do título (o padrão do Nexus, _explica.html). #}
+{% from "_explica.html" import explica %}
 <div class="pg alm">
 <p class="gc-eyebrow">PCM · Almoxarifado</p>
-<h1 class="titulo-pagina">Almoxarifado</h1>
+<div class="gc-titulo-explica"><h1 class="titulo-pagina">Almoxarifado</h1>
+{% call explica('Entenda esta tela') %}<p><b>Por almoxarifado.</b> Cada cartão é um almoxarifado do Fracttal. A barra é a parte
+  das peças acima do mínimo. A última contagem gravada é a do inventário (a mais nova entre as gravadas no Fracttal). O valor em
+  estoque é o saldo vezes o custo unitário do Fracttal, somado por Curva ABC do cadastro da peça; a peça com saldo e sem custo
+  fica fora da soma, e o cartão diz quantas.</p>
+<p><b>O almoxarifado sem saldo ainda.</b> Ele aparece assim que sobe qualquer dado: o saldo do ciclo do App, uma contagem do
+  inventário ou o histórico do Nexus. Sem linha no saldo do ciclo, o cartão não mostra número e diz por quê. Contagem enviada:
+  é a gravação da contagem no Fracttal que liga as peças ao almoxarifado, e o saldo vem no ciclo do App seguinte a ela.
+  Contagem gravada: o saldo vem no próximo ciclo; se o ciclo já passou sem trazê-lo, confira no Fracttal as peças ligadas.</p>
+<p><b>Vistos antes.</b> O almoxarifado que o histórico do Nexus já viu e que o ciclo de agora não traz, sem contagem (sem peça
+  ligada no Fracttal hoje, ou desativado), fica no grupo recolhido do fim, com o dia em que um ciclo o viu pela última vez, e não
+  conta no número do alto.</p>{% endcall %}</div>
 {% if erro %}<div class="cn-erro" role="alert">Uma fonte não respondeu agora: {{ erro }}</div>{% endif %}
 
 {% if d.estado == 'sem_livro' %}
@@ -35,7 +50,7 @@
 
 <section class="kb-kpis alm-kpis" aria-label="Resumo do almoxarifado">
   <div class="kb-kpi" data-alm-kpi><span class="kb-kpi-rot">Almoxarifados</span>
-    <div class="kb-kpi-linha"><b class="kb-kpi-v">{{ k.almoxarifados }}</b><span class="kb-kpi-nota">nas usinas</span></div></div>
+    <div class="kb-kpi-linha"><b class="kb-kpi-v">{{ k.almoxarifados }}</b><span class="kb-kpi-nota">nas usinas{% if k.sem_saldo %}, {{ k.sem_saldo }} sem saldo ainda{% endif %}</span></div></div>
   <div class="kb-kpi" data-alm-kpi><span class="kb-kpi-rot">Peças com saldo</span>
     <div class="kb-kpi-linha"><b class="kb-kpi-v">{{ k.com_saldo }}</b><span class="kb-kpi-nota">em algum almoxarifado</span></div></div>
   <div class="kb-kpi" data-alm-kpi><span class="kb-kpi-rot">Abaixo do mínimo</span>
@@ -54,9 +69,7 @@
   <button class="alm-aba" role="tab" aria-selected="true" data-aba="reposicao">Reposição ({{ k.abaixo }} + {{ k.no_limite }} no limite)</button>
   <button class="alm-aba" role="tab" aria-selected="false" data-aba="almoxarifados">Por almoxarifado ({{ k.almoxarifados }})</button>
   <button class="alm-aba" role="tab" aria-selected="false" data-aba="catalogo">Catálogo e saldo ({{ d.catalogo|length }})</button>
-  <button class="alm-aba" role="tab" aria-selected="false" data-aba="consumo">Consumo nas OS ({{ d.consumo|length }})</button>
   <button class="alm-aba" role="tab" aria-selected="false" data-aba="avariadas">Avariadas ({{ k.avariadas }})</button>
-  <button class="alm-aba" role="tab" aria-selected="false" data-aba="cadastro">Cadastro a corrigir</button>
   {# as quatro partes do inventário (26/10/2026) são OUTRAS páginas: links na fila das abas, juntas (o Inventário com quantas
      contagens esperam o PCM), as mesmas do pcm/_almox_abas.html das páginas do inventário #}
   <a class="alm-aba" role="tab" aria-selected="false" href="{{ raiz }}/t/pcm/pecas/inventario">Inventário{% if inventario_a_revisar %} ({{ inventario_a_revisar }}){% endif %}</a>
@@ -129,12 +142,21 @@
 
 <section class="alm-painel" data-painel="almoxarifados" hidden>
   <h2>Por almoxarifado</h2>
-  <p class="alm-ajuda">A barra é a parte das peças acima do mínimo. A última contagem gravada é a do inventário (a mais nova
-    entre as gravadas no Fracttal). O valor em estoque é o saldo vezes o custo unitário do Fracttal, somado por Curva ABC
-    do cadastro da peça; a peça com saldo e sem custo fica fora da soma e o cartão diz quantas.{% if not d.tem_custo %} O App
-    ainda não traz o custo: por enquanto os cartões não mostram o valor.{% endif %}</p>
+  {# como se lê cada cartão está no "!" do título; aqui só o que muda com o dado #}
+  {% if not d.tem_custo %}<p class="alm-ajuda">O App ainda não traz o custo: por enquanto os cartões não mostram o valor.</p>{% endif %}
+  {% for m in d.avisos_sem_saldo or [] %}<div class="cn-erro cn-aviso" role="status">{{ m }}</div>{% endfor %}
   <div class="alm-cards">
   {% for c in cartoes %}
+    {% if c.sem_saldo %}
+    {# o almoxarifado que o saldo do ciclo não traz (11/11/2026): só com contagem do App ou só no histórico do Nexus. Nenhum
+       número (sem saldo não há peça, mínimo nem valor) e sem "Ver peças"; o porquê vem do `_porque_sem_saldo` #}
+    <article class="alm-card alm-card--sem-saldo">
+      <h3>{{ c.nome }}</h3>
+      <p class="alm-det">{% if c.usina %}{{ c.usina }}{% else %}<span class="alm-ruim">usina não ligada</span> (ligar em Base → Ligações){% if c.local %} · no Fracttal: {{ c.local }}{% endif %}{% endif %}</p>
+      <p class="alm-sem-saldo"><span class="inv-selo">sem saldo ainda</span> {{ c.porque }}</p>
+      {% if c.ultima_contagem %}<div class="alm-card-info"><p>Última contagem gravada: <b>{{ c.ultima_contagem }}</b></p></div>{% endif %}
+    </article>
+    {% else %}
     <article class="alm-card">
       <h3>{{ c.nome }}</h3>
       <p class="alm-det">{% if c.usina %}{{ c.usina }}{% else %}<span class="alm-ruim">usina não ligada</span> (ligar em Base → Ligações){% endif %}</p>
@@ -172,8 +194,22 @@
         <div data-pecas-corpo></div>
       </div>
     </article>
+    {% endif %}
   {% endfor %}
   </div>
+  {# os vistos antes (a revisão de 11/11/2026): os almoxarifados só do histórico, recolhidos, com o dia em que um ciclo os viu
+     pela última vez; fora dos cartões e do número do alto #}
+  {% if d.vistos_antes %}
+  <details class="alm-vistos">
+    <summary><b>Vistos antes ({{ d.vistos_antes|length }})</b> <span class="mudo">o histórico já os viu; o ciclo de agora não
+      traz peça nenhuma ligada a eles</span></summary>
+    <ul class="alm-vistos-lista">
+      {% for c in d.vistos_antes %}
+      <li><b>{{ c.nome }}</b> <span class="alm-det">{% if c.usina %}{{ c.usina }}{% else %}usina não ligada{% if c.local %} · no Fracttal: {{ c.local }}{% endif %}{% endif %} · {% if c.visto_em %}visto pela última vez em {{ c.visto_em }}{% else %}sem data no histórico{% endif %}</span></li>
+      {% endfor %}
+    </ul>
+  </details>
+  {% endif %}
 </section>
 
 <section class="alm-painel" data-painel="catalogo" hidden>
@@ -191,29 +227,6 @@
     </tr>
     {% endfor %}
     <tr data-fl-vazio="alm-f" hidden><td colspan="4" class="mudo">Nenhuma peça com esses filtros.</td></tr>
-    </tbody>
-  </table>
-</section>
-
-<section class="alm-painel" data-painel="consumo" hidden>
-  <h2>Peças lançadas nas OS pelo App</h2>
-  <p class="alm-ajuda">O que o técnico lançou pelo App de Campo, desde o início. A baixa no estoque é do Fracttal, quando a
-    OS fecha; a recusada nunca saiu do saldo.{% if d.consumo_fonte == 'app' %}
-    Por enquanto, o histórico ainda não é gravado: mostrando os 90 dias do App.{% endif %}</p>
-  <table class="alm-t" data-fl-grupo="alm-f">
-    <thead><tr><th>Dia</th><th>OS</th><th>Peça</th><th class="num">Qtd</th><th>Almoxarifado</th><th>No Fracttal</th></tr></thead>
-    <tbody>
-    {% for c in d.consumo|reverse %}
-    <tr{{ filtro(c.almox, c.familia, c.busca) }}>
-      <td data-r="Dia"><span class="alm-v">{{ c.dia }}</span></td>
-      <td data-r="OS" class="alm-cod"><span class="alm-v">{{ c.os }}</span></td>
-      <td data-r="Peça"><span class="alm-v"><span class="alm-cod">{{ c.codigo }}</span> {{ c.nome }}</span></td>
-      <td data-r="Qtd" class="num"><span class="alm-v">{{ '%g'|format(c.quantidade) }}</span></td>
-      <td data-r="Almoxarifado"><span class="alm-v">{{ c.almox }}</span></td>
-      <td data-r="No Fracttal"><span class="alm-v">{% if c.situacao == 'lançada' %}<span class="alm-ok">lançada</span>{% else %}<span class="alm-ruim">recusada</span>{% if c.recusa %} <span class="alm-det">{{ c.recusa }}</span>{% endif %}{% endif %}</span></td>
-    </tr>
-    {% endfor %}
-    <tr data-fl-vazio="alm-f"{% if d.consumo %} hidden{% endif %}><td colspan="6" class="mudo">Nenhuma peça lançada pelo App.</td></tr>
     </tbody>
   </table>
 </section>
@@ -244,19 +257,6 @@
   {% else %}<p class="mudo">Nenhuma peça avariada com saldo.</p>{% endif %}
 </section>
 
-<section class="alm-painel" data-painel="cadastro" hidden>
-  <h2>Cadastro a corrigir no Fracttal</h2>
-  <p class="alm-ajuda">Quem corrige é o PCM, no Fracttal; o Nexus só lê. Sem o mínimo, a peça nunca aparece na Reposição.{% if d.tem_curva or d.tem_criticidade %}
-    A peça sem curva ou sem criticidade vai para o fim da ordem da Reposição.{% endif %}</p>
-  <ul class="alm-lista">
-    {% for s in d.cadastro.sem_minimo %}<li><b>{{ s.n }}</b> peça(s) sem mínimo em {{ s.almoxarifado }}</li>{% endfor %}
-    {# só com a coluna no livro (o App de antes não a traz): o texto é inteiro, sem tag no meio, para ler e buscar como frase #}
-    {% if d.cadastro.sem_curva %}<li>{{ d.cadastro.sem_curva }} peça{{ 's' if d.cadastro.sem_curva != 1 else '' }} com saldo sem Curva ABC no Fracttal</li>{% endif %}
-    {% if d.cadastro.sem_criticidade %}<li>{{ d.cadastro.sem_criticidade }} peça{{ 's' if d.cadastro.sem_criticidade != 1 else '' }} com saldo sem criticidade no Fracttal</li>{% endif %}
-    {% for r in d.cadastro.recusadas %}<li><span class="alm-ruim">corrigir no Fracttal</span>: a peça <span class="alm-cod">{{ r.codigo }}</span> da OS {{ r.os }} foi recusada{% if r.recusa %} ({{ r.recusa }}){% endif %} e não saiu do saldo</li>{% endfor %}
-    {% if not (d.cadastro.sem_minimo or d.cadastro.sem_curva or d.cadastro.sem_criticidade or d.cadastro.recusadas) %}<li class="mudo">Nada a corrigir.</li>{% endif %}
-  </ul>
-</section>
 <script>
   // as abas: mostrar uma esconde as outras (a tabela escondida não conta no filtro) e o endereço guarda qual está aberta.
   // A barra do filtro só aparece onde há tabela para filtrar, e a troca de aba REFAZ as contas do filtro: o script de antes
@@ -268,8 +268,8 @@
     var filtro = document.querySelector('[data-alm-filtro]');
     // quem abre uma aba: as abas e o cartão das avariadas (o `aria-selected` fica só nas abas)
     var gatilhos = Array.prototype.slice.call(document.querySelectorAll('[data-aba]'));
-    // a fila tem dez abas e, a 1366 px com o menu aberto, não cabe: rola por dentro, e a aba aberta vem para o meio dela (sem
-    // isto, o `?aba=` de uma das últimas abria com a aba fora da tela). `nearest` no vertical: a página não anda
+    // a fila tem oito abas e, no celular, não cabe: rola por dentro, e a aba aberta vem para o meio dela (sem isto, o `?aba=`
+    // de uma das últimas abria com a aba fora da tela). `nearest` no vertical: a página não anda
     function centrar(aba) {
       if (aba && aba.scrollIntoView) aba.scrollIntoView({block: 'nearest', inline: 'center'});
     }
