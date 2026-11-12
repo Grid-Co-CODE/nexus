@@ -94,6 +94,10 @@ CABS = {"fechamento": fatos.CAB_FECHAMENTO, "ronda": fato_ronda.CAB_RONDA, "pt":
         # as OS do cliente pela FAMA (11/11/2026, fase 1: sombra): o servidor grava de hora em hora, só com as três chaves
         "os_fama": fato_os_fama.CAB_OS_FAMA}
 PROIBIDAS = ("nome", "email", "tecnico", "observacao", "comentario", "motivo", "tarefa", "relatorio", "atividades")
+# a coluna com nome de texto que só leva CIFRA, com o leitor e a chave declarados: o motivo da recontagem para o técnico no
+# App (12/11/2026, contrato fechado com o App v342; a cifra, o vetor fixo e a recusa do texto pronto em
+# tests/test_pcm_inventario_motivo_tecnico.py)
+SO_CIFRA = {("evento_inventario", "motivo_tecnico")}
 
 
 def test_catalogo_bate_com_o_codigo_de_cada_fato_conformado_ou_montado():
@@ -115,7 +119,7 @@ def test_catalogo_bate_com_o_codigo_de_cada_fato_conformado_ou_montado():
         assert ("equipamento_id" not in cab) or "equipamento_ligado_por" in cab, fid
         # texto pessoal não entra; a contagem (_qtd), a chave (tarefa_chave) e o indicador 1/0 declarado, sim
         indicadores = {m.coluna for m in f.medidas if m.unidade == "1/0"}
-        assert not [c for c in cab if c not in indicadores and any(
+        assert not [c for c in cab if c not in indicadores and (fid, c) not in SO_CIFRA and any(
             c == p or (c.startswith(p + "_") and not c.endswith(("_qtd", "_chave"))) for p in PROIBIDAS)], fid
         if f.conformado_em:
             livro, aba = f.conformado_em.split(" · ")

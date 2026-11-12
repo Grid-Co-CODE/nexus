@@ -46,6 +46,30 @@ def _derivar(mestra: bytes, uso: bytes) -> bytes:
     return HKDF(algorithm=hashes.SHA256(), length=32, salt=None, info=b"nexus-cadastro/" + uso).derive(mestra)
 
 
+def aead_derivada(segredo: bytes, info: bytes) -> AESGCM:
+    """A AES-256-GCM numa chave HKDF-SHA256 (sem sal, 32 bytes) de `segredo` com `info`: a cifra de um texto para OUTRO
+    leitor, que tem o segredo dele e não a NEXUS_CHAVE_CADASTRO (o motivo da recontagem para o técnico no App, 12/11/2026,
+    com a NEXUS_PESSOA_HMAC). O valor tem o formato do Cofre: `cifrar_com` e `decifrar_com`."""
+    return AESGCM(HKDF(algorithm=hashes.SHA256(), length=32, salt=None, info=info).derive(segredo))
+
+
+def cifrar_com(aead: AESGCM, texto: str, contexto: str) -> str:
+    """`cf1:` + base64url sem o `=` de (nonce de 12 bytes + cifra com a tag), com o `contexto` como dado associado."""
+    nonce = os.urandom(12)
+    return PREFIXO + _b64e(nonce + aead.encrypt(nonce, texto.encode("utf-8"), contexto.encode("utf-8")))
+
+
+def decifrar_com(aead: AESGCM, valor, contexto: str) -> str:
+    if not (isinstance(valor, str) and valor.startswith(PREFIXO)):
+        raise CifraErro("valor não está cifrado")
+    try:
+        bruto = _b64d(valor[len(PREFIXO):])
+        return aead.decrypt(bruto[:12], bruto[12:], contexto.encode("utf-8")).decode("utf-8")
+    except Exception:
+        # InvalidTag, base64 quebrado, UTF-8 inválido: para a tela é tudo "não confere".
+        raise CifraErro("cifra não confere: adulterada, de outra linha ou de outra chave") from None
+
+
 class Cofre:
     def __init__(self, chave_b64: str):
         try:
@@ -62,19 +86,10 @@ class Cofre:
         return isinstance(valor, str) and valor.startswith(PREFIXO)
 
     def cifrar(self, texto: str, contexto: str) -> str:
-        nonce = os.urandom(12)
-        corpo = self._aead.encrypt(nonce, texto.encode("utf-8"), contexto.encode("utf-8"))
-        return PREFIXO + _b64e(nonce + corpo)
+        return cifrar_com(self._aead, texto, contexto)
 
     def decifrar(self, valor: str, contexto: str) -> str:
-        if not self.eh_cifrado(valor):
-            raise CifraErro("valor não está cifrado")
-        try:
-            bruto = _b64d(valor[len(PREFIXO):])
-            return self._aead.decrypt(bruto[:12], bruto[12:], contexto.encode("utf-8")).decode("utf-8")
-        except Exception:
-            # InvalidTag, base64 quebrado, UTF-8 inválido: para a tela é tudo "não confere".
-            raise CifraErro("cifra não confere: adulterada, de outra linha ou de outra chave") from None
+        return decifrar_com(self._aead, valor, contexto)
 
     def selar(self, linha: dict) -> str:
         corpo = {k: v for k, v in linha.items() if k != "_selo"}

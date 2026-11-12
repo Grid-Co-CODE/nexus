@@ -92,7 +92,9 @@ def test_contrato_do_livro():
         "fato_evento_inventario", "fato_regua_minimo", "fato_curadoria_inventario")
     assert F.CAB_EVENTO == ["evento_id", "quando", "data_id", "contagem_id", "tipo", "id_almoxarifado", "usina_id",
                             "id_item", "codigo", "de_qtd", "para_qtd", "contado_qtd", "movimento_fracttal", "situacao",
-                            "lote", "pessoa_id", "pessoa_hmac", "dados_cifrados", "usina_ligada_por"]
+                            "lote", "pessoa_id", "pessoa_hmac", "dados_cifrados", "usina_ligada_por",
+                            # a cópia do motivo da recontagem para o técnico no App (12/11/2026): no fim, cifrada
+                            "motivo_tecnico"]
     assert F.TIPOS_EVENTO == ("contagem_recebida", "aprovada", "peca_gravada", "conflito", "erro", "peca_tirada",
                               "recontagem_pedida", "numero_corrigido", "substituida", "curadoria", "regua_gravada",
                               # a recontagem só das peças marcadas (30/10/2026): no fim, um evento por peça
@@ -295,8 +297,11 @@ def test_nada_de_nome_no_livro(cfg):
     """A API do banco tem leitura aberta: nome, e-mail e o motivo do PCM (texto livre) não têm coluna em claro. O
     motivo vai só dentro do `dados_cifrados` (o Cofre do cadastro), amarrado à linha."""
     proibidas = ("nome", "email", "e_mail", "motivo", "obs", "descri", "texto", "comentario", "tecnico")
+    # a única exceção é a cópia do motivo da recontagem para o técnico no App (12/11/2026): só cifrada, pelo módulo
+    # (tests/test_pcm_inventario_motivo_tecnico.py)
+    cifradas = {"motivo_tecnico"}
     for cab in (F.CAB_EVENTO, F.CAB_REGUA, F.CAB_CURADORIA):
-        assert not [c for c in cab if any(p in c for p in proibidas)], cab
+        assert not [c for c in cab if c not in cifradas and any(p in c for p in proibidas)], cab
     assert "dados_cifrados" in F.CAB_EVENTO and "dados_cifrados" in F.CAB_CURADORIA
     assert "dados_cifrados" not in F.CAB_REGUA                  # a régua é número: não tem texto livre
     F.acrescentar(cfg, F.ABA_EVENTO, [_ev("peca_tirada", dados={"motivo": "peça com defeito do lote azul"})])

@@ -485,6 +485,10 @@ def test_revisar_tirar_corrigir_recontagem(app, inv, falso, monkeypatch):
     e = _eventos(app)[2]
     assert e["tipo"] == "recontagem_pedida" and not e["id_item"] and e["contagem_id"] == "C-1"
     assert F.decifrar(cfg, F.ABA_EVENTO, e) == {"motivo": "as fotos estão ilegíveis"}
+    # o motivo da recontagem chega ao técnico no App (12/11/2026): a cópia cifrada para ele; a peça tirada e o número
+    # corrigido não levam
+    assert F.motivo_do_tecnico(cfg, e) == "as fotos estão ilegíveis"
+    assert [bool(x.get("motivo_tecnico")) for x in _eventos(app)] == [False, False, True]
     assert L.contagens(cfg)[0]["estado"] == "recontagem_pedida"
     html = c.get(f"{LISTA}/C-1").get_data(as_text=True)
     assert "recontagem pedida" in html.lower() and 'data-rev="' not in html and "data-lote" not in html

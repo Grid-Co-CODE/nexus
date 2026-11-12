@@ -690,7 +690,10 @@ Fracttal aceita de verdade: `...-passo0.md`. Cada parte tem a seção dela abaix
    botão "Gravar N alterações".
 3. **Revisão:** tirar uma peça do lote, corrigir o número, pedir a recontagem só das peças marcadas (desde 30/10/2026: elas
    saem deste lote e o resto da contagem segue) ou a da contagem inteira, sempre com o motivo (cifrado). Só grava no livro do
-   inventário. **Quem avisa o técnico depende do App** (04/11/2026): o da revisão de 30/10/2026 lê os pedidos, os mostra ao
+   inventário. **O motivo da recontagem chega ao técnico** (12/11/2026, Levi: "O MOTIVO TEM QUE SUBIR PARA O TÉCNICO"; o PCM
+   perguntou "Quando eu peço a recontagem, o técnico consegue ver o motivo?") pela coluna `motivo_tecnico` do evento,
+   cifrada para o App (a seção do livro, abaixo); o App v342 a mostra e espera a coluna. **Quem avisa o técnico depende do
+   App** (04/11/2026): o da revisão de 30/10/2026 lê os pedidos, os mostra ao
    técnico e reconta só as marcadas (a contagem com o "Recontagem de"); o de hoje (v321) não lê pedido nenhum, e o PCM combina
    com o técnico por fora. As telas dizem qual dos dois pela versão do livro, e o pedido aparece em "Recontagens pedidas" até
    ser atendido (a seção da aba Inventário, "Os textos pela versão do App"). **Curadoria** (`.../curadoria`): o achado
@@ -1198,7 +1201,11 @@ para usar:
   é `ler(cfg)` (as três abas, cópia de 2 min) e o motivo se abre com `decifrar(cfg, aba, linha)`. Nunca escreva no livro por
   outro caminho: a gravação relê e troca o livro inteiro, e só o `acrescentar` faz isso com a trava.
 - **O motivo é `dados={"motivo": ...}`** (no evento e na curadoria; a régua não tem texto): o módulo o cifra, e o
-  `dados_cifrados` não se passa pronto. `motivo=`, nome, e-mail ou `dados_cifrados` como coluna é `ValueError` (erro de quem
+  `dados_cifrados` não se passa pronto. Na recontagem (`recontagem_pedida` e `recontagem_item_pedida`), o módulo põe também
+  a cópia para o técnico, `motivo_tecnico` (`motivo_para_o_tecnico`; a prova do contrato com o App é `motivo_do_tecnico`).
+  Ela é cifrada com a `NEXUS_PESSOA_HMAC`, não com a chave do cadastro, e fica vazia sem ela. A recontagem antiga ganha a
+  cópia na gravação seguinte, pelo `dados_cifrados`. Essa coluna também não se passa pronta, e nunca vai em claro: nem na
+  tela, nem no log, nem em controle. `motivo=`, nome, e-mail ou `dados_cifrados` como coluna é `ValueError` (erro de quem
   chama). A pessoa vai como `pessoa_hmac` (sempre, os 24 hexadecimais do `codigo_da_pessoa`) e `pessoa_id` (quando o
   cadastro a acha). Só entra o que cabe na coluna: `situacao` é uma das seis da peça (`dominios.SITUACAO_INVENTARIO`, igual a
   `contas.SITUACOES`), `id_item`, `id_almoxarifado` e `movimento_fracttal` (o folio) são dígitos, `contagem_id`, `chave_linha`
@@ -1216,7 +1223,8 @@ para usar:
   com menos linhas do que a listagem do banco diz (página curta) não grava e não é devolvida: `Recusada`.
 - **Na cópia de prova e nos testes:** `NEXUS_ALMOX_INVENTARIO_ARQUIVO` (um JSON); teste sem ele lê vazio e não grava. Prova:
   `tests/test_pcm_inventario_livro.py` (inclusive o banco falso com `como_texto=True`, a leitura que falha, a listagem
-  incompleta e as mutações nas regras).
+  incompleta e as mutações nas regras) e `tests/test_pcm_inventario_motivo_tecnico.py` (o vetor fixo do App, a decifração
+  independente, o retroativo e o banco sem a chave).
 
 ## Inventário do almoxarifado: a régua de mínimo e máximo (`inventario/regua.py`; 26/10/2026)
 
