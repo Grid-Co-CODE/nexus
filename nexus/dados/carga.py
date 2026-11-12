@@ -75,8 +75,11 @@ _LACO = {"thread": None, "parar": threading.Event(), "ultimo": None}
 # longe de qualquer limite.
 FAMA_INTERVALO_S = 600
 FAMA_DESLOCAMENTO_S = 300
-# `lendo`: uma volta de cada vez. A thread já é uma só, mas a trava vale também para quem chamar `_volta_fama` por fora
+# `lendo`: uma volta de cada vez. A thread já é uma só, mas a trava vale também para quem chamar `_volta_fama` por fora, e
+# a conferência das ligações a segura enquanto relê (`_volta_conferencia`)
 _FAMA = {"thread": None, "parar": threading.Event(), "lendo": threading.Lock()}
+# quanto a conferência espera a leitura da FAMA em andamento acabar (o prazo da FAMA é de 90 s, mais o banco)
+CONFERENCIA_ESPERA_FAMA_S = 120
 
 
 def _agora():
@@ -912,7 +915,16 @@ def ligar_fama(app):
 
 def _volta_conferencia(app) -> None:
     """A conferência das ligações (12/11/2026, `conferencia.py`), depois de tudo o que a hora gravou: uma vez por dia
-    (quem a acha feita há menos de 20 h não repete), só leitura por página, e a falha dela fica no estado e no log."""
+    (quem a acha feita há menos de 20 h não repete), só leitura por página, e a falha dela fica no estado e no log.
+
+    A volta da FAMA corre noutra thread desde 12/11/2026 e podia regravar o `nexus_os_fama` no meio da releitura (a
+    conferência leva ~68 s), com uma contagem falsa naquele dia (revisão de 12/11/2026). A conferência espera a leitura da
+    FAMA em andamento acabar (até `CONFERENCIA_ESPERA_FAMA_S`; passou disso, confere assim mesmo e diz no log) e segura a
+    trava enquanto relê: a volta da FAMA que chegar no meio pula, e a seguinte, 10 min depois, lê."""
+    pegou = _FAMA["lendo"].acquire(timeout=CONFERENCIA_ESPERA_FAMA_S)
+    if not pegou:
+        log.info("conferência das ligações: a leitura da FAMA passou de %s s; confiro assim mesmo",
+                 CONFERENCIA_ESPERA_FAMA_S)
     try:
         from . import conferencia
         _LACO["conferencia"] = conferencia.rodar(app.config)
@@ -920,6 +932,9 @@ def _volta_conferencia(app) -> None:
     except Exception as e:      # noqa: BLE001 — a conferência não segura nada
         _LACO["conferencia"] = {"erro": f"{type(e).__name__}: {e}"[:300]}
         log.exception("conferência das ligações")
+    finally:
+        if pegou:
+            _FAMA["lendo"].release()
 
 
 def ligar(app):

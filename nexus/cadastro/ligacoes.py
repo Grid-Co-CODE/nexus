@@ -564,7 +564,8 @@ def mesmo_cliente(a, b) -> bool:
     """O mesmo cliente: o nome igual (sem acento, caixa e pontuação) ou um nome é o começo do outro, palavra por palavra.
     O Fracttal escreve o cliente mais curto que o cadastro ("Aurora" para a "Aurora Energia", nomes inventados; o caso
     real de 12/11/2026: por isso as chaves "<Cliente> - X 1 - UF" desse cliente nunca tinham sugestão). Começo de palavra
-    não vale: "Aurorax" não é a "Aurora Energia"."""
+    não vale: "Aurorax" não é a "Aurora Energia". Quem escolhe o cliente da chave é o `_clientes_da_chave`: o exato
+    primeiro, e o começo só sem ele."""
     x, y = B.norm(a).split(), B.norm(b).split()
     n = min(len(x), len(y))
     return bool(n) and x[:n] == y[:n]
@@ -578,12 +579,42 @@ def _nome_e_cliente(item: dict) -> tuple:
     return nome, cliente
 
 
+def _clientes_da_chave(cliente, usinas: list[dict]) -> tuple[frozenset, frozenset]:
+    """(os clientes do cadastro que valem para a chave, os que ficaram em dúvida). O de nome exato vale sozinho, se houver
+    (revisão de 12/11/2026: com "Aurora" e "Aurora Solar" no cadastro, o começo do nome levava a chave da Aurora à usina
+    da Aurora Solar a 100%; um cliente não é outro, Levi 04/10); sem ele, o que começa igual (`mesmo_cliente`), só se for
+    UM. Dois pelo começo é dúvida: nenhum vale."""
+    alvo = B.norm(cliente)
+    nomes = {u["cliente"] for u in usinas if u.get("cliente")}
+    exatos = frozenset(c for c in nomes if B.norm(c) == alvo)
+    if exatos:
+        return exatos, frozenset()
+    pelo_comeco = frozenset(c for c in nomes if mesmo_cliente(c, cliente))
+    if len({B.norm(c) for c in pelo_comeco}) == 1:
+        return pelo_comeco, frozenset()
+    return frozenset(), pelo_comeco
+
+
+_UFS = frozenset(K.UF.values())
+
+
+def _uf_da_chave(item: dict) -> str | None:
+    """A UF que a chave diz: a do item (o "Estado" do BD_Thopen, por extenso ou em sigla) ou a do fim do nome do Fracttal
+    ("Cliente - Usina 1 - BA"); só as 27."""
+    if item.get("uf"):
+        uf = K.UF.get(K._ascii(item["uf"]), str(item["uf"]).strip().upper()[:2])
+        return uf if uf in _UFS else None
+    nome = item.get("nome") or (item.get("nomes") or [item.get("chave")])[0]
+    m = re.search(r"\s-\s*([A-Z]{2})\s*$", str(nome or ""))
+    return m.group(1) if m and m.group(1) in _UFS else None
+
+
 def _trava(item: dict, u: dict, primeiro: str | None) -> str | None:
     """As mesmas travas do casamento automático (achadas na tela real, 04/10/2026), que valem para toda sugestão: o que
-    impede a usina `u` de ser a chave, ou None."""
-    nums_u = {w for v in K.variantes(u["nome"]) for w in v.split() if w.isdigit()}
-    if primeiro and nums_u and primeiro not in nums_u:
-        return "o número"                   # "Marajoara 2" (e "Marajoara 2 1") não é a "Marajoara 1"
+    impede a usina `u` de ser a chave, ou None. O identificador é o número ou a letra solta (`casamento.termos`)."""
+    ids_u = K.identificadores_da_usina(u["nome"])
+    if primeiro and ids_u and primeiro not in ids_u:
+        return "o número"                   # "Marajoara 2" (e "Marajoara 2 1") não é a "Marajoara 1"; "Pinhal A", a B
     if item.get("cidade") and K.mesma_cidade(item["cidade"], u["cidade"]) is False:
         return "a cidade"                   # "Ouro Branco I" de Bandeirantes/PR não é a "Ouro Branco" de AL
     mwp = item.get("mwp")
@@ -596,24 +627,27 @@ def sugestoes(item: dict, usinas: list[dict], n: int = 3) -> list[dict]:
     """As usinas do cadastro mais parecidas com uma chave sem par: código (letras do "AAA999"), nome, cliente e cidade.
     Só sugere; quem liga é a pessoa.
 
-    A contenção de palavras (12/11/2026, `casamento.contencao`): a usina cujo nome contém todas as palavras da chave, ou
-    cabe nela, com o mesmo número, vem a 100 se for a ÚNICA do cliente assim; duas ou mais, ou a chave sem o cliente, vêm
-    abaixo de 100 (`casamento.NOTA_CONTIDA_*`). O que só a parecença de letras acha segue como antes, e as travas valem
-    para as duas."""
+    A contenção de palavras (12/11/2026, `casamento.contencao`): a usina cujo nome contém todas as palavras da chave, com
+    o mesmo número ou letra, vem a 100 se for a ÚNICA do cliente assim. Fica abaixo de 100, fora do lote
+    (`casamento.NOTA_CONTIDA_*`, revisão de 12/11/2026): o nome do cadastro que cabe na chave, a chave com palavras a mais
+    (95, a palavra a mais pode ser a que separa duas usinas); a chave sem o cliente (90); duas ou mais (80, e nenhuma
+    sugestão acima de 95); e a UF da chave diferente da usina (95, sem vetar: a base também erra a UF). A sugestão com
+    ressalva leva o texto em `ressalva`, que o "por quê" da seção mostra. O que só a parecença de letras acha segue como
+    antes, e as travas valem para as duas."""
     cod = B.sufixo_codigo(item.get("codigo") or (item.get("chave") if re.fullmatch(r"[A-Z0-9-]+", str(item.get("chave"))) else ""))
     nome, cliente = _nome_e_cliente(item)
     texto = _sem_cliente_e_uf(nome, cliente)
     nome_item = " ".join(K.palavras(texto))
     termos = K.termos(texto)
     cli = B.norm(cliente or "")
-    primeiro = next((w for w in nome_item.split() if w.isdigit()), None)
-    # E1 não é Thopen (Levi, 04/10): nem como sugestão; o mesmo cliente com o nome mais curto, sim (`mesmo_cliente`)
-    do_cliente = [u for u in usinas if not cli or mesmo_cliente(u["cliente"], cliente)]
+    primeiro = K.primeiro_identificador(texto)
+    uf = _uf_da_chave(item)
+    # E1 não é Thopen (Levi, 04/10): nem como sugestão; o cliente exato, e sem ele o de nome mais curto (`_clientes_da_chave`)
+    do_cliente = [u for u in usinas if u.get("cliente") in _clientes_da_chave(cliente, usinas)[0]] if cli else usinas
     # "a ÚNICA do cliente que contém as palavras com o mesmo número" conta antes das travas de cidade e de potência: a
     # outra candidata vetada pela cidade ainda é dúvida
-    contidas = {u["id"] for u in do_cliente if K.contencao(termos, u["nome"]) == K.MESMO}
-    nota_contida = (K.NOTA_CONTIDA_VARIAS if len(contidas) > 1 else
-                    K.NOTA_CONTIDA_UNICA if cli else K.NOTA_CONTIDA_SEM_CLIENTE)
+    rel = {u["id"]: K.contencao(termos, u["nome"]) for u in do_cliente}
+    contidas = {i for i, r in rel.items() if r in K.CONTIDAS}
     out = []
     for u in do_cliente:
         if _trava(item, u, primeiro):
@@ -630,31 +664,49 @@ def sugestoes(item: dict, usinas: list[dict], n: int = 3) -> list[dict]:
             nota += 0.15
         if item.get("cidade") and K.mesma_cidade(item["cidade"], u["cidade"]):
             nota += 0.15
-        nota = round(min(nota, 1) * 100)
+        nota, ressalva = round(min(nota, 1) * 100), None
         if u["id"] in contidas:
-            nota = max(nota, nota_contida)
+            a_mais = rel[u["id"]] == K.MESMO_A_MAIS
+            nota = max(nota, K.NOTA_CONTIDA_VARIAS if len(contidas) > 1 else K.NOTA_CONTIDA_SEM_CLIENTE if not cli
+                       else K.NOTA_CONTIDA_A_MAIS if a_mais else K.NOTA_CONTIDA_UNICA)
+            if a_mais:                      # 95 mesmo com o código e a parecença (o ruling da revisão de 12/11/2026)
+                nota = min(nota, K.NOTA_CONTIDA_A_MAIS)
+                extra = " ".join(sorted(termos[0] - K.termos(u["nome"])[0]))
+                ressalva = (f"a chave tem palavras a mais que a {u['titulo']} ({extra}): pode ser outra usina, confira "
+                            f"antes de ligar")
         if len(contidas) > 1:
             nota = min(nota, K.TETO_COM_DUVIDA)
+        uf_u = str(u.get("uf") or "").strip().upper()
+        if uf and uf_u and uf_u != uf:      # município de mesmo nome em outro estado; a base também erra a UF: não veta
+            nota = min(nota, K.TETO_COM_DUVIDA)
+            ressalva = ressalva or f"a {u['titulo']} é de {uf_u}, e a chave diz {uf}: confira antes de ligar"
         if nota >= 50:
-            out.append({"id": u["id"], "titulo": u["titulo"], "codigo": u["codigo"], "nota": nota})
+            s = {"id": u["id"], "titulo": u["titulo"], "codigo": u["codigo"], "nota": nota}
+            out.append(dict(s, ressalva=ressalva) if ressalva else s)
     return sorted(out, key=lambda x: -x["nota"])[:n]
 
 
 def _numero(ns) -> str:
-    return " e ".join(sorted(ns, key=int))
+    """Os identificadores da chave como a frase os diz: os números em ordem, depois as letras em maiúscula ("2 e A")."""
+    return " e ".join(sorted((w if w.isdigit() else w.upper() for w in ns),
+                             key=lambda w: (not w.isdigit(), int(w) if w.isdigit() else 0, w)))
 
 
-def porque(termos, cliente, candidatas: list[dict], sem_cliente: bool = False, vetadas=()) -> str:
+def porque(termos, cliente, candidatas: list[dict], sem_cliente: bool = False, vetadas=(), duvida=()) -> str:
     """O "por quê" do buraco sem sugestão (12/11/2026), no lugar do "sem par no cadastro", que não dizia o que fazer.
     `termos` = `casamento.termos` da chave; `candidatas` = as usinas que a chave poderia ser (as do cliente dela, ou
     todas); `sem_cliente`: o cliente da chave não está no cadastro; `vetadas` = [(usina, trava)]: as de nome contido e o
-    mesmo número que uma trava tirou (a cidade ou a potência da base não batem com as do cadastro).
+    mesmo número que uma trava tirou (a cidade ou a potência da base não batem com as do cadastro); `duvida` = os
+    clientes do cadastro que começam como o da chave, quando são dois ou mais.
     Ordem: o cliente, a vetada (ela é a provável: "o cadastro tem a X 2, não a 1" estaria errado com a X 1 lá), o
     número, e o nada parecido."""
     def nome(u):
         return f"a {u['nome'] if cliente else u['titulo']}"
     if sem_cliente:
         return f"o cadastro não tem o cliente {cliente}: confira o nome do cliente ou crie no Registro mestre"
+    if duvida:
+        return (f"o cliente {cliente} começa como {' e '.join(sorted(duvida))} no cadastro: confira o nome do cliente "
+                f"antes de ligar à mão")
     if vetadas:
         u, trava = vetadas[0]
         return f"o cadastro tem {nome(u)}, mas {trava} da base não bate com a do cadastro: confira antes de ligar à mão"
@@ -676,11 +728,14 @@ def porque_sem_sugestao(item: dict, usinas: list[dict]) -> str:
     nome, cliente = _nome_e_cliente(item)
     texto = _sem_cliente_e_uf(nome, cliente)
     termos = K.termos(texto)
-    primeiro = next((w for w in K.palavras(texto) if w.isdigit()), None)
+    primeiro = K.primeiro_identificador(texto)
     cli = cliente if B.norm(cliente or "") else None
-    do_cliente = [u for u in usinas if not cli or mesmo_cliente(u["cliente"], cli)]
-    vetadas = [(u, t) for u in do_cliente if K.contencao(termos, u["nome"]) == K.MESMO and (t := _trava(item, u, primeiro))]
-    return porque(termos, cli, do_cliente, sem_cliente=bool(cli) and not do_cliente, vetadas=vetadas)
+    validos, duvida = _clientes_da_chave(cli, usinas) if cli else (None, frozenset())
+    do_cliente = [u for u in usinas if u.get("cliente") in validos] if cli else usinas
+    vetadas = [(u, t) for u in do_cliente
+               if K.contencao(termos, u["nome"]) in K.CONTIDAS and (t := _trava(item, u, primeiro))]
+    return porque(termos, cli, do_cliente, sem_cliente=bool(cli) and not do_cliente and not duvida, vetadas=vetadas,
+                  duvida=duvida)
 
 
 def _por_nome(como: str) -> bool:
@@ -786,8 +841,9 @@ def panorama(srv, atual: dict | None, regras: dict) -> dict:
                 razao = None if sug else porque_sem_sugestao(it, usinas)
             if razao and not (como.startswith(B.SEM_PAR) or como == B.A_DECIDIR):
                 razao = None                # o motivo do de-para já é o porquê (conflito, desligado à mão, ...)
-            if sug:
-                razao = _ja_ligada(sug, ja_ligada, sistema, chave, itens)
+            if sug:                         # a usina já ligada a outra chave, e sem isso a ressalva da sugestão
+                razao = (_ja_ligada(sug, ja_ligada, sistema, chave, itens)
+                         or next((g["ressalva"] for g in sug if g.get("ressalva")), None))
             # `rotulo` e `os`: o que a seção mostra no lugar da chave quando ela é um id (o projeto da FAMA)
             buracos.append({"sistema": sistema, "chave": chave, "motivo": como, "porque": razao,
                             "tarefas": it.get("tarefas"), "nome": it.get("nome"), "cidade": it.get("cidade"),

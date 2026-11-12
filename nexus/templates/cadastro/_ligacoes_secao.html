@@ -10,14 +10,20 @@
     <div class="gc-titulo-explica"><h2 class="dd-h2" style="margin-top:0">Ligações entre bases</h2>
     {% call explica('Como as sugestões se contam') %}
       <p><b>De onde vem a sugestão.</b> O Nexus compara a chave da base com o nome de cada usina do cadastro do mesmo
-        cliente. Vale o nome que contém todas as palavras da chave, ou que cabe nela ("Pinhal 1" e "São Brás do Pinhal 1"),
-        sem acento, com o romano em arábico e sem as palavras que não dizem usina (usina, UFV, solar, cliente, do, da,
-        de). O número tem de ser o mesmo dos dois lados. A parecença de letras e o código seguem valendo.</p>
-      <p><b>Como se conta.</b> 100% é a única usina do cliente com esse nome e esse número. Com duas ou mais, cada uma
-        vem a 80% e nenhuma chega a 100%. A chave que não diz o cliente (o projeto da FAMA) vem a 90%. A usina que já
-        está ligada a outra chave da mesma base fica abaixo de 100% e o "por quê" diz qual chave é.</p>
-      <p><b>O que nunca vira sugestão.</b> Usina de outro cliente, número diferente, cidade diferente ou potência muito
-        diferente.</p>
+        cliente (o de nome igual; sem ele, o que começa igual, se for um só). Vale o nome que contém todas as palavras da
+        chave ("Pinhal 1" e "São Brás do Pinhal 1"), sem acento, com o romano em arábico e sem as palavras que não dizem
+        usina (usina, UFV, solar, cliente, do, da, de). O número e a letra da usina ("Pinhal A") têm de ser os mesmos dos
+        dois lados. A parecença de letras e o código seguem valendo.</p>
+      <p><b>Como se conta.</b> 100% é a única usina do cliente que contém o nome da chave, com o mesmo número. Fica
+        abaixo de 100%, a um clique e fora do lote: a chave com palavras a mais que o nome do cadastro (95%: a palavra a
+        mais pode ser a de outra usina); a UF da chave diferente da usina (95%); a usina que já está ligada a outra chave
+        da mesma base (95%); duas ou mais usinas assim (80% cada); e a chave que não diz o cliente, o projeto da FAMA
+        (90%). O "por quê" diz a razão.</p>
+      <p><b>Os 90% da FAMA.</b> São um degrau, não uma segunda conferência: ligada a chave do Fracttal da usina, o
+        projeto da FAMA de mesmo nome passa a 100% e entra no próximo lote. Confira a chave do Fracttal com o mesmo
+        cuidado.</p>
+      <p><b>O que nunca vira sugestão.</b> Usina de outro cliente, número ou letra diferente, cidade diferente ou
+        potência muito diferente.</p>
       <p><b>O "por quê" sem sugestão.</b> Diz o que o cadastro tem: a usina com outro número, a de nome certo com a
         cidade ou a potência que não batem, ou nada parecido. Antes de criar no Registro mestre, confira se a usina não
         está lá com outro nome.</p>

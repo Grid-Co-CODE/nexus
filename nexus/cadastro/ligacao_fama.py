@@ -110,6 +110,6 @@ def sugestoes(item: dict, idx: dict, por_id: dict, n: int = 3) -> list[dict]:
         return [{"id": i, "titulo": por_id[i]["titulo"], "codigo": por_id[i]["codigo"], "nota": 100 // len(ids)}
                 for i in ids][:n]
     t = K.termos(nome)
-    ids = sorted({i for k, us in idx.items() if K.contencao(t, k) == K.MESMO for i in us if i in por_id})
+    ids = sorted({i for k, us in idx.items() if K.contencao(t, k) in K.CONTIDAS for i in us if i in por_id})
     nota = K.NOTA_CONTIDA_SEM_CLIENTE if len(ids) == 1 else K.NOTA_CONTIDA_VARIAS
     return [{"id": i, "titulo": por_id[i]["titulo"], "codigo": por_id[i]["codigo"], "nota": nota} for i in ids][:n]

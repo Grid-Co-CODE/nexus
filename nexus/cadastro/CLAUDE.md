@@ -791,7 +791,9 @@ colunas (a maioria escondida: o seletor de colunas mostra sem recarregar), e a p
   nome igual é procurado no nome da usina, no título "<Cliente> - <Usina>" e nas chaves do Fracttal ligadas a ela; mais de
   uma usina (o mesmo nome em dois clientes), todas aparecem, divididas, e quem escolhe é a pessoa. Sem o nome igual, a
   contenção de palavras (a regra das sugestões, abaixo) contra os mesmos nomes, a 90% a única e a 80% cada uma de várias:
-  o projeto não diz o cliente, então nunca a 100%; ligada a chave do Fracttal da usina, o nome igual a acha a 100%. A FAMA só cobre os
+  o projeto não diz o cliente, então nunca a 100%. Os 90% são um DEGRAU, não uma segunda conferência (revisão de
+  12/11/2026): ligada a chave do Fracttal da usina, o nome igual acha o projeto a 100%, e o clique seguinte do botão geral
+  o liga; um erro na chave do Fracttal se espalha para a FAMA. A FAMA só cobre os
   clientes que a usam, sem lista no código: não tem a aba "Usinas fora" (`ligacoes.SEM_AUSENCIA`). Prova:
   `tests/test_cadastro_ligacoes_fama.py`.
 - **A regra de ignorar "Grid Co." do Fracttal pega "RenoGrid - Colíder 1/2" por acaso** (`ignorado` compara texto
@@ -804,15 +806,22 @@ colunas (a maioria escondida: o seletor de colunas mostra sem recarregar), e a p
 - **As sugestões dos buracos** (`ligacoes.sugestoes`, `casamento.contencao`; 12/11/2026, Levi: "tem muita coisa que dá
   para vir sugerido do Nexus e não está vindo"). O caso: a chave do Fracttal e o projeto da FAMA diziam "Pinhal 1" (nome
   inventado aqui) e o cadastro "São Brás do Pinhal 1", e a parecença de letras (o corte de 0,78) não chegava. **A
-  contenção:** todas as palavras significativas da chave (sem o cliente e a UF, sem acento, o romano em arábico, sem
-  `casamento.GENERICAS_SUGESTAO`: usina, ufv, solar, cliente e as preposições) estão no nome do cadastro, ou o contrário,
-  com o lado menor tendo uma palavra forte (não só "Nova", "Santa", "Rio"), e os MESMOS números (ou nenhum dos dois lados;
-  o "1 e 2" do cadastro responde pelo 2; a usina com número não responde pela chave sem). **A nota:** 100 só quando é a
-  ÚNICA do cliente assim (contada antes das travas de cidade e de potência); duas ou mais, 80 cada e nenhuma sugestão
-  acima de 95; a chave sem o cliente, 90; a usina que já liga a OUTRA chave da mesma base cai a 95 (`_ja_ligada`). O
-  cliente é o mesmo quando um nome é o começo do outro, palavra por palavra (`mesmo_cliente`: o Fracttal escreve o
-  cliente mais curto que o cadastro, e a chave dele nunca tinha sugestão). **As travas continuam** (`_trava`): nunca outro
-  cliente, número diferente, cidade diferente, potência 40%+ diferente; na 1ª versão real (04/10) ela sugeria "E1 -
+  contenção:** as palavras significativas de um lado estão todas no outro (sem o cliente e a UF, sem acento e apóstrofo,
+  o romano em arábico até o XXXIX, sem `casamento.GENERICAS_SUGESTAO`: usina, ufv, solar, cliente e as preposições), com
+  o lado menor tendo uma palavra forte (três letras ou mais, e não só "Nova", "Santa", "Rio") e os MESMOS identificadores:
+  o número e a LETRA solta ("Pinhal A" não é a "Pinhal B"; o "e" e o "a" só caem entre dois números, "1 e 2" e "1 a 4",
+  que respondem por cada número; a letra com ponto, "S.", é abreviação), ou nenhum dos dois lados; a usina com número
+  não responde pela chave sem. **A nota:** 100 só quando a chave cabe no nome do cadastro e ele é o ÚNICO do cliente
+  assim (contado antes das travas de cidade e de potência). Abaixo de 100, fora do lote e a um clique (revisão de
+  12/11/2026; ligação errada é pior que nenhuma): o nome do cadastro que cabe na chave, a chave com palavras A MAIS (95,
+  `MESMO_A_MAIS`: "Nova Quimera 1" não é a "Quimera 1"; mesmo com o código igual); a UF da
+  chave diferente da usina (95, sem vetar: município de mesmo nome noutro estado, e a base também erra a UF); a usina
+  que já liga a OUTRA chave da mesma base (95, `_ja_ligada`); duas ou mais, 80 cada e nenhuma acima de 95; a chave sem o
+  cliente, 90. A sugestão com ressalva leva o texto em `ressalva`, que vira o "por quê" do buraco. **O cliente**
+  (`_clientes_da_chave`): o de nome igual vale sozinho; sem ele, o que começa igual palavra por palavra (`mesmo_cliente`:
+  o Fracttal escreve o cliente mais curto que o cadastro, e a chave dele nunca tinha sugestão), só se for UM; dois pelo
+  começo é dúvida, sem sugestão, e o "por quê" diz. **As travas continuam** (`_trava`): nunca outro cliente, número ou
+  letra diferente, cidade diferente, potência 40%+ diferente; na 1ª versão real (04/10) ela sugeria "E1 -
   Andradina 1" para a Andradina da Thopen, "Marajoara 1" a 100% para a Marajoara 2 e "Ouro Branco" (AL) para as de
   Bandeirantes (PR). **O "por quê"** do buraco sem sugestão (`porque`, no lugar do "sem par no cadastro"; o motivo do
   de-para que diz mais, a ponte ou o "a decidir", fica embaixo): o cliente que o cadastro não tem; a usina de nome certo
@@ -822,7 +831,10 @@ colunas (a maioria escondida: o seletor de colunas mostra sem recarregar), e a p
   buraco, 575 com uma sugestão de 100% (eram 384), todas certas; sem as decisões à mão do Fracttal (o estado do servidor,
   onde a FAMA tinha 34 a 100%), o botão de 100% de cada base, somado, daria 72 ligações: 36 iguais à decisão à
   mão e nenhuma diferente.
-  Prova: `tests/test_cadastro_ligacoes_sugestoes.py`.
+  Medido de novo depois da revisão (12/11, só leitura): 569 das 693 a 100%, todas certas; 6 das antigas pedem um clique
+  (2 com palavras a mais, 4 com a UF diferente); o botão geral no servidor simulado segue em 72, nenhuma diferente.
+  Prova: `tests/test_cadastro_ligacoes_sugestoes.py` (com as mutações da revisão de 12/11: o teto com duas contidas, a
+  única contada antes das travas, a palavra forte de três letras, a letra, a UF, o cliente exato e o sentido da chave).
 - **Teste da tela nunca grava na pasta real:** em 04/10 um teste gravou no arquivo de regras de verdade (o `create_app`
   não repassava `NEXUS_DADOS`). Hoje `pasta_dados` recusa em TESTING sem `NEXUS_DADOS`.
 - Medido em 04/10 (no banco): BD_Operações 258/258, Fracttal 139/144, Tickets 136/156, BD_Performance 136/156,

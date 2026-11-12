@@ -165,27 +165,74 @@ def _pela_potencia(item, candidatas, aceita_sem_potencia=False):
 # inventados: a chave "Cliente - Pinhal 1 - UF" do Fracttal (e o projeto "Pinhal I" da FAMA) é a "São Brás do Pinhal 1"
 # do cadastro, e a parecença de letras (o corte de 0,78 da `ligacoes.sugestoes`) não chegava lá. Aqui só se SUGERE: o
 # `casar` acima, o casamento automático, não usa nada disto (ligação errada é pior que faltando).
-# As palavras que não fazem uma usina ser outra (a lista curta; as preposições já saem nas `palavras`, e "e"/"a" são o
-# "1 e 2" e o "1 a 4")
-GENERICAS_SUGESTAO = frozenset({"usina", "ufv", "solar", "cliente", "de", "do", "da", "dos", "das", "e", "a"})
-MESMO, OUTRO_NUMERO = "mesmo", "outro número"
+# As palavras que não fazem uma usina ser outra (a lista curta; as preposições já saem nas `palavras`). O "e" e o "a"
+# NÃO estão aqui: só caem entre dois números ("1 e 2", "1 a 4"); fora disso, a letra solta é a usina (revisão de
+# 12/11/2026: o "a" desta lista apagava a letra, e "Pinhal A" sugeria a "Pinhal B" a 100%)
+GENERICAS_SUGESTAO = frozenset({"usina", "ufv", "solar", "cliente", "de", "do", "da", "dos", "das"})
+# MESMO: a chave cabe no nome do cadastro (o caso do pedido, "Pinhal 1" e "São Brás do Pinhal 1"); MESMO_A_MAIS: o nome do
+# cadastro cabe na chave, que tem palavras A MAIS ("Nova Quimera 1" contra a "Quimera 1"): a palavra a mais pode ser a que
+# separa duas usinas, então fica fora do lote (o ruling da revisão de 12/11/2026: ligação errada é pior que nenhuma)
+MESMO, MESMO_A_MAIS, OUTRO_NUMERO = "mesmo", "mesmo, a chave com palavras a mais", "outro número"
+CONTIDAS = (MESMO, MESMO_A_MAIS)
 # a nota da usina achada pela contenção (as duas fontes de sugestão: `ligacoes.sugestoes` e `ligacao_fama.sugestoes`)
-NOTA_CONTIDA_UNICA = 100        # a ÚNICA usina do cliente que contém as palavras com o mesmo número
+NOTA_CONTIDA_UNICA = 100        # a ÚNICA usina do cliente que contém as palavras da chave, com o mesmo identificador
+NOTA_CONTIDA_A_MAIS = 95        # a única, mas a chave tem palavras a mais: no alto, a um clique, fora do lote
 NOTA_CONTIDA_SEM_CLIENTE = 90   # a única, mas a chave não diz o cliente: a trava do cliente não se confere
 NOTA_CONTIDA_VARIAS = 80        # duas ou mais: nenhuma com certeza
-TETO_COM_DUVIDA = 95            # com duas ou mais contidas, nenhuma sugestão chega a 100 (o lote não as liga)
+TETO_COM_DUVIDA = 95            # com duas ou mais contidas, a UF diferente ou a usina já ligada: o lote não liga
+_ROMANO = re.compile(r"x{0,3}(ix|iv|v?i{0,3})")
+_VALOR_ROMANO = {"i": 1, "v": 5, "x": 10}
+
+
+def _romano(w: str) -> int | None:
+    """O romano que as `palavras` não convertem (passa do XII: "xiii" a "xxxix"), ou None."""
+    if len(w) < 2 or not _ROMANO.fullmatch(w):
+        return None
+    total = 0
+    for a, b in zip(w, w[1:] + " "):
+        v = _VALOR_ROMANO[a]
+        total += -v if _VALOR_ROMANO.get(b, 0) > v else v
+    return total
+
+
+def _fichas(texto) -> tuple[list[str], list[tuple[int, int]]]:
+    """As `palavras` prontas para a contenção, e as faixas "N a M". O apóstrofo some antes ("D'Água" é "dagua", e não a
+    letra "d"), e a letra abreviada também ("S. José": a letra com ponto não é a letra da usina); o "e" e o "a" entre dois
+    números caem (a faixa é guardada); o romano acima do XII vira número."""
+    t = re.sub(r"['’`´]", "", str(texto or ""))
+    ws = palavras(re.sub(r"\b[^\W\d_]\.", " ", t))
+    out, faixas = [], []
+    for i, w in enumerate(ws):
+        if w in ("e", "a") and 0 < i < len(ws) - 1 and ws[i - 1].isdigit() and ws[i + 1].isdigit():
+            if w == "a":
+                faixas.append((int(ws[i - 1]), int(ws[i + 1])))
+            continue
+        r = _romano(w)
+        out.append(str(r) if r is not None else w)
+    return out, faixas
+
+
+def _identificador(w: str) -> bool:
+    """O que separa uma usina da irmã: o número e a letra solta ("Pinhal A" não é a "Pinhal B")."""
+    return w.isdigit() or len(w) == 1
 
 
 def termos(texto) -> tuple[frozenset, frozenset]:
-    """(palavras, números) que contam na contenção: as `palavras` (sem acento e sem caixa, o romano em arábico) sem as
-    genéricas. "UFV Pinhal II" -> ({"pinhal"}, {"2"})."""
-    ws = [w for w in palavras(texto) if w not in GENERICAS_SUGESTAO]
-    return frozenset(w for w in ws if not w.isdigit()), frozenset(w for w in ws if w.isdigit())
+    """(palavras, identificadores) que contam na contenção: as `palavras` (sem acento e sem caixa, o romano em arábico) sem
+    as genéricas, e os números e as letras soltas à parte. "UFV Pinhal II" -> ({"pinhal"}, {"2"})."""
+    ws = [w for w in _fichas(texto)[0] if w not in GENERICAS_SUGESTAO]
+    return frozenset(w for w in ws if not _identificador(w)), frozenset(w for w in ws if _identificador(w))
+
+
+def primeiro_identificador(texto) -> str | None:
+    """O 1º número ou letra solta da chave, na ordem escrita (a trava do número: "Quimera 2 1" é a 2)."""
+    return next((w for w in _fichas(texto)[0] if _identificador(w) and w not in GENERICAS_SUGESTAO), None)
 
 
 def _contidas(a: frozenset, b: frozenset) -> bool:
     """Todas as palavras de um lado estão no outro, e o lado menor tem uma palavra forte: "Nova", "Santa" ou "Rio"
-    sozinha (as `_GENERICAS` da regra 4) está em meio cadastro e não diz usina nenhuma."""
+    sozinha (as `_GENERICAS` da regra 4) está em meio cadastro e não diz usina nenhuma, e a sigla de duas letras ("GD")
+    também não."""
     if not a or not b or not (a <= b or b <= a):
         return False
     menor = a if len(a) <= len(b) else b
@@ -194,23 +241,48 @@ def _contidas(a: frozenset, b: frozenset) -> bool:
 
 @lru_cache(maxsize=8192)
 def _termos_da_usina(nome: str) -> tuple:
-    """Os `termos` de cada variante do nome do cadastro (só as numeradas, se houver). Guardado por nome: a seção das
-    Ligações compara cada buraco com o cadastro inteiro a cada visita."""
-    vs = variantes(nome)
-    numeradas = [v for v in vs if any(p.isdigit() for p in v.split())]
-    return tuple(termos(v) for v in sorted(numeradas or vs))
+    """As formas que o nome do cadastro responde, (palavras, identificadores) cada uma: o nome inteiro, e cada número do
+    "1 e 2" e da faixa "1 a 4" sozinho (com as letras do nome); o de dentro e o de fora do parêntese ("Topázio (Matão
+    2)"). A usina com identificador não responde pelo nome sem ele. Guardado por nome: a seção das Ligações compara cada
+    buraco com o cadastro inteiro a cada visita."""
+    nome = str(nome or "")
+    pedacos = [nome]
+    m = re.search(r"\(([^)]*)\)", nome)
+    if m:
+        pedacos += [m.group(1), re.sub(r"\(.*\)", " ", nome)]
+    formas = set()
+    for pedaco in pedacos:
+        fichas, faixas = _fichas(pedaco)
+        ws = frozenset(w for w in fichas if w not in GENERICAS_SUGESTAO and not _identificador(w))
+        ids = [w for w in fichas if w not in GENERICAS_SUGESTAO and _identificador(w)]
+        letras = frozenset(w for w in ids if not w.isdigit())
+        nums = {w for w in ids if w.isdigit()} | {str(n) for a, b in faixas for n in range(a, b + 1)}
+        formas.add((ws, frozenset(ids)))
+        if len(nums) > 1:
+            formas |= {(ws, letras | {n}) for n in nums}
+    com_id = {f for f in formas if f[1]}
+    return tuple(sorted(com_id or formas, key=lambda f: (sorted(f[0]), sorted(f[1]))))
+
+
+def identificadores_da_usina(nome) -> frozenset:
+    """Todos os números e letras que o nome do cadastro responde (a trava do número das sugestões)."""
+    return frozenset(i for _, ids in _termos_da_usina(str(nome or "")) for i in ids)
 
 
 def contencao(termos_da_chave, nome_da_usina) -> str | None:
-    """`MESMO`: as palavras significativas de um lado estão todas no outro (o nome do cadastro com palavras a mais, ou a
-    menos) e os números são os mesmos, ou nenhum lado tem número; `OUTRO_NUMERO`: as palavras batem e o número não
-    ("Quimera 2" contra "Nova Quimera 1"); None: as palavras não batem. Vale cada `variantes` do nome do cadastro ("1 e 2"
-    responde pelo 2); a usina com número não responde pelo nome sem número."""
+    """`MESMO`: todas as palavras significativas da chave estão no nome do cadastro (inclusive igual) e os identificadores
+    (números e letras soltas) são os mesmos, ou nenhum lado tem; `MESMO_A_MAIS`: o contrário, o nome do cadastro cabe na
+    chave, que tem palavras a mais; `OUTRO_NUMERO`: as palavras batem e o identificador não ("Quimera 2" contra "Nova
+    Quimera 1"); None: as palavras não batem. Vale cada forma do nome do cadastro (`_termos_da_usina`)."""
     ws, ns = termos_da_chave
-    outro = False
+    achado = None
     for uw, un in _termos_da_usina(str(nome_da_usina or "")):
-        if _contidas(ws, uw):
-            if un == ns:
-                return MESMO
-            outro = True
-    return OUTRO_NUMERO if outro else None
+        if not _contidas(ws, uw):
+            continue
+        if un != ns:
+            achado = achado or OUTRO_NUMERO
+        elif ws <= uw:
+            return MESMO
+        else:
+            achado = MESMO_A_MAIS
+    return achado

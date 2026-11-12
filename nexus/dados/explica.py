@@ -409,7 +409,7 @@ PARA_QUE = {
                  "programada e em que pé está. É de onde a Visão do responsável conta as OS abertas e atrasadas e a "
                  "zeladoria de cada usina.",
     "os_fama": "Guarda cada OS que um cliente abriu na FAMA (a plataforma do cliente) e atribuiu à Grid, desde 2023, "
-               "lida pelo Nexus de hora em hora: o projeto da FAMA, a usina do Nexus (quando a ligação foi decidida na "
+               "lida pelo Nexus de 10 em 10 minutos: o projeto da FAMA, a usina do Nexus (quando a ligação foi decidida na "
                "seção Ligações entre bases), as datas de criação, prevista e de fim, o status, o tipo e a severidade. O "
                "título e a descrição só existem cifrados, e quem criou ou aprovou não é guardado. Serve para o PCM "
                "acompanhar as OS do cliente sem redigitar nada.",

@@ -659,8 +659,9 @@ def test_a_falha_da_fama_nao_derruba_a_volta(monkeypatch):
 
 
 def test_o_laco_de_hora_em_hora_nao_roda_mais_a_fama(monkeypatch):
-    """O laço de verdade (`carga.ligar`), duas voltas: a carga, a geração e o almoxarifado. A FAMA saiu dele (12/11/2026):
-    tem a volta dela, de 10 em 10 min, que não atrasa a carga da hora nem é atrasada por ela."""
+    """O laço de verdade (`carga.ligar`), duas voltas: a carga, a geração, o almoxarifado e a conferência das ligações (de
+    mentira: nenhum pedido de rede). A FAMA saiu dele (12/11/2026): tem a volta dela, de 10 em 10 min, que não atrasa a
+    carga da hora nem é atrasada por ela."""
     import threading
     ordem = []
     monkeypatch.setitem(carga._LACO, "thread", None)
@@ -669,12 +670,13 @@ def test_o_laco_de_hora_em_hora_nao_roda_mais_a_fama(monkeypatch):
     monkeypatch.setattr(carga, "rodar", lambda config: ordem.append("carga") or {})
     monkeypatch.setattr(carga, "gerar_geracao", lambda config: ordem.append("geracao") or {})
 
-    def almoxarifado(config):
-        ordem.append("almoxarifado")
-        if ordem.count("almoxarifado") == 2:
+    monkeypatch.setattr(carga, "gerar_almoxarifado", lambda config: ordem.append("almoxarifado") or {})
+
+    def conferencia(app):
+        ordem.append("conferencia")
+        if ordem.count("conferencia") == 2:
             carga._LACO["parar"].set()
-        return {}
-    monkeypatch.setattr(carga, "gerar_almoxarifado", almoxarifado)
+    monkeypatch.setattr(carga, "_volta_conferencia", conferencia)
     monkeypatch.setattr(fama, "gerar_fama", lambda config: ordem.append("fama") or {})
     carga.ligar(_App())
     try:
@@ -684,7 +686,7 @@ def test_o_laco_de_hora_em_hora_nao_roda_mais_a_fama(monkeypatch):
         carga._LACO["parar"].set()
         carga._LACO["thread"].join(10)
     assert not carga._LACO["thread"].is_alive()
-    assert ordem == ["carga", "geracao", "almoxarifado"] * 2
+    assert ordem == ["carga", "geracao", "almoxarifado", "conferencia"] * 2
 
 
 @pytest.fixture
@@ -755,6 +757,46 @@ def test_uma_volta_da_fama_de_cada_vez(volta_fama, monkeypatch):
         solta.set()
         t.join(10)
     assert carga._volta_fama(_App()) is True and len(chamadas) == 2              # acabada a primeira, a próxima lê
+
+
+def test_ligar_a_volta_da_fama_duas_vezes_faz_uma_thread_so(volta_fama, monkeypatch):
+    import threading
+    monkeypatch.setattr(carga, "_espera_fama_s", lambda agora=None: 3600)        # a thread espera; ninguém lê
+    monkeypatch.setattr(fama, "gerar_fama", lambda config: pytest.fail("leu a FAMA"))
+    carga.ligar_fama(_App())
+    primeira = carga._FAMA["thread"]
+    carga.ligar_fama(_App())
+    assert carga._FAMA["thread"] is primeira
+    assert [t for t in threading.enumerate() if t.name == "nexus-fama"] == [primeira]
+
+
+def test_a_conferencia_espera_a_leitura_da_fama_e_a_segura_enquanto_rele(volta_fama, monkeypatch):
+    """A volta da FAMA regravando o `nexus_os_fama` no meio da conferência das ligações daria uma contagem falsa naquele
+    dia (revisão de 12/11/2026): a conferência espera a FAMA acabar e segura a trava enquanto relê."""
+    import threading
+    from nexus.dados import conferencia
+    durante = []
+    monkeypatch.setattr(conferencia, "rodar", lambda config: durante.append(carga._FAMA["lendo"].locked()) or {})
+    monkeypatch.setattr(fama, "gerar_fama", lambda config: {"pulou": "FAMA de mentira"})
+    carga._FAMA["lendo"].acquire()                                   # a FAMA lendo
+    t = threading.Thread(target=carga._volta_conferencia, args=(_App(),))
+    t.start()
+    try:
+        t.join(0.3)
+        assert t.is_alive() and durante == []                        # esperando a FAMA
+    finally:
+        carga._FAMA["lendo"].release()
+        t.join(10)
+    assert durante == [True] and not carga._FAMA["lendo"].locked()    # segurou enquanto relia, e soltou
+    assert carga._volta_fama(_App()) is True                         # a FAMA volta a ler
+    # a leitura da FAMA que passa da espera não segura a conferência para sempre
+    monkeypatch.setattr(carga, "CONFERENCIA_ESPERA_FAMA_S", 0.1)
+    carga._FAMA["lendo"].acquire()
+    try:
+        carga._volta_conferencia(_App())
+    finally:
+        carga._FAMA["lendo"].release()
+    assert len(durante) == 2
 
 
 @pytest.mark.parametrize("falta", fama.CHAVES)

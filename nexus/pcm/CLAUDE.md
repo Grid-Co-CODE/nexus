@@ -2113,7 +2113,7 @@ livro `nexus_os_fama · fato_os_fama` e o de-para em Ligações são da parte A 
   renova por trás, uma renovação de cada vez (o voo único: a marca "rodando", posta e tirada dentro da trava, como o
   `_RENOVANDO` da `campo/visao.py`; pelo `is_alive()` da thread, duas visitas na mesma expiração abriam duas), e recebe
   a cópia de antes. A renovação confere antes o `updated_at` do livro (o `livros.atualizado_em`): se não mudou (sem o
-  livro no banco, None igual a None), a cópia fica sem reler as páginas (de hora em hora ela é relida inteira, pelo
+  livro no banco, None igual a None), a cópia fica sem reler as páginas (de 10 em 10 minutos ela é relida inteira, pelo
   cadastro). A subida aquece a cópia: o `servir.py` e o `app.py` chamam o `fama_quadro.aquecer_ao_subir`, por trás e na
   hora (só o banco, sem os 5 min da pré-carga, que espaçam o Fracttal); o `create_app` (os testes) e a cópia de prova
   não, e `NEXUS_PRE_CARGA=0` desliga junto. Sem cópia (só nos primeiros segundos depois de subir), o Quadro abre sem a

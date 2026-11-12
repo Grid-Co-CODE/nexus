@@ -19,13 +19,13 @@ from conftest import SENHA_TESTE
 FR = "Fracttal · Classificação 1"
 
 
-def _u(i, nome, cliente="Aurora Energia", cidade=None, mwp=None, codigo=""):
+def _u(i, nome, cliente="Aurora Energia", cidade=None, mwp=None, codigo="", uf=None):
     return {"id": i, "nome": nome, "cliente": cliente, "titulo": f"{cliente} - {nome}", "codigo": codigo,
-            "cidade": cidade, "mwp": mwp}
+            "cidade": cidade, "mwp": mwp, "uf": uf}
 
 
 USINAS = [
-    _u(1, "São Brás do Pinhal 1", cidade="São Brás do Pinhal", mwp=2.5),
+    _u(1, "São Brás do Pinhal 1", cidade="São Brás do Pinhal", mwp=2.5, uf="BA"),
     _u(2, "Nova Quimera 1"),
     _u(3, "Cachoeira Dourada 1"), _u(4, "Dourada do Sul 1"),
     _u(5, "Ventania 3"),
@@ -52,8 +52,18 @@ def test_o_nome_do_cadastro_com_palavras_a_mais_vem_sugerido_a_100():
     assert _ids(_fr("Aurora - Pinhal 1 - BA")) == [(1, 100)]
 
 
-def test_o_nome_do_cadastro_com_palavras_a_menos_tambem():
-    assert _ids(_fr("Aurora - Ventania do Norte 3 - CE")) == [(5, 100)]
+def test_a_chave_com_palavras_a_mais_vem_a_95_fora_do_lote():
+    """O sentido contrário ao do pedido: o nome do cadastro cabe na chave, que tem palavras A MAIS. A palavra a mais pode
+    ser a que separa duas usinas ("Nova Quimera 1" não é a "Quimera 1"; o caso da revisão de 12/11/2026, ao contrário do
+    pedido): 95, no alto e a um clique, mas fora do lote (ligação errada é pior que nenhuma), e o "por quê" diz."""
+    assert _ids(_fr("Aurora - Ventania do Norte 3 - CE")) == [(5, 95)]
+    usinas = [_u(11, "Quimera 1", cliente="Boreal")]
+    s = L.sugestoes(_fr("Boreal - Nova Quimera 1 - PA"), usinas)
+    assert [(x["id"], x["nota"]) for x in s] == [(11, 95)]
+    assert s[0]["ressalva"] == ("a chave tem palavras a mais que a Boreal - Quimera 1 (nova): pode ser outra usina, "
+                                "confira antes de ligar")
+    buraco = {"sistema": FR, "chave": "Boreal - Nova Quimera 1 - PA", "sugestoes": s}
+    assert L.sugestoes_de_100([buraco], FR)["ligar"] == []
 
 
 def test_o_romano_vira_arabico_na_contencao():
@@ -76,6 +86,80 @@ def test_duas_candidatas_do_cliente_nenhuma_chega_a_100():
     buraco = {"sistema": FR, "chave": "Aurora - Dourada 1 - GO", "sugestoes": L.sugestoes(_fr("Aurora - Dourada 1 - GO"),
                                                                                           USINAS)}
     assert L.sugestoes_de_100([buraco], FR) == {"ligar": [], "pulos": {"varias": 1, "abaixo": 0, "sem": 0, "repetida": 0}}
+
+
+def test_a_letra_solta_e_a_usina():
+    """O "a" e o "e" só caem entre dois números (o "1 a 4", o "1 e 2"); fora disso a letra é a usina: "Pinhal A" não é a
+    "Pinhal B", nem a "Pinhal" sem letra (revisão de 12/11/2026: o "a" das genéricas apagava a letra, e vinha a 100%)."""
+    usinas = [_u(21, "Pinhal B"), _u(22, "Pinhal"), _u(23, "Pinhal 1 a 4", cliente="Boreal")]
+    assert _ids(_fr("Aurora - Pinhal A - BA"), usinas[:1]) == []
+    # contra a "Pinhal" sem letra, a parecença de letras ainda sugere, abaixo de 100 (como "Caxambu" e "Caxambu 1")
+    assert all(n < 100 for _, n in _ids(_fr("Aurora - Pinhal C - BA"), usinas))
+    assert _ids(_fr("Aurora - Pinhal B - BA"), usinas)[0] == (21, 100)
+    assert _ids(_fr("Boreal - Pinhal 3 - BA"), usinas) == [(23, 100)]          # a faixa responde pelo 3
+    assert K.contencao(K.termos("Pinhal A"), "Pinhal B") == K.OUTRO_NUMERO
+    assert K.contencao(K.termos("Pinhal 3"), "Pinhal 1 a 4") == K.MESMO
+    assert K.contencao(K.termos("Pinhal 5"), "Pinhal 1 a 4") == K.OUTRO_NUMERO
+    assert K.contencao(K.termos("Pinhal 1 e 2"), "Pinhal 1 e 2") == K.MESMO
+    # a letra abreviada e o apóstrofo não são letra da usina
+    assert K.termos("S. Pinhal 1") == K.termos("Pinhal 1")
+    assert K.contencao(K.termos("Olho dAgua 1"), "Olho D'Água 1") == K.MESMO
+
+
+def test_o_romano_acima_do_xii_tambem_e_numero():
+    """As `palavras` param no XII; na contenção, "Pinhal XIII" é a 13, e não a "Pinhal" sem número."""
+    usinas = [_u(31, "Pinhal")]
+    assert all(n < 100 for _, n in _ids(_fr("Aurora - Pinhal XIII - BA"), usinas))
+    assert K.contencao(K.termos("Pinhal XIII"), "Pinhal 13") == K.MESMO
+    assert K.contencao(K.termos("Pinhal XXXIX"), "Pinhal") == K.OUTRO_NUMERO
+    assert K.termos("Vivi Civil 1")[0] == {"vivi", "civil"}                     # palavra não é romano
+
+
+def test_a_uf_diferente_segura_em_95_sem_vetar():
+    """O município de mesmo nome em outro estado: a chave diz SP e a usina é da BA. Não veta (a base também erra a UF),
+    mas sai do lote, e o "por quê" diz."""
+    s = L.sugestoes(_fr("Aurora - Pinhal 1 - SP"), USINAS)
+    assert [(x["id"], x["nota"]) for x in s] == [(1, 95)]
+    assert s[0]["ressalva"] == "a Aurora Energia - São Brás do Pinhal 1 é de BA, e a chave diz SP: confira antes de ligar"
+    assert _ids(_fr("Aurora - Pinhal 1 - BA")) == [(1, 100)]
+    # a UF por extenso, do BD_Thopen
+    assert _ids({"chave": "Pinhal 1", "nome": "Pinhal 1", "cliente": "Aurora Energia", "uf": "São Paulo"}) == [(1, 95)]
+
+
+def test_o_cliente_exato_vale_primeiro():
+    """Com "Aurora" e "Aurora Solar" no cadastro, a chave da Aurora fica na Aurora: o começo do nome só vale sem o exato,
+    e só se apontar UM cliente (revisão de 12/11/2026: um cliente não é outro)."""
+    usinas = [_u(41, "Pinhal Alto 1", cliente="Aurora"), _u(42, "São Brás do Pinhal 1", cliente="Aurora Solar")]
+    assert _ids(_fr("Aurora - Pinhal 1 - BA"), usinas) == [(41, 100)]
+    assert _ids(_fr("Aurora Solar - Pinhal 1 - BA"), usinas) == [(42, 100)]
+    # sem o exato, dois clientes que começam como a chave: dúvida, nenhuma sugestão, e o "por quê" diz
+    duas = [_u(43, "Pinhal Alto 1", cliente="Aurora Energia"), _u(44, "São Brás do Pinhal 1", cliente="Aurora Solar")]
+    assert _ids(_fr("Aurora - Pinhal 1 - BA"), duas) == []
+    assert L.porque_sem_sugestao(_fr("Aurora - Pinhal 1 - BA"), duas) == (
+        "o cliente Aurora começa como Aurora Energia e Aurora Solar no cadastro: confira o nome do cliente antes de "
+        "ligar à mão")
+    # um só pelo começo vale (o caso real: o Fracttal escreve o cliente mais curto)
+    assert _ids(_fr("Aurora - Pinhal 1 - BA"), duas[:1]) == [(43, 100)]
+
+
+def test_duas_contidas_uma_vetada_pela_cidade_a_outra_fica_abaixo_de_100():
+    """A única do cliente conta ANTES das travas de cidade e de potência: a candidata que a cidade tirou ainda é dúvida."""
+    usinas = [_u(51, "Pinhal do Norte 1", cidade="Cidade Norte"), _u(52, "Pinhal do Sul 1", cidade="Cidade Sul")]
+    s = _ids({"chave": "Pinhal 1", "nome": "Pinhal 1", "cliente": "Aurora Energia", "cidade": "Cidade Sul"}, usinas)
+    assert [i for i, _ in s] == [52] and s[0][1] < 100
+
+
+def test_com_o_codigo_igual_e_outra_contida_nenhuma_chega_a_100():
+    """O código igual e o nome igual levavam a 100 pelo caminho antigo; com outra contida do cliente, o teto é 95."""
+    usinas = [_u(61, "Pinhal 1", codigo="AUR-PNH100"), _u(62, "Pinhal do Sul 1")]
+    s = _ids({"chave": "Aurora - Pinhal 1 - BA", "nome": "Aurora - Pinhal 1 - BA", "codigo": "PNH100"}, usinas)
+    assert sorted(i for i, _ in s) == [61, 62] and all(n < 100 for _, n in s)
+
+
+def test_a_sigla_de_duas_letras_nao_e_palavra_forte():
+    """ "GD 1" não diz usina nenhuma: a contenção pede uma palavra de três letras ou mais no lado menor."""
+    assert K.contencao(K.termos("GD 1"), "Lagoa GD 1") is None
+    assert _ids(_fr("Aurora - GD 1 - BA"), [_u(71, "Lagoa GD 1")]) == []
 
 
 def test_sem_o_cliente_na_chave_a_unica_fica_abaixo_de_100():
@@ -109,7 +193,7 @@ def test_as_palavras_genericas_nao_contam(chave):
 
 def test_a_lista_curta_das_genericas():
     assert {"usina", "ufv", "solar", "cliente", "de", "do", "da"} <= K.GENERICAS_SUGESTAO
-    assert len(K.GENERICAS_SUGESTAO) <= 12
+    assert len(K.GENERICAS_SUGESTAO) <= 12 and not {"a", "e"} & K.GENERICAS_SUGESTAO       # a letra é a usina
     # só as genéricas de um lado não contêm nada: "Usina 1" não é a "Usina Solar 1" pela contenção
     assert K.contencao(K.termos("Usina 1"), "Usina Solar 1") is None
     # nem a palavra fraca sozinha ("Nova" está em toda parte)
@@ -175,7 +259,8 @@ def test_a_fama_tambem_acha_pela_contencao_abaixo_de_100():
 FONTES = {FR: [_fr("Boreal - Lagoa Bonita 1 - SP"),                       # liga pelo nome
                _fr("Boreal - Lagoa Bonita do Alto 1 - SP"),               # contém a mesma usina: já ligada a outra chave
                _fr("Aurora - Nova Quimera 2 - PA"),                       # o cadastro só tem a 1
-               _fr("Aurora - Pinhal 1 - BA")]}                            # contém: 100
+               _fr("Aurora - Pinhal 1 - BA"),                             # contém: 100
+               _fr("Aurora - Nova Quimera do Norte 1 - PA")]}             # palavras a mais: 95, e o porquê diz
 
 
 @pytest.fixture
@@ -212,7 +297,11 @@ def _linhas_da_tabela(cli):
 def test_o_porque_util_aparece_no_lugar_do_sem_par(cli):
     linhas = _linhas_da_tabela(cli)
     assert set(linhas) == {"Boreal - Lagoa Bonita do Alto 1 - SP", "Aurora - Nova Quimera 2 - PA",
-                           "Aurora - Pinhal 1 - BA"}
+                           "Aurora - Pinhal 1 - BA", "Aurora - Nova Quimera do Norte 1 - PA"}
+    a_mais = linhas["Aurora - Nova Quimera do Norte 1 - PA"]
+    assert "95%" in a_mais and "sem par no cadastro" not in a_mais
+    assert ("a chave tem palavras a mais que a Aurora Energia - Nova Quimera 1 (norte): pode ser outra usina, confira "
+            "antes de ligar") in a_mais
     q = linhas["Aurora - Nova Quimera 2 - PA"]
     assert "o cadastro tem a Nova Quimera 1, não a 2: crie no Registro mestre" in q and "sem par no cadastro" not in q
     p = linhas["Aurora - Pinhal 1 - BA"]
