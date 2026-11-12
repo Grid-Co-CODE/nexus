@@ -165,24 +165,19 @@ def regua_gravar():
 
 @bp.route("/regua/gravar_todos", methods=["POST"])
 def regua_gravar_todos():
-    """O "Gravar no Fracttal todos os acordados deste almoxarifado" (11/11/2026, item 2 da 2ª rodada): `regua.gravar_acordados`,
-    no login de quem apertou, com as recusas de sempre da ponte (`_com_o_fracttal`). Com uma gravação de contagem andando no
-    almoxarifado, 409: ela mesma manda os acordados quando termina, e duas sessões falando com o mesmo almoxarifado ao mesmo
-    tempo não ajudam ninguém. Roda no pedido (um pedido por segundo, a cota da empresa): a página diz que pode levar minutos."""
-    from . import gravacao as G
-    from .erros import Conflito
+    """O "Gravar no Fracttal todos os acordados deste almoxarifado" (11/11/2026, item 2 da 2ª rodada): `regua.iniciar_lote`, no
+    login de quem apertou, com as recusas de sempre da ponte (`_com_o_fracttal`). O lote roda em segundo plano (a revisão de
+    11/11/2026: no pedido, 100 peças levavam uns 2 min e o restart do deploy no meio deixava peças sem o evento): a resposta volta
+    logo, e a página da régua acompanha o andamento. A gravação de contagem e o lote se excluem: com a vez do almoxarifado presa
+    (uma gravação andando, ou parada no meio) ou o almoxarifado fora do modo 0 no Fracttal, 409, e nada é enviado."""
     almox = A._id(request.form.get("almox"))
     de = "/t/pcm/pecas/inventario/regua" + ("?" + urlencode({"almox": almox}) if almox else "")
-
-    def gravar(est):
-        if not almox.isdigit():
-            raise ValueError("Escolha o almoxarifado: nada foi enviado ao Fracttal.")
-        if G._viva(almox):
-            raise Conflito("Há uma gravação de contagem andando neste almoxarifado: espere ela terminar (no fim, ela mesma manda "
-                           "os acordados ao Fracttal). Nada foi enviado.")
-        return regua.gravar_acordados(current_app.config, almox, est, quem.colunas(current_app.config, quem.do_pedido()))["texto"]
-    r = _com_o_fracttal(de, gravar, ao="regua")
-    return r if not isinstance(r, str) else _ok("pcm_regua_aviso", r, de)
+    r = _com_o_fracttal(de, lambda est: regua.iniciar_lote(current_app.config, almox, est,
+                                                           quem.colunas(current_app.config, quem.do_pedido())), ao="regua")
+    if not isinstance(r, dict):
+        return r
+    return _sem_cache(jsonify({"ok": True, "mensagem": "Mandando os acordados ao Fracttal em segundo plano: acompanhe nesta "
+                                                       "página.", "volta": na_raiz(de), "estado": r.get("estado")}))
 
 
 # ── a curadoria: cadastrar a peça nova no Fracttal (Task 9) ─────────────────────────────────────────────────────────────

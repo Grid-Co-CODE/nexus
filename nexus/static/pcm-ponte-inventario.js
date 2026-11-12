@@ -56,10 +56,14 @@
       // o 401 do portão do Nexus (a sessão que nasceu do Fracttal e perdeu o cookie dele foi encerrada junto): o `login` é um
       // true e o endereço de entrar de novo é o `entrar`; o 401 da ponte traz o `login` com o /os/login do Fracttal
       if (x.d.sessao_encerrada) mostrar(x.d.erro || "A sessão acabou: entre de novo.", x.d.entrar, "Entrar de novo");
-      else mostrar(x.d.erro || "O Nexus não respondeu como esperado (HTTP " + x.r.status + "). Nada foi anotado.", x.d.login);
+      // o 502 e o 504 do proxy (ou o pedido que caiu no meio) não dizem o que o Nexus fez: pode ter gravado, e a frase de antes
+      // garantia que nada tinha sido anotado (a revisão de 11/11/2026)
+      else mostrar(x.d.erro || "O Nexus não respondeu como esperado (HTTP " + x.r.status + "): pode ter gravado. Por isso, " +
+                   "recarregue a página e confira antes de tentar de novo.", x.d.login);
       if (botao) botao.disabled = false;
     }).catch(function () {
-      mostrar("Não consegui falar com o Nexus agora. Nada foi anotado; confira a página antes de tentar de novo.");
+      mostrar("Não consegui falar com o Nexus agora, e o pedido pode ter chegado: recarregue a página e confira antes de " +
+              "tentar de novo.");
       if (botao) botao.disabled = false;
     });
   });

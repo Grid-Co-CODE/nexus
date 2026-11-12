@@ -1256,7 +1256,8 @@ class _RecusaARegua(EstoqueFalso):
 def test_depois_da_gravacao_o_acordado_vai_ao_fracttal(app, grav):
     """Quando a gravação da contagem termina, na MESMA sessão do Fracttal de quem gravou, o Nexus manda a régua acordada de cada
     peça do almoxarifado cujo acordado difere do que o Fracttal tem: a 501 (sem régua) vai; a 502 já tem a acordada e não gasta
-    pedido; a 503 não tem acordado e não muda. A peça mandada vira um `regua_gravada` da contagem, e a etapa Gravação diz."""
+    pedido (o livro não dizia "gravado": ganha o `regua_gravada` de igual para igual); a 503 não tem acordado e não muda. Os
+    eventos são da contagem, e a etapa Gravação diz."""
     _acordo(app, ("501", (2, 20)), ("502", (1, 5)))
     falso = _falso({"501": 10, "502": {"saldo": 5, "minimo": 1, "maximo": 5}, "503": 4}, agora=grav["relogio"])
     _iniciar(grav, falso)
@@ -1264,8 +1265,10 @@ def test_depois_da_gravacao_o_acordado_vai_ao_fracttal(app, grav):
     lido = falso.ler("10")
     assert (lido["501"]["minimo"], lido["501"]["maximo"]) == (2.0, 20.0) and (lido["501"]["saldo"]) == 12
     assert (lido["503"]["minimo"], lido["503"]["maximo"]) == (None, None)
-    assert [(e["id_item"], e["contagem_id"], e["pessoa_hmac"]) for e in _eventos(app, "regua_gravada")] == \
-        [("501", "C-1", APROVADOR["pessoa_hmac"])]
+    ev = {e["id_item"]: e for e in _eventos(app, "regua_gravada")}
+    assert set(ev) == {"501", "502"} and float(ev["501"]["para_qtd"]) == 2
+    assert (float(ev["502"]["de_qtd"]), float(ev["502"]["para_qtd"])) == (1, 1)            # de igual para igual
+    assert {(e["contagem_id"], e["pessoa_hmac"]) for e in ev.values()} == {("C-1", APROVADOR["pessoa_hmac"])}
     assert L.estado_dos_eventos(_da_c1(app)) == "gravada"
     est = G.estado(app.config, "C-1")
     assert est["estado"] == "concluida" and est["registro"][-1]["texto"] == "Gravação concluída."
@@ -1321,3 +1324,49 @@ def test_o_login_que_expira_na_regua_nao_para_a_gravacao(app, grav):
     assert est["registro"][-2]["texto"] == (f"A régua acordada não foi ao Fracttal ({G.LOGIN}): grave pela tela Mínimo e "
                                             "máximo.")
     assert not list(grav_pasta(app).glob("trava-*"))
+
+
+# ── a rodada de correção da onda 1 (a revisão de 11/11/2026): a gravação e o lote dos acordados se excluem ──────────────────
+def test_correcao_1_a_gravacao_espera_o_lote_dos_acordados(app, grav):
+    """Com o lote dos acordados indo ao Fracttal no almoxarifado (a vez do `regua._LOTE` presa), aprovar e continuar recusam
+    (409) antes de qualquer pedido: duas sessões falando com o mesmo almoxarifado ao mesmo tempo não ajudam ninguém."""
+    from nexus.pcm.inventario import regua as R
+    falso = _falso(agora=grav["relogio"])
+    trava = R._LOTE.de("10")
+    assert trava.acquire(blocking=False)
+    try:
+        with pytest.raises(G.Recusada, match="acordados") as ex:
+            _iniciar(grav, falso)
+        assert ex.value.status == 409 and falso.chamadas == []
+    finally:
+        trava.release()
+    expira = _falso(expirar_em=9, agora=grav["relogio"])          # a gravação para no meio, com a sessão aberta
+    _iniciar(grav, expira)
+    assert G.estado(app.config, "C-1")["estado"] == "parada"
+    assert trava.acquire(blocking=False)
+    try:
+        with pytest.raises(G.Recusada, match="acordados"):
+            _continuar(grav, _falso(agora=grav["relogio"]))
+    finally:
+        trava.release()
+
+
+def test_correcao_2_o_deploy_espera_o_lote_dos_acordados(app, grav):
+    """O controle do lote dos acordados "gravando" e salvo há menos de 5 min segura o restart como a gravação; o concluído, o
+    velho (o Nexus que reiniciou no meio) e o ilegível não."""
+    import json
+    from datetime import datetime
+    pasta = grav_pasta(app)
+    pasta.mkdir(parents=True, exist_ok=True)
+    agora = datetime(2026, 10, 26, 15, 0, tzinfo=timezone.utc)
+    (pasta / "regua-lote-10.json").write_text(json.dumps({"id_almox": "10", "estado": "gravando",
+                                                          "atualizado_em": "2026-10-26T14:58:00Z"}), "utf-8")
+    assert G.com_lote_aberto(pasta, agora) == ["regua-10"]
+    (pasta / "regua-lote-10.json").write_text(json.dumps({"id_almox": "10", "estado": "gravando",
+                                                          "atualizado_em": "2026-10-26T14:50:00Z"}), "utf-8")
+    assert G.com_lote_aberto(pasta, agora) == []
+    (pasta / "regua-lote-10.json").write_text(json.dumps({"id_almox": "10", "estado": "concluida",
+                                                          "atualizado_em": "2026-10-26T14:59:00Z"}), "utf-8")
+    assert G.com_lote_aberto(pasta, agora) == []
+    (pasta / "regua-lote-20.json").write_text("{ilegível", "utf-8")
+    assert G.com_lote_aberto(pasta, agora) == []

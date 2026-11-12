@@ -800,8 +800,8 @@ def _eventos(cfg, tipo=None):
 
 def test_gravar_acordados_manda_so_o_acordado_diferente(cfg):
     """Só vai a peça com acordado registrado e diferente do que o Fracttal tem: a 5001 (de 1 e 4 para 2 e 20). A 5003 já tem o
-    acordado (não gasta pedido, e passa a "gravado no Fracttal": é o que ele tem), a 5004 não tem acordado (só o recomendado,
-    que nunca vai) e não muda. Um pedido de leitura, um por peça mandada e a releitura."""
+    acordado (não gasta pedido, e passa a "gravado no Fracttal", com o evento de igual para igual: é o que ele tem), a 5004 não
+    tem acordado (só o recomendado, que nunca vai) e não muda. Um pedido de leitura, um por peça mandada e a releitura."""
     _acordar(cfg, ("5001", (2, 20)), ("5003", (2, 20)))
     R.decidir(cfg, ALMOX, "5004", recomendado=(3, 30), pessoa=PESSOA, varredura=VAR_LOTE)
     falso = _falso_lote()
@@ -811,9 +811,10 @@ def test_gravar_acordados_manda_so_o_acordado_diferente(cfg):
     assert (lido["5001"]["minimo"], lido["5001"]["maximo"]) == (2.0, 20.0)
     assert (lido["5004"]["minimo"], lido["5004"]["maximo"]) == (5.0, 9.0)            # sem acordado: não muda
     assert (r["total"], r["gravadas"], r["iguais"], r["falhas"]) == (2, 1, 1, 0)
-    ev = _eventos(cfg, "regua_gravada")
-    assert [(e["id_item"], e["de_qtd"], e["para_qtd"]) for e in ev] == [("5001", 1, 2)]
-    assert ev[0]["pessoa_hmac"] == QUEM["pessoa_hmac"] and ev[0]["usina_id"] == 7 and ev[0]["codigo"] == "SP-CAB-001"
+    ev = {e["id_item"]: e for e in _eventos(cfg, "regua_gravada")}
+    assert {i: (e["de_qtd"], e["para_qtd"]) for i, e in ev.items()} == {"5001": (1, 2), "5003": (2, 2)}
+    assert ev["5001"]["pessoa_hmac"] == QUEM["pessoa_hmac"] and ev["5001"]["usina_id"] == 7
+    assert ev["5001"]["codigo"] == "SP-CAB-001"
     q = {x["id_item"]: x for x in R.quadro(cfg, ALMOX, varredura=VAR_LOTE)}
     assert q["5001"]["gravado"] and q["5003"]["gravado"] and not q["5004"]["gravado"]
     assert "1 gravado no Fracttal" in r["texto"] and "1 já estava igual" in r["texto"]
@@ -978,17 +979,19 @@ def test_gravar_todos_pela_ponte(inv, monkeypatch, tmp_path):
     r = c.post(TODOS, data={"almox": "10"})
     assert r.status_code == 200 and r.get_json()["ok"] is True
     assert r.get_json()["volta"].endswith("/t/pcm/pecas/inventario/regua?almox=10")
-    assert falso.chamadas == ["ler", "definir_regua", "ler"]
+    R.aguardar_lote("10")
+    assert falso.chamadas == ["modo", "ler", "definir_regua", "ler"]       # o modo conferido antes do lote
     html = c.get(r.get_json()["volta"]).get_data(as_text=True)
     assert "1 gravado no Fracttal" in html and "no Fracttal agora" in html and "mín 2, máx 9" in html
 
 
-def test_gravar_todos_recusas_da_ponte(inv, logado, monkeypatch):
+def test_gravar_todos_recusas_da_ponte(inv, logado, monkeypatch, tmp_path):
     """As recusas de sempre da ponte, antes de qualquer pedido ao Fracttal: outro setor 403; sem o cookie do Fracttal 401 com o
     link do login; a conta do Fracttal de outra pessoa 409; a senha de administrador 409. E com uma gravação de contagem andando
     no almoxarifado, 409 (ela mesma manda os acordados no fim)."""
     from nexus.pcm.inventario import gravacao as G
     from nexus.pcm.inventario import ponte_os
+    inv.config["NEXUS_DADOS"] = str(tmp_path / "dados")
     falso = _falso_10()
     _estoque_da_sessao(monkeypatch, falso)
     _no_setor(monkeypatch, SID.PERFORMANCE)
@@ -1005,3 +1008,255 @@ def test_gravar_todos_recusas_da_ponte(inv, logado, monkeypatch):
     r = com_o_fracttal(inv, _pessoa_ms(inv)).post(TODOS, data={"almox": "10"})
     assert r.status_code == 409 and "gravação de contagem" in r.get_json()["erro"]
     assert falso.chamadas == []
+
+
+# ── a rodada de correção da onda 1 (a revisão de 11/11/2026) ─────────────────────────────────────────────────────────────
+def _vez_presa_por_uma_gravacao_parada(pasta, almox="10", cid="C-9"):
+    """A vez do almoxarifado presa por uma contagem cuja gravação parou no meio (o controle "parada" com o lote em sessão: o
+    almoxarifado talvez travado em ajuste no Fracttal), como o `gravacao._reservar` a deixa."""
+    import json
+    d = pasta / "almox_inventario"
+    d.mkdir(parents=True, exist_ok=True)
+    (d / f"trava-{almox}.json").write_text(json.dumps({"contagem_id": cid, "desde": "2026-10-25T12:00:00Z"}), "utf-8")
+    (d / f"{cid}.json").write_text(json.dumps({
+        "contagem_id": cid, "id_almox": almox, "almox_nome": f"Almoxarifado {almox}", "estado": "parada",
+        "motivo": "o login do Fracttal expirou", "rodada": 1, "aprovada_em": "2026-10-25T12:00:00Z",
+        "atualizado_em": "2026-10-25T12:05:00Z", "fim": "2026-10-25T12:05:00Z", "aprovador": {"pessoa_hmac": "x"},
+        "lotes": [{"n": 1, "itens": ["1"], "estado": "aberto", "sessao": 1, "ref": "INVENTARIO-x-L1",
+                   "aberto_em": "2026-10-25T12:01:00Z", "marco": 1, "mexidas": []}],
+        "itens": {"1": {"codigo": "SP-1", "estado": "escrita", "lote": 1}}}), "utf-8")
+
+
+def test_correcao_1_o_botao_recusa_com_a_vez_presa_e_fora_do_modo_0(inv, monkeypatch, tmp_path):
+    """O botão de todos e a gravação se excluem: com a vez do almoxarifado presa por uma contagem que não terminou (a gravação
+    parada, talvez com o almoxarifado travado em ajuste), 409 antes de qualquer pedido; e, livre, o modo do almoxarifado é
+    conferido no Fracttal antes do lote: fora do 0 (ajuste ou inventário físico), 409."""
+    dados = tmp_path / "dados"
+    inv.config["NEXUS_DADOS"] = str(dados)
+    falso = _falso_10()
+    _estoque_da_sessao(monkeypatch, falso)
+    _no_setor(monkeypatch, SID.PCM)
+    c = com_o_fracttal(inv, _pessoa_ms(inv))
+    _vez_presa_por_uma_gravacao_parada(dados)
+    r = c.post(TODOS, data={"almox": "10"})
+    assert r.status_code == 409 and "travado em ajuste" in r.get_json()["erro"] and falso.chamadas == []
+    (dados / "almox_inventario" / "trava-10.json").unlink()
+    falso.definir_modo("10", 2)
+    r = c.post(TODOS, data={"almox": "10"})
+    assert r.status_code == 409 and "ajuste" in r.get_json()["erro"] and falso.chamadas == ["modo"]
+    assert not R.lote_andando("10")                                     # a vez do lote foi solta
+
+
+class _Pausa(EstoqueFalso):
+    """O Fracttal que segura a régua de cada peça até o teste soltar (o lote andando em segundo plano)."""
+
+    def __init__(self, *a, **k):
+        import threading
+        super().__init__(*a, **k)
+        self.entrou, self.soltar = threading.Event(), threading.Event()
+
+    def definir_regua(self, id_almox, id_item, minimo, maximo):
+        self.entrou.set()
+        self.soltar.wait(10)
+        return super().definir_regua(id_almox, id_item, minimo, maximo)
+
+
+def test_correcao_2_o_lote_roda_em_segundo_plano_com_o_controle(inv, monkeypatch, tmp_path):
+    """O lote não roda mais dentro do pedido (100 peças são uns 2 min; 574, uns 10): o botão começa uma thread com um controle
+    "gravando", salvo a cada peça, que o deploy espera como espera a gravação (`gravacao.com_lote_aberto`) e a tela acompanha
+    (`lote.json`). No fim, o controle diz o resultado, e a vez do almoxarifado é solta."""
+    from nexus.pcm.inventario import gravacao as G
+    dados = tmp_path / "dados"
+    inv.config["NEXUS_DADOS"] = str(dados)
+    falso = _Pausa({"10": {"1": {"saldo": 1, "minimo": 3, "maximo": 3, "codigo": "SP-1"}}})
+    _estoque_da_sessao(monkeypatch, falso)
+    _no_setor(monkeypatch, SID.PCM)
+    c = com_o_fracttal(inv, _pessoa_ms(inv))
+    assert c.post("/t/pcm/pecas/inventario/regua/decidir", data={"almox": "10", "item": "1", "aco_min": "2",
+                                                                   "aco_max": "9"}).status_code == 303
+    try:
+        r = c.post(TODOS, data={"almox": "10"})
+        assert r.status_code == 200 and r.get_json()["ok"] is True
+        assert falso.entrou.wait(10)
+        e = c.get("/t/pcm/pecas/inventario/regua/lote.json?almox=10").get_json()
+        assert e["estado"] == "gravando" and e["a_mandar"] == 1
+        assert R.lote_andando("10") and "regua-10" in G.com_lote_aberto(dados / "almox_inventario")
+        html = c.get("/t/pcm/pecas/inventario/regua?almox=10").get_data(as_text=True)
+        assert "Mandando os acordados ao Fracttal" in html and 'data-rg-lote="gravando"' in html
+        assert "Gravar no Fracttal todos os acordados deste almoxarifado</button>" not in html     # sem o 2º clique
+    finally:
+        falso.soltar.set()
+        R.aguardar_lote("10")
+    e = c.get("/t/pcm/pecas/inventario/regua/lote.json?almox=10").get_json()
+    assert e["estado"] == "concluida" and e["gravadas"] == 1 and not R.lote_andando("10")
+    assert "regua-10" not in G.com_lote_aberto(dados / "almox_inventario")
+
+
+class _Morte(BaseException):
+    """O processo que morre no meio (o deploy reiniciou o Nexus): nenhum `except Exception` a pega."""
+
+
+class _MorreNaSegunda(EstoqueFalso):
+    """O Fracttal grava a régua da 2ª peça e o Nexus morre logo depois, antes de anotar."""
+
+    def __init__(self, *a, **k):
+        super().__init__(*a, **k)
+        self.vez, self.morrer = 0, True
+
+    def definir_regua(self, id_almox, id_item, minimo, maximo):
+        super().definir_regua(id_almox, id_item, minimo, maximo)
+        self.vez += 1
+        if self.morrer and self.vez == 2:
+            raise _Morte()
+
+
+def test_correcao_2_o_lote_cortado_no_meio_e_retomado(cfg, tmp_path, monkeypatch):
+    """O Nexus reinicia no meio do lote: o Fracttal já tem a régua das duas primeiras peças, e o livro não tem nada delas. O
+    controle fica "gravando" (a tela diz que parou), e o lote seguinte anota cada peça que o Fracttal já tem igual e sem evento
+    com um `regua_gravada` de = para (a Auditoria não perde quem nem quando), e manda o resto."""
+    import threading
+    monkeypatch.setattr(threading, "excepthook", lambda args: None)      # a morte é de propósito: sem o traceback da thread
+    cfg["NEXUS_DADOS"] = str(tmp_path / "dados")
+    _acordar(cfg, ("5001", (2, 20)), ("5002", (1, 8)), ("5004", (4, 12)))
+    falso = _MorreNaSegunda({ALMOX: {"5001": {"saldo": 10, "minimo": 1, "maximo": 4, "codigo": "SP-CAB-001"},
+                                     "5002": {"saldo": 4, "minimo": 0, "maximo": 0, "codigo": "SP-CAB-002"},
+                                     "5004": {"saldo": 7, "minimo": 5, "maximo": 9, "codigo": "SP-CAB-004"}}})
+    R.iniciar_lote(cfg, ALMOX, falso, QUEM)
+    R.aguardar_lote(ALMOX)
+    assert _eventos(cfg) == [] and R.estado_do_lote(cfg, ALMOX)["estado"] == "parada"       # morreu antes de anotar
+    assert (falso.ler(ALMOX)["5002"]["minimo"], falso.ler(ALMOX)["5004"]["minimo"]) == (1.0, 5.0)
+    falso.morrer = False
+    R.iniciar_lote(cfg, ALMOX, falso, QUEM)
+    R.aguardar_lote(ALMOX)
+    ev = {e["id_item"]: (e["de_qtd"], e["para_qtd"]) for e in _eventos(cfg, "regua_gravada")}
+    assert ev == {"5001": (2, 2), "5002": (1, 1), "5004": (5, 4)}       # as duas de antes de = para; a 5004, mandada agora
+    assert all(e["pessoa_hmac"] == QUEM["pessoa_hmac"] for e in _eventos(cfg, "regua_gravada"))
+    assert all(x["gravado"] for x in R.quadro(cfg, ALMOX, varredura=VAR_LOTE) if x["acordado"] != (None, None))
+    assert R.estado_do_lote(cfg, ALMOX)["estado"] == "concluida"
+
+
+def test_correcao_2_o_livro_que_recusa_o_lote_e_anotado_no_seguinte(cfg, monkeypatch):
+    """O Fracttal recebeu e o livro do inventário recusou o registro do lote: o texto manda gravar de novo, e o lote seguinte anota
+    a peça igual e sem evento com o `regua_gravada` de = para."""
+    _acordar(cfg, ("5001", (2, 20)))
+    escrever, vezes = F.acrescentar, []
+
+    def recusa_o_primeiro(cfg_, aba, linhas):
+        if aba == F.ABA_EVENTO and not vezes:
+            vezes.append(1)
+            raise F.Recusada("o banco não deixou reler")
+        return escrever(cfg_, aba, linhas)
+    monkeypatch.setattr(F, "acrescentar", recusa_o_primeiro)
+    falso = _falso_lote()
+    r = R.gravar_acordados(cfg, ALMOX, falso, QUEM)
+    assert r["sem_livro"] and "grave de novo" in r["texto"] and _eventos(cfg) == []
+    r = R.gravar_acordados(cfg, ALMOX, falso, QUEM)
+    assert [(e["id_item"], e["de_qtd"], e["para_qtd"]) for e in _eventos(cfg, "regua_gravada")] == [("5001", 2, 2)]
+    assert r["iguais"] == 1 and R.quadro(cfg, ALMOX, varredura=VAR_LOTE)[0]["gravado"]
+
+
+def test_correcao_3_a_regua_lista_a_peca_da_contagem_gravada(cfg):
+    """A peça que a gravação ligou ao almoxarifado só chega à varredura do App no ciclo seguinte: a régua a lista já, pela
+    contagem gravada (o saldo e o código do `peca_gravada`), o PCM registra o acordado logo depois da auditoria, e o lote
+    seguinte o manda."""
+    F.acrescentar(cfg, F.ABA_EVENTO, [{"tipo": "peca_gravada", "contagem_id": "C-1", "id_almoxarifado": ALMOX,
+                                       "id_item": "7777", "codigo": "SP-CAB-777", "usina_id": 7,
+                                       "usina_ligada_por": LIGADA, "de_qtd": 0, "para_qtd": 6}])
+    q = {x["id_item"]: x for x in R.quadro(cfg, ALMOX, varredura=VAR_LOTE)}
+    assert q["7777"]["codigo"] == "SP-CAB-777" and q["7777"]["saldo"] == 6 and q["7777"]["saldo_de"] == "contagem gravada"
+    assert (q["7777"]["sugestao_min"], q["7777"]["sugestao_max"]) == (2, 12)
+    R.decidir(cfg, ALMOX, "7777", acordado=(2, 12), pessoa=PESSOA, varredura=VAR_LOTE)
+    falso = EstoqueFalso({ALMOX: {"7777": {"saldo": 6, "minimo": 0, "maximo": 0, "codigo": "SP-CAB-777"}}})
+    r = R.gravar_acordados(cfg, ALMOX, falso, QUEM)
+    assert r["gravadas"] == 1 and (falso.ler(ALMOX)["7777"]["minimo"], falso.ler(ALMOX)["7777"]["maximo"]) == (2.0, 12.0)
+    linha = [x for x in _livro(cfg, F.ABA_REGUA) if x["id_item"] == "7777"][-1]
+    assert linha["usina_id"] == 7 and linha["codigo"] == "SP-CAB-777"
+
+
+def test_correcao_4_o_lote_com_falha_nao_sai_na_caixa_verde(inv, monkeypatch, tmp_path):
+    """O resultado do lote vem do controle, na cor dele: tudo gravado é a caixa de sucesso; com falha, a de alerta."""
+    inv.config["NEXUS_DADOS"] = str(tmp_path / "dados")
+    falso = _RecusaUma({"10": {"1": {"saldo": 1, "minimo": 3, "maximo": 3, "codigo": "SP-1"},
+                               "2": {"saldo": 5, "minimo": 5, "maximo": 5, "codigo": "SP-2"}}}, recusar="1")
+    _estoque_da_sessao(monkeypatch, falso)
+    _no_setor(monkeypatch, SID.PCM)
+    c = com_o_fracttal(inv, _pessoa_ms(inv))
+    for corpo in ({"almox": "10", "item": "1", "aco_min": "2", "aco_max": "9"},
+                  {"almox": "10", "item": "2", "aco_min": "4", "aco_max": "6"}):
+        c.post("/t/pcm/pecas/inventario/regua/decidir", data=corpo)
+    c.post(TODOS, data={"almox": "10"})
+    R.aguardar_lote("10")
+    html = c.get("/t/pcm/pecas/inventario/regua?almox=10").get_data(as_text=True)
+    caixa = re.search(r'<div class="([^"]*)" role="status" data-rg-resultado>', html)
+    assert caixa and "cn-aviso" in caixa.group(1) and "cn-certo" not in caixa.group(1) and "1 falhou" in html
+
+
+def test_correcao_5_o_script_da_ponte_nao_diz_que_nada_foi_anotado():
+    """O 502 do proxy, o 504 e a rede cortada não dizem o que o Nexus fez: o lote (ou a régua de uma peça) pode ter gravado. O
+    script manda recarregar e conferir antes de tentar de novo, e nunca diz "Nada foi anotado"."""
+    js = (RAIZ / "nexus" / "static" / "pcm-ponte-inventario.js").read_text("utf-8")
+    assert "Nada foi anotado" not in js and js.count("recarregue a página e confira") >= 2
+
+
+def test_correcao_6_o_acordado_e_conferido_antes_de_cada_envio(cfg, monkeypatch):
+    """O acordado é lido de novo, sob a trava da peça, logo antes de mandar: o que outra pessoa registrou enquanto o lote andava
+    vai no lugar do de antes."""
+    _acordar(cfg, ("5001", (2, 20)), ("5002", (1, 8)))
+    falso = _falso_lote()
+    original = falso.definir_regua
+
+    def e_no_meio(id_almox, id_item, minimo, maximo):
+        original(id_almox, id_item, minimo, maximo)
+        if id_item == "5001":                   # enquanto a 5001 vai, outra pessoa registra outro acordado da 5002
+            F.acrescentar(cfg, F.ABA_REGUA, [{"id_almoxarifado": ALMOX, "id_item": "5002", "codigo": "SP-CAB-002",
+                                              "acordado_min_qtd": 3, "acordado_max_qtd": 15, "gravado_fracttal": 0,
+                                              "pessoa_hmac": QUEM["pessoa_hmac"]}])
+    monkeypatch.setattr(falso, "definir_regua", e_no_meio)
+    R.gravar_acordados(cfg, ALMOX, falso, QUEM)
+    assert (falso.ler(ALMOX)["5002"]["minimo"], falso.ler(ALMOX)["5002"]["maximo"]) == (3.0, 15.0)
+    q = {x["id_item"]: x for x in R.quadro(cfg, ALMOX, varredura=VAR_LOTE)}
+    assert q["5002"]["acordado"] == (3, 15) and q["5002"]["gravado"]
+
+
+def test_correcao_7_a_releitura_que_nao_se_le_volta_a_varredura(cfg, monkeypatch):
+    """O arquivo da releitura que o disco não deixa ler (o `PermissionError` não é o "não existe"): a coluna volta a ser a da
+    varredura, e a tela não cai num 500."""
+    from nexus.pcm.inventario import gravacao as G
+    cfg["NEXUS_DADOS"] = cfg["NEXUS_ALMOX_INVENTARIO_ARQUIVO"].rsplit("inventario.json", 1)[0] + "dados"
+    _acordar(cfg, ("5001", (2, 20)))
+    R.gravar_acordados(cfg, ALMOX, _falso_lote(), QUEM)
+
+    def negado(p):
+        raise PermissionError("acesso negado")
+    monkeypatch.setattr(G, "_ler_json", negado)
+    assert R.lida(cfg, ALMOX) is None
+    q = {x["id_item"]: x for x in R.quadro(cfg, ALMOX, varredura=VAR_LOTE, lida_depois_de="2000-01-01T00:00:00Z")}
+    assert q["5001"]["agora_em"] == ""
+
+
+def test_correcao_8_a_espera_do_429_solta_a_trava_da_peca(cfg):
+    """Os 62 s do 429 não seguram a peça: durante a espera, a trava dela está solta (registrar o acordado dela não espera)."""
+    _acordar(cfg, ("5001", (2, 20)))
+    presa = []
+    falso = _falso_lote(limite_em=2)
+
+    def dormir(s):
+        presa.append(R._PECA.de((ALMOX, "5001")).locked())
+    r = R.gravar_acordados(cfg, ALMOX, falso, QUEM, dormir=dormir)
+    assert presa == [False] and r["gravadas"] == 1
+
+
+def test_correcao_9_o_aviso_de_registrar_diz_quando_o_acordado_vai(inv, monkeypatch):
+    """O aviso depois de Registrar dizia "quando você mandar gravar": o acordado também vai sozinho no fim da gravação."""
+    _no_setor(monkeypatch, SID.PCM)
+    c = _pessoa_ms(inv)
+    r = c.post("/t/pcm/pecas/inventario/regua/decidir", data={"almox": "10", "item": "1", "aco_min": "2", "aco_max": "9"})
+    html = c.get(r.headers["Location"]).get_data(as_text=True)
+    assert "quando você mandar gravar" not in html and "no fim da próxima gravação de contagem" in html
+
+
+def test_correcao_13_feitas_nao_conta_a_peca_que_nao_foi(cfg):
+    """O 429 de novo para o lote: a peça que não foi mandada não entra em `feitas` (o andamento da tela)."""
+    _acordar(cfg, ("5001", (2, 20)), ("5002", (1, 8)))
+    r = R.gravar_acordados(cfg, ALMOX, _falso_lote(limite_em=[2, 3]), QUEM, dormir=lambda s: None)
+    assert (r["feitas"], r["nao_enviadas"], r["a_mandar"]) == (0, 2, 2)

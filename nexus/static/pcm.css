@@ -1267,6 +1267,11 @@ table.alm-t{width:100%;border-collapse:collapse;font-size:13px;color:var(--tinta
 .alm-card--sem-saldo{border-style:dashed}
 .alm-sem-saldo{margin:6px 0 0;font-size:12.5px;line-height:1.5;color:var(--tinta-2)}
 .alm-sem-saldo .inv-selo{margin-right:4px}
+/* os vistos antes (a revisão de 11/11/2026): recolhidos depois dos cartões, uma linha por almoxarifado */
+.alm-vistos{margin-top:12px;font-size:13px;color:var(--tinta-2)}
+.alm-vistos summary{cursor:pointer;padding:6px 0}
+.alm-vistos-lista{margin:4px 0 0;padding-left:18px;line-height:1.7}
+.alm-vistos-lista .alm-det{display:inline}
 .alm-pecas{margin-top:12px}
 .alm-pecas-msg{margin:0;font-size:13px;color:var(--mudo)}
 .alm-pecas-msg:empty{display:none}

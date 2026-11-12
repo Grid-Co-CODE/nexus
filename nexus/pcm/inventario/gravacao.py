@@ -115,6 +115,10 @@ SEM_LIVRO = "não consegui registrar no livro do inventário; o almoxarifado fic
 RELEITURA = "{n} {pecas} não {conferiram} na releitura do Fracttal: confira e continue"
 INTERROMPIDA = "a gravação parou no meio (o Nexus reiniciou)"
 EM_ANDAMENTO = "já tem uma gravação em andamento neste almoxarifado"
+# o lote dos acordados (`regua.iniciar_lote`, 11/11/2026) e a gravação se excluem: duas sessões falando com o mesmo almoxarifado ao
+# mesmo tempo não ajudam ninguém, e a régua mandada com o ajuste aberto nunca foi provada
+LOTE_DA_REGUA = ("Não gravei: os acordados deste almoxarifado estão indo ao Fracttal agora (a tela Mínimo e máximo mostra o "
+                 "andamento). Espere terminar e grave de novo.")
 SO_QUEM_APROVOU = "só quem aprovou continua"
 AVISO_TRAVADO = "{almox} ficou travado em ajuste no Fracttal; quem aprovou precisa continuar para destravar."
 SEM_PESSOA = ("Não sei quem está aprovando: entre com o seu login do Fracttal (a gravação fica no nome de quem aprova, e a "
@@ -319,6 +323,38 @@ def _reservar(cfg, id_almox: str, contagem_id: str) -> None:
         if ctrl is not None and ctrl.get("estado") not in ("concluida", "encerrada"):
             raise Recusada(f"Não gravei: {EM_ANDAMENTO} (outra contagem, parada no meio: quem a aprovou precisa continuar).")
     _gravar_json(p, {"contagem_id": contagem_id, "desde": _iso(_agora())})
+
+
+def vez_presa(cfg, id_almox: str) -> str:
+    """Por que o almoxarifado não pode receber o lote dos acordados agora ("" se pode; 11/11/2026, a revisão da onda 1): uma
+    gravação de contagem andando (ou começando) neste processo, ou a vez presa por uma contagem que não terminou, a parada no
+    meio inclusive (talvez com o almoxarifado travado em ajuste no Fracttal). A mesma conta do `_reservar`, sem reservar, sob a
+    `_TRAVA`: o lote segura a vez dele (`regua._LOTE`) antes de perguntar, e a gravação olha a vez do lote sob a mesma trava
+    (`_sem_lote_da_regua`), então uma das duas sempre vê a outra. O controle ilegível conta como presa (na dúvida, nada vai)."""
+    almox = A._id(id_almox)
+    with _TRAVA:
+        if _viva(almox):
+            return f"{EM_ANDAMENTO} (uma gravação de contagem)"
+        try:
+            dono = _ler_json(_caminho_trava(cfg, almox))
+            outra = str((dono or {}).get("contagem_id") or "")
+            ctrl = _controle(cfg, outra) if outra else None
+        except Recusada as ex:
+            return str(ex)
+    if ctrl is None or ctrl.get("estado") in ("concluida", "encerrada"):
+        return ""
+    est = estado(cfg, outra) or {}
+    if est.get("travado"):
+        return est.get("aviso") or AVISO_TRAVADO.format(almox=ctrl.get("almox_nome") or "O almoxarifado")
+    return ("uma gravação de contagem deste almoxarifado parou no meio: quem aprovou precisa continuar ou encerrar antes "
+            "(a lista do Inventário mostra qual)")
+
+
+def _sem_lote_da_regua(id_almox: str) -> None:
+    """A gravação (aprovar e continuar) recusa enquanto o lote dos acordados deste almoxarifado anda (chamar sob `_TRAVA`)."""
+    from . import regua
+    if regua.lote_andando(id_almox):
+        raise Recusada(LOTE_DA_REGUA)
 
 
 def _soltar(cfg, id_almox: str, contagem_id: str) -> None:
@@ -954,6 +990,7 @@ def iniciar(cfg, contagem: dict, itens: list[dict], estoque, aprovador: dict, *,
         if _controle(cfg, cid) is not None:
             raise Recusada("Esta contagem já foi aprovada: a gravação dela está em andamento ou parada (quem aprovou "
                            "continua).")
+        _sem_lote_da_regua(almox)
         _reservar(cfg, almox, cid)
         _ATIVAS[almox] = (cid, None)                # a vez é desta contagem enquanto a aprovação se registra
         try:
@@ -1005,6 +1042,7 @@ def continuar(cfg, contagem_id: str, estoque, pessoa: dict, *, dormir=None, agor
             raise Recusada("A gravação desta contagem já terminou.")
         if ctrl.get("estado") == "encerrada":
             raise Recusada("A gravação desta contagem foi encerrada: não se continua.")
+        _sem_lote_da_regua(almox)
         _reservar(cfg, almox, cid)
         ctrl.update(estado="gravando", motivo="", fim=None, rodada=int(ctrl.get("rodada") or 1) + 1)
         t = _Trabalho(cfg, ctrl, estoque, dormir, agora)
@@ -1209,7 +1247,7 @@ def _controles(pasta: Path):
     if pasta is None or not pasta.is_dir():
         return
     for arq in sorted(pasta.glob("*.json")):
-        if arq.name.startswith(("trava-", "regua-lida-")):         # a vez do almoxarifado e a releitura da régua
+        if arq.name.startswith(("trava-", "regua-lida-", "regua-lote-")):     # a vez, a releitura e o lote da régua
             continue
         try:
             ctrl = _ler_json(arq)
@@ -1236,7 +1274,9 @@ def com_lote_aberto(pasta: Path | None, agora: datetime | None = None) -> list[s
     com um lote em `abrindo`/`aberto`/`fechando`: o intervalo entre dois lotes (a releitura, o registro no livro) deixava o
     restart passar, e ele matava a gravação logo antes de abrir o lote seguinte (a revisão final de 27/10/2026). O teto de 10
     min é do `ferramentas/gravacao_aberta.py`. O processo que pergunta não é o do Nexus e não vê a thread: a gravação viva
-    salva o controle a cada pedido, e a parada (a que o reinício matou, ou a sem login) não ganha nada com a espera."""
+    salva o controle a cada pedido, e a parada (a que o reinício matou, ou a sem login) não ganha nada com a espera. Desde
+    11/11/2026, também o lote dos acordados do botão da régua (`regua.iniciar_lote`, o controle `regua-lote-<almox>.json` salvo a
+    cada peça), como `regua-<almox>`."""
     agora = instante(agora or _agora())
     out = []
     for ctrl in _controles(pasta):
@@ -1248,6 +1288,16 @@ def com_lote_aberto(pasta: Path | None, agora: datetime | None = None) -> list[s
             continue
         if agora - salvo <= timedelta(seconds=VIVA_S):
             out.append(str(ctrl["contagem_id"]))
+    # o lote dos acordados do botão da régua (11/11/2026): a mesma conta, pelo controle dele (`regua-lote-<almox>.json`, salvo a
+    # cada peça); o restart no meio deixaria peças mandadas sem o evento até o lote seguinte
+    for arq in sorted(pasta.glob("regua-lote-*.json")) if pasta is not None and pasta.is_dir() else ():
+        try:
+            ctrl = _ler_json(arq)
+            salvo = instante((ctrl or {}).get("atualizado_em"))
+        except (Recusada, ValueError):
+            continue
+        if (ctrl or {}).get("estado") == "gravando" and agora - salvo <= timedelta(seconds=VIVA_S):
+            out.append(f"regua-{A._id(ctrl.get('id_almox'))}")
     return out
 
 

@@ -28,8 +28,10 @@
 <p><b>O almoxarifado sem saldo ainda.</b> Ele aparece assim que sobe qualquer dado: o saldo do ciclo do App, uma contagem do
   inventário ou o histórico do Nexus. Sem linha no saldo do ciclo, o cartão não mostra número e diz por quê. Contagem enviada:
   é a gravação da contagem no Fracttal que liga as peças ao almoxarifado, e o saldo vem no ciclo do App seguinte a ela.
-  Contagem gravada: o saldo vem no próximo ciclo; se o ciclo já passou sem trazê-lo, confira no Fracttal as peças ligadas.
-  Sem peça ligada no Fracttal: o histórico já o viu com saldo, e o ciclo de agora não lista peça nenhuma nele.</p>{% endcall %}</div>
+  Contagem gravada: o saldo vem no próximo ciclo; se o ciclo já passou sem trazê-lo, confira no Fracttal as peças ligadas.</p>
+<p><b>Vistos antes.</b> O almoxarifado que o histórico do Nexus já viu e que o ciclo de agora não traz, sem contagem (sem peça
+  ligada no Fracttal hoje, ou desativado), fica no grupo recolhido do fim, com o dia em que um ciclo o viu pela última vez, e não
+  conta no número do alto.</p>{% endcall %}</div>
 {% if erro %}<div class="cn-erro" role="alert">Uma fonte não respondeu agora: {{ erro }}</div>{% endif %}
 
 {% if d.estado == 'sem_livro' %}
@@ -195,6 +197,19 @@
     {% endif %}
   {% endfor %}
   </div>
+  {# os vistos antes (a revisão de 11/11/2026): os almoxarifados só do histórico, recolhidos, com o dia em que um ciclo os viu
+     pela última vez; fora dos cartões e do número do alto #}
+  {% if d.vistos_antes %}
+  <details class="alm-vistos">
+    <summary><b>Vistos antes ({{ d.vistos_antes|length }})</b> <span class="mudo">o histórico já os viu; o ciclo de agora não
+      traz peça nenhuma ligada a eles</span></summary>
+    <ul class="alm-vistos-lista">
+      {% for c in d.vistos_antes %}
+      <li><b>{{ c.nome }}</b> <span class="alm-det">{% if c.usina %}{{ c.usina }}{% else %}usina não ligada{% if c.local %} · no Fracttal: {{ c.local }}{% endif %}{% endif %} · {% if c.visto_em %}visto pela última vez em {{ c.visto_em }}{% else %}sem data no histórico{% endif %}</span></li>
+      {% endfor %}
+    </ul>
+  </details>
+  {% endif %}
 </section>
 
 <section class="alm-painel" data-painel="catalogo" hidden>

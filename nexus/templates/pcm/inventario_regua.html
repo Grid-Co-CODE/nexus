@@ -27,7 +27,11 @@
   almoxarifado"; e sozinho, quando a gravação de uma contagem do almoxarifado termina, no login de quem gravou. Vai só o acordado
   diferente do que o Fracttal tem (a peça que a contagem acabou de ligar, que entra com 0 e 0, inclusive); a peça sem acordado
   não muda, e o recomendado e a sugestão nunca vão. Cada peça é relida antes de ser anotada como gravada, e a falha de uma não
-  para as outras (fica na Auditoria).</p>
+  para as outras (fica na Auditoria). O botão de todos manda em segundo plano, um pedido por segundo (a cota do Fracttal é da
+  empresa), e esta página acompanha; com uma gravação de contagem andando ou parada no meio no almoxarifado, ou com ele em
+  ajuste no Fracttal, ele não manda nada.</p>
+<p><b>A peça da contagem gravada.</b> A peça que a gravação ligou ao almoxarifado aparece aqui logo depois da auditoria, com o
+  saldo da contagem, antes de a varredura do App lê-la: registre o acordado dela, e o lote seguinte o manda.</p>
 <p><b>No Fracttal.</b> Depois de gravar, o Nexus relê o almoxarifado e mostra o mínimo e o máximo que o Fracttal tem agora, com a
   hora da leitura, até a varredura seguinte do App (que só traz o mínimo).</p>{% endcall %}</div>
 {# as partes do almoxarifado: a fila das abas, com as quatro do inventário juntas (pcm/_almox_abas.html) #}
@@ -58,6 +62,19 @@
 
 {% if almox %}
 {% set com_acordo = linhas|rejectattr('acordado', 'equalto', (none, none))|list %}
+{# o lote dos acordados em segundo plano (a revisão de 11/11/2026): andando, a página pergunta o andamento a cada 3 s
+   (pcm-regua.js) e recarrega no fim; parado, diz por quê; terminado há pouco, o resultado na cor dele (o lote com falha não sai
+   na caixa verde de sucesso) #}
+{% if lote and lote.estado == 'gravando' %}
+<div class="cn-erro cn-aviso" role="status" data-rg-lote="gravando" data-url="{{ raiz }}/t/pcm/pecas/inventario/regua/lote.json?almox={{ almox.id }}">
+  <span><b>Mandando os acordados ao Fracttal:</b> <span data-rg-lote-n>{{ lote.feitas or 0 }} de {{ lote.a_mandar or 0 }}</span>
+    peças, um pedido por segundo. Esta página se atualiza sozinha no fim.</span></div>
+{% elif lote and lote.estado == 'parada' %}
+<div class="cn-erro" role="alert" data-rg-resultado><span><b>{{ lote.texto }}</b></span></div>
+{% elif lote %}
+<div class="{{ 'cn-certo' if lote.tom == 'ok' else 'cn-erro cn-aviso' }}" role="status" data-rg-resultado><span><b>{{ lote.texto }}</b>
+  <span class="alm-det">o lote de {{ lote.fim_txt }}</span></span></div>
+{% endif %}
 <div class="inv-tiles" aria-label="Resumo da régua de {{ almox.nome }}">
   <div class="inv-tile"><b class="inv-tile-v">{{ linhas|length }}</b><span class="inv-tile-r">Peças</span></div>
   <div class="inv-tile inv-tile--info"><b class="inv-tile-v">{{ com_acordo|length }}</b><span class="inv-tile-r">Com acordado</span></div>
@@ -68,11 +85,11 @@
   <div class="inv-card-cab"><h3>{{ almox.nome }}</h3>
     <span class="inv-card-nota">O saldo é o da última contagem gravada; sem ela, o da varredura do App. Registrar guarda a decisão no
       Nexus. Gravar no Fracttal manda só o acordado registrado, no seu login, e confere relendo.</span></div>
-  {% if pode and com_acordo %}
-  {# todos os acordados de uma vez (11/11/2026), a mesma regra do botão de cada peça. Roda no pedido, um pedido por segundo (a
-     cota do Fracttal é da empresa): o script da ponte mostra o data-ponte-espera enquanto espera #}
+  {% if pode and com_acordo and not (lote and lote.estado == 'gravando') %}
+  {# todos os acordados de uma vez (11/11/2026), a mesma regra do botão de cada peça. O lote roda em segundo plano (a revisão de
+     11/11/2026), e a página acompanha; enquanto ele anda, o botão some (o 2º clique só levaria 409) #}
   <form method="post" action="{{ raiz }}/os/_nexus/inventario/regua/gravar_todos" data-ponte class="rg-todos"
-        data-ponte-espera="Mandando os acordados ao Fracttal, um pedido por segundo (a cota é da empresa): pode levar alguns minutos.">
+        data-ponte-espera="Conferindo o almoxarifado no Fracttal e começando o lote dos acordados…">
     <input type="hidden" name="almox" value="{{ almox.id }}">
     <button class="gc-btn gc-btn--ui gc-btn--primario" type="submit">Gravar no Fracttal todos os acordados deste almoxarifado</button>
     <span class="alm-det">Vai só o acordado diferente do que o Fracttal tem; a peça sem acordado não muda.</span>

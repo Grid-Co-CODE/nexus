@@ -908,7 +908,7 @@ def test_o_almoxarifado_que_so_tem_contagem_aparece(app, almox, monkeypatch):
     assert set(c) == {"10", "20", "30"}
     novo = c["30"]
     assert (novo["nome"], novo["usina"], novo["pecas"], novo["sem_saldo"]["porque"]) == \
-        ("Almoxarifado 30", USINA_1, 0, "contagem")
+        ("Almoxarifado 30", USINA_1, None, "contagem")                # sem número: nenhum "0 peças" inventado
     assert c["10"].get("sem_saldo") is None and c["10"]["pecas"] == 2
     k = _dados()["kpis"]
     assert (k["almoxarifados"], k["sem_saldo"]) == (3, 1)
@@ -919,18 +919,21 @@ def test_o_almoxarifado_que_so_tem_contagem_aparece(app, almox, monkeypatch):
     assert "Por almoxarifado (3)" in html and "1 sem saldo ainda" in html
 
 
-def test_o_almoxarifado_do_historico_sem_peca_aparece(app, almox, monkeypatch):
-    """O almoxarifado que o histórico do Nexus já viu (a `dim_almoxarifado`) e que o saldo deste ciclo não traz: sem peça ligada
-    no Fracttal. O nome e a usina vêm da dimensão; a usina, pela de-para de hoje."""
+def test_o_almoxarifado_do_historico_sem_peca_vai_para_vistos_antes(app, almox, monkeypatch):
+    """O almoxarifado que o histórico do Nexus já viu (a `dim_almoxarifado`) e que o ciclo de agora não traz, sem contagem: não é
+    cartão (a revisão de 11/11/2026: todo almoxarifado da dimensão, mesmo o desativado, virava "sem saldo ainda" para sempre e
+    contava no número do alto). Vai para o grupo recolhido "vistos antes", com o nome e a usina da dimensão (a usina pela
+    de-para de hoje; sem ela, a que a carga ligou), e fica fora do número do alto."""
     _dim_almox(almox, ("40", "Almoxarifado Quarenta", ALT_CHAVE, None), ("10", "Almoxarifado 10", ALT_CHAVE, 1),
                ("41", "Almoxarifado Quarenta e Um", "Sem Ligacao - Usina Y - MT", "2.0"))
-    c = _por_id()
-    assert set(c) == {"10", "20", "40", "41"}
-    assert (c["40"]["nome"], c["40"]["usina"], c["40"]["pecas"], c["40"]["sem_saldo"]["porque"]) == \
-        ("Almoxarifado Quarenta", USINA_1, 0, "sem_peca")
-    assert c["41"]["usina"] == USINA_2                    # a de-para de hoje não liga: vale a usina que a carga ligou
-    cartao = _cartao(_abrir(app, monkeypatch).get_data(as_text=True), "Almoxarifado Quarenta")
-    assert "Sem peça ligada no Fracttal no ciclo do App de 25/10, 00:29" in cartao and "Ver peças" not in cartao
+    d = _dados()
+    assert set(_por_id()) == {"10", "20"} and d["kpis"]["almoxarifados"] == 2
+    v = {x["id"]: x for x in d["vistos_antes"]}
+    assert set(v) == {"40", "41"} and (v["40"]["nome"], v["40"]["usina"]) == ("Almoxarifado Quarenta", USINA_1)
+    assert v["41"]["usina"] == USINA_2                    # a de-para de hoje não liga: vale a usina que a carga ligou
+    html = _abrir(app, monkeypatch).get_data(as_text=True)
+    grupo = re.search(r'<details class="alm-vistos">.*?</details>', html, re.S).group(0)
+    assert "Vistos antes (2)" in grupo and "Almoxarifado Quarenta" in grupo and "<h3>Almoxarifado Quarenta</h3>" not in html
 
 
 def test_contagem_e_historico_do_mesmo_almoxarifado_viram_um_cartao(app, almox, monkeypatch):
@@ -950,7 +953,7 @@ def test_a_usina_que_nao_liga_e_o_almoxarifado_de_teste(app, almox, monkeypatch)
                      ("C-60", "60", "2026-10-25T11:00:00Z", ALT_CHAVE))
     _dim_almox(almox, ("61", "Almoxarifado de teste", ALT_CHAVE, 1))
     c = _por_id()
-    assert "60" not in c and "61" not in c
+    assert "60" not in c and "61" not in c and not _dados()["vistos_antes"]
     assert c["50"]["usina"] is None and c["50"]["local"] == "Nenhuma - Usina Z - MT"
     cartao = _cartao(_abrir(app, monkeypatch).get_data(as_text=True), "Almoxarifado 50")
     assert "usina não ligada" in cartao and "Nenhuma - Usina Z - MT" in cartao
@@ -1011,3 +1014,32 @@ def test_os_cartoes_sem_saldo_vem_da_copia_de_5_min(app, almox, monkeypatch):
     monkeypatch.setattr(T, "_abas", nao_ler)
     monkeypatch.setattr(visao, "_livro", nao_ler)
     assert "30" in {c["id"] for c in T.montar().dados["por_almoxarifado"]}
+
+
+# ── a rodada de correção da onda 1 (a revisão de 11/11/2026) ─────────────────────────────────────────────────────────────
+def test_correcao_10_o_cartao_sem_saldo_nao_guarda_zero(app, almox, monkeypatch):
+    """O cartão sem saldo não tem número: os contadores dele são None (nenhuma tela mostra "0 peças" de um almoxarifado que nem
+    foi lido), e a régua diz "sem saldo ainda"."""
+    _contagem_do_app(almox, ("C-30", "30", "2026-10-25T11:00:00Z", ALT_CHAVE))
+    c = _por_id()["30"]
+    assert all(c[k] is None for k in ("pecas", "abaixo", "no_limite", "saldo_unitario", "sem_minimo", "zeradas", "ok",
+                                      "nao_informado", "pct_ok", "sem_custo"))
+
+
+def test_correcao_11_vistos_antes_com_a_data_em_que_foi_visto(app, almox, monkeypatch):
+    """O almoxarifado só do histórico diz quando foi visto pela última vez: o dia do ciclo aplicado mais novo em que ele tinha
+    linha no saldo (a foto do mês). Sem a foto, "sem data no histórico", nunca uma data inventada."""
+    _historico(almox, [("2026-10-01", 2, False), ("2026-10-15", 2, False)], item="9", almox="40")
+    _dim_almox(almox, ("40", "Almoxarifado Quarenta", ALT_CHAVE, 1), ("41", "Almoxarifado Quarenta e Um", ALT_CHAVE, 1))
+    v = {x["id"]: x for x in _dados()["vistos_antes"]}
+    assert v["40"]["visto_em"] == "15/10/2026" and v["41"]["visto_em"] == ""
+    grupo = re.search(r'<details class="alm-vistos">.*?</details>', _abrir(app, monkeypatch).get_data(as_text=True),
+                      re.S).group(0)
+    assert "visto pela última vez em 15/10/2026" in grupo and "sem data no histórico" in grupo
+
+
+def test_correcao_12_sem_os_comentarios_do_cadastro_a_corrigir():
+    """A aba Cadastro a corrigir saiu: o código não fala dela como se existisse ("vai para o", "cobrado no")."""
+    src = (Path(__file__).resolve().parent.parent / "nexus" / "pcm" / "almoxarifado.py").read_text("utf-8")
+    for velho in ("vai para o Cadastro a corrigir", "cobrado no Cadastro a corrigir", "no Cadastro a corrigir seria"):
+        assert velho not in src, velho
