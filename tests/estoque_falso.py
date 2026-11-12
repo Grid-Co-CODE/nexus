@@ -49,6 +49,13 @@ aprovar e recusar só no estado 3 (fora dele, `STATE_CHANGED`, esse provado); a 
 no modo 0 e o saldo de cada peça cobrindo a quantidade (senão `Recusado`, e nada muda); ela baixa o saldo, leva a requisição a
 5 e põe a saída em `.movimentos`. `.decisoes` guarda o corpo de cada aprovar e recusar; `.saidas`, o de cada saída.
 `mudar_requisicao` (fora do contrato) muda a linha por fora (a requisição aprovada ou cancelada no meio).
+A transferência entre almoxarifados (12/11/2026): `transferir` exige a peça ligada aos dois lados (sem o vínculo no destino,
+`Recusado` com `SEM_VINCULO_NO_DESTINO`), os dois no modo 0 e o saldo da origem cobrindo; baixa a origem, põe um movimento do
+tipo 8 em cada lado (com a nota e o documento) e soma no destino. `almoxarifados` é a lista (de `almoxarifados=`, {id: {"nome",
+"local", "codigo"}}, ou um por almoxarifado de `saldos`), com o modo, o `ativo` (falso para os ids de `inativos=`) e o
+`exige_aprovacao` (verdadeiro para os de `aprovacao_transferencia=`; o Nexus recusa esses, e o falso, se chamado assim mesmo,
+transfere como os outros). `.transferencias` guarda o que se mandou. O falso SUPÕE (PROVA PENDENTE no
+Fracttal de verdade): o mesmo id da transferência nos dois lados.
 `mover` e `definir_modo` não são do contrato (nem contam como chamada): o teste os usa para simular o que acontece fora do
 inventário (uma OS que lança peça, uma compra que entra, um almoxarifado que ficou em inventário físico).
 """
@@ -80,7 +87,8 @@ def _operacao(f):
 
 class EstoqueFalso(Estoque):
     def __init__(self, saldos: dict, *, perder_resposta=(), limite_em=None, expirar_em=None, agora=None,
-                 pecas_do_catalogo=None, requisicoes=None, detalhes=None, responsaveis=None):
+                 pecas_do_catalogo=None, requisicoes=None, detalhes=None, responsaveis=None, aprovacao_transferencia=(),
+                 inativos=(), almoxarifados=None, com_serie_ou_lote=()):
         """`saldos`: `{id_almox: {id_item: saldo}}`, ou o item como `{"saldo", "minimo", "maximo", "codigo", "unidade",
         "criticidade"}` quando o teste precisa da régua, do código, da unidade ou da criticidade (o que falta é None, e o
         código, a unidade e a criticidade, vazios). Todo item de `saldos` já está ligado."""
@@ -105,6 +113,13 @@ class EstoqueFalso(Estoque):
         self._responsaveis = [dict(r) for r in (responsaveis or [])]
         self.decisoes: list[dict] = []
         self.saidas: list[dict] = []
+        self._aprova_transf = {str(a) for a in (aprovacao_transferencia or ())}
+        self._inativos = {str(a) for a in (inativos or ())}
+        self._serie_ou_lote = {str(i) for i in (com_serie_ou_lote or ())}           # os id_item com série ou lote
+        # a lista dos almoxarifados: {id: {"nome", "local", "codigo"}}; sem ela, um por almoxarifado de `saldos`, sem local
+        self._almoxes = {str(k): dict(v) for k, v in (almoxarifados or {}).items()}
+        self._transf: dict[str, dict] = {}
+        self.transferencias: list[dict] = []
         self._n_item, self._n_movimento = 53_000_000, 0
         self._perder, self._perdidas = ({perder_resposta} if isinstance(perder_resposta, str)
                                         else set(perder_resposta or ())), set()
@@ -401,6 +416,74 @@ class EstoqueFalso(Estoque):
                  "tipo": m["tipo_fracttal"], "folio": m["folio"], "quando": m["quando"]}
                 for m in reversed(self.movimentos) if m["id_almox"] == str(id_almox) and instante(m["quando"]) >= desde]
         return _E.primeira_com_a_os(movs, os_, ids_itens)
+
+    # ── a transferência entre almoxarifados (12/11/2026) ──────────────────────────────────────────────────────────────────
+    @_operacao
+    def transferir(self, id_origem: str, id_destino: str, nome_destino: str, id_item: str, qtd: float, responsavel: dict,
+                   documento: str, nota: str, agora=None) -> dict:
+        n = validar_quantidade(qtd, "quantidade")
+        if n <= 0:
+            raise ValueError("a quantidade da transferência precisa ser maior que zero")
+        o, d, i = str(id_origem), str(id_destino), str(id_item)
+        if o == d:
+            raise ValueError("a origem e o destino são o mesmo almoxarifado")
+        if not str(nota or "").strip():
+            raise ValueError("a transferência precisa da nota com o código do Nexus")
+        _E.responsavel_valido(responsavel)
+        item = self._item(o, i)                              # ValueError: a peça não está ligada à origem
+        if i in self._serie_ou_lote:
+            raise ValueError("a peça tem controle de série ou de lote no Fracttal: a transferência pelo Nexus não a cobre")
+        if any(self._modos.get(a, 0) in (2, 3) for a in (o, d)):
+            raise Recusado("o almoxarifado trava as saídas e as entradas enquanto está em ajuste ou inventário", "transferir")
+        if i not in self._itens.get(d, {}):
+            raise Recusado(_E.SEM_VINCULO_NO_DESTINO, "transferir")
+        if item["saldo"] is None or item["saldo"] < n:
+            raise Recusado(_E.SALDO_NAO_DA, "transferir")
+        quando = self._iso(agora)
+        tid = str(72_000_000 + len(self._transf) + 1)
+        item["saldo"] -= n
+        self._itens[d][i]["saldo"] = (self._itens[d][i]["saldo"] or 0.0) + n
+        self._transf[tid] = {"origem": o, "destino": d, "item": i, "qtd": n}
+        folios = {}
+        for almox, tipo in ((o, "saida"), (d, "entrada")):
+            m = self._movimento(almox, i, tipo, n, str(nota), quando, _E.TIPO_TRANSFERENCIA)
+            m.update(transferencia=tid)
+            folios[tipo] = m["folio"]
+        for m in self.movimentos[-2:]:
+            m["documento"] = folios["entrada"]              # o Fracttal troca o `document` pelo folio do destino
+        self.transferencias.append({"id": tid, "id_warehouse_source": int(o), "id_warehouse_target": int(d),
+                                    "warehouses_target_description": str(nome_destino or ""), "id_item": i, "qty": n,
+                                    "document": str(documento or ""), "description": str(nota),
+                                    "id_responsible": int(str(responsavel["id"]))})
+        return {"id": tid, "folio_origem": folios["saida"], "folio_destino": folios["entrada"]}
+
+    @_operacao
+    def serie_ou_lote(self, id_almox: str, id_item: str) -> bool:
+        self._item(id_almox, id_item)
+        return str(id_item) in self._serie_ou_lote
+
+    @_operacao
+    def achar_transferencia(self, id_almox: str, codigo: str, desde_iso: str) -> dict | None:
+        alvo = str(codigo or "").strip().upper()
+        if not alvo:
+            raise ValueError("sem o código do Nexus, qualquer transferência seria a achada")
+        desde = instante(desde_iso)
+        for m in reversed(self.movimentos):
+            if m["id_almox"] != str(id_almox) or m["tipo_fracttal"] != _E.TIPO_TRANSFERENCIA or instante(m["quando"]) < desde:
+                continue
+            if alvo in m["referencia"].upper():
+                saida = next(x for x in self.movimentos if x.get("transferencia") == m["transferencia"])
+                return {"id": m["transferencia"], "folio": saida["folio"], "documento": saida["documento"],
+                        "quando": m["quando"]}
+        return None
+
+    @_operacao
+    def almoxarifados(self) -> list[dict]:
+        ids = list(self._almoxes) or list(self._itens)
+        return [{"id": a, "codigo": str((self._almoxes.get(a) or {}).get("codigo") or f"ALM-{a}"),
+                 "nome": str((self._almoxes.get(a) or {}).get("nome") or f"Almoxarifado {a}"),
+                 "local": str((self._almoxes.get(a) or {}).get("local") or ""), "ativo": a not in self._inativos,
+                 "modo": self._modos.get(a, 0), "exige_aprovacao": a in self._aprova_transf} for a in ids]
 
     @_operacao
     def responsavel(self, email: str) -> dict | None:

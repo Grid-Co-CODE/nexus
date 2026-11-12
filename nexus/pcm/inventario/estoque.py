@@ -77,6 +77,18 @@ RESPONSAVEIS = "personnel.responsibles_list"
 PESSOAL = "personnel.personnel_list"
 TIPO_REQUISICAO = 13
 NAO_ENTREGUE, ENTREGA_PARCIAL, ENTREGA_TOTAL, CANCELADA = 3, 4, 5, 6
+# A transferência entre almoxarifados (12/11/2026, PCM → Almoxarifado → Transferir): a MESMA chamada da saída (`outputs_insert`)
+# com o tipo 8 (WAREHOUSE_TRANSFER) e o destino. O destino que exige aprovação da entrada (o `transfer_approval` dele na lista
+# dos almoxarifados) o Nexus NÃO cobre: medido no Fracttal de verdade em 12/11/2026, nenhum dos 183 almoxarifados o tem ligado,
+# e a aprovação não teria como ser provada; a transferência recusa antes de gravar. O Fracttal só transfere para o almoxarifado
+# onde a peça já está vinculada: sem o vínculo, `ITEMS_NO_LINKED`.
+TIPO_TRANSFERENCIA = 8
+SEM_VINCULO_NO_DESTINO = ("a peça não está vinculada ao almoxarifado de destino no Fracttal (ITEMS_NO_LINKED): vincule-a antes "
+                          "de transferir")
+SALDO_NAO_DA = ("a quantidade passa do saldo da peça na origem no Fracttal (NEGATIVE_VALUE): releia o saldo e transfira no máximo "
+                "o que há")
+# a recusa da transferência vem com `message` nulo e o motivo em `data[0].message` (medido em 12/11/2026)
+RECUSAS_DA_TRANSFERENCIA = {"ITEMS_NO_LINKED": SEM_VINCULO_NO_DESTINO, "NEGATIVE_VALUE": SALDO_NAO_DA}
 _BRT = timezone(timedelta(hours=-3))
 
 GRUPOS = {"tipo": ("id_group", "groups_description"), "classificacao_1": ("id_group_1", "groups_1_description"),
@@ -262,6 +274,76 @@ def comentario_valido(comentario) -> str:
     if not texto:
         raise ValueError("o comentário é obrigatório (o Fracttal o exige)")
     return texto
+
+
+def responsavel_valido(responsavel: dict | None) -> dict:
+    """O responsável do Fracttal (`{"id", "descricao"}`) de quem grava o movimento: os dois, sempre. ValueError sem um deles:
+    nada vai sem dono (a saída da requisição e a transferência)."""
+    resp = responsavel or {}
+    if not str(resp.get("id") or "").strip() or not str(resp.get("descricao") or "").strip():
+        raise ValueError("sem o responsável do Fracttal: o movimento não vai sem dono")
+    return resp
+
+
+def _aprovada(valor) -> bool | None:
+    """O `approved` de um movimento: None quando ele não diz (a entrada de transferência PENDENTE é a de `approved` nulo, como
+    a tela de Entradas do Fracttal a reconhece), senão sim ou não."""
+    if valor is None or str(valor).strip().lower() in ("", "none", "null"):
+        return None
+    return _sim(valor)
+
+
+def _quando_do_corpo(agora) -> tuple[str, str]:
+    """(o dia de Brasília, a hora UTC como o `toISOString` da tela) do movimento que se manda."""
+    quando = instante(agora or datetime.now(timezone.utc))
+    return (quando.astimezone(_BRT).strftime("%Y-%m-%d"),
+            quando.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.") + f"{quando.microsecond // 1000:03d}Z")
+
+
+# ── a transferência: o corpo capturado na tela do Fracttal ────────────────────────────────────────────────────────────────
+# Capturado na tela (Saídas → novo → Transferência de almoxarifado) e reenviado pelo RPC em 12/11/2026, nos dois almoxarifados
+# de teste, lido de volta e desfeito (o saldo 2→1 na origem e 0→1 no destino, no mesmo pedido: sem aprovação). Mora só nestas
+# duas funções e no dicionário de referência do teste (`CORPO_DE_REFERENCIA`, em `tests/test_pcm_inventario_transferencia.py`).
+# Não provado: o custo diferente de zero (a prova foi com custo 0) e a peça com controle de série ou de lote (recusada antes).
+def _linha_da_transferencia(linha_saldo: dict, qtd: float, uid: str) -> dict:
+    """A linha da peça, campo a campo da tela, a partir da linha da peça no `warehouses_items_stock` da ORIGEM (guardada crua
+    pelo `ler`): o `id_item` é o da peça no catálogo (não o da ligação), a `description` da linha vai no `items_description`
+    (idêntica, com os quatro espaços antes da chave), o `stock` é o saldo lido na hora e o custo é o `unit_cost` da linha
+    (`total_cost` = quantidade × custo). Os fixos são os da tela."""
+    custo = _numero_lido(linha_saldo.get("unit_cost"), "unit_cost", SALDOS) or 0
+    q = _no_corpo(float(qtd))
+    return {"id": uid, "qty": q, "unit_cost": _no_corpo(float(custo)), "total_cost": _no_corpo(float(qtd) * float(custo)),
+            "id_taxes": 1, "tax_name": "Exempt", "item_tax_rate": 0, "serial_numbers": [], "stock": linha_saldo.get("stock"),
+            "id_item": _id(linha_saldo["id_item"]), "items_description": str(linha_saldo.get("description") or ""),
+            "units_description": str(linha_saldo.get("units_description") or ""),
+            "unit_cost_company": _no_corpo(float(custo)), "qty_max": 0,
+            "is_serial_control": _sim(linha_saldo.get("is_serial_control")),
+            "is_lot_control": _sim(linha_saldo.get("is_lot_control"))}
+
+
+def _corpo_da_transferencia(uid: str, id_origem, id_destino, nome_destino: str, linha: dict, responsavel: dict,
+                            documento: str, nota: str, agora=None) -> dict:
+    """O `outputs_insert` da transferência, na ordem da tela: o tipo 8 (WAREHOUSE_TRANSFER) no estado 2 ("RETURN"), sem
+    requisição, o destino com o nome, o responsável, o dia de Brasília e a hora UTC, o `document` (o Fracttal o TROCA pelo
+    folio do destino, "MOV-1", mas a tela exige o campo) e a nota na `description` (a referência do PCM e o código do Nexus:
+    é por ela que a resposta perdida se confere). O `id` e o `idInternal` são o mesmo uuid novo."""
+    dia, hora = _quando_do_corpo(agora)
+    return {
+        "id": uid, "id_movement_reference": None, "is_from_work_order": False, "folio_source": "", "symbol": "R$",
+        "currency_code": "BRL", "id_movement_type": TIPO_TRANSFERENCIA, "movements_types_description": "WAREHOUSE_TRANSFER",
+        "movements_states_description": "RETURN", "id_movement_state": 2, "id_warehouse_target": _id(id_destino),
+        "id_warehouse_source": _id(id_origem), "id_responsible": _id(responsavel["id"]),
+        "responsible_description": str(responsavel["descricao"]), "date": dia, "date_create": hora,
+        "document": str(documento or ""), "id_third_party": None, "third_parties_name": "", "id_cost_center": None,
+        "warehouses_target_description": str(nome_destino or ""), "costs_center_description": "",
+        "description": str(nota or ""), "status_display": "", "items": [linha], "idInternal": uid}
+
+
+def serie_ou_lote(linha_saldo: dict | None) -> bool:
+    """A peça com controle de série ou de lote (a tela do Fracttal pede os números de série ou o lote na transferência, e isso
+    não foi provado): o Nexus recusa antes de gravar."""
+    linha = linha_saldo or {}
+    return _sim(linha.get("is_serial_control")) or _sim(linha.get("is_lot_control"))
 
 
 def mapa_das_pecas(linhas) -> dict[str, dict[str, str]]:
@@ -518,6 +600,40 @@ class Estoque(abc.ABC):
         campos."""
 
     @abc.abstractmethod
+    def transferir(self, id_origem: str, id_destino: str, nome_destino: str, id_item: str, qtd: float, responsavel: dict,
+                   documento: str, nota: str, agora=None) -> dict:
+        """Transfere `qtd` da peça da origem ao destino (`outputs_insert` do tipo 8; o corpo capturado, em
+        `_corpo_da_transferencia`): a linha da peça sai da linha do saldo da origem. `nota` vai na `description` (o código do
+        Nexus, por onde `achar_transferencia` confere a resposta perdida) e `documento` no `document` (que o Fracttal troca pelo
+        folio do destino). Vale na hora: o saldo da origem cai e o do destino sobe. Devolve `{"id", "folio_origem",
+        "folio_destino"}` (o `data.id`, o `folio_source` e o `folio_target`). As recusas do Fracttal (`RECUSAS_DA_TRANSFERENCIA`)
+        são `Recusado` com a frase em português; a quantidade que não é maior que zero, a origem igual ao destino, a nota vazia, o
+        responsável sem o id ou a descrição, a peça que não está ligada à origem e a de série ou lote são ValueError, e nada
+        vai."""
+
+    @abc.abstractmethod
+    def serie_ou_lote(self, id_almox: str, id_item: str) -> bool:
+        """A peça tem controle de série ou de lote no almoxarifado (o `is_serial_control` ou o `is_lot_control` da linha do
+        saldo, a guardada pelo `ler`; sem ela, lê). ValueError se a peça não está ligada."""
+
+    @abc.abstractmethod
+    def achar_transferencia(self, id_almox: str, codigo: str, desde_iso: str) -> dict | None:
+        """O movimento de transferência (tipo 8) mais novo do histórico do almoxarifado, desde `desde_iso`, com o `codigo` do
+        Nexus na `description` (SÓ nela: o `document` o Fracttal troca pelo folio do destino): `{"id", "folio", "documento",
+        "quando"}` (o `id_movements`, o `folio`, que é o da origem, e o `document`, que é o folio do destino), ou None. A mesma
+        linha aparece no histórico da origem e no do destino (medido em 12/11/2026): procurar num só basta. A linha sem o tipo
+        conta (na dúvida, o código basta)."""
+
+    @abc.abstractmethod
+    def almoxarifados(self) -> list[dict]:
+        """A lista dos almoxarifados da empresa no Fracttal, lida agora (`warehouses_list`, o corpo medido em 12/11/2026: 183
+        linhas numa página de 200), cada um como `{"id", "codigo", "nome", "local", "ativo", "modo", "exige_aprovacao"}`: o
+        `code`, a `description`, o `location_description` como veio ("// Cliente/ Cliente - Usina - UF/ "), o `active` (o que
+        não vem é ativo), o `mode` (None se não vem: quem transfere recusa) e o `transfer_approval` (o que não vem é não). É a
+        lista da Transferir: o livro Saldo da varredura do App só tem os almoxarifados com peça, e o destino típico é o novo,
+        vazio."""
+
+    @abc.abstractmethod
     def responsavel(self, email: str) -> dict | None:
         """O responsável do Fracttal com este e-mail: `{"id", "descricao"}` (a pessoa do `personnel.personnel_list` pelo e-mail,
         com a descrição da linha de mesmo `id` do `personnel.responsibles_list`, como a tela a manda na saída, "<nome>
@@ -569,6 +685,7 @@ class EstoqueFracttal(Estoque):
             ritmo = Ritmo(relogio or time.monotonic, dormir or time.sleep, INTERVALO_S if intervalo is None else intervalo)
         self._chamar_rpc, self._ritmo, self._pagina = chamar, ritmo, pagina
         self._ligacoes: dict[str, dict[str, str]] = {}      # almoxarifado -> {id_item: ligação}
+        self._linhas_saldo: dict[str, dict[str, dict]] = {}  # almoxarifado -> {id_item: a linha do saldo como veio}
         self._unidades: dict[str, tuple[int, str]] | None = None
 
     # o pedido: o ritmo, a tradução dos erros e o `success`
@@ -587,7 +704,11 @@ class EstoqueFracttal(Estoque):
         if not isinstance(r, dict):
             raise ErroFracttal("o Fracttal respondeu sem corpo", metodo)
         if r.get("success") is False:
-            raise Recusado(str(r.get("message") or "o Fracttal recusou o pedido"), metodo)
+            # o motivo pode vir no `message` ou, com ele nulo, no `data[0].message` (a recusa da transferência, 12/11/2026)
+            dados = r.get("data")
+            do_dado = (dados[0].get("message") if isinstance(dados, list) and dados and isinstance(dados[0], dict)
+                       else dados.get("message") if isinstance(dados, dict) else None)
+            raise Recusado(str(r.get("message") or do_dado or "o Fracttal recusou o pedido"), metodo)
         return r
 
     def _linhas(self, metodo: str, base: dict):
@@ -639,18 +760,36 @@ class EstoqueFracttal(Estoque):
         return _id(mapa[item])
 
     # o modo e a sessão de ajuste
-    def modo(self, id_almox: str) -> int:
+    def _almoxarifado(self, id_almox: str) -> dict:
+        """A linha do almoxarifado na lista dos almoxarifados do Fracttal (o `mode`, o `transfer_approval`, ...)."""
         alvo = _id(id_almox)
         base = {"filter": [], "sort": [], "is_tree": False, "node": None}
         for l in self._linhas(LISTA, base):
             if isinstance(l, dict) and str(l.get("id")) == str(alvo):
-                modo = _numero_lido(l.get("mode"), "mode", LISTA)
-                if modo is None:
-                    # é a conferência da trava (o almoxarifado em ajuste ou em inventário físico não aceita movimento):
-                    # vazio nunca é "0 = normal"
-                    raise ErroFracttal(f"o almoxarifado {id_almox} veio sem o `mode`", LISTA)
-                return int(modo)
+                return l
         raise ErroFracttal(f"o almoxarifado {id_almox} não está na lista do Fracttal", LISTA)
+
+    def modo(self, id_almox: str) -> int:
+        modo = _numero_lido(self._almoxarifado(id_almox).get("mode"), "mode", LISTA)
+        if modo is None:
+            # é a conferência da trava (o almoxarifado em ajuste ou em inventário físico não aceita movimento):
+            # vazio nunca é "0 = normal"
+            raise ErroFracttal(f"o almoxarifado {id_almox} veio sem o `mode`", LISTA)
+        return int(modo)
+
+    def almoxarifados(self) -> list[dict]:
+        base = {"filter": [], "sort": [], "group": {"property": ""}, "is_tree": False, "node": None}
+        out = []
+        for l in self._linhas(LISTA, base):
+            if not isinstance(l, dict) or _inteiro(l.get("id")) is None:
+                continue
+            modo = _numero_lido(l.get("mode"), "mode", LISTA)
+            out.append({"id": str(_inteiro(l["id"])), "codigo": " ".join(str(l.get("code") or "").split()),
+                        "nome": " ".join(str(l.get("description") or "").split()),
+                        "local": str(l.get("location_description") or ""),
+                        "ativo": l.get("active") is None or _sim(l.get("active")),
+                        "modo": None if modo is None else int(modo), "exige_aprovacao": _sim(l.get("transfer_approval"))})
+        return out
 
     def abrir_ajuste(self, id_almox: str) -> None:
         """Os dois pedidos que a tela faz, nessa ordem: muda o modo e atualiza o almoxarifado."""
@@ -683,7 +822,7 @@ class EstoqueFracttal(Estoque):
     # o saldo, a ligação e a régua
     def ler(self, id_almox: str) -> dict[str, dict]:
         base = {"filter": [], "sort": [], "is_tree": False, "node": None, "id_warehouse": _id(id_almox)}
-        lido, ligacoes = {}, {}
+        lido, ligacoes, cruas = {}, {}, {}
         for l in self._linhas(SALDOS, base):
             if not isinstance(l, dict) or l.get("id_item") is None or l.get("id") is None:
                 raise ErroFracttal("linha de saldo sem a peça ou sem a ligação", SALDOS)
@@ -697,7 +836,9 @@ class EstoqueFracttal(Estoque):
                           # a coluna Crit. da aprovação (27/10/2026): o grupo 1 da peça no Fracttal é a criticidade dela
                           "criticidade": str(l.get("groups_1_description") or "").strip()}
             ligacoes[item] = str(l["id"])
+            cruas[item] = dict(l)                         # a linha da transferência sai dela (`_linha_da_transferencia`)
         self._ligacoes[str(_id(id_almox))] = ligacoes
+        self._linhas_saldo[str(_id(id_almox))] = cruas
         return lido
 
     def ligar(self, id_almox: str, id_item: str) -> str:
@@ -740,7 +881,8 @@ class EstoqueFracttal(Estoque):
             yield {"folio": str(l.get("folio") or l.get("id_movements") or ""), "id_item": str(l.get("id_item") or ""),
                    "quando": l.get("date_create"), "referencia": str(l.get("description") or "").strip(),
                    "documento": str(l.get("document") or "").strip(),
-                   "id": _inteiro(l.get("id_movements")), "tipo": _inteiro(l.get("id_movement_type"))}
+                   "id": _inteiro(l.get("id_movements")), "tipo": _inteiro(l.get("id_movement_type")),
+                   "estado": _inteiro(l.get("id_movement_state")), "aprovada": _aprovada(l.get("approved"))}
 
     def achar_movimento(self, id_almox: str, referencia: str, desde_iso: str | None = None) -> str | None:
         alvo = str(referencia or "").strip()
@@ -876,26 +1018,75 @@ class EstoqueFracttal(Estoque):
         `toISOString` da tela."""
         if not pecas or not all(isinstance(p, dict) for p in pecas):
             raise ValueError("a saída precisa das peças da requisição")
-        resp = responsavel or {}
-        if not str(resp.get("id") or "").strip() or not str(resp.get("descricao") or "").strip():
-            raise ValueError("sem o responsável do Fracttal: a saída não vai sem dono")
-        quando = instante(agora or datetime.now(timezone.utc))
+        resp = responsavel_valido(responsavel)
+        dia, hora = _quando_do_corpo(agora)
         u = str(uuid.uuid4())
         r = self._rpc(SAIDA, {
             "id": u, "idInternal": u, "id_movement_reference": _id(requisicao["id"]), "is_from_work_order": True,
             "id_movement_type": 4, "movements_types_description": "WORK_ORDER", "id_movement_state": 2,
             "movements_states_description": "RETURN", "id_warehouse_source": _id(requisicao["id_almox"]),
             "id_warehouse_target": None, "id_responsible": _id(resp["id"]), "responsible_description": str(resp["descricao"]),
-            "date": quando.astimezone(_BRT).strftime("%Y-%m-%d"),
-            "date_create": quando.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.")
-            + f"{quando.microsecond // 1000:03d}Z",
-            "document": str(requisicao.get("os") or ""), "folio_source": "", "symbol": "R$", "currency_code": "BRL",
+            "date": dia, "date_create": hora, "document": str(requisicao.get("os") or ""), "folio_source": "", "symbol": "R$", "currency_code": "BRL",
             "id_third_party": None, "third_parties_name": "", "id_cost_center": None, "warehouses_target_description": "",
             "costs_center_description": "", "description": "", "status_display": "", "items": [dict(p) for p in pecas]})
         return self._id_do_dado(r, SAIDA)
 
     def saida_com_a_os(self, id_almox: str, os_: str, ids_itens: list[str], desde_iso: str) -> dict | None:
         return primeira_com_a_os(self._historico(id_almox, instante(desde_iso)), os_, ids_itens)
+
+    # a transferência entre almoxarifados (12/11/2026)
+    def transferir(self, id_origem: str, id_destino: str, nome_destino: str, id_item: str, qtd: float, responsavel: dict,
+                   documento: str, nota: str, agora=None) -> str:
+        n = validar_quantidade(qtd, "quantidade")
+        if n <= 0:
+            raise ValueError("a quantidade da transferência precisa ser maior que zero")
+        if str(_id(id_origem)) == str(_id(id_destino)):
+            raise ValueError("a origem e o destino são o mesmo almoxarifado")
+        if not str(nota or "").strip():
+            raise ValueError("a transferência precisa da nota com o código do Nexus: é por ela que se confere a resposta perdida")
+        resp = responsavel_valido(responsavel)
+        origem, item = str(_id(id_origem)), str(id_item)
+        linha = self._linha_crua(origem, item)
+        if serie_ou_lote(linha):
+            raise ValueError("a peça tem controle de série ou de lote no Fracttal: a transferência pelo Nexus não a cobre")
+        uid = str(uuid.uuid4())
+        corpo = _corpo_da_transferencia(uid, origem, id_destino, nome_destino, _linha_da_transferencia(linha, n, str(uuid.uuid4())),
+                                        resp, documento, nota, agora)
+        try:
+            r = self._rpc(SAIDA, corpo)
+        except Recusado as ex:
+            claro = next((t for k, t in RECUSAS_DA_TRANSFERENCIA.items() if k in ex.mensagem.upper()), None)
+            if claro:
+                raise Recusado(claro, SAIDA) from ex
+            raise
+        d = r.get("data") if isinstance(r.get("data"), dict) else {}
+        return {"id": self._id_do_dado(r, SAIDA), "folio_origem": str(d.get("folio_source") or ""),
+                "folio_destino": str(d.get("folio_target") or "")}
+
+    def _linha_crua(self, id_almox, id_item) -> dict:
+        """A linha do saldo como o Fracttal a deu ao último `ler` deste almoxarifado (lê se falta). ValueError sem a peça."""
+        a, item = str(_id(id_almox)), str(id_item)
+        if item not in self._linhas_saldo.get(a, {}):
+            self.ler(a)
+        linha = self._linhas_saldo.get(a, {}).get(item)
+        if linha is None:
+            raise ValueError(f"a peça {item} não está ligada ao almoxarifado {id_almox}")
+        return linha
+
+    def serie_ou_lote(self, id_almox: str, id_item: str) -> bool:
+        return serie_ou_lote(self._linha_crua(id_almox, id_item))
+
+    def achar_transferencia(self, id_almox: str, codigo: str, desde_iso: str) -> dict | None:
+        alvo = str(codigo or "").strip().upper()
+        if not alvo:
+            raise ValueError("sem o código do Nexus, qualquer transferência seria a achada")
+        for m in self._historico(id_almox, instante(desde_iso)):
+            if m["tipo"] not in (TIPO_TRANSFERENCIA, None):
+                continue
+            if alvo in m["referencia"].upper():
+                return {"id": str(m["id"]) if m["id"] is not None else "", "folio": m["folio"], "documento": m["documento"],
+                        "quando": m["quando"]}
+        return None
 
     def responsavel(self, email: str) -> dict | None:
         """Medido no Fracttal de verdade em 12/11/2026 (só leitura), o caso que criou: a lista dos responsáveis (174 linhas)
