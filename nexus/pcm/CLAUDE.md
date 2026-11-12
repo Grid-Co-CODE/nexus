@@ -548,7 +548,7 @@ PCM"; a prévia com os dados reais foi aprovada no mesmo dia. Desenho e plano: `
   o número "Lançadas pelo App" do alto e a versão do cliente a usam), e a do cadastro (`d["cadastro"]`) também, sem tela; o
   `?aba=consumo` e o `?aba=cadastro` de antes abrem a Reposição. Desde 26/10/2026, as quatro partes do inventário (Inventário,
   Mínimo e máximo, Curadoria e Auditoria) vêm logo depois, juntas, como links para outras páginas (as seções do inventário,
-  abaixo). Filtro na própria página (`filtro-local.js`). **São dez abas** (a das Requisições e a das Usinas e almoxarifados, 12/11/2026, por último): onde não cabem (no celular), a fila rola por dentro e
+  abaixo). Filtro na própria página (`filtro-local.js`). **São onze abas** (a das Requisições, a das Usinas e almoxarifados e a do Transferir, 12/11/2026, por último): onde não cabem (no celular), a fila rola por dentro e
   o script da página traz a aba aberta para o meio dela ao carregar e a cada troca (`scrollIntoView({block:'nearest',
   inline:'center'})`; as páginas do inventário fazem o mesmo em `pcm/_almox_abas.html`).
 - **Usinas e almoxarifados** (`almox_usinas.py`, `templates/pcm/almox_usinas.html`, `/t/pcm/pecas/usinas`; 12/11/2026; o PCM:
@@ -1775,6 +1775,56 @@ Levi (12/11/2026): **Rank A** o PCM aceita no Nexus com um clique; **B e C** o N
   saída do Nexus que não se repete, a resposta incerta, os dois aceites juntos, o `id_item_original`, o saldo antes de aprovar,
   a pausa, o Rank em conflito, o dono, as recusas da ponte, o deploy e a tela; e, da re-revisão, a fronteira da OS, a janela de 7
   dias, só a GENERAL, as duas requisições da mesma OS, o erro de rede do OS Creator e a trava sem decifrar).
+
+## Transferir peça entre almoxarifados (`inventario/transferencia.py`, `templates/pcm/transferir.html`, `static/pcm-transferir.js`; 12/11/2026)
+
+O pedido do PCM de 04/11/2026 (desenho `docs/superpowers/specs/2026-11-12-transferir-entre-almoxarifados-design.md`): desde
+04/11 toda usina tem almoxarifado no Fracttal, os novos nasceram vazios, e o campo improvisava com saída "Geral" e ajuste de
+inventário (a peça saía de um almoxarifado sem entrar em nenhum). A aba é para a peça **guardada** que muda de lugar; a
+**instalada** é baixa na OS, pelo App ("Peça de outro almoxarifado").
+- **O caminho, num clique** (`transferir`): relê e valida (`conferir`), vincula no destino se falta (`estoque.ligar`, com 0 e 0,
+  a decisão de 26/10), lança a transferência (`outputs_insert` do tipo 8, o corpo capturado na tela e **provado no Fracttal de
+  verdade em 12/11/2026** nos dois almoxarifados de teste: vale na hora, a origem cai e o destino sobe no mesmo pedido), relê os
+  dois e anota. **Conferir** mostra o saldo de agora e o de depois dos dois lados e se vai vincular, sem gravar.
+- **Os almoxarifados são os do Fracttal, lidos na hora** (`estoque.almoxarifados`, o `warehouses_list`): o livro Saldo da
+  varredura só tem os com peça, e o destino típico é o novo, vazio. O inativo não aparece nem passa.
+- **O mesmo cliente:** o 1º nó do CAMINHO do local (`cliente_do_caminho`: "// Cliente Alfa/ Cliente Alfa - Usina Um - PA/ " é
+  "Cliente Alfa"), sem acento e sem caixa; o de um nó só (o de teste) é o próprio nó; o sem nó (o desativado) é desconhecido e
+  recusa. Não é o `almox_usinas.cliente_do_local` (que corta o nome da usina). Outro cliente é empréstimo: recusa.
+- **Recusa antes de gravar:** a origem igual ao destino, o cliente diferente ou desconhecido, a peça sem saldo, a quantidade
+  (maior que zero, no máximo o saldo lido na hora, inteira na unidade inteira, até duas casas em METRO e MASSA), o almoxarifado
+  inativo, fora do modo 0 ou com a vez presa por uma contagem, **a peça com série ou lote** (a tela do Fracttal pede os números,
+  não provado) e **o destino que exige aprovação de transferência** (nenhum dos 183 a tem ligada: a aprovação não tem como ser
+  provada, e o Nexus não a faz; "faça pela tela do Fracttal").
+- **A nota e o documento:** o Fracttal TROCA o `document` pelo folio do destino ("MOV-1"). A referência do PCM só sobrevive na
+  `description`: "<referência> · Transferência pelo Nexus NX-TR-xxxxxxxx" (sem ela, só a segunda parte); o `document` vai com a
+  referência ou o código (a tela o exige). O código se procura SÓ na `description`.
+- **As recusas do Fracttal** vêm com o `message` nulo e o motivo em `data[0].message` (o `_rpc` o lê para todo pedido):
+  `ITEMS_NO_LINKED` e `NEGATIVE_VALUE` viram frase em português e são o "não" (nada foi feito), nunca a resposta incerta.
+- **A resposta incerta não se repete** (o C2 das requisições): sem a resposta, o Nexus procura o código no histórico da origem
+  (a mesma linha está no da origem e no do destino). Achou, segue; não achou, a trava (`transferencia_travada` e a memória do
+  processo), e a tela diz "pode ter feito: confira no Fracttal". A próxima tentativa da mesma peça na mesma origem procura de novo
+  ANTES de mandar: achou, registra como feita e não manda; não achou, libera. A trava vale pelas colunas em claro (o tipo, o
+  almoxarifado, a peça, o lote), nunca pelo `dados`.
+- **A releitura que não bate** é a `transferencia_falha`, e a tela diz o que leu; a entrada só vai ao livro com o destino relido
+  mostrando a peça. **Uma de cada vez** por origem, destino e peça (409). **Só no servidor** (`NEXUS_INVENTARIO_GRAVAR`); o
+  Conferir e as listas só leem e abrem em qualquer um.
+- **O dono:** o responsável é o das requisições (`estoque.responsavel`, pela `personnel_list`); sem ele, 409.
+- **O livro** (`fato_evento_inventario`, nenhuma coluna nova): `transferencia_vinculo` (destino), `transferencia_saida`
+  (origem) e `transferencia_entrada` (destino), com o saldo antes e depois e o número do folio daquele lado no
+  `movimento_fracttal` (só dígitos: "MOV-21" é 21; o id do movimento e os folios inteiros no `dados`), `transferencia_falha` e
+  `transferencia_travada`. Todas com o código do Nexus no `lote` (o número inteiro, menor que 2³¹; a Auditoria mostra o
+  código); a referência do PCM e os dois almoxarifados (id e nome) só cifrados.
+- **Na tela:** a origem (agrupada por cliente), a peça com o saldo, o destino (só os do mesmo cliente), a quantidade, a OS ou
+  referência; Conferir, e só então Transferir (mudar um campo fecha o Transferir de novo). Embaixo, as **Últimas transferências**
+  (30), do livro, sem falar com o Fracttal: quando, quem (só para o PCM), a peça, de → para (o nome do `dados`), a quantidade,
+  os saldos de cada lado, o vínculo e a situação (Feita, Lançada sem confirmar, Pode ter feito, Não feita). As rotas da ponte:
+  `GET /os/_nexus/inventario/transferir/almoxarifados`, `GET .../pecas?origem=`, `POST .../conferir` e `POST .../transferir`.
+- **Não provado:** o custo diferente de zero (vai o `unit_cost` da linha de saldo, e quantidade × custo no `total_cost`; a prova
+  foi com custo 0) e o clique de ponta a ponta pelo Nexus no servidor.
+- **Provar:** `tests/test_pcm_inventario_transferencia.py` (a porta: o corpo de referência, as recusas, a lista, o histórico),
+  `_regra.py` (as validações, os passos, a resposta incerta, a trava sem decifrar, o histórico), `_ponte.py` (as rotas e as
+  guardas) e `_tela.py`.
 
 ## Inventário do almoxarifado: a auditoria (`revisao.montar_auditoria`, `templates/pcm/inventario_auditoria.html`; 26/10/2026)
 

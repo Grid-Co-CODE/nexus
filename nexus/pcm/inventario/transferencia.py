@@ -87,7 +87,8 @@ def _agora() -> datetime:
 
 
 def _g(n) -> str:
-    return "?" if n is None else f"{n:g}"
+    """O número na frase da tela, em pt-BR ("1,5")."""
+    return "?" if n is None else f"{n:g}".replace(".", ",")
 
 
 # ── o código do Nexus e o lote ──────────────────────────────────────────────────────────────────────────────────────────
@@ -594,3 +595,27 @@ def _transferir(cfg, estoque, ctx, o, d, item, qtd, referencia, quem_, responsav
                        if not ok_d else " Confira na tela do Fracttal.") + vinculo_txt)
     mensagem += _anotar(cfg, eventos)
     return {"ok": True, "confirmada": confirmada, "mensagem": mensagem, "codigo": codigo}
+
+
+# ── a página (em /t/pcm: não fala com o Fracttal) ───────────────────────────────────────────────────────────────────────
+def registrar(bp) -> None:
+    from flask import current_app, render_template, session
+
+    @bp.route("/pecas/transferir", endpoint="transferir")
+    def transferir_tela():
+        """A aba Transferir do Almoxarifado: a casca do formulário (as listas, o Conferir e o Transferir vêm da ponte do login
+        do Fracttal, por `fetch`) e as Últimas transferências, do livro. Quem entrou pela senha de administrador não é uma
+        pessoa e não tem o login: a página diz isso e nem pede. O nome de quem transferiu, só para o PCM (`pode`)."""
+        from .. import telas
+        from . import quem
+        from .revisao import _nomes_das_pessoas
+        cfg = current_app.config
+        pode = telas.pode_programar()
+        h = historico(cfg, nomes_do_app())
+        if pode and h["linhas"]:
+            pessoas = _nomes_das_pessoas({x["pessoa_id"] for x in h["linhas"]} - {None})
+            for x in h["linhas"]:
+                if x["pessoa_id"]:
+                    x["quem"] = pessoas.get(x["pessoa_id"]) or f"ficha {x['pessoa_id']} do cadastro"
+        return render_template("pcm/transferir.html", pode=pode, com_pessoa=bool(quem.do_pedido().get("email")),
+                               historico=h, aviso=session.pop("pcm_transferir_aviso", None))

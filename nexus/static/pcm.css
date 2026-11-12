@@ -1826,3 +1826,19 @@ details.inv-card:not([open])>summary{border-bottom:0}
   .au-form .gc-rotulo,.au-form .gc-campo,.au-form .gc-btn{grid-row:auto}
   .au-form .gc-btn{justify-self:start}
 }
+
+/* PCM → Almoxarifado → Transferir (12/11/2026): o formulário em duas colunas, uma no celular; o plano do Conferir numa caixa */
+.tr-form{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px 14px;padding:12px 14px}
+.tr-campo{display:flex;flex-direction:column;gap:4px;min-width:0}
+.tr-campo .gc-campo{width:100%;box-sizing:border-box;min-width:0}
+.tr-botoes{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:8px}
+.tr-botoes .gc-btn:disabled{opacity:.45;cursor:not-allowed}
+.tr-plano{grid-column:1/-1;padding:10px 12px;border:1px solid var(--linha-forte);border-radius:var(--raio-md);
+  background:var(--superficie);color:var(--tinta);font-size:13.5px}
+.tr-plano p{margin:0 0 4px}
+.tr-plano[hidden],.tr-form .rq-erro[hidden]{display:none}
+.tr-plano-tit{font-weight:600}
+.tr-form .rq-erro{grid-column:1/-1}
+@media (max-width:640px){
+  .tr-form{grid-template-columns:minmax(0,1fr)}
+}

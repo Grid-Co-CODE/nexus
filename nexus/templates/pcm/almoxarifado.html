@@ -78,6 +78,7 @@
   <a class="alm-aba" role="tab" aria-selected="false" href="{{ raiz }}/t/pcm/pecas/inventario/auditoria">Auditoria</a>
   <a class="alm-aba" role="tab" aria-selected="false" href="{{ raiz }}/t/pcm/pecas/requisicoes">Requisições</a>
   <a class="alm-aba" role="tab" aria-selected="false" href="{{ raiz }}/t/pcm/pecas/usinas">Usinas e almoxarifados</a>
+  <a class="alm-aba" role="tab" aria-selected="false" href="{{ raiz }}/t/pcm/pecas/transferir">Transferir</a>
 </nav>
 
 <form class="cn-filtros alm-filtros" method="get" id="alm-f" data-filtro-local data-alm-filtro>
@@ -270,7 +271,7 @@
     var filtro = document.querySelector('[data-alm-filtro]');
     // quem abre uma aba: as abas e o cartão das avariadas (o `aria-selected` fica só nas abas)
     var gatilhos = Array.prototype.slice.call(document.querySelectorAll('[data-aba]'));
-    // a fila tem dez abas e, no celular, não cabe: rola por dentro, e a aba aberta vem para o meio dela (sem isto, o `?aba=`
+    // a fila tem onze abas e, no celular, não cabe: rola por dentro, e a aba aberta vem para o meio dela (sem isto, o `?aba=`
     // de uma das últimas abria com a aba fora da tela). `nearest` no vertical: a página não anda
     function centrar(aba) {
       if (aba && aba.scrollIntoView) aba.scrollIntoView({block: 'nearest', inline: 'center'});

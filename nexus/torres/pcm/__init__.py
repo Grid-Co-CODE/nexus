@@ -19,6 +19,7 @@ from ...pcm.inventario import curadoria as inventario_curadoria
 from ...pcm.inventario import ponte_os as inventario_ponte
 from ...pcm.inventario import regua as inventario_regua
 from ...pcm.inventario import requisicoes as inventario_requisicoes
+from ...pcm.inventario import transferencia as inventario_transferencia
 from ...pcm.telas import registrar_pcm
 from ...cadastro import setor_ids as SID
 from ..modelo import Tela, Torre
@@ -101,6 +102,8 @@ inventario_regua.registrar(bp)
 inventario_curadoria.registrar(bp)
 # as requisições de material, o Aceitar pelo Nexus (nexus/pcm/inventario/requisicoes.py; a lista e o que grava, na ponte)
 inventario_requisicoes.registrar(bp)
+# transferir peça entre almoxarifados do mesmo cliente (nexus/pcm/inventario/transferencia.py; 12/11/2026)
+inventario_transferencia.registrar(bp)
 # as usinas e os almoxarifados: sem almoxarifado, compartilha ou próprio (nexus/pcm/almox_usinas.py; 12/11/2026)
 almox_usinas.registrar(bp)
 # a ponte do login do Fracttal do inventário, na raiz do app (/os/_nexus/inventario; nexus/pcm/inventario/ponte_os.py)

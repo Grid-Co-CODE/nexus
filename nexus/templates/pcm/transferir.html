@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% block titulo %}Transferir · Almoxarifado{% endblock %}
+{% block conteudo %}
+{% from "_explica.html" import explica %}
+{% macro n(v) %}{{ ('%g'|format(v))|replace('.', ',') if v is not none else '?' }}{% endmacro %}
+<link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='engenharia.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='pcm.css') }}">
+{# PCM → Almoxarifado → Transferir (12/11/2026; o pedido do PCM de 04/11/2026): a peça guardada que muda de almoxarifado dentro
+   do mesmo cliente. A casca: as listas, o Conferir e o Transferir vêm da ponte do login do Fracttal
+   (/os/_nexus/inventario/transferir, o cookie dele só chega em /os), por pcm-transferir.js; as Últimas transferências saem do
+   livro do inventário, aqui. As regras estão em nexus/pcm/inventario/transferencia.py. #}
+<div class="pg alm inv rq tr">
+<p class="gc-eyebrow">PCM · Almoxarifado</p>
+<div class="gc-titulo-explica"><h1 class="titulo-pagina">Transferir</h1>
+{% call explica('Entenda esta tela') %}<p><b>Para que serve.</b> Mudar uma peça guardada de um almoxarifado para outro do mesmo
+  cliente, no Fracttal, com um clique: o Nexus vincula a peça ao destino se faltar, lança a transferência e relê os dois
+  saldos.</p>
+<p><b>Peça guardada e peça instalada.</b> Esta tela é para a peça que mudou de lugar e continua em estoque. A peça
+  <b>instalada</b> numa usina é baixa na OS, pelo App de Campo (a "Peça de outro almoxarifado"), e não passa por aqui.</p>
+<p><b>Só dentro do mesmo cliente.</b> O cliente de cada almoxarifado é o primeiro nome do caminho do local dele no Fracttal.
+  Levar a peça para outro cliente é <b>empréstimo</b> e passa pela coordenação: a tela recusa.</p>
+<p><b>O vínculo entra com 0 e 0.</b> O Fracttal só transfere para o almoxarifado onde a peça já está vinculada. Se faltar, o
+  Nexus vincula com mínimo e máximo 0: só o acordado vai ao Fracttal, e a sugestão aparece em Mínimo e máximo.</p>
+<p><b>De onde vem.</b> Os almoxarifados e o saldo são lidos no Fracttal agora, com o seu login; o nome da peça vem do catálogo
+  do App. <b>Conferir</b> mostra o saldo de agora e o de depois dos dois lados, sem gravar nada.</p>
+<p><b>O que fica com o Fracttal:</b> o almoxarifado que exige aprovação de transferência, a peça com controle de série ou de lote
+  e o almoxarifado inativo. Se a resposta do Fracttal não vier, a tela diz "pode ter feito: confira no Fracttal", e a próxima
+  tentativa procura o código da transferência antes de mandar outra.</p>{% endcall %}</div>
+{% set aba_inventario = 'transferir' %}
+{% include "pcm/_almox_abas.html" %}
+{% if aviso %}<div class="{{ 'cn-certo' if aviso.ok else 'cn-erro cn-aviso' }}" role="status"><span><b>{{ aviso.texto }}</b></span></div>{% endif %}
+{% if not pode %}
+<div class="inv-vazio"><p><b>A transferência entre almoxarifados é do setor PCM:</b> ela grava no Fracttal com o login de quem
+  transfere.</p></div>
+{% elif not com_pessoa %}
+<div class="cn-erro cn-aviso" role="status"><span><b>Para transferir, entre no Nexus pelo Fracttal.</b> A transferência usa o
+  login do Fracttal de quem transfere, e a senha de administrador não tem esse login.</span></div>
+{% else %}
+<section class="inv-card">
+<div class="inv-card-cab"><h3>Nova transferência</h3><span class="inv-card-nota">uma peça por vez</span></div>
+<form class="tr-form" data-tr-form novalidate
+      data-tr-almox="{{ raiz }}/os/_nexus/inventario/transferir/almoxarifados"
+      data-tr-pecas="{{ raiz }}/os/_nexus/inventario/transferir/pecas"
+      data-tr-conferir="{{ raiz }}/os/_nexus/inventario/transferir/conferir"
+      data-tr-transferir="{{ raiz }}/os/_nexus/inventario/transferir">
+  <div class="tr-campo"><label class="gc-rotulo" for="tr-origem">Origem</label>
+    <select class="gc-campo" id="tr-origem" name="origem" required disabled><option value="">Lendo os almoxarifados no Fracttal…</option></select></div>
+  <div class="tr-campo"><label class="gc-rotulo" for="tr-item">Peça (com saldo na origem)</label>
+    <select class="gc-campo" id="tr-item" name="item" required disabled><option value="">Escolha a origem antes</option></select></div>
+  <div class="tr-campo"><label class="gc-rotulo" for="tr-destino">Destino (do mesmo cliente)</label>
+    <select class="gc-campo" id="tr-destino" name="destino" required disabled><option value="">Escolha a origem antes</option></select></div>
+  <div class="tr-campo tr-campo--qtd"><label class="gc-rotulo" for="tr-qtd">Quantidade</label>
+    <input class="gc-campo" id="tr-qtd" name="qtd" inputmode="decimal" autocomplete="off" required aria-describedby="tr-qtd-nota">
+    <span class="alm-det" id="tr-qtd-nota" data-tr-qtd-nota></span></div>
+  <div class="tr-campo"><label class="gc-rotulo" for="tr-ref">OS ou referência (opcional)</label>
+    <input class="gc-campo" id="tr-ref" name="referencia" maxlength="60" autocomplete="off" placeholder="em branco: o código do Nexus"></div>
+  <div class="tr-botoes">
+    <button class="gc-btn gc-btn--ui gc-btn--contorno" type="submit" data-tr-btn-conferir>Conferir</button>
+    <button class="gc-btn gc-btn--ui gc-btn--primario" type="button" data-tr-btn-transferir disabled>Transferir</button>
+  </div>
+  <div class="tr-plano" data-tr-plano aria-live="polite" hidden></div>
+  <p class="rq-erro" data-tr-erro role="alert" hidden></p>
+</form>
+</section>
+<script src="{{ url_for('static', filename='pcm-transferir.js') }}"></script>
+{% endif %}
+
+<section class="inv-card">
+<div class="inv-card-cab"><h3>Últimas transferências</h3><span class="inv-card-nota">do livro do Nexus, a mais nova primeiro</span></div>
+{% if historico.erro %}<div class="cn-erro cn-aviso" role="status"><span><b>{{ historico.erro }}</b></span></div>
+{% elif historico.linhas %}
+<div class="inv-tw"><table class="alm-t inv-t">
+  <thead><tr><th>Quando</th>{% if pode %}<th>Quem</th>{% endif %}<th>Peça</th><th>De → para</th><th class="num">Quantidade</th><th>Saldo na origem</th><th>Saldo no destino</th><th>Vínculo</th><th>Situação</th></tr></thead>
+  <tbody>{% for x in historico.linhas %}
+  <tr><td data-r="Quando"><span class="alm-v">{{ x.quando_txt or '?' }}<span class="alm-det">{{ x.codigo }}</span></span></td>
+    {% if pode %}<td data-r="Quem"><span class="alm-v">{{ x.quem or '—' }}</span></td>{% endif %}
+    <td data-r="Peça"><span class="alm-v"><span class="alm-cod">{{ x.peca or x.id_item }}</span> {{ x.peca_nome }}</span></td>
+    <td data-r="De → para"><span class="alm-v">{{ x.origem_nome }} → {{ x.destino_nome }}</span></td>
+    <td data-r="Quantidade" class="num"><span class="alm-v">{{ n(x.qtd) }}</span></td>
+    <td data-r="Saldo na origem"><span class="alm-v">{% if x.o_antes is not none or x.o_depois is not none %}{{ n(x.o_antes) }} → {{ n(x.o_depois) }}{% else %}—{% endif %}</span></td>
+    <td data-r="Saldo no destino"><span class="alm-v">{% if x.d_antes is not none or x.d_depois is not none %}{{ n(x.d_antes) }} → {{ n(x.d_depois) }}{% else %}—{% endif %}</span></td>
+    <td data-r="Vínculo"><span class="alm-v">{{ 'criado (0 e 0)' if x.vinculo else 'já havia' }}</span></td>
+    <td data-r="Situação"><span class="alm-v"><span class="inv-selo inv-selo--{{ x.tom }}">{{ x.situacao }}</span></span></td></tr>
+  {% endfor %}</tbody></table></div>
+{% else %}<div class="inv-vazio"><p>Nenhuma transferência pelo Nexus ainda.</p></div>{% endif %}
+</section>
+</div>
+{% endblock %}
