@@ -1730,8 +1730,12 @@ Levi (12/11/2026): **Rank A** o PCM aceita no Nexus com um clique; **B e C** o N
   (`classificacao.mapa_guardado`, a cópia de 1 h da Curadoria). A "Curva ABC" do catálogo do App vem VAZIA para os Ranks.
   A peça fora do mapa, sem a Classificação 2, "1.Avariado" ou com duas Classificações 2 diferentes no mesmo código (a lista
   traz as inativas) é a curva desconhecida e vai para o PCM, como a A.
-- **O dono:** a saída leva o responsável do Fracttal de quem está na ponte (`personnel.responsibles_list` pelo e-mail, 1 h na
-  memória; o "não achei", 5 min) e a aprovação a conta (o `id_account` pelo catálogo de pessoas do OS Creator,
+- **O dono:** a saída leva o responsável do Fracttal de quem está na ponte (1 h na memória; o "não achei", 5 min). **Medido em
+  12/11/2026:** a `personnel.responsibles_list` NÃO tem a coluna `email` (a versão de antes, que a procurava ali, nunca achava
+  ninguém, e o Aceitar recusava todo mundo). A pessoa sai da `personnel.personnel_list` pelo `account_email` (o da conta de
+  login, sem caixa e sem espaço) ou, sem ele, pelo `email` de UMA pessoa só (o repetido é "não achei": não se escolhe no
+  chute); a descrição que vai na saída ("Nome  {63}") é a da lista dos responsáveis com o mesmo `id`, e sem essa linha é "não
+  achei" (`estoque.responsavel`) e a aprovação a conta (o `id_account` pelo catálogo de pessoas do OS Creator,
   `comando.avisos._do_fracttal`). Sem um deles, 409. A vez do almoxarifado presa por uma gravação de inventário, ou ele fora do
   modo 0, 409. O Recusar não lê os responsáveis.
 - **O automático SOBE DESLIGADO** (a revisão final do ramo, 12/11/2026): `AUTO_DESDE = None`. Desligado, nenhuma vai sozinha: as
@@ -1760,7 +1764,7 @@ Levi (12/11/2026): **Rank A** o PCM aceita no Nexus com um clique; **B e C** o N
   as peças com a curva, cifrados).
 - **Provado no Fracttal de verdade (12/11/2026, TESTE - PA):** o caminho pela tela e pelo RPC; o corpo da saída com as linhas
   cruas do `movements_details_list` (o saldo de 1 para 0, a requisição a 5); a aprovação com a requisição no estado 3; o
-  `STATE_CHANGED` depois da entrega. **Falta:** o Recusar; o responsável pelo e-mail (o corpo da lista e a coluna `email`); o
+  `STATE_CHANGED` depois da entrega. **Falta:** o Recusar; o
   clique e o automático de ponta a ponta pelo Nexus; onde a Saída Geral grava a OS (`document` ou `description`) e se ela vem
   com o tipo 5 no histórico; o que o Fracttal responde à segunda aprovação e à segunda saída.
 - **O que a trava ainda não cobre:** a saída que não liga à requisição (ela não vai a 5), com o livro que não gravou o aceite e

@@ -171,18 +171,55 @@ def test_o_corpo_da_saida_ligada(monkeypatch):
     assert len(fr.pedidos) == 1
 
 
-def test_as_pecas_e_o_responsavel():
-    fr = Fracttal({E.DETALHES: em_paginas([_det(1, "SP-1")]),
-                   E.RESPONSAVEIS: em_paginas([{"id": 9, "email": "outra@exemplo.test", "description": "Outra  {P-09}"},
-                                               {"id": 501, "email": "Pessoa.Teste@Exemplo.com", "description": "Pessoa  {P-01}"},
-                                               {"id": 502, "email": "sem.descricao@exemplo.test", "description": ""}])})
-    est = estoque(fr)
-    assert est.pecas_da_requisicao("101") == [_det(1, "SP-1")]                           # como vêm (a saída as devolve)
+# o pessoal e os responsáveis como o Fracttal os devolve (medido em 12/11/2026): a lista dos responsáveis SEM o e-mail; o pessoal
+# com o `account_email` (o da conta) e o `email` (que se repete), com os mesmos `id`
+PESSOAL = [{"id": 9, "account_email": "outra@exemplo.test", "email": "outra@exemplo.test", "full_name": "Outra Pessoa"},
+           {"id": 501, "account_email": " Pessoa.Teste@Exemplo.com ", "email": "geral@exemplo.test", "full_name": "Pessoa"},
+           {"id": 502, "account_email": "", "email": "so.email@exemplo.test", "full_name": "Só Email"},
+           {"id": 503, "account_email": None, "email": "repetido@exemplo.test", "full_name": "Um"},
+           {"id": 504, "account_email": None, "email": "Repetido@exemplo.test", "full_name": "Dois"},
+           {"id": 505, "account_email": "sem.linha@exemplo.test", "email": "", "full_name": "Sem Linha"},
+           {"id": 506, "account_email": "sem.descricao@exemplo.test", "email": "", "full_name": "Sem Descrição"}]
+LISTA_RESPONSAVEIS = [{"id": 9, "description": "Outra  {P-09}", "active": True},
+                      {"id": 501, "description": "Pessoa  {P-01}", "active": True},
+                      {"id": 502, "description": "Só Email  {}", "active": True},
+                      {"id": 503, "description": "Um  {3}"}, {"id": 504, "description": "Dois  {4}"},
+                      {"id": 506, "description": ""}]
+
+
+def _fr_do_pessoal():
+    return Fracttal({E.PESSOAL: em_paginas(PESSOAL), E.RESPONSAVEIS: em_paginas(LISTA_RESPONSAVEIS)})
+
+
+def test_as_pecas_da_requisicao():
+    fr = Fracttal({E.DETALHES: em_paginas([_det(1, "SP-1")])})
+    assert estoque(fr).pecas_da_requisicao("101") == [_det(1, "SP-1")]                 # como vêm (a saída as devolve)
     assert fr.pedidos[0] == (E.DETALHES, {"id_movement": 101, "page": 1, "limit": 200, "start": 0})
-    assert est.responsavel("pessoa.teste@exemplo.com") == {"id": "501", "descricao": "Pessoa  {P-01}"}
-    assert fr.pedidos[1] == (E.RESPONSAVEIS, {"filter": [], "sort": [], "is_tree": False, "node": None, "noShowDisabled": True,
-                                              "page": 1, "limit": 200, "start": 0})
-    assert est.responsavel("ninguem@exemplo.test") is None and est.responsavel("sem.descricao@exemplo.test") is None
+
+
+def test_o_responsavel_pelo_email_da_conta():
+    """O `account_email` (sem caixa e sem espaço) acha a pessoa no pessoal; a descrição é a da lista dos responsáveis com o
+    mesmo `id`, como a tela a manda. Os dois pedidos são os da tela."""
+    fr = _fr_do_pessoal()
+    assert estoque(fr).responsavel("pessoa.teste@exemplo.com ") == {"id": "501", "descricao": "Pessoa  {P-01}"}
+    assert fr.pedidos == [
+        (E.PESSOAL, {"filter": [], "sort": [], "is_tree": False, "node": None, "page": 1, "limit": 200, "start": 0}),
+        (E.RESPONSAVEIS, {"filter": [], "sort": [], "is_tree": False, "node": None, "noShowDisabled": True,
+                          "page": 1, "limit": 200, "start": 0})]
+    # para na página que acha: com páginas de 2 linhas, a pessoa 501 está na 1ª página do pessoal e dos responsáveis
+    fr2 = _fr_do_pessoal()
+    estoque(fr2, pagina=2).responsavel("pessoa.teste@exemplo.com")
+    assert fr2.metodos == [E.PESSOAL, E.RESPONSAVEIS]
+
+
+def test_o_responsavel_pelo_email_unico_e_nunca_no_chute():
+    est = estoque(_fr_do_pessoal())
+    assert est.responsavel("so.email@exemplo.test") == {"id": "502", "descricao": "Só Email  {}"}       # o `email` de um só
+    assert est.responsavel("repetido@exemplo.test") is None                 # duas pessoas com o mesmo e-mail: não achei
+    assert est.responsavel("sem.linha@exemplo.test") is None                # sem a linha na lista dos responsáveis
+    assert est.responsavel("sem.descricao@exemplo.test") is None            # a linha sem a descrição
+    assert est.responsavel("ninguem@exemplo.test") is None
+    assert est.responsavel("geral@exemplo.test") == {"id": "501", "descricao": "Pessoa  {P-01}"}     # o `email` único
     with pytest.raises(ValueError):
         est.responsavel(" ")
 

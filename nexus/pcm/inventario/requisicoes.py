@@ -31,7 +31,8 @@ Regras, com o caso que as criou:
   automático e ficam à vista; a pausa (429) e o login vencido não registram falha (nada foi feito) e a próxima abertura tenta.
   O saldo é conferido ANTES de aprovar (a peça que não tem o bastante não chega a "aprovada, saída falhou").
 - **O estado 4 (entrega parcial) não entra**, nem no clique: a saída do pendente não foi provada ("conclua no Fracttal").
-- **O dono**: a saída precisa do responsável do Fracttal de quem está na ponte (`estoque.responsavel`, pelo e-mail) e a
+- **O dono**: a saída precisa do responsável do Fracttal de quem está na ponte (`estoque.responsavel`: a pessoa do pessoal pelo
+  e-mail e a descrição da lista de responsáveis, medido em 12/11/2026) e a
   aprovação da conta dele (o id e o nome, pelo catálogo de pessoas do OS Creator, como os avisos do Comando). Sem um deles,
   nada vai (409): não se grava sem dono.
 - **O automático (B e C)**: o Nexus não tem conta de serviço no Fracttal e grava só com o login de quem está na ponte. Quando
@@ -82,8 +83,10 @@ TELA = "/t/pcm/pecas/requisicoes"
 DESLIGADO = "O aceite automático das de Rank B e C ainda está desligado: é o PCM que aceita, com um clique. Nada foi enviado."
 SO_NO_SERVIDOR = ("O aceite e a recusa das requisições só roda no servidor do Nexus (NEXUS_INVENTARIO_GRAVAR): nada foi "
                   "enviado ao Fracttal.")
-SEM_RESPONSAVEL = ("Não achei você na lista de responsáveis do Fracttal (pelo seu e-mail): a saída precisa de um responsável, e "
-                   "o Nexus não grava sem dono. Peça ao administrador do Fracttal para cadastrar o seu e-mail. Nada foi enviado.")
+SEM_RESPONSAVEL = ("Não achei você como responsável no Fracttal: pelo seu e-mail, no pessoal (o e-mail da conta de login, ou "
+                   "o e-mail de uma pessoa só), e então na lista de responsáveis. A saída precisa de um responsável, e o Nexus "
+                   "não grava sem dono. Peça ao administrador do Fracttal para conferir o seu cadastro de pessoal. Nada foi "
+                   "enviado.")
 SEM_CONTA = ("Não achei a sua conta do Fracttal (o catálogo de pessoas do OS Creator, pelo seu e-mail): a aprovação vai no nome "
              "de quem decide. Nada foi enviado.")
 JA_ANDANDO = "O Nexus já está aceitando as de Rank B e C agora: acompanhe nesta página."

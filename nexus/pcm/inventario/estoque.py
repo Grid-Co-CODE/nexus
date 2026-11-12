@@ -65,12 +65,16 @@ UNIDADES = "companies.units_list"
 # A requisição de material (12/11/2026, item 6 da 2ª rodada; provado no TESTE - PA e lido de volta): o movimento OUTPUT_ORDER
 # (`id_movement_type` 13) que a tarefa da OS gera no almoxarifado da usina; aprovar é o `outputs_orders_update`, e a saída
 # LIGADA a ela (o tipo "Ordem de Serviço" da tela de Saídas, `outputs_insert` com o `id_movement_reference`) baixa o saldo e a
-# leva sozinha à Entrega total (estado 5). O responsável da saída sai do `personnel.responsibles_list`.
+# leva sozinha à Entrega total (estado 5). O responsável da saída é a pessoa do `personnel.personnel_list` (pelo e-mail) com a
+# descrição do `personnel.responsibles_list` (o mesmo `id`).
 MOVIMENTOS = "inventories.movements_new_list"
 DETALHES = "inventories.movements_details_list"
 DECIDIR_REQUISICAO = "inventories.outputs_orders_update"
 SAIDA = "inventories.outputs_insert"
 RESPONSAVEIS = "personnel.responsibles_list"
+# o pessoal do Fracttal, com o e-mail (medido em 12/11/2026: a lista dos responsáveis NÃO tem a coluna `email`; a do pessoal
+# tem o `account_email`, o da conta de login, e o `email`, com os MESMOS `id` da lista dos responsáveis)
+PESSOAL = "personnel.personnel_list"
 TIPO_REQUISICAO = 13
 NAO_ENTREGUE, ENTREGA_PARCIAL, ENTREGA_TOTAL, CANCELADA = 3, 4, 5, 6
 _BRT = timezone(timedelta(hours=-3))
@@ -515,8 +519,9 @@ class Estoque(abc.ABC):
 
     @abc.abstractmethod
     def responsavel(self, email: str) -> dict | None:
-        """O responsável do Fracttal com este e-mail (`personnel.responsibles_list`): `{"id", "descricao"}` (a descrição como
-        a tela a manda na saída, "<nome>  {<código>}"), ou None. Nada dele é guardado fora da memória."""
+        """O responsável do Fracttal com este e-mail: `{"id", "descricao"}` (a pessoa do `personnel.personnel_list` pelo e-mail,
+        com a descrição da linha de mesmo `id` do `personnel.responsibles_list`, como a tela a manda na saída, "<nome>
+        {<código>}"), ou None. Nada dele é guardado fora da memória."""
 
     @abc.abstractmethod
     def classificacoes(self) -> dict[str, list[tuple[str, str]]]:
@@ -893,17 +898,39 @@ class EstoqueFracttal(Estoque):
         return primeira_com_a_os(self._historico(id_almox, instante(desde_iso)), os_, ids_itens)
 
     def responsavel(self, email: str) -> dict | None:
-        """Pela coluna do e-mail da lista de responsáveis (o pedido é o da tela de Saídas: a lista com o `noShowDisabled`).
-        Para na primeira página que acha. O corpo da lista e a coluna `email` seguem o padrão das listas do Fracttal: PROVA
-        PENDENTE no Fracttal de verdade (a captura de 12/11/2026 foi a da saída, com o id já escolhido)."""
-        alvo = str(email or "").strip().lower()
+        """Medido no Fracttal de verdade em 12/11/2026 (só leitura), o caso que criou: a lista dos responsáveis (174 linhas)
+        NÃO tem a coluna `email` (os campos são `id`, `description`, `active`, ...), e a versão de antes, que a procurava ali,
+        nunca achava ninguém: o Aceitar das requisições recusava todo mundo com o "não achei você". Quem tem o e-mail é o
+        pessoal (`personnel.personnel_list`, os mesmos `id`):
+        1. a pessoa cujo `account_email` (o da conta de login; 165 de 174 o têm, nenhum repetido) é o e-mail, sem caixa e sem
+           espaço; para na página que acha;
+        2. sem nenhuma, a de `email` igual, mas só se UMA linha o tiver (3 e-mails se repetem: duas ou mais é "não achei", não
+           se escolhe uma pessoa no chute);
+        3. a `descricao` é a `description` da linha de mesmo `id` da lista dos responsáveis ("Nome  {63}", às vezes "{}"; o pedido
+           é o da tela de Saídas, com o `noShowDisabled`), para na página que acha; sem a linha, ou com ela vazia, "não achei"."""
+        def limpo(v) -> str:
+            return "".join(str(v or "").split()).lower()
+        alvo = limpo(email)
         if not alvo:
             raise ValueError("sem o e-mail, qualquer responsável seria o achado")
+        pela_conta, pelo_email = None, []
+        for l in self._linhas(PESSOAL, {"filter": [], "sort": [], "is_tree": False, "node": None}):
+            if not isinstance(l, dict) or _inteiro(l.get("id")) is None:
+                continue
+            if limpo(l.get("account_email")) == alvo:
+                pela_conta = l
+                break
+            if limpo(l.get("email")) == alvo:
+                pelo_email.append(l)
+        pessoa = pela_conta or (pelo_email[0] if len(pelo_email) == 1 else None)
+        if pessoa is None:
+            return None
+        pid = str(_inteiro(pessoa["id"]))
         base = {"filter": [], "sort": [], "is_tree": False, "node": None, "noShowDisabled": True}
         for l in self._linhas(RESPONSAVEIS, base):
-            if isinstance(l, dict) and str(l.get("email") or "").strip().lower() == alvo and l.get("id") is not None:
+            if isinstance(l, dict) and str(_inteiro(l.get("id"))) == pid:
                 descricao = str(l.get("description") or "").strip()
-                return {"id": str(l["id"]), "descricao": descricao} if descricao else None
+                return {"id": pid, "descricao": descricao} if descricao else None
         return None
 
     def codigos(self, sigla: str) -> list[str]:
