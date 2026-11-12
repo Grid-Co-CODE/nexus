@@ -28,7 +28,7 @@ from datetime import date, datetime
 from decimal import Decimal
 
 from ..cadastro.cifra import CifraErro, Cofre
-from .tabelas import coluna_cifrada
+from .tabelas import coluna_cifrada as _cifrada_zeladoria
 
 log = logging.getLogger(__name__)
 
@@ -57,8 +57,8 @@ def _chave_txt(v) -> str:
     return s.split(".")[0] if _INTEIRO_COM_ZEROS.match(s) else s
 
 
-def _contexto(aba: str, chave_valor, coluna: str) -> str:
-    return f"zeladoria/{aba}/{_chave_txt(chave_valor)}/{coluna}"
+def _contexto(aba: str, chave_valor, coluna: str, prefixo: str = "zeladoria") -> str:
+    return f"{prefixo}/{aba}/{_chave_txt(chave_valor)}/{coluna}"
 
 
 def _serializar(v, tipo: str):
@@ -83,8 +83,12 @@ def _partes(v) -> list:
     return [v[i:i + PARTE] for i in range(0, len(v), PARTE)]
 
 
-def para_aba(aba: str, colunas: list, linhas: list, cofre: Cofre, chave: str) -> tuple:
-    """(cabeçalho, linhas) no formato do `livros.publicar`. `colunas` = [(nome, tipo do Postgres)], na ordem da tabela."""
+def para_aba(aba: str, colunas: list, linhas: list, cofre: Cofre, chave: str, *, cifrada=None,
+             prefixo: str = "zeladoria") -> tuple:
+    """(cabeçalho, linhas) no formato do `livros.publicar`. `colunas` = [(nome, tipo do Postgres)], na ordem da tabela.
+    `cifrada` e `prefixo` deixam outro app usar o mesmo molde com a regra de cifra e o contexto dele (o SSO da zeladoria,
+    12/11/2026: `nexus/sso/`); sem eles, é a Zeladoria."""
+    coluna_cifrada = cifrada or _cifrada_zeladoria
     tipos = dict(colunas)
     nomes = [c for c, _t in colunas]
     chave_cifrada = coluna_cifrada(aba, chave, tipos.get(chave))
@@ -96,7 +100,7 @@ def para_aba(aba: str, colunas: list, linhas: list, cofre: Cofre, chave: str) ->
             v = _serializar(linha.get(c), tipos[c])
             if v is not None and coluna_cifrada(aba, c, tipos[c]):
                 texto = v if isinstance(v, str) else json.dumps(v)
-                ctx = f"zeladoria/{aba}/-/{c}" if (c == chave and chave_cifrada) else _contexto(aba, k, c)
+                ctx = f"{prefixo}/{aba}/-/{c}" if (c == chave and chave_cifrada) else _contexto(aba, k, c, prefixo)
                 v = cofre.cifrar(texto, ctx)
             saida[c] = _partes(v)
         prontas.append(saida)
@@ -144,15 +148,17 @@ def _juntar(linha: dict, c: str):
     return v
 
 
-def de_aba(aba: str, tipos: dict, linhas: list, cofre: Cofre, chave: str) -> list:
+def de_aba(aba: str, tipos: dict, linhas: list, cofre: Cofre, chave: str, *, cifrada=None,
+           prefixo: str = "zeladoria") -> list:
     """As linhas como o app do Radar as recebia do Supabase. `linhas` = o que o `livros.ler` devolve (dict por linha)."""
+    coluna_cifrada = cifrada or _cifrada_zeladoria
     chave_cifrada = coluna_cifrada(aba, chave, tipos.get(chave))
     out = []
     for linha in linhas:
         k = _juntar(linha, chave)
         if chave_cifrada and Cofre.eh_cifrado(k):
             try:
-                k = cofre.decifrar(k, f"zeladoria/{aba}/-/{chave}")
+                k = cofre.decifrar(k, f"{prefixo}/{aba}/-/{chave}")
             except CifraErro:
                 k = None
         nova = {}
@@ -160,7 +166,7 @@ def de_aba(aba: str, tipos: dict, linhas: list, cofre: Cofre, chave: str) -> lis
             v = k if c == chave and chave_cifrada else _juntar(linha, c)
             if v not in (None, "") and coluna_cifrada(aba, c, tipo) and Cofre.eh_cifrado(v):
                 try:
-                    v = cofre.decifrar(v, _contexto(aba, k, c))
+                    v = cofre.decifrar(v, _contexto(aba, k, c, prefixo))
                 except CifraErro:
                     log.warning("zeladoria: a cifra de %s.%s não abre", aba, c)
                     nova[c] = NAO_ABRE if _eh_texto(tipo) else None

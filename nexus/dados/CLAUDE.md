@@ -360,6 +360,17 @@ plataforma de Performance). Regra em `nexus/casca/CLAUDE.md`; o esquecimento que
 - **Carga:** cópia sob comando da exportação do Supabase (`ferramentas/copiar_zeladoria.py`), não entra na carga de hora em hora. A cópia de 06/11/2026: 5.148 linhas nas 41 tabelas mais 120 últimas rondas, as 42 abas iguais à origem. A 1ª medida, de 03/11/2026: 4.756 linhas mais 117 últimas rondas, as 40 abas iguais à origem, 13,8 s para gravar. Regra e passo a passo em `nexus/torres/zeladoria/CLAUDE.md`.
 - **Depois da troca, a torre grava** (`nexus/zeladoria/gravacao.py`, só com `NEXUS_ZELADORIA_GRAVA=1`): em lote, os livros que mudaram, pelo `livros.publicar`; a mudança espera num diário cifrado na pasta de dados, fora do banco. A `atualizacao` ganhou a coluna `versao` no fim (0 = a cópia; cada lote grava a sua), e a cópia recusa gravar por cima de uma versão acima de 0.
 
+**SSO da zeladoria (12/11/2026).** Sete livros `nexus_sso_*`, um por módulo do app de segurança dos fornecedores
+(integração por vídeo, APR, EPI, vistoria, diário de obra, cronograma e o inventário dos arquivos), registrados no
+catálogo antes de existir.
+- **Origem:** as 12 tabelas do SSO no Supabase do Radar, com o nome da view que o app usa (`iv_presencas`,
+  `apr_submissoes`...), mais o inventário dos arquivos do Storage (que ficaram travados no Supabase).
+- **Exceção à regra 10**, como a Zeladoria: cópia fiel em `ABAS_FORA_DA_REGRA`; os fatos vêm depois.
+- **Cifra:** todo texto por padrão (CPF, telefone, e-mail, assinaturas em base64), menos o que está em claro em
+  `nexus/sso/tabelas.py` (ids, datas, estados, usina, serviço, fase).
+- **Carga:** cópia sob comando da exportação de 12/11/2026 (`ferramentas/copiar_sso.py`). Regra e passo a passo em
+  `nexus/sso/CLAUDE.md`.
+
 **Mapa de equipe (08/11/2026).** Cinco livros, todos registrados no catálogo ANTES de existir (regra 10). **Ainda não estão
 no banco: aparecem com a primeira gravação depois do deploy** (a primeira posição, a primeira chave emitida, a primeira
 abertura do mapa). Quem escreve é o gravador em lote (`nexus/campo/equipe/gravador.py`, a cada 5 min), só onde

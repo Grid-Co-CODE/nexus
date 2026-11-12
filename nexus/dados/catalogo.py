@@ -36,6 +36,7 @@ from dataclasses import dataclass
 from . import almoxarifado, fato_chamado, fato_chamado_aberto, fato_inventario, fato_pt, fato_ronda, fato_tarefa_os, fato_uso_os, fatos, geracao
 from . import fato_os_fama, programacao
 from ..zeladoria import tabelas as zeladoria_tabelas
+from ..sso import tabelas as sso_tabelas
 
 # o modelo (Fato, Livro, as dimensões e as regras) mora em modelo.py desde 05/11/2026; o catálogo o reexporta
 from .modelo import (ESTADOS, ESTADOS_FATO, TIPOS_FATO, TIPO_ROTULO, SOMA, SUFIXOS_UNIDADE, Medida, medida_valida, _m, _fontes, DIMENSOES, DIM_IDS, Fato, _d, Livro)  # noqa: F401
@@ -1670,6 +1671,26 @@ LIVROS = (
            "Radar lia (fracttal_rondas), o índice das fotos, o cursor da leitura e a última ronda de cada usina", ()),
           (zeladoria_tabelas.LIVRO_HISTORICO, "registrado e gravado em 03/11/2026: o registro de ações e as "
            "alterações das parcelas, das provisões e do cronograma, que só crescem", zeladoria_tabelas.HISTORICO))),
+    # o SSO da zeladoria (a Integração de Segurança dos fornecedores: integração por vídeo, APR, EPI, vistoria, diário de
+    # obra e cronograma), que morava no mesmo Supabase do Radar (Levi, 12/11/2026: "vamos migrar [...] pode pôr no mesmo
+    # banco do Nexus"): as tabelas com o nome das views que o app usa, um livro por módulo. Regra em nexus/sso/CLAUDE.md
+    *(Livro(nome, tuple(a for a, lv in sso_tabelas.TABELAS.items() if lv == nome) + ("atualizacao",),
+            "sob comando (ferramentas/copiar_sso.py), da exportação do Supabase",
+            "nexus/sso/copia.py (a cópia do Supabase do SSO)", False,
+            "registrado em 12/11/2026 antes de existir: nasce com a cópia da exportação de 12/11 (o Supabase parou em 11/11 "
+            "e ninguém grava no SSO desde então); " + obs,
+            so_cresce=tuple(a for a in sso_tabelas.HISTORICO if sso_tabelas.TABELAS.get(a) == nome))
+      for nome, obs in (
+          (sso_tabelas.LIVRO_INTEGRACAO, "a integração por vídeo: a sessão, as visualizações, as presenças (com CPF, "
+           "telefone, e-mail e a assinatura, cifrados) e os perfis da gestão"),
+          (sso_tabelas.LIVRO_APR, "as APR enviadas pelos fornecedores, com as assinaturas cifradas"),
+          (sso_tabelas.LIVRO_EPI, "os checklists de EPI por serviço, com a assinatura cifrada"),
+          (sso_tabelas.LIVRO_VISTORIA, "as vistorias antes e depois do serviço (a tabela public.checklists do Supabase)"),
+          (sso_tabelas.LIVRO_DIARIO, "o diário de obra e a lista de usinas dele"),
+          (sso_tabelas.LIVRO_CRONOGRAMA, "o cronograma dos fornecedores, o registro das alterações (só cresce) e a lista de "
+           "fornecedores"),
+          (sso_tabelas.LIVRO_ARQUIVOS, "o inventário dos arquivos do Storage (fotos, PDFs, vídeo): o arquivo em si ficou "
+           "travado no Supabase; a lista guarda o caminho, o tamanho e o tipo de cada um"))),
     Livro("nexus_setores", ("dim_setor", "fato_decisao_setor"), "a cada mudança na aba Pessoas e setores de Base → Acessos",
           "nexus/cadastro/setores.py, pela tela Base > Acessos > Pessoas e setores", False,
           "registrado em 12/10/2026 antes de existir: nasce com o 1º setor criado na tela; a tela lê com cache de "
@@ -1819,6 +1840,10 @@ ABAS_FORA_DA_REGRA = {
                         "em palavras do cliente; conta do Nexus (nexus/campo/zeladoria.py), não fato conformado: o "
                         "checklist das rondas que a origina não está no banco",
 }
+# as tabelas do SSO da zeladoria, com o nome das views que o app usa (12/11/2026)
+ABAS_FORA_DA_REGRA.update({a: "cópia fiel da tabela do SSO da zeladoria (a Integração de Segurança), com o nome da view "
+                              "que o app usa; os fatos vêm depois, a partir dela" for a in sso_tabelas.TABELAS
+                           if a not in sso_tabelas.HISTORICO})
 # as tabelas do Radar mantêm o nome do Supabase (o clone e a ponte usam o mesmo nome; os fatos vêm depois, a partir delas)
 ABAS_FORA_DA_REGRA.update({a: "cópia fiel da tabela do Radar de Fornecedores (zeladoria), com o mesmo nome; os fatos "
                               "vêm depois, a partir dela" for a in zeladoria_tabelas.TABELAS
