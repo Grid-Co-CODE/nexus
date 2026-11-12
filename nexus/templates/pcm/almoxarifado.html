@@ -62,7 +62,7 @@
   <button type="button" class="kb-kpi alm-kpi-ir" data-alm-kpi data-aba="avariadas" title="Abrir a aba Avariadas"><span class="kb-kpi-rot">Avariadas</span>
     <span class="kb-kpi-linha"><b class="kb-kpi-v{% if k.avariadas %} kb-kpi-v--alerta{% endif %}">{{ k.avariadas }}</b><span class="kb-kpi-nota">com saldo</span></span></button>
   <div class="kb-kpi" data-alm-kpi><span class="kb-kpi-rot">Lançadas pelo App</span>
-    <div class="kb-kpi-linha"><b class="kb-kpi-v">{{ k.lancadas }}</b><span class="kb-kpi-nota"><b{% if k.recusadas %} class="alm-ruim"{% endif %}>{{ k.recusadas }}</b> recusadas</span></div></div>
+    <div class="kb-kpi-linha"><b class="kb-kpi-v">{{ k.lancadas }}</b><span class="kb-kpi-nota"><b{% if k.recusadas %} class="alm-ruim"{% endif %}>{{ k.recusadas }}</b> recusadas{% if k.de_outro_almox %} · <b>{{ k.de_outro_almox }}</b> de outro almoxarifado{% endif %}</span></div></div>
 </section>
 
 <nav class="alm-abas" role="tablist" aria-label="Partes do almoxarifado">

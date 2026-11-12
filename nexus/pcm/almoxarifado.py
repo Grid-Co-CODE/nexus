@@ -332,8 +332,14 @@ def _avariadas(linhas: list[dict], tem_custo: bool, hoje) -> list[dict]:
 
 
 def _consumo(pecas_nx: list[dict] | None, pecas_app: list[dict], fonte: dict) -> tuple[list[dict], str]:
+    """As peças lançadas pelo App, do `fato_peca_lancada` (ou, sem ele, do livro Peças), cada uma com `de_outro_almox` (12/11/2026,
+    a 15ª coluna do livro Peças): a peça saiu de um almoxarifado que não é da usina da OS. O fato do Nexus não guarda a coluna: a
+    marca vem do livro do App pelo ID do lançamento (a janela de 90 dias dele); fora dela, ou no livro de antes da v339, sem
+    marca."""
     its = fonte["itens"] if fonte else {}
     nomes = {l["id_almox"]: l["almox"] for l in (fonte or {}).get("linhas", [])}
+    da_os = {_txt(p.get("ID do lançamento")): p.get("ID do almoxarifado da usina da OS") for p in pecas_app
+             if _txt(p.get("ID do lançamento"))}
     out = []
     if pecas_nx is not None:
         for p in pecas_nx:
@@ -341,7 +347,9 @@ def _consumo(pecas_nx: list[dict] | None, pecas_app: list[dict], fonte: dict) ->
             out.append({"data_id": _id(p.get("data_id")), "os": _txt(p.get("os")), "id_item": _id(p.get("id_item")),
                         "codigo": _txt(p.get("codigo")), "quantidade": _num(p.get("quantidade_qtd")),
                         "id_almox": _id(p.get("id_almoxarifado")),
-                        "situacao": "lançada" if lancada else _RECUSA, "recusa": _txt(p.get("recusa"))})
+                        "situacao": "lançada" if lancada else _RECUSA, "recusa": _txt(p.get("recusa")),
+                        "de_outro_almox": A.de_outro_almoxarifado(p.get("id_almoxarifado"),
+                                                                  da_os.get(_txt(p.get("lancamento_id"))))})
         origem = "nexus"
     else:
         for p in pecas_app:
@@ -352,7 +360,9 @@ def _consumo(pecas_nx: list[dict] | None, pecas_app: list[dict], fonte: dict) ->
                         "quantidade": _num(p.get("Quantidade")), "id_almox": _id(p.get("ID do almoxarifado")),
                         "situacao": "lançada" if _txt(p.get("Situação")).lower() == "lançada" else _RECUSA,
                         "recusa": _txt(p.get("Motivo da recusa")) or ("outro" if _txt(p.get("Situação")).lower()
-                                                                       != "lançada" else "")})
+                                                                       != "lançada" else ""),
+                        "de_outro_almox": A.de_outro_almoxarifado(p.get("ID do almoxarifado"),
+                                                                  p.get("ID do almoxarifado da usina da OS"))})
         origem = "app"
     for c in out:
         i = its.get(c["id_item"], {})
@@ -543,6 +553,8 @@ def montar():
         d["consumo"], d["consumo_fonte"] = _consumo(pecas_nx, pecas_app, fonte)
         d["kpis"]["lancadas"] = sum(1 for c in d["consumo"] if c["situacao"] == "lançada")
         d["kpis"]["recusadas"] = sum(1 for c in d["consumo"] if c["situacao"] == _RECUSA)
+        # a peça lançada que saiu de outro almoxarifado que não o da usina da OS (o App v339; a 15ª coluna do livro Peças)
+        d["kpis"]["de_outro_almox"] = sum(1 for c in d["consumo"] if c["situacao"] == "lançada" and c["de_outro_almox"])
         d["cadastro"]["recusadas"] = [c for c in d["consumo"] if c["situacao"] == _RECUSA]
         n = (lambda v: f"{A.numero(v):g}" if A.numero(v) is not None else "?")        # "574.0" da API vira "574"
         d.update(estado="ok", aviso=aviso, ciclo={"fim": _quando(fonte["fim"] or fonte["inicio"]),

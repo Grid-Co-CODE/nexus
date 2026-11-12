@@ -49,7 +49,11 @@ COLUNAS_SALDO = ("ID do item", "Código", "ID do almoxarifado", "Almoxarifado", 
                  "Custo unitário")
 COLUNAS_PECAS = ("ID do lançamento", "Recebido em", "Usada em", "OS", "Tarefa", "Código do ativo", "ID do item",
                  "Código", "ID do almoxarifado", "Quantidade", "Unidade", "Situação", "Motivo da recusa",
-                 "Lançado por (HMAC)")
+                 "Lançado por (HMAC)",
+                 # 12/11/2026 (o App v339, a "Peça de outro almoxarifado"): os almoxarifados da usina da OS, os IDs separados
+                 # por vírgula. O "ID do almoxarifado" (a 9ª) é de onde a peça SAIU; fora destes, a peça veio de outro
+                 # almoxarifado. O livro de antes da v339 não tem a coluna: vazio, sem marca
+                 "ID do almoxarifado da usina da OS")
 INICIO = "Início do ciclo"
 
 # O livro das contagens do inventário (26/10/2026): 1 linha = 1 peça de uma contagem enviada, a pendência fora do catálogo
@@ -177,6 +181,20 @@ def sem_almoxarifado_de_teste(saldo: list[dict], config) -> list[dict]:
     metade"."""
     ids = ids_de_teste(config)
     return [l for l in saldo if _id(l.get("ID do almoxarifado")) not in ids] if ids else saldo
+
+
+def almoxarifados_da_usina_da_os(v) -> set[str]:
+    """A 15ª coluna do livro Peças ("ID do almoxarifado da usina da OS") como os IDs: separados por vírgula, sem o ".0" e sem o
+    vazio do `sync-xlsx` ("None"). Vazio (o livro de antes da v339, ou o App que não soube) é o conjunto vazio."""
+    return {i for i in (id_ou_vazio(p) for p in _txt(v).split(",")) if i}
+
+
+def de_outro_almoxarifado(id_almox, usina_da_os) -> bool:
+    """A peça saiu de um almoxarifado que não é da usina da OS (a "Peça de outro almoxarifado" do App v339). Sem a 15ª coluna
+    (o livro antigo) ou sem o ID de onde saiu, não há marca: na dúvida, nada se afirma."""
+    da_usina = almoxarifados_da_usina_da_os(usina_da_os)
+    saiu = id_ou_vazio(id_almox)
+    return bool(da_usina) and bool(saiu) and saiu not in da_usina
 
 
 def chave_do_local(caminho) -> str | None:

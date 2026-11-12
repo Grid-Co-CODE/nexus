@@ -862,7 +862,9 @@ FATOS = (
          fontes=(f"{almoxarifado.LIVRO_PECAS} · {almoxarifado.ABA_PECAS}",),
          janela_origem="90 dias (App)",
          observacao="a recusa vai como o domínio (dominios.RECUSA_PECA), nunca o texto do erro do Fracttal; a tarefa "
-                    "vira tarefa_chave. A recusada nunca saiu do saldo do Fracttal"),
+                    "vira tarefa_chave. A recusada nunca saiu do saldo do Fracttal. A 15ª coluna do livro (ID do almoxarifado da "
+                    "usina da OS, 12/11/2026, o App v339) não entra no fato: a marca de outro almoxarifado do PCM a lê do "
+                    "livro do App"),
     # o inventário (26/10/2026: o técnico conta as peças no App e o PCM aprova e grava no Fracttal; desenho
     # docs/superpowers/specs/2026-10-26-inventario-almoxarifado-design.md): a contagem é o 5º livro do App, e o Nexus guarda
     # o resto (a revisão, a aprovação, as gravações, a régua e a curadoria) em livro dele, `nexus_almoxarifado_inventario`,

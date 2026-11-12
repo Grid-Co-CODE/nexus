@@ -545,7 +545,9 @@ PCM"; a prévia com os dados reais foi aprovada no mesmo dia. Desenho e plano: `
   unitário)" na nota, sem mínimo, avariadas com saldo, que é um botão para a aba delas, lançadas pelo App com as recusadas) e 4
   abas: Reposição, Por almoxarifado, Catálogo e saldo e Avariadas (30/10/2026). **O Consumo nas OS e o Cadastro a corrigir
   saíram em 11/11/2026** (o PCM: "Cadastros a corrigir e consumo da OS podem ser tirados"): a conta do consumo FICA (`_consumo`:
-  o número "Lançadas pelo App" do alto e a versão do cliente a usam), e a do cadastro (`d["cadastro"]`) também, sem tela; o
+  o número "Lançadas pelo App" do alto e a versão do cliente a usam; desde 12/11/2026 cada peça leva o `de_outro_almox`, e o
+  número diz "N de outro almoxarifado": a peça que saiu de um almoxarifado fora dos da usina da OS, pela 15ª coluna do livro
+  Peças do App v339, "ID do almoxarifado da usina da OS"; o livro de antes, sem a coluna, fica sem marca), e a do cadastro (`d["cadastro"]`) também, sem tela; o
   `?aba=consumo` e o `?aba=cadastro` de antes abrem a Reposição. Desde 26/10/2026, as quatro partes do inventário (Inventário,
   Mínimo e máximo, Curadoria e Auditoria) vêm logo depois, juntas, como links para outras páginas (as seções do inventário,
   abaixo). Filtro na própria página (`filtro-local.js`). **São onze abas** (a das Requisições, a das Usinas e almoxarifados e a do Transferir, 12/11/2026, por último): onde não cabem (no celular), a fila rola por dentro e
