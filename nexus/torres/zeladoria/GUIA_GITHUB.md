@@ -74,6 +74,7 @@ A área da Zeladoria (leia o `CLAUDE.md` desta pasta antes):
 | O dado: leitura, gravação, financeiro, rondas do Fracttal, cronograma | `nexus/zeladoria/` |
 | A ponte (o `supabase` falso que o app usa) e os filtros | `nexus/static/zeladoria/` |
 | Os testes | `tests/test_zeladoria_*.py` |
+| O SSO da zeladoria (a API que o site do SSO chama, desde 12/11/2026) | `nexus/sso/` (roteiro: `nexus/sso/ROTEIRO_CLAUDE_CODE.md`) |
 
 **Fora da Zeladoria** (menu, login, cadastro, as outras torres): fale com o Levi antes. Ser administrador deixa subir,
 mas o resto do Nexus é de outras pessoas.

@@ -9,7 +9,8 @@ as permissões e os volumes) ficou fora do repositório, em `Downloads\Deploy\ss
 Levi, 12/11/2026, com o Supabase parado (a cota estourou em 11/11): "vamos migrar, isso sim! pode pôr no mesmo banco do
 Nexus"; e, no mesmo dia, **"Esse site fica a parte do nexus, o objetivo é apenas migrar os dados, tirar do supabase e
 passar para o PG"**, escolhendo a API do Nexus para o site. O site fica no Cloudflare do HEAD, com a mesma cara; o Nexus
-guarda os dados e responde no lugar do Supabase. Nada do SSO aparece no menu do Nexus.
+guarda os dados e responde no lugar do Supabase. Nada do SSO aparece no menu do Nexus. Quem mexe no SSO pelo Claude
+Code (o HEAD da zeladoria) tem o roteiro em `ROTEIRO_CLAUDE_CODE.md`, nesta pasta.
 
 ## Como funciona
 
