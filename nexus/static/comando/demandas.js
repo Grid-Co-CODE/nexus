@@ -97,22 +97,62 @@
     f.setAttribute('data-enviando', '1');
   });
 
-  trocarAba(abaAtual, raiz.getAttribute('data-sel') || '');
+  // o ?d= do endereço só entra no seletor se tiver a forma de um id (um link mexido não para o script)
+  var sel = raiz.getAttribute('data-sel') || '';
+  trocarAba(abaAtual, /^d[0-9a-f]{11}$/.test(sel) ? sel : '');
 
   // ── a Nova demanda ────────────────────────────────────────────────────────────────────────────────────────────────
   var dlg = document.getElementById('dm-nova'), botao = raiz.querySelector('[data-dm-nova]');
   if (!dlg || !botao) return;
-  botao.addEventListener('click', function () { if (dlg.showModal) dlg.showModal(); else dlg.setAttribute('open', ''); });
-  dlg.querySelectorAll('[data-dm-fechar]').forEach(function (b) { b.addEventListener('click', function () { dlg.close(); }); });
-
   var fSetor = dlg.querySelector('[data-dm-f-setor]'), fPessoa = dlg.querySelector('[data-dm-f-pessoa]');
   var fTema = dlg.querySelector('[data-dm-f-tema]'), fPrazo = dlg.querySelector('[data-dm-f-prazo]');
-  var prazoTexto = fPrazo.textContent;
+  var prazoTexto = fPrazo.textContent, erroPessoas = dlg.querySelector('[data-dm-f-pessoas-erro]');
   // as opções guardadas: a lista se refaz pelo setor (esconder <option> não vale em todo navegador)
   function guardar(sel) {
     return Array.prototype.slice.call(sel.options).filter(function (o) { return o.value; }).map(function (o) { return o.cloneNode(true); });
   }
-  var pessoas = guardar(fPessoa), temas = guardar(fTema);
+  var pessoas = [], temas = guardar(fTema), carregou = false;
+
+  // quem recebe vem ao abrir (os nomes são do pessoal do Fracttal: a Caixa não o lê ao abrir)
+  function carregarPessoas() {
+    if (carregou) return;
+    fetch(dlg.getAttribute('data-pessoas-url'), {credentials: 'same-origin'})
+      .then(function (r) { return r.json(); })
+      .then(function (j) {
+        var lista = j.pessoas || [], setores = {};
+        if (!j.ok || !lista.length) {
+          erroPessoas.textContent = !j.ok ? 'Não li a lista de pessoas agora: feche e abra de novo em instantes.'
+            : 'Ainda não há pessoas com setor no Nexus para receber demandas (Base → Acessos → Pessoas e setores).';
+          erroPessoas.hidden = false;
+          fSetor.innerHTML = '<option value="">Sem setores</option>';
+          return;
+        }
+        carregou = true; erroPessoas.hidden = true;
+        pessoas = lista.map(function (p) {
+          setores[p.setor_id] = p.setor_nome;
+          var o = document.createElement('option');
+          o.value = p.hmac; o.setAttribute('data-setor', String(p.setor_id)); o.textContent = p.nome + ' · ' + p.setor_nome;
+          return o;
+        });
+        fSetor.innerHTML = '';
+        var v = document.createElement('option'); v.value = ''; v.textContent = 'Escolha o setor'; fSetor.appendChild(v);
+        Object.keys(setores).sort(function (a, b) { return setores[a].localeCompare(setores[b], 'pt-BR'); }).forEach(function (sid) {
+          var o = document.createElement('option'); o.value = sid; o.textContent = setores[sid]; fSetor.appendChild(o);
+        });
+        // sem setor escolhido, a pessoa se escolhe da lista inteira (escolher a pessoa acerta o setor)
+        refazer(fPessoa, pessoas, '', 'Escolha a pessoa');
+        fPessoa.options[0].textContent = 'Escolha a pessoa';
+      })
+      .catch(function () {
+        erroPessoas.textContent = 'Não li a lista de pessoas agora: feche e abra de novo em instantes.';
+        erroPessoas.hidden = false;
+      });
+  }
+  botao.addEventListener('click', function () {
+    carregarPessoas();
+    if (dlg.showModal) dlg.showModal(); else dlg.setAttribute('open', '');
+  });
+  dlg.querySelectorAll('[data-dm-fechar]').forEach(function (b) { b.addEventListener('click', function () { dlg.close(); }); });
   function refazer(sel, todas, setor, vazio) {
     var antes = sel.value;
     sel.innerHTML = '';

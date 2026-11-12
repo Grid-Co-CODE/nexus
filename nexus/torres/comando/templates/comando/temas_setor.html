@@ -49,6 +49,7 @@
         <td class="dm-mudo">sim</td>
         <td><form id="dm-t-novo" method="post" action="{{ '/t/comando/temas-do-setor/salvar'|na_raiz }}">
           <input type="hidden" name="codigo" value="{{ codigo }}"><input type="hidden" name="setor_id" value="{{ setor_id }}">
+          <input type="hidden" name="novo_id" value="{{ novo_tema }}">
           <button class="gc-btn gc-btn--ui gc-btn--primario" type="submit"{% if not tem_login %} disabled{% endif %}><i class="ph ph-plus" aria-hidden="true"></i> Novo tema</button></form></td>
       </tr>
     </tbody>

@@ -91,7 +91,8 @@ def test_a_performance_ve_os_tres_relatorios_sem_marcar_nada(app, setores):
     assert c.get("/t/relatorios/potencia-ativa").status_code == 200
     with app.app_context():
         assert ST.das_do_setor(SID.PERFORMANCE) == ST.das_do_setor({"id": SID.PERFORMANCE, "nome": "Performance e Dados"}) \
-            == {f"relatorios/{t}" for t in RELATORIOS} | {"comando/caixa-de-entrada", "performance/equipe", "campo/equipe"}
+            == {f"relatorios/{t}" for t in RELATORIOS} | {"comando/caixa-de-entrada", "comando/temas-do-setor",
+                                                          "performance/equipe", "campo/equipe"}
         # a Caixa é de todos (03/11); o Quadro da equipe da Performance (04/11); o Mapa de equipe (08/11/2026) é dos
         # cinco setores que veem a posição do técnico: PCM, COS, Performance, Supervisão Campo e Responsáveis UFV
         # os do PCM (14/10/2026) são do setor PCM: os relatórios (nexus/pcm/relatorios, tests/test_relatorios_pcm.py) e o
@@ -101,7 +102,7 @@ def test_a_performance_ve_os_tres_relatorios_sem_marcar_nada(app, setores):
         # (nexus/pcm/almoxarifado.py, tests/test_pcm_almoxarifado.py)
         assert ST.das_do_setor(SID.PCM) == ({f"relatorios/pcm-{t}" for t in ("diario", "tarde", "semanal", "alerta", "executivo")}
                                           | {"pcm/acompanhamento", "pcm/gerar", "pcm/quadro", "pcm/fora-da-programacao",
-                                             "pcm/tecnicos-por-usina", "pcm/pecas", "comando/caixa-de-entrada",
+                                             "pcm/tecnicos-por-usina", "pcm/pecas", "comando/caixa-de-entrada", "comando/temas-do-setor",
                                              "campo/equipe"})
         # o Gerar e o Quadro têm dois donos: o PCM e os supervisores (Levi, 16/10/2026: "tanto PCM quanto supervisores!
         # Vou criar um setor de Responsáveis UFV"), pelo setor_id (04/11/2026: pelo nome, o "Responsável UFV" do banco não
@@ -112,7 +113,7 @@ def test_a_performance_ve_os_tres_relatorios_sem_marcar_nada(app, setores):
         # tests/test_campo_ocorrencias.py)
         assert ST.das_do_setor(SID.RESPONSAVEL_UFV) == ST.das_do_setor({"id": SID.RESPONSAVEL_UFV, "nome": "Responsável UFV"}) == {
             "pcm/gerar", "pcm/quadro", "pcm/fora-da-programacao", "pcm/tecnicos-por-usina", "campo/ocorrencias",
-            "comando/caixa-de-entrada", "campo/equipe"}
+            "comando/caixa-de-entrada", "comando/temas-do-setor", "campo/equipe"}
         assert ST.das_do_setor(None) == set() and ST.das_do_setor({"nome": "PCM"}) == set()
 
 

@@ -233,6 +233,8 @@ bloco no alto da Caixa e a Nova demanda), `temas_setor.html`, `static/comando/de
 sem recarregar; a pessoa e o tema pelo setor; as OS das usinas marcadas) e o CSS `dm-` no `comando.css`. O sininho é o
 `_sino_demandas` da casca.
 
+**A revisão independente de 12/11/2026 (antes de subir) deixou estas regras:** a pausada não dá "Vence hoje" nem entra no "Vencem até amanhã" (a vez é de quem pediu); a Nova demanda confere o tamanho ANTES de ler o corpo (`max_content_length`, como as Sugestões); a gravação que entrou no banco e respondeu com erro vale, com os anexos (só a que não entrou os leva embora); a leitura é conferida (`abas_conferidas`) e a que começou antes de uma gravação não fica na cópia (`_GERACAO`); só vale o passo de quem tem o papel dele (`passos_validos`: uma linha posta no banco por fora não muda a situação); a cifra da demanda amarra também o setor de quem recebe; o `?d=` só entra se tiver a forma do id; o tema novo leva `novo_id`. **A Caixa não lê o Fracttal ao abrir:** a lista de quem recebe (os nomes vêm do pessoal do Fracttal) chega ao abrir a Nova demanda (`GET .../demandas/pessoas`); a tela que lê o Fracttal sai da pré-carga e gasta a cota da empresa.
+
 **Fora, por agora:** a demanda para mais de um setor; o e-mail; o painel de tempo de resposta por setor (os passos já
 guardam o dia de cada um para medir).
 

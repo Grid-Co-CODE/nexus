@@ -146,7 +146,9 @@ def avisos(lista: list[dict], meu_hmac: str, meu_setor: int | None, hoje: date) 
             tipo = "vencida"
         elif para_mim and e["situacao"] == "devolvida":
             tipo = "devolvida"
-        elif para_mim and e["aberta"] and e["dias_restantes"] == 0:
+        # a pausada (aguardando quem pediu) não aperta quem recebeu: a vez é de quem pediu (revisão de 12/11/2026: o
+        # pedido de informação no dia do prazo dava "Vence hoje" todo dia enquanto a linha dizia "Pausado")
+        elif para_mim and e["aberta"] and e["situacao"] != "aguardando" and e["dias_restantes"] == 0:
             tipo = "vence_hoje"
         # a nova antes do prazo: a que acabou de chegar com 2 dias diz "Nova" (a prévia aprovada em 11/11/2026); a que
         # vence hoje já saiu acima

@@ -65,11 +65,25 @@ ROTULO_PASSO = {"em_analise": "colocou em análise", "pediu_informacao": "pediu 
                 "devolveu": "devolveu", "concluiu": "concluiu"}
 
 
+def passos_validos(demanda: dict, eventos: list[dict]) -> list[dict]:
+    """Os passos que valem: o evento conhecido, de quem tem o papel dele (quem recebeu ou quem pediu). Uma linha posta no
+    banco por fora, com outro código, não muda a situação (revisão de 12/11/2026)."""
+    dono = {"recebe": _txt(demanda.get("para_hmac")).lower(), "pediu": _txt(demanda.get("de_hmac")).lower()}
+    return [e for e in eventos if _txt(e.get("evento")) in PASSOS
+            and _txt(e.get("pessoa_hmac")).lower() == dono[PASSOS[_txt(e.get("evento"))][0]]]
+
+
 class Recusada(ValueError):
     """Nada foi gravado: o texto diz por quê, para a tela mostrar."""
 
 
+_GERACAO = [0]
+
+
 def limpar() -> None:
+    """Esquece a cópia. A geração sobe: a leitura que começou antes (por trás, ou noutra thread) não guarda o livro de
+    antes da gravação (revisão de 12/11/2026: quem acabou de abrir a demanda não a via e reenviava)."""
+    _GERACAO[0] += 1
     _CACHE.clear()
 
 
@@ -111,7 +125,8 @@ def _ctx(aba: str, l: dict) -> str:
     if aba == ABA_TEMA:
         return f"banco/demandas/tema/{_txt(l.get('id'))}/{_txt(l.get('tema_id'))}/{_txt(l.get('setor_id'))}"
     if aba == ABA_DEMANDA:
-        return f"banco/demandas/{_txt(l.get('demanda_id'))}/{_txt(l.get('de_hmac'))}/{_txt(l.get('para_hmac'))}"
+        return (f"banco/demandas/{_txt(l.get('demanda_id'))}/{_txt(l.get('de_hmac'))}/{_txt(l.get('para_hmac'))}/"
+                f"{_txt(l.get('para_setor_id'))}")
     return f"banco/demandas/evento/{_txt(l.get('id'))}/{_txt(l.get('demanda_id'))}/{_txt(l.get('evento'))}"
 
 
@@ -148,8 +163,10 @@ def _quem(usuario) -> dict:
 
 # ── o livro ──────────────────────────────────────────────────────────────────────────────────────────────────────────
 def _ler_abas() -> dict:
+    """As quatro abas. Conferidas com o /api/workbooks (achado 6 da revisão de 05/11/2026): a listagem que omite o livro
+    por um instante levanta `LeituraIncompleta`, e a tela diz que não leu, em vez de mostrar "nenhuma demanda"."""
     base, sessao = _banco()
-    a = livros.abas(base, sessao, LIVRO)
+    a = livros.abas_conferidas(base, sessao, LIVRO, ())
     return {aba: (livros._linhas(base, sessao, a[aba]) if a.get(aba) else []) for aba, _cab in ABAS}
 
 
@@ -173,15 +190,18 @@ def ler(forcar: bool = False) -> dict:
     g = _CACHE.get("livro")
     if g and not forcar and agora - g["lido_em"] < TTL_S:
         return g
+    geracao = _GERACAO[0]
     try:
         t = _ler_abas()
     except Exception as ex:      # noqa: BLE001 — banco fora, rede: a tela diz e segue
         erro = f"{type(ex).__name__}: {str(ex)[:160]}"
         return dict(g, erro=erro) if g else {"temas": [], "demandas": [], "usinas": [], "eventos": [], "lido_em": None,
                                              "erro": erro}
-    _CACHE["livro"] = {"temas": t[ABA_TEMA], "demandas": t[ABA_DEMANDA], "usinas": t[ABA_USINA],
-                       "eventos": t[ABA_EVENTO], "lido_em": agora, "erro": ""}
-    return _CACHE["livro"]
+    lido = {"temas": t[ABA_TEMA], "demandas": t[ABA_DEMANDA], "usinas": t[ABA_USINA], "eventos": t[ABA_EVENTO],
+            "lido_em": agora, "erro": ""}
+    if geracao == _GERACAO[0]:
+        _CACHE["livro"] = lido
+    return lido
 
 
 def copia() -> dict | None:
@@ -218,7 +238,8 @@ def avisos_do_sino(meu_hmac: str, meu_setor: int | None, hoje: date | None = Non
             continue
         d = {"demanda_id": did, "para_hmac": _txt(l.get("para_hmac")).lower(), "de_hmac": _txt(l.get("de_hmac")).lower(),
              "para_setor_id": _int(l.get("para_setor_id")),
-             "estado": R.estado(l, eventos.get(did, []), _int(l.get("prazo_dias_uteis")) or 0, hoje)}
+             "estado": R.estado(l, passos_validos(l, eventos.get(did, [])), _int(l.get("prazo_dias_uteis")) or 0,
+                                hoje)}
         base.append(d)
         por[did] = l
     av = R.avisos(base, (meu_hmac or "").lower(), meu_setor, hoje)
@@ -258,7 +279,7 @@ def temas(setor_id: int | None = None, so_ativos: bool = True) -> list[dict]:
 
 
 def salvar_tema(setor_id: int, nome: str, prazo_dias_uteis, usuario: dict, tema_id: str | None = None,
-                ativo: bool = True) -> dict:
+                ativo: bool = True, novo: str | None = None) -> dict:
     """Uma versão nova do tema (o novo, a troca do nome ou do prazo, desativar). O nome tem de 1 a 60 caracteres e o
     prazo, de 1 a 30 dias úteis."""
     nome = " ".join(str(nome or "").split())
@@ -280,6 +301,12 @@ def salvar_tema(setor_id: int, nome: str, prazo_dias_uteis, usuario: dict, tema_
             atual = _temas_de(t[ABA_TEMA], cofre).get(tid) or {}
             if atual.get("setor_id") != _int(setor_id):
                 raise Recusada("Esse tema é de outro setor")
+        if not tid and ID_TEMA.fullmatch(_txt(novo)):
+            # o `novo_id` do formulário do tema novo: o 2º envio (o duplo clique) acha o tema e não grava outro
+            ja = _temas_de(t[ABA_TEMA], cofre).get(_txt(novo))
+            if ja:
+                return {k: ja[k] for k in ("tema_id", "nome", "prazo_dias_uteis", "ativo", "setor_id")}
+            tid = _txt(novo)
         tid = tid or novo_id("m")
         registrado, data_id = _agora_iso()
         linha = {"id": novo_id("v"), "tema_id": tid, "registrado_em": registrado, "data_id": data_id,
@@ -427,6 +454,15 @@ def abrir(form: dict, arquivos, usuario: dict) -> dict:
         try:
             _publicar(t)
         except Exception:
+            # a resposta falhou, mas a gravação pode ter entrado (o tempo esgotado, a conferência depois): relido o
+            # livro, a demanda que está lá vale, com os anexos; só a que não entrou leva os anexos embora (revisão de
+            # 12/11/2026: o rmtree deixava a demanda gravada sem anexo, e o reenvio a duplicava)
+            try:
+                entrou = any(_txt(l.get("demanda_id")) == did for l in _ler_abas()[ABA_DEMANDA])
+            except Exception:    # noqa: BLE001 — sem saber, os anexos ficam (um anexo a mais no disco não perde nada)
+                entrou = True
+            if entrou:
+                return linha
             if feitos:
                 shutil.rmtree(_pasta(did), ignore_errors=True)
             raise
@@ -459,7 +495,7 @@ def registrar(demanda_id: str, evento: str, texto: str, usuario: dict, novo_id_:
         if dono.lower() != quem["hmac"]:
             raise Recusada("Esse passo é de quem recebeu a demanda" if papel == "recebe"
                            else "Esse passo é de quem pediu a demanda")
-        evs = [e for e in t[ABA_EVENTO] if _txt(e.get("demanda_id")) == did]
+        evs = passos_validos(d, [e for e in t[ABA_EVENTO] if _txt(e.get("demanda_id")) == did])
         sit = R.estado(d, evs, _int(d.get("prazo_dias_uteis")) or 0, datetime.now(_BRT).date())["situacao"]
         if sit not in vale_em:
             raise Recusada(f"A demanda está {R.SITUACOES[sit][0].lower()}: esse passo não vale agora")
@@ -522,7 +558,7 @@ def lista(hoje: date | None = None) -> list[dict]:
         if not ID_DEMANDA.fullmatch(did):
             continue
         dados = _decifrar(cofre, ABA_DEMANDA, l)
-        evs = eventos.get(did, [])
+        evs = passos_validos(l, eventos.get(did, []))
         tema = temas_.get(_txt(l.get("tema_id"))) or {}
         e = R.estado(l, evs, _int(l.get("prazo_dias_uteis")) or 0, hoje)
         passos = []
@@ -568,7 +604,8 @@ FILTROS = (("abertas", "Abertas"), ("vencem", "Vencem até amanhã"), ("vencidas
 def _passa(d: dict, filtro: str) -> bool:
     e = d["estado"]
     if filtro == "vencem":
-        return e["aberta"] and e["dias_restantes"] is not None and 0 <= e["dias_restantes"] <= 1 and not e["vencida"]
+        return (e["aberta"] and not e["pausada"] and e["dias_restantes"] is not None and 0 <= e["dias_restantes"] <= 1
+                and not e["vencida"])
     if filtro == "vencidas":
         return e["vencida"]
     if filtro == "finalizadas":

@@ -322,7 +322,11 @@ def test_a_caixa_mostra_a_demanda_para_quem_recebe_quem_pediu_e_o_setor(app, cen
 def test_a_nova_demanda_pela_tela_grava_uma_vez_e_o_anexo_so_para_quem_ve(app, cena):
     c = _cliente(app, ANA)
     html = c.get(CAIXA).get_data(as_text=True)
-    assert 'id="dm-nova"' in html and "Juliana Prado · Performance" in html and ">Ana Souza · Supervisão de Campo<" not in html
+    assert 'id="dm-nova"' in html and "/demandas/pessoas" in html
+    # quem recebe vem ao abrir o formulário (a Caixa não lê o Fracttal ao abrir), sem quem pede
+    ps = c.get(CAIXA + "/demandas/pessoas").get_json()
+    assert ps["ok"] and [(p["nome"], p["setor_nome"]) for p in ps["pessoas"]] == [
+        ("Bruno Lima", "Performance"), ("Juliana Prado", "Performance")]
     f = _form(cena)
     dados = dict(f, codigo=_codigo(html), usinas="1", anexos=(io.BytesIO(PDF), "laudo.pdf"))
     r = c.post(CAIXA + "/demandas/nova", data=dados, content_type="multipart/form-data")
@@ -417,3 +421,81 @@ def test_o_sininho_avisa_quem_recebe_quem_pediu_e_o_setor_na_vencida(app, cena):
     with c.session_transaction() as ss:
         ss.update(logado=True, admin=True)
     assert "sino-dem" not in c.get(CAIXA).get_data(as_text=True)
+
+
+# ── o que a revisão de 12/11/2026 apontou ────────────────────────────────────────────────────────────────────────────
+def test_a_pausada_nao_vence_hoje_nem_entra_no_vencem_ate_amanha():
+    d = {"registrado_em": "2026-11-16T12:00:00.000Z", "para_hmac": "j", "de_hmac": "a", "para_setor_id": 1}
+    pausa = [_ev("pediu_informacao", "2026-11-18T12:00:00.000Z")]            # no dia do prazo (2 dias úteis)
+    for dia in (18, 19, 23):
+        e = R.estado(d, pausa, 2, date(2026, 11, dia))
+        assert e["situacao"] == "aguardando" and e["dias_restantes"] == 0
+        x = dict(d, demanda_id="d1", estado=e)
+        assert R.avisos([x], "j", 1, date(2026, 11, dia)) == []
+        assert not D.filtrar([x], "vencem")
+
+
+def test_o_passo_posto_no_banco_por_outra_pessoa_nao_vale(app, cena):
+    did = _abrir_pela_api(app, cena)
+    banco = cena["banco"]
+    with app.test_request_context():
+        D.registrar(did, "respondeu", "Ligado.", JU)
+        evs = banco.linhas(D.LIVRO, D.ABA_EVENTO)
+        falso = dict(evs[0], id="e00000000999", evento="concluiu", pessoa_hmac=_h(BRUNO["email"]))
+        _aba_extra = [{k: falso.get(k) for k in D.CAB_EVENTO}]
+        D._publicar(dict(D._ler_abas(), **{D.ABA_EVENTO: evs + _aba_extra}))
+        d = next(x for x in D.lista() if x["demanda_id"] == did)
+    assert d["estado"]["situacao"] == "finalizada"                       # o "concluiu" do Bruno não é de quem pediu
+
+
+def test_a_gravacao_que_entrou_e_respondeu_com_erro_fica_com_os_anexos(app, cena, monkeypatch):
+    original = D._publicar
+
+    def grava_e_falha(t):
+        original(t)
+        raise TimeoutError("a resposta não veio")
+    monkeypatch.setattr(D, "_publicar", grava_e_falha)
+    with app.test_request_context():
+        d = D.abrir(_form(cena), [("laudo.pdf", io.BytesIO(PDF))], ANA)
+        monkeypatch.setattr(D, "_publicar", original)
+        D.limpar()
+        assert D.arquivo(d["demanda_id"], 1)[0].read_bytes() == PDF
+    assert len(cena["banco"].linhas(D.LIVRO, D.ABA_DEMANDA)) == 1
+
+
+def test_a_leitura_de_antes_da_gravacao_nao_fica_na_copia(app, cena, monkeypatch):
+    original = D._ler_abas
+
+    def lenta():
+        t = original()
+        D.limpar()                                                        # uma gravação terminou no meio da leitura
+        return t
+    monkeypatch.setattr(D, "_ler_abas", lenta)
+    with app.test_request_context():
+        D.limpar()
+        assert D.ler()["temas"] and "livro" not in D._CACHE
+
+
+def test_o_tema_novo_no_duplo_clique_e_um_so(app, cena):
+    c = _cliente(app, JU)
+    html = c.get("/t/comando/temas-do-setor").get_data(as_text=True)
+    novo = html.split('name="novo_id" value="', 1)[1].split('"', 1)[0]
+    dados = {"codigo": _codigo(html), "setor_id": "1", "nome": "Relatório do cliente", "prazo": "3", "novo_id": novo}
+    c.post("/t/comando/temas-do-setor/salvar", data=dados)
+    c.post("/t/comando/temas-do-setor/salvar", data=dados)
+    with app.test_request_context():
+        assert [t["nome"] for t in D.temas(1)].count("Relatório do cliente") == 1
+
+
+def test_o_envio_grande_demais_volta_com_o_aviso_e_a_caixa_nao_le_o_fracttal(app, cena, monkeypatch):
+    c = _cliente(app, ANA)
+    lidas = []
+    original = FP.ler_pessoal
+    monkeypatch.setattr(FP, "ler_pessoal", lambda forcar=False, ler=None: lidas.append(1) or original())
+    html = c.get(CAIXA + "?d=x%22%5D").get_data(as_text=True)          # o ?d= mexido não entra na tela
+    assert lidas == [] and 'data-sel=""' in html
+    r = c.post(CAIXA + "/demandas/nova", data=dict(_form(cena), codigo=_codigo(html),
+                                                  anexos=(io.BytesIO(PDF + b"x" * (17 * 1024 * 1024)), "a.pdf")))
+    assert r.status_code == 303
+    assert "passam de 15 MB juntos" in c.get(CAIXA).get_data(as_text=True)
+    assert not cena["banco"].linhas(D.LIVRO, D.ABA_DEMANDA)

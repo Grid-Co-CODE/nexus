@@ -8,7 +8,7 @@
   <div class="dm-cab">
     <h2 class="dm-titulo" id="dm-titulo">Demandas entre setores</h2>
     {% if not dem.falta %}
-    <button class="gc-btn gc-btn--ui gc-btn--primario" type="button" data-dm-nova{% if not dem.tem_login or not dem.pessoas %} disabled aria-describedby="dm-nova-por-que"{% endif %}>
+    <button class="gc-btn gc-btn--ui gc-btn--primario" type="button" data-dm-nova{% if not dem.tem_login %} disabled aria-describedby="dm-nova-por-que"{% endif %}>
       <i class="ph ph-plus" aria-hidden="true"></i> Nova demanda</button>
     {% endif %}
   </div>
@@ -16,8 +16,7 @@
   <div class="cn-erro cn-aviso" role="status">As demandas precisam das chaves do Nexus ({{ dem.falta|join(', ') }}): sem elas o texto não vai cifrado e nada grava.</div>
   {% else %}
   {% if dem.erro %}<div class="cn-erro" role="alert"><b>Não li as demandas agora ({{ dem.erro }}).</b> A lista pode estar incompleta.</div>{% endif %}
-  {% if not dem.tem_login %}<p class="dm-nota" id="dm-nova-por-que">Para abrir e responder demandas, entre com o seu login (Microsoft ou Fracttal): a senha de administrador não diz quem é a pessoa.</p>
-  {% elif not dem.pessoas %}<p class="dm-nota" id="dm-nova-por-que">Ainda não há pessoas com setor no Nexus para receber demandas (Base → Acessos → Pessoas e setores).</p>{% endif %}
+  {% if not dem.tem_login %}<p class="dm-nota" id="dm-nova-por-que">Para abrir e responder demandas, entre com o seu login (Microsoft ou Fracttal): a senha de administrador não diz quem é a pessoa.</p>{% endif %}
 
   <div class="dm-abas" role="tablist" aria-label="Demandas">
     {% for aba, rot in dem.abas %}
@@ -123,7 +122,7 @@
             <button class="gc-btn gc-btn--ui gc-btn--contorno" type="submit" name="acao" value="em_analise"><i class="ph ph-hourglass" aria-hidden="true"></i> Colocar em análise</button>
           </form>
           {% endif %}
-          <p class="dm-nota">Pedir informação para o prazo até {{ d.de_nome or 'quem pediu' }} responder. Vencida, avisa você e todo o {{ d.para_setor_nome or 'setor' }}.</p>
+          <p class="dm-nota">Pedir informação pausa o prazo até {{ d.de_nome or 'quem pediu' }} responder. Vencida, avisa você e todo o {{ d.para_setor_nome or 'setor' }}.</p>
         </div>
         {% elif d.eu_pedi and sit == 'aguardando' %}
         <div class="dm-acoes">
@@ -162,23 +161,24 @@
   {% endif %}
 </section>
 
-{% if not dem.falta and dem.tem_login and dem.pessoas %}
-<dialog class="dm-dialogo" id="dm-nova" aria-labelledby="dm-nova-t">
+{% if not dem.falta and dem.tem_login %}
+{# a lista de quem recebe vem ao abrir a Nova demanda (GET .../demandas/pessoas): os nomes são do pessoal do Fracttal,
+   e a Caixa não lê o Fracttal ao abrir (a cota é da empresa, e a tela que lê o Fracttal sai da pré-carga) #}
+<dialog class="dm-dialogo" id="dm-nova" aria-labelledby="dm-nova-t" data-pessoas-url="{{ '/t/comando/caixa-de-entrada/demandas/pessoas'|na_raiz }}">
   <form method="post" action="{{ '/t/comando/caixa-de-entrada/demandas/nova'|na_raiz }}" enctype="multipart/form-data" data-dm-form-nova>
     <input type="hidden" name="codigo" value="{{ codigo }}"><input type="hidden" name="novo_id" value="{{ dem.novo_id }}">
     <p class="gc-eyebrow">Comando</p>
     <h2 class="dm-dialogo-t" id="dm-nova-t">Nova demanda</h2>
     <p class="dm-nota">Para pedir algo a outro setor sem abrir uma OS.</p>
+    <p class="dm-nota dm-nota--erro" role="alert" data-dm-f-pessoas-erro hidden></p>
     <div class="dm-dupla">
       <div class="dm-campo"><label class="gc-rotulo" for="dm-f-setor">Setor</label>
         <select class="gc-campo" id="dm-f-setor" name="para_setor_id" required data-dm-f-setor>
-          <option value="">Escolha o setor</option>
-          {% for sid, nome in dem.setores %}<option value="{{ sid }}">{{ nome }}</option>{% endfor %}
+          <option value="">Carregando os setores…</option>
         </select></div>
       <div class="dm-campo"><label class="gc-rotulo" for="dm-f-pessoa">Para quem</label>
         <select class="gc-campo" id="dm-f-pessoa" name="para_hmac" required data-dm-f-pessoa>
-          <option value="">Escolha a pessoa</option>
-          {% for p in dem.pessoas %}<option value="{{ p.hmac }}" data-setor="{{ p.setor_id }}">{{ p.nome }} · {{ p.setor_nome }}</option>{% endfor %}
+          <option value="">Escolha o setor primeiro</option>
         </select></div>
     </div>
     <div class="dm-campo"><label class="gc-rotulo" for="dm-f-tema">Tema</label>

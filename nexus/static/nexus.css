@@ -356,7 +356,8 @@ a{color:inherit}
 .sug-responder .gc-campo{width:100%;box-sizing:border-box;resize:vertical;font-family:var(--font-sans)}
 .sug-responder .gc-btn{justify-self:start}
 @media (max-width:820px){.sug-recebidas{grid-template-columns:minmax(0,1fr)}
-  .sug-setores{position:static;flex-direction:row;flex-wrap:wrap}}
+  .sug-setores{position:static;flex-direction:row;flex-wrap:wrap}
+}
 
 /* Tipografia da casca */
 .titulo-pagina{font:800 30px/36px var(--font-display);letter-spacing:-.01em;margin:6px 0 10px}

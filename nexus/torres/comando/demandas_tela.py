@@ -9,6 +9,7 @@ Fica num módulo à parte, importado no fim do `__init__` da torre (como as Ocor
 from datetime import datetime, timedelta, timezone
 
 from flask import abort, current_app, jsonify, redirect, render_template, request, send_file, session
+from werkzeug.exceptions import RequestEntityTooLarge
 
 from ...comando import demandas as D
 from ...comando import demandas_regras as R
@@ -84,8 +85,8 @@ def contexto() -> dict:
     admin = bool(session.get("admin"))
     hoje = _hoje()
     out = {"abas": ABAS, "filtros": D.FILTROS, "aba": request.args.get("dem") or "para",
-           "sel": request.args.get("d") or "", "falta": falta, "tem_login": bool(meu), "erro": "", "meu": meu,
-           "listas": {}, "contas": {}, "itens": {}, "pessoas": [], "setores": [], "temas": [], "usinas": [],
+           "sel": (request.args.get("d") or "") if D.ID_DEMANDA.fullmatch(request.args.get("d") or "") else "", "falta": falta, "tem_login": bool(meu), "erro": "", "meu": meu,
+           "listas": {}, "contas": {}, "itens": {}, "temas": [], "usinas": [],
            "novo_id": D.novo_id("d"), "novo_evento": lambda: D.novo_id("e"), "setor_id": (setor or {}).get("id"),
            "setor_nome": (setor or {}).get("nome") or "", "admin": admin, "dia_txt": dia_txt,
            "sozinha_dias": R.CONCLUI_SOZINHA_DIAS,
@@ -118,11 +119,6 @@ def contexto() -> dict:
                                    key=lambda p: p[1].lower())
     out["filtro_temas"] = sorted({(d["tema_id"], d["tema_nome"]) for d in no_setor if d["tema_nome"]},
                                  key=lambda t: t[1].lower())
-    try:
-        out["pessoas"] = [p for p in D.pessoas_com_setor() if p["hmac"] != meu]
-    except Exception:            # noqa: BLE001 — sem a lista, o formulário diz e não abre
-        current_app.logger.exception("demandas: a lista de pessoas não abriu")
-    out["setores"] = sorted({(p["setor_id"], p["setor_nome"]) for p in out["pessoas"]}, key=lambda s: s[1].lower())
     out["temas"] = [dict(t, ate=dia_txt(R.somar_dias_uteis(hoje, t["prazo_dias_uteis"]))) for t in D.temas()]
     try:
         from ...campo import visao
@@ -148,17 +144,25 @@ def demanda_nova():
     """`POST` da Nova demanda (multipart, com os anexos). O tamanho é conferido antes de ler o corpo, como as Sugestões."""
     from ...casca import sugestoes as SUG
     destino = _volta("pedi")
-    venceu = _form_venceu(destino)
-    if venceu:
-        return venceu
+    # o tamanho ANTES de ler o corpo (o `_form_venceu` lê o formulário): o pedido maior que o teto não chega a ocupar a
+    # memória nem o disco, e o sem tamanho declarado para no teto (a regra das Sugestões; revisão de 12/11/2026)
     teto = SUG.MAX_MB_TOTAL * SUG.MB + SUG.MB
+    grande = ("erro", f"Os anexos passam de {SUG.MAX_MB_TOTAL} MB juntos. Nada foi enviado.")
     if (request.content_length or 0) > teto:
-        session[_AVISO] = ("erro", f"Os anexos passam de {SUG.MAX_MB_TOTAL} MB juntos. Nada foi enviado.")
+        session[_AVISO] = grande
         return redirect(destino, code=303)
-    form = {k: request.form.get(k, "") for k in ("para_hmac", "para_setor_id", "tema_id", "titulo", "descricao", "os",
-                                                 "novo_id")}
-    form["usinas"] = request.form.getlist("usinas")
-    arquivos = [(f.filename, f.stream) for f in request.files.getlist("anexos")]
+    request.max_content_length = teto
+    try:
+        venceu = _form_venceu(destino)
+        if venceu:
+            return venceu
+        form = {k: request.form.get(k, "") for k in ("para_hmac", "para_setor_id", "tema_id", "titulo", "descricao",
+                                                     "os", "novo_id")}
+        form["usinas"] = request.form.getlist("usinas")
+        arquivos = [(f.filename, f.stream) for f in request.files.getlist("anexos")]
+    except RequestEntityTooLarge:
+        session[_AVISO] = grande
+        return redirect(destino, code=303)
     try:
         d = D.abrir(form, arquivos, _usuario())
         session[_AVISO] = ("ok", "Demanda enviada. Ela aparece em \"Que eu pedi\", e quem recebeu é avisado no sininho.")
@@ -216,6 +220,19 @@ def demanda_anexo(demanda_id, n):
                      download_name=a.get("nome") or caminho.name)
 
 
+@bp.route("/caixa-de-entrada/demandas/pessoas")
+def demanda_pessoas():
+    """Quem pode receber (as pessoas com setor, menos quem pede): [{hmac, nome, setor_id, setor_nome}] para a Nova demanda.
+    Vem ao abrir o formulário, e não com a Caixa: os nomes são do pessoal do Fracttal (cópia de 1 hora)."""
+    meu = _meu_hmac()
+    try:
+        ps = [p for p in D.pessoas_com_setor() if p["hmac"] != meu]
+    except Exception:            # noqa: BLE001 — o formulário diz que não leu
+        current_app.logger.exception("demandas: a lista de pessoas não abriu")
+        return jsonify(ok=False, pessoas=[])
+    return jsonify(ok=True, pessoas=ps)
+
+
 @bp.route("/caixa-de-entrada/demandas/os")
 def demanda_os():
     """As OS das usinas escolhidas no formulário (`?usinas=1,2`): [{os, rotulo}] para o campo da OS."""
@@ -253,7 +270,7 @@ def temas_do_setor():
     return render_template("comando/temas_setor.html", torre=TORRE, tela=TORRE.tela("temas-do-setor"), temas=temas,
                            setor_id=sid, setor_nome=nome, setores=ativos, admin=bool(session.get("admin")),
                            falta=falta, codigo=_codigo(), tem_login=bool(_meu_hmac()), aviso=session.pop(_AVISO, None),
-                           prazo_min=D.PRAZO_MIN, prazo_max=D.PRAZO_MAX)
+                           prazo_min=D.PRAZO_MIN, prazo_max=D.PRAZO_MAX, novo_tema=D.novo_id("m"))
 
 
 @bp.route("/temas-do-setor/salvar", methods=["POST"])
@@ -268,7 +285,8 @@ def temas_do_setor_salvar():
         abort(403)
     try:
         D.salvar_tema(sid, request.form.get("nome"), request.form.get("prazo"), _usuario(),
-                      tema_id=request.form.get("tema_id") or None, ativo=request.form.get("ativo") != "nao")
+                      tema_id=request.form.get("tema_id") or None, ativo=request.form.get("ativo") != "nao",
+                      novo=request.form.get("novo_id"))
         session[_AVISO] = ("ok", "Tema salvo.")
     except D.Recusada as ex:
         session[_AVISO] = ("erro", f"{ex}. Nada foi gravado.")

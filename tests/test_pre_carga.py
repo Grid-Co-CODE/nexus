@@ -20,7 +20,8 @@ TELAS = ["cos/mesa", "cos/ocorrencias", "pcm/quadro", "campo/aprovacao", "campo/
 # a Ana é da Performance: além das marcadas, a Central de emissão, que os relatórios DO setor dela trazem (Tela.do_setor,
 # 13/10/2026); os relatórios são molduras da plataforma e não entram na pré-carga
 QUENTES = {"cos/mesa", "cos/ocorrencias", "pcm/quadro", "campo/rondas", "relatorios/central",
-           "comando/caixa-de-entrada"}   # a Caixa é de todo setor (03/11/2026)
+           "comando/caixa-de-entrada",   # a Caixa é de todo setor (03/11/2026)
+           "comando/temas-do-setor"}     # e os Temas do setor das demandas (12/11/2026)
 
 
 @pytest.fixture
@@ -51,11 +52,11 @@ def test_o_primeiro_clique_de_quem_tem_setor_aquece_as_telas_dele(ligada):
     e = _estado(ligada)
     assert set(e["aquecida_em"]) == QUENTES
     assert all(status == 200 for status, _ in e["ultimo"].values())
-    assert e["ultima_volta"]["telas"] == 6 and not e["ultima_volta"]["erros"] and not e["trabalhando"]
+    assert e["ultima_volta"]["telas"] == 7 and not e["ultima_volta"]["erros"] and not e["trabalhando"]
     # a 1ª tela de cada torre primeiro (onde o cartão do Início leva), depois o resto na ordem do menu (a Usinas 360°,
     # id `campo`, logo abaixo de Comando desde 05/11/2026)
     assert list(e["ultimo"]) == ["comando/caixa-de-entrada", "campo/rondas", "cos/mesa", "pcm/quadro",
-                                 "relatorios/central", "cos/ocorrencias"]
+                                 "relatorios/central", "comando/temas-do-setor", "cos/ocorrencias"]
 
 
 def test_uma_vez_por_minuto_e_so_o_que_esfriou(ligada):
@@ -144,5 +145,5 @@ def test_a_volta_fica_no_resumo_e_saiu_de_acessos(ligada, logado):
     assert PC.resumo(ligada)["volta"] is None
     _como(ligada, ANA).get("/")
     v = PC.resumo(ligada)["volta"]
-    assert v and v["telas"] == 6 and not v["erros"]
+    assert v and v["telas"] == 7 and not v["erros"]
     assert "Pré-carga" not in logado.get(URL).get_data(as_text=True)
