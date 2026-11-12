@@ -297,6 +297,9 @@ details.cad-dif summary{cursor:pointer;padding:9px 12px;color:var(--tinta-2);fon
 .lig-buracos .lig-linha .gc-btn{flex:none}
 .lig-buracos .lig-form:not(.lig-linha){display:block}
 .lig-buracos .lig-sug{margin:0 0 4px}
+/* o "por quê" que diz o que fazer, e embaixo o motivo do de-para (12/11/2026) */
+.lig-buracos .lig-porque{display:block;color:var(--tinta)}
+.lig-buracos .lig-motivo{display:block;margin-top:3px;font-size:11.5px;color:var(--mudo)}
 
 /* Base → Acessos (11/10/2026): os administradores do Nexus pela tela. O desenho é o do Cadastro; aqui só o encaixe da
    tabela dentro da seção (sem borda dupla), o formulário no alto da seção e a etiqueta "do servidor" no azul de

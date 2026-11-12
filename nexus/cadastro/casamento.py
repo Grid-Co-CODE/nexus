@@ -21,6 +21,7 @@ O que sobra com mais de um candidato NÃO casa: ligação errada é pior que lig
 import re
 import unicodedata
 from difflib import SequenceMatcher
+from functools import lru_cache
 
 ROMANOS = {"i": 1, "ii": 2, "iii": 3, "iv": 4, "v": 5, "vi": 6, "vii": 7, "viii": 8, "ix": 9, "x": 10, "xi": 11, "xii": 12}
 UF = {"acre": "AC", "alagoas": "AL", "amapa": "AP", "amazonas": "AM", "bahia": "BA", "ceara": "CE", "distrito federal": "DF",
@@ -157,3 +158,59 @@ def _pela_potencia(item, candidatas, aceita_sem_potencia=False):
     if len(candidatas) > 1 and abs(sum(pots) - p) <= TOLERANCIA * p:
         return [c["id"] for c in candidatas], "nome + potência (soma)"
     return None
+
+
+# ── a contenção de palavras: as sugestões da tela Ligações (12/11/2026) ────────────────────────────────────────────
+# Levi, 12/11/2026: "tem muita coisa que dá para vir sugerido do Nexus e não está vindo". O caso real, aqui com nomes
+# inventados: a chave "Cliente - Pinhal 1 - UF" do Fracttal (e o projeto "Pinhal I" da FAMA) é a "São Brás do Pinhal 1"
+# do cadastro, e a parecença de letras (o corte de 0,78 da `ligacoes.sugestoes`) não chegava lá. Aqui só se SUGERE: o
+# `casar` acima, o casamento automático, não usa nada disto (ligação errada é pior que faltando).
+# As palavras que não fazem uma usina ser outra (a lista curta; as preposições já saem nas `palavras`, e "e"/"a" são o
+# "1 e 2" e o "1 a 4")
+GENERICAS_SUGESTAO = frozenset({"usina", "ufv", "solar", "cliente", "de", "do", "da", "dos", "das", "e", "a"})
+MESMO, OUTRO_NUMERO = "mesmo", "outro número"
+# a nota da usina achada pela contenção (as duas fontes de sugestão: `ligacoes.sugestoes` e `ligacao_fama.sugestoes`)
+NOTA_CONTIDA_UNICA = 100        # a ÚNICA usina do cliente que contém as palavras com o mesmo número
+NOTA_CONTIDA_SEM_CLIENTE = 90   # a única, mas a chave não diz o cliente: a trava do cliente não se confere
+NOTA_CONTIDA_VARIAS = 80        # duas ou mais: nenhuma com certeza
+TETO_COM_DUVIDA = 95            # com duas ou mais contidas, nenhuma sugestão chega a 100 (o lote não as liga)
+
+
+def termos(texto) -> tuple[frozenset, frozenset]:
+    """(palavras, números) que contam na contenção: as `palavras` (sem acento e sem caixa, o romano em arábico) sem as
+    genéricas. "UFV Pinhal II" -> ({"pinhal"}, {"2"})."""
+    ws = [w for w in palavras(texto) if w not in GENERICAS_SUGESTAO]
+    return frozenset(w for w in ws if not w.isdigit()), frozenset(w for w in ws if w.isdigit())
+
+
+def _contidas(a: frozenset, b: frozenset) -> bool:
+    """Todas as palavras de um lado estão no outro, e o lado menor tem uma palavra forte: "Nova", "Santa" ou "Rio"
+    sozinha (as `_GENERICAS` da regra 4) está em meio cadastro e não diz usina nenhuma."""
+    if not a or not b or not (a <= b or b <= a):
+        return False
+    menor = a if len(a) <= len(b) else b
+    return any(len(w) > 2 and w not in _GENERICAS for w in menor)
+
+
+@lru_cache(maxsize=8192)
+def _termos_da_usina(nome: str) -> tuple:
+    """Os `termos` de cada variante do nome do cadastro (só as numeradas, se houver). Guardado por nome: a seção das
+    Ligações compara cada buraco com o cadastro inteiro a cada visita."""
+    vs = variantes(nome)
+    numeradas = [v for v in vs if any(p.isdigit() for p in v.split())]
+    return tuple(termos(v) for v in sorted(numeradas or vs))
+
+
+def contencao(termos_da_chave, nome_da_usina) -> str | None:
+    """`MESMO`: as palavras significativas de um lado estão todas no outro (o nome do cadastro com palavras a mais, ou a
+    menos) e os números são os mesmos, ou nenhum lado tem número; `OUTRO_NUMERO`: as palavras batem e o número não
+    ("Quimera 2" contra "Nova Quimera 1"); None: as palavras não batem. Vale cada `variantes` do nome do cadastro ("1 e 2"
+    responde pelo 2); a usina com número não responde pelo nome sem número."""
+    ws, ns = termos_da_chave
+    outro = False
+    for uw, un in _termos_da_usina(str(nome_da_usina or "")):
+        if _contidas(ws, uw):
+            if un == ns:
+                return MESMO
+            outro = True
+    return OUTRO_NUMERO if outro else None

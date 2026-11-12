@@ -557,30 +557,64 @@ def _sem_cliente_e_uf(nome, cliente) -> str:
     return re.sub(r"\s*-\s*[A-Z]{2}\s*$", "", s).strip()
 
 
-def sugestoes(item: dict, usinas: list[dict], n: int = 3) -> list[dict]:
-    """As usinas do cadastro mais parecidas com uma chave sem par: código (letras do "AAA999"), nome, cliente e cidade.
-    Só sugere; quem liga é a pessoa."""
-    cod = B.sufixo_codigo(item.get("codigo") or (item.get("chave") if re.fullmatch(r"[A-Z0-9-]+", str(item.get("chave"))) else ""))
+def mesmo_cliente(a, b) -> bool:
+    """O mesmo cliente: o nome igual (sem acento, caixa e pontuação) ou um nome é o começo do outro, palavra por palavra.
+    O Fracttal escreve o cliente mais curto que o cadastro ("Aurora" para a "Aurora Energia", nomes inventados; o caso
+    real de 12/11/2026: por isso as chaves "<Cliente> - X 1 - UF" desse cliente nunca tinham sugestão). Começo de palavra
+    não vale: "Aurorax" não é a "Aurora Energia"."""
+    x, y = B.norm(a).split(), B.norm(b).split()
+    n = min(len(x), len(y))
+    return bool(n) and x[:n] == y[:n]
+
+
+def _nome_e_cliente(item: dict) -> tuple:
     nome, cliente = item.get("nome") or (item.get("nomes") or [item.get("chave")])[0], item.get("cliente")
     m = re.fullmatch(r"\s*(.+?)\s+-\s+(.+?)(?:\s+-\s+[A-Z]{2})?\s*", str(nome or ""))
     if not cliente and m:                   # Fracttal: "Athon - Matões 1 - MA" traz o cliente no próprio nome
         cliente, nome = m.group(1), m.group(2)
-    nome_item = " ".join(K.palavras(_sem_cliente_e_uf(nome, cliente)))
+    return nome, cliente
+
+
+def _trava(item: dict, u: dict, primeiro: str | None) -> str | None:
+    """As mesmas travas do casamento automático (achadas na tela real, 04/10/2026), que valem para toda sugestão: o que
+    impede a usina `u` de ser a chave, ou None."""
+    nums_u = {w for v in K.variantes(u["nome"]) for w in v.split() if w.isdigit()}
+    if primeiro and nums_u and primeiro not in nums_u:
+        return "o número"                   # "Marajoara 2" (e "Marajoara 2 1") não é a "Marajoara 1"
+    if item.get("cidade") and K.mesma_cidade(item["cidade"], u["cidade"]) is False:
+        return "a cidade"                   # "Ouro Branco I" de Bandeirantes/PR não é a "Ouro Branco" de AL
+    mwp = item.get("mwp")
+    if mwp and u.get("mwp") and abs(u["mwp"] - mwp) > 0.4 * max(u["mwp"], mwp):
+        return "a potência"                 # "AP. do Taboado" (0,41 MWp) não é a "Aparecida do Taboado 1 e 2" (2,58)
+    return None
+
+
+def sugestoes(item: dict, usinas: list[dict], n: int = 3) -> list[dict]:
+    """As usinas do cadastro mais parecidas com uma chave sem par: código (letras do "AAA999"), nome, cliente e cidade.
+    Só sugere; quem liga é a pessoa.
+
+    A contenção de palavras (12/11/2026, `casamento.contencao`): a usina cujo nome contém todas as palavras da chave, ou
+    cabe nela, com o mesmo número, vem a 100 se for a ÚNICA do cliente assim; duas ou mais, ou a chave sem o cliente, vêm
+    abaixo de 100 (`casamento.NOTA_CONTIDA_*`). O que só a parecença de letras acha segue como antes, e as travas valem
+    para as duas."""
+    cod = B.sufixo_codigo(item.get("codigo") or (item.get("chave") if re.fullmatch(r"[A-Z0-9-]+", str(item.get("chave"))) else ""))
+    nome, cliente = _nome_e_cliente(item)
+    texto = _sem_cliente_e_uf(nome, cliente)
+    nome_item = " ".join(K.palavras(texto))
+    termos = K.termos(texto)
     cli = B.norm(cliente or "")
     primeiro = next((w for w in nome_item.split() if w.isdigit()), None)
-    mwp = item.get("mwp")
+    # E1 não é Thopen (Levi, 04/10): nem como sugestão; o mesmo cliente com o nome mais curto, sim (`mesmo_cliente`)
+    do_cliente = [u for u in usinas if not cli or mesmo_cliente(u["cliente"], cliente)]
+    # "a ÚNICA do cliente que contém as palavras com o mesmo número" conta antes das travas de cidade e de potência: a
+    # outra candidata vetada pela cidade ainda é dúvida
+    contidas = {u["id"] for u in do_cliente if K.contencao(termos, u["nome"]) == K.MESMO}
+    nota_contida = (K.NOTA_CONTIDA_VARIAS if len(contidas) > 1 else
+                    K.NOTA_CONTIDA_UNICA if cli else K.NOTA_CONTIDA_SEM_CLIENTE)
     out = []
-    for u in usinas:
-        if cli and B.norm(u["cliente"]) != cli:
-            continue                        # E1 não é Thopen (Levi, 04/10): nem como sugestão
-        nums_u = {w for v in K.variantes(u["nome"]) for w in v.split() if w.isdigit()}
-        # As mesmas travas do casamento automático (achadas na tela real, 04/10):
-        if primeiro and nums_u and primeiro not in nums_u:
-            continue                        # número diferente: "Marajoara 2" (e "Marajoara 2 1") não é a "Marajoara 1"
-        if item.get("cidade") and K.mesma_cidade(item["cidade"], u["cidade"]) is False:
-            continue                        # "Ouro Branco I" de Bandeirantes/PR não é a "Ouro Branco" de AL
-        if mwp and u.get("mwp") and abs(u["mwp"] - mwp) > 0.4 * max(u["mwp"], mwp):
-            continue                        # "AP. do Taboado" (0,41 MWp) não é a "Aparecida do Taboado 1 e 2" (2,58)
+    for u in do_cliente:
+        if _trava(item, u, primeiro):
+            continue
         nota = 0.0
         cu = B.sufixo_codigo(u["codigo"])
         if cod and cu and cod == cu:
@@ -593,9 +627,57 @@ def sugestoes(item: dict, usinas: list[dict], n: int = 3) -> list[dict]:
             nota += 0.15
         if item.get("cidade") and K.mesma_cidade(item["cidade"], u["cidade"]):
             nota += 0.15
-        if nota >= 0.5:
-            out.append({"id": u["id"], "titulo": u["titulo"], "codigo": u["codigo"], "nota": round(min(nota, 1) * 100)})
+        nota = round(min(nota, 1) * 100)
+        if u["id"] in contidas:
+            nota = max(nota, nota_contida)
+        if len(contidas) > 1:
+            nota = min(nota, K.TETO_COM_DUVIDA)
+        if nota >= 50:
+            out.append({"id": u["id"], "titulo": u["titulo"], "codigo": u["codigo"], "nota": nota})
     return sorted(out, key=lambda x: -x["nota"])[:n]
+
+
+def _numero(ns) -> str:
+    return " e ".join(sorted(ns, key=int))
+
+
+def porque(termos, cliente, candidatas: list[dict], sem_cliente: bool = False, vetadas=()) -> str:
+    """O "por quê" do buraco sem sugestão (12/11/2026), no lugar do "sem par no cadastro", que não dizia o que fazer.
+    `termos` = `casamento.termos` da chave; `candidatas` = as usinas que a chave poderia ser (as do cliente dela, ou
+    todas); `sem_cliente`: o cliente da chave não está no cadastro; `vetadas` = [(usina, trava)]: as de nome contido e o
+    mesmo número que uma trava tirou (a cidade ou a potência da base não batem com as do cadastro).
+    Ordem: o cliente, a vetada (ela é a provável: "o cadastro tem a X 2, não a 1" estaria errado com a X 1 lá), o
+    número, e o nada parecido."""
+    def nome(u):
+        return f"a {u['nome'] if cliente else u['titulo']}"
+    if sem_cliente:
+        return f"o cadastro não tem o cliente {cliente}: confira o nome do cliente ou crie no Registro mestre"
+    if vetadas:
+        u, trava = vetadas[0]
+        return f"o cadastro tem {nome(u)}, mas {trava} da base não bate com a do cadastro: confira antes de ligar à mão"
+    outras = [u for u in candidatas if K.contencao(termos, u["nome"]) == K.OUTRO_NUMERO]
+    if outras:
+        tem = " e ".join(nome(u) for u in outras[:3])
+        if not termos[1]:
+            return f"o cadastro tem {tem}, com número, e a chave não diz qual: confira ou crie no Registro mestre"
+        if not any(K.termos(u["nome"])[1] for u in outras):
+            return f"o cadastro tem {tem}, sem número: confira se é a mesma usina antes de ligar à mão"
+        return f"o cadastro tem {tem}, não a {_numero(termos[1])}: crie no Registro mestre"
+    if cliente:
+        return "o cadastro não tem usina parecida deste cliente: crie no Registro mestre"
+    return "o cadastro não tem usina parecida: crie no Registro mestre"
+
+
+def porque_sem_sugestao(item: dict, usinas: list[dict]) -> str:
+    """O `porque` de uma chave das bases de sempre (a mesma leitura do nome, do cliente e das travas da `sugestoes`)."""
+    nome, cliente = _nome_e_cliente(item)
+    texto = _sem_cliente_e_uf(nome, cliente)
+    termos = K.termos(texto)
+    primeiro = next((w for w in K.palavras(texto) if w.isdigit()), None)
+    cli = cliente if B.norm(cliente or "") else None
+    do_cliente = [u for u in usinas if not cli or mesmo_cliente(u["cliente"], cli)]
+    vetadas = [(u, t) for u in do_cliente if K.contencao(termos, u["nome"]) == K.MESMO and (t := _trava(item, u, primeiro))]
+    return porque(termos, cli, do_cliente, sem_cliente=bool(cli) and not do_cliente, vetadas=vetadas)
 
 
 def _por_nome(como: str) -> bool:
@@ -636,6 +718,25 @@ def sugestoes_de_100(buracos: list[dict], sistema: str) -> dict:
     return {"ligar": ligar, "pulos": pulos}
 
 
+def _ja_ligada(sug: list[dict], ja_ligada: dict, sistema: str, chave: str, itens: dict) -> str | None:
+    """A sugestão cuja usina já liga a OUTRA chave da mesma base cai abaixo de 100 (o lote não a liga: duas chaves de
+    uma base na mesma usina é engano de uma delas, ou a mesma usina com dois nomes, e quem sabe é a pessoa) e o "por quê"
+    diz qual. Muda as notas de `sug` no lugar; devolve o texto da 1ª, ou None."""
+    texto = None
+    for s in sug:
+        outras = [(c, como) for c, como in ja_ligada.get((sistema, s["id"]), ()) if c != chave]
+        if not outras:
+            continue
+        s["nota"] = min(s["nota"], K.TETO_COM_DUVIDA)
+        if texto is None:
+            c, como = outras[0]
+            nome = itens.get((sistema, c), {}).get("rotulo") or c
+            por = "por nome " if _por_nome(como) else ""
+            texto = f"a {s['titulo']} já está ligada {por}a outra chave desta base ({nome}): confira antes de ligar"
+    sug.sort(key=lambda x: -x["nota"])
+    return texto
+
+
 def panorama(srv, atual: dict | None, regras: dict) -> dict:
     """Os números por base e as quatro listas da tela."""
     usinas = _usinas(srv)
@@ -647,6 +748,10 @@ def panorama(srv, atual: dict | None, regras: dict) -> dict:
     est = defaultdict(lambda: {"ligadas": set(), "buracos": set(), "ignoradas": set(), "usinas": set()})
     buracos, por_nome = [], []
     fama = {}                               # o índice da proposta da FAMA, montado uma vez (só se houver buraco dela)
+    ja_ligada = defaultdict(list)           # (sistema, usina_id) -> [(chave, como)]: as chaves que já ligam a usina
+    for uid, sistema, chave, como in atual["linhas"]:
+        if uid is not None and not como.startswith("ignorado"):
+            ja_ligada[(sistema, uid)].append((str(chave), como))
     for uid, sistema, chave, como in atual["linhas"]:
         e, chave = est[sistema], str(chave)
         if como.startswith("ignorado"):
@@ -658,12 +763,18 @@ def panorama(srv, atual: dict | None, regras: dict) -> dict:
                 if not fama:
                     fama["idx"] = _indice_fama(usinas, atual["linhas"])
                 sug = ligacao_fama.sugestoes(it, fama["idx"], por_id)
+                razao = None if sug else porque(K.termos(ligacao_fama.nome_fama(it.get("nome"))), None, usinas)
             else:
                 sug = sugestoes(it, usinas)
+                razao = None if sug else porque_sem_sugestao(it, usinas)
+            if razao and not (como.startswith(B.SEM_PAR) or como == B.A_DECIDIR):
+                razao = None                # o motivo do de-para já é o porquê (conflito, desligado à mão, ...)
+            if sug:
+                razao = _ja_ligada(sug, ja_ligada, sistema, chave, itens)
             # `rotulo` e `os`: o que a seção mostra no lugar da chave quando ela é um id (o projeto da FAMA)
-            buracos.append({"sistema": sistema, "chave": chave, "motivo": como, "tarefas": it.get("tarefas"),
-                            "nome": it.get("nome"), "cidade": it.get("cidade"), "rotulo": it.get("rotulo"),
-                            "os": it.get("os"), "sugestoes": sug})
+            buracos.append({"sistema": sistema, "chave": chave, "motivo": como, "porque": razao,
+                            "tarefas": it.get("tarefas"), "nome": it.get("nome"), "cidade": it.get("cidade"),
+                            "rotulo": it.get("rotulo"), "os": it.get("os"), "sugestoes": sug})
         else:
             e["ligadas"].add(chave)
             e["usinas"].add(uid)

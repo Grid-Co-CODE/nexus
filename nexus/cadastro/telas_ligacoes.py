@@ -54,7 +54,7 @@ def contexto(srv, cfg, args) -> dict:
     lote = L.sugestoes_de_100(p["buracos"], sistema) if sistema else {"ligar": []}
     return dict(p=p, aba=aba, n_sugestoes_100=len(lote["ligar"]), abas=ABAS, sistema=sistema, buracos=filtra(p["buracos"]), por_nome=filtra(p["por_nome"]),
                 fora=fora, contagem=contagem, gerado_em=_hora(p["gerado_em"]), hora=_hora, ok=args.get("ok"),
-                erro=args.get("erro"), pode_publicar=bool(cfg.get("GRIDCO_SQL_TOKEN")))
+                erro=args.get("erro"), pode_publicar=bool(cfg.get("GRIDCO_SQL_TOKEN")), sem_par=B.SEM_PAR)
 
 
 def registrar_ligacoes(bp):

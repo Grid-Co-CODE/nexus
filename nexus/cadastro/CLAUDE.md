@@ -789,7 +789,9 @@ colunas (a maioria escondida: o seletor de colunas mostra sem recarregar), e a p
   ficam), o zero à esquerda, "UFV" e as preposições caem, a sigla do estado no fim cai (só as 27 UFs: "II" não é estado)
   e, do lado do cadastro e do Fracttal, o cliente da frente também ("<Cliente> - Usina 2 - UF" casa com "Usina II"). O
   nome igual é procurado no nome da usina, no título "<Cliente> - <Usina>" e nas chaves do Fracttal ligadas a ela; mais de
-  uma usina (o mesmo nome em dois clientes), todas aparecem, divididas, e quem escolhe é a pessoa. A FAMA só cobre os
+  uma usina (o mesmo nome em dois clientes), todas aparecem, divididas, e quem escolhe é a pessoa. Sem o nome igual, a
+  contenção de palavras (a regra das sugestões, abaixo) contra os mesmos nomes, a 90% a única e a 80% cada uma de várias:
+  o projeto não diz o cliente, então nunca a 100%; ligada a chave do Fracttal da usina, o nome igual a acha a 100%. A FAMA só cobre os
   clientes que a usam, sem lista no código: não tem a aba "Usinas fora" (`ligacoes.SEM_AUSENCIA`). Prova:
   `tests/test_cadastro_ligacoes_fama.py`.
 - **A regra de ignorar "Grid Co." do Fracttal pega "RenoGrid - Colíder 1/2" por acaso** (`ignorado` compara texto
@@ -799,10 +801,28 @@ colunas (a maioria escondida: o seletor de colunas mostra sem recarregar), e a p
   gravou com strings do pyarrow). O `fracttal()` pega a mais nova e "Ler as bases de novo" quebra (e o
   `publicar_cadastro.py` sem `--bases-guardadas` também, ainda em 08/10); as fotos das rodadas do Nexus (02/10) abrem.
   Instalar o `pyarrow` ou apontar outra foto.
-- **Sugestão nunca cruza cliente** nem passa pelas travas do casamento (número diferente, cidade diferente, potência
-  40%+ diferente): na 1ª versão real (04/10) ela sugeria "E1 - Andradina 1" para a Andradina da Thopen, "Marajoara 1"
-  a 100% para a Marajoara 2 e "Ouro Branco" (AL) para as de Bandeirantes (PR). Hoje os 73 buracos não têm par no
-  cadastro e a tela diz "nenhuma parecida".
+- **As sugestões dos buracos** (`ligacoes.sugestoes`, `casamento.contencao`; 12/11/2026, Levi: "tem muita coisa que dá
+  para vir sugerido do Nexus e não está vindo"). O caso: a chave do Fracttal e o projeto da FAMA diziam "Pinhal 1" (nome
+  inventado aqui) e o cadastro "São Brás do Pinhal 1", e a parecença de letras (o corte de 0,78) não chegava. **A
+  contenção:** todas as palavras significativas da chave (sem o cliente e a UF, sem acento, o romano em arábico, sem
+  `casamento.GENERICAS_SUGESTAO`: usina, ufv, solar, cliente e as preposições) estão no nome do cadastro, ou o contrário,
+  com o lado menor tendo uma palavra forte (não só "Nova", "Santa", "Rio"), e os MESMOS números (ou nenhum dos dois lados;
+  o "1 e 2" do cadastro responde pelo 2; a usina com número não responde pela chave sem). **A nota:** 100 só quando é a
+  ÚNICA do cliente assim (contada antes das travas de cidade e de potência); duas ou mais, 80 cada e nenhuma sugestão
+  acima de 95; a chave sem o cliente, 90; a usina que já liga a OUTRA chave da mesma base cai a 95 (`_ja_ligada`). O
+  cliente é o mesmo quando um nome é o começo do outro, palavra por palavra (`mesmo_cliente`: o Fracttal escreve o
+  cliente mais curto que o cadastro, e a chave dele nunca tinha sugestão). **As travas continuam** (`_trava`): nunca outro
+  cliente, número diferente, cidade diferente, potência 40%+ diferente; na 1ª versão real (04/10) ela sugeria "E1 -
+  Andradina 1" para a Andradina da Thopen, "Marajoara 1" a 100% para a Marajoara 2 e "Ouro Branco" (AL) para as de
+  Bandeirantes (PR). **O "por quê"** do buraco sem sugestão (`porque`, no lugar do "sem par no cadastro"; o motivo do
+  de-para que diz mais, a ponte ou o "a decidir", fica embaixo): o cliente que o cadastro não tem; a usina de nome certo
+  que a cidade ou a potência tiraram (ela vem antes, senão "o cadastro tem a X 2, não a 1" saía com a X 1 lá); "o cadastro
+  tem a X 1, não a 2: crie no Registro mestre"; o lado sem número; e "o cadastro não tem usina parecida deste cliente: crie
+  no Registro mestre". Medido em 12/11 no dado desta máquina (só leitura): das 693 chaves já ligadas, tratadas como
+  buraco, 575 com uma sugestão de 100% (eram 384), todas certas; sem as decisões à mão do Fracttal (o estado do servidor,
+  onde a FAMA tinha 34 a 100%), o botão de 100% de cada base, somado, daria 72 ligações: 36 iguais à decisão à
+  mão e nenhuma diferente.
+  Prova: `tests/test_cadastro_ligacoes_sugestoes.py`.
 - **Teste da tela nunca grava na pasta real:** em 04/10 um teste gravou no arquivo de regras de verdade (o `create_app`
   não repassava `NEXUS_DADOS`). Hoje `pasta_dados` recusa em TESTING sem `NEXUS_DADOS`.
 - Medido em 04/10 (no banco): BD_Operações 258/258, Fracttal 139/144, Tickets 136/156, BD_Performance 136/156,

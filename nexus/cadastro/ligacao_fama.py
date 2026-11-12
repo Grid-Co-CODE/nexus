@@ -22,6 +22,7 @@ import re
 import unicodedata
 
 from ..dados import fato_os_fama as F
+from . import casamento as K
 
 SISTEMA = F.SISTEMA
 UFS = frozenset("ac al ap am ba ce df es go ma mt ms mg pa pb pr pe pi rj rn rs ro rr sc sp se to".split())
@@ -97,7 +98,18 @@ def indice(usinas: list[dict], fracttal_por_usina: dict | None = None) -> dict:
 
 def sugestoes(item: dict, idx: dict, por_id: dict, n: int = 3) -> list[dict]:
     """A proposta pelo nome de um projeto da FAMA: as usinas de nome igual pela régua da FAMA. Uma só = 100%; o mesmo nome
-    em mais de uma usina, todas, divididas (quem escolhe é a pessoa)."""
-    ids = sorted(i for i in idx.get(nome_fama(item.get("nome")), ()) if i in por_id)
-    return [{"id": i, "titulo": por_id[i]["titulo"], "codigo": por_id[i]["codigo"], "nota": 100 // len(ids)}
-            for i in ids][:n]
+    em mais de uma usina, todas, divididas (quem escolhe é a pessoa).
+
+    Sem o nome igual, a contenção de palavras (12/11/2026, `casamento.contencao`: "Pinhal I" é a "São Brás do Pinhal 1"),
+    contra os mesmos nomes do índice. O projeto não diz o cliente, então a única contida vem abaixo de 100
+    (`NOTA_CONTIDA_SEM_CLIENTE`): a pessoa confirma. Ligada a chave do Fracttal dessa usina, o índice a acha pelo nome
+    igual, e aí sim a 100."""
+    nome = nome_fama(item.get("nome"))
+    ids = sorted(i for i in idx.get(nome, ()) if i in por_id)
+    if ids:
+        return [{"id": i, "titulo": por_id[i]["titulo"], "codigo": por_id[i]["codigo"], "nota": 100 // len(ids)}
+                for i in ids][:n]
+    t = K.termos(nome)
+    ids = sorted({i for k, us in idx.items() if K.contencao(t, k) == K.MESMO for i in us if i in por_id})
+    nota = K.NOTA_CONTIDA_SEM_CLIENTE if len(ids) == 1 else K.NOTA_CONTIDA_VARIAS
+    return [{"id": i, "titulo": por_id[i]["titulo"], "codigo": por_id[i]["codigo"], "nota": nota} for i in ids][:n]

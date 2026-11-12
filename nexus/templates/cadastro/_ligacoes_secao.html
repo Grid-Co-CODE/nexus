@@ -4,9 +4,24 @@
 {% macro alvo(sistema) %}<input type="hidden" name="alvo_sistema" value="{{ sistema }}"><input type="hidden" name="aba" value="{{ aba }}">{% if request.args.get('sistema') %}<input type="hidden" name="sistema" value="{{ request.args.get('sistema') }}">{% endif %}{% endmacro %}
 <link rel="stylesheet" href="{{ url_for('static', filename='cadastro.css') }}">
 <script src="{{ url_for('static', filename='cadastro-ligacoes.js') }}" defer></script>
+{% from "_explica.html" import explica %}
 <div class="cad-topo">
   <div>
-    <h2 class="dd-h2" style="margin-top:0">Ligações entre bases</h2>
+    <div class="gc-titulo-explica"><h2 class="dd-h2" style="margin-top:0">Ligações entre bases</h2>
+    {% call explica('Como as sugestões se contam') %}
+      <p><b>De onde vem a sugestão.</b> O Nexus compara a chave da base com o nome de cada usina do cadastro do mesmo
+        cliente. Vale o nome que contém todas as palavras da chave, ou que cabe nela ("Pinhal 1" e "São Brás do Pinhal 1"),
+        sem acento, com o romano em arábico e sem as palavras que não dizem usina (usina, UFV, solar, cliente, do, da,
+        de). O número tem de ser o mesmo dos dois lados. A parecença de letras e o código seguem valendo.</p>
+      <p><b>Como se conta.</b> 100% é a única usina do cliente com esse nome e esse número. Com duas ou mais, cada uma
+        vem a 80% e nenhuma chega a 100%. A chave que não diz o cliente (o projeto da FAMA) vem a 90%. A usina que já
+        está ligada a outra chave da mesma base fica abaixo de 100% e o "por quê" diz qual chave é.</p>
+      <p><b>O que nunca vira sugestão.</b> Usina de outro cliente, número diferente, cidade diferente ou potência muito
+        diferente.</p>
+      <p><b>O "por quê" sem sugestão.</b> Diz o que o cadastro tem: a usina com outro número, a de nome certo com a
+        cidade ou a potência que não batem, ou nada parecido. Antes de criar no Registro mestre, confira se a usina não
+        está lá com outro nome.</p>
+    {% endcall %}</div>
     <p class="cad-sub">Que usina cada base chama de quê, e onde a ligação falta. A correção feita aqui entra no de_para na hora e vai ao banco quando você publicar.</p>
   </div>
   <div class="lig-acoes">
@@ -61,7 +76,9 @@
     <td class="lig-base">{{ b.sistema.split(' · ')[0] }}</td>
     {# a chave que é um id (o projeto da FAMA, 11/11/2026) aparece pelo rótulo, com o id e as OS ao lado #}
     <td><strong class="lig-chave">{{ b.rotulo or b.chave }}</strong>{% if b.rotulo %}<span class="mudo gc-num"> · id {{ b.chave }}</span>{% endif %}{% if b.os %}<span class="mudo gc-num"> · {{ b.os }} OS</span>{% endif %}{% if b.tarefas %}<span class="mudo gc-num"> · {{ b.tarefas }} tarefas</span>{% endif %}{% if b.cidade %}<div class="mudo">{{ b.cidade }}</div>{% endif %}</td>
-    <td class="mudo">{{ b.motivo }}</td>
+    {# o "por quê" que diz o que fazer (12/11/2026) vem no lugar do "sem par no cadastro"; o motivo do de-para que diz
+       mais que isso (a ponte, "a decidir na tela") fica embaixo #}
+    <td class="mudo">{% if b.porque %}<span class="lig-porque">{{ b.porque }}</span>{% if b.motivo != sem_par %}<span class="lig-motivo">{{ b.motivo }}</span>{% endif %}{% else %}{{ b.motivo }}{% endif %}</td>
     <td>
       {% for g in b.sugestoes %}
       <form method="post" action="{{ raiz }}/t/base/ligacoes/decidir" class="lig-form">{{ alvo(b.sistema) }}
