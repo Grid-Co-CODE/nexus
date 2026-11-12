@@ -21,6 +21,9 @@ RESUMO = {
     "evento_ocorrencia": "Cada ocorrência das usinas, o plano de ação e o andamento",
     "sugestao": "As sugestões que as pessoas mandam para melhorar o Nexus",
     "status_sugestao": "Cada mudança de status das sugestões, de Iniciada a Concluída",
+    "demanda": "As demandas que um setor abre para outro, com o tema e o prazo",
+    "demanda_usina": "As usinas citadas em cada demanda",
+    "evento_demanda": "Cada passo das demandas, da análise à conclusão",
     "resposta_sugestao": "As respostas dos administradores às sugestões",
     "evento_insight": "Quem assumiu ou concluiu cada insight do motor de regras",
     # ── Mapa de equipe (08/11/2026) ──
@@ -162,6 +165,12 @@ PARA_QUE = {
                    "cada área leva para responder e se resolve no prazo.",
     "resposta_sugestao": "Guarda cada resposta que um administrador escreveu a uma sugestão, com o dia e a hora. Serve "
                          "para a pessoa que sugeriu ler a resposta em Minhas sugestões.",
+    "demanda": "Guarda cada demanda que uma pessoa abriu para outra de outro setor (sem abrir uma OS): o tema, o prazo "
+               "do setor, a OS e o texto, cifrado. Serve para a Caixa de entrada do Comando e para medir em quanto "
+               "tempo cada setor responde.",
+    "demanda_usina": "Guarda as usinas que cada demanda cita. Serve para achar as demandas de uma usina.",
+    "evento_demanda": "Guarda cada passo das demandas (em análise, pediu informação, respondeu, devolveu, concluiu), com "
+                      "o dia e quem fez. Serve para a situação de agora, o prazo e a linha do tempo de cada demanda.",
     "status_sugestao": "Guarda cada vez que um administrador mudou o status de uma sugestão (Iniciada, Em "
                        "verificação ou Concluída), com o dia e a hora. Serve para a pessoa acompanhar em Minhas "
                        "sugestões e para contar as que ainda não foram concluídas.",

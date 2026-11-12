@@ -245,6 +245,39 @@ FATOS = (
                     "tipo execucao, solicitacao, atribuida ou cancelada; os_id e folio da OS; destino_hmac = o código do NOME de quem pediu a solicitação (o "
                     "Fracttal só traz o nome; prefixo nome:, separado do código do e-mail). Os nomes (quem pediu, quem "
                     "aprovou) só cifrados (Cofre). Só acrescenta: nada se edita nem se apaga"),
+    # 12/11/2026 (Levi: "os setores consigam conversar entre si sem ter que especificamente criar um OS"): as demandas
+    # entre setores, com o tema e o prazo de cada setor (docs/superpowers/specs/2026-11-12-demandas-entre-setores-design.md).
+    # Registradas antes da 1ª gravação. A lista de temas de cada setor é a dim_tema do mesmo livro
+    Fato("demanda", "Demanda entre setores", "base", "nexus_demandas · fato_demanda",
+         "1 linha = 1 demanda aberta por 1 pessoa para 1 pessoa de 1 setor, sobre 1 tema do setor",
+         _d(data=("id", "data_id_criacao (o dia de Brasília em que foi aberta)"),
+            pessoa=("cod", "de_hmac e para_hmac (o código do e-mail de quem pediu e de quem recebe); de_pessoa_id quando o "
+                           "cadastro liga")),
+         tipo="sem_medida", chave=("demanda_id",), fontes=("nexus_demandas · fato_demanda",),
+         janela_origem="o Nexus é a fonte",
+         observacao="de_setor_id e para_setor_id ligam à nexus_setores · dim_setor; tema_id à dim_tema do mesmo livro "
+                    "(vale a última versão); prazo_dias_uteis = o do tema na hora em que foi aberta; os = o número da OS "
+                    "vinculada (dimensão degenerada), só uma OS do retrato das usinas da demanda. As usinas vão na "
+                    "fato_demanda_usina. O título, a descrição, os nomes e os anexos só cifrados (Cofre, a chave do "
+                    "cadastro); os anexos no disco do servidor (demandas/<id>/). A situação de agora é o último passo "
+                    "(fato_evento_demanda). Só acrescenta: nada se edita nem se apaga"),
+    Fato("demanda_usina", "Usina de uma demanda", "base", "nexus_demandas · fato_demanda_usina",
+         "1 linha = 1 usina citada em 1 demanda",
+         _d(usina=("id", "usina_id")),
+         tipo="sem_medida", chave=("id",), fontes=("nexus_demandas · fato_demanda_usina",),
+         janela_origem="o Nexus é a fonte",
+         observacao="id = <demanda_id>-<usina_id>; demanda_id liga à fato_demanda. Só acrescenta"),
+    Fato("evento_demanda", "Passo de uma demanda", "base", "nexus_demandas · fato_evento_demanda",
+         "1 linha = 1 passo (em análise, pediu informação, informou, respondeu, devolveu, concluiu) de 1 pessoa em 1 "
+         "demanda",
+         _d(data=("id", "data_id (o dia de Brasília do passo)"),
+            pessoa=("id", "pessoa_id de quem fez quando o cadastro liga (e o pessoa_hmac)")),
+         tipo="sem_medida", chave=("id",), fontes=("nexus_demandas · fato_evento_demanda",),
+         janela_origem="o Nexus é a fonte",
+         observacao="evento em claro; vale o último para a situação (Nova sem passo). O prazo é calculado, não gravado: "
+                    "a abertura ou a última devolução + os dias úteis do tema + os dias úteis parados entre "
+                    "pediu_informacao e informou. A conclusão sozinha (3 dias úteis depois do respondeu) é só da leitura. "
+                    "O texto (a resposta, a pergunta, a justificativa) e o nome só cifrados (Cofre). Só acrescenta"),
     # 03/11/2026 (Fase 3 dos setores conversando): o pedido a uma área, com o prazo que quem pede escolhe, e o retorno
     # dela; o tempo de resposta de cada área sai daqui. Registrado antes da 1ª gravação
     Fato("pedido_area", "Pedido a uma área, com prazo", "base", "nexus_pedidos · fato_pedido_area",
@@ -1562,6 +1595,12 @@ LIVROS = (
           "a cada mensagem e a cada Marcar como lida nas conversas (insight, OS, usina)",
           "nexus/comando/conversa.py, pelas telas Comando → Insights, Caixa de entrada e a conversa de cada objeto", False,
           "registrado em 03/11/2026 antes da 1ª gravação (regra 10): nasce na 1ª mensagem",
+          so_cresce=True),
+    Livro("nexus_demandas", ("dim_tema", "fato_demanda", "fato_demanda_usina", "fato_evento_demanda"),
+          "a cada tema salvo, demanda aberta e passo (Comando → Caixa de entrada e Temas do setor)",
+          "nexus/comando/demandas.py, pelas telas Comando → Caixa de entrada e Comando → Temas do setor", False,
+          "registrado em 12/11/2026 antes da 1ª gravação (regra 10): nasce no 1º tema salvo. As abas vão juntas a cada "
+          "gravação, sobre o livro relido do banco; a aba ainda vazia entra com a 1ª linha dela",
           so_cresce=True),
     Livro("nexus_pedidos", ("fato_pedido_area",),
           "a cada Pedir retorno a uma área e a cada Responder da área pedida (insight, OS, usina)",
