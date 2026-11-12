@@ -221,7 +221,24 @@ def test_a_caixa_so_mostra_as_torres_do_setor(app, banco, limpo, motor_dublado, 
     assert "2 extintores vencidos" in html and "16702" not in html
     monkeypatch.setattr(MO, "torres_da_pessoa", lambda: None)
     html = _aberta(_cliente(app), "/t/comando/caixa-de-entrada")
-    assert "2 extintores vencidos" in html and "16702" in html and "todas as torres" in html
+    assert "2 extintores vencidos" in html and "16702" in html
+
+
+def test_a_caixa_numeros_no_alto_e_sem_dono_recolhido(app, banco, limpo, motor_dublado, monkeypatch):
+    """Levi, 13/11/2026: o cabeçalho sem a pergunta e sem o "todas as torres · conta das HH:MM" ("inútil"); "joga os
+    insights para cima como KPI" (antes das demandas); o Sem dono recolhido, "só fica o contador. Porque senão a rolagem é
+    infinita"; e o lugar dos temas à vista ("eu não achei um de cadastro os temas")."""
+    monkeypatch.setattr(MO, "torres_da_pessoa", lambda: None)
+    html = _cliente(app).get("/t/comando/caixa-de-entrada").get_data(as_text=True)
+    assert "todas as torres" not in html and "conta das" not in html and "O que é meu para fazer hoje" not in html
+    assert html.index('class="cn-numeros cx-numeros"') < html.index('id="demandas"')
+    assert 'href="#cx-sem-dono"' in html
+    sem_dono = html.split('<details class="cx-recolhe" id="cx-sem-dono"', 1)[1]
+    assert sem_dono.startswith(">") and "a OS 16702 voltou" in sem_dono                    # fechado, com a lista dentro
+    assert "/t/comando/temas-do-setor" in html.split('id="demandas"', 1)[1].split("</section>", 1)[0]
+    # o insight do Sem dono pedido pelo endereço (?abrir=) vem com o Sem dono aberto
+    html = _cliente(app).get("/t/comando/caixa-de-entrada?abrir=N01:16702").get_data(as_text=True)
+    assert '<details class="cx-recolhe" id="cx-sem-dono" open>' in html
 
 
 def test_o_sino_nao_mostra_os_insights_sem_dono(app, banco, limpo, motor_dublado, monkeypatch):

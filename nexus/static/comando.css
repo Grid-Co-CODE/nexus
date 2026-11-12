@@ -400,3 +400,15 @@ a.ins-titulo:hover{color:var(--verde-texto)}
 @media (max-width:1100px){.dm-grade{grid-template-columns:minmax(0,1fr)}.dm-detalhes{position:static}}
 @media (max-width:640px){.dm-linha{grid-template-columns:70px minmax(0,1fr)}.dm-dir{grid-column:2;flex-direction:row;align-items:center}
   .dm-dupla{grid-template-columns:1fr}}
+
+/* Caixa de entrada (13/11/2026): os números dos insights no alto levam à lista de cada um; o Sem dono vem recolhido, só
+   com o contador (Levi: "senão a rolagem é infinita"); o lugar dos temas ao lado da Nova demanda */
+.cx-numeros a{color:inherit;text-decoration:none}
+.cx-numeros a:hover .v,.cx-numeros a:focus-visible .v{color:var(--verde-texto)}
+.cx-recolhe > summary{list-style:none;cursor:pointer;display:flex;align-items:baseline;gap:12px}
+.cx-recolhe > summary::-webkit-details-marker{display:none}
+.cx-recolhe > summary .ins-sub{margin-bottom:0}
+.cx-mostrar{font-size:12.5px;font-weight:600;color:var(--verde-texto)}
+.cx-recolhe[open] .cx-mostrar{color:var(--mudo)}
+.cx-recolhe[open] .cx-mostrar::after{content:" (recolher)"}
+.dm-cab-acoes{display:inline-flex;gap:8px;flex-wrap:wrap}

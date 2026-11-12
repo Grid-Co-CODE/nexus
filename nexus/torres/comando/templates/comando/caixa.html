@@ -4,12 +4,13 @@
 {% block conteudo %}
 <link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='comando.css') }}">
-{# Caixa de entrada (03/11/2026): primeiro os pedidos de retorno que outras áreas mandaram para o setor da pessoa; depois
-   o que ela assumiu, o que está sem dono e o que outra pessoa assumiu, das torres que o setor vê (Base → Acessos). #}
+{# Caixa de entrada (03/11/2026): os números dos insights no alto, depois as demandas entre setores, depois os pedidos,
+   as menções e os insights das torres que o setor vê (Base → Acessos). Levi, 13/11/2026: o cabeçalho sem a pergunta e sem
+   o "todas as torres · conta das HH:MM" ("inútil"); "joga os insights para cima como KPI"; o Sem dono recolhido, "só fica
+   o contador. Porque senão a rolagem é infinita". #}
 <div class="campo-nativa">
   <div class="cn-cab">
-    <div><p class="gc-eyebrow">{{ torre.nome }}</p><h1 class="cn-titulo">{{ tela.nome }}</h1><p class="cn-pergunta">{{ tela.pergunta }}</p></div>
-    <div class="cn-frescor">{% if minhas_torres is none %}todas as torres{% elif not minhas_torres %}o seu setor ainda não tem torre liberada{% else %}das torres do seu setor: {{ minhas_torres|join(', ') }}{% endif %}{% if gerado %}<br>conta das <b>{{ gerado.strftime('%H:%M') }}</b>{% endif %}</div>
+    <div><p class="gc-eyebrow">{{ torre.nome }}</p><h1 class="cn-titulo">{{ tela.nome }}</h1></div>
   </div>
   {% if aviso %}<div class="cn-erro{% if aviso[0] == 'ok' %} ins-ok{% endif %}" role="{{ 'status' if aviso[0] == 'ok' else 'alert' }}"><b>{{ aviso[1] }}</b></div>{% endif %}
   {% if calculando %}<div class="cn-erro cn-aviso" role="status" data-recarregar="10"><b>A conta dos insights está sendo feita agora</b> (o Nexus acabou de subir; leva perto de meio minuto). A página se atualiza sozinha.</div>{% endif %}
@@ -17,22 +18,22 @@
   {% if falhas %}<div class="cn-erro cn-aviso" role="status">{{ falhas|length }} {{ 'regra não leu' if falhas|length == 1 else 'regras não leram' }} a fonte agora: o que elas apontariam pode faltar. <a href="{{ raiz }}/t/comando/insights">Ver as regras</a></div>{% endif %}
   {% if not tem_login %}<div class="cn-erro cn-aviso" role="status">Entre com o seu login (Microsoft ou Fracttal) para notificar, responder e assumir: a senha de administrador não diz quem é a pessoa.</div>{% endif %}
 
-  {# as demandas entre setores (12/11/2026) primeiro: é o que outra pessoa pediu para você, com prazo #}
+  <div class="cn-numeros cx-numeros">
+    <a href="#cx-mencoes"><span class="gc-rotulo">Menções</span><span class="v">{{ mencoes|length }}</span><span class="d">conversas que chamam você ou o seu setor</span></a>
+    <a href="#cx-pedidos"><span class="gc-rotulo">Pedidos para você</span><span class="v">{{ pedidos|length }}</span><span class="d">{% set atr = pedidos|selectattr('situacao', 'equalto', 'atrasado')|list|length %}{{ atr }} {{ 'atrasado' if atr == 1 else 'atrasados' }}</span></a>
+    <a href="#cx-com-voce"><span class="gc-rotulo">Com você</span><span class="v">{{ meus|length }}</span><span class="d">o que você assumiu</span></a>
+    <a href="#cx-sem-dono"><span class="gc-rotulo">Sem dono</span><span class="v">{{ sem_dono|length }}</span><span class="d">{{ sem_dono|selectattr('sev', 'equalto', 'critico')|list|length }} críticos</span></a>
+    <a href="#cx-com-outra-pessoa"><span class="gc-rotulo">Com outra pessoa</span><span class="v">{{ com_dono|length }}</span><span class="d">já assumidos</span></a>
+  </div>
+
+  {# as demandas entre setores (12/11/2026): é o que outra pessoa pediu para você, com prazo #}
   {% include "comando/_demandas.html" %}
 
-  <h2 class="dm-titulo dm-titulo--motor">Insights e pedidos do motor</h2>
-
-  <div class="cn-numeros">
-    <span><span class="gc-rotulo">Menções</span><span class="v">{{ mencoes|length }}</span><span class="d">conversas que chamam você ou o seu setor</span></span>
-    <span><span class="gc-rotulo">Pedidos para você</span><span class="v">{{ pedidos|length }}</span><span class="d">{% set atr = pedidos|selectattr('situacao', 'equalto', 'atrasado')|list|length %}{{ atr }} {{ 'atrasado' if atr == 1 else 'atrasados' }}</span></span>
-    <span><span class="gc-rotulo">Com você</span><span class="v">{{ meus|length }}</span><span class="d">o que você assumiu</span></span>
-    <span><span class="gc-rotulo">Sem dono</span><span class="v">{{ sem_dono|length }}</span><span class="d">{{ sem_dono|selectattr('sev', 'equalto', 'critico')|list|length }} críticos</span></span>
-    <span><span class="gc-rotulo">Com outra pessoa</span><span class="v">{{ com_dono|length }}</span><span class="d">já assumidos</span></span>
-  </div>
+  <h2 class="dm-titulo dm-titulo--motor">Insights e pedidos</h2>
 
   {% if erro_pedidos %}<div class="cn-erro cn-aviso" role="status"><b>Não li os pedidos agora ({{ erro_pedidos }}).</b></div>{% endif %}
   {# os pedidos para o meu setor (Fase 3): o atrasado primeiro, depois o que vence antes; responder abre o objeto #}
-  <h2 class="ins-sub">Pedidos para o seu setor{% if pedidos %} <span class="ins-sub-n">{{ pedidos|length }}</span>{% endif %}</h2>
+  <h2 class="ins-sub" id="cx-pedidos">Pedidos para o seu setor{% if pedidos %} <span class="ins-sub-n">{{ pedidos|length }}</span>{% endif %}</h2>
   {% if pedidos %}
   <ol class="ins-lista">
     {% for p in pedidos %}
@@ -70,7 +71,7 @@
   {% endif %}
 
   {# as menções que ainda não li (Fase 2): uma linha por conversa, a mais nova primeiro #}
-  <h2 class="ins-sub">Menções para você{% if mencoes %} <span class="ins-sub-n">{{ mencoes|length }}</span>{% endif %}</h2>
+  <h2 class="ins-sub" id="cx-mencoes">Menções para você{% if mencoes %} <span class="ins-sub-n">{{ mencoes|length }}</span>{% endif %}</h2>
   {% if mencoes %}
   <ol class="ins-lista">
     {% for x in mencoes %}
@@ -118,11 +119,18 @@
   </details>
   {% endif %}
 
-  {% for titulo, lista, vazio, aberto in [('Com você', meus, 'Nada assumido por você.', false), ('Sem dono', sem_dono, 'Nada sem dono nas torres do seu setor.', false), ('Com outra pessoa', com_dono, '', false)] %}
+  {% for titulo, lista, vazio, aberto, ancora in [('Com você', meus, 'Nada assumido por você.', false, 'cx-com-voce'), ('Sem dono', sem_dono, 'Nada sem dono nas torres do seu setor.', false, 'cx-sem-dono'), ('Com outra pessoa', com_dono, '', false, 'cx-com-outra-pessoa')] %}
   {% if lista or vazio %}
-  <h2 class="ins-sub">{{ titulo }}{% if lista %} <span class="ins-sub-n">{{ lista|length }}</span>{% endif %}</h2>
+  {% if ancora == 'cx-sem-dono' and lista %}
+  <details class="cx-recolhe" id="{{ ancora }}"{% if abrir and lista|selectattr('id', 'equalto', abrir)|list %} open{% endif %}>
+    <summary><h2 class="ins-sub">{{ titulo }} <span class="ins-sub-n">{{ lista|length }}</span></h2><span class="cx-mostrar">mostrar a lista</span></summary>
+    <ol class="ins-lista">{% for i in lista %}{{ cartao(i, nomes_torres, areas, retornos, codigo, voltar, tem_login, aberto or i.id == abrir, hoje) }}{% endfor %}</ol>
+  </details>
+  {% else %}
+  <h2 class="ins-sub" id="{{ ancora }}">{{ titulo }}{% if lista %} <span class="ins-sub-n">{{ lista|length }}</span>{% endif %}</h2>
   {% if lista %}<ol class="ins-lista">{% for i in lista %}{{ cartao(i, nomes_torres, areas, retornos, codigo, voltar, tem_login, aberto or i.id == abrir, hoje) }}{% endfor %}</ol>
   {% else %}<p class="cn-vazio">{{ 'A lista aparece assim que a conta terminar.' if calculando else vazio }}</p>{% endif %}
+  {% endif %}
   {% endif %}
   {% endfor %}
 </div>

@@ -8,8 +8,11 @@
   <div class="dm-cab">
     <h2 class="dm-titulo" id="dm-titulo">Demandas entre setores</h2>
     {% if not dem.falta %}
+    <span class="dm-cab-acoes">
+    <a class="gc-btn gc-btn--ui gc-btn--contorno" href="{{ '/t/comando/temas-do-setor'|na_raiz }}"><i class="ph ph-list-bullets" aria-hidden="true"></i> Temas do meu setor</a>
     <button class="gc-btn gc-btn--ui gc-btn--primario" type="button" data-dm-nova{% if not dem.tem_login %} disabled aria-describedby="dm-nova-por-que"{% endif %}>
       <i class="ph ph-plus" aria-hidden="true"></i> Nova demanda</button>
+    </span>
     {% endif %}
   </div>
   {% if dem.falta %}
@@ -186,7 +189,7 @@
         <option value="">Escolha o setor primeiro</option>
         {% for t in dem.temas %}<option value="{{ t.tema_id }}" data-setor="{{ t.setor_id }}" data-ate="{{ t.ate }}">{{ t.nome }} ({{ t.prazo_dias_uteis }} {{ 'dia útil' if t.prazo_dias_uteis == 1 else 'dias úteis' }})</option>{% endfor %}
       </select>
-      <span class="dm-nota" id="dm-f-prazo" data-dm-f-prazo>O prazo é o do tema, em dias úteis. O setor sem tema ainda não recebe demanda: peça a ele que cadastre em Comando → Temas do setor.</span></div>
+      <span class="dm-nota" id="dm-f-prazo" data-dm-f-prazo>O prazo é o do tema, em dias úteis. O setor sem tema ainda não recebe demanda: peça a ele que cadastre em <a href="{{ '/t/comando/temas-do-setor'|na_raiz }}">Temas do setor</a>.</span></div>
     <div class="dm-campo"><label class="gc-rotulo" for="dm-f-titulo">Título</label>
       <input class="gc-campo" id="dm-f-titulo" name="titulo" maxlength="{{ dem.limites.titulo }}" required placeholder="Em poucas palavras"></div>
     <div class="dm-campo"><label class="gc-rotulo" for="dm-f-desc">Descrição</label>
