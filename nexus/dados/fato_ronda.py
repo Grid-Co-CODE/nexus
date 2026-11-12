@@ -52,7 +52,7 @@ from ..cadastro.ligacao_campo import _norm as norm_nome
 from ..cadastro.ligacao_campo import codigo_da_pessoa
 from . import dominios as DOM
 from .equipamento import FORA_DA_DIMENSAO
-from .fatos import _id, _int, _txt, data_do_registro, ligar_equipamento, pct_versao
+from .fatos import _id, _int, _txt, data_do_registro, ligar_equipamento, os_do_fato, pct_versao
 from .fatos import _pct as pct
 
 FATO, TIPO = "ronda", "snapshot_acumulado"
@@ -240,7 +240,7 @@ def fato_ronda(app: list[dict], checklist: list[dict], avulsas: list[dict], lig,
         codigo_nome = codigo_do_nome(nome) if (codigo_do_nome and not hmac_ and _txt(nome)) else None
         presentes, desconhecidas = DOM.falhas(a.get("Falhas"))
         rotulos = len(presentes) + len(desconhecidas)
-        os_ = _txt(a.get("OS")) or None
+        os_ = os_do_fato(a.get("OS"))
         # o checklist do App na própria linha (v249) vence o da carga única: é a mesma resposta, lida na fonte
         resp_app = _respostas_do_app(a)
         resp = resp_app or (_respostas_checklist(ck) if ck is not None else {})

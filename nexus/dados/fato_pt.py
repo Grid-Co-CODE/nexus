@@ -26,7 +26,7 @@ from datetime import datetime, timedelta, timezone
 
 from . import dominios as DOM
 from .fato_ronda import _equip, _quando, chave, conferir_grao, linha_de_qualidade
-from .fatos import _int, _sim, _txt, data_do_registro
+from .fatos import _int, _sim, _txt, data_do_registro, os_do_fato
 
 FATO, TIPO = "pt", "snapshot_acumulado"
 GRAO = "1 linha = 1 PT × ativo (o App decide por linha)"
@@ -89,7 +89,7 @@ def fato_pt(pt: list[dict], lig, equip=None, *, agora: datetime | None = None) -
         ativs = [a for a in (x.strip() for x in _txt(r.get("Atividades")).split(";")) if a]
         eid, eq_como = _equip(equip, cod)
         out.append([
-            chave(n, cod), n, int(cod == menor[n]), _txt(r.get("OS")) or None, cod or None,
+            chave(n, cod), n, int(cod == menor[n]), os_do_fato(r.get("OS")), cod or None,
             data_do_registro(criada), data_do_registro(decidida_em), uid, como, lig.equipe(r.get("Região")),
             eid, eq_como, lig.pessoa(sol) if sol else None, sol or None, lig.pessoa(dec) if dec else None,
             dec or None, DOM.codigo(r.get("Papel de quem decidiu")), sit, decidida, criada, decidida_em, espera, parada,

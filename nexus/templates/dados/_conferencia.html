@@ -1,0 +1,34 @@
+{# A conferência das ligações (12/11/2026, Levi: "Quero uma análise das relações de dados e se as bases estão sendo lincadas
+   da maneira correta"): o que está GRAVADO no banco aponta para algo que existe? `conferencia.py` confere uma vez por dia
+   cada coluna de ID dos fatos e das dimensões e a chave de cada fato; aqui, os números da última e as linhas com
+   problema. Entra nas duas visões, depois do radar, com o desenho dele (as classes do radar). #}
+<section class="dd-radar" id="dd-conferencia" aria-labelledby="dd-conferencia-titulo">
+  <h2 class="dd-h2" id="dd-conferencia-titulo">Conferência das ligações: o ID gravado existe?</h2>
+  {% if not conferencia %}
+  <p class="dd-mudo">{% if conferencia_erro %}Não consegui ler a última conferência ({{ conferencia_erro }}).{% else %}A conferência ainda não rodou neste banco: a primeira sai na próxima volta da carga do servidor.{% endif %}</p>
+  {% else %}
+  <ul class="dd-radar-contas">
+    <li data-conf="tabelas"><b>{{ conferencia.tabelas }}</b><span>tabelas conferidas</span></li>
+    <li data-conf="colunas"><b>{{ conferencia.colunas }}</b><span>colunas de ID</span></li>
+    <li data-conf="orfaos" class="{{ 'critico' if conferencia.orfaos else 'ok' }}"><b>{{ milhar(conferencia.orfaos) }}</b><span>{{ 'linha' if conferencia.orfaos == 1 else 'linhas' }} com ID que a dimensão não tem</span></li>
+    <li data-conf="repetidas" class="{{ 'critico' if conferencia.repetidas else 'ok' }}"><b>{{ milhar(conferencia.repetidas) }}</b><span>{{ 'linha' if conferencia.repetidas == 1 else 'linhas' }} com a chave repetida</span></li>
+  </ul>
+  <p class="dd-mudo">Conferido em <b>{{ hora(conferencia.gerado_em) or '—' }}</b>{% if conferencia.erros %} · <span class="dd-org-estado alerta">{{ conferencia.erros }} {{ 'tabela não foi lida' if conferencia.erros == 1 else 'tabelas não foram lidas' }}</span>{% endif %}</p>
+  {% if conferencia.problemas %}
+  <ul class="dd-radar-novas">
+    {% for p in conferencia.problemas %}
+    <li><div class="dd-org-fato critico dd-radar-nova">
+      <span class="dd-org-nome"><code>{{ p.tabela }}</code></span>
+      {% if p.repetidas %}
+      <span class="dd-org-linha"><span class="dd-org-estado critico">chave repetida</span></span>
+      <span class="dd-org-resumo">{{ milhar(p.repetidas) }} de {{ milhar(p.linhas) }} linhas repetem uma chave que já apareceu</span>
+      {% else %}
+      <span class="dd-org-linha"><span class="dd-org-estado critico">ID órfão</span><span class="dd-org-tipo"><code>{{ p.coluna }}</code></span></span>
+      <span class="dd-org-resumo">{{ milhar(p.orfaos) }} de {{ milhar(p.linhas) }} linhas apontam para {{ p.distintos }} {{ 'valor' if p.distintos == 1 else 'valores' }} que a dimensão de {{ p.dimensao }} não tem</span>
+      {% endif %}
+    </div></li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+  {% endif %}
+</section>

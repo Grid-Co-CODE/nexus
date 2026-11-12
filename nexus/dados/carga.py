@@ -857,6 +857,18 @@ def _volta_fama(app) -> None:
         log.error("fama: %s", sem_chave(traceback.format_exc()))
 
 
+def _volta_conferencia(app) -> None:
+    """A conferência das ligações (12/11/2026, `conferencia.py`), depois de tudo o que a hora gravou: uma vez por dia
+    (quem a acha feita há menos de 20 h não repete), só leitura por página, e a falha dela fica no estado e no log."""
+    try:
+        from . import conferencia
+        _LACO["conferencia"] = conferencia.rodar(app.config)
+        log.info("conferência das ligações: %s", {k: v for k, v in _LACO["conferencia"].items() if k != "problemas"})
+    except Exception as e:      # noqa: BLE001 — a conferência não segura nada
+        _LACO["conferencia"] = {"erro": f"{type(e).__name__}: {e}"[:300]}
+        log.exception("conferência das ligações")
+
+
 def ligar(app):
     """O laço de hora em hora. Quem chama é o `nexus.dados.instalar` (app.py e servir.py), nunca o create_app."""
     if _LACO["thread"] is not None:
@@ -894,6 +906,8 @@ def ligar(app):
                     log.exception("almoxarifado")
                 # as OS da FAMA (11/11/2026): uma leitura por volta, depois das outras; só onde há as três chaves
                 _volta_fama(app)
+                # a conferência das ligações (12/11/2026): uma vez por dia, por último, sobre o que ficou gravado
+                _volta_conferencia(app)
 
     _LACO["thread"] = threading.Thread(target=laco, name="nexus-carga-dados", daemon=True)
     _LACO["thread"].start()

@@ -147,7 +147,7 @@ def test_ronda_com_os_e_campos_do_app():
     d, _, _ = _ronda([_app(Falhas="ronda longa pendente; sem GPS", **{"Situação da OS": "Criada — aviso inventado"})],
                      equip={"XPT-ABC100": 777}.get)
     r = d[0]
-    assert (r["origem"], r["os"], r["id_os_fracttal"], r["equipamento_id"]) == ("app_os", "15001", "9150010", 777)
+    assert (r["origem"], r["os"], r["id_os_fracttal"], r["equipamento_id"]) == ("app_os", 15001, "9150010", 777)
     assert (r["data_id"], r["usina_id"], r["usina_ligada_por"], r["equipe_id"]) == (20260930, 3, "de-para do Fracttal",
                                                                                     41)
     assert (r["os_situacao"], r["tipo_ronda"], r["duracao_min"], r["nota_pts"]) == ("criada_com_aviso", "curta", 40, 95)

@@ -340,6 +340,9 @@ def de_para(srv, fontes: dict, regras=None) -> list[list]:
                 pass
             elif it.get("so_decisao"):              # a FAMA (11/11/2026): a proposta pelo nome é só sugestão na tela
                 como = A_DECIDIR
+            elif it.get("pela_estrutura") and int(it["pela_estrutura"]) in existe:
+                # o plant_id da plataforma (12/11/2026): a usina da chave do supervisório na estrutura das usinas
+                ids, como = [int(it["pela_estrutura"])], "chave do supervisório"
             elif ids_ref:                           # a mesma usina de uma chave já casada: herda (1 ou 2 usinas)
                 ids, como = list(ids_ref), f"igual a {ref[0]}"
             elif como_ref and como_ref.startswith("ignorado"):

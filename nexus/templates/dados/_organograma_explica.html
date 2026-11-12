@@ -11,4 +11,8 @@ catálogo do Nexus (<code>nexus/dados/catalogo.py</code>).</p>
 {% for e, (rot, tom, explica_estado) in estado_org.items() if e != 'aposentado' %}<dt><span class="dd-org-estado {{ tom }}">{{ rot }}</span></dt><dd>{{ explica_estado }}</dd>
 {% endfor %}
 </dl>
+<p><b>Conferência das ligações.</b> Uma vez por dia o Nexus relê o que está gravado no banco e confere, tabela a tabela,
+se cada ID (data, usina, equipe, pessoa, equipamento) existe na dimensão dele e se a chave de cada fato se repete. O
+<b>ID órfão</b> é a linha que aponta para algo que a dimensão não tem; a <b>chave repetida</b>, a mesma linha gravada duas
+vezes. Os dois têm de dar zero. ID vazio não é órfão: é o que não ligou, e aparece na qualidade de cada tabela.</p>
 {% endcall %}

@@ -58,7 +58,7 @@ from datetime import date, datetime, timedelta, timezone
 
 from ..cadastro.ligacao_campo import _norm as norm_nome
 from .calendario import data_id as _data_id
-from .fatos import ligar_equipamento
+from .fatos import ligar_equipamento, os_do_fato
 from .fatos import tarefa_chave as _tarefa_chave_unica
 
 LIVRO = "nexus_programacao"
@@ -386,7 +386,7 @@ def fato_programacao(dados: dict | None, lig, pessoa_por_nome: dict | None, equi
             out.append([
                 hashlib.sha1(base.encode("utf-8")).hexdigest()[:16], seg, dia_prog,
                 _dia_de_brasilia(r.get("dataCriacao")), _dia_de_brasilia(r.get("dataFinal")), uid, por, eid, tec, resp,
-                eq_id, eq_como, codigo, os_, tch, _txt(r.get("tipo")) or None, rot, pts, 0,
+                eq_id, eq_como, codigo, os_do_fato(os_), tch, _txt(r.get("tipo")) or None, rot, pts, 0,
                 _minutos(r.get("duracao")), _minutos(r.get("desloc")), h_ini, _sim_nao(r.get("reprog")),
                 _qtd(r.get("vezes")), _sim_nao(r.get("termo")), _sim_nao(r.get("paralelo")), _nova_os(r), _rolada(r),
                 st_exec, st_os, gerada, lido])
@@ -529,9 +529,12 @@ def _no_tipo(c, v):
         return int(x) if isinstance(x, (int, float)) and float(x).is_integer() else None
     if c == "criticidade_pts":
         return _num(v)
+    if c == "os":
+        # a OS é inteiro em todo fato desde 12/11/2026 (`fatos.os_do_fato`): o banco a devolve como 15377, 15377.0 ou
+        # "15377" conforme a aba, e a semana que fica do banco e a da fonte têm de ter a mesma OS no mesmo tipo
+        return os_do_fato(v)
     if isinstance(v, (int, float)) and not isinstance(v, bool):
-        # coluna de texto que o banco devolveu como número (a OS 15377 volta 15377 ou 15377.0): volta a texto, para a
-        # semana do banco e a da fonte não terem a mesma OS em dois tipos
+        # coluna de texto que o banco devolveu como número: volta a texto
         return str(int(v)) if float(v).is_integer() else str(v)
     return v
 

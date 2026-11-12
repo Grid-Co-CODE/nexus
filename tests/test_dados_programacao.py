@@ -128,7 +128,7 @@ def test_executada_fora_do_plano_e_pendente_nao_viram_bloco():
     grão. Em 08/10 eram 2.159 de 5.897 linhas; somadas, inflariam as tarefas programadas."""
     fora = _r(os_id="15800", tarefa="Corretiva no campo", foraDoPlano=True, reprog="", vezes=0, status="Finalizados")
     f, rel, _ = _fato(_dados(_semana("2026-W41", [_r(), fora])))
-    assert [x["os"] for x in f] == ["15001"] and rel["fora_do_plano"] == 1 and rel["linhas"] == 1
+    assert [x["os"] for x in f] == [15001] and rel["fora_do_plano"] == 1 and rel["linhas"] == 1
     assert "99999" not in {x["os"] for x in f}                     # a pendente (backlog) também não
 
 
@@ -184,7 +184,7 @@ def test_medidas_em_minutos_indicadores_e_dominios():
     assert (c["status_execucao"], c["status_os"]) == (None, None)
     assert (a["hora_inicio"], b["hora_inicio"], c["hora_inicio"]) == ("07:30", "07:05", None)
     assert (a["data_id_criacao_os"], a["data_id_fim_execucao"], b["data_id_fim_execucao"]) == (20260915, None, 20261006)
-    assert (a["tipo_tarefa"], a["codigo_ativo"], a["os"]) == ("MPM", "XPT-ALF100-INVR1.1", "15001")
+    assert (a["tipo_tarefa"], a["codigo_ativo"], a["os"]) == ("MPM", "XPT-ALF100-INVR1.1", 15001)      # a OS é inteiro em todo fato (12/11/2026)
     assert (a["semana_gerada_em"], a["lido_em"]) == ("2026-10-02T21:54:41Z", "2026-10-08T12:00:00-03:00")
 
 
@@ -254,7 +254,7 @@ def test_mesclar_troca_so_a_semana_da_fonte_e_guarda_as_outras():
     assert no_banco[0]["data_id_semana"] == "20260914"              # o banco devolveu texto
     _, _, l_novo = _fato(_dados(_semana("2026-W41", [_r(os_id="3")])))
     m = [dict(zip(P.CAB_PROGRAMACAO, l)) for l in P.mesclar_semanas(no_banco, l_novo)]
-    assert [(x["data_id_semana"], x["os"]) for x in m] == [(20260914, "15001"), (20261005, "3")]
+    assert [(x["data_id_semana"], x["os"]) for x in m] == [(20260914, 15001), (20261005, 3)]
     assert m[0]["usina_id"] == 3 and m[0]["primeiro_bloco"] == 1 and m[0]["duracao_min"] == 66
     assert m[0]["programacao_id"] == velho[0]["programacao_id"]
     # fonte vazia não apaga nada; linha do banco sem semana não é descartada
@@ -425,7 +425,7 @@ def test_linha_que_nao_mudou_guarda_o_lido_em_do_banco():
                                   PESSOAS, None, "13:00")
     m = P.manter_lido_em(P.mesclar_semanas(no_banco, agora), no_banco)
     i_os, i_lido = P.CAB_PROGRAMACAO.index("os"), P.CAB_PROGRAMACAO.index("lido_em")
-    assert {l[i_os]: l[i_lido] for l in m} == {"15001": "2026-10-08T12:00:00-03:00", "2": "13:00"}
+    assert {l[i_os]: l[i_lido] for l in m} == {15001: "2026-10-08T12:00:00-03:00", 2: "13:00"}
     assert P.sha_linhas(m) == P.sha_linhas(agora)                              # o lido_em não entra no sha
     assert P.manter_lido_em(agora, []) == agora                                 # sem banco, nada muda
 
@@ -440,7 +440,7 @@ def test_semana_da_fonte_sem_status_nao_troca_a_do_banco():
                                  _semana("2026-W43", [_r(os_id="5")])))
     assert P.semanas_degradadas(l_fonte) == {20261005, 20261012}
     m = [dict(zip(P.CAB_PROGRAMACAO, l)) for l in P.mesclar_semanas(velho, l_fonte)]
-    assert sorted((x["data_id_semana"], x["os"]) for x in m) == [(20261005, "15001"), (20261005, "2"), (20261019, "5")]
+    assert sorted((x["data_id_semana"], x["os"]) for x in m) == [(20261005, 2), (20261005, 15001), (20261019, 5)]
     assert P.semanas_degradadas([]) == set()
 
 

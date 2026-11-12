@@ -118,6 +118,7 @@
       </span>
       <p class="dd-org-carga">Última carga: <b>{{ hora(atualizacao.get('gerado_em')) or '—' }}</b>{% if atualizacao.get('maquina') %} · {{ atualizacao.get('maquina') }}{% endif %}</p>
       {% if radar %}<p class="dd-org-radar {{ 'critico' if radar.n.nova else 'ok' }}"><a href="#dd-radar">Radar do banco: {% if radar.n.nova %}<b>{{ radar.n.nova }}</b> {{ 'tabela nova' if radar.n.nova == 1 else 'tabelas novas' }}, fora do catálogo{% else %}nenhuma tabela nova; as {{ milhar(radar.total) }} têm dono{% endif %}</a></p>{% endif %}
+      {% if conferencia %}<p class="dd-org-radar {{ 'critico' if conferencia.orfaos or conferencia.repetidas else 'ok' }}"><a href="#dd-conferencia">Conferência das ligações: {% if conferencia.orfaos or conferencia.repetidas %}<b>{{ milhar(conferencia.orfaos) }}</b> {{ 'linha' if conferencia.orfaos == 1 else 'linhas' }} com ID órfão e <b>{{ milhar(conferencia.repetidas) }}</b> com a chave repetida{% else %}nenhum ID órfão nem chave repetida em {{ conferencia.tabelas }} tabelas{% endif %}</a></p>{% endif %}
     </div>
 
     <ul class="dd-org-setores" aria-label="Setores">
@@ -181,6 +182,7 @@
 </div>
 
 {% with com_gaveta = true %}{% include "dados/_radar.html" %}{% endwith %}
+{% include "dados/_conferencia.html" %}
 
 {% for s in org.setores %}{% for c in s.ativos + s.fontes %}{{ detalhe(c) }}{% endfor %}{% endfor %}
 {# A gaveta e, à esquerda dela, a tabela (o botão de tabela ao lado do X). Um <dialog> só, modal: prende o foco nos dois

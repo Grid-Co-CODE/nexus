@@ -723,8 +723,24 @@ colunas (a maioria escondida: o seletor de colunas mostra sem recarregar), e a p
   usinas "Cliente - Usina - UF" que as tarefas não têm, com `origem` "árvore de ativos do Fracttal"; grafia que só muda
   no espaço, caixa ou acento de uma chave que já existe não entra. Caso: 53 usinas iam ao App de Campo sem o nome do
   Fracttal (PCM → Técnicos por usina); 40 da Faro, da Apolo e da RenoGrid estavam na árvore e quase sem tarefa, e não
-  apareciam nas Ligações. O cliente do Fracttal ("Faro") não é o do cadastro ("Faro Energy"): elas ligam à mão. As 13 da
-  Elis Energia em operação não estão no Fracttal (nem tarefa, nem ativo) e seguem sem nome até serem cadastradas lá.
+  apareciam nas Ligações. O cliente do Fracttal ("Faro") não é o do cadastro ("Faro Energy"): elas ligam à mão. **A usina que só a foto dos
+  ativos tem** (12/11/2026, `usinas_da_foto`): a foto do banco (`nexus_ativos_fracttal · foto_ativos`, renovada toda noite,
+  igual nas duas máquinas) dá a RAIZ de cada usina (o item cujo código é só o da usina e cujo nome é "Cliente - Usina -
+  UF"), com o código, depois das tarefas, da árvore do PCM e dos almoxarifados; o item que saiu do Fracttal não entra.
+  Caso: em 27/10 as 13 usinas de um cliente em operação não estavam no Fracttal; em 12/11 a foto já tinha 2.362 ativos com
+  o prefixo dele, 14 usinas seguiam sem o nome do Fracttal no de-para e a tela não as mostrava (a árvore do PCM é um
+  arquivo de quem rodou o PCM por último naquela máquina). Medido: 29 usinas novas na tela. Com o código no Registro
+  mestre elas ligam sozinhas pelo código; sem ele, à mão.
+- **`Plataforma · plant_id` (12/11/2026, `ligacoes.itens_plant`):** as falhas de string e de tracker e os eventos de
+  tracker só têm o `plant_id` da fonte e o nome que a fonte dá à usina, e o de-para não conhecia nenhum dos dois. O
+  sistema novo tem 1 chave por `plant_id` (lido de `falhas_performance`: cobertura, episódios de string e de tracker e
+  tracker × dia) e liga pela **chave do supervisório** da estrutura das usinas (`nexus_estrutura_usina ·
+  dim_supervisorio`: uma chave serve a uma usina só; a comparação junta os espaços e ignora a caixa), `casou_por` =
+  "chave do supervisório". Não chuta: nome fora da estrutura, chave desligada, usina que saiu do Registro e `plant_id`
+  cujos nomes levam a duas usinas ficam nos Buracos, com o nome da fonte no rótulo, para ligar à mão. A chave é só o
+  `plant_id` porque os 26 que aparecem em mais de uma fonte são a mesma usina com o mesmo nome (medido). Não entra
+  nas "Usinas fora" (`SEM_AUSENCIA`: a plataforma não cobre a carteira inteira). Medido em 12/11: 181 `plant_id`, 151
+  ligados (90 usinas). Prova: `tests/test_dados_ligacoes_12_11.py`.
 - **`casamento.py` (BD_Thopen, sem código):** romano → número, "1 e 2"/"1 a 4" abertos, usina sem número = a "1".
   Nome igual casa mesmo com cidade/estado diferente (o BD_Thopen erra: Saturnino "no PR", Sítio dos Nogueiras "no MT")
   e fica anotado; nome só-base precisa de localização igual e potência (±15%) — é o que separa "Ouro Branco I" (PR) da

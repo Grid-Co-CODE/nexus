@@ -415,8 +415,8 @@ def test_carga_grava_os_livros_registrados_e_confere(banco):
     assert {x["equipamento_id"] for x in f} == {equipamento.equipamento_id("THPN-PRM200-PGINVR1")}
     # o fato único de ronda: a com OS, a sem OS com as respostas do checklist
     rd = {x["os"] or "sem": x for x in livros.ler(BASE, api, "nexus_fatos", "fato_ronda")}
-    assert set(rd) == {"15400", "sem"} and rd["sem"]["vala_nivel"] == 3 and rd["sem"]["origem"] == "app_sem_os"
-    assert rd["15400"]["equipamento_id"] == equipamento.equipamento_id("THPN-PRM200")
+    assert set(rd) == {15400, "sem"} and rd["sem"]["vala_nivel"] == 3 and rd["sem"]["origem"] == "app_sem_os"
+    assert rd[15400]["equipamento_id"] == equipamento.equipamento_id("THPN-PRM200")
     assert "Pessoa Inventada" not in json.dumps(livros.ler(BASE, api, "nexus_fatos", "fato_ronda"))
     # a PT de dois ativos: 2 linhas, 1 PT
     p = livros.ler(BASE, api, "nexus_fatos", "fato_pt")
@@ -636,7 +636,7 @@ def test_carga_mescla_mantem_semana_antiga_e_troca_a_semana_do_arquivo(banco):
     p = {x["data_id_semana"]: x for x in livros.ler(BASE, api, programacao.LIVRO, programacao.ABA)}
     assert set(p) == {20260720, 20261005}
     assert p[20260720]["programacao_id"] == "aaaa000000000030" and p[20260720]["lido_em"] == "antes"   # intocada
-    assert p[20261005]["os"] == "15500"                                 # a W41 é a do arquivo, não a velha do banco
+    assert p[20261005]["os"] == 15500                                 # a W41 é a do arquivo, não a velha do banco
     at = livros.ler(BASE, api, programacao.LIVRO, "atualizacao")[0]
     assert at["semanas"] == 2 and at["sha_linhas"] == programacao.sha_linhas(
         programacao.mesclar_semanas(livros.ler(BASE, api, programacao.LIVRO, programacao.ABA), []))

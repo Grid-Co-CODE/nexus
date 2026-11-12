@@ -649,8 +649,8 @@ FATOS = (
          "parada de tracker, tomada na tela Strings e trackers da plataforma",
          _d(data=("id", "data_id (o dia de Brasília da decisão) e data_id_inicio (o dia em que a falha começou: "
                         "papel, regra 7)"),
-            usina=("cod", "plant_id + fonte, os mesmos dos episódios das falhas; o plant_id por fonte ainda não está no "
-                          "de_para (pendência 10)"),
+            usina=("cod", "plant_id + fonte, os mesmos dos episódios das falhas; o plant_id liga pelo de_para desde "
+                          "12/11/2026 (sistema Plataforma · plant_id, pendência 10), depois de publicado"),
             equipamento=("nome", "equipamento: o inversor (\"Inversor 1.2\") ou o tracker, como a tela e os episódios o "
                                  "nomeiam; sem equipamento_id (o nome não é o código do ativo: regra 4)"),
             os=("cod", "os (o nº da OS do Fracttal: dimensão degenerada)")),
@@ -1242,14 +1242,21 @@ FATOS = (
     # ── Tickets ────────────────────────────────────────────────────────────────────────────────────────────────
     Fato("ticket", "Ticket de performance", "chamados",
          "tickets_performance · Tickets de Performance, Trackers, Strings indisp", "1 linha = 1 ticket",
-         _d(data=("cod", "Início da ocorrência"), usina=("cod", "Código da usina"), cliente=("nome", "Cliente"),
+         # a usina NÃO sai da coluna "Código da usina" do ticket (12/11/2026): ela é fórmula na planilha e chega ao banco
+         # como 0 (692 de 774 linhas; as outras 82, vazias). A chave é a coluna "Usina", que a aba "Base de dados - Usinas"
+         # do mesmo livro troca pelo código, a chave do de-para "Tickets · Base de dados - Usinas": 692 de 774 ligam (89,4%);
+         # 81 têm a usina fora daquela aba e 1 não tem usina
+         _d(data=("cod", "Início da ocorrência"),
+            usina=("cod", "Usina → o código pela aba Base de dados - Usinas do mesmo livro (a coluna Código da usina do "
+                          "ticket é fórmula e vem 0 do banco)"), cliente=("nome", "Cliente"),
             pessoa=("nome", "Supervisor(a), Responsável"), equipamento=("nome", "Equipamento, Inversor, Tracker"),
             os=("cod", "N° OS")),
          tipo="snapshot_acumulado", chave=("ID",),
          medidas=_m((("indisponibilidade_min", "min", "aditiva"), ("impacto_kwh", "kWh", "aditiva"))),
          fontes=("tickets_performance · Tickets de Performance", "tickets_performance · Trackers",
                  "tickets_performance · Strings indisp"),
-         observacao="o ID falta em 57 de 774 tickets; as abas Trackers e Strings indisp não têm ID"),
+         observacao="o ID falta em 57 de 774 tickets; as abas Trackers e Strings indisp não têm ID; o livro não é "
+                    "atualizado desde 14/09/2026 e tem nomes em claro (Supervisor(a), Responsável, Solicitante)"),
     # Chamados de garantia no banco (12/10/2026, Levi: "O nexus é um ambiente centralizado e precisamos ter os dados se
     # conversando!"): as OS de acompanhamento de chamado do Fracttal (o quadro Acompanhamento de chamados do OS Creator),
     # publicadas pelo Nexus de hora em hora (nexus/campo/chamados_acompanhamento.py). Quem só conta chamados (a Visão do
@@ -1839,6 +1846,13 @@ LIVROS = (
           "1 minuto e a gravação relê o banco antes (troca o livro inteiro); a leitura que não acha a aba do livro que "
           "existe não vira \"vazio\" (livros.abas_conferidas)",
           so_cresce=True),
+    # a conferência das ligações (12/11/2026, Levi: "Quero uma análise das relações de dados e se as bases estão sendo
+    # lincadas da maneira correta"): o ID gravado existe na dimensão? a chave do fato se repete? Uma vez por dia
+    Livro("nexus_conferencia", ("qualidade", "atualizacao"), "1 vez por dia, na volta da carga de hora em hora",
+          "nexus/dados/conferencia.py (o laço da carga)", False,
+          "1 linha da qualidade = 1 coluna de ID (ou a chave) de 1 tabela, na última conferência: linhas, preenchidas, "
+          "órfãs (o ID que a dimensão não tem) e as que repetem a chave. Trocado inteiro a cada conferência; só "
+          "contagens, nenhum valor. Registrado em 12/11/2026 antes de existir: nasce na 1ª volta do servidor"),
     # os livros da Segurança · HSEQ, declarados na pasta dela (nexus/hseq/catalogo.py)
     *hseq_catalogo.LIVROS,
     # o uso das telas do OS Creator e os pedidos ao Fracttal, por hora (31/10/2026, etapa 0 do canto central do OS Creator):

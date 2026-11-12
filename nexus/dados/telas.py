@@ -27,7 +27,7 @@ from datetime import datetime
 from flask import abort, current_app, render_template, request, session, url_for
 
 from . import carga, catalogo, equipamento, explica, fato_almoxarifado, fato_inventario, fato_tarefa_os, historico, livros
-from . import fato_os_fama, previa
+from . import conferencia, fato_os_fama, previa
 from . import programacao, radar
 
 _CACHE = {"t": 0.0, "v": None}
@@ -72,6 +72,11 @@ def _ultima_qualidade():
         v.update(radar=radar.resumo(previa._abas(base, s)), radar_erro=None)
     except Exception as e:      # noqa: BLE001
         v.update(radar=None, radar_erro=type(e).__name__)
+    # a conferência das ligações (12/11/2026): a última gravada, com a listagem que o radar acabou de ler
+    try:
+        v.update(conferencia=conferencia.ultima(base, s, previa._abas(base, s)), conferencia_erro=None)
+    except Exception as e:      # noqa: BLE001
+        v.update(conferencia=None, conferencia_erro=type(e).__name__)
     _CACHE.update(t=time.time(), v=v)
     return v
 
@@ -394,6 +399,7 @@ def registrar_governanca(bp):
                                url_organograma=url_for(f"{bp.name}.governanca"),
                                url_tabela=url_for(f"{bp.name}.governanca_tabela"), radar=v.get("radar"),
                                radar_erro=v.get("radar_erro"), admin=bool(session.get("admin")),
+                               conferencia=v.get("conferencia"), conferencia_erro=v.get("conferencia_erro"),
                                milhar=previa._milhar)
 
     @bp.route("/governanca/tabela")

@@ -18,7 +18,9 @@ DIAS = ("segunda", "terça", "quarta", "quinta", "sexta", "sábado", "domingo")
 CAB_DIA = ["data_id", "data", "ano", "mes", "dia", "dia_semana", "nome_dia", "semana_iso", "ano_mes", "trimestre",
            "fim_de_semana", "feriado_nacional", "feriado_fonte", "dia_util"]
 CAB_FERIADO = ["data_id", "data", "tipo", "uf", "municipio", "nome"]
-INICIO, FIM = date(2025, 1, 1), date(2027, 12, 31)
+# desde 2023 (12/11/2026): o calendário começava em 2025, e 2.197 das 4.749 OS da FAMA (a mais antiga de 14/08/2023)
+# tinham a data de criação fora do `dim_data`; o fato que aponta para um dia sem linha não entra em corte nenhum
+INICIO, FIM = date(2023, 1, 1), date(2027, 12, 31)
 
 
 def data_id(d: date) -> int:

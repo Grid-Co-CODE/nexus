@@ -28,6 +28,7 @@ leitura aberta). Indicadores (sim/não) vão como 1/0, para somar e tirar média
 """
 import hashlib
 import json
+import re
 import unicodedata
 from collections import Counter
 from datetime import datetime, timedelta, timezone
@@ -172,6 +173,18 @@ class Ligador:
         return self.pessoas.get(primeiro) if primeiro else None
 
 
+def os_do_fato(v):
+    """O nº da OS como todo fato o guarda (12/11/2026): INTEIRO quando é só dígitos ("17903", 17903.0 e "17903.0" são a OS
+    17903); o que tem letra fica texto; vazio = None. Medido no banco em 12/11/2026: texto em seis fatos (fechamento,
+    ronda, PT, programação, normalização e ocorrência aberta) e inteiro em quatro (chamado, tarefa da OS, motivo do PCM e
+    vínculo de OS): cruzar a OS entre setores pedia converter em cada leitura."""
+    t = _txt(v)
+    if t.lower() in ("nan", "none", "null"):        # a célula vazia que o banco ou a planilha devolvem como palavra
+        return None
+    m = re.fullmatch(r"(\d+)(?:\.0+)?", t)
+    return int(m.group(1)) if m else (t or None)
+
+
 def chave_fechamento(a: dict) -> str:
     """`fechamento_id` = sha1("ID da OS|Tarefa|Registrado em")[:16]. Uma função só: a carga põe a chave no fato e a tela
     do Campo junta o livro cru ao fato por ela (passo 4 do Kimball, 08/10/2026)."""
@@ -190,7 +203,7 @@ def fato_fechamento(origem: list[dict], lig: Ligador, equip=None) -> list[list]:
         out.append([
             chave_fechamento(a), data_do_registro(reg), uid,
             lig.equipe(a.get("Região")), lig.pessoa(a.get("Técnico (HMAC)")), eid, eq_como,
-            _txt(a.get("OS")) or None, _txt(a.get("ID da OS no Fracttal")) or None,
+            os_do_fato(a.get("OS")), _txt(a.get("ID da OS no Fracttal")) or None,
             _txt(a.get("Código do ativo")) or None, tarefa_chave(a.get("Tarefa")),
             _txt(a.get("Tipo da OS")) or None, _txt(a.get("Criticidade")) or None, _int(a.get("Nota do painel")),
             _sim(a.get("Pontual")), _sim(a.get("Devolvida")), _txt(a.get("Revisão")) or None, _int(a.get("Fotos")),

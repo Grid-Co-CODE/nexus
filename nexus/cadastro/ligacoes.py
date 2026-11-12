@@ -53,7 +53,13 @@ SO_DO_CLIENTE = {"BD_Thopen · Dados Gerais Usinas": "Thopen", "BD_Thopen · aba
 SEM_O_CLIENTE = {"BD_Performance · aba": "Thopen"}
 # Base que só cobre os clientes que a usam, sem lista fixa no código: a FAMA (11/11/2026, `ligacao_fama.py`). Usina fora
 # dela não é buraco, e a aba "Usinas fora" listaria a carteira inteira
-SEM_AUSENCIA = frozenset({SISTEMA_FAMA})
+# O plant_id das fontes da plataforma (12/11/2026, a pendência 10 da camada de dados): as falhas de string e de tracker
+# e os eventos de tracker só têm o `plant_id` e o nome que a fonte dá à usina, e o de-para não conhecia nenhum dos dois
+# (esses fatos só ligavam por nome: 43,6% dos 163 mil eventos de tracker). As abas abaixo trazem o par com o nome
+SISTEMA_PLANT = "Plataforma · plant_id"
+ABAS_PLANT = (("falhas_performance", "cobertura"), ("falhas_performance", "strings_episodios"),
+              ("falhas_performance", "trackers_episodios"), ("falhas_performance", "trackers_dia"))
+SEM_AUSENCIA = frozenset({SISTEMA_FAMA, SISTEMA_PLANT})
 # A tabela de equipamentos do BD_Performance fecha o ciclo da aba de geração (Levi, 08/10/2026: "usa a tabela
 # equipamentos da BD_Performance como base de de-para, se liga ao fractall e aí você ligaria o fractal as usinas do
 # BD_Operações e fecharia esse ciclo"). Uma linha por equipamento (a "UFV", as UGs, os inversores), com a "Usina" (o
@@ -186,6 +192,11 @@ def fontes(config) -> dict:
     if (ALM.LIVRO_SALDO, ALM.ABA_SALDO) in abas:
         saldo = ALM.sem_almoxarifado_de_teste(_linhas_api(base, abas[(ALM.LIVRO_SALDO, ALM.ABA_SALDO)]), config)
         out[FRACTTAL] += locais_de_almoxarifado(saldo, {str(i.get("chave")) for i in out[FRACTTAL]})
+    # as usinas que só a foto dos ativos tem (12/11/2026): depois das tarefas, da árvore do PCM e dos almoxarifados
+    from ..dados import equipamento as EQP
+    if (EQP.LIVRO_FOTO, EQP.ABA_FOTO) in abas:
+        out[FRACTTAL] += usinas_da_foto(_linhas_api(base, abas[(EQP.LIVRO_FOTO, EQP.ABA_FOTO)]),
+                                        {str(i.get("chave")) for i in out[FRACTTAL]})
     dicas = {}
     if ("de_para_trackers", "Resumo por usina") in abas:
         for t in _linhas_api(base, abas[("de_para_trackers", "Resumo por usina")]):
@@ -224,6 +235,11 @@ def fontes(config) -> dict:
     # da 1ª volta do servidor), a FAMA não aparece
     if (FAMA.LIVRO, FAMA.ABA_DIM) in abas:
         out[SISTEMA_FAMA] = ligacao_fama.itens(_linhas_api(base, abas[(FAMA.LIVRO, FAMA.ABA_DIM)]))
+    # o plant_id das fontes da plataforma (12/11/2026): pelas abas de falhas e pela estrutura das usinas
+    lidas_plant = [_linhas_api(base, abas[k]) for k in ABAS_PLANT if k in abas]
+    if lidas_plant:
+        sup = _linhas_api(base, abas[(EU.LIVRO, EU.ABA_SUP)]) if (EU.LIVRO, EU.ABA_SUP) in abas else []
+        out[SISTEMA_PLANT] = itens_plant(lidas_plant, sup)
     return out
 
 
@@ -373,6 +389,68 @@ def usinas_da_arvore(caminho: Path, ja: set) -> list[dict]:
             vistos.add(B.norm(n))
             novos.append({"chave": n, "nome": n, "origem": "árvore de ativos do Fracttal"})
     return novos
+
+
+def usinas_da_foto(linhas_foto, ja: set) -> list[dict]:
+    """As usinas da foto dos ativos do Fracttal no banco (`nexus_ativos_fracttal · foto_ativos`, que o leitor do servidor
+    renova toda noite: igual nas duas máquinas) que ainda não são chave: a RAIZ de cada usina, o item cujo código é só o
+    da usina ("XYZ-ABC100") e cujo nome é "Cliente - Usina - UF". Vai com o código, que é por onde ela liga ao Registro
+    mestre. Caso de 12/11/2026: 14 usinas de um cliente em operação sem o nome do Fracttal no de-para, e a foto já com
+    2.362 ativos com o prefixo dele; a tela só conhecia as usinas das tarefas e da árvore que o motor do PCM guarda em
+    arquivo (a de quem rodou o PCM por último naquela máquina). O item que saiu do Fracttal não entra, e a grafia que só
+    muda no espaço, na caixa ou no acento de uma chave que já existe também não (seria a mesma usina duas vezes)."""
+    vistos = {B.norm(k) for k in ja}
+    novos = []
+    for x in sorted(linhas_foto or (), key=lambda x: str(x.get("descricao") or "")):
+        cod, nome = str(x.get("codigo") or "").strip().upper(), str(x.get("descricao") or "").strip()
+        if not cod or B.codigo_do_equipamento(cod) != cod or not _USINA_UF.fullmatch(nome):
+            continue
+        if str(x.get("fora_do_fracttal_desde") or "").strip() or B.norm(nome) in vistos:
+            continue
+        vistos.add(B.norm(nome))
+        novos.append({"chave": nome, "nome": nome, "codigo": cod, "origem": "foto dos ativos do Fracttal"})
+    return novos
+
+
+def _chave_sup(v) -> str:
+    """A chave do supervisório para comparar: os espaços juntados (a aba e a API PV escrevem "Assis Chateaubriand  Skid 1
+    (79)", com espaço duplo, e a estrutura guarda com um) e sem caixa."""
+    return " ".join(str(v or "").split()).casefold()
+
+
+def _plant(v) -> str:
+    """O plant_id como texto: 18749574.0 do banco é o 18749574; o de letras (o código-base) fica como vem."""
+    t = str(v if v is not None else "").strip()
+    return t[:-2] if re.fullmatch(r"\d+\.0", t) else t
+
+
+def itens_plant(abas, supervisorios) -> list[dict]:
+    """As chaves do sistema `Plataforma · plant_id`, uma por plant_id das abas de falhas (`ABAS_PLANT`), com a usina a
+    que o NOME da fonte leva pela chave do supervisório da estrutura das usinas (`nexus_estrutura_usina ·
+    dim_supervisorio`: uma chave serve a uma usina só, e quem a ligou foi a tela Equipamentos das usinas ou o Modo
+    de-para). `pela_estrutura` = o usina_id, ou None: o nome fora da estrutura, a chave desligada e o plant_id cujos
+    nomes levam a duas usinas não ligam (ficam à vista na seção, para ligar à mão). Medido em 12/11/2026: os 26 plant_id
+    que aparecem em mais de uma fonte são a mesma usina com o mesmo nome, por isso a chave é só o plant_id."""
+    dono = defaultdict(set)
+    for x in supervisorios or ():
+        if str(x.get("excluido") or "").strip().lower() != "sim" and B._id(x.get("usina_id")):
+            dono[_chave_sup(x.get("usina_supervisorio"))].add(B._id(x.get("usina_id")))
+    nomes = defaultdict(Counter)
+    for linhas in abas or ():
+        for x in linhas or ():
+            pid, nome = _plant(x.get("plant_id")), " ".join(str(x.get("usina") or "").split())
+            if pid and nome:
+                nomes[pid][nome] += 1
+    out = []
+    for pid in sorted(nomes):
+        usinas = set()
+        for nome in nomes[pid]:
+            d = dono.get(_chave_sup(nome), set())
+            usinas |= d if len(d) == 1 else set()
+        nome = nomes[pid].most_common(1)[0][0]
+        out.append({"chave": pid, "nome": nome, "rotulo": f"{nome} · plant_id {pid}",
+                    "pela_estrutura": next(iter(usinas)) if len(usinas) == 1 else None})
+    return out
 
 
 def locais_de_almoxarifado(linhas_saldo: list[dict], ja: set) -> list[dict]:
