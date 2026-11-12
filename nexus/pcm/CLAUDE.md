@@ -1237,8 +1237,12 @@ cada almoxarifado, TRÊS números de mínimo e máximo, e só um vai ao Fracttal
   página mandou (outro almoxarifado ou ID chutado é 400). **A peça da contagem gravada** (a revisão de 11/11/2026): a que a gravação
   ligou ao almoxarifado só chega à varredura no ciclo seguinte, e o `decidir` a recusava; a régua a lista já
   (`_pecas_da_contagem`: o saldo, o código e a usina do `peca_gravada`, o nome e a unidade do catálogo do App), o PCM registra o
-  acordado logo depois da auditoria, e o lote seguinte o manda. O almoxarifado de teste não tem linha na varredura (fica fora das
-  telas): a prova dele passa a `varredura=` à mão.
+  acordado logo depois da auditoria, e o lote seguinte o manda. **Só a gravada DEPOIS do início do ciclo que a tela mostra** (a
+  re-revisão de 11/11/2026): a gravada antes dele já devia estar na varredura, e a que não está foi desligada ou desativada no
+  Fracttal (voltava à régua com o saldo velho, e o `decidir` a aceitava); sem o início do ciclo, nenhuma. A peça que a curadoria
+  cadastrou e o catálogo ainda não traz leva a unidade da decisão `cadastrar` (cifrada, no `dados`; sem ela, o acordado decimal em
+  METRO da peça nova era recusado). O almoxarifado de teste não tem linha na varredura (fica fora das telas): a prova dele passa a
+  `varredura=` (e o `ciclo_inicio=`) à mão.
 - **Gravar roda na PONTE `/os/_nexus/inventario/regua/gravar` (`ponte_os.py`), não em `/t/pcm`:** o login do Fracttal é o cookie
   `os_sessao`, gravado com `Path=<raiz>/os`, e o navegador não o manda para `/t/pcm/...`; `estoque_da_sessao` numa rota de `/t/pcm`
   seria sempre `SemLogin` em produção (os testes que trocam a função não pegam isso: o teste `test_o_login_do_fracttal_so_chega_na_ponte`
@@ -1253,7 +1257,11 @@ cada almoxarifado, TRÊS números de mínimo e máximo, e só um vai ao Fracttal
   `gravado_fracttal`. A releitura que não bate é um evento `erro` e `NaoConfere` (502): o livro nunca diz que o Fracttal tem o
   que não tem. Uma linha do livro com só um dos números acordados (a API aceita linha à mão) é `Conflito` ("incompleto"), nunca
   um `TypeError` na conferência. O evento sai antes do retrato: se o retrato falhar, a peça segue "não gravada" e o PCM grava de novo (idempotente).
-  Sem acordado, ou peça não ligada ao almoxarifado: `Conflito` (409), nenhum pedido. Quem entrou pela senha de administrador
+  Sem acordado, ou peça não ligada ao almoxarifado: `Conflito` (409), nenhum pedido. **A vez do almoxarifado, como no botão de
+  todos** (a re-revisão de 11/11/2026 fechou a brecha antiga deste botão): `_vez_livre` dá 409 com a gravação de contagem andando
+  ou parada no meio e com o almoxarifado fora do modo 0, antes da leitura; a peça se anuncia antes (`_indo`, uma conta por
+  almoxarifado sob a `gravacao._TRAVA`, e não uma trava: duas peças ainda vão juntas), e a gravação de contagem recusa enquanto
+  ela vai (`lote_andando`). Quem entrou pela senha de administrador
   registra, mas não grava: 409 (não é uma pessoa; o `os_sessao` que estiver no navegador seria o login de outra), e a tela diz por
   quê; a conta do Fracttal do cookie que não é a pessoa da sessão: 409 com o link para entrar de novo; sem o cookie (quem entrou pela
   Microsoft): 401 com o link do `/os/login` e a volta à página. Quem entrou pelo Fracttal e chega à ponte sem o cookie dele tem a
@@ -1277,10 +1285,11 @@ cada almoxarifado, TRÊS números de mínimo e máximo, e só um vai ao Fracttal
   mínimo de -> para; com o `contagem_id` quando veio da gravação, e a Auditoria da contagem o mostra) e o retrato
   `gravado_fracttal`, escrevendo o livro uma vez por lote. A peça já igual no Fracttal não gasta pedido; se o livro ainda não a
   dizia gravada (o lote que o reinício cortou, o livro que recusou o registro, quem gravou à mão), ela ganha um `regua_gravada`
-  de igual para igual e o retrato (a Auditoria não perde quem nem quando). **O acordado é relido sob a trava da peça logo antes
-  de cada envio** (o que outra pessoa registrou com o lote andando vai no lugar do de antes). **A falha de uma peça não para as
-  outras:** vira um evento `erro` (o porquê cifrado, só texto do
-  Nexus, como na gravação); o `Recusado` não gravou; a resposta perdida talvez gravou, e a releitura decide. O 429 espera 62 s
+  de igual para igual e o retrato (a Auditoria não perde quem nem quando), com "já estava igual" no `dados` (o evento leva só o
+  mínimo, e sem a marca ele se confundia com a gravação que mudou só o máximo). **O acordado é relido sob a trava da peça logo
+  antes de cada envio** (o que outra pessoa registrou com o lote andando vai no lugar do de antes, e o `erro` da recusa leva o
+  relido, que foi o que se mandou). **A falha de uma peça não para as outras:** vira um evento `erro` (o porquê cifrado, só texto
+  do Nexus, como na gravação); o `Recusado` não gravou; a resposta perdida talvez gravou, e a releitura decide. O 429 espera 62 s
   FORA da trava da peça (registrar o acordado dela não espera) e tenta UMA vez; de novo, o lote para e o resto não vai (o texto
   diz quantas e manda gravar de novo; `feitas` não conta a que não foi); o login que expira também para, e a releitura que não
   veio deixa as mandadas sem anotação de gravada. O acordado que outra pessoa registra depois do envio não vira "gravado": o
@@ -1291,13 +1300,19 @@ cada almoxarifado, TRÊS números de mínimo e máximo, e só um vai ao Fracttal
   `<NEXUS_DADOS>/almox_inventario/regua-lote-<almox>.json` ("gravando", salvo a cada peça; quem mandou só como código, nunca o
   login), que **o deploy espera como espera a gravação** (`gravacao.com_lote_aberto` devolve `regua-<almox>`) e a tela acompanha
   (`GET /t/pcm/pecas/inventario/regua/lote.json`, a cada 3 s pelo `pcm-regua.js`, que recarrega no fim; o botão some enquanto
-  ele anda). O resultado vem do controle, na cor dele (`_tom_do_lote`: o lote com falha, sem ligação, incompleto ou parado no
-  meio sai na caixa de alerta, nunca na verde), por `RESULTADO_H` (12 h); o "gravando" sem a thread viva é o Nexus que reiniciou
-  no meio: "parada", e o lote seguinte anota de igual para igual a peça que o Fracttal já tem. **O lote e a gravação de contagem
-  se excluem dos dois lados:** o botão toma a vez do lote (`_LOTE`) e então confere a da gravação sob a `gravacao._TRAVA`
-  (`gravacao.vez_presa`: a gravação andando, ou a vez presa por uma contagem que parou no meio, talvez com o almoxarifado
-  travado em ajuste: 409) e o modo do almoxarifado no Fracttal (fora do 0, 409: a régua com o ajuste aberto nunca foi provada);
-  o aprovar e o continuar recusam (409) enquanto o lote anda (`gravacao._sem_lote_da_regua`, sob a mesma trava).
+  ele anda). **O controle do começo que o disco não deixa gravar não começa o lote** (503 com o porquê, nada vai ao Fracttal; a
+  re-revisão de 11/11/2026: a ponte devolvia None, e a página levava um 500 com o lote andando sem o deploy saber); o do andamento
+  que falha só tira o andamento da tela. O `almox` do `lote.json` só vira caminho com números. **A sessão que vence para as
+  perguntas** (o 401 do portão, ou o pedido levado à tela de entrar): a caixa diz que a sessão do Fracttal venceu e manda
+  recarregar e entrar de novo; o lote segue no Nexus. O resultado vem do controle, na cor dele (`_tom_do_lote`: o lote com falha,
+  sem ligação, incompleto ou parado no meio sai na caixa de alerta, nunca na verde), por `RESULTADO_H` (12 h); o "gravando" sem a
+  thread viva é o Nexus que reiniciou no meio: "parada", e o lote seguinte anota de igual para igual a peça que o Fracttal já tem.
+  **A régua e a gravação de contagem se excluem dos dois lados:** o botão de todos toma a vez do lote (`_LOTE`), e o de uma peça
+  se anuncia (`_indo`), e então conferem a da gravação sob a `gravacao._TRAVA` (`_vez_livre` com o `gravacao.vez_presa`: a
+  gravação andando, ou a vez presa por uma contagem que parou no meio, talvez com o almoxarifado travado em ajuste: 409) e o
+  modo do almoxarifado no Fracttal (fora do 0, 409: a régua com o ajuste aberto nunca foi provada); o aprovar e o continuar
+  recusam (409) enquanto o lote anda ou uma peça vai (`gravacao._sem_lote_da_regua`, sob a mesma trava). Sem a pasta de dados
+  nenhuma gravação começa, e a vez só é presa pela viva no processo.
 - **"No Fracttal agora" (11/11/2026):** toda releitura de régua (o botão da peça e o lote) guarda o mínimo e o máximo de cada peça
   do almoxarifado e a hora (`guardar_lida`, `<NEXUS_DADOS>/almox_inventario/regua-lida-<almox>.json`: a foto do Fracttal para a
   tela, como o controle da gravação; o rastro de negócio é o evento no banco), e a coluna No Fracttal mostra "mín X, máx Y", com
@@ -1349,7 +1364,9 @@ branco não é pendência, nem a avariada sem o ID E sem o Código da peça boa 
   auditoria, e entra no lote pela `contas.contado_efetivo`: "é a peça X" e "cadastrar" SOMAM as achadas ao contado da peça NESSA
   contagem (o total substitui o saldo); o genérico confirmado tira do genérico e põe no específico. `decisoes(cfg, contagem)` devolve
   `{ID da linha: {decisao, id_item, codigo}}`, o formato que `contado_efetivo` e `itens_do_lote` pedem. A peça cadastrada é ligada ao
-  almoxarifado e ajustada na gravação da contagem, não aqui.
+  almoxarifado e ajustada na gravação da contagem, não aqui. **O `cadastrar` guarda a unidade que foi ao Fracttal** (cifrada, no
+  `dados`, ao lado do motivo; a re-revisão de 11/11/2026): o catálogo do App só traz a peça nova na varredura seguinte, e a
+  régua a lê daqui.
 - **Uma linha decidida não se decide de novo** (`Conflito`, 409: dois do PCM com a tela aberta não cadastram a mesma peça duas
   vezes), e **a decisão só vale até a contagem ser gravada**: gravada, aprovada (a gravação começou), com o controle da gravação já
   criado (`gravacao.existe`: o registro da aprovação que falhou no meio deixa os eventos em "nova" com o lote congelado; antes do

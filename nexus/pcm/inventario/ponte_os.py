@@ -148,7 +148,8 @@ def lote(contagem_id: str):
 def regua_gravar():
     """Manda o acordado registrado ao Fracttal, relê e anota (`regua.gravar_acordado`). Só o que está no livro vai: o formulário
     traz o almoxarifado, a peça e o acordado que a tela MOSTRAVA (`aco_min`, `aco_max`), só para conferir: se o registrado agora é
-    outro, 409 "a régua mudou desde que você abriu a tela"."""
+    outro, 409 "a régua mudou desde que você abriu a tela". Como no botão de todos (a re-revisão de 11/11/2026), 409 com a vez do
+    almoxarifado presa por uma gravação de contagem ou com ele fora do modo 0 no Fracttal."""
     f = request.form
     almox, item = A._id(f.get("almox")), A._id(f.get("item"))
     de = "/t/pcm/pecas/inventario/regua" + ("?" + urlencode({"almox": almox}) if almox else "")
@@ -169,7 +170,9 @@ def regua_gravar_todos():
     login de quem apertou, com as recusas de sempre da ponte (`_com_o_fracttal`). O lote roda em segundo plano (a revisão de
     11/11/2026: no pedido, 100 peças levavam uns 2 min e o restart do deploy no meio deixava peças sem o evento): a resposta volta
     logo, e a página da régua acompanha o andamento. A gravação de contagem e o lote se excluem: com a vez do almoxarifado presa
-    (uma gravação andando, ou parada no meio) ou o almoxarifado fora do modo 0 no Fracttal, 409, e nada é enviado."""
+    (uma gravação andando, ou parada no meio) ou o almoxarifado fora do modo 0 no Fracttal, 409, e nada é enviado. O controle do
+    lote que o disco não deixa gravar é 503 com o porquê (o `iniciar_lote` não começa; a re-revisão de 11/11/2026: aqui chegava
+    None, e a página levava um 500)."""
     almox = A._id(request.form.get("almox"))
     de = "/t/pcm/pecas/inventario/regua" + ("?" + urlencode({"almox": almox}) if almox else "")
     r = _com_o_fracttal(de, lambda est: regua.iniciar_lote(current_app.config, almox, est,

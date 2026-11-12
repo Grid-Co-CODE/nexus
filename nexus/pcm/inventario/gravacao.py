@@ -115,10 +115,11 @@ SEM_LIVRO = "não consegui registrar no livro do inventário; o almoxarifado fic
 RELEITURA = "{n} {pecas} não {conferiram} na releitura do Fracttal: confira e continue"
 INTERROMPIDA = "a gravação parou no meio (o Nexus reiniciou)"
 EM_ANDAMENTO = "já tem uma gravação em andamento neste almoxarifado"
-# o lote dos acordados (`regua.iniciar_lote`, 11/11/2026) e a gravação se excluem: duas sessões falando com o mesmo almoxarifado ao
-# mesmo tempo não ajudam ninguém, e a régua mandada com o ajuste aberto nunca foi provada
-LOTE_DA_REGUA = ("Não gravei: os acordados deste almoxarifado estão indo ao Fracttal agora (a tela Mínimo e máximo mostra o "
-                 "andamento). Espere terminar e grave de novo.")
+# o lote dos acordados (`regua.iniciar_lote`, 11/11/2026) e o botão de uma peça da régua (a re-revisão) se excluem com a gravação:
+# duas sessões falando com o mesmo almoxarifado ao mesmo tempo não ajudam ninguém, e a régua mandada com o ajuste aberto nunca foi
+# provada
+LOTE_DA_REGUA = ("Não gravei: os acordados deste almoxarifado estão indo ao Fracttal agora (o lote ou uma peça, na tela Mínimo e "
+                 "máximo). Espere terminar e grave de novo.")
 SO_QUEM_APROVOU = "só quem aprovou continua"
 AVISO_TRAVADO = "{almox} ficou travado em ajuste no Fracttal; quem aprovou precisa continuar para destravar."
 SEM_PESSOA = ("Não sei quem está aprovando: entre com o seu login do Fracttal (a gravação fica no nome de quem aprova, e a "
@@ -326,15 +327,19 @@ def _reservar(cfg, id_almox: str, contagem_id: str) -> None:
 
 
 def vez_presa(cfg, id_almox: str) -> str:
-    """Por que o almoxarifado não pode receber o lote dos acordados agora ("" se pode; 11/11/2026, a revisão da onda 1): uma
+    """Por que o almoxarifado não pode receber a régua acordada agora ("" se pode; 11/11/2026, a revisão da onda 1): uma
     gravação de contagem andando (ou começando) neste processo, ou a vez presa por uma contagem que não terminou, a parada no
     meio inclusive (talvez com o almoxarifado travado em ajuste no Fracttal). A mesma conta do `_reservar`, sem reservar, sob a
-    `_TRAVA`: o lote segura a vez dele (`regua._LOTE`) antes de perguntar, e a gravação olha a vez do lote sob a mesma trava
-    (`_sem_lote_da_regua`), então uma das duas sempre vê a outra. O controle ilegível conta como presa (na dúvida, nada vai)."""
+    `_TRAVA`: o lote segura a vez dele (`regua._LOTE`), e o botão de uma peça se anuncia (`regua._indo`), antes de perguntar, e
+    a gravação olha os dois sob a mesma trava (`_sem_lote_da_regua`), então uma das duas sempre vê a outra. O controle ilegível
+    conta como presa (na dúvida, nada vai). Sem a pasta de dados nenhuma gravação começa (o `_reservar` a exige): só a viva neste
+    processo conta (o botão de uma peça grava sem a pasta; o de todos a exige, para o controle dele)."""
     almox = A._id(id_almox)
     with _TRAVA:
         if _viva(almox):
             return f"{EM_ANDAMENTO} (uma gravação de contagem)"
+        if _pasta(cfg) is None:
+            return ""
         try:
             dono = _ler_json(_caminho_trava(cfg, almox))
             outra = str((dono or {}).get("contagem_id") or "")
@@ -351,7 +356,8 @@ def vez_presa(cfg, id_almox: str) -> str:
 
 
 def _sem_lote_da_regua(id_almox: str) -> None:
-    """A gravação (aprovar e continuar) recusa enquanto o lote dos acordados deste almoxarifado anda (chamar sob `_TRAVA`)."""
+    """A gravação (aprovar e continuar) recusa enquanto o lote dos acordados deste almoxarifado anda, ou uma peça dele vai ao
+    Fracttal pelo botão dela (`regua.lote_andando`; chamar sob `_TRAVA`)."""
     from . import regua
     if regua.lote_andando(id_almox):
         raise Recusada(LOTE_DA_REGUA)

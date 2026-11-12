@@ -658,6 +658,12 @@ def _conferir_o_nome_da_peca(achada: dict, reserva: dict, codigo: str) -> None:
                        "Fracttal.")
 
 
+def _unidade_do_cadastro(unidade, da_boa="") -> str:
+    """A unidade que vai ao Fracttal no cadastro: a que o PCM mandou ou, sem ela, a `da_boa` (a avariada sem cadastro); sem
+    nenhuma, UNIDADE. A decisão `cadastrar` a guarda (a régua lê dela a unidade da peça que o catálogo do App ainda não traz)."""
+    return (_txt(unidade) or _txt(da_boa)).upper() or "UNIDADE"
+
+
 def _cadastrar(cfg, contagem_id, chave, almox, sigla, nome, unidade, estoque) -> tuple[str, str, bool]:
     """Cria a peça no Fracttal sem duplicar. Devolve (id do item, código, criou agora).
 
@@ -672,7 +678,7 @@ def _cadastrar(cfg, contagem_id, chave, almox, sigla, nome, unidade, estoque) ->
     nome = " ".join(_txt(nome).split())
     if not nome or len(nome) > NOME_MAX:
         raise ValueError(f"Informe o nome da peça (até {NOME_MAX} letras).")
-    unidade = _txt(unidade).upper() or "UNIDADE"
+    unidade = _unidade_do_cadastro(unidade)
     if estoque is None:
         raise ValueError("Cadastrar fala com o Fracttal: é preciso o login do Fracttal de quem decide.")
     arq = _arquivo_reserva(cfg, contagem_id)
@@ -756,7 +762,7 @@ def _cadastrar_avariado(l: dict, nome, unidade, estoque) -> tuple[str, str, bool
     nome = " ".join(_txt(nome or l.get("_nome_av")).split())
     if not nome or len(nome) > NOME_MAX:
         raise ValueError(f"Informe o nome da peça (até {NOME_MAX} letras).")
-    unidade = (_txt(unidade) or _txt(l.get("_unidade_av"))).upper() or "UNIDADE"
+    unidade = _unidade_do_cadastro(unidade, l.get("_unidade_av"))
     if estoque is None:
         raise ValueError("Cadastrar fala com o Fracttal: é preciso o login do Fracttal de quem decide.")
     with _CODIGO_AV.de(codigo.upper()):
@@ -863,8 +869,13 @@ def decidir(cfg, contagem_id: str, chave_linha: str, decisao: str, *, id_item: s
                      "codigo_criado": (codigo or None) if decisao == "cadastrar" else None, "id_almoxarifado": almox,
                      "usina_id": usina,
                      "usina_ligada_por": F.USINA_LIGADA_POR[0] if usina else None, **quem_}
-            if motivo:
-                linha["dados"] = {"motivo": motivo}
+            # a unidade da peça criada (a re-revisão de 11/11/2026): até a varredura seguinte do App, o catálogo não a traz, e a
+            # régua a lê daqui (sem ela, o acordado decimal em METRO da peça nova era recusado)
+            dados = {"motivo": motivo} if motivo else {}
+            if decisao == "cadastrar":
+                dados["unidade"] = _unidade_do_cadastro(unidade, l.get("_unidade_av") if tipo == "avariado" else "")
+            if dados:
+                linha["dados"] = dados
             F.acrescentar(cfg, F.ABA_CURADORIA, [linha])
             try:
                 F.acrescentar(cfg, F.ABA_EVENTO, [{

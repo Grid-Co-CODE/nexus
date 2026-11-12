@@ -1599,3 +1599,17 @@ def test_quem_so_olha_nao_ve_a_sugestao(cur, banco, monkeypatch):  # noqa: F811
     monkeypatch.setattr(telas, "pode_programar", lambda: False)
     html = _pessoa_ms(cur).get(URL).get_data(as_text=True)
     assert "(sugerida)" not in html and "As mais parecidas no catálogo" not in html
+
+
+# ── a re-revisão da onda 1 (11/11/2026) ──────────────────────────────────────────────────────────────────────────────────
+def test_rerevisao_1_o_cadastrar_guarda_a_unidade_na_decisao(cur):
+    """A peça cadastrada hoje só chega ao catálogo do App na varredura seguinte, e a régua (a peça da contagem gravada) a lia sem
+    unidade: o acordado decimal em METRO era recusado. A decisão `cadastrar` guarda a unidade que foi ao Fracttal (cifrada, no
+    `dados`, como o motivo); a da avariada sem cadastro é a da boa, quando o PCM não diz outra."""
+    _cadastrar(cur.config, _falso())
+    d = _livro(cur.config, F.ABA_CURADORIA)[0]
+    assert F.decifrar(cur.config, F.ABA_CURADORIA, d) == {"unidade": "METRO"}
+    _o_bom_sem_av(cur)
+    CU.decidir(cur.config, "C-1", "L-6", "cadastrar", estoque=_falso(), pessoa=PESSOA)
+    d = [x for x in _livro(cur.config, F.ABA_CURADORIA) if x["chave_linha"] == "L-6"][0]
+    assert F.decifrar(cur.config, F.ABA_CURADORIA, d) == {"unidade": "METRO"}

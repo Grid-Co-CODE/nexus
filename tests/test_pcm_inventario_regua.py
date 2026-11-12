@@ -6,6 +6,7 @@ ao Fracttal (`min_stock_level`, que dispara o alarme), e só quando a releitura 
 códigos e IDs inventados, sem nome de gente."""
 import json
 import re
+import shutil
 from datetime import datetime
 from pathlib import Path
 
@@ -154,7 +155,7 @@ def test_so_o_acordado_vai_ao_fracttal(cfg):
     R.decidir(cfg, ALMOX, "5001", acordado=(2, 20), pessoa=PESSOA, varredura=var)
     assert falso.chamadas == []
     R.gravar_acordado(cfg, ALMOX, "5001", falso, PESSOA)
-    assert falso.chamadas == ["ler", "definir_regua", "ler"]
+    assert falso.chamadas == ["modo", "ler", "definir_regua", "ler"]            # o modo conferido antes (a vez do almoxarifado)
     item = falso.ler(ALMOX)["5001"]
     assert (item["minimo"], item["maximo"]) == (2.0, 20.0)            # o acordado, e não o recomendado (3 e 30)
     assert item["saldo"] == 10.0 and falso.movimentos == []         # a régua não mexe em saldo nem gera movimento
@@ -478,7 +479,7 @@ def test_gravar_pela_ponte_usa_o_login_de_quem_aprova(inv, monkeypatch):
     r = c.post(PONTE, data=GRAVAR)
     assert r.status_code == 200 and r.get_json()["ok"] is True
     assert r.get_json()["volta"].endswith("/t/pcm/pecas/inventario/regua?almox=10")
-    assert falso.chamadas == ["ler", "definir_regua", "ler"]
+    assert falso.chamadas == ["modo", "ler", "definir_regua", "ler"]
     assert (falso.ler("10")["1"]["minimo"], falso.ler("10")["1"]["maximo"]) == (2.0, 9.0)
     html = c.get(r.get_json()["volta"]).get_data(as_text=True)
     assert "régua gravada no fracttal: mínimo 2, máximo 9" in html.lower()
@@ -597,7 +598,7 @@ def test_acordado_decimal_so_em_metro_e_massa(cfg):
     inteiro = EstoqueFalso({ALMOX: {"5001": {"saldo": 10, "minimo": 1, "maximo": 4, "codigo": "SP-CAB-001", "unidade": "UNIDADE"}}})
     with pytest.raises(ValueError, match="UNIDADE|unidade"):
         R.gravar_acordado(cfg, ALMOX, "5001", inteiro, PESSOA)
-    assert inteiro.chamadas == ["ler"] and inteiro.ler(ALMOX)["5001"]["maximo"] == 4.0
+    assert inteiro.chamadas == ["modo", "ler"] and inteiro.ler(ALMOX)["5001"]["maximo"] == 4.0
     metro = EstoqueFalso({ALMOX: {"5001": {"saldo": 10, "minimo": 1, "maximo": 4, "codigo": "SP-CAB-001", "unidade": "METRO"}}})
     R.gravar_acordado(cfg, ALMOX, "5001", metro, PESSOA)
     assert (metro.ler(ALMOX)["5001"]["minimo"], metro.ler(ALMOX)["5001"]["maximo"]) == (2.5, 9.0)
@@ -715,6 +716,8 @@ def test_o_login_do_fracttal_so_chega_na_ponte(inv, api_do_clone, monkeypatch):
     def post(url, headers=None, json=None, timeout=None):
         metodo = json[0]["method"]
         pedidos.append((metodo, headers["Authorization"]))
+        if metodo == "inventories.warehouses_list":              # o modo do almoxarifado, conferido antes da régua
+            return _result({"success": True, "total": 1, "data": [{"id": 10, "code": "ALMOX-10", "mode": 0, "active": True}]})
         if metodo == "inventories.warehouses_items_stock":
             return _result({"success": True, "total": 1, "data": [{
                 "id": 777, "id_item": 1, "code": "SP-1", "stock": 1, "min_stock_level": nivel["min"],
@@ -734,8 +737,8 @@ def test_o_login_do_fracttal_so_chega_na_ponte(inv, api_do_clone, monkeypatch):
     assert pedidos == []
     r = c.post(PONTE, data=GRAVAR)
     assert r.status_code == 200 and r.get_json()["ok"] is True
-    assert [m for m, _ in pedidos] == ["inventories.warehouses_items_stock", "inventories.warehouses_items_update",
-                                       "inventories.warehouses_items_stock"]
+    assert [m for m, _ in pedidos] == ["inventories.warehouses_list", "inventories.warehouses_items_stock",
+                                       "inventories.warehouses_items_update", "inventories.warehouses_items_stock"]
     assert {h for _, h in pedidos} == {f"Bearer {jwt}"}                        # no login de quem apertou
     assert nivel == {"min": 2.0, "max": 9.0}
     assert [e["tipo"] for e in F.ler(inv.config, forcar=True)[F.ABA_EVENTO]] == ["regua_gravada"]
@@ -1162,10 +1165,10 @@ def test_correcao_3_a_regua_lista_a_peca_da_contagem_gravada(cfg):
     F.acrescentar(cfg, F.ABA_EVENTO, [{"tipo": "peca_gravada", "contagem_id": "C-1", "id_almoxarifado": ALMOX,
                                        "id_item": "7777", "codigo": "SP-CAB-777", "usina_id": 7,
                                        "usina_ligada_por": LIGADA, "de_qtd": 0, "para_qtd": 6}])
-    q = {x["id_item"]: x for x in R.quadro(cfg, ALMOX, varredura=VAR_LOTE)}
+    q = {x["id_item"]: x for x in R.quadro(cfg, ALMOX, varredura=VAR_LOTE, ciclo_inicio=CICLO)}
     assert q["7777"]["codigo"] == "SP-CAB-777" and q["7777"]["saldo"] == 6 and q["7777"]["saldo_de"] == "contagem gravada"
     assert (q["7777"]["sugestao_min"], q["7777"]["sugestao_max"]) == (2, 12)
-    R.decidir(cfg, ALMOX, "7777", acordado=(2, 12), pessoa=PESSOA, varredura=VAR_LOTE)
+    R.decidir(cfg, ALMOX, "7777", acordado=(2, 12), pessoa=PESSOA, varredura=VAR_LOTE, ciclo_inicio=CICLO)
     falso = EstoqueFalso({ALMOX: {"7777": {"saldo": 6, "minimo": 0, "maximo": 0, "codigo": "SP-CAB-777"}}})
     r = R.gravar_acordados(cfg, ALMOX, falso, QUEM)
     assert r["gravadas"] == 1 and (falso.ler(ALMOX)["7777"]["minimo"], falso.ler(ALMOX)["7777"]["maximo"]) == (2.0, 12.0)
@@ -1260,3 +1263,195 @@ def test_correcao_13_feitas_nao_conta_a_peca_que_nao_foi(cfg):
     _acordar(cfg, ("5001", (2, 20)), ("5002", (1, 8)))
     r = R.gravar_acordados(cfg, ALMOX, _falso_lote(limite_em=[2, 3]), QUEM, dormir=lambda s: None)
     assert (r["feitas"], r["nao_enviadas"], r["a_mandar"]) == (0, 2, 2)
+
+
+# ── a re-revisão da onda 1 (11/11/2026): os 7 menores ───────────────────────────────────────────────────────────────────────
+CICLO = "2026-10-25T03:00:12Z"          # o início do ciclo do App que a tela mostra
+
+
+def test_rerevisao_1_a_peca_da_contagem_so_depois_do_ciclo_e_com_a_unidade_da_curadoria(cfg):
+    """A peça da contagem gravada que a varredura não traz só entra na régua se a gravação veio DEPOIS do início do ciclo do App
+    que a tela mostra: a gravada antes dele já devia estar na varredura, e a que não está foi desligada ou desativada no Fracttal
+    (com o saldo velho, ela voltava à régua, e o `decidir` a aceitava). Sem o início do ciclo, nenhuma. A peça que a curadoria
+    cadastrou e o catálogo do App ainda não traz leva a unidade da decisão da curadoria: o acordado decimal em METRO vale."""
+    F.acrescentar(cfg, F.ABA_EVENTO, [
+        {"quando": "2026-10-20T10:00:00Z", "tipo": "peca_gravada", "contagem_id": "C-1", "id_almoxarifado": ALMOX,
+         "id_item": "6666", "codigo": "SP-CAB-666", "usina_id": 7, "usina_ligada_por": LIGADA, "de_qtd": 0, "para_qtd": 5},
+        {"quando": "2026-10-26T10:00:00Z", "tipo": "peca_gravada", "contagem_id": "C-2", "id_almoxarifado": ALMOX,
+         "id_item": "8888", "codigo": "SP-CAB-888", "usina_id": 7, "usina_ligada_por": LIGADA, "de_qtd": 0,
+         "para_qtd": 12.5}])
+    F.acrescentar(cfg, F.ABA_CURADORIA, [{"contagem_id": "C-2", "chave_linha": "L-1", "decisao": "cadastrar",
+                                          "id_item": "8888", "codigo_criado": "SP-CAB-888", "id_almoxarifado": ALMOX,
+                                          "usina_id": 7, "usina_ligada_por": LIGADA, "pessoa_hmac": QUEM["pessoa_hmac"],
+                                          "dados": {"unidade": "METRO"}}])
+    q = {x["id_item"]: x for x in R.quadro(cfg, ALMOX, varredura=VAR_LOTE, ciclo_inicio=CICLO)}
+    assert "6666" not in q                     # gravada antes do ciclo e fora da varredura: desligada no Fracttal
+    assert q["8888"]["unidade"] == "METRO" and q["8888"]["decimal"] and q["8888"]["saldo"] == 12.5
+    assert "8888" not in {x["id_item"] for x in R.quadro(cfg, ALMOX, varredura=VAR_LOTE)}       # sem o ciclo, nenhuma
+    with pytest.raises(ValueError, match="almoxarifado"):
+        R.decidir(cfg, ALMOX, "6666", acordado=(1, 4), pessoa=PESSOA, varredura=VAR_LOTE, ciclo_inicio=CICLO)
+    R.decidir(cfg, ALMOX, "8888", acordado=("2,5", "25,5"), pessoa=PESSOA, varredura=VAR_LOTE, ciclo_inicio=CICLO)
+    linha = _livro(cfg, F.ABA_REGUA)[-1]
+    assert (linha["id_item"], linha["acordado_min_qtd"], linha["acordado_max_qtd"]) == ("8888", 2.5, 25.5)
+
+
+def test_rerevisao_2_o_erro_da_recusa_leva_o_acordado_relido(cfg, monkeypatch):
+    """O Fracttal recusa a régua de uma peça cujo acordado outra pessoa mudou com o lote andando: o evento `erro` leva o acordado
+    relido sob a trava da peça, que foi o que se mandou, e não o do começo do lote."""
+    _acordar(cfg, ("5001", (2, 20)))
+    falso = _RecusaUma({ALMOX: {"5001": {"saldo": 10, "minimo": 1, "maximo": 4, "codigo": "SP-CAB-001"}}})
+    ler = falso.ler
+
+    def ler_e_mudar(id_almox):
+        lido = ler(id_almox)
+        if falso.chamadas.count("ler") == 1:          # depois da 1ª leitura do lote, outra pessoa registra outro acordado
+            R.decidir(cfg, ALMOX, "5001", acordado=(3, 30), pessoa=PESSOA, varredura=VAR_LOTE)
+        return lido
+    monkeypatch.setattr(falso, "ler", ler_e_mudar)
+    r = R.gravar_acordados(cfg, ALMOX, falso, QUEM)
+    assert r["falhas"] == 1
+    assert [(e["id_item"], e["de_qtd"], e["para_qtd"]) for e in _eventos(cfg, "erro")] == [("5001", 1, 3)]
+
+
+def test_rerevisao_3_o_de_igual_para_igual_diz_que_ja_estava_igual(cfg):
+    """O `regua_gravada` de igual para igual (a peça que o Fracttal já tinha e o livro não dizia) leva só o mínimo, como a
+    gravação que mudou só o máximo: o `dados` (cifrado) diz "já estava igual", e a Auditoria (o "motivo cifrado") os distingue."""
+    _acordar(cfg, ("5001", (2, 20)), ("5003", (2, 20)))
+    R.gravar_acordados(cfg, ALMOX, _falso_lote(), QUEM)
+    ev = {e["id_item"]: e for e in _eventos(cfg, "regua_gravada")}
+    assert (ev["5003"]["de_qtd"], ev["5003"]["para_qtd"]) == (2, 2)
+    assert "já estava igual" in F.decifrar(cfg, F.ABA_EVENTO, ev["5003"])["motivo"]
+    assert F.decifrar(cfg, F.ABA_EVENTO, ev["5001"]) == {} and not ev["5001"].get("dados_cifrados")
+
+
+def test_rerevisao_4_o_controle_do_lote_so_com_o_almoxarifado_de_numeros(cfg, tmp_path):
+    """O `lote.json?almox=` chega cru da página: o caminho do controle do lote só se monta com o ID de números (como o da
+    releitura). Com outro texto, nenhum arquivo é lido, nem o de fora da pasta."""
+    dados = tmp_path / "dados"
+    cfg["NEXUS_DADOS"] = str(dados)
+    (dados / "almox_inventario").mkdir(parents=True)
+    (dados / "segredo.json").write_text(json.dumps({"estado": "concluida", "id_almox": "x", "texto": "de fora"}), "utf-8")
+    for fora in ("x/../../segredo", "../segredo", "10.5", "abc", ""):
+        with pytest.raises(ValueError):
+            R._arquivo_lote(cfg, fora)
+        assert R.estado_do_lote(cfg, fora) is None, fora
+    assert R._arquivo_lote(cfg, "10").name == "regua-lote-10.json"
+
+
+def test_rerevisao_5_o_controle_que_nao_grava_nao_comeca_o_lote(inv, monkeypatch, tmp_path):
+    """O controle do lote que o disco não deixa gravar: o lote não começa (sem o controle, o deploy não o esperaria e a tela não o
+    acompanharia), nada vai ao Fracttal, e a página recebe um erro claro, e não o 500 do pedido sem resposta."""
+    from nexus.pcm.inventario import gravacao as G
+    inv.config["NEXUS_DADOS"] = str(tmp_path / "dados")
+    falso = _falso_10()
+    _estoque_da_sessao(monkeypatch, falso)
+    _no_setor(monkeypatch, SID.PCM)
+    c = com_o_fracttal(inv, _pessoa_ms(inv))
+    assert c.post("/t/pcm/pecas/inventario/regua/decidir", data={"almox": "10", "item": "1", "aco_min": "2",
+                                                                   "aco_max": "9"}).status_code == 303
+    gravar = G._gravar_json
+
+    def disco_cheio(p, d):
+        if p.name.startswith("regua-lote-"):
+            raise OSError(28, "No space left on device")
+        return gravar(p, d)
+    monkeypatch.setattr(G, "_gravar_json", disco_cheio)
+    try:
+        r = c.post(TODOS, data={"almox": "10"})
+    finally:
+        R.aguardar_lote("10")
+    assert r.status_code == 503 and "controle do lote" in r.get_json()["erro"]
+    assert "definir_regua" not in falso.chamadas and not R.lote_andando("10")
+
+
+PAGINA_REGUA = r"""
+const CENA = JSON.parse(process.argv[2]);
+let tick = null, parou = false, recarregou = false, pedidos = 0;
+globalThis.window = globalThis;
+globalThis.setInterval = f => { tick = f; return 7; };
+globalThis.clearInterval = () => { parou = true; };
+window.nexusRota = u => u;
+window.location = {reload() { recarregou = true; }};
+function el(attrs) {
+  return {attrs: Object.assign({}, attrs), textContent: "",
+    getAttribute(k) { return k in this.attrs ? this.attrs[k] : null; },
+    setAttribute(k, v) { this.attrs[k] = String(v); }};
+}
+const n = el({});
+const caixa = el({"data-rg-lote": "gravando", "data-url": "/t/pcm/pecas/inventario/regua/lote.json?almox=10", role: "status"});
+caixa.querySelector = sel => sel === "[data-rg-lote-n]" ? n : null;
+globalThis.document = {addEventListener() {},
+  querySelector(sel) { return sel === '[data-rg-lote="gravando"]' ? caixa : null; }};
+globalThis.fetch = () => {
+  pedidos++;
+  const r = CENA;
+  return Promise.resolve({status: r.status, ok: r.status >= 200 && r.status < 300, redirected: !!r.redirected,
+    json() { return r.corpo === null ? Promise.reject(new Error("html")) : Promise.resolve(r.corpo); }});
+};
+require(process.argv[1]);
+tick();
+setTimeout(() => process.stdout.write(JSON.stringify({parou, recarregou, pedidos, texto: caixa.textContent,
+  n: n.textContent, role: caixa.attrs.role})), 30);
+"""
+
+
+def _pergunta_do_lote(**cena):
+    import subprocess
+    r = subprocess.run(["node", "-e", PAGINA_REGUA, str(RAIZ / "nexus" / "static" / "pcm-regua.js"), json.dumps(cena)],
+                       capture_output=True, text=True, encoding="utf-8", timeout=60)
+    assert r.returncode == 0, r.stderr
+    return json.loads(r.stdout)
+
+
+@pytest.mark.skipif(not shutil.which("node"), reason="sem node nesta máquina")
+def test_rerevisao_6_a_pergunta_do_lote_para_quando_a_sessao_vence():
+    """A página do lote andando pergunta o andamento a cada 3 s; com a sessão vencida (o 401 do portão, ou o pedido levado à
+    tela de entrar), perguntar de novo não traria nada: para, e a caixa diz que a sessão do Fracttal venceu e o que fazer."""
+    venceu = "A sua sessão do Fracttal venceu (ela dura cerca de 12 horas), e o Nexus saiu junto. Entre de novo para continuar."
+    r = _pergunta_do_lote(status=401, corpo={"ok": False, "login": True, "erro": venceu})
+    assert r["parou"] and not r["recarregou"] and r["role"] == "alert"
+    assert venceu in r["texto"] and "recarregue" in r["texto"]
+    r = _pergunta_do_lote(status=200, redirected=True, corpo=None)          # sem a sessão: a tela de entrar, em HTML
+    assert r["parou"] and not r["recarregou"] and "sessão do Fracttal venceu" in r["texto"]
+    r = _pergunta_do_lote(status=200, corpo={"estado": "gravando", "feitas": 2, "a_mandar": 5})
+    assert not r["parou"] and r["n"] == "2 de 5" and r["texto"] == ""
+    r = _pergunta_do_lote(status=200, corpo={"estado": "concluida"})
+    assert r["parou"] and r["recarregou"]
+
+
+def test_rerevisao_7_o_botao_de_uma_peca_confere_a_vez_e_o_modo(inv, monkeypatch, tmp_path):
+    """A brecha antiga: o botão de UMA peça não conferia a vez nem o modo. Agora é a mesma conferência do botão de todos (409 com
+    a contagem presa, ou com o almoxarifado fora do modo 0, antes de mandar), e a gravação de contagem recusa enquanto a peça vai
+    ao Fracttal (as duas se excluem dos dois lados). Duas peças ainda vão ao mesmo tempo: a trava segue sendo da peça."""
+    import threading
+    from nexus.pcm.inventario import gravacao as G
+    dados = tmp_path / "dados"
+    inv.config["NEXUS_DADOS"] = str(dados)
+    falso = _falso_10()
+    _estoque_da_sessao(monkeypatch, falso)
+    _no_setor(monkeypatch, SID.PCM)
+    c = com_o_fracttal(inv, _pessoa_ms(inv))
+    corpo = {"almox": "10", "item": "1", "aco_min": "2", "aco_max": "9"}
+    assert c.post("/t/pcm/pecas/inventario/regua/decidir", data=corpo).status_code == 303
+    uma = "/os/_nexus/inventario/regua/gravar"
+    _vez_presa_por_uma_gravacao_parada(dados)
+    r = c.post(uma, data=corpo)
+    assert r.status_code == 409 and "travado em ajuste" in r.get_json()["erro"] and falso.chamadas == []
+    (dados / "almox_inventario" / "trava-10.json").unlink()
+    falso.definir_modo("10", 2)
+    r = c.post(uma, data=corpo)
+    assert r.status_code == 409 and "ajuste" in r.get_json()["erro"] and falso.chamadas == ["modo"]
+    lento = _Lento({"10": {"1": {"saldo": 1, "minimo": 3, "maximo": 3, "codigo": "SP-1"}}})
+    t = threading.Thread(target=lambda: R.gravar_acordado(inv.config, "10", "1", lento, PESSOA))
+    t.start()
+    try:
+        assert lento.entrou.wait(10)
+        with G._TRAVA:
+            with pytest.raises(G.Recusada, match="indo ao Fracttal"):
+                G._sem_lote_da_regua("10")
+    finally:
+        lento.soltar.set()
+        t.join(10)
+    with G._TRAVA:
+        G._sem_lote_da_regua("10")                  # a peça foi: a gravação de contagem já pode começar
+    assert lento.chamadas == ["modo", "ler", "definir_regua", "ler"]
