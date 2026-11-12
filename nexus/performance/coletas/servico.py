@@ -48,31 +48,52 @@ class SessaoNexus(Sessao):
         self._pasta = pasta
         self._formatos_novos = formatos_novos
         self.origem_bd = {}                    # destino -> "banco" | "arquivo"
+        self._trava_bd = threading.RLock()     # a troca de BD (banco em fundo x Excel solto): ver carregar_bd
         self.pronto = threading.Event()
         self.uso = time.time()
         self._lotes = 0
         self.saidas = []                       # os caminhos das planilhas da última conversão (a tela baixa pelo índice)
 
     # ------------------------------------------------------------ BDs: o banco, ou o Excel que a pessoa soltou
+    # A leitura do banco NUNCA passa por cima do Excel que a pessoa soltou (12/11/2026, o 1º uso do Levi: "usei o subir
+    # excel, não prestou nada!, clico em converter e dá erro!"). Ao abrir a tela, o banco é lido em fundo (segundos); o
+    # BD_Thopen em Excel que chegou nesse meio-tempo entrava, e a leitura do banco, terminando depois, o tirava e punha o
+    # "falta o mapa de fórmulas" no lugar: a conversão saía com "BD_Thopen não foi lido". Agora a troca é sob a trava da
+    # sessão, e o banco só entra onde não há Excel (o Limpar, que tira o Excel, volta ao banco por `_voltar_ao_banco`).
     def carregar_bd(self, destino, caminho=None):
-        velho = self.bds.pop(destino, None)
-        if velho is not None and self.origem_bd.get(destino) == "arquivo":
-            velho.fechar()                     # o do banco é o mesmo para todos: não se fecha aqui
-        self.erros_bd.pop(destino, None)
         if caminho:
-            self.caminhos_bd[destino] = caminho
-            r = super().carregar_bd(destino, caminho)
-            self.origem_bd[destino] = "arquivo" if r else self.origem_bd.get(destino)
-            return r
-        self.caminhos_bd[destino] = None
-        bd, erro = pg.bd_do_banco(destino, self._banco())
-        if bd is not None:
-            self.bds[destino] = bd
-            self.origem_bd[destino] = "banco"
-        else:
-            self.erros_bd[destino] = erro
+            with self._trava_bd:
+                velho = self.bds.pop(destino, None)
+                if velho is not None and self.origem_bd.get(destino) == "arquivo":
+                    velho.fechar()             # o do banco é o mesmo para todos: não se fecha aqui
+                self.erros_bd.pop(destino, None)
+                self.caminhos_bd[destino] = caminho
+                r = super().carregar_bd(destino, caminho)
+                if r is not None:
+                    self.origem_bd[destino] = "arquivo"
+                return r
+        bd, erro = pg.bd_do_banco(destino, self._banco())          # fora da trava: leva segundos
+        with self._trava_bd:
+            if self.origem_bd.get(destino) == "arquivo":
+                return self.bds.get(destino)   # o Excel chegou enquanto o banco era lido: vale o Excel
+            self.bds.pop(destino, None)
+            self.erros_bd.pop(destino, None)
+            self.caminhos_bd[destino] = None
+            if bd is not None:
+                self.bds[destino] = bd
+                self.origem_bd[destino] = "banco"
+            else:
+                self.erros_bd[destino] = erro
+                self.origem_bd.pop(destino, None)
+            return bd
+
+    def _voltar_ao_banco(self, destino):
+        with self._trava_bd:
+            velho = self.bds.pop(destino, None)
+            if velho is not None and self.origem_bd.get(destino) == "arquivo":
+                velho.fechar()
             self.origem_bd.pop(destino, None)
-        return bd
+        return self.carregar_bd(destino)
 
     def carregar_bds(self):
         for destino in (BD_PERFORMANCE, BD_THOPEN):
@@ -205,7 +226,7 @@ class SessaoNexus(Sessao):
         shutil.rmtree(os.path.join(self._pasta, "saida"), ignore_errors=True)
         for destino in list(self.origem_bd):   # o BD solto em Excel sai com os arquivos: volta o do banco
             if self.origem_bd.get(destino) == "arquivo":
-                self.carregar_bd(destino)
+                self._voltar_ao_banco(destino)
 
     # ------------------------------------------------------------ conversão
     def converter(self, agora=None):

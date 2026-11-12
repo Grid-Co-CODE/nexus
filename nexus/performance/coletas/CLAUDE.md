@@ -59,7 +59,9 @@ só com o Excel solto.
 - **A data do arquivo é a do computador de quem soltou** (`File.lastModified` -> `os.utime`): o "só dia fechado" usa a
   data do arquivo como a hora da baixa (o mensal da Sal baixado 08/11 12:41 traz o 08/11 pela metade).
 - **O BD em Excel solto junto** (nome `BD_Performance*.xlsx` / `BD_Thopen*.xlsx`, ou pelo botão do BD) entra no lugar do
-  banco para aquela sessão; o Limpar volta ao banco.
+  banco para aquela sessão; o Limpar volta ao banco. **A leitura do banco nunca passa por cima do Excel** (12/11/2026, o 1º
+  uso do Levi: o BD_Thopen em Excel entrou enquanto o banco era lido em fundo, e a leitura, terminando depois, o tirou; a
+  conversão saiu com "BD_Thopen não foi lido"): a troca é sob a trava da sessão e o banco só entra onde não há Excel.
 - **Furos de coleta:** o relatório `Furos_Coleta_Performance_*.html` (gerado fora) sobe pelo "Abrir relatório" e fica em
   `<NEXUS_DADOS>/coletas/furos/`: todos veem o mesmo (como a pasta da equipe no .exe). As confirmações de cada pessoa
   ficam no navegador dela (como no HTML original); **confirmação compartilhada é dado novo no banco**: catálogo antes e
