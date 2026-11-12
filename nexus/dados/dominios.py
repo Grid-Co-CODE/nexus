@@ -249,6 +249,10 @@ RECUSA_PECA = ("chave recusada pelo Fracttal", "sem permissão", "outro")
 # PCM, e `tests/test_pcm_inventario_livro.py` confere que as duas são iguais). Vai à coluna `situacao` do
 # `fato_evento_inventario`: coluna em claro de uma API aberta aceita só estes códigos (ou vazio), nunca o texto de um erro.
 SITUACAO_INVENTARIO = ("para_cima", "para_baixo", "zerar", "sem_alteracao", "nao_tocada", "curadoria")
+# O almoxarifado de cada usina, marcado pelo PCM (12/11/2026, `nexus_almoxarifado_usinas · dim_almoxarifado_usina`, o contrato
+# com o App v343): a usina sem almoxarifado (o inventário dela deixa de ser cobrado), a que usa o de outra usina do mesmo
+# cliente (o técnico vê e conta o da dona) e a que tem o próprio (anula o par da App Setting do App)
+SITUACAO_ALMOX_USINA = ("sem_almoxarifado", "compartilha", "proprio")
 
 
 # ── O status do chamado de garantia (28/10/2026) ─────────────────────────────────────────────────────────────────

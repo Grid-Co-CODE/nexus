@@ -14,7 +14,7 @@ O Acompanhamento (14/10/2026, Levi, com o pacote do painel de acompanhamento do 
 PCM essa visão de acompanhamento. O design quero alá Nexus [...] mas as estruturas quero sim que mantenha!"): as abas
 MPA, MPS, Radar de Backlog, Mapa e One Page, com as fontes do Nexus (`nexus/pcm/acompanhamento`), do setor PCM.
 """
-from ...pcm import acompanhamento, almoxarifado, inventario
+from ...pcm import acompanhamento, almox_usinas, almoxarifado, inventario
 from ...pcm.inventario import curadoria as inventario_curadoria
 from ...pcm.inventario import ponte_os as inventario_ponte
 from ...pcm.inventario import regua as inventario_regua
@@ -101,6 +101,8 @@ inventario_regua.registrar(bp)
 inventario_curadoria.registrar(bp)
 # as requisições de material, o Aceitar pelo Nexus (nexus/pcm/inventario/requisicoes.py; a lista e o que grava, na ponte)
 inventario_requisicoes.registrar(bp)
+# as usinas e os almoxarifados: sem almoxarifado, compartilha ou próprio (nexus/pcm/almox_usinas.py; 12/11/2026)
+almox_usinas.registrar(bp)
 # a ponte do login do Fracttal do inventário, na raiz do app (/os/_nexus/inventario; nexus/pcm/inventario/ponte_os.py)
 # (idempotente: a aba Inventário também a registra)
 inventario_ponte.registrar(bp)

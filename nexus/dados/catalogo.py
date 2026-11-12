@@ -34,7 +34,7 @@ import re
 from dataclasses import dataclass
 
 from . import almoxarifado, fato_chamado, fato_chamado_aberto, fato_inventario, fato_pt, fato_ronda, fato_tarefa_os, fato_uso_os, fatos, geracao
-from . import fato_os_fama, programacao
+from . import almox_usinas, fato_os_fama, programacao
 from ..zeladoria import tabelas as zeladoria_tabelas
 from ..sso import tabelas as sso_tabelas
 
@@ -971,6 +971,26 @@ FATOS = (
                     "descrição e a foto da peça fora do catálogo ficam só no livro do App. O motivo do PCM (texto livre) "
                     "vai só em dados_cifrados; a pessoa como pessoa_id e pessoa_hmac (24 hexadecimais), nunca nome nem "
                     "e-mail"),
+    # o almoxarifado de cada usina (12/11/2026; o PCM: "Algumas usinas não tem almoxarifado ou compartilham os almoxarifados";
+    # o Levi: "Passa para o cadastro do nexus"): a dimensão `dim_almoxarifado_usina` é o contrato com o App (a usina marcada), e
+    # este é o histórico das marcações, como o das decisões de setor
+    Fato("decisao_almox_usina", "Almoxarifado de cada usina (as marcações do PCM)", "pcm",
+         f"{almox_usinas.LIVRO} · {almox_usinas.ABA_DECISAO}",
+         "1 linha = 1 decisão do PCM de marcar 1 usina (sem almoxarifado, compartilha o almoxarifado da usina dona ou "
+         "próprio) ou de desmarcá-la; vale a última de cada usina",
+         _d(data=("id", "data_id (o dia de Brasília da decisão; decidida_em, a hora em UTC)"),
+            usina=("id", "usina_id (escolhida na lista das usinas do cadastro com o local no Fracttal) + usina_dona_id "
+                         "(a dona, só em compartilha)"),
+            pessoa=("hmac", "pessoa_hmac (quem marcou, o codigo_da_pessoa; vazio pela senha de administrador)")),
+         tipo="sem_medida", chave=("decidida_em", "usina_id"),
+         fontes=(f"{almox_usinas.LIVRO} · {almox_usinas.ABA_DECISAO}",),
+         janela_origem="o Nexus é a fonte (só acrescenta; a marcação de hoje de cada usina está na dim_almoxarifado_usina "
+                       "do mesmo livro)",
+         observacao="situacao é uma das três da dominios.SITUACAO_ALMOX_USINA ou desmarcada; cliente_por diz por onde o "
+                    "mesmo cliente da dona foi conferido (o cadastro do Nexus ou o 1º nó do local no Fracttal). A "
+                    "dim_almoxarifado_usina (o contrato com o App v343: usina_id, usina = o nome do local no Fracttal, "
+                    "situacao, usina_dona_id e usina_dona só em compartilha, atualizado_em, pessoa_hmac) tem 1 linha por "
+                    "usina marcada, e desmarcar a tira. Nada de nome de pessoa nem e-mail (regra 8)"),
     Fato("geracao_usina_dia", "Geração diária por usina", "performance",
          "bd_thopen · bd_performance (1 aba por usina)", geracao.GRAO_USINA,
          _d(data=("id", "data_id"),
@@ -1523,6 +1543,14 @@ LIVROS = (
           "juntas e confere a contagem; texto livre só cifrado: em dados_cifrados (Cofre) e, desde 12/11/2026, a cópia do "
           "motivo da recontagem para o técnico em motivo_tecnico (preenchida também nas antigas, na gravação)",
           so_cresce=fato_inventario.ABAS_FATO),
+    # o almoxarifado de cada usina (12/11/2026): o PCM marca na aba Usinas e almoxarifados, e o App de Campo (v343) lê a
+    # dimensão por cima da App Setting dele. A dimensão encolhe ao desmarcar (sem trava); o histórico só cresce
+    Livro(almox_usinas.LIVRO, almox_usinas.ABAS, "a cada marcação na aba Usinas e almoxarifados (PCM → Almoxarifado)",
+          "nexus/dados/almox_usinas.py (trocar), pela tela de nexus/pcm/almox_usinas.py", False,
+          "registrado em 12/11/2026 antes da 1ª gravação (regra 10): nasce na 1ª marcação. Gravar relê o livro inteiro "
+          "antes (a leitura que falha, curta ou sem uma aba do livro que existe não grava), troca as duas abas juntas e "
+          "confere a contagem; a tela lê com cache de 1 minuto",
+          so_cresce=(almox_usinas.ABA_DECISAO,)),
     Livro("nexus_rondas_checklist", ("fato_checklist_ronda", "qualidade", "atualizacao"), "carga única (06/10/2026)",
           "ferramentas/carregar_checklist_rondas_sem_os.py", True,
           "a aba qualidade existe no banco desde a carga única e só entrou aqui em 09/10, quando o radar a achou"),

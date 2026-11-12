@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% block titulo %}Usinas e almoxarifados · Almoxarifado{% endblock %}
+{% block conteudo %}
+{% from "_explica.html" import explica %}
+<link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='engenharia.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='pcm.css') }}">
+{# PCM → Almoxarifado → Usinas e almoxarifados (12/11/2026; o PCM: "Algumas usinas não tem almoxarifado ou compartilham os
+   almoxarifados"; o Levi: "Passa para o cadastro do nexus"). `d` vem de `nexus/pcm/almox_usinas.montar`; o livro e o contrato
+   com o App em `nexus/dados/almox_usinas.py`. Quem pode programar marca (um formulário por usina, POST com volta para cá);
+   quem só olha vê a lista. Cartões, que cabem em 375 px. #}
+<div class="pg alm inv au">
+<p class="gc-eyebrow">PCM · Almoxarifado</p>
+<div class="gc-titulo-explica"><h1 class="titulo-pagina">Usinas e almoxarifados</h1>
+{% call explica('Entenda esta tela') %}<p><b>Para que serve.</b> Dizer ao App de Campo, por usina, se ela não tem almoxarifado,
+  se usa o almoxarifado de outra usina ou se tem o próprio. A marcação vale no App sem deploy.</p>
+<p><b>O que cada situação faz no App.</b> <b>Compartilha:</b> o técnico vê e conta o almoxarifado da usina dona, no inventário e
+  na baixa de peça. <b>Sem almoxarifado:</b> o inventário da usina deixa de ser cobrado. <b>Próprio:</b> anula o par que a
+  configuração antiga do App tinha para a usina.</p>
+<p><b>De onde vem.</b> A lista são as usinas do cadastro do Nexus com o local no Fracttal. "No Fracttal" são os almoxarifados que o
+  Fracttal liga a ela, pela mesma conta da aba Por almoxarifado. A marcação é a deste livro do Nexus. A configuração antiga do App
+  (a App Setting dos almoxarifados compartilhados) o Nexus não lê: para a usina <b>sem marcação</b>, o par antigo dela segue
+  valendo no App.</p>
+<p><b>As regras.</b> A usina dona é outra usina do mesmo cliente: pelo cliente do cadastro das duas e, se uma delas não o tem,
+  pelo início do nome do local no Fracttal ("Cliente - Usina - UF"); a mensagem diz qual valeu. Sem cadeia: a dona não usa o
+  almoxarifado de outra, nem está sem almoxarifado. "Sem marcação" tira a marcação. Quem marcou e quando ficam no histórico.</p>{% endcall %}</div>
+{% set aba_inventario = 'usinas' %}
+{% include "pcm/_almox_abas.html" %}
+{% if aviso %}<div class="{{ 'cn-certo' if aviso.ok else 'cn-erro cn-aviso' }}" role="status"><span><b>{{ aviso.texto }}</b></span></div>{% endif %}
+{% if d.erro_livro %}<div class="cn-erro cn-aviso" role="status"><span><b>{{ d.erro_livro }}</b> A marcação fica parada até o livro ser lido.</span></div>{% endif %}
+{% if not d.almox_lido %}<p class="alm-det au-aviso">Os almoxarifados do Fracttal não foram lidos agora (a varredura do App): a coluna "No Fracttal" volta quando ela chegar.</p>{% endif %}
+
+<div class="inv-tiles" aria-label="Resumo das usinas">
+  <div class="inv-tile"><b class="inv-tile-v">{{ d.n_usinas }}</b><span class="inv-tile-r">Usinas com o Fracttal</span></div>
+  <div class="inv-tile inv-tile--info"><b class="inv-tile-v">{{ d.contas.compartilha }}</b><span class="inv-tile-r">Compartilham</span></div>
+  <div class="inv-tile"><b class="inv-tile-v">{{ d.contas.sem_almoxarifado }}</b><span class="inv-tile-r">Sem almoxarifado</span></div>
+  <div class="inv-tile inv-tile--ok"><b class="inv-tile-v">{{ d.contas.proprio }}</b><span class="inv-tile-r">Próprio</span></div>
+  <div class="inv-tile"><b class="inv-tile-v">{{ d.contas.sem_marcacao }}</b><span class="inv-tile-r">Sem marcação</span></div>
+</div>
+
+<section class="inv-card">
+<div class="inv-card-cab"><h3>Usinas ({{ d.linhas|length }})</h3>
+<form class="cn-filtros alm-filtros inv-filtros" method="get" action="{{ raiz }}/t/pcm/pecas/usinas">
+  <select name="cliente" class="gc-campo" aria-label="Filtrar por cliente">
+    <option value="">Todos os clientes</option>
+    {% for c in d.clientes %}<option value="{{ c }}"{% if c == d.filtro.cliente %} selected{% endif %}>{{ c }}</option>{% endfor %}
+  </select>
+  <select name="situacao" class="gc-campo" aria-label="Filtrar por situação">
+    <option value="">Todas as situações</option>
+    {% for v, r in d.filtro_situacao.items() %}<option value="{{ v }}"{% if v == d.filtro.situacao %} selected{% endif %}>{{ r }}</option>{% endfor %}
+  </select>
+  <button class="gc-btn gc-btn--ui gc-btn--contorno" type="submit">Filtrar</button>
+  {% if d.filtro.cliente or d.filtro.situacao %}<a class="cn-filtro-ativo" href="{{ raiz }}/t/pcm/pecas/usinas">Limpar</a>{% endif %}
+</form></div>
+{% for u in d.linhas %}
+<article class="rq-card au-usina" id="u-{{ u.id }}" aria-label="Usina {{ u.nome }}">
+  <p class="cu-tit"><span class="inv-selo{% if u.tom != 'neutro' %} inv-selo--{{ u.tom }}{% endif %}">{{ u.rotulo }}</span> {{ u.nome }}</p>
+  <p class="alm-det">{{ u.cliente_txt or 'cliente não informado' }} · local no Fracttal: {{ u.locais|join(', ') }}</p>
+  <p class="alm-det">No Fracttal: {% if not d.almox_lido %}não lido agora{% elif u.almoxarifados %}{{ u.almoxarifados|join(', ') }}{% else %}nenhum almoxarifado ligado a ela{% endif %}</p>
+  {% if u.situacao == 'compartilha' %}<p class="alm-det">Usa o almoxarifado de <b>{{ u.dona or 'usina ' ~ u.dona_id }}</b>.</p>{% endif %}
+  {% if u.dona_de %}<p class="alm-det">É a dona do almoxarifado de {{ u.dona_de|join(', ') }}.</p>{% endif %}
+  {% if u.marcada_em %}<p class="alm-det">Marcada em {{ u.marcada_em }}.</p>{% endif %}
+  {% if pode and not d.erro_livro %}
+  <form class="au-form" method="post" action="{{ raiz }}/t/pcm/pecas/usinas/marcar">
+    <input type="hidden" name="usina" value="{{ u.id }}">
+    {% if d.filtro.cliente %}<input type="hidden" name="cliente" value="{{ d.filtro.cliente }}">{% endif %}
+    {% if d.filtro.situacao %}<input type="hidden" name="filtro_situacao" value="{{ d.filtro.situacao }}">{% endif %}
+    <label class="gc-rotulo" for="au-sit-{{ u.id }}">Situação</label>
+    <select class="gc-campo" id="au-sit-{{ u.id }}" name="situacao">
+      <option value="sem_marcacao"{% if u.situacao == 'sem_marcacao' %} selected{% endif %}>Sem marcação</option>
+      {% for v, r in d.rotulo.items() %}<option value="{{ v }}"{% if v == u.situacao %} selected{% endif %}>{{ r }}</option>{% endfor %}
+    </select>
+    <label class="gc-rotulo" for="au-dona-{{ u.id }}">Usina dona (só em Compartilha)</label>
+    <select class="gc-campo" id="au-dona-{{ u.id }}" name="dona">
+      <option value="">{{ 'Escolha a usina dona' if u.opcoes_dona else 'Nenhuma usina do mesmo cliente pode ser a dona' }}</option>
+      {% for o in u.opcoes_dona %}<option value="{{ o.id }}"{% if o.id == u.dona_id %} selected{% endif %}>{{ o.nome }}</option>{% endfor %}
+    </select>
+    <button class="gc-btn gc-btn--ui gc-btn--primario" type="submit">Salvar</button>
+  </form>
+  {% endif %}
+</article>
+{% else %}
+<div class="inv-vazio"><p>{% if d.filtro.cliente or d.filtro.situacao %}Nenhuma usina com esse filtro.{% else %}Nenhuma usina do cadastro tem o local no Fracttal.{% endif %}</p></div>
+{% endfor %}
+</section>
+</div>
+{% endblock %}

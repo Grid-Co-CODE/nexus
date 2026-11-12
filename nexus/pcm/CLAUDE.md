@@ -69,6 +69,7 @@ escolhida de cada semana e os números: `nexus/dados/CLAUDE.md`.
 | `atribuicoes.py` | **os técnicos por usina** (17/10/2026, seção abaixo): o livro `nexus_pcm_atribuicoes` (decisões que só acrescentam, vale a última de cada usina × pessoa × papel; apoio com datas; cada linha assinada para o App) |
 | `admins_app.py` | **os administradores do App de Campo** (05/11/2026, seção Técnicos por usina abaixo): o livro `nexus_acessos_app_campo`, só deles, escolhidos em Base → Acessos (a aba da tela mora na casca: `nexus/auth/telas_admins_app.py`) |
 | `responsaveis.py` | **o Responsável UFV no livro** (30/10/2026, fase 3 dos técnicos por usina): de hora em hora, o `responsavel_om_id` da ficha de cada usina vai ao `nexus_pcm_atribuicoes` no papel `responsavel`, para o App mandar e assinar a PT |
+| `almox_usinas.py` | a aba Usinas e almoxarifados do Almoxarifado (12/11/2026): a lista das usinas com o local no Fracttal, os almoxarifados que o Fracttal liga a cada uma e a marcação do PCM (sem almoxarifado, compartilha, próprio), com as regras (seção Almoxarifado); o livro em `nexus/dados/almox_usinas.py` |
 | `tecnicos_usina.py` | a visão da tela Técnicos por usina: o cadastro do banco, o nome da usina que vai ao App (`_fracttal`), a evidência de campo (rondas, fechamentos, programação), os avisos, os filtros em cascata, a carga inicial pela regra da equipe, a reemissão (de uma usina e o Reenviar tudo) e a comparação com a foto do App |
 | `inventario/` | **o inventário do almoxarifado** (26/10/2026, em construção): `estoque.py` é o adaptador do estoque do Fracttal, a única porta de leitura e gravação de saldo, régua e peça; `contas.py` são as contas (situações, contado efetivo, substituição, janela de aprovação; puro); `leitura.py` lê as contagens do App e o estado de cada uma pelos eventos; `revisao.py` é a aba Inventário (a lista, a contagem aberta com o Sistema × Contado × Δ e a revisão do PCM), com as rotas em `__init__.py`; `gravacao.py` grava o lote aprovado no Fracttal em segundo plano, por sessão de ajuste; `regua.py` é a régua de mínimo e máximo e `curadoria.py` o fora do catálogo (com `fotos_app.py`, a rota assinada que recebe as fotos do App); a auditoria é o `revisao.montar_auditoria`; `ponte_os.py` é a ponte com o login do Fracttal (as rotas de `/os/_nexus/inventario`, a ÚNICA porta de tudo o que lê ou grava no Fracttal: o lote, gravar, continuar, encerrar, a régua acordada, cadastrar a peça); o livro `nexus_almoxarifado_inventario` (eventos, régua e curadoria) é o `nexus/dados/fato_inventario.py`. As seções abaixo |
 | `motor/` | **cópia idêntica** do motor do PCM: **não edite** (mudança de regra entra no repositório do PCM e é copiada; veja o `README.md` de lá); hoje a do `cb8239c` (23/10/2026: a MPM da última semana do mês vai para os dias livres antes de ser forçada no dia da usina, e o preenchimento dos dias livres respeita o dia fixo da usina e o feriado municipal) |
@@ -546,9 +547,29 @@ PCM"; a prévia com os dados reais foi aprovada no mesmo dia. Desenho e plano: `
   o número "Lançadas pelo App" do alto e a versão do cliente a usam), e a do cadastro (`d["cadastro"]`) também, sem tela; o
   `?aba=consumo` e o `?aba=cadastro` de antes abrem a Reposição. Desde 26/10/2026, as quatro partes do inventário (Inventário,
   Mínimo e máximo, Curadoria e Auditoria) vêm logo depois, juntas, como links para outras páginas (as seções do inventário,
-  abaixo). Filtro na própria página (`filtro-local.js`). **São nove abas** (a das Requisições, 12/11/2026, por último): onde não cabem (no celular), a fila rola por dentro e
+  abaixo). Filtro na própria página (`filtro-local.js`). **São dez abas** (a das Requisições e a das Usinas e almoxarifados, 12/11/2026, por último): onde não cabem (no celular), a fila rola por dentro e
   o script da página traz a aba aberta para o meio dela ao carregar e a cada troca (`scrollIntoView({block:'nearest',
   inline:'center'})`; as páginas do inventário fazem o mesmo em `pcm/_almox_abas.html`).
+- **Usinas e almoxarifados** (`almox_usinas.py`, `templates/pcm/almox_usinas.html`, `/t/pcm/pecas/usinas`; 12/11/2026; o PCM:
+  "Algumas usinas não tem almoxarifado ou compartilham os almoxarifados"; o Levi: "Passa para o cadastro do nexus"). O PCM
+  marca, por usina, **Sem almoxarifado** (o App deixa de cobrar o inventário dela), **Compartilha** (o técnico vê e conta o
+  almoxarifado da usina dona, no inventário e na baixa) ou **Próprio** (anula o par da App Setting `ALMOX_COMPARTILHADOS` do App,
+  que antes só o Levi editava). O App v343 lê o livro `nexus_almoxarifado_usinas` (o contrato e o histórico em
+  `nexus/dados/CLAUDE.md`).
+  - **A lista** são as usinas do cadastro com o local no Fracttal (a de-para `Fracttal · Classificação 1`). Mostra o cliente,
+    os almoxarifados que o Fracttal liga a cada uma (a mesma conta da aba Por almoxarifado; sem o ciclo do App, "não lido
+    agora") e a marcação do livro. A App Setting o Nexus não lê: o "!" diz que o par antigo vale para a usina sem marcação.
+  - **As regras** (`conferir`, sobre o livro relido sob a trava):
+    - a dona é outra usina do MESMO CLIENTE, pelo cliente do cadastro das duas; se uma não o tem, pelo 1º nó do local no
+      Fracttal. A mensagem e o histórico (`cliente_por`) dizem qual valeu;
+    - sem cadeia: a dona não é "compartilha" nem "sem almoxarifado", e a usina que é dona de outra não passa a nenhuma das duas;
+    - "Sem marcação" tira a linha.
+  - **Quem:** marca quem pode programar (administrador e setor PCM); quem só olha vê a lista, e o POST dele é 403. O POST de
+    outro site é 403 (`_de_outro_site`). Quem entrou pela senha de administrador marca sem o `pessoa_hmac`, como no inventário.
+  - **Na tela:** filtros de cliente e de situação (a marcação volta ao filtro), cartões que cabem em 375 px, o selo da situação, a
+    dona e de quem a usina é dona.
+  - **Provar:** `tests/test_pcm_almox_usinas.py` (o contrato, o catálogo e o radar, marcar e desmarcar, as recusas, quem pode, o
+    outro site, a tela, o livro que não se lê e o banco falso). Na cópia de prova, `NEXUS_ALMOX_USINAS_ARQUIVO`.
 - **O filtro conta a aba à vista (30/10/2026, item 7):** o script das abas disparava `input` no formulário, que o
   `filtro-local.js` não escuta (ele ouve o `change` dos `select` e o `input` do campo de texto): as opções ficavam com os
   números da aba anterior. A troca de aba chama `FiltroLocal['alm-f'].aplicar()` (o filtro se aplica sozinho ao carregar,
