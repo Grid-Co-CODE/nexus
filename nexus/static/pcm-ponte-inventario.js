@@ -2,7 +2,9 @@
    /t/pcm, porque o login do Fracttal (o cookie os_sessao) só chega aos endereços debaixo de /os. O formulário com
    data-ponte vai por fetch para a rota da ponte (o action dele, /os/_nexus/inventario/...), que responde JSON:
    {ok, volta} recarrega a página (que mostra o aviso), {erro, login?} aparece no alto da página, com o link para entrar pelo
-   Fracttal quando é isso que falta. Quem não tem JavaScript não grava no Fracttal: de propósito, a resposta é JSON. */
+   Fracttal quando é isso que falta. Quem não tem JavaScript não grava no Fracttal: de propósito, a resposta é JSON.
+   O formulário com data-ponte-espera (11/11/2026: todos os acordados de um almoxarifado, um pedido por segundo) diz o texto
+   dele no alto enquanto a ponte trabalha: o pedido pode levar minutos, e o botão parado sem palavra parecia travado. */
 (function () {
   function aviso() {
     var caixa = document.querySelector("[data-ponte-aviso]");
@@ -29,12 +31,22 @@
     caixa.appendChild(div);
     if (caixa.scrollIntoView) caixa.scrollIntoView({block: "nearest"});
   }
+  function esperar(texto) {
+    var caixa = aviso();
+    if (!caixa) return;
+    var div = document.createElement("div");
+    div.className = "cn-erro cn-aviso";
+    div.setAttribute("role", "status");
+    div.textContent = texto;
+    caixa.appendChild(div);
+  }
   document.addEventListener("submit", function (ev) {
     var f = ev.target;
     if (!f || !f.hasAttribute || !f.hasAttribute("data-ponte")) return;
     ev.preventDefault();
     var botao = f.querySelector('button[type="submit"]');
     if (botao) botao.disabled = true;
+    if (f.hasAttribute("data-ponte-espera")) esperar(f.getAttribute("data-ponte-espera"));
     fetch(window.nexusRota(f.getAttribute("action")), {
       method: "POST", body: new FormData(f), credentials: "same-origin", headers: {"Accept": "application/json"}
     }).then(function (r) {

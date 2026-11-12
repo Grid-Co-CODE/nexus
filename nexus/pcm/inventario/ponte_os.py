@@ -18,7 +18,8 @@ Cada rota daqui: só administrador e setor PCM, pedido só da própria página (
 Fracttal (a régua, o cadastro da curadoria, gravar, continuar, encerrar) confere também a PESSOA (`_estoque_da_pessoa`): a senha de
 administrador não é uma pessoa (409), e a conta do Fracttal do cookie tem de ser a pessoa da sessão do Nexus (409; a revisão final
 de 27/10/2026 achou a régua e o cadastro sem essa conferência). Cada tarefa põe as rotas dela num bloco próprio: o lote da contagem
-(Tasks 5 e 6), a régua (Task 8), a curadoria (Task 9), a gravação (Task 7).
+(Tasks 5 e 6), a régua (Task 8; desde 11/11/2026 também todos os acordados do almoxarifado de uma vez), a curadoria (Task 9), a
+gravação (Task 7).
 """
 from __future__ import annotations
 
@@ -158,6 +159,28 @@ def regua_gravar():
         esperado = (regua.nivel(f.get("aco_min"), "O acordado que a tela mostrava, mínimo"),
                     regua.nivel(f.get("aco_max"), "O acordado que a tela mostrava, máximo"))
         return regua.gravar_acordado(current_app.config, almox, item, est, quem.do_pedido(), esperado=esperado)
+    r = _com_o_fracttal(de, gravar, ao="regua")
+    return r if not isinstance(r, str) else _ok("pcm_regua_aviso", r, de)
+
+
+@bp.route("/regua/gravar_todos", methods=["POST"])
+def regua_gravar_todos():
+    """O "Gravar no Fracttal todos os acordados deste almoxarifado" (11/11/2026, item 2 da 2ª rodada): `regua.gravar_acordados`,
+    no login de quem apertou, com as recusas de sempre da ponte (`_com_o_fracttal`). Com uma gravação de contagem andando no
+    almoxarifado, 409: ela mesma manda os acordados quando termina, e duas sessões falando com o mesmo almoxarifado ao mesmo
+    tempo não ajudam ninguém. Roda no pedido (um pedido por segundo, a cota da empresa): a página diz que pode levar minutos."""
+    from . import gravacao as G
+    from .erros import Conflito
+    almox = A._id(request.form.get("almox"))
+    de = "/t/pcm/pecas/inventario/regua" + ("?" + urlencode({"almox": almox}) if almox else "")
+
+    def gravar(est):
+        if not almox.isdigit():
+            raise ValueError("Escolha o almoxarifado: nada foi enviado ao Fracttal.")
+        if G._viva(almox):
+            raise Conflito("Há uma gravação de contagem andando neste almoxarifado: espere ela terminar (no fim, ela mesma manda "
+                           "os acordados ao Fracttal). Nada foi enviado.")
+        return regua.gravar_acordados(current_app.config, almox, est, quem.colunas(current_app.config, quem.do_pedido()))["texto"]
     r = _com_o_fracttal(de, gravar, ao="regua")
     return r if not isinstance(r, str) else _ok("pcm_regua_aviso", r, de)
 

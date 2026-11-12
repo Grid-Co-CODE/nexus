@@ -506,7 +506,7 @@ def montar():
         n = (lambda v: f"{A.numero(v):g}" if A.numero(v) is not None else "?")        # "574.0" da API vira "574"
         d.update(estado="ok", aviso=aviso, ciclo={"fim": _quando(fonte["fim"] or fonte["inicio"]),
                                                   "lidos": n(fonte["lidos"]), "total": n(fonte["total"]),
-                                                  "inicio_iso": fonte["inicio"]},
+                                                  "inicio_iso": fonte["inicio"], "fim_iso": fonte["fim"]},
                  almoxarifados=sorted({x["almox"] for x in d["linhas"]}),
                  familias=sorted({i["familia"] for i in fonte["itens"].values() if i["familia"]}))
         return d

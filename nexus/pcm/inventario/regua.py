@@ -20,16 +20,27 @@ Gravar no Fracttal segue a regra da casa: mostrar (a tela já traz o acordado re
 evento `regua_gravada` e o retrato `gravado_fracttal`. A releitura que não bate é um evento `erro` e nada mais: o livro
 nunca diz que o Fracttal tem o que não tem. O evento carrega o MÍNIMO (de, para: é o que dispara o alarme); o máximo
 acordado fica no retrato da régua, que é o registro do par.
+
+Todos os acordados de um almoxarifado de uma vez (`gravar_acordados`, 11/11/2026; o PCM: "Mínimo e máximo: não está
+atualizando após a auditoria automaticamente no Fracttal"): o fim da gravação de cada contagem (`gravacao`, na mesma sessão do
+Fracttal de quem gravou) e o botão da régua mandam a régua acordada de cada peça do almoxarifado cujo acordado difere do que o
+Fracttal tem (a peça recém-ligada pela gravação inclusive, que entra com 0 e 0), com a mesma regra: só o acordado, relido antes de
+anotar, e a falha de uma peça não para as outras. A releitura fica guardada (`lida`), e a tela mostra "no Fracttal agora" sem
+esperar a varredura do App.
 """
 from __future__ import annotations
 
+import logging
 import math
 import re
+import time
 import unicodedata
+from datetime import datetime, timedelta, timezone
 from urllib.parse import urlencode
 
 from flask import abort, current_app, redirect, render_template, request, session
 
+from ...campo import visao
 from ...dados import almoxarifado as A
 from ...dados import fato_inventario as F
 from ...prefixo import na_raiz
@@ -45,7 +56,15 @@ _AVARIADA = re.compile(r"-AV(?:-|\s|$)")
 # ler o retrato de antes e escrever o de agora é uma conta só: uma trava POR PEÇA do almoxarifado (duas pessoas na mesma peça
 # esperam uma pela outra; o resto não espera ninguém, nem a gravação lenta no Fracttal de outra peça)
 _PECA = Travas()
+# um lote de acordados de cada vez por almoxarifado (o botão e o fim da gravação de uma contagem)
+_LOTE = Travas()
 _TOLERANCIA = 1e-9
+LOTE_REGUA = 50              # as peças mandadas entre uma releitura (e um registro no livro) e outra
+ESPERA_LIMITE_S = 62         # a cota do Fracttal é por minuto: 62 s e ela já virou (o mesmo da gravação)
+LIMITE = "limite do Fracttal"
+LOGIN = "o login do Fracttal expirou"
+SEM_RELEITURA = "a releitura do Fracttal não veio"
+_BRT = timezone(timedelta(hours=-3))
 LIGADA = F.USINA_LIGADA_POR[0]      # por onde a usina do almoxarifado liga: só a de-para do Fracttal
 
 
@@ -184,6 +203,57 @@ def _da_varredura(id_almox: str) -> list[dict]:
     return [l for l in d.get("linhas", []) if _id(l.get("id_almox")) == id_almox]
 
 
+def _arquivo_lida(cfg, almox: str):
+    """`<NEXUS_DADOS>/almox_inventario/regua-lida-<almox>.json`: o que o Fracttal tinha de mínimo e máximo na última releitura do
+    Nexus. É a foto do Fracttal para a tela (como o controle da gravação, fora do banco: não é dado de negócio, e o rastro de
+    negócio é o evento `regua_gravada`). Em teste sem pasta de dados, nenhum."""
+    from .gravacao import _pasta
+    p = _pasta(cfg)
+    return None if p is None or not str(almox).isdigit() else p / f"regua-lida-{almox}.json"
+
+
+def guardar_lida(cfg, almox: str, lido: dict, quando) -> None:
+    """Guarda a releitura do almoxarifado inteiro (`Estoque.ler`): o mínimo e o máximo de cada peça ligada, e a hora. O arquivo
+    que não grava só tira o "no Fracttal agora" da tela (a coluna volta a ser a da varredura): nunca para quem gravou."""
+    arq = _arquivo_lida(cfg, _id(almox))
+    if arq is None:
+        return
+    from .gravacao import _gravar_json, _iso
+    try:
+        _gravar_json(arq, {"lido_em": _iso(quando), "pecas": {str(i): [_num(v.get("minimo")), _num(v.get("maximo"))]
+                                                              for i, v in (lido or {}).items() if isinstance(v, dict)}})
+    except OSError as ex:
+        logging.warning("régua: a releitura do almoxarifado %s não ficou guardada (%s)", almox, type(ex).__name__)
+
+
+def lida(cfg, almox: str) -> dict | None:
+    """A última releitura guardada (`{"lido_em", "pecas": {id_item: (mínimo, máximo)}}`), ou None (nunca relido, sem pasta, ou o
+    arquivo que não se lê: na dúvida, a tela mostra a varredura)."""
+    arq = _arquivo_lida(cfg, _id(almox))
+    if arq is None:
+        return None
+    from .gravacao import _ler_json
+    try:
+        d = _ler_json(arq)
+        quando = E.instante(d.get("lido_em")) if isinstance(d, dict) else None
+    except (F.Recusada, ValueError):
+        return None
+    if quando is None or not isinstance(d.get("pecas"), dict):
+        return None
+    pecas = {}
+    for i, par in d["pecas"].items():
+        if isinstance(par, (list, tuple)) and len(par) == 2:
+            pecas[str(i)] = (_num(par[0]), _num(par[1]))
+    return {"lido_em": quando, "pecas": pecas}
+
+
+def _quando_lido(quando) -> str:
+    """"às 14:05" (hoje, em Brasília) ou "em 25/10 às 14:05"."""
+    d = quando.astimezone(_BRT)
+    hoje = visao._agora().astimezone(_BRT).date()
+    return f"às {d:%H:%M}" if d.date() == hoje else f"em {d:%d/%m} às {d:%H:%M}"
+
+
 def _montar(l: dict, almox: str, vig: dict, gravados: dict) -> dict:
     item = _id(l.get("id_item"))
     k = (almox, item)
@@ -202,16 +272,34 @@ def _montar(l: dict, almox: str, vig: dict, gravados: dict) -> dict:
             "gravado": bool(v.get("gravado")), "decidida_em": v.get("quando", ""), "usina_id": l.get("usina_id")}
 
 
-def quadro(cfg, id_almox: str, *, varredura: list[dict] | None = None) -> list[dict]:
+def quadro(cfg, id_almox: str, *, varredura: list[dict] | None = None, lida_depois_de: str | None = None) -> list[dict]:
     """Uma entrada por peça do almoxarifado: o saldo (o da última contagem gravada; sem ela, o da varredura), a sugestão, o
     recomendado e o acordado vigentes (a última decisão do `fato_regua_minimo`) e se o acordado já foi ao Fracttal.
     `varredura`: as linhas do saldo do almoxarifado no formato da tela do Almoxarifado; sem elas, as da varredura do App.
-    Livro que não se lê levanta `Recusada` (nunca devolve vazio no lugar do que não leu)."""
+    Livro que não se lê levanta `Recusada` (nunca devolve vazio no lugar do que não leu).
+
+    `agora_min`, `agora_max` e `agora_em` (11/11/2026): o que o Fracttal tinha na última releitura do Nexus (`lida`), quando ela é
+    mais nova que a varredura que a tela mostra (`lida_depois_de`, o fim do ciclo do App; sem ele, não se sabe qual é a mais
+    nova, e vale a varredura): "no Fracttal agora", sem esperar o ciclo seguinte do App. Sem releitura mais nova, `agora_em`
+    vazio, e a coluna é a da varredura (só o mínimo: o App não traz o máximo)."""
     alvo = _id(id_almox)
     linhas = _da_varredura(alvo) if varredura is None else [l for l in varredura if _id(l.get("id_almox")) == alvo]
     livro = F.ler(cfg)
     vig, gravados = _vigentes(livro[F.ABA_REGUA]), _saldos_gravados(livro[F.ABA_EVENTO])
-    return sorted((_montar(l, alvo, vig, gravados) for l in linhas), key=lambda x: (x["codigo"], x["id_item"]))
+    lido = lida(cfg, alvo) if lida_depois_de else None
+    try:
+        if lido and lido["lido_em"] <= E.instante(lida_depois_de):
+            lido = None                          # a varredura é mais nova: ela já traz o que a releitura viu
+    except ValueError:
+        lido = None
+    out = []
+    for l in linhas:
+        x = _montar(l, alvo, vig, gravados)
+        par = (lido or {}).get("pecas", {}).get(x["id_item"]) if lido else None
+        x.update(agora_min=par[0] if par else None, agora_max=par[1] if par else None,
+                 agora_em=_quando_lido(lido["lido_em"]) if par else "")
+        out.append(x)
+    return sorted(out, key=lambda x: (x["codigo"], x["id_item"]))
 
 
 # ── registrar e gravar ───────────────────────────────────────────────────────────────────────────────────────────────
@@ -307,7 +395,9 @@ def gravar_acordado(cfg, id_almox: str, id_item: str, estoque: E.Estoque, pessoa
                            "vínculo dela com o almoxarifado (a gravação da contagem a liga). Nada foi enviado.")
         _confere_a_unidade((mn, mx), peca.get("unidade"))      # a unidade que o Fracttal diz, antes do pedido que grava
         estoque.definir_regua(almox, item, mn, mx)
-        depois = estoque.ler(almox).get(item) or {}
+        relido = estoque.ler(almox)
+        guardar_lida(cfg, almox, relido, datetime.now(timezone.utc))      # a tela mostra "no Fracttal agora" de todas as peças
+        depois = relido.get(item) or {}
         base = {"id_almoxarifado": almox, "id_item": item, "codigo": v["codigo"] or None,
                 "usina_id": v["usina_id"], "usina_ligada_por": v["usina_ligada_por"] or None, **quem_}
         if not (_igual(depois.get("minimo"), mn) and _igual(depois.get("maximo"), mx)):
@@ -324,6 +414,207 @@ def gravar_acordado(cfg, id_almox: str, id_item: str, estoque: E.Estoque, pessoa
         F.acrescentar(cfg, F.ABA_REGUA, [_retrato(almox, item, v["codigo"], v["usina_id"], v["sugestao"],
                                                   v["recomendado"], v["acordado"], True, quem_)])
     return f"Régua gravada no Fracttal: mínimo {fmt(mn)}, máximo {fmt(mx)}."
+
+
+# ── todos os acordados de um almoxarifado (11/11/2026, item 2 da 2ª rodada) ─────────────────────────────────────────────
+class _LimiteDeNovo(Exception):
+    """O 429 que voltou depois da espera de 62 s: o lote para (o resto não vai), como na gravação."""
+
+
+def _texto_do_lote(r: dict, prefixo: str = "Acordados deste almoxarifado") -> str:
+    """O que a tela (o aviso depois do botão; a etapa Gravação da contagem, com o `prefixo` "Régua acordada") diz do lote."""
+    if not r["total"]:
+        return "Nenhuma peça deste almoxarifado tem o acordado registrado: nada foi ao Fracttal."
+
+    def n(k, um, varios):
+        return f"{r[k]} {um if r[k] == 1 else varios}"
+    partes = []
+    if r["gravadas"]:
+        partes.append(n("gravadas", "gravado no Fracttal e relido", "gravados no Fracttal e relidos"))
+    if r["iguais"]:
+        partes.append(n("iguais", "já estava igual", "já estavam iguais"))
+    if r["falhas"]:
+        partes.append(n("falhas", "falhou", "falharam") + " (veja a Auditoria)")
+    if r["sem_ligacao"]:
+        partes.append(n("sem_ligacao", "sem ligação com o almoxarifado no Fracttal", "sem ligação com o almoxarifado no Fracttal"))
+    if r["incompletas"]:
+        partes.append(n("incompletas", "com o acordado incompleto (registre o mínimo e o máximo)",
+                        "com o acordado incompleto (registre o mínimo e o máximo)"))
+    if r["nao_enviadas"]:
+        partes.append(n("nao_enviadas", "não foi mandado", "não foram mandados") + f" ({r['parou']}: grave de novo)")
+    texto = f"{prefixo}: " + ", ".join(partes) + "."
+    if r.get("sem_livro"):
+        texto += (f" O Fracttal recebeu, mas não consegui anotar no livro do inventário ({r['sem_livro']}): grave de novo, é o "
+                  "mesmo número.")
+    return texto
+
+
+def gravar_acordados(cfg, id_almox: str, estoque: E.Estoque, quem_: dict, *, contagem_id: str | None = None, dormir=None,
+                     agora=None, ao_andar=None) -> dict:
+    """Manda ao Fracttal a régua ACORDADA de cada peça do almoxarifado cujo acordado difere do que o Fracttal tem (o recomendado e
+    a sugestão nunca vão; a peça sem acordado não muda), relê e só então anota: o evento `regua_gravada` (o mínimo de -> para) e o
+    retrato `gravado_fracttal`, como `gravar_acordado`, mas de uma leitura, um pedido por peça mandada e uma releitura por lote de
+    `LOTE_REGUA` (o livro também é escrito uma vez por lote, e não duas vezes por peça). O estoque é o do login de quem gravou
+    (o botão da régua, ou a sessão do Fracttal da gravação da contagem que acabou, `gravacao`); `quem_` as colunas da pessoa
+    (`quem.colunas`, ou o aprovador da gravação); `contagem_id`, a contagem cuja gravação puxou o lote (vai nos eventos: a
+    Auditoria da contagem os mostra).
+
+    A peça que o Fracttal já tem igual não gasta pedido, e passa a "gravado no Fracttal" se o retrato ainda não dizia (é o que
+    ele tem). A falha de uma peça é registrada (um evento `erro`, com o porquê cifrado e só texto do Nexus) e não para as
+    outras: o `success: false` (`Recusado`) não gravou; a resposta perdida (rede) talvez gravou, e a releitura decide. O 429
+    espera 62 s e tenta UMA vez; de novo, o lote para e o resto não vai (o texto diz quantas). O login que expira também para.
+    A releitura que não veio deixa as mandadas sem anotação de gravada (o livro nunca diz que o Fracttal tem o que não tem). O
+    acordado que outra pessoa registrou enquanto o lote estava no Fracttal não vira "gravado" (o retrato é escrito sob a trava
+    da peça, conferindo o registrado de agora). Um lote de cada vez por almoxarifado (`Conflito`).
+
+    `Limite`, `SemLogin` e `ErroFracttal` da PRIMEIRA leitura sobem (nada foi mandado); o resto vira o resumo: `{"total", "a_mandar",
+    "feitas", "gravadas", "iguais", "falhas", "sem_ligacao", "incompletas", "nao_enviadas", "parou", "sem_livro", "lido_em",
+    "texto"}`. `ao_andar(resumo)` a cada peça mandada (a etapa Gravação mostra o andamento)."""
+    dormir, agora = dormir or time.sleep, agora or (lambda: datetime.now(timezone.utc))
+    almox = _id(id_almox)
+    trava = _LOTE.de(almox)
+    if not trava.acquire(blocking=False):
+        raise Conflito("Já tem um lote de acordados indo ao Fracttal neste almoxarifado: espere ele terminar. Nada foi enviado.")
+    try:
+        return _gravar_acordados(cfg, almox, estoque, quem_, contagem_id, dormir, agora, ao_andar)
+    finally:
+        trava.release()
+
+
+def _gravar_acordados(cfg, almox, estoque, quem_, contagem_id, dormir, agora, ao_andar) -> dict:
+    r = {"total": 0, "a_mandar": 0, "feitas": 0, "gravadas": 0, "iguais": 0, "falhas": 0, "sem_ligacao": 0, "incompletas": 0,
+         "nao_enviadas": 0, "parou": "", "sem_livro": "", "lido_em": ""}
+    acordados = {item: v for (a, item), v in _vigentes(F.ler(cfg, forcar=True)[F.ABA_REGUA]).items()
+                 if a == almox and v["acordado"] != (None, None)}
+    r["total"] = len(acordados)
+    if not acordados:                             # nem a leitura vai ao Fracttal: a cota é da empresa
+        return dict(r, texto=_texto_do_lote(r))
+
+    def chamar(f, *args):
+        try:
+            return f(*args)
+        except E.Limite:
+            dormir(ESPERA_LIMITE_S)
+            try:
+                return f(*args)
+            except E.Limite as ex:
+                raise _LimiteDeNovo() from ex
+
+    try:
+        antes = chamar(estoque.ler, almox)
+    except _LimiteDeNovo:
+        raise E.Limite("o Fracttal pediu uma pausa de novo depois de 62 s") from None
+    lido, lido_em = antes, agora()
+
+    def base(item, v) -> dict:
+        b = {"id_almoxarifado": almox, "id_item": item, "codigo": v["codigo"] or None, "usina_id": v["usina_id"],
+             "usina_ligada_por": v["usina_ligada_por"] or None, **quem_}
+        return dict(b, contagem_id=contagem_id) if contagem_id else b
+
+    def erro(item, v, peca, motivo) -> dict:
+        return dict(base(item, v), tipo="erro", de_qtd=(peca or {}).get("minimo"), para_qtd=v["acordado"][0],
+                    dados={"motivo": motivo})
+
+    eventos, ficam_gravados, a_mandar = [], [], []           # ficam_gravados: (peça, o acordado que o Fracttal tem)
+    for item, v in sorted(acordados.items()):
+        mn, mx = v["acordado"]
+        peca = antes.get(item)
+        if mn is None or mx is None:
+            r["incompletas"] += 1                  # uma linha do livro com só um dos números: os dois vão ao Fracttal
+        elif peca is None:
+            r["sem_ligacao"] += 1                  # a régua é do vínculo da peça com o almoxarifado: a gravação liga
+        elif _igual(peca.get("minimo"), mn) and _igual(peca.get("maximo"), mx):
+            r["iguais"] += 1
+            if not v["gravado"]:
+                ficam_gravados.append((item, v["acordado"]))
+        elif any(isinstance(n, float) and not n.is_integer() for n in (mn, mx)) and not decimal(peca.get("unidade")):
+            r["falhas"] += 1
+            eventos.append(erro(item, v, peca, "o acordado tem casa decimal e a unidade da peça no Fracttal é inteira"))
+        else:
+            a_mandar.append((item, v, peca))
+    r["a_mandar"] = len(a_mandar)
+    for k in range(0, max(len(a_mandar), 1), LOTE_REGUA):
+        enviadas = []
+        for item, v, peca in a_mandar[k:k + LOTE_REGUA]:
+            if r["parou"]:
+                r["nao_enviadas"] += 1
+                continue
+            try:
+                with _PECA.de((almox, item)):      # a gravação de uma peça só, ao mesmo tempo, espera
+                    chamar(estoque.definir_regua, almox, item, *v["acordado"])
+                enviadas.append((item, v, peca, ""))
+            except _LimiteDeNovo:
+                r["parou"], r["nao_enviadas"] = LIMITE, r["nao_enviadas"] + 1      # o 429 não executa nada
+            except E.SemLogin:
+                r["parou"], r["nao_enviadas"] = LOGIN, r["nao_enviadas"] + 1
+            except (E.Recusado, ValueError) as ex:   # o "não" com todas as letras, ou o pedido que nem saiu: nada foi gravado
+                r["falhas"] += 1
+                eventos.append(erro(item, v, peca, f"o Fracttal recusou a régua ({type(ex).__name__})"))
+            except Exception as ex:                # noqa: BLE001 — a resposta que não veio: talvez gravou, a releitura decide
+                enviadas.append((item, v, peca, type(ex).__name__))
+            r["feitas"] += 1
+            if ao_andar:
+                ao_andar(dict(r))
+        depois = None
+        if enviadas:
+            try:
+                depois = chamar(estoque.ler, almox)
+                lido, lido_em = depois, agora()
+            except Exception as ex:                # noqa: BLE001 — sem a releitura nada é anotado como gravado
+                r["parou"] = r["parou"] or (LOGIN if isinstance(ex, E.SemLogin) else LIMITE if isinstance(ex, _LimiteDeNovo)
+                                            else SEM_RELEITURA)
+        for item, v, peca, perdida in enviadas:
+            mn, mx = v["acordado"]
+            agora_ = (depois or {}).get(item) or {}
+            if depois is None:
+                r["falhas"] += 1
+                eventos.append(erro(item, v, peca, "a régua foi enviada, mas a releitura do Fracttal não veio: confira na tela "
+                                                   "do Fracttal"))
+            elif _igual(agora_.get("minimo"), mn) and _igual(agora_.get("maximo"), mx):
+                r["gravadas"] += 1
+                eventos.append(dict(base(item, v), tipo="regua_gravada", de_qtd=peca.get("minimo"), para_qtd=mn))
+                ficam_gravados.append((item, v["acordado"]))
+            else:
+                r["falhas"] += 1
+                eventos.append(erro(item, v, peca, "a releitura do Fracttal não bateu com o acordado"
+                                    + (f" (a resposta não veio: {perdida})" if perdida else "")))
+        if eventos or ficam_gravados:
+            r["sem_livro"] = r["sem_livro"] or _registrar_lote(cfg, almox, eventos, ficam_gravados, quem_)
+        eventos, ficam_gravados = [], []
+    guardar_lida(cfg, almox, lido, lido_em)
+    r["lido_em"] = E.instante(lido_em).isoformat()
+    return dict(r, texto=_texto_do_lote(r))
+
+
+def _registrar_lote(cfg, almox, eventos, ficam_gravados, quem_) -> str:
+    """Escreve os eventos e os retratos `gravado_fracttal` de um lote, o evento primeiro (como `gravar_acordado`: o retrato que
+    falhar deixa a peça "não gravada", e gravar de novo é o mesmo número). O retrato só sai se o acordado registrado AGORA é o que
+    o Fracttal tem, conferido sob a trava de cada peça (ninguém registra outro acordado dela entre a conferência e a escrita). ""
+    se gravou; senão o porquê (o Fracttal já recebeu: o texto manda gravar de novo)."""
+    itens = sorted({e["id_item"] for e in eventos} | {i for i, _ in ficam_gravados})
+    travas = [_PECA.de((almox, i)) for i in itens]
+    for tr in travas:
+        tr.acquire()
+    try:
+        linhas = []
+        if ficam_gravados:
+            vig = _vigentes(F.ler(cfg, forcar=True)[F.ABA_REGUA])
+            for item, aco in ficam_gravados:
+                v = vig.get((almox, item))
+                if v and v["acordado"] == aco:
+                    linhas.append(_retrato(almox, item, v["codigo"], v["usina_id"], v["sugestao"], v["recomendado"], aco,
+                                           True, quem_))
+        if eventos:
+            F.acrescentar(cfg, F.ABA_EVENTO, eventos)
+        if linhas:
+            F.acrescentar(cfg, F.ABA_REGUA, linhas)
+        return ""
+    except (F.Recusada, OSError) as ex:
+        logging.warning("régua: o lote do almoxarifado %s não entrou no livro (%s)", almox, type(ex).__name__)
+        return str(ex) if isinstance(ex, F.Recusada) else type(ex).__name__
+    finally:
+        for tr in reversed(travas):
+            tr.release()
 
 
 # ── as telas ─────────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -352,7 +643,9 @@ def _pagina(almox: str = "", *, erro: str = "", status: int = 200):
         erro, status = erro or "Esse almoxarifado não está na varredura do App.", 404 if status == 200 else status
     if escolhido:
         try:
-            linhas = quadro(cfg, almox, varredura=[l for l in d["linhas"] if _id(l.get("id_almox")) == almox])
+            ciclo = d.get("ciclo") or {}
+            linhas = quadro(cfg, almox, varredura=[l for l in d["linhas"] if _id(l.get("id_almox")) == almox],
+                            lida_depois_de=ciclo.get("fim_iso") or ciclo.get("inicio_iso"))
         except F.Recusada as ex:
             erro_livro = str(ex)
     aviso = session.pop("pcm_regua_aviso", None) if status == 200 else None

@@ -1229,3 +1229,95 @@ def test_a_vez_do_almoxarifado_solta_mesmo_se_o_controle_nao_grava_ao_parar(app,
         G.iniciar(grav["cfg"], _contagem(linhas), itens, falso, APROVADOR, curadoria={},
                   dormir=grav["esperas"].append, agora=grav["relogio"])
     assert caiu and not G._viva("10")
+
+
+# ── o acordado vai sozinho ao Fracttal quando a gravação termina (11/11/2026, item 2 da 2ª rodada) ─────────────────────────
+# O PCM: "Mínimo e máximo: não está atualizando após a auditoria automaticamente no Fracttal". Decisão do Levi (11/11/2026): vai o
+# ACORDADO que o PCM registrou na régua; a peça sem acordado não muda, e o recomendado e a sugestão nunca vão.
+def _acordo(app, *pares):
+    """O acordado registrado na régua do almoxarifado 10 (o retrato, como o `regua.decidir` o grava)."""
+    F.acrescentar(app.config, F.ABA_REGUA, [{"id_almoxarifado": "10", "id_item": i, "codigo": f"SP-{i}", "acordado_min_qtd": mn,
+                                            "acordado_max_qtd": mx, "gravado_fracttal": 0,
+                                            "pessoa_hmac": APROVADOR["pessoa_hmac"]} for i, (mn, mx) in pares])
+
+
+def _da_c1(app):
+    return [e for e in _eventos(app) if e["contagem_id"] == "C-1"]
+
+
+class _RecusaARegua(EstoqueFalso):
+    """O Fracttal que grava o saldo e recusa (o `success: false`) toda régua."""
+
+    def definir_regua(self, id_almox, id_item, minimo, maximo):
+        self.chamadas.append("definir_regua")
+        raise E.Recusado("ITEM_LOCKED", "inventories.warehouses_items_update")
+
+
+def test_depois_da_gravacao_o_acordado_vai_ao_fracttal(app, grav):
+    """Quando a gravação da contagem termina, na MESMA sessão do Fracttal de quem gravou, o Nexus manda a régua acordada de cada
+    peça do almoxarifado cujo acordado difere do que o Fracttal tem: a 501 (sem régua) vai; a 502 já tem a acordada e não gasta
+    pedido; a 503 não tem acordado e não muda. A peça mandada vira um `regua_gravada` da contagem, e a etapa Gravação diz."""
+    _acordo(app, ("501", (2, 20)), ("502", (1, 5)))
+    falso = _falso({"501": 10, "502": {"saldo": 5, "minimo": 1, "maximo": 5}, "503": 4}, agora=grav["relogio"])
+    _iniciar(grav, falso)
+    assert falso.chamadas[-3:] == ["ler", "definir_regua", "ler"]           # depois da última releitura da gravação
+    lido = falso.ler("10")
+    assert (lido["501"]["minimo"], lido["501"]["maximo"]) == (2.0, 20.0) and (lido["501"]["saldo"]) == 12
+    assert (lido["503"]["minimo"], lido["503"]["maximo"]) == (None, None)
+    assert [(e["id_item"], e["contagem_id"], e["pessoa_hmac"]) for e in _eventos(app, "regua_gravada")] == \
+        [("501", "C-1", APROVADOR["pessoa_hmac"])]
+    assert L.estado_dos_eventos(_da_c1(app)) == "gravada"
+    est = G.estado(app.config, "C-1")
+    assert est["estado"] == "concluida" and est["registro"][-1]["texto"] == "Gravação concluída."
+    assert est["registro"][-2]["texto"] == "Régua acordada: 1 gravado no Fracttal e relido, 1 já estava igual."
+
+
+def test_a_peca_recem_ligada_entra_com_0_e_0_e_recebe_o_acordado(app, grav):
+    """A peça que a gravação liga ao almoxarifado entra no Fracttal com mínimo e máximo 0: com o acordado registrado, ele vai logo
+    depois, na mesma sessão (de 0 para o mínimo acordado)."""
+    _acordo(app, ("508", (1, 4)))
+    falso = _falso(agora=grav["relogio"])
+    _iniciar(grav, falso, {"501": 12, "508": 3})
+    lido = falso.ler("10")["508"]
+    assert (lido["saldo"], lido["minimo"], lido["maximo"]) == (3.0, 1.0, 4.0)
+    assert [(e["id_item"], float(e["de_qtd"]), float(e["para_qtd"])) for e in _eventos(app, "regua_gravada")] == \
+        [("508", 0.0, 1.0)]
+
+
+def test_sem_acordado_a_gravacao_nao_chama_o_fracttal_de_novo(app, grav):
+    """Sem acordado registrado no almoxarifado, o fim da gravação não faz pedido nenhum a mais (a cota é da empresa) e não diz
+    nada na etapa Gravação."""
+    falso = _falso(agora=grav["relogio"])
+    _iniciar(grav, falso)
+    assert "definir_regua" not in falso.chamadas and falso.chamadas[-1] == "ler" and falso.chamadas.count("ler") == 3
+    assert not any("Régua" in r["texto"] for r in G.estado(app.config, "C-1")["registro"])
+
+
+def test_a_falha_da_regua_nao_desfaz_o_saldo(app, grav):
+    """O Fracttal recusa a régua: cada peça vira um `erro` (o porquê cifrado), o saldo contado fica gravado e a contagem termina
+    "gravada" e a gravação "concluída"; a etapa Gravação diz que falharam."""
+    _acordo(app, ("501", (2, 20)), ("502", (1, 8)))
+    falso = _RecusaARegua({"10": {"501": 10, "502": 5, "503": 4}}, agora=grav["relogio"])
+    _iniciar(grav, falso)
+    assert _saldos(falso) == {"501": 12, "502": 3, "503": 0}
+    assert L.estado_dos_eventos(_da_c1(app)) == "gravada"
+    erros = [e for e in _eventos(app, "erro") if e.get("id_item")]
+    assert sorted(e["id_item"] for e in erros) == ["501", "502"]
+    assert "recusou" in F.decifrar(app.config, F.ABA_EVENTO, erros[0])["motivo"]
+    est = G.estado(app.config, "C-1")
+    assert est["estado"] == "concluida" and "2 falharam" in est["registro"][-2]["texto"]
+    assert est["registro"][-2]["tom"] == "alerta"
+
+
+def test_o_login_que_expira_na_regua_nao_para_a_gravacao(app, grav):
+    """O login do Fracttal que expira logo depois da última peça gravada: a régua não vai, a etapa Gravação diz por quê e manda
+    gravar pela tela Mínimo e máximo, e a contagem termina "gravada" do mesmo jeito (a vez do almoxarifado é solta)."""
+    _acordo(app, ("501", (2, 20)))
+    falso = _falso(expirar_em=15, agora=grav["relogio"])                   # os 14 pedidos da gravação passam
+    _iniciar(grav, falso)
+    assert {e["id_item"] for e in _eventos(app, "peca_gravada")} == {"501", "502", "503"}   # o saldo ficou gravado
+    est = G.estado(app.config, "C-1")
+    assert est["estado"] == "concluida" and L.estado_dos_eventos(_da_c1(app)) == "gravada"
+    assert est["registro"][-2]["texto"] == (f"A régua acordada não foi ao Fracttal ({G.LOGIN}): grave pela tela Mínimo e "
+                                            "máximo.")
+    assert not list(grav_pasta(app).glob("trava-*"))

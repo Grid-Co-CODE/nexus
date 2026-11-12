@@ -698,7 +698,8 @@ Fracttal aceita de verdade: `...-passo0.md`. Cada parte tem a seção dela abaix
    Gravação acompanha pelo `estado.json` (os números, uma linha por lote e o que aconteceu); a parada mostra o "Continuar" a quem aprovou (e o aviso forte se o almoxarifado ficou travado),
    e o "Encerrar" fecha a que ninguém vai continuar.
 5. **Mínimo e máximo** (`.../regua`): a sugestão, o recomendado (Grid, só no livro) e o acordado (cliente), o único que vai ao
-   Fracttal, pela ponte.
+   Fracttal: pela ponte (uma peça, ou todas as do almoxarifado de uma vez) e, desde 11/11/2026, sozinho no fim da gravação de
+   cada contagem (a seção da régua, "Todos os acordados de uma vez").
 6. **Auditoria** (`.../auditoria`): todos os eventos do livro, com o filtro por tipo e a busca; os de uma contagem, na etapa 4
    dela.
 
@@ -746,6 +747,9 @@ script desliga o filtro só na cópia e deixa a sigla `TST` para ele), com o liv
   isso sozinhas, pela versão do livro (`leitura._o_que_o_app_faz`); quando o App publicar as cinco colunas, os textos mudam sem
   deploy nem chave.
 - A tela da contagem no App (a sessão do App constrói pelo contrato).
+- A prova no Fracttal de verdade (TESTE - PA, lendo de volta) do lote dos acordados de 11/11/2026: o fim da gravação de uma
+  contagem mandando a régua acordada (a peça recém-ligada, de 0 e 0 para o acordado) e o botão "Gravar no Fracttal todos os
+  acordados deste almoxarifado". Provado só com o `EstoqueFalso`; fica com o Levi.
 - O que a prova real de 27/10/2026 no almoxarifado de teste NÃO passou (são os caminhos de defeito; o `EstoqueFalso` os supõe):
   voltar ao modo 0 numa sessão aberta sem finalizar; finalizar uma sessão vazia; repetir o `warehouse_change_mode` no 429; ligar
   a peça duas vezes; mover em modo 2; o filtro `code =` e o `field_1` (o nome) da lista de peças (o `Estoque.peca`, só da nova
@@ -1213,7 +1217,7 @@ cada almoxarifado, TRÊS números de mínimo e máximo, e só um vai ao Fracttal
   antes do teto.
 - **Recomendado** (a Grid): decisão do PCM, só no livro (`fato_regua_minimo`), é o histórico com que se defende o mínimo.
 - **Acordado** (o cliente): decisão do PCM e o ÚNICO que vai ao Fracttal (`definir_regua`, fora da sessão de ajuste: sem
-  movimento, sem mexer no saldo). Leva os DOIS números; o recomendado pode ficar sem mínimo. Mínimo acima do máximo é
+  movimento, sem mexer no saldo), pelo botão da peça, pelo de todas e no fim da gravação da contagem (abaixo). Leva os DOIS números; o recomendado pode ficar sem mínimo. Mínimo acima do máximo é
   recusado (400) antes de qualquer pedido. **O acordado com casa decimal só em METRO e MASSA** (400): a unidade da varredura vale ao
   registrar, e a que o Fracttal diz (`Estoque.ler()["unidade"]`) vale antes do `definir_regua`; a unidade que ninguém disse é
   inteira.
@@ -1253,12 +1257,42 @@ cada almoxarifado, TRÊS números de mínimo e máximo, e só um vai ao Fracttal
   por chave) e `ponte_os.py` (o blueprint `/os/_nexus/inventario`, registrado na raiz do app como o `bp_raiz` do OS Creator, com
   `registrar` idempotente; cada tarefa põe as rotas dela num bloco próprio; `tests/test_pcm_inventario_ponte.py` prova o registro duas
   vezes e as duas rotas debaixo do `NEXUS_PREFIXO=/nexus`). `Estoque.ler` passou a devolver também a `unidade`.
+- **Todos os acordados de uma vez (`gravar_acordados`, 11/11/2026, item 2 da 2ª rodada; o PCM: "Mínimo e máximo: não está
+  atualizando após a auditoria automaticamente no Fracttal"):** decisão do Levi (11/11/2026): vai o ACORDADO registrado, a regra
+  de sempre; a peça sem acordado não muda, e o recomendado e a sugestão nunca vão. Duas portas, a mesma conta: o **fim da
+  gravação de cada contagem** (`gravacao._Trabalho.regua_acordada`, na MESMA sessão do Fracttal de quem gravou, com o
+  almoxarifado já fora do ajuste; a seção da gravação) e o botão **"Gravar no Fracttal todos os acordados deste almoxarifado"**
+  (`POST /os/_nexus/inventario/regua/gravar_todos`, na ponte, com as recusas de sempre: outro setor 403, sem o cookie do Fracttal
+  401, a senha de administrador e a conta de outra pessoa 409; e 409 com uma gravação de contagem andando no almoxarifado, que
+  manda os acordados no fim). Uma leitura do almoxarifado; manda cada peça cujo acordado difere do que o Fracttal tem (a que a
+  gravação acabou de ligar, com 0 e 0, inclusive); relê por lote de 50 (`LOTE_REGUA`) e só então anota o `regua_gravada` (o
+  mínimo de -> para; com o `contagem_id` quando veio da gravação, e a Auditoria da contagem o mostra) e o retrato
+  `gravado_fracttal`, escrevendo o livro uma vez por lote. A peça já igual no Fracttal não gasta pedido e passa a "gravado no
+  Fracttal" (é o que ele tem). **A falha de uma peça não para as outras:** vira um evento `erro` (o porquê cifrado, só texto do
+  Nexus, como na gravação); o `Recusado` não gravou; a resposta perdida talvez gravou, e a releitura decide. O 429 espera 62 s e
+  tenta UMA vez; de novo, o lote para e o resto não vai (o texto diz quantas e manda gravar de novo); o login que expira também
+  para, e a releitura que não veio deixa as mandadas sem anotação de gravada. O acordado que outra pessoa registra durante o
+  lote não vira "gravado": o retrato é escrito sob a trava de cada peça, conferindo o registrado de agora. Um lote por
+  almoxarifado de cada vez (`Conflito`). Roda no pedido, um pedido por segundo (a cota da empresa): o botão leva o
+  `data-ponte-espera` e o `pcm-ponte-inventario.js` diz "pode levar alguns minutos" enquanto espera. Sem acordado nenhum, nem a
+  leitura vai ao Fracttal.
+- **"No Fracttal agora" (11/11/2026):** toda releitura de régua (o botão da peça e o lote) guarda o mínimo e o máximo de cada peça
+  do almoxarifado e a hora (`guardar_lida`, `<NEXUS_DADOS>/almox_inventario/regua-lida-<almox>.json`: a foto do Fracttal para a
+  tela, como o controle da gravação; o rastro de negócio é o evento no banco), e a coluna No Fracttal mostra "mín X, máx Y", com
+  "no Fracttal agora" e "lido às HH:MM" (de outro dia, "lido em dd/mm às HH:MM") em duas linhas curtas (a célula não quebra: numa
+  linha só a coluna espremia a da peça a 1366 px, conferido na cópia de prova), enquanto a releitura for mais nova que a varredura
+  que a tela mostra (`quadro(lida_depois_de=)`, o fim do ciclo do App); depois, volta o mínimo da varredura (o App não traz o
+  máximo). Sem pasta de dados, ou com o arquivo ilegível, vale a varredura. O rótulo longo do botão de todos quebra dentro dele
+  no celular (`.rg-todos .gc-btn`; o `nowrap` da casa o cortava no cartão a 375 px).
 - **Provar:** `tests/test_pcm_inventario_regua.py` (a conta, o quadro, o retrato, só o acordado ao Fracttal, a releitura, o 403
   de quem não é PCM, o 400, o 409, o 401, o 429, a resposta perdida) com mutações nas regras (manda o recomendado, não confere a
   releitura, teto vira piso, avariada com mínimo, gravado sobrevive ao acordado novo, perde o acordado de antes, aceita mínimo
   acima do máximo, ignora a contagem gravada, vale a primeira decisão, peça de qualquer almoxarifado, os dois gates), todas pegas. A
   revisão de 27/10 acrescentou: o acordado que mudou desde que a tela abriu, o decimal em unidade inteira (no registro e na gravação), o
   acordado incompleto, a trava por peça (duas pessoas na mesma peça; a gravação lenta de uma não segura a outra) e o erro de rede.
+  O lote de 11/11/2026: `test_gravar_acordados_manda_so_o_acordado_diferente` e seguintes (a peça sem acordado, a falha de uma, a
+  resposta perdida, a releitura que não bate, o 429, o login, a releitura no quadro, o acordado mudado no meio, a ponte e as
+  recusas dela) e, na gravação, `test_depois_da_gravacao_o_acordado_vai_ao_fracttal` e seguintes.
 
 ## Inventário do almoxarifado: a curadoria (`inventario/curadoria.py`; 26/10/2026)
 
@@ -1505,6 +1539,15 @@ inventário físico). Tudo no módulo existe para nunca deixar um almoxarifado t
   o login:** o JWT e o e-mail vivem só na instância do `Estoque`. Os eventos vão ao livro SEMPRE com a sessão fechada (o banco
   lento não segura o almoxarifado travado), com o `evento_id` tirado da contagem, do tipo e da peça: registrar de novo não
   duplica a auditoria.
+- **A régua acordada no fim (11/11/2026, item 2 da 2ª rodada):** quando a gravação termina (concluída, com ou sem conflitos;
+  a parada não), `_executar` chama a `regua_acordada` antes do `fim`: o `regua.gravar_acordados` do almoxarifado, na MESMA
+  sessão do Fracttal (o `Estoque` de quem aprovou ou continuou), no nome de quem aprovou, com os eventos ligados à contagem. O
+  controle segue "gravando" (o deploy espera; a vez do almoxarifado só se solta no fim), com o andamento em `regua`, e a etapa
+  Gravação diz o resultado antes de "Gravação concluída." ("Régua acordada: N gravados no Fracttal e relidos, ..."; nada quando
+  o almoxarifado não tem acordado, e aí nem um pedido a mais). **Nunca desfaz o saldo:** a falha da régua (o login que expira, o
+  429 de novo, o livro) fica no controle ("A régua acordada não foi ao Fracttal (...): grave pela tela Mínimo e máximo") e a
+  contagem termina "concluída" do mesmo jeito. O arquivo da releitura (`regua-lida-*`) mora na mesma pasta e fica fora dos
+  `_controles`.
 - **O deploy espera a gravação viva** (Levi, 26/10/2026): o `deploy/atualizar.sh` pergunta ao `ferramentas/gravacao_aberta.py`
   (`gravacao.com_lote_aberto`: "gravando" e salvo há menos de 5 min, com um lote aberto OU entre um lote e outro) e deixa o
   restart para a rodada seguinte, por no máximo 10 min contados da 1ª espera (`DEPLOY.md`, seção 8). A 1ª versão só segurava com

@@ -65,6 +65,14 @@ processo só (a trava da memória basta), mas o arquivo segura a reinicializaç�
 Os eventos vão ao livro do inventário (`fato_inventario.acrescentar`) SEMPRE com o almoxarifado fora da sessão: o livro é o
 banco, e gravar nele com o almoxarifado travado o deixaria travado mais tempo. Cada evento tem um `evento_id` que sai da
 contagem, do tipo e da peça: registrar de novo (a retomada depois de uma falha do banco) não duplica a auditoria.
+
+**A régua acordada no fim** (11/11/2026; o PCM: "Mínimo e máximo: não está atualizando após a auditoria automaticamente no
+Fracttal"): quando a gravação termina (concluída, com conflitos ou não), na MESMA sessão do Fracttal de quem gravou e com o
+almoxarifado já fora do ajuste, o Nexus manda a régua acordada de cada peça do almoxarifado cujo acordado difere do que o
+Fracttal tem (`regua.gravar_acordados`; a peça que esta gravação ligou entra com 0 e 0, e recebe o dela). O controle segue
+"gravando" enquanto isso (o deploy espera, e a vez do almoxarifado só se solta no fim), e o resultado fica no controle
+(`regua`), que a etapa Gravação mostra. A falha da régua nunca desfaz o saldo gravado: a contagem termina "concluída" do mesmo
+jeito, e o PCM grava pela tela Mínimo e máximo.
 """
 from __future__ import annotations
 
@@ -786,6 +794,41 @@ class _Trabalho:
                             type(erro).__name__)
         self.salvar()
 
+    def regua_acordada(self) -> None:
+        """A gravação terminou: a régua acordada do almoxarifado vai ao Fracttal na MESMA sessão (`regua.gravar_acordados`,
+        no nome de quem aprovou, com os eventos da contagem), e o resultado vai ao controle (`regua`), que a etapa Gravação
+        mostra. Nunca levanta: a falha da régua não desfaz o saldo gravado (as peças já estão `peca_gravada` no livro), e a
+        contagem termina "concluída" do mesmo jeito; o controle que não grava aqui só perde o andamento."""
+        from . import regua
+        aprov = self.c.get("aprovador") or {}
+        quem_ = {"pessoa_hmac": aprov.get("pessoa_hmac")}
+        if aprov.get("pessoa_id") is not None:
+            quem_["pessoa_id"] = aprov["pessoa_id"]
+
+        def andou(r: dict) -> None:
+            self.c["regua"] = {"estado": "gravando", "a_mandar": r["a_mandar"], "feitas": r["feitas"]}
+            self._salvar_sem_parar()
+        try:
+            r = regua.gravar_acordados(self.cfg, self.almox, self.e, quem_, contagem_id=self.c["contagem_id"],
+                                       dormir=self._dormir, agora=self._agora, ao_andar=andou)
+            self.c["regua"] = {"estado": "feita", "fim": _iso(self._agora()),
+                               **{k: r[k] for k in ("total", "gravadas", "iguais", "falhas", "nao_enviadas")},
+                               "texto": regua._texto_do_lote(r, "Régua acordada")}
+        except Exception as ex:                # noqa: BLE001 — a régua nunca desfaz o saldo nem para o fim da gravação
+            logging.warning("inventário %s: a régua acordada não foi ao Fracttal (%s)", self.c["contagem_id"],
+                            type(ex).__name__)
+            motivo = (LOGIN if isinstance(ex, SemLogin) else LIMITE if isinstance(ex, Limite)
+                      else str(ex) if isinstance(ex, F.Recusada) else _motivo_do_erro(ex))
+            self.c["regua"] = {"estado": "falhou", "fim": _iso(self._agora()), "motivo": motivo}
+        self._salvar_sem_parar()
+
+    def _salvar_sem_parar(self) -> None:
+        try:
+            self.salvar()
+        except OSError as ex:
+            logging.error("inventário %s: o controle não gravou o andamento da régua: %s", self.c["contagem_id"],
+                          type(ex).__name__)
+
     def fim(self, estado: str, motivo: str) -> None:
         self.c.update(estado=estado, motivo=motivo, fim=_iso(self._agora()))
         self.salvar()
@@ -818,6 +861,7 @@ def _executar(t: _Trabalho) -> None:
             t.erro_geral(ex)
             t.fim("parada", _motivo_do_erro(ex))
         else:
+            t.regua_acordada()                      # a régua acordada, na mesma sessão (nunca levanta)
             t.fim("concluida", "")
     except Exception as ex:                         # noqa: BLE001 — nem o controle gravou: o log diz, a vez se solta abaixo
         # só o tipo: o texto do erro pode ser o do Fracttal, e ele pode ter nome de gente
@@ -1165,7 +1209,7 @@ def _controles(pasta: Path):
     if pasta is None or not pasta.is_dir():
         return
     for arq in sorted(pasta.glob("*.json")):
-        if arq.name.startswith("trava-"):
+        if arq.name.startswith(("trava-", "regua-lida-")):         # a vez do almoxarifado e a releitura da régua
             continue
         try:
             ctrl = _ler_json(arq)
@@ -1290,6 +1334,17 @@ def _registro(ctrl: dict, situacao: str, motivo: str) -> list[dict]:
             out.append({"hora": "", "tom": "ok", "texto": f"Lote {l['n']} fechado e relido: {g} "
                                                          f"{'gravada' if g == 1 else 'gravadas'}, {c} em conflito."})
         pecas(l.get("n"))
+    rg = ctrl.get("regua") or {}                 # a régua acordada do fim da gravação (11/11/2026)
+    if rg.get("estado") == "gravando":
+        out.append({"hora": "", "tom": "alerta", "texto": f"Mandando a régua acordada ao Fracttal: {rg.get('feitas', 0)} de "
+                                                         f"{rg.get('a_mandar', 0)} peças."})
+    elif rg.get("estado") == "feita" and rg.get("total"):
+        out.append({"hora": _hora_curta(rg.get("fim")), "tom": "alerta" if rg.get("falhas") or rg.get("nao_enviadas") else "ok",
+                    "texto": rg.get("texto") or ""})
+    elif rg.get("estado") == "falhou":
+        out.append({"hora": _hora_curta(rg.get("fim")), "tom": "critico",
+                    "texto": f"A régua acordada não foi ao Fracttal ({rg.get('motivo') or 'erro'}): grave pela tela Mínimo e "
+                             "máximo."})
     if situacao in ("parada", "concluida", "encerrada") and ctrl.get("fim"):
         fim = {"concluida": ("ok", "Gravação concluída."), "encerrada": ("", f"Gravação {motivo}."),
                "parada": ("critico", f"Gravação parada: {motivo}.")}[situacao]

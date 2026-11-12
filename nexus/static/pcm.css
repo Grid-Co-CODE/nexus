@@ -1573,6 +1573,10 @@ details.inv-card:not([open])>summary{border-bottom:0}
 .rg-usar{align-self:flex-start;padding:0;font-size:12px}
 .rg-acao{display:flex;flex-direction:column;align-items:flex-start;gap:6px}
 .rg-acao form{margin:0}
+/* todos os acordados do almoxarifado de uma vez (11/11/2026): o botão e a regra numa faixa, no alto do cartão */
+.rg-todos{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;margin:0;padding:10px 14px;border-bottom:1px solid var(--linha)}
+/* o rótulo é longo: no celular ele quebra dentro do botão (o `nowrap` da casa o cortava no cartão, conferido a 375 px) */
+.rg-todos .gc-btn{max-width:100%;white-space:normal;text-align:left}
 @media (max-width:640px){
   .alm-t td .rg-par,.alm-t td .rg-acao,.alm-t td .rg-sug{align-items:flex-end}
   .rg-n{width:72px}
