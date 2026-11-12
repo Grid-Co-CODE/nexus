@@ -83,7 +83,8 @@
 
   // ── as cores: os tokens do nexus.css, lidos na hora (os dois temas) ─────────────────────────────────────────────
   var TOKENS = ["--superficie", "--superficie-2", "--fundo", "--linha", "--linha-forte", "--tinta", "--tinta-2", "--mudo",
-                "--verde", "--info-cheio", "--ok-cheio", "--alerta-cheio", "--critico", "--severo", "--papel", "--papel-tinta"];
+                "--verde", "--info-cheio", "--ok-cheio", "--alerta-cheio", "--critico", "--severo", "--papel", "--papel-tinta",
+                "--semcom"];
   function paleta() {
     var cs = getComputedStyle(raiz), t = {};
     TOKENS.forEach(function (n) { t[n] = cs.getPropertyValue(n).trim(); });
@@ -222,7 +223,7 @@
   }
   // a cor da usina (12/11/2026, Levi: "Quero as cores das usinas de acordo com o tempo real, OS Abertas do setor COS, as
   // regras estão em 'Comando > Usinas' pode pegar as cores de lá!"): o Agora de Comando > Usinas, no tom de lá (normal
-  // verde, atenção amarelo, crítico vermelho, sem comunicação cinza; sem leitura do COS só o contorno). Com o clima
+  // verde, atenção amarelo, crítico vermelho, sem comunicação roxo desde 13/11/2026; sem leitura do COS só o contorno). Com o clima
   // ligado, a cor é o nível do alerta de clima, e o selo "!" diz que o COS tem crítico ou atenção
   function corDaUsina(u) {
     if (u.nivel) return u.nivel;
@@ -233,6 +234,7 @@
     var cores = NIVEL();
     var fill = { neutra: P.terra, dest: P.verde, sem_leitura: P.terra, a_ok: P.t["--ok-cheio"],
                  a_alerta: P.t["--alerta-cheio"], a_critico: P.t["--critico"], a_neutro: P.t["--mudo"],
+                 a_semcom: P.t["--semcom"],
                  cinza: mistura(P.terra, P.t["--mudo"], 0.7) };
     Object.keys(cores).forEach(function (k) { fill[k] = cores[k]; });
     Object.keys(fill).forEach(function (k) {
@@ -260,7 +262,7 @@
     return fc(coords.length > 1 ? [{ type: "Feature", geometry: { type: "LineString", coordinates: coords }, properties: {} }] : []);
   }
   function usinasGeo() {
-    var ORD = { agir: 9, a_critico: 8, atencao: 7, a_alerta: 6, regiao: 4, sem: 3, nx: 2, a_neutro: 2, a_ok: 1, dest: 1,
+    var ORD = { agir: 9, a_critico: 8, atencao: 7, a_alerta: 6, a_semcom: 5, regiao: 4, sem: 3, nx: 2, a_neutro: 2, a_ok: 1, dest: 1,
                 sem_leitura: 0, neutra: 0 };
     return fc(D.usinas.map(function (u) {
       var cor = corDaUsina(u), corT = corNoFoco(cor, "tecnico");

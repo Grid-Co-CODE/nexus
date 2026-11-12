@@ -74,6 +74,8 @@
 .cn-info{color:var(--info);background:var(--info-suave)}
 .cn-ok{color:var(--ok);background:var(--ok-suave)}
 .cn-neutro{color:var(--mudo);background:var(--superficie-2)}
+/* sem comunicação: o roxo do semáforo (Comando > Usinas, 13/11/2026) */
+.cn-semcom{color:var(--semcom);background:var(--semcom-suave)}
 .cn-tag{display:inline-block;font:600 11px/16px var(--font-sans);padding:2px 8px;border-radius:5px;background:var(--superficie-3);color:var(--tinta-2)}
 .cn-fora{color:var(--verde-texto);font-weight:600;text-decoration:none;white-space:nowrap}
 .cn-fora:hover{text-decoration:underline}
@@ -2275,6 +2277,7 @@ tr.rd-linha--ativa td{background:var(--verde-suave)}
 .eqtv-kpi--critico strong{color:var(--critico)}
 .eqtv-kpi--alerta strong{color:var(--alerta)}
 .eqtv-kpi--neutro strong{color:var(--tinta-2)}
+.eqtv-kpi--semcom strong{color:var(--semcom)}
 .eqtv-kpi--zero strong{color:var(--mudo)}
 .eqtv-lista{position:relative;flex:1;min-height:0;overflow:hidden}
 .eqtv-trilho{display:grid;gap:1.4vh;will-change:transform}
@@ -2289,6 +2292,7 @@ tr.rd-linha--ativa td{background:var(--verde-suave)}
 .eqtv-card--critico{--tom:var(--critico)}
 .eqtv-card--alerta{--tom:var(--alerta)}
 .eqtv-card--neutro{--tom:var(--mudo)}
+.eqtv-card--semcom{--tom:var(--semcom)}
 .eqtv-card-corpo{display:grid;gap:.25em;min-width:0}
 .eqtv-card-corpo p{margin:0;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .eqtv-card-l1{display:flex;align-items:baseline;gap:.6em}

@@ -77,6 +77,19 @@ def test_as_colunas_e_a_ordem():
     assert CU.resumo(r)["por_estado"] == {"normal": 1, "atencao": 0, "critico": 1, "sem_com": 0, "sem_leitura": 1}
 
 
+def test_sem_comunicacao_e_roxo():
+    """Levi, 13/11/2026: "Quando for falha de comunicação [...] na cor precisa estar roxo". O tom é o `semcom` do semáforo,
+    e não o cinza do "Sem leitura"; o selo, a barra da faixa e o ponto da legenda têm a classe dele."""
+    from pathlib import Path
+    assert CU.ESTADOS["sem_com"][1] == "semcom" and CU.ESTADOS["sem_leitura"][1] == "neutro"
+    a = CU.agora_pelo_cos([_oc(falha="Falha de comunicação", problema="com")], AGORA)
+    assert (a["estado"], a["estado_tom"], a["detalhe"]) == ("sem_com", "semcom", "Falha de comunicação")
+    estatico = Path(__file__).resolve().parent.parent / "nexus" / "static"
+    campo, comando = (estatico / "campo.css").read_text(encoding="utf-8"), (estatico / "comando.css").read_text(encoding="utf-8")
+    assert ".cn-semcom{color:var(--semcom);background:var(--semcom-suave)}" in campo
+    assert ".cmu-seg--semcom{background:var(--semcom)}" in comando and ".cmu-ponto--semcom{background:var(--semcom)}" in comando
+
+
 def test_a_regua_do_levi():
     """11/11/2026: "religamento com OS aberta em campo tem que estar como crítico", "atenção vai ser inversor desligado",
     "falha de comunicação é sem comunicação e etc"."""
