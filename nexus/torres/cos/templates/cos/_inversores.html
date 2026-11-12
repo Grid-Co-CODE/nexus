@@ -6,8 +6,9 @@
    - Clicar num cartão de usina (data-gid) abre a curva dela e a de cada inversor, na mesma escala, com o estado de cada um.
    - O ritmo é o da tela de monitoramento da Ronda COS: o cartão do SCADA de 3 em 3 s (depois de cada resposta, parado com a
      aba escondida) e a curva gravada de 5 em 5 min, com a ponta andando pelas leituras de 3 s.
-   - Quem lê é o NAVEGADOR, direto na API da Ronda COS (`cos_api`, NEXUS_COS_API_URL), com o login da pessoa: um reinício
-     do Nexus não derruba a tela aberta. Sem `cos_api`, a tela fica só com o que o Andamento manda.
+   - Quem lê, desde 12/11/2026, é o SERVIDOR do Nexus, pela chave do Andamento (`/t/cos/monitoramento/ronda-api/...`,
+     `cos_pela_porta`): sem login da Ronda COS, e a mesma leitura serve a todos (2 s de cópia). Com NEXUS_COS_API_URL, o
+     navegador lê a API da Ronda COS direto, com o login da pessoa (o desenho do protótipo).
    - "Aberto no COS": as ocorrências abertas que citam um inversor, pela fotografia do Andamento (servidor). #}
 <dialog class="cos-inv-dlg" id="cos-inv-dlg" aria-labelledby="cos-inv-titulo">
   <header class="cos-inv-topo"><div><h2 class="cos-inv-titulo" id="cos-inv-titulo"></h2><span class="cos-inv-sub"></span></div>
@@ -21,6 +22,7 @@
     api: {{ cos_api|tojson }},
     console: {{ cos_console|tojson }},
     semLogin: {{ (cos_sem_login or false)|tojson }},
+    pelaPorta: {{ (cos_pela_porta or false)|tojson }},
     inversoresAbertos: {{ cos_inversores_abertos()|tojson }}
   });
 </script>

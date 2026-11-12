@@ -594,12 +594,59 @@ def ler_curvas(config) -> Leitura:
                         TTL_CURVAS_S, TIMEOUT_CURVAS_S)
 
 
+# ── Os inversores ao vivo (12/11/2026): a janela dos inversores do Monitoramento, de 3 em 3 s ─────────────────────────
+# O navegador da pessoa logada no Nexus pede ao Nexus (`/t/cos/monitoramento/ronda-api/...`), e o Nexus lê o Andamento
+# (`/api/nexus/geracao/scada` e `/scada-curva`, a chave de máquina): sem login da Ronda COS. Ao vivo de verdade, então
+# NADA da cópia vencida servida na hora (`_com_copia`): a cópia vale `TTL_AO_VIVO_S` e a mesma leitura serve a todos
+# (um pedido só por leitura no ar). A curva dos inversores muda de 5 em 5 min: 60 s de cópia.
+TTL_AO_VIVO_S = 2.0
+TTL_CURVA_INVERSORES_S = 60.0
+_AO_VIVO_MAX = 200                     # chaves guardadas (as curvas são uma por usina e dia): o resto sai pela idade
+_ao_vivo: dict = {}
+_ao_vivo_no_ar: dict = {}
+_ao_vivo_trava = threading.Lock()
+
+
+def ler_ao_vivo(config, caminho: str, ttl: float) -> tuple[dict | None, str]:
+    """(dados, erro) de um caminho do Andamento, com a cópia de `ttl` s e um pedido só por caminho no ar."""
+    f = fonte(config)
+    if not f.ligada:
+        return None, "a fonte do Andamento não está ligada neste servidor"
+    chave = (f.url, caminho)
+    with _ao_vivo_trava:
+        c = _ao_vivo.get(chave)
+        if c and time.monotonic() - c[0] < ttl:
+            return c[1], c[2]
+        no_ar = _ao_vivo_no_ar.get(chave)
+        dono = no_ar is None
+        if dono:
+            no_ar = _ao_vivo_no_ar[chave] = threading.Event()
+    if not dono:
+        no_ar.wait(TIMEOUT_GERACAO_S + 1)
+        with _ao_vivo_trava:
+            c = _ao_vivo.get(chave)
+        return (c[1], c[2]) if c else (None, "a leitura ao vivo não respondeu")
+    try:
+        r = (_pedir(f, caminho, timeout=TIMEOUT_GERACAO_S), "")
+    except FonteErro as ex:
+        r = (None, str(ex))
+    with _ao_vivo_trava:
+        _ao_vivo[chave] = (time.monotonic(), *r)
+        if len(_ao_vivo) > _AO_VIVO_MAX:
+            for k in sorted(_ao_vivo, key=lambda k: _ao_vivo[k][0])[:len(_ao_vivo) - _AO_VIVO_MAX]:
+                _ao_vivo.pop(k, None)
+        _ao_vivo_no_ar.pop(chave).set()
+    return r
+
+
 def limpar_cache() -> None:
     with _trava:
         _cache.clear()
         _cache_clientes.clear()
         _falha.clear()
         _irmaos_em.clear()
+    with _ao_vivo_trava:
+        _ao_vivo.clear()
 
 
 # ----------------------------------------------------------------------------------------------------------------------

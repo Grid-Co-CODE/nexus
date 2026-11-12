@@ -216,13 +216,45 @@ def test_a_tela_do_videowall_sem_a_casca_e_o_corpo_que_se_atualiza(tela):
 
 # --- a visão por usina e os inversores (12/11/2026) --------------------------------------------------------------------
 
-def test_um_cartao_por_usina_com_a_atencao_e_sem_a_api_o_cartao_nao_e_botao(tela):
+def test_um_cartao_por_usina_com_a_atencao_e_os_inversores_pelo_servidor_do_nexus(tela):
     html = tela.get("/t/cos/monitoramento").get_data(as_text=True)
     assert html.count('<article class="cos-mon-u') == 4 and 'data-gid="scada-a1"' in html
     assert "Atenção agora" in html and html.index("Atenção agora") < html.index('<article class="cos-mon-u')
-    # sem o endereço da API da Ronda COS (NEXUS_COS_API_URL), sem a janela dos inversores e o cartão não é botão
-    assert "cos-inv-dlg" not in html and "cos/inversores.js" not in html and 'role="button"' not in html
+    # 12/11/2026: sem NEXUS_COS_API_URL, o ao vivo vem pelo servidor do Nexus (sem login da Ronda COS): o cartão abre
+    # os inversores, e a janela lê /t/cos/monitoramento/ronda-api
+    assert 'id="cos-inv-dlg"' in html and "cos/inversores.js" in html and 'role="button"' in html
+    assert 'api: "/t/cos/monitoramento/ronda-api",' in html and "pelaPorta: true," in html
     assert "cos/fluido.js" in html
+
+
+def test_sem_a_fonte_do_andamento_nao_ha_janela_dos_inversores(logado):
+    html = logado.get("/t/cos/monitoramento").get_data(as_text=True)
+    assert "cos-inv-dlg" not in html and 'role="button"' not in html
+
+
+def test_os_inversores_ao_vivo_pelo_servidor_do_nexus(ligada, logado, monkeypatch):
+    scada = {"versao": 1, "configurado": True, "canal_calado": False, "cartoes": [{"pid": "p1", "inversores": [{"modbus_id": 1}]}]}
+    curva = {"versao": 1, "dia": "2026-11-09", "pontos": [], "inversores": [{"modbus_id": 1, "pontos": []}]}
+    pedidos = _servir(monkeypatch, {"/api/nexus/geracao/scada": scada, "/api/nexus/geracao/scada-curva": curva})
+    r = logado.get("/t/cos/monitoramento/ronda-api/scada/monitoramento?entradas=separadas")
+    assert r.status_code == 200 and r.get_json()["cartoes"][0]["inversores"] == [{"modbus_id": 1}]
+    assert r.headers["Cache-Control"] == "private, no-store"
+    # a mesma leitura serve a todos por 2 s: o segundo pedido não vai ao Andamento
+    logado.get("/t/cos/monitoramento/ronda-api/scada/monitoramento?entradas=separadas")
+    assert [p[0] for p in pedidos] == ["/api/nexus/geracao/scada"]
+    r = logado.get("/t/cos/monitoramento/ronda-api/scada/curva/EXA01,EXA02?dia=2026-11-09")
+    assert r.status_code == 200 and r.get_json()["inversores"][0]["modbus_id"] == 1
+    assert pedidos[-1][0] == "/api/nexus/geracao/scada-curva?ids=EXA01%2CEXA02&dia=2026-11-09"
+    # só os dois caminhos; o dia fora do formato é recusado
+    assert logado.get("/t/cos/monitoramento/ronda-api/registros").status_code == 404
+    assert logado.get("/t/cos/monitoramento/ronda-api/scada/curva/../auth").status_code == 404
+    assert logado.get("/t/cos/monitoramento/ronda-api/scada/curva/EXA01?dia=ontem").status_code == 400
+
+
+def test_o_andamento_fora_e_503_com_o_motivo(ligada, logado, monkeypatch):
+    _servir(monkeypatch, {"/api/nexus/geracao/scada": AND.FonteErro("o Andamento respondeu 503", 503)})
+    r = logado.get("/t/cos/monitoramento/ronda-api/scada/monitoramento")
+    assert r.status_code == 503 and "503" in r.get_json()["error"]
 
 
 def test_com_o_endereco_da_api_o_cartao_abre_os_inversores(tela, ligada):
