@@ -30,7 +30,7 @@
   var h = decodeURIComponent((location.hash || "").slice(1));
   var id = h.indexOf("conv-insight-") === 0 ? "ins-" + h.slice(13) : (h.indexOf("ins-") === 0 ? h : "");
   var li = id && document.getElementById(id);
-  // o Sem dono vem recolhido (13/11/2026): o número do alto (#cx-sem-dono) e o endereço de um insight dele o abrem
+  // o Sem dono vem recolhido (12/11/2026): o número do alto (#cx-sem-dono) e o endereço de um insight dele o abrem
   function abrirRecolhido(el) { var r = el && el.closest && el.closest("details.cx-recolhe"); if (r && !r.open) r.open = true; }
   if (h === "cx-sem-dono") abrirRecolhido(document.getElementById(h));
   window.addEventListener("hashchange", function () {

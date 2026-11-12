@@ -2,7 +2,6 @@
 {% block titulo %}{{ tela.nome }}{% endblock %}
 {% block conteudo %}
 {% from "_explica.html" import explica %}
-{% from "campo/_graficos.html" import geracao %}
 <link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
 {# Visão do responsável (12/10/2026, Levi: "uma visão que ele olha as usinas, as metas, os problemas, onde ele deve focar,
    no que ele deve deixar. No caso seria separado por responsável"; protótipo aprovado: "aposte em um formato reduzido que
@@ -50,9 +49,9 @@
           </dl>
 {% endmacro %}
 {% macro det_bloco(u, b) %}{{ det_linhas(u, u[b].det, b == 'perf') }}{% endmacro %}
-{# a lista das PT esperando o De acordo, na janela: a do número do Painel (29/10/2026) e a do número da PT da Central da
-   usina (05/11/2026, Levi: "ao clicar no KPI aparece o mesmo card que aparece em visão do responsável > painel"). `pt`
-   é o `painel_responsavel.pts` (a parada de hoje primeiro); cada PT abre a decisão na mesma janela #}
+{# a lista das PT esperando o De acordo, na janela: a do número do Painel (29/10/2026). `pt` é o
+   `painel_responsavel.pts` (a parada de hoje primeiro); cada PT abre a decisão na mesma janela. (A aba da usina, que
+   também a abria pelo número da PT, mostra desde 12/11/2026 o prontuário: lá cada PT abre a decisão direto.) #}
 {% macro idade(m) %}{% if m is none %}—{% elif m >= 1440 %}{{ m // 1440 }} d {{ (m % 1440) // 60 }} h{% elif m >= 60 %}{{ m // 60 }} h {{ m % 60 }} min{% else %}{{ m }} min{% endif %}{% endmacro %}
 {% macro lista_pts(pt, nome) %}
     <header class="cr-jan-cab"><div><p class="gc-eyebrow">PTs pendentes</p><h2>{{ nome }}</h2>
@@ -112,8 +111,9 @@
       {% if not responsavel_logado %}<a href="{{ url(modo='cartoes', responsavel='*', equipe=None, filtro=None, bloco=None) }}"{% if modo == 'cartoes' %} aria-current="page"{% endif %}>Por responsável</a>{% endif %}
       <a href="{{ url(modo='painel', equipe=None, filtro=None, bloco=None) }}"{% if modo == 'painel' %} aria-current="page"{% endif %}>Painel</a>
       <a href="{{ url(modo='geral', responsavel=responsavel or '*', filtro=None, bloco=None) }}"{% if modo == 'geral' %} aria-current="page"{% endif %}>Visão geral</a>
-      {# a Central da usina (Levi, 04/11/2026: "inclua junto da central dos responsáveis, como aba alternativa") #}
-      <a href="{{ url(modo='usina', equipe=None, filtro=None, bloco=None, ver=None) }}"{% if modo == 'usina' %} aria-current="page"{% endif %}>Central da usina</a>
+      {# a aba da usina (Levi, 04/11/2026: "inclua junto da central dos responsáveis, como aba alternativa"); desde
+         12/11/2026 leva o nome da página que ela mostra, o prontuário da usina #}
+      <a href="{{ url(modo='usina', equipe=None, filtro=None, bloco=None, ver=None) }}"{% if modo == 'usina' %} aria-current="page"{% endif %}>Prontuário da usina</a>
     </div>
     {# na Central da usina a busca é a da usina, com todas elas: o responsável, o cliente e a busca da lista não valem lá #}
     {% if modo != 'usina' %}
@@ -510,126 +510,20 @@
   {% endif %}
   </div>
   {% elif modo == 'usina' %}
-  {# A Central da usina (Levi, 04/11/2026: "podemos ter como pesquisar a usina e ter uma central de informações daquela
-     usina, performance, disponibilidade, sujidade, pendências, chamados, PTs etc"; "inclua junto da central dos
-     responsáveis, como aba alternativa"). A busca leva à usina; a página junta a linha dela na Visão (os mesmos números e
-     as mesmas janelas do Painel e da Visão geral) e o que vem das telas donas (nexus/campo/central_usina.py). Decisões
-     dele: o mês corrente; nas pendências, rondas, OS atrasadas e pausadas, ocorrências abertas e Segurança; todas as
-     usinas na busca. 2ª rodada (mesmo dia): a lista da busca já aberta sem usina escolhida ("Deixar a lista de 'buscar
-     usina' já no estilo nexus"), os quadros com respiro e marca de situação ("está simples demais e as linhas estão
-     muito coladas") e o relatório do cliente em PDF (nexus/campo/relatorio_usina.py). 3ª rodada (05/11/2026): sem usina,
-     só o campo da busca ("não precisa amontoar um monte de card de usinas"), à direita das abas; os números alinhados em
-     linhas, no meio; o gráfico da geração na Performance; os chamados só com as linhas que têm chamado; o número da PT
-     abre a lista do Painel (o quadro da PT saiu); o mês do relatório em botões, primeiro #}
+  {# A aba da usina: desde 12/11/2026 é o PRONTUÁRIO da usina, a mesma página do Comando > Usinas (Levi: "essa visão irá
+     substituir a central da usina"), no comando/_prontuario.html. Antes era a Central da usina (04/11/2026: "pesquisar a
+     usina e ter uma central de informações daquela usina [...] como aba alternativa"), em quadros abertos; a conta dela
+     (`_central_da_usina`, nexus/campo/central_usina.py) segue e alimenta o prontuário. Ficam daqui: a busca com todas as
+     usinas, à direita das abas (05/11/2026), e a janela desta tela (o dia a dia, os extintores e a decisão da PT abrem
+     por cima, pelo `data-cr-painel`). Sem usina escolhida, só o campo da busca #}
   {% set cu = central %}
   {% if not cu.u %}
   {% if cu.nome %}<p class="cu-vazio"><b>Nenhuma usina com o nome "{{ cu.nome }}".</b> Clique em "Buscar a usina": a lista filtra enquanto você digita.</p>{% endif %}
-  {% else %}{% set u = cu.u %}{% set pv, mv, av = u.perf.valores, u.manut.valores, u.acomp.valores %}
-  {% for f, e in cu.erros.items() %}<div class="cn-erro cn-aviso" role="status">Não consegui ler {{ e }}: essa parte ficou de fora, o resto da página vale.</div>{% endfor %}
-  <header class="cu-cab">
-    <div class="cu-id">
-      <h2 class="cu-nome">{{ u.usina }}</h2>
-      <p class="cu-onde">{{ u.cliente or '—' }}{% if u.cidade %} · {{ u.cidade }}{% if u.uf %}/{{ u.uf }}{% endif %}{% endif %}{% if u.equipe %} · {{ u.equipe }}{% endif %}</p>
-    </div>
-    <button type="button" class="gc-btn gc-btn--contorno cu-baixar" data-cu-rel aria-haspopup="dialog" title="Escolher o mês e os temas e baixar o relatório da usina em PDF"><i class="ph ph-file-pdf" aria-hidden="true"></i> Baixar relatório</button>
-  </header>
-  {# as pessoas da usina: o papel em cima, o nome embaixo, as iniciais no círculo (o técnico da barra lateral das Rondas) #}
-  {% macro pessoa(papel, nome, vazio='—') %}<li><span class="cn-avatar">{{ iniciais(nome) if nome else '—' }}</span><span><small>{{ papel }}</small><b{% if not nome %} class="mudo"{% endif %}>{{ nome or vazio }}</b></span></li>{% endmacro %}
-  <ul class="cu-gente" aria-label="Pessoas da usina">
-    {{ pessoa('Responsável O&M', u.responsavel if u.responsavel != sem_responsavel else '', 'sem responsável') }}
-    {{ pessoa('Supervisor de Campo', cu.pessoas.supervisor if cu.pessoas.supervisor != 'vaga' else '', 'vaga') }}
-    {{ pessoa('Gestor do contrato', cu.pessoas.gestor) }}
-    {% for t in cu.pessoas.tecnicos %}{{ pessoa('Técnico na usina', t) }}{% else %}{{ pessoa('Técnico na usina', '', 'nenhum no PCM') }}{% endfor %}
-  </ul>
-  {# os números da linha da usina na Visão, na cor da régua de cada um; os da Performance abrem o dia a dia #}
-  <div class="cn-numeros cu-numeros">
-    {% for k, rot in (('meta', 'Meta do mês'), ('pr', 'PR'), ('disp', 'Disponibilidade')) %}{% set v = pv[k] %}
-    <button type="button" class="cr-abre" data-cr-painel="{{ url_for('torre_campo.responsaveis_painel', usina_id=u.usina_id, painel=k) }}" title="{{ v.get('dica') or (rot ~ ': ver o dia a dia') }}"><span class="d">{{ rot }}</span><b class="v cn-t-{{ v.cls }}">{{ v.txt }}{{ '%' if k == 'pr' and v.txt != '—' }}</b>{% if v.sub %}<span class="d">{{ 'previsto ' ~ v.sub[2:] ~ '%' if k == 'pr' else v.sub }}</span>{% endif %}</button>
-    {% endfor %}
-    {% for k, rot in (('limpeza', 'Limpeza'), ('ronda', 'Ronda'), ('chamados', 'Chamados')) %}{% set v = av[k] %}
-    <span><span class="d">{{ rot }}</span><b class="v cn-t-{{ v.cls }}">{{ v.txt }}</b></span>
-    {% endfor %}
-    {% set v = av.pt %}<button type="button" data-cu-pts aria-haspopup="dialog" title="Ver as PT esperando o De acordo"><span class="d">PT</span><b class="v cn-t-{{ v.cls }}">{{ v.txt }}</b></button>
-    {% set v = mv.atrasadas %}<span><span class="d">OS atrasadas</span><b class="v cn-t-{{ v.cls }}">{{ v.txt }}</b>{% if v.sub %}<span class="d">a mais antiga há {{ v.sub }}</span>{% endif %}</span>
-  </div>
-  {# a marca de situação de cada linha das pendências: o ponto na cor da régua da Visão #}
-  {% set tipo_ronda = (u.ronda or {}).get('tipo') %}
-  {% set marca = {'Ronda': 'alerta' if tipo_ronda == 'longa_pendente' else 'critico', 'Atrasadas': mv.atrasadas.cls, 'Pausadas': 'alerta'} %}
-  {% set oc_pior = 'critico' if cu.ocorrencias|selectattr('cor', 'equalto', 'critico')|list else ('alerta' if cu.ocorrencias else 'ok') %}
-  {% set seg_pior = 'critico' if cu.seguranca|selectattr('chave', 'in', ['pts', 'vencidos', 'sem_luvas'])|list else ('alerta' if cu.seguranca else 'ok') %}
-  <div class="cu-grade"><div class="cu-col">
-    <section class="cu-q" aria-labelledby="cu-perf">
-      <header class="pn-cab"><h2 id="cu-perf"><i class="ph ph-chart-line-up" aria-hidden="true"></i>Performance do mês</h2></header>
-      {% if u.perf.det %}{{ det_bloco(u, 'perf') }}{% else %}<p class="mudo">Sem meta, PR ou disponibilidade publicados para a usina neste mês.</p>{% endif %}
-      {# o gráfico da geração do mês (05/11/2026, Levi: "Quero que o gráfico de geração também apareça na visão do
-         responsável > central da usina"): o mesmo da janela da Meta; sem a série do dia a dia no banco, fica de fora #}
-      {% if cu.graf_ger %}{{ geracao(cu.graf_ger) }}{% endif %}
-    </section>
-    <section class="cu-q" aria-labelledby="cu-ronda">
-      <header class="pn-cab"><h2 id="cu-ronda"><i class="ph ph-path" aria-hidden="true"></i>Rondas e limpeza</h2>{% if cu.link['campo/rondas'] %}<a class="pn-ver" href="{{ url_for('torre_campo.rondas_usina', usina_id=u.usina_id) }}">evolução dos últimos 30 dias</a>{% endif %}</header>
-      {% if cu.ronda_limpeza %}{{ det_linhas(u, cu.ronda_limpeza) }}{% else %}<p class="mudo">Nenhuma ronda lida nos últimos 90 dias.</p>{% endif %}
-    </section>
-    <section class="cu-q" aria-labelledby="cu-ch">
-      {% set ch = u.chamados or {} %}{% set lista_ch = ch.get('lista') or [] %}
-      <header class="pn-cab"><h2 id="cu-ch"><i class="ph ph-lifebuoy" aria-hidden="true"></i>Chamados</h2></header>
-      {% if lista_ch or cu.chamados_mes %}
-      <dl class="cr-dl">
-        {% for situ, rot in (('aberto', 'Abertos'), ('verificacao', 'Em verificação')) %}{% set da = lista_ch|selectattr('situacao', 'equalto', situ)|list %}
-        {% if da %}<dt>{{ rot }}<span class="cu-n">{{ da|length }}</span></dt>
-        <dd>{% for c in da %}<span class="it"><button type="button" class="cn-link cr-os cr-link-botao" data-wid="" data-folio="{{ c.os }}" title="Abrir o card da OS">OS {{ c.os }}</button> · {{ c.equip }}{% if c.fabricante %} · {{ c.fabricante }}{% endif %}{% if situ == 'aberto' and c.dias is not none %} · há {{ c.dias }} d{% endif %}{% if c.status %} · {{ c.status }}{% endif %}</span>{% endfor %}</dd>{% endif %}
-        {% endfor %}
-        {% if cu.chamados_mes %}<dt>Finalizados no mês<span class="cu-n">{{ cu.chamados_mes|length }}</span></dt>
-        <dd>{% for c in cu.chamados_mes %}<span class="it"><button type="button" class="cn-link cr-os cr-link-botao" data-wid="" data-folio="{{ c.os }}" title="Abrir o card da OS">OS {{ c.os }}</button> · {{ c.equip }}{% if c.fim %} · fechado em {{ c.fim.strftime('%d/%m') }}{% endif %}{% if c.dias is not none %} · {{ c.dias }} d aberto{% endif %}</span>{% endfor %}</dd>{% endif %}
-      </dl>
-      {% else %}<p class="mudo">Nenhum chamado aberto, em verificação ou finalizado no mês.</p>{% endif %}
-    </section>
-  </div><div class="cu-col">
-    <section class="cu-q" aria-labelledby="cu-pend">
-      <header class="pn-cab"><h2 id="cu-pend"><i class="ph ph-list-checks" aria-hidden="true"></i>Pendências</h2></header>
-      {% if cu.ronda_pendente %}{{ det_linhas(u, cu.ronda_pendente, marca=marca) }}{% else %}<dl class="cr-dl"><dt class="cu-dt cu-dt--ok">Ronda</dt><dd class="cn-t-ok">em dia</dd></dl>{% endif %}
-      {% if cu.os_pendentes %}{{ det_linhas(u, cu.os_pendentes, marca=marca) }}{% else %}<dl class="cr-dl"><dt class="cu-dt cu-dt--ok">OS</dt><dd class="cn-t-ok">nenhuma atrasada ou pausada</dd></dl>{% endif %}
-      <dl class="cr-dl">
-        <dt class="cu-dt cu-dt--{{ oc_pior }}">Ocorrências</dt>
-        <dd>{% for o in cu.ocorrencias %}<span class="it"><em class="cr-tag cr-tag--{{ o.cor }}">{{ o.crit_txt }}</em> {{ o.titulo or ('ativo ' ~ o.cod if o.cod else 'sem título') }}{% if o.inicio %} · desde {{ o.inicio.strftime('%d/%m') }}{% endif %}{% if o.atrasada %} · <span class="cn-t-critico">ação atrasada</span>{% elif not o.acoes_abertas %} · <span class="cn-t-alerta">sem ação planejada</span>{% endif %}</span>{% else %}<span class="cn-t-ok">nenhuma aberta</span>{% endfor %}</dd>
-        <dt class="cu-dt cu-dt--{{ seg_pior }}">Segurança</dt>
-        <dd>{% for g in cu.seguranca %}<span class="it"><b class="{{ 'cn-t-critico' if g.chave in ('pts', 'vencidos', 'sem_luvas') else 'cn-t-alerta' }}">{{ g.rot }}{% if g.n > 1 %} ({{ g.n }}){% endif %}</b>{% for it in g.itens %}{{ ' · ' if loop.first else '' }}{% if it.get('pt') %}<button type="button" class="cn-link cr-abre cr-link-botao" data-cr-painel="{{ url_for('torre_campo.responsaveis_pt', numero=it.pt.numero, ativo=it.pt.codigo, volta=request.full_path) }}" title="{{ it.pt.titulo }}">{{ it.forte }}</button>{% elif it.forte %}{{ it.forte }}{% endif %}{% if it.txt %}{{ ' · ' if it.forte else '' }}{{ it.txt }}{% endif %}{{ '; ' if not loop.last else '' }}{% endfor %}</span>{% else %}<span class="cn-t-ok">nada pendente</span>{% endfor %}</dd>
-      </dl>
-      {% set ver_ext = (u.extintores or {}).get('total') %}
-      {% if ver_ext or (cu.ocorrencias and cu.link['campo/ocorrencias']) or (cu.seguranca and cu.link['hseq/mesa']) %}
-      <footer class="cu-pe">
-        {% if ver_ext %}<button type="button" class="cn-link cr-link-botao cr-abre" data-cr-painel="{{ url_for('torre_campo.responsaveis_painel', usina_id=u.usina_id, painel='extintores') }}">Ver os extintores</button>{% endif %}
-        {% if cu.ocorrencias and cu.link['campo/ocorrencias'] %}<a class="cn-link" href="{{ url_for('torre_campo.ocorrencias', usina=u.usina_id, responsavel='*') }}">Abrir as ocorrências</a>{% endif %}
-        {% if cu.seguranca and cu.link['hseq/mesa'] %}<a class="cn-link" href="{{ url_for('torre_hseq.mesa') }}">Abrir a Mesa da Segurança</a>{% endif %}
-      </footer>
-      {% endif %}
-    </section>
-    <section class="cu-q" aria-labelledby="cu-os">
-      <header class="pn-cab"><h2 id="cu-os"><i class="ph ph-wrench" aria-hidden="true"></i>OS e manutenção</h2></header>
-      {% if cu.os_linhas %}{{ det_linhas(u, cu.os_linhas) }}{% else %}<p class="mudo">Nenhuma OS aberta da usina no Fracttal.</p>{% endif %}
-    </section>
-  </div></div>
-  {# a lista das PT da usina, que o número da PT abre na janela: a do Painel, da mesma macro (05/11/2026) #}
-  <template id="cu-pts-lista">{{ lista_pts(cu.pts, u.usina) }}</template>
-  {# o relatório do cliente (04/11/2026, Levi: "Algo bem profissional para o cliente!"; "Tem que poder escolher que nem é
-     no painel"): o mês (o anterior de início) e os temas, todos marcados; o Baixar PDF leva o mês e os marcados. O mês
-     vem primeiro, em botões (05/11/2026: "Quando clicar em baixar relatórios: escolher qual o mês!") #}
-  <template id="cu-rel-temas">
-    <header class="cr-jan-cab"><div><p class="gc-eyebrow">Relatório da usina</p><h2>{{ u.usina }}</h2>
-      <p class="mudo">O PDF é para o cliente: geração, disponibilidade, rondas, manutenção e chamados do mês. PT, Segurança e nomes de técnicos não entram.</p></div></header>
-    <form class="pn-rel" method="get" action="{{ url_for('torre_campo.responsaveis_usina_relatorio', usina_id=u.usina_id) }}" data-cu-rel-form>
-      <fieldset class="cu-rel-meses">
-        <legend class="gc-rotulo">Qual mês?</legend>
-        <div class="cu-rel-chips">{% for m, rot in cu.rel_meses %}<label><input type="radio" name="mes" value="{{ m }}"{% if m == cu.rel_mes %} checked{% endif %}><span>{{ rot }}{% if loop.first %}<small>até ontem</small>{% endif %}</span></label>{% endfor %}</div>
-      </fieldset>
-      <p class="gc-rotulo cu-rel-t">Quais temas?</p>
-      <p class="pn-rel-todos"><button type="button" class="cn-link cr-link-botao" data-cu-rel-todos="1">Marcar todos</button><span aria-hidden="true">·</span><button type="button" class="cn-link cr-link-botao" data-cu-rel-todos="0">Tirar todos</button></p>
-      <ul class="pn-rel-temas" aria-label="Temas do relatório">
-        {% for k, rot in cu.rel_temas %}<li><label><input type="checkbox" name="tema" value="{{ k }}" checked> {{ rot }}</label></li>{% endfor %}
-      </ul>
-      <p class="pn-rel-aviso cn-t-alerta" role="status" hidden>Marque pelo menos um tema para baixar.</p>
-      <div class="pn-rel-pe"><button type="submit" class="gc-btn gc-btn--primario"><i class="ph ph-file-pdf" aria-hidden="true"></i> Baixar PDF</button></div>
-    </form>
-  </template>
+  {% elif prontuario %}
+  <link rel="stylesheet" href="{{ url_for('static', filename='comando.css') }}">
+  {% with x=prontuario.x, p=prontuario.p, insights=prontuario.insights, severidades=prontuario.severidades, regras=prontuario.regras, avisos=prontuario.avisos, pu_na_aba=true %}{% include "comando/_prontuario.html" %}{% endwith %}
+  {% else %}
+  <div class="cn-erro" role="alert"><b>Não consegui montar o prontuário da {{ cu.u.usina }} agora.</b> Tente de novo em instantes.</div>
   {% endif %}
   {% endif %}
 
@@ -675,19 +569,6 @@
     if (!dlg.open) { dlg.showModal(); }
   });
 })();
-// o número da PT da Central da usina abre a mesma lista, só da usina (05/11/2026, Levi: "ao clicar no KPI aparece o mesmo
-// card que aparece em visão do responsável > painel")
-(function () {
-  var b = document.querySelector('[data-cu-pts]'), lista = document.getElementById('cu-pts-lista');
-  var dlg = document.getElementById('cr-modal');
-  if (!b || !lista || !dlg) { return; }
-  b.addEventListener('click', function () {
-    var corpo = dlg.querySelector('.cr-modal-corpo');
-    corpo.innerHTML = '';
-    corpo.appendChild(lista.content.cloneNode(true));
-    if (!dlg.open) { dlg.showModal(); }
-  });
-})();
 // o Exportar relatório abre a escolha dos temas na janela (30/10/2026: "a pessoa possa marcar o tema que ela quer levar,
 // as vezes não quer algo, tem que ter a opção de tirar"): todos marcados de início; sem nenhum, o Baixar PDF trava e diz
 // por quê; baixado, a janela fecha (o PDF chega como download, a página fica)
@@ -720,42 +601,6 @@
   });
   dlg.addEventListener('submit', function (ev) {
     var f = ev.target.closest('[data-pn-rel-form]');
-    if (!f) { return; }
-    if (!conferir(f)) { ev.preventDefault(); return; }
-    setTimeout(function () { if (dlg.open) { dlg.close(); } }, 400);
-  });
-})();
-// o relatório da usina (Central da usina, 04/11/2026: "Tem que poder escolher que nem é no painel"): a janela com o mês
-// e os temas, todos marcados; sem nenhum, o Baixar PDF trava e diz por quê; baixado, a janela fecha
-(function () {
-  var b = document.querySelector('[data-cu-rel]'), tpl = document.getElementById('cu-rel-temas');
-  var dlg = document.getElementById('cr-modal');
-  if (!b || !tpl || !dlg) { return; }
-  b.addEventListener('click', function () {
-    var corpo = dlg.querySelector('.cr-modal-corpo');
-    corpo.innerHTML = '';
-    corpo.appendChild(tpl.content.cloneNode(true));
-    if (!dlg.open) { dlg.showModal(); }
-  });
-  function conferir(f) {
-    var algum = !!f.querySelector('input[name="tema"]:checked');
-    f.querySelector('button[type="submit"]').disabled = !algum;
-    f.querySelector('.pn-rel-aviso').hidden = algum;
-    return algum;
-  }
-  dlg.addEventListener('change', function (ev) {
-    var f = ev.target.closest('[data-cu-rel-form]');
-    if (f) { conferir(f); }
-  });
-  dlg.addEventListener('click', function (ev) {
-    var t = ev.target.closest('[data-cu-rel-todos]');
-    if (!t) { return; }
-    var f = t.closest('[data-cu-rel-form]'), marcar = t.getAttribute('data-cu-rel-todos') === '1';
-    f.querySelectorAll('input[name="tema"]').forEach(function (c) { c.checked = marcar; });
-    conferir(f);
-  });
-  dlg.addEventListener('submit', function (ev) {
-    var f = ev.target.closest('[data-cu-rel-form]');
     if (!f) { return; }
     if (!conferir(f)) { ev.preventDefault(); return; }
     setTimeout(function () { if (dlg.open) { dlg.close(); } }, 400);

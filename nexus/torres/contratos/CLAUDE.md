@@ -3,7 +3,7 @@
 Torre do menu "Contratos e clientes". Telas vivas: **Contestações** (13/10/2026) e **Acessos dos clientes** (14/10/2026).
 Clientes, Onboarding, Comunicação por cliente e Portal ainda são placeholder (a view com a mesma rota vence a genérica).
 
-**Prévia: contrato e prontuário** (13/11/2026, `/t/contratos/previa`, de todos): o mockup que a Ana pediu para a
+**Prévia: contrato e prontuário** (12/11/2026, `/t/contratos/previa`, de todos): o mockup que a Ana pediu para a
 avaliação de Contratos (Danuth, Camila, Fred) e dos setores, `nexus/static/previa/contratos-e-prontuario.html` (a mesma
 página do `docs/mockups/contratos-e-prontuario` da plataforma), numa moldura; dentro do Nexus ele esconde o topo e o menu
 dele. Dados fictícios, nada grava. Quando a visão do contrato virar tela de verdade, ela entra na tela Clientes (a

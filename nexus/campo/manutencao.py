@@ -61,7 +61,7 @@ def _vazio() -> dict:
     return {"os_abertas": 0, "em_verificacao": 0, "nao_iniciadas": 0, "em_execucao": 0, "atrasadas": 0,
             "atrasadas_os": 0, "maior_atraso": None,
             "lista_atrasadas": [], "todas_atrasadas": [], "vencem": 0, "paradas": 0, "motivo_comum": None,
-            "lista_paradas": [], "todas_paradas": [],
+            "lista_paradas": [], "todas_paradas": [], "os_verificacao": [], "os_nao_iniciadas": [], "os_em_execucao": [],
             "zeladoria_proxima": None, "zeladoria_vencida": None, "zeladoria_ultima": None}
 
 
@@ -132,6 +132,11 @@ def tarefas_por_usina(tarefas, marcas: list[dict], os_de_chamado: set, hoje: dat
         em_processo = abertas.get(uid, set()) - verif.get(uid, set())
         r["nao_iniciadas"] = len(em_processo - comecou)
         r["em_execucao"] = len(em_processo) - r["nao_iniciadas"]
+        # as OS de cada estado, com o id do Fracttal (o card da OS): o prontuário da usina as lista (12/11/2026, Levi:
+        # "mesmo dando drill down, a informação direta ali na lata"). Cada contagem de cima é o tamanho da lista dela
+        r["os_verificacao"] = [{"os": o, "wid": wids.get(o)} for o in sorted(verif.get(uid, ()))]
+        r["os_nao_iniciadas"] = [{"os": o, "wid": wids.get(o)} for o in sorted(em_processo - comecou)]
+        r["os_em_execucao"] = [{"os": o, "wid": wids.get(o)} for o in sorted(em_processo & comecou)]
         a = atr.get(uid, {})
         r["atrasadas_os"], r["maior_atraso"] = len(a), (max(a.values()) if a else None)
         # a linha da Visão geral mostra as 5 piores; a janela da equipe, todas (Levi, 28/10/2026, sobre o "e mais" do Em

@@ -48,6 +48,22 @@ LARG = 178 * mm - 12        # a largura útil (o quadro do SimpleDocTemplate tem
 TEMAS = (("perf", "Performance e disponibilidade"), ("rondas", "Rondas e limpeza"), ("manut", "Manutenção"),
          ("chamados", "Chamados de garantia"))
 CHAVES_TEMAS = tuple(k for k, _ in TEMAS)
+# Os CAMPOS de cada tema (12/11/2026, Levi, no prontuário da usina: "eu quero o relatório de forma profissional, que dê
+# para editar os campos que eu quero que apareça"): cada bloco do PDF é um campo que a pessoa liga e desliga na janela
+# do relatório. (a chave, o tema dele — "" = o resumo, que é de todos —, o nome na janela), na ordem do PDF. Sem `campo`
+# no pedido valem todos os campos dos temas pedidos: o endereço de antes, só com `tema`, dá o mesmo PDF de sempre
+CAMPOS = (("resumo", "", "Resumo do mês, em frases"),
+          ("perf_numeros", "perf", "Os números do mês: geração, meta, PR e disponibilidade"),
+          ("perf_grafico", "perf", "Gráfico da geração de cada dia contra a meta"),
+          ("perf_dias", "perf", "Tabela do dia a dia"),
+          ("perf_eventos", "perf", "Eventos que afetaram a disponibilidade"),
+          ("rondas_lista", "rondas", "Rondas do mês, com sujidade e vegetação"),
+          ("manut_feitas", "manut", "Tarefas executadas no mês"),
+          ("manut_abertas", "manut", "Ordens de serviço em aberto"),
+          ("manut_zeladoria", "manut", "Zeladoria feita"),
+          ("chamados_lista", "chamados", "Chamados do mês"),
+          ("chamados_abertos", "chamados", "Chamados em aberto hoje"))
+CHAVES_CAMPOS = tuple(k for k, _tema, _rot in CAMPOS)
 TIPO_TAREFA = {"preventiva": "Preventiva", "corretiva": "Corretiva", "corretiva_emergencial": "Corretiva emergencial",
                "religamento": "Religamento", "religamento_remoto": "Religamento remoto", "inspecao": "Inspeção",
                "preditiva": "Preditiva", "administrativa": "Administrativa", "zeladoria": "Zeladoria",
@@ -78,6 +94,28 @@ def temas_do_pedido(pedidos) -> tuple:
     """Os temas pedidos, na ordem do relatório (o que não é tema não entra); nenhum pedido válido = todos."""
     quer = {str(x).strip() for x in pedidos or ()}
     return tuple(k for k in CHAVES_TEMAS if k in quer) or CHAVES_TEMAS
+
+
+def campos_por_tema() -> list[tuple[str, str, list[tuple[str, str]]]]:
+    """Os campos agrupados para a janela do relatório: [(tema, o nome do tema, [(campo, nome)])], o geral ("") primeiro."""
+    nomes = dict(TEMAS)
+    return [(t, nomes.get(t, "Geral"), [(k, rot) for k, tema, rot in CAMPOS if tema == t]) for t in ("",) + CHAVES_TEMAS]
+
+
+def campos_do_pedido(pedidos, temas=CHAVES_TEMAS) -> tuple:
+    """Os campos que entram no PDF, na ordem dele: os pedidos (`campo` repetido) que são dos temas pedidos (o resumo é
+    de todos). Sem nenhum campo válido no pedido, ou se nenhum for dos temas, valem todos os campos dos temas (o
+    endereço só com `tema`): o relatório nunca sai vazio por um endereço torto."""
+    quer = {str(x).strip() for x in pedidos or ()}
+    dos_temas = tuple(k for k, tema, _rot in CAMPOS if not tema or tema in temas)
+    return tuple(k for k in dos_temas if k in quer) or dos_temas
+
+
+def temas_dos_campos(temas, campos) -> tuple:
+    """Os temas que têm ao menos um campo ligado, na ordem do relatório: o resumo só fala deles (quem desligou todos os
+    campos das Rondas não lê a frase das rondas). Com só o resumo ligado, ele fala de todos os temas pedidos."""
+    com = {tema for k, tema, _rot in CAMPOS if k in campos and tema}
+    return tuple(t for t in temas if t in com) or tuple(temas)
 
 
 # ── os dados, das telas donas ──────────────────────────────────────────────────────────────────────────────────────
@@ -388,14 +426,18 @@ def _sem(e: dict, txt: str) -> Paragraph:
     return Paragraph(_t(txt), e["mudo"])
 
 
-def _perf(d: dict, e: dict) -> list:
+def _perf(d: dict, e: dict, campos=CHAVES_CAMPOS) -> list:
     p = d.get("perf") or {}
     out = []
-    g = _grafico(d)
+    g = _grafico(d) if "perf_grafico" in campos else None
     if g:
         out += [Paragraph("Geração diária e meta", e["sub_secao"]), g, Spacer(1, 2 * mm)]
     tab = p.get("tabela") or {}
-    if tab.get("linhas"):
+    if "perf_dias" not in campos:
+        # sem a tabela, o gráfico pedido que não tem dado diz que não tem (a seção não fica muda)
+        if "perf_grafico" in campos and not g:
+            out.append(_sem(e, "Sem geração publicada para a usina neste mês."))
+    elif tab.get("linhas"):
         linhas = [[f"{x['dia']:02d}", _br(x["real"]), _br(x["meta"]), _p(f"{x['pct']}%" if x["pct"] is not None else "—", e,
                    cor=x["cls"]), _br(x["poa"], 2), _p(_pct(x["disp"]), e, cor=x["disp_cls"] if x["disp"] is not None else None)]
                   for x in tab["linhas"]]
@@ -410,6 +452,8 @@ def _perf(d: dict, e: dict) -> list:
                           "do dia sai quando o dia fecha.", e["mudo"])]
     else:
         out.append(_sem(e, "Sem geração publicada para a usina neste mês."))
+    if "perf_eventos" not in campos:
+        return out
     oss = (p.get("oss") or {}).get("oss") or []
     out.append(Paragraph("Eventos que afetaram a disponibilidade", e["sub_secao"]))
     if oss:
@@ -433,7 +477,9 @@ def _nivel_txt(n) -> Paragraph | str:
     return f'<font color="{_cor("critico" if n >= 5 else "alerta" if n >= 4 else "ok")}"><b>{n}</b></font>'
 
 
-def _rondas(d: dict, e: dict) -> list:
+def _rondas(d: dict, e: dict, campos=CHAVES_CAMPOS) -> list:
+    if "rondas_lista" not in campos:
+        return []
     rs = d.get("rondas") or []
     if not rs:
         return [_sem(e, "Nenhuma ronda registrada na usina no mês.")]
@@ -451,30 +497,35 @@ def _rondas(d: dict, e: dict) -> list:
                       "curta: a volta de rotina; longa: a vistoria completa da usina.", e["mudo"])]
 
 
-def _manut(d: dict, e: dict) -> list:
+def _manut(d: dict, e: dict, campos=CHAVES_CAMPOS) -> list:
     mt = d.get("manut") or {}
-    out = [Paragraph("Tarefas executadas no mês", e["sub_secao"])]
-    if mt.get("feitas"):
+    out = [Paragraph("Tarefas executadas no mês", e["sub_secao"])] if "manut_feitas" in campos else []
+    if "manut_feitas" not in campos:
+        pass
+    elif mt.get("feitas"):
         linhas = [[x["tipo"], str(x["tarefas"]), str(x["os"])] for x in mt["feitas"]]
         linhas.append([_p("Total", e, negrito=True), _p(str(sum(x["tarefas"] for x in mt["feitas"])), e, negrito=True),
                        _p(str(sum(x["os"] for x in mt["feitas"])), e, negrito=True)])
         out.append(_tabela(e, ["Tipo", "Tarefas", "Ordens de serviço"], linhas, [70, 40, 50], total=True))
     else:
         out.append(_sem(e, "Nenhuma tarefa executada pela equipe registrada no mês."))
-    out.append(Paragraph(f"Ordens de serviço em aberto em {_dm(d['hoje'])}/{d['hoje'].year}", e["sub_secao"]))
-    if mt.get("abertas"):
-        out.append(_tabela(e, ["Tipo", "Ordens de serviço"], [[x["tipo"], str(x["os"])] for x in mt["abertas"]], [70, 50]))
-    else:
-        out.append(_sem(e, "Nenhuma ordem de serviço em aberto."))
-    if mt.get("zeladoria"):
+    if "manut_abertas" in campos:
+        out.append(Paragraph(f"Ordens de serviço em aberto em {_dm(d['hoje'])}/{d['hoje'].year}", e["sub_secao"]))
+        if mt.get("abertas"):
+            out.append(_tabela(e, ["Tipo", "Ordens de serviço"], [[x["tipo"], str(x["os"])] for x in mt["abertas"]], [70, 50]))
+        else:
+            out.append(_sem(e, "Nenhuma ordem de serviço em aberto."))
+    if "manut_zeladoria" in campos and mt.get("zeladoria"):
         out.append(Paragraph("Zeladoria feita em " + ", ".join(_dm(x) for x in mt["zeladoria"]) + ".", e["base"]))
     return out
 
 
-def _chamados(d: dict, e: dict) -> list:
+def _chamados(d: dict, e: dict, campos=CHAVES_CAMPOS) -> list:
     ch = d.get("chamados") or {}
     out = []
-    if ch.get("mes"):
+    if "chamados_lista" not in campos:
+        pass
+    elif ch.get("mes"):
         linhas = [[str(c["os"] or "—"), c["equip"], c["fabricante"] or "—", c["componente"] or "—", _dm(c["ini"]),
                    _dm(c["fim"]) if c["situacao"] == "concluido" else ("em verificação" if c["situacao"] == "verificacao"
                                                                        else "em aberto"),
@@ -483,13 +534,17 @@ def _chamados(d: dict, e: dict) -> list:
                            [16, 44, 28, 34, 18, 22, 16]))
     else:
         out.append(_sem(e, "Nenhum chamado de garantia aberto ou finalizado no mês."))
-    out.append(Paragraph(f"Em aberto em {_dm(d['hoje'])}/{d['hoje'].year}: {ch.get('em_aberto', 0)} "
-                         f"chamado{'s' if ch.get('em_aberto', 0) != 1 else ''} de garantia.", e["base"]))
+    if "chamados_abertos" in campos:
+        out.append(Paragraph(f"Em aberto em {_dm(d['hoje'])}/{d['hoje'].year}: {ch.get('em_aberto', 0)} "
+                             f"chamado{'s' if ch.get('em_aberto', 0) != 1 else ''} de garantia.", e["base"]))
     return out
 
 
-def gerar(d: dict, temas=CHAVES_TEMAS, gerado_em: str = "") -> bytes:
-    """O PDF: a faixa navy com o logo, a usina e o mês, os números do mês, o resumo e um tema por seção."""
+def gerar(d: dict, temas=CHAVES_TEMAS, gerado_em: str = "", campos=None) -> bytes:
+    """O PDF: a faixa navy com o logo, a usina e o mês, os números do mês, o resumo e um tema por seção. `campos` = os
+    campos escolhidos na janela (`campos_do_pedido`; None = todos): o campo desligado não se desenha, e o tema sem
+    nenhum campo ligado não abre seção."""
+    campos = CHAVES_CAMPOS if campos is None else tuple(campos)
     e = _estilos()
     buf = io.BytesIO()
     periodo = (f"{d['ini'].day} a {d['fim'].day} de {d['mes_txt']}" if d["fim"] >= d["ini"] else d["mes_txt"])
@@ -530,9 +585,9 @@ def gerar(d: dict, temas=CHAVES_TEMAS, gerado_em: str = "") -> bytes:
     story = [Paragraph(_t(d["usina"]), e["titulo"]), Paragraph(_t(onde), e["sub"]),
              Paragraph(_t(f"Período: {periodo}" + (" (mês em andamento, até ontem)" if d["corrente"] else "")), e["sub"]),
              Spacer(1, 6 * mm)]
-    if "perf" in temas:
+    if "perf" in temas and "perf_numeros" in campos:
         story += [_kpis(d, e), Spacer(1, 5 * mm)]
-    frases = _resumo(d, temas)
+    frases = _resumo(d, temas) if "resumo" in campos else []
     if frases:
         story += [Paragraph("Resumo do mês", e["sub_secao"])]
         story += [Paragraph("• " + _t(f), e["base"]) for f in frases]
@@ -540,11 +595,12 @@ def gerar(d: dict, temas=CHAVES_TEMAS, gerado_em: str = "") -> bytes:
               "manut": ("Manutenção", _manut), "chamados": ("Chamados de garantia", _chamados)}
     for k in temas:
         titulo, f = secoes[k]
-        story += _secao(titulo, e)
         if k in d["erros"]:
-            story.append(_sem(e, f"Não consegui ler os dados deste tema ({d['erros'][k]}): ele ficou de fora."))
+            corpo = [_sem(e, f"Não consegui ler os dados deste tema ({d['erros'][k]}): ele ficou de fora.")]
         else:
-            story += f(d, e)
+            corpo = f(d, e, campos)
+        if corpo:
+            story += _secao(titulo, e) + corpo
     story += [Spacer(1, 8 * mm),
               Paragraph("Fontes: geração, meta e PR do Gerencial da Grid Co.; disponibilidade, ordens de serviço e chamados "
                         "do sistema de manutenção (Fracttal); rondas do App de Campo. "

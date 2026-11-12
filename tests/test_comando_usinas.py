@@ -78,7 +78,7 @@ def test_as_colunas_e_a_ordem():
 
 
 def test_sem_comunicacao_e_roxo():
-    """Levi, 13/11/2026: "Quando for falha de comunicação [...] na cor precisa estar roxo". O tom é o `semcom` do semáforo,
+    """Levi, 12/11/2026: "Quando for falha de comunicação [...] na cor precisa estar roxo". O tom é o `semcom` do semáforo,
     e não o cinza do "Sem leitura"; o selo, a barra da faixa e o ponto da legenda têm a classe dele."""
     from pathlib import Path
     assert CU.ESTADOS["sem_com"][1] == "semcom" and CU.ESTADOS["sem_leitura"][1] == "neutro"
@@ -185,9 +185,12 @@ def test_a_lista_e_o_prontuario(logado, telas, monkeypatch):
         "ronda_pendente": [], "os_pendentes": [], "os_linhas": [], "ronda_limpeza": [], "graf_ger": None})
     p = logado.get("/t/comando/usinas/1").get_data(as_text=True)
     assert "Prontuário da usina" in p and "Altair sem geração há 2 dias" in p and "Crítico" in p
-    assert "No COS agora" in p and "OS 7001 · Religamento · Desligamento de usina" in p
+    # 12/11/2026: o parecer numa linha, o painel e os cartões fechados (tests/test_comando_prontuario.py); a ocorrência
+    # aberta no COS entra nas pendências e no cartão do COS, com a OS abrindo o card dela
+    assert 'class="pu-parecer pu-parecer--critico"' in p and "Pede ação agora" in p
+    assert "No COS: Desligamento" in p and 'data-pu-os="7001"' in p
     assert "/t/cos/ronda?cliente=Thopen" in p
-    assert 'href="/t/comando/usinas"' in p and "/t/campo/responsaveis?modo=usina&amp;usina=1" in p
+    assert 'href="/t/comando/usinas"' in p and 'href="/os/tradicional?ativo=THPN-ALT100"' in p
     assert logado.get("/t/comando/usinas/999").status_code == 404
 
 

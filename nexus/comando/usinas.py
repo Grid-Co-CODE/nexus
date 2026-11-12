@@ -26,7 +26,7 @@ import unicodedata
 # desligados, a proteção que atuou e a falta de energia da concessionária param a usina (crítico, o "Crítico / sem
 # produção" do mockup); o que sobra (outra falha aberta) é atenção. "Sem leitura": o Andamento não trouxe a usina (nunca
 # "Normal" no escuro)
-# "Sem comunicação" é roxo (13/11/2026, Levi: "Quando for falha de comunicação [...] na cor precisa estar roxo"): o
+# "Sem comunicação" é roxo (12/11/2026, Levi: "Quando for falha de comunicação [...] na cor precisa estar roxo"): o
 # `semcom` do semáforo da casa; até ali saía cinza, igual ao "Sem leitura". O Mapa de equipe e o vídeo wall pegam o tom daqui
 ESTADOS = {"critico": ("Crítico", "critico", 0), "atencao": ("Atenção", "alerta", 1),
            "sem_com": ("Sem comunicação", "semcom", 2), "sem_leitura": ("Sem leitura", "neutro", 3),

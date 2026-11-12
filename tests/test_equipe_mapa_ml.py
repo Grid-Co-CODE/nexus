@@ -249,6 +249,6 @@ def test_as_cores_de_cada_foco():
     r = json.loads(subprocess.run([node, "-e", codigo, str(raiz / "campo-mapa.js")], capture_output=True, text=True,
                                   check=True).stdout)
     assert r["t"] == ["a_critico", "cinza", "cinza", "cinza", "cinza", "cinza", "agir", "atencao", "sem", "cinza"]
-    # a usina sem comunicação é roxa no mapa (13/11/2026, a cor de Comando > Usinas): o ícone existe e lê o token
+    # a usina sem comunicação é roxa no mapa (12/11/2026, a cor de Comando > Usinas): o ícone existe e lê o token
     assert 'a_semcom: P.t["--semcom"]' in js and '"--semcom"' in js
     assert r["u"] == cores

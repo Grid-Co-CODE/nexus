@@ -1236,7 +1236,22 @@ pelo bloco clicado, o resumo ao lado, só as usinas): `docs/superpowers/specs/20
 - **Prova (18/10/2026, o cadastro e o banco reais, só lidos):** 127 usinas no mapa e 4 sem coordenada; o resumo da usina
   clicada; o mapa recolorido pela Manutenção; a 1440 e a 375 px, nos dois temas, sem rolagem de lado.
 
-### A Central da usina, aba da Visão do responsável (04/11/2026)
+### A aba da usina da Visão do responsável: a Central (04/11/2026), o prontuário desde 12/11/2026
+
+**O que vale hoje (12/11/2026).** Levi: "essa visão irá substituir a central da usina". A aba (`modo=usina`) se chama
+"Prontuário da usina" e mostra a MESMA página do Comando > Usinas (`comando/_prontuario.html`; a forma, as fontes e as
+regras estão em `nexus/comando/CLAUDE.md`, seção "O prontuário da usina"). O que é DAQUI e segue: a busca com todas as
+usinas, à direita das abas; a conta da Central (`_central_da_usina` + `central_usina.py`: a linha da Visão no limite de
+quem olha, os técnicos de hoje, as ocorrências, as pendências da Segurança, os chamados finalizados no mês, as PT
+esperando o De acordo e o gráfico da geração), que alimenta o prontuário; o relatório do cliente em PDF; e a janela
+desta tela (`cr-modal`), em que o dia a dia, os extintores e a decisão da PT abrem por cima do prontuário. A view monta
+o prontuário com a Central já calculada (`prontuario_dados.contexto(uid, cu=central, ...)`); se a montagem cair, a aba
+avisa e a busca segue. **Saíram com a Central** (as rodadas abaixo ficam como história do que cada pedido criou): os
+quadros abertos e a marca de situação das pendências (2ª rodada), a faixa dos oito números em subgrade (3ª rodada, 1),
+o quadro Chamados em linhas (3ª, 8: no prontuário é o cartão Chamados e garantias, que só mostra a lista que tem
+chamado) e o número da PT abrindo a lista do Painel (3ª, 9: no prontuário cada PT esperando o De acordo fica no cartão
+da Segurança e abre a decisão direto). O CSS `.cu-numeros`, `.cu-baixar` e `.cu-pe` saiu; o resto do `.cu-*` (o
+cabeçalho, as pessoas, a grade, o quadro, o relatório) o prontuário usa.
 
 Levi: "Como temos uma visão para os supervisores em Central do Responsável podemos ter como pesquisar a usina e ter uma
 central de informações daquela usina, performance, disponibilidade, sujidade, pendências, chamados, PTs etc"; "inclua
@@ -1270,6 +1285,16 @@ usinas mobilizadas, para quem abre a Visão (sem o filtro de responsável, de cl
   coladas": o cabeçalho com as pessoas em selos (as iniciais, o papel e o nome), o quadro com o ícone num selo verde, as
   linhas separadas por um fio com 13 px de respiro, o ponto da situação nas pendências (`det_linhas(..., marca=)`, a cor
   da régua da Visão) e a contagem nas linhas de chamados. Só `.cu-*`: a Visão geral não muda.
+- **Os campos do relatório (12/11/2026, Levi, no prontuário):** "eu quero o relatório de forma profissional, que dê para
+  editar os campos que eu quero que apareça". Cada bloco do PDF é um CAMPO (`relatorio_usina.CAMPOS`: o resumo em
+  frases; os números do mês, o gráfico, a tabela do dia a dia e os eventos de disponibilidade; as rondas; as tarefas
+  executadas, as OS em aberto e a zeladoria; os chamados do mês e os em aberto hoje). A janela do relatório mostra cada
+  tema com os campos dele, todos marcados; o tema liga e desliga os dele, e sem campo nenhum o Baixar trava. O pedido
+  leva `campo` repetido (`campos_do_pedido`): o campo desligado não se desenha e o tema sem campo ligado não abre
+  seção; os números sozinhos ficam no alto, sem a seção da Performance; o resumo só fala dos temas que têm campo
+  ligado (`temas_dos_campos`). **Sem `campo` no endereço sai o PDF de sempre**
+  (todos os campos dos temas), e o campo de um tema que não foi pedido não esvazia o relatório. Continua valendo: PT,
+  Segurança e nomes de técnicos não entram (o PDF é do cliente).
 - **O relatório da usina para o cliente (2ª rodada):** "é interessante que dê para baixar um relatório da usina também!
   Algo bem profissional para o cliente!". O "Baixar relatório" do cabeçalho abre a janela do mês e dos temas (a do
   Painel: "Tem que poder escolher que nem é no painel"); a rota `responsaveis_usina_relatorio`
@@ -2460,7 +2485,8 @@ Aprovação e Triagem usam a lógica do App copiada, não refeita, para o númer
   `montar`, `bloco`, `soma`, e os leitores das janelas (`serie_diaria`, `tabela_meta`, `disp_diaria`,
   `os_disponibilidade`); desde 18/10/2026, a Limpeza (`limpeza`), as paradas abertas (`paradas_abertas`) e o bloco
   Manutenção (`manutencao_fonte`, `alertas_manutencao`, `linha_manutencao`, `com_manutencao`, `limite_do_pedido`).
-- `central_usina.py`: a Central da usina (04/11/2026, acima): a busca, os técnicos, as ocorrências e a Segurança da
+- `central_usina.py`: a Central da usina (04/11/2026, acima; desde 12/11/2026 a conta que alimenta o prontuário da
+  usina, a página da aba): a busca, os técnicos, as ocorrências e a Segurança da
   usina escolhida; o resto é a linha dela na Visão.
 - `visao_cliente.py`: a Visão do cliente (05/11/2026, acima): o recorte por `cliente_id`, o status pelo tempo real,
   as OS, os chamados e a próxima visita por usina, os 5 números e a ordem; a leitura do tempo real pela ponte.

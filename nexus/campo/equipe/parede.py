@@ -21,7 +21,7 @@ from ...cos import andamento as AND
 GRUPOS = (("parada", "Usina parada", "Usina parada", "critico"),
           ("inversor", "Inversores desligados", "Inversor fora", "alerta"),
           ("rede", "Rede concessionária", "Rede", "critico"),
-          ("com", "Sem comunicação", "Comunicação", "semcom"),      # o roxo de Comando > Usinas (13/11/2026)
+          ("com", "Sem comunicação", "Comunicação", "semcom"),      # o roxo de Comando > Usinas (12/11/2026)
           ("outras", "Outras ocorrências", "Outras", "alerta"))
 # a pior ocorrência da usina decide o grupo do cartão: o crítico primeiro (a parada antes da rede), depois a atenção
 # (o inversor antes das outras) e a comunicação por último, como o Agora de Comando > Usinas pinta a usina

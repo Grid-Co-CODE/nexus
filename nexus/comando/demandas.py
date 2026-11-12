@@ -523,7 +523,7 @@ def _inicio(texto: str, n: int = 6) -> str:
     return " ".join(p[:n]) + ("…" if len(p) > n else "")
 
 
-def lista(hoje: date | None = None) -> list[dict]:
+def lista(hoje: date | None = None, lido: dict | None = None) -> list[dict]:
     """As demandas decifradas, com o estado de agora e o selo do prazo. As abertas pelo prazo mais perto primeiro; depois
     as fechadas, da mais nova para a mais velha."""
     hoje = hoje or datetime.now(_BRT).date()
@@ -531,7 +531,7 @@ def lista(hoje: date | None = None) -> list[dict]:
         cofre = _cofre()
     except Recusada:
         cofre = None
-    lido = ler()
+    lido = lido or ler()         # `lido`: a cópia que quem chama já tem (o prontuário da usina não espera o banco)
     temas_ = _temas_de(lido["temas"], cofre)
     try:
         from ..auth import setor_telas as ST

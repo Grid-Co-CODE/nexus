@@ -74,7 +74,7 @@
 .cn-info{color:var(--info);background:var(--info-suave)}
 .cn-ok{color:var(--ok);background:var(--ok-suave)}
 .cn-neutro{color:var(--mudo);background:var(--superficie-2)}
-/* sem comunicação: o roxo do semáforo (Comando > Usinas, 13/11/2026) */
+/* sem comunicação: o roxo do semáforo (Comando > Usinas, 12/11/2026) */
 .cn-semcom{color:var(--semcom);background:var(--semcom-suave)}
 .cn-tag{display:inline-block;font:600 11px/16px var(--font-sans);padding:2px 8px;border-radius:5px;background:var(--superficie-3);color:var(--tinta-2)}
 .cn-fora{color:var(--verde-texto);font-weight:600;text-decoration:none;white-space:nowrap}
@@ -1703,7 +1703,6 @@ tr.rd-linha--ativa td{background:var(--verde-suave)}
 .cu-cab{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:14px 24px;margin-top:22px}
 .cu-nome{margin:0;font:700 26px/1.2 var(--font-sans);letter-spacing:-.01em;color:var(--tinta)}
 .cu-onde{margin:5px 0 0;font-size:13.5px;color:var(--mudo)}
-.cu-baixar{flex:0 0 auto}
 .cu-gente{display:flex;flex-wrap:wrap;gap:10px;margin:16px 0 0;padding:0;list-style:none}
 .cu-gente li{display:flex;align-items:center;gap:10px;min-width:0;padding:7px 16px 7px 7px;border:1px solid var(--linha);
   border-radius:999px}
@@ -1715,16 +1714,6 @@ tr.rd-linha--ativa td{background:var(--verde-suave)}
   color:inherit;font:inherit;text-align:left;cursor:pointer}
 .cn-numeros > button:hover{background:var(--superficie-3)}
 .cn-numeros > button:focus-visible{outline:2px solid var(--foco);outline-offset:-2px}
-/* os oito números numa linha (a faixa das outras telas quebra em 150 px). Cada um ocupa três linhas da faixa, as MESMAS
-   em todos (a subgrade): o nome, o valor e o complemento alinhados entre si, cada pedaço no meio da casa dele (05/11/2026,
-   Levi: "campos separados por linhas invisíveis separando cabeçalho e valor / quero que centralize horizontal e
-   verticalmente") */
-.cu-numeros{grid-template-columns:repeat(auto-fit,minmax(118px,1fr))}
-.cn-numeros.cu-numeros > *{display:grid;grid-row:span 3;grid-template-rows:subgrid;place-items:center;row-gap:2px;padding:14px 12px;text-align:center}
-.cu-numeros .v{margin-top:0}
-/* o complemento que não cabe quebra em duas linhas parelhas ("a mais antiga / há 57 d"), não com o "d" sozinho */
-.cu-numeros .d{text-wrap:balance}
-.cu-numeros .v{font-size:20px;line-height:26px;white-space:nowrap}
 /* duas colunas que se empilham por dentro: o quadro mais curto não deixa buraco embaixo */
 .cu-grade{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin-top:16px;align-items:start}
 .cu-col{display:flex;flex-direction:column;gap:16px;min-width:0}
@@ -1751,7 +1740,6 @@ tr.rd-linha--ativa td{background:var(--verde-suave)}
 .cu-dt--critico::before{background:var(--critico)}
 .cu-dt--alerta::before{background:var(--alerta)}
 .cu-dt--ok::before{background:var(--ok)}
-.cu-pe{display:flex;flex-wrap:wrap;gap:8px 20px;padding:12px 20px;border-top:1px solid var(--linha);font-size:12.5px}
 /* o gráfico da geração dentro do quadro da Performance: sem a caixa da janela (uma superfície só) */
 .cu-q .cr-graf{margin:0;padding:14px 20px 8px;border:0;border-top:1px solid var(--linha);border-radius:0;background:transparent}
 /* na meia largura o desenho da janela encolhe ~30%: os eixos crescem para ler a ~10 px e o valor em cima de cada barra

@@ -322,7 +322,7 @@ a.ins-titulo:hover{color:var(--verde-texto)}
 @media (max-width:640px){.dm-linha{grid-template-columns:70px minmax(0,1fr)}.dm-dir{grid-column:2;flex-direction:row;align-items:center}
   .dm-dupla{grid-template-columns:1fr}}
 
-/* Caixa de entrada (13/11/2026): os números dos insights no alto levam à lista de cada um; o Sem dono vem recolhido, só
+/* Caixa de entrada (12/11/2026): os números dos insights no alto levam à lista de cada um; o Sem dono vem recolhido, só
    com o contador (Levi: "senão a rolagem é infinita"); o lugar dos temas ao lado da Nova demanda */
 .cx-numeros a{color:inherit;text-decoration:none}
 .cx-numeros a:hover .v,.cx-numeros a:focus-visible .v{color:var(--verde-texto)}
@@ -333,3 +333,260 @@ a.ins-titulo:hover{color:var(--verde-texto)}
 .cx-recolhe[open] .cx-mostrar{color:var(--mudo)}
 .cx-recolhe[open] .cx-mostrar::after{content:" (recolher)"}
 .dm-cab-acoes{display:inline-flex;gap:8px;flex-wrap:wrap}
+
+/* O prontuário da usina (12/11/2026; comando/_prontuario.html, no Comando > Usinas e na aba Central da usina da Usinas
+   360°). Levi: "quanto mais direto formos, melhor [...] não é uma caixa de texto infinita [...] Primeiramente, dando um
+   parecer geral, e quando a pessoa quiser se aprofundar, se aprofunda". O parecer numa linha, o painel com o visual na
+   frente ("os KPIs principais de performance, meta, OS, pendências [...] de uma forma mais visual") e um cartão FECHADO
+   por assunto, com o estado dele numa linha; os cartões são os `cu-q` da casa (campo.css), e dentro deles só listas (um
+   nível de superfície). A cor só carrega estado; o ponto, e não a faixa lateral. */
+.pu-motivo{font:500 14px/1.3 var(--font-sans);color:var(--tinta-2);letter-spacing:0}
+.pu-acoes{display:flex;flex-wrap:wrap;gap:8px}
+.pu-acoes .cu-n{margin-left:2px}
+.pu-menu{position:relative}
+.pu-menu > summary{list-style:none}
+.pu-menu > summary::-webkit-details-marker{display:none}
+.pu-menu-caixa{position:absolute;right:0;top:calc(100% + 6px);z-index:30;min-width:280px;padding:6px;background:var(--superficie);
+  border:1px solid var(--linha-forte);border-radius:var(--raio-md);box-shadow:0 12px 32px var(--sombra)}
+.pu-menu-caixa a{display:block;padding:8px 10px;border-radius:6px;color:var(--tinta);text-decoration:none;font:500 13px/1.4 var(--font-sans)}
+.pu-menu-caixa a:hover,.pu-menu-caixa a:focus-visible{background:var(--superficie-2)}
+.pu-menu-caixa small{display:block;padding:6px 10px 4px;font-size:11.5px;line-height:1.45;color:var(--mudo)}
+.pu-ponto{flex:0 0 9px;width:9px;height:9px;border-radius:50%;background:var(--mudo)}
+.pu-ponto--critico{background:var(--critico)}
+.pu-ponto--alerta{background:var(--alerta)}
+.pu-ponto--semcom{background:var(--semcom)}
+.pu-ponto--info{background:var(--info)}
+.pu-ponto--ok{background:var(--ok)}
+/* o parecer: o selo do nível e a frase, numa linha */
+.pu-parecer{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;margin-top:18px;padding:14px 20px;background:var(--superficie);
+  border:1px solid var(--linha);border-radius:var(--raio-md)}
+.pu-par-selo{display:inline-flex;align-items:center;gap:8px;padding:5px 13px;border-radius:999px;font:700 13px/18px var(--font-sans);white-space:nowrap}
+.pu-parecer--critico .pu-par-selo{color:var(--critico);background:var(--critico-suave)}
+.pu-parecer--alerta .pu-par-selo{color:var(--alerta);background:var(--alerta-suave)}
+.pu-parecer--ok .pu-par-selo{color:var(--ok);background:var(--ok-suave)}
+.pu-par-t{flex:1 1 320px;margin:0;font:600 16px/1.4 var(--font-sans);color:var(--tinta)}
+/* o painel: três blocos numa superfície só, separados por fio (a Performance, as OS, as pendências). O número grande na
+   cor da régua, a barra contra a marca dele, e embaixo o que explica o número */
+.pu-painel{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr) minmax(0,1fr);margin-top:14px;background:var(--superficie);
+  border:1px solid var(--linha);border-radius:var(--raio-md);overflow:hidden}
+.pu-bloco{min-width:0;padding:16px 20px 18px;box-shadow:-1px -1px 0 var(--linha)}
+.pu-bloco-t{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 10px;margin:0 0 14px;font:600 14px/20px var(--font-sans);color:var(--tinta)}
+.pu-bloco-t a{color:inherit;text-decoration:none}
+.pu-bloco-t a:hover,.pu-bloco-t a:focus-visible{color:var(--verde-texto)}
+.pu-bloco-t small{display:inline-flex;align-items:center;gap:6px;font:400 12px/16px var(--font-sans);color:var(--mudo)}
+.pu-bloco-t small .pu-ponto{flex:0 0 7px;width:7px;height:7px}
+.pu-bloco-t small .pu-ponto + .pu-ponto,.pu-bloco-t small .pu-ponto:not(:first-child){margin-left:6px}
+.pu-bloco-vazio{margin:0;font-size:13px;color:var(--mudo)}
+.pu-meds{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px 20px}
+.pu-med,.pu-num,.pu-os-n,.pu-spark{color:inherit;text-decoration:none}
+.pu-med{display:block;min-width:0}
+.pu-med-r{display:block;font-size:12px;line-height:1.3;color:var(--tinta-2)}
+.pu-med-v{display:block;margin-top:2px;font:600 27px/32px var(--font-sans);letter-spacing:-.015em;font-variant-numeric:tabular-nums;white-space:nowrap;color:var(--tinta)}
+.pu-med-s{display:block;font-size:11.5px;line-height:1.45;color:var(--tinta-2)}
+.pu-med-s em{display:block;font-style:normal;color:var(--mudo)}
+.pu-med:hover .pu-med-r,.pu-med:focus-visible .pu-med-r,.pu-num:hover small,.pu-num:focus-visible small,.pu-os-n:hover span,
+.pu-os-n:focus-visible span,.pu-spark:hover .pu-spark-leg,.pu-spark:focus-visible .pu-spark-leg{color:var(--verde-texto)}
+.pu-barra{position:relative;display:block;height:8px;margin:7px 0 7px;border-radius:4px;background:var(--linha-forte)}
+.pu-barra-f{position:absolute;left:0;top:0;bottom:0;min-width:3px;border-radius:4px;background:var(--mudo)}
+.pu-barra-f--critico{background:var(--critico-cheio)}
+.pu-barra-f--alerta{background:var(--alerta-cheio)}
+.pu-barra-f--ok{background:var(--ok-cheio)}
+.pu-barra-m{position:absolute;top:-3px;bottom:-3px;width:2px;margin-left:-1px;border-radius:1px;background:var(--tinta)}
+.pu .cn-t-neutro{color:var(--tinta-2)}
+.pu-med-v.cn-t-critico,.pu-num b.cn-t-critico,.pu-niv b.cn-t-critico{color:var(--critico)}
+.pu-med-v.cn-t-alerta,.pu-num b.cn-t-alerta,.pu-niv b.cn-t-alerta{color:var(--alerta)}
+.pu-med-v.cn-t-ok,.pu-num b.cn-t-ok,.pu-niv b.cn-t-ok{color:var(--ok)}
+/* a geração de cada dia do mês contra a meta do dia: as barras do gráfico da casa, numa faixa baixa */
+.pu-bloco--perf{display:flex;flex-direction:column}
+.pu-spark{flex:1 1 auto;display:flex;flex-direction:column;margin-top:16px;padding-top:12px;border-top:1px solid var(--linha)}
+.pu-spark svg{display:block;flex:1 1 54px;width:100%;min-height:54px;max-height:132px}
+.pu-spark-meta{stroke:var(--tinta-2);stroke-width:1;stroke-dasharray:4 3}
+.pu-spark-leg{display:flex;flex-wrap:wrap;justify-content:space-between;gap:2px 12px;margin-top:6px;font-size:11.5px;line-height:1.4;color:var(--tinta-2)}
+.pu-spark-leg span{display:inline-flex;align-items:center;gap:6px;color:var(--mudo)}
+.pu-spark-i{width:14px;height:0;border-top:1px dashed var(--tinta-2)}
+/* as OS: o total, a barra por estado no Fracttal (do que ainda não começou ao que espera a verificação: um tom só, do
+   mais claro ao mais forte, porque estado de OS não é semáforo) e o que pede ação */
+.pu-os-n{display:flex;align-items:baseline;gap:8px}
+.pu-os-n b{font:600 27px/32px var(--font-sans);letter-spacing:-.015em;font-variant-numeric:tabular-nums;color:var(--tinta)}
+.pu-os-n span{font-size:12.5px;color:var(--tinta-2)}
+.pu-pilha{display:flex;gap:2px;height:8px;margin:7px 0 8px;border-radius:4px;overflow:hidden}
+.pu-pilha-p{flex:0 0 auto;min-width:4px;height:100%}
+.pu-pilha-p--ni{background:color-mix(in srgb,var(--tinta) 26%,transparent)}
+.pu-pilha-p--ex{background:color-mix(in srgb,var(--tinta) 55%,transparent)}
+.pu-pilha-p--ve{background:color-mix(in srgb,var(--tinta) 88%,transparent)}
+.pu-pilha-p--ou{background:color-mix(in srgb,var(--tinta) 14%,transparent)}
+.pu-pilha-leg{list-style:none;display:flex;flex-wrap:wrap;gap:2px 14px;margin:0;padding:0;font-size:11.5px;line-height:1.5;color:var(--tinta-2)}
+.pu-pilha-leg li{display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
+.pu-pilha-leg i{width:8px;height:8px;border-radius:2px}
+.pu-pilha-leg b{font-weight:600;color:var(--tinta);font-variant-numeric:tabular-nums}
+.pu-nums{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 18px;margin-top:14px;padding-top:12px;border-top:1px solid var(--linha)}
+.pu-num{display:block;min-width:0}
+.pu-num small{display:block;font-size:12px;line-height:1.3;color:var(--tinta-2)}
+.pu-num b{display:block;margin-top:1px;font:600 20px/26px var(--font-sans);letter-spacing:-.01em;font-variant-numeric:tabular-nums;color:var(--tinta)}
+.pu-num > span:not(.pu-barra){display:block;font-size:11.5px;line-height:1.4;color:var(--mudo)}
+.pu-num .pu-barra{height:6px;margin:4px 0 5px}
+/* as pendências: a contagem e as mais graves (a lista inteira abre) */
+.pu-pend-n{font:600 14px/20px var(--font-sans);font-variant-numeric:tabular-nums;color:var(--tinta)}
+.pu-at-lista{list-style:none;margin:0;padding:0}
+.pu-at-lista a{display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-top:1px solid var(--linha);color:inherit;text-decoration:none}
+.pu-bloco-t + .pu-at-lista li:first-child a{border-top:0;padding-top:0}
+.pu-at-lista a:hover b,.pu-at-lista a:focus-visible b{color:var(--verde-texto)}
+.pu-at-lista .pu-ponto{margin-top:6px}
+.pu-at-lista b{display:block;font:600 13px/1.4 var(--font-sans);color:var(--tinta)}
+.pu-at-lista small{display:block;font-size:12px;line-height:1.4;color:var(--mudo)}
+.pu-at-mais > summary{display:inline-block;margin-top:4px;list-style:none;cursor:pointer;font:600 12.5px/1.4 var(--font-sans);color:var(--verde-texto)}
+.pu-at-mais > summary::-webkit-details-marker{display:none}
+.pu-at-mais[open] > summary{color:var(--mudo)}
+.pu-at-mais .pu-at-lista{margin-top:4px}
+.pu-em-dia{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;margin:12px 0 0;padding-top:12px;border-top:1px solid var(--linha);font-size:12px}
+.pu-bloco-vazio + .pu-em-dia{border-top:0;padding-top:0}
+.pu-em-dia-r{font:600 12px/1.3 var(--font-sans);color:var(--mudo);margin-right:2px}
+.pu-ok{padding:2px 9px;border-radius:999px;color:var(--ok);background:var(--ok-suave);font-weight:600}
+/* a faixa do resto: os que decidem fora da Performance e das OS, numa linha; cada um abre o cartão dele */
+.pu-faixa{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));margin-top:14px;background:var(--superficie);border:1px solid var(--linha);
+  border-radius:var(--raio-md);overflow:hidden}
+.pu-ind{display:block;min-width:0;padding:12px 12px 12px 20px;box-shadow:-1px -1px 0 var(--linha);color:inherit;text-decoration:none}
+.pu-ind:hover,.pu-ind:focus-visible{background:var(--superficie-2)}
+.pu-ind small{display:block;font-size:12px;line-height:1.3;color:var(--tinta-2)}
+.pu-ind > b{display:block;margin-top:3px;font:600 20px/26px var(--font-sans);letter-spacing:-.01em;font-variant-numeric:tabular-nums;white-space:nowrap;color:var(--tinta)}
+.pu-ind > b.pu-ind--txt{font-size:15px;line-height:26px;letter-spacing:0}
+.pu-ind > b.cn-t-neutro{color:var(--tinta-2)}
+.pu-ind > b.cn-t-critico{color:var(--critico)}
+.pu-ind > b.cn-t-alerta{color:var(--alerta)}
+.pu-ind > b.cn-t-ok{color:var(--ok)}
+.pu-ind > span:not(.pu-nivs){display:block;font-size:11.5px;line-height:1.35;color:var(--mudo)}
+/* a sujidade e a vegetação, de 1 a 5: cinco casas, as cheias na cor da régua da Limpeza */
+.pu-nivs{display:grid;gap:3px;margin:5px 0 3px}
+.pu-niv{display:grid;grid-template-columns:minmax(0,1fr) auto 12px;align-items:center;gap:8px;font-size:12px;line-height:1.3}
+.pu-niv em{font-style:normal;color:var(--tinta-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pu-niv-b{display:inline-flex;gap:2px}
+.pu-niv-b i{width:8px;height:8px;border-radius:2px;background:var(--linha-forte)}
+.pu-niv-b i.pu-niv-on--ok{background:var(--ok-cheio)}
+.pu-niv-b i.pu-niv-on--alerta{background:var(--alerta-cheio)}
+.pu-niv-b i.pu-niv-on--critico{background:var(--critico-cheio)}
+.pu-niv b{font-weight:600;font-variant-numeric:tabular-nums;text-align:right}
+/* os cartões: fechados, com o estado numa linha */
+.pu-grade{margin-top:14px}
+.pu-sec > summary{list-style:none;cursor:pointer}
+.pu-sec > summary::-webkit-details-marker{display:none}
+.pu-sec > summary:focus-visible{outline:2px solid var(--foco);outline-offset:-2px}
+.pu-sec:not([open]) > .pn-cab{border-bottom:0}
+.pu-sec > .pn-cab:hover{background:var(--superficie-2)}
+.pu .cu-q > .pn-cab h2{flex:1 1 auto;min-width:0}
+.pu-sum{display:grid;gap:1px;min-width:0}
+.pu-sum-t{font:600 15px/22px var(--font-sans);color:var(--tinta)}
+.pu-sum-e{display:flex;align-items:baseline;gap:8px;font:400 12.5px/1.45 var(--font-sans);color:var(--tinta-2)}
+.pu-sum-e .pu-ponto{transform:translateY(-1px)}
+.pu-seta{margin-left:auto;font-size:16px;color:var(--mudo)}
+.pu-sec[open] > .pn-cab .pu-seta{transform:rotate(180deg)}
+.pu-sec.pu-sec--foco{border-color:var(--verde);box-shadow:0 0 0 1px var(--verde)}
+.pu-sec{scroll-margin-top:12px}
+.pu-pe{margin:0;padding:10px 20px 14px;border-top:1px solid var(--linha);font-size:12.5px}
+.pu-sub{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px;margin:0;padding:14px 20px 8px;border-top:1px solid var(--linha);
+  font:700 11.5px/16px var(--font-sans);letter-spacing:.04em;text-transform:uppercase;color:var(--tinta-2)}
+.pu-sub .mudo{font-weight:500;letter-spacing:0;text-transform:none}
+.pu-sub .cu-n{margin-left:0}
+.pu-lista{list-style:none;margin:0;padding:0 20px 6px}
+.pu-lista li{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 12px;padding:10px 0;border-top:1px solid var(--linha);font-size:13px}
+.pu-lista li:first-child{border-top:0}
+.pu-sub + .pu-lista li:first-child{padding-top:4px}
+.pu-l1{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;min-width:0;grid-column:1}
+.pu-l1 b{font:600 13.5px/1.4 var(--font-sans);color:var(--tinta);overflow-wrap:anywhere}
+.pu-l1 .pu-ponto{flex:none}
+.pu-lista small{grid-column:1;font-size:12.5px;line-height:1.45;color:var(--tinta-2)}
+.pu-oss{grid-column:2;grid-row:1 / span 2;display:flex;flex-wrap:wrap;justify-content:flex-end;align-content:center;gap:2px 10px;max-width:190px}
+.pu-os{padding:0;border:0;background:none;font:600 12.5px/1.4 var(--font-sans);color:var(--verde-texto);cursor:pointer;white-space:nowrap}
+.pu-os:hover{text-decoration:underline}
+.pu-nota{margin:0;padding:8px 20px 14px;font-size:12px;line-height:1.5;color:var(--mudo)}
+/* o cartão das OS: a OS e o que a explica, em linhas; ou só os números, lado a lado */
+.pu-sec > .pn-cab + .pu-sub,.pu-sec > .pn-cab + .cr-graf + .pu-sub{border-top:0}
+.pu-sub .pu-ponto{align-self:center}
+.pu-lista--os li{grid-template-columns:86px minmax(0,1fr);gap:0 12px;align-items:baseline;padding:6px 0;border-top:0}
+.pu-lista--os li .pu-os{justify-self:start}
+.pu-lista--os li span{color:var(--tinta-2);overflow-wrap:anywhere}
+.pu-os-chips{display:flex;flex-wrap:wrap;gap:4px 14px;margin:0;padding:0 20px 10px}
+.pu-sub + .pu-os-chips,.pu-sub + .pu-lista--os{margin-top:-2px}
+.pu-os-mais{padding:0 20px 8px}
+.pu-os-mais > summary{margin-top:0}
+.pu-os-mais .pu-lista,.pu-os-mais .pu-os-chips{padding-left:0;padding-right:0}
+.pu-pe--bts{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 14px}
+/* o mês a mês: o atingimento com a barra dele; o que explica o número, na linha de baixo */
+.pu-tab-barra{min-width:92px}
+.pu-tab-barra .pu-barra{height:5px;margin:4px 0 0}
+.pu-tab-barra .pu-barra-m{top:-2px;bottom:-2px}
+.pu-tab b.cn-t-critico{color:var(--critico)}
+.pu-tab b.cn-t-alerta{color:var(--alerta)}
+.pu-tab b.cn-t-ok{color:var(--ok)}
+.pu-tab-rola{overflow-x:auto;padding:0 20px 8px}
+.pu-tab{width:100%;border-collapse:collapse;font-size:12.5px}
+.pu-tab th{padding:6px 10px 6px 0;text-align:left;font:600 11px/14px var(--font-sans);color:var(--mudo);white-space:nowrap;border-bottom:1px solid var(--linha)}
+.pu-tab td{padding:8px 10px 8px 0;border-bottom:1px solid var(--linha);color:var(--tinta);white-space:nowrap}
+.pu-tab tr:last-child td{border-bottom:0}
+.pu-tab td small{display:block;font-size:11.5px;color:var(--mudo)}
+.pu-zel{padding:0 20px 4px}
+.pu-zel svg{display:block;width:100%;max-width:460px;height:auto}
+.pu-zel-g{stroke:var(--linha);stroke-width:1}
+.pu-zel-e{fill:var(--mudo);font:500 7px var(--font-sans)}
+.pu-zel-l{fill:none;stroke-width:1.6;stroke-linejoin:round;stroke-linecap:round}
+.pu-zel-l--suj{stroke:var(--serie-sujidade)}
+.pu-zel-l--veg{stroke:var(--serie-vegetacao)}
+.pu-zel-p--suj{fill:var(--serie-sujidade)}
+.pu-zel-p--veg{fill:var(--serie-vegetacao)}
+.pu-zel-leg{display:flex;flex-wrap:wrap;gap:4px 16px;margin:6px 0 8px;font-size:12.5px;color:var(--tinta-2)}
+.pu-zel-leg span{display:inline-flex;align-items:center;gap:6px}
+.pu-zel-leg b{color:var(--tinta)}
+.pu-zel-i{width:14px;height:3px;border-radius:2px}
+.pu-zel-i--suj{background:var(--serie-sujidade)}
+.pu-zel-i--veg{background:var(--serie-vegetacao)}
+.pu-rec-linha{margin:0;padding:10px 20px 14px;border-top:1px solid var(--linha);font-size:12.5px;color:var(--tinta-2)}
+.pu-conv{margin:0;padding:2px 20px 0;font-size:13px}
+.pu-conv-t{display:block;margin-top:2px;color:var(--tinta-2)}
+/* a janela do relatório: os campos de cada tema (o tema liga e desliga os dele) */
+.pu-rel-campos{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px 28px;margin:0 0 16px;padding:0}
+.pu-rel-tema{min-width:0;margin:0;padding:0;border:0}
+.pu-rel-tema legend{padding:0;font:600 13.5px/1.4 var(--font-sans);color:var(--tinta)}
+.pu-rel-tema legend label,.pu-rel-tema li label{display:flex;align-items:flex-start;gap:8px;cursor:pointer}
+.pu-rel-tema ul{list-style:none;margin:6px 0 0;padding:0 0 0 24px;display:grid;gap:5px}
+.pu-rel-tema li{font-size:13px;line-height:1.4;color:var(--tinta-2)}
+.pu-rel-tema input{flex:none;width:16px;height:16px;margin:2px 0 0;accent-color:var(--verde)}
+@media (max-width:640px){.pu-rel-campos{grid-template-columns:minmax(0,1fr)}}
+/* a linha do tempo e a composição: fechadas, a largura inteira */
+.pu-rec{margin-top:16px;background:var(--superficie);border:1px solid var(--linha);border-radius:var(--raio-md)}
+.pu-rec > summary{list-style:none;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 20px;cursor:pointer}
+.pu-rec > summary::-webkit-details-marker{display:none}
+.pu-rec > summary:hover{background:var(--superficie-2)}
+.pu-rec > summary b{display:block;font:600 15px/22px var(--font-sans);color:var(--tinta)}
+.pu-rec > summary small{display:block;font-size:12.5px;color:var(--tinta-2)}
+.pu-rec > summary .ph{font-size:16px;color:var(--mudo)}
+.pu-rec[open] > summary{border-bottom:1px solid var(--linha)}
+.pu-rec[open] > summary .ph{transform:rotate(180deg)}
+.pu-rec > summary:focus-visible{outline:2px solid var(--foco);outline-offset:-2px}
+.pu-comp{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:18px 28px;padding:16px 20px 18px}
+.pu-comp-t{margin:0 0 8px;font:700 11.5px/16px var(--font-sans);letter-spacing:.04em;text-transform:uppercase;color:var(--tinta-2)}
+.pu-dl{display:grid;grid-template-columns:minmax(96px,auto) minmax(0,1fr);gap:5px 14px;margin:0;font-size:12.5px;line-height:1.45}
+.pu-dl dt{color:var(--mudo)}
+.pu-dl dd{margin:0;color:var(--tinta);overflow-wrap:anywhere}
+.pu-chips{display:flex;flex-wrap:wrap;gap:8px;padding:14px 20px 4px}
+.pu-chip{padding:5px 12px;border-radius:999px;border:1px solid var(--linha);background:transparent;color:var(--tinta-2);
+  font:500 12.5px/1.3 var(--font-sans);cursor:pointer}
+.pu-chip[aria-pressed="true"]{border-color:var(--verde);background:var(--verde-suave);color:var(--tinta)}
+.pu-chip:focus-visible,.pu-os:focus-visible{outline:2px solid var(--foco);outline-offset:2px}
+.pu-linha{list-style:none;margin:0;padding:6px 20px 8px}
+.pu-dia{display:grid;grid-template-columns:92px minmax(0,1fr);gap:0 16px;padding:10px 0;border-top:1px solid var(--linha)}
+.pu-dia:first-child{border-top:0}
+.pu-dia[hidden]{display:none}
+.pu-dia h3{margin:0;padding-top:5px;font:600 12.5px/18px var(--font-sans);color:var(--tinta-2);white-space:nowrap}
+.pu-dia ul{list-style:none;margin:0;padding:0}
+.pu-dia ul li{display:grid;grid-template-columns:40px 9px minmax(0,1fr) auto;gap:0 10px;align-items:baseline;padding:5px 0;font-size:13px}
+.pu-dia ul li[hidden]{display:none}
+.pu-hora{font-size:12px;color:var(--mudo)}
+.pu-dia .pu-ponto{align-self:center}
+.pu-ev b{font:600 13px/1.4 var(--font-sans);color:var(--tinta)}
+.pu-ev small{display:block;font-size:12px;line-height:1.4;color:var(--tinta-2);overflow-wrap:anywhere}
+.pu-mais{padding:0;border:0;background:none;font:600 12.5px/1.4 var(--font-sans);cursor:pointer}
+@media (max-width:1180px){.pu-painel{grid-template-columns:repeat(2,minmax(0,1fr))}.pu-bloco--pend{grid-column:1 / -1}}
+@media (max-width:820px){.pu-painel{grid-template-columns:minmax(0,1fr)}}
+@media (max-width:640px){.pu-meds{grid-template-columns:minmax(0,1fr)}.pu-faixa{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .pu-dia{grid-template-columns:minmax(0,1fr)}
+  .pu-dia h3{padding:0 0 4px}.pu-oss{grid-column:1;grid-row:auto;justify-content:flex-start;max-width:none}
+  .pu-menu-caixa{position:fixed;left:16px;right:16px;top:auto;bottom:16px;min-width:0}}

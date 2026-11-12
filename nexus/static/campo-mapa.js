@@ -223,7 +223,7 @@
   }
   // a cor da usina (12/11/2026, Levi: "Quero as cores das usinas de acordo com o tempo real, OS Abertas do setor COS, as
   // regras estão em 'Comando > Usinas' pode pegar as cores de lá!"): o Agora de Comando > Usinas, no tom de lá (normal
-  // verde, atenção amarelo, crítico vermelho, sem comunicação roxo desde 13/11/2026; sem leitura do COS só o contorno). Com o clima
+  // verde, atenção amarelo, crítico vermelho, sem comunicação roxo desde 12/11/2026; sem leitura do COS só o contorno). Com o clima
   // ligado, a cor é o nível do alerta de clima, e o selo "!" diz que o COS tem crítico ou atenção
   function corDaUsina(u) {
     if (u.nivel) return u.nivel;

@@ -2,7 +2,12 @@
 como pesquisar a usina e ter uma central de informações daquela usina, performance, disponibilidade, sujidade,
 pendências, chamados, PTs etc"; "inclua junto da central dos responsáveis, como aba alternativa"). Decisões dele: a aba
 na Visão do responsável, o mês corrente, as quatro pendências (rondas, OS atrasadas e pausadas, ocorrências abertas,
-Segurança) e todas as usinas na busca. Banco falso do test_campo_responsaveis (a Altair, a Brodowski 1 e a Coração 1)."""
+Segurança) e todas as usinas na busca. Banco falso do test_campo_responsaveis (a Altair, a Brodowski 1 e a Coração 1).
+
+Desde 12/11/2026 a aba mostra o PRONTUÁRIO da usina, a página do Comando > Usinas (Levi: "essa visão irá substituir a
+central da usina"; tests/test_comando_prontuario.py): a conta da Central (`_central_da_usina`, `central_usina.py`) segue
+e alimenta o prontuário, e estes testes seguram o que é da aba (a busca, o relatório do cliente, a janela desta tela) e
+o que a Central conta."""
 import re
 from datetime import timedelta
 from pathlib import Path
@@ -22,7 +27,7 @@ def _central(logado, args=""):
 
 def test_a_aba_fica_ao_lado_das_outras_e_busca_todas_as_usinas(tela, logado):
     html = logado.get("/t/campo/responsaveis?responsavel=*&modo=geral").get_data(as_text=True)
-    assert ">Central da usina</a>" in html and "modo=usina" in html
+    assert ">Prontuário da usina</a>" in html and "modo=usina" in html
     html = _central(logado, "&responsavel=Ciclano+Chefe")
     # a busca traz TODAS as usinas da Visão, sem o filtro do responsável (decisão do Levi: as 131, para quem abre a tela)
     for uid in (1, 2, 3):
@@ -35,21 +40,22 @@ def test_a_aba_fica_ao_lado_das_outras_e_busca_todas_as_usinas(tela, logado):
 def test_a_usina_escolhida_traz_os_numeros_da_linha_dela_na_visao(tela, logado):
     html = _central(logado, "&usina=1")
     a = _por_usina()["Altair"]
-    assert '<h2 class="cu-nome">Altair</h2>' in html
-    # os números são os da linha da Altair na Visão (o mesmo do Painel e da Visão geral), e a meta abre o dia a dia
+    assert '<h2 class="cu-nome cmu-nome">Altair ' in html
+    # os números são os da linha da Altair na Visão (o mesmo do Painel e da Visão geral), no painel do alto
+    painel = html.split('class="pu-painel"', 1)[1].split('class="pu-faixa"', 1)[0]
     for txt in (a["perf"]["valores"]["meta"]["txt"], a["perf"]["valores"]["disp"]["txt"]):
-        assert txt in html
-    assert "/t/campo/responsaveis/usina/1/meta" in html and "Performance do mês" in html
-    # as pendências: a ronda longa pendente, e a seção de cada uma
-    assert "Ronda longa pendente" in html and "Ocorrências" in html and "Segurança" in html
-    # chamados: o aberto (16034) com o card da OS; o concluído sem fim no mês não entra nos finalizados
-    assert 'data-folio="16034"' in html
-    # PT: as duas que esperam o De acordo (na janela do número da PT)
+        assert txt in painel
+    assert "Performance do mês" in painel and "/t/campo/responsaveis/usina/1/meta" in html
+    # as pendências: a ronda longa pendente, e o cartão de cada assunto
+    assert "Ronda longa pendente" in html and "Segurança do trabalho" in html and "Chamados e garantias" in html
+    # chamados: o aberto (16034) com o card da OS
+    assert 'data-pu-os="16034"' in html
+    # PT: as duas que esperam o De acordo abrem a decisão na janela desta tela
     assert html.count("/t/campo/responsaveis/pt/") >= 2
 
 
 def test_sem_o_script_a_busca_acha_pelo_nome(tela, logado):
-    assert '<h2 class="cu-nome">Coração 1</h2>' in _central(logado, "&nome=coracao")
+    assert '<h2 class="cu-nome cmu-nome">Coração 1 ' in _central(logado, "&nome=coracao")
     html = _central(logado, "&nome=nao+existe")
     assert 'Nenhuma usina com o nome "nao existe"' in html and "cu-nome" not in html
 
@@ -111,7 +117,7 @@ def test_os_meses_do_relatorio_e_o_padrao_o_anterior():
 
 def test_a_central_tem_o_botao_e_a_janela_do_relatorio(tela, logado):
     html = _central(logado, "&usina=1")
-    assert "data-cu-rel" in html and 'id="cu-rel-temas"' in html
+    assert "data-pu-rel" in html and 'id="pu-rel"' in html
     assert "/t/campo/responsaveis/usina/1/relatorio.pdf" in html
     from nexus.campo import relatorio_usina as RU
     for k, rot in RU.TEMAS:                                       # os quatro temas, todos marcados
@@ -139,6 +145,54 @@ def test_o_relatorio_sai_em_pdf_com_os_temas_escolhidos(tela, logado):
     assert "Em aberto em" in texto
 
 
+def test_os_campos_do_relatorio_e_o_pedido():
+    """12/11/2026, Levi: "eu quero o relatório de forma profissional, que dê para editar os campos que eu quero que
+    apareça": cada bloco do PDF é um campo; sem `campo` no pedido valem todos os dos temas (o endereço de antes)."""
+    from nexus.campo import relatorio_usina as RU
+    assert RU.campos_do_pedido([]) == RU.CHAVES_CAMPOS
+    assert RU.campos_do_pedido([], ("perf",)) == ("resumo", "perf_numeros", "perf_grafico", "perf_dias", "perf_eventos")
+    assert RU.campos_do_pedido(["rondas_lista", "perf_grafico", "lixo"]) == ("perf_grafico", "rondas_lista")   # na ordem do PDF
+    # o campo de um tema que não foi pedido não esvazia o relatório: valem os campos do tema pedido
+    assert RU.campos_do_pedido(["rondas_lista"], ("perf",)) == RU.campos_do_pedido([], ("perf",))
+    grupos = RU.campos_por_tema()
+    assert [t for t, _n, _c in grupos] == ["", "perf", "rondas", "manut", "chamados"]
+    assert [k for _t, _n, cs in grupos for k, _r in cs] == list(RU.CHAVES_CAMPOS)
+    assert {t for _k, t, _r in RU.CAMPOS} == {""} | set(RU.CHAVES_TEMAS)
+    # o resumo só fala dos temas que têm campo ligado; só com o resumo, de todos
+    assert RU.temas_dos_campos(RU.CHAVES_TEMAS, ("resumo", "perf_grafico", "chamados_abertos")) == ("perf", "chamados")
+    assert RU.temas_dos_campos(RU.CHAVES_TEMAS, ("resumo",)) == RU.CHAVES_TEMAS
+
+
+def test_o_relatorio_so_desenha_os_campos_escolhidos(tela, logado):
+    import pytest
+    fitz = pytest.importorskip("fitz")
+    mes = HOJE.strftime("%Y-%m")
+
+    def texto(q=""):
+        r = logado.get(f"/t/campo/responsaveis/usina/1/relatorio.pdf?mes={mes}{q}")
+        assert r.status_code == 200 and r.data[:5] == b"%PDF-"
+        return "".join(p.get_text() for p in fitz.open(stream=r.data, filetype="pdf"))
+    tudo = texto()
+    for t in ("Resumo do mês", "Atingimento da meta", "Geração diária e meta", "Dia a dia",
+              "Eventos que afetaram a disponibilidade", "Tarefas executadas no mês", "Ordens de serviço em aberto"):
+        assert t in tudo, t
+    # só o gráfico e os chamados em aberto: o resto não se desenha, e o tema sem campo ligado não abre seção
+    so = texto("&campo=perf_grafico&campo=chamados_abertos")
+    assert "Geração diária e meta" in so and "Em aberto em" in so
+    for t in ("Resumo do mês", "Atingimento da meta", "Dia a dia", "Eventos que afetaram", "Tarefas executadas",
+              "Rondas e limpeza", "Manutenção"):
+        assert t not in so, t
+    # o resumo ligado só fala dos temas com campo ligado: sem campo das Rondas, sem a frase das rondas
+    res = texto("&campo=resumo&campo=perf_numeros")
+    assert "Resumo do mês" in res and "A usina gerou" in res and "ronda" not in res.split("Fontes:", 1)[0].lower()
+    # os números sozinhos ficam no alto e não abrem a seção da Performance
+    num = texto("&campo=perf_numeros")
+    assert "Atingimento da meta" in num and "Performance e disponibilidade" not in num and "Resumo do mês" not in num
+    # pelo endereço do Comando, o mesmo PDF
+    r = logado.get(f"/t/comando/usinas/1/relatorio.pdf?mes={mes}&campo=perf_numeros")
+    assert "Performance e disponibilidade" not in "".join(p.get_text() for p in fitz.open(stream=r.data, filetype="pdf"))
+
+
 def test_os_dados_do_relatorio_sao_os_das_telas_donas(tela):
     from nexus.campo import relatorio_usina as RU
     d = RU.dados(1, HOJE.strftime("%Y-%m"), HOJE)
@@ -156,20 +210,23 @@ BUSCA = Path(__file__).resolve().parents[1] / "nexus" / "torres" / "campo" / "te
 
 
 def _quadro(html, ident):
-    return html.split(f'id="{ident}"', 1)[1].split("</section>", 1)[0]
+    """O miolo de um cartão do prontuário (`pu-perf`, `pu-chamados`, `pu-seg`...)."""
+    return html.split(f'id="{ident}"', 1)[1].split("</details>", 1)[0]
 
 
-def test_os_numeros_em_linhas_alinhadas_o_nome_em_cima_e_o_valor_embaixo_no_meio(tela, logado):
-    """"Nesses KPIS quero campos separados por linhas invisíveis separando cabeçalho e valor / quero que centralize
-    horizontal e verticalmente": cada número ocupa três linhas da faixa (o nome, o valor, o complemento), as MESMAS
-    linhas em todos (a subgrade), e cada pedaço fica no meio da casa dele."""
+def test_os_numeros_viraram_o_painel_do_prontuario(tela, logado):
+    """A faixa dos oito números da Central (05/11/2026) saiu com ela em 12/11/2026: os números da usina estão no painel
+    do prontuário (a Performance em medidores com barra, as OS por estado, as pendências) e na faixa do resto."""
     css = CSS.read_text(encoding="utf-8")
-    regra = re.search(r"\.cn-numeros\.cu-numeros > \*\{([^}]*)\}", css).group(1)
-    assert "grid-row:span 3" in regra and "grid-template-rows:subgrid" in regra
-    assert "place-items:center" in regra and "text-align:center" in regra
-    faixa = _central(logado, "&usina=1").split('<div class="cn-numeros cu-numeros">', 1)[1].split("</div>", 1)[0]
-    for rot in ("Meta do mês", "PR", "Disponibilidade", "Limpeza", "Ronda", "Chamados", "PT", "OS atrasadas"):
-        assert f'<span class="d">{rot}</span><b class="v' in faixa, rot
+    assert "cu-numeros" not in css
+    html = _central(logado, "&usina=1")
+    assert 'class="cn-numeros cu-numeros"' not in html
+    painel = html.split('class="pu-painel"', 1)[1].split('class="pu-faixa"', 1)[0]
+    for rot in ("Meta do mês", "PR", "Disponibilidade"):
+        assert f'<span class="pu-med-r">{rot}</span>' in painel, rot
+    faixa = html.split('class="pu-faixa"', 1)[1].split("</div>", 1)[0]
+    for rot in ("Última ronda", "Chamados abertos", "Segurança"):
+        assert f"<small>{rot}</small>" in faixa, rot
 
 
 def test_a_exclamacao_amarela_ao_lado_do_titulo_leva_a_leitura_e_as_reguas(tela, logado):
@@ -219,64 +276,65 @@ def test_o_relatorio_pergunta_o_mes_primeiro(tela, logado):
     marcado), antes dos temas."""
     from nexus.campo import relatorio_usina as RU
     html = _central(logado, "&usina=1")
-    jan = html.split('<template id="cu-rel-temas">', 1)[1].split("</template>", 1)[0]
+    jan = html.split('id="pu-rel"', 1)[1].split("</dialog>", 1)[0]
     assert '<fieldset class="cu-rel-meses">' in jan and "<legend" in jan and "Qual mês?" in jan
     for m, _rot in RU.meses(HOJE):
         marcado = " checked" if m == RU.mes_padrao(HOJE) else ""
         assert f'<input type="radio" name="mes" value="{m}"{marcado}>' in jan, m
-    assert jan.index("cu-rel-meses") < jan.index("pn-rel-temas")
+    assert jan.index("cu-rel-meses") < jan.index("pu-rel-campos")
     assert "<select" not in jan
 
 
 def test_a_performance_traz_o_grafico_da_geracao(tela, logado):
     """"Quero que o gráfico de geração também apareça na visão do responsável > central da usina": o mesmo gráfico da
-    janela do PR (a geração do dia que o Gerencial conta, a meta e o POA), dentro do quadro da Performance."""
-    perf = _quadro(_central(logado, "&usina=1"), "cu-perf")
+    janela do PR (a geração do dia que o Gerencial conta, a meta e o POA), dentro do cartão da Performance; no painel do
+    alto, as mesmas barras numa faixa baixa."""
+    html = _central(logado, "&usina=1")
+    perf = _quadro(html, "pu-perf")
     assert "Geração diária (MWh) e POA (kWh/m²)" in perf and 'class="cr-svg"' in perf
     assert perf.count('class="cr-barra cr-barra--') == 2              # os dois dias com geração (o 3º só tem PR)
+    assert html.split('class="pu-spark"', 1)[1].split("</a>", 1)[0].count('class="cr-barra cr-barra--') == 2
     # a janela do PR desenha o mesmo gráfico, da mesma macro
     jan = logado.get("/t/campo/responsaveis/usina/1/pr").get_data(as_text=True)
     assert jan.count('class="cr-barra cr-barra--') == 2
     assert "{% macro geracao(g) %}" in (BUSCA.parent / "_graficos.html").read_text(encoding="utf-8")
-    # sem a série do dia a dia no banco, o quadro fica sem o gráfico (a Brodowski 1)
-    assert 'class="cr-svg"' not in _quadro(_central(logado, "&usina=2"), "cu-perf")
+    # sem a série do dia a dia no banco, o cartão e o painel ficam sem o gráfico (a Brodowski 1)
+    sem = _central(logado, "&usina=2")
+    assert 'class="cr-svg"' not in _quadro(sem, "pu-perf") and 'class="pu-spark"' not in sem
 
 
 def test_os_chamados_so_mostram_a_linha_que_tem_chamado(tela, banco, logado):
-    """"SE NÃO TIVER VERIFICAÇÃO OU CONCLUSÃO NÃO PRECISA APARECER NA TELA": a linha sem chamado sai (a dos abertos
-    também, pela mesma regra); sem nenhum, uma frase só."""
-    ch = _quadro(_central(logado, "&usina=1"), "cu-ch")
-    assert "Abertos" in ch and "Em verificação" not in ch and "Finalizados no mês" not in ch
+    """"SE NÃO TIVER VERIFICAÇÃO OU CONCLUSÃO NÃO PRECISA APARECER NA TELA": o cartão só mostra o que há (os abertos e
+    em verificação numa lista, os concluídos no mês em outra); sem nenhum, uma frase só."""
+    ch = _quadro(_central(logado, "&usina=1"), "pu-chamados")
+    assert 'data-pu-os="16034"' in ch and "em verificação</em>" not in ch and "Concluídos neste mês" not in ch
     d = HOJE.replace(day=1)
     _aba(banco, "nexus_chamados", "fato_chamado", [
         dict(_chamado(17001, 1, "concluido", 30), data_id_fim=d.year * 10000 + d.month * 100 + d.day),
         _chamado(17005, 1, "verificacao", 3), _chamado(16050, 3, "aberto", 2)])
     visao.limpar()
-    ch = _quadro(_central(logado, "&usina=1"), "cu-ch")
-    assert "Abertos" not in ch and "Em verificação" in ch and "Finalizados no mês" in ch
-    assert "Abertos" in _quadro(_central(logado, "&usina=3"), "cu-ch")
-    ch = _quadro(_central(logado, "&usina=2"), "cu-ch")
-    assert "Nenhum chamado aberto, em verificação ou finalizado no mês." in ch and "<dt" not in ch
+    ch = _quadro(_central(logado, "&usina=1"), "pu-chamados")
+    assert "em verificação</em>" in ch and "Concluídos neste mês" in ch and 'data-pu-os="17001"' in ch
+    assert 'data-pu-os="16050"' in _quadro(_central(logado, "&usina=3"), "pu-chamados")
+    ch = _quadro(_central(logado, "&usina=2"), "pu-chamados")
+    assert "Nenhum chamado de garantia aberto." in ch and "pu-lista" not in ch
 
 
-def test_o_numero_da_pt_abre_a_lista_do_painel_e_o_quadro_da_pt_sai(tela, logado):
+def test_a_pt_esperando_o_de_acordo_abre_a_decisao_na_janela(tela, logado):
     """"o KPI de PT já tem a informação, ao clicar no KPI aparece o mesmo card que aparece em visão do responsável >
-    painel": o número da PT abre na janela a lista do Painel (as PT esperando o De acordo, a parada de hoje primeiro),
-    cada uma abrindo a decisão; o quadro PT da página saiu."""
+    painel" (05/11/2026): no prontuário (12/11/2026) cada PT esperando o De acordo fica no cartão da Segurança e abre a
+    decisão na janela desta tela, sem a lista no meio; a lista do Painel segue como era."""
     html = _central(logado, "&usina=1")
-    assert 'id="cu-pt"' not in html and "Pedidas no mês" not in html
-    faixa = html.split('<div class="cn-numeros cu-numeros">', 1)[1].split("</div>", 1)[0]
-    assert re.search(r'<button type="button" data-cu-pts aria-haspopup="dialog"[^>]*><span class="d">PT</span>', faixa)
-    lista = html.split('<template id="cu-pts-lista">', 1)[1].split("</template>", 1)[0]
-    assert '<ol class="pn-lista pn-lista--jan"' in lista and "PTs pendentes" in lista and "<h2>Altair</h2>" in lista
-    assert lista.count('class="pn-it cr-abre" data-cr-painel="/t/campo/responsaveis/pt/') == 2
-    # o mesmo desenho da lista do Painel (a mesma macro)
+    assert 'id="cu-pts-lista"' not in html and "data-cu-pts" not in html and "Pedidas no mês" not in html
+    seg = _quadro(html, "pu-seg")
+    assert "2 esperando o De acordo" in seg
+    assert seg.count('class="cn-link cr-abre cr-link-botao" data-cr-painel="/t/campo/responsaveis/pt/') == 2
+    # a lista do Painel (a mesma macro de sempre)
     painel = logado.get("/t/campo/responsaveis?modo=painel&responsavel=*").get_data(as_text=True)
     pl = painel.split('<template id="pn-pts-lista">', 1)[1].split("</template>", 1)[0]
     assert '<ol class="pn-lista pn-lista--jan"' in pl and pl.count('class="pn-it cr-abre"') >= 2
-    assert "querySelector('[data-cu-pts]')" in html and "getElementById('cu-pts-lista')" in html
-    # sem PT esperando, a lista diz que não há (a Coração 1)
-    assert "Nenhuma PT esperando o De acordo." in _central(logado, "&usina=3").split('<template id="cu-pts-lista">', 1)[1]
+    # sem PT esperando, o cartão diz que não há (a Coração 1)
+    assert "nenhuma esperando o De acordo" in _quadro(_central(logado, "&usina=3"), "pu-seg")
 
 
 def test_o_eixo_com_passo_quebrado_mostra_a_casa_decimal():

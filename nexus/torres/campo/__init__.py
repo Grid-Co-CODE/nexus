@@ -441,7 +441,8 @@ def _central_da_usina(todas: list[dict], usina_id: int | None = None) -> dict:
            "u": u, "nome": "" if u else nome, "erros": {}}
     from ...campo import relatorio_usina as RU
     hoje_rel = visao._agora().date()
-    out.update(rel_meses=RU.meses(hoje_rel), rel_mes=RU.mes_padrao(hoje_rel), rel_temas=RU.TEMAS)
+    out.update(rel_meses=RU.meses(hoje_rel), rel_mes=RU.mes_padrao(hoje_rel), rel_temas=RU.TEMAS,
+               rel_campos=RU.campos_por_tema())
     if not u:
         return out
     uid = u["usina_id"]
@@ -603,6 +604,16 @@ def responsaveis():
     # a Central da usina (Levi, 04/11/2026, "como aba alternativa"): a busca com TODAS as usinas da Visão (sem o filtro
     # de responsável, de cliente e da busca: buscar é ir à usina) e a usina escolhida
     central = _central_da_usina(todas) if modo == "usina" else None
+    # desde 12/11/2026 a aba mostra o prontuário da usina, a página do Comando > Usinas (Levi: "essa visão irá substituir
+    # a central da usina"): a Central segue como a conta que o alimenta. Se a montagem cair, a aba avisa e a busca segue
+    prontuario = None
+    if central and central.get("u"):
+        try:
+            from ..comando.prontuario_dados import contexto as _prontuario
+            uid = central["u"]["usina_id"]
+            prontuario = _prontuario(uid, cu=central, rel_url=f"/t/campo/responsaveis/usina/{uid}/relatorio.pdf")
+        except Exception:        # noqa: BLE001
+            _log_campo.exception("o prontuário da usina não montou")
     nomes = sorted({u.get("responsavel") or visao.SEM_RESPONSAVEL for u in todas} | ({responsavel} if responsavel else set()),
                    key=lambda n: (n == visao.SEM_RESPONSAVEL, n))
     # a faixa "Parada agora" (18/10/2026): as OS de parada abertas nas usinas DO FILTRO, a mais antiga primeiro
@@ -620,7 +631,7 @@ def responsaveis():
                                            for bb, nome, txt in campo_resp.BLOCOS if bb == b],
         base_pequena=visao.BASE_PEQUENA,
         responsavel_logado=logado, limite=limite, faixa=faixa, faixa_max=FAIXA_MAX, estado_os=tarefas_os.estado(),
-        central=central, iniciais=_iniciais,
+        central=central, prontuario=prontuario, iniciais=_iniciais,
         foto_os=campo_resp.foto_das_os(((d.get("info") or {}).get("manut") or {}).get("gerado_em"), visao._agora()),
         usinas=usinas, cartoes=campo_resp.por_responsavel(base), resumo=campo_resp.soma(responsavel or "Todos", usinas),
         blocos=[(b, nome, txt, campo_resp.bloco(usinas, b)) for b, nome, txt in campo_resp.BLOCOS],
@@ -773,8 +784,9 @@ def responsaveis_relatorio():
 def responsaveis_usina_relatorio(usina_id):
     """O relatório da usina em PDF, para o cliente (Levi, 04/11/2026: "é interessante que dê para baixar um relatório da
     usina também! Algo bem profissional para o cliente!"): o mês (`mes`, AAAA-MM: o atual ou um dos dois anteriores; o
-    anterior de início) e os temas marcados na janela (`tema` repetido; sem nenhum, todos), em
-    nexus/campo/relatorio_usina.py. Só as usinas da Visão (as mobilizadas)."""
+    anterior de início), os temas marcados na janela (`tema` repetido; sem nenhum, todos) e, desde 12/11/2026, os campos
+    de cada tema (`campo` repetido; sem nenhum, todos os dos temas: "que dê para editar os campos que eu quero que
+    apareça"), em nexus/campo/relatorio_usina.py. Só as usinas da Visão (as mobilizadas)."""
     from ...campo import relatorio_usina as RU
     d = campo_resp.visao_responsaveis().dados or {}
     if not any(u["usina_id"] == usina_id for u in d.get("usinas") or []):
@@ -784,7 +796,9 @@ def responsaveis_usina_relatorio(usina_id):
     mes = RU.mes_do_pedido(request.args.get("mes"), hoje)
     temas = RU.temas_do_pedido(request.args.getlist("tema"))
     dados = RU.dados(usina_id, mes, hoje)
-    pdf = RU.gerar(dados, temas, gerado_em=agora.strftime("%d/%m/%Y às %H:%M"))
+    campos = RU.campos_do_pedido(request.args.getlist("campo"), temas)
+    temas = RU.temas_dos_campos(temas, campos)
+    pdf = RU.gerar(dados, temas, gerado_em=agora.strftime("%d/%m/%Y às %H:%M"), campos=campos)
     nome = f"Relatório {dados['usina']} - {mes}.pdf"
     return Response(pdf, mimetype="application/pdf",
                     headers={"Content-Disposition": "attachment; filename*=UTF-8''" + quote(nome),

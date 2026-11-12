@@ -1,4 +1,4 @@
-"""A prévia da visão do contrato e do prontuário da usina (13/11/2026, Contratos e clientes › Prévia): o mockup para a
+"""A prévia da visão do contrato e do prontuário da usina (12/11/2026, Contratos e clientes › Prévia): o mockup para a
 avaliação de Contratos e dos setores, numa moldura, de todos e com o aviso de dados fictícios."""
 from nexus.torres.contratos import TORRE
 

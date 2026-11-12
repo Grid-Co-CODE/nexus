@@ -22,7 +22,7 @@ TELAS = ["cos/mesa", "cos/ocorrencias", "pcm/quadro", "campo/aprovacao", "campo/
 QUENTES = {"cos/mesa", "cos/ocorrencias", "pcm/quadro", "campo/rondas", "relatorios/central",
            "comando/caixa-de-entrada",   # a Caixa é de todo setor (03/11/2026)
            "comando/temas-do-setor",     # e os Temas do setor das demandas (12/11/2026)
-           "contratos/previa"}           # e a Prévia do contrato e do prontuário (13/11/2026)
+           "contratos/previa"}           # e a Prévia do contrato e do prontuário (12/11/2026)
 
 
 @pytest.fixture

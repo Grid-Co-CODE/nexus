@@ -166,7 +166,11 @@ Crítico "Religamento em campo"; falha de comunicação (ou o problema "com") = 
 o problema "rede") = Crítico, e o resto = Atenção com o nome da falha. A usina mostra a pior (crítico > atenção > sem
 comunicação; no empate, a mais antiga) com a OS, a idade, a etapa e quantas mais. Sem ocorrência: "Sem ocorrência"
 (Normal). A usina que nenhuma fotografia trouxe (o cliente cujo Andamento caiu) é "Sem leitura", nunca Normal. O
-prontuário tem o quadro "No COS agora" com as ocorrências e o link para a Ronda padronizada do cliente.
+prontuário mostra as ocorrências abertas no cartão do COS, com o link para a Ronda padronizada do cliente.
+**A cor do Sem comunicação é o roxo (12/11/2026, Levi: "Quando for falha de comunicação [...] Na cor precisa estar
+roxo").** O tom do grupo `sem_com` em `usinas.ESTADOS` é `semcom` (o roxo do semáforo do Nexus, `--semcom`), e não mais o
+azul de informação: o selo, a barra da faixa e a legenda da lista, o ponto do prontuário, o Mapa de equipe
+(`campo-mapa.js`, `a_semcom`) e o vídeo wall (`equipe/parede.py`) pegam a cor daqui.
 **Quem mais lê esta régua (12/11/2026):** o Mapa de equipe da Usinas 360° pinta as usinas pelo `agora_pelo_cos` e o vídeo
 wall dele agrupa as ocorrências pelo `classificar` (`campo/equipe/parede.py`); mudou a régua aqui, muda lá sozinho. Cada
 ocorrência do `cos_por_usina` leva também o `usina_cod` (o código curto da usina no Andamento, "APR100"), o do cartão
@@ -178,14 +182,96 @@ do vídeo wall.
 
 **Fora, por decisão do Levi (11/11/2026):** o Score de saúde do mockup ("Fora por agora": o Nexus não tem essa nota, e
 criar uma é regra nova). **O clique na usina** abre o prontuário no próprio Comando ("No próprio Comando"),
-`/t/comando/usinas/<id>`: a linha dela, a Central da usina da Usinas 360° em leitura (a mesma conta,
-`torres.campo._central_da_usina(todas, usina_id)`), no desenho dela, e os insights vivos da usina. As janelas da Central
-(o dia a dia, a ronda, a PT, o relatório) são sub-rotas da Usinas 360°: o pé do prontuário leva até lá para quem tem
-acesso. A linha do tempo e o "Em três frases" do mockup não estão: o Nexus ainda não junta os eventos de todas as
-fontes numa linha só. O CSS da tela usa o prefixo `cmu-` (o `cu-` é da Central, no campo.css).
+`/t/comando/usinas/<id>` (a seção abaixo). O CSS da lista usa o prefixo `cmu-` (o `cu-` é da Central, no campo.css).
 
 Prova: `tests/test_comando_usinas.py` (as colunas, a fonte que falta sem 0, os insights vivos, a lista e o prontuário) e a
 renderização com o banco de produção, só leitura, pelo cliente de teste (138 usinas, prontuário sem erro).
+
+## O prontuário da usina (12/11/2026)
+
+**Para que serve.** Levi: "A ideia do prontuário da UFV é juntar todas as informações daquela usina para que o
+supervisor/gestor fique ciente do que está acontecendo na UFV como métricas, pendências, insights e etc. Deixe forma
+visual agradável e direta!". É UMA página com duas portas: o clique na usina em Comando > Usinas
+(`/t/comando/usinas/<id>`) e a aba "Prontuário da usina" da Usinas 360° > Visão do responsável (`modo=usina`), que era a
+Central da usina e foi substituída por ela ("essa visão irá substituir a central da usina, a central da usina! Também
+deve ser possível criar OS para a UFV, criar ticket!").
+
+**A forma, e o caso que criou cada regra.** A 1ª versão vinha com tudo aberto (4.775 px) e o Levi cortou: "quanto mais
+direto formos, melhor [...] a ideia não é essa página ser uma caixa de texto infinita [...] Primeiramente, dando um
+parecer geral, e quando a pessoa quiser se aprofundar, se aprofunda [...] Sejamos assertivos". A 2ª, enxuta, ele aprovou
+e pediu o visual: "ficou legal essa parte mais enxuta. Mas eu creio que dá para colocar um pouquinho mais de números
+[...] Pelo menos os KPIs principais de performance, meta, OS, pendências [...] e deixar de uma forma mais visual. Então,
+o visual na frente, o que está mais importante na frente, e ali aprofundando abaixo [...] mesmo dando drill down, a
+informação direta ali na lata [...] E aí a pessoa consiga também clicar e já se encaminhando para aquela informação.
+Aquela informação aparecer na tela dela". Por isso a página é, de cima para baixo:
+1. **O cabeçalho**: o nome, o estado de agora (o do COS), a ficha numa linha, as pessoas e as ações (Criar OS, Criar
+   ticket, Relatório, Conversa).
+2. **O parecer numa linha** (`prontuario.parecer`): "Pede ação agora" havendo um ponto crítico, "Pede acompanhamento"
+   havendo outro, "Em dia" sem nenhum; a frase conta os pontos e diz o principal. Não é opinião: é a contagem do que as
+   telas donas apontam.
+3. **O painel, o visual na frente** (`prontuario.painel`), três blocos numa superfície só: a **Performance do mês** em
+   medidores (a meta, o PR e a disponibilidade: o número e a cor da Visão do responsável, a barra contra a marca de cada
+   um — a meta em 100% numa escala até 120%, o PR previsto, os 99% da régua da disponibilidade —, o que explica o número
+   e o mês anterior) e a geração de cada dia do mês em barras contra a meta do dia; as **OS** (as abertas repartidas
+   pelo estado no Fracttal, num tom só, porque estado de OS não é semáforo; as tarefas atrasadas, as pausadas, as que
+   vencem até amanhã, a semana passada do plano e, havendo, a parada de agora); e as **Pendências** (a contagem, as 4
+   mais graves e o resto abrindo na tela; embaixo, o que está em dia).
+4. **A faixa do resto**: última ronda, sujidade e vegetação (1 a 5, em casas), chamados, segurança, COS e insights.
+5. **Um cartão FECHADO por assunto**, com o estado dele numa linha (`prontuario.resumos`): Performance, OS e
+   manutenção, Rondas e zeladoria, Segurança do trabalho, COS, Chamados e garantias, Insights do Nexus, Demandas e
+   conversa. Cada número do painel, cada casa da faixa e cada pendência abrem o cartão deles e fecham os outros
+   (`static/comando/prontuario.js`; o endereço com `#pu-<cartão>` também). Dentro, a informação direta: a Performance
+   abre pelo gráfico do mês e o mês a mês (com a barra do atingimento), sem repetir o painel; as OS, pelo que pede ação
+   (`prontuario.os_grupos`: as atrasadas com os dias e o tipo, as pausadas com o motivo, e as OS de cada estado pelo
+   número), cada OS abrindo o card dela por cima.
+6. **A linha do tempo** (30 dias, por dia, com filtro por fonte) **e a composição** (a ficha do cadastro e a estrutura
+   do Nexus), fechadas, na largura inteira.
+Um nível de superfície; a cor só carrega estado (o ponto, não a faixa lateral).
+
+**De onde vem cada dado (nada se inventa; a fonte que não abre fica de fora com o aviso).** A conta é pura
+(`nexus/comando/prontuario.py`, o cabeçalho dele lista parte a parte); quem lê é
+`torres/comando/prontuario_dados.py`: a linha da lista do Comando (`_usinas_montadas`) e a Central da usina
+(`torres.campo._central_da_usina`, a conta da Usinas 360°) dão o estado, a linha da Visão do responsável e as pessoas;
+o que vem do banco para TODAS as usinas (o mês a mês da meta e da disponibilidade, as normalizações do COS, a zeladoria
+semanal, as tarefas das OS abertas, os chamados, os nomes dos equipamentos e a estrutura) é lido uma vez e guardado na
+cópia de 5 min do Campo (`visao._ler`, a chave `comando_prontuarios`): a 1ª abertura fria leva uns 6 s, as seguintes
+0,1 s. As OS de cada estado vêm da tela dona: `campo/manutencao.tarefas_por_usina` passou a dar as listas
+(`os_verificacao`, `os_em_execucao`, `os_nao_iniciadas`) além das contagens, pela MESMA regra (a contagem é o tamanho
+da lista). Nada aqui lê o Fracttal.
+
+**As ações.** Criar OS = o OS Creator tradicional com a usina escolhida (`/os/tradicional?ativo=<código do ativo da
+usina>`). Criar ticket = os planos do setor Performance do OS Creator (`/os/performance/criar?frase=&usina=<o nome no
+Fracttal>`), em que a OS nasce com o ticket da ocorrência; a lista (`prontuario_dados.PLANOS_TICKET`) é CÓPIA do
+`PLANOS` de `os_creator/os_web/perf_web.py` (o clone não se importa do Nexus) e o teste acusa se divergirem. **Esta foi
+a leitura do "criar ticket" do Levi; se ele quis o chamado de garantia, é outra ação a ligar.** Relatório = o PDF do
+cliente da Usinas 360° (`campo/relatorio_usina.py`), também pelo endereço do Comando
+(`/t/comando/usinas/<id>/relatorio.pdf`, que chama a rota de lá), para quem tem o Comando e não a Visão do responsável.
+A janela pergunta o mês e **o que entra** (Levi: "eu quero o relatório de forma profissional, que dê para editar os
+campos que eu quero que apareça"): cada tema com os campos dele, todos marcados (a regra está em
+`nexus/torres/campo/CLAUDE.md`, "Os campos do relatório").
+
+**O que muda entre as duas portas** (`comando/_prontuario.html`, o `pu_na_aba`): na aba da Usinas 360° a página usa a
+janela daquela tela (`cr-modal`, o `data-cr-painel`): o dia a dia da meta, do PR e da disponibilidade, os extintores e a
+**decisão da PT** abrem por cima; no Comando, a PT esperando o De acordo leva à aba. O título é `h2` na aba (a tela já
+tem o `h1`). O card da OS (`oscreator/card_os_abrir.html`) vem de quem inclui, uma vez só.
+
+**O que a pessoa sem a tela não vê** (`prontuario_dados._pode`, a régua do portão, `setor_telas.pode`): sem tela do OS
+Creator, sem o Criar OS e o Criar ticket; sem tela do Comando, sem a conversa; o "abrir" do pé de cada cartão só aparece
+para quem abre a tela dele. As demandas são só as que a pessoa pode ver.
+
+**O que o Nexus ainda NÃO tem, e por isso não está na página** (pedidos do mockup da Ana Barros, 12/11/2026): o
+responsável de performance por usina; a saúde das strings e o PR por inversor (a geração por inversor está no banco, mas
+nenhuma tela a lê; as correntes das strings só existem na moldura da plataforma); as OS concluídas em geral (o banco só
+tem as abertas; as concluídas estão no Histórico de OS do OS Creator); as características da UFV (pediria um livro
+novo no cadastro). Entram quando a fonte existir, cada uma pela tela dona.
+
+**Prova.** `tests/test_comando_prontuario.py` (a conta do parecer, do painel e do cartão das OS; as OS de cada estado na
+tela dona; os planos iguais aos do OS Creator; a página nas duas portas, o relatório pelo Comando e o que a pessoa sem a
+tela não vê), `tests/test_campo_central_usina_0411.py` (a aba) e `tests/test_comando_usinas.py`. E a renderização com o
+banco de produção, só leitura, pelo cliente de teste (12/11/2026: a Mandaguaçu com 55% da meta, PR 54,6% contra 73,2%,
+disponibilidade 58,2%, 41 OS abertas = 8 não iniciadas + 2 em execução + 31 em verificação, 40 tarefas atrasadas em 9
+OS; a Crateús 1 com 18% da meta; os mesmos números da Visão do responsável; tema escuro e claro; a página fechada com
+1.463 px a 1.440 de largura).
 
 ## As demandas entre setores (12/11/2026)
 
@@ -244,7 +330,7 @@ recebe, quem pediu, o colega e quem não tem nada a ver; a Nova demanda pela tel
 o sininho).
 
 ## O visual
-**A ordem da Caixa de entrada (Levi, 13/11/2026):** o título só (sem a pergunta da tela e sem o "todas as torres · conta das HH:MM", "inútil"); os números dos insights no alto, como KPI, antes das demandas ("não faz sentido ter criar demanda de setores e depois seus insights"), cada número leva à sua lista; o **Sem dono vem recolhido**, só com o contador ("senão a rolagem é infinita"), e abre pelo número do alto, pelo clique ou pelo endereço de um insight dele (`insights.js`); o botão "Temas do meu setor" ao lado da Nova demanda ("eu não achei um de cadastro os temas").
+**A ordem da Caixa de entrada (Levi, 12/11/2026):** o título só (sem a pergunta da tela e sem o "todas as torres · conta das HH:MM", "inútil"); os números dos insights no alto, como KPI, antes das demandas ("não faz sentido ter criar demanda de setores e depois seus insights"), cada número leva à sua lista; o **Sem dono vem recolhido**, só com o contador ("senão a rolagem é infinita"), e abre pelo número do alto, pelo clique ou pelo endereço de um insight dele (`insights.js`); o botão "Temas do meu setor" ao lado da Nova demanda ("eu não achei um de cadastro os temas").
 
 Uma lista numa superfície só, uma linha por insight que abre ao clicar (Levi: "não sou muito fã dessa barra lateral em
 vermelho, temos muito dela... poderia fazer algo diferente?"): a gravidade é um selo (ponto + palavra), sem faixa nem

@@ -225,7 +225,7 @@ def test_a_caixa_so_mostra_as_torres_do_setor(app, banco, limpo, motor_dublado, 
 
 
 def test_a_caixa_numeros_no_alto_e_sem_dono_recolhido(app, banco, limpo, motor_dublado, monkeypatch):
-    """Levi, 13/11/2026: o cabeçalho sem a pergunta e sem o "todas as torres · conta das HH:MM" ("inútil"); "joga os
+    """Levi, 12/11/2026: o cabeçalho sem a pergunta e sem o "todas as torres · conta das HH:MM" ("inútil"); "joga os
     insights para cima como KPI" (antes das demandas); o Sem dono recolhido, "só fica o contador. Porque senão a rolagem é
     infinita"; e o lugar dos temas à vista ("eu não achei um de cadastro os temas")."""
     monkeypatch.setattr(MO, "torres_da_pessoa", lambda: None)

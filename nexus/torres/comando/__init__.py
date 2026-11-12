@@ -259,22 +259,23 @@ def usinas():
 def usina(usina_id):
     """O prontuário da usina no Comando (11/11/2026, Levi: o clique na usina "No próprio Comando", como o prontuário do
     mockup): a linha dela na lista, a Central da usina (a mesma conta da Usinas 360°, `_central_da_usina`) em leitura e
-    os insights do Nexus que estão vivos nela. Sem a linha do tempo e o resumo em três frases do mockup (o Nexus ainda
-    não junta os eventos de todas as fontes numa linha só)."""
-    from ...campo import responsaveis as campo_resp
-    from ...campo import visao
-    from ...campo.manutencao import LIMITE_PADRAO
-    from ..campo import _central_da_usina, _iniciais
-    m = _usinas_montadas()
-    x = next((l for l in m["linhas"] if l["usina_id"] == usina_id), None)
-    if x is None:
+    os insights do Nexus que estão vivos nela. Desde 12/11/2026 (Levi: "juntar todas as informações daquela usina [...]
+    métricas, pendências, insights e etc. Deixe forma visual agradável e direta!") junta também o resumo do que pede
+    atenção, o mês a mês, o histórico do COS, a zeladoria semanal, as rondas, os equipamentos com OS aberta, os chamados,
+    a segurança, as demandas, a composição da ficha e a linha do tempo (`prontuario_dados.montar`)."""
+    from .prontuario_dados import contexto as _prontuario
+    ctx = _prontuario(usina_id, rel_url=f"/t/comando/usinas/{usina_id}/relatorio.pdf")
+    if ctx is None:
         abort(404)
-    todas = campo_resp.com_manutencao(m["visao"].get("usinas") or [], LIMITE_PADRAO)
-    cu = _central_da_usina(todas, usina_id)
-    vivos = sorted(m["vivos"].get(usina_id) or [], key=lambda i: (RG.ORDEM_SEV.get(i.get("sev"), 9), i.get("titulo") or ""))
-    return render_template("comando/usina.html", torre=TORRE, tela=TORRE.tela("usinas"), x=x, cu=cu, insights=vivos, severidades=RG.SEVERIDADES,
-                           regras=RG.REGRAS, avisos=m["avisos"], iniciais=_iniciais,
-                           sem_responsavel=visao.SEM_RESPONSAVEL)
+    return render_template("comando/usina.html", torre=TORRE, tela=TORRE.tela("usinas"), **ctx)
+
+
+@bp.route("/usinas/<int:usina_id>/relatorio.pdf")
+def usina_relatorio(usina_id):
+    """O relatório da usina em PDF (o do cliente, `campo/relatorio_usina.py`) pelo endereço do Comando: a mesma conta da
+    Usinas 360° (`responsaveis_usina_relatorio`), para quem tem o Comando > Usinas e não a Visão do responsável."""
+    from ..campo import responsaveis_usina_relatorio
+    return responsaveis_usina_relatorio(usina_id)
 
 
 @bp.route("/caixa-de-entrada")
