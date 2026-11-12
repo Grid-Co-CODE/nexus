@@ -1,0 +1,46 @@
+/* static/cos/monitoramento.css — o Monitoramento por usina (12/11/2026): um cartão por usina com o kW, a
+   situação e a curva do dia, agrupados por cliente, e a "Atenção agora" em cima. Só tokens do Nexus (claro e escuro). */
+.cos-mon-sec{display:flex;align-items:baseline;flex-wrap:wrap;gap:4px 12px;margin:22px 0 10px;font-size:15px;font-weight:600}
+.cos-mon-sec b{font-variant-numeric:tabular-nums}
+.cos-mon-sec .det{font-size:12px;font-weight:400;color:var(--mudo)}
+.cos-mon-grade{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px}
+
+.cos-mon-u{position:relative;display:flex;flex-direction:column;gap:4px;min-width:0;padding:12px 12px 10px;border-radius:12px;
+  background:var(--superficie);border:1px solid var(--linha);transition:border-color .15s,box-shadow .15s}
+/* só é botão quando abre os inversores (o Nexus com o endereço da API da Ronda COS) */
+.cos-mon-u[role=button]{cursor:pointer}
+.cos-mon-u[role=button]:hover,.cos-mon-u[role=button]:focus-visible{border-color:var(--verde);outline:none}
+.cos-mon-u-cab{display:flex;justify-content:space-between;align-items:baseline;gap:8px;min-width:0}
+.cos-mon-u-cab .n{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;font-weight:600}
+.cos-mon-u-cab .kw{flex:none;font-size:18px;font-weight:600}
+.cos-mon-u .st{font-size:12px;color:var(--tinta-2)}
+.cos-mon-u .cos-curva{display:block;width:100%;height:58px;margin-top:4px}
+.cos-mon-u .det{font-size:11px;color:var(--mudo)}
+.cos-mon-semcurva{display:flex;align-items:center;height:58px;margin-top:4px}
+.cos-mon-u-pe{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-top:2px}
+.cos-mon-u-pe .cos-usina-link{font-size:11px}
+
+/* a anormal ganha cor E palavra (a regra das salas de controle, a mesma do videowall) */
+.cos-mon-u--parada{border-color:var(--critico);background:var(--critico-suave)}
+.cos-mon-u--semcom{border-color:var(--alerta);background:var(--alerta-suave)}
+.cos-mon-u--velha{border-style:dashed;border-color:var(--linha-forte)}
+.cos-mon-u .st--parada{color:var(--critico);font-weight:600}
+.cos-mon-u .st--semcom{color:var(--alerta);font-weight:600}
+.cos-mon-u .st--velha{color:var(--mudo);font-weight:600}
+
+/* a Atenção agora: uma linha por usina anormal, clicável como o cartão */
+.cos-mon-atencao{margin-top:8px}
+.cos-mon-at{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:8px}
+.cos-mon-at-i{display:grid;grid-template-columns:1fr auto;gap:2px 10px;align-items:baseline;padding:8px 12px;border-radius:10px;
+  border:1px solid var(--linha);border-left:4px solid var(--linha-forte);background:var(--superficie)}
+.cos-mon-at-i[role=button]{cursor:pointer}
+.cos-mon-at-i[role=button]:hover,.cos-mon-at-i[role=button]:focus-visible{border-color:var(--verde);outline:none}
+.cos-mon-at-i .n{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px}
+.cos-mon-at-i .kw{font-weight:600}
+.cos-mon-at-i .st,.cos-mon-at-i .det{font-size:12px}
+.cos-mon-at-i .det{color:var(--mudo);text-align:right}
+.cos-mon-at-i--parada{border-left-color:var(--critico)}
+.cos-mon-at-i--parada .st{color:var(--critico);font-weight:600}
+.cos-mon-at-i--semcom{border-left-color:var(--alerta)}
+.cos-mon-at-i--semcom .st{color:var(--alerta);font-weight:600}
+.cos-mon-at-i--velha .st{color:var(--mudo);font-weight:600}

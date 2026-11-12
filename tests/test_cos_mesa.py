@@ -185,7 +185,9 @@ def test_a_fonte_desligada(app, logado):
 
 
 def test_a_mesa_vem_logo_depois_do_acompanhamento():
-    """O cartão do COS no Início leva à 1ª tela pronta, e o Acompanhamento continua sendo ela."""
+    """O cartão do COS no Início leva à 1ª tela pronta, e o Acompanhamento continua sendo ela. Desde 12/11/2026 (a
+    reorganização do COS pelo dono) a Mesa e o Desempenho vão para os indicadores, juntas, depois da Ocorrências."""
     from nexus.torres.cos import TORRE
     ids = [t.id for t in TORRE.telas]
-    assert ids[:3] == ["acompanhamento", "mesa", "desempenho"]
+    assert ids[0] == "acompanhamento"
+    assert ids.index("mesa") == ids.index("normalizacoes") + 1 and ids.index("desempenho") == ids.index("mesa") + 1

@@ -32,6 +32,14 @@ GRUPOS = {
 }
 # A parada e a sem comunicação primeiro: o operador olha o que caiu antes do que gera.
 _ORDEM_DO_GRUPO = {"parada": 0, "sem_comunicacao": 1, "outras": 2, "gerando": 3}
+# As usinas com logger que a Ronda COS não liga a cliente nenhum: no catálogo do SCADA dela (scada.ponte.ts) estão com
+# `usina_code: null`, sem usina no cadastro por serem da operação assistida, e o Andamento não chuta cliente. Saíam no
+# grupo "(sem cliente)" com 3,2 MW. O dono, 12/11/2026: "é THOPEN - Operação Assistida" (na Plataforma de Performance a
+# Nova Iguaçu e a Areia Branca são das assistidas da Thopen, `disp_comentarios.ASSISTIDAS`). Pelo id do cartão, que é o
+# do catálogo e não muda. ⚠ O certo é a Ronda COS mandar o cliente; quando mandar, o dela vale e isto não é usado.
+CLIENTE_DA_ASSISTIDA = "Thopen - Operação Assistida"
+CLIENTE_SEM_CADASTRO = {"scada-noig": CLIENTE_DA_ASSISTIDA, "scada-noigb": CLIENTE_DA_ASSISTIDA,      # Nova Iguaçu 2.1 e 2.2
+                        "scada-arbr": CLIENTE_DA_ASSISTIDA, "scada-arbrb": CLIENTE_DA_ASSISTIDA}      # Areia Branca 1.1 e 1.2
 BUSCA_MAX = 80
 
 # A janela da curva: o dia solar. Fora dela não há amostra (o coletor não grava das 19h às 4h, `scada_amostra`); as
@@ -117,7 +125,7 @@ def _linha(u: dict, c: Curva | None, agora: datetime) -> dict:
         "codigo": u.get("usina_codigo") or "",
         "nome": str(u.get("nome") or u.get("id") or ""),
         "sub_usina": u.get("sub_usina"),
-        "cliente": u.get("cliente") or "",
+        "cliente": u.get("cliente") or CLIENTE_SEM_CADASTRO.get(str(u.get("id") or "").lower(), ""),
         "kw": u.get("kw"),
         "kw_txt": kw_txt(u.get("kw")),
         "inversores_online": u.get("inversores_online"),
@@ -232,3 +240,24 @@ def parede(p: Painel) -> dict:
     atencao = sorted((x for x in p.itens if anormal(x)),
                      key=lambda x: (_ORDEM_DA_ATENCAO[anormal(x)], -(x["minutos_atras"] or 0), x["nome"].lower()))
     return {"clientes": clientes, "atencao": atencao}
+
+
+def abertas_de_inversor(fotografias) -> dict:
+    """{código da usina: [[equipamento, tipo, OS, desde (AAAA-MM-DD)]]}: as ocorrências abertas que citam um INVERSOR
+    (desligamento ou offline de inversor, ou um equipamento "Inversor ..."), pelas fotografias do Andamento (a mesma
+    leitura da Ronda padronizada). A janela dos inversores do Monitoramento (12/11/2026) marca "aberto no COS" no inversor
+    que tem ocorrência, para o operador não abrir outra. A OS "R-..." é o registro curto da ocorrência sem OS: vai vazia."""
+    out: dict = {}
+    for foto in fotografias or ():
+        for u in (foto or {}).get("usinas") or []:
+            for o in u.get("ocorrencias") or []:
+                tipo = str(o.get("tipo_falha") or "")
+                equip = [str(e) for e in o.get("equipamentos") or []]
+                de_inversor = tipo.lower().startswith(("desligamento de inversor", "inversor offline"))
+                if not u.get("codigo") or (not de_inversor and not any(e.lower().startswith("inversor") for e in equip)):
+                    continue
+                os_ = str(o.get("os") or "")
+                out.setdefault(u["codigo"], []).append(
+                    [", ".join(equip) or "inversor", tipo, "" if os_.startswith("R-") else os_,
+                     str(o.get("abertura") or "")[:10]])
+    return out

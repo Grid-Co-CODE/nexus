@@ -1,0 +1,77 @@
+/* static/cos/inversores.css — a janela dos inversores do Monitoramento (12/11/2026). Só tokens do Nexus: segue o tema claro/escuro. */
+.cos-inv-dlg{width:min(1240px,96vw);max-height:94vh;padding:0;border:1px solid var(--linha-forte);border-radius:14px;
+  background:var(--superficie);color:var(--tinta);overflow:auto;font:400 14px/1.45 var(--font-sans)}
+.cos-inv-dlg::backdrop{background:rgba(0,0,0,.6)}
+.cos-inv-topo{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;padding:16px 22px;
+  border-bottom:1px solid var(--linha);position:sticky;top:0;background:var(--superficie);z-index:2}
+.cos-inv-topo h2{margin:0;font-size:20px;font-weight:600}
+.cos-inv-sub{color:var(--mudo);font-size:13px}
+.cos-inv-topo-dir{display:flex;align-items:center;gap:12px}
+.cos-inv-lido{color:var(--mudo);font-size:12px;font-variant-numeric:tabular-nums}
+.cos-inv-corpo{padding:16px 22px 24px;transition:opacity .2s}
+.cos-inv-corpo.lendo{opacity:.55}
+.cos-inv-resumo{display:flex;flex-wrap:wrap;gap:8px 22px;align-items:baseline;margin-bottom:12px}
+.cos-inv-resumo .kw{font-size:28px;font-weight:600;font-variant-numeric:tabular-nums}
+.cos-inv-resumo .d{color:var(--tinta-2)}
+.cos-inv-estados{display:flex;flex-wrap:wrap;gap:6px}
+.cos-inv-cos{margin:0 0 14px;padding:8px 12px;border-left:3px solid var(--critico);background:var(--critico-suave);
+  border-radius:0 8px 8px 0;font-size:13px}
+.cos-inv-bloco{margin:0 0 18px}
+.cos-inv-bloco-cab{display:flex;justify-content:space-between;align-items:baseline;gap:12px;margin-bottom:6px}
+.cos-inv-bloco-cab h3{margin:0;font-size:14px;font-weight:600}
+.cos-inv-bloco-cab .d{color:var(--mudo);font-size:12px}
+.cos-inv-graf{position:relative}
+.cos-inv-graf svg{display:block;width:100%;overflow:visible}
+.cos-inv-grade{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px}
+.cos-inv-i{border:1px solid var(--linha);border-radius:12px;padding:10px 12px 8px;background:var(--superficie-2);
+  display:flex;flex-direction:column;gap:6px}
+.cos-inv-i--fora{border:2px solid var(--critico)}
+.cos-inv-i--semcom{border:2px solid var(--alerta)}
+.cos-inv-i-cab{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.cos-inv-i-cab b{font-size:13px;font-weight:600}
+.cos-inv-i-kw{font-size:15px;font-weight:600;font-variant-numeric:tabular-nums}
+.cos-inv-i-kw small{font-weight:400;color:var(--mudo);font-size:11px;margin-left:4px}
+.cos-inv-estado{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--tinta-2)}
+.cos-inv-motivo{font-size:12px;color:var(--tinta-2)}
+.cos-inv-aviso{padding:12px 14px;border:1px dashed var(--alerta);background:var(--alerta-suave);border-radius:8px}
+.cos-inv-tabela{margin-top:16px}
+.cos-inv-tabela table{width:100%;border-collapse:collapse;font-size:13px}
+.cos-inv-tabela th,.cos-inv-tabela td{padding:6px 8px;border-bottom:1px solid var(--linha);text-align:left}
+.cos-inv-tabela td.n{text-align:right;font-variant-numeric:tabular-nums}
+/* o gráfico */
+.pg-grade line{stroke:var(--linha);stroke-width:1;shape-rendering:crispEdges}
+.pg-base{stroke:var(--linha-forte);stroke-width:1;shape-rendering:crispEdges}
+.pg-eixo text{fill:var(--mudo);font:400 11px var(--font-sans);font-variant-numeric:tabular-nums}
+.pg-area{fill:var(--verde-texto);fill-opacity:.12}
+.pg-linha{fill:none;stroke:var(--verde-texto);stroke-width:2;stroke-linejoin:round;stroke-linecap:round}
+.pg--fora .pg-area{fill:var(--critico)} .pg--fora .pg-linha{stroke:var(--critico)}
+.pg--semcom .pg-area{fill:var(--alerta)} .pg--semcom .pg-linha{stroke:var(--alerta)}
+.pg-fim{fill:var(--verde-texto);stroke:var(--superficie);stroke-width:2}
+.pg--fora .pg-fim{fill:var(--critico)} .pg--semcom .pg-fim{fill:var(--alerta)}
+.pg-fim-rot{fill:var(--tinta);font:600 12px var(--font-sans);font-variant-numeric:tabular-nums}
+.pg-agora{stroke:var(--mudo);stroke-width:1;stroke-dasharray:none;opacity:.5}
+.pg-cruz{stroke:var(--tinta-2);stroke-width:1;pointer-events:none}
+.pg-cruz-ponto{fill:var(--tinta);stroke:var(--superficie);stroke-width:2;pointer-events:none}
+.pg-alvo{fill:transparent;cursor:crosshair}
+.cos-inv-dica{position:fixed;z-index:9999;pointer-events:none;padding:6px 10px;border-radius:8px;background:var(--superficie-3);
+  border:1px solid var(--linha-forte);color:var(--tinta);font:400 12px var(--font-sans);box-shadow:0 4px 16px var(--sombra);white-space:nowrap}
+.cos-inv-dica b{font-size:14px;font-variant-numeric:tabular-nums}
+.cos-inv-dica span{color:var(--mudo);margin-left:6px}
+.cos-inv-nota{position:fixed;left:12px;bottom:56px;z-index:5;padding:6px 10px;border-radius:8px;font-size:12px;
+  background:var(--alerta-suave);border:1px dashed var(--alerta);color:var(--tinta)}
+.cos-inv-nota a{color:inherit}
+/* a ponta ao vivo: o halo que respira no último ponto, como o "ponto ao vivo" da Ronda COS */
+.pg-halo{fill:var(--verde-texto);opacity:.25;transform-box:fill-box;transform-origin:center;animation:pg-respira 2s ease-in-out infinite}
+.pg--fora .pg-halo{fill:var(--critico)} .pg--semcom .pg-halo{fill:var(--alerta)}
+@keyframes pg-respira{0%,100%{transform:scale(.6);opacity:.35}50%{transform:scale(1.25);opacity:.1}}
+@media (prefers-reduced-motion:reduce){.pg-halo{animation:none}}
+
+/* o estado ao vivo nos cartões das duas telas (inversores.js) */
+.cos-mon-u.cos-inv--fora,.cos-tv-u.cos-inv--fora{box-shadow:inset 0 0 0 2px var(--critico)}
+.cos-mon-u.cos-inv--semcom,.cos-tv-u.cos-inv--semcom{box-shadow:inset 0 0 0 2px var(--alerta)}
+.st.st--inv{color:var(--critico);font-weight:600}
+.st.st--semresp{color:var(--alerta);font-weight:600}
+.cos-tv-u[data-gid]{cursor:pointer}
+.cos-tv-u[data-gid]:hover,.cos-tv-u[data-gid]:focus-visible{outline:2px solid var(--verde);outline-offset:-2px}
+.cos-inv-vivo{font-size:12px;color:var(--mudo);font-variant-numeric:tabular-nums}
+.cos-inv-vivo--canto{position:fixed;right:12px;bottom:12px;z-index:5}

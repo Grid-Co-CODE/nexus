@@ -17,6 +17,18 @@ Nos testes, sem a chave na config do app, NÃO se vai à rede (o mesmo cuidado d
 
 A leitura não trava a tela: 5 s de teto por pedido, 30 s de cópia em memória por cliente (o Andamento lê a Ronda COS de
 minuto em minuto, e as duas telas recarregam sozinhas), e na falha a última cópia boa continua na tela, dita velha.
+
+**A TELA NÃO ESPERA A RONDA COS** (checkup do COS, 12/11/2026; o dono: "quero que seja a aba mais fluida do Nexus").
+Medido: o Nexus monta qualquer tela do COS em menos de 0,2 s com os dados em mãos; o que demora é esperar o Andamento,
+que oscila com a carga do servidor (a mesma leitura dos 30 dias da Thopen: 1,4 s ao meio-dia e 10,6 s às 10:19), e seis
+telas leem os clientes UM POR UM (a Mesa faz 14 leituras em fila). A cópia vencia em 20 a 60 s, e quem clicava depois
+esperava a leitura inteira. Agora (`_com_copia`):
+- **cópia vencida há pouco é servida NA HORA**, e a leitura nova sai por trás (até COPIA_MAX_S; depois disso, espera);
+- **um pedido só por leitura**: quem chega enquanto ela está no ar espera a mesma resposta (nada de dois pedidos iguais);
+- **os outros clientes saem juntos**: a primeira leitura fria de um cliente chama, por trás e em paralelo, a dos outros
+  (`_aquecer_irmaos`), e a fila da tela vira a espera da mais lenta, não a soma;
+- **ao subir**, `aquecer(config)` enche as cópias do COS por trás (o Nexus reinicia a cada push).
+Nos testes (TESTING), tudo segue síncrono e sem thread, como antes.
 """
 import hashlib
 import hmac
@@ -49,6 +61,14 @@ CLIENTES = "NEXUS_COS_ANDAMENTO_CLIENTES"
 _cache: dict[tuple[str, str], tuple[float, dict, float]] = {}
 _cache_clientes: dict[str, tuple[float, list[str]]] = {}
 _trava = threading.Lock()
+# A cópia vencida que ainda se serve na hora (renovando por trás). Passou disso, a tela espera a leitura: 15 min parados
+# na tela, sem aviso, seria mentir (o Andamento fora a esse ponto já aparece como erro na volta de trás).
+COPIA_MAX_S = 900
+_voando: dict[tuple[str, str], threading.Event] = {}      # a leitura no ar, por chave: quem chega espera ela
+_falha: dict[tuple[str, str], tuple[float, str]] = {}      # a última falha da leitura de trás, para a tela avisar
+_irmaos_em: dict[str, float] = {}                          # quando cada tipo chamou os outros clientes pela última vez
+IRMAOS_S = 20
+LEITURAS_JUNTAS = 4                                        # o servidor da Ronda COS é pequeno: no máximo 4 de uma vez
 
 
 class FonteErro(RuntimeError):
@@ -98,6 +118,16 @@ def _valor(config, chave: str) -> str:
     return str(ler_ambiente().get(chave) or "").strip()
 
 
+# O endereço da API da Ronda COS para o NAVEGADOR (12/11/2026, os inversores do Monitoramento ao vivo, lidos direto da
+# API com o login da pessoa): o HTTPS do servidor dela. Vazio, o que é ao vivo pelo navegador fica desligado. Para ligar
+# falta lá o CORS para o endereço do Nexus e o login pelo passe do Nexus.
+API_RONDA = "NEXUS_COS_API_URL"
+
+
+def api_da_ronda(config) -> str:
+    return _valor(config, API_RONDA).rstrip("/")
+
+
 def fonte(config) -> Fonte:
     return Fonte(
         url=_valor(config, URL).rstrip("/"),
@@ -137,6 +167,128 @@ def validar(d) -> dict:
     return d
 
 
+def _por_tras(config) -> bool:
+    """Ler por trás (thread) só fora dos testes: neles tudo é síncrono, determinístico e sem rede."""
+    return not config.get("TESTING")
+
+
+def _com_copia(config, chave: tuple, ttl: float, buscar, cliente: str = "") -> Leitura:
+    """A leitura com a cópia na frente (ver a explicação do módulo). `buscar()` devolve os dados validados ou levanta
+    FonteErro; ela roda sem o contexto do Flask (pode rodar numa thread)."""
+    agora = time.monotonic()
+    with _trava:
+        em_cache = _cache.get(chave)
+        voando = _voando.get(chave)
+        falha = _falha.get(chave)
+    if em_cache:
+        idade = agora - em_cache[0]
+        if idade < ttl:
+            return Leitura(cliente, em_cache[1], lido_em=em_cache[2])
+        if idade < COPIA_MAX_S and _por_tras(config):
+            if not voando:
+                _ler_por_tras(chave, buscar)
+            # a falha recente da leitura de trás aparece na tela (dita velha), sem esconder a cópia
+            if falha and falha[0] >= em_cache[0]:
+                return Leitura(cliente, em_cache[1], lido_em=em_cache[2], erro=falha[1], velha=True)
+            return Leitura(cliente, em_cache[1], lido_em=em_cache[2])
+    return _ler_agora(chave, buscar, cliente, em_cache)
+
+
+def _ler_agora(chave: tuple, buscar, cliente: str, em_cache) -> Leitura:
+    """A leitura que a tela espera, com um pedido só por chave: quem chega com ela no ar espera a mesma resposta."""
+    with _trava:
+        ev = _voando.get(chave)
+        dono = ev is None
+        if dono:
+            ev = _voando[chave] = threading.Event()
+    if not dono:
+        ev.wait(max(TIMEOUT_S, TIMEOUT_OCORRENCIAS_S, TIMEOUT_CURVAS_S) + 5)
+        with _trava:
+            c = _cache.get(chave)
+            falha = _falha.get(chave)
+        if c and (not em_cache or c[0] > em_cache[0]):
+            return Leitura(cliente, c[1], lido_em=c[2])
+        erro = falha[1] if falha else "o Andamento não respondeu a tempo"
+        return Leitura(cliente, c[1], lido_em=c[2], erro=erro, velha=True) if c else Leitura(cliente, None, erro=erro)
+    try:
+        dados = buscar()
+    except FonteErro as ex:
+        with _trava:
+            _falha[chave] = (time.monotonic(), str(ex))
+        if em_cache:
+            return Leitura(cliente, em_cache[1], lido_em=em_cache[2], erro=str(ex), velha=True)
+        return Leitura(cliente, None, erro=str(ex))
+    finally:
+        with _trava:
+            _voando.pop(chave, None)
+        ev.set()
+    with _trava:
+        _cache[chave] = (time.monotonic(), dados, time.time())
+        _falha.pop(chave, None)
+    return Leitura(cliente, dados, lido_em=time.time())
+
+
+def _ler_por_tras(chave: tuple, buscar) -> None:
+    def ler():
+        try:
+            _ler_agora(chave, buscar, "", None)
+        except Exception:                  # noqa: BLE001 — a leitura de trás nunca derruba nada; a tela segue com a cópia
+            pass
+    threading.Thread(target=ler, name="cos-copia", daemon=True).start()
+
+
+def _aquecer_irmaos(config, tipo: str, ler_um, cliente: str) -> None:
+    """A primeira leitura fria de um cliente chama, por trás, a dos outros clientes do mesmo tipo, LEITURAS_JUNTAS de cada
+    vez: a tela que lê os 7 clientes em fila encontra os outros já no ar (e espera junto) em vez de pedir um por um."""
+    if not _por_tras(config):
+        return
+    agora = time.monotonic()
+    with _trava:
+        if agora - _irmaos_em.get(tipo, -1e9) < IRMAOS_S:
+            return
+        _irmaos_em[tipo] = agora
+    lista, _erro = clientes(config)
+    outros = [c for c in lista if c != cliente]
+    if not outros:
+        return
+
+    def todos():
+        from concurrent.futures import ThreadPoolExecutor
+        with ThreadPoolExecutor(max_workers=LEITURAS_JUNTAS, thread_name_prefix="cos-irmaos") as ex:
+            list(ex.map(lambda c: _sem_erro(ler_um, c), outros))
+    threading.Thread(target=todos, name="cos-irmaos", daemon=True).start()
+
+
+def _sem_erro(f, *a):
+    try:
+        return f(*a)
+    except Exception:                      # noqa: BLE001
+        return None
+
+
+def _fria(chave: tuple) -> bool:
+    with _trava:
+        return chave not in _cache
+
+
+def aquecer(config) -> None:
+    """Enche, por trás, as cópias que as telas do COS leem (chamar ao subir o Nexus e na pré-carga). Os clientes saem
+    LEITURAS_JUNTAS de cada vez; nada disso segura a subida nem uma tela."""
+    if not _por_tras(config) or not fonte(config).ligada:
+        return
+
+    def tudo():
+        from concurrent.futures import ThreadPoolExecutor
+        lista, _erro = clientes(config)
+        tarefas = [lambda: ler_geracao(config), lambda: ler_curvas(config), lambda: ler_os_abertas(config),
+                   lambda: ler_carteiras(config)]
+        for c in lista:
+            tarefas += [lambda c=c: ler(config, c), lambda c=c: ler_ocorrencias(config, c, DIAS_PADRAO)]
+        with ThreadPoolExecutor(max_workers=LEITURAS_JUNTAS, thread_name_prefix="cos-aquecer") as ex:
+            list(ex.map(lambda t: _sem_erro(t), tarefas))
+    threading.Thread(target=tudo, name="cos-aquecer", daemon=True).start()
+
+
 def clientes(config) -> tuple[list[str], str]:
     """(clientes, erro). Os da configuração, ou a lista do Andamento."""
     f = fonte(config)
@@ -164,20 +316,10 @@ def ler(config, cliente: str) -> Leitura:
     if not f.ligada:
         return Leitura(cliente, None, erro="a fonte do Andamento não está ligada neste servidor")
     chave = (f.url, cliente)
-    agora = time.monotonic()
-    with _trava:
-        em_cache = _cache.get(chave)
-        if em_cache and agora - em_cache[0] < TTL_S:
-            return Leitura(cliente, em_cache[1], lido_em=em_cache[2])
-    try:
-        dados = validar(_pedir(f, "/api/nexus/" + urllib.parse.quote(cliente, safe="")))
-    except FonteErro as ex:
-        if em_cache:
-            return Leitura(cliente, em_cache[1], lido_em=em_cache[2], erro=str(ex), velha=True)
-        return Leitura(cliente, None, erro=str(ex))
-    with _trava:
-        _cache[chave] = (agora, dados, time.time())
-    return Leitura(cliente, dados, lido_em=time.time())
+    if _fria(chave):
+        _aquecer_irmaos(config, "fotografia", lambda c: ler(config, c), cliente)
+    return _com_copia(config, chave, TTL_S,
+                      lambda: validar(_pedir(f, "/api/nexus/" + urllib.parse.quote(cliente, safe=""))), cliente)
 
 
 # O que a tela Base → Chaves do Nexus aceita (nexus/auth/chaves.py chama `conferir_para_a_tela`).
@@ -257,21 +399,10 @@ def ler_ocorrencias(config, cliente: str, dias: int) -> Leitura:
         return Leitura(cliente, None, erro="a fonte do Andamento não está ligada neste servidor")
     dias = dias if dias in DIAS_DAS_OCORRENCIAS else DIAS_PADRAO
     chave = (f.url, f"{cliente}|ocorrencias|{dias}")
-    agora = time.monotonic()
-    with _trava:
-        em_cache = _cache.get(chave)
-        if em_cache and agora - em_cache[0] < TTL_OCORRENCIAS_S:
-            return Leitura(cliente, em_cache[1], lido_em=em_cache[2])
-    try:
-        dados = validar_ocorrencias(_pedir(f, f"/api/nexus/{urllib.parse.quote(cliente, safe='')}/ocorrencias?dias={dias}",
-                                           timeout=TIMEOUT_OCORRENCIAS_S))
-    except FonteErro as ex:
-        if em_cache:
-            return Leitura(cliente, em_cache[1], lido_em=em_cache[2], erro=str(ex), velha=True)
-        return Leitura(cliente, None, erro=str(ex))
-    with _trava:
-        _cache[chave] = (agora, dados, time.time())
-    return Leitura(cliente, dados, lido_em=time.time())
+    if _fria(chave):
+        _aquecer_irmaos(config, f"ocorrencias|{dias}", lambda c: ler_ocorrencias(config, c, dias), cliente)
+    return _com_copia(config, chave, TTL_OCORRENCIAS_S, lambda: validar_ocorrencias(_pedir(
+        f, f"/api/nexus/{urllib.parse.quote(cliente, safe='')}/ocorrencias?dias={dias}", timeout=TIMEOUT_OCORRENCIAS_S)), cliente)
 
 
 # A tela Acionamentos e distribuidoras (26/10/2026) lê a terceira rota, com contrato próprio: a UC de cada usina, o canal
@@ -299,20 +430,10 @@ def ler_distribuidoras(config, cliente: str) -> Leitura:
     if not f.ligada:
         return Leitura(cliente, None, erro="a fonte do Andamento não está ligada neste servidor")
     chave = (f.url, f"{cliente}|distribuidoras")
-    agora = time.monotonic()
-    with _trava:
-        em_cache = _cache.get(chave)
-        if em_cache and agora - em_cache[0] < TTL_DISTRIBUIDORAS_S:
-            return Leitura(cliente, em_cache[1], lido_em=em_cache[2])
-    try:
-        dados = validar_distribuidoras(_pedir(f, f"/api/nexus/{urllib.parse.quote(cliente, safe='')}/distribuidoras"))
-    except FonteErro as ex:
-        if em_cache:
-            return Leitura(cliente, em_cache[1], lido_em=em_cache[2], erro=str(ex), velha=True)
-        return Leitura(cliente, None, erro=str(ex))
-    with _trava:
-        _cache[chave] = (agora, dados, time.time())
-    return Leitura(cliente, dados, lido_em=time.time())
+    if _fria(chave):
+        _aquecer_irmaos(config, "distribuidoras", lambda c: ler_distribuidoras(config, c), cliente)
+    return _com_copia(config, chave, TTL_DISTRIBUIDORAS_S, lambda: validar_distribuidoras(
+        _pedir(f, f"/api/nexus/{urllib.parse.quote(cliente, safe='')}/distribuidoras")), cliente)
 
 
 # A tela OS em aberto (27/10/2026) lê a quarta rota, com contrato próprio: o Panorama da Ronda COS, de TODOS os clientes
@@ -338,27 +459,16 @@ def ler_os_abertas(config) -> Leitura:
     f = fonte(config)
     if not f.ligada:
         return Leitura("", None, erro="a fonte do Andamento não está ligada neste servidor")
-    chave = (f.url, "|os-abertas")
-    agora = time.monotonic()
-    with _trava:
-        em_cache = _cache.get(chave)
-        if em_cache and agora - em_cache[0] < TTL_OS_ABERTAS_S:
-            return Leitura("", em_cache[1], lido_em=em_cache[2])
-    try:
+
+    def buscar():
         try:
-            dados = validar_os_abertas(_pedir(f, "/api/nexus/os-abertas"))
+            return validar_os_abertas(_pedir(f, "/api/nexus/os-abertas"))
         except FonteErro as ex:
             if ex.codigo == 404:
                 raise FonteErro("o Andamento ainda não tem a rota das OS abertas, ou a rota do Nexus está desligada lá",
                                 404) from None
             raise
-    except FonteErro as ex:
-        if em_cache:
-            return Leitura("", em_cache[1], lido_em=em_cache[2], erro=str(ex), velha=True)
-        return Leitura("", None, erro=str(ex))
-    with _trava:
-        _cache[chave] = (agora, dados, time.time())
-    return Leitura("", dados, lido_em=time.time())
+    return _com_copia(config, (f.url, "|os-abertas"), TTL_OS_ABERTAS_S, buscar)
 
 
 # A Mesa do operador e o Desempenho da equipe (05/11/2026) leem a quinta rota: a carteira de cada operador da Ronda COS (a
@@ -391,27 +501,16 @@ def ler_carteiras(config) -> Leitura:
     f = fonte(config)
     if not f.ligada:
         return Leitura("", None, erro="a fonte do Andamento não está ligada neste servidor")
-    chave = (f.url, "|carteiras")
-    agora = time.monotonic()
-    with _trava:
-        em_cache = _cache.get(chave)
-        if em_cache and agora - em_cache[0] < TTL_CARTEIRAS_S:
-            return Leitura("", em_cache[1], lido_em=em_cache[2])
-    try:
+
+    def buscar():
         try:
-            dados = validar_carteiras(_pedir(f, "/api/nexus/carteiras"))
+            return validar_carteiras(_pedir(f, "/api/nexus/carteiras"))
         except FonteErro as ex:
             if ex.codigo == 404:
                 raise FonteErro("o Andamento ainda não tem a rota das carteiras, ou a rota do Nexus está desligada lá",
                                 404) from None
             raise
-    except FonteErro as ex:
-        if em_cache:
-            return Leitura("", em_cache[1], lido_em=em_cache[2], erro=str(ex), velha=True)
-        return Leitura("", None, erro=str(ex))
-    with _trava:
-        _cache[chave] = (agora, dados, time.time())
-    return Leitura("", dados, lido_em=time.time())
+    return _com_copia(config, (f.url, "|carteiras"), TTL_CARTEIRAS_S, buscar)
 
 
 # A geração ao vivo (09/11/2026, a aba Monitoramento): o kW de agora e a curva do dia das usinas com logger (SCADA Grid) e
@@ -451,15 +550,10 @@ def _ler_geracao(config, nome: str, caminho: str, validar, ttl: int, timeout: fl
     f = fonte(config)
     if not f.ligada:
         return Leitura("", None, erro="a fonte do Andamento não está ligada neste servidor")
-    chave = (f.url, "|" + nome)
-    agora = time.monotonic()
-    with _trava:
-        em_cache = _cache.get(chave)
-        if em_cache and agora - em_cache[0] < ttl:
-            return Leitura("", em_cache[1], lido_em=em_cache[2])
-    try:
+
+    def buscar():
         try:
-            dados = validar(_pedir(f, caminho, timeout=timeout))
+            return validar(_pedir(f, caminho, timeout=timeout))
         except FonteErro as ex:
             if ex.codigo == 404:
                 raise FonteErro("o Andamento ainda não tem a rota da geração, ou a rota do Nexus está desligada lá",
@@ -467,13 +561,7 @@ def _ler_geracao(config, nome: str, caminho: str, validar, ttl: int, timeout: fl
             if ex.codigo == 503:
                 raise FonteErro("a API da Ronda COS não respondeu ao Andamento", 503) from None
             raise
-    except FonteErro as ex:
-        if em_cache:
-            return Leitura("", em_cache[1], lido_em=em_cache[2], erro=str(ex), velha=True)
-        return Leitura("", None, erro=str(ex))
-    with _trava:
-        _cache[chave] = (agora, dados, time.time())
-    return Leitura("", dados, lido_em=time.time())
+    return _com_copia(config, (f.url, "|" + nome), ttl, buscar)
 
 
 def ler_geracao(config) -> Leitura:
@@ -492,6 +580,8 @@ def limpar_cache() -> None:
     with _trava:
         _cache.clear()
         _cache_clientes.clear()
+        _falha.clear()
+        _irmaos_em.clear()
 
 
 # ----------------------------------------------------------------------------------------------------------------------

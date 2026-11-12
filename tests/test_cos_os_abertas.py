@@ -181,10 +181,11 @@ def test_a_tela_sem_fonte_e_com_o_andamento_antigo(ligada, app, logado, monkeypa
     assert "não está ligada neste servidor" in logado.get("/t/cos/os-abertas").get_data(as_text=True)
 
 
-def test_a_tela_vem_depois_da_passagem_de_turno():
+def test_a_tela_abre_por_dentro_da_ocorrencias():
+    """12/11/2026 (a reorganização do COS pelo dono): sai do menu; o item da Ocorrências acende com ela aberta, e quem a
+    tinha marcada em Base → Acessos continua vendo (`dentro_de`)."""
     from nexus.torres.cos import TORRE
-    ids = [t.id for t in TORRE.telas]
-    assert ids.index("os-abertas") == ids.index("turno") + 1
+    assert TORRE.tela("os-abertas").dentro_de == "normalizacoes"
 
 
 def test_nao_ha_nome_de_pessoa_na_tela(ligada, logado, monkeypatch):

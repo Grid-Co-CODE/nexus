@@ -13,6 +13,13 @@ de novo, com o estado novo: substitui), e pergunta o que mudou a cada minuto. Na
 O que é regra de lá e o Nexus não refaz: o que é normalização, a hora da volta (`normalizado_em`, já corrigida quando
 alguém corrigiu), o tempo fora, a OS aberta no Fracttal (a varredura de 30 em 30 min de lá). Daqui são só os filtros, as
 contas da faixa e o "há quanto tempo a OS segue aberta depois da volta".
+
+**A tela vira "Ocorrências" (12/11/2026, protótipo aprovado pelo dono antes do porte):** as ocorrências EM ANDAMENTO entram
+na mesma lista, no mesmo formato de linha, no topo, e o filtro "Situação" separa as duas (o dono recusou a tela nova
+desenhada do zero: "segue o padrão da tela de Normalizações"). Elas vêm da fotografia de cada cliente (o que está aberto
+agora, de qualquer data: a Santarém aberta desde julho aparece), com o detalhe do ciclo de 7 dias e o status da OS pelo
+Panorama das OS abertas (`andamento`). Só no mês corrente: o mês é o da volta, e a em andamento ainda não voltou. Os números
+da faixa das normalizadas (total, OS aberta, mediana, hora real) seguem contando só as normalizadas.
 """
 import threading
 import time
@@ -23,6 +30,7 @@ from datetime import datetime, timedelta
 from statistics import median
 
 from . import andamento as AND
+from . import os_abertas as OA
 
 VERSAO = 1
 # Por mês (27/10/2026, Levi: "a única mudança que quero é ver por mês"; e depois "Pode tirar esses filtros de 7, 30 dias
@@ -79,6 +87,10 @@ class Painel:
     varredura: datetime | None = None
     desfeitas: int = 0
     carregando: bool = False
+    # as em andamento (12/11/2026): todas as de agora, da aberta mais nova; filtradas na página como as normalizadas
+    # (os registros que passam no filtro do endereço também estão em `visiveis`)
+    andamento: list = field(default_factory=list)
+    com_andamento: bool = False          # o mês corrente: a lista leva as em andamento e o filtro Situação aparece
 
 
 def _mes_de(d: datetime) -> datetime:
@@ -299,6 +311,7 @@ def _item(n: dict, agora: datetime) -> dict:
         "protecoes": [" ".join(str(x).split()) for x in n.get("protecoes") or [] if str(x or "").strip()],
         "geracao_parou": n.get("geracao_parou") if isinstance(n.get("geracao_parou"), bool) else None,
         "conferencia": _conferencia(n.get("conferencia_da_os")),
+        "situacao": "normalizada",
         # o "Detalhes da Atividade" do informe (29/10/2026, Levi: "quero o campo detalhes no normalizações"): a ação, a
         # descrição da ocorrência (sem o planejamento do PCM) e as notas das pessoas. Texto livre do time, às vezes com
         # nome e telefone: só na tela e no CSV, o Nexus não guarda (o guia da API, seção 2.3)
@@ -307,10 +320,11 @@ def _item(n: dict, agora: datetime) -> dict:
 
 
 def alvo_da_busca(i: dict) -> str:
-    """O texto em que a busca procura; a página leva o mesmo em cada linha (`data-f-busca`) e o JS procura igual."""
+    """O texto em que a busca procura; a página leva o mesmo em cada linha (`data-f-busca`) e o JS procura igual. A em
+    andamento leva também a etapa (técnico acionado, aguardando peça...)."""
     return " ".join([i["os"], *i["os_relacionadas"], i["cliente"], i["usina"], i["usina_codigo"], i["falha"],
                      *i["equipamentos"], i["operador"], i["tecnico"], i["resumo"], i["status"], i["acao"],
-                     i["descricao"], *i["notas"]]).lower()
+                     i["descricao"], *i["notas"], *([i["etapa"]] if i.get("etapa") else [])]).lower()
 
 
 def _casa(i: dict, q: str) -> bool:
@@ -320,48 +334,252 @@ def _casa(i: dict, q: str) -> bool:
     return q in alvo_da_busca(i)
 
 
+# ── as em andamento (12/11/2026) ─────────────────────────────────────────────────────────────────────────────────────
+# O filtro "Situação" (o dono, 11/11/2026: a tela unificada "segue o padrão da tela de Normalizações", com as normalizadas e
+# as em andamento e um filtro que separa as duas).
+SITUACAO_FILTRO = {"andamento": "Em andamento", "normalizada": "Normalizadas"}
+# A "Geração parou" da em andamento, pela regra da Ronda COS (`paradaPeloTipo`, geracao-na-normalizacao.ts): os
+# desligamentos e a atuação de proteção param o ativo pela própria definição, desde a abertura. Na falha de comunicação e
+# no inversor offline a resposta só vem na normalização; e, pela regra do dono de 09/11/2026, falha de comunicação com a
+# geração parada não existe (é desligamento): a aberta assim fica "a conferir". O resto (string, tracker, ventilador) não
+# tem a pergunta.
+PARAM_PELO_TIPO = frozenset({"DESLIGAMENTO_USINA", "DESLIGAMENTO_CABINE", "DESLIGAMENTO_QGBT", "DESLIGAMENTO_SKID",
+                             "DESLIGAMENTO_INVERSOR", "ATUACAO_PROTECAO"})
+PERGUNTA_NA_VOLTA = frozenset({"FALHA_COMUNICACAO", "INVERSOR_OFFLINE"})
+# A OS aberta há menos disto e fora do Panorama ainda não passou pela varredura do Fracttal (de 30 em 30 min na Ronda COS):
+# "Nova", e não "Fechada". O mesmo OS_NOVA_MIN da tela Prazos da R04 (nexus/cos/ocorrencias.py).
+OS_NOVA_MIN = 40
+# O tempo aberto em minutos e horas até 48 h; depois, em dias (a Santarém aberta desde julho daria "2.900 h").
+DIAS_DEPOIS_DE_H = 48
+
+
+def _codigo_do_tipo(o7: dict, rotulo: str) -> str:
+    """O código do tipo (`DESLIGAMENTO_USINA`...): o da ocorrência de 7 dias; sem ela (a aberta há mais de 7 dias), pelo
+    rótulo da fotografia."""
+    if o7.get("tipo_falha_codigo"):
+        return str(o7["tipo_falha_codigo"]).upper()
+    r = (rotulo or "").lower()
+    if r.startswith("desligamento") or r.startswith("atuação de proteção"):
+        return "DESLIGAMENTO_USINA"
+    if r.startswith("falha de comunica"):
+        return "FALHA_COMUNICACAO"
+    if r.startswith("inversor offline"):
+        return "INVERSOR_OFFLINE"
+    return ""
+
+
+def _geracao_andamento(codigo: str, impacto: str) -> str | None:
+    """"sim" (o tipo para a geração desde a abertura), "conferir" (falha de comunicação ou inversor offline aberto com a
+    geração interrompida), "na_volta" (a pergunta é feita na normalização) ou None (o tipo não tem a pergunta)."""
+    if codigo in PARAM_PELO_TIPO:
+        return "sim"
+    if codigo in PERGUNTA_NA_VOLTA:
+        imp = (impacto or "").lower()
+        return "conferir" if "interromp" in imp or imp.startswith("gera") else "na_volta"
+    return None
+
+
+def _tempo_aberto(minutos) -> str:
+    if minutos is None:
+        return "—"
+    return duracao(minutos) if minutos < DIAS_DEPOIS_DE_H * 60 else f"{minutos // 1440} dias"
+
+
+def _equipamentos(lista) -> list[str]:
+    out = []
+    for x in lista or []:
+        nome = (x.get("nome") or x.get("codigo")) if isinstance(x, dict) else x
+        if str(nome or "").strip():
+            out.append(" ".join(str(nome).split()))
+    return out
+
+
+def _fracttal_andamento(folio: str, o7: dict, os_map: dict, varredura, agora: datetime) -> dict:
+    """A célula "No Fracttal" da em andamento: o status da OS no Panorama das abertas (a varredura de 30 em 30 min), o que
+    a ocorrência de 7 dias diz da OS, a OS nova que a varredura ainda não viu, ou fechada (a ocorrência segue aberta no COS
+    com a OS já fechada no Fracttal)."""
+    vazio = {"rotulo": "", "tom": "", "det": "", "filtro": "outro", "status": "", "status_card": "", "aberta": False,
+             "pct": 0}
+    if not folio:
+        return vazio
+    m = os_map.get(folio)
+    if m:
+        sit = "feita, falta finalizar" if m["situacao"] == "concluida" else "pendente"
+        alerta = " · alerta: sem reconhecimento há +1 h" if m["em_alerta"] else ""
+        return dict(vazio, rotulo=f"{m['status']} {m['pct']}%", tom="critico" if m["em_alerta"] else "alerta",
+                    det=f"{sit} · OS aberta há {m['aberta_ha']}{alerta}",
+                    filtro="verificacao" if "verifica" in m["status"].lower() else "processo", status=m["status"],
+                    status_card=m["status_card"], aberta=True, pct=m["pct"])
+    f = o7.get("os_fracttal")
+    if isinstance(f, dict) and f:
+        st = STATUS_OS.get(f.get("status"), ("Aberta", ""))
+        pct = int(f.get("concluida_pct") or 0)
+        return dict(vazio, rotulo=f"{st[0]} {pct}%", tom="alerta",
+                    filtro={1: "processo", 2: "verificacao"}.get(f.get("status"), "outro"), status=st[0],
+                    status_card=st[1], aberta=True, pct=pct)
+    aberta_em = AND.instante(o7.get("os_aberta_em"))
+    if aberta_em and ((varredura and aberta_em > varredura) or agora - aberta_em < timedelta(minutes=OS_NOVA_MIN)):
+        return dict(vazio, rotulo="Nova", tom="neutro", filtro="processo", status="Nova",
+                    det=f"aberta {aberta_em.astimezone(AND._BRT):%H:%M}; entra na varredura do Fracttal")
+    return dict(vazio, rotulo="Fechada", tom="ok", filtro="fechada", status="Fechada")
+
+
+def _item_andamento(cliente: str, u: dict, o: dict, o7: dict | None, os_map: dict, varredura,
+                    agora: datetime) -> dict:
+    """A ocorrência em andamento no formato da normalização (as mesmas chaves de `_item`, para a busca, o filtro e o CSV),
+    com o que só ela tem: a etapa, o que aguarda, a "Geração parou" pelo tipo e a célula do Fracttal."""
+    o7 = o7 or {}
+    folio = str(o.get("os") or o7.get("os") or "").strip()
+    if folio.startswith("R-"):                       # a ocorrência sem OS: a fotografia manda o registro curto
+        folio = ""
+    ini = AND.instante(o7.get("inicio")) or AND.instante(o.get("abertura"))
+    minutos = max(0, int((agora - ini).total_seconds() // 60)) if ini else None
+    falha = str(o7.get("tipo_falha") or o.get("tipo_falha") or "").strip() or "—"
+    fr = _fracttal_andamento(folio, o7, os_map, varredura, agora)
+    prot = [" ".join(str(x).split()) for x in o7.get("protecoes") or [] if str(x or "").strip()]
+    if not prot and o.get("protecao") and str(o["protecao"]).strip() != "Sem proteção ativa":
+        prot = [" ".join(str(o["protecao"]).split())]
+    notas = [str((x.get("texto") if isinstance(x, dict) else x) or "").strip() for x in o7.get("notas") or []]
+    notas = [x for x in notas if x]
+    un = o.get("ultima_nota")
+    if not notas and isinstance(un, dict) and str(un.get("texto") or "").strip():
+        q = AND.instante(un.get("quando"))
+        notas = [(f"{q.astimezone(AND._BRT):%d/%m %H:%M} · " if q else "") + str(un["texto"]).strip()]
+    return {
+        "registro": str(o.get("registro") or o7.get("registro") or ""),
+        "os": folio,
+        "os_relacionadas": [],
+        "cliente": str(cliente or "").strip().upper() or "(sem cliente)",    # a grafia da API das normalizações
+        "usina": str(o7.get("usina") or u.get("nome") or "").strip() or "(sem usina)",
+        "usina_codigo": str(u.get("codigo") or o7.get("usina_codigo") or ""),
+        "equipamentos": _equipamentos(o.get("equipamentos") or o7.get("equipamentos")),
+        "falha": falha,
+        "severidade": str(o7.get("severidade") or "").upper(),
+        "normalizada": False,
+        "inicio": ini,
+        "volta": None,
+        "data": ini,
+        "fora": minutos,
+        "fora_txt": _tempo_aberto(minutos),
+        "hora_real": False,
+        "fim_corrigido": False,
+        "declarada_por": "",
+        "aberta": fr["aberta"],
+        "status_filtro": fr["filtro"],
+        "status": fr["status"],
+        "status_card": fr["status_card"],
+        "pct": fr["pct"],
+        "aberta_ha_dias": None,
+        "varrida_em": None,
+        "resumo": "",
+        "operador": " ".join(str(o7.get("os_aberta_por") or "").split()),
+        "tecnico": " ".join(str(o7.get("tecnico") or "").split()),
+        "fora_do_escopo": False,
+        "protecoes": prot,
+        "geracao_parou": None,
+        "conferencia": None,
+        "acao": " ".join(str(o7.get("acao") or o.get("tipo_tarefa") or "").split()),
+        "descricao": str(o7.get("descricao") or " · ".join(str(x) for x in (o.get("falha"), o.get("impacto")) if x)).strip(),
+        "notas": notas,
+        "situacao": "andamento",
+        "etapa": " ".join(str(o7.get("estado_rotulo") or o.get("etapa") or "aberta").split()),
+        "aguardando": ", ".join(" ".join(str(a).split()) for a in o.get("aguardando") or [] if str(a or "").strip()),
+        "dias_andamento": minutos // 1440 if minutos is not None else 0,
+        "geracao": _geracao_andamento(_codigo_do_tipo(o7, falha), str(o.get("impacto") or "")),
+        "impacto": str(o.get("impacto") or "").strip(),
+        "fracttal": fr,
+    }
+
+
+def andamento(fotografias, ocorrencias: dict, os_abertas, agora: datetime) -> list[dict]:
+    """As ocorrências em andamento de todos os clientes, da que começou por último. `fotografias`: [(cliente, dados da
+    fotografia)] (o que está aberto agora em cada usina, de qualquer data); `ocorrencias`: {registro: a do ciclo de 7 dias}
+    (o detalhe: início, tipo, proteções, notas, quem abriu a OS); `os_abertas`: os dados do Panorama das OS abertas (o
+    status no Fracttal), ou None. A mesma ocorrência em duas usinas da fotografia entra uma vez; a que a Ronda COS já diz
+    normalizada no ciclo de 7 dias, não entra (a fotografia é da hora)."""
+    os_map, varredura = {}, None
+    if isinstance(os_abertas, dict):
+        varredura = AND.instante(os_abertas.get("varredura_em"))
+        for o in os_abertas.get("os") or []:
+            if isinstance(o, dict) and o.get("folio") is not None:
+                os_map[str(o["folio"])] = OA._item(o, agora)
+    vistos, out = set(), []
+    for cliente, dados in fotografias:
+        for u in (dados or {}).get("usinas") or []:
+            for o in u.get("ocorrencias") or []:
+                reg = str(o.get("registro") or "")
+                o7 = (ocorrencias or {}).get(reg)
+                if not reg or reg in vistos or (o7 and o7.get("normalizada")):
+                    continue
+                vistos.add(reg)
+                out.append(_item_andamento(cliente, u, o, o7, os_map, varredura, agora))
+    out.sort(key=lambda i: i["data"] or agora, reverse=True)
+    return out
+
+
 def painel(leitura, agora: datetime, mes: str = "", cliente: str = "", usina: str = "", status: str = "",
-           busca: str = "", operador: str = "", tecnico: str = "", falha: str = "") -> Painel | None:
+           busca: str = "", operador: str = "", tecnico: str = "", falha: str = "", situacao: str = "",
+           andamento: list | None = None) -> Painel | None:
     """A tela, do mês pedido (o corrente no padrão), pela hora da volta. Os filtros (Levi, 27/10/2026): cliente, usina,
     status no Fracttal e um texto livre; desde 28/10/2026 também o operador que abriu a OS ("Criado por") e o técnico, que
     a API passou a mandar. As opções de cada filtro contam sobre o mês, ANTES dos outros filtros (um contador que encolhe ao filtrar não diz mais quanto existe); as de usina, dentro do cliente escolhido.
     A faixa conta a lista filtrada, menos o status (senão a fatia aberta seria sempre 100%). A desfeita (a ocorrência
-    voltou a aberta) fica fora da lista e é contada à parte; a sem hora real fica na lista e fora da mediana."""
+    voltou a aberta) fica fora da lista e é contada à parte; a sem hora real fica na lista e fora da mediana.
+
+    `andamento` (12/11/2026, a tela Ocorrências): as em andamento (`andamento()`), que entram só no mês corrente, no topo,
+    com os mesmos filtros e mais a Situação. Os números das normalizadas seguem só delas; as em andamento têm o seu.
+    Sem `andamento` (None), a tela é a de Normalizações como era."""
     d = leitura.dados if leitura else None
     if not d:
         return None
     um_mes = next(m for m in meses(agora) if m[0] == mes_pedido(mes, agora))
     desde, ate = um_mes[2], um_mes[3]
+    corrente = um_mes[0] == meses(agora)[0][0]
     todos = [_item(n, agora) for n in d.get("itens") or []]
     no_mes = [i for i in todos if i["data"] and desde <= i["data"] < ate]
     base = [i for i in no_mes if i["normalizada"]]
+    com_andamento = corrente and andamento is not None
+    ja = {i["registro"] for i in todos if i["normalizada"]}
+    em_andamento = [i for i in andamento or () if i["registro"] not in ja] if com_andamento else []
+    situacao = situacao if com_andamento and situacao in SITUACAO_FILTRO else ""
     busca = " ".join((busca or "").split())[:BUSCA_MAX]
-    recorte = [i for i in base if (not cliente or i["cliente"] == cliente) and (not usina or i["usina"] == usina)
-               and (not operador or i["operador"] == operador) and (not tecnico or i["tecnico"] == tecnico)
-               # o tipo de falha (29/10/2026, Levi: "quero um filtro para saber se foi falha de comunicação ou
-               # desligamento"): pelo rótulo da Ronda COS, com os tipos que existem no mês
-               and (not falha or i["falha"] == falha)
-               and (not busca or _casa(i, busca))]
-    lista = [i for i in recorte if i["status_filtro"] == status] if status in STATUS_FILTRO else list(recorte)
+
+    def passa(i):
+        return ((not cliente or i["cliente"] == cliente) and (not usina or i["usina"] == usina)
+                and (not operador or i["operador"] == operador) and (not tecnico or i["tecnico"] == tecnico)
+                # o tipo de falha (29/10/2026, Levi: "quero um filtro para saber se foi falha de comunicação ou
+                # desligamento"): pelo rótulo da Ronda COS, com os tipos que existem no mês
+                and (not falha or i["falha"] == falha)
+                and (not busca or _casa(i, busca)))
+    recorte = [i for i in base if passa(i)] if situacao != "andamento" else []
+    recorte_and = [i for i in em_andamento if passa(i)] if situacao != "normalizada" else []
+
+    def no_status(lista):
+        return [i for i in lista if i["status_filtro"] == status] if status in STATUS_FILTRO else list(lista)
+    lista = no_status(recorte)
     lista.sort(key=lambda i: i["data"], reverse=True)
+    lista_and = no_status(recorte_and)
     com_hora = [i["fora"] for i in recorte if i["hora_real"] and i["fora"] is not None]
     abertas = [i for i in recorte if i["aberta"]]
     varridas = [i["varrida_em"] for i in todos if i["varrida_em"]]
-    do_cliente = [i for i in base if not cliente or i["cliente"] == cliente]
-    todos = sorted(base, key=lambda i: i["data"], reverse=True)
+    contaveis = em_andamento + base                  # as opções contam as duas, antes dos filtros
+    do_cliente = [i for i in contaveis if not cliente or i["cliente"] == cliente]
+    todos = em_andamento + sorted(base, key=lambda i: i["data"], reverse=True)
     for i in todos:
         i["busca"] = alvo_da_busca(i)
     return Painel(
-        itens=lista,
+        itens=lista_and + lista,
         todos=todos,
-        visiveis={i["registro"] for i in lista},
+        visiveis={i["registro"] for i in lista_and + lista},
         contagem={
-            "cliente": dict(sorted(Counter(i["cliente"] for i in base).items())),
+            "cliente": dict(sorted(Counter(i["cliente"] for i in contaveis).items())),
             "usina": dict(sorted(Counter(i["usina"] for i in do_cliente).items())),
-            "status": {k: sum(1 for i in base if i["status_filtro"] == k) for k in STATUS_FILTRO},
-            "operador": dict(sorted(Counter(i["operador"] for i in base if i["operador"]).items())),
-            "tecnico": dict(sorted(Counter(i["tecnico"] for i in base if i["tecnico"]).items())),
-            "falha": dict(Counter(i["falha"] for i in base).most_common()),
+            "status": {k: sum(1 for i in contaveis if i["status_filtro"] == k) for k in STATUS_FILTRO},
+            "operador": dict(sorted(Counter(i["operador"] for i in contaveis if i["operador"]).items())),
+            "tecnico": dict(sorted(Counter(i["tecnico"] for i in contaveis if i["tecnico"]).items())),
+            "falha": dict(Counter(i["falha"] for i in contaveis).most_common()),
+            # a Situação só existe com as em andamento (no mês corrente)
+            **({"situacao": {"andamento": len(em_andamento), "normalizada": len(base)}} if com_andamento else {}),
         },
         resumo={
             "total": len(recorte),
@@ -370,27 +588,43 @@ def painel(leitura, agora: datetime, mes: str = "", cliente: str = "", usina: st
             "abertas_7d": sum(1 for i in abertas if (i["aberta_ha_dias"] or 0) >= 7),
             "mediana": duracao(median(com_hora)) if com_hora else "—",
             "sem_hora_real": sum(1 for i in recorte if not i["hora_real"]),
+            "andamento": len(recorte_and),
+            "andamento_7d": sum(1 for i in recorte_and if i["dias_andamento"] >= 7),
         },
         varredura=max(varridas) if varridas else None,
         desfeitas=sum(1 for i in no_mes if not i["normalizada"]),
         carregando=bool(d.get("carregando")),
+        andamento=em_andamento,
+        com_andamento=com_andamento,
     )
 
 
-# O "Exportar CSV" (Levi, 27/10/2026): a lista da tela, com os filtros, e o que a tela resume numa coluna só.
+# O "Exportar CSV" (Levi, 27/10/2026): a lista da tela, com os filtros, e o que a tela resume numa coluna só. A Situação
+# (12/11/2026) vai no fim, para as colunas de antes não mudarem de lugar.
 CSV_COLUNAS = ("OS", "OS relacionadas", "Indisponível (min)", "Início", "Normalização", "Hora real da volta",
                "Hora corrigida", "Registrada", "Cliente", "Código da usina", "Usina", "Falha", "Equipamentos",
                "Severidade", "Aberta por (operador)", "Técnico", "Status no Fracttal", "% concluída", "Dias aberta depois da volta",
                "Informe", "Fora do escopo O&M", "Proteções", "Geração parou", "Conferência da OS",
                "Tarefas concluídas", "Data do evento no Fracttal", "Diferença do início (min)",
                "Conclusão no Fracttal", "Diferença da conclusão (min)", "Finalizada no Fracttal em",
-               "Conferência lida em", "Ação", "Descrição da ocorrência", "Notas")
+               "Conferência lida em", "Ação", "Descrição da ocorrência", "Notas", "Situação")
+
+
+def _csv_andamento(i: dict, h) -> list:
+    fr = i["fracttal"]
+    sit = "Em andamento · " + i["etapa"] + (f" · aguardando {i['aguardando']}" if i["aguardando"] else "")
+    return [i["os"], "", "" if i["fora"] is None else i["fora"], h(i["inicio"]), "", "", "", "", i["cliente"],
+            i["usina_codigo"], i["usina"], i["falha"], ", ".join(i["equipamentos"]), i["severidade"].title(),
+            i["operador"], i["tecnico"], fr["status"], fr["pct"] if fr["aberta"] else "", "", "", "não",
+            ", ".join(i["protecoes"]), "sim (pelo tipo)" if i["geracao"] == "sim" else "", *[""] * 8, i["acao"],
+            i["descricao"], " | ".join(i["notas"]), sit]
 
 
 def csv_linhas(p: Painel) -> list[list]:
     def h(d):
         return d.strftime("%d/%m/%Y %H:%M") if d else ""
-    return [[i["os"], ", ".join(i["os_relacionadas"]), "" if i["fora"] is None else i["fora"], h(i["inicio"]),
+    return [_csv_andamento(i, h) if i.get("situacao") == "andamento" else
+            [i["os"], ", ".join(i["os_relacionadas"]), "" if i["fora"] is None else i["fora"], h(i["inicio"]),
              h(i["volta"]), "sim" if i["hora_real"] else "não",
              "sim" if i["fim_corrigido"] else "não", i["declarada_por"], i["cliente"], i["usina_codigo"], i["usina"],
              i["falha"], ", ".join(i["equipamentos"]), i["severidade"].title(), i["operador"], i["tecnico"],
@@ -398,7 +632,7 @@ def csv_linhas(p: Painel) -> list[list]:
              "" if i["aberta_ha_dias"] is None else i["aberta_ha_dias"], i["resumo"],
              "sim" if i["fora_do_escopo"] else "não", ", ".join(i["protecoes"]),
              {True: "sim", False: "não"}.get(i["geracao_parou"], ""), *_csv_conferencia(i["conferencia"], h),
-             i["acao"], i["descricao"], " | ".join(i["notas"])]
+             i["acao"], i["descricao"], " | ".join(i["notas"]), "Normalizada"]
             for i in p.itens]
 
 

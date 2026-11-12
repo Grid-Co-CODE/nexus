@@ -8,13 +8,16 @@
    - as opções dos filtros contam o mês, ANTES dos filtros, e não mudam; as de usina, dentro do cliente escolhido;
    - a busca: o nº igual ao da OS (ou de uma relacionada), ou o texto dentro do de cada linha (data-f-busca);
    - o arredondamento do % é o do Python (o meio vai para o par) e a mediana de duas cai no meio, sem os segundos.
-   Não usa o filtro-local.js porque lá as opções contam em cascata, e aqui a regra do COS é outra. */
+   Não usa o filtro-local.js porque lá as opções contam em cascata, e aqui a regra do COS é outra.
+
+   12/11/2026, a tela Ocorrências: as em andamento (data-f-situacao="andamento") passam pelos mesmos filtros e pela
+   Situação, têm o número delas na faixa (e as de 7 dias ou mais), e saem das contas das normalizadas. */
 (function () {
   "use strict";
   var form = document.getElementById("cos-norm-filtros");
   if (!form) return;
   var linhas = Array.prototype.slice.call(document.querySelectorAll("tr[data-norm-linha]"));
-  var CHAVES = ["falha", "cliente", "usina", "criado_por", "tecnico"];
+  var CHAVES = ["situacao", "falha", "cliente", "usina", "criado_por", "tecnico"];   // a Situação só existe no mês corrente
   var BUSCA_MAX = 80;
   var busca = form.elements.q;
   var relogio = null;
@@ -88,6 +91,10 @@
       }
     });
 
+    var andamento = recorte.filter(function (tr) { return tr.getAttribute("data-f-situacao") === "andamento"; });
+    por("andamento", andamento.length);
+    por("andamento_7d", andamento.filter(function (tr) { return Number(tr.getAttribute("data-dias-andamento") || 0) >= 7; }).length);
+    recorte = recorte.filter(function (tr) { return tr.getAttribute("data-f-situacao") !== "andamento"; });   // os números das normalizadas
     var abertas = recorte.filter(function (tr) { return tr.getAttribute("data-aberta") === "1"; });
     var foras = recorte.filter(function (tr) {
       return tr.getAttribute("data-hr") === "1" && tr.getAttribute("data-fora") !== "";

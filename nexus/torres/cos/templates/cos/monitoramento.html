@@ -4,6 +4,7 @@
 {% from "_explica.html" import explica %}
 <link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='cos.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='cos/monitoramento.css') }}">
 <noscript><meta http-equiv="refresh" content="60"></noscript>
 {# Monitoramento (09/11/2026, nexus/cos/monitoramento.py): a geração em kW ao vivo e a curva do dia de cada usina com logger
    (SCADA Grid) e do SunOP, pelo Andamento da Ronda COS. Só lê. O corpo se atualiza sozinho (static/cos/monitoramento.js). #}
@@ -18,6 +19,9 @@
       amostras de 5 minutos que a Ronda COS grava do SCADA, das {{ '%02d'|format(curva_de) }}h às {{ curva_ate }}h; cada curva
       vai de zero ao máximo da própria usina (a plataforma não guarda a potência instalada). O SunOP não guarda a série:
       a usina dele aparece sem curva. Passe o mouse na curva para ver o kW de cada horário.</p>
+      <p><b>Os inversores.</b> Clique numa usina para ver a curva dela e a de cada inversor, na mesma escala, com o estado de
+      cada um (desligado, em falha, sem comunicação). O kW, o estado e a ponta das curvas andam de 3 em 3 segundos, lidos da
+      Ronda COS como na tela de monitoramento de lá. "Sem comunicação" é o inversor que não responde: ele pode estar gerando.</p>
       <p><b>Como funciona.</b> A tela se atualiza sozinha a cada 30 segundos, sem recarregar a página. Clique no nome da usina
       para abrir a ficha dela.</p>{% endcall %}</div>
       <p class="cn-pergunta">{{ tela.pergunta }}</p></div>
@@ -28,4 +32,6 @@
 </div>
 <div class="cos-dica" id="cos-dica" role="tooltip" hidden></div>
 <script src="{{ url_for('static', filename='cos/monitoramento.js') }}" defer></script>
+{% if cos_api %}{% include "cos/_inversores.html" %}{% endif %}
+{% include "cos/_fluido.html" %}
 {% endblock %}

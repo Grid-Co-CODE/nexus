@@ -15,19 +15,37 @@
     return !!(a && corpo.contains(a) && /^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName));
   }
 
+  var noAr = false, pedido = 0;                 // revisão de 12/11: um pedido de cada vez; a resposta velha não vence a nova
   function atualizar() {
-    if (document.hidden || emUso() || typeof window.nexusPedir !== "function") { return; }
+    if (noAr || document.hidden || emUso() || typeof window.nexusPedir !== "function") { return; }
+    noAr = true;
+    var este = ++pedido;
+    setTimeout(function () { if (este === pedido) { noAr = false; } }, 25000);   // um pedido travado não para a tela
     var q = new URLSearchParams(location.search);
     q.set("parcial", "1");
     window.nexusPedir(nexusRota("/t/cos/monitoramento") + "?" + q.toString()).then(function (d) {
+      noAr = false;
+      if (este !== pedido) { return; }
       if (d && typeof d.html === "string") {
         esconder();
         corpo.innerHTML = d.html;
-        if (lido) { lido.innerHTML = d.lido ? "lido às <b>" + d.lido + "</b>" : ""; }
+        if (lido) {
+          lido.textContent = "";
+          if (d.lido) { lido.appendChild(document.createTextNode("lido às ")); var b = document.createElement("b"); b.textContent = d.lido; lido.appendChild(b); }
+        }
       }
-    }).catch(function () { /* fica a última leitura: a próxima volta tenta de novo */ });
+    }).catch(function () { noAr = false; /* fica a última leitura: a próxima volta tenta de novo */ });
   }
   setInterval(atualizar, INTERVALO_MS);
+  // protótipo de 12/11/2026: a página aberta de uma cópia (o voltar do navegador, uma aba esquecida) com a leitura de mais
+  // de 2 minutos se atualiza na hora, em vez de esperar os 30 s com os números velhos na tela
+  (function () {
+    var b = lido && lido.querySelector("b"), m = b ? /^(\d{2}):(\d{2})$/.exec(b.textContent.trim()) : null;
+    if (!m) { return; }
+    var agora = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Sao_Paulo" }));
+    var dif = agora.getHours() * 60 + agora.getMinutes() - (+m[1] * 60 + +m[2]);
+    if (dif > 2 || dif < 0) { atualizar(); }
+  })();
   document.addEventListener("visibilitychange", function () { if (!document.hidden) { atualizar(); } });
 
   // ── a dica da curva ──

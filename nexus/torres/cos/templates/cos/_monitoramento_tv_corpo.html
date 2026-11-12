@@ -5,7 +5,9 @@
    O desenho segue a regra das salas de controle (a ISA-101): a usina normal fica neutra, e só a anormal ganha cor E
    palavra (parada, sem comunicação, sem leitura nova). Numa parede de 150 usinas, o olho tem de ir direto ao problema, e
    a coluna da atenção não sai da tela mesmo quando a grade gira em páginas. #}
-{% macro curva(c) %}{% if c and c.linha %}<svg class="cos-tv-cv" viewBox="0 0 {{ largura }} {{ altura }}" preserveAspectRatio="none" aria-hidden="true">
+{% macro curva(c) %}{% if c and c.linha %}<svg class="cos-tv-cv" viewBox="0 0 {{ largura }} {{ altura }}" preserveAspectRatio="none" aria-hidden="true"
+  data-de="{{ c.pontos[0][0] if c.pontos else '' }}" data-passo="{{ passo }}"
+  data-kw="{% for _h, v in c.pontos %}{{ '' if v is none else v|round|int }}{{ '|' if not loop.last }}{% endfor %}">
   <path class="cos-curva-area" d="{{ c.area }}"></path><path class="cos-curva-linha" d="{{ c.linha }}"></path></svg>{% endif %}{% endmacro %}
 {% macro palavra(x) %}{% set a = anormal(x) %}{% if a == 'parada' %}Parada{% elif a == 'semcom' %}Sem comunicação{% elif a == 'velha' %}Sem leitura nova{% elif x.grupo == 'outras' %}{{ x.situacao }}{% endif %}{% endmacro %}
 {% if not ligada %}
@@ -34,7 +36,10 @@
     </div></article>
     {% for x in g.itens %}
     {% set a = anormal(x) %}
-    <article class="cos-tv-u{% if a %} cos-tv-u--{{ a }}{% endif %}"><div class="i">
+    {# 12/11/2026: o cartão abre os inversores e anda ao vivo (cos/_inversores.html, static/cos/inversores.js), quando o
+       Nexus tem o endereço da API da Ronda COS (`cos_api`) #}
+    <article class="cos-tv-u{% if a %} cos-tv-u--{{ a }}{% endif %}"{% if cos_api %} tabindex="0" role="button"{% endif %} data-gid="{{ x.id }}"
+      data-codigo="{{ x.codigo }}" data-cliente="{{ x.cliente }}" data-fonte="{{ x.fonte }}"><div class="i">
       <span class="n" title="{{ x.nome }}">{{ x.nome }}{% if x.sub_usina %} · {{ x.sub_usina }}{% endif %}</span>
       <span class="kw">{{ x.kw_txt }}</span>
       {% if a or x.grupo == 'outras' %}<span class="st">{{ palavra(x) }}</span>
