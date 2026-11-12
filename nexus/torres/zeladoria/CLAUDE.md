@@ -230,8 +230,10 @@ adar_2026-11-11\`).
   sem setor, vale como do setor Zeladoria; com outro setor, ganha as telas da Zeladoria. O HEAD aprova na tela Usuários,
   como no Radar. O portão nunca espera o banco: usa a cópia em memória e recarrega por trás (15 min sem a gravação).
   Ainda depende de a pessoa entrar no Nexus (login do Fracttal, ou a conta Microsoft quando a T.I. ligar).
-- **A ordem do dia:** subir o código; gravar a cópia de 11/11 (`copiar_zeladoria.py --arquivo ... --gravar`, na máquina
-  do Levi); o administrador liga a gravação em app.gridco.com.br/t/zeladoria/troca.
+- **Feita em 12/11/2026:** o código subiu (`afad133`), a cópia de 11/11 foi gravada (42 abas iguais à origem, conferidas
+  lendo de volta) e a gravação foi ligada no servidor às 03:33 UTC. A 1ª volta das rondas do Fracttal rodou na hora, sem
+  erro (o livro `_fracttal` foi à versão 1). Desde então o Nexus é a casa da zeladoria, e a cópia do Supabase recusa
+  passar por cima.
 
 ## Como entregar (quem programa a Zeladoria)
 
