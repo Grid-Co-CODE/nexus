@@ -99,18 +99,25 @@ def registrar_ligacoes(bp):
             return _volta(erro="Escolha uma base: o botão vale para uma base por vez.")
         p = L.panorama(srv, L.ler(cfg), L.carregar_regras(cfg))
         lote = L.sugestoes_de_100(p["buracos"], sistema)
+        feitas, recusadas = 0, []
         for chave, usina_id in lote["ligar"]:
-            L.decidir(cfg, "ligar", sistema, chave=chave, usina_id=usina_id,
-                      motivo="sugestão de 100% aceita em lote", quem=_quem())
-        if lote["ligar"]:
+            try:                 # uma recusa não para o lote nem deixa as outras sem o reaplicar do fim
+                L.decidir(cfg, "ligar", sistema, chave=chave, usina_id=usina_id,
+                          motivo="sugestão de 100% aceita em lote", quem=_quem())
+                feitas += 1
+            except L.DecisaoInvalida as ex:
+                recusadas.append(f"{chave} ({str(ex)[:80]})")
+        if feitas:
             L.reaplicar(cfg, srv)
-        n, pu = len(lote["ligar"]), lote["pulos"]
+        n, pu = feitas, lote["pulos"]
         msg = f"{n} ligaç{'ões feitas' if n != 1 else 'ão feita'} (as sugestões de 100% sem outra parecida). Publique no banco para valer."
         por = [f"{q} {txt}" for q, txt in ((pu["varias"], "com mais de uma sugestão"), (pu["abaixo"], "com sugestão abaixo de 100%"),
                                            (pu["sem"], "sem sugestão"), (pu["repetida"], "com a mesma usina sugerida a duas chaves"))
                if q]
         if por:
             msg += f" Ficaram {sum(pu.values())} para você decidir: " + ", ".join(por) + "."
+        if recusadas:
+            msg += f" {len(recusadas)} recusada(s) pelo de-para: " + "; ".join(recusadas[:5]) + "."
         return _volta(ok=msg)
 
     @bp.route("/ligacoes/publicar", methods=["POST"])

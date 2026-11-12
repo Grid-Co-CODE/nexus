@@ -105,3 +105,20 @@ def test_o_botao_aparece_com_a_base_e_pede_confirmacao(app_lote):
     html = _entra(app_lote).get(f"/t/base/governanca?aba=buracos&sistema={BASE}").get_data(as_text=True)
     assert "Ligar as 1 sugestões de 100%" in html and 'data-confirmar="Ligar 1 chaves' in html
     assert "aceitar-sugestoes" not in _entra(app_lote).get("/t/base/governanca").get_data(as_text=True)
+
+
+def test_a_recusa_de_uma_nao_para_o_lote_e_o_fim_ainda_reaplica(app_lote, monkeypatch):
+    """Uma ligação recusada pelo de-para (DecisaoInvalida) não derruba a página nem deixa as outras sem o reaplicar."""
+    original = L.decidir
+
+    def decidir(cfg, acao, sistema, **kw):
+        if kw.get("chave") == "a":
+            raise L.DecisaoInvalida("usina fora do cadastro")
+        return original(cfg, acao, sistema, **kw)
+    monkeypatch.setattr(L, "decidir", decidir)
+    r = _entra(app_lote).post("/t/base/ligacoes/aceitar-sugestoes", data={"alvo_sistema": BASE})
+    assert r.status_code == 303
+    from urllib.parse import parse_qs, urlparse
+    ok = parse_qs(urlparse(r.headers["Location"]).query)["ok"][0]
+    assert ok.startswith("0 ligações feitas") and "1 recusada(s) pelo de-para" in ok
+    assert len(app_lote.reaplicadas) == 0
