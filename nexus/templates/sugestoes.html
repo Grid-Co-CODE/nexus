@@ -67,14 +67,25 @@
   <h2 class="ui-kicker" id="sug-minhas-t">Minhas sugestões{% if minhas %} ({{ minhas|length }}){% endif %}</h2>
   {% if minhas %}
   <ol class="sug-minhas-lista">
+    {# cada uma abre no clique (12/11/2026, Levi: "nos cardzinhos de concluída, eu quero conseguir clicar no que foi
+       concluído e ver se teve alguma resposta [...] É clicar e ver a resposta, né, se a pessoa respondeu ou não"): a
+       linha diz o status, a data, quantas respostas e o título; aberta, o que a pessoa pediu e cada resposta, ou que
+       não houve resposta #}
     {% for m in minhas %}
-    <li><div class="sug-minhas-cab"><span class="gc-status gc-status--{{ m.status_tom }}">{{ m.status_rotulo }}</span>
-        <span class="sug-quando">{{ m.quando_txt }}</span></div>
-      <p class="sug-minhas-titulo">{{ m.titulo or 'Sem o título (texto ilegível)' }}</p>
+    <li><details class="sug-dobra sug-minha">
+      <summary class="sug-minhas-cab" title="Abrir para ver a resposta"><span class="gc-status gc-status--{{ m.status_tom }}">{{ m.status_rotulo }}</span>
+        {% if m.respostas %}<span class="sug-n-resp" title="{{ m.respostas|length }} {{ 'resposta' if m.respostas|length == 1 else 'respostas' }}"><i class="ph ph-chat-circle-text" aria-hidden="true"></i> {{ m.respostas|length }}</span>{% endif %}
+        <span class="sug-quando">{{ m.quando_txt }}</span>
+        <span class="sug-minhas-titulo">{{ m.titulo or 'Sem o título (texto ilegível)' }}</span></summary>
+      <div class="sug-minha-corpo">
       {% if m.area %}<span class="atu-area">{{ m.area_nome }}</span>{% endif %}
       {% if m.status_em_txt %}<p class="mudo sug-minhas-st">{{ m.status_rotulo }} em {{ m.status_em_txt }}</p>{% endif %}
+      {% if m.legivel and m.descricao %}<p class="sug-texto">{{ m.descricao }}</p>{% endif %}
       {% for r in m.respostas %}<div class="sug-resposta"><p class="sug-resposta-cab"><i class="ph ph-arrow-bend-down-right" aria-hidden="true"></i> Resposta{% if r.nome %} de {{ r.nome }}{% endif %}{% if r.quando_txt %} em {{ r.quando_txt }}{% endif %}</p>
-        <p class="sug-resposta-texto">{{ r.texto if r.legivel else 'O texto desta resposta não abriu.' }}</p></div>{% endfor %}</li>
+        <p class="sug-resposta-texto">{{ r.texto if r.legivel else 'O texto desta resposta não abriu.' }}</p></div>
+      {% else %}<p class="mudo sug-sem-resposta">{{ 'Concluída sem resposta escrita.' if m.status == 'concluida' else 'Ainda sem resposta.' }}</p>{% endfor %}
+      </div>
+    </details></li>
     {% endfor %}
   </ol>
   {% elif not faltam %}
@@ -97,6 +108,19 @@
      pediu e quando; ao abrir, o texto, os anexos e a troca do status #}
   {# o contador por setor ao lado da lista (11/11/2026, Levi: "Ao lado das sugestões tem que ter um contador por setor,
      eu clico e filtra"): o setor é a área que a pessoa escolheu ao sugerir; o clique filtra na própria página #}
+  {# o setor e quem solicitou no padrão dos filtros do Nexus (12/11/2026, Levi: "Em sugestões, eu gostaria que desse
+     para filtrar por setor e por quem solicitou"; static/filtros-os.js, o modelo do Histórico de OS). A página filtra
+     sozinha (data-fo="local"); o contador por setor ao lado marca o mesmo filtro e conta só as da pessoa escolhida #}
+  <form class="sug-filtros" method="get" data-fo="local">
+    <label class="atu-filtro"><span class="gc-rotulo">Setor</span>
+      <select class="gc-campo" name="setor" multiple data-todos="Todos os setores" data-sug-filtro="area">
+        {% for k, nome, n in por_area %}<option value="{{ k }}">{{ nome }} ({{ n }})</option>{% endfor %}</select></label>
+    <label class="atu-filtro"><span class="gc-rotulo">Quem solicitou</span>
+      <select class="gc-campo" name="quem" multiple data-todos="Todas as pessoas" data-sug-filtro="quem">
+        {% for k, nome, n in por_quem %}<option value="{{ k }}">{{ nome }} ({{ n }})</option>{% endfor %}</select></label>
+    <span class="mudo sug-conta"><b class="gc-num" data-sug-conta>{{ recebidas|length }}</b> de {{ recebidas|length }} {{ 'sugestão' if recebidas|length == 1 else 'sugestões' }}</span>
+  </form>
+  <script src="{{ url_for('static', filename='filtros-os.js') }}"></script>
   <div class="sug-recebidas">
   <nav class="sug-setores" aria-label="Sugestões por setor">
     <button type="button" class="sug-setor" data-sug-area="" aria-pressed="true">Todas <b>{{ recebidas|length }}</b></button>
@@ -104,12 +128,14 @@
   </nav>
   <ol class="sug-lista">
     {% for s in recebidas %}
-    <li class="sug-item" id="sug-{{ s.id }}" data-sug-area="{{ s.area or '_sem' }}"><details class="sug-dobra">
+    <li class="sug-item" id="sug-{{ s.id }}" data-sug-quem="{{ quem_de.get(s.id, '') }}" data-sug-area="{{ s.area or '_sem' }}"><details class="sug-dobra">
       {# a linha (11/11/2026, Levi: "O nome de quem sugeriu tem que vir primeiro. A ordem fica: Data, Nome e "-" e
-         título"); o setor e o status depois #}
+         título"); o setor e o status depois. O nome no verde da Grid, e nem ele nem o título em negrito (12/11/2026,
+         Levi: "quem solicitou também deve estar em nome verde grid. Verde grid não precisa estar em negrito, nem o
+         título precisa estar em negrito também") #}
       <summary class="sug-cab">
         <span class="sug-quando">{{ s.quando_txt }}</span>
-        <span class="sug-resumo-titulo"><b class="sug-quem">{{ s.nome or 'Sem o nome' }}</b> - {{ s.titulo or 'Sem o título (texto ilegível)' }}</span>
+        <span class="sug-resumo-titulo"><span class="sug-quem">{{ s.nome or 'Sem o nome' }}</span> - {{ s.titulo or 'Sem o título (texto ilegível)' }}</span>
         {% if s.respostas %}<span class="sug-n-resp" title="Respostas"><i class="ph ph-chat-circle-text" aria-hidden="true"></i> {{ s.respostas|length }}</span>{% endif %}
         {% if s.area %}<span class="atu-area">{{ s.area_nome }}</span>{% endif %}
         <span class="gc-status gc-status--{{ s.status_tom }}">{{ s.status_rotulo }}</span>
@@ -161,6 +187,7 @@
       </div>
     </details></li>
     {% endfor %}
+    <li class="mudo sug-vazio" data-sug-vazio hidden>Nenhuma sugestão com esses filtros.</li>
   </ol>
   </div>
   {% endif %}
@@ -168,19 +195,43 @@
 {% endif %}
 
 <script>
-/* o filtro por setor (11/11/2026): o botão do setor mostra só as sugestões dele; "Todas" volta. Na própria página, sem ir
-   ao servidor */
+/* os filtros das recebidas, na própria página, sem ir ao servidor. As <select> do Setor e do Quem solicitou guardam o
+   filtro (quem as grava é o padrão dos filtros, no Aplicar); o botão do setor ao lado (11/11/2026) grava a do Setor e
+   avisa, e por isso aparece nas etiquetas também. O contador ao lado conta as sugestões de quem está escolhido */
 (function () {
+  var itens = Array.prototype.slice.call(document.querySelectorAll('.sug-lista > li[data-sug-area]'));
+  if (!itens.length) return;
   var nav = document.querySelector('.sug-setores');
-  if (!nav) return;
-  nav.addEventListener('click', function (e) {
+  var selArea = document.querySelector('select[data-sug-filtro="area"]');
+  var selQuem = document.querySelector('select[data-sug-filtro="quem"]');
+  var conta = document.querySelector('[data-sug-conta]'), vazio = document.querySelector('[data-sug-vazio]');
+  function marcados(s) {
+    return s ? Array.prototype.filter.call(s.options, function (o) { return o.selected; }).map(function (o) { return o.value; }) : [];
+  }
+  function filtrar() {
+    var areas = marcados(selArea), quem = marcados(selQuem), n = 0, daPessoa = 0, porArea = {};
+    itens.forEach(function (li) {
+      var a = li.getAttribute('data-sug-area');
+      var okQuem = !quem.length || quem.indexOf(li.getAttribute('data-sug-quem')) >= 0;
+      if (okQuem) { daPessoa++; porArea[a] = (porArea[a] || 0) + 1; }
+      li.hidden = !(okQuem && (!areas.length || areas.indexOf(a) >= 0));
+      if (!li.hidden) n++;
+    });
+    if (conta) conta.textContent = n;
+    if (vazio) vazio.hidden = n > 0;
+    if (nav) nav.querySelectorAll('button[data-sug-area]').forEach(function (b) {
+      var k = b.getAttribute('data-sug-area'), num = b.querySelector('b');
+      b.setAttribute('aria-pressed', (k ? areas.indexOf(k) >= 0 : !areas.length) ? 'true' : 'false');
+      if (num) num.textContent = k ? (porArea[k] || 0) : daPessoa;
+    });
+  }
+  [selArea, selQuem].forEach(function (s) { if (s) s.addEventListener('change', filtrar); });
+  if (nav && selArea) nav.addEventListener('click', function (e) {
     var b = e.target.closest('button[data-sug-area]');
     if (!b) return;
-    var area = b.getAttribute('data-sug-area');
-    nav.querySelectorAll('button[data-sug-area]').forEach(function (x) { x.setAttribute('aria-pressed', x === b ? 'true' : 'false'); });
-    document.querySelectorAll('.sug-lista > li[data-sug-area]').forEach(function (li) {
-      li.hidden = !!area && li.getAttribute('data-sug-area') !== area;
-    });
+    var k = b.getAttribute('data-sug-area');
+    Array.prototype.forEach.call(selArea.options, function (o) { o.selected = !!k && o.value === k; });
+    selArea.dispatchEvent(new Event('change', { bubbles: true }));
   });
 })();
 /* confere os anexos ANTES de enviar (o servidor confere de novo): sem isto, 40 MB subiam inteiros só para voltar

@@ -272,6 +272,25 @@ a{color:inherit}
 .atu-pedido{margin:0;padding:8px 12px;border-left:3px solid var(--verde);background:var(--superficie-2);
   border-radius:0 var(--raio-md) var(--raio-md) 0;color:var(--tinta);font-style:italic}
 .atu-rodape{margin-top:12px}
+/* 12/11/2026 (Levi): um mês por vez e a pessoa, no padrão dos filtros (fo-*); a lista e, ao lado, um cartão por pessoa com
+   os commits do mês, que filtra no clique */
+.atu-filtros,.sug-filtros{margin-top:14px}
+.atu-filtro{display:grid;gap:4px}
+.atu-grade{display:grid;grid-template-columns:minmax(0,920px) minmax(220px,280px);gap:8px 32px;align-items:start}
+.atu-pessoas{display:grid;gap:8px;margin-top:18px;position:sticky;top:12px}
+.atu-pessoas .ui-kicker{margin:12px 0 2px}
+.atu-pessoa{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:baseline;gap:6px 12px;padding:12px 14px;
+  border:1px solid var(--linha);border-radius:var(--raio-md);background:var(--superficie);color:var(--tinta);text-decoration:none}
+.atu-pessoa:hover{border-color:var(--mudo)}
+.atu-pessoa[aria-current="true"]{border-color:var(--verde);background:var(--verde-suave)}
+.atu-pessoa:focus-visible{outline:2px solid var(--foco);outline-offset:2px}
+.atu-pessoa-nome{font:600 13.5px/1.35 var(--font-sans);overflow-wrap:anywhere}
+.atu-pessoa-n{font:800 22px/1 var(--font-sans);font-variant-numeric:tabular-nums}
+.atu-pessoa-tipos{grid-column:1 / -1;display:flex;flex-wrap:wrap;align-items:center;gap:6px;font-size:12px}
+.atu-pessoas-nota{margin:2px 0 0;font-size:12px;line-height:1.45}
+@media (max-width:900px){.atu-grade{grid-template-columns:minmax(0,1fr)}
+  .atu-pessoas{position:static;order:-1;grid-template-columns:repeat(auto-fill,minmax(200px,1fr))}
+  .atu-pessoas .ui-kicker,.atu-pessoas-nota{grid-column:1 / -1}}
 .gc-status--info{color:var(--info);background:var(--info-suave)}
 /* Sugestões (24/10/2026): o formulário de todos e a lista do administrador, na mesma superfície das Atualizações */
 .sug-bloco{max-width:920px}
@@ -346,7 +365,20 @@ a{color:inherit}
 .sug-setor:focus-visible{outline:2px solid var(--foco);outline-offset:2px}
 .sug-cab > .sug-quando{margin-left:0;white-space:nowrap}
 .sug-cab > .sug-resumo-titulo{flex:1 1 260px;min-width:0}
-.sug-resumo-titulo .sug-quem{font-weight:700}
+/* 12/11/2026 (Levi): quem solicitou no verde da Grid; nem o nome nem o título em negrito */
+.sug-cab > .sug-resumo-titulo{font-weight:400}
+.sug-resumo-titulo .sug-quem{font-weight:400;color:var(--verde-texto)}
+.sug-filtros{margin-bottom:12px}
+.sug-conta{font-size:12.5px}
+.sug-vazio{padding:10px 2px}
+/* Minhas sugestões abrem no clique (12/11/2026): a linha com o status, as respostas e a data; o título embaixo; a seta
+   presa no canto, para a linha poder quebrar */
+.sug-minha > summary{position:relative;flex-wrap:wrap;padding-right:20px}
+.sug-minha > summary::after{position:absolute;right:3px;top:5px;margin:0}
+.sug-minha > summary .sug-minhas-titulo{flex-basis:100%;margin:6px 0 0}
+.sug-minha-corpo{margin-top:8px;display:grid;gap:6px;justify-items:start}
+.sug-minha-corpo .sug-minhas-st,.sug-minha-corpo .sug-texto,.sug-minha-corpo .sug-resposta{margin:0;justify-self:stretch}
+.sug-sem-resposta{margin:0;font-size:12.5px}
 .sug-n-resp{display:inline-flex;align-items:center;gap:4px;color:var(--mudo);font-size:12px}
 .sug-resposta{margin:10px 0 0;padding:8px 12px;border-left:2px solid var(--verde);background:var(--superficie-2);
   border-radius:0 var(--raio-md) var(--raio-md) 0}

@@ -156,13 +156,14 @@ def _sugestoes():
             from ..cadastro.ligacao_campo import codigo_da_pessoa
             meu = (codigo_da_pessoa(current_app.config.get("NEXUS_PESSOA_HMAC"), email) or "").lower()
             minhas = [x for x in lista if meu and x["pessoa_hmac"] == meu]
+    por_quem, quem_de = _contar_por_quem(recebidas)
     resp = render_template("sugestoes.html", aba="sugestoes", areas=areas, form=form, erro=erro,
                            aviso=session.pop(_CHAVE_AVISO, None), codigo=_codigo(), novo_id=S.novo_id(),
                            tem_login=bool(str(usuario.get("email") or "").strip()), faltam=S.faltam_chaves(),
                            admin=admin, recebidas=recebidas, minhas=minhas, erro_lista=erro_lista,
                            aceitos=S.aceitos(), status_mudaveis=[(k, S.STATUS[k][0]) for k in S.STATUS_MUDAVEIS],
                            novo_resposta_id=S.novo_resposta_id, resposta_max=S.RESPOSTA_MAX,
-                           por_area=_contar_por_area(recebidas),
+                           por_area=_contar_por_area(recebidas), por_quem=por_quem, quem_de=quem_de,
                            aviso_status=session.pop(_CHAVE_AVISO_STATUS, None),
                            sug_abertas=_sugestoes_abertas(),
                            max_mb=S.MAX_MB_ARQUIVO, max_arquivos=S.MAX_ARQUIVOS, max_total=S.MAX_MB_TOTAL,
@@ -263,6 +264,23 @@ def _contar_por_area(recebidas: list[dict]) -> list[tuple[str, str, int]]:
     return sorted(((k, nome, n) for k, (nome, n) in conta.items()), key=lambda x: (x[0] == "_sem", -x[2], x[1]))
 
 
+def _contar_por_quem(recebidas: list[dict]) -> tuple[list[tuple[str, str, int]], dict[str, str]]:
+    """([(chave, nome, quantas)] por quem solicitou, pelo nome; {id da sugestão: chave}), para o filtro Quem solicitou das
+    recebidas (12/11/2026, Levi: "filtrar por setor e por quem solicitou"). A pessoa é a do código do e-mail (o mesmo
+    nome em duas pessoas não se mistura); a chave é só a ordem nesta página ("q1", "q2"): o código não vai ao HTML."""
+    grupos: dict[str, dict] = {}
+    de: dict[str, str] = {}
+    for s in recebidas:
+        nome = s.get("nome") or ""
+        g = grupos.setdefault(s.get("pessoa_hmac") or f"nome:{nome}", {"chave": f"q{len(grupos) + 1}", "nome": "", "n": 0})
+        g["nome"] = g["nome"] or nome
+        g["n"] += 1
+        de[s["id"]] = g["chave"]
+    lista = sorted(((g["chave"], g["nome"] or "Sem o nome", g["n"]) for g in grupos.values()),
+                   key=lambda x: (x[1] == "Sem o nome", x[1].casefold()))
+    return lista, de
+
+
 def _anexo_da_sugestao(S, admin: bool):
     """`/?aba=sugestoes&anexo=<id>&n=<n>`: só o administrador baixa. Imagem abre no navegador; o resto baixa. Com
     `n=todos` (o "Baixar arquivos", 24/10/2026), todos os anexos da sugestão num .zip."""
@@ -292,11 +310,21 @@ def _anexo_da_sugestao(S, admin: bool):
 def _atualizacoes():
     """A aba Atualizações do Início (13/10/2026, Levi: "Inclua no início uma sub aba de atualizações mostrando as últimas
     atualizações dos commits e o que mudou! Ao clicar em versão no ar já leva para lá!"): por dia, com o que mudou; desde
-    19/10/2026 só novidade e correção dos últimos 60 dias (`versao.da_aba`)."""
+    19/10/2026 só novidade e correção. Desde 12/11/2026 (Levi: "ao lado das atualizações, tivesse os cards de quantos
+    commits as pessoas que estão mexendo no Nexus fizeram. E clicando nas pessoas vai ficar filtrado. E também que esteja
+    sempre filtrado no mês atual, que dê para filtrar em outros meses também"): um mês por vez (`?mes=AAAA-MM`, o atual no
+    padrão), os cartões por pessoa ao lado (`versao.pessoas`) e o filtro por pessoa (`?autor=`, um ou mais)."""
     historico = versao.historico()
-    itens = versao.da_aba(historico)
+    mes = versao.mes_pedido(request.args.get("mes"), historico)
+    pessoas = versao.pessoas(historico, mes)
+    conhecidas = {p["chave"] for p in pessoas}
+    autores = [a for a in request.args.getlist("autor") if a in conhecidas]
+    itens = versao.da_aba(historico, mes, autores)
     return render_template("atualizacoes.html", dias=versao.dias(itens), total=len(itens), tem_git=bool(historico),
-                           janela=versao.JANELA_DIAS, no_ar=versao.local()["sha"], conta=versao.contagem,
+                           mes=mes, mes_nome=versao.nome_do_mes(mes), meses=versao.meses(historico),
+                           mes_atual=versao.mes_pedido(None, historico), pessoas=pessoas, autores=autores,
+                           commits_mes=sum(p["commits"] for p in pessoas),
+                           no_ar=versao.local()["sha"], conta=versao.contagem,
                            versao=versao.cartao(current_app._get_current_object()), aba="atualizacoes",
                            sug_abertas=_sugestoes_abertas())
 

@@ -12,7 +12,7 @@ Base → Acessos), o tema (escuro ou claro) e o `/saude`. A cadeira saiu em 12/1
 | `nexus/templates/_raiz_js.html` | `window.NEXUS_RAIZ` e `nexusRota()` para o JavaScript, no `<head>` de base, entrar, modo TV e card da OS |
 | `nexus/config.py` | `OBRIGATORIAS` (sem elas o app não sobe e diz qual falta) e `OPCIONAIS` |
 | `nexus/casca/__init__.py` | `/` (Início, só com as torres do setor, e o cartão "Versão no ar"), `/tema` (troca sem JavaScript), `/saude` (`{"commit", "ok"}`) e o contexto dos templates (menu pelo setor, `setor`, `tema`) |
-| `nexus/casca/versao.py` + `templates/atualizacoes.html` | o cartão "Versão no ar" do Início (a hora do commit, o commit, desde quando está no ar) e a aba Atualizações (`/?aba=atualizacoes`, só novidade, correção e desempenho dos últimos 60 dias, por dia); seção "Versão no ar e Atualizações" abaixo |
+| `nexus/casca/versao.py` + `templates/atualizacoes.html` | o cartão "Versão no ar" do Início (a hora do commit, o commit, desde quando está no ar) e a aba Atualizações (`/?aba=atualizacoes`, só novidade, correção e desempenho, um mês por vez, por dia, com os cartões de commits por pessoa ao lado); seção "Versão no ar e Atualizações" abaixo |
 | `nexus/casca/sugestoes.py` + `templates/sugestoes.html` | a aba Sugestões (`/?aba=sugestoes`): o formulário de todos e a lista do administrador, o livro `nexus_sugestoes` e os anexos no disco; seção "Sugestões no Início" abaixo |
 | `nexus/casca/presos.py` | os pedidos presos: o que cada pedido esperava quando o Nexus parou de responder, no log (o cartão do Início saiu em 13/10; seção "Pedidos presos" abaixo) |
 | `nexus/casca/fracttal_conta.py` | o contador de pedidos ao Fracttal (31/10/2026): um gancho no `Session.send` que soma, por hora de Brasília × origem × método, os pedidos, as recusas (406/429), os erros, o pico por minuto e as esperas; e, no mesmo gancho, o porteiro (etapa 5): o Nexus até 150 pedidos por minuto, o fundo até 90; seção "Pedidos ao Fracttal" abaixo |
@@ -917,12 +917,25 @@ atualizações dos commits e o que mudou! Ao clicar em versão no ar já leva pa
   conferência por trás dele: API do GitHub e `git ls-remote`), o assunto do commit e os pedidos presos.
 - **O Início no menu** (`.item-inicio`, nexus.css; 11/11/2026, Levi: "Pinte o Início de verde grid"): o texto e o ícone no verde da Grid (`--verde-texto`), como a torre com tela pronta.
 - **As abas do Início** (`gc-subabas`, um só `_inicio_abas.html` incluído em `inicio.html`, `atualizacoes.html` e `sugestoes.html`): Visão geral | Atualizações | Sugestões.
-- **A aba Atualizações** (`/?aba=atualizacoes`, exige login como o Início; era `/atualizacoes`, que no servidor ia à plataforma, ver "Regras que já custaram caro"): **só as novidades, as correções e as melhorias de desempenho (`feat`, `fix` e `perf`) dos últimos 60 dias** (o
-  `perf` desde 24/10/2026: o Levi não achou ali a correção da lentidão do dia, um `perf`; 19/10/2026,
-  Levi: "deixe só novidade e correção, sempre os últimos 60 dias!"; até então eram os últimos 60 commits de todo tipo). O
-  `git log` lê 61 dias (no máximo 3.000 commits), uma vez por processo (o deploy reinicia e a lista nova vem junto); o
-  corte dos 60 dias e dos tipos é na hora do pedido (`versao.da_aba`), porque o processo pode ficar dias no ar. Em
-  19/10/2026: 427 commits lidos, 304 na aba (207 novidades, 97 correções). Por dia ("Hoje", "Ontem", dd/mm/aaaa), do
+- **A aba Atualizações** (`/?aba=atualizacoes`, exige login como o Início; era `/atualizacoes`, que no servidor ia à plataforma, ver "Regras que já custaram caro"): **só as novidades, as correções e as melhorias de desempenho (`feat`, `fix` e `perf`), de UM mês por vez, o atual no
+  padrão** (o `perf` desde 24/10/2026: o Levi não achou ali a correção da lentidão do dia, um `perf`; 19/10/2026, Levi:
+  "deixe só novidade e correção"; **o mês desde 12/11/2026**, Levi: "sempre filtrado no mês atual, que dê para filtrar
+  em outros meses também"; até ali, os últimos 60 dias). O `git log` lê 400 dias (no máximo 20.000 commits), uma vez por
+  processo (o deploy reinicia e a lista nova vem junto), com o autor e os pais no FIM do registro; o corte do mês, da
+  pessoa e dos tipos é na hora do pedido (`versao.da_aba(itens, mes, pessoas)`), porque o processo pode ficar dias no ar.
+  **O mês** vem de `?mes=AAAA-MM` (`versao.mes_pedido`: o que não está em `versao.meses`, os meses com commit e o de
+  hoje, cai no de hoje). **Os cartões por pessoa ao lado** (12/11/2026, Levi: "ao lado das atualizações, tivesse os cards
+  de quantos commits as pessoas que estão mexendo no Nexus fizeram. E clicando nas pessoas vai ficar filtrado";
+  `versao.pessoas`): por pessoa, TODO commit dela no mês (qualquer tipo, **sem os merges**: juntar o trabalho de outro
+  não é commit dela) e, deles, quantos são novidade, correção e desempenho, com o "outros N" do resto; o "Todos" soma o
+  mês. A pessoa é o **1º nome do autor do git**, sem acento nem caixa (`versao.pessoa_de`): a mesma pessoa aparece no git
+  em duas contas (o nome de usuário e o nome completo, com e-mails diferentes) e vira um cartão só, com o nome que
+  parece de gente (com espaço, sem número); duas pessoas com o mesmo 1º nome cairiam juntas, e a regra muda ali quando
+  acontecer. O clique no cartão filtra a lista por aquela pessoa (`?autor=<chave>`); o clique no cartão já filtrado, ou
+  no Todos, volta a todas, guardando o mês. **O filtro** é o padrão do Nexus (`filtros-os.js`): Mês (lista de um, o
+  atual é o "sem filtro" pelo `data-padrao`; outro mês vira etiqueta e o × volta ao atual) e Pessoa (lista de marcar,
+  `?autor=` repetido; a pessoa sem commit no mês é ignorada). Em 12/11/2026, novembro: 377 commits sem os merges.
+  Por dia ("Hoje", "Ontem", dd/mm/aaaa), do
   mais novo; desde 29/10/2026 só Hoje vem aberto e os dias antes dele recolhidos (Levi: "gostaria que os dias que
   fossem anteriores a hoje ficassem recolhidos e contando a quantidade de correção, novidade e desempenho"): o
   cabeçalho do dia diz quantos de cada tipo (`versao.contagem`, só os que têm item), o "no ar", se o dia o tem,
@@ -998,10 +1011,21 @@ server".
     corpo antes tiraria do envio das sugestões a recusa do pedido grande sem ler). A mesma mudança repetida não grava.
     **As duas abas vão juntas em toda gravação** (livro que só cresce recusa gravar sem uma aba que o banco tem);
   - **Minhas sugestões**, à direita do formulário (embaixo no celular): as da pessoa pelo `pessoa_hmac` (o código do
-    e-mail, em claro no livro), com o status;
+    e-mail, em claro no livro), com o status. **Cada uma abre no clique** (12/11/2026, Levi: "nos cardzinhos de
+    concluída, eu quero conseguir clicar no que foi concluído e ver se teve alguma resposta [...] se a pessoa respondeu
+    ou não"): fechada, o status, o número de respostas (se houver), a data e o título; aberta, o setor, o que ela pediu
+    e cada resposta, ou "Ainda sem resposta." (a concluída: "Concluída sem resposta escrita.");
   - as recebidas vêm **recolhidas** (`<details>`); aberta, o texto, os anexos, as respostas, o Responder e a troca do
     status. As que faltam concluir primeiro. **A linha** (11/11/2026, Levi: "O nome de quem sugeriu tem que vir primeiro.
-    A ordem fica: Data, Nome e "-" e título"): a data, "Nome - Título", o número de respostas, o setor e o status;
+    A ordem fica: Data, Nome e "-" e título"): a data, "Nome - Título", o número de respostas, o setor e o status. O
+    nome no verde da Grid (`--verde-texto`), e nem ele nem o título em negrito (12/11/2026, Levi: "quem solicitou
+    também deve estar em nome verde grid. Verde grid não precisa estar em negrito, nem o título");
+  - **os filtros Setor e Quem solicitou** (12/11/2026, Levi: "eu gostaria que desse para filtrar por setor e por quem
+    solicitou"): no padrão do Nexus (`filtros-os.js`, `data-fo="local"`: a página filtra sozinha), duas listas de marcar
+    com a conta. Quem solicitou agrupa pelo `pessoa_hmac` (o mesmo nome em duas pessoas não se mistura) e vai ao HTML
+    só como a chave da página (`q1`, `q2`; `casca._contar_por_quem`), nunca o código. O script do `sugestoes.html` lê
+    as duas `<select>` e esconde as linhas; o contador por setor ao lado grava a `<select>` do Setor (por isso aparece
+    nas etiquetas) e conta só as sugestões de quem está escolhido;
   - **o contador por setor ao lado** (11/11/2026, Levi: "Ao lado das sugestões tem que ter um contador por setor, eu clico
     e filtra"): o setor é a área que a pessoa escolheu ao sugerir (a sem área, "Sem área"); "Todas" e um botão por setor
     com a conta (`casca._contar_por_area`), e o clique filtra na própria página (o script do `sugestoes.html`);

@@ -440,3 +440,67 @@ def test_o_inicio_no_verde_da_grid():
     from pathlib import Path
     css = (Path(__file__).resolve().parents[1] / "nexus" / "static" / "nexus.css").read_text(encoding="utf-8")
     assert ".item-inicio,.item-inicio i{color:var(--verde-texto)}" in css
+
+
+def test_as_recebidas_filtram_por_setor_e_por_quem_solicitou_no_padrao_dos_filtros(app, banco, dados):
+    """Levi, 12/11/2026: "Em sugestões, eu gostaria que desse para filtrar por setor e por quem solicitou [...] E quem
+    solicitou também deve estar em nome verde grid. Verde grid não precisa estar em negrito, nem o título precisa estar
+    em negrito também". Os filtros são os do padrão do Nexus (filtros-os.js), na própria página."""
+    from pathlib import Path
+    c = _cliente(app)
+    _mandar(c, "Ideia do PCM", "s00000000001")
+    _mandar(c, "Outra do PCM", "s00000000002")
+    c2 = _cliente(app, usuario=OUTRA)
+    assert c2.post(URL, data=_form(c2, titulo="Ideia sem área", area="", novo_id="s00000000003")).status_code == 302
+    html = _admin(app).get(URL).get_data(as_text=True)
+    filtros = html.split('class="sug-filtros"', 1)[1].split("</form>", 1)[0]
+    assert 'data-fo="local"' in filtros and "filtros-os.js" in html
+    setor = filtros.split('name="setor"', 1)[1].split("</select>", 1)[0]
+    assert "multiple" in setor and 'data-todos="Todos os setores"' in setor and '<option value="pcm">' in setor
+    assert "(2)</option>" in setor and '<option value="_sem">Sem área (1)</option>' in setor
+    quem = filtros.split('name="quem"', 1)[1].split("</select>", 1)[0]
+    assert "multiple" in quem and 'data-todos="Todas as pessoas"' in quem
+    assert quem.index("Beltrana de Teste (1)") < quem.index("Fulana de Teste (2)")          # pelo nome
+    assert "<b class=\"gc-num\" data-sug-conta>3</b> de 3 sugestões" in filtros
+    # cada sugestão diz de quem é pela chave da página (o código da pessoa não vai ao HTML)
+    chave_fulana = quem.split("Fulana de Teste (2)", 1)[0].rsplit('value="', 1)[1].split('"', 1)[0]
+    chave_beltrana = quem.split("Beltrana de Teste (1)", 1)[0].rsplit('value="', 1)[1].split('"', 1)[0]
+    assert chave_fulana != chave_beltrana
+    assert html.count(f'data-sug-quem="{chave_fulana}"') == 2 and html.count(f'data-sug-quem="{chave_beltrana}"') == 1
+    for linha in banco.linhas(S.LIVRO, S.ABA):
+        assert linha["pessoa_hmac"] not in html
+    # o nome no verde da Grid, sem negrito; o título sem negrito
+    assert '<span class="sug-quem">Beltrana de Teste</span> - Ideia sem área' in html and '<b class="sug-quem"' not in html
+    css = (Path(__file__).resolve().parents[1] / "nexus" / "static" / "nexus.css").read_text(encoding="utf-8")
+    assert ".sug-resumo-titulo .sug-quem{font-weight:400;color:var(--verde-texto)}" in css
+    assert ".sug-cab > .sug-resumo-titulo{font-weight:400}" in css
+    # quem não é administrador não recebe os filtros
+    assert 'class="sug-filtros"' not in c.get(URL).get_data(as_text=True)
+
+
+def test_minhas_sugestoes_abrem_no_clique_e_dizem_se_teve_resposta(app, banco, dados):
+    """Levi, 12/11/2026: "No minhas sugestões [...] nos cardzinhos de concluída, eu quero conseguir clicar no que foi
+    concluído e ver se teve alguma resposta [...] É clicar e ver a resposta, né, se a pessoa respondeu ou não"."""
+    c = _cliente(app)
+    _mandar(c, "Com resposta", "s00000000001")
+    _mandar(c, "Concluída calada", "s00000000002")
+    _mandar(c, "Ainda nova", "s00000000003")
+    adm = _admin(app)
+    _responder(adm, "s00000000001", "Já está no ar.")
+    _status(adm, "s00000000001", "concluida")
+    _status(adm, "s00000000002", "concluida")
+    minhas = c.get(URL).get_data(as_text=True).split('class="sug-minhas"', 1)[1].split("</aside>", 1)[0]
+    cartoes = {}
+    for pedaco in minhas.split('<details class="sug-dobra sug-minha">')[1:]:
+        cab, corpo = pedaco.split("</summary>", 1)
+        cartoes[cab.split('class="sug-minhas-titulo">', 1)[1].split("<", 1)[0]] = (cab, corpo.split("</details>", 1)[0])
+    assert set(cartoes) == {"Com resposta", "Concluída calada", "Ainda nova"}
+    cab, corpo = cartoes["Com resposta"]
+    # fechado, o cartão já diz que tem resposta; aberto, a resposta e o que a pessoa pediu
+    assert "Concluída" in cab and 'title="1 resposta"' in cab and "Já está no ar." not in cab
+    assert "Já está no ar." in corpo and "Resposta de Chefe de Teste" in corpo and "Queria escolher uma usina." in corpo
+    assert "sem resposta" not in corpo
+    cab, corpo = cartoes["Concluída calada"]
+    assert "sug-n-resp" not in cab and "Concluída sem resposta escrita." in corpo
+    cab, corpo = cartoes["Ainda nova"]
+    assert "Nova" in cab and "Ainda sem resposta." in corpo

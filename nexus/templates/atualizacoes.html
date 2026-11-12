@@ -8,16 +8,33 @@
 <h1 class="titulo-pagina">Início</h1>
 {% include "_inicio_abas.html" %}
 
-{# sem horários (14/10/2026, Levi: "Esconda os horários!"): o dia agrupa. Só novidade e correção dos últimos 60 dias
-   (19/10/2026, Levi: "deixe só novidade e correção, sempre os últimos 60 dias!") #}
-<p class="lead">As novidades, as correções e as melhorias de desempenho do Nexus nos últimos {{ janela }} dias, da mais nova para a mais antiga.</p>
+{# sem horários (14/10/2026, Levi: "Esconda os horários!"): o dia agrupa. Só novidade e correção (19/10/2026), de UM mês
+   por vez, o atual no padrão (12/11/2026, Levi: "sempre filtrado no mês atual, que dê para filtrar em outros meses
+   também"; até ali, os últimos 60 dias) #}
+<p class="lead">As novidades, as correções e as melhorias de desempenho do Nexus em {{ mes_nome }}, da mais nova para a mais antiga.</p>
 
 {% if not tem_git %}
 <p class="aviso">Sem o histórico de atualizações nesta máquina (o Nexus não está num clone do repositório).</p>
-{% elif not dias %}
-<p class="aviso">Nenhuma novidade, correção ou melhoria de desempenho nos últimos {{ janela }} dias.</p>
 {% else %}
+{# o mês e a pessoa no padrão dos filtros do Nexus (static/filtros-os.js, o modelo do Histórico de OS): o mês atual é o
+   "sem filtro"; outro mês vira etiqueta, e o × dela volta ao atual #}
+<form class="atu-filtros" method="get" action="{{ url_for('casca.inicio') }}" data-fo>
+  <input type="hidden" name="aba" value="atualizacoes">
+  <label class="atu-filtro"><span class="gc-rotulo">Mês</span>
+    <select class="gc-campo" name="mes" data-padrao="{{ mes_atual }}">
+      {% for k, nome in meses %}<option value="{{ k }}"{% if k == mes %} selected{% endif %}>{{ nome }}</option>{% endfor %}</select></label>
+  <label class="atu-filtro"><span class="gc-rotulo">Pessoa</span>
+    <select class="gc-campo" name="autor" multiple data-todos="Todas as pessoas">
+      {% for p in pessoas %}<option value="{{ p.chave }}"{% if p.chave in autores %} selected{% endif %}>{{ p.nome }} ({{ p.commits }})</option>{% endfor %}</select></label>
+  <button class="gc-btn gc-btn--ui" type="submit" data-fo-some>Filtrar</button>
+</form>
+<script src="{{ url_for('static', filename='filtros-os.js') }}"></script>
+
+<div class="atu-grade">
 <div class="atualizacoes">
+  {% if not dias %}
+  <p class="aviso">Nenhuma novidade, correção ou melhoria de desempenho em {{ mes_nome }}{% if autores %} com esse filtro de pessoa{% endif %}.</p>
+  {% endif %}
   {# os dias antes de hoje vêm recolhidos, com quantos de cada tipo no cabeçalho (29/10/2026, Levi: "gostaria que os dias
      que fossem anteriores a hoje ficassem recolhidos e contando a quantidade de correção, novidade e desempenho"), e o total na ponta; o
      "no ar" sobe ao cabeçalho para o clique no cartão da versão achar o dia mesmo recolhido #}
@@ -58,7 +75,34 @@
     </ol>
   </details>
   {% endfor %}
-  <p class="mudo atu-rodape">{{ total }} {{ 'atualização' if total == 1 else 'atualizações' }} nos últimos {{ janela }} dias.</p>
+  {% if dias %}<p class="mudo atu-rodape">{{ total }} {{ 'atualização' if total == 1 else 'atualizações' }} em {{ mes_nome }}{% if autores %}, de {{ pessoas|selectattr('chave', 'in', autores)|map(attribute='nome')|join(', ') }}{% endif %}.</p>{% endif %}
+</div>
+
+{# os cartões por pessoa ao lado (12/11/2026, Levi: "ao lado das atualizações, tivesse os cards de quantos commits as
+   pessoas que estão mexendo no Nexus fizeram. E clicando nas pessoas vai ficar filtrado"): os commits do mês de cada uma
+   (todos os tipos, sem os merges) e, deles, quantos são novidade, correção e desempenho, os que a lista mostra. O clique
+   filtra a lista por aquela pessoa; o clique na que já está filtrada, ou em Todos, volta a todas #}
+{% set o_mes = mes if mes != mes_atual else none %}
+<aside class="atu-pessoas" aria-labelledby="atu-pessoas-t">
+  <h2 class="ui-kicker" id="atu-pessoas-t">Commits em {{ mes_nome }}</h2>
+  {% if not pessoas %}<p class="mudo">Nenhum commit neste mês.</p>{% else %}
+  <a class="atu-pessoa atu-pessoa--todos" href="{{ url_for('casca.inicio', aba='atualizacoes', mes=o_mes) }}"{% if not autores %} aria-current="true"{% endif %}>
+    <span class="atu-pessoa-nome">Todos</span><b class="atu-pessoa-n">{{ commits_mes }}</b>
+  </a>
+  {% for p in pessoas %}
+  {% set so_ela = autores == [p.chave] %}
+  <a class="atu-pessoa" href="{{ url_for('casca.inicio', aba='atualizacoes', mes=o_mes, autor=(none if so_ela else p.chave)) }}"{% if p.chave in autores %} aria-current="true"{% endif %}
+     title="{{ 'Voltar a todas as pessoas' if so_ela else 'Ver só as atualizações de ' ~ p.nome }}">
+    <span class="atu-pessoa-nome">{{ p.nome }}</span><b class="atu-pessoa-n">{{ p.commits }}</b>
+    <span class="atu-pessoa-tipos">
+      {% for tipo_id, rot in (('feat', 'Novidade'), ('fix', 'Correção'), ('perf', 'Desempenho')) %}{% if p[tipo_id] %}<span class="gc-status gc-status--{{ {'feat': 'ok', 'fix': 'alerta', 'perf': 'info'}[tipo_id] }}">{{ rot }} {{ p[tipo_id] }}</span>{% endif %}{% endfor %}
+      {% set outros = p.commits - p.feat - p.fix - p.perf %}{% if outros %}<span class="mudo" title="Documentação, teste, manutenção e ajuste interno: não entram na lista ao lado">outros {{ outros }}</span>{% endif %}
+    </span>
+  </a>
+  {% endfor %}
+  <p class="mudo atu-pessoas-nota">Conta cada commit do mês, sem os merges. A lista mostra as novidades, as correções e o desempenho.</p>
+  {% endif %}
+</aside>
 </div>
 {% endif %}
 {% endblock %}

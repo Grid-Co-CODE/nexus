@@ -55,9 +55,9 @@ def test_a_aba_atualizacoes_lista_os_commits_por_dia_com_o_que_mudou(app, logado
     assert "Novidade" in html and "Correção" in html and ">base<" in html
     assert "Equipamentos das usinas liga pela aba" in html and "cada chave vai a usina" in html
     assert "Corpo da mensagem." in html and "Co-Authored-By" not in html        # a coautoria não aparece
-    # só novidade e correção (19/10/2026, Levi: "deixe só novidade e correção, sempre os últimos 60 dias!")
+    # só novidade e correção (19/10/2026, Levi: "deixe só novidade e correção"), do mês de hoje (12/11/2026)
     assert "mensagem sem tipo" not in html and "no ar</span>" in html
-    assert "2 atualizações nos últimos 60 dias." in html
+    assert "2 atualizações em outubro de 2026." in html
 
 
 def test_sem_git_o_cartao_diz_traco_e_a_aba_diz_por_que(app, logado, monkeypatch):
@@ -114,7 +114,7 @@ def test_a_aba_nao_mostra_horario_e_mostra_os_topicos(app, logado, monkeypatch):
                         f"{SHA}\x1f2026-10-14T03:10:00Z\x1ffeat(base): sai a tela\n")
     monkeypatch.setattr(casca, "_commit", lambda: "648c100")
 
-    class Dia(datetime):                         # a data fica fixa: a aba só mostra os últimos 60 dias
+    class Dia(datetime):                         # a data fica fixa: a aba abre no mês de hoje
         @classmethod
         def now(cls, tz=None):
             return datetime(2026, 10, 14, 20, 0, tzinfo=tz)
@@ -141,9 +141,11 @@ def test_o_cartao_da_versao_tem_o_mesmo_recheio_das_outras_caixas():
 
 
 
-def test_a_aba_so_mostra_novidade_e_correcao_dos_ultimos_60_dias(app, logado, monkeypatch):
-    """19/10/2026, Levi: "Em início > atualização deixe só novidade e correção sempre os últimos 60 dias!". A versão no
-    ar pode ser um commit que não entra na lista (uma documentação): aí nenhum item leva o "no ar"."""
+def test_a_aba_so_mostra_novidade_e_correcao_do_mes(app, logado, monkeypatch):
+    """19/10/2026, Levi: "Em início > atualização deixe só novidade e correção sempre os últimos 60 dias!"; desde
+    12/11/2026 um mês por vez, o atual no padrão ("sempre filtrado no mês atual, que dê para filtrar em outros meses
+    também"). A versão no ar pode ser um commit que não entra na lista (uma documentação): aí nenhum item leva o "no
+    ar"."""
     doc = "dddd111222333444555666777888999000dddd"
     log = (f"{doc}\x1f2026-10-19T12:00:00-03:00\x1fdocs(base): o CLAUDE.md da base\x1f\x1e"
            "eeee111222333444555666777888999000eeee\x1f2026-10-18T12:00:00-03:00\x1ffeat(pcm): o quadro novo\x1f\x1e"
@@ -164,27 +166,129 @@ def test_a_aba_so_mostra_novidade_e_correcao_dos_ultimos_60_dias(app, logado, mo
     versao.historico.cache_clear()
     try:
         html = logado.get("/?aba=atualizacoes").get_data(as_text=True)
+        setembro = logado.get("/?aba=atualizacoes&mes=2026-09").get_data(as_text=True).split('class="lead"', 1)[1]
+        invalido = logado.get("/?aba=atualizacoes&mes=1999-01").get_data(as_text=True).split('class="lead"', 1)[1]
     finally:
         versao.local.cache_clear()
         versao.historico.cache_clear()
     aba = html.split('class="lead"', 1)[1]
-    assert "o quadro novo" in aba and "a foto da ronda" in aba          # feat e fix dentro dos 60 dias
+    assert "em outubro de 2026, da mais nova" in aba and "o quadro novo" in aba       # o feat do mês
     assert "mais rapido" in aba and "Desempenho" in aba                 # e o perf (24/10/2026)
-    for fora in ("velho demais", "o CLAUDE.md da base", "Merge do setor"):
-        assert fora not in aba                                          # mais de 60 dias, docs e merge
+    for fora in ("a foto da ronda", "velho demais", "o CLAUDE.md da base", "Merge do setor"):
+        assert fora not in aba                                          # os outros meses, docs e merge
     assert "no ar</span>" not in aba                                    # a versão no ar é a documentação
-    assert "3 atualizações nos últimos 60 dias." in aba
+    assert "2 atualizações em outubro de 2026." in aba
     assert "Documentação" not in aba
+    # o filtro de mês: os meses que têm commit, o atual marcado e como o "sem filtro" do padrão dos filtros
+    assert 'name="mes" data-padrao="2026-10"' in aba and 'data-fo>' in aba
+    assert '<option value="2026-10" selected>outubro de 2026</option>' in aba
+    assert '<option value="2026-09">setembro de 2026</option>' in aba and '<option value="2026-08">' in aba
+    assert "a foto da ronda" in setembro and "o quadro novo" not in setembro
+    assert "1 atualização em setembro de 2026." in setembro and '<option value="2026-09" selected>' in setembro
+    assert "em outubro de 2026, da mais nova" in invalido               # o mês que não existe cai no atual
 
 
-def test_da_aba_corta_no_dia_do_pedido():
+def test_da_aba_fica_no_mes_e_na_pessoa():
     from datetime import timedelta, timezone
     brt = timezone(timedelta(hours=-3))
     agora = datetime(2026, 10, 19, 12, 0, tzinfo=brt)
-    itens = [{"tipo_id": "feat", "em": agora - timedelta(days=59, hours=23)},
-             {"tipo_id": "fix", "em": agora - timedelta(days=60, hours=1)},
-             {"tipo_id": "docs", "em": agora}, {"tipo_id": "feat", "em": None}]
-    assert versao.da_aba(itens, agora) == [itens[0]]
+    itens = [{"tipo_id": "feat", "em": agora, "pessoa": "fulano"},
+             {"tipo_id": "fix", "em": datetime(2026, 10, 1, 0, 0, tzinfo=brt), "pessoa": "beltrana"},
+             {"tipo_id": "fix", "em": datetime(2026, 9, 30, 23, 59, tzinfo=brt), "pessoa": "fulano"},
+             {"tipo_id": "docs", "em": agora, "pessoa": "fulano"}, {"tipo_id": "feat", "em": None, "pessoa": "fulano"}]
+    assert versao.da_aba(itens, "2026-10") == itens[:2]
+    assert versao.da_aba(itens, "2026-10", ["beltrana"]) == [itens[1]]
+    assert versao.da_aba(itens, "2026-09") == [itens[2]] and versao.da_aba(itens, "2026-08") == []
+    # os meses do filtro: os que têm commit e o de hoje, do mais novo; o pedido que não está na lista cai no de hoje
+    em_novembro = datetime(2026, 11, 2, 9, 0, tzinfo=brt)
+    assert versao.meses(itens, em_novembro) == [("2026-11", "novembro de 2026"), ("2026-10", "outubro de 2026"),
+                                                ("2026-09", "setembro de 2026")]
+    assert versao.mes_pedido("2026-09", itens, em_novembro) == "2026-09"
+    assert versao.mes_pedido("2026-07", itens, em_novembro) == versao.mes_pedido(None, itens, em_novembro) == "2026-11"
+
+
+def test_a_pessoa_do_commit_junta_as_contas_da_mesma_pessoa():
+    """O git traz a mesma pessoa em duas contas (o nome de usuário e o nome completo, com e-mails diferentes): a chave
+    é o 1º nome, sem acento nem caixa."""
+    assert versao.pessoa_de("Fulano-1234") == versao.pessoa_de("Fulano de Tal") == "fulano"
+    assert versao.pessoa_de("Élia Souza") == "elia" and versao.pessoa_de("") == "" and versao.pessoa_de(None) == ""
+
+
+LOG_PESSOAS = (
+    "a111111222333444555666777888999000aaaa\x1f2026-11-12T10:00:00-03:00\x1ffeat(pcm): o quadro novo\x1f\x1fFulano-1234\x1fp1\x1e"
+    "a222111222333444555666777888999000aaaa\x1f2026-11-11T10:00:00-03:00\x1ffix(campo): a foto da ronda\x1f\x1fFulano de Tal\x1fp1\x1e"
+    "a333111222333444555666777888999000aaaa\x1f2026-11-11T09:00:00-03:00\x1fdocs(base): o CLAUDE.md\x1f\x1fFulano-1234\x1fp1\x1e"
+    "a444111222333444555666777888999000aaaa\x1f2026-11-10T10:00:00-03:00\x1fMerge do setor Campo\x1f\x1fFulano-1234\x1fp1 p2\x1e"
+    "a555111222333444555666777888999000aaaa\x1f2026-11-10T09:00:00-03:00\x1ffeat(cos): o filtro da Beltrana\x1f\x1fBeltrana Souza\x1fp1\x1e"
+    "a666111222333444555666777888999000aaaa\x1f2026-10-30T09:00:00-03:00\x1fperf(casca): mais rapido\x1f\x1fBeltrana Souza\x1fp1\x1e"
+    "a777111222333444555666777888999000aaaa\x1f2026-10-29T09:00:00-03:00\x1ffix(base): o de outubro\x1f\x1fCicrano Lima\x1fp1\x1e")
+
+
+def test_os_cartoes_de_commits_por_pessoa_e_o_filtro_por_pessoa_e_por_mes(app, logado, monkeypatch):
+    """12/11/2026, Levi: "em início, atualizações, ao lado das atualizações, tivesse os cards de quantos commits as
+    pessoas que estão mexendo no Nexus fizeram. E clicando nas pessoas vai ficar filtrado. E também que esteja sempre
+    filtrado no mês atual, que dê para filtrar em outros meses também". O cartão conta todo commit do mês da pessoa (as
+    duas contas do git juntas), sem os merges, e diz quantos são novidade, correção e desempenho."""
+    monkeypatch.setattr(versao, "_git", lambda *a, **k: LOG_PESSOAS if a[1] != "-1" else
+                        "a111111222333444555666777888999000aaaa\x1f2026-11-12T10:00:00-03:00\x1ffeat(pcm): o quadro novo\n")
+    monkeypatch.setattr(casca, "_commit", lambda: "a111111")
+
+    class Dia(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return datetime(2026, 11, 12, 15, 0, tzinfo=tz)
+    monkeypatch.setattr(versao, "datetime", Dia)
+    versao.local.cache_clear()
+    versao.historico.cache_clear()
+    try:
+        # o registro do git pede o autor e os pais no fim
+        pedido = []
+        versao.historico.cache_clear()
+        monkeypatch.setattr(versao, "_git", lambda *a, **k: (pedido.append(a), LOG_PESSOAS)[1] if a[1] != "-1" else
+                            "a111111222333444555666777888999000aaaa\x1f2026-11-12T10:00:00-03:00\x1ffeat(pcm): o quadro novo\n")
+        html = logado.get("/?aba=atualizacoes").get_data(as_text=True)
+        assert any(x.endswith("%x1f%an%x1f%P%x1e") for x in pedido[0])
+        dela = logado.get("/?aba=atualizacoes&autor=beltrana").get_data(as_text=True)
+        outubro = logado.get("/?aba=atualizacoes&mes=2026-10&autor=cicrano").get_data(as_text=True)
+        estranho = logado.get("/?aba=atualizacoes&autor=ninguem").get_data(as_text=True)
+    finally:
+        versao.local.cache_clear()
+        versao.historico.cache_clear()
+
+    def cartoes(pagina):
+        return pagina.split('class="atu-pessoas"', 1)[1].split("</aside>", 1)[0]
+
+    def lista(pagina):
+        return pagina.split('class="atualizacoes"', 1)[1].split('class="atu-pessoas"', 1)[0]
+
+    lado = cartoes(html)
+    assert "Commits em novembro de 2026" in lado
+    # Fulano: 3 commits (o merge não conta), 1 novidade, 1 correção e 1 de outro tipo; o nome de gente, não o de usuário
+    assert lado.index("Fulano de Tal") < lado.index("Beltrana Souza") and "Fulano-1234" not in lado
+    fulano = lado.split("Fulano de Tal", 1)[1].split("</a>", 1)[0]
+    assert '<b class="atu-pessoa-n">3</b>' in fulano and ">Novidade 1<" in fulano and ">Correção 1<" in fulano
+    assert ">outros 1<" in fulano and "Desempenho" not in fulano
+    assert '<b class="atu-pessoa-n">1</b>' in lado.split("Beltrana Souza", 1)[1].split("</a>", 1)[0]
+    assert '<span class="atu-pessoa-nome">Todos</span><b class="atu-pessoa-n">4</b>' in lado
+    assert "Cicrano" not in lado                                        # só commit em outubro
+    # o clique no cartão filtra por aquela pessoa; sem filtro, o "Todos" é o marcado
+    assert 'href="/?aba=atualizacoes&amp;autor=beltrana"' in lado and 'href="/?aba=atualizacoes" aria-current="true"' in lado
+    assert "o quadro novo" in lista(html) and "o filtro da Beltrana" in lista(html) and "o de outubro" not in lista(html)
+    assert "3 atualizações em novembro de 2026." in html
+    assert '<option value="fulano">Fulano de Tal (3)</option>' in html and 'name="autor" multiple' in html
+    # filtrado por ela: só as dela na lista; os cartões seguem todos, o dela marcado, e o clique nele volta a todas
+    assert "o filtro da Beltrana" in lista(dela) and "o quadro novo" not in lista(dela)
+    assert "1 atualização em novembro de 2026, de Beltrana Souza." in dela
+    ela = cartoes(dela).split("Beltrana Souza", 1)[0].rsplit("<a ", 1)[1]
+    assert 'href="/?aba=atualizacoes"' in ela and 'aria-current="true"' in ela
+    assert "Fulano de Tal" in cartoes(dela) and '<option value="beltrana" selected>' in dela
+    # outro mês: os cartões e a lista são os dele, e o clique guarda o mês
+    assert "Commits em outubro de 2026" in cartoes(outubro) and "Cicrano Lima" in cartoes(outubro)
+    assert "o de outubro" in lista(outubro) and "mais rapido" not in lista(outubro)
+    assert 'href="/?aba=atualizacoes&amp;mes=2026-10&amp;autor=beltrana"' in cartoes(outubro)
+    # a pessoa que não existe no mês não filtra nada
+    assert "3 atualizações em novembro de 2026." in estranho
+
 
 
 def test_contagem_por_tipo_na_ordem_da_aba():
