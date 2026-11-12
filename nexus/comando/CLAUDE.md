@@ -27,7 +27,7 @@ muito boa"; e "construa o que você sugere"). PRD e tarefas no formato do Taskma
 | `../casca/__init__.py` (`_sino`) + `base.html` | O sino do topo |
 | `avisos.py` + `../casca/__init__.py` (`_avisos_do_sino`, `POST /t/comando/aviso/lida`) | Os avisos das OS de cada pessoa no sino ("OS x concluída pelo técnico", "Sua solicitação gerou uma OS" e, desde 08/11/2026, "OS x criada para você"; desde 11/11/2026, tudo da OS da solicitação, com a cancelada) e o Marcar como lida: o livro `nexus_avisos · fato_evento_aviso` |
 | `demandas_regras.py` + `demandas.py` + `../torres/comando/demandas_tela.py` | As demandas entre setores (12/11/2026): a regra do prazo e dos avisos, o livro `nexus_demandas` e as telas (o bloco da Caixa, a Nova demanda, os Temas do setor e o sininho); ver a seção abaixo |
-| `solicitacoes_fracttal.py` | As solicitações do Fracttal que viraram OS (REST `work_requests`, por trás, a cada 5 min, na memória) e o motivo das OS delas canceladas, para os avisos de quem pediu (11/11/2026) |
+| `solicitacoes_fracttal.py` | As solicitações do Fracttal que viraram OS (REST `work_requests`, por trás, a cada 5 min, na memória) e o motivo das OS delas canceladas, para os avisos de quem pediu (11/11/2026); desde 12/11/2026 também o mapa OS → quem pediu, da leitura inteira (~400 dias, 100 por página, uma vez por dia), para o filtro Solicitante do Histórico de OS (`ligar_historico`, o gancho da ponte) |
 
 ## As regras da Fase 1 (e de onde cada uma lê)
 | Regra | Torre dona | Fonte |

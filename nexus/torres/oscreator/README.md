@@ -1272,6 +1272,13 @@ concluir e cancelar!".
   também). Ele só muda o status: o diálogo (`verificacao`, como o do Concluir) mostra as subtarefas sem resposta e
   oferece o "Fazer a tarefa" antes (o executar sozinho não muda o status). No card, o botão sai na OS que não está Em
   Verificação, Concluída nem Cancelada.
+- **Os filtros Responsável e Solicitante do Histórico** (12/11/2026, Levi: "Responsável (atribuição da OS), Solicitante
+  (quem fez a abertura da solicitação, quando a OS foi gerada por uma solicitação e não direto de OS)"): filtros da tabela,
+  como o Cliente (`data-resp` e `data-sol` em cada linha; `LOCAIS`, `DA_TABELA`, `ROTULO` e `ORDEM` no historico.html).
+  O Responsável é o atribuído da OS (`atribuido_a`); o Solicitante sai do gancho `rotas.SOLICITANTE_DA_OS`, que a ponte
+  liga às solicitações do Fracttal lidas por trás no Nexus (`nexus/comando/solicitacoes_fracttal.py`: a leitura de 5 min,
+  30 dias, e o mapa do dia, a leitura inteira de ~400 dias). As linhas guardadas da versão da lista são refeitas quando o
+  mapa muda. Sozinho (sem a ponte), o Solicitante fica vazio.
 - **Garantias abre o Raio X da OS** (11/11/2026, a etapa 2 do Raio X, "uma página só"): no Nexus, o cartão e a linha do
   quadro (`acomp.html`, o `abrir`) levam à página da OS do Nexus na janela inteira (`target="_top"`; a linha, pelo
   `data-topo` no acomp.js), com `?de=garantias`; a ponte passa a página da OS também ao quadro. A tela do chamado ganhou o

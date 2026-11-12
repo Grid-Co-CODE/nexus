@@ -39,6 +39,7 @@ def limpar() -> None:
     with _TRAVA:
         _ESTADO.update(linhas=None, lido=0.0, lendo=False)
         _CANCEL.clear()
+        _MAPA.update(por_wid=None, lido=0.0, lendo=False)
 
 
 def _txt(v) -> str:
@@ -68,13 +69,16 @@ def enxuta(r: dict) -> dict | None:
             "aprovador": _txt(r.get("requests_x_status_accounts_name"))}
 
 
-def ler_rest(agora: datetime | None = None) -> list[dict]:
-    """As solicitações com OS feitas nos últimos DIAS, pelo REST (erro sobe: quem chama fica com a leitura de antes)."""
+def ler_rest(agora: datetime | None = None, dias: int = DIAS, teto: int = MAX_LINHAS, pausa: float = 0.0) -> list[dict]:
+    """As solicitações com OS feitas nos últimos `dias`, pelo REST (erro sobe: quem chama fica com a leitura de antes). O
+    REST entrega no máximo 100 por página (sondado em 12/11/2026: o limit de 500 e 1000 devolve 99)."""
     api = _clone("api")
     agora = agora or datetime.now(_BRT)
-    since = (agora - timedelta(days=DIAS)).strftime("%Y-%m-%dT00:00:00")
+    since = (agora - timedelta(days=dias)).strftime("%Y-%m-%dT00:00:00")
     out, start = [], 0
-    while start < MAX_LINHAS:
+    while start < teto:
+        if start and pausa:
+            time.sleep(pausa)                       # a leitura inteira não gasta a cota da empresa de uma vez
         r = api._req("GET", "work_requests", params={"since": since, "limit": LIMITE, "start": start})
         d = (r.get("data") if isinstance(r, dict) else r) or []
         out += [x for x in (enxuta(l) for l in d if isinstance(l, dict)) if x]
@@ -153,6 +157,72 @@ def atuais(app=None) -> tuple:
         preparar(app)
     with _TRAVA:
         return list(_ESTADO["linhas"] or []), dict(_CANCEL)
+
+
+# O MAPA OS → QUEM PEDIU, para o filtro Solicitante do Histórico de OS (Levi, 12/11/2026: "Solicitante (quem fez a abertura
+# da solicitação, quando a OS foi gerada por uma solicitação e não direto de OS)"). O Histórico vai até 1 ano, e a leitura
+# de 5 min cobre 30 dias: uma vez por dia, POR TRÁS, a leitura inteira (DIAS_MAPA, ~4.300 solicitações em 12/11/2026, umas
+# 44 páginas com uma pausa entre elas); a leitura de 5 min soma as novas. Só na memória: o nome de quem pediu não vai ao
+# banco por aqui
+DIAS_MAPA = 400
+TTL_MAPA_S = 24 * 3600
+MAX_MAPA = 20000
+PAUSA_MAPA_S = 0.3
+_MAPA = {"por_wid": None, "lido": 0.0, "lendo": False, "versao": 0}
+
+
+def _renovar_mapa(app) -> None:
+    try:
+        if app is not None:
+            with app.app_context():
+                linhas = ler_rest(dias=DIAS_MAPA, teto=MAX_MAPA, pausa=PAUSA_MAPA_S)
+        else:
+            linhas = ler_rest(dias=DIAS_MAPA, teto=MAX_MAPA, pausa=PAUSA_MAPA_S)
+        with _TRAVA:
+            _MAPA.update(por_wid={l["wid"]: l for l in linhas}, lido=time.monotonic(), versao=_MAPA["versao"] + 1)
+    except Exception as e:       # noqa: BLE001 — fica o mapa de antes; amanhã tenta de novo
+        log.warning("Solicitações do Fracttal: a leitura inteira não veio (%s)", type(e).__name__)
+        with _TRAVA:
+            _MAPA["lido"] = time.monotonic() - TTL_MAPA_S + 600      # a que falhou tenta de novo em 10 min, não a cada pedido
+    finally:
+        with _TRAVA:
+            _MAPA["lendo"] = False
+
+
+def preparar_mapa(app=None) -> None:
+    with _TRAVA:
+        vencido = _MAPA["por_wid"] is None and not _MAPA["lido"] or time.monotonic() - _MAPA["lido"] >= TTL_MAPA_S
+        if not vencido or _MAPA["lendo"]:
+            return
+        _MAPA["lendo"] = True
+    _em_segundo_plano(lambda: _renovar_mapa(app))
+
+
+def solicitante_da_os(wid, app=None) -> str:
+    """Quem pediu a solicitação que gerou a OS `wid`, "" quando ela não nasceu de uma (ou ainda não se sabe). Nunca espera:
+    a leitura de 5 min (as novas) e o mapa do dia."""
+    w = _int(wid)
+    if w is None:
+        return ""
+    linhas, _c = atuais(app)
+    if _ligado(app):
+        preparar_mapa(app)
+    l = next((x for x in linhas if x["wid"] == w), None) or (_MAPA["por_wid"] or {}).get(w)
+    return (l or {}).get("nome") or ""
+
+
+def versao_do_mapa() -> tuple:
+    """Muda quando o mapa ou a leitura de 5 min mudam (o Histórico refaz as linhas guardadas com o Solicitante novo)."""
+    with _TRAVA:
+        return _MAPA["versao"], _ESTADO["lido"]
+
+
+def ligar_historico(app):
+    """O gancho que a ponte põe no Histórico do OS Creator (`rotas.SOLICITANTE_DA_OS`): o nome de quem pediu, por OS."""
+    def fn(wid):
+        return solicitante_da_os(wid, app)
+    fn.versao = versao_do_mapa
+    return fn
 
 
 def da_os(wid, app=None) -> dict | None:

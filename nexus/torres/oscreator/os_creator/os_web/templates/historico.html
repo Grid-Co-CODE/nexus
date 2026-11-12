@@ -56,7 +56,7 @@
       <label class="fl-campo fl-busca" title="Filtra as OS carregadas por nº, cliente, usina, ativo, descrição, status, tipo de tarefa e etiqueta  [Ctrl+F]"><svg class="fl-ico" aria-hidden="true"><use href="#fl-i-busca"/></svg><input type="search" name="busca" id="busca_no" value="{{ busca }}" placeholder="Filtrar por nº, cliente, usina, ativo, descrição…" aria-label="Filtrar as OS carregadas"></label>
       <label class="fl-campo fl-busca-os" title="Buscar OS pelo nº: digite o número e tecle Enter — abre a OS direto, mesmo fora do período e dos filtros"><svg class="fl-ico" aria-hidden="true"><use href="#fl-i-hash"/></svg><input type="text" id="busca_os" placeholder="Nº da OS" inputmode="numeric" aria-label="Buscar OS pelo número"></label>
       <button type="button" class="fl-btn fl-periodo" id="b_periodo" aria-haspopup="dialog" aria-expanded="false" aria-controls="fl_painel" title="Período das OS: abre os filtros"><svg class="fl-ico" aria-hidden="true"><use href="#fl-i-cal"/></svg><span id="fl_periodo_txt">{{ de[8:10] }}/{{ de[5:7] }} – {{ ate[8:10] }}/{{ ate[5:7] }}</span><svg class="fl-ico fl-seta" aria-hidden="true"><use href="#fl-i-seta"/></svg></button>
-      <button type="button" class="fl-btn" id="b_filtros" aria-haspopup="dialog" aria-expanded="false" aria-controls="fl_painel" title="Abre os filtros: Criado por, Etiqueta, Status, Cliente, Usina e os Tipos"><svg class="fl-ico" aria-hidden="true"><use href="#fl-i-filtro"/></svg>Filtros <span class="fl-badge" id="fl_n" hidden>0</span></button>
+      <button type="button" class="fl-btn" id="b_filtros" aria-haspopup="dialog" aria-expanded="false" aria-controls="fl_painel" title="Abre os filtros: Criado por, Etiqueta, Status, Cliente, Usina, os Tipos, Responsável e Solicitante"><svg class="fl-ico" aria-hidden="true"><use href="#fl-i-filtro"/></svg>Filtros <span class="fl-badge" id="fl_n" hidden>0</span></button>
       <div class="fl-dir">
         <button type="button" class="fl-btn fl-so-icone" id="b_export" title="Exporta as OS exibidas p/ CSV (abre no Excel).  [Ctrl+E]" aria-label="Exportar"><svg class="fl-ico" aria-hidden="true"><use href="#fl-i-baixar"/></svg></button>
         <button type="submit" class="fl-btn fl-so-icone" id="b_atualizar" title="{% if da_lista_central %}Atualizar  [F5] — confere de novo com o Fracttal e mostra a lista central de OS (o servidor a lê de poucos em poucos minutos){% else %}Atualizar  [F5] — busca de novo no Fracttal{% endif %}" aria-label="Atualizar"><svg class="fl-ico" aria-hidden="true"><use href="#fl-i-atual"/></svg></button>
@@ -122,6 +122,9 @@
             {{ multi('usina', 'Usina', 'Todas as usinas', usinas, [], True, usina_cli) }}
             {{ multi('tipo', 'Tipo de ativo', 'Todos os tipos', tipos_ativo, [], True, None) }}
             {{ multi('tarefa', 'Tipo de tarefa', 'Todos os tipos de tarefa', tipos_tarefa, tarefa_sel, True, None) }}
+            {# o Responsável (o atribuído da OS) e o Solicitante (quem pediu a solicitação que gerou a OS), 12/11/2026 #}
+            {{ multi('resp', 'Responsável', 'Todos os responsáveis', responsaveis, [], True, None) }}
+            {{ multi('solicitante', 'Solicitante', 'Todos os solicitantes', solicitantes, [], True, None) }}
           </div>
         </div>
         <div class="fl-rodape">
@@ -355,12 +358,14 @@
   }
   function aplica() {
     var stats = marcados("status"), clis = marcados("cliente"), usis = marcados("usina"), tips = marcados("tipo"), tars = marcados("tarefa");
+    var resps = marcados("resp"), sols = marcados("solicitante");
     var no = (document.getElementById("busca_no").value || "").trim().toLowerCase(), n = 0;
     linhas.forEach(function (tr) {
       var d = tr.dataset, tarefas = (d.tarefa || "").split(" / ");
       var ok = (!stats.length || stats.indexOf(d.status) >= 0) && (!clis.length || clis.indexOf(d.cliente) >= 0)
             && (!usis.length || usis.indexOf(d.usina) >= 0) && (!tips.length || tips.indexOf(d.tipo) >= 0)
             && (!tars.length || tarefas.some(function (t) { return tars.indexOf(t) >= 0; }))
+            && (!resps.length || resps.indexOf(d.resp || "") >= 0) && (!sols.length || sols.indexOf(d.sol || "") >= 0)
             && (!no || (d.texto + " " + (d.tarefa || "").toLowerCase()).indexOf(no) >= 0);
       tr.hidden = !ok; if (ok) n++;
     });
@@ -376,7 +381,7 @@
 
   // ── o Aplicar: acende quando o que está escolhido difere do que está aplicado; apaga se a pessoa desfaz a troca ──
   var bApl = document.getElementById("b_aplicar"), nAlt = document.getElementById("fl_nalt");
-  var LOCAIS = ["status", "cliente", "usina", "tipo", "tarefa"];
+  var LOCAIS = ["status", "cliente", "usina", "tipo", "tarefa", "resp", "solicitante"];
   // A lista que chegou com Status no endereço já veio CORTADA pelo servidor (ele filtra pelo status): tirar ou trocar esse status
   // só pela tabela mostraria as mesmas OS e diria que são todas. Nessa página o status conta como campo do servidor; na que veio
   // sem status ele segue só filtrando a tabela (a regra do Aplicar).
@@ -395,7 +400,8 @@
   function aplicado() { return juntos(JSON.parse(servidorAplicado), JSON.parse(locaisAplicados || "{}")); }
   // os campos do painel e o que cada um guarda: o Período são duas datas e conta como UMA alteração
   var CAMPOS = [["periodo", ["de", "ate"]], ["pessoa", ["pessoa"]], ["etiqueta", ["etiqueta"]], ["status", ["status"]],
-                ["cliente", ["cliente"]], ["usina", ["usina"]], ["tipo", ["tipo"]], ["tarefa", ["tarefa"]]];
+                ["cliente", ["cliente"]], ["usina", ["usina"]], ["tipo", ["tipo"]], ["tarefa", ["tarefa"]],
+                ["resp", ["resp"]], ["solicitante", ["solicitante"]]];
   var PONTO = {de: document.querySelector('[data-ponto="de"]'), ate: document.querySelector('[data-ponto="ate"]')};   // onde vai o ponto lima
   CAMPOS.slice(1).forEach(function (c) { PONTO[c[0]] = document.querySelector('.fl-cel[data-filtro="' + c[0] + '"]'); });
   // o Aplicar do rodapé acende com N alterações (a conta é por campo); cada campo que mudou ganha o ponto lima
@@ -418,7 +424,7 @@
   // os filtros da tabela que não vão ao servidor (Cliente, Usina, Tipos) atravessam a busca: guardados antes de mandar e
   // remarcados ao chegar. Sem isso, o Aplicar que muda o Período e a Usina juntos perdia a Usina, e a atualização de 10 min
   // zerava os filtros da tabela. Sem sessionStorage (aba anônima com bloqueio), eles zeram, como antes.
-  var GUARDA = "os_hist_filtros_da_tabela", DA_TABELA = ["cliente", "usina", "tipo", "tarefa"];
+  var GUARDA = "os_hist_filtros_da_tabela", DA_TABELA = ["cliente", "usina", "tipo", "tarefa", "resp", "solicitante"];
   function guardaLocais() {
     try { var v = {}; DA_TABELA.forEach(function (n) { v[n] = marcados(n); }); sessionStorage.setItem(GUARDA, JSON.stringify(v)); }
     catch (e) { /* sem sessionStorage: os filtros da tabela zeram na volta */ }
@@ -535,6 +541,7 @@
     form.querySelector("input[name=de]").value = s.de; form.querySelector("input[name=ate]").value = s.ate;
     poe("status", l.status || []); poe("cliente", l.cliente || []);                // o Cliente antes: a cascata esconde as usinas dele
     poe("usina", l.usina || []); poe("tipo", l.tipo || []); poe("tarefa", l.tarefa || []);
+    poe("resp", l.resp || []); poe("solicitante", l.solicitante || []);
     document.querySelectorAll(".os-multi:not(.fl-uni)").forEach(resumo);
     acende();
   }
@@ -544,8 +551,9 @@
     poe("etiqueta", ""); LOCAIS.forEach(function (n) { poe(n, []); });
     acende();
   });
-  var ROTULO = {pessoa: "Criado por", etiqueta: "Etiqueta", status: "Status", cliente: "Cliente", usina: "Usina", tipo: "Tipo de ativo", tarefa: "Tipo de tarefa"};
-  var ORDEM = ["pessoa", "etiqueta", "status", "cliente", "usina", "tipo", "tarefa"];
+  var ROTULO = {pessoa: "Criado por", etiqueta: "Etiqueta", status: "Status", cliente: "Cliente", usina: "Usina", tipo: "Tipo de ativo", tarefa: "Tipo de tarefa",
+                resp: "Responsável", solicitante: "Solicitante"};
+  var ORDEM = ["pessoa", "etiqueta", "status", "cliente", "usina", "tipo", "tarefa", "resp", "solicitante"];
   var caixaDasEtiquetas = document.getElementById("fl_etiquetas"), bLimpar = document.getElementById("b_limpar"), nFiltros = document.getElementById("fl_n");
   function textoDaEtiqueta(chave, v) {                             // "" = filtro sem valor (não ganha etiqueta)
     if (chave === "pessoa" || chave === "etiqueta") {

@@ -962,10 +962,22 @@ def historico():
             usina_cli.setdefault(l["usina"], l.get("cliente") or "")
     tipos_ativo = sorted({l.get("tipo") for l in linhas if l.get("tipo") and l.get("tipo") != "—"})
     tarefa_sel = list(api.TIPOS_COS) if modo == "cos" else []        # a COS já vem com os tipos do COS marcados
+    # o Responsável e o Solicitante (12/11/2026, Levi: "Adição de filtros: Responsável (atribuição da OS), Solicitante (quem
+    # fez a abertura da solicitação, quando a OS foi gerada por uma solicitação e não direto de OS)"): filtros da tabela,
+    # como o Cliente. Quem pediu vem das solicitações do Fracttal lidas por trás no Nexus (o gancho da ponte); sem ele, vazio
+    sol = SOLICITANTE_DA_OS
+    for l in linhas:
+        l["_solicitante"] = (sol(l.get("id")) if sol else "") or ""
+    responsaveis = sorted({str(l.get("atribuido_a") or "").strip() for l in linhas} - {"", "—"}, key=str.lower)
+    solicitantes = sorted({l["_solicitante"] for l in linhas} - {""}, key=str.lower)
     preparar_linhas(lista)
     cols_v = COLS_COS if modo == "cos" else COLS
     # as linhas da tabela montadas UMA vez por versão da lista, visão e busca (eram 2.000 linhas a cada pedido: 43 s no
     # servidor, Raio-X de 19/10/2026 às 17:15)
+    # o Solicitante novo (o mapa do dia ou a leitura de 5 min mudou) refaz as linhas guardadas desta versão da lista
+    if lista and sol and getattr(lista, "html", None) is not None and lista.html.get("_solicitantes") != sol.versao():
+        lista.html.clear()
+        lista.html["_solicitantes"] = sol.versao()
     linhas_html = Markup(HS.html_das_linhas(lista, (modo, busca), lambda: render_template(
         "_historico_linhas.html", linhas=linhas, cols=cols_v, datas=DATAS, fmt=api.fmt_data_br))) if lista else Markup("")
     pessoa_sel = "TODOS" if id_account == "TODOS" else (str(id_account) if isinstance(id_account, int) else (str(eu) if eu is not None else ""))
@@ -978,7 +990,13 @@ def historico():
                            status_opts=list(api.WO_STATUS.values()), status_sel=status_sel, clientes=clientes,
                            usinas=sorted(usina_cli), usina_cli=usina_cli, tipos_ativo=tipos_ativo,
                            tipos_tarefa=sorted(set(tarefa_sel) | {t for l in linhas for t in str(l.get("tipo_tarefa") or "").split(" / ") if t}),
-                           tarefa_sel=tarefa_sel, cortadas=cortadas, total_srv=total_srv, teto=teto)
+                           tarefa_sel=tarefa_sel, cortadas=cortadas, total_srv=total_srv, teto=teto,
+                           responsaveis=responsaveis, solicitantes=solicitantes)
+
+
+# quem pediu a solicitação que gerou cada OS (12/11/2026): a ponte do Nexus põe a função (`ponte._criar_clone`); o OS
+# Creator sozinho fica sem o filtro Solicitante cheio
+SOLICITANTE_DA_OS = None
 
 
 @bp.route("/historico/progresso")

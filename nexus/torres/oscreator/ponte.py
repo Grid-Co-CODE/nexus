@@ -414,6 +414,11 @@ def _criar_clone(app):
     # quem está no setor Performance em Base → Acessos → Pessoas e setores, no contexto do Nexus
     from os_web import solic_eng_web
     solic_eng_web.MEMBROS_DO_SETOR = membros_do_setor(app)
+    # o Solicitante de cada OS no Histórico (12/11/2026, o filtro Solicitante): as solicitações do Fracttal lidas por trás
+    from os_web import rotas as rotas_do_clone
+
+    from ...comando import solicitacoes_fracttal as SF
+    rotas_do_clone.SOLICITANTE_DA_OS = SF.ligar_historico(app)
     # o original fala http com a plataforma na mesma máquina; aqui o cookie segue o do Nexus (Secure no servidor)
     clone.config["SESSION_COOKIE_SECURE"] = bool(app.config.get("SESSION_COOKIE_SECURE"))
     # e mora no /os do Nexus, debaixo do prefixo em que ele roda (o clone fixa "/os", que debaixo de /nexus não ia ao
