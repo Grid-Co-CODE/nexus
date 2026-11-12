@@ -261,3 +261,130 @@ def test_a_lista_decifra_e_as_tres_abas(app, cena):
         assert {d["demanda_id"] for d in D.da_aba(lst, "pedi", _h(ANA["email"]), 2)} == {"d00000000001", "d00000000002"}
         assert D.filtrar(lst, "abertas", pessoa=_h(BRUNO["email"]))[0]["demanda_id"] == "d00000000002"
         assert D.filtrar(lst, "concluidas") == []
+
+
+# ── as telas ─────────────────────────────────────────────────────────────────────────────────────────────────────────
+import re  # noqa: E402
+
+CAIXA = "/t/comando/caixa-de-entrada"
+
+
+def _cliente(app, pessoa):
+    c = app.test_client()
+    with c.session_transaction() as s:
+        s.update(logado=True, admin=False, usuario=dict(pessoa))
+    return c
+
+
+def _codigo(html):
+    return html.split('name="codigo" value="', 1)[1].split('"', 1)[0]
+
+
+def _linha(html, did):
+    """O <li> da demanda na 1ª aba em que aparece."""
+    return html.split(f'data-dm-linha="{did}"', 1)[1].split("</li>", 1)[0]
+
+
+def _det(html, did):
+    return html.split(f'data-dm-det="{did}"', 1)[1].split("</article>", 1)[0]
+
+
+def _abrir_pela_api(app, cena, **kw):
+    with app.test_request_context():
+        d = D.abrir(_form(cena, **kw), [], ANA)
+    D.limpar()
+    return d["demanda_id"]
+
+
+def test_a_caixa_mostra_a_demanda_para_quem_recebe_quem_pediu_e_o_setor(app, cena):
+    did = _abrir_pela_api(app, cena)
+    html = _cliente(app, JU).get(CAIXA).get_data(as_text=True)
+    assert "Demandas entre setores" in html
+    l = _linha(html, did)
+    # o foco: o nome de quem pediu, o setor dele, o título e as primeiras palavras; o tema uma vez só (Levi, 11/11)
+    assert "Ana Souza" in l and "Supervisão de Campo" in l and "Coração 2 sem meta" in l
+    assert "A Coração 2 não aparece no…" in l and l.count("Dado que não bate") == 1
+    assert "Faltam" in l and "dm-s-nova" in l
+    det = _det(html, did)
+    assert 'data-os-folio="18421"' in det and "Altair" in det and det.count("Dado que não bate") == 1
+    assert 'value="respondeu"' in det and 'value="pediu_informacao"' in det and 'value="em_analise"' in det
+    assert 'value="concluiu"' not in det
+    # quem pediu vê em "Que eu pedi", sem os botões de quem recebe
+    html = _cliente(app, ANA).get(CAIXA + "?dem=pedi").get_data(as_text=True)
+    assert "Para Juliana Prado" in _linha(html, did) and 'value="respondeu"' not in _det(html, did)
+    # o colega do setor vê em "Do meu setor" e não responde no lugar dela
+    html = _cliente(app, BRUNO).get(CAIXA).get_data(as_text=True)
+    assert did in html and "Quem responde é Juliana Prado" in _det(html, did) and 'value="respondeu"' not in html
+    # quem não pediu, não recebeu e não é do setor não vê
+    assert "Coração 2 sem meta" not in _cliente(app, SEM).get(CAIXA).get_data(as_text=True)
+
+
+def test_a_nova_demanda_pela_tela_grava_uma_vez_e_o_anexo_so_para_quem_ve(app, cena):
+    c = _cliente(app, ANA)
+    html = c.get(CAIXA).get_data(as_text=True)
+    assert 'id="dm-nova"' in html and "Juliana Prado · Performance" in html and ">Ana Souza · Supervisão de Campo<" not in html
+    f = _form(cena)
+    dados = dict(f, codigo=_codigo(html), usinas="1", anexos=(io.BytesIO(PDF), "laudo.pdf"))
+    r = c.post(CAIXA + "/demandas/nova", data=dados, content_type="multipart/form-data")
+    assert r.status_code == 303 and r.headers["Location"].endswith(f"?dem=pedi&d={f['novo_id']}#demandas")
+    assert len(cena["banco"].linhas(D.LIVRO, D.ABA_DEMANDA)) == 1
+    # outro site e o formulário vencido não gravam
+    c.post(CAIXA + "/demandas/nova", data=dict(_form(cena, novo_id="d00000000077"), codigo=_codigo(html)),
+           headers={"Sec-Fetch-Site": "cross-site"})
+    c.post(CAIXA + "/demandas/nova", data=dict(_form(cena, novo_id="d00000000078"), codigo="outro"))
+    assert len(cena["banco"].linhas(D.LIVRO, D.ABA_DEMANDA)) == 1
+    url = f"{CAIXA}/demandas/{f['novo_id']}/anexo/1"
+    r = _cliente(app, BRUNO).get(url)                       # o setor de quem recebe vê
+    assert r.status_code == 200 and r.data == PDF
+    assert _cliente(app, SEM).get(url).status_code == 404
+    # a recusa volta com o motivo e não grava
+    html = c.get(CAIXA).get_data(as_text=True)
+    c.post(CAIXA + "/demandas/nova", data=dict(_form(cena, os="18500", novo_id="d00000000079"), codigo=_codigo(html)))
+    html = c.get(CAIXA).get_data(as_text=True)
+    assert "A OS 18500 não é de nenhuma das usinas escolhidas" in html
+    assert len(cena["banco"].linhas(D.LIVRO, D.ABA_DEMANDA)) == 1
+
+
+def test_os_passos_pela_tela_no_papel_certo(app, cena):
+    did = _abrir_pela_api(app, cena)
+    ju, ana = _cliente(app, JU), _cliente(app, ANA)
+    cod = _codigo(ju.get(CAIXA).get_data(as_text=True))
+    r = ju.post(f"{CAIXA}/demandas/{did}/passo", data={"codigo": cod, "acao": "respondeu", "texto": "Ligado.",
+                                                       "aba": "para", "novo_id": "e00000000001"})
+    assert r.status_code == 303 and r.headers["Location"].endswith(f"?dem=para&d={did}#demandas")
+    cod_ana = _codigo(ana.get(CAIXA).get_data(as_text=True))
+    ju.post(f"{CAIXA}/demandas/{did}/passo", data={"codigo": cod, "acao": "concluiu", "aba": "para"})   # não é dela
+    html = ju.get(CAIXA).get_data(as_text=True)
+    assert "Esse passo é de quem pediu a demanda. Nada foi gravado." in html
+    html = ana.get(CAIXA + "?dem=pedi&d=" + did).get_data(as_text=True)
+    det = _det(html, did)
+    assert 'value="concluiu"' in det and 'value="devolveu"' in det and "conclui sozinha em" in det
+    ana.post(f"{CAIXA}/demandas/{did}/passo", data={"codigo": cod_ana, "acao": "concluiu", "aba": "pedi"})
+    assert [e["evento"] for e in cena["banco"].linhas(D.LIVRO, D.ABA_EVENTO)] == ["respondeu", "concluiu"]
+    html = ana.get(CAIXA + "?dem=pedi&d=" + did).get_data(as_text=True)
+    assert 'data-f="concluidas"' in html and "dm-s-concluida" in _linha(html, did)
+
+
+def test_as_os_da_usina_para_o_formulario(app, cena):
+    j = _cliente(app, ANA).get(CAIXA + "/demandas/os?usinas=1,3").get_json()
+    assert j["ok"] and [o["os"] for o in j["os"]] == [18500, 18421]
+    assert j["os"][1]["rotulo"] == "OS 18421 · corretiva"
+    assert _cliente(app, ANA).get(CAIXA + "/demandas/os?usinas=").get_json()["os"] == []
+
+
+def test_os_temas_do_setor_cada_setor_mexe_nos_seus(app, cena):
+    c = _cliente(app, JU)
+    html = c.get("/t/comando/temas-do-setor").get_data(as_text=True)
+    assert "Dado que não bate" in html and "Comando · Performance" in html
+    r = c.post("/t/comando/temas-do-setor/salvar", data={"codigo": _codigo(html), "setor_id": "1",
+                                                         "nome": "Relatório do cliente", "prazo": "3"})
+    assert r.status_code == 303
+    assert sorted(t["nome"] for t in D.temas(1)) == ["Dado que não bate", "Relatório do cliente"]
+    # o tema do outro setor, não
+    assert c.post("/t/comando/temas-do-setor/salvar", data={"codigo": _codigo(html), "setor_id": "2",
+                                                            "nome": "Extintores", "prazo": "2"}).status_code == 403
+    html = c.get("/t/comando/temas-do-setor").get_data(as_text=True)
+    assert "Tema salvo." in html and "Relatório do cliente" in html
+    # quem não tem setor vê o aviso, sem o formulário
+    html = _cliente(app, SEM).get("/t/comando/temas-do-setor").get_data(as_text=True)
+    assert "ainda não tem setor no Nexus" in html and "temas-do-setor/salvar" not in html

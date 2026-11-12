@@ -42,6 +42,10 @@ TORRE = Torre(
         Tela("insights", "Nexus Insights",
              "Que regra cruzou as fontes e apontou um problema com dono?",
              "Regras R01 a R13 do motor de correlação"),
+        # as demandas entre setores (12/11/2026): cada setor diz o que os outros podem pedir a ele, e em quanto tempo
+        Tela("temas-do-setor", "Temas do setor",
+             "O que os outros setores podem pedir ao seu, e em quanto tempo o seu setor responde?",
+             "Temas das demandas (nexus_demandas · dim_tema)", de_todos=True),
         Tela("tempo-de-resposta", "Tempo de resposta",
              "Que área responde no prazo, e quais pedidos estão atrasados?",
              "Pedidos entre áreas, com prazo (nexus_pedidos)"),
@@ -301,8 +305,10 @@ def caixa_de_entrada():
     sem_dono = [i for i in das_minhas if not i["meu"] and i["estado"] == "novo"]
     com_dono = [i for i in das_minhas if not i["meu"] and i["estado"] == "assumiu"]
     nomes = _nomes_das_torres()
+    from .demandas_tela import contexto as _demandas
     return render_template("comando/caixa.html", **_contexto(
         torre=TORRE, tela=TORRE.tela("caixa-de-entrada"), lei=lei, pedidos=pedidos, feitos=feitos, meus=meus,
+        dem=_demandas(),
         sem_dono=sem_dono, erro_pedidos=PD.ler()["erro"],
         com_dono=com_dono, gerado=gerado, mencoes=mencoes, usinas_lista=sorted(usinas.items(), key=lambda u: u[1]),
         erro_conversa=CV.ler()["erro"], calculando=lei is None,
@@ -584,3 +590,7 @@ def conversa_acao():
         session[_AVISO] = ("erro", f"Não consegui gravar agora ({type(ex).__name__}). Nada foi gravado.")
     ancora = f"#conv-{ob.replace(':', '-')}" if ob and "/conversa/" not in destino else ""
     return redirect(destino + ancora, code=303)
+
+
+# as demandas entre setores (12/11/2026) num módulo à parte; importado no fim porque usa o `bp` e os ajudantes daqui
+from . import demandas_tela  # noqa: E402,F401

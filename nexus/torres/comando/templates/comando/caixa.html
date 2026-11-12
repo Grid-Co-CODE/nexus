@@ -17,6 +17,11 @@
   {% if falhas %}<div class="cn-erro cn-aviso" role="status">{{ falhas|length }} {{ 'regra não leu' if falhas|length == 1 else 'regras não leram' }} a fonte agora: o que elas apontariam pode faltar. <a href="{{ raiz }}/t/comando/insights">Ver as regras</a></div>{% endif %}
   {% if not tem_login %}<div class="cn-erro cn-aviso" role="status">Entre com o seu login (Microsoft ou Fracttal) para notificar, responder e assumir: a senha de administrador não diz quem é a pessoa.</div>{% endif %}
 
+  {# as demandas entre setores (12/11/2026) primeiro: é o que outra pessoa pediu para você, com prazo #}
+  {% include "comando/_demandas.html" %}
+
+  <h2 class="dm-titulo dm-titulo--motor">Insights e pedidos do motor</h2>
+
   <div class="cn-numeros">
     <span><span class="gc-rotulo">Menções</span><span class="v">{{ mencoes|length }}</span><span class="d">conversas que chamam você ou o seu setor</span></span>
     <span><span class="gc-rotulo">Pedidos para você</span><span class="v">{{ pedidos|length }}</span><span class="d">{% set atr = pedidos|selectattr('situacao', 'equalto', 'atrasado')|list|length %}{{ atr }} {{ 'atrasado' if atr == 1 else 'atrasados' }}</span></span>
@@ -121,6 +126,8 @@
   {% endif %}
   {% endfor %}
 </div>
+{% include "oscreator/card_os_abrir.html" %}
+<script src="{{ url_for('static', filename='comando/demandas.js') }}" defer></script>
 <script src="{{ url_for('static', filename='comando/conversa.js') }}" defer></script>
 <script src="{{ url_for('static', filename='comando/insights.js') }}" defer></script>
 {% endblock %}

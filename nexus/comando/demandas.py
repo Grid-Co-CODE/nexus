@@ -537,3 +537,8 @@ def filtrar(lst: list[dict], filtro: str, pessoa: str = "", tema: str = "") -> l
 
 def contas(lst: list[dict]) -> dict:
     return {k: sum(1 for d in lst if _passa(d, k)) for k, _ in FILTROS}
+
+
+def filtros_da(d: dict) -> list[str]:
+    """Os filtros da faixa em que a demanda aparece (a tela esconde e mostra a linha sem recarregar)."""
+    return [k for k, _ in FILTROS if _passa(d, k)]

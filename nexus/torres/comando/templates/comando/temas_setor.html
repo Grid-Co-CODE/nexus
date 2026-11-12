@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block titulo %}{{ tela.nome }}{% endblock %}
+{% block conteudo %}
+<link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='comando.css') }}">
+{# Comando → Temas do setor (12/11/2026, as demandas entre setores): o que os outros setores podem pedir a este, e o prazo
+   de cada tema em dias úteis. Cada setor mexe só nos dele (Levi: "cada setor precisa poder mexer"); o administrador
+   escolhe o setor. Salvar grava uma versão nova do tema (nexus_demandas · dim_tema): nada se apaga, o tema sai de uso. #}
+<div class="campo-nativa">
+  <div class="cn-cab">
+    <div><p class="gc-eyebrow">{{ torre.nome }}{% if setor_nome %} · {{ setor_nome }}{% endif %}</p><h1 class="cn-titulo">{{ tela.nome }}</h1>
+      <p class="cn-pergunta">O que os outros setores podem pedir {{ ('ao setor ' ~ setor_nome) if setor_nome else 'ao seu setor' }}, e em quanto tempo ele responde.</p></div>
+    <div class="cn-frescor"><a class="gc-btn gc-btn--ui gc-btn--contorno" href="{{ '/t/comando/caixa-de-entrada#demandas'|na_raiz }}"><i class="ph ph-arrow-left" aria-hidden="true"></i> Caixa de entrada</a></div>
+  </div>
+  {% if aviso %}<div class="cn-erro{% if aviso[0] == 'ok' %} ins-ok{% endif %}" role="{{ 'status' if aviso[0] == 'ok' else 'alert' }}"><b>{{ aviso[1] }}</b></div>{% endif %}
+  {% if falta %}
+  <div class="cn-erro cn-aviso" role="status">Os temas precisam das chaves do Nexus ({{ falta|join(', ') }}): sem elas o nome não vai cifrado e nada grava.</div>
+  {% elif not setor_id %}
+  <p class="cn-vazio">Você ainda não tem setor no Nexus: os temas são do setor (Base → Acessos → Pessoas e setores).</p>
+  {% else %}
+  {% if not tem_login %}<div class="cn-erro cn-aviso" role="status">Entre com o seu login (Microsoft ou Fracttal) para salvar: a senha de administrador não diz quem é a pessoa.</div>{% endif %}
+  {% if admin and setores %}
+  <form class="dm-faixa" method="get" action="{{ '/t/comando/temas-do-setor'|na_raiz }}">
+    <label class="gc-rotulo" for="dm-t-setor">Setor</label>
+    <select class="gc-campo" id="dm-t-setor" name="setor" onchange="this.form.submit()">
+      {% for sid, nome in setores %}<option value="{{ sid }}"{% if sid == setor_id %} selected{% endif %}>{{ nome }}</option>{% endfor %}
+    </select>
+    <noscript><button class="gc-btn gc-btn--ui gc-btn--contorno" type="submit">Ver</button></noscript>
+  </form>
+  {% endif %}
+  <table class="dm-temas">
+    <thead><tr><th scope="col">Tema</th><th scope="col">Prazo para responder (dias úteis)</th><th scope="col">Em uso</th><th scope="col"><span class="dm-sr">Salvar</span></th></tr></thead>
+    <tbody>
+      {% for t in temas %}
+      {% set f = 'dm-t-' ~ t.tema_id %}
+      <tr{% if not t.ativo %} class="dm-inativo"{% endif %}>
+        <td><input class="gc-campo" form="{{ f }}" name="nome" value="{{ t.nome }}" maxlength="60" required aria-label="Nome do tema"></td>
+        <td><input class="gc-campo dm-prazo-campo" form="{{ f }}" name="prazo" type="number" min="{{ prazo_min }}" max="{{ prazo_max }}" value="{{ t.prazo_dias_uteis }}" required aria-label="Prazo de {{ t.nome }} em dias úteis"></td>
+        <td><select class="gc-campo" form="{{ f }}" name="ativo" aria-label="{{ t.nome }} em uso"><option value="sim"{% if t.ativo %} selected{% endif %}>sim</option><option value="nao"{% if not t.ativo %} selected{% endif %}>não</option></select></td>
+        <td><form id="{{ f }}" method="post" action="{{ '/t/comando/temas-do-setor/salvar'|na_raiz }}">
+          <input type="hidden" name="codigo" value="{{ codigo }}"><input type="hidden" name="setor_id" value="{{ setor_id }}">
+          <input type="hidden" name="tema_id" value="{{ t.tema_id }}">
+          <button class="gc-btn gc-btn--ui gc-btn--contorno" type="submit"{% if not tem_login %} disabled{% endif %}>Salvar</button></form></td>
+      </tr>
+      {% endfor %}
+      <tr>
+        <td><input class="gc-campo" form="dm-t-novo" name="nome" maxlength="60" required placeholder="Novo tema (por exemplo: Dado que não bate)" aria-label="Nome do novo tema"></td>
+        <td><input class="gc-campo dm-prazo-campo" form="dm-t-novo" name="prazo" type="number" min="{{ prazo_min }}" max="{{ prazo_max }}" value="2" required aria-label="Prazo do novo tema em dias úteis"></td>
+        <td class="dm-mudo">sim</td>
+        <td><form id="dm-t-novo" method="post" action="{{ '/t/comando/temas-do-setor/salvar'|na_raiz }}">
+          <input type="hidden" name="codigo" value="{{ codigo }}"><input type="hidden" name="setor_id" value="{{ setor_id }}">
+          <button class="gc-btn gc-btn--ui gc-btn--primario" type="submit"{% if not tem_login %} disabled{% endif %}><i class="ph ph-plus" aria-hidden="true"></i> Novo tema</button></form></td>
+      </tr>
+    </tbody>
+  </table>
+  {% if not temas %}<p class="dm-nota">{{ setor_nome }} ainda não tem tema: sem tema, o setor não aparece para receber demanda na Nova demanda.</p>{% endif %}
+  <p class="dm-nota">O prazo vale para as demandas abertas a partir de agora: a que já está aberta segue com o prazo da hora em que foi aberta. Tirar um tema de uso não mexe nas demandas dele. Prazo de {{ prazo_min }} a {{ prazo_max }} dias úteis (sem sábado, domingo e feriado nacional).</p>
+  {% endif %}
+</div>
+{% endblock %}
