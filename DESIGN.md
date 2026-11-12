@@ -125,6 +125,10 @@ tela"). Como criar a tela de uma torre (a rota, o template, o menu): `nexus/torr
   muda nada.
 - **Etiqueta de situação** `.gc-status` + `--ok`, `--alerta`, `--critico`, `--info` ou `--neutro`: bolinha e palavra
   na cor do nível, sobre o `-suave`. Sempre com a palavra.
+- **Lista de sugestões de um campo** `input[data-lista]` + `nexus/static/lista-sugestoes.js` (`.ls-menu`, 12/11/2026): no lugar do
+  `<datalist>` do navegador. Colada embaixo do campo, filtra sem acento e sem caixa, setas, Enter, Esc; opções num
+  `<script type="application/json">` cujo id vai no `data-lista`. Fixa na tela e reposicionada ao rolar (o overflow de
+  tabela não a corta).
 - **O "!" das explicações** (`nexus/templates/_explica.html`, o padrão de toda tela desde 05/11/2026; nasceu em
   Segurança → Extintores): o círculo amarelo com "!" ao lado do título; o clique abre a caixa por cima da tela, com a
   borda bevel amarela, e clicar fora ou o Esc fecha (`base.html`). No celular a caixa fica presa à tela, com 16px de

@@ -40,6 +40,8 @@ pendência "Valores parecidos na mesma lista" aparece na Qualidade sem link (nã
 
 Campo novo entra em `esquema.py`, e as telas, a importação e a lista acompanham sozinhas.
 
+- Ligações, campo "usina do cadastro" do Ligar (12/11/2026, Levi: "tem que estar alinhado com o campo"): a lista é do Nexus (`nexus/static/lista-sugestoes.js`, por `data-lista` apontando para o JSON `#lig-usinas-opcoes`), não o `<datalist>` do navegador; abre colada embaixo do campo (position:fixed, reposicionada ao rolar, inclusive o `.cad-rolagem`), e o formulário manda o mesmo `id · título` em `usina`.
+
 ## Onde o dado mora
 
 - **Fonte (onde se edita):** `C:\GridcoAuto\nexus\cadastro_ensaio.json` (servidor: `dados/cadastro_ensaio.json`), fora
