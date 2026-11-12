@@ -339,6 +339,81 @@ def requisicoes_automatico():
                   "estado": r["estado"].get("estado")}, 200)
 
 
+# ── transferir peça entre almoxarifados do mesmo cliente (12/11/2026) ───────────────────────────────────────────────────
+# A página fica em /t/pcm/pecas/transferir (`transferencia_tela.registrar`) e pede aqui, com o login do Fracttal de quem está nela:
+# a lista dos almoxarifados (lida no Fracttal na hora: o livro Saldo da varredura só tem os com peça, e o destino típico é o novo,
+# vazio), as peças com saldo na origem, o Conferir e o Transferir. As recusas de toda rota da ponte (`_com_o_fracttal`: 403 outro
+# site ou setor, 409 a senha de administrador e a conta do Fracttal de outra pessoa, 401 sem o login, com o link); o passo que o
+# Fracttal não fez vem como `{"erro"}` com o status dele (`transferencia.Falhou`). O Transferir só roda no servidor.
+TRANSFERIR = "/t/pcm/pecas/transferir"
+
+
+def _corpo_json() -> dict:
+    corpo = request.get_json(silent=True)
+    return corpo if isinstance(corpo, dict) else {}
+
+
+@bp.route("/transferir/almoxarifados")
+def transferir_almoxarifados():
+    """Os almoxarifados ativos do Fracttal, com o cliente pelo caminho do local: `{"ok", "almoxarifados": [{"id", "nome",
+    "cliente", "teste"}]}` (o de cliente desconhecido vem com o cliente vazio, e a página não o deixa escolher)."""
+    from . import transferencia as T
+    cfg = current_app.config
+    r = _com_o_fracttal(TRANSFERIR, lambda est: {"lista": T.opcoes(T.contexto(cfg, est))})
+    if not isinstance(r, dict):
+        return r
+    return _json({"ok": True, "almoxarifados": [{"id": a["id"], "nome": a["nome"], "cliente": a["cliente"],
+                                                 "teste": a["teste"]} for a in r["lista"]]}, 200)
+
+
+@bp.route("/transferir/pecas")
+def transferir_pecas():
+    """As peças com saldo na origem (`?origem=<id>`), lidas no Fracttal na hora, com o nome pelo catálogo do App: `{"ok",
+    "pecas": [{"id", "codigo", "nome", "unidade", "saldo", "decimal"}]}`."""
+    from . import transferencia as T
+    origem = request.args.get("origem")
+    r = _com_o_fracttal(TRANSFERIR, lambda est: {"pecas": T.pecas_com_saldo(est, {"itens": T.nomes_do_app().get("itens", {})},
+                                                                            origem)})
+    if not isinstance(r, dict):
+        return r
+    return _json({"ok": True, "pecas": r["pecas"]}, 200)
+
+
+def _pedido_da_transferencia(corpo: dict) -> tuple:
+    return (corpo.get("origem"), corpo.get("destino"), corpo.get("item"), corpo.get("qtd"), corpo.get("referencia") or "")
+
+
+@bp.route("/transferir/conferir", methods=["POST"])
+def transferir_conferir():
+    """O Conferir: `{"origem", "destino", "item", "qtd", "referencia"?}` → `{"ok", "plano"}` (o saldo de agora e o de depois dos
+    dois lados e se a peça vai ser vinculada), lido no Fracttal sem gravar nada (`transferencia.conferir`)."""
+    from . import transferencia as T
+    cfg, corpo = current_app.config, _corpo_json()
+    r = _com_o_fracttal(TRANSFERIR, lambda est: {"plano": T.conferir(cfg, est, T.contexto(cfg, est),
+                                                                     *_pedido_da_transferencia(corpo))})
+    if not isinstance(r, dict):
+        return r
+    return _json({"ok": True, "plano": r["plano"]}, 200)
+
+
+@bp.route("/transferir", methods=["POST"])
+def transferir():
+    """O Transferir (`transferencia.transferir`): o mesmo corpo do Conferir. Relê e valida de novo, vincula se falta, transfere e
+    relê, no login de quem apertou. Só no servidor, antes de qualquer leitura."""
+    from . import requisicoes as RQ
+    from . import transferencia as T
+    cfg, corpo = current_app.config, _corpo_json()
+
+    def fazer(est):
+        T.so_no_servidor(cfg)
+        try:
+            return T.transferir(cfg, est, T.contexto(cfg, est), *_pedido_da_transferencia(corpo),
+                                quem_=quem.colunas(cfg, quem.do_pedido()), responsavel=RQ.responsavel_de(est, _email()))
+        except T.Falhou as ex:
+            return {"falhou": ex.mensagem, "status": ex.status}
+    return _falhou_ou(_com_o_fracttal(TRANSFERIR, fazer, ao="transferencia"), TRANSFERIR, "pcm_transferir_aviso")
+
+
 # ── a gravação da contagem no Fracttal: gravar, continuar, encerrar (Task 7) ─────────────────────────────────────────────
 # Respostas em `{"ok", "erro"?, "login"?, "mensagem"?, "estado"?}`. Além do `_barrar` (403), a gravação confere a PESSOA: ela vai
 # no nome de quem aprova (`pessoa_hmac`), então a senha de administrador, que não é uma pessoa, leva 409; e a conta do Fracttal
