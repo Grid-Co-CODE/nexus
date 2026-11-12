@@ -137,19 +137,37 @@ def test_item_nao_lido(app, almox, monkeypatch):
     assert "não lido neste ciclo" in html
 
 
-def test_recusadas_em_cadastro_a_corrigir(app, almox, monkeypatch):
+def test_a_conta_do_cadastro_fica_sem_a_aba(app, almox, monkeypatch):
+    """A aba Cadastro a corrigir saiu (11/11/2026, o PCM: "Cadastros a corrigir e consumo da OS podem ser tirados"); a conta
+    dela segue no `montar` (sem tela)."""
     from nexus.pcm import almoxarifado as T
     cad = T.montar().dados["cadastro"]
     assert [r["codigo"] for r in cad["recusadas"]] == ["SP-2"] and "avariadas" not in cad      # a avariada tem aba própria
     assert {(s["almoxarifado"], s["n"]) for s in cad["sem_minimo"]} == {("Almoxarifado 20", 2)}
-    assert "corrigir no Fracttal" in _abrir(app, monkeypatch).get_data(as_text=True)
+    assert "corrigir no Fracttal" not in _abrir(app, monkeypatch).get_data(as_text=True)
 
 
 def test_consumo_sem_o_fato_le_o_livro_do_app(app, almox, monkeypatch):
+    """A aba Consumo nas OS saiu (11/11/2026), e a conta do consumo FICA: o número "Lançadas pelo App" do alto e a versão do
+    cliente a usam."""
     from nexus.pcm import almoxarifado as T
     d = T.montar().dados
     assert d["consumo_fonte"] == "app" and [c["situacao"] for c in d["consumo"]] == ["lançada", "recusada"]
-    assert "o histórico ainda não é gravado: mostrando os 90 dias do App" in _abrir(app, monkeypatch).get_data(as_text=True)
+    html = _abrir(app, monkeypatch).get_data(as_text=True)
+    assert "o histórico ainda não é gravado: mostrando os 90 dias do App" not in html
+
+
+def test_sem_as_abas_cadastro_a_corrigir_e_consumo_nas_os(app, almox, monkeypatch):
+    """As duas abas e os painéis delas saíram da tela e da fila das páginas do inventário (11/11/2026, o PCM: "Cadastros a
+    corrigir e consumo da OS podem ser tirados"). O número "Lançadas pelo App" do alto fica, com as recusadas."""
+    html = _abrir(app, monkeypatch).get_data(as_text=True)
+    for nome in ("consumo", "cadastro"):
+        assert f'data-aba="{nome}"' not in html and f'data-painel="{nome}"' not in html, nome
+    assert "Consumo nas OS" not in html and "Cadastro a corrigir" not in html
+    assert re.search(r'Lançadas pelo App</span>\s*<div class="kb-kpi-linha"><b class="kb-kpi-v">1</b>', html)
+    assert re.search(r'<b class="alm-ruim">1</b> recusadas', html)
+    abas = (Path(__file__).resolve().parent.parent / "nexus" / "templates" / "pcm" / "_almox_abas.html").read_text("utf-8")
+    assert "consumo" not in abas and "cadastro" not in abas
 
 
 def test_consumo_le_o_fato_do_nexus_quando_ele_existe(app, almox, monkeypatch):
@@ -330,16 +348,14 @@ def test_livro_de_hoje_sem_colunas_novas(app, almox, monkeypatch):
 
 
 def test_cadastro_sem_curva_e_sem_criticidade(app, almox, monkeypatch):
-    """Com as colunas, a peça COM saldo e sem curva (ou sem criticidade) pede o cadastro no Fracttal: completar é lá."""
+    """Com as colunas, a peça COM saldo e sem curva (ou sem criticidade) conta na conta do cadastro (completar é no Fracttal;
+    sem aba desde 11/11/2026)."""
     from nexus.pcm import almoxarifado as T
     _semear(almox, novas={1: ("1.Crítico", ""), 3: ("2.Necessário", "A")})      # o 2 não tem nada; o 4 não tem saldo
     visao.limpar()
     d = T.montar().dados
     assert (d["tem_criticidade"], d["tem_curva"], d["tem_custo"]) == (True, True, True)
     assert d["cadastro"]["sem_curva"] == 2 and d["cadastro"]["sem_criticidade"] == 1
-    html = _abrir(app, monkeypatch).get_data(as_text=True)
-    assert "2 peças com saldo sem Curva ABC no Fracttal" in html
-    assert "1 peça com saldo sem criticidade no Fracttal" in html
 
 
 def test_a_troca_de_aba_refaz_o_filtro(app, almox, monkeypatch):
@@ -465,12 +481,6 @@ def test_avariada_pela_marca_e_pelo_av(app, almox, monkeypatch):
     assert d["kpis"]["avariadas"] == 3
     assert {l["codigo"]: l["avariada"] for l in d["linhas"] if l["id_item"] in ("3", "6", "9", "10")} == \
         {"SP-3-AV": True, "SP-6-AV": True, "SP-9": True, "SP-AVR-001": False}
-
-
-def test_avariada_sai_do_cadastro_a_corrigir(app, almox, monkeypatch):
-    html = _abrir(app, monkeypatch).get_data(as_text=True)
-    cadastro = html[html.index('data-painel="cadastro"'):]
-    assert "avariada com saldo" not in cadastro and "SP-3-AV" not in cadastro
 
 
 def test_kpi_avariadas_conta_com_saldo(app, almox, monkeypatch):

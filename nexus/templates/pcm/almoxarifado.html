@@ -54,9 +54,7 @@
   <button class="alm-aba" role="tab" aria-selected="true" data-aba="reposicao">Reposição ({{ k.abaixo }} + {{ k.no_limite }} no limite)</button>
   <button class="alm-aba" role="tab" aria-selected="false" data-aba="almoxarifados">Por almoxarifado ({{ k.almoxarifados }})</button>
   <button class="alm-aba" role="tab" aria-selected="false" data-aba="catalogo">Catálogo e saldo ({{ d.catalogo|length }})</button>
-  <button class="alm-aba" role="tab" aria-selected="false" data-aba="consumo">Consumo nas OS ({{ d.consumo|length }})</button>
   <button class="alm-aba" role="tab" aria-selected="false" data-aba="avariadas">Avariadas ({{ k.avariadas }})</button>
-  <button class="alm-aba" role="tab" aria-selected="false" data-aba="cadastro">Cadastro a corrigir</button>
   {# as quatro partes do inventário (26/10/2026) são OUTRAS páginas: links na fila das abas, juntas (o Inventário com quantas
      contagens esperam o PCM), as mesmas do pcm/_almox_abas.html das páginas do inventário #}
   <a class="alm-aba" role="tab" aria-selected="false" href="{{ raiz }}/t/pcm/pecas/inventario">Inventário{% if inventario_a_revisar %} ({{ inventario_a_revisar }}){% endif %}</a>
@@ -195,29 +193,6 @@
   </table>
 </section>
 
-<section class="alm-painel" data-painel="consumo" hidden>
-  <h2>Peças lançadas nas OS pelo App</h2>
-  <p class="alm-ajuda">O que o técnico lançou pelo App de Campo, desde o início. A baixa no estoque é do Fracttal, quando a
-    OS fecha; a recusada nunca saiu do saldo.{% if d.consumo_fonte == 'app' %}
-    Por enquanto, o histórico ainda não é gravado: mostrando os 90 dias do App.{% endif %}</p>
-  <table class="alm-t" data-fl-grupo="alm-f">
-    <thead><tr><th>Dia</th><th>OS</th><th>Peça</th><th class="num">Qtd</th><th>Almoxarifado</th><th>No Fracttal</th></tr></thead>
-    <tbody>
-    {% for c in d.consumo|reverse %}
-    <tr{{ filtro(c.almox, c.familia, c.busca) }}>
-      <td data-r="Dia"><span class="alm-v">{{ c.dia }}</span></td>
-      <td data-r="OS" class="alm-cod"><span class="alm-v">{{ c.os }}</span></td>
-      <td data-r="Peça"><span class="alm-v"><span class="alm-cod">{{ c.codigo }}</span> {{ c.nome }}</span></td>
-      <td data-r="Qtd" class="num"><span class="alm-v">{{ '%g'|format(c.quantidade) }}</span></td>
-      <td data-r="Almoxarifado"><span class="alm-v">{{ c.almox }}</span></td>
-      <td data-r="No Fracttal"><span class="alm-v">{% if c.situacao == 'lançada' %}<span class="alm-ok">lançada</span>{% else %}<span class="alm-ruim">recusada</span>{% if c.recusa %} <span class="alm-det">{{ c.recusa }}</span>{% endif %}{% endif %}</span></td>
-    </tr>
-    {% endfor %}
-    <tr data-fl-vazio="alm-f"{% if d.consumo %} hidden{% endif %}><td colspan="6" class="mudo">Nenhuma peça lançada pelo App.</td></tr>
-    </tbody>
-  </table>
-</section>
-
 <section class="alm-painel" data-painel="avariadas" hidden>
   <h2>Peças avariadas com saldo</h2>
   <p class="alm-ajuda">Avariada é a peça com a marca Avariado no Fracttal ou com o código terminado em -AV. A que tem saldo não é
@@ -244,19 +219,6 @@
   {% else %}<p class="mudo">Nenhuma peça avariada com saldo.</p>{% endif %}
 </section>
 
-<section class="alm-painel" data-painel="cadastro" hidden>
-  <h2>Cadastro a corrigir no Fracttal</h2>
-  <p class="alm-ajuda">Quem corrige é o PCM, no Fracttal; o Nexus só lê. Sem o mínimo, a peça nunca aparece na Reposição.{% if d.tem_curva or d.tem_criticidade %}
-    A peça sem curva ou sem criticidade vai para o fim da ordem da Reposição.{% endif %}</p>
-  <ul class="alm-lista">
-    {% for s in d.cadastro.sem_minimo %}<li><b>{{ s.n }}</b> peça(s) sem mínimo em {{ s.almoxarifado }}</li>{% endfor %}
-    {# só com a coluna no livro (o App de antes não a traz): o texto é inteiro, sem tag no meio, para ler e buscar como frase #}
-    {% if d.cadastro.sem_curva %}<li>{{ d.cadastro.sem_curva }} peça{{ 's' if d.cadastro.sem_curva != 1 else '' }} com saldo sem Curva ABC no Fracttal</li>{% endif %}
-    {% if d.cadastro.sem_criticidade %}<li>{{ d.cadastro.sem_criticidade }} peça{{ 's' if d.cadastro.sem_criticidade != 1 else '' }} com saldo sem criticidade no Fracttal</li>{% endif %}
-    {% for r in d.cadastro.recusadas %}<li><span class="alm-ruim">corrigir no Fracttal</span>: a peça <span class="alm-cod">{{ r.codigo }}</span> da OS {{ r.os }} foi recusada{% if r.recusa %} ({{ r.recusa }}){% endif %} e não saiu do saldo</li>{% endfor %}
-    {% if not (d.cadastro.sem_minimo or d.cadastro.sem_curva or d.cadastro.sem_criticidade or d.cadastro.recusadas) %}<li class="mudo">Nada a corrigir.</li>{% endif %}
-  </ul>
-</section>
 <script>
   // as abas: mostrar uma esconde as outras (a tabela escondida não conta no filtro) e o endereço guarda qual está aberta.
   // A barra do filtro só aparece onde há tabela para filtrar, e a troca de aba REFAZ as contas do filtro: o script de antes
@@ -268,8 +230,8 @@
     var filtro = document.querySelector('[data-alm-filtro]');
     // quem abre uma aba: as abas e o cartão das avariadas (o `aria-selected` fica só nas abas)
     var gatilhos = Array.prototype.slice.call(document.querySelectorAll('[data-aba]'));
-    // a fila tem dez abas e, a 1366 px com o menu aberto, não cabe: rola por dentro, e a aba aberta vem para o meio dela (sem
-    // isto, o `?aba=` de uma das últimas abria com a aba fora da tela). `nearest` no vertical: a página não anda
+    // a fila tem oito abas e, no celular, não cabe: rola por dentro, e a aba aberta vem para o meio dela (sem isto, o `?aba=`
+    // de uma das últimas abria com a aba fora da tela). `nearest` no vertical: a página não anda
     function centrar(aba) {
       if (aba && aba.scrollIntoView) aba.scrollIntoView({block: 'nearest', inline: 'center'});
     }

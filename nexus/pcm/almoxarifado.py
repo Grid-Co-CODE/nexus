@@ -2,9 +2,9 @@
 desse almoxarifado na parte de PCM"; a prévia foi aprovada no mesmo dia. Desenho:
 docs/superpowers/specs/2026-10-25-almoxarifado-design.md.
 
-A pergunta: que peça está abaixo do mínimo ou no limite, em que almoxarifado, e o que saiu nas OS? O dado é o que o App
-de Campo publica da varredura diária do inventário do Fracttal (os livros e as contas em `nexus/dados/almoxarifado.py`,
-as MESMAS da carga do histórico); o Nexus não chama o Fracttal.
+A pergunta: que peça está abaixo do mínimo ou no limite, e em que almoxarifado? O dado é o que o App de Campo publica da
+varredura diária do inventário do Fracttal (os livros e as contas em `nexus/dados/almoxarifado.py`, as MESMAS da carga do
+histórico); o Nexus não chama o Fracttal.
 
 De onde vem cada parte:
 - o saldo, do ciclo mais novo dos livros do App quando os três (Ciclo, Itens, Saldo) são do mesmo ciclo e o ciclo leu
@@ -14,7 +14,8 @@ De onde vem cada parte:
   em nada daqui: as linhas dele saem do Saldo DEPOIS de os três livros serem conferidos como inteiros (o ciclo conta as
   do teste nas "Linhas de saldo"), senão todo ciclo com o teste viraria "chegou pela metade";
 - o consumo, do `fato_peca_lancada` do Nexus (tudo desde o início, Levi, 25/10/2026); enquanto ele não existe, do livro
-  Peças do App (90 dias), com a nota.
+  Peças do App (90 dias). A aba Consumo nas OS saiu em 11/11/2026 (o PCM: "Cadastros a corrigir e consumo da OS podem ser
+  tirados"), e a conta FICA: o número "Lançadas pelo App" do alto e a versão do cliente (`campo/versao_cliente.py`) a usam.
 
 As melhorias de 30/10/2026 (docs/superpowers/specs/2026-10-30-almoxarifado-melhorias-design.md): a criticidade e a Curva
 ABC do cadastro da peça no Fracttal (e o custo) vêm do App no fim dos livros Itens e Saldo. O Nexus sobe antes do App, então
@@ -250,6 +251,7 @@ def _partes(fonte: dict, b) -> dict:
     kpis = {"almoxarifados": len(cards), "com_saldo": len(com_saldo),
             "abaixo": len(abaixo), "no_limite": len(limite), "saldo_unitario": len(unitario),
             "sem_minimo": sum(sem_min.values())}      # as avariadas (peça × almoxarifado com saldo) são contadas em `_avariadas`
+    # `cadastro` é a conta da aba Cadastro a corrigir, que saiu da tela em 11/11/2026 (a pedido do PCM); a conta ficou
     return {"kpis": kpis, "reposicao": abaixo + limite, "saldo_unitario": unitario, "linhas": out,
             "por_almoxarifado": sorted(cards.values(), key=lambda c: c["nome"]), "catalogo": catalogo,
             "tem_criticidade": fonte.get("tem_criticidade", False), "tem_curva": fonte.get("tem_curva", False),

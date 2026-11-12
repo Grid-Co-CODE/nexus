@@ -1265,7 +1265,6 @@ table.alm-t{width:100%;border-collapse:collapse;font-size:13px;color:var(--tinta
 .alm-pecas{margin-top:12px}
 .alm-pecas-msg{margin:0;font-size:13px;color:var(--mudo)}
 .alm-pecas-msg:empty{display:none}
-.alm-lista{margin:0;padding-left:18px;font-size:13px;line-height:1.8;color:var(--tinta)}
 @media (max-width:640px){
   .alm-t thead{display:none}
   .alm-t tr{display:block;margin-bottom:8px;padding:6px 8px;border:1px solid var(--linha);border-radius:10px}
