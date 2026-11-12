@@ -376,6 +376,25 @@ def test_tela_mostra_o_quadro_e_o_formulario_do_pcm(inv, monkeypatch):
     assert "SP-3-AV" in html and "avariada" in html.lower()
 
 
+def test_a_regua_lista_o_almoxarifado_sem_saldo_e_nao_quebra(inv, banco, monkeypatch):  # noqa: F811
+    """O Por almoxarifado ganhou os almoxarifados que o saldo do ciclo não traz (11/11/2026, item 4: o de uma usina nova que só
+    mandou a contagem), e a régua usa a mesma lista: o novo aparece como "sem saldo ainda", e abri-lo não quebra (não há peça
+    para a régua)."""
+    from test_campo_visao import _aba
+    from test_pcm_inventario_leitura import _linha
+    from nexus.dados import almoxarifado as A
+    _aba(banco, A.LIVRO_CONTAGENS, A.ABA_CONTAGENS, [_linha("C-30", "L1", "501", "3", almox="30",
+                                                            contada="2026-10-25T11:00:00Z")])
+    visao.limpar()
+    _no_setor(monkeypatch, SID.PCM)
+    c = _pessoa_ms(inv)
+    html = c.get("/t/pcm/pecas/inventario/regua").get_data(as_text=True)
+    item = re.search(r'regua\?almox=30"[^>]*>(.*?)</a>', html, re.S).group(1)
+    assert "Almoxarifado 30" in item and "sem saldo ainda" in item and "0 peças" not in item
+    r = c.get("/t/pcm/pecas/inventario/regua?almox=30")
+    assert r.status_code == 200 and "Nenhuma peça com saldo neste almoxarifado" in r.get_data(as_text=True)
+
+
 def test_so_o_setor_pcm_decide(inv, monkeypatch):
     """Quem não é do PCM nem administrador (outro setor, por exemplo) não decide nem grava: 403, e nada no livro nem no
     Fracttal. O setor dono é o PCM (a tela `pecas`); quem a vê por outro setor só olha (sem formulário)."""

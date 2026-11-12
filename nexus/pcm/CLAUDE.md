@@ -601,6 +601,24 @@ PCM"; a prévia com os dados reais foi aprovada no mesmo dia. Desenho e plano: `
   vazios são "–" (o Fracttal não deu o número), nunca 0. Falha: "não consegui abrir as peças agora", e o clique seguinte tenta de
   novo; o cartão aberto ocupa a linha inteira da grade; abaixo de 640 px a tabela vira cartão (`data-r`). ID desconhecido: 404;
   a fonte caída: 503.
+- **A lista do Por almoxarifado é a união de três fontes (11/11/2026, item 4 da 2ª rodada; o PCM: "atualizar conforme as
+  usinas forem subindo o almoxarifado e ir aparecendo as usinas"):** o Saldo do ciclo, como antes; os almoxarifados com
+  contagem no livro do App (`almoxarifado_contagens_app_campo`); e os já vistos no histórico (`dim_almoxarifado`). Caso que
+  criou: o almoxarifado de uma usina nova só tem peça ligada no Fracttal depois que a contagem dele é GRAVADA (é a gravação
+  que liga as peças), e até o ciclo do App seguinte ele não aparecia. Mora no `montar` (`_sem_saldo`, a mesma cópia de 5 min,
+  e os livros pela de 2 min), e a régua usa a mesma lista (o novo aparece como "sem saldo ainda" e abre sem peça). Cada um
+  vem com a usina pela de-para de hoje, como o saldo (o "Usina" da contagem e o `local` da dimensão; na dimensão, sem ela, a
+  `usina_id` que a carga ligou); sem a dimensão, o nome é "Almoxarifado <ID>". O mesmo almoxarifado nas duas fontes é um cartão
+  só, com o nome da dimensão e o porquê da contagem. **O cartão sem saldo** (tracejado, sem número nem "Ver peças": zero seria
+  inventado) diz por quê (`_porque_sem_saldo`): "Contagem enviada em dd/mm/aaaa: o saldo vem no próximo ciclo do App depois
+  da gravação"; "Contagem gravada no Fracttal: o saldo vem no próximo ciclo do App"; ou, gravada ANTES do ciclo que a tela
+  mostra (a `peca_gravada` mais nova do almoxarifado, `gravadas_em` do `revisao.resumo`, contra o início do ciclo), "... o
+  ciclo do App de dd/mm não trouxe o saldo: confira no Fracttal as peças ligadas" (não promete o que já não veio); e, só no
+  histórico, "Sem peça ligada no Fracttal no ciclo do App de dd/mm". O número do alto e a aba contam a união ("N sem saldo
+  ainda" na nota). O almoxarifado de teste fica fora das três. O livro das contagens (ou a dimensão) que não se lê não
+  derruba a tela: os cartões dele não aparecem, e o painel diz isso (`avisos_sem_saldo`). A explicação dos cartões mora no
+  "!" do título. Prova: os `test_o_almoxarifado_que_so_tem_contagem_aparece` e seguintes de `tests/test_pcm_almoxarifado.py`
+  e `test_a_regua_lista_o_almoxarifado_sem_saldo_e_nao_quebra`.
 - **A aba Avariadas (30/10/2026, item 6):** a avariada COM saldo não é erro de cadastro, é peça esperando destino; saiu da
   conta do cadastro e tem aba própria, com a parada de cada uma. Cada linha da conta traz `avariado` (a marca crua do App) e
   `avariada` (a definição da tela): **use sempre `avariada`**, senão o "SP-3-AV" sem a marca vira "não avariada". **Avariada é uma definição só, a do `regua.avariada`** (a

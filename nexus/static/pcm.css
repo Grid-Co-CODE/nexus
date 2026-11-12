@@ -1262,6 +1262,11 @@ table.alm-t{width:100%;border-collapse:collapse;font-size:13px;color:var(--tinta
   transform:rotate(45deg);transition:transform .15s}
 .alm-ver[aria-expanded=true]::after{margin-top:3px;transform:rotate(-135deg)}
 .alm-card--aberto{grid-column:1 / -1}
+/* o almoxarifado que o saldo do ciclo não traz (11/11/2026): a borda tracejada diz "ainda sem saldo", e o selo e a frase dizem
+   por quê (a cor só reforça a palavra) */
+.alm-card--sem-saldo{border-style:dashed}
+.alm-sem-saldo{margin:6px 0 0;font-size:12.5px;line-height:1.5;color:var(--tinta-2)}
+.alm-sem-saldo .inv-selo{margin-right:4px}
 .alm-pecas{margin-top:12px}
 .alm-pecas-msg{margin:0;font-size:13px;color:var(--mudo)}
 .alm-pecas-msg:empty{display:none}

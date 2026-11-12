@@ -37,6 +37,7 @@ from ..dados import fato_almoxarifado as F
 from ..dados import livros
 from ..dados.dominios import norm
 from .inventario import regua, revisao
+from .inventario.estoque import instante
 
 TELA = "pecas"
 _RECUSA = "recusada"
@@ -360,6 +361,88 @@ def _consumo(pecas_nx: list[dict] | None, pecas_app: list[dict], fonte: dict) ->
     return out, origem
 
 
+# ── os almoxarifados que o saldo do ciclo não traz (11/11/2026, item 4 da 2ª rodada do Almoxarifado) ─────────────────────
+# O PCM: "atualizar conforme as usinas forem subindo o almoxarifado e ir aparecendo as usinas". Os cartões saíam só das linhas
+# do Saldo do App, e o almoxarifado sem peça ligada no Fracttal (o de uma usina nova, cuja contagem ainda não foi gravada: é a
+# gravação que liga as peças a ele) não aparecia até o ciclo do App seguinte à gravação. A lista é a união do Saldo, dos
+# almoxarifados com contagem no livro do App e dos já vistos no histórico (`dim_almoxarifado`).
+
+def _instante(valor):
+    try:
+        return instante(valor)
+    except ValueError:
+        return None
+
+
+def _contagens_por_almox(teste) -> tuple[dict, bool]:
+    """({id do almoxarifado: {"contada_em", "local"}}, se o livro se leu) do livro das contagens do App: o "Contada em" (UTC) da
+    contagem mais nova de cada almoxarifado e a usina como o App a manda, sem os de teste. O livro só acrescenta cartões: a falha
+    (o banco que caiu só nele) não derruba a tela, que diz que esses cartões não aparecem agora. O App que ainda não publica o
+    livro é lido e vazio."""
+    try:
+        if A.ABA_CONTAGENS not in _abas(A.LIVRO_CONTAGENS):
+            return {}, True
+        linhas = visao._livro(A.LIVRO_CONTAGENS, A.ABA_CONTAGENS)
+    except Exception:       # noqa: BLE001 — só acrescenta cartões; o aviso diz que eles não aparecem agora
+        return {}, False
+    por: dict[str, dict] = {}
+    for l in linhas:
+        aid = A.id_ou_vazio(l.get("ID do almoxarifado"))
+        if not aid or aid in teste:
+            continue
+        c = por.setdefault(aid, {"contada_em": "", "local": ""})
+        quando = _instante(l.get("Contada em"))
+        if quando and (not c["contada_em"] or quando > _instante(c["contada_em"])):
+            c["contada_em"] = _txt(l.get("Contada em"))
+        c["local"] = c["local"] or _campo(l.get("Usina"))
+    return por, True
+
+
+def _dim_almox(abas_nx) -> tuple[list[dict], bool]:
+    """As linhas da `dim_almoxarifado` do histórico do Nexus (todo almoxarifado que um ciclo aplicado já trouxe), e se se leram."""
+    if F.ABA_DIM_ALMOX not in abas_nx:
+        return [], True
+    try:
+        return visao._livro(F.LIVRO, F.ABA_DIM_ALMOX), True
+    except Exception:       # noqa: BLE001 — só acrescenta cartões
+        return [], False
+
+
+def _sem_saldo(com_saldo: set, contagens: dict, dim: list[dict], b, teste) -> list[dict]:
+    """Os cartões dos almoxarifados que o saldo do ciclo não traz (`com_saldo`: os que têm linha nele): os com contagem no livro
+    do App (`sem_saldo.porque` "contagem", com o "Contada em" da mais nova) e os do histórico (`dim_almoxarifado`, "sem_peca": o
+    histórico já os viu com saldo, e o ciclo de agora não lista peça nenhuma ligada a eles no Fracttal). O mesmo almoxarifado nas
+    duas fontes é um cartão só, com o nome da dimensão e o porquê da contagem (o dado mais novo); sem a dimensão, o nome é
+    "Almoxarifado <ID>", como na lista do Inventário. A usina vem pela de-para de hoje, como a do saldo (`usina_do_fracttal`
+    sobre o "Cliente - Usina - UF"), e, na dimensão, sem ela, a que a carga ligou. Número nenhum: sem saldo não há peça, mínimo
+    nem valor a mostrar (zero seria inventado)."""
+    dims = {}
+    for r in dim:
+        aid = A.id_ou_vazio(r.get("id_almoxarifado"))
+        if aid and aid not in teste:
+            dims[aid] = r
+    out: dict[str, dict] = {}
+    for aid in [*contagens, *dims]:
+        if aid in com_saldo or aid in out:
+            continue
+        r, c = dims.get(aid) or {}, contagens.get(aid)
+        local = (A.chave_do_local(c["local"]) or c["local"]) if c and c["local"] else _campo(r.get("local"))
+        uid = b.lig.usina_do_fracttal(local) if local else None
+        if not uid and _campo(r.get("usina_id")) and _id(r.get("usina_id")):
+            uid = int(float(_id(r.get("usina_id"))))
+        out[aid] = {"id": aid, "nome": _campo(r.get("nome")) or f"Almoxarifado {aid}", "usina": _usina(b, uid),
+                    "local": local, "pecas": 0, "abaixo": 0, "no_limite": 0, "saldo_unitario": 0, "sem_minimo": 0,
+                    "zeradas": 0, "ok": 0, "nao_informado": 0, "pct_ok": 0, "valor": None, "sem_custo": 0, "valor_txt": None,
+                    "sem_saldo": {"porque": "contagem" if c else "sem_peca", "contada_em": c["contada_em"] if c else ""}}
+    return list(out.values())
+
+
+SEM_CONTAGENS = ("O livro das contagens do App não foi lido agora: os almoxarifados que só têm contagem do inventário não "
+                 "aparecem nesta lista. Tente de novo em alguns minutos.")
+SEM_HISTORICO = ("O histórico do Nexus não foi lido agora: os almoxarifados que só ele conhece não aparecem nesta lista. Tente "
+                 "de novo em alguns minutos.")
+
+
 def montar():
     """Tudo o que a tela mostra (cópia de 5 min e renovada por trás, como as telas do Campo)."""
     def calcular():
@@ -405,6 +488,14 @@ def montar():
             aviso = (aviso + " " if aviso else "") + (f"Saldo de {_quando(fonte['fim'] or fonte['inicio'])}: a "
                                                        "varredura do App não publicou desde então.")
         d = _partes(fonte, b)
+        # a união com os almoxarifados que o saldo do ciclo não traz (item 4 de 11/11/2026), na mesma cópia de 5 min
+        teste = A.ids_de_teste(cfg)
+        contagens, contagens_lidas = _contagens_por_almox(teste)
+        dim, dim_lida = _dim_almox(abas_nx)
+        extras = _sem_saldo({c["id"] for c in d["por_almoxarifado"]}, contagens, dim, b, teste)
+        d["por_almoxarifado"] = sorted(d["por_almoxarifado"] + extras, key=lambda c: c["nome"])
+        d["kpis"]["almoxarifados"], d["kpis"]["sem_saldo"] = len(d["por_almoxarifado"]), len(extras)
+        d["avisos_sem_saldo"] = [m for lido, m in ((contagens_lidas, SEM_CONTAGENS), (dim_lida, SEM_HISTORICO)) if not lido]
         d["avariadas"] = _avariadas(d["linhas"], d["tem_custo"], visao._agora().date())
         d["kpis"]["avariadas"] = len(d["avariadas"])
         pecas_nx = visao._livro(F.LIVRO, F.ABA_PECA) if F.ABA_PECA in abas_nx else None
@@ -414,7 +505,8 @@ def montar():
         d["cadastro"]["recusadas"] = [c for c in d["consumo"] if c["situacao"] == _RECUSA]
         n = (lambda v: f"{A.numero(v):g}" if A.numero(v) is not None else "?")        # "574.0" da API vira "574"
         d.update(estado="ok", aviso=aviso, ciclo={"fim": _quando(fonte["fim"] or fonte["inicio"]),
-                                                  "lidos": n(fonte["lidos"]), "total": n(fonte["total"])},
+                                                  "lidos": n(fonte["lidos"]), "total": n(fonte["total"]),
+                                                  "inicio_iso": fonte["inicio"]},
                  almoxarifados=sorted({x["almox"] for x in d["linhas"]}),
                  familias=sorted({i["familia"] for i in fonte["itens"].values() if i["familia"]}))
         return d
@@ -432,13 +524,44 @@ def _pecas_do_almox(linhas: list[dict], id_almox: str) -> list[dict]:
     return sorted((x for x in linhas if x["id_almox"] == id_almox), key=lambda x: (_GRUPO[x["situacao"]], _ordem(x)))
 
 
-def _cartoes(d: dict, ultimas: dict | None) -> list[dict]:
+_BRT = timezone(timedelta(hours=-3))
+
+
+def _porque_sem_saldo(c: dict, d: dict, gravada_em: str | None) -> str:
+    """Por que o cartão não tem saldo, sem prometer o que já não veio. "sem_peca" (só o histórico o conhece): o ciclo de agora não
+    lista peça ligada a ele no Fracttal. "contagem": com a contagem gravada no Fracttal (`gravada_em`, a `peca_gravada` mais nova
+    do almoxarifado), o saldo vem no próximo ciclo do App, porque a gravação liga as peças ao almoxarifado; gravada ANTES do ciclo
+    que a tela mostra, o ciclo já devia ter trazido o saldo, e o cartão manda conferir as peças ligadas no Fracttal. Sem a
+    gravação (ou com o inventário que não se leu agora), a contagem foi enviada e o saldo vem depois da gravação."""
+    ciclo = d.get("ciclo") or {}
+    if c["sem_saldo"]["porque"] == "sem_peca":
+        return f"Sem peça ligada no Fracttal no ciclo do App de {ciclo.get('fim', '')}."
+    if gravada_em:
+        inicio, gravada = _instante(ciclo.get("inicio_iso")), _instante(gravada_em)
+        if inicio and gravada and gravada < inicio:
+            return (f"Contagem gravada no Fracttal, e o ciclo do App de {ciclo.get('fim', '')} não trouxe o saldo: confira no "
+                    "Fracttal as peças ligadas a este almoxarifado.")
+        return "Contagem gravada no Fracttal: o saldo vem no próximo ciclo do App."
+    q = _instante(c["sem_saldo"]["contada_em"])
+    dia = f" em {q.astimezone(_BRT):%d/%m/%Y}" if q else ""
+    return f"Contagem enviada{dia}: o saldo vem no próximo ciclo do App depois da gravação."
+
+
+def _cartoes(d: dict, r: dict | None) -> list[dict]:
     """Os cartões da aba Por almoxarifado com a última contagem gravada do inventário: "dd/mm/aaaa"; "" se o livro foi lido e
     não tem nenhuma gravada daquele almoxarifado ("sem contagem gravada na janela lida"); e None se o inventário não deu para ler
     ou o App ainda não publica o livro (a linha não aparece). Ela vem de fora da conta de 5 min, como o número da aba Inventário:
-    o estado das contagens muda a cada gravação. Cópias: a conta guardada é de todos."""
-    return [dict(c, ultima_contagem=None if ultimas is None else ultimas.get(c["id"], ""))
-            for c in d.get("por_almoxarifado", [])]
+    o estado das contagens muda a cada gravação. `r`: o `revisao.resumo` (ou None). O cartão sem saldo (item 4 de 11/11/2026)
+    ganha o `porque` (`_porque_sem_saldo`). Cópias: a conta guardada é de todos."""
+    ultimas = None if r is None else r.get("ultimas")
+    gravadas = (r or {}).get("gravadas_em") or {}
+    out = []
+    for c in d.get("por_almoxarifado", []):
+        c = dict(c, ultima_contagem=None if ultimas is None else ultimas.get(c["id"], ""))
+        if c.get("sem_saldo"):
+            c["porque"] = _porque_sem_saldo(c, d, gravadas.get(c["id"]))
+        out.append(c)
+    return out
 
 
 def registrar(bp) -> None:
@@ -462,7 +585,7 @@ def registrar(bp) -> None:
         r = revisao.resumo(current_app.config)
         return render_template("pcm/almoxarifado.html", d=d, erro=g.erro,
                                inventario_a_revisar=None if r is None else r["n"],
-                               cartoes=_cartoes(d, None if r is None else r["ultimas"]))
+                               cartoes=_cartoes(d, r))
 
     @bp.route(f"/{TELA}/almox/<id_almox>", endpoint="pecas_almox")
     def pecas_almox(id_almox):

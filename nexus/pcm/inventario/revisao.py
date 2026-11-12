@@ -231,8 +231,11 @@ def resumo(cfg) -> dict | None:
     almoxarifado sem nenhuma fica fora do dicionário (a tela diz "sem contagem gravada na janela lida": o livro do App é uma janela
     que anda, e "nunca contado" seria mais do que se sabe); e `None` quando o App ainda não publica o livro das contagens
     (`livro_existe` falso): não leu, a tela não diz nada. O retorno `None` é o inventário que não deu para ler.
+    `gravadas_em` (11/11/2026, o cartão sem saldo do Por almoxarifado): `{id do almoxarifado: a hora (UTC) da `peca_gravada`
+    mais nova}`, sem o almoxarifado de teste; None como o `ultimas`. É por ela que o cartão sabe se o ciclo do App que a tela
+    mostra veio depois da gravação (e devia ter trazido o saldo).
 
-    **Quem abre a tela chama isto UMA vez por abertura e tira os dois valores daqui.** A falha de leitura não fica guardada (o
+    **Quem abre a tela chama isto UMA vez por abertura e tira os valores daqui.** A falha de leitura não fica guardada (o
     `visao._calcular` só guarda o que deu certo): chamar `a_revisar` e depois uma segunda função pelo mesmo caminho lia o livro
     duas vezes por abertura justo quando o banco está ruim (a revisão de 30/10/2026). Pela cópia de 5 min do `visao._ler`, renovada
     por trás: os dois são só enfeite, e a leitura do livro do inventário (2 min, no pedido) não pode segurar a tela principal quando
@@ -251,8 +254,22 @@ def resumo(cfg) -> dict | None:
                 continue                  # sem data legível não há o que mostrar (e a que não se lê nem se aprova)
             if c["id_almox"] not in ultimas or quando > ultimas[c["id_almox"]][0]:
                 ultimas[c["id_almox"]] = (quando, quando.astimezone(_BRT).strftime("%d/%m/%Y"))
+        gravadas: dict[str, tuple] = {}
+        if d["livro_existe"]:
+            teste = A.ids_de_teste(cfg)
+            for e in F.ler(cfg)[F.ABA_EVENTO]:          # a cópia de 2 min que a `leitura.ler` acabou de usar
+                aid = A.id_ou_vazio(e.get("id_almoxarifado"))
+                if A._txt(e.get("tipo")) != "peca_gravada" or not aid or aid in teste:
+                    continue
+                try:
+                    quando = instante(e.get("quando"))
+                except ValueError:
+                    continue
+                if aid not in gravadas or quando > gravadas[aid][0]:
+                    gravadas[aid] = (quando, A._txt(e.get("quando")))
         return {"n": sum(1 for c in cs if c["aprovavel"]),
-                "ultimas": {a: dia for a, (_, dia) in ultimas.items()} if d["livro_existe"] else None}
+                "ultimas": {a: dia for a, (_, dia) in ultimas.items()} if d["livro_existe"] else None,
+                "gravadas_em": {a: iso for a, (_, iso) in gravadas.items()} if d["livro_existe"] else None}
     g = visao._ler(("pcm_inventario_resumo",), contar)
     return None if g.erro or not g.dados else g.dados
 

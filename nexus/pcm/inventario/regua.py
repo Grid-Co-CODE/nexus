@@ -343,8 +343,9 @@ def _pagina(almox: str = "", *, erro: str = "", status: int = 200):
     g = almoxarifado.montar()
     d = g.dados or {}
     ok_ = d.get("estado") == "ok"
-    almoxes = [{"id": c["id"], "nome": c["nome"], "usina": c.get("usina"), "pecas": c["pecas"]}
-               for c in d.get("por_almoxarifado", [])] if ok_ else []
+    # a mesma lista do Por almoxarifado, com os que o saldo do ciclo não traz (11/11/2026): eles abrem sem peça nenhuma
+    almoxes = [{"id": c["id"], "nome": c["nome"], "usina": c.get("usina"), "pecas": c["pecas"],
+                "sem_saldo": bool(c.get("sem_saldo"))} for c in d.get("por_almoxarifado", [])] if ok_ else []
     escolhido = next((a for a in almoxes if a["id"] == almox), None) if almox else None
     linhas, erro_livro = [], ""
     if almox and escolhido is None and ok_:

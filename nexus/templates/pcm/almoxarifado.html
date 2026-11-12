@@ -13,10 +13,23 @@
    para um grupo fechado, a Reposição leva a criticidade e a Curva ABC do Fracttal, e as avariadas com saldo ganham a
    aba Avariadas (há quanto tempo cada uma está parada, pelo histórico). Na aba Por almoxarifado, cada cartão mostra a última
    contagem gravada do inventário e o valor em estoque por curva, e o botão "Ver peças" busca, no 1º clique, as peças daquele
-   almoxarifado (a rota `pecas_almox`, o pedaço _almox_pecas.html), da mesma conta guardada de 5 min. #}
+   almoxarifado (a rota `pecas_almox`, o pedaço _almox_pecas.html), da mesma conta guardada de 5 min.
+   11/11/2026 (o PCM: "atualizar conforme as usinas forem subindo o almoxarifado e ir aparecendo as usinas"): o Por almoxarifado
+   é a união do saldo do ciclo, das contagens do App e do histórico do Nexus, e o cartão sem saldo diz por quê, sem número. A
+   explicação dos cartões mora no "!" do título (o padrão do Nexus, _explica.html). #}
+{% from "_explica.html" import explica %}
 <div class="pg alm">
 <p class="gc-eyebrow">PCM · Almoxarifado</p>
-<h1 class="titulo-pagina">Almoxarifado</h1>
+<div class="gc-titulo-explica"><h1 class="titulo-pagina">Almoxarifado</h1>
+{% call explica('Entenda esta tela') %}<p><b>Por almoxarifado.</b> Cada cartão é um almoxarifado do Fracttal. A barra é a parte
+  das peças acima do mínimo. A última contagem gravada é a do inventário (a mais nova entre as gravadas no Fracttal). O valor em
+  estoque é o saldo vezes o custo unitário do Fracttal, somado por Curva ABC do cadastro da peça; a peça com saldo e sem custo
+  fica fora da soma, e o cartão diz quantas.</p>
+<p><b>O almoxarifado sem saldo ainda.</b> Ele aparece assim que sobe qualquer dado: o saldo do ciclo do App, uma contagem do
+  inventário ou o histórico do Nexus. Sem linha no saldo do ciclo, o cartão não mostra número e diz por quê. Contagem enviada:
+  é a gravação da contagem no Fracttal que liga as peças ao almoxarifado, e o saldo vem no ciclo do App seguinte a ela.
+  Contagem gravada: o saldo vem no próximo ciclo; se o ciclo já passou sem trazê-lo, confira no Fracttal as peças ligadas.
+  Sem peça ligada no Fracttal: o histórico já o viu com saldo, e o ciclo de agora não lista peça nenhuma nele.</p>{% endcall %}</div>
 {% if erro %}<div class="cn-erro" role="alert">Uma fonte não respondeu agora: {{ erro }}</div>{% endif %}
 
 {% if d.estado == 'sem_livro' %}
@@ -35,7 +48,7 @@
 
 <section class="kb-kpis alm-kpis" aria-label="Resumo do almoxarifado">
   <div class="kb-kpi" data-alm-kpi><span class="kb-kpi-rot">Almoxarifados</span>
-    <div class="kb-kpi-linha"><b class="kb-kpi-v">{{ k.almoxarifados }}</b><span class="kb-kpi-nota">nas usinas</span></div></div>
+    <div class="kb-kpi-linha"><b class="kb-kpi-v">{{ k.almoxarifados }}</b><span class="kb-kpi-nota">nas usinas{% if k.sem_saldo %}, {{ k.sem_saldo }} sem saldo ainda{% endif %}</span></div></div>
   <div class="kb-kpi" data-alm-kpi><span class="kb-kpi-rot">Peças com saldo</span>
     <div class="kb-kpi-linha"><b class="kb-kpi-v">{{ k.com_saldo }}</b><span class="kb-kpi-nota">em algum almoxarifado</span></div></div>
   <div class="kb-kpi" data-alm-kpi><span class="kb-kpi-rot">Abaixo do mínimo</span>
@@ -127,12 +140,21 @@
 
 <section class="alm-painel" data-painel="almoxarifados" hidden>
   <h2>Por almoxarifado</h2>
-  <p class="alm-ajuda">A barra é a parte das peças acima do mínimo. A última contagem gravada é a do inventário (a mais nova
-    entre as gravadas no Fracttal). O valor em estoque é o saldo vezes o custo unitário do Fracttal, somado por Curva ABC
-    do cadastro da peça; a peça com saldo e sem custo fica fora da soma e o cartão diz quantas.{% if not d.tem_custo %} O App
-    ainda não traz o custo: por enquanto os cartões não mostram o valor.{% endif %}</p>
+  {# como se lê cada cartão está no "!" do título; aqui só o que muda com o dado #}
+  {% if not d.tem_custo %}<p class="alm-ajuda">O App ainda não traz o custo: por enquanto os cartões não mostram o valor.</p>{% endif %}
+  {% for m in d.avisos_sem_saldo or [] %}<div class="cn-erro cn-aviso" role="status">{{ m }}</div>{% endfor %}
   <div class="alm-cards">
   {% for c in cartoes %}
+    {% if c.sem_saldo %}
+    {# o almoxarifado que o saldo do ciclo não traz (11/11/2026): só com contagem do App ou só no histórico do Nexus. Nenhum
+       número (sem saldo não há peça, mínimo nem valor) e sem "Ver peças"; o porquê vem do `_porque_sem_saldo` #}
+    <article class="alm-card alm-card--sem-saldo">
+      <h3>{{ c.nome }}</h3>
+      <p class="alm-det">{% if c.usina %}{{ c.usina }}{% else %}<span class="alm-ruim">usina não ligada</span> (ligar em Base → Ligações){% if c.local %} · no Fracttal: {{ c.local }}{% endif %}{% endif %}</p>
+      <p class="alm-sem-saldo"><span class="inv-selo">sem saldo ainda</span> {{ c.porque }}</p>
+      {% if c.ultima_contagem %}<div class="alm-card-info"><p>Última contagem gravada: <b>{{ c.ultima_contagem }}</b></p></div>{% endif %}
+    </article>
+    {% else %}
     <article class="alm-card">
       <h3>{{ c.nome }}</h3>
       <p class="alm-det">{% if c.usina %}{{ c.usina }}{% else %}<span class="alm-ruim">usina não ligada</span> (ligar em Base → Ligações){% endif %}</p>
@@ -170,6 +192,7 @@
         <div data-pecas-corpo></div>
       </div>
     </article>
+    {% endif %}
   {% endfor %}
   </div>
 </section>

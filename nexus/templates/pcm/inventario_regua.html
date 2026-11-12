@@ -43,7 +43,7 @@
 <ul class="rg-almoxes">
   {% for a in almoxes %}
   <li><a href="{{ raiz }}/t/pcm/pecas/inventario/regua?almox={{ a.id }}"{% if almox and almox.id == a.id %} aria-current="page"{% endif %}>
-    <b>{{ a.nome }}</b><span class="alm-det">{{ a.usina or 'usina não ligada' }} · {{ a.pecas }} peças</span></a></li>
+    <b>{{ a.nome }}</b><span class="alm-det">{{ a.usina or 'usina não ligada' }} · {{ 'sem saldo ainda' if a.sem_saldo else a.pecas ~ ' peças' }}</span></a></li>
   {% endfor %}
 </ul>
 

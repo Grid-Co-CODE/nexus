@@ -7,7 +7,7 @@ from datetime import datetime
 from pathlib import Path
 
 import pytest
-from test_campo_visao import BRT, _aba, banco  # noqa: F401  (banco é fixture)
+from test_campo_visao import BRT, USINAS, _aba, banco  # noqa: F401  (banco é fixture)
 from test_pcm_publicar import _no_setor, _pessoa
 from test_setor_telas import ANA, _como, setores  # noqa: F401  (setores é fixture)
 
@@ -866,3 +866,148 @@ def test_sem_coluna_custo_nao_mostra_valor(app, almox, monkeypatch):
     assert all(c["valor"] is None and c["sem_custo"] == 0 for c in T.montar().dados["por_almoxarifado"])
     html = _abrir(app, monkeypatch).get_data(as_text=True)
     assert "Valor em estoque" not in html and "sem custo no Fracttal" not in html
+
+
+# ── 11/11/2026, item 4: o Por almoxarifado mostra o almoxarifado assim que ele sobe qualquer dado ───────────────────────
+# O PCM: "atualizar conforme as usinas forem subindo o almoxarifado e ir aparecendo as usinas". A lista é a união do Saldo
+# do ciclo, dos almoxarifados com contagem no livro do App e dos já vistos no histórico (`dim_almoxarifado`); o cartão sem
+# saldo diz por quê, sem número inventado.
+ALT_CHAVE = A.chave_do_local(ALT)                      # a usina do livro das contagens, como o App a manda (liga a usina 1)
+USINA_1, USINA_2 = USINAS[0]["nome"], USINAS[1]["nome"]    # as do cadastro de mentira do `banco`
+
+
+def _contagem_do_app(api, *cs):
+    """O livro das contagens do App com uma linha por contagem: (id da contagem, almoxarifado, "Contada em" UTC, usina)."""
+    from test_pcm_inventario_leitura import _linha
+    _aba(api, A.LIVRO_CONTAGENS, A.ABA_CONTAGENS,
+         [_linha(cid, "L1", "501", "3", almox=almox, contada=contada, enviada=contada, usina=usina)
+          for cid, almox, contada, usina in cs])
+    visao.limpar()
+
+
+def _dim_almox(api, *linhas):
+    """A `dim_almoxarifado` do histórico do Nexus: (id, nome, local "Cliente - Usina - UF", usina_id)."""
+    from nexus.dados import fato_almoxarifado as F
+    _aba(api, F.LIVRO, F.ABA_DIM_ALMOX,
+         [dict(zip(F.CAB_DIM_ALMOX, [aid, nome, local, uid, "de-para do Fracttal" if uid else None]))
+          for aid, nome, local, uid in linhas])
+    visao.limpar()
+
+
+def _por_id():
+    return {c["id"]: c for c in _dados()["por_almoxarifado"]}
+
+
+def test_o_almoxarifado_que_so_tem_contagem_aparece(app, almox, monkeypatch):
+    """O almoxarifado novo de uma usina: o técnico mandou a contagem, e o saldo dele ainda não está no ciclo do App (nenhuma peça
+    ligada no Fracttal até a gravação). Ele aparece no Por almoxarifado, com a usina pela de-para, sem número de peça, e o
+    cartão diz por quê. O que já tem saldo segue o de sempre."""
+    _contagem_do_app(almox, ("C-30", "30", "2026-10-25T11:00:00Z", ALT_CHAVE),
+                     ("C-10", "10", "2026-10-25T11:00:00Z", ALT_CHAVE))
+    c = _por_id()
+    assert set(c) == {"10", "20", "30"}
+    novo = c["30"]
+    assert (novo["nome"], novo["usina"], novo["pecas"], novo["sem_saldo"]["porque"]) == \
+        ("Almoxarifado 30", USINA_1, 0, "contagem")
+    assert c["10"].get("sem_saldo") is None and c["10"]["pecas"] == 2
+    k = _dados()["kpis"]
+    assert (k["almoxarifados"], k["sem_saldo"]) == (3, 1)
+    html = _abrir(app, monkeypatch).get_data(as_text=True)
+    cartao = _cartao(html, "Almoxarifado 30")
+    assert "Contagem enviada em 25/10/2026" in cartao and "o saldo vem no próximo ciclo do App" in cartao
+    assert "Ver peças" not in cartao and "peças</span>" not in cartao and "alm-barra" not in cartao
+    assert "Por almoxarifado (3)" in html and "1 sem saldo ainda" in html
+
+
+def test_o_almoxarifado_do_historico_sem_peca_aparece(app, almox, monkeypatch):
+    """O almoxarifado que o histórico do Nexus já viu (a `dim_almoxarifado`) e que o saldo deste ciclo não traz: sem peça ligada
+    no Fracttal. O nome e a usina vêm da dimensão; a usina, pela de-para de hoje."""
+    _dim_almox(almox, ("40", "Almoxarifado Quarenta", ALT_CHAVE, None), ("10", "Almoxarifado 10", ALT_CHAVE, 1),
+               ("41", "Almoxarifado Quarenta e Um", "Sem Ligacao - Usina Y - MT", "2.0"))
+    c = _por_id()
+    assert set(c) == {"10", "20", "40", "41"}
+    assert (c["40"]["nome"], c["40"]["usina"], c["40"]["pecas"], c["40"]["sem_saldo"]["porque"]) == \
+        ("Almoxarifado Quarenta", USINA_1, 0, "sem_peca")
+    assert c["41"]["usina"] == USINA_2                    # a de-para de hoje não liga: vale a usina que a carga ligou
+    cartao = _cartao(_abrir(app, monkeypatch).get_data(as_text=True), "Almoxarifado Quarenta")
+    assert "Sem peça ligada no Fracttal no ciclo do App de 25/10, 00:29" in cartao and "Ver peças" not in cartao
+
+
+def test_contagem_e_historico_do_mesmo_almoxarifado_viram_um_cartao(app, almox, monkeypatch):
+    """O mesmo almoxarifado nas duas fontes é UM cartão: o nome da dimensão e o porquê da contagem (o dado mais novo)."""
+    _contagem_do_app(almox, ("C-40", "40", "2026-10-25T11:00:00Z", ALT_CHAVE))
+    _dim_almox(almox, ("40", "Almoxarifado Quarenta", ALT_CHAVE, 1))
+    cartoes = [c for c in _dados()["por_almoxarifado"] if c["id"] == "40"]
+    assert len(cartoes) == 1 and cartoes[0]["nome"] == "Almoxarifado Quarenta"
+    assert cartoes[0]["sem_saldo"]["porque"] == "contagem"
+
+
+def test_a_usina_que_nao_liga_e_o_almoxarifado_de_teste(app, almox, monkeypatch):
+    """A usina que a de-para não liga diz "usina não ligada", como hoje (com o local do Fracttal para o PCM achar); o almoxarifado
+    de teste (`NEXUS_ALMOX_TESTE_IDS`) não aparece por nenhuma das fontes."""
+    app.config["NEXUS_ALMOX_TESTE_IDS"] = "60,61"
+    _contagem_do_app(almox, ("C-50", "50", "2026-10-25T11:00:00Z", "Nenhuma - Usina Z - MT"),
+                     ("C-60", "60", "2026-10-25T11:00:00Z", ALT_CHAVE))
+    _dim_almox(almox, ("61", "Almoxarifado de teste", ALT_CHAVE, 1))
+    c = _por_id()
+    assert "60" not in c and "61" not in c
+    assert c["50"]["usina"] is None and c["50"]["local"] == "Nenhuma - Usina Z - MT"
+    cartao = _cartao(_abrir(app, monkeypatch).get_data(as_text=True), "Almoxarifado 50")
+    assert "usina não ligada" in cartao and "Nenhuma - Usina Z - MT" in cartao
+
+
+def test_a_contagem_mais_nova_e_a_do_cartao(app, almox, monkeypatch):
+    """Duas contagens do mesmo almoxarifado: vale a data da mais nova ("Contada em" é UTC: o dia é o de Brasília)."""
+    _contagem_do_app(almox, ("C-1", "30", "2026-10-20T15:00:00Z", ALT_CHAVE),
+                     ("C-2", "30", "2026-10-25T01:30:00Z", ALT_CHAVE))
+    cartao = _cartao(_abrir(app, monkeypatch).get_data(as_text=True), "Almoxarifado 30")
+    assert "Contagem enviada em 24/10/2026" in cartao
+
+
+def test_contagem_gravada_e_o_ciclo_que_nao_trouxe_o_saldo(app, inventario, monkeypatch):
+    """A contagem já gravada no Fracttal: o saldo vem no próximo ciclo do App. Gravada ANTES do ciclo que a tela mostra, o ciclo
+    já devia ter trazido o saldo, e o cartão manda conferir as peças ligadas no Fracttal (não promete o que já não veio)."""
+    from test_pcm_inventario_leitura import _ev, _gravar
+    _contagens(app, inventario, ("C-30", "30", "2026-10-25T11:00:00Z", "nova"), ("C-31", "31", "2026-10-24T11:00:00Z", "nova"))
+    _gravar(app, *[_ev("C-30", "aprovada", i, almox="30") for i in (501, 502)],
+            *[_ev("C-30", "peca_gravada", i, almox="30", quando="2026-10-25T12:00:00Z") for i in (501, 502)],
+            *[_ev("C-31", "aprovada", i, almox="31") for i in (501, 502)],
+            *[_ev("C-31", "peca_gravada", i, almox="31", quando="2026-10-24T13:00:00Z") for i in (501, 502)])
+    visao.limpar()
+    html = _abrir(app, monkeypatch).get_data(as_text=True)
+    cartao = _cartao(html, "Almoxarifado 30")
+    assert "Contagem gravada no Fracttal: o saldo vem no próximo ciclo do App" in cartao and "25/10/2026" in cartao
+    cartao = _cartao(html, "Almoxarifado 31")
+    assert "o ciclo do App de 25/10, 00:29 não trouxe o saldo" in cartao and "confira no Fracttal" in cartao
+
+
+def test_o_livro_das_contagens_que_nao_se_le_nao_derruba_a_tela(app, almox, monkeypatch):
+    """O livro das contagens só acrescenta cartões: sem ele (o banco caiu só nele), a tela segue com o saldo e diz que os
+    almoxarifados que só têm contagem não aparecem agora (a lista não fica pela metade calada)."""
+    _contagem_do_app(almox, ("C-30", "30", "2026-10-25T11:00:00Z", ALT_CHAVE))
+    original = visao._livro
+
+    def cair(nome, aba=None):
+        if nome == A.LIVRO_CONTAGENS:
+            raise ConnectionError("banco fora")
+        return original(nome, aba)
+    monkeypatch.setattr(visao, "_livro", cair)
+    visao.limpar()
+    d = _dados()
+    from nexus.pcm import almoxarifado as T
+    assert d["estado"] == "ok" and set(_por_id()) == {"10", "20"} and d["avisos_sem_saldo"] == [T.SEM_CONTAGENS]
+    html = _abrir(app, monkeypatch).get_data(as_text=True)
+    assert "O livro das contagens do App não foi lido agora" in html
+
+
+def test_os_cartoes_sem_saldo_vem_da_copia_de_5_min(app, almox, monkeypatch):
+    """A união sai da MESMA conta guardada da tela (`montar`): aquecida, abrir de novo não relê livro nenhum."""
+    from nexus.pcm import almoxarifado as T
+    _contagem_do_app(almox, ("C-30", "30", "2026-10-25T11:00:00Z", ALT_CHAVE))
+    T.montar()
+
+    def nao_ler(*a, **k):
+        raise AssertionError("leu o banco")
+    monkeypatch.setattr(T, "_abas", nao_ler)
+    monkeypatch.setattr(visao, "_livro", nao_ler)
+    assert "30" in {c["id"] for c in T.montar().dados["por_almoxarifado"]}
