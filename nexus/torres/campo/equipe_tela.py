@@ -777,8 +777,9 @@ def _tela(contexto: dict, status: int = 200):
     tela = TORRE.tela("equipe")
     clima = _com_clima()
     # o Incluir clima (11/11/2026): o botão, e o `clima=1` que o Técnicos | Usinas leva de um lado para o outro
+    # o link para Base > Chaves no "falta a chave" do Satélite (12/11/2026): só o administrador cola a chave
     contexto = {"clima_on": clima, "q_clima": {"clima": "1"} if clima else {}, "q_botao_clima": _q_do_clima(clima),
-                **contexto}
+                "link_chaves": bool(session.get("admin")), **contexto}
     r = current_app.make_response((render_template("campo/equipe.html", torre=TORRE, tela=tela, **contexto), status))
     r.headers["Cache-Control"] = "no-store"         # a posição de pessoas não fica na cópia do navegador nem de proxy
     return r

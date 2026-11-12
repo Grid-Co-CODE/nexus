@@ -2029,7 +2029,16 @@ tr.rd-linha--ativa td{background:var(--verde-suave)}
   border-radius:var(--raio-controle);cursor:pointer}
 .eq-seg-mapa button[aria-pressed="true"]{background:var(--verde);color:var(--sobre-verde)}
 .eq-seg-mapa button:focus-visible{outline:2px solid var(--foco);outline-offset:2px}
-@media (max-width:640px){.eq-camadas{top:auto;bottom:40px;right:10px}}
+.eq-topo-mapa{position:absolute;z-index:2;top:14px;left:14px;right:14px;display:flex;flex-wrap:wrap;
+  justify-content:space-between;align-items:flex-start;gap:6px;pointer-events:none}
+.eq-topo-mapa > *{pointer-events:auto}
+.eq-topo-mapa > .eq-zoom,.eq-topo-mapa > .eq-camadas{position:relative;top:auto;left:auto;right:auto;bottom:auto}
+.eq-topo-mapa > .eq-camadas{margin-left:auto}
+.eq-sat-falta{position:absolute;top:calc(100% + 6px);right:0;width:340px;max-width:calc(100vw - 60px);margin:0;padding:10px 12px;background:var(--superficie);
+  border:1px solid var(--linha);border-radius:var(--raio-controle);color:var(--tinta-2);font-size:13px;line-height:1.45}
+.eq-sat-falta[hidden]{display:none}
+.eq-sat-falta a{color:var(--verde);font-weight:600}
+@media (max-width:640px){.eq-camadas{top:auto;bottom:40px;right:10px}.eq-topo-mapa > .eq-camadas{bottom:auto;right:auto}}
 /* a reprodução do percurso (12/11/2026, a animação da prévia): tocar, voltar no tempo e a velocidade */
 .eq-replay{display:grid;grid-template-columns:auto minmax(0,1fr) auto auto;align-items:center;gap:8px}
 .eq-replay[hidden]{display:none}

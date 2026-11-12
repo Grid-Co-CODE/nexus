@@ -48,8 +48,16 @@
     var mundo = [[-180, -85], [180, -85], [180, 85], [-180, 85], [-180, -85]];
     return { type: "Feature", properties: {}, geometry: { type: "Polygon", coordinates: [mundo].concat(buracos) } };
   }
+  // a cor da usina em cada foco (Levi, 12/11/2026: "No foco técnico todas as UFVs ficam sem cor exceto desligamento e o
+  // resto fica cinza. No modo usina os técnicos ficam cinzas e o foco é na usina!"): no foco técnico só a usina parada (o
+  // crítico do Agora de Comando > Usinas) fica com a cor e o resto do Agora vira cinza; o nível do clima (o Incluir
+  // clima, ligado de propósito) fica como está. No foco usina, a cor de sempre
+  function corNoFoco(cor, foco) {
+    if (foco !== "tecnico" || cor === "a_critico") return cor;
+    return /^a_|^sem_leitura$|^neutra$|^dest$/.test(cor) ? "cinza" : cor;
+  }
   if (typeof module !== "undefined" && module.exports) {
-    module.exports = { mistura: mistura, mascara: mascara, rgb: rgb };
+    module.exports = { mistura: mistura, mascara: mascara, rgb: rgb, corNoFoco: corNoFoco };
     return;
   }
 
@@ -224,7 +232,8 @@
   function icones(mapa) {
     var cores = NIVEL();
     var fill = { neutra: P.terra, dest: P.verde, sem_leitura: P.terra, a_ok: P.t["--ok-cheio"],
-                 a_alerta: P.t["--alerta-cheio"], a_critico: P.t["--critico"], a_neutro: P.t["--mudo"] };
+                 a_alerta: P.t["--alerta-cheio"], a_critico: P.t["--critico"], a_neutro: P.t["--mudo"],
+                 cinza: mistura(P.terra, P.t["--mudo"], 0.7) };
     Object.keys(cores).forEach(function (k) { fill[k] = cores[k]; });
     Object.keys(fill).forEach(function (k) {
       var borda = k === "neutra" ? P.verde : k === "sem_leitura" ? P.t["--mudo"] : P.t["--fundo"];
@@ -254,10 +263,11 @@
     var ORD = { agir: 9, a_critico: 8, atencao: 7, a_alerta: 6, regiao: 4, sem: 3, nx: 2, a_neutro: 2, a_ok: 1, dest: 1,
                 sem_leitura: 0, neutra: 0 };
     return fc(D.usinas.map(function (u) {
-      var cor = corDaUsina(u);
+      var cor = corDaUsina(u), corT = corNoFoco(cor, "tecnico");
       var selo = !!(u.nivel && u.agora && (u.agora.tom === "critico" || u.agora.tom === "alerta"));
-      return ponto(u.c, { id: u.id, nome: u.nome, icone: "u-" + cor + (selo ? "-!" : ""), ordem: ORD[cor] || 0,
-                          pulso: cor === "agir" || cor === "a_critico" });
+      // `icone` = a cor de sempre (o foco usina e o Usinas); `icone_t` = a do foco técnico
+      return ponto(u.c, { id: u.id, nome: u.nome, icone: "u-" + cor + (selo ? "-!" : ""),
+                          icone_t: "u-" + corT + (selo && corT !== "cinza" ? "-!" : ""), ordem: ORD[cor] || 0 });
     }));
   }
   function tecnicosGeo() {
@@ -367,9 +377,8 @@
       { id: "perc-setas", type: "symbol", source: "perc-linha", minzoom: 7, layout: { "symbol-placement": "line", "symbol-spacing": 90, "icon-image": "seta", "icon-size": ["interpolate", ["linear"], ["zoom"], 8, 0.75, 15, 1.05], "icon-allow-overlap": true, "icon-ignore-placement": true, "icon-rotation-alignment": "map" } },
       { id: "perc-pontos", type: "circle", source: "perc-pontos", minzoom: 9, filter: ["!", ["get", "ponta"]], paint: { "circle-color": ["get", "cor"], "circle-radius": 3.6, "circle-stroke-color": P.t["--superficie"], "circle-stroke-width": 1.2 } },
       { id: "perc-pontas", type: "circle", source: "perc-pontos", filter: ["get", "ponta"], paint: { "circle-color": ["get", "cor"], "circle-radius": 7, "circle-stroke-color": P.forte, "circle-stroke-width": 2.4 } },
-      // a usina: o losango que cresce com o zoom (Levi, 11/11/2026), uma a uma (nunca agrupada); a crítica pulsa
-      { id: "usinas-pulso", type: "circle", source: "usinas", filter: ["get", "pulso"], paint: { "circle-color": comAlfa(P.t["--critico"], 0), "circle-stroke-color": P.t["--critico"], "circle-stroke-width": 2, "circle-radius": 12, "circle-stroke-opacity": 0.75,
-        "circle-radius-transition": { duration: REDUZIDO ? 0 : 1100 }, "circle-stroke-opacity-transition": { duration: REDUZIDO ? 0 : 1100 } } },
+      // a usina: o losango que cresce com o zoom (Levi, 11/11/2026), uma a uma (nunca agrupada). O anel vermelho que
+      // pulsava em volta da crítica saiu (Levi, 12/11/2026: "TIRE ESSA BORDA ENORME DAS UFVs em vermelho!")
       { id: "usinas", type: "symbol", source: "usinas", layout: { "icon-image": ["get", "icone"], "icon-size": tamanhoUsina(1),
         "icon-allow-overlap": true, "icon-ignore-placement": true, "symbol-sort-key": ["get", "ordem"] } },
       { id: "usinas-nome", type: "symbol", source: "usinas", minzoom: 8.5, layout: { "text-field": ["get", "nome"], "text-font": FONTE_M, "text-size": ["interpolate", ["linear"], ["zoom"], 8.5, 10.5, 13, 12.5],
@@ -384,7 +393,7 @@
       { id: "tecnicos-halo", type: "circle", source: "tecnicos", filter: ["get", "sel"], paint: { "circle-radius": ["interpolate", ["linear"], ["zoom"], 3, 14, 10, 18], "circle-color": P.t["--papel-tinta"] } },
       { id: "tecnicos", type: "circle", source: "tecnicos", layout: { "circle-sort-key": ["get", "ordem"] }, paint: {
         "circle-radius": ["interpolate", ["linear"], ["zoom"], 3, 10, 10, 14],
-        "circle-color": ["case", ["get", "velho"], P.t["--superficie"], ["get", "cor"]],
+        "circle-color": corDoTecnico(),
         "circle-stroke-color": ["case", ["get", "sel"], P.t["--papel"], ["get", "velho"], P.t["--mudo"], P.t["--superficie"]],
         "circle-stroke-width": ["case", ["get", "sel"], 3.2, ["get", "velho"], 2.6, 1.8] } },
       { id: "tecnicos-ini", type: "symbol", source: "tecnicos", layout: { "text-field": ["get", "ini"], "text-font": FONTE_M, "text-size": 11, "text-allow-overlap": true, "text-ignore-placement": true },
@@ -393,6 +402,9 @@
     L.forEach(function (l) { if (!mapa.getLayer(l.id)) mapa.addLayer(l); });
     aplicarFoco();
     aplicarBase();
+  }
+  function corDoTecnico() {
+    return ["case", ["get", "velho"], P.t["--superficie"], ["get", "cor"]];
   }
   function tamanhoUsina(f) {
     return ["interpolate", ["linear"], ["zoom"], 3, 0.5 * f, 6, 0.65 * f, 9, 0.85 * f, 12, 1.1 * f, 15, 1.4 * f];
@@ -405,11 +417,13 @@
     if (!mapa.getLayer("usinas")) return;
     var u = foco === "usina";
     mapa.setLayoutProperty("usinas", "icon-size", tamanhoUsina(u ? 1.25 : (D.modo === "tecnicos" ? 0.8 : 1)));
+    mapa.setLayoutProperty("usinas", "icon-image", ["get", u ? "icone" : "icone_t"]);
     mapa.setPaintProperty("usinas", "icon-opacity", u || D.modo !== "tecnicos" ? 1 : 0.75);
     mapa.setLayerZoomRange("usinas-nome", u ? 6.5 : 9.5, 24);
     if (mapa.getLayer("tecnicos")) {
       mapa.setPaintProperty("tecnicos", "circle-radius", u ? ["interpolate", ["linear"], ["zoom"], 3, 5, 10, 7]
                                                            : ["interpolate", ["linear"], ["zoom"], 3, 10, 10, 14]);
+      mapa.setPaintProperty("tecnicos", "circle-color", u ? P.t["--mudo"] : corDoTecnico());
       mapa.setPaintProperty("tecnicos", "circle-opacity", u ? 0.55 : 1);
       mapa.setPaintProperty("tecnicos", "circle-stroke-opacity", u ? 0.55 : 1);
       mapa.setLayoutProperty("tecnicos-ini", "visibility", u ? "none" : "visible");
@@ -436,16 +450,12 @@
     });
   }
 
-  // o pulso: as divisas do Brasil (sempre, pedido do Levi) e a usina crítica (parada com os efeitos desligados)
+  // o pulso das divisas do Brasil (sempre, pedido do Levi)
   var fase = false;
   setInterval(function () {
     if (!mapa.getLayer("brasil-borda")) return;
     fase = !fase;
     mapa.setPaintProperty("brasil-borda", "line-opacity", fase ? 0.35 : 0.95);
-    if (!REDUZIDO && mapa.getLayer("usinas-pulso")) {
-      mapa.setPaintProperty("usinas-pulso", "circle-radius", fase ? 20 : 12);
-      mapa.setPaintProperty("usinas-pulso", "circle-stroke-opacity", fase ? 0.05 : 0.75);
-    }
   }, 1300);
   // as formigas do trecho atual do percurso (a prévia; pedida pelo Levi, roda também com os efeitos desligados)
   var FORMIGAS = [[0, 4, 3], [0.5, 4, 2.5], [1, 4, 2], [1.5, 4, 1.5], [2, 4, 1], [2.5, 4, 0.5], [3, 4, 0], [0, 0.5, 3, 3.5],
@@ -597,6 +607,12 @@
     var f = e.target.closest("[data-eq-foco]");
     if (f) { foco = f.getAttribute("data-eq-foco"); guardar("nexus.equipe.foco", foco); aplicarFoco(); return; }
     var bb = e.target.closest("[data-eq-base]");
+    if (bb && bb.hasAttribute("data-eq-sem-chave")) {
+      // sem a chave da Esri: o botão diz o que falta (Levi, 12/11/2026: "CADÊ A OPÇÃO MAPA/SATÉLITE??")
+      var falta = quadro.querySelector(".eq-sat-falta");
+      if (falta) { falta.hidden = !falta.hidden; bb.setAttribute("aria-expanded", String(!falta.hidden)); }
+      return;
+    }
     if (bb) { fundoBase = bb.getAttribute("data-eq-base"); guardar("nexus.equipe.base", fundoBase); aplicarBase(); return; }
     var b = e.target.closest("[data-eq-zoom]");
     if (!b) return;

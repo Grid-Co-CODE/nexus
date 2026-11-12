@@ -141,17 +141,25 @@ def test_a_cor_da_usina_e_o_agora_do_comando_pelo_cos(cliente, pontos, setor, co
     assert all(u["agora"] is None for u in _dados(html)["usinas"])
 
 
-def test_o_satelite_da_esri_so_com_a_chave(app, cliente, pontos, setor, com_mapa_base):
+def test_o_satelite_da_esri_com_a_chave_e_o_botao_sempre_a_vista(app, cliente, pontos, setor, com_mapa_base):
     """Levi, 12/11/2026: "Quero a visão de mapa e satélite", e a escolha dele no mesmo dia: a Esri (ArcGIS), com a chave
-    da conta dele em Base > Chaves (NEXUS_ESRI_CHAVE). Sem a chave, o botão não aparece."""
+    da conta dele em Base > Chaves (NEXUS_ESRI_CHAVE). Sem a chave o botão sumia, e ele perguntou "CADÊ A OPÇÃO
+    MAPA/SATÉLITE??": o botão fica sempre à vista e, sem a chave, diz o que falta (o administrador ganha o link)."""
     _, html = _html(_entrar(cliente, EMAIL[PCM]))
-    assert _dados(html)["satelite"] is None and 'data-eq-base="satelite"' not in html
+    assert _dados(html)["satelite"] is None
+    assert 'data-eq-base="satelite"' in html and "data-eq-sem-chave" in html
+    falta = html.split('class="eq-sat-falta"', 1)[1].split("</p>", 1)[0]
+    assert "chave da Esri" in falta and "Base &gt; Chaves" in falta and "Mapa de equipe: satélite" in falta
+    assert "chaves-nexus" not in falta                                    # quem não é administrador não ganha o link
+    _, html = _html(_entrar(cliente, EMAIL[ADMIN], admin=True))
+    falta = html.split('class="eq-sat-falta"', 1)[1].split("</p>", 1)[0]
+    assert 'href="/t/base/chaves-nexus"' in falta                         # o GET leva à aba Nexus das Chaves
     app.config["NEXUS_ESRI_CHAVE"] = "AAPTxy" + "k" * 90
     _, html = _html(cliente)
     sat = _dados(html)["satelite"]
     assert sat["url"].startswith("https://ibasemaps-api.arcgis.com/arcgis/rest/services/World_Imagery/MapServer/tile/")
     assert "{z}/{y}/{x}" in sat["url"] and sat["url"].endswith("token=AAPTxy" + "k" * 90) and "Esri" in sat["credito"]
-    assert 'data-eq-base="mapa"' in html and 'data-eq-base="satelite"' in html
+    assert 'data-eq-base="mapa"' in html and 'data-eq-base="satelite"' in html and "data-eq-sem-chave" not in html
 
 
 def test_dois_focos_zoom_mais_rapido_e_a_reproducao_do_percurso(cliente, pontos, setor, com_mapa_base):
@@ -212,3 +220,33 @@ def test_so_o_brasil_a_mascara_cobre_o_resto_por_inteiro():
     a cor do fundo, cheia."""
     js = (Path(__file__).resolve().parent.parent / "nexus" / "static" / "campo-mapa.js").read_text(encoding="utf-8")
     assert re.search(r'fora:\s*t\["--fundo"\]\s*,', js), "a máscara de fora do Brasil tem de ser opaca"
+
+
+def test_sem_o_anel_vermelho_em_volta_da_usina():
+    """Levi, 12/11/2026: "TIRE ESSA BORDA ENORME DAS UFVs em vermelho!" (o anel que pulsava em volta da usina crítica e
+    da de clima "agir"). A cor do losango continua; a divisa do Brasil segue pulsando."""
+    js = (Path(__file__).resolve().parent.parent / "nexus" / "static" / "campo-mapa.js").read_text(encoding="utf-8")
+    assert "usinas-pulso" not in js and "pulso:" not in js
+    assert "brasil-borda" in js
+
+
+def test_as_cores_de_cada_foco():
+    """Levi, 12/11/2026: "No foco técnico todas as UFVs ficam sem cor exceto desligamento e o resto fica cinza. No modo
+    usina os técnicos ficam cinzas e o foco é na usina!". A conta pura (`corNoFoco`, no node): no foco técnico só a
+    usina crítica do Agora (a parada) mantém a cor, o resto do Agora vira cinza; o nível do clima, ligado de propósito,
+    fica. No foco usina, a cor de sempre. E os técnicos no foco usina são cinza (o script troca a cor do círculo)."""
+    raiz = Path(__file__).resolve().parent.parent / "nexus" / "static"
+    js = (raiz / "campo-mapa.js").read_text(encoding="utf-8")
+    assert re.search(r'"circle-color",\s*u \? P\.t\["--mudo"\]', js), "no foco usina o técnico é cinza"
+    import shutil
+    import subprocess
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("sem node nesta máquina")
+    cores = ["a_critico", "a_alerta", "a_ok", "a_neutro", "sem_leitura", "neutra", "agir", "atencao", "sem"]
+    codigo = ("const m=require(process.argv[1]);const c=" + json.dumps(cores) + ";console.log(JSON.stringify({"
+              "t:c.map(x=>m.corNoFoco(x,'tecnico')),u:c.map(x=>m.corNoFoco(x,'usina'))}))")
+    r = json.loads(subprocess.run([node, "-e", codigo, str(raiz / "campo-mapa.js")], capture_output=True, text=True,
+                                  check=True).stdout)
+    assert r["t"] == ["a_critico", "cinza", "cinza", "cinza", "cinza", "cinza", "agir", "atencao", "sem"]
+    assert r["u"] == cores

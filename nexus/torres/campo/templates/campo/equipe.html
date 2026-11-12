@@ -186,6 +186,9 @@
       {# o mapa de verdade (11/11/2026, o guia e a prévia do Willian; Levi: "sem 3D", "só Brasil", "em estilo Nexus"): o
          MapLibre sobre o mapa base do Brasil servido pelo próprio Nexus (Base > Mapa base). Os dados vão no JSON abaixo,
          depois do registro da LGPD, com a coordenada só de quem o mapa mostra (campo-mapa.js) #}
+      {# a faixa de cima do mapa: o zoom à esquerda e os focos e o fundo à direita, que quebram de linha em vez de se
+         cobrir quando o mapa é estreito (12/11/2026) #}
+      <div class="eq-topo-mapa">
       <div class="eq-zoom" role="group" aria-label="Zoom do mapa">
         <button type="button" class="eq-zoom-bt" data-eq-zoom="mais" aria-label="Aproximar" title="Aproximar (+)"><i class="ph ph-plus" aria-hidden="true"></i></button>
         <button type="button" class="eq-zoom-bt" data-eq-zoom="menos" aria-label="Afastar" title="Afastar (-)"><i class="ph ph-minus" aria-hidden="true"></i></button>
@@ -196,7 +199,11 @@
          melhor") e o Mapa | Satélite ("Quero a visão de mapa e satélite"; a Esri, com a chave de Base > Chaves) #}
       <div class="eq-camadas" role="group" aria-label="O que o mapa destaca">
         {% if mapa_js.modo == 'tecnicos' %}<div class="cn-seg eq-seg-mapa" role="group" aria-label="Foco"><button type="button" data-eq-foco="tecnico" aria-pressed="true">Foco técnico</button><button type="button" data-eq-foco="usina" aria-pressed="false">Foco usina</button></div>{% endif %}
-        {% if mapa_js.satelite %}<div class="cn-seg eq-seg-mapa" role="group" aria-label="Fundo do mapa"><button type="button" data-eq-base="mapa" aria-pressed="true">Mapa</button><button type="button" data-eq-base="satelite" aria-pressed="false">Satélite</button></div>{% endif %}
+        {# o Mapa | Satélite fica sempre à vista (Levi, 12/11/2026: "CADÊ A OPÇÃO MAPA/SATÉLITE??"); sem a chave da Esri, o
+           Satélite diz o que falta, e o administrador ganha o link para Base > Chaves #}
+        <div class="cn-seg eq-seg-mapa" role="group" aria-label="Fundo do mapa"><button type="button" data-eq-base="mapa" aria-pressed="true">Mapa</button><button type="button" data-eq-base="satelite" aria-pressed="false"{% if not mapa_js.satelite %} data-eq-sem-chave aria-expanded="false" aria-controls="eq-sat-falta"{% endif %}>Satélite</button></div>
+        {% if not mapa_js.satelite %}<p class="eq-sat-falta" id="eq-sat-falta" hidden>O satélite precisa da chave da Esri (a conta é gratuita), que ainda não foi cadastrada. Um administrador cola a chave em Base &gt; Chaves, na linha "Mapa de equipe: satélite".{% if link_chaves %} <a href="{{ url_for('torre_base.chaves_nexus') }}">Cadastrar a chave</a>{% endif %}</p>{% endif %}
+      </div>
       </div>
       <div class="eq-palco eq-palco--ml">
         <div class="eq-ml" id="eq-mapa" role="region" aria-label="{{ 'As usinas no mapa' if usinas else 'Os técnicos de campo no mapa' }}"></div>

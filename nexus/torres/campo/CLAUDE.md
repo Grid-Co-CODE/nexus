@@ -1655,7 +1655,11 @@ e não foram feitas.
   com o crédito que a licença pede), e só aparece com a chave **`NEXUS_ESRI_CHAVE`** em Base > Chaves ("Mapa de equipe:
   satélite"; criada pelo Levi em developers.arcgis.com, conta ArcGIS Location Platform, acesso a Basemaps). **A chave
   vai ao navegador** (o bloco é pedido direto à Esri), então ela é **restrita por referenciador a app.gridco.com.br** no
-  painel da Esri; sem a chave, nem o botão aparece. No satélite saem os preenchimentos do nosso mapa (terra, mata, uso,
+  painel da Esri. **O botão fica sempre à vista** (Levi, 12/11/2026, sem a chave cadastrada: "CADÊ A OPÇÃO
+  MAPA/SATÉLITE??"; até ali, sem a chave o botão nem aparecia): sem a chave, o Satélite abre o aviso `eq-sat-falta` com
+  o que falta, e o administrador ganha o link "Cadastrar a chave" (`torre_base.chaves_nexus`, que leva à aba Nexus das
+  Chaves). O zoom fica à esquerda e os focos e o fundo à direita numa faixa só (`eq-topo-mapa`), que quebra de linha
+  em vez de se cobrir no mapa estreito. No satélite saem os preenchimentos do nosso mapa (terra, mata, uso,
   água, prédio) e as rodovias ficam finas; a máscara fora do Brasil, as divisas, os nomes, as usinas e os técnicos
   continuam. A escolha fica no navegador (`localStorage` `nexus.equipe.base`). LGPD: a Esri recebe o bloco da região
   olhada, não a posição de técnico (o mapa base nosso segue sendo o padrão).
@@ -1676,15 +1680,21 @@ e não foram feitas.
   (`comando.usinas.cos_por_usina`), e `comando.usinas.agora_pelo_cos` (religamento em campo = crítico; usina, cabine,
   skid, QGBT, proteção, concessionária ou rede = crítico; inversor = atenção; comunicação = sem comunicação; sem OS =
   normal; a usina que a fotografia não trouxe = sem leitura) no tom de lá: normal verde, atenção amarelo, crítico
-  vermelho (pulsa), sem comunicação cinza, sem leitura só o contorno. Sem a fonte do Andamento ligada, a usina fica sem
+  vermelho, sem comunicação cinza, sem leitura só o contorno. **Sem anel em volta** (Levi, 12/11/2026: "TIRE ESSA
+  BORDA ENORME DAS UFVs em vermelho!": o anel vermelho que pulsava em volta da crítica e da de clima "agir" saiu; só a
+  divisa do Brasil pulsa). Sem a fonte do Andamento ligada, a usina fica sem
   cor (nunca "normal"). Mudou a régua em Comando > Usinas, muda aqui sozinha (é a mesma função). Com o Incluir clima, a
   cor é o nível do alerta de clima, e o selo "!" diz que o COS tem crítico ou atenção. O Usinas sem o COS segue cheio no
   verde.
 - **Dois focos: Foco técnico | Foco usina (12/11/2026**, Levi: "Quero ter dois focos, foco técnico e focos usina, dessa
-  forma dá para focar melhor"). No canto de cima à direita do mapa dos técnicos. Foco técnico (o padrão): o técnico
-  grande e as usinas menores e mais claras, com o nome a partir do zoom 9,5. Foco usina: as usinas 1,25 vez maiores e o
-  nome delas a partir do zoom 6,5, os técnicos pequenos, meio apagados e sem as iniciais. A escolha fica no navegador
-  (`nexus.equipe.foco`). Nada muda no servidor.
+  forma dá para focar melhor"). No canto de cima à direita do mapa dos técnicos. **As cores de cada foco** (Levi, no
+  mesmo dia: "No foco técnico todas as UFVs ficam sem cor exceto desligamento e o resto fica cinza. No modo usina os
+  técnicos ficam cinzas e o foco é na usina!"). Foco técnico (o padrão): o técnico grande, na cor da situação; as usinas
+  menores e mais claras, **todas cinza menos a parada** (o crítico do Agora, "desligamento"), com o nome a partir do zoom
+  9,5; o nível do clima, quando o Incluir clima está ligado, fica (foi pedido de propósito). Foco usina: as usinas na cor
+  do Agora, 1,25 vez maiores e com o nome a partir do zoom 6,5; **os técnicos cinza**, pequenos, meio apagados e sem as
+  iniciais. A conta é pura (`corNoFoco`, testada no node): cada usina leva os dois ícones (`icone` e `icone_t`) e o foco
+  só troca qual vale. A escolha fica no navegador (`nexus.equipe.foco`). Nada muda no servidor.
 - **O círculo do técnico é maior e as iniciais aparecem sempre (12/11/2026**, Levi: "o nome dos técnicos não aparece
   pq os cards estão muito pequenos, aumente um pouco o tamanho do circulo dos técnicos"): raio de 10 px no Brasil
   inteiro a 14 px de perto, as iniciais em 11 px em todo zoom.
