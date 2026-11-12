@@ -15,9 +15,11 @@ O livro `nexus_almoxarifado_usinas` (registrado em `nexus/dados/catalogo.py` ant
 - `fato_decisao_almox_usina`: o histórico, como o das decisões de setor (`nexus_setores`): 1 linha = 1 marcação ou
   desmarcação, só acrescenta (`so_cresce`). Diz também por onde o "mesmo cliente" foi conferido (`cliente_por`).
 Em claro só IDs, os nomes de local do Fracttal (o de-para do cadastro já os tem), as listas fechadas e o código da pessoa:
-nada de nome nem e-mail (a API é aberta). Gravar relê o livro inteiro antes (a troca é integral; a leitura que falha, que
-volta com menos linhas do que a listagem diz ou sem uma aba do livro que existe não grava), troca as duas abas juntas e
-confere a contagem (`livros.publicar`). Uma gravação por vez neste processo.
+nada de nome nem e-mail (a API é aberta). Gravar relê o livro inteiro antes (`livros.ler_conferido`: a leitura que falha,
+que volta com menos linhas do que a listagem diz ou sem uma aba do livro que existe não grava), renova o nome do local de
+TODAS as linhas pelo de-para de agora (o nome não congela: a revisão de 12/11/2026, I1), troca as duas abas juntas e confere
+a contagem (`livros.publicar`). Uma gravação por vez NESTE processo: dois Nexus com a chave do banco (o do PC e o do
+servidor) marcando ao mesmo tempo perdem uma marcação, o mesmo limite dos outros livros da casa.
 
 `NEXUS_ALMOX_USINAS_ARQUIVO` troca o banco por um arquivo (a cópia de prova e os testes); teste sem ele nunca vai à rede
 (lê vazio e não grava).
@@ -47,18 +49,19 @@ DESMARCADA = "desmarcada"                    # só na decisão: a linha da dimen
 CLIENTE_POR = ("cadastro do Nexus", "local do Fracttal")
 NOME_MAX = 120
 TTL_S = 60
+FALHA_TTL_S = 20             # a falha de leitura fica guardada: com o banco pendurado, a tela não espera de novo a cada abertura
+NADA_MUDOU = "Nada mudou"
 _BRT = timezone(timedelta(hours=-3))
 _RE_HMAC = re.compile(r"[0-9a-f]{24}")
 _TRAVA = threading.Lock()
+_TRAVA_CACHE = threading.Lock()
 _CACHE: dict = {}
+_FALHAS: dict = {}
+_GERACAO = [0]               # sobe a cada gravação: a leitura lenta vê que a cópia dela já nasceu velha
 
 
 class Recusada(ValueError):
     """Nada foi gravado: o texto diz por quê, para a tela mostrar."""
-
-
-class LeituraIncompleta(RuntimeError):
-    """A leitura de uma aba voltou com menos linhas do que a listagem do banco diz que ela tem."""
 
 
 def _agora() -> datetime:
@@ -88,9 +91,8 @@ def _arquivo_local(cfg) -> Path | None:
 
 
 def _ler_cru(cfg) -> dict:
-    """{aba: [linhas]} das duas abas, lidas agora. Livro que ainda não existe = vazio; erro de leitura sobe, e também a
-    listagem que não traz uma aba do livro que existe (`livros.abas_conferidas`) e a aba que volta com menos linhas do que o
-    `row_count` da listagem diz (a página curta: sem isto, a gravação seguinte desmarcaria as usinas que não vieram)."""
+    """{aba: [linhas]} das duas abas, lidas agora (`livros.ler_conferido`). Livro que ainda não existe = vazio; erro de leitura
+    sobe. Teste sem o arquivo nunca vai à rede (vale vazio)."""
     loc = _arquivo_local(cfg)
     if loc is not None:
         try:
@@ -101,20 +103,7 @@ def _ler_cru(cfg) -> dict:
     if cfg.get("TESTING"):
         return {a: [] for a in ABAS}
     base, sessao = _banco(cfg)
-    ids = livros.abas_conferidas(base, sessao, LIVRO, ABAS)
-    if not ids:
-        return {a: [] for a in ABAS}
-    r = sessao.get(f"{base}/api/sheets", timeout=60)
-    r.raise_for_status()
-    contagem = {x["sheet_name"]: livros._int(x.get("row_count")) for x in r.json() if x.get("workbook_key") == LIVRO}
-    out = {}
-    for a in ABAS:
-        lidas = list(livros._linhas(base, sessao, ids[a])) if a in ids else []
-        esperadas = contagem.get(a)
-        if esperadas is not None and len(lidas) < esperadas:
-            raise LeituraIncompleta(f"{a}: li {len(lidas)} linhas e o banco diz {esperadas}")
-        out[a] = lidas
-    return out
+    return livros.ler_conferido(base, sessao, LIVRO, ABAS)
 
 
 def _conferir_destino(cfg) -> None:
@@ -158,25 +147,36 @@ def _vigentes(dim: list[dict]) -> dict:
 
 def ler(cfg, forcar: bool = False) -> dict:
     """{"marcadas": {usina_id: linha}, "decisoes": [...], "erro", "lido_em"}, guardado por 1 minuto. A leitura que falha devolve
-    a última boa com `velha` e o erro; sem nenhuma, nada marcado com o erro (a tela não deixa gravar sem saber o que há)."""
+    a última boa com `velha` e o erro; sem nenhuma, nada marcado, o erro e `lido_em` None (a tela não mostra número pela
+    metade nem deixa gravar). A falha fica guardada `FALHA_TTL_S` (a revisão, M3: com o banco pendurado, cada abertura
+    esperava os 60 s de cada pedido), e a leitura lenta não põe o livro velho por cima do que uma gravação acabou de guardar."""
     chave = str(_arquivo_local(cfg) or "banco")
     g = _CACHE.get(chave)
     if g and not forcar and time.time() - g["lido_em"] < TTL_S:
         return g
+    f = _FALHAS.get(chave)
+    if f and not forcar and time.time() - f["quando"] < FALHA_TTL_S:
+        return dict(g, erro=f["erro"], velha=True) if g else {"marcadas": {}, "decisoes": [], "erro": f["erro"], "lido_em": None}
+    antes = _GERACAO[0]
     try:
         cru = _ler_cru(cfg)
     except Exception as ex:      # noqa: BLE001 — banco fora, rede, leitura curta: a tela diz e não deixa gravar
         erro = f"Não consegui ler o livro das usinas no banco ({type(ex).__name__}): tente de novo em instantes."
+        _FALHAS[chave] = {"erro": erro, "quando": time.time()}
         if g:
             return dict(g, erro=erro, velha=True)
         return {"marcadas": {}, "decisoes": [], "erro": erro, "lido_em": None}
-    g = {"marcadas": _vigentes(cru[ABA]), "decisoes": cru[ABA_DECISAO], "erro": "", "lido_em": time.time()}
-    _CACHE[chave] = g
-    return g
+    _FALHAS.pop(chave, None)
+    novo = {"marcadas": _vigentes(cru[ABA]), "decisoes": cru[ABA_DECISAO], "erro": "", "lido_em": time.time()}
+    with _TRAVA_CACHE:
+        if _GERACAO[0] == antes or chave not in _CACHE:
+            _CACHE[chave] = novo
+        return _CACHE[chave]
 
 
 def limpar() -> None:
     _CACHE.clear()
+    _FALHAS.clear()
 
 
 # ── a linha que entra ─────────────────────────────────────────────────────────────────────────────────────────
@@ -226,11 +226,14 @@ def decisao(usina_id, situacao, dona_id=None, cliente_por="", pessoa_hmac="", ag
             "pessoa_hmac": _hmac(pessoa_hmac)}
 
 
-def trocar(cfg, mudar) -> dict:
+def trocar(cfg, mudar, nomes: dict | None = None) -> dict:
     """Uma marcação: relê o livro AGORA (sob a trava: a troca é integral), chama `mudar(marcadas)` com as linhas vigentes
-    ({usina_id: linha}), que devolve (a nova linha da usina, ou None para desmarcar; a usina; a decisão) ou levanta `Recusada`
-    com o porquê (as regras da tela), e grava as duas abas. Devolve as marcadas de agora. `Recusada` também quando o banco não
-    deixa reler ou gravar: nada foi gravado."""
+    ({usina_id: linha}), que devolve (a nova linha da usina, ou None para desmarcar; a usina; a decisão, ou None quando a
+    marcação é a mesma) ou levanta `Recusada` com o porquê (as regras da tela), e grava as duas abas. `nomes` ({usina_id: o
+    nome do local no Fracttal de agora}) renova o `usina` e o `usina_dona` de TODAS as linhas (a revisão de 12/11/2026, I1: o
+    nome não congela); a usina que não está em `nomes` (perdeu o de-para) segue com o nome de antes. Sem decisão e sem nome a
+    renovar: `Recusada` "Nada mudou" (nada é gravado). Devolve as marcadas de agora. `Recusada` também quando o banco não
+    deixa reler (nada foi gravado) ou quando a gravação não confere (pode ter gravado: a tela manda conferir)."""
     _conferir_destino(cfg)
     with _TRAVA:
         try:
@@ -239,13 +242,32 @@ def trocar(cfg, mudar) -> dict:
             raise Recusada(f"Não consegui ler o livro das usinas no banco ({type(ex).__name__}): nada foi gravado, para não "
                            "apagar o que já está lá.") from ex
         marcadas = _vigentes(cru[ABA])
-        nova, uid, dec = mudar(dict(marcadas))
+        antes = {uid: dict(l) for uid, l in marcadas.items()}
+        nova, uid, dec = mudar({k: dict(v) for k, v in marcadas.items()})
         if nova is None:
             marcadas.pop(uid, None)
         else:
-            marcadas[uid] = nova
-        cru = {ABA: sorted(marcadas.values(), key=lambda l: l["usina_id"]), ABA_DECISAO: cru[ABA_DECISAO] + [dec]}
-        _gravar_cru(cfg, cru)
+            marcadas[uid] = dict(nova)
+        for l in marcadas.values():
+            if (nomes or {}).get(l["usina_id"]):
+                l["usina"] = nomes[l["usina_id"]]
+            if l.get("usina_dona_id") and (nomes or {}).get(l["usina_dona_id"]):
+                l["usina_dona"] = nomes[l["usina_dona_id"]]
+        if dec is None and marcadas == antes:
+            raise Recusada(NADA_MUDOU)
+        cru = {ABA: sorted(marcadas.values(), key=lambda l: l["usina_id"]),
+               ABA_DECISAO: cru[ABA_DECISAO] + ([dec] if dec else [])}
+        try:
+            _gravar_cru(cfg, cru)
+        except Recusada:
+            raise
+        except Exception as ex:      # noqa: BLE001 — a contagem que não confere, a rede no meio: talvez gravou
+            limpar()
+            raise Recusada(f"A gravação não confirmou ({type(ex).__name__}): pode ter gravado. Recarregue a página e confira "
+                           "antes de repetir.") from ex
+        _GERACAO[0] += 1
+        chave = str(_arquivo_local(cfg) or "banco")
         g = {"marcadas": _vigentes(cru[ABA]), "decisoes": cru[ABA_DECISAO], "erro": "", "lido_em": time.time()}
-        _CACHE[str(_arquivo_local(cfg) or "banco")] = g
+        _CACHE[chave] = g
+        _FALHAS.pop(chave, None)
         return g["marcadas"]

@@ -1814,6 +1814,7 @@ details.inv-card:not([open])>summary{border-bottom:0}
 /* PCM → Almoxarifado → Usinas e almoxarifados (12/11/2026, nexus/pcm/almox_usinas.py): um cartão por usina, com o formulário da
    marcação embaixo; em 375 px os campos ocupam a linha inteira */
 .au-aviso{margin:8px 0}
+.au-aviso-nome{color:var(--alerta)}
 .au-form{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto;gap:4px 10px;align-items:end;margin-top:10px;
   max-width:760px}
 .au-form .gc-rotulo{grid-row:1}

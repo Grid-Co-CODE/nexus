@@ -284,3 +284,193 @@ def test_a_linha_fora_da_forma_e_erro_de_quem_chama():
         AU.linha(1, "alguem@exemplo.test", "proprio")
     with pytest.raises(ValueError, match="pessoa_hmac"):
         AU.linha(1, "Cliente Alfa - Usina Um - SP", "proprio", pessoa_hmac="Pessoa Teste")
+
+
+
+# ── a revisão de 5e46f32a: o nome do App, o nome que não congela, a usina fora da lista e os menores ─────────────────
+
+def _de_para(banco, linhas):  # noqa: F811
+    _aba(banco, "cadastro_nexus", "de_para", linhas)
+    visao.limpar()
+
+
+def test_o_nome_que_vai_ao_app_e_o_dos_tecnicos_por_usina(au, banco, monkeypatch):  # noqa: F811
+    """C1: o `usina` e o `usina_dona` saem do `tecnicos_usina._fracttal` (o mesmo nome que os Técnicos por usina mandam ao
+    App), e não do 1º em ordem alfabética, que seria o "(sem Classificação 1) …", o agrupamento do Fracttal para o ativo sem
+    classificação, que o App não conhece."""
+    _de_para(banco, DE_PARA + [{"usina_id": 1, "sistema": FR, "chave_externa": "(sem Classificação 1) Cliente Alfa - Usina Um - SP"},
+                               {"usina_id": 2, "sistema": FR, "chave_externa": "(sem Classificação 1) Cliente Alfa - Usina Dois - SP"}])
+    c = _pcm(au, monkeypatch)
+    _marcar(c, 2, "compartilha", 1)
+    (linha,) = _livro(au)[AU.ABA]
+    assert (linha["usina"], linha["usina_dona"]) == ("Cliente Alfa - Usina Dois - SP", "Cliente Alfa - Usina Um - SP")
+    from nexus.pcm import tecnicos_usina
+    b = visao._Base()
+    assert linha["usina"] == tecnicos_usina.nome_no_fracttal(b, 2) and linha["usina_dona"] == tecnicos_usina.nome_no_fracttal(b, 1)
+
+
+def test_o_cliente_pelo_local_sem_o_agrupamento_do_fracttal(au, banco, monkeypatch):  # noqa: F811
+    """A usina só com o "(sem Classificação 1) …" no de-para: o 1º nó do local é o cliente, sem o agrupamento."""
+    assert P.cliente_do_local("(sem Classificação 1) Cliente Alfa - Usina Quatro - PI") == "Cliente Alfa"
+    _de_para(banco, [d for d in DE_PARA if d["usina_id"] != 4]
+             + [{"usina_id": 4, "sistema": FR, "chave_externa": "(sem Classificação 1) Cliente Alfa - Usina Quatro - PI"}])
+    c = _pcm(au, monkeypatch)
+    _marcar(c, 4, "compartilha", 1)
+    assert "conferido pelo local do Fracttal" in _aviso(c)
+
+
+def test_outro_cliente_pelo_local_do_fracttal_e_recusado(au, monkeypatch):
+    """M9: a Usina Quatro (sem cliente no cadastro, local "Cliente Alfa …") e a Usina Tres (local "Cliente Beta …"): a recusa
+    vem pelo cliente conferido no local, e não pela cadeia."""
+    c = _pcm(au, monkeypatch)
+    _marcar(c, 4, "compartilha", 3)
+    assert "Usina Tres é de outro cliente (conferido pelo local do Fracttal)" in _aviso(c)
+
+
+def test_o_nome_nao_congela(au, banco, monkeypatch):  # noqa: F811
+    """I1: o local renomeado no Fracttal (e a de-para corrigida): a tela avisa no cartão, e a próxima gravação, de QUALQUER
+    usina, renova o `usina` e o `usina_dona` de todas as linhas pelo de-para de agora."""
+    c = _pcm(au, monkeypatch)
+    _marcar(c, 2, "compartilha", 1)
+    novos = {1: "Cliente Alfa - Usina Um Nova - SP", 2: "Cliente Alfa - Usina Dois Nova - SP"}
+    _de_para(banco, [dict(d, chave_externa=novos[d["usina_id"]]) if d["usina_id"] in novos else d for d in DE_PARA])
+    html = c.get(TELA).get_data(as_text=True)
+    dois = html.split('id="u-2"')[1].split("</article>")[0]
+    assert "O nome no livro não é o do Fracttal de hoje" in dois
+    _marcar(c, 3, "proprio")
+    dim = {l["usina_id"]: l for l in _livro(au)[AU.ABA]}
+    assert dim[2]["usina_dona"] == "Cliente Alfa - Usina Um Nova - SP" and dim[2]["usina"] == "Cliente Alfa - Usina Dois Nova - SP"
+    assert "O nome no livro não é o do Fracttal de hoje" not in c.get(TELA).get_data(as_text=True)
+
+
+def test_a_usina_fora_da_lista_aparece_desmarca_e_conta_na_cadeia(au, banco, monkeypatch):  # noqa: F811
+    """I2: a usina marcada que perdeu o de-para do Fracttal (ou foi excluída do cadastro) fica no livro do App: a tela a mostra
+    em "Fora da lista", com o Desmarcar; ela conta na regra sem cadeia; e a gravação a mantém com o nome de antes."""
+    c = _pcm(au, monkeypatch)
+    _marcar(c, 2, "compartilha", 1)
+    _de_para(banco, [d for d in DE_PARA if d["usina_id"] != 2])
+    html = c.get(TELA).get_data(as_text=True)
+    fora = html.split('id="fora-da-lista"')[1].split("</section>")[0]
+    assert "Usina Dois" in fora and "Compartilha" in fora and "sem o local no Fracttal" in fora
+    assert 'name="situacao" value="sem_marcacao"' in fora
+    # conta na cadeia: a Usina Um é dona da Usina Dois (fora da lista) e não passa a compartilhar
+    _marcar(c, 1, "compartilha", 4)
+    assert "Usina Um é a dona do almoxarifado de Usina Dois" in _aviso(c)
+    # outra gravação não a perde (o nome fica o de antes)
+    _marcar(c, 3, "proprio")
+    dim = {l["usina_id"]: l for l in _livro(au)[AU.ABA]}
+    assert dim[2]["usina"] == "Cliente Alfa - Usina Dois - SP" and dim[2]["situacao"] == "compartilha"
+    # desmarca pela tela
+    _marcar(c, 2, "sem_marcacao")
+    assert "Usina Dois ficou sem marcação" in _aviso(c)
+    assert 2 not in {l["usina_id"] for l in _livro(au)[AU.ABA]}
+    # a excluída do cadastro também vai para fora da lista
+    _marcar(c, 3, "sem_almoxarifado")
+    _aba(banco, "cadastro_nexus", "usinas", [dict(u, excluido="sim") if u["usina_id"] == 3 else u for u in USINAS])
+    visao.limpar()
+    fora = c.get(TELA).get_data(as_text=True).split('id="fora-da-lista"')[1].split("</section>")[0]
+    assert "Usina Tres" in fora and "excluída do cadastro" in fora
+
+
+def test_a_regra_vale_sobre_o_livro_relido(au, monkeypatch):
+    """M9: o livro mudou entre a tela e o POST (outra pessoa marcou a Usina Um como Compartilha): a regra vale sobre o livro
+    relido na gravação, e não sobre a cópia da tela."""
+    c = _pcm(au, monkeypatch)
+    c.get(TELA)                                                    # a cópia de 1 min com o livro vazio
+    import json as _json
+    linha = AU.linha(1, "Cliente Alfa - Usina Um - SP", "compartilha", 4, "Cliente Alfa - Usina Quatro - PI")
+    open(au.config["NEXUS_ALMOX_USINAS_ARQUIVO"], "w", encoding="utf-8").write(
+        _json.dumps({AU.ABA: [linha], AU.ABA_DECISAO: []}))
+    _marcar(c, 2, "compartilha", 1)
+    assert "Usina Um já usa o almoxarifado de outra usina" in _aviso(c)
+
+
+def test_a_mesma_marcacao_nao_grava_de_novo(au, monkeypatch):
+    """M2: salvar a mesma marcação diz "Nada mudou" e não grava outra decisão (dois cliques não repetem a chave)."""
+    c = _pcm(au, monkeypatch)
+    _marcar(c, 2, "compartilha", 1)
+    _marcar(c, 2, "compartilha", 1)
+    assert "Nada mudou" in _aviso(c)
+    assert len(_livro(au)[AU.ABA_DECISAO]) == 1
+
+
+def test_a_gravacao_que_nao_confere_diz_que_pode_ter_gravado(au, monkeypatch):
+    """M1: a contagem que não confere depois de gravar (ou a rede no meio) não vira 500: a tela diz que pode ter gravado."""
+    from nexus.dados import livros
+    def nao_confere(cfg, cru):
+        raise livros.GravacaoErro("enviei 2 linhas e o banco tem 1 (de mentira)")
+    monkeypatch.setattr(AU, "_gravar_cru", nao_confere)
+    c = _pcm(au, monkeypatch)
+    r = _marcar(c, 2, "proprio")
+    assert r.status_code == 303 and "pode ter gravado" in _aviso(c)
+
+
+def test_sem_a_chave_da_pessoa_nao_marca_quem_tem_email(au, monkeypatch):
+    """M6: sem a NEXUS_PESSOA_HMAC no servidor, a pessoa com e-mail gravaria sem quem marcou, em silêncio: recusa, como os
+    Técnicos por usina. Quem entrou pela senha de administrador não tem e-mail e marca sem a pessoa."""
+    au.config["NEXUS_PESSOA_HMAC"] = ""
+    c = _pcm(au, monkeypatch)
+    _marcar(c, 2, "proprio")
+    assert "NEXUS_PESSOA_HMAC" in _aviso(c)
+    adm = au.test_client()
+    with adm.session_transaction() as s:
+        s["logado"], s["admin"] = True, True
+    assert adm.post(MARCAR, data={"usina": 2, "situacao": "proprio"}).status_code == 303
+    (linha,) = _livro(au)[AU.ABA]
+    assert linha["pessoa_hmac"] is None
+
+
+def test_sem_nenhuma_leitura_boa_nada_de_numero_pela_metade(au, monkeypatch):
+    """M4: o livro que nunca se leu não mostra "0 compartilham" nem "Sem marcação" em toda usina: os números e os selos
+    somem, e cada cartão diz que a marcação não foi lida."""
+    def caiu(cfg):
+        raise ConnectionError("banco fora (de mentira)")
+    monkeypatch.setattr(AU, "_ler_cru", caiu)
+    html = _pcm(au, monkeypatch).get(TELA).get_data(as_text=True)
+    assert 'aria-label="Resumo das usinas"' not in html and "Marcação não lida" in html
+    assert ">Sem marcação</span>" not in html
+
+
+def test_a_falha_de_leitura_fica_guardada(au, monkeypatch):
+    """M3: com o banco pendurado, a falha fica guardada uns segundos: abrir a tela de novo não espera outra vez."""
+    chamadas = []
+
+    def caiu(cfg):
+        chamadas.append(1)
+        raise ConnectionError("banco fora (de mentira)")
+    monkeypatch.setattr(AU, "_ler_cru", caiu)
+    assert AU.ler(au.config)["erro"] and AU.ler(au.config)["erro"]
+    assert len(chamadas) == 1
+
+
+def test_o_leitor_conferido_do_banco(app):
+    """M5: `livros.ler_conferido` lê as abas com UMA listagem e recusa a aba que volta curta."""
+    from nexus.dados import livros
+    api = ApiPGFalsa(como_texto=True)
+    app.extensions["nexus_dados_sessao"] = api
+    try:
+        with app.app_context():
+            cfg = {"GRIDCO_DB_API": "http://pg.falso", "GRIDCO_SQL_TOKEN": "tk"}
+            usinas = {1: {"id": 1, "nome": "Usina Um", "cliente_id": 1, "local": "Cliente Alfa - Usina Um - SP"}}
+            AU.limpar()
+            P.marcar(cfg, usinas, 1, "proprio", None, "")
+            base = "http://pg.falso"
+            lido = livros.ler_conferido(base, api, AU.LIVRO, AU.ABAS)
+            assert [l["usina_id"] for l in lido[AU.ABA]] == ["1"] and len(lido[AU.ABA_DECISAO]) == 1
+            antes = api.get
+
+            class Curta:
+                def __init__(self, r):
+                    self.r = r
+
+                def __getattr__(self, n):
+                    return getattr(self.r, n)
+
+                def json(self):
+                    return []
+            api.get = lambda url, **k: Curta(antes(url, **k)) if url.endswith("/rows") else antes(url, **k)
+            with pytest.raises(livros.LeituraIncompleta):
+                livros.ler_conferido(base, api, AU.LIVRO, AU.ABAS)
+    finally:
+        app.extensions.pop("nexus_dados_sessao", None)
+        AU.limpar()

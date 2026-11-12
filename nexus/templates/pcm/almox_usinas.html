@@ -30,6 +30,7 @@
 {% if d.erro_livro %}<div class="cn-erro cn-aviso" role="status"><span><b>{{ d.erro_livro }}</b> A marcação fica parada até o livro ser lido.</span></div>{% endif %}
 {% if not d.almox_lido %}<p class="alm-det au-aviso">Os almoxarifados do Fracttal não foram lidos agora (a varredura do App): a coluna "No Fracttal" volta quando ela chegar.</p>{% endif %}
 
+{% if d.livro_lido %}
 <div class="inv-tiles" aria-label="Resumo das usinas">
   <div class="inv-tile"><b class="inv-tile-v">{{ d.n_usinas }}</b><span class="inv-tile-r">Usinas com o Fracttal</span></div>
   <div class="inv-tile inv-tile--info"><b class="inv-tile-v">{{ d.contas.compartilha }}</b><span class="inv-tile-r">Compartilham</span></div>
@@ -37,6 +38,7 @@
   <div class="inv-tile inv-tile--ok"><b class="inv-tile-v">{{ d.contas.proprio }}</b><span class="inv-tile-r">Próprio</span></div>
   <div class="inv-tile"><b class="inv-tile-v">{{ d.contas.sem_marcacao }}</b><span class="inv-tile-r">Sem marcação</span></div>
 </div>
+{% endif %}
 
 <section class="inv-card">
 <div class="inv-card-cab"><h3>Usinas ({{ d.linhas|length }})</h3>
@@ -54,12 +56,13 @@
 </form></div>
 {% for u in d.linhas %}
 <article class="rq-card au-usina" id="u-{{ u.id }}" aria-label="Usina {{ u.nome }}">
-  <p class="cu-tit"><span class="inv-selo{% if u.tom != 'neutro' %} inv-selo--{{ u.tom }}{% endif %}">{{ u.rotulo }}</span> {{ u.nome }}</p>
+  <p class="cu-tit">{% if d.livro_lido %}<span class="inv-selo{% if u.tom != 'neutro' %} inv-selo--{{ u.tom }}{% endif %}">{{ u.rotulo }}</span>{% else %}<span class="inv-selo">Marcação não lida</span>{% endif %} {{ u.nome }}</p>
   <p class="alm-det">{{ u.cliente_txt or 'cliente não informado' }} · local no Fracttal: {{ u.locais|join(', ') }}</p>
   <p class="alm-det">No Fracttal: {% if not d.almox_lido %}não lido agora{% elif u.almoxarifados %}{{ u.almoxarifados|join(', ') }}{% else %}nenhum almoxarifado ligado a ela{% endif %}</p>
   {% if u.situacao == 'compartilha' %}<p class="alm-det">Usa o almoxarifado de <b>{{ u.dona or 'usina ' ~ u.dona_id }}</b>.</p>{% endif %}
   {% if u.dona_de %}<p class="alm-det">É a dona do almoxarifado de {{ u.dona_de|join(', ') }}.</p>{% endif %}
   {% if u.marcada_em %}<p class="alm-det">Marcada em {{ u.marcada_em }}.</p>{% endif %}
+  {% if u.nome_velho %}<p class="alm-det au-aviso-nome">O nome no livro não é o do Fracttal de hoje: o App pode não achar a usina. Salve uma marcação qualquer e o Nexus atualiza os nomes de todas.</p>{% endif %}
   {% if pode and not d.erro_livro %}
   <form class="au-form" method="post" action="{{ raiz }}/t/pcm/pecas/usinas/marcar">
     <input type="hidden" name="usina" value="{{ u.id }}">
@@ -83,5 +86,25 @@
 <div class="inv-vazio"><p>{% if d.filtro.cliente or d.filtro.situacao %}Nenhuma usina com esse filtro.{% else %}Nenhuma usina do cadastro tem o local no Fracttal.{% endif %}</p></div>
 {% endfor %}
 </section>
+
+{% if d.fora %}
+<section class="inv-card" id="fora-da-lista">
+<div class="inv-card-cab"><h3>Fora da lista ({{ d.fora|length }})</h3><span class="inv-card-nota">marcadas no livro do App, mas fora das usinas com o local no Fracttal</span></div>
+{% for u in d.fora %}
+<article class="rq-card au-usina" id="u-{{ u.id }}" aria-label="Usina {{ u.nome }}">
+  <p class="cu-tit"><span class="inv-selo{% if u.tom != 'neutro' %} inv-selo--{{ u.tom }}{% endif %}">{{ u.rotulo }}</span> {{ u.nome }}</p>
+  <p class="alm-det">Fora da lista: {{ u.porque }}. No livro do App: {{ u.usina or 'sem nome' }}{% if u.dona %} · usa o almoxarifado de {{ u.dona }}{% endif %}{% if u.marcada_em %} · marcada em {{ u.marcada_em }}{% endif %}.</p>
+  <p class="alm-det au-aviso-nome">A marcação segue valendo no App e conta na regra sem cadeia. Se a usina não usa mais o Fracttal, desmarque.</p>
+  {% if pode and not d.erro_livro %}
+  <form class="au-form" method="post" action="{{ raiz }}/t/pcm/pecas/usinas/marcar">
+    <input type="hidden" name="usina" value="{{ u.id }}">
+    <input type="hidden" name="situacao" value="sem_marcacao">
+    <button class="gc-btn gc-btn--ui gc-btn--contorno" type="submit">Desmarcar</button>
+  </form>
+  {% endif %}
+</article>
+{% endfor %}
+</section>
+{% endif %}
 </div>
 {% endblock %}

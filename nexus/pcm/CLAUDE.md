@@ -559,17 +559,31 @@ PCM"; a prévia com os dados reais foi aprovada no mesmo dia. Desenho e plano: `
   - **A lista** são as usinas do cadastro com o local no Fracttal (a de-para `Fracttal · Classificação 1`). Mostra o cliente,
     os almoxarifados que o Fracttal liga a cada uma (a mesma conta da aba Por almoxarifado; sem o ciclo do App, "não lido
     agora") e a marcação do livro. A App Setting o Nexus não lê: o "!" diz que o par antigo vale para a usina sem marcação.
+  - **O nome que vai ao livro** (`usina` e `usina_dona`, por onde o App acha a usina) é o MESMO dos Técnicos por usina
+    (`tecnicos_usina._fracttal`, o de `nome_no_fracttal`): nunca o "(sem Classificação 1) …" quando a usina tem o nome de
+    verdade. O caso da revisão de 12/11/2026: o 1º em ordem alfabética era ele em 4 usinas reais. **O nome não congela:** a
+    cada gravação, de qualquer usina, o `usina` e o `usina_dona` de TODAS as linhas saem do de-para de agora. Até lá, o
+    cartão avisa que o nome do livro não é o de hoje. Salvar a mesma marcação não grava outra decisão: renova os nomes, se
+    mudaram, ou diz "Nada mudou".
+  - **Fora da lista:** a usina marcada que saiu da lista (excluída do cadastro, sem o local no de-para ou fora do cadastro)
+    segue no livro do App, com o nome de antes. A tela a mostra num grupo à parte, com o Desmarcar, e ela conta na regra sem
+    cadeia.
   - **As regras** (`conferir`, sobre o livro relido sob a trava):
     - a dona é outra usina do MESMO CLIENTE, pelo cliente do cadastro das duas; se uma não o tem, pelo 1º nó do local no
-      Fracttal. A mensagem e o histórico (`cliente_por`) dizem qual valeu;
+      Fracttal, sem o "(sem Classificação 1)" da frente. A mensagem e o histórico (`cliente_por`) dizem qual valeu;
     - sem cadeia: a dona não é "compartilha" nem "sem almoxarifado", e a usina que é dona de outra não passa a nenhuma das duas;
     - "Sem marcação" tira a linha.
   - **Quem:** marca quem pode programar (administrador e setor PCM); quem só olha vê a lista, e o POST dele é 403. O POST de
     outro site é 403 (`_de_outro_site`). Quem entrou pela senha de administrador marca sem o `pessoa_hmac`, como no inventário.
+    A pessoa com e-mail num Nexus sem a `NEXUS_PESSOA_HMAC` não marca (iria sem quem marcou), como nos Técnicos por usina.
+  - **O livro que não se lê:** sem nenhuma leitura boa, a tela não mostra os números nem os selos ("Marcação não lida") e não
+    deixa marcar. A falha fica guardada 20 s, e a gravação que não confirma diz "pode ter gravado: confira".
   - **Na tela:** filtros de cliente e de situação (a marcação volta ao filtro), cartões que cabem em 375 px, o selo da situação, a
     dona e de quem a usina é dona.
   - **Provar:** `tests/test_pcm_almox_usinas.py` (o contrato, o catálogo e o radar, marcar e desmarcar, as recusas, quem pode, o
-    outro site, a tela, o livro que não se lê e o banco falso). Na cópia de prova, `NEXUS_ALMOX_USINAS_ARQUIVO`.
+    outro site, a tela, o livro que não se lê e o banco falso; da revisão: o nome dos Técnicos por usina, o nome que não
+    congela, a fora da lista, a regra sobre o livro relido, o Nada mudou e o leitor conferido). Na cópia de prova,
+    `NEXUS_ALMOX_USINAS_ARQUIVO`.
 - **O filtro conta a aba à vista (30/10/2026, item 7):** o script das abas disparava `input` no formulário, que o
   `filtro-local.js` não escuta (ele ouve o `change` dos `select` e o `input` do campo de texto): as opções ficavam com os
   números da aba anterior. A troca de aba chama `FiltroLocal['alm-f'].aplicar()` (o filtro se aplica sozinho ao carregar,
@@ -761,7 +775,7 @@ script desliga o filtro só na cópia e deixa a sigla `TST` para ele), com o liv
   `estoque._estoque_do_clone` trocado pelo `EstoqueFalso` e uma rota só da cópia que abre a sessão de uma pessoa do PCM com o cookie
   do Fracttal em `/os` (a cópia recusa todo POST para fora, e o login do Fracttal é um POST).
   A prova de 26/10/2026 achou o `}` do `@media` do fim do inventário perdido no `pcm.css` (a régua e a curadoria sem estilo na
-  tela larga): `test_o_css_do_pcm_fecha_toda_chave`. Onde as nove abas do Almoxarifado não cabem (no celular), a fila rola
+  tela larga): `test_o_css_do_pcm_fecha_toda_chave`. Onde as dez abas do Almoxarifado não cabem (no celular), a fila rola
   por dentro, a aba de agora vem para o meio ao abrir, e o cartão das Avariadas no alto é o outro caminho para a aba.
 - No Fracttal de verdade: a mesma cópia sem o `EstoqueFalso`, com `NEXUS_INVENTARIO_GRAVAR=1` no ambiente dela (sem a chave a
   gravação recusa com 409, seção da gravação), liberando o POST só para `app.fracttal.com` e `one.fracttal.com`, o

@@ -98,28 +98,58 @@ def abas(base: str, sessao, livro: str) -> dict:
     return {x["sheet_name"]: x["id"] for x in r.json() if x.get("workbook_key") == livro}
 
 
-def abas_conferidas(base: str, sessao, livro: str, declaradas) -> dict:
-    """{aba: id} do livro, conferido com o /api/workbooks, para quem lê e grava por cima (achado 6 da revisão de
-    05/11/2026): o `abas` sozinho devolvia {} quando a listagem omitia o livro por um instante, quem lia via "livro
-    vazio" e a gravação seguinte trocaria o livro só com a linha nova. Sobe `LeituraIncompleta` quando o livro existe e
-    a listagem traz menos abas que o `sheet_count` dele, ou não traz uma aba `declarada`. O livro que não existe é vazio,
-    e o criado e nunca gravado (`sheet_count` 0) também, como na trava da gravação (`_conferir_antes`)."""
-    r = sessao.get(f"{base}/api/workbooks", timeout=60)
-    r.raise_for_status()
-    w = next((x for x in r.json() if x.get("key") == livro), None)
-    a = abas(base, sessao, livro)
+def _conferir(livro: str, w: dict | None, a: dict, declaradas) -> None:
+    """A conferência da listagem de um livro que se lê para gravar por cima (o `w` do /api/workbooks, as abas `a` do
+    /api/sheets): sobe `LeituraIncompleta` quando o livro existe e a listagem traz menos abas que o `sheet_count` dele, ou não
+    traz uma aba `declarada`. O livro que não existe passa (é vazio), e o criado e nunca gravado (`sheet_count` 0) também."""
     if w is None:
-        return a
+        return
     n = _int(w.get("sheet_count"))
     if n == 0 and not a:
-        return a
+        return
     if n is not None and len(a) < n:
         raise LeituraIncompleta(f"{livro}: o banco diz que o livro tem {n} abas e a listagem trouxe {len(a)}")
     faltam = [x for x in declaradas if x not in a]
     if faltam:
         raise LeituraIncompleta(f"{livro}: a listagem não trouxe a aba {', '.join(faltam)} do livro que existe")
+
+
+def abas_conferidas(base: str, sessao, livro: str, declaradas) -> dict:
+    """{aba: id} do livro, conferido com o /api/workbooks, para quem lê e grava por cima (achado 6 da revisão de
+    05/11/2026): o `abas` sozinho devolvia {} quando a listagem omitia o livro por um instante, quem lia via "livro
+    vazio" e a gravação seguinte trocaria o livro só com a linha nova. A conferência é a `_conferir`."""
+    r = sessao.get(f"{base}/api/workbooks", timeout=60)
+    r.raise_for_status()
+    w = next((x for x in r.json() if x.get("key") == livro), None)
+    a = abas(base, sessao, livro)
+    _conferir(livro, w, a, declaradas)
     return a
 
+
+def ler_conferido(base: str, sessao, livro: str, declaradas) -> dict:
+    """{aba: [linhas]} das `declaradas`, para quem lê e grava por cima, com UMA listagem de abas (12/11/2026, a revisão das
+    Usinas e almoxarifados, M5: cada livro do Nexus repetia esta leitura, e chamava o /api/sheets duas vezes): a conferência
+    da listagem (`_conferir`) e a de cada aba, que não pode voltar com menos linhas do que o `row_count` dela diz (a página
+    curta: sem isto, a gravação seguinte apagaria as linhas que não vieram). A aba que não existe é vazia."""
+    r = sessao.get(f"{base}/api/workbooks", timeout=60)
+    r.raise_for_status()
+    w = next((x for x in r.json() if x.get("key") == livro), None)
+    r = sessao.get(f"{base}/api/sheets", timeout=60)
+    r.raise_for_status()
+    listadas = {x["sheet_name"]: x for x in r.json() if x.get("workbook_key") == livro}
+    _conferir(livro, w, {n: x["id"] for n, x in listadas.items()}, declaradas)
+    out = {}
+    for aba in declaradas:
+        meta = listadas.get(aba)
+        if meta is None:
+            out[aba] = []
+            continue
+        lidas = list(_linhas(base, sessao, meta["id"]))
+        n = _int(meta.get("row_count"))
+        if n is not None and len(lidas) < n:
+            raise LeituraIncompleta(f"{livro}.{aba}: li {len(lidas)} linhas e o banco diz {n}")
+        out[aba] = lidas
+    return out
 
 PAGINA = 1000
 
