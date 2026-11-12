@@ -175,6 +175,14 @@ def _conferir_grava(valor: str) -> str:
 
 
 # nome da variável → o que é, para que serve, e a conferência antes de gravar
+def _conferir_esri(valor: str) -> str:
+    """A chave de API da Esri (ArcGIS Location Platform): um texto longo, sem espaço (as de hoje começam com AAPT)."""
+    import re as _re
+    if not _re.fullmatch(r"[A-Za-z0-9._\-]{40,600}", valor or ""):
+        raise Recusada("A chave de API da Esri é um texto longo (40 caracteres ou mais), sem espaço: nada foi gravado.")
+    return f"a chave tem {len(valor)} caracteres"
+
+
 CHAVES = {
     "NEXUS_CONTESTACAO_CHAVE_PRIVADA": {
         "nome": "Contestações dos clientes (chave privada)",
@@ -245,6 +253,17 @@ CHAVES = {
         "dica": "o ID do diretório (tenant id) da Grid Co. no Entra ID, um GUID de 8-4-4-4-12 caracteres (o da "
                 "authority do msalConfig do campo.html), não o domínio",
         "conferir": _conferir_guid("ID do diretório da Grid Co."),
+    },
+    # o satélite do Mapa de equipe (12/11/2026, Levi: "Quero a visão de mapa e satélite", e a escolha dele: a Esri). A
+    # chave vai ao navegador de quem abre o mapa (é como a Esri funciona: restrinja-a ao endereço do Nexus na conta)
+    "NEXUS_ESRI_CHAVE": {
+        "nome": "Mapa de equipe: satélite (chave de API da Esri)",
+        "para": "o botão Satélite do Mapa de equipe (a imagem World Imagery da Esri, a que mostra os painéis das usinas); "
+                "sem ela, o botão não aparece",
+        "arquivo": "",
+        "dica": "a chave de API criada em developers.arcgis.com (ArcGIS Location Platform), com o acesso a Basemaps; "
+                "restrinja-a ao endereço app.gridco.com.br na conta",
+        "conferir": _conferir_esri,
     },
     # a gravação do Mapa de equipe (09/11/2026, pedido da sessão Nexus Field: a variável só existia no .env do servidor,
     # que o Levi não alcança). O chaves.json é da MÁQUINA (a pasta de dados): gravada na tela do servidor, vale só lá, e

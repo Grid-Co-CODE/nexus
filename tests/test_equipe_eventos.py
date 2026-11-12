@@ -186,8 +186,7 @@ def test_o_percurso_conta_o_dia_por_usina_com_a_regra_dos_eventos():
               _p(9, 0, NA_A), _p(9, 10, ESTRADA, mov=True), _p(9, 20, ESTRADA), _p(9, 25, ESTRADA),
               _p(9, 30, ESTRADA, mov=True), _p(10, 5, NA_B)]
     assert _percurso(pontos) == [
-        ("inicio", "06:40", "06:40", "Primeira posição, em Cidade Um Teste"),
-        ("saiu", "06:50", "06:50", "Saiu de Cidade Um Teste"),
+        ("cidade", "06:40", "06:50", "Em Cidade Um Teste"),
         ("chegou", "07:30", "07:30", "Chegou na Usina Alfa Teste, depois de 40 min de deslocamento"),
         ("saiu", "09:00", "09:00", "Saiu da Usina Alfa Teste, depois de 1 h 30 na usina"),
         ("parado", "09:20", "09:25", "Parado fora de usina"),
@@ -207,7 +206,7 @@ def test_o_percurso_chama_de_ufv_a_usina_sem_ufv_no_nome_e_fecha_no_ultimo_ponto
     assert itens == [
         ("inicio", "08:00", "08:00", "Primeira posição, na UFV Altair Teste"),
         ("saiu", "08:30", "08:30", "Saiu da UFV Altair Teste"),
-        ("parado", "09:00", "09:05", "Parado em Cidade Um Teste"),
+        ("cidade", "09:00", "09:05", "Em Cidade Um Teste"),
         ("chegou", "10:00", "10:00", "Chegou na UFV Bravo Teste, depois de 1 h 30 de deslocamento"),
         ("saiu", "10:30", "10:30", "Saiu da UFV Bravo Teste, depois de 30 min na usina"),
         ("ultimo", "10:40", "10:40", "Última posição, em deslocamento"),
@@ -224,3 +223,18 @@ def test_o_percurso_de_mais_de_um_dia_leva_a_data_e_sem_ponto_e_vazio():
         ("10/11 08:00", "Saiu da Usina Alfa Teste"),
         ("11/11 09:00", "Chegou na Usina Bravo Teste, depois de 25 h 00 de deslocamento")]
     assert EV.do_percurso([], USINAS, NOMES) == []
+
+
+def test_quem_fica_na_cidade_o_dia_todo_tem_uma_linha_so():
+    """Levi, 12/11/2026, com a imagem da lista repetindo "Parado em Guaratinguetá" dez vezes: "deixa bem simples e
+    direto, 'Em Guaratinguetá' se ele ficou o dia todo vai aparecer só isso o dia todo!". As paradas seguidas na mesma
+    cidade, sem usina no meio, viram UMA linha "Em <cidade>" do primeiro ao último ponto dela; o andar dentro da cidade
+    não quebra a linha, e o começo e o fim andando também entram nela quando o ponto é da mesma cidade."""
+    pontos = [_p(8, 8, CASA), _p(8, 15, CASA), _p(8, 20, ESTRADA, mov=True), _p(8, 42, CASA), _p(8, 50, ESTRADA, mov=True),
+              _p(9, 0, CASA), _p(9, 10, CASA, mov=True)]
+    assert _percurso(pontos) == [("cidade", "08:08", "09:10", "Em Cidade Um Teste")]
+    # andando no começo e no fim, num ponto sem cidade: a primeira e a última posição em deslocamento
+    pontos = [_p(8, 0, ESTRADA, mov=True), _p(8, 10, CASA), _p(8, 20, CASA), _p(8, 30, ESTRADA, mov=True)]
+    assert _percurso(pontos) == [
+        ("inicio", "08:00", "08:00", "Primeira posição, em deslocamento"), ("cidade", "08:10", "08:20", "Em Cidade Um Teste"),
+        ("ultimo", "08:30", "08:30", "Última posição, em deslocamento")]

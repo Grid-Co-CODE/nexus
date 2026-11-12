@@ -1645,29 +1645,69 @@ e não foram feitas.
   OFL; só as faixas 0-255, 256-511 e 8192-8447) em `static/mapa/fontes/`, e o contorno do Brasil do IBGE (países, mínima)
   em `static/clima/ibge-brasil-minima.geojson`.
 - **Só o Brasil**: o recorte só tem o Brasil, a câmera não sai dele (`maxBounds`) e o resto do mundo fica coberto pela
-  máscara (um retângulo do mundo com o contorno do IBGE como buraco); a divisa do Brasil em verde Grid pulsa de leve (o
+  máscara (um retângulo do mundo com o contorno do IBGE como buraco), **opaca, na cor do fundo** (12/11/2026, Levi: "tem
+  como mostrar só Brasil?"; com 90% o satélite do mundo e os vizinhos do recorte apareciam apagados por baixo; o mar
+  de fora do contorno também some); a divisa do Brasil em verde Grid pulsa de leve (o
   pedido de 11/11 das divisas pulsando, mantido com os efeitos de animação do Windows desligados).
-- **Sem 3D**: sem inclinação, sem giro, sem terreno e sem prédio em pé (`maxPitch: 0`, `dragRotate: false`). O satélite
-  também ficou de fora: o da prévia é de demonstração e o de produção pede licença (o guia).
+- **Sem 3D**: sem inclinação, sem giro, sem terreno e sem prédio em pé (`maxPitch: 0`, `dragRotate: false`).
+- **Mapa | Satélite (12/11/2026**, Levi: "Quero a visão de mapa e satélite"; a escolha dele entre as fontes: "Esri
+  (ArcGIS)"). A imagem é o World Imagery da Esri (`ibasemaps-api.arcgis.com`, blocos raster de 256 px até o zoom 19,
+  com o crédito que a licença pede), e só aparece com a chave **`NEXUS_ESRI_CHAVE`** em Base > Chaves ("Mapa de equipe:
+  satélite"; criada pelo Levi em developers.arcgis.com, conta ArcGIS Location Platform, acesso a Basemaps). **A chave
+  vai ao navegador** (o bloco é pedido direto à Esri), então ela é **restrita por referenciador a app.gridco.com.br** no
+  painel da Esri; sem a chave, nem o botão aparece. No satélite saem os preenchimentos do nosso mapa (terra, mata, uso,
+  água, prédio) e as rodovias ficam finas; a máscara fora do Brasil, as divisas, os nomes, as usinas e os técnicos
+  continuam. A escolha fica no navegador (`localStorage` `nexus.equipe.base`). LGPD: a Esri recebe o bloco da região
+  olhada, não a posição de técnico (o mapa base nosso segue sendo o padrão).
 - **Estilo Nexus**: o estilo do mapa é montado no navegador a partir dos tokens do `nexus.css` (`campo-mapa.js`, `paleta`),
   sem cor escrita no script (o teste procura hex e rgb no código), nos dois temas; a troca de tema refaz o estilo (a que
   acontece no meio do carregamento fica para o fim dele). Água e terra navy, as rodovias puxadas para o verde, as
   divisas dos estados tracejadas em verde.
 - **O que o mapa mostra** (tudo do servidor, no JSON `#eq-dados` de `equipe_tela._dados_do_mapa`): as usinas uma a uma
-  (nunca agrupadas), em losango que cresce com o zoom, na cor do dado: neutra (contorno verde), cheia no Usinas, a cor da
-  ocorrência aberta da Usinas 360° (a etiqueta da Visão geral: muito alta = crítico, alta = alerta) e, com o clima, a cor
-  do nível do alerta (com o selo "!" se também há ocorrência); a crítica pulsa. Os técnicos no último ponto, na cor da
-  situação (o de outro dia só no contorno; o escolhido com o anel branco e o halo escuro), com as iniciais de perto; o
-  clique abre o percurso do dia. O percurso aberto em verde Grid com halo, os pontos de perto e os marcos do
-  `eventos.do_percurso` com a hora ("16:50 · Saiu da UFV Altair"). O clima em coordenadas (`clima.mapa.montar(geo=True)`:
-  a área do aviso do INMET, o tracejado do que vai começar, os focos e o anel no foco a até 5 km de uma usina). A dica do
-  mouse diz o nome, a equipe ou o cliente, a situação ou o nível e o motivo, e as ocorrências abertas.
+  (nunca agrupadas), em losango que cresce com o zoom, e os técnicos no último ponto, na cor da situação (o de outro dia
+  só no contorno; o escolhido com o anel branco e o halo escuro); o clique no técnico abre o percurso do dia. O clima em
+  coordenadas (`clima.mapa.montar(geo=True)`: a área do aviso do INMET, o tracejado do que vai começar, os focos e o anel
+  no foco a até 5 km de uma usina). A dica do mouse diz o nome, a equipe ou o cliente, a situação, o Agora do COS e o
+  clima, com o motivo.
+- **A cor da usina é o "Agora" de Comando > Usinas (12/11/2026**, Levi: "Quero as cores das usinas de acordo com o
+  tempo real, OS Abertas do setor COS, as regras estão em 'Comando > Usinas' pode pegar as cores de lá!"; trocou a cor
+  da ocorrência aberta da Usinas 360°, de 11/11). A MESMA leitura e a MESMA régua de lá: a fotografia da Ronda COS de
+  cada cliente do Andamento (`cos.andamento`, a cópia de 30 s), casada com a usina pela ligação do cadastro
+  (`comando.usinas.cos_por_usina`), e `comando.usinas.agora_pelo_cos` (religamento em campo = crítico; usina, cabine,
+  skid, QGBT, proteção, concessionária ou rede = crítico; inversor = atenção; comunicação = sem comunicação; sem OS =
+  normal; a usina que a fotografia não trouxe = sem leitura) no tom de lá: normal verde, atenção amarelo, crítico
+  vermelho (pulsa), sem comunicação cinza, sem leitura só o contorno. Sem a fonte do Andamento ligada, a usina fica sem
+  cor (nunca "normal"). Mudou a régua em Comando > Usinas, muda aqui sozinha (é a mesma função). Com o Incluir clima, a
+  cor é o nível do alerta de clima, e o selo "!" diz que o COS tem crítico ou atenção. O Usinas sem o COS segue cheio no
+  verde.
+- **Dois focos: Foco técnico | Foco usina (12/11/2026**, Levi: "Quero ter dois focos, foco técnico e focos usina, dessa
+  forma dá para focar melhor"). No canto de cima à direita do mapa dos técnicos. Foco técnico (o padrão): o técnico
+  grande e as usinas menores e mais claras, com o nome a partir do zoom 9,5. Foco usina: as usinas 1,25 vez maiores e o
+  nome delas a partir do zoom 6,5, os técnicos pequenos, meio apagados e sem as iniciais. A escolha fica no navegador
+  (`nexus.equipe.foco`). Nada muda no servidor.
+- **O círculo do técnico é maior e as iniciais aparecem sempre (12/11/2026**, Levi: "o nome dos técnicos não aparece
+  pq os cards estão muito pequenos, aumente um pouco o tamanho do circulo dos técnicos"): raio de 10 px no Brasil
+  inteiro a 14 px de perto, as iniciais em 11 px em todo zoom.
+- **O zoom anda o dobro (12/11/2026**, Levi: "Quero o zoom um pouco mais rápido, pelo menos o dobro"): a roda com o
+  dobro da taxa do MapLibre (`setWheelZoomRate(1/200)`, `setZoomRate(1/45)`), e os botões + e − andam 2 níveis.
+- **O mapa é mais alto (12/11/2026**, Levi: "Pode aumentar a altura do mapa, até para quando for expandir o percurso
+  caber mais para cima!"): `--eq-alt` = `clamp(620px, 100vh − 140px, 1600px)` (era 520 / 100vh − 256 / 1500).
+- **O percurso se anima (12/11/2026**, Levi: "Cliquei em percurso e não aparece a animação da referência"; a referência
+  é a prévia do Willian). Ao abrir, a câmera voa até o percurso e a linha se desenha do começo ao fim em ~8 s; a linha
+  tem o degradê do apagado (o começo) ao verde (o fim), setas no sentido do caminho, e o último trecho andando corre em
+  "formigas" (o traço que anda). A barra da reprodução, na gaveta, logo abaixo do resumo: tocar/pausar, o controle do
+  tempo (arrastar volta o percurso até aquela hora, com o ponto "agora" e a hora no mapa) e a velocidade (×120, ×480,
+  ×1200). Cada ponto vai com o instante (`t`, segundos UTC) no JSON do percurso. Os marcos de
+  `eventos.do_percurso` seguem no mapa com a hora ("16:50 · Saiu da UFV Altair").
 - Os botões de sempre (+, −, Ir ao percurso, Brasil) e a escala; o resto da tela (Técnicos | Usinas, Incluir clima,
   Filtros, os painéis) não mudou.
 - **Prova**: `tests/test_mapa_base.py` (a subida em partes, o 409/400/413/507, o que não confere não troca o que está no
-  ar, o 206) e `tests/test_equipe_mapa_ml.py` (o desenho sem o arquivo, a coordenada só de quem aparece, sem 3D nem
-  satélite, o Usinas sem técnico, o percurso e o clima em coordenadas, a cor da ocorrência, o script sem cor própria). Na
-  bancada (`perc_bancada.py` com o arquivo de verdade): Brasil, rua (São Paulo no zoom 14,5), percurso, clima e o tema claro.
+  ar, o 206) e `tests/test_equipe_mapa_ml.py` (o desenho sem o arquivo, a coordenada só de quem aparece, sem 3D, o
+  satélite só com a chave, o Usinas sem técnico, o percurso e o clima em coordenadas, a cor do Agora pelo COS, os dois
+  focos, o zoom, a reprodução, a altura, o script sem cor própria). Na bancada (`perc_bancada.py` com o arquivo de
+  verdade): Brasil, rua (São Paulo no zoom 14,5), percurso (o voo, o desenho, a reprodução no meio), clima, os dois focos,
+  as cores do Agora (simuladas no navegador: a bancada não tem o Andamento), o satélite (Campinas no zoom 13) e o
+  celular (375 px, sem rolagem de lado), e o tema claro.
 
 ### O filtro suspenso (10/11/2026)
 
@@ -1696,7 +1736,8 @@ etiqueta, tirar pela etiqueta).
 
 Pedido do Levi pela sessão Nexus Field (ver a 1ª regra acima). **Ver percurso**, na gaveta do técnico escolhido:
 - **O período em dias e horas de Brasília** (`?tecnico=<id>&de=AAAA-MM-DDTHH:MM&ate=...`, os dois `datetime-local` do
-  formulário; o filtro vai junto). O formulário já vem com o dia da última posição do técnico, das 6h às 22h (ou até agora),
+  formulário, lado a lado desde 12/11/2026, Levi: "podem facilmente ficar lado a lado, assim evitaria gastar mais
+  espaço"; o filtro vai junto). O formulário já vem com o dia da última posição do técnico, das 6h às 22h (ou até agora),
   com o `min` nos 7 dias e o `max` em agora. **Fica dentro da guarda:** o início antes dos 7 dias vai para o limite e a tela
   diz ("o início foi para ..."); o fim depois de agora vira agora; o período torto (texto, dia que não existe, só um dos
   dois) ou ao contrário é dito na gaveta, sem 500, e o painel de sempre abre (o registro é o `abriu_mapa` de sempre, porque
@@ -1740,10 +1781,17 @@ Pedido do Levi pela sessão Nexus Field (ver a 1ª regra acima). **Ver percurso*
   por exemplo 'Chegou na UFV X', 'Saiu da Usina X', 'Chegou na UFV X'"; antes, de 10/11, era ponto a ponto agrupado:
   "de 10:28 a 16:38 parado"). `eventos.do_percurso`, pela MESMA regra dos eventos do dia (a usina é o raio de 1 km, a
   saída é o último ponto nela, a chegada o 1º ponto na outra): a primeira posição, "Saiu da UFV X, depois de 1 h 30 na
-  usina" (o tempo só quando a chegada está no período), "Chegou na UFV Y, depois de 40 min de deslocamento", cada parada
-  fora de usina no caminho ("Parado em <cidade>", de HH:MM a HH:MM: os pontos parados seguidos, sem régua de tempo
-  mínimo) e, se o período termina andando, "Última posição, em deslocamento". O trecho andando fica implícito. O nome
-  ganha "UFV" na frente quando o do cadastro não diz UFV nem Usina.
+  usina" (o tempo só quando a chegada está no período), "Chegou na UFV Y, depois de 40 min de deslocamento" (contado
+  da saída da usina anterior, ou do lugar do início, nunca da parada no caminho) e, se o período termina andando,
+  "Última posição, em deslocamento". O trecho andando fica implícito. O nome ganha "UFV" na frente quando o do cadastro
+  não diz UFV nem Usina.
+- **Fora de usina, uma linha por cidade: "Em <cidade>" (12/11/2026**, Levi, com a lista repetindo "Parado em
+  Guaratinguetá": "deixa bem simples e direto, 'Em garatinguetá' se ele ficou o dia todo vai aparecer só isso o dia
+  todo!"; de 11/11 a 12/11 era uma linha "Parado em <cidade>" por parada). As paradas seguidas na mesma cidade viram UMA
+  linha "Em <cidade>", do primeiro ao último ponto dela; o andar entre elas não quebra a linha, e o começo ou o fim do
+  período andando entram nela quando o ponto é da mesma cidade (a cidade só é lida nos pontos parados e nas duas
+  pontas, `municipios`). Parada sem cidade conhecida: "Parado fora de usina". Quem passou o dia todo numa cidade tem uma
+  linha só. Prova: `tests/test_equipe_eventos.py` (`test_quem_fica_na_cidade_o_dia_todo_tem_uma_linha_so`).
 - **O losango da usina cresce com o zoom** (Levi, 11/11/2026: "O quadrado da UFV continua do mesmo tamanho mesmo eu
   dando zoom"): o `--eq-uz` do `campo-percurso.js` é a raiz quarta do zoom (2x com 16x, 3x com 81x), até 3,2 vezes o
   tamanho do mapa inteiro. O texto e o ponto do técnico seguem do mesmo tamanho na tela.

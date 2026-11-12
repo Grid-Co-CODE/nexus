@@ -767,7 +767,10 @@ gravar) e VENCE a do .env; "Apagar" volta à do .env. A tela nunca mostra o valo
   `NEXUS_EQUIPE_MS_TENANT_ID` (os dois GUIDs do Entra ID com que o Mapa de equipe confere, pela assinatura, o ID token que
   a página do App de Campo manda ao registrar o celular no Nexus Field, `nexus/campo/equipe/token_ms.py`: o registro SPA
   do App e o diretório da Grid; a tela só confere o formato de GUID, e o domínio no lugar do diretório é recusado; a prova
-  é o celular registrar). A tela não edita o .env: nome fora da lista é recusado.
+  é o celular registrar) e, desde 12/11, a `NEXUS_ESRI_CHAVE` (o satélite do Mapa de equipe, a chave de API da Esri:
+  só a forma, 40 a 600 caracteres de letra, número, ponto, hífen e sublinhado; ela VAI ao navegador, por isso é restrita
+  por referenciador a app.gridco.com.br no painel da Esri; sem ela, o botão Satélite não aparece; ver
+  `nexus/torres/campo/CLAUDE.md`, "O mapa de verdade"). A tela não edita o .env: nome fora da lista é recusado.
 - **Quem lê usa `chaves.valor(nome)`** (a da tela e, sem ela, a do .env), nunca `config.get` direto: as Contestações
   (`nexus/contratos/contestacoes.py`) e os Acessos dos clientes (`nexus/contratos/acessos_clientes.py`) leem assim.
 - **NEXUS_SECRET_KEY trocada:** a gravada não abre; vale a do .env (ou nenhuma), e a tela diz "não abre, cole de novo".

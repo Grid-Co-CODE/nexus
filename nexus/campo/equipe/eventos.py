@@ -173,95 +173,104 @@ def _ufv(nome) -> str:
 
 
 def do_percurso(pontos: list, usinas: dict, nomes_usina: dict, *, cidade=None, com_ponto=False) -> list:
-    """O percurso de um período contado por usina (11/11/2026): [{"tipo" (inicio, saiu, chegou, parado, ultimo), "de",
-    "ate" (a hora de Brasília; "dd/mm HH:MM" se o período passa de um dia; iguais num ponto só), "texto", "usina_id"}],
-    na ordem. `pontos` com instante, lat, lon e mov (a trilha do `Servico.percurso`); `usinas` = {usina_id: (lat, lon,
-    uf)}; `cidade(lat, lon) -> nome | None`. A regra de usina, saída e chegada é a de `do_tecnico`. `com_ponto`
-    (11/11/2026, o mapa de verdade): cada linha leva também `ponto`, o índice na lista em ordem do ponto do marco (o
-    servidor da tela põe a coordenada dele no mapa, depois do registro da LGPD)."""
+    """O percurso de um período contado por usina e por cidade: [{"tipo" (inicio, saiu, chegou, cidade, parado, ultimo),
+    "de", "ate" (a hora de Brasília; "dd/mm HH:MM" se o período passa de um dia; iguais num ponto só), "texto",
+    "usina_id"}], na ordem. `pontos` com instante, lat, lon e mov (a trilha do `Servico.percurso`); `usinas` = {usina_id:
+    (lat, lon, uf)}; `cidade(lat, lon) -> nome | None`. `com_ponto`: cada linha leva também `ponto`, o índice na lista em
+    ordem do ponto do marco (o mapa de verdade põe a coordenada dele).
+
+    A usina (11/11/2026): a regra de `do_tecnico` (o raio de 1 km; a saída é o último ponto nela, a chegada o 1º na
+    outra), com "Chegou na UFV X, depois de N de deslocamento" e "Saiu da UFV X, depois de N na usina".
+    Fora de usina (Levi, 12/11/2026: "Fica repetindo parado em guaratinguetá... deixa bem simples e direto, 'Em
+    garatinguetá' se ele ficou o dia todo vai aparecer só isso o dia todo!"): as paradas seguidas na mesma cidade viram
+    UMA linha "Em <cidade>", do primeiro ao último ponto dela; o andar entre elas não quebra a linha, e o começo e o fim
+    do período andando entram nela quando o ponto é da mesma cidade (a cidade só se lê nos pontos parados e nas duas
+    pontas). Parada sem cidade: "Parado fora de usina". O deslocamento da chegada conta da saída da usina anterior (ou
+    do lugar do início), não da parada no caminho."""
     lista = sorted(pontos, key=lambda p: p["instante"])
     if not lista:
         return []
     fmt = "%d/%m %H:%M" if len({_inst(p).astimezone(_BRT).date() for p in lista}) > 1 else "%H:%M"
+    n = len(lista)
+    lugares = [_usina_do_ponto(p, usinas, RAIO_USINA_KM) for p in lista]
+    cache = {}
 
-    def hora(p) -> str:
-        return _inst(p).astimezone(_BRT).strftime(fmt)
+    def cid(i):
+        if i not in cache:
+            try:
+                cache[i] = cidade(lista[i]["lat"], lista[i]["lon"]) if cidade is not None else None
+            except Exception:       # noqa: BLE001 — a cidade é enfeite: sem ela, "fora de usina"
+                cache[i] = None
+        return cache[i]
 
     def nome(u) -> str:
         return _ufv(nomes_usina.get(u) or f"usina {u}")
 
-    def cid(p):
-        if cidade is None:
-            return None
-        try:
-            return cidade(p["lat"], p["lon"])
-        except Exception:       # noqa: BLE001 — a cidade é enfeite: sem ela, "fora de usina"
-            return None
+    def minutos(a, b) -> str:
+        return _tempo(round((_inst(lista[b]) - _inst(lista[a])).total_seconds() / 60))
 
-    out = []                            # (instante, ordem, item): a parada entra na hora dela, entre os eventos
-
-    indice = {id(p): i for i, p in enumerate(lista)}
+    out = []
 
     def item(tipo, a, b, texto, usina=None):
-        linha = {"tipo": tipo, "de": hora(a), "ate": hora(b), "texto": texto, "usina_id": usina}
+        linha = {"tipo": tipo, "de": _inst(lista[a]).astimezone(_BRT).strftime(fmt),
+                 "ate": _inst(lista[b]).astimezone(_BRT).strftime(fmt), "texto": texto, "usina_id": usina}
         if com_ponto:
-            linha["ponto"] = indice[id(a)]
-        out.append((_inst(a), len(out), linha))
+            linha["ponto"] = a
+        out.append(linha)
 
-    lugares = [_usina_do_ponto(p, usinas, RAIO_USINA_KM) for p in lista]
-    primeiro, u0 = lista[0], lugares[0]
-    cid0 = cid(primeiro) if u0 is None and not primeiro.get("mov") else None
-    onde = (f"na {nome(u0)}" if u0 is not None else "em deslocamento" if primeiro.get("mov")
-            else f"em {cid0}" if cid0 else "fora de usina")
-    item("inicio", primeiro, primeiro, f"Primeira posição, {onde}", u0)
-    partida = chegada = None            # a última saída (o deslocamento) e a chegada na usina em que ele está
-    no_inicio = u0 is None and not primeiro.get("mov")
-    inicio_parado = 0                   # quantos pontos do começo são o lugar do início (fora de usina, parado)
-    saiu_do_primeiro = False
-    for a, b, ua, ub in zip(lista, lista[1:], lugares, lugares[1:]):
-        saiu_do_primeiro = saiu_do_primeiro or (a is primeiro and ((ua is not None and ub != ua)
-                                                                    or (no_inicio and ua is None and b.get("mov"))))
-        if no_inicio:
-            inicio_parado += 1
-        if no_inicio and ua is None and b.get("mov"):
-            item("saiu", a, a, f"Saiu de {cid0}" if cid0 else "Saiu de um ponto fora de usina")
-            partida = _inst(a)
-        if ua is not None and ub != ua:
-            texto = f"Saiu da {nome(ua)}"
-            if chegada is not None:
-                texto += f", depois de {_tempo(round((_inst(a) - chegada).total_seconds() / 60))} na usina"
-            item("saiu", a, a, texto, ua)
-            partida, chegada = _inst(a), None
-        if ub is not None and ub != ua:
-            texto = f"Chegou na {nome(ub)}"
-            if partida is not None:
-                texto += f", depois de {_tempo(round((_inst(b) - partida).total_seconds() / 60))} de deslocamento"
-            item("chegou", b, b, texto, ub)
-            partida, chegada = None, _inst(b)
-        if b.get("mov") or ub is not None:
-            no_inicio = False
-    if no_inicio:
-        inicio_parado = len(lista)
-    # as paradas fora de usina no caminho: os pontos parados seguidos fora de usina, depois do lugar do início
-    k = inicio_parado
-    while k < len(lista):
-        if lista[k].get("mov") or lugares[k] is not None:
-            k += 1
+    # as estadas: os pontos seguidos na mesma usina, e os de fora de usina entre elas
+    estadas, k = [], 0
+    while k < n:
+        f = k
+        while f + 1 < n and lugares[f + 1] == lugares[k]:
+            f += 1
+        estadas.append((lugares[k], k, f))
+        k = f + 1
+    partida = None              # o índice do ponto da última saída (a da usina, ou a do lugar do início)
+    for e, (u, a, b) in enumerate(estadas):
+        primeira, ultima = e == 0, e == len(estadas) - 1
+        if u is not None:
+            if primeira and not (a == b and not ultima):
+                item("inicio", a, a, f"Primeira posição, na {nome(u)}", u)
+            elif not primeira:
+                texto = f"Chegou na {nome(u)}"
+                if partida is not None:
+                    texto += f", depois de {minutos(partida, a)} de deslocamento"
+                item("chegou", a, a, texto, u)
+            if not ultima:
+                texto = f"Saiu da {nome(u)}"
+                if not primeira:
+                    texto += f", depois de {minutos(a, b)} na usina"
+                item("saiu", b, b, texto, u)
+                partida = b
             continue
-        fim = k
-        while fim + 1 < len(lista) and not lista[fim + 1].get("mov") and lugares[fim + 1] is None:
-            fim += 1
-        c = cid(lista[k])
-        item("parado", lista[k], lista[fim], f"Parado em {c}" if c else "Parado fora de usina")
-        k = fim + 1
-    ultimo = lista[-1]
-    if len(lista) > 1 and ultimo.get("mov") and lugares[-1] is None:
-        item("ultimo", ultimo, ultimo, "Última posição, em deslocamento")
-    itens = [i for _t, _o, i in sorted(out, key=lambda x: (x[0], x[1]))]
-    # quem sai já no 1º ponto não precisa da "Primeira posição": a saída diz de onde ele partiu
-    if saiu_do_primeiro:
-        itens = [i for i in itens if i["tipo"] != "inicio"]
-    return itens
+        # fora de usina: os grupos pela cidade dos pontos parados (o andar entre eles fica no grupo)
+        grupos = []                 # [cidade, primeiro, último]
+        for i in range(a, b + 1):
+            if lista[i].get("mov"):
+                continue
+            c = cid(i)
+            if grupos and grupos[-1][0] == c:
+                grupos[-1][2] = i
+            else:
+                grupos.append([c, i, i])
+        if primeira and (not grupos or grupos[0][1] > a):
+            # o período começa andando: entra no 1º grupo se o ponto é da mesma cidade
+            if grupos and grupos[0][0] is not None and cid(a) == grupos[0][0]:
+                grupos[0][1] = a
+            else:
+                item("inicio", a, a, "Primeira posição, em deslocamento")
+        fim_andando = ultima and (not grupos or grupos[-1][2] < b)
+        if fim_andando and grupos and grupos[-1][0] is not None and cid(b) == grupos[-1][0]:
+            grupos[-1][2] = b
+            fim_andando = False
+        for c, ga, gb in grupos:
+            item("cidade" if c else "parado", ga, gb, f"Em {c}" if c else "Parado fora de usina")
+        if primeira and grupos:
+            partida = grupos[0][2]
+        if fim_andando and not (primeira and a == b and not grupos):
+            item("ultimo", b, b, "Última posição, em deslocamento")
+    return out
 
 
 def resumo(eventos: list) -> str:

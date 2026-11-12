@@ -630,8 +630,9 @@ def _percurso(srv, sel, pedido, coords, nomes_usina, agora, *, com_coordenada=Fa
         lon = [q["lon"] for q in ordem]
         lat = [q["lat"] for q in ordem]
         out["js"] = {"linha": [_lonlat(q["lat"], q["lon"]) for q in ordem],
-                     "pontos": [{"c": _lonlat(q["lat"], q["lon"]), "hora": m["hora"], "mov": bool(q.get("mov"))}
-                                for q, m in zip(ordem, marcas)],
+                     # o instante de cada ponto (segundos), para a reprodução do percurso no mapa (12/11/2026)
+                     "pontos": [{"c": _lonlat(q["lat"], q["lon"]), "hora": m["hora"], "mov": bool(q.get("mov")),
+                                 "t": int(SI._instante(q["instante"]).timestamp())} for q, m in zip(ordem, marcas)],
                      "marcos": [{"c": _lonlat(ordem[i["ponto"]]["lat"], ordem[i["ponto"]]["lon"]), "tipo": i["tipo"],
                                  "texto": i["texto"], "hora": i["de"] if i["de"] == i["ate"] else f"{i['de']} a {i['ate']}"}
                                 for i in itens],
@@ -800,28 +801,66 @@ def _iniciais(nome: str) -> str:
     return "".join(p[0] for p in (partes[:1] + partes[-1:] if len(partes) > 1 else partes)).upper()
 
 
-def _ocorrencias_por_usina() -> dict:
-    """{usina_id em texto: {"n", "pior", "tom"}} das ocorrências abertas da Usinas 360° (a etiqueta da Visão geral)."""
-    from . import _ocorrencias_abertas
-    from ...campo import ocorrencias as OC
-    return {str(uid): {"n": o["n"], "pior": o["pior"], "tom": OC.COR_ETIQUETA.get(o["pior"], "neutro")}
-            for uid, o in (_ocorrencias_abertas() or {}).items()}
+def _cos_por_usina(b):
+    """A fotografia da Ronda COS de cada cliente do Andamento por usina, como Comando > Usinas a lê
+    (`comando.usinas.cos_por_usina`, a cópia de 30 s por cliente): {"ocs", "lidas"}, ou None sem a fonte."""
+    from ...comando import usinas as CU
+    from ...cos import andamento as AND
+    cfg = current_app.config
+    if b is None or not AND.fonte(cfg).ligada:
+        return None
+    clientes, _erro = AND.clientes(cfg)
+    leituras = [AND.ler(cfg, c) for c in clientes]
+    return CU.cos_por_usina(leituras, lambda nome, codigo: b.lig.usina(nome or "", codigo or "")[0])
+
+
+def _agora_por_usina(b, uids) -> dict:
+    """O "Agora" de Comando > Usinas de cada usina (Levi, 12/11/2026: "Quero as cores das usinas de acordo com o tempo
+    real, OS Abertas do setor COS, as regras estão em 'Comando > Usinas' pode pegar as cores de lá!"): a régua de lá
+    (`comando.usinas.agora_pelo_cos`: religamento em campo = crítico, inversor = atenção, comunicação = sem comunicação,
+    o que para a usina = crítico; sem ocorrência = normal; a usina que a fotografia não trouxe = sem leitura). {usina_id
+    em texto: {"estado", "rotulo", "tom", "motivo"}}; sem a leitura do COS, {} (a usina fica sem cor, nunca "normal")."""
+    from ...comando import usinas as CU
+    try:
+        cos = _cos_por_usina(b)
+    except Exception:           # noqa: BLE001 — sem o COS, o mapa segue sem a cor de agora
+        _log.exception("equipe: a fotografia do COS não abriu (a cor das usinas)")
+        cos = None
+    if cos is None:
+        return {}
+    ocs = {str(k): v for k, v in (cos.get("ocs") or {}).items()}
+    lidas = {str(x) for x in cos.get("lidas") or ()}
+    out = {}
+    for uid in uids:
+        a = CU.agora_pelo_cos(ocs.get(str(uid), []) if str(uid) in lidas else None)
+        out[str(uid)] = {"estado": a["estado"], "rotulo": a["estado_rot"], "tom": a["estado_tom"], "motivo": a["detalhe"]}
+    return out
+
+
+URL_ESRI = ("https://ibasemaps-api.arcgis.com/arcgis/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}?token=")
+CREDITO_ESRI = "Satélite: Esri, Maxar, Earthstar Geographics e a comunidade de usuários do GIS · Powered by Esri"
+
+
+def _satelite() -> dict | None:
+    """O satélite da Esri (12/11/2026, a escolha do Levi), com a chave de Base > Chaves; sem ela, sem o botão."""
+    chave = chaves.valor("NEXUS_ESRI_CHAVE", current_app.config)
+    return {"url": URL_ESRI + chave, "credito": CREDITO_ESRI} if chave else None
 
 
 def _dados_do_mapa(modo, coords, nome_de_usina, onde_de_usina, *, linhas=(), pontos=(), sel=None, perc=None,
-                   clima=None) -> dict:
+                   clima=None, b=None) -> dict:
     """O que o campo-mapa.js desenha (11/11/2026, o guia do Willian com o MapLibre): as usinas uma a uma (a coordenada do
     cadastro, a ocorrência aberta e, com o clima, o nível), os técnicos que o mapa mostra (o último ponto, a situação e o
     endereço do clique), o percurso aberto e o clima em coordenadas. A coordenada do técnico vai SÓ de quem está em
     `pontos` (o piloto, o filtro, com ponto nos 7 dias), e esta função só roda depois do registro da LGPD (Levi, 11/11/2026:
     "Pode trocar" a regra de antes, a página sem coordenada nenhuma)."""
-    oc = _ocorrencias_por_usina() if coords else {}
+    agora_de = _agora_por_usina(b, list(coords)) if coords else {}
     por_nivel = (clima or {}).get("por_id") or {}
     usinas = []
     for uid, (lat, lon, *_r) in coords.items():
         c = por_nivel.get(str(uid))
         usinas.append({"id": str(uid), "nome": nome_de_usina(uid), "onde": onde_de_usina(uid), "c": _lonlat(lat, lon),
-                       "oc": oc.get(str(uid)), "nivel": c["nivel"] if c else None,
+                       "agora": agora_de.get(str(uid)), "nivel": c["nivel"] if c else None,
                        "rotulo": c["rotulo"] if c else "", "motivo": c["motivo_curto"] if c else ""})
     linha_de = {l["pid"]: l for l in linhas}
     tecnicos = []
@@ -839,7 +878,8 @@ def _dados_do_mapa(modo, coords, nome_de_usina, onde_de_usina, *, linhas=(), pon
             # as fontes dos rótulos: o endereço do static SEM o ?v= do controle de cache (ele cairia no meio do molde)
             "fontes": url_for("static", filename="mapa/fontes/FONTE/FAIXA.pbf").split("?")[0]
             .replace("FONTE", "{fontstack}").replace("FAIXA", "{range}"),
-            "usinas": usinas, "tecnicos": tecnicos, "percurso": (perc or {}).get("js"), "clima": geo}
+            "usinas": usinas, "tecnicos": tecnicos, "percurso": (perc or {}).get("js"), "clima": geo,
+            "satelite": _satelite()}
 
 
 # ── o clima por usina (o botão Incluir clima, 11/11/2026) ────────────────────────────────────────────────────────────
@@ -920,8 +960,14 @@ def _tela_usinas(com_clima: bool):
             _log.exception("equipe: o clima não abriu (usinas)")
             avisos.append(CLIMA_FORA)
     usina_de = {u["id"]: u for u in lista}
-    mapa_js = (_dados_do_mapa("usinas", coords, lambda uid: usina_de[str(uid)]["nome"],
-                              lambda uid: usina_de[str(uid)]["onde"], clima=clima) if ml else None)
+    mapa_js = None
+    if ml:
+        try:
+            b = visao._Base()
+        except Exception:       # noqa: BLE001 — sem o cadastro, as usinas seguem sem a cor do COS
+            b = None
+        mapa_js = _dados_do_mapa("usinas", coords, lambda uid: usina_de[str(uid)]["nome"],
+                                 lambda uid: usina_de[str(uid)]["onde"], clima=clima, b=b)
     return _tela({"ver": "usinas", "mapa": mapa, "usinas_lista": lista, "usina_de": usina_de,
                   "erro_usinas": erro, "clima": clima, "avisos": avisos, "perc": None, "sel": None,
                   "painel_ev": False, "admin": False, "piloto_msg": None, "mapa_js": mapa_js})
@@ -1005,7 +1051,8 @@ def equipe():
                       "parado fica fora do mapa.")
     # os dados do mapa de verdade: depois do registro da LGPD, só de quem o mapa mostra
     mapa_js = (_dados_do_mapa("tecnicos", coords, lambda uid: nomes_usina.get(str(uid)) or f"Usina {uid}",
-                              lambda uid: "Usina", linhas=linhas, pontos=pontos, sel=sel, perc=perc, clima=clima)
+                              lambda uid: "Usina", linhas=linhas, pontos=pontos, sel=sel, perc=perc, clima=clima,
+                              b=b)
                if ml else None)
     admin = bool(session.get("admin"))
     todos = []

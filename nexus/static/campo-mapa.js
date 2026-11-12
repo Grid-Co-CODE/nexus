@@ -95,7 +95,9 @@
       limiteUf: mistura(t["--linha-forte"], t["--verde"], claro ? 0.45 : 0.4),
       verde: t["--verde"], rotulo: t["--tinta-2"], forte: t["--tinta"], fraco: t["--mudo"],
       halo: claro ? t["--superficie"] : t["--fundo"],
-      fora: comAlfa(t["--fundo"], claro ? 0.86 : 0.9),
+      // só o Brasil (Levi, 12/11/2026: "tem como mostrar só Brasil?"): a máscara de fora é o fundo, cheio; com 90% o
+      // satélite do mundo e os vizinhos do recorte apareciam apagados por baixo
+      fora: t["--fundo"],
       rotuloAgua: mistura(t["--info-cheio"], t["--tinta-2"], 0.35)
     };
   }
@@ -133,12 +135,15 @@
       version: 8,
       glyphs: new URL(D.fontes.replace("{fontstack}", "FONTSTACK").replace("{range}", "RANGE"), location.href).href
         .replace("FONTSTACK", "{fontstack}").replace("RANGE", "{range}"),
-      sources: {
+      sources: Object.assign({
         base: { type: "vector", url: "pmtiles://" + new URL(D.blocos, location.href).href,
                 attribution: "© OpenStreetMap · Protomaps" }
-      },
+      }, D.satelite ? { satelite: { type: "raster", tiles: [D.satelite.url], tileSize: 256, maxzoom: 19,
+                                    attribution: D.satelite.credito } } : {}),
       layers: [
-        { id: "fundo", type: "background", paint: { "background-color": P.agua } },
+        { id: "fundo", type: "background", paint: { "background-color": P.agua } }
+      ].concat(D.satelite ? [{ id: "satelite", type: "raster", source: "satelite", layout: { visibility: "none" },
+                               paint: { "raster-fade-duration": 150 } }] : [], [
         { id: "terra", type: "fill", source: "base", "source-layer": "earth", paint: { "fill-color": P.terra } },
         { id: "mata-baixa", type: "fill", source: "base", "source-layer": "landcover", filter: ["in", ["get", "kind"], ["literal", ["forest", "scrub", "grassland"]]],
           paint: { "fill-color": P.mata, "fill-opacity": 0.6 } },
@@ -158,7 +163,7 @@
           paint: { "fill-color": P.predio, "fill-opacity": ["interpolate", ["linear"], ["zoom"], 13.5, 0, 14.5, 1] } },
         { id: "limite-uf", type: "line", source: "base", "source-layer": "boundaries", filter: k("region"),
           paint: { "line-color": P.limiteUf, "line-width": ["interpolate", ["linear"], ["zoom"], 3, 0.7, 10, 1.5], "line-dasharray": [3, 2] } }
-      ].concat(vias, [
+      ], vias, [
         { id: "trilho", type: "line", source: "base", "source-layer": "roads", minzoom: 10, filter: k("rail"),
           paint: { "line-color": P.viaMenor, "line-width": ["interpolate", ["linear"], ["zoom"], 10, 0.6, 16, 2], "line-dasharray": [3, 3] } },
         { id: "nome-rio", type: "symbol", source: "base", "source-layer": "water", minzoom: 11,
@@ -207,31 +212,52 @@
     }
     return g.getImageData(0, 0, cv.width, cv.height);
   }
+  // a cor da usina (12/11/2026, Levi: "Quero as cores das usinas de acordo com o tempo real, OS Abertas do setor COS, as
+  // regras estão em 'Comando > Usinas' pode pegar as cores de lá!"): o Agora de Comando > Usinas, no tom de lá (normal
+  // verde, atenção amarelo, crítico vermelho, sem comunicação cinza; sem leitura do COS só o contorno). Com o clima
+  // ligado, a cor é o nível do alerta de clima, e o selo "!" diz que o COS tem crítico ou atenção
+  function corDaUsina(u) {
+    if (u.nivel) return u.nivel;
+    if (u.agora) return u.agora.estado === "sem_leitura" ? "sem_leitura" : "a_" + u.agora.tom;
+    return D.modo === "usinas" ? "dest" : "neutra";
+  }
   function icones(mapa) {
     var cores = NIVEL();
-    var fill = { neutra: P.terra, dest: P.verde, oc_critico: P.t["--critico"], oc_alerta: P.t["--alerta-cheio"] };
+    var fill = { neutra: P.terra, dest: P.verde, sem_leitura: P.terra, a_ok: P.t["--ok-cheio"],
+                 a_alerta: P.t["--alerta-cheio"], a_critico: P.t["--critico"], a_neutro: P.t["--mudo"] };
     Object.keys(cores).forEach(function (k) { fill[k] = cores[k]; });
     Object.keys(fill).forEach(function (k) {
-      var borda = k === "neutra" ? P.verde : P.t["--fundo"];
+      var borda = k === "neutra" ? P.verde : k === "sem_leitura" ? P.t["--mudo"] : P.t["--fundo"];
       [false, true].forEach(function (comSelo) {
         var id = "u-" + k + (comSelo ? "-!" : "");
         if (mapa.hasImage(id)) mapa.removeImage(id);
         mapa.addImage(id, losango(fill[k], borda, comSelo ? P.t["--critico"] : null), { pixelRatio: 2 });
       });
     });
+    // a seta do sentido do percurso
+    var px = 2, cv = document.createElement("canvas");
+    cv.width = cv.height = 12 * px;
+    var g = cv.getContext("2d");
+    g.scale(px, px); g.strokeStyle = P.t["--fundo"]; g.lineWidth = 2.2; g.lineCap = "round"; g.lineJoin = "round";
+    g.beginPath(); g.moveTo(3.5, 2.5); g.lineTo(8, 6); g.lineTo(3.5, 9.5); g.stroke();
+    if (mapa.hasImage("seta")) mapa.removeImage("seta");
+    mapa.addImage("seta", g.getImageData(0, 0, cv.width, cv.height), { pixelRatio: 2 });
   }
 
   // ── os dados nossos em GeoJSON ──────────────────────────────────────────────────────────────────────────────────
   function fc(feats) { return { type: "FeatureCollection", features: feats }; }
   function ponto(c, props) { return { type: "Feature", geometry: { type: "Point", coordinates: c }, properties: props || {} }; }
+  function linhaGeo(coords) {
+    return fc(coords.length > 1 ? [{ type: "Feature", geometry: { type: "LineString", coordinates: coords }, properties: {} }] : []);
+  }
   function usinasGeo() {
-    var ORD = { agir: 9, atencao: 7, oc_critico: 8, oc_alerta: 6, regiao: 4, nx: 2, sem: 3, dest: 1, neutra: 0 };
+    var ORD = { agir: 9, a_critico: 8, atencao: 7, a_alerta: 6, regiao: 4, sem: 3, nx: 2, a_neutro: 2, a_ok: 1, dest: 1,
+                sem_leitura: 0, neutra: 0 };
     return fc(D.usinas.map(function (u) {
-      var cor = u.nivel || (u.oc && u.oc.tom === "critico" ? "oc_critico" : u.oc && u.oc.tom === "alerta" ? "oc_alerta"
-                : D.modo === "usinas" ? "dest" : "neutra");
-      var selo = !!(u.nivel && u.oc && (u.oc.tom === "critico" || u.oc.tom === "alerta"));
+      var cor = corDaUsina(u);
+      var selo = !!(u.nivel && u.agora && (u.agora.tom === "critico" || u.agora.tom === "alerta"));
       return ponto(u.c, { id: u.id, nome: u.nome, icone: "u-" + cor + (selo ? "-!" : ""), ordem: ORD[cor] || 0,
-                          pulso: cor === "agir" || cor === "oc_critico" });
+                          pulso: cor === "agir" || cor === "a_critico" });
     }));
   }
   function tecnicosGeo() {
@@ -241,16 +267,23 @@
                           ordem: t.sel ? 3 : t.velho ? 0 : 1 });
     }));
   }
+  // o trecho atual do percurso (onde as "formigas" andam): do último ponto parado ao fim
+  function trechoAtual() {
+    var p = D.percurso.pontos, k = 0;
+    for (var i = 0; i < p.length - 1; i++) if (!p[i].mov) k = i;
+    return p.slice(k).map(function (q) { return q.c; });
+  }
   function percursoGeo() {
     var p = D.percurso;
-    if (!p) return { linha: fc([]), pontos: fc([]), marcos: fc([]) };
+    if (!p) return { linha: fc([]), pontos: fc([]), marcos: fc([]), atual: fc([]) };
     var tom = TOM(), n = p.pontos.length;
     return {
-      linha: fc([{ type: "Feature", geometry: { type: "LineString", coordinates: p.linha }, properties: {} }]),
+      linha: linhaGeo(p.linha),
       pontos: fc(p.pontos.map(function (q, i) {
         return ponto(q.c, { cor: q.mov ? tom.info : tom.neutro, ponta: i === 0 || i === n - 1, hora: q.hora });
       })),
-      marcos: fc(p.marcos.map(function (m) { return ponto(m.c, { texto: m.hora + " · " + m.texto, tipo: m.tipo }); }))
+      marcos: fc(p.marcos.map(function (m) { return ponto(m.c, { texto: m.hora + " · " + m.texto, tipo: m.tipo }); })),
+      atual: linhaGeo(trechoAtual())
     };
   }
 
@@ -261,7 +294,7 @@
   try {
     mapa = new maplibregl.Map({
       container: caixaMapa, style: estilo(), bounds: BRASIL, fitBoundsOptions: { padding: 24 },
-      maxBounds: [[-100, -48], [-12, 18]], minZoom: 2.5, maxZoom: 17.5,
+      maxBounds: [[-100, -48], [-12, 18]], minZoom: 2.5, maxZoom: 18,
       maxPitch: 0, dragRotate: false, pitchWithRotate: false, touchPitch: false,
       attributionControl: { compact: true }, fadeDuration: REDUZIDO ? 0 : 180, locale: {
         "NavigationControl.ZoomIn": "Aproximar", "NavigationControl.ZoomOut": "Afastar",
@@ -274,18 +307,31 @@
   caixaMapa.mapa = mapa;          // para a conferência no navegador (a bancada e o teste de produção)
   mapa.touchZoomRotate.disableRotation();
   mapa.keyboard.disableRotation();
+  // o zoom mais rápido (Levi, 12/11/2026: "Quero o zoom um pouco mais rápido, pelo menos o dobro"): a roda do mouse 2,25x
+  // (o padrão é 1/450), o trackpad 2,2x (1/100) e os botões de 2 em 2 níveis
+  mapa.scrollZoom.setWheelZoomRate(1 / 200);
+  mapa.scrollZoom.setZoomRate(1 / 45);
   mapa.addControl(new maplibregl.ScaleControl({ unit: "metric", maxWidth: 110 }), "bottom-left");
   mapa.on("error", function (ev) {
     var msg = ev && ev.error && ev.error.message || "";
     if (window.console) console.warn("Mapa de equipe:", msg);
-    if (/404|pmtiles|Failed to fetch/i.test(msg)) avisar("O mapa base não respondeu agora (" + msg.slice(0, 80) + "). Recarregue a página.");
+    if (/404|pmtiles|Failed to fetch/i.test(msg) && !/arcgis/i.test(msg)) avisar("O mapa base não respondeu agora (" + msg.slice(0, 80) + "). Recarregue a página.");
   });
+
+  function guardado(chave, padrao) {
+    try { return localStorage.getItem(chave) || padrao; } catch (e) { return padrao; }
+  }
+  function guardar(chave, v) { try { localStorage.setItem(chave, v); } catch (e) { /* sem armazenamento */ } }
+  var foco = D.modo === "tecnicos" ? guardado("nexus.equipe.foco", "tecnico") : "usina";
+  var fundoBase = D.satelite ? guardado("nexus.equipe.base", "mapa") : "mapa";
 
   var brasilGeo = null;
   function nossas() {
     icones(mapa);
     var vazio = fc([]), pg = percursoGeo();
-    var add = function (id, data) { if (!mapa.getSource(id)) mapa.addSource(id, { type: "geojson", data: data }); };
+    var add = function (id, data, extra) {
+      if (!mapa.getSource(id)) mapa.addSource(id, Object.assign({ type: "geojson", data: data }, extra || {}));
+    };
     add("fora", brasilGeo ? fc([mascara(brasilGeo)]) : vazio);
     add("brasil", brasilGeo || vazio);
     add("avisos", D.clima ? D.clima.avisos : vazio);
@@ -293,9 +339,11 @@
     add("aneis", fc(D.clima ? D.clima.aneis.map(function (c) { return ponto(c); }) : []));
     add("usinas", usinasGeo());
     add("tecnicos", tecnicosGeo());
-    add("perc-linha", pg.linha);
+    add("perc-linha", pg.linha, { lineMetrics: true });
+    add("perc-atual", pg.atual);
     add("perc-pontos", pg.pontos);
     add("perc-marcos", pg.marcos);
+    add("perc-agora", vazio);
     var nv = { 1: P.t["--alerta-cheio"], 2: P.t["--severo"], 3: P.t["--critico"] };
     var corAviso = ["match", ["get", "nivel"], 1, nv[1], 2, nv[2], nv[3]];
     var L = [
@@ -309,31 +357,83 @@
       { id: "avisos-futuro", type: "line", source: "avisos", filter: ["get", "futuro"], paint: { "line-color": corAviso, "line-width": 1.5, "line-dasharray": [3, 2] } },
       { id: "focos", type: "circle", source: "focos", paint: { "circle-color": P.t["--severo"], "circle-opacity": 0.8, "circle-radius": ["interpolate", ["linear"], ["zoom"], 3, 1.6, 10, 3.2] } },
       { id: "aneis", type: "circle", source: "aneis", paint: { "circle-color": comAlfa(P.t["--critico"], 0.12), "circle-stroke-color": P.t["--critico"], "circle-stroke-width": 2, "circle-radius": ["interpolate", ["linear"], ["zoom"], 3, 6, 12, 14] } },
-      // o percurso: a linha em verde Grid com um halo largo, os pontos (de perto) e os marcos com a hora
+      // o percurso (a animação da prévia, Levi, 12/11/2026): a linha que esquenta do início (apagada) ao fim (verde Grid),
+      // com halo, as setas do sentido, o trecho atual andando (as "formigas"), os pontos de perto, os marcos e o "agora"
       { id: "perc-halo", type: "line", source: "perc-linha", layout: { "line-cap": "round", "line-join": "round" }, paint: { "line-color": P.verde, "line-opacity": 0.2, "line-width": z([[5, 6], [12, 12], [16, 18]]) } },
-      { id: "perc-linha", type: "line", source: "perc-linha", layout: { "line-cap": "round", "line-join": "round" }, paint: { "line-color": P.verde, "line-width": z([[5, 2.2], [12, 3.6], [16, 5.5]]) } },
+      { id: "perc-linha", type: "line", source: "perc-linha", layout: { "line-cap": "round", "line-join": "round" }, paint: {
+        "line-gradient": ["interpolate", ["linear"], ["line-progress"], 0, mistura(P.fraco, P.verde, 0.35), 1, P.verde],
+        "line-width": z([[5, 2.6], [12, 4.2], [16, 6.5]]) } },
+      { id: "perc-formigas", type: "line", source: "perc-atual", layout: { "line-cap": "butt", "line-join": "round" }, paint: { "line-color": P.t["--papel"], "line-opacity": 0.85, "line-width": z([[5, 1.2], [12, 1.8], [16, 2.6]]), "line-dasharray": [0, 4, 3] } },
+      { id: "perc-setas", type: "symbol", source: "perc-linha", minzoom: 7, layout: { "symbol-placement": "line", "symbol-spacing": 90, "icon-image": "seta", "icon-size": ["interpolate", ["linear"], ["zoom"], 8, 0.75, 15, 1.05], "icon-allow-overlap": true, "icon-ignore-placement": true, "icon-rotation-alignment": "map" } },
       { id: "perc-pontos", type: "circle", source: "perc-pontos", minzoom: 9, filter: ["!", ["get", "ponta"]], paint: { "circle-color": ["get", "cor"], "circle-radius": 3.6, "circle-stroke-color": P.t["--superficie"], "circle-stroke-width": 1.2 } },
       { id: "perc-pontas", type: "circle", source: "perc-pontos", filter: ["get", "ponta"], paint: { "circle-color": ["get", "cor"], "circle-radius": 7, "circle-stroke-color": P.forte, "circle-stroke-width": 2.4 } },
       // a usina: o losango que cresce com o zoom (Levi, 11/11/2026), uma a uma (nunca agrupada); a crítica pulsa
       { id: "usinas-pulso", type: "circle", source: "usinas", filter: ["get", "pulso"], paint: { "circle-color": comAlfa(P.t["--critico"], 0), "circle-stroke-color": P.t["--critico"], "circle-stroke-width": 2, "circle-radius": 12, "circle-stroke-opacity": 0.75,
         "circle-radius-transition": { duration: REDUZIDO ? 0 : 1100 }, "circle-stroke-opacity-transition": { duration: REDUZIDO ? 0 : 1100 } } },
-      { id: "usinas", type: "symbol", source: "usinas", layout: { "icon-image": ["get", "icone"], "icon-size": ["interpolate", ["linear"], ["zoom"], 3, 0.5, 6, 0.65, 9, 0.85, 12, 1.1, 15, 1.4],
+      { id: "usinas", type: "symbol", source: "usinas", layout: { "icon-image": ["get", "icone"], "icon-size": tamanhoUsina(1),
         "icon-allow-overlap": true, "icon-ignore-placement": true, "symbol-sort-key": ["get", "ordem"] } },
       { id: "usinas-nome", type: "symbol", source: "usinas", minzoom: 8.5, layout: { "text-field": ["get", "nome"], "text-font": FONTE_M, "text-size": ["interpolate", ["linear"], ["zoom"], 8.5, 10.5, 13, 12.5],
         "text-variable-anchor": ["left", "right", "top", "bottom"], "text-radial-offset": 1.1, "text-optional": true }, paint: { "text-color": P.forte, "text-halo-color": P.halo, "text-halo-width": 1.6 } },
       { id: "perc-marcos", type: "symbol", source: "perc-marcos", layout: { "text-field": ["get", "texto"], "text-font": FONTE_M, "text-size": 11.5, "text-max-width": 16,
         "text-variable-anchor": ["left", "right", "top", "bottom"], "text-radial-offset": 1.2, "text-justify": "auto" }, paint: { "text-color": P.forte, "text-halo-color": P.halo, "text-halo-width": 1.8 } },
-      // o técnico: o círculo na cor da situação (de outro dia, só o contorno); o escolhido com o anel branco e o halo escuro
-      { id: "tecnicos-halo", type: "circle", source: "tecnicos", filter: ["get", "sel"], paint: { "circle-radius": ["interpolate", ["linear"], ["zoom"], 3, 12, 10, 15], "circle-color": P.t["--papel-tinta"] } },
+      { id: "perc-agora", type: "circle", source: "perc-agora", paint: { "circle-color": P.verde, "circle-radius": 8, "circle-stroke-color": P.t["--fundo"], "circle-stroke-width": 3 } },
+      { id: "perc-agora-hora", type: "symbol", source: "perc-agora", layout: { "text-field": ["get", "hora"], "text-font": FONTE_M, "text-size": 12, "text-offset": [0, -1.6], "text-allow-overlap": true },
+        paint: { "text-color": P.forte, "text-halo-color": P.halo, "text-halo-width": 2 } },
+      // o técnico (Levi, 12/11/2026: "aumente um pouco o tamanho do circulo dos técnicos"): o círculo na cor da situação
+      // com as iniciais (de outro dia, só o contorno); o escolhido com o anel branco e o halo escuro
+      { id: "tecnicos-halo", type: "circle", source: "tecnicos", filter: ["get", "sel"], paint: { "circle-radius": ["interpolate", ["linear"], ["zoom"], 3, 14, 10, 18], "circle-color": P.t["--papel-tinta"] } },
       { id: "tecnicos", type: "circle", source: "tecnicos", layout: { "circle-sort-key": ["get", "ordem"] }, paint: {
-        "circle-radius": ["interpolate", ["linear"], ["zoom"], 3, 7, 10, 10.5],
+        "circle-radius": ["interpolate", ["linear"], ["zoom"], 3, 10, 10, 14],
         "circle-color": ["case", ["get", "velho"], P.t["--superficie"], ["get", "cor"]],
         "circle-stroke-color": ["case", ["get", "sel"], P.t["--papel"], ["get", "velho"], P.t["--mudo"], P.t["--superficie"]],
         "circle-stroke-width": ["case", ["get", "sel"], 3.2, ["get", "velho"], 2.6, 1.8] } },
-      { id: "tecnicos-ini", type: "symbol", source: "tecnicos", minzoom: 5.5, layout: { "text-field": ["get", "ini"], "text-font": FONTE_M, "text-size": 9.5, "text-allow-overlap": true, "text-ignore-placement": true },
+      { id: "tecnicos-ini", type: "symbol", source: "tecnicos", layout: { "text-field": ["get", "ini"], "text-font": FONTE_M, "text-size": 11, "text-allow-overlap": true, "text-ignore-placement": true },
         paint: { "text-color": ["case", ["get", "velho"], P.fraco, P.t["--fundo"]] } }
     ];
     L.forEach(function (l) { if (!mapa.getLayer(l.id)) mapa.addLayer(l); });
+    aplicarFoco();
+    aplicarBase();
+  }
+  function tamanhoUsina(f) {
+    return ["interpolate", ["linear"], ["zoom"], 3, 0.5 * f, 6, 0.65 * f, 9, 0.85 * f, 12, 1.1 * f, 15, 1.4 * f];
+  }
+
+  // os dois focos (Levi, 12/11/2026: "Quero ter dois focos, foco técnico e focos usina, dessa forma dá para focar
+  // melhor"): no foco técnico o técnico manda (a usina menor e mais apagada, o nome só de perto); no foco usina a usina
+  // manda (maior, com o nome mais cedo) e o técnico vira um ponto pequeno, sem as iniciais. A escolha fica no navegador
+  function aplicarFoco() {
+    if (!mapa.getLayer("usinas")) return;
+    var u = foco === "usina";
+    mapa.setLayoutProperty("usinas", "icon-size", tamanhoUsina(u ? 1.25 : (D.modo === "tecnicos" ? 0.8 : 1)));
+    mapa.setPaintProperty("usinas", "icon-opacity", u || D.modo !== "tecnicos" ? 1 : 0.75);
+    mapa.setLayerZoomRange("usinas-nome", u ? 6.5 : 9.5, 24);
+    if (mapa.getLayer("tecnicos")) {
+      mapa.setPaintProperty("tecnicos", "circle-radius", u ? ["interpolate", ["linear"], ["zoom"], 3, 5, 10, 7]
+                                                           : ["interpolate", ["linear"], ["zoom"], 3, 10, 10, 14]);
+      mapa.setPaintProperty("tecnicos", "circle-opacity", u ? 0.55 : 1);
+      mapa.setPaintProperty("tecnicos", "circle-stroke-opacity", u ? 0.55 : 1);
+      mapa.setLayoutProperty("tecnicos-ini", "visibility", u ? "none" : "visible");
+      mapa.setPaintProperty("tecnicos-halo", "circle-opacity", u ? 0.4 : 1);
+    }
+    quadro.querySelectorAll("[data-eq-foco]").forEach(function (b) {
+      b.setAttribute("aria-pressed", String(b.getAttribute("data-eq-foco") === foco));
+    });
+  }
+  // o Mapa | Satélite (Levi, 12/11/2026: "Quero a visão de mapa e satélite"; a Esri, com a chave de Base > Chaves): no
+  // satélite a imagem manda, e as ruas ficam finas e translúcidas por cima
+  var SO_MAPA = ["terra", "mata-baixa", "uso-verde", "uso-urbano", "agua", "predio"];
+  function aplicarBase() {
+    if (!D.satelite || !mapa.getLayer("satelite")) return;
+    var sat = fundoBase === "satelite";
+    mapa.setLayoutProperty("satelite", "visibility", sat ? "visible" : "none");
+    SO_MAPA.forEach(function (id) { if (mapa.getLayer(id)) mapa.setLayoutProperty(id, "visibility", sat ? "none" : "visible"); });
+    ["menor", "media", "maior", "rodovia"].forEach(function (v) {
+      if (mapa.getLayer("via-" + v)) mapa.setPaintProperty("via-" + v, "line-opacity", sat ? (v === "menor" ? 0 : 0.55) : 1);
+      if (mapa.getLayer("casco-" + v)) mapa.setPaintProperty("casco-" + v, "line-opacity", sat ? 0 : 1);
+    });
+    quadro.querySelectorAll("[data-eq-base]").forEach(function (b) {
+      b.setAttribute("aria-pressed", String(b.getAttribute("data-eq-base") === fundoBase));
+    });
   }
 
   // o pulso: as divisas do Brasil (sempre, pedido do Levi) e a usina crítica (parada com os efeitos desligados)
@@ -347,12 +447,90 @@
       mapa.setPaintProperty("usinas-pulso", "circle-stroke-opacity", fase ? 0.05 : 0.75);
     }
   }, 1300);
+  // as formigas do trecho atual do percurso (a prévia; pedida pelo Levi, roda também com os efeitos desligados)
+  var FORMIGAS = [[0, 4, 3], [0.5, 4, 2.5], [1, 4, 2], [1.5, 4, 1.5], [2, 4, 1], [2.5, 4, 0.5], [3, 4, 0], [0, 0.5, 3, 3.5],
+                  [0, 1, 3, 3], [0, 1.5, 3, 2.5], [0, 2, 3, 2], [0, 2.5, 3, 1.5], [0, 3, 3, 1], [0, 3.5, 3, 0.5]];
+  var passoFormiga = 0;
+  if (D.percurso) setInterval(function () {
+    if (!mapa.getLayer("perc-formigas")) return;
+    passoFormiga = (passoFormiga + 1) % FORMIGAS.length;
+    mapa.setPaintProperty("perc-formigas", "line-dasharray", FORMIGAS[passoFormiga]);
+  }, 60);
+
+  // ── a reprodução do percurso: o traço se desenha do início ao fim, com o "agora" andando e a hora ──────────────────
+  // a barra mora na gaveta, que vem DEPOIS deste script na página: é procurada quando o mapa carrega
+  var rp = null, R = null;
+  function horaDe(t) {
+    return new Date(t * 1000).toLocaleTimeString("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" });
+  }
+  function desenharAte(t) {
+    var p = D.percurso.pontos, coords = [], c = p[0].c;
+    for (var i = 0; i < p.length; i++) {
+      if (p[i].t <= t) { coords.push(p[i].c); c = p[i].c; continue; }
+      var a = p[i - 1] || p[i], f = a.t === p[i].t ? 1 : (t - a.t) / (p[i].t - a.t);
+      c = [a.c[0] + (p[i].c[0] - a.c[0]) * f, a.c[1] + (p[i].c[1] - a.c[1]) * f];
+      coords.push(c);
+      break;
+    }
+    var fim = t >= R.t1;
+    mapa.getSource("perc-linha").setData(linhaGeo(fim ? D.percurso.linha : coords));
+    mapa.getSource("perc-agora").setData(fim ? fc([]) : fc([ponto(c, { hora: horaDe(t) })]));
+    if (rp) {
+      rp.querySelector("[data-eq-replay-tempo]").value = String(Math.round((t - R.t0) / Math.max(1, R.t1 - R.t0) * 1000));
+      rp.querySelector("[data-eq-replay-hora]").textContent = horaDe(t);
+      var bt = rp.querySelector("[data-eq-replay-tocar] i");
+      if (bt) bt.className = "ph ph-" + (R.tocando ? "pause" : "play");
+    }
+  }
+  var ultimoQuadro = 0;
+  function quadroReplay(ms) {
+    if (!R || !R.tocando) return;
+    var dt = ultimoQuadro ? (ms - ultimoQuadro) / 1000 : 0;
+    ultimoQuadro = ms;
+    R.t = Math.min(R.t1, R.t + dt * R.vel);
+    if (R.t >= R.t1) R.tocando = false;
+    desenharAte(R.t);
+    if (R.tocando) requestAnimationFrame(quadroReplay);
+  }
+  function tocar(vel) {
+    if (R.t >= R.t1) R.t = R.t0;
+    R.vel = vel; R.tocando = true; ultimoQuadro = 0;
+    requestAnimationFrame(quadroReplay);
+  }
+  function prepararReplay() {
+    var p = D.percurso.pontos;
+    if (p.length < 2) return;
+    R = { t0: p[0].t, t1: p[p.length - 1].t, t: p[p.length - 1].t, tocando: false, vel: 480 };
+    rp = document.querySelector("[data-eq-replay]");
+    if (!rp) return;
+    rp.hidden = false;
+    var vel = rp.querySelector("[data-eq-replay-vel]");
+    rp.querySelector("[data-eq-replay-hora]").textContent = horaDe(R.t1);
+    rp.querySelector("[data-eq-replay-tocar]").addEventListener("click", function () {
+      if (R.tocando) { R.tocando = false; desenharAte(R.t); } else tocar(+vel.value);
+    });
+    rp.querySelector("[data-eq-replay-tempo]").addEventListener("input", function (e) {
+      R.tocando = false;
+      R.t = R.t0 + (R.t1 - R.t0) * (+e.target.value) / 1000;
+      desenharAte(R.t);
+    });
+    vel.addEventListener("change", function () { if (R.tocando) R.vel = +vel.value; });
+  }
 
   mapa.on("load", function () {
     fetch(new URL(D.brasil, location.href).href, { credentials: "same-origin" })
       .then(function (r) { return r.json(); })
       .then(function (g) { brasilGeo = g; }).catch(function () { brasilGeo = null; })
-      .then(function () { nossas(); });
+      .then(function () {
+        nossas();
+        if (D.percurso && D.percurso.pontos.length > 1) {
+          // a câmera vai ao percurso e o traço se desenha sozinho uma vez (~8 s), como na prévia
+          prepararReplay();
+          var cx = D.percurso.caixa;
+          mapa.fitBounds([[cx[0], cx[1]], [cx[2], cx[3]]], { padding: 90, maxZoom: 15, duration: 1800 });
+          mapa.once("moveend", function () { R.t = R.t0; tocar(Math.max(1, (R.t1 - R.t0) / 8)); });
+        }
+      });
   });
   // a troca de tema refaz o estilo com as cores do tema novo; só depois do 1º carregamento e só quando o tema MUDA (o
   // base.html regrava o mesmo data-tema ao abrir a página, e refazer o estilo no meio do carregamento o deixava vazio)
@@ -400,8 +578,8 @@
     var u = porUsina[e.features[0].properties.id];
     if (!u) return;
     mapa.getCanvas().style.cursor = "pointer";
-    var oc = u.oc ? u.oc.n + (u.oc.n === 1 ? " ocorrência aberta" : " ocorrências abertas") : "";
-    mostrar([u.nome, u.onde, u.rotulo ? u.rotulo + (u.motivo ? ": " + u.motivo : "") : "", oc], e.point.x, e.point.y);
+    var cos = u.agora ? "Agora (COS): " + u.agora.rotulo + (u.agora.motivo ? " · " + u.agora.motivo : "") : "";
+    mostrar([u.nome, u.onde, cos, u.rotulo ? "Clima: " + u.rotulo + (u.motivo ? ": " + u.motivo : "") : ""], e.point.x, e.point.y);
   });
   ["tecnicos", "usinas"].forEach(function (id) {
     mapa.on("mouseleave", id, function () { mapa.getCanvas().style.cursor = ""; esconder(); });
@@ -413,18 +591,22 @@
   });
   mapa.on("click", "usinas", function (e) {
     var c = e.features[0].geometry.coordinates;
-    mapa.flyTo({ center: c, zoom: Math.max(mapa.getZoom(), 12.5), duration: REDUZIDO ? 0 : 900, essential: true });
+    mapa.flyTo({ center: c, zoom: Math.max(mapa.getZoom(), 13), duration: REDUZIDO ? 300 : 900, essential: true });
   });
   quadro.addEventListener("click", function (e) {
+    var f = e.target.closest("[data-eq-foco]");
+    if (f) { foco = f.getAttribute("data-eq-foco"); guardar("nexus.equipe.foco", foco); aplicarFoco(); return; }
+    var bb = e.target.closest("[data-eq-base]");
+    if (bb) { fundoBase = bb.getAttribute("data-eq-base"); guardar("nexus.equipe.base", fundoBase); aplicarBase(); return; }
     var b = e.target.closest("[data-eq-zoom]");
     if (!b) return;
-    var q = b.getAttribute("data-eq-zoom"), dur = REDUZIDO ? 0 : 600;
-    if (q === "mais") mapa.zoomIn({ duration: dur });
-    else if (q === "menos") mapa.zoomOut({ duration: dur });
+    var q = b.getAttribute("data-eq-zoom"), dur = REDUZIDO ? 200 : 450;
+    if (q === "mais") mapa.zoomTo(mapa.getZoom() + 2, { duration: dur });
+    else if (q === "menos") mapa.zoomTo(mapa.getZoom() - 2, { duration: dur });
     else if (q === "inteiro") mapa.fitBounds(BRASIL, { padding: 24, duration: dur });
     else if (q === "percurso" && D.percurso) {
       var cx = D.percurso.caixa;
-      mapa.fitBounds([[cx[0], cx[1]], [cx[2], cx[3]]], { padding: 90, maxZoom: 15, duration: REDUZIDO ? 0 : 900 });
+      mapa.fitBounds([[cx[0], cx[1]], [cx[2], cx[3]]], { padding: 90, maxZoom: 15, duration: 900 });
     }
   });
 })();
