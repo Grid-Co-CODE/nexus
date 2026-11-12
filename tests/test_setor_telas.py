@@ -173,7 +173,8 @@ def test_setor_sem_nenhuma_tela_ve_o_inicio_com_o_aviso(app, setores):
     assert r.status_code == 200
     html = r.get_data(as_text=True)
     assert "ainda não tem telas liberadas" not in html
-    assert set(re.findall(r'data-torre="([^"]+)"', html)) <= {"comando"}
+    # a Caixa e os Temas do setor (Comando) e a Prévia do contrato (Contratos e clientes, 13/11/2026) são de todos
+    assert set(re.findall(r'data-torre="([^"]+)"', html)) <= {"comando", "contratos"}
     assert c.get("/t/comando/caixa-de-entrada").status_code == 200 and c.get("/t/comando/insights").status_code == 403
 
 
@@ -268,8 +269,9 @@ def test_a_secao_mostra_os_setores_e_a_arvore_do_menu(app, setores, logado):
     html = logado.get(URL).get_data(as_text=True)
     assert "Telas por setor" in html and 'id="ace-matriz"' in html
     assert re.search(r'class="ace-setor ativo"[^>]*>\s*<span class="nome">Administrador</span>', html)  # o 1º pelo nome
-    # nenhum setor "vê tudo"; a Caixa de entrada e os Temas do setor (12/11/2026, as demandas entre setores) são de todos
-    assert '<span class="det">vê tudo' not in html and "2 de " in html
+    # nenhum setor "vê tudo"; a Caixa de entrada e os Temas do setor (12/11/2026, as demandas entre setores) e a Prévia do
+    # contrato (13/11/2026) são de todos
+    assert '<span class="det">vê tudo' not in html and "3 de " in html
     # a Caixa de entrada é de todo setor (03/11/2026): marcada e presa, como a do dono. A tela só do cliente (a Visão do
     # cliente, 09/11/2026) não se marca para um setor da Grid
     assert html.count('<input type="checkbox" name="tela"') + html.count('<input type="checkbox" data-do-setor')         == sum(len([s for s in t.telas if not s.so_do_cliente]) for t in app.extensions["nexus_torres"])

@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block titulo %}{{ tela.nome }}{% endblock %}
+{% block conteudo %}
+<link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
+{# A prévia da visão do contrato e do prontuário da usina (13/11/2026): o mockup estático numa moldura, com o aviso de
+   que os dados são fictícios. O mockup esconde o topo e o menu dele quando está dentro do Nexus. #}
+<div class="campo-nativa">
+  <div class="cn-cab">
+    <div><p class="gc-eyebrow">{{ torre.nome }}</p><h1 class="cn-titulo">{{ tela.nome }}</h1><p class="cn-pergunta">{{ tela.pergunta }}</p></div>
+    <div class="cn-frescor"><a class="gc-btn gc-btn--ui gc-btn--contorno" href="{{ url_for('static', filename='previa/contratos-e-prontuario.html') }}" target="_blank" rel="noopener"><i class="ph ph-arrow-square-out" aria-hidden="true"></i> Abrir em tela cheia</a></div>
+  </div>
+  <div class="cn-erro cn-aviso" role="status"><span>Prévia para avaliação de Contratos e dos setores: o cliente, o CNPJ, as pessoas e as usinas são <b>fictícios</b>, e nada aqui grava. O que mudar, mande para a Ana ou o Levi.</span></div>
+  <iframe class="previa-moldura" title="Prévia: visão do contrato e prontuário da usina" src="{{ url_for('static', filename='previa/contratos-e-prontuario.html') }}"
+          style="display:block;width:100%;height:calc(100vh - 230px);min-height:640px;margin-top:12px;border:1px solid var(--linha);border-radius:var(--raio-md);background:var(--fundo)"></iframe>
+</div>
+{% endblock %}
