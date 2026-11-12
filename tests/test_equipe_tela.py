@@ -238,9 +238,9 @@ def test_a_pagina_e_o_json_nao_tem_coordenada(cliente, pontos, setor):
     for pid in (SEM_POSICAO, SEM_PERMISSAO):
         r = cliente.get(URL_ROTA, query_string={"tecnico": pid, "usina": USINA_A})
         assert r.status_code == 404 and not [d for d in DIGITOS if d in r.get_data(as_text=True)]
-    # o x/y do desenho dá o lugar aproximado: o "!" diz isso, e não promete o que o SVG não cumpre (revisão final de
-    # 08/11/2026)
-    assert "aproximado" in html and "nunca traz a latitude" not in html
+    # o "!" diz a regra que vale, sem prometer o que não se cumpre (revisão final de 08/11/2026): desde 11/11/2026, com o
+    # mapa de verdade, a coordenada de quem aparece vai à página depois do registro (Levi: "Pode trocar"), e o texto diz isso
+    assert "precisão do GPS" in html and "depois de gravado o registro" in html and "nunca traz a latitude" not in html
 
 
 @pytest.mark.parametrize("valor", ["²", "1" * 5000], ids=["sobrescrito", "5000_algarismos"])

@@ -2009,6 +2009,19 @@ tr.rd-linha--ativa td{background:var(--verde-suave)}
 .eq-zoom-bt:disabled{opacity:.45;cursor:default}
 .eq-zoom-bt--txt{padding:0 11px}
 .eq-leg-linha{display:inline-block;width:22px;height:0;border-top:3px solid var(--eq-verde);border-radius:2px}
+/* o mapa de verdade (11/11/2026, o MapLibre sobre o mapa base do Brasil; campo-mapa.js): ocupa o palco, e os controles do
+   MapLibre (a escala e os créditos) nas cores do Nexus. Sem o WebGL ou sem o mapa base, o aviso no pé do mapa */
+.eq-palco--ml{background:var(--superficie-2)}
+/* o MapLibre põe .maplibregl-map{position:relative} no contêiner, e o CSS dele vem depois: a regra precisa pesar mais */
+.eq-palco > .eq-ml{position:absolute;inset:0}
+.eq-ml .maplibregl-canvas{outline:none}
+.eq-ml .maplibregl-ctrl-attrib{background:var(--superficie);color:var(--mudo);font:11.5px/1.4 var(--font-sans)}
+.eq-ml .maplibregl-ctrl-attrib a{color:var(--verde-texto)}
+.eq-ml .maplibregl-ctrl-scale{background:var(--superficie);color:var(--tinta-2);border-color:var(--linha-forte);
+  font:11px var(--font-sans)}
+.eq-ml-aviso{position:absolute;z-index:3;left:16px;right:16px;bottom:16px;margin:0;padding:10px 12px;font-size:13px;
+  border:1px solid var(--alerta);border-radius:var(--raio-controle);background:var(--superficie);color:var(--tinta)}
+.eq-ml-aviso[hidden]{display:none}
 /* o botão Incluir clima (11/11/2026), na barra: ligado, fica cheio no verde */
 .eq-clima-bt--on{background:var(--verde);border-color:var(--verde);color:var(--sobre-verde)}
 /* o painel do clima, à esquerda do mapa: os alertas por usina; uma superfície só, as linhas separadas por um fio e a
@@ -2184,3 +2197,15 @@ tr.rd-linha--ativa td{background:var(--verde-suave)}
 .cos-ativos li{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:8px 0;border-top:1px solid var(--linha)}
 .cos-ativos li:first-child{border-top:0}
 .cos-ativo-d{flex:1;color:var(--mudo);font-size:12.5px}
+/* Base > Mapa base (11/11/2026): os cartões do que está no ar e da subida, e a barra do envio */
+.mb-tela .mb-cartao{margin-top:16px;padding:14px 16px 16px;background:var(--superficie);border:1px solid var(--linha);
+  border-radius:var(--raio-md);display:grid;gap:8px}
+.mb-h{margin:0;font:700 11px/16px var(--font-sans);letter-spacing:.06em;text-transform:uppercase;color:var(--mudo)}
+.mb-cartao p{margin:0}
+.mb-sha{overflow-wrap:anywhere}
+.mb-form{display:grid;gap:8px;max-width:640px}
+.mb-sha-campo{font-family:var(--font-mono)}
+.mb-acoes{display:flex;gap:8px}
+.mb-barra{height:8px;border-radius:999px;background:var(--superficie-2);overflow:hidden}
+.mb-barra span{display:block;height:100%;width:0;background:var(--verde)}
+.mb-progresso[hidden]{display:none}

@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block titulo %}Mapa base{% endblock %}
+{% block conteudo %}
+{% from "_explica.html" import explica %}
+{# Base > Mapa base (11/11/2026; nexus/torres/base/mapa_base_tela.py, a regra em nexus/campo/equipe/mapa_base.py): a subida
+   do mapa do Brasil do Mapa de equipe em partes, só administrador. O script é o static/mapa-base-envio.js #}
+<link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
+<div class="campo-nativa mb-tela">
+  <div class="cn-cab">
+    <div><p class="gc-eyebrow">Base</p>
+      <div class="gc-titulo-explica"><h1 class="cn-titulo">Mapa base</h1>
+        {% call explica('O que é este arquivo e como ele sobe') %}
+          <p><b>O que é.</b> O mapa de ruas, rodovias, cidades e rios do Brasil que o Mapa de equipe desenha. É nosso: o
+          Nexus o serve a quem entrou, e nenhum serviço de mapa de terceiro vê a região que alguém está olhando.</p>
+          <p><b>De onde vem.</b> Os dados do OpenStreetMap, no esquema do Protomaps, recortados só no Brasil pela ferramenta
+          <span class="gc-dado">ferramentas/mapa_base_brasil.py</span> (até o zoom 14, ~2,4 GB). A ferramenta imprime o
+          SHA-256 do arquivo: cole-o aqui para o servidor conferir o arquivo inteiro.</p>
+          <p><b>Como sobe.</b> Em partes de {{ parte_max // 1024 // 1024 }} MB, cada uma conferida pela assinatura dela. Se a
+          conexão cair, escolha o mesmo arquivo de novo: a subida continua de onde parou. O que está no ar só é trocado
+          quando o arquivo inteiro confere; enquanto não há arquivo, o Mapa de equipe usa o desenho dos estados.</p>
+        {% endcall %}
+      </div>
+      <p class="cn-pergunta">O mapa do Brasil do Mapa de equipe está no servidor?</p></div>
+  </div>
+
+  <section class="mb-cartao" aria-labelledby="mb-no-ar">
+    <h2 class="mb-h" id="mb-no-ar">No servidor</h2>
+    {% if estado.pronto %}{% set p = estado.pronto %}
+    <p><span class="cn-pill cn-ok">No ar</span> {{ '%.2f'|format(p.tamanho / 1024 / 1024 / 1024) }} GB{% if p.max_zoom is defined %} · zoom {{ p.min_zoom }} a {{ p.max_zoom }}{% endif %}{% if p.enviado_em %} · enviado em {{ p.enviado_em[:16]|replace('T', ' ') }} (UTC){% endif %}</p>
+    <p class="eq-nota">SHA-256 <span class="gc-dado mb-sha">{{ p.sha256 }}</span></p>
+    {% else %}
+    <p><span class="cn-pill cn-alerta">Sem mapa base</span> O Mapa de equipe está usando o desenho dos estados.</p>
+    {% endif %}
+  </section>
+
+  <section class="mb-cartao" aria-labelledby="mb-subir">
+    <h2 class="mb-h" id="mb-subir">Subir um arquivo</h2>
+    {% if estado.parcial %}<p class="eq-nota" data-mb-parcial>Há uma subida pela metade: {{ '%.2f'|format(estado.parcial.recebido / 1024 / 1024 / 1024) }} de {{ '%.2f'|format(estado.parcial.tamanho / 1024 / 1024 / 1024) }} GB. Escolha o mesmo arquivo para continuar.</p>{% endif %}
+    <form class="mb-form" data-mb-form data-iniciar="{{ url_for('torre_base.mapa_base_iniciar') }}" data-parte="{{ url_for('torre_base.mapa_base_parte') }}" data-concluir="{{ url_for('torre_base.mapa_base_concluir') }}" data-cancelar="{{ url_for('torre_base.mapa_base_cancelar') }}" data-parte-max="{{ parte_max }}">
+      <label class="gc-rotulo" for="mb-arquivo">Arquivo do mapa base (.pmtiles)</label>
+      <input class="gc-campo" type="file" id="mb-arquivo" accept=".pmtiles" required>
+      <label class="gc-rotulo" for="mb-sha">SHA-256 que a ferramenta imprimiu (opcional, recomendado)</label>
+      <input class="gc-campo mb-sha-campo" type="text" id="mb-sha" maxlength="64" spellcheck="false" autocomplete="off" placeholder="64 caracteres de 0 a 9 e de a a f">
+      <div class="mb-acoes">
+        <button class="gc-btn gc-btn--primario" type="submit"><i class="ph ph-upload-simple" aria-hidden="true"></i>Enviar</button>
+        <button class="gc-btn gc-btn--contorno" type="button" data-mb-parar hidden>Parar</button>
+      </div>
+      <div class="mb-progresso" hidden><div class="mb-barra"><span></span></div><p class="eq-nota" role="status" aria-live="polite"></p></div>
+    </form>
+  </section>
+</div>
+<script src="{{ url_for('static', filename='mapa-base-envio.js') }}"></script>
+{% endblock %}

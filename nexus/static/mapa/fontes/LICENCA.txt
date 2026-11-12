@@ -1,0 +1,3 @@
+As fontes dos rótulos do Mapa de equipe: Noto Sans (Regular, Medium e Italic), da Google, sob a SIL Open Font License 1.1
+(https://openfontlicense.org), nos glifos SDF (.pbf) do protomaps/basemaps-assets (https://github.com/protomaps/basemaps-assets).
+Só três faixas de caracteres: 0-255 e 256-511 (o português) e 8192-8447 (a pontuação, como o travessão).

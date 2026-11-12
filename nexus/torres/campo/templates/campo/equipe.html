@@ -10,7 +10,9 @@
 {% if clima_on and not recusa %}<script>document.documentElement.classList.add("menu-recolhido");</script>{% endif %}
 {# O Mapa de equipe (08/11/2026; nexus/torres/campo/equipe_tela.py, a regra em nexus/campo/equipe/situacao.py). O desenho é o
    da Visão geral (campo/responsaveis.html, o mapa das usinas): o contorno dos estados do IBGE e cada técnico como um ponto,
-   com o x/y JÁ projetado no servidor. A latitude e a longitude nunca chegam aqui, nem a do técnico nem a da usina. Desde
+   com o x/y JÁ projetado no servidor. Desde 11/11/2026, com o mapa base do Brasil no servidor, o mapa é o MapLibre
+   (campo-mapa.js), e a coordenada de quem o mapa mostra vai no JSON #eq-dados, depois do registro da LGPD (Levi: "Pode
+   trocar" a regra de antes, a página sem coordenada); sem o mapa base, o desenho dos estados de sempre. Desde
    10/11/2026 (Levi: "se tem dados de localização tem que estar mostrando no nexus") a última posição de todo técnico vai ao
    mapa, também o parado fora de usina e a de outro dia (com o contorno), e o Ver percurso desenha o período pedido, também
    só com o x/y. O Abrir rota é um formulário que vai ao servidor, e o servidor manda ao Google. #}
@@ -30,8 +32,10 @@
           <p><b>O mapa aproxima.</b> Com a roda do mouse, os botões do canto ou dois dedos, e arrastando para andar. No
           percurso, as cidades e as horas aparecem conforme a vista chega perto. O losango é a usina; o círculo, o
           técnico.</p>
-          <p><b>O ponto no mapa é aproximado</b>: é o lugar no desenho dos estados, não o endereço. A página não traz a
-          coordenada em texto.</p>
+          {# a regra da coordenada trocada pelo Levi em 11/11/2026 ("Pode trocar"), com o mapa de verdade #}
+          <p><b>A posição no mapa.</b> O ponto é a posição que o celular mandou, com a precisão do GPS. Para desenhar o mapa
+          de ruas, a coordenada de quem aparece no mapa vai à página de quem pode ver, depois de gravado o registro de quem
+          abriu; o mapa de ruas é do próprio Nexus, e nenhum serviço de mapa de fora recebe a posição.</p>
         {% endcall %}
         {% else %}
         {% call explica('O que é coletado, quem vê e por quanto tempo') %}
@@ -62,8 +66,10 @@
           <p><b>O mapa aproxima.</b> Com a roda do mouse, os botões do canto ou dois dedos, e arrastando para andar. No
           percurso, as cidades e as horas aparecem conforme a vista chega perto. O losango é a usina; o círculo, o
           técnico.</p>
-          <p><b>O ponto no mapa é aproximado</b>: é o lugar no desenho dos estados, não o endereço. A página não traz a
-          coordenada em texto.</p>
+          {# a regra da coordenada trocada pelo Levi em 11/11/2026 ("Pode trocar"), com o mapa de verdade #}
+          <p><b>A posição no mapa.</b> O ponto é a posição que o celular mandou, com a precisão do GPS. Para desenhar o mapa
+          de ruas, a coordenada de quem aparece no mapa vai à página de quem pode ver, depois de gravado o registro de quem
+          abriu; o mapa de ruas é do próprio Nexus, e nenhum serviço de mapa de fora recebe a posição.</p>
           {# a hora da leitura mora aqui desde 10/11/2026 (Levi: "essa informação de Lida em x horas pode ficar na
              exclamação do mapa de equipe"): o cabeçalho ganha a linha #}
           <p>{% if agora %}Lido às <b>{{ agora }}</b> de Brasília. {% endif %}As horas são as de Brasília.</p>
@@ -176,7 +182,27 @@
     {% endif %}
     <div class="eq-quadro">
       {% set dm = d or (mapa if mapa.viewbox else none) %}
-      {% if dm %}
+      {% if mapa_js %}
+      {# o mapa de verdade (11/11/2026, o guia e a prévia do Willian; Levi: "sem 3D", "só Brasil", "em estilo Nexus"): o
+         MapLibre sobre o mapa base do Brasil servido pelo próprio Nexus (Base > Mapa base). Os dados vão no JSON abaixo,
+         depois do registro da LGPD, com a coordenada só de quem o mapa mostra (campo-mapa.js) #}
+      <div class="eq-zoom" role="group" aria-label="Zoom do mapa">
+        <button type="button" class="eq-zoom-bt" data-eq-zoom="mais" aria-label="Aproximar" title="Aproximar (+)"><i class="ph ph-plus" aria-hidden="true"></i></button>
+        <button type="button" class="eq-zoom-bt" data-eq-zoom="menos" aria-label="Afastar" title="Afastar (-)"><i class="ph ph-minus" aria-hidden="true"></i></button>
+        {% if mapa_js.percurso %}<button type="button" class="eq-zoom-bt eq-zoom-bt--txt" data-eq-zoom="percurso" title="Aproxima até o percurso inteiro caber na vista"><i class="ph ph-path" aria-hidden="true"></i>Ir ao percurso</button>{% endif %}
+        <button type="button" class="eq-zoom-bt eq-zoom-bt--txt" data-eq-zoom="inteiro" title="Volta ao Brasil inteiro"><i class="ph ph-arrows-out" aria-hidden="true"></i>Brasil</button>
+      </div>
+      <div class="eq-palco eq-palco--ml">
+        <div class="eq-ml" id="eq-mapa" role="region" aria-label="{{ 'As usinas no mapa' if usinas else 'Os técnicos de campo no mapa' }}"></div>
+        <div class="eq-dica" role="status" hidden></div>
+        <p class="eq-ml-aviso" hidden></p>
+      </div>
+      <script type="application/json" id="eq-dados">{{ mapa_js|tojson }}</script>
+      <link rel="stylesheet" href="{{ url_for('static', filename='vendor/maplibre-gl-4.7.1/maplibre-gl.css') }}">
+      <script src="{{ url_for('static', filename='vendor/maplibre-gl-4.7.1/maplibre-gl.js') }}"></script>
+      <script src="{{ url_for('static', filename='vendor/pmtiles-3.2.1/pmtiles.js') }}"></script>
+      <script src="{{ url_for('static', filename='campo-mapa.js') }}"></script>
+      {% elif dm %}
       {# o zoom (campo-percurso.js) vale no mapa dos técnicos, no das usinas e no percurso (11/11/2026): troca o viewBox,
          na proporção do cartão, e diz ao CSS quantas unidades do desenho valem um pixel da tela (--eq-un), para o texto
          e os pontos terem o tamanho certo em qualquer zoom e em qualquer tela #}
@@ -241,7 +267,7 @@
       {% else %}
       <p class="eq-leg"><span class="cn-pill cn-info">em deslocamento</span><span class="cn-pill cn-ok">na usina, até 1 km</span><span class="cn-pill cn-neutro">parado fora de usina</span><span class="cn-pill cn-alerta">sem sinal há 30 min ou mais</span><span class="cn-pill cn-critico">sem permissão</span><span class="mudo">Só o contorno: posição de outro dia.</span><span class="eq-leg-item"><span class="eq-leg-usina eq-leg-usina--anel" aria-hidden="true"></span>usina</span></p>
       {% endif %}
-      {% if clima and dm %}
+      {% if clima and (dm or mapa_js) %}
       <p class="eq-leg eq-leg--clima"><span class="mudo">Clima, a cor da usina:</span>{% for nivel, rot, tom, n in clima.contagem %}<span class="eq-leg-nivel eq-leg-nivel--{{ nivel }}">{{ rot }}</span>{% endfor %}<span class="eq-leg-item"><span class="eq-leg-aviso" aria-hidden="true"></span>aviso do INMET</span><span class="eq-leg-item"><span class="eq-leg-foco" aria-hidden="true"></span>foco de fogo</span></p>
       {% endif %}
     </div>

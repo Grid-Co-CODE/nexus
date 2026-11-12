@@ -35,7 +35,7 @@ import re
 from collections import Counter
 from datetime import datetime, time, timedelta, timezone
 
-from flask import Response, abort, current_app, jsonify, redirect, render_template, request, session, url_for
+from flask import Response, abort, current_app, jsonify, redirect, render_template, request, send_file, session, url_for
 from werkzeug.exceptions import RequestEntityTooLarge
 
 from ...auth import chaves, microsoft, setor_telas
@@ -47,6 +47,7 @@ from ...campo import visao
 from ...campo.equipe import celulares as CE
 from ...campo.equipe import eventos as EV
 from ...campo.equipe import gravador as G
+from ...campo.equipe import mapa_base as MB
 from ...campo.equipe import municipios as MU
 from ...campo.equipe import piloto as PI
 from ...campo.equipe import pontos as PT
@@ -590,7 +591,7 @@ def _cidade_do_ponto():
     return cidade
 
 
-def _percurso(srv, sel, pedido, coords, nomes_usina, agora) -> dict:
+def _percurso(srv, sel, pedido, coords, nomes_usina, agora, *, com_coordenada=False) -> dict:
     """O percurso aberto: {"desenho", "itens", "resumo", "vazio", "vista"} (a trilha com lat/lon fica aqui; a `vista` é
     o recorte do desenho, para o clima, e não vai à página). O fundo é a malha de
     municípios do IBGE que já está no disco (`municipios.na_caixa`, nunca espera o IBGE)."""
@@ -620,9 +621,22 @@ def _percurso(srv, sel, pedido, coords, nomes_usina, agora) -> dict:
     marcas = desenho["marcas"]
     resumo = (f"{n} ponto{'s' if n != 1 else ''} · de {marcas[0]['hora']} a {marcas[-1]['hora']} · "
               f"{SI.km_texto(SI.distancia_km(trilha))} em linha reta entre os pontos")
-    return {"desenho": desenho if desenho.get("viewbox") else None, "resumo": resumo, "vazio": "",
-            "vista": vista if desenho.get("viewbox") else None,
-            "itens": EV.do_percurso(trilha, coords, nomes_usina, cidade=_cidade_do_ponto())}
+    itens = EV.do_percurso(trilha, coords, nomes_usina, cidade=_cidade_do_ponto(), com_ponto=com_coordenada)
+    out = {"desenho": desenho if desenho.get("viewbox") else None, "resumo": resumo, "vazio": "",
+           "vista": vista if desenho.get("viewbox") else None, "itens": itens}
+    if com_coordenada:
+        # o mapa de verdade (11/11/2026): a trilha e os marcos em (lon, lat), para o navegador desenhar
+        ordem = sorted(trilha, key=lambda q: q["instante"])
+        lon = [q["lon"] for q in ordem]
+        lat = [q["lat"] for q in ordem]
+        out["js"] = {"linha": [_lonlat(q["lat"], q["lon"]) for q in ordem],
+                     "pontos": [{"c": _lonlat(q["lat"], q["lon"]), "hora": m["hora"], "mov": bool(q.get("mov"))}
+                                for q, m in zip(ordem, marcas)],
+                     "marcos": [{"c": _lonlat(ordem[i["ponto"]]["lat"], ordem[i["ponto"]]["lon"]), "tipo": i["tipo"],
+                                 "texto": i["texto"], "hora": i["de"] if i["de"] == i["ate"] else f"{i['de']} a {i['ate']}"}
+                                for i in itens],
+                     "caixa": [round(min(lon), 5), round(min(lat), 5), round(max(lon), 5), round(max(lat), 5)]}
+    return out
 
 
 def _programa_do_dia(b, linhas: list, agora) -> dict:
@@ -769,6 +783,65 @@ def _tela(contexto: dict, status: int = 200):
     return r
 
 
+# ── o mapa de verdade (11/11/2026) ───────────────────────────────────────────────────────────────────────────────────
+def _usa_mapa_base() -> bool:
+    """O MapLibre sobre o mapa base do Brasil, quando o arquivo está no servidor (Base > Mapa base); sem ele, ou com
+    `?mapa=desenho`, o desenho dos estados de antes."""
+    return str(request.args.get("mapa") or "").strip() != "desenho" and MB.arquivo(current_app.config) is not None
+
+
+def _lonlat(lat, lon) -> list:
+    """[lon, lat] com 5 casas (~1 m): a ordem do GeoJSON e do MapLibre."""
+    return [round(float(lon), 5), round(float(lat), 5)]
+
+
+def _iniciais(nome: str) -> str:
+    partes = [p for p in str(nome or "").split() if p]
+    return "".join(p[0] for p in (partes[:1] + partes[-1:] if len(partes) > 1 else partes)).upper()
+
+
+def _ocorrencias_por_usina() -> dict:
+    """{usina_id em texto: {"n", "pior", "tom"}} das ocorrências abertas da Usinas 360° (a etiqueta da Visão geral)."""
+    from . import _ocorrencias_abertas
+    from ...campo import ocorrencias as OC
+    return {str(uid): {"n": o["n"], "pior": o["pior"], "tom": OC.COR_ETIQUETA.get(o["pior"], "neutro")}
+            for uid, o in (_ocorrencias_abertas() or {}).items()}
+
+
+def _dados_do_mapa(modo, coords, nome_de_usina, onde_de_usina, *, linhas=(), pontos=(), sel=None, perc=None,
+                   clima=None) -> dict:
+    """O que o campo-mapa.js desenha (11/11/2026, o guia do Willian com o MapLibre): as usinas uma a uma (a coordenada do
+    cadastro, a ocorrência aberta e, com o clima, o nível), os técnicos que o mapa mostra (o último ponto, a situação e o
+    endereço do clique), o percurso aberto e o clima em coordenadas. A coordenada do técnico vai SÓ de quem está em
+    `pontos` (o piloto, o filtro, com ponto nos 7 dias), e esta função só roda depois do registro da LGPD (Levi, 11/11/2026:
+    "Pode trocar" a regra de antes, a página sem coordenada nenhuma)."""
+    oc = _ocorrencias_por_usina() if coords else {}
+    por_nivel = (clima or {}).get("por_id") or {}
+    usinas = []
+    for uid, (lat, lon, *_r) in coords.items():
+        c = por_nivel.get(str(uid))
+        usinas.append({"id": str(uid), "nome": nome_de_usina(uid), "onde": onde_de_usina(uid), "c": _lonlat(lat, lon),
+                       "oc": oc.get(str(uid)), "nivel": c["nivel"] if c else None,
+                       "rotulo": c["rotulo"] if c else "", "motivo": c["motivo_curto"] if c else ""})
+    linha_de = {l["pid"]: l for l in linhas}
+    tecnicos = []
+    for pid, lat, lon, tom, velho in pontos:
+        l = linha_de.get(pid)
+        if l is None:
+            continue
+        tecnicos.append({"pid": pid, "nome": l["nome"], "ini": _iniciais(l["nome"]), "equipe": l["equipe"] or "",
+                         "tom": tom, "rotulo": l["s"]["rotulo"], "velho": bool(velho), "hora": l["hora"],
+                         "sel": bool(sel and sel["pid"] == pid), "c": _lonlat(lat, lon),
+                         "url": url_for("torre_campo.equipe", **l["q_ponto"])})
+    geo = ((clima or {}).get("m") or {}).get("geo")
+    return {"modo": modo, "blocos": url_for("torre_campo.equipe_mapa_base"),
+            "brasil": url_for("static", filename="clima/ibge-brasil-minima.geojson"),
+            # as fontes dos rótulos: o endereço do static SEM o ?v= do controle de cache (ele cairia no meio do molde)
+            "fontes": url_for("static", filename="mapa/fontes/FONTE/FAIXA.pbf").split("?")[0]
+            .replace("FONTE", "{fontstack}").replace("FAIXA", "{range}"),
+            "usinas": usinas, "tecnicos": tecnicos, "percurso": (perc or {}).get("js"), "clima": geo}
+
+
 # ── o clima por usina (o botão Incluir clima, 11/11/2026) ────────────────────────────────────────────────────────────
 # a cor de cada nível do Mapa de risco nas etiquetas daqui (o semáforo do Nexus) e a ordem do desenho: quem pede ação
 # por último, para ficar por cima
@@ -789,7 +862,7 @@ def _cadastro_do_clima() -> tuple:
         return None, "o cadastro não abriu (o motivo está no log do servidor)."
 
 
-def _clima(vista, cadastro, erro) -> dict:
+def _clima(vista, cadastro, erro, geo=False) -> dict:
     """O clima POR USINA no desenho deste mapa (Levi, 11/11/2026: 'vai mostrar os climas os alertas, tanto por usina ou
     por técnico, por mais que mostre os técnicos os avisos tem que ser por usina'). É o modelo do Mapa de risco da
     Performance (`clima.mapa.montar`: as mesmas fontes, o mesmo cache, a mesma regra de nível), pedido na `vista` daqui:
@@ -798,7 +871,7 @@ def _clima(vista, cadastro, erro) -> dict:
     "acompanhar" (o risco na região: o painel as recolhe), "contagem" [(nível, rótulo, tom, quantas)], "avisos" e "focos"
     (as camadas lidas, ou None)}. Sem a vista (não há mapa), o modelo sai no Brasil inteiro e só o painel o usa."""
     m = RISCO.montar(current_app.config, cadastro=cadastro, erro_cadastro=erro, vista_propria=vista, fundo="avisos",
-                     ver=frozenset({"usinas", "focos"}))
+                     ver=frozenset({"usinas", "focos"}), geo=geo)
     rotulo = {**RISCO.A.ROTULO_NIVEL, RISCO.A.SEM_ALERTA: m["rotulo_sem"], RISCO.NX: RISCO.ROTULO_NX}
     linhas = [{**u, "tom": TOM_DO_NIVEL[u["nivel"]]} for u in m["tabela"]]
 
@@ -838,17 +911,20 @@ def _tela_usinas(com_clima: bool):
     except ValueError as e:     # o contorno do IBGE que não abre: a lista continua valendo
         _log.warning("equipe: o contorno dos estados não abriu (%s)", type(e).__name__)
         mapa = {"viewbox": None, "ufs": [], "usinas": [], "pontos": []}
-    clima = None
+    clima, ml = None, _usa_mapa_base()
     if com_clima:
         try:
-            clima = _clima(vista, cad, erro)
+            clima = _clima(None if ml else vista, cad, erro, geo=ml)
             _clima_no_desenho(mapa, clima)
         except Exception:       # noqa: BLE001 — o clima é uma camada a mais: sem ele, o mapa das usinas vale
             _log.exception("equipe: o clima não abriu (usinas)")
             avisos.append(CLIMA_FORA)
-    return _tela({"ver": "usinas", "mapa": mapa, "usinas_lista": lista, "usina_de": {u["id"]: u for u in lista},
+    usina_de = {u["id"]: u for u in lista}
+    mapa_js = (_dados_do_mapa("usinas", coords, lambda uid: usina_de[str(uid)]["nome"],
+                              lambda uid: usina_de[str(uid)]["onde"], clima=clima) if ml else None)
+    return _tela({"ver": "usinas", "mapa": mapa, "usinas_lista": lista, "usina_de": usina_de,
                   "erro_usinas": erro, "clima": clima, "avisos": avisos, "perc": None, "sel": None,
-                  "painel_ev": False, "admin": False, "piloto_msg": None})
+                  "painel_ev": False, "admin": False, "piloto_msg": None, "mapa_js": mapa_js})
 
 
 @bp.route("/equipe", endpoint="equipe")
@@ -894,12 +970,12 @@ def equipe():
     sel = next((l for l in linhas if _ID.fullmatch(pedido) and l["pid"] == int(pedido)), None)
     # o Ver percurso (10/11/2026): só do técnico que o painel abre; o período torto é dito e o painel de sempre abre
     periodo = _periodo(agora) if sel else None
-    perc = None
+    perc, ml = None, _usa_mapa_base()
     if periodo and "de" in periodo:
         # o registro da LGPD do percurso, com o período, ANTES de a trilha ser lida e a página sair
         if not _registrar_acesso(srv, "abriu_percurso", sel["pid"], None, agora, (periodo["de"], periodo["ate"])):
             return _tela({"erro": SEM_REGISTRO}, 503)
-        perc = _percurso(srv, sel, periodo, coords, nomes_usina, agora)
+        perc = _percurso(srv, sel, periodo, coords, nomes_usina, agora, com_coordenada=ml)
         perc["aviso"] = periodo["aviso"]
     # o registro da LGPD: quem abriu, quando e, com um técnico escolhido no painel, de quem; antes de a página sair
     elif not _registrar_acesso(srv, "abriu_mapa", sel["pid"] if sel else None, None, agora):
@@ -917,7 +993,8 @@ def equipe():
             vista = perc.get("vista") if perc and perc.get("desenho") else None
             if vista is None and not (perc and perc.get("desenho")) and mapa["viewbox"]:
                 vista = SI.vista_do_mapa(coords, [(q[1], q[2]) for q in pontos])
-            clima = _clima(vista, *_cadastro_do_clima())
+            # o mapa de verdade desenha o clima no navegador, em coordenadas: o modelo sai no Brasil inteiro
+            clima = _clima(None if ml else vista, *_cadastro_do_clima(), geo=ml)
             _clima_no_desenho(perc.get("desenho") if perc else None, clima)
             _clima_no_desenho(mapa, clima)
         except Exception:       # noqa: BLE001 — o clima é uma camada a mais: sem ele, o mapa dos técnicos vale
@@ -926,6 +1003,10 @@ def equipe():
     if erro_coords:
         avisos.append(f"Sem as coordenadas das usinas neste servidor ({erro_coords}): ninguém conta como na usina, e o "
                       "parado fica fora do mapa.")
+    # os dados do mapa de verdade: depois do registro da LGPD, só de quem o mapa mostra
+    mapa_js = (_dados_do_mapa("tecnicos", coords, lambda uid: nomes_usina.get(str(uid)) or f"Usina {uid}",
+                              lambda uid: "Usina", linhas=linhas, pontos=pontos, sel=sel, perc=perc, clima=clima)
+               if ml else None)
     admin = bool(session.get("admin"))
     todos = []
     if admin:
@@ -957,7 +1038,24 @@ def equipe():
         # se a gravação está ligada nesta máquina (09/11/2026, a chave da tela Base → Chaves): só para o administrador
         "grava": G.ativo(current_app.config) if admin else None,
         "piloto_msg": PILOTO_MSG.get(str(request.args.get("piloto") or "")),
+        "mapa_js": mapa_js,
         "agora": f"{agora.astimezone(_BRT):%H:%M}"})
+
+
+@bp.route("/equipe/mapa-base.pmtiles", endpoint="equipe_mapa_base")
+def equipe_mapa_base():
+    """Os blocos do mapa base do Brasil (11/11/2026), lidos por pedaço (HTTP Range) pelo MapLibre do Mapa de equipe: o
+    mapa de ruas é nosso, servido só a quem vê o Mapa de equipe (o guia do Willian, LGPD item 2: nenhum bloco de
+    terceiro vê a região que o COS está olhando). Sem o arquivo (antes da subida em Base > Mapa base), 404 e o mapa usa
+    o desenho dos estados."""
+    if not _quem_ve()["pode"]:
+        abort(403)
+    p = MB.arquivo(current_app.config)
+    if p is None:
+        return _texto(404, "O mapa base não está neste servidor: suba o arquivo em Base > Mapa base.")
+    r = send_file(p, mimetype="application/octet-stream", conditional=True, etag=True, max_age=3600)
+    r.headers["Cache-Control"] = "private, max-age=3600"
+    return r
 
 
 def _de_outro_site_na_navegacao() -> bool:

@@ -1,0 +1,2 @@
+pmtiles 3.2.1 (https://github.com/protomaps/PMTiles), licença BSD-3-Clause, Copyright Protomaps LLC.
+O pacote do npm não traz o arquivo da licença; o texto é o da BSD-3-Clause (https://opensource.org/license/bsd-3-clause).

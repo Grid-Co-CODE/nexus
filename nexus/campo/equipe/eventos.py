@@ -172,11 +172,13 @@ def _ufv(nome) -> str:
     return n if n.lower().startswith(("ufv", "usina")) else f"UFV {n}"
 
 
-def do_percurso(pontos: list, usinas: dict, nomes_usina: dict, *, cidade=None) -> list:
+def do_percurso(pontos: list, usinas: dict, nomes_usina: dict, *, cidade=None, com_ponto=False) -> list:
     """O percurso de um período contado por usina (11/11/2026): [{"tipo" (inicio, saiu, chegou, parado, ultimo), "de",
     "ate" (a hora de Brasília; "dd/mm HH:MM" se o período passa de um dia; iguais num ponto só), "texto", "usina_id"}],
     na ordem. `pontos` com instante, lat, lon e mov (a trilha do `Servico.percurso`); `usinas` = {usina_id: (lat, lon,
-    uf)}; `cidade(lat, lon) -> nome | None`. A regra de usina, saída e chegada é a de `do_tecnico`."""
+    uf)}; `cidade(lat, lon) -> nome | None`. A regra de usina, saída e chegada é a de `do_tecnico`. `com_ponto`
+    (11/11/2026, o mapa de verdade): cada linha leva também `ponto`, o índice na lista em ordem do ponto do marco (o
+    servidor da tela põe a coordenada dele no mapa, depois do registro da LGPD)."""
     lista = sorted(pontos, key=lambda p: p["instante"])
     if not lista:
         return []
@@ -198,9 +200,13 @@ def do_percurso(pontos: list, usinas: dict, nomes_usina: dict, *, cidade=None) -
 
     out = []                            # (instante, ordem, item): a parada entra na hora dela, entre os eventos
 
+    indice = {id(p): i for i, p in enumerate(lista)}
+
     def item(tipo, a, b, texto, usina=None):
-        out.append((_inst(a), len(out), {"tipo": tipo, "de": hora(a), "ate": hora(b), "texto": texto,
-                                         "usina_id": usina}))
+        linha = {"tipo": tipo, "de": hora(a), "ate": hora(b), "texto": texto, "usina_id": usina}
+        if com_ponto:
+            linha["ponto"] = indice[id(a)]
+        out.append((_inst(a), len(out), linha))
 
     lugares = [_usina_do_ponto(p, usinas, RAIO_USINA_KM) for p in lista]
     primeiro, u0 = lista[0], lugares[0]

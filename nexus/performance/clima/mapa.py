@@ -713,13 +713,15 @@ def _fontes_que_pesaram(avisos, foco, dias, ref, sem_leitura_de: str, completa: 
 
 def montar(config, *, cadastro=None, erro_cadastro=None, regiao="", ref=None, sessao=None, fundo=FUNDO_PADRAO, ver=None,
            dia=None, cliente="", ocultar=frozenset(), sem_eventos=frozenset(), tv=False, girar=None,
-           endereco: Endereco = PERFORMANCE, vista_propria: Vista | None = None) -> dict:
+           endereco: Endereco = PERFORMANCE, vista_propria: Vista | None = None, geo: bool = False) -> dict:
     """Tudo o que o template do mapa precisa. `cadastro` é o `usinas.Cadastro` (ou None com `erro_cadastro` dizendo por quê); o
     resto é o estado da tela (`estado_da_tela`): a camada de fundo, as de cima, o dia do risco de fogo, o cliente, os níveis e os
     eventos escondidos, e o modo TV com o giro das camadas. O `endereco` (08/11/2026) diz para onde os links voltam: a rota vai
     em `rota`, e os templates a usam no `url_for`. A `vista_propria` (11/11/2026) é o recorte de quem pede: o Mapa de equipe
     da Usinas 360° (o botão Incluir clima) desenha o clima no mapa DELE, e a usina, a área do aviso e o foco saem nas unidades
-    daquele desenho; sem ela, vale a região do endereço.
+    daquele desenho; sem ela, vale a região do endereço. Com `geo` (11/11/2026, o mapa de verdade do Mapa de equipe, que
+    desenha no navegador), `m["geo"]` leva as mesmas camadas em coordenadas: os avisos (GeoJSON, a mesma escolha do
+    `_camada_avisos`: o vencido sai), os focos da última hora e os focos a até 5 km de uma usina (os anéis).
 
     O mapa lê as MESMAS três fontes da tela principal, pelo mesmo cache (uma visita a uma e outra não vai duas vezes à rede), e
     o nível de cada usina vem da mesma regra (`alertas.nivel_da_usina`). O painel de frescor é o mesmo código da tela principal
@@ -874,7 +876,31 @@ def montar(config, *, cadastro=None, erro_cadastro=None, regiao="", ref=None, se
     m["usinas"] = desenhadas
     m["n_no_recorte"] = len(desenhadas)
     m["dados_js"] = _dados_js(m, v, dicas)
+    if geo:
+        m["geo"] = _geo(avisos_l, focos_l, indice, usinas, v, ref)
     return m
+
+
+def _geo(avisos_l, focos_l, indice, usinas: list, v: Vista, ref) -> dict:
+    """O clima em coordenadas (lon, lat; 4 casas, ~11 m), para o mapa que desenha no navegador: {"avisos" (FeatureCollection
+    com nivel, futuro e titulo), "focos" [[lon, lat]], "aneis" [[lon, lat]]}. A escolha é a das camadas do SVG."""
+    feats = []
+    for a in (avisos_l.dados or {}).get("avisos") or ():
+        if (a.fim is not None and a.fim < ref) or not v.cruza(a.caixa):
+            continue
+        feats.append({"type": "Feature", "geometry": a.geometria,
+                      "properties": {"nivel": a.nivel, "futuro": not A.em_vigor(a, ref),
+                                     "titulo": f"{a.evento} · {a.severidade} · {V._validade(a, ref)}"}})
+    focos, aneis = [], set()
+    if indice is not None:
+        for f in focos_l.dados["focos"]:
+            if v.lon_oeste <= f.lon <= v.lon_leste and v.lat_sul <= f.lat <= v.lat_norte:
+                focos.append([round(f.lon, 4), round(f.lat, 4)])
+        for u in usinas:
+            for _km, f in indice.no_raio(u.lat, u.lon):
+                aneis.add((round(f.lon, 4), round(f.lat, 4)))
+    return {"avisos": {"type": "FeatureCollection", "features": feats}, "focos": focos,
+            "aneis": [list(a) for a in sorted(aneis)]}
 
 
 def _caixa_svg(v: Vista, caixa) -> list:

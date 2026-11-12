@@ -1605,14 +1605,69 @@ sem a sessão do Nexus) e só aceitam a chave do aparelho ou o login Microsoft c
   servidor (origem no técnico, destino na usina) e redireciona (302); a coordenada só sai no clique, para o Google. Só o
   Google Maps: o link do Waze só recebe o destino e a rota sairia de quem clica, não do técnico. A rota recusa pedido vindo
   de outro site (`Sec-Fetch-Site`), registra o acesso ANTES do redirecionamento e vai com `no-store` e
-  `Referrer-Policy: no-referrer`. O link leva 5 casas (~1 m; a 6ª é o centímetro). A página e o JSON nunca têm a lat/lon
-  em texto (o teste procura a coordenada no HTML); o x/y do desenho dá o lugar aproximado, e o "!" da tela diz isso, sem
-  prometer mais.
+  `Referrer-Policy: no-referrer`. O link leva 5 casas (~1 m; a 6ª é o centímetro).
+- **A coordenada na página: só de quem o mapa mostra, depois do registro** (Levi, 11/11/2026, "Pode trocar", com o mapa
+  de verdade abaixo). Até então a regra era "a página e o JSON nunca têm a lat/lon" (o x/y do desenho, que com 3 casas já
+  era a posição exata: projeção não é anonimização). Agora, com o mapa base no servidor, o JSON `#eq-dados` leva a
+  coordenada (5 casas) SÓ dos técnicos que o mapa desenha (o piloto, o filtro, com ponto nos 7 dias), SÓ para quem vê a
+  tela (`_quem_ve`) e SÓ depois de gravado o "abriu_mapa"/"abriu_percurso"; no Usinas, nenhum técnico. O que protege é
+  quem pode ver e o registro de quem viu, e o mapa de ruas é nosso (nenhum terceiro recebe a posição nem a região
+  olhada). Sem o mapa base (ou com `?mapa=desenho`), a página volta à regra de antes: o x/y do desenho e nenhuma
+  coordenada (o teste segue procurando os dígitos no HTML). O termo do Nexus Field (v2 em diante) já avisa o técnico de
+  que o ponto exato aparece.
 - **Quem abriu é achado pelo e-mail exato da ficha** (`servico.pessoa_do_email`, revisão final de 08/11/2026), como no
   registro do aparelho: o `pessoa_do_login` acha pelo nome tirado do e-mail, e a trilha da LGPD gravaria o homônimo. Sem a
   ficha do e-mail, `pessoa_id` vazio e o código HMAC identifica.
 - **A pré-carga nunca abre o Mapa de equipe** (`pre_carga.SEM_PRE_CARGA`): ela abre as telas com uma sessão interna de
   administrador, e cada abertura grava uma linha na trilha da LGPD.
+
+### O mapa de verdade (11/11/2026)
+
+Levi, com o guia e a prévia do Willian (`GUIA-PARA-O-NEXUS.md`, 11/11/2026): "Quero que utilize essa referência para completar
+nosso mapa, só tenho alguns pontos que você deve considerar 1 - Pode tirar a opção 3D, não deve ter pois é muito pesada e sem
+necessidade 2 - Quero que apareça só Brasil 3 - Quero em estilo Nexus". Esta é a fase 1 do guia (o mapa); a 2 (o roteador
+próprio, "quem está mais perto" pela estrada) e a 3 (o percurso casado com a estrada) pedem uma instância do OSRM no servidor
+e não foram feitas.
+
+- **O mapa base é NOSSO** (o guia, LGPD item 2: nenhum bloco de terceiro vê a região que o COS olha). Um PMTiles do Brasil
+  (os dados do OpenStreetMap no esquema do Protomaps v4, ODbL), recortado do build diário do Protomaps pela
+  `ferramentas/mapa_base_brasil.py` (lê por pedaço só os blocos do Brasil; 2,39 GB até o zoom 14 no build 20261110). O guia
+  sugere gerar com o Planetiler a partir do extrato da Geofabrik, mas o Planetiler só se baixa pelos arquivos de release do
+  GitHub, que a rede da Grid derruba; o Protomaps entrega o mundo pronto no mesmo formato. O arquivo não cabe no git: sobe
+  em **Base > Mapa base** (`nexus/torres/base/mapa_base_tela.py`, só administrador; escolha do Levi, "Upload pelo Nexus"),
+  em partes de 8 MB conferidas pelo SHA-256 de cada uma, retomando de onde parou, e o servidor confere o arquivo inteiro
+  (o SHA-256 que a ferramenta imprimiu, o cabeçalho do PMTiles v3, blocos MVT, as faixas dentro do tamanho) antes de trocar
+  o que estava no ar (`campo/equipe/mapa_base.py`; mora em `<dados>/mapa/brasil.pmtiles`). A rota
+  `/t/campo/equipe/mapa-base.pmtiles` o serve por pedaço (HTTP Range, 206) a quem vê o Mapa de equipe.
+- **Sem o arquivo, o desenho dos estados de antes** (o SVG do servidor, o zoom pelo viewBox): o deploy não depende do
+  upload, e `?mapa=desenho` força o desenho (o navegador sem WebGL também pode usá-lo; a tela avisa).
+- **O MapLibre GL 4.7.1 e o pmtiles 3.2.1 moram em `static/vendor/`** (nada de CDN), as fontes dos rótulos (Noto Sans,
+  OFL; só as faixas 0-255, 256-511 e 8192-8447) em `static/mapa/fontes/`, e o contorno do Brasil do IBGE (países, mínima)
+  em `static/clima/ibge-brasil-minima.geojson`.
+- **Só o Brasil**: o recorte só tem o Brasil, a câmera não sai dele (`maxBounds`) e o resto do mundo fica coberto pela
+  máscara (um retângulo do mundo com o contorno do IBGE como buraco); a divisa do Brasil em verde Grid pulsa de leve (o
+  pedido de 11/11 das divisas pulsando, mantido com os efeitos de animação do Windows desligados).
+- **Sem 3D**: sem inclinação, sem giro, sem terreno e sem prédio em pé (`maxPitch: 0`, `dragRotate: false`). O satélite
+  também ficou de fora: o da prévia é de demonstração e o de produção pede licença (o guia).
+- **Estilo Nexus**: o estilo do mapa é montado no navegador a partir dos tokens do `nexus.css` (`campo-mapa.js`, `paleta`),
+  sem cor escrita no script (o teste procura hex e rgb no código), nos dois temas; a troca de tema refaz o estilo (a que
+  acontece no meio do carregamento fica para o fim dele). Água e terra navy, as rodovias puxadas para o verde, as
+  divisas dos estados tracejadas em verde.
+- **O que o mapa mostra** (tudo do servidor, no JSON `#eq-dados` de `equipe_tela._dados_do_mapa`): as usinas uma a uma
+  (nunca agrupadas), em losango que cresce com o zoom, na cor do dado: neutra (contorno verde), cheia no Usinas, a cor da
+  ocorrência aberta da Usinas 360° (a etiqueta da Visão geral: muito alta = crítico, alta = alerta) e, com o clima, a cor
+  do nível do alerta (com o selo "!" se também há ocorrência); a crítica pulsa. Os técnicos no último ponto, na cor da
+  situação (o de outro dia só no contorno; o escolhido com o anel branco e o halo escuro), com as iniciais de perto; o
+  clique abre o percurso do dia. O percurso aberto em verde Grid com halo, os pontos de perto e os marcos do
+  `eventos.do_percurso` com a hora ("16:50 · Saiu da UFV Altair"). O clima em coordenadas (`clima.mapa.montar(geo=True)`:
+  a área do aviso do INMET, o tracejado do que vai começar, os focos e o anel no foco a até 5 km de uma usina). A dica do
+  mouse diz o nome, a equipe ou o cliente, a situação ou o nível e o motivo, e as ocorrências abertas.
+- Os botões de sempre (+, −, Ir ao percurso, Brasil) e a escala; o resto da tela (Técnicos | Usinas, Incluir clima,
+  Filtros, os painéis) não mudou.
+- **Prova**: `tests/test_mapa_base.py` (a subida em partes, o 409/400/413/507, o que não confere não troca o que está no
+  ar, o 206) e `tests/test_equipe_mapa_ml.py` (o desenho sem o arquivo, a coordenada só de quem aparece, sem 3D nem
+  satélite, o Usinas sem técnico, o percurso e o clima em coordenadas, a cor da ocorrência, o script sem cor própria). Na
+  bancada (`perc_bancada.py` com o arquivo de verdade): Brasil, rua (São Paulo no zoom 14,5), percurso, clima e o tema claro.
 
 ### O filtro suspenso (10/11/2026)
 

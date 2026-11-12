@@ -17,6 +17,7 @@ from ...cadastro.telas_ligacoes import registrar_ligacoes
 from ...dados.telas import registrar_governanca
 from ..modelo import Tela, Torre
 from ..moldura import registrar_molduras
+from .mapa_base_tela import registrar_mapa_base
 
 TORRE = Torre(
     id="base",
@@ -84,6 +85,11 @@ TORRE = Torre(
         Tela("acessos", "Acessos",
              "O que cada setor vê, quem é administrador, quem entrou em 30 dias e o setor de cada pessoa do Fracttal",
              "NEXUS_ADMINS do servidor, a lista da tela, a API do Fracttal (pessoal) e o livro nexus_setores; só administrador"),
+        # Mapa base (11/11/2026): a subida do mapa do Brasil do Mapa de equipe (o PMTiles de ~2,4 GB não cabe no git; Levi
+        # escolheu o "Upload pelo Nexus"). Só administrador. A view: nexus/torres/base/mapa_base_tela.py
+        Tela("mapa-base", "Mapa base",
+             "O mapa do Brasil do Mapa de equipe está no servidor?",
+             "O arquivo PMTiles do Brasil (OpenStreetMap, recorte do Protomaps) na pasta de dados do servidor; só administrador"),
         Tela("ia", "Nexus IA",
              "O que a IA leu e sugeriu, e quanto custou?",
              "API do Claude (a definir)"),
@@ -110,6 +116,7 @@ registrar_ligacoes(bp)
 registrar_governanca(bp)
 registrar_acessos(bp)
 registrar_chaves(bp)
+registrar_mapa_base(bp)     # /t/base/mapa-base: a subida do mapa do Brasil do Mapa de equipe (11/11/2026)
 registrar_raio_x(bp)        # /t/base/raio-x: o que o processo faz agora (14/10/2026), só administrador, fora do menu
 registrar_molduras(bp, TORRE, abas={"chaves-fontes": {"primeira": "Fontes da Performance",
                                                          "outras": [("nexus", "Nexus", aba_nexus)]}})
