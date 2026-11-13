@@ -153,7 +153,7 @@ MB = 1024 * 1024
 BUCKETS = {
     "apr-arquivos": {"fornecedor": True, "tipos": IMAGEM | PDF, "max": 15 * MB},
     "epi-fotos": {"fornecedor": True, "tipos": IMAGEM, "max": 15 * MB},
-    "checklist-fotos": {"fornecedor": True, "tipos": IMAGEM, "max": 15 * MB},
+    "checklist-fotos": {"fornecedor": True, "tipos": IMAGEM | VIDEO, "max": 50 * MB},
     "diario-midia": {"fornecedor": True, "tipos": IMAGEM | VIDEO, "max": 50 * MB},
     "certificados-integracao-video": {"fornecedor": False, "tipos": PDF, "max": 15 * MB},
     "integracao-video-midia": {"fornecedor": False, "tipos": VIDEO, "max": 200 * MB},
