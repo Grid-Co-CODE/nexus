@@ -239,13 +239,19 @@ a.ins-titulo:hover{color:var(--verde-texto)}
 .dm-chip b{color:var(--tinta)}
 .dm-chip[aria-pressed="true"]{border-color:var(--verde);background:var(--verde-suave);color:var(--tinta)}
 .dm-filtro-sel .gc-campo{padding:4px 8px;font-size:12.5px}
-.dm-grade{display:grid;grid-template-columns:minmax(0,1fr) 420px;gap:18px;align-items:start}
+.dm-grade{display:block}
 .dm-lista{list-style:none;margin:0;padding:0;background:var(--superficie);border:1px solid var(--linha);border-radius:var(--raio-md);overflow:hidden}
-.dm-linha{display:grid;grid-template-columns:88px minmax(0,1fr) auto;gap:14px;align-items:center;padding:12px 16px;
+.dm-linha{display:grid;grid-template-columns:88px minmax(0,1fr) auto 18px;gap:14px;align-items:center;padding:12px 16px;
   border-bottom:1px solid var(--linha);cursor:pointer}
 .dm-linha:last-child{border-bottom:0}
 .dm-linha:hover{background:var(--superficie-2)}
-.dm-linha[aria-current="true"]{background:var(--superficie-2);box-shadow:inset 3px 0 0 var(--verde)}
+/* a linha aberta (13/11/2026): a seta vira, o título aparece inteiro e a linha se junta com o que abriu embaixo */
+.dm-seta{font-size:16px;color:var(--mudo);transition:transform .15s ease}
+.dm-linha[aria-expanded="true"]{background:var(--superficie-2);box-shadow:inset 3px 0 0 var(--verde);border-bottom-color:transparent}
+.dm-linha[aria-expanded="true"] .dm-seta{transform:rotate(180deg);color:var(--tinta)}
+.dm-linha[aria-expanded="true"] .dm-l2{white-space:normal}
+.dm-linha[aria-expanded="true"] .dm-ini{display:none}
+.dm-linha[aria-expanded="true"] .dm-tit{font-size:15px}
 .dm-linha[hidden]{display:none}
 .dm-prazo{font:600 11.5px/1.25 var(--font-sans);text-align:center;padding:5px 6px;border-radius:var(--raio-tag)}
 .dm-prazo small{display:block;font-weight:500;font-size:10.5px;opacity:.85}
@@ -270,31 +276,47 @@ a.ins-titulo:hover{color:var(--verde-texto)}
 .dm-s-concluida{color:var(--ok);background:var(--ok-suave)}
 .dm-s-devolvida{color:var(--critico);background:var(--critico-suave)}
 .dm-tema{font-size:11.5px;color:var(--mudo)}
-.dm-detalhes{background:var(--superficie);border:1px solid var(--linha);border-radius:var(--raio-md);padding:18px;position:sticky;top:74px}
-.dm-det-vazio{margin:0;color:var(--mudo);font-size:13px}
-.dm-det-tema{margin:10px 0 0;font:600 11px/1 var(--font-sans);letter-spacing:.08em;text-transform:uppercase;color:var(--mudo)}
-.dm-det-titulo{margin:6px 0 4px;font:700 17px/1.3 var(--font-sans);color:var(--tinta);overflow-wrap:anywhere}
-.dm-meta{display:grid;grid-template-columns:72px minmax(0,1fr);gap:6px 10px;margin:14px 0;font-size:12.5px}
-.dm-meta dt{color:var(--mudo)}
-.dm-meta dd{margin:0;min-width:0}
+/* o que abre embaixo da linha: alinhado com o título (88 px do prazo + o espaço), em blocos com ar entre eles */
+.dm-exp{list-style:none;background:var(--superficie-2);box-shadow:inset 3px 0 0 var(--verde);border-bottom:1px solid var(--linha);
+  padding:6px 28px 26px 118px}
+.dm-exp:last-child{border-bottom:0}
+@media (prefers-reduced-motion:no-preference){.dm-exp{animation:dm-abre .14s ease-out}}
+@keyframes dm-abre{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+.dm-det{display:grid;gap:22px}
+.dm-det-h{margin:0 0 10px;font:600 13px/1.2 var(--font-sans);color:var(--tinta)}
+/* a faixa dos dados: cada um na sua casa, o rótulo em cima, com o fio entre as casas (o que sobra na quebra fica cortado) */
+.dm-meta{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));margin:0;overflow:hidden;
+  background:var(--superficie);border:1px solid var(--linha);border-radius:var(--raio-controle)}
+.dm-meta > div{padding:12px 16px;min-width:0;box-shadow:-1px 0 0 var(--linha),0 -1px 0 var(--linha)}
+.dm-meta dt{margin:0 0 6px;font-size:11.5px;color:var(--mudo)}
+.dm-meta dd{margin:0;min-width:0;font-size:13px;color:var(--tinta)}
+.dm-meta dd small{display:block;margin-top:3px;font-size:12px;color:var(--mudo)}
+.dm-det-corpo{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(260px,1fr);gap:28px;align-items:start}
 .dm-vinc{display:flex;flex-wrap:wrap;gap:6px}
 .dm-vinc span{font:500 11.5px/1 var(--font-sans);padding:5px 8px;border-radius:var(--raio-tag);background:var(--superficie-2);border:1px solid var(--linha)}
 .dm-os{font:600 11.5px/1 var(--font-sans);padding:5px 8px;border-radius:var(--raio-tag);background:var(--superficie-2);
   border:1px solid var(--linha);color:var(--verde-texto);cursor:pointer;text-decoration:underline;text-underline-offset:3px}
-.dm-texto{margin:0;padding:12px;background:var(--superficie-2);border-radius:var(--raio-controle);color:var(--tinta-2);white-space:pre-wrap;overflow-wrap:anywhere;font-size:13px}
+.dm-texto{margin:0;padding:14px 16px;background:var(--superficie);border:1px solid var(--linha);border-radius:var(--raio-controle);
+  color:var(--tinta-2);white-space:pre-wrap;overflow-wrap:anywhere;font-size:13.5px;line-height:1.6;max-width:80ch}
 .dm-anexos{display:flex;flex-wrap:wrap;gap:6px 14px;margin:10px 0 0;padding:0;list-style:none;font-size:12.5px}
 .dm-anexos a{color:var(--verde-texto);text-decoration:none}
 .dm-anexos a:hover{text-decoration:underline}
 .dm-anexos .ph{vertical-align:-2px}
-.dm-tempo{list-style:none;margin:16px 0 0;padding:0;border-left:2px solid var(--linha-forte)}
-.dm-tempo li{position:relative;padding:0 0 12px 16px;font-size:12.5px;color:var(--tinta-2)}
+.dm-tempo{list-style:none;margin:0 0 0 5px;padding:0;border-left:2px solid var(--linha-forte)}
+.dm-tempo li{position:relative;padding:0 0 14px 16px;font-size:12.5px;line-height:1.45;color:var(--tinta-2)}
+.dm-tempo li:last-child{padding-bottom:0}
 .dm-tempo li::before{content:"";position:absolute;left:-6px;top:4px;width:10px;height:10px;border-radius:50%;background:var(--superficie-3);border:2px solid var(--linha-forte)}
 .dm-tempo li.dm-feito{color:var(--tinta)}
 .dm-tempo li.dm-feito::before{background:var(--verde);border-color:var(--verde)}
 .dm-tempo li.dm-tempo--devolveu::before{background:var(--critico);border-color:var(--critico)}
 .dm-tempo small{color:var(--mudo)}
 .dm-tempo q{display:block;margin-top:4px;color:var(--tinta-2);quotes:none;white-space:pre-wrap;overflow-wrap:anywhere}
-.dm-acoes{display:grid;gap:10px;margin-top:14px;padding-top:14px;border-top:1px solid var(--linha)}
+/* a resposta num bloco próprio: o título com a ação curta à direita, o campo e os botões */
+.dm-acoes{display:grid;gap:12px;padding:16px 18px;background:var(--superficie);border:1px solid var(--linha);border-radius:var(--raio-md)}
+.dm-acoes-cab{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.dm-acoes-cab .dm-det-h{margin:0}
+.dm-acoes > .dm-nota{margin:0}
+.dm-acoes textarea.gc-campo{background:var(--superficie-2)}
 .dm-form{display:grid;gap:6px}
 .dm-form textarea.gc-campo,.dm-dialogo textarea.gc-campo{width:100%;box-sizing:border-box;resize:vertical;font-family:var(--font-sans)}
 .dm-botoes{display:flex;flex-wrap:wrap;gap:8px}
@@ -318,8 +340,9 @@ a.ins-titulo:hover{color:var(--verde-texto)}
 .dm-temas .gc-campo{width:100%;box-sizing:border-box}
 .dm-temas .dm-prazo-campo{width:84px}
 .dm-temas tr.dm-inativo td{color:var(--mudo)}
-@media (max-width:1100px){.dm-grade{grid-template-columns:minmax(0,1fr)}.dm-detalhes{position:static}}
+@media (max-width:1000px){.dm-exp{padding:6px 16px 18px}.dm-det-corpo{grid-template-columns:minmax(0,1fr)}}
 @media (max-width:640px){.dm-linha{grid-template-columns:70px minmax(0,1fr)}.dm-dir{grid-column:2;flex-direction:row;align-items:center}
+  .dm-seta{display:none}
   .dm-dupla{grid-template-columns:1fr}}
 
 /* Caixa de entrada (12/11/2026): os números dos insights no alto levam à lista de cada um; o Sem dono vem recolhido, só
@@ -652,10 +675,6 @@ a.ins-titulo:hover{color:var(--verde-texto)}
 .dm-faixa{gap:6px;margin:14px 0 12px}
 .dm-faixa-r{margin-right:4px;font-size:12px;color:var(--mudo)}
 .dm-faixa .dm-chip{padding:3px 10px;font-size:12px}
-/* a aba dos Temas do setor: a tabela na largura toda, sem a coluna do detalhe */
-.dm--temas .dm-grade{grid-template-columns:minmax(0,1fr)}
-.dm--temas .dm-detalhes{display:none}
-.dm-painel--temas{grid-column:1 / -1}
 .dm-temas-o-que{margin:14px 0 10px}
 .dm-temas-setor{display:flex;align-items:center;gap:8px;margin:0 0 12px}
 .dm-painel--temas .dm-temas ~ .dm-nota{margin-top:10px;max-width:80ch}

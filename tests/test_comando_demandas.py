@@ -306,7 +306,12 @@ def test_a_caixa_mostra_a_demanda_para_quem_recebe_quem_pediu_e_o_setor(app, cen
     assert "A Coração 2 não aparece no…" in l and l.count("Dado que não bate") == 1
     assert "Faltam" in l and "dm-s-nova" in l
     det = _det(html, did)
-    assert 'data-os-folio="18421"' in det and "Altair" in det and det.count("Dado que não bate") == 1
+    # a demanda abre na própria linha desde 13/11/2026 (Levi: "Gostei mais dessa versão abrindo o drill up"): o tema, a
+    # situação e o título ficam na linha e não se repetem no que abre; o detalhe vem uma vez, guardado, e nada abre sozinho
+    assert 'data-os-folio="18421"' in det and "Altair" in det and "Dado que não bate" not in det
+    assert 'class="dm-pill' not in det and ">O pedido</h4>" in det and ">Andamento</h4>" in det and ">Responder</h4>" in det
+    assert 'aria-expanded="false"' in l and "dm-seta" in l and 'data-sel=""' in html
+    assert '<div class="dm-guarda" data-dm-guarda hidden>' in html and "dm-detalhes" not in html
     assert 'value="respondeu"' in det and 'value="pediu_informacao"' in det and 'value="em_analise"' in det
     assert 'value="concluiu"' not in det
     # quem pediu vê em "Que eu pedi", sem os botões de quem recebe

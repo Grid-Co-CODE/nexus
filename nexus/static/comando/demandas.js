@@ -159,29 +159,42 @@ window.NexusDemandaNova = function (dlg) {
     });
   }
 
+  // a demanda abre na própria linha (13/11/2026, Levi: "Gostei mais dessa versão abrindo o drill up"): o detalhe sai da
+  // guarda e vai para um <li> logo abaixo da linha; uma aberta por vez; id vazio fecha
+  var guarda = raiz.querySelector('[data-dm-guarda]');
+  function fechar() {
+    raiz.querySelectorAll('.dm-exp').forEach(function (li) {
+      var a = li.querySelector('[data-dm-det]');
+      if (a && guarda) { a.hidden = true; guarda.appendChild(a); }
+      li.parentNode.removeChild(li);
+    });
+    raiz.querySelectorAll('[data-dm-linha][aria-expanded="true"]').forEach(function (l) { l.setAttribute('aria-expanded', 'false'); });
+  }
+
   function abrir(id) {
-    var achou = false;
-    raiz.querySelectorAll('[data-dm-det]').forEach(function (a) {
-      var e = a.getAttribute('data-dm-det') === id; a.hidden = !e; if (e) achou = true;
-    });
-    var vazio = raiz.querySelector('[data-dm-det-vazio]');
-    if (vazio) vazio.hidden = achou;
-    raiz.querySelectorAll('[data-dm-linha]').forEach(function (l) {
-      l.setAttribute('aria-current', l.getAttribute('data-dm-linha') === id ? 'true' : 'false');
-    });
+    fechar();
+    var l = id && painel(abaAtual) && painel(abaAtual).querySelector('[data-dm-linha="' + id + '"]');
+    var a = id && raiz.querySelector('[data-dm-det="' + id + '"]');
+    if (l && a && !l.hidden) {
+      var li = document.createElement('li');
+      li.className = 'dm-exp'; li.id = 'dm-exp-' + id;
+      li.appendChild(a); a.hidden = false;
+      l.parentNode.insertBefore(li, l.nextSibling);
+      l.setAttribute('aria-expanded', 'true'); l.setAttribute('aria-controls', li.id);
+      // o que abriu cabe na tela: se passar do fim, rola até ele (o que é maior que a tela começa pela linha)
+      var r = li.getBoundingClientRect();
+      if (r.bottom > window.innerHeight && li.scrollIntoView) {
+        if (r.height + 90 > window.innerHeight) l.scrollIntoView({block: 'start'}); else li.scrollIntoView({block: 'nearest'});
+      }
+    } else id = '';
     // os formulários do detalhe voltam para a aba que está aberta
-    raiz.querySelectorAll('[data-dm-det="' + id + '"] input[name="aba"]').forEach(function (i) { i.value = abaAtual; });
+    if (a) a.querySelectorAll('input[name="aba"]').forEach(function (i) { i.value = abaAtual; });
     if (window.history && history.replaceState) {
       var u = new URL(window.location.href);
       u.searchParams.set('dem', abaAtual);
       if (id) u.searchParams.set('d', id); else u.searchParams.delete('d');
       history.replaceState(null, '', u.pathname + u.search + '#demandas');
     }
-  }
-
-  function primeiraVisivel(aba) {
-    var l = linhas(aba).filter(function (x) { return !x.hidden; })[0];
-    return l ? l.getAttribute('data-dm-linha') : '';
   }
 
   function trocarAba(aba, id) {
@@ -209,14 +222,14 @@ window.NexusDemandaNova = function (dlg) {
       if (fs.length && fs.indexOf(filtroDe[aba] || 'abertas') < 0) filtroDe[aba] = fs[0];
     }
     aplicar(aba);
-    abrir(alvo ? id : primeiraVisivel(aba));
+    abrir(alvo ? id : '');
   }
 
   raiz.addEventListener('click', function (ev) {
     var b = ev.target.closest('[data-dm-aba]');
     if (b) { trocarAba(b.getAttribute('data-dm-aba')); return; }
     var c = ev.target.closest('[data-dm-filtro]');
-    if (c) { filtroDe[abaAtual] = c.getAttribute('data-dm-filtro'); aplicar(abaAtual); abrir(primeiraVisivel(abaAtual)); return; }
+    if (c) { filtroDe[abaAtual] = c.getAttribute('data-dm-filtro'); aplicar(abaAtual); abrir(''); return; }
     // o "+" do último tema abre a linha do tema novo; o "x" dela desiste (13/11/2026)
     var novo = raiz.querySelector('[data-dm-t-novo]'), mais = raiz.querySelector('[data-dm-t-mais]');
     if (ev.target.closest('[data-dm-t-mais]') && novo) {
@@ -233,14 +246,23 @@ window.NexusDemandaNova = function (dlg) {
     var o = ev.target.closest('[data-os-folio]');
     if (o && window.NexusOsCard) { ev.preventDefault(); NexusOsCard.abrirFolio(o.getAttribute('data-os-folio'), {status: ''}); return; }
     var l = ev.target.closest('[data-dm-linha]');
-    if (l) abrir(l.getAttribute('data-dm-linha'));
+    if (l) alternar(l);
   });
+  // clicar de novo na linha aberta fecha
+  function alternar(l) {
+    abrir(l.getAttribute('aria-expanded') === 'true' ? '' : l.getAttribute('data-dm-linha'));
+  }
   raiz.addEventListener('keydown', function (ev) {
     var l = ev.target.closest && ev.target.closest('[data-dm-linha]');
-    if (l && (ev.key === 'Enter' || ev.key === ' ')) { ev.preventDefault(); abrir(l.getAttribute('data-dm-linha')); }
+    if (l && (ev.key === 'Enter' || ev.key === ' ')) { ev.preventDefault(); alternar(l); return; }
+    // o Esc fecha a aberta e volta para a linha dela (de dentro do campo de resposta também)
+    if (ev.key === 'Escape') {
+      var aberta = raiz.querySelector('[data-dm-linha][aria-expanded="true"]');
+      if (aberta && (ev.target === aberta || ev.target.closest('.dm-exp'))) { abrir(''); aberta.focus(); }
+    }
   });
   raiz.addEventListener('change', function (ev) {
-    if (ev.target.matches('[data-dm-pessoa], [data-dm-tema]')) { aplicar('setor'); abrir(primeiraVisivel('setor')); }
+    if (ev.target.matches('[data-dm-pessoa], [data-dm-tema]')) { aplicar('setor'); abrir(''); }
   });
   // o duplo clique não manda duas vezes (o novo_id já protege o banco; isto evita a espera dobrada)
   document.addEventListener('submit', function (ev) {
