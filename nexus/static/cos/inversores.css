@@ -93,6 +93,17 @@
 /* o calendário do navegador no tema do Nexus (o escuro é o padrão), e não no do sistema */
 .cos-inv-dia-data{padding:3px 8px;font-size:12px;color-scheme:dark}
 :root[data-tema="claro"] .cos-inv-dia-data{color-scheme:light}
+/* o zoom no horário (13/11/2026): os controles no topo fixo, e o arraste sobre os gráficos */
+.cos-inv-zoom{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:6px}
+.cos-inv-zoom[hidden]{display:none}
+.cos-inv-zoom .gc-chip{padding:4px 12px;min-width:34px}
+.cos-inv-zoom-trecho{font-size:12px;color:var(--mudo)}
+.cos-inv-zoom--ativo .cos-inv-zoom-trecho{color:var(--tinta);font-weight:600}
+/* a faixa do trecho que o arraste seleciona: os tokens de destaque da tela */
+.cos-inv-faixa{position:absolute;top:0;bottom:0;pointer-events:none;background:var(--info-a10);
+  border-left:1px solid var(--info-a42);border-right:1px solid var(--info-a42)}
+/* no toque, a vertical é da página (rola) e a horizontal e a pinça são do gráfico (deslizar e aproximar) */
+.cos-inv-dlg .cos-inv-graf{touch-action:pan-y;user-select:none;-webkit-user-select:none}
 .cos-inv-hist-aviso{margin:0 0 8px;font-size:12.5px;color:var(--tinta-2)}
 .cos-inv-hist-aviso:empty{display:none}
 .cos-inv-det{padding:14px 22px 24px}
