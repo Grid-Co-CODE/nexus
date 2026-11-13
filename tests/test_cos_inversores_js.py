@@ -385,3 +385,10 @@ def test_o_eixo_cortado_se_diz_e_o_ampliar_e_o_isolar_estao_na_tela():
     # "Dia inteiro" e o duplo clique no gráfico zeram também a faixa de valor
     assert "function zerarZoom() { faixasY = {}; definirZoom(null); }" in texto
     assert 'host.addEventListener("dblclick", function (ev) { ev.preventDefault(); zerarZoom(); });' in texto
+
+
+def test_o_link_do_ver_abre_a_usina_so_com_id_de_cartao():
+    # 13/11/2026: o "Ver" do aviso de falha do Console embutido traz ?usina=<id do cartão> — só scada-/sunop- abrem.
+    r = rodar("console.log(JSON.stringify([N.usinaDoLink('?usina=scada-exa01'), N.usinaDoLink('?x=1&usina=sunop-exa100'),"
+              " N.usinaDoLink('?usina=fusion-NE%3D1'), N.usinaDoLink(''), N.usinaDoLink('?usina=scada-exa01%22%3E')]))")
+    assert r == ["scada-exa01", "sunop-exa100", None, None, None]
