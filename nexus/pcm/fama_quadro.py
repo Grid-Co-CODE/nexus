@@ -1,9 +1,10 @@
-"""As OS da FAMA no Quadro da semana (fase 1, SOMBRA; 11/11/2026).
+"""As OS da FAMA no Quadro da semana (11/11/2026; no dia do programador desde 13/11/2026).
 
 Levi, 11/11/2026: o cliente cria a OS na FAMA e ela aparece para o programador; as retroativas abertas também entram ("a
-ideia é não ficarmos criando e editando e sim acompanhando"). Na fase 1 o Quadro só MOSTRA: as OS da FAMA não passam pelo
-motor (ocupariam as horas das equipes e mudariam a semana oficial do Fracttal mesmo sem publicar), não se reprogramam e
-não contam nas tarefas nem nas horas do dia. A fase 2 (`NEXUS_FAMA_PROGRAMA=1`, `fama_motor.py`) as põe na programação.
+ideia é não ficarmos criando e editando e sim acompanhando"). O Quadro só MOSTRA: as OS da FAMA não se reprogramam por
+aqui e não contam nas tarefas nem nas horas do dia. Desde 13/11/2026 elas passam pelo programador (`fama_motor.py`), e
+com o plano da rodada (`plano_publicado`, `separar_da_semana`) o cartão vai no dia, na equipe e na hora que ele deu; a
+regra abaixo, pela data prevista, é a da semana sem plano.
 
 O que entra na semana (da segunda ao domingo):
 - as ABERTAS (criada, planejada, pausada), no dia da `data_id_prevista`; a aberta com a previsão antes da segunda vai
@@ -208,7 +209,9 @@ def _vazio(ativa=False, erro=None, lendo=False) -> dict:
 
 
 # ── a FAMA programada (13/11/2026): o dia que o programador deu ──────────────────────────────────────────────────
-_PLANO: dict = {}        # (caminho, mtime) da planilha da rodada publicada -> o plano lido dela (um só guardado)
+_PLANO: dict = {}        # (caminho, mtime) da planilha da rodada publicada -> o plano lido dela (poucos guardados)
+_PLANO_MAX = 8
+_NADA = object()
 
 
 def _ler_plano(planilha) -> dict | None:
@@ -281,11 +284,15 @@ def plano_publicado(cfg, semana: str) -> dict | None:
     if not p or not p.exists():
         return None
     chave = (str(p), p.stat().st_mtime)
-    if chave not in _PLANO:
+    # um pedido não relê o que o outro guardou nem perde o seu: com o `clear` entre o guardar e o ler, dois Quadros de
+    # semanas diferentes ao mesmo tempo davam KeyError (revisão de 13/11/2026)
+    plano = _PLANO.get(chave, _NADA)
+    if plano is _NADA:
         plano = _ler_plano(p)
-        _PLANO.clear()
+        if len(_PLANO) >= _PLANO_MAX:
+            _PLANO.clear()
         _PLANO[chave] = plano
-    return _PLANO[chave]
+    return plano
 
 
 def para_o_quadro(cfg, sem: dict, dia, plano: dict | None = None) -> dict:
@@ -316,6 +323,17 @@ def para_o_quadro(cfg, sem: dict, dia, plano: dict | None = None) -> dict:
 def _moda(valores) -> str:
     c = Counter(v for v in (str(x or "").strip() for x in valores) if v)
     return c.most_common(1)[0][0] if c else ""
+
+
+def _equipe_como_o_motor(s) -> str:
+    """A equipe escrita como o motor a escreve na planilha (o `norm_equipe` do `motor/programacao_v7.py`: a 1ª palavra
+    em caixa alta, as do meio com a inicial maiúscula, a última como veio; uma palavra só, como veio). Com o plano, a OS
+    programada leva a equipe do motor ("EQUIPE Local 2 E 3") e a não programada levava a do cadastro ("Equipe Local 2
+    e 3"): o filtro Equipe listava a mesma equipe duas vezes (revisão de 13/11/2026)."""
+    partes = str(s or "").split()
+    if len(partes) <= 1:
+        return partes[0] if partes else ""
+    return " ".join([partes[0].upper()] + [p.capitalize() for p in partes[1:-1]] + [partes[-1]])
 
 
 def _como_na_semana(nome, da_semana: set) -> str:
@@ -399,7 +417,8 @@ def da_semana(linhas: list[dict], sem: dict, cadastro: dict, hoje, gerado_em=Non
             "os_id": cartao["num"], "usina": nome, "codigo": "", "h_ini": (p or {}).get("h_ini") or "",
             "tarefa": cartao["t"], "tipo": tipo,
             "cliente": _moda(r.get("cliente") for r in daqui) or cad.get("cliente") or "",
-            "cluster": ((p or {}).get("equipe") or _moda(r.get("cluster") for r in daqui) or cad.get("equipe") or ""),
+            "cluster": ((p or {}).get("equipe") or _moda(r.get("cluster") for r in daqui)
+                        or (_equipe_como_o_motor(cad.get("equipe")) if plano else cad.get("equipe") or "")),
             "responsavel": (_moda(r.get("responsavel") for r in daqui)
                             or _como_na_semana(cad.get("responsavel"), responsaveis)),
             "status": F.ESTADO_DA_TAREFA[s], "dia": dia,

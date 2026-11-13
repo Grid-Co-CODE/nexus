@@ -306,6 +306,20 @@ def test_com_a_fama_programada_o_cartao_vai_no_dia_do_programador():
     assert sem_plano["FAMA-102"]["fama"]["atrasada"] and sem_plano["FAMA-107"]["dia"] == "sab"
 
 
+def test_com_o_plano_a_equipe_do_cadastro_vem_escrita_como_o_motor_escreve():
+    """Revisão de 13/11/2026: com o plano, a OS programada leva a equipe do motor (o `norm_equipe` dele põe a 1ª palavra
+    em caixa alta: "EQUIPE Local 2 E 3"), e a não programada levava a do cadastro ("Equipe Local 2 e 3"): o filtro Equipe
+    listava a mesma equipe duas vezes. A não programada sem tarefa do Fracttal na semana passa pela mesma conta."""
+    assert FQ._equipe_como_o_motor("Equipe Local 2 e 3") == "EQUIPE Local 2 E 3"
+    assert FQ._equipe_como_o_motor("SP Leste 02") == "SP Leste 02" and FQ._equipe_como_o_motor("Faro") == "Faro"
+    cad = {**CADASTRO, 30: dict(CADASTRO[30], equipe="Equipe Local 2 e 3")}
+    plano = {"programadas": {}, "pendentes": {107}}
+    f = FQ.da_semana(LINHAS, _semana(), cad, date(2026, 10, 7), gerado_em=LIDO, agora=AGORA, plano=plano)
+    assert {r["os_id"]: r["cluster"] for r in f["linhas"]}["FAMA-107"] == "EQUIPE Local 2 E 3"
+    sem_plano = FQ.da_semana(LINHAS, _semana(), cad, date(2026, 10, 7), gerado_em=LIDO, agora=AGORA)
+    assert {r["os_id"]: r["cluster"] for r in sem_plano["linhas"]}["FAMA-107"] == "Equipe Local 2 e 3"
+
+
 def test_o_plano_sai_da_planilha_da_rodada(tmp_path):
     """O plano é a programação que a rodada publicada guardou: o dia, a equipe e a hora da 1ª linha de cada OS da FAMA
     nas abas de equipe; nas pendentes, as que não couberam (a OS que entrou em parte fica como programada)."""

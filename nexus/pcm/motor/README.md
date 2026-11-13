@@ -1,7 +1,7 @@
 # Motor da programação semanal (cópia)
 
 Estes quatro arquivos são uma cópia **idêntica** do motor do PCM, tirada do repositório
-`fillipefigueiro-source/gridco-pcm-data` no commit `d54c294` (13/11/2026, a corretiva respeita os 70% do dia e o que
+`fillipefigueiro-source/gridco-pcm-data` no commit `4b0d9ee` (13/11/2026, a corretiva respeita os 70% do dia e o que
 não couber vira pendência; antes, `cb8239c` (23/10/2026, o preenchimento respeita o dia fixo da usina,
 sobre o `8d84669`, a MPM da última semana do mês pelos dias livres; antes, `bfbc76c` (19/10/2026, a subtarefa `nome @ CÓDIGO`), `0560d5d`
 (16/10/2026, a carga de 70% já na W43), `6215ceb` e
@@ -32,7 +32,7 @@ substituir. Reescrever o motor tornaria a comparação inútil.
 **Não edite estes arquivos.** Mudança de regra entra no repositório do PCM e é copiada de novo. Enquanto os dois
 sistemas rodarem juntos, as duas cópias precisam ser iguais.
 
-## O que mudou em 13/11/2026 (`d54c294`): a corretiva respeita os 70% do dia
+## O que mudou em 13/11/2026 (`4b0d9ee`): a corretiva respeita os 70% do dia
 
 Levi: "até 70% das horas semanais [...] essas 44 horas têm que ser divididas de segunda a sexta. E aí o resto é
 resolvido"; "regra que tem em um tem que ter em outro" (no dia em que as OS da FAMA entraram no programador). A

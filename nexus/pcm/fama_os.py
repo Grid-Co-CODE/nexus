@@ -12,7 +12,7 @@ nada disso vai para log nem para o motor (o log do motor imprime o texto das tar
 
 O frescor: a porta devolve também o `gerado_em` da aba `atualizacao` (o batimento: a carga grava ao menos uma vez por dia,
 mesmo sem mudança). Mais de `FRESCOR_H` sem batimento é a leitura da FAMA parada (`velho`): o Quadro avisa, e a rodada
-com `NEXUS_FAMA_PROGRAMA=1` não sai.
+com `NEXUS_FAMA_PROGRAMA=1` sai sem a FAMA (a de sempre, com o motivo; desde 13/11/2026, antes não saía).
 
 Os valores da FAMA (o catálogo de lá, em inglês) ficam como vieram no dado; a tela fala português pelas tabelas abaixo, e
 valor que a tabela não conhece aparece como veio (dado é dado).
@@ -120,8 +120,8 @@ def _linhas_fama(config) -> Lido:
     = sem usina ligada em Base → Ligações), `status`, `tipo`, `severidade`, `data_id_prevista`, `data_id_criacao` e
     `titulo`, e o batimento da carga. Sem o livro no banco (antes da 1ª leitura do servidor), nenhuma linha e nenhum
     batimento. No teste, as linhas de `NEXUS_FAMA_LINHAS_TESTE` e o batimento de `NEXUS_FAMA_GERADO_EM_TESTE` (teste não
-    vai ao banco). Erro de leitura sobe: quem chama decide (o Quadro avisa; a rodada com `NEXUS_FAMA_PROGRAMA=1` não
-    sai). Lê o livro `nexus_os_fama` pela parte A (`nexus/dados/fama.ler_banco`).
+    vai ao banco). Erro de leitura sobe: quem chama decide (o Quadro avisa; a rodada com `NEXUS_FAMA_PROGRAMA=1` sai
+    sem a FAMA, com o motivo). Lê o livro `nexus_os_fama` pela parte A (`nexus/dados/fama.ler_banco`).
 
     Só o título das OS abertas e em andamento é decifrado, em memória (revisão de 11/11/2026: o `textos` da parte A
     decifrava também a descrição, que o PCM não mostra, e uma cifra quebrada nela apagava o título). Sem a chave do

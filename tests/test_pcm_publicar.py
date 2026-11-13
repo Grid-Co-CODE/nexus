@@ -141,6 +141,15 @@ def _com_fama_na_planilha(config, rid):
     pend = [None] * len(cab_p)
     pend[cab_p.index("OSs ID")] = "FAMA-94322"
     wp.append(pend)
+    # a equipe local que só tem OS da FAMA (a aba dela ficaria vazia no App) e um número substituto que escapou
+    so_fama = wb.create_sheet("EQUIPE Local 2 E 3")
+    so_fama.append(cab)
+    linha = [None] * len(cab)
+    linha[cab.index("OSs ID")] = "FAMA-94323"
+    so_fama.append(linha)
+    linha = [None] * len(cab)
+    linha[cab.index("OSs ID")] = 9000094324
+    so_fama.append(linha)
     wb.save(p)
     return p
 
@@ -163,16 +172,49 @@ def test_a_os_da_fama_nao_vai_ao_app_ate_o_app_estar_pronto(config, origem, agor
     gh = _com_github(config)
     pub = PB.publicar(config, rid, "pessoa.teste@exemplo.com")
     assert _os_da_fama(gh.arquivos["Programação Semana 41.xlsx"]) == set()
-    assert pub["fama_fora_do_app"] == 2 and all(a["conferido"] for a in pub["arquivos"])
-    assert _os_da_fama(p.read_bytes()) == {"FAMA-94321", "FAMA-94322"}                # a rodada guarda tudo
+    assert pub["fama_fora_do_app"] == 4 and all(a["conferido"] for a in pub["arquivos"])
+    enviada = openpyxl.load_workbook(io.BytesIO(gh.arquivos["Programação Semana 41.xlsx"]), read_only=True)
+    assert "EQUIPE Local 2 E 3" not in enviada.sheetnames                               # a aba só da FAMA não vai
+    assert not any("9000094324" in str(c) for ws in enviada.worksheets for r in ws.iter_rows(values_only=True)
+                   for c in r if c)
+    enviada.close()
+    assert _os_da_fama(p.read_bytes()) == {"FAMA-94321", "FAMA-94322", "FAMA-94323"}  # a rodada guarda tudo
     # as tarefas do Fracttal foram como sempre, e o plano da reserva é só delas
     assert HB.semanas_da_reserva(I.carregar(G.pasta_trabalho(config))["historico"])["2026-W41"] == {
         "15020|ALT1-INV01", "15021|ALT1-CAB01"}
     # com o App pronto, a FAMA vai junto
     config["NEXUS_FAMA_APP"] = "1"
     pub = PB.publicar(config, rid, "pessoa.teste@exemplo.com")
-    assert _os_da_fama(gh.arquivos["Programação Semana 41.xlsx"]) == {"FAMA-94321", "FAMA-94322"}
+    assert _os_da_fama(gh.arquivos["Programação Semana 41.xlsx"]) == {"FAMA-94321", "FAMA-94322", "FAMA-94323"}
     assert "fama_fora_do_app" not in pub
+
+
+def test_a_rodada_gerada_num_modo_da_fama_nao_se_publica_no_outro(config, origem, agora):
+    """Revisão de 13/11/2026: a preventiva do Fracttal das usinas da FAMA sai da rodada só quando a FAMA vai ao App
+    (`NEXUS_FAMA_APP=1`). A rodada gerada com a FAMA fora do App e publicada depois de ligar a variável mandaria ao campo
+    a preventiva do Fracttal E a da FAMA; a gerada com a FAMA no App e publicada com ela desligada, nenhuma das duas."""
+    rid = _rodada(config, origem)
+    pasta = G.pasta_trabalho(config) / "geracoes" / rid
+    st = G.ler_status(config, rid)
+    st["fama"] = {"os_fama": 3, "preventivas_tiradas": 0, "usinas": 2, "vai_ao_app": False}
+    G._gravar(pasta, st)
+    assert PB.motivos_para_nao_publicar(config, rid) == []
+    config["NEXUS_FAMA_APP"] = "1"
+    assert any("gere de novo" in m and "FAMA" in m for m in PB.motivos_para_nao_publicar(config, rid))
+    st["fama"].update(vai_ao_app=True, preventivas_tiradas=4)
+    G._gravar(pasta, st)
+    assert PB.motivos_para_nao_publicar(config, rid) == []
+    config["NEXUS_FAMA_APP"] = ""
+    assert any("gere de novo" in m and "FAMA" in m for m in PB.motivos_para_nao_publicar(config, rid))
+    # a rodada de antes da marca (gerada entre o d04eb47d e esta correção, 13/11/2026) sempre tirou a preventiva do
+    # Fracttal: vale como gerada com a FAMA no App
+    del st["fama"]["vai_ao_app"]
+    G._gravar(pasta, st)
+    assert any("gere de novo" in m and "FAMA" in m for m in PB.motivos_para_nao_publicar(config, rid))
+    # a rodada sem a FAMA (ou que a FAMA deixou fora) publica em qualquer modo
+    st["fama"] = {"fora": "a leitura da FAMA parou"}
+    G._gravar(pasta, st)
+    assert PB.motivos_para_nao_publicar(config, rid) == []
 
 
 def test_republicar_troca_o_plano_da_semana_na_reserva(tmp_path):
@@ -254,6 +296,31 @@ def test_tela_publicar_so_administrador_e_com_confirmacao(app, logado, config, o
     r = c.post("/t/pcm/gerar/publicar", data={"rodada": rid, "confirmo": "1", "substituir": "1"})
     assert r.status_code == 403 and "Só administrador ou o setor PCM publica" in r.get_data(as_text=True)
     assert len(gh.commits) == 2
+
+
+def test_a_tela_gerar_diz_o_que_a_fama_fez_na_rodada(app, logado, config, origem, monkeypatch):
+    """A tela Gerar conta as OS da FAMA que entraram e cada motivo das que ficaram fora (só os que têm OS), e diz o que
+    aconteceu com a preventiva do Fracttal: fica, com a FAMA fora do App; sai, com ela no App."""
+    monkeypatch.setattr(PB, "_agora", lambda: SABADO_ANTES)
+    app.config.update({k: v for k, v in config.items() if k != "TESTING"})
+    rid = _rodada(app.config, origem)
+    pasta = G.pasta_trabalho(app.config) / "geracoes" / rid
+    st = G.ler_status(app.config, rid)
+    st["fama"] = {"os_fama": 7, "preventivas_tiradas": 0, "usinas": 3, "sem_usina": 2, "sem_previsao": 0,
+                  "sem_nome_no_fracttal": 0, "sem_equipe": 1, "tipo_desconhecido": 0, "numero_invalido": 0,
+                  "vai_ao_app": False}
+    G._gravar(pasta, st)
+    html = " ".join(logado.get(f"/t/pcm/gerar?rodada={rid}").get_data(as_text=True).split())
+    assert "OS da FAMA no programador: 7 entraram" in html and "ficaram de fora 2 sem usina ligada, 1 sem equipe." in html
+    assert "sem data prevista" not in html and "a preventiva do Fracttal das usinas da FAMA fica" in html
+    st["fama"].update(vai_ao_app=True, preventivas_tiradas=4)
+    G._gravar(pasta, st)
+    html = " ".join(logado.get(f"/t/pcm/gerar?rodada={rid}").get_data(as_text=True).split())
+    assert "A preventiva do Fracttal saiu de 4 tarefas das usinas da FAMA" in html
+    st["fama"] = {"fora": "a leitura da FAMA parou (a última é de 12/11 08:00)"}
+    G._gravar(pasta, st)
+    html = " ".join(logado.get(f"/t/pcm/gerar?rodada={rid}").get_data(as_text=True).split())
+    assert "As OS da FAMA ficaram fora desta rodada: a leitura da FAMA parou" in html.replace("</strong>", "")
 
 
 def _no_setor(monkeypatch, setor_id, nome="Setor do teste"):

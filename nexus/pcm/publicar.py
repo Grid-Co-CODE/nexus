@@ -33,7 +33,7 @@ from urllib.parse import quote
 
 from dotenv import dotenv_values
 
-from . import fonte, geracao, historico_banco as HB, insumos as I
+from . import fama_motor as FM, fonte, geracao, historico_banco as HB, insumos as I
 
 API = "https://api.github.com"
 OBS_ATUAL = "Observacoes_Semana_Atual.txt"
@@ -176,12 +176,17 @@ def arquivos_da_rodada(config, rid: str) -> tuple[dict, list[tuple[str, Path]]]:
                 (I.OBSERVACOES, pasta / I.OBSERVACOES)]
 
 
-FAMA_NO_APP = "NEXUS_FAMA_APP"
+FAMA_NO_APP = FM.APP
 
 
 def fama_no_app(config) -> bool:
     """As OS da FAMA vão ao App junto com a semana (`NEXUS_FAMA_APP=1`)? Até o App estar pronto para elas, não."""
-    return str(config.get(FAMA_NO_APP) or "").strip() == "1"
+    return FM.vai_ao_app(config)
+
+
+def _da_fama(v) -> bool:
+    """A linha é de OS da FAMA: o FAMA-<id> ou o número substituto do motor (9.000.000.000 + id) que tenha escapado."""
+    return v not in (None, "") and (str(v).startswith("FAMA-") or FM.fama_do_substituto(v) is not None)
 
 
 def sem_as_os_da_fama(dados: bytes) -> tuple[bytes, int]:
@@ -191,10 +196,12 @@ def sem_as_os_da_fama(dados: bytes) -> tuple[bytes, int]:
     Por quê (13/11/2026): a FAMA entrou no programador (Levi: "fama tem que entrar no programador também"), mas o App de
     Campo ainda não sabe lidar com a OS da FAMA, que não existe no Fracttal. O combinado com o Levi: até o App estar
     pronto, a semana vai ao App sem elas. A rodada guarda a programação inteira, e o Quadro mostra a FAMA no dia que o
-    programador deu (`fama_quadro.plano_publicado`)."""
+    programador deu (`fama_quadro.plano_publicado`). Sai também o número substituto (nunca é OS do Fracttal) e a aba da
+    equipe que só tinha OS da FAMA (a equipe local da usina da FAMA): vazia, ela chegaria ao App como equipe sem tarefa."""
     import openpyxl
     wb = openpyxl.load_workbook(io.BytesIO(dados))
     n = 0
+    vazias = []
     for ws in wb.worksheets:
         if ws.max_row < 2:
             continue
@@ -202,13 +209,27 @@ def sem_as_os_da_fama(dados: bytes) -> tuple[bytes, int]:
         if "OSs ID" not in cab:
             continue
         col = cab.index("OSs ID") + 1
-        tirar = [r for r in range(2, ws.max_row + 1) if str(ws.cell(row=r, column=col).value or "").startswith("FAMA-")]
+        tirar = [r for r in range(2, ws.max_row + 1) if _da_fama(ws.cell(row=r, column=col).value)]
+        if not tirar:
+            continue
         for r in reversed(tirar):
             ws.delete_rows(r)
         n += len(tirar)
+        if not ws.title.startswith("_") and not any(v not in (None, "") for lin in ws.iter_rows(min_row=2, values_only=True)
+                                                    for v in lin):
+            vazias.append(ws)
     if not n:
         wb.close()
         return dados, 0
+    tiradas = 0
+    for ws in vazias:
+        if len(wb.worksheets) > 1:
+            wb.remove(ws)
+            tiradas += 1
+    if tiradas:                   # a aba ativa pode ter sido a tirada: a primeira visível fica ativa
+        visiveis = [i for i, w in enumerate(wb.worksheets) if w.sheet_state == "visible"]
+        if visiveis:
+            wb.active = visiveis[0]
     buf = io.BytesIO()
     wb.save(buf)
     wb.close()
@@ -237,6 +258,16 @@ def motivos_para_nao_publicar(config, rid: str, agora: datetime | None = None) -
                    "gere de novo")
     if conf.get("fora_da_semana"):
         out.append(f"{conf['fora_da_semana']} blocos fora da semana {st['semana']}")
+    # a preventiva do Fracttal das usinas da FAMA sai da rodada só quando a FAMA vai ao App (`fama_motor.vai_ao_app`):
+    # publicar no outro modo mandaria ao campo as duas preventivas, ou nenhuma (revisão de 13/11/2026). A rodada sem a
+    # marca (gerada entre o d04eb47d e esta correção) sempre tirou a preventiva: vale como gerada com a FAMA no App
+    fm = st.get("fama") or {}
+    gerada_no_app = bool(fm.get("vai_ao_app", True))
+    if fm.get("os_fama") and gerada_no_app != fama_no_app(config):
+        out.append("a rodada foi gerada com as OS da FAMA " + (
+            "indo ao App (a preventiva do Fracttal saiu das usinas da FAMA), e agora a FAMA não vai ao App"
+            if gerada_no_app else
+            "fora do App (a preventiva do Fracttal ficou nas usinas da FAMA), e agora a FAMA vai ao App") + ": gere de novo")
     return out
 
 

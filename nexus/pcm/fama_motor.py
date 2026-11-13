@@ -1,10 +1,11 @@
-"""O adaptador do programador para as OS da FAMA (fase 2: pronto e DESLIGADO; 11/11/2026).
+"""O adaptador do programador para as OS da FAMA (fase 2, LIGADA desde 13/11/2026; feito em 11/11/2026).
 
 Levi, 11/11/2026: o cliente cria a OS na FAMA, ela vai para o programador automático e cai no App de Campo. Na fase 1 a
-FAMA só aparece no Quadro (`fama_quadro.py`): pôr as OS dela no motor ocuparia as horas das equipes e mudaria a semana
-oficial do Fracttal mesmo sem publicar. A fase 2, combinada depois com o App, liga por `NEXUS_FAMA_PROGRAMA=1`: a rodada
-põe as OS da FAMA na programação e tira a preventiva do Fracttal das usinas da FAMA, porque nelas a preventiva passa a
-ser a da FAMA (decisão do Levi). Sem a variável, o `geracao.py` nem chama este módulo: a rodada é a de hoje.
+FAMA só aparecia no Quadro (`fama_quadro.py`). A fase 2 liga por `NEXUS_FAMA_PROGRAMA=1`, e desde 13/11/2026 o
+`config.carregar_config` a liga por padrão onde a FAMA é lida (Levi: "regra que tem em um tem que ter em outro"): a
+rodada põe as OS da FAMA na programação e tira a preventiva do Fracttal das usinas da FAMA, porque nelas a preventiva
+passa a ser a da FAMA (decisão do Levi), mas só quando a semana vai ao App com as OS da FAMA (`vai_ao_app`): sem isso o
+campo ficaria sem preventiva nenhuma naquela usina. Sem a variável, o `geracao.py` nem chama este módulo.
 
 O motor é cópia idêntica do PCM e não se edita (`motor/README.md`): ele lê o Fracttal pelo `fonte_bd_api.df_semanal`,
 que devolve o `.cache_semanal_api.pkl` da pasta da rodada enquanto o cache está dentro do TTL. É ali que as OS da FAMA
@@ -18,10 +19,10 @@ A linha da FAMA (`linha_do_motor`): o "OSs ID" é um NÚMERO substituto (`substi
 porque o motor faz int() no "OSs ID" (`task_key`, a tarefa atômica) e "FAMA-101" derrubaria a rodada; depois do motor, a
 planilha volta a dizer FAMA-101 (`depois_do_motor`). A usina é o nome que o motor usa (o do Fracttal pelo de-para,
 como ele aparece nas tarefas da usina no cache), a equipe é a das tarefas do Fracttal da usina (sem tarefa, a do
-cadastro, se for do padrão do PCM, "UF Região NN"), o tipo vai para corretiva ou preventiva, a "Data Programada" é a
-previsão e a duração é a que o motor dá à tarefa sem informação (`DURACAO_PADRAO_H`; vazia, o motor de verdade quebra).
-A tarefa é "OS da FAMA <id>": o título NÃO vai, porque o log do motor imprime o texto das tarefas e o título só se
-decifra na tela.
+cadastro, com qualquer nome), o tipo vai para corretiva, preventiva ou zeladoria, a "Data Programada" é a previsão e a
+duração é a que o motor dá à tarefa sem informação (`DURACAO_PADRAO_H`; vazia, o motor de verdade quebra). A tarefa é
+"OS da FAMA <id>", e na preventiva "OS da FAMA <id> · MPM" (a sigla que o título diz, `sigla`): o título NÃO vai,
+porque o log do motor imprime o texto das tarefas e o título só se decifra na tela.
 
 "Usina da FAMA" é a que tem OS da FAMA ligada (qualquer situação); a preventiva do Fracttal que sai é a ainda por fazer
 (nem finalizada nem cancelada); a feita fica, porque é histórico (o placar do mês e a recorrência do motor a contam).
@@ -68,6 +69,15 @@ class FamaErro(RuntimeError):
     """A rodada com a FAMA ligada não sai sem as OS da FAMA. Nunca traz título nem nome de pessoa."""
 
 
+APP = "NEXUS_FAMA_APP"
+
+
+def vai_ao_app(config) -> bool:
+    """A semana vai ao App com as OS da FAMA (`NEXUS_FAMA_APP=1`)? Até o App de Campo estar pronto para elas, não: o
+    `publicar` as tira da planilha que vai ao App e o `aplicar` deixa a preventiva do Fracttal nas usinas da FAMA."""
+    return str(config.get(APP) or "").strip() == "1"
+
+
 def ligado(config) -> bool:
     """A FAMA está no programador nesta máquina (`NEXUS_FAMA_PROGRAMA=1`)? Desde 13/11/2026 o `config.carregar_config`
     a liga por padrão onde a FAMA é lida (a NEXUS_FAMA_CHAVE está na máquina); "0" desliga."""
@@ -102,11 +112,15 @@ def fama_do_substituto(v) -> int | None:
 # outro"): o motor decide a preventiva vencida pela sigla na tarefa (`_fila_elegivel`: MPS e MPA voltam sempre; MPM, MPW,
 # MPQ e MPT só no mês da semana; sem sigla, não voltam) e a ordena por ela (MPA > MPS > MPT > MPM > MPQ). Os nomes são
 # os do motor (`SIGLAS_MULTI`: MPM mensal, MPW semanal, MPT trimestral, MPS semestral, MPA anual, MPB bianual, MPQ
-# quinzenal). A ordem conta: "bianual" antes de "anual". Medido em 13/11 nas 91 preventivas abertas da FAMA: 60 dizem
+# quinzenal). A sigla escrita no título ("Plano MPS") vale primeiro; depois a palavra, e a ordem conta: "semi-annual"
+# antes de "annual" (o "annual" do fim casa sozinho). Medido em 13/11 nas 91 preventivas abertas da FAMA: 60 dizem
 # "mensal", 18 "anual" e 13 nada.
-SIGLA_DA_PERIODICIDADE = (("MPB", r"\bbianua(l|is)\b|\bbienal\b"), ("MPA", r"\banua(l|is)\b|\bannual\b"),
-                          ("MPS", r"\bsemestra(l|is)\b"), ("MPT", r"\btrimestra(l|is)\b"),
-                          ("MPQ", r"\bquinzena(l|is)\b"), ("MPM", r"\bmensa(l|is)\b|\bmonthly\b"),
+SIGLA_DA_PERIODICIDADE = (("MPB", r"\bbianua(l|is)\b|\bbienal\b|\bbiennial\b"),
+                          ("MPS", r"\bsemestra(l|is)\b|\bsemi-?annual\b|\bsix-?month"),
+                          ("MPA", r"\banua(l|is)\b|\bannual\b|\byearly\b"),
+                          ("MPT", r"\btrimestra(l|is)\b|\bquarterly\b"),
+                          ("MPQ", r"\bquinzena(l|is)\b|\bbiweekly\b"),
+                          ("MPM", r"\bmensa(l|is)\b|\bmonthly\b"),
                           ("MPW", r"\bsemana(l|is)\b|\bweekly\b"))
 
 
@@ -117,6 +131,9 @@ def sigla(linha: dict) -> str:
     if not _norm(linha.get("tipo")).startswith("preventive"):
         return ""
     t = str(linha.get("titulo") or "").lower()
+    escrita = re.search(r"\bmp([mastqwb])\b", t)
+    if escrita:
+        return "MP" + escrita.group(1).upper()
     return next((s for s, rx in SIGLA_DA_PERIODICIDADE if re.search(rx, t)), "")
 
 
@@ -161,9 +178,10 @@ def _moda(valores) -> str:
     return c.most_common(1)[0][0] if c else ""
 
 
-def aplicar(df, linhas: list[dict], cadastro: dict):
-    """(o cache novo, o relatório): tira a preventiva por fazer do Fracttal das usinas da FAMA e põe as OS da FAMA abertas
-    e em andamento. Aplicar de novo no mesmo cache não duplica (as linhas da FAMA que já estavam saem antes)."""
+def aplicar(df, linhas: list[dict], cadastro: dict, tirar_preventivas: bool = True):
+    """(o cache novo, o relatório): põe as OS da FAMA abertas e em andamento e, com `tirar_preventivas` (a semana vai ao
+    App com elas, `vai_ao_app`), tira a preventiva por fazer do Fracttal das usinas da FAMA. Aplicar de novo no mesmo
+    cache não duplica (as linhas da FAMA que já estavam saem antes)."""
     import pandas as pd
     faltam = [c for c in colunas_do_motor() if c not in df.columns]
     if faltam:
@@ -178,7 +196,7 @@ def aplicar(df, linhas: list[dict], cadastro: dict):
     nomes = {uid: {_norm(n) for n in cadastro[uid].get("nomes") or [] if _norm(n)} for uid in usinas}
     da_fama = set().union(*nomes.values()) if nomes else set()
     tirar = (ativo.isin(da_fama) & df["Tipo de tarefa"].map(lambda t: _norm(t).startswith("preventiva"))
-             & ~df["Status"].isin(FECHADA) & (df["Estado da Tarefa"] != "Finalizados"))
+             & ~df["Status"].isin(FECHADA) & (df["Estado da Tarefa"] != "Finalizados") & bool(tirar_preventivas))
     rel["preventivas_tiradas"] = int(tirar.sum())
     # o nome e a equipe de cada usina como o motor os vê: os das tarefas do Fracttal dela no cache
     usina = {}
@@ -187,7 +205,7 @@ def aplicar(df, linhas: list[dict], cadastro: dict):
         nome = _moda(daqui["Ativo Classificação 1"]) or (cadastro[uid].get("nomes") or [""])[0]
         # sem tarefa do Fracttal, a equipe do cadastro, com qualquer nome (13/11/2026): até ali só valia a do padrão do PCM
         # ("UF Região NN"), e na simulação da W47 208 das 264 OS da FAMA ficaram fora por "sem equipe", porque as usinas
-        # da Faro têm equipes locais no cadastro ("Cabo Branco 2 e 3"). A equipe local é uma equipe como as outras: o
+        # da Faro têm equipes locais no cadastro ("Equipe Local 2 e 3"). A equipe local é uma equipe como as outras: o
         # motor dá a ela os mesmos 70% de 8,8 h por dia (Levi: "regra que tem em um tem que ter em outro")
         eq = str(cadastro[uid].get("equipe") or "").strip()
         usina[uid] = (nome, _moda(daqui["Ativo Classificação 2"]) or eq)
@@ -219,7 +237,7 @@ def _sha(p: Path) -> str:
     return hashlib.sha256(Path(p).read_bytes()).hexdigest()[:12]
 
 
-def aplicar_no_cache(pasta: Path, linhas: list[dict], cadastro: dict) -> dict:
+def aplicar_no_cache(pasta: Path, linhas: list[dict], cadastro: dict, tirar_preventivas: bool = True) -> dict:
     """O `aplicar` no `.cache_semanal_api.pkl` da rodada, regravado com a mesma idade (o TTL do motor é pela idade do
     arquivo, e a foto guarda a dela). Devolve o relatório, com o sha do cache que o motor recebe."""
     cache = Path(pasta) / CACHE
@@ -230,7 +248,7 @@ def aplicar_no_cache(pasta: Path, linhas: list[dict], cadastro: dict) -> dict:
         raise FamaErro(f"o {CACHE} da rodada não abriu ({type(ex).__name__})") from ex
     if not isinstance(d, dict) or d.get("v") != 1 or "df" not in d:
         raise FamaErro(f"o {CACHE} da rodada não tem a forma que o motor lê")
-    df, rel = aplicar(d["df"], linhas, cadastro)
+    df, rel = aplicar(d["df"], linhas, cadastro, tirar_preventivas)
     idade = cache.stat()
     tmp = cache.with_name(cache.name + ".tmp")
     with open(tmp, "wb") as f:
@@ -263,7 +281,8 @@ def entrada(config, ler_o_fracttal: bool) -> dict | None:
         cadastro = F.cadastro_das_usinas(config)
     except Exception as ex:      # noqa: BLE001
         raise FamaErro(f"não consegui ler o cadastro das usinas ({type(ex).__name__})") from ex
-    return {"linhas": lido.linhas, "cadastro": cadastro, "ler_o_fracttal": ler_o_fracttal}
+    return {"linhas": lido.linhas, "cadastro": cadastro, "ler_o_fracttal": ler_o_fracttal,
+            "tirar_preventivas": vai_ao_app(config)}
 
 
 def antes_do_motor(pasta: Path, st: dict, env: dict, motor: Path, fama: dict, log, timeout: int) -> dict:
@@ -281,10 +300,14 @@ def antes_do_motor(pasta: Path, st: dict, env: dict, motor: Path, fama: dict, lo
         if r.returncode != 0 or not (pasta / CACHE).is_file():
             raise FamaErro(f"a leitura do Fracttal antes do motor falhou (código {r.returncode})")
         env = dict(env, PROG_API_TTL_MIN=TTL_MIN)
-    st["fama"] = aplicar_no_cache(pasta, fama["linhas"], fama["cadastro"])
+    st["fama"] = aplicar_no_cache(pasta, fama["linhas"], fama["cadastro"], fama.get("tirar_preventivas", True))
     x = st["fama"]
-    log.write((f"[FAMA] {x['os_fama']} OS da FAMA entraram na semana; {x['preventivas_tiradas']} preventivas do Fracttal "
-               f"saíram de {x['usinas']} usinas da FAMA; ficaram de fora: {x['sem_usina']} sem usina, {x['sem_previsao']} "
+    x["vai_ao_app"] = bool(fama.get("tirar_preventivas", True))     # o `publicar` barra a rodada publicada no outro modo
+    prev = (f"{x['preventivas_tiradas']} preventivas do Fracttal saíram de {x['usinas']} usinas da FAMA"
+            if fama.get("tirar_preventivas", True) else
+            f"a preventiva do Fracttal ficou nas {x['usinas']} usinas da FAMA (a semana vai ao App sem as OS da FAMA)")
+    log.write((f"[FAMA] {x['os_fama']} OS da FAMA entraram na semana; {prev}; "
+               f"ficaram de fora: {x['sem_usina']} sem usina, {x['sem_previsao']} "
                f"sem previsão, {x['sem_nome_no_fracttal']} sem nome no Fracttal, {x['sem_equipe']} sem equipe, "
                f"{x['tipo_desconhecido']} de tipo desconhecido\n").encode("utf-8"))
     log.flush()

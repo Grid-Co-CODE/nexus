@@ -393,13 +393,25 @@ def _executar(pasta: Path, st: dict, env: dict, motor: Path, origem: Path, saida
                 f.write(f"[FAMA] as OS da FAMA ficaram fora desta rodada: {fama['fora']}\n".encode("utf-8"))
                 f.flush()
                 fama = None
-            if fama is not None:
-                env = FM.antes_do_motor(pasta, st, env, motor, fama, f, TEMPO_MAX_S)
+            tentou = fama is not None
+            if tentou:
+                # o erro DENTRO do adaptador (a leitura do Fracttal antes do motor, o cache que não abre) também deixa a
+                # FAMA fora e a rodada sai a de sempre (revisão de 13/11/2026): com a FAMA ligada por padrão, ele não
+                # pode travar a semana do PCM. O env fica o de antes (sem o TTL longo): o motor lê o Fracttal sozinho
+                try:
+                    env = FM.antes_do_motor(pasta, st, env, motor, fama, f, TEMPO_MAX_S)
+                except Exception as ex:      # noqa: BLE001 — a FamaErro diz o motivo; outro erro, só o nome dele
+                    motivo = str(ex)[:300] if isinstance(ex, FM.FamaErro) else f"o adaptador falhou ({type(ex).__name__})"
+                    st["fama"] = {"fora": motivo}
+                    f.write(f"[FAMA] as OS da FAMA ficaram fora desta rodada: {motivo}\n".encode("utf-8"))
+                    f.flush()
             r = subprocess.run([sys.executable, str(motor), "--semana", st["semana"]], cwd=str(pasta), env=env,
                                stdout=f, stderr=subprocess.STDOUT, timeout=TEMPO_MAX_S)
         st["codigo"] = r.returncode
         if r.returncode == 0 and saida.exists():
-            if fama is not None:
+            if tentou:
+                # mesmo com o erro no meio do adaptador: o "OSs ID" substituto que tenha chegado à planilha volta a dizer
+                # FAMA-<id> (o `publicar` o reconhece e o tira da semana que vai ao App)
                 st["fama"]["planilha"] = FM.depois_do_motor(saida)
             # as tarefas tiradas da semana uma a uma (o "sem:"): falhar aqui derruba a rodada, porque publicar a semana
             # com a tarefa que o PCM tirou seria pior que não ter a semana

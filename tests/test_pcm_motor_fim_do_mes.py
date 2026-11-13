@@ -9,7 +9,8 @@ a segunda com [EXCEDE HH] até as 23 h, e o resto da semana ficava vazio: na W44
 
 O que estes testes seguram: na última semana, a MPM tenta caber como as outras e a sobra vai para os dias livres (o
 passe de preenchimento); só a que não cabe em dia nenhum entra forçada, no dia da usina com mais folga, e nunca vira
-pendência (a regra continua). A corretiva segue forçada no dia da usina, como sempre.
+pendência (a regra continua). A corretiva não é mais forçada (13/11/2026, Levi: "até 70% das horas semanais"): a que
+não cabe no dia vai para outro dia ou para as pendências (`test_a_corretiva_respeita_os_70_por_cento_do_dia`).
 
 O motor roda tudo no import (lê o Fracttal), então o escalonador é tirado do arquivo pelo `ast`: as funções e as
 constantes de horário, com a semana e as regras do teste no lugar das que ele carrega."""

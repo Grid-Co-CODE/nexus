@@ -88,9 +88,17 @@
   <div class="pcm-aviso pcm-aviso--alerta"><i class="ph ph-warning"></i><div><strong>As OS da FAMA ficaram fora desta
     rodada:</strong> {{ sel.fama.fora }}. A semana saiu como antes da FAMA no programador.</div></div>
   {% elif sel.fama and sel.fama.os_fama is defined %}
-  <p class="gc-ajuda">OS da FAMA no programador: {{ sel.fama.os_fama }} entraram com as regras do Fracttal; ficaram de
-    fora {{ sel.fama.sem_previsao }} sem data prevista e {{ sel.fama.sem_usina }} sem usina ligada. Até o App de Campo
-    estar pronto para elas, a semana vai ao App sem as OS da FAMA; o Quadro as mostra no dia programado.</p>
+  {% set fm = sel.fama %}
+  {% set fora_fm = [(fm.sem_previsao, 'sem data prevista'), (fm.sem_usina, 'sem usina ligada'),
+                    (fm.sem_nome_no_fracttal, 'sem o nome da usina no Fracttal'), (fm.sem_equipe, 'sem equipe'),
+                    (fm.tipo_desconhecido, 'de tipo desconhecido'), (fm.numero_invalido, 'com o número inválido')]
+                   | selectattr('0') | list %}
+  <p class="gc-ajuda">OS da FAMA no programador: {{ fm.os_fama }} entraram com as regras do Fracttal{% if fora_fm %};
+    ficaram de fora {% for n, o in fora_fm %}{{ n }} {{ o }}{{ ', ' if not loop.last }}{% endfor %}{% endif %}.
+    {% if fm.vai_ao_app == false %}Até o App de Campo estar pronto para elas, a semana vai ao App sem as OS da FAMA e a
+    preventiva do Fracttal das usinas da FAMA fica; o Quadro mostra a FAMA no dia programado.{% else %}A preventiva do
+    Fracttal saiu de {{ fm.preventivas_tiradas }} {{ 'tarefa' if fm.preventivas_tiradas == 1 else 'tarefas' }} das
+    usinas da FAMA, que passam a ter a preventiva da FAMA.{% endif %}</p>
   {% endif %}
 
   {# publicar no App (09/10/2026): a situação da publicação ou o botão, e o que conferir antes #}
@@ -101,7 +109,9 @@
     {% if app_sel and app_sel.semana %}O App já tem a semana {{ sel.semana }}: {{ app_sel.semana.linhas }} linhas,
     {{ app_sel.semana.pendentes }} pendentes.{% elif app_sel and app_sel.erro %}Não consegui ler o banco_dados.json do App agora
     ({{ app_sel.erro }}).{% else %}O banco_dados.json do App ainda não tem a semana: o robô do PCM leva de 5 a 10 minutos
-    depois da publicação.{% endif %}</div></div>
+    depois da publicação.{% endif %}{% if pb.fama_fora_do_app %} {{ pb.fama_fora_do_app }}
+    {{ 'linha das OS da FAMA ficou' if pb.fama_fora_do_app == 1 else 'linhas das OS da FAMA ficaram' }} fora do App, que
+    ainda não está pronto para elas; o Quadro as mostra.{% endif %}</div></div>
   {% elif pode_publicar %}
   <div class="pcm-pub-barra">
     {% if pode %}<a class="gc-btn gc-btn--ui gc-btn--primario" href="{{ raiz }}/t/pcm/gerar/publicar?rodada={{ sel.id }}"><i class="ph ph-paper-plane-tilt"></i> Publicar no App</a>

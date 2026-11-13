@@ -60,7 +60,7 @@ escolhida de cada semana e os números: `nexus/dados/CLAUDE.md`.
 | `quadro.py` | **Quadro da semana** (09/10/2026): a semana em colunas por dia, a janela da OS e a reprogramação (a linha do motor, a mescla nas observações, o arquivo da semana em curso) |
 | `fama_os.py` | **as OS da FAMA para o PCM** (11/11/2026, seção abaixo): a porta única `_linhas_fama(config)` (as OS e o batimento da carga), o frescor (`velho`), o vocabulário da FAMA (situação, tipo, severidade, em português) e a usina de cada OS pelo cadastro do banco |
 | `fama_quadro.py` | as OS da FAMA no Quadro da semana (fase 1, só aparecem): a cópia em memória renovada por trás (o pedido nunca lê o banco), os cartões só de leitura depois das tarefas, os avisos e a etiqueta de repetição |
-| `fama_motor.py` | o adaptador do programador para as OS da FAMA (fase 2, DESLIGADO: só com `NEXUS_FAMA_PROGRAMA=1`) |
+| `fama_motor.py` | o adaptador do programador para as OS da FAMA (fase 2, LIGADA desde 13/11/2026: `NEXUS_FAMA_PROGRAMA`, padrão onde a FAMA é lida; `NEXUS_FAMA_APP` decide se a FAMA vai ao App) |
 | `telas.py` | as telas, penduradas na torre PCM: cada rota é uma função no alto do módulo (testável sozinha), e o `registrar_pcm(bp)` só as liga ao bp da torre, com o mesmo endereço e endpoint (08/11/2026: eram 25 funções dentro dele) |
 | `relatorios/` | **os quatro relatórios do PCM** na Central de emissão (14/10/2026): diário, recuperação da tarde, fechamento da semana e alerta da programação, cópia do Python do PCM, com a emissão automática nos horários de lá; regras e prova no `relatorios/CLAUDE.md` |
 | `relatorio_exec/` | **o Relatório executivo do PCM** na Central de emissão (14/10/2026): Interno Grid, Cliente e Abertura da Semana, CÓPIA do `js/relatorio_exec.js` do painel (hash conferido no teste), com o gestao_pcm.json, o banco_dados.json e o confiabilidade.json servidos ao lado e a Gerencial aberta pelo servidor (`NEXUS_PCM_MPAS_SENHA`, o "MPA/MPS atrasadas"); na estrutura de toda a Central (os tipos no bloco "Relatório Gerencial PCM", o período e o escopo na coluna, a folha à direita); regras e como atualizar no `relatorio_exec/CLAUDE.md` |
@@ -72,7 +72,7 @@ escolhida de cada semana e os números: `nexus/dados/CLAUDE.md`.
 | `almox_usinas.py` | a aba Usinas e almoxarifados do Almoxarifado (12/11/2026): a lista das usinas com o local no Fracttal, os almoxarifados que o Fracttal liga a cada uma e a marcação do PCM (sem almoxarifado, compartilha, próprio), com as regras (seção Almoxarifado); o livro em `nexus/dados/almox_usinas.py` |
 | `tecnicos_usina.py` | a visão da tela Técnicos por usina: o cadastro do banco, o nome da usina que vai ao App (`_fracttal`), a evidência de campo (rondas, fechamentos, programação), os avisos, os filtros em cascata, a carga inicial pela regra da equipe, a reemissão (de uma usina e o Reenviar tudo) e a comparação com a foto do App |
 | `inventario/` | **o inventário do almoxarifado** (26/10/2026, em construção): `estoque.py` é o adaptador do estoque do Fracttal, a única porta de leitura e gravação de saldo, régua e peça; `contas.py` são as contas (situações, contado efetivo, substituição, janela de aprovação; puro); `leitura.py` lê as contagens do App e o estado de cada uma pelos eventos; `revisao.py` é a aba Inventário (a lista, a contagem aberta com o Sistema × Contado × Δ e a revisão do PCM), com as rotas em `__init__.py`; `gravacao.py` grava o lote aprovado no Fracttal em segundo plano, por sessão de ajuste; `regua.py` é a régua de mínimo e máximo e `curadoria.py` o fora do catálogo (com `fotos_app.py`, a rota assinada que recebe as fotos do App); a auditoria é o `revisao.montar_auditoria`; `ponte_os.py` é a ponte com o login do Fracttal (as rotas de `/os/_nexus/inventario`, a ÚNICA porta de tudo o que lê ou grava no Fracttal: o lote, gravar, continuar, encerrar, a régua acordada, cadastrar a peça); o livro `nexus_almoxarifado_inventario` (eventos, régua e curadoria) é o `nexus/dados/fato_inventario.py`. As seções abaixo |
-| `motor/` | **cópia idêntica** do motor do PCM: **não edite** (mudança de regra entra no repositório do PCM e é copiada; veja o `README.md` de lá); hoje a do `cb8239c` (23/10/2026: a MPM da última semana do mês vai para os dias livres antes de ser forçada no dia da usina, e o preenchimento dos dias livres respeita o dia fixo da usina e o feriado municipal) |
+| `motor/` | **cópia idêntica** do motor do PCM: **não edite** (mudança de regra entra no repositório do PCM e é copiada; veja o `README.md` de lá); hoje a do `4b0d9ee` (13/11/2026: a corretiva não é mais forçada acima dos 70% do dia e a tarefa cortada pela capacidade não some; antes, a do `cb8239c`, 23/10/2026: a MPM da última semana do mês vai para os dias livres antes de ser forçada no dia da usina) |
 
 ## O nome do cliente é o do cadastro do Nexus (`clientes.py`; 18/10/2026)
 
@@ -104,9 +104,10 @@ também entram. "A ideia é não ficarmos criando e editando e sim acompanhando.
   projeto à usina pela decisão do Levi em Base → Ligações entre bases (`FAMA · Projetos`, `nexus/cadastro/CLAUDE.md`).
   Nada muda no campo: o Quadro da semana só MOSTRA as OS da FAMA (seção "OS da FAMA no Quadro e no programador (parte
   B)", abaixo); o motor, o Gerar e o Publicar no App seguem sem a FAMA.
-- **Fase 2 (parte B pronta e DESLIGADA), liga com `NEXUS_FAMA_PROGRAMA=1`:** as OS da FAMA entram no programador e vão
-  ao App; e, nas usinas da FAMA, a preventiva do Fracttal sai da programação, porque nelas a preventiva passa a ser a da
-  FAMA (decisão do Levi). Sem a variável, tudo segue como a fase 1. O que falta antes de ligar está na seção da parte B.
+- **Fase 2, LIGADA desde 13/11/2026** (`NEXUS_FAMA_PROGRAMA`, padrão onde a FAMA é lida; `0` desliga): as OS da FAMA
+  entram no programador com as regras do Fracttal. Com o App pronto para elas (`NEXUS_FAMA_APP=1`), vão ao App, e nas
+  usinas da FAMA a preventiva do Fracttal sai da programação, porque nelas a preventiva passa a ser a da FAMA (decisão do
+  Levi); até lá, a semana vai ao App sem a FAMA e a preventiva do Fracttal fica. Detalhes na seção da parte B.
 
 ## Horas por tarefa e zeladoria no motor (15/10/2026)
 
@@ -2155,11 +2156,18 @@ código), e `0` desliga. No mesmo dia: a equipe da OS é a do cadastro, com qual
 locais, e 208 das 264 OS ficavam fora por "sem equipe"); roçada e limpeza de módulos são Zeladoria, como no Fracttal; a
 preventiva leva a sigla que o título diz (`fama_motor.sigla`: "mensal" = MPM, "anual" = MPA...), para a regra da vencida
 ser a mesma; e o motor deixou de forçar a corretiva acima dos 70% (`motor/README.md`, 13/11), para as duas fontes. **O
-App:** até ele estar pronto para a OS da FAMA (`NEXUS_FAMA_APP=1`), a semana vai ao App sem elas
-(`publicar.sem_as_os_da_fama`; a publicação diz quantas, `fama_fora_do_app`); a rodada guarda a programação inteira, e o
-Quadro a mostra (`fama_quadro.plano_publicado`: o dia, a equipe e a hora do programador; a que ele não programou fica no
-bloco da segunda, "Não coube" ou "Não programada"). O pedido ao App foi à sessão "App de campo" em 13/11. A leitura da
-FAMA, o livro `nexus_os_fama · fato_os_fama` e o de-para em Ligações são da parte A (`nexus/dados/fama.py`).
+App:** até ele estar pronto para a OS da FAMA (`NEXUS_FAMA_APP=1`, `fama_motor.vai_ao_app`), a semana vai ao App sem
+elas (`publicar.sem_as_os_da_fama`: saem as linhas FAMA-<id>, o número substituto que tenha escapado e a aba da equipe
+que só tinha FAMA; a publicação diz quantas, `fama_fora_do_app`) e a preventiva do Fracttal das usinas da FAMA FICA
+(revisão de 13/11: tirá-la deixaria o campo sem preventiva nenhuma ali; o status guarda `vai_ao_app`, e o Publicar barra
+a rodada gerada num modo e publicada no outro: "gere de novo"; a rodada sem a marca, gerada entre o `d04eb47d` e a
+correção, tirou a preventiva e vale como gerada "no App"). A rodada guarda a programação inteira, e o Quadro a
+mostra (`fama_quadro.plano_publicado`: o dia, a equipe e a hora do programador; a que ele não programou fica no bloco da
+segunda, "Não coube" ou "Não programada"; a equipe do cadastro vai escrita como o motor escreve, `_equipe_como_o_motor`).
+No App de Campo (v353, 13/11) a fila do técnico é pessoal: a OS da FAMA aparece para quem EXECUTA a usina nas
+atribuições do Nexus (Técnicos por usina), casada pelo nome da usina no Fracttal; a "Equipe" só vale na visão de equipe.
+Antes de ligar a `NEXUS_FAMA_APP`: os técnicos das usinas da FAMA com o "executa" no Nexus. A leitura da FAMA, o livro
+`nexus_os_fama · fato_os_fama` e o de-para em Ligações são da parte A (`nexus/dados/fama.py`).
 
 - **A porta única:** o PCM só recebe as OS da FAMA por `fama_os._linhas_fama(config)`, que lê o livro pelo
   `fama.ler_banco` e devolve um `Lido`: todas as linhas do fato (qualquer situação), cada uma com `fama_os_id`,
@@ -2213,18 +2221,21 @@ FAMA, o livro `nexus_os_fama · fato_os_fama` e o de-para em Ligações são da 
   a frase inteira vai no `aria-label` do cartão (o leitor de tela lê o rótulo do botão), no `title` e na janela da OS. Só
   informação, para o PCM conferir antes da fase 2.
 - **O adaptador do motor** (`fama_motor.py`, só com `NEXUS_FAMA_PROGRAMA=1`; sem ela o `geracao.py` nem o chama): a OS
-  aberta ou em andamento vira uma linha das `COLS_BD_SEMANAL` no `.cache_semanal_api.pkl` da rodada, e a preventiva do
-  Fracttal ainda por fazer das usinas da FAMA sai (a feita fica: é histórico). Na rodada com a foto, o cache é a foto; na de
+  aberta ou em andamento vira uma linha das `COLS_BD_SEMANAL` no `.cache_semanal_api.pkl` da rodada, e, com a FAMA no App,
+  a preventiva do Fracttal ainda por fazer das usinas da FAMA sai (a feita fica: é histórico). Na rodada com a foto, o cache é a foto; na de
   verdade, a rodada faz antes a MESMA leitura do Fracttal do motor (`fonte_bd_api.df_semanal`, num subprocesso com o
   ambiente dele) e roda o motor com o TTL de 180 min. A linha: "OSs ID" é um NÚMERO substituto (9.000.000.000 + o id),
   porque o motor faz int() no "OSs ID", e a planilha volta a dizer FAMA-<id> depois do motor (`depois_do_motor`); a usina é
   o nome dela nas tarefas do Fracttal no cache (sem tarefa, o do de-para); a equipe, a das tarefas (sem tarefa, a do
-  cadastro, se for "UF Região NN"); o tipo, corretiva ou preventiva; a "Data Programada", a previsão; a tarefa, "OS da FAMA
-  <id>" (o título NÃO vai: o log do motor imprime o texto das tarefas); a duração, 1,5 h. O portão é o FRESCOR, não a
-  contagem (`fama_motor.entrada`): o livro velho (a leitura da FAMA parada) ou o banco fora = a FAMA fica fora da rodada,
-  que sai a de sempre com o motivo no status e na tela Gerar (`geracao._fama`, `{"fora": ...}`; até 13/11/2026 a rodada
-  não saía, o que travaria a semana do PCM agora que a FAMA entra por padrão); o livro fresco e sem
-  OS = a semana de sempre, sem o adaptador. O resumo vai no `status.json` (`fama`) e numa linha do log, só com contagens.
+  cadastro, com qualquer nome); o tipo, corretiva, preventiva ou zeladoria (roçada e limpeza); a "Data Programada", a
+  previsão; a tarefa, "OS da FAMA <id>" e, na preventiva, a sigla (" · MPM"; a escrita no título vale primeiro, depois a
+  palavra: "mensal", "semi-annual", "yearly"...; o título NÃO vai: o log do motor imprime o texto das tarefas); a duração,
+  1,5 h. O portão é o FRESCOR, não a contagem (`fama_motor.entrada`): o livro velho (a leitura da FAMA parada) ou o banco
+  fora = a FAMA fica fora da rodada, que sai a de sempre com o motivo no status e na tela Gerar (`geracao._fama`,
+  `{"fora": ...}`; até 13/11/2026 a rodada não saía, o que travaria a semana do PCM agora que a FAMA entra por padrão); o
+  erro DENTRO do adaptador (a leitura do Fracttal antes do motor, o cache que não abre) também: a rodada sai a de sempre,
+  com o motivo (`geracao._executar`). O livro fresco e sem OS = a semana de sempre, sem o adaptador. O resumo vai no
+  `status.json` (`fama`) e numa linha do log, só com contagens; a tela Gerar mostra cada motivo das que ficaram fora.
 - **Achados da prova com o motor de verdade (11/11/2026):** com a duração vazia, a preventiva da FAMA sem sigla e sem par
   na Lista de Prioridades saía com `dur_h` NaN e a rodada inteira quebrava (`alloc_diurno`): por isso 1,5 h, o último
   recurso do próprio motor (`_estimate_h_sem_fracttal`). O motor gera sempre a semana da próxima segunda: o `--semana` da
@@ -2238,8 +2249,11 @@ FAMA, o livro `nexus_os_fama · fato_os_fama` e o de-para em Ligações são da 
   - o `fama_motor.entrada` lê o banco dentro da `_trava` da geração (`geracao.iniciar`): o banco lento segura a trava;
   - "usina da FAMA" é a que tem OS da FAMA ligada, de qualquer época: a usina que saiu da FAMA perde a preventiva do
     Fracttal (restringir pelo `dim_projeto_fama` ou pela atividade recente);
-  - o robô e o App precisam aceitar "FAMA-<id>" no "OSs ID" e "OS da FAMA <id>" na tarefa (até lá, a semana vai ao App
-    sem elas).
+  - o App aceita "FAMA-<id>" desde a v352/v353 (13/11); falta a rota `POST /t/pcm/fama/app` (o que o técnico faz na OS
+    da FAMA volta ao Nexus) e conferir os técnicos com "executa" nas usinas da FAMA antes da `NEXUS_FAMA_APP=1`;
+  - a equipe local ("EQUIPE Local 2 E 3") não começa por UF: o motor não acha o feriado estadual dela; duas equipes que
+    só diferem depois do 31º caractere dariam a mesma aba; as horas da FAMA não entram na carga do dia do Quadro; e a
+    FAMA não entra no histórico do PCM (a reserva guarda só as tarefas do Fracttal).
 - **Provar:** `tests/test_pcm_fama_quadro.py` (as regras, o teto e o bloco das atrasadas, os filtros e as contas à
   parte, o frescor, a repetição e a tela), `tests/test_pcm_fama_copia.py` (o caminho de produção, com o banco de mentira e
   o livro gravado pela carga da parte A: a 1ª visita não espera, a cópia vencida volta na hora, duas visitas na mesma
