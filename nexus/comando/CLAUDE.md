@@ -312,6 +312,11 @@ conclusão sozinha e o vencido que sobe para o setor; no O&M, a demanda fica pre
   setor"). O setor vê o que todo mundo dele recebe (a aba "Do meu setor", com o filtro por pessoa e por tema).
 - Cada setor monta os seus temas, cada um com o prazo em dias úteis (1 a 30; sem sábado, domingo e feriado nacional):
   Comando → Temas do setor (`de_todos`). O prazo da demanda é o do tema na hora em que foi aberta.
+  Na tela, o campo do tema se chama `tema` e vai com `autocomplete="off"` (12/11/2026, Levi, com o print: "o campo que
+  aparece quando vou digitar está mal formatado, conserte!"): chamado `nome`, o Edge abria por cima da tabela a lista do
+  que já foi digitado em qualquer campo `nome` do Nexus (o nome da pessoa, "Chamados", "Administrador", "Responsável
+  UFV", dos Acessos). A rota ainda aceita `nome` (a página que ficou aberta de antes). **Campo de texto novo num
+  formulário do Nexus: nome próprio do que ele guarda e `autocomplete="off"` quando o histórico do navegador não ajuda.**
 - A OS, as usinas e os anexos são opcionais. A OS tem de existir e ser de uma das usinas escolhidas (o retrato do
   Fracttal no banco, `nexus_os · fato_tarefa_os`: as abertas e em verificação), e abre o card do OS Creator ao clicar
   (`NexusOsCard.abrirFolio`). Os anexos seguem a regra das Sugestões (5 arquivos, 5 MB cada, 15 MB juntos, o conteúdo

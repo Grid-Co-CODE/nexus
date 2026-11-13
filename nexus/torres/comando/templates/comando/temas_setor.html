@@ -34,8 +34,12 @@
       {% for t in temas %}
       {% set f = 'dm-t-' ~ t.tema_id %}
       <tr{% if not t.ativo %} class="dm-inativo"{% endif %}>
-        <td><input class="gc-campo" form="{{ f }}" name="nome" value="{{ t.nome }}" maxlength="60" required aria-label="Nome do tema"></td>
-        <td><input class="gc-campo dm-prazo-campo" form="{{ f }}" name="prazo" type="number" min="{{ prazo_min }}" max="{{ prazo_max }}" value="{{ t.prazo_dias_uteis }}" required aria-label="Prazo de {{ t.nome }} em dias úteis"></td>
+        {# o campo se chama `tema` e vai sem o preenchimento automático do navegador (12/11/2026, Levi, com o print: "o campo
+           que aparece quando vou digitar está mal formatado, conserte!"): chamado `nome`, o Edge abria por cima da tabela a
+           lista do que já foi digitado em QUALQUER campo `nome` do Nexus (o nome da pessoa, "Chamados", "Administrador",
+           "Responsável UFV", dos Acessos), que não tem nada a ver com tema #}
+        <td><input class="gc-campo" form="{{ f }}" name="tema" value="{{ t.nome }}" maxlength="60" required autocomplete="off" aria-label="Nome do tema"></td>
+        <td><input class="gc-campo dm-prazo-campo" form="{{ f }}" name="prazo" type="number" min="{{ prazo_min }}" max="{{ prazo_max }}" value="{{ t.prazo_dias_uteis }}" required autocomplete="off" aria-label="Prazo de {{ t.nome }} em dias úteis"></td>
         <td><select class="gc-campo" form="{{ f }}" name="ativo" aria-label="{{ t.nome }} em uso"><option value="sim"{% if t.ativo %} selected{% endif %}>sim</option><option value="nao"{% if not t.ativo %} selected{% endif %}>não</option></select></td>
         <td><form id="{{ f }}" method="post" action="{{ '/t/comando/temas-do-setor/salvar'|na_raiz }}">
           <input type="hidden" name="codigo" value="{{ codigo }}"><input type="hidden" name="setor_id" value="{{ setor_id }}">
@@ -44,8 +48,8 @@
       </tr>
       {% endfor %}
       <tr>
-        <td><input class="gc-campo" form="dm-t-novo" name="nome" maxlength="60" required placeholder="Novo tema (por exemplo: Dado que não bate)" aria-label="Nome do novo tema"></td>
-        <td><input class="gc-campo dm-prazo-campo" form="dm-t-novo" name="prazo" type="number" min="{{ prazo_min }}" max="{{ prazo_max }}" value="2" required aria-label="Prazo do novo tema em dias úteis"></td>
+        <td><input class="gc-campo" form="dm-t-novo" name="tema" maxlength="60" required autocomplete="off" placeholder="Novo tema (por exemplo: Dado que não bate)" aria-label="Nome do novo tema"></td>
+        <td><input class="gc-campo dm-prazo-campo" form="dm-t-novo" name="prazo" type="number" min="{{ prazo_min }}" max="{{ prazo_max }}" value="2" required autocomplete="off" aria-label="Prazo do novo tema em dias úteis"></td>
         <td class="dm-mudo">sim</td>
         <td><form id="dm-t-novo" method="post" action="{{ '/t/comando/temas-do-setor/salvar'|na_raiz }}">
           <input type="hidden" name="codigo" value="{{ codigo }}"><input type="hidden" name="setor_id" value="{{ setor_id }}">

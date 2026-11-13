@@ -275,7 +275,8 @@ def test_a_pessoa_sem_a_tela_nao_ve_o_link_nem_o_botao_dela(tela, logado, monkey
     from nexus.auth import setor_telas
     monkeypatch.setattr(setor_telas, "liberadas_do_menu", lambda: {"campo/responsaveis", "campo/rondas"})
     html = logado.get("/t/campo/responsaveis?modo=usina&usina=1").get_data(as_text=True)
-    assert "/os/tradicional" not in html and 'href="/os/solicitacao' not in html and "pu-menu-caixa" not in html
+    # o endereço do OS Creator na página (o `/t/os/...` do menu lateral da casca é outra coisa: é a tela do Nexus)
+    assert 'href="/os/tradicional' not in html and 'href="/os/solicitacao' not in html and "pu-menu-caixa" not in html
     assert "/t/comando/conversa/usina/1" not in html and "Abrir os Insights" not in html
     assert "Abrir a Mesa da Segurança" not in html and "/t/campo/rondas/usina/1" in html
     assert "data-pu-rel" in html                                               # o relatório é da própria tela

@@ -380,15 +380,25 @@ def test_os_temas_do_setor_cada_setor_mexe_nos_seus(app, cena):
     c = _cliente(app, JU)
     html = c.get("/t/comando/temas-do-setor").get_data(as_text=True)
     assert "Dado que não bate" in html and "Comando · Performance" in html
+    # o campo do tema não se chama `nome` e vai sem o preenchimento automático (12/11/2026, Levi: "o campo que aparece
+    # quando vou digitar está mal formatado"): o navegador abria a lista do que foi digitado em outros campos `nome`
+    tabela = html.split('<table class="dm-temas">', 1)[1].split("</table>", 1)[0]
+    assert 'name="nome"' not in tabela and tabela.count('name="tema"') == 2          # o tema que existe e o novo
+    assert tabela.count('autocomplete="off"') == 4 and 'name="tema" maxlength="60" required autocomplete="off"' in tabela
     r = c.post("/t/comando/temas-do-setor/salvar", data={"codigo": _codigo(html), "setor_id": "1",
-                                                         "nome": "Relatório do cliente", "prazo": "3"})
+                                                         "tema": "Relatório do cliente", "prazo": "3"})
     assert r.status_code == 303
     assert sorted(t["nome"] for t in D.temas(1)) == ["Dado que não bate", "Relatório do cliente"]
+    # a página que ficou aberta de antes ainda manda `nome`: grava do mesmo jeito
+    html = c.get("/t/comando/temas-do-setor").get_data(as_text=True)
+    assert c.post("/t/comando/temas-do-setor/salvar", data={"codigo": _codigo(html), "setor_id": "1",
+                                                            "nome": "Curva de geração", "prazo": "2"}).status_code == 303
+    assert "Curva de geração" in [t["nome"] for t in D.temas(1)]
     # o tema do outro setor, não
     assert c.post("/t/comando/temas-do-setor/salvar", data={"codigo": _codigo(html), "setor_id": "2",
                                                             "nome": "Extintores", "prazo": "2"}).status_code == 403
     html = c.get("/t/comando/temas-do-setor").get_data(as_text=True)
-    assert "Tema salvo." in html and "Relatório do cliente" in html
+    assert "Relatório do cliente" in html and "Curva de geração" in html
     # quem não tem setor vê o aviso, sem o formulário
     html = _cliente(app, SEM).get("/t/comando/temas-do-setor").get_data(as_text=True)
     assert "ainda não tem setor no Nexus" in html and "temas-do-setor/salvar" not in html

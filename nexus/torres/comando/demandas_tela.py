@@ -284,7 +284,9 @@ def temas_do_setor_salvar():
     if not session.get("admin") and sid != meu:
         abort(403)
     try:
-        D.salvar_tema(sid, request.form.get("nome"), request.form.get("prazo"), _usuario(),
+        # o campo é `tema` desde 12/11/2026 (o `nome` chamava o preenchimento automático do navegador); o `nome` segue
+        # aceito para a página que ficou aberta de antes
+        D.salvar_tema(sid, request.form.get("tema") or request.form.get("nome"), request.form.get("prazo"), _usuario(),
                       tema_id=request.form.get("tema_id") or None, ativo=request.form.get("ativo") != "nao",
                       novo=request.form.get("novo_id"))
         session[_AVISO] = ("ok", "Tema salvo.")
