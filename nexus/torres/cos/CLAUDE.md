@@ -456,6 +456,18 @@ Ignora esse monitoramento que já existe no nexus" (a Performance › Tempo real
   também na tela normal). Clicar no cartão abre a janela dos inversores (`cos/_inversores.html`,
   `static/cos/inversores.js`): a curva da usina e a de cada inversor, o estado de cada um ao vivo de 3 em 3 s, e "aberto
   no COS" no inversor com ocorrência (`MO.abertas_de_inversor`). **Quem lê, desde 12/11/2026 à tarde, é o SERVIDOR do Nexus** (o dono: "o monitoramento do nexus ainda não ta igual do prototipo, corrija"): a janela pede `/t/cos/monitoramento/ronda-api/scada/monitoramento` e `.../scada/curva/<loggers>?dia=`, os mesmos caminhos da API da Ronda COS, e a rota `monitoramento_ronda_api` lê o Andamento (`/api/nexus/geracao/scada` e `/scada-curva`, a chave de máquina) com `AND.ler_ao_vivo`: 2 s de cópia para o ao vivo (60 s para a curva) e um pedido só por leitura no ar, então dez pessoas com a janela aberta são uma leitura a cada 2 s. Sem login da Ronda COS; o portão de setores dá a rota a quem vê o Monitoramento (ela mora debaixo dele). Com `NEXUS_COS_API_URL`, o navegador volta a ler a API direto, com o login da pessoa.
+- **O detalhe de um inversor** (13/11/2026, o dono: "clicar num inversor e ver o gráfico individual desse inversor,
+  junto com o gráfico das strings dele, individual ou em grupo, por exemplo por MPPT"): na janela da usina, o inversor é
+  botão e troca o corpo pelo detalhe (`.cos-inv-det` no `cos/_inversores.html`; "Voltar à usina" e o Esc voltam, com o
+  foco no inversor; o segundo Esc fecha). Mostra a curva dele (a gravada e a ponta), as entradas de agora (a corrente de
+  cada string sob o MPPT que o coletor declarou; tensão, corrente e potência do MPPT) e as entradas **desde que a janela
+  abriu**: Individual, Por MPPT ou Todas (até 4 em destaque). A regra das entradas é a da Ronda COS
+  (`entradas-do-inversor.ts`), portada: nunca um MPPT inventado (o Huawei, pelo SmartLogger, manda strings sem MPPT e não
+  tem "Por MPPT"; o Sungrow sem leitura diz "o coletor não lê MPPT nem string deste inversor"). **A string não tem série
+  gravada** (a `scada_amostra` da Ronda COS guarda só o kW do inversor): o registro é do navegador, com as leituras de 3 s
+  que já chegam, um ponto a cada 20 s, só da usina aberta, e some ao fechar. Nenhum pedido nem rota nova. As contas
+  (`NexusCosInversores`) têm teste no node: `tests/test_cos_inversores_js.py`. O Esc é pelo `cancel` do `<dialog>`: a
+  versão pelo keydown, com uma marca desligada por `setTimeout`, deixava a janela sem fechar no segundo Esc rápido.
 - **As usinas da assistida da Thopen** (o dono, 12/11/2026: "é THOPEN - Operação Assistida"; "atualizar somente o
   monitoramento. Ela não entra em nenhum outro lugar"): as 4 usinas com logger que a Ronda COS manda sem cliente (sem
   usina no cadastro dela) vão para o grupo "Thopen - Operação Assistida" (`MO.CLIENTE_SEM_CADASTRO`, pelo id do cartão).
