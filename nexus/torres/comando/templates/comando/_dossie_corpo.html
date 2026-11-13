@@ -1,0 +1,27 @@
+{# O miolo do dossiê da usina (12/11/2026; o texto é o de nexus/comando/dossie.py): a página (comando/dossie.html) e a
+   janela por cima do prontuário (13/11/2026, Levi: "Pode abrir uma janelinha na frente, sobrepor uma tela. Não precisa
+   ser algo que leva para um link [...] tira totalmente a imersão da tela do prontuário"). Na janela (`na_janela`) o
+   título é o da própria janela; o copiar é o do prontuario.js. #}
+{% from "_explica.html" import explica %}
+  <div class="cn-cab{% if na_janela %} ds-cab-jan{% endif %}">
+    {% if not na_janela %}<div><p class="gc-eyebrow">Dossiê para a IA</p>
+      <div class="gc-titulo-explica"><h1 class="cn-titulo">{{ x.usina }}</h1>
+        {% call explica('Entenda o dossiê') %}
+        <p><b>O que é.</b> Tudo o que o prontuário desta usina junta, de todos os setores, escrito como texto: é o que a IA vai ler junto da pergunta de quem estiver no prontuário.</p>
+        <p><b>De onde vem.</b> Do próprio prontuário, na hora, mais o que a Engenharia acompanha e as observações do responsável. Nenhum número é calculado aqui, e cada seção diz a tela do Nexus de onde o dado saiu.</p>
+        <p><b>Como ler.</b> "Sem dado" quer dizer que a fonte não tem o valor, e não que é zero. A gravidade vem em palavras (crítico, atenção, em dia), a mesma da tela dona. As fontes que não abriram ficam na última seção.</p>
+        <p><b>Pessoas.</b> Aparecem pelo papel, sem o nome: o texto é feito para sair do Nexus.</p>
+        <p><b>Tokens.</b> É uma estimativa pelo tamanho do texto (4 caracteres por token). A conta exata só a API dá.</p>
+        {% endcall %}</div></div>{% else %}<p class="mudo ds-nota-jan">Tudo o que o prontuário desta usina junta, de todos os setores, no texto que a IA vai ler.</p>{% endif %}
+    <div class="ds-acoes">
+      <button type="button" class="gc-btn gc-btn--ui gc-btn--primario" data-ds-copiar><i class="ph ph-copy" aria-hidden="true"></i> Copiar o texto</button>
+      <a class="gc-btn gc-btn--ui gc-btn--contorno" href="{{ raiz }}/t/comando/usinas/{{ x.usina_id }}/dossie.md?baixar=1"><i class="ph ph-download-simple" aria-hidden="true"></i> Baixar .md</a>
+    </div>
+  </div>
+  <dl class="ds-faixa">
+    <div><dt>Seções</dt><dd class="gc-num">{{ d.secoes|length }}</dd></div>
+    <div><dt>Palavras</dt><dd class="gc-num">{{ '{:,}'.format(d.palavras)|replace(',', '.') }}</dd></div>
+    <div><dt>Caracteres</dt><dd class="gc-num">{{ '{:,}'.format(d.caracteres)|replace(',', '.') }}</dd></div>
+    <div><dt>Tokens, estimativa</dt><dd class="gc-num">{{ '{:,}'.format(d.tokens_estimados)|replace(',', '.') }}</dd></div>
+  </dl>
+  <pre class="ds-texto" data-ds-texto tabindex="0" aria-label="O texto do dossiê">{{ d.texto }}</pre>

@@ -1,7 +1,7 @@
 {# A conversa de um objeto (Fase 2, 03/11/2026): as mensagens, com as menções em selo, e o formulário. O @ abre a lista de
    pessoas e áreas (conversa.js, que pede /t/comando/conversa/pessoas só quando alguém digita @); sem JavaScript, as
    áreas se marcam na caixa "Mencionar áreas". Quem é mencionado vê na Caixa de entrada e no sino. #}
-{% macro fio(ob, conv, codigo, voltar, tem_login, areas, titulo='Conversa') %}
+{% macro fio(ob, conv, codigo, voltar, tem_login, areas, titulo='Conversa', areas_abertas=false) %}
 {% set ancora = 'conv-' ~ ob|replace(':', '-') %}
 <section class="conv" id="{{ ancora }}" aria-label="{{ titulo }}">
   <p class="ins-rot">{{ titulo }}{% if conv.n %} <span class="conv-n">{{ conv.n }}</span>{% endif %}</p>
@@ -25,7 +25,8 @@
       <ul class="conv-sugestoes" role="listbox" hidden></ul>
     </div>
     <div class="conv-escolhidas" aria-live="polite"></div>
-    <details class="ins-outras conv-areas">
+    {# na janela da usina (13/11/2026) as áreas vêm abertas: escolher o setor é metade do que se faz ali #}
+    <details class="ins-outras conv-areas"{% if areas_abertas %} open{% endif %}>
       <summary>Mencionar áreas</summary>
       <div class="ins-chk">{% for t, nome in areas %}<label><input type="checkbox" name="area" value="{{ t }}"> {{ nome }}</label>{% endfor %}</div>
     </details>

@@ -354,7 +354,24 @@ a.ins-titulo:hover{color:var(--verde-texto)}
 .pu-menu-seta{font-size:13px}
 /* o Criar OS por cima do prontuário (13/11/2026): a janela das telas do OS Creator (`cr-modal--chamado`, campo.css), com o
    título à esquerda do Fechar; e o aviso da OS criada, no pé da tela, que some sozinho */
-.pu-os-jan .cr-modal-barra{justify-content:space-between;align-items:center;gap:12px}
+.pu-os-jan .cr-modal-barra,.pu-jan .cr-modal-barra{justify-content:space-between;align-items:center;gap:12px}
+/* a janela da usina (13/11/2026): o dossiê e a conversa por cima do prontuário */
+.pu-jan{width:min(920px,calc(100vw - 32px))}
+.pu-jan-corpo[aria-busy="true"]{opacity:.6}
+.pu-jan-carregando{margin:18px 0}
+.pu-jan .ds-cab-jan{margin-top:6px}
+.pu-jan .ds-texto{max-height:52vh}
+.pu-cv-seg{margin:6px 0 14px}
+/* as abas da janela são botões (trocam sem pedido): o mesmo desenho do .cn-seg de links da Visão do responsável */
+.pu-cv-seg button{padding:6px 12px;border:0;border-radius:7px;background:none;color:var(--mudo);font:600 12.5px/18px var(--font-sans);
+  white-space:nowrap;cursor:pointer}
+.pu-cv-seg button:hover{color:var(--tinta)}
+.pu-cv-seg button[aria-selected="true"]{background:var(--verde);color:var(--sobre-verde)}
+.pu-cv-seg button:focus-visible{outline:2px solid var(--foco);outline-offset:2px}
+.pu-cv-seg b.cu-n{margin-left:4px}
+.pu-cv .conv{margin-top:0}
+.pu-cv-dem{padding:0}
+.pu-cv-nova{margin:0}
 .pu-os-jan-t{margin:0;font:600 15px/22px var(--font-sans);color:var(--tinta)}
 .pu-aviso{position:fixed;left:50%;bottom:28px;transform:translateX(-50%);z-index:80;max-width:min(560px,calc(100vw - 32px));
   padding:12px 18px;border:1px solid var(--ok);border-radius:var(--raio-md);background:var(--superficie);color:var(--tinta);

@@ -275,7 +275,22 @@ abre a tela de criação numa janela com o fundo desfocado (`<dialog id="pu-os-j
 `oscreator/criar_os.html`; só as telas de `ponte.CRIAR_POR_CIMA`, que o teste confere contra o `CRIAR_OS`). A tela vem com
 `?janela=1`: sem o topo, e a ponte avisa quando a criação deu certo; criou sem falha, a janela fecha e o aviso aparece no
 pé do prontuário; com falha (lote), a janela fica e a tela diz o que não saiu. Sem o login do Fracttal, a moldura diz como
-entrar e volta ao prontuário. O botão do meio e o Ctrl abrem a tela numa aba, pelo href. O botão "Criar ticket" da 1ª versão
+entrar e volta ao prontuário. O botão do meio e o Ctrl abrem a tela numa aba, pelo href.
+
+**A janela da usina: o dossiê e a conversa também por cima (13/11/2026).** Levi: "o dossiê para IA também tem que ser
+daquela mesma forma [...] Pode abrir uma janelinha na frente, sobrepor uma tela. Não precisa ser algo que leva para um
+link [...] tira totalmente a imersão da tela do prontuário"; e, da conversa: "A ideia é montar uma caixa de entrada, é
+isso? Escolher o setor e tudo mais. Faça no mesmo modelo de janela. Janela acima, e aí faça algo bem versátil". As
+páginas do Nexus não entram em moldura (o `base.html` foge dela), então a janela (`<dialog id="pu-jan">`) recebe um
+PEDAÇO de página por `fetch` (`prontuario.js`): o dossiê pelo `?parcial=1` da rota dele (`comando/_dossie_corpo.html`,
+o mesmo miolo da página, sem o título) e a conversa pela rota `/t/comando/conversa/usina/<id>/janela`
+(`comando/_conversa_janela.html`), com três abas: **Conversa** (o fio de sempre, com @ e as áreas à vista), **Pedir a um
+setor** (a Nova demanda da Caixa, com a usina fixa e as OS dela: os campos moram em `comando/_demanda_nova.html` e o
+script em `window.NexusDemandaNova`, do `comando/demandas.js`, os mesmos do diálogo da Caixa) e **Demandas da usina**
+(as que a citam, das que a pessoa pode ver). O que se faz lá dentro fica lá: os formulários vão por trás e a resposta,
+depois do 303, é a janela de novo, com o aviso (a conversa volta pelo `voltar`; a Nova demanda, pelo `?usina_jan=<id>`,
+cai na aba das demandas). A rota da janela aberta sozinha no navegador leva à página da conversa. Teste:
+`tests/test_comando_demandas.py` (a janela) e `tests/test_comando_dossie.py` (o dossiê na janela). O botão "Criar ticket" da 1ª versão
 (os planos da Performance direto) saiu no mesmo dia. Relatório = o PDF do
 cliente da Usinas 360° (`campo/relatorio_usina.py`), também pelo endereço do Comando
 (`/t/comando/usinas/<id>/relatorio.pdf`, que chama a rota de lá), para quem tem o Comando e não a Visão do responsável.

@@ -1,0 +1,52 @@
+{# Os campos da Nova demanda (12/11/2026), num lugar só desde 13/11/2026: o diálogo da Caixa de entrada
+   (comando/_demandas.html) e a aba "Pedir a um setor" da janela da conversa da usina, no prontuário
+   (comando/_conversa_janela.html). Quem liga o setor, a pessoa, o tema, as OS e os anexos é o `NexusDemandaNova` do
+   comando/demandas.js, que lê a caixa em volta (`data-pessoas-url`, `data-os-url`). `pre` = o começo dos ids (dois
+   formulários na mesma página não repetem id); `usina` = (usina_id, nome): a usina fica fixa, sem a lista, e as OS
+   dela vêm ao abrir. #}
+{% macro campos(dem, codigo, pre='dm-f', usina=none) %}
+    <input type="hidden" name="codigo" value="{{ codigo }}"><input type="hidden" name="novo_id" value="{{ dem.novo_id }}">
+    <p class="dm-nota dm-nota--erro" role="alert" data-dm-f-pessoas-erro hidden></p>
+    <div class="dm-dupla">
+      <div class="dm-campo"><label class="gc-rotulo" for="{{ pre }}-setor">Setor</label>
+        <select class="gc-campo" id="{{ pre }}-setor" name="para_setor_id" required data-dm-f-setor>
+          <option value="">Carregando os setores…</option>
+        </select></div>
+      <div class="dm-campo"><label class="gc-rotulo" for="{{ pre }}-pessoa">Para quem</label>
+        <select class="gc-campo" id="{{ pre }}-pessoa" name="para_hmac" required data-dm-f-pessoa>
+          <option value="">Escolha o setor primeiro</option>
+        </select></div>
+    </div>
+    <div class="dm-campo"><label class="gc-rotulo" for="{{ pre }}-tema">Tema</label>
+      <select class="gc-campo" id="{{ pre }}-tema" name="tema_id" required data-dm-f-tema aria-describedby="{{ pre }}-prazo">
+        <option value="">Escolha o setor primeiro</option>
+        {% for t in dem.temas %}<option value="{{ t.tema_id }}" data-setor="{{ t.setor_id }}" data-ate="{{ t.ate }}">{{ t.nome }} ({{ t.prazo_dias_uteis }} {{ 'dia útil' if t.prazo_dias_uteis == 1 else 'dias úteis' }})</option>{% endfor %}
+      </select>
+      <span class="dm-nota" id="{{ pre }}-prazo" data-dm-f-prazo>O prazo é o do tema, em dias úteis. O setor sem tema ainda não recebe demanda: peça a ele que cadastre em <a href="{{ '/t/comando/temas-do-setor'|na_raiz }}">Temas do setor</a>.</span></div>
+    <div class="dm-campo"><label class="gc-rotulo" for="{{ pre }}-titulo">Título</label>
+      <input class="gc-campo" id="{{ pre }}-titulo" name="titulo" maxlength="{{ dem.limites.titulo }}" required placeholder="Em poucas palavras"></div>
+    <div class="dm-campo"><label class="gc-rotulo" for="{{ pre }}-desc">Descrição</label>
+      <textarea class="gc-campo" id="{{ pre }}-desc" name="descricao" rows="4" maxlength="{{ dem.limites.texto }}" required placeholder="O que você precisa, e por quê"></textarea></div>
+    {% if usina %}
+    <input type="hidden" name="usinas" value="{{ usina[0] }}" data-dm-f-usina-fixa>
+    <div class="dm-campo"><label class="gc-rotulo" for="{{ pre }}-os">OS vinculada (opcional)</label>
+      <select class="gc-campo" id="{{ pre }}-os" name="os" data-dm-f-os aria-describedby="{{ pre }}-os-dica"><option value="">Sem OS</option></select>
+      <span class="dm-nota" id="{{ pre }}-os-dica" data-dm-f-os-dica>As OS abertas e em verificação da {{ usina[1] }}.</span></div>
+    {% else %}
+    <div class="dm-dupla">
+      <fieldset class="dm-campo dm-usinas"><legend class="gc-rotulo">Usinas (opcional, uma ou mais)</legend>
+        <input class="gc-campo" type="search" placeholder="Procurar a usina" aria-label="Procurar a usina" data-dm-f-busca>
+        <div class="dm-usinas-lista" data-dm-f-usinas>
+          {% for uid, nome in dem.usinas %}<label class="dm-usina"><input type="checkbox" name="usinas" value="{{ uid }}"> {{ nome }}</label>{% endfor %}
+        </div></fieldset>
+      <div class="dm-campo"><label class="gc-rotulo" for="{{ pre }}-os">OS vinculada (opcional)</label>
+        <select class="gc-campo" id="{{ pre }}-os" name="os" data-dm-f-os aria-describedby="{{ pre }}-os-dica"><option value="">Sem OS</option></select>
+        <span class="dm-nota" id="{{ pre }}-os-dica" data-dm-f-os-dica>Escolha a usina: aparecem só as OS dela (as abertas e em verificação).</span></div>
+    </div>
+    {% endif %}
+    <div class="dm-campo"><label class="gc-rotulo" for="{{ pre }}-anexos">Anexos (opcional)</label>
+      <input class="gc-campo" id="{{ pre }}-anexos" name="anexos" type="file" multiple accept="{{ dem.anexo.aceitos|replace(' ', '') }}"
+             data-max-mb="{{ dem.anexo.max_mb }}" data-max-arquivos="{{ dem.anexo.max_arquivos }}" data-max-total="{{ dem.anexo.max_total }}" aria-describedby="{{ pre }}-anexos-ajuda" data-dm-f-anexos>
+      <span class="dm-nota" id="{{ pre }}-anexos-ajuda">Até {{ dem.anexo.max_arquivos }} arquivos, {{ dem.anexo.max_mb }} MB cada e {{ dem.anexo.max_total }} MB juntos. Aceitos: {{ dem.anexo.aceitos }}.</span>
+      <span class="dm-nota dm-nota--erro" role="alert" data-dm-f-anexos-erro hidden></span></div>
+{% endmacro %}

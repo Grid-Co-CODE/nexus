@@ -79,6 +79,76 @@
       if (d.tipo === 'criada' && !d.falhas) { fecharJan(); avisar(d.mensagem || 'OS criada no Fracttal.'); }
     });
   }
+  // a janela da usina (13/11/2026, Levi: "Pode abrir uma janelinha na frente, sobrepor uma tela. Não precisa ser algo
+  // que leva para um link [...] tira totalmente a imersão da tela do prontuário"; e, da conversa: "faça algo bem versátil
+  // para as pessoas usarem"): o dossiê e a conversa vêm como pedaço de página. O que se faz lá dentro fica lá: os
+  // formulários vão por trás e a resposta (depois do 303) é a janela de novo, com o aviso; as abas trocam sem pedido
+  var pj = document.getElementById('pu-jan');
+  if (pj) {
+    var pjCorpo = pj.querySelector('[data-pu-jan-corpo]'), pjT = document.getElementById('pu-jan-t'), novas = [];
+    var montarJan = function () {
+      if (window.nexusConversa) window.nexusConversa(pjCorpo);
+      novas = [];
+      pjCorpo.querySelectorAll('[data-pu-dm-nova]').forEach(function (f) {
+        if (window.NexusDemandaNova) novas.push(window.NexusDemandaNova(f));
+      });
+      // a aba Pedir aberta já de início (a volta de um envio que falhou): quem recebe vem agora
+      var pedir = pjCorpo.querySelector('[data-pu-seg-painel="pedir"]');
+      if (pedir && !pedir.hidden) novas.forEach(function (n) { n.carregarPessoas(); });
+    };
+    var carregar = function (url, opcoes) {
+      pjCorpo.setAttribute('aria-busy', 'true');
+      return fetch(url, Object.assign({credentials: 'same-origin'}, opcoes || {})).then(function (r) {
+        if (r.redirected && /\/entrar/.test(r.url)) { location.reload(); return null; }     // a sessão do Nexus caiu
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        return r.text();
+      }).then(function (html) {
+        if (html === null) return;
+        pjCorpo.innerHTML = html;
+        montarJan();
+      }).catch(function (e) {
+        pjCorpo.innerHTML = '<div class="cn-erro" role="alert"><b>Não consegui abrir agora (' + e.message + ').</b> Feche e tente de novo.</div>';
+      }).then(function () { pjCorpo.removeAttribute('aria-busy'); });
+    };
+    raiz.addEventListener('click', function (ev) {
+      var a = ev.target.closest('[data-pu-jan]');
+      if (!a || ev.button || ev.ctrlKey || ev.metaKey || ev.shiftKey || ev.altKey) return;
+      ev.preventDefault();
+      pjT.textContent = a.getAttribute('data-pu-jan-t') || 'Usina';
+      pjCorpo.innerHTML = '<p class="mudo pu-jan-carregando">Carregando…</p>';
+      if (!pj.open) pj.showModal();
+      carregar(a.getAttribute('data-pu-jan'));
+    });
+    pj.addEventListener('submit', function (ev) {
+      var f = ev.target;
+      if (!f || String(f.getAttribute('method') || '').toLowerCase() !== 'post' || ev.defaultPrevented) return;
+      ev.preventDefault();
+      var dados = new FormData(f);
+      if (ev.submitter && ev.submitter.name) dados.append(ev.submitter.name, ev.submitter.value);
+      f.querySelectorAll('button[type="submit"]').forEach(function (b) { b.disabled = true; });
+      carregar(f.action, {method: 'POST', body: dados});
+    });
+    pj.addEventListener('click', function (ev) {
+      if (ev.target === pj) { pj.close(); return; }
+      var s = ev.target.closest('[data-pu-seg]');
+      if (s) {
+        var k = s.getAttribute('data-pu-seg');
+        pjCorpo.querySelectorAll('[data-pu-seg]').forEach(function (b) { b.setAttribute('aria-selected', b === s ? 'true' : 'false'); });
+        pjCorpo.querySelectorAll('[data-pu-seg-painel]').forEach(function (p) { p.hidden = p.getAttribute('data-pu-seg-painel') !== k; });
+        if (k === 'pedir') novas.forEach(function (n) { n.carregarPessoas(); });
+        return;
+      }
+      var c = ev.target.closest('[data-ds-copiar]');
+      if (c) {
+        var pre = pjCorpo.querySelector('[data-ds-texto]'), rot = c.lastChild.textContent;
+        var fim = function (ok) { c.lastChild.textContent = ok ? ' Copiado' : ' Não deu para copiar: selecione o texto'; setTimeout(function () { c.lastChild.textContent = rot; }, 2500); };
+        if (pre && navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(pre.textContent).then(function () { fim(true); }, function () { fim(false); });
+        else fim(false);
+      }
+    });
+    pj.querySelector('[data-pu-jan-fechar]').addEventListener('click', function () { pj.close(); });
+    pj.addEventListener('close', function () { pjCorpo.innerHTML = ''; novas = []; });
+  }
   // o aviso no pé da tela, que some sozinho (a OS criada, com o número)
   function avisar(texto) {
     var t = document.getElementById('pu-aviso');

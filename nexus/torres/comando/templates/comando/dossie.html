@@ -3,7 +3,6 @@
 {% block conteudo %}
 <link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='comando.css') }}">
-{% from "_explica.html" import explica %}
 {# O dossiê da usina para a IA (12/11/2026, Levi: "Monte o dossiê da usina inteira, para a gente usar com a IA
    futuramente, do jeito que uma IA possa ver facilmente"; "use tudo que tem no prontuário da usina [...] Todas as
    informações de todos os setores"). O texto é o de nexus/comando/dossie.py: o prontuário inteiro em Markdown, uma seção
@@ -11,28 +10,7 @@
    deixa copiar ou baixar; quem vai mandar o texto à IA é o Nexus IA, que ainda não existe. #}
 <div class="campo-nativa ds">
   <p class="cmu-volta"><a class="cn-link" href="{{ raiz }}/t/comando/usinas/{{ x.usina_id }}"><i class="ph ph-arrow-left" aria-hidden="true"></i> Prontuário</a></p>
-  <div class="cn-cab">
-    <div><p class="gc-eyebrow">Dossiê para a IA</p>
-      <div class="gc-titulo-explica"><h1 class="cn-titulo">{{ x.usina }}</h1>
-        {% call explica('Entenda o dossiê') %}
-        <p><b>O que é.</b> Tudo o que o prontuário desta usina junta, de todos os setores, escrito como texto: é o que a IA vai ler junto da pergunta de quem estiver no prontuário.</p>
-        <p><b>De onde vem.</b> Do próprio prontuário, na hora, mais o que a Engenharia acompanha e as observações do responsável. Nenhum número é calculado aqui, e cada seção diz a tela do Nexus de onde o dado saiu.</p>
-        <p><b>Como ler.</b> "Sem dado" quer dizer que a fonte não tem o valor, e não que é zero. A gravidade vem em palavras (crítico, atenção, em dia), a mesma da tela dona. As fontes que não abriram ficam na última seção.</p>
-        <p><b>Pessoas.</b> Aparecem pelo papel, sem o nome: o texto é feito para sair do Nexus.</p>
-        <p><b>Tokens.</b> É uma estimativa pelo tamanho do texto (4 caracteres por token). A conta exata só a API dá.</p>
-        {% endcall %}</div></div>
-    <div class="ds-acoes">
-      <button type="button" class="gc-btn gc-btn--ui gc-btn--primario" data-ds-copiar><i class="ph ph-copy" aria-hidden="true"></i> Copiar o texto</button>
-      <a class="gc-btn gc-btn--ui gc-btn--contorno" href="{{ raiz }}/t/comando/usinas/{{ x.usina_id }}/dossie.md?baixar=1"><i class="ph ph-download-simple" aria-hidden="true"></i> Baixar .md</a>
-    </div>
-  </div>
-  <dl class="ds-faixa">
-    <div><dt>Seções</dt><dd class="gc-num">{{ d.secoes|length }}</dd></div>
-    <div><dt>Palavras</dt><dd class="gc-num">{{ '{:,}'.format(d.palavras)|replace(',', '.') }}</dd></div>
-    <div><dt>Caracteres</dt><dd class="gc-num">{{ '{:,}'.format(d.caracteres)|replace(',', '.') }}</dd></div>
-    <div><dt>Tokens, estimativa</dt><dd class="gc-num">{{ '{:,}'.format(d.tokens_estimados)|replace(',', '.') }}</dd></div>
-  </dl>
-  <pre class="ds-texto" data-ds-texto tabindex="0" aria-label="O texto do dossiê">{{ d.texto }}</pre>
+  {% include "comando/_dossie_corpo.html" %}
 </div>
 <script>
 /* copiar o dossiê: o texto do <pre>, como está. O botão diz que copiou e volta ao normal */

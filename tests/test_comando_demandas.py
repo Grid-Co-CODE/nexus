@@ -509,3 +509,41 @@ def test_o_envio_grande_demais_volta_com_o_aviso_e_a_caixa_nao_le_o_fracttal(app
     assert r.status_code == 303
     assert "passam de 15 MB juntos" in c.get(CAIXA).get_data(as_text=True)
     assert not cena["banco"].linhas(D.LIVRO, D.ABA_DEMANDA)
+
+
+# ── a janela da conversa da usina, por cima do prontuário (13/11/2026) ─────────────────────────────────────────────────
+def test_a_janela_da_conversa_da_usina_conversa_pede_a_um_setor_e_lista_as_demandas(app, cena):
+    """Levi, 13/11/2026: "essa parte de conversa. A ideia é montar uma caixa de entrada, é isso? Escolher o setor e tudo
+    mais. Faça no mesmo modelo de janela. Janela acima, e aí faça algo bem versátil para as pessoas usarem"."""
+    c = _cliente(app, ANA)
+    JAN = "/t/comando/conversa/usina/1/janela"
+    h = c.get(JAN).get_data(as_text=True)
+    assert "<html" not in h and "data-pu-cv" in h                                   # um pedaço de página, para a janela
+    for k in ("conversa", "pedir", "demandas"):
+        assert f'data-pu-seg="{k}"' in h and f'data-pu-seg-painel="{k}"' in h
+    # a conversa: o formulário de sempre, voltando à janela, com as áreas à vista
+    assert 'name="voltar" value="/t/comando/conversa/usina/1/janela?aba=conversa"' in h
+    assert '<details class="ins-outras conv-areas" open>' in h
+    # o Pedir a um setor: a Nova demanda com a usina fixa, voltando à janela
+    pedir = h.split('data-pu-seg-painel="pedir"', 1)[1].split('data-pu-seg-painel="demandas"', 1)[0]
+    assert 'action="/t/comando/caixa-de-entrada/demandas/nova?usina_jan=1"' in pedir and "data-pu-dm-nova" in pedir
+    assert 'name="usinas" value="1" data-dm-f-usina-fixa' in pedir and "data-dm-f-busca" not in pedir
+    assert 'id="pu-dm-setor"' in pedir and "Dado que não bate" in pedir
+    # a demanda enviada pela janela volta à janela, na aba das demandas da usina, e aparece lá
+    dados = dict(_form(cena, novo_id="d00000000091"), codigo=_codigo(h))
+    r = c.post("/t/comando/caixa-de-entrada/demandas/nova?usina_jan=1", data=dados)
+    assert r.status_code == 303 and r.headers["Location"].endswith("/t/comando/conversa/usina/1/janela?aba=demandas")
+    h = c.get(JAN + "?aba=demandas").get_data(as_text=True)
+    assert "Demanda enviada." in h and "Coração 2 sem meta" in h.split('data-pu-seg-painel="demandas"', 1)[1]
+    assert 'aria-selected="true" data-pu-seg="demandas"' in h
+    # a mensagem na conversa volta à janela também
+    r = c.post("/t/comando/conversa/acao", data={"codigo": _codigo(h), "objeto": "usina:1", "acao": "mensagem",
+                                                  "texto": "Inversor 2 parado desde cedo",
+                                                  "voltar": "/t/comando/conversa/usina/1/janela?aba=conversa"})
+    assert r.status_code == 303 and "/t/comando/conversa/usina/1/janela?aba=conversa" in r.headers["Location"]
+    h = c.get(JAN).get_data(as_text=True)
+    assert "Inversor 2 parado desde cedo" in h
+    # quem não pode ver a demanda não a vê na janela; aberta sozinha no navegador, leva à página da conversa
+    assert "Coração 2 sem meta" not in _cliente(app, SEM).get(JAN + "?aba=demandas").get_data(as_text=True)
+    r = c.get(JAN, headers={"Sec-Fetch-Dest": "document"})
+    assert r.status_code == 302 and r.headers["Location"].endswith("/t/comando/conversa/usina/1")

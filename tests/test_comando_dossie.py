@@ -145,6 +145,22 @@ def test_a_pagina_e_o_texto_puro(tela, logado):
     assert logado.get("/t/comando/usinas/999/dossie.md").status_code == 404
 
 
+def test_o_dossie_abre_na_janela_por_cima_do_prontuario(tela, logado):
+    """13/11/2026, Levi: "o dossiê para IA também tem que ser daquela mesma forma [...] Pode abrir uma janelinha na
+    frente, sobrepor uma tela. Não precisa ser algo que leva para um link": o atalho abre o miolo (`?parcial=1`) na
+    janela do prontuário; o href fica para o botão do meio."""
+    p = logado.get("/t/comando/usinas/1").get_data(as_text=True)
+    assert 'data-pu-jan="/t/comando/usinas/1/dossie?parcial=1" data-pu-jan-t="Dossiê para a IA · Altair"' in p
+    assert 'id="pu-jan"' in p and "data-pu-jan-corpo" in p
+    r = logado.get("/t/comando/usinas/1/dossie?parcial=1")
+    h = r.get_data(as_text=True)
+    assert r.status_code == 200 and "<!doctype" not in h.lower() and "<html" not in h        # só o miolo, sem a casca
+    assert "data-ds-texto" in h and "data-ds-copiar" in h and "# Dossiê da usina Altair" in h and "Tokens, estimativa" in h
+    assert 'href="/t/comando/usinas/1/dossie.md?baixar=1"' in h and "<h1" not in h       # o título é o da janela
+    js = (RAIZ / "nexus" / "static" / "comando" / "prontuario.js").read_text(encoding="utf-8")
+    assert "[data-ds-copiar]" in js and "[data-pu-jan]" in js
+
+
 def test_o_atalho_no_prontuario_e_so_do_administrador(tela, logado):
     assert 'href="/t/comando/usinas/1/dossie"' in logado.get("/t/comando/usinas/1").get_data(as_text=True)
     with logado.session_transaction() as s:
@@ -154,6 +170,8 @@ def test_o_atalho_no_prontuario_e_so_do_administrador(tela, logado):
     # o endereço segue abrindo para quem abre o prontuário: é o mesmo dado
     assert logado.get("/t/comando/usinas/1/dossie").status_code == 200
 
+
+RAIZ = __import__('pathlib').Path(__file__).resolve().parents[1]
 
 EXTRAS = {
     "ativos": {"janela": 30, "criticos": 1, "atencao": 0, "monitorar": 2, "ativos": [

@@ -350,6 +350,10 @@ def usina_dossie(usina_id):
     junto da pergunta (`nexus/comando/dossie.py`). Esta página mostra o texto, o tamanho dele e deixa copiar e baixar;
     abre para quem abre o prontuário (o mesmo dado, sem o nome das pessoas)."""
     ctx, d = _dossie(usina_id)
+    # na janela por cima do prontuário (13/11/2026, Levi: "Pode abrir uma janelinha na frente, sobrepor uma tela. Não
+    # precisa ser algo que leva para um link"): só o miolo, sem a casca
+    if request.args.get("parcial") == "1":
+        return render_template("comando/_dossie_corpo.html", x=ctx["x"], d=d, na_janela=True)
     return render_template("comando/dossie.html", torre=TORRE, tela=TORRE.tela("usinas"), x=ctx["x"], d=d)
 
 
@@ -622,6 +626,38 @@ def conversa(tipo, oid):
         conv=_com_conversa(CV.atual().get(ob), meu), erro_conversa=lido["erro"],
         pedidos=_com_pedidos(PD.por_objeto(PD.atual()).get(ob) or [], MO.torres_da_pessoa(), meu),
         erro_pedidos=PD.ler()["erro"]))
+
+
+@bp.route("/conversa/usina/<int:usina_id>/janela")
+def conversa_janela(usina_id):
+    """A janela da conversa da usina, por cima do prontuário (13/11/2026, Levi: "A ideia é montar uma caixa de entrada,
+    é isso? Escolher o setor e tudo mais. Faça no mesmo modelo de janela [...] algo bem versátil"): um pedaço de página
+    (comando/_conversa_janela.html) com a conversa da usina, a Nova demanda com a usina já escolhida e as demandas que a
+    citam. `aba` = a que abre (conversa, pedir, demandas). Os formulários são os de sempre (a conversa e a Nova demanda)
+    e voltam aqui; aberta sozinha (sem o prontuário), leva à página da conversa."""
+    from ...comando import conversa as CV
+    from ...comando import demandas as D
+    from .demandas_tela import _hoje, _pode_ver
+    from .demandas_tela import contexto as contexto_demandas
+    ob = CV.objeto("usina", str(usina_id))
+    if not ob:
+        abort(404)
+    if request.headers.get("Sec-Fetch-Dest") == "document":
+        return redirect(na_raiz(f"/t/comando/conversa/usina/{usina_id}"))
+    nome = _usinas().get(usina_id) or f"usina {usina_id}"
+    aba = request.args.get("aba") if request.args.get("aba") in ("conversa", "pedir", "demandas") else "conversa"
+    lido = CV.ler()
+    dem = contexto_demandas()
+    demandas = []
+    if not dem["falta"]:
+        try:
+            demandas = [d for d in D.lista(_hoje()) if any(u == usina_id for u, _n in d["usinas"]) and _pode_ver(d)]
+        except Exception:        # noqa: BLE001 — o livro fora: a aba diz que não há, e a conversa segue
+            current_app.logger.exception("conversa da usina: as demandas não abriram")
+    return render_template("comando/_conversa_janela.html", **_contexto(
+        ob=ob, uid=usina_id, nome=nome, aba=aba, conv=_com_conversa(CV.atual().get(ob), _meu_hmac()),
+        erro_conversa=lido["erro"], dem=dem, demandas=demandas,
+        voltar_jan=f"/t/comando/conversa/usina/{usina_id}/janela?aba=conversa"))
 
 
 @bp.route("/conversa/pessoas")

@@ -66,8 +66,9 @@
       {% if p.rel_url %}<button type="button" class="gc-btn gc-btn--ui gc-btn--contorno" data-pu-rel aria-haspopup="dialog" title="Escolher o mês e os temas e baixar o relatório da usina em PDF"><i class="ph ph-file-pdf" aria-hidden="true"></i> Relatório</button>{% endif %}
       {# o dossiê para a IA (12/11/2026): o texto do prontuário inteiro, que o Nexus IA vai mandar junto da pergunta. Só o
          administrador vê o atalho enquanto a pergunta não existe na tela; o endereço abre para quem abre o prontuário #}
-      {% if p.admin %}<a class="gc-btn gc-btn--ui gc-btn--contorno" href="{{ raiz }}/t/comando/usinas/{{ x.usina_id }}/dossie" title="O texto do prontuário inteiro, do jeito que a IA lê"><i class="ph ph-file-text" aria-hidden="true"></i> Dossiê para a IA</a>{% endif %}
-      {% if p.pode.conversa %}<a class="gc-btn gc-btn--ui gc-btn--contorno" href="{{ raiz }}/t/comando/conversa/usina/{{ x.usina_id }}"><i class="ph ph-chats" aria-hidden="true"></i> Conversa{% if p.conversa.n %} <b class="cu-n">{{ p.conversa.n }}</b>{% endif %}</a>{% endif %}
+      {# o dossiê e a conversa abrem na janela por cima (13/11/2026; prontuario.js); o href fica para o botão do meio #}
+      {% if p.admin %}<a class="gc-btn gc-btn--ui gc-btn--contorno" data-pu-jan="{{ raiz }}/t/comando/usinas/{{ x.usina_id }}/dossie?parcial=1" data-pu-jan-t="Dossiê para a IA · {{ x.usina }}" href="{{ raiz }}/t/comando/usinas/{{ x.usina_id }}/dossie" title="O texto do prontuário inteiro, do jeito que a IA lê"><i class="ph ph-file-text" aria-hidden="true"></i> Dossiê para a IA</a>{% endif %}
+      {% if p.pode.conversa %}<a class="gc-btn gc-btn--ui gc-btn--contorno" data-pu-jan="{{ raiz }}/t/comando/conversa/usina/{{ x.usina_id }}/janela" data-pu-jan-t="Conversa · {{ x.usina }}" href="{{ raiz }}/t/comando/conversa/usina/{{ x.usina_id }}" title="Conversar sobre a usina e pedir a outro setor"><i class="ph ph-chats" aria-hidden="true"></i> Conversa{% if p.conversa.n %} <b class="cu-n">{{ p.conversa.n }}</b>{% endif %}</a>{% endif %}
     </div>
   </header>
   <ul class="cu-gente" aria-label="Quem atende a usina">
@@ -327,8 +328,8 @@
       <h3 class="pu-sub">Conversa da usina</h3>
       {% if p.conversa.ultima %}{% set m = p.conversa.ultima %}
       <p class="pu-conv"><b>{{ m.por or 'Alguém' }}</b> <span class="mudo">{{ m.quando_txt }}</span><span class="pu-conv-t">{{ m.texto|truncate(180) }}</span></p>
-      <p class="pu-nota"><a class="cn-link" href="{{ raiz }}/t/comando/conversa/usina/{{ x.usina_id }}">{{ p.conversa.n }} {{ 'mensagem' if p.conversa.n == 1 else 'mensagens' }}: abrir a conversa</a></p>
-      {% else %}<p class="pu-nota">Ninguém escreveu sobre esta usina ainda. <a class="cn-link" href="{{ raiz }}/t/comando/conversa/usina/{{ x.usina_id }}">Começar a conversa</a></p>{% endif %}
+      <p class="pu-nota"><a class="cn-link" data-pu-jan="{{ raiz }}/t/comando/conversa/usina/{{ x.usina_id }}/janela" data-pu-jan-t="Conversa · {{ x.usina }}" href="{{ raiz }}/t/comando/conversa/usina/{{ x.usina_id }}">{{ p.conversa.n }} {{ 'mensagem' if p.conversa.n == 1 else 'mensagens' }}: abrir a conversa</a></p>
+      {% else %}<p class="pu-nota">Ninguém escreveu sobre esta usina ainda. <a class="cn-link" data-pu-jan="{{ raiz }}/t/comando/conversa/usina/{{ x.usina_id }}/janela" data-pu-jan-t="Conversa · {{ x.usina }}" href="{{ raiz }}/t/comando/conversa/usina/{{ x.usina_id }}">Começar a conversa</a></p>{% endif %}
       {% endif %}
     {% endcall %}
   </div></div>
@@ -374,6 +375,16 @@
   </dialog>
   {% endif %}
 
+  {# a janela da usina (13/11/2026, Levi: "Pode abrir uma janelinha na frente, sobrepor uma tela. Não precisa ser algo
+     que leva para um link [...] tira totalmente a imersão da tela do prontuário"): o dossiê e a conversa (com o Pedir a
+     um setor) vêm como pedaço de página para dentro dela, e o que se faz lá dentro fica lá (prontuario.js) #}
+  {% if p.pode.conversa or p.admin %}
+  <dialog class="cr-modal pu-jan" id="pu-jan" aria-labelledby="pu-jan-t">
+    <div class="cr-modal-barra"><h2 class="pu-os-jan-t" id="pu-jan-t">Usina</h2><button type="button" class="gc-btn gc-btn--contorno" data-pu-jan-fechar>Fechar</button></div>
+    <div class="cr-modal-corpo pu-jan-corpo" data-pu-jan-corpo></div>
+  </dialog>
+  {% endif %}
+
   {# o relatório do cliente em PDF: o mês e os temas (a janela da Central da usina, 04/11/2026) #}
   {% if p.rel_url %}
   <dialog class="cr-modal pu-rel" id="pu-rel" aria-label="Relatório da usina">
@@ -405,4 +416,7 @@
   </dialog>
   {% endif %}
 </div>
+{# a @menção da conversa e os campos da Nova demanda, para a janela da usina #}
+<script src="{{ url_for('static', filename='comando/conversa.js') }}" defer></script>
+<script src="{{ url_for('static', filename='comando/demandas.js') }}" defer></script>
 <script src="{{ url_for('static', filename='comando/prontuario.js') }}" defer></script>

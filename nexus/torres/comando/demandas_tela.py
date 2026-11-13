@@ -143,7 +143,10 @@ def _volta(aba: str = "", did: str = "") -> str:
 def demanda_nova():
     """`POST` da Nova demanda (multipart, com os anexos). O tamanho é conferido antes de ler o corpo, como as Sugestões."""
     from ...casca import sugestoes as SUG
-    destino = _volta("pedi")
+    # vinda da janela da conversa da usina, no prontuário (13/11/2026): volta à janela, e não à Caixa de entrada
+    jan = request.args.get("usina_jan", "")
+    jan = jan if jan.isdigit() else ""
+    destino = na_raiz(f"/t/comando/conversa/usina/{jan}/janela?aba=pedir") if jan else _volta("pedi")
     # o tamanho ANTES de ler o corpo (o `_form_venceu` lê o formulário): o pedido maior que o teto não chega a ocupar a
     # memória nem o disco, e o sem tamanho declarado para no teto (a regra das Sugestões; revisão de 12/11/2026)
     teto = SUG.MAX_MB_TOTAL * SUG.MB + SUG.MB
@@ -165,6 +168,10 @@ def demanda_nova():
         return redirect(destino, code=303)
     try:
         d = D.abrir(form, arquivos, _usuario())
+        if jan:
+            session[_AVISO] = ("ok", "Demanda enviada. Quem recebeu é avisado no sininho; ela está aqui e em \"Que eu "
+                                     "pedi\", na Caixa de entrada.")
+            return redirect(na_raiz(f"/t/comando/conversa/usina/{jan}/janela?aba=demandas"), code=303)
         session[_AVISO] = ("ok", "Demanda enviada. Ela aparece em \"Que eu pedi\", e quem recebeu é avisado no sininho.")
         return redirect(_volta("pedi", d.get("demanda_id") or ""), code=303)
     except D.Recusada as ex:

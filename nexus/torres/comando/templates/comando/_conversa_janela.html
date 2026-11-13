@@ -1,0 +1,55 @@
+{# A janela da conversa da usina, por cima do prontuário (13/11/2026, Levi: "essa parte de conversa. A ideia é montar uma
+   caixa de entrada, é isso? Escolher o setor e tudo mais. Faça no mesmo modelo de janela. Janela acima, e aí faça algo
+   bem versátil para as pessoas usarem"). Três abas, sem sair da tela: a conversa sobre a usina (as mensagens, com @ para
+   chamar uma pessoa ou uma área); "Pedir a um setor" (a Nova demanda da Caixa de entrada, com a usina já escolhida: o
+   setor, quem recebe, o tema com o prazo, a OS da usina e os anexos); e as demandas que citam a usina. É um pedaço de
+   página: o prontuario.js o põe na janela, e os formulários vão por trás e voltam a ele (a rota
+   comando.conversa_janela). A ideia de cada parte e a regra delas moram nas telas donas (a conversa e as demandas). #}
+{% from "comando/_conversa.html" import fio %}
+{% import "comando/_demanda_nova.html" as nova %}
+{% set abas = (('conversa', 'Conversa', conv.n), ('pedir', 'Pedir a um setor', none), ('demandas', 'Demandas da usina', demandas|length)) %}
+<div class="pu-cv" data-pu-cv>
+  {% if aviso %}<div class="cn-erro{% if aviso[0] == 'ok' %} ins-ok{% endif %}" role="{{ 'status' if aviso[0] == 'ok' else 'alert' }}"><b>{{ aviso[1] }}</b></div>{% endif %}
+  {% if erro_conversa %}<div class="cn-erro cn-aviso" role="status"><b>Não li as conversas agora ({{ erro_conversa }}).</b></div>{% endif %}
+  {% if not tem_login %}<div class="cn-erro cn-aviso" role="status">Entre com o seu login (Microsoft ou Fracttal) para escrever e pedir: a senha de administrador não diz quem é a pessoa.</div>{% endif %}
+  <div class="cn-seg pu-cv-seg" role="tablist" aria-label="Conversa da usina">
+    {% for k, rot, n in abas %}<button type="button" role="tab" id="pu-cv-aba-{{ k }}" aria-controls="pu-cv-{{ k }}" aria-selected="{{ 'true' if k == aba else 'false' }}" data-pu-seg="{{ k }}">{{ rot }}{% if n %} <b class="cu-n">{{ n }}</b>{% endif %}</button>{% endfor %}
+  </div>
+
+  <div class="pu-cv-painel" id="pu-cv-conversa" role="tabpanel" aria-labelledby="pu-cv-aba-conversa" data-pu-seg-painel="conversa"{% if aba != 'conversa' %} hidden{% endif %}>
+    {{ fio(ob, conv, codigo, voltar_jan, tem_login, areas, 'Mensagens sobre a usina', true) }}
+    {% if tem_login and conv.n %}<form class="conv-lida" method="post" action="{{ raiz }}/t/comando/conversa/acao">
+      <input type="hidden" name="codigo" value="{{ codigo }}"><input type="hidden" name="objeto" value="{{ ob }}"><input type="hidden" name="voltar" value="{{ voltar_jan }}">
+      <button class="gc-btn gc-btn--ui gc-btn--fantasma" name="acao" value="leu" type="submit">Marcar as menções como lidas</button>
+    </form>{% endif %}
+  </div>
+
+  <div class="pu-cv-painel" id="pu-cv-pedir" role="tabpanel" aria-labelledby="pu-cv-aba-pedir" data-pu-seg-painel="pedir"{% if aba != 'pedir' %} hidden{% endif %}>
+    {% if dem.falta %}<p class="cn-erro cn-aviso">As demandas entre setores ainda não estão ligadas neste servidor.</p>
+    {% elif not tem_login %}<p class="mudo">Para pedir a outro setor, entre com o seu login (Microsoft ou Fracttal).</p>
+    {% else %}
+    <form class="dm-form pu-cv-nova" method="post" enctype="multipart/form-data"
+          action="{{ ('/t/comando/caixa-de-entrada/demandas/nova?usina_jan=' ~ uid)|na_raiz }}"
+          data-pessoas-url="{{ '/t/comando/caixa-de-entrada/demandas/pessoas'|na_raiz }}"
+          data-os-url="{{ '/t/comando/caixa-de-entrada/demandas/os'|na_raiz }}" data-pu-dm-nova>
+      <p class="dm-nota">Peça a outro setor algo sobre a {{ nome }}, sem abrir uma OS. Quem recebe é avisado no sininho, e o prazo é o do tema. A demanda também fica na Caixa de entrada.</p>
+      {{ nova.campos(dem, codigo, pre='pu-dm', usina=(uid, nome)) }}
+      <div class="dm-botoes dm-botoes--fim">
+        <button class="gc-btn gc-btn--ui gc-btn--primario" type="submit"><i class="ph ph-paper-plane-tilt" aria-hidden="true"></i> Enviar demanda</button>
+      </div>
+    </form>
+    {% endif %}
+  </div>
+
+  <div class="pu-cv-painel" id="pu-cv-demandas" role="tabpanel" aria-labelledby="pu-cv-aba-demandas" data-pu-seg-painel="demandas"{% if aba != 'demandas' %} hidden{% endif %}>
+    {% if demandas %}
+    <ul class="pu-lista pu-cv-dem">
+      {% for dm in demandas %}
+      <li><span class="pu-l1"><span class="cn-pill cn-{{ dm.estado.tom }}">{{ dm.estado.rotulo }}</span><b>{{ dm.titulo }}</b></span>
+        <small>{{ dm.de_nome or 'alguém' }}{% if dm.de_setor_nome %} ({{ dm.de_setor_nome }}){% endif %} para {{ dm.para_nome or 'alguém' }}{% if dm.para_setor_nome %} ({{ dm.para_setor_nome }}){% endif %} · {{ dm.tema_nome }} · {{ dm.selo[0] }}{% if dm.selo[1] %} {{ dm.selo[1] }}{% endif %}</small></li>
+      {% endfor %}
+    </ul>
+    <p class="pu-nota">Para responder ou mudar o andamento, abra a demanda na <a class="cn-link" href="{{ '/t/comando/caixa-de-entrada#demandas'|na_raiz }}">Caixa de entrada</a>.</p>
+    {% else %}<p class="mudo">Nenhuma demanda entre setores cita esta usina (das que você pode ver). Para abrir uma, use "Pedir a um setor".</p>{% endif %}
+  </div>
+</div>

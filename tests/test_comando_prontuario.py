@@ -255,6 +255,10 @@ def test_as_acoes_do_alto_criam_a_os_e_o_ticket_com_a_usina_e_baixam_o_relatorio
                      ("/os/chamados/inspecao", "Inspeção de chamados")):
         assert f'href="{url}"><b>{rot}</b>' in menu, rot
     assert "data-pu-rel" in acoes and 'href="/t/comando/conversa/usina/1"' in acoes
+    # a conversa abre na janela por cima (13/11/2026: "Faça no mesmo modelo de janela"); o href fica para o botão do meio
+    assert 'data-pu-jan="/t/comando/conversa/usina/1/janela" data-pu-jan-t="Conversa · Altair"' in acoes
+    for js in ("comando/conversa.js", "comando/demandas.js", "comando/prontuario.js"):
+        assert js in html, js
     # o clique abre a tela de criação na janela por cima do prontuário, não numa aba (13/11/2026, Levi: "está jogando para
     # uma aba nova do OS Creator, que não dá a opção de voltar para o prontuário da usina"); o href fica para o botão do meio
     assert menu.count("<a data-pu-criar=\"/os/") == 5 and 'data-pu-criar="/os/tradicional?ativo=' in menu
