@@ -287,6 +287,40 @@ def usina_relatorio(usina_id):
     return responsaveis_usina_relatorio(usina_id)
 
 
+def _dossie(usina_id: int):
+    """(o contexto do prontuário, o dossiê montado) ou 404 para a usina que não está na lista."""
+    from ...campo import visao
+    from ...comando import dossie as DS
+    from .prontuario_dados import contexto as _prontuario
+    ctx = _prontuario(usina_id)
+    if ctx is None:
+        abort(404)
+    return ctx, DS.montar(ctx, visao._agora())
+
+
+@bp.route("/usinas/<int:usina_id>/dossie")
+def usina_dossie(usina_id):
+    """O dossiê da usina para a IA (12/11/2026, Levi: "Monte o dossiê da usina inteira, para a gente usar com a IA
+    futuramente, do jeito que uma IA possa ver facilmente"): tudo o que o prontuário junta, no texto que a IA vai ler
+    junto da pergunta (`nexus/comando/dossie.py`). Esta página mostra o texto, o tamanho dele e deixa copiar e baixar;
+    abre para quem abre o prontuário (o mesmo dado, sem o nome das pessoas)."""
+    ctx, d = _dossie(usina_id)
+    return render_template("comando/dossie.html", torre=TORRE, tela=TORRE.tela("usinas"), x=ctx["x"], d=d)
+
+
+@bp.route("/usinas/<int:usina_id>/dossie.md")
+def usina_dossie_md(usina_id):
+    """O mesmo dossiê em texto puro (Markdown), para colar numa conversa com a IA ou para o Nexus IA mandar pela API.
+    `?baixar=1` baixa o arquivo. Sem cópia em cache: o dossiê é de agora."""
+    ctx, d = _dossie(usina_id)
+    resp = current_app.response_class(d["texto"], mimetype="text/markdown")
+    nome = "".join(c if c.isalnum() or c in "-_" else "-" for c in str(ctx["x"].get("codigo") or usina_id))
+    resp.headers["Content-Disposition"] = (f'{"attachment" if request.args.get("baixar") else "inline"}; '
+                                           f'filename="dossie-{nome}.md"')
+    resp.headers["Cache-Control"] = "no-store"
+    return resp
+
+
 @bp.route("/caixa-de-entrada")
 def caixa_de_entrada():
     """Caixa de entrada: os pedidos que outras áreas mandaram para o setor da pessoa, o mais atrasado primeiro (Fase 3:

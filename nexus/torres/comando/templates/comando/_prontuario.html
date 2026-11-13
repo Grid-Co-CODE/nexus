@@ -63,6 +63,9 @@
       </details>
       {% endif %}
       {% if p.rel_url %}<button type="button" class="gc-btn gc-btn--ui gc-btn--contorno" data-pu-rel aria-haspopup="dialog" title="Escolher o mês e os temas e baixar o relatório da usina em PDF"><i class="ph ph-file-pdf" aria-hidden="true"></i> Relatório</button>{% endif %}
+      {# o dossiê para a IA (12/11/2026): o texto do prontuário inteiro, que o Nexus IA vai mandar junto da pergunta. Só o
+         administrador vê o atalho enquanto a pergunta não existe na tela; o endereço abre para quem abre o prontuário #}
+      {% if p.admin %}<a class="gc-btn gc-btn--ui gc-btn--contorno" href="{{ raiz }}/t/comando/usinas/{{ x.usina_id }}/dossie" title="O texto do prontuário inteiro, do jeito que a IA lê"><i class="ph ph-file-text" aria-hidden="true"></i> Dossiê para a IA</a>{% endif %}
       {% if p.pode.conversa %}<a class="gc-btn gc-btn--ui gc-btn--contorno" href="{{ raiz }}/t/comando/conversa/usina/{{ x.usina_id }}"><i class="ph ph-chats" aria-hidden="true"></i> Conversa{% if p.conversa.n %} <b class="cu-n">{{ p.conversa.n }}</b>{% endif %}</a>{% endif %}
     </div>
   </header>

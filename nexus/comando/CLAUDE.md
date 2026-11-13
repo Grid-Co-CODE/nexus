@@ -359,6 +359,45 @@ catálogo; o texto só cifrado; o duplo envio; a OS da usina; o papel e a vez; o
 recebe, quem pediu, o colega e quem não tem nada a ver; a Nova demanda pela tela; os passos pela tela; os Temas do setor;
 o sininho).
 
+## O dossiê da usina para a IA (12/11/2026)
+
+Levi, 12/11/2026: "Monte o dossiê da usina inteira, para a gente usar com a IA futuramente, do jeito que uma IA possa ver
+facilmente"; e "A ideia é a pessoa ir no prontuário da usina e perguntar [...] por que a usina está com baixa
+performance, enfim, quais são os problemas dela, e já aparece. Então, use tudo que tem no prontuário da usina, tá? Todas
+as informações de todos os setores".
+
+**O que é.** O prontuário inteiro escrito em texto (Markdown), que o Nexus IA vai mandar junto da pergunta de quem
+estiver no prontuário. `nexus/comando/dossie.py` (`montar(ctx, agora, com_pessoas=False)`) recebe o MESMO contexto da
+página (`prontuario_dados.contexto`) e devolve `{"texto", "secoes", "caracteres", "palavras", "tokens_estimados"}`.
+**Nada é lido de novo nem calculado ali**: o número do dossiê é o da tela dona. A chamada à API ainda não existe (a tela
+Base › Nexus IA segue reservada); o que existe é o texto pronto.
+
+**Onde se vê.** `/t/comando/usinas/<id>/dossie` (a página: o texto, o tamanho, Copiar e Baixar) e
+`/t/comando/usinas/<id>/dossie.md` (o texto puro, `text/markdown`, sem cache; `?baixar=1` baixa). Abre para quem abre o
+prontuário (é o mesmo dado); o atalho "Dossiê para a IA" no prontuário aparece só para o administrador enquanto a
+pergunta não existe na tela.
+
+**As regras do texto** (o que faz uma IA ler bem e errar menos; mexeu no formato, sobe a `VERSAO`):
+- 14 seções, sempre na mesma ordem e com o mesmo título (`SECOES`): Identificação, Parecer e o que pede atenção,
+  Performance (com o mês a mês e a geração de cada dia), COS, OS e manutenção, Equipamentos, Chamados de garantia, Rondas
+  e zeladoria, Segurança, Insights, Demandas e conversa, Linha do tempo, Composição, O que ficou de fora. Cada uma abre
+  com a `Fonte:` (a tela do Nexus de onde o dado saiu), para a resposta citar de onde tirou;
+- **o que falta está escrito**: "sem dado" (a fonte não tem o valor: não é zero), "sem leitura" (a fonte não respondeu;
+  as OS sem leitura dizem "Não quer dizer zero", o COS sem leitura "Não quer dizer normal") e a última seção com as
+  fontes que não abriram. Nenhuma seção fica em branco. É a regra "sem dado não se inventa" levada à IA: ela não pode ler
+  a falta como "está tudo bem";
+- a gravidade em palavras (crítico, atenção, em dia), a mesma cor da tela dona;
+- nada do desenho da tela (largura de barra, coordenada de gráfico, classe de cor, endereço): o teste barra;
+- **as pessoas pelo papel, sem o nome** (o padrão): o texto é feito para sair do Nexus, e nome de pessoa é dado pessoal.
+  "Responsável O&M: definido" ou "não definido" fica, porque "ninguém cuida" é informação. O texto livre que alguém
+  escreveu (a descrição da demanda, a última mensagem da conversa) vai como foi escrito. O cliente e o código da usina
+  ficam: não são dado pessoal, e o código já traz o cliente. `com_pessoas=True` existe para quando o Levi decidir que os
+  nomes podem ir; hoje nenhuma rota o usa;
+- os tokens são ESTIMATIVA (4 caracteres por token): a conta exata só a API dá.
+
+**Seção nova no prontuário entra no dossiê no mesmo trabalho** (senão a IA responde sem ela): a função da seção, a linha
+em `SECOES` e o teste. Prova: `tests/test_comando_dossie.py`.
+
 ## Contestações e Prévia: visão do contrato (no Comando desde 12/11/2026)
 
 Vieram da torre Contratos e clientes, que saiu do menu (Levi, 12/11/2026: "contestações, você vai jogar para o comando,
