@@ -238,6 +238,10 @@
   .fz-mais[open]>summary{margin-bottom:10px}
   .fz-como[open]>summary{margin-bottom:8px}
   #fzTb.sem-cf tr.fz-cf{display:none}
+  #fzTb .fz-iv{display:inline-flex;align-items:center;gap:6px;margin:0 10px 3px 0;white-space:nowrap}
+  #fzTb .fz-mini{font-size:11px;padding:1px 7px;border-radius:10px;border:1px solid var(--borda);background:none;color:var(--mut);cursor:pointer}
+  #fzTb .fz-mini:hover{border-color:var(--verde);color:var(--txt)}
+  #fzTb .fz-parado{display:block;margin-top:2px}
   @media (max-width:1100px){.fz-grade{grid-template-columns:repeat(3,1fr)}}
   /* observação de status (ETM com buraco etc.): canto laranja na célula, como o comentário do Excel; o texto no mouse */
   .grid td.obs{background-image:linear-gradient(225deg,var(--sev) 7px,transparent 7px)}
@@ -340,6 +344,7 @@
               <label class="fz-sw"><input type="checkbox" id="fzFInv" checked><span></span>Inversores</label>
               <label class="fz-sw"><input type="checkbox" id="fzFIpoa" checked><span></span>IPOA</label>
               <label class="fz-sw"><input type="checkbox" id="fzFGhi" checked><span></span>GHI</label></span>
+            <label class="fz-sw" hidden><input type="checkbox" id="fzBpExpl"><span></span>Mostrar explicadas (COS/OS)</label>
             <label class="fz-l" hidden>Mínimo de dias ≤ 70%<select id="fzBpMin" class="fz-ctl"><option selected>1</option><option>2</option><option>3</option><option>5</option><option>7</option></select></label>
             <span style="flex:1"></span>
             <span class="f" id="fzContagem"></span>

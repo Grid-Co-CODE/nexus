@@ -382,8 +382,9 @@ FUROS_VARIOS = [
      'const q = norm($f("fzQ").value), s = vs("fzSrc"), c = vs("fzCli"), ca = vs("fzCart"), mn = +$f("fzBpMin").value || 1;',
      "furos: mural ler"),
     # no Nexus a 1ª conta lê o BD inteiro do banco (~40 s, medido em 13/11/2026); depois fica guardada até a próxima subida
-    ('Calculando o mural com o BD… (uns 10 segundos)',
-     'Calculando o mural com o BD do banco… (até 1 minuto na primeira vez do dia; depois é na hora)', "furos: mural espera"),
+    ('Calculando o mural com o BD e as paradas do COS… (uns 15 segundos)',
+     'Calculando o mural com o BD do banco e as paradas do COS… (até 1 minuto na primeira vez do dia; depois é na hora)',
+     "furos: mural espera"),
     ('if (s && x.fonte !== s) return false;', 'if (s.length && !s.includes(x.fonte)) return false;', "furos: mural fonte"),
     ('if (c && (!p || p.cliente !== c)) return false; if (ca && (!p || p.carteira !== ca)) return false;',
      'if (c.length && (!p || !c.includes(p.cliente))) return false; if (ca.length && (!p || !ca.includes(p.carteira))) '

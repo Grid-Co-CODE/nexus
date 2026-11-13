@@ -456,6 +456,15 @@ def test_a_ronda_e_o_portal_passam_pelo_nexus(coletas):
 
 
 # ── a aba "Baixa performance" do Conversor 1.0.11 (13/11/2026): o mural com os VALORES do banco ────────────────────
+SEM_PARADAS = {"dia": {}, "abertas": {}, "erro": None, "lido": "13/11 10:00"}
+
+
+@pytest.fixture(autouse=True)
+def _paradas_sem_rede(monkeypatch):
+    """As paradas do COS (1.0.13) vêm do db_performace pela rede: no teste, dubladas."""
+    monkeypatch.setattr(servico._paradas, "carregar", lambda forcar=False: SEM_PARADAS)
+
+
 def _bd_mural(tmp_path):
     """Uma usina com 4 inversores em novembro: o 1.4 gera metade dos outros nos dias 3 e 4; o 1.1 tem metade da potência."""
     wb = openpyxl.Workbook()
@@ -478,7 +487,9 @@ def test_o_mural_do_banco_e_o_mesmo_do_exe(tmp_path):
     from conversor import mural
     p = _bd_mural(tmp_path)
     hoje = dt.date(2026, 11, 8)
-    exe = mural.mural({"BD_Performance": BD("BD_Performance", str(p))}, str(p), "2026-11", hoje=hoje)
+    mural._CACHE.clear()
+    exe = mural.mural({"BD_Performance": BD("BD_Performance", str(p))}, str(p), "2026-11", hoje=hoje,
+                      paradas_dados=SEM_PARADAS)
 
     class S:
         origem_bd, bds, caminhos_bd = {}, {}, {}
@@ -487,7 +498,7 @@ def test_o_mural_do_banco_e_o_mesmo_do_exe(tmp_path):
     banco = BancoDeMentira(p, com_mapa=False)
     nx = servico.furos_mural(S(), lambda: banco, "2026-11", hoje=hoje)
     assert nx == exe                                     # sem o mapa de fórmulas: ler não precisa dele
-    assert [(x["inversor"], x["base"], [d for d, _ in x["dias"]]) for x in nx["linhas"]] == \
+    assert [(x["inversor"], x["base"], [d[0] for d in x["dias"]]) for x in nx["linhas"]] == \
         [("Inversor 1.4", "kWh/kWp", ["2026-11-03", "2026-11-04"])]       # o 1.1 menor não é defeito (kWh/kWp)
     lidas = banco.pedidos
     assert servico.furos_mural(S(), lambda: banco, "2026-11", hoje=hoje) is nx   # guardado pela subida:
@@ -505,3 +516,33 @@ def test_o_mural_passa_pela_api_da_tela(coletas):
     furos = open(os.path.join(RAIZ, "nexus", "static", "coletas", "furos.js"), encoding="utf-8").read()
     assert 's = vs("fzSrc"), c = vs("fzCli"), ca = vs("fzCart")' in furos      # o mural lê os filtros de vários valores
     servico._MURAL.clear()
+
+
+def test_a_parada_do_cos_explica_o_dia_baixo_no_mural(tmp_path, monkeypatch):
+    """1.0.13: a OS aberta no inversor explica o dia baixo, pela regra do .exe (paradas.explicar)."""
+    from conversor import mural
+    p = _bd_mural(tmp_path)
+    hoje = dt.date(2026, 11, 8)
+    com_os = {"dia": {}, "abertas": {"Usina X": [{"os": "123", "tipo": "Corretiva", "escopo": "Inversor 1.4",
+                                                   "inicio": "2026-11-02"}]}, "erro": None, "lido": "13/11 10:00"}
+    monkeypatch.setattr(servico._paradas, "carregar", lambda forcar=False: com_os)
+
+    class S:
+        origem_bd, bds, caminhos_bd = {}, {}, {}
+    servico._MURAL.clear()
+    servico._PORTAL.clear()
+    mural._CACHE.clear()
+    nx = servico.furos_mural(S(), lambda: BancoDeMentira(p, com_mapa=False), "2026-11", hoje=hoje)
+    exe = mural.mural({"BD_Performance": BD("BD_Performance", str(p))}, str(p), "2026-11", hoje=hoje,
+                      paradas_dados=com_os)
+    assert nx == exe and nx["paradas"] is True
+    (x,) = nx["linhas"]
+    assert x["n_expl"] == 2 and x["n_sem"] == 0                  # os dois dias baixos explicados pela OS aberta
+    servico._MURAL.clear()
+    servico._PORTAL.clear()
+    mural._CACHE.clear()
+
+
+def test_as_paradas_passam_pela_api_da_tela(coletas):
+    r = coletas.post("/t/performance/coletas/api/furos_paradas", json={"args": []}).get_json()
+    assert r == SEM_PARADAS

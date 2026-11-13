@@ -25,6 +25,7 @@ from . import pg
 from conversor import furos as _furos  # noqa: E402
 from conversor import montagem  # noqa: E402
 from conversor import mural as _mural  # noqa: E402
+from conversor import paradas as _paradas  # noqa: E402
 from conversor.nucleo import BD_PERFORMANCE, BD_THOPEN  # noqa: E402
 from conversor.sessao import Sessao  # noqa: E402
 
@@ -398,6 +399,12 @@ def _janela(mes, hoje):
     return ini, min(dt.date(a + (m == 12), m % 12 + 1, 1) - dt.timedelta(days=1), hoje - dt.timedelta(days=1))
 
 
+def furos_paradas():
+    """As paradas do COS e do Fracttal por usina e dia e as OS abertas (Conversor 1.0.13, `paradas.carregar` do .exe: lê o
+    livro falhas_performance do db_performace, guarda 30 min; sem rede devolve {"erro"} e a tela segue sem explicação)."""
+    return _paradas.carregar()
+
+
 def furos_mural(sessao, banco, mes, hoje=None):
     """{"linhas", "limiar", "ini", "fim"} como o `mural.mural` do .exe; {"erro": ...} quando não dá."""
     if not re.fullmatch(r"\d{4}-\d{2}", str(mes or "")):
@@ -420,6 +427,10 @@ def furos_mural(sessao, banco, mes, hoje=None):
         marca.append((destino, "banco", w.get("updated_at")))
     if not bds:
         return {"erro": "Os BDs não estão no banco nem foram soltos em Excel: solte o BD_Performance e o BD_Thopen."}
+    # 1.0.13: a parada do COS/Fracttal explica o dia baixo (a mesma fonte da aba Para coletar). Como no .exe, o mural
+    # fica guardado pela subida dos BDs, não pela hora das paradas; só a leitura que falhou não fica
+    pd = furos_paradas()
+    marca.append(bool(pd.get("erro")))
     marca = tuple(marca)
     with _TRAVA_MURAL:
         if marca in _MURAL:
@@ -429,12 +440,14 @@ def furos_mural(sessao, banco, mes, hoje=None):
             kwp = _mural.potencias(sessao.caminhos_bd.get(BD_PERFORMANCE))
     else:
         kwp = potencias_de_linhas(_equipamentos_do_banco(banco))
-    out = {"linhas": _mural.calcular(bds, kwp, ini, fim), "limiar": _mural.LIMIAR, "ini": ini.isoformat(),
-           "fim": fim.isoformat()}
+    out = {"linhas": _mural.calcular(bds, kwp, ini, fim, paradas_dados=pd), "limiar": _mural.LIMIAR,
+           "ini": ini.isoformat(), "fim": fim.isoformat(), "paradas": bool(pd and not pd.get("erro")),
+           "paradas_erro": (pd or {}).get("erro")}
     for d, bd in bds.items():
         if sessao.bds.get(d) is not bd:
             bd.fechar()                    # o do banco era só para esta conta: solta a memória
     with _TRAVA_MURAL:
         _MURAL.clear()
-        _MURAL[marca] = out
+        if not pd.get("erro"):
+            _MURAL[marca] = out
     return out

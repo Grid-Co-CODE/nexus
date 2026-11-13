@@ -104,6 +104,12 @@ As duas precisam do Python além do relatório de furos; no .exe usam o BD que a
   (medido 13/11); o resultado fica guardado por (mês, ontem, subida de cada BD) e o BD é solto. Prova de 13/11 até 11/11:
   193 inversores, 177 iguais ao .exe com os BDs em Excel; os 16 restantes eram a Segredo de 11/11, mudada no Excel às 09:21
   depois da subida (01:19): diferença de dado, não de regra.
+- **Paradas do COS/Fracttal** (1.0.13; `api/furos_paradas` -> `servico.furos_paradas` = `paradas.carregar` do .exe): o
+  livro `falhas_performance` do db_performace por urllib, sem login, guardado 30 min no processo; sem rede vem {"erro"} e a
+  tela segue sem explicação. O mural recebe as mesmas paradas (`calcular(..., paradas_dados=)`) e continua guardado pela
+  subida dos BDs, como no .exe; só a conta feita com as paradas fora do ar não fica guardada. Nos testes as paradas são
+  dubladas (`_paradas_sem_rede` em tests/test_coletas.py). Prova de 13/11 até 11/11: 130 usinas com parada, 21 OS abertas;
+  mural 177/193 iguais ao .exe em dias E status (os 16 de novo a Segredo).
 - Trazer uma versão do .exe que a Coleta ainda está mexendo: a pasta pode ter trabalho sem release (o `mural.py` estava lá
   antes da 1.0.11). Sincronize do commit da release (`git archive <release>` da pasta `ferramentas/conversor/conversor`
   para fora e `--origem` nela, mantendo o fim de linha da pasta) ou espere a pasta ficar limpa.

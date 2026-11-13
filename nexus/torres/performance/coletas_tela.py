@@ -21,7 +21,7 @@ from . import TORRE, bp
 
 # Os métodos que a página do Conversor chama (os mesmos da Api do app.py do .exe, sem os da janela do Windows)
 METODOS = {"estado", "responder_usina", "separar", "dado_bruto", "remover", "limpar", "reler_bds", "converter",
-           "novo_lote", "lote_pronto", "furos_mural"}
+           "novo_lote", "lote_pronto", "furos_mural", "furos_paradas"}
 
 
 def _pasta(*partes):
@@ -87,6 +87,8 @@ def coletas_api(metodo):
         if metodo == "reler_bds":
             s.carregar_bds()
             return _json(s.estado())
+        if metodo == "furos_paradas":
+            return _json(servico.furos_paradas())
         if metodo == "furos_mural":
             return _json(servico.furos_mural(s, _fabrica_do_banco(current_app._get_current_object()),
                                              str(args[0]) if args else ""))
