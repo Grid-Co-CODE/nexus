@@ -268,16 +268,62 @@ def _publicar_com(cli, monkeypatch, no_banco):
     return parse_qs(urlparse(r.headers["Location"]).query), enviados
 
 
-def test_a_publicacao_que_perde_ligacao_do_de_para_nao_sai(cli, monkeypatch):
+def _de_para_enviado(conteudo: bytes) -> list[list]:
+    """As linhas da aba de_para do xlsx que a publicação mandou ao banco (sem o cabeçalho)."""
+    import io as _io
+    from openpyxl import load_workbook
+    ws = load_workbook(_io.BytesIO(conteudo), read_only=True)["de_para"]
+    return [list(l) for l in ws.iter_rows(min_row=2, values_only=True)]
+
+
+def test_a_ligacao_de_chave_que_esta_maquina_nao_leu_fica_como_esta_no_banco(cli, monkeypatch):
     """09/11/2026: o "Publicar no banco" do SERVIDOR recalculou o de-para com as bases que ele tinha lido em 07/10, sem as
-    abas do BD_Thopen e do BD_Performance, e trocou o do banco: 187 ligações sumiram, e a geração do Nexus (que acha a
-    usina só por elas) ficou sem usina em todas as linhas. A publicação que perde ligação que o banco tem (a chave some
-    ou fica sem usina) não sai: a tela diz quantas e de que sistema, e manda ler as bases de novo."""
-    perdida = {"usina_id": 1, "sistema": "BD_Thopen · aba", "chave_externa": "Brodowski", "casou_por": "nome da aba"}
-    q, enviados = _publicar_com(cli, monkeypatch, [perdida])
+    abas do BD_Thopen e do BD_Performance, e trocou o do banco: 187 ligações sumiram. A trava de 10/11 passou a recusar a
+    publicação inteira, e em 12/11/2026 ela não saía de jeito nenhum: o banco tinha ligações de chaves que o servidor não
+    lê (a usina que só a árvore de ativos do PC traz), e não há o que ligar na tela para uma chave que a máquina não tem.
+    A regra agora: a ligação de chave que ESTA máquina não leu volta ao banco como estava; nada some e a publicação sai."""
+    do_banco = {"usina_id": "1.0", "sistema": "BD_Thopen · aba", "chave_externa": "Brodowski", "casou_por": "nome da aba"}
+    sem_usina = {"usina_id": None, "sistema": "BD_Thopen · aba", "chave_externa": "Sem Par", "casou_por": "sem par no cadastro"}
+    q, enviados = _publicar_com(cli, monkeypatch, [do_banco, sem_usina])
+    assert len(enviados) == 1
+    linhas = _de_para_enviado(enviados[0])
+    assert [1, "BD_Thopen · aba", "Brodowski", "nome da aba"] in linhas          # voltou como estava, com o id inteiro
+    assert not [l for l in linhas if l[2] == "Sem Par"]                         # o que não era ligação não volta
+    assert "Publicado no banco" in q["ok"][0] and "1 ligação de chave que esta máquina não leu ficou como estava" in q["ok"][0]
+
+
+def test_a_publicacao_que_deixa_sem_usina_uma_chave_que_ela_leu_nao_sai(cli, monkeypatch, app_lig):
+    """A perda de verdade continua travando: a chave que esta máquina LEU e deixaria sem usina (ignorada, desligada ou sem
+    par aqui, e ligada no banco). A tela diz qual chave é, de que base e a que usina o banco a liga (12/11/2026: a mensagem
+    só dizia quantas, e não havia como saber o que ligar)."""
+    from nexus.cadastro import banco as B
+    from nexus.cadastro.telas import servico
+    with app_lig.app_context():
+        novas = B.de_para(servico(), L.ler(app_lig.config)["fontes"], L.carregar_regras(app_lig.config))
+    sem = next(l for l in novas if l[0] in (None, ""))                          # um buraco desta máquina
+    no_banco = [dict(zip(B.CAB_DE_PARA, l)) for l in novas if l is not sem]
+    no_banco.append({"usina_id": 1, "sistema": sem[1], "chave_externa": sem[2], "casou_por": "manual (27/10)"})
+    q, enviados = _publicar_com(cli, monkeypatch, no_banco)
     assert enviados == []
     erro = q["erro"][0]
-    assert "perderia 1 ligação" in erro and "BD_Thopen · aba" in erro and "Ler as bases" in erro
+    assert "perderia 1 ligação" in erro and str(sem[1]) in erro and str(sem[2]) in erro and "usina 1" in erro
+
+
+def test_a_ligacao_do_banco_a_usina_que_nao_existe_mais_nao_volta():
+    """A chave que esta máquina não leu só volta se a usina dela ainda existe no cadastro que vai ser publicado."""
+    from nexus.cadastro import banco as B
+    novas = [[5, FR, "Cliente Alfa - Serra Exemplo 3 - SC", "código"], [None, FR, "Cliente Alfa - Buraco - SC", B.SEM_PAR]]
+    no_banco = [{"usina_id": 5, "sistema": FR, "chave_externa": "Cliente Alfa - Serra Exemplo 3 - SC", "casou_por": "código"},
+                {"usina_id": "7.0", "sistema": FR, "chave_externa": "Cliente Alfa - Vale Exemplo - MT",
+                 "casou_por": "nome (árvore de ativos do Fracttal)"},
+                {"usina_id": 9, "sistema": FR, "chave_externa": "Cliente Alfa - Usina Que Saiu - MT", "casou_por": "código"},
+                {"usina_id": 5, "sistema": FR, "chave_externa": "Cliente Alfa - Buraco - SC", "casou_por": "manual (27/10)"}]
+    mantidas = B.ligacoes_que_nao_li(novas, no_banco, {5, 7})
+    assert mantidas == [[7, FR, "Cliente Alfa - Vale Exemplo - MT", "nome (árvore de ativos do Fracttal)"]]
+    # com as mantidas, sobram as perdas de verdade: a usina que saiu do cadastro e a chave lida aqui que ficaria sem usina
+    perdidas = B.chaves_que_perderia(novas + mantidas, no_banco)
+    assert sorted(d["chave_externa"] for d in perdidas) == ["Cliente Alfa - Buraco - SC", "Cliente Alfa - Usina Que Saiu - MT"]
+    assert B.perdas_de_para(novas + mantidas, no_banco) == {FR: 2}
 
 
 def test_a_publicacao_sem_perda_sai(cli, monkeypatch, app_lig):

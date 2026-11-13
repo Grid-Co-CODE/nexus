@@ -491,15 +491,60 @@ def perdas_de_para(novas: list[list], no_banco: list[dict]):
     com as bases que ele lera em 07/10, sem as abas do BD_Thopen e do BD_Performance, e 187 ligações sumiram do banco;
     a geração do Nexus, que acha a usina só por elas, ficou sem usina em todas as linhas na remontagem seguinte."""
     from collections import Counter
+    return Counter(str(d.get("sistema")) for d in chaves_que_perderia(novas, no_banco))
+
+
+def chaves_que_perderia(novas: list[list], no_banco: list[dict]) -> list[dict]:
+    """As linhas do de-para do banco (ligadas a uma usina) que a publicação `novas` perderia, uma a uma: é o que a tela
+    mostra (12/11/2026: a mensagem só dizia quantas e de que base, e não havia como saber qual chave ligar)."""
     nova = {(str(l[1]), _chave_comparavel(l[2])): l[0] for l in novas}
-    perdas = Counter()
+    return [d for d in no_banco if _ligada(d.get("usina_id"))
+            and not _ligada(nova.get((str(d.get("sistema")), _chave_comparavel(d.get("chave_externa")))))]
+
+
+def _inteiro(v) -> int | None:
+    """O id como o banco pode devolvê-lo ("7.0", 7, " 7 ") em inteiro; o que não é número inteiro, None."""
+    try:
+        f = float(str(v).strip())
+    except (TypeError, ValueError):
+        return None
+    return int(f) if f.is_integer() else None
+
+
+def ligacoes_que_nao_li(novas: list[list], no_banco: list[dict], usinas) -> list[list]:
+    """As ligações que o banco tem para chaves que ESTA máquina não leu (o par sistema e chave não aparece nas `novas`, nem
+    ligado nem sem usina), como linhas de CAB_DE_PARA, para voltarem ao banco como estavam. Só a ligada, e só se a usina
+    ainda está em `usinas` (os ids do cadastro que vai ser publicado); a que esta máquina leu e deixaria sem usina NÃO
+    entra aqui: essa é a perda de verdade, e continua travando (`chaves_que_perderia`).
+
+    O caso (12/11/2026): o banco tinha ligações publicadas pelo PC, de chaves que o servidor não lê (a usina que só a
+    árvore de ativos do PC traz, o nome que mudou na fonte), e a trava de 10/11 recusava a publicação do servidor inteira,
+    sem saída: não há o que ligar na tela para uma chave que a máquina não tem. O que a máquina não leu, ela não apaga."""
+    lidas = {(str(l[1]), _chave_comparavel(l[2])) for l in novas}
+    existe = {int(u) for u in usinas}
+    out, vistas = [], set()
     for d in no_banco:
-        if not _ligada(d.get("usina_id")):
-            continue
+        uid = _inteiro(d.get("usina_id"))
         chave = (str(d.get("sistema")), _chave_comparavel(d.get("chave_externa")))
-        if not _ligada(nova.get(chave)):
-            perdas[chave[0]] += 1
-    return perdas
+        if uid is None or uid not in existe or chave in lidas or chave in vistas:
+            continue
+        vistas.add(chave)
+        out.append([uid, d.get("sistema"), d.get("chave_externa"), d.get("casou_por")])
+    return out
+
+
+def ids_das_usinas(t: dict) -> set[int]:
+    """Os ids das usinas das tabelas que vão ser publicadas (`montar`)."""
+    cab, linhas = t["usinas"]
+    i = cab.index("usina_id")
+    return {n for n in (_inteiro(l[i]) for l in linhas) if n is not None}
+
+
+def juntar_ao_de_para(t: dict, mantidas: list[list]) -> None:
+    """Põe as `mantidas` (`ligacoes_que_nao_li`) no de-para que vai ser publicado e acerta a conta dele na `atualizacao`."""
+    t["de_para"][1].extend(mantidas)
+    cab, linhas = t["atualizacao"]
+    linhas[0][cab.index("de_para")] = len(t["de_para"][1])
 
 
 def sincronizar(conteudo: bytes, *, base: str, token: str, sessao=None) -> dict:

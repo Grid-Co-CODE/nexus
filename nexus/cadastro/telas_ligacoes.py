@@ -162,21 +162,34 @@ def registrar_ligacoes(bp):
             t = B.montar(srv, srv.cofre, atual["fontes"], B.ler_anteriores(base), L.carregar_regras(cfg))
         except Exception as ex:          # noqa: BLE001
             return _volta(erro=f"O banco recusou: {type(ex).__name__}: {str(ex)[:160]}")
-        # a perda no de-para trava a publicação (10/11/2026; o caso em banco.perdas_de_para): o arquivo de cadastro e as
-        # bases lidas são DESTA máquina, e as bases velhas (ou sem as abas dos BDs) apagariam ligações que o banco tem
+        # O arquivo de cadastro e as bases lidas são DESTA máquina, e o de-para do banco não é só dela (10/11/2026; o caso em
+        # banco.perdas_de_para). Duas regras, nesta ordem:
+        # 1. a ligação de chave que esta máquina NÃO leu volta ao banco como estava (12/11/2026, banco.ligacoes_que_nao_li):
+        #    o que a máquina não leu, ela não apaga;
+        # 2. a chave que ela LEU e deixaria sem usina é perda de verdade: não publica, e a tela diz qual é.
         try:
-            perdas = B.perdas_de_para(t["de_para"][1], B.ler_de_para(base))
+            no_banco = B.ler_de_para(base)
         except Exception as ex:          # noqa: BLE001
             return _volta(erro=f"Não publiquei: não consegui ler o de-para do banco para comparar "
                                f"({type(ex).__name__}). Tente de novo em instantes.")
-        if perdas:
-            n = sum(perdas.values())
-            por = ", ".join(f"{s}: {q}" for s, q in perdas.most_common())
+        mantidas = B.ligacoes_que_nao_li(t["de_para"][1], no_banco, B.ids_das_usinas(t))
+        if mantidas:
+            B.juntar_ao_de_para(t, mantidas)
+        perdidas = B.chaves_que_perderia(t["de_para"][1], no_banco)
+        if perdidas:
+            n = len(perdidas)
+            por = ", ".join(f"{s}: {q}" for s, q in B.perdas_de_para(t["de_para"][1], no_banco).most_common())
+            quais = "; ".join(f"{d.get('sistema')}: {d.get('chave_externa')} (usina {B._inteiro(d.get('usina_id'))})"
+                              for d in perdidas[:12]) + (f"; e mais {n - 12}" if n > 12 else "")
             return _volta(erro=f"Não publiquei: a publicação perderia {n} ligaç{'ões' if n > 1 else 'ão'} do de-para "
-                               f"que o banco tem ({por}). As bases desta máquina estão velhas ou sem essas fontes: use "
-                               f"\"Ler as bases de novo\" e confira as Ligações antes de publicar.")
+                               f"que o banco tem ({por}): {quais}. Esta máquina leu "
+                               f"{'essas chaves e as' if n > 1 else 'essa chave e a'} deixaria sem usina: ligue nas "
+                               f"Ligações (ou use \"Ler as bases de novo\", se as bases estiverem velhas) e publique de novo.")
         try:
             r = B.sincronizar(B.xlsx_bytes(t), base=base, token=cfg["GRIDCO_SQL_TOKEN"])
         except Exception as ex:          # noqa: BLE001
             return _volta(erro=f"O banco recusou: {type(ex).__name__}: {str(ex)[:160]}")
-        return _volta(ok=f"Publicado no banco: {r.get('inserted', 0)} linhas novas, {r.get('updated', 0)} alteradas.")
+        m = len(mantidas)
+        ficou = ("" if not m else " 1 ligação de chave que esta máquina não leu ficou como estava no banco." if m == 1
+                 else f" {m} ligações de chaves que esta máquina não leu ficaram como estavam no banco.")
+        return _volta(ok=f"Publicado no banco: {r.get('inserted', 0)} linhas novas, {r.get('updated', 0)} alteradas.{ficou}")

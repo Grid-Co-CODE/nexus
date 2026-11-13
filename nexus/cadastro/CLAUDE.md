@@ -182,9 +182,14 @@ de 1.090 para 876 linhas, 187 ligações a usinas sumiram (BD_Thopen aba 100, BD
 usina. O resto das "770 alteradas" era reenvio igual (pessoas, equipes) e 36 usinas editadas no servidor. Consertado em
 10/11 com o OK do Levi: o de-para devolvido ao estado de antes pelo histórico de linha da API
 (`GET /api/sheets/{id}/rows/{n}/history`; as outras abas como estavam) e a geração remontada. Agora o botão lê o de-para
-do banco antes de publicar e **não publica** se alguma chave ligada a uma usina sumiria ou ficaria sem usina: a tela diz
-quantas e de que sistema e manda usar "Ler as bases de novo"; a leitura do banco que falha também não publica. A troca de
-usina de uma chave não conta como perda (é decisão da tela Ligações).
+do banco antes de publicar, com duas regras nesta ordem (`banco.ligacoes_que_nao_li` e `banco.chaves_que_perderia`):
+(1) **a ligação de chave que esta máquina NÃO leu volta ao banco como estava** (12/11/2026: o banco tinha ligações
+publicadas pelo PC, de chaves que o servidor não lê, como a usina que só a árvore de ativos do PC traz, e a publicação do
+servidor não saía de jeito nenhum, porque não há o que ligar na tela para uma chave que a máquina não tem; o que a máquina
+não leu, ela não apaga; só volta a ligada, e só se a usina ainda está no cadastro); (2) **a chave que ela LEU e deixaria
+sem usina não publica**: a tela diz quantas, de que sistema e QUAL chave com a usina do banco (até 12/11 só dizia
+quantas), para ligar nas Ligações. A leitura do banco que falha também não publica. A troca de usina de uma chave não
+conta como perda (é decisão da tela Ligações). A publicação diz quantas ligações ficaram como estavam.
 **As telas de campo leem o BANCO** (`campo/visao.py`, chamados, Acessos → Pessoas e setores: `cadastro_nexus`), não o arquivo:
 para o responsável novo chegar nelas, aplique no PC e publique (`ferramentas/publicar_cadastro.py --bases-guardadas`,
 com `--ensaio` e a comparação com o banco antes). Foi o caminho de 16/10/2026 (Levi: "mude logo pois precisamos da
