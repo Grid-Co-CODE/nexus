@@ -460,14 +460,23 @@ Ignora esse monitoramento que já existe no nexus" (a Performance › Tempo real
   junto com o gráfico das strings dele, individual ou em grupo, por exemplo por MPPT"): na janela da usina, o inversor é
   botão e troca o corpo pelo detalhe (`.cos-inv-det` no `cos/_inversores.html`; "Voltar à usina" e o Esc voltam, com o
   foco no inversor; o segundo Esc fecha). Mostra a curva dele (a gravada e a ponta), as entradas de agora (a corrente de
-  cada string sob o MPPT que o coletor declarou; tensão, corrente e potência do MPPT) e as entradas **desde que a janela
-  abriu**: Individual, Por MPPT ou Todas (até 4 em destaque). A regra das entradas é a da Ronda COS
-  (`entradas-do-inversor.ts`), portada: nunca um MPPT inventado (o Huawei, pelo SmartLogger, manda strings sem MPPT e não
-  tem "Por MPPT"; o Sungrow sem leitura diz "o coletor não lê MPPT nem string deste inversor"). **A string não tem série
-  gravada** (a `scada_amostra` da Ronda COS guarda só o kW do inversor): o registro é do navegador, com as leituras de 3 s
-  que já chegam, um ponto a cada 20 s, só da usina aberta, e some ao fechar. Nenhum pedido nem rota nova. As contas
-  (`NexusCosInversores`) têm teste no node: `tests/test_cos_inversores_js.py`. O Esc é pelo `cancel` do `<dialog>`: a
-  versão pelo keydown, com uma marca desligada por `setTimeout`, deixava a janela sem fechar no segundo Esc rápido.
+  cada string sob o MPPT que o coletor declarou; tensão, corrente e potência do MPPT) e as entradas **do dia**: Individual,
+  Por MPPT ou Todas (até 4 em destaque). A regra das entradas é a da Ronda COS (`entradas-do-inversor.ts`), portada:
+  nunca um MPPT inventado (o Huawei, pelo SmartLogger, manda strings sem MPPT e não tem "Por MPPT"; o Sungrow sem leitura
+  diz "o coletor não lê MPPT nem string deste inversor"). As contas (`NexusCosInversores`) têm teste no node:
+  `tests/test_cos_inversores_js.py`. O Esc é pelo `cancel` do `<dialog>`: a versão pelo keydown, com uma marca desligada
+  por `setTimeout`, deixava a janela sem fechar no segundo Esc rápido. Nenhum callback guardado lê o `det` global (o
+  `fechar()` o zera antes da limpeza; foi o "Fechar não fecha" do PR #25).
+- **O dia e o histórico das strings** (13/11/2026, o dono: "como faço pra ver os gráficos de ontem ? precisamos
+  armazenar por pelo menos 40 dias"): a janela escolhe o dia (Hoje, Ontem ou uma data até 40 dias atrás, `.cos-inv-dias`
+  no topo fixo), para a curva da usina, a de cada inversor e as entradas do detalhe. As entradas vêm da `scada_entradas`
+  da Ronda COS (5 em 5 min, 05:00 às 19:00, 45 dias), pela rota `.../ronda-api/scada/entradas/<logger>/<modbus>?dia=`
+  (o Andamento `/api/nexus/geracao/scada-entradas`); a curva leva o `?dia=`. Cópia no servidor: 60 s para hoje, 1 h para
+  um dia que passou (`AND.TTL_DIA_PASSADO_S`). Em hoje, a ponta é o registro do navegador desde a abertura (um ponto a
+  cada 20 s, some ao fechar), encaixado depois do último balde gravado, como a ponta da curva; num dia que passou não há
+  ponta, e a releitura de 3 s só mexe no estado e nas entradas de agora. Dia sem histórico diz por quê ("o histórico das
+  strings começou em DD/MM"). 21 usinas inteiras vêm sem MPPT e sem string (medido em 13/11): é do coletor, e o detalhe
+  delas mostra só a curva.
 - **As usinas da assistida da Thopen** (o dono, 12/11/2026: "é THOPEN - Operação Assistida"; "atualizar somente o
   monitoramento. Ela não entra em nenhum outro lugar"): as 4 usinas com logger que a Ronda COS manda sem cliente (sem
   usina no cadastro dela) vão para o grupo "Thopen - Operação Assistida" (`MO.CLIENTE_SEM_CADASTRO`, pelo id do cartão).

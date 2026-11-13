@@ -85,6 +85,16 @@
 .cos-inv-i-abrir span{color:var(--mudo);font-size:15px;line-height:1}
 .cos-inv-i--abre:hover .cos-inv-i-abrir span{color:var(--verde-texto)}
 .cos-inv-det[hidden],.cos-inv-corpo[hidden]{display:none}
+/* o dia dos gráficos (13/11/2026): Hoje, Ontem e uma data, no topo fixo da janela */
+.cos-inv-dias{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:8px}
+.cos-inv-dias[hidden]{display:none}
+.cos-inv-dias .gc-chip{padding:4px 12px}
+.cos-inv-dia-outro{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--mudo)}
+/* o calendário do navegador no tema do Nexus (o escuro é o padrão), e não no do sistema */
+.cos-inv-dia-data{padding:3px 8px;font-size:12px;color-scheme:dark}
+:root[data-tema="claro"] .cos-inv-dia-data{color-scheme:light}
+.cos-inv-hist-aviso{margin:0 0 8px;font-size:12.5px;color:var(--tinta-2)}
+.cos-inv-hist-aviso:empty{display:none}
 .cos-inv-det{padding:14px 22px 24px}
 .cos-inv-det-cab{display:flex;flex-wrap:wrap;align-items:center;gap:8px 16px;margin-bottom:10px}
 .cos-inv-det-cab .gc-btn{padding:6px 12px}
