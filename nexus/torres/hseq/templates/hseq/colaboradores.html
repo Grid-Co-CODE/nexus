@@ -18,7 +18,7 @@
     {{ termo('Desligado', 'neutro') }}<dd>O status de contratação da ficha é Desligado. A ficha continua no cadastro e aparece no filtro Desligados.</dd>
     {{ termo('Região de campo') }}<dd>A região da equipe da pessoa, na estrutura de O&amp;M.</dd>
     {{ termo('Vencido', 'critico') }}<dd>A validade passou: a do ASO e da CNH é a data registrada; a das NRs 10, 10 SEP e 35 é a data de realização mais 2 anos.</dd>
-    {{ termo('Pendente', 'alerta') }}<dd>Pendente assinatura, solicitado ou vence em até 30 dias.</dd>
+    {{ termo('Pendente', 'alerta') }}<dd>Pendente assinatura, solicitado, em andamento (o curso ainda não terminou) ou vence em até 30 dias.</dd>
   {% endcall %}</div><p class="cn-pergunta">{{ tela.pergunta }}</p></div>
     <div class="cn-frescor">cadastro do Nexus + documentação da Segurança<br><b>lido às {{ lido }}</b></div>
   </div>
@@ -69,7 +69,7 @@
         <td>{{ x.cargo or '—' }}</td>
         <td><span class="ext-par"><span>{{ x.equipe or '—' }}</span>{% if x.regiao %}<span class="det">{{ x.regiao }}</span>{% endif %}</span></td>
         <td>{% if x.desligado %}<span class="cn-st cn-t-neutro">Desligado</span>{% elif x.status == sem_status %}<span class="cn-st cn-t-info">{{ sem_status }}</span>{% else %}<span class="cn-st cn-t-ok">{{ x.status }}</span>{% endif %}</td>
-        <td>{% set r = x.doc %}{% if not r.registrados %}<span class="cn-t-neutro">sem registro</span>{% elif not r.pendencias %}<span class="cn-st cn-t-ok">Em dia</span>{% else %}<span class="ext-par">{% for e in ('vencido', 'falta', 'pendente_assinatura', 'solicitado', 'vence_logo') %}{% if r.contagem[e] %}<span class="cn-t-{{ estados[e][1] }}"><b>{{ r.contagem[e] }}</b> {{ estados[e][0]|lower }}</span>{% endif %}{% endfor %}</span>{% endif %}</td></tr>
+        <td>{% set r = x.doc %}{% if not r.registrados %}<span class="cn-t-neutro">sem registro</span>{% elif not r.pendencias %}<span class="cn-st cn-t-ok">Em dia</span>{% else %}<span class="ext-par">{% for e in pendencias %}{% if r.contagem[e] %}<span class="cn-t-{{ estados[e][1] }}"><b>{{ r.contagem[e] }}</b> {{ estados[e][0]|lower }}</span>{% endif %}{% endfor %}</span>{% endif %}</td></tr>
     {% else %}<tr><td colspan="6" class="mudo">Nenhum colaborador com esses filtros.</td></tr>{% endfor %}
     </tbody>
   </table></div>

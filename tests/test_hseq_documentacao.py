@@ -49,13 +49,20 @@ def _planilha() -> bytes:
     ws.append(["CAIO TESTE PRADO", "111.111.111-11", None, "FALTA", "Solicitado (Assinatura)", "SOLICITADO", "OK",
                "FALTA", "Ensino médio", None])
     ws.append(["Zeca Fora do Cadastro", "222.222.222-22", None, "OK", None, None, None, None, None, None])
-    ws.append(["Bruna Lima", None, None, None, None, None, None, None, None, None])      # 1º e último nome: aproximado
+    ws.append(["Bruna Teste Lima", None, None, None, None, None, None, None, None, None])  # 1º e último: aproximado
+    ws.append(["Caio Prado", None, None, "OK", None, None, None, None, None, None])      # só dois nomes: não casa
+    ws.append(["Ana Exemplo Rocha- PJ", None, None, None, None, None, None, None, None, None])   # o "- PJ" sai
+    ws.append(["ASSINATURA = Enviar para assinar", None, None, None, None, None, None, None, None, None])  # legenda
+    ws.append(["LEGENDA:", None, None, None, None, None, None, None, None, None])
     s = wb.create_sheet("SAUDE")
     s.append(["FUNCIONARIO", "FUNÇÃO", "ASO -  Val", "ECG"])
     s.append(["Bruna Ficticia Lima", "Técnica", datetime(2027, 9, 1), "ok"])           # o ASO mais novo vence
     d = wb.create_sheet("DEMITIDOS")
     d.append(["FUNCIONARIO", "STATUS NA PLATAFORMA", "ASO -  Val", "RG", "Coluna1"])
     d.append(["Ana Exemplo Rocha", "DEMITIDO", "10/24/2026", "OK", "FALTA"])
+    a = wb.create_sheet("ATIVOS ADM ")
+    a.append(["FUNCIONARIO", "MATRICULA", "ASO -  Val"])
+    a.append(["Caio Teste Prado", "123", datetime(2030, 1, 1)])                         # o time ADM: fora do painel
     t = wb.create_sheet("TERCEIROS")
     t.append(["FUNCIONARIO", "EMPRESA", "NR 10"])
     t.append(["Terceiro Ficticio", "Empresa X", datetime(2025, 1, 1)])
@@ -76,6 +83,19 @@ def test_o_valor_da_planilha_vira_situacao_e_data():
     assert DOC.ler_valor(" 23/07/2025") == ("valido", date(2025, 7, 23))                  # sempre dd/mm/aaaa
     assert DOC.ler_valor("10/24/2026") is False                                           # mês 24: não é data brasileira
     assert DOC.ler_valor("Eletrotecnico") is False and DOC.ler_valor(None) is None and DOC.ler_valor("  ") is None
+
+
+def test_em_andamento_legenda_e_pj():
+    """A 1ª conferência com a planilha real (13/11/2026): os textos de curso em andamento, as linhas de legenda lidas
+    como nome e o "- PJ" grudado no nome."""
+    assert DOC.ler_valor("Em andamento") == ("em_andamento", None)
+    assert DOC.ler_valor("Aguardando a finalização dos Cursos") == ("em_andamento", None)
+    assert DOC.ler_valor("Aguardando assinatura D4Sign") == ("pendente_assinatura", None)   # a assinatura vence
+    assert "em_andamento" in DOC.PENDENCIAS and DOC.ESTADOS["em_andamento"][1] == "alerta"
+    assert DOC.linha_de_legenda("ZIP =Está na pasta") and DOC.linha_de_legenda("LEGENDA:")
+    assert not DOC.linha_de_legenda("Bruna Ficticia Lima")
+    assert DOC.nome_da_pessoa("Fulana Teste Rocha- PJ") == "Fulana Teste Rocha"
+    assert DOC.nome_da_pessoa("Fulana Teste Rocha - pj ") == "Fulana Teste Rocha"
 
 
 def test_validade_pela_norma_e_o_estado():
@@ -103,8 +123,13 @@ def test_a_planilha_casa_pelo_cadastro_e_so_leva_o_pessoa_id(livro):
     assert reg[(3, "nr10")] == ("pendente_assinatura", None) and reg[(3, "nr35")] == ("solicitado", None)
     assert reg[(2, "cpf_doc")] == ("falta", None) and (2, "aso") not in reg  # a "Coluna1" dos demitidos; 10/24 não entra
     assert {i for _p, i, _s, _d in res["registros"]} <= set(DOC.POR_ID)      # CPF, e-mail, obs: nunca
-    assert res["nao_casou"] == [("Zeca Fora do Cadastro", "não está no cadastro")]
-    assert res["aproximados"] == [("Bruna Lima", "Bruna Ficticia Lima")]
+    assert res["nao_casou"] == [("Caio Prado", "só dois nomes na planilha: escreva o nome completo"),
+                                ("Zeca Fora do Cadastro", "não está no cadastro")]
+    assert res["aproximados"] == [("Bruna Teste Lima", "Bruna Ficticia Lima")]
+    assert reg[(3, "aso")] == ("falta", None)                                # a aba ADM não trouxe o ASO de 2030
+    assert any(a == "ATIVOS ADM" and "administrativo" in m for a, m in res["fora"])
+    om = next(a for a in res["abas"] if a["aba"] == "ATIVOS O&M")
+    assert (om["pessoas"], om["legendas"]) == (6, 2)                          # as linhas de legenda não são pessoa
     assert ("DEMITIDOS", "ASO", "10/24/2026", 1) in res["desconhecidos"]
     assert ("ATIVOS O&M", "CNH", "Ensino médio", 1) in res["desconhecidos"]
     assert any(a == "TERCEIROS" and "terceiros" in m for a, m in res["fora"])
