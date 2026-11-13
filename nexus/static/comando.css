@@ -347,7 +347,7 @@ a.ins-titulo:hover{color:var(--verde-texto)}
 .dm-temas .gc-campo{width:100%;box-sizing:border-box}
 .dm-temas .dm-prazo-campo{width:84px}
 .dm-temas tr.dm-inativo td{color:var(--mudo)}
-@media (max-width:1000px){.dm-exp{padding:0 16px 14px}.dm-det-corpo{grid-template-columns:minmax(0,1fr)}
+@media (max-width:1100px){.dm-exp{padding:0 16px 14px}.dm-det-corpo{grid-template-columns:minmax(0,1fr)}
   .dm-det-dir{padding:10px 0 0;border-left:0;border-top:1px solid var(--linha)}}
 @media (max-width:640px){.dm-linha{grid-template-columns:70px minmax(0,1fr)}.dm-dir{grid-column:2;flex-direction:row;align-items:center}
   .dm-seta{display:none}
