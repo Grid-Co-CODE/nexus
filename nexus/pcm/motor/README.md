@@ -1,7 +1,8 @@
 # Motor da programação semanal (cópia)
 
 Estes quatro arquivos são uma cópia **idêntica** do motor do PCM, tirada do repositório
-`fillipefigueiro-source/gridco-pcm-data` no commit `cb8239c` (23/10/2026, o preenchimento respeita o dia fixo da usina,
+`fillipefigueiro-source/gridco-pcm-data` no commit `d54c294` (13/11/2026, a corretiva respeita os 70% do dia e o que
+não couber vira pendência; antes, `cb8239c` (23/10/2026, o preenchimento respeita o dia fixo da usina,
 sobre o `8d84669`, a MPM da última semana do mês pelos dias livres; antes, `bfbc76c` (19/10/2026, a subtarefa `nome @ CÓDIGO`), `0560d5d`
 (16/10/2026, a carga de 70% já na W43), `6215ceb` e
 `fdad64e` de 16/10,
@@ -18,7 +19,7 @@ Conferido pelo hash (SHA-256 da cópia com CRLF):
 
 | Arquivo | Hash |
 |---|---|
-| `programacao_v7.py` | `92e30be10bfd…` |
+| `programacao_v7.py` | `8a58e515e534…` |
 | `fonte_bd_api.py` | `b81d2c394d67…` |
 | `gerar_bd_via_api.py` | `6c580738ab5e…` |
 | `fora_da_programacao.py` | `91f9a81140c0…` |
@@ -30,6 +31,22 @@ substituir. Reescrever o motor tornaria a comparação inútil.
 
 **Não edite estes arquivos.** Mudança de regra entra no repositório do PCM e é copiada de novo. Enquanto os dois
 sistemas rodarem juntos, as duas cópias precisam ser iguais.
+
+## O que mudou em 13/11/2026 (`d54c294`): a corretiva respeita os 70% do dia
+
+Levi: "até 70% das horas semanais [...] essas 44 horas têm que ser divididas de segunda a sexta. E aí o resto é
+resolvido"; "regra que tem em um tem que ter em outro" (no dia em que as OS da FAMA entraram no programador). A
+corretiva sem folga no dia da usina era forçada ([EXCEDE HH]) no primeiro dia dela, no passe 1 do `schedule_team`. Na
+W47 simulada com a foto do Fracttal de 11/11 e as OS da FAMA, uma equipe ficou com 28,5 h na segunda e a sexta vazia, e
+o Fracttal sozinho já tinha 48 linhas forçadas. Agora a corretiva entra primeiro, até a capacidade do dia; sem folga,
+tenta os outros dias da usina e os dias livres (passe 4) e, sem folga em nenhum, vira pendência ("Não couberam na
+semana"). A MPM do fim do mês (passe 5) e a OS que a observação manda pôr no dia seguem forçadas como eram. Junto, o
+`alloc_diurno` devolvia "completa" a tarefa cortada pela capacidade do dia: ela saía da lista e o resto sumia (nem na
+agenda, nem nas pendências), com a linha dizendo a duração inteira; agora só é completa a que coube inteira. Na mesma
+W47: 0 linhas [EXCEDE HH] (eram 48 do Fracttal e 106 da FAMA), nenhuma equipe da FAMA acima de 6,15 h no dia, as OS da
+FAMA de segunda a quinta (a sexta é feriado) e o que não coube nas pendências. Prova:
+`tests/test_pcm_motor_fim_do_mes.py::test_a_corretiva_respeita_os_70_por_cento_do_dia` (nada some: agenda mais pendências
+é a semana pedida).
 
 ## O que mudou em 23/10/2026 (`8d84669` e `cb8239c`): a MPM da última semana do mês pelos dias livres
 

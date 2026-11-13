@@ -331,14 +331,19 @@ def _preparar(config, semana: str, pasta: Path, trabalho: Path, origem: Path | N
 
 
 def _fama(config, ler_o_fracttal: bool) -> dict | None:
-    """As OS da FAMA para a rodada (a fase 2, `fama_motor.py`), só com `NEXUS_FAMA_PROGRAMA=1`. Sem a variável, None, e a
-    rodada é a de sempre: nem a leitura do Fracttal antes do motor nem o adaptador rodam."""
+    """As OS da FAMA para a rodada (`fama_motor.py`), com `NEXUS_FAMA_PROGRAMA=1`. Sem a variável, None, e a rodada é a de
+    sempre: nem a leitura do Fracttal antes do motor nem o adaptador rodam.
+
+    A FAMA que não abre (a leitura parada há mais de 26 h, o banco fora) deixa a rodada sem ela, a de sempre, com o motivo
+    em `{"fora": ...}` (vai ao status e à tela): desde 13/11/2026 a FAMA entra por padrão, e até ali o erro barrava a
+    rodada inteira, o que agora travaria a semana do PCM por causa da FAMA. A semana de sempre não tira preventiva do
+    Fracttal nem põe OS da FAMA velha: é o lado seguro."""
     if not FM.ligado(config):
         return None
     try:
         return FM.entrada(config, ler_o_fracttal)
     except FM.FamaErro as ex:
-        raise NaoPronto(f"OS da FAMA: {ex}") from ex
+        return {"fora": str(ex)[:300]}
 
 
 def iniciar(config, semana: str) -> dict:
@@ -382,6 +387,12 @@ def _executar(pasta: Path, st: dict, env: dict, motor: Path, origem: Path, saida
     log = pasta / "log_motor.txt"
     try:
         with open(log, "wb") as f:
+            if fama is not None and "fora" in fama:
+                # a FAMA que não abriu (`_fama`): a rodada de sempre, e o motivo no status, no log e na tela
+                st["fama"] = {"fora": fama["fora"]}
+                f.write(f"[FAMA] as OS da FAMA ficaram fora desta rodada: {fama['fora']}\n".encode("utf-8"))
+                f.flush()
+                fama = None
             if fama is not None:
                 env = FM.antes_do_motor(pasta, st, env, motor, fama, f, TEMPO_MAX_S)
             r = subprocess.run([sys.executable, str(motor), "--semana", st["semana"]], cwd=str(pasta), env=env,

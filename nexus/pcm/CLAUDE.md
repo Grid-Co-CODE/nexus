@@ -2147,9 +2147,19 @@ ainda não começou e não foi ao App; `?rodada=` abre qualquer rodada, também 
 
 Levi, 11/11/2026: o cliente cria a OS na FAMA, ela aparece para o programador automático e cai no App de Campo; as
 retroativas abertas também entram ("a ideia é não ficarmos criando e editando e sim acompanhando"). A **fase 1 é
-sombra**: a FAMA aparece no Quadro e nada muda no campo nem na programação oficial. A **fase 2**, combinada depois com o
-App, liga por `NEXUS_FAMA_PROGRAMA=1` (vazia por padrão, em `nexus/config.py` e no `.env.example`). A leitura da FAMA, o
-livro `nexus_os_fama · fato_os_fama` e o de-para em Ligações são da parte A (`nexus/dados/fama.py`).
+sombra**: a FAMA aparece no Quadro e nada muda no campo nem na programação oficial. A **fase 2 está LIGADA desde
+13/11/2026** (Levi: "fama tem que entrar no programador também [...] O PCM precisa tratar a FAMA como ele trata os outros.
+Então, regra que tem em um tem que ter em outro"): o `config.carregar_config` liga a `NEXUS_FAMA_PROGRAMA` por padrão onde
+a FAMA é lida (a `NEXUS_FAMA_CHAVE` está na máquina, o servidor; o .env do servidor é da T.I., por isso o padrão mora no
+código), e `0` desliga. No mesmo dia: a equipe da OS é a do cadastro, com qualquer nome (as usinas da Faro têm equipes
+locais, e 208 das 264 OS ficavam fora por "sem equipe"); roçada e limpeza de módulos são Zeladoria, como no Fracttal; a
+preventiva leva a sigla que o título diz (`fama_motor.sigla`: "mensal" = MPM, "anual" = MPA...), para a regra da vencida
+ser a mesma; e o motor deixou de forçar a corretiva acima dos 70% (`motor/README.md`, 13/11), para as duas fontes. **O
+App:** até ele estar pronto para a OS da FAMA (`NEXUS_FAMA_APP=1`), a semana vai ao App sem elas
+(`publicar.sem_as_os_da_fama`; a publicação diz quantas, `fama_fora_do_app`); a rodada guarda a programação inteira, e o
+Quadro a mostra (`fama_quadro.plano_publicado`: o dia, a equipe e a hora do programador; a que ele não programou fica no
+bloco da segunda, "Não coube" ou "Não programada"). O pedido ao App foi à sessão "App de campo" em 13/11. A leitura da
+FAMA, o livro `nexus_os_fama · fato_os_fama` e o de-para em Ligações são da parte A (`nexus/dados/fama.py`).
 
 - **A porta única:** o PCM só recebe as OS da FAMA por `fama_os._linhas_fama(config)`, que lê o livro pelo
   `fama.ler_banco` e devolve um `Lido`: todas as linhas do fato (qualquer situação), cada uma com `fama_os_id`,
@@ -2165,7 +2175,7 @@ livro `nexus_os_fama · fato_os_fama` e o de-para em Ligações são da parte A 
   leitura (o servidor lê a FAMA de 10 em 10 minutos e só regrava o livro quando a FAMA muda ou uma vez por dia; o
   Quadro relê o livro inteiro de 10 em 10 minutos também, `fama_quadro.COMPLETA_S`; o "!" diz isso;
   o "lidas em" de antes parecia a FAMA sem leitura havia horas, re-revisão de 11/11/2026). Parada, o Quadro avisa "A
-  leitura da FAMA parou: o que aparece pode estar velho"; a rodada ligada não sai (abaixo).
+  leitura da FAMA parou: o que aparece pode estar velho"; a rodada sai sem a FAMA (abaixo).
 - **Por que a FAMA não passa pelo motor na fase 1:** ocuparia as horas das equipes, e a semana oficial do Fracttal mudaria
   mesmo sem publicar.
 - **A velocidade:** o pedido do Quadro NUNCA lê o banco (revisão de 11/11/2026: o livro tem ~4.700 linhas em páginas). As
@@ -2211,25 +2221,25 @@ livro `nexus_os_fama · fato_os_fama` e o de-para em Ligações são da parte A 
   o nome dela nas tarefas do Fracttal no cache (sem tarefa, o do de-para); a equipe, a das tarefas (sem tarefa, a do
   cadastro, se for "UF Região NN"); o tipo, corretiva ou preventiva; a "Data Programada", a previsão; a tarefa, "OS da FAMA
   <id>" (o título NÃO vai: o log do motor imprime o texto das tarefas); a duração, 1,5 h. O portão é o FRESCOR, não a
-  contagem (`fama_motor.entrada`): o livro velho (a leitura da FAMA parada) = a rodada ligada não sai; o livro fresco e sem
+  contagem (`fama_motor.entrada`): o livro velho (a leitura da FAMA parada) ou o banco fora = a FAMA fica fora da rodada,
+  que sai a de sempre com o motivo no status e na tela Gerar (`geracao._fama`, `{"fora": ...}`; até 13/11/2026 a rodada
+  não saía, o que travaria a semana do PCM agora que a FAMA entra por padrão); o livro fresco e sem
   OS = a semana de sempre, sem o adaptador. O resumo vai no `status.json` (`fama`) e numa linha do log, só com contagens.
 - **Achados da prova com o motor de verdade (11/11/2026):** com a duração vazia, a preventiva da FAMA sem sigla e sem par
   na Lista de Prioridades saía com `dur_h` NaN e a rodada inteira quebrava (`alloc_diurno`): por isso 1,5 h, o último
   recurso do próprio motor (`_estimate_h_sem_fracttal`). O motor gera sempre a semana da próxima segunda: o `--semana` da
   linha de comando não pega nele (ele lê o próprio "--semana" como valor) e o Nexus tira o `PCM_WEEK_FORCE` do ambiente.
-- **Antes de ligar a fase 2** (o que a revisão de 11/11/2026 deixou anotado, sem corrigir agora):
-  - as retroativas somem no motor: a vencida há mais de 60 dias (o `PCM_AGING_MAX`) não entra na semana nem nas
-    pendentes. Levar a vencida para a segunda da semana gerada, mostrar quantas entraram e quantas saíram (o
-    `planilha.linhas` do relatório) e testar uma retroativa de 90 dias com o motor de verdade;
-  - o `publicar.py` não recusa a rodada com `st["fama"]` (a semana com a FAMA iria ao App sem o combinado com ele);
+- **O que segue aberto na fase 2** (da revisão de 11/11/2026; o resto foi feito em 13/11):
+  - a vencida segue a regra do Fracttal (`_fila_elegivel`): a corretiva volta sempre; a preventiva, pela sigla (MPS e
+    MPA sempre; MPM só no mês da semana); a preventiva da FAMA sem periodicidade no título, vencida, fica fora (13 das 91
+    abertas em 13/11);
   - reprogramar "FAMA-<id>" no Quadro dá "não está nesta semana" (`quadro.linhas_da_fila` só aceita OS em número);
   - a aba `_Qualidade` e o log do motor mostram o número substituto ("OS 9000000101"), não o FAMA-<id>;
   - o `fama_motor.entrada` lê o banco dentro da `_trava` da geração (`geracao.iniciar`): o banco lento segura a trava;
   - "usina da FAMA" é a que tem OS da FAMA ligada, de qualquer época: a usina que saiu da FAMA perde a preventiva do
     Fracttal (restringir pelo `dim_projeto_fama` ou pela atividade recente);
-  - roçada e limpeza de módulos vão como Preventiva, mas no Fracttal costumam ser Zeladoria (que o motor põe em paralelo,
-    fora da capacidade da equipe);
-  - o robô e o App precisam aceitar "FAMA-<id>" no "OSs ID" e "OS da FAMA <id>" na tarefa.
+  - o robô e o App precisam aceitar "FAMA-<id>" no "OSs ID" e "OS da FAMA <id>" na tarefa (até lá, a semana vai ao App
+    sem elas).
 - **Provar:** `tests/test_pcm_fama_quadro.py` (as regras, o teto e o bloco das atrasadas, os filtros e as contas à
   parte, o frescor, a repetição e a tela), `tests/test_pcm_fama_copia.py` (o caminho de produção, com o banco de mentira e
   o livro gravado pela carga da parte A: a 1ª visita não espera, a cópia vencida volta na hora, duas visitas na mesma
@@ -2526,7 +2536,8 @@ mais, e enquanto uma tela é montada as outras esperam (o Python faz uma coisa d
   (`CARGA_MAX_DIA`) programa até 6,15 h por equipe e dia (era 80%, 7 h); a noite segue em 80%. A conferência
   (`comparar.CARGA_MAX_DIA`, `CAPACIDADE_H`, `DIA_DO_MOTOR_MIN`) usa a mesma conta, e o teste de contrato prende as duas.
   Na W43 com a leitura das 12:23: de 1.232 para 1.220 blocos e 10 tarefas a mais na pendente (a maioria dos dias de
-  equipe já não enchia; 19 passam de 6,15 h pelas corretivas forçadas). Junto, o robô do PCM deixou de mudar a tarefa de
+  equipe já não enchia; 19 passam de 6,15 h pelas corretivas forçadas; desde 13/11/2026 a corretiva também respeita os
+  70% e o que não couber vira pendência, `motor/README.md`). Junto, o robô do PCM deixou de mudar a tarefa de
   dia (rolagem desligada, cascata da OS nova só no mesmo dia): a tarefa de sexta fica no dia dela até o fechamento.
 - **Cota do Fracttal:** 200 pedidos por minuto para a **empresa inteira**, divididos com o App de Campo. O motor anda
   a 1 por segundo, e a tela pede confirmação no horário de campo (seg a sex, das 06h às 18h). Cada leitor do motor tem

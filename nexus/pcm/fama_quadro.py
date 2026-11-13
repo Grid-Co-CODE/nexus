@@ -207,17 +207,107 @@ def _vazio(ativa=False, erro=None, lendo=False) -> dict:
             "lendo": lendo, "gravado_em": "", "velho": False}
 
 
-def para_o_quadro(cfg, sem: dict, dia) -> dict:
+# ── a FAMA programada (13/11/2026): o dia que o programador deu ──────────────────────────────────────────────────
+_PLANO: dict = {}        # (caminho, mtime) da planilha da rodada publicada -> o plano lido dela (um só guardado)
+
+
+def _ler_plano(planilha) -> dict | None:
+    """{"programadas": {id da FAMA: {"dia", "equipe", "h_ini"}}, "pendentes": {ids}} da planilha de uma rodada: o dia,
+    a equipe e a hora da 1ª linha de cada OS da FAMA nas abas de equipe, e as da `_Pendentes` que não entraram em dia
+    nenhum. None = a rodada não tem OS da FAMA (gerada sem a FAMA no programador)."""
+    import openpyxl
+    from .semana import dia_curto
+    prog, pend = {}, set()
+    wb = openpyxl.load_workbook(planilha, read_only=True)
+    try:
+        for ws in wb.worksheets:
+            if ws.title.startswith("_") and ws.title != "_Pendentes":
+                continue
+            it = ws.iter_rows(values_only=True)
+            cab = next(it, None)
+            if not cab or "OSs ID" not in cab:
+                continue
+            i = {c: k for k, c in enumerate(cab)}
+
+            def col(r, nome):
+                k = i.get(nome)
+                return "" if k is None or k >= len(r) or r[k] is None else str(r[k]).strip()
+            for r in it:
+                v = col(r, "OSs ID") if r else ""
+                fid = F.inteiro(v.split("-", 1)[1]) if v.startswith("FAMA-") else None
+                if fid is None:
+                    continue
+                if ws.title == "_Pendentes":
+                    pend.add(fid)
+                elif dia_curto(col(r, "Dia")):
+                    prog.setdefault(fid, {"dia": dia_curto(col(r, "Dia")), "equipe": col(r, "Equipe"),
+                                          "h_ini": col(r, "Hora Início")})
+    finally:
+        wb.close()
+    return {"programadas": prog, "pendentes": pend - set(prog)} if prog or pend else None
+
+
+def separar_da_semana(sem: dict) -> tuple[dict, dict | None]:
+    """(a semana sem as linhas das OS da FAMA, o plano tirado delas). A semana que já traz a FAMA (o rascunho da rodada no
+    Quadro, `?rodada=`, e a semana do App quando o App estiver pronto para elas, `NEXUS_FAMA_APP=1`): as linhas
+    "FAMA-<id>" saem das tarefas, senão a OS aparecia duas vezes (como tarefa e como cartão da FAMA), e dão o plano, como
+    o `_ler_plano` dá da planilha. Sem nenhuma, a mesma semana e None."""
+    def e_fama(r):
+        return str(r.get("os_id") or "").startswith("FAMA-")
+
+    def fid(r):
+        return F.inteiro(str(r.get("os_id")).split("-", 1)[1])
+    rows, pend = sem.get("rows") or [], sem.get("pendentes") or []
+    if not any(e_fama(r) for r in rows) and not any(e_fama(r) for r in pend):
+        return sem, None
+    prog = {}
+    for r in rows:
+        if e_fama(r) and fid(r) is not None and Q.dia_de(r.get("dia")):
+            prog.setdefault(fid(r), {"dia": Q.dia_de(r.get("dia")), "equipe": str(r.get("cluster") or ""),
+                                     "h_ini": str(r.get("h_ini") or "")})
+    pids = {fid(r) for r in pend if e_fama(r)} - {None}
+    limpa = dict(sem, rows=[r for r in rows if not e_fama(r)], pendentes=[r for r in pend if not e_fama(r)])
+    return limpa, {"programadas": prog, "pendentes": pids - set(prog)}
+
+
+def plano_publicado(cfg, semana: str) -> dict | None:
+    """O plano da FAMA da semana: o da rodada que o Nexus publicou para ela (`publicar.publicacoes`), lido da planilha
+    da rodada, que guarda a programação inteira (ao App a semana vai sem a FAMA até o App estar pronto,
+    `publicar.sem_as_os_da_fama`). None = a semana não foi publicada pelo Nexus, ou foi por uma rodada sem a FAMA: o
+    Quadro fica com a data prevista, como na fase 1. Guarda o último plano lido: a planilha só é relida quando muda."""
+    from . import geracao, publicar
+    pub = publicar.publicacoes(cfg).get(semana)
+    p = geracao.planilha(cfg, pub["rodada"]) if pub else None
+    if not p or not p.exists():
+        return None
+    chave = (str(p), p.stat().st_mtime)
+    if chave not in _PLANO:
+        plano = _ler_plano(p)
+        _PLANO.clear()
+        _PLANO[chave] = plano
+    return _PLANO[chave]
+
+
+def para_o_quadro(cfg, sem: dict, dia, plano: dict | None = None) -> dict:
     """As OS da FAMA da semana do Quadro (`da_semana`). Nunca derruba o Quadro nem o faz esperar: a 1ª leitura em
     andamento volta como `lendo`, a que falhou como `erro` (o nome do erro, nunca a mensagem), e o Quadro sai sem elas,
-    com o aviso."""
+    com o aviso. Com o plano (o da própria semana, `separar_da_semana`, ou o da rodada que a publicou,
+    `plano_publicado`), o cartão vai no dia do programador; o plano que não abre deixa o Quadro com a data prevista."""
     if dia > HB.segunda(sem["week"]) + timedelta(days=6):
         return _vazio()
     try:
         r = ler(cfg)
         if r["estado"] != "ok":
             return _vazio(True, erro=r["erro"], lendo=r["estado"] == "lendo")
-        return da_semana(r["linhas"], sem, r["cadastro"], dia, gerado_em=r["gerado_em"]) if r["linhas"] else _vazio()
+        if not r["linhas"]:
+            return _vazio()
+        if plano is None:
+            try:
+                plano = plano_publicado(cfg, sem["week"])
+            except Exception as ex:  # noqa: BLE001 — a planilha da rodada que não abre não derruba o Quadro
+                log.warning("Quadro: o plano da FAMA da semana não abriu (%s)", type(ex).__name__)
+                plano = None
+        return da_semana(r["linhas"], sem, r["cadastro"], dia, gerado_em=r["gerado_em"], plano=plano)
     except Exception as ex:      # noqa: BLE001 — a FAMA fora do ar não derruba o Quadro
         log.warning("Quadro: as OS da FAMA não abriram (%s)", type(ex).__name__)
         return _vazio(True, type(ex).__name__)
@@ -241,17 +331,24 @@ def _como_na_semana(nome, da_semana: set) -> str:
     return " ".join(str(nome).split())
 
 
-def da_semana(linhas: list[dict], sem: dict, cadastro: dict, hoje, gerado_em=None, agora=None) -> dict:
+def da_semana(linhas: list[dict], sem: dict, cadastro: dict, hoje, gerado_em=None, agora=None, plano=None) -> dict:
     """{"ativa", "linhas": uma linha por OS da FAMA que vira cartão, nas chaves das linhas da semana (as que os filtros
     leem) e com o cartão em "fama", "sem_usina", "sem_data", "preventivas": os nomes (normalizados) das usinas com
-    preventiva da FAMA na semana, "gravado_em" e "velho": o frescor do batimento}. As regras estão no docstring do
-    módulo."""
+    preventiva da FAMA na semana, "gravado_em" e "velho": o frescor do batimento, "programada": a semana tem plano}. As
+    regras estão no docstring do módulo.
+
+    Com o `plano` (`plano_publicado`: a FAMA no programador, 13/11/2026; Levi: "As OS estão sendo jogadas todas para
+    segunda-feira [...] até 70% das horas semanais"), a OS programada vai no dia, na equipe e na hora do programador, e
+    a que ele não programou vai para o bloco recolhido da segunda, "não programadas": "Não coube" (estava nas pendentes)
+    ou "Não programada" (aberta depois da rodada, ou deixada fora pela regra da vencida). Sem plano, a data prevista."""
     seg = HB.segunda(sem["week"])
     dom = seg + timedelta(days=6)
     out = _vazio(hoje <= dom)
     if not out["ativa"]:
         return out
-    out.update(gravado_em=F.quando(gerado_em), velho=F.velho(gerado_em, agora))
+    out.update(gravado_em=F.quando(gerado_em), velho=F.velho(gerado_em, agora), programada=bool(plano))
+    prog = (plano or {}).get("programadas") or {}
+    pend = (plano or {}).get("pendentes") or set()
     # as tarefas do Fracttal de cada usina na semana (agenda e pendentes), pelo nome do Fracttal
     por_nome: dict[str, list[dict]] = {}
     for r in (sem.get("rows") or []) + (sem.get("pendentes") or []):
@@ -260,14 +357,15 @@ def da_semana(linhas: list[dict], sem: dict, cadastro: dict, hoje, gerado_em=Non
     for l in linhas:
         sit = F.situacao(l.get("status"))
         prev = F.data_de(l.get("data_id_prevista"))
-        if sit is None or (prev is not None and prev > dom):
+        p = prog.get(F.inteiro(l.get("fama_os_id")))         # o que o programador deu a ela (só com o plano)
+        if sit is None or (p is None and prev is not None and prev > dom):
             continue
         uid = F.inteiro(l.get("usina_id"))
         cad = cadastro.get(uid) if uid else None
         if cad is None:
             out["sem_usina"] += 1
             continue
-        if prev is None:
+        if prev is None and p is None:
             out["sem_data"] += 1
             continue
         nomes = list(cad.get("nomes") or [])
@@ -275,7 +373,18 @@ def da_semana(linhas: list[dict], sem: dict, cadastro: dict, hoje, gerado_em=Non
         nome = _moda(r.get("usina") for r in daqui) or (nomes[0] if nomes else "") or cad.get("nome") or f"Usina {uid}"
         s, t, v = _norm(l.get("status")), _norm(l.get("tipo")), _norm(l.get("severidade"))
         tipo = F.TIPO_PT.get(t) or str(l.get("tipo") or "").strip()
-        atrasada = sit == "aberta" and prev < seg
+        # `atrasada` = vai para o bloco recolhido da segunda: sem plano, a aberta prevista para antes da segunda; com o
+        # plano, a que o programador não programou
+        if plano:
+            atrasada = p is None
+            marca, marcat = (("Não coube" if F.inteiro(l.get("fama_os_id")) in pend else "Não programada", "critico")
+                             if atrasada else ("Em andamento", "alerta") if sit == "andamento" else ("", ""))
+            dia = p["dia"] if p else "seg"
+        else:
+            atrasada = sit == "aberta" and prev < seg
+            marca, marcat = (("Atrasada", "critico") if atrasada else ("Em andamento", "alerta") if sit == "andamento"
+                             else ("", ""))
+            dia = "seg" if prev < seg else Q.DIAS[(prev - seg).days]
         num = F.numero(l.get("fama_os_id"))
         # `num` ("FAMA-<id>") é o identificador: a busca, a planilha do motor e o App. O cartão mostra "FAMA - OS <id>",
         # com a marca FAMA antes do número (Levi, 13/11/2026: "antes do número da OS apareça bem em caixa alta FAMA,
@@ -284,17 +393,18 @@ def da_semana(linhas: list[dict], sem: dict, cadastro: dict, hoje, gerado_em=Non
                   "stc": STATUS_COR.get(s, "nao"), "tp": tipo, "tc": TIPO_COR.get(t, "outro"),
                   "sev": F.SEVERIDADE_PT.get(v) or str(l.get("severidade") or "").strip(), "sevt": SEV_TOM.get(v, "neutro"),
                   "uc": Q.usina_curta(nome), "t": " ".join(str(l.get("titulo") or "").split()),
-                  "prev": prev.strftime("%d/%m"), "atrasada": atrasada,
-                  "marca": "Atrasada" if atrasada else ("Em andamento" if sit == "andamento" else ""),
-                  "marcat": "critico" if atrasada else ("alerta" if sit == "andamento" else "")}
+                  "prev": prev.strftime("%d/%m") if prev else "sem data", "atrasada": atrasada,
+                  "marca": marca, "marcat": marcat}
         out["linhas"].append({
-            "os_id": cartao["num"], "usina": nome, "codigo": "", "h_ini": "", "tarefa": cartao["t"], "tipo": tipo,
+            "os_id": cartao["num"], "usina": nome, "codigo": "", "h_ini": (p or {}).get("h_ini") or "",
+            "tarefa": cartao["t"], "tipo": tipo,
             "cliente": _moda(r.get("cliente") for r in daqui) or cad.get("cliente") or "",
-            "cluster": _moda(r.get("cluster") for r in daqui) or cad.get("equipe") or "",
+            "cluster": ((p or {}).get("equipe") or _moda(r.get("cluster") for r in daqui) or cad.get("equipe") or ""),
             "responsavel": (_moda(r.get("responsavel") for r in daqui)
                             or _como_na_semana(cad.get("responsavel"), responsaveis)),
-            "status": F.ESTADO_DA_TAREFA[s], "dia": "seg" if prev < seg else Q.DIAS[(prev - seg).days],
-            "ordem": (prev, SEV_ORDEM.get(v, 9), F.inteiro(l.get("fama_os_id")) or 0), "fama": cartao})
+            "status": F.ESTADO_DA_TAREFA[s], "dia": dia,
+            "ordem": ((p or {}).get("h_ini") or "", prev or seg, SEV_ORDEM.get(v, 9), F.inteiro(l.get("fama_os_id")) or 0),
+            "fama": cartao})
         if t == F.PREVENTIVA:
             out["preventivas"].update(_norm(n) for n in nomes + [nome])
     return out
@@ -352,4 +462,5 @@ def no_quadro(q: dict, sem: dict, fama: dict, filtros: dict, todos: bool = False
     q["fama"] = {"total": len(sel), "total_semana": len(linhas), "sem_usina": fama.get("sem_usina", 0),
                  "sem_data": fama.get("sem_data", 0), "erro": fama.get("erro"), "lendo": fama.get("lendo", False),
                  "gravado_em": fama.get("gravado_em", ""), "velho": fama.get("velho", False),
+                 "programada": bool(fama.get("programada")),
                  "mostra": bool(linhas or fama.get("sem_usina") or fama.get("sem_data"))}

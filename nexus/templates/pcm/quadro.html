@@ -43,6 +43,12 @@
         para elas, com a conta delas à parte ("+N FAMA").</dd>
       {{ termo('Atrasada', 'critico') }}<dd>A OS aberta da FAMA com a data prevista antes da segunda: vai no bloco recolhido
         da segunda.</dd>
+      {{ termo('FAMA programada', 'info') }}<dd>Desde 13/11/2026 a FAMA entra no programador com as mesmas regras do
+        Fracttal (até 70% das horas da equipe por dia, de segunda a sexta). Na semana publicada por uma rodada que
+        programou a FAMA, o cartão vai no dia, na equipe e na hora que o programador deu; a que ele não programou fica no
+        bloco recolhido da segunda: "Não coube" (não coube nas horas da semana) ou "Não programada" (aberta depois da
+        geração da semana, ou deixada fora pela regra da tarefa vencida). Até o App de Campo estar pronto para elas, a
+        semana vai ao App sem as OS da FAMA.</dd>
       {{ termo('Em andamento', 'alerta') }}<dd>A OS da FAMA em mobilização ou em execução.</dd>
       {{ termo('FAMA também', 'info') }}<dd>A preventiva do Fracttal de uma usina em que a FAMA também tem preventiva nesta
         semana: confira se não é a mesma manutenção.</dd>
@@ -215,7 +221,7 @@
       {% if c.fama_atrasadas_n %}
       <details class="q-fama-atrasadas">
         <summary><i class="ph ph-caret-right q-seta" aria-hidden="true"></i> <b class="gc-num">{{ c.fama_atrasadas_n }}</b>
-          OS da FAMA {{ 'atrasada' if c.fama_atrasadas_n == 1 else 'atrasadas' }}</summary>
+          OS da FAMA {% if q.fama and q.fama.programada %}{{ 'não programada' if c.fama_atrasadas_n == 1 else 'não programadas' }}{% else %}{{ 'atrasada' if c.fama_atrasadas_n == 1 else 'atrasadas' }}{% endif %}</summary>
         {% for f in c.fama_atrasadas %}{{ cartao_fama(f) }}{% endfor %}
         {% if c.fama_atrasadas_ocultas %}<a class="q-mais" href="{{ (url_todos)|na_raiz }}">+{{ c.fama_atrasadas_ocultas }} não {{ 'exibida' if c.fama_atrasadas_ocultas == 1 else 'exibidas' }} · mostrar todas</a>{% endif %}
       </details>

@@ -111,11 +111,24 @@ def test_fora_da_ultima_semana_nada_muda_a_mpm_que_sobra_e_pendencia():
 
 
 @pytest.mark.parametrize("semana", [date(2026, 10, 26), date(2026, 10, 19)])
-def test_a_corretiva_segue_forcada_no_dia_da_usina(semana):
+def test_a_corretiva_respeita_os_70_por_cento_do_dia(semana):
+    """13/11/2026 (Levi: "até 70% das horas semanais [...] essas 44 horas têm que ser divididas de segunda a sexta. E aí
+    o resto é resolvido"): a corretiva sem folga no dia da usina não é mais forçada ([EXCEDE HH]) no primeiro dia dela;
+    vai aos outros dias e aos dias livres, e o que não couber em dia nenhum vira pendência. Até ali as três de 4 h abaixo
+    entravam no mesmo dia (12 h). Nada some: as horas na agenda mais as das pendências são as da semana pedida (a tarefa
+    cortada pela capacidade do dia voltava "completa" e o resto sumia, `alloc_diurno`)."""
     ns = _escalonador(semana)
-    tarefas = [_tarefa(900 + n, "Usina A", n, "OUTRA", True, 4.0) for n in range(3)]   # 12 h de corretiva, 1 usina
-    rows, pend = ns["schedule_team"]("PA Teste", tarefas)
-    assert pend == [] and len(rows) == 3
+    for n_tarefas, pendentes in ((3, False), (8, True)):                 # 12 h cabem na semana; 32 h, não (5 x 6,15 h)
+        tarefas = [_tarefa(900 + n, "Usina A", n, "OUTRA", True, 4.0) for n in range(n_tarefas)]
+        rows, pend = ns["schedule_team"]("PA Teste", tarefas)
+        por_dia = {}
+        for r in rows:
+            por_dia[r["DiaIdx"]] = por_dia.get(r["DiaIdx"], 0) + float(r["Duração (h)"])
+        assert max(por_dia.values()) <= 6.15 + 1e-9, por_dia
+        assert not any("EXCEDE HH" in str(v) for r in rows for v in r.values())
+        assert bool(pend) == pendentes
+        horas_pend = sum(float(p.get("Duração (h)") or 0) for p in pend)
+        assert abs(sum(por_dia.values()) + horas_pend - 4.0 * n_tarefas) < 0.05, (por_dia, horas_pend)
 
 
 @pytest.mark.parametrize("semana", [date(2026, 10, 26), date(2026, 10, 19)])

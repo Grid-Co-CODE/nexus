@@ -80,15 +80,26 @@ FAMA = [_f(101, 10),
         _f(107, 30),                                      # a usina sem nome no Fracttal
         _f(108, 10, tipo="Something else"),               # tipo fora do catálogo
         _f(109, 40),                                      # usina sem tarefa no cache: a equipe do cadastro
-        _f(110, 50)]                                      # equipe do cadastro fora do padrão do PCM
+        _f(110, 50)]                                      # a equipe local do cadastro, fora do padrão "UF Região NN"
 
 
 # ── a linha do motor ─────────────────────────────────────────────────────────────────────────────────────────────
-def test_a_variavel_esta_declarada_e_desligada_por_padrao():
+def test_a_variavel_esta_declarada():
     assert "NEXUS_FAMA_PROGRAMA" in CONFIG.OPCIONAIS
     assert "NEXUS_FAMA_PROGRAMA=" in (RAIZ / ".env.example").read_text(encoding="utf-8")
     assert FM.ligado({"NEXUS_FAMA_PROGRAMA": "1"}) and FM.ligado({"NEXUS_FAMA_PROGRAMA": " 1 "})
     assert not any(FM.ligado(c) for c in ({}, {"NEXUS_FAMA_PROGRAMA": "0"}, {"NEXUS_FAMA_PROGRAMA": ""}))
+
+
+def test_a_fama_entra_no_programador_onde_a_fama_e_lida():
+    """13/11/2026, Levi: "fama tem que entrar no programador também [...] regra que tem em um tem que ter em outro". A
+    FAMA vai ao programador por padrão onde ela é lida (a `NEXUS_FAMA_CHAVE` está na máquina: o servidor); `0` desliga.
+    O padrão mora no Nexus porque o .env do servidor é da T.I. e o deploy não mexe nele."""
+    from nexus.config import OBRIGATORIAS, carregar_config
+    base = {k: "x" for k in OBRIGATORIAS}
+    assert FM.ligado(carregar_config(dict(base, NEXUS_FAMA_CHAVE="chave")))
+    assert not FM.ligado(carregar_config(dict(base, NEXUS_FAMA_CHAVE="chave", NEXUS_FAMA_PROGRAMA="0")))
+    assert not FM.ligado(carregar_config(base))              # sem a leitura da FAMA (o teste, a cópia de prova)
 
 
 def test_as_colunas_do_motor_sao_as_do_arquivo_dele():
@@ -117,7 +128,7 @@ def test_aplicar_poe_as_os_da_fama_e_tira_a_preventiva_do_fracttal_das_usinas_da
     fr = df[df["OSs ID"].map(lambda v: FM.fama_do_substituto(v) is None)]
     assert sorted(fr["OSs ID"]) == ["15002", "15003", "15004"]                  # a 15001 e a 15005 saíram
     fama = {FM.fama_do_substituto(r["OSs ID"]): r for _, r in df.iterrows() if FM.fama_do_substituto(r["OSs ID"])}
-    assert sorted(fama) == [101, 102, 103, 109]
+    assert sorted(fama) == [101, 102, 103, 109, 110]
     a = fama[101]
     assert (a["Status"], a["Estado da Tarefa"], a["Tipo de tarefa"]) == ("Em processo", "Não Iniciada", "Corretiva")
     assert (a["Ativo Classificação 1"], a["Ativo Classificação 2"], a["Ativo"]) == (U1, "SP Leste 02", U1)
@@ -127,19 +138,49 @@ def test_aplicar_poe_as_os_da_fama_e_tira_a_preventiva_do_fracttal_das_usinas_da
     assert a["Tarefa -> Duração estimada"] == pd.Timedelta(hours=1.5) and pd.isna(a["Total de Horas"])
     assert a["Tarefa"] == "OS da FAMA 101" and a["Código"] == ""
     assert (fama[102]["Estado da Tarefa"], fama[102]["Tipo de tarefa"]) == ("pausado", "Preventiva")
-    assert (fama[103]["Estado da Tarefa"], fama[103]["Tipo de tarefa"]) == ("Em progresso", "Preventiva")
+    # a limpeza de módulos e a roçada da FAMA são zeladoria, como no Fracttal (Levi, 13/11/2026: "regra que tem em um tem
+    # que ter em outro"): o motor as põe em paralelo, fora das horas da equipe
+    assert (fama[103]["Estado da Tarefa"], fama[103]["Tipo de tarefa"]) == ("Em progresso", "Zeladoria")
     # a usina sem tarefa no cache: o nome do de-para e a equipe do cadastro
     assert (fama[109]["Ativo Classificação 1"], fama[109]["Ativo Classificação 2"]) == (U4, "MG Sul 01")
+    # a equipe local do cadastro vale como qualquer outra (13/11/2026: na simulação da W47, 208 das 264 OS da FAMA ficavam
+    # fora por "sem equipe": as usinas da Faro têm equipes locais, sem o padrão "UF Região NN")
+    assert fama[110]["Ativo Classificação 2"] == "Usina 5 local"
     # o título da OS nunca vai para o motor
     assert not df.astype(str).apply(lambda col: col.str.contains(TITULO_SIGILOSO)).any().any()
-    assert rel == {"os_fama": 4, "preventivas_tiradas": 2, "usinas": 4, "sem_usina": 1, "sem_previsao": 1,
-                   "sem_nome_no_fracttal": 1, "sem_equipe": 1, "tipo_desconhecido": 1, "numero_invalido": 0}
+    assert rel == {"os_fama": 5, "preventivas_tiradas": 2, "usinas": 4, "sem_usina": 1, "sem_previsao": 1,
+                   "sem_nome_no_fracttal": 1, "sem_equipe": 0, "tipo_desconhecido": 1, "numero_invalido": 0}
     # a forma das colunas que o motor lê não muda (a data segue data; a duração, duração)
     assert df["Data Programada"].dtype == _df()["Data Programada"].dtype
     assert df["Tarefa -> Duração estimada"].dtype == _df()["Tarefa -> Duração estimada"].dtype
     # aplicar de novo não duplica
     df2, rel2 = FM.aplicar(df, FAMA, CADASTRO)
-    assert len(df2) == len(df) and rel2["os_fama"] == 4 and rel2["preventivas_tiradas"] == 0
+    assert len(df2) == len(df) and rel2["os_fama"] == 5 and rel2["preventivas_tiradas"] == 0
+
+
+def test_a_usina_sem_equipe_nenhuma_fica_fora():
+    """Sem tarefa do Fracttal na semana e sem equipe no cadastro, a OS não tem a quem ir: fica fora, contada."""
+    cad = {**CADASTRO, 50: dict(CADASTRO[50], equipe="")}
+    _, rel = FM.aplicar(_df(), FAMA, cad)
+    assert rel["sem_equipe"] == 1 and rel["os_fama"] == 4
+
+
+def test_a_preventiva_da_fama_leva_a_sigla_da_periodicidade():
+    """O motor decide a preventiva vencida pela sigla na tarefa (`_fila_elegivel`: MPS e MPA voltam sempre; MPM, MPW, MPQ e
+    MPT só no mês da semana; sem sigla, não voltam) e a ordena por ela. Para a regra ser a mesma do Fracttal (Levi,
+    13/11/2026), a preventiva da FAMA leva a sigla que o título diz ("mensal", "anual"...). O título nunca vai ao motor:
+    só a sigla. A corretiva não leva sigla (volta sempre, pelo tipo)."""
+    titulos = {201: "Manutenção mensal - November", 202: "Manutenção ANUAL dos trackers", 203: "Manutenção semestral",
+               204: "Manutenção trimestral", 205: "Inspeção quinzenal", 206: "Ronda semanal", 207: "Lavagem bianual",
+               208: "Verificar os itens", 209: "Manutenção mensal"}
+    linhas = [dict(_f(i, 10, tipo="Preventive/Predictive"), titulo=t) for i, t in titulos.items() if i != 209]
+    linhas.append(dict(_f(209, 10), titulo=titulos[209]))                        # corretiva que diz "mensal"
+    df, rel = FM.aplicar(_df(), linhas, CADASTRO)
+    tarefa = {FM.fama_do_substituto(r["OSs ID"]): r["Tarefa"] for _, r in df.iterrows() if FM.fama_do_substituto(r["OSs ID"])}
+    assert tarefa == {201: "OS da FAMA 201 · MPM", 202: "OS da FAMA 202 · MPA", 203: "OS da FAMA 203 · MPS",
+                      204: "OS da FAMA 204 · MPT", 205: "OS da FAMA 205 · MPQ", 206: "OS da FAMA 206 · MPW",
+                      207: "OS da FAMA 207 · MPB", 208: "OS da FAMA 208", 209: "OS da FAMA 209"}
+    assert not df.astype(str).apply(lambda col: col.str.contains("November|trackers|Lavagem")).any().any()
 
 
 def test_aplicar_recusa_o_cache_sem_as_colunas_do_motor():
@@ -257,34 +298,45 @@ def test_com_a_variavel_ligada_as_os_da_fama_entram_e_a_preventiva_do_fracttal_s
                     NEXUS_PCM_MOTOR=str(_motor_e_leitor(tmp_path, cache_deve_existir=True)))
     st = G.aguardar(cfg, G.iniciar(cfg, "2026-W41")["id"], 60)
     assert st["estado"] == "ok", st
-    assert st["fama"]["os_fama"] == 4 and st["fama"]["preventivas_tiradas"] == 2 and st["fama"]["planilha"]["linhas"] == 4
+    assert st["fama"]["os_fama"] == 5 and st["fama"]["preventivas_tiradas"] == 2 and st["fama"]["planilha"]["linhas"] == 5
     log = G.log(cfg, st["id"])
-    assert "leitura falsa do Fracttal" in log and "[FAMA] 4 OS da FAMA" in log and TITULO_SIGILOSO not in log
+    assert "leitura falsa do Fracttal" in log and "[FAMA] 5 OS da FAMA" in log and TITULO_SIGILOSO not in log
     planilha = G.planilha(cfg, st["id"])
     wb = openpyxl.load_workbook(planilha, read_only=True)
     oss = [r[2] for r in wb["SP Leste 02"].iter_rows(min_row=2, values_only=True)]
     wb.close()
-    assert oss == [15020, 15021, "FAMA-101", "FAMA-102", "FAMA-103", "FAMA-109"]
-    assert st["resumo"]["linhas"] == 6
+    assert oss == [15020, 15021, "FAMA-101", "FAMA-102", "FAMA-103", "FAMA-109", "FAMA-110"]
+    assert st["resumo"]["linhas"] == 7
 
 
-def test_ligada_sem_leitura_da_fama_a_rodada_nao_sai(config):
-    """Sem o livro (nenhuma leitura da FAMA, nenhum batimento), a rodada ligada não sai."""
-    cfg = dict(config, NEXUS_FAMA_PROGRAMA="1")
-    with pytest.raises(G.NaoPronto) as erro:
-        G.iniciar(cfg, "2026-W41")
-    assert "FAMA" in str(erro.value)
-    assert not list((G.pasta_trabalho(cfg) / "geracoes").iterdir())        # a pasta da rodada não fica para trás
+def _sem_o_adaptador(monkeypatch):
+    def nao(*a, **k):
+        raise AssertionError("o adaptador rodou com a FAMA fora")
+    for nome in ("antes_do_motor", "aplicar_no_cache", "depois_do_motor"):
+        monkeypatch.setattr(FM, nome, nao)
 
 
-def test_ligada_com_o_livro_velho_a_rodada_nao_sai(config):
+def test_ligada_sem_leitura_da_fama_a_rodada_sai_sem_a_fama(config, tmp_path, monkeypatch):
+    """Sem o livro (nenhuma leitura da FAMA, nenhum batimento), a rodada sai SEM a FAMA, a de sempre, e diz por quê. Até
+    13/11/2026 ela não saía; com a FAMA ligada por padrão, isso travaria a semana do PCM por causa da FAMA."""
+    _sem_o_adaptador(monkeypatch)
+    cfg = dict(config, NEXUS_FAMA_PROGRAMA="1", NEXUS_PCM_MOTOR=str(_motor_e_leitor(tmp_path, cache_deve_existir=False)))
+    st = G.aguardar(cfg, G.iniciar(cfg, "2026-W41")["id"], 60)
+    assert st["estado"] == "ok", st
+    assert "a leitura da FAMA parou" in st["fama"]["fora"] and st["resumo"]["linhas"] == 2
+    assert "[FAMA] as OS da FAMA ficaram fora desta rodada" in G.log(cfg, st["id"])
+
+
+def test_ligada_com_o_livro_velho_a_rodada_sai_sem_a_fama(config, tmp_path, monkeypatch):
     """Revisão de 11/11/2026, item 4: o portão é o frescor, não a contagem. A leitura da FAMA parada há mais de 26 h (o
-    batimento é diário) = a rodada ligada não sai, mesmo com OS no livro: elas podem já ter andado na FAMA."""
-    cfg = _com_fama(config, NEXUS_FAMA_PROGRAMA="1", NEXUS_FAMA_GERADO_EM_TESTE=_lido_ha(27))
-    with pytest.raises(G.NaoPronto) as erro:
-        G.iniciar(cfg, "2026-W41")
-    assert "a leitura da FAMA parou" in str(erro.value)
-    assert not list((G.pasta_trabalho(cfg) / "geracoes").iterdir())
+    batimento é diário) deixa a FAMA fora da rodada, mesmo com OS no livro (elas podem já ter andado na FAMA): a rodada
+    é a de sempre, sem tirar preventiva do Fracttal, e o status diz por quê."""
+    _sem_o_adaptador(monkeypatch)
+    cfg = _com_fama(config, NEXUS_FAMA_PROGRAMA="1", NEXUS_FAMA_GERADO_EM_TESTE=_lido_ha(27),
+                    NEXUS_PCM_MOTOR=str(_motor_e_leitor(tmp_path, cache_deve_existir=False)))
+    st = G.aguardar(cfg, G.iniciar(cfg, "2026-W41")["id"], 60)
+    assert st["estado"] == "ok", st
+    assert "a leitura da FAMA parou" in st["fama"]["fora"]
 
 
 def test_ligada_com_o_livro_fresco_e_vazio_e_a_semana_de_sempre(config, tmp_path, monkeypatch):
@@ -319,7 +371,7 @@ def _motor_da_foto_com_fama(tmp_path):
         foto = os.path.join(base, ".cache_semanal_api.pkl")
         assert time.time() - os.path.getmtime(foto) > 3600, "a foto perdeu a idade"
         oss = list(pickle.load(open(foto, "rb"))["df"]["OSs ID"])
-        assert "15001" not in oss and sum(1 for o in oss if int(o) > 10 ** 9) == 4
+        assert "15001" not in oss and sum(1 for o in oss if int(o) > 10 ** 9) == 5
         wb = openpyxl.Workbook()
         ws = wb.active
         ws.title = "SP Leste 02"
@@ -337,7 +389,7 @@ def test_foto_com_a_variavel_ligada(config, origem, tmp_path):
     cfg = _com_fama(config, NEXUS_FAMA_PROGRAMA="1", NEXUS_PCM_MOTOR=str(_motor_da_foto_com_fama(tmp_path)))
     st = G.gerar_com_foto(cfg, "2026-W41")
     assert st["estado"] == "ok", st
-    assert st["fama"]["os_fama"] == 4 and st["foto"]["intacta"]            # intacta = a foto com as OS da FAMA
+    assert st["fama"]["os_fama"] == 5 and st["foto"]["intacta"]            # intacta = a foto com as OS da FAMA
     assert (origem / ".cache_semanal_api.pkl").read_bytes() == antes        # a pasta do PCM só foi lida
 
 

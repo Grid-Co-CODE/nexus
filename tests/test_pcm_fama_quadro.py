@@ -273,6 +273,105 @@ def _com_fama(**k):
             "NEXUS_FAMA_GERADO_EM_TESTE": _agora_menos(1), **k}
 
 
+# ── a FAMA no programador (13/11/2026): o cartão no dia que o programador deu ────────────────────────────────────
+PLANO = {"programadas": {102: {"dia": "qua", "equipe": "SP Leste 02", "h_ini": "08:00"},
+                         107: {"dia": "sex", "equipe": "MG Sul 01", "h_ini": "07:30"}},
+         "pendentes": {101}}
+
+
+def test_com_a_fama_programada_o_cartao_vai_no_dia_do_programador():
+    """Levi, 13/11/2026: "As OS estão sendo jogadas todas para segunda-feira. Isso não faz sentido nenhum [...] até 70%
+    das horas semanais"; "fama tem que entrar no programador também". Com a semana publicada pela rodada que programou a
+    FAMA, o cartão vai no dia que o programador deu (e na equipe dele); a que ele não programou fica no bloco recolhido
+    da segunda, "não programadas": a que não coube na semana e a que não estava na programação (a aberta depois, ou a
+    que a regra da vencida deixou fora)."""
+    f = FQ.da_semana(LINHAS, _semana(), CADASTRO, date(2026, 10, 7), gerado_em=LIDO, agora=AGORA, plano=PLANO)
+    por = {r["os_id"]: r for r in f["linhas"]}
+    assert f["programada"] is True
+    # a 102 (prevista para 28/09, "atrasada" pela data) foi programada para quarta: sai do bloco da segunda
+    a = por["FAMA-102"]
+    assert (a["dia"], a["fama"]["atrasada"], a["cluster"], a["h_ini"]) == ("qua", False, "SP Leste 02", "08:00")
+    assert a["fama"]["marca"] == ""
+    # a 107 (prevista para o sábado) foi para a sexta, na equipe do programador
+    assert (por["FAMA-107"]["dia"], por["FAMA-107"]["cluster"]) == ("sex", "MG Sul 01")
+    # a 101 não coube na semana; a 103 (em andamento) não estava na programação: as duas no bloco da segunda
+    assert (por["FAMA-101"]["dia"], por["FAMA-101"]["fama"]["atrasada"], por["FAMA-101"]["fama"]["marca"]) == (
+        "seg", True, "Não coube")
+    assert (por["FAMA-103"]["fama"]["atrasada"], por["FAMA-103"]["fama"]["marca"]) == (True, "Não programada")
+    # a da semana seguinte (106) segue fora, e as contas dos avisos não mudam
+    assert "FAMA-106" not in por and (f["sem_usina"], f["sem_data"]) == (2, 1)
+    # sem plano, a regra de antes (a data prevista)
+    sem_plano = {r["os_id"]: r for r in FQ.da_semana(LINHAS, _semana(), CADASTRO, date(2026, 10, 7), gerado_em=LIDO,
+                                                       agora=AGORA)["linhas"]}
+    assert sem_plano["FAMA-102"]["fama"]["atrasada"] and sem_plano["FAMA-107"]["dia"] == "sab"
+
+
+def test_o_plano_sai_da_planilha_da_rodada(tmp_path):
+    """O plano é a programação que a rodada publicada guardou: o dia, a equipe e a hora da 1ª linha de cada OS da FAMA
+    nas abas de equipe; nas pendentes, as que não couberam (a OS que entrou em parte fica como programada)."""
+    import openpyxl
+    p = tmp_path / "sombra.xlsx"
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "SP Leste 02"
+    ws.append(["Equipe", "Dia", "OSs ID", "Hora Início"])
+    ws.append(["SP Leste 02", "Segunda-feira (05/10)", 15020, "07:30"])
+    ws.append(["SP Leste 02", "Quarta-feira (07/10)", "FAMA-102", "08:00"])
+    ws.append(["SP Leste 02", "Quinta-feira (08/10)", "FAMA-102", "08:00"])
+    wp = wb.create_sheet("_Pendentes")
+    wp.append(["Equipe", "OSs ID", "Motivo"])
+    wp.append(["SP Leste 02", "FAMA-101", "Sem capacidade"])
+    wp.append(["SP Leste 02", "FAMA-102", "o resto da OS"])
+    wb.save(p)
+    assert FQ._ler_plano(p) == {"programadas": {102: {"dia": "qua", "equipe": "SP Leste 02", "h_ini": "08:00"}},
+                                "pendentes": {101}}
+    wb = openpyxl.Workbook()
+    wb.active.append(["Equipe", "Dia", "OSs ID"])
+    wb.active.append(["SP Leste 02", "Segunda-feira (05/10)", 15020])
+    wb.save(p)
+    assert FQ._ler_plano(p) is None                       # a rodada sem a FAMA: o Quadro fica com a data prevista
+
+
+def test_o_plano_publicado_e_o_da_rodada_que_publicou_a_semana(tmp_path, monkeypatch):
+    import openpyxl
+    from nexus.pcm import geracao as G
+    from nexus.pcm import publicar as PB
+    p = tmp_path / "sombra.xlsx"
+    wb = openpyxl.Workbook()
+    wb.active.append(["Equipe", "Dia", "OSs ID", "Hora Início"])
+    wb.active.append(["SP Leste 02", "Terça-feira (06/10)", "FAMA-101", "09:00"])
+    wb.save(p)
+    monkeypatch.setattr(PB, "publicacoes", lambda cfg: {"2026-W41": {"rodada": "r1"}})
+    monkeypatch.setattr(G, "planilha", lambda cfg, rid: p if rid == "r1" else None)
+    assert FQ.plano_publicado({}, "2026-W41") == {"programadas": {101: {"dia": "ter", "equipe": "SP Leste 02",
+                                                                       "h_ini": "09:00"}}, "pendentes": set()}
+    assert FQ.plano_publicado({}, "2026-W42") is None
+
+
+def test_a_semana_com_as_linhas_da_fama_da_o_plano_e_elas_saem_das_tarefas():
+    """A semana que já traz as OS da FAMA (o rascunho da rodada no Quadro, `?rodada=`, e a semana do App quando o App
+    estiver pronto para elas): as linhas "FAMA-<id>" saem das tarefas (senão a OS aparecia duas vezes, como tarefa e como
+    cartão da FAMA) e dão o plano: o dia, a equipe e a hora; as das pendentes, as que não couberam."""
+    from test_pcm_quadro import _r
+    sem = dict(_semana(), rows=_semana()["rows"] + [_r("FAMA-102", "Quarta-feira", "08:00", equipe="SP Leste 02"),
+                                                      _r("FAMA-102", "Quinta-feira", "08:00", equipe="SP Leste 02")],
+               pendentes=[_r("FAMA-101", "", ""), _r(9, "", "")])
+    limpa, plano = FQ.separar_da_semana(sem)
+    assert [r["os_id"] for r in limpa["rows"]] == ["1", "2", "3", "4"] and [r["os_id"] for r in limpa["pendentes"]] == ["9"]
+    assert plano == {"programadas": {102: {"dia": "qua", "equipe": "SP Leste 02", "h_ini": "08:00"}}, "pendentes": {101}}
+    assert FQ.separar_da_semana(_semana()) == (_semana(), None)
+
+
+def test_tela_quadro_com_a_fama_programada(app, logado, tmp_path, monkeypatch):
+    monkeypatch.setattr(FQ, "plano_publicado", lambda cfg, semana: PLANO if semana == "2026-W41" else None)
+    html = _tela(app, logado, tmp_path, monkeypatch, **_com_fama())
+    qua = html.split('aria-label="Quarta 07/10"', 1)[1].split("</section>", 1)[0]
+    assert "</span> - OS 102<" in qua
+    seg = html.split('aria-label="Segunda 05/10"', 1)[1].split("</section>", 1)[0]
+    resumo = seg.split('<details class="q-fama-atrasadas">', 1)[1].split("</summary>", 1)[0]
+    assert "OS da FAMA não programadas" in resumo and "atrasada" not in resumo
+
+
 def test_tela_quadro_com_as_os_da_fama(app, logado, tmp_path, monkeypatch):
     html = _tela(app, logado, tmp_path, monkeypatch, **_com_fama())
     # os quatro cartões da FAMA, só de leitura (sem a janela de reprogramar), com a marca FAMA

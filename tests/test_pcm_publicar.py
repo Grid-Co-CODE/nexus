@@ -124,6 +124,57 @@ def test_publica_a_planilha_e_as_observacoes_e_confere(config, origem, agora):
     assert PB.publicacoes(config)["2026-W41"]["rodada"] == rid
 
 
+def _com_fama_na_planilha(config, rid):
+    """Põe na planilha da rodada (a do motor falso) uma OS da FAMA agendada e uma nas pendentes, como o motor deixa com
+    a FAMA no programador (13/11/2026)."""
+    p = G.pasta_trabalho(config) / "geracoes" / rid / "saida" / "sombra.xlsx"
+    wb = openpyxl.load_workbook(p)
+    ws = next(w for w in wb.worksheets if not w.title.startswith("_"))
+    cab = [c.value for c in ws[1]]
+    nova = [None] * len(cab)
+    nova[cab.index("OSs ID")] = "FAMA-94321"
+    ws.append(nova)
+    wp = wb["_Pendentes"] if "_Pendentes" in wb.sheetnames else wb.create_sheet("_Pendentes")
+    if wp.max_row < 1 or wp.cell(row=1, column=1).value is None:
+        wp.append(["Equipe", "OSs ID", "Código Equipamento", "Tarefa", "Motivo"])
+    cab_p = [c.value for c in wp[1]]
+    pend = [None] * len(cab_p)
+    pend[cab_p.index("OSs ID")] = "FAMA-94322"
+    wp.append(pend)
+    wb.save(p)
+    return p
+
+
+def _os_da_fama(conteudo: bytes) -> set:
+    wb = openpyxl.load_workbook(io.BytesIO(conteudo), read_only=True)
+    try:
+        return {str(c) for ws in wb.worksheets for r in ws.iter_rows(values_only=True) for c in r
+                if str(c or "").startswith("FAMA-")}
+    finally:
+        wb.close()
+
+
+def test_a_os_da_fama_nao_vai_ao_app_ate_o_app_estar_pronto(config, origem, agora):
+    """13/11/2026: a FAMA entra no programador, mas o App de Campo ainda não sabe lidar com a OS da FAMA (ela não existe
+    no Fracttal). O combinado com o Levi: até o App estar pronto (`NEXUS_FAMA_APP=1`), a semana vai ao App sem as linhas
+    da FAMA; a rodada guarda a programação inteira, e o Quadro a mostra (`fama_quadro.plano_publicado`)."""
+    rid = _rodada(config, origem)
+    p = _com_fama_na_planilha(config, rid)
+    gh = _com_github(config)
+    pub = PB.publicar(config, rid, "pessoa.teste@exemplo.com")
+    assert _os_da_fama(gh.arquivos["Programação Semana 41.xlsx"]) == set()
+    assert pub["fama_fora_do_app"] == 2 and all(a["conferido"] for a in pub["arquivos"])
+    assert _os_da_fama(p.read_bytes()) == {"FAMA-94321", "FAMA-94322"}                # a rodada guarda tudo
+    # as tarefas do Fracttal foram como sempre, e o plano da reserva é só delas
+    assert HB.semanas_da_reserva(I.carregar(G.pasta_trabalho(config))["historico"])["2026-W41"] == {
+        "15020|ALT1-INV01", "15021|ALT1-CAB01"}
+    # com o App pronto, a FAMA vai junto
+    config["NEXUS_FAMA_APP"] = "1"
+    pub = PB.publicar(config, rid, "pessoa.teste@exemplo.com")
+    assert _os_da_fama(gh.arquivos["Programação Semana 41.xlsx"]) == {"FAMA-94321", "FAMA-94322"}
+    assert "fama_fora_do_app" not in pub
+
+
 def test_republicar_troca_o_plano_da_semana_na_reserva(tmp_path):
     I.registrar_plano_publicado(tmp_path, "2026-W42", ["1|A", "2|B"], "teste")
     I.registrar_plano_publicado(tmp_path, "2026-W43", ["2|B"], "teste")

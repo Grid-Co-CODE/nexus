@@ -113,10 +113,11 @@ OPCIONAIS = ("NEXUS_CHAVE_CADASTRO", "NEXUS_ARMAZEM_LOCAL",
              # só liga onde vale "1" (uma máquina; as rotas do celular respondem 503 onde ele não roda). Sem estarem
              # aqui, o .env nunca chegava ao app.config (revisão final de 08/11/2026)
              "NEXUS_EQUIPE_MS_CLIENT_ID", "NEXUS_EQUIPE_MS_TENANT_ID", "NEXUS_EQUIPE_GRAVA",
-             # a fase 2 das OS da FAMA (11/11/2026, nexus/pcm/fama_motor.py): "1" põe as OS da FAMA na geração da semana e
-             # tira a preventiva do Fracttal das usinas da FAMA. Vazia (o padrão), a rodada é a de sempre e a FAMA só
-             # aparece no Quadro da semana; ligar só depois de combinar com o App de Campo
-             "NEXUS_FAMA_PROGRAMA",
+             # as OS da FAMA no programador da semana (nexus/pcm/fama_motor.py): "1" põe as OS da FAMA na geração e tira a
+             # preventiva do Fracttal das usinas da FAMA. Desde 13/11/2026 ligado por padrão onde a FAMA é lida (o
+             # `carregar_config` abaixo); "0" desliga. NEXUS_FAMA_APP=1 manda as OS da FAMA ao App junto com a semana:
+             # até o App estar pronto para elas, a semana vai ao App sem elas (nexus/pcm/publicar.py)
+             "NEXUS_FAMA_PROGRAMA", "NEXUS_FAMA_APP",
              # as OS que os clientes abrem na FAMA (11/11/2026): a chave da API (api.fama.energy, cabeçalho
              # X-Contractor-Key), posta pela T.I. no .env do servidor; é de PRESTADORA: só abre /v2/contractor/. A volta
              # de 10 em 10 minutos (nexus/dados/carga.ligar_fama, 12/11/2026) lê a lista das OS e grava o nexus_os_fama
@@ -147,4 +148,10 @@ def carregar_config(env: Mapping[str, str] | None = None) -> dict:
         )
     cfg = {nome: env[nome] for nome in OBRIGATORIAS}
     cfg.update({nome: env[nome] for nome in OPCIONAIS if (env.get(nome) or "").strip()})
+    # a FAMA no programador (13/11/2026, Levi: "fama tem que entrar no programador também [...] regra que tem em um tem
+    # que ter em outro"): ligada por padrão onde a FAMA é lida (a NEXUS_FAMA_CHAVE está aqui, o servidor), e
+    # NEXUS_FAMA_PROGRAMA=0 desliga. O padrão mora aqui porque o .env do servidor é da T.I. e o deploy não mexe nele; sem a
+    # chave (o teste, a cópia de prova) fica desligada, como era
+    if (cfg.get("NEXUS_FAMA_CHAVE") or "").strip() and "NEXUS_FAMA_PROGRAMA" not in cfg:
+        cfg["NEXUS_FAMA_PROGRAMA"] = "1"
     return cfg

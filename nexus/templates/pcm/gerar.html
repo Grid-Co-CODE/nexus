@@ -83,6 +83,16 @@
     Baixar a planilha</a> <span class="gc-ajuda">a programação desta rodada em Excel, a mesma que o Publicar no App manda.</span></p>
   {% endif %}
 
+  {# as OS da FAMA na rodada (13/11/2026: a FAMA no programador): quantas entraram, ou por que ficaram fora #}
+  {% if sel.fama and sel.fama.fora %}
+  <div class="pcm-aviso pcm-aviso--alerta"><i class="ph ph-warning"></i><div><strong>As OS da FAMA ficaram fora desta
+    rodada:</strong> {{ sel.fama.fora }}. A semana saiu como antes da FAMA no programador.</div></div>
+  {% elif sel.fama and sel.fama.os_fama is defined %}
+  <p class="gc-ajuda">OS da FAMA no programador: {{ sel.fama.os_fama }} entraram com as regras do Fracttal; ficaram de
+    fora {{ sel.fama.sem_previsao }} sem data prevista e {{ sel.fama.sem_usina }} sem usina ligada. Até o App de Campo
+    estar pronto para elas, a semana vai ao App sem as OS da FAMA; o Quadro as mostra no dia programado.</p>
+  {% endif %}
+
   {# publicar no App (09/10/2026): a situação da publicação ou o botão, e o que conferir antes #}
   {% if sel.publicacao %}
   {% set pb = sel.publicacao %}

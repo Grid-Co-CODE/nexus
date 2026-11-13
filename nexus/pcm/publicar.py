@@ -22,6 +22,7 @@ conteúdo). Sem ele, no PC, o login do `gh` da máquina (o de quem está no PC).
 """
 import base64
 import hashlib
+import io
 import json
 import os
 import subprocess
@@ -175,6 +176,45 @@ def arquivos_da_rodada(config, rid: str) -> tuple[dict, list[tuple[str, Path]]]:
                 (I.OBSERVACOES, pasta / I.OBSERVACOES)]
 
 
+FAMA_NO_APP = "NEXUS_FAMA_APP"
+
+
+def fama_no_app(config) -> bool:
+    """As OS da FAMA vão ao App junto com a semana (`NEXUS_FAMA_APP=1`)? Até o App estar pronto para elas, não."""
+    return str(config.get(FAMA_NO_APP) or "").strip() == "1"
+
+
+def sem_as_os_da_fama(dados: bytes) -> tuple[bytes, int]:
+    """(a planilha sem as linhas das OS da FAMA, quantas saíram), em toda aba com a coluna "OSs ID" (as das equipes e a
+    `_Pendentes`). Sem nenhuma, a planilha volta como veio, byte a byte.
+
+    Por quê (13/11/2026): a FAMA entrou no programador (Levi: "fama tem que entrar no programador também"), mas o App de
+    Campo ainda não sabe lidar com a OS da FAMA, que não existe no Fracttal. O combinado com o Levi: até o App estar
+    pronto, a semana vai ao App sem elas. A rodada guarda a programação inteira, e o Quadro mostra a FAMA no dia que o
+    programador deu (`fama_quadro.plano_publicado`)."""
+    import openpyxl
+    wb = openpyxl.load_workbook(io.BytesIO(dados))
+    n = 0
+    for ws in wb.worksheets:
+        if ws.max_row < 2:
+            continue
+        cab = [c.value for c in ws[1]]
+        if "OSs ID" not in cab:
+            continue
+        col = cab.index("OSs ID") + 1
+        tirar = [r for r in range(2, ws.max_row + 1) if str(ws.cell(row=r, column=col).value or "").startswith("FAMA-")]
+        for r in reversed(tirar):
+            ws.delete_rows(r)
+        n += len(tirar)
+    if not n:
+        wb.close()
+        return dados, 0
+    buf = io.BytesIO()
+    wb.save(buf)
+    wb.close()
+    return buf.getvalue(), n
+
+
 def motivos_para_nao_publicar(config, rid: str, agora: datetime | None = None) -> list[str]:
     """O que impede publicar esta rodada (vazio = pode)."""
     if not geracao.RODADA_RE.match(rid or ""):
@@ -242,8 +282,11 @@ def publicar(config, rid: str, quem: str, agora: datetime | None = None) -> dict
         st, arqs = arquivos_da_rodada(config, rid)
         s = _sessao(config)
         enviados = []
+        fama_fora = 0
         for nome, p in arqs:
             dados = p.read_bytes()
+            if nome.lower().endswith(".xlsx") and not fama_no_app(config):
+                dados, fama_fora = sem_as_os_da_fama(dados)
             commit = _gravar(s, tok, repo, ramo, nome, dados,
                              f"chore: Nexus publica {nome} (semana {st['semana']}, rodada {rid})")
             enviados.append({"nome": nome, "commit": commit, "sha256": _sha256(dados), "bytes": len(dados)})
@@ -257,6 +300,8 @@ def publicar(config, rid: str, quem: str, agora: datetime | None = None) -> dict
         quando = (agora or _agora()).isoformat(timespec="seconds")
         pub = {"semana": st["semana"], "rodada": rid, "quando": quando, "quem": quem, "repo": repo, "ramo": ramo,
                "token": de_onde, "arquivos": enviados}
+        if fama_fora:
+            pub["fama_fora_do_app"] = fama_fora     # as linhas das OS da FAMA que ficaram fora do App (sem_as_os_da_fama)
         pasta = geracao.pasta_trabalho(config) / "geracoes" / rid
         (pasta / "publicacao.json").write_text(json.dumps(pub, ensure_ascii=False, indent=1), encoding="utf-8")
         st["publicacao"] = pub

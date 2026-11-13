@@ -1307,7 +1307,10 @@ def _ctx_quadro(cfg, args, erro: str | None = None) -> dict | None:
     # as OS da FAMA da semana (11/11/2026, fase 1: só aparecem; `fama_quadro.py`): os cartões só de leitura depois das
     # tarefas, os avisos e a etiqueta de repetição nas preventivas do Fracttal das usinas com preventiva da FAMA na semana.
     # Pela cópia em memória: este pedido nunca lê o banco (a renovação vai por trás)
-    fama = FQ.para_o_quadro(cfg, sem, base["dia"])
+    # Desde 13/11/2026 a FAMA está no programador: a semana que já traz as linhas dela (o rascunho da rodada) dá o plano e
+    # as perde como tarefas; sem elas, o plano é o da rodada que publicou a semana (`fama_quadro.plano_publicado`)
+    sem, plano_fama = FQ.separar_da_semana(sem)
+    fama = FQ.para_o_quadro(cfg, sem, base["dia"], plano=plano_fama)
     sem = FQ.marcar_repeticao(sem, fama)
     q = Q.montar(sem, base["publicadas"], filtros, todos=todos, mostrar_pendentes=True if args.get("pend") == "1" else None,
                  outras_opcoes=fama["linhas"])
