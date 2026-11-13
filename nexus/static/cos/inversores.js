@@ -365,12 +365,71 @@
   function maximoNoTrecho(pts, de, ate) { return maximo(recortar(pts, de, ate)); }
   function textoDoTrecho(t) { return hhmm(t ? t.de : DE) + "–" + hhmm(t ? t.ate : ATE); }
 
+  // ── SEPARAR AS LINHAS (13/11/2026; o dono: "tipo o das strings, todas, ficam todas juntas e não consigo separar
+  // qual é qual, por isso o zoom") ─────────────────────────────────────────────────────────────────────────────────
+  // As strings andam todas em 4 a 5 A e viram um feixe: o zoom só no horário não as separa. Com zoom, o eixo Y vai do
+  // menor ao maior do que se vê (não de 0), e a caixa do arraste escolhe também a faixa de valor.
+  // a faixa dos valores vistos no trecho (as séries recortadas nele), ou null sem valor nenhum
+  function faixaDoTrecho(series, de, ate) {
+    var lo = Infinity, hi = -Infinity;
+    series.forEach(function (pts) {
+      recortar(pts || [], de, ate).forEach(function (p) { if (p[1] != null) { lo = Math.min(lo, p[1]); hi = Math.max(hi, p[1]); } });
+    });
+    return lo === Infinity ? null : { min: lo, max: hi };
+  }
+  // o Y JUSTO: a faixa vista com uma folga de 8% (no mínimo 2% do topo, ou 0,05 da unidade), nas marcas redondas do eixo;
+  // não desce abaixo de 0 quando nada é negativo. Sem valor: 0 a 1
+  function escalaJusta(f, partes) {
+    if (!f) { return { min: 0, max: 1 }; }
+    var folga = Math.max((f.max - f.min) * 0.08, Math.abs(f.max) * 0.02, 0.05);
+    var lo = f.min - folga, hi = f.max + folga, passo = passoBonito((hi - lo) / (partes || 4));
+    lo = Math.floor(lo / passo + 1e-9) * passo; hi = Math.ceil(hi / passo - 1e-9) * passo;
+    if (f.min >= 0 && lo < 0) { lo = 0; }
+    return { min: +lo.toFixed(6), max: +hi.toFixed(6) };
+  }
+  // a faixa de valor da caixa (de baixo para cima, qualquer ordem), com uma altura mínima para não virar uma linha
+  function limitarFaixa(v0, v1) {
+    var lo = Math.min(v0, v1), hi = Math.max(v0, v1), minimo = Math.max(0.05, Math.abs(hi) * 0.01);
+    if (hi - lo < minimo) { var meio = (lo + hi) / 2; lo = meio - minimo / 2; hi = meio + minimo / 2; }
+    return { min: lo, max: hi };
+  }
+  // A CAIXA DO ARRASTE: um arraste quase só na horizontal (menos de LIMIAR_Y_PX de altura) é zoom só de horário, como
+  // antes; quase só na vertical (menos de LIMIAR_X_PX de largura), só de valor; os dois, a caixa. `trecho` undefined =
+  // o horário fica como está; `faixa` null = o valor fica como está.
+  var LIMIAR_Y_PX = 18, LIMIAR_X_PX = 8;
+  function caixaDoArraste(m0, m1, v0, v1, dxPx, dyPx) {
+    var r = {};
+    if (Math.abs(dxPx) >= LIMIAR_X_PX) { r.trecho = limitarTrecho(m0, m1); }
+    r.faixa = Math.abs(dyPx) >= LIMIAR_Y_PX ? limitarFaixa(v0, v1) : null;
+    return r;
+  }
+  // a linha MAIS PRÓXIMA do ponteiro naquele horário: o índice da série cujo valor perto de `min` está mais perto de
+  // `valor` (as séries dividem a escala, então a distância em valor é a mesma que na tela), ou -1 sem nenhuma
+  function maisPerto(lista, min, valor, tol) {
+    var melhor = -1, d = Infinity;
+    lista.forEach(function (s, k) {
+      var p = valorEm(s.pts || [], min, tol);
+      if (!p || p[1] == null) { return; }
+      var dd = Math.abs(p[1] - valor);
+      if (dd < d) { d = dd; melhor = k; }
+    });
+    return melhor;
+  }
+  // "Só esta": com uma string isolada, só ela fica no gráfico (sem nenhuma, todas)
+  function visiveis(lista, isolada) {
+    if (!isolada) { return lista; }
+    var so = lista.filter(function (e) { return e.chave === isolada; });
+    return so.length ? so : lista;
+  }
+
   raiz.NexusCosInversores = { nomeDaString: nomeDaString, vistaDasEntradas: vistaDasEntradas, entradasDoInversor: entradasDoInversor,
     anotarPontaEnt: anotarPontaEnt, pontaEnt: pontaEnt, limparPontaEnt: limparPontaEnt, corDaEntrada: corDaEntrada,
     estiloDaCor: estiloDaCor, N_CORES: N_CORES, PONTA_MAX: PONTA_MAX, marcasDoEixo: marcasDoEixo, DIAS_ATRAS: DIAS_ATRAS, diaTexto: diaTexto, diaMenos: diaMenos, diaCurto: diaCurto,
     entradasDoHistorico: entradasDoHistorico, comPontaAoVivo: comPontaAoVivo, avisoDoHistorico: avisoDoHistorico,
     ZOOM_MIN: ZOOM_MIN, DE: DE, ATE: ATE, limitarTrecho: limitarTrecho, aproximar: aproximar, deslizar: deslizar,
-    novoTrecho: novoTrecho, seguirPonta: seguirPonta, recortar: recortar, maximoNoTrecho: maximoNoTrecho, textoDoTrecho: textoDoTrecho };
+    novoTrecho: novoTrecho, seguirPonta: seguirPonta, recortar: recortar, maximoNoTrecho: maximoNoTrecho, textoDoTrecho: textoDoTrecho,
+    faixaDoTrecho: faixaDoTrecho, escalaJusta: escalaJusta, limitarFaixa: limitarFaixa, caixaDoArraste: caixaDoArraste,
+    LIMIAR_Y_PX: LIMIAR_Y_PX, LIMIAR_X_PX: LIMIAR_X_PX, maisPerto: maisPerto, visiveis: visiveis };
   if (typeof document === "undefined") { return; }       // no node (o teste), só as contas
 
   // ── a API: o login (no final, o passe do Nexus em CFG.sessao; no protótipo, o da Ronda COS deste navegador) ───────
@@ -456,13 +515,17 @@
   // `o`: h, max, un ("kW", "A", "V"), de/ate (o trecho, em minutos do dia; o padrão é 5h às 19h), eixoX, eixoY, rotuloFim,
   // vivo (o halo), grupo (fora/semcom), semAgora, tol e passo (minutos), seg (a hora com segundos), nome, rotulo, aoMarcar, dica.
   function grafico(host, lista, o, largura) {
-    var w = Math.max(160, largura || host.clientWidth || 600), h = o.h, max = o.max || 1, un = o.un || "kW";
+    var w = Math.max(160, largura || host.clientWidth || 600), h = o.h, un = o.un || "kW";
+    // a faixa de valor: a da CAIXA do arraste feita neste gráfico (ou nos irmãos da mesma `escala`), senão a de quem
+    // chama (0 a teto sem zoom; o Y justo com zoom). `lo` acima de 0 = o eixo não começa em 0, e a tela diz isso
+    var fy = o.escala && faixasY[o.escala], lo = fy ? fy.min : (o.min || 0), max = fy ? fy.max : (o.max || 1);
+    if (!(max > lo)) { max = lo + 1; }
     // o trecho é o do zoom da janela (13/11/2026): todo gráfico dela aproxima junto; sem zoom, 5h às 19h
     var tr = trechoAtual(), de = o.de != null ? o.de : tr.de, ate = o.ate != null ? o.ate : tr.ate;
     var unica = lista.length === 1;
     var fins = lista.map(function (s) { return ultimo(s.pts); }), fim = null;
     fins.forEach(function (f) { if (f && (!fim || f[0] > fim[0])) { fim = f; } });
-    var assinatura = [w, max, de.toFixed(3), ate.toFixed(3), o.grupo || "", o.semAgora ? "-" : Math.floor(minutoSP(Date.now()))].concat(
+    var assinatura = [w, h, lo, max, de.toFixed(3), ate.toFixed(3), o.grupo || "", o.semAgora ? "-" : Math.floor(minutoSP(Date.now()))].concat(
       lista.map(function (s, k) {
         var f = fins[k];
         return (s.cor == null ? "u" : s.cor) + (s.forte ? "F" : s.fraca ? "f" : "") + ":" + s.pts.length + ":" + (f ? f[0].toFixed(3) + "/" + f[1] : "-");
@@ -472,7 +535,7 @@
     var ml = o.eixoY ? 52 : 6, mr = o.rotuloFim ? 72 : 10, mt = 10, mb = o.eixoX ? 22 : 6;
     var iw = w - ml - mr, ih = h - mt - mb, vao = Math.max(ate - de, 1e-6);
     function x(m) { return ml + (m - de) / vao * iw; }
-    function y(v) { return mt + ih - Math.max(0, Math.min(1, v / max)) * ih; }
+    function y(v) { return mt + ih - Math.max(0, Math.min(1, (v - lo) / (max - lo))) * ih; }
     var foco = velho && document.activeElement === velho.alvo;
     if (foco) { velho.trocando = true; }                 // o blur da troca não apaga a cruz
     var colorida = unica && lista[0].cor != null;          // o gráfico de uma string só, na cor dela (o modo Individual)
@@ -483,13 +546,18 @@
     else { host.textContent = ""; host.appendChild(svg); }
     if (colorida) { svg.setAttribute("style", estiloDaCor(lista[0].cor)); }
     var grade = el("g", { class: "pg-grade" }, svg), eixo = el("g", { class: "pg-eixo" }, svg);
-    var passo = passoBonito(max / (o.eixoY ? 4 : 2));
-    for (var v = passo; v <= max + 1e-6; v += passo) {
+    var passo = passoBonito((max - lo) / (o.eixoY ? 4 : 2));
+    for (var k = 1; lo + k * passo <= max + 1e-6; k++) {
+      var v = lo + k * passo;
       el("line", { x1: ml, x2: ml + iw, y1: Math.round(y(v)) + 0.5, y2: Math.round(y(v)) + 0.5 }, grade);
       if (o.eixoY) { el("text", { x: ml - 8, y: y(v) + 4, "text-anchor": "end" }, eixo).textContent = rotuloDoEixo(v, un); }
     }
-    el("line", { class: "pg-base", x1: ml, x2: ml + iw, y1: Math.round(y(0)) + 0.5, y2: Math.round(y(0)) + 0.5 }, svg);
-    if (o.eixoY) { el("text", { x: ml - 8, y: y(0) + 4, "text-anchor": "end" }, eixo).textContent = "0"; }
+    // a base: em 0, a de sempre; acima de 0, tracejada e com o valor dela, e o aviso no canto (o feixe aberto engana
+    // menos quando se lê que o eixo foi cortado)
+    var yb = Math.round(y(lo)) + 0.5;
+    el("line", { class: "pg-base" + (lo > 0 ? " pg-base--corte" : ""), x1: ml, x2: ml + iw, y1: yb, y2: yb }, svg);
+    if (o.eixoY) { el("text", { x: ml - 8, y: y(lo) + 4, "text-anchor": "end", class: lo > 0 ? "pg-eixo-corte" : "" }, eixo).textContent = lo > 0 ? rotuloDoEixo(lo, un) : "0"; }
+    if (lo > 0) { el("text", { class: "pg-corte", x: ml + 4, y: mt + 9 }, svg).textContent = "o eixo começa em " + rotuloDoEixo(lo, un); }
     if (o.eixoX) {
       if (de === DE && ate === ATE) {
         [6, 9, 12, 15, 18].forEach(function (hh) { el("text", { x: x(hh * 60), y: h - 6, "text-anchor": "middle" }, eixo).textContent = dois(hh) + "h"; });
@@ -504,6 +572,7 @@
     el("rect", { x: ml, y: 0, width: iw, height: h }, corte);
     var dentro = el("g", { "clip-path": "url(#" + idCorte + ")" }, svg);
     var visivel = function (f) { return f && f[0] >= de - 1e-6 && f[0] <= ate + 1e-6; };
+    var linhasEl = [];
     if (unica) {
       var d = caminhos(recortar(lista[0].pts, de, ate), x, y);
       if (d[1]) { el("path", { class: "pg-area", d: d[1] }, dentro); }
@@ -517,12 +586,12 @@
       // cada série na cor dela (`cor`, o número da paleta das strings); as esmaecidas embaixo, as destacadas por cima; o
       // fim de cada uma com o anel da superfície (a sobreposição se lê) quando são poucas ou destacadas
       var camada = function (s) { return s.forte ? 2 : s.fraca ? 0 : 1; };
-      lista.slice().sort(function (a, b) { return camada(a) - camada(b); }).forEach(function (s) {
-        var dl = caminhos(recortar(s.pts, de, ate), x, y)[0];
+      lista.map(function (s, k) { return [s, k]; }).sort(function (a, b) { return camada(a[0]) - camada(b[0]); }).forEach(function (par) {
+        var s = par[0], dl = caminhos(recortar(s.pts, de, ate), x, y)[0];
         if (!dl) { return; }
         var a = { class: "pg-s" + (s.forte ? " pg-s--forte" : s.fraca ? " pg-s--fraca" : ""), d: dl };
         if (s.cor != null) { a.style = estiloDaCor(s.cor); }
-        el("path", a, dentro);
+        linhasEl[par[1]] = el("path", a, dentro);           // guardada pelo índice: a linha mais próxima se destaca sem redesenhar
       });
       lista.forEach(function (s, k) {
         if (!visivel(fins[k]) || s.fraca || !(s.forte || lista.length <= 4)) { return; }
@@ -546,13 +615,15 @@
       // a seta anda 5 min no dia inteiro e menos com zoom (um sexagésimo do trecho, no mínimo 15 s)
       passo: o.passo || Math.min(5, Math.max(0.25, (ate - de) / 60)),
       aoMarcar: o.aoMarcar, dica: o.dica || null, contar: o.contar || ["série", "séries"], fim: fim, alvo: alvo, assinatura: assinatura,
-      svg: svg, w: w, ml: ml, iw: iw };
+      svg: svg, w: w, ml: ml, iw: iw, h: h, mt: mt, ih: ih, min: lo, max: max, escala: o.escala || "", linhasEl: linhasEl, perto: -1 };
     host._g = g;
     ligarZoom(host);
     graficos.push(g);
     function minutoDoEvento(ev) { var r = svg.getBoundingClientRect(); return de + ((ev.clientX - r.left) * (w / r.width) - ml) / iw * vao; }
     alvo.addEventListener("pointermove", function (ev) { marcarTodos(minutoDoEvento(ev), g, ev.clientX, ev.clientY); });
-    alvo.addEventListener("pointerleave", limparTodos);
+    // no toque, tocar escolhe a hora e a linha mais próxima, e a escolha fica até o próximo toque
+    alvo.addEventListener("pointerdown", function (ev) { if (ev.pointerType === "touch") { marcarTodos(minutoDoEvento(ev), g, ev.clientX, ev.clientY); } });
+    alvo.addEventListener("pointerleave", function (ev) { if (ev.pointerType !== "touch") { limparTodos(); } });
     alvo.addEventListener("blur", function () { if (!g.trocando) { limparTodos(); } });
     alvo.addEventListener("keydown", function (ev) {
       if (ev.key !== "ArrowLeft" && ev.key !== "ArrowRight") { return; }
@@ -586,14 +657,31 @@
       return g.de + ((clientX - r.left) * (g.w / r.width) - g.ml) / g.iw * (g.ate - g.de);
     }
     function pxPorMinuto() { var g = host._g, r = g.svg.getBoundingClientRect(); return (g.iw * (r.width / g.w)) / (g.ate - g.de); }
-    function mostrarFaixa(m0, m1) {
+    // o valor (eixo Y) na altura do ponteiro, pela escala do desenho de agora
+    function valorNaAltura(clientY) {
       var g = host._g;
+      if (!g || !g.svg.isConnected) { return null; }
+      var r = g.svg.getBoundingClientRect(), py = (clientY - r.top) * (g.h / r.height);
+      return g.min + (g.mt + g.ih - py) / g.ih * (g.max - g.min);
+    }
+    // a faixa do arraste: só o horário (a altura toda) quando a altura é pequena, a CAIXA (horário e valor) quando não
+    function mostrarFaixa(gst, cx, cy) {
+      var g = host._g, m1 = minutoEm(cx);
       if (!g || m1 == null) { return; }
       if (!faixa) { faixa = document.createElement("div"); faixa.className = "cos-inv-faixa"; faixa.setAttribute("aria-hidden", "true"); host.appendChild(faixa); }
-      var r = g.svg.getBoundingClientRect(), h = host.getBoundingClientRect(), k = r.width / g.w;
-      var a = Math.max(g.de, Math.min(m0, m1)), b = Math.min(g.ate, Math.max(m0, m1));
+      var r = g.svg.getBoundingClientRect(), h = host.getBoundingClientRect(), k = r.width / g.w, ky = r.height / g.h;
+      var soValor = Math.abs(cx - gst.x0) < LIMIAR_X_PX, comValor = Math.abs(cy - gst.y0) >= LIMIAR_Y_PX;
+      var a = soValor ? g.de : Math.max(g.de, Math.min(gst.m0, m1)), b = soValor ? g.ate : Math.min(g.ate, Math.max(gst.m0, m1));
       faixa.style.left = (r.left - h.left + g.x(a) * k).toFixed(1) + "px";
       faixa.style.width = Math.max(1, (g.x(b) - g.x(a)) * k).toFixed(1) + "px";
+      var topo = r.top - h.top + g.mt * ky, alto = g.ih * ky;
+      if (comValor) {
+        var y0 = Math.max(r.top + g.mt * ky, Math.min(gst.y0, cy)), y1 = Math.min(r.top + (g.mt + g.ih) * ky, Math.max(gst.y0, cy));
+        topo = y0 - h.top; alto = Math.max(1, y1 - y0);
+      }
+      faixa.style.top = topo.toFixed(1) + "px";
+      faixa.style.height = alto.toFixed(1) + "px";
+      faixa.classList.toggle("cos-inv-faixa--caixa", comValor);
     }
     function esconderFaixa() { if (faixa) { faixa.remove(); faixa = null; } }
     host.addEventListener("pointerdown", function (ev) {
@@ -611,7 +699,8 @@
       if (ev.button !== 0) { return; }
       var m = minutoEm(ev.clientX);
       if (m == null) { return; }
-      gesto = ev.shiftKey && zoom ? { pan: true, x0: ev.clientX, tr0: zoom, moveu: false } : { m0: m, x0: ev.clientX, moveu: false };
+      gesto = ev.shiftKey && zoom ? { pan: true, x0: ev.clientX, tr0: zoom, moveu: false }
+        : { m0: m, x0: ev.clientX, y0: ev.clientY, v0: valorNaAltura(ev.clientY), moveu: false };
       try { host.setPointerCapture(ev.pointerId); } catch (e) {}
     });
     host.addEventListener("pointermove", function (ev) {
@@ -624,11 +713,11 @@
         definirZoom(aproximar(gesto.tr0, gesto.d0 / Math.max(10, Math.abs(xs[0] - xs[1])), gesto.centro));
         return;
       }
-      var dx = ev.clientX - gesto.x0;
-      if (Math.abs(dx) > 4) { gesto.moveu = true; }
+      var dx = ev.clientX - gesto.x0, dy = gesto.y0 == null ? 0 : ev.clientY - gesto.y0;
+      if (Math.abs(dx) > 4 || Math.abs(dy) > 4) { gesto.moveu = true; }
       if (!gesto.moveu) { return; }
       if (gesto.pan) { definirZoom(deslizar(gesto.tr0, -dx / pxPorMinuto())); }
-      else { mostrarFaixa(gesto.m0, minutoEm(ev.clientX)); }
+      else { mostrarFaixa(gesto, ev.clientX, ev.clientY); }
     });
     function terminar(ev) {
       if (ev.pointerType === "touch") { delete toques[ev.pointerId]; }
@@ -639,8 +728,12 @@
       esconderFaixa();
       if (gst.moveu) { host._arrastou = Date.now(); }
       if (ev.type === "pointerup" && gst.moveu && gst.m0 != null) {
-        var m1 = minutoEm(ev.clientX);
-        if (m1 != null) { definirZoom(limitarTrecho(gst.m0, m1)); }
+        // a CAIXA: o horário vale para a janela inteira; a faixa de valor, só para este gráfico (e os irmãos da escala)
+        var m1 = minutoEm(ev.clientX), v1 = valorNaAltura(ev.clientY), g = host._g;
+        if (m1 == null) { return; }
+        var cx = caixaDoArraste(gst.m0, m1, gst.v0, v1, ev.clientX - gst.x0, ev.clientY - gst.y0);
+        if (cx.faixa && g && g.escala && gst.v0 != null && v1 != null) { faixasY[g.escala] = cx.faixa; }
+        definirZoom(cx.trecho !== undefined ? cx.trecho : zoom);
       }
     }
     host.addEventListener("pointerup", terminar);
@@ -649,7 +742,7 @@
     host.addEventListener("click", function (ev) {
       if (host._arrastou && Date.now() - host._arrastou < 500) { ev.stopPropagation(); ev.preventDefault(); host._arrastou = 0; }
     }, true);
-    host.addEventListener("dblclick", function (ev) { ev.preventDefault(); definirZoom(null); });
+    host.addEventListener("dblclick", function (ev) { ev.preventDefault(); zerarZoom(); });
     host.addEventListener("wheel", function (ev) {
       if (!(ev.ctrlKey || ev.metaKey) || !host._g) { return; }
       ev.preventDefault();
@@ -658,14 +751,41 @@
   }
   var dica = document.getElementById("cos-inv-dica"), dicaQuadro = 0;
   function esconderCruz(g) { g.cruz.setAttribute("visibility", "hidden"); g.pontos.forEach(function (q) { q.c.setAttribute("visibility", "hidden"); }); }
+  // A LINHA EM REALCE (13/11/2026, o dono: "não consigo separar qual é qual"): a mais próxima do ponteiro, ou a do chip
+  // sob o mouse, fica grossa e as outras esmaecem, sem redesenhar; com o minuto, ela ganha o nome ao lado do ponteiro
+  function realcar(g, k, min) {
+    var tem = k != null && k >= 0 && !!g.linhasEl[k];
+    g.svg.classList.toggle("pg-com-perto", tem);
+    g.linhasEl.forEach(function (linha, j) { if (linha) { linha.classList.toggle("pg-s--perto", j === k); } });
+    var p = tem && min != null ? valorEm(g.lista[k].pts, min, g.tol) : null;
+    if (!p || p[1] == null) { if (g.rotPerto) { g.rotPerto.setAttribute("visibility", "hidden"); } return; }
+    if (!g.rotPerto) { g.rotPerto = el("text", { class: "pg-perto-rot" }, g.svg); }
+    var xs = g.x(p[0]), aDireita = xs < g.ml + g.iw - 90;
+    g.rotPerto.setAttribute("x", (aDireita ? xs + 9 : xs - 9).toFixed(1));
+    g.rotPerto.setAttribute("y", (g.y(p[1]) - 8).toFixed(1));
+    g.rotPerto.setAttribute("text-anchor", aDireita ? "start" : "end");
+    g.rotPerto.textContent = g.lista[k].nome || "";
+    g.rotPerto.setAttribute("visibility", "visible");
+  }
   function marcarTodos(min, origem, cx, cy) {
     var p0 = origem ? valorEm(origem.pts, min, origem.tol) : null;
     var alvoMin = p0 ? p0[0] : min;
     cruzEm = alvoMin;
+    // no gráfico de várias linhas em que o ponteiro está, a linha MAIS PRÓXIMA dele na vertical, naquele horário; a
+    // escolha fica guardada pelo BLOCO, para o redesenho de 3 s (que refaz o gráfico e repõe a cruz) não a apagar
+    if (origem) {
+      origem.perto = -1;
+      if (origem.lista.length > 1 && cy != null && origem.svg.isConnected) {
+        var r0 = origem.svg.getBoundingClientRect(), py = (cy - r0.top) * (origem.h / r0.height);
+        origem.perto = maisPerto(origem.lista, alvoMin, origem.min + (origem.mt + origem.ih - py) / origem.ih * (origem.max - origem.min), origem.tol);
+      }
+      pertoGuardado = { host: origem.host, k: origem.perto };
+    }
     graficos.forEach(function (g) {
       if (!g.host.isConnected) { return; }
       // o minuto fora do trecho deste gráfico (a curva do dia e as strings desde a abertura): a cruz some só nele
-      if (alvoMin < g.de - 1e-6 || alvoMin > g.ate + 1e-6) { esconderCruz(g); if (g.aoMarcar) { g.aoMarcar(null, null); } return; }
+      if (alvoMin < g.de - 1e-6 || alvoMin > g.ate + 1e-6) { esconderCruz(g); realcar(g, -1); if (g.aoMarcar) { g.aoMarcar(null, null); } return; }
+      realcar(g, g === origem ? g.perto : (!origem && pertoGuardado && pertoGuardado.host === g.host ? pertoGuardado.k : -1), alvoMin);
       g.cruz.setAttribute("x1", g.x(alvoMin)); g.cruz.setAttribute("x2", g.x(alvoMin)); g.cruz.setAttribute("visibility", "visible");
       g.pontos.forEach(function (q) {
         var p = valorEm(q.s.pts, alvoMin, g.tol);
@@ -679,7 +799,7 @@
         : [{ v: p0 && p0[1] != null ? valorNa(p0[1], origem.un) : "sem amostra", t: (origem.seg ? hhmmssDoMin(alvoMin) : hhmm(alvoMin)) + (origem.nome ? " · " + origem.nome : "") }];
       dica.textContent = "";
       linhas.forEach(function (l) {
-        var r = document.createElement("div"); r.className = "cos-inv-dica-l" + (l.forte ? " forte" : "");
+        var r = document.createElement("div"); r.className = "cos-inv-dica-l" + (l.forte ? " forte" : "") + (l.perto ? " perto" : "");
         if (l.cor != null) { var c = document.createElement("i"); c.className = "cos-inv-cor"; c.setAttribute("style", estiloDaCor(l.cor)); c.setAttribute("aria-hidden", "true"); r.appendChild(c); }
         var b = document.createElement("b"); b.textContent = l.v; r.appendChild(b);
         if (l.t) { var s = document.createElement("span"); s.textContent = l.t; r.appendChild(s); }
@@ -693,9 +813,10 @@
       });
     }
   }
+  var pertoGuardado = null;
   function limparTodos() {
-    cruzEm = null;
-    graficos.forEach(function (g) { esconderCruz(g); if (g.aoMarcar) { g.aoMarcar(null, null); } });
+    cruzEm = null; pertoGuardado = null;
+    graficos.forEach(function (g) { esconderCruz(g); if (g.svg && g.svg.isConnected) { realcar(g, -1); } if (g.aoMarcar) { g.aoMarcar(null, null); } });
     if (dica) { dica.hidden = true; }
   }
 
@@ -843,7 +964,6 @@
   function trechoAtual() { return zoom || { de: DE, ate: ATE }; }
   function minutoDeAgora() { return ehHoje() ? minutoSP(Date.now()) : null; }
   function agoraVisivel() { var a = minutoDeAgora(), tr = trechoAtual(); return a != null && a >= tr.de && a <= tr.ate; }
-  function noTrecho(pts) { var tr = trechoAtual(); return maximoNoTrecho(pts, tr.de, tr.ate); }   // o eixo Y do que se vê
   function mostrarZoom() {
     if (!zoomEl) { return; }
     escrever(zoomTexto, "textContent", textoDoTrecho(zoom) + (!zoom ? " · o dia inteiro" : zoom.segue ? " · acompanhando agora" : ""));
@@ -855,6 +975,45 @@
     mostrarZoom();
     cancelAnimationFrame(zoomQuadro);
     zoomQuadro = requestAnimationFrame(function () { if (aberta && vivo) { limparTodos(); aoVivoNaJanela(); } });
+  }
+  // a FAIXA DE VALOR de cada escala (a caixa do arraste): vale só para o gráfico onde a caixa foi feita, ou para os
+  // irmãos que dividem a escala (os cartões do Individual, a grade dos inversores). "Dia inteiro" e o duplo clique zeram.
+  var faixasY = {};
+  function zerarZoom() { faixasY = {}; definirZoom(null); }
+  // a escala de um gráfico (ou de irmãos): sem zoom, como sempre, de 0 ao teto; com zoom, o Y JUSTO do que se vê
+  // (não começa em 0, e o feixe das strings abre). `extras`: os valores de agora, quando agora está à vista
+  function escalaDe(series, partes, extras) {
+    var tr = trechoAtual(), f = faixaDoTrecho(series, tr.de, tr.ate);
+    (extras || []).forEach(function (v) { if (v != null) { f = f ? { min: Math.min(f.min, v), max: Math.max(f.max, v) } : { min: v, max: v }; } });
+    if (!zoom) { return { min: 0, max: tetoBonito(f ? Math.max(f.max, 0) : 0, partes) }; }
+    return escalaJusta(f, 4);
+  }
+  function rotuloDaEscala(e, un) { return (e.min > 0 ? rotuloDoEixo(e.min, un) : "0") + " a " + rotuloDoEixo(e.max, un); }
+  // AMPLIAR: o gráfico (a curva do inversor, o Todas, um do Por MPPT) ocupa ~70% da altura da tela; o mesmo botão volta
+  var ampliado = "";
+  function alturaDe(chave, h) { return ampliado && ampliado === chave ? Math.max(h, Math.round(window.innerHeight * 0.7)) : h; }
+  function botaoAmpliar(chave, alvo) {                  // `alvo`: o bloco do gráfico, preso aqui (nunca lido do `det`)
+    var b = document.createElement("button"); b.type = "button"; b.className = "gc-chip cos-inv-ampliar";
+    b.setAttribute("data-amplia-botao", chave);
+    b.addEventListener("click", function () {
+      ampliado = ampliado === chave ? "" : chave;
+      if (aberta && vivo) { aoVivoNaJanela(); }
+      var a = typeof alvo === "function" ? alvo() : alvo;
+      if (ampliado && a && a.scrollIntoView) { requestAnimationFrame(function () { a.scrollIntoView({ block: "nearest" }); }); }
+    });
+    return b;
+  }
+  function mostrarAmpliar(b, chave) {
+    var sim = ampliado === chave;
+    escrever(b, "textContent", sim ? "Voltar ao tamanho" : "Ampliar");
+    b.setAttribute("aria-pressed", String(sim));
+    escrever(b, "title", sim ? "Volta o gráfico à altura de antes" : "O gráfico ocupa quase a janela inteira em altura");
+  }
+  // "SÓ ESTA": uma string isolada por inversor no modo Todas (duplo clique ou Shift+Enter no chip); "Mostrar todas" volta
+  var isoladas = {};
+  function isolarString(chave) {
+    if (isoladas[invAberto] === chave) { delete isoladas[invAberto]; } else { isoladas[invAberto] = chave; }
+    if (aberta && vivo) { aoVivoNaJanela(); }
   }
   // o "+" aproxima em torno de agora quando ele está à vista (em hoje, o zoom já nasce acompanhando a ponta)
   function aproximarPeloBotao(fator) { definirZoom(aproximar(zoom, fator, agoraVisivel() ? minutoDeAgora() : null)); }
@@ -963,22 +1122,21 @@
         partes.estados.appendChild(pilula(gerando || !e.grupo ? e.tom : "neutro", conta[v] + " " + e.rotulo.toLowerCase()));
       });
     }
-    var invs = ordenados(c), maxInv = 0;
+    var invs = ordenados(c);
     // a escala comum dos inversores, pelo que se vê no trecho do zoom (o de agora entra só se agora está à vista)
-    invs.forEach(function (i) { maxInv = Math.max(maxInv, noTrecho(porId[i.id] || []), hoje && agoraVisivel() ? (i.pac || 0) : 0); });
+    var eInv = escalaDe(invs.map(function (i) { return porId[i.id] || []; }), 2, hoje && agoraVisivel() ? invs.map(function (i) { return i.pac; }) : []);
     escrever(partes.tituloU, "textContent", "A usina " + quando);
     escrever(partes.detU, "textContent", (hoje ? "a curva gravada de 5 em 5 min e a ponta ao vivo, de 3 em 3 s" : "a curva gravada de 5 em 5 min") +
-      " · passe o mouse (ou use as setas) para ler a hora; arraste para aproximar o horário (duplo clique volta ao dia)");
+      " · passe o mouse (ou use as setas) para ler a hora; arraste para aproximar (uma caixa aproxima também o valor; duplo clique volta)");
     escrever(partes.thMax, "textContent", "Máximo " + quando);
     escrever(partes.thEnergia, "textContent", "Energia " + quando);
-    var tetoInv = tetoBonito(maxInv, 2);
     escrever(partes.escala, "textContent", cv === SEM_CURVA ? "lendo a curva gravada do dia… os pontos ao vivo já aparecem"
-      : "todos na mesma escala (0 a " + kw(tetoInv) + "): quem gera menos fica visivelmente mais baixo" + (detEl ? " · clique num inversor para ver a curva dele e as strings" : ""));
+      : "todos na mesma escala (" + rotuloDaEscala(faixasY.inversores || eInv, "kW") + "): quem gera menos fica visivelmente mais baixo" + (detEl ? " · clique num inversor para ver a curva dele e as strings" : ""));
     // as larguras lidas antes de desenhar (um layout só, e não um por gráfico)
     var larguraUsina = partes.gu.clientWidth, larguras = {};
     invs.forEach(function (i) { var p = partes.invs[i.id]; if (p) { larguras[i.id] = p.graf.clientWidth; } });
-    var pu = hoje ? comPonta(serie(cv.usina), "u:" + aberta.getAttribute("data-gid")) : serie(cv.usina);
-    grafico(partes.gu, [{ pts: pu }], { h: 230, max: tetoBonito(noTrecho(pu), 4), eixoX: true, eixoY: true, rotuloFim: true, vivo: hoje, semAgora: !hoje,
+    var pu = hoje ? comPonta(serie(cv.usina), "u:" + aberta.getAttribute("data-gid")) : serie(cv.usina), eU = escalaDe([pu], 4);
+    grafico(partes.gu, [{ pts: pu }], { h: 230, min: eU.min, max: eU.max, escala: "usina", eixoX: true, eixoY: true, rotuloFim: true, vivo: hoje, semAgora: !hoje,
       nome: "usina", rotulo: "Curva " + quando + " da usina" }, larguraUsina);
     var linhas = [];
     invs.forEach(function (i) {
@@ -996,7 +1154,7 @@
         if (motivo) { var mo = document.createElement("span"); mo.className = "cos-inv-motivo"; mo.textContent = motivo; p.estado.appendChild(mo); }
       }
       // a cor do estado (desligado, sem comunicação) é de AGORA: num dia que passou, a linha fica na cor de sempre
-      grafico(p.graf, [{ pts: porId[i.id] || [] }], { h: 78, max: tetoInv, grupo: hoje ? grupo : "", vivo: hoje, semAgora: !hoje, nome: nomeDoInversor(i),
+      grafico(p.graf, [{ pts: porId[i.id] || [] }], { h: 78, min: eInv.min, max: eInv.max, escala: "inversores", grupo: hoje ? grupo : "", vivo: hoje, semAgora: !hoje, nome: nomeDoInversor(i),
         rotulo: "Curva " + quando + " de " + (i.nome || i.modbus_id),
         aoMarcar: function (pt, min) {
           if (min == null) { kwAgora(); return; }
@@ -1043,6 +1201,8 @@
   }
   function abrirInversor(id) {
     if (!detEl || !aberta || !vivo) { return; }
+    // outro inversor: o trecho do horário fica (a mesma usina), e a faixa de valor das caixas do detalhe sai (era de outro)
+    Object.keys(faixasY).forEach(function (k) { if (k !== "usina" && k !== "inversores") { delete faixasY[k]; } });
     invAberto = id; det = null; limparTodos();
     corpo.hidden = true; detEl.hidden = false;
     aoVivoNaJanela();                                     // desenha já, com a leitura de agora
@@ -1050,7 +1210,7 @@
     detTitulo.focus({ preventScroll: true });             // o leitor de tela anuncia o inversor; o Tab segue para o voltar
   }
   function sairDoDetalhe() {
-    invAberto = null; det = null;
+    invAberto = null; det = null; ampliado = "";
     if (detEl) { detEl.hidden = true; detCorpo.textContent = ""; }
     if (corpo) { corpo.hidden = false; }
   }
@@ -1104,7 +1264,9 @@
     });
     frag.appendChild(fatos);
     var bc = bloco("Curva de hoje", ""); det.tituloCurva = bc._titulo; det.detCurva = bc._detalhe;
-    det.gc = document.createElement("div"); det.gc.className = "cos-inv-graf"; bc.appendChild(det.gc); frag.appendChild(bc);
+    var hostCurva = document.createElement("div"); hostCurva.className = "cos-inv-graf"; det.gc = hostCurva;
+    det.btAmpliarCurva = botaoAmpliar("inversor", hostCurva); bc.firstChild.appendChild(det.btAmpliarCurva);
+    bc.appendChild(hostCurva); frag.appendChild(bc);
     var be = bloco("", "agora, de 3 em 3 s (ao vivo)"); det.entTit = be._titulo;
     det.ent = document.createElement("div"); det.ent.className = "cos-inv-ent"; be.appendChild(det.ent);
     det.nota = document.createElement("p"); det.nota.className = "cos-inv-ent-nota"; be.appendChild(det.nota);
@@ -1121,9 +1283,12 @@
       b.addEventListener("click", function () { modo = par[0]; aoVivoNaJanela(); });
       det.botoes[par[0]] = b; det.modos.appendChild(b);
     });
+    det.btAmpliarTodas = botaoAmpliar("todas", function () { return detCorpo.querySelector('[data-amplia="todas"]'); });
+    det.modos.appendChild(det.btAmpliarTodas);
     bs.appendChild(det.modos);
     det.chips = document.createElement("div"); det.chips.className = "cos-inv-chips"; det.chips.hidden = true;
-    det.chips.setAttribute("role", "group"); det.chips.setAttribute("aria-label", "Destacar strings no gráfico (clique de novo para desfazer)");
+    det.chips.setAttribute("role", "group");
+    det.chips.setAttribute("aria-label", "Destacar strings no gráfico: clique destaca, de novo desfaz; duplo clique (ou Shift+Enter) mostra só esta");
     bs.appendChild(det.chips);
     det.sg = document.createElement("div"); det.sg.className = "cos-inv-sg"; bs.appendChild(det.sg);
     frag.appendChild(bs);
@@ -1173,7 +1338,9 @@
     escrever(campos.nominal, "textContent", i.capacidade != null ? kw(i.capacidade) + (i.capacidade_origem === "modelo" ? " (pelo modelo)" : "") : "—");
     escrever(det.tituloCurva, "textContent", "Curva " + (hoje ? "de hoje" : "de " + diaCurto(dia)));
     escrever(det.detCurva, "textContent", hoje ? "a curva gravada de 5 em 5 min e a ponta ao vivo, de 3 em 3 s" : "a curva gravada de 5 em 5 min");
-    grafico(det.gc, [{ pts: pts }], { h: 230, max: tetoBonito(Math.max(noTrecho(pts), hoje && agoraVisivel() ? (i.pac || 0) : 0), 4), eixoX: true, eixoY: true,
+    var eC = escalaDe([pts], 4, hoje && agoraVisivel() ? [i.pac] : []);
+    mostrarAmpliar(det.btAmpliarCurva, "inversor");
+    grafico(det.gc, [{ pts: pts }], { h: alturaDe("inversor", 230), min: eC.min, max: eC.max, escala: "inversor", eixoX: true, eixoY: true,
       rotuloFim: true, vivo: hoje, semAgora: !hoje, grupo: hoje ? grupo : "", nome: nome, rotulo: "Curva " + quando + " de " + nome,
       aoMarcar: function (pt, min) {
         if (min == null) { agoraTxt(); return; }
@@ -1268,13 +1435,14 @@
   // (5h às 19h), o mesmo da curva: a cruz anda junto nos dois.
   function dicaMulti(g, min) {
     var linhas = [];
-    g.lista.forEach(function (s) {
+    g.lista.forEach(function (s, k) {
       var p = valorEm(s.pts, min, g.tol), v = p && p[1] != null ? p[1] : null;
-      if (v == null && !s.forte) { return; }
-      linhas.push({ cor: s.cor, forte: !!s.forte, v: v == null ? "sem leitura" : valorNa(v, g.un), t: s.nome, n: v == null ? -1 : v });
+      if (v == null && !s.forte && k !== g.perto) { return; }
+      linhas.push({ cor: s.cor, forte: !!s.forte, perto: k === g.perto, v: v == null ? "sem leitura" : valorNa(v, g.un), t: s.nome, n: v == null ? -1 : v });
     });
-    // a destacada primeiro; as outras da maior corrente para a menor (a que destoa para baixo fica no pé)
-    linhas.sort(function (a, b) { return (Number(b.forte) - Number(a.forte)) || (b.n - a.n); });
+    // em ordem de valor, da maior corrente para a menor (a que destoa para baixo fica no pé); a mais próxima do ponteiro
+    // vem marcada, e é ela que leva o nome ao lado do ponteiro no gráfico
+    linhas.sort(function (a, b) { return b.n - a.n; });
     linhas.unshift({ v: hhmm(min), t: g.nome || "" });
     if (linhas.length === 1) { linhas.push({ v: "sem amostra", t: "" }); }
     return linhas;
@@ -1323,13 +1491,14 @@
     escrever(det.botoes.todas, "textContent", ent.tipo === "mppts" ? "Todos" : "Todas");
     Object.keys(det.botoes).forEach(function (b) { det.botoes[b].setAttribute("aria-pressed", String(b === m)); });
     var contar = ent.tipo === "mppts" ? ["MPPT", "MPPT"] : ["string", "strings"];
-    var maxA = 0;
-    // a escala comum das entradas (os cartões do Individual seguem iguais entre si), pelo que se vê no trecho do zoom
-    ent.lista.forEach(function (e) { maxA = Math.max(maxA, noTrecho(serieDe(e.chave)), hoje && agoraVisivel() ? (vivoPor[e.chave] || 0) : 0); });
-    var teto = tetoBonito(maxA, 2);
+    // as que aparecem: no Todas, com uma string isolada ("Só esta"), só ela; nos outros modos, todas
+    var isolada = m === "todas" ? isoladas[id] : null, vis = visiveis(ent.lista, isolada);
+    // a escala comum das entradas (os cartões do Individual seguem iguais entre si), pelo que se vê no trecho do zoom:
+    // sem zoom, de 0 ao teto; com zoom, o Y justo do feixe (não começa em 0)
+    var eS = escalaDe(vis.map(function (e) { return serieDe(e.chave); }), 2, hoje && agoraVisivel() ? vis.map(function (e) { return vivoPor[e.chave]; }) : []);
     escrever(det.stDet, "textContent", "a corrente, gravada de 5 em 5 min (45 dias)" + (hoje ? " e a ponta ao vivo, de 3 em 3 s" : "") +
-      " · " + (m === "todas" ? "0 a " : "todos na mesma escala, 0 a ") + rotuloDoEixo(teto, "A"));
-    var comum = { un: "A", max: teto, vivo: false, semAgora: !hoje, contar: contar };
+      " · " + (m === "todas" ? "" : "todos na mesma escala, ") + rotuloDaEscala(eS, "A") + " · arraste uma caixa para aproximar o horário e o valor");
+    var comum = { un: "A", min: eS.min, max: eS.max, vivo: false, semAgora: !hoje, contar: contar };
     var forma = m + "|" + formaDe(ent);
     if (det.montado !== forma) {
       det.montado = forma; det.sg.textContent = ""; det.hosts = []; det.chips.textContent = ""; det.chipsPor = {};
@@ -1354,6 +1523,8 @@
           var cab = document.createElement("div"); cab.className = "cos-inv-i-cab";
           var b = document.createElement("b"); b.textContent = gr.nome; cab.appendChild(b);
           var qt = document.createElement("span"); qt.className = "d"; qt.textContent = plural(gr.itens.length, "string", "strings"); cab.appendChild(qt);
+          var hostM = document.createElement("div"); hostM.className = "cos-inv-graf";
+          var btM = botaoAmpliar("mppt:" + gr.chave, hostM); cab.appendChild(btM);
           a.appendChild(cab);
           var leg = document.createElement("ul"); leg.className = "cos-inv-leg"; var valores = {};
           gr.itens.forEach(function (e) {
@@ -1364,24 +1535,41 @@
             leg.appendChild(li);
           });
           a.appendChild(leg);
-          var host = document.createElement("div"); host.className = "cos-inv-graf"; a.appendChild(host);
-          gm.appendChild(a); det.hosts.push({ host: host, grupo: gr, valores: valores });
+          a.appendChild(hostM);
+          gm.appendChild(a); det.hosts.push({ host: hostM, grupo: gr, valores: valores, btAmpliar: btM });
         });
         det.sg.appendChild(gm);
       } else {
+        var hostT = document.createElement("div"); hostT.className = "cos-inv-graf"; hostT.setAttribute("data-amplia", "todas");
+        var todas = document.createElement("button"); todas.type = "button"; todas.className = "gc-chip cos-inv-mostrar-todas";
+        todas.textContent = "Mostrar todas"; todas.hidden = true; todas.setAttribute("data-foco", "mostrar-todas");
+        todas.addEventListener("click", function () { delete isoladas[invAberto]; if (aberta && vivo) { aoVivoNaJanela(); } });
+        det.chips.appendChild(todas); det.btMostrarTodas = todas;
         ent.lista.forEach(function (e) {
           var b = document.createElement("button"); b.type = "button"; b.className = "gc-chip cos-inv-chip";
           b.setAttribute("data-foco", "chip:" + e.chave); b.setAttribute("aria-pressed", "false");
           var cor = document.createElement("i"); cor.className = "cos-inv-cor"; cor.setAttribute("style", estiloDaCor(corDaEntrada(e.chave))); cor.setAttribute("aria-hidden", "true"); b.appendChild(cor);
           b.appendChild(document.createTextNode(e.nome));
           b.addEventListener("click", function () { alternarDestaque(e.chave); });
+          // duplo clique: "Só esta" (os dois cliques dele destacam e desfazem, e o destaque fica como estava)
+          b.addEventListener("dblclick", function (ev) { ev.preventDefault(); isolarString(e.chave); });
+          b.addEventListener("keydown", function (ev) { if (ev.key === "Enter" && ev.shiftKey) { ev.preventDefault(); isolarString(e.chave); } });
+          // o mouse no chip realça a linha dele no gráfico (lida no desenho de agora do bloco, nunca no `det`)
+          b.addEventListener("pointerenter", function () {
+            var g = hostT._g;
+            if (g && g.svg.isConnected && cruzEm == null) { realcar(g, g.lista.map(function (s) { return s.chave; }).indexOf(e.chave), null); }
+          });
+          b.addEventListener("pointerleave", function () { var g = hostT._g; if (g && g.svg.isConnected && cruzEm == null) { realcar(g, -1); } });
           det.chips.appendChild(b); det.chipsPor[e.chave] = { b: b, cor: cor };
         });
-        var host = document.createElement("div"); host.className = "cos-inv-graf"; det.sg.appendChild(host);
-        det.hosts.push({ host: host, todas: true });
+        det.sg.appendChild(hostT);
+        det.hosts.push({ host: hostT, todas: true });
       }
     }
     det.chips.hidden = m !== "todas";
+    det.btAmpliarTodas.hidden = m !== "todas";
+    mostrarAmpliar(det.btAmpliarTodas, "todas");
+    if (det.btMostrarTodas) { det.btMostrarTodas.hidden = !isolada; }
     var larguras = det.hosts.map(function (x) { return x.host.clientWidth; });  // as larguras antes de desenhar
     var sel = destaques[id] || {}, nSel = Object.keys(sel).length, chipsPor = det.chipsPor;     // os destacados (sem teto)
     // o valor ao lado do nome: o de agora em hoje; o máximo do dia num dia que passou
@@ -1394,7 +1582,7 @@
       if (x.e) {
         var e = x.e;
         if (cruzEm == null) { rotuloDoValor(x.valor, e); }
-        grafico(x.host, [{ pts: serieDe(e.chave), cor: corDaEntrada(e.chave) }], com(comum, { h: 64, nome: e.nome, rotulo: "A corrente de " + e.nome + " " + (hoje ? "hoje" : "em " + diaCurto(dia)),
+        grafico(x.host, [{ pts: serieDe(e.chave), cor: corDaEntrada(e.chave) }], com(comum, { h: 64, escala: "individual", nome: e.nome, rotulo: "A corrente de " + e.nome + " " + (hoje ? "hoje" : "em " + diaCurto(dia)),
           aoMarcar: function (pt, min) {
             if (min == null) { rotuloDoValor(x.valor, e); return; }
             x.valor.textContent = pt && pt[1] != null ? amp(pt[1]) : "—";
@@ -1404,20 +1592,22 @@
         x.grupo.itens.forEach(function (e) {
           escrever(x.valores[e.chave], "textContent", hoje ? (vivoPor[e.chave] == null ? "sem leitura" : amp(vivoPor[e.chave])) : "");
         });
-        grafico(x.host, x.grupo.itens.map(function (e) { return { pts: serieDe(e.chave), nome: e.nome, cor: corDaEntrada(e.chave) }; }),
-          com(comum, { h: 150, eixoX: true, eixoY: true, nome: x.grupo.nome, rotulo: "As strings do " + x.grupo.nome + " " + (hoje ? "hoje" : "em " + diaCurto(dia)), dica: dicaMulti }), larguras[n]);
+        mostrarAmpliar(x.btAmpliar, "mppt:" + x.grupo.chave);
+        grafico(x.host, x.grupo.itens.map(function (e) { return { pts: serieDe(e.chave), nome: e.nome, chave: e.chave, cor: corDaEntrada(e.chave) }; }),
+          com(comum, { h: alturaDe("mppt:" + x.grupo.chave, 150), escala: "mppt:" + x.grupo.chave, eixoX: true, eixoY: true, nome: x.grupo.nome, rotulo: "As strings do " + x.grupo.nome + " " + (hoje ? "hoje" : "em " + diaCurto(dia)), dica: dicaMulti }), larguras[n]);
       } else {
         ent.lista.forEach(function (e) {
           var ch = chipsPor[e.chave], marcado = !!sel[e.chave];
           if (!ch) { return; }
           ch.b.setAttribute("aria-pressed", String(marcado));
+          ch.b.classList.toggle("cos-inv-chip--oculta", !!isolada && isolada !== e.chave);     // fora do "Só esta"
           escrever(ch.b, "title", hoje ? (vivoPor[e.chave] == null ? e.nome + ": sem leitura agora" : e.nome + ": " + amp(vivoPor[e.chave]) + " agora") : e.nome);
         });
         // toda string na cor dela; com alguma destacada, ela engrossa e as outras esmaecem (sem nenhuma, todas por inteiro)
-        grafico(x.host, ent.lista.map(function (e) {
-          return { pts: serieDe(e.chave), nome: e.nome, cor: corDaEntrada(e.chave), forte: !!sel[e.chave], fraca: nSel > 0 && !sel[e.chave] };
+        grafico(x.host, vis.map(function (e) {
+          return { pts: serieDe(e.chave), nome: e.nome, chave: e.chave, cor: corDaEntrada(e.chave), forte: !!sel[e.chave], fraca: nSel > 0 && !sel[e.chave] };
         }),
-          com(comum, { h: 240, eixoX: true, eixoY: true, nome: ent.tipo === "mppts" ? "todos os MPPT" : "todas as strings",
+          com(comum, { h: alturaDe("todas", 240), escala: "todas", eixoX: true, eixoY: true, nome: ent.tipo === "mppts" ? "todos os MPPT" : "todas as strings",
             rotulo: quais + " " + (hoje ? "hoje" : "em " + diaCurto(dia)), dica: dicaMulti }), larguras[n]);
       }
     });
@@ -1490,7 +1680,7 @@
     if (!d || !/^\d{4}-\d{2}-\d{2}$/.test(d) || d >= hoje) { d = ""; }
     else if (d < limite) { d = limite; }
     if (d !== diaEscolhido) {
-      diaEscolhido = d; curva = null; zoom = null; mostrarZoom();     // outro dia: o dia inteiro
+      diaEscolhido = d; curva = null; zoom = null; faixasY = {}; mostrarZoom();     // outro dia: o dia inteiro, o Y de sempre
       limparTodos(); graficos = [];
       if (aberta && vivo) { aoVivoNaJanela(); }
     }
@@ -1507,7 +1697,7 @@
   }
   function abrir(art) {
     sairDoDetalhe(); limparPontaEnt(); pontasDe = null; destaques = {};   // outra usina: a ponta e os destaques são dela
-    diaEscolhido = ""; zoom = null;                       // e a janela abre sempre em hoje, no dia inteiro
+    diaEscolhido = ""; zoom = null; faixasY = {}; ampliado = ""; isoladas = {};   // e a janela abre em hoje, no dia inteiro
     aberta = art; curva = null; partes = null; assinatura = "";
     var gid = art.getAttribute("data-gid");
     var n = art.querySelector(".n");
@@ -1548,7 +1738,7 @@
     } finally {
       aberta = null; curva = null; partes = null; assinatura = "";
       sairDoDetalhe(); limparPontaEnt(); pontasDe = null; destaques = {};   // a ponta das entradas é da janela aberta: some ao fechar
-      diaEscolhido = ""; zoom = null;
+      diaEscolhido = ""; zoom = null; faixasY = {}; ampliado = ""; isoladas = {};
       graficos = []; if (dlg.open) { dlg.close(); }
     }
   }
@@ -1584,7 +1774,7 @@
       // Home e End vão ao começo e ao fim do dia, "+" e "-" aproximam e afastam
       zoomEl.querySelector(".cos-inv-zoom-mais").addEventListener("click", function () { aproximarPeloBotao(0.5); });
       zoomEl.querySelector(".cos-inv-zoom-menos").addEventListener("click", function () { aproximarPeloBotao(2); });
-      zoomEl.querySelector(".cos-inv-zoom-dia").addEventListener("click", function () { definirZoom(null); });
+      zoomEl.querySelector(".cos-inv-zoom-dia").addEventListener("click", function () { zerarZoom(); });
       zoomEl.addEventListener("keydown", function (ev) {
         var k = ev.key;
         if (k === "+" || k === "=") { ev.preventDefault(); aproximarPeloBotao(0.5); return; }

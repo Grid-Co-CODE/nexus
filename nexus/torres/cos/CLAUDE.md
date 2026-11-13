@@ -470,6 +470,16 @@ Ignora esse monitoramento que já existe no nexus" (a Performance › Tempo real
   `tests/test_cos_inversores_js.py`. O Esc é pelo `cancel` do `<dialog>`: a versão pelo keydown, com uma marca desligada
   por `setTimeout`, deixava a janela sem fechar no segundo Esc rápido. Nenhum callback guardado lê o `det` global (o
   `fechar()` o zera antes da limpeza; foi o "Fechar não fecha" do PR #25).
+- **Separar as linhas** (13/11/2026, o dono: "tipo o das strings, todas, ficam todas juntas e não consigo separar qual é
+  qual, por isso o zoom"; as strings andam em 4 a 5 A e viram um feixe): com zoom, o eixo Y vai do menor ao maior do que
+  se vê (`escalaJusta`, não começa em 0: base tracejada e "o eixo começa em X"); sem zoom, de 0 ao teto, como sempre.
+  O arraste vira CAIXA: com 18 px ou mais de altura (`LIMIAR_Y_PX`) aplica também a faixa de valor, que vale só para o
+  gráfico onde foi feita (`faixasY` por escala; os cartões do Individual e a grade dos inversores dividem a deles);
+  quase só na vertical (menos de 8 px de largura), só o valor. "Dia inteiro" e o duplo clique zeram tudo; outro
+  inversor mantém o horário e solta a faixa do detalhe. A linha MAIS PRÓXIMA do ponteiro (`maisPerto`), ou a do chip sob
+  o mouse, engrossa, as outras esmaecem e ela ganha o nome; a dica vem em ordem de valor com ela marcada; no toque,
+  tocar escolhe. "Ampliar" (~70% da altura da tela) na curva do inversor, no Todas e em cada gráfico do Por MPPT. "Só
+  esta": duplo clique (ou Shift+Enter) no chip isola a string no Todas; "Mostrar todas" volta.
 - **O zoom no horário** (13/11/2026, o dono: "quero poder dar zoom nos graficos, da usina, dos inversores, das
   strings.."): UM trecho para todo gráfico da janela (a curva da usina, a grade de inversores, a curva do inversor e as
   strings e MPPT nos três modos), como a cruz. Arrastar sobre um gráfico seleciona o trecho; Ctrl (ou Cmd) + roda
