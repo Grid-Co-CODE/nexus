@@ -383,3 +383,64 @@ div.dd-org-fato:hover{background:var(--superficie)}
   .dd-prev-fechar-largo{display:none}
   .dd-prev-fechar-estreito{display:inline-flex;align-items:center;gap:6px}
 }
+
+/* o filtro do setor (13/11/2026, Levi: "eu quero que dê para filtrar o setor"), nas duas visões */
+.mx-setores{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:14px 0 4px}
+.mx-setores-r{margin-right:4px;font:700 11px/1 var(--font-sans);letter-spacing:.06em;text-transform:uppercase;color:var(--mudo)}
+.mx-setores .gc-chip{display:inline-flex;align-items:center;gap:6px;text-decoration:none;color:var(--tinta-2)}
+.mx-setores .gc-chip b{font-weight:700;color:var(--tinta)}
+.dd-org-setor[hidden],.mx-grupo[hidden]{display:none}
+
+/* a matriz refeita (13/11/2026, Levi: "não está tão visual [...] um amontoado de palavras"): a grade fato × dimensão com
+   uma marca curta por célula, o fato que abre na linha e o apoio recolhido */
+.mx-legenda{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;margin:18px 0 10px;font-size:12px;color:var(--mudo)}
+.mx-legenda-r{font:700 11px/1 var(--font-sans);letter-spacing:.06em;text-transform:uppercase;color:var(--mudo)}
+.mx-legenda-r--sep{margin-left:14px}
+.mx-legenda-t{margin-right:4px}
+.mx-moldura{overflow-x:auto}
+.mx{width:100%;border-collapse:collapse;font-size:13px}
+.mx thead th{position:sticky;top:0;z-index:1;background:var(--superficie-2);font:700 11px/1.2 var(--font-sans);letter-spacing:.04em;text-transform:uppercase;color:var(--mudo);padding:10px 8px;border-bottom:1px solid var(--linha-forte)}
+.mx th.mx-fato{text-align:left;padding-left:14px;min-width:300px}
+.mx th.mx-dim,.mx td.mx-c{text-align:center;width:88px}
+.mx .mx-seta{width:34px;text-align:center;color:var(--mudo)}
+.mx-grupo-cab th{padding:14px 14px 8px;text-align:left;font:700 13px/1.2 var(--font-sans);color:var(--tinta);background:var(--superficie);border-top:1px solid var(--linha-forte)}
+.mx-grupo-cab .ph{color:var(--verde-texto);margin-right:4px}
+.mx-n{margin-left:6px;padding:1px 8px;border-radius:999px;background:var(--superficie-3);font-size:11.5px;color:var(--tinta-2)}
+.mx-linha td,.mx-linha th{padding:6px 8px;border-top:1px solid var(--linha)}
+.mx-linha:hover,.mx-linha--aberta{background:var(--superficie-2)}
+.mx-linha--fraca .mx-nome{color:var(--mudo)}
+.mx-abre{display:flex;align-items:center;gap:10px;width:100%;padding:4px 6px;border:0;background:none;color:var(--tinta);text-align:left;cursor:pointer;font:inherit}
+.mx-nome{font-weight:600}
+.mx-estado{margin-left:auto;font:600 10.5px/16px var(--font-sans);padding:1px 8px;border-radius:var(--raio-tag);white-space:nowrap}
+.mx-estado--ok{color:var(--ok);background:var(--ok-suave)}
+.mx-estado--al{color:var(--alerta);background:var(--alerta-suave)}
+.mx-estado--neutro{color:var(--mudo);background:var(--superficie-3)}
+.mx-linha--aberta .mx-seta .ph{transform:rotate(180deg)}
+@media (prefers-reduced-motion:no-preference){.mx-seta .ph{transition:transform .15s}}
+.mx-b,.mx-pct{display:inline-block;min-width:58px;padding:3px 6px;border-radius:var(--raio-tag);font:600 11.5px/14px var(--font-sans);text-align:center}
+.mx-b--id{color:var(--verde-texto);background:var(--verde-suave)}
+.mx-b--cod,.mx-b--hmac{color:var(--info);background:var(--info-suave)}
+.mx-b--nome,.mx-b--largo{color:var(--alerta);background:var(--alerta-suave)}
+.mx-b--prop{color:var(--tinta-2);background:var(--superficie-3)}
+.mx-pct--ok{color:var(--sobre-cheio);background:var(--ok-cheio)}
+.mx-pct--al{color:var(--sobre-cheio);background:var(--alerta-cheio)}
+.mx-pct--er{color:var(--sobre-cheio);background:var(--critico-cheio)}
+.mx-vazio{color:var(--mudo);font-weight:700}
+.mx-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.mx-det td{padding:0;background:var(--superficie-2);border-top:0}
+.mx-det-grade{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.2fr);gap:18px 28px;padding:12px 18px 18px 22px}
+.mx-ficha{display:grid;grid-template-columns:110px minmax(0,1fr);gap:6px 12px;margin:0;font-size:12.5px}
+.mx-ficha dt{color:var(--mudo)}
+.mx-ficha dd{margin:0;color:var(--tinta-2);min-width:0;overflow-wrap:anywhere}
+.mx-obs{line-height:1.5}
+.mx-qual{min-width:0}
+.mx-qual h3{margin:0 0 4px;font:600 13px/1.3 var(--font-sans);color:var(--tinta)}
+.mx-qual h4{margin:12px 0 4px;font:600 12.5px/1.3 var(--font-sans);color:var(--tinta)}
+.mx-contas summary{cursor:pointer;font-size:12px;color:var(--mudo);margin-top:6px}
+.mx-apoio{display:grid;gap:10px;margin-top:22px}
+.mx-secao{border:1px solid var(--linha);border-radius:var(--raio-md);background:var(--superficie);padding:0 16px}
+.mx-secao>summary{display:flex;align-items:baseline;gap:12px;padding:12px 0;cursor:pointer;font-weight:600;color:var(--tinta)}
+.mx-secao[open]>summary{border-bottom:1px solid var(--linha);margin-bottom:10px}
+.mx-secao-d{font-weight:400;font-size:12.5px;color:var(--mudo)}
+.mx-secao>*:last-child{margin-bottom:14px}
+@media (max-width:900px){.mx-det-grade{grid-template-columns:minmax(0,1fr)}.mx th.mx-fato{min-width:220px}}

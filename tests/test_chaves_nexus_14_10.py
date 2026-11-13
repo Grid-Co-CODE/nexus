@@ -159,6 +159,16 @@ def test_as_chaves_moram_na_aba_nexus_das_chaves_das_fontes(app, admin, monkeypa
     # a aba da plataforma (a moldura) mostra as mesmas abas no topo
     h = admin.get("/t/base/chaves-fontes").get_data(as_text=True)
     assert '<a href="/t/base/chaves-fontes" aria-current="page">Fontes da Performance</a>' in h
+    # 13/11/2026 (Levi: "Essa fonte do tempo real, deixa junto de chave das fontes, aí vira mais uma abinha"): as Fontes
+    # do tempo real são a 3ª aba, fora do menu; a moldura delas mostra as mesmas abas, e o menu acende as Chaves
+    assert '<a href="/t/base/fontes-tempo-real">Fontes do tempo real</a>' in h
+    assert 'href="/t/base/fontes-tempo-real"' not in menu
+    h = admin.get("/t/base/fontes-tempo-real").get_data(as_text=True)
+    assert '<a href="/t/base/fontes-tempo-real" aria-current="page">Fontes do tempo real</a>' in h
+    assert '<a href="/t/base/chaves-fontes">Fontes da Performance</a>' in h
+    assert '<a href="/t/base/chaves-fontes?aba=nexus">Nexus</a>' in h and 'aria-current="page">Chaves das fontes</a>' in h
+    h = admin.get(PAGINA).get_data(as_text=True)
+    assert '<a href="/t/base/fontes-tempo-real">Fontes do tempo real</a>' in h
     h = admin.get("/t/comando/contestacoes").get_data(as_text=True)
     assert "Este Nexus não tem a chave das contestações." in h and "/t/base/chaves-nexus" in h
 

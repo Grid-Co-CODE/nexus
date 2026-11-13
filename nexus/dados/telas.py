@@ -388,9 +388,14 @@ def registrar_governanca(bp):
             if f.estado != "aposentado":        # Levi, 09/10/2026: "Não mostre aposentado" (nas duas visões)
                 grupos.setdefault(f.area, []).append(f)
         org = organograma(current_app.extensions.get("nexus_torres"), v["qualidade"]) if ver == "organograma" else None
+        # o filtro do setor (13/11/2026, Levi: "Em governança de dados, eu quero que dê para filtrar o setor"): o setor dono
+        # de cada fato, nas duas visões; filtra na própria página (o `?setor=` abre já filtrada)
+        por_torre = {t.id: t for t in (current_app.extensions.get("nexus_torres") or ())}
+        setores = [dict(_setor(a, por_torre), n=len(lista)) for a, lista in grupos.items()]
+        setor = request.args.get("setor") if request.args.get("setor") in grupos else ""
         lig = _secao_ligacoes()
         return render_template("dados/governanca.html", torre=bp.name, catalogo=catalogo, grupos=grupos, lig=lig,
-                               lig_ver=ver,
+                               lig_ver=ver, setores=setores, setor=setor,
                                resumo=catalogo.resumo(), q=v["qualidade"], atualizacao=v["atualizacao"],
                                hist_q=v["historico"], eq_q=v["equipamento"], erro=v["erro"], hora=_hora, pct=_pct,
                                num=_num, extra=_extra, extra_lista=_extra_lista, ver=ver, org=org, degraus=DEGRAUS,

@@ -123,7 +123,7 @@
 
     <ul class="dd-org-setores" aria-label="Setores">
       {% for s in org.setores %}
-      <li class="dd-org-setor" data-setor="{{ s.id }}" style="--trilhas:{{ s.trilhas }};--linhas:{{ s.linhas }}">
+      <li class="dd-org-setor" data-setor="{{ s.id }}" style="--trilhas:{{ s.trilhas }};--linhas:{{ s.linhas }}"{% if setor and setor != s.id %} hidden{% endif %}>
         <details class="dd-org-galho" open>
           <summary class="dd-org-no">
             <span class="dd-org-no-cab"><i class="ph ph-{{ s.icone }}" aria-hidden="true"></i><b>{{ s.rotulo }}</b><i class="ph ph-caret-down dd-org-seta" aria-hidden="true"></i></span>

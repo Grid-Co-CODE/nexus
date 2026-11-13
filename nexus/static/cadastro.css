@@ -669,3 +669,49 @@ details.ace-mais>summary:focus-visible{outline:2px solid var(--foco);outline-off
 .cli-link-linha{display:flex;gap:8px;flex-wrap:wrap}
 .cli-link-linha input{flex:1 1 320px;min-width:0;font-family:var(--font-mono);font-size:12px}
 .cli-novo{display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap}
+
+/* Base → Acessos, aba Acessos do cliente (13/11/2026, Levi: "o mais visual possível"; "a tabelinha de pessoa [...] o nome
+   da pessoa com o e-mail, um em cima do outro [...] deixa a linha grossa"; "nova conta [...] tá feio"): os números com a
+   cor da situação, a pessoa numa linha só e a Nova conta em duas colunas, com as carteiras da Thopen ao lado */
+.ac-numeros{display:flex;flex-wrap:wrap;gap:10px;margin:16px 0}
+.ac-num{display:flex;align-items:center;gap:10px;min-width:150px;padding:10px 16px;border:1px solid var(--linha);border-radius:var(--raio-md);background:var(--superficie)}
+.ac-num b{font:600 22px/1 var(--font-sans);color:var(--tinta)}
+.ac-num span{font-size:12.5px;color:var(--mudo)}
+.ac-ponto{width:9px;height:9px;border-radius:50%;background:var(--mudo)}
+.ac-ponto--ok{background:var(--ok)}.ac-ponto--alerta{background:var(--alerta)}.ac-ponto--critico{background:var(--critico)}
+.ac-tabela td{vertical-align:middle;padding-top:10px;padding-bottom:10px}
+.ac-pessoa{min-width:220px}
+.ac-pessoa b{font-weight:600;color:var(--tinta)}
+.ac-usuario{margin-left:10px;font-size:12.5px;color:var(--mudo)}
+.ac-cart{display:flex;flex-wrap:nowrap;gap:4px}
+.ac-item{font:600 11px/20px var(--font-sans);padding:0 8px;border-radius:var(--raio-tag);background:var(--superficie-3);color:var(--tinta-2)}
+.ac-item--todas{background:var(--verde-suave);color:var(--verde-texto)}
+.ac-papel{white-space:nowrap;color:var(--tinta-2)}
+.ac-senha{white-space:nowrap}
+.ac-quando{margin-left:8px;font-size:12px;color:var(--mudo)}
+.ac-acoes{display:flex;gap:6px;justify-content:flex-end;flex-wrap:nowrap;white-space:nowrap}
+.ac-acoes form{margin:0}
+.ac-bt{width:34px;height:34px;padding:0;justify-content:center;font-size:16px}
+.ac-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.ac-link{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px}
+.ac-link input{flex:1;min-width:240px;font-family:var(--font-mono);font-size:12.5px}
+.ac-nova{max-width:980px;margin:22px 0 6px;padding:18px 20px;background:var(--superficie);border:1px solid var(--linha);border-radius:var(--raio-md)}
+.ac-nova h2{margin:0 0 14px}
+.ac-nova-grade{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:20px;align-items:start}
+.ac-nova-esq{display:grid;gap:14px}
+.ac-campo{display:grid;gap:6px}
+.ac-campo .gc-campo{width:100%;box-sizing:border-box}
+.ac-seg{display:inline-flex;flex-wrap:wrap;border:1px solid var(--linha-forte);border-radius:var(--raio-controle);overflow:hidden;width:max-content;max-width:100%}
+.ac-seg label{position:relative;padding:8px 14px;font-size:13px;color:var(--tinta-2);cursor:pointer}
+.ac-seg input{position:absolute;opacity:0;pointer-events:none}
+.ac-seg label:has(input:checked){background:var(--verde);color:var(--sobre-verde);font-weight:600}
+.ac-seg label:has(input:focus-visible){outline:2px solid var(--foco);outline-offset:-2px}
+.ac-nova-dir{margin:0;padding:14px 16px;border:1px solid var(--linha);border-radius:var(--raio-md);background:var(--superficie-2)}
+.ac-nova-dir legend{padding:0 6px}
+.ac-chips{display:flex;flex-wrap:wrap;gap:8px;margin:6px 0 8px}
+.ac-chip{display:inline-flex;align-items:center;gap:8px;padding:8px 14px;border:1px solid var(--linha-forte);border-radius:999px;background:var(--superficie);font-size:13px;cursor:pointer}
+.ac-chip input{accent-color:var(--verde)}
+.ac-chip:has(input:checked){border-color:var(--verde);background:var(--verde-suave);color:var(--tinta)}
+.ac-nova-pe{display:flex;justify-content:flex-end;margin-top:16px}
+.ac-so-admin{margin-top:12px}
+@media (max-width:900px){.ac-nova-grade{grid-template-columns:minmax(0,1fr)}}

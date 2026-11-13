@@ -731,7 +731,8 @@ def registrar_base(bp):
         if request.args.get("visao") == "supervisor":
             return _visao(srv, "Equipes", EQUIPES, visoes, "supervisor", "Supervisor", "Supervisores", "pessoas",
                           "responsavel_om", "Sem responsável", [("Clusters", _clusters)])
-        return _lista(srv, EQUIPES, "Equipes", [("regiao_campo", "Região de campo", "regioes_campo")],
+        # sem o filtro de Região de campo desde 13/11/2026 (Levi: "Exclua a parte de região de campos")
+        return _lista(srv, EQUIPES, "Equipes", [],
                       ["nome", "codigo"], "/t/base/equipe/nova", "Nova equipe", extras=_extras_equipe(srv),
                       visoes=visoes)
 
@@ -757,6 +758,12 @@ def registrar_base(bp):
     @_tela("Região de campo")
     def regiao(srv, id_):
         return _ficha(srv, REGIOES_CAMPO, id_, "Regiões de campo", extra=lambda r: _resumo_regiao(srv, r))
+
+    def regioes_saiu(id_=None):
+        """Base → Regiões de campo saiu do menu em 13/11/2026 (Levi: "Exclua a parte de região de campos. Não vamos mais
+        usar."): a lista, a ficha e a nova levam às Equipes, não a um 404; o POST de uma tela velha aberta também só
+        redireciona (nada é gravado). O dado das regiões fica no cadastro (a ficha da equipe e a da usina ainda o mostram)."""
+        return redirect(na_raiz("/t/base/equipes"))
 
     def listas_saiu():
         """Base → Listas saiu do menu em 11/10/2026 (Levi: "pode tirar listas pois a governança faz mais sentido"):
@@ -878,9 +885,9 @@ def registrar_base(bp):
     bp.add_url_rule("/equipes", "cad_equipes", equipes)
     bp.add_url_rule("/equipe/nova", "cad_equipe_nova", equipe_nova, methods=["GET", "POST"])
     bp.add_url_rule("/equipe/<id_>", "cad_equipe", equipe, methods=["GET", "POST"])
-    bp.add_url_rule("/regioes-campo", "cad_regioes", regioes)
-    bp.add_url_rule("/regiao-campo/nova", "cad_regiao_nova", regiao_nova, methods=["GET", "POST"])
-    bp.add_url_rule("/regiao-campo/<id_>", "cad_regiao", regiao, methods=["GET", "POST"])
+    bp.add_url_rule("/regioes-campo", "cad_regioes", regioes_saiu, methods=["GET", "POST"])
+    bp.add_url_rule("/regiao-campo/nova", "cad_regiao_nova", regioes_saiu, methods=["GET", "POST"])
+    bp.add_url_rule("/regiao-campo/<id_>", "cad_regiao", regioes_saiu, methods=["GET", "POST"])
     bp.add_url_rule("/listas", "cad_listas", listas_saiu, methods=["GET", "POST"])
     bp.add_url_rule("/importar", "cad_importar", importar_saiu, methods=["GET", "POST"])
     bp.add_url_rule("/importar/aplicar", "cad_importar_aplicar", importar_saiu, methods=["GET", "POST"])

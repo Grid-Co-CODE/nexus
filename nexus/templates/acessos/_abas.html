@@ -1,0 +1,11 @@
+{# As abas de Base → Acessos, num lugar só (13/11/2026): a página de Acessos e a aba "Acessos do cliente", que é a tela das
+   contas do Dashboard Thopen (/t/base/acessos-clientes; Levi: "Acessos do cliente deve ficar junto de acessos, tá? Vai
+   virar uma abinha chamada acessos do cliente"). `aba` = a aberta. #}
+<nav class="gc-subabas" aria-label="Acessos">
+  <a href="{{ url_for('torre_base.acessos') }}"{% if aba == 'telas' %} aria-current="page"{% endif %}>Telas e administradores</a>
+  <a href="{{ url_for('torre_base.acessos', aba='pessoas') }}"{% if aba == 'pessoas' %} aria-current="page"{% endif %}>Pessoas e setores</a>
+  <a href="{{ url_for('torre_base.acessos', aba='admins_app') }}"{% if aba == 'admins_app' %} aria-current="page"{% endif %}>Administradores do App de Campo</a>
+  <a href="{{ url_for('torre_base.acessos', aba='clientes') }}"{% if aba == 'clientes' %} aria-current="page"{% endif %}>Clientes</a>
+  <a href="{{ '/t/base/acessos-clientes'|na_raiz }}"{% if aba == 'acessos_cliente' %} aria-current="page"{% endif %}>Acessos do cliente</a>
+  <a href="{{ url_for('torre_base.acessos', aba='historico') }}"{% if aba == 'historico' %} aria-current="page"{% endif %}>Histórico e registros</a>
+</nav>

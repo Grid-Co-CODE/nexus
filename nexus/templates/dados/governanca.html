@@ -21,18 +21,41 @@
     <div class="gc-titulo-explica"><h1 class="titulo-pagina">{{ 'Organograma da governança' if ver == 'organograma' else 'Matriz de barramento' }}</h1>{% if ver == 'organograma' %}{% include "dados/_organograma_explica.html" %}{% else %}{% call explica('O que é a matriz') %}<p>Cada acontecimento (um <b>fato</b>: um fechamento, uma ronda, a geração de um dia) ligado aos cadastros de
 referência (as <b>dimensões</b>: usina, pessoa, data…) por <b>ID</b>. Quando dois setores usam a mesma dimensão pelo mesmo
 ID, os dados deles se cruzam sem conversão. A matriz vem do catálogo do Nexus (<code>nexus/dados/catalogo.py</code>); a
-qualidade, da carga de hora em hora.</p>{% endcall %}{% endif %}</div>
+qualidade, da carga de hora em hora.</p>
+<p><b>Como ler.</b> Cada linha é um fato; cada coluna, uma dimensão. A marca diz por onde o fato liga: <b>ID</b> do cadastro
+(o certo), <b>código</b> de um sistema (pelo de-para), <b>pessoa</b> (o código do e-mail, com a chave), <b>nome</b> (texto
+livre: junção frágil), <b>colunas</b> (um equipamento por coluna) ou cadastro <b>próprio</b>; o ponto é "não tem". No fato
+já gravado com os IDs, o número é quanto dele ligou no banco. Clique no fato para ver o livro, o grão, as medidas e a
+qualidade da ligação.</p>
+<p><b>Tipo do fato.</b> <b>Transação</b> (1 linha por acontecimento, não muda), <b>foto periódica</b> (o estado no fim de
+cada dia ou semana), <b>foto acumulada</b> (a linha muda até fechar, como a PT aguardando e depois decidida), <b>sem
+medida</b> (só registra que aconteceu).</p>{% endcall %}{% endif %}</div>
   </div>
   <nav class="dd-ver" aria-label="Visão da governança">
     <a href="{{ (url_organograma)|na_raiz }}"{% if ver == 'organograma' %} aria-current="page"{% endif %}>Organograma</a>
     <a href="{{ (url_matriz)|na_raiz }}"{% if ver == 'matriz' %} aria-current="page"{% endif %}>Matriz</a>
   </nav>
 </div>
+{# o filtro do setor (13/11/2026, Levi: "eu quero que dê para filtrar o setor"): o setor dono de cada fato, nas duas visões;
+   o link funciona sem JavaScript (o `?setor=` abre já filtrada) e, com ele, filtra na hora #}
+{% set url_visao = url_matriz if ver == 'matriz' else url_organograma %}
+<nav class="mx-setores" aria-label="Filtrar o setor" data-mx-setores>
+  <span class="mx-setores-r">Setor</span>
+  <a class="gc-chip" href="{{ url_visao|na_raiz }}" data-mx-setor="" aria-pressed="{{ 'false' if setor else 'true' }}">Todos <b class="gc-num">{{ setores | sum(attribute='n') }}</b></a>
+  {% for s in setores %}<a class="gc-chip" href="{{ (url_visao ~ ('&' if '?' in url_visao else '?') ~ 'setor=' ~ s.id)|na_raiz }}" data-mx-setor="{{ s.id }}" aria-pressed="{{ 'true' if setor == s.id else 'false' }}"><i class="ph ph-{{ s.icone }}" aria-hidden="true"></i> {{ s.rotulo }} <b class="gc-num">{{ s.n }}</b></a>{% endfor %}
+</nav>
 {% if ver == 'organograma' %}
 {% include "dados/_organograma.html" %}
 {% else %}
-{# o "o que é" da Matriz foi para o "!" do título (05/11/2026, o padrão do Nexus, _explica.html) #}
-
+{# A matriz refeita em 13/11/2026 (Levi: "Essa matriz não está tão visual. Está parecendo um amontoado de palavras uma em
+   cima da outra. Deixo melhor, mais fácil de ler. Se preciso, deixo tudo recolhido para a pessoa expandindo"): a grade
+   fato × dimensão vem primeiro, cada célula uma marca curta na cor do caminho (ID, código, pessoa, nome, colunas,
+   próprio) ou o % ligado no banco; o fato abre na própria linha com o livro, o grão, o tipo, as medidas, a observação e a
+   qualidade da ligação (eram os cartões "Qualidade da ligação", um embaixo do outro). O histórico, a dimensão de
+   equipamento, os livros e as dimensões ficam recolhidos no fim. O "o que é" mora no "!" do título. #}
+{% set ROTULO_ESTADO = {"conformado": ("com IDs", "ok"), "montado": ("montado", "al"), "fora": ("fora do banco", "al"),
+                        "origem": ("origem", "neutro"), "aposentado": ("aposentado", "neutro")} %}
+{% set CURTO = {"id": "ID", "cod": "código", "hmac": "pessoa", "nome": "nome", "largo": "colunas", "prop": "próprio"} %}
 <div class="dd-kpis">
   <div class="dd-kpi"><span class="v">{{ resumo.fatos }}</span><span class="r">fatos no catálogo</span></div>
   <div class="dd-kpi {{ 'ok' if resumo.conformados else 'er' }}"><span class="v">{{ resumo.conformados }}</span><span class="r">já gravados com os IDs</span></div>
@@ -43,135 +66,139 @@ qualidade, da carga de hora em hora.</p>{% endcall %}{% endif %}</div>
 </div>
 {% if erro %}<p class="dd-aviso">Não consegui ler a qualidade no banco ({{ erro }}): a matriz abaixo é a do catálogo.</p>{% endif %}
 
-{% for fid, l in q.items() %}{% set f = catalogo.POR_ID.get(fid) %}
-<section class="dd-qual">
-  <h2>Qualidade da ligação · {{ f.nome if f else fid }}</h2>
-  <p class="dd-mudo">{{ l.get('linhas') }} linhas de <code>{{ l.get('livro_origem') }}</code> em <code>{{ f.conformado_em if f else '' }}</code>.
-  Vazio é "não ligou": nunca um ID chutado.</p>
-  <div class="dd-barras">
-    {% for d, rot in (("data", "Data"), ("usina", "Usina"), ("equipe", "Equipe"), ("pessoa", "Pessoa"), ("equipamento", "Equipamento")) %}
-    {% if d != "equipamento" or l.get('com_equipamento') not in (none, '') %}{{ barra(rot, l.get(PCT[d])) }}{% endif %}
-    {% endfor %}
-  </div>
-  {% if l.get('pct_usina_versao') not in (none, '') or l.get('pct_pessoa_versao') not in (none, '') %}
-  <p class="dd-mudo">Acham exatamente 1 versão no histórico no dia do fato (a junção "da época"):</p>
-  <div class="dd-barras">{{ barra("Usina", l.get('pct_usina_versao')) }}{{ barra("Pessoa", l.get('pct_pessoa_versao')) }}</div>
-  {% endif %}
-  <p class="dd-mudo">Usina: {{ l.get('usina_por_de_para') }} pelo de-para do Fracttal, {{ l.get('usina_por_codigo') }} pelo código do ativo.</p>
-  {% if l.get('sem_usina_exemplos') %}<p class="dd-falta"><b>Sem usina:</b> {{ l.get('sem_usina_exemplos') }}</p>{% endif %}
-  {% if l.get('sem_equipe_exemplos') %}<p class="dd-falta"><b>Sem equipe:</b> {{ l.get('sem_equipe_exemplos') }}</p>{% endif %}
-  {% set ex = extra(l.get('extra')) %}{% if ex %}
-  <p class="dd-extra">{% for k, x in ex.items() %}<span><b>{{ k | replace('_', ' ') }}</b> {{ x }}</span>{% endfor %}</p>
-  {% endif %}
-  {# o radar da usina trocada (20/10/2026; a OS de Iramaia II que aparecia como Ibipeba no App e no programador) #}
-  {% set trocadas = extra_lista(l.get('extra'), 'usina_trocada') %}{% if trocadas %}
-  <div class="dd-trocada">
-    <h3>Ativo com a Classificação 1 de outra usina</h3>
-    <p class="dd-mudo">A Classificação 1 do ativo é a usina que o robô do PCM, o App e esta ligação usam; a localização diz
-      onde ele fica. Corrija no cadastro do Fracttal (o Nexus não escreve lá). <b>Usina trocada</b>: os dois nomes ligam a
-      usinas diferentes do Registro mestre. <b>Nome a conferir</b>: um dos nomes não está no de-para do Fracttal.
-      Só os ativos com tarefa aberta.</p>
-    <div class="dd-rolagem"><table class="dd-tab">
-      <thead><tr><th>Situação</th><th>Classificação 1 (Fracttal)</th><th>Usina da localização</th><th>Ativos</th><th>Tarefas abertas</th><th>OS</th></tr></thead>
-      <tbody>{% for r in trocadas %}
-      <tr><td class="{{ 'dd-ruim' if r.certeza == 'trocada' else 'dd-conferir' }}">{{ 'usina trocada' if r.certeza == 'trocada' else 'nome a conferir' }}</td>
-        <td>{{ r.classificacao_1 }}</td><td>{{ r.localizacao }}</td>
-        <td><b>{{ r.n_ativos }}</b> <span class="dd-codigos">{{ (r.ativos or [])|join(', ') }}{% if (r.n_ativos or 0) > (r.ativos or [])|length %}…{% endif %}</span></td>
-        <td>{{ r.n_tarefas }}</td><td class="dd-codigos">{{ (r.os or [])|join(', ') }}</td></tr>
-      {% endfor %}</tbody>
-    </table></div>
-  </div>
-  {% endif %}
-</section>
-{% endfor %}
-
-{% if hist_q or eq_q %}
-<div class="dd-saude">
-  {% if hist_q %}
-  <section class="dd-qual">
-    <h2>Histórico das dimensões (válido de / até)</h2>
-    <p class="dd-mudo">Cada versão vale de <code>valido_de_id</code> até a véspera de <code>valido_ate_id</code>. Sobreposição,
-    buraco ou membro sem versão vigente fazem um fato achar 2 versões ou nenhuma.</p>
-    <table class="dd-tab">
-      <thead><tr><th>Dimensão</th><th>Membros</th><th>Versões</th><th>Início presumido</th><th>Sobreposições</th><th>Buracos</th><th>Sem vigente</th><th>Ausentes na leitura</th></tr></thead>
-      <tbody>{% for h in hist_q %}
-      <tr><td>{{ h.get('entidade') }}</td><td>{{ h.get('membros') }}</td><td>{{ h.get('versoes') }}</td><td>{{ h.get('presumidas') }}</td>
-        {% for c in ('sobreposicoes', 'buracos', 'sem_vigente') %}<td class="{{ 'dd-ruim' if (num(h.get(c)) or 0) > 0 else '' }}">{{ h.get(c) }}</td>{% endfor %}
-        <td>{{ h.get('ausentes_na_leitura') }}</td></tr>
-      {% if h.get('pulou_motivo') %}<tr><td colspan="8" class="dd-falta">{{ h.get('pulou_motivo') }}</td></tr>{% endif %}
-      {% endfor %}</tbody>
-    </table>
-  </section>
-  {% endif %}
-  {% if eq_q %}
-  <section class="dd-qual">
-    <h2>Dimensão de equipamento</h2>
-    <p class="dd-mudo">Um membro por código de ativo do Fracttal; o ID sai do próprio código (o mesmo em qualquer máquina).</p>
-    <div class="dd-barras">{% for item, l in eq_q %}{% if loop.first %}<p class="dd-mudo"><b>{{ l.get('valor') }}</b> membros</p>{% else %}{{ barra(item, l.get('pct')) }}{% endif %}{% endfor %}</div>
-  </section>
-  {% endif %}
+<div class="mx-legenda" aria-label="Como ler a matriz">
+  <span class="mx-legenda-r">Liga por</span>
+  {% for e in ("id", "cod", "hmac", "nome", "largo", "prop") %}<span class="mx-b mx-b--{{ e }}" title="{{ catalogo.ESTADOS[e] }}">{{ CURTO[e] }}</span>{% endfor %}
+  <span class="mx-vazio" aria-hidden="true">·</span><span class="mx-legenda-t">não tem</span>
+  <span class="mx-legenda-r mx-legenda-r--sep">No banco</span>
+  <span class="mx-pct mx-pct--ok">98%+</span><span class="mx-pct mx-pct--al">90%+</span><span class="mx-pct mx-pct--er">abaixo</span>
 </div>
-{% endif %}
-
-<h2 class="dd-h2">A matriz</h2>
-<div class="dd-legenda">
-  {% for e, rot in (("id", "liga pelo ID do cadastro"), ("cod", "código de um sistema (liga pelo de-para)"), ("hmac", "código da pessoa (liga com a chave)"), ("nome", "texto livre: junção frágil"), ("largo", "um equipamento por coluna"), ("prop", "cadastro próprio"), ("nao", "não tem")) %}
-  <span><span class="dd-chip {{ e }}">{{ catalogo.ESTADOS[e] }}</span> {{ rot }}</span>
-  {% endfor %}
-</div>
-<p class="dd-mudo">Tipo do fato: <b>transação</b> (1 linha por acontecimento, não muda), <b>foto periódica</b> (o estado no fim
-de cada dia ou semana), <b>foto acumulada</b> (a linha muda até fechar, como a PT aguardando e depois decidida),
-<b>sem medida</b> (só registra que aconteceu).</p>
-<div class="dd-moldura">
-<table class="dd-matriz">
-<thead><tr><th class="dd-proc">Fato · livro · grão</th>
-  {% for did, nome, onde, chave in catalogo.DIMENSOES %}<th class="dd-dim">{{ nome }}<small>{{ chave }}</small></th>{% endfor %}</tr></thead>
-<tbody>
-{% for area, lista in grupos.items() %}
-  <tr class="dd-grupo"><td colspan="{{ catalogo.DIMENSOES | length + 1 }}">{{ AREAS.get(area, area) }}</td></tr>
+<div class="dd-moldura mx-moldura">
+<table class="dd-matriz mx">
+<thead><tr><th class="mx-fato" scope="col">Fato</th>
+  {% for did, nome, onde, chave in catalogo.DIMENSOES %}<th class="mx-dim" scope="col" title="{{ onde }} · {{ chave }}">{{ nome }}</th>{% endfor %}<th class="mx-seta" scope="col"><span class="mx-sr">Abrir</span></th></tr></thead>
+{% for area, lista in grupos.items() %}{% set s = setores | selectattr('id', 'equalto', area) | first %}
+<tbody class="mx-grupo" data-setor="{{ area }}"{% if setor and setor != area %} hidden{% endif %}>
+  <tr class="mx-grupo-cab"><th colspan="{{ catalogo.DIMENSOES | length + 2 }}" scope="colgroup"><i class="ph ph-{{ s.icone if s else 'database' }}" aria-hidden="true"></i> {{ s.rotulo if s else AREAS.get(area, area) }} <span class="mx-n gc-num">{{ lista | length }}</span></th></tr>
   {% for f in lista %}{% set ql = q.get(f.id) %}
-  <tr class="{{ 'dd-aposentado' if f.estado in ('aposentado', 'parte') else '' }}">
-    <td class="dd-proc"><b>{{ f.nome }}
-      {% if f.estado == 'conformado' %}<span class="dd-selo ok">com IDs</span>{% elif f.estado == 'montado' %}<span class="dd-selo al">montado, sem gravar</span>{% elif f.estado == 'fora' %}<span class="dd-selo al">fora do banco</span>{% elif f.estado == 'parte' %}<span class="dd-selo">fonte de {{ f.parte_de | map('replace', '_', ' ') | join(', ') }}</span>{% elif f.estado == 'aposentado' %}<span class="dd-selo">aposentado</span>{% endif %}</b>
-      <code>{{ f.livro }}</code>{% if f.conformado_em %}<code class="dd-conf">→ {{ f.conformado_em }}</code>{% endif %}
-      <span class="grao">{{ f.grao }}</span>
-      {% if f.tipo %}<span class="dd-meta"><span class="dd-tipo">{{ catalogo.TIPO_ROTULO.get(f.tipo, f.tipo) }}</span>{% if f.chave %} chave <code class="dd-in">{{ f.chave | join(' + ') }}</code>{% endif %}{% if f.janela_origem %} · a fonte guarda {{ f.janela_origem }}{% endif %}</span>{% endif %}
-      {% if f.medidas %}<span class="dd-med">{% for m in f.medidas %}<span title="{{ m.unidade }}, {{ SOMA.get(m.soma, m.soma) }}">{{ m.coluna }}</span>{% endfor %}</span>{% endif %}
-      {% if f.observacao %}<span class="obs">{{ f.observacao }}</span>{% endif %}</td>
+  {% set rot = ('fonte de ' ~ (f.parte_de | map('replace', '_', ' ') | join(', ')), 'neutro') if f.estado == 'parte' else ROTULO_ESTADO.get(f.estado, (f.estado, 'neutro')) %}
+  <tr class="mx-linha{{ ' mx-linha--fraca' if f.estado in ('aposentado', 'parte') else '' }}">
+    <th scope="row" class="mx-fato"><button type="button" class="mx-abre" aria-expanded="false" aria-controls="mx-d-{{ f.id }}" data-mx-abre>
+      <span class="mx-nome">{{ f.nome }}</span><span class="mx-estado mx-estado--{{ rot[1] }}">{{ rot[0] }}</span></button></th>
     {% for did, nome, onde, chave in catalogo.DIMENSOES %}{% set est, col = f.dims[did] %}
-      {% if f.estado == 'conformado' and did in PCT and ql and ql.get(PCT[did]) not in (none, '') %}
-      <td class="dd-c"><span class="dd-chip id">ID</span><span class="col">{{ pct(ql.get(PCT[did])) }} ligado</span></td>
-      {% elif est == 'nao' %}<td class="dd-c"><span class="dd-chip nao">—</span></td>
-      {% else %}<td class="dd-c"><span class="dd-chip {{ est }}">{{ catalogo.ESTADOS[est] }}</span><span class="col">{{ col }}</span></td>{% endif %}
+      {% if f.estado == 'conformado' and did in PCT and ql and ql.get(PCT[did]) not in (none, '') %}{% set p = num(ql.get(PCT[did])) %}
+      <td class="mx-c"><span class="mx-pct mx-pct--{{ 'ok' if p >= 98 else ('al' if p >= 90 else 'er') }}" title="{{ pct(ql.get(PCT[did])) }} ligado · {{ col }}">{{ pct(ql.get(PCT[did])) }}</span></td>
+      {% elif est == 'nao' %}<td class="mx-c"><span class="mx-vazio" title="{{ nome }}: não tem">·</span></td>
+      {% else %}<td class="mx-c"><span class="mx-b mx-b--{{ est }}" title="{{ catalogo.ESTADOS[est] }}: {{ col }}">{{ CURTO.get(est, catalogo.ESTADOS[est]) }}</span></td>{% endif %}
     {% endfor %}
+    <td class="mx-seta"><i class="ph ph-caret-down" aria-hidden="true"></i></td>
   </tr>
+  <tr class="mx-det" id="mx-d-{{ f.id }}" hidden><td colspan="{{ catalogo.DIMENSOES | length + 2 }}">
+    <div class="mx-det-grade">
+      <dl class="mx-ficha">
+        <dt>Livro</dt><dd><code>{{ f.livro }}</code>{% if f.conformado_em %} <code class="dd-conf">→ {{ f.conformado_em }}</code>{% endif %}</dd>
+        <dt>1 linha</dt><dd>{{ f.grao }}</dd>
+        {% if f.tipo %}<dt>Tipo</dt><dd>{{ catalogo.TIPO_ROTULO.get(f.tipo, f.tipo) }}{% if f.chave %} · chave <code class="dd-in">{{ f.chave | join(' + ') }}</code>{% endif %}</dd>{% endif %}
+        {% if f.janela_origem %}<dt>A fonte guarda</dt><dd>{{ f.janela_origem }}</dd>{% endif %}
+        {% if f.medidas %}<dt>Medidas</dt><dd class="dd-med">{% for m in f.medidas %}<span title="{{ m.unidade }}, {{ SOMA.get(m.soma, m.soma) }}">{{ m.coluna }}</span>{% endfor %}</dd>{% endif %}
+        {% if f.observacao %}<dt>Observação</dt><dd class="mx-obs">{{ f.observacao }}</dd>{% endif %}
+      </dl>
+      {% if ql %}{% set l = ql %}
+      <section class="mx-qual" aria-label="Qualidade da ligação">
+        <h3>Qualidade da ligação · {{ f.nome }}</h3>
+        <p class="dd-mudo">{{ l.get('linhas') }} linhas de <code>{{ l.get('livro_origem') }}</code>. Vazio é "não ligou": nunca um ID chutado.</p>
+        <div class="dd-barras">
+          {% for d, rotd in (("data", "Data"), ("usina", "Usina"), ("equipe", "Equipe"), ("pessoa", "Pessoa"), ("equipamento", "Equipamento")) %}
+          {% if d != "equipamento" or l.get('com_equipamento') not in (none, '') %}{{ barra(rotd, l.get(PCT[d])) }}{% endif %}
+          {% endfor %}
+        </div>
+        {% if l.get('pct_usina_versao') not in (none, '') or l.get('pct_pessoa_versao') not in (none, '') %}
+        <p class="dd-mudo">Acham 1 versão no histórico no dia do fato (a junção "da época"):</p>
+        <div class="dd-barras">{{ barra("Usina", l.get('pct_usina_versao')) }}{{ barra("Pessoa", l.get('pct_pessoa_versao')) }}</div>
+        {% endif %}
+        <p class="dd-mudo">Usina: {{ l.get('usina_por_de_para') }} pelo de-para do Fracttal, {{ l.get('usina_por_codigo') }} pelo código do ativo.</p>
+        {% if l.get('sem_usina_exemplos') %}<p class="dd-falta"><b>Sem usina:</b> {{ l.get('sem_usina_exemplos') }}</p>{% endif %}
+        {% if l.get('sem_equipe_exemplos') %}<p class="dd-falta"><b>Sem equipe:</b> {{ l.get('sem_equipe_exemplos') }}</p>{% endif %}
+        {% set ex = extra(l.get('extra')) %}{% if ex %}
+        <details class="mx-contas"><summary>As contas da carga ({{ ex | length }})</summary>
+          <p class="dd-extra">{% for k, x in ex.items() %}<span><b>{{ k | replace('_', ' ') }}</b> {{ x }}</span>{% endfor %}</p></details>
+        {% endif %}
+        {# o radar da usina trocada (20/10/2026; a OS de Iramaia II que aparecia como Ibipeba no App e no programador) #}
+        {% set trocadas = extra_lista(l.get('extra'), 'usina_trocada') %}{% if trocadas %}
+        <div class="dd-trocada">
+          <h4>Ativo com a Classificação 1 de outra usina</h4>
+          <p class="dd-mudo">A Classificação 1 do ativo é a usina que o robô do PCM, o App e esta ligação usam; a localização
+            diz onde ele fica. Corrija no cadastro do Fracttal (o Nexus não escreve lá). <b>Usina trocada</b>: os dois nomes
+            ligam a usinas diferentes. <b>Nome a conferir</b>: um dos nomes não está no de-para do Fracttal.</p>
+          <div class="dd-rolagem"><table class="dd-tab">
+            <thead><tr><th>Situação</th><th>Classificação 1 (Fracttal)</th><th>Usina da localização</th><th>Ativos</th><th>Tarefas abertas</th><th>OS</th></tr></thead>
+            <tbody>{% for r in trocadas %}
+            <tr><td class="{{ 'dd-ruim' if r.certeza == 'trocada' else 'dd-conferir' }}">{{ 'usina trocada' if r.certeza == 'trocada' else 'nome a conferir' }}</td>
+              <td>{{ r.classificacao_1 }}</td><td>{{ r.localizacao }}</td>
+              <td><b>{{ r.n_ativos }}</b> <span class="dd-codigos">{{ (r.ativos or [])|join(', ') }}{% if (r.n_ativos or 0) > (r.ativos or [])|length %}…{% endif %}</span></td>
+              <td>{{ r.n_tarefas }}</td><td class="dd-codigos">{{ (r.os or [])|join(', ') }}</td></tr>
+            {% endfor %}</tbody>
+          </table></div>
+        </div>
+        {% endif %}
+      </section>
+      {% endif %}
+    </div>
+  </td></tr>
   {% endfor %}
+</tbody>
 {% endfor %}
-</tbody></table></div>
-
-<h2 class="dd-h2">Os livros do Nexus no banco</h2>
-<p class="dd-mudo">Livro no banco é para sempre (a API não apaga): todo livro entra no catálogo antes de existir.</p>
-<div class="dd-moldura">
-<table class="dd-tab dd-livros">
-  <thead><tr><th>Livro</th><th>Abas</th><th>Quando grava</th><th>Quem grava</th><th>No banco</th></tr></thead>
-  <tbody>{% for lv in catalogo.LIVROS %}
-  <tr><td><code>{{ lv.nome }}</code>{% if lv.observacao %}<span class="obs">{{ lv.observacao }}</span>{% endif %}</td>
-    <td>{% for a in lv.abas %}<code class="dd-in">{{ a }}</code> {% endfor %}</td><td>{{ lv.cadencia }}</td><td><code class="dd-in">{{ lv.quem_grava }}</code></td>
-    <td>{% if lv.no_banco %}<span class="dd-selo ok">sim</span>{% else %}<span class="dd-selo al">registrado, ainda não</span>{% endif %}</td></tr>
-  {% endfor %}</tbody>
 </table></div>
 
 {% with com_gaveta = false %}{% include "dados/_radar.html" %}{% endwith %}
 {% include "dados/_conferencia.html" %}
 
-<h2 class="dd-h2">As dimensões</h2>
-<div class="dd-dims">
-{% for did, nome, onde, chave in catalogo.DIMENSOES %}
-  <div class="dd-dim-card"><b>{{ nome }}</b><code>{{ chave }}</code><span>{{ onde }}</span></div>
-{% endfor %}
+{# o apoio, recolhido: abre quem quiser ver #}
+<div class="mx-apoio">
+{% if hist_q %}
+<details class="mx-secao">
+  <summary><span>Histórico das dimensões</span><span class="mx-secao-d">{{ hist_q | length }} {{ 'dimensão' if hist_q | length == 1 else 'dimensões' }} com versão (válido de / até)</span></summary>
+  <p class="dd-mudo">Cada versão vale de <code>valido_de_id</code> até a véspera de <code>valido_ate_id</code>. Sobreposição,
+    buraco ou membro sem versão vigente fazem um fato achar 2 versões ou nenhuma.</p>
+  <div class="dd-rolagem"><table class="dd-tab">
+    <thead><tr><th>Dimensão</th><th>Membros</th><th>Versões</th><th>Início presumido</th><th>Sobreposições</th><th>Buracos</th><th>Sem vigente</th><th>Ausentes na leitura</th></tr></thead>
+    <tbody>{% for h in hist_q %}
+    <tr><td>{{ h.get('entidade') }}</td><td>{{ h.get('membros') }}</td><td>{{ h.get('versoes') }}</td><td>{{ h.get('presumidas') }}</td>
+      {% for c in ('sobreposicoes', 'buracos', 'sem_vigente') %}<td class="{{ 'dd-ruim' if (num(h.get(c)) or 0) > 0 else '' }}">{{ h.get(c) }}</td>{% endfor %}
+      <td>{{ h.get('ausentes_na_leitura') }}</td></tr>
+    {% if h.get('pulou_motivo') %}<tr><td colspan="8" class="dd-falta">{{ h.get('pulou_motivo') }}</td></tr>{% endif %}
+    {% endfor %}</tbody>
+  </table></div>
+</details>
+{% endif %}
+{% if eq_q %}
+<details class="mx-secao">
+  <summary><span>Dimensão de equipamento</span><span class="mx-secao-d">um membro por código de ativo do Fracttal</span></summary>
+  <div class="dd-barras">{% for item, l in eq_q %}{% if loop.first %}<p class="dd-mudo"><b>{{ l.get('valor') }}</b> membros</p>{% else %}{{ barra(item, l.get('pct')) }}{% endif %}{% endfor %}</div>
+</details>
+{% endif %}
+<details class="mx-secao">
+  <summary><span>Os livros do Nexus no banco</span><span class="mx-secao-d">{{ catalogo.LIVROS | length }} livros; livro no banco é para sempre</span></summary>
+  <div class="dd-rolagem"><table class="dd-tab dd-livros">
+    <thead><tr><th>Livro</th><th>Abas</th><th>Quando grava</th><th>Quem grava</th><th>No banco</th></tr></thead>
+    <tbody>{% for lv in catalogo.LIVROS %}
+    <tr><td><code>{{ lv.nome }}</code>{% if lv.observacao %}<span class="obs">{{ lv.observacao }}</span>{% endif %}</td>
+      <td>{% for a in lv.abas %}<code class="dd-in">{{ a }}</code> {% endfor %}</td><td>{{ lv.cadencia }}</td><td><code class="dd-in">{{ lv.quem_grava }}</code></td>
+      <td>{% if lv.no_banco %}<span class="dd-selo ok">sim</span>{% else %}<span class="dd-selo al">registrado, ainda não</span>{% endif %}</td></tr>
+    {% endfor %}</tbody>
+  </table></div>
+</details>
+<details class="mx-secao">
+  <summary><span>As dimensões</span><span class="mx-secao-d">{{ catalogo.DIMENSOES | length }} cadastros de referência em comum</span></summary>
+  <div class="dd-dims">
+  {% for did, nome, onde, chave in catalogo.DIMENSOES %}
+    <div class="dd-dim-card"><b>{{ nome }}</b><code>{{ chave }}</code><span>{{ onde }}</span></div>
+  {% endfor %}
+  </div>
+  <p class="dd-mudo">Como entra um dado novo: o passo a passo está no <code>nexus/dados/CLAUDE.md</code>. Fonte nova entra
+    primeiro no catálogo, com o grão, o tipo e as dimensões declarados.</p>
+</details>
 </div>
-<p class="dd-mudo dd-rodape">Como entra um dado novo (chamados, engenharia, PCM, segurança…): o passo a passo está no
-<code>nexus/dados/CLAUDE.md</code>. Fonte nova entra primeiro no catálogo, com o grão, o tipo e as dimensões declarados.</p>
 {% endif %}
 
 <section id="ligacoes" class="dd-secao-ligacoes" style="margin-top:36px;scroll-margin-top:16px">
@@ -190,4 +217,39 @@ de cada dia ou semana), <b>foto acumulada</b> (a linha muda até fechar, como a 
 {% endwith %}
 {% endif %}
 </section>
+<script>
+/* o filtro do setor (nas duas visões) e o fato que abre na linha da matriz (13/11/2026) */
+(function () {
+  'use strict';
+  var nav = document.querySelector('[data-mx-setores]');
+  function filtrar(id) {
+    document.querySelectorAll('.mx-grupo[data-setor], .dd-org-setor[data-setor]').forEach(function (g) {
+      g.hidden = !!id && g.getAttribute('data-setor') !== id;
+    });
+    if (nav) nav.querySelectorAll('[data-mx-setor]').forEach(function (c) {
+      c.setAttribute('aria-pressed', c.getAttribute('data-mx-setor') === id ? 'true' : 'false');
+    });
+    try {
+      var u = new URL(location.href);
+      if (id) u.searchParams.set('setor', id); else u.searchParams.delete('setor');
+      history.replaceState(null, '', u.pathname + u.search + u.hash);
+    } catch (e) { /* sem history: o link já leva à mesma visão filtrada */ }
+  }
+  if (nav) nav.addEventListener('click', function (ev) {
+    var c = ev.target.closest('[data-mx-setor]');
+    if (!c) return;
+    ev.preventDefault();
+    filtrar(c.getAttribute('data-mx-setor'));
+  });
+  document.addEventListener('click', function (ev) {
+    var b = ev.target.closest('[data-mx-abre]');
+    if (!b) return;
+    var det = document.getElementById(b.getAttribute('aria-controls'));
+    var abrir = b.getAttribute('aria-expanded') !== 'true';
+    b.setAttribute('aria-expanded', abrir ? 'true' : 'false');
+    b.closest('tr').classList.toggle('mx-linha--aberta', abrir);
+    if (det) det.hidden = !abrir;
+  });
+})();
+</script>
 {% endblock %}

@@ -2,7 +2,7 @@
 
 O registro mestre do Nexus: usinas, clientes, pessoas, equipes, regiões de campo e listas, com os mesmos dados do
 BD_Operações (a região de campo vem da estrutura de O&M de 10/2026), mas editáveis numa tela. As telas ficam nas torres
-Base (Registro mestre, Clientes, Equipes, Equipamentos das usinas, Regiões de campo, Qualidade do cadastro) e Pessoas
+Base (Registro mestre, Clientes, Equipes, Equipamentos das usinas, Qualidade do cadastro) e Pessoas
 (Colaboradores Operação). A tela Importar do Excel saiu em 14/10/2026 (Levi: "Tire 'Importar do Excel' do módulo base"):
 `/t/base/importar` leva ao Registro mestre, sem importar nada; a importação segue por comando (abaixo). Desde 15/10/2026 o
 BD_Operações novo exporta CSV, e o Registro mestre tem **Atualizar pelo CSV** (`importar_csv.py`, seção própria abaixo).
@@ -256,7 +256,9 @@ Coordenação de Campo → **Supervisor de Campo** (1 por região de campo: lide
 OS**) → equipes volantes (E-01 a E-40). Em paralelo, o **Supervisor PM** = o Gestor de contrato (cliente, contrato,
 SLA), por usina. O "Supervisor" de antes virou essas duas figuras; quem tem esse vínculo no cadastro é, na prática,
 Gestor de contrato.
-- **Região de campo** (Base → Regiões de campo, lista e ficha como as outras): nome, base, Supervisor de Campo e
+- **Região de campo** (a tela Base → Regiões de campo SAIU em 13/11/2026, Levi: "Exclua a parte de região de campos. Não
+  vamos mais usar.": `/t/base/regioes-campo`, a ficha e a nova levam às Equipes, e a lista das Equipes não filtra
+  mais pela região; o dado fica no cadastro e a ficha da equipe e a da usina ainda o mostram): nome, base, Supervisor de Campo e
   Coordenador de Campo (pessoas do cadastro). **Vazio é vaga** (`Campo.vazio`): a tela escreve "Vaga" no azul
   tracejado (`.cad-vaga`), nunca como erro nem pendência. A ficha lista as equipes da região; a lista diz quantas
   equipes com usina em operação ainda estão sem região.
@@ -294,8 +296,12 @@ Gestor de contrato.
 
 ## Pessoas e setores, a antiga Integração Fracttal (`fracttal_pessoal.py`, `telas_fracttal.py`; 12/10/2026)
 
-**Base → Acessos dos clientes** (`/t/base/acessos-clientes`, na Base desde 12/11/2026; Levi: "Joga o acesso cliente lá
-para bases") é outra tela, logo abaixo do Acessos no menu: as contas por pessoa dos clientes no Dashboard Thopen. Veio
+**Base → Acessos → Acessos do cliente** (`/t/base/acessos-clientes`, na Base desde 12/11/2026; Levi: "Joga o acesso
+cliente lá para bases"; desde 13/11/2026 é uma aba de Acessos, fora do menu: "Vai virar uma abinha chamada acessos do
+cliente") são as contas por pessoa dos clientes no Dashboard Thopen. A aba mostra os números com a cor da situação, a
+pessoa numa linha só (o nome e logo depois o usuário) e a Nova conta em duas colunas: o nome, o usuário e o papel à
+esquerda; à direita, as carteiras DA THOPEN, que só aparecem no papel Cliente (Levi: "Só no caso de cliente da Thopen,
+tá? Porque a gente vai ter mais de um cliente"). As abas de Acessos moram em `templates/acessos/_abas.html`. Veio
 da torre Contratos e clientes, que saiu do menu; a view é `nexus/torres/base/acessos_clientes_tela.py` e as regras estão
 em `nexus/contratos/CLAUDE.md` (leia lá antes de mexer). Não confundir com o Acessos, que é o que cada setor do Nexus vê.
 

@@ -106,6 +106,16 @@ def test_toda_tela_do_mapa_e_um_item_do_menu_com_a_moldura(app):
         assert endpoint == f"torre_{t.torre}.moldura_{t.tela.replace('-', '_')}", (t, endpoint)
 
 
+def _item_do_menu(t) -> str:
+    """O item do menu que acende com a tela do mapa aberta: o dela; o da Central de emissão nos relatórios (13/10/2026);
+    o da tela de dentro da qual ela se abre (`Tela.dentro_de`: as Fontes do tempo real nas Chaves das fontes, 13/11/2026)."""
+    from nexus.torres import descobrir_torres
+    if t.torre == "relatorios":
+        return f"{t.torre}/central"
+    decl = next(x for x in descobrir_torres() if x.id == t.torre).tela(t.tela)
+    return f"{t.torre}/{decl.dentro_de or t.tela}"
+
+
 # ── cada tela do mapa abre a moldura com o formulário certo ─────────────────────────────────────────────────────────
 @pytest.mark.parametrize("prefixo", ["", PREFIXO])
 @pytest.mark.parametrize("t", porta.MAPA, ids=lambda t: f"{t.torre}-{t.tela}")
@@ -117,7 +127,7 @@ def test_cada_tela_do_mapa_abre_a_moldura_com_o_formulario_certo(prefixo, t):
     h = r.get_data(as_text=True)
     assert t.nome in h and 'class="menu"' in h and "Em construção" not in h
     # o relatório abre por dentro da Central de emissão (13/10/2026): acende o item dela
-    no_menu = f"{t.torre}/central" if t.torre == "relatorios" else f"{t.torre}/{t.tela}"
+    no_menu = _item_do_menu(t)
     assert f'href="{prefixo}/t/{no_menu}" class="com-conteudo" aria-current="page"' in h
     dados = _dados(h)
     assert dados["url"] == f"{prefixo}/t/{t.torre}/{t.tela}" and dados["plataforma"] == ""
@@ -281,7 +291,7 @@ def test_o_menu_traz_as_telas_novas_e_acende_o_item():
     h = _cliente().get("/t/performance/disponibilidade").get_data(as_text=True)
     for t in porta.MAPA:
         # os relatórios abrem pela Central de emissão (13/10/2026): o item é o dela
-        assert f'href="/t/{t.torre}/{"central" if t.torre == "relatorios" else t.tela}"' in h, t
+        assert f'href="/t/{_item_do_menu(t)}"' in h, t
     assert re.search(r'<details class="torre com-conteudo" data-torre="performance"[^>]*open', h)
     assert h.count('aria-current="page"') == 1
 
@@ -418,10 +428,10 @@ def test_sem_a_chave_as_molduras_nao_ficam_verdes_no_menu(monkeypatch):
     h = _cliente(NEXUS_SSO_CHAVE=None, **ponte).get("/").get_data(as_text=True)
     assert _verde(h, "/t/performance/tempo-real")
     for t in porta.MAPA:
-        if t.tela != "tempo-real":
+        if t.tela != "tempo-real" and _item_do_menu(t) == f"{t.torre}/{t.tela}":
             assert not _verde(h, f"/t/{t.torre}/{t.tela}"), t
     h = _cliente(**ponte).get("/").get_data(as_text=True)
-    assert all(_verde(h, f"/t/{t.torre}/{t.tela}") for t in porta.MAPA if t.torre != "relatorios")
+    assert all(_verde(h, f"/t/{_item_do_menu(t)}") for t in porta.MAPA if t.torre != "relatorios")
     assert _verde(h, "/t/relatorios/central")              # os relatórios abrem por ela (13/10/2026)
 
 

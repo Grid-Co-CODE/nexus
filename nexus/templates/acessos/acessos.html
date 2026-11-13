@@ -35,13 +35,7 @@
    a antiga tela Base > Integração Fracttal é a aba Pessoas e setores, que lê o Fracttal. A dos administradores do
    App de Campo (05/11/2026: "os administradores do App de Campo [...] têm de ser escolhidos no Nexus") é a terceira e
    usa a cópia dela; a de telas não lê o Fracttal #}
-<nav class="gc-subabas" aria-label="Acessos">
-  <a href="{{ url_for('torre_base.acessos') }}"{% if aba == 'telas' %} aria-current="page"{% endif %}>Telas e administradores</a>
-  <a href="{{ url_for('torre_base.acessos', aba='pessoas') }}"{% if aba == 'pessoas' %} aria-current="page"{% endif %}>Pessoas e setores</a>
-  <a href="{{ url_for('torre_base.acessos', aba='admins_app') }}"{% if aba == 'admins_app' %} aria-current="page"{% endif %}>Administradores do App de Campo</a>
-  <a href="{{ url_for('torre_base.acessos', aba='clientes') }}"{% if aba == 'clientes' %} aria-current="page"{% endif %}>Clientes</a>
-  <a href="{{ url_for('torre_base.acessos', aba='historico') }}"{% if aba == 'historico' %} aria-current="page"{% endif %}>Histórico e registros</a>
-</nav>
+{% include "acessos/_abas.html" %}
 {% if aba == 'pessoas' %}{% include "acessos/_pessoas.html" %}{% elif aba == 'admins_app' %}{% include "acessos/_admins_app.html" %}{% elif aba == 'clientes' %}{% include "acessos/_clientes.html" %}{% else %}
 
 {% if aviso %}<div class="cad-aviso cad-aviso--ok" role="status"><i class="ph ph-check-circle"></i><div><strong>Gravado.</strong> {{ aviso }}</div></div>{% endif %}

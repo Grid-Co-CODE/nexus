@@ -180,12 +180,17 @@ def _endereco(t, destino: str | None, tv: bool = False) -> str:
     return f"/t/{t.torre}/{t.tela}" + ("?" + urlencode(consulta) if consulta else "")
 
 
-def abas_da_tela(t, primeira: str, outras, atual: str = "") -> list[dict]:
+def abas_da_tela(t, primeira: str, outras, atual: str = "", vizinhas=(), dona: str | None = None) -> list[dict]:
     """As abas de uma tela de moldura (14/10/2026): [{id, nome, url, atual}], a da plataforma primeiro (sem `?aba`). A
-    `url` sai sem o prefixo: o template põe com `|na_raiz`."""
-    base = f"/t/{t.torre}/{t.tela}"
-    out = [{"id": "", "nome": primeira, "url": base, "atual": not atual}]
-    out += [{"id": i, "nome": nome, "url": f"{base}?aba={i}", "atual": atual == i} for i, nome, _f in outras]
+    `url` sai sem o prefixo: o template põe com `|na_raiz`.
+    `vizinhas` = [(tela, nome)]: outra tela de moldura da mesma torre que aparece como aba (13/11/2026: as Fontes do
+    tempo real dentro das Chaves das fontes); `dona` = a tela das abas (a 1ª e as `?aba=`), quando a aberta é a vizinha."""
+    dona = dona or t.tela
+    base = f"/t/{t.torre}/{dona}"
+    na_dona = t.tela == dona
+    out = [{"id": "", "nome": primeira, "url": base, "atual": na_dona and not atual}]
+    out += [{"id": i, "nome": nome, "url": f"{base}?aba={i}", "atual": na_dona and atual == i} for i, nome, _f in outras]
+    out += [{"id": v, "nome": nome, "url": f"/t/{t.torre}/{v}", "atual": t.tela == v} for v, nome in vizinhas]
     return out
 
 
@@ -194,10 +199,11 @@ def _pagina(torre, t, reserva=None, tem_tv: bool = False, abas=None, modelo_da_t
     # As abas da tela (14/10/2026; Levi, sobre as chaves do Nexus: "bote essa informação na seção Chave das fontes!"): a
     # tela da plataforma é a aba padrão; `?aba=<id>` de uma página do Nexus abre a página dela, com as mesmas abas no topo
     if abas:
-        pedida = str(request.args.get("aba") or "")
+        dona = abas.get("dona") or t.tela
+        pedida = str(request.args.get("aba") or "") if dona == t.tela else ""
         outra = next((f for i, _n, f in abas["outras"] if i == pedida), None)
         if outra is not None:
-            return outra(abas_da_tela(t, abas["primeira"], abas["outras"], pedida))
+            return outra(abas_da_tela(t, abas["primeira"], abas["outras"], pedida, abas.get("vizinhas", ()), dona))
     estado = estado_da_porta()
     # `?p=` (favorito, F5, o endereço que a moldura acompanhou): só caminho do mapa. De outro item, vai ao item dono (o
     # menu acende o certo); fora do mapa, a tela padrão do item (spec 7: "sem seguir o caminho").
@@ -219,7 +225,8 @@ def _pagina(torre, t, reserva=None, tem_tv: bool = False, abas=None, modelo_da_t
                 # o botão "Modo TV" da faixa leva o caminho aberto; o "Sair do modo TV" volta à tela de sempre nele
                 "tem_tv": tem_tv, "endereco_tv": _endereco(t, destino, tv=True) if tem_tv else "",
                 "sair_tv": _endereco(t, destino), "prazo_tv": prazo,
-                "abas": abas_da_tela(t, abas["primeira"], abas["outras"]) if abas else []}
+                "abas": abas_da_tela(t, abas["primeira"], abas["outras"], "", abas.get("vizinhas", ()), abas.get("dona"))
+                         if abas else []}
     if extra and not na_tv:
         contexto.update(extra(t))
     if t.so_admin and not session.get("admin"):

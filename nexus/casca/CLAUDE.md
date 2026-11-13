@@ -754,7 +754,11 @@ a peça diz isso), e a peça que quebrar vai ao log e diz que não montou, nunca
 Levi, sobre pôr a chave das contestações no servidor pela T.I.: "Se precisa de TI então vou ter que mandar um arquivo novo
 de deploy para a TI ué!". Depois de colar a 1ª ("deu certo"): "bote essa informação na seção Chave das fontes!" — a
 página é a aba **Nexus** de Base → Chaves das fontes (`/t/base/chaves-fontes?aba=nexus`, ao lado da aba "Fontes da
-Performance", a tela /tokens da plataforma; as abas saem do `registrar_molduras(..., abas=...)`). O `/t/base/chaves-nexus`
+Performance", a tela /tokens da plataforma; as abas saem do `registrar_molduras(..., abas=...)`). Desde 13/11/2026 a
+3ª aba é **Fontes do tempo real** (Levi: "Essa fonte do tempo real, deixa junto de chave das fontes, aí vira mais uma
+abinha"): a moldura de `/admin/tempo-real` é uma tela VIZINHA (`abas["vizinhas"]`; a tela dela leva `dona="chaves-fontes"`
+e `Tela.dentro_de`), fora do menu, com as mesmas abas e o item das Chaves aceso; o mapa da porta não mudou (a plataforma
+não precisou mexer). O `/t/base/chaves-nexus`
 recebe o formulário (POST, só administrador; o GET leva à aba). Código em `nexus/auth/chaves.py`: a chave colada é
 conferida e gravada em `chaves.json` na pasta de dados (`NEXUS_DADOS`, fora do git), CIFRADA com AES-256-GCM
 numa chave derivada da `NEXUS_SECRET_KEY` (HKDF) e presa ao nome. Vale na hora (relida a cada 30 s e logo depois de

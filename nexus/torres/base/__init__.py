@@ -44,10 +44,8 @@ TORRE = Torre(
              "Que nome a usina tem no Fracttal e no supervisório, e quais cabines, inversores e strings ela tem?",
              "Registro mestre, as Ligações (Fracttal) e o livro nexus_estrutura_usina; a aba Equipamentos só como "
              "referência; só administrador"),
-        # Estrutura de O&M de 10/2026 (Levi, 08/10: "pode adaptar, deixa as vagas preparadas")
-        Tela("regioes-campo", "Regiões de campo",
-             "Quem é o Supervisor de Campo de cada região, que equipes ela tem e onde a vaga está aberta?",
-             "Cadastro do Nexus (estrutura de O&M de 10/2026)"),
+        # "Regiões de campo" saiu em 13/11/2026 (Levi: "Exclua a parte de região de campos. Não vamos mais usar."): o
+        # endereço /t/base/regioes-campo leva às Equipes (nexus/cadastro/telas.py); o dado das regiões fica no cadastro
         # "Listas" saiu em 11/10/2026 (Levi: "pode tirar listas pois a governança faz mais sentido"): o endereço
         # /t/base/listas leva à Governança de dados (nexus/cadastro/telas.py); os valores das listas ficam no cadastro.
         # "Importar do Excel" saiu em 14/10/2026 (Levi: "Tire 'Importar do Excel' do módulo base"): o endereço
@@ -70,9 +68,12 @@ TORRE = Torre(
         # essa informação na seção Chave das fontes!". O endereço /t/base/chaves-nexus leva a ela.
         # Fontes do tempo real (11/10/2026): quais usinas de cada fonte entram no tempo real (e são coletadas), e as novas
         # esperando liberação. A tela é da plataforma (/admin/tempo-real), numa moldura; só administrador.
+        # desde 13/11/2026 é a 3ª aba das Chaves das fontes (Levi: "Essa fonte do tempo real, deixa junto de chave das
+        # fontes, aí vira mais uma abinha"): sai do menu e a moldura dela mostra as abas das Chaves
         Tela("fontes-tempo-real", "Fontes do tempo real",
              "Quais usinas de cada fonte entram no tempo real, e quais estão esperando liberação?",
-             "Plataforma de Performance (/admin/tempo-real) e o livro nexus_tempo_real no banco, só administrador"),
+             "Plataforma de Performance (/admin/tempo-real) e o livro nexus_tempo_real no banco, só administrador",
+             dentro_de="chaves-fontes"),
         # De-para de equipamentos (11/10/2026): como cada usina de cada fonte se liga ao cadastro, e o editor (a ponte da
         # usina pelo id, o nome de cada inversor, a sugestão pelo kWh). A tela é da plataforma (/admin/de-para), numa
         # moldura; grava no livro nexus_depara; só administrador.
@@ -89,9 +90,12 @@ TORRE = Torre(
         # Acessos dos clientes (14/10/2026: as contas por pessoa do Dashboard Thopen), da torre Contratos e clientes, que
         # saiu do menu em 12/11/2026 (Levi: "Joga o acesso cliente lá para bases"). Não é o Acessos de cima (o que cada
         # setor do Nexus vê). A view: nexus/torres/base/acessos_clientes_tela.py; as regras: nexus/contratos/
-        Tela("acessos-clientes", "Acessos dos clientes",
+        # desde 13/11/2026 é a aba "Acessos do cliente" de Acessos (Levi: "Acessos do cliente deve ficar junto de
+        # acessos, tá? Vai virar uma abinha chamada acessos do cliente"): sai do menu; o endereço é o mesmo
+        Tela("acessos-clientes", "Acessos do cliente",
              "Quem do cliente entra no Dashboard Thopen, e o que cada um vê?",
-             "Contas por pessoa (livro nexus_acessos_clientes, cifrado); a senha, a pessoa define no painel"),
+             "Contas por pessoa (livro nexus_acessos_clientes, cifrado); a senha, a pessoa define no painel",
+             dentro_de="acessos"),
         # Mapa base (11/11/2026): a subida do mapa do Brasil do Mapa de equipe (o PMTiles de ~2,4 GB não cabe no git; Levi
         # escolheu o "Upload pelo Nexus"). Só administrador. A view: nexus/torres/base/mapa_base_tela.py
         Tela("mapa-base", "Mapa base",
@@ -126,5 +130,9 @@ registrar_chaves(bp)
 registrar_acessos_clientes(bp, TORRE)   # /t/base/acessos-clientes: as contas do Dashboard Thopen (12/11/2026)
 registrar_mapa_base(bp)     # /t/base/mapa-base: a subida do mapa do Brasil do Mapa de equipe (11/11/2026)
 registrar_raio_x(bp)        # /t/base/raio-x: o que o processo faz agora (14/10/2026), só administrador, fora do menu
-registrar_molduras(bp, TORRE, abas={"chaves-fontes": {"primeira": "Fontes da Performance",
-                                                         "outras": [("nexus", "Nexus", aba_nexus)]}})
+# as abas das Chaves das fontes: a página da plataforma, a do Nexus e, desde 13/11/2026, a moldura das Fontes do tempo
+# real (uma tela vizinha: a moldura dela mostra as mesmas abas, com a dona = chaves-fontes)
+_ABAS_FONTES = {"primeira": "Fontes da Performance", "outras": [("nexus", "Nexus", aba_nexus)],
+                "vizinhas": [("fontes-tempo-real", "Fontes do tempo real")]}
+registrar_molduras(bp, TORRE, abas={"chaves-fontes": _ABAS_FONTES,
+                                    "fontes-tempo-real": dict(_ABAS_FONTES, dona="chaves-fontes")})

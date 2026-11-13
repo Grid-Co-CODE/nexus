@@ -152,13 +152,13 @@ def _banco_da_previa(app, api=None):
 # ── a alternância ─────────────────────────────────────────────────────────────────────────────────────────────────
 def test_organograma_e_o_padrao_e_a_matriz_vem_pela_url(tela):
     padrao = tela.get(URL).get_data(as_text=True)
-    assert "Organograma da governança" in padrao and "dd-org-arvore" in padrao and 'class="dd-matriz"' not in padrao
+    assert "Organograma da governança" in padrao and "dd-org-arvore" in padrao and 'class="dd-matriz' not in padrao
     assert f'<a href="{URL}" aria-current="page">Organograma</a>' in padrao and f'<a href="{MAT}">Matriz</a>' in padrao
     # Levi, 09/10: "Deixe organograma como padrão, Matriz em segundo"
     assert padrao.index(">Organograma</a>") < padrao.index(">Matriz</a>")
 
     mat = tela.get(MAT).get_data(as_text=True)
-    assert "Matriz de barramento" in mat and 'class="dd-matriz"' in mat and "dd-org-arvore" not in mat
+    assert "Matriz de barramento" in mat and 'class="dd-matriz mx"' in mat and "dd-org-arvore" not in mat
     assert f'<a href="{MAT}" aria-current="page">Matriz</a>' in mat and f'<a href="{URL}">Organograma</a>' in mat
     # o link antigo do organograma segue valendo; visão que não existe cai no padrão (a URL nunca quebra a tela)
     for ver in ("organograma", "matrix", "", "ORGANOGRAMA", "<script>"):
@@ -662,3 +662,34 @@ def test_fato_novo_no_catalogo_aparece_sozinho_e_cobra_o_texto(tela, app, monkey
     assert "<code>planilha_nova · eventos</code>" in html
     faltam = [f.id for f in catalogo.FATOS if f.estado != "aposentado" and f.id not in explica.PARA_QUE]
     assert faltam == ["teste_novo"]
+
+
+# ── o filtro do setor e a matriz refeita (13/11/2026) ────────────────────────────────────────────────────────────────
+def test_o_setor_filtra_as_duas_visoes(tela):
+    """Levi, 13/11/2026: "Em governança de dados, eu quero que dê para filtrar o setor". O setor dono de cada fato, nas
+    duas visões; o `?setor=` abre já filtrada (o resto chega escondido) e o setor que não existe não filtra nada."""
+    from nexus.dados import catalogo
+    areas = list(dict.fromkeys(f.area for f in catalogo.FATOS if f.estado != "aposentado"))
+    alvo, outro = areas[0], areas[1]
+    for url, q in ((URL, {}), (MAT, {"ver": "matriz"})):
+        h = tela.get(URL, query_string=dict(q, setor=alvo)).get_data(as_text=True)
+        assert 'data-mx-setores' in h and f'data-mx-setor="{alvo}" aria-pressed="true"' in h
+        assert 'data-mx-setor="" aria-pressed="false"' in h
+        marca = 'class="mx-grupo" data-setor="%s"' if url == MAT else 'class="dd-org-setor" data-setor="%s"'
+        bloco = h.split(marca % outro, 1)[1].split(">", 1)[0]
+        assert " hidden" in bloco, url
+        assert " hidden" not in h.split(marca % alvo, 1)[1].split(">", 1)[0], url
+        h = tela.get(URL, query_string=dict(q, setor="<script>")).get_data(as_text=True)
+        assert 'data-mx-setor="" aria-pressed="true"' in h and "<script>\"" not in h
+
+
+def test_a_matriz_e_a_grade_com_o_fato_recolhido(tela):
+    """Levi, 13/11/2026: "Essa matriz não está tão visual. Está parecendo um amontoado de palavras [...] deixo tudo
+    recolhido para a pessoa expandindo". A grade fato × dimensão com a marca curta; o fato abre na linha (o detalhe vem
+    escondido); o apoio (histórico, livros, dimensões) recolhido."""
+    h = tela.get(MAT).get_data(as_text=True)
+    assert '<span class="mx-b mx-b--id"' in h and 'data-mx-abre' in h
+    det = h.split('class="mx-det" id="mx-d-', 1)[1].split(">", 1)[0]
+    assert det.endswith("hidden")
+    assert '<details class="mx-secao">' in h and "Os livros do Nexus no banco" in h
+    assert h.index('class="dd-matriz mx"') < h.index("Os livros do Nexus no banco")     # a grade vem primeiro

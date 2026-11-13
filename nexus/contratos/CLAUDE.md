@@ -8,7 +8,7 @@ cliente lá para bases, contestações, você vai jogar para o comando, prévia 
 |---|---|---|
 | **Contestações** (13/10/2026) | Comando, `/t/comando/contestacoes` | `nexus/torres/comando/contestacoes_tela.py`, `comando/contestacoes.html` e `_contestacao_card.html` |
 | **Prévia: visão do contrato** (12/11/2026) | Comando, `/t/comando/visao-do-contrato`, de todos | o mesmo módulo, `comando/visao_do_contrato.html` |
-| **Acessos dos clientes** (14/10/2026) | Base, `/t/base/acessos-clientes` (logo abaixo do Acessos, que é outra coisa: o que cada setor do Nexus vê) | `nexus/torres/base/acessos_clientes_tela.py`, `nexus/templates/acessos_dos_clientes.html` |
+| **Acessos dos clientes** (14/10/2026) | Base → Acessos, a aba "Acessos do cliente" (`/t/base/acessos-clientes`, desde 13/11/2026 fora do menu; as outras abas de Acessos são outra coisa: o que cada setor do Nexus vê) | `nexus/torres/base/acessos_clientes_tela.py`, `nexus/templates/acessos_dos_clientes.html` |
 | Clientes, Onboarding de cliente, Comunicação por cliente, Portal do cliente | saíram: eram só o aviso de "em construção" | — |
 
 - **As regras não mudaram de lugar**: esta pasta (`contestacoes.py`, `tratamento.py`, `acessos_clientes.py`) e este

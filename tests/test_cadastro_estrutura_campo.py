@@ -119,58 +119,40 @@ def _h(r):
     return r.get_data(as_text=True)
 
 
-def test_menu_e_lista_das_regioes_com_a_vaga_como_vaga(cli):
-    html = _h(cli.get("/t/base/regioes-campo"))
-    assert "Regiões de campo" in html and "Nordeste 01" in html and "Sudeste 03" in html
-    linha = re.search(r"<tr[^>]*>\s*<td class=\"id\">1</td>.*?</tr>", html, re.S).group(0)
-    # a vaga aparece como vaga (tracejado azul de informação), não como aviso nem como crítico
-    assert linha.count('<span class="cad-vaga">Vaga</span>') == 2 and "cad-chip--critico" not in linha
-    assert "cad-com-aviso" not in linha
-    linha2 = re.search(r"<tr[^>]*>\s*<td class=\"id\">2</td>.*?</tr>", html, re.S).group(0)
-    assert "Supervisora Teste" in linha2 and "Coordenador Teste" in linha2 and "cad-vaga" not in linha2
-    # equipes e usinas em operação da região; a nota das equipes com usina em operação sem região
-    assert ">1<" in linha and "1 equipe com usina em operação ainda sem região de campo (1 usina em operação)" in html
-
-
-def test_ficha_da_regiao_mostra_a_vaga_as_equipes_e_salva_a_pessoa(cli, app_cad):
-    html = _h(cli.get("/t/base/regiao-campo/1"))
-    assert '<option value="" selected>Vaga</option>' in html                         # o vazio da caixa diz "Vaga"
-    assert 'class="cad-vaga"' in html and "Equipes da região" in html and "E-05 · CE  Leste 01" in html
-    # na caixa, quem é Supervisor de Campo vem primeiro; o rótulo novo do gestor; o "Supervisor" antigo, legado
-    assert 'label="Supervisor (legado)"' in html and 'label="Gestor de contrato (Supervisor PM)"' in html
-    form = _FormularioDoNavegador(html).campos
-    form["supervisor_campo"] = "2"
-    assert cli.post("/t/base/regiao-campo/1", data=form).status_code == 302
+def test_a_tela_das_regioes_saiu_e_o_endereco_leva_as_equipes(cli, app_cad):
+    """Base → Regiões de campo saiu em 13/11/2026 (Levi: "Exclua a parte de região de campos. Não vamos mais usar."): a
+    lista, a ficha e a nova levam às Equipes, e o POST de uma tela velha também (nada é gravado)."""
+    from nexus.cadastro.telas import servico
     with app_cad.app_context():
-        from nexus.cadastro.telas import servico
-        assert servico().registro("regioes_campo", "1").valores["supervisor_campo"] == "2"
-    assert "Supervisora Teste" in _h(cli.get("/t/base/regioes-campo"))
+        antes = servico().registro("regioes_campo", "1").versao
+    for url in ("/t/base/regioes-campo", "/t/base/regiao-campo/1", "/t/base/regiao-campo/nova"):
+        r = cli.get(url)
+        assert r.status_code == 302 and r.headers["Location"].endswith("/t/base/equipes"), url
+    assert cli.post("/t/base/regiao-campo/1", data={"supervisor_campo": "2"}).status_code == 302
+    with app_cad.app_context():
+        servico()._cache = None
+        assert servico().registro("regioes_campo", "1").versao == antes
+    menu = _h(cli.get("/t/base/equipes")).split('<nav class="menu"', 1)[1].split("</nav>", 1)[0]
+    assert "Regiões de campo" not in menu
 
 
 def test_abrir_e_salvar_sem_mexer_nao_muda_a_regiao_nem_a_equipe(cli, app_cad):
     from nexus.cadastro.telas import servico
     with app_cad.app_context():
-        antes = {("regioes_campo", "1"): servico().registro("regioes_campo", "1").versao,
-                 ("equipes", "2"): servico().registro("equipes", "2").versao}
-    for url in ("/t/base/regiao-campo/1", "/t/base/equipe/2"):
+        antes = {("equipes", "2"): servico().registro("equipes", "2").versao}
+    for url in ("/t/base/equipe/2",):
         assert cli.post(url, data=_FormularioDoNavegador(_h(cli.get(url))).campos).status_code == 302
     with app_cad.app_context():
         servico()._cache = None
         assert {k: servico().registro(*k).versao for k in antes} == antes
 
 
-def test_nova_regiao_pela_tela(cli):
-    r = cli.post("/t/base/regiao-campo/nova", data={"nome": "Norte-01", "base": "Mãe do Rio/PA"})
-    assert r.status_code == 302 and r.headers["Location"].endswith("/t/base/regiao-campo/3")
-    assert cli.post("/t/base/regiao-campo/nova", data={"nome": "norte-01"}).status_code == 422     # nome único
-
-
 def test_equipe_tem_codigo_e_regiao_e_o_filtro_por_regiao(cli):
     html = _h(cli.get("/t/base/equipe/2"))
     assert 'name="codigo"' in html and 'value="E-05"' in html and 'name="regiao_campo"' in html
     assert "Supervisor de Campo" in html and 'class="cad-vaga"' in html               # a região dele está vaga
-    assert "SP Norte 01" in _h(cli.get("/t/base/equipes?regiao_campo=2"))
-    assert "SP Norte 01" not in _h(cli.get("/t/base/equipes?regiao_campo=1"))
+    # a lista das Equipes não filtra mais pela região (13/11/2026: a tela das regiões saiu)
+    assert 'name="regiao_campo"' not in _h(cli.get("/t/base/equipes"))
     assert "Região de campo: Sudeste 03" in _h(cli.get("/t/base/usina/1"))
 
 

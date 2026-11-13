@@ -20,9 +20,13 @@ def test_a_torre_saiu_do_menu_e_as_telas_foram_para_o_comando_e_a_base(logado):
     html = logado.get("/").get_data(as_text=True)
     menu = html.split('<nav class="menu"', 1)[1].split("</nav>", 1)[0]
     assert "Contratos e clientes" not in menu and "/t/contratos/" not in html
-    for endereco, nome in (("/t/comando/contestacoes", "Contestações"), ("/t/comando/visao-do-contrato", "Prévia: visão do contrato"),
-                           ("/t/base/acessos-clientes", "Acessos dos clientes")):
+    for endereco, nome in (("/t/comando/contestacoes", "Contestações"), ("/t/comando/visao-do-contrato", "Prévia: visão do contrato")):
         assert re.search(r'<a href="%s"[^>]*>\s*%s' % (re.escape(endereco), re.escape(nome)), menu), endereco
+    # desde 13/11/2026 os acessos do cliente são uma aba de Base → Acessos (Levi: "Vai virar uma abinha chamada acessos
+    # do cliente"): fora do menu, dentro das abas de Acessos
+    assert torres["base"].tela("acessos-clientes").dentro_de == "acessos" and "/t/base/acessos-clientes" not in menu
+    abas = logado.get("/t/base/acessos").get_data(as_text=True).split('<nav class="gc-subabas"', 1)[1].split("</nav>", 1)[0]
+    assert '<a href="/t/base/acessos-clientes">Acessos do cliente</a>' in abas
     # as quatro telas que eram só o aviso de "em construção" saíram junto
     for fora in ("Onboarding de cliente", "Comunicação por cliente", "Portal do cliente"):
         assert fora not in menu
