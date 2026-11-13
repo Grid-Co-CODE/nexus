@@ -659,3 +659,22 @@ a.ins-titulo:hover{color:var(--verde-texto)}
 .dm-temas-o-que{margin:14px 0 10px}
 .dm-temas-setor{display:flex;align-items:center;gap:8px;margin:0 0 12px}
 .dm-painel--temas .dm-temas ~ .dm-nota{margin-top:10px;max-width:80ch}
+/* 13/11/2026 (Levi, com a foto da aba): a aba só com os temas; as colunas centradas, o nome do tema à esquerda; o "+" */
+[data-cx-fora-temas][hidden]{display:none !important}
+.dm-temas-so{display:flex;gap:8px;align-items:flex-start;max-width:880px;box-sizing:border-box;margin:0 0 4px;padding:10px 12px;
+  border:1px solid var(--linha);border-left:3px solid var(--info);border-radius:var(--raio-controle);background:var(--superficie);
+  font-size:13px;color:var(--tinta-2)}
+.dm-temas-so i{font-size:16px;color:var(--info);margin-top:1px}
+.dm-temas-so b{color:var(--tinta)}
+.dm-temas th,.dm-temas td{text-align:center}
+.dm-temas td.dm-t-nome{text-align:left}
+.dm-temas th:nth-child(2){width:280px}
+.dm-temas th:nth-child(3){width:120px}
+.dm-temas th:nth-child(4){width:150px}
+/* o Salvar no mesmo lugar em todas as linhas; o "+" do último tema vem logo depois dele */
+.dm-temas td:nth-child(4){text-align:left}
+.dm-temas .dm-prazo-campo{display:block;margin-inline:auto;text-align:center}
+.dm-temas select.gc-campo{display:block;width:96px;margin-inline:auto}
+.dm-t-acoes{display:inline-flex;align-items:center;gap:6px}
+.dm-t-mais{padding-inline:10px}
+.dm-t-mais[hidden],.dm-temas tr[hidden]{display:none}

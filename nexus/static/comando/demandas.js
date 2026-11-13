@@ -192,6 +192,8 @@ window.NexusDemandaNova = function (dlg) {
     raiz.querySelectorAll('[data-dm-painel]').forEach(function (p) { p.hidden = p.getAttribute('data-dm-painel') !== aba; });
     // a aba dos Temas do setor (13/11/2026): sem lista nem detalhe; a tabela ocupa a largura
     raiz.classList.toggle('dm--temas', aba === 'temas');
+    // na aba dos temas, só os temas: os números, os avisos e o bloco dos insights saem (13/11/2026, Levi)
+    document.querySelectorAll('[data-cx-fora-temas]').forEach(function (e) { e.hidden = aba === 'temas'; });
     if (aba === 'temas') {
       if (window.history && history.replaceState) {
         var u = new URL(window.location.href);
@@ -215,6 +217,19 @@ window.NexusDemandaNova = function (dlg) {
     if (b) { trocarAba(b.getAttribute('data-dm-aba')); return; }
     var c = ev.target.closest('[data-dm-filtro]');
     if (c) { filtroDe[abaAtual] = c.getAttribute('data-dm-filtro'); aplicar(abaAtual); abrir(primeiraVisivel(abaAtual)); return; }
+    // o "+" do último tema abre a linha do tema novo; o "x" dela desiste (13/11/2026)
+    var novo = raiz.querySelector('[data-dm-t-novo]'), mais = raiz.querySelector('[data-dm-t-mais]');
+    if (ev.target.closest('[data-dm-t-mais]') && novo) {
+      novo.hidden = false; if (mais) mais.hidden = true;
+      var campo = novo.querySelector('input[name="tema"]'); if (campo) campo.focus();
+      return;
+    }
+    if (ev.target.closest('[data-dm-t-cancelar]') && novo) {
+      novo.hidden = true;
+      novo.querySelectorAll('input[name="tema"]').forEach(function (i) { i.value = ''; });
+      if (mais) { mais.hidden = false; mais.focus(); }
+      return;
+    }
     var o = ev.target.closest('[data-os-folio]');
     if (o && window.NexusOsCard) { ev.preventDefault(); NexusOsCard.abrirFolio(o.getAttribute('data-os-folio'), {status: ''}); return; }
     var l = ev.target.closest('[data-dm-linha]');

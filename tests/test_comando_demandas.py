@@ -391,6 +391,16 @@ def test_os_temas_do_setor_cada_setor_mexe_nos_seus(app, cena):
     tabela = html.split('<table class="dm-temas">', 1)[1].split("</table>", 1)[0]
     assert 'name="nome"' not in tabela and tabela.count('name="tema"') == 2          # o tema que existe e o novo
     assert tabela.count('autocomplete="off"') == 4 and 'name="tema" maxlength="60" required autocomplete="off"' in tabela
+    # a aba só com os temas, o aviso de que são só deste setor e o "+" no último tema no lugar da linha fantasma
+    # (13/11/2026, Levi, com a foto da aba)
+    assert re.search(r'<div class="cx-insights" data-cx-fora-temas hidden>\s*<h2[^>]*>Insights e pedidos', html)
+    assert 'class="cn-numeros cx-numeros" data-cx-fora-temas hidden' in html
+    assert "Estes temas são só do setor <b>Performance</b>" in painel
+    assert tabela.count("data-dm-t-mais") == 1 and '<tr class="dm-t-novo" data-dm-t-novo hidden>' in tabela
+    assert "data-dm-t-cancelar" in tabela and "Novo tema (por exemplo" not in tabela
+    assert tabela.index("data-dm-t-mais") < tabela.index("data-dm-t-novo")
+    fora = _cliente(app, JU).get(CAIXA).get_data(as_text=True)                  # nas outras abas, os insights ficam
+    assert '<div class="cx-insights" data-cx-fora-temas>' in fora and "data-cx-fora-temas hidden" not in fora
     r = c.post("/t/comando/temas-do-setor/salvar", data={"codigo": _codigo(html), "setor_id": "1",
                                                          "tema": "Relatório do cliente", "prazo": "3"})
     assert r.status_code == 303 and r.headers["Location"].endswith("/t/comando/caixa-de-entrada?dem=temas#demandas")
@@ -405,6 +415,10 @@ def test_os_temas_do_setor_cada_setor_mexe_nos_seus(app, cena):
                                                             "nome": "Extintores", "prazo": "2"}).status_code == 403
     html = c.get(CAIXA + "?dem=temas").get_data(as_text=True)
     assert "Tema salvo." in html and "Relatório do cliente" in html and "Curva de geração" in html
+    # o setor sem tema nenhum já vê a linha do tema novo aberta, sem o "+" e sem o "x"
+    tabela = _cliente(app, ANA).get(CAIXA + "?dem=temas").get_data(as_text=True).split('<table class="dm-temas">', 1)[1]
+    assert '<tr class="dm-t-novo" data-dm-t-novo>' in tabela and "data-dm-t-mais" not in tabela
+    assert "data-dm-t-cancelar" not in tabela.split("</table>", 1)[0]
     # quem não tem setor vê o aviso, sem o formulário
     html = _cliente(app, SEM).get(CAIXA + "?dem=temas").get_data(as_text=True)
     assert "ainda não tem setor no Nexus" in html and "temas-do-setor/salvar" not in html

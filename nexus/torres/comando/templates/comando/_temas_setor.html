@@ -3,7 +3,10 @@
    setor. Salvar grava uma versão nova do tema (nexus_demandas · dim_tema): nada se apaga, o tema sai de uso.
    Desde 13/11/2026 é uma aba das Demandas entre setores, na Caixa de entrada (Levi: "eu gostaria que temas por setor fosse
    mais uma aba do demanda entre setores [...] E aí você tira o tema do setor na barra lateral. Deixa dentro da caixa de
-   entrada"). `ts` = demandas_tela.temas_contexto(); `codigo` e `tem_login` são os da Caixa. #}
+   entrada"). `ts` = demandas_tela.temas_contexto(); `codigo` e `tem_login` são os da Caixa.
+   No mesmo dia, com a foto da aba: o aviso de que os temas são só daquele setor; as colunas e o cabeçalho centrados (o
+   Tema só no cabeçalho: o nome fica à esquerda); e, no lugar da linha fantasma do "Novo tema", um "+" no último tema que
+   já cria a linha ("pode ter só um mais, sempre no último tema [...] E já cria a linha"). #}
   <p class="dm-nota dm-temas-o-que">O que os outros setores podem pedir {{ ('ao setor ' ~ ts.setor_nome) if ts.setor_nome else 'ao seu setor' }}, e em quanto tempo ele responde.</p>
   {% if ts.falta %}
   <div class="cn-erro cn-aviso" role="status">Os temas precisam das chaves do Nexus ({{ ts.falta|join(', ') }}): sem elas o nome não vai cifrado e nada grava.</div>
@@ -12,6 +15,7 @@
   {% elif not ts.setor_id %}
   <p class="cn-vazio">Você ainda não tem setor no Nexus: os temas são do setor (Base → Acessos → Pessoas e setores).</p>
   {% else %}
+  <p class="dm-temas-so"><i class="ph ph-info" aria-hidden="true"></i><span>Estes temas são só do setor <b>{{ ts.setor_nome }}</b>: na Nova demanda, aparecem apenas para quem escolhe esse setor. Cada setor cadastra os seus.</span></p>
   {% if not tem_login %}<div class="cn-erro cn-aviso" role="status">Entre com o seu login (Microsoft ou Fracttal) para salvar: a senha de administrador não diz quem é a pessoa.</div>{% endif %}
   {% if ts.admin and ts.setores %}
   <form class="dm-temas-setor" method="get" action="{{ '/t/comando/caixa-de-entrada'|na_raiz }}">
@@ -24,7 +28,7 @@
   </form>
   {% endif %}
   <table class="dm-temas">
-    <thead><tr><th scope="col">Tema</th><th scope="col">Prazo para responder (dias úteis)</th><th scope="col">Em uso</th><th scope="col"><span class="dm-sr">Salvar</span></th></tr></thead>
+    <thead><tr><th scope="col" class="dm-t-nome">Tema</th><th scope="col">Prazo para responder (dias úteis)</th><th scope="col">Em uso</th><th scope="col"><span class="dm-sr">Salvar</span></th></tr></thead>
     <tbody>
       {% for t in ts.temas %}
       {% set f = 'dm-t-' ~ t.tema_id %}
@@ -32,23 +36,30 @@
         {# o campo se chama `tema` e vai sem o preenchimento automático do navegador (12/11/2026, Levi, com o print: "o campo
            que aparece quando vou digitar está mal formatado, conserte!"): chamado `nome`, o Edge abria por cima da tabela a
            lista do que já foi digitado em QUALQUER campo `nome` do Nexus #}
-        <td><input class="gc-campo" form="{{ f }}" name="tema" value="{{ t.nome }}" maxlength="60" required autocomplete="off" aria-label="Nome do tema"></td>
+        <td class="dm-t-nome"><input class="gc-campo" form="{{ f }}" name="tema" value="{{ t.nome }}" maxlength="60" required autocomplete="off" aria-label="Nome do tema"></td>
         <td><input class="gc-campo dm-prazo-campo" form="{{ f }}" name="prazo" type="number" min="{{ ts.prazo_min }}" max="{{ ts.prazo_max }}" value="{{ t.prazo_dias_uteis }}" required autocomplete="off" aria-label="Prazo de {{ t.nome }} em dias úteis"></td>
         <td><select class="gc-campo" form="{{ f }}" name="ativo" aria-label="{{ t.nome }} em uso"><option value="sim"{% if t.ativo %} selected{% endif %}>sim</option><option value="nao"{% if not t.ativo %} selected{% endif %}>não</option></select></td>
-        <td><form id="{{ f }}" method="post" action="{{ '/t/comando/temas-do-setor/salvar'|na_raiz }}">
+        <td><div class="dm-t-acoes"><form id="{{ f }}" method="post" action="{{ '/t/comando/temas-do-setor/salvar'|na_raiz }}">
           <input type="hidden" name="codigo" value="{{ codigo }}"><input type="hidden" name="setor_id" value="{{ ts.setor_id }}">
           <input type="hidden" name="tema_id" value="{{ t.tema_id }}">
-          <button class="gc-btn gc-btn--ui gc-btn--contorno" type="submit"{% if not tem_login %} disabled{% endif %}>Salvar</button></form></td>
+          <button class="gc-btn gc-btn--ui gc-btn--contorno" type="submit"{% if not tem_login %} disabled{% endif %}>Salvar</button></form>
+          {%- if loop.last %}
+          <button class="gc-btn gc-btn--ui gc-btn--contorno dm-t-mais" type="button" data-dm-t-mais aria-label="Novo tema" title="Novo tema"{% if not tem_login %} disabled{% endif %}><i class="ph ph-plus" aria-hidden="true"></i></button>
+          {%- endif %}</div></td>
       </tr>
       {% endfor %}
-      <tr>
-        <td><input class="gc-campo" form="dm-t-novo" name="tema" maxlength="60" required autocomplete="off" placeholder="Novo tema (por exemplo: Dado que não bate)" aria-label="Nome do novo tema"></td>
+      {# a linha do tema novo: aparece pelo "+" do último tema; o setor sem tema nenhum já a vê aberta #}
+      <tr class="dm-t-novo" data-dm-t-novo{% if ts.temas %} hidden{% endif %}>
+        <td class="dm-t-nome"><input class="gc-campo" form="dm-t-novo" name="tema" maxlength="60" required autocomplete="off" placeholder="Nome do novo tema" aria-label="Nome do novo tema"></td>
         <td><input class="gc-campo dm-prazo-campo" form="dm-t-novo" name="prazo" type="number" min="{{ ts.prazo_min }}" max="{{ ts.prazo_max }}" value="2" required autocomplete="off" aria-label="Prazo do novo tema em dias úteis"></td>
         <td class="dm-mudo">sim</td>
-        <td><form id="dm-t-novo" method="post" action="{{ '/t/comando/temas-do-setor/salvar'|na_raiz }}">
+        <td><div class="dm-t-acoes"><form id="dm-t-novo" method="post" action="{{ '/t/comando/temas-do-setor/salvar'|na_raiz }}">
           <input type="hidden" name="codigo" value="{{ codigo }}"><input type="hidden" name="setor_id" value="{{ ts.setor_id }}">
           <input type="hidden" name="novo_id" value="{{ ts.novo_tema }}">
-          <button class="gc-btn gc-btn--ui gc-btn--primario" type="submit"{% if not tem_login %} disabled{% endif %}><i class="ph ph-plus" aria-hidden="true"></i> Novo tema</button></form></td>
+          <button class="gc-btn gc-btn--ui gc-btn--primario" type="submit"{% if not tem_login %} disabled{% endif %}>Salvar</button></form>
+          {%- if ts.temas %}
+          <button class="gc-btn gc-btn--ui gc-btn--contorno dm-t-mais" type="button" data-dm-t-cancelar aria-label="Desistir do tema novo" title="Desistir"><i class="ph ph-x" aria-hidden="true"></i></button>
+          {%- endif %}</div></td>
       </tr>
     </tbody>
   </table>

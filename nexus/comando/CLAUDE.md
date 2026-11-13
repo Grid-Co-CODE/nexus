@@ -340,6 +340,13 @@ conclusão sozinha e o vencido que sobe para o setor; no O&M, a demanda fica pre
   O prazo da demanda é o do tema na hora em que foi aberta. Até 13/11/2026 era uma tela do menu (Comando → Temas do
   setor); o Levi pediu "mais uma aba do demanda entre setores [...] tira o tema do setor na barra lateral. Deixa dentro da
   caixa de entrada". O endereço `/t/comando/temas-do-setor` leva à aba, e o Salvar volta a ela (`_temas_na_caixa`).
+  Na aba, só os temas (13/11/2026, Levi, com a foto: "não entendi porque tem insights e pedidos dentro do tema do setor,
+  sendo que é algo que tem que ser focado no tema do setor"): os números do alto, os avisos dos insights e o bloco dos
+  insights e pedidos levam `data-cx-fora-temas` (a página já vem com `hidden` em `?dem=temas`; o `demandas.js` esconde e
+  mostra ao trocar de aba). No alto, o aviso de que os temas são só daquele setor (aparecem na Nova demanda só para quem
+  escolhe o setor). A tabela tem as colunas e o cabeçalho centrados, menos o nome do tema (só o cabeçalho é centrado). Não
+  há linha fantasma do tema novo: um "+" no último tema abre a linha (o "x" dela desiste); o setor sem tema nenhum já a
+  vê aberta.
   Na tela, o campo do tema se chama `tema` e vai com `autocomplete="off"` (12/11/2026, Levi, com o print: "o campo que
   aparece quando vou digitar está mal formatado, conserte!"): chamado `nome`, o Edge abria por cima da tabela a lista do
   que já foi digitado em qualquer campo `nome` do Nexus (o nome da pessoa, "Chamados", "Administrador", "Responsável

@@ -8,17 +8,21 @@
    as menções e os insights das torres que o setor vê (Base → Acessos). Levi, 12/11/2026: o cabeçalho sem a pergunta e sem
    o "todas as torres · conta das HH:MM" ("inútil"); "joga os insights para cima como KPI"; o Sem dono recolhido, "só fica
    o contador. Porque senão a rolagem é infinita". #}
+{# a aba dos Temas do setor fica só com os temas (13/11/2026, Levi: "não entendi porque tem insights e pedidos dentro do
+   tema do setor, sendo que é algo que tem que ser focado no tema do setor"): os números, os avisos dos insights e o bloco
+   dos insights e pedidos levam `data-cx-fora-temas`, e o comando/demandas.js esconde e mostra ao trocar de aba #}
+{% set so_temas = dem is defined and dem.aba == 'temas' %}
 <div class="campo-nativa">
   <div class="cn-cab">
     <div><p class="gc-eyebrow">{{ torre.nome }}</p><h1 class="cn-titulo">{{ tela.nome }}</h1></div>
   </div>
   {% if aviso %}<div class="cn-erro{% if aviso[0] == 'ok' %} ins-ok{% endif %}" role="{{ 'status' if aviso[0] == 'ok' else 'alert' }}"><b>{{ aviso[1] }}</b></div>{% endif %}
-  {% if calculando %}<div class="cn-erro cn-aviso" role="status" data-recarregar="10"><b>A conta dos insights está sendo feita agora</b> (o Nexus acabou de subir; leva perto de meio minuto). A página se atualiza sozinha.</div>{% endif %}
+  {% if calculando %}<div class="cn-erro cn-aviso" role="status" data-recarregar="10" data-cx-fora-temas{% if so_temas %} hidden{% endif %}><b>A conta dos insights está sendo feita agora</b> (o Nexus acabou de subir; leva perto de meio minuto). A página se atualiza sozinha.</div>{% endif %}
   {% if lei.erro %}<div class="cn-erro" role="alert"><b>{{ lei.erro }}.</b></div>{% endif %}
-  {% if falhas %}<div class="cn-erro cn-aviso" role="status">{{ falhas|length }} {{ 'regra não leu' if falhas|length == 1 else 'regras não leram' }} a fonte agora: o que elas apontariam pode faltar. <a href="{{ raiz }}/t/comando/insights">Ver as regras</a></div>{% endif %}
-  {% if not tem_login %}<div class="cn-erro cn-aviso" role="status">Entre com o seu login (Microsoft ou Fracttal) para notificar, responder e assumir: a senha de administrador não diz quem é a pessoa.</div>{% endif %}
+  {% if falhas %}<div class="cn-erro cn-aviso" role="status" data-cx-fora-temas{% if so_temas %} hidden{% endif %}>{{ falhas|length }} {{ 'regra não leu' if falhas|length == 1 else 'regras não leram' }} a fonte agora: o que elas apontariam pode faltar. <a href="{{ raiz }}/t/comando/insights">Ver as regras</a></div>{% endif %}
+  {% if not tem_login %}<div class="cn-erro cn-aviso" role="status" data-cx-fora-temas{% if so_temas %} hidden{% endif %}>Entre com o seu login (Microsoft ou Fracttal) para notificar, responder e assumir: a senha de administrador não diz quem é a pessoa.</div>{% endif %}
 
-  <div class="cn-numeros cx-numeros">
+  <div class="cn-numeros cx-numeros" data-cx-fora-temas{% if so_temas %} hidden{% endif %}>
     <a href="#cx-mencoes"><span class="gc-rotulo">Menções</span><span class="v">{{ mencoes|length }}</span><span class="d">conversas que chamam você ou o seu setor</span></a>
     <a href="#cx-pedidos"><span class="gc-rotulo">Pedidos para você</span><span class="v">{{ pedidos|length }}</span><span class="d">{% set atr = pedidos|selectattr('situacao', 'equalto', 'atrasado')|list|length %}{{ atr }} {{ 'atrasado' if atr == 1 else 'atrasados' }}</span></a>
     <a href="#cx-com-voce"><span class="gc-rotulo">Com você</span><span class="v">{{ meus|length }}</span><span class="d">o que você assumiu</span></a>
@@ -29,6 +33,7 @@
   {# as demandas entre setores (12/11/2026): é o que outra pessoa pediu para você, com prazo #}
   {% include "comando/_demandas.html" %}
 
+  <div class="cx-insights" data-cx-fora-temas{% if so_temas %} hidden{% endif %}>
   <h2 class="dm-titulo dm-titulo--motor">Insights e pedidos</h2>
 
   {% if erro_pedidos %}<div class="cn-erro cn-aviso" role="status"><b>Não li os pedidos agora ({{ erro_pedidos }}).</b></div>{% endif %}
@@ -133,6 +138,7 @@
   {% endif %}
   {% endif %}
   {% endfor %}
+  </div>
 </div>
 {% include "oscreator/card_os_abrir.html" %}
 <script src="{{ url_for('static', filename='comando/demandas.js') }}" defer></script>
