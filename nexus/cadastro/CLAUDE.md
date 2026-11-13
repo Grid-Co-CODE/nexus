@@ -182,11 +182,12 @@ de 1.090 para 876 linhas, 187 ligações a usinas sumiram (BD_Thopen aba 100, BD
 usina. O resto das "770 alteradas" era reenvio igual (pessoas, equipes) e 36 usinas editadas no servidor. Consertado em
 10/11 com o OK do Levi: o de-para devolvido ao estado de antes pelo histórico de linha da API
 (`GET /api/sheets/{id}/rows/{n}/history`; as outras abas como estavam) e a geração remontada. Agora o botão lê o de-para
-do banco antes de publicar, com três regras (`banco.ligacoes_que_nao_li`, `banco.chaves_que_perderia` e
-`banco.chaves_que_trocariam`), juntas numa função só, `banco.conferir_com_o_banco`, por onde passa TODO caminho que
-publica: o botão e a `ferramentas/publicar_cadastro.py` (até 12/11/2026 a ferramenta enviava direto, e rodada no PC
-apagaria as ligações que só o servidor conhece, como os projetos da FAMA e o plant_id; nela a recusa lista as linhas
-PERDERIA e TROCARIA, o `--ensaio` mostra o mesmo sem enviar, e o aceite é o `--aceitar-trocas MARCA`):
+do banco antes de publicar, com quatro regras (`banco.ligacoes_que_nao_li`, `banco.chaves_que_perderia` e a lista do
+aceite, `banco.a_aceitar`: `banco.chaves_que_trocariam` mais `ligacoes.novas_que_cruzam_cliente`), juntas numa função
+só, `banco.conferir_com_o_banco`, por onde passa TODO caminho que publica: o botão e a
+`ferramentas/publicar_cadastro.py` (até 12/11/2026 a ferramenta enviava direto, e rodada no PC apagaria as ligações que
+só o servidor conhece, como os projetos da FAMA e o plant_id; nela a recusa lista as linhas PERDERIA, TROCARIA e LIGARIA
+A OUTRO CLIENTE, o `--ensaio` mostra o mesmo sem enviar, e o aceite é o `--aceitar-trocas MARCA`):
 (1) **a ligação de chave que esta máquina NÃO leu volta ao banco como estava** (12/11/2026: o banco tinha ligações
 publicadas pelo PC, de chaves que o servidor não lê, como a usina que só a árvore de ativos do PC traz, e a publicação do
 servidor não saía de jeito nenhum, porque não há o que ligar na tela para uma chave que a máquina não tem; o que a máquina
@@ -206,13 +207,29 @@ tela não mostrava, sem saída). A recusa volta com `?trocas=1`, e a seção lis
 (`telas_ligacoes._trocas_da_tela`; a lista lê o de-para do banco, por isso só abre com esse parâmetro): **Manter a do
 banco** grava a decisão de ligar à usina do banco (só quando o banco liga a chave a UMA usina que ainda está no
 cadastro, e não para a chave do BD_Operações, que é o ID do BD da ficha: `banco.COMO_ID_BD`, corrige-se no Registro
-mestre), e **Publicar com as trocas** manda a marca da lista (`banco.assinatura_das_trocas`), que só vale se o conjunto
-calculado no clique for o mostrado. O pedido de outro site não publica (`auth.origem.de_outro_site`: a marca não é
-segredo). A leitura do banco que falha também não publica. A publicação diz quantas ligações ficaram como estavam e
+mestre), e **Publicar com estas ligações** manda a marca da lista (`banco.assinatura_das_trocas`), que só vale se o
+conjunto calculado no clique for o mostrado. O pedido de outro site não publica (`auth.origem.de_outro_site`: a marca não
+é segredo). A leitura do banco que falha também não publica. A publicação diz quantas ligações ficaram como estavam e
 quantas chaves trocaram com o aceite.
-Para provar: `tests/test_cadastro_ligacoes.py` (os testes da troca; cada regra quebrada de propósito derruba um).
-**Ainda aberto:** a ligação NOVA (chave que o banco não tinha) feita pelo sufixo do código a uma usina de outro cliente
-não passa por trava nenhuma; o remédio de hoje é o código de cada usina preenchido no Registro mestre.
+**(4) A ligação NOVA que cruza cliente entra na mesma lista do aceite** (13/11/2026, `ligacoes.novas_que_cruzam_cliente`;
+a lista inteira é a `banco.a_aceitar`). A trava da troca só olha a chave que o banco já ligava; o mesmo erro numa chave
+nova (o local que acabou de entrar no Fracttal, com o sufixo do código igual ao da usina de outro cliente) passava
+solto. Entra a chave que o banco ainda não liga e que uma regra automática ligaria a usina de cliente que não é o que a
+chave diz: o cliente da chave é o campo do item ou, SÓ no Fracttal, o começo do nome (`_nome_e_cliente`; noutra base o
+nome com " - " não começa pelo cliente, como o skid de uma usina no supervisório, e a revisão de 13/11 o achou entrando
+na lista), e vale para ele o cliente do cadastro que as sugestões aceitam (`_clientes_da_chave`: o nome exato, ou o
+começo do nome se for um só). Na lista a linha vem com o "No banco" vazio, "a chave diz <cliente>" e o **Não ligar** (a
+decisão de desligar: a chave fica sem usina, nos buracos, para alguém ligar à certa; só quando a publicação a liga a UMA
+usina). Não entra a ligada à mão nem a chave que não diz cliente.
+Medido nos dados do PC antes de fazer: entre todas as ligações automáticas, duas cruzavam cliente, as duas antigas e
+pelo cliente escrito errado na fonte (uma letra a menos), e a lista do aceite contra o banco deu zero. A chave nova com
+o cliente escrito errado, ou com o nome do local fora do padrão do Fracttal, aparece uma vez na lista: quem publica
+confere e aceita.
+**Ainda aberto:** a chave que não diz cliente não é conferida, mesmo quando o prefixo do código diria (o local do
+Fracttal sem Classificação 1, só com o código); e a chave ligada a duas usinas em que só uma é de outro cliente não tem
+o "Não ligar" (sai pelo aceite da lista).
+Para provar: `tests/test_cadastro_ligacoes.py` (os testes da troca e da ligação nova; cada regra quebrada de propósito
+derruba um).
 **As telas de campo leem o BANCO** (`campo/visao.py`, chamados, Acessos → Pessoas e setores: `cadastro_nexus`), não o arquivo:
 para o responsável novo chegar nelas, aplique no PC e publique (`ferramentas/publicar_cadastro.py --bases-guardadas`,
 com `--ensaio` e a comparação com o banco antes). Foi o caminho de 16/10/2026 (Levi: "mude logo pois precisamos da

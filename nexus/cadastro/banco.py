@@ -542,7 +542,7 @@ def chaves_que_trocariam(novas: list[list], no_banco: list[dict]) -> list[dict]:
 
 
 def assinatura_das_trocas(trocas: list[dict]) -> str:
-    """A marca do conjunto de trocas (16 hex de um sha256). O "Publicar com as trocas" da tela a devolve, e o aceite só
+    """A marca do conjunto de trocas (16 hex de um sha256). O "Publicar com estas ligações" da tela a devolve, e o aceite só
     vale se o conjunto calculado na hora do clique for o que a tela mostrou: a ordem não muda a marca; outra chave, outra
     usina de antes ou outra usina de depois, muda."""
     import hashlib
@@ -598,17 +598,28 @@ def juntar_ao_de_para(t: dict, mantidas: list[list]) -> None:
     linhas[0][cab.index("de_para")] = len(t["de_para"][1])
 
 
-def conferir_com_o_banco(t: dict, no_banco: list[dict]) -> dict:
-    """As três regras da publicação contra o de-para que o banco tem, num lugar só, para TODO caminho que publica (o
-    botão da tela e a `ferramentas/publicar_cadastro.py`): junta ao `t` as ligações de chaves que esta máquina não leu
-    e devolve {"mantidas": linhas que voltaram como estavam, "perdidas": linhas do banco que ficariam sem usina (não
-    publica), "trocas": chaves que mudariam de usina por regra automática (não publica sem o aceite da marca,
-    `assinatura_das_trocas`)}. As trocas são contadas ANTES de juntar as mantidas: só nas chaves que esta máquina leu.
+def a_aceitar(srv, fontes: dict, novas: list[list], no_banco: list[dict]) -> list[dict]:
+    """A lista do aceite da publicação, numa conta só para a tela, a rota e a ferramenta: as chaves que trocariam de
+    usina (`chaves_que_trocariam`) e as ligações novas que cruzam cliente (`ligacoes.novas_que_cruzam_cliente`, com o
+    "de" vazio), por sistema e chave. `novas` são as linhas que esta máquina calculou, sem as mantidas."""
+    from . import ligacoes          # aqui dentro: o ligacoes importa este módulo
+    lista = chaves_que_trocariam(novas, no_banco) + ligacoes.novas_que_cruzam_cliente(srv, fontes, novas, no_banco)
+    return sorted(lista, key=lambda x: (str(x["sistema"]), _chave_comparavel(x["chave_externa"])))
+
+
+def conferir_com_o_banco(t: dict, no_banco: list[dict], srv, fontes: dict) -> dict:
+    """As regras da publicação contra o de-para que o banco tem, num lugar só, para TODO caminho que publica (o botão
+    da tela e a `ferramentas/publicar_cadastro.py`): junta ao `t` as ligações de chaves que esta máquina não leu e
+    devolve {"mantidas": linhas que voltaram como estavam, "perdidas": linhas do banco que ficariam sem usina (não
+    publica), "trocas": a lista do aceite (`a_aceitar`: as chaves que mudariam de usina por regra automática e as
+    ligações novas que cruzam cliente; não publica sem a marca, `assinatura_das_trocas`)}. A lista do aceite é contada
+    ANTES de juntar as mantidas: só nas chaves que esta máquina leu. `srv` e `fontes` (as bases lidas) são para saber o
+    cliente de cada usina e o que cada chave diz.
 
     O caso (12/11/2026): a ferramenta do PC enviava direto, sem regra nenhuma. Depois da publicação do servidor daquela
     noite o banco tinha ligações que só o servidor conhece (os projetos da FAMA, o plant_id da plataforma), e a
     ferramenta rodada no PC as apagaria todas; a regra que mora em uma rota só protege quem passa por ela."""
-    trocas = chaves_que_trocariam(t["de_para"][1], no_banco)
+    trocas = a_aceitar(srv, fontes, t["de_para"][1], no_banco)
     mantidas = ligacoes_que_nao_li(t["de_para"][1], no_banco, ids_das_usinas(t))
     if mantidas:
         juntar_ao_de_para(t, mantidas)

@@ -595,6 +595,54 @@ def _clientes_da_chave(cliente, usinas: list[dict]) -> tuple[frozenset, frozense
     return frozenset(), pelo_comeco
 
 
+def novas_que_cruzam_cliente(srv, fontes: dict, novas: list[list], no_banco: list[dict]) -> list[dict]:
+    """As ligações NOVAS (a chave não tem usina no banco) que uma regra automática faria entre a chave que diz um cliente
+    e a usina de OUTRO: [{"sistema", "chave_externa", "de": [], "para": [usinas], "casou_por", "cliente_da_chave",
+    "cliente_da_usina"}], por sistema e chave, no formato das trocas (`banco.chaves_que_trocariam`): entram na mesma
+    lista do aceite da publicação (`banco.a_aceitar`). O cliente da chave é o do item ou, SÓ no Fracttal, o começo do nome
+    (`_nome_e_cliente`; a revisão de 13/11/2026 achou o nome de outras bases lido como cliente: o skid "Usina - Skid 1"
+    do supervisório entrava na lista); vale para ele o cliente do cadastro que as sugestões aceitam
+    (`_clientes_da_chave`: o nome exato, ou o começo do nome se for um só). Não entra: a chave que o banco já liga (a mesma usina é o que já está lá;
+    outra usina é troca), a ligada à mão, a que não diz cliente e a linha sem item nas bases lidas (o ID do BD da ficha,
+    que vem do Registro mestre).
+
+    O caso (13/11/2026): a trava da troca nasceu porque a chave do Fracttal de um cliente foi para a usina de outro pelo
+    sufixo do código, e só pegava a chave que o banco já ligava. A mesma coisa numa chave nova (a usina que acabou de
+    entrar no Fracttal) passava sem trava nenhuma. Medido nos dados do PC antes de fazer: só o Fracttal traz o cliente
+    no nome (as outras bases têm o campo), e entre todas as ligações automáticas duas cruzavam cliente, as duas antigas
+    e pelo cliente escrito errado na fonte."""
+    usinas = _usinas(srv)
+    cliente_de = {u["id"]: u.get("cliente") or "" for u in usinas}
+    ja_ligadas = {(str(d.get("sistema")), B._chave_comparavel(d.get("chave_externa")))
+                  for d in no_banco if B._inteiro(d.get("usina_id")) is not None}
+    itens = {(str(s), B._chave_comparavel(it["chave"])): it for s, its in (fontes or {}).items() for it in its}
+    agora: dict = {}
+    for l in novas:
+        a = agora.setdefault((str(l[1]), B._chave_comparavel(l[2])), {"ids": set(), "chave": l[2], "como": None})
+        uid = B._inteiro(l[0])
+        if uid is not None:
+            a["ids"].add(uid)
+            a["como"] = a["como"] or l[3]
+    out = []
+    for k in sorted(agora):
+        a, it = agora[k], itens.get(k)
+        como = str(a["como"] or "")
+        if not a["ids"] or it is None or k in ja_ligadas or como.startswith("manual"):
+            continue
+        # o cliente no começo do nome é o padrão do Fracttal ("Cliente - Usina - UF"); noutra base o nome com " - "
+        # não começa pelo cliente (o "Usina - Skid 1" do supervisório): lá só vale o campo do item
+        dito = _nome_e_cliente(it)[1] if k[0] == FRACTTAL else it.get("cliente")
+        if not B.norm(dito or ""):
+            continue
+        validos = _clientes_da_chave(dito, usinas)[0]
+        de_outro = sorted({cliente_de.get(u) or "sem cliente" for u in a["ids"] if cliente_de.get(u) not in validos})
+        if de_outro:
+            out.append({"sistema": k[0], "chave_externa": a["chave"], "de": [], "para": sorted(a["ids"]),
+                        "casou_por": a["como"], "cliente_da_chave": str(dito).strip(),
+                        "cliente_da_usina": ", ".join(de_outro)})
+    return out
+
+
 _UFS = frozenset(K.UF.values())
 
 

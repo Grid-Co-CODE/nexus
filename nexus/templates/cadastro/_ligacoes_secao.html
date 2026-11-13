@@ -35,8 +35,12 @@
         menos ou a uma a mais) não sai sozinha: a tela lista cada uma, com a usina do banco e a nova. "Manter a do
         banco" grava a sua decisão de ligar à usina do banco; não há esse botão quando o banco liga a chave a mais de
         uma usina, a uma usina que saiu do cadastro, ou quando a chave é o ID do BD da ficha (corrige-se no Registro
-        mestre). "Publicar com as trocas" aceita a lista mostrada, e só ela. A troca que alguém decidiu aqui na tela
-        publica sem perguntar.</p>
+        mestre). "Publicar com estas ligações" aceita a lista mostrada, e só ela. A troca que alguém decidiu aqui na
+        tela publica sem perguntar.</p>
+      <p><b>A chave nova que cruzaria cliente.</b> Entra na mesma lista a chave que o banco ainda não ligava e que as
+        regras do Nexus ligariam à usina de outro cliente: a chave diz um cliente (no Fracttal, o começo do nome) e a
+        usina é de outro, pela mesma conta das sugestões. "Não ligar" grava a sua decisão de desligar: a chave fica sem
+        usina, nos buracos, para você ligar à certa.</p>
     {% endcall %}</div>
     <p class="cad-sub">Que usina cada base chama de quê, e onde a ligação falta. A correção feita aqui entra no de_para na hora e vai ao banco quando você publicar.</p>
   </div>
@@ -50,23 +54,29 @@
 {% if erro %}<div class="cad-aviso cad-aviso--alerta"><i class="ph ph-warning"></i><div>{{ erro }}</div></div>{% endif %}
 {# a chave que trocaria de usina sem ninguém decidir não publica (12/11/2026, `banco.chaves_que_trocariam`: a chave de um
    cliente tinha ido para a usina de outro, calada). A recusa volta com ?trocas=1 e a lista abre aqui, com o "Manter a
-   do banco" de cada chave e o aceite da lista inteira (a marca `aceitar_trocas` só vale para esta lista) #}
+   do banco" de cada chave e o aceite da lista inteira (a marca `aceitar_trocas` só vale para esta lista). Na mesma
+   lista, desde 13/11/2026, a ligação NOVA que cruza cliente (`ligacoes.novas_que_cruzam_cliente`: o "No banco" vazio e
+   o "Não ligar") #}
 {% if trocas_erro %}<div class="cad-aviso cad-aviso--alerta"><i class="ph ph-warning"></i><div>{{ trocas_erro }}</div></div>{% endif %}
 {% if trocas %}
 <div class="lig-trocas">
   <div class="cad-rolagem">
   <table class="cad-tabela lig-tabela">
-    <thead><tr><th>Base</th><th>Chave que trocaria de usina</th><th>No banco</th><th>Nesta publicação</th><th></th></tr></thead>
+    <thead><tr><th>Base</th><th>Chave na base</th><th>No banco</th><th>Nesta publicação</th><th></th></tr></thead>
     <tbody>
     {% for t in trocas %}
     <tr>
       <td class="lig-base">{{ t.sistema.split(' · ')[0] }}</td>
       <td><strong class="lig-chave">{{ t.chave_externa }}</strong></td>
-      <td>{% for u in t.de %}<div><span class="id">{{ u.id }}</span> {{ u.titulo or 'fora do cadastro' }}</div>{% endfor %}</td>
-      <td>{% for u in t.para %}<div><span class="id">{{ u.id }}</span> {{ u.titulo or 'fora do cadastro' }}</div>{% endfor %}<span class="mudo">{{ t.casou_por }}</span></td>
+      <td>{% for u in t.de %}<div><span class="id">{{ u.id }}</span> {{ u.titulo or 'fora do cadastro' }}</div>{% else %}<span class="mudo">sem usina</span>{% endfor %}</td>
+      <td>{% for u in t.para %}<div><span class="id">{{ u.id }}</span> {{ u.titulo or 'fora do cadastro' }}</div>{% endfor %}<span class="mudo">{{ t.casou_por }}{% if t.cliente_da_chave %} · a chave diz {{ t.cliente_da_chave }}{% endif %}</span></td>
       {% if t.manter %}
       <td class="lig-botoes">
         <form method="post" action="{{ raiz }}/t/base/ligacoes/decidir" class="lig-form">{{ alvo(t.sistema) }}<input type="hidden" name="trocas" value="1"><input type="hidden" name="acao" value="ligar"><input type="hidden" name="chave" value="{{ t.chave_externa }}"><input type="hidden" name="usina" value="{{ t.manter }}"><input type="hidden" name="motivo" value="mantida a usina do banco: a publicação a trocaria"><button class="gc-btn gc-btn--contorno" type="submit"><i class="ph ph-check"></i> Manter a do banco</button></form>
+      </td>
+      {% elif t.nao_ligar %}
+      <td class="lig-botoes">
+        <form method="post" action="{{ raiz }}/t/base/ligacoes/decidir" class="lig-form">{{ alvo(t.sistema) }}<input type="hidden" name="trocas" value="1"><input type="hidden" name="acao" value="desligar"><input type="hidden" name="chave" value="{{ t.chave_externa }}"><input type="hidden" name="usina" value="{{ t.nao_ligar }}"><button class="gc-btn gc-btn--contorno" type="submit"><i class="ph ph-link-break"></i> Não ligar</button></form>
       </td>
       {% else %}<td class="mudo">{{ t.sem_manter }}</td>{% endif %}
     </tr>
@@ -75,12 +85,12 @@
   </table>
   </div>
   {% set n_trocas = trocas|length %}
-  <form method="post" action="{{ raiz }}/t/base/ligacoes/publicar" class="lig-lote" data-confirmar="Publicar trocando a usina {{ 'destas ' ~ n_trocas ~ ' chaves' if n_trocas > 1 else 'desta chave' }}? No banco, cada uma passa da usina da coluna &quot;No banco&quot; para a da coluna &quot;Nesta publicação&quot;.">{{ alvo('') }}<input type="hidden" name="aceitar_trocas" value="{{ trocas_assinatura }}">
-    <button class="gc-btn gc-btn--contorno" type="submit"><i class="ph ph-cloud-arrow-up"></i> Publicar com {{ 'as ' ~ n_trocas ~ ' trocas' if n_trocas > 1 else 'a troca' }}</button>
+  <form method="post" action="{{ raiz }}/t/base/ligacoes/publicar" class="lig-lote" data-confirmar="Publicar com {{ 'estas ' ~ n_trocas ~ ' ligações' if n_trocas > 1 else 'esta ligação' }}? No banco, cada chave da lista passa a ligar à usina da coluna &quot;Nesta publicação&quot;.">{{ alvo('') }}<input type="hidden" name="aceitar_trocas" value="{{ trocas_assinatura }}">
+    <button class="gc-btn gc-btn--contorno" type="submit"><i class="ph ph-cloud-arrow-up"></i> Publicar com {{ 'estas ' ~ n_trocas ~ ' ligações' if n_trocas > 1 else 'esta ligação' }}</button>
     <span class="lig-lote-nota">Vale só para esta lista: se ela mudar, a publicação pergunta de novo.</span>
   </form>
 </div>
-{% elif ver_trocas and not trocas_erro and not erro %}<p class="lig-meta">Nenhuma chave trocaria de usina agora: a publicação pode sair.</p>
+{% elif ver_trocas and not trocas_erro and not erro %}<p class="lig-meta">Nenhuma chave trocaria de usina nem cruzaria cliente agora: a publicação pode sair.</p>
 {% endif %}
 
 {% if not gerado_em %}

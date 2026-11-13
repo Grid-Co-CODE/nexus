@@ -536,6 +536,106 @@ def test_a_ferramenta_do_pc_passa_pelas_mesmas_tres_regras(app_lig, monkeypatch,
     assert enviados == [] and saida is None
 
 
+# ── a ligação NOVA que cruza cliente entra na mesma lista do aceite (13/11/2026) ─────────────────────────────────
+CRUZA = "Athon - Brodowski 9 - SP"          # a chave diz Athon; o código BWK100 casa com a usina 1, que é da Thopen
+
+
+def _com_a_chave_que_cruza(app_lig):
+    """Lê as bases de novo com uma chave a mais, que casa pelo sufixo do código com a usina de outro cliente (o desenho
+    do caso de 12/11/2026), e devolve o de-para do banco SEM ela: para o banco, é ligação nova."""
+    from nexus.cadastro import banco as B
+    from nexus.cadastro.telas import servico
+    fontes = {FR: FONTES[FR] + [{"chave": CRUZA, "codigo": "BWK100", "nome": CRUZA}]}
+    with app_lig.app_context():
+        L.calcular(app_lig.config, servico(), fs=fontes)
+        novas = B.de_para(servico(), fontes, L.carregar_regras(app_lig.config))
+    assert [1, FR, CRUZA, "código"] in novas
+    return [dict(zip(B.CAB_DE_PARA, l)) for l in novas if l[2] != CRUZA]
+
+
+def test_a_ligacao_nova_a_usina_de_outro_cliente_e_listada(app_lig):
+    """A trava da troca (12/11/2026) só olha a chave que o banco já ligava. A chave NOVA que uma regra automática liga à
+    usina de outro cliente passava sem trava nenhuma, e é o mesmo erro do caso que criou a trava (lá a chave já estava
+    no banco; numa usina nova estaria solta). Entra na lista a chave que diz um cliente (no campo do item ou, no
+    Fracttal, no começo do nome) e ganharia, sem ninguém decidir, usina que não é dele, pela conta das sugestões
+    (`_clientes_da_chave`: o nome exato, ou o começo do nome se for um só). Fora do Fracttal só vale o campo do item: o
+    nome com " - " de outra base (o skid de uma usina no supervisório) não começa pelo cliente (revisão de 13/11/2026)."""
+    from nexus.cadastro import banco as B
+    from nexus.cadastro.telas import servico
+    AB = "BD_Exemplo · aba"
+    nomes = ("Athon - Brodowski 9 - SP", "Thopen - Brodowski 1 - SP", "Faro - Pedra do Sal 1 - PI", "Athon - Outra 2 - SP",
+             "Athon - Decidida 3 - SP", "Athon - Sem Usina 4 - SP", "Cliente Novo - Algo 1 - SP")
+    fontes = {FR: [{"chave": c, "nome": c} for c in nomes],
+              AB: [{"chave": "Aba X", "nome": "Aba X", "cliente": "Athon"},
+                   {"chave": "Aba Y", "nome": "Aba Y", "cliente": "Faro Energy"},
+                   {"chave": "Aba Z", "nome": "Aba Z"},
+                   {"chave": "Brodowski - Skid 1", "nome": "Brodowski - Skid 1"}]}
+    novas = [[1, FR, "Athon - Brodowski 9 - SP", "código"],          # diz Athon e a usina 1 é da Thopen: cruza
+             [1, FR, "Thopen - Brodowski 1 - SP", "código"],         # o mesmo cliente
+             [3, FR, "Faro - Pedra do Sal 1 - PI", "nome"],          # "Faro" é o começo de "Faro Energy": o mesmo
+             [1, FR, "Athon - Outra 2 - SP", "código"],              # cruza, mas o banco já a liga assim: não é nova
+             [1, FR, "Athon - Decidida 3 - SP", "manual (12/11)"],   # alguém decidiu na tela
+             [None, FR, "Athon - Sem Usina 4 - SP", B.SEM_PAR],      # sem usina: nada a conferir
+             [1, FR, "Cliente Novo - Algo 1 - SP", "código"],        # o cliente da chave nem está no cadastro: cruza
+             [3, AB, "Aba X", "nome"],                               # o item diz Athon e a usina 3 é da Faro: cruza
+             [3, AB, "Aba Y", "nome"],                               # o item diz Faro Energy: o mesmo
+             [3, AB, "Aba Z", "nome"],                               # a chave não diz cliente: nada a comparar
+             [1, AB, "Brodowski - Skid 1", "chave do supervisório"],  # fora do Fracttal o nome não diz cliente
+             [2, "BD_Operações", "UFV-002", B.COMO_ID_BD]]           # o ID do BD da ficha não diz cliente
+    no_banco = [{"usina_id": 1, "sistema": FR, "chave_externa": "Athon - Outra 2 - SP", "casou_por": "código"},
+                {"usina_id": None, "sistema": FR, "chave_externa": "Athon - Brodowski 9 - SP", "casou_por": B.SEM_PAR}]
+    with app_lig.app_context():
+        achadas = L.novas_que_cruzam_cliente(servico(), fontes, novas, no_banco)
+    assert achadas == [
+        {"sistema": AB, "chave_externa": "Aba X", "de": [], "para": [3], "casou_por": "nome",
+         "cliente_da_chave": "Athon", "cliente_da_usina": "Faro Energy"},
+        {"sistema": FR, "chave_externa": "Athon - Brodowski 9 - SP", "de": [], "para": [1], "casou_por": "código",
+         "cliente_da_chave": "Athon", "cliente_da_usina": "Thopen"},
+        {"sistema": FR, "chave_externa": "Cliente Novo - Algo 1 - SP", "de": [], "para": [1], "casou_por": "código",
+         "cliente_da_chave": "Cliente Novo", "cliente_da_usina": "Thopen"}]
+
+
+def test_a_ligacao_nova_que_cruza_cliente_nao_publica_sem_decisao(cli, monkeypatch, app_lig):
+    """Na tela: a recusa diz a chave, o cliente que ela diz e de quem é a usina; a lista traz a linha com o "Não ligar"
+    (a decisão de desligar: a chave fica sem usina para alguém ligar à certa) e o aceite da lista publica a ligação."""
+    import re
+    no_banco = _com_a_chave_que_cruza(app_lig)
+    q, enviados = _publicar_com(cli, monkeypatch, no_banco)
+    assert enviados == [] and q["trocas"] == ["1"]
+    erro = q["erro"][0]
+    assert "1 chave nova ligaria à usina de outro cliente" in erro and CRUZA in erro and "a chave diz Athon" in erro and "Thopen" in erro
+    secao = _secao(cli, "?trocas=1")
+    bloco = secao.split('class="lig-trocas"')[1].split("</table>")[0]
+    assert CRUZA in bloco and "sem usina" in bloco and "a chave diz Athon" in bloco and "Thopen - Brodowski" in bloco
+    assert "Não ligar" in bloco and 'name="acao" value="desligar"' in bloco and "Manter a do banco" not in bloco
+    assinatura = re.search(r'name="aceitar_trocas" value="([0-9a-f]{16})"', secao).group(1)
+    # o aceite da lista publica a ligação, e a mensagem diz
+    q, enviados = _publicar_com(cli, monkeypatch, no_banco, aceitar_trocas=assinatura)
+    assert len(enviados) == 1 and [1, FR, CRUZA, "código"] in _de_para_enviado(enviados[0])
+    assert "1 chave nova foi ligada à usina de outro cliente" in q["ok"][0]
+    # o "Não ligar" grava a decisão: a chave fica sem usina, sai da lista e a publicação sai sem aceite
+    q = _decidir(cli, acao="desligar", chave=CRUZA, usina="1", trocas="1")
+    assert "ok" in q and q["trocas"] == ["1"]
+    assert 'class="lig-trocas"' not in _secao(cli, "?trocas=1")
+    q, enviados = _publicar_com(cli, monkeypatch, no_banco)
+    assert len(enviados) == 1 and "ok" in q
+    assert next(l for l in _de_para_enviado(enviados[0]) if l[2] == CRUZA)[0] is None
+
+
+def test_a_ferramenta_do_pc_tambem_segura_a_ligacao_nova_que_cruza_cliente(app_lig, monkeypatch, capsys):
+    """A mesma conferência (`banco.conferir_com_o_banco`) vale para a ferramenta do PC: a linha LIGARIA A OUTRO CLIENTE,
+    a recusa, e o aceite pela marca."""
+    import re
+    no_banco = _com_a_chave_que_cruza(app_lig)
+    capsys.readouterr()
+    enviados, saida = _ferramenta(app_lig, monkeypatch, no_banco)
+    dito = capsys.readouterr().out
+    assert enviados == [] and saida not in (None, 0) and "LIGARIA A OUTRO CLIENTE" in dito and CRUZA in dito
+    marca = re.search(r"--aceitar-trocas ([0-9a-f]{16})", dito).group(1)
+    enviados, saida = _ferramenta(app_lig, monkeypatch, no_banco, "--aceitar-trocas", marca)
+    assert saida is None and len(enviados) == 1
+
+
 def test_o_publicar_de_outro_site_nao_sai(cli, monkeypatch, app_lig):
     """O aceite das trocas é passo de risco, e a marca não é segredo (calcula-se com o de-para do banco, de leitura
     aberta): o pedido que não vem de uma página do próprio Nexus não publica (a mesma guarda do "Ligar as sugestões")."""
@@ -548,7 +648,7 @@ def test_o_publicar_de_outro_site_nao_sai(cli, monkeypatch, app_lig):
 
 
 def test_a_assinatura_das_trocas_e_do_conjunto_mostrado():
-    """O "Publicar com as trocas" só vale para o conjunto que a tela mostrou: a ordem não muda a assinatura, e qualquer
+    """O "Publicar com estas ligações" só vale para o conjunto que a tela mostrou: a ordem não muda a assinatura, e qualquer
     chave, usina de antes ou usina de depois diferente muda."""
     from nexus.cadastro import banco as B
     a = {"sistema": FR, "chave_externa": "Cliente Beta - Vila Exemplo - MT", "de": [220], "para": [113], "casou_por": "código"}
@@ -562,7 +662,7 @@ def test_a_assinatura_das_trocas_e_do_conjunto_mostrado():
 
 def test_a_publicacao_que_trocaria_a_usina_de_uma_chave_nao_sai_sem_o_aceite(cli, monkeypatch, app_lig):
     """A troca por regra automática não publica: a tela diz a chave, a usina do banco e a usina nova, lista cada uma com
-    o "Manter a do banco" e oferece o "Publicar com as trocas", que só vale para a lista mostrada."""
+    o "Manter a do banco" e oferece o "Publicar com estas ligações", que só vale para a lista mostrada."""
     import re
     no_banco = _banco_com_a_chave_noutra_usina(app_lig)
     q, enviados = _publicar_com(cli, monkeypatch, no_banco)
@@ -599,7 +699,7 @@ def test_manter_a_usina_do_banco_vira_decisao_e_a_publicacao_sai(cli, monkeypatc
 
 def test_o_manter_so_aparece_quando_o_banco_liga_a_uma_usina_do_cadastro(cli, monkeypatch, app_lig):
     """A decisão de ligar aponta UMA usina: a chave que o banco liga a duas, ou a uma usina que saiu do cadastro, não tem
-    o "Manter a do banco" (a linha diz por quê), e segue podendo sair pelo "Publicar com as trocas"."""
+    o "Manter a do banco" (a linha diz por quê), e segue podendo sair pelo "Publicar com estas ligações"."""
     duas = _banco_com_a_chave_noutra_usina(app_lig, usina=2)
     duas.append({**next(d for d in duas if d["chave_externa"] == BROD), "usina_id": 3})
     _banco_de_mentira(cli, monkeypatch, duas)
@@ -609,7 +709,7 @@ def test_o_manter_so_aparece_quando_o_banco_liga_a_uma_usina_do_cadastro(cli, mo
     secao = _secao(cli, "?trocas=1")
     bloco = secao.split('class="lig-trocas"')[1].split("</table>")[0]
     assert "Manter a do banco" not in bloco and "a usina do banco saiu do cadastro" in bloco
-    assert 'name="aceitar_trocas"' in secao and "Publicar com a troca" in secao
+    assert 'name="aceitar_trocas"' in secao and "Publicar com esta ligação" in secao
 
 
 def test_a_troca_decidida_a_mao_nesta_maquina_publica(cli, monkeypatch, app_lig):

@@ -7,10 +7,11 @@
     ... --aceitar-trocas MARCA   publica mesmo com chaves que trocariam de usina: a marca é a que a recusa (ou o
                             ensaio) mostrou, e só vale para aquela lista
 
-Antes de enviar, confere com o de-para que o BANCO tem, pelas mesmas três regras do botão da tela
+Antes de enviar, confere com o de-para que o BANCO tem, pelas mesmas regras do botão da tela
 (`banco.conferir_com_o_banco`, 12/11/2026): a ligação de chave que esta máquina não leu volta como estava; a chave que
-ela leu e deixaria sem usina não publica; a que trocaria de usina por regra automática pede a marca. Até aquela data a
-ferramenta enviava direto, e rodada no PC apagaria as ligações que só o servidor conhece (FAMA, plant_id).
+ela leu e deixaria sem usina não publica; a que trocaria de usina por regra automática e a ligação nova que cruza
+cliente (13/11/2026) pedem a marca. Até 12/11 a ferramenta enviava direto, e rodada no PC apagaria as ligações que só o
+servidor conhece (FAMA, plant_id).
 
 `--bases-guardadas` existe porque a leitura das bases pode falhar numa máquina sem quebrar a publicação do cadastro: em
 08/10/2026 a foto do Fracttal da pasta do PCM não abria neste PC (sem o pyarrow) e o ensaio da estrutura de campo parou
@@ -58,8 +59,8 @@ def main():
     t = B.montar(srv, cofre, atual["fontes"], B.ler_anteriores(base), L.carregar_regras(env))
     for aba, (cab, linhas) in t.items():
         print(f"{aba}: {len(linhas)} linhas, {len(cab)} colunas")
-    # as três regras contra o de-para do banco, antes de montar o xlsx (as mantidas entram nele)
-    c = B.conferir_com_o_banco(t, B.ler_de_para(base))
+    # as regras contra o de-para do banco, antes de montar o xlsx (as mantidas entram nele)
+    c = B.conferir_com_o_banco(t, B.ler_de_para(base), srv, atual["fontes"])
     dp = t["de_para"][1]
     print("de-para por sistema:", dict(Counter(l[1] for l in dp)))
     print("casou por:", dict(Counter(l[3] for l in dp)))
@@ -68,15 +69,20 @@ def main():
         print(f"PERDERIA: {d.get('sistema')}: {d.get('chave_externa')} (no banco, usina {B._inteiro(d.get('usina_id'))})")
     marca = B.assinatura_das_trocas(c["trocas"]) if c["trocas"] else ""
     for x in c["trocas"]:
-        print(f"TROCARIA: {x['sistema']}: {x['chave_externa']} (no banco, usina {x['de']}; aqui, usina {x['para']}, "
-              f"por {x['casou_por']})")
+        if x["de"]:
+            print(f"TROCARIA: {x['sistema']}: {x['chave_externa']} (no banco, usina {x['de']}; aqui, usina {x['para']}, "
+                  f"por {x['casou_por']})")
+        else:                   # a ligação nova que cruza cliente (13/11/2026)
+            print(f"LIGARIA A OUTRO CLIENTE: {x['sistema']}: {x['chave_externa']} (a chave diz {x['cliente_da_chave']}; "
+                  f"aqui, usina {x['para']}, do cliente {x['cliente_da_usina']}, por {x['casou_por']})")
     recusa = None
     if c["perdidas"]:
         recusa = (f"não publiquei: {len(c['perdidas'])} ligação(ões) do banco ficariam sem usina (as linhas PERDERIA "
                   "acima). Ligue na tela Base → Ligações, ou leia as bases de novo, e rode outra vez.")
     elif c["trocas"] and a.aceitar_trocas != marca:
-        recusa = (f"não publiquei: {len(c['trocas'])} chave(s) trocariam de usina sem ninguém ter decidido (as linhas "
-                  f"TROCARIA acima). Decida na tela Base → Ligações, ou aceite esta lista com --aceitar-trocas {marca}")
+        recusa = (f"não publiquei: {len(c['trocas'])} chave(s) trocariam de usina ou ligariam à usina de outro cliente "
+                  "sem ninguém ter decidido (as linhas TROCARIA e LIGARIA A OUTRO CLIENTE acima). Decida na tela "
+                  f"Base → Ligações, ou aceite esta lista com --aceitar-trocas {marca}")
     conteudo = B.xlsx_bytes(t)
     if a.ensaio:
         destino = L.pasta_dados(env) / "cadastro_nexus_ensaio.xlsx"

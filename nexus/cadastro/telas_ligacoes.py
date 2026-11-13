@@ -54,29 +54,61 @@ def _usinas_txt(ids) -> str:
     return ("usina " + ids[0]) if len(ids) == 1 else ("usinas " + ", ".join(ids[:-1]) + " e " + ids[-1])
 
 
+def _recusa_do_aceite(lista: list[dict]) -> str:
+    """O aviso da publicação que não saiu por causa da lista do aceite: quantas de cada tipo e as 5 primeiras (a lista
+    inteira abre logo abaixo dele)."""
+    mudam, novas = [x for x in lista if x["de"]], [x for x in lista if not x["de"]]
+    partes = []
+    if mudam:
+        partes.append(f"{len(mudam)} chave{'s trocariam' if len(mudam) > 1 else ' trocaria'} de usina")
+    if novas:
+        partes.append(f"{len(novas)} chave{'s novas ligariam' if len(novas) > 1 else ' nova ligaria'} à usina de outro "
+                      "cliente")
+
+    def uma(x):
+        if x["de"]:
+            return (f"{x['sistema']}: {x['chave_externa']} (no banco, {_usinas_txt(x['de'])}; aqui, "
+                    f"{_usinas_txt(x['para'])}, por {x['casou_por']})")
+        return (f"{x['sistema']}: {x['chave_externa']} (a chave diz {x['cliente_da_chave']}; aqui, "
+                f"{_usinas_txt(x['para'])}, do cliente {x['cliente_da_usina']}, por {x['casou_por']})")
+    n = len(lista)
+    quais = "; ".join(uma(x) for x in lista[:5]) + (f"; e mais {n - 5}" if n > 5 else "")
+    return (f"Não publiquei: {' e '.join(partes)} sem ninguém ter decidido: {quais}. Na lista abaixo, decida cada uma "
+            "ou publique com estas ligações.")
+
+
 def _trocas_da_tela(srv, cfg, atual, regras, usinas) -> dict:
-    """A lista das chaves que trocariam de usina na publicação (`banco.chaves_que_trocariam`), com o título de cada usina
-    e a marca do conjunto para o "Publicar com as trocas". Lê o de-para do BANCO, por isso só roda quando o endereço traz
-    `trocas=1` (a recusa da publicação o põe, e o "Manter a do banco" o devolve): a Governança de toda visita não lê o
-    banco. `manter` = a usina do "Manter a do banco": só quando o banco liga a chave a UMA usina que ainda está no
-    cadastro (a decisão de ligar aponta uma usina só) e a chave passa pelas decisões da tela (a do BD_Operações é o ID do
-    BD da ficha: a decisão não a alcança, e o botão gravaria uma decisão sem efeito); sem ele, `sem_manter` diz por quê.
-    As trocas são contadas nas linhas que esta máquina calculou, como na rota (`ligacoes_publicar`): mesma função, mesmo
-    conjunto, mesma marca."""
+    """A lista do aceite da publicação (`banco.a_aceitar`: as chaves que trocariam de usina e as ligações novas que
+    cruzam cliente), com o título de cada usina e a marca do conjunto para o "Publicar com estas ligações". Lê o de-para
+    do BANCO, por isso só roda quando o endereço traz `trocas=1` (a recusa da publicação o põe, e os botões da lista o
+    devolvem): a Governança de toda visita não lê o banco. Em cada linha, o botão do lado seguro:
+    - `manter` = a usina do "Manter a do banco" (a decisão de ligar): só quando o banco liga a chave a UMA usina que
+      ainda está no cadastro e a chave passa pelas decisões da tela (a do BD_Operações é o ID do BD da ficha: a decisão
+      não a alcança, e o botão gravaria uma decisão sem efeito);
+    - `nao_ligar` = a usina do "Não ligar" da ligação nova que cruza cliente (a decisão de desligar: a chave fica sem
+      usina, à espera de alguém ligar à certa): só quando a publicação a liga a UMA usina.
+    Sem botão, `sem_manter` diz por quê. A lista é contada nas linhas que esta máquina calculou, como na rota
+    (`ligacoes_publicar`): mesma função, mesmo conjunto, mesma marca."""
     try:
-        brutas = B.chaves_que_trocariam(B.de_para(srv, atual["fontes"], regras), B.ler_de_para(_base(cfg)))
+        brutas = B.a_aceitar(srv, atual["fontes"], B.de_para(srv, atual["fontes"], regras), B.ler_de_para(_base(cfg)))
     except Exception as ex:          # noqa: BLE001 — o banco fora não derruba a Governança: a tela diz
         return {"erro": "A lista das chaves que trocariam de usina não abriu: não consegui ler o de-para do banco "
                         f"({type(ex).__name__}). Tente de novo em instantes."}
     titulo = {u["id"]: u["titulo"] for u in usinas}
     lista = []
     for x in brutas:
-        sem = ("vem do ID do BD da ficha: corrija no Registro mestre" if x["casou_por"] == B.COMO_ID_BD
-               else "o banco liga a mais de uma usina" if len(x["de"]) > 1
-               else "" if x["de"][0] in titulo else "a usina do banco saiu do cadastro")
+        manter = nao_ligar = None
+        if not x["de"]:                         # ligação nova que cruza cliente
+            sem = "" if len(x["para"]) == 1 else "a chave ligaria a mais de uma usina"
+            nao_ligar = None if sem else x["para"][0]
+        else:
+            sem = ("vem do ID do BD da ficha: corrija no Registro mestre" if x["casou_por"] == B.COMO_ID_BD
+                   else "o banco liga a mais de uma usina" if len(x["de"]) > 1
+                   else "" if x["de"][0] in titulo else "a usina do banco saiu do cadastro")
+            manter = None if sem else x["de"][0]
         lista.append(dict(x, de=[{"id": i, "titulo": titulo.get(i)} for i in x["de"]],
                           para=[{"id": i, "titulo": titulo.get(i)} for i in x["para"]],
-                          manter=None if sem else x["de"][0], sem_manter=sem))
+                          manter=manter, nao_ligar=nao_ligar, sem_manter=sem))
     return {"lista": lista, "assinatura": B.assinatura_das_trocas(brutas)}
 
 
@@ -206,20 +238,23 @@ def registrar_ligacoes(bp):
         except Exception as ex:          # noqa: BLE001
             return _volta(erro=f"O banco recusou: {type(ex).__name__}: {str(ex)[:160]}")
         # O arquivo de cadastro e as bases lidas são DESTA máquina, e o de-para do banco não é só dela (10/11/2026; o caso em
-        # banco.perdas_de_para). Três regras (`banco.conferir_com_o_banco`, a mesma conta da ferramenta do PC):
+        # banco.perdas_de_para). Quatro regras (`banco.conferir_com_o_banco`, a mesma conta da ferramenta do PC):
         # 1. a ligação de chave que esta máquina NÃO leu volta ao banco como estava (12/11/2026, banco.ligacoes_que_nao_li):
         #    o que a máquina não leu, ela não apaga;
         # 2. a chave que ela LEU e deixaria sem usina é perda de verdade: não publica, e a tela diz qual é;
         # 3. a chave que TROCARIA de usina por regra automática (12/11/2026, banco.chaves_que_trocariam) não publica sem o
         #    aceite da lista que a tela mostrou: a chave de um cliente tinha ido para a usina de outro, calada. Contada
         #    nas linhas que ESTA máquina calculou, antes de juntar as mantidas: é o mesmo conjunto da tela
-        #    (`_trocas_da_tela`), e a chave que a máquina não leu não é troca dela.
+        #    (`_trocas_da_tela`), e a chave que a máquina não leu não é troca dela;
+        # 4. a ligação NOVA que uma regra automática faria entre a chave que diz um cliente e a usina de outro
+        #    (13/11/2026, ligacoes.novas_que_cruzam_cliente) entra na mesma lista do aceite: é o mesmo erro do item 3
+        #    numa chave que o banco ainda não tinha.
         try:
             no_banco = B.ler_de_para(base)
         except Exception as ex:          # noqa: BLE001
             return _volta(erro=f"Não publiquei: não consegui ler o de-para do banco para comparar "
                                f"({type(ex).__name__}). Tente de novo em instantes.")
-        conferido = B.conferir_com_o_banco(t, no_banco)
+        conferido = B.conferir_com_o_banco(t, no_banco, srv, atual["fontes"])
         mantidas, perdidas, trocas = conferido["mantidas"], conferido["perdidas"], conferido["trocas"]
         if perdidas:
             n = len(perdidas)
@@ -231,21 +266,19 @@ def registrar_ligacoes(bp):
                                f"{'essas chaves e as' if n > 1 else 'essa chave e a'} deixaria sem usina: ligue nas "
                                f"Ligações (ou use \"Ler as bases de novo\", se as bases estiverem velhas) e publique de novo.")
         if trocas and request.form.get("aceitar_trocas") != B.assinatura_das_trocas(trocas):
-            n = len(trocas)             # o aviso cita as 5 primeiras: a lista inteira abre logo abaixo dele
-            quais = "; ".join(f"{x['sistema']}: {x['chave_externa']} (no banco, {_usinas_txt(x['de'])}; aqui, "
-                              f"{_usinas_txt(x['para'])}, por {x['casou_por']})"
-                              for x in trocas[:5]) + (f"; e mais {n - 5}" if n > 5 else "")
-            return _volta(erro=f"Não publiquei: {n} chave{'s trocariam' if n > 1 else ' trocaria'} de usina sem ninguém "
-                               f"ter decidido: {quais}. Na lista abaixo, mantenha a usina do banco em cada uma ou "
-                               f"publique com as trocas.", trocas="1")
+            return _volta(erro=_recusa_do_aceite(trocas), trocas="1")
         try:
             r = B.sincronizar(B.xlsx_bytes(t), base=base, token=cfg["GRIDCO_SQL_TOKEN"])
         except Exception as ex:          # noqa: BLE001
             return _volta(erro=f"O banco recusou: {type(ex).__name__}: {str(ex)[:160]}")
-        m, n = len(mantidas), len(trocas)
+        m = len(mantidas)
+        n = sum(1 for x in trocas if x["de"])               # as que trocaram de usina
+        c = len(trocas) - n                                 # as novas que cruzam cliente
         ficou = ("" if not m else " 1 ligação de chave que esta máquina não leu ficou como estava no banco." if m == 1
                  else f" {m} ligações de chaves que esta máquina não leu ficaram como estavam no banco.")
-        trocou = ("" if not n else " 1 chave trocou de usina, com o seu aceite." if n == 1
-                  else f" {n} chaves trocaram de usina, com o seu aceite.")
+        trocou = "" if not n else "1 chave trocou de usina" if n == 1 else f"{n} chaves trocaram de usina"
+        ligou = ("" if not c else "1 chave nova foi ligada à usina de outro cliente" if c == 1
+                 else f"{c} chaves novas foram ligadas à usina de outro cliente")
+        aceite = f" {' e '.join(x for x in (trocou, ligou) if x)}, com o seu aceite." if trocas else ""
         return _volta(ok=f"Publicado no banco: {r.get('inserted', 0)} linhas novas, {r.get('updated', 0)} alteradas."
-                         f"{ficou}{trocou}")
+                         f"{ficou}{aceite}")
