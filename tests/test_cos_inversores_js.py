@@ -410,3 +410,16 @@ def test_a_ponta_ao_vivo_leva_a_hora_da_leitura_e_nao_a_do_pedido():
     texto = JS.read_text(encoding="utf-8")
     assert 'anotarPonta("u:" + pid, mapa[pid].pac_total_kw, horaDaLeitura(' in texto
     assert 'anotarPonta("i:" + i.id, i.pac, lidoEm)' in texto
+
+
+def test_a_curva_interrompe_onde_ninguem_mediu_em_vez_de_ligar_com_uma_reta():
+    # 13/11/2026, o dono: "em alguns casos ela fica sem dados de amostra e só completa com uma linha reta, não acho isso
+    # ideal". A gravada de 5 em 5 min com um vão de 30 min ganha um null no meio; a do cartão (15 em 15) não se parte à toa.
+    r = rodar("console.log(JSON.stringify(["
+              " N.comBuracos([[720, 700], [725, 650], [755, 225], [760, 230]]),"
+              " N.comBuracos([[720, 700], [735, 650], [750, 600]]),"
+              " N.limiarDeBuraco([[720, 1], [725, 1]]), N.limiarDeBuraco([[720, 1], [735, 1]]), N.limiarDeBuraco([])]))")
+    com_vao, de_15, lim5, lim15, lim_vazio = r
+    assert com_vao == [[720, 700], [725, 650], [740, None], [755, 225], [760, 230]]
+    assert de_15 == [[720, 700], [735, 650], [750, 600]]          # passo de 15: nada a partir
+    assert lim5 == 7.5 and lim15 == 22.5 and lim_vazio == 7.5
