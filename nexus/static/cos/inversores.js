@@ -38,9 +38,8 @@
   var API = CFG.api || "";                               // vazio: sem o ao vivo (a tela fica com o que o servidor manda)
   var DE = 5 * 60, ATE = 19 * 60;
   var VIVO_MS = 3000, CURVA_MS = 5 * 60000, CURVAS_GUARDADAS = 20;      // por usina e dia (13/11/2026: o dia escolhido)
-  // o registro das entradas (13/11/2026): um ponto a cada 20 s (o pedido: "um ponto a cada 15 a 30 s"); no máximo 15 h
-  // de janela aberta (2.700 pontos), e o mais antigo sai. Até 4 séries com cor de identidade num gráfico (DESTAQUES).
-  var REG_MS = 20000, REG_MAX = 2700, DESTAQUES = 4;
+  // as cores das strings (13/11/2026): 24 tons em ordem fixa por índice (`--cos-str-1..24`, no inversores.css)
+  var N_CORES = 24;
   var fusoMin = -180, fusoEm = 0;                        // America/Sao_Paulo (UTC−3 hoje), conferido de hora em hora
   function fuso(ms) {
     if (ms - fusoEm > 3600000 || ms < fusoEm) {
@@ -209,38 +208,34 @@
     return { tipo: "nada", lista: [], grupos: [], porMppt: false };
   }
 
-  // ── O REGISTRO das entradas da usina aberta (13/11/2026) ───────────────────────────────────────────────────────────
-  // Um tempo por ponto (`t`, minuto do dia) e, por inversor e entrada, o valor em cada ponto. `null` onde a entrada não
-  // veio ou a leitura da usina estava velha (o cartão não `fresca`): a linha QUEBRA ali, nunca liga dois pontos por cima de
-  // um buraco — a mesma regra da gravação da Ronda COS ("leitura velha não vira linha", scada.job.ts). Um ponto a cada
-  // REG_MS; na virada do dia começa de novo; acima de REG_MAX pontos, sai o mais antigo.
-  function novoRegistro(gid, ms) { return { gid: gid, desde: ms, dia: diaSP(ms), em: 0, v: 0, t: [], inv: {} }; }
-  function cadaSerie(reg, fn) { Object.keys(reg.inv).forEach(function (id) { var d = reg.inv[id]; Object.keys(d).forEach(function (k) { fn(d[k]); }); }); }
-  function anotarRegistro(reg, inversores, ms) {
-    if (diaSP(ms) !== reg.dia) { reg.desde = ms; reg.dia = diaSP(ms); reg.em = 0; reg.t = []; reg.inv = {}; }
-    if (reg.em && ms - reg.em < REG_MS) { return false; }
-    reg.em = ms; reg.v++;
-    var n = reg.t.length;
-    reg.t.push(minutoSP(ms));
-    (inversores || []).forEach(function (i) {
-      var dest = reg.inv[i.id] || (reg.inv[i.id] = {});
-      entradasDoInversor(i).lista.forEach(function (e) {
-        var arr = dest[e.chave];
-        if (!arr) { arr = dest[e.chave] = []; while (arr.length < n) { arr.push(null); } }
-        if (arr.length === n) { arr.push(e.valor); }
-      });
-    });
-    cadaSerie(reg, function (arr) { if (arr.length < n + 1) { arr.push(null); } });
-    if (reg.t.length > REG_MAX) { reg.t.shift(); cadaSerie(reg, function (arr) { arr.shift(); }); }
-    return true;
+  // ── A PONTA DAS ENTRADAS da usina aberta (13/11/2026) ───────────────────────────────────────────────────────────
+  // O dono, no ar: "as strings não mostram o gráfico do dia, apenas somente depois de 50 segundos praticamente. Eu preciso
+  // do gráfico do dia em tempo real". A 1ª versão anotava um ponto a cada 20 s; agora é a ponta de 3 s, como a da curva:
+  // cada leitura da usina aberta anota a corrente de cada entrada (chave "<inversor>|<entrada>"). Valor que repete não
+  // empilha ponto: o último anda até a leitura de agora (a linha chega ao "agora" mesmo parada). Só o dia de hoje; no
+  // máximo PONTA_MAX pontos por entrada (o histórico gravado cobre o resto do dia).
+  var PONTA_MAX = 400, pontasEnt = {}, versaoPontaEnt = 0;
+  function limparPontaEnt() { pontasEnt = {}; versaoPontaEnt++; }
+  function anotarPontaEnt(chave, valor, ms) {
+    var l = pontasEnt[chave] || (pontasEnt[chave] = []), dia = diaSP(ms), min = minutoSP(ms), n = l.length;
+    while (l.length && l[0].dia !== dia) { l.shift(); }  // virou o dia: a de ontem sai
+    n = l.length;
+    if (n && l[n - 1].ms === ms) { return; }              // a mesma leitura de novo (um clique redesenha a janela)
+    if (n >= 2 && l[n - 1].kw === valor && l[n - 2].kw === valor) { l[n - 1].min = min; l[n - 1].ms = ms; }
+    else { l.push({ dia: dia, min: min, kw: valor, ms: ms }); if (l.length > PONTA_MAX) { l.shift(); } }
+    versaoPontaEnt++;
   }
-  function serieDoRegistro(reg, invId, chave) {
-    var d = reg && reg.inv[invId], arr = d && d[chave];
-    if (!arr) { return []; }
-    var pts = new Array(reg.t.length);
-    for (var k = 0; k < reg.t.length; k++) { pts[k] = [reg.t[k], arr[k] == null ? null : arr[k]]; }
-    return pts;
+  function pontaEnt(chave) {
+    var l = pontasEnt[chave] || [], hoje = diaSP(Date.now()), out = [];
+    for (var k = 0; k < l.length; k++) { if (l[k].dia === hoje) { out.push([l[k].min, l[k].kw]); } }
+    return out;
   }
+  // a cor de uma entrada pelo índice dela ("s7" e "m7" = 7; a 25 volta à cor da 1), e o estilo que a leva ao SVG
+  function corDaEntrada(chave) {
+    var n = parseInt(String(chave).replace(/^[a-z]+/, ""), 10);
+    return n > 0 ? ((n - 1) % N_CORES) + 1 : 1;
+  }
+  function estiloDaCor(k) { return "--cor:var(--cos-str-" + k + ")"; }
   // as marcas do eixo de um trecho que não é o dia inteiro: o menor passo redondo que dá até 5 marcas
   var PASSOS_DO_EIXO = [1, 2, 5, 10, 15, 30, 60, 120, 180, 240];
   function marcasDoEixo(de, ate) {
@@ -292,8 +287,8 @@
     return { ent: ent, series: series, pontos: pontos.length, dia: (r && r.dia) || "", primeiroDia: (r && r.primeiro_dia) || null,
       desde: (r && r.gravacao_desde) || null };
   }
-  // a série gravada com a ponta ao vivo (o registro desde a abertura) depois do último balde, só no trecho do gráfico
-  function comPontaDoRegistro(base, ponta) {
+  // a série gravada com a ponta ao vivo (as leituras de 3 s) depois do último balde, só no trecho do gráfico
+  function comPontaAoVivo(base, ponta) {
     var ult = -1, extra = [];
     for (var i = base.length - 1; i >= 0; i--) { if (base[i][1] != null) { ult = base[i][0]; break; } }
     for (var k = 0; k < ponta.length; k++) { if (ponta[k][0] > ult && ponta[k][0] >= DE && ponta[k][0] <= ATE) { extra.push(ponta[k]); } }
@@ -317,9 +312,9 @@
   }
 
   raiz.NexusCosInversores = { nomeDaString: nomeDaString, vistaDasEntradas: vistaDasEntradas, entradasDoInversor: entradasDoInversor,
-    novoRegistro: novoRegistro, anotarRegistro: anotarRegistro, serieDoRegistro: serieDoRegistro, marcasDoEixo: marcasDoEixo,
-    REG_MS: REG_MS, REG_MAX: REG_MAX, DIAS_ATRAS: DIAS_ATRAS, diaTexto: diaTexto, diaMenos: diaMenos, diaCurto: diaCurto,
-    entradasDoHistorico: entradasDoHistorico, comPontaDoRegistro: comPontaDoRegistro, avisoDoHistorico: avisoDoHistorico };
+    anotarPontaEnt: anotarPontaEnt, pontaEnt: pontaEnt, limparPontaEnt: limparPontaEnt, corDaEntrada: corDaEntrada,
+    estiloDaCor: estiloDaCor, N_CORES: N_CORES, PONTA_MAX: PONTA_MAX, marcasDoEixo: marcasDoEixo, DIAS_ATRAS: DIAS_ATRAS, diaTexto: diaTexto, diaMenos: diaMenos, diaCurto: diaCurto,
+    entradasDoHistorico: entradasDoHistorico, comPontaAoVivo: comPontaAoVivo, avisoDoHistorico: avisoDoHistorico };
   if (typeof document === "undefined") { return; }       // no node (o teste), só as contas
 
   // ── a API: o login (no final, o passe do Nexus em CFG.sessao; no protótipo, o da Ronda COS deste navegador) ───────
@@ -398,21 +393,22 @@
   }
   var graficos = [], cruzEm = null;
   // Um gráfico por bloco; refeito só quando as séries, o teto, o trecho ou a largura mudam (a volta de 3 s não mexe no
-  // resto). `lista`: [{pts, nome, cor}]. UMA série sem `cor` é o desenho de sempre (a área e a linha verde, o ponto do fim).
-  // Com várias, cada uma é uma linha: `cor` 0 a 3 é a cor de identidade (pg-c1..pg-c4, em ordem fixa, nunca reciclada) e
-  // `null` é a linha de fundo, sem cor — acima de 4 séries a cor não identificaria mais nada (a dica diz os valores).
+  // resto). `lista`: [{pts, nome, cor, forte, fraca}]. UMA série é o desenho de sempre (a área, a linha e o ponto do fim):
+  // verde sem `cor`, ou na cor da string com ela (o modo Individual). Com várias, cada uma é uma linha na cor dela: `cor` é
+  // o número da paleta das strings (1 a 24, `--cos-str-N` no inversores.css, pela ordem do índice da string); `forte` é a
+  // destacada (mais grossa, por cima) e `fraca` a esmaecida (13/11/2026: o destaque no lugar do teto de 4 cores).
   // `o`: h, max, un ("kW", "A", "V"), de/ate (o trecho, em minutos do dia; o padrão é 5h às 19h), eixoX, eixoY, rotuloFim,
   // vivo (o halo), grupo (fora/semcom), semAgora, tol e passo (minutos), seg (a hora com segundos), nome, rotulo, aoMarcar, dica.
   function grafico(host, lista, o, largura) {
     var w = Math.max(160, largura || host.clientWidth || 600), h = o.h, max = o.max || 1, un = o.un || "kW";
     var de = o.de != null ? o.de : DE, ate = o.ate != null ? o.ate : ATE;
-    var unica = lista.length === 1 && lista[0].cor === undefined;
+    var unica = lista.length === 1;
     var fins = lista.map(function (s) { return ultimo(s.pts); }), fim = null;
     fins.forEach(function (f) { if (f && (!fim || f[0] > fim[0])) { fim = f; } });
     var assinatura = [w, max, de.toFixed(3), ate.toFixed(3), o.grupo || "", o.semAgora ? "-" : Math.floor(minutoSP(Date.now()))].concat(
       lista.map(function (s, k) {
         var f = fins[k];
-        return (s.cor === undefined ? "u" : s.cor === null ? "n" : s.cor) + ":" + s.pts.length + ":" + (f ? f[0].toFixed(3) + "/" + f[1] : "-");
+        return (s.cor == null ? "u" : s.cor) + (s.forte ? "F" : s.fraca ? "f" : "") + ":" + s.pts.length + ":" + (f ? f[0].toFixed(3) + "/" + f[1] : "-");
       })).join("|");
     var velho = host._g;
     if (velho && velho.assinatura === assinatura) { velho.aoMarcar = o.aoMarcar; graficos.push(velho); return velho; }
@@ -423,8 +419,10 @@
     var foco = velho && document.activeElement === velho.alvo;
     if (foco) { velho.trocando = true; }                 // o blur da troca não apaga a cruz
     host.textContent = "";
-    var svg = el("svg", { viewBox: "0 0 " + w + " " + h, width: w, height: h, class: "pg" + (o.grupo ? " pg--" + o.grupo : ""),
+    var colorida = unica && lista[0].cor != null;          // o gráfico de uma string só, na cor dela (o modo Individual)
+    var svg = el("svg", { viewBox: "0 0 " + w + " " + h, width: w, height: h, class: "pg" + (o.grupo ? " pg--" + o.grupo : "") + (colorida ? " pg-colorida" : ""),
       role: "img", "aria-label": o.rotulo || "" }, host);
+    if (colorida) { svg.setAttribute("style", estiloDaCor(lista[0].cor)); }
     var grade = el("g", { class: "pg-grade" }, svg), eixo = el("g", { class: "pg-eixo" }, svg);
     var passo = passoBonito(max / (o.eixoY ? 4 : 2));
     for (var v = passo; v <= max + 1e-6; v += passo) {
@@ -452,23 +450,33 @@
         if (o.rotuloFim) { el("text", { class: "pg-fim-rot", x: x(fim[0]) + 10, y: y(fim[1]) + 4 }, svg).textContent = valorNa(fim[1], un); }
       }
     } else {
-      // as de fundo primeiro, as de cor por cima; o fim de cada uma de cor com o anel da superfície (a sobreposição se lê)
-      lista.filter(function (s) { return s.cor == null; }).concat(lista.filter(function (s) { return s.cor != null; })).forEach(function (s) {
+      // cada série na cor dela (`cor`, o número da paleta das strings); as esmaecidas embaixo, as destacadas por cima; o
+      // fim de cada uma com o anel da superfície (a sobreposição se lê) quando são poucas ou destacadas
+      var camada = function (s) { return s.forte ? 2 : s.fraca ? 0 : 1; };
+      lista.slice().sort(function (a, b) { return camada(a) - camada(b); }).forEach(function (s) {
         var dl = caminhos(s.pts, x, y)[0];
-        if (dl) { el("path", { class: "pg-s " + (s.cor == null ? "pg-s--fundo" : "pg-c" + (s.cor + 1)), d: dl }, svg); }
+        if (!dl) { return; }
+        var a = { class: "pg-s" + (s.forte ? " pg-s--forte" : s.fraca ? " pg-s--fraca" : ""), d: dl };
+        if (s.cor != null) { a.style = estiloDaCor(s.cor); }
+        el("path", a, svg);
       });
       lista.forEach(function (s, k) {
-        if (s.cor != null && fins[k]) { el("circle", { class: "pg-sfim pg-c" + (s.cor + 1), cx: x(fins[k][0]), cy: y(fins[k][1]), r: 3.5 }, svg); }
+        if (!fins[k] || s.fraca || !(s.forte || lista.length <= 4)) { return; }
+        var a = { class: "pg-sfim", cx: x(fins[k][0]), cy: y(fins[k][1]), r: 3.5 };
+        if (s.cor != null) { a.style = estiloDaCor(s.cor); }
+        el("circle", a, svg);
       });
     }
     var cruz = el("line", { class: "pg-cruz", x1: 0, x2: 0, y1: mt, y2: mt + ih, visibility: "hidden" }, svg);
     var pontos = [];
     lista.forEach(function (s) {
-      if (!unica && s.cor == null) { return; }
-      pontos.push({ s: s, c: el("circle", { class: "pg-cruz-ponto" + (unica ? "" : " pg-cp" + (s.cor + 1)), r: 4, cx: 0, cy: 0, visibility: "hidden" }, svg) });
+      if (!unica && s.fraca) { return; }                   // a esmaecida não ganha ponto na cruz (a dica ainda a lê)
+      var a = { class: "pg-cruz-ponto" + (unica ? "" : " pg-cp"), r: unica ? 4 : 3, cx: 0, cy: 0, visibility: "hidden" };
+      if (!unica && s.cor != null) { a.style = estiloDaCor(s.cor); }
+      pontos.push({ s: s, c: el("circle", a, svg) });
     });
     var alvo = el("rect", { class: "pg-alvo", x: ml, y: 0, width: iw, height: h, tabindex: "0", "aria-label": (o.nome || "") + ": use as setas para ler a curva" }, svg);
-    var principal = unica ? lista[0] : (lista.filter(function (s) { return s.cor != null; })[0] || lista[0]);
+    var principal = unica ? lista[0] : (lista.filter(function (s) { return s.forte; })[0] || lista[0]);
     var g = { host: host, lista: lista, pts: principal ? principal.pts : [], x: x, y: y, de: de, ate: ate, un: un,
       tol: o.tol == null ? 7.5 : o.tol, seg: !!o.seg, passo: o.passo || 5, cruz: cruz, pontos: pontos, nome: o.nome,
       aoMarcar: o.aoMarcar, dica: o.dica || null, contar: o.contar || ["série", "séries"], fim: fim, alvo: alvo, assinatura: assinatura };
@@ -512,8 +520,8 @@
         : [{ v: p0 && p0[1] != null ? valorNa(p0[1], origem.un) : "sem amostra", t: (origem.seg ? hhmmssDoMin(alvoMin) : hhmm(alvoMin)) + (origem.nome ? " · " + origem.nome : "") }];
       dica.textContent = "";
       linhas.forEach(function (l) {
-        var r = document.createElement("div"); r.className = "cos-inv-dica-l";
-        if (l.cor != null) { var c = document.createElement("i"); c.className = "cos-inv-cor pg-c" + (l.cor + 1); c.setAttribute("aria-hidden", "true"); r.appendChild(c); }
+        var r = document.createElement("div"); r.className = "cos-inv-dica-l" + (l.forte ? " forte" : "");
+        if (l.cor != null) { var c = document.createElement("i"); c.className = "cos-inv-cor"; c.setAttribute("style", estiloDaCor(l.cor)); c.setAttribute("aria-hidden", "true"); r.appendChild(c); }
         var b = document.createElement("b"); b.textContent = l.v; r.appendChild(b);
         if (l.t) { var s = document.createElement("span"); s.textContent = l.t; r.appendChild(s); }
         dica.appendChild(r);
@@ -522,7 +530,7 @@
       cancelAnimationFrame(dicaQuadro);
       dicaQuadro = requestAnimationFrame(function () {          // a posição lida e escrita num quadro só
         dica.style.left = Math.min(window.innerWidth - dica.offsetWidth - 8, cx + 14) + "px";
-        dica.style.top = Math.max(8, cy - 40) + "px";
+        dica.style.top = Math.max(8, Math.min(window.innerHeight - dica.offsetHeight - 8, cy - 40)) + "px";   // a de 24 linhas cabe na tela
       });
     }
   }
@@ -661,7 +669,7 @@
   var detEl = dlg && dlg.querySelector(".cos-inv-det");
   var detCorpo = detEl && detEl.querySelector(".cos-inv-det-corpo"), detTitulo = detEl && detEl.querySelector(".cos-inv-det-titulo");
   var detSub = detEl && detEl.querySelector(".cos-inv-det-sub");
-  var invAberto = null, det = null, modo = "", destaques = {}, reg = null;
+  var invAberto = null, det = null, modo = "", destaques = {}, pontasDe = null;    // pontasDe: a usina da ponta das entradas
   // o dia escolhido na janela (13/11/2026): "" é hoje (com a ponta ao vivo); um dia que passou não tem ponta, e a
   // releitura de 3 s não mexe nos gráficos dele (o estado de agora e as barras de agora continuam ao vivo)
   var diaEscolhido = "";
@@ -722,6 +730,15 @@
         cab.appendChild(p.abrir);
         p.art.title = "Abrir o detalhe do " + nome;
         p.art.addEventListener("click", function (ev) { if (ev.target.closest && ev.target.closest("a")) { return; } abrirInversor(id); });
+        // o histórico do dia pedido ao passar o mouse (ou o foco) no inversor, como a curva da usina no cartão: quando o
+        // detalhe abre, o gráfico das strings já vem com o gravado (o dono: "eu preciso do gráfico do dia em tempo real")
+        var antesHist = null;
+        var preCarregarHist = function () {
+          clearTimeout(antesHist);
+          antesHist = setTimeout(function () { lerHistorico(id, diaEscolhido).catch(function () {}); }, 150);
+        };
+        p.art.addEventListener("pointerenter", preCarregarHist);
+        p.art.addEventListener("focusin", preCarregarHist);
       } else {
         var b = document.createElement("b"); b.textContent = nome; cab.appendChild(b);
       }
@@ -862,14 +879,9 @@
     if (p && p.abrir && p.abrir.isConnected) { p.abrir.focus(); }   // o foco volta ao inversor de onde se saiu
     else { var f = dlg.querySelector(".cos-inv-fechar"); if (f) { f.focus(); } }
   }
-  function alternarDestaque(chave) {                     // até DESTAQUES em cor; a cor fica com a string até ela sair
+  function alternarDestaque(chave) {                     // destaca e desfaz; quantas quiser (13/11/2026: sem o teto de 4)
     var d = destaques[invAberto] || (destaques[invAberto] = {});
-    if (d[chave] != null) { delete d[chave]; }
-    else {
-      var usados = {};
-      Object.keys(d).forEach(function (k) { usados[d[k]] = 1; });
-      for (var s = 0; s < DESTAQUES; s++) { if (!usados[s]) { d[chave] = s; break; } }
-    }
+    if (d[chave]) { delete d[chave]; } else { d[chave] = true; }
     aoVivoNaJanela();
   }
 
@@ -882,6 +894,7 @@
     var k = chaveHist(id, dia), g = historicos[k];
     if (pedidosHist[k]) { return pedidosHist[k]; }
     if (g && (dia || Date.now() - g.em < CURVA_MS)) { return Promise.resolve(g.h); }
+    if (falhouHist[k] && Date.now() - falhouHist[k] < 30000) { return Promise.reject({ erro: "o histórico falhou há pouco; tenta de novo em 30 s" }); }
     var p = String(id).split(":");                        // o id do inversor é "<logger>:<modbus>" (scada.parser.ts)
     if (p.length !== 2) { return Promise.reject({ erro: "o inversor não diz de qual logger é" }); }
     pedidosHist[k] = pedir("/scada/entradas/" + encodeURIComponent(p[0]) + "/" + encodeURIComponent(p[1]) + (dia ? "?dia=" + dia : ""))
@@ -927,7 +940,7 @@
     });
     bs.appendChild(det.modos);
     det.chips = document.createElement("div"); det.chips.className = "cos-inv-chips"; det.chips.hidden = true;
-    det.chips.setAttribute("role", "group"); det.chips.setAttribute("aria-label", "Destacar até " + DESTAQUES + " no gráfico");
+    det.chips.setAttribute("role", "group"); det.chips.setAttribute("aria-label", "Destacar strings no gráfico (clique de novo para desfazer)");
     bs.appendChild(det.chips);
     det.sg = document.createElement("div"); det.sg.className = "cos-inv-sg"; bs.appendChild(det.sg);
     frag.appendChild(bs);
@@ -1071,16 +1084,15 @@
   // em cor, até 4) e Todas (um só, todas em linha de fundo e até 4 em destaque, escolhidas nos botões). O eixo é o do dia
   // (5h às 19h), o mesmo da curva: a cruz anda junto nos dois.
   function dicaMulti(g, min) {
-    var linhas = [{ v: hhmm(min), t: g.nome || "" }], vals = [], comCor = 0;
+    var linhas = [];
     g.lista.forEach(function (s) {
-      var p = valorEm(s.pts, min, g.tol);
-      if (!p || p[1] == null) { if (s.cor != null) { linhas.push({ cor: s.cor, v: "sem leitura", t: s.nome }); } return; }
-      vals.push(p[1]);
-      if (s.cor != null) { linhas.push({ cor: s.cor, v: valorNa(p[1], g.un), t: s.nome }); comCor++; }
+      var p = valorEm(s.pts, min, g.tol), v = p && p[1] != null ? p[1] : null;
+      if (v == null && !s.forte) { return; }
+      linhas.push({ cor: s.cor, forte: !!s.forte, v: v == null ? "sem leitura" : valorNa(v, g.un), t: s.nome, n: v == null ? -1 : v });
     });
-    if (vals.length > comCor) {
-      linhas.push({ v: plural(vals.length, g.contar[0], g.contar[1]), t: "de " + valorNa(Math.min.apply(null, vals), g.un) + " a " + valorNa(Math.max.apply(null, vals), g.un) });
-    }
+    // a destacada primeiro; as outras da maior corrente para a menor (a que destoa para baixo fica no pé)
+    linhas.sort(function (a, b) { return (Number(b.forte) - Number(a.forte)) || (b.n - a.n); });
+    linhas.unshift({ v: hhmm(min), t: g.nome || "" });
     if (linhas.length === 1) { linhas.push({ v: "sem amostra", t: "" }); }
     return linhas;
   }
@@ -1103,7 +1115,7 @@
     var ent = hist && hist.ent.tipo !== "nada" ? hist.ent : (hoje ? entVivo : SEM_ENTRADAS);
     var quais = ent.tipo === "mppts" ? "Os MPPT" : "As strings";
     escrever(det.stTit, "textContent", quais + " " + (hoje ? "hoje" : "em " + diaCurto(dia)));
-    escrever(det.stAviso, "textContent", avisoDoHistorico(hist, hoje, dia, falhou, !!(hoje && reg && reg.t.length)));
+    escrever(det.stAviso, "textContent", avisoDoHistorico(hist, hoje, dia, falhou, !!(hoje && aberta && pontasDe === aberta.getAttribute("data-gid"))));
     var nada = ent.tipo === "nada";
     det.modos.hidden = nada;
     if (nada) {
@@ -1111,13 +1123,13 @@
       escrever(det.stDet, "textContent", "");
       return;
     }
-    var chaveCache = (reg && hoje ? reg.v : -1) + "|" + (g ? g.em : 0) + "|" + dia;
+    var chaveCache = (hoje ? versaoPontaEnt : -1) + "|" + (g ? g.em : 0) + "|" + dia;     // a ponta anda a cada leitura de 3 s
     if (det.cacheChave !== chaveCache) { det.cacheChave = chaveCache; det.cache = {}; }
     var cache = det.cache;
     var serieDe = function (chave) {
       if (cache[chave]) { return cache[chave]; }
       var base = hist && hist.series[chave] || [];
-      cache[chave] = hoje && reg && reg.gid === (aberta && aberta.getAttribute("data-gid")) ? comPontaDoRegistro(base, serieDoRegistro(reg, id, chave)) : base;
+      cache[chave] = hoje ? comPontaAoVivo(base, pontaEnt(id + "|" + chave)) : base;
       return cache[chave];
     };
     var m = modoDe(ent);
@@ -1131,7 +1143,7 @@
     var maxA = 0;
     ent.lista.forEach(function (e) { maxA = Math.max(maxA, maximo(serieDe(e.chave)), hoje ? (vivoPor[e.chave] || 0) : 0); });
     var teto = tetoBonito(maxA, 2);
-    escrever(det.stDet, "textContent", "a corrente, gravada de 5 em 5 min (45 dias)" + (hoje ? " e a ponta ao vivo desde a abertura da janela" : "") +
+    escrever(det.stDet, "textContent", "a corrente, gravada de 5 em 5 min (45 dias)" + (hoje ? " e a ponta ao vivo, de 3 em 3 s" : "") +
       " · " + (m === "todas" ? "0 a " : "todos na mesma escala, 0 a ") + rotuloDoEixo(teto, "A"));
     var comum = { un: "A", max: teto, vivo: false, semAgora: !hoje, contar: contar };
     var forma = m + "|" + formaDe(ent);
@@ -1142,7 +1154,9 @@
         ent.lista.forEach(function (e) {
           var a = document.createElement("article"); a.className = "cos-inv-sgi";
           var cab = document.createElement("div"); cab.className = "cos-inv-i-cab";
-          var b = document.createElement("b"); b.textContent = e.nome; cab.appendChild(b);
+          var b = document.createElement("b"); b.className = "cos-inv-sgi-nome";
+          var ci = document.createElement("i"); ci.className = "cos-inv-cor"; ci.setAttribute("style", estiloDaCor(corDaEntrada(e.chave))); ci.setAttribute("aria-hidden", "true");
+          b.appendChild(ci); b.appendChild(document.createTextNode(e.nome)); cab.appendChild(b);
           var vv = document.createElement("span"); vv.className = "cos-inv-i-kw"; cab.appendChild(vv);
           a.appendChild(cab);
           var host = document.createElement("div"); host.className = "cos-inv-graf"; a.appendChild(host);
@@ -1157,26 +1171,24 @@
           var b = document.createElement("b"); b.textContent = gr.nome; cab.appendChild(b);
           var qt = document.createElement("span"); qt.className = "d"; qt.textContent = plural(gr.itens.length, "string", "strings"); cab.appendChild(qt);
           a.appendChild(cab);
-          var comCor = gr.itens.length <= DESTAQUES;
           var leg = document.createElement("ul"); leg.className = "cos-inv-leg"; var valores = {};
-          gr.itens.forEach(function (e, n) {
+          gr.itens.forEach(function (e) {
             var li = document.createElement("li");
-            var cor = document.createElement("i"); cor.className = "cos-inv-cor" + (comCor ? " pg-c" + (n + 1) : ""); cor.setAttribute("aria-hidden", "true"); li.appendChild(cor);
+            var cor = document.createElement("i"); cor.className = "cos-inv-cor"; cor.setAttribute("style", estiloDaCor(corDaEntrada(e.chave))); cor.setAttribute("aria-hidden", "true"); li.appendChild(cor);
             li.appendChild(document.createTextNode(e.nome + " "));
             var vv = document.createElement("span"); vv.className = "gc-num"; li.appendChild(vv); valores[e.chave] = vv;
             leg.appendChild(li);
           });
-          if (!comCor) { var nt = document.createElement("li"); nt.className = "d"; nt.textContent = "mais de " + DESTAQUES + ": passe o mouse para ler cada uma"; leg.appendChild(nt); }
           a.appendChild(leg);
           var host = document.createElement("div"); host.className = "cos-inv-graf"; a.appendChild(host);
-          gm.appendChild(a); det.hosts.push({ host: host, grupo: gr, comCor: comCor, valores: valores });
+          gm.appendChild(a); det.hosts.push({ host: host, grupo: gr, valores: valores });
         });
         det.sg.appendChild(gm);
       } else {
         ent.lista.forEach(function (e) {
           var b = document.createElement("button"); b.type = "button"; b.className = "gc-chip cos-inv-chip";
           b.setAttribute("data-foco", "chip:" + e.chave); b.setAttribute("aria-pressed", "false");
-          var cor = document.createElement("i"); cor.className = "cos-inv-cor"; cor.setAttribute("aria-hidden", "true"); b.appendChild(cor);
+          var cor = document.createElement("i"); cor.className = "cos-inv-cor"; cor.setAttribute("style", estiloDaCor(corDaEntrada(e.chave))); cor.setAttribute("aria-hidden", "true"); b.appendChild(cor);
           b.appendChild(document.createTextNode(e.nome));
           b.addEventListener("click", function () { alternarDestaque(e.chave); });
           det.chips.appendChild(b); det.chipsPor[e.chave] = { b: b, cor: cor };
@@ -1187,7 +1199,7 @@
     }
     det.chips.hidden = m !== "todas";
     var larguras = det.hosts.map(function (x) { return x.host.clientWidth; });  // as larguras antes de desenhar
-    var sel = destaques[id] || {}, nSel = Object.keys(sel).length, chipsPor = det.chipsPor;
+    var sel = destaques[id] || {}, nSel = Object.keys(sel).length, chipsPor = det.chipsPor;     // os destacados (sem teto)
     // o valor ao lado do nome: o de agora em hoje; o máximo do dia num dia que passou
     var rotuloDoValor = function (no, e) {
       if (hoje) { no.textContent = vivoPor[e.chave] == null ? "sem leitura" : amp(vivoPor[e.chave]); }
@@ -1198,7 +1210,7 @@
       if (x.e) {
         var e = x.e;
         if (cruzEm == null) { rotuloDoValor(x.valor, e); }
-        grafico(x.host, [{ pts: serieDe(e.chave) }], com(comum, { h: 64, nome: e.nome, rotulo: "A corrente de " + e.nome + " " + (hoje ? "hoje" : "em " + diaCurto(dia)),
+        grafico(x.host, [{ pts: serieDe(e.chave), cor: corDaEntrada(e.chave) }], com(comum, { h: 64, nome: e.nome, rotulo: "A corrente de " + e.nome + " " + (hoje ? "hoje" : "em " + diaCurto(dia)),
           aoMarcar: function (pt, min) {
             if (min == null) { rotuloDoValor(x.valor, e); return; }
             x.valor.textContent = pt && pt[1] != null ? amp(pt[1]) : "—";
@@ -1208,18 +1220,19 @@
         x.grupo.itens.forEach(function (e) {
           escrever(x.valores[e.chave], "textContent", hoje ? (vivoPor[e.chave] == null ? "sem leitura" : amp(vivoPor[e.chave])) : "");
         });
-        grafico(x.host, x.grupo.itens.map(function (e, q) { return { pts: serieDe(e.chave), nome: e.nome, cor: x.comCor ? q : null }; }),
+        grafico(x.host, x.grupo.itens.map(function (e) { return { pts: serieDe(e.chave), nome: e.nome, cor: corDaEntrada(e.chave) }; }),
           com(comum, { h: 150, eixoX: true, eixoY: true, nome: x.grupo.nome, rotulo: "As strings do " + x.grupo.nome + " " + (hoje ? "hoje" : "em " + diaCurto(dia)), dica: dicaMulti }), larguras[n]);
       } else {
         ent.lista.forEach(function (e) {
-          var ch = chipsPor[e.chave], s = sel[e.chave], marcado = s != null;
+          var ch = chipsPor[e.chave], marcado = !!sel[e.chave];
           if (!ch) { return; }
-          escrever(ch.b, "disabled", !marcado && nSel >= DESTAQUES);
           ch.b.setAttribute("aria-pressed", String(marcado));
-          escrever(ch.cor, "className", "cos-inv-cor" + (marcado ? " pg-c" + (s + 1) : ""));
           escrever(ch.b, "title", hoje ? (vivoPor[e.chave] == null ? e.nome + ": sem leitura agora" : e.nome + ": " + amp(vivoPor[e.chave]) + " agora") : e.nome);
         });
-        grafico(x.host, ent.lista.map(function (e) { return { pts: serieDe(e.chave), nome: e.nome, cor: sel[e.chave] != null ? sel[e.chave] : null }; }),
+        // toda string na cor dela; com alguma destacada, ela engrossa e as outras esmaecem (sem nenhuma, todas por inteiro)
+        grafico(x.host, ent.lista.map(function (e) {
+          return { pts: serieDe(e.chave), nome: e.nome, cor: corDaEntrada(e.chave), forte: !!sel[e.chave], fraca: nSel > 0 && !sel[e.chave] };
+        }),
           com(comum, { h: 240, eixoX: true, eixoY: true, nome: ent.tipo === "mppts" ? "todos os MPPT" : "todas as strings",
             rotulo: quais + " " + (hoje ? "hoje" : "em " + diaCurto(dia)), dica: dicaMulti }), larguras[n]);
       }
@@ -1237,9 +1250,13 @@
     var dia = diaEscolhido, hoje = ehHoje(), guardada = curvas[chaveDaCurva(gid, dia)];
     curva = guardada ? guardada.cv : null; curvaEm = guardada ? guardada.em : 0;
     (c.inversores || []).forEach(function (i) { anotarPonta("i:" + i.id, i.pac, vivoEm); });
-    // o registro das entradas desde a abertura (só desta usina); a leitura velha do cartão entra como buraco
-    if (!reg || reg.gid !== gid) { reg = novoRegistro(gid, vivoEm); }
-    anotarRegistro(reg, c.fresca === false ? [] : c.inversores, vivoEm);
+    // a ponta das entradas de hoje: cada leitura de 3 s, só desta usina (outra usina limpa); leitura velha não entra
+    if (pontasDe !== gid) { limparPontaEnt(); pontasDe = gid; }
+    if (c.fresca !== false) {
+      (c.inversores || []).forEach(function (i) {
+        entradasDoInversor(i).lista.forEach(function (e) { anotarPontaEnt(i.id + "|" + e.chave, e.valor, vivoEm); });
+      });
+    }
     atualizar(c, curva);
     escrever(lido, "textContent", "ao vivo · " + hhmmss(vivoEm) + (!curva ? " · lendo a curva do dia…"
       : hoje ? " · curva gravada lida às " + hhmmss(curvaEm) : " · curva gravada de " + diaCurto(dia)));
@@ -1303,7 +1320,7 @@
     corpo.textContent = ""; corpo.appendChild(p); partes = null; assinatura = "";
   }
   function abrir(art) {
-    sairDoDetalhe(); reg = null; destaques = {};          // outra usina: o registro e os destaques são dela
+    sairDoDetalhe(); limparPontaEnt(); pontasDe = null; destaques = {};   // outra usina: a ponta e os destaques são dela
     diaEscolhido = "";                                    // e a janela abre sempre em hoje
     aberta = art; curva = null; partes = null; assinatura = "";
     var gid = art.getAttribute("data-gid");
@@ -1341,7 +1358,7 @@
       limparTodos();
     } finally {
       aberta = null; curva = null; partes = null; assinatura = "";
-      sairDoDetalhe(); reg = null; destaques = {};        // o registro das entradas é da janela aberta: some ao fechar
+      sairDoDetalhe(); limparPontaEnt(); pontasDe = null; destaques = {};   // a ponta das entradas é da janela aberta: some ao fechar
       diaEscolhido = "";
       graficos = []; if (dlg.open) { dlg.close(); }
     }

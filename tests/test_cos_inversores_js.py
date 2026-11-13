@@ -101,40 +101,31 @@ def test_as_series_nunca_inventam_mppt():
 T0 = 1794574800000
 
 
-def test_o_registro_um_ponto_a_cada_20_s_com_buraco_onde_nao_houve_leitura():
+def test_a_ponta_das_entradas_anda_a_cada_leitura_de_3_s():
+    # 13/11/2026, o dono no ar: "as strings não mostram o gráfico do dia, apenas somente depois de 50 segundos
+    # praticamente. Eu preciso do gráfico do dia em tempo real". A 1ª versão anotava um ponto a cada 20 s; agora cada
+    # leitura de 3 s entra, como a ponta da curva. Valor que repete não empilha ponto: o último anda até agora.
     r = rodar("""
-    const inv = JSON.parse(A[0]), t0 = +A[1], reg = N.novoRegistro("scada-exa01", t0), passos = [];
-    passos.push(N.anotarRegistro(reg, [inv], t0));
-    passos.push(N.anotarRegistro(reg, [inv], t0 + 3000));            // 3 s depois: não anota (um ponto a cada 20 s)
-    const sem2 = JSON.parse(JSON.stringify(inv)); sem2.strings_sem_mppt.splice(1, 1);
-    passos.push(N.anotarRegistro(reg, [sem2], t0 + 20000));          // a String2 não veio: buraco nela
-    passos.push(N.anotarRegistro(reg, [], t0 + 40000));              // a leitura da usina estava velha: buraco em todas
-    const nova = JSON.parse(JSON.stringify(inv)); nova.strings_sem_mppt.push({indice: 9, mppt: null, corrente: 4.5, sem_corrente: false});
-    passos.push(N.anotarRegistro(reg, [nova], t0 + 60000));          // a String9 apareceu: o passado dela é buraco
-    process.stdout.write(JSON.stringify({passos, t: reg.t, v: reg.v, s1: N.serieDoRegistro(reg, inv.id, "s1"),
-      s2: N.serieDoRegistro(reg, inv.id, "s2"), s9: N.serieDoRegistro(reg, inv.id, "s9"),
-      outro: N.serieDoRegistro(reg, "EXA99:1", "s1")}));
-    """, json.dumps(HUAWEI), str(T0))
-    assert r["passos"] == [True, False, True, True, True] and r["v"] == 4
-    assert [round(m, 4) for m in r["t"]] == [600.0, round(600 + 1 / 3, 4), round(600 + 2 / 3, 4), 601.0]
-    assert [p[1] for p in r["s1"]] == [8.1, 8.1, None, 8.1]
-    assert [p[1] for p in r["s2"]] == [0.0, None, None, 0.0]
-    assert [p[1] for p in r["s9"]] == [None, None, None, 4.5]
-    assert r["outro"] == []
-
-
-def test_o_registro_recomeca_na_virada_do_dia_e_guarda_no_maximo_15_h():
-    t = T0 - (9 * 60 + 30) * 60000                     # 00:30: as 15 h de pontos cabem no mesmo dia
-    r = rodar("""
-    const inv = JSON.parse(A[0]), t0 = +A[1], reg = N.novoRegistro("scada-exa01", t0);
-    for (let k = 0; k <= N.REG_MAX; k++) { N.anotarRegistro(reg, [inv], t0 + k * N.REG_MS); }
-    const cheio = reg.t.length, primeiro = reg.t[0], serie = N.serieDoRegistro(reg, inv.id, "s1").length;
-    const meia = t0 + 23.5 * 3600000 + 1000;                         // 00:00:01 do dia seguinte
-    N.anotarRegistro(reg, [inv], meia);
-    process.stdout.write(JSON.stringify({cheio, primeiro, serie, depois: reg.t.length, desde: reg.desde, meia, minuto: reg.t[0]}));
-    """, json.dumps(HUAWEI), str(t))
-    assert r["cheio"] == r["serie"] == 2700 and r["primeiro"] > 30       # o mais antigo saiu
-    assert r["depois"] == 1 and r["desde"] == r["meia"] and r["minuto"] < 0.1
+    const t0 = +A[0], k = "EXA01:1|s1";
+    Date.now = () => t0 + 20000;                    // o relógio parado em 13/11, 10:00:20 (nada de bomba-relógio)
+    N.limparPontaEnt();
+    N.anotarPontaEnt(k, 8.1, t0);
+    N.anotarPontaEnt(k, 8.2, t0 + 3000);            // 3 s depois: já é ponto
+    N.anotarPontaEnt(k, 8.2, t0 + 6000);
+    N.anotarPontaEnt(k, 8.2, t0 + 9000);            // repetiu: o último anda, sem ponto novo
+    N.anotarPontaEnt(k, 8.3, t0 + 12000);
+    const antes = N.pontaEnt(k).map((p) => [Math.round(p[0] * 60), p[1]]);
+    N.anotarPontaEnt(k, 8.4, t0 + 15 * 3600000);    // 01:00 do dia seguinte: a de ontem sai
+    Date.now = () => t0 + 15 * 3600000 + 1000;
+    const depois = N.pontaEnt(k).length;
+    Date.now = () => t0 + 20000;
+    N.limparPontaEnt();
+    for (let n = 0; n <= N.PONTA_MAX; n++) { N.anotarPontaEnt(k, n, t0 + n * 3000); }
+    process.stdout.write(JSON.stringify({antes, depois, cheio: N.pontaEnt(k).length, outra: N.pontaEnt("EXA01:1|s2")}));
+    """, str(T0))
+    assert r["antes"] == [[36000, 8.1], [36003, 8.2], [36009, 8.2], [36012, 8.3]]      # em segundos do dia: 10:00:00...
+    assert r["cheio"] == 400 and r["outra"] == []
+    assert r["depois"] == 1                                                            # no dia seguinte, só o ponto dele
 
 
 def test_as_marcas_do_eixo_de_um_trecho():
@@ -210,9 +201,9 @@ def test_a_ponta_ao_vivo_entra_depois_do_ultimo_balde_gravado():
     r = rodar("""
     const base = [[600, 8.1], [605, 8.2], [610, null]];
     process.stdout.write(JSON.stringify([
-      N.comPontaDoRegistro(base, [[604, 9], [606, 8.3], [606.5, 8.4]]),     // só o que vem depois de 10:05
-      N.comPontaDoRegistro(base, [[640, 8.5]]),                             // a janela abriu às 10:40: buraco no meio
-      N.comPontaDoRegistro(base, []),
+      N.comPontaAoVivo(base, [[604, 9], [606, 8.3], [606.5, 8.4]]),     // só o que vem depois de 10:05
+      N.comPontaAoVivo(base, [[640, 8.5]]),                             // a janela abriu às 10:40: buraco no meio
+      N.comPontaAoVivo(base, []),
     ]));""")
     assert r[0] == [[600, 8.1], [605, 8.2], [610, None], [606, 8.3], [606.5, 8.4]]
     assert r[1] == [[600, 8.1], [605, 8.2], [610, None], [622.5, None], [640, 8.5]]
@@ -243,3 +234,32 @@ def test_o_dia_de_sao_paulo_ontem_e_o_limite_de_40_dias():
       N.diaMenos("2026-11-13", 1), N.diaMenos("2026-03-01", 1), N.diaMenos("2026-11-13", N.DIAS_ATRAS),
       N.diaCurto("2026-11-09")]));""")
     assert r == ["2026-11-13", "2026-11-14", "2026-11-12", "2026-02-28", "2026-10-04", "09/11"]
+
+
+# --- as cores das strings (13/11/2026) ----------------------------------------------------------------------------------
+# O dono, no modo Todas: "eu preciso que todas as strings apareçam com uma cor destacada, aí só estou podendo selecionar
+# 4". Toda string tem a cor do índice dela (24 tons, nos dois temas), e o chip destaca, sem teto.
+
+CSS = JS.with_name("inversores.css")
+
+
+def test_a_cor_e_a_do_indice_da_string_em_todo_modo():
+    r = rodar("""process.stdout.write(JSON.stringify([N.corDaEntrada("s1"), N.corDaEntrada("s24"), N.corDaEntrada("s25"),
+      N.corDaEntrada("m3"), N.corDaEntrada("s7~2"), N.N_CORES, N.estiloDaCor(7)]));""")
+    assert r == [1, 24, 1, 3, 7, 24, "--cor:var(--cos-str-7)"]
+
+
+def test_a_paleta_tem_24_tons_nos_dois_temas_e_nenhum_teto_de_destaque():
+    css = CSS.read_text(encoding="utf-8")
+    escuro = css[css.index(":root{"):css.index("}", css.index(":root{"))]
+    claro = css[css.index(':root[data-tema="claro"]{'):css.index("}", css.index(':root[data-tema="claro"]{'))]
+    for bloco in (escuro, claro):
+        cores = re.findall(r"--cos-str-(\d+):(#[0-9a-f]{6});", bloco)
+        assert [int(n) for n, _ in cores] == list(range(1, 25))
+        assert len({c for _, c in cores}) == 24                       # 24 tons diferentes
+    assert escuro != claro
+    texto = JS.read_text(encoding="utf-8")
+    # as 4 cores de antes e o teto saíram; a cor vai ao SVG só pelo número (`--cor`), nunca um hex no JavaScript
+    assert "DESTAQUES" not in texto and "pg-c1" not in texto and "pg-c1" not in css
+    assert not re.search(r"#[0-9a-fA-F]{6}\b", texto)
+    assert ".pg-s--forte{" in css and ".pg-s--fraca{" in css

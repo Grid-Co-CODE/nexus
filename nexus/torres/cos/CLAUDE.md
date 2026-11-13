@@ -461,7 +461,10 @@ Ignora esse monitoramento que já existe no nexus" (a Performance › Tempo real
   botão e troca o corpo pelo detalhe (`.cos-inv-det` no `cos/_inversores.html`; "Voltar à usina" e o Esc voltam, com o
   foco no inversor; o segundo Esc fecha). Mostra a curva dele (a gravada e a ponta), as entradas de agora (a corrente de
   cada string sob o MPPT que o coletor declarou; tensão, corrente e potência do MPPT) e as entradas **do dia**: Individual,
-  Por MPPT ou Todas (até 4 em destaque). A regra das entradas é a da Ronda COS (`entradas-do-inversor.ts`), portada:
+  Por MPPT ou Todas. Toda string tem a cor do índice dela (24 tons em ordem fixa, `--cos-str-1..24` no
+  `static/cos/inversores.css`, escuro e claro; a mesma nos três modos), e no Todas o chip DESTACA (engrossa a escolhida e
+  esmaece as outras; várias, sem teto; clicar de novo desfaz) — o dono, 13/11: "eu preciso que todas as strings apareçam
+  com uma cor destacada, aí só estou podendo selecionar 4". A regra das entradas é a da Ronda COS (`entradas-do-inversor.ts`), portada:
   nunca um MPPT inventado (o Huawei, pelo SmartLogger, manda strings sem MPPT e não tem "Por MPPT"; o Sungrow sem leitura
   diz "o coletor não lê MPPT nem string deste inversor"). As contas (`NexusCosInversores`) têm teste no node:
   `tests/test_cos_inversores_js.py`. O Esc é pelo `cancel` do `<dialog>`: a versão pelo keydown, com uma marca desligada
@@ -472,8 +475,9 @@ Ignora esse monitoramento que já existe no nexus" (a Performance › Tempo real
   no topo fixo), para a curva da usina, a de cada inversor e as entradas do detalhe. As entradas vêm da `scada_entradas`
   da Ronda COS (5 em 5 min, 05:00 às 19:00, 45 dias), pela rota `.../ronda-api/scada/entradas/<logger>/<modbus>?dia=`
   (o Andamento `/api/nexus/geracao/scada-entradas`); a curva leva o `?dia=`. Cópia no servidor: 60 s para hoje, 1 h para
-  um dia que passou (`AND.TTL_DIA_PASSADO_S`). Em hoje, a ponta é o registro do navegador desde a abertura (um ponto a
-  cada 20 s, some ao fechar), encaixado depois do último balde gravado, como a ponta da curva; num dia que passou não há
+  um dia que passou (`AND.TTL_DIA_PASSADO_S`). Em hoje, a ponta é a de 3 s, como a da curva (cada leitura da usina
+  aberta; a 1ª versão anotava de 20 em 20 s, e o dono viu o gráfico "somente depois de 50 segundos"), encaixada depois do
+  último balde gravado, e o histórico do dia já é pedido ao passar o mouse no inversor; num dia que passou não há
   ponta, e a releitura de 3 s só mexe no estado e nas entradas de agora. Dia sem histórico diz por quê ("o histórico das
   strings começou em DD/MM"). 21 usinas inteiras vêm sem MPPT e sem string (medido em 13/11): é do coletor, e o detalhe
   delas mostra só a curva.
