@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% block titulo %}{{ tela.nome }}{% endblock %}
+{% block conteudo %}
+<link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='hseq.css') }}">
+{# Colaboradores (Segurança · HSEQ, 05/11/2026): as pessoas do cadastro do Nexus (nexus/hseq/colaboradores.py), com a
+   documentação de segurança de cada uma desde 06/11/2026 (nexus/hseq/documentacao.py): o resumo na lista, a ficha no nome.
+   O desenho do EPI e EPC: a faixa de números que filtra a tabela (aqui, a situação: Ativos, Desligados, Todos), os
+   filtros em squircle e a tabela. Incluir ou corrigir alguém é no cadastro (Pessoas → Colaboradores Operação). #}
+{% from 'hseq/_legenda.html' import termo %}
+{% from '_explica.html' import explica %}
+{% set pronto = not leitura.erro %}
+<div class="campo-nativa">
+  <div class="cn-cab">
+    <div><p class="gc-eyebrow">{{ torre.nome }}</p><div class="gc-titulo-explica"><h1 class="cn-titulo">{{ tela.nome }}</h1>
+    {% call explica('De onde vem', 'As pessoas vêm do cadastro do Nexus (Pessoas → Colaboradores Operação). Para incluir, corrigir ou desligar alguém, use o cadastro. A documentação de segurança (ASO, NRs, integrações, anuências e documentos) é registrada aqui, na ficha de cada pessoa, ou carregada da planilha da Segurança.', termos=True) %}
+    {{ termo('Ativo', 'ok') }}<dd>O status de contratação da ficha é Ativo, ou está vazio (a mesma régua do Campo).</dd>
+    {{ termo('Desligado', 'neutro') }}<dd>O status de contratação da ficha é Desligado. A ficha continua no cadastro e aparece no filtro Desligados.</dd>
+    {{ termo('Região de campo') }}<dd>A região da equipe da pessoa, na estrutura de O&amp;M.</dd>
+    {{ termo('Vencido', 'critico') }}<dd>A validade passou: a do ASO e da CNH é a data registrada; a das NRs 10, 10 SEP e 35 é a data de realização mais 2 anos.</dd>
+    {{ termo('Pendente', 'alerta') }}<dd>Pendente assinatura, solicitado ou vence em até 30 dias.</dd>
+  {% endcall %}</div><p class="cn-pergunta">{{ tela.pergunta }}</p></div>
+    <div class="cn-frescor">cadastro do Nexus + documentação da Segurança<br><b>lido às {{ lido }}</b></div>
+  </div>
+  {% if leitura.erro %}<div class="cn-erro" role="alert"><b>{{ leitura.erro }}.</b></div>
+  {% elif d.get('sem_chave') %}<div class="cn-erro" role="alert"><b>Sem a chave do cadastro, os nomes não aparecem.</b>
+    A tela mostra o número de cada pessoa no cadastro, e a documentação não abre (vai cifrada).</div>
+  {% elif d.get('sem_nome') %}<div class="cn-erro" role="alert"><b>{{ d.sem_nome }} ficha(s) sem nome legível.</b>
+    Aparecem pelo número da pessoa: confira essas fichas no cadastro.</div>{% endif %}
+  {% if doc_erro %}<div class="cn-erro" role="alert"><b>Não consegui ler a documentação no banco.</b> {{ doc_erro }}</div>{% endif %}
+  {% if ok %}<p class="hs-feito" role="status">{{ ok }}</p>{% endif %}
+  {% if erro %}<div class="cn-erro" role="alert"><b>{{ erro }}</b></div>{% endif %}
+
+  <form class="cn-filtros" method="get">
+    <label class="ext-filtro"><span class="gc-rotulo">Vínculo</span>
+    <select class="gc-campo" id="col-vinculo" name="vinculo" onchange="this.form.submit()">
+      <option value="">Todos</option>{% for v in vinculos %}<option value="{{ v }}"{% if v == fl.vinculo %} selected{% endif %}>{{ v }}</option>{% endfor %}
+    </select></label>
+    <label class="ext-filtro"><span class="gc-rotulo">Cargo</span>
+    <select class="gc-campo" id="col-cargo" name="cargo" onchange="this.form.submit()">
+      <option value="">Todos</option>{% for v in cargos %}<option value="{{ v }}"{% if v == fl.cargo %} selected{% endif %}>{{ v }}</option>{% endfor %}
+    </select></label>
+    <label class="ext-filtro"><span class="gc-rotulo">Região de campo</span>
+    <select class="gc-campo" id="col-regiao" name="regiao" onchange="this.form.submit()">
+      <option value="">Todas</option>{% for v in regioes %}<option value="{{ v }}"{% if v == fl.regiao %} selected{% endif %}>{{ v }}</option>{% endfor %}
+    </select></label>
+    <label class="ext-filtro"><span class="gc-rotulo">Documentação</span>
+    <select class="gc-campo" id="col-doc" name="doc" onchange="this.form.submit()">
+      <option value="">Todas</option>{% for k, v in filtros_doc.items() %}<option value="{{ k }}"{% if k == fdoc %} selected{% endif %}>{{ v }}</option>{% endfor %}
+    </select></label>
+    <input class="gc-campo" type="search" name="q" value="{{ q }}" placeholder="nome, cargo ou equipe" aria-label="Buscar">
+    {% if request.args.get('situacao') %}<input type="hidden" name="situacao" value="{{ situacao }}">{% endif %}
+  </form>
+
+  {% if pronto %}
+  {# a situação: Ativos abre (quem está na operação); Desligados mantém à vista quem saiu (05/11/2026) #}
+  <div class="cn-numeros cn-numeros--filtro">
+    <a href="{{ url(situacao=None) }}"{% if situacao == 'ativos' %} aria-current="page"{% endif %}><span class="gc-rotulo">Ativos</span><span class="v{% if contagem.ativos %} cn-t-ok{% endif %}">{{ contagem.ativos }}</span><span class="d">na operação</span></a>
+    <a href="{{ url(situacao='desligados') }}"{% if situacao == 'desligados' %} aria-current="page"{% endif %}><span class="gc-rotulo">Desligados</span><span class="v">{{ contagem.desligados }}</span><span class="d">continuam no cadastro</span></a>
+    <a href="{{ url(situacao='todos') }}"{% if situacao == 'todos' %} aria-current="page"{% endif %}><span class="gc-rotulo">Todos</span><span class="v">{{ contagem.todos }}</span><span class="d">fichas do cadastro</span></a>
+  </div>
+
+  <div class="cn-tab cn-tab--compacta ext-tab"><table>
+    <thead><tr><th>Nome</th><th>Vínculo</th><th>Cargo</th><th>Equipe</th><th>Status</th><th>Documentação</th></tr></thead>
+    <tbody>
+    {% for x in lista[:limite] %}
+      <tr><td class="ext-usina"><span class="ext-par"><a href="{{ url_for('.colaborador', pessoa_id=x.pessoa_id) }}">{{ x.nome }}</a>{% if not x.com_nome %}<span class="det cn-t-info">sem nome legível</span>{% endif %}</span></td>
+        <td>{{ x.vinculo or '—' }}</td>
+        <td>{{ x.cargo or '—' }}</td>
+        <td><span class="ext-par"><span>{{ x.equipe or '—' }}</span>{% if x.regiao %}<span class="det">{{ x.regiao }}</span>{% endif %}</span></td>
+        <td>{% if x.desligado %}<span class="cn-st cn-t-neutro">Desligado</span>{% elif x.status == sem_status %}<span class="cn-st cn-t-info">{{ sem_status }}</span>{% else %}<span class="cn-st cn-t-ok">{{ x.status }}</span>{% endif %}</td>
+        <td>{% set r = x.doc %}{% if not r.registrados %}<span class="cn-t-neutro">sem registro</span>{% elif not r.pendencias %}<span class="cn-st cn-t-ok">Em dia</span>{% else %}<span class="ext-par">{% for e in ('vencido', 'falta', 'pendente_assinatura', 'solicitado', 'vence_logo') %}{% if r.contagem[e] %}<span class="cn-t-{{ estados[e][1] }}"><b>{{ r.contagem[e] }}</b> {{ estados[e][0]|lower }}</span>{% endif %}{% endfor %}</span>{% endif %}</td></tr>
+    {% else %}<tr><td colspan="6" class="mudo">Nenhum colaborador com esses filtros.</td></tr>{% endfor %}
+    </tbody>
+  </table></div>
+  {% if lista|length > limite %}<p class="mudo">Mostrando {{ limite }} de {{ lista|length }}: use os filtros ou a busca para afunilar.</p>{% endif %}
+  {% endif %}
+
+  {% if pode %}
+  {# a planilha da Segurança pela tela (06/11/2026): Conferir não grava; Gravar grava só o que muda #}
+  <form class="cn-filtros col-planilha" method="post" action="{{ url_for('.colaboradores_planilha') }}" enctype="multipart/form-data">
+    <label class="ext-filtro"><span class="gc-rotulo">Planilha da Segurança</span>
+    <input class="gc-campo" type="file" name="arquivo" accept=".xlsx" required></label>
+    <button class="gc-btn gc-btn--ui gc-btn--contorno" type="submit" name="acao" value="conferir">Conferir a planilha</button>
+  </form>
+  {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block titulo %}{{ x.nome }} · {{ tela.nome }}{% endblock %}
+{% block conteudo %}
+<link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='hseq.css') }}">
+{# A ficha de UM colaborador na Segurança (06/11/2026, nexus/hseq/documentacao.py): cada item de documentação com a
+   situação, a data e a validade pela norma; quem é da Segurança registra a situação nova em cada linha (o último
+   registro vale; o livro só acrescenta). #}
+{% from 'hseq/_legenda.html' import termo %}
+{% from '_explica.html' import explica %}
+<div class="campo-nativa">
+  <div class="cn-cab">
+    <div><p class="gc-eyebrow"><a href="{{ url_for('.colaboradores') }}">{{ torre.nome }} · {{ tela.nome }}</a></p>
+    <div class="gc-titulo-explica"><h1 class="cn-titulo">{{ x.nome }}</h1>
+    {% call explica('Como ler a documentação', 'Cada item guarda a última situação registrada, pela tela ou pela planilha da Segurança. Nas NRs a data é a de realização; no ASO e na CNH, a de validade.', termos=True) %}
+    {{ termo('Vencido', 'critico') }}<dd>A validade passou. NR-10, NR-10 SEP e NR-35 valem 2 anos a partir da realização.</dd>
+    {{ termo('Vence em breve', 'alerta') }}<dd>Vence em até {{ alerta_dias }} dias.</dd>
+    {{ termo('Sem prazo') }}<dd>NR-06, NR-12, NR-24, direção defensiva e integrações ainda não têm periodicidade definida: não vencem.</dd>
+  {% endcall %}</div>
+    <p class="cn-pergunta">{{ x.vinculo or '—' }} · {{ x.cargo or 'sem cargo' }} · {{ x.equipe or 'sem equipe' }}{% if x.regiao %} ({{ x.regiao }}){% endif %} ·
+      {% if x.desligado %}<span class="cn-t-neutro">Desligado</span>{% elif x.status == sem_status %}<span class="cn-t-info">{{ sem_status }}</span>{% else %}<span class="cn-t-ok">{{ x.status }}</span>{% endif %}</p></div>
+    <div class="cn-frescor">{{ resumo.registrados }} de {{ itens|length }} itens registrados<br><b>{{ resumo.pendencias }} pendência{{ '' if resumo.pendencias == 1 else 's' }}</b></div>
+  </div>
+  {% if doc_erro %}<div class="cn-erro" role="alert"><b>Não consegui ler a documentação no banco.</b> {{ doc_erro }}</div>{% endif %}
+  {% if ok %}<p class="hs-feito" role="status">{{ ok }}</p>{% endif %}
+  {% if erro %}<div class="cn-erro" role="alert"><b>{{ erro }}</b></div>{% endif %}
+
+  <div class="cn-tab cn-tab--compacta ext-tab col-ficha"><table>
+    <thead><tr><th>Item</th><th>Situação</th><th>Data</th><th>Validade</th><th>Registrado</th>{% if pode %}<th>Registrar</th>{% endif %}</tr></thead>
+    <tbody>
+    {% for l in itens %}{% set i = l.item %}{% set r = l.reg %}{% set e = estados[l.estado] %}
+      <tr id="item-{{ i.id }}"><td><span class="ext-par"><span>{{ i.rotulo }}</span>{% if i.norma %}<span class="det">{{ i.norma }}</span>{% endif %}</span></td>
+        <td data-r="Situação"><span class="cn-st cn-t-{{ e[1] }}">{{ e[0] }}</span></td>
+        <td class="m" data-r="Data">{{ r.data.strftime('%d/%m/%Y') if r and r.data else '—' }}</td>
+        <td data-r="Validade">{% if l.vence %}<span class="ext-par"><span class="m">{{ l.vence.strftime('%d/%m/%Y') }}</span><span class="det cn-t-{{ e[1] }}">{{ 'venceu há ' ~ (-l.dias) ~ ' d' if l.dias < 0 else ('vence hoje' if l.dias == 0 else 'faltam ' ~ l.dias ~ ' d') }}</span></span>{% elif r and r.situacao == 'valido' and i.tipo == 'realizacao' %}<span class="mudo">sem prazo</span>{% else %}<span class="mudo">—</span>{% endif %}</td>
+        <td data-r="Registrado">{% if r %}<span class="ext-par"><span class="m">{{ r.registrado_em[8:10] }}/{{ r.registrado_em[5:7] }}/{{ r.registrado_em[:4] }}</span><span class="det">{{ 'pela planilha' if r.origem == 'planilha' else 'pela tela' }}</span></span>{% else %}<span class="mudo">—</span>{% endif %}</td>
+        {% if pode %}<td data-r="Registrar"><form class="col-reg" method="post" action="{{ url_for('.colaborador_item', pessoa_id=x.pessoa_id) }}">
+          <input type="hidden" name="item" value="{{ i.id }}">
+          <select class="gc-campo" name="situacao" aria-label="Situação de {{ i.rotulo }}">{% for k, v in situacoes.items() %}<option value="{{ k }}"{% if r and r.situacao == k %} selected{% endif %}>{{ v }}</option>{% endfor %}</select>
+          {% if i.tipo != 'situacao' %}<input class="gc-campo col-data" type="text" inputmode="numeric" name="data" placeholder="dd/mm/aaaa" maxlength="10" value="{{ r.data.strftime('%d/%m/%Y') if r and r.data else '' }}" aria-label="{{ 'Validade' if i.tipo == 'validade' else 'Data de realização' }} de {{ i.rotulo }}" title="{{ 'Validade' if i.tipo == 'validade' else 'Data de realização' }}">{% endif %}
+          <button class="gc-btn gc-btn--ui gc-btn--contorno" type="submit">Salvar</button>
+        </form></td>{% endif %}</tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+  <p class="mudo"><a href="{{ url_for('.colaboradores') }}">Voltar aos colaboradores</a></p>
+</div>
+{% endblock %}

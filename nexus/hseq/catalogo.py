@@ -79,6 +79,24 @@ FATOS = (
                     "nome nem e-mail de pessoa (o link da Mesa leva o número da pessoa, ?r=). Assinado (assinatura, HMAC "
                     "com a chave derivada da NEXUS_PESSOA_HMAC, rótulo nexus:hseq:email): o App só manda a linha "
                     "assinada e acha o e-mail pelo código"),
+    # a documentação de segurança de cada colaborador (06/11/2026, a Segurança: "puxar os dados dos colaboradores de
+    # acordo com a base já utilizada, porém quero editar/incluir esses itens da planilha"): o Nexus é a FONTE; a tela
+    # Colaboradores edita e carrega a planilha. Registrado antes da 1ª gravação
+    Fato("documentacao_colaborador", "Documentação de segurança do colaborador", "hseq",
+         "nexus_hseq_documentacao · fato_documentacao",
+         "1 linha = 1 registro da situação de 1 item de documentação (ASO, NR, integração, anuência, documento) de 1 "
+         "pessoa; vale o último de cada pessoa e item",
+         _d(data=("id", "data_id (o dia de Brasília do registro)"),
+            pessoa=("id", "pessoa_id (a ficha do cadastro; a planilha casa pelo nome, na memória, e nunca chuta) + "
+                          "registrado_por_hmac (quem registrou; o nome só cifrado)")),
+         tipo="sem_medida", chave=("registrado_em", "pessoa_id", "item"),
+         fontes=("nexus_hseq_documentacao · fato_documentacao",),
+         janela_origem="o Nexus é a fonte (só acrescenta)",
+         observacao="item (domínio: documentacao.ITENS) e origem (tela ou planilha) em claro. A situação (Válido, Falta, "
+                    "Pendente assinatura, Solicitado, Não se aplica), a data (de realização nas NRs, de validade no ASO "
+                    "e na CNH) e quem registrou só cifrados (dados_cifrados, o Cofre do cadastro): o ASO é dado de "
+                    "saúde e a API tem leitura aberta. A validade das NRs sai da periodicidade da norma, na tela. A "
+                    "planilha só grava o que muda o último registro da pessoa"),
 )
 
 LIVROS = (
@@ -95,6 +113,12 @@ LIVROS = (
           "registrado em 24/10/2026 antes de existir: nasce com a 1ª decisão. A tela lê com cache de 1 minuto e a "
           "gravação relê o banco antes (troca o livro inteiro, as abas juntas)",
           so_cresce=True),
+    Livro("nexus_hseq_documentacao", ("fato_documentacao",),
+          "a cada registro na tela Colaboradores e a cada carga da planilha da Segurança",
+          "nexus/hseq/documentacao.py, pela tela Colaboradores da Segurança", False,
+          "registrado em 06/11/2026 antes de existir: nasce com o 1º registro. A gravação relê o banco antes e troca o "
+          "livro inteiro",
+          so_cresce=True),
 )
 
 RESUMO = {
@@ -102,6 +126,7 @@ RESUMO = {
     "pedido_ronda_extintor": "As novas rondas de extintores que a Segurança pediu, por usina",
     "edicao_extintor": "As edições que a Segurança fez no cadastro dos extintores",
     "email_pendencias_seguranca": "O e-mail semanal das pendências da Segurança, por destinatário",
+    "documentacao_colaborador": "A documentação de segurança de cada colaborador (ASO, NRs)",
 }
 
 PARA_QUE = {
@@ -117,4 +142,9 @@ PARA_QUE = {
     "email_pendencias_seguranca": "Guarda o e-mail de cada segunda com as pendências da Segurança: um para a TST, "
                                   "com todas as usinas, e um para cada Responsável UFV, com as usinas dele. O Nexus "
                                   "monta e o App de Campo manda. Não leva nome nem e-mail de pessoa, só o código.",
+    "documentacao_colaborador": "Guarda a situação de cada item de documentação de segurança de cada colaborador do "
+                                "cadastro (ASO, NR-10, NR-35 e as outras NRs, integrações, anuências e documentos), "
+                                "registrada pela Segurança na tela Colaboradores ou carregada da planilha dela. A tela "
+                                "mostra o que venceu, o que falta e o que espera assinatura. A situação e a data vão "
+                                "cifradas.",
 }
