@@ -365,8 +365,10 @@ resposta de "Descreva a atividade realizada" da OS filha. Desenho em
   `created_by`, desde 27/10/2026, criação e etiquetas); à direita o que
   ela lê (Na nota da OS; Demais respostas do técnico, numa tabela por OS de campo; Comentários, na linha do tempo das
   Observações de lá: a data e o ano à esquerda, o mais novo em verde, a mudança de status ou prioridade com o ponto
-  âmbar). **A nota da OS** é a que o card do OS Creator lê (`os_equipe._nota_da_os`: a da tarefa, `task_note`, senão a
-  `note`; Levi, 24/10/2026: "não está puxando a nota da OS da engenharia", a página mostrava só a `note`).
+  âmbar). **A nota da OS** é a que o card do OS Creator mostra (`os_equipe._nota_da_os`, a regra do
+  `os_detalhe.juntar_notas`: a `note` e a `task_note` de cada tarefa, sem repetir a que já está dentro da outra). Dois
+  casos: em 24/10/2026 a página mostrava só a `note` ("não está puxando a nota da OS da engenharia"); em 13/11/2026 só a
+  `task_note`, e o `work_orders_update` grava a nota nova na `note` (a 19378, pelo chat de Chamados).
 - **Quando o Fracttal não responde** (502), a página diz o nome do erro e dá o botão **Tentar novamente**, um link para
   ela mesma (a de ETM na tela de ETM; Levi, 05/11/2026: "Deixa um botão para a pessoa tentar novamente"). O erro mais
   comum é o `Recusado`: o 429 da cota de 200 pedidos por minuto da empresa toda. Dentro do clique, o
@@ -454,7 +456,7 @@ resposta de "Descreva a atividade realizada" da OS filha. Desenho em
   comentário, edição ou remoção (prova no Fracttal de 05/11/2026, OS 18591 de TESTE - PA; o Fracttal falso dos testes
   tinha um campo só, e o `tests/test_engenharia_nota_da_os.py` tem os dois). A nota que a página mostra tem de estar na
   junção (a OS 12191 tinha as duas diferentes), senão o comentário fica só no Nexus. "Na nota da OS" da página mostra a
-  `task_note` (`os_equipe._nota_da_os`): as linhas do Nexus aparecem no card do OS Creator e na linha do tempo, não ali. Sem a sessão do Fracttal (quem entrou pela Microsoft), a resposta traz o login do Fracttal, que volta
+  mesma junção (`os_equipe._nota_da_os`, desde 13/11/2026): as linhas do Nexus aparecem ali também. Sem a sessão do Fracttal (quem entrou pela Microsoft), a resposta traz o login do Fracttal, que volta
   para a página; a sessão cassada antes do vencimento encerra o Nexus de quem entrou pelo Fracttal (o /os/login, com o
   JWT morto no cookie, voltava direto para a página) e tira o cookie do OS Creator de quem entrou pela Microsoft. Erro
   do Fracttal não grava nada. O comentário também fica no livro (texto e nome cifrados).

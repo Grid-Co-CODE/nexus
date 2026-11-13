@@ -65,3 +65,19 @@ def test_editar_e_apagar_mudam_so_a_linha(os_):
     assert P._mudar_linha_na_nota(api, regra, WID, [L2], None) == "sim"
     assert os_["note"] == ENTRADA + "\n" + L1 + " CC (editado)"
     assert api.get_os_detalhes(WID)["notas"].count("[ENGENHARIA]") == 1
+
+
+def test_a_pagina_da_os_mostra_a_note_e_a_task_note_sem_repetir():
+    """Levi, 13/11/2026 (pelo chat de Chamados): "Na nota da OS" da página mostrava a nota velha nas OS em que o
+    `work_orders_update` gravou a nota nova (a 19378 e mais cinco administrativas): a `note` trazia o cabeçalho e as
+    respostas da Inspeção, e a `task_note` só o cabeçalho de 3 linhas. A regra agora é a do card do OS Creator
+    (`os_detalhe.juntar_notas`): as duas, sem repetir a que já está dentro da outra."""
+    from nexus.engenharia import os_equipe as E
+    cab = "Chamado 812\nCliente X\nUsina Alfa"
+    nova = cab + "\nInspeção: string 3 sem corrente"
+    assert E._nota_da_os([{"task_note": cab, "note": nova}]) == nova
+    assert E._nota_da_os([{"task_note": cab, "note": ""}]) == cab
+    assert E._nota_da_os([{"task_note": None, "note": nova}]) == nova
+    assert E._nota_da_os([{"task_note": "Entrada", "note": "Outra"}]) == "Outra\nEntrada"
+    assert E._nota_da_os([{"task_note": cab, "note": nova}, {"task_note": cab, "note": nova}]) == nova
+    assert E._nota_da_os([{"task_note": "None", "note": None}]) == ""

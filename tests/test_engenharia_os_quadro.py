@@ -660,12 +660,14 @@ def test_titulo_da_os_em_cima_e_a_os_e_o_ativo_embaixo(pagina, cliente):
 
 
 def test_nota_da_os_e_a_que_o_card_do_os_creator_mostra(pagina, cliente):
-    # Levi: "não está puxando a nota da OS da engenharia": a nota fica na TAREFA (task_note), como o card lê
+    # Levi: "não está puxando a nota da OS da engenharia" (24/10/2026): a nota com que a OS nasce fica na TAREFA
+    # (task_note); e a nota nova do `work_orders_update` vai para a `note` (13/11/2026, a 19378, pelo chat de Chamados).
+    # A página mostra as duas, como o card do OS Creator, cada uma uma vez só
     from test_engenharia_acompanhamento import _como
     pagina["task_note"] = "Inversor desarmando à tarde; pedir as curvas."
     html = _como(cliente, ANA).get(URL).get_data(as_text=True)
     nota = _secao(html, "Na nota da OS")
-    assert "Inversor desarmando à tarde; pedir as curvas." in nota and "Nota antiga da OS" not in nota
+    assert nota.count("Inversor desarmando à tarde; pedir as curvas.") == 1 and nota.count("Nota antiga da OS") == 1
 
 
 def test_dados_so_com_ativo_usina_responsavel_quem_criou_criacao_e_etiquetas(pagina, cliente):

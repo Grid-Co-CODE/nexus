@@ -250,15 +250,19 @@ def montar(linhas: list[dict], pessoa: dict, agora: datetime) -> list[dict]:
 
 
 def _nota_da_os(ts: list[dict]) -> str:
-    """A nota da OS como o card do OS Creator a lê (`api.get_os_detalhes`): a de cada tarefa (`task_note`, senão a
-    `note`), sem repetir. Caso real (24/10/2026, Levi: "não está puxando a nota da OS da engenharia"): a página mostrava
-    só a `note`, e a nota das OS da engenharia mora na tarefa."""
-    vistas = []
+    """A nota da OS como o card do OS Creator a mostra (`os_detalhe.juntar_notas`): a `note` e a `task_note` de cada
+    tarefa, sem repetir a que já está dentro de outra. Dois casos reais: em 24/10/2026 a página mostrava só a `note`, e a
+    nota das OS da engenharia nasce na tarefa (Levi: "não está puxando a nota da OS da engenharia"); em 13/11/2026 ela
+    mostrava só a `task_note`, e o `work_orders_update` grava a nota nova na `note` (a 19378 e mais cinco
+    administrativas de chamados: o cabeçalho e as respostas da Inspeção na `note`, só o cabeçalho na `task_note`)."""
+    notas: list[str] = []
     for t in ts:
-        n = str(t.get("task_note") or t.get("note") or "").strip()
-        if n and n not in vistas:
-            vistas.append(n)
-    return "\n".join(vistas)
+        for k in ("note", "task_note"):
+            v = str((t or {}).get(k) or "").strip()
+            if not v or v.lower() == "none" or any(v in x for x in notas):
+                continue
+            notas = [x for x in notas if x not in v] + [v]
+    return "\n".join(notas)
 
 
 def _ativos_da_os(ts: list[dict]) -> list[dict]:
