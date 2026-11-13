@@ -27,6 +27,14 @@ Code (o HEAD da zeladoria) tem o roteiro em `ROTEIRO_CLAUDE_CODE.md`, nesta past
   conta. Cada uma confere o passe ou cai na regra do anônimo, com o limite por IP (`limite.py`: largo, porque a equipe
   de uma usina sai pelo mesmo IP da operadora), o teto de tamanho e o `Origin` do site (`NEXUS_SSO_ORIGENS`, padrão
   `https://sso-zeladoria.gridco.com.br`; a resposta leva o CORS só para ele).
+- **O endereço público, nunca o `request.host`** (`api.endereco_publico`): no servidor o pedido chega pelo proxy com o
+  endereço interno (`10.32.28.19:5070`). Em 13/11/2026, o 1º dia do site no Nexus, toda vistoria, APR, EPI e diário com
+  foto foi recusada ("endereço de arquivo que não é do SSO"), e o link do vídeo e das fotos da Gestão saía com o
+  endereço interno. Vale `NEXUS_SSO_ENDERECO`; sem ela, a máquina local (o PC, a cópia de prova, os testes) usa o próprio
+  endereço, e o resto, `https://app.gridco.com.br`. A página do administrador mostra o endereço público, a máquina e o
+  IP que o Nexus vê. Prova atrás do proxy: a `porta_local.py` mantém o Host do navegador, como o Caddy por padrão, e
+  não imita o servidor. Para provar, passe a cópia de prova por um repassador que troque o Host por um endereço interno e
+  ponha `NEXUS_SSO_ENDERECO` com o endereço do repassador.
 - **A Gestão entra pelo login do Nexus.** Sem passe, a página da Gestão vai a `/t/sso/voltar?para=<a Gestão>`, que
   exige o login (Fracttal ou senha de administrador; o setor não conta: `sso.voltar` está nos `LIVRES` do portão de
   setor) e volta com o passe no fragmento (`#nexus_sso=`, que não vai a servidor nenhum). O passe (`regras.py`) diz só o
@@ -121,8 +129,10 @@ No disco do servidor, `<NEXUS_DADOS>/sso/arquivos/<bucket>/<caminho>`, com o mes
 - **Quem abre:** só com o link assinado (`?a=`, 12 h) que a Gestão recebe ao ler: toda URL de arquivo dentro das linhas
   (`/storage/v1/object/public/...`, de qualquer endereço, inclusive as antigas do Supabase) sai trocada pelo endereço do
   Nexus com a assinatura, e o que a Gestão manda de volta vai ao banco sem ela. O `<img>` e o html2canvas do PDF não
-  mandam o passe, por isso a assinatura no endereço (e o CORS para o site). No Supabase os buckets eram públicos. O vídeo
-  da sessão ativa abre sem login (`/video/...`, com o Range).
+  mandam o passe, por isso a assinatura no endereço (e o CORS para o site). No Supabase os buckets eram públicos. O envio
+  devolve o link assinado também ao fornecedor, para a miniatura da foto que ele acabou de anexar (a vistoria e o diário
+  mostram a foto pelo endereço; sem a assinatura ela aparecia quebrada), e a linha dele vai ao banco sem a assinatura. O
+  vídeo da sessão ativa abre sem login (`/video/...`, com o Range).
 - **Os antigos (~2,5 GB) ficaram travados no Supabase** desde 11/11/2026 (402 até pelo painel): aparecem quebrados até o
   resgate. A página do administrador (`/t/sso/admin`) recebe uma pasta baixada de um bucket e põe cada arquivo no caminho
   do inventário que termina igual. **O vídeo da integração (28 MB) também ficou lá:** até o administrador enviá-lo pela

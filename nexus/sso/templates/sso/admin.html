@@ -31,7 +31,9 @@
   <div><div class="r">Disco livre</div><div class="v">{{ arquivos.livre_gb if arquivos.livre_gb is not none else "—" }} GB</div>
     <div class="d">o envio para abaixo de 2 GB</div></div>
   <div><div class="r">Site que fala com o Nexus</div><div class="v sso-pequeno">{{ origens|join(", ") }}</div>
-    <div class="d">máquina {{ maquina }}</div></div>
+    {# o endereço público vai nos links de arquivo; a máquina e o IP, como o Nexus os vê atrás do proxy (13/11/2026: o
+       endereço interno recusava toda foto; o IP diz se o limite por IP do SSO vê cada fornecedor ou só o proxy) #}
+    <div class="d">endereço público {{ endereco }}; máquina {{ maquina }}; seu IP visto pelo Nexus {{ ip }}</div></div>
 </div>
 
 {% if situacao %}

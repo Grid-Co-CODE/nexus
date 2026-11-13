@@ -134,7 +134,7 @@ def ler(est: dict, view: str, *, filtros: list, ordem: list, limite: int | None,
     return base
 
 
-def preparar(est: dict, quem: dict, ops: list, *, host: str) -> list:
+def preparar(est: dict, quem: dict, ops: list, *, hosts: set) -> list:
     """Os pedidos do app ([{"op", "view", "linhas" | "patch", "filtros"}]) conferidos e prontos para o gravador
     ([{"op", "aba", ...}]). Recusa o que o RLS recusava; na linha do fornecedor, o servidor decide os campos dele."""
     prontos = []
@@ -165,7 +165,7 @@ def preparar(est: dict, quem: dict, ops: list, *, host: str) -> list:
         if not all(E.pode(papel_do_rls, aba, p) for p in ((precisa,) if isinstance(precisa, str) else precisa)):
             raise Recusa("sem permissão")
         if papel_do_rls == "fornecedor":
-            linhas = [_do_fornecedor(est, aba, l, host) for l in linhas]
+            linhas = [_do_fornecedor(est, aba, l, hosts) for l in linhas]
         else:
             linhas = [A.sem_assinatura(l) for l in linhas]
         pronto = {"op": nome, "aba": aba, "linhas": linhas, "filtros": filtros}
@@ -184,16 +184,17 @@ def preparar(est: dict, quem: dict, ops: list, *, host: str) -> list:
 MAX_LINHA = 1024 * 1024       # a maior linha real tinha 130 KB (uma vistoria com assinatura, 12/11/2026)
 
 
-def _do_fornecedor(est: dict, aba: str, linha: dict, host: str) -> dict:
+def _do_fornecedor(est: dict, aba: str, linha: dict, hosts: set) -> dict:
     import json
     # a linha grande demais: sem teto, um anônimo mandava 120 linhas de 10 MB por hora, e cada lote recifra e remonta o
     # livro inteiro na memória do Nexus (revisão de 12/11/2026)
     if len(json.dumps(linha, ensure_ascii=False, default=str)) > MAX_LINHA:
         raise Recusa("envio grande demais")
-    nova = {c: v for c, v in linha.items() if c not in E.DO_SERVIDOR.get(aba, ())}
+    # o endereço da foto vai ao banco sem a assinatura de 12 h que o envio devolveu para a miniatura
+    nova = A.sem_assinatura({c: v for c, v in linha.items() if c not in E.DO_SERVIDOR.get(aba, ())})
     if aba == "vistoria_checklists" and nova.get("fase") not in ("antes", "depois"):
         raise Recusa("a fase da vistoria é antes ou depois")          # a fase fica em claro: só a lista fechada
-    ruins = A.estranhas(nova, host)
+    ruins = A.estranhas(nova, hosts)
     if ruins:
         raise Recusa("endereço de arquivo que não é do SSO: " + ruins[0])
     if aba == "iv_visualizacoes":

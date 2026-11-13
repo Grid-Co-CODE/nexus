@@ -175,7 +175,7 @@ def sem_assinatura(obj):
     return _andar(obj, troca)
 
 
-def estranhas(obj, host: str) -> list:
+def estranhas(obj, hosts) -> list:
     """As URLs que o fornecedor não pode gravar: só arquivo deste Nexus num bucket do SSO, ou a assinatura desenhada
     (`data:image/png;base64,...`). Sem isto, a linha levaria à Gestão um link de outro site."""
     achadas = []
@@ -187,7 +187,7 @@ def estranhas(obj, host: str) -> list:
             m = URL.match(s.strip())
             dono = (m.group("antes").split("//", 1)[-1].split("/", 1)[0].lower() if m and "//" in m.group("antes")
                     else "")
-            if not m or m.group("bucket") not in E.BUCKETS or dono != host.lower() or m.group("depois"):
+            if not m or m.group("bucket") not in E.BUCKETS or dono not in {h.lower() for h in hosts} or m.group("depois"):
                 achadas.append(s[:80])
         elif t.startswith("data:") and not _DATA_IMAGEM.match(s.strip()):
             achadas.append(s[:40])

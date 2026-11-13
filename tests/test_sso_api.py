@@ -547,3 +547,55 @@ def test_regravar_diz_o_resultado_e_o_segundo_clique_nao_pede_outra(sso, logado)
     assert s["pendente"] is False and s["regravacao"]["concluida"] is True and s["gravado_em"]
     assert "Pronto" in logado.get("/t/sso/admin").get_data(as_text=True)
     assert sso.test_client().get("/t/sso/admin/situacao").status_code == 302          # sem login: Entrar
+
+
+# ── atrás do proxy do servidor (13/11/2026) ─────────────────────────────────────────────────────────────────────────
+INTERNO = "10.32.28.19:5070"          # o endereço com que o pedido chega ao Nexus no servidor, pelo proxy
+PUBLICO = "https://app.gridco.com.br/t/sso"
+
+
+def test_atras_do_proxy_a_foto_do_site_e_aceita_e_os_links_saem_com_o_endereco_publico(sso):
+    """13/11/2026: no servidor o pedido chega com o host interno, e a conferência do endereço da foto exigia esse host:
+    toda vistoria, APR, EPI e diário com foto foi recusada ("endereço de arquivo que não é do SSO"). E os links que saem
+    (o vídeo, as fotos assinadas da Gestão, a resposta do envio) iam com o endereço interno, que o navegador não abre."""
+    cli = sso.test_client()
+    url = f"{PUBLICO}/storage/v1/object/public/checklist-fotos/antes/1763000000000-abc123.jpg"
+    cab = {**_cab(sso), "Host": INTERNO}
+    r = cli.post("/t/sso/api/gravar", headers=cab, json={"ops": [{"op": "insert", "view": "checklists", "linhas": [
+        {"fase": "antes", "usina": "Usina Teste", "dados": {"imgsModulos": [url], "assinaturaDataUrl": "data:image/png;base64,AA=="}}]}]})
+    assert r.status_code == 200, r.get_json()
+    r = cli.post("/t/sso/api/gravar", headers=cab, json={"ops": [{"op": "insert", "view": "checklists", "linhas": [
+        {"fase": "antes", "dados": {"imgsModulos": ["https://outro.test/storage/v1/object/public/checklist-fotos/a.jpg"]}}]}]})
+    assert r.status_code == 400                                       # outro site segue recusado
+    sessoes = cli.get("/t/sso/api/v/iv_sessoes_video", headers=cab).get_json()
+    assert sessoes[0]["url_video"] == f"{PUBLICO}/video/integracao-video-midia/video.mp4"
+    gestao = {**_cab(sso, "gestor@exemplo.test"), "Host": INTERNO}
+    apr = cli.get("/t/sso/api/v/apr_submissoes", headers=gestao).get_json()[0]
+    assert apr["desvios_urls"][0].startswith(f"{PUBLICO}/storage/v1/object/public/apr-arquivos/a1/desvio-1-foto.jpg?a=")
+    r = cli.post("/t/sso/api/arquivo", headers=gestao, content_type="multipart/form-data",
+                 data={"bucket": "epi-fotos", "caminho": f"{NOVO}/item-1.jpg", "upsert": "false",
+                       "arquivo": (BytesIO(JPG), "f.jpg")})
+    assert r.get_json()["url"].startswith(f"{PUBLICO}/storage/v1/object/public/epi-fotos/")
+
+
+def test_o_endereco_publico_vem_da_variavel_quando_ela_existe(sso):
+    sso.config["NEXUS_SSO_ENDERECO"] = "https://nexus.exemplo.test"
+    cli = sso.test_client()
+    sessoes = cli.get("/t/sso/api/v/iv_sessoes_video", headers={**_cab(sso), "Host": INTERNO}).get_json()
+    assert sessoes[0]["url_video"].startswith("https://nexus.exemplo.test/t/sso/video/")
+
+
+def test_o_fornecedor_ve_a_miniatura_da_foto_que_enviou_e_a_linha_grava_sem_a_assinatura(sso):
+    """A vistoria e o diário mostram a foto anexada pelo endereço que o envio devolve: sem a assinatura, a miniatura
+    aparecia quebrada (no Supabase o bucket era público). A linha vai ao banco com o endereço limpo."""
+    cli = sso.test_client()
+    r = _enviar(cli, {**_cab(sso), "Host": INTERNO}, "checklist-fotos", "antes/1763000000001-zzz999.jpg", JPG)
+    url = r.get_json()["url"]
+    assert url.startswith(f"{PUBLICO}/storage/v1/object/public/checklist-fotos/antes/1763000000001-zzz999.jpg?a=")
+    caminho = url.split("/t/sso", 1)[1]
+    assert cli.get("/t/sso" + caminho).status_code == 200                # a miniatura abre
+    r = cli.post("/t/sso/api/gravar", headers={**_cab(sso), "Host": INTERNO}, json={"ops": [{"op": "insert",
+                 "view": "checklists", "linhas": [{"id": NOVO, "fase": "antes", "dados": {"imgsModulos": [url]}}]}]})
+    assert r.status_code == 200, r.get_json()
+    gravada = G.do_app(sso.config).linha("vistoria_checklists", NOVO)["dados"]["imgsModulos"][0]
+    assert gravada == url.split("?")[0]

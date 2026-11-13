@@ -61,17 +61,42 @@ def origens() -> tuple:
     return tuple(o.strip().rstrip("/") for o in v.split(",") if o.strip()) if v else ORIGENS_PADRAO
 
 
+ENDERECO_PADRAO = "https://app.gridco.com.br"      # o Nexus no servidor, na raiz (o mesmo do e-mail semanal da Segurança)
+_LOCAIS = ("localhost", "127.0.0.1", "::1", "[::1]")
+
+
+def endereco_publico() -> str:
+    """O endereço do Nexus como o navegador o vê, para os links que saem para o site (os arquivos assinados, o vídeo) e
+    para conferir os endereços de arquivo que o fornecedor grava. NUNCA o `request.host`: no servidor o pedido chega pelo
+    proxy com o endereço interno (`10.32.28.19:5070`), e em 13/11/2026 toda linha com foto foi recusada ("endereço de
+    arquivo que não é do SSO"), e o link do vídeo e das fotos da Gestão saía com o endereço interno. `NEXUS_SSO_ENDERECO`
+    vence; sem ela, a máquina local (o PC, a cópia de prova, os testes) usa o próprio endereço, e o resto, o do servidor."""
+    v = str(current_app.config.get("NEXUS_SSO_ENDERECO") or os.environ.get("NEXUS_SSO_ENDERECO") or "").strip()
+    if v:
+        return v.rstrip("/")
+    nome = (request.host or "").rsplit(":", 1)[0].lower() if not (request.host or "").startswith("[") else "[::1]"
+    if nome in _LOCAIS or nome.endswith(".localhost"):
+        return request.host_url.rstrip("/")
+    return ENDERECO_PADRAO
+
+
+def hosts_do_nexus() -> set:
+    """Os endereços que valem como "deste Nexus" num link de arquivo: o público e o do próprio pedido."""
+    return {urlsplit(endereco_publico()).netloc.lower(), (request.host or "").lower()} - {""}
+
+
 def _origem_ok() -> bool:
     o = (request.headers.get("Origin") or "").rstrip("/")
-    return o in origens() or (bool(o) and urlsplit(o).netloc.lower() == (request.host or "").lower())
+    return o in origens() or (bool(o) and urlsplit(o).netloc.lower() in hosts_do_nexus())
 
 
 @bp.after_request
 def _cors(resp):
     o = (request.headers.get("Origin") or "").rstrip("/")
+    # sempre: o vídeo pedido pelo <video> (sem Origin) ficava no cache sem o CORS, e um fetch do site depois falhava
+    resp.headers["Vary"] = "Origin"
     if o in origens():
         resp.headers["Access-Control-Allow-Origin"] = o
-        resp.headers["Vary"] = "Origin"
         resp.headers["Access-Control-Allow-Headers"] = CABECALHOS
         resp.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
         resp.headers["Access-Control-Max-Age"] = "600"
@@ -117,7 +142,7 @@ def _limitar_arquivo(gestao: bool):
 
 
 def _base_absoluta() -> str:
-    return request.host_url.rstrip("/") + na_raiz("/t/sso")
+    return endereco_publico() + na_raiz("/t/sso")
 
 
 def _gravador():
@@ -252,7 +277,7 @@ def gravar():
         return _erro("muitos envios deste endereço; tente de novo mais tarde", 429)
     try:
         with g._trava:
-            prontos = R.preparar(g.estado, quem, ops, host=request.host or "")
+            prontos = R.preparar(g.estado, quem, ops, hosts=hosts_do_nexus())
             r = g.aplicar(prontos, {"email": quem.get("email") or "formulario", "status": "aprovado"},
                           g.estado["versao"])
     except Recusa as e:
@@ -402,9 +427,11 @@ def arquivo_enviar():
         r = _receber(bucket, caminho, gestao and request.form.get("upsert") == "true")
     except A.Recusado as e:
         return _erro(str(e), 409 if "já existe" in str(e) else 400)
-    url = f"{_base_absoluta()}/storage/v1/object/public/{bucket}/{caminho}"
-    if gestao:
-        url += "?a=" + quote(A.assinar(current_app._get_current_object(), bucket, caminho))
+    # o link assinado volta também ao fornecedor, para a miniatura da foto que ele acabou de anexar (a vistoria e o diário
+    # mostram a foto pelo endereço; sem a assinatura ela aparecia quebrada, e no Supabase o bucket era público). A linha
+    # que ele grava vai ao banco sem a assinatura (`regras._do_fornecedor`)
+    url = (f"{_base_absoluta()}/storage/v1/object/public/{bucket}/{caminho}"
+           f"?a={quote(A.assinar(current_app._get_current_object(), bucket, caminho))}")
     return jsonify(Key=f"{bucket}/{caminho}", path=caminho, url=url, bytes=r["bytes"])
 
 
@@ -478,7 +505,8 @@ def admin():
                     key=str.lower)
     return render_template("sso/admin.html", grava=G.ativo(cfg), forcada=G.forcada(cfg), erro=erro,
                            situacao=_situacao(g), estado=est, arquivos=sit, sessoes=sessoes,
-                           origens=origens(), maquina=request.host, usinas_diario=usinas)
+                           origens=origens(), maquina=request.host, usinas_diario=usinas,
+                           endereco=endereco_publico(), ip=request.remote_addr)
 
 
 def _situacao(g) -> dict | None:
