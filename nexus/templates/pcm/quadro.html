@@ -143,14 +143,16 @@
 
 {# O cartão da OS da FAMA (11/11/2026, fase 1): só de leitura (sem a janela de reprogramar, que é da programação), com a
    borda tracejada de quem não está na programação, a marca FAMA e a severidade em cor e palavra. Não conta no número nem
-   nas horas do dia (nexus/pcm/fama_quadro.py). #}
+   nas horas do dia (nexus/pcm/fama_quadro.py). O número é "FAMA - OS <id>", com a marca FAMA em caixa alta ANTES do
+   número (Levi, 13/11/2026: "antes do número da OS apareça bem em caixa alta FAMA, traço, OS X"); até lá era "FAMA-<id>"
+   com a marca na linha do tipo. #}
 {% macro cartao_fama(f) %}
-        <article class="q-cartao q-fama q-t--{{ f.tc }}" aria-label="{{ f.num }}, OS da FAMA (só leitura)">
+        <article class="q-cartao q-fama q-t--{{ f.tc }}" aria-label="FAMA - OS {{ f.os }} (só leitura)">
           <div class="q-c-topo">
-            <span class="q-c-os gc-num">{{ f.num }}</span>
-            <span class="q-st q-st--{{ f.stc }}">{{ f.st }}</span>
+            <span class="q-c-os gc-num"><span class="q-fama-marca">FAMA</span> - OS {{ f.os }}</span>
+            <span class="q-st q-st--{{ f.stc }}" title="{{ f.st }}">{{ f.st }}</span>
           </div>
-          <div class="q-c-tipo"><span class="q-fama-marca">FAMA</span><i class="q-ponto"></i><span class="q-c-tp" title="{{ f.tp }}">{{ f.tp or 'Sem tipo' }}</span>
+          <div class="q-c-tipo"><i class="q-ponto"></i><span class="q-c-tp" title="{{ f.tp }}">{{ f.tp or 'Sem tipo' }}</span>
             {% if f.sev %}<span class="q-fama-sev q-fama-sev--{{ f.sevt }}">{{ f.sev }}</span>{% endif %}</div>
           <div class="q-c-usina" title="{{ f.uc }}">{{ f.uc }}</div>
           <div class="q-c-tarefa" title="{{ f.t }}">{{ f.t or 'Sem título' }}</div>

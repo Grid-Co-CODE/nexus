@@ -155,6 +155,8 @@ def test_o_cartao_mostra_numero_usina_tipo_severidade_previsao_status_e_titulo()
     assert {k: f[k] for k in ("num", "st", "tp", "sev", "sevt", "uc", "t", "prev", "tc")} == {
         "num": "FAMA-101", "st": "Criada", "tp": "Corretiva", "sev": "Crítica", "sevt": "critico", "uc": "Usina 1 - SP",
         "t": TITULO_SIGILOSO, "prev": "06/10", "tc": "corretiva"}
+    # o número que o cartão mostra depois da marca ("FAMA - OS 101"); o `num` segue sendo o identificador (a busca)
+    assert f["os"] == "101"
     # a usina sem tarefa do Fracttal na semana sai pelo nome do de-para
     g = next(f for c in _quadro()["colunas"] for f in c.get("fama") or [] if f["num"] == "FAMA-107")
     assert (g["uc"], g["tp"], g["sev"]) == ("Usina 3 - MG", "Controle de vegetação", "Não urgente")
@@ -275,9 +277,13 @@ def test_tela_quadro_com_as_os_da_fama(app, logado, tmp_path, monkeypatch):
     html = _tela(app, logado, tmp_path, monkeypatch, **_com_fama())
     # os quatro cartões da FAMA, só de leitura (sem a janela de reprogramar), com a marca FAMA
     assert html.count('class="q-cartao q-fama') == 4 and html.count('class="q-fama-marca">FAMA<') == 4
-    for num in ("FAMA-101", "FAMA-102", "FAMA-103", "FAMA-107"):
-        assert num in html
-    assert "FAMA-105" not in html and "FAMA-106" not in html
+    # o número como "FAMA - OS X", com a marca FAMA em caixa alta ANTES do número (Levi, 13/11/2026: "antes do número da OS
+    # apareça bem em caixa alta FAMA, traço, OS X"); antes era "FAMA-101" e a marca ficava na linha do tipo
+    for n in (101, 102, 103, 107):
+        assert f'<span class="q-c-os gc-num"><span class="q-fama-marca">FAMA</span> - OS {n}</span>' in html
+        assert f'aria-label="FAMA - OS {n} (só leitura)"' in html
+    assert 'class="q-c-tipo"><span class="q-fama-marca">' not in html          # a marca saiu da linha do tipo
+    assert "</span> - OS 105<" not in html and "</span> - OS 106<" not in html
     assert html.count("data-cartao=") == 4                               # os do Fracttal, como antes
     assert TITULO_SIGILOSO in html and "Atrasada" in html and "Em andamento" in html and "Sábado" in html
     # as atrasadas num bloco recolhido da segunda, depois das tarefas oficiais

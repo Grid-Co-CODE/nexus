@@ -2180,8 +2180,11 @@ livro `nexus_os_fama · fato_os_fama` e o de-para em Ligações são da parte A 
   FAMA, com "Lendo as OS da FAMA: recarregue em alguns segundos". A falha não trava: com a cópia boa, ela fica; sem
   cópia, o aviso do erro, e a próxima tentativa só depois de 60 s.
 - **No Quadro** (`fama_quadro.py`, pelo `telas._ctx_quadro`): o cartão com a marca FAMA, só de leitura (sem a janela de
-  reprogramar; borda tracejada), com o número FAMA-<id>, a usina, o tipo, a severidade (cor e palavra), a previsão, a
-  situação e o título. Entram as abertas (criada, planejada, pausada) no dia da `data_id_prevista`; a aberta com a previsão
+  reprogramar; borda tracejada), com o número "FAMA - OS <id>" (a marca FAMA em caixa alta ANTES do número; Levi,
+  13/11/2026: "antes do número da OS apareça bem em caixa alta FAMA, traço, OS X"; até lá era "FAMA-<id>" com a marca
+  na linha do tipo), a usina, o tipo, a severidade (cor e palavra), a previsão, a situação e o título. O "FAMA-<id>"
+  segue sendo o identificador (`fama_os.numero`): é por ele ou só pelo número que a busca do Quadro acha a OS, e é ele
+  que vai na planilha do motor e no App. Entram as abertas (criada, planejada, pausada) no dia da `data_id_prevista`; a aberta com a previsão
   antes da segunda vai num bloco recolhido da segunda ("N OS da FAMA atrasadas"); em mobilização e em execução, "Em
   andamento"; a previsão depois do domingo é de outra semana. Os cartões da FAMA vêm DEPOIS das tarefas oficiais da
   coluna, com o mesmo `TETO_CARTOES` e o "+N" (revisão de 11/11/2026: no alto, 30 atrasadas empurravam a programação para

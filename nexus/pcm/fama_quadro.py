@@ -276,7 +276,11 @@ def da_semana(linhas: list[dict], sem: dict, cadastro: dict, hoje, gerado_em=Non
         s, t, v = _norm(l.get("status")), _norm(l.get("tipo")), _norm(l.get("severidade"))
         tipo = F.TIPO_PT.get(t) or str(l.get("tipo") or "").strip()
         atrasada = sit == "aberta" and prev < seg
-        cartao = {"num": F.numero(l.get("fama_os_id")), "st": F.STATUS_PT.get(s) or str(l.get("status") or ""),
+        num = F.numero(l.get("fama_os_id"))
+        # `num` ("FAMA-<id>") é o identificador: a busca, a planilha do motor e o App. O cartão mostra "FAMA - OS <id>",
+        # com a marca FAMA antes do número (Levi, 13/11/2026: "antes do número da OS apareça bem em caixa alta FAMA,
+        # traço, OS X"): `os` é o <id> que vai depois da marca
+        cartao = {"num": num, "os": num.split("-", 1)[1], "st": F.STATUS_PT.get(s) or str(l.get("status") or ""),
                   "stc": STATUS_COR.get(s, "nao"), "tp": tipo, "tc": TIPO_COR.get(t, "outro"),
                   "sev": F.SEVERIDADE_PT.get(v) or str(l.get("severidade") or "").strip(), "sevt": SEV_TOM.get(v, "neutro"),
                   "uc": Q.usina_curta(nome), "t": " ".join(str(l.get("titulo") or "").split()),

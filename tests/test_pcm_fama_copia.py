@@ -320,10 +320,11 @@ def test_a_tela_abre_na_hora_com_o_aviso_e_depois_mostra_a_os(producao, tmp_path
     c = app.test_client()
     assert c.post("/entrar", data={"senha": SENHA}).status_code == 302
     html = c.get("/t/pcm/quadro").get_data(as_text=True)
-    assert "Lendo as OS da FAMA: recarregue em alguns segundos" in html and "FAMA-1<" not in html
+    assert "Lendo as OS da FAMA: recarregue em alguns segundos" in html and "</span> - OS 1<" not in html
     assert FQ.esperar(10)
     html = c.get("/t/pcm/quadro").get_data(as_text=True)
-    assert 'class="q-c-os gc-num">FAMA-1<' in html and "livro da FAMA gravado em" in html and TITULO in html
+    assert ('class="q-c-os gc-num"><span class="q-fama-marca">FAMA</span> - OS 1<' in html
+            and "livro da FAMA gravado em" in html and TITULO in html)
     assert "Lendo as OS da FAMA" not in html
 
 

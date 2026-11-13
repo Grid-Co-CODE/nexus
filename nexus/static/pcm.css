@@ -1792,6 +1792,17 @@ details.inv-card:not([open])>summary{border-bottom:0}
   border-left-color:var(--q-cor,var(--linha-forte))}
 .q-fama-marca{flex:none;padding:0 5px;border:1px solid var(--info-a42);border-radius:var(--raio-tag);color:var(--info);
   background:var(--info-a10);font-weight:700;letter-spacing:.06em}
+/* o número do cartão da FAMA (13/11/2026, Levi: "antes do número da OS apareça bem em caixa alta FAMA, traço, OS X"):
+   "FAMA - OS <id>", com a marca ANTES do número, na cor dela e sem a caixa. Com a caixa o número ficava ~38 px mais
+   comprido que o "FAMA-<id>" de antes e, na coluna mais estreita (196 px, o bloco das atrasadas), cortava "Planejada" e
+   "Pausada" em "…" (medido na prova de 13/11); sem ela, com o vão e a etiqueta um pouco mais justos, as duas cabem com
+   o número de 5 dígitos (com 6, ficam no limite; a 375 px, no bloco das atrasadas, "Planejada" perde 6 px). O número
+   não encolhe: se faltar lugar, quem cede é a situação (o texto inteiro vai no title; "Em mobilização" e "Em execução"
+   têm o "Em andamento" na última linha do cartão) */
+.q-cartao.q-fama .q-c-os{flex:none}
+.q-cartao.q-fama .q-c-topo{gap:4px}
+.q-cartao.q-fama .q-st{padding:0 5px}
+.q-c-os .q-fama-marca{padding:0;border:0;background:none;letter-spacing:.03em}
 .q-cartao .q-c-tipo .q-fama-sev{flex:none;margin-left:auto;padding-left:6px;color:var(--mudo);text-transform:none;letter-spacing:0}
 .q-cartao .q-c-tipo .q-fama-sev--critico{color:var(--critico)}
 .q-cartao .q-c-tipo .q-fama-sev--severo{color:var(--severo)}
