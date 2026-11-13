@@ -363,6 +363,25 @@ e-mails pessoais); filtro Origem e a etiqueta "externo" na linha.
   trouxer os campos que as telas do OS Creator usam (o `active` e o `id_account`, que esta tela nunca viu no REST, entre
   eles; README do OS Creator, "Os catálogos pequenos num lugar só").
 
+### A coluna Nexus Field (13/11/2026)
+
+Levi, pela sessão Nexus Field: "conseguimos saber que já instalou o nexus field e logou sem eu ter que ficar
+cadastrando?" ("Pede"). O caso: um técnico do piloto da localização ficou numa versão antiga e só se soube perguntando.
+- **A fonte é o App de Campo** (a v354, o contrato que a sessão do App mandou): a tabela dos aparelhos que a casca
+  registra a cada abertura com login (a `pushaparelhos`, para os avisos), publicada de hora em hora aos :25, troca
+  integral, no livro `aparelhos_nexus_field_app_campo · Aparelhos` (catálogo: o fato `aparelho_field`, registrado antes
+  da 1ª publicação). Colunas pelo NOME: Pessoa (HMAC), Aparelho, Versão do Nexus Field, Instalado em, Último acesso. Sem
+  e-mail: a tela casa a linha pelo código do e-mail dela (`ligacao_campo.codigo_da_pessoa`, NEXUS_PESSOA_HMAC). O Nexus
+  não lê nada do Azure: é o App que publica no banco (a regra "Nexus sem Azure").
+- **Por pessoa vale o celular do último acesso** (a versão, quando e o modelo; "N celulares" e os outros no título).
+  **Versão antiga** = abaixo da mais nova que algum celular tem (`field_aparelhos.resumo`; nenhum número fixo no código:
+  quando o 1º celular abrir com a versão nova, quem ficou na de antes vira antiga), em alerta.
+- **Filtro "Nexus Field"** na própria página (Instalou, Versão antiga, Não instalou; `data-f-field`) e no endereço
+  (`field=`). Quem não aparece não abriu o Nexus Field com login: o App pelo navegador e o celular sem os serviços do
+  Google (sem FCM) não se registram. O livro que ainda não existe (o App não publicou) vira aviso, e todos ficam "não
+  instalou".
+Prova: `tests/test_base_acessos_nexus_field.py`.
+
 ## Equipamentos das usinas (`estrutura_usina.py`, `telas_equipamentos.py`, `/t/base/equipamentos`; 13/10/2026)
 
 > Desde 05/11/2026 o guia "Como funciona" e a dica do (!) antigo ficam juntos na exclamação amarela do título (`explica`, `_explica.html`); o guia deixou de ser uma seção do painel vazio.

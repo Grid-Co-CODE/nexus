@@ -1,7 +1,7 @@
 # CLAUDE.md — Segurança · HSEQ
 
 Torre do menu "Segurança · HSEQ". Telas vivas: a **Mesa da Segurança** (a primeira, 24/10/2026), **Extintores** (com o
-relatório de cada cliente e usina em PDF e Excel), **EPI e EPC** e **APR e PT** (09/10/2026). Riscos da semana, DSS e
+relatório de cada cliente e usina em PDF e Excel), **EPI e EPC**, **APR e PT** (09/10/2026) e **Colaboradores** (05/11/2026, as pessoas do cadastro e a documentação de segurança de cada uma). Riscos da semana, DSS e
 Incidentes ainda são placeholder (a view com a mesma rota vence a genérica). As contas moram em `nexus/hseq/`; a view e o
 template, aqui.
 
@@ -434,6 +434,46 @@ pelo `por_mes` de `epi.luvas`), sem quem conferiu, técnico, responsável, a inf
 não reconhecidos, edições nem botões. As sub-rotas (a usina, a foto, a informação, os relatórios) continuam da Grid: o
 portão do cliente só abre o endereço exato. Mudou a linha de `extintores.linha` ou de `epi.luvas`? A versão do cliente
 muda junto (`tests/test_clientes_versoes_entrega2.py`).
+
+## Colaboradores (05/11/2026; a documentação desde 06/11/2026; no menu logo depois da Mesa desde 13/11/2026)
+
+Pedido da Segurança: acompanhar os colaboradores pela base que o Nexus já usa, sem uma segunda lista, "após o
+colaborador ser demitido eu ainda preciso ter a visibilidade dele", e "editar/incluir esses itens da planilha" (a
+"Atualização de Ativos": ASO, NRs, integrações, anuências, documentos). A tela (`/t/hseq/colaboradores`, do setor
+Segurança porque mostra nomes) **lê** as pessoas do cadastro (`nexus/hseq/colaboradores.py`, o livro
+`cadastro_nexus · pessoas`; incluir, corrigir ou desligar alguém é em Pessoas → Colaboradores Operação) e **grava** a
+documentação de cada uma (`nexus/hseq/documentacao.py`).
+
+**As pessoas.** Uma linha por ficha não excluída: nome (decifrado; sem a `NEXUS_CHAVE_CADASTRO`, "Pessoa N"), vínculo,
+cargo, equipe e região de campo, status. **Desligado** = status Desligado; fica no filtro Desligados. Sem status conta
+como ativo (a régua do Campo). Do cofre sai só o nome.
+
+**A documentação** (livro `nexus_hseq_documentacao · fato_documentacao`, registrado em `nexus/hseq/catalogo.py`): 1 linha
+= 1 registro da situação de 1 item de 1 pessoa (`pessoa_id`), só acrescenta, vale o último de cada pessoa e item. Em
+claro só o `pessoa_id`, o item, a origem (tela ou planilha), o dia e o código de quem registrou; a situação, a data e o
+nome de quem registrou vão cifrados (o ASO é dado de saúde). As regras da Segurança (05/11/2026): OK = Válido; FALTA =
+Falta; ASSINATURA e SOLICITADO (ASSINATURA) = Pendente assinatura; data sempre dd/mm/aaaa ("10/24/2026" não entra); nas
+NRs a data é a de realização e a validade sai da norma (NR-10, NR-10 SEP e NR-35: 2 anos); no ASO e na CNH a data é a
+validade; NR-06, NR-12, NR-24, direção defensiva e integrações sem prazo até a Segurança definir (`ITENS`). "Vence em
+breve" = até 30 dias. Ainda a confirmar pela Segurança: "SOLICITADO" sozinho (Solicitado), "Não possui ASO no servidor"
+(Falta) e "Falta enviar para assinatura" (Pendente assinatura).
+
+**A planilha pela tela.** Conferir lê o .xlsx na memória e mostra, sem gravar: as abas lidas, quantos mudariam, os nomes
+que não casam com o cadastro, os que casaram só pelo primeiro e último nome (para conferir) e os valores que o Nexus
+não reconhece. Gravar pede o arquivo de novo e grava só o que muda (a mesma planilha duas vezes não grava nada). O nome
+casa com o nome completo da ficha; senão, com o primeiro e o último nome quando são de uma ficha só; nunca chuta. A
+coluna CPF (o número), e-mail, telefone, obs e os exames da aba de saúde não entram; o documento CPF é a CPF2 (nos
+demitidos, a "Coluna1"). Pessoa em duas abas: vale a data mais nova. A aba de terceiros (com a coluna EMPRESA) fica
+fora: eles não estão no cadastro (decisão do Levi).
+
+**A tela.** A lista: a faixa de situação (Ativos, Desligados, Todos), os filtros (vínculo, cargo, região de campo,
+documentação: com pendência, em dia, sem registro) e a coluna Documentação (o que venceu, falta, espera assinatura ou
+vence em breve). O nome abre a ficha (`/t/hseq/colaboradores/<pessoa_id>`): cada item com a situação, a data, a validade
+e quando foi registrado; quem é da Segurança registra em cada linha, sempre com login de pessoa.
+
+**Como provar.** `python -m pytest -q tests/test_hseq_colaboradores.py tests/test_hseq_documentacao.py` (a leitura do
+cadastro, o valor da planilha virando situação, a validade pela norma, o casamento pelo cadastro sem chutar, nada
+pessoal nem a situação em claro no livro, a mesma planilha que não grava duas vezes, a ficha, quem pode registrar).
 
 ## APR e PT
 

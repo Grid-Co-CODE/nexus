@@ -237,7 +237,7 @@
 .fz-fotos.ruim{color:var(--osc-critico, #ff6b6b)}
 .fz-pe{display:flex;flex-direction:column;gap:8px;border-top:1px solid var(--f-border);padding-top:10px}
 .fz-datas{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-@media (max-width:560px){
+@media (max-width:640px){
   .acoes-dlg-fazer{padding:14px 12px}
   .fz-datas{grid-template-columns:1fr}
   .fz-sub-cab{flex-direction:column}

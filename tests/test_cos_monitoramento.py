@@ -265,6 +265,21 @@ def test_com_o_endereco_da_api_o_cartao_abre_os_inversores(tela, ligada):
     assert "inversoresAbertos: {}" in html
 
 
+def test_a_janela_tem_o_detalhe_do_inversor_escondido_com_o_voltar(tela):
+    """13/11/2026, o dono: clicar num inversor e ver o gráfico dele e o das strings. O detalhe mora na mesma janela,
+    escondido até o clique; o título recebe o foco (tabindex -1) e o "Voltar à usina" é botão de verdade. Também no
+    videowall, que inclui a mesma janela."""
+    for url in ("/t/cos/monitoramento", "/t/cos/monitoramento?tv=1"):
+        html = tela.get(url).get_data(as_text=True)
+        dlg = html[html.index('id="cos-inv-dlg"'):html.index("</dialog>")]
+        assert '<section class="cos-inv-det" id="cos-inv-det" aria-labelledby="cos-inv-det-titulo" hidden>' in dlg
+        assert '<h3 class="cos-inv-det-titulo" id="cos-inv-det-titulo" tabindex="-1">' in dlg
+        assert '<button type="button" class="gc-btn gc-btn--contorno cos-inv-voltar">' in dlg and "Voltar à usina" in dlg
+        assert 'class="cos-inv-det-corpo"' in dlg
+        # o corpo da usina vem antes do detalhe e continua o mesmo (o JavaScript troca um pelo outro)
+        assert dlg.index('class="cos-inv-corpo"') < dlg.index('class="cos-inv-det"')
+
+
 def test_as_usinas_da_assistida_da_thopen_que_a_ronda_cos_manda_sem_cliente():
     """O dono, 12/11/2026: as usinas com logger sem cadastro na Ronda COS (sem cliente) são da "Thopen - Operação
     Assistida", e só no Monitoramento. O cliente que a Ronda COS mandar vale primeiro."""

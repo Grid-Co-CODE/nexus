@@ -591,6 +591,21 @@ FATOS = (
                     "do piso ou anulada (a anulada é uma tarefa boa que caiu pelas abaixo do piso do mês); Pontos = os "
                     "que a tarefa tinha antes da devolução e da anulação; o Motivo é o texto do App. Sobe com o "
                     "ranking_app_campo, aos :25; livro vazio não sobe"),
+    # quem instalou o Nexus Field (13/11/2026, Levi, pela sessão Nexus Field: "conseguimos saber que já instalou o nexus
+    # field e logou sem eu ter que ficar cadastrando?"): o App publica a tabela dos aparelhos que a casca registra a cada
+    # abertura com login (a pushaparelhos, para os avisos). Registrado antes da 1ª publicação. Tela: Base → Acessos →
+    # Pessoas e setores, a coluna Nexus Field (nexus/campo/field_aparelhos.py)
+    Fato("aparelho_field", "Aparelho com o Nexus Field", "base", "aparelhos_nexus_field_app_campo · Aparelhos",
+         "1 linha = 1 aparelho de 1 pessoa com o Nexus Field (a última abertura com login nesse aparelho)",
+         _d(data=("cod", "Instalado em e Último acesso (ISO, UTC)"), pessoa=("hmac", "Pessoa (HMAC)")),
+         tipo="sem_medida", chave=("Pessoa (HMAC)", "Aparelho", "Instalado em"),
+         fontes=("aparelhos_nexus_field_app_campo · Aparelhos",),
+         janela_origem="o que a tabela do App tem agora (até PUSH_MAX_APARELHOS por pessoa; o mais antigo sai)",
+         observacao="quem publica é o App (a v354), de hora em hora aos :25, troca integral; livro vazio não sobe. "
+                    "Colunas lidas pelo NOME: Pessoa (HMAC), Aparelho (o modelo), Versão do Nexus Field, Instalado em, "
+                    "Último acesso; coluna nova só no fim. Sem e-mail nem o token do FCM. Quem não aparece não abriu o "
+                    "Nexus Field com login (o App pelo navegador e o celular sem os serviços do Google não se "
+                    "registram). A versão atual é a mais nova que algum aparelho tem"),
     Fato("fechamento_coletor", "Fechamento pelo coletor", "campo", "campo_nexus · fechamentos",
          "1 linha = 1 tarefa da fila do Fracttal",
          _d(data=("cod", "fim"), usina=("id", "usina_id"), equipe=("nome", "regiao"), pessoa=("id", "pessoa_id"),

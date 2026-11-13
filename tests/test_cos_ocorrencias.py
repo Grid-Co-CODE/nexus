@@ -235,7 +235,7 @@ def test_a_tela_com_o_andamento_fora_do_ar(ligada, logado, monkeypatch):
     assert "O Andamento não tem este cliente" in html and CHAVE not in html
 
 
-# --- o que aconteceu, todos os clientes e o CSV (11/11/2026, pedido da Ana Barros) --------------------------------------
+# --- o que aconteceu, todos os clientes e o CSV (11/11/2026, pedido do COS) --------------------------------------
 # "ajustarmos a visão da aba de ocorrências pra ficar similar a de normalizações (com possibilidade de exportação) … não
 # consigo exportar ou ver de bate pronto qq rolou". O Andamento manda o texto com o corte da API das normalizações; aqui
 # ele vira a linha curta, o "o que aconteceu" aberto no clique e as colunas do CSV.
@@ -314,7 +314,7 @@ def test_a_formula_no_texto_sai_neutralizada_no_csv(ligada, logado, monkeypatch)
     assert "'=HYPERLINK(1)" in texto
 
 
-# --- os filtros da tela Normalizações (11/11/2026, pedido da Ana Barros) ---------------------------------------------
+# --- os filtros da tela Normalizações (11/11/2026, pedido do COS) ---------------------------------------------
 # "os filtros que existem em Normalizações, tipo de falha, cliente, usina, criado por, tecnico, status fracttal, lupa de
 # pesquisa". Os mesmos nomes no endereço; o cliente é a aba. Os dois nomes vêm da Ronda COS (f860dc3).
 

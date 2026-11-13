@@ -252,3 +252,17 @@ def test_as_cores_de_cada_foco():
     # a usina sem comunicação é roxa no mapa (12/11/2026, a cor de Comando > Usinas): o ícone existe e lê o token
     assert 'a_semcom: P.t["--semcom"]' in js and '"--semcom"' in js
     assert r["u"] == cores
+
+
+def test_a_escala_com_a_borda_inteira_e_os_creditos_recolhidos():
+    """Levi, 13/11/2026 (pela sessão Nexus Field): "Esse contador de 500 km aí do mapa [...] tá sem a borda de cima. Isso
+    deixou muito estranho" (a escala do MapLibre vem por padrão com a borda só dos lados e embaixo) e "tem exclamação que
+    fica estendida, mostrando de onde está vindo os dados [...] Deixa essa exclamação sempre recolhida" (os créditos do
+    mapa, que o MapLibre abre no começo e só recolhe no primeiro arrasto)."""
+    raiz = Path(__file__).resolve().parent.parent / "nexus" / "static"
+    css = (raiz / "campo.css").read_text(encoding="utf-8")
+    escala = re.search(r"\.eq-ml \.maplibregl-ctrl-scale\{([^}]*)\}", css).group(1)
+    assert "border:1px solid var(--linha-forte)" in escala and "border-top" not in escala
+    js = (raiz / "campo-mapa.js").read_text(encoding="utf-8")
+    assert "function recolherCreditos" in js and 'classList.remove("maplibregl-compact-show")' in js
+    assert 'removeAttribute("open")' in js and 'mapa.on("load", recolherCreditos)' in js

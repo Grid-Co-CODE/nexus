@@ -24,6 +24,7 @@ RESUMO = {
     "demanda": "As demandas que um setor abre para outro, com o tema e o prazo",
     "demanda_usina": "As usinas citadas em cada demanda",
     "evento_demanda": "Cada passo das demandas, da análise à conclusão",
+    "aparelho_field": "Cada celular com o Nexus Field e a versão dele",
     "resposta_sugestao": "As respostas dos administradores às sugestões",
     "evento_insight": "Quem assumiu ou concluiu cada insight do motor de regras",
     # ── Mapa de equipe (08/11/2026) ──
@@ -170,6 +171,9 @@ PARA_QUE = {
                "do setor, a OS e o texto, cifrado. Serve para a Caixa de entrada do Comando e para medir em quanto "
                "tempo cada setor responde.",
     "demanda_usina": "Guarda as usinas que cada demanda cita. Serve para achar as demandas de uma usina.",
+    "aparelho_field": "Guarda cada celular em que alguém entrou no Nexus Field, com o modelo, a versão do app, quando "
+                      "instalou e o último acesso. Serve para saber quem já instalou e quem ficou numa versão antiga, "
+                      "sem cadastro à mão.",
     "evento_demanda": "Guarda cada passo das demandas (em análise, pediu informação, respondeu, devolveu, concluiu), com "
                       "o dia, quem fez e a OS atrelada na mensagem. Serve para a situação de agora, o prazo, a linha do "
                       "tempo e as OS atreladas de cada demanda.",

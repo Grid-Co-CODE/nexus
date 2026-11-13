@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block titulo %}Planilha · {{ tela.nome }}{% endblock %}
+{% block conteudo %}
+<link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='hseq.css') }}">
+{# A conferência e a carga da planilha da Segurança (06/11/2026, nexus/hseq/documentacao.py): primeiro Conferir (não
+   grava), depois Gravar com o mesmo arquivo (grava só o que muda). Os nomes que não casam aparecem só aqui, na tela de
+   quem é da Segurança; nada disso vai para o banco. #}
+<div class="campo-nativa">
+  <div class="cn-cab">
+    <div><p class="gc-eyebrow"><a href="{{ url_for('.colaboradores') }}">{{ torre.nome }} · {{ tela.nome }}</a></p>
+    <h1 class="cn-titulo">{{ 'Planilha gravada' if gravados is not none else 'Conferência da planilha' }}</h1>
+    <p class="cn-pergunta">{{ nome_arquivo }}</p></div>
+  </div>
+  {% if erro %}<div class="cn-erro" role="alert"><b>{{ erro }}</b></div>{% endif %}
+
+  {% if res %}
+  <div class="cn-numeros">
+    <span><span class="gc-rotulo">Pessoas do cadastro</span><span class="v">{{ res.pessoas }}</span><span class="d">com algum item na planilha</span></span>
+    <span><span class="gc-rotulo">Registros</span><span class="v">{{ res.registros|length }}</span><span class="d">pessoa × item lidos</span></span>
+    {% if gravados is not none %}
+    <span><span class="gc-rotulo">Gravados</span><span class="v cn-t-ok">{{ gravados }}</span><span class="d">o que mudou; o resto já estava igual</span></span>
+    {% else %}
+    <span><span class="gc-rotulo">Mudariam</span><span class="v{% if mudariam %} cn-t-alerta{% endif %}">{{ mudariam }}</span><span class="d">o que a gravação acrescentaria</span></span>
+    {% endif %}
+    <span><span class="gc-rotulo">Não casaram</span><span class="v{% if res.nao_casou %} cn-t-critico{% endif %}">{{ res.nao_casou|length }}</span><span class="d">nomes fora do cadastro</span></span>
+  </div>
+
+  <h2 class="gc-rotulo col-secao">Abas lidas</h2>
+  <div class="cn-tab cn-tab--compacta"><table>
+    <thead><tr><th>Aba</th><th>Pessoas</th><th>No cadastro</th><th>Colunas de documentação</th></tr></thead>
+    <tbody>{% for a in res.abas %}<tr><td>{{ a.aba }}</td><td>{{ a.pessoas }}</td><td>{{ a.casadas }}</td><td>{{ a.itens }}</td></tr>{% endfor %}
+    {% for aba, motivo in res.fora %}<tr><td>{{ aba }}</td><td colspan="3" class="mudo">fora: {{ motivo }}</td></tr>{% endfor %}</tbody>
+  </table></div>
+
+  {% if res.nao_casou %}
+  <h2 class="gc-rotulo col-secao">Nomes que não casaram com o cadastro (não entram)</h2>
+  <p class="mudo">Confira a grafia na planilha ou inclua a pessoa no cadastro (Pessoas → Colaboradores Operação) e confira de novo.</p>
+  <div class="cn-tab cn-tab--compacta"><table>
+    <thead><tr><th>Nome na planilha</th><th>Por quê</th></tr></thead>
+    <tbody>{% for nome, motivo in res.nao_casou %}<tr><td>{{ nome }}</td><td>{{ motivo }}</td></tr>{% endfor %}</tbody>
+  </table></div>
+  {% endif %}
+
+  {% if res.aproximados %}
+  <h2 class="gc-rotulo col-secao">Casaram só pelo primeiro e último nome (confira antes de gravar)</h2>
+  <p class="mudo">O nome completo da planilha não está no cadastro, mas o primeiro e o último nome são de uma ficha só. Se alguma linha for outra pessoa, corrija o nome na planilha antes de gravar.</p>
+  <div class="cn-tab cn-tab--compacta"><table>
+    <thead><tr><th>Nome na planilha</th><th>Ficha do cadastro</th></tr></thead>
+    <tbody>{% for nome, ficha in res.aproximados %}<tr><td>{{ nome }}</td><td>{{ ficha }}</td></tr>{% endfor %}</tbody>
+  </table></div>
+  {% endif %}
+
+  {% if res.desconhecidos %}
+  <h2 class="gc-rotulo col-secao">Valores que o Nexus não reconhece (não entram)</h2>
+  <p class="mudo">A data é sempre dd/mm/aaaa. Corrija na planilha e confira de novo, ou registre na ficha da pessoa.</p>
+  <div class="cn-tab cn-tab--compacta"><table>
+    <thead><tr><th>Aba</th><th>Item</th><th>Valor</th><th>Vezes</th></tr></thead>
+    <tbody>{% for aba, item, valor, n in res.desconhecidos %}<tr><td>{{ aba }}</td><td>{{ item }}</td><td>{{ valor }}</td><td>{{ n }}</td></tr>{% endfor %}</tbody>
+  </table></div>
+  {% endif %}
+  {% endif %}
+
+  {% if gravados is none %}
+  {# o Gravar pede o arquivo de novo: o servidor não guarda a planilha entre um pedido e outro #}
+  <form class="cn-filtros" method="post" action="{{ url_for('.colaboradores_planilha') }}" enctype="multipart/form-data">
+    <label class="ext-filtro"><span class="gc-rotulo">Planilha da Segurança</span>
+    <input class="gc-campo" type="file" name="arquivo" accept=".xlsx" required></label>
+    <button class="gc-btn gc-btn--ui gc-btn--contorno" type="submit" name="acao" value="conferir">Conferir de novo</button>
+    {% if res and res.registros %}<button class="gc-btn gc-btn--ui gc-btn--primario" type="submit" name="acao" value="gravar">Gravar no Nexus</button>{% endif %}
+  </form>
+  {% if res and res.registros %}<p class="mudo">Para gravar, escolha o mesmo arquivo de novo e clique em Gravar no Nexus. Só o que muda é gravado.</p>{% endif %}
+  {% endif %}
+  <p class="mudo"><a href="{{ url_for('.colaboradores') }}">Voltar aos colaboradores</a></p>
+</div>
+{% endblock %}

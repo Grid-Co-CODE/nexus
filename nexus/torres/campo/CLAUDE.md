@@ -1808,6 +1808,11 @@ e não foram feitas.
   tempo (arrastar volta o percurso até aquela hora, com o ponto "agora" e a hora no mapa) e a velocidade (×120, ×480,
   ×1200). Cada ponto vai com o instante (`t`, segundos UTC) no JSON do percurso. Os marcos de
   `eventos.do_percurso` seguem no mapa com a hora ("16:50 · Saiu da UFV Altair").
+- **A escala e os créditos (13/11/2026**, Levi, pela sessão Nexus Field): a escala com a borda inteira ("tá sem a borda
+  de cima. Isso deixou muito estranho": o MapLibre a desenha só com os lados e o fundo) e os créditos do mapa ("de onde
+  está vindo os dados", no "i") **sempre recolhidos** ("Deixa essa exclamação sempre recolhida"): o MapLibre os abre no
+  começo e só recolhe no primeiro arrasto; o `recolherCreditos` do `campo-mapa.js` recolhe uma vez, quando eles chegam
+  com as fontes, e daí em diante o "i" abre e fecha no toque.
 - Os botões de sempre (+, −, Ir ao percurso, Brasil) e a escala; o resto da tela (Técnicos | Usinas, Incluir clima,
   Filtros, os painéis) não mudou.
 - **Prova**: `tests/test_mapa_base.py` (a subida em partes, o 409/400/413/507, o que não confere não troca o que está no
@@ -2323,6 +2328,12 @@ Aprovação e Triagem usam a lógica do App copiada, não refeita, para o númer
   a resposta e o `ApiError` são os mesmos; o Nexus tem o próprio teto (`casca/fracttal_conta.py`: 150 dos 200/min, 90 no
   fundo, sobrando 50 para o App e os robôs) e o `fx` dele segue levantando `fracttal.Recusado`, nunca `FxLimite`.
   Recópia pelo extrator: muda só o cabeçalho, a assinatura e dois imports da biblioteca padrão que a cópia não usa.
+- **13/11, App v353 (código `1d90c968dbc08416`):** o teste acusou a `_fx_wo_paralelo` e a assinatura do `fx`. No App, a
+  leitura de fundo adiada pela reserva dos técnicos passou a dizer quanto esperar (`FxLimite.adiada` e `espera`), e a
+  `_fx_wo_paralelo` paciente espera só isso e tenta até 8 voltas (eram 4 de 60 s). Decisão: recópia; **o substituto do
+  `fx` fica** (o do Nexus nunca levanta `FxLimite`, e a cópia lê o `adiada` com `getattr`, valor padrão). No Nexus o
+  que muda é só a releitura da fila da Aprovação em segundo plano (`aprovacao.py`, `paciente=True`): com o Fracttal
+  recusando, ela insiste até 8 voltas de 60 s em vez de 4. As telas não mudam.
 - Trocados pelo Nexus no fim do arquivo gerado: `_tabela` e `tabela_qlog` (leem pela fonte do Nexus, `tabelas.py`),
   `tabela` (a dos tokens do Fracttal: só a partição `cadastro`; `tok` e `pt` recusadas), `fx` (Fracttal só GET,
   `fracttal.py`), `ident` (`pessoas.ident`) e `_varredura_carregar` (sempre `False`: sem blob do App).

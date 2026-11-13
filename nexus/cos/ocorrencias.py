@@ -18,7 +18,7 @@ from urllib.parse import quote, urlsplit
 from . import andamento as AND
 from . import normalizacoes as NO
 
-# "Todos os clientes" (11/11/2026, pedido da Ana Barros: "a visão consolidada"): o valor do `?cliente=` que junta as
+# "Todos os clientes" (11/11/2026, pedido do COS: "a visão consolidada"): o valor do `?cliente=` que junta as
 # ocorrências de todos os clientes do Andamento numa tabela só. Nenhum cliente do Andamento se chama assim.
 TODOS = "todos"
 # A ocorrência sem hora de registro vai para o fim da tabela juntada.
@@ -425,7 +425,7 @@ def painel(leitura, agora: datetime, situacao: str = "", url_do_andamento: str =
 
 
 # ── Os filtros (11/11/2026) ───────────────────────────────────────────────────────────────────────────────────────────
-# Pedido da Ana Barros: "os filtros que existem em Normalizações, tipo de falha, cliente, usina, criado por, tecnico,
+# Pedido do COS: "os filtros que existem em Normalizações, tipo de falha, cliente, usina, criado por, tecnico,
 # status fracttal, lupa de pesquisa". Os MESMOS nomes de parâmetro da tela Normalizações (`falha`, `usina`,
 # `criado_por`, `tecnico`, `status`, `q`), para o endereço de uma valer na outra. O cliente é a aba de cima ("Todos os
 # clientes" ou um). "Criado por" e "Técnico" são os dois nomes que a Ronda COS manda (os da API das normalizações).
@@ -508,7 +508,7 @@ def _opcoes(todas: list) -> dict:
 
 
 # ── O que aconteceu (11/11/2026) ──────────────────────────────────────────────────────────────────────────────────────
-# Pedido da Ana Barros: "ajustarmos a visão da aba de ocorrências pra ficar similar a de normalizações (com
+# Pedido do COS: "ajustarmos a visão da aba de ocorrências pra ficar similar a de normalizações (com
 # possibilidade de exportação) … não consigo exportar ou ver de bate pronto qq rolou". O Andamento manda, por
 # ocorrência, a descrição (sem o planejamento do PCM), a "Ação:" do molde, as notas de pessoa (sem autor nem hora), a
 # causa escolhida pelo COS, o resumo do informe e a OS no espelho do Fracttal — o MESMO corte da API das normalizações.

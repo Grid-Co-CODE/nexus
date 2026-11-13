@@ -75,3 +75,79 @@
 .cos-tv-u[data-gid]:hover,.cos-tv-u[data-gid]:focus-visible{outline:2px solid var(--verde);outline-offset:-2px}
 .cos-inv-vivo{font-size:12px;color:var(--mudo);font-variant-numeric:tabular-nums}
 .cos-inv-vivo--canto{position:fixed;right:12px;bottom:12px;z-index:5}
+
+/* ── o detalhe de um inversor (13/11/2026) ────────────────────────────────────────────────────────────────────────── */
+/* o inversor abre o detalhe: o nome é o botão (teclado); o cartão todo responde ao mouse */
+.cos-inv-i--abre{cursor:pointer}
+.cos-inv-i--abre:hover{border-color:var(--linha-forte);background:var(--superficie-3)}
+.cos-inv-i-abrir{display:inline-flex;align-items:baseline;gap:6px;padding:0;border:0;background:transparent;color:var(--tinta);
+  font:inherit;text-align:left;cursor:pointer;border-radius:4px}
+.cos-inv-i-abrir span{color:var(--mudo);font-size:15px;line-height:1}
+.cos-inv-i--abre:hover .cos-inv-i-abrir span{color:var(--verde-texto)}
+.cos-inv-det[hidden],.cos-inv-corpo[hidden]{display:none}
+.cos-inv-det{padding:14px 22px 24px}
+.cos-inv-det-cab{display:flex;flex-wrap:wrap;align-items:center;gap:8px 16px;margin-bottom:10px}
+.cos-inv-det-cab .gc-btn{padding:6px 12px}
+.cos-inv-det-titulo{margin:0;font-size:18px;font-weight:600}
+.cos-inv-det-titulo:focus{outline:none}
+.cos-inv-det-sub{color:var(--mudo);font-size:13px}
+.cos-inv-det-estado{margin-bottom:10px}
+/* no detalhe o texto ao lado do título é longo: ele desce para baixo do título em vez de espremê-lo (a 375 px o
+   "As strings desde 10:05" virava quatro linhas) */
+.cos-inv-det .cos-inv-bloco-cab{flex-wrap:wrap}
+.cos-inv-det .cos-inv-bloco-cab h3{flex:none}
+.cos-inv-fatos{display:flex;flex-wrap:wrap;gap:8px 28px;margin:0 0 16px}
+.cos-inv-fatos dt{font:700 11px/14px var(--font-sans);letter-spacing:.05em;text-transform:uppercase;color:var(--mudo)}
+.cos-inv-fatos dd{margin:2px 0 0;font-size:16px;font-weight:600}
+.cos-inv-fatos dd small{font-weight:400;color:var(--mudo);font-size:11px;margin-left:4px}
+/* as entradas de agora: um cartão por MPPT, a corrente de cada string em barra */
+.cos-inv-mppts{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(260px,100%),1fr));gap:10px}
+.cos-inv-mppt{border:1px solid var(--linha);border-radius:10px;padding:8px 10px;background:var(--superficie-2);display:flex;flex-direction:column;gap:6px}
+.cos-inv-mppt--soltas{border-style:dashed;background:transparent}
+.cos-inv-mppt--so-strings{grid-column:1/-1}
+.cos-inv-mppt-cab{display:flex;flex-wrap:wrap;justify-content:space-between;gap:2px 10px;margin:0;font-size:12px}
+.cos-inv-mppt-cab b{font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--tinta-2)}
+.cos-inv-mppt-cab span{color:var(--mudo)}
+p.cos-inv-mppt-cab{font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--tinta-2)}
+.cos-inv-ent-rot{margin:0;font-size:12px;color:var(--mudo)}
+.cos-inv-cels{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:4px}
+.cos-inv-cel{display:flex;flex-direction:column;gap:4px;padding:5px 7px;border-radius:6px;background:var(--superficie)}
+.cos-inv-cel-l{display:flex;justify-content:space-between;align-items:baseline;gap:6px;font-size:12px;font-variant-numeric:tabular-nums}
+.cos-inv-cel-l span:first-child{color:var(--tinta-2)}
+.cos-inv-cel-l .sem{color:var(--mudo);font-size:11px}
+.cos-inv-barra{display:block;height:4px;border-radius:999px;background:var(--barra);overflow:hidden}
+.cos-inv-barra i{display:block;height:100%;border-radius:999px;background:var(--verde)}
+.cos-inv-barra i.apagada{background:var(--linha-forte)}
+.cos-inv-ent-vazio{margin:0;font-size:12px;color:var(--mudo)}
+.cos-inv-ent-nota{margin:8px 0 0;font-size:12px;color:var(--mudo);max-width:900px}
+.cos-inv-ent-nota:empty{display:none}
+/* as entradas desde a abertura: os modos, os destaques e os gráficos */
+.cos-inv-modos,.cos-inv-chips{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 10px}
+.cos-inv-chips[hidden]{display:none}
+.cos-inv-modos .gc-chip:disabled,.cos-inv-chip:disabled{cursor:not-allowed;color:var(--mudo);background:transparent;border-style:dashed}
+.cos-inv-chip{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;font-size:11.5px}
+.cos-inv-cor{display:inline-block;flex:none;width:12px;height:3px;border-radius:2px;background:var(--linha-forte)}
+.cos-inv-cor.pg-c1{background:var(--info)} .cos-inv-cor.pg-c2{background:var(--anomalo)}
+.cos-inv-cor.pg-c3{background:var(--bronze)} .cos-inv-cor.pg-c4{background:var(--verde-texto)}
+.cos-inv-sg-grade{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(200px,100%),1fr));gap:10px}
+.cos-inv-sg-mppts{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(320px,100%),1fr));gap:12px}
+.cos-inv-sgi,.cos-inv-sgm{border:1px solid var(--linha);border-radius:12px;padding:8px 10px 6px;background:var(--superficie-2);
+  display:flex;flex-direction:column;gap:4px}
+.cos-inv-sgm--soltas{border-style:dashed}
+.cos-inv-sgi .cos-inv-i-kw{font-size:13px}
+.cos-inv-sgm .d{color:var(--mudo);font-size:12px}
+.cos-inv-leg{display:flex;flex-wrap:wrap;gap:2px 14px;margin:0;padding:0;list-style:none;font-size:12px;color:var(--tinta-2)}
+.cos-inv-leg li{display:inline-flex;align-items:center;gap:6px}
+.cos-inv-leg .gc-num{color:var(--tinta);font-weight:600}
+/* as séries de string: a de fundo sem cor de identidade; as de destaque nas 4 cores (ordem fixa, conferidas no validador
+   do dataviz nos dois temas: azul, rosa, bronze e verde; o par verde x rosa fica no limite do daltonismo no claro, por
+   isso a legenda e a dica dizem o nome de cada uma) */
+.pg-s{fill:none;stroke-width:2;stroke-linejoin:round;stroke-linecap:round}
+.pg-s--fundo{stroke:var(--linha-forte);stroke-width:1.25}
+.pg-s.pg-c1{stroke:var(--info)} .pg-s.pg-c2{stroke:var(--anomalo)} .pg-s.pg-c3{stroke:var(--bronze)} .pg-s.pg-c4{stroke:var(--verde-texto)}
+.pg-sfim{stroke:var(--superficie);stroke-width:2}
+.pg-sfim.pg-c1,.pg-cruz-ponto.pg-cp1{fill:var(--info)} .pg-sfim.pg-c2,.pg-cruz-ponto.pg-cp2{fill:var(--anomalo)}
+.pg-sfim.pg-c3,.pg-cruz-ponto.pg-cp3{fill:var(--bronze)} .pg-sfim.pg-c4,.pg-cruz-ponto.pg-cp4{fill:var(--verde-texto)}
+.cos-inv-dica-l{display:flex;align-items:center;gap:0}
+.cos-inv-dica-l+.cos-inv-dica-l{margin-top:2px}
+.cos-inv-dica-l .cos-inv-cor{margin-right:6px}

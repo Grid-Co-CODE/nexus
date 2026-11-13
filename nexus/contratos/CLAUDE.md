@@ -23,8 +23,8 @@ cliente lá para bases, contestações, você vai jogar para o comando, prévia 
   quem decide é a tela de destino.
 - Prova: `tests/test_contratos_torre_saiu.py`. O menu passou de 14 para 13 torres.
 
-**Prévia: visão do contrato** (12/11/2026, `/t/comando/visao-do-contrato`, de todos): o mockup que a Ana pediu para a
-avaliação de Contratos (Danuth, Camila, Fred) e dos setores, `nexus/static/previa/visao-do-contrato.html` (a mesma
+**Prévia: visão do contrato** (12/11/2026, `/t/comando/visao-do-contrato`, de todos): o mockup que a área de Contratos pediu para a
+avaliação de Contratos e dos setores, `nexus/static/previa/visao-do-contrato.html` (a mesma
 página do `docs/mockups/visao-do-contrato` da plataforma), numa moldura; dentro do Nexus ele esconde o topo dele. Dados
 fictícios, nada grava. Quando a visão do contrato virar tela de verdade, ela entra na tela Clientes (a "Gestão de
 contratos (a estruturar)") e a prévia sai.

@@ -21,7 +21,9 @@ from urllib.parse import urlencode
 from flask import Response, abort, current_app, jsonify, redirect, render_template, request, session, url_for
 
 from ...campo import visao
+from ...hseq import colaboradores as COL
 from ...hseq import decisoes as DEC
+from ...hseq import documentacao as DOC
 from ...hseq import epi as EPI
 from ...hseq import extintores as EXT
 from ...hseq import fotos as FOT
@@ -46,6 +48,14 @@ TORRE = Torre(
         Tela("mesa", "Mesa da Segurança",
              "O que pede ação hoje: PT parada, extintor vencido ou não reconhecido e usina sem luvas?",
              "PT do App, extintores e rondas do App + cadastro do Nexus", do_setor=SID.SEGURANCA),
+        # os colaboradores pelo cadastro do Nexus, com a documentação de segurança de cada um, logo depois da Mesa (a
+        # Segurança, 13/11/2026: "entre Mesa de Segurança e Extintores"); os desligados num filtro (05/11/2026: "após o
+        # colaborador ser demitido eu ainda preciso ter a visibilidade dele"); do setor Segurança, porque mostra nomes
+        Tela("colaboradores", "Colaboradores",
+             "Quem está na operação, com que documentação de segurança em dia, vencida ou faltando, e quem já foi "
+             "desligado?",
+             "Cadastro do Nexus (Pessoas → Colaboradores Operação) + documentação registrada pela Segurança",
+             do_setor=SID.SEGURANCA),
         Tela("extintores", "Extintores",
              "Que extintor está vencido, perto de vencer ou sem conferência há mais de 30 dias, em que cliente e usina, "
              "e com qual responsável?",
@@ -717,3 +727,119 @@ def epi():
         lista=[x for x in base if not f or x["situacao"] == f], limite=LIMITE_LINHAS,
         cartoes=EPI.por_responsavel(base, d.get("times") or {}), situacoes=EPI.SITUACOES, tempo=EXT.tempo,
         dias_sem=EPI.DIAS_SEM_VERIFICAR, pergunta=EPI.PERGUNTA)
+
+
+# a documentação de cada pessoa (06/11/2026): o filtro da lista, pelo resumo da pessoa (`documentacao.resumo`)
+FILTROS_DOC = {"pendencia": "Com pendência", "em_dia": "Em dia", "sem_registro": "Sem registro"}
+
+
+def _doc_passa(x, f) -> bool:
+    r = x["doc"]
+    return (not f or (f == "pendencia" and r["pendencias"] > 0)
+            or (f == "em_dia" and not r["pendencias"] and r["registrados"] > 0)
+            or (f == "sem_registro" and not r["registrados"]))
+
+
+@bp.route("/colaboradores")
+def colaboradores():
+    """Colaboradores (05/11/2026): as pessoas do cadastro do Nexus vistas pela Segurança (`nexus/hseq/colaboradores.py`),
+    com a documentação de segurança de cada uma desde 06/11/2026 (`nexus/hseq/documentacao.py`). A faixa de números é o
+    filtro de situação (Ativos, o padrão; Desligados, para não perder de vista quem saiu; Todos); os outros filtros são o
+    vínculo, o cargo, a região de campo, a documentação e a busca. O nome leva à ficha da pessoa."""
+    leitura = COL.colaboradores()
+    d = leitura.dados
+    doc = DOC.ler(current_app.config)
+    hoje = visao._agora().date()
+    todas = [dict(x, doc=DOC.resumo(doc["pessoas"].get(x["pessoa_id"]), hoje)) for x in d.get("pessoas") or []]
+    sit = COL.situacao(request.args.get("situacao", ""))
+    fl = {c: request.args.get(c, "").strip() for c in ("vinculo", "cargo", "regiao")}
+    fdoc = request.args.get("doc", "") if request.args.get("doc", "") in FILTROS_DOC else ""
+    q = request.args.get("q", "").strip().lower()
+    base = [x for x in todas if all(not v or x[c] == v for c, v in fl.items()) and _doc_passa(x, fdoc)
+            and (not q or q in " ".join(str(x.get(c) or "") for c in ("nome", "cargo", "equipe", "regiao")).lower())]
+    return render_template(
+        "hseq/colaboradores.html", torre=TORRE, tela=TORRE.tela("colaboradores"), leitura=leitura, d=d,
+        lido=_lido(leitura), url=_url, situacao=sit, situacoes=COL.SITUACOES, fl=fl, q=request.args.get("q", ""),
+        contagem=COL.contar(base), lista=[x for x in base if COL.na_situacao(x, sit)], limite=LIMITE_LINHAS,
+        vinculos=COL.opcoes(todas, "vinculo"), cargos=COL.opcoes(todas, "cargo"), regioes=COL.opcoes(todas, "regiao"),
+        sem_status=COL.SEM_STATUS, fdoc=fdoc, filtros_doc=FILTROS_DOC, estados=DOC.ESTADOS, doc_erro=doc["erro"],
+        pode=_pode(), ok=request.args.get("ok", ""), erro=request.args.get("erro", ""))
+
+
+def _pessoa(pessoa_id: int) -> dict:
+    x = next((p for p in COL.colaboradores().dados.get("pessoas") or [] if p["pessoa_id"] == pessoa_id), None)
+    if x is None:
+        abort(404)
+    return x
+
+
+@bp.route("/colaboradores/<int:pessoa_id>")
+def colaborador(pessoa_id: int):
+    """A ficha de UM colaborador na Segurança: cada item de documentação com a situação, a data, a validade pela norma
+    e, para quem é da Segurança, o formulário de cada item (06/11/2026)."""
+    x = _pessoa(pessoa_id)
+    doc = DOC.ler(current_app.config)
+    hoje = visao._agora().date()
+    regs = doc["pessoas"].get(pessoa_id)
+    return render_template(
+        "hseq/colaborador.html", torre=TORRE, tela=TORRE.tela("colaboradores"), x=x, itens=DOC.ficha(regs, hoje),
+        resumo=DOC.resumo(regs, hoje), estados=DOC.ESTADOS, situacoes=DOC.SITUACOES, sem_status=COL.SEM_STATUS,
+        doc_erro=doc["erro"], pode=_pode(), alerta_dias=DOC.ALERTA_DIAS, ok=request.args.get("ok", ""),
+        erro=request.args.get("erro", ""))
+
+
+@bp.route("/colaboradores/<int:pessoa_id>/item", methods=["POST"])
+def colaborador_item(pessoa_id: int):
+    """Registra a situação de UM item de UMA pessoa (o último registro vale; o livro só acrescenta)."""
+    from ..moldura import _de_outro_site
+    if _de_outro_site():
+        abort(403)
+    _pessoa(pessoa_id)
+    f = request.form
+    try:
+        texto = DOC.registrar(current_app.config, pessoa_id=pessoa_id, item=f.get("item", ""),
+                              situacao=f.get("situacao", ""), data_txt=f.get("data", ""),
+                              usuario=session.get("usuario"), pode=_pode())
+        volta = {"ok": texto}
+    except DOC.Recusada as e:
+        volta = {"erro": str(e)}
+    except Exception as e:      # noqa: BLE001 — banco fora, trava: a tela diz
+        import logging
+        logging.exception("Colaboradores: o registro da documentação falhou")
+        volta = {"erro": f"Não consegui gravar no banco ({type(e).__name__}). Tente de novo em instantes"}
+    return redirect(url_for(".colaborador", pessoa_id=pessoa_id, **volta) + f"#item-{f.get('item', '')}", code=303)
+
+
+@bp.route("/colaboradores/planilha", methods=["POST"])
+def colaboradores_planilha():
+    """A planilha da Segurança ("Atualização de Ativos"), pela tela: Conferir lê e mostra o que entraria, sem gravar;
+    Gravar lê de novo e grava só o que muda (a mesma planilha duas vezes não grava nada). O arquivo não fica guardado:
+    é lido na memória do servidor e descartado."""
+    from ..moldura import _de_outro_site
+    if _de_outro_site():
+        abort(403)
+    if not _pode():
+        abort(403)
+    gravar = request.form.get("acao") == "gravar"
+    arq = request.files.get("arquivo")
+    res, gravados, mudariam, erro = None, None, None, ""
+    try:
+        if not arq or not arq.filename:
+            raise DOC.Recusada("Escolha o arquivo da planilha (.xlsx).")
+        pessoas = COL.colaboradores().dados.get("pessoas") or []
+        if not pessoas:
+            raise DOC.Recusada("Não consegui ler o cadastro de pessoas agora: sem ele, nenhum nome casa. Nada foi gravado.")
+        res = DOC.ler_planilha(arq.read(), pessoas)
+        if gravar:
+            gravados = DOC.carregar_planilha(current_app.config, res["registros"], session.get("usuario"), True)
+        else:
+            mudariam = DOC.mudancas(current_app.config, res["registros"])
+    except DOC.Recusada as e:
+        erro = str(e)
+    except Exception as e:      # noqa: BLE001 — banco fora: a tela diz
+        import logging
+        logging.exception("Colaboradores: a carga da planilha falhou")
+        erro = f"Não consegui gravar no banco ({type(e).__name__}). Nada foi gravado; tente de novo em instantes"
+    return render_template(
+        "hseq/colaboradores_planilha.html", torre=TORRE, tela=TORRE.tela("colaboradores"), res=res, gravar=gravar,
+        gravados=gravados, mudariam=mudariam, erro=erro, nome_arquivo=(arq.filename if arq else ""))

@@ -2096,8 +2096,10 @@ tr.rd-linha--ativa td{background:var(--verde-suave)}
 .eq-ml .maplibregl-canvas{outline:none}
 .eq-ml .maplibregl-ctrl-attrib{background:var(--superficie);color:var(--mudo);font:11.5px/1.4 var(--font-sans)}
 .eq-ml .maplibregl-ctrl-attrib a{color:var(--verde-texto)}
-.eq-ml .maplibregl-ctrl-scale{background:var(--superficie);color:var(--tinta-2);border-color:var(--linha-forte);
-  font:11px var(--font-sans)}
+/* a escala com a borda inteira (Levi, 13/11/2026: "tá sem a borda de cima. Isso deixou muito estranho"; o MapLibre a
+   desenha por padrão só com os lados e o fundo) */
+.eq-ml .maplibregl-ctrl-scale{background:var(--superficie);color:var(--tinta-2);border:1px solid var(--linha-forte);
+  border-radius:var(--raio-tag);padding:1px 6px;font:11px var(--font-sans)}
 .eq-ml-aviso{position:absolute;z-index:3;left:16px;right:16px;bottom:16px;margin:0;padding:10px 12px;font-size:13px;
   border:1px solid var(--alerta);border-radius:var(--raio-controle);background:var(--superficie);color:var(--tinta)}
 .eq-ml-aviso[hidden]{display:none}
