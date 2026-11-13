@@ -109,10 +109,6 @@
         <h3 class="dm-sr" id="dm-det-t-{{ d.demanda_id }}">{{ d.titulo or '(sem o texto)' }}</h3>
         <div class="dm-det-corpo">
           <div class="dm-det-esq">
-            <p class="dm-fatos">
-              <span class="dm-fato dm-fato--resp"><span class="dm-fato-r">Responsável</span> <b>{{ d.para_nome or '—' }}</b>{% if d.para_setor_nome %} <span class="dm-mudo">{{ d.para_setor_nome }}</span>{% endif %}</span>
-              {% if d.os %}<span class="dm-fato"><span class="dm-fato-r">OS</span> <button class="dm-os" type="button" data-os-folio="{{ d.os }}" title="Abrir o card da OS {{ d.os }}">OS {{ d.os }}</button></span>{% endif %}
-            </p>
             {% if d.descricao %}<p class="dm-texto">{{ d.descricao }}</p>{% endif %}
             {% if d.anexos %}
             <ul class="dm-anexos">
@@ -127,6 +123,8 @@
                 <input type="hidden" name="novo_id" value="{{ dem.novo_evento() }}">
                 <label class="dm-sr" for="dm-r-{{ d.demanda_id }}">Sua resposta, ou a sua pergunta para quem pediu</label>
                 <textarea class="gc-campo" id="dm-r-{{ d.demanda_id }}" name="texto" rows="2" maxlength="{{ dem.limites.passo }}" required placeholder="Escreva a resposta, ou a pergunta para quem pediu"></textarea>
+                {% if d.usinas %}<div class="dm-atrelar"><label class="dm-fato-r" for="dm-or-{{ d.demanda_id }}">Atrelar OS</label>
+                  <select class="gc-campo" id="dm-or-{{ d.demanda_id }}" name="os" data-dm-os-sel data-usinas="{% for uid, nome in d.usinas %}{{ uid }}{{ ',' if not loop.last }}{% endfor %}" data-ja="{{ d.oss|join(',') }}"><option value="">Nenhuma</option></select></div>{% endif %}
                 <div class="dm-botoes">
                   <button class="gc-btn gc-btn--ui gc-btn--primario" type="submit" name="acao" value="respondeu"><i class="ph ph-paper-plane-tilt" aria-hidden="true"></i> Responder e finalizar</button>
                   <button class="gc-btn gc-btn--ui gc-btn--contorno" type="submit" name="acao" value="pediu_informacao"><i class="ph ph-question" aria-hidden="true"></i> Pedir informação</button>
@@ -148,6 +146,8 @@
                 <input type="hidden" name="novo_id" value="{{ dem.novo_evento() }}">
                 <label class="dm-sr" for="dm-i-{{ d.demanda_id }}">A informação que foi pedida</label>
                 <textarea class="gc-campo" id="dm-i-{{ d.demanda_id }}" name="texto" rows="2" maxlength="{{ dem.limites.passo }}" required placeholder="A informação que foi pedida"></textarea>
+                {% if d.usinas %}<div class="dm-atrelar"><label class="dm-fato-r" for="dm-oi-{{ d.demanda_id }}">Atrelar OS</label>
+                  <select class="gc-campo" id="dm-oi-{{ d.demanda_id }}" name="os" data-dm-os-sel data-usinas="{% for uid, nome in d.usinas %}{{ uid }}{{ ',' if not loop.last }}{% endfor %}" data-ja="{{ d.oss|join(',') }}"><option value="">Nenhuma</option></select></div>{% endif %}
                 <div class="dm-botoes"><button class="gc-btn gc-btn--ui gc-btn--primario" type="submit" name="acao" value="informou"><i class="ph ph-paper-plane-tilt" aria-hidden="true"></i> Enviar a informação</button></div>
               </form>
               <p class="dm-nota">O prazo volta a correr quando você enviar.</p>
@@ -159,6 +159,8 @@
                 <input type="hidden" name="novo_id" value="{{ dem.novo_evento() }}">
                 <label class="dm-sr" for="dm-v-{{ d.demanda_id }}">Justificativa para devolver</label>
                 <textarea class="gc-campo" id="dm-v-{{ d.demanda_id }}" name="texto" rows="2" maxlength="{{ dem.limites.passo }}" required placeholder="Se a resposta não resolveu, o que ficou faltando (para devolver)"></textarea>
+                {% if d.usinas %}<div class="dm-atrelar"><label class="dm-fato-r" for="dm-ov-{{ d.demanda_id }}">Atrelar OS</label>
+                  <select class="gc-campo" id="dm-ov-{{ d.demanda_id }}" name="os" data-dm-os-sel data-usinas="{% for uid, nome in d.usinas %}{{ uid }}{{ ',' if not loop.last }}{% endfor %}" data-ja="{{ d.oss|join(',') }}"><option value="">Nenhuma</option></select></div>{% endif %}
                 <div class="dm-botoes">
                   <button class="gc-btn gc-btn--ui gc-btn--primario" type="submit" form="dm-cc-{{ d.demanda_id }}" name="acao" value="concluiu"><i class="ph ph-check" aria-hidden="true"></i> Concluir</button>
                   <button class="gc-btn gc-btn--ui gc-btn--contorno" type="submit" name="acao" value="devolveu"><i class="ph ph-arrow-u-up-left" aria-hidden="true"></i> Devolver com justificativa</button>
@@ -174,15 +176,29 @@
             <p class="dm-nota dm-acoes">Quem responde é {{ d.para_nome or 'quem recebeu' }}; quem conclui é {{ d.de_nome or 'quem pediu' }}.</p>
             {% endif %}
           </div>
-          <aside class="dm-det-dir" aria-labelledby="dm-det-a-{{ d.demanda_id }}">
-            <h4 class="dm-det-h" id="dm-det-a-{{ d.demanda_id }}">Andamento</h4>
-            <ol class="dm-tempo">
-              <li class="dm-feito">Aberta <small>{{ d.aberta_txt }}</small></li>
-              {% for p in d.passos %}
-              <li class="dm-feito{% if p.evento == 'devolveu' %} dm-tempo--devolveu{% endif %}">{{ p.nome or 'Alguém' }} {{ p.rotulo }} <small>{{ p.quando_txt }}</small>{% if p.texto %}<q>{{ p.texto }}</q>{% endif %}</li>
-              {% endfor %}
-              {% if d.pendente %}<li>{{ d.pendente }}</li>{% endif %}
-            </ol>
+          {# à direita, de cima para baixo: o Responsável (13/11/2026, Levi: "Responsável fica acima de em andamento"), as
+             OS atreladas ("OS vira 'OS(s) atrelada(s)'": a da abertura e as que entraram nas mensagens) e o andamento #}
+          <aside class="dm-det-dir" aria-label="Responsável, OS atreladas e andamento">
+            <div class="dm-dir-b dm-fato--resp">
+              <h4 class="dm-det-h">Responsável</h4>
+              <p class="dm-dir-v"><b>{{ d.para_nome or '—' }}</b>{% if d.para_setor_nome %} <span class="dm-mudo">{{ d.para_setor_nome }}</span>{% endif %}</p>
+            </div>
+            {% if d.oss %}
+            <div class="dm-dir-b">
+              <h4 class="dm-det-h">OS(s) atrelada(s)</h4>
+              <p class="dm-dir-os">{% for n in d.oss %}<button class="dm-os" type="button" data-os-folio="{{ n }}" title="Abrir o card da OS {{ n }}">OS {{ n }}</button>{% endfor %}</p>
+            </div>
+            {% endif %}
+            <div class="dm-dir-b">
+              <h4 class="dm-det-h">Andamento</h4>
+              <ol class="dm-tempo">
+                <li class="dm-feito">Aberta <small>{{ d.aberta_txt }}</small></li>
+                {% for p in d.passos %}
+                <li class="dm-feito{% if p.evento == 'devolveu' %} dm-tempo--devolveu{% endif %}">{{ p.nome or 'Alguém' }} {{ p.rotulo }} <small>{{ p.quando_txt }}</small>{% if p.texto %}<q>{{ p.texto }}</q>{% endif %}{% if p.os %}<span class="dm-tempo-os">Atrelou a <button class="dm-os" type="button" data-os-folio="{{ p.os }}" title="Abrir o card da OS {{ p.os }}">OS {{ p.os }}</button></span>{% endif %}</li>
+                {% endfor %}
+                {% if d.pendente %}<li>{{ d.pendente }}</li>{% endif %}
+              </ol>
+            </div>
           </aside>
         </div>
       </article>

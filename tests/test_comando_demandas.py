@@ -315,7 +315,11 @@ def test_a_caixa_mostra_a_demanda_para_quem_recebe_quem_pediu_e_o_setor(app, cen
     # Responsável"): a usina só na linha, antes do título; no que abre, nem quem pediu, nem a usina, nem o prazo
     assert '<span class="dm-usina-t">Altair</span> – <span class="dm-tit">Coração 2 sem meta</span>' in l
     assert "Altair" not in det and "Ana Souza" not in det and ">Prazo<" not in det and ">De<" not in det
-    assert '<span class="dm-fato-r">Responsável</span> <b>Juliana Prado</b>' in det and ">Andamento</h4>" in det
+    # à direita, de cima para baixo: o Responsável, as OS atreladas e o andamento (13/11/2026, Levi: "Responsável fica
+    # acima de em andamento"; "OS vira 'OS(s) atrelada(s)'")
+    assert det.index(">Responsável</h4>") < det.index(">OS(s) atrelada(s)</h4>") < det.index(">Andamento</h4>")
+    assert "<b>Juliana Prado</b>" in det.split(">Responsável</h4>", 1)[1].split("</div>", 1)[0]
+    assert 'name="os" data-dm-os-sel data-usinas="1" data-ja="18421"' in det
     # o Colocar em análise na mesma fileira dos outros botões, pelo formulário dele (atributo `form`)
     assert f'form="dm-ea-{did}" name="acao" value="em_analise"' in det and f'<form id="dm-ea-{did}"' in det
     assert '<div class="dm-guarda" data-dm-guarda hidden>' in html and "dm-detalhes" not in html
@@ -379,6 +383,44 @@ def test_os_passos_pela_tela_no_papel_certo(app, cena):
     assert [e["evento"] for e in cena["banco"].linhas(D.LIVRO, D.ABA_EVENTO)] == ["respondeu", "concluiu"]
     html = ana.get(CAIXA + "?dem=pedi&d=" + did).get_data(as_text=True)
     assert 'data-f="concluidas"' in html and "dm-s-concluida" in _linha(html, did)
+
+
+def test_no_meio_das_mensagens_atrela_os(app, cena):
+    """13/11/2026, Levi: "no meio das mensagens as pessoas podem atrelar OSs". A OS vai no passo (a coluna `os` no fim da
+    fato_evento_demanda), pela regra da abertura: uma OS do retrato das usinas da demanda; sem usina, não atrela."""
+    did = _abrir_pela_api(app, cena, usinas=["1", "3"], os="18421")
+    ju, ana = _cliente(app, JU), _cliente(app, ANA)
+    cod = _codigo(ju.get(CAIXA).get_data(as_text=True))
+    r = ju.post(f"{CAIXA}/demandas/{did}/passo", data={"codigo": cod, "acao": "pediu_informacao", "aba": "para",
+                                                       "texto": "Qual inversor?", "os": "18500", "novo_id": "e00000000001"})
+    assert r.status_code == 303
+    ev = cena["banco"].linhas(D.LIVRO, D.ABA_EVENTO)
+    assert [(e["evento"], int(e["os"])) for e in ev] == [("pediu_informacao", 18500)]
+    html = ju.get(CAIXA + "?d=" + did).get_data(as_text=True)
+    assert "com a OS 18500 atrelada" in html
+    det = _det(html, did)
+    oss = det.split(">OS(s) atrelada(s)</h4>", 1)[1].split("</div>", 1)[0]
+    assert oss.index('data-os-folio="18421"') < oss.index('data-os-folio="18500"')         # a da abertura primeiro
+    assert 'Atrelou a <button class="dm-os" type="button" data-os-folio="18500"' in det     # e na mensagem em que entrou
+    # agora a vez é de quem pediu: o campo de atrelar vem no formulário da informação, sem as OS já atreladas
+    det_ana = _det(ana.get(CAIXA + "?dem=pedi&d=" + did).get_data(as_text=True), did)
+    assert 'id="dm-oi-' + did + '" name="os" data-dm-os-sel data-usinas="1,3" data-ja="18421,18500"' in det_ana
+    # a OS de outra usina, a OS no passo sem mensagem e a demanda sem usina não atrelam (nada é gravado)
+    with app.test_request_context():
+        with pytest.raises(D.Recusada, match="OS 99999 não é de nenhuma das usinas"):
+            D.registrar(did, "informou", "O 2.", ANA, os=99999)
+        with pytest.raises(D.Recusada, match="junto com uma mensagem"):
+            D.registrar(did, "em_analise", "", JU, os=18500)
+    sem = _abrir_pela_api(app, cena, usinas=[], os="", novo_id="d00000000002")
+    with app.test_request_context():
+        with pytest.raises(D.Recusada, match="não tem usina"):
+            D.registrar(sem, "respondeu", "Feito.", JU, os=18421)
+    assert len(cena["banco"].linhas(D.LIVRO, D.ABA_EVENTO)) == 1
+    # sem usina, o formulário não oferece o campo
+    assert 'data-dm-os-sel' not in _det(ju.get(CAIXA).get_data(as_text=True), sem)
+    # o passo de antes da coluna (sem `os`) segue lido, sem OS
+    D.limpar()
+    assert [p["os"] for d in D.lista() if d["demanda_id"] == did for p in d["passos"]] == [18500]
 
 
 def test_as_os_da_usina_para_o_formulario(app, cena):

@@ -7,7 +7,8 @@ O Nexus é a FONTE. Quatro abas, todas só acrescentam (registradas no catálogo
 - `fato_demanda`: 1 demanda aberta: quem pediu e quem recebe por código, o setor de cada um, o tema, o prazo do tema na
   hora e a OS (o número);
 - `fato_demanda_usina`: 1 usina de 1 demanda;
-- `fato_evento_demanda`: 1 passo de 1 demanda (em análise, pediu informação, informou, respondeu, devolveu, concluiu).
+- `fato_evento_demanda`: 1 passo de 1 demanda (em análise, pediu informação, informou, respondeu, devolveu, concluiu);
+  desde 13/11/2026 com a OS atrelada naquela mensagem (`os`, a coluna no fim; vazia no passo sem OS).
 
 O banco tem leitura aberta: em claro só IDs, códigos e números; o nome do tema, o título, a descrição, os nomes das
 pessoas, os textos dos passos e os nomes dos anexos vão cifrados (o Cofre, a chave do cadastro), cada um amarrado à
@@ -36,7 +37,10 @@ CAB_TEMA = ("id", "tema_id", "registrado_em", "data_id", "setor_id", "prazo_dias
 CAB_DEMANDA = ("demanda_id", "registrado_em", "data_id_criacao", "de_hmac", "de_pessoa_id", "de_setor_id", "para_hmac",
                "para_pessoa_id", "para_setor_id", "tema_id", "prazo_dias_uteis", "os", "dados_cifrados")
 CAB_USINA = ("id", "demanda_id", "usina_id")
-CAB_EVENTO = ("id", "demanda_id", "evento", "registrado_em", "data_id", "pessoa_id", "pessoa_hmac", "dados_cifrados")
+# a `os` no fim (13/11/2026, Levi: "no meio das mensagens as pessoas podem atrelar OSs"): o número da OS atrelada naquele
+# passo; os passos de antes ficam com ela vazia
+CAB_EVENTO = ("id", "demanda_id", "evento", "registrado_em", "data_id", "pessoa_id", "pessoa_hmac", "dados_cifrados",
+              "os")
 ABAS = ((ABA_TEMA, CAB_TEMA), (ABA_DEMANDA, CAB_DEMANDA), (ABA_USINA, CAB_USINA), (ABA_EVENTO, CAB_EVENTO))
 # os ids: a letra do que é e 11 hexadecimais (a API do banco infere o tipo da coluna: só algarismos voltaria número)
 ID_DEMANDA = re.compile(r"d[0-9a-f]{11}")
@@ -469,10 +473,15 @@ def abrir(form: dict, arquivos, usuario: dict) -> dict:
     return linha
 
 
-def registrar(demanda_id: str, evento: str, texto: str, usuario: dict, novo_id_: str | None = None) -> dict:
+def registrar(demanda_id: str, evento: str, texto: str, usuario: dict, novo_id_: str | None = None, os=None) -> dict:
     """Um passo da demanda, no papel e na vez certos (`PASSOS`); o texto é obrigatório no pedir informação, no informar,
-    no responder e no devolver (a justificativa). O `novo_id` do formulário torna o 2º envio inofensivo."""
+    no responder e no devolver (a justificativa). O `novo_id` do formulário torna o 2º envio inofensivo.
+    `os`: a OS atrelada junto com a mensagem (13/11/2026), pela regra da abertura: uma OS do retrato (as abertas e em
+    verificação) das usinas da demanda; a demanda sem usina não atrela."""
     did, evento = _txt(demanda_id), _txt(evento)
+    os_n = _int(os)
+    if os_n and evento not in COM_TEXTO:
+        raise Recusada("A OS se atrela junto com uma mensagem")
     if not ID_DEMANDA.fullmatch(did):
         raise Recusada("Não achei esta demanda: recarregue a página")
     if evento not in PASSOS:
@@ -491,6 +500,20 @@ def registrar(demanda_id: str, evento: str, texto: str, usuario: dict, novo_id_:
             raise Recusada("Não achei esta demanda: recarregue a página")
         if any(_txt(l.get("id")) == eid for l in t[ABA_EVENTO]):
             return {}
+        if os_n:
+            usinas = sorted({u for u in (_int(x.get("usina_id")) for x in t[ABA_USINA]
+                                         if _txt(x.get("demanda_id")) == did) if u})
+            if not usinas:
+                raise Recusada("Esta demanda não tem usina: não há OS para atrelar")
+            if os_n not in {o["os"] for o in os_das_usinas(usinas)}:
+                raise Recusada(f"A OS {os_n} não é de nenhuma das usinas da demanda: escolha uma OS da lista")
+        if os_n:
+            usinas = sorted({u for u in (_int(x.get("usina_id")) for x in t[ABA_USINA]
+                                         if _txt(x.get("demanda_id")) == did) if u})
+            if not usinas:
+                raise Recusada("Esta demanda não tem usina: não há OS para atrelar")
+            if os_n not in {o["os"] for o in os_das_usinas(usinas)}:
+                raise Recusada(f"A OS {os_n} não é de nenhuma das usinas da demanda: escolha uma OS da lista")
         dono = _txt(d.get("para_hmac")) if papel == "recebe" else _txt(d.get("de_hmac"))
         if dono.lower() != quem["hmac"]:
             raise Recusada("Esse passo é de quem recebeu a demanda" if papel == "recebe"
@@ -501,7 +524,7 @@ def registrar(demanda_id: str, evento: str, texto: str, usuario: dict, novo_id_:
             raise Recusada(f"A demanda está {R.SITUACOES[sit][0].lower()}: esse passo não vale agora")
         registrado, data_id = _agora_iso()
         linha = {"id": eid, "demanda_id": did, "evento": evento, "registrado_em": registrado, "data_id": data_id,
-                 "pessoa_id": quem["pessoa_id"], "pessoa_hmac": quem["hmac"]}
+                 "pessoa_id": quem["pessoa_id"], "pessoa_hmac": quem["hmac"], "os": os_n}
         linha["dados_cifrados"] = cofre.cifrar(json.dumps({"texto": texto, "nome": quem["nome"]}, ensure_ascii=False),
                                                _ctx(ABA_EVENTO, linha))
         t[ABA_EVENTO] = t[ABA_EVENTO] + [linha]
@@ -567,7 +590,7 @@ def lista(hoje: date | None = None, lido: dict | None = None) -> list[dict]:
             q = _quando(ev.get("registrado_em"))
             passos.append({"evento": _txt(ev.get("evento")), "rotulo": ROTULO_PASSO.get(_txt(ev.get("evento")), ""),
                            "quando_txt": q.strftime("%d/%m %H:%M") if q else "", "nome": _txt(dd.get("nome")),
-                           "texto": _txt(dd.get("texto"))})
+                           "texto": _txt(dd.get("texto")), "os": _int(ev.get("os"))})
         q = _quando(l.get("registrado_em"))
         descricao = _txt(dados.get("descricao"))
         out.append({
@@ -580,6 +603,10 @@ def lista(hoje: date | None = None, lido: dict | None = None) -> list[dict]:
             "titulo": _txt(dados.get("titulo")), "descricao": descricao, "inicio": _inicio(descricao),
             "usinas": [(u, nomes_usina.get(u, f"usina {u}")) for u in sorted(usinas_de.get(did, []))],
             "os": _int(l.get("os")), "anexos": dados.get("anexos") or [], "legivel": bool(dados),
+            # as OS atreladas: a da abertura e as das mensagens, sem repetir, na ordem em que entraram
+            "oss": list(dict.fromkeys(n for n in [_int(l.get("os"))] + [p["os"] for p in passos] if n)),
+            # as OS atreladas: a da abertura e as das mensagens, sem repetir, na ordem em que entraram
+            "oss": list(dict.fromkeys(n for n in [_int(l.get("os"))] + [p["os"] for p in passos] if n)),
             "aberta_txt": q.strftime("%d/%m %H:%M") if q else "", "registrado_em": _txt(l.get("registrado_em")),
             "passos": passos, "estado": e, "selo": R.selo_do_prazo(e)})
     abertas = sorted((d for d in out if d["estado"]["aberta"]),

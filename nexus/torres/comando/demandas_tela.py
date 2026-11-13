@@ -194,8 +194,9 @@ def demanda_passo(demanda_id):
         return venceu
     acao = request.form.get("acao") or ""
     try:
-        D.registrar(demanda_id, acao, request.form.get("texto") or "", _usuario(), request.form.get("novo_id"))
-        session[_AVISO] = ("ok", f"Feito: {D.ROTULO_PASSO.get(acao, acao)}.")
+        os_n = request.form.get("os", type=int)
+        D.registrar(demanda_id, acao, request.form.get("texto") or "", _usuario(), request.form.get("novo_id"), os=os_n)
+        session[_AVISO] = ("ok", f"Feito: {D.ROTULO_PASSO.get(acao, acao)}" + (f", com a OS {os_n} atrelada." if os_n else "."))
     except D.Recusada as ex:
         session[_AVISO] = ("erro", f"{ex}. Nada foi gravado.")
     except Exception as ex:      # noqa: BLE001

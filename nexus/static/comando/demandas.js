@@ -171,6 +171,26 @@ window.NexusDemandaNova = function (dlg) {
     raiz.querySelectorAll('[data-dm-linha][aria-expanded="true"]').forEach(function (l) { l.setAttribute('aria-expanded', 'false'); });
   }
 
+  // o campo "Atrelar OS" (13/11/2026): as OS das usinas da demanda (as abertas e em verificação), sem as já atreladas;
+  // vêm na 1ª vez que a demanda abre (a Caixa não lê o retrato das OS ao abrir)
+  function trazerOsDaDemanda(sel) {
+    if (sel.getAttribute('data-carregado')) return;
+    sel.setAttribute('data-carregado', '1');
+    var ja = (sel.getAttribute('data-ja') || '').split(',');
+    fetch(raiz.getAttribute('data-os-url') + '?usinas=' + encodeURIComponent(sel.getAttribute('data-usinas') || ''),
+          {credentials: 'same-origin'})
+      .then(function (r) { return r.json(); })
+      .then(function (j) {
+        var novas = (j.os || []).filter(function (o) { return ja.indexOf(String(o.os)) < 0; });
+        novas.forEach(function (o) {
+          var op = document.createElement('option'); op.value = o.os; op.textContent = o.rotulo; sel.appendChild(op);
+        });
+        if (!j.ok) sel.options[0].textContent = 'Não li as OS agora';
+        else if (!novas.length) sel.options[0].textContent = 'Nenhuma outra OS aberta nas usinas';
+      })
+      .catch(function () { sel.options[0].textContent = 'Não li as OS agora'; });
+  }
+
   function abrir(id) {
     fechar();
     var l = id && painel(abaAtual) && painel(abaAtual).querySelector('[data-dm-linha="' + id + '"]');
@@ -181,6 +201,7 @@ window.NexusDemandaNova = function (dlg) {
       li.appendChild(a); a.hidden = false;
       l.parentNode.insertBefore(li, l.nextSibling);
       l.setAttribute('aria-expanded', 'true'); l.setAttribute('aria-controls', li.id);
+      a.querySelectorAll('[data-dm-os-sel]').forEach(trazerOsDaDemanda);
       // o que abriu cabe na tela: se passar do fim, rola até ele (o que é maior que a tela começa pela linha)
       var r = li.getBoundingClientRect();
       if (r.bottom > window.innerHeight && li.scrollIntoView) {

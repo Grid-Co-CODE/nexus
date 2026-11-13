@@ -171,7 +171,8 @@ PARA_QUE = {
                "tempo cada setor responde.",
     "demanda_usina": "Guarda as usinas que cada demanda cita. Serve para achar as demandas de uma usina.",
     "evento_demanda": "Guarda cada passo das demandas (em análise, pediu informação, respondeu, devolveu, concluiu), com "
-                      "o dia e quem fez. Serve para a situação de agora, o prazo e a linha do tempo de cada demanda.",
+                      "o dia, quem fez e a OS atrelada na mensagem. Serve para a situação de agora, o prazo, a linha do "
+                      "tempo e as OS atreladas de cada demanda.",
     "status_sugestao": "Guarda cada vez que um administrador mudou o status de uma sugestão (Iniciada, Em "
                        "verificação ou Concluída), com o dia e a hora. Serve para a pessoa acompanhar em Minhas "
                        "sugestões e para contar as que ainda não foram concluídas.",

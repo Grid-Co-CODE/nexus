@@ -371,8 +371,15 @@ conclusão sozinha e o vencido que sobe para o setor; no O&M, a demanda fica pre
   - **Nada repete a linha** ("O nome Ana aparece duas vezes sem necessidade"): quem pediu, a situação, o tema, o prazo e
     o título ficam só na linha; o andamento começa em "Aberta", sem o nome; o campo diz "quem pediu".
   - **A usina só no título, em verde:** a linha é "Nome e cargo" em cima e "Usina – Título" embaixo (`.dm-usina-t`).
-  - **Dos dados, só o Responsável (o "Para") e a OS**, numa linha curta; em "Que eu pedi" o Responsável some (a linha já
-    diz "Para Fulano"; `data-aba` na seção).
+  - **À direita, de cima para baixo: Responsável (o "Para"), "OS(s) atrelada(s)" e o Andamento** (Levi: "Responsável
+    fica acima de em andamento"; "OS vira 'OS(s) atrelada(s)'"). Em "Que eu pedi" o Responsável some (a linha já diz
+    "Para Fulano"; `data-aba` na seção).
+  - **No meio das mensagens se atrela OS** (Levi: "no meio das mensagens as pessoas podem atrelar OSs"): os formulários
+    com texto (responder, pedir informação, informar, devolver) têm o "Atrelar OS", com as OS do retrato das usinas da
+    demanda (as abertas e em verificação), sem as já atreladas; a lista vem na 1ª vez que a demanda abre
+    (`GET .../demandas/os`). A OS vai no passo, na coluna `os` no fim da `fato_evento_demanda` (vazia nos passos de
+    antes); "OS(s) atrelada(s)" = a da abertura + as das mensagens, sem repetir; o andamento diz "Atrelou a OS N" no
+    passo. Demanda sem usina não atrela (o campo não aparece; o servidor recusa); o passo sem texto não leva OS.
   - **Espaço pela metade e leitura em F:** o pedido e a resposta descem pela esquerda, alinhados com o título; o
     andamento fica à direita, atrás de um fio. Os botões ficam numa fileira só: "Colocar em análise" e "Concluir" são de
     outro formulário e entram nela pelo atributo `form` (o Concluir não pede a justificativa do Devolver).
@@ -386,7 +393,7 @@ conclusão sozinha e o vencido que sobe para o setor; no O&M, a demanda fica pre
 
 **Os dados** (`nexus_demandas`, registrado no catálogo antes da 1ª gravação; o Nexus é a fonte, só acrescenta):
 `dim_tema` (1 versão de 1 tema; vale a última por `tema_id`), `fato_demanda`, `fato_demanda_usina` e
-`fato_evento_demanda`. Em claro só ids, códigos (`*_hmac`), setores, prazo, OS e datas; o nome do tema, o título, a
+`fato_evento_demanda` (com a `os` atrelada na mensagem, a coluna no fim desde 13/11/2026). Em claro só ids, códigos (`*_hmac`), setores, prazo, OS e datas; o nome do tema, o título, a
 descrição, os textos dos passos, os nomes e os anexos só cifrados (o Cofre, amarrado à linha). O `novo_id` do formulário
 torna o 2º envio (o duplo clique, o F5) inofensivo. O setor da pessoa vem das decisões de Base → Acessos → Pessoas e
 setores (`setor_telas.setor_da_pessoa`), e não do `acesso()`, que só diz o setor com o portão por setor ligado.

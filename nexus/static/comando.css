@@ -286,15 +286,19 @@ a.ins-titulo:hover{color:var(--verde-texto)}
 @keyframes dm-abre{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
 .dm-det-corpo{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:12px 24px;align-items:start}
 .dm-det-esq{display:grid;gap:10px;min-width:0}
-.dm-det-dir{padding-left:20px;border-left:1px solid var(--linha);min-width:0}
+.dm-det-dir{display:grid;gap:12px;align-content:start;padding-left:20px;border-left:1px solid var(--linha);min-width:0}
+.dm-dir-b .dm-det-h{margin-bottom:5px}
+.dm-dir-v{margin:0;font-size:13px;color:var(--tinta-2)}
+.dm-dir-v b{color:var(--tinta);font-weight:600}
+.dm-dir-os{display:flex;flex-wrap:wrap;gap:6px;margin:0}
+.dm-tempo-os{display:flex;align-items:center;gap:6px;margin-top:4px}
+/* o campo de atrelar a OS, entre o texto e os botões */
+.dm-atrelar{display:flex;align-items:center;gap:8px}
+.dm-atrelar .gc-campo{width:auto;min-width:240px;max-width:100%;padding:5px 8px;font-size:12.5px}
 .dm-det-h{margin:0 0 8px;font:600 12px/1.2 var(--font-sans);color:var(--mudo)}
-.dm-fatos{display:flex;flex-wrap:wrap;align-items:center;gap:6px 22px;margin:0;font-size:13px;color:var(--tinta-2)}
-.dm-fato{display:inline-flex;align-items:center;gap:6px}
 .dm-fato-r{font-size:12px;color:var(--mudo)}
-.dm-fato b{color:var(--tinta);font-weight:600}
 /* em "Que eu pedi" a linha já diz para quem foi: o Responsável não se repete */
 .dm[data-aba="pedi"] .dm-fato--resp{display:none}
-.dm[data-aba="pedi"] .dm-fatos:not(:has(.dm-fato:not(.dm-fato--resp))){display:none}
 .dm-usina-t{color:var(--verde-texto);font-weight:600}
 .dm-vinc{display:flex;flex-wrap:wrap;gap:6px}
 .dm-vinc span{font:500 11.5px/1 var(--font-sans);padding:5px 8px;border-radius:var(--raio-tag);background:var(--superficie-2);border:1px solid var(--linha)}

@@ -277,7 +277,9 @@ FATOS = (
          observacao="evento em claro; vale o último para a situação (Nova sem passo). O prazo é calculado, não gravado: "
                     "a abertura ou a última devolução + os dias úteis do tema + os dias úteis parados entre "
                     "pediu_informacao e informou. A conclusão sozinha (3 dias úteis depois do respondeu) é só da leitura. "
-                    "O texto (a resposta, a pergunta, a justificativa) e o nome só cifrados (Cofre). Só acrescenta"),
+                    "O texto (a resposta, a pergunta, a justificativa) e o nome só cifrados (Cofre). os = o número da "
+                    "OS atrelada naquela mensagem (dimensão degenerada; coluna no fim desde 13/11/2026, vazia nos passos "
+                    "de antes e no passo sem OS), só uma OS do retrato das usinas da demanda. Só acrescenta"),
     # 03/11/2026 (Fase 3 dos setores conversando): o pedido a uma área, com o prazo que quem pede escolhe, e o retorno
     # dela; o tempo de resposta de cada área sai daqui. Registrado antes da 1ª gravação
     Fato("pedido_area", "Pedido a uma área, com prazo", "base", "nexus_pedidos · fato_pedido_area",
