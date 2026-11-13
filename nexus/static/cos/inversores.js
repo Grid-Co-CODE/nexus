@@ -858,7 +858,11 @@
     }
     var pts = porId[i.id] || [], mx = null;
     pts.forEach(function (q) { if (q[1] != null && (!mx || q[1] > mx[1])) { mx = q; } });
-    var agoraTxt = function () { det.f.agora.textContent = kw(i.pac); var sm = document.createElement("small"); sm.textContent = "agora"; det.f.agora.appendChild(sm); };
+    // ⚠ Os campos ficam presos AQUI (`campos`), e não lidos de `det` na hora: o `fechar()` zera o `det` e a limpeza dos
+    // gráficos chama o `aoMarcar` depois — lendo `det.f` dava TypeError e a janela não fechava (13/11/2026, o dono:
+    // "o botão de fechar a tela de graficos nao ta funcionando").
+    var campos = det.f;
+    var agoraTxt = function () { campos.agora.textContent = kw(i.pac); var sm = document.createElement("small"); sm.textContent = "agora"; campos.agora.appendChild(sm); };
     if (cruzEm == null) { agoraTxt(); }
     escrever(det.f.max, "textContent", mx ? kw(mx[1]) + " às " + hhmm(mx[0]) : "—");
     escrever(det.f.energia, "textContent", i.geracao_dia != null ? fmtKW.format(i.geracao_dia) + " kWh" : "—");
@@ -869,8 +873,8 @@
       vivo: true, grupo: grupo, nome: nome, rotulo: "Curva de hoje de " + nome,
       aoMarcar: function (pt, min) {
         if (min == null) { agoraTxt(); return; }
-        det.f.agora.textContent = pt && pt[1] != null ? kw(pt[1]) : "—";
-        var sm = document.createElement("small"); sm.textContent = "às " + hhmm(min); det.f.agora.appendChild(sm);
+        campos.agora.textContent = pt && pt[1] != null ? kw(pt[1]) : "—";
+        var sm = document.createElement("small"); sm.textContent = "às " + hhmm(min); campos.agora.appendChild(sm);
       } }, det.gc.clientWidth);
     desenharEntradas(i);
     if (ent.tipo !== "nada") { desenharRegistro(i, ent); }
@@ -1150,9 +1154,15 @@
     });
   }
   function fechar() {
-    aberta = null; curva = null; partes = null; assinatura = "";
-    sairDoDetalhe(); reg = null; destaques = {};          // o registro das entradas é da janela aberta: some ao fechar
-    limparTodos(); graficos = []; if (dlg.open) { dlg.close(); }
+    // ⚠ A janela fecha SEMPRE (`finally`): um erro na limpeza dos gráficos não pode prender a pessoa na janela. E a
+    // limpeza vem ANTES de sair do detalhe, enquanto os gráficos ainda acham o que escrever (13/11/2026).
+    try {
+      limparTodos();
+    } finally {
+      aberta = null; curva = null; partes = null; assinatura = "";
+      sairDoDetalhe(); reg = null; destaques = {};        // o registro das entradas é da janela aberta: some ao fechar
+      graficos = []; if (dlg.open) { dlg.close(); }
+    }
   }
 
   if (dlg) {
