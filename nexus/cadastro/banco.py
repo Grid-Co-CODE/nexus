@@ -51,6 +51,9 @@ USINA_CIFRADA_NO_BANCO = ("ucs",)
 ID_DE = {"clientes": "cliente_id", "equipes": "equipe_id", "pessoas": "pessoa_id", "usinas": "usina_id",
          "regioes_campo": "regiao_campo_id"}
 CAB_DE_PARA = ["usina_id", "sistema", "chave_externa", "casou_por"]
+# o `casou_por` da linha do BD_Operações: a chave é o ID do BD da ficha da usina (Registro mestre), não passa pelas
+# decisões da tela Ligações (a troca dela na publicação não tem o "Manter a do banco": corrige-se na ficha)
+COMO_ID_BD = "id do BD"
 # `regioes_campo` (quantas regiões) entrou no fim da linha em 10/2026, pelo mesmo motivo das colunas novas
 CAB_ATUALIZACAO = ["publicado_em", "clientes", "equipes", "pessoas", "usinas", "de_para", "sem_id_na_referencia",
                    "como_ler", "regioes_campo"]
@@ -313,7 +316,7 @@ def de_para(srv, fontes: dict, regras=None) -> list[list]:
         por_cliente.setdefault(norm(cliente), []).append({
             "id": uid, "nome": u.valor("nome"), "cidade": u.valor("cidade"), "uf": u.valor("uf"),
             "mwp": float(pot) if isinstance(pot, (int, float)) and not isinstance(pot, bool) else None})
-    linhas = [[_id(u.id), "BD_Operações", u.valor("id_bd"), "id do BD"]
+    linhas = [[_id(u.id), "BD_Operações", u.valor("id_bd"), COMO_ID_BD]
               for u in srv.registros("usinas") if u.valor("id_bd")]
     ligado_por_nome = {}                    # chave externa (ex.: nome no Fracttal) -> usina_id, para as dicas
     ligado = {}                             # (sistema, chave) -> ([usina_id], como), para o `igual_a` de outra fonte
@@ -486,8 +489,8 @@ def _chave_comparavel(v) -> str:
 
 def perdas_de_para(novas: list[list], no_banco: list[dict]):
     """As ligações que o banco tem (a chave ligada a uma usina) e que a publicação `novas` (linhas de CAB_DE_PARA)
-    perderia: a chave some, ou fica sem usina. Counter {sistema: quantas}. A troca de usina não conta aqui (é decisão da
-    tela Ligações). O caso que criou a regra: 09/11/2026, 16:44, o "Publicar no banco" do servidor recalculou o de-para
+    perderia: a chave some, ou fica sem usina. Counter {sistema: quantas}. A troca de usina não conta aqui: tem a regra
+    dela (`chaves_que_trocariam`). O caso que criou a regra: 09/11/2026, 16:44, o "Publicar no banco" do servidor recalculou o de-para
     com as bases que ele lera em 07/10, sem as abas do BD_Thopen e do BD_Performance, e 187 ligações sumiram do banco;
     a geração do Nexus, que acha a usina só por elas, ficou sem usina em todas as linhas na remontagem seguinte."""
     from collections import Counter
@@ -500,6 +503,52 @@ def chaves_que_perderia(novas: list[list], no_banco: list[dict]) -> list[dict]:
     nova = {(str(l[1]), _chave_comparavel(l[2])): l[0] for l in novas}
     return [d for d in no_banco if _ligada(d.get("usina_id"))
             and not _ligada(nova.get((str(d.get("sistema")), _chave_comparavel(d.get("chave_externa")))))]
+
+
+def chaves_que_trocariam(novas: list[list], no_banco: list[dict]) -> list[dict]:
+    """As chaves que o banco liga a usina e que a publicação `novas` ligaria a um conjunto DIFERENTE de usinas (outra,
+    uma a menos ou uma a mais) por regra automática: [{"sistema", "chave_externa" (como esta máquina a escreve), "de":
+    [usinas no banco], "para": [usinas na publicação], "casou_por" (o da publicação)}], por sistema e chave. Não entra: a
+    chave que fica sem usina (é perda, `chaves_que_perderia`) e a que alguém ligou à mão nesta máquina (o "manual" já é
+    escolha de alguém; a troca que ninguém escolheu é que não pode passar calada). `novas` são as linhas que ESTA máquina
+    calculou (`de_para`), sem as mantidas do banco: a chave que ela não leu não é decisão dela, e a tela e a rota têm de
+    contar o mesmo conjunto (revisão de 12/11/2026: a rota contava depois de juntar as mantidas e recusava uma troca que
+    a tela não mostrava). A usina a mais também conta: a 2ª usina errada é o mesmo erro, somado em vez de trocado.
+
+    O caso (12/11/2026): a trava só barrava a chave que ficava SEM usina. Na primeira publicação do servidor depois do
+    conserto das mantidas, a chave do Fracttal de um cliente saiu da usina dele para a usina de outro cliente na mesma
+    cidade: a usina certa não tinha código no cadastro, e o código do local no Fracttal casou pelo sufixo com o da outra.
+    As OS daquele local iriam para a usina errada, e só a conferência com a cópia de antes mostrou."""
+    antes: dict = {}
+    for d in no_banco:
+        uid = _inteiro(d.get("usina_id"))
+        if uid is not None:
+            antes.setdefault((str(d.get("sistema")), _chave_comparavel(d.get("chave_externa"))), set()).add(uid)
+    agora: dict = {}
+    for l in novas:
+        a = agora.setdefault((str(l[1]), _chave_comparavel(l[2])), {"ids": set(), "chave": l[2], "como": None})
+        uid = _inteiro(l[0])
+        if uid is not None:
+            a["ids"].add(uid)
+            a["como"] = a["como"] or l[3]
+    out = []
+    for k in sorted(agora):
+        a, de = agora[k], antes.get(k) or set()
+        if not a["ids"] or not de or de == a["ids"] or str(a["como"] or "").startswith("manual"):
+            continue
+        out.append({"sistema": k[0], "chave_externa": a["chave"], "de": sorted(de), "para": sorted(a["ids"]),
+                    "casou_por": a["como"]})
+    return out
+
+
+def assinatura_das_trocas(trocas: list[dict]) -> str:
+    """A marca do conjunto de trocas (16 hex de um sha256). O "Publicar com as trocas" da tela a devolve, e o aceite só
+    vale se o conjunto calculado na hora do clique for o que a tela mostrou: a ordem não muda a marca; outra chave, outra
+    usina de antes ou outra usina de depois, muda."""
+    import hashlib
+    itens = sorted(json.dumps([str(t["sistema"]), _chave_comparavel(t["chave_externa"]), sorted(t["de"]),
+                               sorted(t["para"])], ensure_ascii=False) for t in trocas)
+    return hashlib.sha256("\n".join(itens).encode("utf-8")).hexdigest()[:16]
 
 
 def _inteiro(v) -> int | None:
@@ -515,7 +564,9 @@ def ligacoes_que_nao_li(novas: list[list], no_banco: list[dict], usinas) -> list
     """As ligações que o banco tem para chaves que ESTA máquina não leu (o par sistema e chave não aparece nas `novas`, nem
     ligado nem sem usina), como linhas de CAB_DE_PARA, para voltarem ao banco como estavam. Só a ligada, e só se a usina
     ainda está em `usinas` (os ids do cadastro que vai ser publicado); a que esta máquina leu e deixaria sem usina NÃO
-    entra aqui: essa é a perda de verdade, e continua travando (`chaves_que_perderia`).
+    entra aqui: essa é a perda de verdade, e continua travando (`chaves_que_perderia`). A chave que o banco liga a duas
+    usinas volta com as duas (revisão de 12/11/2026: voltava só a 1ª linha da chave, e a 2ª ligação sumia calada); a
+    linha repetida no banco volta uma vez.
 
     O caso (12/11/2026): o banco tinha ligações publicadas pelo PC, de chaves que o servidor não lê (a usina que só a
     árvore de ativos do PC traz, o nome que mudou na fonte), e a trava de 10/11 recusava a publicação do servidor inteira,
@@ -526,9 +577,9 @@ def ligacoes_que_nao_li(novas: list[list], no_banco: list[dict], usinas) -> list
     for d in no_banco:
         uid = _inteiro(d.get("usina_id"))
         chave = (str(d.get("sistema")), _chave_comparavel(d.get("chave_externa")))
-        if uid is None or uid not in existe or chave in lidas or chave in vistas:
+        if uid is None or uid not in existe or chave in lidas or (chave, uid) in vistas:
             continue
-        vistas.add(chave)
+        vistas.add((chave, uid))
         out.append([uid, d.get("sistema"), d.get("chave_externa"), d.get("casou_por")])
     return out
 
@@ -545,6 +596,23 @@ def juntar_ao_de_para(t: dict, mantidas: list[list]) -> None:
     t["de_para"][1].extend(mantidas)
     cab, linhas = t["atualizacao"]
     linhas[0][cab.index("de_para")] = len(t["de_para"][1])
+
+
+def conferir_com_o_banco(t: dict, no_banco: list[dict]) -> dict:
+    """As três regras da publicação contra o de-para que o banco tem, num lugar só, para TODO caminho que publica (o
+    botão da tela e a `ferramentas/publicar_cadastro.py`): junta ao `t` as ligações de chaves que esta máquina não leu
+    e devolve {"mantidas": linhas que voltaram como estavam, "perdidas": linhas do banco que ficariam sem usina (não
+    publica), "trocas": chaves que mudariam de usina por regra automática (não publica sem o aceite da marca,
+    `assinatura_das_trocas`)}. As trocas são contadas ANTES de juntar as mantidas: só nas chaves que esta máquina leu.
+
+    O caso (12/11/2026): a ferramenta do PC enviava direto, sem regra nenhuma. Depois da publicação do servidor daquela
+    noite o banco tinha ligações que só o servidor conhece (os projetos da FAMA, o plant_id da plataforma), e a
+    ferramenta rodada no PC as apagaria todas; a regra que mora em uma rota só protege quem passa por ela."""
+    trocas = chaves_que_trocariam(t["de_para"][1], no_banco)
+    mantidas = ligacoes_que_nao_li(t["de_para"][1], no_banco, ids_das_usinas(t))
+    if mantidas:
+        juntar_ao_de_para(t, mantidas)
+    return {"mantidas": mantidas, "perdidas": chaves_que_perderia(t["de_para"][1], no_banco), "trocas": trocas}
 
 
 def sincronizar(conteudo: bytes, *, base: str, token: str, sessao=None) -> dict:

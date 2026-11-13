@@ -182,14 +182,37 @@ de 1.090 para 876 linhas, 187 ligações a usinas sumiram (BD_Thopen aba 100, BD
 usina. O resto das "770 alteradas" era reenvio igual (pessoas, equipes) e 36 usinas editadas no servidor. Consertado em
 10/11 com o OK do Levi: o de-para devolvido ao estado de antes pelo histórico de linha da API
 (`GET /api/sheets/{id}/rows/{n}/history`; as outras abas como estavam) e a geração remontada. Agora o botão lê o de-para
-do banco antes de publicar, com duas regras nesta ordem (`banco.ligacoes_que_nao_li` e `banco.chaves_que_perderia`):
+do banco antes de publicar, com três regras (`banco.ligacoes_que_nao_li`, `banco.chaves_que_perderia` e
+`banco.chaves_que_trocariam`), juntas numa função só, `banco.conferir_com_o_banco`, por onde passa TODO caminho que
+publica: o botão e a `ferramentas/publicar_cadastro.py` (até 12/11/2026 a ferramenta enviava direto, e rodada no PC
+apagaria as ligações que só o servidor conhece, como os projetos da FAMA e o plant_id; nela a recusa lista as linhas
+PERDERIA e TROCARIA, o `--ensaio` mostra o mesmo sem enviar, e o aceite é o `--aceitar-trocas MARCA`):
 (1) **a ligação de chave que esta máquina NÃO leu volta ao banco como estava** (12/11/2026: o banco tinha ligações
 publicadas pelo PC, de chaves que o servidor não lê, como a usina que só a árvore de ativos do PC traz, e a publicação do
 servidor não saía de jeito nenhum, porque não há o que ligar na tela para uma chave que a máquina não tem; o que a máquina
-não leu, ela não apaga; só volta a ligada, e só se a usina ainda está no cadastro); (2) **a chave que ela LEU e deixaria
+não leu, ela não apaga; só volta a ligada, e só se a usina ainda está no cadastro; a chave que o banco liga a duas usinas
+volta com as duas: até a revisão de 12/11 voltava só a 1ª linha); (2) **a chave que ela LEU e deixaria
 sem usina não publica**: a tela diz quantas, de que sistema e QUAL chave com a usina do banco (até 12/11 só dizia
-quantas), para ligar nas Ligações. A leitura do banco que falha também não publica. A troca de usina de uma chave não
-conta como perda (é decisão da tela Ligações). A publicação diz quantas ligações ficaram como estavam.
+quantas), para ligar nas Ligações; (3) **a chave que TROCARIA de usina por regra automática não publica sem o aceite**
+(12/11/2026, à noite: a trava só barrava a chave que ficava sem usina, e na primeira publicação do servidor depois do
+conserto das mantidas a chave do Fracttal de um cliente saiu da usina dele para a usina de outro cliente na mesma
+cidade; a usina certa não tinha código no cadastro, e o código do local no Fracttal casou pelo sufixo com o da outra; só
+a conferência com a cópia de antes mostrou, e foi corrigido com uma decisão de ligar e nova publicação). Troca é: a chave
+tinha usina no banco e a publicação a liga a um conjunto DIFERENTE de usinas (outra, uma a menos ou uma a mais: a 2ª
+usina errada é o mesmo erro, somado). Não é troca a que alguém ligou à mão nesta máquina (o "manual" já é escolha). Conta
+só a chave que esta máquina LEU, nas linhas que ela calculou, antes de juntar as mantidas: a tela e a rota usam a mesma
+função sobre o mesmo conjunto (a revisão de 12/11 achou a rota contando depois das mantidas e recusando uma troca que a
+tela não mostrava, sem saída). A recusa volta com `?trocas=1`, e a seção lista cada chave com a usina do banco e a nova
+(`telas_ligacoes._trocas_da_tela`; a lista lê o de-para do banco, por isso só abre com esse parâmetro): **Manter a do
+banco** grava a decisão de ligar à usina do banco (só quando o banco liga a chave a UMA usina que ainda está no
+cadastro, e não para a chave do BD_Operações, que é o ID do BD da ficha: `banco.COMO_ID_BD`, corrige-se no Registro
+mestre), e **Publicar com as trocas** manda a marca da lista (`banco.assinatura_das_trocas`), que só vale se o conjunto
+calculado no clique for o mostrado. O pedido de outro site não publica (`auth.origem.de_outro_site`: a marca não é
+segredo). A leitura do banco que falha também não publica. A publicação diz quantas ligações ficaram como estavam e
+quantas chaves trocaram com o aceite.
+Para provar: `tests/test_cadastro_ligacoes.py` (os testes da troca; cada regra quebrada de propósito derruba um).
+**Ainda aberto:** a ligação NOVA (chave que o banco não tinha) feita pelo sufixo do código a uma usina de outro cliente
+não passa por trava nenhuma; o remédio de hoje é o código de cada usina preenchido no Registro mestre.
 **As telas de campo leem o BANCO** (`campo/visao.py`, chamados, Acessos → Pessoas e setores: `cadastro_nexus`), não o arquivo:
 para o responsável novo chegar nelas, aplique no PC e publique (`ferramentas/publicar_cadastro.py --bases-guardadas`,
 com `--ensaio` e a comparação com o banco antes). Foi o caminho de 16/10/2026 (Levi: "mude logo pois precisamos da

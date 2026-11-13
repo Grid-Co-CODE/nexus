@@ -255,8 +255,8 @@ def test_usina_da_arvore_liga_a_mao_na_tela(app_lig, cli):
 
 
 # ── a publicação que perde ligação do de-para não sai (10/11/2026) ───────────────────────────────────────────────
-def _publicar_com(cli, monkeypatch, no_banco):
-    """O "Publicar no banco" com o banco de mentira: `no_banco` = as linhas do de-para que o banco tem agora."""
+def _banco_de_mentira(cli, monkeypatch, no_banco) -> list:
+    """O banco de mentira: `no_banco` = as linhas do de-para que o banco tem agora. Devolve a lista do que foi enviado."""
     from nexus.cadastro import banco as B
     enviados = []
     cli.application.config["GRIDCO_SQL_TOKEN"] = "token-de-teste"
@@ -264,7 +264,13 @@ def _publicar_com(cli, monkeypatch, no_banco):
     monkeypatch.setattr(B, "ler_de_para", lambda base, sessao=None: no_banco)
     monkeypatch.setattr(B, "sincronizar", lambda conteudo, base, token, sessao=None: enviados.append(conteudo)
                         or {"inserted": 0, "updated": 1})
-    r = cli.post("/t/base/ligacoes/publicar", data={})
+    return enviados
+
+
+def _publicar_com(cli, monkeypatch, no_banco, **form):
+    """O "Publicar no banco" com o banco de mentira (`form`: o que o botão manda a mais, como o `aceitar_trocas`)."""
+    enviados = _banco_de_mentira(cli, monkeypatch, no_banco)
+    r = cli.post("/t/base/ligacoes/publicar", data=form)
     return parse_qs(urlparse(r.headers["Location"]).query), enviados
 
 
@@ -341,6 +347,293 @@ def test_a_publicacao_sem_perda_sai(cli, monkeypatch, app_lig):
     monkeypatch.setattr(B, "ler_de_para", quebra)
     r = cli.post("/t/base/ligacoes/publicar", data={})
     assert "não consegui ler o de-para do banco" in parse_qs(urlparse(r.headers["Location"]).query)["erro"][0]
+
+
+# ── a chave que trocaria de usina sem ninguém decidir não publica (12/11/2026) ───────────────────────────────────
+BROD = "Thopen - Brodowski 1 - SP"          # esta máquina a liga à usina 1, pelo código
+
+
+def _banco_com_a_chave_noutra_usina(app_lig, usina=3, como="nome (árvore de ativos do Fracttal)"):
+    """O de-para do banco igual ao desta máquina, menos a chave BROD, que o banco liga a `usina`."""
+    from nexus.cadastro import banco as B
+    from nexus.cadastro.telas import servico
+    with app_lig.app_context():
+        novas = B.de_para(servico(), L.ler(app_lig.config)["fontes"], L.carregar_regras(app_lig.config))
+    return [dict(zip(B.CAB_DE_PARA, [usina, l[1], l[2], como] if l[2] == BROD else l)) for l in novas]
+
+
+def _secao(cli, consulta=""):
+    return cli.get("/t/base/governanca" + consulta).get_data(as_text=True).split('<section id="ligacoes"')[1]
+
+
+def test_a_chave_que_trocaria_de_usina_por_regra_automatica_e_listada():
+    """12/11/2026: a trava só barrava a chave que ficava SEM usina; a que TROCAVA de usina passava calada. Na primeira
+    publicação do servidor depois do conserto das mantidas, a chave do Fracttal de um cliente saiu da usina dele para a
+    usina de OUTRO cliente na mesma cidade: a usina certa não tinha código no cadastro, e o código do local no Fracttal
+    casou pelo sufixo com o da outra. Só a conferência com a cópia de antes mostrou. Troca é: a chave tinha usina no banco
+    e a publicação a liga a um conjunto DIFERENTE de usinas (outra, uma a menos ou uma a mais), por regra automática; a
+    decidida à mão nesta máquina é escolha de alguém."""
+    from nexus.cadastro import banco as B
+    AB = "BD_Exemplo · aba"
+    novas = [[113, FR, "Cliente Beta - Vila Exemplo - MT", "código"],           # o banco liga à 220: troca
+             [5, FR, "Cliente Alfa - Serra Exemplo 3 - SC", "código"],          # igual ao banco
+             [7, FR, "Cliente Alfa - Vale Exemplo - MT", "manual (12/11)"],     # trocou por decisão da tela: passa
+             [8, AB, "Dupla", "igual a X"], [9, AB, "Dupla", "igual a X"],      # duas usinas, as mesmas do banco
+             [8, AB, "Dupla que perdeu uma", "igual a X"],                      # o banco tinha a 8 e a 9: troca
+             [8, AB, "Ganhou outra", "nome"], [9, AB, "Ganhou outra", "nome"],  # o banco só tinha a 8: a 9 a mais é troca
+             [10, AB, 10, "código"],                                            # a chave numérica: "10.0" é a mesma
+             [13, AB, "12.0", "código"],                                        # e a 12 do banco é a "12.0" daqui
+             [None, FR, "Cliente Alfa - Buraco - SC", B.SEM_PAR],               # ficou sem usina: é perda, não troca
+             [4, FR, "Cliente Alfa - Nova - SC", "código"]]                     # o banco não tinha: ligação nova
+    no_banco = [{"usina_id": "220.0", "sistema": FR, "chave_externa": "Cliente Beta - Vila Exemplo - MT",
+                 "casou_por": "nome (árvore de ativos do Fracttal)"},
+                {"usina_id": 5, "sistema": FR, "chave_externa": "Cliente Alfa - Serra Exemplo 3 - SC", "casou_por": "código"},
+                {"usina_id": 6, "sistema": FR, "chave_externa": "Cliente Alfa - Vale Exemplo - MT", "casou_por": "nome"},
+                {"usina_id": 8, "sistema": AB, "chave_externa": "Dupla", "casou_por": "igual a X"},
+                {"usina_id": 9, "sistema": AB, "chave_externa": "Dupla", "casou_por": "igual a X"},
+                {"usina_id": 9, "sistema": AB, "chave_externa": "Dupla que perdeu uma", "casou_por": "igual a X"},
+                {"usina_id": 8, "sistema": AB, "chave_externa": "Dupla que perdeu uma", "casou_por": "igual a X"},
+                {"usina_id": 8, "sistema": AB, "chave_externa": "Ganhou outra", "casou_por": "nome"},
+                {"usina_id": 11, "sistema": AB, "chave_externa": "10.0", "casou_por": "código"},
+                {"usina_id": 14, "sistema": AB, "chave_externa": 12, "casou_por": "código"},
+                {"usina_id": 5, "sistema": FR, "chave_externa": "Cliente Alfa - Buraco - SC", "casou_por": "manual (27/10)"},
+                {"usina_id": None, "sistema": FR, "chave_externa": "Cliente Alfa - Nova - SC", "casou_por": B.SEM_PAR}]
+    assert B.chaves_que_trocariam(novas, no_banco) == [
+        {"sistema": AB, "chave_externa": 10, "de": [11], "para": [10], "casou_por": "código"},
+        {"sistema": AB, "chave_externa": "12.0", "de": [14], "para": [13], "casou_por": "código"},
+        {"sistema": AB, "chave_externa": "Dupla que perdeu uma", "de": [8, 9], "para": [8], "casou_por": "igual a X"},
+        {"sistema": AB, "chave_externa": "Ganhou outra", "de": [8], "para": [8, 9], "casou_por": "nome"},
+        {"sistema": FR, "chave_externa": "Cliente Beta - Vila Exemplo - MT", "de": [220], "para": [113], "casou_por": "código"}]
+
+
+def test_a_chave_de_duas_usinas_que_esta_maquina_nao_leu_volta_com_as_duas():
+    """A revisão de 12/11/2026 achou: a mantida voltava com UMA usina só (a 1ª linha da chave), e a 2ª ligação de uma
+    chave que o banco liga a duas usinas (as "I e II" de uma aba) sumia calada. "Como estava" é com todas as usinas."""
+    from nexus.cadastro import banco as B
+    AB = "BD_Exemplo · aba"
+    no_banco = [{"usina_id": 8, "sistema": AB, "chave_externa": "Dupla", "casou_por": "igual a X"},
+                {"usina_id": "9.0", "sistema": AB, "chave_externa": "Dupla", "casou_por": "igual a X"},
+                {"usina_id": 8, "sistema": AB, "chave_externa": "Dupla", "casou_por": "igual a X"},     # linha repetida
+                {"usina_id": 77, "sistema": AB, "chave_externa": "Dupla", "casou_por": "igual a X"}]    # usina que saiu
+    assert B.ligacoes_que_nao_li([], no_banco, {8, 9}) == [[8, AB, "Dupla", "igual a X"], [9, AB, "Dupla", "igual a X"]]
+
+
+def test_a_tela_e_a_rota_contam_as_mesmas_trocas_com_chave_mantida(cli, monkeypatch, app_lig):
+    """A revisão de 12/11/2026: a rota contava as trocas DEPOIS de juntar as mantidas e a tela, antes; com uma chave de
+    duas usinas que esta máquina não leu, a rota recusava uma troca que a tela não mostrava, sem botão para sair. A troca
+    é só de chave que esta máquina LEU, nos dois lugares: a marca da tela vale na rota, e a mantida volta inteira."""
+    import re
+    AB = "BD_Exemplo · aba"
+    dupla = [{"usina_id": 2, "sistema": AB, "chave_externa": "Dupla", "casou_por": "igual a X"},
+             {"usina_id": 3, "sistema": AB, "chave_externa": "Dupla", "casou_por": "igual a X"}]
+    # só a mantida de duas usinas: não há troca, a publicação sai e as duas ligações voltam
+    from nexus.cadastro import banco as B
+    from nexus.cadastro.telas import servico
+    with app_lig.app_context():
+        iguais = [dict(zip(B.CAB_DE_PARA, l)) for l in
+                  B.de_para(servico(), L.ler(app_lig.config)["fontes"], L.carregar_regras(app_lig.config))]
+    q, enviados = _publicar_com(cli, monkeypatch, iguais + dupla)
+    assert len(enviados) == 1 and "2 ligações de chaves que esta máquina não leu ficaram" in q["ok"][0]
+    linhas = _de_para_enviado(enviados[0])
+    assert [2, AB, "Dupla", "igual a X"] in linhas and [3, AB, "Dupla", "igual a X"] in linhas
+    # a mantida com uma usina que saiu do cadastro volta só com a que existe, e isso não é troca desta máquina (contada
+    # depois de juntar as mantidas, a rota recusaria uma troca que a tela não lista)
+    saiu = [{"usina_id": 2, "sistema": AB, "chave_externa": "Meia", "casou_por": "igual a X"},
+            {"usina_id": 99, "sistema": AB, "chave_externa": "Meia", "casou_por": "igual a X"}]
+    q, enviados = _publicar_com(cli, monkeypatch, iguais + saiu)
+    assert len(enviados) == 1 and "ok" in q
+    meia = [l for l in _de_para_enviado(enviados[0]) if l[2] == "Meia"]
+    assert meia == [[2, AB, "Meia", "igual a X"]]
+    # com uma troca de verdade junto: a tela lista só ela, e o aceite da tela vale na rota
+    no_banco = _banco_com_a_chave_noutra_usina(app_lig) + dupla
+    q, enviados = _publicar_com(cli, monkeypatch, no_banco)
+    assert enviados == [] and "1 chave trocaria de usina" in q["erro"][0] and "Dupla" not in q["erro"][0]
+    secao = _secao(cli, "?trocas=1")
+    bloco = secao.split('class="lig-trocas"')[1].split("</table>")[0]
+    assert BROD in bloco and "Dupla" not in bloco
+    assinatura = re.search(r'name="aceitar_trocas" value="([0-9a-f]{16})"', secao).group(1)
+    q, enviados = _publicar_com(cli, monkeypatch, no_banco, aceitar_trocas=assinatura)
+    assert len(enviados) == 1 and "1 chave trocou de usina" in q["ok"][0]
+
+
+def test_a_troca_pelo_id_do_bd_nao_tem_o_manter(cli, monkeypatch, app_lig):
+    """A chave do BD_Operações é o ID do BD da ficha da usina: sai do Registro mestre, não do de-para decidido na tela,
+    e a decisão de ligar não a alcança (revisão de 12/11/2026: o "Manter" gravava uma decisão sem efeito e dizia
+    "aplicada"). A troca aparece, sem o botão, e diz onde se corrige."""
+    from nexus.cadastro import banco as B
+    de_para = B.de_para
+    monkeypatch.setattr(B, "de_para", lambda srv, fontes, regras=None:
+                        de_para(srv, fontes, regras) + [[1, "BD_Operações", "UFV-001", B.COMO_ID_BD]])
+    no_banco = _banco_com_a_chave_noutra_usina(app_lig, usina=1, como="código")
+    no_banco.append({"usina_id": 2, "sistema": "BD_Operações", "chave_externa": "UFV-001", "casou_por": B.COMO_ID_BD})
+    _banco_de_mentira(cli, monkeypatch, no_banco)
+    secao = _secao(cli, "?trocas=1")
+    bloco = secao.split('class="lig-trocas"')[1].split("</table>")[0]
+    assert "UFV-001" in bloco and "Manter a do banco" not in bloco and "Registro mestre" in bloco
+    assert 'name="aceitar_trocas"' in secao
+
+
+def _ferramenta(app_lig, monkeypatch, no_banco, *args):
+    """Roda a `ferramentas/publicar_cadastro.py --bases-guardadas` com o cadastro e as bases da fixture e o banco de
+    mentira. Devolve (o que foi enviado, o código de saída: None = terminou sem `sys.exit`)."""
+    import sys
+    import ferramentas.publicar_cadastro as P
+    from nexus.cadastro import banco as B
+    env = {k: app_lig.config[k] for k in ("NEXUS_CHAVE_CADASTRO", "NEXUS_ARMAZEM_LOCAL", "NEXUS_DADOS")}
+    env["GRIDCO_SQL_TOKEN"] = "token-de-teste"
+    enviados = []
+    monkeypatch.setattr(P, "ler_ambiente", lambda: env)
+    monkeypatch.setattr(B, "ler_anteriores", lambda base, sessao=None: {})
+    monkeypatch.setattr(B, "ler_de_para", lambda base, sessao=None: no_banco)
+    monkeypatch.setattr(B, "sincronizar", lambda conteudo, base, token, sessao=None: enviados.append(conteudo)
+                        or {"inserted": 0, "updated": 1})
+    monkeypatch.setattr(sys, "argv", ["publicar_cadastro.py", "--bases-guardadas", *args])
+    try:
+        P.main()
+    except SystemExit as e:
+        return enviados, e.code
+    return enviados, None
+
+
+def test_a_ferramenta_do_pc_passa_pelas_mesmas_tres_regras(app_lig, monkeypatch, capsys):
+    """A `ferramentas/publicar_cadastro.py` enviava direto, sem regra nenhuma (achado de 12/11/2026): depois da
+    publicação do servidor daquela noite o banco tinha ligações que só o servidor conhece (os projetos da FAMA, o
+    plant_id), e a ferramenta rodada no PC apagaria todas. Agora ela passa pela mesma conferência do botão da tela
+    (`banco.conferir_com_o_banco`): mantém o que não leu, não sai com perda, e a troca pede a marca."""
+    import re
+    from nexus.cadastro import banco as B
+    from nexus.cadastro.telas import servico
+    with app_lig.app_context():
+        proprias = B.de_para(servico(), L.ler(app_lig.config)["fontes"], L.carregar_regras(app_lig.config))
+    iguais = [dict(zip(B.CAB_DE_PARA, l)) for l in proprias]
+    so_do_banco = {"usina_id": 3, "sistema": "FAMA · Projetos", "chave_externa": "21", "casou_por": "manual (12/11)"}
+    # 1. a chave que esta máquina não leu volta como estava
+    enviados, saida = _ferramenta(app_lig, monkeypatch, iguais + [so_do_banco])
+    assert saida is None and len(enviados) == 1
+    assert [3, "FAMA · Projetos", "21", "manual (12/11)"] in _de_para_enviado(enviados[0])
+    # 2. a perda não sai, e a ferramenta diz a chave
+    buraco = next(l for l in proprias if l[0] in (None, ""))
+    com_perda = [d for d in iguais if d["chave_externa"] != buraco[2]] + [
+        {"usina_id": 1, "sistema": buraco[1], "chave_externa": buraco[2], "casou_por": "manual (27/10)"}]
+    capsys.readouterr()
+    enviados, saida = _ferramenta(app_lig, monkeypatch, com_perda)
+    assert enviados == [] and saida not in (None, 0)
+    assert str(buraco[2]) in capsys.readouterr().out
+    # 3. a troca não sai sem a marca; com a marca que a ferramenta mostrou, sai
+    com_troca = _banco_com_a_chave_noutra_usina(app_lig)
+    enviados, saida = _ferramenta(app_lig, monkeypatch, com_troca)
+    dito = capsys.readouterr().out
+    assert enviados == [] and saida not in (None, 0) and BROD in dito
+    marca = re.search(r"--aceitar-trocas ([0-9a-f]{16})", dito).group(1)
+    enviados, saida = _ferramenta(app_lig, monkeypatch, com_troca, "--aceitar-trocas", "0" * 16)
+    assert enviados == [] and saida not in (None, 0)
+    enviados, saida = _ferramenta(app_lig, monkeypatch, com_troca, "--aceitar-trocas", marca)
+    assert saida is None and len(enviados) == 1
+    # o ensaio confere e não envia: nem com a troca à vista, nem com tudo certo
+    enviados, saida = _ferramenta(app_lig, monkeypatch, com_troca, "--ensaio")
+    assert enviados == [] and saida is None and BROD in capsys.readouterr().out
+    enviados, saida = _ferramenta(app_lig, monkeypatch, iguais, "--ensaio")
+    assert enviados == [] and saida is None
+
+
+def test_o_publicar_de_outro_site_nao_sai(cli, monkeypatch, app_lig):
+    """O aceite das trocas é passo de risco, e a marca não é segredo (calcula-se com o de-para do banco, de leitura
+    aberta): o pedido que não vem de uma página do próprio Nexus não publica (a mesma guarda do "Ligar as sugestões")."""
+    no_banco = _banco_com_a_chave_noutra_usina(app_lig, usina=1, como="código")        # igual a esta máquina
+    enviados = _banco_de_mentira(cli, monkeypatch, no_banco)
+    r = cli.post("/t/base/ligacoes/publicar", data={}, headers={"Sec-Fetch-Site": "cross-site"})
+    assert r.status_code == 403 and enviados == []
+    r = cli.post("/t/base/ligacoes/publicar", data={}, headers={"Sec-Fetch-Site": "same-origin"})
+    assert r.status_code == 303 and len(enviados) == 1
+
+
+def test_a_assinatura_das_trocas_e_do_conjunto_mostrado():
+    """O "Publicar com as trocas" só vale para o conjunto que a tela mostrou: a ordem não muda a assinatura, e qualquer
+    chave, usina de antes ou usina de depois diferente muda."""
+    from nexus.cadastro import banco as B
+    a = {"sistema": FR, "chave_externa": "Cliente Beta - Vila Exemplo - MT", "de": [220], "para": [113], "casou_por": "código"}
+    b = {"sistema": FR, "chave_externa": "Cliente Alfa - Vale Exemplo - MT", "de": [6], "para": [7], "casou_por": "nome"}
+    assert B.assinatura_das_trocas([a, b]) == B.assinatura_das_trocas([b, a])
+    assert B.assinatura_das_trocas([a]) != B.assinatura_das_trocas([a, b])
+    assert B.assinatura_das_trocas([a]) != B.assinatura_das_trocas([{**a, "para": [114]}])
+    assert B.assinatura_das_trocas([a]) != B.assinatura_das_trocas([{**a, "de": [221]}])
+    assert B.assinatura_das_trocas([a]) != B.assinatura_das_trocas([{**a, "chave_externa": "Cliente Beta - Outra - MT"}])
+
+
+def test_a_publicacao_que_trocaria_a_usina_de_uma_chave_nao_sai_sem_o_aceite(cli, monkeypatch, app_lig):
+    """A troca por regra automática não publica: a tela diz a chave, a usina do banco e a usina nova, lista cada uma com
+    o "Manter a do banco" e oferece o "Publicar com as trocas", que só vale para a lista mostrada."""
+    import re
+    no_banco = _banco_com_a_chave_noutra_usina(app_lig)
+    q, enviados = _publicar_com(cli, monkeypatch, no_banco)
+    assert enviados == [] and q["trocas"] == ["1"]
+    erro = q["erro"][0]
+    assert "1 chave trocaria de usina" in erro and BROD in erro and "usina 3" in erro and "usina 1" in erro
+    bloco = _secao(cli, "?trocas=1").split('class="lig-trocas"')[1].split("</table>")[0]
+    assert BROD in bloco and "Faro Energy - Pedra do Sal 1" in bloco and "Thopen - Brodowski" in bloco
+    assert "Manter a do banco" in bloco and 'name="usina" value="3"' in bloco
+    assinatura = re.search(r'name="aceitar_trocas" value="([0-9a-f]{16})"', _secao(cli, "?trocas=1")).group(1)
+    # o aceite de outro conjunto não vale
+    q, enviados = _publicar_com(cli, monkeypatch, no_banco, aceitar_trocas="0" * 16)
+    assert enviados == [] and "trocaria de usina" in q["erro"][0]
+    # o aceite da lista mostrada publica, e a mensagem diz que trocou
+    q, enviados = _publicar_com(cli, monkeypatch, no_banco, aceitar_trocas=assinatura)
+    assert len(enviados) == 1 and [1, FR, BROD, "código"] in _de_para_enviado(enviados[0])
+    assert "Publicado no banco" in q["ok"][0] and "1 chave trocou de usina" in q["ok"][0]
+
+
+def test_manter_a_usina_do_banco_vira_decisao_e_a_publicacao_sai(cli, monkeypatch, app_lig):
+    """O "Manter a do banco" grava a decisão de ligar a chave à usina que o banco tem: deixa de ser troca, a lista
+    continua aberta para a próxima chave e a publicação sai sem o aceite."""
+    no_banco = _banco_com_a_chave_noutra_usina(app_lig)
+    _banco_de_mentira(cli, monkeypatch, no_banco)
+    assert 'class="lig-trocas"' in _secao(cli, "?trocas=1")
+    q = _decidir(cli, acao="ligar", chave=BROD, usina="3", trocas="1")
+    assert "ok" in q and q["trocas"] == ["1"]
+    assert 'class="lig-trocas"' not in _secao(cli, "?trocas=1")        # não sobrou troca: o bloco some
+    q, enviados = _publicar_com(cli, monkeypatch, no_banco)
+    assert len(enviados) == 1 and "trocou de usina" not in q["ok"][0]
+    linha = next(l for l in _de_para_enviado(enviados[0]) if l[2] == BROD)
+    assert linha[0] == 3 and linha[3].startswith("manual (")
+
+
+def test_o_manter_so_aparece_quando_o_banco_liga_a_uma_usina_do_cadastro(cli, monkeypatch, app_lig):
+    """A decisão de ligar aponta UMA usina: a chave que o banco liga a duas, ou a uma usina que saiu do cadastro, não tem
+    o "Manter a do banco" (a linha diz por quê), e segue podendo sair pelo "Publicar com as trocas"."""
+    duas = _banco_com_a_chave_noutra_usina(app_lig, usina=2)
+    duas.append({**next(d for d in duas if d["chave_externa"] == BROD), "usina_id": 3})
+    _banco_de_mentira(cli, monkeypatch, duas)
+    bloco = _secao(cli, "?trocas=1").split('class="lig-trocas"')[1].split("</table>")[0]
+    assert "Manter a do banco" not in bloco and "o banco liga a mais de uma usina" in bloco
+    _banco_de_mentira(cli, monkeypatch, _banco_com_a_chave_noutra_usina(app_lig, usina=99))
+    secao = _secao(cli, "?trocas=1")
+    bloco = secao.split('class="lig-trocas"')[1].split("</table>")[0]
+    assert "Manter a do banco" not in bloco and "a usina do banco saiu do cadastro" in bloco
+    assert 'name="aceitar_trocas"' in secao and "Publicar com a troca" in secao
+
+
+def test_a_troca_decidida_a_mao_nesta_maquina_publica(cli, monkeypatch, app_lig):
+    """Quem ligou a chave a outra usina na tela desta máquina já decidiu: a publicação não pergunta de novo."""
+    _decidir(cli, acao="ligar", chave=BROD, usina="3")
+    no_banco = _banco_com_a_chave_noutra_usina(app_lig, usina=1, como="código")
+    q, enviados = _publicar_com(cli, monkeypatch, no_banco)
+    assert len(enviados) == 1 and "ok" in q
+    assert next(l for l in _de_para_enviado(enviados[0]) if l[2] == BROD)[0] == 3
+
+
+def test_a_lista_das_trocas_so_le_o_banco_quando_pedida(cli, monkeypatch, app_lig):
+    """A Governança não lê o de-para do banco a cada visita: só com o `trocas=1` que a recusa põe no endereço. E a
+    leitura que falha não derruba a tela: ela diz que não conseguiu listar."""
+    from nexus.cadastro import banco as B
+    leituras = []
+    def quebra(base, sessao=None):
+        leituras.append(base)
+        raise ConnectionError("banco fora")
+    monkeypatch.setattr(B, "ler_de_para", quebra)
+    sem = _secao(cli)
+    assert leituras == [] and 'class="lig-trocas"' not in sem and "não consegui ler o de-para do banco" not in sem
+    com = _secao(cli, "?trocas=1")
+    assert len(leituras) == 1 and 'class="lig-trocas"' not in com and "não consegui ler o de-para do banco" in com
 
 
 def test_o_ligar_usa_a_lista_do_nexus_e_nao_o_datalist(cli):
