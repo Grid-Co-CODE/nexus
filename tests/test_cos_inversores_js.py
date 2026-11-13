@@ -147,3 +147,17 @@ def test_sem_pedido_novo_so_os_dois_caminhos_de_sempre():
     texto = JS.read_text(encoding="utf-8")
     assert set(re.findall(r'pedir\("([^"]+)"', texto)) == {"/scada/monitoramento?entradas=separadas", "/scada/curva/"}
     assert "fetch(" in texto and texto.count("fetch(") == 3      # o refresh do login, o pedido direto e o pela porta
+
+
+def test_fechar_fecha_mesmo_com_o_inversor_aberto():
+    # 13/11/2026, o dono: "o botão de fechar a tela de graficos nao ta funcionando". O `fechar()` zerava o detalhe ANTES
+    # de limpar os gráficos; a limpeza chama o `aoMarcar` da curva do inversor, que lia `det.f` (já nulo): TypeError, e o
+    # `dlg.close()` nunca chegava. Agora a limpeza vem antes, o fechamento fica num `finally`, e nenhum `aoMarcar` lê o
+    # `det` global.
+    texto = JS.read_text(encoding="utf-8")
+    corpo = texto[texto.index("function fechar() {"):]
+    corpo = corpo[: corpo.index("\n  }\n")]
+    assert corpo.index("limparTodos()") < corpo.index("sairDoDetalhe()")
+    assert corpo.index("finally") < corpo.index("dlg.close()")
+    for trecho in texto.split("aoMarcar: function")[1:]:
+        assert "det.f" not in trecho[: trecho.find("}") + 400].split("aoMarcar")[0][:400]
