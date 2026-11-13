@@ -13,9 +13,18 @@
    - O DETALHE DE UM INVERSOR (13/11/2026, .cos-inv-det): clicar num inversor troca o corpo da janela pela curva dele, as
      entradas de agora (strings sob o MPPT declarado) e as entradas desde que a janela abriu (Individual, Por MPPT, Todas).
      O "Voltar à usina" e o Esc voltam ao corpo, com o foco no inversor de onde se saiu; o segundo Esc fecha a janela.
-     O conteúdo é do static/cos/inversores.js; daqui só a casca, para o título e o voltar existirem sem JavaScript. #}
+     O conteúdo é do static/cos/inversores.js; daqui só a casca, para o título e o voltar existirem sem JavaScript.
+   - O DIA (13/11/2026, o dono: "como faço pra ver os gráficos de ontem ?"): Hoje, Ontem ou uma data até 40 dias atrás, no
+     topo fixo da janela (.cos-inv-dias). Vale para a curva da usina, a de cada inversor e as strings e MPPT do detalhe, que
+     vêm do histórico gravado na Ronda COS (45 dias, `scada/entradas/<logger>/<modbus>?dia=`). Num dia que passou não há
+     ponta ao vivo; o estado e as entradas de AGORA continuam ao vivo. Escondido no SunOP, que não tem série gravada. #}
 <dialog class="cos-inv-dlg" id="cos-inv-dlg" aria-labelledby="cos-inv-titulo">
-  <header class="cos-inv-topo"><div><h2 class="cos-inv-titulo" id="cos-inv-titulo"></h2><span class="cos-inv-sub"></span></div>
+  <header class="cos-inv-topo"><div><h2 class="cos-inv-titulo" id="cos-inv-titulo"></h2><span class="cos-inv-sub"></span>
+    <div class="cos-inv-dias" role="group" aria-label="O dia dos gráficos" hidden>
+      <button type="button" class="gc-chip" data-dia="hoje" aria-pressed="true">Hoje</button>
+      <button type="button" class="gc-chip" data-dia="ontem" aria-pressed="false">Ontem</button>
+      <label class="cos-inv-dia-outro"><span>Outro dia</span> <input type="date" class="gc-campo cos-inv-dia-data" title="Até 40 dias atrás"></label>
+    </div></div>
     <div class="cos-inv-topo-dir"><span class="cos-inv-lido"></span>
     <button type="button" class="gc-btn gc-btn--ui gc-btn--fantasma cos-inv-fechar" aria-label="Fechar">Fechar</button></div></header>
   <div class="cos-inv-corpo"></div>

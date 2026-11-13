@@ -671,22 +671,38 @@ def _inversores_abertos(cfg) -> dict:
 # mesmos caminhos que pediria à API da Ronda COS, e daqui saem só estes dois, lidos do Andamento com a chave de máquina.
 # Debaixo de /t/cos/monitoramento/: o portão de setores dá a quem vê o Monitoramento (auth/setor_telas.py).
 _CURVA_DOS_INVERSORES = re.compile(r"scada/curva/([A-Za-z0-9_-]{1,40}(?:,[A-Za-z0-9_-]{1,40}){0,7})")
+# 13/11/2026: o histórico das strings e dos MPPT de UM inversor num dia (o logger e o número modbus dele)
+_ENTRADAS_DO_INVERSOR = re.compile(r"scada/entradas/([A-Za-z0-9_-]{1,40})/(\d{1,5})")
 _DIA = re.compile(r"\d{4}-\d{2}-\d{2}")
+
+
+def _dia_pedido() -> tuple[str, bool]:
+    """O `?dia=` (recusado com 400 fora do formato) e se ele já passou: o dia passado não muda, e a cópia é maior."""
+    dia = request.args.get("dia", "")
+    if dia and not _DIA.fullmatch(dia):
+        abort(400)
+    return dia, bool(dia) and dia < AND.agora().date().isoformat()
 
 
 @bp.route("/monitoramento/ronda-api/<path:caminho>")
 def monitoramento_ronda_api(caminho):
-    """Os inversores ao vivo: `scada/monitoramento` (os cartões do SCADA com os inversores, 2 s de cópia) e
-    `scada/curva/<loggers>?dia=` (a curva com a série de cada inversor, 60 s). O resto, 404. Só lê."""
+    """Os inversores ao vivo: `scada/monitoramento` (os cartões do SCADA com os inversores, 2 s de cópia),
+    `scada/curva/<loggers>?dia=` (a curva com a série de cada inversor, 60 s) e, desde 13/11/2026,
+    `scada/entradas/<logger>/<modbus>?dia=` (as strings e os MPPT de um inversor no dia, 60 s). Dia que já passou: 1 h
+    de cópia. O resto, 404. Só lê."""
     cfg = current_app.config
     if caminho == "scada/monitoramento":
         dados, erro = AND.ler_ao_vivo(cfg, "/api/nexus/geracao/scada", AND.TTL_AO_VIVO_S)
     elif m := _CURVA_DOS_INVERSORES.fullmatch(caminho):
-        dia = request.args.get("dia", "")
-        if dia and not _DIA.fullmatch(dia):
-            abort(400)
+        dia, passado = _dia_pedido()
         q = urlencode({"ids": m.group(1), **({"dia": dia} if dia else {})})
-        dados, erro = AND.ler_ao_vivo(cfg, f"/api/nexus/geracao/scada-curva?{q}", AND.TTL_CURVA_INVERSORES_S)
+        dados, erro = AND.ler_ao_vivo(cfg, f"/api/nexus/geracao/scada-curva?{q}",
+                                      AND.TTL_DIA_PASSADO_S if passado else AND.TTL_CURVA_INVERSORES_S)
+    elif m := _ENTRADAS_DO_INVERSOR.fullmatch(caminho):
+        dia, passado = _dia_pedido()
+        q = urlencode({"logger": m.group(1), "modbus": m.group(2), **({"dia": dia} if dia else {})})
+        dados, erro = AND.ler_ao_vivo(cfg, f"/api/nexus/geracao/scada-entradas?{q}",
+                                      AND.TTL_DIA_PASSADO_S if passado else AND.TTL_ENTRADAS_S)
     else:
         abort(404)
     resp = jsonify(dados) if dados is not None else jsonify(error=erro or "a leitura ao vivo falhou")

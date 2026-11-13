@@ -251,6 +251,38 @@ def test_os_inversores_ao_vivo_pelo_servidor_do_nexus(ligada, logado, monkeypatc
     assert logado.get("/t/cos/monitoramento/ronda-api/scada/curva/EXA01?dia=ontem").status_code == 400
 
 
+def test_o_historico_das_entradas_e_o_dia_que_passou_pelo_servidor_do_nexus(ligada, logado, monkeypatch):
+    """13/11/2026, o dono: "como faço pra ver os gráficos de ontem ? precisamos armazenar por pelo menos 40 dias". O
+    histórico das strings e dos MPPT de UM inversor num dia vem do Andamento (`/api/nexus/geracao/scada-entradas`), e a
+    curva de um dia que passou leva o `?dia=`. O dia que passou não muda: uma hora de cópia; o de hoje, 60 s."""
+    entradas = {"versao": 1, "usina_id": "EXA01", "modbus_id": 2, "dia": "2026-11-08", "strings": [], "mppts": [], "pontos": []}
+    curva = {"versao": 1, "dia": "2026-11-08", "pontos": [], "inversores": []}
+    pedidos = _servir(monkeypatch, {"/api/nexus/geracao/scada-entradas": entradas, "/api/nexus/geracao/scada-curva": curva})
+    relogio = [1000.0]
+    monkeypatch.setattr(AND.time, "monotonic", lambda: relogio[0])
+    base = "/t/cos/monitoramento/ronda-api/scada/"
+    r = logado.get(base + "entradas/EXA01/2?dia=2026-11-08")
+    assert r.status_code == 200 and r.get_json()["usina_id"] == "EXA01" and r.headers["Cache-Control"] == "private, no-store"
+    assert pedidos[-1][0] == "/api/nexus/geracao/scada-entradas?logger=EXA01&modbus=2&dia=2026-11-08"
+    logado.get(base + "entradas/EXA01/2")                              # hoje (o AGORA dos testes é 09/11): sem o dia
+    assert pedidos[-1][0] == "/api/nexus/geracao/scada-entradas?logger=EXA01&modbus=2"
+    logado.get(base + "curva/EXA01?dia=2026-11-08")
+    assert pedidos[-1][0] == "/api/nexus/geracao/scada-curva?ids=EXA01&dia=2026-11-08"
+    # dois minutos depois: o dia que passou (as entradas e a curva) sai da cópia; o de hoje é relido
+    relogio[0] += 120
+    antes = len(pedidos)
+    logado.get(base + "entradas/EXA01/2?dia=2026-11-08")
+    logado.get(base + "curva/EXA01?dia=2026-11-08")
+    assert len(pedidos) == antes
+    logado.get(base + "entradas/EXA01/2")
+    assert len(pedidos) == antes + 1
+    # o inversor sem o número, o caminho torto e o dia fora do formato
+    assert logado.get(base + "entradas/EXA01/dois").status_code == 404
+    assert logado.get(base + "entradas/EXA01").status_code == 404
+    assert logado.get(base + "entradas/../auth/2").status_code == 404
+    assert logado.get(base + "entradas/EXA01/2?dia=ontem").status_code == 400
+
+
 def test_o_andamento_fora_e_503_com_o_motivo(ligada, logado, monkeypatch):
     _servir(monkeypatch, {"/api/nexus/geracao/scada": AND.FonteErro("o Andamento respondeu 503", 503)})
     r = logado.get("/t/cos/monitoramento/ronda-api/scada/monitoramento")
@@ -278,6 +310,11 @@ def test_a_janela_tem_o_detalhe_do_inversor_escondido_com_o_voltar(tela):
         assert 'class="cos-inv-det-corpo"' in dlg
         # o corpo da usina vem antes do detalhe e continua o mesmo (o JavaScript troca um pelo outro)
         assert dlg.index('class="cos-inv-corpo"') < dlg.index('class="cos-inv-det"')
+        # 13/11/2026: o dia dos gráficos no topo fixo da janela (Hoje, Ontem e uma data), escondido até a usina abrir
+        topo = dlg[dlg.index('<header class="cos-inv-topo">'):dlg.index("</header>")]
+        assert '<div class="cos-inv-dias" role="group" aria-label="O dia dos gráficos" hidden>' in topo
+        assert 'data-dia="hoje" aria-pressed="true">Hoje</button>' in topo and 'data-dia="ontem"' in topo
+        assert '<input type="date" class="gc-campo cos-inv-dia-data"' in topo
 
 
 def test_as_usinas_da_assistida_da_thopen_que_a_ronda_cos_manda_sem_cliente():

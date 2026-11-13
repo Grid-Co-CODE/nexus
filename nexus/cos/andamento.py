@@ -601,6 +601,10 @@ def ler_curvas(config) -> Leitura:
 # (um pedido só por leitura no ar). A curva dos inversores muda de 5 em 5 min: 60 s de cópia.
 TTL_AO_VIVO_S = 2.0
 TTL_CURVA_INVERSORES_S = 60.0
+# 13/11/2026, o dia escolhido na janela da usina: o histórico das strings de hoje muda de 5 em 5 min (60 s de cópia,
+# como a curva); o de um dia que já passou não muda mais, e a mesma leitura serve uma hora.
+TTL_ENTRADAS_S = 60.0
+TTL_DIA_PASSADO_S = 3600.0
 _AO_VIVO_MAX = 200                     # chaves guardadas (as curvas são uma por usina e dia): o resto sai pela idade
 _ao_vivo: dict = {}
 _ao_vivo_no_ar: dict = {}

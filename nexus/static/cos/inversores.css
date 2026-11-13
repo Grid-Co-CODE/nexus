@@ -85,6 +85,16 @@
 .cos-inv-i-abrir span{color:var(--mudo);font-size:15px;line-height:1}
 .cos-inv-i--abre:hover .cos-inv-i-abrir span{color:var(--verde-texto)}
 .cos-inv-det[hidden],.cos-inv-corpo[hidden]{display:none}
+/* o dia dos gráficos (13/11/2026): Hoje, Ontem e uma data, no topo fixo da janela */
+.cos-inv-dias{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:8px}
+.cos-inv-dias[hidden]{display:none}
+.cos-inv-dias .gc-chip{padding:4px 12px}
+.cos-inv-dia-outro{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--mudo)}
+/* o calendário do navegador no tema do Nexus (o escuro é o padrão), e não no do sistema */
+.cos-inv-dia-data{padding:3px 8px;font-size:12px;color-scheme:dark}
+:root[data-tema="claro"] .cos-inv-dia-data{color-scheme:light}
+.cos-inv-hist-aviso{margin:0 0 8px;font-size:12.5px;color:var(--tinta-2)}
+.cos-inv-hist-aviso:empty{display:none}
 .cos-inv-det{padding:14px 22px 24px}
 .cos-inv-det-cab{display:flex;flex-wrap:wrap;align-items:center;gap:8px 16px;margin-bottom:10px}
 .cos-inv-det-cab .gc-btn{padding:6px 12px}
@@ -126,9 +136,7 @@ p.cos-inv-mppt-cab{font-weight:600;letter-spacing:.04em;text-transform:uppercase
 .cos-inv-chips[hidden]{display:none}
 .cos-inv-modos .gc-chip:disabled,.cos-inv-chip:disabled{cursor:not-allowed;color:var(--mudo);background:transparent;border-style:dashed}
 .cos-inv-chip{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;font-size:11.5px}
-.cos-inv-cor{display:inline-block;flex:none;width:12px;height:3px;border-radius:2px;background:var(--linha-forte)}
-.cos-inv-cor.pg-c1{background:var(--info)} .cos-inv-cor.pg-c2{background:var(--anomalo)}
-.cos-inv-cor.pg-c3{background:var(--bronze)} .cos-inv-cor.pg-c4{background:var(--verde-texto)}
+.cos-inv-cor{display:inline-block;flex:none;width:12px;height:4px;border-radius:2px;background:var(--cor,var(--linha-forte))}
 .cos-inv-sg-grade{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(200px,100%),1fr));gap:10px}
 .cos-inv-sg-mppts{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(320px,100%),1fr));gap:12px}
 .cos-inv-sgi,.cos-inv-sgm{border:1px solid var(--linha);border-radius:12px;padding:8px 10px 6px;background:var(--superficie-2);
@@ -139,15 +147,36 @@ p.cos-inv-mppt-cab{font-weight:600;letter-spacing:.04em;text-transform:uppercase
 .cos-inv-leg{display:flex;flex-wrap:wrap;gap:2px 14px;margin:0;padding:0;list-style:none;font-size:12px;color:var(--tinta-2)}
 .cos-inv-leg li{display:inline-flex;align-items:center;gap:6px}
 .cos-inv-leg .gc-num{color:var(--tinta);font-weight:600}
-/* as séries de string: a de fundo sem cor de identidade; as de destaque nas 4 cores (ordem fixa, conferidas no validador
-   do dataviz nos dois temas: azul, rosa, bronze e verde; o par verde x rosa fica no limite do daltonismo no claro, por
-   isso a legenda e a dica dizem o nome de cada uma) */
-.pg-s{fill:none;stroke-width:2;stroke-linejoin:round;stroke-linecap:round}
-.pg-s--fundo{stroke:var(--linha-forte);stroke-width:1.25}
-.pg-s.pg-c1{stroke:var(--info)} .pg-s.pg-c2{stroke:var(--anomalo)} .pg-s.pg-c3{stroke:var(--bronze)} .pg-s.pg-c4{stroke:var(--verde-texto)}
-.pg-sfim{stroke:var(--superficie);stroke-width:2}
-.pg-sfim.pg-c1,.pg-cruz-ponto.pg-cp1{fill:var(--info)} .pg-sfim.pg-c2,.pg-cruz-ponto.pg-cp2{fill:var(--anomalo)}
-.pg-sfim.pg-c3,.pg-cruz-ponto.pg-cp3{fill:var(--bronze)} .pg-sfim.pg-c4,.pg-cruz-ponto.pg-cp4{fill:var(--verde-texto)}
+/* AS CORES DAS STRINGS (13/11/2026, o dono no modo Todas: "eu preciso que todas as strings apareçam com uma cor
+   destacada"): uma paleta categórica de 24 tons, um por índice de string, em ORDEM FIXA — a String1 tem a mesma cor em
+   todo modo e todo inversor (acima de 24, a 25 volta à cor da 1). Os matizes são de 15 em 15 graus, numa ordem escolhida
+   para os VIZINHOS (String k e k+1, quase sempre do mesmo MPPT) ficarem longe, e a luminosidade alterna entre vizinhos.
+   Conferida no validador do dataviz: o pior par vizinho tem ΔE 18,5 no escuro e 18,4 no claro sob daltonismo (o alvo é
+   8), e todo tom tem 3:1 contra a superfície. Com 24 tons, dois que não são vizinhos podem se parecer: a legenda e a dica
+   dizem o nome de cada linha. Os tokens moram aqui (a área do COS); o JavaScript só escolhe o número (`--cor`). */
+:root{
+  --cos-str-1:#30de97; --cos-str-2:#be62c4; --cos-str-3:#6fda75; --cos-str-4:#cd5cac; --cos-str-5:#bbc92a; --cos-str-6:#5886f2;
+  --cos-str-7:#edb417; --cos-str-8:#199eaa; --cos-str-9:#d7bf0a; --cos-str-10:#d85891; --cos-str-11:#99d352; --cos-str-12:#ac6ad8;
+  --cos-str-13:#1bd9d1; --cos-str-14:#e15955; --cos-str-15:#6cc9fd; --cos-str-16:#de602f; --cos-str-17:#8cc3fc; --cos-str-18:#de5774;
+  --cos-str-19:#07d2fe; --cos-str-20:#bf7b0f; --cos-str-21:#b1b7fd; --cos-str-22:#d16e0d; --cos-str-23:#09dcb8; --cos-str-24:#9572e7;
+}
+:root[data-tema="claro"]{
+  --cos-str-1:#0da26b; --cos-str-2:#842a8b; --cos-str-3:#33a340; --cos-str-4:#902275; --cos-str-5:#8a9500; --cos-str-6:#284eb5;
+  --cos-str-7:#b3880f; --cos-str-8:#0d646c; --cos-str-9:#a39001; --cos-str-10:#9a1a5d; --cos-str-11:#679b0f; --cos-str-12:#75329d;
+  --cos-str-13:#169d97; --cos-str-14:#a21921; --cos-str-15:#0497d2; --cos-str-16:#953307; --cos-str-17:#2393f1; --cos-str-18:#a01642;
+  --cos-str-19:#0a9cbc; --cos-str-20:#794d0b; --cos-str-21:#8082f7; --cos-str-22:#854408; --cos-str-23:#159f85; --cos-str-24:#623bab;
+}
+/* a linha de cada string leva a cor dela; destacada, engrossa; com alguma destacada, as outras esmaecem */
+.pg-s{fill:none;stroke:var(--cor,var(--linha-forte));stroke-width:1.75;stroke-linejoin:round;stroke-linecap:round}
+.pg-s--forte{stroke-width:3.5}
+.pg-s--fraca{stroke-opacity:.2}
+.pg-sfim{fill:var(--cor,var(--tinta));stroke:var(--superficie);stroke-width:2}
+.pg-cruz-ponto.pg-cp{fill:var(--cor,var(--tinta))}
+/* o gráfico de uma string só (o modo Individual): a área e a linha na cor dela */
+.pg-colorida .pg-linha{stroke:var(--cor)} .pg-colorida .pg-area{fill:var(--cor)} .pg-colorida .pg-fim{fill:var(--cor)}
 .cos-inv-dica-l{display:flex;align-items:center;gap:0}
 .cos-inv-dica-l+.cos-inv-dica-l{margin-top:2px}
 .cos-inv-dica-l .cos-inv-cor{margin-right:6px}
+.cos-inv-dica-l.forte b,.cos-inv-dica-l.forte span{color:var(--tinta);font-weight:700}
+.cos-inv-sgi-nome{display:inline-flex;align-items:center;gap:6px}
+.cos-inv-chip[aria-pressed="true"] .cos-inv-cor{height:6px}
