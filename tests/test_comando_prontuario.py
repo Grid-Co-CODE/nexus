@@ -9,7 +9,7 @@ aquela informação".
 
 O que estes testes seguram: a conta pura (`nexus/comando/prontuario.py`: o parecer, o painel do alto com as barras, o
 cartão das OS), as OS de cada estado na tela dona (`campo/manutencao.py`), as formas do Criar OS apontando para as rotas do OS
-Creator, o ligador da fotografia do COS, e a mesma página nas duas portas (o que muda entre elas e o que a pessoa sem a tela não vê)."""
+Creator, o ligador geral (o código pela regra da casa), e a mesma página nas duas portas (o que muda entre elas e o que a pessoa sem a tela não vê)."""
 import re
 from pathlib import Path
 
@@ -187,27 +187,31 @@ def test_o_criar_os_leva_as_formas_de_hoje_do_os_creator():
     assert all("?" not in o["url"] for o in criar_os(""))               # sem o código no cadastro, sem a usina
 
 
-def test_o_ligador_do_cos_nao_liga_o_codigo_com_o_prefixo_de_outro_cliente():
+def test_o_ligador_nao_liga_o_codigo_com_o_prefixo_de_outro_cliente():
     """A análise das usinas Sem leitura (12/11/2026): o `E1EN-PCN100` (a Poconé da E1, sem código no cadastro) caía na
-    Poconé 1 da Thopen (`THPN-PCN100`) pela terminação, e as ocorrências de uma apareciam na outra. A fotografia do COS
-    liga pela regra da casa (a das normalizações): o código cheio, ou a terminação de UMA usina sem prefixo de outro
-    cliente; antes de tudo, o nome do Fracttal pelo de-para."""
-    from nexus.comando import usinas as CU
+    Poconé 1 da Thopen (`THPN-PCN100`) pela terminação, e as ocorrências de uma apareciam na outra; as duas Ipixuna
+    (`2C-IPX100` e `THPN-IPX100`, a mesma terminação em dois clientes) não ligavam em nenhuma. O ligador geral liga o
+    código pela regra da casa (`equipamento.usina_do_codigo`): o código cheio, ou a terminação de UMA usina sem o
+    prefixo de outro cliente; antes de tudo, o nome do Fracttal pelo de-para. A coluna Agora de Comando > Usinas e o
+    Mapa de equipe ligam a fotografia do COS por ele."""
     from nexus.dados import fatos as D
+    usinas = [{"usina_id": 1, "nome": "Poconé 1", "codigo": "THPN-PCN100"}, {"usina_id": 2, "nome": "Poconé", "codigo": ""},
+              {"usina_id": 3, "nome": "Itajá 1 e 2", "codigo": "ITA100"},
+              {"usina_id": 4, "nome": "Aparecida do Taboado 1 e 2", "codigo": "THPN-ADT100"},
+              {"usina_id": 5, "nome": "Ipixuna do Pará 1", "codigo": "2C-IPX100"},
+              {"usina_id": 6, "nome": "Ipixuna 1 e 2", "codigo": "THPN-IPX100"}]
+    lig = D.Ligador(usinas, [{"sistema": D.SISTEMA_FRACTTAL, "chave_externa": "E1 - Poconé - MT", "usina_id": 2}], [], {})
 
-    class _B:
-        usinas = [{"usina_id": 1, "nome": "Poconé 1", "codigo": "THPN-PCN100"}, {"usina_id": 2, "nome": "Poconé", "codigo": ""},
-                  {"usina_id": 3, "nome": "Itajá 1 e 2", "codigo": "ITA100"},
-                  {"usina_id": 4, "nome": "Aparecida do Taboado 1 e 2", "codigo": "THPN-ADT100"}]
-        de_para = [{"sistema": D.SISTEMA_FRACTTAL, "chave_externa": "E1 - Poconé - MT", "usina_id": 2}]
-    _B.lig = D.Ligador(_B.usinas, _B.de_para, [], {})
-    assert _B.lig.usina("", "E1EN-PCN100")[0] == 1                    # o ligador geral liga errado (a terminação)
-    usina_de = CU.ligador_do_cos(_B)
-    assert usina_de("Poconé", "E1EN-PCN100") is None                  # o prefixo é de outro cliente: não liga
-    assert usina_de("Poconé 1", "THPN-PCN100") == 1                   # o código cheio
-    assert usina_de("", "THOPEN-ITA100") == 3 and usina_de("", "ADT100") == 4      # a terminação de uma usina só
-    assert usina_de("E1 - Poconé - MT", "E1EN-PCN100") == 2           # o nome do Fracttal, pelo de-para, vem antes
-    assert usina_de("", "") is None and usina_de(None, None) is None
+    def de(nome, codigo):
+        return lig.usina(nome, codigo)[0]
+    assert de("Poconé", "E1EN-PCN100") is None and de("", "E1EN-PCN100-ETKR2.101") is None   # o prefixo é de outro cliente
+    assert de("Poconé 1", "THPN-PCN100") == 1 and de("", "THPN-PCN100-INVR1.2") == 1         # o código cheio
+    assert de("", "THOPEN-ITA100") == 3 and de("", "ADT100") == 4 and de("", "ADT100-INVR1.1") == 4   # a terminação de uma só
+    assert de("", "2C-IPX100") == 5 and de("", "2C-IPX100-INVR3.5") == 5 and de("", "THPN-IPX100") == 6   # o cheio desempata
+    assert de("", "IPX100") is None and de("", "IPX100-INVR1.1") is None                  # sem prefixo, é de duas: não liga
+    assert de("E1 - Poconé - MT", "E1EN-PCN100") == 2                 # o nome do Fracttal, pelo de-para, vem antes
+    assert lig.usina("E1 - Poconé - MT", "")[1] == "de-para do Fracttal" and lig.usina("", "THPN-PCN100")[1] == "código do ativo"
+    assert lig.usina("", "") == (None, None) and lig.usina(None, None) == (None, None)
 
 
 # ── a página, nas duas portas ────────────────────────────────────────────────────────────────────────────────────────

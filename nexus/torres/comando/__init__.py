@@ -203,7 +203,7 @@ def _usinas_montadas() -> dict:
     if AND.fonte(cfg).ligada and b is not None:
         clientes_cos, erro_cli = AND.clientes(cfg)
         leituras = [AND.ler(cfg, c) for c in clientes_cos]
-        cos = CU.cos_por_usina(leituras, CU.ligador_do_cos(b))
+        cos = CU.cos_por_usina(leituras, lambda nome, codigo: b.lig.usina(nome or "", codigo or "")[0])
         falharam = [lt.cliente for lt in leituras if not lt.dados]
         if falharam:
             avisos.append("o COS de " + ", ".join(falharam) + " (essas usinas aparecem Sem leitura)")

@@ -428,7 +428,13 @@ Regra de uso e do porquê: `nexus/torres/campo/CLAUDE.md`, "Mapa de equipe".
    usinas). Indicador sim/não como 1/0. Número da OS fica no fato (dimensão degenerada), **inteiro quando é só dígitos** e texto quando tem letra (`fatos.os_do_fato`, 12/11/2026: era texto em seis fatos e inteiro em quatro; o fechamento, a ronda, a PT e a programação passaram a inteiro, e a semana da programação que fica do banco é lida no mesmo tipo; os dois fatos das normalizações do COS seguem texto, porque a plataforma os lê). Texto que identifica uma
    coisa (a tarefa) entra como chave (`tarefa_chave`, sha1 do texto normalizado), nunca o texto.
 4. **Não liga = vazio. Nunca chutar ID.** Código que é de duas usinas não liga (há código de usina que é de dois
-   clientes). Nome que é de duas pessoas não liga. A lacuna aparece na qualidade e se conserta **no cadastro** (de-para, equipe que falta),
+   clientes). **A regra do código é UMA, `equipamento.usina_do_codigo`** (o código cheio igual ao do cadastro; senão a
+   terminação que é de UMA usina, e nunca o código com o prefixo de outro cliente), e desde 12/11/2026 o ligador geral
+   dos fatos (`fatos.Ligador.usina`) também liga por ela: antes olhava só a terminação. Medido nos 31.147 ativos do
+   Fracttal que o banco tem, 465 mudaram, todos para o certo: 231 da Ipixuna do Pará 1 (`2C-IPX100`) e da Ipixuna 1 e 2
+   (`THPN-IPX100`) passaram a ligar (a mesma terminação em dois clientes não ligava nenhum); 148 `E1EN-PCN100-…` (a Poconé
+   da E1) deixaram de cair na Poconé 1 da Thopen e 86 `FARO-COR100-…` (a Corisco da Faro) deixaram de cair na Coração 1
+   e 2 da Thopen. Nome que é de duas pessoas não liga. A lacuna aparece na qualidade e se conserta **no cadastro** (de-para, equipe que falta),
    nunca no fato. Valor fora do domínio (`dominios.py`) = vazio + conta.
 5. **Linhagem:** o fato diz por onde ligou (`usina_ligada_por`, `equipamento_ligado_por`, `pessoa_ligada_por`). A
    qualidade diz quantos por cada caminho. Chave repetida (`GraoDuplicado`) não grava AQUELE fato: a aba dele fica como

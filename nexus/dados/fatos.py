@@ -34,6 +34,7 @@ from collections import Counter
 from datetime import datetime, timedelta, timezone
 
 from ..cadastro.banco import codigo_do_equipamento, sufixo_codigo
+from .equipamento import IndiceUsinas, usina_do_codigo
 from ..cadastro.ligacao_campo import _norm as norm_fracttal
 from .calendario import data_id as _data_id
 
@@ -144,6 +145,15 @@ class Ligador:
                 continue
             donos.setdefault(sufixo_codigo(u.get("codigo")), set()).add(_id(u.get("usina_id")))
         self.por_codigo = {c: next(iter(ids)) for c, ids in donos.items() if len(ids) == 1}
+        # o código liga pela regra da casa (`equipamento.usina_do_codigo`, a da dimensão de equipamentos e das
+        # normalizações do COS), e não mais só pela terminação (`por_codigo`, que fica para quem lê). O que criou a regra
+        # (12/11/2026, a análise das usinas Sem leitura de Comando > Usinas; medido nos 31.147 ativos do Fracttal que o
+        # banco tem, 465 mudam e todos para o certo): a terminação que é de dois clientes não ligava nenhum (229 ativos
+        # `2C-IPX100-…` da Ipixuna do Pará 1 e o `THPN-IPX100` da Ipixuna 1 e 2); e a terminação de UMA usina ligava o
+        # ativo de OUTRO cliente nela (148 `E1EN-PCN100-…`, a Poconé da E1, na Poconé 1 da Thopen, `THPN-PCN100`; 86
+        # `FARO-COR100-…`, a Corisco da Faro, na Coração 1 e 2 da Thopen, `THPN-COR100`). Ligação errada é pior que
+        # faltando (regra 4)
+        self.indice = IndiceUsinas(usinas)
         eq = {}
         for e in equipes:
             if _txt(e.get("excluido")).lower() != "sim" and _id(e.get("equipe_id")) and _txt(e.get("nome")):
@@ -161,8 +171,7 @@ class Ligador:
         uid = self.usina_do_fracttal(texto)
         if uid:
             return uid, "de-para do Fracttal"
-        cod = codigo_do_equipamento(codigo_ativo)
-        uid = self.por_codigo.get(sufixo_codigo(cod)) if cod else None
+        uid = usina_do_codigo(codigo_ativo, self.indice)[0] if _txt(codigo_ativo) else None
         return (uid, "código do ativo") if uid else (None, None)
 
     def equipe(self, texto) -> int | None:

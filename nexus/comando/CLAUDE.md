@@ -171,16 +171,16 @@ prontuário mostra as ocorrências abertas no cartão do COS, com o link para a 
 roxo").** O tom do grupo `sem_com` em `usinas.ESTADOS` é `semcom` (o roxo do semáforo do Nexus, `--semcom`), e não mais o
 azul de informação: o selo, a barra da faixa e a legenda da lista, o ponto do prontuário, o Mapa de equipe
 (`campo-mapa.js`, `a_semcom`) e o vídeo wall (`equipe/parede.py`) pegam a cor daqui.
-**Como a fotografia do COS liga à usina do cadastro (`usinas.ligador_do_cos`, 12/11/2026).** Primeiro o nome do
-Fracttal pelo de-para; depois o código pela regra da casa (`dados.equipamento.usina_do_codigo`, a mesma das
-normalizações do COS): o código cheio igual ao do cadastro, ou a terminação que é de UMA usina, e nunca o código com o
-prefixo de outro cliente. Até aqui a coluna usava o ligador geral (`Ligador.usina`), que só olha a terminação. **O caso
-que criou a regra** (Levi pediu a análise das usinas "Sem leitura"; medido no banco, pelos códigos que o COS mandou nas
-ocorrências desde 01/10): o `E1EN-PCN100`, a Poconé da E1 (sem código no cadastro), caía na Poconé 1 da Thopen
-(`THPN-PCN100`), e as ocorrências de uma apareciam na outra; e as duas Ipixuna (`2C-IPX100` e `THPN-IPX100`, a mesma
-terminação em dois clientes) não ligavam em nenhuma e ficavam "Sem leitura". Comparado código a código nos 129 que o
-COS mandou: 126 iguais, e só esses 3 mudam. O Mapa de equipe usa a mesma função. **Quem ainda usa o ligador geral com a
-fotografia do COS** (outras frentes, não mexi): `campo/visao_cliente.py`, `cos/acionamentos.py` e `cos/ficha.py`.
+**Como a fotografia do COS liga à usina do cadastro (12/11/2026).** Pelo ligador geral dos fatos
+(`dados.fatos.Ligador.usina`, o `b.lig`): primeiro o nome do Fracttal pelo de-para; depois o código pela regra da casa
+(`dados.equipamento.usina_do_codigo`, a mesma das normalizações do COS): o código cheio igual ao do cadastro, ou a
+terminação que é de UMA usina, e nunca o código com o prefixo de outro cliente. Até 12/11/2026 o ligador geral só olhava
+a terminação. **O caso que mudou a regra** (Levi pediu a análise das usinas "Sem leitura"; medido no banco, pelos
+códigos que o COS mandou nas ocorrências desde 01/10): o `E1EN-PCN100`, a Poconé da E1 (sem código no cadastro), caía
+na Poconé 1 da Thopen (`THPN-PCN100`), e as ocorrências de uma apareciam na outra; e as duas Ipixuna (`2C-IPX100` e
+`THPN-IPX100`, a mesma terminação em dois clientes) não ligavam em nenhuma e ficavam "Sem leitura". A mudança foi no
+ligador geral (a regra e a medida estão em `nexus/dados/CLAUDE.md`, regra 4): vale também para o Mapa de equipe, a Visão
+do cliente, os Acionamentos e a ficha do COS, que ligam a fotografia por ele.
 **O que continua "Sem leitura" e por quê (12/11/2026):** as 11 usinas SEM CÓDIGO no cadastro (Apolo: Gravatá II, Iramaia
 II, Rio do Peixe I e II; E1: Barra das Garças, Boituva II, Chapada dos Guimarães, Nova Xavantina, Poconé; Elis: Máquinas
 1 a 2; Qair: Aquiraz e Cascavel), que só ligariam pelo nome do Fracttal — o conserto é preencher o código no cadastro (o
@@ -291,7 +291,7 @@ tem as abertas; as concluídas estão no Histórico de OS do OS Creator); as car
 novo no cadastro). Entram quando a fonte existir, cada uma pela tela dona.
 
 **Prova.** `tests/test_comando_prontuario.py` (a conta do parecer, do painel e do cartão das OS; as OS de cada estado na
-tela dona; as formas do Criar OS apontando para rotas que o OS Creator tem; o ligador da fotografia do COS; a página nas
+tela dona; as formas do Criar OS apontando para rotas que o OS Creator tem; o ligador geral ligando o código pela regra da casa; a página nas
 duas portas, o relatório pelo Comando e o que a pessoa sem a tela não vê), `tests/test_campo_central_usina_0411.py` (a aba) e `tests/test_comando_usinas.py`. E a renderização com o
 banco de produção, só leitura, pelo cliente de teste (12/11/2026: a Mandaguaçu com 55% da meta, PR 54,6% contra 73,2%,
 disponibilidade 58,2%, 41 OS abertas = 8 não iniciadas + 2 em execução + 31 em verificação, 40 tarefas atrasadas em 9
