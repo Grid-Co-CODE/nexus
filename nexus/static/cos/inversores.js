@@ -1334,7 +1334,9 @@
     art._sunop = art.getAttribute("data-fonte") === "SunOP" || String(gid).indexOf("sunop-") === 0;
     if (diasEl) { diasEl.hidden = art._sunop; mostrarDia(); }   // o SunOP não tem série gravada: não há dia a escolher
     if (art._sunop) {
-      aviso("Usina do SunOP: a curva por inversor depende do portal do SunOP, que está recusando a conta da plataforma desde 09/11 (o token oficial está pendente).");
+      // 13/11/2026: a Ronda COS passou a gravar a curva do SunOP (a cada 5 min, com o buraco do portal preenchido pela
+      // média de 15 min). O cartão já desenha a curva da usina; o inversor a inversor nesta janela é a próxima etapa.
+      aviso("Usina do SunOP: a curva da usina está no cartão, gravada a cada 5 min desde 13/11. A curva de cada inversor nesta janela ainda não está disponível para o SunOP.");
       return;
     }
     if (vivo && mapaVivo[gid]) { aoVivoNaJanela(); return; }
