@@ -1083,7 +1083,8 @@ que é uma tela dentro de uma tela!".
   invés de direcionar para o OS Creator aparece a tela de criação de OS sobrepondo toda a tela dando um blur de fundo,
   assim que a pessoa finaliza a OS só aparece a notificação de criação!". A plataforma abre `/os/performance/criar` com
   `?janela=1` num iframe que cobre a tela; a ponte (`_JANELA_OS`) a entrega sem o topo e embrulha o `fetch`: o POST de
-  `/os/api/<x>/criar` que responde ok manda `{gc: "os-criada", mensagem, detalhes}` à página de baixo, que fecha a janela
+  `/os/api/<x>/criar` (e, desde 13/11/2026, `/os/api/<x>/<y>/criar`: a solicitação à Performance e à Engenharia) que
+  responde ok manda `{gc: "os-criada", mensagem, detalhes, falhas}` (a mensagem da inspeção vem do `texto` dela) à página de baixo, que fecha a janela
   e mostra a notificação. O código do OS Creator não muda: quem embrulha o fetch é a ponte.
 - **As telas da Plataforma de Performance sem a faixa** "<tela> · Plataforma de Performance": a faixa só nasce com
   controle (o seletor de usina do Diagnóstico). Ver `nexus/performance/CLAUDE.md`.

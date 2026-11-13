@@ -544,6 +544,14 @@ aparece quando clicamos em uma OS no histórico do OS Creator Web. Como fazem pa
   meio diz "Para abrir o chamado, entre pelo Fracttal", com a mesma volta do card (`/os/_nexus/card/voltar`). O Esc
   dentro dela avisa o Nexus para fechar (`{nexusChamado: 1, tipo: 'fechar'}`), salvo com um diálogo da tela aberto.
   Os links da tela (o "← Acompanhamento", a OS, os outros chamados do ativo) andam dentro da janela.
+- **O Criar OS por cima de uma tela do Nexus** (13/11/2026, o prontuário da usina; Levi: "Abre o cardzão da OS, dando um
+  blur de fundo, e aí quando a pessoa cria a OS, ela só pode fechar o card e já era"): `/os/_nexus/criar?url=<a tela de
+  criação>&de=<a tela>` (`ponte.criar_os`, template `oscreator/criar_os.html`) é a moldura do MEIO, como a do chamado. Só
+  as telas de `ponte.CRIAR_POR_CIMA` (OS avulsa, solicitação ao PCM, solicitação à Performance e à Engenharia, inspeção
+  de chamados), com o `ativo` quando tem cara de código; o resto é 404. A tela de dentro vem com `?janela=1` (o
+  `_JANELA_OS`: sem o topo e o aviso `{gc: "os-criada"}` quando a criação dá certo), e a do meio passa o aviso à tela do
+  Nexus como `{nexusCriarOs: 1, tipo: 'criada', mensagem, falhas}`; o Esc, como `{nexusCriarOs: 1, tipo: 'fechar'}`.
+  Teste: `tests/test_oscreator_criar_por_cima.py`.
 - **O X do card** ficava escondido atrás do cabeçalho fixo dele, também no Histórico (`.os-modal-x` com z-index 2, o
   `.det-top` com 3, e o clique caía no cabeçalho). Passou a 4, no `os.css`.
 - **Como provar:** `tests/test_torre_oscreator.py` (a moldura, o aviso sem login, o `ir`) e

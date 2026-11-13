@@ -41,6 +41,55 @@
     document.addEventListener('keydown', function (ev) { if (ev.key === 'Escape' && menu.open) menu.open = false; });
   }
 
+  // o Criar OS por cima do prontuário (13/11/2026, Levi: "está jogando para uma aba nova do OS Creator, que não dá a
+  // opção de voltar para o prontuário da usina [...] Abre o cardzão da OS, dando um blur de fundo, e aí quando a pessoa
+  // cria a OS, ela só pode fechar o card e já era"): a tela de criação do OS Creator numa janela com o fundo desfocado,
+  // pela moldura do meio (/os/_nexus/criar, a mesma ideia da tela do chamado). Criou sem falha: a janela fecha e o aviso
+  // aparece (o mesmo do Tempo real). Com falha, a janela fica: a tela diz o que não saiu. Fechar, Esc e o clique fora
+  // fecham, e a moldura sai junto. O botão do meio e o Ctrl abrem a tela numa aba, pelo href
+  var jan = document.getElementById('pu-os-jan');
+  if (jan) {
+    var mold = null;
+    var tirar = function () { if (mold) { mold.remove(); mold = null; } };
+    var fecharJan = function () { if (jan.open) jan.close(); tirar(); };
+    raiz.addEventListener('click', function (ev) {
+      var a = ev.target.closest('[data-pu-criar]');
+      if (!a || ev.button || ev.ctrlKey || ev.metaKey || ev.shiftKey || ev.altKey) return;
+      ev.preventDefault();
+      if (menu) menu.open = false;
+      tirar();
+      var rot = ((a.querySelector('b') || a).textContent || '').trim() || 'Criar OS';
+      var q = new URLSearchParams({url: a.getAttribute('data-pu-criar'), de: location.pathname + location.search});
+      mold = document.createElement('iframe');
+      mold.className = 'cr-chamado-moldura';
+      mold.title = rot;
+      mold.src = nexusRota('/os/_nexus/criar') + '?' + q.toString();
+      document.getElementById('pu-os-jan-t').textContent = rot;
+      jan.appendChild(mold);
+      jan.showModal();
+    });
+    jan.addEventListener('close', tirar);
+    jan.addEventListener('click', function (ev) { if (ev.target === jan) fecharJan(); });
+    jan.querySelector('[data-pu-os-fechar]').addEventListener('click', fecharJan);
+    window.addEventListener('message', function (e) {
+      if (!mold || e.origin !== location.origin || e.source !== mold.contentWindow) return;
+      var d = e.data || {};
+      if (d.nexusCriarOs !== 1) return;
+      if (d.tipo === 'fechar') { fecharJan(); return; }
+      if (d.tipo === 'criada' && !d.falhas) { fecharJan(); avisar(d.mensagem || 'OS criada no Fracttal.'); }
+    });
+  }
+  // o aviso no pé da tela, que some sozinho (a OS criada, com o número)
+  function avisar(texto) {
+    var t = document.getElementById('pu-aviso');
+    if (!t) {
+      t = document.createElement('div'); t.id = 'pu-aviso'; t.className = 'pu-aviso'; t.setAttribute('role', 'status');
+      document.body.appendChild(t);
+    }
+    t.textContent = texto; t.hidden = false;
+    clearTimeout(t._fim); t._fim = setTimeout(function () { t.hidden = true; }, 8000);
+  }
+
   // o relatório em PDF: a janela do mês e dos campos de cada tema; sem campo marcado o Baixar trava e diz por quê
   var dlg = document.getElementById('pu-rel'), bRel = raiz.querySelector('[data-pu-rel]');
   if (dlg && bRel) {

@@ -164,5 +164,5 @@ def test_o_aviso_da_janela_so_sai_quando_a_criacao_deu_certo():
     p = subprocess.run([node, "-e", harness], capture_output=True, text=True, encoding="utf-8", timeout=60)
     assert p.returncode == 0, p.stderr
     avisos = json.loads(p.stdout)
-    assert avisos == [[{"gc": "os-criada", "mensagem": "2 OS criadas", "detalhes": ["OS 101", "OS 102"]},
+    assert avisos == [[{"gc": "os-criada", "mensagem": "2 OS criadas", "detalhes": ["OS 101", "OS 102"], "falhas": 0},
                        "https://app.gridco.com.br"]]

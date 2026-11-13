@@ -267,7 +267,15 @@ tela em que o próprio setor cria as OS dele (`/os/performance`, com os planos d
 `/os/engenharia`). A **OS avulsa** (o "Criar OS do zero" de lá, `/os/tradicional`) e a **Solicitação de OS** ao PCM
 (`/os/solicitacao`) abrem com a usina já escolhida (`?ativo=<o código da usina no cadastro>`, que é o do ativo dela no
 Fracttal; `tradicional_web.sugestao`); as abas da Performance e da Engenharia e a **Inspeção de chamados**
-(`/os/chamados/inspecao`, que pede o ativo pelo id do Fracttal) abrem sem a usina. O botão "Criar ticket" da 1ª versão
+(`/os/chamados/inspecao`, que pede o ativo pelo id do Fracttal) abrem sem a usina. **Tudo abre POR CIMA do prontuário** (13/11/2026, Levi:
+"está jogando para uma aba nova do OS Creator, que não dá a opção de voltar para o prontuário da usina [...] Abre o
+cardzão da OS, dando um blur de fundo, e aí quando a pessoa cria a OS, ela só pode fechar o card e já era"): o clique
+abre a tela de criação numa janela com o fundo desfocado (`<dialog id="pu-os-jan">`, a janela das telas do OS Creator,
+`cr-modal--chamado`), pela moldura do meio `/os/_nexus/criar?url=<a tela>&de=<o prontuário>` (`ponte.criar_os`,
+`oscreator/criar_os.html`; só as telas de `ponte.CRIAR_POR_CIMA`, que o teste confere contra o `CRIAR_OS`). A tela vem com
+`?janela=1`: sem o topo, e a ponte avisa quando a criação deu certo; criou sem falha, a janela fecha e o aviso aparece no
+pé do prontuário; com falha (lote), a janela fica e a tela diz o que não saiu. Sem o login do Fracttal, a moldura diz como
+entrar e volta ao prontuário. O botão do meio e o Ctrl abrem a tela numa aba, pelo href. O botão "Criar ticket" da 1ª versão
 (os planos da Performance direto) saiu no mesmo dia. Relatório = o PDF do
 cliente da Usinas 360° (`campo/relatorio_usina.py`), também pelo endereço do Comando
 (`/t/comando/usinas/<id>/relatorio.pdf`, que chama a rota de lá), para quem tem o Comando e não a Visão do responsável.

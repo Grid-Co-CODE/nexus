@@ -248,13 +248,20 @@ def test_as_acoes_do_alto_criam_a_os_e_o_ticket_com_a_usina_e_baixam_o_relatorio
     acoes = html.split('class="pu-acoes"', 1)[1].split("</header>", 1)[0]
     # o Criar OS abre as cinco formas de hoje do OS Creator; a avulsa e a solicitação já com a usina; sem o ticket
     menu = acoes.split('class="pu-menu-caixa"', 1)[1].split("</div>", 1)[0]
-    assert menu.count("<a href=") == 5 and "ticket</b>" not in acoes and "Criar ticket" not in html
+    assert menu.count(" href=") == 5 and "ticket</b>" not in acoes and "Criar ticket" not in html
     assert re.search(r'href="/os/tradicional\?ativo=[A-Z0-9-]+"><b>OS avulsa</b>', menu)
     assert re.search(r'href="/os/solicitacao\?ativo=[A-Z0-9-]+"><b>Solicitação de OS</b>', menu)
     for url, rot in (("/os/solicitacao/performance", "OS de Performance"), ("/os/solicitacao/engenharia", "OS de Engenharia"),
                      ("/os/chamados/inspecao", "Inspeção de chamados")):
         assert f'href="{url}"><b>{rot}</b>' in menu, rot
     assert "data-pu-rel" in acoes and 'href="/t/comando/conversa/usina/1"' in acoes
+    # o clique abre a tela de criação na janela por cima do prontuário, não numa aba (13/11/2026, Levi: "está jogando para
+    # uma aba nova do OS Creator, que não dá a opção de voltar para o prontuário da usina"); o href fica para o botão do meio
+    assert menu.count("<a data-pu-criar=\"/os/") == 5 and 'data-pu-criar="/os/tradicional?ativo=' in menu
+    jan = html.split('id="pu-os-jan"', 1)[1].split("</dialog>", 1)[0]
+    assert "cr-modal--chamado pu-os-jan" in html and "data-pu-os-fechar" in jan and "<iframe" not in jan   # nasce vazia
+    js = (RAIZ / "nexus" / "static" / "comando" / "prontuario.js").read_text(encoding="utf-8")
+    assert "nexusRota('/os/_nexus/criar')" in js and "d.nexusCriarOs !== 1" in js and "jan.showModal()" in js
     # o relatório do cliente em PDF pelo endereço do próprio Comando: o mês (o anterior marcado) e os temas
     jan = html.split('id="pu-rel"', 1)[1].split("</dialog>", 1)[0]
     assert 'action="/t/comando/usinas/1/relatorio.pdf"' in jan and "Qual mês?" in jan

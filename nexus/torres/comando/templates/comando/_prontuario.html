@@ -58,7 +58,8 @@
       <details class="pu-menu">
         <summary class="gc-btn gc-btn--ui gc-btn--primario" title="Criar uma OS para esta usina, pelas formas do OS Creator"><i class="ph ph-plus" aria-hidden="true"></i> Criar OS <i class="ph ph-caret-down pu-menu-seta" aria-hidden="true"></i></summary>
         <div class="pu-menu-caixa">
-          {% for o in p.criar_os %}<a href="{{ raiz }}{{ o.url }}"><b>{{ o.rot }}</b><span>{{ o.sub }}</span></a>{% endfor %}
+          {# o clique abre a tela de criação na janela por cima (prontuario.js); o botão do meio e o Ctrl, numa aba #}
+          {% for o in p.criar_os %}<a data-pu-criar="{{ o.url }}" href="{{ raiz }}{{ o.url }}"><b>{{ o.rot }}</b><span>{{ o.sub }}</span></a>{% endfor %}
         </div>
       </details>
       {% endif %}
@@ -361,6 +362,16 @@
       {% endfor %}
     </div>
   </details>
+  {% endif %}
+
+  {# o Criar OS por cima do prontuário (13/11/2026, Levi: "está jogando para uma aba nova do OS Creator, que não dá a
+     opção de voltar para o prontuário da usina [...] Abre o cardzão da OS, dando um blur de fundo"): a janela das telas
+     do OS Creator (a do chamado, campo.css), com o fundo desfocado. Nasce vazia: a moldura (/os/_nexus/criar) entra no
+     clique e sai ao fechar (prontuario.js) #}
+  {% if p.pode.os %}
+  <dialog class="cr-modal cr-modal--chamado pu-os-jan" id="pu-os-jan" aria-labelledby="pu-os-jan-t">
+    <div class="cr-modal-barra"><h2 class="pu-os-jan-t" id="pu-os-jan-t">Criar OS</h2><button type="button" class="gc-btn gc-btn--contorno" data-pu-os-fechar>Fechar</button></div>
+  </dialog>
   {% endif %}
 
   {# o relatório do cliente em PDF: o mês e os temas (a janela da Central da usina, 04/11/2026) #}

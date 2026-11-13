@@ -352,6 +352,14 @@ a.ins-titulo:hover{color:var(--verde-texto)}
 .pu-menu-caixa a b{display:block;font-weight:600}
 .pu-menu-caixa a span{display:block;font-size:12px;line-height:1.4;color:var(--mudo)}
 .pu-menu-seta{font-size:13px}
+/* o Criar OS por cima do prontuário (13/11/2026): a janela das telas do OS Creator (`cr-modal--chamado`, campo.css), com o
+   título à esquerda do Fechar; e o aviso da OS criada, no pé da tela, que some sozinho */
+.pu-os-jan .cr-modal-barra{justify-content:space-between;align-items:center;gap:12px}
+.pu-os-jan-t{margin:0;font:600 15px/22px var(--font-sans);color:var(--tinta)}
+.pu-aviso{position:fixed;left:50%;bottom:28px;transform:translateX(-50%);z-index:80;max-width:min(560px,calc(100vw - 32px));
+  padding:12px 18px;border:1px solid var(--ok);border-radius:var(--raio-md);background:var(--superficie);color:var(--tinta);
+  font-size:13.5px;line-height:1.45;white-space:pre-line;box-shadow:0 12px 32px var(--sombra)}
+.pu-aviso[hidden]{display:none}
 .pu-menu[open] > summary .pu-menu-seta{transform:rotate(180deg)}
 .pu-menu-caixa a:hover,.pu-menu-caixa a:focus-visible{background:var(--superficie-2)}
 .pu-ponto{flex:0 0 9px;width:9px;height:9px;border-radius:50%;background:var(--mudo)}

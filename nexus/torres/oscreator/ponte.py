@@ -93,14 +93,16 @@ _ESTILO_NEXUS = (b'<style>.os-n2--nexus{font-size:13px;line-height:1;align-self:
 # OS Creator aparece a tela de criação de OS sobrepondo toda a tela dando um blur de fundo, assim que a pessoa finaliza a
 # OS só aparece a notificação de criação!"): a plataforma abre a tela de criação com ?janela=1 num iframe que cobre a tela.
 # Aqui ela sai sem o topo (a marca os-no-nexus) e avisa a página de baixo quando o POST da criação responde ok
-# (`{gc: "os-criada", mensagem, detalhes}`), para a janela fechar e a notificação aparecer. O código do OS Creator não
-# muda: quem embrulha o fetch é esta resposta.
+# (`{gc: "os-criada", mensagem, detalhes, falhas}`), para a janela fechar e a notificação aparecer. O código do OS Creator
+# não muda: quem embrulha o fetch é esta resposta. Desde 13/11/2026 (o Criar OS do prontuário da usina, `criar_os`, mais
+# abaixo) vale também a criação de dois níveis (`/os/api/solicitacao/<setor>/criar`), a mensagem da inspeção vem do
+# `texto` dela, e `falhas` diz quantas não saíram na criação em lote (a janela com falha fica aberta).
 _JANELA_OS = (rb'<script>document.documentElement.classList.add("os-no-nexus","os-janela");'
               rb'(function(){var f=window.fetch;if(!f)return;window.fetch=function(u,o){var p=f.apply(this,arguments);'
-              rb'try{if(/\/os\/api\/[a-z_-]+\/criar(\?|$)/.test(String(u))&&o&&String(o.method||"").toUpperCase()==="POST"){'
+              rb'try{if(/\/os\/api\/[a-z_-]+(\/[a-z_-]+)?\/criar(\?|$)/.test(String(u))&&o&&String(o.method||"").toUpperCase()==="POST"){'
               rb'p.then(function(r){return r.clone().json().then(function(j){if(r.ok&&j&&j.ok&&window.parent!==window)'
-              rb'window.parent.postMessage({gc:"os-criada",mensagem:j.mensagem||"",detalhes:j.detalhes||[]},'
-              rb'location.origin);});}).catch(function(){});}}catch(e){}return p;};})();</script>')
+              rb'window.parent.postMessage({gc:"os-criada",mensagem:j.mensagem||j.texto||"",detalhes:j.detalhes||[],'
+              rb'falhas:j.falhas||0},location.origin);});}).catch(function(){});}}catch(e){}return p;};})();</script>')
 
 # Sobe de moldura em moldura até a de baixo do Nexus (o <html data-nexus>). Sem Nexus em cima, chega ao topo e é o
 # window.top de sempre. Moldura de outro domínio (o supervisório embutido na Engenharia) para a subida no try.
@@ -940,6 +942,46 @@ def chamado_os(folio: int):
     volta = "/os/_nexus/card/voltar?" + urlencode({"de": de}, safe="/")
     return render_template("oscreator/chamado_os.html", folio=folio, estado=estado,
                            pagina=f"/os/chamados/acompanhamento/{folio}",
+                           entrar=na_raiz("/os/login") + "?next=" + quote(volta, safe=""))
+
+
+# ── o Criar OS do prontuário da usina por cima da tela (13/11/2026) ─────────────────────────────────────────────────
+# Levi: "está jogando para uma aba nova do OS Creator, que não dá a opção de voltar para o prontuário da usina. O melhor é
+# fazer [...] que nem o Nexus Performance faz [...] no tempo real [...] Abre o cardzão da OS, dando um blur de fundo, e aí
+# quando a pessoa cria a OS, ela só pode fechar o card e já era". As telas de criação que a janela abre (as do Criar OS do
+# prontuário, `torres/comando/prontuario_dados.CRIAR_OS`; o teste confere que as duas listas andam juntas)
+CRIAR_POR_CIMA = frozenset({"/os/tradicional", "/os/solicitacao", "/os/solicitacao/performance",
+                            "/os/solicitacao/engenharia", "/os/chamados/inspecao"})
+
+
+@bp_raiz.route("/os/_nexus/criar")
+def criar_os():
+    """A moldura do meio (`oscreator/criar_os.html`) entre a tela do Nexus e uma tela de criação do clone (`url`: só as
+    de `CRIAR_POR_CIMA`, com o `ativo` da usina quando vem), a mesma, sem cópia, com ?janela=1: a tela se vê embutida (o
+    `window.__osTopo()` dela para aqui), sai sem o topo e avisa quando a criação deu certo, e esta moldura passa o aviso à
+    tela do Nexus. Mora em /os/_nexus pelo motivo do card e do chamado: o cookie do Fracttal (os_sessao) só vai para /os, e
+    sem o login do Fracttal a moldura diz como entrar (e volta à tela `de`), em vez de o login do clone ficar na janela."""
+    from urllib.parse import parse_qsl, quote, urlencode, urlsplit
+
+    from flask import abort
+
+    from ...auth import next_seguro
+    alvo = urlsplit(str(request.args.get("url") or ""))
+    if alvo.scheme or alvo.netloc or alvo.path not in CRIAR_POR_CIMA:
+        abort(404)
+    # o ativo da usina (o código do cadastro, que é o do ativo dela no Fracttal): só o que tem cara de código
+    ativo = dict(parse_qsl(alvo.query)).get("ativo", "").strip()
+    q = {"ativo": ativo} if re.fullmatch(r"[\w.-]{1,80}", ativo) else {}
+    de = next_seguro(request.args.get("de"))
+    try:
+        estado = "ok" if _tem_login_fracttal(clone(current_app._get_current_object())) else "sem"
+    except Exception:            # noqa: BLE001 — clone que não sobe: a moldura diz, e a tela de baixo segue
+        logging.exception("OS Creator: o clone não subiu (Criar OS por cima)")
+        estado = "fora"
+    volta = "/os/_nexus/card/voltar?" + urlencode({"de": de}, safe="/")
+    return render_template("oscreator/criar_os.html", estado=estado,
+                           pagina=alvo.path + "?" + urlencode(dict(q, janela="1")),
+                           sozinha=alvo.path + ("?" + urlencode(q) if q else ""),
                            entrar=na_raiz("/os/login") + "?next=" + quote(volta, safe=""))
 
 
