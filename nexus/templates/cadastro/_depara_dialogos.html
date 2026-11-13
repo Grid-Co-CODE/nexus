@@ -1,0 +1,38 @@
+{# As duas janelas da aba De-para (13/11/2026):
+   - o editor do inversor do CADASTRO (o lápis): grava pela mesma rota do Salvar da aba Equipamentos. Na chave que a
+     plataforma ainda lê da aba Equipamentos, o Salvar pergunta (Levi, 13/11/2026, "Pergunta ao salvar"): mostra as
+     diferenças Nexus × aba e deixa escolher entre passar a valer na plataforma (a chave vai "no lugar da aba") e salvar
+     só no Nexus;
+   - a tela De-para da plataforma, para decidir o par ("Ligar a…"), pela porta única (rota equipamentos_fontes_janela). #}
+<dialog class="dpx-dialogo dpx-editor" id="dpx-editor" aria-labelledby="dpx-ed-t">
+  <div class="dpx-ed-cab"><i class="ph ph-cpu" aria-hidden="true"></i><h3 id="dpx-ed-t">Inversor</h3>
+    <button type="button" class="dpx-x" data-dpx-cancelar aria-label="Fechar"><i class="ph ph-x" aria-hidden="true"></i></button></div>
+  <div class="dpx-ed-corpo" data-dpx-passo="1">
+    <p class="dpx-dica" data-dpx-dica hidden></p>
+    <label>Equipamento<input class="gc-campo" data-ed="nome" maxlength="120" autocomplete="off"></label>
+    <label>Nome no supervisório<input class="gc-campo gc-dado" data-ed="equipamento_supervisorio" maxlength="120" autocomplete="off"></label>
+    <label>Cabine<select class="gc-campo" data-ed="cabine"></select></label>
+    <label>Chave do supervisório<select class="gc-campo" data-ed="chave"></select></label>
+    <label>Potência (kWp)<input class="gc-campo gc-num" data-ed="potencia_kwp" inputmode="decimal" autocomplete="off"></label>
+    <label>Strings<input class="gc-campo gc-num" data-ed="strings_esperadas_qtd" inputmode="numeric" autocomplete="off"></label>
+  </div>
+  <div class="dpx-ed-corpo dpx-pergunta" data-dpx-passo="2" hidden>
+    <p class="dpx-pergunta-texto">A plataforma ainda lê <b class="gc-dado" data-dpx-chave></b> da aba Equipamentos. Salvo só no Nexus, o de-para dela continua vendo a aba.</p>
+    <div data-dpx-difs></div>
+  </div>
+  <p class="dpx-msg" data-dpx-msg role="alert" hidden></p>
+  <div class="dpx-ed-pe" data-dpx-pe="1">
+    <button type="button" class="gc-btn gc-btn--ui gc-btn--contorno" data-dpx-cancelar>Cancelar</button>
+    <button type="button" class="gc-btn gc-btn--ui gc-btn--primario" data-dpx-salvar><i class="ph ph-floppy-disk" aria-hidden="true"></i> Salvar</button>
+  </div>
+  <div class="dpx-ed-pe" data-dpx-pe="2" hidden>
+    <button type="button" class="gc-btn gc-btn--ui gc-btn--fantasma" data-dpx-voltar>Voltar</button>
+    <button type="button" class="gc-btn gc-btn--ui gc-btn--contorno" data-dpx-so-nexus>Salvar só no Nexus</button>
+    <button type="button" class="gc-btn gc-btn--ui gc-btn--primario" data-dpx-valer>Salvar e passar a valer na plataforma</button>
+  </div>
+</dialog>
+<dialog class="dpx-dialogo dpx-janela" id="dpx-janela" aria-labelledby="dpx-jn-t" data-url="{{ url_for('torre_base.equipamentos_fontes_janela') }}">
+  <div class="dpx-ed-cab"><i class="ph ph-arrows-left-right" aria-hidden="true"></i><h3 id="dpx-jn-t">Ligar na plataforma</h3>
+    <button type="button" class="dpx-x" data-dpx-fechar-janela aria-label="Fechar"><i class="ph ph-x" aria-hidden="true"></i></button></div>
+  <iframe class="dpx-janela-moldura" title="De-para da fonte: Plataforma de Performance"></iframe>
+</dialog>

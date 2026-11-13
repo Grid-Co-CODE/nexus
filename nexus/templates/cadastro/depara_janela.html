@@ -1,0 +1,37 @@
+<!doctype html>
+{# A tela De-para da plataforma numa janela por cima de Base > Equipamentos das usinas (13/11/2026). Sem o base.html de
+   propósito: a casca do Nexus toma a janela quando está numa moldura, e esta página só existe para ser a moldura do
+   editor da plataforma (`/admin/de-para?janela=1&editar=fonte|id`). O formulário leva o passe da porta única à
+   plataforma (POST, alvo = a moldura), como a performance/_porta.html. Quando o editor de lá fecha, ele avisa a página
+   de cima (`{gc: 'depara-fechar'}`); aqui o aviso só passa adiante, para a janela de Equipamentos fechar e reler. #}
+<html lang="pt-BR" data-tema="{{ tema }}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>De-para da fonte · Nexus</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='nexus.css') }}">
+  <style>
+    html,body{margin:0;height:100%;background:var(--fundo);color:var(--tinta);font:400 14px/1.5 var(--font-sans)}
+    .dpj-moldura{display:block;border:0;width:100%;height:100%}
+    .dpj-recusa{margin:24px;padding:14px 16px;border-radius:var(--raio-md);background:var(--superficie);border-left:3px solid var(--alerta)}
+  </style>
+</head>
+<body>
+{% if recusa %}
+<p class="dpj-recusa" role="alert">{{ recusa }}</p>
+{% else %}
+<form id="dpj-passe" method="post" action="{{ plataforma }}/painel/nexus/entrar" target="dpj-moldura">
+  <input type="hidden" name="passe" value="{{ passe }}">
+  <noscript><button type="submit" class="gc-btn gc-btn--primario">Abrir</button></noscript>
+</form>
+<iframe class="dpj-moldura" name="dpj-moldura" title="De-para da fonte: Plataforma de Performance"></iframe>
+<script>
+  document.getElementById('dpj-passe').submit();
+  window.addEventListener('message', function (e) {
+    if (e.origin !== location.origin || !e.data || e.data.gc !== 'depara-fechar') return;
+    try { parent.postMessage({gc: 'depara-fechar'}, location.origin); } catch (x) {}
+  });
+</script>
+{% endif %}
+</body>
+</html>

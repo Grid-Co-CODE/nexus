@@ -715,3 +715,129 @@ details.ace-mais>summary:focus-visible{outline:2px solid var(--foco);outline-off
 .ac-nova-pe{display:flex;justify-content:flex-end;margin-top:16px}
 .ac-so-admin{margin-top:12px}
 @media (max-width:900px){.ac-nova-grade{grid-template-columns:minmax(0,1fr)}}
+
+/* ── Base > Equipamentos das usinas com o De-para junto (13/11/2026; a prévia aprovada: docs/mockups/equipamentos-e-depara,
+   no repositório da plataforma). Levi: "Deixa a visualização dos dois parecida"; "o mais visual possível". As duas abas
+   têm os mesmos números do alto (cada um filtra), a mesma lista com as três luzes e o mesmo cabeçalho da usina. ── */
+.eqx-n{display:inline-block;margin-left:6px;padding:2px 7px;border-radius:999px;background:var(--alerta-suave);color:var(--alerta);
+  font:700 11px/1.2 var(--font-sans)}
+.eqx-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:14px 0 16px}
+.eqx-kpi{display:grid;gap:6px;align-content:start;padding:14px 16px;border:1px solid var(--linha);border-radius:var(--raio-md);
+  background:var(--superficie);color:var(--tinta);text-decoration:none}
+.eqx-kpi:hover{background:var(--superficie-2)}
+.eqx-kpi:focus-visible{outline:2px solid var(--foco);outline-offset:2px}
+.eqx-kpi .r{font:700 11px/14px var(--font-sans);letter-spacing:.05em;text-transform:uppercase;color:var(--mudo)}
+.eqx-kpi .v{font:600 26px/30px var(--font-sans);font-variant-numeric:tabular-nums}
+.eqx-kpi .v small{margin-left:6px;font-size:13px;font-weight:500;color:var(--mudo)}
+.eqx-kpi .d{font-size:12px;color:var(--mudo)}
+.eqx-barra{display:block;height:6px;border-radius:999px;background:var(--superficie-3);overflow:hidden}
+.eqx-barra i{display:block;height:100%;border-radius:999px;background:var(--verde)}
+.eqx-partes{display:flex;flex-wrap:wrap;gap:6px}
+/* a lista: as fichas do filtro (com quantas usinas cada uma) e as três luzes de cada usina */
+.eqx-chips{display:flex;flex-wrap:wrap;gap:6px}
+.eqx-chip{border:1px solid var(--linha-forte);border-radius:999px;padding:2px 10px;font-size:12px;color:var(--tinta-2);text-decoration:none}
+.eqx-chip b{margin-left:3px;font-weight:700}
+.eqx-chip:hover{color:var(--tinta);border-color:var(--mudo)}
+.eqx-chip[aria-current="true"]{border-color:var(--verde);background:var(--verde-suave);color:var(--tinta)}
+.eqx-legenda{display:flex;gap:12px;margin:0;font-size:11px;color:var(--mudo)}
+.eqx-legenda span{display:inline-flex;align-items:center;gap:5px}
+.eqx-legenda .eqx-luz{height:10px}
+.eqx-item{display:grid;grid-template-columns:minmax(0,1fr) auto;column-gap:10px;align-items:center}
+.eqx-item .eq-item-nome{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.eqx-item .eq-item-cli{grid-column:1}
+.eqx-luzes{grid-row:1 / span 2;grid-column:2;display:flex;gap:4px}
+.eqx-luz{display:inline-block;width:10px;height:22px;border-radius:3px;background:var(--superficie-3);border:1px solid var(--linha-forte)}
+.eqx-luz--ok{background:var(--ok);border-color:var(--ok)}
+.eqx-luz--alerta{background:var(--alerta);border-color:var(--alerta)}
+.eqx-luz--critico{background:var(--critico);border-color:var(--critico)}
+
+/* a aba De-para: um cartão por fonte; cada par é UMA linha da grade de três colunas (a fonte, o fio, o cadastro), e a cor
+   do "sem par" atravessa a coluna do meio (Levi, 13/11/2026, com a foto: "a coluna Liga está cortando a cor amarelo") */
+.dpx-topo{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:14px 18px;border-bottom:1px solid var(--linha)}
+.dpx-topo h2{margin:0 auto 0 0;font:600 16px/22px var(--font-sans)}
+.dpx-lido{font-size:12px}
+.dpx-cartoes{display:grid;gap:12px;padding:14px 18px 18px}
+.dpx-sub{display:flex;align-items:center;gap:8px;margin:18px 0 4px;font:600 14px/20px var(--font-sans)}
+.dpx-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.dpx-fonte{border:1px solid var(--linha);border-radius:var(--raio-md);background:var(--superficie);overflow:hidden}
+.dpx-fonte>summary{list-style:none;display:grid;grid-template-columns:auto minmax(0,1fr) auto auto auto;gap:12px;align-items:center;
+  padding:11px 16px;cursor:pointer}
+.dpx-fonte>summary::-webkit-details-marker{display:none}
+.dpx-fonte>summary::after{content:"";width:8px;height:8px;border-right:2px solid var(--mudo);border-bottom:2px solid var(--mudo);
+  transform:rotate(45deg);margin:0 4px 4px 0}
+.dpx-fonte[open]>summary::after{transform:rotate(-135deg);margin:4px 4px 0 0}
+.dpx-fonte>summary:focus-visible{outline:2px solid var(--foco);outline-offset:-2px}
+.dpx-ico{width:34px;height:34px;border-radius:var(--raio-controle);display:grid;place-items:center;background:var(--superficie-2);
+  color:var(--tinta-2);font-size:18px}
+.dpx-fonte-nome{min-width:0}
+.dpx-fonte-nome b{display:block}
+.dpx-fonte-nome .gc-dado{display:block;font-size:12px;color:var(--mudo);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dpx-cad{font-size:12px;color:var(--mudo);white-space:nowrap}
+.dpx-alertas{list-style:none;margin:0;padding:0 16px 10px;display:grid;gap:4px;font-size:12.5px;color:var(--tinta-2)}
+.dpx-alertas li{display:flex;gap:8px;align-items:baseline}
+.dpx-ponto{flex:none;width:7px;height:7px;border-radius:50%;background:var(--mudo);transform:translateY(-1px)}
+.dpx-ponto--critico{background:var(--critico)}
+.dpx-ponto--alerta{background:var(--alerta)}
+.dpx-ponto--info{background:var(--info)}
+.dpx-pares{border-top:1px solid var(--linha)}
+.dpx-par{display:grid;grid-template-columns:minmax(0,1fr) 92px minmax(0,1fr);border-top:1px solid var(--linha)}
+.dpx-par--cab{border-top:0;background:var(--superficie-2)}
+.dpx-par--cab>span{font:700 10.5px/1 var(--font-sans);letter-spacing:.06em;text-transform:uppercase;color:var(--mudo);padding:10px 16px}
+.dpx-par--cab>.dpx-meio{text-align:center;padding-left:0;padding-right:0}
+.dpx-par--sem{background:var(--alerta-suave)}
+.dpx-pc{display:flex;align-items:center;gap:10px;min-height:44px;padding:6px 16px;min-width:0}
+.dpx-pc-txt{display:grid;min-width:0;margin-right:auto}
+.dpx-pc-txt>*{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dpx-pc-txt small{font-size:11.5px;color:var(--mudo)}
+.dpx-pc--acoes{flex-wrap:wrap;gap:6px}
+.dpx-fio{position:relative;display:grid;place-items:center}
+.dpx-fio::before{content:"";position:absolute;left:0;right:0;top:50%;border-top:2px solid var(--ok)}
+.dpx-fio i{position:relative;width:22px;height:22px;border-radius:50%;display:grid;place-items:center;font-size:13px;
+  background:var(--superficie);border:2px solid var(--ok);color:var(--ok)}
+.dpx-fio--ordem::before{border-top-style:dashed;border-top-color:var(--alerta)}
+.dpx-fio--ordem i{border-color:var(--alerta);color:var(--alerta)}
+.dpx-fio--decidido::before{border-top-color:var(--info)}
+.dpx-fio--decidido i{border-color:var(--info);color:var(--info)}
+.dpx-fio--sem::before,.dpx-fio--falta::before,.dpx-fio--nome::before{border-top:2px dashed var(--linha-forte)}
+.dpx-fio--sem i{border-color:var(--alerta);color:var(--alerta)}
+.dpx-fio--falta i{border-color:var(--critico);color:var(--critico)}
+.dpx-fio--nome i{border-color:var(--linha-forte);color:var(--mudo)}
+.dpx-lapis{flex:none;width:30px;height:30px;display:grid;place-items:center;border-radius:var(--raio-controle);
+  border:1px solid var(--linha-forte);background:var(--superficie-2);color:var(--tinta);cursor:pointer}
+.dpx-lapis:hover{border-color:var(--verde)}
+.dpx-lapis:focus-visible{outline:2px solid var(--foco);outline-offset:2px}
+.dpx-nota{margin:0;padding:10px 16px;border-top:1px solid var(--linha);color:var(--tinta-2);font-size:13px}
+.dpx-pe{display:flex;align-items:center;gap:10px;padding:9px 16px;border-top:1px solid var(--linha);background:var(--superficie-2);
+  font-size:12.5px;color:var(--mudo)}
+.dpx-pe>span{margin-right:auto}
+.dpx-tabela td{vertical-align:middle}
+/* as janelas: o editor do inversor do cadastro e a tela De-para da plataforma */
+.dpx-dialogo{padding:0;border:1px solid var(--linha-forte);border-radius:12px;background:var(--superficie);color:var(--tinta)}
+.dpx-dialogo::backdrop{background:var(--veu)}
+.dpx-editor{width:min(580px,94vw)}
+.dpx-ed-cab{display:flex;align-items:center;gap:10px;padding:14px 18px;border-bottom:1px solid var(--linha)}
+.dpx-ed-cab h3{margin:0;font:600 17px/22px var(--font-sans);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dpx-x{margin-left:auto;background:none;border:0;color:var(--mudo);font-size:20px;cursor:pointer;padding:4px}
+.dpx-x:hover{color:var(--tinta)}
+.dpx-ed-corpo{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:16px 18px}
+.dpx-ed-corpo label{display:grid;gap:6px;font:700 10.5px/1 var(--font-sans);letter-spacing:.06em;text-transform:uppercase;color:var(--mudo)}
+.dpx-ed-corpo .gc-campo{width:100%;box-sizing:border-box}
+.dpx-dica{grid-column:1 / -1;margin:0;padding:8px 10px;border-radius:var(--raio-controle);background:var(--info-suave);color:var(--tinta-2);font-size:12.5px}
+.dpx-pergunta{grid-template-columns:minmax(0,1fr);font-size:13.5px;color:var(--tinta-2)}
+.dpx-pergunta p{margin:0}
+.dpx-difs{margin:6px 0 0;padding-left:18px;display:grid;gap:4px;font-size:12.5px}
+.dpx-iguais{display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}
+.dpx-msg{margin:0 18px 12px;padding:8px 10px;border-radius:var(--raio-controle);background:var(--critico-suave);color:var(--critico);font-size:13px}
+.dpx-ed-pe{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;padding:12px 18px;border-top:1px solid var(--linha)}
+.dpx-janela{width:min(1200px,96vw);height:min(860px,92vh)}
+.dpx-janela[open]{display:flex;flex-direction:column}
+.dpx-janela-moldura{flex:1 1 auto;width:100%;border:0;background:var(--fundo)}
+@media (max-width:1100px){.eqx-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:640px){
+  .eqx-kpis{grid-template-columns:minmax(0,1fr)}
+  .dpx-par{grid-template-columns:minmax(0,1fr) 40px minmax(0,1fr)}
+  .dpx-pc{padding:6px 8px;flex-wrap:wrap}
+  .dpx-fonte>summary{grid-template-columns:auto minmax(0,1fr) auto}
+  .dpx-fonte>summary .dpx-cad{display:none}
+  .dpx-ed-corpo{grid-template-columns:minmax(0,1fr)}
+}
