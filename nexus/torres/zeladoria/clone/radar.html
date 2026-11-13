@@ -5234,7 +5234,17 @@ function kpiCardsEquipeHtml(gastosEscopo, periodoOrc, periodoLabel){
      lado do "Total lançado" de sempre (que continua sendo COM Paytrack) — as duas versões
      sempre visíveis, sem precisar trocar de filtro pra ver uma ou outra. */
   var gastosSemPaytrack = gastosEscopo.filter(function(g){ return g.formaPagamento !== 'Paytrack'; });
+  /* "Provisionado" (pedido pontual, 2026-11) — um gasto com Data no futuro é, por definição,
+     ainda não confirmado: não existe campo novo no banco pra isso (ver gastoEhProvisao), só o
+     lançamento com a data de quando PODE acontecer. Já entra somado nos totais acima (sempre
+     entrou — é só a mesma soma por data de sempre), este card só avisa quanto disso ainda não é
+     certo, pra não esquecer de confirmar, mudar a data ou excluir quando não acontecer mais. */
+  var provisoes = gastosEscopo.filter(gastoEhProvisao);
   var html = '<div class="grid kpi-row" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr));">';
+  if (provisoes.length) {
+    html += kpiTile('Provisionado (ainda não aconteceu)', fmtMoney(provisoes.reduce(function(a,g){ return a + (g.valor||0); }, 0)),
+      provisoes.length + ' gasto(s) com data futura — confira', 'tint-warn');
+  }
   if (periodoOrc) {
     html += kpiTileComparativoEquipe('Total — ' + periodoLabel, gastosEscopo.reduce(function(a,g){ return a + (g.valor||0); }, 0), periodoOrc.totalPrevisto, gastosEscopo.length + ' gasto(s)');
     html += kpiTile('Total sem Paytrack', fmtMoney(gastosSemPaytrack.reduce(function(a,g){ return a + (g.valor||0); }, 0)), gastosSemPaytrack.length + ' gasto(s)', '');
@@ -5254,6 +5264,15 @@ function kpiCardsEquipeHtml(gastosEscopo, periodoOrc, periodoLabel){
   html += '</div>';
   return html;
 }
+/* Um gasto da Equipe com Data no futuro ainda não aconteceu de verdade — é uma provisão (pedido
+   pontual, 2026-11: valores possíveis do Joel pra semana seguinte, pra 04/12 e um reembolso em
+   10 dias, lançados já mas sem certeza nenhuma acontecer naquele dia). Não precisa de coluna
+   nova no banco (`gastos_equipe` não tem — ver nexus/zeladoria/tabelas.py — e não dá pra
+   acrescentar uma sem o Levi registrar no esquema do Nexus): a própria Data no futuro já diz
+   isso sozinha. Quando o dia chega (ou passa), vira gasto normal sem precisar marcar nada à
+   mão — "marcar como lançado" é só deixar o tempo passar; mudar de ideia é Editar (mudar a
+   Data) ou Excluir, os botões de sempre. */
+function gastoEhProvisao(g){ return !!(g.data && g.data > hoje()); }
 /* Extraída junto — linha da tabela de gastos, reaproveitada pela tabela de detalhe de "Mês a
    mês - Primarizados" também. `comAcoes` desliga os botões de Editar/Duplicar/Excluir na visão
    de dashboard (que é só consulta — a edição continua centralizada em "Acompanhamento de
@@ -5261,7 +5280,7 @@ function kpiCardsEquipeHtml(gastosEscopo, periodoOrc, periodoLabel){
 function linhaGastoEquipeHtml(g, comAcoes){
   var col = g.colaboradorId ? colaboradorById(g.colaboradorId) : null;
   var html = '<tr>';
-  html += '<td class="mono">' + fmtDate(g.data) + '</td>';
+  html += '<td class="mono">' + fmtDate(g.data) + (gastoEhProvisao(g) ? ' <span class="pill pill-info" style="font-size:9.5px;padding:1px 6px;" title="Data no futuro — ainda não confirmado. Mude a data ou exclua se não for mais acontecer.">Provisionado</span>' : '') + '</td>';
   html += '<td><span class="pill pill-neutral">' + esc(g.formaPagamento||'—') + '</span></td>';
   html += '<td>' + esc(g.tipoGasto||'—') + '</td>';
   html += '<td>' + esc(g.fornecedorId ? nomeFornecedor(g.fornecedorId) : '—') + '</td>';
@@ -5280,7 +5299,7 @@ function linhaGastoEquipeHtml(g, comAcoes){
 }
 function renderGastosEquipe(){
   var todos = gastosEquipeAtivos();
-  var html = '<div class="cell-muted" style="font-size:12px;margin:-4px 0 14px;">Controle de gastos das equipes Primarizadas (diárias, Paytrack, cartões, boletos) — separado do financeiro de zeladoria acima, não entra na meta nem na projeção mensal.</div>';
+  var html = '<div class="cell-muted" style="font-size:12px;margin:-4px 0 14px;">Controle de gastos das equipes Primarizadas (diárias, Paytrack, cartões, boletos) — separado do financeiro de zeladoria acima, não entra na meta nem na projeção mensal. Lance com a Data de quando PODE acontecer: se for no futuro, aparece como "Provisionado" até o dia chegar — mude a Data ou exclua se não for mais acontecer.</div>';
 
   /* "Ver por" (pedido pontual, 2026-09) — um único seletor (Mês ou Semana) comanda os cards de
      baixo E a tabela de gastos, em vez de dois mecanismos soltos (card mensal sempre visível +
