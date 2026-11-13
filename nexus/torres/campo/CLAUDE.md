@@ -1808,6 +1808,11 @@ e não foram feitas.
   tempo (arrastar volta o percurso até aquela hora, com o ponto "agora" e a hora no mapa) e a velocidade (×120, ×480,
   ×1200). Cada ponto vai com o instante (`t`, segundos UTC) no JSON do percurso. Os marcos de
   `eventos.do_percurso` seguem no mapa com a hora ("16:50 · Saiu da UFV Altair").
+- **A escala e os créditos (13/11/2026**, Levi, pela sessão Nexus Field): a escala com a borda inteira ("tá sem a borda
+  de cima. Isso deixou muito estranho": o MapLibre a desenha só com os lados e o fundo) e os créditos do mapa ("de onde
+  está vindo os dados", no "i") **sempre recolhidos** ("Deixa essa exclamação sempre recolhida"): o MapLibre os abre no
+  começo e só recolhe no primeiro arrasto; o `recolherCreditos` do `campo-mapa.js` recolhe uma vez, quando eles chegam
+  com as fontes, e daí em diante o "i" abre e fecha no toque.
 - Os botões de sempre (+, −, Ir ao percurso, Brasil) e a escala; o resto da tela (Técnicos | Usinas, Incluir clima,
   Filtros, os painéis) não mudou.
 - **Prova**: `tests/test_mapa_base.py` (a subida em partes, o 409/400/413/507, o que não confere não troca o que está no

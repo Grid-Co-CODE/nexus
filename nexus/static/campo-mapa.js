@@ -317,6 +317,19 @@
     return;
   }
   caixaMapa.mapa = mapa;          // para a conferência no navegador (a bancada e o teste de produção)
+  // os créditos do mapa sempre recolhidos (Levi, 13/11/2026: "tem exclamação que fica estendida, mostrando de onde está
+  // vindo os dados [...] Deixa essa exclamação sempre recolhida"): o MapLibre os abre no começo e só recolhe no primeiro
+  // arrasto; aqui recolhe logo, e o "i" abre e fecha no toque
+  // (uma vez só: os créditos chegam com as fontes, às vezes depois do load; depois, quem abre no "i" não é fechado)
+  var creditosRecolhidos = false;
+  function recolherCreditos() {
+    if (creditosRecolhidos) return;
+    var a = caixaMapa.querySelector(".maplibregl-ctrl-attrib.maplibregl-compact");
+    if (a) { a.classList.remove("maplibregl-compact-show"); a.removeAttribute("open"); creditosRecolhidos = true; }
+  }
+  recolherCreditos();
+  mapa.on("load", recolherCreditos);
+  mapa.on("sourcedata", recolherCreditos);
   mapa.touchZoomRotate.disableRotation();
   mapa.keyboard.disableRotation();
   // o zoom mais rápido (Levi, 12/11/2026: "Quero o zoom um pouco mais rápido, pelo menos o dobro"): a roda do mouse 2,25x
