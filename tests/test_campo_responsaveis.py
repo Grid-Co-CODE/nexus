@@ -18,6 +18,8 @@ from nexus.dados import fato_chamado as F
 BRT = timezone(timedelta(hours=-3))
 HOJE = datetime.now(BRT).date()
 MES_ID, MES = HOJE.year * 100 + HOJE.month, HOJE.strftime("%Y-%m")
+_ANT = HOJE.replace(day=1) - timedelta(days=1)
+MES_ANT_ID = _ANT.year * 100 + _ANT.month        # o mês anterior (em janeiro, o MES_ID - 1 dava o mês 00)
 RESPONSAVEL = {1: 91, 2: 91, 3: 90}
 
 
@@ -67,7 +69,7 @@ def tela(banco, monkeypatch):
     _aba(banco, "nexus_performance", "fato_meta_usina_mes", [
         _meta("Altair", 850000, 1000000, 85.0), _meta("Brodowski 1 A", 600000, 500000, 120.0, pr=82, pr_meta=80),
         _meta("Brodowski 1 B", 400000, 500000, 80.0, pr=78, pr_meta=80), _meta("Coração 1", 990000, 1000000, 99.0),
-        _meta("Altair", 1, 1, 100.0, mes_id=MES_ID - 1)])           # outro mês não entra
+        _meta("Altair", 1, 1, 100.0, mes_id=MES_ANT_ID)])           # outro mês não entra
     ontem = (HOJE - timedelta(days=1)).isoformat()
     _aba(banco, "falhas_performance", "disponibilidade_dia", [
         _disp("Altair", ontem, 100, 0, "Thopen - Altair 1 - SP"), _disp("Altair", ontem[:8] + "01", 70, 3.6),

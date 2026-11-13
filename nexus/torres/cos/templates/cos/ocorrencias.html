@@ -37,7 +37,7 @@
   {% else %}
   {% if clientes|length > 1 %}
   <nav class="cn-abas" aria-label="Clientes">
-    {# "Todos os clientes" (11/11/2026, pedido da Ana Barros): a visão consolidada, como a das Normalizações. #}
+    {# "Todos os clientes" (11/11/2026, pedido do COS): a visão consolidada, como a das Normalizações. #}
     <a href="{{ url(cliente='todos', situacao=None) }}"{% if todos %} aria-current="page"{% endif %}>Todos os clientes</a>
     {% for c in clientes %}<a href="{{ url(cliente=c, situacao=None) }}"{% if c == cliente %} aria-current="page"{% endif %}>{{ c }}</a>{% endfor %}
   </nav>
@@ -53,7 +53,7 @@
     </div>
   </div>
 
-  {# Os filtros da tela Normalizações (11/11/2026, pedido da Ana Barros), com os mesmos nomes no endereço. O cliente é a
+  {# Os filtros da tela Normalizações (11/11/2026, pedido do COS), com os mesmos nomes no endereço. O cliente é a
      aba de cima. Cada escolha relê a página (o servidor filtra); a lupa vale no Enter. A contagem de cada opção é do
      período inteiro, antes dos filtros. #}
   <form class="cn-filtros cos-norm-filtros" method="get" id="cos-oc-filtros" data-fo>

@@ -222,7 +222,7 @@ def ocorrencias():
     acionado, normalizada, encerrada — com o prazo da spec R04. Os fatos vêm do Andamento; o veredito, de
     nexus/cos/ocorrencias.py. Só lê: agir na ocorrência é na Ronda COS (o link de cada linha).
 
-    11/11/2026 (pedido da Ana Barros): `?cliente=todos` junta os clientes numa tabela só, cada linha diz o que aconteceu
+    11/11/2026 (pedido do COS): `?cliente=todos` junta os clientes numa tabela só, cada linha diz o que aconteceu
     (causa, ação, informe, descrição e notas, como na tela Normalizações) e `?formato=csv` baixa a lista com os filtros."""
     cfg = current_app.config
     fonte = AND.fonte(cfg)

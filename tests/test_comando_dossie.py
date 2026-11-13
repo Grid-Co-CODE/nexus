@@ -13,6 +13,7 @@ from test_campo_responsaveis import HOJE, tela  # noqa: F401  (tela é fixture)
 from test_campo_visao import banco  # noqa: F401  (banco é fixture)
 
 from nexus.comando import dossie as DS
+from nexus.comando import prontuario as PR
 
 AGORA = datetime(2026, 11, 12, 22, 0, tzinfo=timezone(timedelta(hours=-3)))
 NOMES = ("Ciclano Chefe", "Beltrano Supervisor", "Supervisora Campo", "Fulano Souza", "Técnico Silva")
@@ -63,10 +64,15 @@ def test_o_numero_do_dossie_e_o_do_prontuario(tela, logado):
     # os medidores da Performance: o mesmo texto da tela, a gravidade e o que explica o número
     for m in p["painel"]["perf"]["medidores"]:
         assert m["txt"] in texto and m["txt"] in html
-    assert "- Meta do mês: 85% (crítico); 850,0 de 1.000,0 MWh; mês anterior, out/26: 100%" in texto
+    # o mês do fixture é o do dia em que o teste roda (`MES_ID` do `test_campo_responsaveis`), e o anterior, o de antes
+    # dele: escritos como o prontuário escreve (`prontuario.MESES`), não "novembro de 2026", que quebraria em 01/12
+    ant = HOJE.replace(day=1) - timedelta(days=1)
+    mes, ant_curto = f"{PR.MESES[HOJE.month - 1]} de {HOJE.year}", PR.MESES[ant.month - 1][:3] + f"/{ant.year % 100:02d}"
+    assert f"- Meta do mês: 85% (crítico); 850,0 de 1.000,0 MWh; mês anterior, {ant_curto}: 100%" in texto
     assert "- PR: 80,0% (em dia); previsto 79,0%" in texto and "- Disponibilidade: 85,0% (atenção); 3,6 h paradas" in texto
     assert "- O mês corrente é parcial: os números cobrem 10 de 31 dias." in texto
-    assert "| novembro de 2026 (parcial) | 85% (crítico) | 850,0 de 1.000,0 MWh | 80,0% | 79,0% | 85,0% | 3,6 h paradas | 10 de 31 dias |" in texto
+    assert (f"| {mes} (parcial) | 85% (crítico) | 850,0 de 1.000,0 MWh | 80,0% | 79,0% | 85,0% | 3,6 h paradas "
+            "| 10 de 31 dias |") in texto
     # o dia a dia da geração, que é o que responde "por que a performance está baixa"
     assert "- Dia 2: geração 5,8 MWh (meta 40,0 MWh, 14%) · POA 1,40 kWh/m²" in texto
     assert "- Dia 3: geração sem dado · POA 5,00 kWh/m²" in texto and "geração — MWh" not in texto
@@ -74,12 +80,17 @@ def test_o_numero_do_dossie_e_o_do_prontuario(tela, logado):
     assert "- Confiabilidade dos ativos: sem leitura dos números agora. O que a Visão do responsável contou:" in texto
     assert "  - Inversor 1 (THPN-ALT100-INVR1): 4 falhas em 30 dias (crítico)" in texto
     # os outros setores
-    assert "- OS de PARADA aberta agora: OS 13002; Corretiva Emergencial; Inversor 1; THPN-ALT100-INVR1; desde 02/11 08:00" in texto
+    assert ("- OS de PARADA aberta agora: OS 13002; Corretiva Emergencial; Inversor 1; THPN-ALT100-INVR1; "
+            f"desde 02/{HOJE:%m} 08:00") in texto                   # a parada do fixture é do dia 2 do mês corrente
     assert "| 16034 | Tracker 1 STI | STI | Estrutura Trackers | aberto | 26 dias | — |" in texto
     assert "| Tracker 1 STI | THPN-ALT100-ETKR1 | 0 | 0 | — | — | OS 16034, STI, aberto |" in texto
-    assert "- Última ronda: há 1 dia; 11/11/2026; ronda longa pendente" in texto
-    assert "| 11/11 | curta | 60 min | Atenção | — | — | 500 | incompleta |" in texto           # o veredito sem repetir a palavra
-    assert "- Extintores: 2 na usina; vencidos: 1; a vencer: 0; sem conferir: 0; última conferência em 07/11/2026" in texto
+    # a ronda e o extintor do fixture são de ontem e de 5 dias atrás, contados do dia em que o teste roda (o `HOJE` do
+    # `test_campo_responsaveis`): com a data de 12/11/2026 escrita aqui, o teste quebrou sozinho no dia seguinte
+    ontem, conferido = HOJE - timedelta(days=1), HOJE - timedelta(days=5)
+    assert f"- Última ronda: há 1 dia; {ontem:%d/%m/%Y}; ronda longa pendente" in texto
+    assert f"| {ontem:%d/%m} | curta | 60 min | Atenção | — | — | 500 | incompleta |" in texto  # o veredito sem repetir a palavra
+    assert ("- Extintores: 2 na usina; vencidos: 1; a vencer: 0; sem conferir: 0; última conferência em "
+            f"{conferido:%d/%m/%Y}") in texto
     assert "  - PT-1; OS 700; Troca de string; esperando há 1 d 6 h; a tarefa está PARADA por ela" in texto
     assert "- [crítico] 1 extintor vencido\n  - regra R07: Extintor vencido" in texto and "  - ação sugerida: Programar a recarga" in texto
     assert "- Status: OPERAÇÃO" in texto and "- Mobilizada em: 10/2025" in texto

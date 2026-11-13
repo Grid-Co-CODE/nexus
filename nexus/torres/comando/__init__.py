@@ -52,7 +52,7 @@ TORRE = Torre(
              "Aba KPIs do Plano de Documentação"),
         # da torre Contratos e clientes, que saiu do menu (12/11/2026, Levi: "contestações, você vai jogar para o
         # comando, prévia visão do contrato, você vai jogar no comando"; as views em contestacoes_tela.py). A prévia é de
-        # todos, para cada setor avaliar sem liberar um por um (Ana: "pedir avaliação da Danuth, Camila e Fred")
+        # todos, para cada setor avaliar sem liberar um por um (o pedido: a avaliação de Contratos e dos outros setores)
         Tela("contestacoes", "Contestações",
              "O que os clientes contestaram nos dashboards, e para qual setor?",
              "Dashboard Thopen: a contestação de cada dia, gravada cifrada no banco (livro thopen_contestacoes)"),

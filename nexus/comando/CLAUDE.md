@@ -309,7 +309,7 @@ tem o `h1`). O card da OS (`oscreator/card_os_abrir.html`) vem de quem inclui, u
 Creator, sem o Criar OS; sem tela do Comando, sem a conversa; o "abrir" do pé de cada cartão só aparece
 para quem abre a tela dele. As demandas são só as que a pessoa pode ver.
 
-**O que o Nexus ainda NÃO tem, e por isso não está na página** (pedidos do mockup da Ana Barros, 12/11/2026): o
+**O que o Nexus ainda NÃO tem, e por isso não está na página** (pedidos do mockup de Contratos, 12/11/2026): o
 responsável de performance por usina; a saúde das strings e o PR por inversor (a geração por inversor está no banco, mas
 nenhuma tela a lê; as correntes das strings só existem na moldura da plataforma); as OS concluídas em geral (o banco só
 tem as abertas; as concluídas estão no Histórico de OS do OS Creator); as características da UFV (pediria um livro
@@ -368,7 +368,7 @@ conclusão sozinha e o vencido que sobe para o setor; no O&M, a demanda fica pre
 - **A demanda abre na própria linha** (13/11/2026), e não numa coluna à direita: o Levi comparou as duas num protótipo
   ("Gostei mais dessa versão abrindo o drill up"). A 1ª versão em blocos grandes ele recusou com a foto ("Muito espaço
   vazio, não gostei do estilo proposto"), e as regras que ficaram são:
-  - **Nada repete a linha** ("O nome Ana aparece duas vezes sem necessidade"): quem pediu, a situação, o tema, o prazo e
+  - **Nada repete a linha** ("O nome [de quem pediu] aparece duas vezes sem necessidade"): quem pediu, a situação, o tema, o prazo e
     o título ficam só na linha; o andamento começa em "Aberta", sem o nome; o campo diz "quem pediu".
   - **A usina só no título, em verde:** a linha é "Nome e cargo" em cima e "Usina – Título" embaixo (`.dm-usina-t`).
   - **À direita, de cima para baixo: Responsável (o "Para"), "OS(s) atrelada(s)" e o Andamento** (Levi: "Responsável

@@ -2323,6 +2323,12 @@ Aprovação e Triagem usam a lógica do App copiada, não refeita, para o númer
   a resposta e o `ApiError` são os mesmos; o Nexus tem o próprio teto (`casca/fracttal_conta.py`: 150 dos 200/min, 90 no
   fundo, sobrando 50 para o App e os robôs) e o `fx` dele segue levantando `fracttal.Recusado`, nunca `FxLimite`.
   Recópia pelo extrator: muda só o cabeçalho, a assinatura e dois imports da biblioteca padrão que a cópia não usa.
+- **13/11, App v353 (código `1d90c968dbc08416`):** o teste acusou a `_fx_wo_paralelo` e a assinatura do `fx`. No App, a
+  leitura de fundo adiada pela reserva dos técnicos passou a dizer quanto esperar (`FxLimite.adiada` e `espera`), e a
+  `_fx_wo_paralelo` paciente espera só isso e tenta até 8 voltas (eram 4 de 60 s). Decisão: recópia; **o substituto do
+  `fx` fica** (o do Nexus nunca levanta `FxLimite`, e a cópia lê o `adiada` com `getattr`, valor padrão). No Nexus o
+  que muda é só a releitura da fila da Aprovação em segundo plano (`aprovacao.py`, `paciente=True`): com o Fracttal
+  recusando, ela insiste até 8 voltas de 60 s em vez de 4. As telas não mudam.
 - Trocados pelo Nexus no fim do arquivo gerado: `_tabela` e `tabela_qlog` (leem pela fonte do Nexus, `tabelas.py`),
   `tabela` (a dos tokens do Fracttal: só a partição `cadastro`; `tok` e `pt` recusadas), `fx` (Fracttal só GET,
   `fracttal.py`), `ident` (`pessoas.ident`) e `_varredura_carregar` (sempre `False`: sem blob do App).
