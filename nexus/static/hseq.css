@@ -260,3 +260,27 @@
   font-size:13px;box-shadow:0 8px 24px var(--sombra)}
 .hs-dlg-lista select{width:100%}
 .hs-dlg-outro{margin-top:4px}
+
+/* Colaboradores (06/11/2026): o registro de cada item na ficha, numa linha que quebra no celular; a data é texto
+   dd/mm/aaaa (o campo de data do navegador segue o idioma dele, e a Segurança quer sempre o formato brasileiro) */
+.col-reg{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+.col-reg .gc-campo{min-width:0}
+.col-data{width:118px}
+.col-secao{margin:24px 0 8px}
+.col-planilha{margin-top:24px}
+/* a ficha no celular: cada item vira um cartão, com o rótulo de cada coluna ao lado do valor (a tabela de 6 colunas
+   escondia a situação na rolagem lateral, conferido a 375 px em 06/11/2026) */
+@media (max-width: 820px){
+  .col-ficha table,.col-ficha tbody,.col-ficha tr,.col-ficha td{display:block;width:auto}
+  .cn-tab.col-ficha table{min-width:0}            /* o min-width de 980 px das tabelas do Campo */
+  .ext-tab.col-ficha td{white-space:normal}
+  .col-ficha thead{display:none}
+  .col-ficha tr{padding:10px 12px;border-top:1px solid var(--linha)}
+  .col-ficha td{padding:3px 0;border:0;text-align:left}
+  .col-ficha td[data-r]{display:flex;gap:10px;align-items:baseline}
+  .col-ficha td[data-r]::before{content:attr(data-r);flex:0 0 84px;font-size:12px;color:var(--mudo)}
+  .col-ficha td[data-r="Registrar"]{display:block}
+  .col-ficha td[data-r="Registrar"]::before{display:block;margin-bottom:4px}
+  .col-ficha .col-reg select{flex:1 1 100%}
+  .col-ficha .col-reg .col-data{flex:1 1 auto}
+}
