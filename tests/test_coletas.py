@@ -546,3 +546,11 @@ def test_a_parada_do_cos_explica_o_dia_baixo_no_mural(tmp_path, monkeypatch):
 def test_as_paradas_passam_pela_api_da_tela(coletas):
     r = coletas.post("/t/performance/coletas/api/furos_paradas", json={"args": []}).get_json()
     assert r == SEM_PARADAS
+
+
+def test_a_recoleta_pela_api_pv_fica_desligada_no_nexus(coletas):
+    """1.0.14: a recoleta gasta a cota paga da API PV; no Nexus fica escondida e sem método até o Levi decidir."""
+    html = coletas.get("/t/performance/coletas/app").get_data(as_text=True)
+    assert '<button class="btn2" id="rcAbrir" hidden>' in html
+    for m in ("recoleta_opcoes", "recoleta_fatias", "recoleta_parte", "recoleta_montar"):
+        assert coletas.post("/t/performance/coletas/api/" + m, json={"args": []}).status_code == 404

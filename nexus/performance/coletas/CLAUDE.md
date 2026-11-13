@@ -110,6 +110,11 @@ As duas precisam do Python além do relatório de furos; no .exe usam o BD que a
   subida dos BDs, como no .exe; só a conta feita com as paradas fora do ar não fica guardada. Nos testes as paradas são
   dubladas (`_paradas_sem_rede` em tests/test_coletas.py). Prova de 13/11 até 11/11: 130 usinas com parada, 21 OS abertas;
   mural 177/193 iguais ao .exe em dias E status (os 16 de novo a Segredo).
+- **Recoleta pela API PV (1.0.14) DESLIGADA no Nexus** (13/11/2026): o botão "Recoletar pela API" sai escondido pelo
+  `portar_tela_conversor.py` e os métodos `recoleta_*` não estão em `METODOS` (404). Motivo: a recoleta gasta a cota PAGA
+  da API PV (o servidor da plataforma atende por `X-Recoleta-Chave`, o HMAC da PV_PASSWORD; teto de 150/dia) e aqui
+  qualquer pessoa com a tela Coletas poderia gastar. Ligar é decisão do Levi: precisa da chave no servidor do Nexus (sem
+  ir ao git, o repositório é público) e dos 4 métodos na lista, por pessoa logada.
 - Trazer uma versão do .exe que a Coleta ainda está mexendo: a pasta pode ter trabalho sem release (o `mural.py` estava lá
   antes da 1.0.11). Sincronize do commit da release (`git archive <release>` da pasta `ferramentas/conversor/conversor`
   para fora e `--origem` nela, mantendo o fim de linha da pasta) ou espere a pasta ficar limpa.

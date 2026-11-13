@@ -133,6 +133,12 @@
   ::-webkit-scrollbar-thumb{background:var(--rolagem);border-radius:8px}
   ::-webkit-scrollbar-thumb:hover{background:var(--rolagem-hover)}
   ::-webkit-scrollbar-button{display:none}
+  /* ---- recoleta pela API PV (tela 1): o servidor busca, o resultado abre como uma conversão */
+  .rc{margin-top:12px}
+  .rc-campos{display:flex;align-items:flex-end;gap:14px;flex-wrap:wrap}
+  .rc-u{flex:1;min-width:240px}
+  .rc-st{margin-top:8px;min-height:16px}
+  .rc-st.er{color:var(--err)}
   /* ---- tela 3: furos de coleta (furos.js) — Nexus: um nível de superfície, cor só para estado, tabela centralizada */
   .fz-topo{display:flex;align-items:flex-end;gap:10px;flex-wrap:wrap}
   .fz-tit{font-size:16px;font-weight:600}
@@ -277,11 +283,24 @@
       <div class="pad">
         <div class="drop" id="drop"><b>Solte os arquivos aqui</b>ou clique para escolher · <a id="pasta">escolher uma pasta</a> · xlsx, xls, csv, zip, tar.gz · um ou vários de uma vez · o BD_Performance ou o BD_Thopen em Excel solto junto entra no lugar do banco</div>
         <div class="av erro" id="bd-aviso" hidden></div>
+        <div class="box rc" id="rc" hidden>
+          <h4>Recoletar pela API PV <span>o servidor da Grid Co. busca na API; o resultado abre como uma conversão: amarelo = valor novo, o resto já bate com o BD</span></h4>
+          <div class="rc-campos">
+            <label class="fz-l rc-u">Usina<input id="rcUsina" class="fz-ctl" list="rcLista" placeholder="carregando…" autocomplete="off"></label>
+            <datalist id="rcLista"></datalist>
+            <label class="fz-l">De<input type="date" id="rcIni" class="fz-ctl"></label>
+            <label class="fz-l">Até<input type="date" id="rcFim" class="fz-ctl"></label>
+            <label class="fz-sw"><input type="checkbox" id="rcGer" checked><span></span>Geração</label>
+            <label class="fz-sw"><input type="checkbox" id="rcEtm" checked><span></span>ETM</label>
+            <button class="btn" id="rcIr" disabled>Recoletar</button>
+          </div>
+          <div class="f rc-st" id="rcSt"></div>
+        </div>
         <div id="lista"></div>
         <div class="vazio" id="semarq">Nenhum arquivo ainda. O app reconhece a fonte e a usina pelo conteúdo; se não tiver certeza, pergunta.</div>
         <div class="row">
           <span class="mut" id="contagem"></span>
-          <span><button class="btn2" id="limpar">Limpar</button> <button class="btn" id="converter" disabled>Converter</button></span>
+          <span><button class="btn2" id="rcAbrir" hidden>Recoletar pela API</button> <button class="btn2" id="limpar">Limpar</button> <button class="btn" id="converter" disabled>Converter</button></span>
         </div>
       </div>
     </section>
@@ -651,7 +670,7 @@ const app = {
   resultado() {
     const r = this.res, t = r.totais;
     const k = (n, txt, cls) => `<div class="kpi"><div class="n ${cls || ""}">${(n || 0).toLocaleString("pt-BR")}</div><div class="t">${txt}</div></div>`;
-    $("#kpis").innerHTML = k(t.arquivos, "arquivos convertidos") + k(t.abas, "abas do BD com algo a colar") +
+    $("#kpis").innerHTML = (r.origem === "recoleta" ? k(r.recoleta.celulas, "valores vindos da API PV") : k(t.arquivos, "arquivos convertidos")) + k(t.abas, "abas do BD com algo a colar") +
       k(t.novo, "células para colar") + k(t.troca, "trocas de dia parcial", t.troca ? "lv" : "") +
       k(t.fora, "fora do bloco (conferir)", t.fora ? "sv" : "") + k(t.separados, "separados para o Levi", t.separados ? "er" : "");
     const sit = l => l.situacao === "pronto" ? '<span class="ok">pronto</span>' :
@@ -751,6 +770,67 @@ $("#aba1").onclick = () => app.tela(1);
 $("#aba2").onclick = () => app.res && app.tela(2);
 $("#aba3").onclick = () => app.tela(3);
 furos.iniciar();
+
+// Recoleta pela API PV (Levi, 13/11/2026: "a pessoa seleciona a usina, o período, se quer recoletar geração, ETM... o que
+// não está batendo fica em amarelo"). O período vai em fatias de até 7 dias, uma por vez, com o andamento na tela.
+const rc = {
+  us: [], restam: null,
+  iso(d) { return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); },
+  ddmm(s) { return s.slice(8, 10) + "/" + s.slice(5, 7); },
+  st(t, erro) { $("#rcSt").textContent = t || ""; $("#rcSt").classList.toggle("er", !!erro); },
+  usina() { return this.us.find(x => x.usina === $("#rcUsina").value); },
+  dias() { const a = $("#rcIni").value, b = $("#rcFim").value; return a && b && b >= a ? Math.round((new Date(b) - new Date(a)) / 864e5) + 1 : 0; },
+  custo() {
+    const u = this.usina(), n = this.dias(), g = $("#rcGer").checked ? 1 : 0, e = $("#rcEtm").checked ? 1 : 0;
+    return u ? u.plantas.length * (g + n * (g + e)) : 0;
+  },
+  validar() {
+    const u = this.usina(), n = this.dias(), c = this.custo();
+    $("#rcIr").disabled = !(u && n && ($("#rcGer").checked || $("#rcEtm").checked));
+    if (!this.us.length) return;
+    if (!u) { this.st(this.us.length + " usinas com planta na API PV" + (this.restam != null ? " · restam " + this.restam + " consultas hoje" : "")); return; }
+    this.st(u.destino + " · " + u.plantas.join(", ") + (n ? " · custa " + c + " consulta(s) da API PV" + (this.restam != null ? " (restam " + this.restam + " hoje)" : "") : ""));
+  },
+  async abrir() {
+    const box = $("#rc"); box.hidden = !box.hidden; if (box.hidden) return;
+    const ontem = new Date(); ontem.setDate(ontem.getDate() - 1);
+    ["#rcIni", "#rcFim"].forEach(i => { $(i).max = this.iso(ontem); if (!$(i).value) $(i).value = this.iso(ontem); });
+    if (this.us.length) { this.validar(); return; }
+    this.st("Buscando as usinas da API PV…");
+    const r = await api().recoleta_opcoes();
+    if (!r || r.erro) { this.st((r && r.erro) || "sem resposta", true); $("#rcUsina").placeholder = "indisponível"; return; }
+    this.us = r.usinas || []; this.restam = r.restam_hoje;
+    $("#rcLista").innerHTML = this.us.map(x => `<option value="${esc(x.usina)}">${esc(x.destino.replace("BD_", ""))} · ${esc(x.plantas.join(", "))}</option>`).join("");
+    $("#rcUsina").placeholder = "digite para buscar a usina";
+    this.validar();
+  },
+  async ir() {
+    const u = this.usina(); if (!u) return;
+    const ger = $("#rcGer").checked, etm = $("#rcEtm").checked;
+    $("#rcIr").disabled = true;
+    const fs = await api().recoleta_fatias($("#rcIni").value, $("#rcFim").value);
+    for (let i = 0; i < fs.length; i++) {
+      const [a, b] = fs[i];
+      this.st(`Recoletando ${u.usina}: ${this.ddmm(a)} a ${this.ddmm(b)}` + (fs.length > 1 ? ` (${i + 1} de ${fs.length})` : "") + "…");
+      const r = await api().recoleta_parte(u.usina, a, b, ger, etm, i === 0);
+      if (!r || r.erro) { this.st((r && r.erro) || "sem resposta", true); this.validar(); $("#rcIr").disabled = false; return; }
+      if (r.restam != null) this.restam = r.restam;
+    }
+    this.st("Comparando com o BD…");
+    const res = await api().recoleta_montar(u.usina, ger, etm);
+    $("#rcIr").disabled = false;
+    if (!res || res.erro) { this.st((res && res.erro) || "sem resposta", true); return; }
+    app.res = res;
+    $("#status").textContent = `Recoleta de ${u.usina} pronta às ${res.hora}`;
+    $("#pasta-saida").textContent = res.pasta;
+    $("#aba2").disabled = false;
+    app.resultado(); app.tela(2);
+    this.validar();
+  },
+};
+$("#rcAbrir").onclick = () => rc.abrir();
+$("#rcIr").onclick = () => rc.ir();
+["#rcUsina", "#rcIni", "#rcFim", "#rcGer", "#rcEtm"].forEach(i => { $(i).oninput = () => rc.validar(); $(i).onchange = () => rc.validar(); });
 $("#av-info").onclick = () => { app.mostrarInfo = !app.mostrarInfo; app.avisos(); };
 $("#bd-perf").onclick = async () => aplicarEstado(await api().escolher_bd("BD_Performance"));
 $("#bd-thopen").onclick = async () => aplicarEstado(await api().escolher_bd("BD_Thopen"));
