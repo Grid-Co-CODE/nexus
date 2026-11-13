@@ -93,7 +93,9 @@ def contexto() -> dict:
            "anexo": {"aceitos": SUG.aceitos(), "max_mb": SUG.MAX_MB_ARQUIVO, "max_arquivos": SUG.MAX_ARQUIVOS,
                      "max_total": SUG.MAX_MB_TOTAL},
            "limites": {"titulo": D.TITULO_MAX, "texto": D.TEXTO_MAX, "passo": D.PASSO_MAX}}
-    if out["aba"] not in dict(ABAS):
+    # a aba dos Temas do setor (13/11/2026): os temas do setor de quem abre (o administrador escolhe o setor, `?setor=`)
+    out["ts"] = temas_contexto()
+    if out["aba"] not in dict(ABAS) and out["aba"] != "temas":
         out["aba"] = "para"
     if falta:
         return out
@@ -268,22 +270,42 @@ def _setor_da_tela():
     return sid, dict(ativos).get(sid, ""), ativos
 
 
+def temas_contexto() -> dict:
+    """Os temas do setor para a aba deles na Caixa de entrada (comando/_temas_setor.html): o setor de quem abre, e o que o
+    administrador escolheu (`?setor=`). O cadastro que não abre vira o aviso da aba, e a Caixa segue."""
+    falta = D.faltam_chaves()
+    out = {"temas": [], "setor_id": None, "setor_nome": "", "setores": [], "admin": bool(session.get("admin")),
+           "falta": falta, "erro": "", "prazo_min": D.PRAZO_MIN, "prazo_max": D.PRAZO_MAX, "novo_tema": D.novo_id("m"),
+           "em_uso": 0}
+    if falta:
+        return out
+    try:
+        sid, nome, ativos = _setor_da_tela()
+        temas = D.temas(sid, so_ativos=False) if sid else []
+    except Exception as ex:      # noqa: BLE001 — o banco fora: a aba diz, a Caixa segue
+        current_app.logger.exception("demandas: os temas do setor não abriram")
+        return dict(out, erro=type(ex).__name__)
+    return dict(out, temas=temas, setor_id=sid, setor_nome=nome, setores=ativos,
+                em_uso=sum(1 for t in temas if t.get("ativo")))
+
+
+def _temas_na_caixa(sid=None) -> str:
+    """A aba dos Temas do setor na Caixa de entrada (o administrador volta ao setor que escolheu)."""
+    return na_raiz(CAIXA) + "?dem=temas" + (f"&setor={sid}" if session.get("admin") and sid else "") + "#demandas"
+
+
 @bp.route("/temas-do-setor")
 def temas_do_setor():
-    """Comando › Temas do setor: o que os outros setores podem pedir ao seu, e o prazo de cada tema em dias úteis."""
-    falta = D.faltam_chaves()
-    sid, nome, ativos = (None, "", []) if falta else _setor_da_tela()
-    temas = D.temas(sid, so_ativos=False) if sid else []
-    return render_template("comando/temas_setor.html", torre=TORRE, tela=TORRE.tela("temas-do-setor"), temas=temas,
-                           setor_id=sid, setor_nome=nome, setores=ativos, admin=bool(session.get("admin")),
-                           falta=falta, codigo=_codigo(), tem_login=bool(_meu_hmac()), aviso=session.pop(_AVISO, None),
-                           prazo_min=D.PRAZO_MIN, prazo_max=D.PRAZO_MAX, novo_tema=D.novo_id("m"))
+    """Comando › Temas do setor: desde 13/11/2026 é uma aba das Demandas entre setores, na Caixa de entrada (Levi: "eu
+    gostaria que temas por setor fosse mais uma aba do demanda entre setores [...] Deixa dentro da caixa de entrada").
+    O endereço de antes leva à aba."""
+    return redirect(_temas_na_caixa(request.args.get("setor", type=int)))
 
 
 @bp.route("/temas-do-setor/salvar", methods=["POST"])
 def temas_do_setor_salvar():
     sid = request.form.get("setor_id", type=int)
-    destino = na_raiz("/t/comando/temas-do-setor") + (f"?setor={sid}" if session.get("admin") and sid else "")
+    destino = _temas_na_caixa(sid)
     venceu = _form_venceu(destino)
     if venceu:
         return venceu

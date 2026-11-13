@@ -633,3 +633,29 @@ a.ins-titulo:hover{color:var(--verde-texto)}
   .pu-dia{grid-template-columns:minmax(0,1fr)}
   .pu-dia h3{padding:0 0 4px}.pu-oss{grid-column:1;grid-row:auto;justify-content:flex-start;max-width:none}
   .pu-menu-caixa{position:fixed;left:16px;right:16px;top:auto;bottom:16px;min-width:0}}
+
+/* Caixa de entrada, menos peso de uma vez (13/11/2026, Levi: "Me incomodando com a quantidade de informação na tela de uma
+   vez [...] esse abertas, vencer até amanhã, vencidas [...] estão muito perto desse tal de para mim, o que eu pedi do meu
+   setor [...] Esse menções, pedido para você, com você, sem dono e com outra pessoa, poderia ocupar um pouco menos de
+   espaço"). Os números do alto viram uma linha de fichas; as abas das demandas ficam abas de verdade (maiores, com o fio
+   embaixo) e o filtro vem embaixo, menor, com o "Mostrar" na frente */
+.cn-numeros.cx-numeros{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;padding:0;background:none;border:0;border-radius:0}
+.cn-numeros.cx-numeros > a{display:inline-flex;align-items:baseline;gap:8px;padding:6px 14px;border:1px solid var(--linha);
+  border-radius:999px;background:var(--superficie)}
+.cn-numeros.cx-numeros > a:hover{background:var(--superficie-2)}
+.cn-numeros.cx-numeros .gc-rotulo{margin:0;font:500 12.5px/18px var(--font-sans);letter-spacing:0;text-transform:none;color:var(--tinta-2)}
+.cn-numeros.cx-numeros .v{display:inline;margin:0;font:700 15px/18px var(--font-sans);letter-spacing:0}
+.cn-numeros.cx-numeros .d{font-size:11.5px;color:var(--mudo)}
+.dm-abas{gap:2px;margin-top:16px;border-bottom:1px solid var(--linha-forte)}
+.dm-aba{padding:10px 16px;font-size:14.5px;font-weight:600}
+.dm-aba[aria-selected="true"]{border-bottom-width:3px}
+.dm-faixa{gap:6px;margin:14px 0 12px}
+.dm-faixa-r{margin-right:4px;font-size:12px;color:var(--mudo)}
+.dm-faixa .dm-chip{padding:3px 10px;font-size:12px}
+/* a aba dos Temas do setor: a tabela na largura toda, sem a coluna do detalhe */
+.dm--temas .dm-grade{grid-template-columns:minmax(0,1fr)}
+.dm--temas .dm-detalhes{display:none}
+.dm-painel--temas{grid-column:1 / -1}
+.dm-temas-o-que{margin:14px 0 10px}
+.dm-temas-setor{display:flex;align-items:center;gap:8px;margin:0 0 12px}
+.dm-painel--temas .dm-temas ~ .dm-nota{margin-top:10px;max-width:80ch}

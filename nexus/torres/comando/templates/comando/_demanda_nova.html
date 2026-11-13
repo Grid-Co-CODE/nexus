@@ -22,7 +22,7 @@
         <option value="">Escolha o setor primeiro</option>
         {% for t in dem.temas %}<option value="{{ t.tema_id }}" data-setor="{{ t.setor_id }}" data-ate="{{ t.ate }}">{{ t.nome }} ({{ t.prazo_dias_uteis }} {{ 'dia útil' if t.prazo_dias_uteis == 1 else 'dias úteis' }})</option>{% endfor %}
       </select>
-      <span class="dm-nota" id="{{ pre }}-prazo" data-dm-f-prazo>O prazo é o do tema, em dias úteis. O setor sem tema ainda não recebe demanda: peça a ele que cadastre em <a href="{{ '/t/comando/temas-do-setor'|na_raiz }}">Temas do setor</a>.</span></div>
+      <span class="dm-nota" id="{{ pre }}-prazo" data-dm-f-prazo>O prazo é o do tema, em dias úteis. O setor sem tema ainda não recebe demanda: peça a ele que cadastre na aba <a href="{{ '/t/comando/caixa-de-entrada?dem=temas#demandas'|na_raiz }}">Temas do setor</a> da Caixa de entrada.</span></div>
     <div class="dm-campo"><label class="gc-rotulo" for="{{ pre }}-titulo">Título</label>
       <input class="gc-campo" id="{{ pre }}-titulo" name="titulo" maxlength="{{ dem.limites.titulo }}" required placeholder="Em poucas palavras"></div>
     <div class="dm-campo"><label class="gc-rotulo" for="{{ pre }}-desc">Descrição</label>

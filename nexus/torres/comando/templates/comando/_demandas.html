@@ -3,13 +3,12 @@
    As três abas vêm na página; o comando/demandas.js troca a aba, o filtro e a demanda aberta sem recarregar. Sem o JS, a
    lista aparece inteira e os formulários gravam do mesmo jeito. `dem` = demandas_tela.contexto(). #}
 {% set F = dem.filtros %}
-<section class="dm" id="demandas" aria-labelledby="dm-titulo" data-dm data-aba="{{ dem.aba }}" data-sel="{{ dem.sel }}"
+<section class="dm{% if dem.aba == 'temas' %} dm--temas{% endif %}" id="demandas" aria-labelledby="dm-titulo" data-dm data-aba="{{ dem.aba }}" data-sel="{{ dem.sel }}"
          data-os-url="{{ '/t/comando/caixa-de-entrada/demandas/os'|na_raiz }}">
   <div class="dm-cab">
     <h2 class="dm-titulo" id="dm-titulo">Demandas entre setores</h2>
     {% if not dem.falta %}
     <span class="dm-cab-acoes">
-    <a class="gc-btn gc-btn--ui gc-btn--contorno" href="{{ '/t/comando/temas-do-setor'|na_raiz }}"><i class="ph ph-list-bullets" aria-hidden="true"></i> Temas do meu setor</a>
     <button class="gc-btn gc-btn--ui gc-btn--primario" type="button" data-dm-nova{% if not dem.tem_login %} disabled aria-describedby="dm-nova-por-que"{% endif %}>
       <i class="ph ph-plus" aria-hidden="true"></i> Nova demanda</button>
     </span>
@@ -26,6 +25,9 @@
     <button class="dm-aba" type="button" role="tab" id="dm-aba-{{ aba }}" aria-controls="dm-painel-{{ aba }}"
             aria-selected="{{ 'true' if aba == dem.aba else 'false' }}" data-dm-aba="{{ aba }}">{{ rot }}<b>{{ dem.contas[aba].abertas if dem.contas[aba] else 0 }}</b></button>
     {% endfor %}
+    {# os temas do setor, desde 13/11/2026 (eram uma tela do menu): o número é o dos temas em uso #}
+    <button class="dm-aba dm-aba--temas" type="button" role="tab" id="dm-aba-temas" aria-controls="dm-painel-temas"
+            aria-selected="{{ 'true' if dem.aba == 'temas' else 'false' }}" data-dm-aba="temas">Temas do setor<b>{{ dem.ts.em_uso }}</b></button>
   </div>
 
   <div class="dm-grade">
@@ -33,7 +35,11 @@
       {% for aba, rot in dem.abas %}
       {% set ids = dem.listas[aba] or [] %}
       <div class="dm-painel" id="dm-painel-{{ aba }}" role="tabpanel" aria-labelledby="dm-aba-{{ aba }}" data-dm-painel="{{ aba }}"{% if aba != dem.aba %} hidden{% endif %}>
+        {# o filtro, separado das abas (13/11/2026, Levi: "esse abertas, vencer até amanhã, vencidas, finalizadas,
+           concluídas, estão muito perto desse tal de para mim, o que eu pedi do meu setor. E acaba que às vezes confunde a
+           mente"): as abas dizem DE QUEM é a demanda; o "Mostrar", em que pé ela está #}
         <div class="dm-faixa" role="group" aria-label="Filtrar {{ rot|lower }}">
+          <span class="dm-faixa-r" aria-hidden="true">Mostrar</span>
           {% for k, nome in F %}
           <button class="dm-chip" type="button" data-dm-filtro="{{ k }}" aria-pressed="{{ 'true' if k == 'abertas' else 'false' }}">{{ nome }} <b>{{ dem.contas[aba][k] if dem.contas[aba] else 0 }}</b></button>
           {% endfor %}
@@ -75,6 +81,11 @@
           {%- else %}Nenhuma demanda aberta para o {{ dem.setor_nome or 'seu setor' }}.{% endif %}</p>
       </div>
       {% endfor %}
+    </div>
+
+    {# a aba dos Temas do setor: a tabela inteira na largura das listas (a coluna do detalhe some nela) #}
+    <div class="dm-painel dm-painel--temas" id="dm-painel-temas" role="tabpanel" aria-labelledby="dm-aba-temas" data-dm-painel="temas"{% if dem.aba != 'temas' %} hidden{% endif %}>
+      {% with ts=dem.ts, tem_login=dem.tem_login %}{% include "comando/_temas_setor.html" %}{% endwith %}
     </div>
 
     <div class="dm-detalhes" aria-live="polite">

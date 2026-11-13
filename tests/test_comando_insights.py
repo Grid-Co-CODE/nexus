@@ -235,7 +235,8 @@ def test_a_caixa_numeros_no_alto_e_sem_dono_recolhido(app, banco, limpo, motor_d
     assert 'href="#cx-sem-dono"' in html
     sem_dono = html.split('<details class="cx-recolhe" id="cx-sem-dono"', 1)[1]
     assert sem_dono.startswith(">") and "a OS 16702 voltou" in sem_dono                    # fechado, com a lista dentro
-    assert "/t/comando/temas-do-setor" in html.split('id="demandas"', 1)[1].split("</section>", 1)[0]
+    # os temas: desde 13/11/2026 uma aba das demandas (saíram do menu)
+    assert 'data-dm-aba="temas"' in html.split('id="demandas"', 1)[1].split("</section>", 1)[0]
     # o insight do Sem dono pedido pelo endereço (?abrir=) vem com o Sem dono aberto
     html = _cliente(app).get("/t/comando/caixa-de-entrada?abrir=N01:16702").get_data(as_text=True)
     assert '<details class="cx-recolhe" id="cx-sem-dono" open>' in html

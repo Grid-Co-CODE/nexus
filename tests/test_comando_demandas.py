@@ -377,9 +377,15 @@ def test_as_os_da_usina_para_o_formulario(app, cena):
 
 
 def test_os_temas_do_setor_cada_setor_mexe_nos_seus(app, cena):
+    """Desde 13/11/2026 os temas são uma aba das demandas na Caixa de entrada (Levi: "eu gostaria que temas por setor fosse
+    mais uma aba do demanda entre setores [...] E aí você tira o tema do setor na barra lateral")."""
     c = _cliente(app, JU)
-    html = c.get("/t/comando/temas-do-setor").get_data(as_text=True)
-    assert "Dado que não bate" in html and "Comando · Performance" in html
+    r = c.get("/t/comando/temas-do-setor")                                # o endereço de antes leva à aba
+    assert r.status_code == 302 and r.headers["Location"].endswith("/t/comando/caixa-de-entrada?dem=temas#demandas")
+    html = c.get(CAIXA + "?dem=temas").get_data(as_text=True)
+    assert 'aria-selected="true" data-dm-aba="temas"' in html and '<section class="dm dm--temas"' in html
+    painel = html.split('id="dm-painel-temas"', 1)[1].split("</table>", 1)[0]
+    assert "Dado que não bate" in painel and "ao setor Performance" in painel and " hidden>" not in painel.split(">", 1)[0] + ">"
     # o campo do tema não se chama `nome` e vai sem o preenchimento automático (12/11/2026, Levi: "o campo que aparece
     # quando vou digitar está mal formatado"): o navegador abria a lista do que foi digitado em outros campos `nome`
     tabela = html.split('<table class="dm-temas">', 1)[1].split("</table>", 1)[0]
@@ -387,20 +393,20 @@ def test_os_temas_do_setor_cada_setor_mexe_nos_seus(app, cena):
     assert tabela.count('autocomplete="off"') == 4 and 'name="tema" maxlength="60" required autocomplete="off"' in tabela
     r = c.post("/t/comando/temas-do-setor/salvar", data={"codigo": _codigo(html), "setor_id": "1",
                                                          "tema": "Relatório do cliente", "prazo": "3"})
-    assert r.status_code == 303
+    assert r.status_code == 303 and r.headers["Location"].endswith("/t/comando/caixa-de-entrada?dem=temas#demandas")
     assert sorted(t["nome"] for t in D.temas(1)) == ["Dado que não bate", "Relatório do cliente"]
     # a página que ficou aberta de antes ainda manda `nome`: grava do mesmo jeito
-    html = c.get("/t/comando/temas-do-setor").get_data(as_text=True)
+    html = c.get(CAIXA + "?dem=temas").get_data(as_text=True)
     assert c.post("/t/comando/temas-do-setor/salvar", data={"codigo": _codigo(html), "setor_id": "1",
                                                             "nome": "Curva de geração", "prazo": "2"}).status_code == 303
     assert "Curva de geração" in [t["nome"] for t in D.temas(1)]
     # o tema do outro setor, não
     assert c.post("/t/comando/temas-do-setor/salvar", data={"codigo": _codigo(html), "setor_id": "2",
                                                             "nome": "Extintores", "prazo": "2"}).status_code == 403
-    html = c.get("/t/comando/temas-do-setor").get_data(as_text=True)
-    assert "Relatório do cliente" in html and "Curva de geração" in html
+    html = c.get(CAIXA + "?dem=temas").get_data(as_text=True)
+    assert "Tema salvo." in html and "Relatório do cliente" in html and "Curva de geração" in html
     # quem não tem setor vê o aviso, sem o formulário
-    html = _cliente(app, SEM).get("/t/comando/temas-do-setor").get_data(as_text=True)
+    html = _cliente(app, SEM).get(CAIXA + "?dem=temas").get_data(as_text=True)
     assert "ainda não tem setor no Nexus" in html and "temas-do-setor/salvar" not in html
 
 
@@ -488,8 +494,8 @@ def test_a_leitura_de_antes_da_gravacao_nao_fica_na_copia(app, cena, monkeypatch
 
 def test_o_tema_novo_no_duplo_clique_e_um_so(app, cena):
     c = _cliente(app, JU)
-    html = c.get("/t/comando/temas-do-setor").get_data(as_text=True)
-    novo = html.split('name="novo_id" value="', 1)[1].split('"', 1)[0]
+    html = c.get(CAIXA + "?dem=temas").get_data(as_text=True)
+    novo = html.split('id="dm-painel-temas"', 1)[1].split('name="novo_id" value="', 1)[1].split('"', 1)[0]
     dados = {"codigo": _codigo(html), "setor_id": "1", "nome": "Relatório do cliente", "prazo": "3", "novo_id": novo}
     c.post("/t/comando/temas-do-setor/salvar", data=dados)
     c.post("/t/comando/temas-do-setor/salvar", data=dados)

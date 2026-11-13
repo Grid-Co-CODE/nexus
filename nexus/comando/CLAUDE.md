@@ -63,8 +63,10 @@ Fase 3: o prazo, "Quem pede sempre escolhe" (sem prazo padrão), e o pedido vale
   (Brasília). A cor diz isso (crítico, alerta, info) e a palavra também.
 - **Onde aparece:** a Caixa ("Pedidos para o seu setor", o atrasado primeiro, e "Pedidos que você fez"); o sino (o pedido
   sem resposta ou atrasado para as áreas da pessoa; o atrasado conta como crítico); a linha do insight (a área com
-  "Atrasado" ou "Vence hoje"); e Comando → **Tempo de resposta** (por área: pedidos, abertos, sem resposta, atrasados, %
-  no prazo e as medianas; e a lista dos atrasados). Sem filtro de período e sem meta de % por enquanto: perguntar ao Levi
+  "Atrasado" ou "Vence hoje"); e o painel do **Tempo de resposta** (por área: pedidos, abertos, sem resposta, atrasados, %
+  no prazo e as medianas; e a lista dos atrasados), em `/t/comando/tempo-de-resposta`. Desde 13/11/2026 ele não está no
+  menu: fica por dentro da Prévia (visão do contrato), `dentro_de="visao-do-contrato"` (Levi: "Tempo de resposta também.
+  Pode remover. Vai ficar dentro da parte de revisão de contratos"). Sem filtro de período e sem meta de % por enquanto: perguntar ao Levi
   antes de pôr.
 - O link de todo pedido é a página do objeto (`/t/comando/conversa/<tipo>/<id>`), que mostra os pedidos e a conversa e
   abre para quem só tem a Caixa. O pedido sobre um insight que a regra parou de apontar continua (o título diz "a regra
@@ -334,7 +336,10 @@ conclusão sozinha e o vencido que sobe para o setor; no O&M, a demanda fica pre
 - A pessoa e o setor de quem recebe são obrigatórios; um setor só por demanda ("Esquece essa parte de indicar mais de um
   setor"). O setor vê o que todo mundo dele recebe (a aba "Do meu setor", com o filtro por pessoa e por tema).
 - Cada setor monta os seus temas, cada um com o prazo em dias úteis (1 a 30; sem sábado, domingo e feriado nacional):
-  Comando → Temas do setor (`de_todos`). O prazo da demanda é o do tema na hora em que foi aberta.
+  a aba **Temas do setor** das demandas, na Caixa de entrada (`?dem=temas`; o administrador escolhe o setor, `&setor=`).
+  O prazo da demanda é o do tema na hora em que foi aberta. Até 13/11/2026 era uma tela do menu (Comando → Temas do
+  setor); o Levi pediu "mais uma aba do demanda entre setores [...] tira o tema do setor na barra lateral. Deixa dentro da
+  caixa de entrada". O endereço `/t/comando/temas-do-setor` leva à aba, e o Salvar volta a ela (`_temas_na_caixa`).
   Na tela, o campo do tema se chama `tema` e vai com `autocomplete="off"` (12/11/2026, Levi, com o print: "o campo que
   aparece quando vou digitar está mal formatado, conserte!"): chamado `nome`, o Edge abria por cima da tabela a lista do
   que já foi digitado em qualquer campo `nome` do Nexus (o nome da pessoa, "Chamados", "Administrador", "Responsável
@@ -368,11 +373,22 @@ setores (`setor_telas.setor_da_pessoa`), e não do `acesso()`, que só diz o set
 **Os arquivos:** `demandas_regras.py` (o prazo, a situação e os avisos, sem Flask nem banco), `demandas.py` (a gravação,
 a leitura decifrada, as três abas e os filtros), `../torres/comando/demandas_tela.py` (as rotas, debaixo de
 `/t/comando/caixa-de-entrada/demandas/...` para herdar a Caixa, que é de todos), `templates/comando/_demandas.html` (o
-bloco no alto da Caixa e a Nova demanda), `temas_setor.html`, `static/comando/demandas.js` (aba, filtro e demanda aberta
+bloco da Caixa), `_demanda_nova.html` (os campos da Nova demanda, um lugar só para a Caixa e a janela da conversa da
+usina), `_temas_setor.html` (a aba dos temas; o contexto é o `temas_contexto()`), `static/comando/demandas.js` (aba, filtro e demanda aberta
 sem recarregar; a pessoa e o tema pelo setor; as OS das usinas marcadas) e o CSS `dm-` no `comando.css`. O sininho é o
 `_sino_demandas` da casca.
 
 **A revisão independente de 12/11/2026 (antes de subir) deixou estas regras:** a pausada não dá "Vence hoje" nem entra no "Vencem até amanhã" (a vez é de quem pediu); a Nova demanda confere o tamanho ANTES de ler o corpo (`max_content_length`, como as Sugestões); a gravação que entrou no banco e respondeu com erro vale, com os anexos (só a que não entrou os leva embora); a leitura é conferida (`abas_conferidas`) e a que começou antes de uma gravação não fica na cópia (`_GERACAO`); só vale o passo de quem tem o papel dele (`passos_validos`: uma linha posta no banco por fora não muda a situação); a cifra da demanda amarra também o setor de quem recebe; o `?d=` só entra se tiver a forma do id; o tema novo leva `novo_id`. **A Caixa não lê o Fracttal ao abrir:** a lista de quem recebe (os nomes vêm do pessoal do Fracttal) chega ao abrir a Nova demanda (`GET .../demandas/pessoas`); a tela que lê o Fracttal sai da pré-carga e gasta a cota da empresa.
+
+**A Caixa com menos peso na tela (13/11/2026).** Levi: "Me incomodando com a quantidade de informação na tela de uma
+vez [...] abertas, vencer até amanhã, vencidas, finalizadas, concluídas, estão muito perto desse [...] para mim, o que eu
+pedi do meu setor [...] Esse menções, pedido para você, com você, sem dono e com outra pessoa, poderia ocupar um pouco
+menos de espaço". Ficou assim: os números do alto (Menções, Pedidos para você, Com você, Sem dono, Com outra pessoa)
+viraram uma linha de fichas (`.cn-numeros.cx-numeros`); as abas das demandas (Para mim, Que eu pedi, Do meu setor, Temas
+do setor) são maiores, com o fio embaixo; o filtro de situação vem abaixo delas, menor e com "Mostrar" na frente
+(`.dm-faixa-r`). Na aba dos temas não há lista nem detalhe (`.dm--temas`). No mesmo pedido saíram do menu a Sala de comando
+e o Kanban (só o lugar reservado; Levi: "remove a opção Kanban, que não tem nada. Então, sala de comando também. Pode
+remover por hora"): voltam como `Tela` no `TORRE.telas` quando tiverem o que mostrar.
 
 **Fora, por agora:** a demanda para mais de um setor; o e-mail; o painel de tempo de resposta por setor (os passos já
 guardam o dia de cada um para medir).

@@ -190,6 +190,16 @@ window.NexusDemandaNova = function (dlg) {
       b.setAttribute('aria-selected', b.getAttribute('data-dm-aba') === aba ? 'true' : 'false');
     });
     raiz.querySelectorAll('[data-dm-painel]').forEach(function (p) { p.hidden = p.getAttribute('data-dm-painel') !== aba; });
+    // a aba dos Temas do setor (13/11/2026): sem lista nem detalhe; a tabela ocupa a largura
+    raiz.classList.toggle('dm--temas', aba === 'temas');
+    if (aba === 'temas') {
+      if (window.history && history.replaceState) {
+        var u = new URL(window.location.href);
+        u.searchParams.set('dem', 'temas'); u.searchParams.delete('d');
+        history.replaceState(null, '', u.pathname + u.search + '#demandas');
+      }
+      return;
+    }
     // a demanda pedida (?d=) pode estar fora do filtro "Abertas" (a que acabou de ser concluída): vai para o filtro dela
     var alvo = id && painel(aba).querySelector('[data-dm-linha="' + id + '"]');
     if (alvo) {

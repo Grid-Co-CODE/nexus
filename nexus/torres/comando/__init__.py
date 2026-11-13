@@ -29,26 +29,20 @@ TORRE = Torre(
     ordem=0,
     icone="squares-four",
     descricao="Sala de comando, fila única de ações e o que pede decisão.",
+    # Saíram do menu em 13/11/2026 (Levi: "remove a opção Kanban, que não tem nada. Então, sala de comando também. Pode
+    # remover por hora. Tempo de resposta também. Pode remover. Vai ficar dentro da parte de revisão de contratos"): a
+    # Sala de comando e o Kanban, que eram só o lugar reservado; o Tempo de resposta fica por dentro da Prévia do contrato
+    # (a página segue no endereço); os Temas do setor viraram uma aba das demandas na Caixa de entrada
     telas=[
-        Tela("sala-de-comando", "Sala de comando",
-             "Onde estou perdendo dinheiro esta semana e quem está segurando?",
-             "Motor de correlação do Nexus + Performance, PCM e Fracttal"),
         Tela("caixa-de-entrada", "Caixa de entrada",
              "O que é meu para fazer hoje, por prazo e valor?",
              "Itens de trabalho do Nexus (insights, OS, chamados, solicitações)", de_todos=True),
-        Tela("kanban", "Kanban",
-             "Onde as ações nascidas no Nexus estão travando?",
-             "Itens de trabalho do Nexus"),
         Tela("insights", "Nexus Insights",
              "Que regra cruzou as fontes e apontou um problema com dono?",
              "Regras R01 a R13 do motor de correlação"),
-        # as demandas entre setores (12/11/2026): cada setor diz o que os outros podem pedir a ele, e em quanto tempo
-        Tela("temas-do-setor", "Temas do setor",
-             "O que os outros setores podem pedir ao seu, e em quanto tempo o seu setor responde?",
-             "Temas das demandas (nexus_demandas · dim_tema)", de_todos=True),
         Tela("tempo-de-resposta", "Tempo de resposta",
              "Que área responde no prazo, e quais pedidos estão atrasados?",
-             "Pedidos entre áreas, com prazo (nexus_pedidos)"),
+             "Pedidos entre áreas, com prazo (nexus_pedidos)", dentro_de="visao-do-contrato"),
         # a tela do mockup "Início > Usinas" (11/11/2026, nexus/comando/usinas.py)
         Tela("usinas", "Usinas",
              "Como está cada usina agora, e o que cada setor diz dela?",
