@@ -308,9 +308,16 @@ def test_a_caixa_mostra_a_demanda_para_quem_recebe_quem_pediu_e_o_setor(app, cen
     det = _det(html, did)
     # a demanda abre na própria linha desde 13/11/2026 (Levi: "Gostei mais dessa versão abrindo o drill up"): o tema, a
     # situação e o título ficam na linha e não se repetem no que abre; o detalhe vem uma vez, guardado, e nada abre sozinho
-    assert 'data-os-folio="18421"' in det and "Altair" in det and "Dado que não bate" not in det
-    assert 'class="dm-pill' not in det and ">O pedido</h4>" in det and ">Andamento</h4>" in det and ">Responder</h4>" in det
+    assert 'data-os-folio="18421"' in det and "Dado que não bate" not in det and 'class="dm-pill' not in det
     assert 'aria-expanded="false"' in l and "dm-seta" in l and 'data-sel=""' in html
+    # 2ª versão (13/11/2026, Levi, com a foto: "O nome Ana aparece duas vezes"; "O nome da usina deve aparecer somente uma
+    # vez e no Título [...] Usina - Título"; "sai o prazo, quem criou e usinas, tira o para também, o para vira o nome
+    # Responsável"): a usina só na linha, antes do título; no que abre, nem quem pediu, nem a usina, nem o prazo
+    assert '<span class="dm-usina-t">Altair</span> – <span class="dm-tit">Coração 2 sem meta</span>' in l
+    assert "Altair" not in det and "Ana Souza" not in det and ">Prazo<" not in det and ">De<" not in det
+    assert '<span class="dm-fato-r">Responsável</span> <b>Juliana Prado</b>' in det and ">Andamento</h4>" in det
+    # o Colocar em análise na mesma fileira dos outros botões, pelo formulário dele (atributo `form`)
+    assert f'form="dm-ea-{did}" name="acao" value="em_analise"' in det and f'<form id="dm-ea-{did}"' in det
     assert '<div class="dm-guarda" data-dm-guarda hidden>' in html and "dm-detalhes" not in html
     assert 'value="respondeu"' in det and 'value="pediu_informacao"' in det and 'value="em_analise"' in det
     assert 'value="concluiu"' not in det

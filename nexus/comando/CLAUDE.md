@@ -366,12 +366,19 @@ conclusão sozinha e o vencido que sobe para o setor; no O&M, a demanda fica pre
   limpo"); o tema aparece uma vez só (Levi: "O tema está se repetindo no título e nas linhas de baixo"). O selo da
   esquerda é o prazo; o da direita, a situação.
 - **A demanda abre na própria linha** (13/11/2026), e não numa coluna à direita: o Levi comparou as duas num protótipo
-  ("Gostei mais dessa versão abrindo o drill up") e pediu a parte aberta organizada ("Distribua melhor as informações!
-  está tudo muito junto! Organize"). Ela vem em blocos: a faixa dos dados (De, Para, Prazo, Usinas, OS, cada um na sua
-  casa), "O pedido" e o "Andamento" lado a lado, e a resposta num bloco próprio, com a ação curta (Colocar em análise,
-  Concluir) no título dele. A situação, o tema e o título ficam só na linha. Uma aberta por vez; clicar de novo ou o Esc
-  fecha; nada abre sozinho, só a do `?d=` (a volta de um passo). O detalhe vem uma vez só na página
-  (`data-dm-guarda`), porque a mesma demanda pode estar em duas abas; o `demandas.js` o leva para baixo da linha.
+  ("Gostei mais dessa versão abrindo o drill up"). A 1ª versão em blocos grandes ele recusou com a foto ("Muito espaço
+  vazio, não gostei do estilo proposto"), e as regras que ficaram são:
+  - **Nada repete a linha** ("O nome Ana aparece duas vezes sem necessidade"): quem pediu, a situação, o tema, o prazo e
+    o título ficam só na linha; o andamento começa em "Aberta", sem o nome; o campo diz "quem pediu".
+  - **A usina só no título, em verde:** a linha é "Nome e cargo" em cima e "Usina – Título" embaixo (`.dm-usina-t`).
+  - **Dos dados, só o Responsável (o "Para") e a OS**, numa linha curta; em "Que eu pedi" o Responsável some (a linha já
+    diz "Para Fulano"; `data-aba` na seção).
+  - **Espaço pela metade e leitura em F:** o pedido e a resposta descem pela esquerda, alinhados com o título; o
+    andamento fica à direita, atrás de um fio. Os botões ficam numa fileira só: "Colocar em análise" e "Concluir" são de
+    outro formulário e entram nela pelo atributo `form` (o Concluir não pede a justificativa do Devolver).
+  Uma aberta por vez; clicar de novo ou o Esc fecha; nada abre sozinho, só a do `?d=` (a volta de um passo). O detalhe vem
+  uma vez só na página (`data-dm-guarda`), porque a mesma demanda pode estar em duas abas; o `demandas.js` o leva para
+  baixo da linha.
 - O sininho (bandeja, ao lado do botão do OS Creator): para quem recebeu, a nova, o prazo apertando (faltam 2 dias,
   falta 1, vence hoje), a vencida e a devolvida; para o setor de quem recebeu, a vencida ("Quem recebeu + todo o setor");
   para quem pediu, a respondida e o pedido de informação. A nova vence o prazo de 2 dias na ordem (a prévia mostrava

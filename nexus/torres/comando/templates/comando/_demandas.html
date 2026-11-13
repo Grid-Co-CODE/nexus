@@ -68,7 +68,9 @@
               {% else %}
               <span class="dm-l1"><b>{{ d.de_nome or 'Quem pediu' }}</b><span class="dm-setor">{{ d.de_setor_nome or 'sem setor' }}</span>{% if aba == 'setor' and not d.eu_recebo %}<span class="dm-setor">para {{ d.para_nome }}</span>{% endif %}</span>
               {% endif %}
-              <span class="dm-l2"><span class="dm-tit">{{ d.titulo or '(sem o texto: a linha mudou no banco)' }}</span>{% if d.inicio %}<span class="dm-ini"> · {{ d.inicio }}</span>{% endif %}</span>
+              {# a usina só aqui, no título, em verde (13/11/2026, Levi: "O nome da usina deve aparecer somente uma vez e no
+                 Título [...] Nome e cargo (como já está) Logo abaixo Usina - Título") #}
+              <span class="dm-l2">{% if d.usinas %}<span class="dm-usina-t">{% for uid, nome in d.usinas %}{{ nome }}{% if not loop.last %}, {% endif %}{% endfor %}</span> – {% endif %}<span class="dm-tit">{{ d.titulo or '(sem o texto: a linha mudou no banco)' }}</span>{% if d.inicio %}<span class="dm-ini"> · {{ d.inicio }}</span>{% endif %}</span>
             </span>
             <span class="dm-dir">
               <span class="dm-pill dm-s-{{ d.estado.situacao }}">{{ d.estado.rotulo }}</span>
@@ -93,100 +95,96 @@
       {% with ts=dem.ts, tem_login=dem.tem_login %}{% include "comando/_temas_setor.html" %}{% endwith %}
     </div>
 
-    {# o detalhe de cada demanda, guardado: o script leva para baixo da linha clicada (a situação, o tema e o título
-       já estão na linha, e não se repetem aqui) #}
+    {# o detalhe de cada demanda, guardado: o script leva para baixo da linha clicada.
+       2ª versão, 13/11/2026 (Levi, com a foto da 1ª: "Muito espaço vazio, não gostei do estilo proposto"; "O nome Ana
+       aparece duas vezes sem necessidade"; "sai o prazo, quem criou e usinas, tira o para também, o para vira o nome
+       Responsável"; "O espaçamento [...] corte pela metade"; "Use as regras de design de leitura em formato de F"): nada
+       repete a linha (quem pediu, a usina, o prazo, a situação, o tema e o título já estão nela); em cima, numa linha curta,
+       o Responsável e a OS; o texto do pedido e a resposta descem pela esquerda; o andamento fica ao lado, à direita.
+       Os botões de outro formulário (Colocar em análise, Concluir) ficam na mesma fileira pelo atributo `form`. #}
     <div class="dm-guarda" data-dm-guarda hidden>
       {% for i, d in dem.itens.items() %}
+      {% set sit = d.estado.situacao %}
       <article class="dm-det" data-dm-det="{{ d.demanda_id }}" aria-labelledby="dm-det-t-{{ d.demanda_id }}" hidden>
         <h3 class="dm-sr" id="dm-det-t-{{ d.demanda_id }}">{{ d.titulo or '(sem o texto)' }}</h3>
-        <dl class="dm-meta">
-          <div><dt>De</dt><dd><b>{{ d.de_nome or '—' }}</b>{% if d.de_setor_nome %}<small>{{ d.de_setor_nome }}</small>{% endif %}</dd></div>
-          <div><dt>Para</dt><dd><b>{{ d.para_nome or '—' }}</b>{% if d.para_setor_nome %}<small>{{ d.para_setor_nome }}</small>{% endif %}</dd></div>
-          <div><dt>Prazo</dt><dd><span class="dm-prazo dm-prazo--linha dm-p-{{ d.selo[2] }}">{{ d.selo[0] }}{% if d.selo[1] %} {{ d.selo[1] }}{% endif %}</span>{% if d.estado.prazo and d.estado.aberta %}<small>{{ dem.dia_txt(d.estado.prazo) }}</small>{% endif %}</dd></div>
-          {% if d.usinas %}<div><dt>Usinas</dt><dd class="dm-vinc">{% for uid, nome in d.usinas %}<span>{{ nome }}</span>{% endfor %}</dd></div>{% endif %}
-          {% if d.os %}<div><dt>OS</dt><dd class="dm-vinc"><button class="dm-os" type="button" data-os-folio="{{ d.os }}" title="Abrir o card da OS {{ d.os }}">OS {{ d.os }}</button></dd></div>{% endif %}
-        </dl>
         <div class="dm-det-corpo">
-          <section class="dm-det-bloco" aria-labelledby="dm-det-p-{{ d.demanda_id }}">
-            <h4 class="dm-det-h" id="dm-det-p-{{ d.demanda_id }}">O pedido</h4>
-            {% if d.descricao %}<p class="dm-texto">{{ d.descricao }}</p>{% else %}<p class="dm-nota">Sem descrição.</p>{% endif %}
+          <div class="dm-det-esq">
+            <p class="dm-fatos">
+              <span class="dm-fato dm-fato--resp"><span class="dm-fato-r">Responsável</span> <b>{{ d.para_nome or '—' }}</b>{% if d.para_setor_nome %} <span class="dm-mudo">{{ d.para_setor_nome }}</span>{% endif %}</span>
+              {% if d.os %}<span class="dm-fato"><span class="dm-fato-r">OS</span> <button class="dm-os" type="button" data-os-folio="{{ d.os }}" title="Abrir o card da OS {{ d.os }}">OS {{ d.os }}</button></span>{% endif %}
+            </p>
+            {% if d.descricao %}<p class="dm-texto">{{ d.descricao }}</p>{% endif %}
             {% if d.anexos %}
             <ul class="dm-anexos">
               {% for a in d.anexos %}<li><a href="{{ ('/t/comando/caixa-de-entrada/demandas/' ~ d.demanda_id ~ '/anexo/' ~ a.n)|na_raiz }}" target="_blank" rel="noopener"><i class="ph {{ 'ph-image' if (a.arquivo or '').lower().endswith(('.png', '.jpg', '.jpeg')) else 'ph-file-text' }}" aria-hidden="true"></i> {{ a.nome }}</a></li>{% endfor %}
             </ul>
             {% endif %}
-          </section>
-          <section class="dm-det-bloco" aria-labelledby="dm-det-a-{{ d.demanda_id }}">
+
+            {% if d.eu_recebo and sit in ('nova', 'em_analise', 'devolvida') %}
+            <div class="dm-acoes">
+              <form method="post" action="{{ ('/t/comando/caixa-de-entrada/demandas/' ~ d.demanda_id ~ '/passo')|na_raiz }}" class="dm-form" data-dm-form>
+                <input type="hidden" name="codigo" value="{{ codigo }}"><input type="hidden" name="aba" value="para">
+                <input type="hidden" name="novo_id" value="{{ dem.novo_evento() }}">
+                <label class="dm-sr" for="dm-r-{{ d.demanda_id }}">Sua resposta, ou a sua pergunta para quem pediu</label>
+                <textarea class="gc-campo" id="dm-r-{{ d.demanda_id }}" name="texto" rows="2" maxlength="{{ dem.limites.passo }}" required placeholder="Escreva a resposta, ou a pergunta para quem pediu"></textarea>
+                <div class="dm-botoes">
+                  <button class="gc-btn gc-btn--ui gc-btn--primario" type="submit" name="acao" value="respondeu"><i class="ph ph-paper-plane-tilt" aria-hidden="true"></i> Responder e finalizar</button>
+                  <button class="gc-btn gc-btn--ui gc-btn--contorno" type="submit" name="acao" value="pediu_informacao"><i class="ph ph-question" aria-hidden="true"></i> Pedir informação</button>
+                  {% if sit in ('nova', 'devolvida') %}<button class="gc-btn gc-btn--ui gc-btn--contorno" type="submit" form="dm-ea-{{ d.demanda_id }}" name="acao" value="em_analise"><i class="ph ph-hourglass" aria-hidden="true"></i> Colocar em análise</button>{% endif %}
+                </div>
+              </form>
+              {% if sit in ('nova', 'devolvida') %}
+              <form id="dm-ea-{{ d.demanda_id }}" method="post" action="{{ ('/t/comando/caixa-de-entrada/demandas/' ~ d.demanda_id ~ '/passo')|na_raiz }}" data-dm-form hidden>
+                <input type="hidden" name="codigo" value="{{ codigo }}"><input type="hidden" name="aba" value="para">
+                <input type="hidden" name="novo_id" value="{{ dem.novo_evento() }}">
+              </form>
+              {% endif %}
+              <p class="dm-nota">Pedir informação pausa o prazo até quem pediu responder. Vencida, avisa você e todo o {{ d.para_setor_nome or 'setor' }}.</p>
+            </div>
+            {% elif d.eu_pedi and sit == 'aguardando' %}
+            <div class="dm-acoes">
+              <form method="post" action="{{ ('/t/comando/caixa-de-entrada/demandas/' ~ d.demanda_id ~ '/passo')|na_raiz }}" class="dm-form" data-dm-form>
+                <input type="hidden" name="codigo" value="{{ codigo }}"><input type="hidden" name="aba" value="pedi">
+                <input type="hidden" name="novo_id" value="{{ dem.novo_evento() }}">
+                <label class="dm-sr" for="dm-i-{{ d.demanda_id }}">A informação que foi pedida</label>
+                <textarea class="gc-campo" id="dm-i-{{ d.demanda_id }}" name="texto" rows="2" maxlength="{{ dem.limites.passo }}" required placeholder="A informação que foi pedida"></textarea>
+                <div class="dm-botoes"><button class="gc-btn gc-btn--ui gc-btn--primario" type="submit" name="acao" value="informou"><i class="ph ph-paper-plane-tilt" aria-hidden="true"></i> Enviar a informação</button></div>
+              </form>
+              <p class="dm-nota">O prazo volta a correr quando você enviar.</p>
+            </div>
+            {% elif d.eu_pedi and sit == 'finalizada' %}
+            <div class="dm-acoes">
+              <form method="post" action="{{ ('/t/comando/caixa-de-entrada/demandas/' ~ d.demanda_id ~ '/passo')|na_raiz }}" class="dm-form" data-dm-form>
+                <input type="hidden" name="codigo" value="{{ codigo }}"><input type="hidden" name="aba" value="pedi">
+                <input type="hidden" name="novo_id" value="{{ dem.novo_evento() }}">
+                <label class="dm-sr" for="dm-v-{{ d.demanda_id }}">Justificativa para devolver</label>
+                <textarea class="gc-campo" id="dm-v-{{ d.demanda_id }}" name="texto" rows="2" maxlength="{{ dem.limites.passo }}" required placeholder="Se a resposta não resolveu, o que ficou faltando (para devolver)"></textarea>
+                <div class="dm-botoes">
+                  <button class="gc-btn gc-btn--ui gc-btn--primario" type="submit" form="dm-cc-{{ d.demanda_id }}" name="acao" value="concluiu"><i class="ph ph-check" aria-hidden="true"></i> Concluir</button>
+                  <button class="gc-btn gc-btn--ui gc-btn--contorno" type="submit" name="acao" value="devolveu"><i class="ph ph-arrow-u-up-left" aria-hidden="true"></i> Devolver com justificativa</button>
+                </div>
+              </form>
+              <form id="dm-cc-{{ d.demanda_id }}" method="post" action="{{ ('/t/comando/caixa-de-entrada/demandas/' ~ d.demanda_id ~ '/passo')|na_raiz }}" data-dm-form hidden>
+                <input type="hidden" name="codigo" value="{{ codigo }}"><input type="hidden" name="aba" value="pedi">
+                <input type="hidden" name="novo_id" value="{{ dem.novo_evento() }}">
+              </form>
+              <p class="dm-nota">Devolvida, o prazo do tema recomeça a contar do dia da devolução. Sem o seu ok nem a devolução em {{ dem.sozinha_dias }} dias úteis, conclui sozinha.</p>
+            </div>
+            {% elif sit not in ('concluida',) and not d.eu_recebo and not d.eu_pedi %}
+            <p class="dm-nota dm-acoes">Quem responde é {{ d.para_nome or 'quem recebeu' }}; quem conclui é {{ d.de_nome or 'quem pediu' }}.</p>
+            {% endif %}
+          </div>
+          <aside class="dm-det-dir" aria-labelledby="dm-det-a-{{ d.demanda_id }}">
             <h4 class="dm-det-h" id="dm-det-a-{{ d.demanda_id }}">Andamento</h4>
             <ol class="dm-tempo">
-              <li class="dm-feito">Aberta por {{ d.de_nome or 'quem pediu' }} <small>{{ d.aberta_txt }}</small></li>
+              <li class="dm-feito">Aberta <small>{{ d.aberta_txt }}</small></li>
               {% for p in d.passos %}
               <li class="dm-feito{% if p.evento == 'devolveu' %} dm-tempo--devolveu{% endif %}">{{ p.nome or 'Alguém' }} {{ p.rotulo }} <small>{{ p.quando_txt }}</small>{% if p.texto %}<q>{{ p.texto }}</q>{% endif %}</li>
               {% endfor %}
               {% if d.pendente %}<li>{{ d.pendente }}</li>{% endif %}
             </ol>
-          </section>
+          </aside>
         </div>
-
-        {% set sit = d.estado.situacao %}
-        {% if d.eu_recebo and sit in ('nova', 'em_analise', 'devolvida') %}
-        <div class="dm-acoes">
-          <div class="dm-acoes-cab">
-            <h4 class="dm-det-h">Responder</h4>
-            {% if sit in ('nova', 'devolvida') %}
-            <form method="post" action="{{ ('/t/comando/caixa-de-entrada/demandas/' ~ d.demanda_id ~ '/passo')|na_raiz }}" data-dm-form>
-              <input type="hidden" name="codigo" value="{{ codigo }}"><input type="hidden" name="aba" value="para">
-              <input type="hidden" name="novo_id" value="{{ dem.novo_evento() }}">
-              <button class="gc-btn gc-btn--ui gc-btn--contorno" type="submit" name="acao" value="em_analise"><i class="ph ph-hourglass" aria-hidden="true"></i> Colocar em análise</button>
-            </form>
-            {% endif %}
-          </div>
-          <form method="post" action="{{ ('/t/comando/caixa-de-entrada/demandas/' ~ d.demanda_id ~ '/passo')|na_raiz }}" class="dm-form" data-dm-form>
-            <input type="hidden" name="codigo" value="{{ codigo }}"><input type="hidden" name="aba" value="para">
-            <input type="hidden" name="novo_id" value="{{ dem.novo_evento() }}">
-            <label class="gc-rotulo" for="dm-r-{{ d.demanda_id }}">Sua resposta, ou a pergunta para {{ d.de_nome or 'quem pediu' }}</label>
-            <textarea class="gc-campo" id="dm-r-{{ d.demanda_id }}" name="texto" rows="3" maxlength="{{ dem.limites.passo }}" required></textarea>
-            <div class="dm-botoes">
-              <button class="gc-btn gc-btn--ui gc-btn--primario" type="submit" name="acao" value="respondeu"><i class="ph ph-paper-plane-tilt" aria-hidden="true"></i> Responder e finalizar</button>
-              <button class="gc-btn gc-btn--ui gc-btn--contorno" type="submit" name="acao" value="pediu_informacao"><i class="ph ph-question" aria-hidden="true"></i> Pedir informação</button>
-            </div>
-          </form>
-          <p class="dm-nota">Pedir informação pausa o prazo até {{ d.de_nome or 'quem pediu' }} responder. Vencida, avisa você e todo o {{ d.para_setor_nome or 'setor' }}.</p>
-        </div>
-        {% elif d.eu_pedi and sit == 'aguardando' %}
-        <div class="dm-acoes">
-          <div class="dm-acoes-cab"><h4 class="dm-det-h">Enviar a informação</h4></div>
-          <form method="post" action="{{ ('/t/comando/caixa-de-entrada/demandas/' ~ d.demanda_id ~ '/passo')|na_raiz }}" class="dm-form" data-dm-form>
-            <input type="hidden" name="codigo" value="{{ codigo }}"><input type="hidden" name="aba" value="pedi">
-            <input type="hidden" name="novo_id" value="{{ dem.novo_evento() }}">
-            <label class="gc-rotulo" for="dm-i-{{ d.demanda_id }}">A informação que {{ d.para_nome or 'quem recebeu' }} pediu</label>
-            <textarea class="gc-campo" id="dm-i-{{ d.demanda_id }}" name="texto" rows="3" maxlength="{{ dem.limites.passo }}" required></textarea>
-            <div class="dm-botoes"><button class="gc-btn gc-btn--ui gc-btn--primario" type="submit" name="acao" value="informou"><i class="ph ph-paper-plane-tilt" aria-hidden="true"></i> Enviar a informação</button></div>
-          </form>
-          <p class="dm-nota">O prazo volta a correr quando você enviar.</p>
-        </div>
-        {% elif d.eu_pedi and sit == 'finalizada' %}
-        <div class="dm-acoes">
-          <div class="dm-acoes-cab">
-            <h4 class="dm-det-h">A resposta resolveu?</h4>
-            <form method="post" action="{{ ('/t/comando/caixa-de-entrada/demandas/' ~ d.demanda_id ~ '/passo')|na_raiz }}" data-dm-form>
-              <input type="hidden" name="codigo" value="{{ codigo }}"><input type="hidden" name="aba" value="pedi">
-              <input type="hidden" name="novo_id" value="{{ dem.novo_evento() }}">
-              <button class="gc-btn gc-btn--ui gc-btn--primario" type="submit" name="acao" value="concluiu"><i class="ph ph-check" aria-hidden="true"></i> Concluir</button>
-            </form>
-          </div>
-          <form method="post" action="{{ ('/t/comando/caixa-de-entrada/demandas/' ~ d.demanda_id ~ '/passo')|na_raiz }}" class="dm-form" data-dm-form>
-            <input type="hidden" name="codigo" value="{{ codigo }}"><input type="hidden" name="aba" value="pedi">
-            <input type="hidden" name="novo_id" value="{{ dem.novo_evento() }}">
-            <label class="gc-rotulo" for="dm-v-{{ d.demanda_id }}">Justificativa para devolver</label>
-            <textarea class="gc-campo" id="dm-v-{{ d.demanda_id }}" name="texto" rows="2" maxlength="{{ dem.limites.passo }}" required placeholder="O que a resposta não cobriu"></textarea>
-            <div class="dm-botoes"><button class="gc-btn gc-btn--ui gc-btn--contorno" type="submit" name="acao" value="devolveu"><i class="ph ph-arrow-u-up-left" aria-hidden="true"></i> Devolver com justificativa</button></div>
-          </form>
-          <p class="dm-nota">Devolvida, o prazo do tema recomeça a contar do dia da devolução. Sem o seu ok nem a devolução em {{ dem.sozinha_dias }} dias úteis, conclui sozinha.</p>
-        </div>
-        {% elif sit not in ('concluida',) and not d.eu_recebo and not d.eu_pedi %}
-        <p class="dm-nota dm-acoes">Quem responde é {{ d.para_nome or 'quem recebeu' }}; quem conclui é {{ d.de_nome or 'quem pediu' }}.</p>
-        {% endif %}
       </article>
       {% endfor %}
     </div>

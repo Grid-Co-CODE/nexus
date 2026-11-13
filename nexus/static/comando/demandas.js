@@ -199,6 +199,7 @@ window.NexusDemandaNova = function (dlg) {
 
   function trocarAba(aba, id) {
     abaAtual = aba;
+    raiz.setAttribute('data-aba', aba);
     raiz.querySelectorAll('[data-dm-aba]').forEach(function (b) {
       b.setAttribute('aria-selected', b.getAttribute('data-dm-aba') === aba ? 'true' : 'false');
     });
