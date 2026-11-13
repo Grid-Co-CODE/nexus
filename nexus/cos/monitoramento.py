@@ -9,6 +9,7 @@ Nada aqui é regra de geração: o kW, a situação, o frescor e a curva vêm pr
 monitoramento de lá, pelo Andamento: `andamento.ler_geracao` e `andamento.ler_curvas`). Daqui são só os filtros, as
 contas da faixa e o desenho da curva (o caminho do SVG), que é puro e testável sem Flask.
 """
+import unicodedata
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 
@@ -41,6 +42,12 @@ CLIENTE_DA_ASSISTIDA = "Thopen - Operação Assistida"
 CLIENTE_SEM_CADASTRO = {"scada-noig": CLIENTE_DA_ASSISTIDA, "scada-noigb": CLIENTE_DA_ASSISTIDA,      # Nova Iguaçu 2.1 e 2.2
                         "scada-arbr": CLIENTE_DA_ASSISTIDA, "scada-arbrb": CLIENTE_DA_ASSISTIDA}      # Areia Branca 1.1 e 1.2
 BUSCA_MAX = 80
+
+
+def dobrar(texto: str) -> str:
+    """O texto sem acento e em minúscula: a busca "ribeirao" acha a Ribeirão (13/11/2026). A MESMA regra do navegador
+    (`dobrar` em static/cos/monitoramento.js), que filtra ao digitar antes de o servidor responder."""
+    return "".join(c for c in unicodedata.normalize("NFD", texto or "") if unicodedata.category(c) != "Mn").lower()
 
 # A janela da curva: o dia solar. Fora dela não há amostra (o coletor não grava das 19h às 4h, `scada_amostra`); as
 # usinas ficam lado a lado no mesmo eixo, para a curva de uma se comparar com a da outra.
@@ -167,10 +174,10 @@ def painel(geracao, curvas, agora: datetime, cliente: str = "", grupo: str = "",
     contagem = {g: sum(1 for x in no_cliente if x["grupo"] == g) for g in GRUPOS}
     contagem["velhas"] = sum(1 for x in no_cliente if not x["fresca"])
     contagem["todas"] = len(no_cliente)
-    palavras = " ".join((busca or "").lower().split())[:BUSCA_MAX].split()
+    palavras = dobrar(" ".join((busca or "").split())[:BUSCA_MAX]).split()
     lista = [x for x in no_cliente
              if (not grupo or (grupo == "velhas" and not x["fresca"]) or x["grupo"] == grupo)
-             and all(p in " ".join((x["nome"], x["codigo"], x["cliente"])).lower() for p in palavras)]
+             and all(p in dobrar(" ".join((x["nome"], x["codigo"] or "", x["cliente"] or ""))) for p in palavras)]
 
     frescas = [x for x in lista if x["fresca"] and x["kw"] is not None]
     avisos = []
