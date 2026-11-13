@@ -114,6 +114,14 @@
 
   // ── a PONTA ao vivo: as leituras de 3 s depois do último ponto gravado, só do dia de hoje ─────────────────────────
   var pontas = {};
+  // ⚠ A HORA DA PONTA É A DA LEITURA (`recebido_em` do cartão), nunca a do pedido (13/11/2026, o dono: "Ipixuna 2c, a
+  // ultima leitura foi 15:49, mas no grafico está como 16:04"). Com o coletor calado, a resposta de 3 s repete a leitura
+  // velha; carimbada com a hora do pedido, ela esticava a curva até agora. Sem `recebido_em` (ou com ele adiante do
+  // relógio daqui), fica a hora do pedido — nunca uma hora futura.
+  function horaDaLeitura(c, pedidoMs) {
+    var t = c && c.recebido_em ? Date.parse(c.recebido_em) : NaN;
+    return isFinite(t) ? Math.min(t, pedidoMs) : pedidoMs;
+  }
   function anotarPonta(chave, valor, ms) {
     var l = pontas[chave] || (pontas[chave] = []);
     if (l.length && l[l.length - 1].kw === valor && l[l.length - 1].dia === diaSP(ms)) { return; }
@@ -422,7 +430,7 @@
     return so.length ? so : lista;
   }
 
-  raiz.NexusCosInversores = { usinaDoLink: usinaDoLink, nomeDaString: nomeDaString, vistaDasEntradas: vistaDasEntradas, entradasDoInversor: entradasDoInversor,
+  raiz.NexusCosInversores = { horaDaLeitura: horaDaLeitura, usinaDoLink: usinaDoLink, nomeDaString: nomeDaString, vistaDasEntradas: vistaDasEntradas, entradasDoInversor: entradasDoInversor,
     anotarPontaEnt: anotarPontaEnt, pontaEnt: pontaEnt, limparPontaEnt: limparPontaEnt, corDaEntrada: corDaEntrada,
     estiloDaCor: estiloDaCor, N_CORES: N_CORES, PONTA_MAX: PONTA_MAX, marcasDoEixo: marcasDoEixo, DIAS_ATRAS: DIAS_ATRAS, diaTexto: diaTexto, diaMenos: diaMenos, diaCurto: diaCurto,
     entradasDoHistorico: entradasDoHistorico, comPontaAoVivo: comPontaAoVivo, avisoDoHistorico: avisoDoHistorico,
@@ -853,7 +861,7 @@
   }
   function aplicarNaGrade(m, agoraMs) {
     var mapa = mapaDosCartoes(m), fora = 0, semcom = 0, vistos = {};
-    Object.keys(mapa).forEach(function (pid) { anotarPonta("u:" + pid, mapa[pid].pac_total_kw, agoraMs); });
+    Object.keys(mapa).forEach(function (pid) { anotarPonta("u:" + pid, mapa[pid].pac_total_kw, horaDaLeitura(mapa[pid], agoraMs)); });
     document.querySelectorAll(SELETOR).forEach(function (art) {
       var gid = art.getAttribute("data-gid"), c = mapa[gid];
       if (!c) { return; }
@@ -1623,12 +1631,13 @@
     // a curva DO DIA ESCOLHIDO (13/11/2026): guardada por usina e dia; trocar o dia não deixa a de outro dia na tela
     var dia = diaEscolhido, hoje = ehHoje(), guardada = curvas[chaveDaCurva(gid, dia)];
     curva = guardada ? guardada.cv : null; curvaEm = guardada ? guardada.em : 0;
-    (c.inversores || []).forEach(function (i) { anotarPonta("i:" + i.id, i.pac, vivoEm); });
+    var lidoEm = horaDaLeitura(c, vivoEm);                 // a hora da leitura, não a do pedido
+    (c.inversores || []).forEach(function (i) { anotarPonta("i:" + i.id, i.pac, lidoEm); });
     // a ponta das entradas de hoje: cada leitura de 3 s, só desta usina (outra usina limpa); leitura velha não entra
     if (pontasDe !== gid) { limparPontaEnt(); pontasDe = gid; }
     if (c.fresca !== false) {
       (c.inversores || []).forEach(function (i) {
-        entradasDoInversor(i).lista.forEach(function (e) { anotarPontaEnt(i.id + "|" + e.chave, e.valor, vivoEm); });
+        entradasDoInversor(i).lista.forEach(function (e) { anotarPontaEnt(i.id + "|" + e.chave, e.valor, lidoEm); });
       });
     }
     // o zoom que contém agora acompanha a ponta ao vivo (em hoje); o de um trecho do passado fica parado

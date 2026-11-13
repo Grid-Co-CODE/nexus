@@ -392,3 +392,21 @@ def test_o_link_do_ver_abre_a_usina_so_com_id_de_cartao():
     r = rodar("console.log(JSON.stringify([N.usinaDoLink('?usina=scada-exa01'), N.usinaDoLink('?x=1&usina=sunop-exa100'),"
               " N.usinaDoLink('?usina=fusion-NE%3D1'), N.usinaDoLink(''), N.usinaDoLink('?usina=scada-exa01%22%3E')]))")
     assert r == ["scada-exa01", "sunop-exa100", None, None, None]
+
+
+def test_a_ponta_ao_vivo_leva_a_hora_da_leitura_e_nao_a_do_pedido():
+    # 13/11/2026, o dono: "Ipixuna 2c, a ultima leitura foi 15:49, mas no grafico está como 16:04". Com o coletor calado, a
+    # resposta de 3 s repete a leitura velha; carimbada com a hora do pedido, ela esticava a curva até agora.
+    r = rodar("const pedido = Date.parse('2026-11-13T19:04:00Z');"
+              "console.log(JSON.stringify(["
+              " N.horaDaLeitura({ recebido_em: '2026-11-13T18:49:48.085Z' }, pedido),"
+              " N.horaDaLeitura({}, pedido),"
+              " N.horaDaLeitura({ recebido_em: 'lixo' }, pedido),"
+              " N.horaDaLeitura({ recebido_em: '2026-11-13T19:10:00Z' }, pedido),"
+              " pedido]))")
+    assert r[0] == 1794595788085      # 15:49:48 de São Paulo, a hora da leitura
+    assert r[1] == r[4] and r[2] == r[4]   # sem hora de leitura: a do pedido
+    assert r[3] == r[4]               # nunca uma hora adiante do relógio daqui
+    texto = JS.read_text(encoding="utf-8")
+    assert 'anotarPonta("u:" + pid, mapa[pid].pac_total_kw, horaDaLeitura(' in texto
+    assert 'anotarPonta("i:" + i.id, i.pac, lidoEm)' in texto
