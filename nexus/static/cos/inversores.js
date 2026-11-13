@@ -422,7 +422,7 @@
     return so.length ? so : lista;
   }
 
-  raiz.NexusCosInversores = { nomeDaString: nomeDaString, vistaDasEntradas: vistaDasEntradas, entradasDoInversor: entradasDoInversor,
+  raiz.NexusCosInversores = { usinaDoLink: usinaDoLink, nomeDaString: nomeDaString, vistaDasEntradas: vistaDasEntradas, entradasDoInversor: entradasDoInversor,
     anotarPontaEnt: anotarPontaEnt, pontaEnt: pontaEnt, limparPontaEnt: limparPontaEnt, corDaEntrada: corDaEntrada,
     estiloDaCor: estiloDaCor, N_CORES: N_CORES, PONTA_MAX: PONTA_MAX, marcasDoEixo: marcasDoEixo, DIAS_ATRAS: DIAS_ATRAS, diaTexto: diaTexto, diaMenos: diaMenos, diaCurto: diaCurto,
     entradasDoHistorico: entradasDoHistorico, comPontaAoVivo: comPontaAoVivo, avisoDoHistorico: avisoDoHistorico,
@@ -1806,6 +1806,29 @@
     }
     var redim = null;
     window.addEventListener("resize", function () { clearTimeout(redim); redim = setTimeout(function () { if (aberta && vivo) { partes = null; assinatura = ""; aoVivoNaJanela(); } }, 150); });
+    abrirPeloLink();
   }
   lerVivo();
+
+  // ── O LINK QUE ABRE UMA USINA (13/11/2026) ──────────────────────────────────────────────────────────────────────
+  // O "Ver" do aviso de falha do Console embutido traz `?usina=<id do cartão>` (o mesmo `data-gid`): a janela daquela
+  // usina abre sozinha. O parâmetro sai do endereço logo depois, para recarregar a página não reabrir a janela.
+  function usinaDoLink(busca) {
+    var m = /(?:^|[?&])usina=([^&#]*)/.exec(busca || "");
+    var id = m ? decodeURIComponent(m[1].replace(/\+/g, " ")) : "";
+    return /^(scada|sunop)-[A-Za-z0-9_-]{1,80}$/.test(id) ? id : null;
+  }
+  function abrirPeloLink() {
+    var id = usinaDoLink(raiz.location && raiz.location.search);
+    if (!id) { return; }
+    try {
+      var url = new URL(raiz.location.href); url.searchParams.delete("usina");
+      raiz.history.replaceState(raiz.history.state, "", url.pathname + url.search + url.hash);
+    } catch (e) { /* sem history: a janela abre do mesmo jeito */ }
+    var arts = document.querySelectorAll(SELETOR), art = null;
+    for (var k = 0; k < arts.length; k++) { if (arts[k].getAttribute("data-gid") === id && !dlg.contains(arts[k])) { art = arts[k]; break; } }
+    if (!art) { return; }                                   // a usina não está nesta tela (outro filtro ou fonte)
+    if (art.scrollIntoView) { art.scrollIntoView({ block: "center" }); }
+    abrir(art);
+  }
 })(typeof window !== "undefined" ? window : globalThis);
