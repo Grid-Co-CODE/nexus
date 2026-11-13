@@ -77,10 +77,13 @@ nesta pasta.
   | PCM | `/os/setor/pcm` |
   | Chamados | `/os/chamados` |
   | Engenharia | `/os/engenharia` |
+  | Tradicional (o Criar OS do zero, desde 12/11/2026) | `/os/tradicional` |
   | Solicitação | `/os/solicitacao` |
   | Clonagem de OS | `/os/clonar` |
 
-  O "Setores" virou um item por setor e entrou "Ativos Fracttal" (Levi, 04/10/2026). Cada setor abre o mesmo
+  O "Setores" virou um item por setor e entrou "Ativos Fracttal" (Levi, 04/10/2026). O Tradicional entrou em 12/11/2026
+  (a sugestão de uma colega da Performance pedia o Tradicional e uma OS com várias tarefas): existia só pelo cartão do
+  Início, sem tela para liberar ao setor em Base → Acessos; várias tarefas numa OS é o "Agrupar em 1 OS" dele. Cada setor abre o mesmo
   endereço do card dele na tela inicial do OS Creator. Com `?abrir=/os/...`, a moldura abre nesse endereço (só
   `/os/...`; o resto cai no destino da tela) e a casca do OS Creator o põe numa aba: era por onde o card da OS aberto
   em outra torre levava ao "Clonar esta OS" e ao "Abrir chamado", que saíram do card em 29/10/2026.

@@ -16,7 +16,7 @@ from nexus.torres import descobrir_torres
 
 DESTINOS = {"inicio": "/os/", "historico": "/os/historico", "ativos": "/os/ativos", "performance": "/os/performance",
             "cos": "/os/cos", "pcm": "/os/setor/pcm", "chamados": "/os/chamados", "engenharia": "/os/engenharia",
-            "solicitacao": "/os/solicitacao", "clonagem": "/os/clonar"}
+            "solicitacao": "/os/solicitacao", "clonagem": "/os/clonar", "tradicional": "/os/tradicional"}
 
 
 def _torre_os():

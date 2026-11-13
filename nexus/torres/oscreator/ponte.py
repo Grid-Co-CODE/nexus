@@ -47,6 +47,7 @@ DESTINOS = {
     "pcm": "/os/setor/pcm",
     "chamados": "/os/chamados",
     "engenharia": "/os/engenharia",
+    "tradicional": "/os/tradicional",          # o Criar OS do zero (12/11/2026)
     "solicitacao": "/os/solicitacao",
     "clonagem": "/os/clonar",
 }

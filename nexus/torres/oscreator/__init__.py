@@ -31,6 +31,12 @@ TORRE = Torre(
         Tela("pcm", "PCM", "O que o PCM planeja, recebe na fila e já atendeu?", "Setor PCM do OS Creator web"),
         Tela("chamados", "Chamados", "Que chamados de garantia estão abertos e com quem?", "Setor Chamados do OS Creator web"),
         Tela("engenharia", "Engenharia", "Que OS a Engenharia abre?", "Setor Engenharia do OS Creator web"),
+        # o Criar OS do zero no menu (12/11/2026, sugestão de uma colega da Performance: "Adicionar opção de OS Tradicional no
+        # Nexus e uma OS com várias tarefas"): existia só pelo cartão do Início do OS Creator, sem tela para liberar ao
+        # setor em Base → Acessos. Várias tarefas numa OS é o "Agrupar em 1 OS" de lá, com mais de um ativo marcado
+        Tela("tradicional", "Tradicional",
+             "Como crio uma OS do zero, com um ou vários ativos (uma tarefa por ativo)?",
+             "Criar OS do zero do OS Creator web (o Tradicional) + Fracttal"),
         Tela("solicitacao", "Solicitação",
              "Como peço uma OS ao PCM e acompanho o pedido?",
              "Solicitações do OS Creator web + Fila do PCM"),
