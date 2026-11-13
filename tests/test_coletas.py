@@ -363,7 +363,8 @@ def test_os_furos_usam_o_painel_do_historico_e_varios_valores(coletas):
     assert 'p.cliente !== c' not in furos                                      # não sobrou o filtro de um valor só
     assert "window.coletasFiltros.atualizar()" in furos
     peca = open(os.path.join(RAIZ, "nexus", "static", "coletas", "filtros.js"), encoding="utf-8").read()
-    for campo in ("fzCli", "fzCart", "fzSrc", "fzSt", "fzSit", "fzZero", "fzOS", "fzConf"):
+    for campo in ("fzCli", "fzCart", "fzSrc", "fzSt", "fzSit", "fzZero", "fzOS", "fzConf", "fzFInv", "fzFIpoa", "fzFGhi",
+                  "fzColF"):
         assert '"%s"' % campo in peca                                          # todos os filtros do .exe no painel
     assert "Aplicar" in peca and "Limpar tudo" in peca and "zf-badge" in peca
 
@@ -399,3 +400,108 @@ def test_a_leitura_do_banco_em_fundo_nao_tira_o_excel_que_chegou_no_meio(tmp_pat
     finally:
         s.fechar()
         pg._GUARDA.clear()
+
+
+# ── a aba "Para coletar" do Conversor 1.0.10 (13/11/2026): onde buscar no portal e a ronda ──────────────────────────
+_CAB_EQ = ["", "Cliente", "Usina", "Usina Supervisório", "Usina Fractall", "Equipamento", "Equipamento Supervisório",
+           "Equipamento Parente"]
+
+
+def _com_equipamentos(banco):
+    """A aba Equipamentos do BD_Performance como o banco devolve: cabeçalho na linha 3, dados a partir da 4."""
+    linhas = [[None, "Thopen", "Ceilândia 2", "Ceilandia II - Pitangueira (94)", None, "UFV", None, None],
+              [None, "Thopen", "Ceilândia 2", "Ceilandia II - Pitangueira (94)", None, "Inversor 2.1", "INVERSOR - 1", "UFV"],
+              [None, "Thopen", "Ceilândia 2", "Ceilandia II - Pitangueira (94)", None, "Inversor 2.2", "INVERSOR - 2", "UFV"],
+              [None, "Sunpower", "Cascavel (Sunpower)", "SunPower UFV 6 (12)", None, "Inversor 6,2", "INV 6.2", "UFV"],
+              [None, "Thopen", "Sem planta", None, None, "Inversor 1.1", "X", "UFV"]]
+    banco.sheets["bd_performance"]["Equipamentos"] = {"id": 900, "sheet_name": "Equipamentos", "header_row": 3}
+    banco.rows[900] = [{"row_number": i + 4, "headers": _CAB_EQ, "values": v} for i, v in enumerate(linhas)]
+    return banco
+
+
+def test_onde_buscar_no_portal_sai_da_aba_equipamentos_do_banco(coletas, app, tmp_path):
+    p = _bd_excel(tmp_path)
+    app.config["NEXUS_COLETAS_BANCO"] = lambda: _com_equipamentos(BancoDeMentira(p))
+    servico._PORTAL.clear()
+    m = coletas.get("/t/performance/coletas/furos/portal").get_json()
+    assert m["Ceilândia 2"] == {"plantas": ["Ceilandia II - Pitangueira"],
+                                "inv": {"Inversor 2.1": ["Ceilandia II - Pitangueira", "INVERSOR - 1"],
+                                        "Inversor 2.2": ["Ceilandia II - Pitangueira", "INVERSOR - 2"]}}
+    assert m["Cascavel (Sunpower)"]["inv"] == {"Inversor 6.2": ["SunPower UFV 6", "INV 6.2"]}   # "6,2" = "6.2"
+    assert "Sem planta" not in m                                                 # sem a planta do supervisório não entra
+    servico._PORTAL.clear()
+
+
+def test_a_leitura_do_portal_e_a_mesma_do_exe(tmp_path):
+    """O Excel com a aba Equipamentos: o furos.portal do .exe e a leitura do banco dão o mesmo mapa."""
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Equipamentos"
+    ws.append([])
+    ws.append([])
+    ws.append(_CAB_EQ)
+    for v in _com_equipamentos(BancoDeMentira(_bd_excel(tmp_path))).rows[900]:
+        ws.append(v["values"])
+    x = tmp_path / "BD_Performance_eq.xlsx"
+    wb.save(x)
+    linhas = [_CAB_EQ] + [v["values"] for v in _com_equipamentos(BancoDeMentira(_bd_excel(tmp_path))).rows[900]]
+    assert servico.portal_de_linhas(linhas) == servico._furos.portal(str(x))
+
+
+def test_a_ronda_e_o_portal_passam_pelo_nexus(coletas):
+    html = coletas.get("/t/performance/coletas/app").get_data(as_text=True)
+    assert "furos_gravar_ronda(x)" in html and 'NX_BASE + "/furos/portal"' in html and "CHAVE_RONDA" in html
+    furos = open(os.path.join(RAIZ, "nexus", "static", "coletas", "furos.js"), encoding="utf-8").read()
+    assert 'data-t="col"' in html and "api().furos_portal()" in furos
+
+
+# ── a aba "Baixa performance" do Conversor 1.0.11 (13/11/2026): o mural com os VALORES do banco ────────────────────
+def _bd_mural(tmp_path):
+    """Uma usina com 4 inversores em novembro: o 1.4 gera metade dos outros nos dias 3 e 4; o 1.1 tem metade da potência."""
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Usina X"
+    ws.append(["Data", "Inversor 1.1", "Inversor 1.2", "Inversor 1.3", "Inversor 1.4"])
+    for d in range(1, 8):
+        baixo = d in (3, 4)
+        ws.append([dt.datetime(2026, 11, d), 50.0, 100.0, 100.0, 40.0 if baixo else 100.0])
+    eq = wb.create_sheet("Equipamentos")
+    eq.append(["Cliente", "Usina", "Usina Supervisório", "Equipamento", "Equipamento Supervisório", "Potência (kWp)"])
+    for i, k in ((1, 50), (2, 100), (3, 100), (4, 100)):
+        eq.append(["X", "Usina X", "Planta X (7)", "Inversor 1.%d" % i, "INV-%d" % i, k])
+    p = tmp_path / "BD_Performance_mural.xlsx"
+    wb.save(p)
+    return p
+
+
+def test_o_mural_do_banco_e_o_mesmo_do_exe(tmp_path):
+    from conversor import mural
+    p = _bd_mural(tmp_path)
+    hoje = dt.date(2026, 11, 8)
+    exe = mural.mural({"BD_Performance": BD("BD_Performance", str(p))}, str(p), "2026-11", hoje=hoje)
+
+    class S:
+        origem_bd, bds, caminhos_bd = {}, {}, {}
+    servico._MURAL.clear()
+    servico._PORTAL.clear()
+    banco = BancoDeMentira(p, com_mapa=False)
+    nx = servico.furos_mural(S(), lambda: banco, "2026-11", hoje=hoje)
+    assert nx == exe                                     # sem o mapa de fórmulas: ler não precisa dele
+    assert [(x["inversor"], x["base"], [d for d, _ in x["dias"]]) for x in nx["linhas"]] == \
+        [("Inversor 1.4", "kWh/kWp", ["2026-11-03", "2026-11-04"])]       # o 1.1 menor não é defeito (kWh/kWp)
+    lidas = banco.pedidos
+    assert servico.furos_mural(S(), lambda: banco, "2026-11", hoje=hoje) is nx   # guardado pela subida:
+    assert banco.pedidos == lidas                                                # não lê as abas de novo
+    assert "erro" in servico.furos_mural(S(), None, "11/2026")
+    servico._MURAL.clear()
+    servico._PORTAL.clear()
+
+
+def test_o_mural_passa_pela_api_da_tela(coletas):
+    servico._MURAL.clear()
+    r = coletas.post("/t/performance/coletas/api/furos_mural", json={"args": ["2026-10"]}).get_json()
+    assert "linhas" in r and r["ini"] == "2026-10-01"
+    assert "erro" in coletas.post("/t/performance/coletas/api/furos_mural", json={"args": ["x"]}).get_json()
+    furos = open(os.path.join(RAIZ, "nexus", "static", "coletas", "furos.js"), encoding="utf-8").read()
+    assert 's = vs("fzSrc"), c = vs("fzCli"), ca = vs("fzCart")' in furos      # o mural lê os filtros de vários valores
+    servico._MURAL.clear()

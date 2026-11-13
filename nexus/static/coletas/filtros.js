@@ -17,8 +17,11 @@
   var LISTAS = [["fzCli", "Cliente"], ["fzCart", "Carteira (Thopen)"], ["fzSrc", "Fonte"], ["fzSt", "Status da usina"],
                 ["fzSit", "Situação"]];
   // as três chaves do .exe mudam a CONTA (não escolhem linhas): no painel, como marcas, e etiqueta só quando desligadas
-  var MARCAS = [["fzZero", "Contar zerado como furo"], ["fzOS", "OS/ticket de desligamento = ausência esperada"],
-                ["fzConf", "Confirmados contam como OK"]];
+  // as "Falta" da aba Para coletar (1.0.10, 13/11/2026) escolhem linhas pelo tipo que falta; ligadas = sem filtro
+  // (o 3º item é o padrão quando não é "ligada"; o filtro em cada coluna, do 1.0.12, começa desligado)
+  var MARCAS = [["fzFInv", "Falta: Inversores (Para coletar)"], ["fzFIpoa", "Falta: IPOA (Para coletar)"],
+                ["fzFGhi", "Falta: GHI (Para coletar)"], ["fzZero", "Contar zerado como furo"], ["fzOS", "OS/ticket de desligamento = ausência esperada"],
+                ["fzConf", "Confirmados contam como OK"], ["fzColF", "Filtro em cada coluna da tabela", false]];
   var SVG = {
     busca: '<svg class="zf-ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>',
     filtro: '<svg class="zf-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M7 12h10M10 18h4"/></svg>',
@@ -48,7 +51,7 @@
       return { chave: x[0], rotulo: x[1], tipo: "varios", opcoes: opcoes(x[0]), padrao: [],
                atual: [].filter.call($(x[0]).options, function (o) { return o.selected && o.value !== ""; }).map(function (o) { return o.value; }) };
     }).concat(MARCAS.map(function (x) {
-      return { chave: x[0], rotulo: x[1], tipo: "marca", padrao: true, atual: $(x[0]).checked };
+      return { chave: x[0], rotulo: x[1], tipo: "marca", padrao: x.length > 2 ? x[2] : true, atual: $(x[0]).checked };
     }));
   }
   function aplicados() { return campos().filter(function (c) { return !igual(c.atual, c.padrao); }); }
@@ -60,13 +63,17 @@
   }
 
   // ── a barra: a busca, o botão Filtros e, à direita, a contagem; embaixo, as etiquetas ───────────────────────────
+  // A tela 3 do .exe 1.0.12 (13/11/2026) tem a barra da frente (Mês, Buscar, Fonte, Falta, a contagem e os botões) e o
+  // "Mais filtros" recolhido. No Nexus a barra fica, com o modelo do Histórico no lugar dos filtros: a busca com a lupa e
+  // o botão Filtros entram depois do Mês; Fonte, Falta, o "Mais filtros" e o "Limpar filtros" do .exe somem (estão no
+  // painel e nas etiquetas). Mês, Mínimo de dias, a contagem, Copiar lista e Exportar continuam onde o .exe pôs.
   function montar() {
-    var corpo = $("fzCorpo"), caixa = corpo && corpo.querySelector(".box");
-    if (!caixa || barra) return;
+    var corpo = $("fzCorpo"), barraExe = corpo && corpo.querySelector(".fz-barra");
+    if (!barraExe || barra) return;
     LISTAS.forEach(function (x) { $(x[0]).multiple = true; [].forEach.call($(x[0]).options, function (o) { o.selected = false; }); });
-    barra = el('<div class="zf-barra cf-barra"></div>');
+    var q = $("fzQ"), rotuloQ = q.closest("label");
+    barra = el('<span class="cf-barra"></span>');
     var busca = el('<label class="cf-busca" title="Filtra as usinas pelo nome">' + SVG.busca + "</label>");
-    var q = $("fzQ");
     q.placeholder = "Buscar usina…";
     q.setAttribute("aria-label", "Buscar usina");
     busca.appendChild(q);
@@ -74,15 +81,14 @@
       SVG.filtro + 'Filtros <span class="zf-badge" hidden></span></button></span>');
     botao = ancora.firstChild;
     botao.addEventListener("click", function () { if (aberto) fechar(); else abrir(); });
-    var dir = el('<span class="cf-dir"></span>');
-    dir.appendChild($("fzContagem"));
     barra.appendChild(busca);
     barra.appendChild(ancora);
-    barra.appendChild(dir);
+    rotuloQ.insertAdjacentElement("afterend", barra);
+    [rotuloQ, $("fzSrc").closest("label"), $("fzFaltaBox"), $("fzMais"), $("fzLimpar")].forEach(function (x) {
+      if (x) x.classList.add("cf-oculto");
+    });
     etiquetas = el('<div class="zf-etiquetas cf-etiquetas" role="group" aria-label="Filtros aplicados" hidden></div>');
-    caixa.classList.add("cf-oculto");
-    caixa.insertAdjacentElement("beforebegin", barra);
-    barra.insertAdjacentElement("afterend", etiquetas);
+    barraExe.insertAdjacentElement("afterend", etiquetas);
     atualizar();
   }
 

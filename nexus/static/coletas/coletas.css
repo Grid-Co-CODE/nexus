@@ -2,12 +2,12 @@
    modelo A"), com o painel e as etiquetas do static/zeladoria/filtros.css (as classes zf-*). Aqui só a barra: a busca com a
    lupa, o botão Filtros ao lado e a contagem à direita. COR SÓ POR TOKEN. */
 .cf-oculto{display:none !important}
-.cf-barra{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:2px 0 10px}
+/* 1.0.12: a busca e o botão Filtros entram na barra da frente do .exe, depois do Mês */
+.cf-barra{display:flex;align-items:center;gap:10px;flex:1 1 360px;min-width:0;align-self:flex-end}
 .cf-busca{flex:1 1 280px;max-width:420px;height:36px;padding:0 12px;border-radius:10px;border:1px solid var(--linha-forte);
   background:var(--fundo);color:var(--mudo);display:flex;align-items:center;gap:8px}
 .cf-busca:focus-within{border-color:var(--info-a42)}
 .cf-busca input{flex:1;min-width:0;height:100%;border:0;background:transparent;color:var(--tinta);font:inherit;font-size:13px;outline:none}
 .cf-busca input::placeholder{color:var(--mudo)}
-.cf-dir{margin-left:auto;color:var(--mudo);font-size:12.5px}
-.cf-etiquetas{margin:0 0 10px}
+.cf-etiquetas{margin:0}
 @media (max-width:639px){.cf-busca{flex-basis:100%;max-width:none}}

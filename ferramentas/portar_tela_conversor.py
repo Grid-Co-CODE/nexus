@@ -58,6 +58,7 @@ SHIM = r"""// ---- a ponte com o servidor do Nexus (no .exe era o Python da jane
 const NX_BASE = window.NX.base;
 const TETO_ENVIO = 25 * 1024 * 1024;        // o teto de envio do Nexus, por pedido (um arquivo por pedido)
 const CHAVE_CONF = "nexus.coletas.furos.conf";
+const CHAVE_RONDA = "nexus.coletas.furos.ronda";    // a Ronda da aba "Para coletar" (1.0.10): por pessoa, como as confirmações
 async function nxPost(metodo, args, auto) {
   const h = {"Content-Type": "application/json", "Accept": "application/json"};
   if (auto) h["X-Nexus-Auto"] = "1";        // a pergunta do estado não conta como uso da pessoa
@@ -129,8 +130,9 @@ function vigiar() {
     else $("#status").textContent = "Pronto.";
   }, 900);
 }
-function lerConf() { try { return JSON.parse(localStorage.getItem(CHAVE_CONF) || "{}") || {}; } catch (e) { return {}; } }
-async function furosLer(r) { const d = await r.json(); if (d && !d.erro) d.conf = lerConf(); return d; }
+function lerChave(k) { try { return JSON.parse(localStorage.getItem(k) || "{}") || {}; } catch (e) { return {}; } }
+const lerConf = () => lerChave(CHAVE_CONF);
+async function furosLer(r) { const d = await r.json(); if (d && !d.erro) { d.conf = lerConf(); d.ronda = lerChave(CHAVE_RONDA); } return d; }
 const WEB = {
   async escolher_arquivos() { await enviar((await escolher({multiple: true})).map(f => ({file: f, rel: f.name}))); return true; },
   async escolher_pasta() { await enviar((await escolher({pasta: true})).map(f => ({file: f, rel: f.webkitRelativePath || f.name}))); return true; },
@@ -152,6 +154,12 @@ const WEB = {
     return furosLer(await fetch(NX_BASE + "/furos", {method: "POST", credentials: "same-origin", body: fd}));
   },
   furos_gravar_conf(c) { try { localStorage.setItem(CHAVE_CONF, JSON.stringify(c || {})); } catch (e) {} return true; },
+  furos_gravar_ronda(x) { try { localStorage.setItem(CHAVE_RONDA, JSON.stringify(x || {})); } catch (e) {} return true; },
+  // onde buscar no portal: a aba Equipamentos do BD_Performance (o do banco, ou o Excel que a pessoa soltou)
+  async furos_portal() {
+    try { const r = await fetch(NX_BASE + "/furos/portal", {credentials: "same-origin"}); return r.ok ? await r.json() : {}; }
+    catch (e) { return {}; }
+  },
   furos_salvar(nome, texto) { baixarBlob(nome, new Blob([texto], {type: nome.endsWith(".csv") ? "text/csv" : "application/json"})); return nome; },
   async furos_importar() {
     const fs = await escolher({accept: ".json"});
@@ -295,10 +303,10 @@ def gerar_pagina(index_html: str) -> str:
     t = _troca(t, "xlsx, xls, csv, zip, tar.gz · um ou vários de uma vez</div>",
                "xlsx, xls, csv, zip, tar.gz · um ou vários de uma vez · o BD_Performance ou o BD_Thopen em Excel solto "
                "junto entra no lugar do banco</div>\n        <div class=\"av erro\" id=\"bd-aviso\" hidden></div>", "drop")
-    t = _troca(t, '<button class="btn2" id="fzNovo" title="Volta para o relatório mais novo da pasta 4. O&amp;M &gt; 9.Pós '
-                  'Operação &gt; 1. Performance">Mais novo da pasta</button>',
-               '<button class="btn2" id="fzNovo" title="Volta para o relatório mais novo que subiu ao Nexus">Mais novo no '
-               'Nexus</button>', "furos: mais novo")
+    t = _troca(t, '<button class="btn2 fz-sm" id="fzNovo" title="Volta para o relatório mais novo da pasta 4. O&amp;M &gt; '
+                  '9.Pós Operação &gt; 1. Performance">Usar o relatório mais novo da pasta</button>',
+               '<button class="btn2 fz-sm" id="fzNovo" title="Volta para o relatório mais novo que subiu ao Nexus">Usar o '
+               'relatório mais novo no Nexus</button>', "furos: mais novo")
     # os filtros dos Furos no modelo do Histórico de OS (12/11/2026): o painel e as etiquetas da Zeladoria (zf-*) e a barra
     t = _troca(t, "</style>\n</head>",
                "</style>\n{% endraw %}<link rel=\"stylesheet\" href=\"{{ url_for('static', filename='zeladoria/filtros.css') }}\">\n"
@@ -343,9 +351,9 @@ FUROS_VARIOS = [
      '{ o.selected = o.value !== "" && keep[k].includes(o.value); }));', "furos: remarcar"),
     ('let n = FILTROS.filter(i => $f(i).value).length;',
      'let n = FILTROS.filter(i => i === "fzQ" ? $f(i).value : vs(i).length).length;', "furos: ativos"),
-    ('FILTROS.forEach(i => { $f(i).value = ""; }); cliSel = "";',
-     'FILTROS.forEach(i => { if (i === "fzQ") $f(i).value = ""; else [...$f(i).options].forEach(o => { o.selected = false; }); }); '
-     'cliSel = "";', "furos: limpar"),
+    ('FILTROS.forEach(i => { $f(i).value = ""; });',
+     'FILTROS.forEach(i => { if (i === "fzQ") $f(i).value = ""; else [...$f(i).options].forEach(o => { o.selected = false; }); });',
+     "furos: limpar"),
     ('const q = $f("fzQ").value.toLowerCase(), c = $f("fzCli").value, ca = $f("fzCart").value, s = $f("fzSrc").value, '
      'st = $f("fzSt").value, sit = $f("fzSit").value;',
      'const q = $f("fzQ").value.toLowerCase(), c = vs("fzCli"), ca = vs("fzCart"), s = vs("fzSrc"), st = vs("fzSt"), '
@@ -368,6 +376,18 @@ FUROS_VARIOS = [
     ('if (i === "fzOS") applyOS(); if (i === "fzCli") cliSel = $f("fzCli").value; render();',
      'if (i === "fzOS") applyOS(); if (i === "fzCli") { const v = vs("fzCli"); cliSel = v.length === 1 ? v[0] : ""; } render();',
      "furos: cliente escolhido"),
+    # a aba Baixa performance (1.0.11) lê os mesmos filtros: vários valores também
+    ('const q = norm($f("fzQ").value), s = $f("fzSrc").value, c = $f("fzCli").value, ca = $f("fzCart").value, '
+     'mn = +$f("fzBpMin").value || 1;',
+     'const q = norm($f("fzQ").value), s = vs("fzSrc"), c = vs("fzCli"), ca = vs("fzCart"), mn = +$f("fzBpMin").value || 1;',
+     "furos: mural ler"),
+    # no Nexus a 1ª conta lê o BD inteiro do banco (~40 s, medido em 13/11/2026); depois fica guardada até a próxima subida
+    ('Calculando o mural com o BD… (uns 10 segundos)',
+     'Calculando o mural com o BD do banco… (até 1 minuto na primeira vez do dia; depois é na hora)', "furos: mural espera"),
+    ('if (s && x.fonte !== s) return false;', 'if (s.length && !s.includes(x.fonte)) return false;', "furos: mural fonte"),
+    ('if (c && (!p || p.cliente !== c)) return false; if (ca && (!p || p.carteira !== ca)) return false;',
+     'if (c.length && (!p || !c.includes(p.cliente))) return false; if (ca.length && (!p || !ca.includes(p.carteira))) '
+     'return false;', "furos: mural cliente"),
     ('    $f("fzContagem").textContent = rr.length + " de " + all.length + " usinas";',
      '    $f("fzContagem").textContent = rr.length + " de " + all.length + " usinas";\n'
      '    if (window.coletasFiltros) window.coletasFiltros.atualizar();     // Nexus: a barra no modelo do Histórico de OS',

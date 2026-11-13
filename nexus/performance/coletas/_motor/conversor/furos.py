@@ -104,7 +104,9 @@ def carregar(caminho_bd_perf=None, escolhido=None):
         r = ler(p)
     except (OSError, ValueError) as e:
         return {"erro": "Não consegui ler %s: %s" % (os.path.basename(p), e), "caminho": p}
-    r["conf"] = _estado().get("conf") or {}
+    e = _estado()
+    r["conf"] = e.get("conf") or {}
+    r["ronda"] = e.get("ronda") or {}
     return r
 
 
@@ -125,6 +127,74 @@ def gravar_conf(conf):
     e["conf"] = conf if isinstance(conf, dict) else {}
     _gravar_estado(e)
     return True
+
+
+def gravar_ronda(ronda):
+    """A coluna Ronda da aba "Para coletar": {"AAAA-MM|fonte|usina": "AAAA-MM-DDTHH:MM"} de quem já passou na usina."""
+    e = _estado()
+    e["ronda"] = ronda if isinstance(ronda, dict) else {}
+    _gravar_estado(e)
+    return True
+
+
+# ------------------------------------------------------------------ onde buscar no portal
+# Uma pessoa do backoffice, coletando a Ceilândia 2 no iSolarCloud (Levi, 13/11/2026): "tem uns dados que estão faltando
+# de um inversor específico... tem várias Ceilândia, aí eu não sei qual delas devo clicar". A resposta está na aba
+# Equipamentos do BD_Performance, a mesma que a coleta usa para casar o supervisório com o BD: o Inversor 2.3 da
+# Ceilândia 2 é o "INVERSOR - 3" da planta "Ceilandia II - Pitangueira". O "(94)" do fim é o id da API PV, sai do nome.
+_PORTAL = {}
+
+
+def _sem_id(nome):
+    return re.sub(r"\s*\(\d+\)\s*$", "", str(nome or "")).strip()
+
+
+def _equip(nome):
+    return re.sub(r"(\d),(\d)", r"\1.\2", str(nome or "").strip())      # "Inversor 6,2" (Cascavel) = "Inversor 6.2"
+
+
+def portal(caminho_bd_perf=None):
+    """{usina do BD: {"plantas": [nome da planta no portal...], "inv": {"Inversor 2.3": [planta, equipamento]}}}."""
+    if not caminho_bd_perf or not os.path.isfile(caminho_bd_perf):
+        return {}
+    chave = (caminho_bd_perf, os.path.getmtime(caminho_bd_perf))
+    if chave in _PORTAL:
+        return _PORTAL[chave]
+    import shutil
+    import tempfile
+    import openpyxl
+    tmp = os.path.join(tempfile.gettempdir(), "conversor_equipamentos.xlsx")
+    shutil.copy2(caminho_bd_perf, tmp)                  # o BD do OneDrive pode estar aberto: lê uma cópia
+    out = {}
+    wb = openpyxl.load_workbook(tmp, read_only=True, data_only=True)
+    try:
+        if "Equipamentos" not in wb.sheetnames:
+            return {}
+        linhas = wb["Equipamentos"].iter_rows(values_only=True)
+        cab = None
+        for r in linhas:                                # o cabeçalho está na linha 3 (1 e 2 em branco)
+            s_ = [str(c).strip() if c is not None else "" for c in r]
+            if "Usina Supervisório" in s_ and "Equipamento" in s_:
+                cab = {n: i for i, n in enumerate(s_)}
+                break
+        if cab is None:
+            return {}
+        for r in linhas:
+            us, u = r[cab["Usina Supervisório"]], r[cab["Usina"]]
+            if not us or not u:
+                continue
+            d = out.setdefault(str(u).strip(), {"plantas": [], "inv": {}})
+            pl = _sem_id(us)
+            if pl not in d["plantas"]:
+                d["plantas"].append(pl)
+            es, e = r[cab["Equipamento Supervisório"]], r[cab["Equipamento"]]
+            if es and e:
+                d["inv"].setdefault(_equip(e), [pl, str(es).strip()])
+    finally:
+        wb.close()
+    _PORTAL.clear()
+    _PORTAL[chave] = out
+    return out
 
 
 def html_com_marcacoes(caminho, conf):

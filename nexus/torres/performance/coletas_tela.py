@@ -21,7 +21,7 @@ from . import TORRE, bp
 
 # Os métodos que a página do Conversor chama (os mesmos da Api do app.py do .exe, sem os da janela do Windows)
 METODOS = {"estado", "responder_usina", "separar", "dado_bruto", "remover", "limpar", "reler_bds", "converter",
-           "novo_lote", "lote_pronto"}
+           "novo_lote", "lote_pronto", "furos_mural"}
 
 
 def _pasta(*partes):
@@ -87,6 +87,9 @@ def coletas_api(metodo):
         if metodo == "reler_bds":
             s.carregar_bds()
             return _json(s.estado())
+        if metodo == "furos_mural":
+            return _json(servico.furos_mural(s, _fabrica_do_banco(current_app._get_current_object()),
+                                             str(args[0]) if args else ""))
         if metodo == "novo_lote":
             return _json(s.novo_lote())
         if metodo == "lote_pronto":
@@ -165,6 +168,16 @@ def coletas_furos_subir():
     with open(p, "w", encoding="utf-8") as g:
         g.write(texto)
     return _json(servico.furos_ler(p))
+
+
+@bp.route("/coletas/furos/portal")
+def coletas_furos_portal():
+    """Onde buscar no portal (a aba "Para coletar"): a aba Equipamentos do BD_Performance, do Excel solto ou do banco."""
+    try:
+        return _json(servico.furos_portal(_minha(), _fabrica_do_banco(current_app._get_current_object())))
+    except Exception:                       # noqa: BLE001 — sem o mapa a aba só não diz onde buscar
+        current_app.logger.exception("coletas: furos_portal")
+        return _json({})
 
 
 @bp.route("/coletas/furos/html", methods=["POST"])

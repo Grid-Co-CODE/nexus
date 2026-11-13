@@ -24,6 +24,7 @@ from . import motor  # noqa: F401 — o motor como `conversor`
 from . import pg
 from conversor import furos as _furos  # noqa: E402
 from conversor import montagem  # noqa: E402
+from conversor import mural as _mural  # noqa: E402
 from conversor.nucleo import BD_PERFORMANCE, BD_THOPEN  # noqa: E402
 from conversor.sessao import Sessao  # noqa: E402
 
@@ -303,3 +304,137 @@ def furos_ler(caminho):
     r["caminho"] = os.path.basename(caminho)
     r["conf"] = {}                          # as de cada pessoa ficam no navegador dela (a tela soma)
     return r
+
+
+# ------------------------------------------------------------------------- onde buscar no portal (Conversor 1.0.10)
+# A aba "Para coletar" dos Furos diz em que planta e equipamento do supervisório buscar o inversor que falta (13/11/2026,
+# quem coleta a Thopen no iSolarCloud: "tem várias Ceilândia, aí eu não sei qual delas devo clicar"). No .exe sai da
+# aba Equipamentos do BD_Performance em Excel (`furos.portal`); aqui, do Excel que a pessoa soltou ou, sem ele, da mesma
+# aba no banco (a subida do coletor). A leitura é a do .exe, linha a linha: o cabeçalho é a linha com "Usina Supervisório"
+# e "Equipamento"; o "(94)" do id da API PV sai do nome da planta; "Inversor 6,2" = "Inversor 6.2".
+_PORTAL = {}
+_TRAVA_PORTAL = threading.Lock()        # o furos.portal do .exe copia o Excel para um nome fixo no temp
+
+
+def portal_de_linhas(linhas):
+    out, cab = {}, None
+    linhas = iter(linhas)
+    for r in linhas:
+        s_ = [str(c).strip() if c is not None else "" for c in r]
+        if "Usina Supervisório" in s_ and "Equipamento" in s_:
+            cab = {n: i for i, n in enumerate(s_)}
+            break
+    if cab is None:
+        return {}
+    pega = lambda r, n: r[cab[n]] if cab.get(n) is not None and cab[n] < len(r) else None   # noqa: E731
+    for r in linhas:
+        us, u = pega(r, "Usina Supervisório"), pega(r, "Usina")
+        if not us or not u:
+            continue
+        d = out.setdefault(str(u).strip(), {"plantas": [], "inv": {}})
+        pl = _furos._sem_id(us)
+        if pl not in d["plantas"]:
+            d["plantas"].append(pl)
+        es, e = pega(r, "Equipamento Supervisório"), pega(r, "Equipamento")
+        if es and e:
+            d["inv"].setdefault(_furos._equip(e), [pl, str(es).strip()])
+    return out
+
+
+def _equipamentos_do_banco(banco):
+    """As linhas da aba Equipamentos do BD_Performance no banco (o cabeçalho primeiro), guardadas 10 min."""
+    with _TRAVA_PORTAL:
+        g = _PORTAL.get("banco")
+        if g and time.time() - g[0] < pg.VALE_S:
+            return g[1]
+    b = banco()
+    sh = (b.abas().get(pg.CHAVE[BD_PERFORMANCE]) or {}).get("Equipamentos")
+    rows = b.linhas(sh["id"]) if sh else []
+    linhas = ([rows[0].get("headers") or []] if rows else []) + [x.get("values") or [] for x in rows]
+    with _TRAVA_PORTAL:
+        _PORTAL["banco"] = (time.time(), linhas)
+    return linhas
+
+
+def furos_portal(sessao, banco):
+    """{usina do BD: {"plantas": [...], "inv": {"Inversor 2.3": [planta, equipamento]}}}; {} quando não há de onde ler."""
+    if sessao.origem_bd.get(BD_PERFORMANCE) == "arquivo":
+        with _TRAVA_PORTAL:
+            return _furos.portal(sessao.caminhos_bd.get(BD_PERFORMANCE))
+    return portal_de_linhas(_equipamentos_do_banco(banco))
+
+
+# ------------------------------------------------------------------------- mural de baixa performance (Conversor 1.0.11)
+# A régua é a do .exe (`mural.calcular`): cada inversor contra a média dos demais da usina no dia, em kWh/kWp quando a aba
+# Equipamentos tem a potência de todos. No .exe usa os BDs que a janela leu; aqui, o Excel que a pessoa soltou ou, sem
+# ele, os VALORES do banco (`pg.BDdoBanco(so_valores=True)`: ler não precisa do mapa de fórmulas, que só protege a
+# colagem). A conta lê o BD inteiro: o resultado fica guardado por (mês, subida de cada BD), o BD não.
+_MURAL = {}
+_TRAVA_MURAL = threading.Lock()
+
+
+def potencias_de_linhas(linhas):
+    """A leitura do `mural.potencias` do .exe sobre as linhas da aba Equipamentos: {usina: {"Inversor 1.1": kWp}}."""
+    out, cab = {}, None
+    linhas = iter(linhas)
+    for r in linhas:
+        s_ = [str(c).strip() if c is not None else "" for c in r]
+        if "Usina" in s_ and "Equipamento" in s_ and "Potência (kWp)" in s_:
+            cab = {n: i for i, n in enumerate(s_)}
+            break
+    if cab is None:
+        return {}
+    for r in linhas:
+        u, e, k = (r[cab[n]] if cab[n] < len(r) else None for n in ("Usina", "Equipamento", "Potência (kWp)"))
+        if u and e and isinstance(k, (int, float)) and not isinstance(k, bool) and k > 0:
+            out.setdefault(str(u).strip(), {})[_mural._equip(e)] = float(k)
+    return out
+
+
+def _janela(mes, hoje):
+    """O mês até ontem, como o `mural.mural` do .exe."""
+    a, m = (int(x) for x in mes.split("-"))
+    ini = dt.date(a, m, 1)
+    return ini, min(dt.date(a + (m == 12), m % 12 + 1, 1) - dt.timedelta(days=1), hoje - dt.timedelta(days=1))
+
+
+def furos_mural(sessao, banco, mes, hoje=None):
+    """{"linhas", "limiar", "ini", "fim"} como o `mural.mural` do .exe; {"erro": ...} quando não dá."""
+    if not re.fullmatch(r"\d{4}-\d{2}", str(mes or "")):
+        return {"erro": "mês inválido"}
+    ini, fim = _janela(mes, hoje or dt.date.today())
+    bds, marca = {}, [mes, fim.isoformat()]
+    b = livros = abas = None
+    for destino in (BD_PERFORMANCE, BD_THOPEN):
+        if sessao.origem_bd.get(destino) == "arquivo" and sessao.bds.get(destino):
+            bds[destino] = sessao.bds[destino]
+            marca.append((destino, "arquivo", str(sessao.bds[destino].lido_em)))
+            continue
+        if livros is None:
+            b = banco()
+            livros, abas = b.livros(), b.abas()
+        w = livros.get(pg.CHAVE[destino])
+        if not w:
+            continue
+        bds[destino] = pg.BDdoBanco(destino, b, livros, abas, so_valores=True)
+        marca.append((destino, "banco", w.get("updated_at")))
+    if not bds:
+        return {"erro": "Os BDs não estão no banco nem foram soltos em Excel: solte o BD_Performance e o BD_Thopen."}
+    marca = tuple(marca)
+    with _TRAVA_MURAL:
+        if marca in _MURAL:
+            return _MURAL[marca]
+    if sessao.origem_bd.get(BD_PERFORMANCE) == "arquivo":
+        with _TRAVA_PORTAL:                # o .exe copia o Excel para um nome fixo no temp
+            kwp = _mural.potencias(sessao.caminhos_bd.get(BD_PERFORMANCE))
+    else:
+        kwp = potencias_de_linhas(_equipamentos_do_banco(banco))
+    out = {"linhas": _mural.calcular(bds, kwp, ini, fim), "limiar": _mural.LIMIAR, "ini": ini.isoformat(),
+           "fim": fim.isoformat()}
+    for d, bd in bds.items():
+        if sessao.bds.get(d) is not bd:
+            bd.fechar()                    # o do banco era só para esta conta: solta a memória
+    with _TRAVA_MURAL:
+        _MURAL.clear()
+        _MURAL[marca] = out
+    return out

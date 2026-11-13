@@ -159,6 +159,11 @@
   .fz-tabs{display:flex;border:1px solid var(--borda);border-radius:4px;overflow:hidden}
   .fz-tab{background:none;border:0;padding:6px 14px;color:var(--mut)}
   .fz-tab.on{background:var(--sup);color:var(--txt);box-shadow:inset 0 -2px 0 var(--verde)}
+  .fz-l2{color:var(--mut);font-size:12px}
+  .fz-sep{width:1px;height:18px;background:var(--linha);margin:0 4px}
+  #fzTb tr.fz-feito td{opacity:.55}
+  #fzTb td.fz-portal,#fzTb td.fz-inv{text-align:left;font-size:12px;max-width:360px}
+  #fzTb input.fz-ronda{width:16px;height:16px;cursor:pointer;accent-color:var(--verde)}
   .fz-legend{display:flex;flex-wrap:wrap;gap:12px;justify-content:center;font-size:11.5px;color:var(--mut)}
   .fz-legend span{display:inline-flex;align-items:center;gap:5px}
   .fz-legend i{width:12px;height:12px;border-radius:2px;display:inline-block}
@@ -217,6 +222,22 @@
   .lg-at{background:var(--sev)}.lg-cr{background:var(--err)}.lg-cf{background:var(--ok)}.lg-in{background:var(--mut)}
   .fz-vazio{color:var(--fra);padding:24px}
   .fz-nota{font-size:11.5px;text-align:center}
+  .fz-barra{display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap}
+  .fz-barra .fz-l{min-width:150px}
+  .fz-falta{display:inline-flex;align-items:center;gap:12px;padding-bottom:6px}
+  .fz-tabs-main{align-self:flex-start}
+  .fz-tabs-main .fz-tab{padding:8px 16px;font-size:13.5px}
+  .fz-menu{position:relative}
+  .fz-menu>summary{list-style:none;cursor:pointer}
+  .fz-menu>summary::-webkit-details-marker{display:none}
+  .fz-menu-c{position:absolute;right:0;top:calc(100% + 6px);z-index:20;display:flex;flex-direction:column;gap:6px;
+    min-width:280px;padding:10px;background:var(--sup);border:1px solid var(--borda);border-radius:6px}
+  .fz-menu-c .btn2{text-align:left}
+  .fz-mais>summary,.fz-como>summary{cursor:pointer;color:var(--mut);font-size:12.5px;width:max-content}
+  .fz-mais[open]{padding:10px 12px;border:1px solid var(--linha);border-radius:6px}
+  .fz-mais[open]>summary{margin-bottom:10px}
+  .fz-como[open]>summary{margin-bottom:8px}
+  #fzTb.sem-cf tr.fz-cf{display:none}
   @media (max-width:1100px){.fz-grade{grid-template-columns:repeat(3,1fr)}}
   /* observação de status (ETM com buraco etc.): canto laranja na célula, como o comentário do Excel; o texto no mouse */
   .grid td.obs{background-image:linear-gradient(225deg,var(--sev) 7px,transparent 7px)}
@@ -292,22 +313,45 @@
 
     <section id="tela3" hidden>
       <div class="pad fz">
+        <!-- Enxuta (Levi, 13/11/2026: "só tô vendo uma porrada de botão, filtro... muita informação"): na frente só as
+             abas, mês, busca, fonte e 4 números; o resto em "Mais filtros", "Mais opções" e "Como ler esta tela". -->
         <div class="fz-topo">
-          <div><div class="fz-tit">Furos de coleta de geração</div><div class="f" id="fzSub"></div></div>
+          <div><div class="fz-tit">Furos de coleta</div><div class="f" id="fzSub"></div></div>
           <span style="flex:1"></span>
-          <label class="fz-l">Mês de análise<select id="fzMes" class="fz-ctl"></select></label>
-          <button class="btn2" id="fzNovo" title="Volta para o relatório mais novo que subiu ao Nexus">Mais novo no Nexus</button>
-          <button class="btn2" id="fzAbrir">Abrir relatório…</button>
+          <details class="fz-menu"><summary class="btn2">Mais opções</summary>
+            <div class="fz-menu-c">
+              <button class="btn2 fz-sm" id="fzNovo" title="Volta para o relatório mais novo que subiu ao Nexus">Usar o relatório mais novo no Nexus</button>
+              <button class="btn2 fz-sm" id="fzAbrir">Abrir outro relatório…</button>
+              <button class="btn2 fz-sm" id="fzExp">Exportar confirmações</button>
+              <button class="btn2 fz-sm" id="fzImp">Importar confirmações</button>
+              <button class="btn2 fz-sm" id="fzHtml">Salvar HTML com as marcações</button>
+              <div class="f" id="fzOrigem"></div>
+            </div>
+          </details>
         </div>
-        <div class="f" id="fzOrigem"></div>
         <div class="vazio" id="fzErro" hidden></div>
         <div id="fzCorpo" hidden style="display:flex;flex-direction:column;gap:10px">
-          <div class="box">
+          <div class="fz-tabs fz-tabs-main"><button class="fz-tab on" data-t="col">Para coletar</button><button class="fz-tab" data-t="bp">Baixa performance</button><button class="fz-tab" data-t="res">Resumo por usina</button><button class="fz-tab" data-t="det">Detalhe por equipamento</button></div>
+          <div class="fz-barra">
+            <label class="fz-l">Mês<select id="fzMes" class="fz-ctl"></select></label>
+            <label class="fz-l">Buscar usina<input type="search" id="fzQ" class="fz-ctl" placeholder="nome da usina…"></label>
+            <label class="fz-l">Fonte<select id="fzSrc" class="fz-ctl"><option value="">Todas</option><option value="BD_Thopen">Thopen</option><option value="BD_Performance">Performance</option></select></label>
+            <span class="fz-falta" id="fzFaltaBox"><span class="fz-l2">Falta:</span>
+              <label class="fz-sw"><input type="checkbox" id="fzFInv" checked><span></span>Inversores</label>
+              <label class="fz-sw"><input type="checkbox" id="fzFIpoa" checked><span></span>IPOA</label>
+              <label class="fz-sw"><input type="checkbox" id="fzFGhi" checked><span></span>GHI</label></span>
+            <label class="fz-l" hidden>Mínimo de dias ≤ 70%<select id="fzBpMin" class="fz-ctl"><option selected>1</option><option>2</option><option>3</option><option>5</option><option>7</option></select></label>
+            <span style="flex:1"></span>
+            <span class="f" id="fzContagem"></span>
+            <button class="btn2 fz-sm" id="fzLimpar" hidden>Limpar filtros</button>
+            <button class="btn fz-sm" id="fzCopiar" hidden>Copiar lista</button>
+            <button class="btn2 fz-sm" id="fzCsv">Exportar</button>
+          </div>
+          <div class="kpis fz-kpis" id="fzKpis"></div>
+          <details class="fz-mais" id="fzMais"><summary>Mais filtros <span id="fzMaisN"></span></summary>
             <div class="fz-grade">
-              <label class="fz-l">Buscar usina<input type="search" id="fzQ" class="fz-ctl" placeholder="nome da usina…"></label>
               <label class="fz-l">Cliente<select id="fzCli" class="fz-ctl"></select></label>
               <label class="fz-l">Carteira (Thopen)<select id="fzCart" class="fz-ctl"></select></label>
-              <label class="fz-l">Fonte<select id="fzSrc" class="fz-ctl"><option value="">Todas</option><option>BD_Performance</option><option>BD_Thopen</option></select></label>
               <label class="fz-l">Status da usina<select id="fzSt" class="fz-ctl"></select></label>
               <label class="fz-l">Situação<select id="fzSit" class="fz-ctl"><option value="">Todas (falhas em destaque)</option><option value="falha">Falha pendente</option><option value="conf">Confirmado OK</option><option value="ok">Sem falha</option><option value="os">Com ausência esperada por OS/ticket</option><option value="noos">Com parada sem OS (atenção)</option><option value="ipoa">Sem IPOA pendente</option><option value="ghi">Sem GHI pendente</option><option value="inop">Com equipamento inoperante</option><option value="inv">Inversor com furo pendente</option></select></label>
             </div>
@@ -315,21 +359,15 @@
               <label class="fz-sw"><input type="checkbox" id="fzZero" checked><span></span>Contar zerado como furo</label>
               <label class="fz-sw"><input type="checkbox" id="fzOS" checked><span></span>OS/ticket de desligamento = ausência esperada</label>
               <label class="fz-sw"><input type="checkbox" id="fzConf" checked><span></span>Confirmados contam como OK</label>
-              <span style="flex:1"></span>
-              <span class="f" id="fzContagem"></span>
-              <button class="btn2" id="fzLimpar" disabled>Limpar filtros</button>
+              <label class="fz-sw"><input type="checkbox" id="fzColF"><span></span>Filtro em cada coluna da tabela</label>
             </div>
-          </div>
-          <div class="kpis fz-kpis" id="fzKpis"></div>
-          <div class="lbl" style="text-align:center">Resumo por cliente · usinas com falha pendente / total · clique para filtrar</div>
-          <div class="fz-clients" id="fzClients"></div>
-          <div class="row" style="flex-wrap:wrap">
-            <div class="fz-tabs"><button class="fz-tab on" data-t="res">Resumo por usina</button><button class="fz-tab" data-t="det">Detalhe por equipamento</button></div>
-            <span><button class="btn2 fz-sm" id="fzCsv">Exportar CSV</button> <button class="btn2 fz-sm" id="fzExp">Exportar confirmações</button> <button class="btn2 fz-sm" id="fzImp">Importar confirmações</button> <button class="btn2 fz-sm" id="fzHtml">Salvar HTML com as marcações</button></span>
-          </div>
-          <div class="fz-legend" id="fzLegend"></div>
-          <div class="fz-rol fz-tab-wrap"><table id="fzTb"><thead></thead><tbody></tbody></table></div>
-          <div class="f fz-nota">Critério: célula = equipamento × dia. Vazio = sem valor na planilha; zerado = 0 enquanto os demais inversores geraram (ou IPOA/GHI 0 com geração). No mês corrente, os 2 últimos dias totalmente em branco na usina são tratados como coleta pendente (defasagem), não falha. As confirmações ficam salvas neste computador; "Exportar confirmações" gera o confirmacoes_furos.json para o gerador embutir. · <span id="fzNconf"></span></div>
+          </details>
+          <div class="fz-clients" id="fzClients" hidden></div>
+          <div class="fz-rol fz-tab-wrap"><table id="fzTb" class="sem-cf"><thead></thead><tbody></tbody></table></div>
+          <details class="fz-como"><summary>Como ler esta tela</summary>
+            <div class="fz-legend" id="fzLegend"></div>
+            <div class="f fz-nota">Critério: célula = equipamento × dia. Vazio = sem valor na planilha; zerado = 0 enquanto os demais inversores geraram (ou IPOA/GHI 0 com geração). No mês corrente, os 2 últimos dias totalmente em branco na usina são tratados como coleta pendente (defasagem), não falha. As confirmações ficam salvas neste computador; "Exportar confirmações" gera o confirmacoes_furos.json para o gerador embutir. · <span id="fzNconf"></span></div>
+          </details>
         </div>
       </div>
     </section>
@@ -366,6 +404,7 @@ const tam = b => b >= 1048576 ? (b/1048576).toLocaleString("pt-BR",{maximumFract
 const NX_BASE = window.NX.base;
 const TETO_ENVIO = 25 * 1024 * 1024;        // o teto de envio do Nexus, por pedido (um arquivo por pedido)
 const CHAVE_CONF = "nexus.coletas.furos.conf";
+const CHAVE_RONDA = "nexus.coletas.furos.ronda";    // a Ronda da aba "Para coletar" (1.0.10): por pessoa, como as confirmações
 async function nxPost(metodo, args, auto) {
   const h = {"Content-Type": "application/json", "Accept": "application/json"};
   if (auto) h["X-Nexus-Auto"] = "1";        // a pergunta do estado não conta como uso da pessoa
@@ -437,8 +476,9 @@ function vigiar() {
     else $("#status").textContent = "Pronto.";
   }, 900);
 }
-function lerConf() { try { return JSON.parse(localStorage.getItem(CHAVE_CONF) || "{}") || {}; } catch (e) { return {}; } }
-async function furosLer(r) { const d = await r.json(); if (d && !d.erro) d.conf = lerConf(); return d; }
+function lerChave(k) { try { return JSON.parse(localStorage.getItem(k) || "{}") || {}; } catch (e) { return {}; } }
+const lerConf = () => lerChave(CHAVE_CONF);
+async function furosLer(r) { const d = await r.json(); if (d && !d.erro) { d.conf = lerConf(); d.ronda = lerChave(CHAVE_RONDA); } return d; }
 const WEB = {
   async escolher_arquivos() { await enviar((await escolher({multiple: true})).map(f => ({file: f, rel: f.name}))); return true; },
   async escolher_pasta() { await enviar((await escolher({pasta: true})).map(f => ({file: f, rel: f.webkitRelativePath || f.name}))); return true; },
@@ -460,6 +500,12 @@ const WEB = {
     return furosLer(await fetch(NX_BASE + "/furos", {method: "POST", credentials: "same-origin", body: fd}));
   },
   furos_gravar_conf(c) { try { localStorage.setItem(CHAVE_CONF, JSON.stringify(c || {})); } catch (e) {} return true; },
+  furos_gravar_ronda(x) { try { localStorage.setItem(CHAVE_RONDA, JSON.stringify(x || {})); } catch (e) {} return true; },
+  // onde buscar no portal: a aba Equipamentos do BD_Performance (o do banco, ou o Excel que a pessoa soltou)
+  async furos_portal() {
+    try { const r = await fetch(NX_BASE + "/furos/portal", {credentials: "same-origin"}); return r.ok ? await r.json() : {}; }
+    catch (e) { return {}; }
+  },
   furos_salvar(nome, texto) { baixarBlob(nome, new Blob([texto], {type: nome.endsWith(".csv") ? "text/csv" : "application/json"})); return nome; },
   async furos_importar() {
     const fs = await escolher({accept: ".json"});

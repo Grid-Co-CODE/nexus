@@ -79,7 +79,34 @@ descartam. Cliente, Carteira, Fonte, Status e Situação são **listas digitáve
 Situação passa a usina que cumpre QUALQUER uma das marcadas); as três chaves que mudam a conta (zerado como furo, OS como
 ausência esperada, confirmados como OK) ficam no painel como marcas, com etiqueta quando desligadas. O `furos.js` gerado
 lê os vários valores pelas trocas `FUROS_VARIOS` do `portar_tela_conversor.py` (os `<select>` do .exe viram `multiple`).
-Nenhum filtro novo nem padrão novo: os mesmos campos do .exe.
+Nenhum filtro novo nem padrão novo: os mesmos campos do .exe. As caixas "Falta: Inversores / IPOA / GHI" do 1.0.10
+entram no painel como marcas (ligadas = sem filtro, etiqueta quando desligadas).
+
+**1.0.12 (13/11/2026), a tela 3 enxuta do .exe:** abre no "Para coletar"; na frente, Mês, busca, Fonte, Falta e 4 números;
+o resto no "Mais filtros" (details), no "Mais opções" (menu) e no "Como ler esta tela". No Nexus a barra da frente fica e
+o `filtros.js` põe nela, depois do Mês, a busca com lupa e o botão Filtros; Fonte, Falta, o "Mais filtros" e o "Limpar
+filtros" do .exe ficam escondidos (`cf-oculto`), porque estão no painel e nas etiquetas. O "Filtro em cada coluna da
+tabela" (`fzColF`) é marca com padrão DESLIGADO (o 3º item de `MARCAS`).
+
+## As abas "Para coletar" (1.0.10) e "Baixa performance" (1.0.11), 13/11/2026
+
+As duas precisam do Python além do relatório de furos; no .exe usam o BD que a janela leu, aqui:
+
+- **Onde buscar no portal** (`/coletas/furos/portal` -> `servico.furos_portal`): a aba Equipamentos do BD_Performance. Com
+  o Excel solto, o `furos.portal` do .exe; sem ele, a mesma aba no banco (`bd_performance · Equipamentos`, guardada 10 min),
+  lida por `portal_de_linhas`, que repete a leitura do .exe linha a linha. Prova de 13/11: banco = Excel, 131 usinas.
+- **Ronda** e **confirmações** ficam no navegador de cada pessoa (localStorage `nexus.coletas.furos.ronda` / `.conf`):
+  no .exe era o `furos.json` do PC.
+- **Mural** (`api/furos_mural` -> `servico.furos_mural`): a conta é o `mural.calcular` do .exe. Sem Excel solto, lê os
+  **valores** do banco por `pg.BDdoBanco(so_valores=True)`: ler não precisa do mapa de fórmulas (que só protege a
+  colagem), então o mural funciona mesmo antes do `bd_formulas` existir. A potência (kWh/kWp) vem da mesma aba
+  Equipamentos (`potencias_de_linhas` = `mural.potencias`). A 1ª conta lê o BD inteiro do banco: **~40 s e pico de ~60 MB**
+  (medido 13/11); o resultado fica guardado por (mês, ontem, subida de cada BD) e o BD é solto. Prova de 13/11 até 11/11:
+  193 inversores, 177 iguais ao .exe com os BDs em Excel; os 16 restantes eram a Segredo de 11/11, mudada no Excel às 09:21
+  depois da subida (01:19): diferença de dado, não de regra.
+- Trazer uma versão do .exe que a Coleta ainda está mexendo: a pasta pode ter trabalho sem release (o `mural.py` estava lá
+  antes da 1.0.11). Sincronize do commit da release (`git archive <release>` da pasta `ferramentas/conversor/conversor`
+  para fora e `--origem` nela, mantendo o fim de linha da pasta) ou espere a pasta ficar limpa.
 
 ## Como provar
 

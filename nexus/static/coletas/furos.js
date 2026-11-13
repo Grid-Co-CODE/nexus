@@ -7,10 +7,17 @@
 const furos = (() => {
   const $f = id => document.getElementById(id);
   const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"}[c]));
-  let REL = null, DB = null, MKEYS = [], MONTH = "", TAB = "res", cliSel = "";
-  const sortK = {res: "pend", det: "pend"}, sortD = {res: -1, det: -1};
-  const OPEN = {res: new Set(), det: new Set()}, SHOWALL = new Set();
-  const COLF = {res: {}, det: {}}, CFO = {res: {}, det: {}}, CATS = ["cliente", "carteira", "status", "src", "sit"];
+  let REL = null, DB = null, MKEYS = [], MONTH = "", TAB = "col", cliSel = "";   // abre no "Para coletar" (13/11)
+  // "Para coletar" (Levi, 13/11/2026, relato de quem coleta a Thopen no iSolarCloud): a lista do que falta por usina,
+  // no formato da planilha de ronda dela (POA | GHI | Inversores | Ronda), com ONDE buscar no portal — "tem várias
+  // Ceilândia, aí eu não sei qual delas devo clicar". PORTAL vem da aba Equipamentos do BD_Performance (furos.portal).
+  let PORTAL = {}, RONDA = {};
+  // Mural de baixa performance (Levi, 13/11/2026: "inversores com baixa performance... em relação aos demais... a média
+  // ali é 100%... 70 para baixo"): calculado no app com o BD (mural.py), por mês; não vem do relatório de furos.
+  const MURAL = {}; let bpSort = {k: "n", d: -1};
+  const sortK = {res: "pend", det: "pend", col: "usina"}, sortD = {res: -1, det: -1, col: 1};
+  const OPEN = {res: new Set(), det: new Set(), col: new Set()}, SHOWALL = new Set();
+  const COLF = {res: {}, det: {}, col: {}}, CFO = {res: {}, det: {}, col: {}}, CATS = ["cliente", "carteira", "status", "src", "sit", "ronda"];
   const NUMK = new Set(["pendN", "confN", "ex", "inopN", "ipF", "ghF", "invF", "nInv", "cp", "comp"]);
   const MN = ["", "janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro",
               "novembro", "dezembro"];
@@ -172,6 +179,10 @@ const furos = (() => {
   const sitOk = (x, m) => x === "falha" ? m.sit === "falha" : x === "conf" ? m.sit === "conf" : x === "ok" ? m.sit === "ok" :
     x === "ipoa" ? !!m.ipF : x === "ghi" ? !!m.ghF : x === "inop" ? !!m.inopN : x === "os" ? !!m.ex : x === "noos" ? !!m.noos :
     x === "inv" ? !!m.invF : true;
+  const FALTA = [["fzFInv", "inv"], ["fzFIpoa", "ipoa"], ["fzFGhi", "ghi"]];
+  // falta marcada: todas ligadas = sem filtro; senão a usina precisa ter pendência de um dos tipos ligados
+  const faltaOn = () => FALTA.filter(([i]) => $f(i).checked).map(([, t]) => t);
+  const temFalta = (m, tipos) => tipos.some(t => t === "inv" ? (m.invF || m.pend.some(x => x.tipo === "UFV")) : t === "ipoa" ? m.ipF : m.ghF);
   function fillFilters() {
     const ps = P(), keep = [vs("fzCli"), vs("fzCart"), vs("fzSt")];
     $f("fzCli").innerHTML = '<option value="">Todos</option>' + [...new Set(ps.map(p => p.cliente))].sort().map(c => `<option>${esc(c)}</option>`).join("");
@@ -181,16 +192,20 @@ const furos = (() => {
   }
   function ativos() {
     let n = FILTROS.filter(i => i === "fzQ" ? $f(i).value : vs(i).length).length;
+    if (TAB === "col" && faltaOn().length < FALTA.length) n++;
     n += Object.values(COLF[TAB]).filter(v => v !== "").length;
     return n;
   }
   function limparFiltros() {
-    FILTROS.forEach(i => { if (i === "fzQ") $f(i).value = ""; else [...$f(i).options].forEach(o => { o.selected = false; }); }); cliSel = ""; COLF.res = {}; COLF.det = {}; render();
+    FILTROS.forEach(i => { if (i === "fzQ") $f(i).value = ""; else [...$f(i).options].forEach(o => { o.selected = false; }); }); FALTA.forEach(([i]) => { $f(i).checked = true; });
+    cliSel = ""; COLF.res = {}; COLF.det = {}; COLF.col = {}; render();
   }
   const rowsAll = () => P().map(p => ({p, m: calc(p)}));
   function filtered() {
     const q = $f("fzQ").value.toLowerCase(), c = vs("fzCli"), ca = vs("fzCart"), s = vs("fzSrc"), st = vs("fzSt"), sit = vs("fzSit");
+    const tipos = faltaOn(), restringe = TAB === "col" && tipos.length < FALTA.length;
     return rowsAll().filter(({p, m}) => {
+      if (restringe && !temFalta(m, tipos)) return false;
       if (c.length && !c.includes(p.cliente)) return false; if (ca.length && !ca.includes(p.carteira)) return false; if (s.length && !s.includes(p.src)) return false;
       if (st.length && !st.includes(p.status || "—")) return false; if (q && !p.usina.toLowerCase().includes(q)) return false;
       if (sit.length && !sit.some(x => sitOk(x, m))) return false;
@@ -202,7 +217,10 @@ const furos = (() => {
     switch (k) {
       case "usina": return p.usina; case "cliente": return p.cliente; case "carteira": return p.carteira; case "status": return p.status || "—";
       case "src": return p.src; case "sit": return sitLbl(m); case "falha": return (falhaResumo(p, m) + " " + falhaTxt(p, m)).replace(/<[^>]+>/g, " ");
-      case "comp": return Math.round(m.comp * 100); default: return m[k];
+      case "comp": return Math.round(m.comp * 100);
+      case "ipD": return ipTxt(p, m); case "ghD": return ghTxt(p, m); case "invD": return invTxt(p, m);
+      case "portal": return portalTxt(p, m).replace(/<[^>]+>/g, " "); case "ronda": return RONDA[rkey(p)] ? "feita" : "";
+      default: return m[k];
     }
   }
   function numOk(v, q) {
@@ -263,6 +281,140 @@ const furos = (() => {
     });
     $f("fzTb").tBodies[0].innerHTML = h || '<tr><td colspan="13" class="fz-vazio">Nenhuma usina para os filtros.</td></tr>';
   }
+  // ---------------------------------------------------------------- Para coletar
+  const rkey = p => MONTH + "|" + p.src + "|" + p.usina;
+  const curto = n => n.replace(/^Inversor\s*/i, "");
+  const eqN = n => String(n).replace(/(\d),(\d)/g, "$1.$2");
+  function ipTxt(p, m) { if (!faltaOn().includes("ipoa")) return ""; const t = m.pend.find(x => x.tipo === "IPOA"); return t ? ranges(t.idx, p.days) : ""; }
+  function ghTxt(p, m) { if (!faltaOn().includes("ghi")) return ""; const t = m.pend.find(x => x.tipo === "GHI"); return t ? ranges(t.idx, p.days) : ""; }
+  function invTxt(p, m) {
+    if (!faltaOn().includes("inv")) return "";
+    const out = [], uf = m.pend.find(x => x.tipo === "UFV");
+    if (uf) out.push("UFV toda: " + ranges(uf.idx, p.days));
+    m.pend.filter(x => x.tipo === "Inversor").forEach(t => out.push("Inv " + curto(t.nome) + " (" + ranges(t.idx, p.days) + ")"));
+    return out.join("; ");
+  }
+  // planta e equipamento no portal; sem de-para no cadastro, a planta provável pelos irmãos (2.3 -> a planta do 2.x)
+  function portalDe(p, nome) {
+    const u = PORTAL[p.usina]; if (!u) return null;
+    const x = u.inv[eqN(nome)]; if (x) return {pl: x[0], eq: x[1]};
+    const pre = (eqN(nome).match(/(\d+)\.\d+$/) || [])[1];
+    const irmao = pre && Object.entries(u.inv).find(([k]) => (k.match(/(\d+)\.\d+$/) || [])[1] === pre);
+    return {pl: irmao ? irmao[1][0] : null, eq: null};
+  }
+  function portalTxt(p, m) {
+    const u = PORTAL[p.usina], tipos = faltaOn();
+    if (!u) return '<small class="f">sem a usina no cadastro Equipamentos</small>';
+    const por = {}, sem = [];
+    const add = (pl, txt) => { (por[pl] = por[pl] || []).push(txt); };
+    if (tipos.includes("inv")) {
+      if (m.pend.some(x => x.tipo === "UFV")) u.plantas.forEach(pl => add(pl, "todos"));
+      m.pend.filter(x => x.tipo === "Inversor").forEach(t => {
+        const d = portalDe(p, t.nome);
+        if (d && d.eq) add(d.pl, d.eq);
+        else if (d && d.pl) add(d.pl, curto(t.nome) + " sem de-para no cadastro");
+        else sem.push(curto(t.nome));
+      });
+    }
+    if (!Object.keys(por).length && !sem.length && (m.pend.some(x => x.tipo === "IPOA" || x.tipo === "GHI")))
+      u.plantas.forEach(pl => add(pl, "estação"));
+    const h = Object.entries(por).map(([pl, eqs]) => "<b>" + esc(pl) + "</b>: " + esc([...new Set(eqs)].join(", ")));
+    if (sem.length) h.push('<span class="fz-an">' + esc(sem.join(", ")) + " sem de-para no cadastro</span>");
+    return h.join("<br>") || '<small class="f">—</small>';
+  }
+  function linhasCol(rows) {
+    const tipos = faltaOn();
+    return rows.filter(({m}) => temFalta(m, tipos));
+  }
+  function renderCol(rows) {
+    head([["usina", "Usina"], ["src", "Fonte"], ["ipD", "POA (dias)"], ["ghD", "GHI (dias)"], ["invD", "Inversores (dias)"],
+          ["portal", "Onde buscar no portal"], ["ronda", "Ronda"]], "col");
+    sortRows(rows, "col"); let h = "";
+    rows.forEach(({p, m}) => {
+      const id = rid(p), feita = !!RONDA[rkey(p)];
+      h += `<tr class="pl ${feita ? "fz-feito" : rowCls(m)}" data-id="${esc(id)}"><td><b>${esc(p.usina)}</b></td><td>${esc(p.src.replace("BD_", ""))}</td>` +
+        `<td>${esc(ipTxt(p, m))}</td><td>${esc(ghTxt(p, m))}</td><td class="fz-inv">${esc(invTxt(p, m))}</td><td class="fz-portal">${portalTxt(p, m)}</td>` +
+        `<td><input type="checkbox" class="fz-ronda" data-a="ronda" data-id="${esc(id)}" ${feita ? "checked" : ""} title="${feita ? "Ronda feita em " + esc(RONDA[rkey(p)]) : "Marcar a ronda desta usina"}"></td></tr>`;
+    });
+    $f("fzTb").tBodies[0].innerHTML = h || '<tr><td colspan="7" class="fz-vazio">Nenhuma usina com falta para os filtros.</td></tr>';
+  }
+  function listaTsv() {
+    const L = [["Usina", "Fonte", "POA (dias)", "GHI (dias)", "Inversores (dias)", "Onde buscar no portal", "Ronda"]];
+    const rr = applyCol(linhasCol(filtered()), "col"); sortRows(rr, "col");
+    rr.forEach(({p, m}) => L.push([p.usina, p.src, ipTxt(p, m), ghTxt(p, m), invTxt(p, m),
+      portalTxt(p, m).replace(/<br>/g, " | ").replace(/<[^>]+>/g, ""), RONDA[rkey(p)] ? "feita" : ""]));
+    return L;
+  }
+  async function copiarLista() {
+    const texto = (TAB === "bp" ? bpTsv() : listaTsv()).map(r => r.join("\t")).join("\r\n");
+    let ok = false;
+    try { if (window.pywebview && window.pywebview.api && window.pywebview.api.copiar) ok = await api().copiar(texto); } catch (e) {}
+    if (!ok) { try { await navigator.clipboard.writeText(texto); ok = true; } catch (e) {} }
+    toast(ok ? "Lista copiada — cole no Excel com Ctrl+V" : "Não consegui copiar");
+  }
+  // ---------------------------------------------------------------- Mural de baixa performance
+  const pct = r => Math.round(r * 100) + "%";
+  const bpCls = r => r <= 0.5 ? "fz-b-cr" : "fz-b-at";
+  function bpLinhas() {
+    const dm = MURAL[MONTH]; if (!dm || !dm.linhas) return [];
+    const q = norm($f("fzQ").value), s = vs("fzSrc"), c = vs("fzCli"), ca = vs("fzCart"), mn = +$f("fzBpMin").value || 1;
+    const porU = {}; P().forEach(p => { porU[p.src + "|" + p.usina] = p; });
+    const L = dm.linhas.filter(x => {
+      const p = porU[x.fonte + "|" + x.usina];
+      if (x.n < mn) return false; if (s.length && !s.includes(x.fonte)) return false; if (q && !norm(x.usina).includes(q)) return false;
+      if (c.length && (!p || !c.includes(p.cliente))) return false; if (ca.length && (!p || !ca.includes(p.carteira))) return false;
+      return true;
+    });
+    const k = bpSort.k, d = bpSort.d;
+    L.sort((a, b) => { const x = a[k], y = b[k]; return ((x > y ? 1 : x < y ? -1 : 0) * d) || (b.n - a.n) || (a.pior - b.pior); });
+    return L;
+  }
+  const bpDias = x => ranges(x.dias.map((_, i) => i), x.dias.map(([dd]) => +dd.slice(8, 10)));
+  const bpTip = x => x.dias.map(([dd, r]) => dd.slice(8, 10) + "/" + dd.slice(5, 7) + ": " + pct(r)).join(" · ");
+  function bpPortal(x) {
+    const d = portalDe({usina: x.usina}, x.inversor);
+    return d && d.eq ? "<b>" + esc(d.pl) + "</b>: " + esc(d.eq) : d && d.pl ? "<b>" + esc(d.pl) + "</b>" : '<small class="f">—</small>';
+  }
+  function renderBp() {
+    const dm = MURAL[MONTH];
+    if (!dm) {
+      MURAL[MONTH] = {carregando: true};
+      Promise.resolve(api().furos_mural(MONTH)).then(r => { MURAL[MONTH] = r || {erro: "sem resposta"}; if (TAB === "bp") render(); });
+    }
+    const cols = [["usina", "Usina"], ["fonte", "Fonte"], ["inversor", "Inversor"], ["n", "Dias ≤ 70%"], ["comparados", "Dias comparados"],
+                  ["pior", "Pior dia"], ["media", "Média nos dias baixos"], ["ultimo", "Dias"], ["portal", "Onde buscar no portal"], ["base", "Base"]];
+    $f("fzTb").tHead.innerHTML = "<tr>" + cols.map(([k, l]) => `<th data-bk="${k}">${l}${bpSort.k === k ? (bpSort.d > 0 ? " ▲" : " ▼") : ""}</th>`).join("") + "</tr>";
+    $f("fzTb").tHead.querySelectorAll("th").forEach(t => t.onclick = () => {
+      const k = t.dataset.bk; if (k === "portal") return;
+      if (bpSort.k === k) bpSort.d *= -1; else { bpSort.k = k; bpSort.d = (k === "usina" || k === "inversor" || k === "fonte" || k === "pior" || k === "media") ? 1 : -1; }
+      render();
+    });
+    const m = MURAL[MONTH];
+    if (m.carregando) { $f("fzTb").tBodies[0].innerHTML = '<tr><td colspan="10" class="fz-vazio">Calculando o mural com o BD do banco… (até 1 minuto na primeira vez do dia; depois é na hora)</td></tr>'; return; }
+    if (m.erro) { $f("fzTb").tBodies[0].innerHTML = '<tr><td colspan="10" class="fz-vazio">' + esc(m.erro) + "</td></tr>"; return; }
+    const L = bpLinhas();
+    $f("fzTb").tBodies[0].innerHTML = L.map(x => `<tr class="pl ${x.pior <= 0.5 ? "gap g-cr" : "gap g-at"}"><td><b>${esc(x.usina)}</b></td><td>${esc(x.fonte.replace("BD_", ""))}</td><td>${esc(curto(x.inversor))}</td>` +
+      `<td>${x.n}</td><td>${x.comparados}</td><td><span class="fz-b ${bpCls(x.pior)}">${pct(x.pior)}</span></td><td><span class="fz-b ${bpCls(x.media)}">${pct(x.media)}</span></td>` +
+      `<td title="${esc(bpTip(x))}">${esc(bpDias(x))}</td><td class="fz-portal">${bpPortal(x)}</td><td><small class="f">${esc(x.base)}</small></td></tr>`).join("") ||
+      '<tr><td colspan="10" class="fz-vazio">Nenhum inversor abaixo de 70% para os filtros.</td></tr>';
+    const us = new Set(L.map(x => x.usina)).size;
+    $f("fzKpis").innerHTML = [["Inversores ≤ 70%", L.length, L.length ? "sv" : ""], ["Usinas", us, ""], ["Com 5 dias ou mais", L.filter(x => x.n >= 5).length, ""],
+      ["Abaixo de 50% (pior dia)", L.filter(x => x.pior <= 0.5).length, L.some(x => x.pior <= 0.5) ? "sv" : ""]]
+      .map(([a, b, c]) => `<div class="kpi"><div class="n ${c}">${b}</div><div class="t">${a}</div></div>`).join("");
+    $f("fzLegend").innerHTML = '<span class="f">Cada inversor com geração no dia contra a MÉDIA DOS DEMAIS inversores da mesma usina no mesmo dia (= 100%), em kWh/kWp quando a aba Equipamentos tem a potência de todos (senão em kWh). Fica quem fez 70% ou menos, com pelo menos 2 outros gerando. Zerado/vazio não entra (é furo, nas outras abas). Período: ' +
+      esc(m.ini.slice(8, 10) + "/" + m.ini.slice(5, 7)) + " a " + esc(m.fim.slice(8, 10) + "/" + m.fim.slice(5, 7)) + '. Passe o mouse em "Dias" para ver o % de cada dia.</span>';
+    $f("fzContagem").textContent = L.length + " inversor(es) em " + us + " usina(s)";
+  }
+  function bpTsv() {
+    const L = [["Usina", "Fonte", "Inversor", "Dias <= 70%", "Dias comparados", "Pior dia", "Média nos dias baixos", "Dias", "Onde buscar no portal", "Base"]];
+    bpLinhas().forEach(x => L.push([x.usina, x.fonte, x.inversor, x.n, x.comparados, pct(x.pior), pct(x.media), bpTip(x),
+      bpPortal(x).replace(/<[^>]+>/g, ""), x.base]));
+    return L;
+  }
+
+  let rondaT = null;
+  function salvarRonda() { clearTimeout(rondaT); rondaT = setTimeout(() => { try { api().furos_gravar_ronda(RONDA); } catch (e) {} }, 300); }
+
   const motOpts = (ap, sel) => '<option value="">— pendente de confirmação —</option>' + MOT.filter(x => x.ap === "both" || x.ap === ap).map(x => `<option value="${x.k}" ${sel === x.k ? "selected" : ""}>${x.l}</option>`).join("");
   function panel(p, m) {
     const id = esc(rid(p));
@@ -325,28 +477,38 @@ const furos = (() => {
     const rows = filtered(), n = k => rows.filter(r => r.m.sit === k).length;
     const cT = rows.reduce((a, r) => a + r.m.cellT, 0), cP = rows.reduce((a, r) => a + r.m.cp, 0);
     const emU = f => "em " + rows.filter(f).length + " usina(s)";
-    const K = [["Usinas no filtro", rows.length, ""], ["Com falha pendente", n("falha"), n("falha") ? "sv" : ""], ["Confirmadas OK", n("conf"), ""], ["Sem falha", n("ok"), "ok"],
-      ["Usinas c/ IPOA pendente", rows.filter(r => r.m.ipF).length, ""], ["Usinas c/ GHI pendente", rows.filter(r => r.m.ghF).length, ""],
-      ["Paradas COS sem OS (atenção)", rows.reduce((a, r) => a + r.m.noos, 0), rows.some(r => r.m.noos) ? "lv" : "", emU(r => r.m.noos)],
-      ["Células esperadas c/ OS/ticket", rows.reduce((a, r) => a + r.m.ex, 0), "", emU(r => r.m.ex)],
-      ["Equipamentos inoperantes", rows.reduce((a, r) => a + r.m.inopN, 0), "", emU(r => r.m.inopN)],
-      ["Inversores c/ furo pendente", rows.reduce((a, r) => a + r.m.invF, 0), "", "de " + rows.reduce((a, r) => a + r.m.nInv, 0) + " inversores"],
-      ["Completude (pendências)", cT ? ((1 - cP / cT) * 100).toFixed(1) + "%" : "—", ""]];
+    // 4 números na frente (13/11/2026: "muita informação"); o resto está no Resumo e no Detalhe
+    const K = [["Usinas com falha", n("falha"), n("falha") ? "sv" : "", "de " + rows.length],
+      ["Inversores com furo", rows.reduce((a, r) => a + r.m.invF, 0), "", emU(r => r.m.invF)],
+      ["Usinas sem IPOA ou GHI", rows.filter(r => r.m.ipF || r.m.ghF).length, ""],
+      ["Completude", cT ? ((1 - cP / cT) * 100).toFixed(1) + "%" : "—", ""]];
     $f("fzKpis").innerHTML = K.map(([a, b, c, d]) => `<div class="kpi"><div class="n ${c}">${b}</div><div class="t">${a}${d ? '<br><span class="f">' + d + '</span>' : ''}</div></div>`).join("");
-    $f("fzLegend").innerHTML = TAB === "det"
+    $f("fzLegend").innerHTML = TAB === "col"
+      ? '<span class="f">Só as usinas com falta pendente dos tipos marcados em "Falta". Onde buscar = planta e equipamento no supervisório (aba Equipamentos do BD_Performance, o mesmo de-para da coleta); "sem de-para no cadastro" é inversor que a coleta não consegue preencher. Ronda fica salva neste computador.</span>'
+      : TAB === "det"
       ? LEG_DET.map(([c, l]) => `<span><i class="s-${c}"></i>${l}</span>`).join("")
       : '<span><i class="lg-at"></i>Falha pendente</span><span><i class="lg-cr"></i>Falha crítica (≥50% das células ou sem coleta)</span><span><i class="lg-cf"></i>Confirmado OK</span><span><i class="lg-in"></i>Equipamento inoperante (conta como OK, fica sinalizado)</span><span><i class="s-e"></i>Células esperadas por OS/ticket (fora da falha)</span><span class="f">Linhas esmaecidas = sem falha. Clique na linha para revisar e confirmar.</span>';
     CFO[TAB] = {}; CATS.forEach(k => CFO[TAB][k] = [...new Set(rows.map(r => String(colVal(k, r))))].sort());
-    const rr = applyCol(rows, TAB);
-    TAB === "res" ? renderRes(rr) : renderDet(rr);
+    $f("fzCopiar").hidden = TAB !== "col" && TAB !== "bp";
+    $f("fzBpMin").parentElement.hidden = TAB !== "bp";
+    $f("fzFaltaBox").hidden = TAB !== "col";
+    $f("fzTb").classList.toggle("sem-cf", !$f("fzColF").checked || TAB === "bp");
+    const nm = ["fzCli", "fzCart", "fzSt", "fzSit"].filter(i => $f(i).value).length;
+    $f("fzMaisN").textContent = nm ? "(" + nm + " ligado" + (nm > 1 ? "s" : "") + ")" : "";
+    if (TAB === "bp") { renderBp(); return; }
+    const rr = applyCol(TAB === "col" ? linhasCol(rows) : rows, TAB);
+    TAB === "res" ? renderRes(rr) : TAB === "det" ? renderDet(rr) : renderCol(rr);
     // filtro ativo fica com a borda verde; o botão diz quantos estão ligados
     FILTROS.forEach(i => $f(i).classList.toggle("on", !!$f(i).value));
     const na = ativos();
     $f("fzLimpar").textContent = na ? "Limpar filtros (" + na + ")" : "Limpar filtros";
     $f("fzLimpar").disabled = !na;
+    $f("fzLimpar").hidden = !na;
     $f("fzContagem").textContent = rr.length + " de " + all.length + " usinas";
     if (window.coletasFiltros) window.coletasFiltros.atualizar();     // Nexus: a barra no modelo do Histórico de OS
     const nc = Object.keys(CONF).length, ne = Object.keys(REL.conf_arquivo || {}).length;
+    const nr = Object.keys(RONDA).filter(k => k.startsWith(MONTH + "|")).length;
+    if (TAB === "col") $f("fzContagem").textContent = rr.length + " usina(s) com falta · ronda feita em " + nr;
     $f("fzNconf").textContent = "Confirmações: " + nc + (ne ? " (do relatório: " + ne + ")" : "");
   }
 
@@ -372,6 +534,7 @@ const furos = (() => {
   function onChange(e) {
     const t = e.target, a = t.dataset.a; if (!a || a.startsWith("bulk")) return; const p = byId(t.dataset.id); if (!p) return;
     const n = t.dataset.n, tr = t.closest("tr");
+    if (a === "ronda") { const k = rkey(p); if (t.checked) RONDA[k] = new Date().toLocaleString("pt-BR", {dateStyle: "short", timeStyle: "short"}); else delete RONDA[k]; salvarRonda(); render(); return; }
     if (a === "mot") { const vig = tr.querySelector("[data-a=vig]").value; setConf(p, n, t.value, vig); render(); }
     else if (a === "vig") { const c = getConf(p, n); if (c) { setConf(p, n, c.r, t.value); render(); } }
     else if (a === "obs") { const c = getConf(p, n); if (c) { CONF[ckey(p, n)].o = t.value; save(); } }
@@ -381,6 +544,11 @@ const furos = (() => {
     toast("Baixado: " + p.split("\\").pop()); api().mostrar_pasta(p);
   }
   function csv() {
+    if (TAB === "col" || TAB === "bp") {
+      const L = TAB === "bp" ? bpTsv() : listaTsv();
+      salvar((TAB === "bp" ? "baixa_performance_" : "para_coletar_") + MONTH + ".csv", "\ufeff" + L.map(r => r.map(x => '"' + String(x).replace(/"/g, '""') + '"').join(";")).join("\n"));
+      return;
+    }
     const L = [["Mês", "Cliente", "Carteira", "Usina", "Fonte", "Status usina", "Item", "Tipo", "Dias com furo", "Datas", "Situação", "Motivo da confirmação", "Vigência", "Observação"]];
     applyCol(filtered(), TAB).forEach(({p, m}) => m.items.forEach(t => {
       const c = t.conf;
@@ -407,6 +575,8 @@ const furos = (() => {
     REL = r; DB = r.db; MKEYS = Object.keys(DB.months).sort();
     MKEYS.forEach(k => DB.months[k].plants.forEach(p => { p.eqs = [...p.eqs.filter(e => !isGen(e)), ...p.eqs.filter(isGen).sort(cmpN)]; }));
     // confirmações: as do relatório + as desta pessoa; a mais recente vence (como o localStorage do HTML original)
+    RONDA = Object.assign({}, r.ronda || {});
+    try { Promise.resolve(api().furos_portal()).then(x => { PORTAL = x || {}; render(); }); } catch (e) {}
     CONF = Object.assign({}, r.conf_arquivo || {});
     Object.entries(r.conf || {}).forEach(([k, v]) => { const a = CONF[k]; if (!a || (v.t || "") >= (a.t || "")) CONF[k] = v; });
     if (!MKEYS.includes(MONTH)) MONTH = MKEYS[MKEYS.length - 1];
@@ -429,7 +599,8 @@ const furos = (() => {
   }
   function iniciar() {
     $f("fzMes").onchange = () => { MONTH = $f("fzMes").value; OPEN.res.clear(); OPEN.det.clear(); SHOWALL.clear(); fillFilters(); subtitulo(); render(); };
-    ["fzCli", "fzCart", "fzSrc", "fzSt", "fzSit", "fzZero", "fzConf", "fzOS"].forEach(i => $f(i).onchange = () => {
+    $f("fzCopiar").onclick = copiarLista;
+    ["fzCli", "fzCart", "fzSrc", "fzSt", "fzSit", "fzZero", "fzConf", "fzOS", "fzFInv", "fzFIpoa", "fzFGhi", "fzBpMin", "fzColF"].forEach(i => $f(i).onchange = () => {
       if (i === "fzOS") applyOS(); if (i === "fzCli") { const v = vs("fzCli"); cliSel = v.length === 1 ? v[0] : ""; } render();
     });
     $f("fzQ").oninput = render;
@@ -442,6 +613,7 @@ const furos = (() => {
     $f("fzTb").tHead.addEventListener("input", onCol);
     $f("fzTb").tHead.addEventListener("change", e => { if (e.target.tagName === "SELECT") onCol(e); });
     $f("fzCsv").onclick = csv; $f("fzExp").onclick = expConf; $f("fzImp").onclick = impConf; $f("fzHtml").onclick = saveHtml;
+    document.querySelector(".fz-menu-c").addEventListener("click", e => { if (e.target.closest("button")) e.currentTarget.closest("details").open = false; });
     $f("fzAbrir").onclick = async () => aplicar(await api().furos_abrir());
     $f("fzNovo").onclick = async () => aplicar(await api().furos_mais_novo());
     document.querySelectorAll(".fz-tab").forEach(t => t.onclick = () => {

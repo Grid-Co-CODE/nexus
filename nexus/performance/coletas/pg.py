@@ -118,7 +118,7 @@ def _dicts(rows):
 class BDdoBanco:
     """Um BD (BD_Performance ou BD_Thopen) lido do banco, com as fórmulas do `bd_formulas` por cima dos valores."""
 
-    def __init__(self, destino, banco, livros=None, abas=None):
+    def __init__(self, destino, banco, livros=None, abas=None, so_valores=False):
         self.destino = destino
         self._b = banco
         chave = CHAVE[destino]
@@ -131,6 +131,12 @@ class BDdoBanco:
         self.subida_txt = w.get("updated_at") or w.get("atualizado_em")
         self.caminho = f"banco · {chave}"
         self._sheets = abas.get(chave) or {}
+        if so_valores:
+            # só para LER o valor (o mural de baixa performance, Conversor 1.0.11): sem colar nada, a fórmula não
+            # importa e o valor que subiu é o que vale. Sem o mapa não há a lista de abas do Excel: entram todas (a aba
+            # velha, renomeada, parou em 30/09 e não tem dia no mês pedido)
+            self.mapa_em, self._lista, self._formulas, self._abas, self.velhas = None, list(self._sheets), {}, {}, []
+            return
         mapa = abas.get(LIVRO_FORMULAS) or {}
         sf, sa = mapa.get(aba_formulas(destino)), mapa.get(aba_abas(destino))
         if not sf or not sa:
