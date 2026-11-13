@@ -675,7 +675,9 @@ def relatorio():
 @exige_sessao
 def tabela():
     """A tabela em Excel (Levi, 28/10/2026: "Em tabela, tem que ter a opção de Exportar tabela"): as linhas que a tela
-    mostra com os filtros (os nºs vêm do navegador, na ordem dela), com as colunas da tabela e as que ajudam a planilha."""
+    mostra com os filtros (os nºs vêm do navegador, na ordem dela), com as colunas da tabela e as que ajudam a planilha.
+    O nº da OS de campo e o da inspeção entraram em 13/11/2026 (pedido da área de chamados: "a inspeção vinculada aparece
+    nos cartões do quadro, mas não vem na exportação"), logo depois da OS: a cadeia que o cartão já lê da nota."""
     from openpyxl import Workbook
     from openpyxl.styles import Font
     folios = [str(x).strip() for x in (_corpo().get("folios") or []) if str(x).strip()]
@@ -684,17 +686,21 @@ def tabela():
     wb = Workbook()
     ws = wb.active
     ws.title = "Garantias"
-    ws.append(["OS", "Ativo", "Cliente", "Usina", "Responsável UFV", "Fornecedor", "Geral", "Status", "Ticket",
-               "Situação", "Aberto há (dias)", "Sem atualização (dias)", "Responsável"])
+    def num(v):
+        v = str(v or "").strip()
+        return int(v) if v.isdigit() else (v or None)
+    ws.append(["OS", "Nº da OS de campo", "Nº da OS de inspeção", "Ativo", "Cliente", "Usina", "Responsável UFV",
+               "Fornecedor", "Geral", "Status", "Ticket", "Situação", "Aberto há (dias)", "Sem atualização (dias)",
+               "Responsável"])
     for c in linhas:
-        ws.append([int(c["folio"]) if c["folio"].isdigit() else c["folio"], c["ativo_nome"] or c["code"], c["cliente"],
-                   c["usina"], c["resp_ufv"], c["marca"], c["geral"], c["status_ch"], c["ticket"], c["situacao"],
-                   c["dias"], c["dias_sem"], c["responsavel"]])
+        ws.append([num(c["folio"]), num(c.get("os_campo")), num(c.get("inspecao")), c["ativo_nome"] or c["code"],
+                   c["cliente"], c["usina"], c["resp_ufv"], c["marca"], c["geral"], c["status_ch"], c["ticket"],
+                   c["situacao"], c["dias"], c["dias_sem"], c["responsavel"]])
     for x in ws[1]:
         x.font = Font(bold=True)
     ws.freeze_panes = "A2"
     ws.auto_filter.ref = ws.dimensions
-    for col, larg in zip("ABCDEFGHIJKLM", (9, 34, 18, 26, 24, 14, 11, 34, 26, 26, 12, 14, 24)):
+    for col, larg in zip("ABCDEFGHIJKLMNO", (9, 12, 13, 34, 18, 26, 24, 14, 11, 34, 26, 26, 12, 14, 24)):
         ws.column_dimensions[col].width = larg
     buf = io.BytesIO()
     wb.save(buf)

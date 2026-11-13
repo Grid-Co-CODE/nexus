@@ -3099,12 +3099,15 @@ fundo que nem quando vamos criar OS." O menu e a janela são da plataforma (Moni
   cliente com chamado em andamento (o cliente do filtro vem marcado); um PDF por cliente, dois ou mais num .zip. O
   modelo é a "Atualização dos chamados de garantia" que a gestão de chamados mandava ao cliente: o resumo executivo
   (em andamento, aguardando o cliente, o fabricante, em tratativa pela Grid Co., em standby), a visão por usina com o
-  supervisor, os chamados por quem precisa agir (o ticket, a usina e o ativo, o status, a última observação escrita na
-  tela com a data, os dias em aberto) e os próximos passos, no visual do PDF da OS. A última observação vai ao cliente:
-  quem escreve sabe disso.
+  supervisor, os chamados por quem precisa agir (o ticket, a usina e o ativo, o status, a OS de campo e a de inspeção
+  quando a nota as traz, a última observação escrita na tela com a data, os dias em aberto) e os próximos passos, no
+  visual do PDF da OS. A última observação vai ao cliente: quem escreve sabe disso.
 - **Exportar tabela** (`POST /os/chamados/acompanhamento/tabela`, na vista de tabela): as linhas que os filtros deixam,
   na ordem da tela, numa planilha (o cabeçalho congelado e o filtro do Excel), com o cliente, o Responsável UFV e os
-  dias em aberto e sem atualização a mais.
+  dias em aberto e sem atualização a mais. O nº da OS de campo e o da inspeção vêm logo depois da OS, desde 13/11/2026
+  (pedido da área de chamados: "a inspeção vinculada aparece nos cartões do quadro, mas não vem na exportação"; o Levi,
+  também no PDF): a cadeia que o cartão lê da nota, vazia quando a nota não a traz
+  (`tests/test_oscreator_garantias_exportar_os_13_11.py`).
 - **As observações não esperam o banco lento** (`chamados_obs_store.listar`): vencida (60 s), a leitura de antes sai na
   hora e a aba é relida por trás, uma releitura por vez, e a que falha fica com a de antes. Medido em 28/10/2026: 20,2 s
   com erro, 21,4 s e 0,8 s em três leituras seguidas; o quadro esperava isso a cada minuto, e no erro mostrava o "Read

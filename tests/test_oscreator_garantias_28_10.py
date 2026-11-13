@@ -262,7 +262,9 @@ def test_exportar_a_tabela_leva_so_as_linhas_filtradas_na_ordem(tela):
     assert r.status_code == 200 and r.mimetype == "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     ws = openpyxl.load_workbook(io.BytesIO(r.data)).active
     cab = [x.value for x in ws[1]]
-    assert cab[:8] == ["OS", "Ativo", "Cliente", "Usina", "Responsável UFV", "Fornecedor", "Geral", "Status"]
+    # 13/11/2026: o nº da OS de campo e o da inspeção logo depois da OS (test_oscreator_garantias_exportar_os_13_11.py)
+    assert cab[:10] == ["OS", "Nº da OS de campo", "Nº da OS de inspeção", "Ativo", "Cliente", "Usina", "Responsável UFV",
+                        "Fornecedor", "Geral", "Status"]
     assert [ws.cell(row=i, column=1).value for i in (2, 3)] == [9103, 9101] and ws.max_row == 3
 
 

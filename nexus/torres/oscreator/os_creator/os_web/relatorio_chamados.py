@@ -79,6 +79,9 @@ def modelo(cards, cliente: str, hoje: dt.datetime, obs: dict) -> dict:
             itens.append({"ref": ("Ticket %s" % c["ticket"]) if c.get("ticket") else "OS %s" % c.get("folio"),
                           "onde": " · ".join(x for x in (c.get("usina"), c.get("ativo_nome") or c.get("code")) if x),
                           "status": c.get("status_ch") or "", "fabricante": c.get("marca") or "",
+                          # a cadeia do chamado (13/11/2026, pedido da área de chamados): o nº da OS de campo e o da
+                          # inspeção, quando a nota da OS os traz
+                          "os_campo": str(c.get("os_campo") or "").strip(), "inspecao": str(c.get("inspecao") or "").strip(),
                           "atualizacao": ("%s: %s" % (_data(quando), " ".join(str(texto).split()))) if texto else "",
                           "dias": c.get("dias")})
         if itens:
@@ -223,6 +226,10 @@ def gerar(m: dict) -> bytes:
             if x["status"]:
                 partes.append("<i>%s</i>" % _texto(x["status"]))
             corpo = " · ".join(partes)
+            cadeia = " · ".join(t % n for t, n in (("OS de campo %s", x.get("os_campo")),
+                                                    ("OS de inspeção %s", x.get("inspecao"))) if n)
+            if cadeia:
+                corpo += '<br/><font color="#%s">%s</font>' % (mudo.hexval()[2:], _texto(cadeia))
             if x["atualizacao"]:
                 corpo += "<br/>%s" % _texto(x["atualizacao"])
             if x["dias"] is not None:
