@@ -31,7 +31,7 @@
   <select class="gc-campo" name="cliente" onchange="this.form.submit()">
     <option value="">Todos</option>{% for c, n in p.clientes %}<option value="{{ c }}"{% if c == cliente %} selected{% endif %}>{{ c }} ({{ n }})</option>{% endfor %}
   </select></label>
-  <input class="gc-campo" type="search" name="q" value="{{ busca }}" placeholder="Usina ou código" aria-label="Buscar usina">
+  <input class="gc-campo" type="search" name="q" value="{{ busca }}" placeholder="Buscar usina, código ou cliente" aria-label="Buscar usina (filtra enquanto digita)" autocomplete="off">
 </form>
 <div class="cn-chips" aria-label="Situação">
   <a href="{{ url(situacao=None) }}"{% if not grupo %} aria-current="page"{% endif %}>Todas<b>{{ p.contagem.todas }}</b></a>

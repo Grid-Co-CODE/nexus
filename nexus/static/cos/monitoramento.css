@@ -44,3 +44,7 @@
 .cos-mon-at-i--semcom{border-left-color:var(--alerta)}
 .cos-mon-at-i--semcom .st{color:var(--alerta);font-weight:600}
 .cos-mon-at-i--velha .st{color:var(--mudo);font-weight:600}
+
+/* a busca ao digitar (13/11/2026, static/cos/monitoramento.js): o cartão, o item da "Atenção agora" e a seção que ficam
+   fora do filtro somem — o `display` dos cartões venceria o `hidden` sozinho */
+.cos-mon-u[hidden], .cos-mon-at-i[hidden], .cos-mon-cliente[hidden], .cos-mon-atencao[hidden] { display: none !important; }

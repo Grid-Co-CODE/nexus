@@ -344,3 +344,31 @@ def test_as_abertas_de_inversor_pela_fotografia():
         {"codigo": None, "ocorrencias": [{"tipo_falha": "Inversor offline", "equipamentos": [], "os": "1"}]}]}
     assert MO.abertas_de_inversor([foto]) == {"EX-UM100": [["Inversor 1.2", "Inversor offline", "17001", "2026-11-09"],
                                                            ["Inversor 1.3", "Falha de comunicação", "", "2026-11-08"]]}
+
+
+def test_a_busca_ignora_acento_e_maiuscula_dos_dois_lados():
+    # 13/11/2026, o dono: digitar o nome e só aparecer depois do Enter "fica incomodando". A tela filtra ao digitar
+    # (static/cos/monitoramento.js) com a MESMA regra do servidor: toda palavra, sem acento ("tres" acha a "Três").
+    for busca in ("tres", "TRÊS", "exemplo três", "ex-tres100"):
+        p = MO.painel(_leitura(_geracao()), None, AGORA, busca=busca)
+        assert [x["id"] for x in p.itens] == ["scada-c1"], busca
+    assert MO.dobrar("Ribeirão Cascalheiras") == "ribeirao cascalheiras"
+
+
+def test_a_tela_filtra_enquanto_digita_com_a_mesma_regra(tela):
+    import shutil
+    import subprocess
+    from pathlib import Path
+    js = Path(__file__).resolve().parents[1] / "nexus" / "static" / "cos" / "monitoramento.js"
+    texto = js.read_text(encoding="utf-8")
+    assert 'corpo.addEventListener("input"' in texto and "trocarEmVoltaDoFormulario" in texto
+    assert 'e.key === "Enter"' in texto and "e.preventDefault()" in texto          # o Enter não recarrega a página
+    if not shutil.which("node"):
+        pytest.skip("sem node nesta máquina")
+    script = ("require(process.argv[1]); const B = globalThis.NexusCosBusca;"
+              "console.log(JSON.stringify([B.combina('UFV Ribeirão Cascalheiras THPN-RCS100 Thopen', B.palavrasDa('ribeirao thopen')),"
+              " B.combina('Usina Exemplo Um EX-UM100 Cliente A', B.palavrasDa('dois')), B.palavrasDa('  Três  usinas ')]))")
+    r = subprocess.run(["node", "-e", script, str(js)], capture_output=True, text=True, encoding="utf-8", timeout=60)
+    assert r.returncode == 0, r.stderr
+    import json
+    assert json.loads(r.stdout) == [True, False, ["tres", "usinas"]]
