@@ -405,6 +405,11 @@ details.cad-dif summary{cursor:pointer;padding:9px 12px;color:var(--tinta-2);fon
 @media (max-width:560px){.aa-por>.gc-btn{align-self:stretch;justify-content:center}}
 /* Base > Integração Fracttal (12/10/2026): equipe e setor numa linha só */
 .fr-tabela td.fr-curta{white-space:nowrap}
+/* o Nexus Field (13/11/2026): a versão em cima, quando e qual celular embaixo, menor */
+.fr-tabela td.fr-nf{min-width:170px}
+.fr-nf-v{white-space:nowrap}
+.fr-nf-v{font-weight:600;color:var(--tinta)}
+.fr-nf-d{display:block;margin-top:2px;font-size:12px;color:var(--mudo)}
 .fr-tabela td{vertical-align:middle}
 .fr-tabela .gc-dado{font-size:12px}
 /* O "Como liga" virou a dica do (!) ao lado do botão (Levi: "invés de botar um texto ridículo de gigante"): aparece

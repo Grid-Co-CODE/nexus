@@ -25,7 +25,7 @@ log = logging.getLogger(__name__)
 
 _BRT = timezone(timedelta(hours=-3))
 LIGACOES = (("", "Todas"), ("ligadas", "Com ficha no Nexus"), ("sem_ficha", "Sem ficha no Nexus"))
-FILTROS = ("q", "ligacao", "acesso", "origem", "setor", "todas_fichas")     # o que a volta leva, e nada além
+FILTROS = ("q", "ligacao", "acesso", "origem", "setor", "field", "todas_fichas")     # o que a volta leva, e nada além
 _CHAVE_AVISO = "fracttal_aviso"
 # O Fracttal ligado às fichas, guardado para a tela (25/10/2026, Levi: "cada pesquisa faz um carregamento novo na tabela
 # que já está carregada"): a 1ª abertura fria levava ~2,4 s (o cadastro de pessoas e as equipes do banco, as fichas
@@ -160,18 +160,32 @@ def contexto(cfg, args) -> dict:
         if sid:
             n_setor[sid] = n_setor.get(sid, 0) + 1
     setores = [dict(s, n=n_setor.get(s["setor_id"], 0)) for s in S.ativos(st["setores"])]
+    # o Nexus Field de cada pessoa (13/11/2026, Levi: "conseguimos saber que já instalou o nexus field e logou sem eu ter
+    # que ficar cadastrando?"): o livro que o App publica, casado pelo código do e-mail da linha (nada de e-mail no banco)
+    from ..campo import field_aparelhos as NF
+    from .ligacao_campo import codigo_da_pessoa
+    nf = NF.ler()
+    chave_hmac = cfg.get("NEXUS_PESSOA_HMAC")
+    n_field = {k: 0 for k, _ in NF.FILTRO}
+    for x in rel["linhas"]:
+        f = NF.da_pessoa(nf, codigo_da_pessoa(chave_hmac, x["email"]) if chave_hmac else None)
+        x["field"], x["f_field"] = f["info"], f["filtro"]
+        for k in f["filtro"].split("|"):
+            n_field[k] += 1
     q = str(args.get("q") or "").strip()[:120]
     ligacao = args.get("ligacao") if args.get("ligacao") in dict(LIGACOES) else ""
     acessos = sorted({x["acesso"] for x in rel["linhas"]})
     acesso = args.get("acesso") if args.get("acesso") in acessos else ""
     origem = args.get("origem") if args.get("origem") in FP.ORIGENS else ""
     setor = args.get("setor") if args.get("setor") in ({"sem"} | {str(s["setor_id"]) for s in setores}) else ""
-    visiveis = {x["id"] for x in FP.filtrar(rel["linhas"], q, ligacao, acesso, origem, setor)}
+    field = args.get("field") if args.get("field") in dict(NF.FILTRO) else ""
+    visiveis = {x["id"] for x in FP.filtrar(rel["linhas"], q, ligacao, acesso, origem, setor)
+                if not field or field in x["f_field"].split("|")}
     sem_ficha = [x for x in rel["linhas"] if not x["ficha"]]
     lido_em = datetime.fromtimestamp(lido["lido_em"], _BRT).strftime("%d/%m às %H:%M") if lido.get("lido_em") else ""
     so_ativas = args.get("todas_fichas") != "1"
     sem_conta = [f for f in rel["sem_conta"] if not so_ativas or f["status"].lower() == "ativo"]
-    filtros = {"q": q, "ligacao": ligacao, "acesso": acesso, "origem": origem, "setor": setor,
+    filtros = {"q": q, "ligacao": ligacao, "acesso": acesso, "origem": origem, "setor": setor, "field": field,
                "todas_fichas": "" if so_ativas else "1"}
     aviso = session.pop(_CHAVE_AVISO, None)
     return {"rel": rel, "linhas": rel["linhas"], "visiveis": visiveis, "total": len(lido["pessoas"]),
@@ -193,7 +207,11 @@ def contexto(cfg, args) -> dict:
             "sem_token": not cfg.get("GRIDCO_SQL_TOKEN"),
             "pode_gravar_setor": not st.get("erro") and bool(cfg.get("GRIDCO_SQL_TOKEN")),
             "volta": urlencode([(k, v) for k, v in filtros.items() if v]),
-            "aviso": aviso, "abrir_setores": bool(aviso and aviso.get("painel"))}
+            "aviso": aviso, "abrir_setores": bool(aviso and aviso.get("painel")),
+            # o Nexus Field
+            "field": field, "field_opcoes": [(k, rot, n_field[k]) for k, rot in NF.FILTRO],
+            "nf": {"existe": nf["existe"], "erro": nf["erro"], "versao_atual": nf["versao_atual"]},
+            "nf_sem_hmac": not chave_hmac}
 
 
 def _responder(ok: bool, texto: str, status: int = 200, ancora: str = "", painel: bool = False, **extra):

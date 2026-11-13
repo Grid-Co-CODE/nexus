@@ -18,6 +18,10 @@
       <span><strong>Setor.</strong> O Fracttal não diz o setor de ninguém. Crie a lista em Setores e escolha o de cada
         pessoa na coluna Setor, ou marque várias e aplique de uma vez. Vai para o banco, sem nome nem e-mail.</span>
       <span><strong>Leitura.</strong> O Fracttal fica guardado por 1 hora; o botão ao lado lê de novo.</span>
+      <span><strong>Nexus Field.</strong> Quem entrou no app com login, pelo que o App de Campo publica de hora em hora:
+        a versão e o último acesso do celular que a pessoa usa. Quem não aparece não abriu o Nexus Field com login (o
+        App pelo navegador e o celular sem os serviços do Google não se registram). Versão antiga = abaixo da mais nova
+        que algum celular já tem.</span>
     </span>
   </span>
 </div>
@@ -33,6 +37,10 @@
   <strong>{{ 'Setores da última leitura boa; para gravar, a leitura precisa voltar.' if setores_velha else 'Não consegui ler os setores do banco: o setor fica só para ver.' }}</strong> {{ erro_setores }}</div></div>
 {% elif sem_token %}<div class="cad-aviso cad-aviso--alerta"><i class="ph ph-key"></i><div><strong>Este Nexus não grava no banco.</strong>
   Sem a <span class="gc-dado">GRIDCO_SQL_TOKEN</span>, o setor fica só para ver.</div></div>{% endif %}
+
+{% if nf.erro %}<div class="cad-aviso cad-aviso--alerta" role="status"><i class="ph ph-device-mobile"></i><div><strong>Não li os aparelhos do Nexus Field agora ({{ nf.erro }}).</strong> A coluna Nexus Field fica vazia até a próxima leitura.</div></div>
+{% elif nf_sem_hmac %}<div class="cad-aviso cad-aviso--alerta"><i class="ph ph-key"></i><div><strong>Sem a <span class="gc-dado">NEXUS_PESSOA_HMAC</span>.</strong> O App manda a pessoa só como o código do e-mail; sem a chave, ninguém casa com o celular.</div></div>
+{% elif not nf.existe %}<div class="cad-aviso cad-aviso--alerta" role="status"><i class="ph ph-device-mobile"></i><div><strong>O App de Campo ainda não publicou os aparelhos do Nexus Field.</strong> A coluna Nexus Field se preenche na 1ª publicação (de hora em hora, aos :25).</div></div>{% endif %}
 
 {# a faixa de números saiu em 09/11/2026 (Levi: "Em pessoas e setores pode tirar esse KPI") #}
 
@@ -68,13 +76,20 @@
       {% for s in setores %}<option value="{{ s.setor_id }}" data-rotulo="{{ s.nome }}"{% if setor == s.setor_id|string %} selected{% endif %}>{{ s.nome }} ({{ s.n }})</option>{% endfor %}
     </select>
   </div>
+  <div class="campo">
+    <label class="gc-rotulo" for="fr-nf">Nexus Field</label>
+    <select id="fr-nf" name="field" class="gc-campo" data-fl>
+      <option value="">Todos</option>
+      {% for v, rot, n in field_opcoes %}<option value="{{ v }}" data-rotulo="{{ rot }}"{% if v == field %} selected{% endif %}>{{ rot }} ({{ n }})</option>{% endfor %}
+    </select>
+  </div>
   {% if not so_ativas %}<input type="hidden" name="todas_fichas" value="1">{% endif %}
   <noscript><button class="gc-btn gc-btn--ui gc-btn--contorno" type="submit">Filtrar</button></noscript>
-  <a class="gc-btn gc-btn--ui gc-btn--fantasma" href="{{ url_for('torre_base.acessos', aba='pessoas') }}" data-fl-limpar{% if not (q or ligacao or acesso or origem or setor) %} hidden{% endif %}>Limpar</a>
+  <a class="gc-btn gc-btn--ui gc-btn--fantasma" href="{{ url_for('torre_base.acessos', aba='pessoas') }}" data-fl-limpar{% if not (q or ligacao or acesso or origem or setor or field) %} hidden{% endif %}>Limpar</a>
 </form>
 
 <div class="cad-barra-tabela">
-  <p class="cad-conta"><span class="gc-num" data-fl-conta="fr">{{ visiveis|length }}</span> de <span class="gc-num">{{ total }}</span> pessoas · <span class="gc-num">{{ sem_setor }}</span> sem setor. Origem pelo domínio do e-mail: gridco.com.br é da Grid Co.; o resto é externo.</p>
+  <p class="cad-conta"><span class="gc-num" data-fl-conta="fr">{{ visiveis|length }}</span> de <span class="gc-num">{{ total }}</span> pessoas · <span class="gc-num">{{ sem_setor }}</span> sem setor{% if nf.versao_atual %} · Nexus Field mais novo: <span class="gc-num">{{ nf.versao_atual }}</span>{% endif %}. Origem pelo domínio do e-mail: gridco.com.br é da Grid Co.; o resto é externo.</p>
   <details class="cad-colunas fr-setores" id="fr-setores"{% if abrir_setores %} open{% endif %}>
     <summary class="gc-btn gc-btn--ui gc-btn--contorno"><i class="ph ph-tag"></i> Setores ({{ setores|length }})</summary>
     <div class="cad-colunas-painel fr-setores-painel">
@@ -101,15 +116,20 @@
   <table class="cad-tabela fr-tabela">
     <thead><tr>
       <th class="fr-marca"><input type="checkbox" id="fr-todas" aria-label="Marcar todas as pessoas da lista"{% if not pode_gravar_setor or not setores %} disabled{% endif %}></th>
-      <th>Nome no Fracttal</th><th>E-mail</th><th>Acesso</th><th>Ficha no Nexus</th><th>Vínculo</th><th>Equipe</th><th>Setor</th>
+      <th>Nome no Fracttal</th><th>E-mail</th><th>Acesso</th><th>Nexus Field</th><th>Ficha no Nexus</th><th>Vínculo</th><th>Equipe</th><th>Setor</th>
     </tr></thead>
     <tbody>
     {% for x in linhas %}
-    <tr id="p-{{ x.id }}" data-fl-linha data-f-ligacao="{{ 'ligadas' if x.ficha else 'sem_ficha' }}" data-f-acesso="{{ x.acesso }}" data-f-origem="{{ x.origem }}" data-f-setor="{{ x.setor_id or 'sem' }}" data-busca-base="{{ x.busca_base }}" data-f-busca="{{ x.busca }}"{% if x.id not in visiveis %} hidden{% endif %}>
+    <tr id="p-{{ x.id }}" data-fl-linha data-f-ligacao="{{ 'ligadas' if x.ficha else 'sem_ficha' }}" data-f-acesso="{{ x.acesso }}" data-f-origem="{{ x.origem }}" data-f-setor="{{ x.setor_id or 'sem' }}" data-f-field="{{ x.f_field }}" data-busca-base="{{ x.busca_base }}" data-f-busca="{{ x.busca }}"{% if x.id not in visiveis %} hidden{% endif %}>
       <td class="fr-marca"><input type="checkbox" class="fr-marcar" name="pessoa" value="{{ x.id }}" form="fr-lote" aria-label="Marcar {{ x.nome }}"{% if not pode_gravar_setor or not setores %} disabled{% endif %}></td>
       <td>{{ x.nome or '—' }}{% if x.origem != 'Grid Co.' %} <span class="cad-chip cad-chip--operacao" title="{{ x.dominio }}">externo</span>{% endif %}</td>
       <td><span class="gc-dado">{{ x.email or '—' }}</span></td>
       <td>{% if x.conta_ativa %}{{ x.acesso }}{% else %}<span class="cad-chip cad-chip--alerta">{{ x.acesso }}{% if x.acesso != 'sem acesso' %} · conta inativa{% endif %}</span>{% endif %}</td>
+      {# o Nexus Field (13/11/2026): a versão do celular do último acesso (a antiga em alerta), quando e qual celular #}
+      <td class="fr-nf">{% if x.field %}{% set nf_x = x.field %}
+        <span class="{{ 'cad-chip cad-chip--alerta' if nf_x.antiga else 'fr-nf-v' }}"{% if nf_x.antiga %} title="Abaixo da versão mais nova ({{ nf.versao_atual }})"{% endif %}>{{ nf_x.versao or 'sem versão' }}{% if nf_x.antiga %} · antiga{% endif %}</span>
+        <span class="fr-nf-d"{% if nf_x.outros %} title="Outros celulares: {% for o in nf_x.outros %}{{ o.modelo }} ({{ o.versao }}, {{ o.acesso_txt }}){{ '; ' if not loop.last }}{% endfor %}"{% endif %}>{{ nf_x.acesso_txt }}{% if nf_x.modelo %} · {{ nf_x.modelo }}{% endif %}{% if nf_x.n > 1 %} · {{ nf_x.n }} celulares{% endif %}</span>
+        {% else %}<span class="mudo">não instalou</span>{% endif %}</td>
       <td>{% if x.ficha %}<a href="{{ url_for('torre_pessoas.cad_pessoa', id_=x.ficha.pessoa_id) }}">{{ x.ficha.nome_padrao or x.ficha.nome }}</a>
         <span class="mudo">· pelo {{ x.por }}</span>{% if x.repetida %} <span class="cad-chip cad-chip--critico">mesma ficha de outra conta</span>{% endif %}
         {% elif x.ambiguo %}<span class="cad-chip cad-chip--alerta">nome de duas fichas</span>{% else %}<span class="cad-chip cad-chip--info">sem ficha</span>{% endif %}</td>
@@ -126,7 +146,7 @@
       </td>
     </tr>
     {% endfor %}
-    <tr data-fl-vazio="fr"{% if visiveis %} hidden{% endif %}><td colspan="8" class="mudo">Ninguém com esses filtros.</td></tr>
+    <tr data-fl-vazio="fr"{% if visiveis %} hidden{% endif %}><td colspan="9" class="mudo">Ninguém com esses filtros.</td></tr>
     </tbody>
   </table>
 </div>
