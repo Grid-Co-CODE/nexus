@@ -621,7 +621,6 @@ th[aria-sort="descending"] .cn-ordem::after{content:"▼";opacity:1;color:var(--
 
 .cr-limite{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;font-size:12.5px;color:var(--mudo)}
 .cr-limite input{width:72px}
-.cr-nota-bloco{margin:0;font-size:12px;color:var(--mudo)}
 /* a faixa "Parada agora": as OS de parada abertas nas usinas do filtro, acima dos blocos */
 .cr-parada{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 18px;margin-top:16px;padding:10px 16px;font-size:13px;
   border:1px solid var(--critico-a35);border-left:4px solid var(--critico);border-radius:var(--raio-md);
@@ -714,6 +713,10 @@ details.cr-parada[open] .cr-parada-ver{display:none}
    branco, o do botão do navegador); no claro, o texto é o musgo #566610 (o --verde-texto, 5,1:1 no verde-suave) */
 :root[data-tema="claro"] .cr-v--ok{color:var(--verde-texto)}
 .cr-v--neutro{color:var(--mudo)}
+/* na lista da Visão geral, o valor em dia fica sem fundo (12/11/2026, a revisão de desenho: toda célula tinha cor, 13
+   por linha, e o olho não achava o problema): a cor é do crítico e da atenção */
+.cr-gr-lista .cr-v--ok{background:none;color:var(--tinta-2)}
+:root[data-tema="claro"] .cr-gr-lista .cr-v--ok{color:var(--tinta-2)}
 button.cr-v--neutro{background:transparent}
 .cr-seta{color:var(--mudo);font-size:13px}
 .cr-lin[open] .cr-seta{transform:rotate(180deg)}
@@ -970,9 +973,13 @@ tr.rk-linha[aria-expanded="true"] .rk-seta{transform:rotate(180deg)}
   border-radius:999px;font:600 12px/16px var(--font-sans);color:var(--tinta);text-decoration:none;white-space:nowrap}
 a.cr-gr-atn:hover,a.cr-gr-chip:hover,a.cr-gr-kpi:hover{border-color:var(--linha-forte)}
 .cr-gr-sel,a.cr-gr-atn.cr-gr-sel,a.cr-gr-chip.cr-gr-sel{border-color:var(--verde);background:var(--verde-suave)}
-.cr-gr-kpis{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:12px 0 10px}
-.cr-gr-kpi{display:block;min-width:0;padding:9px 11px;border:1px solid var(--linha);border-radius:var(--raio-md);
-  background:var(--superficie-2);color:inherit;text-decoration:none}
+.cr-gr-kpis{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px 10px;margin:14px 0 12px}
+/* o número do bloco sem caixa (12/11/2026, a revisão de desenho: eram 12 caixas dentro de 3 cartões, caixa dentro
+   de caixa): um fio à esquerda marca o lugar, e só o número escolhido como filtro (`cr-gr-sel`) ganha o fundo */
+.cr-gr-kpi{display:block;min-width:0;padding:4px 10px;border-left:2px solid var(--linha);border-radius:0 var(--raio-controle) var(--raio-controle) 0;
+  color:inherit;text-decoration:none}
+a.cr-gr-kpi:hover{border-left-color:var(--verde)}
+.cr-gr-kpi.cr-gr-sel{border-left-color:var(--verde)}
 .cr-gr-kpi .r{display:block;font:700 10px/14px var(--font-sans);letter-spacing:.06em;text-transform:uppercase;color:var(--mudo);
   overflow-wrap:anywhere}
 .cr-gr-kpi b{display:block;font:700 22px/1.3 var(--font-sans)}
@@ -1478,7 +1485,9 @@ button.pn-it:hover{background:var(--superficie-2)}
 .pn-pagina > :not(dialog):not(template){zoom:.8}
 /* o número das PT à esquerda da faixa "Parada agora", na mesma linha e com a mesma altura (29/10/2026: "faça caber ao
    lado esquerdo de parado agora"); sem paradas, ele fica sozinho na linha */
-.pn-topo{display:flex;align-items:stretch;gap:14px;margin-top:16px}
+/* os números com a altura deles (12/11/2026): com a Parada agora numa linha, que abre a lista para baixo, o
+   `stretch` esticaria os dois números vazios, como o bloco de texto de antes fazia */
+.pn-topo{display:flex;align-items:flex-start;gap:14px;margin-top:16px}
 .pn-topo > .pn-kpi{margin-left:0;flex:none}
 .pn-topo > .cr-parada{flex:1;min-width:0;margin-top:0}
 /* a lista das PT na janela: inteira, sem o limite das 6 linhas do quadro */

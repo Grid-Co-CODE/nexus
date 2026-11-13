@@ -109,3 +109,38 @@ def test_a_parada_agora_numa_linha_com_o_total_e_a_lista_no_clique(manut, logado
     assert re.search(r"<b>1</b>\s*<span>parada agora</span>", resumo)
     assert "a mais antiga" not in resumo and "Altair" in resumo and "13002" in resumo      # uma só: ela inteira
     assert faixa.count("<li>") == 0
+
+
+# ── a 2ª entrega: o Painel e a Visão geral ────────────────────────────────────────────────────────────────────────────
+def test_no_painel_a_parada_agora_tambem_e_uma_linha(manut, logado):
+    """No Painel a faixa era um bloco vermelho com todas as paradas em texto corrido (18 na visão de todos, 12/11/2026),
+    e os dois números ao lado esticavam vazios até a altura dele. Agora a mesma linha das outras abas (o total, a mais
+    antiga, a lista inteira no clique: nada fica de fora) e os números com a altura deles."""
+    html = logado.get("/t/campo/responsaveis?responsavel=*&modo=painel").get_data(as_text=True)
+    topo = html[html.index('class="pn-topo"'):]
+    topo = topo[:topo.index('class="pn"')]
+    assert '<details class="cr-parada"' in topo and 'class="cr-parada" role="status"' not in html
+    assert "Altair" in topo and "13002" in topo
+    css = (RAIZ / "static/campo.css").read_text(encoding="utf-8")
+    assert re.search(r"\.pn-topo\{[^}]*align-items:flex-start", css)
+
+
+def test_na_visao_geral_os_numeros_do_bloco_nao_sao_caixas_e_a_lista_so_pinta_o_fora_da_regua():
+    """Eram 12 caixas de número dentro de 3 cartões (caixa dentro de caixa) e, na lista, toda célula colorida (13 por
+    linha): o olho não achava o problema. O número do bloco fica sem caixa (só o escolhido como filtro se destaca) e, na
+    lista, o valor em dia fica sem fundo: a cor é do crítico e da atenção."""
+    css = (RAIZ / "static/campo.css").read_text(encoding="utf-8")
+    kpi = re.search(r"\n\.cr-gr-kpi\{([^}]*)\}", css).group(1)
+    assert "border:1px solid" not in kpi and "background:var(--superficie-2)" not in kpi
+    em_dia = re.search(r"\.cr-gr-lista \.cr-v--ok\{([^}]*)\}", css).group(1)
+    assert "background:none" in em_dia and "color:var(--tinta-2)" in em_dia
+
+
+def test_a_procedencia_da_manutencao_mora_no_ponto_de_exclamacao(manut, logado):
+    """O parágrafo "A semana vem do arquivo do PCM..." morava dentro do cartão Manutenção: é procedência, vai para o "!"
+    do título, com as outras."""
+    html = logado.get("/t/campo/responsaveis?responsavel=*&modo=geral").get_data(as_text=True)
+    assert 'class="cr-nota-bloco"' not in html
+    i = html.index('<details class="gc-explica">')
+    explica = html[i:html.index("</details>", i)]
+    assert "A semana vem do arquivo do PCM" in explica

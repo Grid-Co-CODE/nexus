@@ -19,6 +19,8 @@
     {% for b, nome, _txt, _bl in blocos_geral %}
     <dl class="cr-reguas"><dt class="cr-reguas-bloco">{{ nome }}</dt>{% for bb, a, r, t in reguas if bb == b %}<dt>{{ r }}</dt><dd>{{ t }}</dd>{% endfor %}</dl>
     {% endfor %}
+    {# a procedência da Manutenção morava dentro do cartão dela na Visão geral (até 12/11/2026, a revisão de desenho) #}
+    {% if manut_i is defined and foto_os is defined %}<p><b>Manutenção.</b> A semana vem do arquivo do PCM, copiado para o banco de hora em hora{% if manut_i.get('semana_passada') %} (semana passada: {{ manut_i.semana_passada }}){% endif %}. As OS são lidas do Fracttal pelo Nexus{% if foto_os.quando %}; a leitura no banco é {{ foto_os.quando }}{% endif %}.</p>{% endif %}
     <p>Responsável O&amp;M é o da ficha da usina no cadastro (o mesmo da Central de atenção); só usina mobilizada. Fonte sem
     dado da usina não alerta nem conta como em dia: fica "—". Usina com duas linhas no Gerencial (Santarém 1 e 2) soma
     as duas.</p>
@@ -166,9 +168,10 @@
       <span class="pn-kpi-txt"><small>OSs em verificação</small><span><b data-pn-verif-num>…</b> esperando concluir</span></span>
       <i class="ph ph-caret-right pn-kpi-seta" aria-hidden="true"></i></button>
   {% endif %}
-  {# fora do Painel, a Parada agora numa linha (12/11/2026, a revisão de desenho: eram 6 paradas em texto corrido num
-     bloco vermelho): o total, a mais antiga e o "ver as N", que abre a lista inteira ali mesmo #}
-  {% if faixa and modo not in ('usina', 'painel') %}{% set n_par = faixa|length %}{% set u0, p0 = faixa[0] %}
+  {# a Parada agora numa linha (12/11/2026, a revisão de desenho: eram as paradas em texto corrido num bloco vermelho,
+     6 nas abas e todas no Painel): o total, a mais antiga e o "ver as N", que abre a lista INTEIRA ali mesmo (a regra do
+     Painel segue valendo, Levi, 28/10/2026: "não podemos deixar nada de fora") #}
+  {% if faixa and modo != 'usina' %}{% set n_par = faixa|length %}{% set u0, p0 = faixa[0] %}
   <details class="cr-parada">
     <summary><b>{{ n_par }}</b> <span>parada{{ 's' if n_par != 1 }} agora</span>
       {% if n_par == 1 %}<span><strong>{{ u0.usina }} · {{ p0.escopo }}</strong> · OS {{ p0.os }} · desde {{ p0.inicio }}</span>
@@ -176,14 +179,6 @@
       <span class="cr-parada-ver">ver as {{ n_par }}</span>{% endif %}</summary>
     {% if n_par > 1 %}<ul class="cr-parada-lista">{% for u, p in faixa %}<li><b>{{ u.usina }}</b> · {{ p.escopo }} · OS {{ p.os }} · desde {{ p.inicio }}</li>{% endfor %}</ul>{% endif %}
   </details>
-  {% elif faixa and modo == 'painel' %}
-  <div class="cr-parada" role="status">
-    <b>Parada agora</b>
-    {# no Painel, todas (Levi, 28/10/2026: "não podemos deixar nada de fora"); nas outras visões, as 6 mais antigas #}
-    {% set faixa_vista = faixa if modo == 'painel' else faixa[:faixa_max] %}
-    {% for u, p in faixa_vista %}<span>{{ u.usina }} · {{ p.escopo }} · OS {{ p.os }} · desde {{ p.inicio }}</span>{% endfor %}
-    {% if faixa|length > faixa_vista|length %}<span class="mudo">e mais {{ faixa|length - faixa_vista|length }}</span>{% endif %}
-  </div>
   {% endif %}
   {% if modo == 'painel' and painel %}</div>{% endif %}
 
@@ -434,7 +429,6 @@
         <span>dias</span>
         <button class="gc-btn gc-btn--contorno" type="submit">Aplicar</button>
       </form>
-      <p class="cr-nota-bloco">A semana vem do arquivo do PCM, copiado para o banco de hora em hora{% if manut_i.get('semana_passada') %} (semana passada: {{ manut_i.semana_passada }}){% endif %}. As OS são lidas do Fracttal pelo Nexus{% if foto_os.quando %}; a leitura no banco é {{ foto_os.quando }}{% endif %}.</p>
       {% endif %}
     </section>
     {% endfor %}

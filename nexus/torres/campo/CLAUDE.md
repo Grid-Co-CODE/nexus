@@ -762,6 +762,19 @@ vez, 3,2 MB); (5) Ranking e Ocorrências. Uma tela por vez. **Feito até aqui (1
 - **Prova:** `tests/test_campo_design_360_1211.py`; na bancada com o banco de verdade só para leitura, nos dois temas e
   a 500 px.
 
+**2ª entrega (12/11/2026, as outras duas abas da Visão do responsável):**
+
+- **Painel:** a Parada agora é a mesma linha das outras abas (era o bloco vermelho com TODAS em texto corrido, 18 na
+  visão de todos); a lista inteira abre no clique, então a regra dele segue valendo (Levi, 28/10/2026: "não podemos
+  deixar nada de fora"). Os dois números do alto (PTs pendentes, OSs em verificação) ficam com a altura deles
+  (`.pn-topo` com `align-items:flex-start`; antes esticavam vazios até a altura do bloco). **Não mexi** no que é decisão
+  dele no Painel: a página 20% menor (`zoom:.8`), o título com o nome da pessoa, as 6 linhas por quadro com rolagem.
+- **Visão geral:** o número do bloco sem caixa (eram 12 caixas dentro de 3 cartões; fica um fio à esquerda, e só o
+  número escolhido como filtro ganha o fundo); na lista, **o valor em dia fica sem fundo** (`.cr-gr-lista .cr-v--ok`; a
+  cor é do crítico e da atenção: eram 13 células coloridas por linha); a procedência da Manutenção ("A semana vem do
+  arquivo do PCM...") saiu do cartão e mora no "!" do título. O "Focar atrasada há mais de N dias" continua no cartão: é
+  a régua de quem olha (Levi, 18/10/2026).
+
 ## Visão do responsável (12/10/2026)
 
 Levi: "Precisamos criar uma visão que os supervisores irão usar, uma visão que ele olha as usinas, as metas, os
