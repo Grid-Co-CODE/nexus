@@ -327,3 +327,61 @@ def test_os_gestos_do_zoom_nao_tomam_a_roda_nem_leem_o_det():
     assert "if (!(ev.ctrlKey || ev.metaKey) || !host._g) { return; }" in corpo and "passive: false" in corpo
     assert "det." not in corpo and "det[" not in corpo                          # a lição do PR #25
     assert 'addEventListener("dblclick"' in corpo                                # o duplo clique volta ao dia inteiro
+
+
+# --- separar as linhas (13/11/2026) ---------------------------------------------------------------------------------
+# O dono: "tipo o das strings, todas, ficam todas juntas e não consigo separar qual é qual, por isso o zoom". As strings
+# andam em 4 a 5 A e viram um feixe: com zoom, o Y vai do menor ao maior do que se vê; a caixa escolhe também o valor.
+
+def test_o_y_justo_abre_o_feixe_e_nao_comeca_em_0():
+    serie = lambda *vs: [[600 + 5 * k, v] for k, v in enumerate(vs)]
+    a, b = serie(4.1, 4.3, 4.6), serie(4.4, 4.9, 4.2)
+    assert zoom("N.faixaDoTrecho(" + json.dumps([a, b]) + ", 600, 610)") == {"min": 4.1, "max": 4.9}
+    assert zoom("N.faixaDoTrecho([[]], 600, 610)") is None
+    # o feixe de 4,1 a 4,9 A: o eixo de 4 a 5 A (e não de 0 a 6)
+    assert zoom("N.escalaJusta({min: 4.1, max: 4.9}, 4)") == {"min": 4, "max": 5}
+    assert zoom("N.escalaJusta({min: 4.5, max: 4.5}, 4)") == {"min": 4.4, "max": 4.6}     # uma linha reta ganha folga
+    assert zoom("N.escalaJusta({min: 0.02, max: 812}, 4)") == {"min": 0, "max": 1000}     # nunca abaixo de 0 sem negativo
+    assert zoom("N.escalaJusta({min: -2, max: 3}, 4)")["min"] < -2                         # com negativo, desce
+    assert zoom("N.escalaJusta(null, 4)") == {"min": 0, "max": 1}
+
+
+def test_a_caixa_do_arraste_horario_valor_ou_os_dois():
+    assert zoom("[N.LIMIAR_Y_PX, N.LIMIAR_X_PX]") == [18, 8]
+    # quase só na horizontal (10 px de altura): zoom só de horário, como antes
+    assert zoom("N.caixaDoArraste(600, 660, 4.2, 4.6, 120, 10)") == {"trecho": {"de": 600, "ate": 660}, "faixa": None}
+    # a caixa: o horário e a faixa de valor (em qualquer ordem)
+    assert zoom("N.caixaDoArraste(660, 600, 4.6, 4.2, -120, 40)") == {"trecho": {"de": 600, "ate": 660}, "faixa": {"min": 4.2, "max": 4.6}}
+    # quase só na vertical (3 px de largura): só o valor, e o horário fica como está (trecho ausente)
+    assert zoom("N.caixaDoArraste(600, 600.1, 4.2, 4.6, 3, 60)") == {"faixa": {"min": 4.2, "max": 4.6}}
+    # a faixa mínima: uma caixa achatada não vira uma linha
+    f = zoom("N.limitarFaixa(4.5, 4.501)")
+    assert (round(f["min"], 4), round(f["max"], 4)) == (4.4755, 4.5255)          # 0,05 A de altura, no mínimo
+
+
+def test_a_linha_mais_proxima_do_ponteiro_naquele_horario():
+    lista = [{"pts": [[600, 4.1], [605, 4.2]], "nome": "String1"}, {"pts": [[600, 4.6], [605, 4.7]], "nome": "String2"},
+             {"pts": [[600, None], [605, 4.4]], "nome": "String3"}, {"pts": [], "nome": "String4"}]
+    perto = lambda minuto, valor: zoom("N.maisPerto(" + json.dumps(lista) + ", " + str(minuto) + ", " + str(valor) + ")")
+    assert perto(605, 4.45) == 2          # às 10:05, o ponteiro em 4,45 A: a String3 (4,4)
+    assert perto(600, 4.45) == 1          # às 10:00 a String3 não tem leitura: a String2 (4,6) é a mais perto
+    assert perto(600, 3.0) == 0
+    assert zoom("N.maisPerto([], 600, 4)") == -1
+
+
+def test_so_esta_isola_uma_string_e_mostrar_todas_volta():
+    lista = [{"chave": "s1"}, {"chave": "s2"}, {"chave": "s3"}]
+    assert zoom("N.visiveis(" + json.dumps(lista) + ", 's2')") == [{"chave": "s2"}]
+    assert zoom("N.visiveis(" + json.dumps(lista) + ", null)") == lista
+    assert zoom("N.visiveis(" + json.dumps(lista) + ", 's9')") == lista                   # a isolada sumiu: todas de novo
+
+
+def test_o_eixo_cortado_se_diz_e_o_ampliar_e_o_isolar_estao_na_tela():
+    texto = JS.read_text(encoding="utf-8")
+    assert '"o eixo começa em " + rotuloDoEixo(lo, un)' in texto and '"pg-base" + (lo > 0 ? " pg-base--corte" : "")' in texto
+    assert "window.innerHeight * 0.7" in texto and '"Voltar ao tamanho" : "Ampliar"' in texto
+    assert 'addEventListener("dblclick", function (ev) { ev.preventDefault(); isolarString(e.chave); })' in texto
+    assert '"Mostrar todas"' in texto
+    # "Dia inteiro" e o duplo clique no gráfico zeram também a faixa de valor
+    assert "function zerarZoom() { faixasY = {}; definirZoom(null); }" in texto
+    assert 'host.addEventListener("dblclick", function (ev) { ev.preventDefault(); zerarZoom(); });' in texto
