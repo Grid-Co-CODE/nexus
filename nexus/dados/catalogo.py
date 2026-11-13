@@ -2071,6 +2071,11 @@ CONHECIDAS = (
               "outubro!\"): 1 linha = parte da usina × dia, com o kWp da parte; o Dashboard Thopen pondera as partes e "
               "usa o número no lugar da conta das OS e dos comentários, só nesse mês (thopen/disp_excecao.py da "
               "plataforma); gravada uma vez, de fora do 5080"),
+    Conhecida("thopen_disp_fechamento", ("disp_dia",), "apoio",
+              "a disponibilidade dos meses FECHADOS do Dashboard Thopen (13/11/2026, o cliente validou outubro num dia e "
+              "no outro os números tinham mudado): 1 linha = usina do 5080 × dia de um mês fechado, o número que o "
+              "dashboard mostrava na hora de fechar; o 5080 grava no dia 10 do mês seguinte (outubro/2026 fechado na "
+              "mão em 13/11) e lê dali, no lugar de qualquer conta (thopen/disp_fechamento.py da plataforma)"),
     Conhecida("organizacao_app_campo", ("Atribuicoes",), "apoio",
               "a foto das atribuições do App de Campo (usina × pessoa em HMAC × papel), publicada pelo App para o PCM "
               "comparar na tela Técnicos por usina antes de o App passar a ler o nexus_pcm_atribuicoes (17/10/2026); "
