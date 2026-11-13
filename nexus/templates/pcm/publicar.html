@@ -61,9 +61,10 @@
     <li>{% if conf.acima_da_capacidade %}{{ conf.acima_da_capacidade }} dias de equipe acima de {{ conf.capacidade_txt or '7' }} h pela coluna de duração
       (o maior: {{ conf.horas_dia_max }} h){% else %}Nenhum dia de equipe acima de {{ conf.capacidade_txt or '7' }} h.{% endif %}</li>
     {% if conf.excede_hh_os %}
-    <li><strong class="pcm-pub-ruim">Corretivas forçadas além das horas do dia:</strong>
+    <li><strong class="pcm-pub-ruim">OS forçadas além das horas do dia</strong> (fixadas num dia cheio pelas observações,
+      ou a MPM da última semana do mês):
       {% for e in conf.excede_hh_os %}OS {{ e.os }} ({{ e.tarefas }} {{ 'tarefa' if e.tarefas == 1 else 'tarefas' }}, {{ e.horas }} h, {{ e.equipe }}, {{ e.dia }}){{ ', ' if not loop.last }}{% endfor %}.
-      Confira a duração estimada das tarefas no Fracttal ou fixe-as em dias diferentes nas observações, e gere de novo.</li>
+      Mude o dia da OS nas observações ou confira a duração estimada das tarefas no Fracttal, e gere de novo.</li>
     {% endif %}
     {% if conf.fora_da_jornada %}<li>{{ conf.fora_da_jornada }} blocos começam fora da jornada (07:00 às 17:00).</li>{% endif %}
     <li>Observações: {{ obs.usinas }} usinas com dia de atendimento, {{ obs.fora }} OS fora e {{ obs.fixar }} OS com dia fixo{% if obs.problemas %};

@@ -119,11 +119,14 @@
     {% else %}<span class="gc-ajuda">Esta semana pode ser publicada no App por um administrador ou por quem é do setor PCM.</span>{% endif %}
   </div>
   {% endif %}
+  {# desde 13/11/2026 o motor não força a corretiva: o [EXCEDE HH] que sobra é o da OS fixada num dia cheio pelas
+     observações (o pin manda, decisão do PCM) e o da MPM da última semana do mês #}
   {% if sel.conferencia and sel.conferencia.excede_hh_os %}
-  <div class="pcm-aviso pcm-aviso--alerta"><i class="ph ph-warning"></i><div><strong>Corretivas forçadas além das horas do dia:</strong>
+  <div class="pcm-aviso pcm-aviso--alerta"><i class="ph ph-warning"></i><div><strong>OS forçadas além das horas do dia</strong>
+    (fixadas num dia cheio pelas observações, ou a MPM da última semana do mês):
     {% for e in sel.conferencia.excede_hh_os %}OS {{ e.os }} ({{ e.tarefas }} {{ 'tarefa' if e.tarefas == 1 else 'tarefas' }},
-    {{ e.horas }} h, {{ e.equipe }}, {{ e.dia }}){{ ', ' if not loop.last }}{% endfor %}. Confira a duração estimada no Fracttal
-    ou fixe as tarefas em dias diferentes (bloco 2) e gere de novo.</div></div>
+    {{ e.horas }} h, {{ e.equipe }}, {{ e.dia }}){{ ', ' if not loop.last }}{% endfor %}. Mude o dia da OS nas observações
+    (bloco 2) ou confira a duração estimada no Fracttal, e gere de novo.</div></div>
   {% endif %}
 
   {% if sel.comparacao %}

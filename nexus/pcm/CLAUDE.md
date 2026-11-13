@@ -55,7 +55,7 @@ escolhida de cada semana e os números: `nexus/dados/CLAUDE.md`.
 | `geracao.py` | roda o motor numa pasta por rodada, num subprocesso, a 1 pedido por segundo ao Fracttal; depois do motor, tira da planilha as tarefas do `sem:` das observações (`aplicar_sem`, 15/10/2026: o motor só o aplica nas OS de plano; seção do Quadro); `gerar_com_foto`, o mesmo com a FOTO do Fracttal e sem credencial (a prova) |
 | `insumos.py` | os insumos do motor guardados no Nexus, escritos na rodada no formato que o motor lê |
 | `historico_banco.py` | o histórico das programações que o motor lê, montado do `fato_programacao` do banco (desde 08/10/2026); o plano publicado da semana em andamento vem da reserva, do REPOSITÓRIO do PCM ou da pasta do PCM |
-| `comparar.py` | compara a semana do Nexus com a oficial (a do PCM), linha a linha; `conferir`: a conferência da semana gerada (dentro da semana, horas por equipe e dia, fora da jornada, repetidas, e `excede_hh_os`: a OS cuja corretiva o motor forçou além das horas do dia) |
+| `comparar.py` | compara a semana do Nexus com a oficial (a do PCM), linha a linha; `conferir`: a conferência da semana gerada (dentro da semana, horas por equipe e dia, fora da jornada, repetidas, e `excede_hh_os`: a OS que o motor forçou além das horas do dia; desde 13/11/2026 não é mais a corretiva, só a OS fixada num dia cheio pelas observações, o pin que manda, e a MPM da última semana do mês: a tela diz "OS forçadas") |
 | `publicar.py` | **Publicar no App** (09/10/2026): a planilha e as observações da rodada vão para o repositório do PCM, conferidas relendo, e o plano vai para a reserva do histórico |
 | `quadro.py` | **Quadro da semana** (09/10/2026): a semana em colunas por dia, a janela da OS e a reprogramação (a linha do motor, a mescla nas observações, o arquivo da semana em curso) |
 | `fama_os.py` | **as OS da FAMA para o PCM** (11/11/2026, seção abaixo): a porta única `_linhas_fama(config)` (as OS e o batimento da carga), o frescor (`velho`), o vocabulário da FAMA (situação, tipo, severidade, em português) e a usina de cada OS pelo cadastro do banco |
@@ -2161,7 +2161,7 @@ elas (`publicar.sem_as_os_da_fama`: saem as linhas FAMA-<id>, o número substitu
 que só tinha FAMA; a publicação diz quantas, `fama_fora_do_app`) e a preventiva do Fracttal das usinas da FAMA FICA
 (revisão de 13/11: tirá-la deixaria o campo sem preventiva nenhuma ali; o status guarda `vai_ao_app`, e o Publicar barra
 a rodada gerada num modo e publicada no outro: "gere de novo"; a rodada sem a marca, gerada entre o `d04eb47d` e a
-correção, tirou a preventiva e vale como gerada "no App"). A rodada guarda a programação inteira, e o Quadro a
+correção, tirou a preventiva e vale como gerada "no App"; só barra se tirou alguma: a W47 das 05:20 de 13/11 tirou 0). A rodada guarda a programação inteira, e o Quadro a
 mostra (`fama_quadro.plano_publicado`: o dia, a equipe e a hora do programador; a que ele não programou fica no bloco da
 segunda, "Não coube" ou "Não programada"; a equipe do cadastro vai escrita como o motor escreve, `_equipe_como_o_motor`).
 No App de Campo (v353, 13/11) a fila do técnico é pessoal: a OS da FAMA aparece para quem EXECUTA a usina nas

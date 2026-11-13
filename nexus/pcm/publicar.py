@@ -260,14 +260,16 @@ def motivos_para_nao_publicar(config, rid: str, agora: datetime | None = None) -
         out.append(f"{conf['fora_da_semana']} blocos fora da semana {st['semana']}")
     # a preventiva do Fracttal das usinas da FAMA sai da rodada só quando a FAMA vai ao App (`fama_motor.vai_ao_app`):
     # publicar no outro modo mandaria ao campo as duas preventivas, ou nenhuma (revisão de 13/11/2026). A rodada sem a
-    # marca (gerada entre o d04eb47d e esta correção) sempre tirou a preventiva: vale como gerada com a FAMA no App
+    # marca (gerada entre o d04eb47d e esta correção) sempre tirou a preventiva: vale como gerada com a FAMA no App, e
+    # só barra se tirou alguma (a W47 das 05:20 de 13/11 não tirou nenhuma)
     fm = st.get("fama") or {}
     gerada_no_app = bool(fm.get("vai_ao_app", True))
-    if fm.get("os_fama") and gerada_no_app != fama_no_app(config):
-        out.append("a rodada foi gerada com as OS da FAMA " + (
-            "indo ao App (a preventiva do Fracttal saiu das usinas da FAMA), e agora a FAMA não vai ao App"
-            if gerada_no_app else
-            "fora do App (a preventiva do Fracttal ficou nas usinas da FAMA), e agora a FAMA vai ao App") + ": gere de novo")
+    if fm.get("os_fama") and gerada_no_app and fm.get("preventivas_tiradas") and not fama_no_app(config):
+        out.append(f"a rodada tirou {fm['preventivas_tiradas']} preventivas do Fracttal das usinas da FAMA (gerada com a "
+                   "FAMA indo ao App), e agora a FAMA não vai ao App: gere de novo")
+    elif fm.get("os_fama") and not gerada_no_app and fama_no_app(config):
+        out.append("a rodada foi gerada com as OS da FAMA fora do App (a preventiva do Fracttal ficou nas usinas da "
+                   "FAMA), e agora a FAMA vai ao App: gere de novo")
     return out
 
 

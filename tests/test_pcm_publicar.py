@@ -211,6 +211,11 @@ def test_a_rodada_gerada_num_modo_da_fama_nao_se_publica_no_outro(config, origem
     del st["fama"]["vai_ao_app"]
     G._gravar(pasta, st)
     assert any("gere de novo" in m and "FAMA" in m for m in PB.motivos_para_nao_publicar(config, rid))
+    # sem preventiva tirada não há o que faltar no campo: a W47 gerada no servidor em 13/11 às 05:20 (222 OS da FAMA,
+    # 0 preventivas tiradas) publica
+    st["fama"]["preventivas_tiradas"] = 0
+    G._gravar(pasta, st)
+    assert PB.motivos_para_nao_publicar(config, rid) == []
     # a rodada sem a FAMA (ou que a FAMA deixou fora) publica em qualquer modo
     st["fama"] = {"fora": "a leitura da FAMA parou"}
     G._gravar(pasta, st)
@@ -321,6 +326,24 @@ def test_a_tela_gerar_diz_o_que_a_fama_fez_na_rodada(app, logado, config, origem
     G._gravar(pasta, st)
     html = " ".join(logado.get(f"/t/pcm/gerar?rodada={rid}").get_data(as_text=True).split())
     assert "As OS da FAMA ficaram fora desta rodada: a leitura da FAMA parou" in html.replace("</strong>", "")
+
+
+def test_a_os_forcada_alem_das_horas_nao_se_chama_mais_corretiva(app, logado, config, origem, monkeypatch):
+    """Desde 13/11/2026 o motor não força a corretiva (Levi: "até 70% das horas semanais"): o [EXCEDE HH] que sobra é o da
+    OS fixada num dia cheio pelas observações (o pin manda, decisão do PCM de 21/08/2026) e o da MPM da última semana do
+    mês. Na W47 gerada no servidor em 13/11, todas as "corretivas forçadas" da tela eram MPM fixadas pelo PCM."""
+    monkeypatch.setattr(PB, "_agora", lambda: SABADO_ANTES)
+    app.config.update({k: v for k, v in config.items() if k != "TESTING"})
+    rid = _rodada(app.config, origem)
+    _com_github(app.config)
+    st = G.ler_status(app.config, rid)
+    st["conferencia"]["excede_hh_os"] = [{"os": "19161", "equipe": "ES Norte 02", "dia": "qua", "tarefas": 10,
+                                          "horas": 12.5}]
+    G._gravar(G.pasta_trabalho(app.config) / "geracoes" / rid, st)
+    for url in (f"/t/pcm/gerar?rodada={rid}", f"/t/pcm/gerar/publicar?rodada={rid}"):
+        html = " ".join(logado.get(url).get_data(as_text=True).split())
+        assert "OS forçadas além das horas do dia" in html and "OS 19161 (10 tarefas, 12.5 h, ES Norte 02, qua)" in html
+        assert "Corretivas forçadas" not in html and "fixadas num dia cheio pelas observações" in html
 
 
 def _no_setor(monkeypatch, setor_id, nome="Setor do teste"):
