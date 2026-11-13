@@ -566,7 +566,9 @@ como no Quadro da equipe. Desenho em `docs/superpowers/specs/2026-10-26-engenhar
   de 5 min, relida por trás enquanto a tela é usada e 270 s depois de subir (`etm.manter_quente`, no `instalar`).
 - **Engenharia, Chamados e Campo** (Levi, 26/10/2026: "Engenharia e Chamados vai pelas pessoas dos setores, Campo é o
   restante!"): o setor de quem está com a OS, pelo id do Fracttal, nos setores de Base → Acessos → Pessoas e setores
-  (`nexus_setores`, a última decisão de cada pessoa; os nomes "Engenharia" e "Chamados", sem acento nem caixa). Cada
+  (`nexus_setores`, a última decisão de cada pessoa; pelo setor_id, `etm.GRUPO_DO_SETOR`). O grupo **Chamados é o setor
+  Performance** desde 13/11/2026 (Levi: "o setor vira performance mas continua na aba chamados"; em 05/11 o setor
+  Chamados foi excluído e as pessoas dele foram para a Performance, e o grupo, achado pelo nome, ficou vazio). Cada
   cartão tem o selo (azul, verde, neutro), os três filtram e a faixa conta as abertas de cada um. Sem o banco dos
   setores, a Engenharia vem da lista do Quadro da equipe (pelo nome), Chamados não se separa e a tela diz. Medido em
   26/10/2026: 7 pessoas na Engenharia e 2 em Chamados, 260 OS na tela (54, 1 e 205).

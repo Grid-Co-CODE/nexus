@@ -12,6 +12,9 @@ Engenharia, Chamados e Campo (Levi, 26/10/2026: "Engenharia e Chamados vai pelas
 restante!"): o setor de quem está com a OS, pelo id do Fracttal, nos setores de Base → Acessos → Pessoas e setores (livro
 `nexus_setores`, a última decisão de cada pessoa); quem não é de nenhum dos dois é Campo. Sem o banco dos setores, a
 Engenharia vem da lista do Quadro da equipe (`os_equipe.nomes`, pelo nome), Chamados não se separa e a tela diz.
+O grupo Chamados é o setor PERFORMANCE desde 13/11/2026: em 05/11 o Levi excluiu o setor Chamados e pôs as pessoas dele
+na Performance, e o grupo, que era achado pelo NOME do setor, ficou vazio (as OS delas iam para Campo). Levi, 13/11: "o
+setor vira performance mas continua na aba chamados". Os setores vão pelo setor_id (`GRUPO_DO_SETOR`), não pelo nome.
 
 Quais OS entram (a regra do app, sem nome no código): as Corretivas e as Administrativas, mais as de responsável ou
 solicitante da Engenharia ou de Chamados. O solicitante do Fracttal é texto livre: casa pelo nome do Fracttal das
@@ -25,6 +28,7 @@ import time
 from datetime import datetime, timedelta, timezone
 from urllib.parse import quote
 
+from ..cadastro import setor_ids as SID
 from . import os_equipe
 
 ETM = "Estação Meteorológica"
@@ -36,7 +40,9 @@ QUENTE_S = 60
 TETO_ETMS = 5       # páginas de 100 (172 ETMs em 26/10/2026)
 TETO_OS = 40        # páginas de 100 (1213 OS em 26/10/2026): um filtro ignorado não vira o Fracttal inteiro
 TIPOS_SEMPRE = ("corretiva", "administrativa")
-SETORES = ("engenharia", "chamados")      # os setores que separam a OS (o nome em Base → Acessos, sem acento nem caixa)
+SETORES = ("engenharia", "chamados")      # os grupos que separam a OS (Campo é o resto)
+# o setor de Base → Acessos de cada grupo, pelo setor_id: Chamados é o setor Performance desde 13/11/2026 (ver o topo)
+GRUPO_DO_SETOR = {SID.ENGENHARIA: "engenharia", SID.PERFORMANCE: "chamados"}
 COLUNAS = (("nao_iniciada", "Não iniciadas"), ("em_andamento", "Em andamento"), ("finalizada", "Finalizadas"),
            ("cancelada", "Canceladas"))
 # a coluna do quadro da equipe → a do Planner do app (a verificação ainda não fechou: está em andamento)
@@ -138,15 +144,16 @@ def montar(linhas: list[dict], codigos_etm: set, setores: dict, hoje) -> list[di
 
 
 def _ler_setores(app) -> dict:
-    """Os setores Engenharia e Chamados de Base → Acessos → Pessoas e setores: quem é de cada um pela última decisão
-    (o id do Fracttal) e o nome do Fracttal dessas pessoas (para o solicitante, que é texto livre)."""
+    """Os grupos Engenharia e Chamados pelos setores de Base → Acessos → Pessoas e setores (`GRUPO_DO_SETOR`: o setor
+    Engenharia e o Performance): quem é de cada um pela última decisão (o id do Fracttal) e o nome do Fracttal dessas
+    pessoas (para o solicitante, que é texto livre)."""
     from ..cadastro import setores as S
     from ..dados import conexao
     st = S.ler(*conexao.banco())
     if not st.get("lido_em"):
         raise RuntimeError(st.get("erro") or "o livro dos setores não veio")
-    ids = {os_equipe._norm(s["nome"]): s["setor_id"] for s in S.ativos(st.get("setores") or [])}
-    alvo = {ids[n]: n for n in SETORES if n in ids}
+    ativos = {s["setor_id"] for s in S.ativos(st.get("setores") or [])}
+    alvo = {sid: g for sid, g in GRUPO_DO_SETOR.items() if sid in ativos}
     por_id = {_id(fid): alvo[sid] for fid, sid in S.vigentes(st.get("decisoes") or []).items()
               if sid in alvo and _id(fid)}
     nomes: dict = {s: [] for s in SETORES}
