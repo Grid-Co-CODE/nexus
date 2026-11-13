@@ -22,7 +22,6 @@
       <div class="cn-eq-cab">
         <div class="cn-eq-titulo"><b>{{ s.responsavel }}</b><span class="cn-min-st cn-min-st--{{ 'critico' if s.parada else 'alerta' }}">{{ (s.parada ~ ' parada' ~ ('s' if s.parada != 1 else '')) if s.parada else 'aguardando' }}</span></div>
         <span>{{ 'PT de usinas sem responsável UFV no cadastro' if s.responsavel == sem_responsavel else 'Responsável UFV' }} · {{ s.usinas }} usina{{ 's' if s.usinas != 1 }} com PT esperando · {{ s.equipes|length }} equipe{{ 's' if s.equipes|length != 1 }}</span>
-        <span class="cn-sup-equipes" title="{{ s.equipes|join(', ') }}">{{ s.equipes|join(', ') }}</span>
       </div>
       <div class="cn-min-num"><b>{{ s.pts }}</b><span>PT esperando o De acordo</span></div>
       <div class="cn-min-motivos">{% if s.parada %}<span class="critico">{{ s.parada }} parada{{ 's' if s.parada != 1 }} há mais de 2 h</span>{% endif %}{% if s.pts - s.parada %}<span class="alerta">{{ s.pts - s.parada }} aguardando</span>{% endif %}</div>

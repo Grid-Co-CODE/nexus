@@ -420,14 +420,16 @@ As constantes ficam no topo do arquivo; cada função diz a regra no docstring.
     60/85/95 e 10 min); o GPS só aparece como a falha "sem GPS". "Ronda longa pendente" é pendência para o App
     (vira Atenção). Medido em 08/10, 30 dias: 527 rondas, cobertura 83% (106 de 128), qualidade 96%, duração média
     47 min; 7 dias: 149 rondas, 66% (84 de 128).
-  - **Os sete indicadores filtram a tabela** (Levi, 05/10): Rondas finalizadas = as de hoje (`ind=hoje`); Cobertura =
-    o filtro Sem ronda (`cob=sem`); **Nunca tiveram ronda** = `cob=nunca`; Qualidade = abaixo do limite
-    (`ind=qualidade`); Duração = da mais longa para a mais curta (`ind=duracao`); Abaixo de 10 min = `dur=curta`; Usina
-    mais atrasada = as há 7 dias ou mais (`cob=atrasadas`). O cartão ativo fica marcado; clicar de novo, ou no
-    × do filtro, tira.
+  - **Os cinco indicadores filtram a tabela** (Levi, 05/10): Rondas finalizadas = as de hoje (`ind=hoje`); Cobertura =
+    o filtro Sem ronda (`cob=sem`); Qualidade = abaixo do limite (`ind=qualidade`); Duração = da mais longa para a mais
+    curta (`ind=duracao`); Abaixo de 10 min = `dur=curta`. O cartão ativo fica marcado; clicar de novo, ou no × do
+    filtro, tira. **Eram sete até 12/11/2026** (a revisão de desenho; Levi: "ok" para "Rondas fica só com o que foi
+    feito"): o "Nunca tiveram ronda" e a "Usina mais atrasada" são pendência, e a pendência mora na Central de atenção;
+    aqui ficou uma linha com o total das que nunca tiveram ronda, que leva até lá (`rd-pend`). As listas `cob=nunca` e
+    `cob=atrasadas` seguem no "Mostrar" dos Filtros.
   - **Nunca tiveram ronda** (08/10: "em KPIs coloque mais um, quantas usinas nunca tiveram ronda";
     `visao._registro_da_cobertura`): usina mobilizada sem nenhuma ronda em TODO o registro do Nexus, não só no período:
-    o livro de rondas do App, as avulsas e a carga `nexus_rondas_checklist`. O `title` do cartão diz desde quando vai o
+    o livro de rondas do App, as avulsas e a carga `nexus_rondas_checklist`. O `title` do número (na linha `rd-pend`, desde 12/11/2026) diz desde quando vai o
     registro (a data mais antiga das três). Medido em 08/10: registro desde 11/08/2026; 19 de 128 mobilizadas nunca
     tiveram ronda (igual à conta antiga "999 dias": a carga só tem rondas que o livro também tem).
   - **Sem ronda** (08/10: "troque por uma tabela chamada 'Sem ronda' que mostrará usina, equipe, técnicos, supervisor e
@@ -774,6 +776,21 @@ vez, 3,2 MB); (5) Ranking e Ocorrências. Uma tela por vez. **Feito até aqui (1
   cor é do crítico e da atenção: eram 13 células coloridas por linha); a procedência da Manutenção ("A semana vem do
   arquivo do PCM...") saiu do cartão e mora no "!" do título. O "Focar atrasada há mais de N dias" continua no cartão: é
   a régua de quem olha (Levi, 18/10/2026).
+
+**3ª entrega (12/11/2026, a Central de atenção e as Rondas; a regra 3, cada número com a sua tela dona):** a proposta
+ao Levi foi "Central fica com o que está pendente (quem está sem ronda); Rondas fica só com o que foi feito (cobertura,
+duração e qualidade)", e a resposta, "ok".
+
+- **Central de atenção:** a procedência saiu do canto do título (o `cn-frescor` com "rondas e PT do App + cadastro do
+  Nexus / lido às" e o aviso do fato em letra de código) e mora no "!"; o cartão do responsável perdeu a lista de equipes
+  (fica a conta, "12 equipes"; vale para as rondas e para as PT); os quatro números do mesmo peso viraram **o total com
+  a composição** (`cn-comp`): o total grande e a barra dos três motivos (nunca teve ronda, sem ronda há 7 dias ou mais,
+  longa pendente) com a legenda; o total e cada motivo seguem filtrando a tabela.
+- **Rondas:** a faixa ficou com os cinco números do que foi FEITO; o "Nunca tiveram ronda" (pedido dele de 08/10/2026) e
+  a "Usina mais atrasada" saíram da faixa, e uma linha leva à Central (`rd-pend`). A Qualidade e o Veredito seguem em
+  duas colunas: a auditoria dizia que repetiam, mas não repetem (a mesma qualidade de 95% dá "Atenção" numa ronda e
+  "Muito bom" em outra, porque o veredito olha também a duração e as pendências).
+- **Prova:** `tests/test_campo_design_360_central_rondas_1211.py`; na bancada com o banco de verdade, nos dois temas.
 
 ## Visão do responsável (12/10/2026)
 

@@ -39,8 +39,9 @@
     na OS para abrir a PT e decidir. Por responsável: o Responsável UFV da usina da PT; o cartão leva à tabela das PT
     dele. O livro de PT do App chega de hora em hora.</p>{% endif %}
         <p>A região da tabela sai do estado da usina no cadastro.</p>
+        {# a procedência morava no canto do título, em letra de código (até 12/11/2026, a revisão de desenho) #}
+        <p><b>Lido às {{ lido }}</b>: as rondas e as PT do App e o cadastro do Nexus. {% include 'campo/_aviso_fato.html' %}</p>
       {% endcall %}</div><p class="cn-pergunta">{{ tela.pergunta }}</p></div>
-    <div class="cn-frescor">rondas e PT do App + cadastro do Nexus<br><b>lido às {{ lido }}</b>{% include 'campo/_aviso_fato.html' %}</div>
   </div>
   {% if leitura.erro %}<div class="cn-erro" role="alert"><b>{{ leitura.erro }}.</b></div>{% endif %}
 
@@ -74,11 +75,19 @@
   {% include 'campo/_pt_esperando.html' %}
   {% else %}
   {% if vista == 'pendentes' %}
-  {# as pendentes pedem atenção: cada número filtra a tabela #}
-  <div class="cn-numeros cn-numeros--filtro">
-    <a href="{{ url(f=None, modo='tabela') }}"{% if not f and modo == 'tabela' %} aria-current="page"{% endif %}><span class="gc-rotulo">Rondas pendentes</span><span class="v{% if total %} ruim{% endif %}">{{ total }}</span><span class="d">usinas mobilizadas pedindo ronda</span></a>
-    {% for s, (rot, cor) in status.items() %}<a href="{{ url(f=s, modo='tabela') }}"{% if s == f %} aria-current="page"{% endif %}><span class="gc-rotulo">{{ rot }}</span><span class="v cn-t-{{ cor }}">{{ contagem.get(s, 0) }}</span><span class="d">{{ {'nunca': 'desde a mobilização', 'sem_ronda': 'há 7 dias ou mais', 'longa_pendente': 'o App pede a longa'}[s] }}</span></a>{% endfor %}
-  </div>
+  {# o total com a composição (12/11/2026, a revisão de desenho): eram quatro números do mesmo peso (84, 15, 46, 23) sem
+     dizer que o 1º é a soma dos outros. O total grande e, ao lado, a barra dos três motivos com a legenda; o total e
+     cada motivo seguem filtrando a tabela, como antes #}
+  {% set detalhe = {'nunca': 'desde a mobilização', 'sem_ronda': 'há 7 dias ou mais', 'longa_pendente': 'o App pede a longa'} %}
+  <div class="cn-comp">
+    <a class="cn-comp-total" href="{{ url(f=None, modo='tabela') }}"{% if not f and modo == 'tabela' %} aria-current="page"{% endif %}><span class="v{% if total %} ruim{% endif %}">{{ total }}</span><span class="d">usina{{ 's' if total != 1 }} mobilizada{{ 's' if total != 1 }} pedindo ronda</span></a>
+    <div class="cn-comp-partes">
+      <div class="cn-comp-barra" aria-hidden="true">{% for s, (rot, cor) in status.items() if contagem.get(s, 0) %}<span class="cn-comp-seg cn-comp-seg--{{ s }}" style="flex: {{ contagem.get(s, 0) }}"></span>{% endfor %}</div>
+      <div class="cn-comp-leg">
+        {% for s, (rot, cor) in status.items() %}<a class="cn-comp-parte{% if s == f %} cn-comp-parte--sel{% endif %}" href="{{ url(f=s, modo='tabela') }}"{% if s == f %} aria-current="page"{% endif %}><i class="cn-comp-seg--{{ s }}" aria-hidden="true"></i><b>{{ contagem.get(s, 0) }}</b><span>{{ rot }}<small>{{ detalhe[s] }}</small></span></a>{% endfor %}
+      </div>
+    </div>
+  </div><!-- /cn-comp -->
   {% endif %}
 
   {% if modo == 'responsaveis' %}
@@ -90,7 +99,6 @@
         <div class="cn-eq-cab">
           <div class="cn-eq-titulo"><b>{{ s.responsavel }}</b>{{ pct_feitas(s) }}</div>
           <span>{{ 'usinas sem responsável UFV no cadastro' if s.responsavel == sem_responsavel else 'Responsável UFV' }} · {{ s.usinas }} usina{{ 's' if s.usinas != 1 }} · {{ s.n_equipes }} equipe{{ 's' if s.n_equipes != 1 }}</span>
-          <span class="cn-sup-equipes" title="{{ s.equipes|join(', ') }}">{{ s.equipes|join(', ') }}</span>
         </div>
         {{ numeros_ronda(s) }}
       </a>

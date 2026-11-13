@@ -83,7 +83,9 @@ def test_indicador_nunca_tiveram_ronda_conta_todo_o_registro(banco, logado):
     assert k["nunca"] == 1                                     # Coração 1
     html = logado.get("/t/campo/rondas").get_data(as_text=True)
     desde = _dia(3)
-    assert "Nunca tiveram ronda" in html and 'href="?cob=nunca"' in html
+    # desde 12/11/2026 (a revisão de desenho) o número não é mais um indicador da faixa: fica numa linha que leva à
+    # Central de atenção (a tela dona do pendente), e a lista segue no "Mostrar" dos Filtros
+    assert "<b>1</b> usina nunca teve ronda" in html and 'value="nunca"' in html
     assert f"desde {desde[8:10]}/{desde[5:7]}/{desde[:4]}, rondas avulsas" in html          # o title diz desde quando
     # uma ronda de 40 dias atrás: fora dos 30 dias, mas no registro; Coração 1 deixa de ser "nunca" e segue sem ronda
     _rondas_do_banco(banco, _ronda(_dia(40), usina="Coração Fracttal", ativo="THPN-COR100"))
@@ -218,7 +220,7 @@ def test_painel_compara_regiao_equipe_cliente_regiao_de_campo_e_gestor(banco, lo
 
 def test_indicadores_levam_a_aba_sem_ronda(banco, logado):
     html = logado.get("/t/campo/rondas").get_data(as_text=True)
-    assert 'href="?cob=sem"' in html and 'href="?cob=atrasadas"' in html
+    assert 'href="?cob=sem"' in html and 'value="atrasadas"' in html      # a atrasada: só no "Mostrar" (12/11/2026)
     # duas abas (03/11/2026): a Sem ronda virou o "Mostrar" dos Filtros
     abas = re.findall(r'<nav class="cn-abas" id="abas".*?</nav>', html, re.S)[0]
     assert re.findall(r">(Registros|Trackers)<", abas) == ["Registros", "Trackers"] and "Sem ronda" not in abas

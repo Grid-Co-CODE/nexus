@@ -57,19 +57,18 @@
     {{ card(cob == 'sem', dict(cob='sem')) }}<span class="gc-rotulo">Cobertura de usinas</span>
       <span class="v">{{ '—' if k.cobertura_pct is none else k.cobertura_pct }}<small>%</small></span>
       <span class="d">{{ k.cobertas }} de {{ k.usinas }}{% if k.cobertura_ant_pct is not none and k.cobertura_pct is not none %}{% set dl = k.cobertura_pct - k.cobertura_ant_pct %} · <span class="cn-t-{{ 'ok' if dl >= 0 else 'critico' }}">{{ '▲' if dl >= 0 else '▼' }} {{ dl|abs }}%</span>{% endif %}</span></a>
-    {# Levi, 08/10: "em KPIs coloque mais um, quantas usinas nunca tiveram ronda" (em todo o registro, não só no período) #}
-    {{ card(cob == 'nunca', dict(cob='nunca'), 'Usinas mobilizadas sem nenhuma ronda em todo o registro do Nexus, não só no período: livro de rondas do App' ~ (' desde ' ~ dmy(registro_desde) if registro_desde else '') ~ ', rondas avulsas e a carga do checklist das rondas sem OS.') }}<span class="gc-rotulo">Nunca tiveram ronda</span>
-      <span class="v{% if k.nunca %} cn-t-critico{% endif %}">{{ k.nunca }}</span><span class="d">de {{ k.usinas }} mobilizadas</span></a>
     {{ card(ind == 'qualidade', dict(ind='qualidade')) }}<span class="gc-rotulo">Qualidade média</span>
       <span class="v">{{ '—' if k.qualidade is none else k.qualidade }}<small>%</small></span><span class="d">{{ k.abaixo_limite }} abaixo de {{ k.limite }}%</span></a>
     {{ card(ind == 'duracao', dict(ind='duracao')) }}<span class="gc-rotulo">Duração média</span>
       <span class="v">{{ '—' if k.dur_media is none else k.dur_media }}<small>min</small></span><span class="d">mediana {{ '—' if k.dur_mediana is none else k.dur_mediana ~ ' min' }}</span></a>
     {{ card(dur == 'curta', dict(dur='curta')) }}<span class="gc-rotulo">Abaixo de {{ k.dur_min }} min</span>
       <span class="v{% if k.curtas %} cn-t-critico{% endif %}">{{ k.curtas }}</span><span class="d">checklist não percorrido</span></a>
-    {{ card(cob == 'atrasadas', dict(cob='atrasadas')) }}<span class="gc-rotulo">Usina mais atrasada</span>
-      {% if atr %}<span class="v cn-t-{{ 'critico' if atr.dias >= 14 else ('alerta' if atr.dias >= 7 else 'ok') }}">{{ 'nunca' if atr.dias >= 999 else atr.dias ~ ' d' }}</span>
-      <span class="d">{{ atr.usina }}</span>{% else %}<span class="v">—</span>{% endif %}</a>
   </div>
+  {# o que está PENDENTE tem a tela dona dele, a Central de atenção (12/11/2026, a revisão de desenho; Levi: "ok" para
+     "Central fica com o que está pendente; Rondas fica só com o que foi feito"). Saíram da faixa o "Nunca tiveram ronda"
+     (pedido dele de 08/10/2026) e a "Usina mais atrasada"; fica uma linha com o total daqui, que leva até lá. A lista
+     continua no "Mostrar" dos Filtros #}
+  <p class="rd-pend"><i class="ph ph-arrow-bend-down-right" aria-hidden="true"></i>{% if k.nunca %}<span title="{{ 'Usinas mobilizadas sem nenhuma ronda em todo o registro do Nexus, não só no período: livro de rondas do App' ~ (' desde ' ~ dmy(registro_desde) if registro_desde else '') ~ ', rondas avulsas e a carga do checklist das rondas sem OS.' }}"><b>{{ k.nunca }}</b> usina{{ 's nunca tiveram' if k.nunca != 1 else ' nunca teve' }} ronda.</span> {% endif %}<span>O que está pendente fica na <a href="{{ url_for('torre_campo.atencao') }}">Central de atenção</a>.</span></p>
 
   {# a barra de uma linha (o modelo do Histórico do OS Creator Web, Levi, 03/11/2026): o Buscar por usina vai à página
      da usina; a busca filtra a tabela; os Filtros abrem o painel (só valem no Aplicar; fechar sem aplicar descarta; no

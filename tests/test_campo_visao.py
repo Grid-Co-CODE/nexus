@@ -173,7 +173,8 @@ def test_painel_de_rondas_duracao_veredito_e_indicadores(banco):
 def test_tela_de_rondas_no_estilo_do_painel(banco, logado):
     html = logado.get("/t/campo/rondas").get_data(as_text=True)
     assert "Cobertura, duração e qualidade da ronda" in html and "Rondas finalizadas" in html
-    assert "Usina mais atrasada" in html and "Rondas diárias" in html and 'class="cn-avatar">FS<' in html
+    # 12/11/2026 (a revisão de desenho): a "Usina mais atrasada" saiu da faixa; o pendente leva à Central de atenção
+    assert 'class="rd-pend"' in html and "Rondas diárias" in html and 'class="cn-avatar">FS<' in html
     assert "1h00" in html and "Atenção" in html and "Exportar CSV" in html
     r = logado.get("/t/campo/rondas?csv=1")
     assert r.mimetype == "text/csv" and "Fulano Souza" in r.get_data(as_text=True)
@@ -643,7 +644,9 @@ def test_indicadores_da_ronda_filtram_a_tabela(banco, logado):
     # 08/10: o 7º indicador (nunca tiveram ronda) e a aba Sem ronda no lugar da Cobertura
     # juntos numa faixa desde 03/11/2026 ("no padrão de tudo junto"); a Sem ronda é o filtro cob
     faixa = html.split('class="cn-numeros cn-numeros--filtro rd-numeros">', 1)[1].split("</div>", 1)[0]
-    assert faixa.count("<a href=") == 7
+    # 12/11/2026 (a revisão de desenho): cinco, só do que foi feito; "nunca tiveram ronda" e "usina mais atrasada"
+    # são pendência, e a pendência mora na Central de atenção
+    assert faixa.count("<a href=") == 5
     assert 'href="?ind=qualidade"' in html and 'href="?cob=sem"' in html and 'href="?dur=curta"' in html
     # o filtro aplicado vira uma etiqueta com o × (03/11/2026, o modelo do Histórico do OS Creator Web)
     html = logado.get("/t/campo/rondas?ind=hoje").get_data(as_text=True)
