@@ -287,6 +287,51 @@ def usina_relatorio(usina_id):
     return responsaveis_usina_relatorio(usina_id)
 
 
+def _extras_do_dossie(usina_id: int) -> dict:
+    """O que os setores sabem da usina e o prontuário ainda não mostra (Levi, 12/11/2026, conferindo o dossiê: "tá indo o
+    que a engenharia tá vendo [...] tá indo alguma anotação de supervisão"): os ativos com sinal na Confiabilidade com os
+    números de lá, os ativos em acompanhamento pela Engenharia, os relatórios de FMEA e de causa raiz e as observações do
+    Responsável O&M. Cada fonte no `try` dela: a que não abre vai como None, e o dossiê diz "sem leitura" (nunca
+    "nenhum"). Nenhuma lê o Fracttal: são as cópias e os livros que as telas donas já leem."""
+    import logging
+
+    from ...campo import visao
+    log = logging.getLogger(__name__)
+
+    def tentar(nome, f):
+        try:
+            return f()
+        except Exception:           # noqa: BLE001 — a fonte fora do ar não derruba o dossiê
+            log.exception("dossiê: %s não abriu", nome)
+            return None
+
+    def ativos():
+        from ...campo import responsaveis as R
+        return R.ativos_da_usina(usina_id, visao._agora().date())
+
+    def acompanhamentos():
+        from ...engenharia import acompanhamento as EA
+        lido = EA.ler()
+        if lido.get("erro") and not lido.get("lido_em"):
+            raise RuntimeError(lido["erro"])
+        nomes = {str(d.get("id")): d.get("nome") or "" for d in EA.diagnosticos(lido.get("diagnosticos") or [])}
+        return [dict(a, diagnostico=nomes.get(str(a.get("diagnostico_id")), "")) for a in EA.estado(lido.get("eventos") or []).values()
+                if a.get("usina_id") == usina_id]
+
+    def relatorios():
+        from ...engenharia import fmea as F
+        lido = F.ler()
+        if lido.get("erro") and not lido.get("lido_em"):
+            raise RuntimeError(lido["erro"])
+        return [r["ultima"] for r in F.relatorios(lido.get("linhas") or []) if r["ultima"].get("usina_id") == usina_id]
+
+    def observacoes():
+        from ...campo import observacao_responsavel as OB
+        return OB.da_usina(usina_id, limite=20)
+    return {"ativos": tentar("a Confiabilidade", ativos), "acompanhamentos": tentar("o acompanhamento da Engenharia", acompanhamentos),
+            "relatorios": tentar("os relatórios de falha", relatorios), "observacoes": tentar("as observações", observacoes)}
+
+
 def _dossie(usina_id: int):
     """(o contexto do prontuário, o dossiê montado) ou 404 para a usina que não está na lista."""
     from ...campo import visao
@@ -295,7 +340,7 @@ def _dossie(usina_id: int):
     ctx = _prontuario(usina_id)
     if ctx is None:
         abort(404)
-    return ctx, DS.montar(ctx, visao._agora())
+    return ctx, DS.montar(ctx, visao._agora(), extras=_extras_do_dossie(usina_id))
 
 
 @bp.route("/usinas/<int:usina_id>/dossie")

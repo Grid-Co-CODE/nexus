@@ -369,8 +369,21 @@ as informações de todos os setores".
 **O que é.** O prontuário inteiro escrito em texto (Markdown), que o Nexus IA vai mandar junto da pergunta de quem
 estiver no prontuário. `nexus/comando/dossie.py` (`montar(ctx, agora, com_pessoas=False)`) recebe o MESMO contexto da
 página (`prontuario_dados.contexto`) e devolve `{"texto", "secoes", "caracteres", "palavras", "tokens_estimados"}`.
-**Nada é lido de novo nem calculado ali**: o número do dossiê é o da tela dona. A chamada à API ainda não existe (a tela
-Base › Nexus IA segue reservada); o que existe é o texto pronto.
+**Nada é calculado ali**: o número do dossiê é o da tela dona. A chamada à API ainda não existe (a tela Base › Nexus IA
+segue reservada); o que existe é o texto pronto.
+
+**O que os setores sabem e o prontuário ainda NÃO mostra entra por `extras`** (Levi, conferindo o dossiê no mesmo dia:
+"tá indo o que a engenharia tá vendo [...] tá indo o que performance tá vendo, tá indo o que COS abriu, tá indo as PTs
+pendentes, tá indo os extintores vencidos [...] tá indo alguma anotação de supervisão"). Faltavam duas coisas, e as duas
+entraram: **a Engenharia** (os ativos com sinal na Confiabilidade com os números da gaveta de lá: falhas em 30 e em 7
+dias, MTBF, MTTR e a disponibilidade do ativo, `responsaveis.ativos_da_usina`; os ativos em acompanhamento, com o
+diagnóstico, a OS de análise e os comentários, `engenharia/acompanhamento.py`; e os relatórios de FMEA e de causa raiz,
+`engenharia/fmea.py`) e **as observações do Responsável O&M** (`campo/observacao_responsavel.da_usina`, a "anotação de
+supervisão"). Quem lê é a view (`torres/comando._extras_do_dossie`), cada fonte no `try` dela: a que não abre vai como
+None, e o dossiê diz "sem leitura" e a lista na última seção (vazio é outra coisa: "nenhum"). Nenhuma lê o Fracttal.
+**Ainda de fora, por não estarem no Nexus por usina:** os comentários dos analistas da Performance (ficam na plataforma)
+e as observações escritas dentro de cada chamado de garantia (ficam no OS Creator); as contestações do cliente e a
+programação da semana do PCM também não entram ainda.
 
 **Onde se vê.** `/t/comando/usinas/<id>/dossie` (a página: o texto, o tamanho, Copiar e Baixar) e
 `/t/comando/usinas/<id>/dossie.md` (o texto puro, `text/markdown`, sem cache; `?baixar=1` baixa). Abre para quem abre o
@@ -378,10 +391,11 @@ prontuário (é o mesmo dado); o atalho "Dossiê para a IA" no prontuário apare
 pergunta não existe na tela.
 
 **As regras do texto** (o que faz uma IA ler bem e errar menos; mexeu no formato, sobe a `VERSAO`):
-- 14 seções, sempre na mesma ordem e com o mesmo título (`SECOES`): Identificação, Parecer e o que pede atenção,
-  Performance (com o mês a mês e a geração de cada dia), COS, OS e manutenção, Equipamentos, Chamados de garantia, Rondas
-  e zeladoria, Segurança, Insights, Demandas e conversa, Linha do tempo, Composição, O que ficou de fora. Cada uma abre
-  com a `Fonte:` (a tela do Nexus de onde o dado saiu), para a resposta citar de onde tirou;
+- 16 seções, sempre na mesma ordem e com o mesmo título (`SECOES`): Identificação, Parecer e o que pede atenção,
+  Performance (com o mês a mês e a geração de cada dia), COS, OS e manutenção, Engenharia, Equipamentos, Chamados de
+  garantia, Rondas e zeladoria, Segurança, Insights, Anotações do responsável, Demandas e conversa, Linha do tempo,
+  Composição, O que ficou de fora. Cada uma abre com a `Fonte:` (a tela do Nexus de onde o dado saiu), para a resposta
+  citar de onde tirou;
 - **o que falta está escrito**: "sem dado" (a fonte não tem o valor: não é zero), "sem leitura" (a fonte não respondeu;
   as OS sem leitura dizem "Não quer dizer zero", o COS sem leitura "Não quer dizer normal") e a última seção com as
   fontes que não abriram. Nenhuma seção fica em branco. É a regra "sem dado não se inventa" levada à IA: ela não pode ler

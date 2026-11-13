@@ -33,13 +33,14 @@ def test_uma_secao_por_assunto_na_mesma_ordem_e_com_a_fonte(tela, logado):
     assert texto.startswith("# Dossiê da usina Altair\n")
     assert "- Gerado em: 12/11/2026 às 22:00, horário de Brasília" in texto and f"(formato {DS.VERSAO})" in texto
     titulos = re.findall(r"^## (\d+)\. (.+)$", texto, flags=re.M)
-    assert [int(n) for n, _t in titulos] == list(range(1, 15))
+    assert [int(n) for n, _t in titulos] == list(range(1, 17))
     esperados = [t for t, _f in DS.SECOES]
     esperados[esperados.index("Linha do tempo")] = "Linha do tempo dos últimos 30 dias"
     assert [t for _n, t in titulos] == esperados and d["secoes"] == [t for t, _f in DS.SECOES]
     # todos os setores do prontuário entram
-    for assunto in ("Performance", "COS", "OS e manutenção", "Chamados de garantia", "Rondas e zeladoria", "Segurança",
-                    "Insights do Nexus", "Demandas entre setores e conversa", "Composição da usina"):
+    for assunto in ("Performance", "COS", "OS e manutenção", "Engenharia", "Chamados de garantia", "Rondas e zeladoria",
+                    "Segurança", "Insights do Nexus", "Anotações do responsável", "Demandas entre setores e conversa",
+                    "Composição da usina"):
         assert assunto in esperados
     # cada seção diz de que tela o dado veio, logo abaixo do título
     for bloco in re.split(r"^## \d+\. ", texto, flags=re.M)[1:]:
@@ -69,7 +70,9 @@ def test_o_numero_do_dossie_e_o_do_prontuario(tela, logado):
     # o dia a dia da geração, que é o que responde "por que a performance está baixa"
     assert "- Dia 2: geração 5,8 MWh (meta 40,0 MWh, 14%) · POA 1,40 kWh/m²" in texto
     assert "- Dia 3: geração sem dado · POA 5,00 kWh/m²" in texto and "geração — MWh" not in texto
-    assert "- Inversor 1 (THPN-ALT100-INVR1): 4 falhas em 30 dias (crítico)" in texto
+    # sem os números da Confiabilidade (`extras`), fica o que a Visão do responsável contou, com o aviso
+    assert "- Confiabilidade dos ativos: sem leitura dos números agora. O que a Visão do responsável contou:" in texto
+    assert "  - Inversor 1 (THPN-ALT100-INVR1): 4 falhas em 30 dias (crítico)" in texto
     # os outros setores
     assert "- OS de PARADA aberta agora: OS 13002; Corretiva Emergencial; Inversor 1; THPN-ALT100-INVR1; desde 02/11 08:00" in texto
     assert "| 16034 | Tracker 1 STI | STI | Estrutura Trackers | aberto | 26 dias | — |" in texto
@@ -87,15 +90,16 @@ def test_o_que_falta_esta_escrito_e_nao_vira_zero(tela, logado):
     assert "- Agora: sem leitura do COS (a fonte não respondeu ou a usina não está na fotografia). Não quer dizer normal." in texto
     assert "- OS abertas: sem leitura (as OS do Fracttal não chegaram ao banco). Não quer dizer zero." in texto
     assert "- Leitura semanal de sujidade e vegetação (zeladoria): sem dado." in texto
-    fora = texto.split("## 14. O que ficou de fora", 1)[1]
+    fora = texto.split("## 16. O que ficou de fora", 1)[1]
     assert "não abriram quando o dossiê foi gerado" in fora and "- o COS (a coluna Agora)" in fora
     # sem nada (a fonte inteira fora), o dossiê ainda sai inteiro, dizendo o que não tem
     vazio = DS.montar({"x": {"usina": "Usina X", "insights": None}, "cu": {}, "p": {}}, AGORA)["texto"]
-    assert len(re.findall(r"^## \d+\. ", vazio, flags=re.M)) == 14
+    assert len(re.findall(r"^## \d+\. ", vazio, flags=re.M)) == 16
     for frase in ("- Código: sem dado", "- Estado agora, pelo COS: sem dado", "- Meta, PR e disponibilidade do mês: sem dado.",
                   "- OS abertas: sem leitura", "- Última ronda: sem dado", "- Extintores: sem dado.",
                   "- Luvas de alta tensão: sem dado", "- Os Insights ainda estão sendo calculados: sem leitura agora.",
-                  "- Ficha da usina no cadastro: sem dado.", "- Todas as fontes do prontuário abriram."):
+                  "- Ficha da usina no cadastro: sem dado.", "- Sem leitura das observações do responsável agora.",
+                  "- Ativos em acompanhamento pela Engenharia: sem leitura."):
         assert frase in vazio, frase
     # nenhuma seção em branco: depois da fonte vem sempre ao menos uma linha
     for bloco in re.split(r"^## \d+\. ", vazio, flags=re.M)[1:]:
@@ -149,3 +153,71 @@ def test_o_atalho_no_prontuario_e_so_do_administrador(tela, logado):
     assert "/dossie" not in html
     # o endereço segue abrindo para quem abre o prontuário: é o mesmo dado
     assert logado.get("/t/comando/usinas/1/dossie").status_code == 200
+
+
+EXTRAS = {
+    "ativos": {"janela": 30, "criticos": 1, "atencao": 0, "monitorar": 2, "ativos": [
+        {"nome": "Inversor 1", "cod": "THPN-ALT100-INVR1", "fam": "Inversor", "cls": "critico", "nivel_txt": "Crítico",
+         "porque": ["4 falhas em 30 dias"], "n30": 4, "n7": 1, "mtbf": "166 h", "mttr": "5,2 h", "disp": "96,9%",
+         "circuito": ""}]},
+    "acompanhamentos": [
+        {"cod": "THPN-ALT100-INVR1", "aberto": True, "inicio": HOJE, "fim": None, "diagnostico": "Falha de isolamento",
+         "falhas30_entrada": 3, "os_folio": "18900", "responsavel": {"nome": "Engenheira Lima"},
+         "comentarios": [{"quando_txt": "11/11/2026 às 10:00", "nome": "Engenheira Lima", "texto": "Megômetro abaixo do limite na string 7."}]},
+        {"cod": "THPN-ALT100-ETKR1", "aberto": False, "inicio": None, "fim": HOJE, "diagnostico": "", "falhas30_entrada": None,
+         "os_folio": "", "responsavel": {"nome": ""}, "comentarios": []}],
+    "relatorios": [{"numero": "RCA-2026-0003", "rev_txt": "R01", "tipo_txt": "Causa raiz", "cod": "THPN-ALT100-INVR1",
+                    "data_txt": "10/11/2026", "tipo_falha": "Isolamento", "rpn": 144, "autor": "Engenheira Lima"}],
+    "observacoes": [
+        {"quando_txt": "11/11/2026 às 18:30", "nome": "Ciclano Chefe", "do_responsavel": True,
+         "texto": "Cliente avisado da parada do Inversor 1; peça chega na sexta."},
+        {"quando_txt": "02/11/2026 às 09:00", "nome": "Outro Responsável", "do_responsavel": False, "texto": "Cobrindo as férias."}]}
+
+
+def test_a_engenharia_e_as_anotacoes_do_responsavel_entram_no_dossie(tela, logado):
+    """Levi, 12/11/2026, conferindo o dossiê: "tá indo o que a engenharia tá vendo [...] tá indo alguma anotação de
+    supervisão". Não estavam no prontuário: entram pelo `extras`, que a view lê das telas donas."""
+    ctx = _ctx(logado)
+    texto = DS.montar(ctx, AGORA, extras=EXTRAS)["texto"]
+    eng = texto.split("## 6. Engenharia", 1)[1].split("## 7. ", 1)[0]
+    assert "Fonte: Engenharia › Confiabilidade, o acompanhamento dos ativos e os relatórios de FMEA e de causa raiz." in eng
+    assert "- Ativos com sinal de falha nos últimos 30 dias: 1 em crítico, 0 em atenção e 2 só em monitoramento" in eng
+    assert ("  - Inversor 1 (THPN-ALT100-INVR1), Inversor [crítico]: 4 falhas em 30 dias; falhas em 30 dias: 4; em 7 dias: 1; "
+            "MTBF 166 h; MTTR 5,2 h; disponibilidade do ativo 96,9%") in eng
+    assert "- Ativos em acompanhamento pela Engenharia: 1 em aberto e 1 já encerrados" in eng
+    assert ("  - THPN-ALT100-INVR1; em análise; início da análise em " + HOJE.strftime("%d/%m/%Y") +
+            "; diagnóstico: Falha de isolamento; entrou com 3 falhas em 30 dias; OS de análise 18900; 1 comentário") in eng
+    assert "    - 11/11/2026 às 10:00: Megômetro abaixo do limite na string 7." in eng
+    assert "  - THPN-ALT100-ETKR1; análise encerrada; fim em " + HOJE.strftime("%d/%m/%Y") + "; diagnóstico: a definir; sem comentário" in eng
+    assert "  - RCA-2026-0003 R01; Causa raiz; ativo THPN-ALT100-INVR1; emitido em 10/11/2026; tipo de falha: Isolamento; RPN 144" in eng
+    obs = texto.split("## 12. Anotações do responsável", 1)[1].split("## 13. ", 1)[0]
+    assert "- Observações registradas: 2 (a mais nova primeiro)" in obs
+    assert "  - 11/11/2026 às 18:30, o responsável da usina: Cliente avisado da parada do Inversor 1; peça chega na sexta." in obs
+    assert "  - 02/11/2026 às 09:00, um responsável de outra usina, cobrindo: Cobrindo as férias." in obs
+    # as pessoas seguem pelo papel; com os nomes, quem escreveu aparece
+    assert "Engenheira Lima" not in texto and "Outro Responsável" not in texto
+    com = DS.montar(ctx, AGORA, com_pessoas=True, extras=EXTRAS)["texto"]
+    assert "com Engenheira Lima" in com and "11/11/2026 às 18:30, Ciclano Chefe: Cliente avisado" in com
+    # a fonte vazia diz "nenhum"; a que não abriu diz "sem leitura" e vai para o fim (não é a mesma coisa)
+    vazias = DS.montar(ctx, AGORA, extras={"ativos": {"janela": 30, "ativos": []}, "acompanhamentos": [], "relatorios": [],
+                                           "observacoes": []})["texto"]
+    assert "- Ativos em acompanhamento pela Engenharia: nenhum nesta usina." in vazias
+    assert "- Nenhuma observação registrada pelo responsável nesta usina." in vazias
+    assert "as observações do responsável" not in vazias.split("## 16. O que ficou de fora", 1)[1]
+    fechadas = DS.montar(ctx, AGORA, extras={})["texto"].split("## 16. O que ficou de fora", 1)[1]
+    for fonte in ("- os números da Confiabilidade (Engenharia)", "- os ativos em acompanhamento pela Engenharia",
+                  "- os relatórios de falha da Engenharia", "- as observações do responsável"):
+        assert fonte in fechadas, fonte
+
+
+def test_a_pagina_le_a_engenharia_e_as_observacoes_das_telas_donas(tela, logado):
+    """O endereço monta os `extras` com as fontes de verdade (aqui, o banco de teste): o texto diz o que cada uma
+    respondeu, e a fonte que não abre não derruba o dossiê."""
+    texto = logado.get("/t/comando/usinas/1/dossie.md").get_data(as_text=True)
+    assert "## 6. Engenharia" in texto and "## 12. Anotações do responsável" in texto
+    eng = texto.split("## 6. Engenharia", 1)[1].split("## 7. ", 1)[0]
+    # a Confiabilidade do cenário de teste tem o Inversor 1 em crítico
+    assert "Inversor 1 (THPN-ALT100-INVR1)" in eng
+    obs = texto.split("## 12. Anotações do responsável", 1)[1].split("## 13. ", 1)[0]
+    assert "Nenhuma observação registrada" in obs or "Sem leitura das observações" in obs
+

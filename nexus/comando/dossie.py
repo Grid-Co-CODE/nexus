@@ -21,6 +21,12 @@ As regras do texto, que são o que faz uma IA ler bem e errar menos:
   livre que alguém escreveu (a descrição de uma demanda, a última mensagem da conversa) vai como foi escrito. O cliente
   e o código da usina ficam: não são dado pessoal, e o código já traz o cliente.
 
+O que os setores sabem e o prontuário ainda NÃO mostra entra por `extras` (Levi, 12/11/2026, conferindo o dossiê: "tá
+indo o que a engenharia tá vendo [...] tá indo alguma anotação de supervisão"): a Engenharia (os ativos com sinal da
+Confiabilidade com os números de lá, os ativos em acompanhamento com o diagnóstico e os comentários, os relatórios de FMEA
+e de causa raiz) e as observações do Responsável O&M. Quem lê essas fontes é a view (`torres/comando`), cada uma no
+`try` dela: a que não abre chega como None e o dossiê diz "sem leitura".
+
 Funções puras: recebem o contexto pronto e devolvem o texto; o teste prova que o número do dossiê é o da tela.
 """
 from datetime import date, datetime
@@ -136,10 +142,6 @@ def _performance(u: dict, cu: dict, p: dict) -> list[str]:
     anomalia = _t((u.get("meta") or {}).get("anomalia"))
     if anomalia:
         out.append(f"- Anomalia apontada na geração: {anomalia}")
-    ativos = (u.get("ativos") or {}).get("lista") or []
-    if ativos:
-        out += ["", "Ativos falhando (confiabilidade):"]
-        out += [f"- {_t(a.get('nome'))} ({_t(a.get('cod'))}): {_com_g(a.get('porque'), a.get('nivel'))}" for a in ativos]
     meses = p.get("meses") or []
     if meses:
         out += ["", "Mês a mês:"] + _tabela(
@@ -208,6 +210,81 @@ def _os(u: dict, p: dict, com_pessoas: bool) -> list[str]:
             out += ["- " + _junta(f"OS {_t(i.get('os'))}", i.get("txt")) for i in g.get("itens") or []]
         else:
             out.append("- OS " + ", ".join(_t(i.get("os")) for i in g.get("itens") or []))
+    return out
+
+
+def _engenharia(u: dict, extras: dict, com_pessoas: bool) -> list[str]:
+    """O que a Engenharia vê da usina: os ativos com sinal na Confiabilidade (com os números da gaveta de lá), os que
+    estão em acompanhamento (o diagnóstico, a OS de análise e os comentários) e os relatórios de falha emitidos."""
+    out = []
+    at = extras.get("ativos")
+    if at is None:
+        # a Confiabilidade não abriu: fica o que a Visão do responsável já tinha contado, e o aviso
+        lista = (u.get("ativos") or {}).get("lista") or []
+        out.append("- Confiabilidade dos ativos: sem leitura dos números agora" + (". O que a Visão do responsável contou:" if lista else "."))
+        out += [f"  - {_t(a.get('nome'))} ({_t(a.get('cod'))}): {_com_g(a.get('porque'), a.get('nivel'))}" for a in lista]
+    else:
+        out.append(f"- Ativos com sinal de falha nos últimos {at.get('janela')} dias: {at.get('criticos') or 0} em crítico, "
+                   f"{at.get('atencao') or 0} em atenção e {at.get('monitorar') or 0} só em monitoramento")
+        for a in at.get("ativos") or []:
+            out.append(f"  - {_t(a.get('nome'))} ({_t(a.get('cod'))})" + (f", {_t(a.get('fam'))}" if _t(a.get("fam")) else "")
+                       + f" [{_g(a.get('cls')) or _t(a.get('nivel_txt'))}]: " + _junta(
+                "; ".join(_t(q) for q in a.get("porque") or []),
+                f"falhas em 30 dias: {a.get('n30')}", f"em 7 dias: {a.get('n7')}",
+                f"MTBF {_t(a.get('mtbf'))}" if _t(a.get("mtbf")) not in ("", "—") else "",
+                f"MTTR {_t(a.get('mttr'))}" if _t(a.get("mttr")) not in ("", "—") else "",
+                f"disponibilidade do ativo {_t(a.get('disp'))}" if _t(a.get("disp")) not in ("", "—") else "",
+                f"circuito {_t(a.get('circuito'))}" if _t(a.get("circuito")) else ""))
+    acs = extras.get("acompanhamentos")
+    if acs is None:
+        out.append("- Ativos em acompanhamento pela Engenharia: sem leitura.")
+    elif not acs:
+        out.append("- Ativos em acompanhamento pela Engenharia: nenhum nesta usina.")
+    else:
+        abertos = [a for a in acs if a.get("aberto")]
+        out.append(f"- Ativos em acompanhamento pela Engenharia: {len(abertos)} em aberto e {len(acs) - len(abertos)} já encerrados")
+        for a in sorted(acs, key=lambda a: (not a.get("aberto"), _t(a.get("cod")))):
+            ini, fim = a.get("inicio"), a.get("fim")
+            coms = a.get("comentarios") or []
+            out.append("  - " + _junta(
+                _t(a.get("cod")), "em análise" if a.get("aberto") else "análise encerrada",
+                f"início da análise em {ini.strftime('%d/%m/%Y')}" if isinstance(ini, date) else "",
+                f"fim em {fim.strftime('%d/%m/%Y')}" if isinstance(fim, date) else "",
+                f"diagnóstico: {_t(a.get('diagnostico')) or 'a definir'}",
+                f"entrou com {a['falhas30_entrada']} falhas em 30 dias" if a.get("falhas30_entrada") is not None else "",
+                f"OS de análise {_t(a.get('os_folio'))}" if _t(a.get("os_folio")) else "",
+                f"com {_t((a.get('responsavel') or {}).get('nome'))}" if com_pessoas and _t((a.get("responsavel") or {}).get("nome")) else "",
+                f"{len(coms)} {'comentário' if len(coms) == 1 else 'comentários'}" if coms else "sem comentário"))
+            for c in coms[:3]:      # os mais novos primeiro (é a ordem do livro)
+                out.append(f"    - {_t(c.get('quando_txt'))}" + (f", {_t(c.get('nome'))}" if com_pessoas and _t(c.get("nome")) else "")
+                           + f": {_t(c.get('texto'))}")
+    rels = extras.get("relatorios")
+    if rels is None:
+        out.append("- Relatórios de falha (FMEA e causa raiz): sem leitura.")
+    elif not rels:
+        out.append("- Relatórios de falha (FMEA e causa raiz): nenhum emitido para ativos desta usina.")
+    else:
+        out.append(f"- Relatórios de falha emitidos: {len(rels)}")
+        for r in rels:
+            out.append("  - " + _junta(f"{_t(r.get('numero'))} {_t(r.get('rev_txt'))}", _t(r.get("tipo_txt")), f"ativo {_t(r.get('cod'))}",
+                                       f"emitido em {_t(r.get('data_txt'))}", f"tipo de falha: {_t(r.get('tipo_falha'))}" if _t(r.get("tipo_falha")) else "",
+                                       f"RPN {r['rpn']}" if r.get("rpn") else "", f"por {_t(r.get('autor'))}" if com_pessoas and _t(r.get("autor")) else ""))
+    return out
+
+
+def _observacoes(extras: dict, com_pessoas: bool) -> list[str]:
+    """As observações do Responsável O&M sobre a usina (a anotação de supervisão), a mais nova primeiro. O texto vai como
+    foi escrito; quem escreveu, pelo papel."""
+    obs = extras.get("observacoes")
+    if obs is None:
+        return ["- Sem leitura das observações do responsável agora."]
+    if not obs:
+        return ["- Nenhuma observação registrada pelo responsável nesta usina."]
+    out = [f"- Observações registradas: {len(obs)} (a mais nova primeiro)"]
+    for o in obs:
+        quem = "o responsável da usina" if o.get("do_responsavel") else "um responsável de outra usina, cobrindo"
+        out.append(f"  - {_t(o.get('quando_txt'))}, {_t(o.get('nome')) if com_pessoas and _t(o.get('nome')) else quem}: "
+                   f"{_t(o.get('texto')) or 'texto ilegível (a chave do cadastro não abriu)'}")
     return out
 
 
@@ -384,9 +461,13 @@ def _composicao(p: dict) -> list[str]:
     return out[:-1]
 
 
-def _fora(ctx: dict, p: dict, cu: dict) -> list[str]:
+_EXTRAS = (("ativos", "os números da Confiabilidade (Engenharia)"), ("acompanhamentos", "os ativos em acompanhamento pela Engenharia"),
+           ("relatorios", "os relatórios de falha da Engenharia"), ("observacoes", "as observações do responsável"))
+
+
+def _fora(ctx: dict, p: dict, cu: dict, extras: dict) -> list[str]:
     fora = [_t(a) for a in ctx.get("avisos") or []] + [_t(a) for a in p.get("avisos") or []] + \
-           [_t(e) for e in (cu.get("erros") or {}).values()]
+           [_t(e) for e in (cu.get("erros") or {}).values()] + [rot for k, rot in _EXTRAS if extras.get(k) is None]
     fora = [f for f in fora if f]
     if not fora:
         return ["- Todas as fontes do prontuário abriram."]
@@ -415,11 +496,13 @@ SECOES = (
     ("Performance", "Performance › Visão gerencial e Disponibilidade, pela Visão do responsável"),
     ("COS", "COS › Ronda COS (a fotografia de agora) e as normalizações gravadas no banco"),
     ("OS e manutenção", "As OS do Fracttal no banco, pela Visão do responsável › Manutenção"),
+    ("Engenharia", "Engenharia › Confiabilidade, o acompanhamento dos ativos e os relatórios de FMEA e de causa raiz"),
     ("Equipamentos com OS ou chamado aberto", "As tarefas das OS abertas por ativo e os chamados de garantia"),
     ("Chamados de garantia", "Chamados › Garantias (o Acompanhamento de chamados)"),
     ("Rondas e zeladoria", "Usinas 360° › Rondas e Zeladoria"),
     ("Segurança", "Segurança · HSEQ (PT, extintores e luvas)"),
     ("Insights do Nexus", "Comando › Nexus Insights (as regras que cruzam as fontes)"),
+    ("Anotações do responsável", "Usinas 360° › Visão do responsável › Observação do responsável"),
     ("Demandas entre setores e conversa", "Comando › Caixa de entrada e a conversa da usina"),
     ("Linha do tempo", "Rondas, COS, PT, chamados e OS, numa lista só"),
     ("Composição da usina", "Base › Registro mestre (a ficha) e Base › Equipamentos das usinas"),
@@ -427,16 +510,19 @@ SECOES = (
 )
 
 
-def montar(ctx: dict, agora: datetime, com_pessoas: bool = False) -> dict:
+def montar(ctx: dict, agora: datetime, com_pessoas: bool = False, extras: dict | None = None) -> dict:
     """{"texto": o dossiê em Markdown, "secoes": [títulos], "caracteres", "palavras", "tokens_estimados"}. `ctx` = o
-    contexto do prontuário (`prontuario_dados.contexto`); `agora` = a hora de Brasília em que foi gerado. Os tokens são
-    uma estimativa pelo tamanho do texto (4 caracteres por token): a conta exata só a API dá."""
+    contexto do prontuário (`prontuario_dados.contexto`); `agora` = a hora de Brasília em que foi gerado; `extras` = o
+    que os setores sabem e o prontuário não mostra: {"ativos" (`responsaveis.ativos_da_usina`), "acompanhamentos",
+    "relatorios", "observacoes"}, cada um None quando a fonte não abriu. Os tokens são uma estimativa pelo tamanho do
+    texto (4 caracteres por token): a conta exata só a API dá."""
     x, cu, p = ctx.get("x") or {}, ctx.get("cu") or {}, ctx.get("p") or {}
-    u = cu.get("u") or {}
+    u, extras = cu.get("u") or {}, extras or {}
     corpos = (_identificacao(x, u, cu, p, com_pessoas), _parecer(p, com_pessoas), _performance(u, cu, p), _cos(x, p),
-              _os(u, p, com_pessoas), _equipamentos(p), _chamados(p), _rondas(u, p, com_pessoas),
-              _seguranca(u, cu, p, com_pessoas), _insights(ctx), _demandas(p, com_pessoas),
-              _linha(p, com_pessoas), _composicao(p), _fora(ctx, p, cu))
+              _os(u, p, com_pessoas), _engenharia(u, extras, com_pessoas), _equipamentos(p), _chamados(p),
+              _rondas(u, p, com_pessoas), _seguranca(u, cu, p, com_pessoas), _insights(ctx),
+              _observacoes(extras, com_pessoas), _demandas(p, com_pessoas), _linha(p, com_pessoas), _composicao(p),
+              _fora(ctx, p, cu, extras))
     dias = p.get("linha_dias") or PR.LINHA_DO_TEMPO_DIAS
     linhas = [f"# Dossiê da usina {_t(x.get('usina'))}", "",
               f"- Documento: dossiê da usina, gerado pelo Nexus para leitura por IA (formato {VERSAO})",
