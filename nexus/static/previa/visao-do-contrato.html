@@ -30,7 +30,11 @@
    - as Regras abrem RECOLHIDAS: uma linha por categoria, com quantas regras e quantas acordadas; o clique abre;
    - o que está em atraso fica numa linha no cabeçalho do contrato, em TODA aba, com o aviso de que o gestor recebe a
      notificação no sino do Nexus enquanto houver atraso;
-   - cada cliente tem o contrato dele: o nome no alto troca o contrato (no mockup só o primeiro tem dados). */
+   - cada cliente tem o contrato dele: o nome no alto troca o contrato (no mockup só o primeiro tem dados);
+   - o gestor do contrato aparece QUANDO o contrato tem um (Levi: "Caso tenha gestor do contrato, também quero que
+     apareça"): na 1ª linha do cabeçalho, ao lado do código e do tipo, no aviso de atraso (é no sino dele que o aviso
+     cai) e na coluna do Atendimento por cliente. Contrato sem gestor não mostra o campo vazio: a 1ª linha fica sem ele,
+     o aviso de atraso diz que vai para o setor Contratos e a tabela diz "sem gestor". */
 :root{
   --fundo:#090d18;--superficie:#161d30;--superficie-2:#1c2640;--superficie-3:#243154;--barra:#0d1526;
   --tinta:#e9eef6;--tinta-2:#c3cad7;--mudo:#96a0b4;--fraco:#767d92;
@@ -77,6 +81,10 @@ html.embutido main{padding:16px 2px 40px;max-width:none}
 .ct-nome .ph{position:absolute;right:4px;top:50%;margin-top:-8px;font-size:16px;color:var(--mudo);pointer-events:none}
 .ct-cod{color:var(--tinta-2);font-size:13px}
 .ct-tipo{color:var(--mudo);font-size:13px}
+/* o gestor do contrato, quando há: na 1ª linha, à vista sem abrir a ficha */
+.ct-gestor{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:500;color:var(--tinta)}
+.ct-gestor small{font-weight:400;font-size:12px;color:var(--mudo)}
+.ct-gestor .ph{font-size:16px;color:var(--verde-texto)}
 .ct-mais{margin-left:auto}
 .fatos{display:flex;flex-wrap:wrap;gap:4px 30px;margin:8px 0 0;padding:0}
 .fatos div{display:flex;align-items:baseline;gap:8px;min-width:0}
@@ -262,9 +270,10 @@ var USINAS = [
   {id: "SA2", nome: "UFV Serra Azul 2", mwp: 4.5, cidade: "Pirapora/MG"},
   {id: "LC", nome: "UFV Lagoa Clara", mwp: 2.9, cidade: "Bom Jesus da Lapa/BA"}];
 var CONTRATOS = [
-  {cod: "CT-2025-014", nome: "Full O&M", cliente: "Solar Horizonte Energia S.A.", cnpj: "12.345.678/0001-90"},
-  {cod: "CT-2024-031", nome: "O&M Básico", cliente: "Vale do Sol Geração Ltda.", cnpj: "98.765.432/0001-10"},
-  {cod: "CT-2026-002", nome: "Full O&M", cliente: "Cerrado GD Participações S.A.", cnpj: "45.678.912/0001-34"}];
+  {cod: "CT-2025-014", nome: "Full O&M", cliente: "Solar Horizonte Energia S.A.", cnpj: "12.345.678/0001-90", gestor: "Marina Alves", substituto: "Paula Nunes"},
+  {cod: "CT-2024-031", nome: "O&M Básico", cliente: "Vale do Sol Geração Ltda.", cnpj: "98.765.432/0001-10", gestor: "Paula Nunes"},
+  // o 3º contrato não tem gestor, para o mockup mostrar como a tela fica sem um
+  {cod: "CT-2026-002", nome: "Full O&M", cliente: "Cerrado GD Participações S.A.", cnpj: "45.678.912/0001-34", gestor: ""}];
 
 var REGRAS = [
   {cat: "Entregáveis por setor", nome: "Relatório mensal de operação (RMO)", setor: "Engenharia de O&M", cl: "7.2", contratual: "Até o 5º dia útil do mês seguinte", hist: []},
@@ -415,6 +424,7 @@ function vContrato() {
   var h = '<div class="ct-linha"><label class="ct-nome"><span class="so-leitor">Contrato</span><select id="selCt">' +
     CONTRATOS.map(function (k, i) { return '<option value="' + i + '"' + (i === estado.ct ? " selected" : "") + ">" + esc(k.cliente) + "</option>"; }).join("") +
     '</select><i class="ph ph-caret-down" aria-hidden="true"></i></label><span class="ct-cod num">' + c.cod + '</span><span class="ct-tipo">' + c.nome + "</span>" +
+    (c.gestor ? '<span class="ct-gestor"><i class="ph ph-user-circle" aria-hidden="true"></i><small>Gestor do contrato</small>' + esc(c.gestor) + "</span>" : "") +
     (estado.ct ? "" : '<button class="linkbtn ct-mais" data-ficha aria-expanded="' + estado.ficha + '">Dados do contrato<i class="ph ph-caret-' + (estado.ficha ? "up" : "down") + '" aria-hidden="true"></i></button>') + "</div>";
   // cada cliente tem o contrato dele (as regras, o calendário, o financeiro); no mockup só o primeiro tem dados
   if (estado.ct) {
@@ -423,21 +433,20 @@ function vContrato() {
   }
   h += '<dl class="fatos"><div><dt>Vigência</dt><dd>até 28/02/2028<small>faltam 15 meses</small></dd></div>' +
     '<div><dt>Mensalidade</dt><dd class="num">' + brl(195347.20) + "</dd></div>" +
-    '<div><dt>Usinas</dt><dd><span class="num">' + USINAS.length + '</span><small class="num">' + pct(mwp) + " MWp</small></dd></div>" +
-    "<div><dt>Gestora</dt><dd>Marina Alves</dd></div></dl>";
+    '<div><dt>Usinas</dt><dd><span class="num">' + USINAS.length + '</span><small class="num">' + pct(mwp) + " MWp</small></dd></div></dl>";
   if (estado.ficha) {
     h += '<dl class="ficha"><div><dt>Contrato</dt><dd><b class="num">' + c.cod + "</b>, " + c.nome + ". 2 aditivos, o último em 21/10/2026</dd></div>" +
       '<div><dt>CNPJ do contrato</dt><dd><b class="num">' + c.cnpj + "</b></dd></div>" +
       "<div><dt>Vigência</dt><dd><b>01/03/2025 a 28/02/2028</b>. Aviso de renovação em 30/11/2027</dd></div>" +
       '<div><dt>Valor mensal vigente</dt><dd><b class="num">' + brl(195347.20) + "</b>. Reajuste pelo IPCA em 01/03, aplicado em 2026</dd></div>" +
-      "<div><dt>Gestão</dt><dd><b>Marina Alves</b>, Contratos. Substituta: Paula Nunes</dd></div>" +
+      (c.gestor ? "<div><dt>Gestor do contrato</dt><dd><b>" + esc(c.gestor) + "</b>, Contratos" + (c.substituto ? ". Na ausência: " + esc(c.substituto) : "") + "</dd></div>" : "") +
       "<div><dt>Onde</dt><dd>Minas Gerais e Bahia</dd></div>" +
       '<div class="larga"><dt>Usinas</dt><dd><ul class="usinas">' + USINAS.map(function (u) { return "<li>" + esc(u.nome) + '<span class="num">' + pct(u.mwp) + " MWp</span></li>"; }).join("") + "</ul></dd></div></dl>";
   }
   // o gestor do contrato sempre vê o que está em atraso, em toda aba, e recebe o aviso no sino até resolver
   if (atrasadas) {
     h += '<p class="atraso" role="status"><i class="ponto p-critico" aria-hidden="true"></i><b>' + atrasadas + " em atraso</b><span>" + esc(emAtraso.join(" e ")) + '</span><a class="linkbtn" href="#/calendario">Ver no calendário</a>' +
-      '<span class="atraso-sino"><i class="ph ph-bell" aria-hidden="true"></i>No sino da gestora, todo dia, até resolver</span></p>';
+      '<span class="atraso-sino"><i class="ph ph-bell" aria-hidden="true"></i>' + (c.gestor ? "No sino de " + esc(c.gestor) + ", todo dia, até resolver" : "Contrato sem gestor: o aviso vai para o setor Contratos") + "</span></p>";
   }
   h += '<nav class="abas" aria-label="Partes do contrato">' + ABAS.map(function (a) {
     return '<a href="#/' + a[0] + '"' + (estado.aba === a[0] ? ' aria-current="page"' : "") + ">" + a[1] +
@@ -531,10 +540,10 @@ function pAtendimento() {
           '<td class="r"><b class="num ' + tom + '">' + p + "%</b></td></tr>";
       }).join("") + "</tbody></table></div>";
   } else {
-    h += '<div class="rolavel"><table class="tab"><thead><tr><th>Cliente</th><th class="c">Usinas</th><th>Entregáveis</th><th>SLA no prazo</th><th>Rotinas</th><th>Pendências</th><th class="r">Atendido</th></tr></thead><tbody>' +
+    h += '<div class="rolavel"><table class="tab"><thead><tr><th>Cliente</th><th>Gestor do contrato</th><th class="c">Usinas</th><th>Entregáveis</th><th>SLA no prazo</th><th>Rotinas</th><th>Pendências</th><th class="r">Atendido</th></tr></thead><tbody>' +
       POR_CLIENTE.map(function (x) {
         var tom = x.pct >= 95 ? "c-ok" : x.pct >= 90 ? "c-alerta" : "c-critico";
-        return '<tr><td><span class="nome">' + esc(x.c.cliente) + '</span><span class="sub"><span class="num">' + x.c.cod + "</span>, " + x.c.nome + '</span></td><td class="c num">' + x.usinas +
+        return '<tr><td><span class="nome">' + esc(x.c.cliente) + '</span><span class="sub"><span class="num">' + x.c.cod + "</span>, " + x.c.nome + "</span></td><td>" + (x.c.gestor ? esc(x.c.gestor) : '<span class="vazio-c">sem gestor</span>') + '</td><td class="c num">' + x.usinas +
           '</td><td class="num">' + x.ent + '</td><td class="num">' + x.sla + '</td><td class="num">' + x.rot + "</td><td>" + (x.pend === "nenhuma" ? '<span class="c-ok">nenhuma</span>' : '<span class="c-critico">' + x.pend + "</span>") +
           '</td><td class="r"><b class="num ' + tom + '">' + x.pct + "%</b></td></tr>";
       }).join("") + "</tbody></table></div>";

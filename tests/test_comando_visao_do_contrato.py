@@ -70,7 +70,22 @@ def test_a_barra_de_rolagem_do_nexus_as_regras_recolhidas_e_o_atraso_sempre_a_vi
     assert "var aberto = estado.soAcordadas || !!estado.grupos[cat]" in pagina and "if (!aberto) return;" in pagina
     # o atraso no cabeçalho do contrato (antes das abas: aparece em toda aba), com o aviso ao gestor
     assert pagina.index('class="atraso" role="status"') < pagina.index('<nav class="abas" aria-label="Partes do contrato">')
-    assert " em atraso</b>" in pagina and "No sino da gestora, todo dia, até resolver" in pagina
+    assert " em atraso</b>" in pagina and ", todo dia, até resolver" in pagina
     # cada cliente com o contrato dele: o nome troca o contrato (sem o aviso que desfazia a escolha)
     assert "CONTRATOS[estado.ct]" in pagina and "estado.ct = +t.value" in pagina and 't.value = "0"' not in pagina
+
+
+def test_o_gestor_do_contrato_aparece_quando_o_contrato_tem_um(cliente):
+    """Levi, 12/11/2026: "Caso tenha gestor do contrato, também quero que apareça". Na 1ª linha do cabeçalho, no aviso
+    de atraso e no Atendimento por cliente; o contrato sem gestor não mostra o campo vazio."""
+    r = cliente.get(MOCKUP)
+    pagina = r.get_data(as_text=True)
+    r.close()
+    assert 'gestor: "Marina Alves"' in pagina and 'gestor: ""' in pagina             # um com, um sem
+    # a 1ª linha (a que aparece para todo cliente, antes do corte do cliente sem dados) leva o gestor, se houver
+    linha = pagina.split("var h = '<div class=\"ct-linha\">", 1)[1].split("if (estado.ct) {", 1)[0]
+    assert "(c.gestor ? '<span class=\"ct-gestor\">" in linha and "<small>Gestor do contrato</small>' + esc(c.gestor)" in linha
+    assert '(c.gestor ? "No sino de " + esc(c.gestor)' in pagina and "Contrato sem gestor: o aviso vai para o setor Contratos" in pagina
+    assert "<th>Cliente</th><th>Gestor do contrato</th>" in pagina and "sem gestor</span>" in pagina
+    assert "<dt>Gestora</dt>" not in pagina                                             # saiu da linha de fatos
 

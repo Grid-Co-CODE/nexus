@@ -60,6 +60,11 @@ atraso, isso está sempre para ele [...] Sempre"; do calendário: "ótimo també
   categoria aberta;
 - **cada cliente tem o contrato dele**: o nome no alto troca o contrato (no mockup só o primeiro tem dados, e os outros
   dizem isso);
+- **o gestor do contrato aparece quando o contrato tem um** (Levi: "Caso tenha gestor do contrato, também quero que
+  apareça"): na 1ª linha do cabeçalho, ao lado do código e do tipo (antes era o 4º fato da linha de baixo, e sumia para
+  o cliente sem dados), no aviso de atraso (é no sino dele que cai) e numa coluna do Atendimento por cliente. Contrato
+  sem gestor não mostra campo vazio: a linha fica sem ele, o aviso de atraso diz que vai para o setor Contratos e a
+  tabela diz "sem gestor" (o 3º contrato do mockup é assim, de propósito);
 - **o que está em atraso fica numa linha no cabeçalho do contrato, em TODA aba**, com o que é e o atalho para o
   calendário, e diz que o gestor do contrato recebe o aviso no sino do Nexus, todo dia, até resolver. **Pendente para a
   tela de verdade:** a notificação ao gestor (o sino e o `nexus/notificacoes/`) e a conta de "tantos em atraso" somando
