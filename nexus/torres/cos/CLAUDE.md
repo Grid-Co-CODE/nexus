@@ -470,6 +470,18 @@ Ignora esse monitoramento que já existe no nexus" (a Performance › Tempo real
   `tests/test_cos_inversores_js.py`. O Esc é pelo `cancel` do `<dialog>`: a versão pelo keydown, com uma marca desligada
   por `setTimeout`, deixava a janela sem fechar no segundo Esc rápido. Nenhum callback guardado lê o `det` global (o
   `fechar()` o zera antes da limpeza; foi o "Fechar não fecha" do PR #25).
+- **O zoom no horário** (13/11/2026, o dono: "quero poder dar zoom nos graficos, da usina, dos inversores, das
+  strings.."): UM trecho para todo gráfico da janela (a curva da usina, a grade de inversores, a curva do inversor e as
+  strings e MPPT nos três modos), como a cruz. Arrastar sobre um gráfico seleciona o trecho; Ctrl (ou Cmd) + roda
+  aproxima e afasta em torno do ponteiro (a roda sozinha continua rolando a janela, que é longa e cheia de gráficos; a
+  pinça do trackpad chega como roda com Ctrl); Shift + arrastar desliza; duplo clique volta ao dia inteiro; no toque, a
+  pinça aproxima e um dedo na horizontal desliza (`touch-action: pan-y`: a vertical rola a página). Controles no topo
+  fixo (`.cos-inv-zoom`: "−", "+", "Dia inteiro" e o trecho; setas deslizam, Home e End). Mínimo de 10 min (o gravado é
+  de 5 em 5 min). O eixo Y é o do que se vê no trecho, com a escala comum entre irmãos. Em hoje, o trecho que contém
+  agora acompanha a ponta; um do passado fica parado. Trocar o dia volta ao dia inteiro; outro inversor mantém; outra
+  usina e fechar zeram. As contas (`limitarTrecho`, `aproximar`, `deslizar`, `seguirPonta`, `recortar`) têm teste no node.
+  Os gestos ficam no BLOCO do gráfico (o SVG é refeito a cada zoom e o arraste capturado se perderia), e o clique que
+  fecha um arraste não abre o inversor do cartão.
 - **O dia e o histórico das strings** (13/11/2026, o dono: "como faço pra ver os gráficos de ontem ? precisamos
   armazenar por pelo menos 40 dias"): a janela escolhe o dia (Hoje, Ontem ou uma data até 40 dias atrás, `.cos-inv-dias`
   no topo fixo), para a curva da usina, a de cada inversor e as entradas do detalhe. As entradas vêm da `scada_entradas`

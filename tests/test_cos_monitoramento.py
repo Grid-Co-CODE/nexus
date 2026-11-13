@@ -315,6 +315,10 @@ def test_a_janela_tem_o_detalhe_do_inversor_escondido_com_o_voltar(tela):
         assert '<div class="cos-inv-dias" role="group" aria-label="O dia dos gráficos" hidden>' in topo
         assert 'data-dia="hoje" aria-pressed="true">Hoje</button>' in topo and 'data-dia="ontem"' in topo
         assert '<input type="date" class="gc-campo cos-inv-dia-data"' in topo
+        # 13/11/2026: o zoom no horário, com os controles visíveis e de teclado ("−", "+", "Dia inteiro" e o trecho)
+        assert '<div class="cos-inv-zoom" role="group" aria-label="Zoom no horário dos gráficos" hidden' in topo
+        assert 'cos-inv-zoom-menos" aria-label="Afastar: mostrar mais horas"' in topo and 'cos-inv-zoom-mais' in topo
+        assert '>Dia inteiro</button>' in topo and 'class="cos-inv-zoom-trecho gc-num" aria-live="polite"' in topo
 
 
 def test_as_usinas_da_assistida_da_thopen_que_a_ronda_cos_manda_sem_cliente():

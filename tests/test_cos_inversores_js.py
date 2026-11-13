@@ -263,3 +263,67 @@ def test_a_paleta_tem_24_tons_nos_dois_temas_e_nenhum_teto_de_destaque():
     assert "DESTAQUES" not in texto and "pg-c1" not in texto and "pg-c1" not in css
     assert not re.search(r"#[0-9a-fA-F]{6}\b", texto)
     assert ".pg-s--forte{" in css and ".pg-s--fraca{" in css
+
+
+# --- o zoom no horário (13/11/2026) ---------------------------------------------------------------------------------
+# O dono: "quero poder dar zoom nos graficos, da usina, dos inversores, das strings..". Um trecho só para a janela
+# inteira, em minutos do dia (5h = 300, 19h = 1140); null é o dia inteiro. O mínimo é de 10 min.
+
+def zoom(expr):
+    return rodar("process.stdout.write(JSON.stringify(" + expr + "));")
+
+
+def test_o_trecho_fica_no_dia_e_nunca_abaixo_de_10_min():
+    assert zoom("[N.ZOOM_MIN, N.DE, N.ATE]") == [10, 300, 1140]
+    assert zoom("N.limitarTrecho(660, 600)") == {"de": 600, "ate": 660}            # o arraste da direita para a esquerda
+    assert zoom("N.limitarTrecho(600, 603)") == {"de": 596.5, "ate": 606.5}        # 3 min viram 10, em torno do meio
+    assert zoom("N.limitarTrecho(250, 400)") == {"de": 300, "ate": 450}            # antes das 5h: encosta no começo
+    assert zoom("N.limitarTrecho(1100, 1200)") == {"de": 1040, "ate": 1140}        # depois das 19h: encosta no fim
+    assert zoom("N.limitarTrecho(1138, 1139)") == {"de": 1130, "ate": 1140}        # o mínimo também cabe no fim
+    assert zoom("N.limitarTrecho(200, 1300)") is None                              # o dia inteiro (ou mais) é sem zoom
+
+
+def test_aproximar_e_afastar_em_torno_do_ponteiro():
+    assert zoom("N.aproximar(null, 0.5, 720)") == {"de": 510, "ate": 930}          # do dia inteiro, metade em torno das 12h
+    assert zoom("N.aproximar({de: 600, ate: 720}, 0.5, 630)") == {"de": 615, "ate": 675}   # o 10:30 fica no lugar
+    assert zoom("N.aproximar({de: 600, ate: 720}, 0.5)") == {"de": 630, "ate": 690}        # sem ponteiro: o meio
+    assert zoom("N.aproximar({de: 600, ate: 612}, 0.5, 606)") == {"de": 601, "ate": 611}   # não passa dos 10 min
+    assert zoom("N.aproximar({de: 600, ate: 720}, 2, 660)") == {"de": 540, "ate": 780}     # afastar
+    assert zoom("N.aproximar({de: 400, ate: 1000}, 2, 700)") is None                       # afastar até o dia inteiro
+
+
+def test_deslizar_o_trecho_sem_sair_do_dia_e_sem_mudar_a_largura():
+    assert zoom("N.deslizar({de: 600, ate: 660}, 30)") == {"de": 630, "ate": 690}
+    assert zoom("N.deslizar({de: 600, ate: 660}, -400)") == {"de": 300, "ate": 360}       # para no começo do dia
+    assert zoom("N.deslizar({de: 1000, ate: 1100}, 500)") == {"de": 1040, "ate": 1140}    # para no fim do dia
+    assert zoom("N.deslizar(null, 30)") is None
+
+
+def test_o_trecho_com_agora_acompanha_a_ponta_e_o_do_passado_fica_parado():
+    segue = zoom("N.novoTrecho({de: 600, ate: 660}, 650)")
+    assert segue == {"de": 600, "ate": 660, "segue": True, "folga": 10}
+    assert zoom("N.seguirPonta(" + json.dumps(segue) + ", 655)") == {"de": 605, "ate": 665, "segue": True, "folga": 10}
+    assert zoom("N.seguirPonta(" + json.dumps(segue) + ", 1138)") == {"de": 1080, "ate": 1140, "segue": True, "folga": 10}
+    parado = zoom("N.novoTrecho({de: 500, ate: 560}, 650)")                       # um trecho de antes de agora
+    assert parado["segue"] is False and zoom("N.seguirPonta(" + json.dumps(parado) + ", 700)") == parado
+    assert zoom("N.novoTrecho({de: 600, ate: 660}, null)")["segue"] is False      # num dia que passou nada anda
+    assert zoom("N.novoTrecho(null, 650)") is None
+
+
+def test_a_serie_recortada_no_trecho_e_o_eixo_y_do_que_se_ve():
+    pts = [[600, 1], [610, 9], [620, 2], [630, 3], [640, 50], [650, 4]]
+    assert zoom("N.recortar(" + json.dumps(pts) + ", 615, 632)") == [[610, 9], [620, 2], [630, 3], [640, 50]]   # com os vizinhos
+    assert zoom("N.recortar(" + json.dumps(pts) + ", 300, 1140)") == pts                                       # dia inteiro: tudo
+    # o eixo Y é o do que se vê: no trecho das 10:21 às 10:29, o pico das 10:40 fica de fora
+    assert zoom("N.maximoNoTrecho(" + json.dumps(pts) + ", 621, 629)") == 3
+    assert zoom("N.maximoNoTrecho(" + json.dumps(pts) + ", 300, 1140)") == 50
+    assert zoom("[N.textoDoTrecho({de: 640, ate: 680}), N.textoDoTrecho(null)]") == ["10:40–11:20", "05:00–19:00"]
+
+
+def test_os_gestos_do_zoom_nao_tomam_a_roda_nem_leem_o_det():
+    texto = JS.read_text(encoding="utf-8")
+    corpo = texto[texto.index("function ligarZoom(host) {"):texto.index("var dica = document.getElementById")]
+    # a roda sozinha rola a janela; só com Ctrl (ou Cmd, ou a pinça do trackpad) aproxima
+    assert "if (!(ev.ctrlKey || ev.metaKey) || !host._g) { return; }" in corpo and "passive: false" in corpo
+    assert "det." not in corpo and "det[" not in corpo                          # a lição do PR #25
+    assert 'addEventListener("dblclick"' in corpo                                # o duplo clique volta ao dia inteiro

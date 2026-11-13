@@ -17,13 +17,23 @@
    - O DIA (13/11/2026, o dono: "como faço pra ver os gráficos de ontem ?"): Hoje, Ontem ou uma data até 40 dias atrás, no
      topo fixo da janela (.cos-inv-dias). Vale para a curva da usina, a de cada inversor e as strings e MPPT do detalhe, que
      vêm do histórico gravado na Ronda COS (45 dias, `scada/entradas/<logger>/<modbus>?dia=`). Num dia que passou não há
-     ponta ao vivo; o estado e as entradas de AGORA continuam ao vivo. Escondido no SunOP, que não tem série gravada. #}
+     ponta ao vivo; o estado e as entradas de AGORA continuam ao vivo. Escondido no SunOP, que não tem série gravada.
+   - O ZOOM NO HORÁRIO (13/11/2026, o dono: "quero poder dar zoom nos graficos, da usina, dos inversores, das strings.."):
+     um trecho só para todo gráfico da janela (.cos-inv-zoom: "−", "+", "Dia inteiro" e o trecho; o arraste, a roda com
+     Ctrl, Shift + arrastar e a pinça estão no static/cos/inversores.js). Trocar o dia volta ao dia inteiro. #}
 <dialog class="cos-inv-dlg" id="cos-inv-dlg" aria-labelledby="cos-inv-titulo">
   <header class="cos-inv-topo"><div><h2 class="cos-inv-titulo" id="cos-inv-titulo"></h2><span class="cos-inv-sub"></span>
     <div class="cos-inv-dias" role="group" aria-label="O dia dos gráficos" hidden>
       <button type="button" class="gc-chip" data-dia="hoje" aria-pressed="true">Hoje</button>
       <button type="button" class="gc-chip" data-dia="ontem" aria-pressed="false">Ontem</button>
       <label class="cos-inv-dia-outro"><span>Outro dia</span> <input type="date" class="gc-campo cos-inv-dia-data" title="Até 40 dias atrás"></label>
+    </div>
+    <div class="cos-inv-zoom" role="group" aria-label="Zoom no horário dos gráficos" hidden
+      title="Arraste num gráfico para aproximar o horário; Ctrl + roda do mouse aproxima e afasta; Shift + arrastar desliza; duplo clique volta ao dia inteiro. No teclado: setas deslizam, + e - aproximam e afastam.">
+      <button type="button" class="gc-chip cos-inv-zoom-menos" aria-label="Afastar: mostrar mais horas">−</button>
+      <button type="button" class="gc-chip cos-inv-zoom-mais" aria-label="Aproximar: mostrar menos horas">+</button>
+      <button type="button" class="gc-chip cos-inv-zoom-dia">Dia inteiro</button>
+      <span class="cos-inv-zoom-trecho gc-num" aria-live="polite"></span>
     </div></div>
     <div class="cos-inv-topo-dir"><span class="cos-inv-lido"></span>
     <button type="button" class="gc-btn gc-btn--ui gc-btn--fantasma cos-inv-fechar" aria-label="Fechar">Fechar</button></div></header>
