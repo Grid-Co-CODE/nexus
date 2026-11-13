@@ -100,8 +100,8 @@
   function serie(pontos) {
     if (!pontos) { return []; }
     if (convertidas.has(pontos)) { return convertidas.get(pontos); }
-    var s = pontos.map(function (p) { return [minutoSP(p.em), p.pac_kw == null ? null : +p.pac_kw]; })
-      .filter(function (p) { return p[0] >= DE && p[0] <= ATE; }).sort(function (a, b) { return a[0] - b[0]; });
+    var s = comBuracos(pontos.map(function (p) { return [minutoSP(p.em), p.pac_kw == null ? null : +p.pac_kw]; })
+      .filter(function (p) { return p[0] >= DE && p[0] <= ATE; }).sort(function (a, b) { return a[0] - b[0]; }));
     convertidas.set(pontos, s);
     return s;
   }
@@ -135,7 +135,33 @@
     while (l.length && l[0].dia !== hoje) { l.shift(); }   // podada só a de ontem: o resto é de quem desenha
     var ponta = [];
     for (var k = 0; k < l.length; k++) { var p = l[k]; if (p.min > ult && p.min >= DE && p.min <= ATE && p.kw != null) { ponta.push([p.min, p.kw]); } }
-    return ponta.length ? base.concat(ponta) : base;
+    if (!ponta.length) { return base; }
+    // a ponta que começa longe do último ponto gravado (o coletor calou e voltou): buraco, nunca uma reta por cima
+    var junta = base.slice();
+    if (ult >= 0 && ponta[0][0] - ult > limiarDeBuraco(base)) { junta.push([(ult + ponta[0][0]) / 2, null]); }
+    return junta.concat(ponta);
+  }
+  // ⚠ O BURACO NA CURVA (13/11/2026, o dono: "em alguns casos ela fica sem dados de amostra e só completa com uma linha
+  // reta, não acho isso ideal"). Entre dois pontos mais distantes que 1,5 passo da série (5 min na gravada, 15 na do
+  // cartão), ninguém mediu: o desenho interrompe a linha (um null no meio), como já fazia o gráfico das strings.
+  function limiarDeBuraco(pts) {
+    var menor = Infinity, ant = null;
+    for (var i = 0; i < pts.length; i++) {
+      if (pts[i][1] == null) { ant = null; continue; }
+      if (ant != null && pts[i][0] - ant > 0) { menor = Math.min(menor, pts[i][0] - ant); }
+      ant = pts[i][0];
+    }
+    return Math.max(7.5, (isFinite(menor) ? menor : 5) * 1.5);
+  }
+  function comBuracos(pts) {
+    var lim = limiarDeBuraco(pts), out = [], ant = null;
+    for (var i = 0; i < pts.length; i++) {
+      var p = pts[i];
+      if (p[1] != null && ant != null && p[0] - ant > lim) { out.push([(ant + p[0]) / 2, null]); }
+      out.push(p);
+      ant = p[1] == null ? null : p[0];
+    }
+    return out;
   }
 
   // ── AS ENTRADAS DO INVERSOR: a regra da Ronda COS (apps/web/src/lib/entradas-do-inversor.ts), portada ─────────────
@@ -430,7 +456,7 @@
     return so.length ? so : lista;
   }
 
-  raiz.NexusCosInversores = { horaDaLeitura: horaDaLeitura, usinaDoLink: usinaDoLink, nomeDaString: nomeDaString, vistaDasEntradas: vistaDasEntradas, entradasDoInversor: entradasDoInversor,
+  raiz.NexusCosInversores = { comBuracos: comBuracos, limiarDeBuraco: limiarDeBuraco, horaDaLeitura: horaDaLeitura, usinaDoLink: usinaDoLink, nomeDaString: nomeDaString, vistaDasEntradas: vistaDasEntradas, entradasDoInversor: entradasDoInversor,
     anotarPontaEnt: anotarPontaEnt, pontaEnt: pontaEnt, limparPontaEnt: limparPontaEnt, corDaEntrada: corDaEntrada,
     estiloDaCor: estiloDaCor, N_CORES: N_CORES, PONTA_MAX: PONTA_MAX, marcasDoEixo: marcasDoEixo, DIAS_ATRAS: DIAS_ATRAS, diaTexto: diaTexto, diaMenos: diaMenos, diaCurto: diaCurto,
     entradasDoHistorico: entradasDoHistorico, comPontaAoVivo: comPontaAoVivo, avisoDoHistorico: avisoDoHistorico,
