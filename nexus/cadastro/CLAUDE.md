@@ -376,6 +376,12 @@ cadastrando?" ("Pede"). O caso: um técnico do piloto da localização ficou num
 - **Por pessoa vale o celular do último acesso** (a versão, quando e o modelo; "N celulares" e os outros no título).
   **Versão antiga** = abaixo da mais nova que algum celular tem (`field_aparelhos.resumo`; nenhum número fixo no código:
   quando o 1º celular abrir com a versão nova, quem ficou na de antes vira antiga), em alerta.
+- **A versão chega como o agente da casca** (o 1º livro, 13/11/2026 11:25, 4 linhas): `NexusField/1.2.4`, e o celular
+  de teste com `NexusField/1.2.0-rc.1`. A conta lia só `1.2.4`/`v1.2.4`, e com o livro de verdade a versão atual ficava
+  vazia e ninguém virava "versão antiga". Agora `field_aparelhos.versao` tira o nome antes da barra e põe a prévia
+  (`-rc.1`) abaixo da mesma versão sem ela; a tela mostra `rotulo` (`1.2.4`, `1.2.0-rc.1`). Conferido no livro real: a
+  atual é 1.2.4 e o celular da rc.1 aparece como antiga. **O "Aparelho" vem só como `android`** (a casca não manda o
+  modelo): a coluna mostra isso até o App mandar o modelo.
 - **Filtro "Nexus Field"** na própria página (Instalou, Versão antiga, Não instalou; `data-f-field`) e no endereço
   (`field=`). Quem não aparece não abriu o Nexus Field com login: o App pelo navegador e o celular sem os serviços do
   Google (sem FCM) não se registram. O livro que ainda não existe (o App não publicou) vira aviso, e todos ficam "não

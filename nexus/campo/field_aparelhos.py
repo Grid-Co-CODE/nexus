@@ -23,15 +23,43 @@ C_PESSOA, C_APARELHO, C_VERSAO = "Pessoa (HMAC)", "Aparelho", "Versão do Nexus 
 C_INSTALADO, C_ACESSO = "Instalado em", "Último acesso"
 _BRT = timezone(timedelta(hours=-3))
 _HMAC = re.compile(r"[0-9a-f]{24}")
-_VERSAO = re.compile(r"v?(\d{1,4}(?:\.\d{1,4}){0,3})")
+# A versão chega como o agente da casca, "NexusField/1.2.4", e a de teste como "NexusField/1.2.0-rc.1" (o 1º livro,
+# 13/11/2026 11:25). Até ali a conta só lia "1.2.4" e "v1.2.4": nenhuma versão se lia, a "versão atual" ficava vazia e
+# ninguém aparecia como "versão antiga", que é o caso que criou a coluna. O nome antes da barra sai; a prévia (o "-rc.1")
+# fica abaixo da mesma versão sem ela e acima da anterior.
+_VERSAO = re.compile(r"(?:[A-Za-z][\w. -]*/)?v?(\d{1,4}(?:\.\d{1,4}){0,3})(?:-([0-9A-Za-z][0-9A-Za-z.-]*))?")
 # o filtro da tela (Base → Acessos → Pessoas e setores): o valor de cada linha e o rótulo
 FILTRO = (("instalou", "Instalou"), ("antiga", "Versão antiga"), ("nao_instalou", "Não instalou"))
 
 
-def versao(texto) -> tuple | None:
-    """ "1.2.4" (ou "v1.2.4") -> (1, 2, 4); o que não é versão -> None (não entra na conta da versão atual)."""
+def _partes(texto) -> tuple | None:
+    """("NexusField/1.2.0-rc.1") -> ([1, 2, 0], "rc.1"); o que não é versão -> None."""
     m = _VERSAO.fullmatch(str(texto or "").strip())
-    return tuple(int(p) for p in m.group(1).split(".")) if m else None
+    return ([int(p) for p in m.group(1).split(".")], m.group(2) or "") if m else None
+
+
+def versao(texto) -> tuple | None:
+    """ "1.2.4", "v1.2.4" ou "NexusField/1.2.4" -> a chave que se compara número a número (1.2.10 > 1.2.9); a prévia
+    ("1.2.0-rc.1") fica abaixo da mesma versão sem ela. O que não é versão -> None (não entra na conta da versão atual)."""
+    p = _partes(texto)
+    if not p:
+        return None
+    nums, pre = p
+    nums = (nums + [0, 0, 0, 0])[:4]
+    if not pre:
+        return (*nums, 1, 0)
+    n = re.findall(r"\d+", pre)
+    return (*nums, 0, int(n[-1]) if n else 0)
+
+
+def rotulo(texto) -> str:
+    """A versão como a tela mostra: sem o nome do app ("NexusField/1.2.4" -> "1.2.4"), com a prévia quando há
+    ("1.2.0-rc.1"). O que não se lê fica como veio."""
+    p = _partes(texto)
+    if not p:
+        return str(texto or "").strip()
+    nums, pre = p
+    return ".".join(map(str, nums)) + (f"-{pre}" if pre else "")
 
 
 def _quando(iso) -> datetime | None:
@@ -56,10 +84,11 @@ def resumo(linhas) -> dict:
         if not _HMAC.fullmatch(h):
             continue
         v = str(r.get(C_VERSAO) or "").strip()
-        por.setdefault(h, []).append({"versao": v, "v": versao(v), "modelo": " ".join(str(r.get(C_APARELHO) or "").split()),
+        por.setdefault(h, []).append({"versao": rotulo(v), "v": versao(v),
+                                      "modelo": " ".join(str(r.get(C_APARELHO) or "").split()),
                                       "acesso": _quando(r.get(C_ACESSO)), "instalado": _quando(r.get(C_INSTALADO))})
-    vs = [a["v"] for ap in por.values() for a in ap if a["v"]]
-    atual = max(vs) if vs else None
+    mais_nova = max(((a["v"], a["versao"]) for ap in por.values() for a in ap if a["v"]), default=None)
+    atual = mais_nova[0] if mais_nova else None
     out = {}
     for h, ap in por.items():
         ap.sort(key=lambda a: a["acesso"] or datetime.min.replace(tzinfo=_BRT), reverse=True)
@@ -71,7 +100,7 @@ def resumo(linhas) -> dict:
                   "outros": [{"versao": o["versao"], "modelo": o["modelo"],
                               "acesso_txt": o["acesso"].strftime("%d/%m/%Y %H:%M") if o["acesso"] else ""}
                              for o in ap[1:]]}
-    return {"por_pessoa": out, "versao_atual": ".".join(map(str, atual)) if atual else ""}
+    return {"por_pessoa": out, "versao_atual": mais_nova[1] if mais_nova else ""}
 
 
 def ler() -> dict:

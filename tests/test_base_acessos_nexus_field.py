@@ -80,6 +80,37 @@ def test_a_versao_atual_e_a_mais_nova_que_algum_celular_tem():
     assert NF.resumo([])["versao_atual"] == ""
 
 
+def test_a_versao_como_o_app_publica():
+    """O 1º livro de verdade (13/11/2026 11:25) trouxe a versão como o agente da casca: "NexusField/1.2.4" e, num celular
+    de teste, "NexusField/1.2.0-rc.1". A conta só lia "1.2.4" e "v1.2.4": nenhuma versão se lia e ninguém virava
+    "versão antiga". O nome antes da barra sai; a prévia fica abaixo da mesma versão sem ela."""
+    assert NF.versao("NexusField/1.2.4") == NF.versao("1.2.4") == NF.versao("v1.2.4") is not None
+    assert NF.versao("1.1.9") < NF.versao("NexusField/1.2.0-rc.1") < NF.versao("1.2.0") < NF.versao("NexusField/1.2.4")
+    assert NF.versao("1.2.0-rc.1") < NF.versao("1.2.0-rc.2") and NF.versao("1.2") == NF.versao("1.2.0")
+    assert NF.rotulo("NexusField/1.2.4") == "1.2.4" and NF.rotulo("NexusField/1.2.0-rc.1") == "1.2.0-rc.1"
+    assert NF.rotulo("beta") == "beta" and NF.versao("beta") is None
+    r = NF.resumo([{NF.C_PESSOA: "a" * 24, NF.C_APARELHO: "android", NF.C_VERSAO: "NexusField/1.2.4",
+                    NF.C_ACESSO: "2026-11-13T13:17:48.729Z"},
+                   {NF.C_PESSOA: "b" * 24, NF.C_APARELHO: "android", NF.C_VERSAO: "NexusField/1.2.0-rc.1",
+                    NF.C_ACESSO: "2026-11-13T10:49:50.008Z"}])
+    a, b = r["por_pessoa"]["a" * 24], r["por_pessoa"]["b" * 24]
+    assert r["versao_atual"] == "1.2.4" and a["versao"] == "1.2.4" and not a["antiga"]
+    assert b["versao"] == "1.2.0-rc.1" and b["antiga"] and a["acesso_txt"] == "13/11/2026 10:17"
+
+
+def test_a_tela_com_o_livro_como_o_app_publica(banco, com_fracttal, logado):
+    _aba(banco, NF.LIVRO, NF.ABA, [
+        _ap("beltrano@exemplo.test", "android", "NexusField/1.2.4", "2026-11-12T13:01:51.638Z", "2026-11-13T13:17:48.729Z"),
+        _ap("ciclano.chefe@empresa.test", "android", "NexusField/1.2.0-rc.1", "2026-11-09T18:31:16.623Z",
+            "2026-11-13T10:49:50.008Z")])
+    h = logado.get(URL).get_data(as_text=True)
+    assert "NexusField/" not in h and 'Nexus Field mais novo: <span class="gc-num">1.2.4</span>' in h
+    assert 'data-f-field="instalou"' in _linha(h, 501) and "1.2.4" in _linha(h, 501)
+    c = _linha(h, 502)
+    assert 'data-f-field="instalou|antiga"' in c and "1.2.0-rc.1 · antiga" in c
+    assert '>Instalou (2)</option>' in h and '>Versão antiga (1)</option>' in h
+
+
 def test_o_livro_do_app_esta_no_catalogo():
     f = catalogo.POR_ID["aparelho_field"]
     assert f.livro == f"{NF.LIVRO} · {NF.ABA}" and f.fontes == (f.livro,) and f.dims["pessoa"][0] == "hmac"
