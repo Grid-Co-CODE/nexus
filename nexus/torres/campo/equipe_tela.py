@@ -1066,6 +1066,9 @@ def equipe():
             return _tela({"erro": SEM_REGISTRO}, 503)
         perc = _percurso(srv, sel, periodo, coords, nomes_usina, agora, com_coordenada=ml)
         perc["aviso"] = periodo["aviso"]
+        # o dia do percurso, quando não é o de hoje (o clique na pessoa sem posição hoje abre o último dia dela)
+        dia = periodo["de"].astimezone(_BRT).date()
+        perc["outro_dia"] = dia.strftime("%d/%m") if dia != agora.astimezone(_BRT).date() else ""
     # o registro da LGPD: quem abriu, quando e, com um técnico escolhido no painel, de quem; antes de a página sair
     elif not _registrar_acesso(srv, "abriu_mapa", sel["pid"] if sel else None, None, agora):
         return _tela({"erro": SEM_REGISTRO}, 503)

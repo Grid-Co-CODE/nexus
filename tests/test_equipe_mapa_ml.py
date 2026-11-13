@@ -250,7 +250,7 @@ def test_as_cores_de_cada_foco():
                                   check=True).stdout)
     assert r["t"] == ["a_critico", "cinza", "cinza", "cinza", "cinza", "cinza", "agir", "atencao", "sem", "cinza"]
     # a usina sem comunicação é roxa no mapa (12/11/2026, a cor de Comando > Usinas): o ícone existe e lê o token
-    assert 'a_semcom: P.t["--semcom"]' in js and '"--semcom"' in js
+    assert 'a_semcom: P.t["--semcom-cheio"]' in js and '"--semcom"' in js
     assert r["u"] == cores
 
 
@@ -266,3 +266,20 @@ def test_a_escala_com_a_borda_inteira_e_os_creditos_recolhidos():
     js = (raiz / "campo-mapa.js").read_text(encoding="utf-8")
     assert "function recolherCreditos" in js and 'classList.remove("maplibregl-compact-show")' in js
     assert 'removeAttribute("open")' in js and 'mapa.on("load", recolherCreditos)' in js
+
+
+def test_a_usina_arredondada_e_o_roxo_forte_da_sem_comunicacao():
+    """Levi, 13/11/2026: "No foco usina, eu quero as formas arredondadas [...] E lá embaixo também, no rodapé, fica com o
+    símbolo da usina arredondada. E também eu quero, quando a usina estiver sem comunicação, ficar um roxo mais forte".
+    O losango tem os cantos arredondados (o ícone do mapa e o da legenda) e a sem comunicação pinta com o roxo cheio
+    (`--semcom-cheio`, nos dois temas), não com o roxo de texto das etiquetas."""
+    raiz = Path(__file__).resolve().parent.parent / "nexus" / "static"
+    js = (raiz / "campo-mapa.js").read_text(encoding="utf-8")
+    los = js[js.index("function losango("):js.index("function corDaUsina(")]
+    assert "arcTo" in los and 'lineJoin = "round"' in los
+    assert 'a_semcom: P.t["--semcom-cheio"]' in js and '"--semcom-cheio"' in js
+    nexus = (raiz / "nexus.css").read_text(encoding="utf-8")
+    assert nexus.count("--semcom-cheio:") == 2
+    css = (raiz / "campo.css").read_text(encoding="utf-8")
+    leg = re.search(r"(?m)^\.eq-leg-usina\{([^}]*)\}", css).group(1)
+    assert "border-radius:3px" in leg and "rotate(45deg)" in leg

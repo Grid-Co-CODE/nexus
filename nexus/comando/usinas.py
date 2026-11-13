@@ -61,10 +61,13 @@ def classificar(oc: dict) -> tuple[str, str]:
     grupo do problema que a Ronda COS manda; não lê o texto livre."""
     tarefa, falha, prob = _norm(oc.get("tipo_tarefa")), _norm(oc.get("tipo_falha")), _norm(oc.get("problema"))
     com_os = str(oc.get("os") or "").isdigit()          # a ocorrência ainda sem OS vem como "R-<registro>"
-    if tarefa.startswith("religamento") and "remoto" not in tarefa and com_os:
-        return "critico", "Religamento em campo"
+    # a falha de comunicação vem ANTES do religamento (Levi, 13/11/2026: Santo Anastácio e Crateús saíam críticas, com o
+    # motivo "Falha de comunicação": "Ele não está constando como falha de comunicação"; as duas tinham OS de religamento
+    # abertas para a comunicação de um inversor e de um relé). Religar a comunicação não é a usina parada
     if "comunica" in falha or prob == "com":
         return "sem_com", "Sem comunicação"
+    if tarefa.startswith("religamento") and "remoto" not in tarefa and com_os:
+        return "critico", "Religamento em campo"
     if "inversor" in falha or prob == "inv":
         return "atencao", "Inversor desligado"
     if any(p in falha for p in _PARA_A_USINA) or prob == "rede":

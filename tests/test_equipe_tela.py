@@ -441,7 +441,7 @@ def test_o_filtro_estreita_o_mapa_a_lista_e_o_resumo(cliente, pontos, setor):
     # o link do técnico leva o filtro junto, e o "Ver todos" do painel dele volta ao filtro, não a todos
     assert f'href="/t/campo/equipe?tecnico={SEM_POSICAO}&amp;equipe={LESTE}"' in html
     _, html = _html(cliente, query_string={"equipe": LESTE, "tecnico": SEM_POSICAO})
-    assert f'href="/t/campo/equipe?painel=tecnicos&amp;equipe={LESTE}">Ver todos os técnicos' in html
+    assert f'href="/t/campo/equipe?painel=tecnicos&amp;equipe={LESTE}"><i class="ph ph-arrow-left" aria-hidden="true"></i>Ver todos os técnicos' in html
     # o técnico de fora do filtro não abre o painel dele
     _, html = _html(cliente, query_string={"equipe": LESTE, "tecnico": NA_USINA})
     assert "eq-det" not in html and NOME[NA_USINA] not in html
@@ -746,7 +746,7 @@ def test_o_painel_ao_lado_do_mapa_abre_nos_eventos_e_o_botao_leva_a_tecnico_e_ro
     (href,) = re.findall(r'eq-ev-botao[^"]*" href="([^"]+)"', _lado(html))
     assert _q(href) == {"painel": ["tecnicos"], "equipe": [str(LESTE)]}
     _, html = _html(cliente, query_string={"tecnico": NA_USINA})
-    (ver,) = re.findall(r'href="([^"]+)">Ver todos os técnicos', html)
+    (ver,) = re.findall(r'href="([^"]+)">(?:<i [^>]*></i>)?Ver todos os técnicos', html)
     assert _q(ver) == {"painel": ["tecnicos"]}
 
 
@@ -1191,3 +1191,21 @@ def test_quem_nao_ve_o_mapa_de_equipe_nao_ve_as_usinas_dele(app, cliente, banco,
     assert st in (302, 403) and "data-mapa" not in html
     st, html = _html(_entrar(cliente, EMAIL[ADMIN], admin=True), query_string={"ver": "usinas"})
     assert st == 200 and "Usina Alfa" in html
+
+
+def test_ver_todos_os_tecnicos_no_alto_e_o_aviso_do_percurso_de_outro_dia(cliente, pontos, setor):
+    """Levi, 13/11/2026: "Esse botão de ver todos os técnicos tem que estar na parte de cima, antes do nome do técnico.
+    Que aí a pessoa não precisa ficar rolando para acessar"; e, sobre o clique na pessoa que abria o percurso de 11/11
+    (o último dia com posição dele): a gaveta diz de que dia é o percurso quando não é de hoje."""
+    from html import unescape
+    _receber(pontos, SEM_POSICAO, [((-16.712468, -49.013579), 16 * 60, False)])     # ontem às 20:00 de Brasília
+    pontos.registro.novos()
+    _entrar(cliente, EMAIL[PCM])
+    _, html = _html(cliente, query_string={"tecnico": SEM_POSICAO, "de": "2026-11-07T06:00", "ate": "2026-11-07T22:00"})
+    gaveta = unescape(html[html.index('<section class="eq-det">'):html.index("</aside>")])
+    assert gaveta.index("Ver todos os técnicos") < gaveta.index('class="eq-det-nome"')
+    assert html.count("Ver todos os técnicos") == 1
+    assert "Percurso de 07/11, não de hoje" in gaveta
+    # o percurso de hoje não leva o aviso
+    _, html = _html(cliente, query_string={"tecnico": ANDANDO, "de": "2026-11-08T06:00", "ate": "2026-11-08T12:00"})
+    assert "não de hoje" not in html

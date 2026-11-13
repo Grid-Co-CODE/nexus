@@ -84,7 +84,7 @@
   // ── as cores: os tokens do nexus.css, lidos na hora (os dois temas) ─────────────────────────────────────────────
   var TOKENS = ["--superficie", "--superficie-2", "--fundo", "--linha", "--linha-forte", "--tinta", "--tinta-2", "--mudo",
                 "--verde", "--info-cheio", "--ok-cheio", "--alerta-cheio", "--critico", "--severo", "--papel", "--papel-tinta",
-                "--semcom"];
+                "--semcom", "--semcom-cheio"];
   function paleta() {
     var cs = getComputedStyle(raiz), t = {};
     TOKENS.forEach(function (n) { t[n] = cs.getPropertyValue(n).trim(); });
@@ -206,12 +206,16 @@
   }
 
   // ── os ícones: a usina é um losango (o técnico é o círculo), na cor do dado ─────────────────────────────────────
+  // com os cantos arredondados (Levi, 13/11/2026: "No foco usina, eu quero as formas arredondadas"); a legenda também
   function losango(fundo, borda, selo) {
-    var px = 2, L = 26, cv = document.createElement("canvas");
+    var px = 2, L = 26, R = 3.2, cv = document.createElement("canvas");
     cv.width = cv.height = L * px;
     var g = cv.getContext("2d");
     g.scale(px, px);
-    g.beginPath(); g.moveTo(13, 2.5); g.lineTo(23.5, 13); g.lineTo(13, 23.5); g.lineTo(2.5, 13); g.closePath();
+    g.beginPath(); g.moveTo(7.75, 7.75);
+    g.arcTo(13, 2.5, 23.5, 13, R); g.arcTo(23.5, 13, 13, 23.5, R); g.arcTo(13, 23.5, 2.5, 13, R); g.arcTo(2.5, 13, 13, 2.5, R);
+    g.closePath();
+    g.lineJoin = "round";
     g.fillStyle = fundo; g.fill(); g.lineWidth = 2; g.strokeStyle = borda; g.stroke();
     if (selo) {
       g.beginPath(); g.arc(20, 6, 5, 0, Math.PI * 2); g.fillStyle = selo; g.fill();
@@ -234,7 +238,7 @@
     var cores = NIVEL();
     var fill = { neutra: P.terra, dest: P.verde, sem_leitura: P.terra, a_ok: P.t["--ok-cheio"],
                  a_alerta: P.t["--alerta-cheio"], a_critico: P.t["--critico"], a_neutro: P.t["--mudo"],
-                 a_semcom: P.t["--semcom"],
+                 a_semcom: P.t["--semcom-cheio"],
                  cinza: mistura(P.terra, P.t["--mudo"], 0.7) };
     Object.keys(cores).forEach(function (k) { fill[k] = cores[k]; });
     Object.keys(fill).forEach(function (k) {

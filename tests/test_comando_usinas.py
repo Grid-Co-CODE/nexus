@@ -94,6 +94,11 @@ def test_a_regua_do_levi():
     """11/11/2026: "religamento com OS aberta em campo tem que estar como crítico", "atenção vai ser inversor desligado",
     "falha de comunicação é sem comunicação e etc"."""
     assert CU.classificar(_oc(tarefa="Religamento", falha="Desligamento de usina")) == ("critico", "Religamento em campo")
+    # o religamento aberto para uma FALHA DE COMUNICAÇÃO é sem comunicação, não crítico (Levi, 13/11/2026: Santo Anastácio
+    # e Crateús estavam críticos no mapa com o motivo "Falha de comunicação": "Ele não está constando como falha de
+    # comunicação"; as duas tinham OS de religamento abertas para a comunicação de um inversor e de um relé)
+    assert CU.classificar(_oc(tarefa="Religamento", falha="Falha de comunicação", problema="com")) == ("sem_com", "Sem comunicação")
+    assert CU.classificar(_oc(tarefa="Religamento", falha="Perda de comunicação")) == ("sem_com", "Sem comunicação")
     assert CU.classificar(_oc(falha="Inversor desligado", problema="inv")) == ("atencao", "Inversor desligado")
     assert CU.classificar(_oc(falha="Perda de comunicação com a usina", problema="com")) == ("sem_com", "Sem comunicação")
     # o etc: o que para a usina é crítico; o religamento remoto e o ainda sem OS vão pela falha; o resto é atenção

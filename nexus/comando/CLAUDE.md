@@ -189,6 +189,11 @@ II, Rio do Peixe I e II; E1: Barra das Garças, Boituva II, Chapada dos Guimarã
 COS já manda `APOL-GVT200`, `APOL-IRM200`, `APOL-RDP100` e `E1EN-PCN100`) —, e as que o COS nunca mandou pelo código do
 cadastro (GD Energy: Sol do Norte 1 e 2; Sal Energia: Cascavel Sunpower), que dependem de o COS confirmar o cadastro
 delas na Ronda COS. A usina cujo cliente não respondeu na hora também fica "Sem leitura" (o aviso amarelo diz qual).
+**A falha de comunicação vem antes do religamento (13/11/2026).** Levi: Santo Anastácio e Crateús saíam Crítico com o
+motivo "Falha de comunicação" ("Ele não está constando como falha de comunicação"): as duas tinham OS de RELIGAMENTO
+abertas para a comunicação (de um inversor e de um relé), e o religamento em campo com OS era a 1ª regra. Agora o
+`classificar` olha a comunicação primeiro: religar a comunicação não é a usina parada. A usina com outra ocorrência mais
+grave segue com a pior (Crateús tinha também um Furto aberto há 81 dias, sem OS: Atenção, pela régua).
 **Quem mais lê esta régua (12/11/2026):** o Mapa de equipe da Usinas 360° pinta as usinas pelo `agora_pelo_cos` e o vídeo
 wall dele agrupa as ocorrências pelo `classificar` (`campo/equipe/parede.py`); mudou a régua aqui, muda lá sozinho. Cada
 ocorrência do `cos_por_usina` leva também o `usina_cod` (o código curto da usina no Andamento, "APR100"), o do cartão

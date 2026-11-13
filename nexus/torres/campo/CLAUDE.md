@@ -1808,6 +1808,13 @@ e não foram feitas.
   tempo (arrastar volta o percurso até aquela hora, com o ponto "agora" e a hora no mapa) e a velocidade (×120, ×480,
   ×1200). Cada ponto vai com o instante (`t`, segundos UTC) no JSON do percurso. Os marcos de
   `eventos.do_percurso` seguem no mapa com a hora ("16:50 · Saiu da UFV Altair").
+- **A usina arredondada, o roxo forte e a gaveta (13/11/2026**, Levi): o losango da usina tem os cantos arredondados no
+  mapa (`losango` com `arcTo`) e na legenda ("No foco usina, eu quero as formas arredondadas [...] no rodapé, fica com o
+  símbolo da usina arredondada"); a sem comunicação pinta com o roxo CHEIO (`--semcom-cheio`, token novo nos dois temas;
+  "um roxo mais forte"; o `--semcom` segue sendo o do texto das etiquetas), também na faixa do cartão do vídeo wall; o
+  **Ver todos os técnicos** fica no ALTO da gaveta, antes do nome ("não precisa ficar rolando para acessar"); e o percurso
+  que não é de hoje diz de que dia é ("Percurso de 11/11, não de hoje: é o último dia com posição"): o clique na pessoa
+  sem posição hoje abre o último dia dela (a regra de 10/11), e a lista só tinha as horas.
 - **A escala e os créditos (13/11/2026**, Levi, pela sessão Nexus Field): a escala com a borda inteira ("tá sem a borda
   de cima. Isso deixou muito estranho": o MapLibre a desenha só com os lados e o fundo) e os créditos do mapa ("de onde
   está vindo os dados", no "i") **sempre recolhidos** ("Deixa essa exclamação sempre recolhida"): o MapLibre os abre no

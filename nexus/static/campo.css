@@ -2050,7 +2050,7 @@ tr.rd-linha--ativa td{background:var(--verde-suave)}
 .eq-leg-item .eq-leg-usina{margin:0 2px}
 .eq-leg-aviso{width:14px;height:10px;border-radius:2px;background:var(--alerta-cheio);opacity:.5}
 .eq-leg-foco{width:6px;height:6px;border-radius:50%;background:var(--severo)}
-.eq-leg-usina{display:inline-block;width:9px;height:9px;margin:0 7px 0 3px;border-radius:2px;background:var(--eq-verde);
+.eq-leg-usina{display:inline-block;width:9px;height:9px;margin:0 7px 0 3px;border-radius:3px;background:var(--eq-verde);
   transform:rotate(45deg)}
 .eq-leg-usina--anel{background:var(--superficie);border:1.5px solid var(--eq-verde)}
 .eq-leg-nivel{display:inline-flex;align-items:center;gap:5px;color:var(--tinta-2)}
@@ -2357,6 +2357,8 @@ tr.rd-linha--ativa td{background:var(--verde-suave)}
 .eqtv-kpi--alerta strong{color:var(--alerta)}
 .eqtv-kpi--neutro strong{color:var(--tinta-2)}
 .eqtv-kpi--semcom strong{color:var(--semcom)}
+/* a faixa do Ver todos os técnicos no alto da gaveta (13/11/2026) */
+.eq-voltar--alto{display:inline-flex;align-items:center;gap:6px;margin:0 0 12px}
 .eqtv-kpi--zero strong{color:var(--mudo)}
 .eqtv-lista{position:relative;flex:1;min-height:0;overflow:hidden}
 .eqtv-trilho{display:grid;gap:1.4vh;will-change:transform}
@@ -2371,7 +2373,7 @@ tr.rd-linha--ativa td{background:var(--verde-suave)}
 .eqtv-card--critico{--tom:var(--critico)}
 .eqtv-card--alerta{--tom:var(--alerta)}
 .eqtv-card--neutro{--tom:var(--mudo)}
-.eqtv-card--semcom{--tom:var(--semcom)}
+.eqtv-card--semcom{--tom:var(--semcom-cheio)}
 .eqtv-card-corpo{display:grid;gap:.25em;min-width:0}
 .eqtv-card-corpo p{margin:0;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .eqtv-card-l1{display:flex;align-items:baseline;gap:.6em}

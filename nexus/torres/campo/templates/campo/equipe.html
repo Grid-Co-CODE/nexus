@@ -280,6 +280,9 @@
       </section>
       {% elif sel %}{% set s = sel.s %}
       <section class="eq-det">
+        {# o Ver todos os técnicos no alto, antes do nome (Levi, 13/11/2026: "tem que estar na parte de cima, antes do nome
+           do técnico. Que aí a pessoa não precisa ficar rolando para acessar"); até ali ficava no pé da gaveta #}
+        <a class="cn-link eq-voltar eq-voltar--alto" href="{{ url_for('torre_campo.equipe', painel='tecnicos', **filtro.q) }}"><i class="ph ph-arrow-left" aria-hidden="true"></i>Ver todos os técnicos</a>
         <div class="eq-det-cab"><h2 class="eq-det-nome">{{ sel.nome }}</h2><span class="cn-pill cn-{{ s.tom }}">{{ s.rotulo }}</span></div>
         <p class="eq-det-eq">{{ sel.equipe or 'Sem equipe no cadastro' }}</p>
         <dl class="eq-dl">
@@ -294,6 +297,9 @@
         <section class="eq-perc" aria-label="O percurso">
           <h3 class="eq-perc-titulo">Percurso</h3>
           {% if perc.aviso %}<p class="eq-nota eq-perc-aviso">{{ perc.aviso }}</p>{% endif %}
+          {# o percurso que não é de hoje diz de que dia é (13/11/2026: o clique na pessoa sem posição hoje abre o último dia
+             com posição dela, e a lista só tinha as horas) #}
+          {% if perc.outro_dia %}<p class="eq-nota eq-perc-aviso">Percurso de {{ perc.outro_dia }}, não de hoje{{ ': é o último dia com posição' if s.rotulo == 'Sem posição hoje' }}.</p>{% endif %}
           {% if perc.vazio %}<p class="eq-vazio">{{ perc.vazio }}</p>{% else %}
           <p class="eq-perc-resumo">{{ perc.resumo }}</p>
           {% if mapa_js and mapa_js.percurso %}
@@ -348,7 +354,6 @@
           <button class="gc-btn gc-btn--contorno" type="submit"><i class="ph ph-path" aria-hidden="true"></i>Ver percurso</button>
           <p class="eq-nota">Dentro dos últimos 7 dias, na hora de Brasília. Cada abertura do percurso fica registrada: quem viu, de quem e de que período.</p>
         </form>
-        <a class="cn-link eq-voltar" href="{{ url_for('torre_campo.equipe', painel='tecnicos', **filtro.q) }}">Ver todos os técnicos</a>
       </section>
       {% elif painel_ev %}
       {# os eventos do dia (10/11/2026, Levi, com a imagem do quadro de eventos do COS: "Quero que apareça tipo
