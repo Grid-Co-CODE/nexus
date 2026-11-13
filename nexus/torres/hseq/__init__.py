@@ -763,6 +763,7 @@ def colaboradores():
         contagem=COL.contar(base), lista=[x for x in base if COL.na_situacao(x, sit)], limite=LIMITE_LINHAS,
         vinculos=COL.opcoes(todas, "vinculo"), cargos=COL.opcoes(todas, "cargo"), regioes=COL.opcoes(todas, "regiao"),
         sem_status=COL.SEM_STATUS, fdoc=fdoc, filtros_doc=FILTROS_DOC, estados=DOC.ESTADOS, doc_erro=doc["erro"],
+        pendencias=DOC.PENDENCIAS,
         pode=_pode(), ok=request.args.get("ok", ""), erro=request.args.get("erro", ""))
 
 

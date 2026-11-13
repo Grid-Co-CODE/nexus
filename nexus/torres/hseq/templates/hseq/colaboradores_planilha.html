@@ -29,7 +29,7 @@
   <h2 class="gc-rotulo col-secao">Abas lidas</h2>
   <div class="cn-tab cn-tab--compacta"><table>
     <thead><tr><th>Aba</th><th>Pessoas</th><th>No cadastro</th><th>Colunas de documentação</th></tr></thead>
-    <tbody>{% for a in res.abas %}<tr><td>{{ a.aba }}</td><td>{{ a.pessoas }}</td><td>{{ a.casadas }}</td><td>{{ a.itens }}</td></tr>{% endfor %}
+    <tbody>{% for a in res.abas %}<tr><td>{{ a.aba }}</td><td>{{ a.pessoas }}{% if a.legendas %} <span class="mudo">(+{{ a.legendas }} linha{{ 's' if a.legendas > 1 }} de legenda, ignorada{{ 's' if a.legendas > 1 }})</span>{% endif %}</td><td>{{ a.casadas }}</td><td>{{ a.itens }}</td></tr>{% endfor %}
     {% for aba, motivo in res.fora %}<tr><td>{{ aba }}</td><td colspan="3" class="mudo">fora: {{ motivo }}</td></tr>{% endfor %}</tbody>
   </table></div>
 

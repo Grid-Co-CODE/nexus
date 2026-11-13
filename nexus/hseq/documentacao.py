@@ -47,13 +47,24 @@ LINHAS_MAX = 3000                   # linhas por aba da planilha (a de hoje tem 
 COLUNAS_MAX = 60                    # a planilha tem aba com 16 mil colunas vazias: lê só as primeiras
 
 SITUACOES = {"valido": "Válido", "falta": "Falta", "pendente_assinatura": "Pendente assinatura",
-             "solicitado": "Solicitado", "nao_se_aplica": "Não se aplica"}
+             "solicitado": "Solicitado", "em_andamento": "Em andamento", "nao_se_aplica": "Não se aplica"}
 # o estado que a tela mostra (a situação + a validade), do mais grave para o menos; o tom é a cor do Nexus
 ESTADOS = {"vencido": ("Vencido", "critico"), "falta": ("Falta", "critico"),
            "pendente_assinatura": ("Pendente assinatura", "alerta"), "solicitado": ("Solicitado", "alerta"),
+           "em_andamento": ("Em andamento", "alerta"),
            "vence_logo": ("Vence em breve", "alerta"), "valido": ("Válido", "ok"),
            "nao_se_aplica": ("Não se aplica", "neutro"), "sem_registro": ("Sem registro", "neutro")}
-PENDENCIAS = ("vencido", "falta", "pendente_assinatura", "solicitado", "vence_logo")
+PENDENCIAS = ("vencido", "falta", "pendente_assinatura", "solicitado", "em_andamento", "vence_logo")
+# a 1ª conferência com a planilha real (13/11/2026): "Em andamento" (o curso começou) e "Aguardando a finalização dos
+# Cursos" (a anuência e a OS esperam o curso) não entravam; a Segurança pediu que eu decidisse, e os dois são o mesmo
+# fato: o item ainda não vale porque o curso está em curso. Viram "Em andamento", uma pendência em amarelo
+EM_ANDAMENTO = ("EM ANDAMENTO", "AGUARDANDO A FINALIZACAO", "AGUARDANDO FINALIZACAO")
+# a aba do time administrativo: este painel é só da operação (a Segurança, 13/11/2026: "nesse painel entra apenas os
+# colaboradores da operação, então precisamos ter um controle à parte para o time ADM")
+ABA_ADM = "ADM"
+# "Ana Fulana- PJ" na planilha: o "- PJ" diz o contrato, não faz parte do nome da ficha
+_SUFIXO_PJ = re.compile(r"\s*-\s*PJ\s*$", re.I)
+NOMES_MIN_APROXIMADO = 3
 
 
 @dataclass(frozen=True)
@@ -147,6 +158,8 @@ def ler_valor(v) -> tuple[str, date | None] | None | bool:
         return "falta", None
     if n in ("SOLICITADO", "SOLICIDADO"):
         return "solicitado", None
+    if n.startswith(EM_ANDAMENTO):
+        return "em_andamento", None
     return False
 
 
@@ -368,10 +381,24 @@ def _indice(pessoas: list[dict]) -> tuple[dict, dict]:
     return completo, curto
 
 
+def linha_de_legenda(nome) -> bool:
+    """As linhas de legenda no fim da planilha ("ASSINATURA = Enviar para assinar", "LEGENDA:"): não são pessoa. Na 1ª
+    conferência com a planilha real (13/11/2026) elas apareciam entre os nomes que não casaram."""
+    t = str(nome or "").strip()
+    return "=" in t or t.endswith(":")
+
+
+def nome_da_pessoa(nome) -> str:
+    """O nome para casar: sem o "- PJ" do fim."""
+    return _SUFIXO_PJ.sub("", str(nome or "")).strip()
+
+
 def casar(nome, indice) -> tuple[int | None, str]:
-    """(pessoa_id, como casou) ou (None, por quê). Nunca chuta: duas fichas com o mesmo nome não casam."""
+    """(pessoa_id, como casou) ou (None, por quê). Nunca chuta: duas fichas com o mesmo nome não casam, e o primeiro e
+    o último nome só casam quando a planilha traz ao menos 3 nomes. Caso real (13/11/2026): "Pedro Silva" na planilha
+    casava com "Pedro da Silva" do cadastro; com dois nomes comuns, não dá para saber se é a mesma pessoa."""
     completo, curto = indice
-    n = _norm(nome)
+    n = _norm(nome_da_pessoa(nome))
     ids = completo.get(n) or []
     if len(ids) == 1:
         return ids[0], "nome completo"
@@ -379,8 +406,10 @@ def casar(nome, indice) -> tuple[int | None, str]:
         return None, "nome de mais de uma ficha"
     partes = n.split()
     ids = curto.get(f"{partes[0]} {partes[-1]}") if len(partes) >= 2 else None
-    if ids and len(ids) == 1:
+    if ids and len(ids) == 1 and len(partes) >= NOMES_MIN_APROXIMADO:
         return ids[0], "primeiro e último nome"
+    if ids and len(ids) == 1:
+        return None, "só dois nomes na planilha: escreva o nome completo"
     return None, "nome de mais de uma ficha" if ids else "não está no cadastro"
 
 
@@ -407,12 +436,18 @@ def ler_planilha(conteudo: bytes, pessoas: list[dict]) -> dict:
         if "EMPRESA" in cab:
             fora.append((ws.title.strip(), "terceiros: não estão no cadastro (decisão do Levi)"))
             continue
+        if ABA_ADM in _cab(ws.title).split():
+            fora.append((ws.title.strip(), "time administrativo: fora deste painel, que é da operação"))
+            continue
         i_nome = cab.index("FUNCIONARIO")
         cols = [(j, por_col[c]) for j, c in enumerate(cab) if c in por_col]
-        lidas = casadas = 0
+        lidas = casadas = legendas = 0
         for r in linhas:
             nome = str(r[i_nome] or "").strip() if i_nome < len(r) else ""
             if not nome:
+                continue
+            if linha_de_legenda(nome):
+                legendas += 1
                 continue
             lidas += 1
             pid, como = casar(nome, indice)
@@ -434,7 +469,8 @@ def ler_planilha(conteudo: bytes, pessoas: list[dict]) -> dict:
                 if item.tipo == "situacao":
                     d = None        # documento sem validade: a data da planilha (quando houver) é só o "tem"
                 candidatos.setdefault((pid, item.id), []).append((d or date.min, -ordem, sit, d))
-        abas.append({"aba": ws.title.strip(), "pessoas": lidas, "casadas": casadas, "itens": len(cols)})
+        abas.append({"aba": ws.title.strip(), "pessoas": lidas, "casadas": casadas, "itens": len(cols),
+                     "legendas": legendas})
     # a mesma pessoa em duas abas (o ASO na aba de saúde e na de ativos): vale a data mais nova; sem data, a 1ª aba
     registros = [(pid, item, *max(c, key=lambda t: (t[0], t[1]))[2:]) for (pid, item), c in sorted(candidatos.items())]
     return {"abas": abas, "fora": fora, "nao_casou": sorted(nao_casou.items()), "aproximados": sorted(aproximados.items()),
