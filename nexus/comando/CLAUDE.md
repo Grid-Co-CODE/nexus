@@ -619,6 +619,18 @@ o que é que ele tem que fazer".
   - Embaixo vêm "Tem que fazer", "Pode fazer" e "Pendente com outros", com a OS de cada item como link: o Raio X para
     chamado, Engenharia e Performance; o card para as outras.
   - O botão "Recolher" encolhe o bloco, e o navegador lembra a escolha.
+  - **Cada item tem o destino** (Levi: "todos esses tem que ter um botão para dar o destino [...] fazer [...] E aí já vai
+    preenchido automático [...] visualizar [...] solicitar ao COS"). A IA escolhe o destino de uma lista fechada, e
+    `ler` só aceita setor ativo do cadastro e lugar da lista (`VER`):
+    - **"Fazer"** (em "Tem que fazer" e "Pode fazer") e **"Solicitar ao setor"** (em "Pendente") abrem, na janela por
+      cima, o "Pedir a um setor" da usina já preenchido.
+      - A janela da conversa aceita `setor`, `titulo`, `descricao` e `os`; setor e OS só como número.
+      - O `demandas.js` escolhe o setor e a OS que vieram.
+      - Quem envia confere e escolhe a pessoa e o tema.
+      - O que depende da concessionária é pedido ao COS, que abre o chamado com a rede.
+    - **"Visualizar"** abre a Aprovação de OS ou a Mesa do engenheiro (noutra aba), ou abre o cartão do próprio
+      prontuário (rondas, segurança, COS, chamados...).
+    - A OS do item vira "Ver OS N" (o Raio X ou o card).
 - **Um por usina por dia** (o dia de Brasília), guardado em `<NEXUS_DADOS>/ia/diagnosticos/AAAA-MM-DD/<usina>.json`.
   - A primeira abertura do dia pega a trava (`<usina>.andamento`, criada de forma exclusiva), monta o dossiê na hora e
     manda a IA fazer numa thread à parte. A rota responde "preparando" e a página não espera.
