@@ -428,3 +428,28 @@ def test_as_sugestoes_no_alto_e_o_criar_os_dos_setores_que_recebem_os(tela, loga
     criar = json.loads(h.split("data-ia-criar-os>")[1].split("</script>")[0])
     assert criar == {"engenharia": {"rot": "OS de Engenharia", "url": "/os/solicitacao/engenharia"},
                      "performance": {"rot": "OS de Performance", "url": "/os/solicitacao/performance"}}
+
+
+# ── 14/11/2026 à noite: a Nexus IA com o modelo escondido e o relatório do tema da conversa ────────────────────────────
+def test_o_modelo_padrao_e_o_nemotron_e_fica_escondido_no_i(tela, logado):
+    logado.application.config.update(OPENROUTER_API_KEY="k", GEMINI_API_KEY="g")
+    assert IA.padrao(logado.application.config) == "nemotron"
+    h = logado.get("/t/comando/usinas/1/ia?parcial=1").get_data(as_text=True)
+    assert '<details class="ia-info">' in h and "Responde: <b>Nemotron 3 Ultra grátis</b>" in h
+    assert 'value="nemotron" data-ia-modelo checked' in h and 'value="gemini-lite" data-ia-modelo>' in h
+    # o padrão sem chave: vale o primeiro com chave
+    assert IA.padrao({"GEMINI_API_KEY": "g"}) == "gemini-lite" and IA.padrao({}) == ""
+    p = logado.get("/t/comando/usinas/1").get_data(as_text=True)
+    assert "Pergunte à Nexus IA" in p and "Pergunte à IA<" not in p
+
+
+def test_o_relatorio_do_tema_da_conversa():
+    """Levi: "baixar relatório de religamento, baixar relatório de COS, baixar relatório de performance"."""
+    from datetime import date
+    assert IA.temas_da_conversa("Quais foram os últimos desligamentos?") == ["religamentos"]
+    assert IA.temas_da_conversa("O que o COS registrou?") == ["religamentos"]
+    assert IA.temas_da_conversa("Como foi a performance no mês?") == ["perf"]
+    assert IA.temas_da_conversa("Algo mais?", "A OS 123 e a OS 456 seguem abertas.") == []          # a "OS" sozinha não conta
+    assert IA.temas_da_conversa("Algo mais?", "Os chamados da garantia: 2 chamados parados.") == ["chamados"]
+    hoje = date(2026, 11, 14)
+    assert IA.mes_da_conversa("Por que caiu?", hoje) == "2026-11" and IA.mes_da_conversa("e em outubro?", hoje) == "2026-10"

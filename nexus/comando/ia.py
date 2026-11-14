@@ -439,7 +439,7 @@ def _sem_acento(s) -> str:
 _RX_RELATORIO = re.compile(r"\b(relat[oó]rio|pdf)\b", re.I)
 # os temas do PDF (nexus/campo/relatorio_usina.TEMAS) pelas palavras de quem pede
 _TEMAS_PALAVRAS = (("chamados", r"chamad|garantia"),
-                   ("religamentos", r"religament|desligament|\bparada|\bqueda|\bcaiu"),
+                   ("religamentos", r"religament|desligament|\bparada|\bqueda|\bcaiu|\bcos\b|normaliza"),
                    ("perf", r"performance|gera[cç][aã]o|disponibilidade|\bmeta\b|\bpr\b|energia"),
                    ("rondas", r"ronda|limpeza|zeladoria|sujidade|vegeta"),
                    ("manut", r"manuten|\bos\b|ordens? de servi|tarefa|corretiva|preventiva"))
@@ -469,6 +469,45 @@ def pedido_de_relatorio(pergunta: str, hoje) -> dict | None:
                 break
     return {"temas": temas or list(RU.CHAVES_TEMAS), "mes": mes or RU.mes_padrao(hoje),
             "mes_fora": bool(mes is None and any(re.search(rf"\b{n}\b", t) for n in _MESES))}
+
+
+def temas_da_conversa(pergunta: str, resposta: str = "") -> list[str]:
+    """Os temas do PDF de que a conversa trata, para a oferta "Baixar relatório de ..." embaixo da resposta (14/11/2026,
+    Levi: "Quando responder temas relacionados diretamente a setores [...] ter a opção de criar um relatório"). Pela
+    pergunta; sem tema nela, o tema que a resposta mais cita (2 vezes ou mais; a "OS" sozinha não conta, ela aparece em
+    toda resposta). Até 2."""
+    # sem o "os" das palavras da manutenção: na conversa é o artigo ("os últimos desligamentos") ou a OS de qualquer tema
+    palavras = [(k, rx.replace("|\\bos\\b", "")) for k, rx in _TEMAS_PALAVRAS]
+    t = _sem_acento(pergunta)
+    temas = [k for k, rx in palavras if re.search(rx, t)]
+    if not temas and resposta:
+        r = _sem_acento(resposta)
+        conta = {k: len(re.findall(rx, r)) for k, rx in palavras}
+        k, n = max(conta.items(), key=lambda kv: kv[1])
+        temas = [k] if n >= 2 else []
+    return temas[:2]
+
+
+def mes_da_conversa(pergunta: str, hoje) -> str:
+    """O mês da oferta do relatório: o que a pergunta cita (o nome, "mês passado"); sem isso, o mês corrente (a conversa é
+    sobre agora; o PDF sai parcial, até ontem)."""
+    from ..campo import relatorio_usina as RU
+    p = pedido_de_relatorio("relatório " + str(pergunta or ""), hoje) or {}
+    t = _sem_acento(pergunta)
+    cita = re.search(r"mes passado|mes anterior|ultimo mes", t) or any(re.search(rf"\b{n}\b", t) for n in _MESES)
+    return p.get("mes") if cita and p.get("mes") else RU.meses(hoje)[0][0]
+
+
+# o modelo da janela (14/11/2026, Levi: "Bora usar como padrão esse Nemotron 3 Ultra"); NEXUS_IA_PADRAO troca
+MODELO_PADRAO = "nemotron"
+
+
+def padrao(cfg) -> str:
+    """O modelo que vem marcado: o padrão, se tem chave; senão, o primeiro com chave; "" sem nenhum."""
+    lista = disponiveis(cfg)
+    quer = str(cfg.get("NEXUS_IA_PADRAO") or MODELO_PADRAO).strip()
+    com = [m["id"] for m in lista if m.get("tem_chave")]
+    return quer if quer in com else (com[0] if com else "")
 
 
 # ── as citações e as OS da resposta ───────────────────────────────────────────────────────────────────────────────────

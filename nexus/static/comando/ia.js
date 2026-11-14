@@ -158,6 +158,14 @@
       if (j.relatorio) { caixa.className = 'ia-respostas'; relatorio(caixa, j.relatorio); return; }
       respostas[id] = {pergunta: pergunta, lista: j.respostas};
       caixa.innerHTML = j.respostas.map(function (r, ri) { return cartao(r, id + '-' + ri, raiz.getAttribute('data-ia-raiz') || ''); }).join('');
+      // o relatório do tema da conversa, para baixar (o PDF do prontuário só com aquele tema)
+      if ((j.relatorios || []).length) {
+        caixa.insertAdjacentHTML('afterend', '<div class="ia-rel-ofertas">' + j.relatorios.map(function (r) {
+          return '<a class="gc-btn gc-btn--ui gc-btn--contorno ia-rel-oferta" href="' + esc(r.url) + '" download>' +
+            '<i class="ph ph-file-pdf" aria-hidden="true"></i> Baixar relatório de ' + esc((r.temas[0] || '').toLowerCase()) +
+            ' <span class="mudo">(' + esc(String(r.mes || '').toLowerCase()) + ')</span></a>';
+        }).join('') + '</div>');
+      }
       var primeira = j.respostas.filter(function (r) { return r.ok; })[0];
       if (primeira) historico = historico.concat([{pergunta: pergunta, resposta: primeira.texto}]).slice(-3);
       var g = raiz.querySelector('[data-ia-gasto]');

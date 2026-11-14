@@ -401,7 +401,7 @@ def usina_ia(usina_id):
     if ctx is None:
         abort(404)
     cfg = current_app.config
-    dados = dict(x=ctx["x"], modelos=IA.disponiveis(cfg), sugestoes=IA.SUGESTOES, gasto=IA.gasto_do_mes(cfg),
+    dados = dict(x=ctx["x"], modelos=IA.disponiveis(cfg), padrao=IA.padrao(cfg), sugestoes=IA.SUGESTOES, gasto=IA.gasto_do_mes(cfg),
                  teto=IA.teto(cfg), max_pergunta=IA.MAX_PERGUNTA, setores=_ia_setores(), criar_os=_ia_criar_os())
     if request.args.get("parcial") == "1":          # a janela por cima do prontuário
         return render_template("comando/_ia.html", **dados)
@@ -524,8 +524,13 @@ def usina_ia_perguntar(usina_id):
     setores = [s["nome"] for s in _ia_setores()]
     respostas = IA.perguntar(cfg, ids, d["texto"], pergunta, historico, setores=setores, meu_setor=_ia_meu_setor())
     IA.registrar(cfg, usina_id, pergunta, respostas, _meu_hmac(), d["tokens_estimados"])
+    # a oferta do relatório do tema da conversa (14/11/2026, Levi: "baixar relatório de religamento, baixar relatório de
+    # COS, baixar relatório de performance"): o PDF do prontuário só com aquele tema, no mês da conversa
+    primeira = next((r for r in respostas if r.get("ok")), {})
+    mes = IA.mes_da_conversa(pergunta, visao._agora().date())
+    relatorios = [_ia_relatorio(usina_id, {"temas": [t], "mes": mes}) for t in IA.temas_da_conversa(pergunta, primeira.get("texto") or "")]
     resp = jsonify(ok=True, respostas=respostas, dossie_tokens=d["tokens_estimados"], gasto=IA.gasto_do_mes(cfg),
-                   teto=teto)
+                   teto=teto, relatorios=relatorios)
     resp.headers["Cache-Control"] = "no-store"
     return resp
 

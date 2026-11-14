@@ -8,24 +8,35 @@
   {# para onde a resposta pode mandar demanda: os setores, as pessoas e os temas (a Nova demanda da Caixa de entrada) #}
   <script type="application/json" data-ia-setores>{{ setores|tojson }}</script>
   <script type="application/json" data-ia-criar-os>{{ criar_os|tojson }}</script>
-  <fieldset class="ia-modelos">
-    <legend>Modelos <span class="mudo">· marque mais de um para comparar</span></legend>
-    {% for m in modelos %}
-    <label class="ia-modelo{% if not m.tem_chave %} ia-modelo--sem{% endif %}" title="{{ m.motivo or (m.provedor_nome ~ ' · ' ~ m.modelo) }}">
-      <input type="checkbox" value="{{ m.id }}" data-ia-modelo{% if not m.tem_chave %} disabled{% elif m.id == com_chave[0].id %} checked{% endif %}>
-      <span class="ia-modelo-nome">{{ m.rotulo }}</span>
-      <span class="ia-modelo-prov">{% if m.tem_chave %}{{ m.provedor_nome }}{% else %}sem chave{% endif %}</span>
-    </label>
-    {% endfor %}
-  </fieldset>
+  {# as perguntas sugeridas lado a lado, no alto (ficam depois da primeira pergunta); o modelo escondido no "i", no canto
+     (14/11/2026, Levi: "pode esconder os modelos da IA. Bora usar como padrão esse Nemotron 3 Ultra [...] o nome,
+     escondido em algum canto [...] na exclamação"). Lá dentro, quem quiser compara com outros modelos #}
+  {% set atual = modelos|selectattr('id', 'equalto', padrao)|first %}
+  <div class="ia-topo">
+    <div class="ia-sugestoes" role="group" aria-label="Perguntas sugeridas">{% for s in sugestoes %}<button type="button" class="ia-sugestao" data-ia-sugestao>{{ s }}</button>{% endfor %}</div>
+    <details class="ia-info">
+      <summary title="O modelo da IA" aria-label="O modelo da IA"><i class="ph ph-info" aria-hidden="true"></i></summary>
+      <div class="ia-info-caixa">
+        <p class="ia-info-t">{% if atual %}Responde: <b>{{ atual.rotulo }}</b> <span class="mudo">({{ atual.provedor_nome }})</span>{% else %}Nenhuma IA com chave neste servidor.{% endif %}</p>
+        <fieldset class="ia-modelos">
+          <legend>Comparar <span class="mudo">· marque mais de um para ver lado a lado</span></legend>
+          {% for m in modelos %}
+          <label class="ia-modelo{% if not m.tem_chave %} ia-modelo--sem{% endif %}" title="{{ m.motivo or (m.provedor_nome ~ ' · ' ~ m.modelo) }}">
+            <input type="checkbox" value="{{ m.id }}" data-ia-modelo{% if not m.tem_chave %} disabled{% elif m.id == padrao %} checked{% endif %}>
+            <span class="ia-modelo-nome">{{ m.rotulo }}</span>
+            <span class="ia-modelo-prov">{% if m.tem_chave %}{{ m.provedor_nome }}{% else %}sem chave{% endif %}</span>
+          </label>
+          {% endfor %}
+        </fieldset>
+      </div>
+    </details>
+  </div>
   {% if not com_chave %}
   <div class="ia-aviso" role="status"><i class="ph ph-key" aria-hidden="true"></i><div>
     <strong>Nenhuma IA ligada neste servidor.</strong> Cada provedor precisa da chave dele no <span class="gc-dado">.env</span>:
     {% for m in modelos|unique(attribute='provedor') %}{{ m.motivo }}{{ ' ' if not loop.last }}{% endfor %}</div></div>
   {% endif %}
 
-  {# as perguntas sugeridas lado a lado, no alto, e ficam depois da primeira pergunta (14/11/2026, Levi) #}
-  <div class="ia-sugestoes" role="group" aria-label="Perguntas sugeridas">{% for s in sugestoes %}<button type="button" class="ia-sugestao" data-ia-sugestao>{{ s }}</button>{% endfor %}</div>
   <div class="ia-conversa" data-ia-conversa aria-live="polite">
     <div class="ia-vazio" data-ia-vazio>
       <p class="ia-vazio-t">Pergunte sobre a {{ x.usina }}.</p>

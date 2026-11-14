@@ -604,6 +604,23 @@ Gemini, Groq, Grok [...] Qualquer IA que dê para puxar a API para fazermos o te
 Prova: `tests/test_comando_ia.py` (cada provedor no formato dele, com dublês; a rota, o teto, o registro, a rodada; a
 troca entre as grátis; o Criar OS e as sugestões na janela).
 
+- **14/11/2026 à noite (Levi):**
+  - O botão virou **"Pergunte à Nexus IA"**.
+  - **Os modelos ficam escondidos no "i"**, no canto da janela ("pode esconder os modelos da IA. Bora usar como padrão
+    esse Nemotron 3 Ultra [...] escondido em algum canto [...] na exclamação"). O "i" diz quem responde e, dentro dele,
+    dá para marcar outros modelos e comparar.
+    - O modelo marcado é o `NEXUS_IA_PADRAO` (padrão `nemotron`), se ele tem chave; senão, o primeiro com chave
+      (`ia.padrao`).
+    - O Nemotron 3 Ultra entrou no OpenRouter em 04/06/2026.
+  - **O relatório do tema da conversa** ("Quando responder temas relacionados diretamente a setores [...] baixar
+    relatório de religamento, de COS, de performance"): embaixo da resposta vem "Baixar relatório de ..." com o PDF do
+    prontuário só daquele tema (`temas_da_conversa`).
+    - O tema vem pela pergunta. Sem tema nela, vale o tema que a resposta cita 2 vezes ou mais. O "os" não conta: é
+      artigo ou OS de qualquer tema.
+    - O COS e as normalizações levam ao tema Paradas e religamentos.
+    - O mês é o que a pergunta cita; sem isso, o mês corrente (`mes_da_conversa`).
+    - Ainda não há um tema de Engenharia no PDF.
+
 ## O diagnóstico do dia da IA no prontuário (14/11/2026; `nexus/comando/diagnostico.py`)
 
 Levi, 14/11/2026: "Sempre que a pessoa for abrir o prontuário da usina, abrir o diagnóstico da IA [...] Se a pessoa abrir

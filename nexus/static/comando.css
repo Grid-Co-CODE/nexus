@@ -753,6 +753,18 @@ a.ins-titulo:hover{color:var(--verde-texto)}
 .pu-jan:has([data-ia]){width:min(1240px,calc(100vw - 32px))}
 .ia{display:grid;gap:12px}
 .ia-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.ia-topo{position:relative;display:flex;align-items:flex-start;gap:10px}
+.ia-topo .ia-sugestoes{flex:1 1 auto;min-width:0}
+.ia-info{flex:none}
+.ia-info>summary{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:50%;
+  border:1px solid var(--linha-forte);color:var(--tinta-2);cursor:pointer;list-style:none;font-size:15px}
+.ia-info>summary::-webkit-details-marker{display:none}
+.ia-info>summary:hover,.ia-info[open]>summary{color:var(--tinta);border-color:var(--tinta-2)}
+.ia-info-caixa{position:absolute;right:0;top:34px;z-index:5;width:min(560px,100%);padding:12px 14px;background:var(--superficie);
+  border:1px solid var(--linha-forte);border-radius:var(--raio-md);box-shadow:0 10px 30px rgba(0,0,0,.35)}
+.ia-info-t{margin:0 0 10px;font-size:13px;color:var(--tinta)}
+.ia-rel-ofertas{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+.ia-rel-oferta .mudo{font-weight:400}
 .ia-modelos{display:flex;flex-wrap:wrap;gap:6px;margin:0;padding:0;border:0}
 .ia-modelos legend{padding:0;margin:0 0 6px;font:700 11px/14px var(--font-sans);letter-spacing:.05em;text-transform:uppercase;color:var(--mudo)}
 .ia-modelos legend .mudo{text-transform:none;letter-spacing:0;font-weight:500}
