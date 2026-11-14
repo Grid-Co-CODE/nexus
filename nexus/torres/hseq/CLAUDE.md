@@ -464,8 +464,8 @@ assinatura).
 que não casam com o cadastro, os que casaram só pelo primeiro e último nome (para conferir) e os valores que o Nexus
 não reconhece. Gravar pede o arquivo de novo e grava só o que muda (a mesma planilha duas vezes não grava nada). O nome
 casa com o nome completo da ficha, sem o "- PJ" do fim; senão, com o primeiro e o último nome quando são de uma ficha só
-E a planilha traz ao menos 3 nomes (13/11/2026: "Pedro Silva" casava com "Pedro da Silva", e com dois nomes comuns não
-dá para saber); nunca chuta. As linhas de legenda da planilha (com "=" ou terminadas em ":") não são pessoa: a
+E a planilha traz ao menos 3 nomes (13/11/2026, com nome inventado: "Fulano Souza" casava com "Fulano de Souza", e
+com dois nomes comuns não dá para saber); nunca chuta. As linhas de legenda da planilha (com "=" ou terminadas em ":") não são pessoa: a
 conferência só as conta. A
 coluna CPF (o número), e-mail, telefone, obs e os exames da aba de saúde não entram; o documento CPF é a CPF2 (nos
 demitidos, a "Coluna1"). Pessoa em duas abas: vale a data mais nova. A aba de terceiros (com a coluna EMPRESA) fica

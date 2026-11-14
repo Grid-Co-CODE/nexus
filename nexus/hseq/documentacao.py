@@ -395,8 +395,9 @@ def nome_da_pessoa(nome) -> str:
 
 def casar(nome, indice) -> tuple[int | None, str]:
     """(pessoa_id, como casou) ou (None, por quê). Nunca chuta: duas fichas com o mesmo nome não casam, e o primeiro e
-    o último nome só casam quando a planilha traz ao menos 3 nomes. Caso real (13/11/2026): "Pedro Silva" na planilha
-    casava com "Pedro da Silva" do cadastro; com dois nomes comuns, não dá para saber se é a mesma pessoa."""
+    o último nome só casam quando a planilha traz ao menos 3 nomes. Caso real (13/11/2026), com nome inventado:
+    "Fulano Souza" na planilha casava com "Fulano de Souza" do cadastro; com dois nomes comuns, não dá para saber se é
+    a mesma pessoa."""
     completo, curto = indice
     n = _norm(nome_da_pessoa(nome))
     ids = completo.get(n) or []
