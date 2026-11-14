@@ -605,10 +605,11 @@ def test_ver_percurso_desenha_o_periodo_na_ordem_com_a_hora_e_registra(cliente, 
     lado = html.split('class="eq-lado"', 1)[1]
     # a lista conta o percurso por usina (Levi, 11/11/2026: "deve ser mais generalista por exemplo 'Chegou na UFV X',
     # 'Saiu da Usina X'"; `eventos.do_percurso`): andando às 9h, parado fora de usina às 10h, andando até as 11:59
-    itens = re.findall(r'<li class="eq-perc-item eq-perc-item--(\w+)">(.*?)</li>', lado, flags=re.S)
-    assert [(t, re.sub(r"\s+", " ", re.sub(r"<[^>]+>", "", i)).strip()) for t, i in itens] == [
-        ("inicio", "09:00 Primeira posição, em deslocamento"), ("parado", "10:00 Parado fora de usina"),
-        ("ultimo", "11:59 Última posição, em deslocamento")]
+    # desde 13/11/2026 uma linha do tempo curta ("Entrou, saiu, voltou")
+    itens = re.findall(r'<li class="eq-tl-item eq-tl-item--(\w+)">(.*?)</li>', lado, flags=re.S)
+    assert [(t, re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", i)).strip()) for t, i in itens] == [
+        ("inicio", "09:00 Começou em deslocamento"), ("parado", "10:00 Parado fora de usina"),
+        ("ultimo", "11:59 Terminou em deslocamento")]
     assert "4 pontos" in lado and "Fechar o percurso" in lado
     assert not [d for d in (*DIGITOS, *DIGITOS_MANHA) if d in html]
     (a,) = _acessos(manha)

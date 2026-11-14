@@ -185,43 +185,54 @@ def test_o_percurso_conta_o_dia_por_usina_com_a_regra_dos_eventos():
     pontos = [_p(6, 40, CASA), _p(6, 50, CASA), _p(7, 0, ESTRADA, mov=True), _p(7, 30, NA_A),
               _p(9, 0, NA_A), _p(9, 10, ESTRADA, mov=True), _p(9, 20, ESTRADA), _p(9, 25, ESTRADA),
               _p(9, 30, ESTRADA, mov=True), _p(10, 5, NA_B)]
+    # a linha do tempo (Levi, 13/11/2026: "Tá com muito texto. Eu queria mais essa visão de linha do tempo mesmo [...]
+    # Entrou, saiu, voltou"): o texto é o que aconteceu e onde; o tempo vai num detalhe curto
     assert _percurso(pontos) == [
         ("cidade", "06:40", "06:50", "Em Cidade Um Teste"),
-        ("chegou", "07:30", "07:30", "Chegou na Usina Alfa Teste, depois de 40 min de deslocamento"),
-        ("saiu", "09:00", "09:00", "Saiu da Usina Alfa Teste, depois de 1 h 30 na usina"),
+        ("chegou", "07:30", "07:30", "Entrou na Usina Alfa Teste"),
+        ("saiu", "09:00", "09:00", "Saiu da Usina Alfa Teste"),
         ("parado", "09:20", "09:25", "Parado fora de usina"),
-        ("chegou", "10:05", "10:05", "Chegou na Usina Bravo Teste, depois de 1 h 05 de deslocamento"),
+        ("chegou", "10:05", "10:05", "Entrou na Usina Bravo Teste"),
+    ]
+    itens = EV.do_percurso(pontos, USINAS, NOMES, cidade=_cidade)
+    assert [(i["acao"], i["lugar"], i["detalhe"], i["repete"]) for i in itens] == [
+        ("Em", "Cidade Um Teste", "", False),
+        ("Entrou", "Usina Alfa Teste", "40 min de deslocamento", False),
+        ("Saiu", "Usina Alfa Teste", "1 h 30 na usina", True),            # o lugar da linha de cima: a tela não repete
+        ("Parado", "fora de usina", "", False),
+        ("Entrou", "Usina Bravo Teste", "1 h 05 de deslocamento", False),
     ]
 
 
 def test_o_percurso_chama_de_ufv_a_usina_sem_ufv_no_nome_e_fecha_no_ultimo_ponto():
-    """O nome do cadastro em geral não diz "UFV" ("Altair", "Ipixuna 1 e 2"): o texto diz "Chegou na UFV Altair". O
-    nome que já diz UFV ou Usina fica como está. Começar na usina é "Primeira posição, na UFV X"; o período que termina
-    andando fecha com a última posição; a parada fora de usina diz a cidade."""
+    """O nome do cadastro em geral não diz "UFV" ("Altair", "Ipixuna 1 e 2"): o texto diz "Entrou na UFV Altair". O
+    nome que já diz UFV ou Usina fica como está. Começar na usina é "Começou na UFV X"; o período que termina
+    andando fecha com "Terminou em deslocamento"; a parada fora de usina diz a cidade."""
     nomes = {"7": "Altair Teste", "8": "UFV Bravo Teste"}
     pontos = [_p(8, 0, NA_A), _p(8, 30, NA_A), _p(8, 40, ESTRADA, mov=True), _p(9, 0, CASA), _p(9, 5, CASA),
               _p(9, 10, ESTRADA, mov=True), _p(10, 0, NA_B), _p(10, 30, NA_B), _p(10, 40, ESTRADA, mov=True)]
     itens = [(i["tipo"], i["de"], i["ate"], i["texto"])
              for i in EV.do_percurso(pontos, USINAS, nomes, cidade=_cidade)]
     assert itens == [
-        ("inicio", "08:00", "08:00", "Primeira posição, na UFV Altair Teste"),
+        ("inicio", "08:00", "08:00", "Começou na UFV Altair Teste"),
         ("saiu", "08:30", "08:30", "Saiu da UFV Altair Teste"),
         ("cidade", "09:00", "09:05", "Em Cidade Um Teste"),
-        ("chegou", "10:00", "10:00", "Chegou na UFV Bravo Teste, depois de 1 h 30 de deslocamento"),
-        ("saiu", "10:30", "10:30", "Saiu da UFV Bravo Teste, depois de 30 min na usina"),
-        ("ultimo", "10:40", "10:40", "Última posição, em deslocamento"),
+        ("chegou", "10:00", "10:00", "Entrou na UFV Bravo Teste"),
+        ("saiu", "10:30", "10:30", "Saiu da UFV Bravo Teste"),
+        ("ultimo", "10:40", "10:40", "Terminou em deslocamento"),
     ]
-    # cada linha só com tipo, horas, texto e a usina: nenhuma coordenada
-    assert all(set(i) == {"tipo", "de", "ate", "texto", "usina_id"} for i in EV.do_percurso(pontos, USINAS, nomes))
+    # cada linha só com tipo, horas, o texto em partes e a usina: nenhuma coordenada
+    assert all(set(i) == {"tipo", "de", "ate", "texto", "acao", "lugar", "detalhe", "repete", "usina_id"}
+               for i in EV.do_percurso(pontos, USINAS, nomes))
 
 
 def test_o_percurso_de_mais_de_um_dia_leva_a_data_e_sem_ponto_e_vazio():
     pontos = [_p(8, 0, NA_A), {**_p(8, 0, NA_B), "instante": "2026-11-11T12:00:00Z"}]
     itens = EV.do_percurso(pontos, USINAS, NOMES)
     # quem sai já no 1º ponto não ganha a "Primeira posição" no mesmo minuto: a saída diz de onde ele partiu
-    assert [(i["de"], i["texto"]) for i in itens] == [
-        ("10/11 08:00", "Saiu da Usina Alfa Teste"),
-        ("11/11 09:00", "Chegou na Usina Bravo Teste, depois de 25 h 00 de deslocamento")]
+    assert [(i["de"], i["texto"], i["detalhe"]) for i in itens] == [
+        ("10/11 08:00", "Saiu da Usina Alfa Teste", ""),
+        ("11/11 09:00", "Entrou na Usina Bravo Teste", "25 h 00 de deslocamento")]
     assert EV.do_percurso([], USINAS, NOMES) == []
 
 
@@ -236,5 +247,24 @@ def test_quem_fica_na_cidade_o_dia_todo_tem_uma_linha_so():
     # andando no começo e no fim, num ponto sem cidade: a primeira e a última posição em deslocamento
     pontos = [_p(8, 0, ESTRADA, mov=True), _p(8, 10, CASA), _p(8, 20, CASA), _p(8, 30, ESTRADA, mov=True)]
     assert _percurso(pontos) == [
-        ("inicio", "08:00", "08:00", "Primeira posição, em deslocamento"), ("cidade", "08:10", "08:20", "Em Cidade Um Teste"),
-        ("ultimo", "08:30", "08:30", "Última posição, em deslocamento")]
+        ("inicio", "08:00", "08:00", "Começou em deslocamento"), ("cidade", "08:10", "08:20", "Em Cidade Um Teste"),
+        ("ultimo", "08:30", "08:30", "Terminou em deslocamento")]
+
+
+def test_quem_sai_e_volta_a_mesma_usina_voltou():
+    """Levi, 13/11/2026, com a lista da Matões 200 ("Chegou na UFV Matões 200, depois de 14 min de deslocamento", "Saiu
+    da UFV Matões 200, depois de 22 min na usina"...): "Entrou, saiu, voltou, entendeu? Eu acho que não tem necessidade
+    de muito texto". Quem volta à usina de onde acabou de sair VOLTOU, e o detalhe diz quanto tempo ficou fora."""
+    pontos = [_p(7, 18, CASA), _p(7, 20, NA_A), _p(10, 44, NA_A), _p(10, 50, ESTRADA, mov=True), _p(10, 58, NA_A),
+              _p(11, 20, NA_A), _p(11, 22, ESTRADA, mov=True), _p(11, 24, NA_A), _p(11, 30, NA_A)]
+    itens = EV.do_percurso(pontos, USINAS, NOMES, cidade=_cidade)
+    assert [(i["de"], i["acao"], i["detalhe"], i["repete"]) for i in itens] == [
+        ("07:18", "Em", "", False),
+        ("07:20", "Entrou", "2 min de deslocamento", False),
+        ("10:44", "Saiu", "3 h 24 na usina", True),
+        ("10:58", "Voltou", "14 min fora", True),
+        ("11:20", "Saiu", "22 min na usina", True),
+        ("11:24", "Voltou", "4 min fora", True),
+    ]
+    assert itens[3]["texto"] == "Voltou à Usina Alfa Teste"
+

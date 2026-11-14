@@ -2153,15 +2153,22 @@ tr.rd-linha--ativa td{background:var(--verde-suave)}
 .eq-perc-resumo{margin:0;color:var(--tinta)}
 .eq-perc-cidades{margin:0;font-size:12.5px;color:var(--tinta-2);overflow-wrap:anywhere}
 .eq-perc-cidades span{color:var(--mudo)}
-.eq-perc-lista{list-style:none;margin:0;padding:0;display:grid;gap:2px;max-height:320px;overflow:auto;
-  font-variant-numeric:tabular-nums}
-.eq-perc-item{display:grid;grid-template-columns:auto minmax(0,1fr);gap:10px;padding:4px 0;border-bottom:1px solid var(--linha)}
-.eq-perc-item b{font-weight:600;color:var(--tinta)}
-.eq-perc-quando{color:var(--mudo);white-space:nowrap}
-.eq-perc-item span{color:var(--mudo);overflow-wrap:anywhere}
-/* a chegada e a saída da usina são o que importa no percurso (11/11/2026): a cor do texto; a chegada com o verde */
-.eq-perc-item--chegou span,.eq-perc-item--saiu span{color:var(--tinta)}
-.eq-perc-item--chegou b{color:var(--verde-texto)}
+/* a linha do tempo do percurso (13/11/2026, Levi: "Entrou, saiu, voltou"): a hora à esquerda, um fio com a marca de
+   cada evento (cheia na entrada, vazada na saída, pequena no resto) e o texto curto, com o tempo em letra pequena */
+.eq-tl{list-style:none;margin:0;padding:2px 0;max-height:360px;overflow:auto;overscroll-behavior:contain}
+.eq-tl-item{position:relative;display:grid;grid-template-columns:44px 14px minmax(0,1fr);gap:0 10px;align-items:start;padding:0 0 12px}
+.eq-tl-item::before{content:"";position:absolute;left:calc(44px + 10px + 6px);top:14px;bottom:-2px;width:2px;background:var(--linha-forte)}
+.eq-tl-item:last-child::before{display:none}
+.eq-tl-hora{font:600 13px/20px var(--font-mono);color:var(--tinta);font-variant-numeric:tabular-nums;white-space:nowrap}
+.eq-tl-hora small{display:block;font:500 11px/14px var(--font-mono);color:var(--mudo)}
+.eq-tl-marca{position:relative;z-index:1;width:10px;height:10px;margin:5px 2px 0;border-radius:50%;background:var(--superficie);
+  border:2px solid var(--mudo);box-sizing:border-box}
+.eq-tl-item--chegou .eq-tl-marca,.eq-tl-item--inicio .eq-tl-marca{background:var(--verde);border-color:var(--verde)}
+.eq-tl-item--saiu .eq-tl-marca{border-color:var(--verde)}
+.eq-tl-item--cidade .eq-tl-marca,.eq-tl-item--parado .eq-tl-marca,.eq-tl-item--ultimo .eq-tl-marca{width:8px;height:8px;margin:6px 3px 0}
+.eq-tl-txt{min-width:0;font-size:14px;line-height:20px;color:var(--tinta-2);overflow-wrap:anywhere}
+.eq-tl-txt b{font-weight:600;color:var(--tinta)}
+.eq-tl-txt small{display:block;font-size:12px;line-height:16px;color:var(--mudo)}
 .eq-perc-form{display:grid;gap:8px;padding-top:12px;border-top:1px solid var(--linha)}
 .eq-perc-form .gc-campo{width:100%;min-width:0}
 /* De e Até lado a lado (Levi, 12/11/2026: "podem facilmente ficar lado a lado, assim evitaria gastar mais espaço") */

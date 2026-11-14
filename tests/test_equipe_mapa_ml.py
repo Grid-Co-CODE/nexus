@@ -105,8 +105,8 @@ def test_o_percurso_vai_ao_mapa_com_os_marcos(cliente, pontos, setor, com_mapa_b
     p = d["percurso"]
     assert len(p["linha"]) == 4 and [x["hora"] for x in p["pontos"]] == ["09:00", "10:00", "11:00", "11:59"]
     assert [(m["tipo"], m["texto"]) for m in p["marcos"]] == [
-        ("inicio", "Primeira posição, em deslocamento"), ("parado", "Parado fora de usina"),
-        ("ultimo", "Última posição, em deslocamento")]
+        ("inicio", "Começou em deslocamento"), ("parado", "Parado fora de usina"),
+        ("ultimo", "Terminou em deslocamento")]
     assert all(len(m["c"]) == 2 for m in p["marcos"]) and len(p["caixa"]) == 4
     assert 'data-eq-zoom="percurso"' in html
     assert [a["acao"] for a in _acessos(pontos)][-1] == "abriu_percurso"

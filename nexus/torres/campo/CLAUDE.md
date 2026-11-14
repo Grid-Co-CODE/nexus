@@ -1939,11 +1939,19 @@ Pedido do Levi pela sessão Nexus Field (ver a 1ª regra acima). **Ver percurso*
 - **A lista da gaveta conta o percurso por usina** (Levi, 11/11/2026: "O percurso do técnico deve ser mais generalista
   por exemplo 'Chegou na UFV X', 'Saiu da Usina X', 'Chegou na UFV X'"; antes, de 10/11, era ponto a ponto agrupado:
   "de 10:28 a 16:38 parado"). `eventos.do_percurso`, pela MESMA regra dos eventos do dia (a usina é o raio de 1 km, a
-  saída é o último ponto nela, a chegada o 1º ponto na outra): a primeira posição, "Saiu da UFV X, depois de 1 h 30 na
-  usina" (o tempo só quando a chegada está no período), "Chegou na UFV Y, depois de 40 min de deslocamento" (contado
-  da saída da usina anterior, ou do lugar do início, nunca da parada no caminho) e, se o período termina andando,
-  "Última posição, em deslocamento". O trecho andando fica implícito. O nome ganha "UFV" na frente quando o do cadastro
-  não diz UFV nem Usina.
+  saída é o último ponto nela, a chegada o 1º ponto na outra). O trecho andando fica implícito. O nome ganha "UFV" na
+  frente quando o do cadastro não diz UFV nem Usina.
+- **A lista é uma LINHA DO TEMPO: Entrou, Saiu, Voltou (13/11/2026**, Levi, com a lista da Matões 200 cheia de "Chegou
+  na UFV X, depois de 2 min de deslocamento" / "Saiu da UFV X, depois de 3 h 24 na usina": "Tá com muito texto. Eu
+  queria mais essa visão de linha do tempo mesmo [...] Entrou, saiu, voltou"). Cada linha do `do_percurso` traz, além
+  do `texto` (a frase curta, a do marco no mapa: "Entrou na UFV X", "Saiu da UFV X", "Voltou à UFV X", "Começou na UFV
+  X" / "Começou em deslocamento", "Em <cidade>", "Parado fora de usina", "Terminou em deslocamento"), as partes
+  `acao`, `lugar`, `detalhe` (o tempo, curto: "40 min de deslocamento", "1 h 30 na usina", "14 min fora") e `repete`
+  (o lugar é o da linha de cima). **Voltou** = chegar de novo à usina de onde acabou de sair; o detalhe é o tempo fora.
+  A gaveta (`.eq-tl`) desenha a hora (com "até HH:MM" no trecho), um fio com a marca (cheia na entrada e no começo,
+  vazada na saída, pequena no resto), a ação em negrito, o lugar SÓ quando muda e o detalhe em letra pequena. O tempo
+  na usina só aparece quando a chegada está no período; o deslocamento conta da saída da usina anterior (ou do lugar
+  do início), nunca da parada no caminho.
 - **Fora de usina, uma linha por cidade: "Em <cidade>" (12/11/2026**, Levi, com a lista repetindo "Parado em
   Guaratinguetá": "deixa bem simples e direto, 'Em garatinguetá' se ele ficou o dia todo vai aparecer só isso o dia
   todo!"; de 11/11 a 12/11 era uma linha "Parado em <cidade>" por parada). As paradas seguidas na mesma cidade viram UMA

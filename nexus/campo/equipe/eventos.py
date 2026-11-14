@@ -30,8 +30,8 @@ eventos, num período qualquer (não só hoje) e sem o destino nem o sem sinal: 
 tempo que ficou nela quando a chegada está no período; ou do lugar do início fora de usina), a chegada (com o tempo de
 deslocamento desde a última saída), cada parada fora de usina no caminho (com a cidade e o intervalo: os pontos parados
 seguidos, a mesma junção da lista de antes) e, se o período termina andando, a última posição. O trecho andando fica
-implícito entre a saída e a chegada. O nome da usina ganha "UFV" na frente quando não diz UFV nem Usina ("Chegou na UFV
-Altair").
+implícito entre a saída e a chegada. O nome da usina ganha "UFV" na frente quando não diz UFV nem Usina ("Entrou na UFV
+Altair"). Desde 13/11/2026 a lista é uma linha do tempo curta: Entrou, Saiu, Voltou (ver `do_percurso`).
 
 **O formato serve a outra tela** (o videowall do COS, se um dia quiser): cada evento é um dict com `instante` (UTC, com
 Z), `hora` (Brasília), `pessoa_id`, `tipo`, `texto`, `rotulo`, `tom`, `usina_id`, `destino_usina_id`, `destino` (o
@@ -174,19 +174,24 @@ def _ufv(nome) -> str:
 
 def do_percurso(pontos: list, usinas: dict, nomes_usina: dict, *, cidade=None, com_ponto=False) -> list:
     """O percurso de um período contado por usina e por cidade: [{"tipo" (inicio, saiu, chegou, cidade, parado, ultimo),
-    "de", "ate" (a hora de Brasília; "dd/mm HH:MM" se o período passa de um dia; iguais num ponto só), "texto",
-    "usina_id"}], na ordem. `pontos` com instante, lat, lon e mov (a trilha do `Servico.percurso`); `usinas` = {usina_id:
+    "de", "ate" (a hora de Brasília; "dd/mm HH:MM" se o período passa de um dia; iguais num ponto só), "texto" (a frase
+    curta, a do marco no mapa), "acao", "lugar", "detalhe" (o tempo, curto), "repete" (o lugar é o da linha de cima: a
+    lista não o repete), "usina_id"}], na ordem. `pontos` com instante, lat, lon e mov (a trilha do `Servico.percurso`); `usinas` = {usina_id:
     (lat, lon, uf)}; `cidade(lat, lon) -> nome | None`. `com_ponto`: cada linha leva também `ponto`, o índice na lista em
     ordem do ponto do marco (o mapa de verdade põe a coordenada dele).
 
     A usina (11/11/2026): a regra de `do_tecnico` (o raio de 1 km; a saída é o último ponto nela, a chegada o 1º na
-    outra), com "Chegou na UFV X, depois de N de deslocamento" e "Saiu da UFV X, depois de N na usina".
+    outra): "Entrou na UFV X" (detalhe "N de deslocamento"), "Saiu da UFV X" (detalhe "N na usina").
     Fora de usina (Levi, 12/11/2026: "Fica repetindo parado em guaratinguetá... deixa bem simples e direto, 'Em
     garatinguetá' se ele ficou o dia todo vai aparecer só isso o dia todo!"): as paradas seguidas na mesma cidade viram
     UMA linha "Em <cidade>", do primeiro ao último ponto dela; o andar entre elas não quebra a linha, e o começo e o fim
     do período andando entram nela quando o ponto é da mesma cidade (a cidade só se lê nos pontos parados e nas duas
     pontas). Parada sem cidade: "Parado fora de usina". O deslocamento da chegada conta da saída da usina anterior (ou
-    do lugar do início), não da parada no caminho."""
+    do lugar do início), não da parada no caminho.
+    A linha do tempo (Levi, 13/11/2026: "Tá com muito texto. Eu queria mais essa visão de linha do tempo mesmo [...]
+    Entrou, saiu, voltou"): o texto é o que aconteceu e onde ("Entrou na UFV X", "Saiu da UFV X", "Voltou à UFV X" quando
+    volta à usina de onde acabou de sair, "Começou"/"Terminou"), e o tempo vai num detalhe curto ("40 min de
+    deslocamento", "1 h 30 na usina", "14 min fora")."""
     lista = sorted(pontos, key=lambda p: p["instante"])
     if not lista:
         return []
@@ -210,10 +215,16 @@ def do_percurso(pontos: list, usinas: dict, nomes_usina: dict, *, cidade=None, c
         return _tempo(round((_inst(lista[b]) - _inst(lista[a])).total_seconds() / 60))
 
     out = []
+    # a preposição de cada ação na frase do marco ("Entrou na", "Saiu da", "Voltou à"; a usina tem o nome com UFV/Usina)
+    _PREP = {"Entrou": "na", "Saiu": "da", "Voltou": "à", "Começou": "na", "Em": "", "Parado": "", "Terminou": ""}
 
-    def item(tipo, a, b, texto, usina=None):
+    def item(tipo, a, b, acao, lugar, detalhe="", usina=None):
+        prep = _PREP.get(acao, "") if usina is not None else ""
+        texto = " ".join(x for x in (acao, prep, lugar) if x)
         linha = {"tipo": tipo, "de": _inst(lista[a]).astimezone(_BRT).strftime(fmt),
-                 "ate": _inst(lista[b]).astimezone(_BRT).strftime(fmt), "texto": texto, "usina_id": usina}
+                 "ate": _inst(lista[b]).astimezone(_BRT).strftime(fmt), "texto": texto, "acao": acao, "lugar": lugar,
+                 "detalhe": detalhe, "repete": bool(out) and usina is not None and out[-1]["usina_id"] == usina,
+                 "usina_id": usina}
         if com_ponto:
             linha["ponto"] = a
         out.append(linha)
@@ -227,22 +238,20 @@ def do_percurso(pontos: list, usinas: dict, nomes_usina: dict, *, cidade=None, c
         estadas.append((lugares[k], k, f))
         k = f + 1
     partida = None              # o índice do ponto da última saída (a da usina, ou a do lugar do início)
+    saiu_de = None              # a usina da última saída: chegar de novo nela é "Voltou"
     for e, (u, a, b) in enumerate(estadas):
         primeira, ultima = e == 0, e == len(estadas) - 1
         if u is not None:
             if primeira and not (a == b and not ultima):
-                item("inicio", a, a, f"Primeira posição, na {nome(u)}", u)
+                item("inicio", a, a, "Começou", nome(u), usina=u)
             elif not primeira:
-                texto = f"Chegou na {nome(u)}"
-                if partida is not None:
-                    texto += f", depois de {minutos(partida, a)} de deslocamento"
-                item("chegou", a, a, texto, u)
+                volta = saiu_de == u
+                fora = minutos(partida, a) if partida is not None else ""
+                detalhe = (f"{fora} fora" if volta else f"{fora} de deslocamento") if fora else ""
+                item("chegou", a, a, "Voltou" if volta else "Entrou", nome(u), detalhe, u)
             if not ultima:
-                texto = f"Saiu da {nome(u)}"
-                if not primeira:
-                    texto += f", depois de {minutos(a, b)} na usina"
-                item("saiu", b, b, texto, u)
-                partida = b
+                item("saiu", b, b, "Saiu", nome(u), "" if primeira else f"{minutos(a, b)} na usina", u)
+                partida, saiu_de = b, u
             continue
         # fora de usina: os grupos pela cidade dos pontos parados (o andar entre eles fica no grupo)
         grupos = []                 # [cidade, primeiro, último]
@@ -259,17 +268,17 @@ def do_percurso(pontos: list, usinas: dict, nomes_usina: dict, *, cidade=None, c
             if grupos and grupos[0][0] is not None and cid(a) == grupos[0][0]:
                 grupos[0][1] = a
             else:
-                item("inicio", a, a, "Primeira posição, em deslocamento")
+                item("inicio", a, a, "Começou", "em deslocamento")
         fim_andando = ultima and (not grupos or grupos[-1][2] < b)
         if fim_andando and grupos and grupos[-1][0] is not None and cid(b) == grupos[-1][0]:
             grupos[-1][2] = b
             fim_andando = False
         for c, ga, gb in grupos:
-            item("cidade" if c else "parado", ga, gb, f"Em {c}" if c else "Parado fora de usina")
+            item("cidade" if c else "parado", ga, gb, "Em" if c else "Parado", c or "fora de usina")
         if primeira and grupos:
             partida = grupos[0][2]
         if fim_andando and not (primeira and a == b and not grupos):
-            item("ultimo", b, b, "Última posição, em deslocamento")
+            item("ultimo", b, b, "Terminou", "em deslocamento")
     return out
 
 
