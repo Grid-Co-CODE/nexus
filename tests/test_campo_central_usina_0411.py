@@ -16,6 +16,7 @@ from test_campo_responsaveis import HOJE, _chamado, _por_usina, tela  # noqa: F4
 from test_campo_visao import _aba, banco  # noqa: F401  (banco é fixture)
 
 from nexus.campo import central_usina as CU
+from nexus.campo import relatorio_usina as RU
 from nexus.campo import responsaveis as R
 from nexus.campo import visao
 from nexus.dados import fato_chamado as F
@@ -362,6 +363,38 @@ def test_o_pdf_leva_as_paradas_do_mes_com_o_que_aconteceu():
                            "parou": True, "os": "19150", "protecoes": "27", "relato": ""}]}
     assert "O COS registrou 2 paradas no mês, 2 com a geração parada." in RU._resumo(d, ("religamentos",))
     corpo = RU._religamentos(d, RU._estilos(), RU.CHAVES_CAMPOS)
-    assert len(corpo) == 2 and "27 (2x), 59 (1x)" in corpo[1].text
+    # a explicação do religamento, os quatro números, a tabela e as proteções (título + tabela)
+    assert "a volta é o religamento" in corpo[0].text and len(corpo) == 7
     pdf = RU.gerar(d, ("religamentos",), gerado_em="14/11/2026 às 15:00", campos=("religamentos_lista",))
     assert pdf[:4] == b"%PDF" and len(pdf) > 1000
+
+
+def test_o_que_aconteceu_so_completa_a_linha():
+    """14/11/2026, Levi: "no usina desligada de dia tal a tal hora [...] já diz o período [...] Não precisa repetir
+    quando voltou [...] no que aconteceu só complementa". As frases-modelo da Ronda COS, como estão no banco."""
+    p = RU.relato_partes("Usina desligada de 02/11 às 21:40 a 03/11 às 08:51 (11 h 11 min). Causa: atuação da proteção "
+                         "de sobretensão (59) no relé da usina. A usina voltou a gerar em 03/11 às 08:51, após o reset do "
+                         "relé e o religamento no local. Foi aberto um chamado com a concessionária (nº 4471).")
+    assert p == {"rotulo": "Usina desligada", "causa": "Atuação da proteção de sobretensão (59) no relé da usina",
+                 "volta": "Voltou a funcionar após o reset do relé e o religamento no local.", "jeito": "local",
+                 "extras": ["Foi aberto um chamado com a concessionária (nº 4471)."]}
+    p = RU.relato_partes("Perda de comunicação com a usina de 05/11 às 09:35 a 05/11 às 15:30 (5 h 55 min), sem impacto "
+                         "na geração. Causa: falha no equipamento de comunicação local da usina. Em 05/11 às 15:30, a "
+                         "comunicação foi restabelecida. Normalizada em 05/11 às 15:40.")
+    assert (p["rotulo"], p["volta"], p["extras"], p["jeito"]) == (
+        "Perda de comunicação", "A comunicação foi restabelecida.", ["Sem impacto na geração."], None)
+    p = RU.relato_partes("Usina desligada de 09/11 às 15:05 a 09/11 às 15:09 (4 min). A usina voltou a gerar em 09/11 às "
+                         "15:09, religada remotamente pelo COS.")
+    assert (p["volta"], p["jeito"], p["causa"]) == ("Voltou a funcionar pelo religamento remoto, feito pelo COS.", "remoto", "")
+    # a volta sem o "como" sai inteira (a hora já está no Período); a continuação traz a causa no fim
+    p = RU.relato_partes("Continuação: Cabine 1 e Cabine 2 desligadas de 04/11 às 00:00 a 04/11 às 10:15, por atuação da "
+                         "proteção de subtensão (27). A Cabine 1 e a Cabine 2 voltaram a gerar em 04/11 às 10:15.")
+    assert p == {"rotulo": "Cabines 1 e 2 desligadas", "causa": "Atuação da proteção de subtensão (27)", "volta": "",
+                 "jeito": None, "extras": []}
+    assert RU._rotulo_curto("Cabine 1, Cabine 2, Cabine 4, Cabine 5 e Cabine 6 desligadas") == "Cabines 1, 2, 4, 5 e 6 desligadas"
+    assert RU.protecoes_do_texto("27ABC;59N, 27") == ["27", "59"] and RU.PROTECAO_NOME["78"] == "Salto de vetor"
+    # nada de hora repetida no texto que vai para a célula
+    texto = RU._o_que_aconteceu(RU.relato_partes("Usina desligada de 02/11 às 21:40 a 03/11 às 08:51 (11 h 11 min). "
+                                                 "A usina voltou a gerar em 03/11 às 08:51, religada no local pela "
+                                                 "equipe de campo."), RU._estilos()).text
+    assert "às" not in texto and "Voltou a funcionar pelo religamento no local, feito pela equipe de campo." in texto

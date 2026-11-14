@@ -1376,8 +1376,27 @@ usinas mobilizadas, para quem abre a Visão (sem o filtro de responsável, de cl
     - `religamentos_protecoes`: as proteções que mais atuaram, com a contagem.
   - O dado é o `fato_normalizacao` do banco (a Ronda COS, `_religamentos_do_mes`), pelos mesmos leitores do prontuário
     (`PR.instante`, `PR.tipo_cos`, `PR.fora_txt`).
-  - "O que aconteceu" é o relato ao cliente da Ronda COS, que já é escrito para o cliente (a causa, a proteção, os
-    horários, a volta remota ou no local). Sem relato, a linha diz que ele não veio.
+  - O desenho (14/11/2026, Levi: "achei meio feinho, mal formatado [...] um negócio explicando religamento, bonitinho
+    mesmo"): uma frase que explica o religamento (remoto, a distância; ou no local, com a equipe de campo) e quatro
+    números (paradas no mês e quantas com a geração parada; religamentos remotos; no local; a proteção que mais atuou).
+  - A tabela tem tudo centralizado, menos o corpo do "O que aconteceu" (o cabeçalho dele também é centralizado). As
+    colunas: o Período (o início e "até" o fim, o início mais o tempo fora), a Parada, o Tempo fora, as Proteções (o
+    número, sem a fase: 27ABC conta como 27), a OS e "O que aconteceu".
+  - **A Parada é o destaque, e "O que aconteceu" só completa** ("no usina desligada de dia tal a tal hora [...] já diz o
+    período [...] Não precisa repetir quando voltou"). `relato_partes` separa o relato da Ronda COS, que é feito de
+    frases-modelo fixas:
+    - a 1ª frase dá o rótulo da Parada, com o equipamento ("Inversor 7.1 desligado"; várias cabines viram "Cabines 1,
+      2 e 4", `_rotulo_curto`);
+    - a Parada tem o fundo claro da cor dela: a usina inteira em crítico, uma parte em alerta, sem a geração parada em
+      neutro;
+    - na célula ficam só a causa, como voltou (em verde, sem a hora: "Voltou a funcionar após o reset do relé e o
+      religamento no local") e o que sobra (o chamado com a concessionária, "sem impacto na geração");
+    - a hora da volta e o "Normalizada em" saem.
+
+    Medido nas 1.830 normalizações do banco em 14/11: todas deram rótulo; o que não é frase-modelo (texto escrito à
+    mão, 1 caso cada) fica inteiro no fim. Sem relato, a linha diz que ele não veio.
+  - O nome das proteções (`PROTECAO_NOME`) é o que o COS escreve no relato, por exemplo 27 subtensão, 59 sobretensão e
+    47 sequência de fase. As "Proteções que mais atuaram" dizem em quantas paradas cada uma atuou, com uma barra.
   - O resumo ganha "O COS registrou N paradas no mês, M com a geração parada", e o rodapé de fontes cita o COS.
   - Na janela, cada tema é uma linha com a caixa de marcar e "N campos", recolhido (`<details>`); quem quiser abre e
     escolhe campo por campo. O tema continua ligando e desligando os campos dele (`[data-pu-rel-grupo]`).

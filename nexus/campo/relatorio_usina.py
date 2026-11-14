@@ -19,6 +19,7 @@ marcados; PT, Segurança e os nomes dos técnicos ficam de fora (são internos).
 import calendar
 import collections
 import io
+import re
 from datetime import date, timedelta
 from pathlib import Path
 from xml.sax.saxutils import escape
@@ -26,10 +27,11 @@ from xml.sax.saxutils import escape
 from reportlab import rl_config
 from reportlab.graphics.shapes import Drawing, Line, PolyLine, Rect, String
 from reportlab.lib import colors
+from reportlab.lib.enums import TA_CENTER
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.units import mm
-from reportlab.platypus import CondPageBreak, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+from reportlab.platypus import CondPageBreak, Flowable, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
 from . import visao
 
@@ -155,11 +157,109 @@ def _religamentos_do_mes(uid: int, ano: int, mes: int) -> list[dict]:
         ini = PR.instante(r.get("inicio"))
         if not ini or (ini.year, ini.month) != (ano, mes):
             continue
-        out.append({"ini": ini, "tipo": PR.tipo_cos(r.get("tipo_falha"))[0], "fora": PR.fora_txt(r.get("fora_min")),
+        fora_min = _num(r.get("fora_min"))
+        out.append({"ini": ini, "fim": ini + timedelta(minutes=fora_min) if fora_min is not None else None,
+                    "tipo": PR.tipo_cos(r.get("tipo_falha"))[0], "fora": PR.fora_txt(r.get("fora_min")),
                     "parou": str(r.get("geracao_parou") or "") in ("1", "True"), "os": str(r.get("os") or "").strip(),
                     "protecoes": " ".join(str(r.get("protecoes") or "").split()),
                     "relato": " ".join(str(r.get("relato_cliente") or r.get("relato_continuacao") or "").split())})
     return sorted(out, key=lambda x: x["ini"])
+
+
+# o nome de cada proteção, como o COS escreve no relato (conferido nas 1.830 normalizações do banco em 14/11/2026); o
+# código da coluna `protecoes` vem com a fase ou o neutro (27ABC, 59N) e conta pelo número
+PROTECAO_NOME = {"27": "Subtensão", "32": "Potência reversa", "46": "Desequilíbrio de corrente", "47": "Sequência de fase",
+                 "50": "Sobrecorrente", "51": "Sobrecorrente", "59": "Sobretensão", "67": "Sobrecorrente direcional",
+                 "78": "Salto de vetor", "81": "Frequência", "86": "Bloqueio"}
+_RX_FRASES = re.compile(r"(?<=[.)])\s+(?=[A-ZÁÉÍÓÚÂÊÔÃÕÇ])")
+_HORA = r"\d{1,2}/\d{1,2} às \d{1,2}:\d{2}"
+_RX_PERIODO = re.compile(rf"^(?:Continuação: )?(?P<rot>.+?) de {_HORA} a {_HORA}(?: \([^)]*\))?(?P<resto>.*?)\.?$")
+_RX_VOLTOU = re.compile(rf"^(?P<quem>.+?) (?P<verbo>voltou|voltaram) a gerar em {_HORA}(?:, (?P<como>.+?))?\.?$")
+
+
+def protecoes_do_texto(txt: str) -> list[str]:
+    """Os códigos da coluna `protecoes` ("27ABC;59N") pelo número, sem repetir: ["27", "59"]."""
+    out = []
+    for p in re.split(r"[;,\s]+", txt or ""):
+        m = re.match(r"\d+", p)
+        if m and m.group() not in out:
+            out.append(m.group())
+    return out
+
+
+def _como_voltou(como: str, plural: bool) -> tuple[str | None, str]:
+    """('remoto' | 'local' | None, a frase da volta sem a hora, que já está no Período)."""
+    c = como.strip().rstrip(".")
+    jeito = "remoto" if re.search(r"remot|centro de operações|\bCOS\b", c) else "local" if "no local" in c else None
+    verbo = "Voltaram a funcionar" if plural else "Voltou a funcionar"
+    if re.fullmatch(r"religad[oa]s? remotamente pelo COS", c):
+        return jeito, f"{verbo} pelo religamento remoto, feito pelo COS."
+    if re.fullmatch(r"religad[oa]s? no local pela equipe de campo", c):
+        return jeito, f"{verbo} pelo religamento no local, feito pela equipe de campo."
+    if c.startswith("após"):
+        return jeito, f"{verbo} {c}."
+    return jeito, f"{verbo}: {c}."
+
+
+_PLURAL = {"Cabine": "Cabines", "Inversor": "Inversores", "SKID": "SKIDs", "QGBT": "QGBTs", "Tracker": "Trackers"}
+
+
+def _rotulo_curto(rot: str) -> str:
+    """ "Cabine 1, Cabine 2, Cabine 4 e Cabine 5 desligadas" -> "Cabines 1, 2, 4 e 5 desligadas" (a coluna Parada é
+    estreita: na Capitão Poço, em 10/11, o nome das cinco cabines ocupava seis linhas)."""
+    m = re.match(r"^(?P<eq>Cabine|Inversor|SKID|QGBT|Tracker) (?P<lista>[\w.]+(?:(?:, | e )(?P=eq) [\w.]+)+)(?P<resto>.*)$", rot)
+    if not m:
+        return rot
+    nums = re.split(r", | e ", m.group("lista").replace(m.group("eq") + " ", ""))
+    return f"{_PLURAL[m.group('eq')]} {', '.join(nums[:-1])} e {nums[-1]}{m.group('resto')}"
+
+
+def relato_partes(relato: str) -> dict:
+    """O relato da Ronda COS sem o que a tabela já mostra (14/11/2026, Levi: "no usina desligada de dia tal a tal hora
+    [...] já diz o período [...] Não precisa repetir quando voltou"). As frases são modelos fixos da Ronda COS
+    (`relato-cliente.ts`), então dá para separar: {rotulo, causa, volta, jeito, extras}.
+    - rotulo: o que parou ("Inversor 7.1 desligado", "Perda de comunicação"), da 1ª frase, para a coluna Parada;
+    - causa: o "Causa: ..." (ou o resto da linha de continuação);
+    - volta: como voltou, sem a hora; jeito: 'remoto' | 'local' | None;
+    - extras: o que sobra (o chamado com a concessionária, "religado, mas desligou de novo", "sem impacto na geração").
+    A frase da hora da volta sem o "como" e o "Normalizada em" saem: o Período já diz."""
+    out = {"rotulo": "", "causa": "", "volta": "", "jeito": None, "extras": []}
+    for f in _RX_FRASES.split(" ".join(str(relato or "").split())):
+        f = f.strip()
+        if not f:
+            continue
+        m = _RX_PERIODO.match(f)
+        if m and not out["rotulo"] and not f.startswith("Em "):
+            out["rotulo"] = _rotulo_curto(m.group("rot").replace(" com a usina", "").strip())
+            resto = m.group("resto").strip(" ,")
+            if re.match(r"sem (impacto|interrupção)", resto):
+                out["extras"].append(resto[0].upper() + resto[1:] + ".")
+            elif resto and not out["causa"]:
+                out["causa"] = re.sub(r"^por ", "", resto)
+            continue
+        if f.startswith("Causa:"):
+            out["causa"] = f[6:].strip().rstrip(".")
+            continue
+        if re.match(rf"^Normalizada em {_HORA}\.?$", f):
+            continue
+        if re.match(rf"^Em {_HORA}, a comunicação foi restabelecida\.?$", f):
+            out["volta"] = "A comunicação foi restabelecida."
+            continue
+        if re.search(r"religad[oa]s? remotamente e voltou a gerar", f):
+            out["jeito"], out["volta"] = "remoto", "Voltou a funcionar pelo religamento remoto."
+            continue
+        if re.match(r"^A equipe de campo religou .* no local", f):
+            out["jeito"], out["volta"] = "local", "Voltou a funcionar pelo religamento no local, feito pela equipe de campo."
+            continue
+        m = _RX_VOLTOU.match(f)
+        if m:
+            if m.group("como"):
+                out["jeito"], out["volta"] = _como_voltou(m.group("como"), m.group("verbo") == "voltaram")
+            continue
+        out["extras"].append(f if f.endswith(".") else f + ".")
+    if out["causa"]:
+        out["causa"] = out["causa"][0].upper() + out["causa"][1:]
+    return out
 
 
 def dados(uid: int, mes: str, hoje: date) -> dict:
@@ -302,6 +402,11 @@ def _estilos() -> dict:
             "cel": ParagraphStyle("cel", parent=base, fontSize=8.5, leading=11),
             "cel_cab": ParagraphStyle("cel_cab", parent=base, fontName="Helvetica-Bold", fontSize=8, leading=10,
                                       textColor=MUDO),
+            "cel_c": ParagraphStyle("cel_c", parent=base, fontSize=8.5, leading=11, alignment=TA_CENTER),
+            "cel_cab_c": ParagraphStyle("cel_cab_c", parent=base, fontName="Helvetica-Bold", fontSize=8, leading=10,
+                                        textColor=MUDO, alignment=TA_CENTER),
+            "parada": ParagraphStyle("parada", parent=base, fontName="Helvetica-Bold", fontSize=8.5, leading=11,
+                                     alignment=TA_CENTER),
             "kpi_rot": ParagraphStyle("kpi_rot", parent=base, fontSize=8, leading=10, textColor=MUDO),
             "kpi_val": ParagraphStyle("kpi_val", parent=base, fontName="Helvetica-Bold", fontSize=18, leading=22),
             "kpi_sub": ParagraphStyle("kpi_sub", parent=base, fontSize=7.5, leading=10, textColor=MUDO)}
@@ -316,10 +421,13 @@ def _secao(titulo: str, e: dict) -> list:
 
 
 def _tabela(e: dict, cab: list[str], linhas: list[list], larguras: list[float], total: bool = False,
-            direita: tuple = ()) -> Table:
-    dados_t = [[Paragraph(_t(c), e["cel_cab"]) for c in cab]]
+            direita: tuple = (), centro: tuple = (), cab_centro: bool = False) -> Table:
+    """`centro`: as colunas do corpo centralizadas; `cab_centro`: o cabeçalho todo centralizado (a tabela das paradas,
+    14/11/2026, Levi: "centralizar todas as colunas e cabeçalhos, a não ser a coluna do que aconteceu")."""
+    dados_t = [[Paragraph(_t(c), e["cel_cab_c"] if cab_centro else e["cel_cab"]) for c in cab]]
     for ln in linhas:
-        dados_t.append([c if isinstance(c, Paragraph) else Paragraph(_t(c), e["cel"]) for c in ln])
+        dados_t.append([c if isinstance(c, Flowable) else Paragraph(_t(c), e["cel_c"] if i in centro else e["cel"])
+                        for i, c in enumerate(ln)])
     # as larguras em mm somam a largura toda; a tabela sai alinhada com o texto, à esquerda
     fator = LARG / (sum(larguras) * mm)
     t = Table(dados_t, colWidths=[w * mm * fator for w in larguras], repeatRows=1, hAlign="LEFT")
@@ -572,22 +680,108 @@ def _chamados(d: dict, e: dict, campos=CHAVES_CAMPOS) -> list:
     return out
 
 
+# a cor da parada (o semáforo da casa): a usina inteira parada é crítica, um pedaço dela (cabine, inversor) é alerta, e a
+# parada sem a geração parada (a comunicação) é neutra. O fundo claro da célula destaca a parada sem faixa lateral
+_TINTA_PARADA = {"critico": colors.HexColor("#fdecee"), "alerta": colors.HexColor("#fdf3e3"), "neutro": colors.HexColor("#eef0f4")}
+
+
+def _nivel_parada(x: dict, rotulo: str) -> str:
+    if not x.get("parou") or rotulo.startswith("Manutenção"):
+        return "neutro"
+    return "critico" if rotulo.lower().startswith("usina") else "alerta"
+
+
+def _contagem_protecoes(rel: list[dict]) -> list[tuple[str, int]]:
+    """[(código, em quantas paradas atuou)], a que mais atuou primeiro."""
+    return collections.Counter(c for x in rel for c in protecoes_do_texto(x.get("protecoes"))).most_common()
+
+
+def _kpis_religamentos(rel: list[dict], partes: list[dict], e: dict) -> Table:
+    parou = sum(1 for x in rel if x.get("parou"))
+    remoto = sum(1 for p in partes if p["jeito"] == "remoto")
+    local = sum(1 for p in partes if p["jeito"] == "local")
+    conta = _contagem_protecoes(rel)
+    if conta:
+        cod, n = conta[0]
+        prot = (cod, f"{PROTECAO_NOME.get(cod, 'proteção ' + cod).lower()}, em {n} parada{'s' if n != 1 else ''}")
+    else:
+        prot = ("—", "nenhuma proteção registrada")
+    cel = [("Paradas no mês", str(len(rel)), f"{parou} com a geração parada", "critico" if parou else None),
+           ("Religamento remoto", str(remoto), "a distância, sem ir à usina", None),
+           ("Religamento no local", str(local), "com a equipe de campo na usina", None),
+           ("Proteção que mais atuou", prot[0], prot[1], None)]
+    linha = [[Paragraph(_t(rot), e["kpi_rot"]),
+              Paragraph(f'<font color="{_cor(nivel) if nivel else "#111827"}">{_t(val)}</font>', e["kpi_val"]),
+              Paragraph(_t(sub), e["kpi_sub"])] for rot, val, sub, nivel in cel]
+    t = Table([linha], colWidths=[LARG / 4] * 4, hAlign="LEFT")
+    t.setStyle(TableStyle([("BACKGROUND", (0, 0), (-1, -1), FUNDO), ("BOX", (0, 0), (-1, -1), 0.5, LINHA),
+                           ("LINEAFTER", (0, 0), (-2, -1), 0.5, LINHA), ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                           ("TOPPADDING", (0, 0), (-1, -1), 8), ("BOTTOMPADDING", (0, 0), (-1, -1), 9),
+                           ("LEFTPADDING", (0, 0), (-1, -1), 9), ("RIGHTPADDING", (0, 0), (-1, -1), 6)]))
+    return t
+
+
+def _o_que_aconteceu(p: dict, e: dict) -> Paragraph:
+    """A causa, como voltou (em verde: é a resolução) e o que mais o relato traz; nada do que a linha já mostra."""
+    partes = []
+    if p["causa"]:
+        partes.append(f"<b>Causa:</b> {_t(p['causa'])}.")
+    if p["volta"]:
+        partes.append(f'<font color="{TOM["ok"].hexval().replace("0x", "#")}">{_t(p["volta"])}</font>')
+    if p["extras"]:
+        partes.append(f'<font color="{MUDO.hexval().replace("0x", "#")}">{_t(" ".join(p["extras"]))}</font>')
+    if not partes:
+        return Paragraph(_t("O relato não veio da Ronda COS."), e["mudo"])
+    return Paragraph("<br/>".join(partes), e["cel"])
+
+
 def _religamentos(d: dict, e: dict, campos=CHAVES_CAMPOS) -> list:
+    """As paradas do mês (14/11/2026, Levi: "um negócio explicando religamento, bonitinho mesmo"): a explicação do
+    religamento, os quatro números, a tabela (a parada em destaque; o "o que aconteceu" só completa) e as proteções."""
     rel = d.get("religamentos") or []
     out = []
+    partes = [relato_partes(x.get("relato")) for x in rel]
     if "religamentos_lista" in campos:
-        if rel:
-            linhas = [[x["ini"].strftime("%d/%m %H:%M"), x["tipo"], x["fora"] or "—", x["protecoes"] or "—",
-                       x["os"] or "—", x["relato"] or "O relato não veio da Ronda COS."] for x in rel]
-            out.append(_tabela(e, ["Início", "Parada", "Tempo fora", "Proteções", "OS", "O que aconteceu"], linhas,
-                               [17, 22, 15, 20, 12, 92]))
-        else:
+        out.append(Paragraph(_t("Cada parada do mês registrada pelo Centro de Operações (COS) da Grid Co., com a causa e "
+                                "a forma como a usina voltou. Quando uma proteção do relé desliga a usina, a volta é o "
+                                "religamento: remoto, feito a distância, ou no local, com a equipe de campo na usina."),
+                             e["base"]))
+        out.append(Spacer(1, 3 * mm))
+        if not rel:
             out.append(_sem(e, "Nenhuma parada registrada pelo COS no mês."))
+        else:
+            out += [_kpis_religamentos(rel, partes, e), Spacer(1, 4 * mm)]
+            linhas, tintas = [], []
+            for x, p in zip(rel, partes):
+                rotulo = p["rotulo"] or x.get("tipo") or "Parada"
+                nivel = _nivel_parada(x, rotulo)
+                tintas.append(_TINTA_PARADA[nivel])
+                fim = x.get("fim")
+                periodo = (f"{x['ini']:%d/%m %H:%M}" + (f'<br/><font color="{MUDO.hexval().replace("0x", "#")}">até '
+                                                        f"{fim:%d/%m %H:%M}</font>" if fim else ""))
+                linhas.append([Paragraph(periodo, e["cel_c"]),
+                               Paragraph(f'<font color="{_cor(nivel)}">{_t(rotulo)}</font>', e["parada"]),
+                               x.get("fora") or "—", ", ".join(protecoes_do_texto(x.get("protecoes"))) or "—",
+                               x.get("os") or "—", _o_que_aconteceu(p, e)])
+            t = _tabela(e, ["Período", "Parada", "Tempo fora", "Proteções", "OS", "O que aconteceu"], linhas,
+                        [25, 26, 19, 19, 13, 76], centro=(0, 2, 3, 4), cab_centro=True)
+            # a parada em destaque: o fundo claro da cor dela (por cima da zebra)
+            t.setStyle(TableStyle([("BACKGROUND", (1, i), (1, i), c) for i, c in enumerate(tintas, start=1)]))
+            out.append(t)
     if "religamentos_protecoes" in campos and rel:
-        conta = collections.Counter(p for x in rel for p in x["protecoes"].replace(",", ";").replace(" ", ";").split(";") if p)
+        conta = _contagem_protecoes(rel)[:6]
         if conta:
-            out.append(Paragraph("Proteções que mais atuaram: " + _t(", ".join(f"{p} ({n}x)" for p, n in conta.most_common(6)))
-                                 + ".", e["base"]))
+            out.append(Paragraph(_t("Proteções que mais atuaram"), e["sub_secao"]))
+            maior = conta[0][1]
+            linhas = []
+            for cod, n in conta:
+                barra = Drawing(60 * mm, 8)
+                barra.add(Rect(0, 1, 60 * mm, 6, fillColor=FUNDO, strokeColor=None))
+                barra.add(Rect(0, 1, 60 * mm * n / maior, 6, fillColor=VERDE, strokeColor=None))
+                linhas.append([cod, PROTECAO_NOME.get(cod, "—"), str(n), barra])
+            t = _tabela(e, ["Código", "Proteção", "Paradas", ""], linhas, [16, 48, 18, 96], centro=(0, 1, 2),
+                        cab_centro=True)
+            out.append(t)
     return out
 
 
