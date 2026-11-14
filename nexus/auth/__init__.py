@@ -94,6 +94,22 @@ JANELA_S = 15 * 60
 COOKIE_DISPOSITIVO = "nexus_dispositivo"
 DISPOSITIVO_S = 90 * 24 * 3600
 _DISPOSITIVO_MAX_CONTAS = 8
+# O "Continuar como" (14/11/2026, Levi, depois de ver o do App de Campo, a v350: "quando o cara já conectou no Microsoft,
+# para ele não precisar ficar logando de novo no Microsoft, só tem um botão lá de continuar como pessoa tal [...] Porque
+# às vezes desconecta sozinho"). Desde 14/10 toda entrada pela Microsoft pede a senha (`microsoft.endereco_de_entrada`:
+# no PC da sala do NOC, B entraria como A), e a sessão do Nexus vence 12 h depois da entrada: todo dia a senha de novo.
+# Escolha do Levi, entre três (sem senha em qualquer PC, como o App; sem senha só no PC marcado; um botão que ainda pede
+# a senha): "Sem senha no PC marcado". Na entrada pela Microsoft a pessoa marca "Este computador é só meu"; com a marca,
+# o cookie assinado `nexus_lembrar` guarda o e-mail e o nome dela por 30 dias (desde a última entrada nele), e o Entrar
+# mostra "Continuar como Fulano", que vai à Microsoft sem tela (`prompt=none` + `login_hint`): a sessão da Microsoft
+# viva no navegador e a conta ativa no diretório bastam (quem saiu da empresa não volta: a Microsoft recusa). O cookie
+# só diz QUEM mostrar no botão; quem entra é quem a Microsoft devolver, conferido como sempre (`microsoft.conferir`) e
+# igual ao e-mail do botão. A entrada completa sem a marca desmarca (o PC passa a ser de quem entrou por último, sem
+# marcar); o Sair também (o do Nexus e o do OS Creator); a sessão que vence, não (é para isso que ele existe).
+COOKIE_LEMBRAR = "nexus_lembrar"
+LEMBRAR_S = 30 * 24 * 3600
+TEXTO_OUTRA_CONTA = ("A Microsoft devolveu outra conta, não a do botão Continuar. Entre com a sua conta (a marca deste "
+                     "computador foi desfeita).")
 # o e-mail é texto livre de quem tenta: acima disto, as chaves vencidas saem da memória
 _MAX_CHAVES = 5000
 # o waitress atende em 8 threads: duas tentativas ao mesmo tempo não podem limpar a mesma fila nem podar o dicionário
@@ -190,6 +206,45 @@ def _gravar_dispositivo(resp, email_n: str):
                                                   "e": contas[:_DISPOSITIVO_MAX_CONTAS]})
     resp.set_cookie(COOKIE_DISPOSITIVO, valor, max_age=DISPOSITIVO_S, path=raiz() or "/", httponly=True,
                     samesite="Lax", secure=bool(current_app.config.get("SESSION_COOKIE_SECURE")))
+    return resp
+
+
+def _serializador_do_lembrar():
+    return URLSafeTimedSerializer(current_app.secret_key, salt="nexus-lembrar")
+
+
+def lembrado() -> dict | None:
+    """Quem marcou este computador como dele ({"email", "nome", "curto"}), pelo cookie `nexus_lembrar` conferido
+    (assinatura, prazo e e-mail da Grid), ou None. Com a Microsoft desligada, ninguém (o botão não teria para onde ir)."""
+    cfg = current_app.config
+    bruto = request.cookies.get(COOKIE_LEMBRAR)
+    if not bruto or not microsoft.ligado(cfg):
+        return None
+    try:
+        dado = _serializador_do_lembrar().loads(bruto, max_age=LEMBRAR_S)
+    except Exception:            # noqa: BLE001 — assinatura errada, vencido ou lixo: ninguém
+        return None
+    email = microsoft.email_da_grid(cfg, (dado or {}).get("email") if isinstance(dado, dict) else "")
+    if not email:
+        return None
+    nome = " ".join(str(dado.get("nome") or "").split())[:120] or email.split("@")[0]
+    partes = nome.split()
+    # o botão com o primeiro e o último nome, como o do App ("Continuar como Levi Maia"); o e-mail inteiro vai embaixo
+    return {"email": email, "nome": nome, "curto": f"{partes[0]} {partes[-1]}" if len(partes) > 1 else nome}
+
+
+def _lembrar(resp, conta: dict):
+    resp.set_cookie(COOKIE_LEMBRAR, _serializador_do_lembrar().dumps({"email": conta["email"], "nome": conta["nome"]}),
+                    max_age=LEMBRAR_S, path=raiz() or "/", httponly=True, samesite="Lax",
+                    secure=bool(current_app.config.get("SESSION_COOKIE_SECURE")))
+    return resp
+
+
+def _esquecer(resp):
+    """Desmarca o computador (o Sair, a entrada sem a marca, a conta trocada). Só quando o pedido trouxe o cookie."""
+    if COOKIE_LEMBRAR in request.cookies:
+        resp.delete_cookie(COOKIE_LEMBRAR, path=raiz() or "/", httponly=True, samesite="Lax",
+                           secure=bool(current_app.config.get("SESSION_COOKIE_SECURE")))
     return resp
 
 
@@ -495,6 +550,16 @@ def _ida_para_a_microsoft(destino: str):
     if not microsoft.ligado(cfg):
         return redirect(url_for("auth.entrar", **({"next": destino} if destino != "/" else {})))
     pedido = microsoft.novo_pedido(destino)
+    quem = lembrado() if request.args.get("continuar") == "1" else None
+    if quem:
+        # o "Continuar como": o e-mail é o do cookie, nunca o do endereço (COOKIE_LEMBRAR)
+        pedido.update(continuar=quem["email"], lembrar=True)
+    elif request.args.get("lembrar") == "1":
+        pedido["lembrar"] = True
+    return _levar_a_microsoft(cfg, pedido)
+
+
+def _levar_a_microsoft(cfg, pedido: dict):
     session["ms_pedidos"] = microsoft.guardar(session.get("ms_pedidos"), pedido)
     resp = redirect(microsoft.endereco_de_entrada(cfg, pedido))
     resp.headers["Cache-Control"] = "no-store"
@@ -513,6 +578,14 @@ def _volta_da_microsoft():
     else:
         session.pop("ms_pedidos", None)
     destino = next_seguro(pedido.get("next") if isinstance(pedido, dict) else None)
+    if (isinstance(pedido, dict) and pedido.get("continuar")
+            and str(request.args.get("error") or "") in microsoft.SEM_SESSAO_NA_MICROSOFT
+            and time.time() - float(pedido.get("t") or 0) <= microsoft.PEDIDO_S):
+        # o "Continuar" sem tela, e a sessão da Microsoft neste navegador também tinha caído: a ida de sempre, com a
+        # senha, e o e-mail já preenchido. Não é recusa de ninguém: não conta no teto da rede
+        novo = microsoft.novo_pedido(destino)
+        novo.update(dica=pedido["continuar"], lembrar=True)
+        return _levar_a_microsoft(cfg, novo)
     # o teto por rede da volta é só dela: as recusas da Microsoft não trancam a senha de administrador, a reserva para
     # quando a Microsoft é que está com defeito
     chave = ("ms", _ip())
@@ -529,6 +602,12 @@ def _volta_da_microsoft():
         if e.contar:
             _contar_erro(chave)
         return _tela_entrar(erro=str(e), destino=destino), 403
+    esperado = str(pedido.get("continuar") or pedido.get("dica") or "")
+    if pedido.get("continuar") and conta["email"] != esperado:
+        # sem tela, a Microsoft devolveu outra conta (não deveria, com o login_hint): ninguém entra no lugar de quem está
+        # no botão, e a marca sai
+        log.warning("Continuar como: a Microsoft devolveu outra conta; a marca do computador saiu")
+        return _esquecer(make_response(_tela_entrar(erro=TEXTO_OUTRA_CONTA, destino=destino), 403))
     session.clear()
     session.permanent = True
     session["logado"] = True
@@ -544,6 +623,12 @@ def _volta_da_microsoft():
     # o OS Creator de quem usou este navegador antes não passa para quem entrou agora (o PC da sala do NOC): o
     # `os_sessao` é a sessão do Fracttal de outra pessoa, e a OS nasceria no nome dela
     resp.delete_cookie("os_sessao", path=os_cookie_path())
+    # a marca do computador (COOKIE_LEMBRAR): com ela, renova os 30 dias; sem ela, desmarca. Na ida com o e-mail
+    # preenchido a pessoa pode trocar de conta na Microsoft (com a senha dela): aí a marca do outro sai
+    if pedido.get("lembrar") and (not esperado or conta["email"] == esperado):
+        _lembrar(resp, conta)
+    else:
+        _esquecer(resp)
     return _sem_a_sessao_velha_da_raiz(resp)
 
 
@@ -661,7 +746,8 @@ def _tela_entrar(**contexto):
     (favorito, aba aberta) seguia como A, com o e-mail de A no diário. Sem a chave, a página de sempre."""
     cfg = current_app.config
     return render_template("entrar.html", plataforma_sair=_plataforma_para_sair(), ms=microsoft.ligado(cfg),
-                           ms_dominios=", ".join("@" + d for d in microsoft.dominios(cfg)), **contexto)
+                           ms_dominios=", ".join("@" + d for d in microsoft.dominios(cfg)), lembrado=lembrado(),
+                           **contexto)
 
 
 def _plataforma_para_sair() -> str | None:
@@ -686,6 +772,7 @@ def sair():
         resp = make_response(render_template("sair.html", plataforma=plataforma))
         resp.headers["Cache-Control"] = "no-store"
     resp.delete_cookie("os_sessao", path=os_cookie_path())      # sai do OS Creator junto
+    _esquecer(resp)                                             # e desmarca o computador (o "Continuar como" some)
     return _sem_a_sessao_velha_da_raiz(resp)
 
 
@@ -700,7 +787,7 @@ def instalar_portao(app) -> None:
         if request.path == "/os/logout":
             # o "sair" do OS Creator ("Sair do Fracttal nesta área") sai do Nexus também, como o Sair do Nexus sai do OS
             # Creator: sair, de qualquer lugar, sai de tudo
-            return encerrar("saiu", json=False)
+            return _esquecer(encerrar("saiu", json=False))          # é um Sair: desmarca o computador também
         if session.get("via") == "cliente":
             # o cliente (07/11/2026, `clientes.py`): a conta segue ativa e no mesmo cliente, e nas 12 h do login; senão
             # sai. Depois, só as telas dele

@@ -128,7 +128,9 @@ def test_ligada_a_porta_e_a_microsoft_e_o_fracttal_sai_da_porta(ms, cliente, mon
     monkeypatch.setattr(fracttal, "entrar", nao_vai_ao_fracttal)
     html = cliente.get("/entrar?next=/t/cos/mesa").get_data(as_text=True)
     assert "Entrar com a Microsoft" in html and "@gridco.com.br" in html and "E-mail do Fracttal" not in html
-    assert 'href="/entrar?ms=1&next=/t/cos/mesa"' in html
+    # desde 14/11/2026 a entrada é um formulário GET (leva a marca "Este computador é só meu", test_auth_continuar_como)
+    assert '<form method="get" action="/entrar" class="entrar-ms-form">' in html
+    assert '<input type="hidden" name="ms" value="1">' in html and 'name="next" value="/t/cos/mesa"' in html
     assert "Entrar com a senha de administrador" in html
     # o POST do Fracttal feito sem a tela também é recusado, e não conta como senha errada
     r = cliente.post("/entrar", data={"email": "alguem@fracttal.exemplo.test", "senha": "x"})

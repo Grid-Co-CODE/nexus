@@ -52,6 +52,11 @@ _GUID = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{1
 _EMAIL = re.compile(r"^[a-z0-9._%+'-]+@([a-z0-9-]+(?:\.[a-z0-9-]+)+)$")
 _AADSTS = re.compile(r"AADSTS\d+")
 _ERRO_OAUTH = re.compile(r"[a-z_]{1,40}")          # inteiro (fullmatch): o $ do match aceitaria quebra de linha no fim
+# o "Continuar como" (14/11/2026) vai sem tela (`prompt=none`): a Microsoft responde estes erros quando a sessão dela
+# neste navegador também caiu, ou quando precisaria perguntar algo; aí a ida vira a de sempre, com a senha e o e-mail
+# já preenchido, em vez de mostrar erro (OpenID Connect Core, 3.1.2.6)
+SEM_SESSAO_NA_MICROSOFT = frozenset({"login_required", "interaction_required", "account_selection_required",
+                                     "consent_required"})
 
 TEXTO_DE_FORA = "Esta conta não é da Grid Co. O Nexus só aceita a conta Microsoft da Grid Co. ({dominios})."
 TEXTO_CONVIDADO = ("Conta de convidado no diretório da Grid Co. não entra no Nexus. Entre com a sua conta da Grid Co. "
@@ -125,13 +130,33 @@ def endereco_de_entrada(cfg, pedido: dict) -> str:
     pedia. Com o `select_account` (a primeira versão), no PC da sala do NOC a conta de quem usou o navegador antes
     aparecia na lista e abria o Nexus para outro com um clique, mesmo depois do Sair (revisão adversarial de 14/10/2026:
     A, administrador, sai; B escolhe a conta de A e entra como A). O Sair do Nexus não sai da Microsoft do navegador
-    (sairia também do Outlook e do Teams da pessoa), e com a senha pedida não precisa."""
+    (sairia também do Outlook e do Teams da pessoa), e com a senha pedida não precisa.
+
+    A exceção é o "Continuar como" (14/11/2026, Levi: "quando o cara já conectou no Microsoft, para ele não precisar
+    ficar logando de novo [...] só tem um botão lá de continuar como pessoa tal"), só no computador que a própria pessoa
+    marcou como dela ("Este computador é só meu", o cookie `nexus_lembrar` do auth): `continuar` = o e-mail dela, vai
+    com `prompt=none` e `login_hint`, e a Microsoft devolve o código sem tela se a sessão dela no navegador estiver viva
+    (e a conta ativa no diretório). `dica` = a ida de sempre, com a senha, e o e-mail já preenchido: é para onde o
+    "Continuar" cai quando a sessão da Microsoft também acabou."""
     q = {"client_id": _limpo(cfg, "NEXUS_MS_CLIENT_ID"), "response_type": "code",
          "redirect_uri": _limpo(cfg, "NEXUS_MS_VOLTA"), "response_mode": "query", "scope": ESCOPO,
          "state": pedido["state"], "nonce": pedido["nonce"],
          "code_challenge": _b64url(hashlib.sha256(pedido["verificador"].encode()).digest()),
          "code_challenge_method": "S256", "prompt": "login", "domain_hint": dominios(cfg)[0]}
+    email = str(pedido.get("continuar") or pedido.get("dica") or "")
+    if email:
+        q.pop("domain_hint")
+        q["login_hint"] = email
+        if pedido.get("continuar"):
+            q["prompt"] = "none"
     return f"{AUTORIDADE}/{_diretorio(cfg)}/oauth2/v2.0/authorize?{urlencode(q)}"
+
+
+def email_da_grid(cfg, valor) -> str:
+    """O e-mail quando ele é de um domínio da Grid (o mesmo formato que a volta aceita); senão ''."""
+    email = str(valor or "").strip().lower()
+    m = _EMAIL.match(email)
+    return email if m and m.group(1) in dominios(cfg) else ""
 
 
 def _texto_do_erro(cfg, erro: str, aadsts: str = "") -> str:

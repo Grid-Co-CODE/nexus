@@ -663,6 +663,18 @@ mark.menu-achado{background:none;color:var(--tinta);font-weight:700;text-decorat
 .entrar-ms-marca{display:grid;grid-template-columns:repeat(2,8px);gap:2px}
 .entrar-ms-marca i{width:8px;height:8px;background:currentColor;display:block}
 .entrar .entrar-erro{margin:24px 0 0;max-width:380px}
+/* o "Continuar como" (14/11/2026): o botão com o nome e o e-mail embaixo, como o do App de Campo; a entrada de sempre
+   vira um formulário GET com a marca "Este computador é só meu" */
+.entrar .entrar-ms-form{gap:0;margin-top:30px}
+.entrar .entrar-ms-form .entrar-ms{align-self:flex-start;margin-top:0}
+.entrar .entrar-continuar{min-height:58px;padding:8px 24px 8px 22px}
+.entrar .entrar-continuar + .entrar-ms-form{margin-top:12px}
+.entrar-continuar-quem{display:flex;flex-direction:column;align-items:flex-start;text-align:left;line-height:1.25}
+.entrar-continuar-quem small{font:500 12px/1.35 var(--font-sans);opacity:.78}
+.entrar .entrar-outra{align-self:flex-start;margin-top:0}
+.entrar-lembrar{display:flex;align-items:flex-start;gap:8px;margin-top:14px;font-size:13px;line-height:1.45;
+  color:var(--tinta-2);cursor:pointer}
+.entrar-lembrar input{flex:none;width:16px;height:16px;margin:2px 0 0;accent-color:var(--verde);cursor:pointer}
 /* a usina: a sombra, os pés, o módulo opaco com as células, a luz que passa ao abrir, a névoa da distância e o realce */
 .eu-sombra{fill:var(--sombra)}
 .eu-pe{stroke:var(--mudo);stroke-width:1.4;opacity:.55}
@@ -678,7 +690,7 @@ mark.menu-achado{background:none;color:var(--tinta);font-weight:700;text-decorat
   .entrar{padding:28px 20px 40px}
   .entrar-logo{margin-bottom:28px}
   .entrar .titulo-pagina{font-size:60px}
-  .entrar .entrar-ms{display:flex;width:100%;justify-content:center}
+  .entrar .entrar-ms,.entrar .entrar-ms-form .entrar-ms,.entrar .entrar-outra{display:flex;width:100%;justify-content:center;align-self:stretch}
 }
 
 /* Celular: o menu sobe para cima do conteúdo */

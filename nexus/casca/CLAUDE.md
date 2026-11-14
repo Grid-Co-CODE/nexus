@@ -1213,7 +1213,30 @@ conferências moram em `nexus/auth/microsoft.py`; a ida, a volta e a sessão, no
 - **`prompt=login`: toda entrada pede a senha da Microsoft**, como o Fracttal já pedia. A primeira versão usava o
   `select_account`, e a revisão adversarial de 14/10/2026 mostrou o furo: no PC da sala do NOC, A (administrador) sai,
   a conta de A segue no navegador e B a escolhe na lista e entra como A, sem senha. O Sair do Nexus não sai da
-  Microsoft do navegador (sairia também do Outlook e do Teams da pessoa), e com a senha pedida não precisa.
+  Microsoft do navegador (sairia também do Outlook e do Teams da pessoa), e com a senha pedida não precisa. A única
+  exceção é o computador que a própria pessoa marcou (o item abaixo).
+- **"Continuar como Fulano" (14/11/2026)**: Levi, depois do App de Campo (a v350): "quando o cara já conectou no
+  Microsoft, para ele não precisar ficar logando de novo [...] só tem um botão lá de continuar como pessoa tal [...]
+  Porque às vezes desconecta sozinho". O "sozinho" é a sessão do Nexus, que vence 12 h depois da entrada, e cada volta
+  pedia a senha. O App é no celular de cada um e lá o botão vale em qualquer aparelho; no Nexus há o PC do NOC, então o
+  Levi escolheu, entre três opções, **"Sem senha no PC marcado"**:
+  - a entrada pela Microsoft é um formulário GET com a caixa **"Este computador é só meu"** (`lembrar=1`); marcada, a
+    volta certa grava o cookie assinado **`nexus_lembrar`** (`auth.COOKIE_LEMBRAR`, salt `nexus-lembrar`, HttpOnly,
+    Lax, 30 dias desde a última entrada) com o e-mail e o nome;
+  - com ele (`auth.lembrado()`: assinatura, prazo, e-mail de um domínio da Grid, Microsoft ligada), o Entrar mostra
+    "Continuar como" + o primeiro e o último nome, com o e-mail embaixo, e "Entrar com outra conta" (o mesmo formulário);
+  - o botão (`/entrar?ms=1&continuar=1`) vai com **`prompt=none` e `login_hint`** = o e-mail do COOKIE (o do endereço
+    não vale): a Microsoft devolve o código sem tela se a sessão dela no navegador estiver viva, e a conta desligada no
+    Entra não volta. Quem entra é quem a Microsoft devolver, conferido como sempre, e tem de ser o do botão (senão 403,
+    `TEXTO_OUTRA_CONTA`, e a marca sai);
+  - a sessão da Microsoft também caída (`login_required`, `interaction_required`, `account_selection_required`,
+    `consent_required`: `microsoft.SEM_SESSAO_NA_MICROSOFT`) leva à ida de sempre, **com a senha e o e-mail já
+    preenchido** (a `dica`), sem contar no teto da rede; ali a pessoa pode trocar de conta (com a senha dela), e a marca
+    do outro sai;
+  - **desmarcam**: a entrada pela Microsoft sem a caixa, o Sair do Nexus e o do OS Creator (`/os/logout`). A sessão do
+    Nexus que vence (as 12 h, `expirou`) **não** desmarca: é o caso que criou o botão;
+  - a senha de administrador, o Fracttal e o cliente não mexem na marca. Prova: `tests/test_auth_continuar_como.py`
+    (12 de 12 mutações das proteções pegas em 14/11/2026).
 - **Teto da volta por rede** (`("ms", ip)`, 50 em 15 min): só conta a recusa que custou uma ida ao endpoint de token por
   causa de quem tentou (código de lixo, conta de fora). Segredo vencido (`invalid_client`, AADSTS7000215/7000222) e
   Microsoft fora não contam, porque aí todo mundo falharia e a rede do escritório trancaria. Nada disso tranca a senha
