@@ -2207,7 +2207,11 @@ o formulário mandava o código dela, por fora da recusa do `decidir`).
   daqui for mais nova que a recusa, a tela mostra o porquê e libera uma decisão nova (`decisao_pt.recusada_pelo_app`). A
   aba `decisoes` de antes (nunca gravada) não é lida.
 - **Quem pode decidir** (Levi, 09/10/2026): o Supervisor de Campo da região da usina (com a vaga aberta, o
-  Coordenador), o gestor de contrato da usina, quem tem o vínculo COS no cadastro e um administrador do Nexus
+  Coordenador), o gestor de contrato da usina, o COS **só no plantão, de sexta 18h a segunda 6h de Brasília** (14/11/2026,
+  Levi: "O pessoal do COS pode dar o de acordo a partir de sexta-feira, 6 horas da noite, até segunda, 6 horas da manhã.
+  Passou disso, só com o supervisor"; vale o setor COS da pessoa do login em Base → Acessos, pelo código do e-mail, ou o
+  vínculo COS da ficha: as 11 pessoas do setor COS não têm ficha, e até ali nenhuma conseguia assinar;
+  `decisao_pt.cos_no_plantao`) e um administrador do Nexus
   (`decisao_pt.aprovadores` / `pode_decidir`, conferido no `decidir`; a recusa diz quem pode). **Desde 30/10/2026, o
   Responsável UFV da ficha da usina** (`usinas.responsavel_om_id`, papel "responsável UFV", o 1º da lista de quem
   pode): é a quem o App manda o aviso e a assinatura da PT desde a v314 (30/10, 04:39Z). A pessoa é a do login

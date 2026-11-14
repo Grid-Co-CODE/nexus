@@ -61,11 +61,12 @@ def test_o_detalhe_traz_a_assinatura_quem_assina_e_a_decisao_que_volta_para_a_li
     assert "Executante · assinatura da APR" in html
     assert 'action="/os/_nexus/pt/PT-1/decidir"' in html and '<input type="hidden" name="volta" value="/t/hseq/apr-pt?modo=tabela">' in html
     assert ("Quem assina</dt><dd>O Supervisor de Campo da Sudeste 03 (Supervisora Campo), o gestor de contrato "
-            "(Beltrano Supervisor), alguém do COS (ninguém com o vínculo COS no cadastro ainda) ou um administrador") in html
+            "(Beltrano Supervisor), alguém do COS (de sexta 18h a segunda 6h) ou um administrador") in html
     assert "O App ainda não lê a\n          decisão do Nexus" in html or "O App ainda não lê a" in html
 
 
-def test_quem_pode_dar_o_de_acordo(banco, app):
+def test_quem_pode_dar_o_de_acordo(banco, app, monkeypatch):
+    from datetime import datetime
     p = visao.pt("PT-1")
     assert decisao_pt.pode_decidir(p, "beltrano@exemplo.test")[0] is True              # o gestor de contrato
     assert decisao_pt.pode_decidir(p, "supervisora@exemplo.test")[0] is True           # o Supervisor de Campo
@@ -75,8 +76,13 @@ def test_quem_pode_dar_o_de_acordo(banco, app):
     # o coordenador só aprova com a vaga de supervisor aberta (a Sudeste 03 tem supervisora)
     assert decisao_pt.pode_decidir(p, "coordenador@exemplo.test")[0] is False
     _com_cos(banco)
+    # o COS só no plantão, de sexta 18h a segunda 6h (Levi, 14/11/2026); o relógio parado no teste
+    monkeypatch.setattr(decisao_pt, "_agora", lambda: datetime(2026, 11, 14, 10, tzinfo=decisao_pt._BRT))   # sábado
     assert decisao_pt.pode_decidir(visao.pt("PT-1"), "cos@exemplo.test") == (True, "COS")
-    assert "alguém do COS ou um administrador" in decisao_pt.aprovadores(visao.pt("PT-1"))["texto"]
+    monkeypatch.setattr(decisao_pt, "_agora", lambda: datetime(2026, 11, 11, 10, tzinfo=decisao_pt._BRT))   # quarta
+    ok, porque = decisao_pt.pode_decidir(visao.pt("PT-1"), "cos@exemplo.test")
+    assert ok is False and porque.startswith("O COS dá o De acordo só no plantão, de sexta 18h a segunda 6h.")
+    assert "alguém do COS (de sexta 18h a segunda 6h) ou um administrador" in decisao_pt.aprovadores(visao.pt("PT-1"))["texto"]
 
 
 def test_quem_nao_pode_e_recusado_e_quem_pode_decide_pela_lista(banco, app, cliente):

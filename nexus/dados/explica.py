@@ -343,7 +343,7 @@ PARA_QUE = {
                           "cada tela. Não guarda nome nem e-mail.",
     "decisao_pt": "Guarda cada decisão (De acordo ou Não autorizo) tomada no Nexus sobre uma PT, equipamento por "
                   "equipamento, como o App decide: a PT de três equipamentos tem três decisões. Decide o Supervisor "
-                  "de Campo, o gestor de contrato, alguém do COS ou um administrador, nunca quem pediu a PT. O App "
+                  "de Campo, o gestor de contrato, alguém do COS (no plantão do fim de semana) ou um administrador, nunca quem pediu a PT. O App "
                   "de Campo lê esta tabela e aplica a decisão na PT do técnico. O motivo é gravado sem dado pessoal, "
                   "porque o técnico o lê.",
     "extintor": "Lista cada extintor das usinas (o cadastro da TST e os que o técnico acha na ronda), com onde ele "

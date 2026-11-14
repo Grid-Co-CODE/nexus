@@ -36,6 +36,13 @@ O RESPONSÁVEL UFV também decide (30/10/2026, pedido do Levi pelo chat do App d
 card de assinar no Nexus, `/t/campo/pt/<n>/assinar`): desde a v314 (30/10, 04:39Z) o App manda o aviso e a assinatura
 da PT ao Responsável O&M da ficha da usina no Nexus (`usinas.responsavel_om_id`), e 65 usinas trocaram de quem recebe.
 Sem o papel aqui, quem recebe o e-mail abriria o card e leria "quem pode dar o De acordo: ...", sem ele na lista.
+
+O COS, PELO SETOR DOS ACESSOS E SÓ NO PLANTÃO (14/11/2026, Levi: "O pessoal do COS pode dar o de acordo a partir de
+sexta-feira, 6 horas da noite, até segunda, 6 horas da manhã. Passou disso, só com o supervisor"). Até ali o COS valia
+pelo vínculo COS da ficha do cadastro, e ninguém tinha esse vínculo: as 11 pessoas do setor COS (Base → Acessos →
+Pessoas e setores) não têm ficha, porque o cadastro é o do time de campo, e nenhuma conseguia assinar. Agora vale o
+setor da pessoa do login (`setor_telas.setor_da_pessoa`, pelo código do e-mail), e o vínculo COS da ficha continua
+valendo, os dois só de sexta 18h a segunda 6h de Brasília (`cos_no_plantao`). Fora da janela, decidem os outros papéis.
 """
 import re
 import threading
@@ -61,6 +68,30 @@ DECISOES = {"de_acordo": "De acordo", "negada": "Não autorizo"}
 MOTIVO_MAX = 400
 _BRT = timezone(timedelta(hours=-3))
 _TRAVA = threading.Lock()      # um processo grava por vez: duas decisões juntas não se apagam (o livro é trocado inteiro)
+PLANTAO_COS = "de sexta 18h a segunda 6h"
+
+
+def _agora() -> datetime:
+    return datetime.now(_BRT)
+
+
+def cos_no_plantao(agora: datetime | None = None) -> bool:
+    """O COS decide a PT só no plantão do fim de semana: de sexta 18h a segunda 6h, no horário de Brasília."""
+    a = (agora or _agora()).astimezone(_BRT)
+    return (a.weekday() == 4 and a.hour >= 18) or a.weekday() in (5, 6) or (a.weekday() == 0 and a.hour < 6)
+
+
+def _do_setor_cos(email: str) -> bool:
+    """A pessoa do login está no setor COS dos Acessos? O setor ilegível não é "do COS": decidem os outros papéis."""
+    if not email:
+        return False
+    from ..auth.setor_telas import setor_da_pessoa
+    from ..cadastro import setores as S
+    try:
+        st = setor_da_pessoa(current_app.config, email, visao._base(), visao._sessao())
+    except Exception:       # noqa: BLE001
+        return False
+    return bool(st) and S._norm(st.get("nome")) == "cos"
 
 
 class Recusada(ValueError):
@@ -102,7 +133,7 @@ def aprovadores(p: dict, b=None) -> dict:
                        else f"o Supervisor de Campo da {r['nome']} (vaga)"))
     if ids["gestor de contrato"]:
         partes.append(f"o gestor de contrato ({b.nome_da_pessoa(ids['gestor de contrato'], 'Gestor')})")
-    partes.append("alguém do COS" if cos else "alguém do COS (ninguém com o vínculo COS no cadastro ainda)")
+    partes.append(f"alguém do COS ({PLANTAO_COS})")
     partes.append("um administrador")
     texto = ", ".join(partes[:-1]) + " ou " + partes[-1]
     return {"ids": {k: v for k, v in ids.items() if v}, "cos": cos, "texto": texto[0].upper() + texto[1:]}
@@ -133,9 +164,14 @@ def pode_decidir(p: dict, email: str, nome: str = "", admin: bool = False, b=Non
     if admin:
         return True, "administrador"
     a = aprovadores(p, b)
-    papel = next((k for k, v in a["ids"].items() if pid and v == pid), None) or ("COS" if pid and pid in a["cos"] else None)
+    papel = next((k for k, v in a["ids"].items() if pid and v == pid), None)
     if papel:
         return True, papel
+    if (pid and pid in a["cos"]) or _do_setor_cos(email):
+        if cos_no_plantao():
+            return True, "COS"
+        return False, (f"O COS dá o De acordo só no plantão, {PLANTAO_COS}. Agora, quem pode: "
+                       f"{a['texto'][0].lower()}{a['texto'][1:]}.")
     return False, f"Quem pode dar o De acordo nesta PT: {a['texto'][0].lower()}{a['texto'][1:]}."
 
 

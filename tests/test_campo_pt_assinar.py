@@ -60,6 +60,42 @@ def test_o_responsavel_ufv_da_ficha_decide_a_pt(com_responsavel):
     assert ok is False and "Responsável UFV" not in porque
 
 
+def test_o_plantao_do_cos_vai_de_sexta_18h_a_segunda_6h():
+    """Levi, 14/11/2026: "O pessoal do COS pode dar o de acordo a partir de sexta-feira, 6 horas da noite, até segunda,
+    6 horas da manhã. Passou disso, só com o supervisor". No horário de Brasília."""
+    from datetime import datetime
+    h = lambda d, hora, minuto=0: datetime(2026, 11, d, hora, minuto, tzinfo=decisao_pt._BRT)  # noqa: E731
+    assert not decisao_pt.cos_no_plantao(h(13, 17, 59)) and decisao_pt.cos_no_plantao(h(13, 18))      # sexta
+    assert decisao_pt.cos_no_plantao(h(14, 12)) and decisao_pt.cos_no_plantao(h(15, 23, 59))         # sábado e domingo
+    assert decisao_pt.cos_no_plantao(h(16, 5, 59)) and not decisao_pt.cos_no_plantao(h(16, 6))       # segunda
+    assert not decisao_pt.cos_no_plantao(h(11, 3))                                                    # quarta
+
+
+def test_o_setor_cos_dos_acessos_decide_a_pt_no_plantao(com_responsavel, monkeypatch):
+    """O COS vale pelo setor da pessoa do login em Base → Acessos (as 11 pessoas do COS não têm ficha no cadastro, que é
+    o do time de campo): sem ficha nenhuma, a pessoa do setor COS decide no plantão e só nele."""
+    from datetime import datetime
+
+    from nexus.cadastro import setores as S
+    cos = "plantao.cos@exemplo.test"
+    _aba(com_responsavel, S.LIVRO, S.ABA_SETOR, [{"setor_id": 5, "nome": "COS", "criado_em": "2026-10-12",
+                                                  "alterado_em": "", "excluido": "não"}])
+    com_responsavel._id(S.LIVRO, S.ABA_DECISAO)["linhas"] = [
+        {"headers": list(S.CAB_DECISAO),
+         "values": ["2026-10-12T10:00:00-03:00", 20261012, 700, "", "", codigo_da_pessoa(CHAVE, cos), 5, "", "tela"]}]
+    S._CACHE.clear()
+    p = visao.pt("PT-1")
+    monkeypatch.setattr(decisao_pt, "_agora", lambda: datetime(2026, 11, 14, 22, tzinfo=decisao_pt._BRT))  # sábado
+    assert decisao_pt.pode_decidir(p, cos) == (True, "COS")
+    monkeypatch.setattr(decisao_pt, "_agora", lambda: datetime(2026, 11, 16, 9, tzinfo=decisao_pt._BRT))   # segunda 9h
+    ok, porque = decisao_pt.pode_decidir(p, cos)
+    assert ok is False and "plantão" in porque and "Responsável UFV (Responsável Exemplo)" in porque
+    # quem não está no setor COS segue sem poder, no plantão também
+    monkeypatch.setattr(decisao_pt, "_agora", lambda: datetime(2026, 11, 14, 22, tzinfo=decisao_pt._BRT))
+    assert decisao_pt.pode_decidir(p, "outra.pessoa@exemplo.test")[0] is False
+    S._CACHE.clear()
+
+
 def test_o_card_mostra_a_pt_e_a_assinatura_volta_ao_card_com_as_outras(app, com_responsavel):
     c = _sessao(app, RESP, "Responsável Exemplo")
     html = c.get(CARD_PT1).get_data(as_text=True)
