@@ -4,7 +4,7 @@
    comando/demandas.js, que lê a caixa em volta (`data-pessoas-url`, `data-os-url`). `pre` = o começo dos ids (dois
    formulários na mesma página não repetem id); `usina` = (usina_id, nome): a usina fica fixa, sem a lista, e as OS
    dela vêm ao abrir. #}
-{% macro campos(dem, codigo, pre='dm-f', usina=none) %}
+{% macro campos(dem, codigo, pre='dm-f', usina=none, valores=none) %}
     <input type="hidden" name="codigo" value="{{ codigo }}"><input type="hidden" name="novo_id" value="{{ dem.novo_id }}">
     <p class="dm-nota dm-nota--erro" role="alert" data-dm-f-pessoas-erro hidden></p>
     <div class="dm-dupla">
@@ -24,9 +24,9 @@
       </select>
       <span class="dm-nota" id="{{ pre }}-prazo" data-dm-f-prazo>O prazo é o do tema, em dias úteis. O setor sem tema ainda não recebe demanda: peça a ele que cadastre na aba <a href="{{ '/t/comando/caixa-de-entrada?dem=temas#demandas'|na_raiz }}">Temas do setor</a> da Caixa de entrada.</span></div>
     <div class="dm-campo"><label class="gc-rotulo" for="{{ pre }}-titulo">Título</label>
-      <input class="gc-campo" id="{{ pre }}-titulo" name="titulo" maxlength="{{ dem.limites.titulo }}" required placeholder="Em poucas palavras"></div>
+      <input class="gc-campo" id="{{ pre }}-titulo" name="titulo" maxlength="{{ dem.limites.titulo }}" required placeholder="Em poucas palavras"{% if valores and valores.titulo %} value="{{ valores.titulo }}"{% endif %}></div>
     <div class="dm-campo"><label class="gc-rotulo" for="{{ pre }}-desc">Descrição</label>
-      <textarea class="gc-campo" id="{{ pre }}-desc" name="descricao" rows="4" maxlength="{{ dem.limites.texto }}" required placeholder="O que você precisa, e por quê"></textarea></div>
+      <textarea class="gc-campo" id="{{ pre }}-desc" name="descricao" rows="4" maxlength="{{ dem.limites.texto }}" required placeholder="O que você precisa, e por quê">{% if valores and valores.descricao %}{{ valores.descricao }}{% endif %}</textarea></div>
     {% if usina %}
     <input type="hidden" name="usinas" value="{{ usina[0] }}" data-dm-f-usina-fixa>
     <div class="dm-campo"><label class="gc-rotulo" for="{{ pre }}-os">OS vinculada (opcional)</label>

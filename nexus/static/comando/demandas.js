@@ -45,6 +45,10 @@ window.NexusDemandaNova = function (dlg) {
         // sem setor escolhido, a pessoa se escolhe da lista inteira (escolher a pessoa acerta o setor)
         refazer(fPessoa, pessoas, '', 'Escolha a pessoa');
         fPessoa.options[0].textContent = 'Escolha a pessoa';
+        // o setor que veio preenchido (o "Fazer" do diagnóstico do dia, 14/11/2026): escolhido, com as pessoas e os temas dele
+        var preSetor = dlg.getAttribute('data-pre-setor');
+        if (preSetor && setores[preSetor]) { fSetor.value = preSetor; fSetor.dispatchEvent(new Event('change')); }
+        dlg.removeAttribute('data-pre-setor');
       })
       .catch(function () {
         erroPessoas.textContent = 'Não li a lista de pessoas agora: feche e abra de novo em instantes.';
@@ -93,7 +97,8 @@ window.NexusDemandaNova = function (dlg) {
   });
   var pedido = 0;
   function trazerOs(ids) {
-    var antes = fOs.value, n = ++pedido;
+    var antes = fOs.value || dlg.getAttribute('data-pre-os') || '', n = ++pedido;
+    dlg.removeAttribute('data-pre-os');
     fOs.innerHTML = '<option value="">Sem OS</option>';
     if (!ids.length) { osDica.textContent = dicaOs; return; }
     osDica.textContent = 'Buscando as OS…';

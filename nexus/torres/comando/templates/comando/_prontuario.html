@@ -85,7 +85,7 @@
      parecer agora, vai ter o diagnóstico da IA [...] o que é que está pendente, o que é que dá para fazer [...] direcione
      o supervisor"). O selo continua o do parecer (a conta das regras); a frase vira a situação da IA e embaixo vêm o que
      ele tem que fazer, o que pode fazer e o que está pendente com outros, recolhível. Sem a IA, fica o parecer (prontuario.js) #}
-  <section class="pu-parecer pu-parecer--{{ p.parecer.nivel }} pu-diag" aria-labelledby="pu-par-t" data-pu-diag="{{ raiz }}/t/comando/usinas/{{ x.usina_id }}/ia/diagnostico">
+  <section class="pu-parecer pu-parecer--{{ p.parecer.nivel }} pu-diag" aria-labelledby="pu-par-t" data-pu-diag="{{ raiz }}/t/comando/usinas/{{ x.usina_id }}/ia/diagnostico" data-pu-diag-usina="{{ x.usina_id }}" data-pu-diag-nome="{{ x.usina }}">
     <div class="pu-diag-linha">
       <span class="pu-par-selo"><i class="pu-ponto pu-ponto--{{ p.parecer.nivel }}" aria-hidden="true"></i><span data-pu-diag-selo>{{ p.parecer.titulo }}</span></span>
       <h2 class="pu-par-t" id="pu-par-t" data-pu-diag-frase>{{ p.parecer.frase }}</h2>

@@ -408,6 +408,20 @@ def usina_ia(usina_id):
     return render_template("comando/ia.html", torre=TORRE, tela=TORRE.tela("usinas"), **dados)
 
 
+def _setores_ativos() -> list[dict]:
+    """[{setor_id, nome}] dos setores ativos do cadastro: para onde o diagnóstico do dia pode mandar o "Fazer" (só o
+    cadastro, sem as pessoas nem os temas: a janela do pedido lê esses na hora)."""
+    from ...auth import setor_telas as ST
+    from ...cadastro import setores as S
+    from ...dados.conexao import banco
+    try:
+        st = ST._setores_no_clique(*banco())
+        return [{"setor_id": s["setor_id"], "nome": s["nome"]} for s in S.ativos(st.get("setores") or [])]
+    except Exception:            # noqa: BLE001 — sem os setores, o item sai sem o "Fazer"
+        current_app.logger.exception("Diagnóstico do dia: os setores não abriram")
+        return []
+
+
 def _ia_setores() -> list[dict]:
     """Para onde a resposta pode mandar demanda (14/11/2026, Levi: "ao citar coisas que podem ser feitas por outros
     setores, tem que dar a opção de caixa de entrada para mandar msg para esses setores"): os setores com pessoas, cada um
@@ -552,7 +566,7 @@ def usina_ia_diagnostico(usina_id):
         except BaseException:
             DG.soltar(cfg, usina_id, dia)
             raise
-        args = (dict(cfg), usina_id, dz["texto"], dz["tokens_estimados"], dia)
+        args = (dict(cfg), usina_id, dz["texto"], dz["tokens_estimados"], dia, _setores_ativos())
         if cfg.get("TESTING"):
             out = DG.para_tela(DG.gerar(*args))
         else:
@@ -874,8 +888,15 @@ def conversa_janela(usina_id):
             demandas = [d for d in D.lista(_hoje()) if any(u == usina_id for u, _n in d["usinas"]) and _pode_ver(d)]
         except Exception:        # noqa: BLE001 — o livro fora: a aba diz que não há, e a conversa segue
             current_app.logger.exception("conversa da usina: as demandas não abriram")
+    # o pedido já preenchido, vindo do "Fazer" do diagnóstico do dia (14/11/2026, Levi: "E aí já vai preenchido
+    # automático"): o setor, o título, o texto e a OS; quem envia confere, escolhe a pessoa e o tema
+    a = request.args
+    pre = {"setor": a.get("setor", "") if (a.get("setor") or "").isdigit() else "",
+           "titulo": " ".join((a.get("titulo") or "").split())[:D.TITULO_MAX],
+           "descricao": (a.get("descricao") or "").strip()[:D.TEXTO_MAX],
+           "os": a.get("os", "") if (a.get("os") or "").isdigit() else ""}
     return render_template("comando/_conversa_janela.html", **_contexto(
-        ob=ob, uid=usina_id, nome=nome, aba=aba, conv=_com_conversa(CV.atual().get(ob), _meu_hmac()),
+        ob=ob, uid=usina_id, nome=nome, aba=aba, conv=_com_conversa(CV.atual().get(ob), _meu_hmac()), pre=pre,
         erro_conversa=lido["erro"], dem=dem, demandas=demandas,
         voltar_jan=f"/t/comando/conversa/usina/{usina_id}/janela?aba=conversa"))
 

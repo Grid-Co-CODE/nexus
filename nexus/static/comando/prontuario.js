@@ -19,11 +19,43 @@
   function osDiag(n, tipo) {
     if (!n) return '';
     if (tipo === 'os' || !tipo) {
-      return ' <button type="button" class="pu-diag-os" data-pu-os="' + escD(n) + '" title="Abrir o card da OS ' + escD(n) + '">OS ' + escD(n) + '</button>';
+      return ' <button type="button" class="pu-diag-os" data-pu-os="' + escD(n) + '" title="Abrir o card da OS ' + escD(n) + '">Ver OS ' + escD(n) + '</button>';
     }
     var de = tipo === 'chamado' ? '?de=garantias' : (tipo === 'performance' ? '?de=performance' : '');
     return ' <a class="pu-diag-os" href="' + escD(nexusRota('/t/engenharia/equipe/os/')) + escD(n) + de +
-      '" target="_blank" rel="noopener" title="Raio X da OS ' + escD(n) + ' (abre em outra aba)">OS ' + escD(n) + '</a>';
+      '" target="_blank" rel="noopener" title="Raio X da OS ' + escD(n) + ' (abre em outra aba)">Ver OS ' + escD(n) + '</a>';
+  }
+  // o destino do item (14/11/2026, Levi: "todos esses tem que ter um botão para dar o destino [...] fazer [...] E aí já
+  // vai preenchido automático [...] visualizar [...] solicitar ao COS"): o "Fazer" abre o Pedir a um setor da usina já
+  // preenchido (o setor, o título, o texto e a OS), na janela por cima; o "Visualizar" leva à tela ou ao cartão
+  var VER_TELA = {aprovacao: function () { return nexusRota('/t/campo/aprovacao'); },
+                  engenharia: function () { return nexusRota('/t/engenharia/mesa'); }};
+  var VER_CARTAO = {performance: 'perf', os: 'os', rondas: 'rondas', seguranca: 'seg', cos: 'cos', chamados: 'chamados',
+                    insights: 'insights', demandas: 'demandas'};
+  function artigo(setor) {
+    var s = String(setor || '').trim();
+    return /(a|ção|dade|ance)$/i.test(s) ? 'à ' : 'ao ';
+  }
+  function botaoDiag(el, j, lista, x) {
+    var d = x.destino;
+    if (!d) return '';
+    if (d.tipo === 'ver') {
+      if (VER_TELA[d.onde]) {
+        return ' <a class="pu-diag-bt" href="' + escD(VER_TELA[d.onde]()) + '" target="_blank" rel="noopener">Visualizar</a>';
+      }
+      var sec = VER_CARTAO[d.onde];
+      if (!sec || !document.getElementById('pu-' + sec)) return '';
+      return ' <a class="pu-diag-bt" href="#pu-' + sec + '" data-pu-abre="' + sec + '">Visualizar</a>';
+    }
+    if (d.tipo !== 'pedir' || !d.setor_id) return '';
+    var uid = el.getAttribute('data-pu-diag-usina'), nome = el.getAttribute('data-pu-diag-nome') || '';
+    var desc = x.texto + '\n\nDo Nexus IA Insights de ' + (j.data || 'hoje') + ' da ' + nome + ': ' + ((j.diag || {}).situacao || '');
+    var url = nexusRota('/t/comando/conversa/usina/' + uid + '/janela') + '?aba=pedir&setor=' + encodeURIComponent(d.setor_id) +
+      '&titulo=' + encodeURIComponent(x.texto) + '&descricao=' + encodeURIComponent(desc) + (x.os ? '&os=' + encodeURIComponent(x.os) : '');
+    var rot = lista === 'pendente' ? 'Solicitar ' + artigo(d.setor) + d.setor : 'Fazer';
+    return ' <a class="pu-diag-bt pu-diag-bt--fazer" href="' + escD(url) + '" data-pu-jan="' + escD(url) +
+      '" data-pu-jan-t="Pedir a um setor · ' + escD(nome) + '" title="Pedir ' + escD(artigo(d.setor) + d.setor) +
+      ', já preenchido">' + escD(rot) + '</a>';
   }
   var LISTAS_DIAG = [['tem_que_fazer', 'Tem que fazer', 'critico'], ['pode_fazer', 'Pode fazer', 'ok'],
                      ['pendente', 'Pendente com outros', 'alerta']];
@@ -49,7 +81,7 @@
         var itens = d[l[0]] || [];
         if (!itens.length) return '';
         return '<div class="pu-diag-col pu-diag-col--' + l[2] + '"><h3>' + l[1] + '</h3><ul>' + itens.map(function (x) {
-          return '<li>' + escD(x.texto) + osDiag(x.os, x.os_tipo) + '</li>';
+          return '<li>' + escD(x.texto) + osDiag(x.os, x.os_tipo) + botaoDiag(el, j, l[0], x) + '</li>';
         }).join('') + '</ul></div>';
       }).join('');
     } else {

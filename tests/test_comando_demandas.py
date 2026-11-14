@@ -621,3 +621,17 @@ def test_a_janela_da_conversa_da_usina_conversa_pede_a_um_setor_e_lista_as_deman
     assert "Coração 2 sem meta" not in _cliente(app, SEM).get(JAN + "?aba=demandas").get_data(as_text=True)
     r = c.get(JAN, headers={"Sec-Fetch-Dest": "document"})
     assert r.status_code == 302 and r.headers["Location"].endswith("/t/comando/conversa/usina/1")
+
+
+def test_o_pedir_abre_preenchido_pelo_diagnostico_do_dia(app, cena):
+    """14/11/2026, Levi: "solicitar engenharia, tem um botão fazer [...] E aí já vai preenchido automático". O "Fazer" do
+    diagnóstico abre o Pedir a um setor com o setor, o título, o texto e a OS; quem envia confere e escolhe a pessoa."""
+    c = _cliente(app, ANA)
+    h = c.get("/t/comando/conversa/usina/1/janela?aba=pedir&setor=3&titulo=Revisar%20a%2027&descricao=Do%20diagn%C3%B3stico"
+              "&os=19301").get_data(as_text=True)
+    pedir = h.split('data-pu-seg-painel="pedir"', 1)[1].split('data-pu-seg-painel="demandas"', 1)[0]
+    assert 'data-pre-setor="3"' in pedir and 'data-pre-os="19301"' in pedir
+    assert 'value="Revisar a 27"' in pedir and ">Do diagnóstico</textarea>" in pedir
+    # sem o preenchido, os campos vêm vazios (a Nova demanda de sempre)
+    h = c.get("/t/comando/conversa/usina/1/janela?aba=pedir").get_data(as_text=True)
+    assert "data-pre-setor" not in h and 'placeholder="Em poucas palavras">' in h

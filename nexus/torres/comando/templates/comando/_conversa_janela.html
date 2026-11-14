@@ -31,9 +31,10 @@
     <form class="dm-form pu-cv-nova" method="post" enctype="multipart/form-data"
           action="{{ ('/t/comando/caixa-de-entrada/demandas/nova?usina_jan=' ~ uid)|na_raiz }}"
           data-pessoas-url="{{ '/t/comando/caixa-de-entrada/demandas/pessoas'|na_raiz }}"
-          data-os-url="{{ '/t/comando/caixa-de-entrada/demandas/os'|na_raiz }}" data-pu-dm-nova>
+          data-os-url="{{ '/t/comando/caixa-de-entrada/demandas/os'|na_raiz }}" data-pu-dm-nova
+          {%- if pre and pre.setor %} data-pre-setor="{{ pre.setor }}"{% endif %}{% if pre and pre.os %} data-pre-os="{{ pre.os }}"{% endif %}>
       <p class="dm-nota">Peça a outro setor algo sobre a {{ nome }}, sem abrir uma OS. Quem recebe é avisado no sininho, e o prazo é o do tema. A demanda também fica na Caixa de entrada.</p>
-      {{ nova.campos(dem, codigo, pre='pu-dm', usina=(uid, nome)) }}
+      {{ nova.campos(dem, codigo, pre='pu-dm', usina=(uid, nome), valores=pre) }}
       <div class="dm-botoes dm-botoes--fim">
         <button class="gc-btn gc-btn--ui gc-btn--primario" type="submit"><i class="ph ph-paper-plane-tilt" aria-hidden="true"></i> Enviar demanda</button>
       </div>

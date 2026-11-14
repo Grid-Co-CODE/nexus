@@ -25,7 +25,8 @@ def test_le_o_json_limpa_as_secoes_e_tira_a_os_que_nao_esta_no_dossie():
     assert [x["texto"] for x in d["tem_que_fazer"]] == ["Programar a ronda atrasada há 11 dias",
                                                         "Cobrar a análise da recorrência da 27"]
     assert d["tem_que_fazer"][1]["os"] == ""                       # 99999 não está no dossiê: não vira link
-    assert d["pode_fazer"] == [{"texto": "Pedir à concessionária o registro das oscilações", "os": "", "os_tipo": ""}]
+    assert d["pode_fazer"] == [{"texto": "Pedir à concessionária o registro das oscilações", "os": "", "os_tipo": "",
+                                "destino": None}]
     assert [x["texto"] for x in d["pendente"]] == ["Chamado da Brametal sem retorno há 22 dias"]
     # sem o JSON: None (a tela mostra o texto); o bloco cortado no fim ainda serve
     assert DG.ler("A usina está bem.", DOSSIE) is None and DG.ler('<diagnostico>{"situacao": ""}', DOSSIE) is None
@@ -102,3 +103,28 @@ def test_a_variavel_do_modelo_chega_ao_config():
     from nexus import create_app
     app = create_app({"NEXUS_SECRET_KEY": "x", "NEXUS_SENHA_ADMIN": "y", "NEXUS_IA_DIAGNOSTICO_MODELO": "gemini-lite"})
     assert DG.modelo(app.config) == "gemini-lite" and DG.modelo({}) == "nemotron"
+
+
+def test_cada_item_tem_o_destino_validado():
+    """14/11/2026, Levi: "todos esses tem que ter um botão para dar o destino [...] fazer [...] visualizar [...] solicitar
+    ao COS". Só setor da lista e lugar da lista viram botão."""
+    setores = [{"setor_id": 3, "nome": "Engenharia"}, {"setor_id": 7, "nome": "COS"}]
+    resp = ('<diagnostico>{"situacao": "Ok.", "tem_que_fazer": [], "pode_fazer": ['
+            '{"acao": "Solicitar à Engenharia a revisão dos ajustes", "os": null, "destino": {"pedir": "engenharia"}},'
+            '{"acao": "Aprovar as 65 OS em verificação", "os": null, "destino": {"ver": "aprovacao"}},'
+            '{"acao": "Pedir ao Marketing", "os": null, "destino": {"pedir": "Marketing"}},'
+            '{"acao": "Ver o site", "os": null, "destino": {"ver": "http://x"}}],'
+            '"pendente": [{"item": "Estabilidade da rede", "os": null, "destino": {"pedir": "COS"}},'
+            '{"item": "Análise da Engenharia", "os": null, "destino": {"ver": "Engenharia"}}]}</diagnostico>')
+    d = DG.ler(resp, DOSSIE, setores)
+    # o setor que não está na lista (Marketing) não vira botão; o 4º item passa do limite de 3
+    assert [x["destino"] for x in d["pode_fazer"]] == [{"tipo": "pedir", "setor_id": 3, "setor": "Engenharia"},
+                                                       {"tipo": "ver", "onde": "aprovacao"}, None]
+    assert [x["destino"] for x in d["pendente"]] == [{"tipo": "pedir", "setor_id": 7, "setor": "COS"},
+                                                     {"tipo": "ver", "onde": "engenharia"}]
+
+
+def test_o_pedido_preenchido_recusa_o_que_nao_e_numero(tela, logado):
+    """O setor e a OS do "Fazer" só entram como número (o preenchido de verdade: test_comando_demandas)."""
+    h = logado.get("/t/comando/conversa/usina/1/janela?aba=pedir&setor=x&os=1;2").get_data(as_text=True)
+    assert "data-pre-setor" not in h and "data-pre-os" not in h
