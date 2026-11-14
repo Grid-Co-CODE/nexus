@@ -628,6 +628,8 @@ o que é que ele tem que fazer".
       - O `demandas.js` escolhe o setor e a OS que vieram.
       - Quem envia confere e escolhe a pessoa e o tema.
       - O que depende da concessionária é pedido ao COS, que abre o chamado com a rede.
+      - Os chamados de garantia (cobrar o fabricante) são pedidos à Performance: não há setor de Garantias no cadastro,
+        a garantia fica dentro da Performance (Levi, 14/11/2026). O mesmo vale para as ações do chat.
     - **"Visualizar"** abre a Aprovação de OS ou a Mesa do engenheiro (noutra aba), ou abre o cartão do próprio
       prontuário (rondas, segurança, COS, chamados...).
     - A OS do item vira "Ver OS N" (o Raio X ou o card).

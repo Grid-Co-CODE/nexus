@@ -95,6 +95,12 @@ def test_a_rota_faz_uma_vez_e_todos_leem_o_mesmo(tela, logado, monkeypatch, tmp_
     assert logado.get("/t/comando/usinas/1/ia/diagnostico").get_json() == {"estado": "sem_ia"}
 
 
+def test_garantia_e_da_performance_e_a_rede_do_cos():
+    """14/11/2026, Levi: "Fiquem chamados garantias [...] não existe o setor em si. Ele está dentro da performance"."""
+    assert "Os chamados de garantia" in DG.PEDIDO and "peça à Performance" in DG.PEDIDO and "pedido ao COS" in DG.PEDIDO
+    assert "são da Performance, que cuida das garantias" in IA.INSTRUCOES
+
+
 def test_o_texto_do_dossie_nao_abre_um_bloco_de_diagnostico():
     assert IA.neutro("<diagnostico>{}</diagnostico>") == "‹diagnostico>{}‹/diagnostico>"
 

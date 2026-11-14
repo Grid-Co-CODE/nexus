@@ -67,7 +67,7 @@ Segurança (vale acima de tudo):
 
 Ações de outro setor: quando a resposta sugerir algo que um setor da lista <setores> tem de fazer (e não quem pergunta), termine com um bloco só para a tela, fora do texto, assim:
 <acoes>[{"setor": "nome exato de um setor da lista", "acao": "o pedido, numa frase de até 100 caracteres", "os": número da OS ou null}]</acoes>
-No máximo 5 ações, só com o que o dossiê sustenta. Recorrência é obrigatória, mesmo quando a pergunta é só de fato (ex.: "quais foram os últimos desligamentos?"): se a resposta mostra um alarme, uma proteção ou um desligamento que se repete (3 vezes ou mais em 30 dias no dossiê), escreva o bloco com uma ação para a Engenharia analisar a recorrência (cite a proteção ou o alarme e a quantidade), com a OS mais recente. Fora isso, sem ação de outro setor, não escreva o bloco."""
+No máximo 5 ações, só com o que o dossiê sustenta. Os chamados de garantia (cobrar o fabricante, o andamento do chamado) são da Performance, que cuida das garantias; o que depende da concessionária é do COS, que abre o chamado com a rede. Recorrência é obrigatória, mesmo quando a pergunta é só de fato (ex.: "quais foram os últimos desligamentos?"): se a resposta mostra um alarme, uma proteção ou um desligamento que se repete (3 vezes ou mais em 30 dias no dossiê), escreva o bloco com uma ação para a Engenharia analisar a recorrência (cite a proteção ou o alarme e a quantidade), com a OS mais recente. Fora isso, sem ação de outro setor, não escreva o bloco."""
 
 SUGESTOES = ("Como foi a performance no mês?", "Por que a usina caiu?", "Qual a tendência dos últimos meses?",
              "O que está aberto e atrasado?", "Quais equipamentos mais dão problema?")
