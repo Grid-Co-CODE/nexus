@@ -168,7 +168,7 @@
     // o tema liga e desliga os campos dele; o tema fica marcado enquanto houver um campo dele marcado
     var conferir = function () {
       form.querySelectorAll('[data-pu-rel-tema]').forEach(function (t) {
-        var grupo = t.closest('fieldset');
+        var grupo = t.closest('[data-pu-rel-grupo]');
         if (grupo) { t.checked = !!grupo.querySelector('input[name="campo"]:checked'); }
       });
       var algum = !!form.querySelector('input[name="campo"]:checked');
@@ -189,7 +189,7 @@
     form.addEventListener('change', function (ev) {
       var t = ev.target;
       if (t.matches && t.matches('[data-pu-rel-tema]')) {
-        t.closest('fieldset').querySelectorAll('input[name="campo"]').forEach(function (c) { c.checked = t.checked; });
+        t.closest('[data-pu-rel-grupo]').querySelectorAll('input[name="campo"]').forEach(function (c) { c.checked = t.checked; });
       }
       conferir();
     });

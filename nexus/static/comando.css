@@ -605,6 +605,10 @@ a.ins-titulo:hover{color:var(--verde-texto)}
 .pu-rel-tema{min-width:0;margin:0;padding:0;border:0}
 .pu-rel-tema legend{padding:0;font:600 13.5px/1.4 var(--font-sans);color:var(--tinta)}
 .pu-rel-tema legend label,.pu-rel-tema li label{display:flex;align-items:flex-start;gap:8px;cursor:pointer}
+.pu-rel-tema-cab{display:flex;align-items:center;gap:8px;font:600 13.5px/1.4 var(--font-sans);color:var(--tinta);cursor:pointer}
+.pu-rel-det{margin:2px 0 0 24px}
+.pu-rel-det>summary{cursor:pointer;font-size:12px;color:var(--mudo);list-style-position:inside}
+.pu-rel-det>summary:hover{color:var(--tinta)}
 .pu-rel-tema ul{list-style:none;margin:6px 0 0;padding:0 0 0 24px;display:grid;gap:5px}
 .pu-rel-tema li{font-size:13px;line-height:1.4;color:var(--tinta-2)}
 .pu-rel-tema input{flex:none;width:16px;height:16px;margin:2px 0 0;accent-color:var(--verde)}
@@ -729,9 +733,9 @@ a.ins-titulo:hover{color:var(--verde-texto)}
 .ia-vazio{align-self:center;justify-self:center;text-align:center;max-width:560px;padding:20px 8px}
 .ia-vazio-t{margin:0 0 4px;font:600 17px/24px var(--font-sans);color:var(--tinta)}
 .ia-vazio .mudo{margin:0 0 14px;font-size:13px}
-.ia-sugestoes{display:flex;flex-wrap:wrap;justify-content:center;gap:8px}
-.ia-sugestao{border:1px solid var(--linha-forte);background:var(--superficie-2);color:var(--tinta);border-radius:999px;padding:6px 13px;
-  font:500 13px/18px var(--font-sans);cursor:pointer}
+.ia-sugestoes{display:flex;flex-wrap:wrap;gap:6px}
+.ia-sugestao{border:1px solid var(--linha-forte);background:var(--superficie-2);color:var(--tinta);border-radius:999px;padding:4px 11px;
+  font:500 12.5px/17px var(--font-sans);cursor:pointer}
 .ia-sugestao:hover{border-color:var(--verde)}
 .ia-sugestao:focus-visible{outline:2px solid var(--foco);outline-offset:2px}
 .ia-turno{display:grid;gap:10px}
@@ -779,6 +783,8 @@ a.ins-titulo:hover{color:var(--verde-texto)}
 .ia-acao-setor{padding:2px 8px;border-radius:var(--raio-tag);background:var(--info-suave);color:var(--info);font:600 11.5px/16px var(--font-sans)}
 .ia-acao-txt{font-size:13px}
 .ia-acao-feita{color:var(--ok);font:600 12.5px/1 var(--font-sans);white-space:nowrap}
+.ia-acao-botoes{display:inline-flex;flex-wrap:wrap;gap:6px;justify-content:flex-end}
+.ia-r-troca{margin:0;padding:6px 10px;border-radius:var(--raio-controle);background:var(--info-suave);color:var(--tinta-2);font-size:12.5px}
 .ia-demanda{grid-column:1 / -1;display:grid;grid-template-columns:1fr 1fr;gap:8px;padding-top:6px}
 .ia-demanda label{display:grid;gap:4px;font:700 10.5px/1 var(--font-sans);letter-spacing:.05em;text-transform:uppercase;color:var(--mudo)}
 .ia-demanda .gc-campo{width:100%;box-sizing:border-box;text-transform:none;letter-spacing:0}

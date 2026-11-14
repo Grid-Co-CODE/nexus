@@ -59,12 +59,27 @@
     }
     return h;
   }
+  // o "Criar OS" da ação, à esquerda da caixa de entrada, para o setor que recebe OS (Engenharia, Performance): o
+  // mesmo Criar OS do prontuário (a janela do OS Creator por cima; fora do prontuário, o OS Creator noutra aba)
+  var criarOsMapa = null;
+  function semAcento(s) { return String(s || '').normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim(); }
+  function criarOs(setor) {
+    if (criarOsMapa === null) {
+      var el = document.querySelector('[data-ia-criar-os]');
+      try { criarOsMapa = el ? JSON.parse(el.textContent) : {}; } catch (e) { criarOsMapa = {}; }
+    }
+    var c = criarOsMapa[semAcento(setor)];
+    if (!c) return '';
+    return '<a class="gc-btn gc-btn--ui gc-btn--contorno" data-pu-criar="' + esc(c.url) + '" href="' + esc(nexusRota(c.url)) +
+      '" target="_blank" rel="noopener"><i class="ph ph-plus" aria-hidden="true"></i> Criar ' + esc(c.rot) + '</a>';
+  }
   function acoes(r, ri) {
     if (!r.acoes || !r.acoes.length) return '';
     return '<div class="ia-acoes"><p class="ia-acoes-t">Pedir a outro setor</p>' + r.acoes.map(function (a, i) {
       return '<div class="ia-acao" data-ia-acao="' + ri + '-' + i + '"><span class="ia-acao-setor">' + esc(a.setor) + '</span>' +
         '<span class="ia-acao-txt">' + esc(a.acao) + (a.os ? ' <span class="mudo">· OS ' + a.os + '</span>' : '') + '</span>' +
-        '<button type="button" class="gc-btn gc-btn--ui gc-btn--contorno" data-ia-pedir><i class="ph ph-tray-arrow-down" aria-hidden="true"></i> Mandar para a caixa de entrada</button></div>';
+        '<span class="ia-acao-botoes">' + criarOs(a.setor) +
+        '<button type="button" class="gc-btn gc-btn--ui gc-btn--contorno" data-ia-pedir><i class="ph ph-tray-arrow-down" aria-hidden="true"></i> Mandar para a caixa de entrada</button></span></div>';
     }).join('') + '</div>';
   }
   function cartao(r, ri, raiz) {
@@ -78,7 +93,8 @@
       (n.fora.length ? 'Fora do dossiê (cálculo da IA ou invenção): ' + esc(n.fora.join(', ')) : 'Todos os números da resposta estão no dossiê') +
       '">' + n.no_dossie + ' de ' + n.n + ' números no dossiê</span>' : '';
     var custo = 'US$ ' + num(r.custo_usd, 4) + (r.preco_oficial ? '' : ' (ref.)');
-    return '<article class="ia-r">' + cab + '<div class="ia-r-texto">' + texto(r.texto, r.os, raiz) + '</div>' + acoes(r, ri) +
+    return '<article class="ia-r">' + cab + (r.troca ? '<p class="ia-r-troca">' + esc(r.troca) + '</p>' : '') +
+      '<div class="ia-r-texto">' + texto(r.texto, r.os, raiz) + '</div>' + acoes(r, ri) +
       (r.parou ? '<p class="ia-r-aviso">A resposta foi cortada (' + esc(r.parou) + ').</p>' : '') +
       '<p class="ia-r-pe">' + conf + '<span class="mudo">' + num(r.ms / 1000, 1) + ' s · ' + num(r.entrada + (r.cache_lido || 0)) +
       ' → ' + num(r.saida) + ' tokens · ' + custo + '</span></p></article>';

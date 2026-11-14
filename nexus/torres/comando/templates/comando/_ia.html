@@ -7,6 +7,7 @@
      data-ia-demanda-url="{{ raiz }}/t/comando/usinas/{{ x.usina_id }}/ia/demanda" data-ia-raiz="{{ raiz }}">
   {# para onde a resposta pode mandar demanda: os setores, as pessoas e os temas (a Nova demanda da Caixa de entrada) #}
   <script type="application/json" data-ia-setores>{{ setores|tojson }}</script>
+  <script type="application/json" data-ia-criar-os>{{ criar_os|tojson }}</script>
   <fieldset class="ia-modelos">
     <legend>Modelos <span class="mudo">· marque mais de um para comparar</span></legend>
     {% for m in modelos %}
@@ -23,11 +24,12 @@
     {% for m in modelos|unique(attribute='provedor') %}{{ m.motivo }}{{ ' ' if not loop.last }}{% endfor %}</div></div>
   {% endif %}
 
+  {# as perguntas sugeridas lado a lado, no alto, e ficam depois da primeira pergunta (14/11/2026, Levi) #}
+  <div class="ia-sugestoes" role="group" aria-label="Perguntas sugeridas">{% for s in sugestoes %}<button type="button" class="ia-sugestao" data-ia-sugestao>{{ s }}</button>{% endfor %}</div>
   <div class="ia-conversa" data-ia-conversa aria-live="polite">
     <div class="ia-vazio" data-ia-vazio>
       <p class="ia-vazio-t">Pergunte sobre a {{ x.usina }}.</p>
       <p class="mudo">A resposta vem só do dossiê de agora: o prontuário inteiro, sem o nome das pessoas.</p>
-      <div class="ia-sugestoes">{% for s in sugestoes %}<button type="button" class="ia-sugestao" data-ia-sugestao>{{ s }}</button>{% endfor %}</div>
     </div>
   </div>
 

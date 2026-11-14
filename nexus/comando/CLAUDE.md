@@ -568,11 +568,41 @@ Gemini, Groq, Grok [...] Qualquer IA que dê para puxar a API para fazermos o te
   - **Pedido de relatório** ("se eu pedisse um relatório já baixa um automático [...] se eu pedir só chamado vem filtrado
     só chamado"). `pedido_de_relatorio` reconhece o pedido no Nexus, sem gastar pedido da IA, e devolve o endereço do
     PDF do prontuário (`/relatorio.pdf?mes=&tema=`):
-    - os temas vêm pelas palavras (chamado/garantia, performance/geração, ronda/limpeza, manutenção/OS);
+    - os temas vêm pelas palavras (chamado/garantia, religamento/desligamento/parada/queda, performance/geração,
+      ronda/limpeza, manutenção/OS);
     - o mês vem pelo nome, por "este mês" ou "mês passado"; sem nada disso, é o mês fechado anterior;
     - a tela baixa o PDF sozinha.
 
-Prova: `tests/test_comando_ia.py` (cada provedor no formato dele, com dublês; a rota, o teto, o registro, a rodada).
+- **14/11/2026 à tarde, cinco pedidos do Levi (com a resposta dos "últimos desligamentos" da Capitão Poço 100):**
+  - **A conclusão primeiro** ("a pessoa começa com a conclusão e ela vê o porquê [...] um diagnóstico baseado em dados").
+    As instruções mandam abrir pelo diagnóstico (o que aconteceu e por quê), nunca por uma introdução, e só depois os
+    tópicos com os dados (até 6).
+  - **Recorrência vira ação da Engenharia** ("esse alarme está repetindo muito, seria importante ele abrir a opção de ou
+    criar um OS para engenharia ou mandar uma mensagem por caixa de entrada"). Alarme, proteção ou desligamento que se
+    repete 3 vezes ou mais em 30 dias no dossiê gera uma ação para a Engenharia, com a OS mais recente.
+  - **Criar OS ao lado da caixa de entrada** ("chamados não vai dar para criar OS, porque quem cria OS para os chamados é
+    o técnico [...] para engenharia dá, para performance dá"). A ação de Engenharia ou de Performance ganha, à esquerda
+    do "Mandar para a caixa de entrada", o "Criar OS de Engenharia" / "Criar OS de Performance".
+    - Os endereços são os do Criar OS do prontuário (`prontuario_dados.CRIAR_OS`, por `_ia_criar_os`), num JSON da
+      janela (`data-ia-criar-os`).
+    - Dentro do prontuário, o clique abre o OS Creator por cima (o `[data-pu-criar]` de sempre); fora, noutra aba.
+    - Os outros setores ficam só com a caixa de entrada.
+  - **Perguntas sugeridas no alto, lado a lado** ("se não couber na linha, quebra a linha e continua [...] que ficassem as
+    perguntas sugeridas ainda em cima"). Saíram do "vazio" para cima da conversa e ficam depois da primeira pergunta.
+  - **A troca entre as grátis, no lugar de várias contas.** O Levi perguntou se podia criar 3 ou 4 contas do OpenRouter
+    para trocar quando uma estourasse a cota. Os termos do OpenRouter proíbem (seção 7, item 3: criar várias contas
+    "for purposes of bypassing or circumventing use limits"). No lugar:
+    - com UM modelo grátis pedido, se ele bate o limite do dia, a pergunta vai à próxima grátis com chave
+      (`TROCA_GRATIS`: Nemotron, Gemini Flash-Lite, GPT-OSS);
+    - o cartão diz quem respondeu e por quê (`troca`);
+    - no modo de comparar não há troca.
+
+    O caminho permitido para mais pedidos é o próprio OpenRouter: US$ 10 de crédito sobem o limite dos `:free` de 50
+    para 1.000 por dia. Não há prazo fixo para o Nemotron grátis: o OpenRouter e o dono do modelo (NVIDIA) tiram ou
+    mudam o modelo quando quiserem (termos, seções 1 e 9). A chave tem a validade marcada na criação (`expires_at`).
+
+Prova: `tests/test_comando_ia.py` (cada provedor no formato dele, com dublês; a rota, o teto, o registro, a rodada; a
+troca entre as grátis; o Criar OS e as sugestões na janela).
 
 ## Contestações e Prévia: visão do contrato (no Comando desde 12/11/2026)
 

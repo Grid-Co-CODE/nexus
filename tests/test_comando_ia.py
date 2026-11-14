@@ -331,8 +331,10 @@ def test_a_resposta_leva_as_os_do_dossie_e_a_acao_perde_a_os_inventada(monkeypat
 def test_o_pedido_de_relatorio_pelo_tema_e_pelo_mes():
     from datetime import date
     h = date(2026, 11, 14)
-    assert IA.pedido_de_relatorio("me dá o relatório", h) == {"temas": ["perf", "rondas", "manut", "chamados"],
+    assert IA.pedido_de_relatorio("me dá o relatório", h) == {"temas": ["perf", "religamentos", "rondas", "manut", "chamados"],
                                                               "mes": "2026-10", "mes_fora": False}
+    assert IA.pedido_de_relatorio("relatório dos religamentos", h)["temas"] == ["religamentos"]
+    assert IA.pedido_de_relatorio("pdf das paradas de outubro", h)["temas"] == ["religamentos"]
     assert IA.pedido_de_relatorio("quero o relatório só de chamados", h)["temas"] == ["chamados"]
     assert IA.pedido_de_relatorio("pdf deste mês da performance e das rondas", h) == {
         "temas": ["perf", "rondas"], "mes": "2026-11", "mes_fora": False}
@@ -389,3 +391,40 @@ def test_a_janela_leva_os_setores_com_pessoas_e_temas(tela, logado, monkeypatch)
     assert [(s["nome"], len(s["pessoas"]), len(s["temas"])) for s in dados] == [
         ("Engenharia", 1, 1), ("PCM", 0, 0), ("Segurança", 1, 0)]
     assert 'data-ia-demanda-url="/t/comando/usinas/1/ia/demanda"' in h
+
+
+
+# ── 14/11/2026 à tarde: a troca entre os grátis, o Criar OS das ações, as sugestões no alto ─────────────────────────────
+def test_o_gratis_que_bate_o_limite_passa_a_pergunta_ao_proximo(monkeypatch):
+    """Os termos do OpenRouter proíbem várias contas para contornar o limite: no lugar, a troca para outro grátis."""
+    vistos = []
+
+    def chamar(m, *a):
+        vistos.append(m.id)
+        if m.id == "nemotron":
+            return {"erro": "O OpenRouter pediu para esperar (limite de uso): tente de novo em instantes."}
+        return {"texto": f"Resposta do {m.id} (§3).", "entrada": 1, "saida": 1}
+    monkeypatch.setattr(IA, "_chamar", chamar)
+    cfg = {"OPENROUTER_API_KEY": "k", "GEMINI_API_KEY": "g", "GROQ_API_KEY": "q"}
+    rs = IA.perguntar(cfg, ["nemotron"], DOSSIE, "?")
+    assert [r["id"] for r in rs] == ["gemini-lite"] and vistos == ["nemotron", "gemini-lite"]
+    assert rs[0]["troca"] == "O Nemotron 3 Ultra grátis bateu o limite do dia: quem respondeu foi o Gemini 3.1 Flash-Lite grátis."
+    # no modo de comparar não há troca: cada cartão é o modelo marcado
+    vistos.clear()
+    rs = IA.perguntar(cfg, ["nemotron", "groq-oss"], DOSSIE, "?")
+    assert [(r["id"], r["ok"]) for r in rs] == [("nemotron", False), ("groq-oss", True)] and "troca" not in rs[1]
+
+
+def test_as_instrucoes_pedem_a_conclusao_primeiro_e_a_engenharia_na_recorrencia():
+    assert "Comece SEMPRE pela conclusão" in IA.INSTRUCOES and "Nunca abra com uma introdução" in IA.INSTRUCOES
+    assert "3 vezes ou mais em 30 dias" in IA.INSTRUCOES and "Engenharia analisar a recorrência" in IA.INSTRUCOES
+    assert "Recorrência é obrigatória, mesmo quando a pergunta é só de fato" in IA.INSTRUCOES
+
+
+def test_as_sugestoes_no_alto_e_o_criar_os_dos_setores_que_recebem_os(tela, logado):
+    h = logado.get("/t/comando/usinas/1/ia?parcial=1").get_data(as_text=True)
+    # as sugestões fora do "vazio": ficam depois da primeira pergunta
+    assert h.index('class="ia-sugestoes"') < h.index('data-ia-conversa') and "data-ia-vazio" in h
+    criar = json.loads(h.split("data-ia-criar-os>")[1].split("</script>")[0])
+    assert criar == {"engenharia": {"rot": "OS de Engenharia", "url": "/os/solicitacao/engenharia"},
+                     "performance": {"rot": "OS de Performance", "url": "/os/solicitacao/performance"}}

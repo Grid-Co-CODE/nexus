@@ -402,7 +402,7 @@ def usina_ia(usina_id):
         abort(404)
     cfg = current_app.config
     dados = dict(x=ctx["x"], modelos=IA.disponiveis(cfg), sugestoes=IA.SUGESTOES, gasto=IA.gasto_do_mes(cfg),
-                 teto=IA.teto(cfg), max_pergunta=IA.MAX_PERGUNTA, setores=_ia_setores())
+                 teto=IA.teto(cfg), max_pergunta=IA.MAX_PERGUNTA, setores=_ia_setores(), criar_os=_ia_criar_os())
     if request.args.get("parcial") == "1":          # a janela por cima do prontuário
         return render_template("comando/_ia.html", **dados)
     return render_template("comando/ia.html", torre=TORRE, tela=TORRE.tela("usinas"), **dados)
@@ -442,6 +442,15 @@ def _ia_setores() -> list[dict]:
             elif nome == "temas":
                 s["temas"].append({"tema_id": x["tema_id"], "nome": x["nome"], "prazo": x["prazo_dias_uteis"]})
     return sorted(out.values(), key=lambda s: s["nome"].lower())
+
+
+def _ia_criar_os() -> dict:
+    """{setor sem acento: {rot, url}} dos setores que recebem OS pelo Criar OS do prontuário (14/11/2026, Levi: "para
+    engenharia dá para criar OS, para performance dá para a pessoa criar um OS"; chamado não, quem abre é o técnico):
+    a ação para eles ganha o "Criar OS" ao lado do "Mandar para a caixa de entrada"."""
+    from .prontuario_dados import CRIAR_OS
+    return {setor: {"rot": rot, "url": url} for rot, _sub, url, _leva in CRIAR_OS
+            for setor in ("engenharia", "performance") if url.endswith("/solicitacao/" + setor)}
 
 
 def _ia_meu_setor() -> str:

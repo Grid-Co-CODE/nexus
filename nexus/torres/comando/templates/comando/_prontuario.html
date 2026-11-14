@@ -405,11 +405,15 @@
         <p class="gc-rotulo cu-rel-t">O que entra no relatório?</p>
         <p class="pn-rel-todos"><button type="button" class="cn-link cr-link-botao" data-pu-rel-todos="1">Marcar todos</button><span aria-hidden="true">·</span><button type="button" class="cn-link cr-link-botao" data-pu-rel-todos="0">Tirar todos</button></p>
         <div class="pu-rel-campos">
+          {# cada tema recolhido, com o que ele tem escrito ao lado (14/11/2026, Levi: "tem que vir recolhido por
+             setores [...] se a pessoa quiser ela expande"); o tema marca e desmarca todos os campos dele #}
           {% for tema, nome, campos in p.rel_campos %}
-          <fieldset class="pu-rel-tema">
-            <legend>{% if tema %}<label><input type="checkbox" data-pu-rel-tema name="tema" value="{{ tema }}" checked> {{ nome }}</label>{% else %}{{ nome }}{% endif %}</legend>
-            <ul>{% for k, rot in campos %}<li><label><input type="checkbox" name="campo" value="{{ k }}" checked> {{ rot }}</label></li>{% endfor %}</ul>
-          </fieldset>
+          <div class="pu-rel-tema" data-pu-rel-grupo>
+            <label class="pu-rel-tema-cab">{% if tema %}<input type="checkbox" data-pu-rel-tema name="tema" value="{{ tema }}" checked>{% else %}<input type="checkbox" data-pu-rel-tema checked>{% endif %} {{ nome }}</label>
+            <details class="pu-rel-det"><summary>{{ campos|length }} {{ 'campo' if campos|length == 1 else 'campos' }}</summary>
+              <ul>{% for k, rot in campos %}<li><label><input type="checkbox" name="campo" value="{{ k }}" checked> {{ rot }}</label></li>{% endfor %}</ul>
+            </details>
+          </div>
           {% endfor %}
         </div>
         <p class="pn-rel-aviso cn-t-alerta" role="status" hidden>Marque pelo menos um campo para baixar.</p>

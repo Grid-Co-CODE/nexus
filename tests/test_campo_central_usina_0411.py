@@ -155,7 +155,7 @@ def test_os_campos_do_relatorio_e_o_pedido():
     # o campo de um tema que não foi pedido não esvazia o relatório: valem os campos do tema pedido
     assert RU.campos_do_pedido(["rondas_lista"], ("perf",)) == RU.campos_do_pedido([], ("perf",))
     grupos = RU.campos_por_tema()
-    assert [t for t, _n, _c in grupos] == ["", "perf", "rondas", "manut", "chamados"]
+    assert [t for t, _n, _c in grupos] == ["", "perf", "religamentos", "rondas", "manut", "chamados"]
     assert [k for _t, _n, cs in grupos for k, _r in cs] == list(RU.CHAVES_CAMPOS)
     assert {t for _k, t, _r in RU.CAMPOS} == {""} | set(RU.CHAVES_TEMAS)
     # o resumo só fala dos temas que têm campo ligado; só com o resumo, de todos
@@ -344,3 +344,24 @@ def test_o_eixo_com_passo_quebrado_mostra_a_casa_decimal():
     g = G.geracao([{"dia": 1, "geracao_kwh": 37000, "meta_kwh": 40000, "ipoa": 9.5, "ipoa_meta": 7.7}], 30)
     assert [m["rotulo"] for m in g["grades_dir"]] == ["0,0", "2,5", "5,0", "7,5", "10,0", "12,5"]
     assert [m["rotulo"] for m in g["grades"]] == ["0", "10", "20", "30", "40", "50"]      # o passo inteiro fica sem casa
+
+
+
+def test_o_pdf_leva_as_paradas_do_mes_com_o_que_aconteceu():
+    """14/11/2026, Levi: "Na parte de relatório, eu não vi a opção de religamentos [...] Tem que ter religamentos"."""
+    from datetime import date, datetime, timezone
+    from nexus.campo import relatorio_usina as RU
+    br = timezone(timedelta(hours=-3))
+    d = {"uid": 1, "usina": "Altair", "cliente": "Thopen", "cidade": "", "uf": "SP", "potencia_mwp": None,
+         "mes": "2026-11", "mes_id": 202611, "mes_txt": "novembro de 2026", "ini": date(2026, 11, 1),
+         "fim": date(2026, 11, 13), "corrente": True, "hoje": date(2026, 11, 14), "erros": {},
+         "religamentos": [{"ini": datetime(2026, 11, 12, 9, 41, tzinfo=br), "tipo": "Usina desligada", "fora": "54 min",
+                           "parou": True, "os": "19375", "protecoes": "27;59",
+                           "relato": "Causa: oscilação na rede da concessionária."},
+                          {"ini": datetime(2026, 11, 10, 15, 55, tzinfo=br), "tipo": "Usina desligada", "fora": "4 min",
+                           "parou": True, "os": "19150", "protecoes": "27", "relato": ""}]}
+    assert "O COS registrou 2 paradas no mês, 2 com a geração parada." in RU._resumo(d, ("religamentos",))
+    corpo = RU._religamentos(d, RU._estilos(), RU.CHAVES_CAMPOS)
+    assert len(corpo) == 2 and "27 (2x), 59 (1x)" in corpo[1].text
+    pdf = RU.gerar(d, ("religamentos",), gerado_em="14/11/2026 às 15:00", campos=("religamentos_lista",))
+    assert pdf[:4] == b"%PDF" and len(pdf) > 1000

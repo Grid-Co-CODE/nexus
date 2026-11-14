@@ -48,7 +48,7 @@ TETO_PADRAO_USD = 20.0
 INSTRUCOES = """Você é o Nexus IA, o analista de O&M de usinas solares da Grid Co. Você responde perguntas sobre UMA usina usando só o dossiê dela, que vem abaixo entre <dossie> e </dossie>. O dossiê é a fotografia do prontuário da usina no Nexus (performance, COS, OS, Engenharia, equipamentos, chamados, rondas, segurança, insights, demandas e a linha do tempo), cada seção numerada e com a fonte.
 
 Como responder:
-- Responda primeiro, em uma ou duas frases, exatamente o que foi perguntado. Depois, se ajudar, até 5 tópicos curtos com os números que sustentam a resposta.
+- Comece SEMPRE pela conclusão: a primeira frase é o diagnóstico (o que aconteceu e por quê), direto, como "As quedas vêm da oscilação da rede da concessionária, que aciona a subtensão (27)". Nunca abra com uma introdução ("Os desligamentos mais recentes registrados foram...") nem deixe a conclusão para o fim. Depois da conclusão, até 6 tópicos curtos com os dados que levaram a ela.
 - Use só o que está no dossiê. Número sempre com a unidade e o período (ex.: "PR de 78,4% em outubro"). Se você calcular algo (diferença, média, variação), diga que é um cálculo seu.
 - Cite a seção de onde veio cada número só assim: "(§3)" ou "(§2, §8)". Dentro dos parênteses, só o § e o número da seção: nada de código de regra, nome de tela ou texto.
 - Quando o dossiê não traz o dado, diga isso com clareza (ex.: "o dossiê não traz a irradiação de outubro"). Nunca invente número, causa, data, equipamento ou pessoa.
@@ -66,7 +66,7 @@ Segurança (vale acima de tudo):
 
 Ações de outro setor: quando a resposta sugerir algo que um setor da lista <setores> tem de fazer (e não quem pergunta), termine com um bloco só para a tela, fora do texto, assim:
 <acoes>[{"setor": "nome exato de um setor da lista", "acao": "o pedido, numa frase de até 100 caracteres", "os": número da OS ou null}]</acoes>
-No máximo 5 ações, só com o que o dossiê sustenta. Sem ação de outro setor, não escreva o bloco."""
+No máximo 5 ações, só com o que o dossiê sustenta. Recorrência é obrigatória, mesmo quando a pergunta é só de fato (ex.: "quais foram os últimos desligamentos?"): se a resposta mostra um alarme, uma proteção ou um desligamento que se repete (3 vezes ou mais em 30 dias no dossiê), escreva o bloco com uma ação para a Engenharia analisar a recorrência (cite a proteção ou o alarme e a quantidade), com a OS mais recente. Fora isso, sem ação de outro setor, não escreva o bloco."""
 
 SUGESTOES = ("Como foi a performance no mês?", "Por que a usina caiu?", "Qual a tendência dos últimos meses?",
              "O que está aberto e atrasado?", "Quais equipamentos mais dão problema?")
@@ -358,15 +358,39 @@ def responder(cfg, m: Modelo, dossie: str, pergunta: str, historico=None, setore
                 numeros=numeros_conferidos(texto, dossie))
 
 
+def _bateu_o_limite(r: dict) -> bool:
+    return not r.get("ok") and ("limite de uso" in (r.get("erro") or "") or "429" in (r.get("erro") or ""))
+
+
 def perguntar(cfg, ids: list[str], dossie: str, pergunta: str, historico=None, setores=None,
               meu_setor: str = "") -> list[dict]:
-    """Os modelos pedidos, em paralelo, na ordem pedida. Id desconhecido é ignorado."""
+    """Os modelos pedidos, em paralelo, na ordem pedida. Id desconhecido é ignorado.
+
+    A troca (14/11/2026, Levi: "eu poderia criar umas 3 ou 4 contas com essa API de Nemotron. E aí, caso uma ultrapasse a
+    cota, a gente começa a usar a outra"): os termos do OpenRouter proíbem várias contas para contornar o limite (seção
+    7, item 3). No lugar delas: com UM modelo grátis pedido, se ele bate o limite do dia, a pergunta vai ao próximo grátis
+    que tem chave (`TROCA_GRATIS`), e a resposta diz quem respondeu e por quê. No modo de comparar não há troca (cada
+    cartão é o modelo marcado)."""
     por_id = {m.id: m for m in modelos(cfg)}
     escolhidos = [por_id[i] for i in dict.fromkeys(ids) if i in por_id]
     if not escolhidos:
         return []
     with ThreadPoolExecutor(max_workers=min(8, len(escolhidos))) as ex:
-        return list(ex.map(lambda m: responder(cfg, m, dossie, pergunta, historico, setores, meu_setor), escolhidos))
+        out = list(ex.map(lambda m: responder(cfg, m, dossie, pergunta, historico, setores, meu_setor), escolhidos))
+    if len(escolhidos) == 1 and _bateu_o_limite(out[0]) and escolhidos[0].entrada == 0:
+        for mid in TROCA_GRATIS:
+            m = por_id.get(mid)
+            if not m or m.id == escolhidos[0].id or not chave(cfg, m.provedor):
+                continue
+            r = responder(cfg, m, dossie, pergunta, historico, setores, meu_setor)
+            if r.get("ok"):
+                r["troca"] = f"O {escolhidos[0].rotulo} bateu o limite do dia: quem respondeu foi o {m.rotulo}."
+                return [r]
+    return out
+
+
+# a ordem da troca entre os grátis (o teste de 14/11/2026: o Nemotron com a melhor nota; depois os rápidos)
+TROCA_GRATIS = ("nemotron", "gemini-lite", "groq-oss")
 
 
 # ── as ações de outro setor (o bloco <acoes>) ─────────────────────────────────────────────────────────────────────────
@@ -414,6 +438,7 @@ def _sem_acento(s) -> str:
 _RX_RELATORIO = re.compile(r"\b(relat[oó]rio|pdf)\b", re.I)
 # os temas do PDF (nexus/campo/relatorio_usina.TEMAS) pelas palavras de quem pede
 _TEMAS_PALAVRAS = (("chamados", r"chamad|garantia"),
+                   ("religamentos", r"religament|desligament|\bparada|\bqueda|\bcaiu"),
                    ("perf", r"performance|gera[cç][aã]o|disponibilidade|\bmeta\b|\bpr\b|energia"),
                    ("rondas", r"ronda|limpeza|zeladoria|sujidade|vegeta"),
                    ("manut", r"manuten|\bos\b|ordens? de servi|tarefa|corretiva|preventiva"))

@@ -45,8 +45,8 @@ MESES_NOME = ("janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho
               "novembro", "dezembro")
 MESES = 3                   # o atual e os dois anteriores (90 dias no banco)
 LARG = 178 * mm - 12        # a largura útil (o quadro do SimpleDocTemplate tem 6 pt de folga de cada lado)
-TEMAS = (("perf", "Performance e disponibilidade"), ("rondas", "Rondas e limpeza"), ("manut", "Manutenção"),
-         ("chamados", "Chamados de garantia"))
+TEMAS = (("perf", "Performance e disponibilidade"), ("religamentos", "Paradas e religamentos"),
+         ("rondas", "Rondas e limpeza"), ("manut", "Manutenção"), ("chamados", "Chamados de garantia"))
 CHAVES_TEMAS = tuple(k for k, _ in TEMAS)
 # Os CAMPOS de cada tema (12/11/2026, Levi, no prontuário da usina: "eu quero o relatório de forma profissional, que dê
 # para editar os campos que eu quero que apareça"): cada bloco do PDF é um campo que a pessoa liga e desliga na janela
@@ -57,6 +57,10 @@ CAMPOS = (("resumo", "", "Resumo do mês, em frases"),
           ("perf_grafico", "perf", "Gráfico da geração de cada dia contra a meta"),
           ("perf_dias", "perf", "Tabela do dia a dia"),
           ("perf_eventos", "perf", "Eventos que afetaram a disponibilidade"),
+          # as paradas do mês com o que aconteceu (14/11/2026): o relato da Ronda COS, que já é escrito para o cliente
+          # (frases-modelo: a causa reconhecida, a proteção, os horários, se voltou pelo religamento remoto ou no local)
+          ("religamentos_lista", "religamentos", "Paradas do mês e o que aconteceu em cada uma"),
+          ("religamentos_protecoes", "religamentos", "Proteções que mais atuaram"),
           ("rondas_lista", "rondas", "Rondas do mês, com sujidade e vegetação"),
           ("manut_feitas", "manut", "Tarefas executadas no mês"),
           ("manut_abertas", "manut", "Ordens de serviço em aberto"),
@@ -139,6 +143,25 @@ def _tipo(v) -> str:
     return TIPO_TAREFA.get(t) or (visao.D._txt(v).strip().capitalize() or "Outras")
 
 
+def _religamentos_do_mes(uid: int, ano: int, mes: int) -> list[dict]:
+    """As paradas do mês registradas pelo COS (`nexus_cos_normalizacoes · fato_normalizacao`), da mais velha para a mais
+    nova: o início, o tipo, o tempo fora, se a geração parou, as proteções, a OS e o relato da Ronda COS."""
+    from ..comando import prontuario as PR
+    from ..cos import normalizacoes_banco as NB
+    out = []
+    for r in visao._livro(NB.LIVRO, NB.ABA):
+        if visao.D._id(r.get("usina_id")) != uid:
+            continue
+        ini = PR.instante(r.get("inicio"))
+        if not ini or (ini.year, ini.month) != (ano, mes):
+            continue
+        out.append({"ini": ini, "tipo": PR.tipo_cos(r.get("tipo_falha"))[0], "fora": PR.fora_txt(r.get("fora_min")),
+                    "parou": str(r.get("geracao_parou") or "") in ("1", "True"), "os": str(r.get("os") or "").strip(),
+                    "protecoes": " ".join(str(r.get("protecoes") or "").split()),
+                    "relato": " ".join(str(r.get("relato_cliente") or r.get("relato_continuacao") or "").split())})
+    return sorted(out, key=lambda x: x["ini"])
+
+
 def dados(uid: int, mes: str, hoje: date) -> dict:
     """Tudo o que o relatório mostra da usina no mês, cada tema da sua fonte; o tema que não abre fica em `erros`."""
     from ..dados import fato_tarefa_os as FT
@@ -207,6 +230,10 @@ def dados(uid: int, mes: str, hoje: date) -> dict:
                         "zeladoria": sorted(set(zel))}
     except Exception as e:      # noqa: BLE001
         out["erros"]["manut"] = type(e).__name__
+    try:
+        out["religamentos"] = _religamentos_do_mes(uid, ano, m)
+    except Exception as e:      # noqa: BLE001
+        out["erros"]["religamentos"] = type(e).__name__
     try:
         linhas = [r for r in visao._livro(R.LIVRO_CHAMADOS, R.ABA_CHAMADOS) if visao.D._id(r.get("usina_id")) == uid]
         nome_equip = {visao.D._id(r.get("equipamento_id")): str(r.get("descricao") or "").strip()
@@ -399,6 +426,11 @@ def _resumo(d: dict, temas: tuple) -> list[str]:
             out.append(f"A disponibilidade foi de {_pct(disp['disp'])}" +
                        (f", com {n} evento{'s' if n != 1 else ''} de parada registrado{'s' if n != 1 else ''}."
                         if n else ", sem parada registrada."))
+    if "religamentos" in temas and d.get("religamentos") is not None:
+        n = len(d["religamentos"])
+        parou = sum(1 for x in d["religamentos"] if x["parou"])
+        if n:
+            out.append(f"O COS registrou {n} parada{'s' if n != 1 else ''} no mês, {parou} com a geração parada.")
     if "rondas" in temas and d.get("rondas") is not None:
         n = len(d["rondas"])
         lidas = [r for r in d["rondas"] if r.get("sujidade") is not None]
@@ -540,6 +572,25 @@ def _chamados(d: dict, e: dict, campos=CHAVES_CAMPOS) -> list:
     return out
 
 
+def _religamentos(d: dict, e: dict, campos=CHAVES_CAMPOS) -> list:
+    rel = d.get("religamentos") or []
+    out = []
+    if "religamentos_lista" in campos:
+        if rel:
+            linhas = [[x["ini"].strftime("%d/%m %H:%M"), x["tipo"], x["fora"] or "—", x["protecoes"] or "—",
+                       x["os"] or "—", x["relato"] or "O relato não veio da Ronda COS."] for x in rel]
+            out.append(_tabela(e, ["Início", "Parada", "Tempo fora", "Proteções", "OS", "O que aconteceu"], linhas,
+                               [17, 22, 15, 20, 12, 92]))
+        else:
+            out.append(_sem(e, "Nenhuma parada registrada pelo COS no mês."))
+    if "religamentos_protecoes" in campos and rel:
+        conta = collections.Counter(p for x in rel for p in x["protecoes"].replace(",", ";").replace(" ", ";").split(";") if p)
+        if conta:
+            out.append(Paragraph("Proteções que mais atuaram: " + _t(", ".join(f"{p} ({n}x)" for p, n in conta.most_common(6)))
+                                 + ".", e["base"]))
+    return out
+
+
 def gerar(d: dict, temas=CHAVES_TEMAS, gerado_em: str = "", campos=None) -> bytes:
     """O PDF: a faixa navy com o logo, a usina e o mês, os números do mês, o resumo e um tema por seção. `campos` = os
     campos escolhidos na janela (`campos_do_pedido`; None = todos): o campo desligado não se desenha, e o tema sem
@@ -591,7 +642,8 @@ def gerar(d: dict, temas=CHAVES_TEMAS, gerado_em: str = "", campos=None) -> byte
     if frases:
         story += [Paragraph("Resumo do mês", e["sub_secao"])]
         story += [Paragraph("• " + _t(f), e["base"]) for f in frases]
-    secoes = {"perf": ("Performance e disponibilidade", _perf), "rondas": ("Rondas e limpeza", _rondas),
+    secoes = {"perf": ("Performance e disponibilidade", _perf), "religamentos": ("Paradas e religamentos", _religamentos),
+              "rondas": ("Rondas e limpeza", _rondas),
               "manut": ("Manutenção", _manut), "chamados": ("Chamados de garantia", _chamados)}
     for k in temas:
         titulo, f = secoes[k]
@@ -603,7 +655,8 @@ def gerar(d: dict, temas=CHAVES_TEMAS, gerado_em: str = "", campos=None) -> byte
             story += _secao(titulo, e) + corpo
     story += [Spacer(1, 8 * mm),
               Paragraph("Fontes: geração, meta e PR do Gerencial da Grid Co.; disponibilidade, ordens de serviço e chamados "
-                        "do sistema de manutenção (Fracttal); rondas do App de Campo. "
+                        "do sistema de manutenção (Fracttal); paradas e religamentos do Centro de Operações (COS); rondas "
+                        "do App de Campo. "
                         + ("O mês em andamento é parcial: os números mudam até o mês fechar." if d["corrente"] else ""),
                         e["mudo"])]
     doc.build(story, onFirstPage=pagina, onLaterPages=pagina)

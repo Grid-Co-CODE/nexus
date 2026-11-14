@@ -271,8 +271,10 @@ def test_as_acoes_do_alto_criam_a_os_e_o_ticket_com_a_usina_e_baixam_o_relatorio
     assert 'action="/t/comando/usinas/1/relatorio.pdf"' in jan and "Qual mês?" in jan
     # o que entra no PDF: cada tema com os campos dele, todos marcados ("editar os campos que eu quero que apareça")
     from nexus.campo import relatorio_usina as RU
-    assert "O que entra no relatório?" in jan and jan.count("data-pu-rel-tema") == 4
-    assert jan.count('name="tema"') == 4 and jan.count('name="campo"') == len(RU.CAMPOS) == jan.count(" checked> ") - 4
+    # os 5 temas e o Geral, cada um recolhido (14/11/2026: "tem que vir recolhido por setores"; os religamentos entram)
+    assert "O que entra no relatório?" in jan and jan.count("data-pu-rel-tema") == 6
+    assert 'value="religamentos"' in jan and jan.count('<details class="pu-rel-det">') == 6 and "<details class=\"pu-rel-det\" open" not in jan
+    assert jan.count('name="tema"') == 5 and jan.count('name="campo"') == len(RU.CAMPOS) == jan.count(" checked> ") - 6
     for k, _tema, rot in RU.CAMPOS:
         assert f'name="campo" value="{k}" checked> {rot}' in jan, k
     r = logado.get(f"/t/comando/usinas/1/relatorio.pdf?mes={HOJE.strftime('%Y-%m')}")

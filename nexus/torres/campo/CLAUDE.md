@@ -1368,6 +1368,19 @@ usinas mobilizadas, para quem abre a Visão (sem o filtro de responsável, de cl
   ligado (`temas_dos_campos`). **Sem `campo` no endereço sai o PDF de sempre**
   (todos os campos dos temas), e o campo de um tema que não foi pedido não esvazia o relatório. Continua valendo: PT,
   Segurança e nomes de técnicos não entram (o PDF é do cliente).
+- **Paradas e religamentos, e os temas recolhidos (14/11/2026, Levi):** "Na parte de relatório, eu não vi a opção de
+  religamentos [...] Tem que ter religamentos [...] tem que vir recolhido por setores [...] do jeito que tá vindo
+  expandido, tá meio feio".
+  - O tema novo `religamentos` ("Paradas e religamentos"), logo depois da Performance, tem dois campos:
+    - `religamentos_lista`: a tabela das paradas do mês (início, tipo, tempo fora, proteções, OS e o que aconteceu);
+    - `religamentos_protecoes`: as proteções que mais atuaram, com a contagem.
+  - O dado é o `fato_normalizacao` do banco (a Ronda COS, `_religamentos_do_mes`), pelos mesmos leitores do prontuário
+    (`PR.instante`, `PR.tipo_cos`, `PR.fora_txt`).
+  - "O que aconteceu" é o relato ao cliente da Ronda COS, que já é escrito para o cliente (a causa, a proteção, os
+    horários, a volta remota ou no local). Sem relato, a linha diz que ele não veio.
+  - O resumo ganha "O COS registrou N paradas no mês, M com a geração parada", e o rodapé de fontes cita o COS.
+  - Na janela, cada tema é uma linha com a caixa de marcar e "N campos", recolhido (`<details>`); quem quiser abre e
+    escolhe campo por campo. O tema continua ligando e desligando os campos dele (`[data-pu-rel-grupo]`).
 - **O relatório da usina para o cliente (2ª rodada):** "é interessante que dê para baixar um relatório da usina também!
   Algo bem profissional para o cliente!". O "Baixar relatório" do cabeçalho abre a janela do mês e dos temas (a do
   Painel: "Tem que poder escolher que nem é no painel"); a rota `responsaveis_usina_relatorio`
