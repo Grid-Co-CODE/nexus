@@ -34,6 +34,7 @@ JWT = "aaa.eyJlbWFpbCI6InRlc3RlQGV4ZW1wbG8uaW52YWxpZCIsImV4cCI6OTk5OTk5OTk5OX0.s
     ("Testes em campo", "Grid"), ("Aguardando Abertura de OS", "Grid"), ("Aguardando retorno Pré - Operação", "Grid"),
     ("Aguardando retorno do Supervisor", "Grid"), ("Aguardando retorno do Cliente", "Cliente"),
     ("Aguardando coleta do equipamento defeituoso", "Fabricante"), ("Aguardando retorno do Fabricante", "Fabricante"),
+    ("Aguardando transportadora", "Fabricante"),
     ("Standby", "Standby"), ("", ""), ("Algo da planilha antiga", "")])
 def test_o_status_geral_sai_do_status(status, geral):
     assert aw.status_geral(status) == geral

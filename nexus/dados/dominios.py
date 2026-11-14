@@ -263,7 +263,7 @@ SITUACAO_ALMOX_USINA = ("sem_almoxarifado", "compartilha", "proprio")
 # escolher), 2 "STANDBY – chamado fechado pelo fabricante…" e 1 "(em branco na V02)"; 2 trocados pela tela.
 STATUS_CHAMADO = ("Testes em campo", "Aguardando retorno do Cliente", "Aguardando retorno do Supervisor",
                   "Aguardando retorno do Fabricante", "Aguardando retorno Pré - Operação", "Aguardando Abertura de OS",
-                  "Standby", "Aguardando coleta do equipamento defeituoso")
+                  "Standby", "Aguardando coleta do equipamento defeituoso", "Aguardando transportadora")
 # de onde veio o status (regra 5, linhagem): a última troca pela tela de Garantias ou, sem troca, a nota da OS
 STATUS_CHAMADO_POR = ("tela", "nota")
 _STATUS_CHAMADO = sorted(((norm(s), s) for s in STATUS_CHAMADO), key=lambda x: -len(x[0]))

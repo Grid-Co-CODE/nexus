@@ -33,10 +33,11 @@ DIAS_FINALIZADOS = 90
 DIAS_PARADA = 5
 # o status do chamado que a analista de chamados escolhe na tela (27/10/2026, Levi: "Gostaria de poder mudar os status,
 # pode ter essas opções"): a lista que ela mandou, na grafia dela (a mesma da planilha de gestão de chamados, de onde
-# vem o "Status atual" da nota da retroativa). A linha em branco da lista dela é o "Sem status" da tela.
+# vem o "Status atual" da nota da retroativa). A linha em branco da lista dela é o "Sem status" da tela. O
+# "Aguardando transportadora" entrou em 13/11/2026, a pedido dela ("é possível incluir rapidinho um status nos chamados?").
 STATUS_CHAMADO = ("Testes em campo", "Aguardando retorno do Cliente", "Aguardando retorno do Supervisor",
                   "Aguardando retorno do Fabricante", "Aguardando retorno Pré - Operação", "Aguardando Abertura de OS",
-                  "Standby", "Aguardando coleta do equipamento defeituoso")
+                  "Standby", "Aguardando coleta do equipamento defeituoso", "Aguardando transportadora")
 # o status geral, AUTOMÁTICO pelo status (Levi, 28/10/2026: "Os gerais serão automáticos: Atividade Grid: Teste em Campo,
 # Aguardando abertura de OS, Aguardando retorno Pré - Operação, Aguardando retorno do Supervisor; Atividade Cliente:
 # Aguardando retorno do Cliente; Atividade Fabricante: Aguardando coleta do equipamento defeituoso, Aguardando retorno do
@@ -47,7 +48,9 @@ GERAL_DO_STATUS = {"Testes em campo": "Grid", "Aguardando Abertura de OS": "Grid
                    "Aguardando retorno Pré - Operação": "Grid", "Aguardando retorno do Supervisor": "Grid",
                    "Aguardando retorno do Cliente": "Cliente",
                    "Aguardando coleta do equipamento defeituoso": "Fabricante",
-                   "Aguardando retorno do Fabricante": "Fabricante", "Standby": "Standby"}
+                   "Aguardando retorno do Fabricante": "Fabricante", "Standby": "Standby",
+                   # o transporte do equipamento da garantia, entre a coleta e o fabricante (13/11/2026)
+                   "Aguardando transportadora": "Fabricante"}
 
 # o nome técnico do campo (o que a nota traz) → como a tela chama. É esse nome que liga a resposta do técnico ao campo
 # do formulário do fornecedor — por isso ele continua visível, pequeno, embaixo do rótulo.

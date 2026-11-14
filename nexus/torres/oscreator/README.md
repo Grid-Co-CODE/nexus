@@ -3045,7 +3045,8 @@ fundo que nem quando vamos criar OS." O menu e a janela são da plataforma (Moni
 
 - **O status do chamado** (Levi: "Gostaria de poder mudar os status, pode ter essas opções", a lista da analista de
   chamados): `acomp_web.STATUS_CHAMADO`, na grafia dela (Testes em campo, Aguardando retorno do Cliente, do Supervisor,
-  do Fabricante, Pré - Operação, Aguardando Abertura de OS, Standby, Aguardando coleta do equipamento defeituoso), mais
+  do Fabricante, Pré - Operação, Aguardando Abertura de OS, Standby, Aguardando coleta do equipamento defeituoso e,
+  desde 13/11/2026, Aguardando transportadora), mais
   o "Sem status". Mora no banco da Gridco como as observações (`chamados_obs_store`, tipo `status`: uma linha por troca,
   com quem e quando, o status em `extra` e a frase no texto, "Status: Standby", que o código de antes mostra como
   observação comum). O atual é o da última troca (`status_por_os`); sem troca nenhuma, o "Status atual" da nota da
@@ -3073,7 +3074,8 @@ fundo que nem quando vamos criar OS." O menu e a janela são da plataforma (Moni
 
 - **O status geral é automático** (Levi: "Os gerais serão automáticos"), pelo status: Grid (Testes em campo, Aguardando
   Abertura de OS, Aguardando retorno Pré - Operação, Aguardando retorno do Supervisor), Cliente (Aguardando retorno do
-  Cliente), Fabricante (Aguardando coleta do equipamento defeituoso, Aguardando retorno do Fabricante) e Standby ("stand
+  Cliente), Fabricante (Aguardando coleta do equipamento defeituoso, Aguardando retorno do Fabricante, Aguardando
+  transportadora) e Standby ("stand
   by deixa de ser status comum e vira status geral", escolhido no mesmo seletor). `acomp_web.GERAL_DO_STATUS` e
   `status_geral`; o status que não é da lista (o "Status atual" da planilha antiga) fica sem geral. A tela do chamado o
   mostra embaixo do seletor; o quadro e a tabela o levam (`data-geral`, a coluna Geral).

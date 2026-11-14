@@ -27,7 +27,8 @@ CSS = Path(ponte.RAIZ_CLONE) / "os_web" / "static" / "chamados.css"
 JWT = "aaa.eyJlbWFpbCI6InRlc3RlQGV4ZW1wbG8uaW52YWxpZCIsImV4cCI6OTk5OTk5OTk5OX0.sig"   # de mentira
 OPCOES = ["Testes em campo", "Aguardando retorno do Cliente", "Aguardando retorno do Supervisor",
           "Aguardando retorno do Fabricante", "Aguardando retorno Pré - Operação", "Aguardando Abertura de OS",
-          "Standby", "Aguardando coleta do equipamento defeituoso"]
+          "Standby", "Aguardando coleta do equipamento defeituoso",
+          "Aguardando transportadora"]          # 13/11/2026, pedido da analista de chamados
 NOTA_RETRO = ("[CHAMADO] Acompanhamento — Huawei · Inversor\nOS de abertura: 11001 · OS de campo: 12002\n"
               "Status atual: Testes em campo\nData da ocorrência / abertura do chamado: 21/08/2026")
 
