@@ -604,6 +604,48 @@ Gemini, Groq, Grok [...] Qualquer IA que dê para puxar a API para fazermos o te
 Prova: `tests/test_comando_ia.py` (cada provedor no formato dele, com dublês; a rota, o teto, o registro, a rodada; a
 troca entre as grátis; o Criar OS e as sugestões na janela).
 
+## O diagnóstico do dia da IA no prontuário (14/11/2026; `nexus/comando/diagnostico.py`)
+
+Levi, 14/11/2026: "Sempre que a pessoa for abrir o prontuário da usina, abrir o diagnóstico da IA [...] Se a pessoa abrir
+duas vezes no mesmo dia, ou se uma pessoa abrir, uma pessoa diferente abrir também no mesmo dia, usar o mesmo diagnóstico
+[...] Para não ficar gastando token à toa [...] baseado em D-1. No lugar que tem esse parecer agora, vai ter o diagnóstico
+da IA [...] o que é que está pendente, o que é que dá para fazer [...] direcione o supervisor: o que é que ele pode fazer e
+o que é que ele tem que fazer".
+
+- **Onde:** no lugar da frase do parecer, no alto do prontuário (Comando › Usinas e a Central da usina da Usinas 360°).
+  - O selo continua o do parecer, que vem da conta das regras.
+  - A frase vira a situação da IA.
+  - Embaixo vêm "Tem que fazer", "Pode fazer" e "Pendente com outros", com a OS de cada item como link: o Raio X para
+    chamado, Engenharia e Performance; o card para as outras.
+  - O botão "Recolher" encolhe o bloco, e o navegador lembra a escolha.
+- **Um por usina por dia** (o dia de Brasília), guardado em `<NEXUS_DADOS>/ia/diagnosticos/AAAA-MM-DD/<usina>.json`.
+  - A primeira abertura do dia pega a trava (`<usina>.andamento`, criada de forma exclusiva), monta o dossiê na hora e
+    manda a IA fazer numa thread à parte. A rota responde "preparando" e a página não espera.
+  - Quem abre enquanto isso vê "preparando", e o JS pergunta de novo a cada 5 s.
+  - Quem abre depois lê o guardado, sem chamar a IA.
+  - A trava com mais de 5 min é de um pedido que morreu (o servidor reiniciou) e é refeita.
+- **A IA:** é a do Nexus IA (`ia.perguntar`), com as mesmas instruções e blindagem. O pedido é o `PEDIDO`:
+  - um JSON com a situação (a conclusão primeiro), até 4 "tem que fazer", 3 "pode fazer" e 4 "pendente";
+  - cada número com o nome que o dossiê dá (17 normalizações não são 17 desligamentos);
+  - a OS que não está no dossiê sai do item (`ler`).
+
+  O modelo é o `NEXUS_IA_DIAGNOSTICO_MODELO` (padrão Nemotron, grátis), com a troca entre as grátis quando ele bate o
+  limite. Cada diagnóstico entra no registro do mês ("[diagnóstico do dia]") e conta no teto.
+- **Abre para quem abre o prontuário**, não só para o administrador. O dossiê não leva o nome das pessoas.
+- **"D-1":** a performance do dossiê vai até ontem; as pendências são as da hora da primeira abertura. A linha de baixo
+  diz isso, com a hora e o modelo.
+- **Sem a IA** fica o parecer de sempre:
+  - sem chave nenhuma, o estado é `sem_ia` e a tela não mostra aviso;
+  - com o teto do mês estourado, a tela diz que o teto foi atingido;
+  - quando a IA falha, a tela mostra o motivo e o erro fica guardado 20 min (`ESPERA_ERRO_S`); depois a próxima
+    abertura tenta de novo.
+- **Medido na Capitão Poço 100 (14/11):** o Nemotron levou cerca de 40 s; a segunda abertura leu o guardado em 0,01 s.
+  Com a página já aberta, o dossiê leva de 0,5 a 2,3 s.
+  - O Nemotron ainda escreveu "17 desligamentos" num item, mesmo com a regra dos nomes: é o limite do modelo grátis.
+
+Prova: `tests/test_comando_diagnostico.py` (o JSON e a OS fora do dossiê; um por dia, a trava, o erro de 20 min, a trava
+morta; a rota faz uma vez e a segunda abertura não chama a IA; sem chave fica o parecer; a marca no `neutro`).
+
 ## Contestações e Prévia: visão do contrato (no Comando desde 12/11/2026)
 
 Vieram da torre Contratos e clientes, que saiu do menu (Levi, 12/11/2026: "contestações, você vai jogar para o comando,

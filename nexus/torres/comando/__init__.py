@@ -516,6 +516,53 @@ def usina_ia_perguntar(usina_id):
     return resp
 
 
+@bp.route("/usinas/<int:usina_id>/ia/diagnostico")
+def usina_ia_diagnostico(usina_id):
+    """O diagnóstico do dia da IA, no lugar do parecer do prontuário (14/11/2026, Levi: "Sempre que a pessoa for abrir o
+    prontuário da usina, abrir o diagnóstico da IA [...] uma pessoa diferente abrir também no mesmo dia, usar o mesmo
+    diagnóstico [...] Para não ficar gastando token à toa"). JSON {estado: pronto | texto | preparando | erro | teto |
+    sem_ia, diag, ...}. O guardado do dia volta na hora; sem ele, a primeira abertura pega a trava, monta o dossiê e manda
+    fazer numa thread à parte (a página não espera), e as outras veem "preparando" até ficar pronto. Abre para quem abre o
+    prontuário (as regras e o guardado: nexus/comando/diagnostico.py)."""
+    import threading
+
+    from flask import jsonify
+
+    from ...comando import diagnostico as DG
+    from ...comando import ia as IA
+    usinas = _usinas()
+    if usinas and usina_id not in usinas:
+        abort(404)
+    cfg = current_app.config
+    dia = DG.hoje()
+    d = DG.guardado(cfg, usina_id, dia)
+    if d:
+        out = DG.para_tela(d)
+    elif not DG.disponivel(cfg):
+        out = {"estado": "sem_ia"}
+    elif DG.em_andamento(cfg, usina_id, dia):
+        out = {"estado": "preparando"}
+    elif IA.gasto_do_mes(cfg) >= IA.teto(cfg):
+        out = {"estado": "teto"}
+    elif not DG.travar(cfg, usina_id, dia):
+        out = {"estado": "preparando"}
+    else:
+        try:
+            _ctx, dz = _dossie(usina_id)
+        except BaseException:
+            DG.soltar(cfg, usina_id, dia)
+            raise
+        args = (dict(cfg), usina_id, dz["texto"], dz["tokens_estimados"], dia)
+        if cfg.get("TESTING"):
+            out = DG.para_tela(DG.gerar(*args))
+        else:
+            threading.Thread(target=DG.gerar, args=args, daemon=True, name=f"diagnostico-{usina_id}").start()
+            out = {"estado": "preparando"}
+    resp = jsonify(out)
+    resp.headers["Cache-Control"] = "no-store"
+    return resp
+
+
 @bp.route("/usinas/<int:usina_id>/ia/demanda", methods=["POST"])
 def usina_ia_demanda(usina_id):
     """A ação de outro setor que a resposta sugeriu, mandada como demanda (JSON {para_hmac, para_setor_id, tema_id,

@@ -81,10 +81,18 @@
     {% for t in cu.pessoas.tecnicos %}{{ pessoa('Técnico na usina', t) }}{% else %}{{ pessoa('Técnico na usina', '', 'nenhum no PCM') }}{% endfor %}
   </ul>
 
-  {# o parecer geral: uma linha #}
-  <section class="pu-parecer pu-parecer--{{ p.parecer.nivel }}" aria-labelledby="pu-par-t">
-    <span class="pu-par-selo"><i class="pu-ponto pu-ponto--{{ p.parecer.nivel }}" aria-hidden="true"></i>{{ p.parecer.titulo }}</span>
-    <h2 class="pu-par-t" id="pu-par-t">{{ p.parecer.frase }}</h2>
+  {# o parecer geral numa linha e, no lugar da frase, o diagnóstico do dia da IA (14/11/2026, Levi: "No lugar que tem esse
+     parecer agora, vai ter o diagnóstico da IA [...] o que é que está pendente, o que é que dá para fazer [...] direcione
+     o supervisor"). O selo continua o do parecer (a conta das regras); a frase vira a situação da IA e embaixo vêm o que
+     ele tem que fazer, o que pode fazer e o que está pendente com outros, recolhível. Sem a IA, fica o parecer (prontuario.js) #}
+  <section class="pu-parecer pu-parecer--{{ p.parecer.nivel }} pu-diag" aria-labelledby="pu-par-t" data-pu-diag="{{ raiz }}/t/comando/usinas/{{ x.usina_id }}/ia/diagnostico">
+    <div class="pu-diag-linha">
+      <span class="pu-par-selo"><i class="pu-ponto pu-ponto--{{ p.parecer.nivel }}" aria-hidden="true"></i>{{ p.parecer.titulo }}</span>
+      <h2 class="pu-par-t" id="pu-par-t" data-pu-diag-frase>{{ p.parecer.frase }}</h2>
+      <button type="button" class="pu-diag-alterna" data-pu-diag-alterna aria-expanded="true" hidden><i class="ph ph-caret-up" aria-hidden="true"></i><span>Recolher</span></button>
+    </div>
+    <div class="pu-diag-corpo" data-pu-diag-corpo hidden></div>
+    <p class="pu-diag-fonte" data-pu-diag-fonte hidden></p>
   </section>
 
   {# o painel, o visual na frente (Levi, 12/11/2026: "os KPIs principais de performance, meta, OS, pendências [...] de

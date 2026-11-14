@@ -156,7 +156,7 @@ def custo(m: Modelo, entrada: int, saida: int, cache_lido: int = 0, cache_gravad
 
 
 # ── as chamadas (só aqui se fala com a rede) ─────────────────────────────────────────────────────────────────────────
-_RX_MARCAS = re.compile(r"<\s*/?\s*(dossie|acoes|setores|instrucoes|system|sistema)\b", re.I)
+_RX_MARCAS = re.compile(r"<\s*/?\s*(dossie|acoes|setores|instrucoes|system|sistema|diagnostico)\b", re.I)
 
 
 def neutro(texto) -> str:

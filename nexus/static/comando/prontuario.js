@@ -8,6 +8,91 @@
   var raiz = document.querySelector('[data-pu]');
   if (!raiz) return;
 
+  // ── o diagnóstico do dia da IA, no lugar do parecer (14/11/2026) ───────────────────────────────────────────────────
+  // Um por usina por dia: a primeira abertura manda fazer (a rota responde "preparando" e a página segue), e quem abre
+  // depois lê o guardado. Sem a IA (sem chave, teto, erro), fica o parecer que já está na página
+  function escD(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return {'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c];
+    });
+  }
+  function osDiag(n, tipo) {
+    if (!n) return '';
+    if (tipo === 'os' || !tipo) {
+      return ' <button type="button" class="pu-diag-os" data-pu-os="' + escD(n) + '" title="Abrir o card da OS ' + escD(n) + '">OS ' + escD(n) + '</button>';
+    }
+    var de = tipo === 'chamado' ? '?de=garantias' : (tipo === 'performance' ? '?de=performance' : '');
+    return ' <a class="pu-diag-os" href="' + escD(nexusRota('/t/engenharia/equipe/os/')) + escD(n) + de +
+      '" target="_blank" rel="noopener" title="Raio X da OS ' + escD(n) + ' (abre em outra aba)">OS ' + escD(n) + '</a>';
+  }
+  var LISTAS_DIAG = [['tem_que_fazer', 'Tem que fazer', 'critico'], ['pode_fazer', 'Pode fazer', 'ok'],
+                     ['pendente', 'Pendente com outros', 'alerta']];
+  var CHAVE_RECOLHIDO = 'nexus.pu-diag.recolhido';
+  function recolher(el, sim) {
+    var corpo = el.querySelector('[data-pu-diag-corpo]'), bt = el.querySelector('[data-pu-diag-alterna]');
+    corpo.hidden = sim;
+    bt.setAttribute('aria-expanded', sim ? 'false' : 'true');
+    bt.querySelector('span').textContent = sim ? 'Ver o que fazer' : 'Recolher';
+    bt.querySelector('i').className = 'ph ' + (sim ? 'ph-caret-down' : 'ph-caret-up');
+  }
+  function desenharDiag(el, j) {
+    var frase = el.querySelector('[data-pu-diag-frase]'), corpo = el.querySelector('[data-pu-diag-corpo]');
+    var fonte = el.querySelector('[data-pu-diag-fonte]'), bt = el.querySelector('[data-pu-diag-alterna]');
+    var d = j.diag;
+    if (d) {
+      frase.textContent = d.situacao;
+      frase.classList.add('pu-par-t--ia');
+      corpo.innerHTML = LISTAS_DIAG.map(function (l) {
+        var itens = d[l[0]] || [];
+        if (!itens.length) return '';
+        return '<div class="pu-diag-col pu-diag-col--' + l[2] + '"><h3>' + l[1] + '</h3><ul>' + itens.map(function (x) {
+          return '<li>' + escD(x.texto) + osDiag(x.os, x.os_tipo) + '</li>';
+        }).join('') + '</ul></div>';
+      }).join('');
+    } else {
+      corpo.innerHTML = '<p class="pu-diag-texto">' + escD(j.texto) + '</p>';
+    }
+    fonte.textContent = 'Diagnóstico da IA de ' + (j.data || 'hoje') + (j.hora ? ', feito às ' + j.hora : '') +
+      (j.rotulo ? ' pelo ' + j.rotulo : '') + ', com a performance até ontem e as pendências daquela hora. ' +
+      'É um por dia: quem abrir hoje vê este mesmo.' + (j.troca ? ' ' + j.troca : '');
+    fonte.hidden = false;
+    if (corpo.innerHTML) {
+      bt.hidden = false;
+      var recolhido = false;
+      try { recolhido = localStorage.getItem(CHAVE_RECOLHIDO) === '1'; } catch (e) { /* sem armazenamento: aberto */ }
+      recolher(el, recolhido);
+    }
+  }
+  function carregarDiag(el, vez) {
+    var fonte = el.querySelector('[data-pu-diag-fonte]');
+    fetch(el.getAttribute('data-pu-diag'), {credentials: 'same-origin', headers: {'Accept': 'application/json'}})
+      .then(function (r) { return r.ok ? r.json() : {estado: 'fora'}; })
+      .then(function (j) {
+        if (j.estado === 'pronto' || j.estado === 'texto') { desenharDiag(el, j); return; }
+        if (j.estado === 'preparando') {
+          fonte.textContent = 'A IA está fazendo o diagnóstico do dia desta usina. Quem abrir depois já vê pronto.';
+          fonte.hidden = false;
+          if (vez < 36) { setTimeout(function () { carregarDiag(el, vez + 1); }, 5000); }
+          return;
+        }
+        if (j.estado === 'erro' || j.estado === 'teto') {
+          fonte.textContent = j.estado === 'teto' ? 'O diagnóstico da IA não saiu: o teto do mês do Nexus IA foi atingido. Vale o parecer acima.'
+            : 'O diagnóstico da IA não saiu agora (' + (j.erro || 'sem resposta') + '). Vale o parecer acima; a IA tenta de novo em 20 minutos.';
+          fonte.hidden = false;
+        }
+      })
+      .catch(function () { /* sem conexão: fica o parecer */ });
+  }
+  var diagEl = raiz.querySelector('[data-pu-diag]');
+  if (diagEl && window.fetch) {
+    diagEl.querySelector('[data-pu-diag-alterna]').addEventListener('click', function () {
+      var sim = !diagEl.querySelector('[data-pu-diag-corpo]').hidden;
+      recolher(diagEl, sim);
+      try { localStorage.setItem(CHAVE_RECOLHIDO, sim ? '1' : '0'); } catch (e) { /* segue sem lembrar */ }
+    });
+    carregarDiag(diagEl, 0);
+  }
+
   // o número, a barra e a pendência do alto levam ao cartão deles: ele abre, os outros fecham (a página não vira uma
   // parede de texto), fica marcado e sobe para a vista (Levi, 12/11/2026: "clicar e já se encaminhando para aquela
   // informação. Aquela informação aparecer na tela dela"). Quem abre o cartão pelo título dele não fecha os outros

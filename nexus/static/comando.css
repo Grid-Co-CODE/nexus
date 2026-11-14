@@ -424,6 +424,28 @@ a.ins-titulo:hover{color:var(--verde-texto)}
 .pu-parecer--alerta .pu-par-selo{color:var(--alerta);background:var(--alerta-suave)}
 .pu-parecer--ok .pu-par-selo{color:var(--ok);background:var(--ok-suave)}
 .pu-par-t{flex:1 1 320px;margin:0;font:600 16px/1.4 var(--font-sans);color:var(--tinta)}
+/* o diagnóstico do dia da IA no lugar do parecer (14/11/2026): a linha do parecer, o que fazer em colunas e a origem */
+.pu-diag{display:block}
+.pu-diag-linha{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px}
+.pu-diag .pu-par-t--ia{font:600 15px/1.45 var(--font-sans)}
+.pu-diag-alterna{display:inline-flex;align-items:center;gap:6px;margin-left:auto;padding:5px 10px;border:1px solid var(--linha-forte);
+  border-radius:var(--raio-controle);background:transparent;color:var(--tinta-2);font:500 12.5px/16px var(--font-sans);cursor:pointer}
+.pu-diag-alterna:hover{color:var(--tinta);border-color:var(--tinta-2)}
+.pu-diag-corpo{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px 28px;margin-top:14px;padding-top:14px;
+  border-top:1px solid var(--linha)}
+.pu-diag-corpo[hidden]{display:none}
+.pu-diag-col h3{display:flex;align-items:center;gap:8px;margin:0 0 8px;font:600 13px/18px var(--font-sans);color:var(--tinta)}
+.pu-diag-col h3::before{content:"";width:8px;height:8px;border-radius:50%;flex:none}
+.pu-diag-col--critico h3::before{background:var(--critico)}
+.pu-diag-col--ok h3::before{background:var(--ok)}
+.pu-diag-col--alerta h3::before{background:var(--alerta)}
+.pu-diag-col ul{display:grid;gap:7px;margin:0;padding:0 0 0 16px}
+.pu-diag-col li{font-size:13.5px;line-height:1.45;color:var(--tinta)}
+.pu-diag-os{margin-left:4px;padding:0 6px;border:1px solid var(--linha-forte);border-radius:999px;background:transparent;
+  color:var(--tinta-2);font:600 12px/18px var(--font-sans);text-decoration:none;white-space:nowrap;cursor:pointer}
+.pu-diag-os:hover{color:var(--tinta);border-color:var(--tinta-2)}
+.pu-diag-texto{margin:0;font-size:13.5px;line-height:1.5;white-space:pre-line}
+.pu-diag-fonte{margin:10px 0 0;font-size:12px;line-height:1.45;color:var(--mudo)}
 /* o painel: três blocos numa superfície só, separados por fio (a Performance, as OS, as pendências). O número grande na
    cor da régua, a barra contra a marca dele, e embaixo o que explica o número */
 .pu-painel{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr) minmax(0,1fr);margin-top:14px;background:var(--superficie);

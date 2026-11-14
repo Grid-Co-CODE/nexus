@@ -127,7 +127,7 @@ OPCIONAIS = ("NEXUS_CHAVE_CADASTRO", "NEXUS_ARMAZEM_LOCAL",
              # o Nexus IA no prontuário (nexus/comando/ia.py, 13/11/2026): a chave de cada provedor de IA, a lista de
              # modelos (JSON, troca sem deploy) e o teto do mês em dólar. Sem chave, o modelo aparece "sem chave" na tela
              "ANTHROPIC_API_KEY", "GEMINI_API_KEY", "XAI_API_KEY", "GROQ_API_KEY", "OPENROUTER_API_KEY",
-             "NEXUS_IA_MODELOS", "NEXUS_IA_TETO_USD")
+             "NEXUS_IA_MODELOS", "NEXUS_IA_TETO_USD", "NEXUS_IA_DIAGNOSTICO_MODELO")
 
 
 class ConfigErro(RuntimeError):
