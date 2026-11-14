@@ -3,7 +3,10 @@
    acontece aqui dentro é do comando/ia.js. Marcar mais de um modelo é o modo de comparar: a mesma pergunta, lado a lado.
    As regras: nexus/comando/ia.py. #}
 {% set com_chave = modelos|selectattr('tem_chave')|list %}
-<div class="ia" data-ia data-ia-url="{{ raiz }}/t/comando/usinas/{{ x.usina_id }}/ia/perguntar">
+<div class="ia" data-ia data-ia-url="{{ raiz }}/t/comando/usinas/{{ x.usina_id }}/ia/perguntar"
+     data-ia-demanda-url="{{ raiz }}/t/comando/usinas/{{ x.usina_id }}/ia/demanda" data-ia-raiz="{{ raiz }}">
+  {# para onde a resposta pode mandar demanda: os setores, as pessoas e os temas (a Nova demanda da Caixa de entrada) #}
+  <script type="application/json" data-ia-setores>{{ setores|tojson }}</script>
   <fieldset class="ia-modelos">
     <legend>Modelos <span class="mudo">· marque mais de um para comparar</span></legend>
     {% for m in modelos %}

@@ -147,7 +147,8 @@
       }
     });
     pj.querySelector('[data-pu-jan-fechar]').addEventListener('click', function () { pj.close(); });
-    pj.addEventListener('close', function () { pjCorpo.innerHTML = ''; novas = []; });
+    // o Nexus IA fecha a janela para o card da OS aparecer e a reabre depois (data-manter): o chat não se perde
+    pj.addEventListener('close', function () { if (pj.dataset.manter) return; pjCorpo.innerHTML = ''; novas = []; });
   }
   // o aviso no pé da tela, que some sozinho (a OS criada, com o número)
   function avisar(texto) {
