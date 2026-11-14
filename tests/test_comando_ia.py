@@ -38,7 +38,7 @@ def test_sem_chave_o_modelo_aparece_e_nao_e_chamado(monkeypatch):
     chamados = []
     monkeypatch.setattr(IA, "_chamar", lambda *a: chamados.append(a) or {"texto": "x"})
     d = {m["id"]: m for m in IA.disponiveis({"GEMINI_API_KEY": "g"})}
-    assert d["gemini-flash"]["tem_chave"] and not d["opus"]["tem_chave"]
+    assert d["gemini-lite"]["tem_chave"] and not d["opus"]["tem_chave"] and not d["nemotron"]["tem_chave"]
     assert "ANTHROPIC_API_KEY" in d["opus"]["motivo"] and "console.anthropic.com" in d["opus"]["motivo"]
     r = IA.responder({}, IA.modelos({})[0], DOSSIE, "Como foi o mês?")
     assert not r["ok"] and "Falta a ANTHROPIC_API_KEY" in r["erro"] and chamados == []
@@ -118,10 +118,10 @@ def test_gemini_tira_o_pensamento_e_soma_o_que_pensou_na_saida(monkeypatch):
             {"text": "pensando...", "thought": True}, {"text": "A meta foi 91,4% (§3)."}]}}],
             "usageMetadata": {"promptTokenCount": 5000, "candidatesTokenCount": 40, "thoughtsTokenCount": 300}})
     monkeypatch.setattr(IA.requests, "post", post)
-    m = next(x for x in IA.MODELOS_PADRAO if x.id == "gemini-flash")
+    m = next(x for x in IA.MODELOS_PADRAO if x.id == "gemini-lite")
     r = IA.responder({"GEMINI_API_KEY": "g"}, m, DOSSIE, "Como foi o mês?", [{"pergunta": "oi", "resposta": "olá"}])
     assert r["ok"] and r["texto"] == "A meta foi 91,4% (§3)." and (r["entrada"], r["saida"]) == (5000, 340)
-    assert visto["url"].endswith("/models/gemini-2.5-flash:generateContent") and visto["headers"]["x-goog-api-key"] == "g"
+    assert visto["url"].endswith("/models/gemini-3.1-flash-lite:generateContent") and visto["headers"]["x-goog-api-key"] == "g"
     assert [c["role"] for c in visto["corpo"]["contents"]] == ["user", "model", "user"]
     assert "<dossie>" in visto["corpo"]["systemInstruction"]["parts"][0]["text"]
     assert r["numeros"] == {"n": 1, "no_dossie": 1, "fora": []}
@@ -142,8 +142,8 @@ def test_grok_groq_e_openrouter_pelo_chat_completions(monkeypatch):
     lista.append({"id": "grok", "rotulo": "Grok", "provedor": "xai", "modelo": "grok-x", "entrada": 2, "saida": 6})
     cfg = {"XAI_API_KEY": "k", "GROQ_API_KEY": "k", "OPENROUTER_API_KEY": "k", "NEXUS_IA_MODELOS": json.dumps(lista)}
     assert "grok" not in [m.id for m in IA.MODELOS_PADRAO]
-    rs = IA.perguntar(cfg, ["grok", "groq-oss", "deepseek", "opus"], DOSSIE, "Qual a tendência?")
-    assert [r["id"] for r in rs] == ["grok", "groq-oss", "deepseek", "opus"]
+    rs = IA.perguntar(cfg, ["grok", "groq-oss", "nemotron", "opus"], DOSSIE, "Qual a tendência?")
+    assert [r["id"] for r in rs] == ["grok", "groq-oss", "nemotron", "opus"]
     assert rs[2]["custo_usd"] == 0.0                                    # o ":free" do OpenRouter não custa
     assert [r["ok"] for r in rs] == [True, True, True, False] and rs[0]["texto"] == "Subiu."
     assert sorted(urls) == ["https://api.groq.com/openai/v1/chat/completions", "https://api.x.ai/v1/chat/completions",
@@ -153,7 +153,7 @@ def test_grok_groq_e_openrouter_pelo_chat_completions(monkeypatch):
 def test_modelo_que_nao_existe_diz_quais_existem(monkeypatch):
     monkeypatch.setattr(IA.requests, "post", lambda *a, **k: _Resp(404, {"error": {"message": "The model x does not exist"}}))
     monkeypatch.setattr(IA.requests, "get", lambda *a, **k: _Resp(200, {"data": [{"id": "deepseek/a:free"}, {"id": "qwen/b:free"}]}))
-    r = IA.responder({"OPENROUTER_API_KEY": "k"}, next(m for m in IA.MODELOS_PADRAO if m.id == "deepseek"), DOSSIE, "?")
+    r = IA.responder({"OPENROUTER_API_KEY": "k"}, next(m for m in IA.MODELOS_PADRAO if m.id == "nemotron"), DOSSIE, "?")
     assert not r["ok"] and "404" in r["erro"] and "Os que existem para esta chave: deepseek/a:free, qwen/b:free" in r["erro"]
 
 
@@ -163,8 +163,8 @@ def test_um_provedor_que_quebra_nao_derruba_os_outros(monkeypatch):
             raise RuntimeError("boom")
         return {"texto": "ok", "entrada": 1, "saida": 1}
     monkeypatch.setattr(IA, "_chamar", chamar)
-    rs = IA.perguntar({"GEMINI_API_KEY": "g", "GROQ_API_KEY": "k"}, ["gemini-pro", "groq-oss", "naoexiste"], DOSSIE, "?")
-    assert [(r["id"], r["ok"]) for r in rs] == [("gemini-pro", False), ("groq-oss", True)]
+    rs = IA.perguntar({"GEMINI_API_KEY": "g", "GROQ_API_KEY": "k"}, ["gemini-lite", "groq-oss", "naoexiste"], DOSSIE, "?")
+    assert [(r["id"], r["ok"]) for r in rs] == [("gemini-lite", False), ("groq-oss", True)]
     assert rs[0]["erro"] == "Falhou (RuntimeError)."
 
 
@@ -196,7 +196,10 @@ def test_o_botao_e_a_janela_so_para_administrador(tela, logado):
 
 
 def test_perguntar_monta_o_dossie_de_agora_e_registra(tela, logado, monkeypatch, tmp_path):
-    logado.application.config.update(NEXUS_DADOS=str(tmp_path), GEMINI_API_KEY="g")
+    logado.application.config.update(NEXUS_DADOS=str(tmp_path), GEMINI_API_KEY="g", NEXUS_IA_MODELOS=json.dumps([
+        {"id": "gemini-flash", "rotulo": "Gemini", "provedor": "gemini", "modelo": "g", "entrada": 0.3, "saida": 2.5},
+        {"id": "gemini-pro", "rotulo": "Gemini Pro", "provedor": "gemini", "modelo": "p", "entrada": 1.25, "saida": 10},
+        {"id": "opus", "rotulo": "Opus", "provedor": "anthropic", "modelo": "claude-opus-5-5", "entrada": 4, "saida": 20}]))
     visto = {}
 
     def perguntar(cfg, ids, dossie, pergunta, historico=None):
@@ -205,7 +208,7 @@ def test_perguntar_monta_o_dossie_de_agora_e_registra(tela, logado, monkeypatch,
     monkeypatch.setattr(IA, "perguntar", perguntar)
     h = logado.get("/t/comando/usinas/1/ia?parcial=1").get_data(as_text=True)
     # marcado de início: o 1º modelo com chave (a Anthropic sem chave fica de fora)
-    assert 'value="gemini-pro" data-ia-modelo checked' in h and 'value="gemini-flash" data-ia-modelo>' in h
+    assert 'value="gemini-flash" data-ia-modelo checked' in h and 'value="gemini-pro" data-ia-modelo>' in h
     assert 'value="opus" data-ia-modelo disabled' in h and "Nenhuma IA ligada" not in h and "US$ 0,00" in h
     r = logado.post("/t/comando/usinas/1/ia/perguntar", json={
         "pergunta": "  Por que   caiu? ", "modelos": ["gemini-flash"], "historico": [{"pergunta": "a", "resposta": "b"}]})
@@ -227,7 +230,12 @@ def test_perguntar_monta_o_dossie_de_agora_e_registra(tela, logado, monkeypatch,
 # ── a rodada de comparação (ferramentas/ia_comparar.py) ──────────────────────────────────────────────────────────────
 def test_a_rodada_compara_os_modelos_com_chave_e_respeita_o_teto(monkeypatch, tmp_path):
     from ferramentas import ia_comparar as CMP
-    monkeypatch.setattr(CMP, "_dossies", lambda ids: ({1: ("Altair", DOSSIE)}, {"GEMINI_API_KEY": "g", "GROQ_API_KEY": "k"}))
+    lista = json.dumps([{"id": "gemini-pro", "rotulo": "P", "provedor": "gemini", "modelo": "p", "entrada": 1.25, "saida": 10},
+                        {"id": "gemini-flash", "rotulo": "F", "provedor": "gemini", "modelo": "f", "entrada": 0.3, "saida": 2.5},
+                        {"id": "groq-oss", "rotulo": "G", "provedor": "groq", "modelo": "o", "entrada": 0.15, "saida": 0.6},
+                        {"id": "opus", "rotulo": "O", "provedor": "anthropic", "modelo": "claude-opus-5-5", "entrada": 4, "saida": 20}])
+    monkeypatch.setattr(CMP, "_dossies", lambda ids: ({1: ("Altair", DOSSIE)}, {"GEMINI_API_KEY": "g", "GROQ_API_KEY": "k",
+                                                                               "NEXUS_IA_MODELOS": lista}))
     for p in IA.PROVEDORES.values():
         monkeypatch.delenv(p["chave"], raising=False)
     monkeypatch.setattr(IA, "_chamar", lambda m, *a: {"texto": f"{m.id}: a meta foi 91,4% e 55,5 inventado.",
@@ -243,3 +251,15 @@ def test_a_rodada_compara_os_modelos_com_chave_e_respeita_o_teto(monkeypatch, tm
     assert "1 de 2 números no dossiê · fora: 55,5" in pagina and "<script" not in pagina
     monkeypatch.setattr(CMP, "_dossies", lambda ids: ({1: ("Altair", DOSSIE)}, {}))
     assert CMP.main(["--usinas", "1", "--saida", str(tmp_path)]) == 2          # nenhuma chave: não roda
+
+
+def test_as_chaves_e_a_lista_chegam_ao_app_config_pelo_env():
+    """14/11/2026: o .env só chega ao app.config pelas OPCIONAIS; sem elas, o chat dizia "sem chave" com a chave no .env."""
+    from nexus import create_app
+    from nexus.config import OPCIONAIS
+    for p in IA.PROVEDORES.values():
+        assert p["chave"] in OPCIONAIS
+    assert "NEXUS_IA_MODELOS" in OPCIONAIS and "NEXUS_IA_TETO_USD" in OPCIONAIS
+    app = create_app({"NEXUS_SECRET_KEY": "x", "NEXUS_SENHA_ADMIN": "y", "OPENROUTER_API_KEY": "k", "NEXUS_IA_TETO_USD": "5"})
+    assert app.config["OPENROUTER_API_KEY"] == "k" and IA.teto(app.config) == 5.0
+    assert {m["id"]: m["tem_chave"] for m in IA.disponiveis(app.config)}["nemotron"] is True

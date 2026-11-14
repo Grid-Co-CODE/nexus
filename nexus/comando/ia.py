@@ -92,15 +92,18 @@ MODELOS_PADRAO = (
     Modelo("opus", "Claude Opus 5.5", "anthropic", "claude-opus-5-5", 4.0, 20.0, True),
     Modelo("sonnet", "Claude Sonnet 5.5", "anthropic", "claude-sonnet-5-5", 2.0, 10.0, True),
     Modelo("haiku", "Claude Haiku 5.5", "anthropic", "claude-haiku-5-5", 0.10, 0.50, True),
-    Modelo("gemini-pro", "Gemini 2.5 Pro", "gemini", "gemini-2.5-pro", 1.25, 10.0),
-    Modelo("gemini-flash", "Gemini 2.5 Flash", "gemini", "gemini-2.5-flash", 0.30, 2.50),
-    Modelo("groq-oss", "GPT-OSS 120B no Groq", "groq", "openai/gpt-oss-120b", 0.15, 0.60),
-    Modelo("deepseek", "DeepSeek grátis (OpenRouter)", "openrouter", "deepseek/deepseek-chat-v3-0324:free", 0.0, 0.0),
+    Modelo("nemotron", "Nemotron 3 Ultra grátis", "openrouter", "nvidia/nemotron-3-ultra-550b-a55b:free", 0.0, 0.0),
+    Modelo("gemini-lite", "Gemini 3.1 Flash-Lite grátis", "gemini", "gemini-3.1-flash-lite", 0.0, 0.0),
+    Modelo("groq-oss", "GPT-OSS 120B grátis (Groq)", "groq", "openai/gpt-oss-120b", 0.0, 0.0),
 )
+# A lista de 14/11/2026 é a do teste com as chaves grátis do Levi (o relatório "Nota e tempo de resposta de cada IA"):
+# o Nemotron 3 Ultra (OpenRouter, 23,5 de 30, 6 a 16 s; o grátis dá 20 pedidos por minuto e 50 por dia na conta), o
+# Gemini 3.1 Flash-Lite e o GPT-OSS 120B no Groq (16 de 30, menos de 2 s). Ficaram de fora: o Gemini 2.5 (fechado para
+# conta nova), o 3.8 Flash (503 de alta demanda), o 4 Argon (sem cota no grátis), o Gemma do OpenRouter (limite) e o
+# Qwen no Groq (o dossiê passa dos 7.000 tokens por minuto do grátis). Os grátis custam 0 na conta da tela.
 # O Grok (xAI) saiu da lista padrão em 13/11/2026 (Levi: "Grok é pago, não vou pegar"; "não colocarei API paga para
-# testes"): o provedor continua aqui, e volta pelo NEXUS_IA_MODELOS se um dia houver chave. No OpenRouter, só os modelos
-# ":free" (sem crédito, com limite de pedidos por dia). No plano gratuito do Gemini e nos ":free" do OpenRouter, o
-# provedor pode usar o que recebe para melhorar os produtos dele: o Levi decide se o dossiê vai por ali.
+# testes"): o provedor continua aqui, e volta pelo NEXUS_IA_MODELOS se um dia houver chave. No plano gratuito do Gemini e
+# nos ":free" do OpenRouter, o provedor pode usar o que recebe para melhorar os produtos dele.
 
 
 def modelos(cfg) -> list[Modelo]:
