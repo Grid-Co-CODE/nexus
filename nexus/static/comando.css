@@ -773,7 +773,7 @@ a.ins-titulo:hover{color:var(--verde-texto)}
 .ia-info>summary::-webkit-details-marker{display:none}
 .ia-info>summary:hover,.ia-info[open]>summary{color:var(--tinta);border-color:var(--tinta-2)}
 .ia-info-caixa{position:absolute;right:0;top:34px;z-index:5;width:min(560px,100%);padding:12px 14px;background:var(--superficie);
-  border:1px solid var(--linha-forte);border-radius:var(--raio-md);box-shadow:0 10px 30px rgba(0,0,0,.35)}
+  border:1px solid var(--linha-forte);border-radius:var(--raio-md);box-shadow:0 10px 30px var(--sombra)}
 .ia-info-t{margin:0 0 10px;font-size:13px;color:var(--tinta)}
 .ia-rel-ofertas{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
 .ia-rel-oferta .mudo{font-weight:400}
