@@ -473,13 +473,16 @@ def modo_cliente_sair():
     return redirect(url_for("casca.inicio"), code=303)
 
 
-@bp.route("/menu/busca")
+@bp.route("/t/menu/busca")
 def menu_busca():
     """O que a busca do menu lateral (14/11/2026, `static/menu-busca.js`) procura além dos nomes que já estão na página:
     a pergunta de cada tela e as telas que abrem por dentro de outra que a pessoa abre, pelo endereço da tela no menu.
     Pedido só quando a pessoa vai à busca. Na 1ª versão isso ia no HTML de toda página, e as telas conferem o que não
     mostram (a suíte de 14/11 pegou: o Relatório semanal e os Acessos do cliente fora do menu, a pergunta da Caixa de
-    entrada fora da Caixa). O cliente e o Modo cliente não têm a busca."""
+    entrada fora da Caixa). O cliente e o Modo cliente não têm a busca. Debaixo de `/t/` porque no servidor o Caddy só
+    manda ao Nexus a raiz, `/t/*`, `/entrar`, `/sair`, `/saude`, `/tema`, `/os/*` e `/static/*` (um `/menu/busca` caía
+    na plataforma); `menu` não é torre, e a rota passa no portão de setor pelo `setor_telas.LIVRES` (devolve só o que
+    a pessoa já vê no menu)."""
     if session.get("via") == "cliente" or setor_telas.em_modo_cliente():
         abort(403)
     a = setor_telas.acesso()

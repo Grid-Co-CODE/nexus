@@ -180,7 +180,7 @@ def test_o_modo_cliente_do_administrador(app, dados, cliente_tela, logado):
     assert ">Comando</span>" in menu and ">Início</span>" not in menu        # o menu do cliente (o mockup)
     assert 'id="modo-cliente-card"' not in pag
     assert 'id="menu-busca"' not in pag and "menu-busca.js" not in pag      # a busca do menu (14/11) é da Grid
-    assert logado.get("/menu/busca").status_code == 403
+    assert logado.get("/t/menu/busca").status_code == 403
     assert logado.get("/t/base/acessos").status_code == 403 and logado.get("/t/comando/insights").status_code == 403
     # sai pelo menu lateral e volta ao Nexus inteiro
     assert logado.post("/t/base/modo-cliente/sair", data={"codigo": codigo}).status_code == 303

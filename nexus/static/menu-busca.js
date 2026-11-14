@@ -2,7 +2,7 @@
    aí já aparece tudo. Tudo que tem relação, já aparece expandido"). Filtra na própria página, letra a letra:
    - acha pelo nome da área, pelo nome da tela e pela pergunta que a tela responde (a `Tela.pergunta`), sem acento e sem
      caixa: "disponib" acha a Disponibilidade, "mtta" acha as telas do COS pela pergunta. Os nomes já estão na página; a
-     pergunta e as telas de dentro vêm do /menu/busca, pedido uma vez no 1º foco do campo (no HTML de toda página elas
+     pergunta e as telas de dentro vêm do /t/menu/busca, pedido uma vez no 1º foco do campo (no HTML de toda página elas
      apareciam onde as telas conferem que não aparecem: a suíte de 14/11/2026 pegou cinco);
    - mais de uma palavra: a tela precisa ter todas, em qualquer um dos três ("pcm semana");
    - a área com resultado abre, a sem resultado some; o pedaço achado fica em destaque e, quando ele só está na pergunta,
@@ -74,7 +74,7 @@
   var nada = menu.querySelector(".menu-busca-nada");
   var inicio = menu.querySelector(".item-inicio");
 
-  // o índice começa com os nomes que a página já tem; a pergunta e as telas de dentro chegam do /menu/busca
+  // o índice começa com os nomes que a página já tem; a pergunta e as telas de dentro chegam do /t/menu/busca
   var torres = [].map.call(menu.querySelectorAll(".torre"), function (d) {
     var span = d.querySelector("summary span");
     var telas = [].map.call(d.querySelectorAll("ul > li"), function (li) {
@@ -90,7 +90,7 @@
   var pedido = null, chegou = false;
   function carregar() {
     if (pedido) return;
-    pedido = fetch(nexusRota("/menu/busca"), {credentials: "same-origin", headers: {Accept: "application/json"}})
+    pedido = fetch(nexusRota("/t/menu/busca"), {credentials: "same-origin", headers: {Accept: "application/json"}})
       .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
       .then(function (dados) {
         var porUrl = dados.telas || {};

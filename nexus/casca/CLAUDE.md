@@ -993,7 +993,7 @@ da Grid (o menu do cliente e o do Modo cliente não têm) e filtra na própria p
   que faz "MTTA" achar o Acompanhamento COS e o Desempenho da equipe: **tela nova com pergunta vaga é tela que a busca
   não acha**. Sem acento e sem caixa; mais de uma palavra, a tela precisa ter todas (em qualquer um dos três). O nome da
   área traz todas as telas dela ("zeladoria").
-- **De onde vem:** os nomes já estão no menu da página. A pergunta e as telas de dentro vêm do **`GET /menu/busca`**
+- **De onde vem:** os nomes já estão no menu da página. A pergunta e as telas de dentro vêm do **`GET /t/menu/busca`** (debaixo de `/t/` por causa do Caddy; passa no portão de setor pelo `LIVRES`)
   (`casca.menu_busca`: `{"telas": {endereço do link: {"pergunta", "dentro": [...]}}}`, pela sessão, `private` 5 min;
   403 para o cliente e o Modo cliente), pedido uma vez quando o mouse passa no campo, no foco ou na 1ª letra; até chegar,
   o vazio diz "Procurando…". **Não ponha isso no HTML da página**: a 1ª versão (14/11/2026) punha a pergunta em
@@ -1013,7 +1013,7 @@ da Grid (o menu do cliente e o do Modo cliente não têm) e filtra na própria p
 - **Volta:** campo vazio = o menu como estava (as mesmas áreas abertas). No trilho recolhido sobra a lupa; buscar abre o
   menu só enquanto se busca e ele recolhe de novo depois, sem mexer no `nexus.menu` (a escolha da pessoa).
 - O input não tem `name` (não entra em formulário nenhum) e tem o rótulo com `for="menu-busca"`.
-- Prova: `tests/test_menu_busca.py` (o campo, o menu de sempre sem nada da busca, o `/menu/busca` com a pergunta e as de
+- Prova: `tests/test_menu_busca.py` (o campo, o menu de sempre sem nada da busca, o `/t/menu/busca` com a pergunta e as de
   dentro por setor, e as contas do JS no node: `sem`, `achar`, `faixas`, `trecho`, expostas em `window.NexusMenuBusca`).
 
 ## Sugestões no Início (24/10/2026)

@@ -3,7 +3,7 @@ um campo de busca para a pessoa digitar palavras-chave e aí já aparece tudo. T
 
 O que estes testes seguram: o campo no alto do menu de quem é da Grid (o do cliente não tem), sem `name` (não entra em
 formulário nenhum); o menu da página igual ao de antes (sem a pergunta e sem as telas de dentro: a 1ª versão as punha no
-HTML de toda página, e a suíte de 14/11 pegou cinco telas que conferem o que não mostram); o /menu/busca, que entrega a
+HTML de toda página, e a suíte de 14/11 pegou cinco telas que conferem o que não mostram); o /t/menu/busca, que entrega a
 pergunta de cada tela (`Tela.pergunta`, a palavra-chave que não está no nome) e as telas que abrem por dentro de outra
 (o Relatório semanal, na Central de emissão), só as que a pessoa abre; e as contas do `menu-busca.js`, rodadas no node:
 sem acento, todas as palavras, o nome da área traz as telas dela, a pergunta só quando o nome não basta, o destaque no
@@ -40,7 +40,7 @@ def test_o_campo_no_alto_do_menu_e_o_menu_de_sempre(logado):
 
 
 def test_o_menu_busca_entrega_a_pergunta_e_as_telas_de_dentro(logado):
-    r = logado.get("/menu/busca")
+    r = logado.get("/t/menu/busca")
     assert r.status_code == 200 and "private" in r.headers["Cache-Control"]
     telas = r.get_json()["telas"]
     torres = {t.id: t for t in descobrir_torres()}
@@ -56,8 +56,32 @@ def test_o_menu_busca_entrega_a_pergunta_e_as_telas_de_dentro(logado):
     assert [d["url"] for d in telas["/t/base/acessos"]["dentro"]] == ["/t/base/acessos-clientes"]
 
 
+def test_quem_tem_setor_recebe_so_as_telas_dele(app, monkeypatch):
+    """Com o portão de setor ligado, a rota passa (`setor_telas.LIVRES`: ela não é tela de torre, e o `pode` a barraria)
+    e devolve só o que a pessoa já vê no menu: a Caixa, a Central e, dentro dela, só o relatório liberado."""
+    import time
+
+    from nexus.auth import setor_telas as ST
+    monkeypatch.setattr(ST, "ligado", lambda cfg: True)
+    monkeypatch.setattr(ST, "acesso", lambda: {
+        "tudo": False, "telas": {"comando/caixa-de-entrada", "relatorios/central", "relatorios/pcm-diario"},
+        "setor": {"id": 5, "nome": "Setor Qualquer"}, "erro": ""})
+    c = app.test_client()
+    with c.session_transaction() as s:
+        s.update(logado=True, admin=False, via="microsoft", ms_ate=time.time() + 3600,
+                 usuario={"email": "fulano@exemplo.test", "nome": "Fulano de Tal", "perfil": ""})
+    r = c.get("/t/menu/busca")
+    assert r.status_code == 200
+    telas = r.get_json()["telas"]
+    assert set(telas) == {"/t/comando/caixa-de-entrada", "/t/relatorios/central"}
+    assert [d["url"] for d in telas["/t/relatorios/central"]["dentro"]] == ["/t/relatorios/pcm-diario"]
+    # sem o LIVRES, o portão de setor recusaria (a prova de que a liberação é o que deixa passar)
+    monkeypatch.setattr(ST, "LIVRES", ST.LIVRES - {"casca.menu_busca"})
+    assert c.get("/t/menu/busca").status_code == 403
+
+
 def test_o_menu_busca_pede_login(cliente):
-    assert cliente.get("/menu/busca").status_code in (302, 401, 403)
+    assert cliente.get("/t/menu/busca").status_code in (302, 401, 403)
 
 
 def test_so_as_telas_de_dentro_que_a_pessoa_abre():
