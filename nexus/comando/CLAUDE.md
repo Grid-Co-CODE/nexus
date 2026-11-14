@@ -627,7 +627,14 @@ o que é que ele tem que fazer".
   - A trava com mais de 5 min é de um pedido que morreu (o servidor reiniciou) e é refeita.
 - **A IA:** é a do Nexus IA (`ia.perguntar`), com as mesmas instruções e blindagem. O pedido é o `PEDIDO`:
   - um JSON com a situação (a conclusão primeiro), até 4 "tem que fazer", 3 "pode fazer" e 4 "pendente";
-  - cada número com o nome que o dossiê dá (17 normalizações não são 17 desligamentos);
+  - cada número com o nome que o dossiê dá. **Desligamento é só a parada em que a geração parou** (Levi: "um deles foi
+    falha de comunicação [...] você vai dizer 16 desligamentos, que é verdade [...] A pessoa pode ter até colocado o tipo
+    da tarefa como religamento, mas na realidade não foi").
+    - O dossiê (formato 3) tem, por mês, os desligamentos (a geração parou), os registros sem a geração parar e o total.
+    - Em cada parada, o dossiê diz "desligamento" ou "não é desligamento".
+    - As instruções do Nexus IA dizem o mesmo; vale para o chat e para o diagnóstico.
+    - O PDF de religamentos conta "Desligamentos no mês" e mostra "a geração não parou", sem tempo indisponível, na
+      linha da perda de comunicação;
   - a OS que não está no dossiê sai do item (`ler`).
 
   O modelo é o `NEXUS_IA_DIAGNOSTICO_MODELO` (padrão Nemotron, grátis), com a troca entre as grátis quando ele bate o

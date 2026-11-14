@@ -278,9 +278,17 @@ def test_o_que_aconteceu_em_cada_parada_e_os_religamentos():
     sem = dict(c, os="18818", protecoes="", relato="")
     p = {"cos": {"total": 2, "ultimas": [c, sem], "todas": [c, sem], "por_mes": []}}
     t = "\n".join(DS._cos({"estado": ""}, p))
-    assert ("- 12/11 09:41 · Usina desligada · OS 19375 · proteções que atuaram: 27C. O que aconteceu: Usina desligada de "
-            "12/11 às 09:41 a 12/11 às 10:35 (54 min). Causa: falta de energia da concessionária.") in t
+    assert ("- 12/11 09:41 · Usina desligada · desligamento (a geração parou) · OS 19375 · proteções que atuaram: 27C. O que "
+            "aconteceu: Usina desligada de 12/11 às 09:41 a 12/11 às 10:35 (54 min). Causa: falta de energia da concessionária.") in t
     assert "OS 18818. O que aconteceu: sem dado (a Ronda COS não mandou o relato)" in t
+    # desligamento é só a parada em que a geração parou (14/11/2026, Levi: "um deles foi falha de comunicação [...] você vai
+    # dizer 16 desligamentos, que é verdade"): a perda de comunicação fica no histórico, sem contar como desligamento
+    com = dict(c, tipo="Perda de comunicação", parou=False, os="18604")
+    p = {"cos": {"total": 17, "ultimas": [com], "todas": [com], "por_mes": [{"rot": "nov/26", "n": 17, "parou": 16}]}}
+    t = "\n".join(DS._cos({"estado": ""}, p))
+    assert "Perda de comunicação · não é desligamento (a geração não parou) · OS 18604" in t
+    assert "| nov/26 | 16 | 1 | 17 |" in t and "Desligamentos (a geração parou)" in t
+    assert "a perda de comunicação sem a geração parar não é desligamento" in t
     assert DS._religamentos({}) == ["- Religamentos: sem leitura (a tela COS › Religamentos lê o Andamento da Ronda COS, "
                                     "que só o servidor tem)."]
     assert DS._religamentos({"religamentos": []}) == ["- Religamentos nos últimos 30 dias: nenhum nesta usina."]

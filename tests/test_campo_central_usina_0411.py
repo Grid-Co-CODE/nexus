@@ -463,3 +463,25 @@ def test_o_tempo_indisponivel_conta_so_o_periodo_solar():
     assert RU.minutos_solares(h(1, 5, 0), h(4, 7, 0)) == 3 * 720 + 60    # vários dias: em horas, não em dias
     assert RU._h_min(3 * 720 + 60) == "37 h" and RU._h_min(171) == "2 h 51 min" and RU._h_min(None) == "—"
     assert RU.minutos_solares(h(1, 5, 0), None) is None
+
+
+def test_desligamento_e_so_quando_a_geracao_parou():
+    """14/11/2026, Levi: "um deles foi falha de comunicação [...] você vai dizer 16 desligamentos, que é verdade [...] A
+    pessoa pode ter até colocado o tipo da tarefa como religamento, mas na realidade não foi". A perda de comunicação fica
+    na tabela, sem tempo indisponível, e fora do número do alto."""
+    from datetime import date, datetime, timezone
+    br = timezone(timedelta(hours=-3))
+    para = {"ini": datetime(2026, 11, 12, 9, 41, tzinfo=br), "fim": datetime(2026, 11, 12, 10, 35, tzinfo=br),
+            "tipo": "Usina desligada", "fora": "54 min", "parou": True, "os": "19375", "protecoes": "27",
+            "relato": "Usina desligada de 12/11 às 09:41 a 12/11 às 10:35 (54 min). Causa: subtensão."}
+    com = {"ini": datetime(2026, 11, 5, 9, 35, tzinfo=br), "fim": datetime(2026, 11, 5, 15, 30, tzinfo=br),
+           "tipo": "Falha de comunicação", "fora": "5 h 55 min", "parou": False, "os": "18604", "protecoes": "",
+           "relato": "Perda de comunicação com a usina de 05/11 às 09:35 a 05/11 às 15:30 (5 h 55 min), sem impacto na "
+                     "geração. Causa: falha no equipamento de comunicação local da usina."}
+    d = {"religamentos": [com, para], "ini": date(2026, 11, 1)}
+    corpo = RU._religamentos(d, RU._estilos(), RU.CHAVES_CAMPOS)
+    kpi = corpo[2]._cellvalues[0][0]
+    assert [p.text for p in kpi] == ["Desligamentos no mês", '<font color="#c8102e">1</font>',
+                                     "e 1 perda de comunicação, sem parar a geração"]
+    linhas = corpo[-1]._cellvalues
+    assert "a geração não parou" in linhas[1][2].text and linhas[2][2].text == "54 min"

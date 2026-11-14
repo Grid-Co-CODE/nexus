@@ -705,7 +705,15 @@ def _kpis_religamentos(rel: list[dict], partes: list[dict], e: dict) -> Table:
         prot = (cod, f"{PROTECAO_NOME.get(cod, 'proteção ' + cod).lower()}, em {n} parada{'s' if n != 1 else ''}")
     else:
         prot = ("—", "nenhuma proteção registrada")
-    cel = [("Paradas no mês", str(len(rel)), f"{parou} com a geração parada", "critico" if parou else None),
+    # desligamento é só a parada em que a geração parou (14/11/2026, Levi: "você vai dizer 16 desligamentos, que é
+    # verdade"); a perda de comunicação fica na tabela e aqui só no texto de baixo
+    nao = len(rel) - parou
+    so_com = all(str((p or {}).get("rotulo") or "").startswith("Perda de comunicação")
+                 for x, p in zip(rel, partes) if not x.get("parou"))
+    sub = ("todos com a geração parada" if not nao else
+           f"e {nao} {'perda' if nao == 1 else 'perdas'} de comunicação, sem parar a geração" if so_com else
+           f"e {nao} {'ocorrência' if nao == 1 else 'ocorrências'} sem a geração parar")
+    cel = [("Desligamentos no mês", str(parou), sub, "critico" if parou else None),
            ("Religamento remoto", str(remoto), "a distância, sem ir à usina", None),
            ("Religamento no local", str(local), "com a equipe de campo na usina", None),
            ("Proteção que mais atuou", prot[0], prot[1], None)]
@@ -786,7 +794,10 @@ def _religamentos(d: dict, e: dict, campos=CHAVES_CAMPOS) -> list:
                 periodo += [Spacer(1, 3), _pilula(f"{fim:%d/%m %H:%M}", PILULA_VOLTA, e)]
             linhas.append([Paragraph(f'<font color="{_cor(nivel)}">{_t(rotulo)}</font>', e["parada"]),
                            periodo,
-                           _h_min(minutos_solares(x["ini"], fim)), ", ".join(protecoes_do_texto(x.get("protecoes"))) or "—",
+                           # sem a geração parar não há tempo indisponível (a perda de comunicação)
+                           _h_min(minutos_solares(x["ini"], fim)) if x.get("parou") else Paragraph(
+                               f'<font color="{MUDO.hexval().replace("0x", "#")}">a geração não parou</font>', e["cel_c"]),
+                           ", ".join(protecoes_do_texto(x.get("protecoes"))) or "—",
                            x.get("os") or "—", _o_que_aconteceu(p, e)])
         # a Parada na frente (14/11/2026, Levi: "Parada fica na frente")
         t = _tabela(e, ["Parada", "Período", "Tempo indisponível (solar)", "Proteções", "OS", "O que aconteceu"], linhas,

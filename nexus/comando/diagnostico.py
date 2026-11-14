@@ -42,7 +42,7 @@ Responda SÓ com o bloco abaixo, em JSON válido, sem nada antes ou depois, sem 
 - tem_que_fazer: o que o supervisor TEM que fazer (obrigação vencida ou crítica: ronda atrasada, extintor vencido, OS crítica parada, desligamento que se repete), o mais urgente primeiro; até 4; cada um em até 110 caracteres, começando pelo verbo.
 - pode_fazer: o que ele PODE fazer para melhorar (recomendação, não obrigação); até 3; até 110 caracteres, começando pelo verbo.
 - pendente: o que está em aberto esperando alguém (fabricante, concessionária, outro setor, peça, chamado); até 4; até 110 caracteres.
-- Cada número com o nome que o dossiê dá a ele: se o dossiê diz "17 normalizações, 16 com a geração parada", não escreva "17 desligamentos".
+- Cada número com o nome que o dossiê dá a ele. Desligamento é só a parada em que a geração parou: com 17 normalizações e 16 com a geração parada, são 16 desligamentos (a perda de comunicação não conta).
 - "os": o número de uma OS do dossiê ligada ao item, ou null. Nunca invente OS, pendência ou número.
 - Lista vazia quando não houver nada."""
 

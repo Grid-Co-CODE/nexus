@@ -33,7 +33,7 @@ from datetime import date, datetime
 
 from . import prontuario as PR
 
-VERSAO = 2
+VERSAO = 3
 # a cor da tela em palavras (a régua é a de cada tela dona; aqui só o nome)
 GRAVIDADE = {"critico": "crítico", "alerta": "atenção", "atencao": "atenção", "semcom": "sem comunicação",
              "info": "informativo", "ok": "em dia", "neutro": ""}
@@ -173,10 +173,16 @@ def _cos(x: dict, p: dict) -> list[str]:
     cos = p.get("cos") or {}
     if not cos.get("total"):
         return out + ["- Histórico de normalizações: nenhuma registrada no banco para esta usina."]
-    out.append(f"- Normalizações registradas: {cos['total']}")
+    # desligamento é só a parada em que a geração parou (14/11/2026, Levi: "um deles foi falha de comunicação [...] você
+    # tem que dizer quantos realmente teve que a geração parou"): a normalização sem a geração parar (a perda de
+    # comunicação) fica no histórico, mas não conta como desligamento, mesmo registrada como religamento
+    out.append(f"- Normalizações registradas: {cos['total']}. Desligamento é só a normalização em que a geração parou "
+               "(\"A geração parou: sim\"); a perda de comunicação sem a geração parar não é desligamento.")
     if cos.get("por_mes"):
-        out += ["", "Por mês:"] + _tabela(["Mês", "Normalizações", "Com a geração parada"],
-                                         [[m.get("rot"), m.get("n"), m.get("parou")] for m in cos["por_mes"]])
+        out += ["", "Por mês:"] + _tabela(["Mês", "Desligamentos (a geração parou)", "Sem a geração parar (não é desligamento)",
+                                          "Normalizações no total"],
+                                         [[m.get("rot"), m.get("parou"), (m.get("n") or 0) - (m.get("parou") or 0), m.get("n")]
+                                          for m in cos["por_mes"]])
     out += ["", f"As {len(cos.get('ultimas') or [])} mais recentes:"] + _tabela(
         ["Início", "Tipo", "Tempo fora", "A geração parou", "Voltou em", "OS", "Fora do escopo de O&M"],
         [[f"{c.get('dia')} {c.get('hora')}", _com_g(c.get("tipo"), c.get("tom")), c.get("fora"), "sim" if c.get("parou") else "não",
@@ -187,7 +193,9 @@ def _cos(x: dict, p: dict) -> list[str]:
     if com_relato:
         out += ["", "O que aconteceu em cada parada (o relato da Ronda COS e as proteções que atuaram):"]
         for c in com_relato:
-            out.append("- " + _junta(f"{c.get('dia')} {c.get('hora')}", c.get("tipo"), f"OS {c['os']}" if c.get("os") else "",
+            out.append("- " + _junta(f"{c.get('dia')} {c.get('hora')}", c.get("tipo"),
+                                     "desligamento (a geração parou)" if c.get("parou") else "não é desligamento (a geração não parou)",
+                                     f"OS {c['os']}" if c.get("os") else "",
                                      f"proteções que atuaram: {c['protecoes']}" if c.get("protecoes") else "", sep=" · ")
                        + ". O que aconteceu: " + (c.get("relato") or f"{SEM_DADO} (a Ronda COS não mandou o relato)"))
     return out
