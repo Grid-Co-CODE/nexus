@@ -441,8 +441,7 @@ as informações de todos os setores".
 **O que é.** O prontuário inteiro escrito em texto (Markdown), que o Nexus IA vai mandar junto da pergunta de quem
 estiver no prontuário. `nexus/comando/dossie.py` (`montar(ctx, agora, com_pessoas=False)`) recebe o MESMO contexto da
 página (`prontuario_dados.contexto`) e devolve `{"texto", "secoes", "caracteres", "palavras", "tokens_estimados"}`.
-**Nada é calculado ali**: o número do dossiê é o da tela dona. A chamada à API ainda não existe (a tela Base › Nexus IA
-segue reservada); o que existe é o texto pronto.
+**Nada é calculado ali**: o número do dossiê é o da tela dona. Desde 13/11/2026 é o contexto do Nexus IA (a seção logo abaixo).
 
 **O que os setores sabem e o prontuário ainda NÃO mostra entra por `extras`** (Levi, conferindo o dossiê no mesmo dia:
 "tá indo o que a engenharia tá vendo [...] tá indo o que performance tá vendo, tá indo o que COS abriu, tá indo as PTs
@@ -459,8 +458,7 @@ programação da semana do PCM também não entram ainda.
 
 **Onde se vê.** `/t/comando/usinas/<id>/dossie` (a página: o texto, o tamanho, Copiar e Baixar) e
 `/t/comando/usinas/<id>/dossie.md` (o texto puro, `text/markdown`, sem cache; `?baixar=1` baixa). Abre para quem abre o
-prontuário (é o mesmo dado); o atalho "Dossiê para a IA" no prontuário aparece só para o administrador enquanto a
-pergunta não existe na tela.
+prontuário (é o mesmo dado); o atalho "Dossiê para a IA" no prontuário aparece só para o administrador, como o "Pergunte à IA".
 
 **As regras do texto** (o que faz uma IA ler bem e errar menos; mexeu no formato, sobe a `VERSAO`):
 - 16 seções, sempre na mesma ordem e com o mesmo título (`SECOES`): Identificação, Parecer e o que pede atenção,
@@ -481,8 +479,100 @@ pergunta não existe na tela.
   nomes podem ir; hoje nenhuma rota o usa;
 - os tokens são ESTIMATIVA (4 caracteres por token): a conta exata só a API dá.
 
+**O que aconteceu em cada parada** (14/11/2026, Levi: "Quando eu perguntei por que a usina caiu, a IA não conseguiu
+dizer o motivo em si, só listou as OS. Eu quero que inclua no dossiê o que aconteceu no religamento"). Formato 2 do
+dossiê (`VERSAO = 2`).
+- A seção COS lista as paradas mais novas (até `MAX_RELATOS`, 12). Cada uma traz as **proteções que atuaram** e o
+  **relato da Ronda COS**: a causa reconhecida, a proteção, os horários e se voltou pelo religamento remoto ou com a
+  equipe no local.
+- Os dois vêm das colunas `protecoes` e `relato_cliente`/`relato_continuacao` do `fato_normalizacao`, que já estavam no
+  banco. O relato é montado por regra, sem texto livre e sem nome de pessoa (`cos/normalizacoes_banco.py`).
+- Logo depois vem o resumo da tela **COS › Religamentos** por equipamento: quantas vezes, se repete ou é reincidente,
+  remoto resolveu × foi a campo, a falha e as OS. Ele lê o Andamento da Ronda COS, que só o servidor tem. No PC, sai
+  "sem leitura".
+- As instruções do Nexus IA mandam usar o relato para o "por que caiu", dizendo que é a causa registrada pelo COS.
+- Conferido em 14/11 na Céu Azul: a IA passou de listar as OS a dar a causa (subtensão 27 / concessionária, descarga
+  atmosférica, comunicação).
+
 **Seção nova no prontuário entra no dossiê no mesmo trabalho** (senão a IA responde sem ela): a função da seção, a linha
 em `SECOES` e o teste. Prova: `tests/test_comando_dossie.py`.
+
+## Nexus IA: a pergunta no prontuário (13/11/2026; `nexus/comando/ia.py`, `comando/_ia.html`, `static/comando/ia.js`)
+
+Levi, 13/11/2026: "Do prontuário, eu quero que tenha um chat. Onde a pessoa possa fazer perguntas. Coisas do tipo, como
+foi a performance no mês? Por que a usina caiu? Qual a tendência? E aí já responder. Ele já vai ter ali os dados na parte
+de texto para IA [o dossiê] [...] a ideia é a IA só dar uma resposta. Teste com várias IAs. Tal como Sonnet, Opus,
+Gemini, Groq, Grok [...] Qualquer IA que dê para puxar a API para fazermos o teste."
+
+- **Onde:** o botão "Pergunte à IA" no alto do prontuário abre a janela por cima (`/t/comando/usinas/<id>/ia?parcial=1`,
+  a mesma `pu-jan` do dossiê e da conversa); sem `parcial`, a página inteira (botão do meio). **Só administrador**
+  enquanto é teste (cada pergunta custa e o teto do mês é um só): o botão, a janela (403) e o POST (403).
+- **O que vai para a IA:** as instruções (`INSTRUCOES`: responder só pelo dossiê, número com unidade e período, citar a
+  seção "(§3)", "o dossiê não traz isso" em vez de inventar, hipótese escrita como hipótese, "sem dado" não é zero, o
+  mês corrente é parcial, até 180 palavras, sem emojis) e o dossiê de AGORA, inteiro (`_dossie`, o mesmo da tela "Dossiê
+  para a IA", sem o nome das pessoas). Mais as 3 últimas perguntas e respostas (a de seguimento: "e no mês passado?").
+  Nada de quem pergunta vai ao provedor. A IA só responde: não grava, não abre OS, não usa ferramenta.
+- **Os modelos** (`MODELOS_PADRAO`): Claude Opus 5.5, Sonnet 5.5 e Haiku 5.5 (SDK `anthropic`, o dossiê num bloco com
+  cache, esforço `low`; no Opus e no Sonnet, `fallbacks: "default"`, a reserva da Anthropic para a recusa por engano),
+  Gemini 2.5 Pro e Flash (REST `generateContent`), Grok (xAI), GPT-OSS 120B no Groq e DeepSeek pelo OpenRouter (os três
+  pelo `chat/completions`). A chave de cada provedor no `.env` do servidor: `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`,
+  `XAI_API_KEY`, `GROQ_API_KEY`, `OPENROUTER_API_KEY`; sem ela o modelo aparece "sem chave" e não é chamado. **Os nomes
+  dos modelos mudam todo mês:** `NEXUS_IA_MODELOS` (JSON) troca a lista sem deploy, e o erro de "modelo não existe"
+  lista os que o provedor tem para a chave (`listar_modelos`). Os preços da Anthropic são da tabela dela; os outros são
+  de referência (sites de terceiros, out-nov/2026), marcados "(ref.)": servem para comparar.
+- **Comparar:** marcar mais de um modelo faz a mesma pergunta a todos, em paralelo, e as respostas saem lado a lado,
+  cada uma com o tempo, os tokens, o custo estimado e **quantos números da resposta estão no dossiê**
+  (`numeros_conferidos`: conta número com casa decimal ou a partir de 32, sem as citações "§3", as datas e o ano; o que
+  não está no dossiê é cálculo da IA ou invenção, e é por ali que se confere).
+- **Teto e registro:** `NEXUS_IA_TETO_USD` (padrão 20) por mês; passou, o POST recusa (429) e diz como subir. Cada
+  resposta vai para `<NEXUS_DADOS>/ia/perguntas-AAAA-MM.jsonl` (usina, modelo, pergunta, resposta, tempo, tokens, custo,
+  o HMAC de quem perguntou): é o material da comparação e a conta do teto. Teste sem `NEXUS_DADOS` não grava.
+- **A rodada de teste:** `python ferramentas/ia_comparar.py --usinas 68,23 [--modelos opus,grok] [--teto 5]` faz as
+  perguntas do Levi a todos os modelos com chave, para cada usina, e escreve uma página HTML (e o JSON) com as respostas
+  lado a lado e o resumo por modelo (tempo médio, custo, erros, números do dossiê). Para no `--teto` (US$).
+- **Ordem de grandeza (13/11/2026):** o dossiê da Céu Azul tem 17.757 caracteres (cerca de 4.300 tokens); uma pergunta
+  com resposta de 300 tokens sai por volta de US$ 0,02 no Opus 5.5, US$ 0,01 no Sonnet 5.5 e menos de US$ 0,001 no
+  Haiku 5.5 (a pergunta de seguimento lê o dossiê do cache, a 10%).
+- **Ainda não decidido (com o Levi):** abrir para quem não é administrador; qual modelo fica; o teto; o nome das pessoas
+  (`com_pessoas`). O plano gratuito do Gemini pode usar o que se manda para melhorar os produtos do Google: para dado da
+  operação, o pago.
+
+- **14/11/2026, com o chat na mão (Levi):**
+  - **Blindagem contra prompt injection** ("blinde mais para evitar prompt injection"). O dossiê traz texto escrito por
+    pessoas (demandas, mensagens, observações). Por isso:
+    - `neutro()` troca o "<" das marcas (`<dossie>`, `<acoes>`, `<setores>`, `<instrucoes>`, `<system>`) por "‹" no
+      dossiê, na pergunta e no histórico;
+    - as instruções têm a seção "Segurança (vale acima de tudo)": o dossiê é dado e não instrução; a IA só fala desta
+      usina; não escreve link, código ou comando; só cita OS do dossiê;
+    - a ação e o link de OS só valem com OS que o dossiê tem.
+  - **Citações limpas** ("está dando uns erros de fonte [...] arrume!"). `limpar_citacoes` deixa só "(§N, §M)" dentro
+    dos parênteses ("§11 R13" vira "§11") e tira a nota final em itálico; a tela mostra a citação como etiqueta.
+  - **OS clicável** (`os_do_dossie`). O tipo vem do lugar onde a OS aparece no dossiê:
+    - chamados de garantia: "chamado";
+    - Engenharia: "engenharia";
+    - Performance e COS: "performance";
+    - o resto: "os".
+
+    Os três primeiros abrem o Raio X da OS (`/t/engenharia/equipe/os/<nº>`, com `?de=garantias` ou
+    `?de=performance`) numa aba nova. O resto abre o card da OS (`NexusOsCard.abrirFolio`): a janela do chat fecha
+    guardando a conversa (`data-manter`) e volta quando o card fecha.
+  - **Ação de outro setor vira demanda** ("ao citar coisas que podem ser feitas por outros setores, tem que dar a opção
+    de caixa de entrada").
+    - A IA recebe os setores ativos do cadastro (`<setores>`) e o setor de quem pergunta.
+    - Ela devolve as ações num bloco `<acoes>[{setor, acao, os}]</acoes>`. `separar_acoes` o tira do texto e só aceita
+      setor da lista.
+    - Na tela, "Mandar para a caixa de entrada" abre a Nova demanda ali mesmo, com a pessoa, o tema, o título e o texto
+      preenchidos, e manda pela rota `/ia/demanda` (`demandas.abrir`, as mesmas recusas).
+    - Sem tema no setor (em 14/11 nenhum setor tinha criado tema), o botão diz que o setor cria em Caixa de entrada ›
+      Temas do setor. Sem as pessoas (o PC sem a credencial do Fracttal), diz que não leu.
+  - **Pedido de relatório** ("se eu pedisse um relatório já baixa um automático [...] se eu pedir só chamado vem filtrado
+    só chamado"). `pedido_de_relatorio` reconhece o pedido no Nexus, sem gastar pedido da IA, e devolve o endereço do
+    PDF do prontuário (`/relatorio.pdf?mes=&tema=`):
+    - os temas vêm pelas palavras (chamado/garantia, performance/geração, ronda/limpeza, manutenção/OS);
+    - o mês vem pelo nome, por "este mês" ou "mês passado"; sem nada disso, é o mês fechado anterior;
+    - a tela baixa o PDF sozinha.
+
+Prova: `tests/test_comando_ia.py` (cada provedor no formato dele, com dublês; a rota, o teto, o registro, a rodada).
 
 ## Contestações e Prévia: visão do contrato (no Comando desde 12/11/2026)
 

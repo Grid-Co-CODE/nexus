@@ -20,3 +20,6 @@ pypdf==6.14.2
 # o .xls BIFF do relatório NeoWind da Cascavel (Sunpower) na tela Coletas (nexus/performance/coletas, 11/11/2026): o motor
 # do Conversor o importa só ao ler um .xls; sem ele, só esse formato dá erro no cartão
 xlrd==2.0.1
+# o Nexus IA (nexus/comando/ia.py, 13/11/2026): os modelos da Anthropic pelo SDK oficial; importado na hora da pergunta,
+# então sem ele só a Anthropic falha, com o motivo escrito (Gemini, Grok, Groq e OpenRouter vão pelo requests)
+anthropic==2.8.0

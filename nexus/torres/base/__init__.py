@@ -77,9 +77,13 @@ TORRE = Torre(
         # De-para de equipamentos (11/10/2026): como cada usina de cada fonte se liga ao cadastro, e o editor (a ponte da
         # usina pelo id, o nome de cada inversor, a sugestão pelo kWh). A tela é da plataforma (/admin/de-para), numa
         # moldura; grava no livro nexus_depara; só administrador.
+        # desde 13/11/2026 o De-para mora junto de Equipamentos das usinas (a aba De-para; Levi: "o equipamentos das
+        # usinas tem que ser junto do de para de equipamentos, pois um complementa o outro"): sai do menu, acende o item
+        # de Equipamentos e continua no endereço de sempre (o "De-para completo" da aba leva a ele)
         Tela("de-para-equipamentos", "De-para de equipamentos",
              "Ligar cada usina e cada inversor de cada fonte ao cadastro, com a sugestão pelo kWh do BD",
-             "Plataforma de Performance (/admin/de-para) e o livro nexus_depara no banco, só administrador"),
+             "Plataforma de Performance (/admin/de-para) e o livro nexus_depara no banco, só administrador",
+             dentro_de="equipamentos"),
         # Acessos (11/10/2026: "Tem algum canto do Nexus onde eu posso administrar isso?"): quem é administrador, dar e
         # tirar pela tela, e quem entrou em 30 dias. Só administrador. A view e as regras moram em nexus/auth/. Desde
         # 25/10/2026 a aba Pessoas e setores (`?aba=pessoas`) é a antiga Integração Fracttal

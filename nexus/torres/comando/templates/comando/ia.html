@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block titulo %}Nexus IA · {{ x.usina }}{% endblock %}
+{% block conteudo %}
+<link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='comando.css') }}">
+{# O Nexus IA numa página só (o botão do meio, o Ctrl no "Pergunte à IA"); o normal é a janela por cima do prontuário. #}
+<div class="campo-nativa ia-pagina">
+  <p class="cmu-volta"><a class="cn-link" href="{{ raiz }}/t/comando/usinas/{{ x.usina_id }}"><i class="ph ph-arrow-left" aria-hidden="true"></i> Prontuário</a></p>
+  <h1 class="titulo-pagina">Nexus IA · {{ x.usina }}</h1>
+  {% include "comando/_ia.html" %}
+</div>
+{% include "oscreator/card_os_abrir.html" %}
+<script src="{{ url_for('static', filename='comando/ia.js') }}" defer></script>
+{% endblock %}

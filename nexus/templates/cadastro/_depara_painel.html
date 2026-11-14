@@ -1,0 +1,21 @@
+{# A aba De-para com a usina aberta (13/11/2026; a prévia aprovada: docs/mockups/equipamentos-e-depara, repositório da
+   plataforma). Um cartão por fonte que chega nas chaves desta usina: o que a fonte manda de um lado, o cadastro do outro,
+   o fio no meio. Os cartões vêm por fetch (cadastro-depara.js, rota equipamentos_fontes): a usina da plataforma pode
+   levar segundos, e a página não espera. O lápis corrige o CADASTRO (a estrutura do Nexus, o mesmo Salvar da aba
+   Equipamentos); o "Ligar a…" decide o par na tela da plataforma, numa janela por cima. #}
+<section class="cad-secao dpx" id="dpx" data-cartoes-url="{{ url_for('torre_base.equipamentos_fontes', usina=u.id) }}">
+  <div class="dpx-topo">
+    <h2>Fontes que chegam nesta usina</h2>
+    <span class="dpx-lido mudo" data-dpx-lido></span>
+    <button type="button" class="gc-btn gc-btn--ui gc-btn--contorno" data-dpx-reler><i class="ph ph-arrows-clockwise" aria-hidden="true"></i> Ler de novo</button>
+    <a class="gc-btn gc-btn--ui gc-btn--fantasma" href="{{ '/t/base/de-para-equipamentos'|na_raiz }}"><i class="ph ph-arrow-square-out" aria-hidden="true"></i> De-para completo</a>
+  </div>
+  <div class="dpx-cartoes" data-dpx-cartoes aria-live="polite">
+    {% if painel.fontes %}<p class="eq-vazio">Lendo o que {{ 'a fonte manda' if painel.fontes|length == 1 else 'as ' ~ painel.fontes|length ~ ' fontes mandam' }}…</p>
+    {% elif dp.erro %}<p class="eq-vazio">Sem leitura do de-para da plataforma: {{ dp.erro }}.</p>
+    {% elif not painel.chaves %}<p class="eq-vazio">Sem chave do supervisório, nenhuma fonte chega aqui: ligue a chave na aba Equipamentos.</p>
+    {% else %}<p class="eq-vazio">Nenhuma fonte do de-para chega nas chaves desta usina.</p>{% endif %}
+  </div>
+</section>
+<script type="application/json" id="dpx-dados">{{ dict(painel.editor, pode_gravar=pode_gravar)|tojson }}</script>
+{% include "cadastro/_depara_dialogos.html" %}

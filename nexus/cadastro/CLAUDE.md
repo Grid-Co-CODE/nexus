@@ -35,7 +35,7 @@ pendência "Valores parecidos na mesma lista" aparece na Qualidade sem link (nã
 | `fracttal_pessoal.py` + `telas_fracttal.py` | tela Base → Acessos → Pessoas e setores: o pessoal do Fracttal ao lado do cadastro de pessoas (12/10/2026) |
 | `setores.py` | o setor de cada pessoa do Fracttal e a lista de setores, no livro `nexus_setores` do banco (12/10/2026) |
 | `ligacao_campo.py` | a ligação por ID do que o App de Campo grava: `usina_id` pelo `de_para`, `pessoa_id` pelo nome e `codigo_da_pessoa` (o HMAC do e-mail que o App manda). Morava em `campo/ligacao_cadastro.py` até 08/11/2026 (32 módulos, inclusive 5 fatos de `dados/`, iam ao Campo buscar a chave comum); o endereço antigo reexporta daqui para os ramos em andamento |
-| `estrutura_usina.py` + `telas_equipamentos.py` | tela Base → Equipamentos das usinas: a usina ligada à mão às chaves do supervisório e os equipamentos dela nas colunas da aba Equipamentos (cabines, inversores, strings, potência), no livro `nexus_estrutura_usina` (13/10/2026; sem Fracttal na tela) |
+| `estrutura_usina.py` + `telas_equipamentos.py` + `depara_fontes.py` | tela Base → Equipamentos das usinas (com a aba De-para desde 13/11/2026, o de-para da plataforma lido pela ponte): a usina ligada à mão às chaves do supervisório e os equipamentos dela nas colunas da aba Equipamentos (cabines, inversores, strings, potência), no livro `nexus_estrutura_usina` (13/10/2026; sem Fracttal na tela) |
 | `telas.py` | as rotas, penduradas nas torres Base e Pessoas |
 
 Campo novo entra em `esquema.py`, e as telas, a importação e a lista acompanham sozinhas.
@@ -397,6 +397,48 @@ Prova: `tests/test_base_acessos_nexus_field.py`.
 ## Equipamentos das usinas (`estrutura_usina.py`, `telas_equipamentos.py`, `/t/base/equipamentos`; 13/10/2026)
 
 > Desde 05/11/2026 o guia "Como funciona" e a dica do (!) antigo ficam juntos na exclamação amarela do título (`explica`, `_explica.html`); o guia deixou de ser uma seção do painel vazio.
+
+### A aba De-para e as três luzes (13/11/2026; `depara_fontes.py`, `cadastro-depara.js`, `cadastro/_depara_*.html`)
+
+Levi, 13/11/2026: "o equipamentos das usinas tem que ser junto do de para de equipamentos, pois um complementa o outro,
+certo? E no de para do equipamento, tem que ser possível editar o equipamento da usina. Deixa a visualização dos dois
+parecida [...] o mais visual possível". A prévia aprovada: `docs/mockups/equipamentos-e-depara` (repositório da
+plataforma). O item **De-para de equipamentos** saiu do menu (`dentro_de="equipamentos"`): o endereço segue, e o botão
+"De-para completo" da aba leva a ele.
+
+- **As duas abas** (`?aba=depara`, `ABAS`): os mesmos números do alto em ladrilhos (cada um filtra), a mesma lista com
+  as fichas do filtro (com a contagem; "De-para pendente" é novo) e **três luzes** por usina: chave do supervisório,
+  equipamentos (o kWp dos inversores fecha com o Registro mestre: `_luz_equip`) e de-para (a pior fonte da usina).
+  Apagada = sem leitura, nunca verde. O "Ligar pela aba" e o "Refazer a visão" ficam só na aba Equipamentos.
+- **De onde vem o de-para:** da PLATAFORMA, só leitura, pela ponte (`X-Nexus-Leitura`, `ponte.enviar`, tempo-limite de
+  20 s e não os 150 da ponte, guardado 2 min): `/api/admin/de-para` (o diagnóstico) e `/api/admin/de-para/usina` (a
+  usina de uma fonte, sem o `cadastro_usinas`). A plataforma deixa a chave ler **só esses dois caminhos exatos**
+  (`plataforma/leitura_nexus._GET_EXATO`, 13/11/2026) e não abre a API PV em pedido do Nexus: o que a fonte "manda hoje"
+  é o da tabela do ciclo dela. Falha fechada: resposta sem `X-Nexus-Leitura-Ok` não vale. Sem a ponte configurada, a
+  tela abre e diz "sem leitura do de-para".
+- **Como a linha chega à usina** (`por_usina`): pela chave (`usina_supervisorio`, no `norm`) e, sem ela, pelo nome de
+  exibição gravado no Nexus quando ele é de UMA chave só (a API PV escreve "Alto Paraná 1"; a chave é "Alto Parana 1
+  (40)"). Medido em 13/11/2026: 155 das 179 linhas pela chave, 18 pela exibição, 6 sem usina no Nexus (a chave está
+  na aba, sem ligação). Essas 6 aparecem na aba De-para sem usina aberta ("Na fonte, fora do Nexus").
+- **Os pares** (`pares`): um cartão por fonte; cada par é UMA linha da grade de três colunas (a fonte, o fio, o cadastro),
+  para a cor do "sem par" atravessar a coluna do meio (Levi, 13/11, com a foto: "a coluna Liga está cortando a cor
+  amarelo"). O fio vem do `origem` da plataforma: nome/código = liga, tela = decidido, ordem = conferir, sem = sem par.
+  O alvo é o do cadastro que a PLATAFORMA lê (a aba, ou a visão do Nexus na chave no lugar da aba); o inversor do Nexus
+  vai junto quando casa (o nome no supervisório e, sem ele, o nome do equipamento), e só então o lápis aparece ("só na
+  aba" quando não casa). Fonte sem a lista de inversores (a tabela do ciclo não tem a usina) = **"sem a lista da
+  fonte"**, nunca "não chega da fonte" (o cadastro inteiro sobraria, e isso não se sabe). A fonte que liga pelo nome
+  (Athon, Axis) não tem pares: o cartão traz os alertas e o cadastro com o lápis.
+- **O lápis** edita o inversor do CADASTRO (a estrutura do Nexus) e grava pela **mesma rota** do Salvar da aba
+  Equipamentos (`/equipamentos/salvar`, a usina inteira com o selo). **Na chave que a plataforma ainda lê da aba Excel
+  (`substitui_aba` falso), o Salvar pergunta** (Levi, 13/11/2026, "Pergunta ao salvar"): mostra as diferenças Nexus ×
+  aba do que está salvo (`comparacao`) e dá "Salvar e passar a valer na plataforma" (marca a chave no lugar da aba) ou
+  "Salvar só no Nexus". O "+ No cadastro" do inversor sem par abre o mesmo editor, com o nome que a fonte manda.
+- **O "Ligar a…"** decide o par na tela da PLATAFORMA, numa janela por cima: `/equipamentos/fontes/janela?editar=fonte|id`
+  é uma página sem o base.html (a casca toma a janela quando está numa moldura) que leva o passe da porta única a
+  `/admin/de-para?janela=1&editar=…`. Quando o editor de lá fecha, ele avisa (`{gc: 'depara-fechar'}`), a página do
+  meio passa adiante, a janela fecha e os cartões são relidos (`forcar=1`).
+- Prova: `tests/test_base_equipamentos_depara_fontes.py` (a Céu Azul III de 13/11: o INVERSOR05 duas vezes, o INVERSOR09
+  sem par, o INVERSOR07 que não chega).
 
 Levi, 13/10/2026 (o atalho do Tempo real abria o editor do de-para da plataforma na fonte errada): "Temos que substituir a
 aba equipamentos aproveitando o que tem lá e usando o Nexus como ponto de partida a partir daquele produto. Precisamos

@@ -552,7 +552,12 @@ def cos_historico(linhas: list[dict] | None, hoje: date, n: int = 6) -> dict:
         itens.append({"quando": ini, "dia": ini.strftime("%d/%m"), "hora": ini.strftime("%H:%M"), "tipo": nome, "tom": tom,
                       "fora": fora_txt(r.get("fora_min")), "parou": str(r.get("geracao_parou") or "") in ("1", "True"),
                       "os": os_ if os_.isdigit() else "", "volta": volta.strftime("%d/%m %H:%M") if volta else "",
-                      "fora_escopo": str(r.get("fora_do_escopo_oem") or "") in ("1", "True")})
+                      "fora_escopo": str(r.get("fora_do_escopo_oem") or "") in ("1", "True"),
+                      # o que aconteceu (14/11/2026, para o dossiê da IA): as proteções que atuaram e o relato que a
+                      # Ronda COS monta por regra (frases-modelo e valores, sem texto livre nem nome de pessoa:
+                      # `normalizacoes_banco`, "O relato ao cliente")
+                      "protecoes": " ".join(str(r.get("protecoes") or "").split()),
+                      "relato": " ".join(str(r.get("relato_cliente") or r.get("relato_continuacao") or "").split())})
     itens.sort(key=lambda i: i["quando"], reverse=True)
     meses: dict[int, dict] = {}
     for i in itens:

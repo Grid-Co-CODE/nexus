@@ -281,7 +281,7 @@ def usina_relatorio(usina_id):
     return responsaveis_usina_relatorio(usina_id)
 
 
-def _extras_do_dossie(usina_id: int) -> dict:
+def _extras_do_dossie(usina_id: int, codigo: str = "") -> dict:
     """O que os setores sabem da usina e o prontuário ainda não mostra (Levi, 12/11/2026, conferindo o dossiê: "tá indo o
     que a engenharia tá vendo [...] tá indo alguma anotação de supervisão"): os ativos com sinal na Confiabilidade com os
     números de lá, os ativos em acompanhamento pela Engenharia, os relatórios de FMEA e de causa raiz e as observações do
@@ -322,8 +322,31 @@ def _extras_do_dossie(usina_id: int) -> dict:
     def observacoes():
         from ...campo import observacao_responsavel as OB
         return OB.da_usina(usina_id, limite=20)
+
+    def religamentos():
+        """A tela COS › Religamentos desta usina (14/11/2026, Levi: "inclua no dossiê o que aconteceu no religamento"):
+        as ocorrências de 30 dias da Ronda COS de todos os clientes, só as da usina (pelo código do Fracttal), na régua
+        de lá (`religamentos.painel`). Sem a fonte do Andamento (o PC), None: "sem leitura"."""
+        from ...cos import andamento as AND
+        from ...cos import religamentos as RE
+        cfg = current_app.config
+        if not AND.fonte(cfg).ligada:
+            return None
+        cod = str(codigo or "").strip().upper()
+        clientes, erro = AND.clientes(cfg)
+        if erro or not cod:
+            raise RuntimeError(erro or "a usina sem código do Fracttal")
+        ocs = []
+        for c in clientes:
+            le = AND.ler_ocorrencias(cfg, c, RE.DIAS_PADRAO)
+            ocs += [o for o in (le.dados or {}).get("ocorrencias") or [] if str(o.get("usina_codigo") or "").upper() == cod]
+        p = RE.painel(AND.Leitura("", {"ocorrencias": ocs}), ver="todos")
+        return [{"equipamento": e.rotulo, "total": e.total, "repete": e.repete, "reincidente": e.reincidente,
+                 "desfechos": [(RE.DESFECHOS[k][0], n) for k, n in e.desfechos.items()], "tipos": e.tipos, "os": e.os,
+                 "ultima": e.ultima.strftime("%d/%m %H:%M") if e.ultima else ""} for e in (p.itens if p else [])]
     return {"ativos": tentar("a Confiabilidade", ativos), "acompanhamentos": tentar("o acompanhamento da Engenharia", acompanhamentos),
-            "relatorios": tentar("os relatórios de falha", relatorios), "observacoes": tentar("as observações", observacoes)}
+            "relatorios": tentar("os relatórios de falha", relatorios), "observacoes": tentar("as observações", observacoes),
+            "religamentos": tentar("os religamentos do COS", religamentos)}
 
 
 def _dossie(usina_id: int):
@@ -334,7 +357,7 @@ def _dossie(usina_id: int):
     ctx = _prontuario(usina_id)
     if ctx is None:
         abort(404)
-    return ctx, DS.montar(ctx, visao._agora(), extras=_extras_do_dossie(usina_id))
+    return ctx, DS.montar(ctx, visao._agora(), extras=_extras_do_dossie(usina_id, (ctx.get("x") or {}).get("codigo") or ""))
 
 
 @bp.route("/usinas/<int:usina_id>/dossie")
@@ -362,6 +385,153 @@ def usina_dossie_md(usina_id):
                                            f'filename="dossie-{nome}.md"')
     resp.headers["Cache-Control"] = "no-store"
     return resp
+
+
+# ── Nexus IA: a pergunta sobre a usina (13/11/2026) ──────────────────────────────────────────────────────────────────
+# Levi: "Do prontuário, eu quero que tenha um chat. Onde a pessoa possa fazer perguntas [...] como foi a performance no
+# mês? Por que a usina caiu? Qual a tendência? [...] Teste com várias IAs". As regras moram em nexus/comando/ia.py. Só
+# administrador enquanto é teste (cada pergunta custa, e o teto do mês é um só); a janela é a do prontuário (pu-jan).
+@bp.route("/usinas/<int:usina_id>/ia")
+def usina_ia(usina_id):
+    from ...comando import ia as IA
+    from .prontuario_dados import contexto as _prontuario
+    if not session.get("admin"):
+        abort(403)
+    ctx = _prontuario(usina_id)
+    if ctx is None:
+        abort(404)
+    cfg = current_app.config
+    dados = dict(x=ctx["x"], modelos=IA.disponiveis(cfg), sugestoes=IA.SUGESTOES, gasto=IA.gasto_do_mes(cfg),
+                 teto=IA.teto(cfg), max_pergunta=IA.MAX_PERGUNTA, setores=_ia_setores())
+    if request.args.get("parcial") == "1":          # a janela por cima do prontuário
+        return render_template("comando/_ia.html", **dados)
+    return render_template("comando/ia.html", torre=TORRE, tela=TORRE.tela("usinas"), **dados)
+
+
+def _ia_setores() -> list[dict]:
+    """Para onde a resposta pode mandar demanda (14/11/2026, Levi: "ao citar coisas que podem ser feitas por outros
+    setores, tem que dar a opção de caixa de entrada para mandar msg para esses setores"): os setores com pessoas, cada um
+    com as pessoas (menos quem pergunta) e os temas ativos, a mesma regra da Nova demanda. Fora do ar: lista vazia (a
+    resposta sai sem o botão)."""
+    from ...auth import setor_telas as ST
+    from ...cadastro import setores as S
+    from ...comando import demandas as DM
+    from ...dados.conexao import banco
+    # os setores ativos do cadastro: a IA conhece todos, mesmo sem pessoa ou tema lido agora (no PC sem a credencial do
+    # Fracttal não há os nomes; tema, o setor cria em Caixa de entrada › Temas do setor). O botão diz o que falta
+    try:
+        st = ST._setores_no_clique(*banco())
+        out = {s["setor_id"]: {"setor_id": s["setor_id"], "nome": s["nome"], "pessoas": [], "temas": []}
+               for s in S.ativos(st.get("setores") or [])}
+    except Exception:            # noqa: BLE001 — sem os setores, sem o botão
+        current_app.logger.exception("Nexus IA: os setores não abriram")
+        return []
+    meu = _meu_hmac()
+    for nome, ler in (("pessoas", DM.pessoas_com_setor), ("temas", DM.temas)):
+        try:
+            itens = ler()
+        except Exception:        # noqa: BLE001 — a parte que não abriu fica vazia, e o botão diz
+            current_app.logger.exception("Nexus IA: %s das demandas não abriram", nome)
+            continue
+        for x in itens:
+            s = out.get(x["setor_id"])
+            if not s:
+                continue
+            if nome == "pessoas" and x["hmac"] != meu:
+                s["pessoas"].append({"hmac": x["hmac"], "nome": x["nome"]})
+            elif nome == "temas":
+                s["temas"].append({"tema_id": x["tema_id"], "nome": x["nome"], "prazo": x["prazo_dias_uteis"]})
+    return sorted(out.values(), key=lambda s: s["nome"].lower())
+
+
+def _ia_meu_setor() -> str:
+    try:
+        from .demandas_tela import _meu_setor
+        return (_meu_setor() or {}).get("nome") or ""
+    except Exception:            # noqa: BLE001
+        return ""
+
+
+def _ia_relatorio(usina_id: int, pedido: dict) -> dict:
+    """O PDF do prontuário que o pedido quer (o mês e os temas), sem passar pela IA: o mesmo endereço do botão Relatório."""
+    from urllib.parse import urlencode
+
+    from ...campo import relatorio_usina as RU
+    from ...campo import visao
+    hoje = visao._agora().date()
+    rotulo = dict(RU.meses(hoje)).get(pedido["mes"], pedido["mes"])
+    temas = dict(RU.TEMAS)
+    q = urlencode([("mes", pedido["mes"])] + [("tema", t) for t in pedido["temas"]])
+    aviso = (f"O relatório tem só os três últimos meses: vai o de {rotulo.lower()}." if pedido.get("mes_fora") else "")
+    return {"url": na_raiz(f"/t/comando/usinas/{usina_id}/relatorio.pdf?{q}"), "mes": rotulo,
+            "temas": [temas[t] for t in pedido["temas"]], "aviso": aviso}
+
+
+@bp.route("/usinas/<int:usina_id>/ia/perguntar", methods=["POST"])
+def usina_ia_perguntar(usina_id):
+    """JSON {pergunta, modelos: [ids], historico: [{pergunta, resposta}]} -> {ok, respostas, dossie_tokens, gasto, teto}.
+    O dossiê é montado AGORA (o mesmo do "Dossiê para a IA"), uma vez para todos os modelos pedidos."""
+    from flask import jsonify
+
+    from ...comando import ia as IA
+    if not session.get("admin"):
+        return jsonify(ok=False, erro="Só administrador, enquanto o Nexus IA está em teste."), 403
+    if _de_outro_site():
+        return jsonify(ok=False, erro="Pedido de outro site."), 403
+    b = request.get_json(silent=True) or {}
+    pergunta = IA.limpar_pergunta(b.get("pergunta"))
+    ids = [str(i) for i in (b.get("modelos") or []) if isinstance(i, str)][:10]
+    if not pergunta:
+        return jsonify(ok=False, erro="Escreva a pergunta."), 400
+    if not ids:
+        return jsonify(ok=False, erro="Escolha ao menos um modelo."), 400
+    cfg = current_app.config
+    # o pedido de relatório baixa o PDF do prontuário, sem gastar pedido da IA (14/11/2026, Levi: "se eu pedisse um
+    # relatório já baixa um automático que já temos criado [...] se eu pedir só chamado vem filtrado só chamado")
+    from ...campo import visao
+    rel = IA.pedido_de_relatorio(pergunta, visao._agora().date())
+    if rel:
+        return jsonify(ok=True, relatorio=_ia_relatorio(usina_id, rel), respostas=[])
+    gasto, teto = IA.gasto_do_mes(cfg), IA.teto(cfg)
+    if gasto >= teto:
+        return jsonify(ok=False, erro=f"O teto do mês do Nexus IA (US$ {teto:.2f}) foi atingido: US$ {gasto:.2f} "
+                                      "gastos. Para subir, mude a NEXUS_IA_TETO_USD no servidor."), 429
+    historico = [h for h in (b.get("historico") or []) if isinstance(h, dict)][-IA.MAX_HISTORICO:]
+    _ctx, d = _dossie(usina_id)
+    setores = [s["nome"] for s in _ia_setores()]
+    respostas = IA.perguntar(cfg, ids, d["texto"], pergunta, historico, setores=setores, meu_setor=_ia_meu_setor())
+    IA.registrar(cfg, usina_id, pergunta, respostas, _meu_hmac(), d["tokens_estimados"])
+    resp = jsonify(ok=True, respostas=respostas, dossie_tokens=d["tokens_estimados"], gasto=IA.gasto_do_mes(cfg),
+                   teto=teto)
+    resp.headers["Cache-Control"] = "no-store"
+    return resp
+
+
+@bp.route("/usinas/<int:usina_id>/ia/demanda", methods=["POST"])
+def usina_ia_demanda(usina_id):
+    """A ação de outro setor que a resposta sugeriu, mandada como demanda (JSON {para_hmac, para_setor_id, tema_id,
+    titulo, descricao, os, novo_id}): a mesma Nova demanda da Caixa de entrada (`demandas.abrir`, as mesmas recusas),
+    com a usina deste prontuário. Só quem pode perguntar (administrador, enquanto é teste)."""
+    from flask import jsonify
+
+    from ...comando import demandas as DM
+    from .demandas_tela import _usuario
+    if not session.get("admin"):
+        return jsonify(ok=False, erro="Só administrador, enquanto o Nexus IA está em teste."), 403
+    if _de_outro_site():
+        return jsonify(ok=False, erro="Pedido de outro site."), 403
+    b = request.get_json(silent=True) or {}
+    form = {k: str(b.get(k) or "") for k in ("para_hmac", "para_setor_id", "tema_id", "titulo", "descricao", "os", "novo_id")}
+    form["usinas"] = [str(usina_id)]
+    try:
+        d = DM.abrir(form, [], _usuario())
+    except DM.Recusada as ex:
+        return jsonify(ok=False, erro=f"{ex}. Nada foi enviado."), 400
+    except Exception as ex:      # noqa: BLE001 — banco fora: a pessoa sabe que não foi
+        current_app.logger.exception("Nexus IA: a demanda não foi gravada")
+        return jsonify(ok=False, erro=f"Não consegui gravar agora ({type(ex).__name__}). Nada foi enviado."), 500
+    return jsonify(ok=True, demanda_id=d.get("demanda_id"),
+                   aviso="Demanda enviada. Ela está em \u201cQue eu pedi\u201d, na Caixa de entrada, e quem recebeu é avisado no sininho.")
 
 
 @bp.route("/caixa-de-entrada")

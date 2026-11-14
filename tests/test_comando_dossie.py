@@ -250,3 +250,51 @@ def test_a_pagina_le_a_engenharia_e_as_observacoes_das_telas_donas(tela, logado)
     obs = texto.split("## 12. Anotações do responsável", 1)[1].split("## 13. ", 1)[0]
     assert "Nenhuma observação registrada" in obs or "Sem leitura das observações" in obs
 
+
+
+def test_as_luvas_vao_com_o_dia_e_a_os_e_sem_o_tecnico():
+    """13/11/2026, no teste do Nexus IA (Céu Azul): o registro da ronda das luvas saía cru no texto, como dicionário,
+    com o nome do técnico ("última verificação em {'dia': datetime.date(...), 'tecnico': '...'}")."""
+    from datetime import date
+    p = {"luvas": {"situacao": "conferidas", "ultima": {"dia": date(2026, 11, 9), "inicio": "2026-11-09T12:58:50Z",
+                                                        "luvas": True, "tecnico": "Técnico Silva", "os": "19011"}}}
+    sem = "\n".join(DS._seguranca({}, {}, p, False))
+    assert "última verificação em 09/11/2026, OS 19011" in sem
+    assert "Técnico Silva" not in sem and "{" not in sem and "datetime" not in sem
+    assert "Técnico Silva" in "\n".join(DS._seguranca({}, {}, p, True))
+    p["luvas"]["ultima"] = "2026-11-09"                          # o formato de antes segue valendo
+    assert "última verificação em 09/11/2026" in "\n".join(DS._seguranca({}, {}, p, False))
+
+
+
+def test_o_que_aconteceu_em_cada_parada_e_os_religamentos():
+    """14/11/2026, Levi: "Quando eu perguntei por que a usina caiu, a IA não conseguiu dizer o motivo em si, só listou as
+    OS. Eu quero que inclua no dossiê o que aconteceu no religamento". O relato da Ronda COS (gravado no banco com a
+    normalização) e as proteções vão para cada parada; a tela COS › Religamentos, por equipamento."""
+    from datetime import datetime as dt
+    c = {"dia": "12/11", "hora": "09:41", "tipo": "Usina desligada", "tom": "critico", "fora": "54 min", "parou": True,
+         "volta": "12/11 10:35", "os": "19375", "fora_escopo": False, "protecoes": "27C",
+         "relato": "Usina desligada de 12/11 às 09:41 a 12/11 às 10:35 (54 min). Causa: falta de energia da concessionária."}
+    sem = dict(c, os="18818", protecoes="", relato="")
+    p = {"cos": {"total": 2, "ultimas": [c, sem], "todas": [c, sem], "por_mes": []}}
+    t = "\n".join(DS._cos({"estado": ""}, p))
+    assert ("- 12/11 09:41 · Usina desligada · OS 19375 · proteções que atuaram: 27C. O que aconteceu: Usina desligada de "
+            "12/11 às 09:41 a 12/11 às 10:35 (54 min). Causa: falta de energia da concessionária.") in t
+    assert "OS 18818. O que aconteceu: sem dado (a Ronda COS não mandou o relato)" in t
+    assert DS._religamentos({}) == ["- Religamentos: sem leitura (a tela COS › Religamentos lê o Andamento da Ronda COS, "
+                                    "que só o servidor tem)."]
+    assert DS._religamentos({"religamentos": []}) == ["- Religamentos nos últimos 30 dias: nenhum nesta usina."]
+    r = DS._religamentos({"religamentos": [{"equipamento": "Inversor 2.3", "total": 3, "repete": True, "reincidente": True,
+                                            "desfechos": [("Remoto resolveu", 2), ("Remoto e depois campo", 1)],
+                                            "tipos": ["INV_DESL"], "os": ["19001", "18800"], "ultima": "12/11 09:41"}]})
+    assert r[1] == ("  - Inversor 2.3; 3 religamentos; reincidente; 2 remoto resolveu, 1 remoto e depois campo; falha: INV_DESL; "
+                    "OS 19001, 18800; última em 12/11 09:41")
+
+
+def test_o_prontuario_le_o_relato_e_as_protecoes_do_banco():
+    from datetime import date
+    h = PR.cos_historico([{"os": "19375", "tipo_falha": "USINA_DESL", "inicio": "2026-11-12T12:41:00Z",
+                           "normalizado_em": "2026-11-12T13:35:00Z", "fora_min": 54, "geracao_parou": "1",
+                           "fora_do_escopo_oem": "0", "protecoes": " 27C ", "relato_cliente": "Causa: falta de energia.",
+                           "relato_continuacao": ""}], date(2026, 11, 14))
+    assert h["ultimas"][0]["protecoes"] == "27C" and h["ultimas"][0]["relato"] == "Causa: falta de energia."

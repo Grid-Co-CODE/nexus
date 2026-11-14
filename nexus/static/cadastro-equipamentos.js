@@ -27,8 +27,13 @@
       if (conta) conta.textContent = n;
     });
   }
-  var sel = document.querySelector('.eq-item--sel');
-  if (sel && sel.scrollIntoView) { sel.scrollIntoView({block: 'nearest'}); }
+  // só a LISTA rola até a usina aberta (13/11/2026): o scrollIntoView rolava a página também, e a usina do fim da lista
+  // abria com o alto escondido (as abas Equipamentos e De-para e os números)
+  var sel = document.querySelector('.eq-item--sel'), itens = document.getElementById('eq-itens');
+  if (sel && itens) {
+    var y = sel.getBoundingClientRect().top - itens.getBoundingClientRect().top + itens.scrollTop;
+    itens.scrollTop = Math.max(0, y - itens.clientHeight / 3);
+  }
 
   var raiz = document.getElementById('eq-editor');
   var dados = document.getElementById('eq-dados');

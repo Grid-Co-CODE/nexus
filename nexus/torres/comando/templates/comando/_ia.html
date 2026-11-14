@@ -1,0 +1,40 @@
+{# Nexus IA na janela do prontuário (13/11/2026; Levi: "Do prontuário, eu quero que tenha um chat. Onde a pessoa possa
+   fazer perguntas [...] Teste com várias IAs"). Vem como pedaço de página para dentro da janela (prontuario.js); o que
+   acontece aqui dentro é do comando/ia.js. Marcar mais de um modelo é o modo de comparar: a mesma pergunta, lado a lado.
+   As regras: nexus/comando/ia.py. #}
+{% set com_chave = modelos|selectattr('tem_chave')|list %}
+<div class="ia" data-ia data-ia-url="{{ raiz }}/t/comando/usinas/{{ x.usina_id }}/ia/perguntar"
+     data-ia-demanda-url="{{ raiz }}/t/comando/usinas/{{ x.usina_id }}/ia/demanda" data-ia-raiz="{{ raiz }}">
+  {# para onde a resposta pode mandar demanda: os setores, as pessoas e os temas (a Nova demanda da Caixa de entrada) #}
+  <script type="application/json" data-ia-setores>{{ setores|tojson }}</script>
+  <fieldset class="ia-modelos">
+    <legend>Modelos <span class="mudo">· marque mais de um para comparar</span></legend>
+    {% for m in modelos %}
+    <label class="ia-modelo{% if not m.tem_chave %} ia-modelo--sem{% endif %}" title="{{ m.motivo or (m.provedor_nome ~ ' · ' ~ m.modelo) }}">
+      <input type="checkbox" value="{{ m.id }}" data-ia-modelo{% if not m.tem_chave %} disabled{% elif m.id == com_chave[0].id %} checked{% endif %}>
+      <span class="ia-modelo-nome">{{ m.rotulo }}</span>
+      <span class="ia-modelo-prov">{% if m.tem_chave %}{{ m.provedor_nome }}{% else %}sem chave{% endif %}</span>
+    </label>
+    {% endfor %}
+  </fieldset>
+  {% if not com_chave %}
+  <div class="ia-aviso" role="status"><i class="ph ph-key" aria-hidden="true"></i><div>
+    <strong>Nenhuma IA ligada neste servidor.</strong> Cada provedor precisa da chave dele no <span class="gc-dado">.env</span>:
+    {% for m in modelos|unique(attribute='provedor') %}{{ m.motivo }}{{ ' ' if not loop.last }}{% endfor %}</div></div>
+  {% endif %}
+
+  <div class="ia-conversa" data-ia-conversa aria-live="polite">
+    <div class="ia-vazio" data-ia-vazio>
+      <p class="ia-vazio-t">Pergunte sobre a {{ x.usina }}.</p>
+      <p class="mudo">A resposta vem só do dossiê de agora: o prontuário inteiro, sem o nome das pessoas.</p>
+      <div class="ia-sugestoes">{% for s in sugestoes %}<button type="button" class="ia-sugestao" data-ia-sugestao>{{ s }}</button>{% endfor %}</div>
+    </div>
+  </div>
+
+  <form class="ia-form" data-ia-form>
+    <label class="ia-sr" for="ia-pergunta">Pergunta</label>
+    <textarea id="ia-pergunta" name="pergunta" rows="2" maxlength="{{ max_pergunta }}" placeholder="Ex.: por que a usina caiu em outubro?" data-ia-pergunta{% if not com_chave %} disabled{% endif %}></textarea>
+    <button type="submit" class="gc-btn gc-btn--ui gc-btn--primario" data-ia-enviar{% if not com_chave %} disabled{% endif %}><i class="ph ph-paper-plane-right" aria-hidden="true"></i> Perguntar</button>
+  </form>
+  <p class="ia-pe mudo">Gasto do mês: <b class="gc-num" data-ia-gasto>US$ {{ ('%.2f'|format(gasto)).replace('.', ',') }}</b> de US$ {{ ('%.2f'|format(teto)).replace('.', ',') }} · Enter envia, Shift+Enter quebra a linha.</p>
+</div>

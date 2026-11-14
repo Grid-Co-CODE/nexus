@@ -23,13 +23,16 @@ import logging
 from collections import Counter, defaultdict
 from datetime import datetime, timedelta, timezone
 
-from flask import current_app, jsonify, redirect, render_template, request, session, url_for
+from urllib.parse import urlencode
+
+from flask import current_app, jsonify, make_response, redirect, render_template, request, session, url_for
 
 from ..dados import fatos as D
 from ..dados.livros import GravacaoRecusada
 from . import banco as B
 from . import estrutura_usina as E
 from . import ligacoes as L
+from . import depara_fontes as DF
 from .telas import _quem, _tela
 from ..dados.conexao import banco as _banco
 from ..auth.sessao import email_da_sessao as _meu_email
@@ -39,8 +42,10 @@ log = logging.getLogger(__name__)
 
 TITULO = "Equipamentos das usinas"
 _BRT = timezone(timedelta(hours=-3))
-FILTROS = (("", "Todas as usinas"), ("sem_chave", "Sem chave do supervisório"),
-           ("sem_inversores", "Sem inversores"), ("potencia", "Potência que não fecha"))
+FILTROS = (("", "Todas"), ("sem_chave", "Sem chave"), ("sem_inversores", "Sem inversores"),
+           ("potencia", "kWp não fecha"), ("depara", "De-para pendente"))
+# as duas abas da tela (13/11/2026, Levi: "o equipamentos das usinas tem que ser junto do de para de equipamentos")
+ABAS = ("", "depara")
 SEM_CLIENTE = "-"            # o valor do filtro de cliente para as usinas sem cliente no Registro mestre
 _CHAVE_AVISO = "equipamentos_aviso"
 
@@ -171,17 +176,29 @@ def _painel(u: dict, est: dict, aba: dict, fr_nomes, fr_dono, nome_usina: dict, 
                            salvar_url=url_for("torre_base.equipamentos_salvar"))}
 
 
+def _luz_equip(x: dict) -> str:
+    """A luz do meio da lista: os equipamentos (o kWp dos inversores fecha com o Registro mestre?)."""
+    r = x["resumo"]
+    if not r["inversores"]:
+        return "alerta" if r["chaves"] else "neutro"
+    return {"fecha": "ok", "perto": "alerta", "nao_fecha": "critico"}.get(x["pot"], "neutro")
+
+
 def contexto(srv, cfg, args) -> dict:
     reler = args.get("reler") == "1"
     est, aba = _leituras(forcar=reler)
+    # o De-para das fontes (13/11/2026): o diagnóstico da plataforma pela ponte, guardado 2 min (depara_fontes.py)
+    dp = DF.resumo(DF.ler_lista(cfg, forcar=reler), est)
     fr_nomes, fr_da_usina, fr_dono, fr_lido = _fracttal(cfg)
     usinas = _usinas(srv)
     nome_usina = {u["id"]: u["titulo"] for u in usinas}
     lista = []
     for u in usinas:
         r = E.resumo(E.da_usina(est, u["id"]))
-        lista.append(dict(u, fracttal=fr_da_usina.get(u["id"], []), resumo=r,
-                          pot=E.conferir_potencia(u["kwp"], r["kwp_inversores"] if r["inversores"] else r["kwp_cabines"])))
+        x = dict(u, fracttal=fr_da_usina.get(u["id"], []), resumo=r,
+                 pot=E.conferir_potencia(u["kwp"], r["kwp_inversores"] if r["inversores"] else r["kwp_cabines"]))
+        x["luzes"] = ["ok" if r["chaves"] else "critico", _luz_equip(x), dp["luzes"].get(u["id"]) or "neutro"]
+        lista.append(x)
     lista.sort(key=lambda x: E.norm(x["titulo"]))
     q = str(args.get("q") or "").strip()[:120]
     filtro = args.get("filtro") if args.get("filtro") in dict(FILTROS) else ""
@@ -194,18 +211,27 @@ def contexto(srv, cfg, args) -> dict:
     if cliente not in {c[0] for c in clientes}:
         cliente = ""
 
-    def passa(x):
+    def na_busca(x):
         if cliente and (x["cliente"] or SEM_CLIENTE) != cliente:
             return False
-        if q and E.norm(q) not in E.norm(f"{x['titulo']} {x['codigo']} {x['cidade'] or ''}"):
-            return False
+        return not q or E.norm(q) in E.norm(f"{x['titulo']} {x['codigo']} {x['cidade'] or ''}")
+
+    def no_filtro(x, f):
         r = x["resumo"]
-        return {"": True, "sem_chave": not r["chaves"],
-                "sem_inversores": not r["inversores"], "potencia": x["pot"] in ("perto", "nao_fecha")}[filtro]
+        return {"": True, "sem_chave": not r["chaves"], "sem_inversores": not r["inversores"],
+                "potencia": x["pot"] in ("perto", "nao_fecha"), "depara": x["luzes"][2] in ("alerta", "critico")}[f]
+
+    def passa(x):
+        return na_busca(x) and no_filtro(x, filtro)
+    buscadas = [x for x in lista if na_busca(x)]
+    chips = [(v, rot, sum(1 for x in buscadas if no_filtro(x, v))) for v, rot in FILTROS]
+    aba_tela = args.get("aba") if args.get("aba") in ABAS else ""
     sel = D._id(args.get("usina"))
     aberta = next((x for x in lista if x["id"] == sel), None)
     info = _info_usinas(srv, cfg, usinas)
     painel = _painel(aberta, est, aba, fr_nomes, fr_dono, nome_usina, info) if aberta else None
+    if painel:
+        painel["fontes"] = dp["por_usina"].get(aberta["id"], [])
     aviso = session.pop(_CHAVE_AVISO, None)
     pode_gravar = bool(cfg.get("GRIDCO_SQL_TOKEN")) and not est.get("erro")
     # o que a "Ligar pela aba Equipamentos" ligaria agora, e o que fica de fora com o motivo (13/10/2026)
@@ -213,6 +239,7 @@ def contexto(srv, cfg, args) -> dict:
         {"ligar": {}, "fora": [], "ja_ligadas": 0}
     auto = dict(auto, n_chaves=sum(len(v) for v in auto["ligar"].values()), n_usinas=len(auto["ligar"]))
     return {"lista": [x for x in lista if passa(x)], "total": len(lista), "q": q, "filtro": filtro, "filtros": FILTROS,
+            "chips": chips, "aba": aba_tela, "dp": dp, "nome_usina": nome_usina,
             "cliente": cliente, "clientes": clientes,
             "painel": painel, "aviso": aviso, "erro_livro": est.get("erro") or "", "livro_velho": est.get("velha", False),
             "erro_aba": aba.get("erro") or "", "aba_lida_em": _hora(aba.get("lido_em")), "fr_lido": fr_lido,
@@ -226,7 +253,7 @@ def contexto(srv, cfg, args) -> dict:
             "n_chaves_ligadas": sum(1 for c in aba["chaves"] if any(
                 s["usina_supervisorio"] == c and not s["excluido"] for s in est["supervisorios"])),
             "auto": auto,
-            "volta": {k: v for k, v in (("q", q), ("filtro", filtro), ("cliente", cliente)) if v}}
+            "volta": {k: v for k, v in (("q", q), ("filtro", filtro), ("cliente", cliente), ("aba", aba_tela)) if v}}
 
 
 def _volta(usina=None, ancora: str = "") -> str:
@@ -240,6 +267,8 @@ def _volta(usina=None, ancora: str = "") -> str:
     cliente = (request.form.get("cliente") or "").strip()[:120]
     if cliente:                                     # vai como parâmetro do endereço (url_for codifica); a tela confere
         q["cliente"] = cliente
+    if request.form.get("aba") in ABAS and request.form.get("aba"):
+        q["aba"] = request.form["aba"]
     if usina:
         q["usina"] = usina
     return url_for("torre_base.equipamentos", **q) + (f"#{ancora}" if ancora else "")
@@ -552,6 +581,59 @@ def _depara_salvar(srv):
                    cabines_excluidas=r["cabines_excluidas"], marcacao=r["marcacao"])
 
 
+# ── o De-para das fontes na aba De-para (13/11/2026) ─────────────────────────────────────────────────────────────────
+# Levi: "o equipamentos das usinas tem que ser junto do de para de equipamentos, pois um complementa o outro". Os cartões
+# da usina aberta (uma fonte por cartão, o que ela manda de um lado e o cadastro do outro) vêm por fetch, depois da página:
+# a usina da plataforma pode levar segundos (a tabela do ciclo dela), e a lista não espera por isso. Só leitura pela ponte
+# (depara_fontes.py); decidir um par é na tela da plataforma, que abre por cima (`_janela_depara`).
+def _fontes_json(srv):
+    if _de_outro_site():
+        return _recusa_json("Pedido de outro site.", 403)
+    uid = D._id(request.args.get("usina"))
+    if uid not in {u["id"] for u in L._usinas(srv)}:
+        return _recusa_json("Usina fora do Registro mestre.", 400)
+    cfg, forcar = current_app.config, request.args.get("forcar") == "1"
+    est, _aba = _leituras()
+    if est.get("erro"):
+        return _recusa_json("Não consegui ler a estrutura no banco: sem ela as fontes não se ligam à usina.", 503)
+    lista = DF.ler_lista(cfg, forcar=forcar)
+    if lista.get("erro"):
+        r = jsonify(ok=False, motivo=f"O de-para da plataforma não foi lido: {lista['erro']}.", cartoes=[])
+        r.status_code = 502
+        return r
+    por, _sem = DF.por_usina(lista, est)
+    cartoes = DF.cartoes(cfg, por.get(uid, []), E.da_usina(est, uid), forcar=forcar)
+    r = jsonify(ok=True, cartoes=cartoes, lido_em=_hora(lista.get("lido_em")))
+    r.headers["Cache-Control"] = "no-store"
+    return r
+
+
+def _janela_depara():
+    """`GET /t/base/equipamentos/fontes/janela?editar=<fonte>|<id>`: a tela De-para da PLATAFORMA (`/admin/de-para`, o
+    editor da usina aberto direto, `?janela=1` sem a moldura dela) numa página do Nexus que cabe numa janela por cima de
+    Equipamentos. Sem o base.html: a casca do Nexus não se deixa emoldurar (base.html), e esta página existe só para isso.
+    O passe é o da porta única (60 s, uma vez, quem está logado); a plataforma confere de novo."""
+    from ..performance import porta
+    from ..torres.moldura import _passe, estado_da_porta
+    editar = str(request.args.get("editar") or "")
+    fonte, _, id_ = editar.partition("|")
+    estado = estado_da_porta()
+    ctx = {"recusa": "", "passe": None, "plataforma": estado["plataforma"]}
+    if not estado["ligada"]:
+        ctx["recusa"] = f"A tela da plataforma não abre neste servidor: {estado['motivo']}."
+    elif not fonte or not id_ or len(editar) > 200:
+        ctx["recusa"] = "Diga a fonte e a usina da fonte."
+    else:
+        destino = porta.destino_permitido("/admin/de-para?" + urlencode({"janela": "1", "editar": editar}))
+        if not destino:
+            ctx["recusa"] = "Esse endereço não é uma tela da plataforma."
+        else:
+            ctx["passe"] = _passe(destino)
+    resp = make_response(render_template("cadastro/depara_janela.html", **ctx), 200 if ctx["passe"] else 400)
+    resp.headers["Cache-Control"] = "no-store"      # o passe leva o e-mail e vale uma vez
+    return resp
+
+
 def registrar_equipamentos(bp) -> None:
     """Pendura a tela na torre Base (`/t/base/equipamentos`), vencendo o placeholder, e as ações dela."""
     @bp.route("/equipamentos")
@@ -598,3 +680,13 @@ def registrar_equipamentos(bp) -> None:
     @_tela(TITULO)
     def equipamentos_depara_salvar(srv):
         return _depara_salvar(srv)
+
+    @bp.route("/equipamentos/fontes")
+    @_tela(TITULO)
+    def equipamentos_fontes(srv):
+        return _fontes_json(srv)
+
+    @bp.route("/equipamentos/fontes/janela")
+    @_tela(TITULO)
+    def equipamentos_fontes_janela(srv):  # noqa: ARG001 — o decorador garante administrador
+        return _janela_depara()
