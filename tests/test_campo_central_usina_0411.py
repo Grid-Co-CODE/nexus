@@ -364,10 +364,11 @@ def test_o_pdf_leva_as_paradas_do_mes_com_o_que_aconteceu():
                            "parou": True, "os": "19150", "protecoes": "27", "relato": ""}]}
     assert "O COS registrou 2 paradas no mês, 2 com a geração parada." in RU._resumo(d, ("religamentos",))
     corpo = RU._religamentos(d, RU._estilos(), RU.CHAVES_CAMPOS)
-    # a explicação do religamento, os quatro números, a tabela e as proteções (título + tabela)
-    assert "a volta é o religamento" in corpo[0].text and len(corpo) == 7
+    # a explicação do religamento, os quatro números, o gráfico das proteções (logo depois dos números) e a tabela
+    assert "a volta é o religamento" in corpo[0].text and len(corpo) == 10
+    assert corpo[4].text == "Proteções que mais atuaram" and "conta em cada uma delas" in corpo[7].text
     # a Parada na frente e o período em pílulas: a parada no fundo vermelho-pastel, a volta no verde-pastel
-    tabela = corpo[4]
+    tabela = corpo[-1]
     assert [c.text for c in tabela._cellvalues[0]] == ["Parada", "Período", "Tempo fora", "Proteções", "OS", "O que aconteceu"]
     saiu, _esp, voltou = tabela._cellvalues[1][1]
     assert "12/11 09:41" in saiu._cellvalues[0][0].text and saiu._bkgrndcmds[0][3] == RU.PILULA_PARADA[0]
@@ -405,3 +406,19 @@ def test_o_que_aconteceu_so_completa_a_linha():
                                                  "A usina voltou a gerar em 03/11 às 08:51, religada no local pela "
                                                  "equipe de campo."), RU._estilos()).text
     assert "às" not in texto and "Voltou a funcionar pelo religamento no local, feito pela equipe de campo." in texto
+
+
+
+def test_o_grafico_destaca_os_desligamentos_sem_protecao():
+    """14/11/2026, Levi: "destaque também as sem proteção [...] Sem proteção atuada. Quando for desligamento". A perda
+    de comunicação (a geração não para) e a manutenção programada não entram; a parada com 27 e 59 conta nas duas."""
+    rel = [{"parou": True, "protecoes": "27;59"}, {"parou": True, "protecoes": "27ABC"},
+           {"parou": True, "protecoes": ""}, {"parou": False, "protecoes": ""}, {"parou": True, "protecoes": ""}]
+    partes = [{"rotulo": "Usina desligada"}, {"rotulo": "Usina desligada"}, {"rotulo": "Inversor 7.1 desligado"},
+              {"rotulo": "Perda de comunicação"}, {"rotulo": "Manutenção programada"}]
+    assert RU.sem_protecao(rel, partes) == 1 and RU._contagem_protecoes(rel) == [("27", 2), ("59", 1)]
+    titulo, tabela, _esp, nota, _esp2 = RU._grafico_protecoes(rel, partes, RU._estilos())
+    linhas = tabela._cellvalues
+    assert [linhas[1][0].text, linhas[2][0].text] == ["27", "59"] and "Sem proteção atuada" in linhas[3][1].text
+    assert "Sem proteção atuada: desligamentos" in nota.text
+    assert RU._grafico_protecoes([], [], RU._estilos()) == []

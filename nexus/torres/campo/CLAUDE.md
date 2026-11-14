@@ -1400,7 +1400,16 @@ usinas mobilizadas, para quem abre a Visão (sem o filtro de responsável, de cl
     Medido nas 1.830 normalizações do banco em 14/11: todas deram rótulo; o que não é frase-modelo (texto escrito à
     mão, 1 caso cada) fica inteiro no fim. Sem relato, a linha diz que ele não veio.
   - O nome das proteções (`PROTECAO_NOME`) é o que o COS escreve no relato, por exemplo 27 subtensão, 59 sobretensão e
-    47 sequência de fase. As "Proteções que mais atuaram" dizem em quantas paradas cada uma atuou, com uma barra.
+    47 sequência de fase.
+  - **As "Proteções que mais atuaram" vêm logo depois dos números, antes da tabela** ("deve vir para cima [...] Depois
+    dos KPIs vem esse gráfico"). Cada proteção mostra em quantas paradas atuou, com uma barra verde (até 6 proteções).
+    - Uma parada com 27 e 59 conta nas duas; a nota embaixo do gráfico explica isso.
+    - Por isso a soma das barras passa do total de paradas. Na Capitão Poço em novembro: 27 em 10 paradas, 59 em 6,
+      3 com as duas.
+  - **"Sem proteção atuada"** ("destaque também as sem proteção [...] Quando for desligamento") vem numa linha à parte,
+    em âmbar (`sem_protecao`). Conta os desligamentos com a geração parada sem proteção registrada, como o inversor ou
+    a cabine que caiu. A perda de comunicação e a manutenção programada ficam fora.
+    - A conta fecha na Capitão Poço: 13 paradas com proteção e 3 sem proteção dão as 16 com a geração parada.
   - O resumo ganha "O COS registrou N paradas no mês, M com a geração parada", e o rodapé de fontes cita o COS.
   - Na janela, cada tema é uma linha com a caixa de marcar e "N campos", recolhido (`<details>`); quem quiser abre e
     escolhe campo por campo. O tema continua ligando e desligando os campos dele (`[data-pu-rel-grupo]`).

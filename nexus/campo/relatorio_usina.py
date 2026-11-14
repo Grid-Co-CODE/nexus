@@ -771,42 +771,74 @@ def _religamentos(d: dict, e: dict, campos=CHAVES_CAMPOS) -> list:
             out.append(_sem(e, "Nenhuma parada registrada pelo COS no mês."))
         else:
             out += [_kpis_religamentos(rel, partes, e), Spacer(1, 4 * mm)]
-            linhas, tintas = [], []
-            for x, p in zip(rel, partes):
-                rotulo = p["rotulo"] or x.get("tipo") or "Parada"
-                nivel = _nivel_parada(x, rotulo)
-                tintas.append(_TINTA_PARADA[nivel])
-                # o período em destaque: a hora da parada numa pílula vermelho-pastel e a da volta numa verde-pastel
-                # (14/11/2026, Levi; o sublinhado colorido da primeira versão "não gostei muito")
-                fim = x.get("fim")
-                periodo = [_pilula(f"{x['ini']:%d/%m %H:%M}", PILULA_PARADA, e)]
-                if fim:
-                    periodo += [Spacer(1, 3), _pilula(f"{fim:%d/%m %H:%M}", PILULA_VOLTA, e)]
-                linhas.append([Paragraph(f'<font color="{_cor(nivel)}">{_t(rotulo)}</font>', e["parada"]),
-                               periodo,
-                               x.get("fora") or "—", ", ".join(protecoes_do_texto(x.get("protecoes"))) or "—",
-                               x.get("os") or "—", _o_que_aconteceu(p, e)])
-            # a Parada na frente (14/11/2026, Levi: "Parada fica na frente")
-            t = _tabela(e, ["Parada", "Período", "Tempo fora", "Proteções", "OS", "O que aconteceu"], linhas,
-                        [26, 25, 19, 19, 13, 76], centro=(1, 2, 3, 4), cab_centro=True)
-            # a parada em destaque: o fundo claro da cor dela (por cima da zebra)
-            t.setStyle(TableStyle([("BACKGROUND", (0, i), (0, i), c) for i, c in enumerate(tintas, start=1)]))
-            out.append(t)
+    # o gráfico das proteções logo depois dos números, antes da tabela (14/11/2026, Levi: "esse gráfico aí de proteções
+    # que mais atuaram deve vir para cima [...] Depois dos KPIs vem esse gráfico")
     if "religamentos_protecoes" in campos and rel:
-        conta = _contagem_protecoes(rel)[:6]
-        if conta:
-            out.append(Paragraph(_t("Proteções que mais atuaram"), e["sub_secao"]))
-            maior = conta[0][1]
-            linhas = []
-            for cod, n in conta:
-                barra = Drawing(60 * mm, 8)
-                barra.add(Rect(0, 1, 60 * mm, 6, fillColor=FUNDO, strokeColor=None))
-                barra.add(Rect(0, 1, 60 * mm * n / maior, 6, fillColor=VERDE, strokeColor=None))
-                linhas.append([cod, PROTECAO_NOME.get(cod, "—"), str(n), barra])
-            t = _tabela(e, ["Código", "Proteção", "Paradas", ""], linhas, [16, 48, 18, 96], centro=(0, 1, 2),
-                        cab_centro=True)
-            out.append(t)
+        out += _grafico_protecoes(rel, partes, e)
+    if "religamentos_lista" in campos and rel:
+        linhas, tintas = [], []
+        for x, p in zip(rel, partes):
+            rotulo = p["rotulo"] or x.get("tipo") or "Parada"
+            nivel = _nivel_parada(x, rotulo)
+            tintas.append(_TINTA_PARADA[nivel])
+            # o período em destaque: a hora da parada numa pílula vermelho-pastel e a da volta numa verde-pastel
+            # (14/11/2026, Levi; o sublinhado colorido da primeira versão "não gostei muito")
+            fim = x.get("fim")
+            periodo = [_pilula(f"{x['ini']:%d/%m %H:%M}", PILULA_PARADA, e)]
+            if fim:
+                periodo += [Spacer(1, 3), _pilula(f"{fim:%d/%m %H:%M}", PILULA_VOLTA, e)]
+            linhas.append([Paragraph(f'<font color="{_cor(nivel)}">{_t(rotulo)}</font>', e["parada"]),
+                           periodo,
+                           x.get("fora") or "—", ", ".join(protecoes_do_texto(x.get("protecoes"))) or "—",
+                           x.get("os") or "—", _o_que_aconteceu(p, e)])
+        # a Parada na frente (14/11/2026, Levi: "Parada fica na frente")
+        t = _tabela(e, ["Parada", "Período", "Tempo fora", "Proteções", "OS", "O que aconteceu"], linhas,
+                    [26, 25, 19, 19, 13, 76], centro=(1, 2, 3, 4), cab_centro=True)
+        # a parada em destaque: o fundo claro da cor dela (por cima da zebra)
+        t.setStyle(TableStyle([("BACKGROUND", (0, i), (0, i), c) for i, c in enumerate(tintas, start=1)]))
+        out.append(t)
     return out
+
+
+def sem_protecao(rel: list[dict], partes: list[dict]) -> int:
+    """Os desligamentos sem proteção atuada: a geração parou e o COS não registrou proteção nenhuma (o inversor, a cabine
+    que caiu sem o relé). A perda de comunicação (a geração não para) e a manutenção programada não contam (14/11/2026,
+    Levi: "Sem proteção atuada. Quando for desligamento")."""
+    return sum(1 for x, p in zip(rel, partes) if x.get("parou") and not protecoes_do_texto(x.get("protecoes"))
+               and not (p.get("rotulo") or "").startswith("Manutenção"))
+
+
+def _grafico_protecoes(rel: list[dict], partes: list[dict], e: dict) -> list:
+    """As proteções que mais atuaram (até 6), em barras verdes, e os desligamentos sem proteção atuada numa barra âmbar,
+    à parte. Uma parada com duas proteções (27 e 59) conta nas duas: a barra é "em quantas paradas esta atuou"."""
+    conta = _contagem_protecoes(rel)[:6]
+    sem = sem_protecao(rel, partes)
+    if not conta and not sem:
+        return []
+    maior = max([n for _c, n in conta] + [sem])
+
+    def barra(n, cor):
+        b = Drawing(60 * mm, 8)
+        b.add(Rect(0, 1, 60 * mm, 6, fillColor=FUNDO, strokeColor=None))
+        b.add(Rect(0, 1, 60 * mm * n / maior, 6, fillColor=cor, strokeColor=None))
+        return b
+    linhas = [[cod, PROTECAO_NOME.get(cod, "—"), str(n), barra(n, VERDE)] for cod, n in conta]
+    if sem:
+        cor = _cor("alerta")
+        linhas.append(["—", Paragraph(f'<font color="{cor}"><b>Sem proteção atuada</b></font>', e["cel_c"]),
+                       Paragraph(f'<font color="{cor}"><b>{sem}</b></font>', e["cel_c"]), barra(sem, TOM["alerta"])])
+    t = _tabela(e, ["Código", "Proteção", "Paradas", ""], linhas, [16, 48, 18, 96], centro=(0, 1, 2), cab_centro=True)
+    if sem:
+        # o destaque da linha: o fundo âmbar-claro (o mesmo da parada em alerta)
+        t.setStyle(TableStyle([("BACKGROUND", (0, len(linhas)), (-1, len(linhas)), _TINTA_PARADA["alerta"]),
+                               ("LINEABOVE", (0, len(linhas)), (-1, len(linhas)), 0.8, MUDO)]))
+    nota = ("Uma parada em que atuou mais de uma proteção (por exemplo, 27 e 59) conta em cada uma delas: a barra mostra "
+            "em quantas paradas aquela proteção atuou.")
+    if sem:
+        nota += (" Sem proteção atuada: desligamentos com a geração parada em que o COS não registrou proteção do relé "
+                 "(um inversor ou uma cabine que caiu, por exemplo).")
+    return [Paragraph(_t("Proteções que mais atuaram"), e["sub_secao"]), t, Spacer(1, 2 * mm),
+            Paragraph(_t(nota), e["mudo"]), Spacer(1, 4 * mm)]
 
 
 def gerar(d: dict, temas=CHAVES_TEMAS, gerado_em: str = "", campos=None) -> bytes:
