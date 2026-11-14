@@ -479,6 +479,21 @@ prontuário (é o mesmo dado); o atalho "Dossiê para a IA" no prontuário apare
   nomes podem ir; hoje nenhuma rota o usa;
 - os tokens são ESTIMATIVA (4 caracteres por token): a conta exata só a API dá.
 
+**O que aconteceu em cada parada** (14/11/2026, Levi: "Quando eu perguntei por que a usina caiu, a IA não conseguiu
+dizer o motivo em si, só listou as OS. Eu quero que inclua no dossiê o que aconteceu no religamento"). Formato 2 do
+dossiê (`VERSAO = 2`).
+- A seção COS lista as paradas mais novas (até `MAX_RELATOS`, 12). Cada uma traz as **proteções que atuaram** e o
+  **relato da Ronda COS**: a causa reconhecida, a proteção, os horários e se voltou pelo religamento remoto ou com a
+  equipe no local.
+- Os dois vêm das colunas `protecoes` e `relato_cliente`/`relato_continuacao` do `fato_normalizacao`, que já estavam no
+  banco. O relato é montado por regra, sem texto livre e sem nome de pessoa (`cos/normalizacoes_banco.py`).
+- Logo depois vem o resumo da tela **COS › Religamentos** por equipamento: quantas vezes, se repete ou é reincidente,
+  remoto resolveu × foi a campo, a falha e as OS. Ele lê o Andamento da Ronda COS, que só o servidor tem. No PC, sai
+  "sem leitura".
+- As instruções do Nexus IA mandam usar o relato para o "por que caiu", dizendo que é a causa registrada pelo COS.
+- Conferido em 14/11 na Céu Azul: a IA passou de listar as OS a dar a causa (subtensão 27 / concessionária, descarga
+  atmosférica, comunicação).
+
 **Seção nova no prontuário entra no dossiê no mesmo trabalho** (senão a IA responde sem ela): a função da seção, a linha
 em `SECOES` e o teste. Prova: `tests/test_comando_dossie.py`.
 

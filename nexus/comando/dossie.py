@@ -33,11 +33,12 @@ from datetime import date, datetime
 
 from . import prontuario as PR
 
-VERSAO = 1
+VERSAO = 2
 # a cor da tela em palavras (a régua é a de cada tela dona; aqui só o nome)
 GRAVIDADE = {"critico": "crítico", "alerta": "atenção", "atencao": "atenção", "semcom": "sem comunicação",
              "info": "informativo", "ok": "em dia", "neutro": ""}
 SEM_DADO = "sem dado"
+SEM_LEITURA = "sem leitura"
 _FONTE_LINHA = {"cos": "COS", "ronda": "Ronda", "pt": "PT", "chamado": "Chamado", "os": "OS"}
 _LUVAS = {"sem_luvas": "sem luvas na última ronda", "sem_verificacao": "nunca verificadas na ronda", "ok": "conferidas",
           "com_luvas": "conferidas"}
@@ -180,6 +181,34 @@ def _cos(x: dict, p: dict) -> list[str]:
         ["Início", "Tipo", "Tempo fora", "A geração parou", "Voltou em", "OS", "Fora do escopo de O&M"],
         [[f"{c.get('dia')} {c.get('hora')}", _com_g(c.get("tipo"), c.get("tom")), c.get("fora"), "sim" if c.get("parou") else "não",
           c.get("volta"), c.get("os"), "sim" if c.get("fora_escopo") else "não"] for c in cos.get("ultimas") or []])
+    # o que aconteceu em cada parada (14/11/2026, Levi: "a IA não conseguiu dizer o motivo em si, só listou as OS"): o
+    # relato da Ronda COS (montado por regra: a causa reconhecida, a proteção, os horários) e as proteções que atuaram
+    com_relato = [c for c in (cos.get("todas") or cos.get("ultimas") or [])[:MAX_RELATOS]]
+    if com_relato:
+        out += ["", "O que aconteceu em cada parada (o relato da Ronda COS e as proteções que atuaram):"]
+        for c in com_relato:
+            out.append("- " + _junta(f"{c.get('dia')} {c.get('hora')}", c.get("tipo"), f"OS {c['os']}" if c.get("os") else "",
+                                     f"proteções que atuaram: {c['protecoes']}" if c.get("protecoes") else "", sep=" · ")
+                       + ". O que aconteceu: " + (c.get("relato") or f"{SEM_DADO} (a Ronda COS não mandou o relato)"))
+    return out
+
+
+def _religamentos(extras: dict) -> list[str]:
+    """A tela COS › Religamentos da usina (`cos/religamentos.py`): cada equipamento que teve religamento nos últimos 30
+    dias, quantas vezes, se o remoto resolveu ou foi a campo, o tipo de falha e as OS. Lido no Andamento da Ronda COS,
+    que só o servidor tem: sem a fonte, "sem leitura" (nunca "nenhum")."""
+    r = extras.get("religamentos")
+    if r is None:
+        return [f"- Religamentos: {SEM_LEITURA} (a tela COS › Religamentos lê o Andamento da Ronda COS, que só o servidor tem)."]
+    if not r:
+        return ["- Religamentos nos últimos 30 dias: nenhum nesta usina."]
+    out = ["- Religamentos nos últimos 30 dias, por equipamento (COS › Religamentos):"]
+    for e in r:
+        des = ", ".join(f"{n} {rot.lower()}" for rot, n in e.get("desfechos") or [])
+        out.append("  - " + _junta(e.get("equipamento"), f"{e.get('total')} {'religamento' if e.get('total') == 1 else 'religamentos'}",
+                                   "reincidente" if e.get("reincidente") else ("repete" if e.get("repete") else ""), des,
+                                   f"falha: {', '.join(e['tipos'])}" if e.get("tipos") else "",
+                                   f"OS {', '.join(e['os'][:6])}" if e.get("os") else "", f"última em {e['ultima']}" if e.get("ultima") else ""))
     return out
 
 
@@ -502,7 +531,8 @@ SECOES = (
     ("Identificação", "Base › Registro mestre e Comando › Usinas"),
     ("Parecer e o que pede atenção", "Comando › Usinas › prontuário (a contagem do que as telas donas apontam)"),
     ("Performance", "Performance › Visão gerencial e Disponibilidade, pela Visão do responsável"),
-    ("COS", "COS › Ronda COS (a fotografia de agora) e as normalizações gravadas no banco"),
+    ("COS", "COS › Ronda COS (a fotografia de agora), as normalizações gravadas no banco (com o relato e as proteções "
+            "de cada parada) e COS › Religamentos"),
     ("OS e manutenção", "As OS do Fracttal no banco, pela Visão do responsável › Manutenção"),
     ("Engenharia", "Engenharia › Confiabilidade, o acompanhamento dos ativos e os relatórios de FMEA e de causa raiz"),
     ("Equipamentos com OS ou chamado aberto", "As tarefas das OS abertas por ativo e os chamados de garantia"),
@@ -518,6 +548,9 @@ SECOES = (
 )
 
 
+MAX_RELATOS = 12             # o relato das paradas mais novas: as que explicam o "por que caiu"
+
+
 def montar(ctx: dict, agora: datetime, com_pessoas: bool = False, extras: dict | None = None) -> dict:
     """{"texto": o dossiê em Markdown, "secoes": [títulos], "caracteres", "palavras", "tokens_estimados"}. `ctx` = o
     contexto do prontuário (`prontuario_dados.contexto`); `agora` = a hora de Brasília em que foi gerado; `extras` = o
@@ -526,7 +559,8 @@ def montar(ctx: dict, agora: datetime, com_pessoas: bool = False, extras: dict |
     texto (4 caracteres por token): a conta exata só a API dá."""
     x, cu, p = ctx.get("x") or {}, ctx.get("cu") or {}, ctx.get("p") or {}
     u, extras = cu.get("u") or {}, extras or {}
-    corpos = (_identificacao(x, u, cu, p, com_pessoas), _parecer(p, com_pessoas), _performance(u, cu, p), _cos(x, p),
+    corpos = (_identificacao(x, u, cu, p, com_pessoas), _parecer(p, com_pessoas), _performance(u, cu, p),
+              _cos(x, p) + [""] + _religamentos(extras),
               _os(u, p, com_pessoas), _engenharia(u, extras, com_pessoas), _equipamentos(p), _chamados(p),
               _rondas(u, p, com_pessoas), _seguranca(u, cu, p, com_pessoas), _insights(ctx),
               _observacoes(extras, com_pessoas), _demandas(p, com_pessoas), _linha(p, com_pessoas), _composicao(p),

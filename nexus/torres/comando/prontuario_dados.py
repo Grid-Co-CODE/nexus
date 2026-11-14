@@ -89,7 +89,7 @@ def _de_todas():
         def ler_cos():
             from ...cos import normalizacoes_banco as NB
             return por_usina(NB.LIVRO, NB.ABA, ("os", "tipo_falha", "inicio", "normalizado_em", "fora_min", "geracao_parou",
-                                                "fora_do_escopo_oem"))
+                                                "fora_do_escopo_oem", "protecoes", "relato_cliente", "relato_continuacao"))
 
         def ler_zel():
             from ...campo import zeladoria_banco as ZB

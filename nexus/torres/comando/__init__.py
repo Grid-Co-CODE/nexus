@@ -281,7 +281,7 @@ def usina_relatorio(usina_id):
     return responsaveis_usina_relatorio(usina_id)
 
 
-def _extras_do_dossie(usina_id: int) -> dict:
+def _extras_do_dossie(usina_id: int, codigo: str = "") -> dict:
     """O que os setores sabem da usina e o prontuário ainda não mostra (Levi, 12/11/2026, conferindo o dossiê: "tá indo o
     que a engenharia tá vendo [...] tá indo alguma anotação de supervisão"): os ativos com sinal na Confiabilidade com os
     números de lá, os ativos em acompanhamento pela Engenharia, os relatórios de FMEA e de causa raiz e as observações do
@@ -322,8 +322,31 @@ def _extras_do_dossie(usina_id: int) -> dict:
     def observacoes():
         from ...campo import observacao_responsavel as OB
         return OB.da_usina(usina_id, limite=20)
+
+    def religamentos():
+        """A tela COS › Religamentos desta usina (14/11/2026, Levi: "inclua no dossiê o que aconteceu no religamento"):
+        as ocorrências de 30 dias da Ronda COS de todos os clientes, só as da usina (pelo código do Fracttal), na régua
+        de lá (`religamentos.painel`). Sem a fonte do Andamento (o PC), None: "sem leitura"."""
+        from ...cos import andamento as AND
+        from ...cos import religamentos as RE
+        cfg = current_app.config
+        if not AND.fonte(cfg).ligada:
+            return None
+        cod = str(codigo or "").strip().upper()
+        clientes, erro = AND.clientes(cfg)
+        if erro or not cod:
+            raise RuntimeError(erro or "a usina sem código do Fracttal")
+        ocs = []
+        for c in clientes:
+            le = AND.ler_ocorrencias(cfg, c, RE.DIAS_PADRAO)
+            ocs += [o for o in (le.dados or {}).get("ocorrencias") or [] if str(o.get("usina_codigo") or "").upper() == cod]
+        p = RE.painel(AND.Leitura("", {"ocorrencias": ocs}), ver="todos")
+        return [{"equipamento": e.rotulo, "total": e.total, "repete": e.repete, "reincidente": e.reincidente,
+                 "desfechos": [(RE.DESFECHOS[k][0], n) for k, n in e.desfechos.items()], "tipos": e.tipos, "os": e.os,
+                 "ultima": e.ultima.strftime("%d/%m %H:%M") if e.ultima else ""} for e in (p.itens if p else [])]
     return {"ativos": tentar("a Confiabilidade", ativos), "acompanhamentos": tentar("o acompanhamento da Engenharia", acompanhamentos),
-            "relatorios": tentar("os relatórios de falha", relatorios), "observacoes": tentar("as observações", observacoes)}
+            "relatorios": tentar("os relatórios de falha", relatorios), "observacoes": tentar("as observações", observacoes),
+            "religamentos": tentar("os religamentos do COS", religamentos)}
 
 
 def _dossie(usina_id: int):
@@ -334,7 +357,7 @@ def _dossie(usina_id: int):
     ctx = _prontuario(usina_id)
     if ctx is None:
         abort(404)
-    return ctx, DS.montar(ctx, visao._agora(), extras=_extras_do_dossie(usina_id))
+    return ctx, DS.montar(ctx, visao._agora(), extras=_extras_do_dossie(usina_id, (ctx.get("x") or {}).get("codigo") or ""))
 
 
 @bp.route("/usinas/<int:usina_id>/dossie")
