@@ -364,6 +364,60 @@ def usina_dossie_md(usina_id):
     return resp
 
 
+# ── Nexus IA: a pergunta sobre a usina (13/11/2026) ──────────────────────────────────────────────────────────────────
+# Levi: "Do prontuário, eu quero que tenha um chat. Onde a pessoa possa fazer perguntas [...] como foi a performance no
+# mês? Por que a usina caiu? Qual a tendência? [...] Teste com várias IAs". As regras moram em nexus/comando/ia.py. Só
+# administrador enquanto é teste (cada pergunta custa, e o teto do mês é um só); a janela é a do prontuário (pu-jan).
+@bp.route("/usinas/<int:usina_id>/ia")
+def usina_ia(usina_id):
+    from ...comando import ia as IA
+    from .prontuario_dados import contexto as _prontuario
+    if not session.get("admin"):
+        abort(403)
+    ctx = _prontuario(usina_id)
+    if ctx is None:
+        abort(404)
+    cfg = current_app.config
+    dados = dict(x=ctx["x"], modelos=IA.disponiveis(cfg), sugestoes=IA.SUGESTOES, gasto=IA.gasto_do_mes(cfg),
+                 teto=IA.teto(cfg), max_pergunta=IA.MAX_PERGUNTA)
+    if request.args.get("parcial") == "1":          # a janela por cima do prontuário
+        return render_template("comando/_ia.html", **dados)
+    return render_template("comando/ia.html", torre=TORRE, tela=TORRE.tela("usinas"), **dados)
+
+
+@bp.route("/usinas/<int:usina_id>/ia/perguntar", methods=["POST"])
+def usina_ia_perguntar(usina_id):
+    """JSON {pergunta, modelos: [ids], historico: [{pergunta, resposta}]} -> {ok, respostas, dossie_tokens, gasto, teto}.
+    O dossiê é montado AGORA (o mesmo do "Dossiê para a IA"), uma vez para todos os modelos pedidos."""
+    from flask import jsonify
+
+    from ...comando import ia as IA
+    if not session.get("admin"):
+        return jsonify(ok=False, erro="Só administrador, enquanto o Nexus IA está em teste."), 403
+    if _de_outro_site():
+        return jsonify(ok=False, erro="Pedido de outro site."), 403
+    b = request.get_json(silent=True) or {}
+    pergunta = IA.limpar_pergunta(b.get("pergunta"))
+    ids = [str(i) for i in (b.get("modelos") or []) if isinstance(i, str)][:10]
+    if not pergunta:
+        return jsonify(ok=False, erro="Escreva a pergunta."), 400
+    if not ids:
+        return jsonify(ok=False, erro="Escolha ao menos um modelo."), 400
+    cfg = current_app.config
+    gasto, teto = IA.gasto_do_mes(cfg), IA.teto(cfg)
+    if gasto >= teto:
+        return jsonify(ok=False, erro=f"O teto do mês do Nexus IA (US$ {teto:.2f}) foi atingido: US$ {gasto:.2f} "
+                                      "gastos. Para subir, mude a NEXUS_IA_TETO_USD no servidor."), 429
+    historico = [h for h in (b.get("historico") or []) if isinstance(h, dict)][-IA.MAX_HISTORICO:]
+    _ctx, d = _dossie(usina_id)
+    respostas = IA.perguntar(cfg, ids, d["texto"], pergunta, historico)
+    IA.registrar(cfg, usina_id, pergunta, respostas, _meu_hmac(), d["tokens_estimados"])
+    resp = jsonify(ok=True, respostas=respostas, dossie_tokens=d["tokens_estimados"], gasto=IA.gasto_do_mes(cfg),
+                   teto=teto)
+    resp.headers["Cache-Control"] = "no-store"
+    return resp
+
+
 @bp.route("/caixa-de-entrada")
 def caixa_de_entrada():
     """Caixa de entrada: os pedidos que outras áreas mandaram para o setor da pessoa, o mais atrasado primeiro (Fase 3:

@@ -67,6 +67,9 @@
       {# o dossiê para a IA (12/11/2026): o texto do prontuário inteiro, que o Nexus IA vai mandar junto da pergunta. Só o
          administrador vê o atalho enquanto a pergunta não existe na tela; o endereço abre para quem abre o prontuário #}
       {# o dossiê e a conversa abrem na janela por cima (13/11/2026; prontuario.js); o href fica para o botão do meio #}
+      {# o Nexus IA (13/11/2026, Levi: "Do prontuário, eu quero que tenha um chat"): a pergunta sobre a usina, respondida com o
+         dossiê; só administrador enquanto é teste (comando/_ia.html, nexus/comando/ia.py) #}
+      {% if p.admin %}<a class="gc-btn gc-btn--ui gc-btn--primario" data-pu-jan="{{ raiz }}/t/comando/usinas/{{ x.usina_id }}/ia?parcial=1" data-pu-jan-t="Nexus IA · {{ x.usina }}" href="{{ raiz }}/t/comando/usinas/{{ x.usina_id }}/ia" title="Perguntar sobre a usina: a IA responde com o prontuário inteiro"><i class="ph ph-sparkle" aria-hidden="true"></i> Pergunte à IA</a>{% endif %}
       {% if p.admin %}<a class="gc-btn gc-btn--ui gc-btn--contorno" data-pu-jan="{{ raiz }}/t/comando/usinas/{{ x.usina_id }}/dossie?parcial=1" data-pu-jan-t="Dossiê para a IA · {{ x.usina }}" href="{{ raiz }}/t/comando/usinas/{{ x.usina_id }}/dossie" title="O texto do prontuário inteiro, do jeito que a IA lê"><i class="ph ph-file-text" aria-hidden="true"></i> Dossiê para a IA</a>{% endif %}
       {% if p.pode.conversa %}<a class="gc-btn gc-btn--ui gc-btn--contorno" data-pu-jan="{{ raiz }}/t/comando/conversa/usina/{{ x.usina_id }}/janela" data-pu-jan-t="Conversa · {{ x.usina }}" href="{{ raiz }}/t/comando/conversa/usina/{{ x.usina_id }}" title="Conversar sobre a usina e pedir a outro setor"><i class="ph ph-chats" aria-hidden="true"></i> Conversa{% if p.conversa.n %} <b class="cu-n">{{ p.conversa.n }}</b>{% endif %}</a>{% endif %}
     </div>
@@ -420,3 +423,4 @@
 <script src="{{ url_for('static', filename='comando/conversa.js') }}" defer></script>
 <script src="{{ url_for('static', filename='comando/demandas.js') }}" defer></script>
 <script src="{{ url_for('static', filename='comando/prontuario.js') }}" defer></script>
+{% if p.admin %}<script src="{{ url_for('static', filename='comando/ia.js') }}" defer></script>{% endif %}

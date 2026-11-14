@@ -369,9 +369,17 @@ def _seguranca(u: dict, cu: dict, p: dict, com_pessoas: bool) -> list[str]:
     else:
         out.append(f"- Extintores: {SEM_DADO}.")
     lv = p.get("luvas")
+    # a última verificação vem como o registro da ronda ({dia, os, tecnico, ...}): o dia e a OS, e o técnico só com
+    # `com_pessoas` (13/11/2026: o registro inteiro saía cru no texto, com o nome do técnico; o teste do Nexus IA achou)
+    ult = (lv or {}).get("ultima")
+    if isinstance(ult, dict):
+        ult_txt = _junta(f"última verificação em {_dia(ult.get('dia') or str(ult.get('inicio') or '')[:10])}",
+                         f"OS {_t(ult.get('os'))}" if ult.get("os") else "", _t(ult.get("tecnico")) if com_pessoas else "",
+                         sep=", ")
+    else:
+        ult_txt = f"última verificação em {_dia(ult)}" if ult else ""
     out.append("- Luvas de alta tensão: " + (SEM_DADO if not lv else _junta(
-        _LUVAS.get(_t(lv.get("situacao")), _t(lv.get("situacao")).replace("_", " ")),
-        f"última verificação em {_dia(lv.get('ultima'))}" if lv.get("ultima") else "")))
+        _LUVAS.get(_t(lv.get("situacao")), _t(lv.get("situacao")).replace("_", " ")), ult_txt)))
     espera = p.get("pts_espera") or []
     out.append(f"- PT (permissão de trabalho) esperando o De acordo: {len(espera)}")
     for pt in espera:

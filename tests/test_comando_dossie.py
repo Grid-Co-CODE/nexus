@@ -250,3 +250,17 @@ def test_a_pagina_le_a_engenharia_e_as_observacoes_das_telas_donas(tela, logado)
     obs = texto.split("## 12. Anotações do responsável", 1)[1].split("## 13. ", 1)[0]
     assert "Nenhuma observação registrada" in obs or "Sem leitura das observações" in obs
 
+
+
+def test_as_luvas_vao_com_o_dia_e_a_os_e_sem_o_tecnico():
+    """13/11/2026, no teste do Nexus IA (Céu Azul): o registro da ronda das luvas saía cru no texto, como dicionário,
+    com o nome do técnico ("última verificação em {'dia': datetime.date(...), 'tecnico': '...'}")."""
+    from datetime import date
+    p = {"luvas": {"situacao": "conferidas", "ultima": {"dia": date(2026, 11, 9), "inicio": "2026-11-09T12:58:50Z",
+                                                        "luvas": True, "tecnico": "Técnico Silva", "os": "19011"}}}
+    sem = "\n".join(DS._seguranca({}, {}, p, False))
+    assert "última verificação em 09/11/2026, OS 19011" in sem
+    assert "Técnico Silva" not in sem and "{" not in sem and "datetime" not in sem
+    assert "Técnico Silva" in "\n".join(DS._seguranca({}, {}, p, True))
+    p["luvas"]["ultima"] = "2026-11-09"                          # o formato de antes segue valendo
+    assert "última verificação em 09/11/2026" in "\n".join(DS._seguranca({}, {}, p, False))

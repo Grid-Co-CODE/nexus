@@ -705,3 +705,62 @@ a.ins-titulo:hover{color:var(--verde-texto)}
 .dm-t-acoes{display:inline-flex;align-items:center;gap:6px}
 .dm-t-mais{padding-inline:10px}
 .dm-t-mais[hidden],.dm-temas tr[hidden]{display:none}
+
+/* ── Nexus IA na janela do prontuário (13/11/2026; comando/_ia.html, comando/ia.js). A janela fica mais larga quando há
+   mais de um modelo marcado: as respostas lado a lado são o jeito de comparar as IAs (Levi: "Teste com várias IAs"). ── */
+.pu-jan:has([data-ia]){width:min(1240px,calc(100vw - 32px))}
+.ia{display:grid;gap:12px}
+.ia-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.ia-modelos{display:flex;flex-wrap:wrap;gap:6px;margin:0;padding:0;border:0}
+.ia-modelos legend{padding:0;margin:0 0 6px;font:700 11px/14px var(--font-sans);letter-spacing:.05em;text-transform:uppercase;color:var(--mudo)}
+.ia-modelos legend .mudo{text-transform:none;letter-spacing:0;font-weight:500}
+.ia-modelo{display:inline-flex;align-items:center;gap:7px;padding:5px 11px 5px 8px;border:1px solid var(--linha-forte);border-radius:999px;
+  font-size:12.5px;color:var(--tinta-2);cursor:pointer}
+.ia-modelo input{accent-color:var(--verde);margin:0}
+.ia-modelo:has(input:checked){border-color:var(--verde);background:var(--verde-suave);color:var(--tinta)}
+.ia-modelo:has(input:focus-visible){outline:2px solid var(--foco);outline-offset:2px}
+.ia-modelo-nome{font-weight:600}
+.ia-modelo-prov{font-size:11px;color:var(--mudo)}
+.ia-modelo--sem{opacity:.55;cursor:not-allowed}
+.ia-aviso{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border-radius:var(--raio-md);background:var(--alerta-suave);
+  color:var(--tinta-2);font-size:13px}
+.ia-aviso>i{color:var(--alerta);font-size:18px}
+.ia-conversa{display:grid;gap:16px;min-height:220px;max-height:58vh;overflow:auto;padding:4px 2px}
+.ia-vazio{align-self:center;justify-self:center;text-align:center;max-width:560px;padding:20px 8px}
+.ia-vazio-t{margin:0 0 4px;font:600 17px/24px var(--font-sans);color:var(--tinta)}
+.ia-vazio .mudo{margin:0 0 14px;font-size:13px}
+.ia-sugestoes{display:flex;flex-wrap:wrap;justify-content:center;gap:8px}
+.ia-sugestao{border:1px solid var(--linha-forte);background:var(--superficie-2);color:var(--tinta);border-radius:999px;padding:6px 13px;
+  font:500 13px/18px var(--font-sans);cursor:pointer}
+.ia-sugestao:hover{border-color:var(--verde)}
+.ia-sugestao:focus-visible{outline:2px solid var(--foco);outline-offset:2px}
+.ia-turno{display:grid;gap:10px}
+.ia-pergunta{justify-self:end;max-width:78%;margin:0;padding:9px 13px;border-radius:12px 12px 4px 12px;background:var(--superficie-3);
+  color:var(--tinta);font-size:14px}
+.ia-respostas{display:grid;gap:10px;grid-template-columns:minmax(0,1fr)}
+.ia-respostas--2{grid-template-columns:repeat(2,minmax(0,1fr))}
+.ia-respostas--3{grid-template-columns:repeat(3,minmax(0,1fr))}
+.ia-lendo{margin:0;font-size:13px}
+.ia-r{display:grid;align-content:start;gap:8px;padding:12px 14px;border:1px solid var(--linha);border-radius:var(--raio-md);background:var(--superficie-2)}
+.ia-r--erro{border-color:var(--critico-suave)}
+.ia-r-cab{display:flex;align-items:baseline;gap:8px;font-size:13px}
+.ia-r-cab .mudo{font-size:11.5px}
+.ia-r-texto{font-size:13.5px;line-height:1.55;color:var(--tinta)}
+.ia-r-texto p{margin:0 0 8px}
+.ia-r-texto ul,.ia-r-texto ol{margin:0 0 8px;padding-left:20px}
+.ia-r-texto li{margin:2px 0}
+.ia-r-texto>:last-child{margin-bottom:0}
+.ia-r-erro{margin:0;color:var(--critico);font-size:13px}
+.ia-r-aviso{margin:0;font-size:12px;color:var(--alerta)}
+.ia-r-pe{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;margin:0;padding-top:8px;border-top:1px solid var(--linha);font-size:11.5px}
+.ia-num{display:inline-flex;align-items:center;gap:5px;padding:2px 8px;border-radius:var(--raio-tag);font-weight:600}
+.ia-num::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}
+.ia-num--ok{color:var(--ok);background:var(--ok-suave)}
+.ia-num--alerta{color:var(--alerta);background:var(--alerta-suave)}
+.ia-form{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:end}
+.ia-form textarea{width:100%;box-sizing:border-box;resize:vertical;min-height:44px;padding:9px 12px;border:1px solid var(--linha-forte);
+  border-radius:var(--raio-controle);background:var(--superficie-2);color:var(--tinta);font:400 14px/1.45 var(--font-sans)}
+.ia-form textarea:focus-visible{outline:2px solid var(--foco);outline-offset:1px}
+.ia-pe{margin:0;font-size:12px}
+@media (max-width:900px){.ia-respostas--2,.ia-respostas--3{grid-template-columns:minmax(0,1fr)}.ia-pergunta{max-width:100%}}
+@media (max-width:640px){.ia-form{grid-template-columns:minmax(0,1fr)}}
