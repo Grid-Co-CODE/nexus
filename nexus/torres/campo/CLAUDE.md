@@ -1380,8 +1380,15 @@ usinas mobilizadas, para quem abre a Visão (sem o filtro de responsável, de cl
     mesmo"): uma frase que explica o religamento (remoto, a distância; ou no local, com a equipe de campo) e quatro
     números (paradas no mês e quantas com a geração parada; religamentos remotos; no local; a proteção que mais atuou).
   - A tabela tem tudo centralizado, menos o corpo do "O que aconteceu" (o cabeçalho dele também é centralizado). As
-    colunas, nesta ordem ("Parada fica na frente"): a Parada, o Período, o Tempo fora, as Proteções (o número, sem a
-    fase: 27ABC conta como 27), a OS e "O que aconteceu".
+    colunas, nesta ordem ("Parada fica na frente"): a Parada, o Período, o Tempo indisponível (solar), as Proteções (o
+    número, sem a fase: 27ABC conta como 27), a OS e "O que aconteceu".
+  - **O tempo indisponível é o do período solar, das 6h às 18h** (`minutos_solares`; 14/11/2026, Levi: "tem que ser
+    calculado em período solar [...] De 6 da manhã às 6 da tarde [...] tempo indisponível [...] entre parênteses
+    solar").
+    - Soma, dia a dia, o pedaço da parada dentro da janela. Exemplo: de 02/11 21:40 a 03/11 08:51 dá 2 h 51 min; a
+      parada só de noite dá 0 min.
+    - Fica em horas mesmo passando de um dia (`_h_min`): 3 dias inteiros são 36 h solares, não "1 d 12 h".
+    - O rodapé das fontes explica a regra quando a tabela está no PDF.
   - O Período vem em duas pílulas de cantos redondos: a hora da parada no fundo vermelho-pastel e a da volta no
     verde-pastel ("no horário que saiu, fica um pastelzinho vermelho. No horário que voltou, um pastelzinho verde").
     A volta é o início mais o tempo fora. A frase do alto explica as cores (`_pilula`, `PILULA_PARADA`,
@@ -1406,7 +1413,7 @@ usinas mobilizadas, para quem abre a Visão (sem o filtro de responsável, de cl
     (`_contagem_combinacoes`). Levi: "para esse caso aí de ser 2 ao mesmo tempo, incluir uma linha [...] bota 27 e 59
     [...] subtensão e sobretensão [...] as paradas bota 3".
     - Cada parada entra numa linha só: a 27 sozinha, a 59 sozinha, a 27 e 59 juntas. Assim as linhas somam as paradas
-      com a geração parada, e a nota embaixo do gráfico explica isso.
+      com a geração parada. Sem nota embaixo do gráfico ("esse textinho aí debaixo do gráfico [...] pode tirar").
     - O número do alto ("Proteção que mais atuou") continua contando todas as paradas em que a proteção atuou, sozinha
       ou junto com outra.
     - Na Capitão Poço em novembro: 27 sozinha em 7 paradas, 59 sozinha em 3, 27 e 59 em 3, sem proteção em 3; somam 16.
@@ -1414,7 +1421,10 @@ usinas mobilizadas, para quem abre a Visão (sem o filtro de responsável, de cl
   - **"Sem proteção atuada"** ("destaque também as sem proteção [...] Quando for desligamento") vem numa linha à parte,
     em âmbar (`sem_protecao`). Conta os desligamentos com a geração parada sem proteção registrada, como o inversor ou
     a cabine que caiu. A perda de comunicação e a manutenção programada ficam fora.
-  - O resumo ganha "O COS registrou N paradas no mês, M com a geração parada", e o rodapé de fontes cita o COS.
+  - O resumo do mês não fala das paradas: o número do alto da seção já diz ("é a mesma coisa que se repete no KPI";
+    14/11/2026). O rodapé das fontes traz só as fontes dos temas que entraram no PDF (`FONTES`): no PDF só de
+    religamentos, só o COS ("Não sei porque você botou meta, PR, gerencial"). A linha era uma só para o relatório
+    inteiro, e o Gerencial era a fonte real da Performance, não um dado inventado.
   - Na janela, cada tema é uma linha com a caixa de marcar e "N campos", recolhido (`<details>`); quem quiser abre e
     escolhe campo por campo. O tema continua ligando e desligando os campos dele (`[data-pu-rel-grupo]`).
 - **O relatório da usina para o cliente (2ª rodada):** "é interessante que dê para baixar um relatório da usina também!

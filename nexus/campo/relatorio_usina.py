@@ -20,7 +20,7 @@ import calendar
 import collections
 import io
 import re
-from datetime import date, timedelta
+from datetime import date, datetime, time, timedelta
 from pathlib import Path
 from xml.sax.saxutils import escape
 
@@ -536,11 +536,8 @@ def _resumo(d: dict, temas: tuple) -> list[str]:
             out.append(f"A disponibilidade foi de {_pct(disp['disp'])}" +
                        (f", com {n} evento{'s' if n != 1 else ''} de parada registrado{'s' if n != 1 else ''}."
                         if n else ", sem parada registrada."))
-    if "religamentos" in temas and d.get("religamentos") is not None:
-        n = len(d["religamentos"])
-        parou = sum(1 for x in d["religamentos"] if x["parou"])
-        if n:
-            out.append(f"O COS registrou {n} parada{'s' if n != 1 else ''} no mês, {parou} com a geração parada.")
+    # as paradas e religamentos não têm frase aqui: o número do alto da seção já diz (14/11/2026, Levi: "nesse resumo
+    # aí, é a mesma coisa que se repete no KPI que tem no paradas e religamentos. Então pode tirar")
     if "rondas" in temas and d.get("rondas") is not None:
         n = len(d["rondas"])
         lidas = [r for r in d["rondas"] if r.get("sujidade") is not None]
@@ -789,15 +786,44 @@ def _religamentos(d: dict, e: dict, campos=CHAVES_CAMPOS) -> list:
                 periodo += [Spacer(1, 3), _pilula(f"{fim:%d/%m %H:%M}", PILULA_VOLTA, e)]
             linhas.append([Paragraph(f'<font color="{_cor(nivel)}">{_t(rotulo)}</font>', e["parada"]),
                            periodo,
-                           x.get("fora") or "—", ", ".join(protecoes_do_texto(x.get("protecoes"))) or "—",
+                           _h_min(minutos_solares(x["ini"], fim)), ", ".join(protecoes_do_texto(x.get("protecoes"))) or "—",
                            x.get("os") or "—", _o_que_aconteceu(p, e)])
         # a Parada na frente (14/11/2026, Levi: "Parada fica na frente")
-        t = _tabela(e, ["Parada", "Período", "Tempo fora", "Proteções", "OS", "O que aconteceu"], linhas,
-                    [26, 25, 19, 19, 13, 76], centro=(1, 2, 3, 4), cab_centro=True)
+        t = _tabela(e, ["Parada", "Período", "Tempo indisponível (solar)", "Proteções", "OS", "O que aconteceu"], linhas,
+                    [26, 25, 23, 18, 13, 73], centro=(1, 2, 3, 4), cab_centro=True)
         # a parada em destaque: o fundo claro da cor dela (por cima da zebra)
         t.setStyle(TableStyle([("BACKGROUND", (0, i), (0, i), c) for i, c in enumerate(tintas, start=1)]))
         out.append(t)
     return out
+
+
+# o período solar (14/11/2026, Levi: "a parte de tempo fora, tem que ser calculado em período solar [...] De 6 da manhã
+# às 6 da tarde [...] bota assim, tempo indisponível. Aí bota entre parênteses solar"): a parada da noite não tira
+# geração, então só conta o pedaço dela dentro da janela
+SOLAR = (time(6), time(18))
+
+
+def minutos_solares(ini: datetime | None, fim: datetime | None) -> int | None:
+    """Os minutos da parada dentro do período solar (6h às 18h, no fuso do início), somados dia a dia. None sem o fim.
+    Ex.: de 02/11 21:40 a 03/11 08:51 = 2 h 51 min (só a manhã do dia 3)."""
+    if not ini or not fim:
+        return None
+    total, dia = 0.0, ini.date()
+    while dia <= fim.date():
+        a = datetime.combine(dia, SOLAR[0], tzinfo=ini.tzinfo)
+        b = datetime.combine(dia, SOLAR[1], tzinfo=ini.tzinfo)
+        total += max(0.0, (min(fim, b) - max(ini, a)).total_seconds())
+        dia += timedelta(days=1)
+    return round(total / 60)
+
+
+def _h_min(m: int | None) -> str:
+    """171 -> "2 h 51 min"; 0 -> "0 min"; em horas mesmo passando de um dia (as horas solares de vários dias)."""
+    if m is None:
+        return "—"
+    if m < 60:
+        return f"{m} min"
+    return f"{m // 60} h" + (f" {m % 60} min" if m % 60 else "")
 
 
 def sem_protecao(rel: list[dict], partes: list[dict]) -> int:
@@ -850,13 +876,17 @@ def _grafico_protecoes(rel: list[dict], partes: list[dict], e: dict) -> list:
         # o destaque da linha: o fundo âmbar-claro (o mesmo da parada em alerta)
         t.setStyle(TableStyle([("BACKGROUND", (0, len(linhas)), (-1, len(linhas)), _TINTA_PARADA["alerta"]),
                                ("LINEABOVE", (0, len(linhas)), (-1, len(linhas)), 0.8, MUDO)]))
-    nota = ("Cada parada aparece uma vez, na linha das proteções que atuaram nela: a parada em que atuaram a 27 e a 59 "
-            "juntas está na linha “27 e 59”, e não nas linhas da 27 e da 59 sozinhas.")
-    if sem:
-        nota += (" Sem proteção atuada: desligamentos com a geração parada em que o COS não registrou proteção do relé "
-                 "(um inversor ou uma cabine que caiu, por exemplo).")
-    return [Paragraph(_t("Proteções que mais atuaram"), e["sub_secao"]), t, Spacer(1, 2 * mm),
-            Paragraph(_t(nota), e["mudo"]), Spacer(1, 4 * mm)]
+    # sem a nota embaixo (14/11/2026, Levi: "esse textinho aí debaixo do gráfico de paradas pode tirar")
+    return [Paragraph(_t("Proteções que mais atuaram"), e["sub_secao"]), t, Spacer(1, 5 * mm)]
+
+
+# de onde vem o dado de cada tema (as telas donas, `dados`)
+FONTES = {"perf": "geração, meta e PR do Gerencial da Grid Co.; disponibilidade e eventos de parada do sistema de "
+                  "manutenção (Fracttal)",
+          "religamentos": "paradas e religamentos registrados pelo Centro de Operações (COS) da Grid Co.",
+          "rondas": "rondas do App de Campo",
+          "manut": "tarefas executadas pelo App de Campo; ordens de serviço e zeladoria do sistema de manutenção (Fracttal)",
+          "chamados": "chamados de garantia do sistema de manutenção (Fracttal)"}
 
 
 def gerar(d: dict, temas=CHAVES_TEMAS, gerado_em: str = "", campos=None) -> bytes:
@@ -921,11 +951,16 @@ def gerar(d: dict, temas=CHAVES_TEMAS, gerado_em: str = "", campos=None) -> byte
             corpo = f(d, e, campos)
         if corpo:
             story += _secao(titulo, e) + corpo
-    story += [Spacer(1, 8 * mm),
-              Paragraph("Fontes: geração, meta e PR do Gerencial da Grid Co.; disponibilidade, ordens de serviço e chamados "
-                        "do sistema de manutenção (Fracttal); paradas e religamentos do Centro de Operações (COS); rondas "
-                        "do App de Campo. "
-                        + ("O mês em andamento é parcial: os números mudam até o mês fechar." if d["corrente"] else ""),
-                        e["mudo"])]
+    # as fontes só dos temas que entraram (14/11/2026, Levi, no PDF só de religamentos: "a fonte está vindo do próprio
+    # COS mesmo, né? Não sei porque você botou meta, PR, gerencial"): a linha era uma só para o relatório inteiro
+    fontes = [FONTES[k] for k in temas_dos_campos(temas, campos) if k in FONTES]
+    if fontes:
+        solar = ("O tempo indisponível das paradas conta só o período solar, das 6h às 18h: a parte da parada fora "
+                 "desse horário não entra. " if "religamentos" in temas_dos_campos(temas, campos)
+                 and "religamentos_lista" in campos and d.get("religamentos") else "")
+        story += [Spacer(1, 8 * mm),
+                  Paragraph(("Fontes: " if len(fontes) > 1 else "Fonte: ") + "; ".join(fontes).rstrip(".") + ". " + solar
+                            + ("O mês em andamento é parcial: os números mudam até o mês fechar." if d["corrente"] else ""),
+                            e["mudo"])]
     doc.build(story, onFirstPage=pagina, onLaterPages=pagina)
     return buf.getvalue()

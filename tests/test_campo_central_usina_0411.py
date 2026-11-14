@@ -362,14 +362,18 @@ def test_o_pdf_leva_as_paradas_do_mes_com_o_que_aconteceu():
                            "relato": "Causa: oscilação na rede da concessionária."},
                           {"ini": datetime(2026, 11, 10, 15, 55, tzinfo=br), "tipo": "Usina desligada", "fora": "4 min",
                            "parou": True, "os": "19150", "protecoes": "27", "relato": ""}]}
-    assert "O COS registrou 2 paradas no mês, 2 com a geração parada." in RU._resumo(d, ("religamentos",))
+    # o resumo não repete o número do alto da seção (14/11/2026, Levi: "é a mesma coisa que se repete no KPI")
+    assert RU._resumo(d, ("religamentos",)) == []
     corpo = RU._religamentos(d, RU._estilos(), RU.CHAVES_CAMPOS)
     # a explicação do religamento, os quatro números, o gráfico das proteções (logo depois dos números) e a tabela
-    assert "a volta é o religamento" in corpo[0].text and len(corpo) == 10
-    assert corpo[4].text == "Proteções que mais atuaram" and "Cada parada aparece uma vez" in corpo[7].text
+    assert "a volta é o religamento" in corpo[0].text and len(corpo) == 8
+    assert corpo[4].text == "Proteções que mais atuaram"
     # a Parada na frente e o período em pílulas: a parada no fundo vermelho-pastel, a volta no verde-pastel
     tabela = corpo[-1]
-    assert [c.text for c in tabela._cellvalues[0]] == ["Parada", "Período", "Tempo fora", "Proteções", "OS", "O que aconteceu"]
+    assert [c.text for c in tabela._cellvalues[0]] == ["Parada", "Período", "Tempo indisponível (solar)", "Proteções", "OS",
+                                                       "O que aconteceu"]
+    # 12/11 09:41 a 10:35, toda no período solar: 54 min
+    assert tabela._cellvalues[1][2].text == "54 min"
     saiu, _esp, voltou = tabela._cellvalues[1][1]
     assert "12/11 09:41" in saiu._cellvalues[0][0].text and saiu._bkgrndcmds[0][3] == RU.PILULA_PARADA[0]
     assert "12/11 10:35" in voltou._cellvalues[0][0].text and voltou._bkgrndcmds[0][3] == RU.PILULA_VOLTA[0]
@@ -418,12 +422,44 @@ def test_o_grafico_destaca_os_desligamentos_sem_protecao():
     partes = [{"rotulo": "Usina desligada"}, {"rotulo": "Usina desligada"}, {"rotulo": "Inversor 7.1 desligado"},
               {"rotulo": "Perda de comunicação"}, {"rotulo": "Manutenção programada"}]
     assert RU.sem_protecao(rel, partes) == 1 and RU._contagem_protecoes(rel) == [("27", 2), ("59", 1)]
-    titulo, tabela, _esp, nota, _esp2 = RU._grafico_protecoes(rel, partes, RU._estilos())
+    titulo, tabela, _esp = RU._grafico_protecoes(rel, partes, RU._estilos())
     linhas = tabela._cellvalues
     assert [(linhas[i][0].text, linhas[i][1].text, linhas[i][2].text) for i in (1, 2)] == [
         ("27", "Subtensão", "1"), ("27 e 59", "Subtensão e sobretensão", "1")]
     assert "Sem proteção atuada" in linhas[3][1].text
     assert RU._contagem_combinacoes([{"protecoes": "59;27"}, {"protecoes": "27"}, {"protecoes": "27, 59N"},
                                      {"protecoes": "59"}, {"protecoes": ""}]) == [(("27", "59"), 2), (("27",), 1), (("59",), 1)]
-    assert "Sem proteção atuada: desligamentos" in nota.text
     assert RU._grafico_protecoes([], [], RU._estilos()) == []
+
+
+
+def test_as_fontes_sao_so_as_dos_temas_do_pdf():
+    """14/11/2026, Levi, no PDF só de religamentos: "a fonte está vindo do próprio COS mesmo, né? Não sei porque você
+    botou meta, PR, gerencial". A linha das fontes era uma só para o relatório inteiro; agora é a dos temas que entraram."""
+    import fitz
+    from datetime import date
+    d = {"uid": 1, "usina": "Altair", "cliente": "Thopen", "cidade": "", "uf": "SP", "potencia_mwp": None,
+         "mes": "2026-10", "mes_id": 202610, "mes_txt": "outubro de 2026", "ini": date(2026, 10, 1),
+         "fim": date(2026, 10, 31), "corrente": False, "hoje": date(2026, 11, 14), "erros": {}, "religamentos": []}
+    texto = "".join(p.get_text() for p in fitz.open(stream=RU.gerar(d, ("religamentos",), gerado_em="14/11/2026"),
+                                                    filetype="pdf")).replace("\n", " ")
+    assert "Fonte: paradas e religamentos registrados pelo Centro de Operações (COS)" in texto and "Grid Co.." not in texto
+    assert "Gerencial" not in texto and "Fracttal" not in texto and "Resumo do mês" not in texto
+
+
+
+def test_o_tempo_indisponivel_conta_so_o_periodo_solar():
+    """14/11/2026, Levi: "a parte de tempo fora, tem que ser calculado em período solar [...] De 6 da manhã às 6 da
+    tarde". As paradas reais da Capitão Poço 100 em novembro."""
+    from datetime import datetime, timedelta, timezone
+    br = timezone(timedelta(hours=-3))
+
+    def h(dia, hh, mm):
+        return datetime(2026, 11, dia, hh, mm, tzinfo=br)
+    assert RU.minutos_solares(h(2, 21, 40), h(3, 8, 51)) == 171          # só a manhã do dia 3: 06:00 a 08:51
+    assert RU.minutos_solares(h(5, 9, 35), h(5, 15, 30)) == 355          # toda de dia
+    assert RU.minutos_solares(h(9, 22, 45), h(9, 22, 51)) == 0           # toda de noite
+    assert RU.minutos_solares(h(9, 17, 17), h(10, 9, 30)) == 43 + 210    # o fim da tarde e a manhã seguinte
+    assert RU.minutos_solares(h(1, 5, 0), h(4, 7, 0)) == 3 * 720 + 60    # vários dias: em horas, não em dias
+    assert RU._h_min(3 * 720 + 60) == "37 h" and RU._h_min(171) == "2 h 51 min" and RU._h_min(None) == "—"
+    assert RU.minutos_solares(h(1, 5, 0), None) is None
