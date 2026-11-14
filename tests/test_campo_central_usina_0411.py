@@ -366,7 +366,7 @@ def test_o_pdf_leva_as_paradas_do_mes_com_o_que_aconteceu():
     corpo = RU._religamentos(d, RU._estilos(), RU.CHAVES_CAMPOS)
     # a explicação do religamento, os quatro números, o gráfico das proteções (logo depois dos números) e a tabela
     assert "a volta é o religamento" in corpo[0].text and len(corpo) == 10
-    assert corpo[4].text == "Proteções que mais atuaram" and "conta em cada uma delas" in corpo[7].text
+    assert corpo[4].text == "Proteções que mais atuaram" and "Cada parada aparece uma vez" in corpo[7].text
     # a Parada na frente e o período em pílulas: a parada no fundo vermelho-pastel, a volta no verde-pastel
     tabela = corpo[-1]
     assert [c.text for c in tabela._cellvalues[0]] == ["Parada", "Período", "Tempo fora", "Proteções", "OS", "O que aconteceu"]
@@ -411,7 +411,8 @@ def test_o_que_aconteceu_so_completa_a_linha():
 
 def test_o_grafico_destaca_os_desligamentos_sem_protecao():
     """14/11/2026, Levi: "destaque também as sem proteção [...] Sem proteção atuada. Quando for desligamento". A perda
-    de comunicação (a geração não para) e a manutenção programada não entram; a parada com 27 e 59 conta nas duas."""
+    de comunicação (a geração não para) e a manutenção programada não entram. A parada com 27 e 59 tem a linha dela
+    ("para esse caso aí de ser 2 ao mesmo tempo, incluir uma linha [...] bota 27 e 59"): cada parada numa linha só."""
     rel = [{"parou": True, "protecoes": "27;59"}, {"parou": True, "protecoes": "27ABC"},
            {"parou": True, "protecoes": ""}, {"parou": False, "protecoes": ""}, {"parou": True, "protecoes": ""}]
     partes = [{"rotulo": "Usina desligada"}, {"rotulo": "Usina desligada"}, {"rotulo": "Inversor 7.1 desligado"},
@@ -419,6 +420,10 @@ def test_o_grafico_destaca_os_desligamentos_sem_protecao():
     assert RU.sem_protecao(rel, partes) == 1 and RU._contagem_protecoes(rel) == [("27", 2), ("59", 1)]
     titulo, tabela, _esp, nota, _esp2 = RU._grafico_protecoes(rel, partes, RU._estilos())
     linhas = tabela._cellvalues
-    assert [linhas[1][0].text, linhas[2][0].text] == ["27", "59"] and "Sem proteção atuada" in linhas[3][1].text
+    assert [(linhas[i][0].text, linhas[i][1].text, linhas[i][2].text) for i in (1, 2)] == [
+        ("27", "Subtensão", "1"), ("27 e 59", "Subtensão e sobretensão", "1")]
+    assert "Sem proteção atuada" in linhas[3][1].text
+    assert RU._contagem_combinacoes([{"protecoes": "59;27"}, {"protecoes": "27"}, {"protecoes": "27, 59N"},
+                                     {"protecoes": "59"}, {"protecoes": ""}]) == [(("27", "59"), 2), (("27",), 1), (("59",), 1)]
     assert "Sem proteção atuada: desligamentos" in nota.text
     assert RU._grafico_protecoes([], [], RU._estilos()) == []

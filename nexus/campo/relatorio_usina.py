@@ -808,10 +808,24 @@ def sem_protecao(rel: list[dict], partes: list[dict]) -> int:
                and not (p.get("rotulo") or "").startswith("Manutenção"))
 
 
+def _contagem_combinacoes(rel: list[dict]) -> list[tuple[tuple, int]]:
+    """[((códigos), em quantas paradas atuou exatamente esta combinação)], a maior primeiro; no empate, a de menos
+    proteções e depois o código. Cada parada conta uma vez só (14/11/2026, Levi: "para esse caso aí de ser 2 ao mesmo
+    tempo, incluir uma linha [...] bota 27 e 59 [...] subtensão e sobretensão [...] as paradas bota 3")."""
+    conta = collections.Counter(tuple(sorted(protecoes_do_texto(x.get("protecoes")), key=int)) for x in rel)
+    conta.pop((), None)
+    return sorted(conta.items(), key=lambda kv: (-kv[1], len(kv[0]), [int(c) for c in kv[0]]))
+
+
+def _e(itens: list[str]) -> str:
+    return itens[0] if len(itens) == 1 else ", ".join(itens[:-1]) + " e " + itens[-1]
+
+
 def _grafico_protecoes(rel: list[dict], partes: list[dict], e: dict) -> list:
-    """As proteções que mais atuaram (até 6), em barras verdes, e os desligamentos sem proteção atuada numa barra âmbar,
-    à parte. Uma parada com duas proteções (27 e 59) conta nas duas: a barra é "em quantas paradas esta atuou"."""
-    conta = _contagem_protecoes(rel)[:6]
+    """As proteções que atuaram, uma linha por combinação (a 27 sozinha, a 59 sozinha, a 27 e a 59 juntas), em barras
+    verdes, até 6 linhas; e os desligamentos sem proteção atuada numa linha âmbar, à parte. Cada parada entra numa linha
+    só, então as linhas somam as paradas com a geração parada."""
+    conta = _contagem_combinacoes(rel)[:6]
     sem = sem_protecao(rel, partes)
     if not conta and not sem:
         return []
@@ -822,7 +836,11 @@ def _grafico_protecoes(rel: list[dict], partes: list[dict], e: dict) -> list:
         b.add(Rect(0, 1, 60 * mm, 6, fillColor=FUNDO, strokeColor=None))
         b.add(Rect(0, 1, 60 * mm * n / maior, 6, fillColor=cor, strokeColor=None))
         return b
-    linhas = [[cod, PROTECAO_NOME.get(cod, "—"), str(n), barra(n, VERDE)] for cod, n in conta]
+    linhas = []
+    for cods, n in conta:
+        nomes = [PROTECAO_NOME.get(c, f"proteção {c}") for c in cods]
+        nomes = [nomes[0]] + [x.lower() for x in nomes[1:]]
+        linhas.append([_e(list(cods)), _e(nomes), str(n), barra(n, VERDE)])
     if sem:
         cor = _cor("alerta")
         linhas.append(["—", Paragraph(f'<font color="{cor}"><b>Sem proteção atuada</b></font>', e["cel_c"]),
@@ -832,8 +850,8 @@ def _grafico_protecoes(rel: list[dict], partes: list[dict], e: dict) -> list:
         # o destaque da linha: o fundo âmbar-claro (o mesmo da parada em alerta)
         t.setStyle(TableStyle([("BACKGROUND", (0, len(linhas)), (-1, len(linhas)), _TINTA_PARADA["alerta"]),
                                ("LINEABOVE", (0, len(linhas)), (-1, len(linhas)), 0.8, MUDO)]))
-    nota = ("Uma parada em que atuou mais de uma proteção (por exemplo, 27 e 59) conta em cada uma delas: a barra mostra "
-            "em quantas paradas aquela proteção atuou.")
+    nota = ("Cada parada aparece uma vez, na linha das proteções que atuaram nela: a parada em que atuaram a 27 e a 59 "
+            "juntas está na linha “27 e 59”, e não nas linhas da 27 e da 59 sozinhas.")
     if sem:
         nota += (" Sem proteção atuada: desligamentos com a geração parada em que o COS não registrou proteção do relé "
                  "(um inversor ou uma cabine que caiu, por exemplo).")
