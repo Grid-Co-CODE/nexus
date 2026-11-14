@@ -576,6 +576,39 @@ html{scrollbar-width:thin;scrollbar-color:var(--rolagem) transparent}
 .menu-recolhido .item-inicio,
 .menu-recolhido .torre summary{justify-content:center;padding:10px 0}
 
+/* A busca do menu (14/11/2026, o JS em static/menu-busca.js): o campo no alto, na altura de um item do menu; o input
+   não alarga o menu (width 0 + flex), quem dá a largura continuam sendo os nomes. No trilho recolhido sobra a lupa, e
+   clicar nela abre o menu enquanto se busca. O achado em destaque é o texto mais forte com o sublinhado verde, sem fundo
+   (a cor no Nexus é do estado). A pergunta que trouxe a tela, embaixo do nome, em letra menor. */
+.menu-busca{margin:0 0 10px}
+.menu-busca-campo{position:relative;display:flex;align-items:center;gap:8px;height:34px;padding:0 6px 0 10px;cursor:text;
+  border:1px solid var(--linha-forte);border-radius:var(--raio-controle);color:var(--mudo)}
+.menu-busca-campo:hover{border-color:var(--mudo)}
+.menu-busca-campo:focus-within{border-color:var(--foco)}
+.menu-busca-campo > i{font-size:16px;flex:none}
+.menu-busca-campo input{flex:1;width:0;min-width:0;height:100%;padding:0;border:0;outline:0;background:transparent;
+  color:var(--tinta);font:500 13px/18px var(--font-sans)}
+.menu-busca-campo input::placeholder{color:var(--mudo);opacity:1}
+.menu-busca-campo input::-webkit-search-cancel-button{display:none}
+.menu-busca-tecla{flex:none;min-width:18px;padding:0 5px;border:1px solid var(--linha-forte);border-radius:4px;
+  font:600 11px/16px var(--font-sans);color:var(--mudo);text-align:center}
+.menu-busca-campo:focus-within .menu-busca-tecla,.menu-buscando .menu-busca-tecla{display:none}
+.menu-busca-limpa{flex:none;display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;padding:0;
+  border:0;border-radius:6px;background:transparent;color:var(--mudo);cursor:pointer}
+.menu-busca-limpa:hover{color:var(--tinta);background:var(--superficie-2)}
+.menu-busca-limpa[hidden]{display:none}
+.menu-busca-conta{margin:6px 2px 0;font-size:12px;line-height:16px;color:var(--mudo)}
+.menu-busca-nada{margin:4px 10px;font-size:12.5px;line-height:18px;color:var(--mudo)}
+mark.menu-achado{background:none;color:var(--tinta);font-weight:700;text-decoration:underline;
+  text-decoration-color:var(--verde);text-decoration-thickness:2px;text-underline-offset:3px}
+.menu-pergunta{display:block;margin-top:2px;font-size:11.5px;line-height:15px;color:var(--fraco)}
+.menu-pergunta mark.menu-achado{color:var(--tinta-2);font-weight:600}
+/* a tela que abre por dentro de outra, achada na busca: um passo para dentro, com o fio da de fora */
+.torre li.menu-dentro{margin-left:10px;padding-left:4px;border-left:1px solid var(--linha-forte)}
+.menu-recolhido .menu-busca-campo{justify-content:center;padding:0}
+.menu-recolhido .menu-busca-campo input{position:absolute;inset:0;width:100%;opacity:0;cursor:pointer}
+.menu-recolhido .menu-busca-tecla{display:none}
+
 /* Início: grade de torres */
 .grade-torres{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px}
 .card-torre{display:block;background:var(--superficie);border:1px solid var(--linha);border-radius:var(--raio-md);

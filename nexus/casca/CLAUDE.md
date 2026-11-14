@@ -31,7 +31,7 @@ Base → Acessos), o tema (escuro ou claro) e o `/saude`. A cadeira saiu em 12/1
 | `nexus/templates/base.html` | a moldura: o topo (a ação da tela no bloco `topo_acoes`, o sino e quem entrou, que abre o menu da conta com o Setor, o Tema e o Sair; seção "Um cabeçalho só"), menu lateral, recolher (`[` ou botão, lembrado em `localStorage` `nexus.menu`; no trilho recolhido, passar o mouse
 ou focar o ícone abre ao lado a caixa `menu-voo` com o nome da torre e as telas dela, os mesmos links do menu,
 e o clique no ícone segue levando à 1ª tela; 05/11/2026, Levi: "ao passar o mouse aparecesse as opções daquela
-área"), menu do celular, botão do tema (que troca também as molduras do OS Creator abertas) |
+área"), a busca do menu (14/11/2026; ver "A busca do menu lateral" abaixo), menu do celular, botão do tema (que troca também as molduras do OS Creator abertas) |
 | `nexus/templates/entrar.html` + `static/entrar-usina.js` | a tela de entrar (07/11/2026, Levi: "Essa tela inicial do Nexus é feia demais", aprovada depois de seis rodadas de prévia): o texto e a porta à esquerda, sem cartão, e atrás a usina sem fim, desenhada em SVG pelo JS (dois blocos espelhados de strings de módulos vistos do alto; a ordem do desenho é por módulo, o módulo é opaco e a distância apaga com uma névoa da cor do fundo; o mouse realça o módulo em verde; uma luz verde passa uma vez ao abrir, salvo com o movimento reduzido). Cores só por classe (`.eu-*`, nexus.css, seção "Entrar"), então segue o escuro e o claro; no celular a porta desce e a usina fica no alto |
 | `nexus/templates/_icone.html` + `static/grid-icone-branco.png` | o ícone da aba do navegador (24/10/2026, Levi: "o logo branco da grid"): o símbolo branco sobre o navy do Nexus (só branco sumiria na aba clara do navegador), no `<head>` de base, entrar, sair e os dois modos TV; feito do `grid-icon.png` do OS Creator, 256 px |
 | `nexus/templates/_tema_cabeca.html` | o script do tema no `<head>` (base, entrar e os dois modos TV): a reserva do `localStorage` antes de pintar |
@@ -982,6 +982,32 @@ trocado depois (o Monitoramento do COS) é montado de novo sozinho. Sem o script
 **Quem já usa:** o Comando > Usinas e as seis telas do COS com filtro. As outras torres ainda estão no "cartão suspenso"
 de 10/11 (`campo-filtros.js`, `rd-*`, a Usinas 360°) ou nas `<select>` soltas: entram neste padrão trocando o `data-fs`
 por `data-fo`, tela a tela. Prova: `tests/test_filtros_os.py`.
+
+## A busca do menu lateral (`static/menu-busca.js`, 14/11/2026)
+
+Levi: "Em Nexus, na barra lateral, onde tem todas as janelas, seria interessante um campo de busca para a pessoa digitar
+palavras-chave e aí já aparece tudo. Tudo que tem relação, já aparece expandido". O campo fica no alto do menu de quem é
+da Grid (o menu do cliente e o do Modo cliente não têm) e filtra na própria página, sem ir ao servidor.
+
+- **Onde procura:** o nome da área, o da tela e a **pergunta que a tela responde** (`Tela.pergunta`, no `data-pergunta`
+  de cada link; `montar_menu` a leva). A pergunta é o que faz "MTTA" achar o Acompanhamento COS e o Desempenho da equipe:
+  **tela nova com pergunta vaga é tela que a busca não acha**. Sem acento e sem caixa; mais de uma palavra, a tela
+  precisa ter todas (em qualquer um dos três). O nome da área traz todas as telas dela ("zeladoria").
+- **As telas de dentro** (`Tela.dentro_de`: os relatórios da Central de emissão, o Tempo de resposta, as OS em aberto,
+  as Fontes do tempo real, os Acessos do cliente) vão no menu como `li.menu-dentro hidden` logo depois da de fora (a
+  chave `dentro` do `montar_menu`, só as que a pessoa abre: a regra do `setor_telas.pode`), e só aparecem na busca, um
+  passo para dentro; achada uma, a de fora aparece junto, sem destaque.
+- **O que se vê:** a área com resultado abre, a sem resultado some; o achado em destaque; se ele só está na pergunta, a
+  pergunta (um trecho dela, quando é longa) aparece embaixo do nome; no alto, "N telas em M áreas"; sem nada, "Nenhuma
+  tela com ...". A largura do menu fica presa na máxima durante a busca (seguir o maior nome à vista sacudia a tela;
+  presa na de antes, os nomes quebravam). No celular a largura não se prende.
+- **Teclado:** `/` fora de campo de texto leva à busca; Enter abre a 1ª; as setas andam pelos resultados; Esc limpa e,
+  vazio, sai.
+- **Volta:** campo vazio = o menu como estava (as mesmas áreas abertas). No trilho recolhido sobra a lupa; buscar abre o
+  menu só enquanto se busca e ele recolhe de novo depois, sem mexer no `nexus.menu` (a escolha da pessoa).
+- O input não tem `name`: não entra em formulário nenhum (há telas que conferem os formulários da página).
+- Prova: `tests/test_menu_busca.py` (o campo, a pergunta, as de dentro por setor e as contas do JS no node: `sem`,
+  `achar`, `faixas`, `trecho`, expostas em `window.NexusMenuBusca`).
 
 ## Sugestões no Início (24/10/2026)
 

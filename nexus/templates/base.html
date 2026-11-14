@@ -217,6 +217,20 @@
     {% endif %}
     {% endfor %}
     {% else %}
+    {# A busca do menu (14/11/2026, Levi: "um campo de busca para a pessoa digitar palavras-chave e aí já aparece tudo.
+       Tudo que tem relação, já aparece expandido"): filtra na página, sem ir ao servidor, pelo nome da área, o da tela e a
+       pergunta que a tela responde (data-pergunta), sem acento; as telas que abrem por dentro de outra (li.menu-dentro)
+       só aparecem na busca. Sem name: não entra em formulário nenhum. O JS está no fim desta página. #}
+    <div class="menu-busca" role="search">
+      <label class="menu-busca-campo" title="Buscar tela ( / )">
+        <i class="ph ph-magnifying-glass" aria-hidden="true"></i>
+        <input type="search" id="menu-busca" placeholder="Buscar tela" aria-label="Buscar tela no menu"
+               aria-describedby="menu-busca-conta" autocomplete="off" spellcheck="false" enterkeyhint="go">
+        <kbd class="menu-busca-tecla" aria-hidden="true">/</kbd>
+        <button type="button" class="menu-busca-limpa" aria-label="Limpar a busca" title="Limpar (Esc)" hidden><i class="ph ph-x" aria-hidden="true"></i></button>
+      </label>
+      <p class="menu-busca-conta" id="menu-busca-conta" aria-live="polite" hidden></p>
+    </div>
     <a class="item-inicio" href="{{ raiz }}/" {% if caminho == '/' %}aria-current="page"{% endif %} title="Início">
       <i class="ph ph-house"></i><span>Início</span>
     </a>
@@ -229,11 +243,15 @@
       </summary>
       <ul>
         {% for s in t.telas %}
-        <li><a href="{{ raiz }}{{ s.url }}" {% if s.pronta %}class="com-conteudo"{% endif %} {% if caminho == s.url or caminho in s.filhas %}aria-current="page"{% endif %}>{{ s.nome }}</a></li>
+        <li><a href="{{ raiz }}{{ s.url }}" {% if s.pronta %}class="com-conteudo"{% endif %} {% if caminho == s.url or caminho in s.filhas %}aria-current="page"{% endif %} data-pergunta="{{ s.pergunta }}">{{ s.nome }}</a></li>
+        {% for f in s.dentro %}
+        <li class="menu-dentro" hidden><a href="{{ raiz }}{{ f.url }}" {% if f.pronta %}class="com-conteudo"{% endif %} {% if caminho == f.url %}aria-current="page"{% endif %} data-pergunta="{{ f.pergunta }}">{{ f.nome }}</a></li>
+        {% endfor %}
         {% endfor %}
       </ul>
     </details>
     {% endfor %}
+    <p class="menu-busca-nada" hidden></p>
     {% endif %}
   </nav>
 
@@ -242,6 +260,7 @@
     {% block conteudo %}{% endblock %}
   </main>
 
+  {% if not vista_cliente %}<script src="{{ url_for('static', filename='menu-busca.js') }}" defer></script>{% endif %}
   {% if session.admin and not cliente_modo %}
   {# o card do Modo cliente (07/11/2026): na frente, com o fundo desfocado; a lista vem do cadastro quando ele abre #}
   {# montado pelo JavaScript ao abrir: um formulário em toda página de administrador entrava nas telas que conferem os

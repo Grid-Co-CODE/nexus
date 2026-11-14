@@ -70,13 +70,23 @@ def montar_menu(torres: list[Torre], torre_atual: str | None, prontas: frozenset
     primeiro sub-item era o próprio Início, o que não fazia sentido para quem usa (Levi, 29/09).
     """
     menu = []
+
+    def ve(t, s):
+        return (cliente or not s.so_do_cliente) and (liberadas is None or f"{t.id}/{s.id}" in liberadas)
+
     for t in sorted(torres, key=lambda t: t.ordem):
         # a tela que abre por dentro de outra (`Tela.dentro_de`, os relatórios da Central de emissão, 13/10/2026) não é
-        # item: entra nas `filhas` da outra, que acende quando ela está aberta
+        # item: entra nas `filhas` da outra, que acende quando ela está aberta. A `pergunta` e as de `dentro` (só as que a
+        # pessoa abre, a mesma regra do `setor_telas.pode`) são da busca do menu (14/11/2026, Levi: "um campo de busca
+        # para a pessoa digitar palavras-chave e aí já aparece tudo"): o "Relatório semanal" se acha pelo nome, debaixo
+        # da Central de emissão, sem virar item do menu
         telas = [{"id": s.id, "nome": s.nome, "url": f"/t/{t.id}/{s.id}", "pronta": f"/t/{t.id}/{s.id}" in prontas,
-                  "filhas": [f"/t/{t.id}/{f.id}" for f in t.telas if f.dentro_de == s.id]}
-                 for s in t.telas if not s.dentro_de and (cliente or not s.so_do_cliente)
-                 and (liberadas is None or f"{t.id}/{s.id}" in liberadas)]
+                  "pergunta": s.pergunta,
+                  "filhas": [f"/t/{t.id}/{f.id}" for f in t.telas if f.dentro_de == s.id],
+                  "dentro": [{"nome": f.nome, "url": f"/t/{t.id}/{f.id}", "pergunta": f.pergunta,
+                              "pronta": f"/t/{t.id}/{f.id}" in prontas}
+                             for f in t.telas if f.dentro_de == s.id and ve(t, f)]}
+                 for s in t.telas if not s.dentro_de and ve(t, s)]
         if not telas:
             continue
         menu.append({

@@ -90,6 +90,9 @@ Número em coluna ou em cartão leva `.gc-num` (algarismos de largura igual). As
 - Topo: `--topo` 60px.
 - **Menu recolhido (trilho de ícones):** passar o mouse num ícone abre ao lado a caixa com o nome da área e as telas
   dela (`.menu-voo`, o verde da tela pronta e a tela aberta, como no menu aberto); o clique no ícone leva à 1ª tela.
+- **Busca do menu (14/11/2026):** o campo no alto do menu, na altura de um item (`.menu-busca`); o achado em destaque
+  é o texto mais forte com o sublinhado verde, sem fundo (`mark.menu-achado`); a pergunta que trouxe a tela vai embaixo
+  do nome em letra menor (`.menu-pergunta`). No trilho sobra a lupa. Regra em `nexus/casca/CLAUDE.md`.
 - **Até 820px:** o menu sai da lateral e abre pelo botão "Menu" (um checkbox, sem JavaScript); some o nome de quem
   entrou.
 - **De 821 a 1180px:** o menu estreita (196px) e o setor do topo encolhe.
