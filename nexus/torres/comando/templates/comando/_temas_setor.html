@@ -37,18 +37,20 @@
   </form>
   {% endif %}
   <table class="dm-temas">
-    <thead><tr><th scope="col" class="dm-t-nome">Tema</th><th scope="col">Prazo para responder (dias úteis)</th><th scope="col">Em uso</th><th scope="col"><span class="dm-sr">Salvar</span></th></tr></thead>
+    {# a área numa coluna dela, quando o setor tem área (a Performance tem Chamados); os temas agrupados por área (14/11/2026) #}
+    <thead><tr>{% if ts.areas %}<th scope="col" class="dm-t-c-area">Área</th>{% endif %}<th scope="col" class="dm-t-nome">Tema</th><th scope="col" class="dm-t-c-prazo">Prazo <span class="dm-t-un">dias úteis</span></th><th scope="col" class="dm-t-c-uso">Em uso</th><th scope="col" class="dm-t-c-acao"><span class="dm-sr">Salvar</span></th></tr></thead>
     <tbody>
-      {% for t in ts.temas %}
+      {% for t in ts.temas|sort(attribute='area') %}
       {% set f = 'dm-t-' ~ t.tema_id %}
       <tr{% if not t.ativo %} class="dm-inativo"{% endif %}>
+        {% if ts.areas %}<td class="dm-t-c-area"><span class="dm-t-area{% if not t.area %} dm-t-area--setor{% endif %}">{{ t.area or ts.setor_nome }}</span></td>{% endif %}
         {# o campo se chama `tema` e vai sem o preenchimento automático do navegador (12/11/2026, Levi, com o print: "o campo
            que aparece quando vou digitar está mal formatado, conserte!"): chamado `nome`, o Edge abria por cima da tabela a
            lista do que já foi digitado em QUALQUER campo `nome` do Nexus #}
-        <td class="dm-t-nome">{% if t.area %}<span class="dm-t-area" title="Área do setor: aparece como &quot;{{ t.area }}&quot; na Nova demanda">{{ t.area }}</span>{% endif %}<input class="gc-campo" form="{{ f }}" name="tema" value="{{ t.nome }}" maxlength="60" required autocomplete="off" aria-label="Nome do tema"></td>
+        <td class="dm-t-nome"><input class="gc-campo" form="{{ f }}" name="tema" value="{{ t.nome }}" maxlength="60" required autocomplete="off" aria-label="Nome do tema"></td>
         <td><input class="gc-campo dm-prazo-campo" form="{{ f }}" name="prazo" type="number" min="{{ ts.prazo_min }}" max="{{ ts.prazo_max }}" value="{{ t.prazo_dias_uteis }}" required autocomplete="off" aria-label="Prazo de {{ t.nome }} em dias úteis"></td>
         <td><select class="gc-campo" form="{{ f }}" name="ativo" aria-label="{{ t.nome }} em uso"><option value="sim"{% if t.ativo %} selected{% endif %}>sim</option><option value="nao"{% if not t.ativo %} selected{% endif %}>não</option></select></td>
-        <td><div class="dm-t-acoes"><form id="{{ f }}" method="post" action="{{ '/t/comando/temas-do-setor/salvar'|na_raiz }}">
+        <td class="dm-t-c-acao"><div class="dm-t-acoes"><form id="{{ f }}" method="post" action="{{ '/t/comando/temas-do-setor/salvar'|na_raiz }}">
           <input type="hidden" name="codigo" value="{{ codigo }}"><input type="hidden" name="setor_id" value="{{ ts.setor_id }}">
           <input type="hidden" name="tema_id" value="{{ t.tema_id }}">
           <button class="gc-btn gc-btn--ui gc-btn--contorno" type="submit"{% if not tem_login %} disabled{% endif %}>Salvar</button></form>
@@ -59,10 +61,11 @@
       {% endfor %}
       {# a linha do tema novo: aparece pelo "+" do último tema; o setor sem tema nenhum já a vê aberta #}
       <tr class="dm-t-novo" data-dm-t-novo{% if ts.temas %} hidden{% endif %}>
-        <td class="dm-t-nome">{% if ts.areas %}<select class="gc-campo dm-t-area-sel" form="dm-t-novo" name="area" aria-label="Área do novo tema"><option value="">{{ ts.setor_nome }}</option>{% for a in ts.areas %}<option value="{{ a }}">{{ a }}</option>{% endfor %}</select>{% endif %}<input class="gc-campo" form="dm-t-novo" name="tema" maxlength="60" required autocomplete="off" placeholder="Nome do novo tema" aria-label="Nome do novo tema"></td>
+        {% if ts.areas %}<td class="dm-t-c-area"><select class="gc-campo dm-t-area-sel" form="dm-t-novo" name="area" aria-label="Área do novo tema"><option value="">{{ ts.setor_nome }}</option>{% for a in ts.areas %}<option value="{{ a }}">{{ a }}</option>{% endfor %}</select></td>{% endif %}
+        <td class="dm-t-nome"><input class="gc-campo" form="dm-t-novo" name="tema" maxlength="60" required autocomplete="off" placeholder="Nome do novo tema" aria-label="Nome do novo tema"></td>
         <td><input class="gc-campo dm-prazo-campo" form="dm-t-novo" name="prazo" type="number" min="{{ ts.prazo_min }}" max="{{ ts.prazo_max }}" value="2" required autocomplete="off" aria-label="Prazo do novo tema em dias úteis"></td>
         <td class="dm-mudo">sim</td>
-        <td><div class="dm-t-acoes"><form id="dm-t-novo" method="post" action="{{ '/t/comando/temas-do-setor/salvar'|na_raiz }}">
+        <td class="dm-t-c-acao"><div class="dm-t-acoes"><form id="dm-t-novo" method="post" action="{{ '/t/comando/temas-do-setor/salvar'|na_raiz }}">
           <input type="hidden" name="codigo" value="{{ codigo }}"><input type="hidden" name="setor_id" value="{{ ts.setor_id }}">
           <input type="hidden" name="novo_id" value="{{ ts.novo_tema }}">
           <button class="gc-btn gc-btn--ui gc-btn--primario" type="submit"{% if not tem_login %} disabled{% endif %}>Salvar</button></form>
@@ -72,6 +75,5 @@
       </tr>
     </tbody>
   </table>
-  {% if not ts.temas %}<p class="dm-nota">{{ ts.setor_nome }} ainda não tem tema: sem tema, o setor não aparece para receber demanda na Nova demanda.</p>{% endif %}
-  <p class="dm-nota">O prazo vale para as demandas abertas a partir de agora: a que já está aberta segue com o prazo da hora em que foi aberta. Tirar um tema de uso não mexe nas demandas dele. Prazo de {{ ts.prazo_min }} a {{ ts.prazo_max }} dias úteis (sem sábado, domingo e feriado nacional).</p>
+  <p class="dm-nota dm-t-rodape">{% if not ts.temas %}<b>{{ ts.setor_nome }} ainda não tem tema</b>: sem tema, o setor não aparece na Nova demanda. {% endif %}O prazo vale para as demandas abertas a partir de agora ({{ ts.prazo_min }} a {{ ts.prazo_max }} dias úteis, sem fim de semana e feriado nacional); tirar um tema de uso não mexe nas demandas dele.</p>
   {% endif %}
