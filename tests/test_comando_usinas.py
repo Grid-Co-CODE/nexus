@@ -192,7 +192,7 @@ def test_a_lista_e_o_prontuario(logado, telas, monkeypatch):
     assert "Prontuário da usina" in p and "Altair sem geração há 2 dias" in p and "Crítico" in p
     # 12/11/2026: o parecer numa linha, o painel e os cartões fechados (tests/test_comando_prontuario.py); a ocorrência
     # aberta no COS entra nas pendências e no cartão do COS, com a OS abrindo o card dela
-    assert 'class="pu-parecer pu-parecer--critico"' in p and "Pede ação agora" in p
+    assert 'class="pu-parecer pu-parecer--critico pu-diag"' in p and "Pede ação agora" in p   # o diagnóstico do dia entra no lugar (14/11/2026)
     assert "No COS: Desligamento" in p and 'data-pu-os="7001"' in p
     assert "/t/cos/ronda?cliente=Thopen" in p
     assert 'href="/t/comando/usinas"' in p and 'href="/os/tradicional?ativo=THPN-ALT100"><b>OS avulsa</b>' in p
