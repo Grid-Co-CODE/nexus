@@ -42,6 +42,9 @@
     if (d) {
       frase.textContent = d.situacao;
       frase.classList.add('pu-par-t--ia');
+      // o selo diz de quem é a leitura, na cor do nível do parecer (14/11/2026, Levi: "mude o nome de 'Pede ação agora'
+      // para Nexus IA Insights"); sem a IA, fica o título do parecer
+      el.querySelector('[data-pu-diag-selo]').textContent = 'Nexus IA Insights';
       corpo.innerHTML = LISTAS_DIAG.map(function (l) {
         var itens = d[l[0]] || [];
         if (!itens.length) return '';

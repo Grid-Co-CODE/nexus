@@ -77,6 +77,7 @@ def test_a_rota_faz_uma_vez_e_todos_leem_o_mesmo(tela, logado, monkeypatch, tmp_
     # o prontuário traz o lugar do diagnóstico, no lugar da frase do parecer
     h = logado.get("/t/comando/usinas/1").get_data(as_text=True)
     assert 'data-pu-diag="/t/comando/usinas/1/ia/diagnostico"' in h and "data-pu-diag-frase" in h
+    assert "<span data-pu-diag-selo>" in h            # o JS troca o título do parecer por "Nexus IA Insights"
     j = logado.get("/t/comando/usinas/1/ia/diagnostico").get_json()
     assert j["estado"] == "pronto" and j["diag"]["tem_que_fazer"][0]["texto"].startswith("Programar a ronda")
     assert chamadas == [DG.PEDIDO]

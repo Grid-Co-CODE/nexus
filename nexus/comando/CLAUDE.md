@@ -613,7 +613,8 @@ da IA [...] o que é que está pendente, o que é que dá para fazer [...] direc
 o que é que ele tem que fazer".
 
 - **Onde:** no lugar da frase do parecer, no alto do prontuário (Comando › Usinas e a Central da usina da Usinas 360°).
-  - O selo continua o do parecer, que vem da conta das regras.
+  - O selo passa a dizer "Nexus IA Insights" (Levi: "mude o nome de 'Pede ação agora' para Nexus IA Insights"), na
+    cor do nível do parecer, que vem da conta das regras. Sem a IA, o selo fica com o título do parecer.
   - A frase vira a situação da IA.
   - Embaixo vêm "Tem que fazer", "Pode fazer" e "Pendente com outros", com a OS de cada item como link: o Raio X para
     chamado, Engenharia e Performance; o card para as outras.

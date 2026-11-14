@@ -87,7 +87,7 @@
      ele tem que fazer, o que pode fazer e o que está pendente com outros, recolhível. Sem a IA, fica o parecer (prontuario.js) #}
   <section class="pu-parecer pu-parecer--{{ p.parecer.nivel }} pu-diag" aria-labelledby="pu-par-t" data-pu-diag="{{ raiz }}/t/comando/usinas/{{ x.usina_id }}/ia/diagnostico">
     <div class="pu-diag-linha">
-      <span class="pu-par-selo"><i class="pu-ponto pu-ponto--{{ p.parecer.nivel }}" aria-hidden="true"></i>{{ p.parecer.titulo }}</span>
+      <span class="pu-par-selo"><i class="pu-ponto pu-ponto--{{ p.parecer.nivel }}" aria-hidden="true"></i><span data-pu-diag-selo>{{ p.parecer.titulo }}</span></span>
       <h2 class="pu-par-t" id="pu-par-t" data-pu-diag-frase>{{ p.parecer.frase }}</h2>
       <button type="button" class="pu-diag-alterna" data-pu-diag-alterna aria-expanded="true" hidden><i class="ph ph-caret-up" aria-hidden="true"></i><span>Recolher</span></button>
     </div>
