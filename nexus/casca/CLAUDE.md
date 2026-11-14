@@ -764,6 +764,12 @@ BOTE SLOTS PARA 3 CHAVES, QUANDO UMA ACABAR USE A OUTRA".
   - a pergunta vai à próxima vaga; outro erro (o modelo, a rede) não gasta as outras;
   - o descanso fica em `<NEXUS_DADOS>/ia/nvidia-vagas.json`, pela impressão (sha256) da chave, e a aba diz até quando;
   - a `NVIDIA_API_KEY` do .env entra depois das vagas.
+- **A vaga do OpenRouter** (`OPENROUTER_API_KEY`, 14/11/2026, Levi: "bora pela openrouter") também fica na aba IA, e é
+  uma só, porque os termos do OpenRouter proíbem várias contas para fugir do limite.
+  - A conferência (`_conferir_openrouter`) exige o formato `sk-or-` e lê a página da própria chave (`/api/v1/key`), sem
+    gastar pedido.
+  - Na Nexus IA, a chave da tela vence a do .env (`ia.chave`).
+  - Com a chave da NVIDIA posta, a NVIDIA vai primeiro e o OpenRouter fica de reserva.
 
 Levi, sobre pôr a chave das contestações no servidor pela T.I.: "Se precisa de TI então vou ter que mandar um arquivo novo
 de deploy para a TI ué!". Depois de colar a 1ª ("deu certo"): "bote essa informação na seção Chave das fontes!" — a

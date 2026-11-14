@@ -265,3 +265,29 @@ def test_a_aba_ia_tem_as_tres_vagas_da_nvidia_e_confere_antes_de_gravar(app, adm
     r = admin.post(URL, data={"codigo": codigo, "chave": "NVIDIA_API_KEY_2", "acao": "gravar", "valor": "nvapi-" + "b" * 40})
     assert r.status_code == 400 and "recusou a chave" in r.get_data(as_text=True)
     assert CHV.CHAVES["NVIDIA_API_KEY_3"]["grupo"] == "ia"
+
+
+def test_a_chave_do_openrouter_pela_aba_ia_vence_a_do_env(app, admin, monkeypatch):
+    """14/11/2026, Levi: "bora pela openrouter": uma vaga do OpenRouter na aba IA, conferida pela página da chave (sem
+    gastar pedido); a da tela vence a do .env, e sem ela vale a do .env."""
+    from nexus.comando import ia as IA
+    h = admin.get("/t/base/chaves-fontes?aba=ia").get_data(as_text=True)
+    assert 'name="chave" value="OPENROUTER_API_KEY"' in h
+    codigo = re.search(r'name="codigo" value="([^"]+)"', h).group(1)
+    r = admin.post(URL, data={"codigo": codigo, "chave": "OPENROUTER_API_KEY", "acao": "gravar", "valor": "nvapi-errada-1234567890"})
+    assert r.status_code == 400 and "começa com sk-or-" in r.get_data(as_text=True)
+
+    class R:
+        status_code = 200
+    vistos = []
+    monkeypatch.setattr("requests.get", lambda url, **k: vistos.append((url, k["headers"]["Authorization"])) or R())
+    chave = "sk-or-v1-" + "c" * 40
+    app.config["OPENROUTER_API_KEY"] = "sk-or-v1-do-env"
+    with app.app_context():
+        assert IA.chave(app.config, "openrouter") == "sk-or-v1-do-env"          # sem a da tela, a do .env
+    r = admin.post(URL, data={"codigo": codigo, "chave": "OPENROUTER_API_KEY", "acao": "gravar", "valor": chave})
+    assert r.status_code == 303 and r.headers["Location"].endswith("?aba=ia")
+    assert vistos == [("https://openrouter.ai/api/v1/key", f"Bearer {chave}")]
+    with app.app_context():
+        assert IA.chave(app.config, "openrouter") == chave and IA.padrao(app.config) == "nemotron"
+    assert chave not in admin.get("/t/base/chaves-fontes?aba=ia").get_data(as_text=True)

@@ -205,6 +205,24 @@ def _conferir_nvidia(valor: str) -> str:
     return "a NVIDIA respondeu com esta chave"
 
 
+def _conferir_openrouter(valor: str) -> str:
+    """A chave do OpenRouter (14/11/2026, a Nexus IA pelo Nemotron 3 Ultra grátis): começa com sk-or-. Confere pela
+    página da própria chave no OpenRouter (/api/v1/key), que não gasta pedido: recusada (401, 403) não grava."""
+    import requests
+    if not re.fullmatch(r"sk-or-[A-Za-z0-9_\-]{20,200}", valor or ""):
+        raise Recusada("Isto não parece uma chave do OpenRouter (ela começa com sk-or-): nada foi gravado.")
+    try:
+        r = requests.get("https://openrouter.ai/api/v1/key", timeout=30, headers={"Authorization": f"Bearer {valor}"})
+    except Exception as e:       # noqa: BLE001 — rede: não grava sem conferir
+        raise Recusada(f"Não consegui falar com o OpenRouter ({type(e).__name__}): nada foi gravado; tente de novo.") from None
+    if r.status_code in (401, 403):
+        raise Recusada(f"O OpenRouter recusou a chave ({r.status_code}): vencida, apagada ou copiada pela metade. Nada foi "
+                       "gravado.")
+    if r.status_code != 200:
+        raise Recusada(f"O OpenRouter respondeu {r.status_code}: nada foi gravado.")
+    return "o OpenRouter reconheceu a chave"
+
+
 # as 3 vagas da NVIDIA (14/11/2026, Levi: "BOTE SLOTS PARA 3 CHAVES, QUANDO UMA ACABAR USE A OUTRA"): a aba IA das Chaves
 # das fontes; a ordem é a do rodízio (nexus/comando/ia.py, `chaves_nvidia`)
 _VAGA_NVIDIA = {
@@ -314,6 +332,18 @@ CHAVES = {
         # não é segredo: uma escolha, e a tela diz como está (09/11/2026, a 1ª tentativa no servidor: o campo de senha
         # recebeu o que o navegador preencheu sozinho, e a tela recusou "use 1 (liga) ou 0 (desliga)")
         "escolha": (("1", "1 · liga o Mapa de equipe nesta máquina"), ("0", "0 · desliga")),
+    },
+    # o OpenRouter (14/11/2026, Levi: "bora pela openrouter"): uma vaga só (os termos dele proíbem várias contas de uma
+    # pessoa para fugir do limite); vence a OPENROUTER_API_KEY do .env (nexus/comando/ia.py, `chave`)
+    "OPENROUTER_API_KEY": {
+        "nome": "OpenRouter: chave (o Nemotron 3 Ultra grátis)",
+        "para": "a Nexus IA (o Pergunte à Nexus IA e o diagnóstico do dia no prontuário) responder pelo Nemotron 3 Ultra "
+                "grátis do OpenRouter (50 pedidos por dia na conta grátis; 1.000 com US$ 10 de crédito). Com a chave da "
+                "NVIDIA posta, a NVIDIA vai primeiro e o OpenRouter fica de reserva",
+        "arquivo": "",
+        "dica": "a chave criada em openrouter.ai/keys (começa com sk-or-)",
+        "conferir": _conferir_openrouter,
+        "grupo": "ia",
     },
     "NVIDIA_API_KEY_1": dict(_VAGA_NVIDIA, nome="NVIDIA: chave 1 (a primeira a ser usada)"),
     "NVIDIA_API_KEY_2": dict(_VAGA_NVIDIA, nome="NVIDIA: chave 2 (quando a 1 é barrada)"),

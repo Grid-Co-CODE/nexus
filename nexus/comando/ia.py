@@ -140,10 +140,18 @@ def modelos(cfg) -> list[Modelo]:
 
 
 def chave(cfg, provedor: str) -> str:
+    """A chave do provedor: a da tela (Base › Chaves das fontes › IA; hoje a NVIDIA e o OpenRouter) e, sem ela, a do .env."""
     if provedor == "nvidia":
         ks = chaves_nvidia(cfg)
         return ks[0][1] if ks else ""
-    return str(cfg.get(PROVEDORES[provedor]["chave"]) or "").strip()
+    nome = PROVEDORES[provedor]["chave"]
+    if provedor == "openrouter":
+        try:
+            from ..auth import chaves as CH
+            return str(CH.valor(nome, cfg) or "").strip()
+        except Exception:        # noqa: BLE001 — sem a pasta ou a cifra: vale a do .env
+            pass
+    return str(cfg.get(nome) or "").strip()
 
 
 # ── as 3 vagas da NVIDIA e o rodízio (14/11/2026) ────────────────────────────────────────────────────────────────────
@@ -243,6 +251,7 @@ def disponiveis(cfg) -> list[dict]:
         p = PROVEDORES[m.provedor]
         tem = bool(chave(cfg, m.provedor))
         falta = ("Falta a chave da NVIDIA (Base › Chaves das fontes › IA)." if m.provedor == "nvidia"
+                 else "Falta a chave do OpenRouter (Base › Chaves das fontes › IA)." if m.provedor == "openrouter"
                  else f"Falta a {p['chave']} no servidor ({p['onde']}).")
         out.append(dict(asdict(m), provedor_nome=p["nome"], tem_chave=tem, motivo="" if tem else falta))
     return out
