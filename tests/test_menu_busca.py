@@ -2,10 +2,12 @@
 um campo de busca para a pessoa digitar palavras-chave e aí já aparece tudo. Tudo que tem relação, já aparece expandido").
 
 O que estes testes seguram: o campo no alto do menu de quem é da Grid (o do cliente não tem), sem `name` (não entra em
-formulário nenhum); cada tela leva a pergunta que responde (`Tela.pergunta`, a palavra-chave que não está no nome); as
-telas que abrem por dentro de outra (o Relatório semanal, na Central de emissão) entram escondidas, só as que a pessoa
-abre; e as contas do `menu-busca.js`, rodadas no node: sem acento, todas as palavras, o nome da área traz as telas dela,
-a pergunta só quando o nome não basta, o destaque no texto original e o trecho da pergunta longa."""
+formulário nenhum); o menu da página igual ao de antes (sem a pergunta e sem as telas de dentro: a 1ª versão as punha no
+HTML de toda página, e a suíte de 14/11 pegou cinco telas que conferem o que não mostram); o /menu/busca, que entrega a
+pergunta de cada tela (`Tela.pergunta`, a palavra-chave que não está no nome) e as telas que abrem por dentro de outra
+(o Relatório semanal, na Central de emissão), só as que a pessoa abre; e as contas do `menu-busca.js`, rodadas no node:
+sem acento, todas as palavras, o nome da área traz as telas dela, a pergunta só quando o nome não basta, o destaque no
+texto original e o trecho da pergunta longa."""
 import json
 import shutil
 import subprocess
@@ -22,30 +24,40 @@ def _menu(html: str) -> str:
     return html.split('<nav class="menu"', 1)[1].split("</nav>", 1)[0]
 
 
-def test_o_campo_no_alto_do_menu_e_a_pergunta_de_cada_tela(logado):
+def test_o_campo_no_alto_do_menu_e_o_menu_de_sempre(logado):
     html = logado.get("/t/engenharia/fmea").get_data(as_text=True)
     m = _menu(html)
     assert m.index('id="menu-busca"') < m.index('class="item-inicio"')        # o campo antes do Início
     campo = m[m.index("<input", m.index('class="menu-busca"')):]
     campo = campo[:campo.index(">")]
     assert 'type="search"' in campo and " name=" not in campo                 # fora de qualquer formulário
+    assert 'for="menu-busca"' in m                                            # o rótulo do campo, como os outros
     assert "menu-busca.js" in html and '<p class="menu-busca-nada" hidden>' in m
-    # a pergunta vem da declaração da tela, e não de uma lista à mão
+    # nada da busca no HTML da página: nem a pergunta, nem as telas de dentro
     perf = next(t for t in descobrir_torres() if t.id == "performance")
-    disp = perf.tela("disponibilidade")
-    fim = m.index(">Disponibilidade</a>")
-    assert f'data-pergunta="{disp.pergunta}"' in m[m.rindex("<a ", 0, fim):fim]
+    assert perf.tela("disponibilidade").pergunta not in html and "data-pergunta" not in html
+    assert "menu-dentro" not in m and "/t/relatorios/relatorio-semanal" not in m
 
 
-def test_a_tela_de_dentro_entra_escondida_debaixo_da_de_fora(logado):
-    m = _menu(logado.get("/t/engenharia/fmea").get_data(as_text=True))
-    central = m.index(">Central de emissão</a></li>")
-    semanal = m.index(">Relatório semanal</a></li>")
-    assert central < semanal < m.index('data-torre="pessoas"')
-    li = m[m.rindex("<li", 0, semanal):semanal]
-    assert li.startswith('<li class="menu-dentro" hidden><a href="/t/relatorios/relatorio-semanal"')
-    # o item da Central continua o de sempre: a tela de dentro não vira item do menu
-    assert m[m.rindex("<li", 0, central):central].startswith('<li><a href="/t/relatorios/central"')
+def test_o_menu_busca_entrega_a_pergunta_e_as_telas_de_dentro(logado):
+    r = logado.get("/menu/busca")
+    assert r.status_code == 200 and "private" in r.headers["Cache-Control"]
+    telas = r.get_json()["telas"]
+    torres = {t.id: t for t in descobrir_torres()}
+    # a pergunta vem da declaração da tela, e não de uma lista à mão; a chave é o endereço do link no menu
+    assert telas["/t/performance/disponibilidade"] == {"pergunta": torres["performance"].tela("disponibilidade").pergunta,
+                                                      "dentro": []}
+    central = telas["/t/relatorios/central"]
+    rel = [s for s in torres["relatorios"].telas if s.dentro_de == "central"]
+    assert [d["url"] for d in central["dentro"]] == [f"/t/relatorios/{s.id}" for s in rel]
+    assert [d["nome"] for d in central["dentro"]] == [s.nome for s in rel]
+    assert all(d["pergunta"] for d in central["dentro"])
+    assert "/t/relatorios/relatorio-semanal" not in telas                     # não é item do menu
+    assert [d["url"] for d in telas["/t/base/acessos"]["dentro"]] == ["/t/base/acessos-clientes"]
+
+
+def test_o_menu_busca_pede_login(cliente):
+    assert cliente.get("/menu/busca").status_code in (302, 401, 403)
 
 
 def test_so_as_telas_de_dentro_que_a_pessoa_abre():

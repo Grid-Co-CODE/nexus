@@ -1,7 +1,9 @@
 /* A busca do menu lateral (14/11/2026, Levi: "seria interessante um campo de busca para a pessoa digitar palavras-chave e
-   aí já aparece tudo. Tudo que tem relação, já aparece expandido"). Filtra na própria página, sem ir ao servidor:
-   - acha pelo nome da área, pelo nome da tela e pela pergunta que a tela responde (data-pergunta, a `Tela.pergunta`), sem
-     acento e sem caixa: "disponib" acha a Disponibilidade, "mtta" acha as telas do COS pela pergunta;
+   aí já aparece tudo. Tudo que tem relação, já aparece expandido"). Filtra na própria página, letra a letra:
+   - acha pelo nome da área, pelo nome da tela e pela pergunta que a tela responde (a `Tela.pergunta`), sem acento e sem
+     caixa: "disponib" acha a Disponibilidade, "mtta" acha as telas do COS pela pergunta. Os nomes já estão na página; a
+     pergunta e as telas de dentro vêm do /menu/busca, pedido uma vez no 1º foco do campo (no HTML de toda página elas
+     apareciam onde as telas conferem que não aparecem: a suíte de 14/11/2026 pegou cinco);
    - mais de uma palavra: a tela precisa ter todas, em qualquer um dos três ("pcm semana");
    - a área com resultado abre, a sem resultado some; o pedaço achado fica em destaque e, quando ele só está na pergunta,
      a pergunta aparece embaixo do nome, para a pessoa ver por que a tela veio;
@@ -72,18 +74,52 @@
   var nada = menu.querySelector(".menu-busca-nada");
   var inicio = menu.querySelector(".item-inicio");
 
+  // o índice começa com os nomes que a página já tem; a pergunta e as telas de dentro chegam do /menu/busca
   var torres = [].map.call(menu.querySelectorAll(".torre"), function (d) {
     var span = d.querySelector("summary span");
-    var fora = null;
     var telas = [].map.call(d.querySelectorAll("ul > li"), function (li) {
       var a = li.querySelector("a");
-      var t = {li: li, a: a, nome: a.textContent.trim(), pergunta: a.getAttribute("data-pergunta") || "",
-               dentro: li.classList.contains("menu-dentro")};
-      if (t.dentro) t.fora = fora; else fora = t;
-      return t;
+      return {li: li, a: a, nome: a.textContent.trim(), pergunta: "", dentro: false};
     });
     return {d: d, span: span, nome: span ? span.textContent.trim() : "", telas: telas};
   });
+
+  // a pergunta de cada tela e as telas que abrem por dentro de outra (só as que a pessoa abre), pedidas uma vez, quando
+  // a pessoa vai ao campo. A de dentro entra no menu escondida (li.menu-dentro), logo depois da de fora, e só aparece na
+  // busca. Sem resposta (servidor fora, sessão vencida), a busca segue pelos nomes, e o próximo foco pede de novo.
+  var pedido = null, chegou = false;
+  function carregar() {
+    if (pedido) return;
+    pedido = fetch(nexusRota("/menu/busca"), {credentials: "same-origin", headers: {Accept: "application/json"}})
+      .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+      .then(function (dados) {
+        var porUrl = dados.telas || {};
+        torres.forEach(function (t) {
+          t.telas = [].concat.apply([], t.telas.map(function (s) {
+            var info = porUrl[s.a.getAttribute("href")];
+            if (!info || s.dentro) return [s];
+            s.pergunta = info.pergunta || "";
+            var depois = s.li;
+            return [s].concat((info.dentro || []).map(function (f) {
+              var li = document.createElement("li"), a = document.createElement("a");
+              li.className = "menu-dentro";
+              li.hidden = true;
+              a.href = f.url;
+              a.textContent = f.nome;
+              if (f.pronta) a.className = "com-conteudo";
+              if (location.pathname === f.url) a.setAttribute("aria-current", "page");
+              li.appendChild(a);
+              depois.after(li);
+              depois = li;
+              return {li: li, a: a, nome: f.nome, pergunta: f.pergunta || "", dentro: true, fora: s};
+            }));
+          }));
+        });
+        chegou = true;
+        if (campo.value.trim()) buscar();
+      })
+      .catch(function () { pedido = null; });
+  }
 
   // o texto com <mark> nos pedaços achados
   function realcar(el, texto, ps) {
@@ -170,7 +206,9 @@
     });
     if (inicio) inicio.hidden = !ps.every(function (p) { return "inicio".indexOf(p) >= 0; });
     nada.hidden = nTelas > 0 || (inicio && !inicio.hidden);
-    nada.textContent = "Nenhuma tela com “" + q + "”. Tente outra palavra ou só o começo dela.";
+    // com o pedido no caminho, o "nenhuma" ainda pode mudar (a palavra pode estar na pergunta): espera a resposta
+    nada.textContent = pedido && !chegou ? "Procurando…"
+      : "Nenhuma tela com “" + q + "”. Tente outra palavra ou só o começo dela.";
     conta.hidden = !nTelas;
     conta.textContent = nTelas + (nTelas === 1 ? " tela" : " telas") + " em " + nAreas + (nAreas === 1 ? " área" : " áreas");
   }
@@ -180,8 +218,11 @@
                           function (a) { return !a.hidden && a.offsetParent !== null; });
   }
 
-  campo.addEventListener("input", buscar);
-  campo.addEventListener("focus", abrirDoTrilho);
+  // pede a pergunta e as telas de dentro já com o mouse sobre o campo (chegam antes da 1ª letra); o foco e a 1ª letra
+  // garantem o pedido para quem chega pelo teclado ou pelo "/" (o foco dado por script nem sempre dispara o evento)
+  caixa.addEventListener("mouseenter", carregar);
+  campo.addEventListener("input", function () { carregar(); buscar(); });
+  campo.addEventListener("focus", function () { carregar(); abrirDoTrilho(); });
   campo.addEventListener("blur", function () {
     setTimeout(function () { if (!menu.contains(document.activeElement)) voltarAoTrilho(); }, 0);
   });
@@ -225,5 +266,5 @@
     campo.select();
   });
   // o navegador devolve o texto digitado ao voltar pela história: a busca reaparece filtrada, e não com o menu inteiro
-  if (campo.value.trim()) buscar();
+  if (campo.value.trim()) { carregar(); buscar(); }
 })();

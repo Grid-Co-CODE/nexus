@@ -989,13 +989,20 @@ Levi: "Em Nexus, na barra lateral, onde tem todas as janelas, seria interessante
 palavras-chave e aí já aparece tudo. Tudo que tem relação, já aparece expandido". O campo fica no alto do menu de quem é
 da Grid (o menu do cliente e o do Modo cliente não têm) e filtra na própria página, sem ir ao servidor.
 
-- **Onde procura:** o nome da área, o da tela e a **pergunta que a tela responde** (`Tela.pergunta`, no `data-pergunta`
-  de cada link; `montar_menu` a leva). A pergunta é o que faz "MTTA" achar o Acompanhamento COS e o Desempenho da equipe:
-  **tela nova com pergunta vaga é tela que a busca não acha**. Sem acento e sem caixa; mais de uma palavra, a tela
-  precisa ter todas (em qualquer um dos três). O nome da área traz todas as telas dela ("zeladoria").
+- **Onde procura:** o nome da área, o da tela e a **pergunta que a tela responde** (`Tela.pergunta`). A pergunta é o
+  que faz "MTTA" achar o Acompanhamento COS e o Desempenho da equipe: **tela nova com pergunta vaga é tela que a busca
+  não acha**. Sem acento e sem caixa; mais de uma palavra, a tela precisa ter todas (em qualquer um dos três). O nome da
+  área traz todas as telas dela ("zeladoria").
+- **De onde vem:** os nomes já estão no menu da página. A pergunta e as telas de dentro vêm do **`GET /menu/busca`**
+  (`casca.menu_busca`: `{"telas": {endereço do link: {"pergunta", "dentro": [...]}}}`, pela sessão, `private` 5 min;
+  403 para o cliente e o Modo cliente), pedido uma vez quando o mouse passa no campo, no foco ou na 1ª letra; até chegar,
+  o vazio diz "Procurando…". **Não ponha isso no HTML da página**: a 1ª versão (14/11/2026) punha a pergunta em
+  `data-pergunta` e as telas de dentro escondidas no menu, e a suíte pegou cinco telas que conferem o que NÃO mostram (a
+  pergunta da Caixa de entrada fora da Caixa, o Relatório semanal e os Acessos do cliente fora do menu, o item aceso
+  colado ao nome, todo `input` da página com rótulo `for=`). Sem resposta, a busca segue pelos nomes.
 - **As telas de dentro** (`Tela.dentro_de`: os relatórios da Central de emissão, o Tempo de resposta, as OS em aberto,
-  as Fontes do tempo real, os Acessos do cliente) vão no menu como `li.menu-dentro hidden` logo depois da de fora (a
-  chave `dentro` do `montar_menu`, só as que a pessoa abre: a regra do `setor_telas.pode`), e só aparecem na busca, um
+  as Fontes do tempo real, os Acessos do cliente; a chave `dentro` do `montar_menu`, só as que a pessoa abre: a regra do
+  `setor_telas.pode`) o JS põe no menu como `li.menu-dentro hidden` logo depois da de fora, e só aparecem na busca, um
   passo para dentro; achada uma, a de fora aparece junto, sem destaque.
 - **O que se vê:** a área com resultado abre, a sem resultado some; o achado em destaque; se ele só está na pergunta, a
   pergunta (um trecho dela, quando é longa) aparece embaixo do nome; no alto, "N telas em M áreas"; sem nada, "Nenhuma
@@ -1005,9 +1012,9 @@ da Grid (o menu do cliente e o do Modo cliente não têm) e filtra na própria p
   vazio, sai.
 - **Volta:** campo vazio = o menu como estava (as mesmas áreas abertas). No trilho recolhido sobra a lupa; buscar abre o
   menu só enquanto se busca e ele recolhe de novo depois, sem mexer no `nexus.menu` (a escolha da pessoa).
-- O input não tem `name`: não entra em formulário nenhum (há telas que conferem os formulários da página).
-- Prova: `tests/test_menu_busca.py` (o campo, a pergunta, as de dentro por setor e as contas do JS no node: `sem`,
-  `achar`, `faixas`, `trecho`, expostas em `window.NexusMenuBusca`).
+- O input não tem `name` (não entra em formulário nenhum) e tem o rótulo com `for="menu-busca"`.
+- Prova: `tests/test_menu_busca.py` (o campo, o menu de sempre sem nada da busca, o `/menu/busca` com a pergunta e as de
+  dentro por setor, e as contas do JS no node: `sem`, `achar`, `faixas`, `trecho`, expostas em `window.NexusMenuBusca`).
 
 ## Sugestões no Início (24/10/2026)
 

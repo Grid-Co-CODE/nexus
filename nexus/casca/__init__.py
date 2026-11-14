@@ -11,7 +11,7 @@ from flask import Blueprint, abort, current_app, jsonify, redirect, render_templ
 from werkzeug.exceptions import RequestEntityTooLarge
 
 from ..auth import destino_seguro, setor_telas
-from ..prefixo import raiz
+from ..prefixo import na_raiz, raiz
 from ..torres import montar_menu, telas_com_conteudo
 # no topo, e não dentro do Início: o "no ar desde" do cartão da versão é a hora do import, a do boot (13/10/2026)
 from . import versao
@@ -471,6 +471,27 @@ def modo_cliente_sair():
         abort(403)
     session.pop("modo_cliente", None)
     return redirect(url_for("casca.inicio"), code=303)
+
+
+@bp.route("/menu/busca")
+def menu_busca():
+    """O que a busca do menu lateral (14/11/2026, `static/menu-busca.js`) procura além dos nomes que já estão na página:
+    a pergunta de cada tela e as telas que abrem por dentro de outra que a pessoa abre, pelo endereço da tela no menu.
+    Pedido só quando a pessoa vai à busca. Na 1ª versão isso ia no HTML de toda página, e as telas conferem o que não
+    mostram (a suíte de 14/11 pegou: o Relatório semanal e os Acessos do cliente fora do menu, a pergunta da Caixa de
+    entrada fora da Caixa). O cliente e o Modo cliente não têm a busca."""
+    if session.get("via") == "cliente" or setor_telas.em_modo_cliente():
+        abort(403)
+    a = setor_telas.acesso()
+    menu = montar_menu(current_app.extensions["nexus_torres"], None, _telas_prontas(current_app),
+                       None if a["tudo"] else a["telas"])
+    telas = {na_raiz(s["url"]): {"pergunta": s["pergunta"],
+                                 "dentro": [{"nome": d["nome"], "url": na_raiz(d["url"]), "pergunta": d["pergunta"],
+                                             "pronta": d["pronta"]} for d in s["dentro"]]}
+             for t in menu for s in t["telas"]}
+    resp = jsonify(telas=telas)
+    resp.headers["Cache-Control"] = "private, max-age=300"
+    return resp
 
 
 @bp.route("/saude")

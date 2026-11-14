@@ -218,11 +218,12 @@
     {% endfor %}
     {% else %}
     {# A busca do menu (14/11/2026, Levi: "um campo de busca para a pessoa digitar palavras-chave e aí já aparece tudo.
-       Tudo que tem relação, já aparece expandido"): filtra na página, sem ir ao servidor, pelo nome da área, o da tela e a
-       pergunta que a tela responde (data-pergunta), sem acento; as telas que abrem por dentro de outra (li.menu-dentro)
-       só aparecem na busca. Sem name: não entra em formulário nenhum. O JS está no fim desta página. #}
+       Tudo que tem relação, já aparece expandido"): filtra na página pelo nome da área e o da tela, sem acento; a
+       pergunta de cada tela e as telas que abrem por dentro de outra vêm do /menu/busca quando a pessoa vai ao campo (no
+       HTML de toda página elas apareciam onde as telas conferem que não aparecem). Sem name: não entra em formulário
+       nenhum. O JS: static/menu-busca.js. #}
     <div class="menu-busca" role="search">
-      <label class="menu-busca-campo" title="Buscar tela ( / )">
+      <label class="menu-busca-campo" for="menu-busca" title="Buscar tela ( / )">
         <i class="ph ph-magnifying-glass" aria-hidden="true"></i>
         <input type="search" id="menu-busca" placeholder="Buscar tela" aria-label="Buscar tela no menu"
                aria-describedby="menu-busca-conta" autocomplete="off" spellcheck="false" enterkeyhint="go">
@@ -243,10 +244,7 @@
       </summary>
       <ul>
         {% for s in t.telas %}
-        <li><a href="{{ raiz }}{{ s.url }}" {% if s.pronta %}class="com-conteudo"{% endif %} {% if caminho == s.url or caminho in s.filhas %}aria-current="page"{% endif %} data-pergunta="{{ s.pergunta }}">{{ s.nome }}</a></li>
-        {% for f in s.dentro %}
-        <li class="menu-dentro" hidden><a href="{{ raiz }}{{ f.url }}" {% if f.pronta %}class="com-conteudo"{% endif %} {% if caminho == f.url %}aria-current="page"{% endif %} data-pergunta="{{ f.pergunta }}">{{ f.nome }}</a></li>
-        {% endfor %}
+        <li><a href="{{ raiz }}{{ s.url }}" {% if s.pronta %}class="com-conteudo"{% endif %} {% if caminho == s.url or caminho in s.filhas %}aria-current="page"{% endif %}>{{ s.nome }}</a></li>
         {% endfor %}
       </ul>
     </details>

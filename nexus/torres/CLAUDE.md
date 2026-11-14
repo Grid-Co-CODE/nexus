@@ -64,7 +64,7 @@ Cada pasta em `nexus/torres/` é uma torre do menu lateral. Torre com regra pró
   quem cria a tela lembra.
 - `montar_menu` mostra só as telas que o setor da pessoa vê (`liberadas`, chaves `torre/tela`; None = tudo) e tira a
   torre sem nenhuma. A cadeira, que punha a torre dela primeiro, saiu em 12/10/2026 (Base → Acessos). Ele leva também a
-  `pergunta` de cada tela e as telas de `dentro` que a pessoa abre: são da busca do menu (14/11/2026), que acha a tela
-  pelo nome e pela pergunta. **A `pergunta` da `Tela` é a palavra-chave da busca**: escreva com os termos que quem usa
+  `pergunta` de cada tela e as telas de `dentro` que a pessoa abre: são da busca do menu (14/11/2026, servidas pelo
+  `/menu/busca`, nunca no HTML da página), que acha a tela pelo nome e pela pergunta. **A `pergunta` da `Tela` é a palavra-chave da busca**: escreva com os termos que quem usa
   digitaria (MTTA, inversor, garantia). Regra em `nexus/casca/CLAUDE.md`, seção "A busca do menu lateral".
 - O módulo-modelo chama `modelo.py`, não `base.py`: `base` colidia com o pacote da torre Base.
