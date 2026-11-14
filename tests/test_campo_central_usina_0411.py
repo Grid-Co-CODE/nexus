@@ -366,11 +366,12 @@ def test_o_pdf_leva_as_paradas_do_mes_com_o_que_aconteceu():
     corpo = RU._religamentos(d, RU._estilos(), RU.CHAVES_CAMPOS)
     # a explicação do religamento, os quatro números, a tabela e as proteções (título + tabela)
     assert "a volta é o religamento" in corpo[0].text and len(corpo) == 7
-    # a Parada na frente e o período com a parada sublinhada em vermelho e a volta em verde
+    # a Parada na frente e o período em pílulas: a parada no fundo vermelho-pastel, a volta no verde-pastel
     tabela = corpo[4]
     assert [c.text for c in tabela._cellvalues[0]] == ["Parada", "Período", "Tempo fora", "Proteções", "OS", "O que aconteceu"]
-    per = tabela._cellvalues[1][1].text
-    assert "<u color=\"#c8102e\"" in per and "12/11 09:41" in per and "<u color=\"#1f7a3f\"" in per and "12/11 10:35" in per
+    saiu, _esp, voltou = tabela._cellvalues[1][1]
+    assert "12/11 09:41" in saiu._cellvalues[0][0].text and saiu._bkgrndcmds[0][3] == RU.PILULA_PARADA[0]
+    assert "12/11 10:35" in voltou._cellvalues[0][0].text and voltou._bkgrndcmds[0][3] == RU.PILULA_VOLTA[0]
     pdf = RU.gerar(d, ("religamentos",), gerado_em="14/11/2026 às 15:00", campos=("religamentos_lista",))
     assert pdf[:4] == b"%PDF" and len(pdf) > 1000
 

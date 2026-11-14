@@ -407,7 +407,7 @@ def _estilos() -> dict:
                                         textColor=MUDO, alignment=TA_CENTER),
             "parada": ParagraphStyle("parada", parent=base, fontName="Helvetica-Bold", fontSize=8.5, leading=11,
                                      alignment=TA_CENTER),
-            "periodo": ParagraphStyle("periodo", parent=base, fontName="Helvetica-Bold", fontSize=8.5, leading=14,
+            "periodo": ParagraphStyle("periodo", parent=base, fontName="Helvetica-Bold", fontSize=8.5, leading=10.5,
                                       alignment=TA_CENTER),
             "kpi_rot": ParagraphStyle("kpi_rot", parent=base, fontSize=8, leading=10, textColor=MUDO),
             "kpi_val": ParagraphStyle("kpi_val", parent=base, fontName="Helvetica-Bold", fontSize=18, leading=22),
@@ -428,7 +428,7 @@ def _tabela(e: dict, cab: list[str], linhas: list[list], larguras: list[float], 
     14/11/2026, Levi: "centralizar todas as colunas e cabeçalhos, a não ser a coluna do que aconteceu")."""
     dados_t = [[Paragraph(_t(c), e["cel_cab_c"] if cab_centro else e["cel_cab"]) for c in cab]]
     for ln in linhas:
-        dados_t.append([c if isinstance(c, Flowable) else Paragraph(_t(c), e["cel_c"] if i in centro else e["cel"])
+        dados_t.append([c if isinstance(c, (Flowable, list)) else Paragraph(_t(c), e["cel_c"] if i in centro else e["cel"])
                         for i, c in enumerate(ln)])
     # as larguras em mm somam a largura toda; a tabela sai alinhada com o texto, à esquerda
     fator = LARG / (sum(larguras) * mm)
@@ -723,9 +723,21 @@ def _kpis_religamentos(rel: list[dict], partes: list[dict], e: dict) -> Table:
     return t
 
 
-def _sublinhado(txt: str, cor) -> str:
-    """O texto sublinhado na cor (o `<u color>` do ReportLab), um pouco abaixo da linha e mais grosso que o padrão."""
-    return f'<u color="{cor.hexval().replace("0x", "#")}" width="1.4" offset="-2.2">{_t(txt)}</u>'
+# as pílulas do período (14/11/2026, Levi: "no horário que saiu, fica um pastelzinho vermelho. No horário que voltou,
+# um pastelzinho verde"): o fundo pastel e o texto no tom escuro da mesma cor, para ler bem
+PILULA_PARADA = (colors.HexColor("#fde4e7"), colors.HexColor("#a3122a"))
+PILULA_VOLTA = (colors.HexColor("#dcf2e3"), colors.HexColor("#17603a"))
+
+
+def _pilula(txt: str, cor: tuple, e: dict) -> Table:
+    """O horário numa pílula de cantos redondos, com o fundo pastel."""
+    fundo, tinta = cor
+    t = Table([[Paragraph(f'<font color="{tinta.hexval().replace("0x", "#")}">{_t(txt)}</font>', e["periodo"])]],
+              colWidths=[21 * mm], hAlign="CENTER")
+    t.setStyle(TableStyle([("BACKGROUND", (0, 0), (-1, -1), fundo), ("ROUNDEDCORNERS", [4, 4, 4, 4]),
+                           ("TOPPADDING", (0, 0), (-1, -1), 2), ("BOTTOMPADDING", (0, 0), (-1, -1), 2.5),
+                           ("LEFTPADDING", (0, 0), (-1, -1), 2), ("RIGHTPADDING", (0, 0), (-1, -1), 2)]))
+    return t
 
 
 def _o_que_aconteceu(p: dict, e: dict) -> Paragraph:
@@ -752,7 +764,7 @@ def _religamentos(d: dict, e: dict, campos=CHAVES_CAMPOS) -> list:
         out.append(Paragraph(_t("Cada parada do mês registrada pelo Centro de Operações (COS) da Grid Co., com a causa e "
                                 "a forma como a usina voltou. Quando uma proteção do relé desliga a usina, a volta é o "
                                 "religamento: remoto, feito a distância, ou no local, com a equipe de campo na usina. "
-                                "No período, o sublinhado vermelho marca a hora da parada e o verde, a hora da volta."),
+                                "No período, o fundo vermelho marca a hora da parada e o verde, a hora da volta."),
                              e["base"]))
         out.append(Spacer(1, 3 * mm))
         if not rel:
@@ -764,15 +776,14 @@ def _religamentos(d: dict, e: dict, campos=CHAVES_CAMPOS) -> list:
                 rotulo = p["rotulo"] or x.get("tipo") or "Parada"
                 nivel = _nivel_parada(x, rotulo)
                 tintas.append(_TINTA_PARADA[nivel])
-                # o período em destaque (14/11/2026, Levi: "quando for a hora da parada [...] a underline vermelha e
-                # quando for a hora de voltar, a underline verde"): a hora da parada e a da volta, cada uma sublinhada
-                # na sua cor
+                # o período em destaque: a hora da parada numa pílula vermelho-pastel e a da volta numa verde-pastel
+                # (14/11/2026, Levi; o sublinhado colorido da primeira versão "não gostei muito")
                 fim = x.get("fim")
-                periodo = _sublinhado(f"{x['ini']:%d/%m %H:%M}", TOM["critico"])
+                periodo = [_pilula(f"{x['ini']:%d/%m %H:%M}", PILULA_PARADA, e)]
                 if fim:
-                    periodo += "<br/>" + _sublinhado(f"{fim:%d/%m %H:%M}", TOM["ok"])
+                    periodo += [Spacer(1, 3), _pilula(f"{fim:%d/%m %H:%M}", PILULA_VOLTA, e)]
                 linhas.append([Paragraph(f'<font color="{_cor(nivel)}">{_t(rotulo)}</font>', e["parada"]),
-                               Paragraph(periodo, e["periodo"]),
+                               periodo,
                                x.get("fora") or "—", ", ".join(protecoes_do_texto(x.get("protecoes"))) or "—",
                                x.get("os") or "—", _o_que_aconteceu(p, e)])
             # a Parada na frente (14/11/2026, Levi: "Parada fica na frente")
