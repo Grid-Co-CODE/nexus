@@ -79,7 +79,7 @@ PROVEDORES = {
     "xai": {"nome": "xAI Grok", "chave": "XAI_API_KEY", "onde": "console.x.ai"},
     "groq": {"nome": "Groq", "chave": "GROQ_API_KEY", "onde": "console.groq.com"},
     "openrouter": {"nome": "OpenRouter", "chave": "OPENROUTER_API_KEY", "onde": "openrouter.ai"},
-    # a NVIDIA direto (14/11/2026): as chaves vêm de Base › Chaves das fontes › IA (3 vagas, `chaves_nvidia`) e do .env
+    # a NVIDIA direto (14/11/2026): só pela NVIDIA_API_KEY do .env (as vagas da tela passaram ao OpenRouter)
     "nvidia": {"nome": "NVIDIA", "chave": "NVIDIA_API_KEY", "onde": "build.nvidia.com"},
 }
 # os provedores que falam o formato "chat/completions"
@@ -140,46 +140,42 @@ def modelos(cfg) -> list[Modelo]:
 
 
 def chave(cfg, provedor: str) -> str:
-    """A chave do provedor: a da tela (Base › Chaves das fontes › IA; hoje a NVIDIA e o OpenRouter) e, sem ela, a do .env."""
-    if provedor == "nvidia":
-        ks = chaves_nvidia(cfg)
+    """A chave do provedor: a 1ª vaga com chave (Base › Chaves das fontes › IA para o OpenRouter; a da tela vence a do
+    .env) e, para os outros, a do .env."""
+    if provedor in VAGAS:
+        ks = vagas(cfg, provedor)
         return ks[0][1] if ks else ""
-    nome = PROVEDORES[provedor]["chave"]
-    if provedor == "openrouter":
-        try:
-            from ..auth import chaves as CH
-            return str(CH.valor(nome, cfg) or "").strip()
-        except Exception:        # noqa: BLE001 — sem a pasta ou a cifra: vale a do .env
-            pass
-    return str(cfg.get(nome) or "").strip()
+    return str(cfg.get(PROVEDORES[provedor]["chave"]) or "").strip()
 
 
-# ── as 3 vagas da NVIDIA e o rodízio (14/11/2026) ────────────────────────────────────────────────────────────────────
-# Levi: "BOTE SLOTS PARA 3 CHAVES, QUANDO UMA ACABAR USE A OUTRA". As vagas são as chaves NVIDIA_API_KEY_1..3 de Base ›
-# Chaves das fontes › IA (cifradas, `nexus/auth/chaves.py`), na ordem, e depois a NVIDIA_API_KEY do .env. A chave que a
-# NVIDIA barra (o limite, 429; o crédito, 402) descansa `DESCANSO_LIMITE_S`; a recusada (401, 403: vencida, apagada)
-# descansa `DESCANSO_RECUSADA_S`. A pergunta vai à próxima vaga. O descanso fica em `<NEXUS_DADOS>/ia/nvidia-vagas.json`,
-# pela impressão da chave (sha256, 12 caracteres): nunca a chave.
-VAGAS_NVIDIA = ("NVIDIA_API_KEY_1", "NVIDIA_API_KEY_2", "NVIDIA_API_KEY_3")
+# ── as vagas de chave e o rodízio (14/11/2026) ───────────────────────────────────────────────────────────────────────
+# Levi: "BOTE SLOTS PARA 3 CHAVES, QUANDO UMA ACABAR USE A OUTRA"; depois, "troca as keys da nvidea pelo do openrouter
+# mesmo! aí fica 3". As 3 vagas do OpenRouter são as chaves de Base › Chaves das fontes › IA (cifradas,
+# `nexus/auth/chaves.py`), na ordem: a 1ª é a OPENROUTER_API_KEY de sempre (a da tela vence a do .env). A chave barrada
+# descansa e a pergunta vai à próxima vaga:
+# - a cota do dia do grátis (429 "per-day"): até a meia-noite UTC, quando o OpenRouter zera a conta (21h de Brasília);
+# - o limite por minuto ou o crédito (429, 402): `DESCANSO_LIMITE_S`;
+# - a recusada (401, 403: vencida, apagada): `DESCANSO_RECUSADA_S`.
+# O descanso fica em `<NEXUS_DADOS>/ia/vagas.json`, pela impressão da chave (sha256, 12 caracteres): nunca a chave.
+# A NVIDIA direto ficou sem vaga na tela: vale a NVIDIA_API_KEY do .env, se um dia houver.
+VAGAS = {"openrouter": ("OPENROUTER_API_KEY", "OPENROUTER_API_KEY_2", "OPENROUTER_API_KEY_3"),
+         "nvidia": ("NVIDIA_API_KEY",)}
 DESCANSO_LIMITE_S = 10 * 60
 DESCANSO_RECUSADA_S = 6 * 3600
 
 
-def chaves_nvidia(cfg) -> list[tuple[str, str]]:
-    """[(vaga, chave)] das vagas com chave, na ordem (a do .env por último, se não repete uma vaga)."""
+def vagas(cfg, provedor: str) -> list[tuple[str, str]]:
+    """[(vaga, chave)] das vagas do provedor com chave, na ordem, sem repetir a mesma chave."""
     from ..auth import chaves as CH
     out, vistas = [], set()
-    for i, nome in enumerate(VAGAS_NVIDIA, 1):
+    for i, nome in enumerate(VAGAS.get(provedor, ()), 1):
         try:
             k = str(CH.valor(nome, cfg) or "").strip()
-        except Exception:        # noqa: BLE001 — sem a pasta ou a cifra: a vaga fica vazia
-            k = ""
+        except Exception:        # noqa: BLE001 — sem a pasta ou a cifra: vale a do .env
+            k = str(cfg.get(nome) or "").strip()
         if k and k not in vistas:
-            out.append((f"vaga {i}", k))
+            out.append((f"chave {i}", k))
             vistas.add(k)
-    env = str(cfg.get("NVIDIA_API_KEY") or "").strip()
-    if env and env not in vistas:
-        out.append((".env", env))
     return out
 
 
@@ -190,7 +186,7 @@ def impressao(k: str) -> str:
 
 def _arquivo_vagas(cfg) -> Path | None:
     p = _pasta(cfg)
-    return p / "nvidia-vagas.json" if p else None
+    return p / "vagas.json" if p else None
 
 
 def descansos(cfg) -> dict:
@@ -215,15 +211,23 @@ def _descansar(cfg, k: str, segundos: int, motivo: str) -> None:
         arq.parent.mkdir(parents=True, exist_ok=True)
         arq.write_text(json.dumps(d), encoding="utf-8")
     except OSError as ex:
-        log.error("IA: o descanso da chave da NVIDIA não foi gravado (%s).", ex)
+        log.error("IA: o descanso da chave não foi gravado (%s).", ex)
 
 
-def _chamar_nvidia(cfg, m: "Modelo", dossie: str, msgs: list, contexto: str = "") -> dict:
+def ate_a_meia_noite_utc(agora: datetime | None = None) -> int:
+    """Os segundos até a meia-noite UTC (+5 s), quando a cota do dia do grátis do OpenRouter volta."""
+    agora = agora or datetime.now(timezone.utc)
+    amanha = (agora + timedelta(days=1)).replace(hour=0, minute=0, second=5, microsecond=0)
+    return max(60, int((amanha - agora).total_seconds()))
+
+
+def _chamar_rodizio(cfg, m: "Modelo", dossie: str, msgs: list, contexto: str = "") -> dict:
     """A pergunta pela 1ª vaga livre; a barrada descansa e a pergunta vai à próxima. Todas em descanso: tenta mesmo assim a
-    que descansa há mais tempo (o limite por minuto pode já ter passado)."""
-    ks = chaves_nvidia(cfg)
+    que volta primeiro. Erro que não é da chave (o modelo, a rede) não gasta as outras vagas."""
+    nome = PROVEDORES[m.provedor]["nome"]
+    ks = vagas(cfg, m.provedor)
     if not ks:
-        return {"erro": "Falta a chave da NVIDIA (Base › Chaves das fontes › IA)."}
+        return {"erro": f"Falta a chave do {nome} (Base › Chaves das fontes › IA)."}
     parados = descansos(cfg)
     livres = [x for x in ks if impressao(x[1]) not in parados] or \
         sorted(ks, key=lambda x: parados.get(impressao(x[1]), {}).get("ate", 0))[:1]
@@ -232,14 +236,18 @@ def _chamar_nvidia(cfg, m: "Modelo", dossie: str, msgs: list, contexto: str = ""
         r = _chamar(m, k, dossie, msgs, contexto)
         st = r.get("status")
         if not r.get("erro"):
-            r["servido_por"] = f"NVIDIA, {vaga}"
+            if len(ks) > 1:
+                r["servido_por"] = f"{nome}, {vaga}"
             return r
-        if st in (402, 429):
-            _descansar(cfg, k, DESCANSO_LIMITE_S, f"a NVIDIA barrou pelo limite ({st})")
+        detalhe = str(r.get("detalhe") or "").lower()
+        if st == 429 and ("per-day" in detalhe or "per day" in detalhe):
+            _descansar(cfg, k, ate_a_meia_noite_utc(), f"o {nome} barrou pela cota do dia (429); volta à meia-noite UTC")
+        elif st in (402, 429):
+            _descansar(cfg, k, DESCANSO_LIMITE_S, f"o {nome} barrou pelo limite ({st})")
         elif st in (401, 403):
-            _descansar(cfg, k, DESCANSO_RECUSADA_S, f"a NVIDIA recusou a chave ({st})")
+            _descansar(cfg, k, DESCANSO_RECUSADA_S, f"o {nome} recusou a chave ({st})")
         else:
-            return r                  # outro erro (o modelo, a rede): não é da chave, não adianta a próxima
+            return r
         ultimo = r
     return ultimo
 
@@ -250,8 +258,7 @@ def disponiveis(cfg) -> list[dict]:
     for m in modelos(cfg):
         p = PROVEDORES[m.provedor]
         tem = bool(chave(cfg, m.provedor))
-        falta = ("Falta a chave da NVIDIA (Base › Chaves das fontes › IA)." if m.provedor == "nvidia"
-                 else "Falta a chave do OpenRouter (Base › Chaves das fontes › IA)." if m.provedor == "openrouter"
+        falta = ("Falta a chave do OpenRouter (Base › Chaves das fontes › IA)." if m.provedor == "openrouter"
                  else f"Falta a {p['chave']} no servidor ({p['onde']}).")
         out.append(dict(asdict(m), provedor_nome=p["nome"], tem_chave=tem, motivo="" if tem else falta))
     return out
@@ -345,7 +352,8 @@ def _erro_http(nome: str, r) -> dict:
     if r.status_code in (401, 403):
         return {"erro": f"A chave do {nome} foi recusada ({r.status_code}).", "status": r.status_code}
     if r.status_code in (402, 429):
-        return {"erro": f"O {nome} pediu para esperar (limite de uso): tente de novo em instantes.", "status": r.status_code}
+        return {"erro": f"O {nome} pediu para esperar (limite de uso): tente de novo em instantes.", "status": r.status_code,
+                "detalhe": str(msg or "")[:300]}
     return {"erro": f"O {nome} respondeu {r.status_code}: {str(msg or '')[:200]}", "modelo_inexistente": inexistente,
             "status": r.status_code}
 
@@ -439,8 +447,8 @@ def responder(cfg, m: Modelo, dossie: str, pergunta: str, historico=None, setore
     t0 = time.monotonic()
     try:
         ctx = _contexto([neutro(s) for s in setores], neutro(meu_setor)) if setores is not None else ""
-        if m.provedor == "nvidia":
-            r = _chamar_nvidia(cfg, m, neutro(dossie), _mensagens(historico, pergunta), ctx)
+        if m.provedor in VAGAS:
+            r = _chamar_rodizio(cfg, m, neutro(dossie), _mensagens(historico, pergunta), ctx)
         else:
             r = _chamar(m, k, neutro(dossie), _mensagens(historico, pergunta), ctx)
     except Exception as ex:      # noqa: BLE001 — um provedor quebrado não derruba os outros

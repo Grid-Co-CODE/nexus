@@ -751,25 +751,23 @@ a peça diz isso), e a peça que quebrar vai ao log e diz que não montou, nunca
 
 ## Chaves do Nexus (Base → Chaves das fontes → aba Nexus, 14/10/2026)
 
-**A aba IA (14/11/2026):** as 3 vagas da chave da NVIDIA da Nexus IA (`NVIDIA_API_KEY_1..3`, `grupo: "ia"` em `CHAVES`;
-`aba_ia`, `/t/base/chaves-fontes?aba=ia`). Levi: "Cria um campo no nexus chamado de IA QUE VAI TER A CHAVE DA NVIDIA.
-BOTE SLOTS PARA 3 CHAVES, QUANDO UMA ACABAR USE A OUTRA".
+**A aba IA (14/11/2026):** as 3 vagas da chave do **OpenRouter** da Nexus IA: `OPENROUTER_API_KEY` (a de sempre: a da
+tela vence a do .env), `OPENROUTER_API_KEY_2` e `_3`, com `grupo: "ia"` em `CHAVES` (`aba_ia`, `/t/base/chaves-fontes?aba=ia`).
+- O pedido: "Cria um campo no nexus chamado de IA [...] BOTE SLOTS PARA 3 CHAVES, QUANDO UMA ACABAR USE A OUTRA". As vagas
+  nasceram da NVIDIA; no mesmo dia viraram do OpenRouter ("troca as keys da nvidea pelo do openrouter mesmo! aí fica 3").
 - O mesmo cofre da aba Nexus: a chave fica cifrada no `chaves.json` e nunca aparece de volta. A aba Nexus mostra só as
   chaves sem grupo, e o Gravar volta à aba da chave.
-- A conferência (`_conferir_nvidia`) exige o formato `nvapi-` e faz um pedido de 1 token ao Nemotron 3 Ultra:
-  - a chave recusada (401, 403) não grava;
-  - com o limite (429), grava, porque a chave existe.
-- O rodízio mora em `nexus/comando/ia.py` (`chaves_nvidia`, `_chamar_nvidia`):
-  - a pergunta vai pela vaga 1; a vaga barrada (402, 429) descansa 10 min, e a recusada (401, 403), 6 h;
-  - a pergunta vai à próxima vaga; outro erro (o modelo, a rede) não gasta as outras;
-  - o descanso fica em `<NEXUS_DADOS>/ia/nvidia-vagas.json`, pela impressão (sha256) da chave, e a aba diz até quando;
-  - a `NVIDIA_API_KEY` do .env entra depois das vagas.
-- **A vaga do OpenRouter** (`OPENROUTER_API_KEY`, 14/11/2026, Levi: "bora pela openrouter") também fica na aba IA, e é
-  uma só, porque os termos do OpenRouter proíbem várias contas para fugir do limite.
-  - A conferência (`_conferir_openrouter`) exige o formato `sk-or-` e lê a página da própria chave (`/api/v1/key`), sem
-    gastar pedido.
-  - Na Nexus IA, a chave da tela vence a do .env (`ia.chave`).
-  - Com a chave da NVIDIA posta, a NVIDIA vai primeiro e o OpenRouter fica de reserva.
+- A conferência (`_conferir_openrouter`) exige o formato `sk-or-` e lê a página da própria chave (`/api/v1/key`), sem
+  gastar pedido. A chave recusada não grava.
+- O rodízio mora em `nexus/comando/ia.py` (`vagas`, `_chamar_rodizio`):
+  - a pergunta vai pela chave 1; a barrada descansa e a pergunta vai à próxima;
+  - a cota do dia do grátis (429 "per-day") descansa até a meia-noite UTC, quando o OpenRouter zera a conta;
+  - o limite por minuto ou o crédito (429, 402) descansa 10 min, e a recusada (401, 403), 6 h;
+  - outro erro (o modelo, a rede) não gasta as outras;
+  - o descanso fica em `<NEXUS_DADOS>/ia/vagas.json`, pela impressão (sha256) da chave, e a aba diz até quando.
+- **Os termos do OpenRouter** proíbem várias contas de uma pessoa para fugir do limite. O Levi foi avisado; as vagas
+  servem a chaves de pessoas diferentes ou de reserva.
+- A NVIDIA direto ficou sem vaga na tela: vale a `NVIDIA_API_KEY` do .env, se um dia houver.
 
 Levi, sobre pôr a chave das contestações no servidor pela T.I.: "Se precisa de TI então vou ter que mandar um arquivo novo
 de deploy para a TI ué!". Depois de colar a 1ª ("deu certo"): "bote essa informação na seção Chave das fontes!" — a

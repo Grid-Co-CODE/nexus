@@ -455,40 +455,45 @@ def test_o_relatorio_do_tema_da_conversa():
     assert IA.mes_da_conversa("Por que caiu?", hoje) == "2026-11" and IA.mes_da_conversa("e em outubro?", hoje) == "2026-10"
 
 
-# ── a NVIDIA com 3 vagas e o rodízio (14/11/2026) ──────────────────────────────────────────────────────────────────────
+# ── as 3 vagas do OpenRouter e o rodízio (14/11/2026) ─────────────────────────────────────────────────────────────────
 def test_a_vaga_barrada_descansa_e_a_pergunta_vai_a_proxima(monkeypatch, tmp_path):
-    """Levi: "BOTE SLOTS PARA 3 CHAVES, QUANDO UMA ACABAR USE A OUTRA"."""
+    """Levi: "BOTE SLOTS PARA 3 CHAVES, QUANDO UMA ACABAR USE A OUTRA"; "troca as keys da nvidea pelo do openrouter"."""
     cfg = {"NEXUS_DADOS": str(tmp_path)}
-    monkeypatch.setattr(IA, "chaves_nvidia", lambda c: [("vaga 1", "nvapi-a"), ("vaga 2", "nvapi-b"), ("vaga 3", "nvapi-c")])
+    ks = {"openrouter": [("chave 1", "sk-or-a"), ("chave 2", "sk-or-b"), ("chave 3", "sk-or-c")]}
+    monkeypatch.setattr(IA, "vagas", lambda c, p: ks.get(p, []))
     usadas = []
 
     def chamar(m, k, *a):
         usadas.append(k)
-        if k == "nvapi-a":
-            return {"erro": "O NVIDIA pediu para esperar (limite de uso): tente de novo em instantes.", "status": 429}
-        if k == "nvapi-b":
-            return {"erro": "A chave do NVIDIA foi recusada (401).", "status": 401}
+        if k == "sk-or-a":
+            return {"erro": "limite", "status": 429, "detalhe": "Rate limit exceeded: free-models-per-day."}
+        if k == "sk-or-b":
+            return {"erro": "recusada", "status": 401}
         return {"texto": "Bem (§3).", "entrada": 1, "saida": 1}
     monkeypatch.setattr(IA, "_chamar", chamar)
-    m = next(x for x in IA.MODELOS_PADRAO if x.id == "nemotron-nvidia")
+    m = next(x for x in IA.MODELOS_PADRAO if x.id == "nemotron")
     r = IA.responder(cfg, m, DOSSIE, "?")
-    assert r["ok"] and r["servido_por"] == "NVIDIA, vaga 3" and usadas == ["nvapi-a", "nvapi-b", "nvapi-c"]
+    assert r["ok"] and r["servido_por"] == "OpenRouter, chave 3" and usadas == ["sk-or-a", "sk-or-b", "sk-or-c"]
     d = IA.descansos(cfg)
-    assert set(d) == {IA.impressao("nvapi-a"), IA.impressao("nvapi-b")} and "nvapi" not in json.dumps(d)
-    assert d[IA.impressao("nvapi-a")]["motivo"] == "a NVIDIA barrou pelo limite (429)"
+    assert set(d) == {IA.impressao("sk-or-a"), IA.impressao("sk-or-b")} and "sk-or" not in json.dumps(d)
+    assert d[IA.impressao("sk-or-a")]["motivo"] == "o OpenRouter barrou pela cota do dia (429); volta à meia-noite UTC"
+    assert d[IA.impressao("sk-or-b")]["motivo"] == "o OpenRouter recusou a chave (401)"
+    # a cota do dia descansa até a meia-noite UTC; o limite por minuto, 10 minutos
+    from datetime import datetime, timezone
+    assert IA.ate_a_meia_noite_utc(datetime(2026, 11, 14, 23, 0, tzinfo=timezone.utc)) == 3605
     # a próxima pergunta já começa pela vaga livre
     usadas.clear()
-    assert IA.responder(cfg, m, DOSSIE, "?")["ok"] and usadas == ["nvapi-c"]
+    assert IA.responder(cfg, m, DOSSIE, "?")["ok"] and usadas == ["sk-or-c"]
     # erro que não é da chave (o modelo, a rede) não gasta as outras vagas
-    monkeypatch.setattr(IA, "chaves_nvidia", lambda c: [("vaga 1", "nvapi-d"), ("vaga 2", "nvapi-e")])
+    ks["openrouter"] = [("chave 1", "sk-or-d"), ("chave 2", "sk-or-e")]
     usadas.clear()
-    monkeypatch.setattr(IA, "_chamar", lambda m, k, *a: usadas.append(k) or {"erro": "O NVIDIA respondeu 500", "status": 500})
-    assert not IA.responder(cfg, m, DOSSIE, "?")["ok"] and usadas == ["nvapi-d"]
+    monkeypatch.setattr(IA, "_chamar", lambda m, k, *a: usadas.append(k) or {"erro": "O OpenRouter respondeu 500", "status": 500})
+    assert not IA.responder(cfg, m, DOSSIE, "?")["ok"] and usadas == ["sk-or-d"]
 
 
-def test_com_a_chave_da_nvidia_o_nemotron_vai_por_ela():
-    assert IA.padrao({"NVIDIA_API_KEY": "nvapi-x", "OPENROUTER_API_KEY": "k"}) == "nemotron-nvidia"
+def test_a_chave_do_openrouter_vem_das_vagas_e_a_nvidia_so_do_env():
+    assert IA.chave({"OPENROUTER_API_KEY": "sk-or-env"}, "openrouter") == "sk-or-env"
     assert IA.padrao({"OPENROUTER_API_KEY": "k"}) == "nemotron"
-    assert IA.TROCA_GRATIS[0] == "nemotron-nvidia"
-    falta = next(m for m in IA.disponiveis({}) if m["id"] == "nemotron-nvidia")["motivo"]
-    assert falta == "Falta a chave da NVIDIA (Base › Chaves das fontes › IA)."
+    assert IA.padrao({"NVIDIA_API_KEY": "nvapi-x", "OPENROUTER_API_KEY": "k"}) == "nemotron-nvidia"
+    falta = next(m for m in IA.disponiveis({}) if m["id"] == "nemotron")["motivo"]
+    assert falta == "Falta a chave do OpenRouter (Base › Chaves das fontes › IA)."

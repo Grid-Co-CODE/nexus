@@ -230,41 +230,32 @@ def test_token_do_github_que_nao_serve_nao_grava(app, admin, valor, resp, pedaco
 
 
 # ── a aba IA: as 3 vagas da NVIDIA (14/11/2026) ────────────────────────────────────────────────────────────────────────
-def test_a_aba_ia_tem_as_tres_vagas_da_nvidia_e_confere_antes_de_gravar(app, admin, monkeypatch):
-    """Levi, 14/11/2026: "Cria um campo no nexus chamado de IA QUE VAI TER A CHAVE DA NVIDIA. BOTE SLOTS PARA 3 CHAVES,
-    QUANDO UMA ACABAR USE A OUTRA"."""
+def test_a_aba_ia_tem_as_tres_vagas_do_openrouter_e_confere_antes_de_gravar(app, admin, monkeypatch):
+    """Levi, 14/11/2026: "Cria um campo no nexus chamado de IA [...] BOTE SLOTS PARA 3 CHAVES, QUANDO UMA ACABAR USE A
+    OUTRA"; depois, "troca as keys da nvidea pelo do openrouter mesmo! aí fica 3"."""
     from nexus.auth import chaves as CHV
     from nexus.comando import ia as IA
     h = admin.get("/t/base/chaves-fontes?aba=ia").get_data(as_text=True)
     assert '<a href="/t/base/chaves-fontes?aba=ia" aria-current="page">IA</a>' in h
-    assert h.count('name="chave" value="NVIDIA_API_KEY_') == 3 and "NEXUS_CONTESTACAO" not in h
-    nexus = admin.get(PAGINA).get_data(as_text=True)
-    assert "NVIDIA_API_KEY_1" not in nexus                                    # a aba Nexus fica com as dela
+    assert h.count('name="chave" value="OPENROUTER_API_KEY') == 3 and "NVIDIA_API_KEY" not in h
+    assert "NEXUS_CONTESTACAO" not in h and "OPENROUTER_API_KEY" not in admin.get(PAGINA).get_data(as_text=True)
     codigo = re.search(r'name="codigo" value="([^"]+)"', h).group(1)
-    # a que não começa com nvapi- não grava, e o valor não volta na tela
-    r = admin.post(URL, data={"codigo": codigo, "chave": "NVIDIA_API_KEY_1", "acao": "gravar", "valor": "sk-errada-123"})
-    assert r.status_code == 400 and "começa com nvapi-" in r.get_data(as_text=True) and "sk-errada-123" not in r.get_data(as_text=True)
 
     class R:
-        def __init__(self, st):
-            self.status_code = st
-    pedidos = []
-    monkeypatch.setattr("requests.post", lambda url, **k: pedidos.append(k["headers"]["Authorization"]) or R(200))
-    chave = "nvapi-" + "a" * 40
-    r = admin.post(URL, data={"codigo": codigo, "chave": "NVIDIA_API_KEY_1", "acao": "gravar", "valor": chave})
+        status_code = 200
+    monkeypatch.setattr("requests.get", lambda url, **k: R())
+    chave2 = "sk-or-v1-" + "2" * 40
+    r = admin.post(URL, data={"codigo": codigo, "chave": "OPENROUTER_API_KEY_2", "acao": "gravar", "valor": chave2})
     assert r.status_code == 303 and r.headers["Location"].endswith("/t/base/chaves-fontes?aba=ia")
-    assert pedidos == [f"Bearer {chave}"]
     with app.app_context():
-        assert IA.chaves_nvidia(app.config) == [("vaga 1", chave)]
-        assert IA.padrao(app.config) == "nemotron-nvidia"                    # "Aí boto a chave e já vou usando"
-    h = admin.get("/t/base/chaves-fontes?aba=ia").get_data(as_text=True)
-    assert "Posta pela tela" in h and chave not in h
+        assert IA.vagas(app.config, "openrouter") == [("chave 2", chave2)]      # a 1 vazia: a 2 responde
+        assert IA.padrao(app.config) == "nemotron"
     # a recusada (401) não grava
-    monkeypatch.setattr("requests.post", lambda url, **k: R(401))
-    codigo = re.search(r'name="codigo" value="([^"]+)"', h).group(1)
-    r = admin.post(URL, data={"codigo": codigo, "chave": "NVIDIA_API_KEY_2", "acao": "gravar", "valor": "nvapi-" + "b" * 40})
+    R.status_code = 401
+    r = admin.post(URL, data={"codigo": codigo, "chave": "OPENROUTER_API_KEY_3", "acao": "gravar",
+                              "valor": "sk-or-v1-" + "3" * 40})
     assert r.status_code == 400 and "recusou a chave" in r.get_data(as_text=True)
-    assert CHV.CHAVES["NVIDIA_API_KEY_3"]["grupo"] == "ia"
+    assert CHV.CHAVES["OPENROUTER_API_KEY_3"]["grupo"] == "ia" and "NVIDIA_API_KEY_1" not in CHV.CHAVES
 
 
 def test_a_chave_do_openrouter_pela_aba_ia_vence_a_do_env(app, admin, monkeypatch):

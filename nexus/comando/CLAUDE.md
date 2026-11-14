@@ -636,17 +636,14 @@ Gemini, Groq, Grok [...] Qualquer IA que dê para puxar a API para fazermos o te
 Prova: `tests/test_comando_ia.py` (cada provedor no formato dele, com dublês; a rota, o teto, o registro, a rodada; a
 troca entre as grátis; o Criar OS e as sugestões na janela).
 
-- **A NVIDIA direto, com 3 vagas de chave (14/11/2026):** "Cria um campo no nexus chamado de IA QUE VAI TER A CHAVE DA
-  NVIDIA. BOTE SLOTS PARA 3 CHAVES [...] Aí boto a chave e já vou usando".
-  - O provedor `nvidia` (`integrate.api.nvidia.com/v1`, o formato chat/completions) e o modelo `nemotron-nvidia` (o
-    mesmo `nvidia/nemotron-3-ultra-550b-a55b`).
-  - As chaves vêm de Base › Chaves das fontes › IA, em 3 vagas, com o rodízio. As regras estão no `nexus/casca/CLAUDE.md`,
+- **As chaves pela tela, 3 vagas do OpenRouter (14/11/2026):** "Cria um campo no nexus chamado de IA [...] BOTE SLOTS
+  PARA 3 CHAVES [...] Aí boto a chave e já vou usando"; depois, "troca as keys da nvidea pelo do openrouter mesmo! aí
+  fica 3".
+  - As chaves ficam em Base › Chaves das fontes › IA, com o rodízio. As regras estão no `nexus/casca/CLAUDE.md`,
     seção Chaves do Nexus.
-  - Com uma chave da NVIDIA, o padrão da janela e o do diagnóstico do dia passam a ser o Nemotron pela NVIDIA
-    (`PREFERIDOS`). Sem ela, o Nemotron vai pelo OpenRouter.
-  - A troca entre as grátis começa pela NVIDIA.
-  - O grátis da NVIDIA é por pedidos por minuto (cerca de 40 por chave, pelo fórum dela), sem a cota de 50 por dia do
-    OpenRouter.
+  - Com uma chave lá, o servidor responde sem a T.I. A da tela vence a `OPENROUTER_API_KEY` do .env.
+  - O provedor `nvidia` (`integrate.api.nvidia.com/v1`) e o modelo `nemotron-nvidia` ficaram no código: valem só com a
+    `NVIDIA_API_KEY` do .env, e aí vão primeiro (`PREFERIDOS`). Sem ela, o Nemotron vai pelo OpenRouter.
 - **14/11/2026 à noite (Levi):**
   - O botão virou **"Pergunte à Nexus IA"**.
   - **Os modelos ficam escondidos no "i"**, no canto da janela ("pode esconder os modelos da IA. Bora usar como padrão
