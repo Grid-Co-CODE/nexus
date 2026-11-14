@@ -53,7 +53,7 @@
           return antes + '<button type="button" class="ia-os" data-ia-os="' + n + '" title="Abrir o card da OS ' + n + '">' + n + '</button>';
         }
         var de = tipo === 'chamado' ? '?de=garantias' : (tipo === 'performance' ? '?de=performance' : '');
-        return antes + '<a class="ia-os ia-os--raiox" href="' + esc(raiz) + '/t/engenharia/equipe/os/' + n + de +
+        return antes + '<a class="ia-os ia-os--raiox" href="' + esc(nexusRota('/t/engenharia/equipe/os/')) + n + de +
           '" target="_blank" rel="noopener" title="Raio X da OS ' + n + ' (abre em outra aba)">' + n + '</a>';
       });
     }
