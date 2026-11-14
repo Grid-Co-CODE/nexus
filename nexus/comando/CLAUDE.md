@@ -337,6 +337,38 @@ repositório da plataforma): `docs/superpowers/specs/2026-11-12-demandas-entre-s
 Management, ServiceNow): catálogo de temas por setor com o prazo por tema, "respondida" separada de "concluída", a
 conclusão sozinha e o vencido que sobe para o setor; no O&M, a demanda fica presa ao que o campo enxerga (a usina e a OS).
 
+**Os temas padrão e a área Chamados (14/11/2026; `temas_padrao.py`).** Levi: "crie temas padrões para setores [...] o
+que um supervisor solicitaria para o setor? O que o setor poderia solicitar para o supervisor [...] todas essas indicações
+que o Nexus IA pode gerar, transformar em um tema [...] o setor da performance também tem chamados [...] ter a opção de
+escolher o setor chamados, mas no back-end entender que é um setor de performance [...] E aí, mais ter temas separados".
+- **`PADRAO`**: por setor do cadastro (o nome sem acento), a lista de temas com o prazo de partida. Alguns exemplos:
+  - Engenharia: verificação de ativo, recorrência de falha, ajuste de proteção, parecer;
+  - Performance: verificação de ativo, geração e PR, meta ou disponibilidade, relatório;
+  - Chamados: acompanhamento de chamado, abertura de garantia, cobrança ao fabricante, peça ou RMA;
+  - COS: chamado com a concessionária, religamento remoto, alarme, acompanhamento de parada;
+  - também há listas para PCM, Manutenção, Segurança, Zeladoria, Supervisão Campo e Supervisor de Contrato.
+
+  Cada setor muda o nome e o prazo dos seus depois.
+- **O botão "Criar os temas padrão"** fica na aba Temas do setor e só o administrador vê; ele diz quantos faltam.
+  - Cria, numa gravação só, os que faltam em todos os setores (`demandas.criar_temas_padrao`).
+  - O código de cada tema padrão é fixo (`codigo`): clicar de novo não duplica.
+  - Um tema que o setor já criou à mão, com o mesmo nome, não ganha um gêmeo.
+  - Na prática, criar depende do login de uma pessoa (Microsoft ou Fracttal); a senha de administrador não basta.
+- **A área do setor** (`AREAS`, hoje só "Chamados" na Performance) fica no cifrado do tema, junto do nome (sem coluna
+  nova).
+  - Na Nova demanda, a área é mais uma escolha de setor ("Chamados"), com o valor `2:Chamados`. As pessoas são as da
+    Performance, e os temas, só os da área.
+  - `abrir` grava a demanda no setor (`para_setor_id` = 2) e exige o tema da área. O tema da área não vale no setor, e o
+    do setor não vale na área.
+  - Trocar o nome ou o prazo do tema não o tira da área.
+  - O "Solicitar" do diagnóstico do dia vai a "Chamados" nas garantias.
+- **Na Nova demanda, as usinas vêm recolhidas** ("eu quero que fique recolhido [...] Tá muito grande"):
+  - a lista abre quando a pessoa digita e mostra só o que bate;
+  - as marcadas viram etiquetas embaixo da busca (o clique tira);
+  - Esc recolhe;
+  - a OS fica na mesma linha;
+  - sem JavaScript, a lista fica aberta.
+
 **As regras (todas do Levi):**
 - A pessoa e o setor de quem recebe são obrigatórios; um setor só por demanda ("Esquece essa parte de indicar mais de um
   setor"). O setor vê o que todo mundo dele recebe (a aba "Do meu setor", com o filtro por pessoa e por tema).

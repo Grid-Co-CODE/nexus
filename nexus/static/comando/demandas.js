@@ -39,6 +39,12 @@ window.NexusDemandaNova = function (dlg) {
         });
         fSetor.innerHTML = '';
         var v = document.createElement('option'); v.value = ''; v.textContent = 'Escolha o setor'; fSetor.appendChild(v);
+        // a área do setor vira mais uma escolha ("Chamados", dentro da Performance; 14/11/2026): o valor leva o setor e a
+        // área ("2:Chamados"), as pessoas são as do setor e os temas, os da área
+        temas.forEach(function (o) {
+          var a = o.getAttribute('data-area'), s = o.getAttribute('data-setor');
+          if (a && setores[s]) setores[s + ':' + a] = a;
+        });
         Object.keys(setores).sort(function (a, b) { return setores[a].localeCompare(setores[b], 'pt-BR'); }).forEach(function (sid) {
           var o = document.createElement('option'); o.value = sid; o.textContent = setores[sid]; fSetor.appendChild(o);
         });
@@ -58,7 +64,12 @@ window.NexusDemandaNova = function (dlg) {
   function refazer(sel, todas, setor, vazio) {
     var antes = sel.value;
     sel.innerHTML = '';
-    var lista = todas.filter(function (o) { return !setor || o.getAttribute('data-setor') === setor; });
+    var base = String(setor || '').split(':')[0], area = String(setor || '').split(':').slice(1).join(':');
+    var lista = todas.filter(function (o) {
+      if (setor && o.getAttribute('data-setor') !== base) return false;
+      // o tema da área só na área; o do setor, só no setor (a pessoa vale para os dois)
+      return !o.hasAttribute('data-area') || !setor || (o.getAttribute('data-area') || '') === area;
+    });
     var v = document.createElement('option'); v.value = '';
     v.textContent = !setor ? 'Escolha o setor primeiro' : (lista.length ? vazio : 'Este setor ainda não tem ' + (sel === fTema ? 'tema' : 'pessoa'));
     sel.appendChild(v);
@@ -80,7 +91,7 @@ window.NexusDemandaNova = function (dlg) {
   fPessoa.addEventListener('change', function () {
     var o = fPessoa.selectedOptions && fPessoa.selectedOptions[0];
     var s = o && o.getAttribute('data-setor');
-    if (s && fSetor.value !== s) { fSetor.value = s; var p = fPessoa.value; fSetor.dispatchEvent(new Event('change')); fPessoa.value = p; }
+    if (s && fSetor.value.split(':')[0] !== s) { fSetor.value = s; var p = fPessoa.value; fSetor.dispatchEvent(new Event('change')); fPessoa.value = p; }
   });
   fTema.addEventListener('change', prazo);
   refazer(fTema, temas, fSetor.value, 'Escolha o tema');

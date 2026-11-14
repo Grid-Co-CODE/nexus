@@ -635,3 +635,52 @@ def test_o_pedir_abre_preenchido_pelo_diagnostico_do_dia(app, cena):
     # sem o preenchido, os campos vêm vazios (a Nova demanda de sempre)
     h = c.get("/t/comando/conversa/usina/1/janela?aba=pedir").get_data(as_text=True)
     assert "data-pre-setor" not in h and 'placeholder="Em poucas palavras">' in h
+
+
+# ── os temas padrão e a área Chamados da Performance (14/11/2026) ──────────────────────────────────────────────────────
+def test_os_temas_padrao_saem_uma_vez_e_a_area_chamados_vai_para_a_performance(app, cena):
+    """Levi, 14/11/2026: "crie temas padrões para setores [...] a parte da performance poderia iniciar com ter a opção de
+    escolher o setor chamados, mas no back-end entender que é um setor de performance [...] E aí, mais ter temas separados
+    para ele"."""
+    from nexus.comando import temas_padrao as TP
+    setores = [{"setor_id": 1, "nome": "Performance"}, {"setor_id": 2, "nome": "Supervisão Campo"}]
+    assert all(D.ID_TEMA.fullmatch(TP.codigo(1, a, n)) for a, n, _p in TP.PADRAO["performance"])
+    with app.test_request_context():
+        feitos = D.criar_temas_padrao(setores, JU)
+        assert len(feitos) == len(TP.PADRAO["performance"]) + len(TP.PADRAO["supervisao campo"])
+        assert D.criar_temas_padrao(setores, JU) == []                           # rodar de novo não duplica
+    D.limpar()
+    chamados = [t for t in D.temas(1) if t["area"] == "Chamados"]
+    assert sorted(t["nome"] for t in chamados) == ["Abertura de chamado de garantia", "Acompanhamento de chamado",
+                                                   "Cobrança ao fabricante", "Envio de peça ou RMA"]
+    assert "Dado que não bate" in [t["nome"] for t in D.temas(1) if not t["area"]]   # o que já existia fica
+    # a demanda para "Chamados" vai para a Performance (o setor 1), com o tema da área; o tema da área não vale no setor
+    acomp = next(t for t in chamados if t["nome"] == "Acompanhamento de chamado")
+    with app.test_request_context():
+        d = D.abrir(_form(cena, para_setor_id="1:Chamados", tema_id=acomp["tema_id"], novo_id="d00000000081"), [], ANA)
+        assert d["para_setor_id"] == 1
+        with pytest.raises(D.Recusada, match="Escolha um dos temas de Chamados"):
+            D.abrir(_form(cena, para_setor_id="1:Chamados", novo_id="d00000000082"), [], ANA)
+        with pytest.raises(D.Recusada, match="Escolha um dos temas de Performance"):
+            D.abrir(_form(cena, tema_id=acomp["tema_id"], novo_id="d00000000083"), [], ANA)
+        # trocar o prazo não tira o tema da área
+        D.salvar_tema(1, acomp["nome"], 4, JU, tema_id=acomp["tema_id"])
+    D.limpar()
+    assert next(t for t in D.temas(1) if t["tema_id"] == acomp["tema_id"])["area"] == "Chamados"
+
+
+def test_o_botao_dos_temas_padrao_e_do_administrador(app, cena):
+    c = _cliente(app, JU)
+    html = c.get(CAIXA + "?dem=temas").get_data(as_text=True)
+    assert "Criar os temas padrão" not in html                                 # quem não é administrador não vê
+    assert c.post("/t/comando/temas-do-setor/padrao", data={"codigo": _codigo(html), "setor_id": "1"}).status_code == 403
+    app.config["NEXUS_ADMINS"] = JU["email"]                    # o admin da sessão segue a lista de agora, a cada pedido
+    html = c.get(CAIXA + "?dem=temas&setor=1").get_data(as_text=True)
+    assert "Criar os temas padrão" in html and "<b>8</b> temas padrão" in html
+    r = c.post("/t/comando/temas-do-setor/padrao", data={"codigo": _codigo(html), "setor_id": "1"})
+    assert r.status_code == 303
+    html = c.get(CAIXA + "?dem=temas&setor=1").get_data(as_text=True)
+    assert "temas padrão criados" in html and "Criar os temas padrão" not in html
+    assert '<span class="dm-t-area"' in html and 'name="area"' in html          # a área no tema e no tema novo
+    # na Nova demanda, o tema leva a área (o JS faz dela mais uma escolha de setor)
+    assert 'data-area="Chamados"' in c.get(CAIXA).get_data(as_text=True)

@@ -286,8 +286,18 @@ def temas_contexto() -> dict:
     except Exception as ex:      # noqa: BLE001 — o banco fora: a aba diz, a Caixa segue
         current_app.logger.exception("demandas: os temas do setor não abriram")
         return dict(out, erro=type(ex).__name__)
+    # os temas padrão que faltam em todos os setores (só o administrador cria; 14/11/2026)
+    faltam = []
+    if session.get("admin"):
+        from ...comando import temas_padrao as TP
+        try:
+            faltam = TP.para_criar([{"setor_id": s, "nome": n} for s, n in ativos], D.temas(so_ativos=False))
+        except Exception:        # noqa: BLE001 — sem a conta, sem o botão
+            current_app.logger.exception("demandas: a conta dos temas padrão falhou")
+    from ...comando import temas_padrao as TP
     return dict(out, temas=temas, setor_id=sid, setor_nome=nome, setores=ativos,
-                em_uso=sum(1 for t in temas if t.get("ativo")))
+                em_uso=sum(1 for t in temas if t.get("ativo")), padrao_faltam=len(faltam),
+                areas=TP.areas_do_setor(nome))
 
 
 def _temas_na_caixa(sid=None) -> str:
@@ -301,6 +311,30 @@ def temas_do_setor():
     gostaria que temas por setor fosse mais uma aba do demanda entre setores [...] Deixa dentro da caixa de entrada").
     O endereço de antes leva à aba."""
     return redirect(_temas_na_caixa(request.args.get("setor", type=int)))
+
+
+@bp.route("/temas-do-setor/padrao", methods=["POST"])
+def temas_do_setor_padrao():
+    """Cria os temas padrão que faltam em todos os setores (só o administrador; 14/11/2026, Levi: "crie temas padrões
+    para setores"). Uma gravação só; rodar de novo não duplica (`demandas.criar_temas_padrao`)."""
+    sid = request.form.get("setor_id", type=int)
+    destino = _temas_na_caixa(sid)
+    venceu = _form_venceu(destino)
+    if venceu:
+        return venceu
+    if not session.get("admin"):
+        abort(403)
+    try:
+        _sid, _nome, ativos = _setor_da_tela()
+        feitos = D.criar_temas_padrao([{"setor_id": s, "nome": n} for s, n in ativos], _usuario())
+        session[_AVISO] = ("ok", f"{len(feitos)} {'tema padrão criado' if len(feitos) == 1 else 'temas padrão criados'}."
+                           if feitos else "Os temas padrão já estavam criados.")
+    except D.Recusada as ex:
+        session[_AVISO] = ("erro", f"{ex}. Nada foi gravado.")
+    except Exception as ex:      # noqa: BLE001
+        current_app.logger.exception("temas padrão não gravados")
+        session[_AVISO] = ("erro", f"Não consegui gravar agora ({type(ex).__name__}). Nada foi gravado.")
+    return redirect(destino, code=303)
 
 
 @bp.route("/temas-do-setor/salvar", methods=["POST"])
@@ -318,7 +352,8 @@ def temas_do_setor_salvar():
         # aceito para a página que ficou aberta de antes
         D.salvar_tema(sid, request.form.get("tema") or request.form.get("nome"), request.form.get("prazo"), _usuario(),
                       tema_id=request.form.get("tema_id") or None, ativo=request.form.get("ativo") != "nao",
-                      novo=request.form.get("novo_id"))
+                      novo=request.form.get("novo_id"),
+                      area=request.form.get("area") if "area" in request.form else None)
         session[_AVISO] = ("ok", "Tema salvo.")
     except D.Recusada as ex:
         session[_AVISO] = ("erro", f"{ex}. Nada foi gravado.")

@@ -11,6 +11,7 @@ view com a mesma rota (ela vence a genérica), por exemplo:
         return render_template("comando/sala-de-comando.html")
 """
 import hmac
+import re
 import secrets
 
 from flask import abort, current_app, redirect, render_template, request, session, url_for
@@ -415,8 +416,14 @@ def _setores_ativos() -> list[dict]:
     from ...cadastro import setores as S
     from ...dados.conexao import banco
     try:
+        from ...comando import temas_padrao as TP
         st = ST._setores_no_clique(*banco())
-        return [{"setor_id": s["setor_id"], "nome": s["nome"]} for s in S.ativos(st.get("setores") or [])]
+        out = []
+        for s in S.ativos(st.get("setores") or []):
+            out.append({"setor_id": s["setor_id"], "nome": s["nome"]})
+            # a área do setor como mais um destino ("Chamados", na Performance): o pedido vai ao setor, no tema da área
+            out += [{"setor_id": f"{s['setor_id']}:{a}", "nome": a} for a in TP.areas_do_setor(s["nome"])]
+        return out
     except Exception:            # noqa: BLE001 — sem os setores, o item sai sem o "Fazer"
         current_app.logger.exception("Diagnóstico do dia: os setores não abriram")
         return []
@@ -896,7 +903,7 @@ def conversa_janela(usina_id):
     # o pedido já preenchido, vindo do "Fazer" do diagnóstico do dia (14/11/2026, Levi: "E aí já vai preenchido
     # automático"): o setor, o título, o texto e a OS; quem envia confere, escolhe a pessoa e o tema
     a = request.args
-    pre = {"setor": a.get("setor", "") if (a.get("setor") or "").isdigit() else "",
+    pre = {"setor": a.get("setor", "") if re.fullmatch(r"\d+(:[\w ]{1,30})?", a.get("setor") or "") else "",
            "titulo": " ".join((a.get("titulo") or "").split())[:D.TITULO_MAX],
            "descricao": (a.get("descricao") or "").strip()[:D.TEXTO_MAX],
            "os": a.get("os", "") if (a.get("os") or "").isdigit() else ""}

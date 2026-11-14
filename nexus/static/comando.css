@@ -337,6 +337,12 @@ a.ins-titulo:hover{color:var(--verde-texto)}
 .dm-dupla{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .dm-usinas legend{margin-bottom:6px;padding:0}
 .dm-dupla--topo{align-items:start}
+.dm-temas-padrao{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;margin:0 0 12px;padding:10px 14px;
+  border:1px solid var(--linha);border-radius:var(--raio-md);background:var(--superficie-2)}
+.dm-temas-padrao .dm-nota{flex:1 1 320px;margin:0}
+.dm-t-area{display:inline-block;margin:0 8px 0 0;padding:1px 8px;border-radius:999px;background:var(--verde-suave);
+  color:var(--verde-texto);font:600 11.5px/18px var(--font-sans);vertical-align:middle}
+.dm-t-area-sel{width:auto;margin-right:8px}
 .dm-usinas-marcadas{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
 .dm-usinas-marcadas:empty{display:none}
 .dm-chip{display:inline-flex;align-items:center;gap:6px;padding:2px 10px;border:1px solid var(--linha-forte);border-radius:999px;

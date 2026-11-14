@@ -34,6 +34,7 @@
                     insights: 'insights', demandas: 'demandas'};
   function artigo(setor) {
     var s = String(setor || '').trim();
+    if (/s$/i.test(s) && !/^[A-Z]+$/.test(s)) return 'a ';          // "Chamados": "Solicitar a Chamados"
     return /(a|ção|dade|ance)$/i.test(s) ? 'à ' : 'ao ';
   }
   function botaoDiag(el, j, lista, x) {

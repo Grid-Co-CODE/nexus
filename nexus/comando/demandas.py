@@ -267,8 +267,10 @@ def _temas_de(linhas: list[dict], cofre) -> dict[str, dict]:
         if not ID_TEMA.fullmatch(tid):
             continue
         out[tid] = {"tema_id": tid, "setor_id": _int(l.get("setor_id")), "prazo_dias_uteis": _int(l.get("prazo_dias_uteis")),
-                    "ativo": _txt(l.get("ativo")).lower() in ("1", "sim", "true"),
-                    "nome": _txt(_decifrar(cofre, ABA_TEMA, l).get("nome"))}
+                    "ativo": _txt(l.get("ativo")).lower() in ("1", "sim", "true")}
+        dd = _decifrar(cofre, ABA_TEMA, l)
+        # a área do setor (14/11/2026: "Chamados", dentro da Performance), no cifrado junto do nome: sem coluna nova
+        out[tid].update(nome=_txt(dd.get("nome")), area=_txt(dd.get("area")))
     return out
 
 
@@ -283,7 +285,7 @@ def temas(setor_id: int | None = None, so_ativos: bool = True) -> list[dict]:
 
 
 def salvar_tema(setor_id: int, nome: str, prazo_dias_uteis, usuario: dict, tema_id: str | None = None,
-                ativo: bool = True, novo: str | None = None) -> dict:
+                ativo: bool = True, novo: str | None = None, area: str | None = None) -> dict:
     """Uma versão nova do tema (o novo, a troca do nome ou do prazo, desativar). O nome tem de 1 a 60 caracteres e o
     prazo, de 1 a 30 dias úteis."""
     nome = " ".join(str(nome or "").split())
@@ -305,6 +307,8 @@ def salvar_tema(setor_id: int, nome: str, prazo_dias_uteis, usuario: dict, tema_
             atual = _temas_de(t[ABA_TEMA], cofre).get(tid) or {}
             if atual.get("setor_id") != _int(setor_id):
                 raise Recusada("Esse tema é de outro setor")
+            if area is None:
+                area = atual.get("area") or ""          # a troca do nome ou do prazo não tira o tema da área
         if not tid and ID_TEMA.fullmatch(_txt(novo)):
             # o `novo_id` do formulário do tema novo: o 2º envio (o duplo clique) acha o tema e não grava outro
             ja = _temas_de(t[ABA_TEMA], cofre).get(_txt(novo))
@@ -316,11 +320,38 @@ def salvar_tema(setor_id: int, nome: str, prazo_dias_uteis, usuario: dict, tema_
         linha = {"id": novo_id("v"), "tema_id": tid, "registrado_em": registrado, "data_id": data_id,
                  "setor_id": _int(setor_id), "prazo_dias_uteis": prazo, "ativo": "sim" if ativo else "não",
                  "pessoa_id": quem["pessoa_id"], "pessoa_hmac": quem["hmac"]}
-        linha["dados_cifrados"] = cofre.cifrar(json.dumps({"nome": nome, "quem": quem["nome"]}, ensure_ascii=False),
-                                               _ctx(ABA_TEMA, linha))
+        area = " ".join(str(area or "").split())[:TEMA_MAX]
+        linha["dados_cifrados"] = cofre.cifrar(json.dumps({"nome": nome, "quem": quem["nome"], "area": area},
+                                                          ensure_ascii=False), _ctx(ABA_TEMA, linha))
         t[ABA_TEMA] = t[ABA_TEMA] + [linha]
         _publicar(t)
-    return {"tema_id": tid, "nome": nome, "prazo_dias_uteis": prazo, "ativo": ativo, "setor_id": _int(setor_id)}
+    return {"tema_id": tid, "nome": nome, "prazo_dias_uteis": prazo, "ativo": ativo, "setor_id": _int(setor_id),
+            "area": area}
+
+
+def criar_temas_padrao(setores: list[dict], usuario: dict) -> list[dict]:
+    """Os temas padrão que faltam (`temas_padrao.para_criar`), numa gravação só: o livro relido uma vez e publicado uma
+    vez (um tema por vez seriam dezenas de gravações). O código de cada um é fixo: rodar de novo não duplica."""
+    from . import temas_padrao as TP
+    quem = _quem(usuario)
+    cofre = _cofre()
+    with _TRAVA:
+        t = _ler_abas()
+        faltam = TP.para_criar(setores, list(_temas_de(t[ABA_TEMA], cofre).values()))
+        if not faltam:
+            return []
+        registrado, data_id = _agora_iso()
+        novas = []
+        for x in faltam:
+            linha = {"id": novo_id("v"), "tema_id": x["tema_id"], "registrado_em": registrado, "data_id": data_id,
+                     "setor_id": x["setor_id"], "prazo_dias_uteis": x["prazo_dias_uteis"], "ativo": "sim",
+                     "pessoa_id": quem["pessoa_id"], "pessoa_hmac": quem["hmac"]}
+            linha["dados_cifrados"] = cofre.cifrar(json.dumps({"nome": x["nome"], "quem": quem["nome"], "area": x["area"]},
+                                                              ensure_ascii=False), _ctx(ABA_TEMA, linha))
+            novas.append(linha)
+        t[ABA_TEMA] = t[ABA_TEMA] + novas
+        _publicar(t)
+    return faltam
 
 
 # ── quem é quem e as OS da usina ─────────────────────────────────────────────────────────────────────────────────────
@@ -414,7 +445,10 @@ def abrir(form: dict, arquivos, usuario: dict) -> dict:
     quem = _quem(usuario)
     cofre = _cofre()
     para_hmac = _txt(form.get("para_hmac")).lower()
-    para_setor = _int(form.get("para_setor_id"))
+    # o setor pode vir com a área ("2:Chamados", 14/11/2026: "escolher o setor chamados, mas no back-end entender que é
+    # um setor de performance"): a demanda é do setor; o tema tem de ser da área
+    setor_txt, _, area = _txt(form.get("para_setor_id")).partition(":")
+    para_setor = _int(setor_txt)
     pessoas = {p["hmac"]: p for p in pessoas_com_setor()}
     para = pessoas.get(para_hmac)
     if not para:
@@ -423,9 +457,10 @@ def abrir(form: dict, arquivos, usuario: dict) -> dict:
         raise Recusada(f"{para['nome']} não é do setor escolhido: {para['nome']} é de {para['setor_nome']}")
     if para_hmac == quem["hmac"]:
         raise Recusada("A demanda é para outra pessoa: escolha quem vai receber")
-    tema = next((t for t in temas(para_setor) if t["tema_id"] == _txt(form.get("tema_id"))), None)
+    tema = next((t for t in temas(para_setor) if t["tema_id"] == _txt(form.get("tema_id"))
+                 and (t.get("area") or "").lower() == area.strip().lower()), None)
     if not tema:
-        raise Recusada(f"Escolha um dos temas de {para['setor_nome']}")
+        raise Recusada(f"Escolha um dos temas de {area.strip() or para['setor_nome']}")
     titulo = " ".join(_texto(form.get("titulo"), TITULO_MAX, "Escreva um título", "O título").split())
     descricao = _texto(form.get("descricao"), TEXTO_MAX, "Escreva a descrição", "A descrição")
     usinas = sorted({u for u in (_int(x) for x in (form.get("usinas") or [])) if u})

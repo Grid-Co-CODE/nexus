@@ -27,6 +27,15 @@
     <noscript><button class="gc-btn gc-btn--ui gc-btn--contorno" type="submit">Ver</button></noscript>
   </form>
   {% endif %}
+  {% if ts.admin and ts.padrao_faltam %}
+  {# os temas padrão (14/11/2026, Levi: "crie temas padrões para setores [...] o que um supervisor solicitaria para o
+     setor? O que o setor poderia solicitar para o supervisor"): um clique cria os que faltam em todos os setores #}
+  <form class="dm-temas-padrao" method="post" action="{{ '/t/comando/temas-do-setor/padrao'|na_raiz }}">
+    <input type="hidden" name="codigo" value="{{ codigo }}"><input type="hidden" name="setor_id" value="{{ ts.setor_id }}">
+    <p class="dm-nota">Há <b>{{ ts.padrao_faltam }}</b> {{ 'tema padrão' if ts.padrao_faltam == 1 else 'temas padrão' }} para criar nos setores (o que o supervisor pede a cada setor e o que o setor pede ao supervisor). Cada setor muda o nome e o prazo dos seus depois.</p>
+    <button class="gc-btn gc-btn--ui gc-btn--primario" type="submit"{% if not tem_login %} disabled{% endif %}><i class="ph ph-list-plus" aria-hidden="true"></i> Criar os temas padrão</button>
+  </form>
+  {% endif %}
   <table class="dm-temas">
     <thead><tr><th scope="col" class="dm-t-nome">Tema</th><th scope="col">Prazo para responder (dias úteis)</th><th scope="col">Em uso</th><th scope="col"><span class="dm-sr">Salvar</span></th></tr></thead>
     <tbody>
@@ -36,7 +45,7 @@
         {# o campo se chama `tema` e vai sem o preenchimento automático do navegador (12/11/2026, Levi, com o print: "o campo
            que aparece quando vou digitar está mal formatado, conserte!"): chamado `nome`, o Edge abria por cima da tabela a
            lista do que já foi digitado em QUALQUER campo `nome` do Nexus #}
-        <td class="dm-t-nome"><input class="gc-campo" form="{{ f }}" name="tema" value="{{ t.nome }}" maxlength="60" required autocomplete="off" aria-label="Nome do tema"></td>
+        <td class="dm-t-nome">{% if t.area %}<span class="dm-t-area" title="Área do setor: aparece como &quot;{{ t.area }}&quot; na Nova demanda">{{ t.area }}</span>{% endif %}<input class="gc-campo" form="{{ f }}" name="tema" value="{{ t.nome }}" maxlength="60" required autocomplete="off" aria-label="Nome do tema"></td>
         <td><input class="gc-campo dm-prazo-campo" form="{{ f }}" name="prazo" type="number" min="{{ ts.prazo_min }}" max="{{ ts.prazo_max }}" value="{{ t.prazo_dias_uteis }}" required autocomplete="off" aria-label="Prazo de {{ t.nome }} em dias úteis"></td>
         <td><select class="gc-campo" form="{{ f }}" name="ativo" aria-label="{{ t.nome }} em uso"><option value="sim"{% if t.ativo %} selected{% endif %}>sim</option><option value="nao"{% if not t.ativo %} selected{% endif %}>não</option></select></td>
         <td><div class="dm-t-acoes"><form id="{{ f }}" method="post" action="{{ '/t/comando/temas-do-setor/salvar'|na_raiz }}">
@@ -50,7 +59,7 @@
       {% endfor %}
       {# a linha do tema novo: aparece pelo "+" do último tema; o setor sem tema nenhum já a vê aberta #}
       <tr class="dm-t-novo" data-dm-t-novo{% if ts.temas %} hidden{% endif %}>
-        <td class="dm-t-nome"><input class="gc-campo" form="dm-t-novo" name="tema" maxlength="60" required autocomplete="off" placeholder="Nome do novo tema" aria-label="Nome do novo tema"></td>
+        <td class="dm-t-nome">{% if ts.areas %}<select class="gc-campo dm-t-area-sel" form="dm-t-novo" name="area" aria-label="Área do novo tema"><option value="">{{ ts.setor_nome }}</option>{% for a in ts.areas %}<option value="{{ a }}">{{ a }}</option>{% endfor %}</select>{% endif %}<input class="gc-campo" form="dm-t-novo" name="tema" maxlength="60" required autocomplete="off" placeholder="Nome do novo tema" aria-label="Nome do novo tema"></td>
         <td><input class="gc-campo dm-prazo-campo" form="dm-t-novo" name="prazo" type="number" min="{{ ts.prazo_min }}" max="{{ ts.prazo_max }}" value="2" required autocomplete="off" aria-label="Prazo do novo tema em dias úteis"></td>
         <td class="dm-mudo">sim</td>
         <td><div class="dm-t-acoes"><form id="dm-t-novo" method="post" action="{{ '/t/comando/temas-do-setor/salvar'|na_raiz }}">
