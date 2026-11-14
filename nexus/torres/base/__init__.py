@@ -7,7 +7,7 @@ view com a mesma rota (ela vence a genérica), por exemplo:
     def registro_mestre():
         return render_template("base/registro-mestre.html")
 """
-from ...auth.chaves import aba_nexus, registrar_chaves
+from ...auth.chaves import aba_ia, aba_nexus, registrar_chaves
 from ...auth.telas_acessos import registrar_acessos
 from ...casca.raio_x import registrar_raio_x
 from ...cadastro.telas import registrar_base
@@ -136,7 +136,7 @@ registrar_mapa_base(bp)     # /t/base/mapa-base: a subida do mapa do Brasil do M
 registrar_raio_x(bp)        # /t/base/raio-x: o que o processo faz agora (14/10/2026), só administrador, fora do menu
 # as abas das Chaves das fontes: a página da plataforma, a do Nexus e, desde 13/11/2026, a moldura das Fontes do tempo
 # real (uma tela vizinha: a moldura dela mostra as mesmas abas, com a dona = chaves-fontes)
-_ABAS_FONTES = {"primeira": "Fontes da Performance", "outras": [("nexus", "Nexus", aba_nexus)],
+_ABAS_FONTES = {"primeira": "Fontes da Performance", "outras": [("nexus", "Nexus", aba_nexus), ("ia", "IA", aba_ia)],
                 "vizinhas": [("fontes-tempo-real", "Fontes do tempo real")]}
 registrar_molduras(bp, TORRE, abas={"chaves-fontes": _ABAS_FONTES,
                                     "fontes-tempo-real": dict(_ABAS_FONTES, dona="chaves-fontes")})

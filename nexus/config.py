@@ -128,7 +128,7 @@ OPCIONAIS = ("NEXUS_CHAVE_CADASTRO", "NEXUS_ARMAZEM_LOCAL",
              # modelos (JSON, troca sem deploy) e o teto do mês em dólar. Sem chave, o modelo aparece "sem chave" na tela
              "ANTHROPIC_API_KEY", "GEMINI_API_KEY", "XAI_API_KEY", "GROQ_API_KEY", "OPENROUTER_API_KEY",
              "NEXUS_IA_MODELOS", "NEXUS_IA_TETO_USD", "NEXUS_IA_DIAGNOSTICO_MODELO",
-             "NEXUS_IA_PADRAO")
+             "NEXUS_IA_PADRAO", "NVIDIA_API_KEY")
 
 
 class ConfigErro(RuntimeError):

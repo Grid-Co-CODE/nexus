@@ -18,7 +18,12 @@
 <nav class="gc-subabas" aria-label="{{ tela.nome }}">
   {% for a in abas %}<a href="{{ a.url|na_raiz }}"{% if a.atual %} aria-current="page"{% endif %}>{{ a.nome }}</a>{% endfor %}
 </nav>
+{% if grupo == 'ia' %}
+{# a aba IA (14/11/2026): as 3 vagas da NVIDIA, na ordem do rodízio #}
+<p class="cad-sub chv-sub">As chaves da NVIDIA da Nexus IA. A pergunta vai pela chave 1; quando a NVIDIA barra uma chave (o limite de uso) ou a recusa, ela descansa e a pergunta vai à próxima. Com uma chave aqui, o Pergunte à Nexus IA e o diagnóstico do dia passam a usar o Nemotron 3 Ultra pela NVIDIA. O valor nunca aparece de volta.</p>
+{% else %}
 <p class="cad-sub chv-sub">As chaves que o Nexus usa, postas aqui sem a T.I. e sem reiniciar. O valor nunca aparece de volta.</p>
+{% endif %}
 
 {% if aviso %}<div class="cad-aviso cad-aviso--ok" role="status"><i class="ph ph-check-circle"></i><div><strong>Feito.</strong> {{ aviso }}</div></div>{% endif %}
 {% if erro %}<div class="cad-aviso cad-aviso--alerta" role="alert"><i class="ph ph-warning"></i><div><strong>Nada mudou.</strong> {{ erro }}</div></div>{% endif %}
@@ -31,7 +36,9 @@
     {% if c.origem == 'tela' %}<span class="gc-status gc-status--ok">Posta pela tela</span>
     {% elif c.origem == 'env' %}<span class="gc-status gc-status--ok">Posta no .env do servidor</span>
     {% else %}<span class="gc-status gc-status--alerta">Não posta</span>{% endif %}
+    {% if c.descanso %}<span class="gc-status gc-status--alerta">Em descanso até {{ c.descanso_ate }}</span>{% endif %}
   </div>
+  {% if c.descanso %}<p class="chv-quando">{{ c.descanso|capitalize }}: a próxima vaga responde até lá.</p>{% endif %}
   <p class="chv-para">Para {{ c.para }}. Variável <span class="gc-dado">{{ c.id }}</span>; {% if c.arquivo %}vem do arquivo <span class="gc-dado">{{ c.arquivo }}</span>{% else %}é {{ c.dica }}{% endif %}.</p>
   {% if c.origem == 'tela' %}<p class="chv-quando">Gravada em {{ c.quando }}{% if c.por %} por {{ c.por }}{% endif %}.{% if c.env_tambem %} O .env também tem uma; vale a da tela.{% endif %}</p>{% endif %}
   {% if c.nao_abre %}<div class="cad-aviso cad-aviso--critico" role="alert"><i class="ph ph-warning-octagon"></i><div><strong>A chave gravada pela tela não abre.</strong> A NEXUS_SECRET_KEY deste servidor mudou depois que ela foi gravada{% if c.origem == 'env' %}; vale a do .env{% endif %}. Cole a chave de novo.</div></div>{% endif %}

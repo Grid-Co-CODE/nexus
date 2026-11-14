@@ -30,6 +30,7 @@ from . import ia as IA
 log = logging.getLogger(__name__)
 
 MODELO_PADRAO = "nemotron"       # o grátis com a melhor nota no teste de 14/11/2026; NEXUS_IA_DIAGNOSTICO_MODELO troca
+                                 # (com a chave da NVIDIA, o mesmo Nemotron vai por ela: `modelo`)
 ESPERA_ERRO_S = 20 * 60          # o erro guardado vale isto; depois a próxima abertura tenta de novo
 TRAVA_MORTA_S = 5 * 60           # a trava mais velha que isto é de um pedido que morreu (o servidor reiniciou)
 MAX_ITENS = {"tem_que_fazer": 4, "pode_fazer": 3, "pendente": 4}
@@ -128,7 +129,8 @@ def _pasta(cfg, dia: str) -> Path | None:
 
 
 def modelo(cfg) -> str:
-    return str(cfg.get("NEXUS_IA_DIAGNOSTICO_MODELO") or MODELO_PADRAO).strip()
+    """O NEXUS_IA_DIAGNOSTICO_MODELO; sem ele, o padrão da Nexus IA (o Nemotron pela NVIDIA quando há a chave dela)."""
+    return str(cfg.get("NEXUS_IA_DIAGNOSTICO_MODELO") or IA.padrao(cfg) or MODELO_PADRAO).strip()
 
 
 def disponivel(cfg) -> bool:

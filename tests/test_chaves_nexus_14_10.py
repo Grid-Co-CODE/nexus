@@ -227,3 +227,41 @@ def test_token_do_github_que_nao_serve_nao_grava(app, admin, valor, resp, pedaco
     r = _gravar_token(admin, valor)
     assert r.status_code == 400 and pedaco in r.get_data(as_text=True)
     assert PB.token(app.config) == ("", "") and "Chaves das fontes" in PB.SEM_TOKEN
+
+
+# ── a aba IA: as 3 vagas da NVIDIA (14/11/2026) ────────────────────────────────────────────────────────────────────────
+def test_a_aba_ia_tem_as_tres_vagas_da_nvidia_e_confere_antes_de_gravar(app, admin, monkeypatch):
+    """Levi, 14/11/2026: "Cria um campo no nexus chamado de IA QUE VAI TER A CHAVE DA NVIDIA. BOTE SLOTS PARA 3 CHAVES,
+    QUANDO UMA ACABAR USE A OUTRA"."""
+    from nexus.auth import chaves as CHV
+    from nexus.comando import ia as IA
+    h = admin.get("/t/base/chaves-fontes?aba=ia").get_data(as_text=True)
+    assert '<a href="/t/base/chaves-fontes?aba=ia" aria-current="page">IA</a>' in h
+    assert h.count('name="chave" value="NVIDIA_API_KEY_') == 3 and "NEXUS_CONTESTACAO" not in h
+    nexus = admin.get(PAGINA).get_data(as_text=True)
+    assert "NVIDIA_API_KEY_1" not in nexus                                    # a aba Nexus fica com as dela
+    codigo = re.search(r'name="codigo" value="([^"]+)"', h).group(1)
+    # a que não começa com nvapi- não grava, e o valor não volta na tela
+    r = admin.post(URL, data={"codigo": codigo, "chave": "NVIDIA_API_KEY_1", "acao": "gravar", "valor": "sk-errada-123"})
+    assert r.status_code == 400 and "começa com nvapi-" in r.get_data(as_text=True) and "sk-errada-123" not in r.get_data(as_text=True)
+
+    class R:
+        def __init__(self, st):
+            self.status_code = st
+    pedidos = []
+    monkeypatch.setattr("requests.post", lambda url, **k: pedidos.append(k["headers"]["Authorization"]) or R(200))
+    chave = "nvapi-" + "a" * 40
+    r = admin.post(URL, data={"codigo": codigo, "chave": "NVIDIA_API_KEY_1", "acao": "gravar", "valor": chave})
+    assert r.status_code == 303 and r.headers["Location"].endswith("/t/base/chaves-fontes?aba=ia")
+    assert pedidos == [f"Bearer {chave}"]
+    with app.app_context():
+        assert IA.chaves_nvidia(app.config) == [("vaga 1", chave)]
+        assert IA.padrao(app.config) == "nemotron-nvidia"                    # "Aí boto a chave e já vou usando"
+    h = admin.get("/t/base/chaves-fontes?aba=ia").get_data(as_text=True)
+    assert "Posta pela tela" in h and chave not in h
+    # a recusada (401) não grava
+    monkeypatch.setattr("requests.post", lambda url, **k: R(401))
+    codigo = re.search(r'name="codigo" value="([^"]+)"', h).group(1)
+    r = admin.post(URL, data={"codigo": codigo, "chave": "NVIDIA_API_KEY_2", "acao": "gravar", "valor": "nvapi-" + "b" * 40})
+    assert r.status_code == 400 and "recusou a chave" in r.get_data(as_text=True)
+    assert CHV.CHAVES["NVIDIA_API_KEY_3"]["grupo"] == "ia"

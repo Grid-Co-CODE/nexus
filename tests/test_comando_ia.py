@@ -453,3 +453,42 @@ def test_o_relatorio_do_tema_da_conversa():
     assert IA.temas_da_conversa("Algo mais?", "Os chamados da garantia: 2 chamados parados.") == ["chamados"]
     hoje = date(2026, 11, 14)
     assert IA.mes_da_conversa("Por que caiu?", hoje) == "2026-11" and IA.mes_da_conversa("e em outubro?", hoje) == "2026-10"
+
+
+# ── a NVIDIA com 3 vagas e o rodízio (14/11/2026) ──────────────────────────────────────────────────────────────────────
+def test_a_vaga_barrada_descansa_e_a_pergunta_vai_a_proxima(monkeypatch, tmp_path):
+    """Levi: "BOTE SLOTS PARA 3 CHAVES, QUANDO UMA ACABAR USE A OUTRA"."""
+    cfg = {"NEXUS_DADOS": str(tmp_path)}
+    monkeypatch.setattr(IA, "chaves_nvidia", lambda c: [("vaga 1", "nvapi-a"), ("vaga 2", "nvapi-b"), ("vaga 3", "nvapi-c")])
+    usadas = []
+
+    def chamar(m, k, *a):
+        usadas.append(k)
+        if k == "nvapi-a":
+            return {"erro": "O NVIDIA pediu para esperar (limite de uso): tente de novo em instantes.", "status": 429}
+        if k == "nvapi-b":
+            return {"erro": "A chave do NVIDIA foi recusada (401).", "status": 401}
+        return {"texto": "Bem (§3).", "entrada": 1, "saida": 1}
+    monkeypatch.setattr(IA, "_chamar", chamar)
+    m = next(x for x in IA.MODELOS_PADRAO if x.id == "nemotron-nvidia")
+    r = IA.responder(cfg, m, DOSSIE, "?")
+    assert r["ok"] and r["servido_por"] == "NVIDIA, vaga 3" and usadas == ["nvapi-a", "nvapi-b", "nvapi-c"]
+    d = IA.descansos(cfg)
+    assert set(d) == {IA.impressao("nvapi-a"), IA.impressao("nvapi-b")} and "nvapi" not in json.dumps(d)
+    assert d[IA.impressao("nvapi-a")]["motivo"] == "a NVIDIA barrou pelo limite (429)"
+    # a próxima pergunta já começa pela vaga livre
+    usadas.clear()
+    assert IA.responder(cfg, m, DOSSIE, "?")["ok"] and usadas == ["nvapi-c"]
+    # erro que não é da chave (o modelo, a rede) não gasta as outras vagas
+    monkeypatch.setattr(IA, "chaves_nvidia", lambda c: [("vaga 1", "nvapi-d"), ("vaga 2", "nvapi-e")])
+    usadas.clear()
+    monkeypatch.setattr(IA, "_chamar", lambda m, k, *a: usadas.append(k) or {"erro": "O NVIDIA respondeu 500", "status": 500})
+    assert not IA.responder(cfg, m, DOSSIE, "?")["ok"] and usadas == ["nvapi-d"]
+
+
+def test_com_a_chave_da_nvidia_o_nemotron_vai_por_ela():
+    assert IA.padrao({"NVIDIA_API_KEY": "nvapi-x", "OPENROUTER_API_KEY": "k"}) == "nemotron-nvidia"
+    assert IA.padrao({"OPENROUTER_API_KEY": "k"}) == "nemotron"
+    assert IA.TROCA_GRATIS[0] == "nemotron-nvidia"
+    falta = next(m for m in IA.disponiveis({}) if m["id"] == "nemotron-nvidia")["motivo"]
+    assert falta == "Falta a chave da NVIDIA (Base › Chaves das fontes › IA)."

@@ -751,6 +751,20 @@ a peça diz isso), e a peça que quebrar vai ao log e diz que não montou, nunca
 
 ## Chaves do Nexus (Base → Chaves das fontes → aba Nexus, 14/10/2026)
 
+**A aba IA (14/11/2026):** as 3 vagas da chave da NVIDIA da Nexus IA (`NVIDIA_API_KEY_1..3`, `grupo: "ia"` em `CHAVES`;
+`aba_ia`, `/t/base/chaves-fontes?aba=ia`). Levi: "Cria um campo no nexus chamado de IA QUE VAI TER A CHAVE DA NVIDIA.
+BOTE SLOTS PARA 3 CHAVES, QUANDO UMA ACABAR USE A OUTRA".
+- O mesmo cofre da aba Nexus: a chave fica cifrada no `chaves.json` e nunca aparece de volta. A aba Nexus mostra só as
+  chaves sem grupo, e o Gravar volta à aba da chave.
+- A conferência (`_conferir_nvidia`) exige o formato `nvapi-` e faz um pedido de 1 token ao Nemotron 3 Ultra:
+  - a chave recusada (401, 403) não grava;
+  - com o limite (429), grava, porque a chave existe.
+- O rodízio mora em `nexus/comando/ia.py` (`chaves_nvidia`, `_chamar_nvidia`):
+  - a pergunta vai pela vaga 1; a vaga barrada (402, 429) descansa 10 min, e a recusada (401, 403), 6 h;
+  - a pergunta vai à próxima vaga; outro erro (o modelo, a rede) não gasta as outras;
+  - o descanso fica em `<NEXUS_DADOS>/ia/nvidia-vagas.json`, pela impressão (sha256) da chave, e a aba diz até quando;
+  - a `NVIDIA_API_KEY` do .env entra depois das vagas.
+
 Levi, sobre pôr a chave das contestações no servidor pela T.I.: "Se precisa de TI então vou ter que mandar um arquivo novo
 de deploy para a TI ué!". Depois de colar a 1ª ("deu certo"): "bote essa informação na seção Chave das fontes!" — a
 página é a aba **Nexus** de Base → Chaves das fontes (`/t/base/chaves-fontes?aba=nexus`, ao lado da aba "Fontes da

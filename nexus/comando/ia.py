@@ -79,10 +79,12 @@ PROVEDORES = {
     "xai": {"nome": "xAI Grok", "chave": "XAI_API_KEY", "onde": "console.x.ai"},
     "groq": {"nome": "Groq", "chave": "GROQ_API_KEY", "onde": "console.groq.com"},
     "openrouter": {"nome": "OpenRouter", "chave": "OPENROUTER_API_KEY", "onde": "openrouter.ai"},
+    # a NVIDIA direto (14/11/2026): as chaves vêm de Base › Chaves das fontes › IA (3 vagas, `chaves_nvidia`) e do .env
+    "nvidia": {"nome": "NVIDIA", "chave": "NVIDIA_API_KEY", "onde": "build.nvidia.com"},
 }
 # os provedores que falam o formato "chat/completions"
 _BASE_COMPATIVEL = {"xai": "https://api.x.ai/v1", "groq": "https://api.groq.com/openai/v1",
-                    "openrouter": "https://openrouter.ai/api/v1"}
+                    "openrouter": "https://openrouter.ai/api/v1", "nvidia": "https://integrate.api.nvidia.com/v1"}
 _GEMINI = "https://generativelanguage.googleapis.com/v1beta"
 
 
@@ -103,6 +105,9 @@ MODELOS_PADRAO = (
     Modelo("opus", "Claude Opus 5.5", "anthropic", "claude-opus-5-5", 4.0, 20.0, True),
     Modelo("sonnet", "Claude Sonnet 5.5", "anthropic", "claude-sonnet-5-5", 2.0, 10.0, True),
     Modelo("haiku", "Claude Haiku 5.5", "anthropic", "claude-haiku-5-5", 0.10, 0.50, True),
+    # o mesmo Nemotron 3 Ultra direto na NVIDIA (14/11/2026): o catálogo dela (integrate.api.nvidia.com) tem o modelo com
+    # o mesmo nome; o grátis da NVIDIA é por pedidos por minuto (cerca de 40), sem a cota de 50 por dia do OpenRouter
+    Modelo("nemotron-nvidia", "Nemotron 3 Ultra (NVIDIA)", "nvidia", "nvidia/nemotron-3-ultra-550b-a55b", 0.0, 0.0),
     Modelo("nemotron", "Nemotron 3 Ultra grátis", "openrouter", "nvidia/nemotron-3-ultra-550b-a55b:free", 0.0, 0.0),
     Modelo("gemini-lite", "Gemini 3.1 Flash-Lite grátis", "gemini", "gemini-3.1-flash-lite", 0.0, 0.0),
     Modelo("groq-oss", "GPT-OSS 120B grátis (Groq)", "groq", "openai/gpt-oss-120b", 0.0, 0.0),
@@ -135,7 +140,100 @@ def modelos(cfg) -> list[Modelo]:
 
 
 def chave(cfg, provedor: str) -> str:
+    if provedor == "nvidia":
+        ks = chaves_nvidia(cfg)
+        return ks[0][1] if ks else ""
     return str(cfg.get(PROVEDORES[provedor]["chave"]) or "").strip()
+
+
+# ── as 3 vagas da NVIDIA e o rodízio (14/11/2026) ────────────────────────────────────────────────────────────────────
+# Levi: "BOTE SLOTS PARA 3 CHAVES, QUANDO UMA ACABAR USE A OUTRA". As vagas são as chaves NVIDIA_API_KEY_1..3 de Base ›
+# Chaves das fontes › IA (cifradas, `nexus/auth/chaves.py`), na ordem, e depois a NVIDIA_API_KEY do .env. A chave que a
+# NVIDIA barra (o limite, 429; o crédito, 402) descansa `DESCANSO_LIMITE_S`; a recusada (401, 403: vencida, apagada)
+# descansa `DESCANSO_RECUSADA_S`. A pergunta vai à próxima vaga. O descanso fica em `<NEXUS_DADOS>/ia/nvidia-vagas.json`,
+# pela impressão da chave (sha256, 12 caracteres): nunca a chave.
+VAGAS_NVIDIA = ("NVIDIA_API_KEY_1", "NVIDIA_API_KEY_2", "NVIDIA_API_KEY_3")
+DESCANSO_LIMITE_S = 10 * 60
+DESCANSO_RECUSADA_S = 6 * 3600
+
+
+def chaves_nvidia(cfg) -> list[tuple[str, str]]:
+    """[(vaga, chave)] das vagas com chave, na ordem (a do .env por último, se não repete uma vaga)."""
+    from ..auth import chaves as CH
+    out, vistas = [], set()
+    for i, nome in enumerate(VAGAS_NVIDIA, 1):
+        try:
+            k = str(CH.valor(nome, cfg) or "").strip()
+        except Exception:        # noqa: BLE001 — sem a pasta ou a cifra: a vaga fica vazia
+            k = ""
+        if k and k not in vistas:
+            out.append((f"vaga {i}", k))
+            vistas.add(k)
+    env = str(cfg.get("NVIDIA_API_KEY") or "").strip()
+    if env and env not in vistas:
+        out.append((".env", env))
+    return out
+
+
+def impressao(k: str) -> str:
+    import hashlib
+    return hashlib.sha256(str(k).encode()).hexdigest()[:12]
+
+
+def _arquivo_vagas(cfg) -> Path | None:
+    p = _pasta(cfg)
+    return p / "nvidia-vagas.json" if p else None
+
+
+def descansos(cfg) -> dict:
+    """{impressão: {"ate": ts, "motivo": texto, "em": iso}} das chaves em descanso agora."""
+    arq = _arquivo_vagas(cfg)
+    try:
+        d = json.loads(arq.read_text(encoding="utf-8")) if arq and arq.exists() else {}
+    except (OSError, ValueError):
+        d = {}
+    agora = time.time()
+    return {k: v for k, v in d.items() if isinstance(v, dict) and float(v.get("ate") or 0) > agora}
+
+
+def _descansar(cfg, k: str, segundos: int, motivo: str) -> None:
+    arq = _arquivo_vagas(cfg)
+    if not arq:
+        return
+    d = descansos(cfg)
+    d[impressao(k)] = {"ate": time.time() + segundos, "motivo": motivo,
+                       "em": datetime.now(_BRT).isoformat(timespec="seconds")}
+    try:
+        arq.parent.mkdir(parents=True, exist_ok=True)
+        arq.write_text(json.dumps(d), encoding="utf-8")
+    except OSError as ex:
+        log.error("IA: o descanso da chave da NVIDIA não foi gravado (%s).", ex)
+
+
+def _chamar_nvidia(cfg, m: "Modelo", dossie: str, msgs: list, contexto: str = "") -> dict:
+    """A pergunta pela 1ª vaga livre; a barrada descansa e a pergunta vai à próxima. Todas em descanso: tenta mesmo assim a
+    que descansa há mais tempo (o limite por minuto pode já ter passado)."""
+    ks = chaves_nvidia(cfg)
+    if not ks:
+        return {"erro": "Falta a chave da NVIDIA (Base › Chaves das fontes › IA)."}
+    parados = descansos(cfg)
+    livres = [x for x in ks if impressao(x[1]) not in parados] or \
+        sorted(ks, key=lambda x: parados.get(impressao(x[1]), {}).get("ate", 0))[:1]
+    ultimo = {}
+    for vaga, k in livres:
+        r = _chamar(m, k, dossie, msgs, contexto)
+        st = r.get("status")
+        if not r.get("erro"):
+            r["servido_por"] = f"NVIDIA, {vaga}"
+            return r
+        if st in (402, 429):
+            _descansar(cfg, k, DESCANSO_LIMITE_S, f"a NVIDIA barrou pelo limite ({st})")
+        elif st in (401, 403):
+            _descansar(cfg, k, DESCANSO_RECUSADA_S, f"a NVIDIA recusou a chave ({st})")
+        else:
+            return r                  # outro erro (o modelo, a rede): não é da chave, não adianta a próxima
+        ultimo = r
+    return ultimo
 
 
 def disponiveis(cfg) -> list[dict]:
@@ -144,8 +242,9 @@ def disponiveis(cfg) -> list[dict]:
     for m in modelos(cfg):
         p = PROVEDORES[m.provedor]
         tem = bool(chave(cfg, m.provedor))
-        out.append(dict(asdict(m), provedor_nome=p["nome"], tem_chave=tem,
-                        motivo="" if tem else f"Falta a {p['chave']} no servidor ({p['onde']})."))
+        falta = ("Falta a chave da NVIDIA (Base › Chaves das fontes › IA)." if m.provedor == "nvidia"
+                 else f"Falta a {p['chave']} no servidor ({p['onde']}).")
+        out.append(dict(asdict(m), provedor_nome=p["nome"], tem_chave=tem, motivo="" if tem else falta))
     return out
 
 
@@ -235,10 +334,11 @@ def _erro_http(nome: str, r) -> dict:
     inexistente = r.status_code == 404 or "model" in str(msg or "").lower() and ("not found" in str(msg).lower()
                                                                               or "does not exist" in str(msg).lower())
     if r.status_code in (401, 403):
-        return {"erro": f"A chave do {nome} foi recusada ({r.status_code})."}
-    if r.status_code == 429:
-        return {"erro": f"O {nome} pediu para esperar (limite de uso): tente de novo em instantes."}
-    return {"erro": f"O {nome} respondeu {r.status_code}: {str(msg or '')[:200]}", "modelo_inexistente": inexistente}
+        return {"erro": f"A chave do {nome} foi recusada ({r.status_code}).", "status": r.status_code}
+    if r.status_code in (402, 429):
+        return {"erro": f"O {nome} pediu para esperar (limite de uso): tente de novo em instantes.", "status": r.status_code}
+    return {"erro": f"O {nome} respondeu {r.status_code}: {str(msg or '')[:200]}", "modelo_inexistente": inexistente,
+            "status": r.status_code}
 
 
 def _chamar_gemini(m: Modelo, k: str, dossie: str, msgs: list, contexto: str = "") -> dict:
@@ -329,8 +429,11 @@ def responder(cfg, m: Modelo, dossie: str, pergunta: str, historico=None, setore
         return dict(base, ok=False, erro=f"Falta a {PROVEDORES[m.provedor]['chave']} no servidor.")
     t0 = time.monotonic()
     try:
-        r = _chamar(m, k, neutro(dossie), _mensagens(historico, pergunta),
-                    _contexto([neutro(s) for s in setores], neutro(meu_setor)) if setores is not None else "")
+        ctx = _contexto([neutro(s) for s in setores], neutro(meu_setor)) if setores is not None else ""
+        if m.provedor == "nvidia":
+            r = _chamar_nvidia(cfg, m, neutro(dossie), _mensagens(historico, pergunta), ctx)
+        else:
+            r = _chamar(m, k, neutro(dossie), _mensagens(historico, pergunta), ctx)
     except Exception as ex:      # noqa: BLE001 — um provedor quebrado não derruba os outros
         log.exception("IA: %s falhou", m.id)
         r = {"erro": f"Falhou ({type(ex).__name__})."}
@@ -391,7 +494,7 @@ def perguntar(cfg, ids: list[str], dossie: str, pergunta: str, historico=None, s
 
 
 # a ordem da troca entre os grátis (o teste de 14/11/2026: o Nemotron com a melhor nota; depois os rápidos)
-TROCA_GRATIS = ("nemotron", "gemini-lite", "groq-oss")
+TROCA_GRATIS = ("nemotron-nvidia", "nemotron", "gemini-lite", "groq-oss")
 
 
 # ── as ações de outro setor (o bloco <acoes>) ─────────────────────────────────────────────────────────────────────────
@@ -498,16 +601,23 @@ def mes_da_conversa(pergunta: str, hoje) -> str:
     return p.get("mes") if cita and p.get("mes") else RU.meses(hoje)[0][0]
 
 
-# o modelo da janela (14/11/2026, Levi: "Bora usar como padrão esse Nemotron 3 Ultra"); NEXUS_IA_PADRAO troca
+# o modelo da janela (14/11/2026, Levi: "Bora usar como padrão esse Nemotron 3 Ultra"); NEXUS_IA_PADRAO troca. Com a chave
+# da NVIDIA (Base › Chaves das fontes › IA: "Aí boto a chave e já vou usando"), o Nemotron vai pela NVIDIA; sem ela, pelo
+# OpenRouter
 MODELO_PADRAO = "nemotron"
+PREFERIDOS = ("nemotron-nvidia", "nemotron")
 
 
 def padrao(cfg) -> str:
-    """O modelo que vem marcado: o padrão, se tem chave; senão, o primeiro com chave; "" sem nenhum."""
+    """O modelo que vem marcado: o NEXUS_IA_PADRAO, se tem chave; senão o 1º dos preferidos com chave; senão o primeiro com
+    chave; "" sem nenhum."""
     lista = disponiveis(cfg)
-    quer = str(cfg.get("NEXUS_IA_PADRAO") or MODELO_PADRAO).strip()
     com = [m["id"] for m in lista if m.get("tem_chave")]
-    return quer if quer in com else (com[0] if com else "")
+    quer = str(cfg.get("NEXUS_IA_PADRAO") or "").strip()
+    for mid in ((quer,) if quer else ()) + PREFERIDOS:
+        if mid in com:
+            return mid
+    return com[0] if com else ""
 
 
 # ── as citações e as OS da resposta ───────────────────────────────────────────────────────────────────────────────────

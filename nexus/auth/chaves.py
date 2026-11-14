@@ -183,6 +183,40 @@ def _conferir_esri(valor: str) -> str:
     return f"a chave tem {len(valor)} caracteres"
 
 
+def _conferir_nvidia(valor: str) -> str:
+    """A chave da NVIDIA (build.nvidia.com; 14/11/2026, a Nexus IA): começa com nvapi-. Confere com um pedido de 1 token ao
+    Nemotron 3 Ultra: recusada (401, 403) não grava; o limite (429) grava, porque a chave existe."""
+    import requests
+    if not re.fullmatch(r"nvapi-[A-Za-z0-9_\-]{20,200}", valor or ""):
+        raise Recusada("Isto não parece uma chave da NVIDIA (ela começa com nvapi-): nada foi gravado.")
+    try:
+        r = requests.post("https://integrate.api.nvidia.com/v1/chat/completions", timeout=60,
+                          headers={"Authorization": f"Bearer {valor}", "Content-Type": "application/json"},
+                          json={"model": "nvidia/nemotron-3-ultra-550b-a55b", "max_tokens": 1,
+                                "messages": [{"role": "user", "content": "ok"}]})
+    except Exception as e:       # noqa: BLE001 — rede: não grava sem conferir
+        raise Recusada(f"Não consegui falar com a NVIDIA ({type(e).__name__}): nada foi gravado; tente de novo.") from None
+    if r.status_code in (401, 403):
+        raise Recusada(f"A NVIDIA recusou a chave ({r.status_code}): vencida, apagada ou copiada pela metade. Nada foi gravado.")
+    if r.status_code in (402, 429):
+        return "a NVIDIA pediu para esperar (limite de uso), mas a chave existe"
+    if r.status_code != 200:
+        raise Recusada(f"A NVIDIA respondeu {r.status_code}: nada foi gravado.")
+    return "a NVIDIA respondeu com esta chave"
+
+
+# as 3 vagas da NVIDIA (14/11/2026, Levi: "BOTE SLOTS PARA 3 CHAVES, QUANDO UMA ACABAR USE A OUTRA"): a aba IA das Chaves
+# das fontes; a ordem é a do rodízio (nexus/comando/ia.py, `chaves_nvidia`)
+_VAGA_NVIDIA = {
+    "para": "a Nexus IA (o Pergunte à Nexus IA e o diagnóstico do dia no prontuário) responder pelo Nemotron 3 Ultra da "
+            "NVIDIA. Quando esta vaga é barrada (o limite) ou recusada, a pergunta vai à próxima",
+    "arquivo": "",
+    "dica": "a chave criada em build.nvidia.com (começa com nvapi-)",
+    "conferir": _conferir_nvidia,
+    "grupo": "ia",
+}
+
+
 CHAVES = {
     "NEXUS_CONTESTACAO_CHAVE_PRIVADA": {
         "nome": "Contestações dos clientes (chave privada)",
@@ -281,6 +315,9 @@ CHAVES = {
         # recebeu o que o navegador preencheu sozinho, e a tela recusou "use 1 (liga) ou 0 (desliga)")
         "escolha": (("1", "1 · liga o Mapa de equipe nesta máquina"), ("0", "0 · desliga")),
     },
+    "NVIDIA_API_KEY_1": dict(_VAGA_NVIDIA, nome="NVIDIA: chave 1 (a primeira a ser usada)"),
+    "NVIDIA_API_KEY_2": dict(_VAGA_NVIDIA, nome="NVIDIA: chave 2 (quando a 1 é barrada)"),
+    "NVIDIA_API_KEY_3": dict(_VAGA_NVIDIA, nome="NVIDIA: chave 3 (quando a 1 e a 2 são barradas)"),
 }
 
 
@@ -380,7 +417,19 @@ def estado(config) -> list[dict]:
         if d.get("escolha"):
             atual = str(valor(nome, config) or "").strip()
             agora = "ligada" if atual == "1" else "desligada"
+        # a vaga da NVIDIA em descanso (barrada ou recusada): a tela diz até quando (nunca a chave)
+        descanso = {}
+        if d.get("grupo") == "ia":
+            try:
+                from ..comando import ia as IA
+                k = str(valor(nome, config) or "").strip()
+                descanso = IA.descansos(config).get(IA.impressao(k), {}) if k else {}
+            except Exception:    # noqa: BLE001
+                descanso = {}
         out.append({"id": nome, "nome": d["nome"], "para": d["para"], "arquivo": d["arquivo"], "dica": d.get("dica", ""),
+                    "grupo": d.get("grupo", ""), "descanso": descanso.get("motivo", ""),
+                    "descanso_ate": A.hora_br(datetime.fromtimestamp(descanso["ate"], timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"))
+                    if descanso.get("ate") else "",
                     "escolha": d.get("escolha") or (), "agora": agora, "origem": origem,
                     "quando": A.hora_br(item.get("quando")) if item else "", "por": (item or {}).get("por", ""),
                     "nao_abre": nao_abre, "env_tambem": env and bool(item)})
@@ -438,17 +487,20 @@ def _quem() -> str:
 # o endereço da página: a aba "Nexus" de Base → Chaves das fontes (14/10/2026, Levi: "bote essa informação na seção
 # Chave das fontes!"); o /t/base/chaves-nexus de antes só recebe o formulário e leva para cá
 ENDERECO = "/t/base/chaves-fontes?aba=nexus"
+ENDERECO_IA = "/t/base/chaves-fontes?aba=ia"
 
 
-def _pagina(erro: str | None = None, status: int = 200, abas=None):
+def _pagina(erro: str | None = None, status: int = 200, abas=None, grupo: str = ""):
+    """A aba "Nexus" (as chaves sem grupo) ou a aba "IA" (`grupo="ia"`: as 3 vagas da NVIDIA)."""
     from ..torres.base import TORRE
     from ..torres.moldura import abas_da_tela
     from ..performance import porta
     if abas is None:
         t = next(x for x in porta.da_torre("base") if x.tela == "chaves-fontes")
-        abas = abas_da_tela(t, "Fontes da Performance", [("nexus", "Nexus", None)], "nexus")
+        abas = abas_da_tela(t, "Fontes da Performance", [("nexus", "Nexus", None), ("ia", "IA", None)], grupo or "nexus")
+    lista = [c for c in estado(current_app.config) if (c.get("grupo") or "") == grupo]
     resp = current_app.make_response((render_template(
-        "acessos/chaves.html", torre=TORRE, tela=TORRE.tela("chaves-fontes"), abas=abas, chaves=estado(current_app.config),
+        "acessos/chaves.html", torre=TORRE, tela=TORRE.tela("chaves-fontes"), abas=abas, chaves=lista, grupo=grupo,
         sem_pasta=_caminho(current_app.config) is None, codigo=_codigo(), erro=erro, acao="/t/base/chaves-nexus",
         aviso=session.pop(_CHAVE_AVISO, None)), status))
     resp.headers["Cache-Control"] = "no-store"
@@ -468,6 +520,14 @@ def aba_nexus(abas):
     return _pagina(abas=abas)
 
 
+def aba_ia(abas):
+    """A aba "IA" de Base → Chaves das fontes (14/11/2026, Levi: "Cria um campo no nexus chamado de IA QUE VAI TER A CHAVE
+    DA NVIDIA"): as 3 vagas da NVIDIA. Só administrador."""
+    if not session.get("admin"):
+        return _sem_permissao()
+    return _pagina(abas=abas, grupo="ia")
+
+
 def _post():
     from .telas_acessos import _de_outro_site
     if _de_outro_site():
@@ -485,10 +545,10 @@ def _post():
         else:
             raise Recusada("Ação desconhecida: nada mudou.")
     except Recusada as ex:
-        return _pagina(erro=str(ex), status=400)
+        return _pagina(erro=str(ex), status=400, grupo=(CHAVES.get(nome) or {}).get("grupo", ""))
     session[_CHAVE_AVISO] = aviso
     from ..prefixo import na_raiz
-    return redirect(na_raiz(ENDERECO), code=303)
+    return redirect(na_raiz(ENDERECO_IA if (CHAVES.get(nome) or {}).get("grupo") == "ia" else ENDERECO), code=303)
 
 
 def registrar_chaves(bp) -> None:
