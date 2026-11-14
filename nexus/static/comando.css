@@ -336,7 +336,15 @@ a.ins-titulo:hover{color:var(--verde-texto)}
 .dm-campo .gc-campo{width:100%;box-sizing:border-box}
 .dm-dupla{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .dm-usinas legend{margin-bottom:6px;padding:0}
-.dm-usinas-lista{max-height:150px;overflow:auto;border:1px solid var(--linha-forte);border-radius:var(--raio-controle);padding:6px 8px;background:var(--superficie-2)}
+.dm-dupla--topo{align-items:start}
+.dm-usinas-marcadas{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.dm-usinas-marcadas:empty{display:none}
+.dm-chip{display:inline-flex;align-items:center;gap:6px;padding:2px 10px;border:1px solid var(--linha-forte);border-radius:999px;
+  background:var(--superficie-2);color:var(--tinta);font:500 12.5px/18px var(--font-sans);cursor:pointer}
+.dm-chip:hover{border-color:var(--tinta-2)}
+.dm-chip span{color:var(--mudo)}
+.dm-usinas-lista[hidden]{display:none}
+.dm-usinas-lista{margin-top:6px;max-height:150px;overflow:auto;border:1px solid var(--linha-forte);border-radius:var(--raio-controle);padding:6px 8px;background:var(--superficie-2)}
 .dm-usina{display:flex;gap:8px;align-items:center;padding:3px 0;font-size:13px;cursor:pointer}
 .dm-usina[hidden]{display:none}
 .dm-temas{width:100%;max-width:880px;border-collapse:collapse;margin-top:14px;font-size:13px;background:var(--superficie);

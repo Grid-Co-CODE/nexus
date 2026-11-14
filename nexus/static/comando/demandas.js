@@ -89,10 +89,43 @@ window.NexusDemandaNova = function (dlg) {
   var busca = dlg.querySelector('[data-dm-f-busca]'), caixa = dlg.querySelector('[data-dm-f-usinas]');
   var fixa = dlg.querySelector('[data-dm-f-usina-fixa]');
   var fOs = dlg.querySelector('[data-dm-f-os]'), osDica = dlg.querySelector('[data-dm-f-os-dica]'), dicaOs = osDica.textContent;
+  // a lista recolhida: abre quando a pessoa digita e mostra só o que bate; as marcadas viram etiquetas embaixo da busca
+  // (o clique na etiqueta desmarca). Esc limpa a busca e recolhe (14/11/2026, Levi: "eu quero que fique recolhido")
+  var marcadasEl = dlg.querySelector('[data-dm-f-marcadas]');
+  function etiquetas() {
+    if (!marcadasEl) return;
+    marcadasEl.innerHTML = '';
+    caixa.querySelectorAll('input:checked').forEach(function (i) {
+      var b = document.createElement('button');
+      b.type = 'button'; b.className = 'dm-chip'; b.setAttribute('data-dm-f-tira', i.value);
+      b.title = 'Tirar esta usina';
+      b.appendChild(document.createTextNode(i.parentNode.textContent.trim() + ' '));
+      var x = document.createElement('span'); x.setAttribute('aria-hidden', 'true'); x.textContent = '×'; b.appendChild(x);
+      marcadasEl.appendChild(b);
+    });
+  }
+  function recolher(sim) {
+    caixa.hidden = sim;
+    busca.setAttribute('aria-expanded', sim ? 'false' : 'true');
+  }
+  if (busca && marcadasEl) {
+    recolher(true);
+    busca.addEventListener('keydown', function (ev) {
+      if (ev.key === 'Escape' && busca.value) { ev.preventDefault(); ev.stopPropagation(); busca.value = ''; recolher(true); }
+    });
+    marcadasEl.addEventListener('click', function (ev) {
+      var b = ev.target.closest('[data-dm-f-tira]');
+      if (!b) return;
+      var i = caixa.querySelector('input[value="' + b.getAttribute('data-dm-f-tira') + '"]');
+      if (i) { i.checked = false; caixa.dispatchEvent(new Event('change')); }
+    });
+  }
   if (busca) busca.addEventListener('input', function () {
     var q = busca.value.trim().toLowerCase();
+    if (marcadasEl) recolher(!q);
     caixa.querySelectorAll('.dm-usina').forEach(function (u) {
-      u.hidden = q && u.textContent.toLowerCase().indexOf(q) < 0 && !u.querySelector('input').checked;
+      u.hidden = marcadasEl ? (q && u.textContent.toLowerCase().indexOf(q) < 0)
+        : (q && u.textContent.toLowerCase().indexOf(q) < 0 && !u.querySelector('input').checked);
     });
   });
   var pedido = 0;
@@ -116,6 +149,7 @@ window.NexusDemandaNova = function (dlg) {
       .catch(function () { if (n === pedido) osDica.textContent = 'Não li as OS agora: dá para enviar sem OS.'; });
   }
   if (caixa) caixa.addEventListener('change', function () {
+    etiquetas();
     trazerOs(Array.prototype.slice.call(caixa.querySelectorAll('input:checked')).map(function (i) { return i.value; }));
   });
   if (fixa) trazerOs([fixa.value]);

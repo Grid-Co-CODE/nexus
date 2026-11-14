@@ -33,10 +33,14 @@
       <select class="gc-campo" id="{{ pre }}-os" name="os" data-dm-f-os aria-describedby="{{ pre }}-os-dica"><option value="">Sem OS</option></select>
       <span class="dm-nota" id="{{ pre }}-os-dica" data-dm-f-os-dica>As OS abertas e em verificação da {{ usina[1] }}.</span></div>
     {% else %}
-    <div class="dm-dupla">
+    {# as usinas recolhidas: a lista abre quando a pessoa digita, e as marcadas ficam em etiquetas; a OS na mesma linha
+       (14/11/2026, Levi: "eu quero que fique recolhido. E quando a pessoa vai digitar que expanda a lista das usinas [...]
+       Tá muito grande"). Sem JavaScript, a lista fica aberta #}
+    <div class="dm-dupla dm-dupla--topo">
       <fieldset class="dm-campo dm-usinas"><legend class="gc-rotulo">Usinas (opcional, uma ou mais)</legend>
-        <input class="gc-campo" type="search" placeholder="Procurar a usina" aria-label="Procurar a usina" data-dm-f-busca>
-        <div class="dm-usinas-lista" data-dm-f-usinas>
+        <input class="gc-campo" type="search" placeholder="Digite o nome da usina" aria-label="Procurar a usina" aria-controls="{{ pre }}-usinas" data-dm-f-busca>
+        <div class="dm-usinas-marcadas" data-dm-f-marcadas aria-live="polite"></div>
+        <div class="dm-usinas-lista" id="{{ pre }}-usinas" data-dm-f-usinas>
           {% for uid, nome in dem.usinas %}<label class="dm-usina"><input type="checkbox" name="usinas" value="{{ uid }}"> {{ nome }}</label>{% endfor %}
         </div></fieldset>
       <div class="dm-campo"><label class="gc-rotulo" for="{{ pre }}-os">OS vinculada (opcional)</label>
