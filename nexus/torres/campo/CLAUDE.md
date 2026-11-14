@@ -1380,8 +1380,10 @@ usinas mobilizadas, para quem abre a Visão (sem o filtro de responsável, de cl
     mesmo"): uma frase que explica o religamento (remoto, a distância; ou no local, com a equipe de campo) e quatro
     números (paradas no mês e quantas com a geração parada; religamentos remotos; no local; a proteção que mais atuou).
   - A tabela tem tudo centralizado, menos o corpo do "O que aconteceu" (o cabeçalho dele também é centralizado). As
-    colunas: o Período (o início e "até" o fim, o início mais o tempo fora), a Parada, o Tempo fora, as Proteções (o
-    número, sem a fase: 27ABC conta como 27), a OS e "O que aconteceu".
+    colunas, nesta ordem ("Parada fica na frente"): a Parada, o Período, o Tempo fora, as Proteções (o número, sem a
+    fase: 27ABC conta como 27), a OS e "O que aconteceu".
+  - O Período vem em negrito, com a hora da parada sublinhada em vermelho e a da volta em verde (a volta é o início
+    mais o tempo fora); a frase do alto explica as cores (`_sublinhado`, o `<u color>` do ReportLab).
   - **A Parada é o destaque, e "O que aconteceu" só completa** ("no usina desligada de dia tal a tal hora [...] já diz o
     período [...] Não precisa repetir quando voltou"). `relato_partes` separa o relato da Ronda COS, que é feito de
     frases-modelo fixas:

@@ -357,6 +357,7 @@ def test_o_pdf_leva_as_paradas_do_mes_com_o_que_aconteceu():
          "mes": "2026-11", "mes_id": 202611, "mes_txt": "novembro de 2026", "ini": date(2026, 11, 1),
          "fim": date(2026, 11, 13), "corrente": True, "hoje": date(2026, 11, 14), "erros": {},
          "religamentos": [{"ini": datetime(2026, 11, 12, 9, 41, tzinfo=br), "tipo": "Usina desligada", "fora": "54 min",
+                           "fim": datetime(2026, 11, 12, 10, 35, tzinfo=br),
                            "parou": True, "os": "19375", "protecoes": "27;59",
                            "relato": "Causa: oscilação na rede da concessionária."},
                           {"ini": datetime(2026, 11, 10, 15, 55, tzinfo=br), "tipo": "Usina desligada", "fora": "4 min",
@@ -365,6 +366,11 @@ def test_o_pdf_leva_as_paradas_do_mes_com_o_que_aconteceu():
     corpo = RU._religamentos(d, RU._estilos(), RU.CHAVES_CAMPOS)
     # a explicação do religamento, os quatro números, a tabela e as proteções (título + tabela)
     assert "a volta é o religamento" in corpo[0].text and len(corpo) == 7
+    # a Parada na frente e o período com a parada sublinhada em vermelho e a volta em verde
+    tabela = corpo[4]
+    assert [c.text for c in tabela._cellvalues[0]] == ["Parada", "Período", "Tempo fora", "Proteções", "OS", "O que aconteceu"]
+    per = tabela._cellvalues[1][1].text
+    assert "<u color=\"#c8102e\"" in per and "12/11 09:41" in per and "<u color=\"#1f7a3f\"" in per and "12/11 10:35" in per
     pdf = RU.gerar(d, ("religamentos",), gerado_em="14/11/2026 às 15:00", campos=("religamentos_lista",))
     assert pdf[:4] == b"%PDF" and len(pdf) > 1000
 

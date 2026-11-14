@@ -407,6 +407,8 @@ def _estilos() -> dict:
                                         textColor=MUDO, alignment=TA_CENTER),
             "parada": ParagraphStyle("parada", parent=base, fontName="Helvetica-Bold", fontSize=8.5, leading=11,
                                      alignment=TA_CENTER),
+            "periodo": ParagraphStyle("periodo", parent=base, fontName="Helvetica-Bold", fontSize=8.5, leading=14,
+                                      alignment=TA_CENTER),
             "kpi_rot": ParagraphStyle("kpi_rot", parent=base, fontSize=8, leading=10, textColor=MUDO),
             "kpi_val": ParagraphStyle("kpi_val", parent=base, fontName="Helvetica-Bold", fontSize=18, leading=22),
             "kpi_sub": ParagraphStyle("kpi_sub", parent=base, fontSize=7.5, leading=10, textColor=MUDO)}
@@ -721,6 +723,11 @@ def _kpis_religamentos(rel: list[dict], partes: list[dict], e: dict) -> Table:
     return t
 
 
+def _sublinhado(txt: str, cor) -> str:
+    """O texto sublinhado na cor (o `<u color>` do ReportLab), um pouco abaixo da linha e mais grosso que o padrão."""
+    return f'<u color="{cor.hexval().replace("0x", "#")}" width="1.4" offset="-2.2">{_t(txt)}</u>'
+
+
 def _o_que_aconteceu(p: dict, e: dict) -> Paragraph:
     """A causa, como voltou (em verde: é a resolução) e o que mais o relato traz; nada do que a linha já mostra."""
     partes = []
@@ -744,7 +751,8 @@ def _religamentos(d: dict, e: dict, campos=CHAVES_CAMPOS) -> list:
     if "religamentos_lista" in campos:
         out.append(Paragraph(_t("Cada parada do mês registrada pelo Centro de Operações (COS) da Grid Co., com a causa e "
                                 "a forma como a usina voltou. Quando uma proteção do relé desliga a usina, a volta é o "
-                                "religamento: remoto, feito a distância, ou no local, com a equipe de campo na usina."),
+                                "religamento: remoto, feito a distância, ou no local, com a equipe de campo na usina. "
+                                "No período, o sublinhado vermelho marca a hora da parada e o verde, a hora da volta."),
                              e["base"]))
         out.append(Spacer(1, 3 * mm))
         if not rel:
@@ -756,17 +764,22 @@ def _religamentos(d: dict, e: dict, campos=CHAVES_CAMPOS) -> list:
                 rotulo = p["rotulo"] or x.get("tipo") or "Parada"
                 nivel = _nivel_parada(x, rotulo)
                 tintas.append(_TINTA_PARADA[nivel])
+                # o período em destaque (14/11/2026, Levi: "quando for a hora da parada [...] a underline vermelha e
+                # quando for a hora de voltar, a underline verde"): a hora da parada e a da volta, cada uma sublinhada
+                # na sua cor
                 fim = x.get("fim")
-                periodo = (f"{x['ini']:%d/%m %H:%M}" + (f'<br/><font color="{MUDO.hexval().replace("0x", "#")}">até '
-                                                        f"{fim:%d/%m %H:%M}</font>" if fim else ""))
-                linhas.append([Paragraph(periodo, e["cel_c"]),
-                               Paragraph(f'<font color="{_cor(nivel)}">{_t(rotulo)}</font>', e["parada"]),
+                periodo = _sublinhado(f"{x['ini']:%d/%m %H:%M}", TOM["critico"])
+                if fim:
+                    periodo += "<br/>" + _sublinhado(f"{fim:%d/%m %H:%M}", TOM["ok"])
+                linhas.append([Paragraph(f'<font color="{_cor(nivel)}">{_t(rotulo)}</font>', e["parada"]),
+                               Paragraph(periodo, e["periodo"]),
                                x.get("fora") or "—", ", ".join(protecoes_do_texto(x.get("protecoes"))) or "—",
                                x.get("os") or "—", _o_que_aconteceu(p, e)])
-            t = _tabela(e, ["Período", "Parada", "Tempo fora", "Proteções", "OS", "O que aconteceu"], linhas,
-                        [25, 26, 19, 19, 13, 76], centro=(0, 2, 3, 4), cab_centro=True)
+            # a Parada na frente (14/11/2026, Levi: "Parada fica na frente")
+            t = _tabela(e, ["Parada", "Período", "Tempo fora", "Proteções", "OS", "O que aconteceu"], linhas,
+                        [26, 25, 19, 19, 13, 76], centro=(1, 2, 3, 4), cab_centro=True)
             # a parada em destaque: o fundo claro da cor dela (por cima da zebra)
-            t.setStyle(TableStyle([("BACKGROUND", (1, i), (1, i), c) for i, c in enumerate(tintas, start=1)]))
+            t.setStyle(TableStyle([("BACKGROUND", (0, i), (0, i), c) for i, c in enumerate(tintas, start=1)]))
             out.append(t)
     if "religamentos_protecoes" in campos and rel:
         conta = _contagem_protecoes(rel)[:6]
