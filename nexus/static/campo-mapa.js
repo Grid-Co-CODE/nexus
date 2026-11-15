@@ -354,7 +354,9 @@
   // no vídeo wall (12/11/2026) o foco começa na usina: o painel ao lado é das usinas com problema, e a cor delas é a dele
   var foco = D.modo === "tecnicos" ? guardado(D.tv ? "nexus.equipe.foco.tv" : "nexus.equipe.foco", D.tv ? "usina" : "tecnico")
                                    : "usina";
-  var fundoBase = D.satelite ? guardado("nexus.equipe.base", "mapa") : "mapa";
+  // no vídeo wall o Satélite vale só até a próxima recarga (Levi, 15/11/2026, a opção A): preso nele 24 h, a TV gastaria
+  // a cota grátis da Esri (2 milhões de imagens por mês) e pararia o satélite de todo mundo até o mês seguinte
+  var fundoBase = D.satelite && !D.tv ? guardado("nexus.equipe.base", "mapa") : "mapa";
 
   var brasilGeo = null;
   function nossas() {
@@ -634,7 +636,7 @@
       if (falta) { falta.hidden = !falta.hidden; bb.setAttribute("aria-expanded", String(!falta.hidden)); }
       return;
     }
-    if (bb) { fundoBase = bb.getAttribute("data-eq-base"); guardar("nexus.equipe.base", fundoBase); aplicarBase(); return; }
+    if (bb) { fundoBase = bb.getAttribute("data-eq-base"); if (!D.tv) guardar("nexus.equipe.base", fundoBase); aplicarBase(); return; }
     var b = e.target.closest("[data-eq-zoom]");
     if (!b) return;
     var q = b.getAttribute("data-eq-zoom"), dur = REDUZIDO ? 200 : 450;

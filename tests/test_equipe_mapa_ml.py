@@ -283,3 +283,15 @@ def test_a_usina_arredondada_e_o_roxo_forte_da_sem_comunicacao():
     css = (raiz / "campo.css").read_text(encoding="utf-8")
     leg = re.search(r"(?m)^\.eq-leg-usina\{([^}]*)\}", css).group(1)
     assert "border-radius:3px" in leg and "rotate(45deg)" in leg
+
+
+def test_no_video_wall_o_satelite_vale_so_ate_a_proxima_recarga():
+    """Levi, 15/11/2026, a opção A: no vídeo wall o Satélite vale só até a próxima recarga (ela vem a cada 2 min) e volta
+    ao Mapa. O satélite gasta a cota grátis da Esri (2 milhões de imagens por mês); o vídeo wall preso nele 24 h numa
+    TV 4K gastaria uns 2,2 milhões e pararia o satélite de todo mundo até o mês seguinte. Fora do vídeo wall a escolha
+    segue guardada."""
+    js = (Path(__file__).resolve().parent.parent / "nexus" / "static" / "campo-mapa.js").read_text(encoding="utf-8")
+    assert re.search(r'var fundoBase = D\.satelite && !D\.tv \? guardado\("nexus\.equipe\.base", "mapa"\) : "mapa";', js)
+    clique = js[js.index('closest("[data-eq-base]")'):]
+    clique = clique[:clique.index("aplicarBase(); return;")]
+    assert re.search(r'if \(!D\.tv\) guardar\("nexus\.equipe\.base", fundoBase\)', clique)

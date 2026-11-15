@@ -1905,7 +1905,11 @@ parâmetro): **todas as ocorrências abertas, agrupadas**; a tela se atualiza **
   de quem abriu (`moldura._prazo_da_tv`) e as letras pela ALTURA da tela (`--eqtv-f`, o mesmo desenho em 1080p e em 4K).
   À esquerda o painel do COS; à direita o mapa de verdade inteiro (o mesmo parcial da tela, `campo/_equipe_mapa_ml.html`).
   O Sair, o zoom, os focos e o fundo aparecem ao mexer o mouse e somem em 4 s. O foco começa em **Foco usina** (o painel
-  é das usinas; a escolha do vídeo wall fica à parte, `nexus.equipe.foco.tv`).
+  é das usinas; a escolha do vídeo wall fica à parte, `nexus.equipe.foco.tv`). **O Satélite vale só até a próxima
+  recarga (15/11/2026**, Levi, a opção A): o vídeo wall abre sempre no Mapa e não grava a troca (`!D.tv` no
+  `campo-mapa.js`). O satélite gasta a cota grátis da Esri (2 milhões de imagens por mês): preso nele 24 h, recarregando
+  a cada 2 min, a TV Full HD gastaria ~760 mil e a 4K ~2,2 milhões, e o satélite pararia para todos até o mês seguinte
+  (a conta está sem cartão: não cobra, para).
 - **O painel** (`parede.montar`): a MESMA fotografia da Ronda COS que pinta as usinas (`_cos_por_usina`), na régua de
   Comando > Usinas (`classificar`), em cinco grupos, na ordem do mockup: **Usina parada** (o crítico), **Inversores
   desligados**, **Rede concessionária** (o crítico com o problema `rede` do placar da própria Ronda COS, ou a falha de
