@@ -193,3 +193,16 @@ def test_a_ponte_libera_o_administrador_e_a_variavel_libera_todos(app, monkeypat
         session["admin"] = False
         monkeypatch.setitem(app.config, "NEXUS_PEDIR_COM_IA", "1")
         assert ponte.ia_liberada() is True
+
+
+def test_o_codigo_da_usina_no_texto_acha_a_usina(ia, monkeypatch):
+    """Na prova no ar (15/11/2026) o Levi pediu "o inversor 2.2 de CPP100" e a IA não sabia de que usina era: o código é o
+    começo do código dos ativos da usina. A IA recebe o código de cada usina, e o Nexus acha a usina pelo código do texto."""
+    novo = dict(CATALOGO[1], id=5, code="CPX100-INVR2.2", label="Inversor 2.2", description="Inversor 2.2 Marca Teste")
+    monkeypatch.setattr(api, "load_assets_cached", lambda *a, **k: [dict(x) for x in CATALOGO] + [dict(novo)])
+    ia.resposta["j"] = {"cliente": "", "usina": "", "ativo": "inversor 2.2", "titulo": "Inspecionar o ventilador externo",
+                        "descricao": "Ventilador externo do inversor.", "tema": "inversor_inspecao"}
+    f = ia.post("/os/api/solic/ia/preencher", json={"setor": "pcm", "texto": "o inversor 2.2 de cpx100, ventilador externo"}).get_json()
+    assert (f["cliente"], f["usina"], f["ativo"]["id"]) == ("Cliente X", USINA, 5) and f["pronta"]
+    assert "%s (CPX100)" % USINA in ia.pedidos[-1]["sistema"]
+    assert IA.usina_pelo_codigo("nada aqui", {USINA: "CPX100"}) == ""

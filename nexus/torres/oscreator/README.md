@@ -3310,6 +3310,13 @@ Performance). Abre sozinha ao entrar na tela, no setor dela; o "Fazer manualment
   ativo pelo nome com os números iguais ("inversor 2.1" nunca vira o 2.3), empate fica para a pessoa; o tema só se for da
   lista e do tipo do ativo (a regra da Nova solicitação); as subtarefas são as do tema (ou a base) mais até 5 que o pedido
   pede, só com tipo do editor. O que não casou vira pergunta na conversa, e a resposta vai com a ficha de antes.
+- **O código da usina:** a IA recebe cada usina com o código dela (o começo do código dos ativos, o "CPP100" de
+  "CPP100-INVR2.2", `solic_ia.codigos_das_usinas`), e o código escrito no pedido acha a usina sozinho, valendo mais que o
+  palpite da IA (na prova no ar, "o inversor 2.2 de CPP100" voltava sem cliente e sem usina).
+- **O ativo de nome igual vence o empate** ("Inversor 1.1" contra "Disjuntor do Inversor 1.1"), e no PCM a ficha tem a
+  Classificação 1 (o impacto): a do tema, senão a que a IA propõe da lista do Fracttal; a pessoa troca.
+- **O tamanho:** a janela ocupa até 1080 × 960 px (Levi: "expanda mais para caber mais informação na tela!"), a ficha em
+  três colunas e as subtarefas em duas; em tela estreita, duas e uma; no celular, a tela inteira.
 - **Trocar na ficha não gasta IA:** usina, ativo e tema refazem a ficha pelo `/os/api/solic/ia/ficha`, com a escolha da
   pessoa valendo como está.
 - **Quem cria é a rota de sempre:** PCM pela Nova solicitação (`/os/api/solic/criar`, a Classificação 1 do tema ou a

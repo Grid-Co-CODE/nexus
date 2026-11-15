@@ -96,13 +96,19 @@ def preencher():
     agora = trad.agora_brt()
     anterior = corpo.get("anterior") if isinstance(corpo.get("anterior"), dict) else None
     opcoes_c1 = _opcoes_c1() if setor == "pcm" else []
-    res = IA.chamar(chave, IA.instrucoes(setor, temas, usinas, agora.date(), [o["txt"] for o in opcoes_c1]),
+    codigos = IA.codigos_das_usinas(assets)
+    res = IA.chamar(chave, IA.instrucoes(setor, temas, usinas, agora.date(), [o["txt"] for o in opcoes_c1], codigos),
                     IA.mensagem(texto, anterior))
     if res.get("erro"):
         return jsonify({"erro": res["erro"]}), 502
     lido = IA.ler_json(res["texto"])
     if not lido:
         return jsonify({"erro": "A IA respondeu fora do formato. Tente escrever de outro jeito."}), 502
+    # o código da usina que a pessoa escreveu ("de CPP100") vale mais que o palpite da IA: é o nome que o campo usa
+    pelo_codigo = IA.usina_pelo_codigo("%s %s" % (texto, lido.get("ativo") or ""), codigos)
+    if pelo_codigo:
+        lido["usina"] = pelo_codigo
+        lido["cliente"] = next((c for c, lista in usinas.items() if pelo_codigo in lista), lido.get("cliente"))
     f = IA.ficha(setor, lido, assets, clientes, lambda c: usinas.get(c) or [],
                  lambda u: reg.ativos_da_usina(assets, u, api._asset_short_name), temas,
                  lambda tema, tipo: sp.de_api(sw.subtarefas_do_tema(tema, tipo)), agora)

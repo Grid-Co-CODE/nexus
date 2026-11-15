@@ -19,6 +19,7 @@ import difflib
 import json
 import re
 import unicodedata
+from collections import Counter
 
 import requests
 
@@ -97,6 +98,29 @@ def escolher(pista, opcoes, rotulo=lambda x: x, n: int = 6, curto=None) -> tuple
     return opcoes[notas[0][2]], cand
 
 
+_RX_CODIGO = re.compile(r"[A-Z]{2,6}\d{2,4}")
+
+
+def codigos_das_usinas(assets) -> dict:
+    """{usina: código}: o prefixo dos códigos dos ativos dela (o "CPP100" de "CPP100-INVR2.2"), o mais comum. É como o
+    campo chama a usina (15/11/2026, na prova no ar: "o inversor 2.2 de CPP100" e a IA sem saber de que usina era)."""
+    cont = {}
+    for a in assets or []:
+        usina = (a or {}).get("usina")
+        pre = str((a or {}).get("code") or "").split("-", 1)[0].strip().upper()
+        if usina and _RX_CODIGO.fullmatch(pre):
+            cont.setdefault(usina, Counter())[pre] += 1
+    return {u: c.most_common(1)[0][0] for u, c in cont.items()}
+
+
+def usina_pelo_codigo(texto, codigos: dict) -> str:
+    """A usina cujo código aparece no texto, ou ''. Código de mais de uma usina, ou dois códigos de usinas diferentes, não
+    valem sozinhos: a pessoa escolhe."""
+    achados = {m.upper() for m in re.findall(r"\b[A-Za-z]{2,6}\d{2,4}\b", str(texto or ""))}
+    usinas = sorted({u for u, c in (codigos or {}).items() if c in achados})
+    return usinas[0] if len(usinas) == 1 else ""
+
+
 def temas_do_tipo(temas: list, tipo: str) -> list:
     """Os temas que valem para o tipo do ativo (a mesma regra da Nova solicitação: o tipo tem de estar nos do tema)."""
     alvo = norm(tipo)
@@ -105,7 +129,7 @@ def temas_do_tipo(temas: list, tipo: str) -> list:
 
 # ── a IA ──────────────────────────────────────────────────────────────────────────────────────────────────────────────
 def instrucoes(setor: str, temas: list, usinas_por_cliente: dict, hoje: dt.date,
-               classif1: list | None = None) -> str:
+               classif1: list | None = None, codigos: dict | None = None) -> str:
     s = setor_de(setor) or SETORES["pcm"]
     # a Classificação 1 da solicitação (só no PCM): o impacto no ativo, numa lista do Fracttal; o tema, quando há, decide
     c1 = [str(x) for x in classif1 or [] if str(x).strip()] if setor == "pcm" else []
@@ -113,14 +137,16 @@ def instrucoes(setor: str, temas: list, usinas_por_cliente: dict, hoje: dt.date,
     regra_c1 = ("\n- classif1: o impacto no ativo, EXATAMENTE um destes: %s." % "; ".join(c1)) if c1 else ""
     linhas_temas = "\n".join("- %s: %s (tipos de ativo: %s)" % (t["chave"], t["nome"], ", ".join(t.get("tipos") or []) or "nenhum")
                              for t in temas or [])
-    linhas_usinas = "\n".join("- %s: %s" % (c, "; ".join(u)) for c, u in sorted((usinas_por_cliente or {}).items()))
+    codigos = codigos or {}
+    linhas_usinas = "\n".join("- %s: %s" % (c, "; ".join("%s (%s)" % (x, codigos[x]) if codigos.get(x) else x for x in u))
+                              for c, u in sorted((usinas_por_cliente or {}).items()))
     return f"""Você é o assistente do OS Creator da Grid Co., empresa de O&M de usinas solares. A pessoa vai abrir {s['cria']} e diz em poucas palavras o que precisa. Hoje é {hoje.strftime('%d/%m/%Y')}.
 
 Responda SÓ com um objeto JSON, sem texto antes ou depois, neste formato:
 {{"cliente": "", "usina": "", "ativo": "", "titulo": "", "descricao": "", "tema": "", "subtarefas": [{{"desc": "", "tipo": "texto"}}], "faltou": ""{campo_c1}}}
 
 Regras:
-- cliente e usina: escreva EXATAMENTE como na lista abaixo. Se a pessoa não disse ou você não tiver certeza, deixe vazio.
+- cliente e usina: escreva EXATAMENTE como na lista abaixo, sem o código entre parênteses. A pessoa pode chamar a usina pelo código (o que está entre parênteses, que também é o começo do código dos ativos dela). Se a pessoa não disse ou você não tiver certeza, deixe vazio.
 - ativo: o equipamento como a pessoa disse, com o tipo e o número (ex.: "inversor 2.1", "transformador 1", "tracker 3"). Não invente número.
 - titulo: o nome curto da OS, até 60 caracteres, sem o nome da usina e sem o do ativo (eles entram sozinhos).
 - descricao: o que precisa ser feito e por quê, em 1 a 3 frases, em português claro e profissional.

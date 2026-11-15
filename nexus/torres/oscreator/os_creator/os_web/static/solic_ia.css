@@ -30,7 +30,7 @@ html[data-tema="claro"]{
 body.sia-aberto{overflow:hidden}
 .sia-veu{position:fixed;inset:0;z-index:70;display:flex;align-items:center;justify-content:center;padding:20px;
   background:var(--sia-veu);-webkit-backdrop-filter:blur(7px);backdrop-filter:blur(7px)}
-.sia{width:min(640px,100%);max-height:min(84vh,780px);display:flex}
+.sia{width:min(1080px,100%);height:min(92vh,960px);display:flex}      /* maior (Levi: "expanda mais para caber mais informação na tela!") */
 .sia-quadro{flex:1 1 auto;display:flex;flex-direction:column;min-height:0;border:1px solid var(--sia-linha);border-radius:16px;
   background:var(--sia-vidro);-webkit-backdrop-filter:blur(16px) saturate(1.15);backdrop-filter:blur(16px) saturate(1.15);
   color:var(--sia-texto);overflow:hidden;box-shadow:0 24px 64px -20px var(--sia-sombra);font-family:var(--sia-mono)}
@@ -105,8 +105,9 @@ body.os-form .sia-prompt textarea::placeholder{color:var(--sia-mudo)}
 .sia-perguntas{color:var(--sia-alerta);background:var(--sia-alerta-fundo);border:1px solid var(--sia-alerta-b);border-radius:8px;
   padding:7px 9px;margin-bottom:10px;font-size:12px}
 .sia-perguntas .sia-dica{color:var(--sia-mudo-2)}
-.sia-grade{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 10px}
+.sia-grade{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px 12px}
 .sia-largo{grid-column:1 / -1}
+.sia-dois{grid-column:span 2}
 .sia-campo{display:flex;flex-direction:column;gap:3px;min-width:0}
 .sia-campo > span{font-size:10.5px;color:var(--sia-mudo);text-transform:lowercase;letter-spacing:.03em}
 body.os-form .sia-campo select,body.os-form .sia-campo input,body.os-form .sia-campo textarea{width:100%;min-height:34px;border-radius:7px;
@@ -121,7 +122,7 @@ body.os-form .sia-campo select:focus,body.os-form .sia-campo input:focus,body.os
 .sia-subs{margin-top:10px}
 .sia-subs-h{font-weight:700;font-size:12px;margin-bottom:5px}
 .sia-subs-h small{font-weight:400;color:var(--sia-mudo);margin-left:6px}
-.sia-subs-l{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:3px;counter-reset:sia}
+.sia-subs-l{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px 8px;counter-reset:sia}
 .sia-subs-l li{display:flex;align-items:center;gap:8px;padding:4px 6px;border-radius:7px;border:1px solid var(--sia-linha);counter-increment:sia}
 .sia-subs-l li::before{content:counter(sia, decimal-leading-zero);font-size:10.5px;color:var(--sia-mudo)}
 .sia-subs-l li.sia-sub--ia{border-color:var(--sia-lima-borda);background:var(--sia-lima-suave)}
@@ -132,16 +133,22 @@ body.os-form .sia-campo select:focus,body.os-form .sia-campo input:focus,body.os
   font-size:15px;line-height:1;cursor:pointer}
 .sia-x:hover{color:var(--sia-critico);border-color:var(--sia-critico-b);background:var(--sia-critico-fundo)}
 .sia-subs-add{display:flex;gap:6px;margin-top:6px}
-body.os-form .sia-subs-add input{flex:1 1 auto;min-height:32px;border-radius:7px;border:1px solid var(--sia-linha);background:var(--sia-campo);
+body.os-form .sia-subs-add input{flex:1 1 auto;min-width:0;min-height:32px;border-radius:7px;border:1px solid var(--sia-linha);background:var(--sia-campo);
   color:var(--sia-texto);font-size:12px;padding:5px 9px}
 .sia-subs-add .os-btn,.sia-acoes .os-btn{min-height:34px;font-size:12px}
 .sia-acoes{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:10px}
 .sia-hint{font-size:11.5px;color:var(--sia-mudo)}
 
+/* ── a tela estreita: a ficha em duas colunas e as subtarefas numa ── */
+@media (max-width:900px){
+  .sia-grade{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .sia-dois{grid-column:1 / -1}
+  .sia-subs-l{grid-template-columns:minmax(0,1fr)}
+}
 /* ── no celular: a janela ocupa a tela ── */
 @media (max-width:640px){
   .sia-veu{padding:0;align-items:stretch}
-  .sia{width:100%;max-height:none}
+  .sia{width:100%;height:auto;max-height:none}
   .sia-quadro{border-radius:0;border-left:none;border-right:none}
   .sia-grade{grid-template-columns:minmax(0,1fr)}
   .sia-rodape-info{display:none}
