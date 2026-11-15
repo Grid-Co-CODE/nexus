@@ -3312,7 +3312,12 @@ dia por este pedido.
   rodízio da Nexus IA. O grátis dá 50 pedidos por dia na conta; cada mensagem gasta um. Sem a chave, a tela diz e nada sai.
 - **Três modelos, em ordem** (`solic_ia.MODELOS`: Gemma 4 31B, Nemotron 3.5 Super, Nemotron 3 Ultra): o OpenRouter passa
   sozinho ao seguinte quando um está fora (`models`), cada tentativa espera no máximo 40 s e, sem resposta, o pedido sai de
-  novo uma vez com o que travou no fim da fila; o raciocínio vai no mínimo (`effort: low`). Caso que criou (Levi,
+  novo uma vez com o que travou no fim da fila. **Sem raciocínio** (`effort: "none"`, 15/11/2026, Levi: "fiz uma pesquisa
+  simples aqui que demorou 26 segundos"): medido no ar, o preencher levou 14,6 s, 14,2 deles na IA e 0,4 s no Nexus (o
+  catálogo já está na memória; a tela depois gasta 1,5 s nos ativos do cliente e 0,4 s nas subtarefas). O `effort: low` de
+  antes LIGAVA o raciocínio até no Gemma 4, que vem desligado; nenhum dos três é de raciocínio obrigatório
+  (`reasoning.mandatory: false` no `/api/v1/models` do OpenRouter). A resposta traz os tokens (`ia_info.tokens`: entrada,
+  saída e raciocínio), no "title" do nome do modelo embaixo da caixa. Caso que criou (Levi,
   15/11/2026, "demorando que só"): o Nemotron 3 Ultra era o único e estava de pé 13% da meia hora nos números públicos do
   OpenRouter (`/api/v1/models/<modelo>/endpoints`), e o pedido esperava até 90 s. A conversa mostra os segundos enquanto
   espera, e diz qual modelo respondeu e em quanto tempo (`ia_info`): é a medida para trocar a ordem.

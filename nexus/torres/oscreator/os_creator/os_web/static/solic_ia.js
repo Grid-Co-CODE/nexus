@@ -60,7 +60,8 @@
     if (!t || ocupado) return;
     ocupado = true; btnEnviar.disabled = true; btnLimpar.disabled = true;
     var t0 = Date.now();
-    dizer('<span class="sia-pensando">lendo o pedido, o catálogo e os temas<span class="sia-seg"></span><span class="sia-cursor"></span></span>');
+    // quem demora é a IA, não o catálogo (que já está na memória do Nexus): a frase diz isso (Levi achou que era o catálogo)
+    dizer('<span class="sia-pensando">a IA está escrevendo a OS<span class="sia-seg"></span><span class="sia-cursor"></span></span>');
     // os segundos correndo: a IA grátis às vezes demora, e a pessoa vê que o pedido está vivo (Levi: "demorando que só")
     var relogio = setInterval(function () {
       var n = Math.round((Date.now() - t0) / 1000), s = linha.querySelector(".sia-seg");
@@ -86,8 +87,11 @@
           var m = nomeModelo(f.ia_info);
           var falta = (f.perguntas || []).length
             ? '<span class="sia-aviso">Falta: ' + esc(f.perguntas.join(" ")) + " Responda aqui ou escolha na tela.</span> " : "";
+          var tk = (f.ia_info && f.ia_info.tokens) || {};
+          var dica = tk.entrada != null ? ' title="tokens: ' + tk.entrada + ' de entrada, ' + tk.saida + ' de saída'
+            + (tk.raciocinio ? ", " + tk.raciocinio + " de raciocínio" : "") + '"' : "";
           dizer(falta + '<span class="' + (f.pronta ? "sia-ok" : "sia-dica") + '">' + (f.pronta ? "Preenchi: " : "Preenchi o que achei: ")
-                + resumo(f) + ". Confira e crie.</span>" + (m ? ' <span class="sia-modelo">' + esc(m) + "</span>" : ""));
+                + resumo(f) + ". Confira e crie.</span>" + (m ? ' <span class="sia-modelo"' + dica + ">" + esc(m) + "</span>" : ""));
           fim();
         }, function (e) { fim(); dizer('<span class="sia-erro">Não consegui preencher a tela: ' + esc((e && e.message) || e) + "</span>"); });
       });

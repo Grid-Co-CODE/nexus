@@ -237,7 +237,8 @@ def test_o_modelo_fora_do_ar_nao_prende_o_pedido():
         status_code = 200
 
         def json(self):
-            return {"model": "nvidia/nemotron-3.5-super-vl", "choices": [{"message": {"content": "{}"}}]}
+            return {"model": "nvidia/nemotron-3.5-super-vl", "choices": [{"message": {"content": "{}"}}],
+                    "usage": {"prompt_tokens": 2600, "completion_tokens": 310, "completion_tokens_details": {"reasoning_tokens": 0}}}
     enviados = []
 
     def post(url, json=None, timeout=None, headers=None):
@@ -248,10 +249,12 @@ def test_o_modelo_fora_do_ar_nao_prende_o_pedido():
         return R()
     r = IA.chamar("k", "s", "u", post=post)
     assert r["texto"] == "{}" and r["modelo"] == "nvidia/nemotron-3.5-super-vl"
+    assert r["tokens"] == {"entrada": 2600, "saida": 310, "raciocinio": 0}
     assert enviados[0]["models"] == list(IA.MODELOS) and enviados[0]["model"] == IA.MODELOS[0]
     assert enviados[1]["models"] == list(IA.MODELOS[1:]) + [IA.MODELOS[0]]           # o que não respondeu foi para o fim
     assert all(e["timeout"] == (10, IA.TEMPO_S) for e in enviados) and IA.TEMPO_S * IA.TENTATIVAS <= 90
-    assert enviados[0]["reasoning"]["effort"] == "low"
+    # sem raciocínio (Levi: "demorou 26 segundos"; 14,2 dos 14,6 s eram a IA): o pedido é preencher um JSON
+    assert all(e["reasoning"] == {"effort": "none"} for e in enviados)
     # nenhum respondeu: a tela diz em quanto tempo desistiu, sem esperar mais
 
     def nunca(*a, **k):
@@ -263,4 +266,4 @@ def test_a_ficha_diz_qual_modelo_respondeu_e_em_quanto_tempo(ia, monkeypatch):
     monkeypatch.setattr(IA, "chamar", lambda *a, **k: {"texto": json.dumps(RESPOSTA), "modelo": "google/gemma-4-31b-it",
                                                         "segundos": 3.4})
     f = ia.post("/os/api/solic/ia/preencher", json={"setor": "pcm", "texto": "inversor 1.1"}).get_json()
-    assert f["ia_info"] == {"modelo": "google/gemma-4-31b-it", "segundos": 3.4}
+    assert f["ia_info"] == {"modelo": "google/gemma-4-31b-it", "segundos": 3.4, "tokens": {}}

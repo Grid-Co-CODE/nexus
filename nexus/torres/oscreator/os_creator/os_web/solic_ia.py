@@ -35,7 +35,7 @@ MODELOS = ("google/gemma-4-31b-it:free", "nvidia/nemotron-3.5-super-vl:free", "n
 MODELO = MODELOS[0]
 TEMPO_S = 40             # por tentativa
 TENTATIVAS = 2
-MAX_SAIDA = 6000         # o raciocínio do modelo conta aqui dentro
+MAX_SAIDA = 2000         # só o JSON da ficha: sem raciocínio, ~300 a 600 tokens
 MAX_TEXTO = 1200         # o que a pessoa escreve, por mensagem
 MAX_EXTRAS = 5           # as subtarefas que a IA acrescenta às do tema
 MAX_TITULO = 80
@@ -226,10 +226,16 @@ def mensagem(texto: str, anterior: dict | None = None) -> str:
 
 
 def chamar(chave: str, sistema: str, usuario: str, post=requests.post) -> dict:
-    """{"texto", "modelo", "segundos"} ou {"erro", "status"}. O 429 é a cota do grátis (50 por dia na conta, de volta à
-    meia-noite UTC). O raciocínio vai no mínimo: o pedido é ler e preencher, e cada passo de raciocínio é espera."""
+    """{"texto", "modelo", "segundos", "tokens"} ou {"erro", "status"}. O 429 é a cota do grátis (50 por dia na conta, de
+    volta à meia-noite UTC).
+
+    SEM RACIOCÍNIO (`effort: "none"`; Levi, 15/11/2026: "fiz uma pesquisa simples aqui que demorou 26 segundos"). A medida no
+    ar: 14,6 s no preencher, 14,2 s deles na IA e 0,4 s no Nexus (o catálogo já está na memória). O pedido é ler e preencher
+    um JSON: o raciocínio é só espera. Antes ia `effort: "low"`, que LIGAVA o raciocínio até no Gemma 4 (que vem desligado);
+    nenhum dos três é de raciocínio obrigatório (`reasoning.mandatory: false` no /api/v1/models do OpenRouter), e o Nemotron 3
+    Ultra aceita "none" na lista dele. `tokens` (entrada, saída, raciocínio) é a medida do que cada resposta gastou."""
     ordem = list(MODELOS)
-    corpo = {"max_tokens": MAX_SAIDA, "temperature": 0.2, "reasoning": {"effort": "low", "exclude": True},
+    corpo = {"max_tokens": MAX_SAIDA, "temperature": 0.2, "reasoning": {"effort": "none"},
              "messages": [{"role": "system", "content": sistema}, {"role": "user", "content": usuario}]}
     for _vez in range(TENTATIVAS):
         corpo["model"], corpo["models"] = ordem[0], list(ordem)
@@ -258,7 +264,11 @@ def chamar(chave: str, sistema: str, usuario: str, post=requests.post) -> dict:
         texto = re.sub(r"<think>.*?</think>", "", str((esc.get("message") or {}).get("content") or ""), flags=re.S).strip()
         if not texto:
             return {"erro": "A IA não respondeu. Tente de novo."}
-        return {"texto": texto, "modelo": str(j.get("model") or ordem[0]), "segundos": round(time.monotonic() - t0, 1)}
+        uso = j.get("usage") if isinstance(j.get("usage"), dict) else {}
+        tokens = {"entrada": uso.get("prompt_tokens"), "saida": uso.get("completion_tokens"),
+                  "raciocinio": (uso.get("completion_tokens_details") or {}).get("reasoning_tokens")}
+        return {"texto": texto, "modelo": str(j.get("model") or ordem[0]), "segundos": round(time.monotonic() - t0, 1),
+                "tokens": tokens}
     return {"erro": "A IA não respondeu em %d s: os modelos grátis estão lentos agora. Tente de novo em instantes ou use "
                     "Fazer manualmente." % (TEMPO_S * TENTATIVAS)}
 

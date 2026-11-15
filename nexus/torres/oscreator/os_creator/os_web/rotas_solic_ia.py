@@ -116,5 +116,6 @@ def preencher():
     if setor == "pcm":
         _com_c1(f, opcoes_c1, pista=str(lido.get("classif1") or ""))
     f["anterior"] = IA.resumo(f)
-    f["ia_info"] = {"modelo": res.get("modelo") or "", "segundos": res.get("segundos")}   # o que respondeu e em quanto tempo
+    # o que respondeu, em quanto tempo e quantos tokens: a medida para a ordem dos modelos e para o raciocínio
+    f["ia_info"] = {"modelo": res.get("modelo") or "", "segundos": res.get("segundos"), "tokens": res.get("tokens") or {}}
     return jsonify(f)
