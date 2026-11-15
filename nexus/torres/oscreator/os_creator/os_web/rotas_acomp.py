@@ -1178,16 +1178,12 @@ def _quando(v):
     return d if d.tzinfo else d.replace(tzinfo=aw.BRT)
 
 
-def _tarefa_unica(wid):
-    """O id da tarefa da OS de UM ativo (uma tarefa), ou None: a regra é só para um ativo. Sem conseguir ler as tarefas,
-    None: a atividade fica de fora, e o comentário e o finalizar seguem como sempre."""
-    try:
-        ids = [int(x) for x in (api._ids_tarefas_da_os(wid) or []) if str(x).isdigit()]
-    except api.SessionExpired:
-        raise
-    except Exception:                                   # noqa: BLE001
-        return None
-    return ids[0] if len(ids) == 1 else None
+def _tarefa_unica(det):
+    """O id da tarefa da OS de UM ativo (uma tarefa), ou None: a regra é só para um ativo. Sai do detalhe que a conferência
+    da OS já leu (`_os_conferida`), sem outro pedido: o `_ids_tarefas_da_os` lia também as imagens, e o Finalizar tem a
+    guarda dos pedidos a mais (`test_finalizar_e_executar_sem_pedido_a_toa`)."""
+    ts = [t for t in ((det or {}).get("tarefas") or []) if isinstance(t, dict) and str(t.get("id") or "").isdigit()]
+    return int(ts[0]["id"]) if len(ts) == 1 else None
 
 
 def _hora(d) -> str:
@@ -1198,8 +1194,8 @@ def _iniciar_atividade(folio, wid, quando) -> dict:
     """O 1º comentário liga a atividade da tarefa, com a hora dele. → {"ok", "mensagem"} ou {"aviso"}; {} quando não se
     aplica (várias tarefas, a atividade que já começou). Nunca levanta: o comentário já está gravado."""
     try:
-        wid, _det = _os_conferida(folio, wid)
-        tid = _tarefa_unica(wid) if wid else None
+        wid, det = _os_conferida(folio, wid)
+        tid = _tarefa_unica(det) if wid else None
         if tid is None or quando is None:
             return {}
         if (api.execucao_atual(tid) or {}).get("estado") != "parada" or api.historico_execucao(tid):
@@ -1273,7 +1269,7 @@ def api_finalizar(folio):
     wid, det = _os_conferida(folio, _corpo().get("wid"))
     if not wid:
         return _erro("Não achei a OS %s no Fracttal." % folio, 404)
-    tid = _tarefa_unica(wid)                                     # a atividade do chamado (15/11/2026): só um ativo
+    tid = _tarefa_unica(det)                                     # a atividade do chamado (15/11/2026): só um ativo
     ativ = _encerrar_atividade(folio, tid) if tid is not None else {}
     if ativ.get("erro"):
         return _erro(ativ["erro"])

@@ -60,7 +60,8 @@ def cron(monkeypatch, fracttal):
                "texto": texto, "quem": "Pessoa Teste", "email": "", "ativo": "", "extra": {}}
         c["banco"].append(reg)
         return reg
-    monkeypatch.setattr(api, "_ids_tarefas_da_os", lambda wid: list(c["tarefas"]))
+    monkeypatch.setattr(api, "get_os_detalhes", lambda wid: {"folio": {1: 9103, 2: 9104}[wid], "notas": "", "code": "TST-1",
+                                                             "subtarefas": [], "tarefas": [{"id": t} for t in c["tarefas"]]})
     monkeypatch.setattr(api, "execucao_atual", lambda tid: {"estado": c["estado"]})
     monkeypatch.setattr(api, "historico_execucao", lambda tid: list(c["registros"]))
     monkeypatch.setattr(api, "iniciar_execucao", iniciar)
