@@ -15,32 +15,37 @@
       <div class="gc-titulo-explica"><h1 class="cn-titulo">Ocorrências</h1>
       {% call explica('Entenda esta tela') %}<p><b>O que é.</b> Uma ocorrência é um problema da usina acompanhado por um plano
       de ação: cada ação com quem faz, o prazo e o andamento.</p>
-      <p><b>Quem registra.</b> O Responsável O&amp;M da usina e o administrador, entrando com o próprio login; os outros
-      veem. O Responsável O&amp;M abre a tela nas usinas dele.</p>
+      {% if novas_abertas %}<p><b>Quem registra.</b> O Responsável O&amp;M da usina e o administrador, entrando com o próprio
+      login; os outros veem. O Responsável O&amp;M abre a tela nas usinas dele.</p>
+      {% else %}<p><b>Ocorrência nova.</b> Vai pela Caixa de entrada do Comando, que substitui esta tela. As que já existem
+      seguem aqui, com o plano de ação e o andamento. O Responsável O&amp;M abre a tela nas usinas dele.</p>{% endif %}
       <p><b>A ordem.</b> A lista abre nas abertas, pela ação que vence antes; a finalizada vai por último. O Quadro tem uma
       coluna por status.</p>
       <p><b>Lido às {{ lido_hora or '—' }}</b>: as ocorrências gravadas no banco do Nexus (o título e os textos vão
       cifrados).</p>{% endcall %}</div>
       <p class="cn-pergunta">{{ tela.pergunta }}</p></div>
-    {% if quem.grava and not nenhuma %}<a class="gc-btn gc-btn--primario oc-nova" href="{{ url_for('torre_campo.ocorrencia_nova', usina=f.usina or None) }}">Nova ocorrência</a>{% endif %}
+    {% if novas_abertas and quem.grava and not nenhuma %}<a class="gc-btn gc-btn--primario oc-nova" href="{{ url_for('torre_campo.ocorrencia_nova', usina=f.usina or None) }}">Nova ocorrência</a>{% endif %}
   </div>
   {{ avisos_de_gravar(quem, sem_chave, cad) }}
   {% if lido.erro %}<div class="cn-erro" role="alert"><b>Não consegui ler as ocorrências no banco</b> ({{ lido.erro }}){% if lido.velha %}: mostro a última leitura boa{% endif %}.</div>{% endif %}
   {# sem nenhuma leitura boa do banco, nada de zeros nem de "nenhuma": a tela não sabe #}
   {% set leu = lido.lido_em is not none %}
 
-  {# nenhuma ocorrência ainda (15/11/2026): o convite a registrar a primeira, no lugar dos zeros, dos filtros e da lista
-     vazia #}
+  {# nenhuma ocorrência (15/11/2026): no lugar dos zeros, dos filtros e da lista vazia, o caminho de agora, a Caixa de
+     entrada do Comando (as novas estão fechadas: Levi, "vai ser substituída por caixa de entrada em comando") #}
   {% if nenhuma %}
   <div class="oc-vazio-inicio">
-    <i class="ph ph-clipboard-text" aria-hidden="true"></i>
-    <h2>Nenhuma ocorrência registrada ainda</h2>
-    <p>Uma ocorrência é um problema da usina com um plano de ação: o que fazer, quem faz e até quando. A lista mostra
-      primeiro a ação que vence antes.</p>
+    <i class="ph ph-tray" aria-hidden="true"></i>
+    <h2>Nenhuma ocorrência registrada</h2>
+    {% if novas_abertas %}<p>Uma ocorrência é um problema da usina com um plano de ação: o que fazer, quem faz e até quando.</p>
     {% if quem.grava %}<a class="gc-btn gc-btn--primario" href="{{ url_for('torre_campo.ocorrencia_nova', usina=f.usina or None) }}">Registrar a primeira</a>
     {% else %}<p class="mudo">Quem registra: o Responsável O&amp;M da usina e o administrador, entrando com o próprio login.</p>{% endif %}
+    {% else %}<p>Os problemas da usina agora vão pela Caixa de entrada do Comando, como demanda para o setor, com o tema,
+      quem faz e o andamento.</p>
+    <a class="gc-btn gc-btn--primario" href="{{ url_for('torre_comando.caixa_de_entrada') }}">Abrir a Caixa de entrada</a>{% endif %}
   </div>
   {% else %}
+  {% if not novas_abertas %}<p class="oc-nota-caixa mudo">Ocorrência nova: pela <a class="cn-link" href="{{ url_for('torre_comando.caixa_de_entrada') }}">Caixa de entrada do Comando</a>, que substitui esta tela.</p>{% endif %}
   {% if leu %}<p class="oc-numeros"><span><b>{{ numeros.abertas }}</b> aberta{{ 's' if numeros.abertas != 1 }}</span>
     <span{% if numeros.atrasadas %} class="oc-atrasada"{% endif %}><b>{{ numeros.atrasadas }}</b> com ação atrasada</span>
     <span><b>{{ numeros.sem_plano }}</b> sem ação em aberto</span></p>{% endif %}

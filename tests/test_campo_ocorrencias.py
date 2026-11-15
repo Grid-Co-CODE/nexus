@@ -326,6 +326,14 @@ def _sem_copia():
     O.limpar()
 
 
+@pytest.fixture(autouse=True)
+def _novas_abertas(monkeypatch):
+    """As novas estão fechadas desde 15/11/2026 (vão pela Caixa de entrada do Comando;
+    test_campo_ranking_ocorrencias_desenho_15_11.py); o registro segue no código, e estes testes o provam aberto."""
+    from nexus.torres.campo import ocorrencias_tela
+    monkeypatch.setattr(ocorrencias_tela, "NOVAS_ABERTAS", True)
+
+
 @pytest.fixture
 def cad(banco, app):
     """O cadastro com o Responsável O&M de cada usina (a Altair e a Brodowski 1 do 91, a Coração 1 do 90) e o

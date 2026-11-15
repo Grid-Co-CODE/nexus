@@ -5,7 +5,9 @@ Ranking: o "Líder 3.240 pontos" repetia o 1º lugar do pódio logo acima, e a p
 em" no canto e "livro do ranking do App · lido às" na barra). O e-mail do pódio FICA: o RH paga o prêmio pelo e-mail
 (Fillipe Figueiró, 03/11/2026), e a auditoria não sabia disso.
 Ocorrências: sem nenhuma ocorrência (em 15/11 eram 0 em produção), a tela mostrava três zeros, o cabeçalho de uma lista
-sem linhas e "Nenhuma ocorrência com esse filtro" sem filtro nenhum; e era a única sem o "!" ao lado do título."""
+sem linhas e "Nenhuma ocorrência com esse filtro" sem filtro nenhum; e era a única sem o "!" ao lado do título. E as
+novas estão fechadas (Levi, 15/11/2026: "mandei capar novas ocorrências mesmo, vai ser substituída por caixa de entrada
+em comando"): a nova vai para a Caixa de entrada do Comando; as que já existem seguem na tela."""
 import html as html_mod
 import re
 
@@ -46,23 +48,36 @@ def _vazio(html):
     return m.group(0) if m else ""
 
 
-def test_sem_nenhuma_ocorrencia_a_tela_convida_a_registrar_a_primeira(cad, cliente):
+def test_sem_nenhuma_ocorrencia_a_tela_leva_a_caixa_de_entrada(cad, cliente):
+    # Levi, 15/11/2026: "mandei capar novas ocorrências mesmo, vai ser substituída por caixa de entrada em comando"
     c = _entra(cliente, ADMIN)
     html = c.get("/t/campo/ocorrencias?responsavel=*").get_data(as_text=True)
     v = _vazio(html)
-    assert "Nenhuma ocorrência registrada ainda" in v and "plano de ação" in v
-    assert re.search(r'<a class="gc-btn gc-btn--primario"[^>]*href="/t/campo/ocorrencias/nova"[^>]*>Registrar a primeira</a>', v)
-    # nada de zeros, do cabeçalho de uma lista sem linhas nem do "com esse filtro" sem filtro
+    assert "Nenhuma ocorrência registrada" in v and "Caixa de entrada" in v
+    assert re.search(r'<a class="gc-btn gc-btn--primario"[^>]*href="/t/comando/caixa-de-entrada"[^>]*>Abrir a Caixa de entrada</a>', v)
+    # nada de registrar aqui, de zeros, do cabeçalho de uma lista sem linhas nem do "com esse filtro" sem filtro
+    assert 'href="/t/campo/ocorrencias/nova' not in html and "Registrar" not in v
     assert 'class="oc-numeros"' not in html and "oc-lin--cab" not in html and "com esse filtro" not in html
-    # o quadro também
     q = c.get("/t/campo/ocorrencias?responsavel=*&ver=quadro").get_data(as_text=True)
     assert _vazio(q) and 'class="oc-quadro"' not in q
 
 
-def test_quem_nao_registra_ve_quem_registra(cad, logado):
-    v = _vazio(logado.get("/t/campo/ocorrencias?responsavel=*").get_data(as_text=True))
-    assert "Nenhuma ocorrência registrada ainda" in v and "Registrar a primeira" not in v
-    assert "o Responsável O&amp;M da usina e o administrador" in v
+def test_a_ocorrencia_nova_vai_para_a_caixa_e_nada_grava(cad, cliente):
+    c = _entra(cliente, ADMIN)
+    r = c.get("/t/campo/ocorrencias/nova?usina=3")
+    assert r.status_code == 303 and r.headers["Location"].endswith("/t/comando/caixa-de-entrada")
+    r = c.post("/t/campo/ocorrencias/nova", data=_form(titulo="Cerca caída", usina_id="3"))
+    assert r.status_code == 303 and r.headers["Location"].endswith("/t/comando/caixa-de-entrada")
+    assert cad.linhas(O.LIVRO, O.ABA) == []
+
+
+def test_as_que_ja_existem_seguem_na_lista_sem_o_nova(cad, cliente):
+    O.criar(_form(titulo="Inversor 2 desarmando", criticidade="alta"), ADMIN, True)
+    c = _entra(cliente, ADMIN)
+    html = c.get("/t/campo/ocorrencias?responsavel=*").get_data(as_text=True)
+    assert "Inversor 2 desarmando" in html and "oc-lin--cab" in html and 'class="oc-numeros"' in html
+    assert "Nova ocorrência" not in html and 'href="/t/campo/ocorrencias/nova' not in html
+    assert re.search(r'Ocorrência nova:.*?<a[^>]*href="/t/comando/caixa-de-entrada"', html, re.S)
 
 
 def test_com_ocorrencias_e_o_filtro_vazio_a_lista_diz_o_filtro_sem_o_cabecalho(cad, cliente):
@@ -70,8 +85,6 @@ def test_com_ocorrencias_e_o_filtro_vazio_a_lista_diz_o_filtro_sem_o_cabecalho(c
     c = _entra(cliente, ADMIN)
     html = c.get("/t/campo/ocorrencias?responsavel=*&criticidade=baixa").get_data(as_text=True)
     assert "Nenhuma ocorrência com esse filtro" in html and "oc-lin--cab" not in html and not _vazio(html)
-    cheia = c.get("/t/campo/ocorrencias?responsavel=*").get_data(as_text=True)
-    assert "oc-lin--cab" in cheia and 'class="oc-numeros"' in cheia
 
 
 def test_o_titulo_tem_o_exclamacao_e_o_eyebrow_nao_repete_o_nome(cad, logado):
@@ -80,4 +93,4 @@ def test_o_titulo_tem_o_exclamacao_e_o_eyebrow_nao_repete_o_nome(cad, logado):
     assert 'class="gc-titulo-explica"' in cab and "Entenda esta tela" in cab
     assert re.search(r'<p class="gc-eyebrow">Usinas 360°</p>', cab)
     t = html_mod.unescape(_texto(cab))
-    assert "plano de ação" in t and "Responsável O&M" in t and "Lido às" in t
+    assert "plano de ação" in t and "Caixa de entrada" in t and "Lido às" in t

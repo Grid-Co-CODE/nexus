@@ -91,3 +91,4 @@ a.oc-lin:hover{border-color:var(--linha-forte);background:var(--superficie-2)}
 .oc-vazio-inicio > i{font-size:32px;color:var(--mudo)}
 .oc-vazio-inicio h2{margin:0;font:700 17px/1.3 var(--font-sans);color:var(--tinta)}
 .oc-vazio-inicio p{margin:0;color:var(--tinta-2);text-wrap:pretty}
+.oc-nota-caixa{margin:0 0 12px;font-size:13px}

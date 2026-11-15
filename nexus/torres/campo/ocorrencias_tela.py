@@ -144,7 +144,8 @@ def ocorrencias():
     lido_hora = (datetime.fromtimestamp(lido["lido_em"], timezone(timedelta(hours=-3))).strftime("%H:%M")
                  if lido["lido_em"] is not None else "")
     return render_template("campo/ocorrencias.html", **_comum(
-        cad=cad, quem=quem, lido=lido, lido_hora=lido_hora, nenhuma=nenhuma, sem_chave=cofre is None, lista=lista,
+        cad=cad, quem=quem, lido=lido, lido_hora=lido_hora, nenhuma=nenhuma, novas_abertas=NOVAS_ABERTAS,
+        sem_chave=cofre is None, lista=lista,
         colunas=colunas,
         quadro_max=QUADRO_FINALIZADAS, ver=ver, f={"responsavel": responsavel, "usina": usina, "status": st,
                                                     "criticidade": crit},
@@ -162,9 +163,18 @@ def _nova(cad, quem, form, erro=""):
     return render_template("campo/ocorrencia_nova.html", **_comum(cad=cad, quem=quem, form=form, erro=erro))
 
 
+# As novas estão FECHADAS (Levi, 15/11/2026: "mandei capar novas ocorrências mesmo, vai ser substituída por caixa de
+# entrada em comando"): a ocorrência nova vai para a Caixa de entrada do Comando (as demandas entre setores); as que já
+# existem seguem na tela, com o plano de ação e o andamento. O registro fica no código: reabrir é este True.
+NOVAS_ABERTAS = False
+
+
 @bp.route("/ocorrencias/nova", methods=["GET", "POST"])
 def ocorrencia_nova():
-    """O formulário de uma ocorrência nova; o POST grava e leva à página dela."""
+    """O formulário de uma ocorrência nova; o POST grava e leva à página dela. Fechada (NOVAS_ABERTAS), os dois levam à
+    Caixa de entrada do Comando, e nada é gravado."""
+    if not NOVAS_ABERTAS:
+        return redirect(url_for("torre_comando.caixa_de_entrada"), code=303)
     cad = _cadastro()
     quem = _quem_esta(cad)
     if request.method == "GET":

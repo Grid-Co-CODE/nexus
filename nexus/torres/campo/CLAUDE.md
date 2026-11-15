@@ -146,12 +146,17 @@ Levi: "Próximas peças: o mapa das usinas e as ocorrências com plano de ação
 supervisor (a ocorrência, o histórico e o plano de ação, em quadro e lista); o objetivo é largar o painel próprio e usar
 só o Nexus. Desenho e as decisões dele no quiz: `docs/superpowers/specs/2026-10-18-ocorrencias-plano-de-acao-design.md`.
 
-**Revisão de desenho (15/11/2026)**: o "!" ao lado do título, como nas outras telas (o que é, quem registra, a ordem e o
-lido às), e o eyebrow sem repetir o nome. **Sem nenhuma ocorrência no banco** (em 15/11 eram 0 em produção), a tela
-convida a registrar a primeira (`.oc-vazio-inicio`: o que é uma ocorrência e o botão "Registrar a primeira" para quem
-grava, ou quem registra para quem não grava), no lugar dos três zeros, dos filtros, do cabeçalho de uma lista sem
-linhas e do "Nenhuma ocorrência com esse filtro" sem filtro nenhum. Com ocorrências e o filtro vazio, a lista diz "com
-esse filtro" sem o cabeçalho. Prova: `test_campo_ranking_ocorrencias_desenho_15_11.py`.
+**AS NOVAS ESTÃO FECHADAS (15/11/2026**, Levi: "mandei capar novas ocorrências mesmo, vai ser substituída por caixa de
+entrada em comando"): `NOVAS_ABERTAS = False` em `ocorrencias_tela.py`; o GET e o POST de `/ocorrencias/nova` levam à
+Caixa de entrada do Comando (as demandas entre setores) e nada gravam; o botão "Nova ocorrência" sai. As que já existem
+seguem na tela, com o plano de ação e o andamento, e a lista diz que a nova vai pela Caixa. O registro ficou no código
+(reabrir = True; os testes de `test_campo_ocorrencias.py` o provam aberto).
+**Revisão de desenho (15/11/2026)**: o "!" ao lado do título, como nas outras telas (o que é, a ocorrência nova pela
+Caixa, a ordem e o lido às), e o eyebrow sem repetir o nome. **Sem nenhuma ocorrência no banco** (em 15/11 eram 0 em
+produção), `.oc-vazio-inicio` leva à Caixa de entrada ("Abrir a Caixa de entrada"), no lugar dos três zeros, dos
+filtros, do cabeçalho de uma lista sem linhas e do "Nenhuma ocorrência com esse filtro" sem filtro nenhum. Com
+ocorrências e o filtro vazio, a lista diz "com esse filtro" sem o cabeçalho. Prova:
+`test_campo_ranking_ocorrencias_desenho_15_11.py`.
 
 - **O Nexus é a fonte, no banco:** `nexus_ocorrencias · fato_evento_ocorrencia` (`nexus/campo/ocorrencias.py`), um
   evento por linha (`criou`, `dados`, `acao`, `andamento`), só acrescenta; o estado sai dos eventos (`estado`: vale a
