@@ -45,12 +45,15 @@
   }
   function resumo(f) {
     var partes = [];
-    if (f.usina) partes.push(esc(f.usina));
+    // a usina pelo nome dela (sem o cliente e o estado); sem a usina, o cliente que achou
+    if (f.usina) partes.push(esc(f.usina_curta || f.usina)); else if (f.cliente) partes.push(esc(f.cliente));
     if (f.ativo) partes.push("<b>" + esc(f.ativo.curto || f.ativo.label || f.ativo.code) + "</b>");
-    partes.push(f.tema ? "tema " + esc(f.tema_nome) : "sem tema");
-    var naTela = (tela.estado().subtarefas || []).length;          // o que a tela tem agora (a pessoa pode ter tirado alguma)
-    var novas = (f.subtarefas || []).filter(function (s) { return s.da_ia; }).length;
-    partes.push(naTela + " subtarefa(s) na tela" + (novas ? ", " + novas + " do pedido" : ""));
+    if (f.com_subtarefas) {                                         // só a tela do PCM tem o tema e as subtarefas
+      partes.push(f.tema ? "tema " + esc(f.tema_nome) : "sem tema");
+      var naTela = (tela.estado().subtarefas || []).length;        // o que a tela tem agora (a pessoa pode ter tirado alguma)
+      var novas = (f.subtarefas || []).filter(function (s) { return s.da_ia; }).length;
+      partes.push(naTela + " subtarefa(s) na tela" + (novas ? ", " + novas + " do pedido" : ""));
+    }
     return partes.join(" · ");
   }
 
@@ -85,8 +88,10 @@
           preenchida = true; txt.value = ""; ajustar();
           txt.placeholder = "Peça uma mudança: “troque para o inversor 2.2”, “título mais curto”…";
           var m = nomeModelo(f.ia_info);
-          var falta = (f.perguntas || []).length
-            ? '<span class="sia-aviso">Falta: ' + esc(f.perguntas.join(" ")) + " Responda aqui ou escolha na tela.</span> " : "";
+          // o que o pedido disse e o catálogo não tem vem antes de tudo (Levi: "poderia ter um aviso ativo x não encontrado")
+          var naoAchou = (f.avisos || []).map(function (a) { return '<span class="sia-erro">' + esc(a) + "</span> "; }).join("");
+          var falta = naoAchou + ((f.perguntas || []).length
+            ? '<span class="sia-aviso">Falta: ' + esc(f.perguntas.join(" ")) + " Responda aqui ou escolha na tela.</span> " : "");
           var tk = (f.ia_info && f.ia_info.tokens) || {};
           var dica = tk.entrada != null ? ' title="tokens: ' + tk.entrada + ' de entrada, ' + tk.saida + ' de saída'
             + (tk.raciocinio ? ", " + tk.raciocinio + " de raciocínio" : "") + '"' : "";

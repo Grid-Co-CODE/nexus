@@ -78,16 +78,6 @@
     </div>
   </div>
 
-  {# as subtarefas só entram com o Pedir com IA (15/11/2026): as do tema que a IA achou e as que o pedido pede; a tela sem
-     a IA segue sem subtarefas. Com elas a OS sai com o checklist e a data programada de 6 dias (a Urgente segue com a dela) #}
-  {% if ia and ia.tem_chave %}
-  <div class="os-cardf sia-subs-card" id="ia_subs_card" hidden><div class="os-cardf-h"><span class="os-badge">+</span><span class="os-cardf-t">Subtarefas <small>(do Pedir com IA)</small></span></div>
-    <div class="os-ajuda" id="ia_subs_hint">Vêm do tema e do pedido. Editar aqui vale: é esta lista que a OS recebe.</div>
-    <div id="ia_subs" class="os-subs"></div>
-    <button type="button" class="os-btn secondary" id="ia_sub_add">Acrescentar subtarefa</button>
-  </div>
-  {% endif %}
-
   <div class="os-cardf"><div class="os-cardf-h"><span class="os-badge">4</span><span class="os-cardf-t">Responsável e datas</span></div>
     <div class="os-linha2">
       {# digitável (Levi, 08/10/2026), como o tipo de ativo acima: o valor continua sendo o id_personnel da <option> #}

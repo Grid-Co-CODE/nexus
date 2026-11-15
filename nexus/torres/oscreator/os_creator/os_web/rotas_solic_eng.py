@@ -23,7 +23,6 @@ from . import perf_web
 from . import solic_eng_web as reg
 from . import solic_ia as IA
 from .rotas_solic_ia import contexto_ia
-from . import solic_web as sw
 from . import rotas
 from .rotas import _conta, exige_sessao
 
@@ -112,10 +111,9 @@ def api_criar(setor):
     # tinha posto aqui, e a revisão da 4.1 o tirou). E a sessão morta cai já aqui, antes de gravar: 401 e o login
     permitidos = reg.equipe(api.responsaveis_ao_vivo(), setor)[0]
     # a tela preenchida pelo Pedir com IA (15/11/2026, Levi: "a data programada sempre vai ser para 6 dias"): a data de 6
-    # dias (a Urgente segue com a dela) e as subtarefas da tela (as do tema e as que a IA acrescentou); a tela sem a IA
-    # segue sem subtarefas e com os 7 dias
+    # dias (a Urgente segue com a dela). Subtarefa nenhuma, com ou sem a IA: a tela não tem ("se não tem a opção acho que
+    # ele não deveria inventar")
     da_ia = corpo.get("origem") == "ia"
-    subs = sw.subs_para_api(corpo.get("subtarefas") or []) if da_ia else []
     ativos, c, erro = reg.montar(corpo, por_id, permitidos, _agora(), api.perf_os_nome, setor=setor,
                                  programada=IA.programada(_agora()) if da_ia and not corpo.get("urgente") else None)
     if erro:
@@ -140,10 +138,10 @@ def api_criar(setor):
              "por_ativo": c["por_ativo"]}
     if c["agrupar"]:
         # cada ativo vira uma atividade (tarefa) com o seu '[Ativo] - Descrição', e todas entram numa OS só
-        res = api.create_work_orders_agrupada(ativos, c["descricao"], reg.TIPO_TAREFA, subs, **comum)
+        res = api.create_work_orders_agrupada(ativos, c["descricao"], reg.TIPO_TAREFA, [], **comum)
         out, oss = reg.mensagem_agrupada(res, ativos, c["prog_date"], setor=setor), reg.oss_da_agrupada(res)
     else:
-        res = api.create_work_orders_bulk(ativos, c["descricao"], reg.TIPO_TAREFA, subs,
+        res = api.create_work_orders_bulk(ativos, c["descricao"], reg.TIPO_TAREFA, [],
                                           responsible_code=c["responsible_code"], **comum)
         out, oss = reg.mensagem(res, ativos, c["prog_date"], setor=setor), reg.oss_do_bulk(res)
     lista_central.criadas(res)         # as OS criadas entram na lista central na hora (31/10/2026, tarefa 3.3)

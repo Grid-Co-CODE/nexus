@@ -93,7 +93,7 @@ def preencher():
     assets = api.load_assets_cached() or []
     clientes = trad.clientes(assets)
     usinas = {c: trad.usinas_de(assets, c) for c in clientes}
-    temas = sw.temas_para_tela()
+    temas = sw.temas_para_tela() if IA.setor_de(setor)["subtarefas"] else []      # a Performance e a Engenharia não têm tema
     agora = trad.agora_brt()
     anterior = corpo.get("anterior") if isinstance(corpo.get("anterior"), dict) else None
     opcoes_c1 = _opcoes_c1() if setor == "pcm" else []

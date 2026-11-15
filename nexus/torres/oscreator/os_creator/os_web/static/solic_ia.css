@@ -53,16 +53,9 @@ body.os-form .sia-prompt textarea::placeholder{color:var(--sia-mudo)}
 @media (prefers-reduced-motion:reduce){.sia-cursor{animation:none}}
 :where(html[data-tema="claro"]) .sia-barra{box-shadow:0 8px 24px -18px var(--sia-sombra)}
 
-/* as subtarefas da tela da Engenharia e da Performance, só depois do Pedir com IA (a tela sem a IA não tem subtarefas) */
-.sia-subs-card[hidden]{display:none!important}
-
 @media (max-width:640px){
   .sia-prompt{flex-wrap:wrap}
   body.os-form .sia-prompt textarea{flex:1 1 calc(100% - 24px)}
   .sia-barra .os-btn{flex:1 1 0}
   .sia-linha{margin-left:0}
-  /* a subtarefa em duas linhas: o texto inteiro em cima, o tipo, a foto e o tirar embaixo */
-  .sia-subs-card .os-sub{grid-template-columns:minmax(0,1fr) auto 34px}
-  .sia-subs-card .os-sub .s-desc{grid-column:1 / -1;min-width:0}
-  body.os-form .sia-subs-card .os-sub select{min-width:0;width:100%}
 }

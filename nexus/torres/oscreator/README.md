@@ -3298,7 +3298,8 @@ preenchido dentro da tela original mesmo e caso a pessoa precise adicionar algo 
 "crie um botão Limpar para tirar tudo o que foi posto"): o botão "Pedir com IA" do alto abre uma caixa de texto com cara de
 linha de comando no topo da tela do PCM, da Engenharia e da Performance (`templates/_solic_ia.html`, `static/solic_ia.js`);
 o setor é o da tela. A resposta preenche os campos de sempre pela cascata de sempre (cliente → usina → tipo → o ativo
-marcado na tabela → tema → título, relato, Classificação 1, data e subtarefas), pelo `window.SolicForm` de cada tela
+marcado na tabela → tema → título, relato, Classificação 1, data e subtarefas; o tema, a Classificação 1 e as
+subtarefas só no PCM), pelo `window.SolicForm` de cada tela
 (`estado`, `preencher`, `limpar`: no `solic.html` e no `solic_eng.js`). O 2º pedido leva o que está na tela agora
 (`anterior`), e a IA muda só o que foi pedido; o que já está igual não se mexe (o ativo marcado à mão, as subtarefas
 editadas). O **Limpar** tira tudo da tela, o da IA e o digitado. `/os/solicitacao/ia` leva à do PCM com a caixa aberta
@@ -3325,7 +3326,11 @@ dia por este pedido.
   ativo pelo nome com os números iguais ("inversor 2.1" nunca vira o 2.3), empate fica para a pessoa; o tema só se for da
   lista e do tipo do ativo (a regra da Nova solicitação); as subtarefas são as do tema (ou a base) mais até 5 que o pedido
   pede, só com tipo do editor. O que não casou vira a linha "Falta: …" embaixo da caixa, e a pessoa responde nela ou
-  escolhe na tela.
+  escolhe na tela. O ativo que o pedido diz e a usina não tem vem antes, em vermelho (`avisos`: Ativo "inversor 1.5" não
+  encontrado na …; Levi, 15/11/2026, no 1.5 de SMP100, cujo grupo 1 vai até o 1.4: "poderia ter um aviso ativo x não
+  encontrado"), e os do mesmo grupo viram as opções da pergunta (`solic_ia.vizinhos`: o 1.1 a 1.4). A linha, o aviso e a
+  pergunta citam a usina pelo nome dela, sem o cliente e o estado (`usina_curta`); sem a usina, o cliente (Levi: "deixa
+  citando só usina ou só cliente a depende do que encontrar").
 - **O código da usina:** a IA recebe cada usina com o código dela (o começo do código dos ativos, o "CPP100" de
   "CPP100-INVR2.2", `solic_ia.codigos_das_usinas`), e o código escrito no pedido acha a usina sozinho, valendo mais que o
   palpite da IA (na prova no ar, "o inversor 2.2 de CPP100" voltava sem cliente e sem usina).
@@ -3335,9 +3340,11 @@ dia por este pedido.
   equipamento dos ativos já devem vir filtrado como inversor"): a IA devolve o `tipo`, o Nexus acha o tipo pelas palavras
   do nome (`solic_ia.tipo_da_pista`: plural vale; "disjuntor do inversor" é Disjuntor, o que vem primeiro), e a tela põe
   esse tipo no campo Tipo de ativo, que filtra a tabela. Os temas valem pelo tipo antes mesmo do ativo.
-- **As subtarefas na Engenharia e na Performance:** a tela delas não tinha subtarefas; com o Pedir com IA aparece o cartão
-  "Subtarefas (do Pedir com IA)", editável como o do PCM, e o criar vai com `origem: "ia"`.
+- **Na Engenharia e na Performance, só o que a tela tem:** sem tema e sem subtarefas (`SETORES[...]["subtarefas"]`); a
+  lista de temas nem vai à IA. Levi, 15/11/2026: "quando vou para performance ou engenharia e escrevo um prompt ele abre
+  subtarefa do nada, se não tem a opção acho que ele não deveria inventar" (a 1ª versão da barra punha ali um cartão de
+  subtarefas que a tela não tem; saiu).
 - **Quem cria é o botão de sempre:** PCM pela Nova solicitação (`/os/api/solic/criar`, com a data sugerida de 6 dias às
-  08:00 que a IA pôs no campo); Performance e Engenharia pela delas, com `origem: "ia"`, que leva as subtarefas da tela e a
-  programada de 6 dias às 08:00 (a Urgente segue com a dela; a tela sem a IA segue sem subtarefas e com os 7 dias).
+  08:00 que a IA pôs no campo); Performance e Engenharia pela delas, com `origem: "ia"`, que leva só a programada de 6
+  dias às 08:00 (a Urgente segue com a dela; a tela sem a IA, com os 7 dias); subtarefa nenhuma, mesmo se vier no corpo.
 - Prova: `tests/test_oscreator_pedir_com_ia_15_11.py`.

@@ -274,10 +274,7 @@
     if (!confirm(frase + fraseAnexos + '\n\nContinuar?')) return;
     const dados = {ativos: Array.from(marcados), descricao: edDesc.value, problema: taProb.value,
                    responsavel: {id_personnel: resp.id_personnel}, evento: dtEvento.value, urgente: urg, agrupar: agr};
-    if (iaAtivo) {                                         // a tela do Pedir com IA: as subtarefas e a data de 6 dias
-      dados.origem = 'ia';
-      dados.subtarefas = iaSubs.filter((x) => String(x.desc || '').trim()).map((x) => ({desc: x.desc, tipo: x.tipo, anexo: !!x.anexo}));
-    }
+    if (iaAtivo) dados.origem = 'ia';                      // a tela do Pedir com IA: a data de 6 dias
     let opcoes;
     if (arquivos.length) {                                 // com anexo: multipart, o MESMO JSON no campo payload
       const fd = new FormData();
@@ -301,45 +298,16 @@
 
   // ── o Pedir com IA (15/11/2026, Levi: "tudo é preenchido dentro da tela original mesmo e caso a pessoa precise adicionar
   //    algo ela pode pedir novamente alguma mudança"; "crie um botão Limpar para tirar tudo o que foi posto"): a caixa de
-  //    texto (solic_ia.js) preenche ESTA tela por aqui, pela cascata de sempre. As subtarefas só existem com a IA: o cartão
-  //    aparece com elas, editáveis como as do PCM, e vão no criar com `origem: "ia"`. O responsável é a pessoa quem escolhe. ──
-  const subsCard = $('ia_subs_card'), caixaSubs = $('ia_subs');
-  const TIPOS_SUB = {texto: 'Texto', num: 'Numérico', simnao: 'Sim/Não', verif: 'Verificação'};
+  //    texto (solic_ia.js) preenche ESTA tela por aqui, pela cascata de sempre, e só com o que ela tem: sem tema nem
+  //    subtarefas (Levi, 15/11/2026: "se não tem a opção acho que ele não deveria inventar"). O responsável é a pessoa
+  //    quem escolhe. ──
   const INICIO = {usinas: cbUsi.innerHTML, evento: dtEvento.value};
-  let iaSubs = [], iaTema = '';
-  function pintarIaSubs() {
-    if (!subsCard) return;
-    subsCard.hidden = !iaAtivo;
-    caixaSubs.innerHTML = iaSubs.map((x, i) => '<div class="os-sub" data-i="' + i + '">'
-      + '<input type="text" class="s-desc" value="' + esc(x.desc) + '" aria-label="Subtarefa ' + (i + 1) + '">'
-      + '<select class="s-tipo" aria-label="Tipo da subtarefa ' + (i + 1) + '">' + Object.keys(TIPOS_SUB).map((t) => '<option value="' + t + '"'
-        + (x.tipo === t ? ' selected' : '') + '>' + TIPOS_SUB[t] + '</option>').join('') + '</select>'
-      + '<label class="os-check"><input type="checkbox" class="s-anexo"' + (x.anexo ? ' checked' : '') + '> foto</label>'
-      + '<button type="button" class="os-btn secondary s-x" title="Remover" aria-label="Remover a subtarefa ' + (i + 1) + '">&times;</button></div>').join('');
-  }
-  if (subsCard) {
-    caixaSubs.addEventListener('click', (e) => {
-      if (!e.target.classList.contains('s-x')) return;
-      iaSubs.splice(Number(e.target.closest('.os-sub').dataset.i), 1); pintarIaSubs();
-    });
-    const ler = (e) => {
-      const d = e.target.closest('.os-sub'), x = d && iaSubs[Number(d.dataset.i)];
-      if (!x) return;
-      if (e.target.classList.contains('s-desc')) x.desc = e.target.value;
-      if (e.target.classList.contains('s-tipo')) x.tipo = e.target.value;
-      if (e.target.classList.contains('s-anexo')) x.anexo = e.target.checked;
-    };
-    caixaSubs.addEventListener('input', ler);
-    caixaSubs.addEventListener('change', ler);
-    $('ia_sub_add').addEventListener('click', () => { iaSubs.push({desc: '', tipo: 'texto', anexo: false}); pintarIaSubs(); });
-  }
   const temOpcao = (sel, v) => Array.prototype.some.call(sel.options, (o) => o.value === String(v));
   window.SolicForm = {
     estado() {
       return {cliente: cbCli.value, usina: cbUsi.value, tipo: cbTipo.value,
               ativo: ativos.filter((a) => marcados.has(String(a.id))).map((a) => a.curto || a.label).join('; '),
-              titulo: edDesc.value, descricao: taProb.value, tema: iaTema,
-              subtarefas: iaSubs.filter((x) => String(x.desc || '').trim()).map((x) => ({desc: x.desc, tipo: x.tipo}))};
+              titulo: edDesc.value, descricao: taProb.value};
     },
     async preencher(f) {
       if (f.cliente && cbCli.value !== f.cliente && temOpcao(cbCli, f.cliente)) { cbCli.value = f.cliente; await trocarCliente(); }
@@ -350,22 +318,15 @@
       busca.value = ''; limite = PAGINA; pintar();
       if (f.titulo) edDesc.value = f.titulo;
       if (f.descricao) taProb.value = f.descricao;
-      // as subtarefas: o tema novo traz as dele; no mesmo tema, as editadas ficam e entram só as que o pedido acrescentou
-      const novas = (f.subtarefas || []).map((x) => ({desc: x.desc, tipo: x.tipo, anexo: !!x.anexo, da_ia: !!x.da_ia}));
-      if (!iaAtivo || (f.tema || '') !== iaTema) iaSubs = novas;
-      else {
-        const tem = new Set(iaSubs.map((x) => semAcento(x.desc)));
-        novas.filter((x) => x.da_ia && !tem.has(semAcento(x.desc))).forEach((x) => iaSubs.push(x));
-      }
-      iaTema = f.tema || ''; iaAtivo = true;
-      pintarIaSubs(); mostrarData(); contar(); regrasAnexo();
+      iaAtivo = true;
+      mostrarData(); contar(); regrasAnexo();
     },
     async limpar() {
       cbCli.value = ''; cbUsi.innerHTML = INICIO.usinas; cbUsi.value = '';
       semAtivos('Selecione a usina para carregar os ativos.'); busca.value = '';
       edDesc.value = ''; taProb.value = ''; cbResp.value = ''; ckUrg.checked = false; dtEvento.value = INICIO.evento;
       arquivos = []; avisarAnexo(''); pintarAnexos(); regrasAnexo();
-      iaSubs = []; iaTema = ''; iaAtivo = false; pintarIaSubs();
+      iaAtivo = false;
       mostrarData(); mostrar(''); hintCriar.textContent = ''; contar();
     }
   };

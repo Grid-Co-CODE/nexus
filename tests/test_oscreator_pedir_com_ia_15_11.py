@@ -58,6 +58,36 @@ def test_o_numero_do_ativo_tem_de_ser_o_mesmo():
     assert IA.escolher("inversor 1.1", ["Disjuntor do Inversor 1.1", "Inversor 1.1"])[0] == "Inversor 1.1"
 
 
+def test_o_ativo_que_a_usina_nao_tem_vira_aviso_com_os_do_mesmo_grupo(ia):
+    """Levi, 15/11/2026: pediu o "inversor 1.5 de SMP100", que não existe (o grupo 1 de lá vai até o 1.4), e a tela só
+    perguntava "Em qual ativo"; "poderia ter um aviso ativo x não encontrado"."""
+    ia.resposta["j"] = dict(RESPOSTA, ativo="inversor 1.5")
+    f = ia.post("/os/api/solic/ia/preencher", json={"setor": "pcm", "texto": "inversor 1.5 da usina teste 1"}).get_json()
+    assert f["ativo"] is None and not f["pronta"] and f["tipo"] == "Inversor"
+    assert f["avisos"] == ['Ativo "inversor 1.5" não encontrado na Usina Teste 1.'] and f["usina_curta"] == "Usina Teste 1"
+    assert f["perguntas"] == ["Qual destes ativos: Inversor 1.1?"]            # o vizinho do grupo 1 vira a opção
+    ia.resposta["j"] = dict(RESPOSTA, ativo="inversor 8.2")                    # grupo que não existe: só o aviso
+    g = ia.post("/os/api/solic/ia/preencher", json={"setor": "pcm", "texto": "inversor 8.2 da usina teste 1"}).get_json()
+    # a usina pelo nome dela, sem o cliente e o estado (Levi: "deixa citando só usina ou só cliente")
+    assert g["avisos"] == ['Ativo "inversor 8.2" não encontrado na Usina Teste 1.']
+    assert g["perguntas"] == ["Em qual ativo da Usina Teste 1?"]
+    ia.resposta["j"] = dict(RESPOSTA, ativo="")                                # a IA não disse ativo: nada a avisar
+    assert ia.post("/os/api/solic/ia/preencher", json={"setor": "pcm", "texto": "inspeção na usina teste 1"}).get_json()["avisos"] == []
+    js = ia.get("/os/static/solic_ia.js").get_data(as_text=True)
+    assert "f.avisos" in js and "sia-erro" in js and "f.usina_curta" in js
+
+
+def test_os_vizinhos_sao_do_mesmo_grupo_e_em_ordem():
+    nomes = ["Inversor 1.10", "Inversor 1.2", "Inversor 2.1", "Disjuntor do Inversor 1.1", "Inversor 1.1", "Inversor 11.1"]
+    so = lambda x: x  # noqa: E731
+    # o mesmo grupo (o 11.1 não é do grupo 1), em ordem de número (o 1.10 depois do 1.2)
+    assert IA.vizinhos("inversor 1.5", nomes, so) == ["Disjuntor do Inversor 1.1", "Inversor 1.1", "Inversor 1.2",
+                                                      "Inversor 1.10"]
+    assert [IA._ordem(n) for n in IA.vizinhos("inversor 1.5", nomes, so)] == [[1, 1], [1, 1], [1, 2], [1, 10]]
+    assert IA.vizinhos("inversor 5", nomes, so) == [] and IA.vizinhos("inversor 9.1", nomes, so) == []
+    assert IA.vizinhos("", nomes, so) == []
+
+
 def test_a_resposta_e_lida_mesmo_com_cerca_e_o_raciocinio_sai():
     assert IA.ler_json('Claro!\n```json\n{"titulo": "x"}\n```') == {"titulo": "x"}
     assert IA.ler_json("sem json nenhum") == {} and IA.ler_json("[1, 2]") == {}
@@ -107,9 +137,28 @@ def test_sem_tema_a_classificacao_e_a_que_a_ia_propos_se_for_da_lista(ia):
 
 def test_o_tema_que_nao_e_do_tipo_do_ativo_cai_e_vem_a_base(ia):
     ia.resposta["j"] = dict(RESPOSTA, tema="limpeza_modulos", subtarefas=[])
-    f = ia.post("/os/api/solic/ia/preencher", json={"setor": "performance", "texto": "baixa performance no inversor 1.1"}).get_json()
+    f = ia.post("/os/api/solic/ia/preencher", json={"setor": "pcm", "texto": "inspeção no inversor 1.1"}).get_json()
     assert f["tema"] == "" and [s["desc"] for s in f["subtarefas"]] == ["Descreva a atividade realizada"]
-    assert [t["chave"] for t in f["temas"]] == ["inversor_inspecao"] and f["responsavel"] is True
+    assert [t["chave"] for t in f["temas"]] == ["inversor_inspecao"] and f["com_subtarefas"] is True
+
+
+def test_na_engenharia_e_na_performance_a_ia_nao_inventa_tema_nem_subtarefa(ia):
+    """Levi, 15/11/2026: "quando vou para performance ou engenharia e escrevo um prompt ele abre subtarefa do nada, se não
+    tem a opção acho que ele não deveria inventar". A tela delas não tem tema nem subtarefas: a ficha não traz, a IA nem
+    recebe a lista de temas, e o criar não manda subtarefa mesmo se vier no corpo."""
+    for setor in ("performance", "engenharia"):
+        f = ia.post("/os/api/solic/ia/preencher", json={"setor": setor, "texto": "baixa performance no inversor 1.1"}).get_json()
+        assert f["ativo"]["id"] == 2 and f["responsavel"] is True and f["pronta"]
+        assert f["tema"] == "" and f["subtarefas"] == [] and f["temas"] == [] and f["com_subtarefas"] is False
+        sistema = ia.pedidos[-1]["sistema"]
+        assert "inversor_inspecao" not in sistema and '"subtarefas"' not in sistema and '"tema"' not in sistema
+    ia.post("/os/api/solic/ia/preencher", json={"setor": "pcm", "texto": "inspeção no inversor 1.1"})
+    assert '"subtarefas"' in ia.pedidos[-1]["sistema"] and "inversor_inspecao" in ia.pedidos[-1]["sistema"]
+    for url in ("/os/solicitacao/engenharia", "/os/solicitacao/performance"):
+        h = ia.get(url).get_data(as_text=True)
+        assert "ia_subs" not in h and "Subtarefas" not in h, url
+    js = ia.get("/os/static/solic_eng.js").get_data(as_text=True)
+    assert "iaSubs" not in js and "dados.subtarefas" not in js
 
 
 def test_o_que_falta_vira_pergunta(ia):
@@ -130,14 +179,14 @@ def test_sem_a_chave_a_tela_diz_e_nada_vai_a_ia(ia, monkeypatch):
     assert ia.post("/os/api/solic/ia/preencher", json={"setor": "x", "texto": "a"}).status_code == 400
 
 
-def test_a_os_da_ia_na_engenharia_leva_as_subtarefas_e_6_dias(cli):
+def test_a_os_da_ia_na_engenharia_vai_com_6_dias_e_sem_subtarefa(cli):
     subs = [{"desc": "Medir a isolação", "tipo": "num", "anexo": True}]
     r = cli.post("/os/api/solicitacao/engenharia/criar", json=_corpo(ativos=[2], origem="ia", subtarefas=subs))
     assert r.status_code == 200
-    assert cli.feito["subtasks"] == sw.subs_para_api(subs) and cli.feito["prog_date"] == IA.programada(dt.datetime.now(IA.BRT))
+    assert cli.feito["subtasks"] == [] and cli.feito["prog_date"] == IA.programada(dt.datetime.now(IA.BRT))
     # Urgente na tela do Pedir com IA: vale a data da Urgente, não os 6 dias
     cli.post("/os/api/solicitacao/engenharia/criar", json=_corpo(ativos=[2], origem="ia", subtarefas=subs, urgente=True))
-    assert cli.feito["subtasks"] == sw.subs_para_api(subs) and cli.feito["prog_date"] < IA.programada(dt.datetime.now(IA.BRT))
+    assert cli.feito["subtasks"] == [] and cli.feito["prog_date"] < IA.programada(dt.datetime.now(IA.BRT))
     # a tela de sempre segue sem subtarefas e com os 7 dias, mesmo se mandar as subtarefas
     cli.post("/os/api/solicitacao/engenharia/criar", json=_corpo(ativos=[2], subtarefas=subs))
     assert cli.feito["subtasks"] == [] and cli.feito["prog_date"] > IA.programada(dt.datetime.now(IA.BRT))
@@ -155,7 +204,6 @@ def test_a_caixa_de_texto_mora_na_tela_de_sempre_das_tres(ia):
         # a caixa fica no alto da tela de sempre, antes do 1º campo; a janela e a ficha de antes não existem mais
         assert h.index('id="sia"') < h.index('id="cb_cli') and "sia_veu" not in h and "sia_ficha" not in h
     assert "window.SolicForm" in ia.get("/os/solicitacao").get_data(as_text=True)          # o PCM preenche pela tela
-    assert 'id="ia_subs_card" hidden' in ia.get("/os/solicitacao/engenharia").get_data(as_text=True)
     r = ia.get("/os/solicitacao/ia")                                    # o cartão do Início: a do PCM, com a caixa aberta
     assert r.status_code == 302 and r.headers["Location"].endswith("/os/solicitacao?ia=1")
 
