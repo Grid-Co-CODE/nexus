@@ -231,10 +231,11 @@
       p.set('secao', k); p.set('de', b.getAttribute('data-de'));
       b.disabled = true; b.textContent = 'Carregando…';
       pedirCartoes(p).then(function (j) {
-        var t = document.createElement('template');
+        var t = document.createElement('template'), ja = {};
         t.innerHTML = j.html;
+        sec.querySelectorAll('.apq-cartao').forEach(function (c) { ja[c.getAttribute('data-folio')] = true; });
         Array.prototype.forEach.call(t.content.querySelectorAll('.apq-cartao'), function (c) {
-          if (!sec.querySelector('.apq-cartao[data-folio="' + c.getAttribute('data-folio') + '"]')) { sec.appendChild(c); }
+          if (!ja[c.getAttribute('data-folio')]) { sec.appendChild(c); }
         });
         verMais(b, j.proximo, j.resta);
         contar();

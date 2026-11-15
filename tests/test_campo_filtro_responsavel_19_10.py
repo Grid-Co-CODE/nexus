@@ -52,11 +52,10 @@ def test_a_releitura_que_falha_fica_com_a_copia_boa(app, monkeypatch):
 
 
 def test_o_filtro_nao_espera_o_banco(tela, logado, monkeypatch):
+    # (a etiqueta das ocorrências saiu da Visão geral em 15/11/2026, com a tela Ocorrências: a Visão geral não lê mais
+    # o livro delas; fica a prova de que o filtro não espera o banco)
     assert logado.get("/t/campo/responsaveis?modo=geral&responsavel=*").status_code == 200    # a conta pronta
     visao._LIVROS.clear()                                  # a cópia dos livros (2 min) venceu
-    O._CACHE["livro"]["lido_em"] -= O.TTL_S + 1             # e a das ocorrências (1 min)
-    por_tras = []
-    monkeypatch.setattr(O, "_reler_por_tras", lambda: por_tras.append(1))   # no servidor, outra thread
     b = _Banco(tela)
     r = logado.get("/t/campo/responsaveis?modo=geral&responsavel=Ciclano+Chefe&cliente=Thopen")
-    assert r.status_code == 200 and b.listagens == 0 and b.paginas == [] and por_tras == [1]
+    assert r.status_code == 200 and b.listagens == 0 and b.paginas == []

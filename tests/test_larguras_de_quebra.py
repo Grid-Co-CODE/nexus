@@ -22,7 +22,6 @@ LEGADO = {
     "nexus/static/engenharia.css": {600: 1, 980: 1, 1000: 1},
     "nexus/static/hseq.css": {1000: 1},
     "nexus/static/nexus.css": {760: 1},
-    "nexus/static/ocorrencias.css": {760: 1, 1000: 1},
     "nexus/static/pcm-acomp.css": {700: 1, 1000: 1, 1200: 1},
     "nexus/static/pcm.css": {560: 1, 760: 1, 980: 1, 1200: 1},
     "nexus/torres/oscreator/os_creator/os_web/static/chamados.css": {980: 1, 1000: 3, 1200: 1},
