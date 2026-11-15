@@ -429,12 +429,13 @@ def execucao_atual(id_work_order_task) -> dict:
             "raw": d}
 
 
-def iniciar_execucao(id_work_order_task) -> dict:
-    """Liga o cronômetro. `initial_date` em UTC com Z, como o web manda."""
+def iniciar_execucao(id_work_order_task, inicio=None) -> dict:
+    """Liga o cronômetro. `initial_date` em UTC com Z, como o web manda. `inicio` (datetime com fuso) liga com outra hora
+    de início: a do 1º comentário do chamado de Garantias (15/11/2026); sem ele, agora."""
     if not id_work_order_task:
         return {"ok": False, "erro": "OS sem tarefa — não dá para iniciar."}
     import datetime as _d
-    agora = _d.datetime.now(_d.timezone.utc)
+    agora = (inicio if inicio is not None else _d.datetime.now(_d.timezone.utc)).astimezone(_d.timezone.utc)
     iso = agora.strftime("%Y-%m-%dT%H:%M:%S.") + "%03dZ" % (agora.microsecond // 1000)
     res = api._rpc_call(RPC_EXEC_INSERT, {"page": 1, "limit": 200, "start": 0, "append": True,
                                       "id_wo_tasks_execution_categorizations": None,

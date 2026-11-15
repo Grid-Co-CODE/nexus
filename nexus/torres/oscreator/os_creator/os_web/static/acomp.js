@@ -467,7 +467,7 @@
       if (!texto) { msg(m, "Escreva a observação antes de salvar.", "er"); campo.focus(); return; }
       bObs.disabled = true; msg(m, "Salvando…");
       try {
-        const j = await postar("/os/api/acomp/" + folio + "/obs", {texto: texto, ativo: ativo});
+        const j = await postar("/os/api/acomp/" + folio + "/obs", {texto: texto, ativo: ativo, wid: wid});
         const e = j.entrada || {};
         const tl = document.getElementById("tl");
         tl.querySelectorAll(".tl-e.novo").forEach(function (x) { x.classList.remove("novo"); });
@@ -490,7 +490,10 @@
         tl.insertBefore(div, tl.firstChild);
         contar(document.getElementById("n_obs"), tl.querySelectorAll(".tl-e").length);
         campo.value = "";
-        msg(m, "Salvo.", "ok");
+        // o 1º comentário inicia a atividade no Fracttal (15/11/2026): a tela diz que iniciou, ou o porquê de não
+        const at = j.atividade || {};
+        if (at.aviso) msg(m, "Salvo. " + at.aviso, "av");
+        else msg(m, "Salvo." + (at.mensagem ? " " + at.mensagem : ""), "ok");
       } catch (e) {
         if (e.message !== "sessão") msg(m, "Não salvou: " + e.message, "er");
       }

@@ -1128,6 +1128,7 @@ def api_obs_excluir(folio, id_obs):
 def api_obs(folio):
     c = _corpo()
     nome, email = _quem()
+    primeira = _primeira_obs(folio)
     try:
         reg = obs_store.adicionar(folio, c.get("texto"), "obs", ativo=str(c.get("ativo") or ""), quem=nome, email=email)
     except ValueError as e:
@@ -1136,7 +1137,126 @@ def api_obs(folio):
         return _erro(e, 403)
     except requests.RequestException as e:
         return _erro("O banco da Gridco não respondeu: %s" % str(e)[:160], 502)
-    return jsonify({"ok": True, "entrada": dict(aw.entrada(reg), novo=True)})
+    atividade = _iniciar_atividade(folio, c.get("wid"), _quando(reg.get("quando"))) if primeira else {}
+    return jsonify({"ok": True, "entrada": dict(aw.entrada(reg), novo=True), "atividade": atividade})
+
+
+# ── a atividade do chamado no Fracttal: começa no 1º comentário e termina na finalização (15/11/2026) ──────────────────
+# Levi: "quando tivesse o primeiro comentário, a data e hora do primeiro comentário entraria como início da atividade do
+# chamado, se tiver só um ativo"; no quiz, "fim na finalização" e "também os abertos". O 1º comentário escrito aqui liga o
+# cronômetro da tarefa (o mesmo do Iniciar da página da OS), com a hora dele. O Finalizar encerra a atividade antes de
+# concluir a OS; o chamado que chegou à finalização sem atividade (os abertos de antes desta regra) ganha o registro
+# inteiro ali: início no 1º comentário, fim na finalização.
+# O RISCO, dito ao Levi antes da escolha: no Fracttal a atividade é de quem a iniciou, só ela encerra, e a OS com atividade
+# aberta não conclui (o `work_orders_recalculate` recusa; o caso da OS 10215, em `os_execucao.fechar_execucoes_abertas`).
+# Se outra pessoa finalizar, o Finalizar diz de quem é a atividade em vez de tentar concluir.
+def _primeira_obs(folio) -> bool:
+    """Ainda não há comentário escrito nesta OS? Sem o banco, não (a atividade não começa por engano)."""
+    try:
+        return not any(x["tipo"] == "obs" and x["os"] == str(folio) for x in obs_store.vigentes(obs_store.listar()))
+    except Exception:                                   # noqa: BLE001 — sem saber, não se inicia nada
+        return False
+
+
+def _primeiro_comentario(folio):
+    """O datetime do 1º comentário escrito da OS (a versão em vigor), ou None."""
+    try:
+        qs = [_quando(x.get("quando")) for x in obs_store.vigentes(obs_store.listar())
+              if x["tipo"] == "obs" and x["os"] == str(folio)]
+    except Exception:                                   # noqa: BLE001
+        return None
+    qs = [q for q in qs if q is not None]
+    return min(qs) if qs else None
+
+
+def _quando(v):
+    import datetime as _dt
+    try:
+        d = _dt.datetime.fromisoformat(str(v or "").replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return d if d.tzinfo else d.replace(tzinfo=aw.BRT)
+
+
+def _tarefa_unica(wid):
+    """O id da tarefa da OS de UM ativo (uma tarefa), ou None: a regra é só para um ativo. Sem conseguir ler as tarefas,
+    None: a atividade fica de fora, e o comentário e o finalizar seguem como sempre."""
+    try:
+        ids = [int(x) for x in (api._ids_tarefas_da_os(wid) or []) if str(x).isdigit()]
+    except api.SessionExpired:
+        raise
+    except Exception:                                   # noqa: BLE001
+        return None
+    return ids[0] if len(ids) == 1 else None
+
+
+def _hora(d) -> str:
+    return d.astimezone(aw.BRT).strftime("%d/%m às %H:%M") if d else ""
+
+
+def _iniciar_atividade(folio, wid, quando) -> dict:
+    """O 1º comentário liga a atividade da tarefa, com a hora dele. → {"ok", "mensagem"} ou {"aviso"}; {} quando não se
+    aplica (várias tarefas, a atividade que já começou). Nunca levanta: o comentário já está gravado."""
+    try:
+        wid, _det = _os_conferida(folio, wid)
+        tid = _tarefa_unica(wid) if wid else None
+        if tid is None or quando is None:
+            return {}
+        if (api.execucao_atual(tid) or {}).get("estado") != "parada" or api.historico_execucao(tid):
+            return {}                                   # já começou (pela página da OS, pelo App ou no Fracttal)
+        res = api.iniciar_execucao(tid, quando)
+        if not (isinstance(res, dict) and res.get("ok")):
+            return {"aviso": "O comentário foi salvo, mas o Fracttal não iniciou a atividade: %s"
+                             % str((res or {}).get("erro") or "sem resposta").replace("_", " ")[:160]}
+        if (api.execucao_atual(tid) or {}).get("estado") != "rodando":
+            return {"aviso": "O comentário foi salvo, mas a atividade não ficou em andamento no Fracttal. Confira na página "
+                             "da OS."}
+        lista_central.mudou(wid)
+        return {"ok": True, "mensagem": "Atividade iniciada no Fracttal em %s (o 1º comentário)." % _hora(quando)}
+    except api.SessionExpired:
+        raise
+    except Exception as e:                              # noqa: BLE001 — o comentário fica; a atividade, não
+        log.warning("Garantias: a atividade da OS %s não iniciou no 1º comentário (%s)", folio, type(e).__name__)
+        return {"aviso": "O comentário foi salvo, mas não consegui iniciar a atividade no Fracttal (%s)." % type(e).__name__}
+
+
+def _encerrar_atividade(folio, tid) -> dict:
+    """Antes de concluir a OS: encerra a atividade em andamento ou, sem atividade nenhuma, lança o registro inteiro (do 1º
+    comentário até agora). → {"mensagem"} ou {"erro"} (aí a OS não é concluída)."""
+    import datetime as _dt
+    est = (api.execucao_atual(tid) or {}).get("estado") or "parada"
+    if est in ("rodando", "pausada"):
+        res = {"ok": True}
+        if est == "pausada":                            # a pausada não encerra: retoma antes (os_execucao)
+            res = api.retomar_execucao(tid)
+        if isinstance(res, dict) and res.get("ok"):
+            res = api.finalizar_execucao(tid)
+        if (api.execucao_atual(tid) or {}).get("estado") != "parada":
+            abertas = api.execucoes_abertas(tid) or []
+            dono = api._dono_execucao(abertas[0]) if abertas else ""
+            return {"erro": "A atividade desta OS está em andamento%s, e só quem a iniciou pode encerrá-la no Fracttal: "
+                            "peça para essa pessoa finalizar o chamado, ou encerrar a atividade pela página da OS."
+                            % ((" no nome de %s" % dono) if dono else "")}
+        return {"mensagem": "A atividade foi encerrada."}
+    if api.historico_execucao(tid):
+        return {}                                       # a atividade já foi registrada e encerrada
+    ini = _primeiro_comentario(folio)
+    if ini is None:
+        return {}                                       # sem comentário, como sempre: conclui sem registro
+    agora = _dt.datetime.now(_dt.timezone.utc)
+    ini = min(ini, agora)
+    for passo in (lambda: api.iniciar_execucao(tid, ini), lambda: api.finalizar_execucao(tid)):
+        r = passo()
+        if not (isinstance(r, dict) and r.get("ok")):
+            return {"erro": "O Fracttal não registrou a atividade do chamado: %s"
+                            % str((r or {}).get("erro") or "sem resposta").replace("_", " ")[:160]}
+    regs = [e for e in (api.historico_execucao(tid) or []) if isinstance(e, dict) and e.get("id")]
+    if regs:
+        e = max(regs, key=lambda x: str(x.get("initial_date") or ""))
+        lido = _quando(e.get("initial_date"))
+        if lido is None or abs((lido - ini).total_seconds()) > 60:   # o Fracttal pôs agora no lugar do pedido
+            api.editar_execucao(e["id"], ini, agora)
+    return {"mensagem": "A atividade foi registrada de %s (o 1º comentário) até agora." % _hora(ini)}
 
 
 def _status_depois_de_concluir(wid):
@@ -1153,6 +1273,10 @@ def api_finalizar(folio):
     wid, det = _os_conferida(folio, _corpo().get("wid"))
     if not wid:
         return _erro("Não achei a OS %s no Fracttal." % folio, 404)
+    tid = _tarefa_unica(wid)                                     # a atividade do chamado (15/11/2026): só um ativo
+    ativ = _encerrar_atividade(folio, tid) if tid is not None else {}
+    if ativ.get("erro"):
+        return _erro(ativ["erro"])
     res = api.concluir_os_checado(wid)                           # o Concluir do card (os_detalhe.py:896)
     if isinstance(res, dict) and res.get("ok") is False:
         return _erro(res.get("msg") or "O Fracttal não concluiu a OS.")
@@ -1172,6 +1296,7 @@ def api_finalizar(folio):
     chk = (res or {}).get("data_fim") if isinstance(res, dict) else None
     sem_fim = bool((chk or {}).get("sem_fim")) if isinstance(chk, dict) else False
     nota = _anotar(folio, "Chamado finalizado", "finalizado", det)
-    return jsonify({"ok": True, "mensagem": "Chamado finalizado: a OS %s foi concluída no Fracttal." % folio,
+    return jsonify({"ok": True, "mensagem": "Chamado finalizado: a OS %s foi concluída no Fracttal.%s" % (
+                        folio, (" " + ativ["mensagem"]) if ativ.get("mensagem") else ""),
                     "aviso": ("Sem registro de execução, o Fracttal deixa a data de fim vazia; o quadro usa a data "
-                              "desta finalização." if sem_fim else ""), "aviso_obs": nota})
+                              "desta finalização." if sem_fim and not ativ.get("mensagem") else ""), "aviso_obs": nota})

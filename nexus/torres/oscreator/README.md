@@ -3131,6 +3131,23 @@ fundo que nem quando vamos criar OS." O menu e a janela são da plataforma (Moni
   cliente, o relatório (um PDF; dois clientes, um .zip) e a planilha; a 375 px a página não rola para o lado e a caixa
   dos avisos fica na tela.
 
+## Garantias: a atividade do chamado começa no 1º comentário (15/11/2026)
+
+Levi: "quando tivesse o primeiro comentário, a data e hora do primeiro comentário entraria como início da atividade do
+chamado, se tiver só um ativo"; no quiz, o fim na finalização, também os abertos e o cronômetro iniciado no comentário.
+- **O 1º comentário** escrito na tela do chamado (`rotas_acomp.api_obs`; nenhum comentário escrito antes desta OS no banco)
+  liga o cronômetro da tarefa com a hora dele (`api.iniciar_execucao(tid, inicio)`, que passou a aceitar o início), só na
+  OS de uma tarefa e só se a atividade nunca começou. A tela diz "Atividade iniciada no Fracttal em ..."; se o Fracttal
+  não iniciar, o comentário fica salvo e a tela avisa.
+- **O Finalizar** (`api_finalizar`, `_encerrar_atividade`) encerra a atividade antes de concluir a OS (a pausada é retomada
+  antes). O chamado sem atividade nenhuma, mas com comentário (os abertos de antes da regra), ganha o registro inteiro:
+  início no 1º comentário, fim na finalização; se o Fracttal gravar outro início, o registro encerrado é corrigido
+  (`editar_execucao`). Sem comentário, conclui sem registro, como sempre.
+- **O risco, escolhido sabendo:** no Fracttal a atividade é de quem a iniciou e só ela encerra; a OS com atividade aberta
+  não conclui (o `work_orders_recalculate`; o caso da OS 10215). Se outra pessoa finalizar, o Finalizar não tenta concluir
+  e diz no nome de quem a atividade está.
+- **Prova:** `tests/test_oscreator_garantias_atividade_15_11.py`; no Fracttal, no TESTE - PA (ver o commit).
+
 ## Garantias: a OS abre a página da OS da Engenharia (09/11/2026)
 
 Levi, pelo chat do scrum master: "em chamados a parte de anexos está toda bugada", e o mesmo desenho da página da OS da
