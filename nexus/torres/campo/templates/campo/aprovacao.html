@@ -9,53 +9,7 @@
    avisos, deve ser possível também aprovar mais que uma de uma vez!"; três colunas. A coluna de cada OS sai dos fatos
    (nexus/campo/prefiltro.py); o quadro é montado na visita e não muda sozinho na frente da pessoa: a marcação vive na
    página, e a OS aprovada sai do quadro quando o Fracttal confirma (a conferência). #}
-{# O cartão no modelo do Quadro da equipe da Engenharia, com o Aprovar (Levi, 05/11/2026: "pode adotar um visual de card
-   de OS parecido com Engenharia > Quadro da equipe porém com o botão aprovar"): no topo o número da OS (verde, sem
-   sublinhado: "deixa o número da OS em verde Grid e tire esse underline estranho!") e os dias; logo abaixo, o motivo da
-   coluna em destaque ("Sempre destacar o motivo de estar em dúvida ou não OK! tem que estar bem visual e acessível": a
-   cor, o ícone e a palavra, nunca só a cor), com a prova; depois a tarefa, onde, o score e os outros avisos; no pé, o
-   técnico e as tarefas, e o Aprovar logo depois do score e dos avisos (a decisão de 04/11). Mais compacto no mesmo dia
-   ("o botão aprovar pode ficar paralelo ao extremo direita do nome do técnico / Nota do app pode ficar ao lado direito de
-   tarefa (...) diminua o tamanho do botão para caber, nota também!"): a nota na linha da tarefa, o Aprovar no pé.
-   A OS com fotos ainda por ler pode virar Não OK depois da leitura: aprova pelo cartão, mas não entra no lote.
-   3ª rodada (05/11/2026): a coluna já diz Em dúvida ou Não OK, o cartão traz só a mensagem, na cor da coluna, com o ícone
-   ("tire esse 'EM DÚVIDA' da OS deixe só a mensagem em laranja"); a linha de baixo diz quantas tarefas, sem repetir o
-   ativo do título; o número da OS e o cartão abrem a barra lateral com o detalhe (a pendência, em que tarefa, as fotos),
-   e o card da OS abre de lá ("poupa informação inicial e vai aprofundando"). #}
-{% macro cartao(o, marcar) %}{% set tom = 'neutro' if o.nota is none else ('ok' if o.nota >= 80 else ('alerta' if o.nota >= 50 else 'critico')) %}{% set marcar = marcar and not (o.avisos|selectattr('tipo', 'equalto', 'faltam')|list) %}{% set motivos = o.avisos|selectattr('tipo', 'in', tipos_motivo)|list %}{% set resto = o.avisos|rejectattr('tipo', 'in', tipos_motivo)|list %}{% set n_t = o.tarefas|length %}
-<article class="apq-cartao" data-wo="{{ o.id_wo or '' }}" data-folio="{{ o.os }}" data-coluna="{{ o.coluna }}" data-cliente="{{ o.cliente_cad }}" data-busca="{{ o.busca }}"{% if o.id_wo %} data-apq-detalhe="{{ url_for('torre_campo.aprovacao_detalhe', id_wo=o.id_wo) }}" tabindex="0"{% endif %}>
-  <header class="apq-c-cab">
-    {% if marcar %}<input class="apq-marcar" type="checkbox" data-apq-marcar aria-label="Marcar a OS {{ o.os }} para aprovar">{% endif %}
-    <button type="button" class="apq-c-os" data-apq-ver title="Ver o detalhe da OS {{ o.os }}: a pendência, em que tarefa, as fotos">OS {{ o.os }}</button>
-    <span class="apq-c-dias cn-t-{{ cor_espera(o.espera_d) }}" title="Dias esperando aprovação, desde o fim da tarefa mais antiga">{{ 'hoje' if o.espera_d == 0 else 'há ' ~ o.espera_d ~ ' d' }}</span>
-  </header>
-  {% if motivos %}{% set grave = o.coluna == 'nao_ok' %}
-  <div class="apq-motivo" data-nivel="{{ 'critico' if grave else 'alerta' }}" role="note">
-    <i class="ph {{ 'ph-x-circle' if grave else 'ph-warning' }}" aria-hidden="true"></i>
-    <ul>{% for a in motivos %}<li>{{ a.texto }}</li>{% endfor %}</ul>
-  </div>
-  {% elif o.fora_motivo %}
-  <div class="apq-motivo" data-nivel="neutro" role="note"><i class="ph ph-funnel-x" aria-hidden="true"></i><ul><li>{{ o.fora_motivo }}</li></ul></div>
-  {% elif o.coluna == 'conferindo' %}
-  {# dado pela metade não vai para a tela como inteiro: sem as fotos lidas, o cartão diz o que falta #}
-  <div class="apq-motivo" data-nivel="neutro" role="note"><i class="ph ph-hourglass-medium" aria-hidden="true"></i><ul><li>{{ o.ainda or 'Fotos ainda não conferidas' }}</li></ul></div>
-  {% endif %}
-  <div class="apq-c-tarefa">
-    <h3 class="apq-c-tit">{{ o.tarefas[0].tarefa or '(sem título)' }}{% if n_t > 1 %}<small> e mais {{ n_t - 1 }}</small>{% endif %}</h3>
-    <p class="apq-score" data-tom="{{ tom }}" title="{{ 'Sem a nota do App: tarefa fechada fora do App' if o.nota is none else ('A pior nota do App entre as tarefas da OS' if n_t > 1 else 'A nota do App da tarefa') }}">{% if o.nota is none %}<span>Fora do App</span>{% else %}<span>Nota do App</span><b class="gc-num cn-t-{{ tom }}">{{ o.nota }}</b>{% endif %}</p>
-  </div>
-  <p class="apq-c-onde">{{ n_t }} tarefa{{ 's' if n_t != 1 }} · <b>{{ o.usina_cad or sem_cadastro }}</b> · {{ o.cliente_cad or 'sem cliente no cadastro' }}</p>
-  <ul class="apq-avisos">
-    {% for a in resto %}<li class="apq-aviso" data-nivel="{{ a.nivel }}">{{ a.texto }}</li>{% endfor %}
-    {% if o.coluna == 'pronta' %}<li class="apq-aviso" data-nivel="ok"><i class="ph ph-check-circle" aria-hidden="true"></i> Nenhum fato contra</li>{% endif %}
-  </ul>
-  <footer class="apq-c-pe">
-    <span class="cn-avatar apq-c-av" aria-hidden="true">{{ iniciais(o.tecnicos[0]) if o.tecnicos and o.tecnicos[0] != '—' else '—' }}</span>
-    <span class="apq-c-quem">{{ o.tecnicos|join(', ') }}{% if not responsavel %} · {{ o.responsavel_cad or sem_responsavel }}{% endif %}{% if o.fotos_em %}<small>fotos conferidas em {{ o.fotos_em }}</small>{% endif %}</span>
-    <button type="button" class="gc-btn gc-btn--primario apq-aprovar" data-apq-aprovar>Aprovar</button>
-  </footer>
-  <p class="apq-msg" data-apq-msg role="status" hidden></p>
-</article>{% endmacro %}
+{% import "campo/_aprovacao_cartao.html" as apq with context %}
 <div class="campo-nativa">
   <div class="cn-cab">
     <div><p class="gc-eyebrow">{{ torre.nome }}</p><div class="gc-titulo-explica"><h1 class="cn-titulo">{{ tela.nome }}</h1>
@@ -83,8 +37,10 @@
       <b>Fora do pré-filtro.</b> Religamento (remoto ou no local), OS com as etiquetas PERFORMANCE ou CHAMADOS e OS
       criadas pelo COS: ficam sem as regras e não entram na conta. A ENGENHARIA entra no pré-filtro.</p>
       <p><b>Aprovar.</b> É o Concluir do OS Creator, com a sua conta do Fracttal: não tem volta, a OS sai da verificação.
-      Para aprovar várias, marque os cartões (ou Selecionar todas) e use Aprovar as marcadas: o Nexus aprova uma depois da
-      outra e para no primeiro pedido de login. O número da OS abre o card dela. Devolver segue no App.</p>{% endcall %}</div>
+      Para aprovar várias, marque os cartões (ou Selecionar as mostradas) e use Aprovar as marcadas: o Nexus aprova uma
+      depois da outra e para no primeiro pedido de login. O número da OS abre o card dela. Devolver segue no App.</p>
+      <p><b>30 de cada vez.</b> Cada coluna mostra as 30 OS que esperam há mais tempo; o Ver mais traz as próximas 30. O
+      número da coluna é o total. A busca e os filtros valem para a fila inteira, não só para as OS mostradas.</p>{% endcall %}</div>
       <p class="cn-pergunta">Toda OS fechada no Fracttal espera aprovação. O que dá para aprovar já, o que pede o seu olho e
         o que tem prova de problema?</p></div>
   </div>
@@ -124,13 +80,15 @@
     <select class="gc-campo" id="apq-tecnico" name="tecnico" onchange="this.form.submit()">
       <option value="">Todos</option>{% for t in opcoes_tecnico %}<option value="{{ t }}"{% if t == tecnico %} selected{% endif %}>{{ t }}</option>{% endfor %}
     </select></span>
+    {# o cliente e a busca no servidor desde 15/11/2026 (com 30 cartões por seção, o filtro na página só enxergaria os
+       30): o cliente vai no painel com os outros; a busca responde enquanto se digita, pela rota dos cartões #}
     <span class="apq-filtro"><label class="gc-rotulo" for="apq-cliente">Cliente</label>
-    <select class="gc-campo" id="apq-cliente" data-apq-cliente>
-      <option value="">Todos</option>{% for c in clientes %}<option value="{{ c }}">{{ c }}</option>{% endfor %}
+    <select class="gc-campo" id="apq-cliente" name="cliente" onchange="this.form.submit()">
+      <option value="">Todos</option>{% for c in clientes %}<option value="{{ c }}"{% if c == cliente %} selected{% endif %}>{{ c }}</option>{% endfor %}
     </select></span>
     <span class="apq-filtro"><label class="gc-rotulo" for="apq-busca">Buscar</label>
-    <input class="gc-campo apq-busca" id="apq-busca" type="search" data-apq-busca placeholder="OS, UFV ou técnico" autocomplete="off"></span>
-    <a class="cn-link cn-barra-fonte" href="{{ url(csv='1') }}">Exportar CSV</a>
+    <input class="gc-campo apq-busca" id="apq-busca" type="search" name="q" value="{{ busca }}" data-apq-busca placeholder="OS, UFV ou técnico" autocomplete="off"></span>
+    <a class="cn-link cn-barra-fonte" href="{{ url(csv='1') }}" data-apq-csv>Exportar CSV</a>
   </form>
   {# o filtro suspenso (10/11/2026, Levi: "a estrutura de filtros usando como referência os filtros de histórico de OS, um filtro suspenso e simples"): o campo-filtros.js monta o botão Filtros, o painel com o Aplicar e as etiquetas com as listas deste formulário #}
   <script src="{{ url_for('static', filename='campo-filtros.js') }}"></script>
@@ -141,35 +99,34 @@
     <p class="apq-lote-msg" data-apq-lote-msg role="status" aria-live="polite"></p>
   </div>
 
-  <div class="apq-quadro">
+  {# 30 OS por seção, com o Ver mais (15/11/2026): o número de cada seção é o total do recorte, não os 30 da página #}
+  {% macro cartoes(k) %}{% set s = secoes[k] %}<div class="apq-cartoes{{ ' apq-cartoes--grade' if k in ('conferindo', 'fora') }}" data-apq-secao="{{ k }}">
+        {% for o in s.cartoes %}{{ apq.cartao(o, k in marca_na_secao) }}{% endfor %}{% if not s.total and k not in ('conferindo', 'fora') %}<p class="mudo apq-vazio">Nenhuma OS aqui.</p>{% endif %}
+      </div>
+      <button type="button" class="gc-btn gc-btn--contorno apq-mais" data-apq-mais data-secao="{{ k }}" data-de="{{ s.proximo }}"{% if not s.resta %} hidden{% endif %}>Ver mais {{ [s.resta, por_vez]|min }}</button>{% endmacro %}
+  <div class="apq-quadro" data-apq-rota="{{ url_for('torre_campo.aprovacao_cartoes') }}" data-apq-por-vez="{{ por_vez }}">
   {% for c in colunas %}
     <section class="apq-coluna" data-coluna="{{ c[0] }}" data-tom="{{ c[2] }}" aria-labelledby="apq-t-{{ c[0] }}">
       <header class="apq-col-cab">
-        <h2 id="apq-t-{{ c[0] }}"><span class="cn-st cn-t-{{ c[2] }}">{{ c[1] }}</span><b class="apq-col-n gc-num" data-apq-n>{{ q[c[0]]|length }}</b></h2>
+        <h2 id="apq-t-{{ c[0] }}"><span class="cn-st cn-t-{{ c[2] }}">{{ c[1] }}</span><b class="apq-col-n gc-num" data-apq-n>{{ secoes[c[0]].total }}</b></h2>
         <p class="mudo">{{ c[3] }}</p>
-        {% if c[0] != 'nao_ok' and q[c[0]] %}<label class="apq-todas"><input type="checkbox" data-apq-todas> Selecionar todas</label>{% endif %}
+        {% if c[0] in marca_na_secao %}<label class="apq-todas"><input type="checkbox" data-apq-todas> Selecionar as mostradas</label>{% endif %}
       </header>
-      <div class="apq-cartoes">
-        {% for o in q[c[0]] %}{{ cartao(o, c[0] != 'nao_ok') }}{% else %}<p class="mudo apq-vazio">Nenhuma OS aqui.</p>{% endfor %}
-      </div>
+      {{ cartoes(c[0]) }}
     </section>
   {% endfor %}
   </div>
 
-  {% if q.conferindo %}
-  <details class="apq-extra" id="apq-conferindo">
-    <summary>Ainda conferindo as fotos: <b class="gc-num" data-apq-n>{{ q.conferindo|length }}</b> OS</summary>
+  <details class="apq-extra" id="apq-conferindo"{% if not secoes.conferindo.total %} hidden{% endif %}>
+    <summary>Ainda conferindo as fotos: <b class="gc-num" data-apq-n>{{ secoes.conferindo.total }}</b> OS</summary>
     <p class="mudo">Aprovam pelo cartão; entram no quadro quando as fotos forem lidas (no máximo umas 150 OS por volta).</p>
-    <div class="apq-cartoes apq-cartoes--grade">{% for o in q.conferindo %}{{ cartao(o, False) }}{% endfor %}</div>
+    {{ cartoes('conferindo') }}
   </details>
-  {% endif %}
-  {% if q.fora %}
-  <details class="apq-extra" id="apq-fora">
-    <summary>Fora do pré-filtro: <b class="gc-num" data-apq-n>{{ q.fora|length }}</b> OS, que não entram na conta</summary>
+  <details class="apq-extra" id="apq-fora"{% if not secoes.fora.total %} hidden{% endif %}>
+    <summary>Fora do pré-filtro: <b class="gc-num" data-apq-n>{{ secoes.fora.total }}</b> OS, que não entram na conta</summary>
     <p class="mudo">Religamento, as etiquetas PERFORMANCE e CHAMADOS e as criadas pelo COS ficam sem as regras e não entram na conta das OS esperando; aprovam pelo cartão.</p>
-    <div class="apq-cartoes apq-cartoes--grade">{% for o in q.fora %}{{ cartao(o, False) }}{% endfor %}</div>
+    {{ cartoes('fora') }}
   </details>
-  {% endif %}
 </div>
 {# a barra lateral da OS (a das Rondas: 1/3 da tela, à direita); o detalhe vem da rota no clique #}
 <aside class="rd-gaveta apq-gaveta" id="apq-gaveta" role="dialog" aria-modal="false" aria-labelledby="apq-g-titulo" hidden>
@@ -198,7 +155,10 @@
     var RECUSA = 'O Fracttal recusou agora: tente daqui a alguns minutos.';
     var lote = document.querySelector('[data-apq-lote]'), loteN = document.querySelector('[data-apq-lote-n]');
     var loteMsg = document.querySelector('[data-apq-lote-msg]');
-    var selCli = document.querySelector('[data-apq-cliente]'), busca = document.querySelector('[data-apq-busca]');
+    var busca = document.querySelector('[data-apq-busca]'), nOs = document.querySelector('.apq-lote-total .gc-num');
+    var quadroEl = document.querySelector('[data-apq-rota]'), ROTA = quadroEl.getAttribute('data-apq-rota');
+    var POR_VEZ = parseInt(quadroEl.getAttribute('data-apq-por-vez'), 10) || 30;
+    var csvLink = document.querySelector('[data-apq-csv]');
     var andando = false;
     function semAcento(s) { return String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase(); }
     function pedir(url, corpo) {
@@ -213,11 +173,8 @@
     function marcadas() {
       return Array.prototype.slice.call(document.querySelectorAll('.apq-cartao:not([hidden]) [data-apq-marcar]:checked'));
     }
+    // o número de cada seção é o total do servidor (15/11/2026: a página traz 30 por seção); aqui só o lote
     function contar() {
-      document.querySelectorAll('.apq-coluna, .apq-extra').forEach(function (s) {
-        var n = s.querySelector('[data-apq-n]');
-        if (n) { n.textContent = s.querySelectorAll('.apq-cartao:not([hidden])').length; }
-      });
       var m = marcadas().length;
       loteN.textContent = m;
       lote.disabled = andando || !m;
@@ -232,8 +189,87 @@
     function conferir(wo, c) {
       fetch(nexusRota('/t/campo/aprovacao/') + wo + '/conferir', {method: 'POST', credentials: 'same-origin'})
         .then(function (r) { return r.json(); })
-        .then(function (j) { if (j && j.saiu && c.parentNode) { c.remove(); contar(); } })
+        .then(function (j) { if (j && j.saiu && c.parentNode) { tirar(c); } })
         .catch(function () { /* sem resposta: a OS sai na releitura de 10 min */ });
+    }
+    // a OS que saiu da fila: o número da seção e o total descem um, e o Ver mais começa uma antes (a fila do servidor
+    // também perdeu essa OS)
+    function menosUm(el) { if (el) { el.textContent = Math.max(0, (parseInt(el.textContent, 10) || 0) - 1); } }
+    function tirar(c) {
+      var sec = c.closest('[data-apq-secao]'), k = sec ? sec.getAttribute('data-apq-secao') : '';
+      var caixa = c.closest('.apq-coluna, .apq-extra');
+      c.remove();
+      menosUm(caixa && caixa.querySelector('[data-apq-n]'));
+      if (k && k !== 'fora') { menosUm(nOs); }
+      var b = k && document.querySelector('[data-apq-mais][data-secao="' + k + '"]');
+      if (b) { b.setAttribute('data-de', Math.max(0, (parseInt(b.getAttribute('data-de'), 10) || 0) - 1)); }
+      contar();
+    }
+    // a rota dos cartões, no recorte do endereço e com a busca do campo
+    function parametros() {
+      var p = new URLSearchParams(location.search);
+      p.delete('csv');
+      var t = busca ? busca.value.trim() : '';
+      if (t) { p.set('q', t); } else { p.delete('q'); }
+      return p;
+    }
+    function pedirCartoes(p) {
+      return fetch(ROTA + '?' + p.toString(), {credentials: 'same-origin', headers: {'Accept': 'application/json'}})
+        .then(function (r) {
+          if (!r.ok || r.redirected) { throw new Error(r.redirected ? 'sessão' : 'HTTP ' + r.status); }
+          return r.json();
+        });
+    }
+    function verMais(b, proximo, resta) {
+      b.disabled = false; b.hidden = resta <= 0;
+      b.setAttribute('data-de', proximo);
+      b.textContent = 'Ver mais ' + Math.min(resta, POR_VEZ);
+    }
+    // o Ver mais: os próximos 30 da seção, sem repetir um cartão que já está na página
+    function maisCartoes(b) {
+      var k = b.getAttribute('data-secao'), sec = document.querySelector('[data-apq-secao="' + k + '"]'), p = parametros();
+      p.set('secao', k); p.set('de', b.getAttribute('data-de'));
+      b.disabled = true; b.textContent = 'Carregando…';
+      pedirCartoes(p).then(function (j) {
+        var t = document.createElement('template');
+        t.innerHTML = j.html;
+        Array.prototype.forEach.call(t.content.querySelectorAll('.apq-cartao'), function (c) {
+          if (!sec.querySelector('.apq-cartao[data-folio="' + c.getAttribute('data-folio') + '"]')) { sec.appendChild(c); }
+        });
+        verMais(b, j.proximo, j.resta);
+        contar();
+      }).catch(function (e) {
+        b.disabled = false;
+        b.textContent = e.message === 'sessão' ? 'A sessão acabou: recarregue a página' : 'Não carregou (' + e.message + '): tentar de novo';
+      });
+    }
+    // a busca responde enquanto se digita (como antes), agora pela rota: as cinco seções voltam do servidor
+    var buscaPedido = 0;
+    function rebuscar() {
+      var p = parametros(), meu = ++buscaPedido;
+      try { history.replaceState(null, '', '?' + p.toString()); } catch (e) { /* o endereço fica como estava */ }
+      if (csvLink) { var pc = new URLSearchParams(p); pc.set('csv', '1'); csvLink.href = '?' + pc.toString(); }
+      pedirCartoes(p).then(function (j) {
+        if (meu !== buscaPedido) { return; }               // chegou a resposta de uma busca já trocada
+        Object.keys(j.secoes).forEach(function (k) {
+          var s = j.secoes[k], sec = document.querySelector('[data-apq-secao="' + k + '"]');
+          if (!sec) { return; }
+          sec.innerHTML = s.html;
+          var caixa = sec.closest('.apq-coluna, .apq-extra'), n = caixa.querySelector('[data-apq-n]');
+          if (n) { n.textContent = s.total; }
+          if (caixa.classList.contains('apq-extra')) { caixa.hidden = !s.total; }
+          var todas = caixa.querySelector('[data-apq-todas]');
+          if (todas) { todas.checked = false; }
+          var b = document.querySelector('[data-apq-mais][data-secao="' + k + '"]');
+          if (b) { verMais(b, s.proximo, s.resta); }
+        });
+        if (nOs) { nOs.textContent = j.n_os; }
+        loteMsg.textContent = '';
+        contar();
+      }).catch(function (e) {
+        if (meu !== buscaPedido) { return; }
+        loteMsg.textContent = e.message === 'sessão' ? SESSAO : 'Não consegui buscar agora (' + e.message + '). Tente de novo.';
+      });
     }
     // 'ok', 'erro' ou o motivo de parar o lote: 'login' (Fracttal), 'sessao' (Nexus), 'recusa' (403, 429, 5xx)
     function aprovar(c) {
@@ -307,16 +343,10 @@
       gaveta.hidden = true;
       if (gAtivo) { gAtivo.classList.remove('apq-cartao--ativo'); gAtivo.focus(); gAtivo = null; }
     }
-    function filtrar() {
-      var cli = selCli ? selCli.value : '', termo = semAcento(busca ? busca.value : '').trim();
-      document.querySelectorAll('.apq-cartao').forEach(function (c) {
-        c.hidden = !((!cli || c.getAttribute('data-cliente') === cli) &&
-                     (!termo || (c.getAttribute('data-busca') || '').indexOf(termo) >= 0));
-      });
-      contar();
-    }
     document.addEventListener('click', function (ev) {
       if (ev.target.closest('[data-apq-g-fechar]')) { fecharGaveta(); return; }
+      var mais = ev.target.closest('[data-apq-mais]');
+      if (mais) { if (!mais.disabled) { maisCartoes(mais); } return; }
       var card = ev.target.closest('[data-apq-card]');
       if (card) { abrirCard(card.getAttribute('data-apq-card'), card.getAttribute('data-folio')); return; }
       // o PDF da OS (05/11/2026: "Quero o botão de baixar o PDF da OS!"): o do OS Creator, como nas OSs em verificação do
@@ -423,9 +453,9 @@
       }
       proxima();
     });
-    if (selCli) { selCli.addEventListener('change', filtrar); }
-    if (busca) { busca.addEventListener('input', filtrar); }
-    // o Enter na busca não recarrega a página (a busca é na página; o formulário só leva o responsável)
+    var espera = null;
+    if (busca) { busca.addEventListener('input', function () { clearTimeout(espera); espera = setTimeout(rebuscar, 300); }); }
+    // o Enter na busca não recarrega a página (a busca responde sozinha; o Aplicar dos Filtros leva a busca junto)
     document.querySelector('[data-apq-filtros]').addEventListener('submit', function (ev) {
       if (document.activeElement === busca) { ev.preventDefault(); }
     });

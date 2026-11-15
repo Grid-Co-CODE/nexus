@@ -189,12 +189,14 @@ def test_o_responsavel_do_login_ja_vem_no_filtro(quadro, cliente):
     assert "15088" in _folios(html)
 
 
-def test_cliente_e_busca_respondem_na_pagina(quadro, logado):
+def test_cliente_e_busca_vao_ao_servidor(quadro, logado):
+    # desde 15/11/2026 (30 cartões por coluna) o cliente e a busca filtram no servidor: o cliente no painel Filtros, a
+    # busca respondendo enquanto se digita pela rota dos cartões (test_campo_aprovacao_desenho_15_11.py)
     html = logado.get("/t/campo/aprovacao?responsavel=*").get_data(as_text=True)
-    assert re.search(r'<select[^>]*data-apq-cliente[^>]*>.*?<option value="Thopen">Thopen</option>', html, re.S)
-    assert re.search(r'<input[^>]*data-apq-busca', html)
+    assert re.search(r'<select[^>]*name="cliente"[^>]*>.*?<option value="Thopen">Thopen</option>', html, re.S)
+    assert re.search(r'<input[^>]*name="q"[^>]*data-apq-busca', html)
     c = _cartao(html, "15088").split(">")[0]
-    assert 'data-cliente="Thopen"' in c and re.search(r'data-busca="[^"]*15088[^"]*usina a', c)
+    assert "data-cliente=" not in c and "data-busca=" not in c
 
 
 def test_o_script_aprova_pelo_concluir_do_os_creator(quadro, logado):

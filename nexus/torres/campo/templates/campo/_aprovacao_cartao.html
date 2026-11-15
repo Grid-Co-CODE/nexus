@@ -1,0 +1,50 @@
+{# O cartão da OS na Aprovação: o da página e o da rota dos próximos 30 (`aprovacao_cartoes`), o mesmo. #}
+{# O cartão no modelo do Quadro da equipe da Engenharia, com o Aprovar (Levi, 05/11/2026: "pode adotar um visual de card
+   de OS parecido com Engenharia > Quadro da equipe porém com o botão aprovar"): no topo o número da OS (verde, sem
+   sublinhado: "deixa o número da OS em verde Grid e tire esse underline estranho!") e os dias; logo abaixo, o motivo da
+   coluna em destaque ("Sempre destacar o motivo de estar em dúvida ou não OK! tem que estar bem visual e acessível": a
+   cor, o ícone e a palavra, nunca só a cor), com a prova; depois a tarefa, onde, o score e os outros avisos; no pé, o
+   técnico e as tarefas, e o Aprovar logo depois do score e dos avisos (a decisão de 04/11). Mais compacto no mesmo dia
+   ("o botão aprovar pode ficar paralelo ao extremo direita do nome do técnico / Nota do app pode ficar ao lado direito de
+   tarefa (...) diminua o tamanho do botão para caber, nota também!"): a nota na linha da tarefa, o Aprovar no pé.
+   A OS com fotos ainda por ler pode virar Não OK depois da leitura: aprova pelo cartão, mas não entra no lote.
+   3ª rodada (05/11/2026): a coluna já diz Em dúvida ou Não OK, o cartão traz só a mensagem, na cor da coluna, com o ícone
+   ("tire esse 'EM DÚVIDA' da OS deixe só a mensagem em laranja"); a linha de baixo diz quantas tarefas, sem repetir o
+   ativo do título; o número da OS e o cartão abrem a barra lateral com o detalhe (a pendência, em que tarefa, as fotos),
+   e o card da OS abre de lá ("poupa informação inicial e vai aprofundando"). #}
+{% macro cartao(o, marcar) %}{% set tom = 'neutro' if o.nota is none else ('ok' if o.nota >= 80 else ('alerta' if o.nota >= 50 else 'critico')) %}{% set marcar = marcar and not (o.avisos|selectattr('tipo', 'equalto', 'faltam')|list) %}{% set motivos = o.avisos|selectattr('tipo', 'in', tipos_motivo)|list %}{% set resto = o.avisos|rejectattr('tipo', 'in', tipos_motivo)|list %}{% set n_t = o.tarefas|length %}
+<article class="apq-cartao" data-wo="{{ o.id_wo or '' }}" data-folio="{{ o.os }}" data-coluna="{{ o.coluna }}"{% if o.id_wo %} data-apq-detalhe="{{ url_for('torre_campo.aprovacao_detalhe', id_wo=o.id_wo) }}" tabindex="0"{% endif %}>
+  <header class="apq-c-cab">
+    {% if marcar %}<input class="apq-marcar" type="checkbox" data-apq-marcar aria-label="Marcar a OS {{ o.os }} para aprovar">{% endif %}
+    <button type="button" class="apq-c-os" data-apq-ver title="Ver o detalhe da OS {{ o.os }}: a pendência, em que tarefa, as fotos">OS {{ o.os }}</button>
+    {# a idade sem cor (15/11/2026): a fila vai de 70 a 177 dias e qualquer limite pintava quase tudo; a mais antiga vem primeiro #}
+    <span class="apq-c-dias" title="Dias esperando aprovação, desde o fim da tarefa mais antiga">{{ 'hoje' if o.espera_d == 0 else 'há ' ~ o.espera_d ~ ' d' }}</span>
+  </header>
+  {% if motivos %}{% set grave = o.coluna == 'nao_ok' %}
+  <div class="apq-motivo" data-nivel="{{ 'critico' if grave else 'alerta' }}" role="note">
+    <i class="ph {{ 'ph-x-circle' if grave else 'ph-warning' }}" aria-hidden="true"></i>
+    <ul>{% for a in motivos %}<li>{{ a.texto }}</li>{% endfor %}</ul>
+  </div>
+  {% elif o.fora_motivo %}
+  <div class="apq-motivo" data-nivel="neutro" role="note"><i class="ph ph-funnel-x" aria-hidden="true"></i><ul><li>{{ o.fora_motivo }}</li></ul></div>
+  {% elif o.coluna == 'conferindo' %}
+  {# dado pela metade não vai para a tela como inteiro: sem as fotos lidas, o cartão diz o que falta #}
+  <div class="apq-motivo" data-nivel="neutro" role="note"><i class="ph ph-hourglass-medium" aria-hidden="true"></i><ul><li>{{ o.ainda or 'Fotos ainda não conferidas' }}</li></ul></div>
+  {% endif %}
+  <div class="apq-c-tarefa">
+    <h3 class="apq-c-tit">{{ o.tarefas[0].tarefa or '(sem título)' }}{% if n_t > 1 %}<small> e mais {{ n_t - 1 }}</small>{% endif %}</h3>
+    <p class="apq-score" data-tom="{{ tom }}" title="{{ 'Sem a nota do App: tarefa fechada fora do App' if o.nota is none else ('A pior nota do App entre as tarefas da OS' if n_t > 1 else 'A nota do App da tarefa') }}">{% if o.nota is none %}<span>Fora do App</span>{% else %}<span>Nota do App</span><b class="gc-num cn-t-{{ tom }}">{{ o.nota }}</b>{% endif %}</p>
+  </div>
+  <p class="apq-c-onde">{{ n_t }} tarefa{{ 's' if n_t != 1 }} · <b>{{ o.usina_cad or sem_cadastro }}</b> · {{ o.cliente_cad or 'sem cliente no cadastro' }}</p>
+  <ul class="apq-avisos">
+    {% for a in resto %}<li class="apq-aviso" data-nivel="{{ a.nivel }}">{{ a.texto }}</li>{% endfor %}
+    {% if o.coluna == 'pronta' %}<li class="apq-aviso" data-nivel="ok"><i class="ph ph-check-circle" aria-hidden="true"></i> Nenhum fato contra</li>{% endif %}
+  </ul>
+  <footer class="apq-c-pe">
+    <span class="cn-avatar apq-c-av" aria-hidden="true">{{ iniciais(o.tecnicos[0]) if o.tecnicos and o.tecnicos[0] != '—' else '—' }}</span>
+    <span class="apq-c-quem">{{ o.tecnicos|join(', ') }}{% if not responsavel %} · {{ o.responsavel_cad or sem_responsavel }}{% endif %}{% if o.fotos_em %}<small>fotos conferidas em {{ o.fotos_em }}</small>{% endif %}</span>
+    {# o Aprovar verde cheio só na Pronta (15/11/2026); nas outras ele fica, de contorno: a decisão pede o olho #}
+    <button type="button" class="gc-btn {{ 'gc-btn--primario' if o.coluna == 'pronta' else 'gc-btn--contorno' }} apq-aprovar" data-apq-aprovar>Aprovar</button>
+  </footer>
+  <p class="apq-msg" data-apq-msg role="status" hidden></p>
+</article>{% endmacro %}

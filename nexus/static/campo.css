@@ -1264,6 +1264,9 @@ a.cr-gr-kpi:hover{border-left-color:var(--verde)}
 .apq-g-motivos{margin:6px 0 0;padding-left:16px;font-size:12px;color:var(--tinta-2)}
 .apq-msg[hidden]{display:none}
 .apq-vazio{margin:6px 2px;font-size:12.5px}
+/* o Ver mais (15/11/2026: 30 OS por seção de cada vez), no pé da coluna, fora da rolagem dos cartões */
+.apq-mais{align-self:stretch;justify-content:center;margin:0 10px 10px}
+.apq-extra .apq-mais{margin:10px 0 0}
 .apq-extra{margin-top:14px;padding:10px 14px;background:var(--superficie);border:1px solid var(--linha);border-radius:var(--raio-md)}
 .apq-extra > summary{font:600 14px/1.4 var(--font-sans);cursor:pointer}
 .apq-extra > p{margin:8px 0 0;font-size:12.5px}

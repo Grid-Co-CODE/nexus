@@ -2613,8 +2613,10 @@ Aprovação e Triagem usam a lógica do App copiada, não refeita, para o númer
       (32×32), a medir nas 30 OS antes de mudar a regra.
     - **Filtros**: o Responsável O&M da usina vai ao servidor (`responsavel=`, "*" = todos; quem entrou pelo Fracttal e é
       responsável já vem nele, `_responsavel_logado_pelo_cadastro`; o responsável e o cliente vêm do cadastro pela usina
-      do Fracttal, `visao.usinas_do_fracttal`); cliente e busca (OS, UFV, técnico, sem acento) filtram na página e
-      recontam as colunas. **Usina e técnico também vão ao servidor (15/11/2026**, Levi, pelo chat do Comando: "tem que
+      do Fracttal, `visao.usinas_do_fracttal`). **Todos os filtros vão ao servidor desde 15/11/2026** (com 30 cartões por
+      seção, o filtro na página só enxergaria os 30): o cliente (`cliente=`) no painel Filtros; a busca (`q=`: OS, UFV,
+      cliente, responsável e técnico, sem acento) responde enquanto se digita, pela rota `aprovacao/cartoes` (300 ms
+      depois da última tecla; o endereço e o link do CSV acompanham). **Usina e técnico também vão ao servidor (15/11/2026**, Levi, pelo chat do Comando: "tem que
       ter o filtro de usina [...] Também tem que ter o filtro do técnico, que seria quem executou a OS [...] a ideia seria
       já vir filtrado na usina correta"): `usina=` é o id do cadastro (o de `/t/comando/usinas/<id>`; o "Aprovar N OS em
       verificação" do prontuário manda `?usina=<id>`), ligado pela usina do Fracttal (`por_nome` leva o `usina_id`);
@@ -2622,6 +2624,15 @@ Aprovação e Triagem usam a lógica do App copiada, não refeita, para o númer
       Todos (o responsável do login cortaria a usina de outro); a usina sem OS na fila abre vazia, com o nome do cadastro
       na lista. O nome repetido na lista leva o cliente (em produção há duas "Linhares 1": a da Axis, id 27, e a da
       Thopen, id 96). O total diz o recorte ("na Usina X", "executadas por Y"). Prova: `test_campo_aprovacao_filtros_15_11.py`.
+    - **O desenho de 15/11/2026** (Levi, "desenho: Ok" às duas réguas recomendadas na revisão da Usinas 360°): **30 OS
+      por seção de cada vez** (`POR_VEZ`; as três colunas, Ainda conferindo e Fora do pré-filtro), com o **Ver mais** no
+      pé da coluna, que pede os próximos 30 à rota `aprovacao/cartoes?secao=&de=` (o cartão é o mesmo,
+      `campo/_aprovacao_cartao.html`, sem repetir o que já está na página). Até ali a página mandava a fila inteira: em
+      15/11, 2.175 cartões, 3,48 MB, de 3 a 6 s para montar. O número da seção é o TOTAL do recorte (não os 30); a OS que
+      sai (aprovada e conferida) desconta um do número, do total e do começo do Ver mais. "Selecionar todas" virou
+      **Selecionar as mostradas**. **A idade sem cor** (a fila ia de 70 a 177 dias: qualquer limite pintava quase tudo;
+      a mais antiga vem primeiro), no cartão e na barra lateral. **O Aprovar verde cheio só na Pronta**; nas outras
+      colunas e no Fora, de contorno (no cartão e na barra lateral). Prova: `test_campo_aprovacao_desenho_15_11.py`.
       CSV (leva os filtros do servidor): OS, dias, criação, fim, Responsável O&M, usina, cliente, técnicos, tarefas, nota do App,
       a coluna ("Fora do pré-filtro (motivo)") e os motivos. No celular as colunas deslizam de lado dentro do quadro.
       Prova: `test_campo_aprovacao_responsavel.py`, `test_campo_aprovacao_visual_0511.py` (a 2ª rodada),

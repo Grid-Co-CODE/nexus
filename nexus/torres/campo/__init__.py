@@ -14,7 +14,7 @@ import uuid
 from datetime import date, datetime, timedelta, timezone
 from urllib.parse import quote, urlencode
 
-from flask import Response, abort, current_app, make_response, redirect, render_template, request, session, url_for
+from flask import Response, abort, current_app, jsonify, make_response, redirect, render_template, request, session, url_for
 from markupsafe import escape
 
 import logging as _logging
@@ -1645,6 +1645,12 @@ COLUNAS_DO_QUADRO = (("pronta", "Pronta", "ok", "Nenhum fato contra"),
                      ("duvida", "Em dúvida", "alerta", "Um fato pede o seu olho"),
                      ("nao_ok", "Não OK", "critico", "Prova de problema: confira antes"))
 NOME_DA_COLUNA = {c[0]: c[1] for c in COLUNAS_DO_QUADRO} | {"conferindo": "Ainda conferindo"}
+# 30 OS por seção de cada vez, com o Ver mais (Levi, 15/11/2026, "desenho: Ok": a página mandava a fila inteira, 2.175
+# cartões e 3,48 MB, de 3 a 6 s para montar). As seções: as três colunas e os blocos Ainda conferindo e Fora do
+# pré-filtro; marcam para o lote só a Pronta e a Em dúvida (a decisão de 04/11)
+POR_VEZ = 30
+SECOES = ("pronta", "duvida", "nao_ok", "conferindo", "fora")
+MARCA_NA_SECAO = ("pronta", "duvida")
 
 
 # O grupo da OS sai das tarefas dela: quem aprova, aprova a OS inteira (Levi, 05/10: "ele não consegue aprovar uma
@@ -1750,8 +1756,6 @@ def _quadro(oss) -> dict:
             fechado = max((str(t.get("fechado_app") or "") for t in o["tarefas"]), default="")
             r = prefiltro.classificar(o, f, fechado, p, m)
             o["coluna"], o["avisos"], o["ainda"] = r["coluna"], r["avisos"], r["ainda"]
-        o["busca"] = _sem_acento(" ".join([str(o["os"]), o["usina_cad"], o["cliente_cad"], o["responsavel_cad"],
-                                           *o["tecnicos"]]))
         q[o["coluna"]].append(o)
     return q
 
@@ -1773,6 +1777,52 @@ def _csv_do_quadro(oss) -> Response:
                     headers={"Content-Disposition": 'attachment; filename="aprovacao-os.csv"'})
 
 
+def _aprovacao_recorte() -> dict:
+    """A fila da Aprovação no recorte do endereço: o responsável, a usina, o técnico, o cliente e a busca (todos no
+    servidor desde 15/11/2026: com 30 cartões por seção, o filtro na página só enxergaria os 30), e o quadro dela."""
+    usina_id = visao.D._id(request.args.get("usina"))
+    tecnico = str(request.args.get("tecnico") or "").strip()
+    cliente = str(request.args.get("cliente") or "").strip()
+    busca = str(request.args.get("q") or "").strip()
+    v = request.args.get("responsavel")
+    if v is None:
+        responsavel = "" if usina_id else _responsavel_logado_pelo_cadastro()
+    else:
+        responsavel = "" if v == TODOS else v
+    mapa = visao.usinas_do_fracttal()
+    leitura = campo_aprovacao.fila_toda(campo_aprovacao.FILA_INTEIRA)
+    todas = _com_cadastro((leitura.dados or {}).get("linhas") or [], mapa)
+    todas_os = _por_os(todas)
+    termo = _sem_acento(busca)
+
+    def cabe(o):
+        if responsavel and o["responsavel_cad"] != responsavel or usina_id and o["usina_id_cad"] != usina_id:
+            return False
+        if tecnico and tecnico not in o["tecnicos"] or cliente and o["cliente_cad"] != cliente:
+            return False
+        # a busca de antes (a OS, a usina, o cliente, o responsável e os técnicos, sem acento), agora no servidor
+        return not termo or termo in _sem_acento(" ".join([str(o["os"]), o["usina_cad"], o["cliente_cad"],
+                                                           o["responsavel_cad"], *o["tecnicos"]]))
+    oss = [o for o in todas_os if cabe(o)]
+    return {"usina_id": usina_id, "tecnico": tecnico, "cliente": cliente, "busca": busca, "responsavel": responsavel,
+            "mapa": mapa, "leitura": leitura, "todas_os": todas_os, "oss": oss, "q": _quadro(oss)}
+
+
+def _ctx_cartao(responsavel) -> dict:
+    """O que o cartão da OS usa (`campo/_aprovacao_cartao.html`), na página e na rota dos próximos."""
+    from ...campo import prefiltro
+    return {"responsavel": responsavel, "tipos_motivo": prefiltro.TIPOS_DO_MOTIVO, "iniciais": _iniciais,
+            "sem_responsavel": visao.SEM_RESPONSAVEL, "sem_cadastro": SEM_CADASTRO}
+
+
+def _secao(q, k, de=0) -> dict:
+    """Os cartões de uma seção a partir de `de`, POR_VEZ de cada vez, com o total e quantos ainda faltam."""
+    lista = q[k]
+    cartoes = lista[de:de + POR_VEZ]
+    return {"cartoes": cartoes, "total": len(lista), "proximo": de + len(cartoes),
+            "resta": max(0, len(lista) - de - len(cartoes))}
+
+
 @bp.route("/aprovacao")
 def aprovacao():
     """A Aprovação de OS em quadro por fatos (Levi, 04/11/2026: "No nexus, em campo app crie uma aba de aprovação de OS.
@@ -1788,35 +1838,48 @@ def aprovacao():
     o nome de quem executou alguma tarefa da OS no Fracttal. A usina pedida no endereço abre com o responsável em Todos:
     o responsável do login cortaria a usina de outro responsável que ele foi ver."""
     from ...campo import prefiltro, prefiltro_fundo
-    usina_id = visao.D._id(request.args.get("usina"))
-    tecnico = str(request.args.get("tecnico") or "").strip()
-    v = request.args.get("responsavel")
-    if v is None:
-        responsavel = "" if usina_id else _responsavel_logado_pelo_cadastro()
-    else:
-        responsavel = "" if v == TODOS else v
-    mapa = visao.usinas_do_fracttal()
-    leitura = campo_aprovacao.fila_toda(campo_aprovacao.FILA_INTEIRA)
-    todas = _com_cadastro((leitura.dados or {}).get("linhas") or [], mapa)
-    todas_os = _por_os(todas)
-    oss = [o for o in todas_os if (not responsavel or o["responsavel_cad"] == responsavel)
-           and (not usina_id or o["usina_id_cad"] == usina_id) and (not tecnico or tecnico in o["tecnicos"])]
-    q = _quadro(oss)
-    opcoes_usina = _opcoes_usina(todas_os, mapa, usina_id)
+    r = _aprovacao_recorte()
+    q, oss, todas_os, mapa = r["q"], r["oss"], r["todas_os"], r["mapa"]
     if request.args.get("csv") == "1":
         return _csv_do_quadro(oss)
+    opcoes_usina = _opcoes_usina(todas_os, mapa, r["usina_id"])
     return render_template("campo/aprovacao.html", **_comum(
-        "aprovacao", leitura, coleta=_coleta(), fila=campo_aprovacao.estado(), fotos=prefiltro_fundo.estado(),
+        "aprovacao", r["leitura"], coleta=_coleta(), fila=campo_aprovacao.estado(), fotos=prefiltro_fundo.estado(),
         # o que está fora do pré-filtro não entra na conta (Levi, 05/11/2026: "O que tiver fora do pré filtro não é
         # contabilizado"): o total é o do quadro e do Ainda conferindo; a lista de fora segue no pé, aprovável pelo cartão
-        responsavel=responsavel, mapa_erro=mapa.erro, q=q, colunas=COLUNAS_DO_QUADRO, n_os=len(oss) - len(q["fora"]),
-        tipos_motivo=prefiltro.TIPOS_DO_MOTIVO, iniciais=_iniciais,
-        opcoes_responsavel=_opcoes_responsavel([{"responsavel": o["responsavel_cad"]} for o in todas_os], responsavel),
-        clientes=sorted({o["cliente_cad"] for o in oss if o["cliente_cad"]}),
-        usina_id=usina_id, opcoes_usina=opcoes_usina, usina_nome=dict(opcoes_usina).get(usina_id, ""), tecnico=tecnico,
-        opcoes_tecnico=sorted(({t for o in todas_os for t in o["tecnicos"]} | ({tecnico} if tecnico else set())) - {"—"}),
-        horas_tarde=prefiltro.parametros(current_app.config)["horas_tarde"], cor_espera=_cor_espera,
-        sem_responsavel=visao.SEM_RESPONSAVEL, sem_cadastro=SEM_CADASTRO))
+        mapa_erro=mapa.erro, colunas=COLUNAS_DO_QUADRO, n_os=len(oss) - len(q["fora"]),
+        secoes={k: _secao(q, k) for k in SECOES}, marca_na_secao=MARCA_NA_SECAO, por_vez=POR_VEZ,
+        opcoes_responsavel=_opcoes_responsavel([{"responsavel": o["responsavel_cad"]} for o in todas_os], r["responsavel"]),
+        clientes=sorted({o["cliente_cad"] for o in todas_os if o["cliente_cad"]} | ({r["cliente"]} if r["cliente"] else set())),
+        cliente=r["cliente"], busca=r["busca"],
+        usina_id=r["usina_id"], opcoes_usina=opcoes_usina, usina_nome=dict(opcoes_usina).get(r["usina_id"], ""),
+        tecnico=r["tecnico"],
+        opcoes_tecnico=sorted(({t for o in todas_os for t in o["tecnicos"]} | ({r["tecnico"]} if r["tecnico"] else set())) - {"—"}),
+        horas_tarde=prefiltro.parametros(current_app.config)["horas_tarde"], **_ctx_cartao(r["responsavel"])))
+
+
+@bp.route("/aprovacao/cartoes")
+def aprovacao_cartoes():
+    """Os cartões da Aprovação em JSON, no recorte do endereço (15/11/2026): com `secao` e `de`, os próximos POR_VEZ daquela
+    seção (o Ver mais); sem `secao`, as cinco seções do começo (a busca, que responde enquanto se digita). Só memória,
+    como a tela."""
+    r = _aprovacao_recorte()
+    q, ctx = r["q"], _ctx_cartao(r["responsavel"])
+
+    def html(k, s):
+        return render_template("campo/_aprovacao_cartoes.html", cartoes=s["cartoes"], marcar=k in MARCA_NA_SECAO,
+                               vazio=s["total"] == 0, **ctx)
+    k = request.args.get("secao")
+    if k:
+        if k not in SECOES:
+            abort(404)
+        s = _secao(q, k, max(0, visao.D._int(request.args.get("de")) or 0))
+        return jsonify(secao=k, html=html(k, s), total=s["total"], proximo=s["proximo"], resta=s["resta"])
+    secoes = {}
+    for k in SECOES:
+        s = _secao(q, k)
+        secoes[k] = {"html": html(k, s), "total": s["total"], "proximo": s["proximo"], "resta": s["resta"]}
+    return jsonify(secoes=secoes, n_os=len(r["oss"]) - len(q["fora"]), por_vez=POR_VEZ)
 
 
 def _opcoes_usina(oss, mapa, escolhida) -> list[tuple[int, str]]:
@@ -1929,7 +1992,7 @@ def aprovacao_detalhe(id_wo):
     f = None if o["fora_motivo"] else prefiltro_fundo.fatos(o.get("id_wo"))
     m = None if o["fora_motivo"] else prefiltro_fundo.meta(o.get("id_wo"))
     return render_template("campo/_aprovacao_detalhe.html", o=o, d=_detalhe_da_os(o, f, m),
-                           nome_coluna=NOME_DA_COLUNA | {"fora": "Fora do pré-filtro"}, cor_espera=_cor_espera,
+                           nome_coluna=NOME_DA_COLUNA | {"fora": "Fora do pré-filtro"},
                            horas_tarde=prefiltro.parametros(current_app.config)["horas_tarde"],
                            sem_responsavel=visao.SEM_RESPONSAVEL, sem_cadastro=SEM_CADASTRO)
 

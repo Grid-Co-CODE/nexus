@@ -1,0 +1,3 @@
+{# Os cartões de uma seção da Aprovação (os 30 da página, os próximos do Ver mais e a busca), o mesmo cartão. #}
+{% import "campo/_aprovacao_cartao.html" as apq with context %}
+{% for o in cartoes %}{{ apq.cartao(o, marcar) }}{% endfor %}{% if vazio %}<p class="mudo apq-vazio">Nenhuma OS aqui.</p>{% endif %}

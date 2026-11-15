@@ -6,11 +6,12 @@
 {% set tom = {'pronta': 'ok', 'duvida': 'alerta', 'nao_ok': 'critico'}.get(o.coluna, 'neutro') %}
 {% macro foto(x) %}<button type="button" class="apq-foto" data-apq-card="{{ o.id_wo }}" data-folio="{{ o.os }}" title="Abrir o card da OS {{ o.os }}, com as fotos"><i class="ph ph-image" aria-hidden="true"></i>{{ x.rot }}{% if x.campo %} · {{ x.campo }}{% endif %}</button>{% endmacro %}
 <header class="apq-g-cab">
-  <p class="gc-eyebrow">OS em verificação · <span class="cn-t-{{ cor_espera(o.espera_d) }}">{{ 'hoje' if o.espera_d == 0 else 'há ' ~ o.espera_d ~ ' dias' }}</span></p>
+  {# a idade sem cor (15/11/2026), como no cartão #}
+  <p class="gc-eyebrow">OS em verificação · {{ 'hoje' if o.espera_d == 0 else 'há ' ~ o.espera_d ~ ' dias' }}</p>
   <h2 id="apq-g-titulo"><span class="apq-g-os">OS {{ o.os }}</span><span class="cn-st cn-t-{{ tom }}">{{ nome_coluna.get(o.coluna, o.coluna) }}</span></h2>
   <p class="apq-g-onde"><b>{{ o.usina_cad or sem_cadastro }}</b> · {{ o.cliente_cad or 'sem cliente no cadastro' }} · Responsável O&amp;M: {{ o.responsavel_cad or sem_responsavel }}</p>
   <div class="apq-g-acoes">
-    <button type="button" class="gc-btn gc-btn--primario" data-apq-aprovar-de="{{ o.id_wo }}">Aprovar</button>
+    <button type="button" class="gc-btn {{ 'gc-btn--primario' if o.coluna == 'pronta' else 'gc-btn--contorno' }}" data-apq-aprovar-de="{{ o.id_wo }}">Aprovar</button>
     <button type="button" class="gc-btn gc-btn--contorno" data-apq-card="{{ o.id_wo }}" data-folio="{{ o.os }}"><i class="ph ph-arrow-square-out" aria-hidden="true"></i> Abrir o card da OS</button>
     {# o PDF da OS do OS Creator, o mesmo das OSs em verificação do Painel (05/11/2026: "Quero o botão de baixar o PDF da OS!") #}
     <button type="button" class="gc-btn gc-btn--contorno" data-apq-pdf="{{ o.id_wo }}" data-folio="{{ o.os }}"><i class="ph ph-file-pdf" aria-hidden="true"></i> Baixar o PDF da OS</button>
