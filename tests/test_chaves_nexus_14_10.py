@@ -237,7 +237,9 @@ def test_a_aba_ia_tem_as_tres_vagas_do_openrouter_e_confere_antes_de_gravar(app,
     from nexus.comando import ia as IA
     h = admin.get("/t/base/chaves-fontes?aba=ia").get_data(as_text=True)
     assert '<a href="/t/base/chaves-fontes?aba=ia" aria-current="page">IA</a>' in h
-    assert h.count('name="chave" value="OPENROUTER_API_KEY') == 3 and "NVIDIA_API_KEY" not in h
+    # as 3 da Nexus IA e a 4ª, só do OS Creator (15/11/2026)
+    assert h.count('name="chave" value="OPENROUTER_API_KEY') == 4 and "NVIDIA_API_KEY" not in h
+    assert 'name="chave" value="OPENROUTER_API_KEY_OS_CREATOR"' in h and "chave 4 (só para o OS Creator)" in h
     assert "NEXUS_CONTESTACAO" not in h and "OPENROUTER_API_KEY" not in admin.get(PAGINA).get_data(as_text=True)
     codigo = re.search(r'name="codigo" value="([^"]+)"', h).group(1)
 
@@ -282,3 +284,21 @@ def test_a_chave_do_openrouter_pela_aba_ia_vence_a_do_env(app, admin, monkeypatc
     with app.app_context():
         assert IA.chave(app.config, "openrouter") == chave and IA.padrao(app.config) == "nemotron"
     assert chave not in admin.get("/t/base/chaves-fontes?aba=ia").get_data(as_text=True)
+
+
+def test_a_chave_4_e_so_do_os_creator(app, admin, monkeypatch):
+    """15/11/2026, Levi: "esse 4° slot terá o objetivo de servir demandas do OS Creator": a Nexus IA não a usa e o OS
+    Creator a lê por `ia.chave_os_creator`."""
+    from nexus.comando import ia as IA
+
+    class R:
+        status_code = 200
+    monkeypatch.setattr("requests.get", lambda url, **k: R())
+    h = admin.get("/t/base/chaves-fontes?aba=ia").get_data(as_text=True)
+    codigo = re.search(r'name="codigo" value="([^"]+)"', h).group(1)
+    chave4 = "sk-or-v1-" + "4" * 40
+    r = admin.post(URL, data={"codigo": codigo, "chave": "OPENROUTER_API_KEY_OS_CREATOR", "acao": "gravar", "valor": chave4})
+    assert r.status_code == 303
+    with app.app_context():
+        assert IA.chave_os_creator(app.config) == chave4
+        assert IA.vagas(app.config, "openrouter") == [] and IA.chave(app.config, "openrouter") == ""

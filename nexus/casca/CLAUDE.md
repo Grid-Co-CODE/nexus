@@ -768,6 +768,11 @@ tela vence a do .env), `OPENROUTER_API_KEY_2` e `_3`, com `grupo: "ia"` em `CHAV
 - **Os termos do OpenRouter** proíbem várias contas de uma pessoa para fugir do limite. O Levi foi avisado; as vagas
   servem a chaves de pessoas diferentes ou de reserva.
 - A NVIDIA direto ficou sem vaga na tela: vale a `NVIDIA_API_KEY` do .env, se um dia houver.
+- **A chave 4, só do OS Creator** (`OPENROUTER_API_KEY_OS_CREATOR`; 15/11/2026, Levi: "esse 4° slot terá o objetivo de
+  servir demandas do OS Creator") fica na mesma aba IA, fora das `VAGAS`.
+  - A Nexus IA não a usa, e o OS Creator não gasta as chaves 1 a 3.
+  - O OS Creator a lê por `nexus.comando.ia.chave_os_creator(cfg)`: a da tela, e sem ela a do .env.
+  - O chat do OS Creator Web foi avisado do caminho.
 
 Levi, sobre pôr a chave das contestações no servidor pela T.I.: "Se precisa de TI então vou ter que mandar um arquivo novo
 de deploy para a TI ué!". Depois de colar a 1ª ("deu certo"): "bote essa informação na seção Chave das fontes!" — a

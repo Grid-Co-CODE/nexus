@@ -318,6 +318,12 @@ CHAVES = {
                                  conferir=_conferir_openrouter),
     "OPENROUTER_API_KEY_3": dict(_VAGA_OPENROUTER, nome="OpenRouter: chave 3 (quando a 1 e a 2 são barradas)",
                                  conferir=_conferir_openrouter),
+    # a 4ª, só do OS Creator (15/11/2026, Levi: "esse 4° slot terá o objetivo de servir demandas do OS Creator"): fora do
+    # rodízio da Nexus IA; o OS Creator a lê por `nexus.comando.ia.chave_os_creator`
+    "OPENROUTER_API_KEY_OS_CREATOR": dict(
+        _VAGA_OPENROUTER, nome="OpenRouter: chave 4 (só para o OS Creator)", conferir=_conferir_openrouter,
+        para="as demandas de IA do OS Creator. Fica fora do rodízio da Nexus IA: o Pergunte à Nexus IA e o diagnóstico "
+             "do dia não a usam, e o OS Creator não gasta as chaves 1 a 3"),
 }
 
 

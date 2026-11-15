@@ -30,14 +30,23 @@ PADRAO = {
     "performance": (("", "Verificação de ativo", 3), ("", "Análise de geração e PR", 3),
                     ("", "Revisão de meta ou disponibilidade", 3), ("", "Relatório da usina", 2),
                     ("Chamados", "Acompanhamento de chamado", 2), ("Chamados", "Abertura de chamado de garantia", 2),
-                    ("Chamados", "Cobrança ao fabricante", 2), ("Chamados", "Envio de peça ou RMA", 5)),
+                    ("Chamados", "Cobrança ao fabricante", 2), ("Chamados", "Envio de peça ou RMA", 5),
+                    # 15/11/2026, da pré-análise de 5 usinas pela IA (Levi: "todas as ações que a IA sugerir ver como
+                    # tema e aí a gente coloca como padrão"): Céu Azul e Santa Maria do Pará pediam juntar a corretiva
+                    # ao chamado de garantia do mesmo equipamento
+                    ("Chamados", "Vincular OS ao chamado de garantia", 2)),
     # ao COS: a concessionária, o religamento, o alarme
     "cos": (("", "Chamado com a concessionária", 1), ("", "Religamento remoto", 1), ("", "Verificação de alarme", 1),
             ("", "Acompanhamento de parada", 1)),
     "pcm": (("", "Programação de ronda", 2), ("", "Reprogramação de OS", 2), ("", "Programação de manutenção", 3)),
-    "manutencao": (("", "Execução de corretiva", 3), ("", "Verificação em campo", 2), ("", "Peça ou material", 5)),
-    "seguranca": (("", "Extintor vencido ou recarga", 5), ("", "Verificação de EPI", 3), ("", "APR ou análise de risco", 3)),
-    "zeladoria": (("", "Limpeza de módulos", 5), ("", "Roçada e vegetação", 5)),
+    # a comunicação da usina (Céu Azul: "restaurar comunicação da usina, offline há 195 dias", da mesma pré-análise)
+    "manutencao": (("", "Execução de corretiva", 3), ("", "Verificação em campo", 2), ("", "Peça ou material", 5),
+                   ("", "Restabelecer a comunicação da usina", 2)),
+    # a conferência dos extintores é diferente da recarga (Linhares 1 e Mãe do Rio: "conferir os extintores sem conferência")
+    "seguranca": (("", "Extintor vencido ou recarga", 5), ("", "Conferência de extintores", 3), ("", "Verificação de EPI", 3),
+                  ("", "APR ou análise de risco", 3)),
+    # a vala obstruída ou parcial (Céu Azul, Mãe do Rio e Santa Maria do Pará, na zeladoria)
+    "zeladoria": (("", "Limpeza de módulos", 5), ("", "Roçada e vegetação", 5), ("", "Desobstrução de vala e drenagem", 5)),
     # o que os setores pedem ao supervisor de campo
     "supervisao campo": (("", "Inspeção na usina", 2), ("", "Informação de campo", 1), ("", "Retorno de OS", 2),
                          ("", "Foto ou evidência", 1)),

@@ -16,6 +16,46 @@
       return {'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c];
     });
   }
+  // a frase clicável (15/11/2026, Levi: "pelo tema, tá clicando e aparecendo no setor"): a frase em pedaços (vírgula,
+  // ponto e vírgula, dois-pontos, " e "); o pedaço com um assunto leva ao cartão dele; a OS citada vira link da OS (o
+  // card no religamento, o Raio X no chamado, na Engenharia e na Performance)
+  var ASSUNTOS = [[/desligad|desligament|religament|oscila|prote[cç]|parad[ao]|queda|caiu|comunica|offline|sem dados/i, 'cos'],
+                  [/\bPR\b|performance|meta|gera[cç][aã]o|disponibilidade|irradia/i, 'perf'],
+                  [/inversor|tracker|pe[cç]as?\b|fabricante|garantia|chamad/i, 'chamados'],
+                  [/ronda|limpeza|zeladoria|sujidade|vegeta|ro[cç]ada|vala/i, 'rondas'],
+                  [/extintor|\bEPI\b|luva|\bPT\b|seguran/i, 'seg'],
+                  [/\bOS\b.*(atrasad|verifica|abert)|tarefa|corretiva|preventiva/i, 'os']];
+  function osFrase(n, tipo) {
+    if (tipo === 'os' || tipo === 'religamento' || !tipo) {
+      return '<button type="button" class="pu-diag-oslink" data-pu-os="' + escD(n) + '" title="Abrir o card da OS ' + escD(n) + '">OS ' + escD(n) + '</button>';
+    }
+    var de = tipo === 'chamado' ? '?de=garantias' : (tipo === 'performance' ? '?de=performance' : '');
+    return '<a class="pu-diag-oslink" href="' + escD(nexusRota('/t/engenharia/equipe/os/')) + escD(n) + de +
+      '" target="_blank" rel="noopener" title="Raio X da OS ' + escD(n) + '">OS ' + escD(n) + '</a>';
+  }
+  function fraseClicavel(d, el) {
+    // o tipo de cada OS: o da frase (o servidor confere no dossiê) e, no diagnóstico guardado de antes, o dos itens
+    var tipos = {};
+    ['tem_que_fazer', 'pode_fazer', 'pendente'].forEach(function (k) {
+      (d[k] || []).forEach(function (x) { if (x.os) tipos[x.os] = x.os_tipo || 'os'; });
+    });
+    Object.keys(d.situacao_os || {}).forEach(function (n) { tipos[n] = d.situacao_os[n]; });
+    var partes = String(d.situacao || '').split(/([,;:]\s+|\.\s+|\s+e\s+)/);
+    return partes.map(function (p, i) {
+      if (i % 2) return escD(p);                                   // o separador fica como veio
+      var sec = '';
+      for (var a = 0; a < ASSUNTOS.length; a++) {
+        if (ASSUNTOS[a][0].test(p) && document.getElementById('pu-' + ASSUNTOS[a][1])) { sec = ASSUNTOS[a][1]; break; }
+      }
+      // as OS saem do pedaço (link próprio); o resto do pedaço leva ao cartão do assunto
+      return p.split(/(OS\s*\d{4,6})/).map(function (q, j) {
+        if (j % 2) { var n = q.replace(/\D/g, ''); return osFrase(n, tipos[n]); }
+        if (!sec || !/[A-Za-zÀ-ú]{3}/.test(q)) return escD(q);
+        var m = q.match(/^(\s*\(?\s*)(.*?)(\s*[()]?\s*)$/);
+        return escD(m[1]) + '<a class="pu-diag-link" href="#pu-' + sec + '" data-pu-abre="' + sec + '">' + escD(m[2]) + '</a>' + escD(m[3]);
+      }).join('');
+    }).join('');
+  }
   function osDiag(n, tipo) {
     if (!n) return '';
     if (tipo === 'os' || tipo === 'religamento' || !tipo) {
@@ -85,7 +125,7 @@
     var fonte = el.querySelector('[data-pu-diag-fonte]'), bt = el.querySelector('[data-pu-diag-alterna]');
     var d = j.diag;
     if (d) {
-      frase.textContent = d.situacao;
+      frase.innerHTML = fraseClicavel(d, el);
       frase.classList.add('pu-par-t--ia');
       // o selo diz de quem é a leitura, na cor do nível do parecer (14/11/2026, Levi: "mude o nome de 'Pede ação agora'
       // para Nexus IA Insights"); sem a IA, fica o título do parecer

@@ -151,3 +151,13 @@ def test_o_pedido_preenchido_recusa_o_que_nao_e_numero(tela, logado):
     """O setor e a OS do "Fazer" só entram como número (o preenchido de verdade: test_comando_demandas)."""
     h = logado.get("/t/comando/conversa/usina/1/janela?aba=pedir&setor=x&os=1;2").get_data(as_text=True)
     assert "data-pre-setor" not in h and "data-pre-os" not in h
+
+
+def test_a_frase_traz_as_os_dela_com_o_tipo():
+    """15/11/2026, Levi, na Ceilândia 2: "Desligamento ativo [...] a OS não é clicável". A frase leva as OS que o dossiê
+    tem, com o tipo (o card no religamento); a OS que não está no dossiê não vira link."""
+    dossie = ("## 4. COS\n\n| Início | Tipo | OS |\n| --- | --- | --- |\n| 14/11 | Usina desligada | 19568 |\n\n"
+              "## 5. OS e manutenção\n\n- Abertas: OS 17460 (comunicação)\n")
+    d = DG.ler('<diagnostico>{"situacao": "Desligamento ativo há 7h (OS 19568), comunicação caída (OS 17460) e OS 99999."}'
+               '</diagnostico>', dossie)
+    assert d["situacao_os"] == {"19568": "religamento", "17460": "os"}
