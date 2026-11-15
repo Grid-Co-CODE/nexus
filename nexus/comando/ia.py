@@ -160,6 +160,19 @@ def chave(cfg, provedor: str) -> str:
 # A NVIDIA direto ficou sem vaga na tela: vale a NVIDIA_API_KEY do .env, se um dia houver.
 VAGAS = {"openrouter": ("OPENROUTER_API_KEY", "OPENROUTER_API_KEY_2", "OPENROUTER_API_KEY_3"),
          "nvidia": ("NVIDIA_API_KEY",)}
+# a 4ª chave do OpenRouter, só do OS Creator (15/11/2026, Levi: "esse 4° slot terá o objetivo de servir demandas do OS
+# Creator"): fica fora das VAGAS (a Nexus IA não a usa, e o OS Creator não gasta as da Nexus IA)
+CHAVE_OS_CREATOR = "OPENROUTER_API_KEY_OS_CREATOR"
+
+
+def chave_os_creator(cfg) -> str:
+    """A chave do OpenRouter do OS Creator: a da tela (Base › Chaves das fontes › IA, "chave 4"), cifrada, e sem ela a
+    OPENROUTER_API_KEY_OS_CREATOR do .env; "" sem nenhuma. Relida a cada 30 s (`nexus/auth/chaves.py`)."""
+    from ..auth import chaves as CH
+    try:
+        return str(CH.valor(CHAVE_OS_CREATOR, cfg) or "").strip()
+    except Exception:            # noqa: BLE001 — sem a pasta ou a cifra: vale a do .env
+        return str(cfg.get(CHAVE_OS_CREATOR) or "").strip()
 DESCANSO_LIMITE_S = 10 * 60
 DESCANSO_RECUSADA_S = 6 * 3600
 
