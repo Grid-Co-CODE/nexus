@@ -115,6 +115,8 @@ def ler(texto: str, dossie: str, setores: list[dict] | None = None) -> dict | No
         return None
     mapa = IA.os_do_dossie(dossie)
     out = {"situacao": _limpo(j.get("situacao"), MAX_SITUACAO)}
+    # as OS da frase, com o tipo (a tela abre o card ou o Raio X): só as que o dossiê tem
+    out["situacao_os"] = {n: mapa[n] for n in re.findall(r"(?<![\d.,])(\d{4,6})(?![\d.,]\d)", out["situacao"]) if n in mapa}
     for lista, campo in (("tem_que_fazer", "acao"), ("pode_fazer", "acao"), ("pendente", "item")):
         itens = []
         for x in (j.get(lista) or [])[:MAX_ITENS[lista]]:
