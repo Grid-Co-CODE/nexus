@@ -9,6 +9,7 @@ isso toda função que este módulo chama, dele ou de fora (o `api._rpc_call`, o
 ajustável (um prazo, um teto) vão pelo `api.`, e enxergam a troca; só as outras constantes e o estado daqui são usados direto. O
 módulo termina com `import api`: o `api` o importa no fim do arquivo (a fachada), e só precisa dele na hora da chamada."""
 
+import solic_spec
 from fracttal_erro import FracttalError
 
 
@@ -181,11 +182,12 @@ def juntar_notas(tasks: list) -> list[str]:
     """A nota que o card mostra: a `note` e a `task_note` de cada tarefa, sem repetir. A que já está DENTRO de outra não
     aparece de novo (prova no Fracttal de 05/11/2026, OS 18591 de TESTE - PA: o comentário da Engenharia grava a `note`
     com a nota de entrada mais a linha nova, e a `task_note` segue com a de entrada; o card mostrava a de entrada duas
-    vezes)."""
+    vezes). O bloco [PCM] da solicitação não aparece (15/11/2026: as OS aprovadas na Fila do PCM nasciam com ele na nota,
+    a lista das subtarefas lida como nota; `solic_spec.sem_bloco`)."""
     notas: list[str] = []
     for t in tasks:
         for k in ("note", "task_note"):
-            v = api._campo_de_nota(t, k)
+            v = solic_spec.sem_bloco(api._campo_de_nota(t, k))
             if not v or any(v in x for x in notas):
                 continue
             notas = [x for x in notas if x not in v] + [v]

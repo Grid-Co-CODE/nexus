@@ -503,6 +503,38 @@ def so_bloco(observacao: str) -> str:
     return ""
 
 
+def sem_bloco(texto: str) -> str:
+    """O texto sem as linhas do bloco `[PCM]`, com o que vier DEPOIS dele (o `relato` para no bloco e perde o resto).
+
+    É o que vai para a nota da OS e o que o card e o Raio X mostram: o bloco é o transporte da Fila, e a OS que nasceu
+    com ele na nota mostrava a lista das subtarefas como se fosse nota (Levi, 15/11/2026, a 18338 de uma usina real: "As
+    subtarefa, nota da OS não deveria estar aparecendo"). O comentário que a Engenharia grava na nota vem depois do bloco
+    e fica. Linha do bloco: o marcador, um "Rótulo: valor" dos campos dele, o "Subtarefas:" e as "- [Tipo] ..."."""
+    import unicodedata
+
+    def _norm(s):
+        s = unicodedata.normalize("NFKD", str(s).lower())
+        return "".join(c for c in s if not unicodedata.combining(c)).strip()
+    rotulos = {_norm(r) for r, _k in _CAMPOS} | {_norm(r) for r in _ALIAS} | {"subtarefas"}
+
+    def _do_bloco(linha):
+        cru = linha.strip()
+        return cru.startswith("- [") or (":" in cru and _norm(cru.split(":", 1)[0]) in rotulos)
+    fora, dentro = [], False
+    for linha in str(texto or "").splitlines():
+        if linha.strip().lower().startswith(MARCADOR.lower()):
+            dentro = True
+            continue
+        if dentro and _do_bloco(linha):
+            continue
+        dentro = False
+        fora.append(linha)
+    limpo = "\n".join(fora).strip()
+    while "\n\n\n" in limpo:                # o bloco tirado do meio deixava duas linhas em branco seguidas
+        limpo = limpo.replace("\n\n\n", "\n\n")
+    return limpo
+
+
 def observacao_com_bloco(observacao: str, dados: dict) -> str:
     """Junta o texto que o supervisor escreveu com o bloco da sugestão.
 

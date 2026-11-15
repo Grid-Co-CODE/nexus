@@ -488,7 +488,9 @@ def api_aprovar(id_code):
             return jsonify({"erro": "Tempo estimado inválido: escreva de 00:01 a 23:59 (HH:mm) no campo da decisão."}), 400
     res = api.aprovar_solicitacao(
         asset, titulo, subs, s.get("id_code"), corpo.get("id_responsible"), corpo.get("responsavel") or "",
-        tipo=corpo.get("tipo") or sw.TIPO_PADRAO, note=str(s.get("observacao") or ""),
+        # a nota da OS é o que a PESSOA escreveu: o bloco [PCM] (tema, data sugerida, subtarefas) é o transporte da Fila e
+        # ia inteiro para a nota (15/11/2026, Levi: "As subtarefa, nota da OS não deveria estar aparecendo")
+        tipo=corpo.get("tipo") or sw.TIPO_PADRAO, note=sp.sem_bloco(s.get("observacao") or ""),
         etiqueta_ids=corpo.get("etiquetas") or None, id_parent=id_parent,
         classif=(corpo.get("classif1") or "", corpo.get("classif2") or ""), prog_date=prog, duracao=dur)
     out = sw.mensagem_aprovacao(res, id_code)

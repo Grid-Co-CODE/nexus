@@ -297,7 +297,7 @@ def test_aprovar_leva_o_que_esta_na_ficha_com_o_anexo(cli):
     assert (code, titulo, idc, idr, nome) == ("TST-INV11", corpo["titulo"], 5001, 1, "Ana Teste Silva")
     assert [(s["description"], s["attachments_required"]) for s in subs] == [("Medir isolação", True)]
     assert k["classif"] == ("Programada", "") and k["etiqueta_ids"] == [7] and k["id_parent"] == 880001
-    assert k["tipo"] == "Corretiva" and k["note"] == OBS
+    assert k["tipo"] == "Corretiva" and k["note"] == "Inversor desligando à tarde."   # sem o bloco [PCM] (15/11)
     # a OS nasce programada na data sugerida da solicitação (15/10/2026; o bloco diz só "15/10/2026": 08:00, como o app)
     import datetime as _dt
     assert k["prog_date"] == _dt.datetime(2026, 10, 15, 8, 0, tzinfo=_dt.timezone(_dt.timedelta(hours=-3)))

@@ -983,6 +983,18 @@ da aprovação, como no app de mesa.
   de OS criada).
 - O app de mesa (`steps/solic_pcm.py`) não mudou. Prova: `tests/test_oscreator_solic_pcm.py`.
 
+## Fila do PCM: a nota da OS sem o bloco [PCM] (15/11/2026)
+
+Levi, no prontuário de uma usina: "As subtarefa, nota da OS não deveria estar aparecendo". A aprovação mandava a
+observação inteira da solicitação como nota da OS, e o bloco [PCM] (tema, data sugerida, subtarefas: o transporte da
+Fila) ia junto; a OS nascia com a lista das subtarefas na nota (uma real, lida no REST: a `task_note` com o bloco).
+- **Na geração:** a nota é `solic_spec.sem_bloco(observação)`, o que a pessoa escreveu. O bloco continua na
+  solicitação, onde a Fila o lê.
+- **Nas que já nasceram com ele:** o card (`os_detalhe.juntar_notas`) e o Raio X (`engenharia/os_equipe._nota_da_os`)
+  tiram as linhas do bloco ao mostrar, sem cortar o comentário que veio depois (o `relato` para no bloco; o `sem_bloco`
+  tira só as linhas dele). No Fracttal a nota delas segue com o bloco.
+- Prova: `tests/test_oscreator_nota_sem_bloco_pcm_15_11.py`.
+
 ## Fila do PCM: o tempo estimado na decisão (21/10/2026)
 
 Levi: "Gostaria que o PCM conseguisse mudar o tempo estimado para cada atividade na fila de PCM". Cada solicitação da

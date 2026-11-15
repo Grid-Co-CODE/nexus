@@ -249,16 +249,28 @@ def montar(linhas: list[dict], pessoa: dict, agora: datetime) -> list[dict]:
     return [_cartao(folio, ts, pessoa, hoje) for folio, ts in por.items()]
 
 
+def _sem_bloco_pcm():
+    """O `solic_spec.sem_bloco` do OS Creator, dono do formato do bloco [PCM], pelo MESMO módulo das telas dele
+    (`ponte.modulo_do_clone`); sem o clone, o texto como veio."""
+    try:
+        from ..torres.oscreator.ponte import modulo_do_clone
+        return modulo_do_clone("solic_spec").sem_bloco
+    except Exception:       # noqa: BLE001 — sem o clone a nota sai como veio, nunca some
+        return lambda v: v
+
+
 def _nota_da_os(ts: list[dict]) -> str:
     """A nota da OS como o card do OS Creator a mostra (`os_detalhe.juntar_notas`): a `note` e a `task_note` de cada
     tarefa, sem repetir a que já está dentro de outra. Dois casos reais: em 24/10/2026 a página mostrava só a `note`, e a
     nota das OS da engenharia nasce na tarefa (Levi: "não está puxando a nota da OS da engenharia"); em 13/11/2026 ela
     mostrava só a `task_note`, e o `work_orders_update` grava a nota nova na `note` (a 19378 e mais cinco
-    administrativas de chamados: o cabeçalho e as respostas da Inspeção na `note`, só o cabeçalho na `task_note`)."""
+    administrativas de chamados: o cabeçalho e as respostas da Inspeção na `note`, só o cabeçalho na `task_note`). Sem o
+    bloco [PCM] da solicitação, como o card (15/11/2026, `solic_spec.sem_bloco`)."""
+    sem_bloco = _sem_bloco_pcm()
     notas: list[str] = []
     for t in ts:
         for k in ("note", "task_note"):
-            v = str((t or {}).get(k) or "").strip()
+            v = sem_bloco(str((t or {}).get(k) or "").strip())
             if not v or v.lower() == "none" or any(v in x for x in notas):
                 continue
             notas = [x for x in notas if x not in v] + [v]
