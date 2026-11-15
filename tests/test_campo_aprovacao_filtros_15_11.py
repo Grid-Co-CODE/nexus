@@ -62,3 +62,16 @@ def test_usina_sem_os_na_fila_abre_vazia_com_o_nome(quadro, logado, fila_resp): 
     html = logado.get("/t/campo/aprovacao?usina=3").get_data(as_text=True)
     assert _folios(html) == []
     assert '<option value="3" selected>Usina C</option>' in _form(html)
+
+
+def test_nome_repetido_na_lista_ganha_o_cliente():
+    """15/11/2026, conferido em produção: há duas "Linhares 1" no cadastro (a da Axis e a da Thopen, ids diferentes); a
+    lista mostrava dois "Linhares 1" iguais. O nome que se repete leva o cliente; o que não se repete fica só o nome."""
+    from types import SimpleNamespace
+
+    from nexus.torres.campo import _opcoes_usina
+    oss = [{"usina_id_cad": 27, "usina_cad": "Linhares 1", "cliente_cad": "Axis"},
+           {"usina_id_cad": 96, "usina_cad": "Linhares 1", "cliente_cad": "Thopen"},
+           {"usina_id_cad": 5, "usina_cad": "Altair", "cliente_cad": "Thopen"}]
+    mapa = SimpleNamespace(dados={"por_nome": {}})
+    assert _opcoes_usina(oss, mapa, None) == [(5, "Altair"), (27, "Linhares 1 · Axis"), (96, "Linhares 1 · Thopen")]

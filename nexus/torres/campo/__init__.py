@@ -1822,11 +1822,16 @@ def aprovacao():
 def _opcoes_usina(oss, mapa, escolhida) -> list[tuple[int, str]]:
     """As usinas do filtro: as das OS da fila, (id do cadastro, nome), pelo nome. A usina pedida que não tem OS na fila
     (a conta do prontuário pode estar à frente da releitura) entra com o nome do cadastro: a tela abre nela, vazia."""
-    nomes = {o["usina_id_cad"]: o["usina_cad"] for o in oss if o.get("usina_id_cad")}
+    import collections
+    nomes = {o["usina_id_cad"]: (o["usina_cad"], o.get("cliente_cad") or "") for o in oss if o.get("usina_id_cad")}
     if escolhida and escolhida not in nomes:
-        nomes[escolhida] = next((c.get("usina") for c in ((mapa.dados or {}).get("por_nome") or {}).values()
-                                 if c.get("usina_id") == escolhida), None) or f"Usina {escolhida}"
-    return sorted(nomes.items(), key=lambda par: _sem_acento(par[1]))
+        cad = next((c for c in ((mapa.dados or {}).get("por_nome") or {}).values() if c.get("usina_id") == escolhida), {})
+        nomes[escolhida] = (cad.get("usina") or f"Usina {escolhida}", cad.get("cliente") or "")
+    # o nome repetido leva o cliente (15/11/2026, conferido em produção: a Linhares 1 da Axis e a da Thopen, ids 27 e 96,
+    # saíam como dois "Linhares 1" iguais na lista)
+    vezes = collections.Counter(n for n, _ in nomes.values())
+    rotulo = {uid: (f"{n} · {c}" if c else f"{n} ({uid})") if vezes[n] > 1 else n for uid, (n, c) in nomes.items()}
+    return sorted(rotulo.items(), key=lambda par: _sem_acento(par[1]))
 
 
 def _com_cadastro(linhas: list[dict], mapa) -> list[dict]:

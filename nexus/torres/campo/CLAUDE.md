@@ -2616,7 +2616,8 @@ Aprovação e Triagem usam a lógica do App copiada, não refeita, para o númer
       verificação" do prontuário manda `?usina=<id>`), ligado pela usina do Fracttal (`por_nome` leva o `usina_id`);
       `tecnico=` é o nome de quem executou ALGUMA tarefa da OS. A usina pedida no endereço abre com o responsável em
       Todos (o responsável do login cortaria a usina de outro); a usina sem OS na fila abre vazia, com o nome do cadastro
-      na lista. O total diz o recorte ("na Usina X", "executadas por Y"). Prova: `test_campo_aprovacao_filtros_15_11.py`.
+      na lista. O nome repetido na lista leva o cliente (em produção há duas "Linhares 1": a da Axis, id 27, e a da
+      Thopen, id 96). O total diz o recorte ("na Usina X", "executadas por Y"). Prova: `test_campo_aprovacao_filtros_15_11.py`.
       CSV (leva os filtros do servidor): OS, dias, criação, fim, Responsável O&M, usina, cliente, técnicos, tarefas, nota do App,
       a coluna ("Fora do pré-filtro (motivo)") e os motivos. No celular as colunas deslizam de lado dentro do quadro.
       Prova: `test_campo_aprovacao_responsavel.py`, `test_campo_aprovacao_visual_0511.py` (a 2ª rodada),
