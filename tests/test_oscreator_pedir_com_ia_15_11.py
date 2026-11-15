@@ -206,3 +206,45 @@ def test_o_codigo_da_usina_no_texto_acha_a_usina(ia, monkeypatch):
     assert (f["cliente"], f["usina"], f["ativo"]["id"]) == ("Cliente X", USINA, 5) and f["pronta"]
     assert "%s (CPX100)" % USINA in ia.pedidos[-1]["sistema"]
     assert IA.usina_pelo_codigo("nada aqui", {USINA: "CPX100"}) == ""
+
+
+def test_o_tipo_de_equipamento_sai_do_pedido():
+    """Levi, 15/11/2026: "Se eu pedi a inspeção de inversor então o tipo de equipamento dos ativos já devem vir filtrado
+    como inversor"."""
+    tipos = [{"sigla": "INV", "nome": "Inversor"}, {"sigla": "DJ", "nome": "Disjuntor"}, {"sigla": "SB", "nome": "String Box"}]
+    assert IA.tipo_da_pista("inversor 2.1", tipos) == "INV"
+    assert IA.tipo_da_pista("Inspeção dos inversores", tipos) == "INV"
+    assert IA.tipo_da_pista("disjuntor do inversor 1.1", tipos) == "DJ"        # o equipamento é o que vem primeiro
+    assert IA.tipo_da_pista("string box 3", tipos) == "SB"
+    assert IA.tipo_da_pista("limpeza dos módulos", tipos) == "" and IA.tipo_da_pista("", tipos) == ""
+    assert IA.tipo_da_pista("inversor 2", [{"sigla": "IC", "nome": "Inversor Central"}]) == "IC"
+
+
+def test_o_tipo_do_pedido_filtra_os_ativos_e_a_pessoa_pode_ver_todos(ia):
+    f = ia.post("/os/api/solic/ia/preencher", json={"setor": "pcm", "texto": "inspeção no inversor 1.1"}).get_json()
+    assert f["tipo"] == "Inversor" and [a["id"] for a in f["ativos"]] == [2] and f["ativo"]["id"] == 2
+    assert {t["sigla"] for t in f["tipos"]} == {"NBRK", "Inversor", "RELE"}
+    # "— todos os tipos —" escolhido na ficha: a usina inteira volta, e o ativo marcado fica
+    g = ia.post("/os/api/solic/ia/ficha", json={"setor": "pcm", "ativo_pista": "inversor 1.1",
+                                                "escolhidos": {"cliente": "Cliente X", "usina": USINA, "ativo_id": 2,
+                                                               "tipo": ""}}).get_json()
+    assert g["tipo"] == "" and sorted(a["id"] for a in g["ativos"]) == [1, 2, 3] and g["ativo"]["id"] == 2
+    # o tipo trocado pela pessoa tira o ativo de outro tipo
+    h = ia.post("/os/api/solic/ia/ficha", json={"setor": "pcm", "ativo_pista": "inversor 1.1",
+                                                "escolhidos": {"cliente": "Cliente X", "usina": USINA, "ativo_id": 2,
+                                                               "tipo": "NBRK"}}).get_json()
+    assert h["tipo"] == "NBRK" and [a["id"] for a in h["ativos"]] == [1] and h["ativo"] is None
+
+
+def test_a_usina_se_escolhe_sem_o_cliente_e_o_ativo_do_pedido_vem_junto(ia):
+    """Levi, 15/11/2026: "gostaria de conseguir pesquisar usina sem ter que pesquisar cliente!". A usina escolhida na ficha
+    traz o cliente, e o "inversor 1.1" do pedido acha o ativo dela sem perguntar de novo à IA."""
+    ia.resposta["j"] = {"ativo": "inversor 1.1", "titulo": "Inspecionar o inversor", "descricao": "Desliga à tarde."}
+    f = ia.post("/os/api/solic/ia/preencher", json={"setor": "pcm", "texto": "inspeção no inversor 1.1"}).get_json()
+    assert f["usina"] == "" and f["tipo"] == "Inversor" and f["ativo_pista"] == "inversor 1.1"
+    assert {"usina": USINA, "cliente": "Cliente X", "codigo": ""} in f["usinas_todas"]
+    assert {x["cliente"] for x in f["usinas_todas"]} == {"Cliente X", "Cliente Y"}
+    g = ia.post("/os/api/solic/ia/ficha", json={"setor": "pcm", "ativo_pista": f["ativo_pista"], "tipo_pista": f["tipo_pista"],
+                                                "titulo": f["titulo"], "descricao": f["descricao"],
+                                                "escolhidos": {"cliente": "", "usina": USINA}}).get_json()
+    assert (g["cliente"], g["usina"], g["ativo"]["id"], g["tipo"]) == ("Cliente X", USINA, 2, "Inversor") and g["pronta"]

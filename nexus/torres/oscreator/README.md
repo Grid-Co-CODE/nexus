@@ -3317,8 +3317,21 @@ Performance). Abre sozinha ao entrar na tela, no setor dela; o "Fazer manualment
   Classificação 1 (o impacto): a do tema, senão a que a IA propõe da lista do Fracttal; a pessoa troca.
 - **O tamanho:** a janela ocupa até 1080 × 960 px (Levi: "expanda mais para caber mais informação na tela!"), a ficha em
   três colunas e as subtarefas em duas; em tela estreita, duas e uma; no celular, a tela inteira.
-- **Trocar na ficha não gasta IA:** usina, ativo e tema refazem a ficha pelo `/os/api/solic/ia/ficha`, com a escolha da
-  pessoa valendo como está.
+- **As listas da ficha são a busca de sempre** (`data-busca`, o `os_busca.js`), todas iguais: cliente, usina, tipo de
+  equipamento, ativo, tema, Classificação 1 e responsável (Levi: "O estilo de lista do cliente está diferente do usina e
+  ativo, padronize tudo"; o cliente virava busca por ter 6 opções ou mais, e a usina e o ativo, que nasciam vazios, ficavam
+  nativos).
+- **A usina sem o cliente** (Levi: "gostaria de conseguir pesquisar usina sem ter que pesquisar cliente!"): sem cliente, a
+  lista é a de todas as usinas, com o código ao lado (`usinas_todas`), e se pesquisa pelo nome ou pelo código; escolhida,
+  ela traz o cliente. Com o cliente, só as dele.
+- **O tipo de equipamento do pedido filtra os ativos** (Levi: "Se eu pedi a inspeção de inversor então o tipo de
+  equipamento dos ativos já devem vir filtrado como inversor"): a IA devolve o `tipo`, e o Nexus acha o tipo pelas
+  palavras do nome (`solic_ia.tipo_da_pista`: plural vale; "disjuntor do inversor" é Disjuntor, o que vem primeiro). Os
+  temas valem pelo tipo antes mesmo do ativo. "— todos os tipos —" mostra a usina inteira; o tipo escolhido pela pessoa só
+  vai ao servidor quando ela o escolheu, senão ele sai do pedido.
+- **Trocar na ficha não gasta IA:** usina, tipo, ativo e tema refazem a ficha pelo `/os/api/solic/ia/ficha`, com a escolha
+  da pessoa valendo como está; o ativo e o tipo que o pedido disse vão junto (`ativo_pista`, `tipo_pista`), e na usina
+  escolhida depois o "inversor 2.1" do pedido acha o ativo dela.
 - **Quem cria é a rota de sempre:** PCM pela Nova solicitação (`/os/api/solic/criar`, a Classificação 1 do tema ou a
   Programada, a data sugerida de 6 dias às 08:00); Performance e Engenharia pela delas, com `origem: "ia"`, que leva as
   subtarefas da ficha e a programada de 6 dias às 08:00 (a tela de sempre segue sem subtarefas e com os 7 dias).

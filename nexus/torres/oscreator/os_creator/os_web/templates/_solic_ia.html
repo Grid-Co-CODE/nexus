@@ -56,16 +56,20 @@
   <div class="sia-ficha">
     <div class="sia-ficha-h"><span class="sia-ficha-t"></span><span class="sia-pill"></span></div>
     <div class="sia-perguntas" hidden></div>
+    {# toda lista da ficha é a busca de sempre do OS Creator (os_busca.js, data-busca): digitar acha no meio do nome, sem
+       acento (Levi, 15/11/2026: "O estilo de lista do cliente está diferente do usina e ativo, padronize tudo"). A usina se
+       pesquisa sem o cliente, pelo nome ou pelo código; o tipo de equipamento vem do pedido e filtra os ativos. #}
     <div class="sia-grade">
-      <label class="sia-campo"><span>Cliente</span><select data-f="cliente"></select></label>
-      <label class="sia-campo"><span>Usina</span><select data-f="usina"></select></label>
-      <label class="sia-campo"><span>Ativo</span><select data-f="ativo"></select></label>
-      <label class="sia-campo sia-dois"><span>Atividade (o nome da OS)</span><input data-f="titulo" maxlength="80"></label>
-      <label class="sia-campo"><span>Tema</span><select data-f="tema"></select></label>
-      <label class="sia-campo sia-largo"><span>O que fazer</span><textarea data-f="descricao" rows="2"></textarea></label>
-      <label class="sia-campo" data-so-pcm><span>Classificação 1 (o impacto)</span><select data-f="classif1"></select></label>
-      <label class="sia-campo" data-so-resp><span>Responsável</span><select data-f="responsavel"><option value="">carregando…</option></select></label>
+      <label class="sia-campo"><span>Cliente</span><select data-f="cliente" data-busca="1" aria-label="Cliente"></select></label>
+      <label class="sia-campo"><span>Usina</span><select data-f="usina" data-busca="1" aria-label="Usina"></select></label>
+      <label class="sia-campo"><span>Tipo de equipamento</span><select data-f="tipo" data-busca="1" aria-label="Tipo de equipamento"></select></label>
+      <label class="sia-campo"><span>Ativo</span><select data-f="ativo" data-busca="1" aria-label="Ativo"></select></label>
+      <label class="sia-campo"><span>Tema</span><select data-f="tema" data-busca="1" aria-label="Tema"></select></label>
       <div class="sia-campo"><span>Data programada</span><div class="sia-data" data-f="programada"></div></div>
+      <label class="sia-campo sia-dois"><span>Atividade (o nome da OS)</span><input data-f="titulo" maxlength="80"></label>
+      <label class="sia-campo" data-so-pcm><span>Classificação 1 (o impacto)</span><select data-f="classif1" data-busca="1" aria-label="Classificação 1"></select></label>
+      <label class="sia-campo" data-so-resp><span>Responsável</span><select data-f="responsavel" data-busca="1" aria-label="Responsável"><option value="">carregando…</option></select></label>
+      <label class="sia-campo sia-largo"><span>O que fazer</span><textarea data-f="descricao" rows="2"></textarea></label>
     </div>
     <div class="sia-subs">
       <div class="sia-subs-h">Subtarefas <small></small></div>

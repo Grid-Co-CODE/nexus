@@ -116,6 +116,14 @@ body.os-form .sia-campo textarea{resize:vertical;line-height:1.45;min-height:52p
 /* a lista nativa que abre do select segue o tema: escura no escuro, clara no claro */
 body.os-form .sia-campo select{color-scheme:dark}
 :where(html[data-tema="claro"]) body.os-form .sia-campo select{color-scheme:light}
+/* as listas da ficha são a busca do os_busca.js (a mesma do resto do OS Creator): a caixa tem a cara dos outros campos e
+   uma seta que diz "isto abre uma lista" (Levi, 15/11/2026: "padronize tudo"); a lista segue a fonte do prompt */
+.sia-campo .osb::after{content:"";position:absolute;right:12px;top:13px;width:6px;height:6px;pointer-events:none;
+  border-right:1.5px solid var(--sia-mudo);border-bottom:1.5px solid var(--sia-mudo);transform:rotate(45deg)}
+body.os-form .sia-campo .osb-in{padding-right:28px;text-overflow:ellipsis}
+/* a lista pode passar da largura do campo: o nome da usina com o código e o do ativo com o código cabem inteiros */
+.sia-campo .osb-lista{font-family:var(--sia-mono);max-height:min(300px,46vh);right:auto;min-width:100%;width:max-content;max-width:min(560px,86vw)}
+.sia-campo .osb-op{font-size:12.5px}
 body.os-form .sia-campo select:focus,body.os-form .sia-campo input:focus,body.os-form .sia-campo textarea:focus{outline:2px solid var(--sia-lima-borda);outline-offset:0;border-color:var(--sia-lima)}
 .sia-data{min-height:34px;display:flex;align-items:center;padding:0 9px;border-radius:7px;border:1px dashed var(--sia-linha);
   font-variant-numeric:tabular-nums;color:var(--sia-mudo-2);font-size:12.5px}

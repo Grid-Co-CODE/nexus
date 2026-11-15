@@ -121,6 +121,51 @@ def usina_pelo_codigo(texto, codigos: dict) -> str:
     return usinas[0] if len(usinas) == 1 else ""
 
 
+_LIGA = {"de", "do", "da", "dos", "das", "e"}
+
+
+def _mesma_palavra(p: str, t: str) -> bool:
+    """A palavra da pista é a do nome do tipo, também no plural ("inversores" é "inversor")."""
+    return p == t or (min(len(p), len(t)) >= 4 and (p.startswith(t) or t.startswith(p)))
+
+
+def tipos_dos_ativos(ativos, nome_tipo=None) -> list:
+    """[{sigla, nome, n}] dos tipos de equipamento presentes, em ordem pelo nome que a pessoa lê."""
+    cont, nomes = Counter(), {}
+    for a in ativos or []:
+        t = str((a or {}).get("tipo") or "").strip()
+        if t:
+            cont[t] += 1
+            nomes[t] = a.get("tipo_nome") or (nome_tipo(t) if nome_tipo else t)
+    return sorted(({"sigla": t, "nome": nomes[t], "n": n} for t, n in cont.items()), key=lambda x: norm(x["nome"]))
+
+
+def tipo_da_pista(pista, tipos: list) -> str:
+    """A sigla do tipo de equipamento que o pedido diz, entre `tipos` ([{sigla, nome}]), ou ''. Vale o tipo com todas as
+    palavras do nome na pista ("inversor 2.1" é Inversor); com dois tipos na pista ("disjuntor do inversor"), o que vem
+    primeiro, que em português é o equipamento (o resto diz de onde ele é). Sem nenhum inteiro, o único cuja 1ª palavra
+    está na pista ("inversor" num lugar que só tem "Inversor Central"). Levi, 15/11/2026: "Se eu pedi a inspeção de
+    inversor então o tipo de equipamento dos ativos já devem vir filtrado como inversor"."""
+    p = [w for w in norm(pista).split() if not re.fullmatch(r"[\d.]+", w)]
+    if not p:
+        return ""
+    melhor, primeira = None, set()
+    for t in tipos or []:
+        palavras = [w for w in norm(t.get("nome")).split() if w not in _LIGA]
+        if not palavras:
+            continue
+        pos = [next((i for i, x in enumerate(p) if _mesma_palavra(x, w)), None) for w in palavras]
+        if None not in pos:
+            chave = (min(pos), -len(palavras))
+            if melhor is None or chave < melhor[0]:
+                melhor = (chave, t["sigla"])
+        elif pos[0] is not None:
+            primeira.add(t["sigla"])
+    if melhor:
+        return melhor[1]
+    return next(iter(primeira)) if len(primeira) == 1 else ""
+
+
 def temas_do_tipo(temas: list, tipo: str) -> list:
     """Os temas que valem para o tipo do ativo (a mesma regra da Nova solicitação: o tipo tem de estar nos do tema)."""
     alvo = norm(tipo)
@@ -143,11 +188,12 @@ def instrucoes(setor: str, temas: list, usinas_por_cliente: dict, hoje: dt.date,
     return f"""Você é o assistente do OS Creator da Grid Co., empresa de O&M de usinas solares. A pessoa vai abrir {s['cria']} e diz em poucas palavras o que precisa. Hoje é {hoje.strftime('%d/%m/%Y')}.
 
 Responda SÓ com um objeto JSON, sem texto antes ou depois, neste formato:
-{{"cliente": "", "usina": "", "ativo": "", "titulo": "", "descricao": "", "tema": "", "subtarefas": [{{"desc": "", "tipo": "texto"}}], "faltou": ""{campo_c1}}}
+{{"cliente": "", "usina": "", "ativo": "", "tipo": "", "titulo": "", "descricao": "", "tema": "", "subtarefas": [{{"desc": "", "tipo": "texto"}}], "faltou": ""{campo_c1}}}
 
 Regras:
 - cliente e usina: escreva EXATAMENTE como na lista abaixo, sem o código entre parênteses. A pessoa pode chamar a usina pelo código (o que está entre parênteses, que também é o começo do código dos ativos dela). Se a pessoa não disse ou você não tiver certeza, deixe vazio.
 - ativo: o equipamento como a pessoa disse, com o tipo e o número (ex.: "inversor 2.1", "transformador 1", "tracker 3"). Não invente número.
+- tipo: o tipo do equipamento, sem o número (ex.: "Inversor", "Transformador", "String Box"); vazio se a pessoa não disse.
 - titulo: o nome curto da OS, até 60 caracteres, sem o nome da usina e sem o do ativo (eles entram sozinhos).
 - descricao: o que precisa ser feito e por quê, em 1 a 3 frases, em português claro e profissional.
 - tema: a chave de um tema da lista abaixo, só se ele servir para o pedido e para o tipo do ativo; senão, vazio.
@@ -233,37 +279,59 @@ def extras(lista, ja: list) -> list:
 
 
 def ficha(setor: str, ia: dict, assets: list, clientes: list, usinas_de, ativos_de, temas: list, subs_do_tema,
-          agora: dt.datetime, escolhidos: dict | None = None) -> dict:
+          agora: dt.datetime, escolhidos: dict | None = None, nome_tipo=None) -> dict:
     """A resposta da IA conferida no catálogo → a ficha da tela. `usinas_de(cliente)` e `ativos_de(usina)` são as listas da
     cascata de sempre; `subs_do_tema(tema, tipo)` devolve as subtarefas no formato do editor ({desc, tipo, anexo}).
-    `escolhidos` ({cliente, usina, ativo_id}) é o que a pessoa marcou na ficha: vale como está, se existir no catálogo."""
+    `escolhidos` ({cliente, usina, ativo_id, tipo}) é o que a pessoa marcou na ficha: vale como está, se existir no catálogo;
+    o `tipo` só vem quando a pessoa o escolheu (até "todos os tipos", o ''), senão ele sai do pedido."""
     ia = ia if isinstance(ia, dict) else {}
     esc = escolhidos if isinstance(escolhidos, dict) else {}
     perguntas = []
     rotulo_ativo = lambda a: "%s %s %s" % (a.get("curto") or "", a.get("label") or "", a.get("tipo_nome") or "")  # noqa: E731
-    if esc.get("cliente") in clientes:
-        cliente, cand_cli = esc["cliente"], []
+    todas = [(c, u) for c in clientes or [] for u in usinas_de(c) or []]
+    # a usina marcada vale mesmo sem o cliente, e o cliente sai dela (Levi, 15/11/2026: "gostaria de conseguir pesquisar
+    # usina sem ter que pesquisar cliente!")
+    marcada = esc.get("usina") or ""
+    par = (next(((c, u) for c, u in todas if u == marcada and c == esc.get("cliente")), None)
+           or next(((c, u) for c, u in todas if u == marcada), None)) if marcada else None
+    if par:
+        (cliente, usina), cand_cli, cand_usi = par, [], []
+        usinas = usinas_de(cliente)
     else:
-        cliente, cand_cli = escolher(ia.get("cliente"), clientes)
-    usinas = usinas_de(cliente) if cliente else []
-    pista_usina = ia.get("usina")
-    if cliente and esc.get("usina") in usinas:
-        usina, cand_usi = esc["usina"], []
-    elif cliente:
-        usina, cand_usi = escolher(pista_usina, usinas)
-    else:                                   # sem o cliente, a usina pela lista inteira: o cliente sai dela
-        todas = [(c, u) for c in clientes for u in usinas_de(c)]
-        par, cand = escolher(pista_usina, todas, rotulo=lambda cu: cu[1])
-        usina, cand_usi = (par[1] if par else None), [u for _c, u in cand]
-        if par:
-            cliente, usinas = par[0], usinas_de(par[0])
-    ativos = ativos_de(usina) if usina else []
-    marcado = next((a for a in ativos if esc.get("ativo_id") not in (None, "") and str(a.get("id")) == str(esc["ativo_id"])), None)
+        if esc.get("cliente") in clientes:
+            cliente, cand_cli = esc["cliente"], []
+        else:
+            cliente, cand_cli = escolher(ia.get("cliente"), clientes)
+        usinas = usinas_de(cliente) if cliente else []
+        if cliente:
+            usina, cand_usi = escolher(ia.get("usina"), usinas)
+        else:                               # sem o cliente, a usina pela lista inteira: o cliente sai dela
+            achado, cand = escolher(ia.get("usina"), todas, rotulo=lambda cu: cu[1])
+            usina, cand_usi = (achado[1] if achado else None), [u for _c, u in cand]
+            if achado:
+                cliente, usinas = achado[0], usinas_de(achado[0])
+    todos_ativos = ativos_de(usina) if usina else []
+    # o tipo de equipamento: o que a pessoa escolheu; senão o que o pedido diz. Ele filtra a lista de ativos
+    tipos = tipos_dos_ativos(todos_ativos if usina else assets, nome_tipo)
+    siglas = {t["sigla"] for t in tipos}
+    tipo_manual = "tipo" in esc and (esc.get("tipo") or "") in siglas | {""}
+    tipo_pista = " ".join(str(ia.get(k) or "") for k in ("tipo", "ativo")).strip()
+    tipo_sel = (esc.get("tipo") or "") if tipo_manual else tipo_da_pista(tipo_pista, tipos)
+    marcado = next((a for a in todos_ativos if esc.get("ativo_id") not in (None, "") and str(a.get("id")) == str(esc["ativo_id"])), None)
+    if marcado and tipo_sel and marcado.get("tipo") != tipo_sel:
+        if tipo_manual:
+            marcado = None                  # a pessoa trocou o tipo: o ativo de outro tipo sai
+        else:
+            tipo_sel = marcado.get("tipo")
+    do_tipo = [a for a in todos_ativos if a.get("tipo") == tipo_sel] if tipo_sel else todos_ativos
     if marcado:
         ativo, cand_ati = marcado, []
     else:
-        ativo, cand_ati = escolher(ia.get("ativo"), ativos, rotulo=rotulo_ativo,
+        ativo, cand_ati = escolher(ia.get("ativo"), do_tipo or todos_ativos, rotulo=rotulo_ativo,
                                    curto=lambda a: a.get("curto") or a.get("label") or "")
+    if ativo and not tipo_manual:
+        tipo_sel = ativo.get("tipo") or tipo_sel
+        do_tipo = [a for a in todos_ativos if a.get("tipo") == tipo_sel] if tipo_sel else todos_ativos
     if not cliente:
         perguntas.append("De qual cliente é a OS?")
     if not usina:
@@ -271,8 +339,9 @@ def ficha(setor: str, ia: dict, assets: list, clientes: list, usinas_de, ativos_
     elif not ativo:
         perguntas.append("Em qual ativo da %s?" % usina if not cand_ati else
                          "Qual destes ativos: %s?" % "; ".join(a.get("curto") or a.get("label") or "" for a in cand_ati[:4]))
-    tipo = (ativo or {}).get("tipo") or ""
-    validos = temas_do_tipo(temas, tipo) if ativo else []
+    # os temas valem pelo tipo do ativo; antes do ativo, pelo tipo escolhido (como a Nova solicitação do PCM)
+    tipo = (ativo or {}).get("tipo") or tipo_sel or ""
+    validos = temas_do_tipo(temas, tipo) if tipo else []
     tema = next((t for t in validos if t["chave"] == str(ia.get("tema") or "").strip()), None)
     subs = [dict(x, da_ia=False) for x in (subs_do_tema(tema["chave"] if tema else "", tipo) or [])]
     subs += extras(ia.get("subtarefas"), subs)
@@ -287,7 +356,9 @@ def ficha(setor: str, ia: dict, assets: list, clientes: list, usinas_de, ativos_
     return {"setor": setor, "setor_nome": (setor_de(setor) or {}).get("nome") or "", "cliente": cliente or "",
             "clientes": list(clientes or []), "clientes_sugeridos": cand_cli[:4] if not cliente else [],
             "usina": usina or "", "usinas": usinas, "usinas_sugeridas": cand_usi[:6] if not usina else [],
-            "ativo": ativo, "ativos": ativos, "ativos_sugeridos": cand_ati[:6],
+            "ativo": ativo, "ativos": do_tipo, "ativos_sugeridos": cand_ati[:6],
+            "tipo": tipo_sel or "", "tipo_nome": next((t["nome"] for t in tipos if t["sigla"] == tipo_sel), ""), "tipos": tipos,
+            "ativo_pista": _txt(ia.get("ativo"), 120), "tipo_pista": _txt(ia.get("tipo"), 60),
             "titulo": titulo, "descricao": descricao, "tema": tema["chave"] if tema else "",
             "tema_nome": tema["nome"] if tema else "", "tema_c1": (tema or {}).get("classif1") or "",
             "temas": [{"chave": t["chave"], "nome": t["nome"], "classif1": t.get("classif1") or ""} for t in validos],
@@ -300,6 +371,6 @@ def ficha(setor: str, ia: dict, assets: list, clientes: list, usinas_de, ativos_
 def resumo(f: dict) -> dict:
     """O que volta à IA na próxima mensagem da conversa (sem as listas do catálogo)."""
     return {k: f.get(k) for k in ("cliente", "usina", "titulo", "descricao", "tema")} | {
-        "classif1": (f.get("classif1") or {}).get("txt") or "",
+        "classif1": (f.get("classif1") or {}).get("txt") or "", "tipo": f.get("tipo_nome") or "",
         "ativo": ((f.get("ativo") or {}).get("curto") or "") if f.get("ativo") else "",
         "subtarefas": [{"desc": s["desc"], "tipo": s["tipo"]} for s in f.get("subtarefas") or [] if s.get("da_ia")]}

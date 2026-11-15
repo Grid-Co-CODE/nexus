@@ -100,7 +100,11 @@
       return '<option value="' + esc(v) + '"' + (String(v) === String(atual) ? " selected" : "") + ">" + esc(r) + "</option>";
     }).join("");
   }
-  function rotuloAtivo(a) { return (a.curto || a.label || a.code) + (a.tipo_nome ? " · " + a.tipo_nome : ""); }
+  // com o tipo escolhido o nome do tipo é o mesmo em todos: no lugar dele, o código do ativo (também se pesquisa por ele)
+  function rotuloAtivo(a) {
+    var resto = ficha && ficha.tipo ? a.code : a.tipo_nome;
+    return (a.curto || a.label || a.code) + (resto ? " · " + resto : "");
+  }
 
   function mostrar(f) {
     ficha = f; anterior = f.anterior || null;
@@ -125,16 +129,22 @@
     perg.innerHTML = (f.perguntas || []).map(function (p) { return "<p>" + esc(p) + "</p>"; }).join("")
       + ((f.perguntas || []).length ? '<p class="sia-dica">Responda aqui embaixo ou escolha na ficha.</p>' : "");
     var cli = q('[data-f="cliente"]'), usi = q('[data-f="usina"]'), ati = q('[data-f="ativo"]');
-    opcoes(cli, uniq(f.clientes || []), f.cliente, "— escolha o cliente —");
-    opcoes(usi, f.usinas || [], f.usina, f.cliente ? "— escolha a usina —" : "— escolha o cliente antes —");
-    // os mais parecidos com o que a pessoa disse vêm primeiro; depois, todos os ativos da usina
+    opcoes(cli, uniq(f.clientes || []), f.cliente, "— qualquer cliente —");
+    // a usina se pesquisa sem o cliente: sem ele, a lista é a de todos (pelo nome ou pelo código), e escolher traz o cliente
+    var usinas = (f.usinas_todas || []).filter(function (x) { return !f.cliente || x.cliente === f.cliente; });
+    opcoes(usi, usinas, f.usina, "— digite a usina ou o código —", function (x) { return x.usina; },
+           function (x) { return x.usina + (x.codigo ? " · " + x.codigo : ""); });
+    // o tipo de equipamento que o pedido disse filtra os ativos ("— todos os tipos —" mostra a usina inteira)
+    opcoes(q('[data-f="tipo"]'), f.tipos || [], f.tipo, "— todos os tipos —", function (t) { return t.sigla; },
+           function (t) { return t.nome + (f.usina ? " (" + t.n + ")" : ""); });
+    // os mais parecidos com o que a pessoa disse vêm primeiro; depois, todos os ativos do tipo (ou da usina)
     var sug = (f.ativos_sugeridos || []), ids = {};
     sug.forEach(function (a) { ids[a.id] = 1; });
     opcoes(ati, sug.concat((f.ativos || []).filter(function (a) { return !ids[a.id]; })), f.ativo ? f.ativo.id : "",
            f.usina ? "— escolha o ativo —" : "— escolha a usina antes —", function (a) { return a.id; }, rotuloAtivo);
     q('[data-f="titulo"]').value = f.titulo || "";
     q('[data-f="descricao"]').value = f.descricao || "";
-    opcoes(q('[data-f="tema"]'), f.temas || [], f.tema, f.ativo ? (f.temas && f.temas.length ? "— sem tema (as subtarefas da base) —" : "nenhum tema para este tipo de ativo") : "— escolha o ativo antes —",
+    opcoes(q('[data-f="tema"]'), f.temas || [], f.tema, f.ativo || f.tipo ? (f.temas && f.temas.length ? "— sem tema (as subtarefas da base) —" : "nenhum tema para este tipo de ativo") : "— escolha o ativo antes —",
            function (t) { return t.chave; }, function (t) { return t.nome; });
     q('[data-f="programada"]').textContent = f.programada || raiz.getAttribute("data-programada");
     var c1 = q("[data-so-pcm]");                        // a Classificação 1 é só da solicitação ao PCM
@@ -178,7 +188,7 @@
     var q = function (s) { return noFicha.querySelector(s); };
     var idAt = q('[data-f="ativo"]').value;
     var at = (ficha.ativos || []).filter(function (a) { return String(a.id) === String(idAt); })[0] || null;
-    return {cliente: q('[data-f="cliente"]').value, usina: q('[data-f="usina"]').value, ativo: at,
+    return {cliente: q('[data-f="cliente"]').value, usina: q('[data-f="usina"]').value, tipo: q('[data-f="tipo"]').value, ativo: at,
             titulo: q('[data-f="titulo"]').value.trim(), descricao: q('[data-f="descricao"]').value.trim(),
             tema: q('[data-f="tema"]').value, responsavel: (q('[data-f="responsavel"]') || {}).value || "",
             classif1_id: q('[data-f="classif1"]').value,
@@ -203,17 +213,23 @@
     var v = lerFicha();
     var extras = (ficha.subtarefas || []).filter(function (s) { return s.da_ia; });
     // o que a pessoa marcou vale como está; trocar o cliente esvazia a usina e o ativo, trocar a usina esvazia o ativo
+    // (o ativo e o tipo do pedido seguem: na usina nova, o "inversor 2.1" do pedido acha o dela). A usina escolhida sem o
+    // cliente traz o cliente dela. O tipo só vai quando a pessoa o escolheu: senão ele sai do pedido
+    if (mudou === "tipo") ficha.tipo_manual = true;
     var escolhidos = {cliente: v.cliente, usina: mudou === "cliente" ? "" : v.usina,
                       ativo_id: mudou === "cliente" || mudou === "usina" ? "" : (v.ativo ? v.ativo.id : ""),
                       classif1_id: ficha.c1_manual ? v.classif1_id : ""};
-    var guardaResp = v.responsavel;
+    if (ficha.tipo_manual) escolhidos.tipo = v.tipo;
+    var guardaResp = v.responsavel, tipoManual = ficha.tipo_manual;
     pedir("/os/api/solic/ia/ficha", {setor: ficha.setor, escolhidos: escolhidos, titulo: v.titulo, descricao: v.descricao,
-                                     tema: v.tema, extras: extras, classif1_atual: v.classif1_txt}).then(function (x) {   // o tema fica se valer para o ativo novo
+                                     tema: v.tema, extras: extras, classif1_atual: v.classif1_txt,
+                                     ativo_pista: ficha.ativo_pista || "", tipo_pista: ficha.tipo_pista || ""}).then(function (x) {   // o tema fica se valer para o ativo novo
       if (!x.ok || x.j.erro) { noFicha.querySelector(".sia-hint").textContent = x.j.erro || "Não deu para refazer a ficha."; return; }
       var f = x.j;
       f.titulo = v.titulo || f.titulo; f.descricao = v.descricao || f.descricao;
       var manual = ficha.c1_manual;
       ficha = f; anterior = f.anterior || anterior; ficha.id_responsavel = guardaResp; ficha.c1_manual = manual;
+      ficha.tipo_manual = tipoManual;
       pintar();
     });
   }
@@ -223,7 +239,7 @@
     el.addEventListener("change", function (e) {
       if (el !== noFicha) return;
       var c = e.target.getAttribute("data-f");
-      if (c === "cliente" || c === "usina" || c === "ativo" || c === "tema") refazer(c);
+      if (c === "cliente" || c === "usina" || c === "tipo" || c === "ativo" || c === "tema") refazer(c);
       else { if (c === "classif1") ficha.c1_manual = true; validar(); }   // a Classificação que a pessoa escolheu fica
     });
     el.addEventListener("input", function () { if (el === noFicha) validar(); });

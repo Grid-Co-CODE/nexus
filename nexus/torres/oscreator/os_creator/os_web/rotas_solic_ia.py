@@ -74,6 +74,13 @@ def _com_c1(f: dict, opcoes: list, escolhido=None, pista: str = "") -> dict:
     return f
 
 
+def _usinas_todas(usinas: dict, codigos: dict) -> list:
+    """[{usina, cliente, codigo}] de todos os clientes: a lista da usina na ficha, que se pesquisa sem o cliente (pelo
+    nome ou pelo código, o CPP100) e, escolhida, traz o cliente junto."""
+    return [{"usina": u, "cliente": c, "codigo": codigos.get(u) or ""}
+            for c in sorted(usinas, key=IA.norm) for u in usinas[c] or []]
+
+
 @bp.route("/api/solic/ia/preencher", methods=["POST"])
 @exige_sessao
 def preencher():
@@ -111,10 +118,11 @@ def preencher():
         lido["cliente"] = next((c for c, lista in usinas.items() if pelo_codigo in lista), lido.get("cliente"))
     f = IA.ficha(setor, lido, assets, clientes, lambda c: usinas.get(c) or [],
                  lambda u: reg.ativos_da_usina(assets, u, api._asset_short_name), temas,
-                 lambda tema, tipo: sp.de_api(sw.subtarefas_do_tema(tema, tipo)), agora)
+                 lambda tema, tipo: sp.de_api(sw.subtarefas_do_tema(tema, tipo)), agora, nome_tipo=reg.rotulo_tipo)
     if setor == "pcm":
         _com_c1(f, opcoes_c1, pista=str(lido.get("classif1") or ""))
     f["anterior"] = IA.resumo(f)
+    f["usinas_todas"] = _usinas_todas(usinas, codigos)
     return jsonify(f)
 
 
@@ -133,13 +141,17 @@ def refazer_ficha():
     clientes = trad.clientes(assets)
     usinas = {c: trad.usinas_de(assets, c) for c in clientes}
     ia = {k: corpo.get(k) for k in ("titulo", "descricao", "tema")}
+    # o ativo e o tipo que o pedido disse seguem valendo: escolhida a usina, o "inversor 2.1" do pedido acha o ativo dela
+    ia["ativo"], ia["tipo"] = corpo.get("ativo_pista") or "", corpo.get("tipo_pista") or ""
     ia["subtarefas"] = [s for s in corpo.get("extras") or [] if isinstance(s, dict)]
     escolhidos = corpo.get("escolhidos") if isinstance(corpo.get("escolhidos"), dict) else {}
     f = IA.ficha(setor, ia, assets, clientes, lambda c: usinas.get(c) or [],
                  lambda u: reg.ativos_da_usina(assets, u, api._asset_short_name), sw.temas_para_tela(),
-                 lambda tema, tipo: sp.de_api(sw.subtarefas_do_tema(tema, tipo)), trad.agora_brt(), escolhidos=escolhidos)
+                 lambda tema, tipo: sp.de_api(sw.subtarefas_do_tema(tema, tipo)), trad.agora_brt(), escolhidos=escolhidos,
+                 nome_tipo=reg.rotulo_tipo)
     f["perguntas"] = []                 # a ficha refeita na tela não pergunta de novo: a pessoa está escolhendo nela
     if setor == "pcm":
         _com_c1(f, _opcoes_c1(), escolhido=escolhidos.get("classif1_id"), pista=str(corpo.get("classif1_atual") or ""))
     f["anterior"] = IA.resumo(f)
+    f["usinas_todas"] = _usinas_todas(usinas, IA.codigos_das_usinas(assets))
     return jsonify(f)
