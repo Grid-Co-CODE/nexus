@@ -49,6 +49,7 @@ from . import solic_web as sw
 from . import tradicional_web as trad
 from .rotas import _MEMO, _MEMO_LOCK, _conta, _memo, exige_sessao
 from .rotas_solic_eng import _abrir_limite, _corpo_e_anexos
+from .rotas_solic_ia import contexto_ia
 
 bp = Blueprint("os_web_solic", __name__, url_prefix="/os")
 
@@ -242,7 +243,8 @@ def solicitacao():
         sugerida=(agora.replace(hour=8, minute=0) + dt.timedelta(days=2)).strftime("%Y-%m-%dT%H:%M"),
         # os anexos (29/10/2026): os limites e os tipos são os do servidor, que confere tudo de novo ao criar
         anexo_aceitar=reg.ACEITAR, anexo_max=reg.MAX_ARQUIVOS, anexo_mb=reg.MAX_MB_ARQUIVO,
-        anexo_total_mb=reg.MAX_MB_TOTAL, anexo_tipos=reg.tipos_aceitos())
+        anexo_total_mb=reg.MAX_MB_TOTAL, anexo_tipos=reg.tipos_aceitos(),
+        ia=contexto_ia())          # a janela do Pedir com IA (15/11/2026), só com a chave 4 no Nexus
 
 
 @bp.route("/api/solic/subtarefas")

@@ -422,6 +422,12 @@ def _criar_clone(app):
 
     from ...comando import solicitacoes_fracttal as SF
     rotas_do_clone.SOLICITANTE_DA_OS = SF.ligar_historico(app)
+    # a chave 4 do OpenRouter, só do OS Creator, no Pedir com IA (15/11/2026): a da tela Base › Chaves das fontes › IA, relida
+    # a cada pedido (a tela a troca sem reiniciar); fora do rodízio da Nexus IA
+    from os_web import solic_ia
+
+    from ...comando import ia as nexus_ia
+    solic_ia.CHAVE = lambda: nexus_ia.chave_os_creator(app.config)
     # o original fala http com a plataforma na mesma máquina; aqui o cookie segue o do Nexus (Secure no servidor)
     clone.config["SESSION_COOKIE_SECURE"] = bool(app.config.get("SESSION_COOKIE_SECURE"))
     # e mora no /os do Nexus, debaixo do prefixo em que ele roda (o clone fixa "/os", que debaixo de /nexus não ia ao
@@ -511,6 +517,19 @@ SETOR_PCM = SID.PCM
 def _sem_acento(t: str) -> str:
     import unicodedata
     return unicodedata.normalize("NFKD", str(t or "")).encode("ascii", "ignore").decode().strip().lower()
+
+
+# O Pedir com IA da Nova solicitação (15/11/2026) entra no ar em TESTE: só o administrador do Nexus vê a janela (Levi: "uma
+# janela de teste no Nexus pra gente testar. Aí sobe lá e usa a chave"). NEXUS_PEDIR_COM_IA=1 libera para todos; sem ela, a
+# tela de quem não é administrador é a de sempre e o preencher recusa.
+IA_LIBERADA = "os_web.ia_liberada"
+
+
+def ia_liberada() -> bool:
+    todos = current_app.config.get("NEXUS_PEDIR_COM_IA") or os.environ.get("NEXUS_PEDIR_COM_IA") or ""
+    if str(todos).strip().lower() in ("1", "sim"):
+        return True
+    return bool(session.get("admin"))
 
 
 def area_pcm() -> dict:
@@ -629,6 +648,7 @@ def encaminhar(resto: str):
         environ[LISTA_CENTRAL] = lista_central()    # quem lê a lista central de OS (ver `lista_central`): sem a marca, fecha
     if resto.startswith(("solicitacao", "api/solic")):
         environ[AREA_PCM] = area_pcm()          # a Área PCM é do setor PCM ou do administrador (ver `area_pcm`)
+        environ[IA_LIBERADA] = ia_liberada()    # o Pedir com IA, em teste só com o administrador (ver `ia_liberada`)
     if _ROTA_OBS.fullmatch(resto):              # só a tela de um chamado e o editar/excluir: o quadro não lê o setor
         environ[OBS_CHAMADOS] = obs_chamados()  # editar e excluir as observações (ver `obs_chamados`)
         environ[PAGINA_DA_OS] = pagina_da_os()  # a OS abre a página da OS da Engenharia (ver `pagina_da_os`)

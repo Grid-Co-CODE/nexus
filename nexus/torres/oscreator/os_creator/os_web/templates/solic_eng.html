@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block titulo %}Solicitação à {{ setor_nome }}{% endblock %}
 {% block body_class %}os-form{% endblock %}
-{% block head %}<link rel="stylesheet" href="/os/static/solic_eng.css">{% endblock %}
+{% block head %}<link rel="stylesheet" href="/os/static/solic_eng.css">{% if ia and ia.tem_chave %}<link rel="stylesheet" href="{{ estatico('solic_ia.css') }}">{% endif %}{% endblock %}
 {% block conteudo %}
 {# A Nova solicitação para a ENGENHARIA (Levi, 06/10/2026): o molde da Performance > Geração e ETM > ETM, liberado para
    todos os ativos. Cria uma OS por ativo ou, desde 08/10, uma OS com todos os ativos (uma atividade por ativo), atribuída
@@ -14,6 +14,7 @@
     <a class="os-btn secondary os-voltar" href="/os/">&larr; Início</a>
     <span class="os-head-titulo">Nova solicitação</span>
     <span class="os-cresce"></span>
+    {% if ia and ia.tem_chave %}<button type="button" class="os-btn secondary sia-abrir" data-sia-abrir>Pedir com IA</button>{% endif %}
     <div class="os-seg" role="tablist" aria-label="Para quem é a solicitação">
       <a class="os-seg-btn" role="tab" aria-selected="false" href="/os/solicitacao">PCM</a>
       <a class="os-seg-btn{% if setor == 'engenharia' %} on{% endif %}" role="tab" aria-selected="{{ 'true' if setor == 'engenharia' else 'false' }}" href="/os/solicitacao/engenharia">Engenharia</a>
@@ -99,5 +100,6 @@
     <div class="os-resultado" id="resultado" hidden></div>
   </div>
 </section>
+{% set ia_setor = setor %}{% include "_solic_ia.html" %}
 {% endblock %}
-{% block scripts %}<script src="/os/static/solic_eng.js"></script>{% endblock %}
+{% block scripts %}<script src="/os/static/solic_eng.js"></script>{% if ia and ia.tem_chave %}<script src="{{ estatico('solic_ia.js') }}"></script>{% endif %}{% endblock %}

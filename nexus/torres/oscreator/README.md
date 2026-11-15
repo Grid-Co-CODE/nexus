@@ -3288,3 +3288,31 @@ dia, "quero que dê para editar o tipo de tarefa também!".
   O tipo de tarefa, no mesmo dia: com o padrão de teste em Inspeção (o do app é Corretiva), o resumo do plano disse "Tipo:
   Inspeção" e a OS 18625 nasceu com o tipo Inspeção, lido de volta; o padrão voltou e a OS foi cancelada. A 1ª gravação
   depois da coluna `tipo_tarefa` regravou o livro com ela, sem recusa.
+
+## Pedir com IA (15/11/2026)
+
+Levi: a pessoa escolhe o setor ("pedir ao PCM, pedir à Performance, pedir à Engenharia"), diz "eu quero uma OS de tal coisa,
+em tal ativo, de tal cliente", e a ficha já vem preenchida, com o tema e as subtarefas; na Performance e na Engenharia ela
+só escolhe o responsável; "a data programada sempre vai ser para 6 dias". Uma conversa com cara de linha de comando, numa
+janela de vidro menor por cima da Nova solicitação, com o formulário desfocado atrás ("um pouco menor em formato de blur, a
+pessoa pode escolher fazer manualmente se quiser"; `templates/_solic_ia.html`, nas telas do PCM, da Engenharia e da
+Performance). Abre sozinha ao entrar na tela, no setor dela; o "Fazer manualmente" fecha e fica lembrado no navegador
+(`siaManual`), e o botão "Pedir com IA" do alto reabre; `/os/solicitacao/ia` leva à do PCM com ela aberta. Sem a chave
+4 no Nexus, nada disso aparece: a tela é a de sempre.
+- **No ar em teste (15/11/2026, Levi: "uma janela de teste no Nexus pra gente testar"):** só o administrador do Nexus vê a
+  janela e usa o preencher; a ponte marca cada pedido (`ponte.ia_liberada`, `os_web.ia_liberada`), e os outros veem a
+  Nova solicitação de sempre. `NEXUS_PEDIR_COM_IA=1` no `.env` libera para todos; o cartão do Início entra junto.
+- **A IA:** o Nemotron 3 Ultra grátis do OpenRouter, na chave 4 da aba IA (Base › Chaves das fontes, a "só para o OS
+  Creator"), pelo gancho `solic_ia.CHAVE` que a ponte liga (`nexus.comando.ia.chave_os_creator`, relida a cada pedido).
+  Fora do rodízio da Nexus IA. O grátis dá 50 pedidos por dia na conta; cada mensagem gasta um. Sem a chave, a tela diz
+  e nada sai.
+- **A IA só propõe; o catálogo decide** (`os_web/solic_ia.py`): cliente e usina pelo nome mais parecido do catálogo, o
+  ativo pelo nome com os números iguais ("inversor 2.1" nunca vira o 2.3), empate fica para a pessoa; o tema só se for da
+  lista e do tipo do ativo (a regra da Nova solicitação); as subtarefas são as do tema (ou a base) mais até 5 que o pedido
+  pede, só com tipo do editor. O que não casou vira pergunta na conversa, e a resposta vai com a ficha de antes.
+- **Trocar na ficha não gasta IA:** usina, ativo e tema refazem a ficha pelo `/os/api/solic/ia/ficha`, com a escolha da
+  pessoa valendo como está.
+- **Quem cria é a rota de sempre:** PCM pela Nova solicitação (`/os/api/solic/criar`, a Classificação 1 do tema ou a
+  Programada, a data sugerida de 6 dias às 08:00); Performance e Engenharia pela delas, com `origem: "ia"`, que leva as
+  subtarefas da ficha e a programada de 6 dias às 08:00 (a tela de sempre segue sem subtarefas e com os 7 dias).
+- Prova: `tests/test_oscreator_pedir_com_ia_15_11.py`.

@@ -208,7 +208,7 @@ def data_br(d: dt.datetime) -> str:
 
 # ── o pedido ───────────────────────────────────────────────────────────────────────────────────────────
 def montar(corpo: dict, assets_por_id: dict, permitidos: list, agora: dt.datetime, nome_os,
-           setor: str = "engenharia") -> tuple[list, dict, str]:
+           setor: str = "engenharia", programada: dt.datetime | None = None) -> tuple[list, dict, str]:
     """Do JSON da tela → (ativos do catálogo, campos da criação, erro). `nome_os(asset, base)` é o `api.perf_os_nome`
     ('[Ativo] - base'), passado de fora para a regra não depender do api."""
     corpo = corpo or {}
@@ -236,7 +236,8 @@ def montar(corpo: dict, assets_por_id: dict, permitidos: list, agora: dt.datetim
     if evento > agora + dt.timedelta(minutes=5):           # o evento já aconteceu: no futuro é dado errado
         return [], {}, "A data do evento não pode estar no futuro."
     urgente = bool(corpo.get("urgente"))
-    prog = data_padrao(agora, urgente)          # uma "programada" no pedido é ignorada: a data não se edita
+    # uma "programada" no PEDIDO é ignorada: a data não se edita. A `programada` daqui vem do servidor (o Pedir com IA, 6 dias)
+    prog = programada or data_padrao(agora, urgente)
     # o título '[Ativo] - Descrição' é o da OS de cada ativo e, na OS agrupada, o da atividade de cada ativo
     por_ativo = {a.get("code"): {"description": nome_os(a, descricao)} for a in assets}
     # a regra, sem escolha na tela (Levi, 06/11/2026: "UM ATIVO UMA OS, SE FOR MAIS QUE UM ATIVO JÁ VIRA UMA OS com mais

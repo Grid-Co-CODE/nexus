@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block titulo %}Nova solicitação{% endblock %}
 {% block body_class %}os-form{% endblock %}
+{% block head %}{% if ia and ia.tem_chave %}<link rel="stylesheet" href="{{ estatico('solic_ia.css') }}">{% endif %}{% endblock %}
 {# SolicitacaoTab (steps/solicitacao.py) na web. Mesma cascata cliente→usina→ativo, mesmo tema
    sugerindo classificação e subtarefas, e a mesma observação com o bloco [PCM] — é por ele que
    o tema, o técnico e a data sugerida chegam à fila do PCM, já que a solicitação não tem campo
@@ -21,6 +22,7 @@
     <span class="os-cresce"></span>
     {# 06/10: as portas — o PCM recebe a solicitação (esta tela); a Engenharia e, desde 06/11/2026, a Performance recebem a OS
        direto (solic_eng.html) #}
+    {% if ia and ia.tem_chave %}<button type="button" class="os-btn secondary sia-abrir" data-sia-abrir>Pedir com IA</button>{% endif %}
     <div class="os-seg" role="tablist" aria-label="Para quem é a solicitação">
       <a class="os-seg-btn on" role="tab" aria-selected="true" href="/os/solicitacao">PCM</a>
       <a class="os-seg-btn" role="tab" aria-selected="false" href="/os/solicitacao/engenharia">Engenharia</a>
@@ -113,6 +115,7 @@
   </div>
   <div class="os-resultado" id="resultado" hidden></div>
 </section>
+{% set ia_setor = "pcm" %}{% include "_solic_ia.html" %}
 {% endblock %}
 
 {% block scripts %}
@@ -505,4 +508,5 @@
   sugerir();
 })();
 </script>
+{% if ia and ia.tem_chave %}<script src="{{ estatico('solic_ia.js') }}"></script>{% endif %}
 {% endblock %}
