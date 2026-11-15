@@ -2610,7 +2610,14 @@ Aprovação e Triagem usam a lógica do App copiada, não refeita, para o númer
     - **Filtros**: o Responsável O&M da usina vai ao servidor (`responsavel=`, "*" = todos; quem entrou pelo Fracttal e é
       responsável já vem nele, `_responsavel_logado_pelo_cadastro`; o responsável e o cliente vêm do cadastro pela usina
       do Fracttal, `visao.usinas_do_fracttal`); cliente e busca (OS, UFV, técnico, sem acento) filtram na página e
-      recontam as colunas. CSV: OS, dias, criação, fim, Responsável O&M, usina, cliente, técnicos, tarefas, nota do App,
+      recontam as colunas. **Usina e técnico também vão ao servidor (15/11/2026**, Levi, pelo chat do Comando: "tem que
+      ter o filtro de usina [...] Também tem que ter o filtro do técnico, que seria quem executou a OS [...] a ideia seria
+      já vir filtrado na usina correta"): `usina=` é o id do cadastro (o de `/t/comando/usinas/<id>`; o "Aprovar N OS em
+      verificação" do prontuário manda `?usina=<id>`), ligado pela usina do Fracttal (`por_nome` leva o `usina_id`);
+      `tecnico=` é o nome de quem executou ALGUMA tarefa da OS. A usina pedida no endereço abre com o responsável em
+      Todos (o responsável do login cortaria a usina de outro); a usina sem OS na fila abre vazia, com o nome do cadastro
+      na lista. O total diz o recorte ("na Usina X", "executadas por Y"). Prova: `test_campo_aprovacao_filtros_15_11.py`.
+      CSV (leva os filtros do servidor): OS, dias, criação, fim, Responsável O&M, usina, cliente, técnicos, tarefas, nota do App,
       a coluna ("Fora do pré-filtro (motivo)") e os motivos. No celular as colunas deslizam de lado dentro do quadro.
       Prova: `test_campo_aprovacao_responsavel.py`, `test_campo_aprovacao_visual_0511.py` (a 2ª rodada),
       `test_campo_aprovacao_gaveta_0511.py` (a 3ª), `test_campo_prefiltro.py`, `test_campo_prefiltro_fundo.py` e

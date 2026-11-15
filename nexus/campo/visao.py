@@ -1740,10 +1740,11 @@ def usinas_do_fracttal() -> leitura.Leitura:
                 equipes.setdefault(o["equipe"], set()).add(n)
                 regioes.setdefault(o["regiao_campo"], set()).add(n)
                 gestores.setdefault(o["gestor"], set()).add(n)
-                # o nome do Fracttal (normalizado como a cópia do App normaliza) -> a usina do cadastro
+                # o nome do Fracttal (normalizado como a cópia do App normaliza) -> a usina do cadastro; o id vai junto
+                # para o filtro de usina da Aprovação de OS (15/11/2026: o prontuário abre ?usina=<usina_id>)
                 por_nome[regras_app._norm(n)] = {**{k: o[k] for k in ("usina", "equipe", "regiao_campo", "supervisor_campo",
                                                                       "coordenador_campo", "gestor", "uf", "regiao_br",
-                                                                      "responsavel", "cliente")}}
+                                                                      "responsavel", "cliente")}, "usina_id": uid}
         return {"equipes": {k: sorted(v) for k, v in equipes.items() if k},
                 "regioes": {k: sorted(v) for k, v in regioes.items() if k},
                 "gestores": {k: sorted(v) for k, v in gestores.items() if k}, "por_nome": por_nome,

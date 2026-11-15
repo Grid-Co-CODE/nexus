@@ -1671,6 +1671,7 @@ def _por_os(linhas) -> list[dict]:
         for c in ("usina_cad", "equipe_cad", "regiao_cad", "supervisor_campo_cad", "gestor_cad", "regiao_br",
                   "responsavel_cad", "cliente_cad"):
             o[c] = primeira.get(c) or ""
+        o["usina_id_cad"] = primeira.get("usina_id_cad")
         o["cadastrada"] = bool(primeira.get("cadastrada"))
         notas = [int(t["qualidade"]) for t in ts if t.get("pelo_app") and t.get("qualidade") is not None]
         o["nota"] = min(notas) if notas else None                            # a pior tarefa
@@ -1780,16 +1781,28 @@ def aprovacao():
     min; cada OS cai na coluna dos fatos dela (Pronta, Em dúvida, Não OK), com os avisos e a prova, e o Aprovar do cartão
     é o Concluir do OS Creator, com a conta do Fracttal de quem clica, uma a uma ou as marcadas. O filtro do servidor é o
     Responsável O&M da usina (quem entrou pelo Fracttal e é responsável já vem nele; Levi, 18/10/2026: "quero apenas por
-    responsável da UFV"); cliente e busca respondem na página, sem recarregar."""
+    responsável da UFV"); cliente e busca respondem na página, sem recarregar.
+    A usina e o técnico também vão ao servidor (Levi, 15/11/2026: "tem que ter o filtro de usina [...] Também tem que ter o
+    filtro do técnico, que seria quem executou a OS [...] a ideia seria já vir filtrado na usina correta"): `?usina=` é o
+    id do cadastro (o de /t/comando/usinas/<id>, que o "Aprovar N OS em verificação" do prontuário manda) e `?tecnico=`
+    o nome de quem executou alguma tarefa da OS no Fracttal. A usina pedida no endereço abre com o responsável em Todos:
+    o responsável do login cortaria a usina de outro responsável que ele foi ver."""
     from ...campo import prefiltro, prefiltro_fundo
+    usina_id = visao.D._id(request.args.get("usina"))
+    tecnico = str(request.args.get("tecnico") or "").strip()
     v = request.args.get("responsavel")
-    responsavel = _responsavel_logado_pelo_cadastro() if v is None else ("" if v == TODOS else v)
+    if v is None:
+        responsavel = "" if usina_id else _responsavel_logado_pelo_cadastro()
+    else:
+        responsavel = "" if v == TODOS else v
     mapa = visao.usinas_do_fracttal()
     leitura = campo_aprovacao.fila_toda(campo_aprovacao.FILA_INTEIRA)
     todas = _com_cadastro((leitura.dados or {}).get("linhas") or [], mapa)
     todas_os = _por_os(todas)
-    oss = [o for o in todas_os if not responsavel or o["responsavel_cad"] == responsavel]
+    oss = [o for o in todas_os if (not responsavel or o["responsavel_cad"] == responsavel)
+           and (not usina_id or o["usina_id_cad"] == usina_id) and (not tecnico or tecnico in o["tecnicos"])]
     q = _quadro(oss)
+    opcoes_usina = _opcoes_usina(todas_os, mapa, usina_id)
     if request.args.get("csv") == "1":
         return _csv_do_quadro(oss)
     return render_template("campo/aprovacao.html", **_comum(
@@ -1800,8 +1813,20 @@ def aprovacao():
         tipos_motivo=prefiltro.TIPOS_DO_MOTIVO, iniciais=_iniciais,
         opcoes_responsavel=_opcoes_responsavel([{"responsavel": o["responsavel_cad"]} for o in todas_os], responsavel),
         clientes=sorted({o["cliente_cad"] for o in oss if o["cliente_cad"]}),
+        usina_id=usina_id, opcoes_usina=opcoes_usina, usina_nome=dict(opcoes_usina).get(usina_id, ""), tecnico=tecnico,
+        opcoes_tecnico=sorted(({t for o in todas_os for t in o["tecnicos"]} | ({tecnico} if tecnico else set())) - {"—"}),
         horas_tarde=prefiltro.parametros(current_app.config)["horas_tarde"], cor_espera=_cor_espera,
         sem_responsavel=visao.SEM_RESPONSAVEL, sem_cadastro=SEM_CADASTRO))
+
+
+def _opcoes_usina(oss, mapa, escolhida) -> list[tuple[int, str]]:
+    """As usinas do filtro: as das OS da fila, (id do cadastro, nome), pelo nome. A usina pedida que não tem OS na fila
+    (a conta do prontuário pode estar à frente da releitura) entra com o nome do cadastro: a tela abre nela, vazia."""
+    nomes = {o["usina_id_cad"]: o["usina_cad"] for o in oss if o.get("usina_id_cad")}
+    if escolhida and escolhida not in nomes:
+        nomes[escolhida] = next((c.get("usina") for c in ((mapa.dados or {}).get("por_nome") or {}).values()
+                                 if c.get("usina_id") == escolhida), None) or f"Usina {escolhida}"
+    return sorted(nomes.items(), key=lambda par: _sem_acento(par[1]))
 
 
 def _com_cadastro(linhas: list[dict], mapa) -> list[dict]:
@@ -1811,6 +1836,7 @@ def _com_cadastro(linhas: list[dict], mapa) -> list[dict]:
         cad = por_nome.get(regras_app._norm(x.get("usina_fx"))) or {}
         x["usina_cad"], x["equipe_cad"] = cad.get("usina") or x.get("usina_fx") or "", cad.get("equipe") or ""
         x["responsavel_cad"], x["cliente_cad"] = cad.get("responsavel") or "", cad.get("cliente") or ""
+        x["usina_id_cad"] = cad.get("usina_id")
         x["cadastrada"] = bool(cad)
     return linhas
 
