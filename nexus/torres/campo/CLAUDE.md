@@ -31,7 +31,7 @@ o login do Fracttal de quem clica, como no OS Creator Web; ver "Aprovação de O
 | **Visão do responsável** (12/10/2026, a 1ª do Campo) | o **Painel** (28/10/2026, a tela inicial de um responsável: seis quadros, ver "O Painel do responsável" abaixo) e três blocos: Performance (meta do Gerencial publicada, diário da disponibilidade, sinais da Confiabilidade), Acompanhamento (Central e PT, a limpeza das Rondas, chamados de `nexus_chamados`, extintores do HSEQ) e, desde 18/10/2026, Manutenção (as tarefas das OS do Fracttal em `nexus_os`, os motivos do PCM, a programação). A aba Ranking das equipes saiu em 09/11/2026 (abaixo) | `campo/responsaveis.py` (junta; cada número é da tela dona), `campo/manutencao.py` (a conta do bloco Manutenção e das Pendências de OS do Painel) |
 | **Visão do cliente** (05/11/2026) — **só do cliente desde 09/11/2026** (`Tela.so_do_cliente`: o Comando do cliente e do Modo cliente; sai do menu da Grid e da lista dos setores da Grid em Base → Acessos, e o endereço leva a Grid à Visão do responsável) | o tempo real da plataforma (a Entrada, pela ponte só de leitura) + o Gerencial (a meta, a mesma linha da Visão do responsável) + o Andamento da Ronda COS (os chamados à distribuidora) + `fato_tarefa_os` (as OS) + `fato_programacao` (a próxima visita) | `campo/visao_cliente.py` (junta; nenhuma conta nova, ver "Visão do cliente" abaixo) |
 | **Mapa de equipe** (08/11/2026) | os pontos de posição que o celular do técnico (Nexus Field) manda às três rotas públicas `/t/campo/equipe/...` + o cadastro (técnicos de campo ativos, coordenada das usinas) + a malha do IBGE (só para a cidade) | `campo/equipe/` (as réguas, os pontos, a situação, os deslocamentos; ver "Mapa de equipe" abaixo) |
-| **Ocorrências** (18/10/2026) | o livro `nexus_ocorrencias` (escrito nesta tela) + cadastro do Nexus | `campo/ocorrencias.py` (ver "Ocorrências com plano de ação" abaixo) |
+| ~~Ocorrências~~ (18/10/2026, **SAIU em 15/11/2026**) | — (os endereços levam à Caixa de entrada do Comando) | o livro `nexus_ocorrencias` e `campo/ocorrencias.py` ficam (ver "Ocorrências com plano de ação" abaixo) |
 | Central de atenção | `fato_ronda` e `fato_pt` (passo 4, ver "De onde vem o dado") + cadastro do Nexus | `visao.atencao` (conta nossa) |
 | Aprovação de OS (quadro por fatos desde 05/11/2026) | fila de verificação do Fracttal INTEIRA (só GET) + nota e fechamento do livro do App + os anexos das OS (1 GET por OS, lido por trás, e as fotos pelo S3) + as respostas e o GPS de cada foto (a leitura rápida: 2 GET por OS, sem baixar foto) + o tempo de execução da tarefa (`real_duration`, na própria fila) + o Responsável O&M da usina (cadastro); aprovar é o Concluir do OS Creator, no cartão ou em lote | `campo/prefiltro.py` (as colunas) sobre a conta pronta das regras copiadas do App; `campo/prefiltro_fundo.py` (as fotos e a leitura rápida) |
 | Permissões de trabalho → **em Segurança · HSEQ > APR e PT desde 09/10/2026** (`/t/hseq/apr-pt`; `/t/campo/pt` leva para lá). O código continua aqui (`pagina_pt`, a aprovação `/t/campo/pt/<número>`, os PDFs da PT e da APR); a regra de lá está em `nexus/torres/hseq/CLAUDE.md` | `fato_pt` (+ `pt_app_campo` para o texto) | `visao.pts` (conta nossa) |
@@ -140,75 +140,19 @@ só**: o "calculado em" no canto; a hora em que o Nexus leu o livro foi para o "
   banco falso dos testes: escuro, claro, região e 390 px. A prévia de 29/10 usou os números reais de outubro do
   livro.
 
-## Ocorrências com plano de ação (18/10/2026)
+## Ocorrências com plano de ação (18/10/2026): SAIU em 15/11/2026
 
-Levi: "Próximas peças: o mapa das usinas e as ocorrências com plano de ação. siga!". A origem é o painel próprio de um
-supervisor (a ocorrência, o histórico e o plano de ação, em quadro e lista); o objetivo é largar o painel próprio e usar
-só o Nexus. Desenho e as decisões dele no quiz: `docs/superpowers/specs/2026-10-18-ocorrencias-plano-de-acao-design.md`.
+Levi, 15/11/2026: "mandei capar novas ocorrências mesmo, vai ser substituída por caixa de entrada em comando" e "tem que
+matar esse caminho de ocorrências!". Saíram a tela (menu, lista, quadro, página da ocorrência, nova e os formulários), a
+etiqueta "N ocorrências" no nome da usina na Visão geral, a seção "Ocorrências abertas pelo campo" do prontuário e a
+conta da Central da usina (`central_usina.ocorrencias`). **Todo endereço antigo** (`/t/campo/ocorrencias` e
+`/t/campo/ocorrencias/...`, GET e POST) **leva à Caixa de entrada do Comando** com 303, e nada se grava
+(`ocorrencias_tela.py`, só isso). Os problemas da usina vão como demanda pela Caixa (as demandas entre setores).
 
-**AS NOVAS ESTÃO FECHADAS (15/11/2026**, Levi: "mandei capar novas ocorrências mesmo, vai ser substituída por caixa de
-entrada em comando"): `NOVAS_ABERTAS = False` em `ocorrencias_tela.py`; o GET e o POST de `/ocorrencias/nova` levam à
-Caixa de entrada do Comando (as demandas entre setores) e nada gravam; o botão "Nova ocorrência" sai. As que já existem
-seguem na tela, com o plano de ação e o andamento, e a lista diz que a nova vai pela Caixa. O registro ficou no código
-(reabrir = True; os testes de `test_campo_ocorrencias.py` o provam aberto).
-**Revisão de desenho (15/11/2026)**: o "!" ao lado do título, como nas outras telas (o que é, a ocorrência nova pela
-Caixa, a ordem e o lido às), e o eyebrow sem repetir o nome. **Sem nenhuma ocorrência no banco** (em 15/11 eram 0 em
-produção), `.oc-vazio-inicio` leva à Caixa de entrada ("Abrir a Caixa de entrada"), no lugar dos três zeros, dos
-filtros, do cabeçalho de uma lista sem linhas e do "Nenhuma ocorrência com esse filtro" sem filtro nenhum. Com
-ocorrências e o filtro vazio, a lista diz "com esse filtro" sem o cabeçalho. Prova:
-`test_campo_ranking_ocorrencias_desenho_15_11.py`.
-
-- **O Nexus é a fonte, no banco:** `nexus_ocorrencias · fato_evento_ocorrencia` (`nexus/campo/ocorrencias.py`), um
-  evento por linha (`criou`, `dados`, `acao`, `andamento`), só acrescenta; o estado sai dos eventos (`estado`: vale a
-  última decisão da ocorrência e de cada ação; o andamento, o mais novo em cima). O título, a descrição, o chamado, o
-  texto da ação, o andamento e quem fez vão só cifrados (o Cofre); em claro, IDs, códigos e datas (regra 8).
-- **Quem grava:** o Responsável O&M (o login de pessoa, em qualquer usina, como a observação: quem cobre as férias de
-  outro registra nas usinas dele) e o administrador, sempre com um login de pessoa (a senha de administrador vê o aviso
-  "entre com o seu login": o histórico guarda quem fez). Os outros só veem (sem botões; o POST é 403). A permissão sai
-  do cadastro de AGORA a cada pedido; na sessão fica só o `pessoa_id` (o nome guardado por 12 h travava quem pegou uma
-  leitura vazia do cadastro). Sem as chaves de gravar no .env (`faltam_chaves`), nenhum formulário, e a tela diz qual
-  falta. A tela é dos **Responsáveis UFV sem marcar** em Base → Acessos (`Tela.do_setor`, como o Gerar e o Quadro do
-  PCM); os outros setores, pela marca.
-- **Página velha e clique duplo** (revisão final de 18/10/2026): o formulário de editar leva a `versao` (o id do último
-  evento da ocorrência ou da ação) e a gravação recusa se ela mudou ("mudou depois que você abriu a página": a página
-  velha reabria a ocorrência que outro finalizou). O de criar leva o id do que vai nascer (`novo_id`, `nova_acao_id`,
-  `evento_id`): o 2º envio acha o id no livro e não grava de novo (o livro é para sempre). O botão se desliga no envio.
-- **Os ids** têm a letra do que são (`o` ocorrência, `a` ação, `e` evento) e 11 hexadecimais: a API infere o tipo da
-  coluna, e um id só de algarismos voltaria como número. A cifra é amarrada à linha inteira (ocorrência, evento, ação,
-  id). O estado aplica o `criou` primeiro e o resto pela hora com milissegundos: o PC e o servidor gravam o mesmo livro,
-  e o evento da máquina de relógio atrasado não some.
-- **A tela** (`nexus/torres/campo/ocorrencias_tela.py`, `templates/campo/ocorrencias.html`, `ocorrencia.html`,
-  `ocorrencia_nova.html`, `static/ocorrencias.css`): a lista abre nas abertas, na ordem do prazo da próxima ação em
-  aberto (sem prazo depois, a mais crítica primeiro; as finalizadas no fim); o quadro tem uma coluna por status (as 20
-  finalizadas mais novas; o resto pela lista). Filtros: usina, Responsável O&M (o logado abre nas usinas dele; "Todos"
-  vai como `*`), status e criticidade. A página da ocorrência tem os dados (editar), o plano de ação (cada ação com o
-  responsável escolhido na lista do cadastro, o prazo e a situação; a vencida em vermelho) e o andamento.
-- **As recusas dizem o porquê e guardam o que foi digitado** (título vazio ou comprido, data inválida ou antes de
-  01/01/2024, início ou fim depois de hoje, fim antes do início, fim sem o status Finalizado, OS com letra ou com
-  algarismo de outra escrita, código do ativo fora do formato do Fracttal ou de outra usina, responsável fora da lista,
-  prazo vazio ou além de 3 anos, "Nada mudou"). O prazo da ação é obrigatório (o desenho: "cada ação com responsável,
-  prazo e situação"). Finalizada sem o fim termina hoje; a ação esquecida aberta na finalizada não fica "atrasada". A
-  ocorrência de usina que saiu da operação continua editável (só não muda PARA usina fora da operação), e a ação de
-  quem saiu da lista do cadastro fecha sem trocar a pessoa. Gravar volta pela página (303, `?ok=`), para o F5 não
-  gravar de novo; a falha que não é recusa vai ao log da máquina (503).
-- **O ativo** é o código do Fracttal (opcional, canônico) e vai em claro: só letras, números e hífen (`COD_RE`; um
-  nome, um telefone ou uma fórmula da planilha não passam) e só desta usina: o que está na dimensão de equipamento
-  (que não seja de outra usina) ou o que leva o código da usina (a regra do `equipamento.valido`). Liga ao
-  `equipamento_id` só quando está na dimensão (não liga = vazio; `equipamento_ligado_por`).
-- **Na Visão geral**, a etiqueta "N ocorrências" no nome da usina (as abertas: status diferente de finalizado), na cor da
-  criticidade mais alta delas (`COR_ETIQUETA`: muito alta vermelha, alta amarela, média e baixa neutras), leva à tela
-  filtrada pela usina (para quem abre a tela Ocorrências; para o setor sem ela, a etiqueta sem link). O livro que não
-  abre deixa a Visão geral sem as etiquetas, nunca quebrada, e a leitura que falhou espera 1 minuto antes de tentar de
-  novo (a Visão geral não fica esperando o banco lento a cada carga). Depois de gravar, a cópia de 1 minuto já tem o
-  que foi gravado; a página que não acha a ocorrência relê o livro antes do 404 (gravada noutro processo), no máximo uma vez por minuto (o id apagado, de favorito, relia o livro todo a cada abertura; auditoria de 08/11/2026). **A Visão
-  geral não espera a releitura** (19/10/2026, `ocorrencias.ler_sem_esperar`): a cópia vencida volta na hora e o livro
-  é relido por trás, uma releitura por vez (só a 1ª vez depois de subir lê no pedido). A tela Ocorrências segue no
-  `ler` (espera a cópia nova).
-- **Fora, por agora:** as anotações privadas, exportar para .xlsx, o comunicado por IA e a importação do painel antigo.
-- **Prova:** `tests/test_campo_ocorrencias.py` (o estado, a ordem, o catálogo, gravar e ler no banco falso com o texto
-  cifrado, as recusas, a releitura que falha não grava, a tela inteira, a etiqueta da Visão geral e, da revisão final,
-  a página velha, o clique duplo, a usina que saiu da operação, o código do ativo, o relógio de duas máquinas e o banco
-  que devolve tudo como texto).
+**Ficam, porque é dado:** o livro `nexus_ocorrencias` (no banco e no catálogo, `fato_evento_ocorrencia`) e a conta dele
+(`nexus/campo/ocorrencias.py`, com os testes da conta em `tests/test_campo_ocorrencias.py`). Em 15/11 eram 0 ocorrências
+em produção. O desenho antigo está em `docs/superpowers/specs/2026-10-18-ocorrencias-plano-de-acao-design.md` e no git.
+Prova: `test_campo_ranking_ocorrencias_desenho_15_11.py`.
 
 ## Zeladoria (26/10/2026)
 

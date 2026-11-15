@@ -1654,7 +1654,8 @@ LIVROS = (
           "registrado em 13/10/2026 antes da 1ª gravação (regra 10): nasce na 1ª observação de um responsável",
           so_cresce=True),
     Livro("nexus_ocorrencias", ("fato_evento_ocorrencia",),
-          "a cada ocorrência criada ou mudada, ação do plano e andamento (tela Usinas 360° > Ocorrências)",
+          "a cada ocorrência criada ou mudada, ação do plano e andamento (tela Usinas 360° > Ocorrências, que saiu em "
+          "15/11/2026: nada escreve mais; os problemas da usina vão pela Caixa de entrada do Comando)",
           "nexus/campo/ocorrencias.py, pela tela Usinas 360° > Ocorrências", False,
           "registrado em 18/10/2026 antes da 1ª gravação (regra 10): nasce na 1ª ocorrência registrada",
           so_cresce=True),

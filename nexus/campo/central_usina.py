@@ -13,7 +13,6 @@ decididas no mês saíram com o quadro da PT (05/11/2026: o número da PT abre a
 Decisões do Levi (04/11/2026): o mês corrente na performance, na disponibilidade e no histórico de chamados;
 nas pendências, as rondas, as OS atrasadas e pausadas, as ocorrências abertas e a Segurança; a busca com todas as usinas
 mobilizadas, para quem abre a Visão (como a Visão, que deixa escolher qualquer responsável)."""
-from . import ocorrencias as campo_oc
 from . import visao
 
 # a Segurança, na ordem da Mesa (o que pede ação primeiro), com o rótulo daqui
@@ -56,15 +55,6 @@ def pessoas(uid: int, b, atribuicoes: dict | None) -> dict:
     nomes = b.nomes(pids) if pids else {}
     return {"supervisor": o.get("supervisor_campo") or "", "gestor": o.get("gestor") or "",
             "tecnicos": sorted({nomes.get(p) for p in pids if nomes.get(p)}, key=visao._norm_nome)}
-
-
-def ocorrencias(uid: int, est: dict) -> list[dict]:
-    """As ocorrências abertas da usina, na ordem da tela Ocorrências (`ocorrencias.ordenar`: a do prazo mais perto
-    primeiro), com a cor da etiqueta da Visão geral pela criticidade."""
-    abertas = [o for o in est.values() if o.get("aberta") and o.get("usina_id") == uid]
-    return [dict(o, cor=campo_oc.COR_ETIQUETA.get(o.get("criticidade"), "neutro"),
-                 crit_txt=campo_oc.CRITICIDADES.get(o.get("criticidade"), o.get("criticidade") or ""))
-            for o in campo_oc.ordenar(abertas)]
 
 
 def _dm(d) -> str:

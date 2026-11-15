@@ -293,10 +293,6 @@
         {% endfor %}
       </ul>
       {% endif %}
-      {% if cu.ocorrencias %}
-      <h3 class="pu-sub">Ocorrências abertas pelo campo</h3>
-      <ul class="pu-lista">{% for o in cu.ocorrencias %}<li><span class="pu-l1"><em class="cr-tag cr-tag--{{ o.cor }}">{{ o.crit_txt }}</em><b>{{ o.titulo or ('ativo ' ~ o.cod if o.cod else 'sem título') }}</b></span>{% if o.inicio %}<small>desde {{ o.inicio.strftime('%d/%m') }}</small>{% endif %}</li>{% endfor %}</ul>
-      {% endif %}
     {% endcall %}
 
     {% call cartao('chamados', 'seal-warning', 'Chamados e garantias', ('/t/chamados/garantias', 'Abrir as Garantias') if p.pode.garantias else none) %}

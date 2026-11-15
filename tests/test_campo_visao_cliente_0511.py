@@ -422,10 +422,11 @@ def test_sem_cadastro_a_tela_abre_com_o_aviso(cliente_tela, modo_cliente, monkey
     assert r.status_code == 200 and "Parte das informações não carregou agora" in r.get_data(as_text=True)
 
 
-def test_fica_logo_depois_das_ocorrencias_no_menu():
+def test_fica_logo_depois_da_visao_do_responsavel_no_menu():
     from nexus.torres.campo import TORRE
     ids = [t.id for t in TORRE.telas]
-    assert ids.index("cliente") == ids.index("ocorrencias") + 1         # a Visão do responsável e as Ocorrências juntas
+    # junto da Visão do responsável (até 15/11/2026 as Ocorrências ficavam entre as duas; a tela saiu)
+    assert ids.index("cliente") == ids.index("responsaveis") + 1
 
 
 def test_a_tela_abre_o_detalhe_da_usina_escolhida(cliente_tela, modo_cliente):

@@ -109,10 +109,9 @@ def test_a_performance_ve_os_tres_relatorios_sem_marcar_nada(app, setores):
         # casava com o "Responsáveis UFV" do código)
         # e, desde 16/10/2026, o Fora da programação (os motivos que tiram a tarefa da semana; tests/test_pcm_motivos.py)
         # e, desde 17/10/2026, os Técnicos por usina (quem vê cada usina no App; tests/test_pcm_tecnicos_tela.py)
-        # e, desde 18/10/2026, as Ocorrências do Campo · App (o painel de ocorrências dos supervisores, no Nexus;
-        # tests/test_campo_ocorrencias.py)
+        # (as Ocorrências do Campo, de 18/10/2026, saíram em 15/11/2026: o caminho é a Caixa de entrada do Comando)
         assert ST.das_do_setor(SID.RESPONSAVEL_UFV) == ST.das_do_setor({"id": SID.RESPONSAVEL_UFV, "nome": "Responsável UFV"}) == {
-            "pcm/gerar", "pcm/quadro", "pcm/fora-da-programacao", "pcm/tecnicos-por-usina", "campo/ocorrencias",
+            "pcm/gerar", "pcm/quadro", "pcm/fora-da-programacao", "pcm/tecnicos-por-usina",
             "comando/caixa-de-entrada", "comando/visao-do-contrato", "campo/equipe"}
         assert ST.das_do_setor(None) == set() and ST.das_do_setor({"nome": "PCM"}) == set()
 

@@ -78,7 +78,7 @@ def test_o_responsavel_ufv_recebe_as_telas_dele(app):
     sem caixa, os dois não casavam, e as telas do PCM e do Campo que são dele não abriam sozinhas."""
     with app.app_context():
         telas = ST.das_do_setor({"id": SID.RESPONSAVEL_UFV, "nome": "Responsável UFV"})
-    assert {"pcm/gerar", "pcm/quadro", "pcm/fora-da-programacao", "pcm/tecnicos-por-usina", "campo/ocorrencias"} <= telas
+    assert {"pcm/gerar", "pcm/quadro", "pcm/fora-da-programacao", "pcm/tecnicos-por-usina", "comando/caixa-de-entrada"} <= telas
 
 
 def test_renomear_nao_muda_quem_age():

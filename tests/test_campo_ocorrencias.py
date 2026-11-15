@@ -326,20 +326,10 @@ def _sem_copia():
     O.limpar()
 
 
-@pytest.fixture(autouse=True)
-def _novas_abertas(monkeypatch):
-    """As novas estão fechadas desde 15/11/2026 (vão pela Caixa de entrada do Comando;
-    test_campo_ranking_ocorrencias_desenho_15_11.py); o registro segue no código, e estes testes o provam aberto."""
-    from nexus.torres.campo import ocorrencias_tela
-    monkeypatch.setattr(ocorrencias_tela, "NOVAS_ABERTAS", True)
-
-
 @pytest.fixture
 def cad(banco, app):
     """O cadastro com o Responsável O&M de cada usina (a Altair e a Brodowski 1 do 91, a Coração 1 do 90) e o
     administrador pelo e-mail (NEXUS_ADMINS)."""
-    from nexus.torres.campo import ocorrencias_tela
-    ocorrencias_tela._RELIDA["em"] = 0.0         # a trava de 1 min da releitura forçada não vaza de um teste para outro
     from test_campo_visao import USINAS, _aba
     from nexus.campo import visao
     _aba(banco, "cadastro_nexus", "usinas", [dict(u, responsavel_om_id={1: 91, 2: 91, 3: 90}.get(u["usina_id"]))
@@ -362,189 +352,37 @@ def _oid(resp) -> str:
     return resp.headers["Location"].split("/ocorrencias/")[1].split("?")[0].split("#")[0]
 
 
-def test_a_tela_esta_no_menu_do_campo_e_e_dos_responsaveis_ufv():
-    from nexus.torres.campo import TORRE
-    t = TORRE.tela("ocorrencias")
-    assert t.nome == "Ocorrências" and t.do_setor == SID.RESPONSAVEL_UFV
-    ids = [x.id for x in TORRE.telas]
-    assert ids.index("ocorrencias") == ids.index("responsaveis") + 1
 
 
-def test_a_lista_abre_nas_abertas_e_o_quadro_tem_as_tres_colunas(cad, cliente):
-    c = _entra(cliente, ADMIN)
-    a = O.criar(_form(titulo="Inversor 2 desarmando", criticidade="alta"), ADMIN, True)["ocorrencia_id"]
-    O.criar(_form(titulo="Cerca caída", usina_id="3", criticidade="baixa", status="pausado"), ADMIN, True)
-    O.criar(_form(titulo="Trafo aquecendo", status="finalizado"), ADMIN, True)
-    html = c.get("/t/campo/ocorrencias?responsavel=*").get_data(as_text=True)
-    assert "Inversor 2 desarmando" in html and "Cerca caída" in html and "Trafo aquecendo" not in html
-    assert f"/t/campo/ocorrencias/{a}" in html and "Nova ocorrência" in html and "Altair" in html
-    assert "Todas" in html and "Abertas" in html
-    html = c.get("/t/campo/ocorrencias?responsavel=*&status=*").get_data(as_text=True)
-    assert "Trafo aquecendo" in html
-    q = c.get("/t/campo/ocorrencias?responsavel=*&ver=quadro").get_data(as_text=True)
-    assert all(f">{col}<" in q for col in ("Em andamento", "Pausado", "Finalizado")) and "Trafo aquecendo" in q
 
 
-def test_criar_pela_tela(cad, cliente):
-    c = _entra(cliente, ADMIN)
-    html = c.get("/t/campo/ocorrencias/nova?usina=3").get_data(as_text=True)
-    assert 'name="titulo"' in html and '<option value="3" selected>' in html
-    r = c.post("/t/campo/ocorrencias/nova", data=_form(titulo="Cerca caída", usina_id="3"))
-    assert r.status_code == 303
-    html = c.get(r.headers["Location"]).get_data(as_text=True)
-    assert "Ocorrência registrada" in html and "Cerca caída" in html and "Coração 1" in html
-    assert "Fulana Administradora" in html and O.estado(O.ler(forcar=True)["eventos"], None)[_oid(r)]["usina_id"] == 3
 
 
-def test_a_recusa_na_tela_diz_o_porque_e_guarda_o_que_foi_digitado(cad, cliente):
-    c = _entra(cliente, ADMIN)
-    r = c.post("/t/campo/ocorrencias/nova", data=_form(titulo="Cerca caída", inicio="2026-13-01"))
-    html = r.get_data(as_text=True)
-    assert r.status_code == 200 and "Data inválida no início" in html and 'value="Cerca caída"' in html
-    assert cad.syncs == 0
 
 
-def test_quem_nao_pode_so_ve(cad, cliente):
-    oid = O.criar(_form(titulo="Inversor 2 desarmando"), ADMIN, True)["ocorrencia_id"]
-    c = _entra(cliente, TECNICO)
-    html = c.get("/t/campo/ocorrencias?responsavel=*").get_data(as_text=True)
-    assert "Inversor 2 desarmando" in html and "Nova ocorrência" not in html
-    html = c.get(f"/t/campo/ocorrencias/{oid}").get_data(as_text=True)
-    assert "Inversor 2 desarmando" in html and "Registrar andamento" not in html and "Salvar a ação" not in html
-    r = c.post("/t/campo/ocorrencias/nova", data=_form())
-    assert r.status_code == 403 and "Responsável O&amp;M" in r.get_data(as_text=True)
-    assert c.post(f"/t/campo/ocorrencias/{oid}/andamento", data={"texto": "x"}).status_code == 403
-    assert len(cad.linhas(O.LIVRO, O.ABA)) == 1
 
 
-def test_o_administrador_da_senha_ve_o_aviso_de_entrar_com_o_login(cad, logado):
-    html = logado.get("/t/campo/ocorrencias").get_data(as_text=True)
-    assert "entre com o seu login" in html.lower() and "Nova ocorrência" not in html
 
 
-def test_o_responsavel_registra_e_a_lista_abre_nas_usinas_dele(cad, cliente):
-    O.criar(_form(titulo="Inversor 2 desarmando"), ADMIN, True)                 # na Altair, do Ciclano
-    c = _entra(cliente, RESP)                                    # o Beltrano é o Responsável O&M da Coração 1
-    r = c.post("/t/campo/ocorrencias/nova", data=_form(titulo="Cerca caída", usina_id="3"))
-    assert r.status_code == 303
-    html = c.get("/t/campo/ocorrencias").get_data(as_text=True)
-    assert "Cerca caída" in html and "Inversor 2 desarmando" not in html
-    assert "Inversor 2 desarmando" in c.get("/t/campo/ocorrencias?responsavel=*").get_data(as_text=True)
 
 
-def test_o_plano_de_acao_e_o_andamento_pela_tela(cad, cliente):
-    c = _entra(cliente, ADMIN)
-    oid = O.criar(_form(), ADMIN, True)["ocorrencia_id"]
-    html = c.get(f"/t/campo/ocorrencias/{oid}").get_data(as_text=True)
-    assert "Nenhuma ação no plano ainda" in html and '<option value="91">Ciclano Chefe</option>' in html
-    ontem = (HOJE - timedelta(days=1)).isoformat()
-    r = c.post(f"/t/campo/ocorrencias/{oid}/acao", data={"acao_id": "", "texto": "Trocar o fusível",
-                                                          "responsavel_id": "91", "prazo": ontem, "situacao": "a_fazer"})
-    assert r.status_code == 303
-    r = c.post(f"/t/campo/ocorrencias/{oid}/andamento", data={"texto": "Fusível comprado"})
-    html = c.get(r.headers["Location"]).get_data(as_text=True)
-    assert "Andamento registrado" in html and "Fusível comprado" in html and "Trocar o fusível" in html
-    assert "Ciclano Chefe" in html and "oc-atrasada" in html
-    aid = O.estado(O.ler(forcar=True)["eventos"], None)[oid]["acoes"][0]["id"]
-    r = c.post(f"/t/campo/ocorrencias/{oid}/acao", data={"acao_id": aid, "texto": "Trocar o fusível",
-                                                          "responsavel_id": "91", "prazo": ontem,
-                                                          "situacao": "concluida"})
-    html = c.get(r.headers["Location"]).get_data(as_text=True)
-    assert "Ação salva" in html and "Concluída" in html and "oc-atrasada" not in html
-    lista = c.get("/t/campo/ocorrencias?responsavel=*").get_data(as_text=True)
-    assert "Sem ação em aberto" in lista
 
 
-def test_a_lista_mostra_a_proxima_acao_e_o_atraso(cad, cliente):
-    c = _entra(cliente, ADMIN)
-    oid = O.criar(_form(), ADMIN, True)["ocorrencia_id"]
-    O.salvar_acao(oid, {"acao_id": "", "texto": "Chamar o fabricante", "responsavel_id": "90",
-                        "prazo": (HOJE - timedelta(days=2)).isoformat(), "situacao": "em_andamento"}, ADMIN, True,
-                  [{"id": 90, "nome": "Beltrano Supervisor"}])
-    html = c.get("/t/campo/ocorrencias?responsavel=*").get_data(as_text=True)
-    assert "Chamar o fabricante" in html and "Beltrano Supervisor" in html and "oc-atrasada" in html
-    assert "(atrasada)" in html
 
 
-def test_editar_pela_tela(cad, cliente):
-    c = _entra(cliente, ADMIN)
-    oid = O.criar(_form(), ADMIN, True)["ocorrencia_id"]
-    r = c.post(f"/t/campo/ocorrencias/{oid}/dados", data=_form(status="pausado"))
-    assert r.status_code == 303
-    html = c.get(r.headers["Location"]).get_data(as_text=True)
-    assert "Ocorrência salva" in html and ">Pausado<" in html
-    html = c.post(f"/t/campo/ocorrencias/{oid}/dados", data=_form(status="pausado")).get_data(as_text=True)
-    assert "Nada mudou" in html
 
 
-def test_os_filtros(cad, cliente):
-    c = _entra(cliente, ADMIN)
-    O.criar(_form(titulo="Ocorrencia Altair"), ADMIN, True)
-    O.criar(_form(titulo="Ocorrencia Coracao", usina_id="3", criticidade="baixa"), ADMIN, True)
-    O.criar(_form(titulo="Ocorrencia Brodowski", usina_id="2", criticidade="muito_alta", status="pausado"), ADMIN, True)
-
-    def titulos(q):
-        html = c.get("/t/campo/ocorrencias?" + q).get_data(as_text=True)
-        return {t for t in ("Ocorrencia Altair", "Ocorrencia Coracao", "Ocorrencia Brodowski") if t in html}
-    assert titulos("responsavel=*&usina=3") == {"Ocorrencia Coracao"}
-    assert titulos("responsavel=*&criticidade=alta") == {"Ocorrencia Altair"}
-    assert titulos("responsavel=*&status=pausado") == {"Ocorrencia Brodowski"}
-    assert titulos("responsavel=Ciclano+Chefe") == {"Ocorrencia Altair", "Ocorrencia Brodowski"}
 
 
-def test_pedido_de_outro_site_e_403(cad, cliente):
-    c = _entra(cliente, ADMIN)
-    oid = O.criar(_form(), ADMIN, True)["ocorrencia_id"]
-    acao = {"acao_id": "", "texto": "x", "responsavel_id": "91", "prazo": HOJE.isoformat(), "situacao": "a_fazer"}
-    for caminho, dados in (("/t/campo/ocorrencias/nova", _form()), (f"/t/campo/ocorrencias/{oid}/dados", _form()),
-                           (f"/t/campo/ocorrencias/{oid}/acao", acao),
-                           (f"/t/campo/ocorrencias/{oid}/andamento", {"texto": "x"})):
-        assert c.post(caminho, data=dados, headers={"Sec-Fetch-Site": "cross-site"}).status_code == 403, caminho
-    assert len(cad.linhas(O.LIVRO, O.ABA)) == 1
 
 
-def test_sem_a_chave_do_cadastro_a_tela_avisa_e_continua_mostrando(cad, cliente, app):
-    c = _entra(cliente, ADMIN)
-    oid = O.criar(_form(), ADMIN, True)["ocorrencia_id"]
-    app.config["NEXUS_CHAVE_CADASTRO"] = None
-    O.limpar()
-    html = c.get("/t/campo/ocorrencias?responsavel=*").get_data(as_text=True)
-    assert "chave do cadastro" in html and f"/t/campo/ocorrencias/{oid}" in html and "Nova ocorrência" not in html
-    r = c.get(f"/t/campo/ocorrencias/{oid}")
-    html = r.get_data(as_text=True)
-    assert r.status_code == 200 and "chave do cadastro" in html and "Registrar andamento" not in html
 
 
-def test_banco_fora_a_tela_diz(cad, cliente, monkeypatch):
-    c = _entra(cliente, ADMIN)
-    monkeypatch.setattr(O, "ler", lambda forcar=False: {"eventos": [], "lido_em": None,
-                                                        "erro": "ConnectionError: banco fora"})
-    r = c.get("/t/campo/ocorrencias")
-    html = r.get_data(as_text=True)
-    assert r.status_code == 200 and "Não consegui ler as ocorrências no banco" in html
-    assert 'class="oc-numeros"' not in html and "Nenhuma ocorrência com esse filtro" not in html
 
 
-def test_ocorrencia_que_nao_existe_e_404(cad, cliente):
-    c = _entra(cliente, ADMIN)
-    assert c.get("/t/campo/ocorrencias/o00000000000").status_code == 404
-    assert c.get("/t/campo/ocorrencias/000000000000").status_code == 404
-    assert c.get("/t/campo/ocorrencias/nao-e-id").status_code == 404
 
 
 # ── na Visão geral: quantas ocorrências abertas cada usina tem ────────────────────────────────────────────────────────
-def test_a_visao_geral_mostra_as_ocorrencias_abertas_da_usina(tela, logado):
-    import re
-    O.criar(_form(titulo="A", criticidade="alta"), ADMIN, True)
-    O.criar(_form(titulo="B", criticidade="media", status="pausado"), ADMIN, True)
-    O.criar(_form(titulo="C", criticidade="muito_alta", status="finalizado"), ADMIN, True)     # finalizada não conta
-    html = logado.get("/t/campo/responsaveis?modo=geral&responsavel=*").get_data(as_text=True)
-    # a cor é a da criticidade mais alta das abertas (alta = atenção), e o link abre a tela filtrada pela usina
-    assert re.search(r'<a class="cr-tag cr-tag--alerta" href="[^"]*/t/campo/ocorrencias\?usina=1[^"]*"[^>]*>2 ocorrências</a>',
-                     html), html[:200]
-    assert html.count("/t/campo/ocorrencias?usina=") == 1                    # só a Altair tem ocorrência aberta
-    # nos cartões dos responsáveis e no ranking, nada muda
-    assert "/t/campo/ocorrencias?usina=" not in logado.get("/t/campo/responsaveis?modo=cartoes").get_data(as_text=True)
 
 
 # ── a revisão final (18/10/2026) ─────────────────────────────────────────────────────────────────────────────────────
@@ -558,16 +396,6 @@ def _acao_form(**kw):
     return f
 
 
-def test_a_pagina_velha_nao_desfaz_a_mudanca_de_outra_pessoa(cad, cliente):
-    c = _entra(cliente, ADMIN)
-    oid = O.criar(_form(), ADMIN, True)["ocorrencia_id"]
-    html = c.get(f"/t/campo/ocorrencias/{oid}").get_data(as_text=True)
-    versao = re.search(r'name="versao" value="([^"]+)"', html).group(1)
-    O.editar(oid, _form(status="finalizado"), RESP, True)          # outra pessoa finaliza com a página aberta
-    r = c.post(f"/t/campo/ocorrencias/{oid}/dados", data=dict(_form(descricao="Outra descrição"), versao=versao))
-    html = r.get_data(as_text=True)
-    assert r.status_code == 200 and "mudou depois que você abriu" in html and "Outra descrição" in html
-    assert O.estado(O.ler(forcar=True)["eventos"], None)[oid]["status"] == "finalizado"
 
 
 def test_a_acao_velha_nao_desfaz_a_acao_concluida(cad):
@@ -581,20 +409,6 @@ def test_a_acao_velha_nao_desfaz_a_acao_concluida(cad):
     assert _estado()[oid]["acoes"][0]["situacao"] == "concluida"
 
 
-def test_clique_duplo_nao_duplica(cad, cliente):
-    c = _entra(cliente, ADMIN)
-    html = c.get("/t/campo/ocorrencias/nova").get_data(as_text=True)
-    novo = re.search(r'name="novo_id" value="(o[0-9a-f]{11})"', html).group(1)
-    for _ in range(2):
-        assert c.post("/t/campo/ocorrencias/nova", data=dict(_form(), novo_id=novo)).status_code == 303
-    html = c.get(f"/t/campo/ocorrencias/{novo}").get_data(as_text=True)
-    nova_acao = re.search(r'name="nova_acao_id" value="(a[0-9a-f]{11})"', html).group(1)
-    evento = re.search(r'name="evento_id" value="(e[0-9a-f]{11})"', html).group(1)
-    for _ in range(2):
-        assert c.post(f"/t/campo/ocorrencias/{novo}/acao", data=_acao_form(nova_acao_id=nova_acao)).status_code == 303
-        assert c.post(f"/t/campo/ocorrencias/{novo}/andamento",
-                      data={"texto": "Fusível comprado", "evento_id": evento}).status_code == 303
-    assert [l["evento"] for l in cad.linhas(O.LIVRO, O.ABA)] == ["criou", "acao", "andamento"]
 
 
 def test_a_ocorrencia_de_usina_que_saiu_da_operacao_ainda_se_edita_e_finaliza(cad):
@@ -628,35 +442,10 @@ def test_o_ativo_da_dimensao_de_outra_usina_e_recusado(banco):
     assert banco.linhas(O.LIVRO, O.ABA)[0]["equipamento_id"] == 901
 
 
-def test_a_finalizada_nao_mostra_acao_atrasada(cad, cliente):
-    oid = O.criar(_form(), ADMIN, True)["ocorrencia_id"]
-    O.salvar_acao(oid, _acao_form(prazo=(HOJE - timedelta(days=1)).isoformat()), ADMIN, True, PESSOAS)
-    O.editar(oid, _form(status="finalizado"), ADMIN, True)
-    c = _entra(cliente, ADMIN)
-    html = c.get("/t/campo/ocorrencias?responsavel=*&status=*").get_data(as_text=True)
-    assert "Finalizada em" in html and "oc-atrasada" not in html
-    assert "oc-atrasada" not in c.get(f"/t/campo/ocorrencias/{oid}").get_data(as_text=True)
 
 
-def test_numero_absurdo_no_endereco_nao_quebra(cad, cliente):
-    c = _entra(cliente, ADMIN)
-    assert c.get("/t/campo/ocorrencias?usina=inf").status_code == 200
-    assert c.get("/t/campo/ocorrencias/nova?usina=1e999").status_code == 200
-    assert "Escolha a usina" in c.post("/t/campo/ocorrencias/nova", data=_form(usina_id="inf")).get_data(as_text=True)
 
 
-def test_o_responsavel_ganha_a_permissao_sem_sair_e_entrar(cad, cliente):
-    from test_campo_visao import USINAS, _aba
-    from nexus.campo import visao
-    _aba(cad, "cadastro_nexus", "usinas", [dict(u, responsavel_om_id={1: 91, 2: 91}.get(u["usina_id"])) for u in USINAS])
-    visao.limpar()
-    c = _entra(cliente, RESP)                                      # a Coração 1 ainda sem o Responsável O&M dela
-    # o botão de registrar: "Nova ocorrência" ou, com o banco sem nenhuma, "Registrar a primeira" (15/11/2026)
-    assert 'href="/t/campo/ocorrencias/nova' not in c.get("/t/campo/ocorrencias").get_data(as_text=True)
-    _aba(cad, "cadastro_nexus", "usinas", [dict(u, responsavel_om_id={1: 91, 2: 91, 3: 90}.get(u["usina_id"]))
-                                           for u in USINAS])
-    visao.limpar()
-    assert 'href="/t/campo/ocorrencias/nova' in c.get("/t/campo/ocorrencias").get_data(as_text=True)
 
 
 def test_a_leitura_que_falha_espera_antes_de_tentar_de_novo(banco, monkeypatch):
@@ -682,13 +471,6 @@ def test_depois_de_gravar_a_copia_ja_tem_o_que_foi_gravado(banco, monkeypatch):
     assert [l["id"] for l in O.ler()["eventos"]] == [ev["id"]] and chamadas == []
 
 
-def test_a_pagina_rele_o_livro_antes_de_dizer_que_a_ocorrencia_nao_existe(cad, cliente):
-    c = _entra(cliente, ADMIN)
-    O.ler()
-    velha = dict(O._CACHE["livro"])
-    oid = O.criar(_form(), ADMIN, True)["ocorrencia_id"]
-    O._CACHE["livro"] = velha               # gravada noutra máquina: a cópia deste processo ficou velha
-    assert c.get(f"/t/campo/ocorrencias/{oid}").status_code == 200
 
 
 def test_o_evento_fora_de_ordem_pelo_relogio_nao_some():
@@ -699,26 +481,8 @@ def test_o_evento_fora_de_ordem_pelo_relogio_nao_some():
     assert [a["id"] for a in oc["acoes"]] == ["a1"] and (oc["criticidade"], oc["status"]) == ("alta", "pausado")
 
 
-def test_sem_as_chaves_de_gravar_a_tela_nao_mostra_os_formularios(cad, cliente, app):
-    c = _entra(cliente, ADMIN)
-    oid = O.criar(_form(), ADMIN, True)["ocorrencia_id"]
-    app.config["GRIDCO_SQL_TOKEN"] = None
-    html = c.get("/t/campo/ocorrencias?responsavel=*").get_data(as_text=True)
-    assert "Nova ocorrência" not in html and "GRIDCO_SQL_TOKEN" in html
-    html = c.get(f"/t/campo/ocorrencias/{oid}").get_data(as_text=True)
-    assert "Registrar andamento" not in html and "Salvar a ação" not in html
 
 
-def test_a_falha_de_gravacao_vai_ao_log_e_responde_503(cad, cliente, monkeypatch, caplog):
-    c = _entra(cliente, ADMIN)
-
-    def falha(*a, **k):
-        raise livros.GravacaoErro("a contagem não bateu")
-    monkeypatch.setattr(livros, "publicar", falha)
-    r = c.post("/t/campo/ocorrencias/nova", data=_form(titulo="Cerca caída"))
-    html = r.get_data(as_text=True)
-    assert r.status_code == 503 and "Não consegui gravar no banco" in html and 'value="Cerca caída"' in html
-    assert any("Ocorrências" in x.getMessage() for x in caplog.records)
 
 
 def test_a_acao_de_quem_saiu_da_lista_ainda_se_fecha(cad):
@@ -732,16 +496,6 @@ def test_a_acao_de_quem_saiu_da_lista_ainda_se_fecha(cad):
         O.salvar_acao(oid, _acao_form(acao_id=aid, responsavel_id="93"), ADMIN, True, PESSOAS)
 
 
-def test_a_pagina_mostra_o_responsavel_que_saiu_da_lista(cad, cliente):
-    from test_campo_visao import _aba, _pessoas
-    from nexus.campo import visao
-    oid = O.criar(_form(), ADMIN, True)["ocorrencia_id"]
-    O.salvar_acao(oid, _acao_form(responsavel_id="92"), ADMIN, True, [{"id": 92, "nome": "Supervisora Campo"}])
-    _aba(cad, "cadastro_nexus", "pessoas", [dict(p, status="Desligado") if p["pessoa_id"] == 92 else p
-                                            for p in _pessoas()])
-    visao.limpar()
-    html = _entra(cliente, ADMIN).get(f"/t/campo/ocorrencias/{oid}").get_data(as_text=True)
-    assert '<option value="92" selected>Supervisora Campo (fora da lista)</option>' in html
 
 
 def test_os_so_com_algarismos_comuns(banco):
@@ -754,20 +508,8 @@ def test_a_os_que_volta_do_banco_como_numero_sai_sem_o_ponto():
     assert O.estado([_criou("A", _t(0), os="16034.0")], None)["A"]["os"] == "16034"
 
 
-def test_a_etiqueta_sem_a_tela_liberada_nao_e_link(tela, logado, monkeypatch):
-    from nexus.auth import setor_telas
-    O.criar(_form(), ADMIN, True)
-    monkeypatch.setattr(setor_telas, "liberadas_do_menu", lambda: {"campo/responsaveis"})
-    html = logado.get("/t/campo/responsaveis?modo=geral&responsavel=*").get_data(as_text=True)
-    assert "/t/campo/ocorrencias?usina=" not in html and ">1 ocorrência</em>" in html
 
 
-def test_quem_nao_pode_nao_muda_a_ocorrencia_nem_a_acao(cad, cliente):
-    oid = O.criar(_form(), ADMIN, True)["ocorrencia_id"]
-    c = _entra(cliente, TECNICO)
-    assert c.post(f"/t/campo/ocorrencias/{oid}/dados", data=_form(status="pausado")).status_code == 403
-    assert c.post(f"/t/campo/ocorrencias/{oid}/acao", data=_acao_form()).status_code == 403
-    assert len(cad.linhas(O.LIVRO, O.ABA)) == 1
 
 
 def test_o_banco_que_devolve_tudo_como_texto(banco):
@@ -798,20 +540,3 @@ def test_os_ids_nunca_parecem_numero(banco):
     assert re.fullmatch(r"a[0-9a-f]{11}", a["acao_id"])
 
 
-def test_link_velho_de_ocorrencia_nao_rele_o_livro_a_cada_abertura(cad, cliente, monkeypatch):
-    """Achado 8 da auditoria de 08/11/2026: o id que não existe (favorito de ocorrência apagada) fazia uma leitura
-    forçada do livro inteiro a cada abertura, por cima do TTL; agora no máximo uma por minuto."""
-    from nexus.torres.campo import ocorrencias_tela
-    c = _entra(cliente, ADMIN)
-    c.get("/t/campo/ocorrencias")                        # a cópia existe (com lido_em)
-    ocorrencias_tela._RELIDA["em"] = 0.0
-    forcadas = []
-    original = O.ler
-
-    def ler(forcar=False):
-        forcadas.extend([1] if forcar else [])
-        return original(forcar)
-    monkeypatch.setattr(O, "ler", ler)
-    assert c.get("/t/campo/ocorrencias/o00000000000").status_code == 404
-    assert c.get("/t/campo/ocorrencias/o00000000000").status_code == 404
-    assert len(forcadas) == 1

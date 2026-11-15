@@ -25,7 +25,6 @@ from ...campo import aprovacao as campo_aprovacao
 from ...campo import fonte_pg as campo_fonte
 from ...campo import responsaveis as campo_resp
 from ...campo import observacao_responsavel as campo_obs
-from ...campo import ocorrencias as campo_oc
 from ...campo import responsaveis_graficos as campo_graficos
 from ...campo import verificacao as campo_verif
 from ...campo import painel_relatorio as campo_relatorio
@@ -56,11 +55,8 @@ TORRE = Torre(
              "Gerencial, Confiabilidade, COS, tickets, rondas e PT, no banco do Nexus"),
         # a Visão do cliente, fase 1 (05/11/2026; a sugestão "Visão do cliente: Comando com a síntese das usinas dele" e o
         # "Sim, fase 1" do Levi): para a Grid, com o login de hoje; a conta mora em nexus/campo/visao_cliente.py
-        # as ocorrências com plano de ação (Levi, 18/10/2026: "as ocorrências com plano de ação. siga!"): o painel próprio
-        # de um supervisor, no Nexus. Dos Responsáveis UFV sem marcar em Base → Acessos (como o Gerar e o Quadro do PCM);
-        # os outros setores, pela marca
-        Tela("ocorrencias", "Ocorrências", "Que ocorrência das minhas usinas tem ação vencendo, e com quem ela está?",
-             "Livro nexus_ocorrencias (escrito nesta tela) + cadastro do Nexus", do_setor=SID.RESPONSAVEL_UFV),
+        # a tela Ocorrências (18/10/2026) saiu em 15/11/2026 (Levi: "tem que matar esse caminho de ocorrências!"; "vai ser
+        # substituída por caixa de entrada em comando"): os endereços dela levam à Caixa de entrada (ocorrencias_tela.py)
         # a Visão do cliente (05/11/2026, fase 1): a síntese das usinas de um cliente (nexus/campo/visao_cliente.py)
         # só do cliente desde 09/11/2026 (Levi, pelo Scrum master: "O 'visão do cliente' pode tirar pois já temos no modo
         # cliente do nosso menu"): é o Comando do cliente (casca._vista_cliente, setor_telas.primeira_do_cliente) e a Grid a
@@ -414,17 +410,6 @@ def _responsavel_do_login(d) -> str:
     return nome
 
 
-def _ocorrencias_abertas() -> dict:
-    """{usina_id: {"n", "pior"}} das ocorrências abertas (o livro nexus_ocorrencias, com a cópia de 1 minuto, que volta na
-    hora e se relê por trás: `ler_sem_esperar`, 19/10/2026). O livro que não abre não derruba a Visão geral: fica sem as
-    etiquetas."""
-    try:
-        return campo_oc.abertas_por_usina(campo_oc.estado(campo_oc.ler_sem_esperar()["eventos"]))
-    except Exception:           # noqa: BLE001 — sem as etiquetas, a Visão geral segue
-        _log_campo.exception("Visão geral: as ocorrências não abriram")
-        return {}
-
-
 def _central_da_usina(todas: list[dict], usina_id: int | None = None) -> dict:
     """A aba Central da usina (Levi, 04/11/2026: "pesquisar a usina e ter uma central de informações daquela usina"; "como
     aba alternativa"): a busca com todas as usinas da Visão (decisão dele: as 131, para quem abre a tela) e, com uma
@@ -458,7 +443,7 @@ def _central_da_usina(todas: list[dict], usina_id: int | None = None) -> dict:
                # o mesmo card que aparece em visão do responsável > painel")
                pts=campo_painel.pts([u]))
     liberadas = setor_telas.liberadas_do_menu()
-    out["link"] = {t: liberadas is None or t in liberadas for t in ("campo/ocorrencias", "hseq/mesa", "campo/rondas")}
+    out["link"] = {t: liberadas is None or t in liberadas for t in ("hseq/mesa", "campo/rondas")}
     # os técnicos que o PCM põe na usina hoje (a regra do App desde 29/10/2026); sem ler, a lista fica vazia e a tela diz
     atr = None
     try:
@@ -471,12 +456,6 @@ def _central_da_usina(todas: list[dict], usina_id: int | None = None) -> dict:
     if atr is None:
         out["erros"]["tecnicos"] = "os técnicos por usina do PCM"
     out["pessoas"] = CU.pessoas(uid, visao._Base(), atr)
-    try:
-        lido = campo_oc.ler_sem_esperar()
-        out["ocorrencias"] = CU.ocorrencias(uid, campo_oc.estado(lido["eventos"], campo_oc.cofre_ou_nada()))
-    except Exception:           # noqa: BLE001
-        _log_campo.exception("Central da usina: as ocorrências não abriram")
-        out["ocorrencias"], out["erros"]["ocorrencias"] = [], "as ocorrências"
     try:
         from ..hseq import _pendencias as pendencias_da_mesa
         mesa = pendencias_da_mesa({})
@@ -580,13 +559,6 @@ def responsaveis():
     lista_geral = campo_resp.lista_geral(usinas, filtro, bloco_ordem) if modo == "geral" else []
     contagem_geral = ({k: len(campo_resp.filtrar_geral(usinas, k)) for k in campo_resp.FILTROS_GERAL}
                       if modo == "geral" else {})
-    # as ocorrências abertas de cada usina (18/10/2026, decisão do Levi: "na Visão geral, quantas ocorrências abertas
-    # cada usina tem, com link para a tela"): a etiqueta no nome, na cor da criticidade mais alta delas
-    ocorrencias_abertas = _ocorrencias_abertas() if modo == "geral" else {}
-    # o link da etiqueta só para quem abre a tela Ocorrências (o setor sem ela veria a página de tela fechada)
-    from ...auth import setor_telas
-    liberadas = setor_telas.liberadas_do_menu() if ocorrencias_abertas else None
-    ocorrencias_link = liberadas is None or "campo/ocorrencias" in liberadas
     # o mapa das usinas (18/10/2026, Levi: "Para o mapa podemos usar o IBGE como a performance faz"): Lista | Mapa na
     # Visão geral, as MESMAS usinas da lista (filtro e ordem), a cor pelo bloco destacado; o ponto clicado (`usina`) abre
     # o resumo ao lado. A coordenada fica no servidor (nexus/campo/mapa_responsaveis.py)
@@ -626,7 +598,6 @@ def responsaveis():
         equipe=equipe, sem_regiao=visao.SEM_REGIAO, painel=painel,
         temas_relatorio=campo_relatorio.TEMAS,
         filtro=filtro, filtros_geral=campo_resp.FILTROS_GERAL, lista_geral=lista_geral, contagem_geral=contagem_geral,
-        ocorrencias_abertas=ocorrencias_abertas, cor_ocorrencia=campo_oc.COR_ETIQUETA, ocorrencias_link=ocorrencias_link,
         bloco_sel=bloco_sel, bloco_ordem=bloco_ordem, ver=ver, mapa=mapa, usina_sel=usina_sel, erro_mapa=erro_mapa,
         blocos_geral=[(b, nome, txt, campo_resp.bloco(usinas, b)) for b in campo_resp.BLOCOS_GERAL
                                            for bb, nome, txt in campo_resp.BLOCOS if bb == b],
@@ -2020,8 +1991,8 @@ def aprovacao_conferir(id_wo):
     return {"saiu": True}
 
 
-# As ocorrências com plano de ação (18/10/2026): as rotas moram em ocorrencias_tela.py, importada aqui no fim porque
-# precisa do `bp`, da `TORRE` e do `_responsavel_do_login` definidos acima; a regra mora em nexus/campo/ocorrencias.py.
+# Os endereços da tela Ocorrências, que saiu em 15/11/2026, levam à Caixa de entrada do Comando (ocorrencias_tela.py),
+# importada aqui no fim porque precisa do `bp` definido acima.
 from . import ocorrencias_tela  # noqa: E402,F401
 # a Visão do cliente (05/11/2026): as rotas em cliente_tela.py, pelo mesmo motivo
 from . import cliente_tela  # noqa: E402,F401

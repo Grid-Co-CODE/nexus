@@ -15,7 +15,7 @@ from pathlib import Path
 import pytest
 
 RAIZ = Path(__file__).resolve().parent.parent / "nexus"
-TELAS = ("atencao", "ocorrencias", "equipe", "responsaveis", "aprovacao", "ranking")
+TELAS = ("atencao", "equipe", "responsaveis", "aprovacao", "ranking")       # a Ocorrências saiu em 15/11/2026
 
 
 @pytest.mark.parametrize("tela", TELAS)
