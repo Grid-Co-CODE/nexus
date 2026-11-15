@@ -343,6 +343,9 @@ a.ins-titulo:hover{color:var(--verde-texto)}
 .dm-t-area{display:inline-block;padding:2px 10px;border-radius:999px;background:var(--verde-suave);
   color:var(--verde-texto);font:600 12px/18px var(--font-sans);white-space:nowrap}
 .dm-t-area--setor{background:var(--superficie-2);color:var(--tinta-2)}
+.dm-area-pessoas{max-width:980px;margin:14px 0 0;padding:12px 14px;border:1px solid var(--linha);border-radius:var(--raio-md)}
+.dm-area-pessoas .dm-nota{margin:0 0 8px}
+.dm-area-lista{display:flex;flex-wrap:wrap;gap:4px 18px;margin:0 0 10px}
 .dm-usinas-marcadas{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
 .dm-usinas-marcadas:empty{display:none}
 .dm-chip{display:inline-flex;align-items:center;gap:6px;padding:2px 10px;border:1px solid var(--linha-forte);border-radius:999px;

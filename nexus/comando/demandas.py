@@ -455,6 +455,12 @@ def abrir(form: dict, arquivos, usuario: dict) -> dict:
         raise Recusada("Escolha a pessoa da lista: essa pessoa não tem setor no Nexus")
     if para["setor_id"] != para_setor:
         raise Recusada(f"{para['nome']} não é do setor escolhido: {para['nome']} é de {para['setor_nome']}")
+    # a área com gente marcada recebe só nela (15/11/2026: Chamados, com as pessoas da garantia)
+    if area.strip():
+        from . import areas as AR
+        da_area = AR.pessoas(current_app.config, para_setor, area.strip())
+        if da_area and para_hmac not in da_area:
+            raise Recusada(f"{para['nome']} não recebe em {area.strip()}: escolha uma das pessoas da área")
     if para_hmac == quem["hmac"]:
         raise Recusada("A demanda é para outra pessoa: escolha quem vai receber")
     tema = next((t for t in temas(para_setor) if t["tema_id"] == _txt(form.get("tema_id"))

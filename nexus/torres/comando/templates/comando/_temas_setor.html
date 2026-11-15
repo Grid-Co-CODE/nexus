@@ -75,5 +75,18 @@
       </tr>
     </tbody>
   </table>
+  {# quem recebe em cada área do setor (15/11/2026, Levi: "quando escolher o setor chamados, vai ficar filtrado só" as
+     pessoas da garantia) #}
+  {% for ar in ts.area_pessoas %}
+  <form class="dm-area-pessoas" method="post" action="{{ '/t/comando/temas-do-setor/area'|na_raiz }}">
+    <input type="hidden" name="codigo" value="{{ codigo }}"><input type="hidden" name="setor_id" value="{{ ts.setor_id }}">
+    <input type="hidden" name="area" value="{{ ar.area }}">
+    <p class="dm-nota"><b>Quem recebe em {{ ar.area }}</b>: na Nova demanda, quem escolhe "{{ ar.area }}" vê só as pessoas marcadas{% if not ar.n %}; sem ninguém marcado, aparece o setor inteiro{% endif %}.</p>
+    {% if ar.pessoas %}
+    <div class="dm-area-lista">{% for p in ar.pessoas %}<label class="dm-usina"><input type="checkbox" name="pessoa" value="{{ p.hmac }}"{% if p.marcada %} checked{% endif %}> {{ p.nome }}</label>{% endfor %}</div>
+    <button class="gc-btn gc-btn--ui gc-btn--contorno" type="submit"{% if not tem_login %} disabled{% endif %}>Salvar quem recebe em {{ ar.area }}</button>
+    {% else %}<p class="mudo">Não li as pessoas do setor agora.</p>{% endif %}
+  </form>
+  {% endfor %}
   <p class="dm-nota dm-t-rodape">{% if not ts.temas %}<b>{{ ts.setor_nome }} ainda não tem tema</b>: sem tema, o setor não aparece na Nova demanda. {% endif %}O prazo vale para as demandas abertas a partir de agora ({{ ts.prazo_min }} a {{ ts.prazo_max }} dias úteis, sem fim de semana e feriado nacional); tirar um tema de uso não mexe nas demandas dele.</p>
   {% endif %}

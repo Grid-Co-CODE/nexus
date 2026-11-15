@@ -35,6 +35,8 @@ window.NexusDemandaNova = function (dlg) {
           setores[p.setor_id] = p.setor_nome;
           var o = document.createElement('option');
           o.value = p.hmac; o.setAttribute('data-setor', String(p.setor_id)); o.textContent = p.nome + ' · ' + p.setor_nome;
+          // as áreas da pessoa (15/11/2026: na área Chamados, só quem o setor marcou)
+          o.setAttribute('data-areas', (p.areas || []).join('|'));
           return o;
         });
         fSetor.innerHTML = '';
@@ -71,9 +73,13 @@ window.NexusDemandaNova = function (dlg) {
     var antes = sel.value;
     sel.innerHTML = '';
     var base = String(setor || '').split(':')[0], area = String(setor || '').split(':').slice(1).join(':');
+    var naArea = function (o) { return (o.getAttribute('data-areas') || '').split('|').indexOf(area) >= 0; };
+    // a área com gente marcada mostra só ela; sem ninguém marcado, o setor inteiro
+    var soDaArea = area && todas.some(function (o) { return o.hasAttribute('data-areas') && o.getAttribute('data-setor') === base && naArea(o); });
     var lista = todas.filter(function (o) {
       if (setor && o.getAttribute('data-setor') !== base) return false;
-      // o tema da área só na área; o do setor, só no setor (a pessoa vale para os dois)
+      if (o.hasAttribute('data-areas')) return !soDaArea || naArea(o);
+      // o tema da área só na área; o do setor, só no setor
       return !o.hasAttribute('data-area') || !setor || (o.getAttribute('data-area') || '') === area;
     });
     var v = document.createElement('option'); v.value = '';

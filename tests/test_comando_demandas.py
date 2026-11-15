@@ -695,3 +695,34 @@ def test_o_pedir_vem_com_o_tema_escolhido(app, cena):
     assert f'data-pre-tema="{cena["tema"]}"' in h
     h = c.get("/t/comando/conversa/usina/1/janela?aba=pedir&setor=1&tema=qualquer").get_data(as_text=True)
     assert "data-pre-tema" not in h
+
+
+def test_a_area_chamados_recebe_so_quem_o_setor_marcou(app, cena):
+    """15/11/2026, Levi: "quando escolher o setor chamados, vai ficar filtrado só" as pessoas da garantia. Sem ninguém
+    marcado, a área recebe o setor inteiro; com gente marcada, a Nova demanda mostra só ela e a gravação recusa outra."""
+    setores = [{"setor_id": 1, "nome": "Performance"}]
+    with app.test_request_context():
+        D.criar_temas_padrao(setores, JU)
+    D.limpar()
+    acomp = next(t for t in D.temas(1) if t["area"] == "Chamados" and t["nome"] == "Acompanhamento de chamado")
+    c = _cliente(app, JU)                                       # a Juliana é da Performance: marca quem recebe
+    html = c.get(CAIXA + "?dem=temas").get_data(as_text=True)
+    assert "Quem recebe em Chamados" in html and "aparece o setor inteiro" in html
+    r = c.post("/t/comando/temas-do-setor/area", data={"codigo": _codigo(html), "setor_id": "1", "area": "Chamados",
+                                                       "pessoa": [_h(BRUNO["email"]), _h(ANA["email"])]})
+    assert r.status_code == 303
+    html = c.get(CAIXA + "?dem=temas").get_data(as_text=True)
+    assert "1 pessoa recebe" in html and "aparece o setor inteiro" not in html          # a Ana não é do setor: não entra
+    ps = {p["nome"]: p["areas"] for p in _cliente(app, ANA).get(CAIXA + "/demandas/pessoas").get_json()["pessoas"]}
+    assert ps[BRUNO["nome"]] == ["Chamados"] and ps[JU["nome"]] == []
+    with app.test_request_context():
+        with pytest.raises(D.Recusada, match="não recebe em Chamados"):
+            D.abrir(_form(cena, para_setor_id="1:Chamados", tema_id=acomp["tema_id"], novo_id="d00000000091"), [], ANA)
+        d = D.abrir(_form(cena, para_hmac=_h(BRUNO["email"]), para_setor_id="1:Chamados", tema_id=acomp["tema_id"],
+                          novo_id="d00000000092"), [], ANA)
+        assert d["para_setor_id"] == 1
+    # outro setor não marca a área da Performance
+    a = _cliente(app, ANA)
+    html = a.get(CAIXA + "?dem=temas").get_data(as_text=True)
+    assert a.post("/t/comando/temas-do-setor/area", data={"codigo": _codigo(html), "setor_id": "1", "area": "Chamados",
+                                                          "pessoa": [_h(ANA["email"])]}).status_code == 403

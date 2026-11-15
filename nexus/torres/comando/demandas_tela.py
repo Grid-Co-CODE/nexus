@@ -234,12 +234,17 @@ def demanda_anexo(demanda_id, n):
 def demanda_pessoas():
     """Quem pode receber (as pessoas com setor, menos quem pede): [{hmac, nome, setor_id, setor_nome}] para a Nova demanda.
     Vem ao abrir o formulário, e não com a Caixa: os nomes são do pessoal do Fracttal (cópia de 1 hora)."""
+    from ...comando import areas as AR
     meu = _meu_hmac()
     try:
         ps = [p for p in D.pessoas_com_setor() if p["hmac"] != meu]
     except Exception:            # noqa: BLE001 — o formulário diz que não leu
         current_app.logger.exception("demandas: a lista de pessoas não abriu")
         return jsonify(ok=False, pessoas=[])
+    # as áreas de cada pessoa (15/11/2026: na área Chamados, a Nova demanda mostra só quem o setor marcou)
+    mapa = AR.ler(current_app.config)
+    for p in ps:
+        p["areas"] = AR.areas_da_pessoa(mapa, p["setor_id"], p["hmac"])
     return jsonify(ok=True, pessoas=ps)
 
 
@@ -294,10 +299,24 @@ def temas_contexto() -> dict:
             faltam = TP.para_criar([{"setor_id": s, "nome": n} for s, n in ativos], D.temas(so_ativos=False))
         except Exception:        # noqa: BLE001 — sem a conta, sem o botão
             current_app.logger.exception("demandas: a conta dos temas padrão falhou")
+    from ...comando import areas as AR
     from ...comando import temas_padrao as TP
+    # quem do setor recebe em cada área (15/11/2026, Levi: "quando escolher o setor chamados, vai ficar filtrado só" as
+    # pessoas da garantia): as pessoas do setor, marcadas as da área
+    area_pessoas = []
+    if TP.areas_do_setor(nome):
+        try:
+            do_setor = [p for p in D.pessoas_com_setor() if p["setor_id"] == sid]
+        except Exception:        # noqa: BLE001 — sem as pessoas, a área fica sem a lista
+            current_app.logger.exception("demandas: as pessoas do setor não abriram")
+            do_setor = []
+        for a in TP.areas_do_setor(nome):
+            marcadas = AR.pessoas(current_app.config, sid, a)
+            area_pessoas.append({"area": a, "pessoas": [dict(p, marcada=p["hmac"] in marcadas) for p in do_setor],
+                                 "n": len(marcadas)})
     return dict(out, temas=temas, setor_id=sid, setor_nome=nome, setores=ativos,
                 em_uso=sum(1 for t in temas if t.get("ativo")), padrao_faltam=len(faltam),
-                areas=TP.areas_do_setor(nome))
+                areas=TP.areas_do_setor(nome), area_pessoas=area_pessoas)
 
 
 def _temas_na_caixa(sid=None) -> str:
@@ -333,6 +352,37 @@ def temas_do_setor_padrao():
         session[_AVISO] = ("erro", f"{ex}. Nada foi gravado.")
     except Exception as ex:      # noqa: BLE001
         current_app.logger.exception("temas padrão não gravados")
+        session[_AVISO] = ("erro", f"Não consegui gravar agora ({type(ex).__name__}). Nada foi gravado.")
+    return redirect(destino, code=303)
+
+
+@bp.route("/temas-do-setor/area", methods=["POST"])
+def temas_do_setor_area():
+    """Quem do setor recebe na área (15/11/2026: Chamados, dentro da Performance). O próprio setor ou o administrador,
+    como nos temas."""
+    from ...comando import areas as AR
+    from ...comando import temas_padrao as TP
+    sid = request.form.get("setor_id", type=int)
+    destino = _temas_na_caixa(sid)
+    venceu = _form_venceu(destino)
+    if venceu:
+        return venceu
+    meu = (_meu_setor() or {}).get("id")
+    if not session.get("admin") and sid != meu:
+        abort(403)
+    area = request.form.get("area") or ""
+    _s, nome, _a = _setor_da_tela()
+    if area not in TP.areas_do_setor(dict(_a).get(sid, nome)):
+        session[_AVISO] = ("erro", "Área desconhecida neste setor. Nada foi gravado.")
+        return redirect(destino, code=303)
+    try:
+        do_setor = {p["hmac"] for p in D.pessoas_com_setor() if p["setor_id"] == sid}
+        lista = AR.gravar(current_app.config, sid, area, [h for h in request.form.getlist("pessoa") if h in do_setor],
+                          _meu_hmac() or "administrador")
+        session[_AVISO] = ("ok", f"{area}: {len(lista)} {'pessoa recebe' if len(lista) == 1 else 'pessoas recebem'}"
+                           if lista else f"{area}: ninguém marcado, recebe o setor inteiro.")
+    except Exception as ex:      # noqa: BLE001
+        current_app.logger.exception("área das demandas não gravada")
         session[_AVISO] = ("erro", f"Não consegui gravar agora ({type(ex).__name__}). Nada foi gravado.")
     return redirect(destino, code=303)
 

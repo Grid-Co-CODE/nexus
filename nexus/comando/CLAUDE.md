@@ -369,6 +369,15 @@ escolher o setor chamados, mas no back-end entender que é um setor de performan
   - `abrir` grava a demanda no setor (`para_setor_id` = 2) e exige o tema da área. O tema da área não vale no setor, e o
     do setor não vale na área.
   - Trocar o nome ou o prazo do tema não o tira da área.
+  - **Quem recebe na área** (15/11/2026, Levi: "quando escolher o setor chamados, vai ficar filtrado só" as duas
+    pessoas da garantia; `nexus/comando/areas.py`):
+    - a aba Temas do setor tem "Quem recebe em Chamados", com as pessoas do setor para marcar; marca o próprio setor
+      ou o administrador;
+    - fica em `<NEXUS_DADOS>/demandas/areas.json`, só com códigos (HMAC do e-mail), sem nome;
+    - com gente marcada, a Nova demanda mostra só ela (o `/pessoas` manda as `areas` de cada pessoa) e `abrir` recusa
+      outra pessoa;
+    - sem ninguém marcado, recebe o setor inteiro;
+    - as duas pessoas da garantia o Levi marca na tela do servidor, porque o nome não vai para o repositório.
   - O "Solicitar" do diagnóstico do dia vai a "Chamados" nas garantias.
 - **Na Nova demanda, as usinas vêm recolhidas** ("eu quero que fique recolhido [...] Tá muito grande"):
   - a lista abre quando a pessoa digita e mostra só o que bate;
