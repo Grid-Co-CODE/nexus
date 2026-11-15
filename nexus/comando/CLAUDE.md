@@ -349,6 +349,14 @@ escolher o setor chamados, mas no back-end entender que é um setor de performan
   - também há listas para PCM, Manutenção, Segurança, Zeladoria, Supervisão Campo e Supervisor de Contrato.
 
   Cada setor muda o nome e o prazo dos seus depois.
+- **A pré-análise de 15/11/2026** (Levi: "bota IA para fazer uma pré-análise de umas 5 usinas todas as ações que a IA
+  sugerir ver como tema e aí a gente coloca como padrão"):
+  - o diagnóstico do dia rodou na Linhares 1, Capitão Poço 100, Céu Azul, Mãe do Rio 100 e Santa Maria do Pará 100;
+  - todo "Fazer" saiu com setor e tema;
+  - o que ficou sem tema próprio virou 4 temas padrão novos: Chamados "Vincular OS ao chamado de garantia", Manutenção
+    "Restabelecer a comunicação da usina", Segurança "Conferência de extintores" (diferente da recarga) e Zeladoria
+    "Desobstrução de vala e drenagem";
+  - os 4 foram gravados no banco: eram 33 temas e ficaram 37.
 - **O botão "Criar os temas padrão"** fica na aba Temas do setor e só o administrador vê; ele diz quantos faltam.
   - Cria, numa gravação só, os que faltam em todos os setores (`demandas.criar_temas_padrao`).
   - O código de cada tema padrão é fixo (`codigo`): clicar de novo não duplica.

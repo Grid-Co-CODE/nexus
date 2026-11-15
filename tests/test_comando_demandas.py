@@ -652,7 +652,8 @@ def test_os_temas_padrao_saem_uma_vez_e_a_area_chamados_vai_para_a_performance(a
     D.limpar()
     chamados = [t for t in D.temas(1) if t["area"] == "Chamados"]
     assert sorted(t["nome"] for t in chamados) == ["Abertura de chamado de garantia", "Acompanhamento de chamado",
-                                                   "Cobrança ao fabricante", "Envio de peça ou RMA"]
+                                                   "Cobrança ao fabricante", "Envio de peça ou RMA",
+                                                   "Vincular OS ao chamado de garantia"]
     assert "Dado que não bate" in [t["nome"] for t in D.temas(1) if not t["area"]]   # o que já existia fica
     # a demanda para "Chamados" vai para a Performance (o setor 1), com o tema da área; o tema da área não vale no setor
     acomp = next(t for t in chamados if t["nome"] == "Acompanhamento de chamado")
@@ -676,7 +677,8 @@ def test_o_botao_dos_temas_padrao_e_do_administrador(app, cena):
     assert c.post("/t/comando/temas-do-setor/padrao", data={"codigo": _codigo(html), "setor_id": "1"}).status_code == 403
     app.config["NEXUS_ADMINS"] = JU["email"]                    # o admin da sessão segue a lista de agora, a cada pedido
     html = c.get(CAIXA + "?dem=temas&setor=1").get_data(as_text=True)
-    assert "Criar os temas padrão" in html and "<b>8</b> temas padrão" in html
+    from nexus.comando import temas_padrao as TP
+    assert "Criar os temas padrão" in html and f"<b>{len(TP.PADRAO['performance'])}</b> temas padrão" in html
     r = c.post("/t/comando/temas-do-setor/padrao", data={"codigo": _codigo(html), "setor_id": "1"})
     assert r.status_code == 303
     html = c.get(CAIXA + "?dem=temas&setor=1").get_data(as_text=True)
