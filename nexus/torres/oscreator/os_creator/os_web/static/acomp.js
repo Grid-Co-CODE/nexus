@@ -550,7 +550,10 @@
         if (!texto) { aviso("Escreva a observação antes de salvar."); alvo.disabled = false; return; }
         await postar("/os/api/acomp/" + folio + "/obs/" + encodeURIComponent(id) + "/editar", {texto: texto});
       } else {
-        await postar("/os/api/acomp/" + folio + "/obs/" + encodeURIComponent(id) + "/excluir", {});
+        const j = await postar("/os/api/acomp/" + folio + "/obs/" + encodeURIComponent(id) + "/excluir", {wid: wid});
+        // o único comentário apagado desfaz a atividade que ele iniciou (15/11/2026): a tela diz antes de recarregar
+        const at = (j && j.atividade) || {};
+        if (at.mensagem || at.aviso) { aviso(at.mensagem || at.aviso); setTimeout(function () { location.reload(); }, 2600); return; }
       }
       location.reload();
     } catch (e) {

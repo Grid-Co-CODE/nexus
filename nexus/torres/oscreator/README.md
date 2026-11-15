@@ -3143,6 +3143,12 @@ chamado, se tiver só um ativo"; no quiz, o fim na finalização, também os abe
   antes). O chamado sem atividade nenhuma, mas com comentário (os abertos de antes da regra), ganha o registro inteiro:
   início no 1º comentário, fim na finalização; se o Fracttal gravar outro início, o registro encerrado é corrigido
   (`editar_execucao`). Sem comentário, conclui sem registro, como sempre.
+- **O comentário apagado** (Levi, no mesmo dia: "pense também na possibilidade de quando o comentário for apagado"):
+  mexer na atividade rodando é o perigo da tarefa órfã que o App de Campo conhece, então: apagou o 1º e ficaram outros, a
+  atividade segue e, na finalização, o início passa para o 1º comentário em vigor (`_inicio_pelo_comentario`, no registro
+  já encerrado); apagou e não sobrou nenhum, a atividade que nasceu de comentário é desfeita na hora: encerrada e apagada
+  (`_desfazer_atividade`, `api.excluir_execucao`), e a tarefa volta a "não iniciada" para o próximo comentário. A atividade
+  que não nasceu de comentário (o início não bate com a hora de nenhum, nem dos apagados) fica como está.
 - **O risco, escolhido sabendo:** no Fracttal a atividade é de quem a iniciou e só ela encerra; a OS com atividade aberta
   não conclui (o `work_orders_recalculate`; o caso da OS 10215). Se outra pessoa finalizar, o Finalizar não tenta concluir
   e diz no nome de quem a atividade está.
@@ -3150,7 +3156,9 @@ chamado, se tiver só um ativo"; no quiz, o fim na finalização, também os abe
   uma tarefa cada, criadas para isso e concluídas), lida de volta: o `work_orders_tasks_execution_insert` grava o início
   pedido (3 h atrás, ao segundo); a mesma conta tem duas atividades rodando em OS diferentes; o `finish` encerra, e o
   concluir (`change_status` 3 + `recalculate_new`) fecha a OS com um registro só, sem lançar outro. Não provado (precisa de
-  duas contas): a atividade de outra pessoa barrando o concluir, que é o caso conhecido da OS 10215.
+  duas contas): a atividade de outra pessoa barrando o concluir, que é o caso conhecido da OS 10215. O desfazer (OS 19580,
+  no mesmo dia): encerrar e apagar o registro (`work_orders_tasks_execution_delete`) deixa a tarefa NO_STARTED, sem
+  execução; iniciar de novo e concluir funcionam depois.
 
 ## Garantias: a OS abre a página da OS da Engenharia (09/11/2026)
 

@@ -1067,7 +1067,8 @@ def _mexer_obs(folio, id_obs, tipo, texto):
         return _erro(e, 403)
     except requests.RequestException as e:
         return _erro("O banco da Gridco não respondeu: %s" % str(e)[:160], 502)
-    return jsonify({"ok": True})
+    atividade = _desfazer_atividade(folio, _corpo().get("wid"), x) if tipo == "exclusao" else {}
+    return jsonify({"ok": True, "atividade": atividade})
 
 
 def _mexer_historico(folio, chave, tipo, texto):
@@ -1216,6 +1217,84 @@ def _iniciar_atividade(folio, wid, quando) -> dict:
         return {"aviso": "O comentário foi salvo, mas não consegui iniciar a atividade no Fracttal (%s)." % type(e).__name__}
 
 
+# O COMENTÁRIO APAGADO (Levi, 15/11/2026: "quero que você pense também na possibilidade de quando o comentário for
+# apagado"). Mexer na atividade rodando é o perigo que o App de Campo conhece (a tarefa órfã, com status de andamento e
+# nenhuma execução, que travou fechamentos em 08/2026): o registro aberto não se edita sem encerrar. Por isso:
+# - apagou o 1º comentário e ficaram outros: a atividade segue; na finalização, o início passa para o 1º comentário que
+#   ficou valendo (o registro já encerrado se edita: `_inicio_pelo_comentario`);
+# - apagou e não sobrou comentário: a atividade iniciada por ele é desfeita na hora, encerrada e apagada, e a tarefa volta a
+#   "não iniciada" (provado no TESTE - PA em 15/11/2026, OS 19580: o `work_orders_tasks_execution_delete` no registro
+#   encerrado deixa a tarefa NO_STARTED, sem execução; iniciar de novo e concluir funcionam depois). O próximo comentário
+#   inicia de novo;
+# - a atividade que não nasceu de comentário (o início não bate com a hora de nenhum) o Nexus não mexe.
+def _comentarios(folio, so_em_vigor: bool) -> list:
+    """Os datetimes dos comentários escritos da OS: os em vigor, ou todos os que já existiram (os apagados também)."""
+    lista = obs_store.listar()
+    linhas = obs_store.vigentes(lista) if so_em_vigor else lista
+    qs = [_quando(x.get("quando")) for x in linhas if x.get("tipo") == "obs" and str(x.get("os")) == str(folio)]
+    return sorted(q for q in qs if q is not None)
+
+
+def _bate(d1, d2, folga=90) -> bool:
+    return d1 is not None and d2 is not None and abs((d1 - d2).total_seconds()) <= folga
+
+
+def _desfazer_atividade(folio, wid, apagado) -> dict:
+    """O comentário `apagado` saiu: sem outro comentário em vigor, desfaz a atividade que ele iniciou. → {"mensagem"},
+    {"aviso"} ou {} (nada a fazer). Nunca levanta: a exclusão já está gravada."""
+    try:
+        # pelo id, e não pela hora (dois comentários no mesmo segundo); a lista pode ainda não ter a exclusão recém-gravada
+        restam = [x for x in obs_store.vigentes(obs_store.listar())
+                  if x.get("tipo") == "obs" and str(x.get("os")) == str(folio) and x.get("id") != apagado.get("id")]
+        if restam:
+            return {}                                   # ficou comentário: o início se acerta na finalização
+        wid, det = _os_conferida(folio, wid)
+        tid = _tarefa_unica(det) if wid else None
+        if tid is None:
+            return {}
+        regs = [e for e in (api.historico_execucao(tid) or []) if isinstance(e, dict) and e.get("id")]
+        ini = _quando(regs[0].get("initial_date")) if len(regs) == 1 else None
+        if ini is None or not any(_bate(ini, q) for q in _comentarios(folio, False)):
+            return {}                                   # não nasceu de comentário (ou já houve outras): não mexe
+        est = (api.execucao_atual(tid) or {}).get("estado") or "parada"
+        if est == "pausada":
+            api.retomar_execucao(tid)
+        if est in ("rodando", "pausada"):
+            api.finalizar_execucao(tid)
+            if (api.execucao_atual(tid) or {}).get("estado") != "parada":
+                abertas = api.execucoes_abertas(tid) or []
+                dono = api._dono_execucao(abertas[0]) if abertas else ""
+                return {"aviso": "A observação foi excluída, mas a atividade que ela iniciou segue no Fracttal%s: só quem "
+                                 "a iniciou pode desfazê-la." % ((" no nome de %s" % dono) if dono else "")}
+        res = api.excluir_execucao(regs[0]["id"])
+        if not (isinstance(res, dict) and res.get("ok")) or api.historico_execucao(tid):
+            return {"aviso": "A observação foi excluída e a atividade foi encerrada, mas o Fracttal não apagou o registro "
+                             "dela. Confira na página da OS."}
+        lista_central.mudou(wid)
+        return {"mensagem": "Era o único comentário: a atividade que ele iniciou foi desfeita no Fracttal."}
+    except api.SessionExpired:
+        raise
+    except Exception as e:                              # noqa: BLE001
+        log.warning("Garantias: a atividade da OS %s não foi desfeita (%s)", folio, type(e).__name__)
+        return {"aviso": "A observação foi excluída, mas não consegui desfazer a atividade no Fracttal (%s)."
+                         % type(e).__name__}
+
+
+def _inicio_pelo_comentario(folio, tid) -> None:
+    """Na finalização, com a atividade encerrada: se ela nasceu de um comentário que foi apagado, o início passa para o
+    1º comentário em vigor."""
+    regs = [e for e in (api.historico_execucao(tid) or []) if isinstance(e, dict) and e.get("id")]
+    if len(regs) != 1 or not _quando(regs[0].get("final_date")):
+        return
+    ini = _quando(regs[0].get("initial_date"))
+    em_vigor = _comentarios(folio, True)
+    if not em_vigor or _bate(ini, em_vigor[0], 60):
+        return
+    if not any(_bate(ini, q) for q in _comentarios(folio, False)):
+        return                                          # não nasceu de comentário: não mexe
+    api.editar_execucao(regs[0]["id"], em_vigor[0], _quando(regs[0].get("final_date")))
+
+
 def _encerrar_atividade(folio, tid) -> dict:
     """Antes de concluir a OS: encerra a atividade em andamento ou, sem atividade nenhuma, lança o registro inteiro (do 1º
     comentário até agora). → {"mensagem"} ou {"erro"} (aí a OS não é concluída)."""
@@ -1233,6 +1312,12 @@ def _encerrar_atividade(folio, tid) -> dict:
             return {"erro": "A atividade desta OS está em andamento%s, e só quem a iniciou pode encerrá-la no Fracttal: "
                             "peça para essa pessoa finalizar o chamado, ou encerrar a atividade pela página da OS."
                             % ((" no nome de %s" % dono) if dono else "")}
+        try:
+            _inicio_pelo_comentario(folio, tid)
+        except api.SessionExpired:
+            raise
+        except Exception:                               # noqa: BLE001 — a atividade está encerrada; o início fica como era
+            log.warning("Garantias: o início da atividade da OS %s não foi acertado ao comentário em vigor", folio)
         return {"mensagem": "A atividade foi encerrada."}
     if api.historico_execucao(tid):
         return {}                                       # a atividade já foi registrada e encerrada

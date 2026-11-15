@@ -51,13 +51,18 @@ def cron(monkeypatch, fracttal):
         c["pedidos"].append(("editar", rid, ini, fim))
         return {"ok": True}
 
+    def excluir(rid):
+        c["pedidos"].append(("excluir", rid))
+        c["registros"] = [e for e in c["registros"] if e["id"] != rid]
+        return {"ok": True}
+
     def concluir(wid):
         c["concluiu"] += 1
         return {"ok": True, "data_fim": {}}
 
     def adicionar(folio, texto, tipo, **k):
         reg = {"id": "n%d" % len(c["banco"]), "quando": dt.datetime.now(BRT).isoformat(), "os": str(folio), "tipo": tipo,
-               "texto": texto, "quem": "Pessoa Teste", "email": "", "ativo": "", "extra": {}}
+               "texto": texto, "quem": "Pessoa Teste", "email": "", "ativo": "", "extra": dict(k.get("extra") or {})}
         c["banco"].append(reg)
         return reg
     monkeypatch.setattr(api, "get_os_detalhes", lambda wid: {"folio": {1: 9103, 2: 9104}[wid], "notas": "", "code": "TST-1",
@@ -70,6 +75,7 @@ def cron(monkeypatch, fracttal):
     monkeypatch.setattr(api, "editar_execucao", editar)
     monkeypatch.setattr(api, "execucoes_abertas", lambda tid: [{"name": c["dono"]}] if c["dono"] else [])
     monkeypatch.setattr(api, "concluir_os_checado", concluir)
+    monkeypatch.setattr(api, "excluir_execucao", excluir)
     monkeypatch.setattr(api, "_cabecalho_os", lambda wid: {"wo_folio": "9104", "id_status_work_order": 3})
     monkeypatch.setattr(obs_store, "adicionar", adicionar)
     monkeypatch.setattr(obs_store, "listar", lambda forcar=False: list(c["banco"]))
@@ -161,3 +167,53 @@ def test_sem_comentario_e_sem_atividade_conclui_como_sempre(cron, fila):
     cli.get(URL)
     j = cli.post("/os/api/acomp/9104/finalizar", json={"wid": 2}).get_json()
     assert j["ok"] is True and not cron["pedidos"] and cron["concluiu"] == 1
+
+
+# ── o comentário apagado (Levi, 15/11/2026: "pense também na possibilidade de quando o comentário for apagado") ─────────
+def _excluir(cli, id_obs):
+    return cli.post("/os/api/acomp/9104/obs/%s/excluir" % id_obs, json={"wid": 2}).get_json()
+
+
+def test_o_unico_comentario_apagado_desfaz_a_atividade_que_ele_iniciou(cron, fila):
+    cli = _cliente()
+    cli.get(URL)
+    _comentar(cli)
+    j = _excluir(cli, cron["banco"][0]["id"])
+    assert j["ok"] is True and "foi desfeita" in j["atividade"]["mensagem"]
+    assert [p[0] for p in cron["pedidos"]] == ["iniciar", "finalizar", "excluir"] and cron["registros"] == []
+    assert _comentar(cli, "Agora no chamado certo.")["atividade"]["ok"] is True      # o próximo inicia de novo
+
+
+def test_apagado_com_outros_comentarios_o_inicio_passa_ao_primeiro_em_vigor_na_finalizacao(cron, fila):
+    cli = _cliente()
+    cli.get(URL)
+    _comentar(cli, "Primeiro.")
+    cron["banco"].append({"id": "o2", "quando": (dt.datetime.now(BRT) + dt.timedelta(hours=2)).isoformat(), "os": "9104",
+                          "tipo": "obs", "texto": "Segundo.", "quem": "", "email": "", "ativo": "", "extra": {}})
+    j = _excluir(cli, cron["banco"][0]["id"])
+    assert j["atividade"] == {} and [p[0] for p in cron["pedidos"]] == ["iniciar"]    # na hora, nada
+    cli.post("/os/api/acomp/9104/finalizar", json={"wid": 2})
+    acao, rid, ini, fim = cron["pedidos"][-1]
+    assert acao == "editar" and ini == dt.datetime.fromisoformat(cron["banco"][1]["quando"]) and fim is not None
+
+
+def test_a_atividade_que_nao_nasceu_de_comentario_nao_e_desfeita(cron, fila):
+    """Iniciada à mão pela página da OS (o início não bate com a hora de nenhum comentário): o Nexus não mexe."""
+    cli = _cliente()
+    cli.get(URL)
+    cron["estado"] = "rodando"
+    cron["registros"].append({"id": 1, "initial_date": "2026-11-01T12:00:00Z", "final_date": None})
+    _comentar(cli)                                                             # já tinha atividade: não inicia
+    j = _excluir(cli, cron["banco"][0]["id"])
+    assert j["atividade"] == {} and not cron["pedidos"] and cron["estado"] == "rodando"
+
+
+def test_apagar_o_primeiro_e_depois_o_segundo_desfaz_a_atividade(cron, fila):
+    """A atividade nasceu do 1º (já apagado); apagado o último que restava, ela é desfeita."""
+    cli = _cliente()
+    cli.get(URL)
+    _comentar(cli, "Primeiro.")
+    _comentar(cli, "Segundo.")
+    assert _excluir(cli, cron["banco"][0]["id"])["atividade"] == {}
+    j = _excluir(cli, cron["banco"][1]["id"])
+    assert "foi desfeita" in j["atividade"]["mensagem"] and cron["registros"] == []

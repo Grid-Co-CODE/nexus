@@ -327,6 +327,7 @@ RPC_EXEC_TYPES = "tasks.wo_tasks_execution_types_list"
 # editar um registro de execução (o início e o fim): capturado no Fracttal web pelo Levi em 09/11/2026 (o id do registro,
 # o início em UTC com o Z, `to_pause` False e `to_stop` True: o registro segue encerrado)
 RPC_EXEC_UPDATE = "tasks.wo_tasks_execution_update"
+RPC_EXEC_DELETE = "tasks.work_orders_tasks_execution_delete"   # apaga um registro (só o dono; o App de Campo usa)
 
 _PAUSA_CACHE = []       # UMA lista, que nunca é religada: o `api._PAUSA_CACHE` é este mesmo objeto (o `motivos_pausa` muda o conteúdo)
 
@@ -489,6 +490,18 @@ def editar_execucao(id_execucao, inicio, fim=None) -> dict:
     res = api._rpc_call(RPC_EXEC_UPDATE, params)
     if isinstance(res, dict) and res.get("success") is False:
         return {"ok": False, "erro": str(res.get("message") or "o Fracttal recusou a edição do registro").replace("_", " ")}
+    return {"ok": True}
+
+
+def excluir_execucao(id_execucao) -> dict:
+    """Apaga um registro de execução. Só funciona com a conta de quem o abriu (a trava é do dono: o App de Campo, 26/08).
+    Usado no registro JÁ ENCERRADO: apagar o que está rodando deixa a tarefa órfã (o caso do App de Campo em 08/2026); o
+    encerrado apagado devolve a tarefa a NO_STARTED (provado no TESTE - PA em 15/11/2026, OS 19580)."""
+    if not id_execucao:
+        return {"ok": False, "erro": "Falta o registro."}
+    res = api._rpc_call(RPC_EXEC_DELETE, {"id": id_execucao})
+    if isinstance(res, dict) and res.get("success") is False:
+        return {"ok": False, "erro": str(res.get("message") or "o Fracttal recusou apagar o registro").replace("_", " ")}
     return {"ok": True}
 
 

@@ -1222,7 +1222,7 @@ from os_execucao import (  # noqa: E402,F401
     RPC_WO_EXEC_LIST, RPC_WO_FORMIT_VALUES, RPC_WO_SEC_VALIDATE, RPC_WO_TASKS_NEW, SIMNAO_OPCOES, TIPO_CAMPO,
     VERIF_OPCOES, _CHECKLIST_SEM_PERMISSAO, _PAUSA_CACHE, _dono_execucao, execucao_atual, execucoes_abertas,
     editar_execucao, execucoes_da_tarefa, fechar_execucoes_abertas, finalizar_execucao, finalizar_execucao_os,
-    historico_execucao,
+    historico_execucao, excluir_execucao,
     id_tarefa_da_os, iniciar_execucao, iniciar_execucao_os, marcar_em_execucao, motivos_pausa, pausar_execucao,
     registrar_execucao, retomar_execucao, salvar_subtarefas, subtarefas_da_tarefa, tempo_trabalhado,
     tempo_trabalhado_em_massa, validar_seguranca_tarefa, anexos_do_item, anexar_no_item, tirar_do_item,
