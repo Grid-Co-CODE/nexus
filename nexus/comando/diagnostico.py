@@ -47,8 +47,10 @@ Responda SÓ com o bloco abaixo, em JSON válido, sem nada antes ou depois, sem 
 - "os": o número de uma OS do dossiê ligada ao item, ou null. Nunca invente OS, pendência ou número.
 - "destino": para onde o supervisor vai a partir do item, ou null:
   - {"pedir": "<nome exato de um setor da lista <setores>>"} quando o item é pedir ou cobrar algo de outro setor (ex.: "Solicitar à Engenharia a revisão dos ajustes", "Cobrar o retorno dos chamados"). O que depende da concessionária (a rede, a tensão, o chamado com a distribuidora) é pedido ao COS, que abre o chamado com a rede. Os chamados de garantia (cobrar o retorno do fabricante, o andamento do chamado) são da área Chamados, dentro da Performance: peça a "Chamados" quando estiver na lista; senão, à Performance.
-  - {"ver": "<onde>"} quando o item é olhar ou decidir algo numa tela: "aprovacao" (aprovar as OS em verificação), "engenharia" (a análise da Engenharia), ou uma parte do prontuário: "performance", "os", "rondas", "seguranca", "cos", "chamados", "insights", "demandas".
-  - Quando o item já tem a OS, a OS abre sozinha: use "destino" só se houver também um pedido a um setor.
+  - {"ver": "<onde>"} quando o item é olhar ou decidir algo numa tela: "aprovacao" (aprovar as OS em verificação), "engenharia" (a análise da Engenharia), "extintores" (a lista dos extintores vencidos, a vencer e sem conferência), ou uma parte do prontuário: "performance", "os", "rondas", "seguranca", "cos", "chamados", "insights", "demandas".
+  - Os dois juntos quando servem: {"pedir": "...", "ver": "..."} (ex.: conferir os extintores: pedir à Segurança e ver a lista).
+  - Quando o item já tem a OS, a OS abre sozinha: use "destino" só se houver também um pedido a um setor ou uma tela.
+- Cada assunto numa lista só: o que o supervisor tem que fazer não se repete em "pendente"; "pendente" é só o que espera outra pessoa ou empresa.
 - Lista vazia quando não houver nada."""
 
 _RX_BLOCO = re.compile(r"[<‹]diagnostico>\s*(.*?)\s*(?:[<‹]/diagnostico>|$)", re.S | re.I)
@@ -60,7 +62,8 @@ def _limpo(txt, limite: int) -> str:
     return t if len(t) <= limite else t[:limite - 1].rstrip() + "…"
 
 
-VER = ("aprovacao", "engenharia", "performance", "os", "rondas", "seguranca", "cos", "chamados", "insights", "demandas")
+VER = ("aprovacao", "engenharia", "extintores", "performance", "os", "rondas", "seguranca", "cos", "chamados", "insights",
+       "demandas")
 
 
 def _sem_acento(s) -> str:
@@ -82,6 +85,14 @@ def _destino(x: dict, setores: list[dict]) -> dict | None:
         return None
     onde = _sem_acento(d.get("ver"))
     return {"tipo": "ver", "onde": onde} if onde in VER else None
+
+
+def _ver(x: dict) -> str:
+    """O "ver" do item, mesmo junto do "pedir" (15/11/2026, Levi: "além da pessoa clicar em fazer, também poder clicar em
+    ver"): só lugar da lista."""
+    d = x.get("destino")
+    onde = _sem_acento(d.get("ver")) if isinstance(d, dict) else ""
+    return onde if onde in VER else ""
 
 
 def ler(texto: str, dossie: str, setores: list[dict] | None = None) -> dict | None:
@@ -113,7 +124,8 @@ def ler(texto: str, dossie: str, setores: list[dict] | None = None) -> dict | No
                 continue
             os_ = str(x.get("os") or "").strip()
             os_ = os_ if os_ in mapa else ""
-            itens.append({"texto": txt, "os": os_, "os_tipo": mapa.get(os_, ""), "destino": _destino(x, setores or [])})
+            itens.append({"texto": txt, "os": os_, "os_tipo": mapa.get(os_, ""), "destino": _destino(x, setores or []),
+                          "ver": _ver(x)})
         out[lista] = itens
     return out
 

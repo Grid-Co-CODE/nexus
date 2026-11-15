@@ -655,18 +655,21 @@ def limpar_citacoes(texto: str) -> str:
     return "\n".join(linhas).strip()
 
 
+# a OS do COS é a de religamento: abre o CARD da OS, como o COS do prontuário (15/11/2026, Levi: "Quando é OS de
+# ligamento, você tem que abrir o card da OS do histórico de OS [...] o raio-x [...] não deveria aparecer em religamento");
+# ela vence a Performance, onde a mesma OS aparece de novo nos eventos da disponibilidade
 _SECAO_DO_TIPO = (("chamado", ("chamados de garantia",)), ("engenharia", ("engenharia",)),
-                  ("performance", ("performance", "cos")))
+                  ("religamento", ("cos",)), ("performance", ("performance",)))
 
 
 def os_do_dossie(dossie: str) -> dict[str, str]:
     """{nº da OS: o tipo} das OS que o dossiê cita, pelo lugar onde aparecem: "chamado" (a seção dos chamados de
-    garantia), "engenharia", "performance" (a Performance e o COS) ou "os" (o resto). A tela abre o Raio X da OS para os
-    três primeiros e o card da OS para o resto (14/11/2026, Levi: "se for chamados, engenharia ou performance seria
+    garantia), "engenharia", "religamento" (o COS), "performance" ou "os" (o resto). A tela abre o Raio X da OS para o
+    chamado, a Engenharia e a Performance, e o card da OS para o religamento e o resto (14/11/2026, Levi: "se for chamados, engenharia ou performance seria
     melhor que abrisse um card do raio x da OS pelos quadro de equipe e garantia"). Conta como OS o número de 4 a 6
     dígitos numa linha que fala de OS."""
     mapa, secao, col_os = {}, "", None
-    peso = {"chamado": 0, "engenharia": 1, "performance": 2, "os": 3}
+    peso = {"chamado": 0, "engenharia": 1, "religamento": 2, "performance": 3, "os": 4}
 
     def poe(n, tipo):
         if n not in mapa or peso[tipo] < peso[mapa[n]]:

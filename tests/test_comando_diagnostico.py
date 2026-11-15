@@ -26,7 +26,7 @@ def test_le_o_json_limpa_as_secoes_e_tira_a_os_que_nao_esta_no_dossie():
                                                         "Cobrar a análise da recorrência da 27"]
     assert d["tem_que_fazer"][1]["os"] == ""                       # 99999 não está no dossiê: não vira link
     assert d["pode_fazer"] == [{"texto": "Pedir à concessionária o registro das oscilações", "os": "", "os_tipo": "",
-                                "destino": None}]
+                                "destino": None, "ver": ""}]
     assert [x["texto"] for x in d["pendente"]] == ["Chamado da Brametal sem retorno há 22 dias"]
     # sem o JSON: None (a tela mostra o texto); o bloco cortado no fim ainda serve
     assert DG.ler("A usina está bem.", DOSSIE) is None and DG.ler('<diagnostico>{"situacao": ""}', DOSSIE) is None
@@ -128,6 +128,11 @@ def test_cada_item_tem_o_destino_validado():
                                                        {"tipo": "ver", "onde": "aprovacao"}, None]
     assert [x["destino"] for x in d["pendente"]] == [{"tipo": "pedir", "setor_id": 7, "setor": "COS"},
                                                      {"tipo": "ver", "onde": "engenharia"}]
+    # o "ver" junto do "pedir" (15/11/2026: "além da pessoa clicar em fazer, também poder clicar em ver")
+    junto = DG.ler('<diagnostico>{"situacao": "Ok.", "tem_que_fazer": [{"acao": "Conferir os 13 extintores", "os": null, '
+                   '"destino": {"pedir": "Engenharia", "ver": "extintores"}}]}</diagnostico>', DOSSIE, setores)
+    assert junto["tem_que_fazer"][0]["destino"]["setor"] == "Engenharia" and junto["tem_que_fazer"][0]["ver"] == "extintores"
+    assert "Cada assunto numa lista só" in DG.PEDIDO
 
 
 def test_o_pedido_preenchido_recusa_o_que_nao_e_numero(tela, logado):

@@ -18,7 +18,7 @@
   }
   function osDiag(n, tipo) {
     if (!n) return '';
-    if (tipo === 'os' || !tipo) {
+    if (tipo === 'os' || tipo === 'religamento' || !tipo) {
       return ' <button type="button" class="pu-diag-os" data-pu-os="' + escD(n) + '" title="Abrir o card da OS ' + escD(n) + '">Ver OS ' + escD(n) + '</button>';
     }
     var de = tipo === 'chamado' ? '?de=garantias' : (tipo === 'performance' ? '?de=performance' : '');
@@ -28,7 +28,9 @@
   // o destino do item (14/11/2026, Levi: "todos esses tem que ter um botão para dar o destino [...] fazer [...] E aí já
   // vai preenchido automático [...] visualizar [...] solicitar ao COS"): o "Fazer" abre o Pedir a um setor da usina já
   // preenchido (o setor, o título, o texto e a OS), na janela por cima; o "Visualizar" leva à tela ou ao cartão
-  var VER_TELA = {aprovacao: function () { return nexusRota('/t/campo/aprovacao'); },
+  // a Aprovação de OS já filtrada pela usina (15/11/2026, Levi: "Tem que estar filtrado"; o filtro da usina é do chat da
+  // Usinas 360°, avisado do ?usina=<id>)
+  var VER_TELA = {aprovacao: function (uid) { return nexusRota('/t/campo/aprovacao') + '?usina=' + encodeURIComponent(uid); },
                   engenharia: function () { return nexusRota('/t/engenharia/mesa'); }};
   var VER_CARTAO = {performance: 'perf', os: 'os', rondas: 'rondas', seguranca: 'seg', cos: 'cos', chamados: 'chamados',
                     insights: 'insights', demandas: 'demandas'};
@@ -37,24 +39,33 @@
     if (/s$/i.test(s) && !/^[A-Z]+$/.test(s)) return 'a ';          // "Chamados": "Solicitar a Chamados"
     return /(a|ção|dade|ance)$/i.test(s) ? 'à ' : 'ao ';
   }
+  // o Visualizar: a tela (noutra aba), a lista dos extintores (na janela por cima) ou o cartão do prontuário
+  function verDiag(el, onde) {
+    var uid = el.getAttribute('data-pu-diag-usina'), nome = el.getAttribute('data-pu-diag-nome') || '';
+    if (!onde) return '';
+    if (VER_TELA[onde]) {
+      return ' <a class="pu-diag-bt" href="' + escD(VER_TELA[onde](uid)) + '" target="_blank" rel="noopener">Visualizar</a>';
+    }
+    if (onde === 'extintores') {
+      var u = nexusRota('/t/campo/responsaveis/usina/' + uid + '/extintores');
+      return ' <a class="pu-diag-bt" href="' + escD(u) + '" data-pu-jan="' + escD(u) + '" data-pu-jan-t="Extintores · ' + escD(nome) + '">Visualizar</a>';
+    }
+    var sec = VER_CARTAO[onde];
+    if (!sec || !document.getElementById('pu-' + sec)) return '';
+    return ' <a class="pu-diag-bt" href="#pu-' + sec + '" data-pu-abre="' + sec + '">Visualizar</a>';
+  }
   function botaoDiag(el, j, lista, x) {
     var d = x.destino;
-    if (!d) return '';
-    if (d.tipo === 'ver') {
-      if (VER_TELA[d.onde]) {
-        return ' <a class="pu-diag-bt" href="' + escD(VER_TELA[d.onde]()) + '" target="_blank" rel="noopener">Visualizar</a>';
-      }
-      var sec = VER_CARTAO[d.onde];
-      if (!sec || !document.getElementById('pu-' + sec)) return '';
-      return ' <a class="pu-diag-bt" href="#pu-' + sec + '" data-pu-abre="' + sec + '">Visualizar</a>';
-    }
-    if (d.tipo !== 'pedir' || !d.setor_id) return '';
+    // o "ver" junto do "pedir" (15/11/2026: "além da pessoa clicar em fazer, também poder clicar em ver"); o diagnóstico
+    // guardado de antes só tem o destino
+    var ver = verDiag(el, x.ver || (d && d.tipo === 'ver' ? d.onde : ''));
+    if (!d || d.tipo !== 'pedir' || !d.setor_id) return ver;
     var uid = el.getAttribute('data-pu-diag-usina'), nome = el.getAttribute('data-pu-diag-nome') || '';
     var desc = x.texto + '\n\nDo Nexus IA Insights de ' + (j.data || 'hoje') + ' da ' + nome + ': ' + ((j.diag || {}).situacao || '');
     var url = nexusRota('/t/comando/conversa/usina/' + uid + '/janela') + '?aba=pedir&setor=' + encodeURIComponent(d.setor_id) +
       '&titulo=' + encodeURIComponent(x.texto) + '&descricao=' + encodeURIComponent(desc) + (x.os ? '&os=' + encodeURIComponent(x.os) : '');
     var rot = lista === 'pendente' ? 'Solicitar ' + artigo(d.setor) + d.setor : 'Fazer';
-    return ' <a class="pu-diag-bt pu-diag-bt--fazer" href="' + escD(url) + '" data-pu-jan="' + escD(url) +
+    return ver + ' <a class="pu-diag-bt pu-diag-bt--fazer" href="' + escD(url) + '" data-pu-jan="' + escD(url) +
       '" data-pu-jan-t="Pedir a um setor · ' + escD(nome) + '" title="Pedir ' + escD(artigo(d.setor) + d.setor) +
       ', já preenchido">' + escD(rot) + '</a>';
   }

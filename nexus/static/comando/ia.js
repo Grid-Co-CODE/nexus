@@ -49,7 +49,7 @@
       h = h.replace(/(^|[^\d.,#])(\d{4,6})(?![\d]|[.,]\d)/g, function (t, antes, n) {
         var tipo = mapaOs[n];
         if (!tipo) return t;
-        if (tipo === 'os') {
+        if (tipo === 'os' || tipo === 'religamento') {
           return antes + '<button type="button" class="ia-os" data-ia-os="' + n + '" title="Abrir o card da OS ' + n + '">' + n + '</button>';
         }
         var de = tipo === 'chamado' ? '?de=garantias' : (tipo === 'performance' ? '?de=performance' : '');

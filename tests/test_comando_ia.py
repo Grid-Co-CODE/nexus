@@ -314,8 +314,11 @@ def test_o_mapa_das_os_pelo_lugar_no_dossie():
          "## 6. Engenharia\n\n- Acompanhamento: OS de análise 18001\n\n"
          "## 8. Chamados de garantia\n\n| OS | Equipamento |\n| --- | --- |\n| 16453 | Tracker |\n\n"
          "## 14. Linha do tempo\n\n- 15/10 chamado aberto (OS 16453); geração de 1.234,5 MWh\n")
-    assert IA.os_do_dossie(d) == {"19375": "performance", "15297": "os", "17077": "os", "18001": "engenharia",
+    # a OS do COS é a de religamento: o card (15/11/2026, Levi: "o raio-x [...] não deveria aparecer em religamento"); ela
+    # vence a Performance, onde a mesma OS aparece de novo nos eventos da disponibilidade
+    assert IA.os_do_dossie(d) == {"19375": "religamento", "15297": "os", "17077": "os", "18001": "engenharia",
                                   "16453": "chamado"}
+    assert IA.os_do_dossie(d + "## 3. Performance\n\n- Eventos da disponibilidade: OS 19375 (54 min)\n")["19375"] == "religamento"
 
 
 def test_a_resposta_leva_as_os_do_dossie_e_a_acao_perde_a_os_inventada(monkeypatch):
