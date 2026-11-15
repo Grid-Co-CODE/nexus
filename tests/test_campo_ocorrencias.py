@@ -643,11 +643,12 @@ def test_o_responsavel_ganha_a_permissao_sem_sair_e_entrar(cad, cliente):
     _aba(cad, "cadastro_nexus", "usinas", [dict(u, responsavel_om_id={1: 91, 2: 91}.get(u["usina_id"])) for u in USINAS])
     visao.limpar()
     c = _entra(cliente, RESP)                                      # a Coração 1 ainda sem o Responsável O&M dela
-    assert "Nova ocorrência" not in c.get("/t/campo/ocorrencias").get_data(as_text=True)
+    # o botão de registrar: "Nova ocorrência" ou, com o banco sem nenhuma, "Registrar a primeira" (15/11/2026)
+    assert 'href="/t/campo/ocorrencias/nova' not in c.get("/t/campo/ocorrencias").get_data(as_text=True)
     _aba(cad, "cadastro_nexus", "usinas", [dict(u, responsavel_om_id={1: 91, 2: 91, 3: 90}.get(u["usina_id"]))
                                            for u in USINAS])
     visao.limpar()
-    assert "Nova ocorrência" in c.get("/t/campo/ocorrencias").get_data(as_text=True)
+    assert 'href="/t/campo/ocorrencias/nova' in c.get("/t/campo/ocorrencias").get_data(as_text=True)
 
 
 def test_a_leitura_que_falha_espera_antes_de_tentar_de_novo(banco, monkeypatch):

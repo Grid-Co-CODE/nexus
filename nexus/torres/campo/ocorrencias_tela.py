@@ -8,7 +8,7 @@ recusa volta na mesma página, com o porquê e o que a pessoa digitou.
 """
 import logging
 import time
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 
 from flask import abort, redirect, render_template, request, session, url_for
 
@@ -138,8 +138,14 @@ def ocorrencias():
     abertas = [i for i in itens if i["o"]["aberta"]]
     numeros = {"abertas": len(abertas), "atrasadas": sum(i["o"]["atrasada"] for i in abertas),
                "sem_plano": sum(not i["o"]["acoes_abertas"] for i in abertas)}
+    # nenhuma ocorrência no banco (lido de verdade): a tela convida a registrar a primeira, sem zeros nem lista vazia
+    # (15/11/2026; em produção eram 0 e a tela dizia "Nenhuma ocorrência com esse filtro" sem filtro nenhum)
+    nenhuma = lido["lido_em"] is not None and not est
+    lido_hora = (datetime.fromtimestamp(lido["lido_em"], timezone(timedelta(hours=-3))).strftime("%H:%M")
+                 if lido["lido_em"] is not None else "")
     return render_template("campo/ocorrencias.html", **_comum(
-        cad=cad, quem=quem, lido=lido, sem_chave=cofre is None, lista=lista, colunas=colunas,
+        cad=cad, quem=quem, lido=lido, lido_hora=lido_hora, nenhuma=nenhuma, sem_chave=cofre is None, lista=lista,
+        colunas=colunas,
         quadro_max=QUADRO_FINALIZADAS, ver=ver, f={"responsavel": responsavel, "usina": usina, "status": st,
                                                     "criticidade": crit},
         opcoes_responsavel=nomes, numeros=numeros, todos=TODOS, url=_url))

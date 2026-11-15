@@ -74,7 +74,8 @@ def test_a_tela_mostra_o_podio_a_classificacao_e_quem_esta_fora(ranking, logado)
     podio = _texto(html.split('class="rk-podio"', 1)[1].split('class="cn-numeros"', 1)[0])
     assert re.search(r"1º lugar Ana Souza SP Norte 01 1\.480 pts .*2º lugar Bruno Lima .*1\.137 pts .*3º lugar Carla Dias", podio)
     assert "Davi Rocha" not in podio                                               # o pódio são três
-    assert "Classificados 4 técnicos no mês" in t and "Fora do ciclo 1 " in t and "Líder 1.480 pontos" in t
+    assert "Classificados 4 técnicos no mês" in t and "Fora do ciclo 1 " in t
+    assert "Líder" not in t                       # 15/11/2026: repetia o 1º lugar do pódio (test_campo_ranking_ocorrencias_desenho_15_11)
     assert "Média do mês 1.040 pontos por técnico classificado" in t             # (1480+1137+905+640)/4
     fora = _texto(html.split("Fora do ciclo</span></h2>", 1)[1])
     assert "Eva Prado SC Oeste 01 210 40 90% 6 tarefas registradas — o mínimo é 10" in fora

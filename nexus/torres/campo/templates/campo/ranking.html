@@ -32,8 +32,10 @@
    horário programado entra como fora do horário (o `bool(None)` do App). Mudou lá, muda aqui. #}
 {% macro como_ler() %}
   {% call explica('Como o App calcula cada coluna') %}
+    {# a procedência num lugar só (15/11/2026): o "calculado em" fica no canto; a hora em que o Nexus leu o livro vem aqui,
+       como nas outras telas revisadas (até ali era a barra "livro do ranking do App · lido às") #}
     <p><b>Como o App calcula.</b> O placar é de {{ mes_txt }} (o App chama o mês de ciclo): o App calcula e publica aqui de
-    hora em hora, e o Nexus não recalcula.</p>
+    hora em hora, e o Nexus não recalcula{% if lido %} (lido pelo Nexus às {{ lido }}){% endif %}.</p>
     <dl class="gc-explica-termos">
       {{ termo('Total') }}<dd>A soma que define a posição: pontos de tarefas + pontos de rondas + bônus. No empate, fica na
         frente quem tem mais tarefas contadas.</dd>
@@ -85,7 +87,6 @@
     <select class="gc-campo" name="regiao" aria-label="Região" onchange="this.form.submit()">
       <option value="">todas as regiões</option>{% for r in regioes %}<option value="{{ r }}"{% if r == regiao %} selected{% endif %}>{{ r }}</option>{% endfor %}
     </select>
-    <span class="cn-barra-fonte">livro do ranking do App · lido às {{ lido }}</span>
   </form>
   {# o filtro suspenso (10/11/2026, Levi: "a estrutura de filtros usando como referência os filtros de histórico de OS, um filtro suspenso e simples"): o campo-filtros.js monta o botão Filtros, o painel com o Aplicar e as etiquetas com as listas deste formulário #}
   <script src="{{ url_for('static', filename='campo-filtros.js') }}"></script>
@@ -135,10 +136,10 @@
   </div>
   {% endif %}
 
+  {# sem o "Líder" (15/11/2026): repetia os pontos do 1º lugar do pódio, logo acima #}
   <div class="cn-numeros">
     <span><span class="gc-rotulo">Classificados</span><span class="v">{{ classificacao|length }}</span><span class="d">técnicos no mês</span></span>
     <span><span class="gc-rotulo">{{ fora_do_ciclo() }}</span><span class="v">{{ fora|length }}</span><span class="d">sem o mínimo de tarefas ou do programado</span></span>
-    <span><span class="gc-rotulo">Líder</span><span class="v">{{ pts(classificacao[0].total) if classificacao else '—' }}</span><span class="d">pontos</span></span>
     <span><span class="gc-rotulo">Média do mês</span><span class="v">{{ pts(media) if media is not none else '—' }}</span><span class="d">pontos por técnico classificado</span></span>
   </div>
 

@@ -70,6 +70,12 @@ Levi: "Quero que traga o ranking de pontos dos técnicos para o Nexus. Cria uma 
 Campo!". É o placar do CICLO do App: a régua de 01/09/2026 revista em 30/09 (`_ciclo_v2` no `function_app.py`; o App
 Setting `PLACAR_V2` diz se é ela que o técnico vê), a mesma da aba "Ranking por colaborador" do painel do App.
 
+**Revisão de desenho (15/11/2026**, Levi: "segue com Ranking e Ocorrências"): saiu o número **"Líder"** (repetia os pontos
+do 1º lugar do pódio, logo acima; ficam Classificados, Fora do ciclo e Média do mês) e a **procedência ficou num lugar
+só**: o "calculado em" no canto; a hora em que o Nexus leu o livro foi para o "!" do título (até ali era também a barra
+"livro do ranking do App · lido às"). **O e-mail do pódio FICA:** o RH paga o prêmio pelo e-mail (Fillipe Figueiró,
+03/11/2026); a auditoria de 12/11 propunha tirar sem saber disso. Prova: `test_campo_ranking_ocorrencias_desenho_15_11.py`.
+
 - **Quem calcula é o App, e o Nexus não recalcula** (`visao.ranking_pontos`, `campo/ranking.html`): o App publica o
   placar no livro `ranking_app_campo` (aba `Ranking`), de hora em hora aos :25, junto com os outros livros: 1 linha =
   1 técnico × 1 mês (o corrente e o anterior), com quem está FORA DO CICLO (o motivo, sem posição). Recalcular já deu
@@ -139,6 +145,13 @@ Setting `PLACAR_V2` diz se é ela que o técnico vê), a mesma da aba "Ranking p
 Levi: "Próximas peças: o mapa das usinas e as ocorrências com plano de ação. siga!". A origem é o painel próprio de um
 supervisor (a ocorrência, o histórico e o plano de ação, em quadro e lista); o objetivo é largar o painel próprio e usar
 só o Nexus. Desenho e as decisões dele no quiz: `docs/superpowers/specs/2026-10-18-ocorrencias-plano-de-acao-design.md`.
+
+**Revisão de desenho (15/11/2026)**: o "!" ao lado do título, como nas outras telas (o que é, quem registra, a ordem e o
+lido às), e o eyebrow sem repetir o nome. **Sem nenhuma ocorrência no banco** (em 15/11 eram 0 em produção), a tela
+convida a registrar a primeira (`.oc-vazio-inicio`: o que é uma ocorrência e o botão "Registrar a primeira" para quem
+grava, ou quem registra para quem não grava), no lugar dos três zeros, dos filtros, do cabeçalho de uma lista sem
+linhas e do "Nenhuma ocorrência com esse filtro" sem filtro nenhum. Com ocorrências e o filtro vazio, a lista diz "com
+esse filtro" sem o cabeçalho. Prova: `test_campo_ranking_ocorrencias_desenho_15_11.py`.
 
 - **O Nexus é a fonte, no banco:** `nexus_ocorrencias · fato_evento_ocorrencia` (`nexus/campo/ocorrencias.py`), um
   evento por linha (`criou`, `dados`, `acao`, `andamento`), só acrescenta; o estado sai dos eventos (`estado`: vale a
