@@ -3146,7 +3146,11 @@ chamado, se tiver só um ativo"; no quiz, o fim na finalização, também os abe
 - **O risco, escolhido sabendo:** no Fracttal a atividade é de quem a iniciou e só ela encerra; a OS com atividade aberta
   não conclui (o `work_orders_recalculate`; o caso da OS 10215). Se outra pessoa finalizar, o Finalizar não tenta concluir
   e diz no nome de quem a atividade está.
-- **Prova:** `tests/test_oscreator_garantias_atividade_15_11.py`; no Fracttal, no TESTE - PA (ver o commit).
+- **Prova:** `tests/test_oscreator_garantias_atividade_15_11.py`; no Fracttal, no TESTE - PA (15/11/2026, OS 19577 e 19578,
+  uma tarefa cada, criadas para isso e concluídas), lida de volta: o `work_orders_tasks_execution_insert` grava o início
+  pedido (3 h atrás, ao segundo); a mesma conta tem duas atividades rodando em OS diferentes; o `finish` encerra, e o
+  concluir (`change_status` 3 + `recalculate_new`) fecha a OS com um registro só, sem lançar outro. Não provado (precisa de
+  duas contas): a atividade de outra pessoa barrando o concluir, que é o caso conhecido da OS 10215.
 
 ## Garantias: a OS abre a página da OS da Engenharia (09/11/2026)
 
