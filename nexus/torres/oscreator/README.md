@@ -3302,10 +3302,15 @@ Performance). Abre sozinha ao entrar na tela, no setor dela; o "Fazer manualment
 - **No ar em teste (15/11/2026, Levi: "uma janela de teste no Nexus pra gente testar"):** só o administrador do Nexus vê a
   janela e usa o preencher; a ponte marca cada pedido (`ponte.ia_liberada`, `os_web.ia_liberada`), e os outros veem a
   Nova solicitação de sempre. `NEXUS_PEDIR_COM_IA=1` no `.env` libera para todos; o cartão do Início entra junto.
-- **A IA:** o Nemotron 3 Ultra grátis do OpenRouter, na chave 4 da aba IA (Base › Chaves das fontes, a "só para o OS
-  Creator"), pelo gancho `solic_ia.CHAVE` que a ponte liga (`nexus.comando.ia.chave_os_creator`, relida a cada pedido).
-  Fora do rodízio da Nexus IA. O grátis dá 50 pedidos por dia na conta; cada mensagem gasta um. Sem a chave, a tela diz
-  e nada sai.
+- **A IA:** os modelos grátis do OpenRouter, na chave 4 da aba IA (Base › Chaves das fontes, a "só para o OS Creator"),
+  pelo gancho `solic_ia.CHAVE` que a ponte liga (`nexus.comando.ia.chave_os_creator`, relida a cada pedido). Fora do
+  rodízio da Nexus IA. O grátis dá 50 pedidos por dia na conta; cada mensagem gasta um. Sem a chave, a tela diz e nada sai.
+- **Três modelos, em ordem** (`solic_ia.MODELOS`: Gemma 4 31B, Nemotron 3.5 Super, Nemotron 3 Ultra): o OpenRouter passa
+  sozinho ao seguinte quando um está fora (`models`), cada tentativa espera no máximo 40 s e, sem resposta, o pedido sai de
+  novo uma vez com o que travou no fim da fila; o raciocínio vai no mínimo (`effort: low`). Caso que criou (Levi,
+  15/11/2026, "demorando que só"): o Nemotron 3 Ultra era o único e estava de pé 13% da meia hora nos números públicos do
+  OpenRouter (`/api/v1/models/<modelo>/endpoints`), e o pedido esperava até 90 s. A conversa mostra os segundos enquanto
+  espera, e a ficha diz qual modelo respondeu e em quanto tempo (`ia_info`): é a medida para trocar a ordem.
 - **A IA só propõe; o catálogo decide** (`os_web/solic_ia.py`): cliente e usina pelo nome mais parecido do catálogo, o
   ativo pelo nome com os números iguais ("inversor 2.1" nunca vira o 2.3), empate fica para a pessoa; o tema só se for da
   lista e do tipo do ativo (a regra da Nova solicitação); as subtarefas são as do tema (ou a base) mais até 5 que o pedido

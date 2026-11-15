@@ -5,8 +5,9 @@ ativo, o título, o que fazer, o tema (o do PCM, quando um tema vale para o tipo
 subtarefas (as do tema, ou as da base, mais as que o pedido pede). Para a Performance e a Engenharia a pessoa só escolhe o
 responsável. A data programada é sempre daqui a 6 dias ("a data programada sempre vai ser para 6 dias").
 
-A IA é o Nemotron 3 Ultra grátis do OpenRouter, na chave 4 da aba IA (Base › Chaves das fontes), a do OS Creator: fora do
-rodízio da Nexus IA, uma não gasta a cota da outra. O grátis dá 50 pedidos por dia na conta.
+A IA são os modelos grátis do OpenRouter, na chave 4 da aba IA (Base › Chaves das fontes), a do OS Creator: fora do
+rodízio da Nexus IA, uma não gasta a cota da outra. O grátis dá 50 pedidos por dia na conta. São três, em ordem, e o
+OpenRouter passa ao seguinte quando um cai (`MODELOS`).
 
 A IA só PROPÕE. Quem decide é o catálogo: o cliente, a usina e o ativo valem só se existirem nele (o nome mais parecido,
 com os números iguais: "inversor 2.1" não vira o 2.3), o tema só se for da lista e do tipo do ativo, a subtarefa só com um
@@ -18,6 +19,7 @@ import datetime as dt
 import difflib
 import json
 import re
+import time
 import unicodedata
 from collections import Counter
 
@@ -25,8 +27,14 @@ import requests
 
 CHAVE = None             # gancho da ponte: () -> a chave 4 do OpenRouter ("" sem ela); nexus.comando.ia.chave_os_creator
 URL = "https://openrouter.ai/api/v1/chat/completions"
-MODELO = "nvidia/nemotron-3-ultra-550b-a55b:free"
-TEMPO_S = 90
+# Levi, 15/11/2026, na 2ª prova no ar: "demorando que só". A medida: o Nemotron 3 Ultra grátis só roda num provedor, que
+# estava de pé 13% da última meia hora (os números públicos do OpenRouter), e o pedido esperava até cair. O 1º é o Gemma
+# 4 31B (Google AI Studio, rápido); o OpenRouter passa sozinho ao seguinte quando um está fora (`models`), e o que não
+# responde em TEMPO_S vai para o fim da fila e o pedido sai de novo, uma vez (TENTATIVAS).
+MODELOS = ("google/gemma-4-31b-it:free", "nvidia/nemotron-3.5-super-vl:free", "nvidia/nemotron-3-ultra-550b-a55b:free")
+MODELO = MODELOS[0]
+TEMPO_S = 40             # por tentativa
+TENTATIVAS = 2
 MAX_SAIDA = 6000         # o raciocínio do modelo conta aqui dentro
 MAX_TEXTO = 1200         # o que a pessoa escreve, por mensagem
 MAX_EXTRAS = 5           # as subtarefas que a IA acrescenta às do tema
@@ -218,28 +226,41 @@ def mensagem(texto: str, anterior: dict | None = None) -> str:
 
 
 def chamar(chave: str, sistema: str, usuario: str, post=requests.post) -> dict:
-    """{"texto"} ou {"erro", "status"}. O 429 é a cota do grátis (50 por dia na conta, de volta à meia-noite UTC)."""
-    corpo = {"model": MODELO, "max_tokens": MAX_SAIDA, "temperature": 0.2,
+    """{"texto", "modelo", "segundos"} ou {"erro", "status"}. O 429 é a cota do grátis (50 por dia na conta, de volta à
+    meia-noite UTC). O raciocínio vai no mínimo: o pedido é ler e preencher, e cada passo de raciocínio é espera."""
+    ordem = list(MODELOS)
+    corpo = {"max_tokens": MAX_SAIDA, "temperature": 0.2, "reasoning": {"effort": "low", "exclude": True},
              "messages": [{"role": "system", "content": sistema}, {"role": "user", "content": usuario}]}
-    try:
-        r = post(URL, json=corpo, timeout=TEMPO_S,
-                 headers={"Authorization": "Bearer %s" % chave, "Content-Type": "application/json"})
-    except requests.RequestException as ex:
-        return {"erro": "Sem conexão com o OpenRouter (%s)." % type(ex).__name__}
-    if r.status_code in (401, 403):
-        return {"erro": "O OpenRouter recusou a chave 4 (%d): confira a chave em Base › Chaves das fontes › IA."
-                        % r.status_code, "status": r.status_code}
-    if r.status_code in (402, 429):
-        return {"erro": "A cota grátis da IA acabou por hoje (50 pedidos por dia). Ela volta às 21h; até lá, use a Nova "
-                        "solicitação de sempre.", "status": r.status_code}
-    if r.status_code != 200:
-        return {"erro": "O OpenRouter respondeu %d. Tente de novo em instantes." % r.status_code, "status": r.status_code}
-    try:
-        esc = (r.json().get("choices") or [{}])[0]
-    except ValueError:
-        return {"erro": "O OpenRouter devolveu uma resposta que não deu para ler."}
-    texto = re.sub(r"<think>.*?</think>", "", str((esc.get("message") or {}).get("content") or ""), flags=re.S).strip()
-    return {"texto": texto} if texto else {"erro": "A IA não respondeu. Tente de novo."}
+    for _vez in range(TENTATIVAS):
+        corpo["model"], corpo["models"] = ordem[0], list(ordem)
+        t0 = time.monotonic()
+        try:
+            r = post(URL, json=corpo, timeout=(10, TEMPO_S),
+                     headers={"Authorization": "Bearer %s" % chave, "Content-Type": "application/json"})
+        except requests.Timeout:
+            ordem = ordem[1:] + ordem[:1]          # o 1º não respondeu a tempo: o seguinte vai na frente
+            continue
+        except requests.RequestException as ex:
+            return {"erro": "Sem conexão com o OpenRouter (%s)." % type(ex).__name__}
+        if r.status_code in (401, 403):
+            return {"erro": "O OpenRouter recusou a chave 4 (%d): confira a chave em Base › Chaves das fontes › IA."
+                            % r.status_code, "status": r.status_code}
+        if r.status_code in (402, 429):
+            return {"erro": "A cota grátis da IA acabou por hoje (50 pedidos por dia). Ela volta às 21h; até lá, use a Nova "
+                            "solicitação de sempre.", "status": r.status_code}
+        if r.status_code != 200:
+            return {"erro": "O OpenRouter respondeu %d. Tente de novo em instantes." % r.status_code, "status": r.status_code}
+        try:
+            j = r.json() or {}
+            esc = (j.get("choices") or [{}])[0]
+        except ValueError:
+            return {"erro": "O OpenRouter devolveu uma resposta que não deu para ler."}
+        texto = re.sub(r"<think>.*?</think>", "", str((esc.get("message") or {}).get("content") or ""), flags=re.S).strip()
+        if not texto:
+            return {"erro": "A IA não respondeu. Tente de novo."}
+        return {"texto": texto, "modelo": str(j.get("model") or ordem[0]), "segundos": round(time.monotonic() - t0, 1)}
+    return {"erro": "A IA não respondeu em %d s: os modelos grátis estão lentos agora. Tente de novo em instantes ou use "
+                    "Fazer manualmente." % (TEMPO_S * TENTATIVAS)}
 
 
 def ler_json(texto: str) -> dict:

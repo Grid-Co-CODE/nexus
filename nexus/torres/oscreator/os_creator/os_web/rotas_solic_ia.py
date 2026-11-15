@@ -123,6 +123,7 @@ def preencher():
         _com_c1(f, opcoes_c1, pista=str(lido.get("classif1") or ""))
     f["anterior"] = IA.resumo(f)
     f["usinas_todas"] = _usinas_todas(usinas, codigos)
+    f["ia_info"] = {"modelo": res.get("modelo") or "", "segundos": res.get("segundos")}   # o que respondeu e em quanto tempo
     return jsonify(f)
 
 

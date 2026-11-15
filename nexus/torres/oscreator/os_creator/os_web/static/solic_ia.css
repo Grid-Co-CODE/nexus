@@ -99,6 +99,8 @@ body.os-form .sia-prompt textarea::placeholder{color:var(--sia-mudo)}
 .sia-ficha--feita textarea{pointer-events:none}
 .sia-ficha-h{display:flex;align-items:center;gap:8px;margin-bottom:8px}
 .sia-ficha-t{font-weight:700;font-size:13px}
+.sia-ficha-m{margin-left:auto;font-size:10.5px;color:var(--sia-mudo)}
+.sia-seg{color:var(--sia-mudo)}
 .sia-pill{font-size:10.5px;padding:1px 8px;border-radius:999px;border:1px solid var(--sia-linha);color:var(--sia-mudo-2)}
 .sia-pill--ok{color:var(--sia-ok);border-color:var(--sia-lima-borda);background:var(--sia-lima-suave)}
 .sia-pill--alerta{color:var(--sia-alerta);border-color:var(--sia-alerta-b);background:var(--sia-alerta-fundo)}

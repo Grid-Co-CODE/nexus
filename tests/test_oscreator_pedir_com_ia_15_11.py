@@ -70,8 +70,8 @@ def test_a_resposta_e_lida_mesmo_com_cerca_e_o_raciocinio_sai():
             return self._j
     assert "cota grátis" in IA.chamar("k", "s", "u", post=lambda *a, **k: R(429))["erro"]
     assert "recusou a chave 4" in IA.chamar("k", "s", "u", post=lambda *a, **k: R(401))["erro"]
-    ok = IA.chamar("k", "s", "u", post=lambda *a, **k: R(200, {"choices": [{"message": {"content": "<think>hm</think>{}"}}]}))
-    assert ok == {"texto": "{}"}
+    ok = IA.chamar("k", "s", "u", post=lambda *a, **k: R(200, {"model": "google/gemma-4-31b-it", "choices": [{"message": {"content": "<think>hm</think>{}"}}]}))
+    assert ok["texto"] == "{}" and ok["modelo"] == "google/gemma-4-31b-it" and ok["segundos"] >= 0
 
 
 def test_a_ficha_volta_conferida_no_catalogo(ia):
@@ -248,3 +248,42 @@ def test_a_usina_se_escolhe_sem_o_cliente_e_o_ativo_do_pedido_vem_junto(ia):
                                                 "titulo": f["titulo"], "descricao": f["descricao"],
                                                 "escolhidos": {"cliente": "", "usina": USINA}}).get_json()
     assert (g["cliente"], g["usina"], g["ativo"]["id"], g["tipo"]) == ("Cliente X", USINA, 2, "Inversor") and g["pronta"]
+
+
+def test_o_modelo_fora_do_ar_nao_prende_o_pedido():
+    """Levi, 15/11/2026, na 2ª prova no ar: "demorando que só". O Nemotron grátis estava de pé 13% da meia hora e o pedido
+    esperava até 90 s por ele. Agora vão os três modelos ao OpenRouter (ele passa ao seguinte quando um cai), cada tentativa
+    espera no máximo TEMPO_S, e o que não respondeu vai para o fim da fila na 2ª tentativa."""
+    import requests
+
+    class R:
+        status_code = 200
+
+        def json(self):
+            return {"model": "nvidia/nemotron-3.5-super-vl", "choices": [{"message": {"content": "{}"}}]}
+    enviados = []
+
+    def post(url, json=None, timeout=None, headers=None):
+        enviados.append({"model": json["model"], "models": list(json["models"]), "timeout": timeout,
+                         "reasoning": json.get("reasoning")})
+        if len(enviados) == 1:
+            raise requests.Timeout()
+        return R()
+    r = IA.chamar("k", "s", "u", post=post)
+    assert r["texto"] == "{}" and r["modelo"] == "nvidia/nemotron-3.5-super-vl"
+    assert enviados[0]["models"] == list(IA.MODELOS) and enviados[0]["model"] == IA.MODELOS[0]
+    assert enviados[1]["models"] == list(IA.MODELOS[1:]) + [IA.MODELOS[0]]           # o que não respondeu foi para o fim
+    assert all(e["timeout"] == (10, IA.TEMPO_S) for e in enviados) and IA.TEMPO_S * IA.TENTATIVAS <= 90
+    assert enviados[0]["reasoning"]["effort"] == "low"
+    # nenhum respondeu: a tela diz em quanto tempo desistiu, sem esperar mais
+
+    def nunca(*a, **k):
+        raise requests.Timeout()
+    assert "não respondeu em %d s" % (IA.TEMPO_S * IA.TENTATIVAS) in IA.chamar("k", "s", "u", post=nunca)["erro"]
+
+
+def test_a_ficha_diz_qual_modelo_respondeu_e_em_quanto_tempo(ia, monkeypatch):
+    monkeypatch.setattr(IA, "chamar", lambda *a, **k: {"texto": json.dumps(RESPOSTA), "modelo": "google/gemma-4-31b-it",
+                                                        "segundos": 3.4})
+    f = ia.post("/os/api/solic/ia/preencher", json={"setor": "pcm", "texto": "inversor 1.1"}).get_json()
+    assert f["ia_info"] == {"modelo": "google/gemma-4-31b-it", "segundos": 3.4}

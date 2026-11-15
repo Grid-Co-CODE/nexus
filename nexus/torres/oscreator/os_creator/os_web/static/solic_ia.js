@@ -84,9 +84,12 @@
     msg("eu", "<p>" + esc(t) + "</p>");
     txt.value = ""; ajustar();
     ocupado = true; btnEnviar.disabled = true; marcarEstado("pensando");
-    var pensando = msg("ia", '<p class="sia-pensando">lendo o pedido, o catálogo e os temas<span class="sia-cursor"></span></p>');
+    var pensando = msg("ia", '<p class="sia-pensando">lendo o pedido, o catálogo e os temas<span class="sia-seg"></span><span class="sia-cursor"></span></p>');
+    // os segundos correndo: a IA grátis às vezes demora, e a pessoa vê que o pedido está vivo (Levi, 15/11/2026: "demorando que só")
+    var t0 = Date.now(), seg = pensando.querySelector(".sia-seg");
+    var relogio = setInterval(function () { var n = Math.round((Date.now() - t0) / 1000); if (n >= 3) seg.textContent = " · " + n + " s"; }, 1000);
     pedir("/os/api/solic/ia/preencher", {setor: setor, texto: t, anterior: anterior}).then(function (x) {
-      pensando.remove(); ocupado = false; btnEnviar.disabled = false;
+      clearInterval(relogio); pensando.remove(); ocupado = false; btnEnviar.disabled = false;
       if (!x.ok || x.j.erro) { marcarEstado("erro"); msg("ia", '<p class="sia-aviso">' + esc(x.j.erro || "Não deu certo.") + "</p>", "sia-msg--aviso"); return; }
       marcarEstado("pronto");
       mostrar(x.j);
@@ -106,8 +109,9 @@
     return (a.curto || a.label || a.code) + (resto ? " · " + resto : "");
   }
 
+  var ultimaIA = null;              // o modelo que respondeu e em quanto tempo (a ficha refeita na tela não pede à IA)
   function mostrar(f) {
-    ficha = f; anterior = f.anterior || null;
+    ficha = f; anterior = f.anterior || null; ultimaIA = f.ia_info || null;
     if (noFicha) noFicha.classList.add("sia-ficha--velha");
     var corpo = msg("ia", "", "sia-msg--ficha").querySelector(".sia-txt");
     corpo.appendChild(modelo.content.cloneNode(true));
@@ -121,6 +125,8 @@
   function pintar() {
     var f = ficha, el = noFicha, q = function (s) { return el.querySelector(s); };
     q(".sia-ficha-t").textContent = (f.setor === "pcm" ? "Solicitação ao PCM" : "OS da " + f.setor_nome);
+    var m = ultimaIA && ultimaIA.modelo ? ultimaIA.modelo.split("/").pop().replace(/:free$/, "") : "";
+    q(".sia-ficha-m").textContent = m ? m + (ultimaIA.segundos != null ? " · " + String(ultimaIA.segundos).replace(".", ",") + " s" : "") : "";
     var pill = q(".sia-pill");
     pill.textContent = f.pronta ? "pronta para conferir" : "falta informação";
     pill.className = "sia-pill " + (f.pronta ? "sia-pill--ok" : "sia-pill--alerta");
