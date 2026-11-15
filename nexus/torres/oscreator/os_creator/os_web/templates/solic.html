@@ -29,6 +29,7 @@
       <a class="os-seg-btn" role="tab" aria-selected="false" href="/os/solicitacao/performance">Performance</a>
     </div>
   </div>
+  {% set ia_setor = "pcm" %}{% include "_solic_ia.html" %}
 
   <div class="os-cardf">
     <div class="os-cardf-h"><span class="os-cardf-t">1 · Ativo</span></div>
@@ -115,7 +116,6 @@
   </div>
   <div class="os-resultado" id="resultado" hidden></div>
 </section>
-{% set ia_setor = "pcm" %}{% include "_solic_ia.html" %}
 {% endblock %}
 
 {% block scripts %}
@@ -252,10 +252,13 @@
   document.getElementById("b_sub_add").addEventListener("click", function () {
     subs.push({desc: "", tipo: "texto", anexo: false}); pintarSubs();
   });
+  var cargaSubs = Promise.resolve();       // a última leitura das subtarefas: o Pedir com IA espera por ela
   function carregarSubs() {
-    busca_json("/os/api/solic/subtarefas?tema=" + encodeURIComponent(cbTema.value || "")).then(function (j) {
-      subs = j.subtarefas || []; pintarSubs();
+    var tema = cbTema.value || "";
+    cargaSubs = busca_json("/os/api/solic/subtarefas?tema=" + encodeURIComponent(tema)).then(function (j) {
+      if ((cbTema.value || "") === tema) { subs = j.subtarefas || []; pintarSubs(); }
     });
+    return cargaSubs;
   }
   cbTema.addEventListener("change", function () {
     var op = cbTema.options[cbTema.selectedIndex], c1 = op.getAttribute("data-c1") || "";
@@ -506,6 +509,67 @@
     });
   }
   sugerir();
+
+  // ── o Pedir com IA (15/11/2026, Levi: "tudo é preenchido dentro da tela original mesmo e caso a pessoa precise adicionar
+  //    algo ela pode pedir novamente alguma mudança"; "crie um botão Limpar para tirar tudo o que foi posto"): a caixa de
+  //    texto do Pedir com IA preenche ESTA tela por aqui. Cada campo pela cascata de sempre: o cliente carrega as usinas, a
+  //    usina os ativos, o ativo os temas, o tema as subtarefas e a Classificação 1. O que já está igual não se mexe (no
+  //    pedido de mudança, o ativo marcado à mão e as subtarefas editadas ficam). ──
+  var edObs = document.getElementById("ed_obs"), dtInc = document.getElementById("dt_inc"), dtSug = document.getElementById("dt_sug");
+  var INICIO = {inc: dtInc.value, sug: dtSug.value};
+  function temOpcao(sel, v) { return Array.prototype.some.call(sel.options, function (o) { return o.value === String(v); }); }
+  window.SolicForm = {
+    estado: function () {
+      var m = marcadosLista();
+      return {cliente: cbCli.value, usina: cbUsi.value, tipo: cbTipo.value,
+              ativo: m.map(function (a) { return a.curto || a.label; }).join("; "), titulo: edDesc.value, descricao: edObs.value,
+              tema: cbTema.value, classif1: txt(cbC1),
+              subtarefas: subs.filter(function (s) { return String(s.desc || "").trim(); }).map(function (s) { return {desc: s.desc, tipo: s.tipo}; })};
+    },
+    preencher: function (f) {
+      var p = Promise.resolve();
+      if (f.cliente && cbCli.value !== f.cliente && temOpcao(cbCli, f.cliente)) {
+        p = p.then(function () { cbCli.value = f.cliente; return carregarUsinas(); });
+      }
+      return p.then(function () {
+        if (f.usina && cbUsi.value !== f.usina && temOpcao(cbUsi, f.usina)) { cbUsi.value = f.usina; return carregarAtivos(); }
+      }).then(function () {
+        if (f.tipo && temOpcao(cbTipo, f.tipo)) cbTipo.value = f.tipo;          // o tipo do pedido filtra a tabela
+        var alvo = f.ativo && ativos.filter(function (a) { return a.code === f.ativo.code; })[0];
+        if (alvo && !marcados.has(alvo.code)) { marcados.clear(); marcados.add(alvo.code); }
+        busca.value = ""; limite = PAGINA; pintar(); filtrarTemas();
+        if ((f.tema || "") !== cbTema.value && (!f.tema || temOpcao(cbTema, f.tema))) {
+          cbTema.value = f.tema || "";
+          cbTema.dispatchEvent(new Event("change"));                            // título do tema, a Classificação, as subtarefas
+        }
+        return cargaSubs;               // a leitura das subtarefas em curso (a do tema, ou a da base que o filtro dos temas pediu)
+      }).then(function () {
+        // as subtarefas que o pedido acrescentou (as do tema já vieram pela tela), sem repetir
+        var tem = {};
+        subs.forEach(function (s) { tem[semAcento(s.desc)] = 1; });
+        (f.subtarefas || []).forEach(function (s) {
+          if (s.da_ia && !tem[semAcento(s.desc)]) { subs.push({desc: s.desc, tipo: s.tipo, anexo: !!s.anexo}); tem[semAcento(s.desc)] = 1; }
+        });
+        pintarSubs();
+        if (f.titulo) { edDesc.value = f.titulo; sugerido = ""; }
+        if (f.descricao) edObs.value = f.descricao;
+        if (f.classif1 && f.classif1.id != null && temOpcao(cbC1, f.classif1.id)) cbC1.value = String(f.classif1.id);
+        if (f.programada_iso) dtSug.value = f.programada_iso.replace(" ", "T");
+        previaTitulo(); dicaTema();
+      });
+    },
+    limpar: function () {
+      cbCli.value = ""; busca.value = "";
+      edDesc.value = ""; sugerido = ""; edObs.value = "";
+      ["cb_c1", "cb_grupo", "cb_c2", "cb_tec"].forEach(function (id) { document.getElementById(id).value = ""; });
+      dtInc.value = INICIO.inc; dtSug.value = INICIO.sug; document.getElementById("ck_urg").checked = false;
+      edPai.value = ""; pai = null; avisoPai(""); paiLista.hidden = true;
+      arquivos = []; pintarAnexos("");
+      res.hidden = true; hint.textContent = "";
+      cbTema.value = "";
+      return carregarUsinas().then(function () { filtrarTemas(); previaTitulo(); return carregarSubs(); });
+    }
+  };
 })();
 </script>
 {% if ia and ia.tem_chave %}<script src="{{ estatico('solic_ia.js') }}"></script>{% endif %}

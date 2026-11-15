@@ -221,14 +221,20 @@
   const p2 = (n) => String(n).padStart(2, '0');
   function dataProg() {
     if (BASE === null) return dtProg.textContent;
-    const d = new Date(BASE + (Date.now() - T0) + (ckUrg.checked ? DIAS_URG : DIAS) * 864e5);
+    const d = new Date(BASE + (Date.now() - T0) + diasAgora() * 864e5);
+    if (iaAtivo && !ckUrg.checked) d.setUTCHours(8, 0, 0, 0);       // a do Pedir com IA é às 08:00, como a do servidor
     return p2(d.getUTCDate()) + '/' + p2(d.getUTCMonth() + 1) + '/' + d.getUTCFullYear() + ' ' + p2(d.getUTCHours()) + ':' + p2(d.getUTCMinutes());
   }
+  // a tela preenchida pelo Pedir com IA vai com a programada de 6 dias (a Urgente segue com a dela): a mesma conta do servidor
+  const barraIA = $('sia'), DIAS_IA = Number(barraIA && barraIA.dataset.dias) || DIAS;
+  let iaAtivo = false;
+  function diasAgora() { return ckUrg.checked ? DIAS_URG : iaAtivo ? DIAS_IA : DIAS; }
   function mostrarData() {
     const urg = ckUrg.checked;
     raiz.classList.toggle('eng-e-urgente', urg);
     dtProg.textContent = dataProg();
-    lbPrazo.textContent = '(automática' + (urg ? ', urgente' : '') + ': ' + (urg ? DIAS_URG : DIAS) + ' dias a partir da criação)';
+    lbPrazo.textContent = '(automática' + (urg ? ', urgente' : iaAtivo ? ', Pedir com IA' : '') + ': ' + diasAgora()
+      + ' dias a partir da criação)';
   }
   ckUrg.addEventListener('change', mostrarData);
   setInterval(mostrarData, 30000);
@@ -268,6 +274,10 @@
     if (!confirm(frase + fraseAnexos + '\n\nContinuar?')) return;
     const dados = {ativos: Array.from(marcados), descricao: edDesc.value, problema: taProb.value,
                    responsavel: {id_personnel: resp.id_personnel}, evento: dtEvento.value, urgente: urg, agrupar: agr};
+    if (iaAtivo) {                                         // a tela do Pedir com IA: as subtarefas e a data de 6 dias
+      dados.origem = 'ia';
+      dados.subtarefas = iaSubs.filter((x) => String(x.desc || '').trim()).map((x) => ({desc: x.desc, tipo: x.tipo, anexo: !!x.anexo}));
+    }
     let opcoes;
     if (arquivos.length) {                                 // com anexo: multipart, o MESMO JSON no campo payload
       const fd = new FormData();
@@ -288,6 +298,77 @@
     } catch (e) { mostrar(e.message, true); }
     finally { criando = false; btn.disabled = false; }
   });
+
+  // ── o Pedir com IA (15/11/2026, Levi: "tudo é preenchido dentro da tela original mesmo e caso a pessoa precise adicionar
+  //    algo ela pode pedir novamente alguma mudança"; "crie um botão Limpar para tirar tudo o que foi posto"): a caixa de
+  //    texto (solic_ia.js) preenche ESTA tela por aqui, pela cascata de sempre. As subtarefas só existem com a IA: o cartão
+  //    aparece com elas, editáveis como as do PCM, e vão no criar com `origem: "ia"`. O responsável é a pessoa quem escolhe. ──
+  const subsCard = $('ia_subs_card'), caixaSubs = $('ia_subs');
+  const TIPOS_SUB = {texto: 'Texto', num: 'Numérico', simnao: 'Sim/Não', verif: 'Verificação'};
+  const INICIO = {usinas: cbUsi.innerHTML, evento: dtEvento.value};
+  let iaSubs = [], iaTema = '';
+  function pintarIaSubs() {
+    if (!subsCard) return;
+    subsCard.hidden = !iaAtivo;
+    caixaSubs.innerHTML = iaSubs.map((x, i) => '<div class="os-sub" data-i="' + i + '">'
+      + '<input type="text" class="s-desc" value="' + esc(x.desc) + '" aria-label="Subtarefa ' + (i + 1) + '">'
+      + '<select class="s-tipo" aria-label="Tipo da subtarefa ' + (i + 1) + '">' + Object.keys(TIPOS_SUB).map((t) => '<option value="' + t + '"'
+        + (x.tipo === t ? ' selected' : '') + '>' + TIPOS_SUB[t] + '</option>').join('') + '</select>'
+      + '<label class="os-check"><input type="checkbox" class="s-anexo"' + (x.anexo ? ' checked' : '') + '> foto</label>'
+      + '<button type="button" class="os-btn secondary s-x" title="Remover" aria-label="Remover a subtarefa ' + (i + 1) + '">&times;</button></div>').join('');
+  }
+  if (subsCard) {
+    caixaSubs.addEventListener('click', (e) => {
+      if (!e.target.classList.contains('s-x')) return;
+      iaSubs.splice(Number(e.target.closest('.os-sub').dataset.i), 1); pintarIaSubs();
+    });
+    const ler = (e) => {
+      const d = e.target.closest('.os-sub'), x = d && iaSubs[Number(d.dataset.i)];
+      if (!x) return;
+      if (e.target.classList.contains('s-desc')) x.desc = e.target.value;
+      if (e.target.classList.contains('s-tipo')) x.tipo = e.target.value;
+      if (e.target.classList.contains('s-anexo')) x.anexo = e.target.checked;
+    };
+    caixaSubs.addEventListener('input', ler);
+    caixaSubs.addEventListener('change', ler);
+    $('ia_sub_add').addEventListener('click', () => { iaSubs.push({desc: '', tipo: 'texto', anexo: false}); pintarIaSubs(); });
+  }
+  const temOpcao = (sel, v) => Array.prototype.some.call(sel.options, (o) => o.value === String(v));
+  window.SolicForm = {
+    estado() {
+      return {cliente: cbCli.value, usina: cbUsi.value, tipo: cbTipo.value,
+              ativo: ativos.filter((a) => marcados.has(String(a.id))).map((a) => a.curto || a.label).join('; '),
+              titulo: edDesc.value, descricao: taProb.value, tema: iaTema,
+              subtarefas: iaSubs.filter((x) => String(x.desc || '').trim()).map((x) => ({desc: x.desc, tipo: x.tipo}))};
+    },
+    async preencher(f) {
+      if (f.cliente && cbCli.value !== f.cliente && temOpcao(cbCli, f.cliente)) { cbCli.value = f.cliente; await trocarCliente(); }
+      if (f.usina && cbUsi.value !== f.usina && temOpcao(cbUsi, f.usina)) { cbUsi.value = f.usina; await trocarUsina(); }
+      if (f.tipo && temOpcao(cbTipo, f.tipo)) cbTipo.value = f.tipo;            // o tipo do pedido filtra a tabela
+      const alvo = f.ativo && ativos.find((a) => String(a.id) === String(f.ativo.id));
+      if (alvo && !marcados.has(String(alvo.id))) { marcados.clear(); marcados.add(String(alvo.id)); }
+      busca.value = ''; limite = PAGINA; pintar();
+      if (f.titulo) edDesc.value = f.titulo;
+      if (f.descricao) taProb.value = f.descricao;
+      // as subtarefas: o tema novo traz as dele; no mesmo tema, as editadas ficam e entram só as que o pedido acrescentou
+      const novas = (f.subtarefas || []).map((x) => ({desc: x.desc, tipo: x.tipo, anexo: !!x.anexo, da_ia: !!x.da_ia}));
+      if (!iaAtivo || (f.tema || '') !== iaTema) iaSubs = novas;
+      else {
+        const tem = new Set(iaSubs.map((x) => semAcento(x.desc)));
+        novas.filter((x) => x.da_ia && !tem.has(semAcento(x.desc))).forEach((x) => iaSubs.push(x));
+      }
+      iaTema = f.tema || ''; iaAtivo = true;
+      pintarIaSubs(); mostrarData(); contar(); regrasAnexo();
+    },
+    async limpar() {
+      cbCli.value = ''; cbUsi.innerHTML = INICIO.usinas; cbUsi.value = '';
+      semAtivos('Selecione a usina para carregar os ativos.'); busca.value = '';
+      edDesc.value = ''; taProb.value = ''; cbResp.value = ''; ckUrg.checked = false; dtEvento.value = INICIO.evento;
+      arquivos = []; avisarAnexo(''); pintarAnexos(); regrasAnexo();
+      iaSubs = []; iaTema = ''; iaAtivo = false; pintarIaSubs();
+      mostrarData(); mostrar(''); hintCriar.textContent = ''; contar();
+    }
+  };
 
   carregarResponsaveis();
 })();

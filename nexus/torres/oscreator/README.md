@@ -3291,16 +3291,21 @@ dia, "quero que dê para editar o tipo de tarefa também!".
 
 ## Pedir com IA (15/11/2026)
 
-Levi: a pessoa escolhe o setor ("pedir ao PCM, pedir à Performance, pedir à Engenharia"), diz "eu quero uma OS de tal coisa,
-em tal ativo, de tal cliente", e a ficha já vem preenchida, com o tema e as subtarefas; na Performance e na Engenharia ela
-só escolhe o responsável; "a data programada sempre vai ser para 6 dias". Uma conversa com cara de linha de comando, numa
-janela de vidro menor por cima da Nova solicitação, com o formulário desfocado atrás ("um pouco menor em formato de blur, a
-pessoa pode escolher fazer manualmente se quiser"; `templates/_solic_ia.html`, nas telas do PCM, da Engenharia e da
-Performance). Abre sozinha ao entrar na tela, no setor dela; o "Fazer manualmente" fecha e fica lembrado no navegador
-(`siaManual`), e o botão "Pedir com IA" do alto reabre; `/os/solicitacao/ia` leva à do PCM com ela aberta. Sem a chave
-4 no Nexus, nada disso aparece: a tela é a de sempre.
-- **No ar em teste (15/11/2026, Levi: "uma janela de teste no Nexus pra gente testar"):** só o administrador do Nexus vê a
-  janela e usa o preencher; a ponte marca cada pedido (`ponte.ia_liberada`, `os_web.ia_liberada`), e os outros veem a
+Levi: a pessoa diz "eu quero uma OS de tal coisa, em tal ativo, de tal cliente", e a Nova solicitação já vem preenchida,
+com o tema e as subtarefas; na Performance e na Engenharia ela só escolhe o responsável; "a data programada sempre vai ser
+para 6 dias". **A IA preenche a própria tela** (Levi: "ao clicar Pedir para a IA aparece uma caixa de texto, tudo é
+preenchido dentro da tela original mesmo e caso a pessoa precise adicionar algo ela pode pedir novamente alguma mudança";
+"crie um botão Limpar para tirar tudo o que foi posto"): o botão "Pedir com IA" do alto abre uma caixa de texto com cara de
+linha de comando no topo da tela do PCM, da Engenharia e da Performance (`templates/_solic_ia.html`, `static/solic_ia.js`);
+o setor é o da tela. A resposta preenche os campos de sempre pela cascata de sempre (cliente → usina → tipo → o ativo
+marcado na tabela → tema → título, relato, Classificação 1, data e subtarefas), pelo `window.SolicForm` de cada tela
+(`estado`, `preencher`, `limpar`: no `solic.html` e no `solic_eng.js`). O 2º pedido leva o que está na tela agora
+(`anterior`), e a IA muda só o que foi pedido; o que já está igual não se mexe (o ativo marcado à mão, as subtarefas
+editadas). O **Limpar** tira tudo da tela, o da IA e o digitado. `/os/solicitacao/ia` leva à do PCM com a caixa aberta
+(`?ia=1`). Sem a chave 4 no Nexus, nada disso aparece. A 1ª versão (a janela de vidro com a ficha própria) saiu no mesmo
+dia por este pedido.
+- **No ar em teste (15/11/2026, Levi: "uma janela de teste no Nexus pra gente testar"):** só o administrador do Nexus vê o
+  botão e usa o preencher; a ponte marca cada pedido (`ponte.ia_liberada`, `os_web.ia_liberada`), e os outros veem a
   Nova solicitação de sempre. `NEXUS_PEDIR_COM_IA=1` no `.env` libera para todos; o cartão do Início entra junto.
 - **A IA:** os modelos grátis do OpenRouter, na chave 4 da aba IA (Base › Chaves das fontes, a "só para o OS Creator"),
   pelo gancho `solic_ia.CHAVE` que a ponte liga (`nexus.comando.ia.chave_os_creator`, relida a cada pedido). Fora do
@@ -3310,34 +3315,24 @@ Performance). Abre sozinha ao entrar na tela, no setor dela; o "Fazer manualment
   novo uma vez com o que travou no fim da fila; o raciocínio vai no mínimo (`effort: low`). Caso que criou (Levi,
   15/11/2026, "demorando que só"): o Nemotron 3 Ultra era o único e estava de pé 13% da meia hora nos números públicos do
   OpenRouter (`/api/v1/models/<modelo>/endpoints`), e o pedido esperava até 90 s. A conversa mostra os segundos enquanto
-  espera, e a ficha diz qual modelo respondeu e em quanto tempo (`ia_info`): é a medida para trocar a ordem.
+  espera, e diz qual modelo respondeu e em quanto tempo (`ia_info`): é a medida para trocar a ordem.
 - **A IA só propõe; o catálogo decide** (`os_web/solic_ia.py`): cliente e usina pelo nome mais parecido do catálogo, o
   ativo pelo nome com os números iguais ("inversor 2.1" nunca vira o 2.3), empate fica para a pessoa; o tema só se for da
   lista e do tipo do ativo (a regra da Nova solicitação); as subtarefas são as do tema (ou a base) mais até 5 que o pedido
-  pede, só com tipo do editor. O que não casou vira pergunta na conversa, e a resposta vai com a ficha de antes.
+  pede, só com tipo do editor. O que não casou vira a linha "Falta: …" embaixo da caixa, e a pessoa responde nela ou
+  escolhe na tela.
 - **O código da usina:** a IA recebe cada usina com o código dela (o começo do código dos ativos, o "CPP100" de
   "CPP100-INVR2.2", `solic_ia.codigos_das_usinas`), e o código escrito no pedido acha a usina sozinho, valendo mais que o
   palpite da IA (na prova no ar, "o inversor 2.2 de CPP100" voltava sem cliente e sem usina).
-- **O ativo de nome igual vence o empate** ("Inversor 1.1" contra "Disjuntor do Inversor 1.1"), e no PCM a ficha tem a
+- **O ativo de nome igual vence o empate** ("Inversor 1.1" contra "Disjuntor do Inversor 1.1"), e no PCM vem a
   Classificação 1 (o impacto): a do tema, senão a que a IA propõe da lista do Fracttal; a pessoa troca.
-- **O tamanho:** a janela ocupa até 1080 × 960 px (Levi: "expanda mais para caber mais informação na tela!"), a ficha em
-  três colunas e as subtarefas em duas; em tela estreita, duas e uma; no celular, a tela inteira.
-- **As listas da ficha são a busca de sempre** (`data-busca`, o `os_busca.js`), todas iguais: cliente, usina, tipo de
-  equipamento, ativo, tema, Classificação 1 e responsável (Levi: "O estilo de lista do cliente está diferente do usina e
-  ativo, padronize tudo"; o cliente virava busca por ter 6 opções ou mais, e a usina e o ativo, que nasciam vazios, ficavam
-  nativos).
-- **A usina sem o cliente** (Levi: "gostaria de conseguir pesquisar usina sem ter que pesquisar cliente!"): sem cliente, a
-  lista é a de todas as usinas, com o código ao lado (`usinas_todas`), e se pesquisa pelo nome ou pelo código; escolhida,
-  ela traz o cliente. Com o cliente, só as dele.
 - **O tipo de equipamento do pedido filtra os ativos** (Levi: "Se eu pedi a inspeção de inversor então o tipo de
-  equipamento dos ativos já devem vir filtrado como inversor"): a IA devolve o `tipo`, e o Nexus acha o tipo pelas
-  palavras do nome (`solic_ia.tipo_da_pista`: plural vale; "disjuntor do inversor" é Disjuntor, o que vem primeiro). Os
-  temas valem pelo tipo antes mesmo do ativo. "— todos os tipos —" mostra a usina inteira; o tipo escolhido pela pessoa só
-  vai ao servidor quando ela o escolheu, senão ele sai do pedido.
-- **Trocar na ficha não gasta IA:** usina, tipo, ativo e tema refazem a ficha pelo `/os/api/solic/ia/ficha`, com a escolha
-  da pessoa valendo como está; o ativo e o tipo que o pedido disse vão junto (`ativo_pista`, `tipo_pista`), e na usina
-  escolhida depois o "inversor 2.1" do pedido acha o ativo dela.
-- **Quem cria é a rota de sempre:** PCM pela Nova solicitação (`/os/api/solic/criar`, a Classificação 1 do tema ou a
-  Programada, a data sugerida de 6 dias às 08:00); Performance e Engenharia pela delas, com `origem: "ia"`, que leva as
-  subtarefas da ficha e a programada de 6 dias às 08:00 (a tela de sempre segue sem subtarefas e com os 7 dias).
+  equipamento dos ativos já devem vir filtrado como inversor"): a IA devolve o `tipo`, o Nexus acha o tipo pelas palavras
+  do nome (`solic_ia.tipo_da_pista`: plural vale; "disjuntor do inversor" é Disjuntor, o que vem primeiro), e a tela põe
+  esse tipo no campo Tipo de ativo, que filtra a tabela. Os temas valem pelo tipo antes mesmo do ativo.
+- **As subtarefas na Engenharia e na Performance:** a tela delas não tinha subtarefas; com o Pedir com IA aparece o cartão
+  "Subtarefas (do Pedir com IA)", editável como o do PCM, e o criar vai com `origem: "ia"`.
+- **Quem cria é o botão de sempre:** PCM pela Nova solicitação (`/os/api/solic/criar`, com a data sugerida de 6 dias às
+  08:00 que a IA pôs no campo); Performance e Engenharia pela delas, com `origem: "ia"`, que leva as subtarefas da tela e a
+  programada de 6 dias às 08:00 (a Urgente segue com a dela; a tela sem a IA segue sem subtarefas e com os 7 dias).
 - Prova: `tests/test_oscreator_pedir_com_ia_15_11.py`.

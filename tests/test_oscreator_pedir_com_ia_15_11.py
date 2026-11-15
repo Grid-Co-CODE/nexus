@@ -130,41 +130,33 @@ def test_sem_a_chave_a_tela_diz_e_nada_vai_a_ia(ia, monkeypatch):
     assert ia.post("/os/api/solic/ia/preencher", json={"setor": "x", "texto": "a"}).status_code == 400
 
 
-def test_trocar_na_ficha_vale_a_escolha_e_nao_gasta_ia(ia, monkeypatch):
-    monkeypatch.setattr(IA, "chamar", lambda *a, **k: pytest.fail("a ficha refeita não pede à IA"))
-    f = ia.post("/os/api/solic/ia/ficha", json={"setor": "pcm", "escolhidos": {"cliente": "Cliente X", "usina": USINA, "ativo_id": 1},
-                                                "titulo": "Olhar o nobreak", "descricao": "Apita.", "tema": "inversor_inspecao",
-                                                "classif1_atual": "Programada",
-                                                "extras": [{"desc": "Anotar o alarme", "tipo": "texto"}]}).get_json()
-    assert f["ativo"]["id"] == 1 and f["tema"] == "" and f["classif1"] == {"id": 8, "txt": "Programada"}
-    # a que a pessoa marcou na ficha vence a do tema
-    g = ia.post("/os/api/solic/ia/ficha", json={"setor": "pcm", "tema": "inversor_inspecao", "classif1_atual": "Corretiva",
-                                                "escolhidos": {"cliente": "Cliente X", "usina": USINA, "ativo_id": 2,
-                                                               "classif1_id": 8}}).get_json()
-    assert g["tema"] == "inversor_inspecao" and g["classif1"] == {"id": 8, "txt": "Programada"}
-    assert [s["desc"] for s in f["subtarefas"]] == ["Descreva a atividade realizada", "Anotar o alarme"]
-
-
 def test_a_os_da_ia_na_engenharia_leva_as_subtarefas_e_6_dias(cli):
     subs = [{"desc": "Medir a isolação", "tipo": "num", "anexo": True}]
     r = cli.post("/os/api/solicitacao/engenharia/criar", json=_corpo(ativos=[2], origem="ia", subtarefas=subs))
     assert r.status_code == 200
     assert cli.feito["subtasks"] == sw.subs_para_api(subs) and cli.feito["prog_date"] == IA.programada(dt.datetime.now(IA.BRT))
+    # Urgente na tela do Pedir com IA: vale a data da Urgente, não os 6 dias
+    cli.post("/os/api/solicitacao/engenharia/criar", json=_corpo(ativos=[2], origem="ia", subtarefas=subs, urgente=True))
+    assert cli.feito["subtasks"] == sw.subs_para_api(subs) and cli.feito["prog_date"] < IA.programada(dt.datetime.now(IA.BRT))
     # a tela de sempre segue sem subtarefas e com os 7 dias, mesmo se mandar as subtarefas
     cli.post("/os/api/solicitacao/engenharia/criar", json=_corpo(ativos=[2], subtarefas=subs))
     assert cli.feito["subtasks"] == [] and cli.feito["prog_date"] > IA.programada(dt.datetime.now(IA.BRT))
 
 
-def test_a_janela_entra_por_cima_das_tres_telas_e_da_para_fazer_manualmente(ia):
-    """Levi, 15/11/2026: "um pouco menor em formato de blur, a pessoa pode escolher fazer manualmente se quiser"."""
+def test_a_caixa_de_texto_mora_na_tela_de_sempre_das_tres(ia):
+    """Levi, 15/11/2026: "ao clicar Pedir para a IA aparece uma caixa de texto, tudo é preenchido dentro da tela original
+    mesmo e caso a pessoa precise adicionar algo ela pode pedir novamente alguma mudança"; "crie um botão Limpar"."""
     for url, setor in (("/os/solicitacao", "pcm"), ("/os/solicitacao/engenharia", "engenharia"),
                        ("/os/solicitacao/performance", "performance")):
         h = ia.get(url).get_data(as_text=True)
-        for s in ('id="sia_veu" hidden', 'data-setor-inicial="%s"' % setor, "data-sia-abrir", "data-sia-manual",
-                  "Fazer manualmente", "daqui a 6 dias", "solic_ia.js", "solic_ia.css", 'data-setor="pcm"'):
+        for s in ('id="sia" hidden', 'data-setor="%s"' % setor, "data-sia-abrir", 'id="sia_limpar"', ">Limpar<",
+                  "daqui a 6 dias", "solic_ia.js", "solic_ia.css"):
             assert s in h, (url, s)
-        assert 'id="cb_cli"' in h or 'id="cb_cliente"' in h or "Cliente" in h          # o formulário de sempre continua
-    r = ia.get("/os/solicitacao/ia")                                    # o cartão do Início: a do PCM, com a janela aberta
+        # a caixa fica no alto da tela de sempre, antes do 1º campo; a janela e a ficha de antes não existem mais
+        assert h.index('id="sia"') < h.index('id="cb_cli') and "sia_veu" not in h and "sia_ficha" not in h
+    assert "window.SolicForm" in ia.get("/os/solicitacao").get_data(as_text=True)          # o PCM preenche pela tela
+    assert 'id="ia_subs_card" hidden' in ia.get("/os/solicitacao/engenharia").get_data(as_text=True)
+    r = ia.get("/os/solicitacao/ia")                                    # o cartão do Início: a do PCM, com a caixa aberta
     assert r.status_code == 302 and r.headers["Location"].endswith("/os/solicitacao?ia=1")
 
 
@@ -176,7 +168,6 @@ def test_em_teste_so_quem_a_ponte_libera_ve_e_usa(ia):
     assert 'id="sia"' not in h and "data-sia-abrir" not in h
     r = ia.post("/os/api/solic/ia/preencher", json={"setor": "pcm", "texto": "x"}, environ_overrides=fora)
     assert r.status_code == 403 and "em teste" in r.get_json()["erro"] and not ia.pedidos
-    assert ia.post("/os/api/solic/ia/ficha", json={"setor": "pcm"}, environ_overrides=fora).status_code == 403
     assert 'id="sia"' in ia.get("/os/solicitacao", environ_overrides={"os_web.ia_liberada": True}).get_data(as_text=True)
 
 
@@ -220,34 +211,20 @@ def test_o_tipo_de_equipamento_sai_do_pedido():
     assert IA.tipo_da_pista("inversor 2", [{"sigla": "IC", "nome": "Inversor Central"}]) == "IC"
 
 
-def test_o_tipo_do_pedido_filtra_os_ativos_e_a_pessoa_pode_ver_todos(ia):
+def test_o_tipo_do_pedido_vai_para_a_tela(ia):
     f = ia.post("/os/api/solic/ia/preencher", json={"setor": "pcm", "texto": "inspeção no inversor 1.1"}).get_json()
-    assert f["tipo"] == "Inversor" and [a["id"] for a in f["ativos"]] == [2] and f["ativo"]["id"] == 2
-    assert {t["sigla"] for t in f["tipos"]} == {"NBRK", "Inversor", "RELE"}
-    # "— todos os tipos —" escolhido na ficha: a usina inteira volta, e o ativo marcado fica
-    g = ia.post("/os/api/solic/ia/ficha", json={"setor": "pcm", "ativo_pista": "inversor 1.1",
-                                                "escolhidos": {"cliente": "Cliente X", "usina": USINA, "ativo_id": 2,
-                                                               "tipo": ""}}).get_json()
-    assert g["tipo"] == "" and sorted(a["id"] for a in g["ativos"]) == [1, 2, 3] and g["ativo"]["id"] == 2
-    # o tipo trocado pela pessoa tira o ativo de outro tipo
-    h = ia.post("/os/api/solic/ia/ficha", json={"setor": "pcm", "ativo_pista": "inversor 1.1",
-                                                "escolhidos": {"cliente": "Cliente X", "usina": USINA, "ativo_id": 2,
-                                                               "tipo": "NBRK"}}).get_json()
-    assert h["tipo"] == "NBRK" and [a["id"] for a in h["ativos"]] == [1] and h["ativo"] is None
+    assert f["tipo"] == "Inversor" and f["tipo_nome"] and f["ativo"]["id"] == 2
+    # sem o ativo, o tipo sai do pedido (a IA disse "tipo"), e a tela filtra a tabela por ele
+    ia.resposta["j"] = dict(RESPOSTA, ativo="", tipo="inversores")
+    g = ia.post("/os/api/solic/ia/preencher", json={"setor": "pcm", "texto": "inspeção nos inversores"}).get_json()
+    assert g["ativo"] is None and g["tipo"] == "Inversor" and g["tema"] == "inversor_inspecao"   # o tema vale pelo tipo
 
 
-def test_a_usina_se_escolhe_sem_o_cliente_e_o_ativo_do_pedido_vem_junto(ia):
-    """Levi, 15/11/2026: "gostaria de conseguir pesquisar usina sem ter que pesquisar cliente!". A usina escolhida na ficha
-    traz o cliente, e o "inversor 1.1" do pedido acha o ativo dela sem perguntar de novo à IA."""
-    ia.resposta["j"] = {"ativo": "inversor 1.1", "titulo": "Inspecionar o inversor", "descricao": "Desliga à tarde."}
-    f = ia.post("/os/api/solic/ia/preencher", json={"setor": "pcm", "texto": "inspeção no inversor 1.1"}).get_json()
-    assert f["usina"] == "" and f["tipo"] == "Inversor" and f["ativo_pista"] == "inversor 1.1"
-    assert {"usina": USINA, "cliente": "Cliente X", "codigo": ""} in f["usinas_todas"]
-    assert {x["cliente"] for x in f["usinas_todas"]} == {"Cliente X", "Cliente Y"}
-    g = ia.post("/os/api/solic/ia/ficha", json={"setor": "pcm", "ativo_pista": f["ativo_pista"], "tipo_pista": f["tipo_pista"],
-                                                "titulo": f["titulo"], "descricao": f["descricao"],
-                                                "escolhidos": {"cliente": "", "usina": USINA}}).get_json()
-    assert (g["cliente"], g["usina"], g["ativo"]["id"], g["tipo"]) == ("Cliente X", USINA, 2, "Inversor") and g["pronta"]
+def test_a_usina_sem_o_cliente_traz_o_cliente(ia):
+    ia.resposta["j"] = {"usina": "usina teste 1", "ativo": "inversor 1.1", "titulo": "Inspecionar o inversor",
+                        "descricao": "Desliga à tarde."}
+    f = ia.post("/os/api/solic/ia/preencher", json={"setor": "pcm", "texto": "inversor 1.1 da usina teste 1"}).get_json()
+    assert (f["cliente"], f["usina"], f["ativo"]["id"], f["tipo"]) == ("Cliente X", USINA, 2, "Inversor") and f["pronta"]
 
 
 def test_o_modelo_fora_do_ar_nao_prende_o_pedido():

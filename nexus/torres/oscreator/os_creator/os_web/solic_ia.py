@@ -300,59 +300,33 @@ def extras(lista, ja: list) -> list:
 
 
 def ficha(setor: str, ia: dict, assets: list, clientes: list, usinas_de, ativos_de, temas: list, subs_do_tema,
-          agora: dt.datetime, escolhidos: dict | None = None, nome_tipo=None) -> dict:
-    """A resposta da IA conferida no catálogo → a ficha da tela. `usinas_de(cliente)` e `ativos_de(usina)` são as listas da
-    cascata de sempre; `subs_do_tema(tema, tipo)` devolve as subtarefas no formato do editor ({desc, tipo, anexo}).
-    `escolhidos` ({cliente, usina, ativo_id, tipo}) é o que a pessoa marcou na ficha: vale como está, se existir no catálogo;
-    o `tipo` só vem quando a pessoa o escolheu (até "todos os tipos", o ''), senão ele sai do pedido."""
+          agora: dt.datetime, nome_tipo=None) -> dict:
+    """A resposta da IA conferida no catálogo → a ficha que a tela de sempre preenche. `usinas_de(cliente)` e
+    `ativos_de(usina)` são as listas da cascata de sempre; `subs_do_tema(tema, tipo)` devolve as subtarefas no formato do
+    editor ({desc, tipo, anexo})."""
     ia = ia if isinstance(ia, dict) else {}
-    esc = escolhidos if isinstance(escolhidos, dict) else {}
     perguntas = []
     rotulo_ativo = lambda a: "%s %s %s" % (a.get("curto") or "", a.get("label") or "", a.get("tipo_nome") or "")  # noqa: E731
-    todas = [(c, u) for c in clientes or [] for u in usinas_de(c) or []]
-    # a usina marcada vale mesmo sem o cliente, e o cliente sai dela (Levi, 15/11/2026: "gostaria de conseguir pesquisar
-    # usina sem ter que pesquisar cliente!")
-    marcada = esc.get("usina") or ""
-    par = (next(((c, u) for c, u in todas if u == marcada and c == esc.get("cliente")), None)
-           or next(((c, u) for c, u in todas if u == marcada), None)) if marcada else None
-    if par:
-        (cliente, usina), cand_cli, cand_usi = par, [], []
-        usinas = usinas_de(cliente)
-    else:
-        if esc.get("cliente") in clientes:
-            cliente, cand_cli = esc["cliente"], []
-        else:
-            cliente, cand_cli = escolher(ia.get("cliente"), clientes)
-        usinas = usinas_de(cliente) if cliente else []
-        if cliente:
-            usina, cand_usi = escolher(ia.get("usina"), usinas)
-        else:                               # sem o cliente, a usina pela lista inteira: o cliente sai dela
-            achado, cand = escolher(ia.get("usina"), todas, rotulo=lambda cu: cu[1])
-            usina, cand_usi = (achado[1] if achado else None), [u for _c, u in cand]
-            if achado:
-                cliente, usinas = achado[0], usinas_de(achado[0])
+    cliente, cand_cli = escolher(ia.get("cliente"), clientes)
+    usinas = usinas_de(cliente) if cliente else []
+    if cliente:
+        usina, cand_usi = escolher(ia.get("usina"), usinas)
+    else:                                   # sem o cliente, a usina pela lista inteira: o cliente sai dela
+        todas = [(c, u) for c in clientes or [] for u in usinas_de(c) or []]
+        achado, cand = escolher(ia.get("usina"), todas, rotulo=lambda cu: cu[1])
+        usina, cand_usi = (achado[1] if achado else None), [u for _c, u in cand]
+        if achado:
+            cliente, usinas = achado[0], usinas_de(achado[0])
     todos_ativos = ativos_de(usina) if usina else []
-    # o tipo de equipamento: o que a pessoa escolheu; senão o que o pedido diz. Ele filtra a lista de ativos
+    # o tipo de equipamento que o pedido diz filtra os ativos da tela (Levi, 15/11/2026: "Se eu pedi a inspeção de
+    # inversor então o tipo de equipamento dos ativos já devem vir filtrado como inversor"); achado o ativo, vale o dele
     tipos = tipos_dos_ativos(todos_ativos if usina else assets, nome_tipo)
-    siglas = {t["sigla"] for t in tipos}
-    tipo_manual = "tipo" in esc and (esc.get("tipo") or "") in siglas | {""}
-    tipo_pista = " ".join(str(ia.get(k) or "") for k in ("tipo", "ativo")).strip()
-    tipo_sel = (esc.get("tipo") or "") if tipo_manual else tipo_da_pista(tipo_pista, tipos)
-    marcado = next((a for a in todos_ativos if esc.get("ativo_id") not in (None, "") and str(a.get("id")) == str(esc["ativo_id"])), None)
-    if marcado and tipo_sel and marcado.get("tipo") != tipo_sel:
-        if tipo_manual:
-            marcado = None                  # a pessoa trocou o tipo: o ativo de outro tipo sai
-        else:
-            tipo_sel = marcado.get("tipo")
+    tipo_sel = tipo_da_pista(" ".join(str(ia.get(k) or "") for k in ("tipo", "ativo")).strip(), tipos)
     do_tipo = [a for a in todos_ativos if a.get("tipo") == tipo_sel] if tipo_sel else todos_ativos
-    if marcado:
-        ativo, cand_ati = marcado, []
-    else:
-        ativo, cand_ati = escolher(ia.get("ativo"), do_tipo or todos_ativos, rotulo=rotulo_ativo,
-                                   curto=lambda a: a.get("curto") or a.get("label") or "")
-    if ativo and not tipo_manual:
+    ativo, cand_ati = escolher(ia.get("ativo"), do_tipo or todos_ativos, rotulo=rotulo_ativo,
+                               curto=lambda a: a.get("curto") or a.get("label") or "")
+    if ativo:
         tipo_sel = ativo.get("tipo") or tipo_sel
-        do_tipo = [a for a in todos_ativos if a.get("tipo") == tipo_sel] if tipo_sel else todos_ativos
     if not cliente:
         perguntas.append("De qual cliente é a OS?")
     if not usina:
@@ -377,9 +351,8 @@ def ficha(setor: str, ia: dict, assets: list, clientes: list, usinas_de, ativos_
     return {"setor": setor, "setor_nome": (setor_de(setor) or {}).get("nome") or "", "cliente": cliente or "",
             "clientes": list(clientes or []), "clientes_sugeridos": cand_cli[:4] if not cliente else [],
             "usina": usina or "", "usinas": usinas, "usinas_sugeridas": cand_usi[:6] if not usina else [],
-            "ativo": ativo, "ativos": do_tipo, "ativos_sugeridos": cand_ati[:6],
-            "tipo": tipo_sel or "", "tipo_nome": next((t["nome"] for t in tipos if t["sigla"] == tipo_sel), ""), "tipos": tipos,
-            "ativo_pista": _txt(ia.get("ativo"), 120), "tipo_pista": _txt(ia.get("tipo"), 60),
+            "ativo": ativo, "ativos_sugeridos": cand_ati[:6],
+            "tipo": tipo_sel or "", "tipo_nome": next((t["nome"] for t in tipos if t["sigla"] == tipo_sel), ""),
             "titulo": titulo, "descricao": descricao, "tema": tema["chave"] if tema else "",
             "tema_nome": tema["nome"] if tema else "", "tema_c1": (tema or {}).get("classif1") or "",
             "temas": [{"chave": t["chave"], "nome": t["nome"], "classif1": t.get("classif1") or ""} for t in validos],

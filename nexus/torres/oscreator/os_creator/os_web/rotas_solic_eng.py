@@ -111,12 +111,13 @@ def api_criar(setor):
     # pessoa desligada e a etiqueta apagada nas últimas horas seguiriam nele até a renovação (a etapa 4 do canto central o
     # tinha posto aqui, e a revisão da 4.1 o tirou). E a sessão morta cai já aqui, antes de gravar: 401 e o login
     permitidos = reg.equipe(api.responsaveis_ao_vivo(), setor)[0]
-    # o pedido do Pedir com IA (15/11/2026, Levi: "a data programada sempre vai ser para 6 dias"): a data de 6 dias e as
-    # subtarefas da ficha (as do tema e as que a IA acrescentou); a tela de sempre segue sem subtarefas e com os 7 dias
+    # a tela preenchida pelo Pedir com IA (15/11/2026, Levi: "a data programada sempre vai ser para 6 dias"): a data de 6
+    # dias (a Urgente segue com a dela) e as subtarefas da tela (as do tema e as que a IA acrescentou); a tela sem a IA
+    # segue sem subtarefas e com os 7 dias
     da_ia = corpo.get("origem") == "ia"
     subs = sw.subs_para_api(corpo.get("subtarefas") or []) if da_ia else []
     ativos, c, erro = reg.montar(corpo, por_id, permitidos, _agora(), api.perf_os_nome, setor=setor,
-                                 programada=IA.programada(_agora()) if da_ia else None)
+                                 programada=IA.programada(_agora()) if da_ia and not corpo.get("urgente") else None)
     if erro:
         return jsonify({"erro": erro}), 400
     # os anexos ANTES de criar, como as etiquetas: anexo recusado = nenhuma OS criada

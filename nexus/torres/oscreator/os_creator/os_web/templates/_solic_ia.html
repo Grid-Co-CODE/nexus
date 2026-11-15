@@ -1,86 +1,22 @@
-{# O Pedir com IA (Levi, 15/11/2026): uma janela de vidro, menor, por cima da Nova solicitação ("um pouco menor em formato
-   de blur, a pessoa pode escolher fazer manualmente se quiser"). Abre sozinha ao entrar na tela (o "Fazer manualmente"
-   fecha e fica lembrado no navegador; o botão "Pedir com IA" do alto reabre). A pele é a do prompt, pensada no escuro.
-   Sem a chave 4 do OpenRouter no Nexus, nada daqui aparece: a tela é a de sempre. As regras estão no solic_ia.py. #}
+{# O Pedir com IA (Levi, 15/11/2026): uma caixa de texto na própria Nova solicitação, que aparece ao clicar em "Pedir com IA"
+   ("tudo é preenchido dentro da tela original mesmo e caso a pessoa precise adicionar algo ela pode pedir novamente alguma
+   mudança"; "crie um botão Limpar para tirar tudo o que foi posto"). A IA devolve a ficha conferida no catálogo
+   (`solic_ia.py`) e quem preenche é a tela, pelo `window.SolicForm` dela (o PCM no solic.html, a Engenharia e a Performance
+   no solic_eng.js). Sem a chave 4 do OpenRouter no Nexus, nada daqui aparece. #}
 {% if ia and ia.tem_chave %}
-<div class="sia-veu" id="sia_veu" hidden>
-  <section class="sia" id="sia" role="dialog" aria-modal="true" aria-labelledby="sia_titulo"
-           data-setor-inicial="{{ ia_setor }}" data-programada="{{ ia.programada }}" data-tipos-sub='{{ ia.tipos_sub|tojson }}'>
-    <div class="sia-quadro">
-      <header class="sia-cab">
-        <span class="sia-luzes" aria-hidden="true"><i></i><i></i><i></i></span>
-        <span class="sia-cab-t" id="sia_titulo">nexus <b>›</b> pedir com ia</span>
-        <span class="os-cresce"></span>
-        <span class="sia-estado" id="sia_estado">pronto</span>
-        <button type="button" class="sia-fechar" data-sia-fechar aria-label="Fechar o Pedir com IA">×</button>
-      </header>
-
-      <div class="sia-setores" role="radiogroup" aria-label="Para quem é o pedido">
-        <span class="sia-rot">pedir a</span>
-        {% for chave, s in ia.setores.items() %}
-        <button type="button" class="sia-setor" role="radio" aria-checked="false" data-setor="{{ chave }}">{{ s.nome }}</button>
-        {% endfor %}
-      </div>
-
-      <div class="sia-log" id="sia_log" aria-live="polite">
-        <div class="sia-msg sia-msg--ia">
-          <span class="sia-quem">nexus</span>
-          <div class="sia-txt">
-            <p>Diga a OS que você precisa: o que fazer, em qual ativo e de qual cliente. Eu preencho a ficha com o tema e as
-              subtarefas; você confere e cria.</p>
-            <p class="sia-dica">Data programada: daqui a {{ ia.dias }} dias ({{ ia.programada }}).</p>
-            <div class="sia-exemplos" aria-label="Exemplos">
-              <button type="button" class="sia-ex">Inspeção no inversor 2.1 da usina, que está desligando à tarde</button>
-              <button type="button" class="sia-ex">Limpeza dos módulos da usina, a sujidade passou do nível 4</button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <form class="sia-prompt" id="sia_form" autocomplete="off">
-        <label class="sia-sinal" for="sia_txt" aria-hidden="true">›</label>
-        <textarea id="sia_txt" rows="1" maxlength="1200" aria-label="O que você precisa"
-                  placeholder="A OS, o ativo e o cliente…"></textarea>
-        <button type="submit" class="sia-enviar" id="sia_enviar">Enviar</button>
-      </form>
-      <footer class="sia-rodape">
-        <button type="button" class="sia-manual" data-sia-manual>Fazer manualmente</button>
-        <span class="os-cresce"></span>
-        <span class="sia-rodape-info">Enter envia · chave 4 do OS Creator · 50 pedidos por dia</span>
-      </footer>
-    </div>
-  </section>
-</div>
-
-<template id="sia_ficha">
-  <div class="sia-ficha">
-    <div class="sia-ficha-h"><span class="sia-ficha-t"></span><span class="sia-pill"></span><span class="sia-ficha-m" title="O modelo que respondeu e em quanto tempo"></span></div>
-    <div class="sia-perguntas" hidden></div>
-    {# toda lista da ficha é a busca de sempre do OS Creator (os_busca.js, data-busca): digitar acha no meio do nome, sem
-       acento (Levi, 15/11/2026: "O estilo de lista do cliente está diferente do usina e ativo, padronize tudo"). A usina se
-       pesquisa sem o cliente, pelo nome ou pelo código; o tipo de equipamento vem do pedido e filtra os ativos. #}
-    <div class="sia-grade">
-      <label class="sia-campo"><span>Cliente</span><select data-f="cliente" data-busca="1" aria-label="Cliente"></select></label>
-      <label class="sia-campo"><span>Usina</span><select data-f="usina" data-busca="1" aria-label="Usina"></select></label>
-      <label class="sia-campo"><span>Tipo de equipamento</span><select data-f="tipo" data-busca="1" aria-label="Tipo de equipamento"></select></label>
-      <label class="sia-campo"><span>Ativo</span><select data-f="ativo" data-busca="1" aria-label="Ativo"></select></label>
-      <label class="sia-campo"><span>Tema</span><select data-f="tema" data-busca="1" aria-label="Tema"></select></label>
-      <div class="sia-campo"><span>Data programada</span><div class="sia-data" data-f="programada"></div></div>
-      <label class="sia-campo sia-dois"><span>Atividade (o nome da OS)</span><input data-f="titulo" maxlength="80"></label>
-      <label class="sia-campo" data-so-pcm><span>Classificação 1 (o impacto)</span><select data-f="classif1" data-busca="1" aria-label="Classificação 1"></select></label>
-      <label class="sia-campo" data-so-resp><span>Responsável</span><select data-f="responsavel" data-busca="1" aria-label="Responsável"><option value="">carregando…</option></select></label>
-      <label class="sia-campo sia-largo"><span>O que fazer</span><textarea data-f="descricao" rows="2"></textarea></label>
-    </div>
-    <div class="sia-subs">
-      <div class="sia-subs-h">Subtarefas <small></small></div>
-      <ol class="sia-subs-l"></ol>
-      <div class="sia-subs-add"><input placeholder="Acrescentar uma subtarefa" maxlength="160" aria-label="Nova subtarefa"><button type="button" class="os-btn secondary">Acrescentar</button></div>
-    </div>
-    <div class="sia-acoes">
-      <button type="button" class="os-btn sia-criar" disabled></button>
-      <button type="button" class="os-btn secondary sia-limpar">Recomeçar</button>
-      <span class="sia-hint" aria-live="polite"></span>
-    </div>
+<section class="sia-barra" id="sia" hidden aria-label="Pedir com IA" data-setor="{{ ia_setor }}"
+         data-setor-nome="{{ ia.setores[ia_setor].nome if ia.setores.get(ia_setor) else '' }}" data-dias="{{ ia.dias }}">
+  <form class="sia-prompt" id="sia_form" autocomplete="off">
+    <label class="sia-sinal" for="sia_txt" aria-hidden="true">›</label>
+    <textarea id="sia_txt" rows="1" maxlength="1200" aria-label="O que você precisa"
+              placeholder="A OS, o ativo e a usina. Ex.: inspeção no inversor 2.1 de CPP100, que desliga à tarde…"></textarea>
+    <button type="submit" class="os-btn sia-enviar" id="sia_enviar">Preencher</button>
+    <button type="button" class="os-btn secondary" id="sia_limpar" title="Tira tudo o que está na tela, da IA e o digitado">Limpar</button>
+  </form>
+  <div class="sia-linha" id="sia_msg" aria-live="polite">
+    <span class="sia-dica">A IA preenche esta tela com o tema e as subtarefas; confira e crie. Para mudar algo, peça de novo
+      (“troque para o inversor 2.2”, “acrescente uma subtarefa de foto”). Data programada: daqui a {{ ia.dias }} dias
+      ({{ ia.programada }}).</span>
   </div>
-</template>
+</section>
 {% endif %}
