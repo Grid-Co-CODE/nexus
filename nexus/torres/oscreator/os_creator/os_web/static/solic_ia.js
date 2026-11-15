@@ -137,6 +137,10 @@
     opcoes(q('[data-f="tema"]'), f.temas || [], f.tema, f.ativo ? (f.temas && f.temas.length ? "— sem tema (as subtarefas da base) —" : "nenhum tema para este tipo de ativo") : "— escolha o ativo antes —",
            function (t) { return t.chave; }, function (t) { return t.nome; });
     q('[data-f="programada"]').textContent = f.programada || raiz.getAttribute("data-programada");
+    var c1 = q("[data-so-pcm]");                        // a Classificação 1 é só da solicitação ao PCM
+    c1.hidden = f.setor !== "pcm";
+    if (f.setor === "pcm") opcoes(q('[data-f="classif1"]'), f.classif1_opcoes || [], (f.classif1 || {}).id || "", "— escolha o impacto —",
+                                  function (o) { return o.id; }, function (o) { return o.txt; });
     var resp = q("[data-so-resp]");
     resp.hidden = !f.responsavel;
     if (f.responsavel) carregarResponsaveis(q('[data-f="responsavel"]'), f.setor);
@@ -176,7 +180,9 @@
     var at = (ficha.ativos || []).filter(function (a) { return String(a.id) === String(idAt); })[0] || null;
     return {cliente: q('[data-f="cliente"]').value, usina: q('[data-f="usina"]').value, ativo: at,
             titulo: q('[data-f="titulo"]').value.trim(), descricao: q('[data-f="descricao"]').value.trim(),
-            tema: q('[data-f="tema"]').value, responsavel: (q('[data-f="responsavel"]') || {}).value || ""};
+            tema: q('[data-f="tema"]').value, responsavel: (q('[data-f="responsavel"]') || {}).value || "",
+            classif1_id: q('[data-f="classif1"]').value,
+            classif1_txt: q('[data-f="classif1"]').selectedIndex > 0 ? q('[data-f="classif1"]').selectedOptions[0].text : ""};
   }
 
   function validar() {
@@ -186,7 +192,7 @@
     if (!v.titulo) falta.push("a atividade");
     if (!v.descricao) falta.push("o que fazer");
     if (ficha.responsavel && !v.responsavel) falta.push("o responsável");
-    if (ficha.setor === "pcm" && !(ficha.classif1 || {}).id) falta.push("a Classificação 1 (recarregue a página)");
+    if (ficha.setor === "pcm" && !v.classif1_id) falta.push("a Classificação 1");
     noFicha.querySelector(".sia-criar").disabled = !!falta.length || ocupado;
     noFicha.querySelector(".sia-hint").textContent = falta.length ? "Falta " + falta.join(", ") + "." : "";
   }
@@ -198,14 +204,16 @@
     var extras = (ficha.subtarefas || []).filter(function (s) { return s.da_ia; });
     // o que a pessoa marcou vale como está; trocar o cliente esvazia a usina e o ativo, trocar a usina esvazia o ativo
     var escolhidos = {cliente: v.cliente, usina: mudou === "cliente" ? "" : v.usina,
-                      ativo_id: mudou === "cliente" || mudou === "usina" ? "" : (v.ativo ? v.ativo.id : "")};
+                      ativo_id: mudou === "cliente" || mudou === "usina" ? "" : (v.ativo ? v.ativo.id : ""),
+                      classif1_id: ficha.c1_manual ? v.classif1_id : ""};
     var guardaResp = v.responsavel;
     pedir("/os/api/solic/ia/ficha", {setor: ficha.setor, escolhidos: escolhidos, titulo: v.titulo, descricao: v.descricao,
-                                     tema: v.tema, extras: extras}).then(function (x) {   // o tema fica se valer para o ativo novo
+                                     tema: v.tema, extras: extras, classif1_atual: v.classif1_txt}).then(function (x) {   // o tema fica se valer para o ativo novo
       if (!x.ok || x.j.erro) { noFicha.querySelector(".sia-hint").textContent = x.j.erro || "Não deu para refazer a ficha."; return; }
       var f = x.j;
       f.titulo = v.titulo || f.titulo; f.descricao = v.descricao || f.descricao;
-      ficha = f; anterior = f.anterior || anterior; ficha.id_responsavel = guardaResp;
+      var manual = ficha.c1_manual;
+      ficha = f; anterior = f.anterior || anterior; ficha.id_responsavel = guardaResp; ficha.c1_manual = manual;
       pintar();
     });
   }
@@ -216,7 +224,7 @@
       if (el !== noFicha) return;
       var c = e.target.getAttribute("data-f");
       if (c === "cliente" || c === "usina" || c === "ativo" || c === "tema") refazer(c);
-      else validar();
+      else { if (c === "classif1") ficha.c1_manual = true; validar(); }   // a Classificação que a pessoa escolheu fica
     });
     el.addEventListener("input", function () { if (el === noFicha) validar(); });
     el.addEventListener("click", function (e) {
@@ -251,8 +259,8 @@
     var url, corpo;
     if (ficha.setor === "pcm") {
       url = "/os/api/solic/criar";
-      corpo = {ativos: [v.ativo.code], descricao: v.titulo, observacao: v.descricao, classif1: ficha.classif1.id,
-               classif1_txt: ficha.classif1.txt, data_sugerida: ficha.programada_iso, tema: v.tema, subtarefas: subs,
+      corpo = {ativos: [v.ativo.code], descricao: v.titulo, observacao: v.descricao, classif1: Number(v.classif1_id),
+               classif1_txt: v.classif1_txt, data_sugerida: ficha.programada_iso, tema: v.tema, subtarefas: subs,
                urgente: false, tecnico: ""};
     } else {
       url = "/os/api/solicitacao/" + ficha.setor + "/criar";

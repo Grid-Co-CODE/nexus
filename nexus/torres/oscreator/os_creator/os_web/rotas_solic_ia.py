@@ -52,15 +52,26 @@ def tela():
     return redirect("/os/solicitacao?ia=1")
 
 
-def _classif1(nome: str) -> dict:
-    """{id, txt} da Classificação 1 da SOLICITAÇÃO pelo nome (a do tema; sem tema, a "Programada" de sempre)."""
+def _opcoes_c1() -> list:
+    """[{id, txt}] da Classificação 1 da SOLICITAÇÃO (o impacto no ativo: "Para o Ativo", "Grave (Parou o Ativo)"...)."""
     try:
         c1 = (catalogos.tipos_solicitacao() or {}).get("classif1") or []
     except api.FracttalError:
-        return {}
-    alvo = IA.norm(nome or sw.CLASSIF1_PADRAO)
-    o = next((x for x in c1 if isinstance(x, dict) and IA.norm(x.get("description")) == alvo), None)
-    return {"id": o.get("id"), "txt": o.get("description") or ""} if o else {}
+        return []
+    return [{"id": x.get("id"), "txt": x.get("description") or ""} for x in c1 if isinstance(x, dict) and x.get("id") is not None]
+
+
+def _com_c1(f: dict, opcoes: list, escolhido=None, pista: str = "") -> dict:
+    """A Classificação 1 da ficha do PCM: a que a pessoa marcou; senão a do tema (como na Nova solicitação, o tema decide);
+    senão a que a IA propôs, se for da lista. Sem nenhuma, a pessoa escolhe na ficha (na 1ª prova no ar, 15/11/2026, a
+    ficha sem tema vinha sem a Classificação e sem o campo para escolher)."""
+    o = next((x for x in opcoes if escolhido not in (None, "") and str(x["id"]) == str(escolhido)), None)
+    if o is None and f.get("tema_c1"):
+        o = next((x for x in opcoes if IA.norm(x["txt"]) == IA.norm(f["tema_c1"])), None)
+    if o is None and pista:
+        o, _cand = IA.escolher(pista, opcoes, rotulo=lambda x: x["txt"])
+    f["classif1"], f["classif1_opcoes"] = (o or {}), opcoes
+    return f
 
 
 @bp.route("/api/solic/ia/preencher", methods=["POST"])
@@ -84,7 +95,9 @@ def preencher():
     temas = sw.temas_para_tela()
     agora = trad.agora_brt()
     anterior = corpo.get("anterior") if isinstance(corpo.get("anterior"), dict) else None
-    res = IA.chamar(chave, IA.instrucoes(setor, temas, usinas, agora.date()), IA.mensagem(texto, anterior))
+    opcoes_c1 = _opcoes_c1() if setor == "pcm" else []
+    res = IA.chamar(chave, IA.instrucoes(setor, temas, usinas, agora.date(), [o["txt"] for o in opcoes_c1]),
+                    IA.mensagem(texto, anterior))
     if res.get("erro"):
         return jsonify({"erro": res["erro"]}), 502
     lido = IA.ler_json(res["texto"])
@@ -94,7 +107,7 @@ def preencher():
                  lambda u: reg.ativos_da_usina(assets, u, api._asset_short_name), temas,
                  lambda tema, tipo: sp.de_api(sw.subtarefas_do_tema(tema, tipo)), agora)
     if setor == "pcm":
-        f["classif1"] = _classif1(f.get("tema_c1"))
+        _com_c1(f, opcoes_c1, pista=str(lido.get("classif1") or ""))
     f["anterior"] = IA.resumo(f)
     return jsonify(f)
 
@@ -121,6 +134,6 @@ def refazer_ficha():
                  lambda tema, tipo: sp.de_api(sw.subtarefas_do_tema(tema, tipo)), trad.agora_brt(), escolhidos=escolhidos)
     f["perguntas"] = []                 # a ficha refeita na tela não pergunta de novo: a pessoa está escolhendo nela
     if setor == "pcm":
-        f["classif1"] = _classif1(f.get("tema_c1"))
+        _com_c1(f, _opcoes_c1(), escolhido=escolhidos.get("classif1_id"), pista=str(corpo.get("classif1_atual") or ""))
     f["anterior"] = IA.resumo(f)
     return jsonify(f)

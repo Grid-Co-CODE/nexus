@@ -54,6 +54,8 @@ def test_o_numero_do_ativo_tem_de_ser_o_mesmo():
     melhor, cand = IA.escolher("inversor", ["Inversor 1.1", "Inversor 1.2"])      # empate: a pessoa escolhe
     assert melhor is None and len(cand) == 2
     assert IA.escolher("", ["Inversor 1.1"]) == (None, [])
+    # a 1ª prova no ar (15/11/2026): as mesmas palavras em dois ativos; o nome igual vence
+    assert IA.escolher("inversor 1.1", ["Disjuntor do Inversor 1.1", "Inversor 1.1"])[0] == "Inversor 1.1"
 
 
 def test_a_resposta_e_lida_mesmo_com_cerca_e_o_raciocinio_sai():
@@ -87,6 +89,20 @@ def test_a_ficha_volta_conferida_no_catalogo(ia):
     p = ia.pedidos[-1]
     assert p["chave"] == "chave-de-teste" and USINA in p["sistema"] and "inversor_inspecao" in p["sistema"]
     assert p["usuario"] == "inspeção no inversor 1.1 da usina teste 1"
+    # no PCM a IA recebe a lista da Classificação 1 da solicitação; a ficha traz as opções para a pessoa trocar
+    assert '"classif1"' in p["sistema"] and "Programada" in p["sistema"]
+    assert [o["txt"] for o in f["classif1_opcoes"]] == ["Corretiva", "Programada"]
+
+
+def test_sem_tema_a_classificacao_e_a_que_a_ia_propos_se_for_da_lista(ia):
+    ia.resposta["j"] = dict(RESPOSTA, tema="limpeza_modulos", classif1="programada")
+    f = ia.post("/os/api/solic/ia/preencher", json={"setor": "pcm", "texto": "x"}).get_json()
+    assert f["tema"] == "" and f["classif1"] == {"id": 8, "txt": "Programada"}
+    ia.resposta["j"] = dict(RESPOSTA, tema="", classif1="Inventada")
+    assert ia.post("/os/api/solic/ia/preencher", json={"setor": "pcm", "texto": "x"}).get_json()["classif1"] == {}
+    # na Engenharia e na Performance não há Classificação 1 na ficha nem no pedido à IA
+    ia.post("/os/api/solic/ia/preencher", json={"setor": "engenharia", "texto": "x"})
+    assert '"classif1"' not in ia.pedidos[-1]["sistema"]
 
 
 def test_o_tema_que_nao_e_do_tipo_do_ativo_cai_e_vem_a_base(ia):
@@ -118,8 +134,14 @@ def test_trocar_na_ficha_vale_a_escolha_e_nao_gasta_ia(ia, monkeypatch):
     monkeypatch.setattr(IA, "chamar", lambda *a, **k: pytest.fail("a ficha refeita não pede à IA"))
     f = ia.post("/os/api/solic/ia/ficha", json={"setor": "pcm", "escolhidos": {"cliente": "Cliente X", "usina": USINA, "ativo_id": 1},
                                                 "titulo": "Olhar o nobreak", "descricao": "Apita.", "tema": "inversor_inspecao",
+                                                "classif1_atual": "Programada",
                                                 "extras": [{"desc": "Anotar o alarme", "tipo": "texto"}]}).get_json()
     assert f["ativo"]["id"] == 1 and f["tema"] == "" and f["classif1"] == {"id": 8, "txt": "Programada"}
+    # a que a pessoa marcou na ficha vence a do tema
+    g = ia.post("/os/api/solic/ia/ficha", json={"setor": "pcm", "tema": "inversor_inspecao", "classif1_atual": "Corretiva",
+                                                "escolhidos": {"cliente": "Cliente X", "usina": USINA, "ativo_id": 2,
+                                                               "classif1_id": 8}}).get_json()
+    assert g["tema"] == "inversor_inspecao" and g["classif1"] == {"id": 8, "txt": "Programada"}
     assert [s["desc"] for s in f["subtarefas"]] == ["Descreva a atividade realizada", "Anotar o alarme"]
 
 
