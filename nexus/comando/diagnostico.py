@@ -46,7 +46,7 @@ Responda SÓ com o bloco abaixo, em JSON válido, sem nada antes ou depois, sem 
 - Cada número com o nome que o dossiê dá a ele. Desligamento é só a parada em que a geração parou: com 17 normalizações e 16 com a geração parada, são 16 desligamentos (a perda de comunicação não conta).
 - "os": o número de uma OS do dossiê ligada ao item, ou null. Nunca invente OS, pendência ou número.
 - "destino": para onde o supervisor vai a partir do item, ou null:
-  - {"pedir": "<nome exato de um setor da lista <setores>>"} quando o item é pedir ou cobrar algo de outro setor (ex.: "Solicitar à Engenharia a revisão dos ajustes", "Cobrar o retorno dos chamados"). O que depende da concessionária (a rede, a tensão, o chamado com a distribuidora) é pedido ao COS, que abre o chamado com a rede. Os chamados de garantia (cobrar o retorno do fabricante, o andamento do chamado) são da área Chamados, dentro da Performance: peça a "Chamados" quando estiver na lista; senão, à Performance.
+  - {"pedir": "<nome exato de um setor da lista <setores>>", "tema": "<nome exato de um tema desse setor, da lista TEMAS abaixo, ou null>"} quando o item é pedir ou cobrar algo de outro setor (ex.: "Solicitar à Engenharia a revisão dos ajustes", "Cobrar o retorno dos chamados"). O que depende da concessionária (a rede, a tensão, o chamado com a distribuidora) é pedido ao COS, que abre o chamado com a rede. Os chamados de garantia (cobrar o retorno do fabricante, o andamento do chamado) são da área Chamados, dentro da Performance: peça a "Chamados" quando estiver na lista; senão, à Performance.
   - {"ver": "<onde>"} quando o item é olhar ou decidir algo numa tela: "aprovacao" (aprovar as OS em verificação), "engenharia" (a análise da Engenharia), "extintores" (a lista dos extintores vencidos, a vencer e sem conferência), ou uma parte do prontuário: "performance", "os", "rondas", "seguranca", "cos", "chamados", "insights", "demandas".
   - Os dois juntos quando servem: {"pedir": "...", "ver": "..."} (ex.: conferir os extintores: pedir à Segurança e ver a lista).
   - Quando o item já tem a OS, a OS abre sozinha: use "destino" só se houver também um pedido a um setor ou uma tela.
@@ -72,8 +72,8 @@ def _sem_acento(s) -> str:
 
 
 def _destino(x: dict, setores: list[dict]) -> dict | None:
-    """{"tipo": "pedir", "setor_id", "setor"} | {"tipo": "ver", "onde"} | None. Só setor da lista e lugar da lista: o
-    que a IA inventar (ou um texto injetado pedir) não vira botão."""
+    """{"tipo": "pedir", "setor_id", "setor", "tema_id", "tema"} | {"tipo": "ver", "onde"} | None. Só setor da lista,
+    tema do setor e lugar da lista: o que a IA inventar (ou um texto injetado pedir) não vira botão nem tema."""
     d = x.get("destino")
     if not isinstance(d, dict):
         return None
@@ -81,7 +81,10 @@ def _destino(x: dict, setores: list[dict]) -> dict | None:
         alvo = _sem_acento(d["pedir"])
         for s in setores or []:
             if _sem_acento(s.get("nome")) == alvo:
-                return {"tipo": "pedir", "setor_id": s.get("setor_id"), "setor": s.get("nome")}
+                quer = _sem_acento(d.get("tema"))
+                tema = next((t for t in s.get("temas") or [] if quer and _sem_acento(t.get("nome")) == quer), None)
+                return {"tipo": "pedir", "setor_id": s.get("setor_id"), "setor": s.get("nome"),
+                        "tema_id": (tema or {}).get("tema_id", ""), "tema": (tema or {}).get("nome", "")}
         return None
     onde = _sem_acento(d.get("ver"))
     return {"tipo": "ver", "onde": onde} if onde in VER else None
@@ -205,13 +208,22 @@ def em_andamento(cfg, usina_id: int, dia: str | None = None) -> bool:
         return False
 
 
+def lista_de_temas(setores: list[dict] | None) -> str:
+    """Os temas de cada setor, no fim do pedido: de onde a IA tira o "tema" do pedir."""
+    linhas = [f"- {s['nome']}: " + "; ".join(t["nome"] for t in s.get("temas") or [])
+              for s in setores or [] if s.get("temas")]
+    return ("\nTEMAS de cada setor (o \"tema\" do pedir é o nome exato de um deles; sem tema que sirva, null):\n"
+            + "\n".join(linhas)) if linhas else ""
+
+
 def gerar(cfg, usina_id: int, dossie: str, dossie_tokens: int = 0, dia: str | None = None,
           setores: list[dict] | None = None) -> dict:
     """Faz o diagnóstico, guarda e solta a trava. Roda numa thread à parte (a rota não espera); no teste, na hora."""
     dia = dia or hoje()
     pasta = _pasta(cfg, dia)
     try:
-        rs = IA.perguntar(cfg, [modelo(cfg)], dossie, PEDIDO, setores=[s["nome"] for s in setores or []])
+        rs = IA.perguntar(cfg, [modelo(cfg)], dossie, PEDIDO + lista_de_temas(setores),
+                          setores=[s["nome"] for s in setores or []])
         r = rs[0] if rs else {"ok": False, "erro": "Nenhuma IA ligada para o diagnóstico."}
         IA.registrar(cfg, usina_id, "[diagnóstico do dia]", rs, "diagnostico-do-dia", dossie_tokens)
         agora = datetime.now(IA._BRT)

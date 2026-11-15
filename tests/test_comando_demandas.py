@@ -684,3 +684,12 @@ def test_o_botao_dos_temas_padrao_e_do_administrador(app, cena):
     assert '<span class="dm-t-area"' in html and 'name="area"' in html          # a área no tema e no tema novo
     # na Nova demanda, o tema leva a área (o JS faz dela mais uma escolha de setor)
     assert 'data-area="Chamados"' in c.get(CAIXA).get_data(as_text=True)
+
+
+def test_o_pedir_vem_com_o_tema_escolhido(app, cena):
+    """15/11/2026, Levi: "já preenche PCM porém não preenche o tema": o tema vai no endereço, só no formato do código."""
+    c = _cliente(app, ANA)
+    h = c.get(f"/t/comando/conversa/usina/1/janela?aba=pedir&setor=1&tema={cena['tema']}").get_data(as_text=True)
+    assert f'data-pre-tema="{cena["tema"]}"' in h
+    h = c.get("/t/comando/conversa/usina/1/janela?aba=pedir&setor=1&tema=qualquer").get_data(as_text=True)
+    assert "data-pre-tema" not in h

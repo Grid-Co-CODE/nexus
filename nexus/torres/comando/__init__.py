@@ -410,19 +410,31 @@ def usina_ia(usina_id):
 
 
 def _setores_ativos() -> list[dict]:
-    """[{setor_id, nome}] dos setores ativos do cadastro: para onde o diagnóstico do dia pode mandar o "Fazer" (só o
-    cadastro, sem as pessoas nem os temas: a janela do pedido lê esses na hora)."""
+    """[{setor_id, nome, temas: [{tema_id, nome}]}] dos setores ativos do cadastro: para onde o diagnóstico do dia pode
+    mandar o "Fazer", com os temas em uso de cada um (15/11/2026: a IA escolhe o tema, e a janela do pedido vem com ele).
+    A área (Chamados, na Performance) é mais um destino, com os temas dela; o setor fica com os temas sem área."""
     from ...auth import setor_telas as ST
     from ...cadastro import setores as S
     from ...dados.conexao import banco
     try:
         from ...comando import temas_padrao as TP
+        from ...comando import demandas as DM
         st = ST._setores_no_clique(*banco())
+        try:
+            temas = DM.temas()
+        except Exception:        # noqa: BLE001 — sem os temas, o "Fazer" vem só com o setor
+            current_app.logger.exception("Diagnóstico do dia: os temas não abriram")
+            temas = []
+
+        def da(sid, area=""):
+            return [{"tema_id": t["tema_id"], "nome": t["nome"]} for t in temas
+                    if t["setor_id"] == sid and (t.get("area") or "").lower() == area.lower()]
         out = []
         for s in S.ativos(st.get("setores") or []):
-            out.append({"setor_id": s["setor_id"], "nome": s["nome"]})
+            out.append({"setor_id": s["setor_id"], "nome": s["nome"], "temas": da(s["setor_id"])})
             # a área do setor como mais um destino ("Chamados", na Performance): o pedido vai ao setor, no tema da área
-            out += [{"setor_id": f"{s['setor_id']}:{a}", "nome": a} for a in TP.areas_do_setor(s["nome"])]
+            out += [{"setor_id": f"{s['setor_id']}:{a}", "nome": a, "temas": da(s["setor_id"], a)}
+                    for a in TP.areas_do_setor(s["nome"])]
         return out
     except Exception:            # noqa: BLE001 — sem os setores, o item sai sem o "Fazer"
         current_app.logger.exception("Diagnóstico do dia: os setores não abriram")
@@ -906,7 +918,8 @@ def conversa_janela(usina_id):
     pre = {"setor": a.get("setor", "") if re.fullmatch(r"\d+(:[\w ]{1,30})?", a.get("setor") or "") else "",
            "titulo": " ".join((a.get("titulo") or "").split())[:D.TITULO_MAX],
            "descricao": (a.get("descricao") or "").strip()[:D.TEXTO_MAX],
-           "os": a.get("os", "") if (a.get("os") or "").isdigit() else ""}
+           "os": a.get("os", "") if (a.get("os") or "").isdigit() else "",
+           "tema": a.get("tema", "") if D.ID_TEMA.fullmatch(a.get("tema") or "") else ""}
     return render_template("comando/_conversa_janela.html", **_contexto(
         ob=ob, uid=usina_id, nome=nome, aba=aba, conv=_com_conversa(CV.atual().get(ob), _meu_hmac()), pre=pre,
         erro_conversa=lido["erro"], dem=dem, demandas=demandas,

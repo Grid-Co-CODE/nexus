@@ -124,10 +124,22 @@ def test_cada_item_tem_o_destino_validado():
             '{"item": "Análise da Engenharia", "os": null, "destino": {"ver": "Engenharia"}}]}</diagnostico>')
     d = DG.ler(resp, DOSSIE, setores)
     # o setor que não está na lista (Marketing) não vira botão; o 4º item passa do limite de 3
-    assert [x["destino"] for x in d["pode_fazer"]] == [{"tipo": "pedir", "setor_id": 3, "setor": "Engenharia"},
+    sem_tema = {"tema_id": "", "tema": ""}
+    assert [x["destino"] for x in d["pode_fazer"]] == [dict({"tipo": "pedir", "setor_id": 3, "setor": "Engenharia"}, **sem_tema),
                                                        {"tipo": "ver", "onde": "aprovacao"}, None]
-    assert [x["destino"] for x in d["pendente"]] == [{"tipo": "pedir", "setor_id": 7, "setor": "COS"},
+    assert [x["destino"] for x in d["pendente"]] == [dict({"tipo": "pedir", "setor_id": 7, "setor": "COS"}, **sem_tema),
                                                      {"tipo": "ver", "onde": "engenharia"}]
+    # o tema do pedir (15/11/2026, Levi: "já preenche PCM porém não preenche o tema"): só tema DO setor; o de outro, não
+    com_temas = [{"setor_id": 9, "nome": "PCM", "temas": [{"tema_id": "m00000000001", "nome": "Programação de ronda"}]},
+                 {"setor_id": 3, "nome": "Engenharia", "temas": [{"tema_id": "m00000000002", "nome": "Parecer técnico"}]}]
+    t = DG.ler('<diagnostico>{"situacao": "Ok.", "tem_que_fazer": ['
+               '{"acao": "Programar a ronda", "destino": {"pedir": "PCM", "tema": "programacao de ronda"}},'
+               '{"acao": "Pedir o parecer ao PCM", "destino": {"pedir": "PCM", "tema": "Parecer técnico"}}]}</diagnostico>',
+               DOSSIE, com_temas)
+    assert [(x["destino"]["tema_id"], x["destino"]["tema"]) for x in t["tem_que_fazer"]] == [
+        ("m00000000001", "Programação de ronda"), ("", "")]
+    assert "TEMAS de cada setor" in DG.lista_de_temas(com_temas) and "- PCM: Programação de ronda" in DG.lista_de_temas(com_temas)
+    assert DG.lista_de_temas([{"setor_id": 1, "nome": "COS", "temas": []}]) == ""
     # o "ver" junto do "pedir" (15/11/2026: "além da pessoa clicar em fazer, também poder clicar em ver")
     junto = DG.ler('<diagnostico>{"situacao": "Ok.", "tem_que_fazer": [{"acao": "Conferir os 13 extintores", "os": null, '
                    '"destino": {"pedir": "Engenharia", "ver": "extintores"}}]}</diagnostico>', DOSSIE, setores)

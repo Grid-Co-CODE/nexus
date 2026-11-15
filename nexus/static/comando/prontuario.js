@@ -63,7 +63,8 @@
     var uid = el.getAttribute('data-pu-diag-usina'), nome = el.getAttribute('data-pu-diag-nome') || '';
     var desc = x.texto + '\n\nDo Nexus IA Insights de ' + (j.data || 'hoje') + ' da ' + nome + ': ' + ((j.diag || {}).situacao || '');
     var url = nexusRota('/t/comando/conversa/usina/' + uid + '/janela') + '?aba=pedir&setor=' + encodeURIComponent(d.setor_id) +
-      '&titulo=' + encodeURIComponent(x.texto) + '&descricao=' + encodeURIComponent(desc) + (x.os ? '&os=' + encodeURIComponent(x.os) : '');
+      '&titulo=' + encodeURIComponent(x.texto) + '&descricao=' + encodeURIComponent(desc) + (x.os ? '&os=' + encodeURIComponent(x.os) : '') +
+      (d.tema_id ? '&tema=' + encodeURIComponent(d.tema_id) : '');
     var rot = lista === 'pendente' ? 'Solicitar ' + artigo(d.setor) + d.setor : 'Fazer';
     return ver + ' <a class="pu-diag-bt pu-diag-bt--fazer" href="' + escD(url) + '" data-pu-jan="' + escD(url) +
       '" data-pu-jan-t="Pedir a um setor · ' + escD(nome) + '" title="Pedir ' + escD(artigo(d.setor) + d.setor) +

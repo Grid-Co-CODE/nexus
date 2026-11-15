@@ -681,15 +681,30 @@ o que é que ele tem que fazer".
     `ler` só aceita setor ativo do cadastro e lugar da lista (`VER`):
     - **"Fazer"** (em "Tem que fazer" e "Pode fazer") e **"Solicitar ao setor"** (em "Pendente") abrem, na janela por
       cima, o "Pedir a um setor" da usina já preenchido.
-      - A janela da conversa aceita `setor`, `titulo`, `descricao` e `os`; setor e OS só como número.
-      - O `demandas.js` escolhe o setor e a OS que vieram.
-      - Quem envia confere e escolhe a pessoa e o tema.
+      - A janela da conversa aceita `setor`, `titulo`, `descricao`, `os` e `tema`. O setor e a OS vão só como número
+        (o setor da área, como `2:Chamados`), e o tema no formato do código (`ID_TEMA`).
+      - O `demandas.js` escolhe o setor, a OS e o tema que vieram.
+      - Quem envia confere e escolhe a pessoa.
+      - **O tema já escolhido** (15/11/2026, Levi: "já preenche PCM porém não preenche o tema"):
+        - o pedido à IA leva os temas em uso de cada setor (`lista_de_temas`, de `_setores_ativos`), e a IA escolhe um;
+        - `ler` só aceita tema DO setor escolhido;
+        - sem tema que sirva, o pedido vai sem tema.
       - O que depende da concessionária é pedido ao COS, que abre o chamado com a rede.
-      - Os chamados de garantia (cobrar o fabricante) são pedidos à Performance: não há setor de Garantias no cadastro,
-        a garantia fica dentro da Performance (Levi, 14/11/2026). O mesmo vale para as ações do chat.
-    - **"Visualizar"** abre a Aprovação de OS ou a Mesa do engenheiro (noutra aba), ou abre o cartão do próprio
-      prontuário (rondas, segurança, COS, chamados...).
-    - A OS do item vira "Ver OS N" (o Raio X ou o card).
+      - Os chamados de garantia (cobrar o fabricante) vão à área Chamados, dentro da Performance; sem a área, à
+        Performance. O mesmo vale para as ações do chat.
+    - **"Visualizar"** pode vir junto do "Fazer" (15/11/2026: "além da pessoa clicar em fazer, também poder clicar em
+      ver"; o item leva `ver` à parte do `destino`). Ele abre:
+      - a Aprovação de OS já com `?usina=<id>` (o filtro da usina é do chat da Usinas 360°, avisado em 15/11);
+      - a Mesa do engenheiro (noutra aba);
+      - a lista dos extintores vencidos, a vencer e sem conferência, na janela por cima (o painel da Usinas 360°);
+      - ou o cartão do próprio prontuário.
+
+      O Segurança do prontuário também ganhou o "ver os extintores" no Comando › Usinas.
+    - A OS do item vira "Ver OS N". O Raio X é para o chamado, a Engenharia e a Performance; o **card** é para a OS de
+      religamento (a do COS, `os_tipo = "religamento"`; Levi: "o raio-x [...] não deveria aparecer em religamento") e o
+      resto.
+    - Cada assunto numa lista só: "Pendente com outros" é só o que espera outra pessoa ou empresa. Na Linhares 1, os 13
+      extintores apareciam em duas listas.
 - **Um por usina por dia** (o dia de Brasília), guardado em `<NEXUS_DADOS>/ia/diagnosticos/AAAA-MM-DD/<usina>.json`.
   - A primeira abertura do dia pega a trava (`<usina>.andamento`, criada de forma exclusiva), monta o dossiê na hora e
     manda a IA fazer numa thread à parte. A rota responde "preparando" e a página não espera.

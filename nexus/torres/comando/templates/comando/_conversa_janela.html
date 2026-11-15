@@ -32,7 +32,7 @@
           action="{{ ('/t/comando/caixa-de-entrada/demandas/nova?usina_jan=' ~ uid)|na_raiz }}"
           data-pessoas-url="{{ '/t/comando/caixa-de-entrada/demandas/pessoas'|na_raiz }}"
           data-os-url="{{ '/t/comando/caixa-de-entrada/demandas/os'|na_raiz }}" data-pu-dm-nova
-          {%- if pre and pre.setor %} data-pre-setor="{{ pre.setor }}"{% endif %}{% if pre and pre.os %} data-pre-os="{{ pre.os }}"{% endif %}>
+          {%- if pre and pre.setor %} data-pre-setor="{{ pre.setor }}"{% endif %}{% if pre and pre.os %} data-pre-os="{{ pre.os }}"{% endif %}{% if pre and pre.tema %} data-pre-tema="{{ pre.tema }}"{% endif %}>
       <p class="dm-nota">Peça a outro setor algo sobre a {{ nome }}, sem abrir uma OS. Quem recebe é avisado no sininho, e o prazo é o do tema. A demanda também fica na Caixa de entrada.</p>
       {{ nova.campos(dem, codigo, pre='pu-dm', usina=(uid, nome), valores=pre) }}
       <div class="dm-botoes dm-botoes--fim">

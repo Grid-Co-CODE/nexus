@@ -55,6 +55,12 @@ window.NexusDemandaNova = function (dlg) {
         var preSetor = dlg.getAttribute('data-pre-setor');
         if (preSetor && setores[preSetor]) { fSetor.value = preSetor; fSetor.dispatchEvent(new Event('change')); }
         dlg.removeAttribute('data-pre-setor');
+        // o tema que veio escolhido (15/11/2026, o "Fazer" do diagnóstico: "não preenche o tema"), se é do setor escolhido
+        var preTema = dlg.getAttribute('data-pre-tema');
+        if (preTema && Array.prototype.some.call(fTema.options, function (o) { return o.value === preTema; })) {
+          fTema.value = preTema; fTema.dispatchEvent(new Event('change'));
+        }
+        dlg.removeAttribute('data-pre-tema');
       })
       .catch(function () {
         erroPessoas.textContent = 'Não li a lista de pessoas agora: feche e abra de novo em instantes.';
