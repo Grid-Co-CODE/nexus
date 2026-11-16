@@ -1083,6 +1083,8 @@
   // só quando há atuação. Só aparece se a usina tem relé. (potência: o URP6000 manda 0xFFFF aqui = sem
   // leitura, então foi removida.)
   function braw(v) { return v == null || isNaN(v) ? "—" : fmtKW.format(v); }
+  // tensao do rele em kV (o valor cru ja e primario, ~V): 14809 -> "14,81". O rele le ~6% acima do HMI (calibracao dele).
+  function releKv(v) { return v == null || isNaN(v) ? "—" : fmt2.format(v / 1000); }
   // Proteções do URP6000 (códigos ANSI) -> nome amigável, para a grade e os cards de trip.
   var RELE_FAMILIAS = [
     ["27", "Subtensão"], ["59", "Sobretensão"],
@@ -1114,7 +1116,7 @@
     });
     br.appendChild(card.grade);
     var tm = document.createElement("table"); tm.className = "cos-rele-tab";
-    tm.innerHTML = "<thead><tr><th>Fase</th><th class='n'>Corrente (A)</th><th class='n'>Tensão (V)</th></tr></thead>";
+    tm.innerHTML = "<thead><tr><th>Fase</th><th class='n'>Corrente (A)</th><th class='n'>Tensão (kV)</th></tr></thead>";
     var tbm = document.createElement("tbody"); card.med = {};
     ["A", "B", "C"].forEach(function (f) {
       var tr = document.createElement("tr");
@@ -1151,7 +1153,7 @@
     var m = r.medidas || {};
     ["A", "B", "C"].forEach(function (f) {
       escrever(card.med["i" + f], "textContent", braw(m["i" + f]));
-      escrever(card.med["v" + f], "textContent", braw(m["v" + f]));
+      escrever(card.med["v" + f], "textContent", releKv(m["v" + f]));
     });
     escrever(card.freq, "textContent", "Frequência: " + (m.freq == null || isNaN(m.freq) ? "—" : fmt2.format(m.freq) + " Hz"));
     escrever(card.disj, "textContent", "Disjuntor: " + releDisjuntor(r.disjuntor));
