@@ -76,6 +76,18 @@ def test_a_acao_leva_as_usinas_e_as_instrucoes_mudam_por_escopo():
     assert IA._sistema("D", "", CI.INSTRUCOES).startswith(CI.INSTRUCOES) and "CARTEIRA" in CI.INSTRUCOES
 
 
+def test_executar_os_nunca_vira_pedido_a_outro_setor():
+    """16/11/2026, na Marabá 200: com a regra nas instruções, o Nemotron ainda mandou estas duas à Manutenção."""
+    _t, acoes = IA.separar_acoes(
+        'Ok.\n<acoes>[{"setor": "Manutenção", "acao": "Executar as corretivas atrasadas OS 18364 (Tracker 9.101)", "os": 18364},'
+        '{"setor": "Manutenção", "acao": "Atender as OS de parada abertas OS 19089 (Cabine 5)", "os": 19089},'
+        '{"setor": "Engenharia", "acao": "Avaliar e apoiar a configuração do sensor de temperatura", "os": null},'
+        '{"setor": "Engenharia", "acao": "Realizar a análise de recorrência do inversor 1.5", "os": null},'
+        '{"setor": "Chamados", "acao": "Cobrar da STI os 4 chamados abertos", "os": null}]</acoes>',
+        ["Manutenção", "Engenharia", "Chamados"])
+    assert [a["acao"][:20] for a in acoes] == ["Avaliar e apoiar a c", "Realizar a análise d", "Cobrar da STI os 4 c"]
+
+
 def test_a_caixa_esta_na_tela_para_todos(tela, logado):
     """Sem janela e sem o botão do alto: o lugar da caixa no prontuário e na lista; o pedaço abre para quem não é
     administrador, e a pergunta também (a de antes respondia 403)."""

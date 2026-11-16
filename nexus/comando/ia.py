@@ -546,6 +546,25 @@ MAX_ACOES = 5
 _RX_ACOES = re.compile(r"<acoes>(.*?)(?:</acoes>|$)", re.S | re.I)
 
 
+# executar OS é do técnico de campo, que o supervisor coordena (16/11/2026, Levi, na Marabá 200: "o supervisor ele não
+# consegue mandar uma caixa para o técnico. Porque o técnico ele não usa o Nexus, ele usa o app de campo"). As instruções
+# dizem isso, e o Nemotron ainda mandou "Executar as corretivas atrasadas" e "Atender as OS de parada" à Manutenção: a
+# ação que só pede para fazer a OS sai aqui, qualquer que seja o setor
+_RX_VERBO_OS = re.compile(r"^(executar|iniciar|concluir|finalizar|atender|realizar|fazer|religar|cobrar a execucao)\b")
+# o objeto: "OS" em maiúscula (o artigo "os" não conta: "Realizar os ajustes de proteção" à Engenharia vale) ou o tipo
+# da tarefa
+_RX_OBJETO_OS = re.compile(r"\bOS\b|\b(?i:tarefas?|corretivas?|preventivas?|religamentos?|paradas?)\b")
+
+
+def acao_de_campo(setor: str, acao: str) -> bool:
+    """A ação é fazer a OS (do técnico, não de outro setor)? Na Manutenção, qualquer pedido para executar, iniciar,
+    concluir ou atender; nos outros setores, só quando fala de OS, tarefa, corretiva ou parada."""
+    a = _sem_acento(acao)
+    if _sem_acento(setor) == "manutencao" and re.match(r"(executar|iniciar|concluir|finalizar|atender|realizar|religar)\b", a):
+        return True
+    return bool(_RX_VERBO_OS.match(a) and _RX_OBJETO_OS.search(acao))
+
+
 def separar_acoes(texto: str, setores) -> tuple[str, list[dict]]:
     """(o texto sem o bloco, [{setor, acao, os}]). Só vale o setor da lista (pelo nome sem acento e sem caixa: a IA
     escreve "seguranca"); o resto do bloco, e o bloco que não é JSON, se descartam calados: a resposta segue igual."""
@@ -565,7 +584,7 @@ def separar_acoes(texto: str, setores) -> tuple[str, list[dict]]:
             continue
         setor = por_nome.get(_sem_acento(it.get("setor")))
         acao = " ".join(str(it.get("acao") or "").split())[:120]
-        if not setor or not acao:
+        if not setor or not acao or acao_de_campo(setor, acao):
             continue
         try:
             os_n = int(it.get("os")) if it.get("os") not in (None, "", "null") else None
