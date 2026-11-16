@@ -52,17 +52,57 @@ def test_a_ponte_da_a_pagina_da_os_ao_quadro():
     assert 'if resto == "chamados/acompanhamento":' in fonte
 
 
-def test_o_raio_x_da_os_de_chamado_mostra_o_chamado(pagina, cliente, monkeypatch):
+def _obs_de_mentira(monkeypatch):
+    import chamados_obs_store as obs_store
+    banco = [{"id": "s1", "quando": "2026-11-12T10:00:00-03:00", "os": "16502", "tipo": "status", "texto": "Status: x",
+              "quem": "Analista Teste", "email": "", "ativo": "", "extra": {"status": "Aguardando retorno do Fabricante"}},
+             {"id": "o1", "quando": "2026-11-13T09:00:00-03:00", "os": "16502", "tipo": "obs",
+              "texto": "Pedimos ao fabricante o laudo.", "quem": "Analista Teste", "email": "", "ativo": "", "extra": {}}]
+    monkeypatch.setattr(obs_store, "listar", lambda forcar=False: list(banco))
+    monkeypatch.setattr(torre, "_ticket_da_os", lambda folio: "SR 7788")
+
+
+def test_o_raio_x_da_os_de_chamado_mostra_o_chamado_sem_moldura(pagina, cliente, monkeypatch):
+    """16/11/2026 (Levi: "A OS de garantia está abrindo um chamado dentro do chamado"; no quiz, "Uma página só"): os blocos
+    do chamado entram no próprio Raio X, sem a moldura com a tela do chamado; o status do chamado fica no lugar do status
+    da Engenharia, e as observações do chamado no lugar dos comentários. Uma cadeia só, a do Raio X."""
     C.limpar()
+    _obs_de_mentira(monkeypatch)
     cli = _como(cliente, ANA)
     html = cli.get(URL_OS + "?de=garantias").get_data(as_text=True)
     assert '<a class="eg-ac-volta" href="/t/chamados/garantias">← Garantias</a>' in html
-    assert 'src="/os/chamados/acompanhamento/16502?blocos=1"' in html and "data-chamado" in html
-    # sem o `de`, vale o livro dos chamados
+    assert "<iframe" not in html and "blocos=1" not in html
+    for h in ("Status do chamado", "Ticket no fornecedor", "Para abrir o ticket", "Observações", "Outros chamados",
+              "A cadeia da OS"):
+        assert "<h2>%s</h2>" % h in html, h
+    for h in ("Status e prioridade", "Comentários", "A cadeia do chamado"):
+        assert "<h2>%s</h2>" % h not in html, h
+    assert '<option value="Aguardando retorno do Fabricante" selected>' in html and 'value="SR 7788"' in html
+    assert "Pedimos ao fabricante o laudo." in html and "data-ch-finalizar" in html
+    assert 'data-base="/os/api/acomp/16502"' in html and "engenharia-chamado.js" in html
+    assert ">Status do chamado</div>" in html and "status geral: " in html               # o 1º número
+    # uma cadeia só: a do chamado (a OS de campo e a inspeção da nota) e esta OS como o Acompanhamento
+    assert '<span class="t">Acompanhamento</span>' in html and '<span class="t">OS da engenharia</span>' not in html
+    # sem o `de`, vale o livro dos chamados; OS que não é chamado: a página de sempre
     monkeypatch.setattr(torre, "_ler_chamados", lambda: [{"os": "16502.0", "situacao": "aberto"}])
-    assert 'src="/os/chamados/acompanhamento/16502?blocos=1"' in cli.get(URL_OS).get_data(as_text=True)
+    assert "<h2>Status do chamado</h2>" in cli.get(URL_OS).get_data(as_text=True)
     monkeypatch.setattr(torre, "_ler_chamados", lambda: [{"os": "99999", "situacao": "aberto"}])
-    assert "data-chamado" not in cli.get(URL_OS).get_data(as_text=True)
+    comum = cli.get(URL_OS).get_data(as_text=True)
+    assert "<h2>Status e prioridade</h2>" in comum and "<h2>Comentários</h2>" in comum and "data-ch-raiz" not in comum
+    assert '<span class="i">1</span><span class="t">OS da engenharia</span>' in comum
+
+
+def test_o_chamado_que_nao_monta_nao_derruba_o_raio_x(pagina, cliente, monkeypatch):
+    C.limpar()
+    monkeypatch.setattr(torre, "_ticket_da_os", lambda folio: None)
+    from nexus.torres.oscreator import ponte
+
+    def quebra(nome):
+        raise RuntimeError("clone fora")
+    monkeypatch.setattr(ponte, "modulo_do_clone", quebra)
+    html = _como(cliente, ANA).get(URL_OS + "?de=garantias").get_data(as_text=True)
+    assert "Não consegui montar o chamado de garantia desta OS (RuntimeError)" in html
+    assert "<h2>Status e prioridade</h2>" in html and "data-ch-raiz" not in html
 
 
 def test_o_banco_dos_chamados_fora_nao_derruba_o_raio_x(pagina, cliente, monkeypatch):
@@ -70,4 +110,12 @@ def test_o_banco_dos_chamados_fora_nao_derruba_o_raio_x(pagina, cliente, monkeyp
         raise RuntimeError("banco fora")
     monkeypatch.setattr(torre, "_ler_chamados", fora)
     r = _como(cliente, ANA).get(URL_OS)
-    assert r.status_code == 200 and "data-chamado" not in r.get_data(as_text=True)
+    assert r.status_code == 200 and "data-ch-raiz" not in r.get_data(as_text=True)
+
+
+def test_as_escritas_vao_as_rotas_do_chamado():
+    js = open(__import__("os").path.join(__import__("nexus").__path__[0], "static", "engenharia-chamado.js"),
+              encoding="utf-8").read()
+    for rota in ("'/status'", "'/ticket'", "'/obs'", "'/finalizar'", "'/obs/' + encodeURIComponent(id) + '/' + tipo"):
+        assert rota in js, rota
+    assert "credentials: 'same-origin'" in js and "e.login" in js

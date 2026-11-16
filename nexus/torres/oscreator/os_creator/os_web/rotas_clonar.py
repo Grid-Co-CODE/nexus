@@ -104,6 +104,11 @@ def api_criar():
     nome = (corpo.get("responsible_name") or "").strip()
     eids = (corpo.get("etiqueta_ids") or None) if corpo.get("clonar_etiquetas") else None
     note = (corpo.get("note") or "").strip()
-    res = api.clonar_os(prontas, idp, nome, eids, note)
+    # "Manter a OS pai" (16/11/2026): o clone nasce filho da mesma OS pai da original
+    try:
+        pai = int(corpo.get("id_parent") or 0) if corpo.get("manter_pai") else 0
+    except (TypeError, ValueError):
+        pai = 0
+    res = api.clonar_os(prontas, idp, nome, eids, note, id_parent=pai or None)
     lista_central.criadas(res)         # a OS clonada entra na lista central na hora (31/10/2026, tarefa 3.3)
     return jsonify(clonar_web.mensagem_resultado(res))

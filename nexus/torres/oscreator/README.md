@@ -3146,6 +3146,24 @@ fundo que nem quando vamos criar OS." O menu e a janela são da plataforma (Moni
   cliente, o relatório (um PDF; dois clientes, um .zip) e a planilha; a 375 px a página não rola para o lado e a caixa
   dos avisos fica na tela.
 
+## Garantias: a equipe de chamados pela tela, o Clonar com a OS pai e o chamado no Raio X sem moldura (16/11/2026)
+- **A equipe de chamados** (Levi: "passe todas as OSs para a responsável"; no quiz, "as abertas e as novas"): o botão
+  "Equipe: <nome>" no alto do quadro, só para o administrador do Nexus (`ponte` põe `os_web.admin_nexus` no pedido),
+  escolhe a pessoa da equipe e, marcado, passa para ela os chamados abertos (Chegaram e Ticket aberto), uma OS por vez,
+  por trás e com pausa (`os_web/acomp_equipe.py`; a janela acompanha pelo `GET /os/api/acomp/equipe`). A escolha mora em
+  `<dados>/oscreator/garantias/acomp_equipe.json` e vence o .env (`OS_WEB_CHAMADO_RESP_ID`/`NOME`), que fica de reserva:
+  é a pessoa no nome de quem o relógio das administrativas cria (`acomp_cadeia`) e contra quem o quadro marca "no nome de
+  outra pessoa". O App cria as dele com a configuração dele (`CHAMADO_RESP_ID` no Azure): trocar lá é com o chat do App.
+  A troca de responsável não mexe na nota da OS: conferido na 19322 em 16/11/2026 (a nota lida antes e depois, igual).
+- **Clonar com a OS pai** (a OS de chamado finalizada por engano, clonada "exatamente como ela é"): a leitura da OS de
+  referência traz o pai (`id_parent_wo` e o nº), e a tela mostra "Manter a OS pai (nº)", marcado; o clone nasce filho do
+  mesmo pai (o pai só vale no pedido que cria a OS numerada: depois o Fracttal ignora).
+- **O chamado no Raio X, sem moldura** (Levi: "A OS de garantia está abrindo um chamado dentro do chamado"): o Raio X monta
+  os blocos do chamado na própria página (`os_web/acomp_raiox.py`, chamado por `torres/engenharia`; ver o CLAUDE.md da
+  Engenharia). O modo "blocos" desta tela (`?blocos=1`) ficou sem uso.
+- **Como provar:** `tests/test_oscreator_garantias_equipe_16_11.py`, `tests/test_oscreator_clonar_pai_16_11.py` e
+  `tests/test_raio_x_garantias_11_11.py`.
+
 ## Garantias: a atividade do chamado começa no 1º comentário (15/11/2026)
 
 Levi: "quando tivesse o primeiro comentário, a data e hora do primeiro comentário entraria como início da atividade do

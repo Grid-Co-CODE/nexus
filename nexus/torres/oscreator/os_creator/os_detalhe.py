@@ -444,17 +444,27 @@ def get_os_para_clonar(id_work_order) -> dict:
             # o tempo da tarefa de origem (o PCM, 30/10/2026: o clone nascia com os 10 min do `create_os_rpc`)
             "duracao": api._segundos(t.get("duration")),
         })
-    etiqueta_ids = []
+    etiqueta_ids, pai_id, pai_folio = [], None, ""
     try:                                              # etiquetas vêm do cabeçalho da WO
         rd = api._rpc_call(api.RPC_WO_DETAILS, {"id": id_work_order, "get_iso_codes": False})
         det = rd.get("data") if isinstance(rd, dict) else rd
         det = det[0] if isinstance(det, list) and det else (det if isinstance(det, dict) else {})
         etiqueta_ids = [l.get("id") for l in (det.get("labels") or [])
                         if isinstance(l, dict) and l.get("id") is not None]
+        pai_id = det.get("id_parent_wo") or None
     except FracttalError:
         pass
+    # a OS pai da original (16/11/2026, Levi: clonar a OS de chamado finalizada por engano "exatamente como ela é"): o
+    # clone pode nascer filho do mesmo pai. Só no pedido que cria a OS numerada: depois o Fracttal ignora (os_criar.py)
+    if not pai_id:
+        pai_id = next((t.get("id_parent_wo") for t in tasks if isinstance(t, dict) and t.get("id_parent_wo")), None)
+    if pai_id:
+        try:
+            pai_folio = api._folio_da_os_pai(pai_id)
+        except Exception:                             # noqa: BLE001 — sem o nº, a tela mostra só que tem pai
+            pai_folio = ""
     return {"folio": folio, "tarefas": tarefas, "etiqueta_ids": etiqueta_ids,
-            "notas": "\n".join(notas_os), "n_sem_ativo": n_sem_ativo}
+            "notas": "\n".join(notas_os), "n_sem_ativo": n_sem_ativo, "id_parent_wo": pai_id, "os_pai": pai_folio}
 
 
 import api  # noqa: E402 — no fim: o `api` importa este módulo

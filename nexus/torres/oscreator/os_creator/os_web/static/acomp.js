@@ -347,6 +347,60 @@
         bExp.disabled = false;
       });
     }
+    // a equipe de chamados (16/11/2026): o administrador escolhe a pessoa e passa as abertas para ela; a passagem roda por
+    // trás no servidor, e a janela mostra o andamento até terminar
+    const dEq = quadro.querySelector("[data-dlg-equipe]"), bEq = quadro.querySelector("[data-equipe]");
+    if (dEq && bEq) {
+      const sel = dEq.querySelector("[data-equipe-pessoa]"), mEq = dEq.querySelector("[data-msg-equipe]");
+      const bGrava = dEq.querySelector("[data-gravar-equipe]");
+      let vigia = null;
+      function andamento(l) {
+        if (!l || !l.total) return "";
+        const e = (l.erros || []).length;
+        return (l.rodando ? "Passando: " : "Passados: ") + l.feitas + " de " + l.total + " para " + l.para +
+          (e ? " · " + e + " não passaram (" + l.erros.slice(0, 3).map(function (x) { return x.os + ": " + x.erro; }).join("; ") + ")" : "");
+      }
+      async function acompanhar() {
+        try {
+          const r = await fetch("/os/api/acomp/equipe", {headers: {"X-Requested-With": "fetch"}});
+          const j = await r.json();
+          msg(mEq, andamento(j.lote), j.lote && j.lote.erros && j.lote.erros.length ? "er" : "ok");
+          if (!(j.lote && j.lote.rodando)) { clearInterval(vigia); vigia = null; bGrava.disabled = false; }
+        } catch (e) { /* a próxima volta tenta */ }
+      }
+      bEq.addEventListener("click", async function () {
+        msg(mEq, "");
+        if (dEq.showModal) dEq.showModal(); else dEq.setAttribute("open", "");
+        try {
+          const [rp, re] = await Promise.all([fetch("/os/api/responsaveis", {headers: {"X-Requested-With": "fetch"}}),
+                                              fetch("/os/api/acomp/equipe", {headers: {"X-Requested-With": "fetch"}})]);
+          const pessoas = ((await rp.json()).pessoas || []), eq = await re.json();
+          sel.innerHTML = '<option value="">Escolha a pessoa</option>' + pessoas.map(function (p) {
+            const id = p.id_personnel || p.id, nome = String(p.name || p.nome || "").replace(/[&<>"]/g, "");
+            return '<option value="' + id + '"' + (String(id) === String(eq.id) ? " selected" : "") + ">" + nome + "</option>";
+          }).join("");
+          if (eq.lote && eq.lote.rodando) { bGrava.disabled = true; msg(mEq, andamento(eq.lote)); vigia = vigia || setInterval(acompanhar, 3000); }
+          else if (eq.lote && eq.lote.total) msg(mEq, andamento(eq.lote), eq.lote.erros.length ? "er" : "ok");
+        } catch (e) { msg(mEq, "Não consegui ler a lista de pessoas: " + e.message, "er"); }
+      });
+      dEq.querySelector("[data-fechar]").addEventListener("click", function () { dEq.close ? dEq.close() : dEq.removeAttribute("open"); });
+      bGrava.addEventListener("click", async function () {
+        const id = sel.value, nome = sel.selectedOptions[0] ? sel.selectedOptions[0].textContent.trim() : "";
+        if (!id) { msg(mEq, "Escolha a pessoa.", "er"); return; }
+        const passar = dEq.querySelector("[data-equipe-passar]").checked;
+        if (passar && !confirm("Passar os chamados abertos para " + nome + "? O responsável muda no Fracttal, uma OS por vez.")) return;
+        bGrava.disabled = true;
+        try {
+          const j = await postar("/os/api/acomp/equipe", {id_personnel: +id, nome: nome, passar: passar});
+          bEq.textContent = "Equipe: " + j.nome;
+          msg(mEq, j.mensagem, "ok");
+          if (j.passar) vigia = vigia || setInterval(acompanhar, 3000); else bGrava.disabled = false;
+        } catch (e) {
+          bGrava.disabled = false;
+          if (e.message !== "sessão") msg(mEq, e.message, "er");
+        }
+      });
+    }
     // o filtro guardado volta (o de antes de 05/11/2026 guardava um valor só por campo: vira lista de um)
     const salvo = lerGuardado(CHAVE_FILTRO) || {};
     let comFiltro = false;

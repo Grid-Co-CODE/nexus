@@ -296,7 +296,15 @@ def equipe() -> tuple:
     """(id, nome) da equipe de chamados no Fracttal — o MESMO padrão do servidor do App (CHAMADO_RESP_ID/NOME, v198).
 
     Vem do .env (`OS_WEB_CHAMADO_RESP_ID`, `OS_WEB_CHAMADO_RESP_NOME`) e não do código: o repositório é público e não leva
-    nome nem id de gente. Lido a cada chamada, e não no import, porque o .env só entra quando o `api` é importado."""
+    nome nem id de gente. Lido a cada chamada, e não no import, porque o .env só entra quando o `api` é importado. Desde
+    16/11/2026 a escolha do administrador na tela do Garantias vence o .env (`acomp_equipe`)."""
+    try:
+        from . import acomp_equipe
+        escolhida = acomp_equipe.atual()
+    except Exception:                                   # noqa: BLE001 — sem a escolha, vale o .env
+        escolhida = None
+    if escolhida:
+        return escolhida
     try:
         rid = int(os.environ.get("OS_WEB_CHAMADO_RESP_ID") or 0)
     except ValueError:

@@ -31,6 +31,9 @@
     const n = (D.etiqueta_ids || []).length;
     $('chk_etiq_txt').textContent = 'Clonar etiquetas (' + n + ')';
     $('chk_etiq').disabled = !n; $('chk_etiq').checked = n > 0;
+    // a OS pai da original (16/11/2026): o clone nasce filho dela, marcado de saída (o clone é a mesma OS)
+    $('lbl_pai').hidden = !D.id_parent_wo; $('chk_pai').checked = !!D.id_parent_wo;
+    $('chk_pai_txt').textContent = 'Manter a OS pai' + (D.os_pai ? ' (' + D.os_pai + ')' : '');
     renderTabela();
     const comAtivo = (D.tarefas || []).filter(temAtivo);
     $('b_upd_all').disabled = !comAtivo.length;
@@ -186,7 +189,8 @@
     $('btn_criar').disabled = true; resultado('');
     hint('criando clone com ' + n + ' tarefa(s)… (pode levar alguns segundos)');
     const corpo = {tarefas: D.tarefas, id_responsible: +idp, responsible_name: cb.selectedOptions[0].textContent.trim(),
-                   clonar_etiquetas: $('chk_etiq').checked, etiqueta_ids: D.etiqueta_ids || [], note: $('obs').value.trim()};
+                   clonar_etiquetas: $('chk_etiq').checked, etiqueta_ids: D.etiqueta_ids || [], note: $('obs').value.trim(),
+                   manter_pai: !!D.id_parent_wo && $('chk_pai').checked, id_parent: D.id_parent_wo || null};
     const r = await OsCarga.buscar('/os/api/clonar/criar', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(corpo)}, 'Criando a OS no Fracttal…');
     const j = r.ok ? await r.json() : {ok: false, mensagem: await apiErro(r)};
     $('btn_criar').disabled = false; hint('');

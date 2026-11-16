@@ -308,6 +308,9 @@ def ligar_garantias(app) -> None:
         # as administrativas das Inspeções realizadas (08/11/2026): as pendentes e as criadas, ao lado da cópia do quadro
         from os_web import acomp_cadeia
         acomp_cadeia.configurar_pasta(os.path.join(api._data_dir(), "oscreator", "garantias"))
+        # a equipe de chamados escolhida pela tela (16/11/2026): no mesmo lugar
+        from os_web import acomp_equipe
+        acomp_equipe.configurar_pasta(os.path.join(api._data_dir(), "oscreator", "garantias"))
 
 
 def modulo_do_clone(nome: str):
@@ -544,6 +547,8 @@ def area_pcm() -> dict:
 # setor_id do Chamados deixou só o administrador ("Sim, passa", para o setor Performance inteiro).
 OBS_CHAMADOS = "os_web.obs_chamados"
 SETOR_OBS_GARANTIAS = SID.PERFORMANCE
+# a equipe de chamados pela tela do Garantias (16/11/2026): só o administrador do Nexus troca (`rotas_acomp.ADMIN_NEXUS`)
+ADMIN_NEXUS = "os_web.admin_nexus"
 _ROTA_OBS = re.compile(r"chamados/acompanhamento/\d+|api/acomp/\d+/obs/[^/]+/(?:editar|excluir)")
 # o "Retornar para responsável" do card (10/11/2026): só esta rota lê o cadastro, e só quando alguém pergunta ou aperta
 _ROTA_RETORNAR = re.compile(r"api/os/\d+/retornar")
@@ -654,6 +659,8 @@ def encaminhar(resto: str):
         environ[PAGINA_DA_OS] = pagina_da_os()  # a OS abre a página da OS da Engenharia (ver `pagina_da_os`)
     if resto == "chamados/acompanhamento":      # o quadro de Garantias abre o Raio X da OS (11/11/2026)
         environ[PAGINA_DA_OS] = pagina_da_os()
+    if resto in ("chamados/acompanhamento", "api/acomp/equipe"):
+        environ[ADMIN_NEXUS] = bool(session.get("admin"))     # a equipe de chamados pela tela (`rotas_acomp.api_equipe`)
     if _ROTA_RETORNAR.fullmatch(resto):         # quem retorna a OS em verificação para o responsável (retornar_os.py)
         from . import retornar_os
         environ[retornar_os.CHAVE] = retornar_os.no_pedido(app)

@@ -1100,6 +1100,44 @@ def _checklist(folio) -> tuple[list[dict], str]:
              "grupo": str(s.get("group") or "").strip()} for s in linhas], ""
 
 
+def _ticket_da_os(folio) -> str | None:
+    """A resposta da subtarefa do ticket ("ticket"/"protocolo", a mesma regra do `acomp_web.item_do_ticket`), lida agora no
+    REST. None quando não deu para ler (vale a da cópia do quadro de Garantias)."""
+    from ...engenharia import os_equipe
+    try:
+        subs = os_equipe._paginas_ate(f"work_orders_subtasks/?folio={int(folio)}", teto=1)
+    except Exception:           # noqa: BLE001
+        return None
+    for s in subs:
+        d = str(s.get("description") or "").lower()
+        if "ticket" in d or "protocolo" in d:
+            v = str(s.get("value") or "").strip()
+            return "" if v in ("None", "False") else v
+    return None
+
+
+def _chamado_no_raiox(o: dict) -> dict:
+    """Os blocos do chamado para o Raio X (`os_web/acomp_raiox.py` do OS Creator), com quem edita e exclui as observações
+    (a regra da ponte). → o dicionário dos blocos, ou {"erro": motivo}: o resto da página abre do mesmo jeito."""
+    import logging
+
+    from ..oscreator import ponte
+    try:
+        ch = ponte.modulo_do_clone("os_web.acomp_raiox").blocos(o["os"], o, ticket=_ticket_da_os(o["os"]))
+        ch["pode_obs"] = bool(ponte.obs_chamados().get("pode"))
+        return ch
+    except Exception as e:      # noqa: BLE001 — o chamado que não monta não derruba a página da OS
+        logging.warning("Raio X: o chamado da OS %s não montou (%s: %s)", o.get("os"), type(e).__name__, str(e)[:160])
+        return {"erro": type(e).__name__}
+
+
+def _kpi_do_chamado(ch: dict) -> dict:
+    """O 1º número do Raio X na OS de chamado: o status do chamado e o status geral, no lugar do status da Engenharia."""
+    st = ch["c"].get("status_ch") or ""
+    return {"rotulo": "Status do chamado", "valor": st or "Sem status", "grav": "",
+            "nota": [("status geral: ", False), (ch.get("status_geral") or "—", True)]}
+
+
 def _pagina_da_os(folio: int, tela_id: str):
     import logging
     from urllib.parse import quote, urlencode
@@ -1167,11 +1205,16 @@ def _pagina_da_os(folio: int, tela_id: str):
                 f["atividade"] = None
     except Exception as e:      # noqa: BLE001
         fs, erro_filhas = [], type(e).__name__
-    # a OS de chamado de garantia mostra o chamado no Raio X (11/11/2026, etapa 2, "uma página só"): a tela do chamado do
-    # OS Creator no modo "blocos", numa moldura. É chamado quem veio de Garantias ou a OS que o livro dos chamados tem
-    chamado_url = ""
+    # a OS de chamado de garantia mostra o chamado no Raio X (16/11/2026, Levi: "A OS de garantia está abrindo um chamado
+    # dentro do chamado ... o raio x da OS é uma evolução dessa visão de dentro"; no quiz, "Uma página só"): os blocos do
+    # chamado entram na própria página, montados aqui (`_chamado_no_raiox`), e o status do chamado vira o 1º número. De
+    # 11/11 a 16/11 era a tela do chamado do OS Creator numa moldura. É chamado quem veio de Garantias ou a OS que o livro
+    # dos chamados tem
+    chamado = None
     if _e_chamado(o["os"], request.args.get("de")):
-        chamado_url = na_raiz(f"/os/chamados/acompanhamento/{o['os']}") + "?blocos=1"
+        chamado = _chamado_no_raiox(o)
+        if not chamado.get("erro"):
+            kpis[0] = _kpi_do_chamado(chamado)
     # a cadeia do Raio X da OS (11/11/2026): as OS incluídas à mão, depois das filhas
     from ...engenharia import cadeia_os as C
     incluidas, erro_cadeia = C.do_banco(o["wid"])
@@ -1190,7 +1233,7 @@ def _pagina_da_os(folio: int, tela_id: str):
                           "data": o.get("evento_local") or ""})
     return render_template(
         "engenharia/os_quadro.html", o=o, est=est, filhas=fs, erro_filhas=erro_filhas, erro_livro=erro_livro,
-        incluidas=incluidas, erro_cadeia=erro_cadeia, solicitacao=solicitacao, chamado_url=chamado_url,
+        incluidas=incluidas, erro_cadeia=erro_cadeia, solicitacao=solicitacao, chamado=chamado,
         solicitante_url=na_raiz(f"/os/api/os/{o['wid']}/solicitacao"),
         velha_em=datetime.fromtimestamp(lido["lido_em"], BRT).strftime("%H:%M") if lido.get("velha") else "",
         kpis=kpis, pode=pode and not erro_livro, **extra,

@@ -1,0 +1,80 @@
+{# O chamado de garantia no Raio X da OS, sem moldura (16/11/2026, Levi: "A OS de garantia está abrindo um chamado dentro do
+   chamado ... o raio x da OS é uma evolução dessa visão de dentro"; no quiz, "Uma página só"). Os blocos que só o chamado
+   tem, montados pelo Raio X (`os_web/acomp_raiox.py` do OS Creator): à esquerda o status do chamado (no lugar do status
+   da Engenharia), o ticket e o Como abrir; à direita os campos para abrir o ticket, as observações e os outros chamados.
+   As escritas vão às rotas do chamado do OS Creator (`engenharia-chamado.js`), com as regras delas. #}
+
+{% macro esquerda(ch, o) %}
+{% set c = ch.c %}
+<section class="eg-bloco" data-ch-caixa>
+  <div class="eg-bloco-h"><h2>Status do chamado</h2></div>
+  <div class="eg-ac-form">
+    <label><span class="eg-ac-lbl">Status</span>
+      <select class="eg-ac-campo" data-ch-status{% if not ch.aberto %} disabled{% endif %}>
+        <option value=""{% if not c.status_ch %} selected{% endif %}>Sem status</option>
+        {%- for s in ch.opcoes_status %}<option value="{{ s }}"{% if s == c.status_ch %} selected{% endif %}>{{ s }}</option>{% endfor %}
+      </select></label>
+    <button type="button" class="eg-ac-btn eg-ac-btn--g" data-ch-acao="status"{% if not ch.aberto %} disabled{% endif %}>Salvar</button>
+  </div>
+  <p class="eg-dica">Status geral: <b>{{ ch.status_geral or '—' }}</b>. {% if ch.aberto %}Fica no Nexus (não vai ao Fracttal) e entra sozinho nas observações.{% else %}Chamado finalizado: o status fica como estava.{% endif %}</p>
+  <p class="eg-os-msg" role="status" hidden></p>
+</section>
+<section class="eg-bloco" data-ch-caixa>
+  <div class="eg-bloco-h"><h2>Ticket no fornecedor</h2></div>
+  <div class="eg-ac-form">
+    <label><span class="eg-ac-lbl">Nº do ticket ou protocolo</span>
+      <input class="eg-ac-campo" data-ch-ticket value="{{ ch.ticket }}" maxlength="120" placeholder="nº do ticket ou protocolo"{% if not ch.aberto %} disabled{% endif %}></label>
+    <button type="button" class="eg-ac-btn eg-ac-btn--g" data-ch-acao="ticket"{% if not ch.aberto %} disabled{% endif %}>Salvar</button>
+  </div>
+  <p class="eg-dica">Grava na subtarefa do ticket da OS {{ o.os }} no Fracttal e entra nas observações.</p>
+  <p class="eg-os-msg" role="status" hidden></p>
+</section>
+{% if ch.canal %}<section class="eg-bloco">
+  <div class="eg-bloco-h"><h2>Como abrir</h2></div>
+  <p class="eg-ac-nota">{{ ch.canal }}</p>
+</section>{% endif %}
+{% endmacro %}
+
+{% macro direita(ch, o) %}
+{% set c, n = ch.c, ch.n %}
+<section class="eg-bloco">
+  <div class="eg-bloco-h"><h2>Para abrir o ticket</h2><span class="n">{{ n.campos|length }} campos</span>
+    {% if n.campos %}<button type="button" class="eg-ac-btn eg-ac-btn--o eg-ac-btn--p" data-ch-copiar="{{ ch.copiar }}">Copiar tudo</button>{% endif %}</div>
+  {% if n.campos %}<table class="eg-t"><tbody>
+    {% for x in n.campos %}<tr><td class="k">{{ x.rotulo }}<small>{{ x.chave }}</small></td><td class="v{% if x.mono %} eg-mono{% endif %}">{{ x.valor or '—' }}</td>
+      <td class="eg-ch-cp">{% if x.valor %}<button type="button" class="eg-ac-btn eg-ac-btn--o eg-ac-btn--p" data-ch-copiar="{{ x.valor }}">Copiar</button>{% endif %}</td></tr>{% endfor %}
+  </tbody></table>
+  {% else %}<p class="eg-vazio-l">A nota da OS não traz os campos do formulário do fabricante.</p>{% endif %}
+  {% if ch.menos7.sim is not none %}<p class="eg-dica">Menos de 7 dias desde a falha: <b>{{ 'Sim' if ch.menos7.sim else 'Não' }}</b> ({{ ch.menos7.dias }} dia{{ '' if ch.menos7.dias == 1 else 's' }}).</p>{% endif %}
+</section>
+<section class="eg-bloco" data-ch-obs data-pode-obs="{{ '1' if ch.pode_obs else '0' }}">
+  <div class="eg-bloco-h"><h2>Observações</h2><span class="n">{{ ch.tl|length }}</span></div>
+  {% if ch.erro_obs %}<p class="eg-dica">{{ ch.erro_obs }}</p>{% endif %}
+  <div class="eg-os-coment" data-ch-caixa>
+    <textarea class="eg-tl-obs" data-ch-texto maxlength="2000" aria-label="Observação" placeholder="O que aconteceu? (a data entra sozinha)"{% if not ch.pode_gravar %} disabled{% endif %}></textarea>
+    <div class="eg-tl-comp"><span class="eg-dica">{% if ch.pode_gravar %}Fica com o seu nome e a data e a hora em que você salvou. O 1º comentário inicia a atividade da OS no Fracttal.{% else %}Este servidor não tem a credencial de escrita do banco da Gridco: dá para ver, não para salvar.{% endif %}</span>
+      <button type="button" class="eg-ac-btn eg-ac-btn--g" data-ch-acao="obs"{% if not ch.pode_gravar %} disabled{% endif %}>Salvar observação</button></div>
+    <p class="eg-os-msg" role="status" hidden></p>
+  </div>
+  {% if ch.tl %}<div class="eg-tl">
+    {% for e in ch.tl %}<div class="eg-tl-e{{ ' novo' if e.novo }}{{ ' ev' if e.ev }}"><div class="eg-tl-g"><div class="eg-tl-d">{{ e.d }}</div><div class="eg-tl-a">{{ e.a }}</div></div>
+      <div class="eg-tl-b"><div class="eg-tl-x"><div class="eg-tl-t">{{ e.texto }}</div><div class="eg-tl-u">{{ e.autor }}</div>
+        {% if ch.pode_obs and e.editavel and e.id %}<div class="eg-coment-acoes" data-ch-obs-id="{{ e.id }}">
+          <details class="eg-coment-editar"><summary>Editar</summary><textarea class="eg-tl-obs" maxlength="2000" aria-label="A observação editada">{{ e.texto }}</textarea><button type="button" class="eg-ac-btn eg-ac-btn--g" data-ch-obs-acao="editar">Salvar</button></details>
+          <button type="button" class="eg-coment-apagar" data-ch-obs-acao="excluir">Excluir</button>
+          <p class="eg-os-msg" role="status" hidden></p></div>{% endif %}</div></div></div>{% endfor %}
+  </div>
+  {% else %}<p class="eg-vazio-l">Nenhuma observação ainda.</p>{% endif %}
+</section>
+<section class="eg-bloco">
+  {% set outros = ch.outros.ativo + ch.outros.campo %}
+  <div class="eg-bloco-h"><h2>Outros chamados</h2><span class="n">{{ outros|length }}</span></div>
+  {% if outros %}<table class="eg-t"><tbody>
+    {% for x in ch.outros.ativo %}<tr><td class="k"><a href="{{ url_for('torre_engenharia.equipe_os', folio=x.folio, de='garantias') }}">{{ x.folio }}</a></td>
+      <td class="v">deste ativo · {{ x.marca or '—' }} · chegou {{ x.chegou }}</td></tr>{% endfor %}
+    {% for x in ch.outros.campo %}<tr><td class="k"><a href="{{ url_for('torre_engenharia.equipe_os', folio=x.folio, de='garantias') }}">{{ x.folio }}</a></td>
+      <td class="v">da mesma OS de campo {{ ch.c.os_campo }} · {{ x.ativo_nome }}</td></tr>{% endfor %}
+  </tbody></table>
+  {% else %}<p class="eg-vazio-l">Nenhum outro chamado deste ativo.</p>{% endif %}
+</section>
+{% endmacro %}

@@ -498,15 +498,26 @@ resposta de "Descreva a atividade realizada" da OS filha. Desenho em
     `nexus_cadeia_os · fato_os_na_cadeia` (`nexus/engenharia/cadeia_os.py`, no catálogo antes da 1ª gravação): eventos que
     só se acrescentam, com o nome dado e quem fez só cifrados.
   A etapa 2 (11/11/2026) trouxe **Garantias para o Raio X**: o quadro de Garantias abre esta página na janela inteira
-  (`?de=garantias`, a volta "← Garantias"), e a OS de chamado (veio de Garantias, ou o livro `nexus_chamados ·
-  fato_chamado` a tem) ganha, logo abaixo dos números, o bloco do chamado: a tela do chamado do OS Creator no modo
-  "blocos" (`/os/chamados/acompanhamento/<nº>?blocos=1`), numa moldura que ajusta a altura pelo `postMessage` (`tipo:
-  'altura'`). Só o que é do chamado vem nela: o estado, o Finalizar chamado, os números do fornecedor, o ticket, o status
-  do chamado, como abrir, a cadeia do chamado, para abrir o ticket, as observações e os outros chamados; o resto é o do Raio
-  X. O banco dos chamados fora não derruba a página (vale só o `de`).
+  (`?de=garantias`, a volta "← Garantias"). A OS de chamado (veio de Garantias, ou o livro `nexus_chamados ·
+  fato_chamado` a tem) mostra o chamado **na própria página, sem moldura** (16/11/2026, Levi: "A OS de garantia está
+  abrindo um chamado dentro do chamado ... o raio x da OS é uma evolução dessa visão de dentro"; no quiz, "Uma página só";
+  de 11/11 a 16/11 era a tela do chamado do OS Creator numa moldura, com rolagem própria, dois status e duas cadeias):
+  - o 1º número é o **Status do chamado** (com o status geral), e o bloco "Status do chamado" fica no lugar do "Status e
+    prioridade" da Engenharia; à esquerda também o **Ticket no fornecedor** e o **Como abrir**;
+  - à direita, antes da Tarefa: **Para abrir o ticket** (os campos da nota, com Copiar e Copiar tudo), as **Observações**
+    do chamado (no lugar dos Comentários da Engenharia: uma linha do tempo só) e os **Outros chamados**; o **Finalizar
+    chamado** fica no alto, ao lado do Solicitar OS. A cadeia é a do Raio X;
+  - quem monta é `_chamado_no_raiox` com `os_web/acomp_raiox.py` do OS Creator (a OS que o Raio X já leu no REST, o
+    ticket pela subtarefa no REST, as observações e o status no banco da Gridco, os outros chamados da cópia do quadro de
+    Garantias). As escritas (`static/engenharia-chamado.js`) vão às mesmas rotas da tela do chamado
+    (`/os/api/acomp/<nº>/status|ticket|obs|obs/<id>/editar|excluir|finalizar`), com o cookie do OS Creator e as regras
+    delas (a atividade do 1º comentário, quem edita e exclui, o Finalizar que encerra a atividade);
+  - o chamado que não monta (o clone fora) diz o motivo no alto e a página abre com o Status e prioridade de sempre; o banco
+    dos chamados fora não derruba a página (vale só o `de`).
 - **Quem mexe:** o setor Engenharia e o administrador, com login de pessoa; os demais leem, sem formulários.
 - **Como provar:** `python -m pytest -q tests/test_engenharia_os_quadro.py tests/test_engenharia_equipe.py
-  tests/test_engenharia_raio_x_11_11.py tests/test_oscreator_solic_pcm.py -k "os_quadro or quadro or sugestao or raio"` e
+  tests/test_engenharia_raio_x_11_11.py tests/test_raio_x_garantias_11_11.py tests/test_oscreator_solic_pcm.py -k "os_quadro or
+  quadro or sugestao or raio"` e
   a página na cópia de prova.
 
 ## ETMs (26/10/2026)

@@ -33,6 +33,7 @@ import chamados_obs_store as obs_store
 import gridco_abas as ga
 
 from . import acomp_cadeia
+from . import acomp_equipe
 from . import acomp_web as aw
 from . import historico_store as HS
 from . import lista_central, rotas, sessao
@@ -623,7 +624,7 @@ def quadro():
     m = _montar(request.args.get("atualizar") == "1")
     return render_template("acomp.html", conta=_conta(), aba="criar", q=m["q"], quando=m["d"].get("quando") or "",
                            erro=m["erro"], erro_obs=m["erro_obs"], equipe=aw.equipe()[1], renovando=m["por_tras"],
-                           status_geral=aw.STATUS_GERAL, pagina_os=_pagina_da_os())
+                           status_geral=aw.STATUS_GERAL, pagina_os=_pagina_da_os(), admin=_admin_nexus())
 
 
 def _cartoes_do_quadro(q: dict) -> list:
@@ -1030,6 +1031,60 @@ PAGINA_DA_OS = "os_web.pagina_da_os"
 def _pagina_da_os():
     v = request.environ.get(PAGINA_DA_OS)
     return v if isinstance(v, dict) and v.get("os") else None
+
+
+# A equipe de chamados pela tela (16/11/2026, `acomp_equipe`): só o administrador do Nexus escolhe a pessoa e passa as
+# abertas para ela. O Nexus põe no pedido `request.environ["os_web.admin_nexus"]` (`ponte.encaminhar`); sem a chave (o OS
+# Creator sozinho) ninguém troca por aqui, e a equipe segue a do .env.
+ADMIN_NEXUS = "os_web.admin_nexus"
+
+
+def _admin_nexus() -> bool:
+    return request.environ.get(ADMIN_NEXUS) is True
+
+
+@bp.route("/api/acomp/equipe")
+@exige_sessao
+def api_equipe():
+    rid, nome = aw.equipe()
+    return jsonify({"id": rid, "nome": nome, "pela_tela": acomp_equipe.atual() is not None, "lote": acomp_equipe.lote(),
+                    "pode": _admin_nexus()})
+
+
+@bp.route("/api/acomp/equipe", methods=["POST"])
+@exige_sessao
+def api_equipe_gravar():
+    """Grava a pessoa da equipe de chamados e, com `passar`, troca o responsável dos chamados abertos do quadro para ela,
+    por trás (o `acomp_equipe.passar`): a tela acompanha pelo GET."""
+    if not _admin_nexus():
+        return _erro("Só o administrador do Nexus troca a equipe de chamados.", 403)
+    c = _corpo()
+    try:
+        reg = acomp_equipe.gravar(c.get("id_personnel"), c.get("nome"), quem=_quem()[0])
+    except ValueError as e:
+        return _erro(e)
+    total = 0
+    if c.get("passar"):
+        cartoes = acomp_equipe.a_passar(_cartoes_do_quadro(_montar()["q"]), reg["nome"])
+        total = len(cartoes)
+        if cartoes and not acomp_equipe.comecar(total, reg["nome"]):
+            return _erro("Já há uma passagem de chamados em andamento: espere ela terminar.", 409)
+        if cartoes:
+            jwt, email = sessao.jwt_atual(), sessao.email_atual()
+
+            def rodar():
+                with sessao.contexto(jwt, email):
+                    r = acomp_equipe.passar(cartoes, reg["id"], api.mudar_responsavel)
+                log.info("Garantias: %s de %s chamados passados para a equipe nova (%s erros)", r["feitas"], r["total"],
+                         len(r["erros"]))
+                _esquecer()                     # o quadro relê e mostra os nomes novos
+            _em_segundo_plano(_de_fundo("fundo:os-web-acomp-equipe", rodar))
+    _esquecer()
+    return jsonify({"ok": True, "id": reg["id"], "nome": reg["nome"], "passar": total,
+                    "mensagem": "A equipe de chamados agora é %s.%s" % (
+                        reg["nome"], (" Passando %d chamado%s aberto%s para ela." % (total, "" if total == 1 else "s",
+                                                                                     "" if total == 1 else "s"))
+                        if total else "")})
 
 
 def _pode_mexer_obs() -> dict:

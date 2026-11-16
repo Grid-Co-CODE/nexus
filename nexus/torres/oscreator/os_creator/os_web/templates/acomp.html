@@ -76,6 +76,8 @@
     <div class="ac-acoes">
       {% if quando %}<span class="ac-fonte"{% if renovando %} data-renovando data-quando="{{ quando }}" title="A tela abriu com a leitura anterior e já está relendo o Fracttal: a nova entra sozinha quando chegar, ou agora no Atualizar."{% endif %}>lido do Fracttal às {{ quando[11:] }} de {{ quando[:5] }}{% if renovando %} · atualizando{% endif %}</span>{% endif %}
       {# o relatório para o cliente (28/10/2026): um checkbox por cliente, um PDF por cliente marcado #}
+      {# a equipe de chamados pela tela (16/11/2026): só o administrador do Nexus vê o botão #}
+      {% if admin %}<button type="button" class="btn btn-o" data-equipe>Equipe: {{ equipe or 'escolher' }}</button>{% endif %}
       <button type="button" class="btn btn-o" data-relatorio>Exportar relatório</button>
       <a class="btn btn-g" href="/os/chamados/acompanhamento?atualizar=1">Atualizar</a>
     </div>
@@ -159,6 +161,14 @@
     <div class="msg" data-msg-relatorio></div>
     <div class="ac-dlg-acoes"><button type="button" class="btn btn-o" data-fechar>Cancelar</button><button type="button" class="btn btn-g" data-exportar-relatorio>Exportar</button></div>
   </dialog>
+  {% if admin %}<dialog class="ac-dlg" data-dlg-equipe aria-labelledby="dlg_eq_t">
+    <h2 id="dlg_eq_t">Equipe de chamados</h2>
+    <p class="dica">A pessoa no nome de quem nascem as administrativas dos chamados. Hoje: <b>{{ equipe or 'a do servidor' }}</b>.</p>
+    <label class="os-campo"><span class="os-lbl">Pessoa</span><select data-equipe-pessoa><option value="">Carregando…</option></select></label>
+    <label class="ac-dlg-chk"><input type="checkbox" data-equipe-passar checked> Passar também os chamados abertos (Chegaram e Ticket aberto) para ela</label>
+    <div class="msg" data-msg-equipe></div>
+    <div class="ac-dlg-acoes"><button type="button" class="btn btn-o" data-fechar>Fechar</button><button type="button" class="btn btn-g" data-gravar-equipe>Gravar</button></div>
+  </dialog>{% endif %}
   {% if q.canceladas or q.antigas %}<p class="rodape">{% if q.canceladas %}{{ q.canceladas }} cancelada{{ '' if q.canceladas == 1 else 's' }} fora do quadro{% endif %}{% if q.canceladas and q.antigas %} · {% endif %}{% if q.antigas %}{{ q.antigas }} finalizada{{ '' if q.antigas == 1 else 's' }} há mais de 90 dias{% endif %}.</p>{% endif %}
 </section>
 {% endblock %}
