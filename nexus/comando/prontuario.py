@@ -379,11 +379,14 @@ def nao_iniciadas(lista, nomes: dict | None = None, central: dict | None = None)
             sit_txt = "no prazo"
         c = central.get(str(x.get("os"))) or {}
         prog_txt = prog.strftime("%d/%m") if hasattr(prog, "strftime") else ""
+        # o texto do dossiê leva TODOS os ativos (16/11/2026, Aparecida 3: a OS de recomposição de string em dois
+        # inversores saía "Inversor 1.7 e mais 1", e a IA não achou o segundo); a tela segue com o primeiro e a conta
+        todos = ", ".join(ativos[:30]) + (f" e mais {len(ativos) - 30}" if len(ativos) > 30 else "")
         out.append({"os": x.get("os"), "wid": x.get("wid"), "titulo": c.get("titulo") or "", "tecnico": c.get("tecnico") or "",
                     "na_lista": bool(c),     # a OS está na lista central: sem técnico ali é "sem técnico atribuído"
                     "ativo": ativo, "tipo": ", ".join(tipos), "programada": prog_txt, "dias": dias, "situacao": sit,
                     "sit_txt": sit_txt, "sit_cls": _SITUACAO_NI[sit][1],
-                    "txt": " · ".join(p for p in (", ".join(tipos), ativo,
+                    "txt": " · ".join(p for p in (", ".join(tipos), todos,
                                                   f"programada para {prog_txt}" if prog_txt else "sem data programada",
                                                   sit_txt) if p)})
         out[-1]["_ord"] = prog.toordinal() if hasattr(prog, "toordinal") else 10 ** 9
@@ -798,6 +801,70 @@ def composicao(ficha: dict | None, estrutura: dict | None = None, cliente: str =
 
 # ── a linha do tempo ────────────────────────────────────────────────────────────────────────────────────────────────
 FONTES = (("cos", "COS"), ("ronda", "Rondas"), ("pt", "PT"), ("chamado", "Chamados"), ("os", "OS"))
+
+
+# ── strings e trackers (16/11/2026) ─────────────────────────────────────────────────────────────────────────────────
+# Levi, na Aparecida 3: "tem dois inversores que ficaram com string sem corrente. Essa informação de string, tempo real,
+# string tracker, não está chegando na usinas, é isso?". Não chegava: os episódios moram no banco da tela Strings e trackers
+# da plataforma (`falhas_performance · strings_episodios` e `trackers_episodios`, publicados ao longo do dia; na Aparecida 3
+# às 09:20 já estavam as strings do Inversor 5 e do 7 que saíram às 06:50). Aqui só se lê e se agrupa: a régua (o que é
+# string fora, tracker parado, crônico) é a da tela dona.
+def _sim(v) -> bool:
+    return str(v or "").strip().lower() in ("1", "true", "sim", "s", "yes")
+
+
+def _quando(v) -> str:
+    s = str(v or "")
+    return f"{s[8:10]}/{s[5:7]} {s[11:16]}".strip() if len(s) >= 10 and s[4] == "-" else s
+
+
+def strings_trackers(ep: dict | None, hoje: date) -> dict | None:
+    """{"inversores": [{inversor, strings, n, desde, perda}] (as strings fora agora, por inversor), "trackers": [{tracker,
+    desde, cronico}] (os parados agora), "mes": {strings, inversores, trackers, perda}, "resumo": {tom, txt}}. None = a
+    fonte não abriu. `ep` = {"strings": [episódios], "trackers": [episódios]} da usina, do mês corrente e do anterior."""
+    if ep is None:
+        return None
+    mes = f"{hoje:%Y-%m}"
+    inv: dict[str, dict] = {}
+    for e in ep.get("strings") or []:
+        if str(e.get("situacao") or "") != "em aberto" and e.get("voltou"):
+            continue
+        if str(e.get("situacao") or "") != "em aberto":
+            continue
+        k = str(e.get("inversor") or "inversor sem nome")
+        x = inv.setdefault(k, {"inversor": k, "strings": [], "desde": "", "perda": 0.0})
+        x["strings"].append(str(e.get("string") or ""))
+        s = str(e.get("saiu") or "")
+        x["desde"] = min(x["desde"], s) if x["desde"] else s
+        x["perda"] += _float(e.get("perda_kwh")) or 0.0
+    inversores = []
+    for x in sorted(inv.values(), key=lambda x: (-len(x["strings"]), x["inversor"])):
+        inversores.append({"inversor": x["inversor"], "strings": sorted(s for s in x["strings"] if s), "n": len(x["strings"]),
+                           "desde": _quando(x["desde"]), "perda": num(x["perda"]) + " kWh"})
+    # um tracker uma vez: a fonte pode ter dois episódios abertos do mesmo tracker (na Aparecida 3, 76 linhas e trackers
+    # repetidos); vale o desde mais antigo e o crônico de qualquer um
+    por_trk: dict[str, dict] = {}
+    for e in ep.get("trackers") or []:
+        if str(e.get("situacao") or "") != "em aberto":
+            continue
+        k = str(e.get("tracker") or "")
+        t = por_trk.setdefault(k, {"tracker": k, "parou": "", "cronico": False})
+        p = str(e.get("parou") or "")
+        t["parou"] = min(t["parou"], p) if t["parou"] and p else (t["parou"] or p)
+        t["cronico"] = t["cronico"] or _sim(e.get("cronico"))
+    trk = [{"tracker": t["tracker"], "desde": _quando(t["parou"]), "cronico": t["cronico"]} for t in por_trk.values()]
+    trk.sort(key=lambda t: (not t["cronico"], t["tracker"]))
+    do_mes_s = [e for e in ep.get("strings") or [] if str(e.get("mes") or "") == mes]
+    do_mes_t = [e for e in ep.get("trackers") or [] if str(e.get("mes") or "") == mes]
+    perda = sum(_float(e.get("perda_kwh")) or 0.0 for e in do_mes_s + do_mes_t)
+    n_str = sum(x["n"] for x in inversores)
+    partes = ([f"{n_str} {'string fora' if n_str == 1 else 'strings fora'} em {len(inversores)} "
+               f"{'inversor' if len(inversores) == 1 else 'inversores'}"] if inversores else []) + \
+             ([f"{len(trk)} {'tracker parado' if len(trk) == 1 else 'trackers parados'}"] if trk else [])
+    return {"inversores": inversores, "trackers": trk,
+            "mes": {"strings": len(do_mes_s), "inversores": len({str(e.get("inversor") or "") for e in do_mes_s}),
+                    "trackers": len(do_mes_t), "perda": num(perda) + " kWh"},
+            "resumo": {"tom": "alerta" if partes else "ok", "txt": " · ".join(partes) if partes else "Nenhuma string fora nem tracker parado agora"}}
 
 
 def linha_do_tempo(hoje: date, rondas=(), cos=(), pts=(), chamados=(), tarefas=(), dias: int = LINHA_DO_TEMPO_DIAS) -> list[dict]:

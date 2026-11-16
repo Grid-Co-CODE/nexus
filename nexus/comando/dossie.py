@@ -33,7 +33,7 @@ from datetime import date, datetime
 
 from . import prontuario as PR
 
-VERSAO = 4
+VERSAO = 5
 # a cor da tela em palavras (a régua é a de cada tela dona; aqui só o nome)
 GRAVIDADE = {"critico": "crítico", "alerta": "atenção", "atencao": "atenção", "semcom": "sem comunicação",
              "info": "informativo", "ok": "em dia", "neutro": ""}
@@ -340,8 +340,34 @@ def _observacoes(extras: dict, com_pessoas: bool) -> list[str]:
     return out
 
 
+def _strings(p: dict) -> list[str]:
+    """As strings fora e os trackers parados agora, e o mês (16/11/2026: a informação não chegava à IA)."""
+    st = p.get("strings")
+    if st is None:
+        return ["- Sem leitura das strings e dos trackers agora. Não quer dizer que estão normais."]
+    out = []
+    if st["inversores"]:
+        out.append(f"- Strings fora agora: {sum(i['n'] for i in st['inversores'])}, em {len(st['inversores'])} inversores")
+        out += [f"  - {i['inversor']}: {i['n']} strings ({', '.join(i['strings'])}), fora desde {i['desde']}, perda até agora "
+                f"{i['perda']}" for i in st["inversores"]]
+    else:
+        out.append("- Nenhuma string fora agora.")
+    if st["trackers"]:
+        cron = sum(1 for t in st["trackers"] if t["cronico"])
+        out.append(f"- Trackers parados agora: {len(st['trackers'])}" + (f" ({cron} crônicos)" if cron else "") + ": "
+                   + ", ".join(t["tracker"] for t in st["trackers"][:60]) + (" e mais" if len(st["trackers"]) > 60 else ""))
+    else:
+        out.append("- Nenhum tracker parado agora.")
+    m = st["mes"]
+    out.append(f"- No mês: {m['strings']} saídas de string em {m['inversores']} inversores e {m['trackers']} paradas de "
+               f"tracker; perda estimada {m['perda']} (a conta da tela Strings e trackers)")
+    out.append("- O nome do inversor aqui é o da fonte de dados (ex.: \"Inversor 5\"); no Fracttal o mesmo inversor pode vir "
+               "como \"Inversor 1.5\" (o bloco e o número).")
+    return out
+
+
 def _equipamentos(p: dict) -> list[str]:
-    e = p.get("equip") or {}
+    e = p.get("equip_todos") or p.get("equip") or {}
     if not e.get("itens"):
         return ["- Nenhum equipamento com tarefa de OS aberta ou chamado de garantia aberto."]
     linhas = []
@@ -571,6 +597,7 @@ SECOES = (
     ("OS e manutenção", "As OS do Fracttal no banco, pela Visão do responsável › Manutenção"),
     ("Engenharia", "Engenharia › Confiabilidade, o acompanhamento dos ativos e os relatórios de FMEA e de causa raiz"),
     ("Equipamentos com OS ou chamado aberto", "As tarefas das OS abertas por ativo e os chamados de garantia"),
+    ("Strings e trackers", "Performance › Strings e trackers (os episódios que a plataforma publica ao longo do dia)"),
     ("Chamados de garantia", "Chamados › Garantias (o Acompanhamento de chamados)"),
     ("Rondas e zeladoria", "Usinas 360° › Rondas e Zeladoria"),
     ("Segurança", "Segurança · HSEQ (PT, extintores e luvas)"),
@@ -596,7 +623,7 @@ def montar(ctx: dict, agora: datetime, com_pessoas: bool = False, extras: dict |
     u, extras = cu.get("u") or {}, extras or {}
     corpos = (_identificacao(x, u, cu, p, com_pessoas), _parecer(p, com_pessoas), _performance(u, cu, p),
               _cos(x, p) + [""] + _religamentos(extras),
-              _os(u, p, com_pessoas), _engenharia(u, extras, com_pessoas), _equipamentos(p), _chamados(p),
+              _os(u, p, com_pessoas), _engenharia(u, extras, com_pessoas), _equipamentos(p), _strings(p), _chamados(p),
               _rondas(u, p, com_pessoas), _seguranca(u, cu, p, com_pessoas), _insights(ctx),
               _observacoes(extras, com_pessoas), _demandas(p, com_pessoas), _linha(p, com_pessoas), _composicao(p),
               _fora(ctx, p, cu, extras))

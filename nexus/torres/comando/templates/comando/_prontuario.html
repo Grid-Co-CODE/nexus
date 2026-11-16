@@ -236,6 +236,29 @@
       {% endif %}
     {% endcall %}
 
+    {# strings e trackers (16/11/2026, Levi, na Aparecida 3: "Essa informação de string, tempo real, string tracker, não está
+       chegando na usinas"): o que está fora agora, por inversor, e os trackers parados, da tela Strings e trackers #}
+    {% call cartao('strings', 'solar-panel', 'Strings e trackers', ('/t/performance/strings-trackers', 'Abrir Strings e trackers') if p.pode.strings else none) %}
+      {% set st = p.strings %}
+      {% if st is none %}<p class="pu-nota">Sem leitura das strings e dos trackers agora.</p>
+      {% else %}
+      {% if st.inversores %}
+      <h3 class="pu-sub"><i class="pu-ponto pu-ponto--alerta" aria-hidden="true"></i>Strings fora agora <span class="cu-n">{{ st.inversores|sum(attribute='n') }}</span></h3>
+      <ul class="pu-ni">{% for i in st.inversores %}
+        <li><span class="pu-st-inv">{{ i.inversor }}</span>
+          <span class="pu-ni-c"><b>{{ i.n }} {{ 'string' if i.n == 1 else 'strings' }}: {{ i.strings|join(', ') }}</b><small>fora desde {{ i.desde }} · perda até agora {{ i.perda }}</small></span>
+          <span></span></li>{% endfor %}
+      </ul>
+      {% endif %}
+      {% if st.trackers %}
+      <h3 class="pu-sub"><i class="pu-ponto pu-ponto--alerta" aria-hidden="true"></i>Trackers parados agora <span class="cu-n">{{ st.trackers|length }}</span></h3>
+      <p class="pu-os-chips">{% for t in st.trackers[:40] %}<span class="pu-st-trk{% if t.cronico %} pu-st-trk--cronico{% endif %}" title="parado desde {{ t.desde }}{% if t.cronico %} · crônico{% endif %}">{{ t.tracker }}</span>{% endfor %}{% if st.trackers|length > 40 %}<span class="mudo">e mais {{ st.trackers|length - 40 }}</span>{% endif %}</p>
+      {% endif %}
+      {% if not st.inversores and not st.trackers %}<p class="pu-nota">Nenhuma string fora nem tracker parado agora.</p>{% endif %}
+      <p class="pu-pe mudo">No mês: {{ st.mes.strings }} {{ 'saída' if st.mes.strings == 1 else 'saídas' }} de string em {{ st.mes.inversores }} {{ 'inversor' if st.mes.inversores == 1 else 'inversores' }} e {{ st.mes.trackers }} {{ 'parada' if st.mes.trackers == 1 else 'paradas' }} de tracker · perda estimada {{ st.mes.perda }}.</p>
+      {% endif %}
+    {% endcall %}
+
     {% call cartao('rondas', 'path', 'Rondas e zeladoria', ('/t/campo/rondas/usina/' ~ x.usina_id, 'Abrir o histórico de rondas, com as fotos') if p.pode.rondas else none) %}
       {% if cu.ronda_limpeza %}{{ linhas(cu.ronda_limpeza) }}{% else %}<p class="mudo">Nenhuma ronda lida nos últimos 90 dias.</p>{% endif %}
       {% if p.rondas and p.rondas.ultimas %}

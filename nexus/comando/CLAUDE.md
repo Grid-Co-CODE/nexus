@@ -824,6 +824,27 @@ o que é que ele tem que fazer".
 Prova: `tests/test_comando_diagnostico.py` (o JSON e a OS fora do dossiê; um por dia, a trava, o erro de 20 min, a trava
 morta; a rota faz uma vez e a segunda abertura não chama a IA; sem chave fica o parecer; a marca no `neutro`).
 
+### Strings e trackers no prontuário e no dossiê (16/11/2026, Levi, na Aparecida 3)
+
+"Tem dois inversores que ficaram com string sem corrente. Essa informação de string, tempo real, string tracker, não está
+chegando na usinas, é isso?". Não chegava. Os episódios já moravam no banco da tela Strings e trackers da plataforma
+(`falhas_performance · strings_episodios` e `trackers_episodios`, publicados ao longo do dia). Na Aparecida 3, às 09:20 já
+estavam as strings do Inversor 5 e do Inversor 7, que saíram às 06:50.
+
+- **Como lê:** `prontuario_dados._de_todas` lê o mês corrente e o anterior e liga à usina pelo nome, com o mesmo `Nomes` do
+  Gerencial.
+- **O que mostra:** `prontuario.strings_trackers` agrupa as strings fora agora por inversor e lista os trackers parados
+  agora, um tracker uma vez só: a fonte tinha episódios repetidos, e eram 76 linhas para 55 trackers. Mostra também o mês.
+- **Onde:**
+  - na tela, o cartão "Strings e trackers", depois do de OS;
+  - no dossiê (formato 5), a seção 8. A IA passa a responder "quais inversores estão com string fora".
+- **A régua é a da tela dona**, sem conta nova aqui. Fonte que não abriu é "sem leitura", nunca "nenhuma".
+- **Os ativos da OS por inteiro:** o dossiê leva todos os ativos de cada OS e a lista inteira dos equipamentos com tarefa
+  aberta. A tela continua mostrando os 6 primeiros. Antes, a OS de recomposição de string em dois inversores saía
+  "Inversor 1.7 e mais 1", e a IA não achou o segundo.
+- **O nome do inversor muda de fonte para fonte:** a fonte das strings diz "Inversor 5"; o Fracttal diz "Inversor 1.5".
+  O dossiê avisa a IA disso.
+
 ### OS, pausa e chamados pelo que pesam (16/11/2026, Levi, na Marabá 200)
 
 Vale para o chat (`ia.INSTRUCOES`) e para o diagnóstico do dia (`diagnostico.PEDIDO`).

@@ -262,9 +262,9 @@ def test_o_prontuario_abre_pelo_parecer_e_pelo_painel_com_os_cartoes_fechados(te
     # cada número leva ao cartão dele
     assert 'href="#pu-perf" data-pu-abre="perf"' in painel and 'href="#pu-os" data-pu-abre="os"' in painel
     # os cartões vêm fechados, com o estado numa linha
-    for sec in ("perf", "os", "rondas", "seg", "cos", "chamados", "insights", "demandas"):
+    for sec in ("perf", "os", "strings", "rondas", "seg", "cos", "chamados", "insights", "demandas"):
         assert f'<details class="cu-q pu-sec" id="pu-{sec}">' in html, sec
-    assert "<details open" not in html and html.count('class="pu-sum-e"') == 8
+    assert "<details open" not in html and html.count('class="pu-sum-e"') == 9
     # a Performance abre pelo gráfico do mês e não repete a meta, o PR e a disponibilidade do painel
     perf = _cartao(html, "perf")
     assert "Geração diária (MWh) e POA (kWh/m²)" in perf and "<dt>Meta do mês</dt>" not in perf
@@ -344,3 +344,26 @@ def test_a_aba_da_usinas_360_mostra_o_mesmo_prontuario(tela, logado):
     # no Comando, a PT leva à aba (lá não há a janela da decisão)
     comando = _cartao(logado.get("/t/comando/usinas/1").get_data(as_text=True), "seg")
     assert "data-cr-painel" not in comando and "/t/campo/responsaveis?modo=usina&amp;usina=1#pu-seg" in comando
+
+
+def test_strings_e_trackers_do_que_esta_fora_agora():
+    """16/11/2026, Levi, na Aparecida 3: "tem dois inversores que ficaram com string sem corrente. Essa informação de string,
+    tempo real, string tracker, não está chegando na usinas, é isso?": as strings fora agora por inversor e os trackers
+    parados, do banco da tela Strings e trackers; a fonte que não abriu é "sem leitura", nunca "nenhuma"."""
+    from datetime import date
+    ep = {"strings": [
+        {"mes": "2026-11", "inversor": "Inversor 5", "string": "ST 09", "saiu": "2026-11-16 06:50", "situacao": "em aberto", "perda_kwh": 44.9},
+        {"mes": "2026-11", "inversor": "Inversor 5", "string": "ST 14", "saiu": "2026-11-16 06:50", "situacao": "em aberto", "perda_kwh": 44.9},
+        {"mes": "2026-11", "inversor": "Inversor 7", "string": "ST 05", "saiu": "2026-11-16 07:10", "situacao": "em aberto", "perda_kwh": 10},
+        {"mes": "2026-11", "inversor": "Inversor 2", "string": "ST 01", "saiu": "2026-11-10 08:00", "voltou": "2026-11-10 12:00",
+         "situacao": "fechado", "perda_kwh": 5}],
+        "trackers": [{"mes": "2026-11", "tracker": "Tracker 03", "parou": "2026-11-16 08:10", "situacao": "em aberto", "cronico": "1"},
+                     {"mes": "2026-10", "tracker": "Tracker 09", "parou": "2026-10-02 08:10", "situacao": "fechado"}]}
+    st = PR.strings_trackers(ep, date(2026, 11, 16))
+    assert [(i["inversor"], i["n"], i["strings"], i["desde"]) for i in st["inversores"]] == [
+        ("Inversor 5", 2, ["ST 09", "ST 14"], "16/11 06:50"), ("Inversor 7", 1, ["ST 05"], "16/11 07:10")]
+    assert st["trackers"] == [{"tracker": "Tracker 03", "desde": "16/11 08:10", "cronico": True}]
+    assert st["mes"] == {"strings": 4, "inversores": 3, "trackers": 1, "perda": "104,8 kWh"}
+    assert st["resumo"] == {"tom": "alerta", "txt": "3 strings fora em 2 inversores · 1 tracker parado"}
+    assert PR.strings_trackers(None, date(2026, 11, 16)) is None
+    assert PR.strings_trackers({}, date(2026, 11, 16))["resumo"]["tom"] == "ok"

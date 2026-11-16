@@ -127,6 +127,24 @@ def _de_todas():
                                                                 "equipamento_id", "situacao", "fabricante", "componente",
                                                                 "status"))
 
+        def ler_strings():
+            # os episódios de string e de tracker da tela Strings e trackers (16/11/2026), do mês corrente e do anterior,
+            # ligados à usina pelo nome (o mesmo `Nomes` do Gerencial: nome que serve a duas usinas não liga)
+            hoje = visao._agora().date()
+            ant = (hoje.replace(day=1) - __import__("datetime").timedelta(days=1))
+            meses = {f"{hoje:%Y-%m}", f"{ant:%Y-%m}"}
+            out = collections.defaultdict(lambda: {"strings": [], "trackers": []})
+            campos = {"strings": ("mes", "inversor", "string", "saiu", "voltou", "situacao", "perda_kwh"),
+                      "trackers": ("mes", "tracker", "parou", "voltou", "situacao", "perda_kwh", "cronico")}
+            for aba, chave in (("strings_episodios", "strings"), ("trackers_episodios", "trackers")):
+                for r in visao._livro("falhas_performance", aba):
+                    if str(r.get("mes") or "") not in meses:
+                        continue
+                    uid = nomes.usina(r.get("usina"))[0]
+                    if uid:
+                        out[uid][chave].append({k: r.get(k) for k in campos[chave]})
+            return dict(out)
+
         def ler_estrutura():
             from ...cadastro import estrutura_usina as EU
             from ...dados.conexao import banco
@@ -144,6 +162,7 @@ def _de_todas():
              "disps": tentar("disp", "o mês a mês da disponibilidade", ler_disps, {}),
              "cos": tentar("cos", "o histórico do COS", ler_cos, {}),
              "zel": tentar("zel", "a leitura semanal da zeladoria", ler_zel, {}),
+             "strings": tentar("strings", "as strings e os trackers", lambda: ler_strings(), {}),
              "tarefas": tentar("tarefas", "as tarefas das OS abertas por equipamento", ler_tarefas, {}),
              "chamados": tentar("chamados", "os chamados de garantia", ler_chamados, {}),
              "estrutura": tentar("estrutura", "a estrutura da usina no Nexus", ler_estrutura, {})}
@@ -165,7 +184,8 @@ def _de_todas():
 # usina já fazia assim com as Ocorrências, a Mesa da Segurança e as Rondas)
 _CAMINHOS = {"os": "/os/tradicional", "conversa": "/t/comando/conversa/usina/{id}", "rondas": "/t/campo/rondas/usina/{id}",
              "mesa": "/t/hseq/mesa", "cos": "/t/cos/ronda", "garantias": "/t/chamados/garantias",
-             "insights": "/t/comando/insights", "caixa": "/t/comando/caixa-de-entrada", "central": "/t/campo/responsaveis"}
+             "insights": "/t/comando/insights", "caixa": "/t/comando/caixa-de-entrada", "central": "/t/campo/responsaveis",
+             "strings": "/t/performance/strings-trackers"}
 
 
 def _pode(usina_id: int) -> dict:
@@ -279,6 +299,10 @@ def montar(usina_id: int, x: dict, cu: dict, vivos: list[dict], rel_url: str = "
     itens = PR.atencao(u, x.get("os_cos"), vivos, demandas, x.get("usina") or "")
     pts_aguardando = PR._int((cu.get("pts") or {}).get("aguardando")) or 0
     resumos = PR.resumos(u, x, vivos, cos, luvas, pts_aguardando, cu.get("seguranca") or (), demandas, conversa["n"])
+    # strings e trackers (16/11/2026): a fonte que não abriu fica None (o cartão diz "sem leitura", nunca "nenhuma")
+    st = PR.strings_trackers((d.get("strings") or {}).get(usina_id, {"strings": [], "trackers": []})
+                             if "strings" not in (d.get("erros") or {}) and d.get("strings") is not None else None, hoje)
+    resumos["strings"] = st["resumo"] if st else {"tom": "neutro", "txt": "Sem leitura agora"}
     return {
         "parecer": PR.parecer(itens),
         "atencao": itens,
@@ -291,7 +315,9 @@ def montar(usina_id: int, x: dict, cu: dict, vivos: list[dict], rel_url: str = "
         "criar_os": criar_os(x.get("codigo") or ""), "rel_url": rel_url,
         "rel_meses": cu.get("rel_meses") or [], "rel_mes": cu.get("rel_mes") or "", "rel_temas": cu.get("rel_temas") or [],
         "rel_campos": cu.get("rel_campos") or [],
-        "meses": meses, "cos": cos, "zel": zel,
+        "meses": meses, "cos": cos, "zel": zel, "strings": st,
+        # o dossiê leva a lista inteira dos equipamentos com tarefa aberta (a tela, os 6 primeiros e o "e mais")
+        "equip_todos": PR.equipamentos_abertos(tarefas, nomes, abertos_por_ativo, x.get("codigo") or "", n=500),
         "rondas": PR.rondas_resumo(hist) if hist is not None else None,
         "equip": equip,
         "os_grupos": PR.os_grupos(u.get("manutencao"), (((u.get("manut") or {}).get("valores") or {}).get("atrasadas") or {})

@@ -34,7 +34,7 @@ def test_uma_secao_por_assunto_na_mesma_ordem_e_com_a_fonte(tela, logado):
     assert texto.startswith("# Dossiê da usina Altair\n")
     assert "- Gerado em: 12/11/2026 às 22:00, horário de Brasília" in texto and f"(formato {DS.VERSAO})" in texto
     titulos = re.findall(r"^## (\d+)\. (.+)$", texto, flags=re.M)
-    assert [int(n) for n, _t in titulos] == list(range(1, 17))
+    assert [int(n) for n, _t in titulos] == list(range(1, 18))
     esperados = [t for t, _f in DS.SECOES]
     esperados[esperados.index("Linha do tempo")] = "Linha do tempo dos últimos 30 dias"
     assert [t for _n, t in titulos] == esperados and d["secoes"] == [t for t, _f in DS.SECOES]
@@ -101,11 +101,11 @@ def test_o_que_falta_esta_escrito_e_nao_vira_zero(tela, logado):
     assert "- Agora: sem leitura do COS (a fonte não respondeu ou a usina não está na fotografia). Não quer dizer normal." in texto
     assert "- OS abertas: sem leitura (as OS do Fracttal não chegaram ao banco). Não quer dizer zero." in texto
     assert "- Leitura semanal de sujidade e vegetação (zeladoria): sem dado." in texto
-    fora = texto.split("## 16. O que ficou de fora", 1)[1]
+    fora = texto.split("## 17. O que ficou de fora", 1)[1]
     assert "não abriram quando o dossiê foi gerado" in fora and "- o COS (a coluna Agora)" in fora
     # sem nada (a fonte inteira fora), o dossiê ainda sai inteiro, dizendo o que não tem
     vazio = DS.montar({"x": {"usina": "Usina X", "insights": None}, "cu": {}, "p": {}}, AGORA)["texto"]
-    assert len(re.findall(r"^## \d+\. ", vazio, flags=re.M)) == 16
+    assert len(re.findall(r"^## \d+\. ", vazio, flags=re.M)) == 17
     for frase in ("- Código: sem dado", "- Estado agora, pelo COS: sem dado", "- Meta, PR e disponibilidade do mês: sem dado.",
                   "- OS abertas: sem leitura", "- Última ronda: sem dado", "- Extintores: sem dado.",
                   "- Luvas de alta tensão: sem dado", "- Os Insights ainda estão sendo calculados: sem leitura agora.",
@@ -219,7 +219,7 @@ def test_a_engenharia_e_as_anotacoes_do_responsavel_entram_no_dossie(tela, logad
     assert "    - 11/11/2026 às 10:00: Megômetro abaixo do limite na string 7." in eng
     assert "  - THPN-ALT100-ETKR1; análise encerrada; fim em " + HOJE.strftime("%d/%m/%Y") + "; diagnóstico: a definir; sem comentário" in eng
     assert "  - RCA-2026-0003 R01; Causa raiz; ativo THPN-ALT100-INVR1; emitido em 10/11/2026; tipo de falha: Isolamento; RPN 144" in eng
-    obs = texto.split("## 12. Anotações do responsável", 1)[1].split("## 13. ", 1)[0]
+    obs = texto.split("## 13. Anotações do responsável", 1)[1].split("## 14. ", 1)[0]
     assert "- Observações registradas: 2 (a mais nova primeiro)" in obs
     assert "  - 11/11/2026 às 18:30, o responsável da usina: Cliente avisado da parada do Inversor 1; peça chega na sexta." in obs
     assert "  - 02/11/2026 às 09:00, um responsável de outra usina, cobrindo: Cobrindo as férias." in obs
@@ -232,8 +232,8 @@ def test_a_engenharia_e_as_anotacoes_do_responsavel_entram_no_dossie(tela, logad
                                            "observacoes": []})["texto"]
     assert "- Ativos em acompanhamento pela Engenharia: nenhum nesta usina." in vazias
     assert "- Nenhuma observação registrada pelo responsável nesta usina." in vazias
-    assert "as observações do responsável" not in vazias.split("## 16. O que ficou de fora", 1)[1]
-    fechadas = DS.montar(ctx, AGORA, extras={})["texto"].split("## 16. O que ficou de fora", 1)[1]
+    assert "as observações do responsável" not in vazias.split("## 17. O que ficou de fora", 1)[1]
+    fechadas = DS.montar(ctx, AGORA, extras={})["texto"].split("## 17. O que ficou de fora", 1)[1]
     for fonte in ("- os números da Confiabilidade (Engenharia)", "- os ativos em acompanhamento pela Engenharia",
                   "- os relatórios de falha da Engenharia", "- as observações do responsável"):
         assert fonte in fechadas, fonte
@@ -243,11 +243,11 @@ def test_a_pagina_le_a_engenharia_e_as_observacoes_das_telas_donas(tela, logado)
     """O endereço monta os `extras` com as fontes de verdade (aqui, o banco de teste): o texto diz o que cada uma
     respondeu, e a fonte que não abre não derruba o dossiê."""
     texto = logado.get("/t/comando/usinas/1/dossie.md").get_data(as_text=True)
-    assert "## 6. Engenharia" in texto and "## 12. Anotações do responsável" in texto
+    assert "## 6. Engenharia" in texto and "## 13. Anotações do responsável" in texto
     eng = texto.split("## 6. Engenharia", 1)[1].split("## 7. ", 1)[0]
     # a Confiabilidade do cenário de teste tem o Inversor 1 em crítico
     assert "Inversor 1 (THPN-ALT100-INVR1)" in eng
-    obs = texto.split("## 12. Anotações do responsável", 1)[1].split("## 13. ", 1)[0]
+    obs = texto.split("## 13. Anotações do responsável", 1)[1].split("## 14. ", 1)[0]
     assert "Nenhuma observação registrada" in obs or "Sem leitura das observações" in obs
 
 
