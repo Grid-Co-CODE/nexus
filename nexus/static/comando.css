@@ -811,7 +811,8 @@ a.ins-titulo:hover{color:var(--verde-texto)}
 .pu-ia:empty,.cmu-ia:empty{display:none}
 .cmu-ia{margin:0 0 16px}
 /* a tabela da resposta (a da carteira lista as usinas) e o link de cada usina */
-.ia-tab-rola{overflow-x:auto;margin:4px 0 10px}
+.ia-tab-rola{max-height:460px;overflow:auto;margin:4px 0 10px}
+.ia-tab thead th{position:sticky;top:0;background:var(--superficie-2)}
 .ia-tab{width:100%;border-collapse:collapse;font-size:12.5px}
 .ia-tab th{padding:6px 10px 6px 0;text-align:left;font:600 11px/14px var(--font-sans);color:var(--mudo);white-space:nowrap;
   border-bottom:1px solid var(--linha)}

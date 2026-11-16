@@ -154,8 +154,11 @@
     return '<article class="ia-r">' + cab + (r.troca ? '<p class="ia-r-troca">' + esc(r.troca) + '</p>' : '') +
       '<div class="ia-r-texto">' + corpo + '</div>' + acoes(r, ri) +
       (r.parou ? '<p class="ia-r-aviso">A resposta foi cortada (' + esc(r.parou) + ').</p>' : '') +
-      '<p class="ia-r-pe">' + conf + '<span class="mudo">' + num(r.ms / 1000, 1) + ' s · ' + num(r.entrada + (r.cache_lido || 0)) +
-      ' → ' + num(r.saida) + ' tokens · ' + custo + '</span>' + csv + '</p></article>';
+      '<p class="ia-r-pe">' + conf + '<span class="mudo">' + (r.sem_ia
+        // a pergunta sugerida da carteira, contada pelo Nexus (16/11/2026: na hora e certa, sem IA)
+        ? 'Contado pelo Nexus com o dado de agora, sem IA · ' + num(r.ms / 1000, 1) + ' s'
+        : num(r.ms / 1000, 1) + ' s · ' + num(r.entrada + (r.cache_lido || 0)) + ' → ' + num(r.saida) + ' tokens · ' + custo) +
+      '</span>' + csv + '</p></article>';
   }
 
   // o relatório: o PDF do prontuário, baixado sozinho (sem a IA)
@@ -206,6 +209,14 @@
     if (!marcados.length) return;
     campo.value = '';
     botao.disabled = true;
+    // o relógio da espera (16/11/2026, Levi: "e a demora pai"): a IA grátis leva de 15 s a mais de 1 min; os segundos
+    // correndo dizem que está trabalhando
+    var lendo = turno.querySelector('.ia-lendo'), t0 = Date.now();
+    var base = lendo ? lendo.textContent.replace(/…$/, '') : '';
+    var relogio = lendo ? setInterval(function () {
+      var s = Math.round((Date.now() - t0) / 1000);
+      if (s >= 2) lendo.textContent = base + '… ' + s + ' s' + (s >= 20 ? ' (a IA grátis pode levar até 1 minuto)' : '');
+    }, 1000) : null;
     fetch(raiz.getAttribute('data-ia-url'), {
       method: 'POST', credentials: 'same-origin',
       headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
@@ -232,7 +243,7 @@
       if (g && j.gasto != null) g.textContent = 'US$ ' + num(j.gasto, 2);
     }).catch(function () {
       turno.querySelector('.ia-respostas').innerHTML = '<p class="ia-r-erro" role="alert">Sem conexão com o Nexus.</p>';
-    }).then(function () { botao.disabled = false; campo.focus(); });
+    }).then(function () { if (relogio) clearInterval(relogio); botao.disabled = false; campo.focus(); });
   }
 
   // a Nova demanda da ação, ali mesmo: a pessoa, o tema, o título e o texto já preenchidos (quem envia é a pessoa)

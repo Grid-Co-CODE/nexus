@@ -41,7 +41,8 @@ def test_o_dossie_da_carteira_tem_uma_linha_por_usina_e_os_chamados_abertos():
     d = CI.montar([_linha(1, "Colíder 1"), _linha(2, "Colíder 2", atingimento=98.0)], _fontes(), AGORA)
     t = d["texto"]
     assert d["usinas"] == {"Colíder 1": 1, "Colíder 2": 2} and d["os_usina"] == {"17129": 1} and d["n_chamados"] == 1
-    assert "## 2. Usinas" in t and "## 3. Chamados de garantia abertos" in t and "## 4. O que ficou de fora" in t
+    assert "## 2. Usinas" in t and "## 3. Totais contados pelo Nexus" in t
+    assert "## 4. Chamados de garantia abertos" in t and "## 5. O que ficou de fora" in t
     linhas = [l for l in t.splitlines() if l.startswith("| ")]
     cab = [c.strip() for c in linhas[0].strip("|").split("|")]
     tab = {c[0]: dict(zip(cab, c)) for c in ([x.strip() for x in l.strip("|").split("|")] for l in linhas[2:4])}
@@ -57,6 +58,48 @@ def test_o_dossie_da_carteira_tem_uma_linha_por_usina_e_os_chamados_abertos():
     assert "17000" not in t                                       # o chamado finalizado não entra
     assert "Fulano Responsável" not in t and "Pessoas: não constam" in t
     assert "- o COS (a coluna Agora)" in t
+
+
+def test_os_totais_sao_contados_pelo_nexus():
+    """Perguntado duas vezes "quais fabricantes têm mais chamados abertos?", o Nemotron contou a Sungrow com 23 e depois
+    com 28 (eram 39) e a STI com 52 (eram 102): a conta vem pronta no dossiê."""
+    f = _fontes()
+    f["chamados"][2] = [{"os": "18000", "situacao": "aberto", "fabricante": "SolarEdge", "data_id_abertura": "20261101"},
+                        {"os": "18001", "situacao": "verificacao", "fabricante": "STI", "data_id_abertura": "20261110"}]
+    t = CI.montar([_linha(1, "Colíder 1"), _linha(2, "Colíder 2", cliente="Thopen")], f, AGORA)["texto"]
+    assert "| SolarEdge | 2 | 2 | 98 dias |" in t and "| STI | 1 | 1 | 6 dias |" in t
+    assert "| Renogrid | 1 | 2,5 | 1 | 1 | 0 | 1 |" in t and "| Thopen | 1 | 2,5 | 1 | 2 | 1 | 1 |" in t
+    assert "Nunca conte linha por linha" in CI.INSTRUCOES
+    # o cruzamento pronto: só as usinas com chamado aberto, da pior disponibilidade para a melhor
+    assert "Usinas com chamado de garantia aberto (2), da pior disponibilidade do mês para a melhor:" in t
+    i = t.index("Usinas com chamado de garantia aberto (2)")
+    assert t.index("| Colíder 1 | Renogrid | 0,0% |", i) < t.index("| Colíder 2 | Thopen | 70,2% |", i)
+
+
+def test_a_resposta_vazia_ou_demorada_passa_a_reserva(monkeypatch):
+    """No servidor só há as chaves do OpenRouter: a reserva é o Nemotron 3.5 Super, no mesmo OpenRouter."""
+    import time
+    cfg = {"OPENROUTER_API_KEY": "k"}
+    vistos = []
+
+    def chamar(m, *a):
+        vistos.append(m.id)
+        return {"texto": ""} if m.id == "nemotron" else {"texto": "Certo."}
+    monkeypatch.setattr(IA, "_chamar", chamar)
+    r = IA.perguntar(cfg, ["nemotron"], "D", "?")
+    assert vistos == ["nemotron", "nemotron-super"] and r[0]["ok"] and "voltou sem resposta" in r[0]["troca"]
+    # o teto do tempo inteiro: a demorada também passa
+    monkeypatch.setattr(IA, "TEMPO_TOTAL_S", 0.2)
+    vistos.clear()
+
+    def lento(m, *a):
+        vistos.append(m.id)
+        if m.id == "nemotron":
+            time.sleep(1)
+        return {"texto": "Certo."}
+    monkeypatch.setattr(IA, "_chamar", lento)
+    r = IA.perguntar(cfg, ["nemotron"], "D", "?")
+    assert vistos[:2] == ["nemotron", "nemotron-super"] and r[0]["ok"] and r[0]["id"] == "nemotron-super"
 
 
 def test_a_usina_citada_pelo_nome_inteiro():
@@ -139,3 +182,27 @@ def test_a_demanda_da_carteira_vai_com_as_usinas_da_lista(tela, logado, monkeypa
     r = logado.post("/t/comando/usinas/ia/demanda", json={"para_hmac": "h", "para_setor_id": "2:Chamados", "tema_id": "t",
                                                          "titulo": "Cobrar", "descricao": "x", "usinas": f"{ids[0]},99999"})
     assert r.status_code == 200 and visto["form"]["usinas"] == [ids[0]]          # a usina fora da lista não vai
+
+
+def test_as_perguntas_sugeridas_saem_prontas_e_certas_sem_ia(tela, logado, monkeypatch):
+    """16/11/2026, Levi: "e a demora pai". A IA grátis levou de 54 a 150 s nessas perguntas e errou a conta (a STI com
+    52 chamados, eram 102): as cinco sugeridas são contas que o Nexus tem, respondidas na hora."""
+    f = _fontes()
+    f["chamados"][2] = [{"os": "18000", "situacao": "aberto", "fabricante": "STI", "data_id_abertura": "20261110"}]
+    dz = CI.montar([_linha(1, "Colíder 1"), _linha(2, "Colíder 2", atingimento=98.0, os_atrasadas=0)], f, AGORA)
+    cruz = CI.resposta_pronta("Chamados abertos × disponibilidade e performance", dz)
+    assert cruz.startswith("**2 usinas têm chamado de garantia aberto (2 chamados).**")
+    assert cruz.index("| Colíder 1 |") < cruz.index("| Colíder 2 |")              # a pior disponibilidade primeiro
+    meta = CI.resposta_pronta("quais usinas estão abaixo da meta no mês", dz)          # sem acento, sem "?", minúscula
+    assert "**2 de 2 usinas estão abaixo da meta de novembro**" in meta and meta.index("| Colíder 1 |") < meta.index("| Colíder 2 |")
+    assert "**1 desligamentos em novembro, em 1 usinas**" in CI.resposta_pronta(CI.SUGESTOES[2], dz)
+    fab = CI.resposta_pronta(CI.SUGESTOES[3], dz)
+    assert "| SolarEdge | 1 | 1 | 98 dias |" in fab and "| STI | 1 | 1 | 6 dias |" in fab
+    os_ = CI.resposta_pronta(CI.SUGESTOES[4], dz)
+    assert os_.startswith("**1 usinas têm OS urgente não iniciada ou atrasada:** 1 urgentes") and "| Colíder 1 |" in os_
+    assert CI.resposta_pronta("Por que a Colíder 1 está com 0%?", dz) is None
+    # pela rota: a sugerida não chama a IA
+    monkeypatch.setattr(IA, "perguntar", lambda *a, **k: (_ for _ in ()).throw(AssertionError("chamou a IA")))
+    j = logado.post("/t/comando/usinas/ia/perguntar", json={"pergunta": CI.SUGESTOES[3], "modelos": ["nemotron"]}).get_json()
+    r = j["respostas"][0]
+    assert j["ok"] and r["sem_ia"] and r["rotulo"] == "Contado pelo Nexus"

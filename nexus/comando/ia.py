@@ -30,6 +30,7 @@ import re
 import time
 import unicodedata
 from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import TimeoutError as FuturesTimeout
 from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -40,6 +41,7 @@ log = logging.getLogger(__name__)
 
 _BRT = timezone(timedelta(hours=-3))
 TEMPO_S = 90                    # por chamada; a pergunta roda os modelos em paralelo, então a espera é a do mais lento
+TEMPO_TOTAL_S = 60              # o teto do tempo inteiro de uma resposta (o OpenRouter mantém a conexão viva com espaços)
 MAX_SAIDA = 8000                # tokens de saída (o raciocínio dos modelos que pensam conta aqui dentro)
 MAX_PERGUNTA = 600
 MAX_HISTORICO = 3               # as últimas perguntas e respostas que voltam junto (a pergunta de seguimento)
@@ -111,6 +113,10 @@ MODELOS_PADRAO = (
     # o mesmo nome; o grátis da NVIDIA é por pedidos por minuto (cerca de 40), sem a cota de 50 por dia do OpenRouter
     Modelo("nemotron-nvidia", "Nemotron 3 Ultra (NVIDIA)", "nvidia", "nvidia/nemotron-3-ultra-550b-a55b", 0.0, 0.0),
     Modelo("nemotron", "Nemotron 3 Ultra grátis", "openrouter", "nvidia/nemotron-3-ultra-550b-a55b:free", 0.0, 0.0),
+    # a reserva no mesmo OpenRouter (16/11/2026): o servidor só tem as chaves do OpenRouter, e o Nemotron Ultra grátis
+    # voltou vazio na pergunta da carteira sem outro modelo para onde ir. Testado no mesmo dia com o dossiê da carteira:
+    # respondeu certo em 14 s (o Gemma 4 grátis estava barrado pelo limite do Google)
+    Modelo("nemotron-super", "Nemotron 3.5 Super grátis", "openrouter", "nvidia/nemotron-3.5-super-vl:free", 0.0, 0.0),
     Modelo("gemini-lite", "Gemini 3.1 Flash-Lite grátis", "gemini", "gemini-3.1-flash-lite", 0.0, 0.0),
     Modelo("groq-oss", "GPT-OSS 120B grátis (Groq)", "groq", "openai/gpt-oss-120b", 0.0, 0.0),
 )
@@ -469,9 +475,19 @@ def responder(cfg, m: Modelo, dossie: str, pergunta: str, historico=None, setore
         ctx = _contexto([neutro(s) for s in setores], neutro(meu_setor)) if setores is not None else ""
         extra = (instrucoes,) if instrucoes else ()      # as da carteira; sem elas, as da usina
         if m.provedor in VAGAS:
-            r = _chamar_rodizio(cfg, m, neutro(dossie), _mensagens(historico, pergunta), ctx, *extra)
+            chamada = lambda: _chamar_rodizio(cfg, m, neutro(dossie), _mensagens(historico, pergunta), ctx, *extra)  # noqa: E731
         else:
-            r = _chamar(m, k, neutro(dossie), _mensagens(historico, pergunta), ctx, *extra)
+            chamada = lambda: _chamar(m, k, neutro(dossie), _mensagens(historico, pergunta), ctx, *extra)  # noqa: E731
+        # o teto do tempo inteiro (16/11/2026: no servidor, o Nemotron grátis levou 146,8 s para voltar vazio; o OpenRouter
+        # manda espaços enquanto processa, e o tempo de leitura do `requests` nunca vence). Passou do teto, a pergunta
+        # segue sem esta resposta (e vai ao próximo grátis); a chamada termina sozinha por trás
+        exe = ThreadPoolExecutor(max_workers=1)
+        try:
+            r = exe.submit(chamada).result(timeout=TEMPO_TOTAL_S)
+        except FuturesTimeout:
+            r = {"erro": f"Demorou mais de {TEMPO_TOTAL_S} s para responder."}
+        finally:
+            exe.shutdown(wait=False)
     except Exception as ex:      # noqa: BLE001 — um provedor quebrado não derruba os outros
         log.exception("IA: %s falhou", m.id)
         r = {"erro": f"Falhou ({type(ex).__name__})."}
@@ -504,7 +520,7 @@ def _bateu_o_limite(r: dict) -> bool:
     """O limite do dia, ou a resposta vazia (16/11/2026: o Nemotron grátis voltou vazio duas vezes na pergunta da
     carteira, a tabela de 144 usinas): nos dois casos a pergunta vai ao próximo grátis."""
     erro = r.get("erro") or ""
-    return not r.get("ok") and ("limite de uso" in erro or "429" in erro or "resposta vazia" in erro)
+    return not r.get("ok") and ("limite de uso" in erro or "429" in erro or "resposta vazia" in erro or "Demorou mais" in erro)
 
 
 def perguntar(cfg, ids: list[str], dossie: str, pergunta: str, historico=None, setores=None,
@@ -524,21 +540,27 @@ def perguntar(cfg, ids: list[str], dossie: str, pergunta: str, historico=None, s
         out = list(ex.map(lambda m: responder(cfg, m, dossie, pergunta, historico, setores, meu_setor, instrucoes),
                           escolhidos))
     if len(escolhidos) == 1 and _bateu_o_limite(out[0]) and escolhidos[0].entrada == 0:
+        # o limite do dia é da conta do provedor (vale para todos os grátis dele): aí a troca é para outro provedor. A
+        # resposta vazia ou demorada é do modelo: aí vale o outro grátis do mesmo provedor (a reserva do OpenRouter)
+        erro0 = out[0].get("erro") or ""
+        do_limite = "limite de uso" in erro0 or "429" in erro0
         for mid in TROCA_GRATIS:
             m = por_id.get(mid)
             if not m or m.id == escolhidos[0].id or not chave(cfg, m.provedor):
                 continue
+            if do_limite and m.provedor == escolhidos[0].provedor:
+                continue
             r = responder(cfg, m, dossie, pergunta, historico, setores, meu_setor, instrucoes)
             if r.get("ok"):
                 r["troca"] = (f"O {escolhidos[0].rotulo} voltou sem resposta: quem respondeu foi o {m.rotulo}."
-                              if "resposta vazia" in (out[0].get("erro") or "")
+                              if "resposta vazia" in (out[0].get("erro") or "") or "Demorou mais" in (out[0].get("erro") or "")
                               else f"O {escolhidos[0].rotulo} bateu o limite do dia: quem respondeu foi o {m.rotulo}.")
                 return [r]
     return out
 
 
 # a ordem da troca entre os grátis (o teste de 14/11/2026: o Nemotron com a melhor nota; depois os rápidos)
-TROCA_GRATIS = ("nemotron-nvidia", "nemotron", "gemini-lite", "groq-oss")
+TROCA_GRATIS = ("nemotron-nvidia", "nemotron", "nemotron-super", "gemini-lite", "groq-oss")
 
 
 # ── as ações de outro setor (o bloco <acoes>) ─────────────────────────────────────────────────────────────────────────

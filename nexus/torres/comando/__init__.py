@@ -13,6 +13,7 @@ view com a mesma rota (ela vence a genérica), por exemplo:
 import hmac
 import re
 import secrets
+import time
 
 from flask import abort, current_app, redirect, render_template, request, session, url_for
 
@@ -713,11 +714,21 @@ def carteira_ia_perguntar():
         return jsonify(ok=False, erro=f"O teto do mês do Nexus IA (US$ {teto:.2f}) foi atingido: US$ {gasto:.2f} "
                                       "gastos. Para subir, mude a NEXUS_IA_TETO_USD no servidor."), 429
     historico = [h for h in (b.get("historico") or []) if isinstance(h, dict)][-IA.MAX_HISTORICO:]
+    t0 = time.monotonic()
     dz = _carteira_ia()
     por_nome = {k.lower(): v for k, v in dz["usinas"].items()}
-    setores = [s["nome"] for s in _ia_setores()]
-    respostas = IA.perguntar(cfg, ids, dz["texto"], pergunta, historico, setores=setores, meu_setor=_ia_meu_setor(),
-                             instrucoes=CI.INSTRUCOES)
+    # a pergunta sugerida sai pronta, contada pelo Nexus, sem IA (16/11/2026, Levi: "e a demora pai": a IA grátis levou
+    # de 54 a 150 s nelas e errou a conta); a pergunta escrita pela pessoa vai à IA
+    pronta = CI.resposta_pronta(pergunta, dz)
+    if pronta:
+        respostas = [{"id": "nexus", "rotulo": "Contado pelo Nexus", "provedor": "sem IA, na hora", "ok": True,
+                      "texto": pronta, "acoes": [], "os": {}, "sem_ia": True,
+                      "ms": round((time.monotonic() - t0) * 1000), "entrada": 0, "saida": 0, "cache_lido": 0,
+                      "custo_usd": 0.0, "preco_oficial": True, "numeros": {"n": 0, "no_dossie": 0, "fora": []}}]
+    else:
+        setores = [s["nome"] for s in _ia_setores()]
+        respostas = IA.perguntar(cfg, ids, dz["texto"], pergunta, historico, setores=setores,
+                                 meu_setor=_ia_meu_setor(), instrucoes=CI.INSTRUCOES)
     for r in respostas:
         if not r.get("ok"):
             continue

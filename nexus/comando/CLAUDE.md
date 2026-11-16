@@ -715,6 +715,34 @@ e correlacionar com as usinas com baixa disponibilidade e performance". Levi, co
 - **Medido em 16/11/2026** (o banco de produção lido do PC): 144 usinas e 272 chamados abertos em 73 delas. O tamanho do
   dossiê está no `tokens_estimados`.
 
+- **Mais rápida e certa** (16/11/2026, no ar o mesmo dia; Levi: "NÃO TÁ MASSA" e "e a demora pai"):
+  - **O que se viu no servidor:** o Nemotron grátis voltou vazio depois de 146,8 s. O servidor só tem as chaves do
+    OpenRouter, então não havia para onde trocar.
+  - **O que se mediu no mesmo dia:**
+    - a IA grátis levou de 54 a 150 s;
+    - ela errou a conta: a STI com 52 chamados, eram 102; a Sungrow com 23 e depois 28, eram 39;
+    - sem o "pensamento" ela responde em 16 s, mas pôs na lista usina sem chamado.
+  - **As cinco perguntas sugeridas saem prontas, contadas pelo Nexus, sem IA** (`carteira_ia.resposta_pronta`), em
+    0,5 s e certas:
+    - chamados × disponibilidade: as usinas com chamado aberto, da pior disponibilidade para a melhor, sem corte de
+      "baixa", porque um corte é parâmetro e se combina com o Levi antes;
+    - abaixo da meta: atingimento abaixo de 100%;
+    - desligamentos do mês;
+    - chamados por fabricante;
+    - OS urgentes e atrasadas.
+
+    A pergunta escrita pela pessoa vai à IA, e a tela conta os segundos enquanto ela pensa.
+  - **O dossiê traz as contas prontas** ("Totais contados pelo Nexus"): os chamados por fabricante, a carteira por
+    cliente e o cruzamento das usinas com chamado aberto. As instruções mandam usar esses totais e nunca contar linha por
+    linha.
+  - **A reserva no mesmo OpenRouter** é o Nemotron 3.5 Super grátis (`nemotron-super`).
+    - A resposta vazia ou demorada passa a ela.
+    - O limite do dia é da conta do provedor, então nesse caso a troca é para outro provedor.
+  - **O teto do tempo inteiro** é `TEMPO_TOTAL_S`, 60 s. O OpenRouter manda espaços enquanto processa, e o tempo de
+    leitura do `requests` nunca vencia.
+  - **Trava no servidor (`ia.acao_de_campo`):** executar OS nunca vira pedido a outro setor. O Nemotron insistia em
+    mandar "Executar as corretivas atrasadas" à Manutenção.
+
 Prova: `tests/test_comando_carteira_ia.py`.
 
 ## O diagnóstico do dia da IA no prontuário (14/11/2026; `nexus/comando/diagnostico.py`)
