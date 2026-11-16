@@ -48,9 +48,12 @@ def aquecer_ao_subir(app) -> None:
     def tarefa():
         time.sleep(5)
         try:
-            with app.app_context():
-                if G.ativo(app.config):
-                    G.do_app(app.config, esperar=True)
+            # na fila de subida (16/11/2026): os ~40 s desta leitura não disputam com as outras tarefas do boot
+            from ..casca import subida
+            with subida.vez("nexus-sso-aquecer"):
+                with app.app_context():
+                    if G.ativo(app.config):
+                        G.do_app(app.config, esperar=True)
         except Exception:        # noqa: BLE001 — o 1º pedido tenta de novo e mostra o erro
             app.logger.warning("sso: a leitura dos livros ao subir falhou", exc_info=True)
     threading.Thread(target=tarefa, daemon=True, name="nexus-sso-aquecer").start()

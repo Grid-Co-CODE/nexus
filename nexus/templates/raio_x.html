@@ -175,6 +175,27 @@
   {% endfor %}</ul>
 </section>
 {% endif %}
+{# a fila de subida (16/11/2026, Levi: "pode seguir com a fila de subida"): as tarefas de aquecimento do boot uma por
+   vez; quem tem a vez, quem espera e o que já passou, na primeira hora depois de subir #}
+{% if subida %}
+<section class="cad-secao">
+  <h2>Fila de subida</h2>
+  <p class="cad-pe">O Nexus subiu há {{ subida.ha_txt }}{% if not subida.ativa %}; a fila já se desligou{% endif %}.</p>
+  {% if subida.dono or subida.fila or subida.feitas %}
+  <ul class="rx-fila">
+    {% if subida.dono %}<li><span class="rx-ha rx-ha--tarefa" aria-hidden="true"><i class="ph ph-play"></i></span>
+      <div class="rx-fila-o"><p class="rx-fila-t"><span class="gc-dado">{{ subida.dono.nome }}</span></p>
+        <p class="rx-fila-d"><span class="mudo">com a vez há {{ subida.dono.ha_s }} s</span></p></div></li>{% endif %}
+    {% for n in subida.fila %}<li><span class="rx-ha rx-ha--tarefa" aria-hidden="true"><i class="ph ph-hourglass"></i></span>
+      <div class="rx-fila-o"><p class="rx-fila-t"><span class="gc-dado">{{ n }}</span></p>
+        <p class="rx-fila-d"><span class="mudo">esperando a vez</span></p></div></li>{% endfor %}
+    {% for f in subida.feitas %}<li><span class="rx-ha rx-ha--tarefa" aria-hidden="true"><i class="ph ph-check"></i></span>
+      <div class="rx-fila-o"><p class="rx-fila-t"><span class="gc-dado">{{ f.nome }}</span></p>
+        <p class="rx-fila-d"><span class="mudo">levou {{ f.levou_s|round|int }} s{% if f.esperou_s >= 1 %}; esperou {{ f.esperou_s|round|int }} s pela vez{% endif %}</span></p></div></li>{% endfor %}
+  </ul>
+  {% else %}<p class="cad-vazio">Nenhuma tarefa de subida entrou na fila ainda.</p>{% endif %}
+</section>
+{% endif %}
 <section class="cad-secao">
   <h2>Pedidos em andamento, do mais antigo</h2>
   {% if threads_atrasado %}<p class="cad-pe">A lista de threads não respondeu em {{ "%g"|format(prazo_memoria) }} s: a máquina está esperando o disco (o swap).{% if threads_quando %} Abaixo, a das {{ threads_quando }} (os tempos são daquela hora).{% else %} Ainda não há uma lista anterior.{% endif %}</p>{% endif %}

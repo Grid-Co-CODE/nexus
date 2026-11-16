@@ -36,6 +36,10 @@ if __name__ == "__main__":
     # ligados ANTES dos instalar_* abaixo, que já abrem laços que pedem ao Fracttal ao subir
     from nexus.casca import fracttal_conta
     fracttal_conta.ligar()
+    # a fila de subida (16/11/2026): as tarefas de aquecimento do boot uma depois da outra, e a pré-carga e o pré-filtro só
+    # depois dela; ligada ANTES dos instalar_*, que abrem essas tarefas (nexus/casca/subida.py)
+    from nexus.casca import subida
+    subida.ligar()
     instalar_campo(app)
     instalar_dados(app)
     instalar_engenharia(app)

@@ -57,6 +57,7 @@ from urllib.parse import quote, urlsplit
 from flask import current_app, has_app_context
 from PIL import Image
 
+from ..casca import subida
 from . import fracttal, nota_fracttal, prefiltro, regras_app
 
 IMG = re.compile(r"\.(jpe?g|png|webp)$", re.I)
@@ -427,6 +428,7 @@ def conferir_meta(app, linhas: list[dict], cos: dict | None = None, do_app: dict
 
 def _volta_meta(app) -> None:
     """A volta da thread da leitura rápida (a fila guardada, quem é do COS e quem é do App, como a das fotos)."""
+    subida.esperar_calma()      # depois da subida (16/11/2026): 14% de um núcleo mais 4 threads logo depois do boot
     try:
         carregar_do_disco(app)
         with app.app_context():
@@ -447,6 +449,7 @@ def _volta_meta(app) -> None:
 
 def _volta(app) -> None:
     """A volta que a thread de fundo roda: a fila guardada e quem é do COS (para não ler à toa o que fica fora)."""
+    subida.esperar_calma()      # depois da subida (16/11/2026): as fotos passam horas baixando; o boot não as espera
     try:
         # a cópia do disco antes de tudo: a volta do boot pode sair antes da thread que carrega o disco, e com a memória
         # vazia relia no Fracttal todas as OS já conferidas (a cada deploy)

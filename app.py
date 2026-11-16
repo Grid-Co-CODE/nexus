@@ -47,6 +47,9 @@ if __name__ == "__main__":
     except ConfigErro as erro:
         sys.exit(f"Nexus não subiu: {erro}")
     app.config["SESSION_COOKIE_SECURE"] = False
+    # a fila de subida (16/11/2026): as tarefas de aquecimento do boot uma depois da outra (nexus/casca/subida.py)
+    from nexus.casca import subida
+    subida.ligar()
     instalar_campo(app)
     instalar_dados(app)
     instalar_engenharia(app)

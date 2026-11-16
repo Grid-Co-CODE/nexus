@@ -73,10 +73,13 @@ def test_o_processador_traz_quem_gastou_na_mesma_janela(monkeypatch):
     monkeypatch.setattr(R, "_pedidos_por_thread", lambda: {})
     monkeypatch.setattr(R, "_tiques_por_segundo", lambda: 100)
     monkeypatch.setattr(R.time, "sleep", lambda s: None)
-    relogio = iter([10.0, 11.0, 11.0, 11.0])
+    # o relógio: o começo do total; antes e depois da 1ª leitura das threads; antes e depois da 2ª; o fim do total.
+    # Com o processador disputado a leitura do /proc demora (aqui 0,2 s cada): a janela das threads vai do meio da 1ª ao
+    # meio da 2ª (1,2 s), e não a do total (1,4 s). No reinício das 17:47 de 16/11/2026 a soma das threads dava ~60 de 120%
+    relogio = iter([10.0, 10.0, 10.2, 11.2, 11.4, 11.4])
     monkeypatch.setattr(R.time, "monotonic", lambda: next(relogio))
     cpu = R._processador()
-    assert cpu["quem"] == [{"nome": "nexus-prefiltro", "pct": 90, "pedido": ""}]
+    assert cpu["quem"] == [{"nome": "nexus-prefiltro", "pct": 75, "pedido": ""}]      # 90 tiques em 1,2 s
 
 
 def test_os_nomes_e_os_pedidos_vem_das_threads_de_verdade(app):

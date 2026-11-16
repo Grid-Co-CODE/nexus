@@ -46,6 +46,7 @@ from pathlib import Path
 from flask import current_app, render_template, request, session
 
 from . import presos as P
+from . import subida
 
 log = logging.getLogger(__name__)
 
@@ -158,6 +159,7 @@ def _maquina(s0, s1, v0: dict, v1: dict, janela_s: float):
     eu = _kb(_ler_proc("self/status"), "VmRSS", "VmSwap")
     gb = 1024 * 1024
     swap_total = mem.get("SwapTotal", 0)
+    teto = _teto_nexus()
     return {"ocupado": round(100.0 * max(0, total - ocioso - disco) / total), "disco": round(100.0 * disco / total),
             "livre_gb": _decimal(mem.get("MemAvailable", 0) / gb), "total_gb": _decimal(mem["MemTotal"] / gb),
             # a barra da memória na aba Agora (16/11/2026): quanto da máquina está tomado
@@ -169,7 +171,9 @@ def _maquina(s0, s1, v0: dict, v1: dict, janela_s: float):
             "trocando_mb_s": _troca_mb_s(v0, v1, janela_s),
             "nexus_mb": round(eu.get("VmRSS", 0) / 1024), "nexus_swap_mb": round(eu.get("VmSwap", 0) / 1024),
             "pressao_mem": _pressao(_ler_proc("pressure/memory")), "pressao_io": _pressao(_ler_proc("pressure/io")),
-            "teto": _teto_nexus(), "teto_deploy": _teto_do_deploy()}
+            # o porquê do arquivo do deploy que não abre só onde há o teto do processo (o Linux do servidor): no PC o
+            # arquivo não existe mesmo
+            "teto": teto, "teto_deploy": _teto_do_deploy(diagnostico=teto is not None)}
 
 
 def _ler_arquivo(caminho: str):
@@ -237,14 +241,20 @@ def _teto_nexus():
 ARQ_TETO_DEPLOY = None
 
 
-def _teto_do_deploy():
-    """{"hora", "texto"}: a última conferência do teto pelo deploy, em português; None sem o arquivo (fora do servidor)."""
+def _teto_do_deploy(diagnostico: bool = False):
+    """{"hora", "texto"}: a última conferência do teto pelo deploy, em português; None sem o arquivo (fora do servidor).
+    Com `diagnostico` (o servidor), o arquivo que não abre vira a linha com o motivo e o caminho: depois do deploy de
+    16/11/2026 o Raio-X de lá seguiu sem o "o deploy conferiu em ...", e de fora não se sabia por quê."""
+    arq = None
     try:
         from . import versao
         arq = ARQ_TETO_DEPLOY or versao.pasta_do_git() / "nexus-teto"
         linhas = arq.read_text(encoding="utf-8").splitlines()
-    except (OSError, UnicodeDecodeError):
-        return None
+    except (OSError, UnicodeDecodeError) as e:
+        if not diagnostico:
+            return None
+        motivo = "não existe" if isinstance(e, FileNotFoundError) else type(e).__name__
+        return {"hora": "?", "texto": f"não leu o arquivo que o deploy grava: {motivo} ({arq})"}
     e = dict(l.split("=", 1) for l in linhas if "=" in l)
     try:
         hora = datetime.fromisoformat(e.get("quando", "")).strftime("%d/%m às %H:%M")
@@ -521,15 +531,22 @@ def _processador(janela_s: float = 1.0) -> dict:
     a máquina pelo /proc (`_maquina`; só Linux) e quem usou o processador (`_quem_gasta`; só Linux)."""
     t0, c0 = time.monotonic(), time.process_time()
     s0, v0 = _cpu_da_maquina(_ler_proc("stat")), _vmstat(_ler_proc("vmstat"))
+    # a janela das threads é a DELAS, do meio de uma leitura ao meio da outra: com o processador disputado a leitura do
+    # /proc demora (cada arquivo solta e retoma a vez de rodar), e dividida pela janela do total a soma das threads dava
+    # ~60 de 120% (o reinício das 17:47 de 16/11/2026)
+    a0 = time.monotonic()
     k0 = _tiques_das_threads()
+    a1 = time.monotonic()
     time.sleep(janela_s)
+    b0 = time.monotonic()
     k1 = _tiques_das_threads()
+    b1 = time.monotonic()
     s1, v1 = _cpu_da_maquina(_ler_proc("stat")), _vmstat(_ler_proc("vmstat"))
     janela = max(time.monotonic() - t0, 1e-6)
     pct = 100.0 * (time.process_time() - c0) / janela
     carga = os.getloadavg() if hasattr(os, "getloadavg") else None
     try:
-        quem = _quem_gasta(k0, k1, janela)
+        quem = _quem_gasta(k0, k1, max((b0 + b1) / 2 - (a0 + a1) / 2, 1e-6))
     except Exception:                       # noqa: BLE001 - a lista de quem usou nunca derruba o Raio-X
         log.exception("Raio-X: não consegui montar quem usou o processador")
         quem = None
@@ -1179,6 +1196,23 @@ def _estado_da_lista_de_os(mod, prazo_s: float = PRAZO_MEMORIA_S) -> dict:
     return e
 
 
+UMA_HORA_S = 3600
+
+
+def _fila_de_subida():
+    """O estado da fila de subida (`casca/subida.py`, 16/11/2026) para a aba Pedidos e tarefas: quem tem a vez, quem
+    espera e o que já passou, com o tempo de cada um. Só na primeira hora depois do boot (depois é ruído); None fora
+    dela, onde a fila não foi ligada (o `create_app`) ou se o estado quebrar: nunca derruba a página."""
+    try:
+        e = subida.estado()
+        if e.get("ha_s") is None or e["ha_s"] >= UMA_HORA_S:
+            return None
+        return dict(e, ha_txt=P._duracao(e["ha_s"]))
+    except Exception:                       # noqa: BLE001 - o quadro nunca derruba a página
+        log.exception("Raio-X: não consegui ler a fila de subida")
+        return None
+
+
 def _secao_canto_central(app=None) -> dict:
     """O bloco do canto central na seção do OS Creator: os ativos (item 0 da 3.1+3.2), a lista de OS (3.2) e os catálogos
     pequenos (4.1). `app`: o leitor que não ligou na subida (`ponte.FALHOS`) é dito na peça dele."""
@@ -1245,7 +1279,7 @@ def registrar_raio_x(bp) -> None:
                                nexus=nexus, uso=_secao_uso_os(app), canto=_secao_canto_central(app),
                                threads_atrasado=threads_atrasado,
                                threads_quando=lista.get("anterior_quando") if threads_atrasado else None,
-                               travamentos=travamentos, abas=ABAS, aba=aba,
+                               travamentos=travamentos, abas=ABAS, aba=aba, subida=_fila_de_subida(),
                                parecer=parecer(pedidos, threads, teto, cpu.get("maquina"), travamentos,
                                                (("Nexus", nexus), ("worker", worker), ("web", web))),
                                quando=time.strftime("%d/%m/%Y %H:%M:%S"))

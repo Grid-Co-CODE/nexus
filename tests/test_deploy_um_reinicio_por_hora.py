@@ -216,6 +216,36 @@ def test_o_nexus_procura_os_arquivos_do_deploy_na_pasta_do_git_que_o_git_diz(tmp
         versao.pasta_do_git.cache_clear()
 
 
+def test_no_servidor_o_raio_x_diz_por_que_nao_leu_o_arquivo_do_deploy(tmp_path, monkeypatch):
+    """Depois do deploy de 16/11/2026 o Raio-X do servidor seguiu sem o "o deploy conferiu em ...", com a pasta do git
+    certa: o arquivo não abre, e de fora não se sabe por quê. Onde há o teto do processo (o Linux do servidor), a linha
+    passa a dizer o motivo e o caminho; no PC, sem o arquivo, segue sem dizer nada."""
+    from pathlib import Path
+
+    from nexus.casca import raio_x as R
+    falta = tmp_path / "nexus-teto"
+    monkeypatch.setattr(R, "ARQ_TETO_DEPLOY", falta)
+    assert R._teto_do_deploy() is None                                         # o PC: nada
+    d = R._teto_do_deploy(diagnostico=True)
+    assert d == {"hora": "?", "texto": f"não leu o arquivo que o deploy grava: não existe ({falta})"}
+    falta.write_text("quando=2026-11-16T10:00:00-03:00" + chr(10) + "acao=nada" + chr(10), encoding="utf-8")
+    monkeypatch.setattr(Path, "read_text", lambda self, *a, **k: (_ for _ in ()).throw(PermissionError(13, "negado")))
+    d = R._teto_do_deploy(diagnostico=True)
+    assert d["texto"] == f"não leu o arquivo que o deploy grava: PermissionError ({falta})"
+    # e quem liga o diagnóstico é a presença do teto do processo (só o Linux tem)
+    fonte = __import__("inspect").getsource(R._maquina)
+    assert "_teto_do_deploy(diagnostico=teto is not None)" in fonte
+
+
+def test_o_script_deixa_os_dois_arquivos_legiveis_para_o_nexus():
+    """O script roda como root e grava como o dono do clone; o Nexus pode rodar como outro usuário."""
+    from test_deploy_atualizar import SCRIPT
+    texto = SCRIPT.read_text(encoding="utf-8")
+    assert texto.count('chmod a+r "$ESPERA"') == 1 and 'chmod a+r "$ARQ_TETO"' in texto
+    assert texto.index('como tee "$ESPERA"') < texto.index('chmod a+r "$ESPERA"')
+    assert texto.index('como tee "$ARQ_TETO"') < texto.index('chmod a+r "$ARQ_TETO"')
+
+
 def test_a_espera_vencida_ha_mais_de_dez_minutos_nao_aparece(tmp_path, monkeypatch):
     """O timer parado (ou o arquivo esquecido) não deixa o aviso para sempre: o reinício sai em até 2 min depois da hora."""
     versao = _arquivo(tmp_path, monkeypatch, ate=time.time() - 11 * MIN)

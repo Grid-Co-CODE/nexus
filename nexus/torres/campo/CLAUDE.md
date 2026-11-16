@@ -2415,7 +2415,9 @@ Aprovação e Triagem usam a lógica do App copiada, não refeita, para o númer
     ~1,1 s; até 05/10 saíam uma por vez com 0,5 s de folga (~90 s). O histórico do OS Creator pergunta outra coisa: o RPC
     com o login da pessoa, com período e "criado por" filtrados no servidor (poucas OS). Agora `fracttal.py` deixa 4
     pedidos ao mesmo tempo, no máximo 4 por segundo, e em segundo plano tenta de novo depois de um 429 (5 s, 10 s); a
-    fila é lida ao subir o Nexus (`aprovacao.aquecer`, 20 s depois; `NEXUS_CAMPO_AQUECER=0` desliga). Medido: fila
+    fila é lida ao subir o Nexus (`aprovacao.aquecer`, 20 s depois; `NEXUS_CAMPO_AQUECER=0` desliga; desde 16/11/2026 a
+    conta e a releitura do boot entram na fila de subida, uma tarefa de aquecimento por vez, e o pré-filtro e as
+    contas do `manter_quente` também: `nexus/casca/CLAUDE.md`, "A fila de subida"). Medido: fila
     inteira em ~20 s.
   - **A fila INTEIRA, sem período** (Levi, 08/10: "não deve ter filtro 'OS fechadas nos X dias' ... ficar preso nessa
     visão é foda"): a conta do App (`aprovacao.fila_toda`; a cópia devolve 200 linhas por chamada e as páginas são

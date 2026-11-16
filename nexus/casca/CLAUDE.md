@@ -28,6 +28,7 @@ Base → Acessos), o tema (escuro ou claro) e o `/saude`. A cadeira saiu em 12/1
 | `nexus/auth/telas_admins_app.py` + `templates/acessos/_admins_app.html` (+ `_admins_app_explica.html`, o "!" do título) + `static/acessos-admins-app.js` | a aba Administradores do App de Campo de Base → Acessos (05/11/2026; o dado em `nexus/pcm/admins_app.py`; seção "Acessos" abaixo) |
 | `nexus/auth/setor_telas.py` + `templates/sem_setor.html` | o que cada setor vê: o portão por setor e o menu filtrado (seção "Telas por setor" abaixo) |
 | `nexus/auth/pre_carga.py` | a pré-carga das telas de quem tem setor (seção "Pré-carga" abaixo) |
+| `nexus/casca/subida.py` | a fila de subida (16/11/2026): as tarefas de aquecimento do boot uma depois da outra, e a pré-carga e o pré-filtro só depois dela (seção "A fila de subida" abaixo) |
 | `nexus/templates/base.html` | a moldura: o topo (a ação da tela no bloco `topo_acoes`, o sino e quem entrou, que abre o menu da conta com o Setor, o Tema e o Sair; seção "Um cabeçalho só"), menu lateral, recolher (`[` ou botão, lembrado em `localStorage` `nexus.menu`; no trilho recolhido, passar o mouse
 ou focar o ícone abre ao lado a caixa `menu-voo` com o nome da torre e as telas dela, os mesmos links do menu,
 e o clique no ícone segue levando à 1ª tela; 05/11/2026, Levi: "ao passar o mouse aparecesse as opções daquela
@@ -381,7 +382,9 @@ OS Creator, que roda DENTRO do processo do Nexus (a ponte, sem proxy).
     Python". O caso: o Raio-X mostrou 231%, 167% e 242% e só dizia o total; o rótulo "trabalhando" é da linha em que a
     thread está, e ela pode estar ali esperando a vez (o Nexus só roda uma conta Python por vez), e o que passa de 100%
     é trabalho fora do Python, que nem aparece como "trabalhando". Fora do Linux (o PC) nada aparece. Sem régua nova: é
-    só leitura. Prova: `tests/test_raio_x_cpu_por_thread_16_11.py`;
+    só leitura. A janela das threads é a delas, do meio de uma leitura do /proc ao meio da outra: com o processador
+    disputado a leitura demora, e dividida pela janela do total a soma dava ~60 de 120% (o reinício das 17:47 de 16/11).
+    Prova: `tests/test_raio_x_cpu_por_thread_16_11.py`;
   - **Memória**: no alto, **o total da máquina** (16/11/2026, Levi: "na parte de memória eu senti falta do total de
     memória"): Total, Em uso (o total menos o disponível, `_maquina` → `usada_gb`/`usada_pct`), Livres, Swap em uso (de
     `swap_total_gb`) e o Nexus, com a barra do total; na tabela dos programas, a linha **Todos os programas** (os da lista e
@@ -784,6 +787,43 @@ contagens, datas, ids e motivos: nunca o texto de um ativo ou de uma OS, nem nom
 importa o OS Creator:** lê o módulo de `sys.modules` (no PC, sem ninguém ter aberto o OS Creator, ele nem está na memória, e
 a peça diz isso), e a peça que quebrar vai ao log e diz que não montou, nunca derruba a página. Prova:
 `tests/test_oscreator_canto_no_raio_x.py` e, para os catálogos, `tests/test_oscreator_catalogos.py::test_os_catalogos_no_raio_x`.
+
+## A fila de subida (16/11/2026)
+
+Levi, depois de ver o processador do Nexus em 231%, 167% e 242% a cada deploy: "qual o motivo do processador estar
+estourando assim?"; e, com a leitura por thread na mão, "pode seguir com a fila de subida". `nexus/casca/subida.py`.
+
+- **O caso.** O reinício das 17:47 de 16/11, lido thread por thread (seção do Raio-X acima), não tinha um culpado: eram
+  umas dez tarefas de subida ao mesmo tempo, cada uma com 10 a 40% de um núcleo por meio a dois minutos (a releitura da
+  fila da Aprovação 37 a 39%, a conta dela 23%, a pré-carga até 21%, os chamados 17%, o pré-filtro 14% mais quatro
+  threads, as contas do Campo 8%). O Nexus roda UMA conta Python por vez: com N tarefas disputando, o clique da pessoa
+  fica com 1/(N+1) do processador a cada troca. Medido num ensaio (8 tarefas de 2 s, um pedido que sozinho leva 51 ms):
+  todas juntas, o pedido leva 1.413 ms na mediana e 2.228 ms no pior; uma por vez, 153 ms e 176 ms; as tarefas terminam
+  30% mais tarde (16,7 s contra 21,7 s).
+- **`subida.vez(nome)`**: a tarefa de subida entra na fila e roda quando chega a vez, na ordem de chegada. A que passa de
+  90 s com a vez (`PRAZO_S`; quase sempre esperando a rede) não segura as outras: a seguinte entra e ela termina por
+  fora. Quem já tem a vez não espera de novo (a tarefa que chama outra). `subida.uma_por_vez(nome, fn)` embrulha o alvo
+  de uma thread.
+- **`subida.esperar_calma()`**: para o que só deve rodar DEPOIS da subida. Espera o boot passar de 5 min (`SOSSEGO_S`, o
+  prazo que a volta do boot da pré-carga já tinha) e a fila esvaziar.
+- **Só na janela de 15 min depois do boot** (`JANELA_S`), e só onde alguém ligou: o `servir.py` e o `app.py` chamam
+  `subida.ligar()` antes dos `instalar_*`. Fora da janela, no `create_app` e nos testes, `vez` e `esperar_calma` não
+  esperam nada.
+- **Quem entra na fila:** as contas do Campo do boot (`visao.manter_quente`, só a 1ª volta; as renovações não), a conta e
+  a releitura da fila da Aprovação (`aprovacao.aquecer`; a conta entra antes, porque a releitura segura a vez pelo prazo
+  inteiro) e os livros do SSO (`sso/api.aquecer_ao_subir`). **Quem espera a calma:** a pré-carga, antes de cada tela
+  (`pre_carga._trabalhar`; no reinício das 17:47 ela começou aos 17 s, chamada pelo 1º pedido de quem tem setor), e as
+  duas voltas do pré-filtro da Aprovação (`prefiltro_fundo._volta` e `_volta_meta`).
+- **O pedido de uma pessoa NUNCA entra na fila**, e nenhuma tela espera por ela: quem abre uma tela fria faz a conta no
+  próprio pedido, como antes. O que a fila custa é a tela fria por mais tempo logo depois do deploy (as cópias ficam
+  prontas uma depois da outra, e a pré-carga só depois de 5 min).
+- **Tarefa de subida nova que gasta processador entra na fila** (`with subida.vez("nexus-<nome>")` no trabalho do boot,
+  não no laço de depois). Não ponha na fila o que alguém espera de dentro de um pedido, nem tarefa que registra "estou
+  calculando" antes de pegar a vez: quem esperasse por ela ficaria esperando a fila.
+- **No Raio-X**, aba Pedidos e tarefas, na primeira hora depois de subir: "Fila de subida", com quem tem a vez, quem
+  espera e o que já passou (quanto levou e quanto esperou). É como se confere, do navegador, que ela funcionou.
+- **Prova:** `tests/test_casca_subida.py` (a ordem, o prazo da lenta, a que quebra, a janela, a calma, o Raio-X e os
+  pontos de entrada).
 
 ## Chaves do Nexus (Base → Chaves das fontes → aba Nexus, 14/10/2026)
 

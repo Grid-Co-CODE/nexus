@@ -128,6 +128,7 @@ for arq in memory.high memory.max; do
   fi
 done
 depois="memory.high=$(no_grupo memory.high) memory.max=$(no_grupo memory.max)"
+ARQ_TETO="$(como git rev-parse --git-dir)/nexus-teto"
 if [ "$acao" != "nada" ]; then
   echo "Teto de memória do $UNIDADE tirado ($acao). Antes: $antes. Depois: $depois."
 fi
@@ -136,7 +137,10 @@ if [ -n "$erro" ]; then
 fi
 printf '%s\n' "quando=$(date -Iseconds)" "unidade=$UNIDADE" "grupo=$GRUPO" "piso_mb=$PISO_MB" "antes=$antes" \
   "fontes=$fontes" "acao=$acao" "erro=$erro" "depois=$depois" \
-  | como tee "$(como git rev-parse --git-dir)/nexus-teto" >/dev/null || true
+  | como tee "$ARQ_TETO" >/dev/null || true
+# o Nexus pode rodar como outro usuário que não o dono do clone: o que o deploy deixa para ele ler fica legível a todos
+# (16/11/2026: o Raio-X do servidor não mostrava o "o deploy conferiu em ..."; nada aqui é segredo)
+chmod a+r "$ARQ_TETO" 2>/dev/null || true
 
 # 0b. A pasta da plataforma (PerformancePainel) depois da reescrita da main de lá (30/10/2026, Levi: "Faz e confere"): o
 # commit 616284b levou ao repositório público duas cópias de cache do Registro mestre e do de-para, e a main foi reescrita
@@ -256,6 +260,7 @@ fi
 if [ -n "$adiar" ]; then
   ate=$((ultimo + INTERVALO_S))
   printf '%s\n' "commit=$alvo" "ate=$ate" | como tee "$ESPERA" >/dev/null || true
+  chmod a+r "$ESPERA" 2>/dev/null || true
   echo "Reinício adiado: o último foi há $(((agora - ultimo) / 60)) min, e no horário útil sai no máximo um a cada $((INTERVALO_S / 60)) min. O commit $alvo sobe às $(em_brasilia "$ate" %H:%M 2>/dev/null || true). Urgente: [agora] na mensagem do commit, ou sudo $0 --forcar."
   exit 0
 fi

@@ -234,7 +234,11 @@ def manter_quente(app, intervalo_s: int = 60):
                     pass
 
     def laco():
-        aquecer()
+        # as contas do boot na fila de subida (16/11/2026): uma tarefa de aquecimento por vez, para o clique da pessoa não
+        # disputar o processador com dez delas juntas (nexus/casca/subida.py). As renovações de depois não entram
+        from ..casca import subida
+        with subida.vez("nexus-campo-quente"):
+            aquecer()
         while True:
             time.sleep(intervalo_s)
             agora = time.time()

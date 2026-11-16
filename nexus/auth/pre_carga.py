@@ -32,6 +32,7 @@ from collections import deque
 
 from flask import current_app
 
+from ..casca import subida
 from ..casca.teto_os import segredo_da_pre_carga
 
 log = logging.getLogger(__name__)
@@ -171,6 +172,10 @@ def _trabalhar(app) -> None:
                 return
             tela = e["fila"].popleft()
             e["na_fila"].discard(tela)
+        # depois da subida (16/11/2026): logo depois do boot a pré-carga espera as tarefas de aquecimento assentarem (5 min e
+        # a fila de subida vazia, nexus/casca/subida.py). No reinício das 17:47 desse dia ela começou aos 17 s, chamada pelo
+        # 1º pedido de quem tem setor, e abriu as telas frias junto com as tarefas do boot. Fora da janela, não espera nada
+        subida.esperar_calma()
         t0 = time.time()
         F.marcar_pre_carga(True)
         try:

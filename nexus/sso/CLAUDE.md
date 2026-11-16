@@ -74,7 +74,7 @@ fechada (já escreveu o nome de uma pessoa), e o administrador tira o que não �
   desde 12/11/2026). `NEXUS_SSO_GRAVA` (1 ou 0) vence onde existir. Onde não grava, a API responde 503 "este Nexus não
   guarda o SSO", e o site mostra o erro sem perder o que foi digitado.
 - **A 1ª leitura** dos sete livros leva ~40 s (o APR tem 4,8 MB): o `servir.py` aquece por trás ao subir
-  (`api.aquecer_ao_subir`), e o pedido nunca espera a leitura: sem o gravador carregado, ela começa por trás e o pedido
+  (`api.aquecer_ao_subir`; desde 16/11/2026 na fila de subida, `nexus/casca/subida.py`), e o pedido nunca espera a leitura: sem o gravador carregado, ela começa por trás e o pedido
   volta 503 "carregando" (revisão de 12/11/2026: 32 pedidos esperando os 40 s tomavam todas as threads e paravam o Nexus
   inteiro). Toda falha da leitura espera 30 s antes da próxima tentativa.
 - **O progresso do vídeo** (o bug da seção 6 do pacote: o app chamava `rpc("atualizar_progresso")` e a função estava em

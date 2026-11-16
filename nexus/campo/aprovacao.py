@@ -232,22 +232,29 @@ def carregar_do_disco(app) -> bool:
 def aquecer(app):
     """Ao subir o Nexus: a última fila boa do disco na hora, e a releitura (em segundo plano) só se ela tem mais de 10
     min (05/10: "fila ainda não lida" logo depois de cada reinício; 13/10: cada deploy relia a fila inteira)."""
+    # as duas tarefas entram na fila de subida (16/11/2026, nexus/casca/subida.py): no reinício das 17:47 desse dia a
+    # releitura usava 37 a 39% de um núcleo e a conta 23%, juntas com as outras tarefas do boot
+    from ..casca import subida
     carregar_do_disco(app)
     lida = _lida_em()
     if lida and time.time() - lida < VALIDADE_S:
         # a fila do disco ainda vale: a conta da tela fica pronta em segundo plano, e a 1ª visita não espera por ela
-        threading.Thread(target=lambda: _preparar(app), daemon=True, name="nexus-fila-conta").start()
+        threading.Thread(target=subida.uma_por_vez("nexus-fila-conta", lambda: _preparar(app)), daemon=True,
+                         name="nexus-fila-conta").start()
         return
     with _TRAVA:
         if _ESTADO["lendo"]:
             return
         _ESTADO["lendo"] = True
     from ..casca import fracttal_conta              # a releitura por trás declara o fundo (o teto de 90 do porteiro)
-    threading.Thread(target=fracttal_conta.de_fundo("fundo:nexus-fila-fracttal", lambda: _reler(app)), daemon=True,
-                     name="nexus-fila-fracttal").start()
     # a releitura leva minutos, e quem abre a tela nesse meio tempo vê a fila do disco: a conta dela começa já (05/11/2026,
-    # a 1ª visita depois do deploy esperou 97 s fazendo esta conta); as fotos esperam a fila relida, como antes
-    threading.Thread(target=lambda: _preparar(app, fotos=False), daemon=True, name="nexus-fila-conta").start()
+    # a 1ª visita depois do deploy esperou 97 s fazendo esta conta); as fotos esperam a fila relida, como antes. A conta
+    # entra ANTES da releitura na fila de subida: a releitura segura a vez pelo prazo inteiro
+    threading.Thread(target=subida.uma_por_vez("nexus-fila-conta", lambda: _preparar(app, fotos=False)), daemon=True,
+                     name="nexus-fila-conta").start()
+    releitura = subida.uma_por_vez("nexus-fila-fracttal", lambda: _reler(app))
+    threading.Thread(target=fracttal_conta.de_fundo("fundo:nexus-fila-fracttal", releitura), daemon=True,
+                     name="nexus-fila-fracttal").start()
 
 
 def _preparar(app, fotos=True):
