@@ -217,6 +217,50 @@ voltar_ao_instalado() {
   fi
 }
 
+# 0c. No horário útil, no máximo um reinício por hora (16/11/2026, Levi: "1 reinício por hora"). Das 15:37 às 15:41 de
+# 16/11 três pushes reiniciaram o Nexus três vezes em 5 min: cada reinício zera as cópias prontas da memória, e por 15 a 20
+# min toda tela refaz a conta do zero ao mesmo tempo, no mesmo processo (o Raio-X das 15:40: processador do Nexus em 167%,
+# 17 pedidos em andamento, o próprio Raio-X preso 41 s). Foram 19 reinícios naquele dia, das 7h às 19h. A regra: o push
+# isolado sobe nesta rodada, como sempre; depois de um reinício FEITO POR ESTE SCRIPT (a hora em .git/nexus-reiniciado), o
+# seguinte só sai NEXUS_REINICIO_INTERVALO_S depois dele (3600; 0 desliga), de segunda a sexta, das 7h às 19h de Brasília.
+# Sobem na hora: o commit com [agora] na mensagem (qualquer um dos que esperam), o --forcar, tudo fora do horário útil e
+# qualquer coisa enquanto o Nexus no ar não responde o /saude (o conserto do commit que o derrubou não espera). A espera
+# vem ANTES do pip e da conferência do boot: a rodada do timer, de 2 em 2 min, não custa nada enquanto espera. Quem espera
+# fica em .git/nexus-espera, que o /saude e o cartão "Versão no ar" do Início mostram. DEPLOY.md, seção 8
+GIT_DIR_SERVICO="$(como git rev-parse --git-dir)"
+REINICIADO="$GIT_DIR_SERVICO/nexus-reiniciado"
+ESPERA="$GIT_DIR_SERVICO/nexus-espera"
+INTERVALO_S="${NEXUS_REINICIO_INTERVALO_S:-3600}"
+agora_s() { printf '%s\n' "${NEXUS_AGORA:-$(date +%s)}"; }       # NEXUS_AGORA: o relógio dos testes
+# Brasília é UTC-3 o ano inteiro (sem horário de verão desde 2019): a conta não depende do fuso do servidor
+em_brasilia() { date -u -d "@$(($1 - 10800))" "+$2"; }
+agora="$(agora_s)"
+ultimo="$(cat "$REINICIADO" 2>/dev/null || true)"
+adiar=""
+if [ "${1:-}" != "--forcar" ] && [[ "$INTERVALO_S" =~ ^[0-9]+$ ]] \
+   && [[ "$agora" =~ ^[0-9]+$ ]] && [[ "$ultimo" =~ ^[0-9]+$ ]] \
+   && [ "$agora" -ge "$ultimo" ] && [ $((agora - ultimo)) -lt "$INTERVALO_S" ]; then
+  # o `date` que não entende a conta deixa dia e hora vazios, e a regra não vale: ela nunca para o deploy
+  dia="$(em_brasilia "$agora" %u 2>/dev/null || true)"
+  hora="$(em_brasilia "$agora" %H 2>/dev/null || true)"
+  if [[ "$dia" =~ ^[1-5]$ ]] && [[ "$hora" =~ ^[0-9][0-9]$ ]] && [ "$((10#$hora))" -ge 7 ] && [ "$((10#$hora))" -lt 19 ]; then
+    # as mensagens dos commits que esperam, numa variável: com o "git log | grep -q" o pipefail trocaria o achado por erro
+    mensagens="$(como git log --format=%B "${instalado:-$antes}..$alvo_completo" 2>/dev/null || true)"
+    saude_agora="$(curl -s --max-time 3 "http://127.0.0.1:$PORTA/saude" 2>/dev/null || true)"
+    case "${mensagens,,}" in
+      *"[agora]"*) ;;
+      *) if [[ "$saude_agora" =~ \"ok\"[[:space:]]*:[[:space:]]*true ]]; then adiar=1; fi ;;
+    esac
+  fi
+fi
+if [ -n "$adiar" ]; then
+  ate=$((ultimo + INTERVALO_S))
+  printf '%s\n' "commit=$alvo" "ate=$ate" | como tee "$ESPERA" >/dev/null || true
+  echo "Reinício adiado: o último foi há $(((agora - ultimo) / 60)) min, e no horário útil sai no máximo um a cada $((INTERVALO_S / 60)) min. O commit $alvo sobe às $(em_brasilia "$ate" %H:%M 2>/dev/null || true). Urgente: [agora] na mensagem do commit, ou sudo $0 --forcar."
+  exit 0
+fi
+rm -f "$ESPERA" 2>/dev/null || true
+
 # 1. o commit novo numa pasta temporária, fora da do serviço (do dono do clone; legível pelo dono do .venv)
 CONFERIDA="$(como mktemp -d)"
 trap 'rm -rf "$CONFERIDA"' EXIT
@@ -262,6 +306,8 @@ systemctl restart "$SERVICO"
 # gravada depois do restart, venha o /saude ou não: um commit que não sobe por outro motivo (o .env, por exemplo) não fica
 # reiniciando a cada 2 min (cada boot relê a Aprovação no Fracttal, na cota dividida com o App); o próximo commit conserta
 printf '%s\n' "$alvo" | como tee "$MARCA" >/dev/null
+# a hora deste reinício: o seguinte, no horário útil, só uma hora depois dela (passo 0c)
+agora_s | como tee "$REINICIADO" >/dev/null || true
 resp=""
 for _ in $(seq 1 "$TENTATIVAS"); do
   sleep 2

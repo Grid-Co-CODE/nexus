@@ -31,13 +31,17 @@ MAX_LINHAS = 1000           # teto de páginas por leitura
 MAX_MOTIVOS = 20            # motivos de cancelamento lidos por rodada
 _BRT = timezone(timedelta(hours=-3))
 _TRAVA = threading.Lock()
-_ESTADO = {"linhas": None, "lido": 0.0, "lendo": False}
+# `versao` só anda quando o solicitante de alguma OS muda de uma leitura para a outra (16/11/2026): o Histórico de OS joga
+# fora as linhas montadas quando ela muda, e com a hora da leitura no lugar dela isso acontecia de 5 em 5 min, à toa
+_ESTADO = {"linhas": None, "lido": 0.0, "lendo": False, "versao": 0}
+# (a leitura de 5 min, {id da OS: a 1ª linha dela}): o índice da leitura em vigor, refeito quando a leitura troca
+_INDICE: tuple = (None, {})
 _CANCEL: dict = {}          # id da OS -> {"motivo", "visto" (datetime de Brasília)}
 
 
 def limpar() -> None:
     with _TRAVA:
-        _ESTADO.update(linhas=None, lido=0.0, lendo=False)
+        _ESTADO.update(linhas=None, lido=0.0, lendo=False, versao=0)
         _CANCEL.clear()
         _MAPA.update(por_wid=None, lido=0.0, lendo=False)
 
@@ -110,6 +114,32 @@ def _motivos(linhas: list[dict]) -> None:
             _CANCEL.setdefault(l["wid"], {"motivo": motivo, "visto": datetime.now(_BRT)})
 
 
+def _por_wid(linhas) -> dict:
+    """{id da OS: a 1ª linha dela na leitura} (a mesma que a varredura linha a linha achava)."""
+    d: dict = {}
+    for x in linhas or ():
+        d.setdefault(x["wid"], x)
+    return d
+
+
+def _quem_pediu(linhas) -> dict:
+    """{id da OS: quem pediu}: o que o Histórico de OS mostra desta leitura. Igual entre duas leituras = nada a refazer lá."""
+    return {w: (l.get("nome") or "") for w, l in _por_wid(linhas).items()}
+
+
+def _da_leitura(w):
+    """A linha da OS `w` na leitura de 5 min em vigor, pelo índice (montado uma vez por leitura). Até 16/11/2026 cada OS
+    do Histórico copiava a leitura e a varria: 2.000 linhas x a leitura inteira, a cada pedido (0,45 s com 4.000
+    solicitações, medido), no processo que só roda uma conta por vez."""
+    global _INDICE
+    linhas = _ESTADO["linhas"]
+    de, indice = _INDICE
+    if de is not linhas:
+        indice = _por_wid(linhas)
+        _INDICE = (linhas, indice)
+    return indice.get(w)
+
+
 def _renovar(app) -> None:
     try:
         if app is not None:
@@ -118,7 +148,8 @@ def _renovar(app) -> None:
         else:
             linhas = ler_rest()
         with _TRAVA:
-            _ESTADO.update(linhas=linhas, lido=time.monotonic())
+            mudou = _quem_pediu(linhas) != _quem_pediu(_ESTADO["linhas"])
+            _ESTADO.update(linhas=linhas, lido=time.monotonic(), versao=_ESTADO["versao"] + (1 if mudou else 0))
         _motivos(linhas)
     except Exception as e:       # noqa: BLE001 — fica a leitura de antes; a próxima visita tenta
         log.warning("Solicitações do Fracttal: não consegui ler o REST (%s)", type(e).__name__)
@@ -204,17 +235,18 @@ def solicitante_da_os(wid, app=None) -> str:
     w = _int(wid)
     if w is None:
         return ""
-    linhas, _c = atuais(app)
     if _ligado(app):
+        preparar(app)
         preparar_mapa(app)
-    l = next((x for x in linhas if x["wid"] == w), None) or (_MAPA["por_wid"] or {}).get(w)
+    l = _da_leitura(w) or (_MAPA["por_wid"] or {}).get(w)
     return (l or {}).get("nome") or ""
 
 
 def versao_do_mapa() -> tuple:
-    """Muda quando o mapa ou a leitura de 5 min mudam (o Histórico refaz as linhas guardadas com o Solicitante novo)."""
+    """Muda quando o mapa do dia é lido de novo ou quando a leitura de 5 min traz o solicitante de alguma OS diferente (o
+    Histórico refaz as linhas guardadas com o Solicitante novo). A leitura de 5 min igual à anterior não a muda."""
     with _TRAVA:
-        return _MAPA["versao"], _ESTADO["lido"]
+        return _MAPA["versao"], _ESTADO["versao"]
 
 
 def ligar_historico(app):

@@ -79,7 +79,9 @@ regra: em 14/10/2026 esta pasta estava 26 commits atrás do GitHub, e o Clima de
   vence o solto, e o solto que não existe em lugar nenhum é o que precisa de commit.
 - **O que está no ar:** `curl -s https://app.gridco.com.br/saude` dá o commit. Produção segue o `origin/main` sozinha: o
   timer `deploy/nexus-atualizar.timer` roda o `deploy/atualizar.sh` a cada 2 min (busca, confere o boot fora da pasta do
-  serviço, anda e reinicia; `DEPLOY.md`, seção 8). Push na `main` = produção reiniciada em ~2 min.
+  serviço, anda e reinicia; `DEPLOY.md`, seção 8). Push na `main` = produção reiniciada em ~2 min, **menos no horário
+  útil (segunda a sexta, 7h às 19h): aí sai no máximo um reinício por hora** (16/11/2026). O push que chega antes de a
+  hora fechar espera, e o `/saude` diz qual commit espera e a que horas sobe (`"espera"`); não é deploy quebrado.
 - **No Git Bash do Windows o `git` não lê `<(...)`** (substituição de processo): o `git diff --no-index <(...) arquivo`
   sai vazio, e vazio parece "igual". Compare com `cmp`, arquivo temporário ou Python.
 
@@ -153,7 +155,10 @@ PerformancePainel.
   anterior a 08/10/2026 ainda tem nomes (não se reescreve).
 - **Segredos** só no `.env` (gitignorado). Nunca imprima `NEXUS_SENHA_ADMIN` nem `NEXUS_SECRET_KEY`,
   nunca desligue o portão de login. Para validar tela atrás da senha, faça login por sessão lendo o `.env`.
-- Commit só quando pedido. Há deploy automático: push na `main` vai para produção em ~2 min, com restart.
+- Commit só quando pedido. Há deploy automático: push na `main` vai para produção em ~2 min, com restart. **No horário
+  útil, no máximo um reinício por hora** (Levi, 16/11/2026; cada reinício esfria as telas de todos por 15 a 20 min):
+  junte o que der num push só. `[agora]` na mensagem do commit sobe na hora; use só para o que não pode esperar
+  (produção quebrada), senão a regra não vale nada.
 - **Quem sobe o quê:** os administradores (Levi) commitam direto na `main`. Quem programa o COS, a Engenharia e a
   Segurança · HSEQ (as duas desde 27/10/2026) entra por pull request, e a conferência `pasta-da-area` só aprova o que
   mexe na área de quem abriu o pedido ("Como entregar" no `CLAUDE.md` de `nexus/torres/cos/`, `nexus/torres/engenharia/`

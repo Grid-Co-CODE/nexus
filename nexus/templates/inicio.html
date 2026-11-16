@@ -22,6 +22,8 @@
     <div class="r">Versão no ar</div>
     <div class="v gc-num">{{ v.em_txt }}</div>
     <div class="d">commit <code>{{ v.curto }}</code> · no ar desde {{ v.no_ar_desde_txt }}</div>
+    {# o commit que espera a vez (16/11/2026): no horário útil o deploy reinicia no máximo uma vez por hora #}
+    {% if v.espera %}<div class="d" data-espera>commit <code>{{ v.espera.curto }}</code> espera: sobe às {{ v.espera.sobe_as }}</div>{% endif %}
   </a>{% endif %}
 </div>
 

@@ -30,7 +30,7 @@
   const R = 27, C = 2 * Math.PI * R;
   const TEXTO_HIST = 'Buscando as OS no Fracttal…';
   const ESPERA_S = 15, LIMITE_S = 45;
-  let el = null, relogio = null, atraso = null, pendentes = 0, espera = null, feitoVisto = -1;
+  let el = null, relogio = null, atraso = null, pendentes = 0, espera = null, feitoVisto = -1, perguntando = false;
 
   function token() { return Math.random().toString(36).slice(2, 12) + Date.now().toString(36); }
 
@@ -154,12 +154,16 @@
   function mostrar(t, repetir) {
     montar(); clearTimeout(atraso); clearInterval(relogio);
     if (espera) { espera.parar(); espera = null; }
-    esperar(repetir); feitoVisto = -1;
+    esperar(repetir); feitoVisto = -1; perguntando = false;
     pintar(0, 0);
     el.querySelector('.carga-txt').textContent = TEXTO_HIST;
     atraso = setTimeout(function () { el.hidden = false; }, 250);
     // a pergunta de 350 em 350 ms é da tela, não da pessoa: o X-Nexus-Auto a deixa fora da conta de cliques (casca/uso_os.py)
+    // só pergunta de novo depois de a anterior voltar (16/11/2026): com o servidor lento as perguntas se empilhavam, ~600
+    // por aba em 3 min 39 s, cada uma numa thread do Nexus e numa vaga do teto do OS Creator
     relogio = setInterval(function () {
+      if (perguntando) return;
+      perguntando = true;
       fetch('/os/historico/progresso?p=' + encodeURIComponent(t), {credentials: 'same-origin', headers: {'Accept': 'application/json', 'X-Nexus-Auto': '1'}})
         .then(function (r) { return r.ok ? r.json() : null; })
         .then(function (j) {
@@ -167,7 +171,8 @@
           if ((j.feito || 0) !== feitoVisto) { feitoVisto = j.feito || 0; if (espera) espera.avancou(); }
           pintar(j.feito || 0, j.total || 0);
         })
-        .catch(function () { /* a página nova já está chegando */ });
+        .catch(function () { /* a página nova já está chegando */ })
+        .then(function () { perguntando = false; }, function () { perguntando = false; });
     }, 350);
   }
 

@@ -686,7 +686,8 @@ falha dele nunca para o deploy do Nexus. Sai do script quando a plataforma volta
 `commit_no_disco` novo).
 
 **Deploy por push (09/10/2026, Levi: "não dá para subir com o commit?").** O timer `deploy/nexus-atualizar.timer` roda o
-mesmo `atualizar.sh` a cada 2 minutos: push na `main` entra no ar em até ~3 min, sem ninguém rodar nada; sem commit
+mesmo `atualizar.sh` a cada 2 minutos: push na `main` entra no ar em até ~3 min (no horário útil, no máximo um reinício
+por hora desde 16/11/2026: o parágrafo seguinte), sem ninguém rodar nada; sem commit
 novo (e com o último já instalado), não reinicia. Instala uma vez (o 1º comando já sobe o que estiver no GitHub):
 
 ```
@@ -699,6 +700,28 @@ servidor: ela roda antes de cada push, na máquina de quem empurra. Commit que n
 não instalou) para na conferência do boot, sem restart e sem mexer na pasta do serviço. Commit que monta e mesmo assim não sobe (o `/saude` não responde
 com ele; o `.env`, por exemplo) deixa o Nexus fora até o próximo commit consertar, como na plataforma: ele já ficou
 marcado como instalado, para o timer não reiniciar a cada 2 min (cada boot relê a Aprovação no Fracttal).
+
+**No horário útil, no máximo um reinício por hora (16/11/2026, Levi: "1 reinício por hora").** Das 15:37 às 15:41 de
+16/11 três pushes reiniciaram o Nexus três vezes em 5 min. Cada reinício zera as cópias prontas da memória, e por 15 a 20
+min toda tela refaz a conta do zero ao mesmo tempo, no mesmo processo: o Raio-X das 15:40 mostrava o processador do Nexus
+em 167%, 17 pedidos em andamento e o próprio Raio-X preso 41 s; medido depois do 3º reinício, o Raio-X levava de 8 a 42 s
+para abrir e o servidor só assentou 19 min depois. Foram 19 reinícios naquele dia das 7h às 19h (17 por dia na média dos
+6 dias úteis anteriores). A regra (passo 0c do `atualizar.sh`):
+- o push isolado sobe na rodada seguinte do timer, como sempre;
+- depois de um reinício FEITO PELO SCRIPT (a hora fica em `.git/nexus-reiniciado`), o seguinte só sai uma hora depois
+  dele (`NEXUS_REINICIO_INTERVALO_S`, 3600; `0` desliga), de segunda a sexta, das 7h às 19h de Brasília (UTC-3 fixo: a
+  conta não depende do fuso do servidor);
+- **sobem na hora:** o commit com `[agora]` na mensagem (título ou corpo, de qualquer um dos que esperam, que sobem
+  juntos), o `--forcar`, tudo fora do horário útil e qualquer coisa enquanto o Nexus no ar não responde o `/saude` com
+  `"ok": true` (o conserto do commit que derrubou o Nexus não espera);
+- a espera vem ANTES do pip e da conferência do boot: a rodada do timer não custa nada enquanto espera;
+- quem espera fica em `.git/nexus-espera` (`commit=`, `ate=` em epoch), apagado na rodada que instala. O `/saude` o
+  mostra (`"espera": {"curto", "sobe_as"}`) e o cartão "Versão no ar" do Início também (`nexus/casca/versao.py`,
+  `espera_do_deploy`): quem empurrou e não viu o commit no ar lê ali qual é e a que horas sobe.
+O reinício fora do script (queda, reboot, `systemctl restart` à mão) não conta nem é contado. A regra nunca para o
+deploy: o `date` que não faz a conta, o `/saude` mudo ou o arquivo ilegível deixam o reinício sair como antes. Conferir no
+servidor: `journalctl -u nexus-atualizar -n 30` diz "Reinício adiado: ... sobe às HH:MM". Simulado nos pushes reais de
+16/11: 19 reinícios viram 8; o push espera 26 min em média. Prova: `tests/test_deploy_um_reinicio_por_hora.py`.
 
 **O restart espera a gravação do inventário (26/10/2026, Levi).** A gravação do inventário (PCM →
 Almoxarifado → Inventário) grava no Fracttal por sessão de ajuste, e enquanto um lote está aberto o almoxarifado fica

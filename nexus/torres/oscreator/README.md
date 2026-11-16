@@ -1301,7 +1301,10 @@ concluir e cancelar!".
   O Responsável é o atribuído da OS (`atribuido_a`); o Solicitante sai do gancho `rotas.SOLICITANTE_DA_OS`, que a ponte
   liga às solicitações do Fracttal lidas por trás no Nexus (`nexus/comando/solicitacoes_fracttal.py`: a leitura de 5 min,
   30 dias, e o mapa do dia, a leitura inteira de ~400 dias). As linhas guardadas da versão da lista são refeitas quando o
-  mapa muda. Sozinho (sem a ponte), o Solicitante fica vazio.
+  mapa muda: quando o mapa do dia é relido ou quando a leitura de 5 min traz o solicitante de alguma OS diferente
+  (`versao_do_mapa`; até 16/11/2026 a versão era a hora da leitura, e as linhas eram refeitas de 5 em 5 min à toa). O
+  solicitante de cada linha sai de um índice montado uma vez por leitura (`_da_leitura`; antes, cada linha copiava e
+  varria a leitura inteira). Sozinho (sem a ponte), o Solicitante fica vazio.
 - **Garantias abre o Raio X da OS** (11/11/2026, a etapa 2 do Raio X, "uma página só"): no Nexus, o cartão e a linha do
   quadro (`acomp.html`, o `abrir`) levam à página da OS do Nexus na janela inteira (`target="_top"`; a linha, pelo
   `data-topo` no acomp.js), com `?de=garantias`; a ponte passa a página da OS também ao quadro. A tela do chamado ganhou o
@@ -1459,7 +1462,13 @@ com as tarefas de 130 OS), repetidos para cada pessoa (a memória era por pessoa
   mesmo status de antes guarda o tipo, as datas e o gatilho.
 - **As linhas são montadas uma vez por versão da lista** (`_historico_linhas.html`, guardado na lista): medido com
   2.000 OS, cada pedido gastava ~0,25 s de processador no PC; agora a 1ª monta (0,38 s) e as seguintes levam
-  0,05–0,07 s, de qualquer pessoa.
+  0,05–0,07 s, de qualquer pessoa. **Uma montagem por vez** (`historico_store.html_das_linhas`, 16/11/2026): quem chega
+  com a montagem da mesma lista, visão e busca em andamento espera por ela (até 60 s) e recebe o mesmo HTML; se quem
+  montava quebrou, quem esperava monta a sua. Sem a trava, N pedidos juntos montavam N vezes (as abas abertas, que se
+  renovam de 10 em 10 min, e o "Tentar de novo" aos 45 s, que não para o pedido de antes): no Raio-X das 16:01 de
+  16/11/2026, depois de três reinícios em 5 min, um `GET /os/historico` estava há 3 min 39 s "trabalhando" (8 montagens
+  juntas levam 2,7 s cada no PC, e o Nexus só roda uma conta por vez). Prova:
+  `tests/test_oscreator_historico_montagem_16_11.py`.
 - A tela mostra "Lista das HH:MM" (quando a lista guardada veio). Erro do Fracttal por trás mantém a lista guardada.
 - Prova: `tests/test_oscreator_historico_compartilhado_19_10.py` (conta cada ida ao Fracttal: uma busca para várias
   pessoas, a visão restrita com a dela, a vencida que soma só as novas, a inteira a cada 10 min sem reler as tarefas
@@ -3258,7 +3267,9 @@ do `nexus/casca/CLAUDE.md`) e separa o clique da pessoa do que a tela pede sozin
   põe o campo escondido `nx_auto=1` só nesse envio e o tira em todo outro; a página carregada apaga o `nx_auto` do endereço
   (`history.replaceState`), para o recarregar do navegador ou o link copiado serem cliques;
 - **`carga.js`**, o círculo de carga, pergunta o `/os/historico/progresso` de 350 em 350 ms enquanto o Histórico busca: o
-  `fetch` leva o cabeçalho (sem ele seria, por folga, a rota mais clicada);
+  `fetch` leva o cabeçalho (sem ele seria, por folga, a rota mais clicada). Desde 16/11/2026 só pergunta de novo depois de
+  a pergunta anterior voltar (`perguntando`): com o servidor lento elas se empilhavam, ~600 por aba em 3 min 39 s, cada
+  uma numa thread do Nexus e numa vaga do teto do OS Creator;
 - a conferência da sessão de 5 min (`/os/_nexus/sessao`) é do Nexus (`nexus/templates/_confere_sessao_js.html`).
 O oem (congelado) não recebe estes arquivos: nada muda no 5090. Tela nova que
 se renova sozinha põe o cabeçalho; sem ele conta como clique.

@@ -499,7 +499,12 @@ def menu_busca():
 
 @bp.route("/saude")
 def saude():
-    # Público de propósito (monitoramento do servidor). Não diz nada além de "está de pé" e o commit.
+    # Público de propósito (monitoramento do servidor). Não diz nada além de "está de pé", o commit e, havendo, o commit
+    # que espera a vez de subir (16/11/2026: no horário útil o deploy reinicia no máximo uma vez por hora; quem empurrou
+    # e não vê o commit aqui lê em `espera` qual é e a que horas sobe; `versao.espera_do_deploy`).
+    espera = versao.espera_do_deploy()
+    if espera:
+        return jsonify(ok=True, commit=_commit(), espera=espera)
     return jsonify(ok=True, commit=_commit())
 
 

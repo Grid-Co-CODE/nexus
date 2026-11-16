@@ -232,13 +232,17 @@ def _teto_nexus():
 # `.git/nexus-teto` (ao lado da marca do commit instalado). A 1ª versão dele (42e506c) tirava o teto só pelo
 # set-property, e às 15:13 o Raio-X ainda mostrava 700 MB / 1 GB com o deploy rodando a cada 2 min; o Levi não tem acesso
 # ao servidor nem ao journal, e ninguém via se o script tinha tirado, falhado ou se outra coisa punha o teto de volta.
-ARQ_TETO_DEPLOY = Path(__file__).resolve().parents[2] / ".git" / "nexus-teto"
+# None = na pasta do git como o git a diz (`versao.pasta_do_git`, 16/11/2026: com o `<raiz>/.git` de cabeça, o Raio-X do
+# servidor não achava o arquivo e o "o deploy conferiu em ..." não aparecia); os testes põem um arquivo deles
+ARQ_TETO_DEPLOY = None
 
 
 def _teto_do_deploy():
     """{"hora", "texto"}: a última conferência do teto pelo deploy, em português; None sem o arquivo (fora do servidor)."""
     try:
-        linhas = ARQ_TETO_DEPLOY.read_text(encoding="utf-8").splitlines()
+        from . import versao
+        arq = ARQ_TETO_DEPLOY or versao.pasta_do_git() / "nexus-teto"
+        linhas = arq.read_text(encoding="utf-8").splitlines()
     except (OSError, UnicodeDecodeError):
         return None
     e = dict(l.split("=", 1) for l in linhas if "=" in l)
@@ -429,18 +433,108 @@ def _quem_ocupa(teto: int = 6):
             "total_swap_mb": sum(x["swap_mb"] for x in lista), "total_processos": sum(x["processos"] for x in lista)}
 
 
+# QUEM usa o processador (16/11/2026, Levi: "qual o motivo do processador estar estourando assim?"). O Raio-X mostrou o
+# Nexus em 231%, 167% e 242% e só dizia o total. As threads "trabalhando" não respondem: o rótulo é da linha em que a thread
+# está, e ela pode estar ali esperando a vez de rodar (o Nexus só roda uma conta Python por vez); e o que passa de 100% é
+# trabalho fora do Python (compactar, imagem, a rede cifrada). Foi preciso amostrar a página 30 vezes de fora para montar
+# o quadro. O Linux guarda o processador de cada thread do processo em /proc/self/task/<id>/stat: lido no começo e no fim
+# da MESMA janela de 1 s do total, dá quem usou. Só nomes de thread e caminhos sem a consulta.
+TAREFAS_DO_PROCESSO = "/proc/self/task"
+MAX_QUEM_GASTA = 8
+SEM_NOME = "thread sem nome no Python"      # a que uma biblioteca abriu por fora do `threading`: somadas numa linha
+
+
+def _tiques_das_threads(base: str | None = None) -> dict | None:
+    """{id da thread no sistema: tiques de processador (usuário + sistema) desde que ela nasceu}; None fora do Linux."""
+    base = base or TAREFAS_DO_PROCESSO
+    try:
+        ids = os.listdir(base)
+    except OSError:
+        return None
+    out = {}
+    for tid in ids:
+        try:
+            with open(f"{base}/{tid}/stat", "rb") as f:
+                # depois do nome entre parênteses (que pode ter espaço e parêntese): estado, ..., utime (12º) e stime (13º)
+                campos = f.read().rsplit(b")", 1)[1].split()
+            out[int(tid)] = int(campos[11]) + int(campos[12])
+        except (OSError, ValueError, IndexError):       # a thread que acabou no meio da leitura
+            continue
+    return out
+
+
+def _tiques_por_segundo() -> int:
+    try:
+        return int(os.sysconf("SC_CLK_TCK")) or 100
+    except (AttributeError, ValueError, OSError):
+        return 100
+
+
+def _nomes_das_threads() -> dict:
+    """{id da thread no sistema: (o nome no Python, o id dela no Python)}."""
+    return {t.native_id: (t.name, t.ident) for t in threading.enumerate() if t.native_id is not None}
+
+
+def _pedidos_por_thread() -> dict:
+    """{id da thread no Python: "GET /caminho"} dos pedidos em andamento (o registro do `presos`); vazio sem ele."""
+    try:
+        estado = current_app.extensions.get(P.CHAVE)
+        if estado is None:
+            return {}
+        with estado.trava:
+            return {p["thread"]: "%s %s" % (p["metodo"], p["caminho"]) for p in estado.em_curso.values()}
+    except Exception:                       # noqa: BLE001 - fora de um pedido, ou o registro num formato novo: sem o pedido
+        return {}
+
+
+def _quem_gasta(antes, depois, janela_s: float, tiques_por_s: int | None = None, nomes: dict | None = None,
+                pedidos: dict | None = None) -> list | None:
+    """As threads que usaram o processador entre as duas leituras, da que mais usou: [{"nome", "pct" (100 = um núcleo
+    inteiro), "pedido" (o pedido que ela atende, ou "")}], no máximo MAX_QUEM_GASTA e só as de 1% ou mais. A thread que
+    nasceu na janela conta desde o zero; as sem nome no Python somam numa linha. None sem as leituras (fora do Linux)."""
+    if antes is None or depois is None:
+        return None
+    tiques = tiques_por_s or _tiques_por_segundo()
+    nomes = _nomes_das_threads() if nomes is None else nomes
+    pedidos = _pedidos_por_thread() if pedidos is None else pedidos
+    por_nome: dict = {}
+    linhas = []
+    for tid, agora in depois.items():
+        usou = agora - antes.get(tid, 0)
+        if usou <= 0:
+            continue
+        pct = 100.0 * usou / tiques / max(janela_s, 1e-6)
+        if tid in nomes:
+            nome, ident = nomes[tid]
+            linhas.append({"nome": nome, "pct": pct, "pedido": pedidos.get(ident, "")})
+        else:
+            por_nome[SEM_NOME] = por_nome.get(SEM_NOME, 0.0) + pct
+    linhas += [{"nome": n, "pct": p, "pedido": ""} for n, p in por_nome.items()]
+    linhas = [dict(l, pct=round(l["pct"])) for l in linhas]
+    linhas = [l for l in linhas if l["pct"] >= 1]
+    linhas.sort(key=lambda l: (-l["pct"], l["nome"]))
+    return linhas[:MAX_QUEM_GASTA]
+
+
 def _processador(janela_s: float = 1.0) -> dict:
     """O processador deste processo numa janela curta (100% = um núcleo inteiro), a carga da máquina e, na mesma janela,
-    a máquina pelo /proc (`_maquina`; só Linux)."""
+    a máquina pelo /proc (`_maquina`; só Linux) e quem usou o processador (`_quem_gasta`; só Linux)."""
     t0, c0 = time.monotonic(), time.process_time()
     s0, v0 = _cpu_da_maquina(_ler_proc("stat")), _vmstat(_ler_proc("vmstat"))
+    k0 = _tiques_das_threads()
     time.sleep(janela_s)
+    k1 = _tiques_das_threads()
     s1, v1 = _cpu_da_maquina(_ler_proc("stat")), _vmstat(_ler_proc("vmstat"))
     janela = max(time.monotonic() - t0, 1e-6)
     pct = 100.0 * (time.process_time() - c0) / janela
     carga = os.getloadavg() if hasattr(os, "getloadavg") else None
+    try:
+        quem = _quem_gasta(k0, k1, janela)
+    except Exception:                       # noqa: BLE001 - a lista de quem usou nunca derruba o Raio-X
+        log.exception("Raio-X: não consegui montar quem usou o processador")
+        quem = None
     return {"pct": round(pct), "nucleos": os.cpu_count(), "carga": [round(x, 2) for x in carga] if carga else None,
-            "maquina": _maquina(s0, s1, v0, v1, janela)}
+            "maquina": _maquina(s0, s1, v0, v1, janela), "quem": quem}
 
 
 # ── o uso do OS Creator e os pedidos ao Fracttal (31/10/2026, etapa 0 do canto central do OS Creator) ────────────────────
@@ -1066,11 +1160,30 @@ def _com_o_leitor_que_nao_ligou(peca: dict, erro: str) -> dict:
     return {"linhas": linhas, "motivo": ""}
 
 
+# A memória da lista central de OS, medida fora do pedido (16/11/2026). A medida anda por todas as OS (~0,4 s com 36 mil,
+# uma vez por versão da lista, que muda a cada leitura do leitor) e rodava dentro do `GET /t/base/raio-x`. Nos Raio-X das
+# 15:40 e das 16:27 de 16/11, logo depois de um reinício e com o Nexus disputando o processador, o próprio Raio-X aparecia
+# entre os pedidos presos, há 41 s e há 40 s, em `os_central.py conta`: a página que diz onde está o gargalo era um deles.
+_OS_MEMORIA = {"thread": None, "ultimo": None, "quando": None}
+
+
+def _estado_da_lista_de_os(mod, prazo_s: float = PRAZO_MEMORIA_S) -> dict:
+    """O `os_central.estado()` de agora, com a memória da lista medida numa thread à parte e com prazo (`_com_prazo`):
+    passou dele, vale a última medida (ou nenhuma: a linha da memória não sai), e a medida presa não abre outra."""
+    e = mod.estado()
+    r = _com_prazo(_OS_MEMORIA, lambda: {"mb": mod.estado(medir_memoria=True).get("memoria_mb")}, prazo_s,
+                   "nexus-raio-x-os-memoria") or {}
+    if r.get("atrasado"):
+        r = r.get("anterior") or {}
+    e["memoria_mb"] = r.get("mb")
+    return e
+
+
 def _secao_canto_central(app=None) -> dict:
     """O bloco do canto central na seção do OS Creator: os ativos (item 0 da 3.1+3.2), a lista de OS (3.2) e os catálogos
     pequenos (4.1). `app`: o leitor que não ligou na subida (`ponte.FALHOS`) é dito na peça dele."""
     pecas = {"ativos": _peca("ativos_central", lambda m: _linhas_dos_ativos(m.estado())),
-             "os": _peca("os_central", lambda m: _linhas_da_lista_de_os(m.estado(medir_memoria=True))),
+             "os": _peca("os_central", lambda m: _linhas_da_lista_de_os(_estado_da_lista_de_os(m))),
              "catalogos": _peca("catalogos", lambda m: _linhas_dos_catalogos(m.estado()))}
     falhos = (app.extensions.get("nexus_leitores_do_clone_falhos") or {}) if app is not None else {}
     for chave, leitor in _LEITOR_DA_PECA.items():

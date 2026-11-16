@@ -11,7 +11,9 @@ da fila sai e entra uma linha em "O que já foi feito", no mesmo commit.
   print, pedir: em 20/10 ele mostrou que dois casos que pareciam "conta fria" eram outra coisa.
 - **Houve deploy nos 5 min antes?** `curl https://app.gridco.com.br/saude` dá o commit no ar e `git log origin/main` a
   hora. Todo push na main reinicia o servidor em 1 a 5 min, e a pré-carga só passa 5 min depois: nesse intervalo, a 1ª
-  abertura de cada tela é fria (até ~15 s nas pesadas).
+  abertura de cada tela é fria (até ~15 s nas pesadas). Com reinícios seguidos é pior: em 16/11/2026, três em 5 min
+  deixaram o Nexus de 117% a 272% de processador e o Raio-X abrindo em 8 a 42 s por 19 min. Desde então, no horário
+  útil sai no máximo um reinício por hora (`DEPLOY.md`, seção 8); o `/saude` diz o commit que espera (`"espera"`).
 
 ## Como ler o Raio-X
 
@@ -21,6 +23,7 @@ da fila sai e entra uma linha em "O que já foi feito", no mesmo commit.
 | "esperando a rede" no Fracttal (`api.*`) | o Fracttal lento, ou a tela pedindo demais | dá para servir a cópia guardada e reler por trás? o mesmo pedido repetido por pessoa ou por visita? |
 | "esperando a rede" no banco (`livros.*`, `banco_campo`) | o banco (a API `db_performace` mora na MESMA máquina) | contas frias juntas, renovações por trás demais, `VAGAS_BANCO` |
 | "trabalhando" e o Processador do Nexus perto de 100% | o processo segura o GIL: um laço Python | a tarefa "trabalhando" (pré-carga, PDF, renovar) e o laço dela |
+| Processador do Nexus alto (desde 16/11/2026 o cartão diz "quem mais usou") | a lista **Quem usou o processador neste segundo** (aba Pedidos e tarefas) dá o processador de cada thread na janela de 1 s: a tarefa de fundo pelo nome, o pedido pelo caminho. "trabalhando" sozinho não prova gasto: a thread pode estar esperando a vez | o primeiro da lista; se ele muda a cada leitura, é disputa (muitos pedidos frios juntos), não um laço só |
 | "trabalhando" com o Nexus baixo e, no Raio-X, esperando o disco alto, swap trocando ou memória parada | a MÁQUINA (disco, memória), não o código | a seção "Quem ocupa a memória da máquina" do Raio-X diz de quem é a memória; sendo a máquina mesmo, os números vão ao Levi para a T.I. Caso de 20/10: o PDF das 13:45 ficou 1 min "trabalhando" no desenho do logo (milissegundos) com a máquina no swap |
 | Lento só nos ~5 min depois de um push | conta fria pós-deploy | a fila, item "Conta fria pós-deploy" |
 | Seção **Uso do OS Creator** (últimos 7 dias; só no servidor, que é quem grava) | o que as pessoas abrem, a que hora e quanto isso pede ao Fracttal: o ANTES e o DEPOIS de cada mudança do canto central do OS Creator (desde 31/10/2026) | veja abaixo, "Como ler o Uso do OS Creator" |
@@ -139,6 +142,10 @@ total da hora (1 linha por hora), e o pico do total não é a soma dos picos de 
 | 11/11 | Base → De-para de equipamentos e o Modo de-para do Tempo real: "sempre roda uma leitura do Fracttal" | medido no ar (09:34): ~14 s para abrir e NENHUM pedido ao Fracttal (as 70 árvores saem da foto dos ativos de 06/11, que a leitura do OS Creator renova toda noite pelo `foto_ativos`, em ~50 ms cada; a leitura direta só entra para usina fora da foto, e não houve nenhuma em 7 dias). Os 12,6 s eram os 4 pedidos ao `/t/base/equipamentos/depara/estado`, um atrás do outro, cada um relendo o livro `nexus_estrutura_usina` inteiro (1.932 inversores; 1,5 a 12 s do PC) | a marca do livro no banco (o `updated_at` do /api/workbooks, que anda a cada gravação) diz se ele mudou: igual, vale a cópia, conferida agora (0,08 s do PC); diferente ou sem marca, relê como antes. A marca é lida antes das linhas (a gravação no meio da leitura anda a marca e o pedido seguinte relê). O selo que o salvar confere segue o do banco de agora. No ar (010fc15): ~14 s → 7,2 s (os 4 pedidos, 12,6 → 5,6 s; no servidor a marca custa 0,6 a 2,3 s). Depois, o estado num pedido só (até 400 chaves, `MAX_ESTADO`; o salvar segue com 50): a tela pede tudo de uma vez, abaixo de 7 KB de URL, e volta aos lotes de 50 com o Nexus de antes | 010fc15 e este |
 | 15/11 | Pedir com IA "demorando que só" | o Nemotron 3 Ultra grátis, único modelo, de pé 13% da meia hora (números públicos do OpenRouter); o pedido esperava até 90 s | três modelos em ordem com a troca do OpenRouter, 40 s por tentativa e uma 2ª com o que travou no fim; os segundos e o modelo na tela | este |
 | 15/11 | Pedir com IA: "uma pesquisa simples demorou 26 segundos" | medido no ar: 14,6 s no preencher, 14,2 deles na IA (o modelo raciocinava: `effort: low` liga o raciocínio até no Gemma 4) e 0,4 s no Nexus; a tela, 1,5 s nos ativos do cliente | `effort: "none"` (nenhum dos três é de raciocínio obrigatório), saída de 2.000 tokens, os tokens de cada resposta em `ia_info` | c186b922: 2,7 s no preencher, 2,1 s na IA, 0 token de raciocínio (o 1º pedido depois do reinício, 10,6 s: a medir) |
+| 16/11 | Raio-X das 15:40: processador do Nexus em 167%, 17 pedidos em andamento, "Pedido preso agora" (o próprio Raio-X há 41 s); "o que tá comendo o processador do nexus??" | três pushes em 5 min (15:37, 15:40, 15:41) = três reinícios; cada um zera as cópias da memória e toda tela refaz a conta fria junto, no mesmo processo (o GIL). Medido de 15:44 a 16:02: 117% a 272%, o Raio-X de 8 a 42 s, até 8 presos juntos; só assentou 19 min depois do último. O prontuário da usina, sozinho numa cópia local: 0,4 s quente, 27 s frio (10 s de processador). 19 reinícios no dia, das 7h às 19h | no horário útil, no máximo um reinício por hora (`deploy/atualizar.sh`, passo 0c; `[agora]` no commit sobe na hora; o `/saude` e o cartão "Versão no ar" dizem o commit que espera). Simulado nos pushes do dia: 19 viram 8 | este |
+| 16/11 | Raio-X das 16:01: um `GET /os/historico` há 3 min 39 s "trabalhando", com perguntas de progresso empilhadas | lido o código: o teto é de 2.000 linhas e montar as 2.000 custa 0,2 s sozinho; o custo era a multiplicação: as linhas guardadas sem trava (N pedidos juntos montavam N vezes), jogadas fora de 5 em 5 min pela hora da leitura das solicitações, o solicitante de cada linha varrendo a leitura inteira (0,45 s por pedido com 4.000) e o círculo perguntando o progresso de 350 em 350 ms sem esperar a resposta | uma montagem por vez (`historico_store.html_das_linhas`); a versão do solicitante só muda quando o solicitante de alguma OS muda; índice por OS montado uma vez por leitura; o círculo só pergunta depois da resposta anterior. Nada muda na tela | este |
+| 16/11 | Raio-X das 15:40 e das 16:27: o próprio `GET /t/base/raio-x` entre os presos, há 41 s, em `os_central.py conta` | a peça da lista central de OS media a memória da lista (todas as OS, uma vez por versão) dentro do pedido; com o processador disputado, 0,4 s viravam 40 s | a medida numa thread à parte com o prazo de 2 s (`raio_x._estado_da_lista_de_os`) | este |
+| 16/11 | "qual o motivo do processador estar estourando assim?": o Raio-X dava só o total (231%, 167%, 242%) | faltava o instrumento: "trabalhando" é a linha em que a thread está, não o gasto dela | o Raio-X lê o processador de cada thread pelo /proc na janela de 1 s e mostra quem usou (cartão do processador e aba Pedidos e tarefas) | este |
 
 ## A fila
 
@@ -153,9 +160,12 @@ total da hora (1 linha por hora), e o pico do total não é a soma dos picos de 
 3. **Clima e risco:** 21 s de processador na 1ª carga (o LZW do GeoTIFF do INPE em Python puro, 183 pedidos; volta a cada
    6 h, a cada deploy e a cada 15 min com o INPE atrasado). Proposta: o decodificador do Pillow (em C) por tile e uma
    cópia em disco.
-4. **Conta fria pós-deploy** (~15 s na 1ª abertura de uma tela nos ~5 min depois de cada push). Opções: agrupar os
-   deploys (no máximo um reinício a cada 30 min, por exemplo) ou uma cópia em disco das abas lidas (servir a última com
-   a hora dela e renovar por trás). É parâmetro: perguntar ao Levi antes.
+4. **Conta fria pós-deploy** (~15 s na 1ª abertura de uma tela nos ~5 min depois de cada push; 15 a 20 min de servidor
+   pesado com reinícios seguidos). O agrupamento saiu em 16/11/2026 (um reinício por hora no horário útil). Falta o
+   reinício sem frio, que o Levi pediu no mesmo dia ("siga"): o processo novo já subir com as cópias prontas. Dois Nexus
+   inteiros de pé ao mesmo tempo NÃO: os gravadores em lote (SSO, Zeladoria, Mapa de equipe), o uso do OS Creator e a
+   gravação do inventário guardam estado por processo, e o porteiro do Fracttal conta por processo (inventário do boot
+   de 16/11/2026). O caminho: encher as cópias de leitura do banco antes do reinício e o processo novo as ler do disco.
 5. **O deploy não pode cortar uma gravação no meio** (21/10/2026, pedido pelo chat Nexus com o OK do Levi): o push das
    09:57 (`dc60042`) reiniciou o servidor às ~10:03 no meio de um "Criar OS" do OS Creator (Performance › Trackers): a
    OS nasceu no Fracttal às 10:03:19, mas o ticket da aba Trackers, gravado depois no mesmo pedido

@@ -253,9 +253,37 @@ def anotar_total(pessoa, chave, total) -> None:
         _CONFERIDOS[(pessoa, chave)] = (_relogio(), int(total or 0))
 
 
+# Quem está montando as linhas de cada (lista, visão e busca). Até 16/11/2026 não havia trava: N pedidos juntos montavam N
+# vezes (as abas abertas, que se renovam de 10 em 10 min, e o "Tentar de novo" aos 45 s, que não para o pedido de antes). No
+# Raio-X das 16:01 desse dia, depois de três reinícios em 5 min, um GET /os/historico estava há 3 min 39 s "trabalhando": a
+# montagem de 2.000 linhas leva 0,2 s sozinha, e 8 juntas levam 2,7 s cada, num processo que só roda uma conta por vez.
+_MONTANDO: dict = {}       # (id da lista, chave do HTML) -> Event de quem está montando
+ESPERA_HTML_S = 60         # quem chega com a montagem em andamento espera por ela, até isto; depois monta a sua
+
+
 def html_das_linhas(lista, chave_html, montar) -> str:
-    """O HTML das linhas desta versão da lista para `chave_html` (a visão e a busca), montado uma vez."""
+    """O HTML das linhas desta versão da lista para `chave_html` (a visão e a busca), montado uma vez: quem chega com a
+    montagem em andamento espera por ela e recebe o mesmo HTML. Se quem montava quebrou (ou passou de ESPERA_HTML_S), quem
+    esperava monta a sua; o erro vai só a quem montava."""
     h = lista.html.get(chave_html)
-    if h is None:
+    if h is not None:
+        return h
+    chave = (id(lista), chave_html)
+    with _TRAVA:
+        em = _MONTANDO.get(chave)
+        dono = em is None
+        if dono:
+            em = _MONTANDO[chave] = threading.Event()
+    if not dono:
+        em.wait(ESPERA_HTML_S)
+        h = lista.html.get(chave_html)
+        if h is None:
+            h = lista.html[chave_html] = montar()
+        return h
+    try:
         h = lista.html[chave_html] = montar()
-    return h
+        return h
+    finally:
+        with _TRAVA:
+            _MONTANDO.pop(chave, None)
+        em.set()

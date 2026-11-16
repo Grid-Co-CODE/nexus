@@ -207,6 +207,11 @@ class Servidor:
         self.log.write_text("")
         # o systemd e o cgroup do teto de memória (passo 0 do script) numa pasta do teste, nunca os da máquina
         env_extra = {"NEXUS_SYSTEMD_DIR": self.systemd.as_posix(), "NEXUS_CGROUP_RAIZ": self.cgroup.as_posix(), **env_extra}
+        # o "um reinício por hora no horário útil" (16/11/2026) depende do relógio: sem o relógio do teste (NEXUS_AGORA) a
+        # regra fica desligada, senão a 2ª rodada destes testes instalaria às 22h e esperaria às 10h. Quem a prova, com o
+        # relógio na mão, é o test_deploy_um_reinicio_por_hora
+        if "NEXUS_AGORA" not in env_extra:
+            env_extra.setdefault("NEXUS_REINICIO_INTERVALO_S", "0")
         env = dict(os.environ, NEXUS_TESTE_LOG=self.log.as_posix(), NEXUS_TESTE_CONTROLE=self.controle.as_posix(),
                    # os falsos primeiro; depois a pasta do bash (readlink, seq, tee... mesmo sem o Git no PATH)
                    PATH=os.pathsep.join([str(self.bin), str(Path(BASH).parent), os.environ.get("PATH", "")]),

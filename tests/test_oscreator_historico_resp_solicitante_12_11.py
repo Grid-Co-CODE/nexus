@@ -50,8 +50,8 @@ def test_os_dois_filtram_a_tabela(cli, monkeypatch):
 
 def test_quem_pediu_vem_da_leitura_de_5_min_e_do_mapa_do_dia(monkeypatch):
     SF.limpar()
-    monkeypatch.setattr(SF, "atuais", lambda app=None: ([{"wid": 1, "nome": "Pessoa Nova"}], {}))
     monkeypatch.setattr(SF, "_ligado", lambda app: False)              # nenhuma leitura sai daqui
+    SF._ESTADO["linhas"] = [{"wid": 1, "nome": "Pessoa Nova"}]         # a leitura de 5 min em vigor
     SF._MAPA["por_wid"] = {2: {"wid": 2, "nome": "Pessoa Antiga"}}
     assert (SF.solicitante_da_os(1), SF.solicitante_da_os(2), SF.solicitante_da_os(3)) == ("Pessoa Nova", "Pessoa Antiga", "")
     SF.limpar()

@@ -23,8 +23,10 @@ import os
 import re
 import unicodedata
 import subprocess
+import time
 from datetime import datetime, timedelta, timezone
 from functools import lru_cache
+from pathlib import Path
 
 _BRT = timezone(timedelta(hours=-3))
 # importado pelo create_app: é a hora em que este processo subiu (cada deploy reinicia o Nexus)
@@ -206,8 +208,49 @@ def _hora(d: datetime | None, agora: datetime) -> str:
     return d.strftime("%H:%M") if d.date() == agora.date() else d.strftime("%d/%m %H:%M")
 
 
+# O commit que espera a vez de subir (16/11/2026, Levi: "1 reinício por hora"): no horário útil o `deploy/atualizar.sh`
+# reinicia o Nexus no máximo uma vez por hora, e o push que chega antes disso espera. Ele grava em `.git/nexus-espera` o
+# commit e até quando (`commit=`, `ate=` em epoch), e apaga na rodada que instala. Sem isto, quem empurrou e não viu o
+# commit no /saude acharia que o deploy quebrou. Fora do servidor o arquivo não existe.
+ARQ_ESPERA = None           # None = `pasta_do_git() / "nexus-espera"`; os testes põem um arquivo deles
+ESPERA_VENCIDA_S = 600      # o reinício sai em até 2 min depois da hora (o timer); passou de 10, o aviso é velho
+
+
+@lru_cache(maxsize=1)
+def pasta_do_git() -> Path:
+    """A pasta do git deste clone como o GIT a diz (`rev-parse --absolute-git-dir`), e não `<raiz>/.git` de cabeça. É
+    nela que o `deploy/atualizar.sh` grava o que o Nexus mostra (`nexus-espera`, `nexus-teto`), pelo `git rev-parse
+    --git-dir` dele. Num clone comum as duas são a mesma pasta; numa worktree, ou num clone com a pasta do git à parte, o
+    `.git` da raiz é um ARQUIVO, e quem procurasse dentro dele não acharia nada, calado. O caso (16/11/2026): o Raio-X do
+    servidor mostrava o teto de memória sem o "o deploy conferiu em ...", que sai do `nexus-teto`: o arquivo que o
+    script grava a cada rodada não era achado. Sem git (a vitrine, a pasta copiada), `<raiz>/.git`."""
+    try:
+        p = _git("rev-parse", "--absolute-git-dir").strip()
+        if p:
+            return Path(p)
+    except (OSError, subprocess.SubprocessError, RuntimeError):
+        pass
+    return Path(__file__).resolve().parents[2] / ".git"
+
+
+def espera_do_deploy() -> dict | None:
+    """{"curto", "sobe_as" (HH:MM de Brasília)} do commit que espera o próximo reinício; None sem espera, com o arquivo
+    ilegível ou com a hora vencida há mais de 10 min (o timer parado não deixa o aviso para sempre). A chave é `curto`, e
+    não `commit`: o `deploy/atualizar.sh` acha o commit no ar pelo `"commit"` do /saude, e um segundo o confundiria."""
+    try:
+        arq = ARQ_ESPERA or pasta_do_git() / "nexus-espera"
+        d = dict(x.split("=", 1) for x in arq.read_text(encoding="utf-8").splitlines() if "=" in x)
+        commit, ate = d["commit"].strip(), int(d["ate"])
+    except (OSError, KeyError, ValueError):
+        return None
+    if not commit or time.time() - ate > ESPERA_VENCIDA_S:
+        return None
+    return {"curto": commit[:12], "sobe_as": datetime.fromtimestamp(ate, _BRT).strftime("%H:%M")}
+
+
 def cartao(app) -> dict:  # noqa: ARG001 — o app fica na assinatura: é quem chama, e a casca passa sempre
-    """O que o cartão do Início mostra: a hora do commit, o commit curto e desde quando o processo está no ar."""
+    """O que o cartão do Início mostra: a hora do commit, o commit curto, desde quando o processo está no ar e, havendo,
+    o commit que espera a vez de subir (`espera_do_deploy`)."""
     from . import _commit
     agora = datetime.now(_BRT)
     curto = _commit()
@@ -215,7 +258,7 @@ def cartao(app) -> dict:  # noqa: ARG001 — o app fica na assinatura: é quem c
     do_mesmo = bool(lo["sha"]) and (curto == "local" or lo["sha"].startswith(curto))
     em = lo["em"] if do_mesmo else None
     return {"curto": curto, "em_txt": em.strftime("%d/%m %H:%M") if em else "—",
-            "no_ar_desde_txt": _hora(NO_AR_DESDE, agora)}
+            "no_ar_desde_txt": _hora(NO_AR_DESDE, agora), "espera": espera_do_deploy()}
 
 
 def contagem(itens) -> list[tuple[str, str, int]]:

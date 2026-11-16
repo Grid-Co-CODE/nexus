@@ -11,8 +11,8 @@ Base → Acessos), o tema (escuro ou claro) e o `/saude`. A cadeira saiu em 12/1
 | `nexus/prefixo.py` | o caminho em que o Nexus é servido (`NEXUS_PREFIXO`): o middleware, `na_raiz`/`sem_raiz` e o cookie no caminho certo |
 | `nexus/templates/_raiz_js.html` | `window.NEXUS_RAIZ` e `nexusRota()` para o JavaScript, no `<head>` de base, entrar, modo TV e card da OS |
 | `nexus/config.py` | `OBRIGATORIAS` (sem elas o app não sobe e diz qual falta) e `OPCIONAIS` |
-| `nexus/casca/__init__.py` | `/` (Início, só com as torres do setor, e o cartão "Versão no ar"), `/tema` (troca sem JavaScript), `/saude` (`{"commit", "ok"}`) e o contexto dos templates (menu pelo setor, `setor`, `tema`) |
-| `nexus/casca/versao.py` + `templates/atualizacoes.html` | o cartão "Versão no ar" do Início (a hora do commit, o commit, desde quando está no ar) e a aba Atualizações (`/?aba=atualizacoes`, só novidade, correção e desempenho, um mês por vez, por dia, com os cartões de commits por pessoa ao lado); seção "Versão no ar e Atualizações" abaixo |
+| `nexus/casca/__init__.py` | `/` (Início, só com as torres do setor, e o cartão "Versão no ar"), `/tema` (troca sem JavaScript), `/saude` (`{"commit", "ok"}` e, com um commit esperando a vez de subir, `"espera"`) e o contexto dos templates (menu pelo setor, `setor`, `tema`) |
+| `nexus/casca/versao.py` + `templates/atualizacoes.html` | o cartão "Versão no ar" do Início (a hora do commit, o commit, desde quando está no ar e o commit que espera a vez de subir) e a aba Atualizações (`/?aba=atualizacoes`, só novidade, correção e desempenho, um mês por vez, por dia, com os cartões de commits por pessoa ao lado); seção "Versão no ar e Atualizações" abaixo |
 | `nexus/casca/sugestoes.py` + `templates/sugestoes.html` | a aba Sugestões (`/?aba=sugestoes`): o formulário de todos e a lista do administrador, o livro `nexus_sugestoes` e os anexos no disco; seção "Sugestões no Início" abaixo |
 | `nexus/casca/presos.py` | os pedidos presos: o que cada pedido esperava quando o Nexus parou de responder, no log (o cartão do Início saiu em 13/10; seção "Pedidos presos" abaixo) |
 | `nexus/casca/fracttal_conta.py` | o contador de pedidos ao Fracttal (31/10/2026): um gancho no `Session.send` que soma, por hora de Brasília × origem × método, os pedidos, as recusas (406/429), os erros, o pico por minuto e as esperas; e, no mesmo gancho, o porteiro (etapa 5): o Nexus até 150 pedidos por minuto, o fundo até 90; seção "Pedidos ao Fracttal" abaixo |
@@ -372,6 +372,16 @@ OS Creator, que roda DENTRO do processo do Nexus (a ponte, sem proxy).
     (crítico/alerta só nos dois sinais acima; o resto em neutro, a cor é do estado), a carga 1/5/15 min em barras contra os
     núcleos e a memória da máquina numa barra (`_maquina` → `usada_pct`). As frases de antes ficam embaixo de cada número
     (os testes as conferem: mudou a frase, muda o teste);
+  - **Quem usou o processador** (16/11/2026, Levi: "qual o motivo do processador estar estourando assim?"): na mesma
+    janela de 1 s do "Processador do Nexus", o Raio-X lê do `/proc/self/task/<id>/stat` do Linux o processador de CADA
+    thread do processo (`_tiques_das_threads`, `_quem_gasta`) e mostra as que mais usaram (até 8, de 1% para cima): no
+    cartão do processador, "quem mais usou"; na aba Pedidos e tarefas, a lista "Quem usou o processador neste segundo".
+    A thread que atende um pedido aparece pelo pedido ("GET /os/historico", do registro do `presos`, sem a consulta); a
+    tarefa de fundo, pelo nome; as que uma biblioteca abriu por fora do `threading` somam em "thread sem nome no
+    Python". O caso: o Raio-X mostrou 231%, 167% e 242% e só dizia o total; o rótulo "trabalhando" é da linha em que a
+    thread está, e ela pode estar ali esperando a vez (o Nexus só roda uma conta Python por vez), e o que passa de 100%
+    é trabalho fora do Python, que nem aparece como "trabalhando". Fora do Linux (o PC) nada aparece. Sem régua nova: é
+    só leitura. Prova: `tests/test_raio_x_cpu_por_thread_16_11.py`;
   - **Memória**: no alto, **o total da máquina** (16/11/2026, Levi: "na parte de memória eu senti falta do total de
     memória"): Total, Em uso (o total menos o disponível, `_maquina` → `usada_gb`/`usada_pct`), Livres, Swap em uso (de
     `swap_total_gb`) e o Nexus, com a barra do total; na tabela dos programas, a linha **Todos os programas** (os da lista e
@@ -760,7 +770,10 @@ cada pessoa restrita conta uma vez por janela; muitas divergências de quem vê 
 resposta", de que a página não basta), a cópia em disco e a memória
 (`os_central.memoria_estimada`: cada registro e texto contados uma vez;
 ~0,4 s com 36 mil OS, medida UMA vez por versão da lista, e a falha da medida vai ao log; 25,8 MB contra os 23,9 MB do
-tracemalloc); e **"Catálogos pequenos"** (4.1, `catalogos.estado()`, `raio_x._linhas_dos_catalogos`): uma linha por catálogo
+tracemalloc; **desde 16/11/2026 a medida roda numa thread à parte, com o prazo de 2 s das outras leituras lentas**,
+`raio_x._estado_da_lista_de_os`: nos Raio-X das 15:40 e das 16:27 desse dia, logo depois de um reinício, o próprio Raio-X
+estava entre os pedidos presos, há 41 s, em `os_central.py conta`; passou do prazo, a página mostra a última medida, ou
+sai sem a linha; prova: `tests/test_raio_x_memoria_da_lista_16_11.py`); e **"Catálogos pequenos"** (4.1, `catalogos.estado()`, `raio_x._linhas_dos_catalogos`): uma linha por catálogo
 (pessoas, etiquetas, tipos e classificações da OS, grupo e classificações da solicitação, falhas do COS, status da
 solicitação, motivos de cancelamento) com quantos itens, de onde veio (o REST da empresa ou o RPC pela sessão de quem usa),
 quando foi lido, a idade contra o prazo, VENCIDO e se está renovando, a última falha, as leituras do Fracttal neste processo e
@@ -1004,7 +1017,18 @@ atualizações dos commits e o que mudou! Ao clicar em versão no ar já leva pa
   EXECUÇÃO, que pode nem estar na lista (uma documentação, um merge): aí nenhum item leva. Nenhuma novidade nem correção
   no período: a aba diz isso (diferente de "sem git").
 - Sem git (a vitrine estática, uma pasta copiada): o cartão diz "—" e a aba diz que não há histórico. O `/saude` segue
-  enxuto (`{"ok", "commit"}`: o `deploy/atualizar.sh` lê o commit dele).
+  enxuto (`{"ok", "commit"}`: o `deploy/atualizar.sh` lê o commit e o `"ok": true` dele).
+- **O commit que espera a vez (16/11/2026, Levi: "1 reinício por hora").** No horário útil o deploy reinicia o Nexus no
+  máximo uma vez por hora (`DEPLOY.md`, seção 8), e o push que chega antes espera. O `deploy/atualizar.sh` grava em
+  `.git/nexus-espera` o commit e até quando; `versao.espera_do_deploy()` o lê a cada pedido (um arquivo de duas linhas) e
+  o `/saude` ganha `"espera": {"curto", "sobe_as"}` e o cartão, a linha "commit X espera: sobe às HH:MM". Sem espera, os
+  dois ficam como sempre. A hora vencida há mais de 10 min não aparece (o timer parado não deixa o aviso para sempre).
+  Quem empurrou e não vê o commit no `/saude` lê ali o porquê. **Os arquivos que o deploy deixa para o Nexus ler**
+  (`nexus-espera` e o `nexus-teto` do Raio-X) **são procurados na pasta do git como o git a diz**
+  (`versao.pasta_do_git`, `git rev-parse --absolute-git-dir`, uma vez por processo), a mesma em que o script grava; com
+  o `<raiz>/.git` de cabeça, num clone em que o `.git` é um arquivo o Nexus não achava nada, calado (o Raio-X do
+  servidor mostrava o teto de memória sem o "o deploy conferiu em ..."). Prova:
+  `tests/test_deploy_um_reinicio_por_hora.py`.
 - **Prova:** `tests/test_casca_versao.py` (o git dublado).
 
 ## Os filtros no padrão do Histórico de OS (`static/filtros-os.js`, `fo-*` no `nexus.css`; 12/11/2026)
