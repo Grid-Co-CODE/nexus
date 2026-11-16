@@ -936,6 +936,11 @@ pessoa abrir uma informação e analisar!". O código e as regras: `nexus/auth/p
   dela); o OS Creator; e as telas da plataforma na moldura (o peso é da plataforma, que tem pré-carga própria). Tela que
   leia o Fracttal na pré-carga assim mesmo é anotada pelo `campo.fracttal.marcar_pre_carga`, sai da volta até o Nexus
   reiniciar e o log pede para pô-la na `FORA` (regra em `nexus/torres/CLAUDE.md`).
+- **O prontuário da usina vai junto da lista do Comando › Usinas** (16/11/2026, Levi: "Eu tô achando as usinas meio
+  demoradas para abrir na primeira vez"). Ele não é tela do menu, e as cópias dele (as de todas as usinas: o mês a mês, o
+  COS, as tarefas, a Visão do responsável, as PT) só enchiam no 1º clique numa usina. Medido no PC em 16/11: a 1ª usina
+  51,9 s, as seguintes 0,1 s. Ao aquecer `comando/usinas` (`PRONTUARIO_JUNTO`), a volta abre também o prontuário da 1ª
+  usina da lista. O diagnóstico do dia da IA não roda aí: quem o pede é o navegador.
 - **Medido antes e depois** (12/10/2026, dado real, uma pessoa da Supervisão Campo com as 50 telas que o Levi marcou, o
   Fracttal bloqueado): sem a pré-carga, os 40 primeiros cliques somaram 35,3 s (8 acima de 0,5 s); com ela, a volta abriu
   35 telas em 39 s de relógio, sem erro e sem Fracttal, e os 40 cliques somaram 1,0 s (nenhum acima de 0,5 s; Clima

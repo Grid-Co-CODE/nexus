@@ -446,13 +446,12 @@ a.ins-titulo:hover{color:var(--verde-texto)}
 .pu-diag-linha{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px}
 .pu-diag .pu-par-t--ia{font:600 15px/1.45 var(--font-sans)}
 /* a frase clicável: o assunto leva ao cartão dele; a OS abre a OS (15/11/2026) */
-/* sublinhado sólido na cor do texto (16/11/2026, Levi: "Deixa um underline sólido embaixo do nome, branco mesmo, e aí,
-   claro, que for OS fica verde") */
-.pu-diag-link{color:inherit;text-decoration:underline solid var(--tinta);text-decoration-thickness:1px;text-underline-offset:4px}
-.pu-diag-link:hover{color:var(--verde-texto);text-decoration-color:var(--verde-texto)}
-.pu-diag-oslink{padding:0;border:0;background:none;color:var(--verde-texto);font:inherit;text-decoration:underline solid;
-  text-decoration-thickness:1px;text-underline-offset:4px;cursor:pointer}
-.pu-diag-oslink:hover{color:var(--tinta)}
+/* o pedaço clicável em amarelo, sem sublinhado (16/11/2026, Levi, em teste: "Ao invés de sublinhado e branco, sólido,
+   deixa a fonte amarela"); a OS segue verde. O sublinhado só no passar do mouse, para dizer que clica */
+.pu-diag-link{color:var(--alerta);text-decoration:none}
+.pu-diag-link:hover{text-decoration:underline;text-underline-offset:4px}
+.pu-diag-oslink{padding:0;border:0;background:none;color:var(--verde-texto);font:inherit;text-decoration:none;cursor:pointer}
+.pu-diag-oslink:hover{text-decoration:underline;text-underline-offset:4px}
 .pu-diag-alterna{display:inline-flex;align-items:center;gap:6px;margin-left:auto;padding:5px 10px;border:1px solid var(--linha-forte);
   border-radius:var(--raio-controle);background:transparent;color:var(--tinta-2);font:500 12.5px/16px var(--font-sans);cursor:pointer}
 .pu-diag-alterna:hover{color:var(--tinta);border-color:var(--tinta-2)}

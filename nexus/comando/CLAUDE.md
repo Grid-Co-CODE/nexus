@@ -757,6 +757,58 @@ o que é que ele tem que fazer".
 Prova: `tests/test_comando_diagnostico.py` (o JSON e a OS fora do dossiê; um por dia, a trava, o erro de 20 min, a trava
 morta; a rota faz uma vez e a segunda abertura não chama a IA; sem chave fica o parecer; a marca no `neutro`).
 
+### OS, pausa e chamados pelo que pesam (16/11/2026, Levi, na Marabá 200)
+
+Vale para o chat (`ia.INSTRUCOES`) e para o diagnóstico do dia (`diagnostico.PEDIDO`).
+
+- **Executar OS é do técnico de campo**, que o supervisor coordena. Levi: "o supervisor ele não consegue mandar uma caixa
+  para o técnico. Porque o técnico ele não usa o Nexus, ele usa o app de campo".
+  - Executar, iniciar ou concluir OS nunca vira ação de outro setor, nem da Manutenção.
+  - No diagnóstico, vira cobrança da equipe em "Tem que fazer", com o "ver" no cartão de OS.
+  - **Falta o aviso no celular do técnico** (o Nexus Field), que depende do App de Campo. O servidor do App é quem tem
+    os aparelhos e o Firebase; hoje ele só manda o resumo das 7h e das 13h e a emergência. O Nexus não manda nada ao
+    celular.
+- **As não iniciadas pelo que pesam.** Levi: "tarefa não iniciada e que não está atrasada também não entra nesse meio do
+  que está parado ou atrasado [...] Claro que tem urgências, corretivo emergencial, religamento remoto".
+  - **Urgente:** o tipo da tarefa é religamento, religamento remoto ou corretiva emergencial
+    (`manutencao.URGENTES`).
+  - **Atrasada:** a régua do PCM, programada há mais de 10 dias.
+  - **No prazo:** o resto. Não é atraso nem pendência, e ninguém é cobrado por ela.
+  - O cartão de OS do prontuário lista as não iniciadas nessa ordem (`prontuario.nao_iniciadas`). Cada linha traz o
+    que é, o tipo, o ativo, o técnico, a data programada e a situação em pílula. Levi: "Uma lista de título, qual ativo,
+    qual OS, quem é o técnico".
+  - O título e o técnico vêm da lista central de OS do OS Creator (`prontuario_dados.da_lista_central`), que o
+    servidor lê do Fracttal a cada poucos minutos. No PC, que não tem a lista, a linha sai sem os dois.
+  - O dossiê (formato 4) traz cada não iniciada com a situação e "Como ler as não iniciadas". O técnico só entra com
+    `com_pessoas`.
+- **A pausa com o porquê.** Levi: "Primeiro, está pausada por quê? [...] O supervisor realmente tem esse poder de
+  liberar? Ou está dependendo de quem?".
+  - A pausa traz quem pausou (o técnico no App ou o PCM), se tira da programação, a tarefa e a observação de quem
+    pausou (`manutencao.marcas_paradas`).
+  - O dossiê explica cada motivo ("Como ler a pausa").
+  - A IA nunca sugere "liberar" a pausa: quem destrava é quem o motivo aponta.
+  - Exemplo da Marabá 200: a OS 16507 foi pausada pelo técnico com o motivo Engenharia. A observação dizia: "o sensor
+    está instalado, falta somente configurar, nesse caso preciso de apoio da Engenharia".
+- **Tudo o que é de chamado vai à área Chamados**: cobrar o fabricante, o andamento e juntar uma OS a um chamado. Levi:
+  "quem cobra é o time de chamados [...] se for vincular alguma coisa relacionada a chamados, também tem que solicitar o
+  time de chamados".
+  - O chat agora tem "Chamados" como destino (`_ia_setores`), com os temas da área e só as pessoas marcadas nela. Sem
+    ninguém marcado, recebe o setor inteiro.
+  - O "juntar a OS ao chamado" vem do Insight "OS corretiva num ativo com chamado de garantia", pelo mesmo equipamento.
+    O dossiê não diz se elas já estão ligadas, então a IA pede a Chamados para avaliar e nunca afirma que não estão.
+- **O pedido pronto** (Levi: "Tudo isso já pronto"):
+  - o item do diagnóstico com "pedir" traz `pedido`, o texto ao setor com os dados (as OS, o fabricante, os dias);
+  - o "Fazer" abre a janela com esse texto.
+- **O visual:**
+  - a OS na resposta do chat ficou sem o tracejado (Levi: "Não tem necessidade");
+  - a frase do Insights tem sublinhado sólido na cor do texto, e a OS fica verde ("Deixa um underline sólido embaixo do
+    nome, branco mesmo").
+
+Prova:
+- `tests/test_comando_prontuario.py`: as não iniciadas;
+- `tests/test_comando_diagnostico.py`: as regras e o pedido pronto;
+- `tests/test_comando_ia.py`: a área Chamados no chat.
+
 ## Contestações e Prévia: visão do contrato (no Comando desde 12/11/2026)
 
 Vieram da torre Contratos e clientes, que saiu do menu (Levi, 12/11/2026: "contestações, você vai jogar para o comando,

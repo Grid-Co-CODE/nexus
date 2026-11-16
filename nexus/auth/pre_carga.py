@@ -50,6 +50,11 @@ FORA = frozenset({"engenharia/mesa", "engenharia/confiabilidade", "engenharia/eq
 # cada boot (`aquecer_ao_subir`). Tela nova cuja abertura grava alguma coisa entra aqui.
 SEM_PRE_CARGA = frozenset({"campo/equipe"})
 CABECALHO = "X-Nexus-Pre-Carga"
+# o prontuário da usina (16/11/2026, Levi: "Eu tô achando as usinas meio demoradas para abrir na primeira vez"): não é uma
+# tela do menu, e as cópias dele (as de todas as usinas: o mês a mês, o COS, as tarefas, a Visão do responsável, as PT)
+# só enchiam no 1º clique numa usina. Medido no PC em 16/11: a 1ª usina 51,9 s, as seguintes 0,1 s. Junto com a lista do
+# Comando › Usinas, a pré-carga abre também o prontuário da 1ª usina da lista: as cópias são de todas as usinas
+PRONTUARIO_JUNTO = "comando/usinas"
 
 
 def ligada(cfg) -> bool:
@@ -169,7 +174,10 @@ def _trabalhar(app) -> None:
         t0 = time.time()
         F.marcar_pre_carga(True)
         try:
-            status = cliente.get("/t/" + tela, headers=cabecalhos).status_code
+            r = cliente.get("/t/" + tela, headers=cabecalhos)
+            status = r.status_code
+            if tela == PRONTUARIO_JUNTO and status == 200:
+                _prontuario_junto(cliente, cabecalhos, r.get_data(as_text=True))
         except Exception as ex:  # noqa: BLE001 — a tela que quebra aqui quebraria na visita: o log diz, a fila segue
             status = type(ex).__name__
         finally:
@@ -192,6 +200,18 @@ def _trabalhar(app) -> None:
             volta["mais_lenta"] = (tela, dt)
         if not app.config.get("TESTING"):
             time.sleep(PAUSA_S)
+
+
+def _prontuario_junto(cliente, cabecalhos, html: str) -> None:
+    """Abre o prontuário da 1ª usina da lista do Comando › Usinas (`PRONTUARIO_JUNTO`), para as cópias dele ficarem
+    quentes. O diagnóstico do dia da IA não roda aqui: quem o pede é o navegador, depois da página."""
+    import re
+    m = re.search(r'/t/comando/usinas/(\d+)"', html or "")
+    if not m:
+        return
+    st = cliente.get(f"/t/comando/usinas/{m.group(1)}", headers=cabecalhos).status_code
+    if st >= 400:
+        log.warning("Pré-carga: o prontuário da usina %s respondeu %s.", m.group(1), st)
 
 
 def resumo(app) -> dict:

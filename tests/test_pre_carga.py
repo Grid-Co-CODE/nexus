@@ -149,3 +149,23 @@ def test_a_volta_fica_no_resumo_e_saiu_de_acessos(ligada, logado):
     v = PC.resumo(ligada)["volta"]
     assert v and v["telas"] == 7 and not v["erros"]
     assert "Pré-carga" not in logado.get(URL).get_data(as_text=True)
+
+
+def test_a_lista_do_comando_leva_junto_o_prontuario_da_primeira_usina():
+    """16/11/2026, Levi: "Eu tô achando as usinas meio demoradas para abrir na primeira vez" (medido no PC: a 1ª usina
+    51,9 s, as seguintes 0,1 s). O prontuário não é tela do menu: com a lista do Comando › Usinas, a pré-carga abre o da
+    1ª usina, e as cópias de todas as usinas ficam quentes."""
+    pedidos = []
+
+    class Cliente:
+        def get(self, url, headers=None):
+            pedidos.append(url)
+
+            class R:
+                status_code = 200
+            return R()
+    PC._prontuario_junto(Cliente(), {}, '<a href="/t/comando/usinas/60">Marabá 200</a><a href="/t/comando/usinas/59">x</a>')
+    assert pedidos == ["/t/comando/usinas/60"]
+    PC._prontuario_junto(Cliente(), {}, "<p>sem usina</p>")
+    assert pedidos == ["/t/comando/usinas/60"]
+    assert PC.PRONTUARIO_JUNTO == "comando/usinas"
