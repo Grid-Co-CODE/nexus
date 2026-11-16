@@ -1100,8 +1100,9 @@
     var fase = { A: "fase A", B: "fase B", C: "fase C", N: "neutro", "0": "sequência zero" }[suf] || suf;
     return releNomeFamilia(fam) + (fase ? " · " + fase : "") + "  (" + code + ")";
   }
-  // cbStatus do disjuntor: 16 = fechado (confirmado com a usina gerando); 0 = aberto; outro = mostra o código.
-  function releDisjuntor(d) { return d == null || isNaN(d) ? "—" : d === 16 ? "Fechado" : d === 0 ? "Aberto" : ("código " + d); }
+  // cbStatus (holding 162) é uma PALAVRA DE STATUS; o disjuntor é o bit 4 (0x10): ligado = fechado.
+  // Lido como BIT (robusto a outros bits da palavra). ⚠ bit 4 inferido com a usina gerando — confirmar quando abrir.
+  function releDisjuntor(d) { return d == null || isNaN(d) ? "—" : (d & 16) ? "Fechado" : "Aberto"; }
   // monta UM card de relé (uma cabine) e devolve as referências; atualizado em `atualizarUmRele`.
   function montarCardRele(rl, idx) {
     var br = bloco("Relé — " + (rl.cabine || ("Cabine " + (idx + 1))), "");
