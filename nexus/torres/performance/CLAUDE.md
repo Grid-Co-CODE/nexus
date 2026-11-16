@@ -25,3 +25,10 @@ a 17 telas (assinatura `db2b2cf9380d2b67`, nos dois lados). Quem a vê: marcar e
 tela da plataforma mostrar sem refazer a conta. Abre para quem tem a tela "Sala de controle" (o caminho fica debaixo
 dela), sem depender de ter a Coletas; o resultado fica no mesmo cofre do mural. Prova: `tests/test_coletas.py`
 (`test_a_sala_de_controle_le_o_abaixo_dos_demais_daqui`).
+
+**O novo da Sala de controle no sino do topo** (16/11/2026): `nexus/performance/sala_novas.py` pergunta à plataforma, pela
+ponte de leitura, o novo de quem está na sessão (`/api/sala/novas?pessoa=<e-mail>`; a regra é de lá) e o `casca._perf_do_sino`
+o põe no sino, por USINA ("3 strings em 2 inversores · 5 trackers"), só para quem tem a tela. O sino nunca espera a
+plataforma: vale a cópia de 2 min por pessoa, lida por trás; a falha é tentada de novo depois de 5 min. O número do sino
+soma as USINAS, não as strings. Some quando a pessoa abre o inversor (ou os trackers) na Sala. Prova:
+`tests/test_sala_novas_sino.py`.

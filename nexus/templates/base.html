@@ -87,6 +87,11 @@
       <ul>{% for m in sino.mencoes %}<li><a href="{{ raiz }}{{ m.link }}"><span class="sino-sev sino-sev--mencao">Menção</span> {{ m.titulo }}</a></li>{% endfor %}</ul>{% endif %}
       {% if sino.n_pedidos %}<p class="sino-t"><b>{{ sino.n_pedidos }} {{ 'pedido para o seu setor' if sino.n_pedidos == 1 else 'pedidos para o seu setor' }}</b></p>
       <ul>{% for p in sino.pedidos %}<li><a href="{{ raiz }}{{ p.link }}"><span class="sino-sev sino-sev--{{ 'critico' if p.atrasado else 'pedido' }}">{{ 'Atrasado' if p.atrasado else 'Pedido' }}</span> {{ p.titulo }}</a></li>{% endfor %}</ul>{% endif %}
+      {# o novo da Sala de controle da Performance, por usina (16/11/2026, casca._perf_do_sino): some quando a pessoa abre o
+         inversor (ou os trackers) lá #}
+      {% if sino.n_perf %}<p class="sino-t"><b>{{ sino.n_perf }} {{ 'usina com ocorrência nova na Performance' if sino.n_perf == 1 else 'usinas com ocorrência nova na Performance' }}</b></p>
+      <ul>{% for u in sino.perf %}<li><a href="{{ raiz }}/t/performance/sala-de-controle"><span class="sino-sev sino-sev--pedido">Nova</span> {{ u.usina }}{% if u.detalhe %}<small class="sino-aviso-d">{{ u.detalhe }}</small>{% endif %}</a></li>{% endfor %}</ul>
+      {% if sino.n_perf > sino.perf|length %}<p class="sino-vazio">e mais {{ sino.n_perf - sino.perf|length }}, na Sala de controle</p>{% endif %}{% endif %}
       {% if not sino.n %}<p class="sino-vazio">Nada novo para você.</p>{% endif %}
       <a class="gc-btn gc-btn--ui gc-btn--contorno sino-todos" href="{{ raiz }}/t/comando/caixa-de-entrada">Abrir a Caixa de entrada</a>
     </div>

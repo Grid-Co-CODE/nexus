@@ -525,7 +525,8 @@ def _sino():
         g = MO.do_cache()
         l_conv, _l_est, l_ped = CV.copias()
         avisos = _avisos_do_sino()
-        if (not g or not g.dados) and not l_conv and not l_ped and not avisos:
+        perf = _perf_do_sino()
+        if (not g or not g.dados) and not l_conv and not l_ped and not avisos and not perf:
             return None
         torres = MO.torres_da_pessoa()
         todos = (g.dados.get("insights") or []) if g and g.dados else []
@@ -551,9 +552,12 @@ def _sino():
         # o botão do topo leva o ícone do OS Creator do menu lateral, no lugar do sino (Levi, 04/11/2026: "quero que troque
         # esse símbolo de sino pelo símbolo do OS Creator"): lido da torre, para os dois nunca divergirem
         icone_os = next((t.icone for t in current_app.extensions.get("nexus_torres", []) if t.id == "os"), "clipboard-text")
-        return {"n": len(mencoes) + len(pedidos) + len(avisos), "criticos": sum(1 for p in pedidos if p["atrasado"]),
+        # o novo da Sala de controle da Performance conta por USINA (16/11/2026): contar cada string encheria o número
+        n_perf = perf["n_usinas"] if perf else 0
+        return {"n": len(mencoes) + len(pedidos) + len(avisos) + n_perf, "criticos": sum(1 for p in pedidos if p["atrasado"]),
                 "mencoes": mencoes[:6], "n_mencoes": len(mencoes), "pedidos": pedidos[:6], "n_pedidos": len(pedidos),
-                "avisos": avisos[:8], "n_avisos": len(avisos), "icone_os": icone_os}
+                "avisos": avisos[:8], "n_avisos": len(avisos), "icone_os": icone_os,
+                "perf": (perf or {}).get("usinas", [])[:6], "n_perf": n_perf}
     except Exception:            # noqa: BLE001 — o sino nunca derruba uma página
         current_app.logger.exception("sino dos insights")
         return None
@@ -591,6 +595,31 @@ def _sino_demandas():
         return {"n": len(itens), "criticos": sum(1 for i in itens if i["tom"] == "critico"), "itens": itens[:8]}
     except Exception:            # noqa: BLE001 — o sininho nunca derruba uma página
         current_app.logger.exception("sininho das demandas")
+        return None
+
+
+def _perf_do_sino() -> dict | None:
+    """O novo da Sala de controle da Performance, por usina (16/11/2026, `performance/sala_novas.py`): o que parou desde
+    a 1ª vez que a pessoa abriu a Sala, segue parado e ela ainda não abriu. Só para quem tem a tela, e só da cópia (a
+    leitura da plataforma corre por trás). O administrador pela senha (sem pessoa) não tem. A falha aqui não tira o
+    resto do sino."""
+    try:
+        a = setor_telas.acesso()
+        if not (a["tudo"] or "performance/sala-de-controle" in a["telas"]):
+            return None
+        from ..performance import sala_novas
+        d = sala_novas.do_sino(current_app.config, (session.get("usuario") or {}).get("email"))
+        if not d or not d.get("n_usinas"):
+            return None
+
+        def frase(u):
+            pl = lambda n, um, mais: f"{n} {um if n == 1 else mais}"           # noqa: E731
+            return " · ".join(x for x in (
+                (pl(u["strings"], "string", "strings") + " em " + pl(u["inversores"], "inversor", "inversores")) if u["strings"] else "",
+                pl(u["trackers"], "tracker", "trackers") if u["trackers"] else "") if x)
+        return {"n_usinas": d["n_usinas"], "usinas": [{"usina": u["usina"], "detalhe": frase(u)} for u in d["usinas"]]}
+    except Exception:            # noqa: BLE001
+        current_app.logger.exception("sino: o novo da Sala de controle")
         return None
 
 
