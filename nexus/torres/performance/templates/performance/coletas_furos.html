@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% from "_explica.html" import explica, termo %}
+{% block titulo %}Furos de coleta{% endblock %}
+{# Furos de coleta (16/11/2026): o relatório R01 da analista calculado pelo Nexus, do banco e do COS, com a validação de todos
+   no mesmo lugar (Levi: "upgradae para a parte de coleta da performance no nexus"; e, sobre o desenho: "Pega o estilo do
+   Nexus [...] deixar fácil para novos usuários entenderem melhor [...] melhor espaçamento, título, leitura em F").
+   A leitura em F: no alto à esquerda o título e a pergunta; a 1ª faixa são os números; a lista começa pela usina e a
+   situação, e o detalhe (validar, paradas, mapa do mês) fica fechado até o clique. A conta e a tela são do
+   static/coletas-furos.js; a regra mora em nexus/performance/coletas/ (CLAUDE.md de lá). #}
+{% block conteudo %}
+<link rel="stylesheet" href="{{ url_for('static', filename='coletas-furos.css') }}">
+<p class="gc-eyebrow">{{ torre.nome }} · {{ tela.nome }}</p>
+<div class="gc-titulo-explica"><h1 class="titulo-pagina">Furos de coleta</h1>
+{% call explica('Entenda esta tela', termos=True) %}
+  {{ termo('Para que serve') }}<dd>Mostra, usina por usina, os dias sem dado de geração, de IPOA ou de GHI no BD_Performance
+    e no BD_Thopen, para a equipe coletar o que falta ou dizer por que falta.</dd>
+  {{ termo('De onde vem') }}<dd>Os BDs vêm do banco, da última subida da coleta (a hora está abaixo dos números). De
+    novembro em diante, as paradas vêm das Ocorrências do COS, só as que têm "Geração parou" = sim, inclusive as em
+    aberto. As de outubro ficaram como a analista de Performance mapeou, com as OS do Fracttal e os tickets.</dd>
+  {{ termo('Como se conta') }}<dd>Cada célula é um equipamento num dia. A verificação vai até anteontem: vazio até lá é
+    furo. Zero enquanto os outros inversores geraram também é furo. Parada com 6 horas ou mais entre 6h e 18h explica o
+    dia. A OS 16493 e o cliente E1 ficam de fora. Na Ultragaz, valor acima de 5 vezes a mediana é coleta equivocada.</dd>
+  {{ termo('Como validar') }}<dd>Clique na usina. Escolha o motivo do item inteiro ou marque só alguns dias; o comentário
+    pode ir sem mudar a situação. A validação vale para todos que têm esta tela, e fica registrado quem validou e
+    quando. Nenhuma validação antiga é apagada ao importar.</dd>
+  {{ termo('Falha crítica', 'critico') }}<dd>A usina não teve nenhuma coleta no mês, ou menos da metade das células
+    esperadas está preenchida.</dd>
+  {{ termo('Falha', 'alerta') }}<dd>Há furo sem validação.</dd>
+  {{ termo('Validado', 'ok') }}<dd>Todo furo da usina tem motivo registrado.</dd>
+  {{ termo('Sem falha', 'neutro') }}<dd>Nada faltando no mês.</dd>
+  {{ termo('Geração e ETM') }}<dd>Geração é furo de inversor, de medidor ou da usina toda. ETM é furo da estação: IPOA
+    ou GHI.</dd>
+{% endcall %}</div>
+<p class="lead">Onde falta dado nos BDs até anteontem, o que uma parada do COS já explica e o que a equipe já validou.</p>
+<nav class="gc-subabas" aria-label="{{ tela.nome }}">
+  <a href="{{ url_for('torre_performance.coletas') }}">Conversor</a>
+  <a href="{{ url_for('torre_performance.coletas_furos_tela') }}" aria-current="page">Furos de coleta</a>
+</nav>
+
+<div id="fr-avisos" class="fr-avisos"></div>
+<p class="fr-carregando mudo" id="fr-carregando">Lendo os furos…</p>
+
+<div id="fr-corpo" hidden>
+  <div class="gc-numeros fr-numeros" id="fr-numeros"></div>
+  <details class="fr-mais" id="fr-mais"><summary>Mais números</summary><div class="fr-mais-grade" id="fr-mais-grade"></div></details>
+  <p class="mudo fr-fontes" id="fr-fontes"></p>
+
+  <div class="fr-barra">
+    <div class="fr-filtros-caixa"><form class="fr-filtros" id="fr-filtros"></form></div>
+    <div class="fr-acoes">
+      <button type="button" class="gc-btn gc-btn--contorno" id="fr-csv"><i class="ph ph-download-simple" aria-hidden="true"></i>Exportar CSV</button>
+      <details class="fr-menu" id="fr-menu"><summary class="gc-btn gc-btn--fantasma">Validações<i class="ph ph-caret-down" aria-hidden="true"></i></summary>
+        <div class="fr-menu-caixa">
+          <button type="button" class="gc-btn gc-btn--fantasma" id="fr-exportar">Exportar as validações (JSON)</button>
+          <button type="button" class="gc-btn gc-btn--fantasma" id="fr-importar">Importar validações ou o relatório R01…</button>
+          <p class="gc-ajuda" id="fr-conf-n"></p>
+        </div>
+      </details>
+      <input type="file" id="fr-arquivo" accept=".json,.html,.htm" hidden>
+    </div>
+  </div>
+
+  <h2 class="ui-kicker">Por cliente <span class="fr-kicker-nota">usinas com furo pendente / total</span></h2>
+  <div class="fr-clientes" id="fr-clientes" role="group" aria-label="Filtrar por cliente"></div>
+
+  <div class="fr-cab-lista">
+    <h2 class="ui-kicker" id="fr-titulo-lista">Usinas</h2>
+    <div class="fr-visoes" role="group" aria-label="Visão da lista">
+      <button type="button" class="gc-chip" data-visao="res" aria-pressed="true">Resumo</button>
+      <button type="button" class="gc-chip" data-visao="det" aria-pressed="false">Detalhe por equipamento</button>
+    </div>
+  </div>
+  <div class="fr-caixa"><table class="fr-tabela" id="fr-tabela"><thead></thead><tbody></tbody></table></div>
+</div>
+<div class="fr-recado" id="fr-recado" role="status" aria-live="polite" hidden></div>
+
+<script type="application/json" id="fr-config">{{ {
+  "dados": url_for('torre_performance.coletas_furos_r01'),
+  "conf": url_for('torre_performance.coletas_furos_r01_conf'),
+  "importar": url_for('torre_performance.coletas_furos_r01_importar')
+}|tojson }}</script>
+<script src="{{ url_for('static', filename='filtros-os.js') }}"></script>
+<script src="{{ url_for('static', filename='coletas-furos.js') }}"></script>
+{% endblock %}

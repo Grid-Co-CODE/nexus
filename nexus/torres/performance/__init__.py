@@ -71,7 +71,7 @@ TORRE = Torre(
         Tela("coletas", "Coletas",
              "O que este relatório de portal, SCADA ou datalogger traz que ainda falta no BD, e onde colar?",
              "os arquivos que a pessoa solta; BD_Performance e BD_Thopen do banco (com o mapa de fórmulas da coleta) ou "
-             "o Excel solto junto; o relatório de furos gerado fora"),
+             "o Excel solto junto; os furos de coleta calculados do banco e das paradas do COS"),
         # O nome de cada fonte por extenso, de fontes.NOMES (Levi, 09/10/2026: "Quero as fontes por extenso também, não só sigla")
         Tela("clima", "Clima e risco",
              f"Onde há aviso do {F.extenso('inmet')}, foco de queimada ou risco de fogo perto das usinas?",
@@ -220,6 +220,7 @@ from . import clima_tela  # noqa: E402,F401
 # Mapa de risco (07/10/2026): a mesma leitura do Clima e risco, num mapa do Brasil (/t/performance/clima/mapa).
 from . import mapa_tela  # noqa: E402,F401
 from . import coletas_tela  # noqa: E402,F401
+from . import furos_tela  # noqa: E402,F401
 
 
 # ── Quadro da equipe (04/11/2026) ───────────────────────────────────────────────────────────────────────────────────

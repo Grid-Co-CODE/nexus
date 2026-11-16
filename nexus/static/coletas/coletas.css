@@ -11,3 +11,6 @@
 .cf-busca input::placeholder{color:var(--mudo)}
 .cf-etiquetas{margin:0}
 @media (max-width:639px){.cf-busca{flex-basis:100%;max-width:none}}
+/* o caminho para a aba "Furos de coleta" do Nexus, no lugar do Resumo e do Detalhe do .exe (16/11/2026) */
+.cf-ir{text-decoration:none;color:var(--verde-texto);font-weight:600}
+.cf-ir:hover{color:var(--tinta)}

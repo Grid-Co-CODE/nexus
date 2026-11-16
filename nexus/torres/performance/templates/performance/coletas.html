@@ -21,6 +21,11 @@
     <p><b>O que não faz.</b> Não grava no BD nem no banco: a saída é a planilha para colar. Os arquivos que você solta ficam
       só durante a sua conversão; o formato que a tela não conhece fica guardado para o Levi ensinar o leitor.</p>
   {% endcall %}</div>
+  {# as abas da tela (16/11/2026): o Conversor e os Furos de coleta, a tela do Nexus que valida o que falta nos BDs #}
+  <nav class="gc-subabas coletas-abas" aria-label="{{ tela.nome }}">
+    <a href="{{ url_for('torre_performance.coletas') }}" aria-current="page">Conversor</a>
+    <a href="{{ url_for('torre_performance.coletas_furos_tela') }}">Furos de coleta</a>
+  </nav>
   <iframe class="os-moldura coletas-moldura" title="{{ tela.nome }}" src="{{ url_for('torre_performance.coletas_app') }}"></iframe>
 </div>
 {% endblock %}

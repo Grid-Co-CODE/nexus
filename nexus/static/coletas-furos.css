@@ -1,0 +1,158 @@
+/* A aba "Furos de coleta" da tela Coletas (16/11/2026; static/coletas-furos.js). Leitura em F (Levi: "melhor espaçamento,
+   título, leitura em F"): o alto à esquerda diz o que é e quanto falta; a lista começa pela usina e a situação; o detalhe
+   só aparece no clique. COR SÓ POR TOKEN; as larguras de quebra são as do DESIGN.md (640 e 900). */
+.fr-avisos .aviso{margin:14px 0 0;max-width:920px}
+.fr-carregando{margin:28px 0}
+.fr-numeros{margin-top:22px}
+.fr-numeros .v small{font:500 14px/20px var(--font-sans);color:var(--mudo);letter-spacing:0}
+.fr-v--critico{color:var(--critico)}
+.fr-v--alerta{color:var(--alerta)}
+.fr-v--ok{color:var(--ok)}
+.fr-mais{margin:10px 0 0}
+.fr-mais>summary{cursor:pointer;font:600 12px/18px var(--font-sans);color:var(--mudo);width:max-content}
+.fr-mais>summary:hover{color:var(--tinta)}
+.fr-mais-grade{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px 24px;margin-top:12px;padding:16px 20px;
+  background:var(--superficie-2);border:1px solid var(--linha);border-radius:var(--raio-md)}
+.fr-mais-grade b{display:block;font:600 16px/22px var(--font-sans);color:var(--tinta);margin-top:2px}
+.fr-fontes{font-size:12px;line-height:18px;margin:10px 0 0}
+
+.fr-barra{display:flex;align-items:flex-start;gap:12px 16px;flex-wrap:wrap;margin:26px 0 0}
+.fr-filtros-caixa{flex:1 1 440px;min-width:0}
+.fr-filtros .fr-mes{display:flex;flex-direction:column;gap:4px}
+.fr-filtros .fr-mes .gc-campo{min-width:170px}
+.fr-acoes{display:flex;align-items:center;gap:8px;margin-left:auto;position:relative}
+.fr-menu{position:relative}
+.fr-menu>summary{list-style:none;cursor:pointer}
+.fr-menu>summary::-webkit-details-marker{display:none}
+.fr-menu-caixa{position:absolute;right:0;top:calc(100% + 6px);z-index:30;min-width:300px;padding:8px;display:flex;flex-direction:column;
+  align-items:stretch;background:var(--superficie);border:1px solid var(--linha-forte);border-radius:var(--raio-md);box-shadow:0 12px 32px var(--sombra)}
+.fr-menu-caixa .gc-btn{justify-content:flex-start;color:var(--tinta)}
+.fr-menu-caixa .gc-btn:hover{background:var(--superficie-2)}
+.fr-menu-caixa .gc-ajuda{margin:6px 14px 6px}
+
+.fr-kicker-nota{text-transform:none;letter-spacing:0;font-weight:400;margin-left:8px}
+.fr-clientes{display:flex;flex-wrap:wrap;gap:8px}
+.fr-clientes .gc-chip{display:inline-flex;align-items:baseline;gap:6px;cursor:pointer;background:transparent;color:var(--tinta)}
+.fr-clientes .gc-chip b{font-weight:700}
+.fr-cab-lista{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:28px 0 12px}
+.fr-cab-lista .ui-kicker{margin:0}
+.fr-visoes{display:flex;gap:8px}
+.fr-visoes .gc-chip{cursor:pointer;background:transparent;color:var(--tinta)}
+
+.fr-caixa{overflow-x:auto;background:var(--superficie);border:1px solid var(--linha);border-radius:var(--raio-md)}
+.fr-tabela{width:100%;border-collapse:collapse;font-size:13px;line-height:20px}
+.fr-tabela>thead th{background:var(--superficie-2);text-align:left;padding:0;white-space:nowrap}
+.fr-tabela>thead th button{all:unset;box-sizing:border-box;display:flex;align-items:center;gap:6px;width:100%;padding:11px 16px;cursor:pointer;
+  font:700 11px/14px var(--font-sans);letter-spacing:.05em;text-transform:uppercase;color:var(--mudo)}
+.fr-tabela>thead th button:hover,.fr-tabela>thead th[aria-sort] button{color:var(--tinta)}
+.fr-tabela>thead th button:focus-visible{outline:2px solid var(--foco);outline-offset:-2px}
+.fr-tabela>thead th.n button{justify-content:flex-end}
+.fr-tabela>tbody>tr>td{padding:13px 16px;border-top:1px solid var(--linha);vertical-align:top}
+.fr-tabela td.n{text-align:right;white-space:nowrap}
+.fr-linha{cursor:pointer}
+.fr-linha:hover>td,.fr-linha.fr-aberta>td{background:var(--superficie-2)}
+.fr-linha:focus-visible{outline:2px solid var(--foco);outline-offset:-2px}
+.fr-linha--cr>td:first-child{box-shadow:inset 3px 0 0 var(--critico-cheio)}
+.fr-linha--at>td:first-child{box-shadow:inset 3px 0 0 var(--alerta-cheio)}
+.fr-linha--conf>td:first-child{box-shadow:inset 3px 0 0 var(--ok-cheio)}
+.fr-linha--ok .fr-usina b{font-weight:600;color:var(--tinta-2)}
+.fr-usina{display:flex;gap:10px;align-items:flex-start;min-width:200px}
+.fr-usina b{display:block;font-weight:700;color:var(--tinta)}
+.fr-usina small{display:block;font-size:12px;line-height:16px}
+.fr-seta{color:var(--mudo);margin-top:3px}
+.fr-aberta .fr-seta{transform:rotate(90deg)}
+.fr-sit{white-space:nowrap}
+.fr-sit .fr-selo{display:block;width:max-content;margin:6px 0 0}
+.fr-falha{min-width:260px;color:var(--tinta-2)}
+.fr-falha b{color:var(--tinta)}
+.fr-falha small{color:var(--mudo);font-size:12px}
+.fr-vazio{text-align:center;color:var(--mudo);padding:32px 16px !important}
+
+.fr-selo{display:inline-block;font:600 11px/16px var(--font-sans);padding:2px 8px;border-radius:var(--raio-tag);background:var(--superficie-2);color:var(--tinta-2)}
+.fr-selo--alerta{color:var(--alerta);background:var(--alerta-suave)}
+.fr-selo--inop{color:var(--semcom);background:var(--semcom-suave)}
+.fr-tipo{display:inline-block;font:600 11px/16px var(--font-sans);padding:2px 8px;border-radius:var(--raio-tag)}
+.fr-tipo--ger{color:var(--severo);background:var(--severo-suave)}
+.fr-tipo--etm{color:var(--info);background:var(--info-suave)}
+.fr-crit,.fr-falha b.fr-crit{color:var(--critico)}
+.fr-anom{color:var(--severo);font-weight:600}
+.fr-okt{color:var(--ok);font-weight:600}
+.fr-parc{color:var(--alerta);font-weight:600}
+.fr-pend{color:var(--alerta);font-weight:600}
+.fr-barra-comp{display:inline-block;width:64px;height:6px;border-radius:3px;background:var(--barra);margin-right:8px;vertical-align:middle;overflow:hidden}
+.fr-barra-comp i{display:block;height:100%;background:var(--verde)}
+
+/* o detalhe da usina: validar, as paradas e o mapa do mês, na ordem em que se usa */
+.fr-tabela>tbody>tr.fr-detalhe>td{padding:0;background:var(--fundo)}
+/* width:0 + min-width:100%: o detalhe ocupa a largura da lista e NÃO a alarga (a tabela dos itens rola dentro da caixa dela) */
+.fr-painel{display:flex;flex-direction:column;gap:18px;padding:20px 22px 26px;box-shadow:inset 3px 0 0 var(--verde);width:0;min-width:100%;box-sizing:border-box}
+.fr-painel-topo{font-size:14px}
+.fr-h3{font:700 13px/18px var(--font-sans);color:var(--tinta);margin:0}
+.fr-lote{display:flex;align-items:center;justify-content:space-between;gap:10px 16px;flex-wrap:wrap}
+.fr-lote-acoes{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.fr-mini{padding:6px 11px;font-size:12px;line-height:16px}
+.fr-sel{min-width:210px;max-width:320px;width:100%;padding-top:6px;padding-bottom:6px}
+.fr-sel--curto{min-width:140px;max-width:170px}
+.fr-lote-acoes .fr-sel{width:auto}
+.fr-obs{min-width:170px;width:100%;box-sizing:border-box}
+.fr-item-estado,.fr-item-nota{display:block;font-size:12px;line-height:16px;margin-top:3px}
+.fr-sug{color:var(--info)}
+.fr-sep{margin:0 8px;color:var(--mudo)}
+.fr-quem{display:block;font-size:11px;line-height:16px;margin-top:4px}
+.fr-rola{overflow-x:auto}
+.fr-sub{width:100%;border-collapse:collapse;font-size:13px}
+.fr-sub th{text-align:left;font:700 11px/14px var(--font-sans);letter-spacing:.05em;text-transform:uppercase;color:var(--mudo);padding:8px 12px;
+  border-bottom:1px solid var(--linha-forte);white-space:nowrap}
+.fr-sub td{padding:10px 10px;border-bottom:1px solid var(--linha);vertical-align:top}
+.fr-sub th.n,.fr-sub td.n{text-align:right}
+.fr-itens td:first-child{min-width:200px}
+.fr-itens td:nth-child(2){min-width:96px}
+.fr-dobra>summary,.fr-dias>summary{cursor:pointer;font:600 13px/18px var(--font-sans);color:var(--tinta)}
+.fr-dobra>summary{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.fr-dobra>summary .mudo{font-weight:400;font-size:12px}
+.fr-dobra[open]>summary{margin-bottom:10px}
+.fr-dias>summary{font-size:12px;color:var(--verde-texto);white-space:nowrap}
+.fr-dias-lista{display:flex;flex-wrap:wrap;gap:4px;margin:8px 0;max-width:420px}
+.fr-dia{font:600 12px/16px var(--font-sans);font-variant-numeric:tabular-nums;min-width:30px;padding:5px 0;border-radius:var(--raio-tag);
+  border:1px solid var(--linha-forte);background:transparent;color:var(--tinta);cursor:pointer}
+.fr-dia--v{background:var(--ok-suave);color:var(--ok);border-color:transparent}
+.fr-dia[aria-pressed="true"]{background:var(--verde-suave);border-color:var(--verde);color:var(--tinta)}
+.fr-dia:focus-visible{outline:2px solid var(--foco);outline-offset:1px}
+.fr-dias-acoes{display:flex;flex-wrap:wrap;gap:6px;align-items:center;max-width:520px}
+
+.fr-mapa-topo{display:flex;align-items:center;gap:10px 18px;flex-wrap:wrap}
+.fr-chave{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12px;line-height:16px;color:var(--mudo);flex:1 1 320px}
+.fr-chave span{display:inline-flex;align-items:center;gap:6px}
+.fr-chave .fr-c{display:inline-block;width:12px;height:12px;border-radius:3px}
+.fr-heat{border-collapse:separate;border-spacing:2px;font-size:12px}
+.fr-heat th{font:500 12px/16px var(--font-sans);color:var(--tinta-2);text-align:left;white-space:nowrap;padding:0 10px 0 0}
+.fr-heat thead th{color:var(--mudo);text-align:center;padding:0 0 2px;font-size:11px}
+.fr-heat td.fr-c{width:20px;min-width:20px;height:20px;border-radius:3px;padding:0}
+.fr-c-o{background:var(--ok-suave)}
+.fr-c-v{background:var(--critico-cheio)}
+.fr-c-x{background:var(--critico-escuro)}
+.fr-c-z{background:var(--alerta-cheio)}
+.fr-c-d{background:var(--severo-cheio)}
+.fr-c-a{background:var(--anomalo)}
+.fr-c-e{background:var(--info-cheio)}
+.fr-c-c{background:var(--ok-cheio)}
+.fr-c-i{background:var(--semcom-cheio)}
+.fr-c-p,.fr-c-w,.fr-c-n{background:var(--superficie-3)}
+
+.fr-recado{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:60;max-width:min(620px,calc(100vw - 32px));padding:12px 18px;
+  background:var(--superficie-3);color:var(--tinta);border:1px solid var(--linha-forte);border-radius:var(--raio-md);box-shadow:0 12px 32px var(--sombra);
+  font-size:13px;line-height:20px}
+.fr-recado--erro{border-color:var(--critico)}
+
+@media (max-width:899px){
+  .fr-acoes{margin-left:0}
+  .fr-painel{padding:16px 14px 20px}
+}
+@media (max-width:639px){
+  .fr-barra{margin-top:20px}
+  .fr-acoes{width:100%}
+  .fr-menu{position:static}
+  .fr-menu-caixa{left:0;right:0;min-width:0}
+  .fr-usina{min-width:150px}
+  .fr-falha{min-width:220px}
+}

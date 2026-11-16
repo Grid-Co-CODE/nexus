@@ -16,6 +16,11 @@ qualquer gravação direta na subida seguinte. O .exe segue de reserva até esta
 | `pg.py` | o BD lido do banco com a cara do `nucleo.BD` do Conversor (`abas`, `aba`, `estilos`, `lido_em`), com o mapa de fórmulas por cima; uma leitura por subida, guardada 10 min |
 | `servico.py` | uma `Sessao` do Conversor por navegador (a pasta temporária dela, os envios em lotes, o reconhecimento em fundo, o BD em Excel solto junto, o separar formato novo) e a leitura do relatório de furos |
 | `nexus/torres/performance/coletas_tela.py` | as rotas: a casca (`/coletas`), a página do Conversor (`/coletas/app`), `/coletas/api/<método>` (a lista `METODOS`), `/coletas/arquivo`, `/coletas/planilha/<i>`, `/coletas/furos` |
+| `furos_r01.py` | o motor dos furos de coleta: a regra do R01 da analista (estados, d-2, Ultragaz, COS, cruzamento de 6 h), sem ler arquivo nenhum |
+| `furos_fonte.py` | de onde o motor tira cada dado no servidor (BDs do banco, paradas do COS, outubro congelado) e a conta em segundo plano |
+| `furos_conf.py` | as validações de todos (`confirmacoes_furos.json`) e as paradas congeladas do HTML R01, em `<NEXUS_DADOS>/coletas/furos/` |
+| `nexus/torres/performance/furos_tela.py` | as rotas da aba Furos de coleta: `/coletas/furos-de-coleta` (a tela), `/coletas/furos/r01` (a conta), `.../conf` (ler e gravar validação), `.../importar` |
+| `templates/performance/coletas_furos.html`, `static/coletas-furos.js` e `.css` | a aba Furos de coleta, tela do Nexus (não é gerada): a conta da tela da analista no desenho do DESIGN.md |
 | `templates/performance/coletas_app.html` e `static/coletas/furos.js` | **GERADOS** da tela do .exe por `ferramentas/portar_tela_conversor.py` (as trocas e o porquê de cada uma estão lá). Não edite: mude o .exe e rode o `sincronizar_conversor.py` |
 
 A regra (leitores, regras de colar, planilha de saída) é a do Conversor: leia o `CLAUDE.md` da pasta do Conversor na
@@ -83,10 +88,86 @@ por isso o "nenhum trecho legível" recusa).
   subir seguia pedindo o Excel (a leitura que falhou nunca era refeita), e a aberta de um dia para o outro ficava na
   subida velha. Nunca no meio de uma conversão (o Contexto do motor usa o mesmo dicionário de BDs), nunca por cima do
   Excel solto, e o banco que falha agora não tira o BD bom que a sessão já tem.
-- **Furos de coleta:** o relatório `Furos_Coleta_Performance_*.html` (gerado fora) sobe pelo "Abrir relatório" e fica em
-  `<NEXUS_DADOS>/coletas/furos/`: todos veem o mesmo (como a pasta da equipe no .exe). As confirmações de cada pessoa
-  ficam no navegador dela (como no HTML original); **confirmação compartilhada é dado novo no banco**: catálogo antes e
-  decisão do Levi.
+- **Furos de coleta:** desde 16/11/2026 a conta é do Nexus (seção abaixo) e a validação é de todos, guardada no servidor.
+  O relatório `Furos_Coleta_Performance_*.html` gerado fora, que subia pelo "Abrir relatório" e fica em
+  `<NEXUS_DADOS>/coletas/furos/`, virou a reserva de quando a conta não sai (o banco fora na 1ª vez).
+
+## Furos de coleta: o R01 da analista calculado pelo Nexus (16/11/2026)
+
+Levi, com o documento `Regras_e_Cruzamentos_Furos_Coleta_GridCo_R01.md` da analista de Performance: "upgradae para a parte de coleta da
+performance no nexus". Até aqui o relatório era gerado à mão no PC dela (a pasta `Gerador_Furos_Coleta`: extract2.py,
+oscross.py, ocn.py, build2.py, ~3 min) e subia como HTML; cada pessoa validava no próprio navegador. As decisões do Levi:
+**o Nexus vira a fonte** (a conta e as validações), **outubro congelado** (as paradas dele vêm do HTML R01), **a tela do R01
+no Nexus** e **valida quem tem a tela Coletas** (fica quem e quando). E o desenho: "Pega o estilo do Nexus [...] deixar fácil
+para novos usuários entenderem melhor [...] melhor espaçamento, título, leitura em F".
+
+**O que é.** Célula = equipamento × dia. A aba **Furos de coleta** (`/t/performance/coletas/furos-de-coleta`, sub-aba da tela
+Coletas, ao lado do Conversor) mostra, por usina, o que falta de geração, IPOA e GHI até anteontem (d-2), o que uma parada
+explica e o que já foi validado.
+
+**De onde vem cada coisa** (`furos_fonte.py`):
+- **BDs, Info Geral e Base UFV: do banco** (Levi: "Faça ler pelo PG mesmo [...] em tese, no dia a dia, para um ser igual ao
+  outro"). A leitura inteira leva ~30 s e fica guardada até a próxima subida (o `updated_at` dos livros `bd_performance` e
+  `bd_thopen`). O banco tem UMA subida por noite: o que a equipe cola no Excel durante o dia só aparece depois dela. A tela
+  avisa quando a subida não cobre d-2 (`fontes.bd_atrasado`): em 16/11 a última era a de sábado 14/11 23:47, e o dia 14
+  inteiro aparecia como furo.
+- **Aba velha:** o banco não apaga a aba renomeada. Sai a que termina antes do mês em que a maioria das abas termina
+  (`furos_r01.velhas`): a "Iramaia" (parou em 31/10, hoje "Iramaia II") entrava em outubro como usina a mais. Quando o
+  `bd_formulas` subir, a lista de abas dele é a régua certa.
+- **Paradas de novembro em diante:** as MESMAS linhas do "Exportar CSV" da tela Ocorrências do COS, montadas pela mesma função
+  (`nexus/cos/normalizacoes.csv_linhas`) sobre as normalizadas guardadas e as em andamento: é o `ocorrencias-2026-11*.csv`
+  que a analista baixava, sem baixar. O COS só está ligado no servidor; sem ele a tela avisa e novembro sai sem paradas (mais
+  furo, nunca menos).
+- **Outubro** (OS do Fracttal + tickets, "não alterar", §6.6 do documento) e os tickets de outubro que entram em novembro
+  (na prova, PEII até 04/11 e PEIII até 06/11): **congelados** do HTML R01 (`furos_conf.Congeladas`,
+  `paradas_congeladas.json`). A cobertura é refeita com a regra de 6 h sobre os estados de agora. Um mês congelado só troca
+  por um HTML gerado depois (o `gen` dele): importar relatório velho não desfaz.
+
+**A regra** é a do documento da analista, portada função a função em `furos_r01.py` (o cabeçalho dele lista cada regra e o caso
+que a criou): os estados o/v/x/z/p/d/a/e, d-2 sem tolerância, o último dia do mês, a régua da Ultragaz (5× a mediana), a
+linha sem Usina e a data repetida, 6 h na janela 06-18 h, UFV/UG/Inversor, a OS 16493, o E1, "Geração parou" = sim, a usina
+agrupada e os aliases do COS (quatro ainda "supostos", esperando a analista). Mudou a regra dela: muda lá e no caso de
+`tests/test_coletas_furos_r01.py`.
+
+**As validações** (`furos_conf.py`; `confirmacoes_furos.json` no formato do §8.4, mais `q`, quem): ficam FORA do banco porque
+o comentário do analista e o nome da pessoa não podem ir para fato de leitura aberta (regra 8 do `nexus/dados/CLAUDE.md`).
+A REGRA PERMANENTE da analista (13/11/2026): nunca perder o que está salvo. Por isso: importar só acrescenta ou atualiza (vence o
+`t` mais recente); cópia em `confirmacoes_backup/` antes de importar e na 1ª gravação do dia; toda mudança vai para o
+`historico_confirmacoes.jsonl` (o antes, o depois, quem, quando); a tela manda só o que mudou, com o `t` que viu, e se outra
+pessoa gravou a mesma chave antes NADA do pedido entra (409) e a tela recarrega; arquivo ilegível nunca é sobrescrito.
+**Antes de mexer no formato ou na fusão, rode os testes de `furos_conf`: perder validação é o erro que não pode acontecer.**
+
+**A tela** (`performance/coletas_furos.html`, `static/coletas-furos.js` e `.css`): a conta da tela da analista (itens, "UFV toda",
+Geração/ETM, validação por dia, vigência, sugestões, CSV) portada do template2.html dela, no desenho do `DESIGN.md`: o
+eyebrow, o título com o "!", cinco números na frente (o resto em "Mais números"), a lista começando pela usina e a situação
+com "o que falta" numa linha, e o detalhe (validar, paradas, mapa do mês) fechado até o clique. Os filtros são os do
+`static/filtros-os.js` (o padrão do Histórico de OS). Não tem "Salvar HTML"; Exportar e Importar ficam em "Validações".
+Saíram de propósito o filtro em cada coluna (o painel cobre) e os emojis.
+
+**A tela 3 do Conversor** segue com "Para coletar" e "Baixa performance", lendo a mesma conta por `/coletas/furos` (as
+validações de todos vão no `conf_arquivo`, na forma que ela entende: `furos_conf.para_tela3`). O Resumo e o Detalhe do .exe
+e o "Mais opções" somem pelo `static/coletas/filtros.js`, e no lugar fica o caminho "Validar os furos". O "Abrir relatório"
+(a rota continua) guarda o HTML e importa as marcações e as paradas congeladas dele.
+
+**A conta** roda em fundo (`furos_fonte.Servico`): a cada 10 min, na virada do dia e a cada subida. O último resultado fica
+em `furos_calculo.json` (o reinício não deixa a tela vazia). Bancada no PC: `NEXUS_FUROS_COS_CSV` aponta o CSV exportado do
+COS e `NEXUS_FUROS_RELOGIO` fixa a hora.
+
+**Para pôr no ar (uma vez):** na aba, Validações > Importar, o `confirmacoes_furos.json` da analista e depois o
+`Furos_Coleta_Performance_GridCo_R01.html` (as 122 validações e as paradas de outubro). Sem isso a tela avisa que outubro
+está sem as paradas.
+
+**Como provar.** `python -m pytest -q tests/test_coletas_furos_r01.py` (os casos do §11 da analista em miniatura, as validações e
+as rotas). E a prova contra o relatório de verdade, feita em 16/11/2026 com o HTML R01 das 11:13:
+1. o motor com os MESMOS insumos da analista (BDs em Excel, o CSV do COS das 08:20, outubro congelado): outubro igual nas 74.927
+   células, 1.189 coberturas e 186 paradas; novembro igual nas 635 coberturas e 77 paradas, com 185 células diferentes de
+   33.838, todas dado que entrou no Excel depois das 11:13 (Gravatá II, Iramaia II, Rio do Peixe, Sete Lagoas, MTS200,
+   TIM200); 566 registros do COS usados, como no §6.8;
+2. o banco contra o Excel: outubro 0 diferença nas 74.927 células; novembro só o que entrou depois da subida de 14/11;
+3. a tela: em outubro, as 144 usinas iguais à conta do HTML da analista com as 122 validações dela, em 11 números por usina; os
+   totais dela em novembro (103 com falha, 67 Geração, 89 ETM, 53 os dois) saem do mesmo calc rodado fora do navegador.
+O banco tem 4 abas da Thopen que o Excel da pasta não tem (Santana, Santo Anastácio, Sapopema e Saturnino): no Nexus são
+148 usinas, no HTML da analista 144.
 
 ## Os filtros dos Furos: o modelo do Histórico de OS (12/11/2026)
 
@@ -102,6 +183,9 @@ ausência esperada, confirmados como OK) ficam no painel como marcas, com etique
 lê os vários valores pelas trocas `FUROS_VARIOS` do `portar_tela_conversor.py` (os `<select>` do .exe viram `multiple`).
 Nenhum filtro novo nem padrão novo: os mesmos campos do .exe. As caixas "Falta: Inversores / IPOA / GHI" do 1.0.10
 entram no painel como marcas (ligadas = sem filtro, etiqueta quando desligadas).
+
+**16/11/2026:** o Resumo por usina e o Detalhe por equipamento (e o "Mais opções") saíram da tela 3: a validação mudou para a
+aba Furos de coleta do Nexus (seção acima). Este painel segue servindo o "Para coletar" e o "Baixa performance".
 
 **1.0.12 (13/11/2026), a tela 3 enxuta do .exe:** abre no "Para coletar"; na frente, Mês, busca, Fonte, Falta e 4 números;
 o resto no "Mais filtros" (details), no "Mais opções" (menu) e no "Como ler esta tela". No Nexus a barra da frente fica e

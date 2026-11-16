@@ -14,6 +14,7 @@ import time
 import openpyxl
 import pytest
 
+from nexus.dados.conexao import SemBanco
 from nexus.performance.coletas import motor, pg, servico
 
 from conversor import montagem  # noqa: E402 — depois do motor
@@ -362,8 +363,15 @@ def test_planilha_que_nao_existe_e_404(coletas):
     assert coletas.get("/t/performance/coletas/planilha/0").status_code == 404
 
 
+def _sem_banco():
+    raise SemBanco("teste sem banco")
+
+
 def test_os_furos_sobem_e_todos_veem_o_mesmo(coletas, app, tmp_path):
+    """Desde 16/11/2026 a tela 3 lê os furos calculados pelo Nexus (tests/test_coletas_furos_r01.py); o relatório que
+    alguém subiu é a reserva de quando a conta não sai (aqui, o banco fora)."""
     app.config["NEXUS_DADOS"] = str(tmp_path / "dados")
+    app.config["NEXUS_COLETAS_BANCO"] = _sem_banco
     assert "erro" in coletas.get("/t/performance/coletas/furos").get_json()
     html = ('<script>\nconst DB={"gen":"11/11/2026","months":{"2026-11":{"plants":[]}}};\n'
             "let CONF=/*CONF0*/{}/*END0*/;\n</script>")

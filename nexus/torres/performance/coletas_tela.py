@@ -150,13 +150,35 @@ def _furos_atual():
     return max(achados, key=os.path.getmtime) if achados else None
 
 
+def _furos_do_motor(esperar=False):
+    """Os furos calculados pelo Nexus (banco + COS, `furos_tela.py`) na forma que a tela 3 do Conversor lê, com as
+    validações de todos no lugar das do arquivo; None enquanto não há conta (o banco fora na 1ª vez)."""
+    from . import furos_tela
+    from ...performance.coletas import furos_conf
+    res, _rodando = furos_tela.servico().resultado(esperar=esperar)
+    if not res or not res.get("months"):
+        return None
+    try:
+        conf, _rev = furos_conf.Confirmacoes(_pasta("furos")).ler()
+    except furos_conf.Ilegivel:
+        conf = {}
+    return {"caminho": "Nexus", "nome": "Calculado pelo Nexus (banco e COS)", "gerado": res.get("gen") or "",
+            "modificado": res.get("_feito") or 0, "db": {"months": res["months"], "gen": res.get("gen")},
+            "conf_arquivo": furos_conf.para_tela3(conf, max(res["months"])), "conf": {}}
+
+
 @bp.route("/coletas/furos")
 def coletas_furos():
-    return _json(servico.furos_ler(_furos_atual()))
+    """Desde 16/11/2026 a tela 3 lê os furos calculados pelo Nexus (Levi: "Nexus vira a fonte"); o relatório gerado fora
+    que alguém subiu fica de reserva, para a tela não ficar vazia se a 1ª conta não sair (o banco fora do ar)."""
+    r = _furos_do_motor(esperar=True)
+    return _json(r if r else servico.furos_ler(_furos_atual()))
 
 
 @bp.route("/coletas/furos", methods=["POST"])
 def coletas_furos_subir():
+    """O "Abrir relatório" da tela 3: o HTML da analista fica guardado (a reserva) e, desde 16/11/2026, as marcações dele e as
+    paradas que o Nexus não refaz (outubro) entram nas do Nexus, sem tirar nenhuma (`furos_tela.importar`)."""
     f = request.files.get("arquivo")
     if f is None:
         return _json({"erro": "nenhum arquivo"}, 400)
@@ -169,7 +191,14 @@ def coletas_furos_subir():
     p = os.path.join(_pasta("furos"), nome)
     with open(p, "w", encoding="utf-8") as g:
         g.write(texto)
-    return _json(servico.furos_ler(p))
+    from . import furos_tela
+    try:
+        resumo = furos_tela.importar(nome, texto, furos_tela._quem())
+        if resumo.get("paradas", {}).get("congelados"):
+            furos_tela.servico().refazer()
+    except Exception:                       # noqa: BLE001 — o relatório subiu; a importação se refaz pela aba nova
+        current_app.logger.exception("coletas: importar as marcações do relatório")
+    return _json(_furos_do_motor() or servico.furos_ler(p))
 
 
 @bp.route("/coletas/furos/portal")

@@ -89,7 +89,24 @@
     });
     etiquetas = el('<div class="zf-etiquetas cf-etiquetas" role="group" aria-label="Filtros aplicados" hidden></div>');
     barraExe.insertAdjacentElement("afterend", etiquetas);
+    paraAAbaDoNexus();
     atualizar();
+  }
+
+  // 16/11/2026 (Levi: "Nexus vira a fonte" dos furos): o Resumo por usina e o Detalhe por equipamento, onde se valida o
+  // furo, mudaram para a aba "Furos de coleta" do Nexus (a tela do R01 da analista, com a validação de todos no servidor). As
+  // duas abas do .exe guardavam a validação no navegador de cada pessoa e não conhecem a validação por dia: saem daqui,
+  // e no lugar fica o caminho para a aba nova. Somem também o "Mais opções" (abrir relatório, exportar, importar e salvar
+  // o HTML com as marcações): o relatório agora é a conta do Nexus, e exportar e importar estão na aba nova. O "Para
+  // coletar" e o "Baixa performance" seguem aqui, lendo a mesma conta (`/coletas/furos`).
+  function paraAAbaDoNexus() {
+    [].forEach.call(d.querySelectorAll('.fz-tab[data-t="res"], .fz-tab[data-t="det"]'), function (b) { b.classList.add("cf-oculto"); });
+    var menu = d.querySelector(".fz-menu"), abas = d.querySelector(".fz-tabs-main");
+    if (menu) menu.classList.add("cf-oculto");
+    if (abas && w.NX && w.NX.base && !abas.querySelector(".cf-ir")) {
+      abas.appendChild(el('<a class="fz-tab cf-ir" target="_top" href="' + esc(w.NX.base + "/furos-de-coleta") +
+        '" title="A lista das usinas com furo, as paradas e a validação, na aba Furos de coleta">Validar os furos</a>'));
+    }
   }
 
   function atualizar() {
