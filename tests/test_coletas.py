@@ -425,6 +425,32 @@ def test_a_leitura_do_banco_em_fundo_nao_tira_o_excel_que_chegou_no_meio(tmp_pat
         pg._GUARDA.clear()
 
 
+def test_a_tela_aberta_antes_do_mapa_le_o_banco_quando_ele_chega(tmp_path):
+    """16/11/2026, o dia em que o mapa de fórmulas passou a subir: a sessão aberta antes dele seguia pedindo o Excel (a
+    leitura que falhou nunca era refeita). Agora o estado confere o banco no máximo a cada minuto e nunca no meio de uma
+    conversão; o Excel solto não sai por aqui."""
+    p = _bd_excel(tmp_path)
+    pg._GUARDA.clear()
+    banco = {"agora": BancoDeMentira(p, com_mapa=False)}
+    s = servico.SessaoNexus(lambda: banco["agora"], str(tmp_path / "sessao"), str(tmp_path / "novos"))
+    try:
+        s.iniciar()
+        assert s.pronto.wait(10)
+        perf = lambda: {x["destino"]: x for x in s.estado()["bds"]}["BD_Performance"]   # noqa: E731
+        assert not perf()["lido"] and "mapa de fórmulas" in perf()["erro"]
+        banco["agora"] = BancoDeMentira(p)                       # o mapa chegou ao banco
+        assert not perf()["lido"]                                # antes de um minuto, não confere de novo
+        s._conferido -= servico.RELER_S
+        s._convertendo.set()
+        assert not perf()["lido"]                                # no meio de uma conversão, também não
+        s._convertendo.clear()
+        assert perf()["lido"] and perf()["origem"] == "banco" and not perf()["erro"]
+        assert s.bds["BD_Performance"].aba("Teste") is not None
+    finally:
+        s.fechar()
+        pg._GUARDA.clear()
+
+
 # ── a aba "Para coletar" do Conversor 1.0.10 (13/11/2026): onde buscar no portal e a ronda ──────────────────────────
 _CAB_EQ = ["", "Cliente", "Usina", "Usina Supervisório", "Usina Fractall", "Equipamento", "Equipamento Supervisório",
            "Equipamento Parente"]

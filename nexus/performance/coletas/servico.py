@@ -30,6 +30,7 @@ from conversor.nucleo import BD_PERFORMANCE, BD_THOPEN  # noqa: E402
 from conversor.sessao import Sessao  # noqa: E402
 
 PARADA_S = 3 * 3600             # sessão parada há 3 h: some com os arquivos
+RELER_S = 60                    # a sessão aberta confere o banco no máximo a cada minuto (ver SessaoNexus._conferir_banco)
 _RX_BD = re.compile(r"^BD_(Performance|Thopen)\b.*\.xls[xm]$", re.I)
 _DESTINO_DO_NOME = {"performance": BD_PERFORMANCE, "thopen": BD_THOPEN}
 
@@ -52,6 +53,8 @@ class SessaoNexus(Sessao):
         self.origem_bd = {}                    # destino -> "banco" | "arquivo"
         self._trava_bd = threading.RLock()     # a troca de BD (banco em fundo x Excel solto): ver carregar_bd
         self.pronto = threading.Event()
+        self._convertendo = threading.Event()  # a conferida do banco espera a conversão: ver _conferir_banco
+        self._conferido = time.time()          # a 1ª leitura é a do iniciar
         self.uso = time.time()
         self._lotes = 0
         self.saidas = []                       # os caminhos das planilhas da última conversão (a tela baixa pelo índice)
@@ -75,6 +78,9 @@ class SessaoNexus(Sessao):
                     self.origem_bd[destino] = "arquivo"
                 return r
         bd, erro = pg.bd_do_banco(destino, self._banco())          # fora da trava: leva segundos
+        return self._por_do_banco(destino, bd, erro)
+
+    def _por_do_banco(self, destino, bd, erro):
         with self._trava_bd:
             if self.origem_bd.get(destino) == "arquivo":
                 return self.bds.get(destino)   # o Excel chegou enquanto o banco era lido: vale o Excel
@@ -126,7 +132,30 @@ class SessaoNexus(Sessao):
                 self.pronto.set()
         threading.Thread(target=vai, daemon=True, name="coletas-bd").start()
 
+    # A sessão aberta acompanha o banco (16/11/2026, o dia em que o mapa de fórmulas passou a subir: a tela aberta antes
+    # de ele chegar seguia pedindo o Excel, porque a leitura do banco que falhou nunca era refeita; e a aberta de um dia
+    # para o outro ficava na subida velha). No máximo uma conferida por minuto, e nunca no meio de uma conversão (o
+    # Contexto do motor usa o mesmo dicionário de BDs). Conferir custa duas consultas pequenas: a leitura em si é a mesma
+    # para todos e fica guardada por subida (`pg.bd_do_banco`). O Excel solto nunca sai por aqui.
+    def _conferir_banco(self, agora=None):
+        agora = time.time() if agora is None else agora
+        if not self.pronto.is_set() or self._convertendo.is_set() or agora - self._conferido < RELER_S:
+            return
+        self._conferido = agora
+        for destino in (BD_PERFORMANCE, BD_THOPEN):
+            if self.origem_bd.get(destino) == "arquivo":
+                continue
+            atual = self.bds.get(destino)
+            novo, erro = pg.bd_do_banco(destino, self._banco())
+            if novo is atual or (novo is None and atual is not None):
+                continue                       # mesma subida; ou o banco falhou agora e a sessão já tem um BD bom
+            self._por_do_banco(destino, novo, erro)
+
     def estado(self):
+        try:
+            self._conferir_banco()
+        except Exception:                      # noqa: BLE001 — conferir é extra: o estado sai com o BD que já havia
+            traceback.print_exc()
         return {"versao": motor.APP_VERSAO, "bds": self.estado_bds(), "bd_pronto": self.pronto.is_set(),
                 "atualizacao": None, "itens": [self.cartao(i) for i in self.itens]}
 
@@ -232,7 +261,11 @@ class SessaoNexus(Sessao):
 
     # ------------------------------------------------------------ conversão
     def converter(self, agora=None):
-        r = super().converter(agora)
+        self._convertendo.set()
+        try:
+            r = super().converter(agora)
+        finally:
+            self._convertendo.clear()
         self.saidas = [s["caminho"] for s in r.get("saidas") or []]
         for i, s in enumerate(r.get("saidas") or []):
             s["caminho"] = os.path.basename(s["caminho"])
