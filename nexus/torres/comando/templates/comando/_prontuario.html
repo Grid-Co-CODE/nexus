@@ -237,13 +237,13 @@
       {% if p.zel %}
       <h3 class="pu-sub">Sujidade e vegetação por semana <span class="mudo">· de 1 (melhor) a 5</span></h3>
       <div class="pu-zel">
-        <svg viewBox="0 0 300 78" role="img" aria-label="Sujidade e vegetação por semana, de 1 a 5: última leitura sujidade {{ p.zel.ultima.suj }} e vegetação {{ p.zel.ultima.veg }}">
-          {% for g in p.zel.grades %}<line class="pu-zel-g" x1="14" x2="292" y1="{{ g.y }}" y2="{{ g.y }}"/><text class="pu-zel-e" x="8" y="{{ g.y + 3 }}" text-anchor="end">{{ g.rot }}</text>{% endfor %}
+        <svg viewBox="0 0 600 120" role="img" aria-label="Sujidade e vegetação por semana, de 1 a 5: última leitura sujidade {{ p.zel.ultima.suj }} e vegetação {{ p.zel.ultima.veg }}">
+          {% for g in p.zel.grades %}<line class="pu-zel-g" x1="24" x2="584" y1="{{ g.y }}" y2="{{ g.y }}"/><text class="pu-zel-e" x="14" y="{{ g.y + 4 }}" text-anchor="end">{{ g.rot }}</text>{% endfor %}
           {% for serie, pts in (('suj', p.zel.suj), ('veg', p.zel.veg)) %}{% if pts %}
           <polyline class="pu-zel-l pu-zel-l--{{ serie }}" points="{% for q in pts %}{{ q.x }},{{ q.y }} {% endfor %}"/>
-          {% for q in pts %}<circle class="pu-zel-p pu-zel-p--{{ serie }}" cx="{{ q.x }}" cy="{{ q.y }}" r="2.6"><title>{{ 'Sujidade' if serie == 'suj' else 'Vegetação' }} {{ q.v }} na {{ q.semana }}</title></circle>{% endfor %}
+          {% for q in pts %}<circle class="pu-zel-p pu-zel-p--{{ serie }}" cx="{{ q.x }}" cy="{{ q.y }}" r="4"><title>{{ 'Sujidade' if serie == 'suj' else 'Vegetação' }} {{ q.v }} na {{ q.semana }}</title></circle>{% endfor %}
           {% endif %}{% endfor %}
-          {% for r in p.zel.rotulos %}<text class="pu-zel-e" x="{{ r.x }}" y="74" text-anchor="middle">{{ r.rot }}</text>{% endfor %}
+          {% for r in p.zel.rotulos %}<text class="pu-zel-e" x="{{ r.x }}" y="114" text-anchor="middle">{{ r.rot }}</text>{% endfor %}
         </svg>
         <p class="pu-zel-leg"><span><i class="pu-zel-i pu-zel-i--suj"></i>sujidade <b>{{ p.zel.ultima.suj if p.zel.ultima.suj is not none else '—' }}</b></span><span><i class="pu-zel-i pu-zel-i--veg"></i>vegetação <b>{{ p.zel.ultima.veg if p.zel.ultima.veg is not none else '—' }}</b></span>{% if p.zel.ultima.vala %}<span>vala: {{ p.zel.ultima.vala|lower }}</span>{% endif %}<span class="mudo">semana {{ p.zel.ultima.semana }}</span></p>
       </div>

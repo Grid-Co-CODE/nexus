@@ -572,7 +572,9 @@ def cos_historico(linhas: list[dict] | None, hoje: date, n: int = 6) -> dict:
 # ── a zeladoria ─────────────────────────────────────────────────────────────────────────────────────────────────────
 def zeladoria_semanas(linhas: list[dict] | None) -> dict | None:
     """A leitura semanal de sujidade e vegetação da usina (1 a 5; `zeladoria_semana`), da mais velha para a mais nova,
-    com os pontos das duas linhas do gráfico (viewBox 0 0 300 78) e a recomendação mais nova. None = sem leitura."""
+    com os pontos das duas linhas do gráfico (viewBox 0 0 600 120) e a recomendação mais nova. None = sem leitura.
+    O desenho é largo (16/11/2026, Levi: "esse gráfico de rondas deve caber no campo todo"): ocupa o cartão inteiro com a
+    letra no tamanho de sempre; o de 300 × 78 ficava preso em 460 px, na metade do cartão."""
     sem = []
     for r in sorted(linhas or [], key=lambda r: str(r.get("semana") or "")):
         veg, suj = _int(r.get("vegetacao_nivel")), _int(r.get("sujidade_nivel"))
@@ -583,7 +585,7 @@ def zeladoria_semanas(linhas: list[dict] | None) -> dict | None:
                     "veg": veg, "suj": suj, "vala": str(r.get("vala") or "").strip(), "linha": r})
     if not sem:
         return None
-    esq, dir_, topo, base = 14.0, 292.0, 8.0, 60.0
+    esq, dir_, topo, base = 24.0, 584.0, 10.0, 92.0
     passo = (dir_ - esq) / max(1, len(sem) - 1)
 
     def y(nivel):
