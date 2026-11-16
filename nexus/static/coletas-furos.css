@@ -135,7 +135,8 @@
 .fr-c-d{background:var(--severo-cheio)}
 .fr-c-a{background:var(--anomalo)}
 .fr-c-e{background:var(--info-cheio)}
-.fr-c-c{background:var(--ok-cheio)}
+/* o validado é calmo (o verde Grid a 40%): numa usina toda validada, o olho tem de ir ao vermelho que sobrou, não ao verde */
+.fr-c-c{background:var(--verde-a40)}
 .fr-c-i{background:var(--semcom-cheio)}
 .fr-c-p,.fr-c-w,.fr-c-n{background:var(--superficie-3)}
 
