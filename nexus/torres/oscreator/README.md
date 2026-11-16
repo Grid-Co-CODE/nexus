@@ -2822,10 +2822,16 @@ O desenho "o chamado do tracker na ronda" (Levi, 08/11/2026: "segue!"; o texto m
     OS numerada, conferido depois), tipo Administrativa, etiqueta CHAMADOS, no nome da equipe de chamados
     (`OS_WEB_CHAMADO_RESP_ID`/`NOME`, as do quadro), com a nota e a subtarefa do ticket do pacote e as respostas lidas do
     Fracttal (a nota igual à do App; a marca sai do título da Inspeção). Os 30 min dão a vez ao App.
-  - A chave é o nº da Inspeção: a que já tem administrativa (a da lista central, que aponta a Inspeção na nota, ou a do
-    registro das que este OS Creator criou, `<dados>/oscreator/garantias/acomp_criadas.json`) não ganha outra. O status
-    da Inspeção é conferido ao vivo antes; falhou, fica anotada em `acomp_pendentes.json` e é tentada de novo depois de 1
-    h (até 10 vezes).
+  - A chave é o nº da Inspeção: a que já tem administrativa VIVA não ganha outra. Desde 16/11/2026 (Levi: "a OS de
+    inspeção gere uma nova administrativa ao finalizar, sem choro!") a cancelada e a apagada no Fracttal não seguram mais:
+    a lista central só segura com a administrativa não cancelada e não "a conferir" (a apagada fica "a conferir" até a
+    noite); o registro das que este OS Creator criou (`<dados>/oscreator/garantias/acomp_criadas.json`, agora com a hora)
+    só segura nas 24 h em que a lista pode ainda não ter a nova, ou com ela viva na lista; e, antes de criar, o Fracttal é
+    lido ao vivo: as filhas da Inspeção (o filtro `id_parent_wo` no servidor) com a etiqueta CHAMADOS e não canceladas.
+    Tem viva (a do App que a lista não trouxe ainda), não cria; a leitura falhou, não cria e tenta de novo em 1 h, sem
+    gastar as tentativas. É o que cobre a administrativa apagada que o App lê como viva (o `_adm_st_da_adm` dele dá 0) e
+    a cancelada antes de a faixa trazer o status. O status da Inspeção também é conferido ao vivo antes; falhou a
+    criação, fica anotada em `acomp_pendentes.json` e é tentada de novo depois de 1 h (até 10 vezes).
   - Roda na abertura do quadro do Acompanhamento de chamados, por trás, no máximo a cada 10 min por processo e até 3 por
     vez, com a sessão de quem abriu (a credencial da empresa só lê); só no servidor acha alguma coisa (a lista central).
     Só as Inspeções realizadas a partir da data de início: ligar não cria administrativa para as antigas.

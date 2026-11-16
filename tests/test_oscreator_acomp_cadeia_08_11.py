@@ -57,6 +57,7 @@ class Fracttal:
         self.criadas, self.etiquetas = [], []
         self.falhar = False
         self.status = {}
+        self.vivas = {}             # {id da Inspeção: [nº das administrativas vivas]} lido "ao vivo"; None = a leitura falhou
         self.subtarefas = [{"descricao": "Número de série", "resposta": "SN-1"},
                            {"descricao": "Pergunta fora do modelo", "resposta": "Sim"},
                            {"descricao": "Sem resposta", "resposta": ""},
@@ -77,6 +78,7 @@ def fr(monkeypatch, tmp_path):
     monkeypatch.setattr(api, "label_id_por_nome", lambda n: 9001 if n == "CHAMADOS" else None)
     monkeypatch.setattr(api, "apply_labels", lambda wid, ids: f.etiquetas.append((wid, ids)) or {})
     monkeypatch.setattr(api, "status_da_os", lambda wid: f.status.get(wid, 3))
+    monkeypatch.setattr(AC, "_vivas_ao_vivo", lambda wid: f.vivas.get(wid, []))
     monkeypatch.setattr(api, "get_os_detalhes", lambda wid: {"subtarefas": f.subtarefas, "os_pai": "90",
                                                              "descricao": "[Tracker 10] - Inspeção para chamado STI",
                                                              "event_date": "2026-11-09T11:00:00"})
@@ -127,7 +129,8 @@ def test_a_inspecao_realizada_sem_administrativa_ganha_a_dela(fr, monkeypatch):
     assert "OS de campo: 90 · Inspeção: 100 · Ativo: TST-UFV100-ETKR1.10" in nota
     assert "aguardando a inspeção" not in nota and "  Pergunta fora do modelo: Sim" in nota
     assert "Sem resposta" not in nota and "Verificação sem valor" not in nota
-    assert fr.etiquetas == [(5550, [9001])] and AC.criadas()["100"] == {"folio": "555", "id": 5550}
+    assert fr.etiquetas == [(5550, [9001])] and {k: AC.criadas()["100"][k] for k in ("folio", "id")} == {"folio": "555", "id": 5550}
+    assert AC.criadas()["100"]["quando"]                    # a hora: o registro segura a 2ª só nas 24 h (16/11/2026)
 
 
 def test_o_que_nao_ganha(fr, monkeypatch):
@@ -220,3 +223,83 @@ def test_o_quadro_dispara_por_tras_no_maximo_a_cada_10_min(monkeypatch):
     monkeypatch.setenv(AC.ENV, "1")
     assert rotas_acomp._andar_junto() is True and len(rodou) == 1
     assert rotas_acomp._andar_junto() is False and len(rodou) == 1        # dentro dos 10 min
+
+
+# ── 16/11/2026: a administrativa que morreu não segura a nova (Levi: "a OS de inspeção gere uma nova administrativa ao
+# finalizar, sem choro!") ──────────────────────────────────────────────────────────────────────────────────────────────
+class ListaConf(Lista):
+    """A lista central com as OS "a conferir" (a faixa não as trouxe: canceladas, apagadas ou só atrasadas)."""
+    def __init__(self, regs, conferir=()):
+        super().__init__(regs)
+        self._conferir = set(conferir)
+
+    def conferir(self, wid):
+        return wid in self._conferir
+
+
+def test_a_administrativa_a_conferir_nao_segura_e_a_leitura_ao_vivo_decide(fr, monkeypatch):
+    """A apagada no Fracttal fica "a conferir" na lista até a noite, e a cancelada até uma faixa trazer o status: nas duas
+    a lista não segura mais, e quem decide é a leitura ao vivo das filhas da Inspeção."""
+    lista = ListaConf([_insp(100), _adm(101, "100"), _insp(200), _adm(201, "200")], conferir={1010, 2010})
+    monkeypatch.setattr(AC, "_lista", lambda: lista)
+    fr.vivas[2000] = ["201"]                                  # a 201 segue viva no Fracttal: a faixa só atrasou
+    r = AC.criar_as_que_faltam(AGORA)
+    assert r == {"criadas": [("100", "555")], "erros": [], "faltam": 2}
+    assert len(fr.criadas) == 1 and fr.criadas[0][2]["id_parent"] == 1000 and AC.pendentes() == {}
+
+
+def test_o_registro_das_criadas_nao_segura_a_que_morreu(fr, monkeypatch):
+    """A administrativa que este OS Creator criou e foi cancelada, ou apagada (a noite a tirou da lista), não segura a
+    nova; fora da lista, nas 24 h depois de criada, segura (a lista ainda pode não tê-la)."""
+    dois_dias, duas_horas = (AGORA - dt.timedelta(days=2)).isoformat(), (AGORA - dt.timedelta(hours=2)).isoformat()
+    AC._gravar("criadas", {"100": {"folio": "101", "id": 1010, "quando": dois_dias},     # na lista, cancelada
+                           "200": {"folio": "201", "id": 2010, "quando": dois_dias},     # fora da lista: apagada
+                           "300": {"folio": "301", "id": 3010},                          # registro de antes de 16/11
+                           "400": {"folio": "401", "id": 4010, "quando": duas_horas},    # recém-criada: a lista atrasa
+                           "500": {"folio": "501", "id": 5010, "quando": dois_dias}})    # na lista e viva
+    _com_lista(monkeypatch, [_insp(100), _adm(101, "100", status=4), _insp(200), _insp(300), _insp(400),
+                             _insp(500), _adm(501, "500")])
+    r = AC.criar_as_que_faltam(AGORA, limite=10)
+    assert [c[0] for c in r["criadas"]] == ["100", "200", "300"] and r["erros"] == []
+    assert AC.criadas()["200"]["folio"] in ("555", "556", "557") and AC.criadas()["200"]["quando"]
+
+
+def test_viva_no_fracttal_nao_cria_e_sem_a_leitura_tenta_depois(fr, monkeypatch):
+    """A leitura ao vivo acha a administrativa que a lista ainda não trouxe (a do App, criada no fechamento): não cria.
+    A leitura que falha também não cria, e não gasta as tentativas: a volta seguinte tenta."""
+    _com_lista(monkeypatch, [_insp(100), _insp(200)])
+    fr.vivas[1000] = ["777"]
+    fr.vivas[2000] = None
+    r = AC.criar_as_que_faltam(AGORA)
+    assert r == {"criadas": [], "erros": [], "faltam": 2} and fr.criadas == [] and AC.pendentes() == {}
+    AC._FEITOS.clear()
+    fr.vivas[2000] = []
+    assert AC.criar_as_que_faltam(AGORA)["criadas"] == [("200", "555")]
+
+
+def test_vivas_ao_vivo_le_as_filhas_da_inspecao(monkeypatch):
+    pedidos = []
+
+    def rpc(metodo, params):
+        pedidos.append((metodo, params))
+        return {"data": [
+            {"wo_folio": 11, "id_status_work_order": 1, "labels": [{"id": 9001, "description": "CHAMADOS"}]},
+            {"wo_folio": 12, "id_status_work_order": 4, "labels": [{"id": 9001, "description": "CHAMADOS"}]},  # cancelada
+            {"wo_folio": 13, "id_status_work_order": 2, "labels": [{"id": 5, "description": "Outra"}]},  # clone, não chamado
+            {"wo_folio": 14, "id_status_work_order": 3, "labels": [{"id": 9001, "description": ""}]}]}  # pela id da etiqueta
+    monkeypatch.setattr(api, "_rpc_call", rpc)
+    monkeypatch.setattr(api, "label_id_por_nome", lambda n: 9001)
+    assert AC._vivas_ao_vivo(1000) == ["11", "14"]
+    assert pedidos[0][0] == api.RPC_WO_LIST
+    assert pedidos[0][1]["filter"] == [{"operator": "=", "property": "id_parent_wo", "value": 1000}]
+
+    def recusa(metodo, params):
+        raise api.FracttalError("O Fracttal não respondeu (Recusado)")
+    monkeypatch.setattr(api, "_rpc_call", recusa)
+    assert AC._vivas_ao_vivo(1000) is None
+
+    def expirou(metodo, params):
+        raise api.SessionExpired("expirou")
+    monkeypatch.setattr(api, "_rpc_call", expirou)
+    with pytest.raises(api.SessionExpired):
+        AC._vivas_ao_vivo(1000)

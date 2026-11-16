@@ -559,7 +559,7 @@ def _com_responsavel_ufv(q: dict) -> None:
                           if RESPONSAVEL_UFV is not None else None)
 
 
-# a Inspeção de garantia realizada sem administrativa ganha a dela (08/11/2026, `acomp_cadeia`; desligado até a prova): a
+# a Inspeção de garantia realizada sem administrativa viva ganha a dela (08/11/2026, `acomp_cadeia`; ligado desde então): a
 # abertura do quadro a cria por trás, com a sessão de quem abriu (a credencial da empresa só lê), no máximo a cada
 # ANDAR_A_CADA_S por processo: é o quadro que mostra essas OS, e a cota do Fracttal é da empresa
 ANDAR_A_CADA_S = 10 * 60

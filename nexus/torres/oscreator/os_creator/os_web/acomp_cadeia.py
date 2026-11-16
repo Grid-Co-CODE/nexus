@@ -19,6 +19,16 @@ REALIZADA (em verificação ou concluída), com as respostas do técnico na nota
   isso acha alguma coisa: é lá que a lista central de OS está fresca.
 - SÓ AS REALIZADAS A PARTIR DE `a_partir_de()`: ligar não pode criar administrativa para as Inspeções antigas que nunca
   tiveram uma. Sem a data, nada se cria.
+- A ADMINISTRATIVA QUE MORREU NÃO SEGURA (16/11/2026, Levi: "a OS de inspeção gere uma nova administrativa ao finalizar,
+  sem choro!"). A que nasceu antes da realização e foi cancelada, ou apagada no Fracttal, não conta: a Inspeção realizada
+  ganha outra. Antes, três coisas seguravam a nova por engano: a lista central guarda a OS apagada "a conferir" até a noite
+  (e a cancelada, até uma faixa trazer o status novo); o registro das criadas segurava para sempre, mesmo com a dela
+  cancelada ou apagada; e o App, que lê a apagada como viva (`_adm_st_da_adm` dá 0, "segue como viva"). Agora a lista só
+  segura com a administrativa viva e conferida (não cancelada, não "a conferir"); o registro das criadas, só nas 24 h em
+  que a lista pode ainda não ter a nova (a noite relê os 365 dias); e, antes de criar, o Fracttal é lido AO VIVO: as filhas
+  da Inspeção com a etiqueta CHAMADOS e não canceladas (`_vivas_ao_vivo`, o filtro `id_parent_wo` no servidor; a apagada
+  não vem). Tem viva, não cria (a do App que a lista ainda não trouxe, por exemplo); a leitura falhou, não cria e tenta de
+  novo na volta seguinte, sem gastar as tentativas.
 LIGADO desde 08/11/2026 (`LIGADO_PADRAO`, o Levi: "liga", depois da prova no TESTE - PA), para as Inspeções realizadas de
 `A_PARTIR_DE` (08/11/2026) em diante; `OS_WEB_ACOMP_NA_INSPECAO=0` desliga numa máquina e `OS_WEB_ACOMP_A_PARTIR_DE` troca a
 data.
@@ -43,6 +53,7 @@ LIGADO_PADRAO = True            # ligado pelo Levi em 08/11/2026 ("liga"), depoi
 A_PARTIR_DE = "2026-11-08"      # AAAA-MM-DD: só as Inspeções realizadas deste dia (Brasília) em diante; vazio = nenhuma
 ENV, ENV_DATA = "OS_WEB_ACOMP_NA_INSPECAO", "OS_WEB_ACOMP_A_PARTIR_DE"
 DURACAO_S = 900                 # a da administrativa (a do App; a tarefa é escrever o ticket)
+VIVA_SEM_LISTA_S = 24 * 3600    # o registro das criadas segura a 2ª só enquanto a lista pode não ter a 1ª (a noite relê)
 ESPERA_S = 30 * 60              # depois do fim da Inspeção: a administrativa do App (no fechamento) chega à lista antes
 POR_VEZ = 3                     # criações no Fracttal por volta (a cota é da empresa)
 REFAZ_MAX = 10                  # tentativas de uma pendente antes de ela sair da fila (segue anotada)
@@ -138,7 +149,8 @@ def _resolver(folio_insp: str) -> None:
 
 def _registrar_criada(folio_insp: str, folio_adm, id_adm) -> None:
     d = criadas()
-    d[str(folio_insp)] = {"folio": str(folio_adm or ""), "id": id_adm}
+    d[str(folio_insp)] = {"folio": str(folio_adm or ""), "id": id_adm,
+                          "quando": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds")}
     if len(d) > 5000:                           # as mais antigas saem (o nº cresce com a criação)
         for k in sorted(d, key=lambda x: int(x) if str(x).isdigit() else 0)[:len(d) - 5000]:
             d.pop(k, None)
@@ -167,11 +179,18 @@ def _eh_acompanhamento(r) -> bool:
     return aw._norm(cg_regras.ETIQUETA_ACOMPANHAMENTO) in _nomes(r) and aw.eh_os3(r)
 
 
+def _a_conferir(lista, r) -> bool:
+    """A lista não sabe se a OS segue como está (uma faixa deveria tê-la trazido e não trouxe: cancelada, apagada...)."""
+    conferir = getattr(lista, "conferir", None)
+    return bool(conferir and conferir(r.get("id")))
+
+
 def com_administrativa(lista) -> set:
-    """Os nº das Inspeções que já têm administrativa não cancelada na lista central (a nota dela aponta a Inspeção)."""
+    """Os nº das Inspeções que já têm administrativa VIVA na lista central (a nota dela aponta a Inspeção): não cancelada e
+    não "a conferir" (a apagada no Fracttal fica "a conferir" até a noite; quem decide essa é a leitura ao vivo)."""
     out = set()
     for r in lista.ordem:
-        if r.get("status_id") != 4 and _eh_acompanhamento(r):
+        if r.get("status_id") != 4 and _eh_acompanhamento(r) and not _a_conferir(lista, r):
             f = str(aw.ler_nota(r.get("note")).get("inspecao") or "")
             if f:
                 out.add(f)
@@ -189,16 +208,33 @@ def _fim(r) -> dt.datetime | None:
     return d if d.tzinfo else d.replace(tzinfo=dt.timezone.utc)
 
 
+def _segura(rg: dict, por_id: dict, agora: dt.datetime) -> bool:
+    """O registro das criadas segura a 2ª administrativa? Com a 1ª na lista, só se ela está viva (cancelada não segura);
+    fora da lista, só nas `VIVA_SEM_LISTA_S` depois de criada (a lista ainda pode não tê-la; depois disso a noite já releu
+    os 365 dias, e a que não está foi apagada). O registro sem a hora (de antes de 16/11/2026) fora da lista não segura."""
+    na = por_id.get(rg.get("id")) if rg.get("id") is not None else None
+    if na is not None:
+        return na.get("status_id") != 4
+    try:
+        q = dt.datetime.fromisoformat(str(rg.get("quando") or ""))
+    except ValueError:
+        return False
+    q = q if q.tzinfo else q.replace(tzinfo=dt.timezone.utc)
+    return (agora - q).total_seconds() < VIVA_SEM_LISTA_S
+
+
 def faltando(lista, agora: dt.datetime, desde: dt.date) -> list:
     """As Inspeções de garantia realizadas (em verificação ou concluídas) de `desde` em diante, terminadas há mais de
-    `ESPERA_S`, sem administrativa (na lista e no registro das criadas), da mais antiga para a mais nova."""
+    `ESPERA_S`, sem administrativa viva (na lista e no registro das criadas), da mais antiga para a mais nova. Quem passa
+    aqui ainda é conferido ao vivo no Fracttal antes de criar (`criar`)."""
     tem, reg = com_administrativa(lista), criadas()
+    por_id = {r.get("id"): r for r in lista.ordem} if reg else {}
     out = []
     for r in lista.ordem:
         if r.get("status_id") not in (2, 3) or not eh_inspecao_de_garantia(r):
             continue
         f, fim = str(r.get("folio") or ""), _fim(r)
-        if not f or f in tem or f in reg or fim is None:
+        if not f or f in tem or fim is None or (f in reg and _segura(reg[f], por_id, agora)):
             continue
         if fim.astimezone(_BRT).date() < desde or (agora - fim).total_seconds() < ESPERA_S:
             continue
@@ -227,15 +263,49 @@ def _nome_ativo(asset: dict, det: dict) -> str:
             or str(asset.get("code") or det.get("code") or ""))
 
 
+def _vivas_ao_vivo(id_insp) -> list | None:
+    """Os nº das administrativas VIVAS da Inspeção, lidos agora no Fracttal: as filhas dela (o filtro `id_parent_wo` no
+    servidor, o mesmo do `os_chamados.get_chamado_de_os`) com a etiqueta CHAMADOS e não canceladas. A apagada não vem.
+    → [nº] ([] = nenhuma viva) ou None, quando não deu para ler (aí não se cria às cegas)."""
+    try:
+        res = api._rpc_call(api.RPC_WO_LIST, {"page": 1, "limit": 100, "start": 0, "append": True, "sort": [],
+                                              "filter": [{"operator": "=", "property": "id_parent_wo",
+                                                          "value": id_insp}]})
+    except api.SessionExpired:
+        raise
+    except Exception:                           # noqa: BLE001 — sem saber, não se cria
+        log.warning("Acompanhamento: as filhas da Inspeção %s não foram lidas", id_insp)
+        return None
+    if not isinstance(res, dict) or not isinstance(res.get("data"), list):
+        return None
+    lid = api.label_id_por_nome(cg_regras.ETIQUETA_ACOMPANHAMENTO)
+    alvo = aw._norm(cg_regras.ETIQUETA_ACOMPANHAMENTO)
+    out = []
+    for w in res["data"]:
+        if not isinstance(w, dict) or str(w.get("id_status_work_order") or "") == "4":
+            continue
+        etq = [l for l in (w.get("labels") or []) if isinstance(l, dict)]
+        if alvo in {aw._norm(l.get("description")) for l in etq} or (lid and lid in {l.get("id") for l in etq}):
+            out.append(str(w.get("wo_folio") or w.get("id") or ""))
+    return out
+
+
 def criar(r_insp) -> dict:
-    """A administrativa de UMA Inspeção realizada (o registro da lista central). Confere ao vivo que ela segue realizada,
-    lê as respostas e o cabeçalho, e cria. → {"ok", "folio", "id_work_order", "aviso"} ou {"ok": False, "erro"} (a
-    pendente fica anotada). Nunca levanta."""
+    """A administrativa de UMA Inspeção realizada (o registro da lista central). Confere ao vivo que ela segue realizada e
+    que não tem administrativa viva, lê as respostas e o cabeçalho, e cria. → {"ok", "folio", "id_work_order", "aviso"}
+    ou {"ok": False, "erro"} (a pendente fica anotada). Nunca levanta."""
     folio, idwo = str(r_insp.get("folio") or ""), r_insp.get("id")
     try:
         st = api.status_da_os(idwo)
         if st not in (2, 3):
             return {"ok": False, "erro": "a Inspeção %s não está mais realizada (status %s)" % (folio, st),
+                    "pulou": True}
+        vivas = _vivas_ao_vivo(idwo)
+        if vivas is None:
+            return {"ok": False, "erro": "não consegui ler no Fracttal se a Inspeção %s já tem administrativa" % folio,
+                    "pulou": True}
+        if vivas:
+            return {"ok": False, "erro": "a Inspeção %s já tem a administrativa %s" % (folio, ", ".join(vivas)),
                     "pulou": True}
         rid, nome = aw.equipe()
         if not rid:
