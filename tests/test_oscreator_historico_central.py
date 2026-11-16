@@ -1665,9 +1665,13 @@ def test_a_janela_que_nao_cobre_o_inicio_do_periodo_deixa_a_regra_de_19_10(fr):
     assert _ao_vivo(_hist(_cliente(TODA), "modo=cos"), 60) and fr.n("lista") == 1
     assert _ao_vivo(_hist(_cliente(OUTRA), "modo=cos"), 60)
     assert fr.n("lista", OUTRA) == 0 and fr.n("total", OUTRA) == 1       # a "Todos" da 1ª; só o total dela, como em 19/10
-    # o período de 7 dias SIM é coberto por essa janela: ali a lista está em uso, e quem não passou fica com a dela
-    de7 = (_hoje() - dt.timedelta(days=6)).isoformat()
-    assert OC.atual().janela[0] <= de7 and not LC.divide_a_todos(OUTRA, de7, hoje)
+    # o período que essa janela cobre SIM está com a lista em uso, e quem não passou fica com a dela. O 1º dia coberto é o dia
+    # UTC seguinte ao `desde` (7 dias atrás, em UTC): de dia é hoje - 6 (a data local); das 21:00 à meia-noite de Brasília a
+    # data UTC já é a de amanhã, e ele é hoje - 5. Antes o teste pedia hoje - 6 a qualquer hora e quebrava toda noite (falhou
+    # às 22:04 de 15/11/2026, sozinho, na suíte inteira); a lista não errava: a tela também lê a data como dia UTC
+    de_coberto = OC.atual().janela[0]
+    assert (_hoje() - dt.timedelta(days=6)).isoformat() <= de_coberto <= (_hoje() - dt.timedelta(days=5)).isoformat()
+    assert not LC.divide_a_todos(OUTRA, de_coberto, hoje)
     _encher()                                                    # a noite correu: os 365 dias cobrem os 30
     assert not LC.divide_a_todos(OUTRA, de30, hoje)
 
