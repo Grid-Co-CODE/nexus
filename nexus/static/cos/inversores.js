@@ -1111,9 +1111,9 @@
     card.status = document.createElement("div"); card.status.className = "cos-rele-status"; br.appendChild(card.status);
     card.grade = document.createElement("div"); card.grade.className = "cos-rele-grade"; card.badges = {};
     RELE_FAMILIAS.forEach(function (fn) {
-      var b = document.createElement("span"); b.className = "cos-rele-fn"; b.title = fn[1];
+      var b = document.createElement("span"); b.className = "cos-rele-fn"; b.title = fn[0] + " — " + fn[1];
       var c = document.createElement("b"); c.textContent = fn[0]; b.appendChild(c);
-      b.appendChild(document.createTextNode(" " + fn[1]));
+      var nm = document.createElement("small"); nm.textContent = fn[1]; b.appendChild(nm);
       card.grade.appendChild(b); card.badges[fn[0]] = b;
     });
     br.appendChild(card.grade);

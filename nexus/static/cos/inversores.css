@@ -214,11 +214,13 @@ p.cos-inv-mppt-cab{font-weight:600;letter-spacing:.04em;text-transform:uppercase
 .cos-rele-status { margin: .3rem 0 .5rem; }
 .cos-rele-ativos { margin: .45rem 0 .1rem; padding-left: 1.1rem; color: var(--alerta); font-weight: 600; }
 .cos-rele-ativos li { margin: .12rem 0; }
-.cos-rele-grade { display: flex; flex-wrap: wrap; gap: .3rem; margin: .3rem 0 .6rem; }
-.cos-rele-grade.muda { opacity: .5; }
-.cos-rele-fn { display: inline-flex; align-items: center; gap: 5px; font: 600 11px/16px var(--font-sans); padding: 3px 8px; border-radius: var(--raio-tag, 6px); color: var(--mudo); background: var(--superficie-2); border: 1px solid var(--linha); }
-.cos-rele-fn b { font-weight: 700; }
-.cos-rele-fn.ativa { color: var(--alerta); background: var(--alerta-suave); border-color: var(--alerta); }
+.cos-rele-grade { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 6px; margin: .4rem 0 .7rem; }
+.cos-rele-grade.muda { opacity: .45; }
+.cos-rele-fn { display: flex; flex-direction: column; gap: 1px; padding: 6px 9px; border-radius: 8px; color: var(--mudo); background: var(--superficie-2); border: 1px solid var(--linha); transition: box-shadow .15s, border-color .15s; }
+.cos-rele-fn b { font: 700 13px/1.25 var(--font-sans); color: var(--tinta-2); letter-spacing: .02em; }
+.cos-rele-fn small { font-size: 10.5px; line-height: 1.15; color: var(--mudo); }
+.cos-rele-fn.ativa { color: var(--alerta); background: var(--alerta-suave); border-color: var(--alerta); box-shadow: 0 0 0 1px var(--alerta) inset, 0 0 10px -2px var(--alerta); }
+.cos-rele-fn.ativa b, .cos-rele-fn.ativa small { color: var(--alerta); }
 .cos-rele-faltas { margin-top: .3rem; }
 .cos-rele-tab { width: 100%; border-collapse: collapse; margin: .2rem 0 .5rem; }
 .cos-rele-tab th, .cos-rele-tab td { padding: .22rem .5rem; text-align: left; }
