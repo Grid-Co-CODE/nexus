@@ -731,7 +731,7 @@ details.csv-extra>.cad-sub{padding:0 14px 12px}
 .rx-detalhe{margin:0 16px 10px}
 .rx-detalhe>summary{cursor:pointer;padding:6px 0;font-size:12.5px;font-weight:600;color:var(--verde-texto)}
 .rx-detalhe>.cad-rolagem{margin:4px -16px 0}
-.rx-peca th{width:30%;text-align:left;font-weight:600;color:var(--tinta-2);vertical-align:top}
+.rx-peca .rx-peca-r{width:30%;font-weight:600;color:var(--tinta-2);vertical-align:top}
 /* a TV: o Raio-X em tela cheia, sem o menu, com os números maiores */
 .rx:fullscreen{overflow:auto;padding:28px 40px;background:var(--fundo)}
 .rx:fullscreen .rx-tile-anel{width:200px;height:200px}

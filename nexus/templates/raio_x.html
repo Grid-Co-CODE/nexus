@@ -277,7 +277,7 @@
   {% if p.linhas %}
   <div class="cad-rolagem cad-rolagem--secao"><table class="cad-tabela rx-peca">
     <tbody>{% for rotulo, frase in p.linhas %}
-      <tr><th scope="row">{{ rotulo }}</th><td>{{ frase }}</td></tr>
+      <tr><td class="rx-peca-r">{{ rotulo }}</td><td>{{ frase }}</td></tr>
     {% endfor %}</tbody>
   </table></div>
   {% else %}<p class="cad-pe">{{ p.motivo }}</p>{% endif %}
