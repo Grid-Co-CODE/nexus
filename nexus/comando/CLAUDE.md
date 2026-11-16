@@ -801,8 +801,9 @@ Vale para o chat (`ia.INSTRUCOES`) e para o diagnóstico do dia (`diagnostico.PE
   - o "Fazer" abre a janela com esse texto.
 - **O visual:**
   - a OS na resposta do chat ficou sem o tracejado (Levi: "Não tem necessidade");
-  - a frase do Insights tem sublinhado sólido na cor do texto, e a OS fica verde ("Deixa um underline sólido embaixo do
-    nome, branco mesmo").
+  - a frase do Insights fica em cinza, com o que clica em branco forte e a OS em verde, sem sublinhado (o sublinhado só
+    aparece ao passar o mouse). Antes vieram o sublinhado branco, o amarelo e o azul; o Levi viu quatro opções lado a lado
+    e escolheu esta ("Gostei da A"). Não entra cor nova: no Nexus, vermelho, amarelo e verde querem dizer situação.
 
 Prova:
 - `tests/test_comando_prontuario.py`: as não iniciadas;

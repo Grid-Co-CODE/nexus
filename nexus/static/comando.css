@@ -444,13 +444,17 @@ a.ins-titulo:hover{color:var(--verde-texto)}
 /* o diagnóstico do dia da IA no lugar do parecer (14/11/2026): a linha do parecer, o que fazer em colunas e a origem */
 .pu-diag{display:block}
 .pu-diag-linha{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px}
-.pu-diag .pu-par-t--ia{font:600 15px/1.45 var(--font-sans)}
+/* a frase da IA em cinza, e o que clica em branco forte (16/11/2026, Levi escolheu a opção A: "Gostei da A"): os fatos
+   saltam sem cor nova, e o vermelho, o amarelo e o verde seguem querendo dizer situação */
+.pu-diag .pu-par-t--ia{font:500 15px/1.45 var(--font-sans);color:var(--mudo)}
 /* a frase clicável: o assunto leva ao cartão dele; a OS abre a OS (15/11/2026) */
-/* o pedaço clicável em azul escuro, sem sublinhado (16/11/2026, Levi, em teste: "deixa a fonte amarela", e depois
-   "troca por azul escuro"); a OS segue verde. O sublinhado só no passar do mouse, para dizer que clica */
-.pu-diag-link{color:var(--azul-link);text-decoration:none}
+/* o pedaço clicável em branco forte, sem sublinhado (16/11/2026: depois do sublinhado branco, do amarelo e do azul, a
+   opção A das quatro que o Levi viu lado a lado); a OS segue verde. O sublinhado só no passar do mouse, para dizer que
+   clica */
+.pu-diag-link{color:var(--tinta);font-weight:700;text-decoration:none}
 .pu-diag-link:hover{text-decoration:underline;text-underline-offset:4px}
-.pu-diag-oslink{padding:0;border:0;background:none;color:var(--verde-texto);font:inherit;text-decoration:none;cursor:pointer}
+.pu-diag-oslink{padding:0;border:0;background:none;color:var(--verde-texto);font:inherit;font-weight:700;text-decoration:none;
+  cursor:pointer}
 .pu-diag-oslink:hover{text-decoration:underline;text-underline-offset:4px}
 .pu-diag-alterna{display:inline-flex;align-items:center;gap:6px;margin-left:auto;padding:5px 10px;border:1px solid var(--linha-forte);
   border-radius:var(--raio-controle);background:transparent;color:var(--tinta-2);font:500 12.5px/16px var(--font-sans);cursor:pointer}
