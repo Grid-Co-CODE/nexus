@@ -446,10 +446,12 @@ a.ins-titulo:hover{color:var(--verde-texto)}
 .pu-diag-linha{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px}
 .pu-diag .pu-par-t--ia{font:600 15px/1.45 var(--font-sans)}
 /* a frase clicável: o assunto leva ao cartão dele; a OS abre a OS (15/11/2026) */
-.pu-diag-link{color:inherit;text-decoration:underline dotted var(--tinta-2);text-underline-offset:4px}
+/* sublinhado sólido na cor do texto (16/11/2026, Levi: "Deixa um underline sólido embaixo do nome, branco mesmo, e aí,
+   claro, que for OS fica verde") */
+.pu-diag-link{color:inherit;text-decoration:underline solid var(--tinta);text-decoration-thickness:1px;text-underline-offset:4px}
 .pu-diag-link:hover{color:var(--verde-texto);text-decoration-color:var(--verde-texto)}
-.pu-diag-oslink{padding:0;border:0;background:none;color:var(--verde-texto);font:inherit;text-decoration:underline;
-  text-underline-offset:3px;cursor:pointer}
+.pu-diag-oslink{padding:0;border:0;background:none;color:var(--verde-texto);font:inherit;text-decoration:underline solid;
+  text-decoration-thickness:1px;text-underline-offset:4px;cursor:pointer}
 .pu-diag-oslink:hover{color:var(--tinta)}
 .pu-diag-alterna{display:inline-flex;align-items:center;gap:6px;margin-left:auto;padding:5px 10px;border:1px solid var(--linha-forte);
   border-radius:var(--raio-controle);background:transparent;color:var(--tinta-2);font:500 12.5px/16px var(--font-sans);cursor:pointer}
@@ -630,6 +632,14 @@ a.ins-titulo:hover{color:var(--verde-texto)}
 .pu-tab b.cn-t-alerta{color:var(--alerta)}
 .pu-tab b.cn-t-ok{color:var(--ok)}
 .pu-tab-rola{overflow-x:auto;padding:0 20px 8px}
+/* as não iniciadas (16/11/2026): o que é quebra a linha; a situação na cor dela, em pílula */
+.pu-tab--ni td.pu-ni-t{white-space:normal;min-width:220px;max-width:420px}
+.pu-tab--ni td.pu-ni-t small{display:block;margin-top:2px;color:var(--mudo);font-size:11.5px}
+.pu-ni-sit{display:inline-block;padding:1px 8px;border-radius:var(--raio-tag);font:600 11.5px/18px var(--font-sans)}
+.pu-ni-sit--critico{background:var(--critico-suave);color:var(--critico)}
+.pu-ni-sit--alerta{background:var(--alerta-suave);color:var(--alerta)}
+.pu-ni-sit--ok{background:var(--superficie-2);color:var(--tinta-2)}
+.pu-os-sub{display:block;margin-top:2px;color:var(--mudo);font-size:11.5px}
 .pu-tab{width:100%;border-collapse:collapse;font-size:12.5px}
 .pu-tab th{padding:6px 10px 6px 0;text-align:left;font:600 11px/14px var(--font-sans);color:var(--mudo);white-space:nowrap;border-bottom:1px solid var(--linha)}
 .pu-tab td{padding:8px 10px 8px 0;border-bottom:1px solid var(--linha);color:var(--tinta);white-space:nowrap}
@@ -843,9 +853,10 @@ a.ins-titulo:hover{color:var(--verde-texto)}
 /* Nexus IA, 14/11/2026: as citações, as OS clicáveis, as ações para outro setor (a Nova demanda ali mesmo) e o relatório */
 .ia-cita{display:inline-block;margin:0 2px;padding:0 6px;border-radius:var(--raio-tag);background:var(--superficie-3);
   color:var(--mudo);font:600 10.5px/17px var(--font-sans);vertical-align:1px;white-space:nowrap}
-.ia-os{display:inline;padding:0 3px;border:0;border-bottom:1px dashed var(--verde-texto);background:none;color:var(--verde-texto);
+/* sem sublinhado (16/11/2026, Levi: "tire esse underline tracejado verde debaixo do número da OS. Não tem necessidade") */
+.ia-os{display:inline;padding:0 3px;border:0;background:none;color:var(--verde-texto);
   font:inherit;font-weight:600;cursor:pointer;text-decoration:none}
-.ia-os:hover{border-bottom-style:solid}
+.ia-os:hover{text-decoration:underline;text-underline-offset:3px}
 .ia-os:focus-visible{outline:2px solid var(--foco);outline-offset:2px}
 .ia-os--raiox::after{content:"↗";margin-left:2px;font-size:.8em}
 .ia-acoes{display:grid;gap:6px;padding-top:8px;border-top:1px solid var(--linha)}

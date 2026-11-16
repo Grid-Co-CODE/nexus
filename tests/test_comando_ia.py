@@ -396,6 +396,35 @@ def test_a_janela_leva_os_setores_com_pessoas_e_temas(tela, logado, monkeypatch)
     assert 'data-ia-demanda-url="/t/comando/usinas/1/ia/demanda"' in h
 
 
+def test_a_area_chamados_e_destino_do_chat_com_as_pessoas_marcadas(tela, logado, monkeypatch):
+    """16/11/2026, Levi, na Marabá 200: "quem cobra é o time de chamados. Então seria solicitar o time de chamados": a
+    área Chamados (na Performance) entra como destino da resposta, com os temas dela (o setor fica com os sem área) e só
+    as pessoas marcadas nela; sem ninguém marcado, o setor inteiro."""
+    from nexus.auth import setor_telas as ST
+    from nexus.comando import areas as AR
+    from nexus.comando import demandas as DM
+    monkeypatch.setattr(ST, "_setores_no_clique", lambda *a: {"setores": [
+        {"setor_id": 2, "nome": "Performance", "excluido": False}], "decisoes": []})
+    monkeypatch.setattr(DM, "pessoas_com_setor", lambda: [
+        {"hmac": "h1", "nome": "Ana", "setor_id": 2, "setor_nome": "Performance"},
+        {"hmac": "h2", "nome": "Bia", "setor_id": 2, "setor_nome": "Performance"}])
+    monkeypatch.setattr(DM, "temas", lambda *a, **k: [
+        {"tema_id": "t1", "nome": "Análise de PR", "setor_id": 2, "prazo_dias_uteis": 5, "ativo": True, "area": ""},
+        {"tema_id": "t2", "nome": "Cobrança ao fabricante", "setor_id": 2, "prazo_dias_uteis": 2, "ativo": True,
+         "area": "Chamados"}])
+
+    def setores():
+        h = logado.get("/t/comando/usinas/1/ia?parcial=1").get_data(as_text=True)
+        return {s["nome"]: s for s in json.loads(h.split("data-ia-setores>")[1].split("</script>")[0])}
+    monkeypatch.setattr(AR, "ler", lambda cfg: {})
+    d = setores()
+    assert d["Chamados"]["setor_id"] == "2:Chamados" and [t["nome"] for t in d["Chamados"]["temas"]] == ["Cobrança ao fabricante"]
+    assert [t["nome"] for t in d["Performance"]["temas"]] == ["Análise de PR"]
+    assert [p["nome"] for p in d["Chamados"]["pessoas"]] == ["Ana", "Bia"]          # ninguém marcado: o setor inteiro
+    monkeypatch.setattr(AR, "areas_da_pessoa", lambda mapa, sid, h: ["Chamados"] if h == "h2" else [])
+    assert [p["nome"] for p in setores()["Chamados"]["pessoas"]] == ["Bia"]
+
+
 
 # ── 14/11/2026 à tarde: a troca entre os grátis, o Criar OS das ações, as sugestões no alto ─────────────────────────────
 def test_o_gratis_que_bate_o_limite_passa_a_pergunta_ao_proximo(monkeypatch):

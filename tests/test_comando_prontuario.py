@@ -123,12 +123,41 @@ def test_o_cartao_das_os_lista_o_que_pede_acao_primeiro_e_as_os_de_cada_estado()
     g = PR.os_grupos(man, "critico")
     assert [(x["chave"], x["n"], x["tom"], x["detalhado"]) for x in g] == [
         ("atrasadas", 2, "critico", True), ("pausadas", 1, "alerta", True), ("verificacao", 1, "neutro", False),
-        ("nao_iniciadas", 1, "neutro", False)]                      # o grupo vazio (em execução) não entra
+        ("nao_iniciadas", 1, "neutro", True)]                       # o grupo vazio (em execução) não entra
     assert g[0]["nota"] == f"40 tarefas programadas há mais de {M.DIAS_ATRASO} dias"
     assert g[0]["itens"] == [{"os": 8466, "wid": 9, "txt": "há 134 d · preventiva"},
                              {"os": 10790, "wid": None, "txt": "há 94 d · inspeção"}]
     assert g[1]["itens"][0]["txt"] == "Aguardando material · desde 02/11 · PCM"
     assert PR.os_grupos(None) == [] and PR.os_grupos({}) == []
+
+
+def test_as_nao_iniciadas_vem_com_o_que_pesa_primeiro_e_as_no_prazo_nao_se_cobram():
+    """Levi, 16/11/2026, na Marabá 200: "seria interessante o supervisor conseguir ver quais são as OS não iniciadas.
+    Uma lista de título, qual ativo, qual OS, quem é o técnico"; e "tarefa não iniciada e que não está atrasada também não
+    entra nesse meio do que está parado ou atrasado [...] Claro que tem urgências, corretivo emergencial, religamento
+    remoto": a urgente primeiro, depois a atrasada (régua do PCM) e a no prazo por último, sem cobrança."""
+    from datetime import date
+    hoje = date(2026, 11, 16)
+    ni = [M._nao_iniciada(18503, 1, {"tipos": {"preventiva"}, "codigos": {"X-CABN1"}, "equipamentos": {7},
+                                     "prog": date(2026, 11, 20)}, hoje),
+          M._nao_iniciada(18364, 2, {"tipos": {"corretiva"}, "codigos": {"X-TKR9"}, "equipamentos": set(),
+                                     "prog": date(2026, 10, 15)}, hoje),
+          M._nao_iniciada(19450, 3, {"tipos": {"corretiva_emergencial"}, "codigos": {"X-INV15"}, "equipamentos": {8},
+                                     "prog": date(2026, 11, 13)}, hoje),
+          M._nao_iniciada(19242, 4, {"tipos": {"inspecao"}, "codigos": set(), "equipamentos": set(), "prog": None}, hoje)]
+    g = PR.os_grupos({"os_nao_iniciadas": ni}, nomes={7: "Cabine 1", 8: "Inversor 1.5"},
+                     central={"19450": {"titulo": "Inversor 1.5 sem gerar", "tecnico": "Técnico A"}})[0]
+    assert (g["chave"], g["tom"], g["tabela"], g["nota"]) == ("nao_iniciadas", "critico", True,
+                                                             "1 urgente · 1 atrasada · 2 no prazo, sem cobrança")
+    assert [(x["os"], x["situacao"], x["sit_txt"]) for x in g["itens"]] == [
+        (19450, "urgente", "urgente, há 3 d"), (18364, "atrasada", "atrasada há 32 d"), (18503, "no prazo", "no prazo"),
+        (19242, "no prazo", "no prazo")]
+    u = g["itens"][0]
+    assert (u["titulo"], u["tecnico"], u["ativo"], u["tipo"], u["programada"]) == (
+        "Inversor 1.5 sem gerar", "Técnico A", "Inversor 1.5", "corretiva emergencial", "13/11")
+    # o texto (o do dossiê da IA) vai sem a pessoa
+    assert "Técnico A" not in u["txt"] and u["txt"] == "corretiva emergencial · Inversor 1.5 · programada para 13/11 · urgente, há 3 d"
+    assert g["itens"][1]["ativo"] == "X-TKR9"                      # sem o nome, o código do ativo
 
 
 def test_a_tela_dona_da_as_os_de_cada_estado_e_a_contagem_e_o_tamanho_da_lista():

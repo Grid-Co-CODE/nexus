@@ -101,7 +101,8 @@
     var ver = verDiag(el, x.ver || (d && d.tipo === 'ver' ? d.onde : ''));
     if (!d || d.tipo !== 'pedir' || !d.setor_id) return ver;
     var uid = el.getAttribute('data-pu-diag-usina'), nome = el.getAttribute('data-pu-diag-nome') || '';
-    var desc = x.texto + '\n\nDo Nexus IA Insights de ' + (j.data || 'hoje') + ' da ' + nome + ': ' + ((j.diag || {}).situacao || '');
+    // o pedido pronto da IA (16/11/2026, Levi: "Tudo isso já pronto"); o diagnóstico guardado de antes só tem o item
+    var desc = (x.pedido || x.texto) + '\n\nDo Nexus IA Insights de ' + (j.data || 'hoje') + ' da ' + nome + ': ' + ((j.diag || {}).situacao || '');
     var url = nexusRota('/t/comando/conversa/usina/' + uid + '/janela') + '?aba=pedir&setor=' + encodeURIComponent(d.setor_id) +
       '&titulo=' + encodeURIComponent(x.texto) + '&descricao=' + encodeURIComponent(desc) + (x.os ? '&os=' + encodeURIComponent(x.os) : '') +
       (d.tema_id ? '&tema=' + encodeURIComponent(d.tema_id) : '');

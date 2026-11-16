@@ -26,7 +26,7 @@ def test_le_o_json_limpa_as_secoes_e_tira_a_os_que_nao_esta_no_dossie():
                                                         "Cobrar a análise da recorrência da 27"]
     assert d["tem_que_fazer"][1]["os"] == ""                       # 99999 não está no dossiê: não vira link
     assert d["pode_fazer"] == [{"texto": "Pedir à concessionária o registro das oscilações", "os": "", "os_tipo": "",
-                                "destino": None, "ver": ""}]
+                                "destino": None, "ver": "", "pedido": ""}]
     assert [x["texto"] for x in d["pendente"]] == ["Chamado da Brametal sem retorno há 22 dias"]
     # sem o JSON: None (a tela mostra o texto); o bloco cortado no fim ainda serve
     assert DG.ler("A usina está bem.", DOSSIE) is None and DG.ler('<diagnostico>{"situacao": ""}', DOSSIE) is None
@@ -96,9 +96,38 @@ def test_a_rota_faz_uma_vez_e_todos_leem_o_mesmo(tela, logado, monkeypatch, tmp_
 
 
 def test_garantia_e_da_performance_e_a_rede_do_cos():
-    """14/11/2026, Levi: "Fiquem chamados garantias [...] não existe o setor em si. Ele está dentro da performance"."""
+    """14/11/2026, Levi: "Fiquem chamados garantias [...] não existe o setor em si. Ele está dentro da performance"; e
+    16/11/2026: "quem cobra é o time de chamados" (no chat também), "se for vincular alguma coisa relacionada a chamados,
+    também tem que solicitar o time de chamados"."""
     assert "Os chamados de garantia" in DG.PEDIDO and 'peça a "Chamados"' in DG.PEDIDO and "pedido ao COS" in DG.PEDIDO
-    assert "são da Performance, que cuida das garantias" in IA.INSTRUCOES
+    assert 'use o setor "Chamados" quando estiver na lista' in IA.INSTRUCOES
+    assert "juntar uma OS a um chamado" in IA.INSTRUCOES and "sem afirmar que não estão" in IA.INSTRUCOES
+    assert '"pedir": "Chamados"' in DG.PEDIDO and "Vincular OS ao chamado de garantia" in DG.PEDIDO
+
+
+def test_os_e_do_tecnico_a_pausa_nao_se_libera_e_a_no_prazo_nao_se_cobra():
+    """16/11/2026, Levi, na Marabá 200: o técnico "não usa o Nexus, ele usa o app de campo" (executar OS não é pedido à
+    Manutenção); "esse lance da engenharia liberar a tarefa pausada tem que entender o motivo por que foi pausada [...] O
+    supervisor realmente tem esse poder de liberar?"; "tarefa não iniciada e que não está atrasada também não entra nesse
+    meio do que está parado ou atrasado"."""
+    for txt in (IA.INSTRUCOES, DG.PEDIDO):
+        assert "é do técnico de campo, que o supervisor coordena" in txt and "nem " in txt
+        assert "não libera a pausa" in txt
+    assert 'as "no prazo" não são atraso nem pendência' in IA.INSTRUCOES
+    assert 'as "no prazo" não entram em lista nenhuma' in DG.PEDIDO
+
+
+def test_o_pedido_pronto_so_vem_com_o_pedir():
+    """16/11/2026, Levi: "solicitar o time de chamados, cobrança de fabricante, STI [...] Tudo isso já pronto": o texto do
+    pedido vai na janela da demanda; sem "pedir", nada."""
+    setores = [{"setor_id": "2:Chamados", "nome": "Chamados", "temas": [{"tema_id": "t9", "nome": "Cobrança ao fabricante"}]}]
+    r = DG.ler('<diagnostico>{"situacao": "Ok.", "pode_fazer": [{"acao": "Cobrar a STI", "destino": {"pedir": "Chamados", '
+               '"tema": "Cobrança ao fabricante"}, "pedido": "Cobrar da STI o retorno dos 4 chamados abertos há 87 dias."}, '
+               '{"acao": "Ver a lista", "destino": {"ver": "os"}, "pedido": "não vale"}]}</diagnostico>', DOSSIE, setores)
+    a, b = r["pode_fazer"]
+    assert (a["destino"]["setor_id"], a["destino"]["tema_id"], a["pedido"]) == (
+        "2:Chamados", "t9", "Cobrar da STI o retorno dos 4 chamados abertos há 87 dias.")
+    assert b["pedido"] == ""
 
 
 def test_o_texto_do_dossie_nao_abre_um_bloco_de_diagnostico():

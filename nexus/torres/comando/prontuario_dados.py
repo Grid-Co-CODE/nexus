@@ -53,6 +53,25 @@ def _id(v):
     return visao.D._id(v)
 
 
+def da_lista_central(folios) -> dict:
+    """{nº da OS: {"titulo", "tecnico"}}, da lista central de OS do OS Creator (a que o servidor lê do Fracttal a cada
+    poucos minutos; aqui nada vai ao Fracttal): a descrição e a quem a OS está atribuída (16/11/2026, Levi: "Uma lista de
+    título, qual ativo, qual OS, quem é o técnico"). Sem a lista (o PC sem a cópia, os testes), vazio: a tela fica sem os
+    dois."""
+    try:
+        from ..oscreator import ponte
+        lista = ponte.modulo_do_clone("os_central").atual()
+        out = {}
+        for f in folios or ():
+            r = lista.por_folio.get(str(f))
+            if r is not None:
+                out[str(f)] = {"titulo": str(r.descricao or "").strip(), "tecnico": str(r.atribuido_a or "").strip()}
+        return out
+    except Exception:            # noqa: BLE001 — sem a lista central, a tabela sai sem o título e o técnico
+        _log.debug("prontuário: a lista central de OS não respondeu", exc_info=True)
+        return {}
+
+
 def _de_todas():
     """{"metas": {AAAAMM: {usina_id: linha}}, "disps": {"AAAA-MM": {usina_id: linha}}, "cos", "zel", "tarefas",
     "chamados" ({usina_id: [linhas]}), "nomes_equip" {equipamento_id: descrição}, "estrutura" {usina_id: resumo},
@@ -276,7 +295,8 @@ def montar(usina_id: int, x: dict, cu: dict, vivos: list[dict], rel_url: str = "
         "rondas": PR.rondas_resumo(hist) if hist is not None else None,
         "equip": equip,
         "os_grupos": PR.os_grupos(u.get("manutencao"), (((u.get("manut") or {}).get("valores") or {}).get("atrasadas") or {})
-                                  .get("cls") or "alerta"),
+                                  .get("cls") or "alerta", nomes,
+                                  da_lista_central([o.get("os") for o in (u.get("manutencao") or {}).get("os_nao_iniciadas") or []])),
         "chamados_abertos": (u.get("chamados") or {}).get("lista") or [],
         "chamados_n": (u.get("chamados") or {}).get("abertos") or 0,
         "pts": [{"numero": p.get("numero"), "dia": p.get("apr_dia") or "", "os": PR._int(p.get("os")),

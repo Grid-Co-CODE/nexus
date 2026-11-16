@@ -34,11 +34,11 @@ MODELO_PADRAO = "nemotron"       # o grátis com a melhor nota no teste de 14/11
 ESPERA_ERRO_S = 20 * 60          # o erro guardado vale isto; depois a próxima abertura tenta de novo
 TRAVA_MORTA_S = 5 * 60           # a trava mais velha que isto é de um pedido que morreu (o servidor reiniciou)
 MAX_ITENS = {"tem_que_fazer": 4, "pode_fazer": 3, "pendente": 4}
-MAX_ITEM, MAX_SITUACAO = 160, 320
+MAX_ITEM, MAX_SITUACAO, MAX_PEDIDO = 160, 320, 600
 
 PEDIDO = """Faça o DIAGNÓSTICO DO DIA desta usina para o supervisor dela. A performance do dossiê vai até ontem (D-1); as pendências são as de agora. Seja direto: o supervisor lê em 20 segundos e sabe o que fazer hoje.
 Responda SÓ com o bloco abaixo, em JSON válido, sem nada antes ou depois, sem markdown e sem citar as seções (§). Este formato vale acima do limite de palavras.
-<diagnostico>{"situacao": "...", "tem_que_fazer": [{"acao": "...", "os": null, "destino": null}], "pode_fazer": [{"acao": "...", "os": null, "destino": null}], "pendente": [{"item": "...", "os": null, "destino": null}]}</diagnostico>
+<diagnostico>{"situacao": "...", "tem_que_fazer": [{"acao": "...", "os": null, "destino": null, "pedido": null}], "pode_fazer": [{"acao": "...", "os": null, "destino": null, "pedido": null}], "pendente": [{"item": "...", "os": null, "destino": null, "pedido": null}]}</diagnostico>
 - situacao: 1 ou 2 frases, a conclusão primeiro: como a usina está e por quê, com o número que sustenta (até 220 caracteres).
 - tem_que_fazer: o que o supervisor TEM que fazer (obrigação vencida ou crítica: ronda atrasada, extintor vencido, OS crítica parada, desligamento que se repete), o mais urgente primeiro; até 4; cada um em até 110 caracteres, começando pelo verbo.
 - pode_fazer: o que ele PODE fazer para melhorar (recomendação, não obrigação); até 3; até 110 caracteres, começando pelo verbo.
@@ -50,6 +50,10 @@ Responda SÓ com o bloco abaixo, em JSON válido, sem nada antes ou depois, sem 
   - {"ver": "<onde>"} quando o item é olhar ou decidir algo numa tela: "aprovacao" (aprovar as OS em verificação), "engenharia" (a análise da Engenharia), "extintores" (a lista dos extintores vencidos, a vencer e sem conferência), ou uma parte do prontuário: "performance", "os", "rondas", "seguranca", "cos", "chamados", "insights", "demandas".
   - Os dois juntos quando servem: {"pedir": "...", "ver": "..."} (ex.: conferir os extintores: pedir à Segurança e ver a lista).
   - Quando o item já tem a OS, a OS abre sozinha: use "destino" só se houver também um pedido a um setor ou uma tela.
+- "pedido": quando o destino tem "pedir", o texto do pedido ao setor, pronto para mandar (até 400 caracteres): o que pedir e os dados do dossiê que o setor precisa (as OS, o equipamento, o fabricante, há quantos dias, a situação). Sem "pedir", null.
+- OS: executar, iniciar ou concluir uma OS é do técnico de campo, que o supervisor coordena: vai em "tem_que_fazer" como cobrança da equipe (com "ver": "os"), nunca como pedido a outro setor (nem à Manutenção). Das não iniciadas, só entram as urgentes (religamento, corretiva emergencial) e as atrasadas; as "no prazo" não entram em lista nenhuma.
+- Tarefa pausada: o supervisor não libera a pausa. Diga o motivo e de quem depende ("Como ler a pausa", no §5); vai em "pendente", e só pede algo ao setor do motivo se a tarefa pesa (geração parada, equipamento em falha).
+- Chamados de garantia: cobrar o fabricante, o andamento e juntar uma OS a um chamado é da área Chamados ("pedir": "Chamados", com o tema dela: "Cobrança ao fabricante", "Vincular OS ao chamado de garantia"...). Juntar a OS ao chamado é a sugestão do Insight pelo mesmo equipamento: o dossiê não diz se já estão ligadas, então o item é pedir a Chamados para avaliar, nunca afirmar que não estão.
 - Cada assunto numa lista só: o que o supervisor tem que fazer não se repete em "pendente"; "pendente" é só o que espera outra pessoa ou empresa.
 - Lista vazia quando não houver nada."""
 
@@ -129,8 +133,12 @@ def ler(texto: str, dossie: str, setores: list[dict] | None = None) -> dict | No
                 continue
             os_ = str(x.get("os") or "").strip()
             os_ = os_ if os_ in mapa else ""
-            itens.append({"texto": txt, "os": os_, "os_tipo": mapa.get(os_, ""), "destino": _destino(x, setores or []),
-                          "ver": _ver(x)})
+            destino = _destino(x, setores or [])
+            # o pedido pronto ao setor (16/11/2026, Levi: "solicitar o time de chamados, cobrança de fabricante, STI [...]
+            # Tudo isso já pronto"): só com o "pedir"
+            pedido = _limpo(x.get("pedido"), MAX_PEDIDO) if destino and destino.get("tipo") == "pedir" else ""
+            itens.append({"texto": txt, "os": os_, "os_tipo": mapa.get(os_, ""), "destino": destino, "ver": _ver(x),
+                          "pedido": pedido})
         out[lista] = itens
     return out
 

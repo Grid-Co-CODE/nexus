@@ -27,7 +27,7 @@
 {# as OS de um grupo do cartão das OS: em linhas (a OS e o que explica) ou só os números; as 12 primeiras à vista, o
    resto abre na própria tela (Levi, 28/10/2026, sobre o "e mais": "o supervisor deve saber o que é") #}
 {% macro os_do_grupo(itens, detalhado) %}
-  {% if detalhado %}<ul class="pu-lista pu-lista--os">{% for it in itens %}<li>{{ os_botao(it.os, it.wid) }}<span>{{ it.txt }}</span></li>{% endfor %}</ul>
+  {% if detalhado %}<ul class="pu-lista pu-lista--os">{% for it in itens %}<li>{{ os_botao(it.os, it.wid) }}<span>{{ it.txt }}{% if it.sub %}<small class="pu-os-sub">{{ it.sub }}</small>{% endif %}</span></li>{% endfor %}</ul>
   {% else %}<p class="pu-os-chips">{% for it in itens %}{{ os_botao(it.os, it.wid) }}{% endfor %}</p>{% endif %}
 {% endmacro %}
 {% macro pessoa(papel, nome, vazio='—') %}<li><span class="cn-avatar">{{ iniciais(nome) if nome else '—' }}</span><span><small>{{ papel }}</small><b{% if not nome %} class="mudo"{% endif %}>{{ nome or vazio }}</b></span></li>{% endmacro %}
@@ -202,9 +202,22 @@
       {% if agora %}{{ linhas(agora, {'Parada agora': 'critico'}) }}{% endif %}
       {% for gr in p.os_grupos %}
       <h3 class="pu-sub">{% if gr.tom != 'neutro' %}<i class="pu-ponto pu-ponto--{{ gr.tom }}" aria-hidden="true"></i>{% endif %}{{ gr.rot }} <span class="cu-n">{{ gr.n }}</span>{% if gr.nota %}<span class="mudo">· {{ gr.nota }}</span>{% endif %}</h3>
+      {% if gr.tabela %}
+      {# as não iniciadas numa tabela, a que pesa primeiro (16/11/2026, Levi: "Uma lista de título, qual ativo, qual OS,
+         quem é o técnico"): a urgente, a atrasada e, por último, a no prazo, que não se cobra #}
+      <div class="pu-tab-rola"><table class="pu-tab pu-tab--ni">
+        <thead><tr><th>OS</th><th>O que é</th><th>Ativo</th><th>Técnico</th><th>Programada</th><th>Situação</th></tr></thead>
+        <tbody>{% for it in gr.itens %}<tr>
+          <td>{{ os_botao(it.os, it.wid) }}</td>
+          <td class="pu-ni-t">{{ it.titulo or it.tipo or '—' }}{% if it.titulo and it.tipo %}<small>{{ it.tipo }}</small>{% endif %}</td>
+          <td>{{ it.ativo or '—' }}</td><td>{{ it.tecnico or '—' }}</td><td class="gc-num">{{ it.programada or '—' }}</td>
+          <td><span class="pu-ni-sit pu-ni-sit--{{ it.sit_cls }}">{{ it.sit_txt }}</span></td></tr>{% endfor %}</tbody>
+      </table></div>
+      {% else %}
       {{ os_do_grupo(gr.itens[:12], gr.detalhado) }}
       {% if gr.itens|length > 12 %}
       <details class="pu-at-mais pu-os-mais"><summary>mais {{ gr.itens|length - 12 }}</summary>{{ os_do_grupo(gr.itens[12:], gr.detalhado) }}</details>
+      {% endif %}
       {% endif %}
       {% endfor %}
       {% if not p.os_grupos and not agora %}<p class="pu-nota">{{ 'Sem leitura das OS do Fracttal agora.' if pn.os is none else 'Nenhuma OS aberta nesta usina.' }}</p>{% endif %}

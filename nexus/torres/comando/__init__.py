@@ -460,6 +460,18 @@ def _ia_setores() -> list[dict]:
         current_app.logger.exception("Nexus IA: os setores não abriram")
         return []
     meu = _meu_hmac()
+    # a área do setor é mais um destino (16/11/2026, Levi: "quem cobra é o time de chamados [...] solicitar o time de
+    # chamados"): "Chamados", na Performance, com os temas dela e as pessoas marcadas nela (sem ninguém marcado, o setor
+    # inteiro), a mesma regra da Nova demanda
+    from ...comando import areas as AR
+    from ...comando import temas_padrao as TP
+    areas = {f"{sid}:{a}": {"setor_id": f"{sid}:{a}", "nome": a, "pessoas": [], "temas": [], "_sid": sid, "_area": a}
+             for sid, s in out.items() for a in TP.areas_do_setor(s["nome"])}
+    try:
+        mapa = AR.ler(current_app.config)
+    except Exception:            # noqa: BLE001 — sem o mapa, a área recebe o setor inteiro
+        current_app.logger.exception("Nexus IA: as áreas das demandas não abriram")
+        mapa = {}
     for nome, ler in (("pessoas", DM.pessoas_com_setor), ("temas", DM.temas)):
         try:
             itens = ler()
@@ -472,9 +484,24 @@ def _ia_setores() -> list[dict]:
                 continue
             if nome == "pessoas" and x["hmac"] != meu:
                 s["pessoas"].append({"hmac": x["hmac"], "nome": x["nome"]})
+                for a in areas.values():
+                    if a["_sid"] == x["setor_id"]:
+                        a.setdefault("_todas", []).append({"hmac": x["hmac"], "nome": x["nome"]})
+                        if a["_area"] in AR.areas_da_pessoa(mapa, x["setor_id"], x["hmac"]):
+                            a["pessoas"].append({"hmac": x["hmac"], "nome": x["nome"]})
             elif nome == "temas":
-                s["temas"].append({"tema_id": x["tema_id"], "nome": x["nome"], "prazo": x["prazo_dias_uteis"]})
-    return sorted(out.values(), key=lambda s: s["nome"].lower())
+                t = {"tema_id": x["tema_id"], "nome": x["nome"], "prazo": x["prazo_dias_uteis"]}
+                area = (x.get("area") or "").strip()
+                if not area:
+                    s["temas"].append(t)
+                elif f"{x['setor_id']}:{area}" in areas:
+                    areas[f"{x['setor_id']}:{area}"]["temas"].append(t)
+    for a in areas.values():
+        if not a["pessoas"]:
+            a["pessoas"] = a.get("_todas") or []
+        for k in ("_sid", "_area", "_todas"):
+            a.pop(k, None)
+    return sorted(list(out.values()) + list(areas.values()), key=lambda s: s["nome"].lower())
 
 
 def _ia_criar_os() -> dict:

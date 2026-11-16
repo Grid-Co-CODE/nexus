@@ -292,12 +292,19 @@ def _bloco_os(u: dict | None, x: dict | None) -> dict | None:
     return {"abertas": abertas, "partes": partes, "linhas": linhas, "semana": semana}
 
 
-def os_grupos(man: dict | None, cls_atrasadas: str = "alerta") -> list[dict]:
+def os_grupos(man: dict | None, cls_atrasadas: str = "alerta", nomes: dict | None = None,
+              central: dict | None = None) -> list[dict]:
     """As OS do cartão, o que pede ação primeiro: as atrasadas (a mais antiga primeiro, com os dias e o tipo), as
     pausadas (o motivo, desde quando e quem) e, pelo estado no Fracttal, as que esperam a verificação, as em execução e
     as não iniciadas. [{"chave", "rot", "n", "nota", "tom", "detalhado", "itens": [{"os", "wid", "txt"}]}]; o grupo
     vazio não entra. As listas são as do bloco Manutenção da Visão (`manutencao.tarefas_por_usina`), inteiras: o "e
-    mais" abre na tela (Levi, 28/10/2026: "o supervisor deve saber o que é")."""
+    mais" abre na tela (Levi, 28/10/2026: "o supervisor deve saber o que é").
+    As não iniciadas vêm numa tabela, a que pesa primeiro (16/11/2026, Levi, na Marabá 200: "seria interessante o
+    supervisor conseguir ver quais são as OS não iniciadas. Uma lista de título, qual ativo, qual OS, quem é o técnico";
+    e "tarefa não iniciada e que não está atrasada também não entra nesse meio do que está parado ou atrasado"): as
+    urgentes (religamento, corretiva emergencial), as atrasadas pela régua do PCM e, por último, as no prazo, que não se
+    cobram. `nomes` = {equipamento_id: nome}; `central` = {nº da OS: {"titulo", "tecnico"}} (a lista central do OS
+    Creator, `prontuario_dados.da_lista_central`); sem eles, o código do ativo e o técnico vazio."""
     from ..campo.manutencao import DIAS_ATRASO
     man = man or {}
 
@@ -317,20 +324,73 @@ def os_grupos(man: dict | None, cls_atrasadas: str = "alerta") -> list[dict]:
         out.append({"chave": "atrasadas", "rot": "Atrasadas", "n": len(atr), "tom": cls_atrasadas, "detalhado": True,
                     "nota": f"{n} {'tarefa programada' if n == 1 else 'tarefas programadas'} há mais de {DIAS_ATRASO} dias",
                     "itens": atr})
+    # a pausa com o porquê (16/11/2026, Levi: "Primeiro, está pausada por quê? [...] Ou está dependendo de quem?"): quem
+    # pausou e a observação dele
     par = [{"os": x.get("os"), "wid": x.get("wid"),
-            "txt": " · ".join(p for p in (str(x.get("motivo") or ""), f"desde {dm(x['desde'])}" if x.get("desde") else "",
-                                          str(x.get("quem") or "")) if p)}
+            "txt": " · ".join(p for p in (str(x.get("motivo") or ""),
+                                          {"app": "pausada pelo técnico no App", "pcm": "pausada pelo PCM"}.get(x.get("origem") or "", ""),
+                                          f"desde {dm(x['desde'])}" if x.get("desde") else "",
+                                          str(x.get("quem") or "")) if p),
+            "sub": " · ".join(p for p in (str(x.get("tarefa") or ""), f"“{x['obs']}”" if x.get("obs") else "") if p)}
            for x in man.get("todas_paradas") or []]
     if par:
         out.append({"chave": "pausadas", "rot": "Pausadas", "n": len(par), "tom": "alerta", "detalhado": True,
                     "nota": "fora da programação, com o motivo", "itens": par})
     for chave, campo, rot, nota in (("verificacao", "os_verificacao", "Esperando a verificação", "feitas, falta aprovar"),
-                                    ("execucao", "os_em_execucao", "Em execução", ""),
-                                    ("nao_iniciadas", "os_nao_iniciadas", "Não iniciadas", "")):
+                                    ("execucao", "os_em_execucao", "Em execução", "")):
         itens = [{"os": x.get("os"), "wid": x.get("wid"), "txt": ""} for x in man.get(campo) or []]
         if itens:
             out.append({"chave": chave, "rot": rot, "n": len(itens), "tom": "neutro", "detalhado": False, "nota": nota,
                         "itens": itens})
+    ni = nao_iniciadas(man.get("os_nao_iniciadas"), nomes, central)
+    if ni:
+        n_urg = sum(1 for x in ni if x["situacao"] == "urgente")
+        n_atr = sum(1 for x in ni if x["situacao"] == "atrasada")
+        n_ok = len(ni) - n_urg - n_atr
+        nota = " · ".join(p for p in (f"{n_urg} {'urgente' if n_urg == 1 else 'urgentes'}" if n_urg else "",
+                                      f"{n_atr} {'atrasada' if n_atr == 1 else 'atrasadas'}" if n_atr else "",
+                                      f"{n_ok} no prazo, sem cobrança" if n_ok else "") if p)
+        out.append({"chave": "nao_iniciadas", "rot": "Não iniciadas", "n": len(ni),
+                    "tom": "critico" if n_urg else ("alerta" if n_atr else "neutro"), "detalhado": True, "tabela": True,
+                    "nota": nota, "itens": ni})
+    return out
+
+
+_SITUACAO_NI = {"urgente": (0, "critico"), "atrasada": (1, "alerta"), "no prazo": (2, "ok")}
+
+
+def nao_iniciadas(lista, nomes: dict | None = None, central: dict | None = None) -> list[dict]:
+    """As OS não iniciadas, a que pesa primeiro: [{os, wid, txt, titulo, tecnico, ativo, tipo, programada, situacao,
+    sit_txt, sit_cls}]. `situacao`: "urgente" (religamento, corretiva emergencial), "atrasada" (programada há mais de
+    `DIAS_ATRASO` dias, a régua do PCM) ou "no prazo". `txt` vai sem pessoa (o dossiê da IA usa)."""
+    nomes, central = nomes or {}, central or {}
+    out = []
+    for x in lista or []:
+        tipos = [_TIPO_TAREFA.get(t, str(t).replace("_", " ")) for t in x.get("tipos") or []]
+        ativos = [nomes.get(e) for e in x.get("equipamentos") or [] if nomes.get(e)] or list(x.get("codigos") or [])
+        ativo = ativos[0] + (f" e mais {len(ativos) - 1}" if len(ativos) > 1 else "") if ativos else ""
+        prog, dias = x.get("programada"), x.get("dias")
+        sit = "urgente" if x.get("urgente") else ("atrasada" if x.get("atrasada") else "no prazo")
+        if sit == "urgente":
+            sit_txt = "urgente" + (f", há {dias} d" if dias and dias > 0 else "")
+        elif sit == "atrasada":
+            sit_txt = f"atrasada há {dias} d"
+        else:
+            sit_txt = "no prazo"
+        c = central.get(str(x.get("os"))) or {}
+        prog_txt = prog.strftime("%d/%m") if hasattr(prog, "strftime") else ""
+        out.append({"os": x.get("os"), "wid": x.get("wid"), "titulo": c.get("titulo") or "", "tecnico": c.get("tecnico") or "",
+                    "ativo": ativo, "tipo": ", ".join(tipos), "programada": prog_txt, "dias": dias, "situacao": sit,
+                    "sit_txt": sit_txt, "sit_cls": _SITUACAO_NI[sit][1],
+                    "txt": " · ".join(p for p in (", ".join(tipos), ativo,
+                                                  f"programada para {prog_txt}" if prog_txt else "sem data programada",
+                                                  sit_txt) if p)})
+        out[-1]["_ord"] = prog.toordinal() if hasattr(prog, "toordinal") else 10 ** 9
+    # a urgente e a atrasada mais velhas primeiro; a no prazo pela data, a mais próxima primeiro
+    out.sort(key=lambda r: (_SITUACAO_NI[r["situacao"]][0], r["_ord"] if r["situacao"] == "no prazo" else -(r["dias"] or 0),
+                            str(r["os"])))
+    for r in out:
+        r.pop("_ord")
     return out
 
 

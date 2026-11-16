@@ -30,6 +30,11 @@ _VIVA = ("em_processo", "em_verificacao")
 # a tarefa que mostra que a OS começou (Levi, 18/10/2026: separar nas OS abertas "o que não foi iniciado"): em progresso,
 # pausada no App ou feita. Sem nenhuma, a OS em processo não foi iniciada (estado vazio não prova começo)
 _COMECOU = ("em_progresso", "pausada", "finalizada")
+# a OS não iniciada que pesa (16/11/2026, Levi, na Marabá 200: "tarefa não iniciada e que não está atrasada também não entra
+# nesse meio do que está parado ou atrasado [...] Claro que tem urgências, corretivo emergencial, religamento remoto. Mas o
+# que não é urgência? O supervisor realmente precisa estar sendo cobrado por isso?"): a urgência pelo tipo da tarefa; o
+# atraso pela régua do PCM (`DIAS_ATRASO`); o resto está no prazo e não se cobra
+URGENTES = ("religamento", "religamento_remoto", "corretiva_emergencial")
 
 
 def _dia(v) -> date | None:
@@ -51,9 +56,14 @@ def marcas_paradas(vigentes: dict, usina_de) -> list[dict]:
         os_, chave = D._id(m.get("os")), D.tarefa_chave(m.get("tarefa"))
         if not os_ or not chave:
             continue
+        # o porquê da pausa (16/11/2026, Levi: "tem que entender o motivo por que foi pausada [...] O supervisor
+        # realmente tem esse poder de liberar? Ou está dependendo de quem?"): quem pausou (o técnico no App ou o PCM), a
+        # observação dele e se o motivo tira da programação
         out.append({"usina_id": usina_de(m), "os": os_, "codigo": E.canon(m.get("codigo")), "chave": chave,
                     "motivo": D._txt(m.get("motivo")) or None, "desde": _dia(D.data_do_registro(m.get("desde"))),
-                    "quem": D._txt(m.get("quem_motivo") or m.get("quem")) or None})
+                    "quem": D._txt(m.get("quem_motivo") or m.get("quem")) or None,
+                    "origem": "app" if m.get("origem_motivo") == "app" else "pcm", "tira": bool(m.get("tira")),
+                    "obs": D._txt(m.get("obs"))[:300] or None, "tarefa": D._txt(m.get("tarefa"))[:120] or None})
     return out
 
 
@@ -75,6 +85,7 @@ def tarefas_por_usina(tarefas, marcas: list[dict], os_de_chamado: set, hoje: dat
     idx = {(m["os"], m["codigo"], m["chave"]): m for m in marcas}
     out, abertas, verif, atr, tipo_atr, wids, paradas = {}, {}, {}, {}, {}, {}, {}
     comecou = set()
+    info: dict = {}             # por OS: os tipos, os ativos e a data programada mais cedo das tarefas vivas
 
     def r_(uid):
         return out.setdefault(uid, _vazio())
@@ -113,6 +124,14 @@ def tarefas_por_usina(tarefas, marcas: list[dict], os_de_chamado: set, hoje: dat
         if fora:
             continue
         abertas.setdefault(uid, set()).add(os_)
+        i = info.setdefault(os_, {"tipos": set(), "codigos": set(), "equipamentos": set(), "prog": None})
+        if tipo:
+            i["tipos"].add(tipo)
+        if D._txt(t.get("codigo_ativo")):
+            i["codigos"].add(D._txt(t.get("codigo_ativo")))
+        if D._id(t.get("equipamento_id")):
+            i["equipamentos"].add(D._id(t.get("equipamento_id")))
+        i["prog"] = _min(i["prog"], prog)
         if prog:
             dias = (hoje - prog).days
             if dias > DIAS_ATRASO:
@@ -135,7 +154,7 @@ def tarefas_por_usina(tarefas, marcas: list[dict], os_de_chamado: set, hoje: dat
         # as OS de cada estado, com o id do Fracttal (o card da OS): o prontuário da usina as lista (12/11/2026, Levi:
         # "mesmo dando drill down, a informação direta ali na lata"). Cada contagem de cima é o tamanho da lista dela
         r["os_verificacao"] = [{"os": o, "wid": wids.get(o)} for o in sorted(verif.get(uid, ()))]
-        r["os_nao_iniciadas"] = [{"os": o, "wid": wids.get(o)} for o in sorted(em_processo - comecou)]
+        r["os_nao_iniciadas"] = [_nao_iniciada(o, wids.get(o), info.get(o), hoje) for o in sorted(em_processo - comecou)]
         r["os_em_execucao"] = [{"os": o, "wid": wids.get(o)} for o in sorted(em_processo & comecou)]
         a = atr.get(uid, {})
         r["atrasadas_os"], r["maior_atraso"] = len(a), (max(a.values()) if a else None)
@@ -150,10 +169,24 @@ def tarefas_por_usina(tarefas, marcas: list[dict], os_de_chamado: set, hoje: dat
         r["motivo_comum"] = sorted(cont.items(), key=lambda kv: (-kv[1], kv[0]))[0][0] if cont else None
         unicas = {(m["os"], m["codigo"], m["chave"]): m for m in ps}
         r["todas_paradas"] = [{"os": m["os"], "wid": wids.get(m["os"]), "motivo": m["motivo"], "desde": m["desde"],
-                               "quem": m["quem"]}
+                               "quem": m["quem"], "origem": m.get("origem"), "tira": m.get("tira"), "obs": m.get("obs"),
+                               "tarefa": m.get("tarefa")}
                               for m in sorted(unicas.values(), key=lambda m: (m["desde"] or date.max, m["os"]))]
         r["lista_paradas"] = r["todas_paradas"][:5]
     return out
+
+
+def _nao_iniciada(os_, wid, i: dict | None, hoje: date) -> dict:
+    """A OS não iniciada com o que pesa: os tipos e os ativos das tarefas, a data programada mais cedo, os dias desde ela
+    (negativo = ainda vem), `urgente` (religamento, religamento remoto, corretiva emergencial) e `atrasada` (a régua do
+    PCM: programada há mais de `DIAS_ATRASO` dias). O resto está no prazo."""
+    i = i or {}
+    tipos = sorted(i.get("tipos") or ())
+    prog = i.get("prog")
+    dias = (hoje - prog).days if prog else None
+    return {"os": os_, "wid": wid, "tipos": tipos, "codigos": sorted(i.get("codigos") or ()),
+            "equipamentos": sorted(i.get("equipamentos") or ()), "programada": prog, "dias": dias,
+            "urgente": any(t in URGENTES for t in tipos), "atrasada": dias is not None and dias > DIAS_ATRASO}
 
 
 def semana_por_usina(prog: list[dict], hoje: date, agora_hhmm: str) -> dict[int, dict]:

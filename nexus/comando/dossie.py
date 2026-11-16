@@ -33,7 +33,7 @@ from datetime import date, datetime
 
 from . import prontuario as PR
 
-VERSAO = 3
+VERSAO = 4
 # a cor da tela em palavras (a régua é a de cada tela dona; aqui só o nome)
 GRAVIDADE = {"critico": "crítico", "alerta": "atenção", "atencao": "atenção", "semcom": "sem comunicação",
              "info": "informativo", "ok": "em dia", "neutro": ""}
@@ -239,10 +239,25 @@ def _os(u: dict, p: dict, com_pessoas: bool) -> list[str]:
     for g in p.get("os_grupos") or []:
         out += ["", f"{g.get('rot')} ({g.get('n')})" + (f", {g['nota']}" if g.get("nota") else "") + ":"]
         if g.get("chave") == "pausadas":
-            # da lista crua, para o nome de quem pausou só entrar com `com_pessoas`
+            # da lista crua, para o nome de quem pausou só entrar com `com_pessoas`; o porquê (16/11/2026, Levi: "Primeiro,
+            # está pausada por quê? Qual é a relevância disso? [...] O supervisor realmente tem esse poder de liberar?")
+            out.append("- " + PAUSA_LER)
             for t in man.get("todas_paradas") or []:
-                out.append("- " + _junta(f"OS {_t(t.get('os'))}", t.get("motivo"), f"desde {_dia(str(t.get('desde') or '')[:10])}"
-                                         if t.get("desde") else "", t.get("quem") if com_pessoas else ""))
+                out.append("- " + _junta(
+                    f"OS {_t(t.get('os'))}", f"motivo: {_t(t.get('motivo'))}" if t.get("motivo") else "",
+                    {"app": "pausada pelo técnico no App", "pcm": "pausada pelo PCM"}.get(t.get("origem") or "", ""),
+                    ("tira da programação" if t.get("tira") else "não tira da programação") if t.get("tira") is not None else "",
+                    f"desde {_dia(str(t.get('desde') or '')[:10])}" if t.get("desde") else "",
+                    f"tarefa: {_t(t.get('tarefa'))}" if t.get("tarefa") else "",
+                    f"observação de quem pausou: {_t(t.get('obs'))}" if t.get("obs") else "sem observação",
+                    t.get("quem") if com_pessoas else ""))
+        elif g.get("chave") == "nao_iniciadas":
+            # o que pesa (16/11/2026, Levi: "tarefa não iniciada e que não está atrasada também não entra nesse meio do que
+            # está parado ou atrasado [...] O supervisor realmente precisa estar sendo cobrado por isso?")
+            out.append("- " + NAO_INICIADAS_LER)
+            for i in g.get("itens") or []:
+                out.append("- " + _junta(f"OS {_t(i.get('os'))}", f"\"{_t(i.get('titulo'))}\"" if i.get("titulo") else "",
+                                         i.get("txt"), f"técnico: {_t(i.get('tecnico'))}" if com_pessoas and i.get("tecnico") else ""))
         elif g.get("detalhado"):
             out += ["- " + _junta(f"OS {_t(i.get('os'))}", i.get("txt")) for i in g.get("itens") or []]
         else:
@@ -519,6 +534,18 @@ def _fora(ctx: dict, p: dict, cu: dict, extras: dict) -> list[str]:
     return ["As fontes abaixo não abriram quando o dossiê foi gerado. O que depende delas está incompleto, e isso não quer "
             "dizer que não há problema:"] + [f"- {f}" for f in fora]
 
+
+# o que a pausa quer dizer (16/11/2026): o motivo é o do PCM (Fora da programação), posto pelo técnico no App ou pelo PCM
+PAUSA_LER = ("Como ler a pausa: o motivo diz de quem a tarefa depende. Engenharia = a tarefa envolve a Engenharia (o "
+             "backoffice, ou o campo com o apoio dela); Chamados (garantia) = depende da garantia; Performance = envolve a "
+             "Performance; Aguardando cliente, concessionária, material ou fabricante/terceiro = espera esse terceiro; Pendente "
+             "recurso = falta peça ou material; Condições climáticas adversas e Vegetação alta = o campo não consegue agora; "
+             "Prioridade = a pedido do cliente; Sinistro = furto, incêndio, raio. Quem destrava é quem o motivo aponta, não o "
+             "supervisor: ele não \"libera\" a pausa")
+# o que pesa nas não iniciadas (16/11/2026)
+NAO_INICIADAS_LER = ("Como ler as não iniciadas: urgente (religamento, religamento remoto, corretiva emergencial) e atrasada "
+                     "(programada há mais de 10 dias, a régua do PCM) pesam; \"no prazo\" não é atraso nem pendência do "
+                     "supervisor e não se cobra")
 
 COMO_LER = (
     "- Este documento é tudo o que o Nexus sabe da usina neste instante. O que não está escrito aqui, o Nexus não sabe.",
