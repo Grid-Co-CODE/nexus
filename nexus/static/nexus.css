@@ -40,6 +40,9 @@
   --critico-a35:rgba(255,91,110,.35); --critico-a45:rgba(255,91,110,.45); --agir-tinta:#fff;
   --erro:#ff7a7a; --erro-cheio:#ff7a7a; --erro-a08:rgba(255,122,122,.08); --erro-a42:rgba(255,122,122,.42); --erro-a55:rgba(255,122,122,.55);
   --info:#7fb8ff; --info-suave:rgba(91,157,255,.14); --info-a10:rgba(127,184,255,.10); --info-a42:rgba(127,184,255,.42);
+  /* o azul escuro do pedaço clicável da frase do Nexus IA Insights (16/11/2026, Levi: "troca por azul escuro"): o mais
+     escuro que ainda passa 4,5:1 no cartão (#3b82f6 dá 4,56:1 no #161d30) */
+  --azul-link:#3b82f6;
   --semcom:#b39dff; --semcom-suave:rgba(179,157,255,.14);
   /* Coletas > Furos (11/11/2026): as categorias do relatório de furos (valor anômalo, ausência esperada por OS, falha crítica) */
   --anomalo:#f472b6; --esperado:#2dd4bf; --critico-escuro:#8a1c2a;
@@ -118,6 +121,7 @@ html[data-tema="claro"]{color-scheme:light}
   --critico-a35:rgba(220,53,69,.22); --critico-a45:rgba(180,34,48,.40); --agir-tinta:#8a1822;
   --erro:#b42230; --erro-cheio:#ef5d6e; --erro-a08:rgba(220,53,69,.07); --erro-a42:rgba(180,34,48,.38); --erro-a55:rgba(180,34,48,.5);
   --info:#0954ad; --info-suave:rgba(9,105,218,.08); --info-a10:rgba(9,105,218,.07); --info-a42:rgba(10,95,196,.38);
+  --azul-link:#0954ad;
   --semcom:#673ab9; --semcom-suave:rgba(130,80,223,.08);
   --anomalo:#a3195b; --esperado:#0f766e; --critico-escuro:#8a1c2a;
   --ok-cheio:#3dbb68; --lima-cheio:#a8e05f; --alerta-cheio:#f0b429; --severo-cheio:#f59342; --critico-cheio:#ef5d6e;

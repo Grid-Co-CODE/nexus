@@ -446,9 +446,9 @@ a.ins-titulo:hover{color:var(--verde-texto)}
 .pu-diag-linha{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px}
 .pu-diag .pu-par-t--ia{font:600 15px/1.45 var(--font-sans)}
 /* a frase clicável: o assunto leva ao cartão dele; a OS abre a OS (15/11/2026) */
-/* o pedaço clicável em amarelo, sem sublinhado (16/11/2026, Levi, em teste: "Ao invés de sublinhado e branco, sólido,
-   deixa a fonte amarela"); a OS segue verde. O sublinhado só no passar do mouse, para dizer que clica */
-.pu-diag-link{color:var(--alerta);text-decoration:none}
+/* o pedaço clicável em azul escuro, sem sublinhado (16/11/2026, Levi, em teste: "deixa a fonte amarela", e depois
+   "troca por azul escuro"); a OS segue verde. O sublinhado só no passar do mouse, para dizer que clica */
+.pu-diag-link{color:var(--azul-link);text-decoration:none}
 .pu-diag-link:hover{text-decoration:underline;text-underline-offset:4px}
 .pu-diag-oslink{padding:0;border:0;background:none;color:var(--verde-texto);font:inherit;text-decoration:none;cursor:pointer}
 .pu-diag-oslink:hover{text-decoration:underline;text-underline-offset:4px}
