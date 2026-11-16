@@ -134,6 +134,9 @@ def ler(texto: str, dossie: str, setores: list[dict] | None = None) -> dict | No
             os_ = str(x.get("os") or "").strip()
             os_ = os_ if os_ in mapa else ""
             destino = _destino(x, setores or [])
+            # executar OS é do técnico: o "Fazer" que pediria isso a outro setor não sai (a mesma trava do chat)
+            if destino and destino.get("tipo") == "pedir" and IA.acao_de_campo(destino.get("setor") or "", txt):
+                destino = None
             # o pedido pronto ao setor (16/11/2026, Levi: "solicitar o time de chamados, cobrança de fabricante, STI [...]
             # Tudo isso já pronto"): só com o "pedir"
             pedido = _limpo(x.get("pedido"), MAX_PEDIDO) if destino and destino.get("tipo") == "pedir" else ""
