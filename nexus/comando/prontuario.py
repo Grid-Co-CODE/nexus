@@ -380,6 +380,7 @@ def nao_iniciadas(lista, nomes: dict | None = None, central: dict | None = None)
         c = central.get(str(x.get("os"))) or {}
         prog_txt = prog.strftime("%d/%m") if hasattr(prog, "strftime") else ""
         out.append({"os": x.get("os"), "wid": x.get("wid"), "titulo": c.get("titulo") or "", "tecnico": c.get("tecnico") or "",
+                    "na_lista": bool(c),     # a OS está na lista central: sem técnico ali é "sem técnico atribuído"
                     "ativo": ativo, "tipo": ", ".join(tipos), "programada": prog_txt, "dias": dias, "situacao": sit,
                     "sit_txt": sit_txt, "sit_cls": _SITUACAO_NI[sit][1],
                     "txt": " · ".join(p for p in (", ".join(tipos), ativo,

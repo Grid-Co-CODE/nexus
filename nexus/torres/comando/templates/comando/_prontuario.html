@@ -205,14 +205,12 @@
       {% if gr.tabela %}
       {# as não iniciadas numa tabela, a que pesa primeiro (16/11/2026, Levi: "Uma lista de título, qual ativo, qual OS,
          quem é o técnico"): a urgente, a atrasada e, por último, a no prazo, que não se cobra #}
-      <div class="pu-tab-rola"><table class="pu-tab pu-tab--ni">
-        <thead><tr><th>OS</th><th>O que é</th><th>Ativo</th><th>Técnico</th><th>Programada</th><th>Situação</th></tr></thead>
-        <tbody>{% for it in gr.itens %}<tr>
-          <td>{{ os_botao(it.os, it.wid) }}</td>
-          <td class="pu-ni-t">{{ it.titulo or it.tipo or '—' }}{% if it.titulo and it.tipo %}<small>{{ it.tipo }}</small>{% endif %}</td>
-          <td>{{ it.ativo or '—' }}</td><td>{{ it.tecnico or '—' }}</td><td class="gc-num">{{ it.programada or '—' }}</td>
-          <td><span class="pu-ni-sit pu-ni-sit--{{ it.sit_cls }}">{{ it.sit_txt }}</span></td></tr>{% endfor %}</tbody>
-      </table></div>
+      <ul class="pu-ni">{% for it in gr.itens %}
+        <li>{{ os_botao(it.os, it.wid) }}
+          <span class="pu-ni-c"><b>{{ it.titulo or it.tipo or '—' }}</b>
+            <small>{{ [it.tipo if it.titulo else '', it.ativo, ('técnico: ' ~ it.tecnico) if it.tecnico else ('sem técnico atribuído' if it.na_lista else ''), ('programada para ' ~ it.programada) if it.programada else 'sem data programada']|select|join(' · ') }}</small></span>
+          <span class="pu-ni-sit pu-ni-sit--{{ it.sit_cls }}">{{ it.sit_txt }}</span></li>{% endfor %}
+      </ul>
       {% else %}
       {{ os_do_grupo(gr.itens[:12], gr.detalhado) }}
       {% if gr.itens|length > 12 %}

@@ -632,10 +632,16 @@ a.ins-titulo:hover{color:var(--verde-texto)}
 .pu-tab b.cn-t-alerta{color:var(--alerta)}
 .pu-tab b.cn-t-ok{color:var(--ok)}
 .pu-tab-rola{overflow-x:auto;padding:0 20px 8px}
-/* as não iniciadas (16/11/2026): o que é quebra a linha; a situação na cor dela, em pílula */
-.pu-tab--ni td.pu-ni-t{white-space:normal;min-width:220px;max-width:420px}
-.pu-tab--ni td.pu-ni-t small{display:block;margin-top:2px;color:var(--mudo);font-size:11.5px}
-.pu-ni-sit{display:inline-block;padding:1px 8px;border-radius:var(--raio-tag);font:600 11.5px/18px var(--font-sans)}
+/* as não iniciadas (16/11/2026): a OS, o que é (com o tipo, o ativo, o técnico e a data embaixo) e a situação em pílula,
+   na cor dela; cabe no cartão estreito sem rolar para o lado */
+.pu-ni{list-style:none;margin:0;padding:0 20px 10px}
+.pu-ni li{display:grid;grid-template-columns:86px minmax(0,1fr) auto;gap:2px 12px;align-items:baseline;padding:7px 0;
+  border-top:1px solid var(--linha)}
+.pu-ni li:first-child{border-top:0}
+.pu-ni .pu-os{justify-self:start}
+.pu-ni-c b{display:block;font-weight:500;color:var(--tinta);overflow-wrap:anywhere}
+.pu-ni-c small{display:block;margin-top:2px;color:var(--mudo);font-size:11.5px;overflow-wrap:anywhere}
+.pu-ni-sit{display:inline-block;justify-self:end;padding:1px 8px;white-space:nowrap;border-radius:var(--raio-tag);font:600 11.5px/18px var(--font-sans)}
 .pu-ni-sit--critico{background:var(--critico-suave);color:var(--critico)}
 .pu-ni-sit--alerta{background:var(--alerta-suave);color:var(--alerta)}
 .pu-ni-sit--ok{background:var(--superficie-2);color:var(--tinta-2)}
