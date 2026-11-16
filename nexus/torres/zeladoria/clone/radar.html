@@ -9865,7 +9865,7 @@ function finEhHead(){ return currentUserPapel === 'HEAD'; }
    mudam a tela (subaba, período, filtros, mês) continuam funcionando — lista FIN_NAV_SO_LEITURA. Promover/editar
    provisão continuam só do HEAD. */
 function finVisaoVisivel(){ return finEhHead() || podeVerAba('financeiro'); }
-var FIN_NAV_SO_LEITURA = '[data-fin-sub-aba],[data-fin-escopo],[data-fin-periodo],[data-fin-base],[data-fin-chip],#fin-limpar-filtros,#fin-alt-todas,#fin-busca,#fin-somar-cenario,[data-fin-periodo-modo],[data-fin-periodo-preset],[data-fin-periodo-limpar],#fin-periodo-de,#fin-periodo-ate,#btn-fin-relatorio,#overlay-fin-rel button,#overlay-fin-rel input';
+var FIN_NAV_SO_LEITURA = '[data-fin-sub-aba],[data-fin-escopo],[data-fin-periodo],[data-fin-base],[data-fin-chip],#fin-limpar-filtros,#fin-alt-todas,#fin-busca,#fin-somar-cenario,[data-fin-periodo-modo],[data-fin-periodo-preset],[data-fin-periodo-limpar],#fin-periodo-de,#fin-periodo-ate,#btn-fin-relatorio,#overlay-fin-rel button,#overlay-fin-rel input,#btn-fin-explicar,#overlay-fin-explicar button,#overlay-fin-explicar input,#overlay-fin-explicar select,#overlay-fin-explicar textarea';
 /* Financeiro abre na Visão executiva (sem o selo beta) desde 2026-11-10. "Mês a mês - Geral" oculto para todos menos o
    Analista (pedido dele, 2026-11-10: o chefe pediu para tirar, mas pode precisar mais na frente) — a página continua no código. */
 var FIN_GERAL_EMAILS = [];
@@ -9915,7 +9915,7 @@ function finRenderExecutivo(){
   /* ordem pedida pelo Analista (2026-11-06): Alterações e motivos sobe; tabela mensal desce e ganha embaixo a lista de pagamentos do mês */
   h += finAlteracoesHtml();
   h += '<div class="fx-grid2"><div style="display:flex;flex-direction:column;gap:16px;">' + finTabelaHtml(info) + finPagamentosMesHtml(sel.mes, op) + '</div>' + finDetalheHtml(sel) + '</div>';
-  h += finProvisoesHtml() + finCenariosHtml() + finRelModalHtml();
+  h += finProvisoesHtml() + finCenariosHtml() + finRelModalHtml() + finExplicarModalHtml();
   return h + '</div>';
 }
 function finAvisosHtml(){
@@ -9941,6 +9941,7 @@ function finBarraHtml(){
   h += '<div class="fx-ctl"><span class="fx-lbl">Somar simulação</span><select class="fx-simsel" id="fin-somar-cenario"><option value="">Nenhuma — só previsto</option>' +
     som.map(function(c){ return '<option value="' + esc(c.id) + '"' + (c.id === u.cenarioId ? ' selected' : '') + '>' + esc(c.nome) + '</option>'; }).join('') + '</select></div>';
   h += '<div class="fx-ctl"><button type="button" class="btn btn-primary btn-sm" id="btn-fin-relatorio" title="Excel detalhado ou PDF executivo: previsto, realizado, a pagar, provisões, conciliação e lançamentos">Exportar relatório</button></div>';
+  h += '<div class="fx-ctl"><button type="button" class="btn btn-ghost btn-sm" id="btn-fin-explicar" title="Texto pronto, em linguagem simples, pra explicar pro Financeiro o fechamento do mês e por que o previsto mudou">Explicar pro Financeiro</button></div>';
   h += '<div class="fx-legend"><span><i class="fx-sw-real"></i>Realizado (pago)</span><span><i class="fx-sw-aberto"></i>Lançado a pagar</span><span><i class="fx-sw-prov"></i>Provisão · alinhar financeiro</span><span><i class="fx-sw-sim"></i>Simulado</span><span><i class="fx-sw-meta"></i>Meta</span></div>';
   return h + '</div>';
 }
@@ -11076,6 +11077,139 @@ function finRelBind(app){
   var x1 = app.querySelector('#btn-fin-rel-excel'); if (x1) x1.addEventListener('click', function(){ var R = finRelDados(r.de, r.ate, r.filtros); if (R) finRelExcel(R); });
   var x2 = app.querySelector('#btn-fin-rel-pdf'); if (x2) x2.addEventListener('click', function(){ var R = finRelDados(r.de, r.ate, r.filtros); if (R) finRelPdf(R); });
 }
+/* ---------- "Explicar pro Financeiro" (2026-11-16) ----------
+   Pedido pontual do Victor: todo início de mês ele precisa escrever pro Financeiro por que o fechamento do mês deu
+   diferente do previsto (sobrou saldo) e por que o previsto dos próximos meses mudou — hoje isso é feito "na mão"
+   toda vez. Este botão (ao lado de "Exportar relatório", mesma barra da Visão executiva) monta um TEXTO pronto,
+   em linguagem simples, pra copiar/colar num e-mail: usa a MESMA fonte de sempre (finMesInfo, finProvisoesAtivas,
+   finAlteracoes — nenhuma conta nova, nenhuma coluna nova no banco). Só lê, não grava nada. */
+function finExplicarMesesFechados(){
+  var r = [], m = finAddMes(finMesAtual(), -12);
+  for (var i = 0; i < 12; i++) { r.push(m); m = finAddMes(m, 1); }
+  return r;
+}
+/* soma, por mês, o quanto cada alteração de PROVISÃO (valor editado, mês incluído/removido — as únicas que mexem
+   no previsto) empurrou o previsto pra cima ou pra baixo, dentro da janela [de, ate]. Edições de Acompanhamento
+   (parcela) entram à parte, em finExplicarDados.acompAlt — não têm o "mes" da provisão aqui. */
+function finExplicarAlteracoesPorMes(de, ate, itemPorId){
+  var deD = new Date(de + 'T00:00:00'), ateD = new Date(ate + 'T23:59:59'), porMes = {};
+  finAlteracoes().filter(function(a){ if (a.acomp) return false; var d = new Date(a.em); return !isNaN(d) && d >= deD && d <= ateD; }).forEach(function(a){
+    var porMesDoEvento = {};
+    a.linhas.forEach(function(l){
+      if (!l.mes || ['valor', 'mes_incluido', 'mes_removido'].indexOf(l.campo) === -1) return;
+      var delta = l.campo === 'mes_removido' ? -(Number(l.valor_antigo) || 0) : l.campo === 'mes_incluido' ? (Number(l.valor_novo) || 0) : (Number(l.valor_novo) || 0) - (Number(l.valor_antigo) || 0);
+      porMesDoEvento[l.mes] = (porMesDoEvento[l.mes] || 0) + delta;
+    });
+    var it = itemPorId[a.itemId] || {}, d = new Date(a.em), quando = isNaN(d) ? '' : d.toLocaleDateString('pt-BR');
+    Object.keys(porMesDoEvento).forEach(function(m){
+      var delta = r2(porMesDoEvento[m]); if (Math.abs(delta) < 0.5) return;
+      var o = porMes[m] || (porMes[m] = { mes: m, delta: 0, eventos: [] });
+      o.delta = r2(o.delta + delta);
+      o.eventos.push({ quem: String(a.quem || '').split('@')[0] || a.quem || '—', quando: quando, item: it.descricao || a.itemId, motivo: a.motivo || '(sem motivo registrado)', delta: delta });
+    });
+  });
+  return porMes;
+}
+function finExplicarDados(mesFechado, de, ate){
+  if (!mesFechado || !de || !ate || de > ate) return null;
+  var ctx = finCtx(), itemPorId = {}; (state.finItens || []).forEach(function(it){ itemPorId[it.id] = it; });
+  var fech = finMesInfo(mesFechado, { escopo: 'G', cenarioId: null, filtros: null }), saldo = r2(fech.aPagar + fech.provisao);
+  var abertos = finProvisoesAtivas().filter(function(pv){ return pv.mes === mesFechado && pv.via !== 'Thopen' && finSaldoProvisao(pv) > 0.5; }).map(function(pv){
+    var it = itemPorId[pv.itemId] || {};
+    return { item: it.descricao || pv.itemId, fornecedor: finNomeFornecedor(pv.fornecedorId, pv.fornecedorNome, pv.tipo, pv.fornecedorADefinir), saldo: finSaldoProvisao(pv), status: FIN_REL_STATUS_PROV[finStatusProvisao(pv)] || finStatusProvisao(pv) };
+  }).sort(function(a, b){ return b.saldo - a.saldo; });
+  var aPagarLista = ctx.lanc.filter(function(l){ return l.mes === mesFechado && !l.pago && l.via !== 'Thopen'; }).map(function(l){
+    return { fornecedor: finNomeFornecedor(l.fornecedorId, l.fornecedorNome, l.tipo), usina: l.usina || '', valor: l.valor };
+  }).sort(function(a, b){ return b.valor - a.valor; });
+  var porMes = finExplicarAlteracoesPorMes(de, ate, itemPorId), mesesFuturos = Object.keys(porMes).filter(function(m){ return m >= finMesAtual(); }).sort();
+  var deD = new Date(de + 'T00:00:00'), ateD = new Date(ate + 'T23:59:59');
+  var acompAlt = finAlteracoes().filter(function(a){ if (!a.acomp) return false; var d = new Date(a.em); return !isNaN(d) && d >= deD && d <= ateD; }).map(function(a){
+    var ids = []; a.linhas.forEach(function(l){ if (ids.indexOf(l.parcela_id) === -1) ids.push(l.parcela_id); });
+    var f = (state.financeiro || []).find(function(x){ return x.id === ids[0]; }) || {}, d = new Date(a.em);
+    var mud = []; a.linhas.forEach(function(l){ mud = mud.concat(finTextoAlteracaoAcomp(l, ids.length > 1)); });
+    return { quando: isNaN(d) ? '' : d.toLocaleDateString('pt-BR'), quem: String(a.quem || '').split('@')[0] || a.quem || '—', alvo: [f.fornecedor, f.ufv].filter(Boolean).join(' · ') || ids.join(', '), mudou: mud.join('; '), motivo: a.motivo || '' };
+  });
+  return { mesFechado: mesFechado, mesFechadoNome: finMesNome(mesFechado), de: de, ate: ate, fech: fech, saldo: saldo, abertos: abertos, aPagarLista: aPagarLista,
+    porMes: porMes, mesesFuturos: mesesFuturos, acompAlt: acompAlt, geradoEm: new Date().toLocaleString('pt-BR'), geradoPor: (typeof whoami === 'function' ? whoami() : '') || '' };
+}
+function finExplicarTexto(R){
+  if (!R) return '';
+  var M = finR0, L = [], pago = R.fech.previsto ? Math.round(R.fech.realizado / R.fech.previsto * 100) : 0;
+  L.push('EXPLICAÇÃO PARA O FINANCEIRO — ' + R.mesFechadoNome.toUpperCase());
+  L.push('Gerado em ' + R.geradoEm + (R.geradoPor ? ' por ' + R.geradoPor : ''));
+  L.push('');
+  L.push('1) FECHAMENTO DE ' + R.mesFechadoNome.toUpperCase());
+  L.push('Em ' + R.mesFechadoNome + ', o previsto era ' + M(R.fech.previsto) + ' (meta ' + M(R.fech.meta) + ').');
+  L.push('Fechamos com ' + M(R.fech.realizado) + ' realmente pago — ' + pago + '% do previsto.');
+  if (R.saldo > 0.5) {
+    L.push('Ficou um saldo de ' + M(R.saldo) + ' que não foi usado dentro do mês:');
+    if (R.fech.aPagar > 0.5) L.push('  - ' + M(R.fech.aPagar) + ' já estava lançado para pagar e ainda não foi pago.');
+    if (R.fech.provisao > 0.5) L.push('  - ' + M(R.fech.provisao) + ' estava provisionado e não chegou a ser lançado no financeiro.');
+    if (R.aPagarLista.length) {
+      L.push('  Lançado a pagar e ainda não pago:');
+      R.aPagarLista.slice(0, 15).forEach(function(x){ L.push('    · ' + x.fornecedor + (x.usina ? ' (' + x.usina + ')' : '') + ' — ' + M(x.valor)); });
+      if (R.aPagarLista.length > 15) L.push('    · … e mais ' + (R.aPagarLista.length - 15) + ' (ver "Exportar relatório")');
+    }
+    if (R.abertos.length) {
+      L.push('  Provisionado e ainda sem lançar:');
+      R.abertos.slice(0, 15).forEach(function(x){ L.push('    · ' + x.item + ' — ' + x.fornecedor + ' — ' + M(x.saldo) + ' (' + x.status + ')'); });
+      if (R.abertos.length > 15) L.push('    · … e mais ' + (R.abertos.length - 15) + ' (ver "Exportar relatório")');
+    }
+    L.push('Esse saldo continua contando no previsto até alguém pagar, lançar, alinhar ou cancelar essas provisões/parcelas.');
+  } else {
+    L.push('Não sobrou saldo — todo o previsto de ' + R.mesFechadoNome + ' foi pago.');
+  }
+  L.push('');
+  L.push('2) POR QUE O PREVISTO DOS PRÓXIMOS MESES MUDOU (alterações com motivo entre ' + fmtDate(R.de) + ' e ' + fmtDate(R.ate) + ')');
+  if (!R.mesesFuturos.length) {
+    L.push('Nenhuma alteração com motivo registrada no período para os próximos meses. Qualquer diferença vem de lançamentos ou provisões novas (sem edição) — veja o detalhe completo em "Exportar relatório".');
+  } else {
+    R.mesesFuturos.forEach(function(m){
+      var o = R.porMes[m];
+      L.push(finMesNome(m) + ': previsto ' + (o.delta >= 0 ? 'subiu' : 'baixou') + ' ' + M(Math.abs(o.delta)) + '. Motivo(s):');
+      o.eventos.forEach(function(e){ L.push('  - ' + e.quem + ' em ' + e.quando + ' (' + e.item + '): ' + e.motivo + ' (' + (e.delta >= 0 ? '+' : '−') + M(Math.abs(e.delta)) + ')'); });
+    });
+  }
+  if (R.acompAlt.length) {
+    L.push('');
+    L.push('3) OUTRAS ALTERAÇÕES NO PERÍODO (Acompanhamento de Pagamentos)');
+    R.acompAlt.slice(0, 20).forEach(function(a){ L.push('  - ' + a.quando + ' · ' + a.quem + ' · ' + a.alvo + ': ' + a.mudou + (a.motivo ? ' — motivo: ' + a.motivo : '')); });
+    if (R.acompAlt.length > 20) L.push('  … e mais ' + (R.acompAlt.length - 20) + ' (ver "Exportar relatório")');
+  }
+  L.push('');
+  L.push('Fonte: Visão executiva do Financeiro (Zeladoria). Para o detalhe completo (todos os lançamentos, provisões e a conciliação), use "Exportar relatório".');
+  return L.join('\n');
+}
+function finExplicarModalHtml(){
+  var e = finUi().explicar; if (!e) return '';
+  var R = finExplicarDados(e.mesFechado, e.de, e.ate), texto = finExplicarTexto(R);
+  return '<div class="overlay open" id="overlay-fin-explicar"><div class="modal" style="max-width:640px;"><div class="modal-head"><h3>Explicação pro Financeiro</h3><button class="modal-close" data-fin-explicar-fechar="1">&times;</button></div><div class="modal-body">' +
+    '<p class="cell-muted" style="font-size:12px;margin:0 0 10px;">Monta um texto pronto, em linguagem simples, pra explicar pro Financeiro por que o fechamento do mês deu diferente do previsto e por que o previsto dos próximos meses mudou. Mesma fonte do "Exportar relatório" — só lê, não grava nada.</p>' +
+    '<label style="display:block;font-size:12.5px;">Mês que fechou<select id="fin-explicar-mes" style="width:100%;margin-top:4px;">' + finExplicarMesesFechados().map(function(m){ return '<option value="' + m + '"' + (m === e.mesFechado ? ' selected' : '') + '>' + finMesNome(m) + '</option>'; }).join('') + '</select></label>' +
+    '<div style="display:flex;gap:10px;margin-top:8px;"><label style="flex:1;font-size:12.5px;">Alterações desde<input type="date" id="fin-explicar-de" value="' + esc(e.de || '') + '" style="width:100%;margin-top:4px;"></label><label style="flex:1;font-size:12.5px;">Até<input type="date" id="fin-explicar-ate" value="' + esc(e.ate || '') + '" style="width:100%;margin-top:4px;"></label></div>' +
+    '<textarea id="fin-explicar-texto" readonly rows="16" style="width:100%;margin-top:12px;font-family:ui-monospace,Consolas,monospace;font-size:12px;line-height:1.5;">' + esc(texto) + '</textarea>' +
+    '<div class="modal-actions"><button class="btn btn-ghost" data-fin-explicar-fechar="1">Fechar</button><button class="btn btn-ghost" id="btn-fin-explicar-baixar"' + (R ? '' : ' disabled') + '>Baixar .txt</button><button class="btn btn-primary" id="btn-fin-explicar-copiar"' + (R ? '' : ' disabled') + '>Copiar texto</button></div>' +
+    '</div></div></div>';
+}
+function finExplicarBind(app){
+  var b = app.querySelector('#btn-fin-explicar');
+  if (b) b.addEventListener('click', function(){
+    var mf = finAddMes(finMesAtual(), -1);
+    finUi().explicar = { mesFechado: mf, de: mf + '-01', ate: hoje() }; render();
+  });
+  var e = finUi().explicar; if (!e || !app.querySelector('#overlay-fin-explicar')) return;
+  app.querySelectorAll('[data-fin-explicar-fechar]').forEach(function(x){ x.addEventListener('click', function(){ finUi().explicar = null; render(); }); });
+  var selMes = app.querySelector('#fin-explicar-mes'); if (selMes) selMes.addEventListener('change', function(){ e.mesFechado = selMes.value; render(); });
+  var de = app.querySelector('#fin-explicar-de'); if (de) de.addEventListener('change', function(){ e.de = de.value; render(); });
+  var ate = app.querySelector('#fin-explicar-ate'); if (ate) ate.addEventListener('change', function(){ e.ate = ate.value; render(); });
+  var cop = app.querySelector('#btn-fin-explicar-copiar'); if (cop) cop.addEventListener('click', function(){
+    var t = app.querySelector('#fin-explicar-texto'), feito = function(){ showToast('Texto copiado'); }, falhou = function(){ if (t) { t.focus(); t.select(); } showToast('Selecionei o texto — copie com Ctrl+C'); };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(t ? t.value : '').then(feito, falhou); else falhou();
+  });
+  var bx = app.querySelector('#btn-fin-explicar-baixar'); if (bx) bx.addEventListener('click', function(){
+    var R = finExplicarDados(e.mesFechado, e.de, e.ate); if (R) baixarArquivo('explicacao_financeiro_' + e.mesFechado + '.txt', finExplicarTexto(R), 'text/plain;charset=utf-8');
+  });
+}
 /* para testes */
 window.__radarFinRel = { dados: function(){ return finRelDados.apply(null, arguments); }, planilhas: function(R){ return finRelPlanilhas(R); }, html: function(R){ return finRelHtml(R); } };
 function finAlteracoes(){
@@ -11272,6 +11406,7 @@ function finBindEventos(app){
   var bAlt = document.getElementById('fin-alt-todas'); if (bAlt) bAlt.addEventListener('click', function(){ u.altTodas = !u.altTodas; render(); });
   finBindMotivoEd();
   finRelBind(app);
+  finExplicarBind(app);
   app.querySelectorAll('[data-fin-ir-alt]').forEach(function(a){ a.addEventListener('click', function(e){ e.preventDefault(); var c = document.getElementById('fin-alteracoes'); if (c) c.scrollIntoView({ behavior: 'smooth', block: 'start' }); }); });
   app.querySelectorAll('[data-fin-hist]').forEach(function(a){ a.addEventListener('click', function(e){ e.preventDefault(); finAbrirHistoricoProvisao(a.getAttribute('data-fin-hist')); }); });
   ['#fin-hist-fechar'].forEach(function(s){ var b = app.querySelector(s); if (b) b.addEventListener('click', function(){ u.historico = null; render(); }); });
