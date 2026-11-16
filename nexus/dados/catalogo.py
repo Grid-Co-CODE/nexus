@@ -2055,9 +2055,11 @@ CONHECIDAS = (
     Conhecida("bd_formulas", ("formulas_bd_performance", "abas_bd_performance", "formulas_bd_thopen", "abas_bd_thopen"),
               "apoio",
               "o mapa de fórmulas do BD_Performance e do BD_Thopen, que a coleta sobe junto com cada BD (o banco recebe "
-              "só valores): formulas_<bd> = 1 linha por célula que é fórmula no Excel (aba, linha do Excel, coluna "
-              "1-based, cabeçalho, o texto da fórmula, subida_em); abas_<bd> = 1 linha por aba do Excel naquela subida "
-              "(as abas renomeadas ficam velhas no banco). A tela Coletas só usa o BD do banco com o mapa da mesma subida"),
+              "só valores): formulas_<bd> = 1 linha por TRECHO de células com fórmula seguidas na mesma coluna (aba, "
+              "coluna 1-based, linha_de, linha_ate do Excel, cabeçalho, o texto da 1ª célula sem o '=', subida_em; "
+              "16/11/2026: 167 mil células em ~1.400 trechos); abas_<bd> = 1 linha por aba do Excel naquela subida (as "
+              "abas renomeadas ficam velhas no banco). Escreve o src/mapa_formulas.py da coleta, logo depois de cada BD. "
+              "A tela Coletas só usa o BD do banco com o mapa da mesma subida"),
     Conhecida("os_creator", ("temas", "plataforma", "chamados_obs"), "apoio",
               "a configuração do OS Creator (temas, plataforma, observações dos chamados)"),
     Conhecida("thopen_acessos", ("senhas",), "apoio",

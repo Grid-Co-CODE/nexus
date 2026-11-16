@@ -17,7 +17,7 @@ import pytest
 from nexus.performance.coletas import motor, pg, servico
 
 from conversor import montagem  # noqa: E402 — depois do motor
-from conversor.nucleo import BD, Celula, Contexto  # noqa: E402
+from conversor.nucleo import BD, Celula, Contexto, formula  # noqa: E402
 
 RAIZ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 D0 = dt.date(2026, 10, 1)
@@ -54,12 +54,13 @@ def _bd_excel(tmp_path):
 
 class BancoDeMentira:
     """A API db_performace como ela devolve (row_number, headers, values; sem fórmula), montada a partir do Excel — e o
-    livro bd_formulas como a coleta vai subir: as células que são fórmula e a lista de abas do Excel."""
+    livro bd_formulas como a coleta sobe (`src/mapa_formulas.py`): os trechos de células com fórmula seguidas na mesma
+    coluna (o texto da 1ª célula, sem o "=") e a lista de abas do Excel."""
 
     def __init__(self, caminho, com_mapa=True, mapa_em=SUBIDA, abas_excel=("Teste",)):
         wb = openpyxl.load_workbook(caminho)
         self.sheets, self.rows, sid = {}, {}, 0
-        formulas = []
+        celulas = {}                                   # (aba, coluna) -> {linha: fórmula}
         for ws in wb.worksheets:
             sid += 1
             cab = [c.value for c in ws[1]]
@@ -69,8 +70,7 @@ class BancoDeMentira:
                 for j in range(1, len(cab) + 1):
                     v = ws.cell(r, j).value
                     if isinstance(v, str) and v.startswith("="):
-                        formulas.append({"aba": ws.title, "linha": r, "coluna": j, "cabecalho": cab[j - 1],
-                                         "formula": v, "subida_em": mapa_em})
+                        celulas.setdefault((ws.title, j, cab[j - 1]), {})[r] = v
                         v = None                       # valores-only: a fórmula sem cache sobe vazia
                     elif isinstance(v, dt.datetime):
                         v = v.strftime("%Y-%m-%d")
@@ -78,6 +78,15 @@ class BancoDeMentira:
                 linhas.append({"row_number": r, "headers": cab, "values": vals})
             self.sheets.setdefault("bd_performance", {})[ws.title] = {"id": sid, "sheet_name": ws.title, "header_row": 1}
             self.rows[sid] = linhas
+        formulas = []
+        for (aba, j, cab_j), por_linha in celulas.items():
+            ls = sorted(por_linha)
+            de = ls[0]
+            for i, n in enumerate(ls):
+                if i + 1 == len(ls) or ls[i + 1] != n + 1:
+                    formulas.append({"aba": aba, "coluna": j, "linha_de": de, "linha_ate": n, "cabecalho": cab_j,
+                                     "formula": por_linha[de][1:], "subida_em": mapa_em})
+                    de = ls[i + 1] if i + 1 < len(ls) else None
         if com_mapa:
             for nome, linhas, cab in (("formulas_bd_performance", formulas, pg.CAB_FORMULAS),
                                       ("abas_bd_performance", [{"aba": a, "linhas": 0, "colunas": 0, "subida_em": mapa_em}
@@ -190,7 +199,10 @@ def test_a_data_vira_data_e_a_formula_volta_por_celula(tmp_path):
     a = bd.aba("Teste")
     assert a.datas[dt.date(2026, 10, 1)] == 2 and a.linha_cab == 1
     assert a.valor(dt.date(2026, 10, 11), a.col("IPOA (kWh/m²)")) == "='Outra aba'!F12"
+    # o trecho 11-13/10 (linhas 12 a 14) volta inteiro como fórmula; o texto é o da 1ª célula (o Conversor só pergunta SE)
+    assert all(formula(a.valor(dt.date(2026, 10, d), a.col("IPOA (kWh/m²)"))) for d in (11, 12, 13))
     assert a.valor(dt.date(2026, 10, 14), a.col("IPOA (kWh/m²)")) is None      # o dia seguinte é valor (vazio)
+    assert all(formula(a.valor(D0 + dt.timedelta(days=k), a.col("Multimedidor"))) for k in range(25))
     assert bd.estilos("Teste", 1, 5, 0, 5) == {}
 
 
@@ -202,6 +214,17 @@ def test_a_aba_velha_do_banco_nao_conta(tmp_path):
 def test_sem_o_mapa_o_banco_nao_e_usado(tmp_path):
     with pytest.raises(pg.SemMapa, match="mapa de fórmulas"):
         pg.BDdoBanco("BD_Performance", BancoDeMentira(_bd_excel(tmp_path), com_mapa=False))
+
+
+def test_mapa_em_outro_formato_nao_vira_bd_sem_formula(tmp_path):
+    """O leitor que não entende o mapa NUNCA lê o BD sem as fórmulas (16/11/2026: o mapa passou de uma linha por célula
+    a trechos; o leitor velho leria o novo sem marcar fórmula nenhuma e o bloco colaria valor por cima da soma)."""
+    b = BancoDeMentira(_bd_excel(tmp_path))
+    sid = b.sheets[pg.LIVRO_FORMULAS]["formulas_bd_performance"]["id"]
+    for x in b.rows[sid]:
+        x["headers"] = ["aba", "linha", "coluna", "cabecalho", "formula", "subida_em", "x"]
+    with pytest.raises(pg.SemMapa, match="nenhum trecho"):
+        pg.BDdoBanco("BD_Performance", b)
 
 
 def test_mapa_de_outra_subida_nao_vale(tmp_path):

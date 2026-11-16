@@ -18,6 +18,11 @@ nexus, ficaria mais fácil para todo mundo, e leria direto do PG!". O que o banc
   está na lista de abas da última subida (`abas_<bd>` do `bd_formulas`).
 - a cor (o amarelo do valor digitado à mão, o vermelho de falta) não sobe: a planilha de colar sai sem ela. A regra de
   não cobrir dado olha o valor, não a cor.
+
+O mapa vem em TRECHOS (16/11/2026): 1 linha por trecho de células com fórmula seguidas na mesma coluna (aba, coluna,
+linha_de, linha_ate). Os dois BDs têm 167 mil células com fórmula, que cabem em ~1.400 trechos (Excel de 16/11). Quem
+escreve é o `src/mapa_formulas.py` da coleta: mudou o formato lá, muda aqui. O texto guardado é o da 1ª célula do
+trecho, porque o Conversor só pergunta SE a célula é fórmula (`nucleo.formula`), nunca qual.
 """
 import datetime as dt
 import threading
@@ -28,7 +33,7 @@ from conversor.nucleo import BD_PERFORMANCE, BD_THOPEN, AbaBD  # noqa: E402
 
 CHAVE = {BD_PERFORMANCE: "bd_performance", BD_THOPEN: "bd_thopen"}
 LIVRO_FORMULAS = "bd_formulas"
-CAB_FORMULAS = ("aba", "linha", "coluna", "cabecalho", "formula", "subida_em")
+CAB_FORMULAS = ("aba", "coluna", "linha_de", "linha_ate", "cabecalho", "formula", "subida_em")
 CAB_ABAS = ("aba", "linhas", "colunas", "subida_em")
 # o mapa sobe na mesma rodada do BD, minutos depois dele (o BD primeiro): mais velho que isto = é de outra subida
 FOLGA_MAPA_S = 30 * 60
@@ -152,12 +157,20 @@ class BDdoBanco:
                           f"{self.lido_em.strftime('%d/%m %H:%M')}). Solte o {destino} em Excel junto com os arquivos.")
         self.mapa_em = quando
         self._lista = [str(x.get("aba") or "").strip() for x in lista if str(x.get("aba") or "").strip()]
-        self._formulas = {}
-        for x in _dicts(banco.linhas(sf["id"])):
-            ln, col, f = _int(x.get("linha")), _int(x.get("coluna")), str(x.get("formula") or "")
-            if ln and col and f:
-                self._formulas.setdefault(str(x.get("aba") or "").strip(), {})[(ln, col - 1)] = \
-                    f if f.startswith("=") else "=" + f
+        self._formulas = {}                     # aba -> [(coluna 0-based, linha_de, linha_ate, "=texto")]
+        linhas_mapa = _dicts(banco.linhas(sf["id"]))
+        for x in linhas_mapa:
+            col, de, ate = _int(x.get("coluna")), _int(x.get("linha_de")), _int(x.get("linha_ate"))
+            f = str(x.get("formula") or "").strip()
+            if col and de:
+                # a coleta grava o texto sem o "=" (no .xlsx do mapa, "=..." viraria fórmula de verdade e chegaria vazio)
+                self._formulas.setdefault(str(x.get("aba") or "").strip(), []).append(
+                    (col - 1, de, max(de, ate or de), "=" + (f[1:] if f.startswith("=") else (f or "?"))))
+        if not self._formulas:
+            # mapa sem nenhum trecho legível (outro formato, ou vazio): ler o BD assim seria ler SEM proteção nenhuma,
+            # o pior caso (o valor parado colado por cima da soma dos inversores). Os dois BDs têm milhares de fórmulas
+            raise SemMapa(f"o mapa de fórmulas do {destino} no banco veio sem nenhum trecho legível "
+                          f"({len(linhas_mapa)} linha(s)). Solte o {destino} em Excel junto com os arquivos.")
         self._abas = {}
         self.velhas = sorted(a for a in self._sheets if a not in set(self._lista))
 
@@ -187,13 +200,14 @@ class BDdoBanco:
             self._abas[nome] = None
             return None
         idata = [c.lower() for c in cab].index("data")
-        for (ln, j), f in (self._formulas.get(nome) or {}).items():
-            if ln not in linhas:
-                continue
-            v = linhas[ln]
-            if j >= len(v):
-                v += [None] * (j + 1 - len(v))
-            v[j] = f
+        for j, de, ate, f in self._formulas.get(nome) or ():
+            for ln in range(de, ate + 1):
+                v = linhas.get(ln)
+                if v is None:                       # a linha 100% vazia não sobe (limpeza B do sync): nada a marcar
+                    continue
+                if j >= len(v):
+                    v += [None] * (j + 1 - len(v))
+                v[j] = f
         final = {}
         for n, v in linhas.items():
             if idata < len(v):

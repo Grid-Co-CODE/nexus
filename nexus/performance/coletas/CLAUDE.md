@@ -30,23 +30,39 @@ Conversor depende de toda fórmula, célula a célula (a mesma coluna é valor n
 Iguaçu é digitada até 08/11/2026 e `=SUM(T_Nova_Iguaçu[[#This Row],...]])` a partir de 09/11): não escreve em célula que é
 fórmula (o IPOA da Vitesse = Hortina; o da Salvales de 21 a 25/10 = Carosa) e parte o bloco de colar onde ela aparece.
 
-A escolha do Levi (11/11/2026, "Aceito também sua recomendação"): **a coleta sobe, na mesma subida de cada BD, o livro
-`bd_formulas`** (registrado em `CONHECIDAS` do `nexus/dados/catalogo.py` antes de existir):
-- `formulas_bd_performance` / `formulas_bd_thopen`: 1 linha por célula que é fórmula no Excel —
-  `aba, linha (do Excel), coluna (1-based), cabecalho, formula (o texto, com "="), subida_em`;
+A escolha do Levi (11/11/2026, "Aceito também sua recomendação"; 16/11/2026, "Faça ler pelo PG mesmo", e a subida da
+coleta passou a levar o mapa): **a coleta sobe, logo depois de cada BD, o livro `bd_formulas`** (em `CONHECIDAS` do
+`nexus/dados/catalogo.py`). Quem escreve é o `src/mapa_formulas.py` da coleta, chamado pelo `sync_gridco_api.py` depois
+da linha "REAL" do BD (o log do fechamento mostra "mapa de formulas: OK ..."); a falha no mapa nunca segura o BD.
+- `formulas_bd_performance` / `formulas_bd_thopen`: 1 linha por **trecho** de células com fórmula seguidas na mesma
+  coluna — `aba, coluna (1-based), linha_de, linha_ate (do Excel), cabecalho, formula (o texto da 1ª célula, sem "="),
+  subida_em`. Uma linha por célula seriam 167 mil linhas toda noite; em trechos são ~1.400 (Excel de 16/11/2026). O
+  texto é só para quem lê o banco: o Conversor só pergunta SE a célula é fórmula (`nucleo.formula`). Sem o "=" porque
+  no .xlsx do mapa o openpyxl o gravaria como fórmula de verdade, que chega vazia.
 - `abas_bd_performance` / `abas_bd_thopen`: 1 linha por aba do Excel naquela subida — `aba, linhas, colunas, subida_em`.
 
-Sem o mapa, ou com o mapa de outra subida (mais de 30 min antes do `updated_at` do BD), **o BD do banco não é usado**: o
-botão do BD fica vermelho, a faixa diz o motivo, e a pessoa solta o BD em Excel junto com os arquivos (ou clica no botão
-do BD) — o mesmo caminho do .exe. Quem sobe o mapa é a coleta (chat Coleta de Dados); até ele existir, a tela funciona
-só com o Excel solto.
+Por que o valor sozinho não basta (medido 16/11/2026, os dois Excel contra o banco): desde 01/10 são 7.319 células com
+fórmula no BD_Performance e 16.594 no BD_Thopen, e o banco traz o valor de cada uma como número digitado (183 vazias, no
+BD_Thopen). Sem o mapa, o bloco de colar levaria a "Energia Produzida" (`=SUM(T_...[[#This Row],[Inversor 1.1]:...])`),
+o IPOA DEF e a Validação como valor parado: colado, a energia ficaria errada quando os inversores fossem preenchidos.
+**Prova do mapa** (16/11/2026, sem gravar nada): o mapa do Excel de hoje + o BD do banco, lidos por este `pg.py`,
+marcam como fórmula as mesmas 61.700 células do BD_Performance e 77.308 do BD_Thopen que o Excel (0 diferença; a única
+"a mais" era uma fórmula de matriz da Sete Lagoas, que o openpyxl devolve como objeto). Ensaio no `zz_teste_claude_apagar`:
+o importador devolve o mapa igual (o texto com quebra de linha volta com outra quebra, sem importância).
+
+Sem o mapa, com o mapa de outra subida (mais de 30 min antes do `updated_at` do BD) ou com um mapa sem nenhum trecho
+legível (o formato mudou), **o BD do banco não é usado**: o botão do BD fica vermelho, a faixa diz o motivo, e a pessoa
+solta o BD em Excel junto com os arquivos (ou clica no botão do BD) — o mesmo caminho do .exe. Mudou o formato do mapa:
+**publique este leitor ANTES** de a coleta subir o formato novo (o leitor velho leria o novo sem marcar fórmula nenhuma;
+por isso o "nenhum trecho legível" recusa).
 
 - **Abas velhas:** a aba renomeada no Excel fica velha no banco (o `replace=true` só troca as abas que sobem: "Vitesse",
   "Carosa", "Salvales", "Hortina" e "SunPower" pararam em 30/09/2026; hoje são "Quixadá 2 (Vitesse)", "Aquiraz 2
   (Carosa)", "Aquiraz 1 (Salvales)", "Quixadá 1 (Hortina)" e "Cascavel (Sunpower)"). Vale só a aba da lista `abas_<bd>`.
 - **A cor não sobe:** a planilha de colar sai sem o amarelo e o vermelho do BD. A regra de não cobrir dado olha o valor.
 - **O banco anda atrás do Excel:** o que a equipe digitou depois da última subida não está lá. Toda conversão com o BD
-  do banco leva o aviso "veio do banco, da subida de dd/mm às HH:MM: confira os dias de dd/mm em diante".
+  do banco leva o aviso "veio do banco, da subida de dd/mm às HH:MM: confira os dias de dd/mm em diante". A subida é a
+  do fechamento das 23:30; se ele cai, o banco fica na anterior (15/11/2026: caiu às 00:12 e o banco ficou na de 14/11).
 
 ## O que muda por ser um servidor
 
