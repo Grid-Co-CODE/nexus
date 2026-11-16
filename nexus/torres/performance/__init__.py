@@ -28,6 +28,12 @@ TORRE = Torre(
         Tela("tempo-real", "Tempo real",
              "O que está fora do normal agora na frota?",
              "Plataforma de Performance, ao vivo"),
+        # A Sala de controle (Levi, 16/11/2026: "uma visão parecida com essa para performance", a partir do Control room de
+        # um portal de fora): a fonte do tempo real na lateral, o que falta acompanhar na frente, e a usina com as strings, os
+        # trackers e a estação. É uma tela da Plataforma de Performance na moldura; entrega 1, só leitura
+        Tela("sala-de-controle", "Sala de controle",
+             "O que está em falha agora, o que ninguém está acompanhando e o que apareceu de novo?",
+             "Plataforma de Performance: o tempo real por fonte e as falhas do mês"),
         Tela("noc", "Painel NOC",
              "Como está a carteira inteira de relance?",
              "Plataforma de Performance"),

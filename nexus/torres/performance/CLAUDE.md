@@ -12,3 +12,10 @@
 A regra mora em `nexus/performance/`; aqui ficam as rotas e os templates. As molduras seguem o padrão do OS Creator (`.conteudo--moldura`), com as classes `.porta-*` no `nexus.css` (as `.ponte-*` são da ponte de 04/10, a reserva do Tempo real). Os ids das telas que já existiam não mudaram (viraram endereço e favorito); Acompanhamento COS (torre COS) e Chaves das fontes (torre Base, só admin) usam a mesma moldura. A moldura em si (o passe, o iframe e o `porta.js`) fica em `_porta.html` desde 14/10/2026, porque também entra na coluna da direita da Central de emissão (`relatorios/moldura.html`); e `registrar_molduras(..., abas=...)` põe abas acima dela, a da plataforma e páginas do Nexus ao lado (Chaves das fontes → Fontes da Performance | Nexus).
 
 Strings e trackers grava no banco do Nexus (20/10/2026, o Vincular OS): a OS ligada a cada falha de string ou tracker vai ao livro `nexus_falhas · fato_decisao_vinculo_os`, gravado e lido pela própria plataforma. O Nexus só o cataloga: grão, colunas e regras em `nexus/dados/CLAUDE.md` ("Vínculo de OS às falhas").
+
+**Sala de controle** (16/11/2026; o dono: "uma visão parecida com essa para performance", a partir do Control room de um
+portal de fora): mais uma tela da Plataforma de Performance na moldura (`/painel/sala-de-controle`), logo depois do Tempo
+real no menu. A fonte do tempo real na lateral, o que falta acompanhar na frente, e a usina com as strings, os trackers e a
+estação. Nesta 1ª entrega ela só lê. A tela, as regras do dono e as próximas entregas estão na plataforma:
+`docs/sala-de-controle.md` e `plataforma/CLAUDE.md` (seção "Sala de controle da Performance"). O mapa da porta única passou
+a 17 telas (assinatura `db2b2cf9380d2b67`, nos dois lados). Quem a vê: marcar em Base → Acessos, como as outras.
