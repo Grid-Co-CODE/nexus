@@ -14,7 +14,13 @@
 
 A conta (sem o banco, ~1 s) é refeita a cada 10 min, na virada do dia e a cada subida nova; o último resultado fica em
 `furos_calculo.json` para o reinício do Nexus não deixar a tela vazia.
+
+A 1ª conta (sem resultado nenhum ainda) é a única que faz a tela esperar (Levi, 16/11/2026, na 1ª abertura: "demora para
+ler hein"). Por isso: as abas do banco são lidas de 8 em 8 ao mesmo tempo (medido do PC: 28,8 s uma a uma, 12,3 s de 8
+em 8, mesmo resultado), o COS é lido junto com o banco e não depois, e abrir a Coletas já dispara a conta, antes de a
+pessoa clicar na aba (`coletas_tela.coletas`).
 """
+import concurrent.futures as cf
 import csv
 import datetime as dt
 import json
@@ -30,6 +36,7 @@ LIVROS = (("BD_Performance", "bd_performance"), ("BD_Thopen", "bd_thopen"))
 REFAZER_S = 600
 TENTAR_DE_NOVO_S = 60
 ARQ_CALCULO = "furos_calculo.json"
+LEITURAS_JUNTAS = 8             # abas do banco lidas ao mesmo tempo (ver o topo)
 
 
 def _int(v):
@@ -56,30 +63,43 @@ def marca_do_banco(livros):
     return tuple((k, (livros.get(k) or {}).get("updated_at")) for _s, k in LIVROS)
 
 
-def ler_banco(banco):
+def _reduzir(src, nome, rows):
+    """Uma aba do banco reduzida ao que o motor usa: ("info"|"base", linhas) ou ("bd", planilhas, último dia) ou None."""
+    rows = sorted(rows, key=lambda x: _int(x.get("row_number")) or 0)
+    if not rows:
+        return None
+    vals = [list(r.get("values") or []) for r in rows]
+    if src == "BD_Performance" and nome == "Info Geral":
+        return "info", [v for r, v in zip(rows, vals) if (_int(r.get("row_number")) or 0) >= 3]
+    if src == "BD_Performance" and nome == "Base UFV":
+        return "base", [v for r, v in zip(rows, vals) if (_int(r.get("row_number")) or 0) >= 2]
+    p, _log = R.ler_abas(src, [(nome, list(rows[0].get("headers") or []), vals)])
+    return ("bd", p, R.ultima_data(vals)) if p else None
+
+
+def ler_banco(banco, juntas=LEITURAS_JUNTAS):
     """Os dois BDs do banco, aba por aba (cada uma já reduzida ao que o motor usa, para não segurar o banco inteiro na
-    memória). -> dict(planilhas, cad, marca, subidas, velhas)."""
+    memória), `juntas` abas ao mesmo tempo; o resultado sai na ordem do banco, igual ao de uma por vez.
+    -> dict(planilhas, cad, marca, subidas, velhas)."""
     livros, abas = banco.livros(), banco.abas()
+    pedidos = [(src, nome, sh) for src, chave in LIVROS for nome, sh in (abas.get(chave) or {}).items()]
+    with cf.ThreadPoolExecutor(max(1, juntas), thread_name_prefix="nexus-furos-banco") as ex:
+        # cada leitura já reduz a sua aba: no máximo `juntas` abas cruas na memória ao mesmo tempo
+        reduzidas = list(ex.map(lambda q: _reduzir(q[0], q[1], banco.linhas(q[2]["id"])), pedidos))
     planilhas, info, base, velhas, subidas = [], [], [], {}, {}
     for src, chave in LIVROS:
         subidas[src] = _quando((livros.get(chave) or {}).get("updated_at"))
         lidas, fins = [], {}
-        for nome, sh in (abas.get(chave) or {}).items():
-            rows = sorted(banco.linhas(sh["id"]), key=lambda x: _int(x.get("row_number")) or 0)
-            if not rows:
+        for (s2, nome, _sh), r in zip(pedidos, reduzidas):
+            if s2 != src or r is None:
                 continue
-            vals = [list(r.get("values") or []) for r in rows]
-            if src == "BD_Performance" and nome == "Info Geral":
-                info = [v for r, v in zip(rows, vals) if (_int(r.get("row_number")) or 0) >= 3]
-                continue
-            if src == "BD_Performance" and nome == "Base UFV":
-                base = [v for r, v in zip(rows, vals) if (_int(r.get("row_number")) or 0) >= 2]
-                continue
-            cab = list(rows[0].get("headers") or [])
-            p, _log = R.ler_abas(src, [(nome, cab, vals)])
-            if p:
-                fins[nome] = R.ultima_data(vals)
-                lidas += p
+            if r[0] == "info":
+                info = r[1]
+            elif r[0] == "base":
+                base = r[1]
+            else:
+                fins[nome] = r[2]
+                lidas += r[1]
         v = R.velhas(fins)
         velhas[src] = sorted([n, d.date().isoformat()] for n, d in v.items())
         planilhas += [p for p in lidas if p["sheet"] not in v]
@@ -169,15 +189,24 @@ class Servico:
 
     def _rodar(self):
         try:
-            banco = self._fab()
-            livros = banco.livros()
-            if not self._bd or self._bd["marca"] != marca_do_banco(livros):
-                self._bd = ler_banco(banco)
             agora = self._relogio()
+            lido = {}
+
+            def le_cos():                                    # junto com o banco, não depois (ver o topo)
+                try:
+                    lido["cos"] = self._ler_cos(agora)
+                except Exception as e:                       # noqa: BLE001
+                    lido["cos"] = (None, f"não consegui ler o COS ({type(e).__name__})")
+            tc = threading.Thread(target=le_cos, name="nexus-furos-cos", daemon=True)
+            tc.start()
             try:
-                cos, aviso = self._ler_cos(agora)
-            except Exception as e:                           # noqa: BLE001
-                cos, aviso = None, f"não consegui ler o COS ({type(e).__name__})"
+                banco = self._fab()
+                livros = banco.livros()
+                if not self._bd or self._bd["marca"] != marca_do_banco(livros):
+                    self._bd = ler_banco(banco)
+            finally:
+                tc.join()
+            cos, aviso = lido["cos"]
             cong = Congeladas(self.pasta)
             res = R.gerar_de(self._bd["planilhas"], self._bd["cad"], cos, cong.meses(), agora.date(), agora)
             info_cong = {m: {k: x.get(k) for k in ("gen", "origem", "importado_em", "quem")} | {"usinas": len(x["usinas"])}

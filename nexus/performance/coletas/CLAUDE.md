@@ -153,6 +153,12 @@ e o "Mais opções" somem pelo `static/coletas/filtros.js`, e no lugar fica o ca
 em `furos_calculo.json` (o reinício não deixa a tela vazia). Bancada no PC: `NEXUS_FUROS_COS_CSV` aponta o CSV exportado do
 COS e `NEXUS_FUROS_RELOGIO` fixa a hora.
 
+**Só a 1ª conta faz a tela esperar** (sem resultado nenhum ainda; Levi, 16/11/2026, na 1ª abertura no servidor: "demora
+para ler hein"). Três coisas a encurtam: as abas do banco são lidas de 8 em 8 ao mesmo tempo (`LEITURAS_JUNTAS`; do PC:
+28,8 s uma a uma, 12,3 s de 8 em 8, resultado idêntico, e a conta em si leva 0,1 s); o COS é lido junto com o banco, não
+depois; e abrir a Coletas (a casca, `coletas_tela._aquecer_furos`) já começa a conta, antes do clique na aba. Nos testes o
+aquecer só liga com `NEXUS_FUROS_AQUECER`. Depois da 1ª vez a aba abre na hora com a última conta e refaz em fundo.
+
 **Para pôr no ar (uma vez):** na aba, Validações > Importar, o `confirmacoes_furos.json` da analista e depois o
 `Furos_Coleta_Performance_GridCo_R01.html` (as 122 validações e as paradas de outubro). Sem isso a tela avisa que outubro
 está sem as paradas.

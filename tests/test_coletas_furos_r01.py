@@ -344,6 +344,39 @@ def test_a_aba_abre_no_padrao_do_nexus(furos):
     assert "/t/performance/coletas/furos-de-coleta" in casca and 'aria-current="page">Conversor</a>' in casca
 
 
+def test_ler_o_banco_de_8_em_8_da_o_mesmo_que_uma_aba_por_vez():
+    """16/11/2026 ("demora para ler hein"): as abas do banco lidas ao mesmo tempo, na ordem do banco."""
+    from nexus.performance.coletas import furos_fonte as FF
+    um, oito = FF.ler_banco(BancoDeMentira(), juntas=1), FF.ler_banco(BancoDeMentira(), juntas=8)
+    assert oito == um and oito["planilhas"] and oito["velhas"]["BD_Performance"] == [["Velha", "2026-10-30"]]
+
+
+def test_abrir_a_coletas_ja_comeca_a_conta_e_o_cos_vem_junto_com_o_banco(furos, app):
+    """A aba Furos de coleta não espera a 1ª conta quando a pessoa clica nela: abrir a Coletas já a começou. E o COS é
+    lido enquanto o banco é lido (antes, só depois)."""
+    import threading
+    from nexus.torres.performance import furos_tela as FT
+    cos_comecou, banco_viu_cos = threading.Event(), []
+
+    class BancoQueOlha(BancoDeMentira):
+        def linhas(self, sid):
+            if not banco_viu_cos:                            # com o COS só depois do banco, isto esperaria à toa
+                banco_viu_cos.append(cos_comecou.wait(3))
+            return super().linhas(sid)
+    ler_cos = FT.servico(app)._ler_cos
+
+    def cos_que_avisa(agora):
+        cos_comecou.set()
+        return ler_cos(agora)
+    app.config.update(NEXUS_COLETAS_BANCO=BancoQueOlha, NEXUS_FUROS_AQUECER=True)
+    FT.servico(app)._ler_cos = cos_que_avisa
+    assert furos.get("/t/performance/coletas").status_code == 200
+    _res, rodando = FT.servico(app).resultado()
+    assert rodando or _res                                   # a casca já pôs a conta para rodar
+    d = _dados(furos)
+    assert d["pronto"] and banco_viu_cos == [True] and d["fontes"]["cos"]["ligado"]
+
+
 def test_a_conta_vem_do_banco_e_do_cos(furos):
     d = _dados(furos)
     assert sorted(p["usina"] for p in d["months"]["2026-11"]["plants"]) == ["T", "U"]        # a "Velha" (parou em outubro) saiu

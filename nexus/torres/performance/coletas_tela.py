@@ -65,8 +65,23 @@ def _json(d, status=200):
     return Response(json.dumps(d, ensure_ascii=False, default=str), status=status, mimetype="application/json")
 
 
+def _aquecer_furos(app):
+    """Abrir a Coletas já começa a conta dos furos (se ela venceu), para a aba Furos de coleta não esperar quando a
+    pessoa clicar nela (Levi, 16/11/2026, na 1ª abertura: "demora para ler hein"). Não espera nada. Nos testes só com
+    `NEXUS_FUROS_AQUECER` (a conta em fundo não pode correr solta entre um teste e outro)."""
+    if not app.config.get("NEXUS_FUROS_AQUECER", not app.config.get("TESTING")):
+        return
+    try:
+        from .furos_tela import servico as furos
+        furos(app).resultado()
+    except Exception:                                        # noqa: BLE001 — aquecer é extra: a casca abre igual
+        import traceback
+        traceback.print_exc()
+
+
 @bp.route("/coletas")
 def coletas():
+    _aquecer_furos(current_app._get_current_object())
     return render_template("performance/coletas.html", torre=TORRE, tela=TORRE.tela("coletas"))
 
 
