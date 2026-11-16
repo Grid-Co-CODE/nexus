@@ -8,6 +8,16 @@
   var raiz = document.querySelector('[data-pu]');
   if (!raiz) return;
 
+  // a Nexus IA na tela, embaixo do Insights (16/11/2026: "sem abrir uma janela"): o pedaço vem por trás; sem ele (sem
+  // rede, erro), o lugar fica vazio e o resto da página vale
+  var lugarIa = raiz.querySelector('[data-pu-ia]');
+  if (lugarIa) {
+    fetch(lugarIa.getAttribute('data-pu-ia'), {credentials: 'same-origin', headers: {'Accept': 'text/html'}})
+      .then(function (r) { return r.ok ? r.text() : ''; })
+      .then(function (h) { lugarIa.innerHTML = h; })
+      .catch(function () { /* fica vazio */ });
+  }
+
   // ── o diagnóstico do dia da IA, no lugar do parecer (14/11/2026) ───────────────────────────────────────────────────
   // Um por usina por dia: a primeira abertura manda fazer (a rota responde "preparando" e a página segue), e quem abre
   // depois lê o guardado. Sem a IA (sem chave, teto, erro), fica o parecer que já está na página

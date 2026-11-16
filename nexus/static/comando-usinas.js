@@ -5,6 +5,14 @@
    (static/filtros-os.js, o modelo do Histórico de OS), que só valem no Aplicar. Vazio vai sempre para o fim. */
 (function () {
   "use strict";
+  // a Nexus IA da carteira, no alto (16/11/2026): o pedaço vem por trás; sem ele, o lugar fica vazio e a lista vale
+  var lugarIa = document.querySelector("[data-cmu-ia]");
+  if (lugarIa) {
+    fetch(lugarIa.getAttribute("data-cmu-ia"), {credentials: "same-origin", headers: {"Accept": "text/html"}})
+      .then(function (r) { return r.ok ? r.text() : ""; })
+      .then(function (h) { lugarIa.innerHTML = h; })
+      .catch(function () { /* fica vazio */ });
+  }
   var tabela = document.querySelector("[data-cmu-tabela]");
   if (!tabela) return;
   var corpo = tabela.tBodies[0];

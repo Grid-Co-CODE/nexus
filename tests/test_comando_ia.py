@@ -180,19 +180,20 @@ def test_registro_do_mes_e_o_teto(tmp_path):
 
 
 # ── a tela ───────────────────────────────────────────────────────────────────────────────────────────────────────────
-def test_o_botao_e_a_janela_so_para_administrador(tela, logado):
+def test_a_caixa_vem_embutida_e_para_todos(tela, logado):
+    """16/11/2026, Levi: "libera para todos" (era só administrador); e o retorno do time: "Tem que ser a caixa de texto
+    para a IA sem abrir uma janela". A caixa vem por trás para o lugar embaixo do Insights."""
     p = logado.get("/t/comando/usinas/1").get_data(as_text=True)
-    assert 'data-pu-jan="/t/comando/usinas/1/ia?parcial=1" data-pu-jan-t="Nexus IA · Altair"' in p
-    assert "/static/comando/ia.js" in p
+    assert 'data-pu-ia="/t/comando/usinas/1/ia?parcial=1"' in p and "/static/comando/ia.js" in p
     h = logado.get("/t/comando/usinas/1/ia?parcial=1").get_data(as_text=True)
     assert "<html" not in h.lower() and 'data-ia-url="/t/comando/usinas/1/ia/perguntar"' in h
     assert "Como foi a performance no mês?" in h and "Nenhuma IA ligada neste servidor" in h and "sem chave" in h
+    assert "sobre a Altair" in h
     assert "<html" in logado.get("/t/comando/usinas/1/ia").get_data(as_text=True).lower()     # a página inteira
     with logado.session_transaction() as s:
         s["admin"] = False
-    assert "/ia?parcial=1" not in logado.get("/t/comando/usinas/1").get_data(as_text=True)
-    assert logado.get("/t/comando/usinas/1/ia?parcial=1").status_code == 403
-    assert logado.post("/t/comando/usinas/1/ia/perguntar", json={"pergunta": "?", "modelos": ["opus"]}).status_code == 403
+    assert logado.get("/t/comando/usinas/1/ia?parcial=1").status_code == 200
+    assert logado.post("/t/comando/usinas/1/ia/perguntar", json={"pergunta": "?", "modelos": []}).status_code == 400
 
 
 def test_perguntar_monta_o_dossie_de_agora_e_registra(tela, logado, monkeypatch, tmp_path):
@@ -374,7 +375,7 @@ def test_a_acao_vira_demanda_pela_regra_da_caixa_de_entrada(tela, logado, monkey
                        headers={"Sec-Fetch-Site": "cross-site"}).status_code == 403
     with logado.session_transaction() as s:
         s["admin"] = False
-    assert logado.post("/t/comando/usinas/1/ia/demanda", json=corpo).status_code == 403
+    assert logado.post("/t/comando/usinas/1/ia/demanda", json=corpo).status_code == 200       # todos, desde 16/11/2026
 
 
 def test_a_janela_leva_os_setores_com_pessoas_e_temas(tela, logado, monkeypatch):
@@ -455,8 +456,8 @@ def test_as_instrucoes_pedem_a_conclusao_primeiro_e_a_engenharia_na_recorrencia(
 
 def test_as_sugestoes_no_alto_e_o_criar_os_dos_setores_que_recebem_os(tela, logado):
     h = logado.get("/t/comando/usinas/1/ia?parcial=1").get_data(as_text=True)
-    # as sugestões fora do "vazio": ficam depois da primeira pergunta
-    assert h.index('class="ia-sugestoes"') < h.index('data-ia-conversa') and "data-ia-vazio" in h
+    # a caixa, as sugestões embaixo dela e a conversa por último (16/11/2026: embutida, sem o "vazio" da janela)
+    assert h.index("data-ia-form") < h.index('class="ia-sugestoes"') < h.index("data-ia-conversa") and "data-ia-vazio" not in h
     criar = json.loads(h.split("data-ia-criar-os>")[1].split("</script>")[0])
     assert criar == {"engenharia": {"rot": "OS de Engenharia", "url": "/os/solicitacao/engenharia"},
                      "performance": {"rot": "OS de Performance", "url": "/os/solicitacao/performance"}}
@@ -471,8 +472,8 @@ def test_o_modelo_padrao_e_o_nemotron_e_fica_escondido_no_i(tela, logado):
     assert 'value="nemotron" data-ia-modelo checked' in h and 'value="gemini-lite" data-ia-modelo>' in h
     # o padrão sem chave: vale o primeiro com chave
     assert IA.padrao({"GEMINI_API_KEY": "g"}) == "gemini-lite" and IA.padrao({}) == ""
-    p = logado.get("/t/comando/usinas/1").get_data(as_text=True)
-    assert "Pergunte à Nexus IA" in p and "Pergunte à IA<" not in p
+    # o selo da caixa embutida (16/11/2026: sem o botão do alto)
+    assert "Pergunte à Nexus IA" in h and "Pergunte à IA<" not in h
 
 
 def test_o_relatorio_do_tema_da_conversa():

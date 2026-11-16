@@ -553,9 +553,15 @@ foi a performance no mês? Por que a usina caiu? Qual a tendência? E aí já re
 de texto para IA [o dossiê] [...] a ideia é a IA só dar uma resposta. Teste com várias IAs. Tal como Sonnet, Opus,
 Gemini, Groq, Grok [...] Qualquer IA que dê para puxar a API para fazermos o teste."
 
-- **Onde:** o botão "Pergunte à IA" no alto do prontuário abre a janela por cima (`/t/comando/usinas/<id>/ia?parcial=1`,
-  a mesma `pu-jan` do dossiê e da conversa); sem `parcial`, a página inteira (botão do meio). **Só administrador**
-  enquanto é teste (cada pergunta custa e o teto do mês é um só): o botão, a janela (403) e o POST (403).
+- **Onde (desde 16/11/2026):** a caixa fica na própria tela, embaixo do Nexus IA Insights, sem janela. O retorno do
+  time foi: "Tem que ser a caixa de texto para a IA sem abrir uma janela".
+  - O `prontuario.js` pede o pedaço (`/t/comando/usinas/<id>/ia?parcial=1`) e o põe no lugar (`data-pu-ia`). A página
+    não espera por ele; sem `parcial`, a rota dá a página inteira.
+  - A caixa já vem aberta para digitar, com as sugestões embaixo. A resposta aparece embaixo da caixa, a mais nova em
+    cima, e "Limpar" recolhe a conversa.
+  - O modelo, o "comparar" e o gasto do mês ficam no "i".
+  - **Para todos** (Levi: "libera para todos"): a caixa, a pergunta e a demanda abrem para quem abre o prontuário (antes
+    só administrador). O "Dossiê para a IA" segue só para o administrador, e o teto do mês vale para todos.
 - **O que vai para a IA:** as instruções (`INSTRUCOES`: responder só pelo dossiê, número com unidade e período, citar a
   seção "(§3)", "o dossiê não traz isso" em vez de inventar, hipótese escrita como hipótese, "sem dado" não é zero, o
   mês corrente é parcial, até 180 palavras, sem emojis) e o dossiê de AGORA, inteiro (`_dossie`, o mesmo da tela "Dossiê
@@ -677,6 +683,39 @@ troca entre as grátis; o Criar OS e as sugestões na janela).
     - O COS e as normalizações levam ao tema Paradas e religamentos.
     - O mês é o que a pergunta cita; sem isso, o mês corrente (`mes_da_conversa`).
     - Ainda não há um tema de Engenharia no PDF.
+
+## A Nexus IA da carteira, no alto do Comando › Usinas (16/11/2026; `nexus/comando/carteira_ia.py`)
+
+Retorno do time: "Eu queria a IA fora do ambiente da usina. Por exemplo... Agora eu quero ver todos os chamados em aberto
+e correlacionar com as usinas com baixa disponibilidade e performance". Levi, com o esboço na mão
+(`docs/mockups/nexus-ia-carteira-e-caixa` da plataforma): "libera para todos e só no Comando › Usinas, pode construir".
+
+- **Onde:** só no Comando › Usinas, no alto da lista, como a caixa do prontuário (o mesmo `_ia.html`, com `ia_base` e
+  `ia_sobre`). O `comando-usinas.js` pede o pedaço `/t/comando/usinas/ia`.
+- **O dossiê da carteira** (`carteira_ia.montar`):
+  - uma linha por usina com o que as telas donas contam: meta e PR do mês, a disponibilidade do mês e a do anterior, os
+    desligamentos do mês (a geração parou) e os sem a geração parar, as OS abertas, as atrasadas e as urgentes não
+    iniciadas, os chamados abertos (o mais antigo e os fabricantes), os insights, as pendências e o estado do COS;
+  - mais a lista de todos os chamados de garantia abertos;
+  - as fontes são as mesmas cópias de 5 min da lista e do prontuário (`_carteira_ia`);
+  - **sem o nome das pessoas**, nem responsáveis nem técnicos: a pergunta vai a um provedor de fora;
+  - o administrador lê o texto em `/t/comando/usinas/dossie-da-carteira.md`.
+- **As instruções** são as da carteira (`carteira_ia.INSTRUCOES`, que vão no lugar das da usina por `instrucoes=` do
+  `ia.perguntar`):
+  - a conclusão primeiro;
+  - a lista de usinas em tabela, com o nome exato;
+  - quando a pergunta diz "baixa" sem número, a IA escolhe um corte e diz qual foi;
+  - o número que não fecha com os outros da mesma usina é dado a conferir;
+  - as mesmas regras de OS, garantia e concessionária do prontuário.
+- **A resposta:**
+  - cada usina citada vira link do prontuário, noutra aba (`r.usinas`, conferido no dossiê);
+  - a tabela baixa para o Excel (CSV com ";" e BOM);
+  - a ação para outro setor leva as usinas dela (`usinas_ids`: os nomes do dossiê e a usina da OS do chamado) e sai
+    pela mesma Nova demanda (`/t/comando/usinas/ia/demanda`), só com usinas da lista.
+- **Medido em 16/11/2026** (o banco de produção lido do PC): 144 usinas e 272 chamados abertos em 73 delas. O tamanho do
+  dossiê está no `tokens_estimados`.
+
+Prova: `tests/test_comando_carteira_ia.py`.
 
 ## O diagnóstico do dia da IA no prontuário (14/11/2026; `nexus/comando/diagnostico.py`)
 

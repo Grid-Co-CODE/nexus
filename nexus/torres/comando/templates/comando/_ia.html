@@ -1,19 +1,23 @@
-{# Nexus IA na janela do prontuário (13/11/2026; Levi: "Do prontuário, eu quero que tenha um chat. Onde a pessoa possa
-   fazer perguntas [...] Teste com várias IAs"). Vem como pedaço de página para dentro da janela (prontuario.js); o que
-   acontece aqui dentro é do comando/ia.js. Marcar mais de um modelo é o modo de comparar: a mesma pergunta, lado a lado.
-   As regras: nexus/comando/ia.py. #}
+{# A caixa da Nexus IA, embutida na tela (16/11/2026; antes, 13/11, era uma janela por cima do prontuário). Levi: "Do
+   prontuário, eu quero que tenha um chat. Onde a pessoa possa fazer perguntas [...] Teste com várias IAs"; e o retorno do
+   time em 16/11: "Tem que ser a caixa de texto para a IA sem abrir uma janela". Vem como pedaço de página: no prontuário,
+   embaixo do Nexus IA Insights (prontuario.js); no Comando › Usinas, a da carteira, no alto da lista (comando-usinas.js).
+   O que acontece aqui dentro é do comando/ia.js. A caixa fica aberta para digitar; a resposta vem embaixo, a mais nova
+   em cima; "Limpar" recolhe a conversa. O modelo e o gasto ficam no "i". As regras: nexus/comando/ia.py (a usina) e
+   nexus/comando/carteira_ia.py (a carteira). #}
 {% set com_chave = modelos|selectattr('tem_chave')|list %}
-<div class="ia" data-ia data-ia-url="{{ raiz }}/t/comando/usinas/{{ x.usina_id }}/ia/perguntar"
-     data-ia-demanda-url="{{ raiz }}/t/comando/usinas/{{ x.usina_id }}/ia/demanda" data-ia-raiz="{{ raiz }}">
+{% set base = ia_base if ia_base is defined and ia_base else '/t/comando/usinas/' ~ x.usina_id ~ '/ia' %}
+<div class="ia ia--embutida" data-ia data-ia-url="{{ raiz }}{{ base }}/perguntar" data-ia-demanda-url="{{ raiz }}{{ base }}/demanda" data-ia-raiz="{{ raiz }}">
   {# para onde a resposta pode mandar demanda: os setores, as pessoas e os temas (a Nova demanda da Caixa de entrada) #}
   <script type="application/json" data-ia-setores>{{ setores|tojson }}</script>
   <script type="application/json" data-ia-criar-os>{{ criar_os|tojson }}</script>
-  {# as perguntas sugeridas lado a lado, no alto (ficam depois da primeira pergunta); o modelo escondido no "i", no canto
-     (14/11/2026, Levi: "pode esconder os modelos da IA. Bora usar como padrão esse Nemotron 3 Ultra [...] o nome,
-     escondido em algum canto [...] na exclamação"). Lá dentro, quem quiser compara com outros modelos #}
   {% set atual = modelos|selectattr('id', 'equalto', padrao)|first %}
-  <div class="ia-topo">
-    <div class="ia-sugestoes" role="group" aria-label="Perguntas sugeridas">{% for s in sugestoes %}<button type="button" class="ia-sugestao" data-ia-sugestao>{{ s }}</button>{% endfor %}</div>
+  <div class="ia-cab">
+    <span class="ia-selo"><i class="ph ph-sparkle" aria-hidden="true"></i> Pergunte à Nexus IA</span>
+    <span class="ia-sobre">{{ ia_sobre if ia_sobre is defined and ia_sobre else 'sobre a ' ~ x.usina }}</span>
+    <button type="button" class="gc-btn gc-btn--ui gc-btn--fantasma ia-limpar" data-ia-limpar hidden><i class="ph ph-x" aria-hidden="true"></i> Limpar</button>
+    {# o modelo escondido no "i" (14/11/2026, Levi: "pode esconder os modelos da IA [...] na exclamação"); lá dentro,
+       quem quiser compara com outros modelos, e o gasto do mês #}
     <details class="ia-info">
       <summary title="O modelo da IA" aria-label="O modelo da IA"><i class="ph ph-info" aria-hidden="true"></i></summary>
       <div class="ia-info-caixa">
@@ -28,26 +32,23 @@
           </label>
           {% endfor %}
         </fieldset>
+        <p class="ia-pe mudo">Gasto do mês: <b class="gc-num" data-ia-gasto>US$ {{ ('%.2f'|format(gasto)).replace('.', ',') }}</b> de US$ {{ ('%.2f'|format(teto)).replace('.', ',') }}. A resposta vem só do dossiê de agora, sem o nome das pessoas.</p>
       </div>
     </details>
   </div>
   {% if not com_chave %}
   <div class="ia-aviso" role="status"><i class="ph ph-key" aria-hidden="true"></i><div>
-    <strong>Nenhuma IA ligada neste servidor.</strong> Cada provedor precisa da chave dele no <span class="gc-dado">.env</span>:
+    <strong>Nenhuma IA ligada neste servidor.</strong> Cada provedor precisa da chave dele (Base › Chaves das fontes › IA):
     {% for m in modelos|unique(attribute='provedor') %}{{ m.motivo }}{{ ' ' if not loop.last }}{% endfor %}</div></div>
   {% endif %}
 
-  <div class="ia-conversa" data-ia-conversa aria-live="polite">
-    <div class="ia-vazio" data-ia-vazio>
-      <p class="ia-vazio-t">Pergunte sobre a {{ x.usina }}.</p>
-      <p class="mudo">A resposta vem só do dossiê de agora: o prontuário inteiro, sem o nome das pessoas.</p>
-    </div>
-  </div>
-
   <form class="ia-form" data-ia-form>
-    <label class="ia-sr" for="ia-pergunta">Pergunta</label>
-    <textarea id="ia-pergunta" name="pergunta" rows="2" maxlength="{{ max_pergunta }}" placeholder="Ex.: por que a usina caiu em outubro?" data-ia-pergunta{% if not com_chave %} disabled{% endif %}></textarea>
+    <label class="ia-sr" for="ia-pergunta-{{ base|replace('/', '-') }}">Pergunta</label>
+    <textarea id="ia-pergunta-{{ base|replace('/', '-') }}" name="pergunta" rows="1" maxlength="{{ max_pergunta }}" placeholder="{{ ia_exemplo if ia_exemplo is defined and ia_exemplo else 'Ex.: por que a usina caiu em outubro?' }}" data-ia-pergunta{% if not com_chave %} disabled{% endif %}></textarea>
     <button type="submit" class="gc-btn gc-btn--ui gc-btn--primario" data-ia-enviar{% if not com_chave %} disabled{% endif %}><i class="ph ph-paper-plane-right" aria-hidden="true"></i> Perguntar</button>
   </form>
-  <p class="ia-pe mudo">Gasto do mês: <b class="gc-num" data-ia-gasto>US$ {{ ('%.2f'|format(gasto)).replace('.', ',') }}</b> de US$ {{ ('%.2f'|format(teto)).replace('.', ',') }} · Enter envia, Shift+Enter quebra a linha.</p>
+  <div class="ia-sugestoes" role="group" aria-label="Perguntas sugeridas">{% for s in sugestoes %}<button type="button" class="ia-sugestao" data-ia-sugestao>{{ s }}</button>{% endfor %}</div>
+
+  {# a conversa, embaixo da caixa: a pergunta mais nova em cima #}
+  <div class="ia-conversa" data-ia-conversa aria-live="polite"></div>
 </div>

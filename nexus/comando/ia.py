@@ -236,7 +236,7 @@ def ate_a_meia_noite_utc(agora: datetime | None = None) -> int:
     return max(60, int((amanha - agora).total_seconds()))
 
 
-def _chamar_rodizio(cfg, m: "Modelo", dossie: str, msgs: list, contexto: str = "") -> dict:
+def _chamar_rodizio(cfg, m: "Modelo", dossie: str, msgs: list, contexto: str = "", instrucoes: str = "") -> dict:
     """A pergunta pela 1ª vaga livre; a barrada descansa e a pergunta vai à próxima. Todas em descanso: tenta mesmo assim a
     que volta primeiro. Erro que não é da chave (o modelo, a rede) não gasta as outras vagas."""
     nome = PROVEDORES[m.provedor]["nome"]
@@ -248,7 +248,7 @@ def _chamar_rodizio(cfg, m: "Modelo", dossie: str, msgs: list, contexto: str = "
         sorted(ks, key=lambda x: parados.get(impressao(x[1]), {}).get("ate", 0))[:1]
     ultimo = {}
     for vaga, k in livres:
-        r = _chamar(m, k, dossie, msgs, contexto)
+        r = _chamar(m, k, dossie, msgs, contexto, *((instrucoes,) if instrucoes else ()))
         st = r.get("status")
         if not r.get("erro"):
             if len(ks) > 1:
@@ -314,12 +314,15 @@ def _contexto(setores=None, meu_setor: str = "") -> str:
     return f"<setores>{lista}</setores>\nQuem pergunta é do setor: {meu_setor or 'não informado'}."
 
 
-def _sistema(dossie: str, contexto: str = "") -> str:
-    return f"{INSTRUCOES}\n\n{contexto}\n\n<dossie>\n{dossie}\n</dossie>" if contexto else \
-        f"{INSTRUCOES}\n\n<dossie>\n{dossie}\n</dossie>"
+def _sistema(dossie: str, contexto: str = "", instrucoes: str = "") -> str:
+    """As instruções (as da usina, `INSTRUCOES`, ou as do escopo que a rota mandou: a carteira, 16/11/2026), o contexto e
+    o dossiê."""
+    ins = instrucoes or INSTRUCOES
+    return f"{ins}\n\n{contexto}\n\n<dossie>\n{dossie}\n</dossie>" if contexto else \
+        f"{ins}\n\n<dossie>\n{dossie}\n</dossie>"
 
 
-def _chamar_anthropic(m: Modelo, k: str, dossie: str, msgs: list, contexto: str = "") -> dict:
+def _chamar_anthropic(m: Modelo, k: str, dossie: str, msgs: list, contexto: str = "", instrucoes: str = "") -> dict:
     """Pelo SDK oficial. O dossiê vai num bloco do system com cache (a pergunta de seguimento na mesma usina relê o
     dossiê do cache, a 10% do preço). Esforço baixo: é conversa, não código. No Opus 5.5 e no Sonnet 5.5, a recusa por
     engano cai num modelo de reserva (`fallbacks: "default"`), em vez de a pessoa ficar sem resposta."""
@@ -329,7 +332,8 @@ def _chamar_anthropic(m: Modelo, k: str, dossie: str, msgs: list, contexto: str 
         return {"erro": "O SDK da Anthropic (pacote anthropic) não está instalado neste servidor."}
     cli = anthropic.Anthropic(api_key=k, timeout=TEMPO_S, max_retries=1)
     pedido = dict(model=m.modelo, max_tokens=MAX_SAIDA, messages=msgs, output_config={"effort": "low"},
-                  system=[{"type": "text", "text": f"{INSTRUCOES}\n\n{contexto}" if contexto else INSTRUCOES},
+                  system=[{"type": "text", "text": f"{instrucoes or INSTRUCOES}\n\n{contexto}" if contexto
+                           else (instrucoes or INSTRUCOES)},
                           {"type": "text", "text": f"<dossie>\n{dossie}\n</dossie>", "cache_control": {"type": "ephemeral"}}])
     try:
         if m.modelo in ("claude-opus-5-5", "claude-sonnet-5-5"):
@@ -373,8 +377,8 @@ def _erro_http(nome: str, r) -> dict:
             "status": r.status_code}
 
 
-def _chamar_gemini(m: Modelo, k: str, dossie: str, msgs: list, contexto: str = "") -> dict:
-    corpo = {"systemInstruction": {"parts": [{"text": _sistema(dossie, contexto)}]},
+def _chamar_gemini(m: Modelo, k: str, dossie: str, msgs: list, contexto: str = "", instrucoes: str = "") -> dict:
+    corpo = {"systemInstruction": {"parts": [{"text": _sistema(dossie, contexto, instrucoes)}]},
              "contents": [{"role": "model" if x["role"] == "assistant" else "user", "parts": [{"text": x["content"]}]}
                           for x in msgs],
              "generationConfig": {"maxOutputTokens": MAX_SAIDA}}
@@ -398,11 +402,11 @@ def _chamar_gemini(m: Modelo, k: str, dossie: str, msgs: list, contexto: str = "
             "parou": "limite de tamanho" if cand.get("finishReason") == "MAX_TOKENS" else ""}
 
 
-def _chamar_compativel(m: Modelo, k: str, dossie: str, msgs: list, contexto: str = "") -> dict:
+def _chamar_compativel(m: Modelo, k: str, dossie: str, msgs: list, contexto: str = "", instrucoes: str = "") -> dict:
     """xAI, Groq e OpenRouter: o formato chat/completions de cada um."""
     nome = PROVEDORES[m.provedor]["nome"]
     corpo = {"model": m.modelo, "max_tokens": MAX_SAIDA,
-             "messages": [{"role": "system", "content": _sistema(dossie, contexto)}] + msgs}
+             "messages": [{"role": "system", "content": _sistema(dossie, contexto, instrucoes)}] + msgs}
     try:
         r = requests.post(f"{_BASE_COMPATIVEL[m.provedor]}/chat/completions", json=corpo, timeout=TEMPO_S,
                           headers={"Authorization": f"Bearer {k}", "Content-Type": "application/json"})
@@ -422,12 +426,12 @@ def _chamar_compativel(m: Modelo, k: str, dossie: str, msgs: list, contexto: str
             "parou": "limite de tamanho" if esc.get("finish_reason") == "length" else ""}
 
 
-def _chamar(m: Modelo, k: str, dossie: str, msgs: list, contexto: str = "") -> dict:
+def _chamar(m: Modelo, k: str, dossie: str, msgs: list, contexto: str = "", instrucoes: str = "") -> dict:
     if m.provedor == "anthropic":
-        return _chamar_anthropic(m, k, dossie, msgs, contexto)
+        return _chamar_anthropic(m, k, dossie, msgs, contexto, instrucoes)
     if m.provedor == "gemini":
-        return _chamar_gemini(m, k, dossie, msgs, contexto)
-    return _chamar_compativel(m, k, dossie, msgs, contexto)
+        return _chamar_gemini(m, k, dossie, msgs, contexto, instrucoes)
+    return _chamar_compativel(m, k, dossie, msgs, contexto, instrucoes)
 
 
 def listar_modelos(cfg, provedor: str) -> list[str]:
@@ -451,7 +455,8 @@ def listar_modelos(cfg, provedor: str) -> list[str]:
 
 
 # ── a pergunta ───────────────────────────────────────────────────────────────────────────────────────────────────────
-def responder(cfg, m: Modelo, dossie: str, pergunta: str, historico=None, setores=None, meu_setor: str = "") -> dict:
+def responder(cfg, m: Modelo, dossie: str, pergunta: str, historico=None, setores=None, meu_setor: str = "",
+              instrucoes: str = "") -> dict:
     """Uma resposta de um modelo: {id, rotulo, provedor, ok, texto, erro, ms, entrada, saida, cache_lido, cache_gravado,
     custo_usd, preco_oficial, parou, numeros}."""
     base = {"id": m.id, "rotulo": m.rotulo, "provedor": PROVEDORES[m.provedor]["nome"], "modelo": m.modelo,
@@ -462,10 +467,11 @@ def responder(cfg, m: Modelo, dossie: str, pergunta: str, historico=None, setore
     t0 = time.monotonic()
     try:
         ctx = _contexto([neutro(s) for s in setores], neutro(meu_setor)) if setores is not None else ""
+        extra = (instrucoes,) if instrucoes else ()      # as da carteira; sem elas, as da usina
         if m.provedor in VAGAS:
-            r = _chamar_rodizio(cfg, m, neutro(dossie), _mensagens(historico, pergunta), ctx)
+            r = _chamar_rodizio(cfg, m, neutro(dossie), _mensagens(historico, pergunta), ctx, *extra)
         else:
-            r = _chamar(m, k, neutro(dossie), _mensagens(historico, pergunta), ctx)
+            r = _chamar(m, k, neutro(dossie), _mensagens(historico, pergunta), ctx, *extra)
     except Exception as ex:      # noqa: BLE001 — um provedor quebrado não derruba os outros
         log.exception("IA: %s falhou", m.id)
         r = {"erro": f"Falhou ({type(ex).__name__})."}
@@ -495,11 +501,14 @@ def responder(cfg, m: Modelo, dossie: str, pergunta: str, historico=None, setore
 
 
 def _bateu_o_limite(r: dict) -> bool:
-    return not r.get("ok") and ("limite de uso" in (r.get("erro") or "") or "429" in (r.get("erro") or ""))
+    """O limite do dia, ou a resposta vazia (16/11/2026: o Nemotron grátis voltou vazio duas vezes na pergunta da
+    carteira, a tabela de 144 usinas): nos dois casos a pergunta vai ao próximo grátis."""
+    erro = r.get("erro") or ""
+    return not r.get("ok") and ("limite de uso" in erro or "429" in erro or "resposta vazia" in erro)
 
 
 def perguntar(cfg, ids: list[str], dossie: str, pergunta: str, historico=None, setores=None,
-              meu_setor: str = "") -> list[dict]:
+              meu_setor: str = "", instrucoes: str = "") -> list[dict]:
     """Os modelos pedidos, em paralelo, na ordem pedida. Id desconhecido é ignorado.
 
     A troca (14/11/2026, Levi: "eu poderia criar umas 3 ou 4 contas com essa API de Nemotron. E aí, caso uma ultrapasse a
@@ -512,15 +521,18 @@ def perguntar(cfg, ids: list[str], dossie: str, pergunta: str, historico=None, s
     if not escolhidos:
         return []
     with ThreadPoolExecutor(max_workers=min(8, len(escolhidos))) as ex:
-        out = list(ex.map(lambda m: responder(cfg, m, dossie, pergunta, historico, setores, meu_setor), escolhidos))
+        out = list(ex.map(lambda m: responder(cfg, m, dossie, pergunta, historico, setores, meu_setor, instrucoes),
+                          escolhidos))
     if len(escolhidos) == 1 and _bateu_o_limite(out[0]) and escolhidos[0].entrada == 0:
         for mid in TROCA_GRATIS:
             m = por_id.get(mid)
             if not m or m.id == escolhidos[0].id or not chave(cfg, m.provedor):
                 continue
-            r = responder(cfg, m, dossie, pergunta, historico, setores, meu_setor)
+            r = responder(cfg, m, dossie, pergunta, historico, setores, meu_setor, instrucoes)
             if r.get("ok"):
-                r["troca"] = f"O {escolhidos[0].rotulo} bateu o limite do dia: quem respondeu foi o {m.rotulo}."
+                r["troca"] = (f"O {escolhidos[0].rotulo} voltou sem resposta: quem respondeu foi o {m.rotulo}."
+                              if "resposta vazia" in (out[0].get("erro") or "")
+                              else f"O {escolhidos[0].rotulo} bateu o limite do dia: quem respondeu foi o {m.rotulo}.")
                 return [r]
     return out
 
@@ -559,7 +571,13 @@ def separar_acoes(texto: str, setores) -> tuple[str, list[dict]]:
             os_n = int(it.get("os")) if it.get("os") not in (None, "", "null") else None
         except (TypeError, ValueError):
             os_n = None
-        out.append({"setor": setor, "acao": acao, "os": os_n})
+        a = {"setor": setor, "acao": acao, "os": os_n}
+        # as usinas da ação (a da carteira, 16/11/2026): os nomes como a IA escreveu; quem liga ao id é a rota, pelo
+        # dossiê (o nome que não está lá não vai na demanda)
+        nomes = [" ".join(str(x).split())[:80] for x in it.get("usinas") or [] if isinstance(x, str) and x.strip()][:10]
+        if nomes:
+            a["usinas"] = nomes
+        out.append(a)
         if len(out) >= MAX_ACOES:
             break
     return limpo, out

@@ -12,10 +12,17 @@
      outro setor (`r.acoes`) ganha o "Mandar para a caixa de entrada", que abre a Nova demanda ali mesmo, preenchida;
    - "se eu pedisse um relatório já baixa um automático": o pedido de relatório volta com o endereço do PDF (sem a IA),
      e o PDF baixa sozinho;
-   - as citações saem como "§2 · §8", sem código de regra (o servidor já limpa; aqui só o desenho). */
+   - as citações saem como "§2 · §8", sem código de regra (o servidor já limpa; aqui só o desenho).
+
+   16/11/2026: a caixa fica na própria tela, sem janela (retorno do time: "Tem que ser a caixa de texto para a IA sem
+   abrir uma janela"), embaixo do Nexus IA Insights no prontuário e no alto do Comando › Usinas (a da carteira). A pergunta
+   mais nova vem em cima, logo abaixo da caixa; "Limpar" recolhe a conversa. A resposta da carteira traz tabela (o
+   Markdown "| a | b |"), cada usina citada vira link do prontuário dela (`r.usinas`, que o servidor confere no dossiê) e a
+   tabela baixa para o Excel. */
 (function () {
   'use strict';
-  var historico = [];          // [{pergunta, resposta}] da usina aberta (a janela fechada zera: o corpo some)
+  // [{pergunta, resposta}] de cada caixa (a da usina e a da carteira podem estar em telas diferentes; cada uma a dela)
+  function hist(raiz) { return raiz._iaHist || (raiz._iaHist = []); }
 
   function esc(s) {
     return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
@@ -25,19 +32,40 @@
   function num(v, casas) {
     return Number(v || 0).toLocaleString('pt-BR', {minimumFractionDigits: casas || 0, maximumFractionDigits: casas || 0});
   }
-  // o mínimo de Markdown que as IAs escrevem: parágrafo, lista com "-" ou "*" ou "1.", **negrito** e *itálico*
-  function texto(md, mapaOs, raiz) {
+  // a tabela do Markdown ("| a | b |", a linha "|---|" e as linhas): a da carteira lista as usinas (16/11/2026)
+  function celulas(l) { return l.replace(/^\|/, '').replace(/\|$/, '').split('|').map(function (c) { return c.trim(); }); }
+  function tabela(cab, corpo) {
+    var num = /^[-−]?[\d.,]+\s*(%|h|d|dias|MWp|kWh|MWh)?$/;
+    return '<div class="ia-tab-rola"><table class="ia-tab"><thead><tr>' + cab.map(function (c) { return '<th>' + c + '</th>'; }).join('') +
+      '</tr></thead><tbody>' + corpo.map(function (l) {
+        return '<tr>' + cab.map(function (_c, i) {
+          var v = l[i] == null ? '' : l[i];
+          return '<td' + (num.test(v) ? ' class="ia-tab-num"' : '') + '>' + v + '</td>';
+        }).join('') + '</tr>';
+      }).join('') + '</tbody></table></div>';
+  }
+  // o mínimo de Markdown que as IAs escrevem: parágrafo, lista com "-" ou "*" ou "1.", tabela, **negrito** e *itálico*
+  function texto(md, mapaOs, raiz, usinas) {
     var linhas = esc(md).split(/\r?\n/), out = [], lista = null;
     function fecha() { if (lista) { out.push('</' + lista + '>'); lista = null; } }
-    linhas.forEach(function (l) {
-      var t = l.trim(), m = t.match(/^([-*•]|\d+[.)])\s+(.*)$/);
+    for (var i = 0; i < linhas.length; i++) {
+      var l = linhas[i], t = l.trim();
+      if (t.charAt(0) === '|' && i + 1 < linhas.length && /^\|?\s*:?-{2,}/.test(linhas[i + 1].trim())) {
+        fecha();
+        var cab = celulas(t), corpo = [];
+        for (i += 2; i < linhas.length && linhas[i].trim().charAt(0) === '|'; i++) corpo.push(celulas(linhas[i].trim()));
+        i--;
+        out.push(tabela(cab, corpo));
+        continue;
+      }
+      var m = t.match(/^([-*•]|\d+[.)])\s+(.*)$/);
       if (m) {
         var tipo = /\d/.test(m[1]) ? 'ol' : 'ul';
         if (lista !== tipo) { fecha(); out.push('<' + tipo + '>'); lista = tipo; }
         out.push('<li>' + m[2] + '</li>');
       } else if (!t) { fecha(); }
       else { fecha(); out.push('<p>' + t.replace(/^#+\s*/, '') + '</p>'); }
-    });
+    }
     fecha();
     var h = out.join('').replace(/\*\*(.+?)\*\*/g, '<b>$1</b>').replace(/(^|[^*\w])\*([^*\s][^*]*?)\*(?!\*)/g, '$1<em>$2</em>');
     // as citações: "(§2, §8)" vira a etiqueta "§2 · §8"
@@ -57,7 +85,30 @@
           '" target="_blank" rel="noopener" title="Raio X da OS ' + n + ' (abre em outra aba)">' + n + '</a>';
       });
     }
-    return h;
+    return linkUsinas(h, usinas);
+  }
+  // as usinas da resposta da carteira viram link do prontuário (noutra aba: a conversa fica): só fora de outro link e
+  // de botão, pelo nome inteiro ("Colíder 1" não pega "Colíder 10")
+  function linkUsinas(h, usinas) {
+    var nomes = Object.keys(usinas || {});
+    if (!nomes.length) return h;
+    var url = {};
+    nomes.forEach(function (n) { url[esc(n).toLowerCase()] = usinas[n]; });
+    var alt = nomes.map(function (n) { return esc(n).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); })
+      .sort(function (a, b) { return b.length - a.length; }).join('|');
+    var rx = new RegExp('(^|[^\\wÀ-ÿ])(' + alt + ')(?![\\wÀ-ÿ])', 'gi'), dentro = 0;
+    return h.split(/(<[^>]+>)/).map(function (p) {
+      if (p.charAt(0) === '<') {
+        if (/^<(a|button)\b/i.test(p)) dentro++;
+        else if (/^<\/(a|button)>/i.test(p)) dentro = Math.max(0, dentro - 1);
+        return p;
+      }
+      if (dentro) return p;
+      return p.replace(rx, function (tudo, antes, nome) {
+        var u = url[nome.toLowerCase()];
+        return u ? antes + '<a class="ia-usina" href="' + esc(u) + '" target="_blank" rel="noopener" title="Abrir o prontuário (noutra aba)">' + nome + '</a>' : tudo;
+      });
+    }).join('');
   }
   // o "Criar OS" da ação, à esquerda da caixa de entrada, para o setor que recebe OS (Engenharia, Performance): o
   // mesmo Criar OS do prontuário (a janela do OS Creator por cima; fora do prontuário, o OS Creator noutra aba)
@@ -93,11 +144,15 @@
       (n.fora.length ? 'Fora do dossiê (cálculo da IA ou invenção): ' + esc(n.fora.join(', ')) : 'Todos os números da resposta estão no dossiê') +
       '">' + n.no_dossie + ' de ' + n.n + ' números no dossiê</span>' : '';
     var custo = 'US$ ' + num(r.custo_usd, 4) + (r.preco_oficial ? '' : ' (ref.)');
+    var corpo = texto(r.texto, r.os, raiz, r.usinas);
+    // a tabela da resposta baixa para o Excel (o CSV com ";" e BOM, que o Excel em português abre em colunas)
+    var csv = corpo.indexOf('<table') >= 0 ? '<button type="button" class="gc-btn gc-btn--ui gc-btn--contorno ia-csv" data-ia-csv>' +
+      '<i class="ph ph-microsoft-excel-logo" aria-hidden="true"></i> Baixar a tabela (Excel)</button>' : '';
     return '<article class="ia-r">' + cab + (r.troca ? '<p class="ia-r-troca">' + esc(r.troca) + '</p>' : '') +
-      '<div class="ia-r-texto">' + texto(r.texto, r.os, raiz) + '</div>' + acoes(r, ri) +
+      '<div class="ia-r-texto">' + corpo + '</div>' + acoes(r, ri) +
       (r.parou ? '<p class="ia-r-aviso">A resposta foi cortada (' + esc(r.parou) + ').</p>' : '') +
       '<p class="ia-r-pe">' + conf + '<span class="mudo">' + num(r.ms / 1000, 1) + ' s · ' + num(r.entrada + (r.cache_lido || 0)) +
-      ' → ' + num(r.saida) + ' tokens · ' + custo + '</span></p></article>';
+      ' → ' + num(r.saida) + ' tokens · ' + custo + '</span>' + csv + '</p></article>';
   }
 
   // o relatório: o PDF do prontuário, baixado sozinho (sem a IA)
@@ -141,15 +196,17 @@
       (marcados.length ? '<div class="ia-respostas ia-respostas--' + Math.min(marcados.length, 3) + '"><p class="ia-lendo mudo">Lendo o dossiê e perguntando a ' +
         marcados.length + (marcados.length === 1 ? ' modelo' : ' modelos') + '…</p></div>'
         : '<p class="ia-r-erro" role="alert">Marque ao menos um modelo.</p>');
-    conversa.appendChild(turno);
-    turno.scrollIntoView({block: 'end'});
+    // a mais nova em cima, logo abaixo da caixa (a caixa fica na tela, sem janela: 16/11/2026)
+    conversa.insertBefore(turno, conversa.firstChild);
+    var limpar = raiz.querySelector('[data-ia-limpar]');
+    if (limpar) limpar.hidden = false;
     if (!marcados.length) return;
     campo.value = '';
     botao.disabled = true;
     fetch(raiz.getAttribute('data-ia-url'), {
       method: 'POST', credentials: 'same-origin',
       headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
-      body: JSON.stringify({pergunta: pergunta, modelos: marcados, historico: historico})
+      body: JSON.stringify({pergunta: pergunta, modelos: marcados, historico: hist(raiz)})
     }).then(function (r) {
       return r.json().catch(function () { return {ok: false, erro: 'Resposta inesperada (' + r.status + ').'}; });
     }).then(function (j) {
@@ -167,7 +224,7 @@
         }).join('') + '</div>');
       }
       var primeira = j.respostas.filter(function (r) { return r.ok; })[0];
-      if (primeira) historico = historico.concat([{pergunta: pergunta, resposta: primeira.texto}]).slice(-3);
+      if (primeira) raiz._iaHist = hist(raiz).concat([{pergunta: pergunta, resposta: primeira.texto}]).slice(-3);
       var g = raiz.querySelector('[data-ia-gasto]');
       if (g && j.gasto != null) g.textContent = 'US$ ' + num(j.gasto, 2);
     }).catch(function () {
@@ -203,6 +260,8 @@
     var desc = a.acao + '\n\nSugerido pelo Nexus IA, a partir da pergunta: “' + ctx.pergunta + '”.';
     caixa.innerHTML =
       '<input type="hidden" name="para_setor_id" value="' + s.setor_id + '"><input type="hidden" name="os" value="' + (a.os || '') + '">' +
+      // as usinas da ação da carteira (o servidor confere na lista); na da usina, a rota põe a usina do prontuário
+      '<input type="hidden" name="usinas" value="' + esc((a.usinas_ids || []).join(',')) + '">' +
       '<input type="hidden" name="novo_id" value="d' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8) + '">' +
       '<label>Para<select class="gc-campo" name="para_hmac" required>' + s.pessoas.map(function (p) { return '<option value="' + esc(p.hmac) + '">' + esc(p.nome) + '</option>'; }).join('') + '</select></label>' +
       '<label>Tema<select class="gc-campo" name="tema_id" required>' + s.temas.map(function (t) { return '<option value="' + esc(t.tema_id) + '">' + esc(t.nome) + ' · ' + t.prazo + ' dias úteis</option>'; }).join('') + '</select></label>' +
@@ -263,9 +322,37 @@
     var raiz = c.closest('[data-ia]');
     if (!raiz.querySelector('[data-ia-enviar]').disabled) enviar(raiz, c.value);
   });
+  // a tabela da resposta para o Excel: o CSV com ";" e o BOM (o Excel em português abre em colunas, com os acentos)
+  function baixarTabela(bt) {
+    var t = bt.closest('.ia-r').querySelector('.ia-tab');
+    if (!t) return;
+    var linhas = Array.prototype.map.call(t.rows, function (tr) {
+      return Array.prototype.map.call(tr.cells, function (c) {
+        var v = c.textContent.replace(/\s+/g, ' ').trim();
+        return /[;"\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v;
+      }).join(';');
+    });
+    var url = URL.createObjectURL(new Blob(['\ufeff' + linhas.join('\r\n')], {type: 'text/csv;charset=utf-8'}));
+    var a = document.createElement('a'), d = new Date();
+    a.href = url;
+    a.download = 'nexus-ia-' + d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0') + '.csv';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function () { URL.revokeObjectURL(url); }, 60000);
+  }
   document.addEventListener('click', function (ev) {
     var os = ev.target.closest('[data-ia-os]');
     if (os) { abrirOs(os.getAttribute('data-ia-os')); return; }
+    var csv = ev.target.closest('[data-ia-csv]');
+    if (csv) { baixarTabela(csv); return; }
+    var lp = ev.target.closest('[data-ia-limpar]');
+    if (lp) {
+      var r = lp.closest('[data-ia]');
+      r.querySelector('[data-ia-conversa]').innerHTML = '';
+      r._iaHist = [];
+      lp.hidden = true;
+      r.querySelector('[data-ia-pergunta]').focus();
+      return;
+    }
     var p = ev.target.closest('[data-ia-pedir]');
     if (p) { formDemanda(p.closest('[data-ia]'), p.closest('[data-ia-acao]')); return; }
     var s = ev.target.closest('[data-ia-sugestao]');
@@ -274,7 +361,4 @@
     if (raiz.querySelector('[data-ia-enviar]').disabled) return;
     enviar(raiz, s.textContent);
   });
-  // a janela que fecha leva a conversa junto (o corpo dela é esvaziado), menos quando fecha para o card da OS
-  var jan = document.getElementById('pu-jan');
-  if (jan) jan.addEventListener('close', function () { if (!jan.dataset.manter) { historico = []; respostas = {}; } });
 })();

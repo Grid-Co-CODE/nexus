@@ -20,6 +20,11 @@
   {% if erro %}<div class="cn-erro" role="alert"><span>A Visão do responsável não carregou agora ({{ erro }}). Tente de novo em instantes.</span></div>{% endif %}
   {% if avisos %}<div class="cn-erro cn-aviso" role="status"><span>Sem leitura agora: {{ avisos|join(', ') }}. O resto da tabela vale.</span></div>{% endif %}
 
+  {# a Nexus IA da carteira (16/11/2026, retorno do time: "Eu queria a IA fora do ambiente da usina [...] ver todos os
+     chamados em aberto e correlacionar com as usinas com baixa disponibilidade e performance"; Levi: "só no Comando ›
+     Usinas"): a caixa embutida, sem janela, aberta para todos; vem por trás (comando-usinas.js) #}
+  <div class="cmu-ia" data-cmu-ia="{{ raiz }}/t/comando/usinas/ia"></div>
+
   <section class="cmu-quadro" aria-label="Usinas">
     {# a faixa: uma barra por usina; passar o mouse diz a usina e o motivo da cor (12/11/2026) #}
     <div class="cmu-faixa" data-cmu-faixa>
@@ -84,4 +89,5 @@
   </section>
 </div>
 <script src="{{ url_for('static', filename='comando-usinas.js') }}"></script>
+<script src="{{ url_for('static', filename='comando/ia.js') }}" defer></script>
 {% endblock %}

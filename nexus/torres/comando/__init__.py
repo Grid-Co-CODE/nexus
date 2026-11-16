@@ -390,14 +390,14 @@ def usina_dossie_md(usina_id):
 
 # ── Nexus IA: a pergunta sobre a usina (13/11/2026) ──────────────────────────────────────────────────────────────────
 # Levi: "Do prontuário, eu quero que tenha um chat. Onde a pessoa possa fazer perguntas [...] como foi a performance no
-# mês? Por que a usina caiu? Qual a tendência? [...] Teste com várias IAs". As regras moram em nexus/comando/ia.py. Só
-# administrador enquanto é teste (cada pergunta custa, e o teto do mês é um só); a janela é a do prontuário (pu-jan).
+# mês? Por que a usina caiu? Qual a tendência? [...] Teste com várias IAs". As regras moram em nexus/comando/ia.py.
+# 16/11/2026, Levi: "libera para todos": quem abre o prontuário pergunta (era só administrador, no teste). E a caixa fica
+# na própria tela, embaixo do Nexus IA Insights, sem janela (retorno do time: "Tem que ser a caixa de texto para a IA sem
+# abrir uma janela"): o prontuario.js pede o pedaço desta rota e o põe no lugar. O teto do mês segue valendo para todos.
 @bp.route("/usinas/<int:usina_id>/ia")
 def usina_ia(usina_id):
     from ...comando import ia as IA
     from .prontuario_dados import contexto as _prontuario
-    if not session.get("admin"):
-        abort(403)
     ctx = _prontuario(usina_id)
     if ctx is None:
         abort(404)
@@ -543,8 +543,6 @@ def usina_ia_perguntar(usina_id):
     from flask import jsonify
 
     from ...comando import ia as IA
-    if not session.get("admin"):
-        return jsonify(ok=False, erro="Só administrador, enquanto o Nexus IA está em teste."), 403
     if _de_outro_site():
         return jsonify(ok=False, erro="Pedido de outro site."), 403
     b = request.get_json(silent=True) or {}
@@ -632,13 +630,11 @@ def usina_ia_diagnostico(usina_id):
 def usina_ia_demanda(usina_id):
     """A ação de outro setor que a resposta sugeriu, mandada como demanda (JSON {para_hmac, para_setor_id, tema_id,
     titulo, descricao, os, novo_id}): a mesma Nova demanda da Caixa de entrada (`demandas.abrir`, as mesmas recusas),
-    com a usina deste prontuário. Só quem pode perguntar (administrador, enquanto é teste)."""
+    com a usina deste prontuário. Quem pergunta (todos, desde 16/11/2026) manda."""
     from flask import jsonify
 
     from ...comando import demandas as DM
     from .demandas_tela import _usuario
-    if not session.get("admin"):
-        return jsonify(ok=False, erro="Só administrador, enquanto o Nexus IA está em teste."), 403
     if _de_outro_site():
         return jsonify(ok=False, erro="Pedido de outro site."), 403
     b = request.get_json(silent=True) or {}
@@ -653,6 +649,126 @@ def usina_ia_demanda(usina_id):
         return jsonify(ok=False, erro=f"Não consegui gravar agora ({type(ex).__name__}). Nada foi enviado."), 500
     return jsonify(ok=True, demanda_id=d.get("demanda_id"),
                    aviso="Demanda enviada. Ela está em \u201cQue eu pedi\u201d, na Caixa de entrada, e quem recebeu é avisado no sininho.")
+
+
+# ── Nexus IA da carteira (16/11/2026) ────────────────────────────────────────────────────────────────────────────────
+# Retorno do time: "Eu queria a IA fora do ambiente da usina. Por exemplo... Agora eu quero ver todos os chamados em aberto
+# e correlacionar com as usinas com baixa disponibilidade e performance". Levi, com o esboço na mão: "libera para todos e
+# só no Comando › Usinas, pode construir". A caixa fica no alto da lista, embutida (comando-usinas.js pede o pedaço); o
+# dossiê e as instruções moram em nexus/comando/carteira_ia.py; a IA, a troca e a blindagem são as do prontuário.
+def _carteira_ia() -> dict:
+    """O dossiê da carteira de agora, das mesmas cópias que a lista e o prontuário já leem (as de 5 min)."""
+    from ...campo import visao
+    from ...comando import carteira_ia as CI
+    from .prontuario_dados import _de_todas
+    m = _usinas_montadas()
+    lei = _de_todas()
+    d = lei.dados or {}
+    avisos = list(m.get("avisos") or []) + list((d.get("erros") or {}).values())
+    if lei.erro:
+        avisos.append(f"o histórico das usinas ({lei.erro})")
+    if m.get("erro"):
+        avisos.append(f"a Visão do responsável ({m['erro']})")
+    man = {u.get("usina_id"): u.get("manutencao") or {} for u in (m.get("visao") or {}).get("usinas") or []}
+    return CI.montar(m["linhas"], {"disps": d.get("disps"), "metas": d.get("metas"), "cos": d.get("cos"),
+                                   "chamados": d.get("chamados"), "nomes_equip": d.get("nomes_equip"), "manutencao": man,
+                                   "vivos": m.get("vivos") or {}, "avisos": avisos}, visao._agora())
+
+
+@bp.route("/usinas/ia")
+def carteira_ia():
+    """A caixa da Nexus IA da carteira, como pedaço de página para o alto do Comando › Usinas (sem janela)."""
+    from ...comando import carteira_ia as CI
+    from ...comando import ia as IA
+    cfg = current_app.config
+    n = len(_usinas_montadas()["linhas"])
+    return render_template("comando/_ia.html", modelos=IA.disponiveis(cfg), padrao=IA.padrao(cfg), sugestoes=CI.SUGESTOES,
+                           gasto=IA.gasto_do_mes(cfg), teto=IA.teto(cfg), max_pergunta=IA.MAX_PERGUNTA,
+                           setores=_ia_setores(), criar_os=_ia_criar_os(), ia_base="/t/comando/usinas/ia",
+                           ia_sobre=f"sobre a carteira inteira: {n} usinas",
+                           ia_exemplo="Ex.: quais usinas com chamado aberto estão com a disponibilidade baixa?")
+
+
+@bp.route("/usinas/ia/perguntar", methods=["POST"])
+def carteira_ia_perguntar():
+    """JSON {pergunta, modelos, historico} -> {ok, respostas, ...}, como a da usina, com o dossiê da carteira de agora e
+    as instruções dela. Cada resposta leva `usinas` ({nome: o prontuário}) das usinas que cita, e cada ação as
+    `usinas_ids` dela (os nomes do dossiê e a usina da OS do chamado)."""
+    from flask import jsonify
+
+    from ...comando import carteira_ia as CI
+    from ...comando import ia as IA
+    if _de_outro_site():
+        return jsonify(ok=False, erro="Pedido de outro site."), 403
+    b = request.get_json(silent=True) or {}
+    pergunta = IA.limpar_pergunta(b.get("pergunta"))
+    ids = [str(i) for i in (b.get("modelos") or []) if isinstance(i, str)][:10]
+    if not pergunta:
+        return jsonify(ok=False, erro="Escreva a pergunta."), 400
+    if not ids:
+        return jsonify(ok=False, erro="Escolha ao menos um modelo."), 400
+    cfg = current_app.config
+    gasto, teto = IA.gasto_do_mes(cfg), IA.teto(cfg)
+    if gasto >= teto:
+        return jsonify(ok=False, erro=f"O teto do mês do Nexus IA (US$ {teto:.2f}) foi atingido: US$ {gasto:.2f} "
+                                      "gastos. Para subir, mude a NEXUS_IA_TETO_USD no servidor."), 429
+    historico = [h for h in (b.get("historico") or []) if isinstance(h, dict)][-IA.MAX_HISTORICO:]
+    dz = _carteira_ia()
+    por_nome = {k.lower(): v for k, v in dz["usinas"].items()}
+    setores = [s["nome"] for s in _ia_setores()]
+    respostas = IA.perguntar(cfg, ids, dz["texto"], pergunta, historico, setores=setores, meu_setor=_ia_meu_setor(),
+                             instrucoes=CI.INSTRUCOES)
+    for r in respostas:
+        if not r.get("ok"):
+            continue
+        r["usinas"] = {n: na_raiz(f"/t/comando/usinas/{uid}")
+                       for n, uid in CI.usinas_citadas(r.get("texto") or "", dz["usinas"]).items()}
+        for a in r.get("acoes") or []:
+            uids = {por_nome[n.lower()] for n in a.get("usinas") or [] if n.lower() in por_nome}
+            if a.get("os") is not None and str(a["os"]) in dz["os_usina"]:
+                uids.add(dz["os_usina"][str(a["os"])])
+            a["usinas_ids"] = sorted(uids)
+    IA.registrar(cfg, 0, "[carteira] " + pergunta, respostas, _meu_hmac(), dz["tokens_estimados"])
+    resp = jsonify(ok=True, respostas=respostas, dossie_tokens=dz["tokens_estimados"], gasto=IA.gasto_do_mes(cfg),
+                   teto=teto, relatorios=[])
+    resp.headers["Cache-Control"] = "no-store"
+    return resp
+
+
+@bp.route("/usinas/ia/demanda", methods=["POST"])
+def carteira_ia_demanda():
+    """A ação de outro setor da resposta da carteira, mandada como demanda: a mesma Nova demanda (`demandas.abrir`), com
+    as usinas da ação (só as da lista do Comando › Usinas)."""
+    from flask import jsonify
+
+    from ...comando import demandas as DM
+    from .demandas_tela import _usuario
+    if _de_outro_site():
+        return jsonify(ok=False, erro="Pedido de outro site."), 403
+    b = request.get_json(silent=True) or {}
+    form = {k: str(b.get(k) or "") for k in ("para_hmac", "para_setor_id", "tema_id", "titulo", "descricao", "os", "novo_id")}
+    validas = {l["usina_id"] for l in _usinas_montadas()["linhas"]}
+    pedidas = b.get("usinas") if isinstance(b.get("usinas"), list) else str(b.get("usinas") or "").split(",")
+    form["usinas"] = [str(x).strip() for x in pedidas if str(x).strip().isdigit() and int(str(x).strip()) in validas]
+    try:
+        d = DM.abrir(form, [], _usuario())
+    except DM.Recusada as ex:
+        return jsonify(ok=False, erro=f"{ex}. Nada foi enviado."), 400
+    except Exception as ex:      # noqa: BLE001 — banco fora: a pessoa sabe que não foi
+        current_app.logger.exception("Nexus IA da carteira: a demanda não foi gravada")
+        return jsonify(ok=False, erro=f"Não consegui gravar agora ({type(ex).__name__}). Nada foi enviado."), 500
+    return jsonify(ok=True, demanda_id=d.get("demanda_id"),
+                   aviso="Demanda enviada. Ela está em \u201cQue eu pedi\u201d, na Caixa de entrada, e quem recebeu é avisado no sininho.")
+
+
+@bp.route("/usinas/dossie-da-carteira.md")
+def carteira_dossie_md():
+    """O dossiê da carteira em texto (o que a IA lê), para o administrador conferir."""
+    if not session.get("admin"):
+        abort(403)
+    resp = current_app.response_class(_carteira_ia()["texto"], mimetype="text/markdown")
+    resp.headers["Cache-Control"] = "no-store"
+    return resp
 
 
 @bp.route("/caixa-de-entrada")
