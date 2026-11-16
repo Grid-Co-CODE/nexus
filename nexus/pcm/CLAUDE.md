@@ -616,6 +616,13 @@ PCM"; a prévia com os dados reais foi aprovada no mesmo dia. Desenho e plano: `
   reserva (o último ciclo aplicado) a chave da coluna não prova que o App a mandou (a carga a grava vazia): "tem" é ao
   menos uma peça com valor no histórico (`_campo(...) != ""`). A criticidade "None" (ou "nan") do `sync-xlsx` é vazio
   (`almoxarifado.campo`, a mesma definição da carga: a dimensão do histórico também não grava mais a palavra).
+- **O nome inteiro da peça (16/11/2026; o PCM: "Eu queria poder ver o nome da peça inteiro, por conta da quantidade de peças
+  parecidas ficar somente o tipo"):** o "Nome" do livro de itens é o `field_1` do Fracttal, curto (em produção, 47 peças
+  dividiam 17 nomes: 7 "Parafuso", 5 "Porca", 4 "DPS"). O App passa a mandar no fim do livro a "Descrição" (o `description`), e
+  as três leituras de tela (`almoxarifado._do_app`, `inventario.leitura._do_app` e a auditoria em `revisao`) tiram o nome do
+  `dados.almoxarifado.nome_da_peca`: a descrição que contém o nome vale sozinha, a que não o contém vai depois dele ("DPS ·
+  ..."), sem ela fica o nome. A busca acha pelo que só a descrição diz. Prova: `test_o_nome_inteiro_da_peca`,
+  `test_a_peca_leva_o_nome_inteiro_quando_o_app_manda_a_descricao` e `test_a_peca_da_contagem_leva_o_nome_inteiro`.
 - **Por almoxarifado em lista (16/11/2026; o PCM: "pediu pra essa parte ser em lista e não em cards"):** uma tabela, um
   almoxarifado por linha (cada um no seu `<tbody class="alm-linha" id="almox-<ID>">`, a linha dos números e a das peças, que
   abre embaixo dela com o "Ver peças"); a coluna do valor só existe com o custo no livro; o "–" diz "não lido" (nunca "nunca

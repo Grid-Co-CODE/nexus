@@ -123,7 +123,7 @@ def _do_app() -> dict:
         do_livro, itens_lido = visao._livro(A.LIVRO_ITENS, A.ABA_ITENS), True
     except Exception:       # noqa: BLE001 — o banco que caiu só neste livro: as contagens sem avariada seguem
         do_livro, itens_lido = [], False
-    itens = {_id(i.get("ID do item")): {"codigo": _txt(i.get("Código")), "nome": _txt(i.get("Nome")),
+    itens = {_id(i.get("ID do item")): {"codigo": _txt(i.get("Código")), "nome": A.nome_da_peca(i.get("Nome"), i.get("Descrição")),
                                          "unidade": _txt(i.get("Unidade")).lower()}
              for i in do_livro if not _vazio(i.get("ID do item"))}
     contagens = []

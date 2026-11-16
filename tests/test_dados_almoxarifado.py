@@ -63,7 +63,7 @@ def test_contrato_e_dominio():
 def test_colunas_novas_no_fim():
     """30/10/2026 (as nove melhorias do Almoxarifado): coluna nova só no FIM, dos dois lados. O Nexus sobe antes do App,
     então os livros de hoje não têm nenhuma destas; o que falta é vazio, nunca um valor inventado."""
-    assert A.COLUNAS_ITENS[-2:] == ("Criticidade", "Curva ABC")
+    assert A.COLUNAS_ITENS[-3:] == ("Criticidade", "Curva ABC", "Descrição")      # a Descrição, 16/11/2026
     assert A.COLUNAS_SALDO[-1] == "Custo unitário"
     assert A.COLUNAS_CONTAGENS[13] == "ID da linha"
     assert A.COLUNAS_CONTAGENS[14:] == ("Fabricante", "Modelo", "Número de série", "Fotos dos dados", "Recontagem de")
@@ -654,3 +654,17 @@ def test_rev_m1_sem_ciclo_e_sem_peca_nao_cria_o_livro():
     api = _api(saldo_inicio="2026-10-24T03:00:05Z", pecas=[])
     r = carga.gerar_almoxarifado(CFG, api)
     assert "pulou" in r and api.syncs == 0 and ALMOX_LIVRO not in api.workbooks
+
+
+def test_o_nome_inteiro_da_peca():
+    """O PCM, 16/11/2026: "Eu queria poder ver o nome da peça inteiro, por conta da quantidade de peças parecidas ficar
+    somente o tipo". O "Nome" do livro de itens é o `field_1` do Fracttal, curto (em produção, 7 peças chamadas só
+    "Parafuso"); a "Descrição" (o `description`, a coluna que o App passa a mandar) traz o resto. A descrição que contém o
+    nome vale sozinha; a que não o contém vai depois dele; sem ela, ou igual a ele, o nome de sempre. O que vem depois da
+    chave ("{"), o App já corta do nome; aqui também."""
+    assert A.nome_da_peca("Parafuso", "Parafuso sextavado M8 x 25  inox") == "Parafuso sextavado M8 x 25 inox"
+    assert A.nome_da_peca("DPS", "Proteção contra surtos 40 kA {cod:7}") == "DPS · Proteção contra surtos 40 kA"
+    assert A.nome_da_peca("Parafuso", "") == A.nome_da_peca("Parafuso", None) == "Parafuso"
+    assert A.nome_da_peca("Disjuntor", "DISJUNTOR") == "Disjuntor"                 # igual sem caixa: nada a somar
+    assert A.nome_da_peca("", "Cabo flexível 6 mm²") == "Cabo flexível 6 mm²"
+    assert A.nome_da_peca("Relé", "None") == "Relé"                                 # o vazio que o sync-xlsx escreve

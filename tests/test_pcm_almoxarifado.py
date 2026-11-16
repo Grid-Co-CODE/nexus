@@ -40,7 +40,7 @@ def _p(lid, item, almox, situacao, motivo=""):
 
 
 def _semear(api, saldo_inicio=INICIO, inicio=INICIO, total=10, nao_lidos=(4,), itens_faltando=0, saldo_extra=(),
-            novas=None, custo=None, avariados=(), codigos=None, so_colunas=None):
+            novas=None, custo=None, avariados=(), codigos=None, so_colunas=None, descricoes=None):
     """Os 4 livros do App coerentes: `total` itens na lista (1 a 4 com nome; os outros sem saldo), os de `nao_lidos`
     com Lido = Não (o 4, por padrão: 9 de 10 lidos, acima dos 90%). `novas` (30/10/2026) é o App com as colunas novas:
     {id do item: (criticidade, curva)} vai para Criticidade e Curva ABC do Itens (o item fora do dicionário leva vazio),
@@ -66,6 +66,9 @@ def _semear(api, saldo_inicio=INICIO, inicio=INICIO, total=10, nao_lidos=(4,), i
             it["Avariado"] = "Sim"
         if int(it["ID do item"]) in (codigos or {}):
             it["Código"] = codigos[int(it["ID do item"])]
+    if descricoes is not None:                  # o App com a coluna Descrição (16/11/2026); o item fora do dicionário, vazia
+        for it in itens:
+            it["Descrição"] = descricoes.get(int(it["ID do item"]), "")
     if novas is not None:
         for it in itens:
             it["Criticidade"], it["Curva ABC"] = novas.get(int(it["ID do item"]), ("", ""))
@@ -1079,3 +1082,18 @@ def test_correcao_12_sem_os_comentarios_do_cadastro_a_corrigir():
     src = (Path(__file__).resolve().parent.parent / "nexus" / "pcm" / "almoxarifado.py").read_text("utf-8")
     for velho in ("vai para o Cadastro a corrigir", "cobrado no Cadastro a corrigir", "no Cadastro a corrigir seria"):
         assert velho not in src, velho
+
+
+def test_a_peca_leva_o_nome_inteiro_quando_o_app_manda_a_descricao(app, almox, monkeypatch):
+    """O PCM, 16/11/2026: "Eu queria poder ver o nome da peça inteiro". Com a coluna Descrição no livro de itens, a peça
+    aparece com o nome inteiro (`almoxarifado.nome_da_peca`) nas peças do almoxarifado, na Reposição e no Catálogo, e a
+    busca acha pelo que só a descrição diz. Sem a coluna, o nome de sempre (os outros testes)."""
+    _semear(almox, descricoes={1: "Fusível 10A NH00 retardado", 2: "Cabo flexível preto 1 kV"})
+    visao.limpar()
+    html = _abrir(app, monkeypatch).get_data(as_text=True)
+    rep = re.search(r'data-painel="reposicao".*?</section>', html, re.S).group(0)
+    assert "Fusível 10A NH00 retardado" in rep and "Cabo 6 mm · Cabo flexível preto 1 kV" in rep
+    assert "Fusível 10A NH00 retardado" in re.search(r'data-painel="catalogo".*?</section>', html, re.S).group(0)
+    assert 'data-f-busca="sp-1 fusivel 10a nh00 retardado"' in rep
+    pecas = _pecas(app, monkeypatch).get_data(as_text=True)
+    assert "Fusível 10A NH00 retardado" in pecas and "Cabo 6 mm · Cabo flexível preto 1 kV" in pecas

@@ -371,7 +371,8 @@ def _nomes_para_auditoria() -> dict:
         for s in leitura._livro_ou_vazio(A.LIVRO_SALDO, A.ABA_SALDO):
             if A._txt(s.get("ID do almoxarifado")) and A._txt(s.get("Almoxarifado")):
                 almox.setdefault(A._id(s.get("ID do almoxarifado")), A._txt(s.get("Almoxarifado")))
-        itens = {A._id(i.get("ID do item")): {"codigo": A._txt(i.get("Código")), "nome": A._txt(i.get("Nome"))}
+        itens = {A._id(i.get("ID do item")): {"codigo": A._txt(i.get("Código")),
+                                              "nome": A.nome_da_peca(i.get("Nome"), i.get("Descrição"))}
                  for i in leitura._livro_ou_vazio(A.LIVRO_ITENS, A.ABA_ITENS) if A._txt(i.get("ID do item"))}
         return {"almox": almox, "itens": itens}
     g = visao._ler(("pcm_inventario_auditoria_nomes",), ler)

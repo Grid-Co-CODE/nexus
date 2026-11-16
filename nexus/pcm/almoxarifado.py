@@ -78,7 +78,7 @@ def _dia(data_id) -> str:
 # ── as duas fontes do saldo, no mesmo formato ─────────────────────────────────────────────────────────────────────────
 
 def _do_app(ciclo: dict, itens: list[dict], saldo: list[dict], b) -> dict:
-    its = {_id(i.get("ID do item")): {"codigo": _txt(i.get("Código")), "nome": _txt(i.get("Nome")),
+    its = {_id(i.get("ID do item")): {"codigo": _txt(i.get("Código")), "nome": A.nome_da_peca(i.get("Nome"), i.get("Descrição")),
                                        "unidade": _txt(i.get("Unidade")), "familia": _txt(i.get("Família")),
                                        "avariado": _txt(i.get("Avariado")).lower() == "sim",
                                        "nao_lido": _txt(i.get("Lido")).lower() == "não",

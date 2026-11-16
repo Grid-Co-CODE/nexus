@@ -1249,6 +1249,9 @@ table.alm-t{width:100%;border-collapse:collapse;font-size:13px;color:var(--tinta
 .alm-lista > tbody > tr > td .alm-aviso{font-size:inherit}
 .alm-lista > tbody > tr > td .alm-aviso b{color:var(--alerta)}
 .alm-lista > tbody > tr > td.alm-acao{width:1%;text-align:right;white-space:nowrap}
+/* o detalhe embaixo do número (o valor por curva, o "+N de saldo unitário") quebra linha: com o `nowrap` dos números ele
+   alargava a lista além da tela a 1280 px (16/11/2026) */
+.alm-lista > tbody > tr > td > .alm-v > .alm-det{white-space:normal}
 .alm-linha--aberta > tr:first-child > td{border-bottom-color:transparent}
 .alm-linha--destaque > tr:first-child > td{background:var(--verde-a16)}
 .alm-lista > tbody > tr.alm-pecas-linha > td{padding:0 8px 12px;background:var(--superficie-2)}

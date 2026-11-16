@@ -1505,3 +1505,18 @@ def test_os_enderecos_nao_partem_da_raiz():
         t = (base / nome).read_text("utf-8")
         assert not re.search(r'(?:href|action|src)="/(?!/)', t), nome
         assert not re.search(r"(?:fetch|location\.href\s*=)\s*\(?\s*['\"]/", t), nome
+
+
+def test_a_peca_da_contagem_leva_o_nome_inteiro(app, inv, falso, monkeypatch):
+    """O PCM, 16/11/2026: "Eu queria poder ver o nome da peça inteiro". Com a coluna Descrição no livro de itens do App, a peça
+    da contagem leva o nome inteiro (`almoxarifado.nome_da_peca`) na leitura, que é de onde a Aprovação e a Auditoria tiram o
+    nome; sem a coluna, o "Nome" de sempre."""
+    _cenario(inv)
+    assert L.ler(app.config)["itens"]["501"]["nome"] == "Fusível 10A"
+    itens = [{"ID do item": str(i), "Código": f"SP-{i}", "Nome": nome, "Unidade": "UNIDADE", "Família": "Teste",
+              "Avariado": "Não", "Ferramenta": "Não", "Início do ciclo": "x", "Lido": "Sim", "Descrição": desc}
+             for i, nome, desc in ((501, "Fusível 10A", "Fusível 10A NH00 retardado"), (502, "Cabo 6 mm", ""))]
+    _aba(inv, A.LIVRO_ITENS, A.ABA_ITENS, itens)
+    visao.limpar()
+    nomes = L.ler(app.config)["itens"]
+    assert nomes["501"]["nome"] == "Fusível 10A NH00 retardado" and nomes["502"]["nome"] == "Cabo 6 mm"

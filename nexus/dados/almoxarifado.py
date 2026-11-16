@@ -42,7 +42,10 @@ COLUNAS_ITENS = ("ID do item", "Código", "Nome", "Unidade", "Família", "Avaria
                  # 30/10/2026: os campos do cadastro da peça no Fracttal (a criticidade é a "1.Crítico",
                  # "2.Necessário"...; a Curva ABC o PCM preenche à mão lá); vazio se a peça não tem. O Nexus não
                  # calcula curva
-                 "Criticidade", "Curva ABC")
+                 "Criticidade", "Curva ABC",
+                 # 16/11/2026: o `description` do item no Fracttal (o "Nome" é o `field_1`, curto: 7 peças eram só
+                 # "Parafuso"). Só a tela o usa, pelo `nome_da_peca`; a carga do histórico grava o "Nome" como veio
+                 "Descrição")
 COLUNAS_SALDO = ("ID do item", "Código", "ID do almoxarifado", "Almoxarifado", "Local do almoxarifado", "Saldo",
                  "Mínimo", "Início do ciclo",
                  # 30/10/2026: o custo da peça naquele almoxarifado, como o Fracttal dá; vazio se não der, nunca 0
@@ -119,6 +122,27 @@ def curva_abc(v) -> str:
     peças lançadas é curto e quase tudo sairia C), e "C" inventado esconderia a peça que ninguém classificou."""
     m = _CURVA.match(_txt(v))
     return m.group(1).upper() if m else ""
+
+
+def _sem_chave(v) -> str:
+    """O texto sem o que vem depois da chave ("{", como o App corta o nome) e com os espaços juntados; o vazio do `sync-xlsx`
+    ("None") é vazio."""
+    return " ".join(campo(v).split("{")[0].split())
+
+
+def nome_da_peca(nome, descricao) -> str:
+    """O nome inteiro da peça para a tela (16/11/2026; o PCM: "Eu queria poder ver o nome da peça inteiro, por conta da
+    quantidade de peças parecidas ficar somente o tipo"). O "Nome" do livro de itens é o `field_1` do Fracttal, curto: em
+    produção, 47 peças dividiam 17 nomes (7 "Parafuso", 5 "Porca", 4 "DPS"), e só o código as separava. A "Descrição" (o
+    `description` do Fracttal, a coluna que o App passa a mandar no fim do livro) traz o resto: a que contém o nome vale
+    sozinha; a que não o contém vai depois dele ("DPS · Proteção contra surtos 40 kA"); sem ela, ou igual a ele, o nome.
+    Só a tela usa: a carga do histórico grava o "Nome" como veio."""
+    n, d = _sem_chave(nome), _sem_chave(descricao)
+    if not d or d.lower() == n.lower():
+        return n
+    if not n or n.lower() in d.lower():
+        return d
+    return f"{n} · {d}"
 
 
 def custo(v) -> float | None:
