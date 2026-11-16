@@ -1078,6 +1078,35 @@
     return i.veredito === "FALHA" ? (i.descricao_falha || i.estado) : (e.grupo === "semcom" ? "não responde ao SCADA: pode estar gerando" : (e.grupo ? i.estado : ""));
   }
 
+  // o cartão do relé de proteção na ficha (16/11/2026): trips em destaque, medidas por fase, última falta.
+  // V/I/P vêm RAW (U16) do relé — rotulados "(bruto)"; a freq já vem em Hz. Só aparece se a usina tem relé.
+  function braw(v) { return v == null || isNaN(v) ? "—" : fmtKW.format(v); }
+  function atualizarRele(r) {
+    var sigT = (r.trips || []).join(",") + "|" + (r.responde ? 1 : 0) + "|" + (r.mins_atras == null ? "" : r.mins_atras);
+    if (partes.rele.trips._sig !== sigT) {
+      partes.rele.trips._sig = sigT; partes.rele.trips.textContent = "";
+      if (!r.responde) {
+        partes.rele.trips.appendChild(pilula("neutro", "Sem comunicação com o relé" + (r.mins_atras != null ? " · há " + r.mins_atras + " min" : "")));
+      } else if (r.trips && r.trips.length) {
+        partes.rele.trips.appendChild(pilula("alerta", "Proteção atuada: " + r.trips.join(", ")));
+      } else {
+        partes.rele.trips.appendChild(pilula("ok", "Sem atuação"));
+      }
+    }
+    escrever(partes.rele.det, "textContent", !r.responde ? "sem comunicação" : (r.mins_atras != null ? "lido há " + r.mins_atras + " min" : "ao vivo"));
+    var m = r.medidas || {};
+    ["A", "B", "C"].forEach(function (f) {
+      escrever(partes.rele.med["i" + f], "textContent", braw(m["i" + f]));
+      escrever(partes.rele.med["v" + f], "textContent", braw(m["v" + f]));
+      escrever(partes.rele.med["p" + f], "textContent", braw(m["p" + f]));
+    });
+    escrever(partes.rele.freq, "textContent", "Frequência: " + (m.freq == null || isNaN(m.freq) ? "—" : fmt2.format(m.freq) + " Hz"));
+    var ff = r.faltas || {}, lf = [];
+    [["ifA", "I falta A"], ["ifB", "I falta B"], ["ifC", "I falta C"], ["ifN", "I falta N"], ["vfA", "V falta A"], ["vfB", "V falta B"], ["vfC", "V falta C"]]
+      .forEach(function (x) { lf.push(x[1] + " " + braw(ff[x[0]])); });
+    escrever(partes.rele.faltasTxt, "textContent", lf.join("  ·  ") + "  (bruto)");
+  }
+
   // monta a estrutura uma vez; a cada 3 s só os números, os estados e os gráficos que mudaram
   function montar(c) {
     partes = { invs: {} };
@@ -1124,6 +1153,25 @@
       grade.appendChild(p.art);
       partes.invs[i.id] = p;
     });
+    if (c.rele) {
+      var br = bloco("Relé de proteção", "");
+      partes.rele = { det: br._detalhe };
+      partes.rele.trips = document.createElement("div"); partes.rele.trips.className = "cos-rele-trips"; br.appendChild(partes.rele.trips);
+      var tm = document.createElement("table"); tm.className = "cos-rele-tab";
+      tm.innerHTML = "<thead><tr><th>Fase</th><th class='n'>Corrente (bruto)</th><th class='n'>Tensão (bruto)</th><th class='n'>Potência (bruto)</th></tr></thead>";
+      var tbm = document.createElement("tbody"); partes.rele.med = {};
+      ["A", "B", "C"].forEach(function (f) {
+        var tr = document.createElement("tr");
+        var tdf = document.createElement("td"); tdf.textContent = "Fase " + f; tr.appendChild(tdf);
+        ["i", "v", "p"].forEach(function (q) { var td = document.createElement("td"); td.className = "n"; tr.appendChild(td); partes.rele.med[q + f] = td; });
+        tbm.appendChild(tr);
+      });
+      tm.appendChild(tbm); br.appendChild(tm);
+      partes.rele.freq = document.createElement("p"); partes.rele.freq.className = "cos-rele-freq"; br.appendChild(partes.rele.freq);
+      var hf = document.createElement("h4"); hf.className = "cos-rele-falta-h"; hf.textContent = "Última falta (o que o relé mediu na atuação)"; br.appendChild(hf);
+      partes.rele.faltasTxt = document.createElement("p"); partes.rele.faltasTxt.className = "cos-rele-faltas-v"; br.appendChild(partes.rele.faltasTxt);
+      frag.appendChild(br);
+    }
     var tab = document.createElement("details"); tab.className = "cos-inv-tabela";
     var su = document.createElement("summary"); su.className = "cn-link"; su.textContent = "Ver os inversores em tabela"; tab.appendChild(su);
     var t = document.createElement("table");
@@ -1136,7 +1184,7 @@
   function atualizar(c, cv) {
     cv = cv || SEM_CURVA;
     var gerando = c.situacao && c.situacao.chave === "GERANDO";
-    var sig = ordenados(c).map(function (i) { return i.id + "=" + i.veredito; }).join(",");
+    var sig = ordenados(c).map(function (i) { return i.id + "=" + i.veredito; }).join(",") + (c.rele ? "|rele" : "");
     if (!partes || sig !== assinatura) { assinatura = sig; montar(c); }
     graficos = [];
     var porId = {};
@@ -1209,6 +1257,7 @@
         partes.tbody.appendChild(tr);
       });
     }
+    if (partes.rele && c.rele) { atualizarRele(c.rele); }
     if (cruzEm != null) { marcarTodos(cruzEm, null, null, null); }      // a cruz fica onde estava
   }
 

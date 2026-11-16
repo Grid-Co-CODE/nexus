@@ -209,3 +209,12 @@ p.cos-inv-mppt-cab{font-weight:600;letter-spacing:.04em;text-transform:uppercase
 .cos-inv-dica-l.forte b,.cos-inv-dica-l.forte span{color:var(--tinta);font-weight:700}
 .cos-inv-sgi-nome{display:inline-flex;align-items:center;gap:6px}
 .cos-inv-chip[aria-pressed="true"] .cos-inv-cor{height:6px}
+
+/* o cartao do rele de proteccao na ficha (16/11/2026): SO LAYOUT; cores herdadas do bloco, para nao mexer no contraste */
+.cos-rele-trips { margin: .3rem 0 .6rem; }
+.cos-rele-tab { width: 100%; border-collapse: collapse; margin: .2rem 0 .5rem; }
+.cos-rele-tab th, .cos-rele-tab td { padding: .22rem .5rem; text-align: left; }
+.cos-rele-tab th.n, .cos-rele-tab td.n { text-align: right; font-variant-numeric: tabular-nums; }
+.cos-rele-freq { margin: .2rem 0 .4rem; font-variant-numeric: tabular-nums; }
+.cos-rele-falta-h { margin: .5rem 0 .2rem; font-size: .9em; font-weight: 600; }
+.cos-rele-faltas-v { margin: 0; opacity: .85; font-variant-numeric: tabular-nums; }
