@@ -18,6 +18,7 @@ O que a leitura pede dos eventos que a gravação (Task 7) escreve, e o que ela 
 | nenhum que mude o estado | `nova` |
 | `peca_tirada`, `numero_corrigido` ou `recontagem_item_pedida` (a recontagem só de algumas peças) | `revisada` |
 | `recontagem_pedida` | `recontagem_pedida` (nunca se aprova) |
+| `contagem_cancelada` (16/11/2026: a repetida, cancelada pelo PCM; o técnico não recebe pedido) | `cancelada` (nunca se aprova) |
 | `substituida` (ou a conta das `contas.substituidas`) | `substituida` |
 | `aprovada`, e o lote ainda sem o fim | `gravando` |
 | `aprovada` e `peca_gravada` de todas as peças do lote | `gravada` |
@@ -45,12 +46,13 @@ from ...dados.fatos import Ligador
 from . import avariados, contas
 from .estoque import instante
 
-ESTADOS = ("nova", "revisada", "recontagem_pedida", "substituida", "gravando", "gravada", "gravada_com_conflitos")
+ESTADOS = ("nova", "revisada", "recontagem_pedida", "substituida", "gravando", "gravada", "gravada_com_conflitos",
+           "cancelada")
 # os estados de quem já foi aprovado: a gravação começou (ou acabou). Contam como "gravada" para a substituição, que não
 # desfaz o que já está no Fracttal
 DA_GRAVACAO = ("gravando", "gravada", "gravada_com_conflitos")
 # a contagem que já não está viva: não substitui ninguém e ninguém a substitui
-MORTAS = ("recontagem_pedida", "substituida")
+MORTAS = ("recontagem_pedida", "substituida", "cancelada")
 # a contagem que o PCM ainda revisa (e aprova): as outras não têm o que revisar
 REVISAVEIS = ("nova", "revisada")
 
@@ -194,6 +196,8 @@ def estado_dos_eventos(eventos: list[dict]) -> str:
     tipos = {e.get("tipo") for e in eventos}
     if tipos & {"aprovada", "peca_gravada", "conflito"}:
         return _estado_da_gravacao(eventos)
+    if "contagem_cancelada" in tipos:
+        return "cancelada"
     if "recontagem_pedida" in tipos:
         return "recontagem_pedida"
     if "substituida" in tipos:
@@ -278,6 +282,8 @@ def _motivo_nao_aprovavel(c: dict, agora: datetime) -> str:
         return "substituída"
     if c["estado"] == "recontagem_pedida":
         return "recontagem pedida"
+    if c["estado"] == "cancelada":
+        return "cancelada pelo PCM"
     if not c["id_almox"]:
         return "contagem sem almoxarifado"
     if any(_vazio(l.get("ID da linha")) for l in c["linhas"]):
@@ -457,9 +463,9 @@ def _contou(c: dict, id_item: str) -> bool:
 def _serve(c: dict, agora) -> bool:
     """A contagem que pode atender um pedido (a 1ª rodada de correções da revisão, 04/11/2026): nem a do contrato do App violado
     (`aviso_do_app`: o número dela não se aproveita), nem a recusada inteira pelo PCM (`recontagem_pedida`: o PCM disse que ela
-    não serve, e o pedido que ela "atenderia" segue de pé), nem a contada no futuro (o "Contada em" além de agora mais
+    não serve, e o pedido que ela "atenderia" segue de pé), nem a cancelada pelo PCM (16/11/2026, pelo mesmo motivo), nem a contada no futuro (o "Contada em" além de agora mais
     `contas.RELOGIO_ADIANTADO`: o relógio do celular adiantado faria qualquer contagem velha parecer "depois do pedido")."""
-    return not c.get("aviso_do_app") and c.get("estado") != "recontagem_pedida" \
+    return not c.get("aviso_do_app") and c.get("estado") not in ("recontagem_pedida", "cancelada") \
         and _quando(c.get("contada_em")) - agora <= contas.RELOGIO_ADIANTADO
 
 

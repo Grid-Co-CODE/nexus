@@ -616,12 +616,20 @@ PCM"; a prévia com os dados reais foi aprovada no mesmo dia. Desenho e plano: `
   reserva (o último ciclo aplicado) a chave da coluna não prova que o App a mandou (a carga a grava vazia): "tem" é ao
   menos uma peça com valor no histórico (`_campo(...) != ""`). A criticidade "None" (ou "nan") do `sync-xlsx` é vazio
   (`almoxarifado.campo`, a mesma definição da carga: a dimensão do histórico também não grava mais a palavra).
-- **Por almoxarifado (30/10/2026, itens 1 e 9):** cada cartão mostra a **última contagem gravada** do inventário (a data, em
+- **Por almoxarifado em lista (16/11/2026; o PCM: "pediu pra essa parte ser em lista e não em cards"):** uma tabela, um
+  almoxarifado por linha (cada um no seu `<tbody class="alm-linha" id="almox-<ID>">`, a linha dos números e a das peças, que
+  abre embaixo dela com o "Ver peças"); a coluna do valor só existe com o custo no livro; o "–" diz "não lido" (nunca "nunca
+  contado"); abaixo de 640 px cada linha vira cartão pelo `data-r`. **Da Reposição ao almoxarifado** (o PCM: "quando a gente
+  apertasse na usina já fosse pra essa por almoxarifado"): o almoxarifado de cada peça é o link `?aba=almoxarifados#almox-<ID>`;
+  o script troca a aba, abre as peças, desce até a linha (de novo quando as peças chegam, e o `scroll-margin-top` desconta o
+  topo fixo) e a destaca; a âncora vale também ao carregar (o link numa aba nova) e no `hashchange`. Prova:
+  `test_por_almoxarifado_e_uma_lista`, `test_a_reposicao_leva_ao_almoxarifado` e `test_o_css_e_o_da_lista_e_nao_o_dos_cartoes`.
+- **Por almoxarifado (30/10/2026, itens 1 e 9):** cada almoxarifado mostra a **última contagem gravada** do inventário (a data, em
   Brasília, da contagem mais nova do almoxarifado em estado `gravada` ou `gravada_com_conflitos`, de qualquer tipo: a recontagem
   gravada também conta, é uma contagem real daquelas peças; a que ainda está `gravando` não; "sem contagem gravada na janela
   lida" quando o livro foi lido e não tem nenhuma gravada dali, porque o livro das contagens do App é uma janela que anda e
-  "nunca contado" diria mais do que se sabe; e, se o inventário não deu para ler OU o App ainda não publica o livro, a linha NÃO
-  aparece: dizer "nunca contado" seria falso) e o **valor em
+  "nunca contado" diria mais do que se sabe; e, se o inventário não deu para ler OU o App ainda não publica o livro, "–":
+  dizer "nunca contado" seria falso) e o **valor em
   estoque por curva** (`_valor`: saldo × custo unitário que o Fracttal deu, somado por Curva ABC do cadastro da peça, "R$ total
   (A · B · C · sem curva)"; a peça COM saldo e sem custo fica fora da soma e o cartão diz "N peças sem custo no Fracttal", porque
   a soma pela metade avisa e não esconde; sem a coluna de custo no livro, sem valor e sem cobrança; total zero, isto é, nenhuma
@@ -638,7 +646,7 @@ PCM"; a prévia com os dados reais foi aprovada no mesmo dia. Desenho e plano: `
   quem não vê o Almoxarifado não vê as peças. Ordem (`_pecas_do_almox`): o grupo de gravidade (abaixo, no limite, saldo
   unitário, sem mínimo, em dia, sem saldo informado) e, dentro dele, a `_ordem` da Reposição (criticidade e curva). Saldo e mínimo
   vazios são "–" (o Fracttal não deu o número), nunca 0. Falha: "não consegui abrir as peças agora", e o clique seguinte tenta de
-  novo; o cartão aberto ocupa a linha inteira da grade; abaixo de 640 px a tabela vira cartão (`data-r`). ID desconhecido: 404;
+  novo; as peças abrem na linha de baixo, da largura da tabela; abaixo de 640 px a tabela vira cartão (`data-r`). ID desconhecido: 404;
   a fonte caída: 503.
 - **A lista do Por almoxarifado é a união de três fontes (11/11/2026, item 4 da 2ª rodada; o PCM: "atualizar conforme as
   usinas forem subindo o almoxarifado e ir aparecendo as usinas"):** o Saldo do ciclo, como antes; os almoxarifados com
@@ -728,7 +736,15 @@ Fracttal aceita de verdade: `...-passo0.md`. Cada parte tem a seção dela abaix
    (lido NA HORA no Fracttal), o Δ, a situação e os seis grupos chegam pela ponte (`GET /os/_nexus/inventario/<id>/lote`), com o
    botão "Gravar N alterações".
 3. **Revisão:** tirar uma peça do lote, corrigir o número, pedir a recontagem só das peças marcadas (desde 30/10/2026: elas
-   saem deste lote e o resto da contagem segue) ou a da contagem inteira, sempre com o motivo (cifrado). Só grava no livro do
+   saem deste lote e o resto da contagem segue), a da contagem inteira ou, desde 16/11/2026, **cancelar a contagem** (o PCM:
+   "colocar um botão no inventário de cancelar auditoria"; caso real: o mesmo técnico contou de novo, no mesmo mês, o
+   almoxarifado já contado e gravado, porque o App voltava a cobrar, o que a v358 do App corrigiu), sempre com o motivo
+   (cifrado). Cancelar grava o `contagem_cancelada`: a contagem fica `cancelada`, morta como a recusada (nada vai ao Fracttal,
+   não substitui nenhuma, a de antes que ela tinha substituído volta à revisão, e não atende pedido de recontagem), sem a cópia
+   do motivo para o técnico e sem pedido nenhum no App. Vale também para a que espera o PCM e não se aprova (a velha, a do
+   contrato violado), não para a gravada, a gravando, a recusada nem a substituída. O App v358 lê o evento: a cancelada não
+   atende pedido e não conta como o inventário do mês, então o almoxarifado volta a se contar no App (o livro do Nexus vai ao
+   App pela cópia de 5 min, e o celular recebe a lista nova em até 30 min ou ao abrir a Ronda). Só grava no livro do
    inventário. **O motivo da recontagem chega ao técnico** (12/11/2026, Levi: "O MOTIVO TEM QUE SUBIR PARA O TÉCNICO"; o PCM
    perguntou "Quando eu peço a recontagem, o técnico consegue ver o motivo?") pela coluna `motivo_tecnico` do evento,
    cifrada para o App (a seção do livro, abaixo); o App v342 a mostra e espera a coluna. **Quem avisa o técnico depende do
@@ -983,13 +999,14 @@ o que não tem contagem na lista: o cartão das recontagens o usa) e o que o App
   apareceria como a aprovar.
 - **Os estados** (`ESTADOS`): `nova` (nenhum evento que mude o estado), `revisada` (`peca_tirada`, `numero_corrigido` ou
   `recontagem_item_pedida`: a recontagem só de algumas peças não mata a contagem), `recontagem_pedida` (a da contagem inteira),
-  `substituida`, `gravando`, `gravada`, `gravada_com_conflitos`. **O lote é o conjunto de `id_item` dos
+  `substituida`, `gravando`, `gravada`, `gravada_com_conflitos` e, desde 16/11/2026, `cancelada` (`contagem_cancelada`, o
+  Cancelar do PCM; morta como a recusada, em `MORTAS`). **O lote é o conjunto de `id_item` dos
   eventos `aprovada`: a gravação (`gravacao.py`) grava UM `aprovada` por peça do lote.** Sem as peças a leitura não sabe o que falta e
   fica em `gravando`; só vira `gravada` quando toda peça do lote tem `peca_gravada`, e `gravada_com_conflitos` quando alguma tem
   `conflito` no lugar. O `erro` não encerra a peça. O `gravando` daqui é "aprovada e sem o fim nos eventos"; a gravação refina
   em andamento ou parada com o controle dela (o `estado.json`).
 - **A substituição sai da conta, a leitura não escreve:** `contas.substituidas` recebe só as contagens VIVAS (nem
-  `recontagem_pedida`, nem `substituida`; uma recontagem recusada como "a mais nova" substituiria as boas sem número para gravar
+  `recontagem_pedida`, nem `substituida`, nem `cancelada`; uma recontagem recusada como "a mais nova" substituiria as boas sem número para gravar
   no lugar) e BOAS (sem `aviso` e com um "Contada em" legível e que não passa do relógio adiantado, `_pode_substituir`: a mais nova
   que não se aprova, por contrato violado ou por relógio de celular no futuro, tirava do caminho as que se aprovam, e o almoxarifado
   ficava sem nenhuma contagem para revisar), e, como `gravadas`, as em `gravando`, `gravada` e `gravada_com_conflitos`. O evento
@@ -1021,7 +1038,7 @@ o que não tem contagem na lista: o cartão das recontagens o usa) e o que o App
   sem o Código da boa não são de peça nenhuma (sumir com elas esconderia unidades contadas). Os quatro dão `aviso` (com
   `aviso_do_app`) e `aprovavel` falso (a tela não mostra comparação). Em branco, a linha sem o ID não perde nada e segue sem aviso.
 - **`motivo_nao_aprovavel`** (a tela mostra o porquê): "já gravada" (gravando, gravada e com conflitos), "substituída",
-  "recontagem pedida", "contagem sem almoxarifado", "linha sem ID da linha", "linha de peça sem o ID do item", "avariada sem o ID
+  "recontagem pedida", "cancelada pelo PCM", "contagem sem almoxarifado", "linha sem ID da linha", "linha de peça sem o ID do item", "avariada sem o ID
   nem o Código da peça boa", o
   `SEM_CATALOGO`, "data da contagem ilegível", "contada no futuro: o relógio do celular" e "mais de 90 dias" (`contas.aprovavel`,
   `APROVAVEL_DIAS`).
@@ -1039,7 +1056,7 @@ o que não tem contagem na lista: o cartão das recontagens o usa) e o que o App
   Inventário). Um pedido por `recontagem_item_pedida` (a peça; o mesmo par contagem e peça vale o primeiro, como a `revisao_da`)
   e por `recontagem_pedida` (a contagem inteira). **Atendido, nas duas versões do App** (a mesma regra da seção 4 da proposta das
   contagens do App): uma contagem do MESMO almoxarifado, outra que não a do pedido, **que serve** (`_serve`: nem a do contrato do
-  App violado, `aviso_do_app`; nem a recusada inteira pelo PCM, `recontagem_pedida`; nem a contada no futuro, além de agora mais
+  App violado, `aviso_do_app`; nem a recusada inteira pelo PCM, `recontagem_pedida`; nem a cancelada, `cancelada`; nem a contada no futuro, além de agora mais
   `contas.RELOGIO_ADIANTADO`), com o "Contada em" DEPOIS do pedido, que contou a peça (`_contou`: linha `item` ou `identificar`
   com o ID do item dela, já resolvida pelos avariados, e o "Contado" não vazio); **na inteira, uma contagem INTEIRA** (sem o
   "Recontagem de": a recontagem só das peças de outro pedido não conta o almoxarifado de novo). Vale a mais antiga que atende. O

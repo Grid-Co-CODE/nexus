@@ -38,11 +38,12 @@ from .estoque import ErroFracttal, Limite, SemLogin, instante
 from .gravacao import TAMANHO_LOTE
 
 ROTULO_ESTADO = {"nova": "Nova", "revisada": "Revisada", "recontagem_pedida": "Recontagem pedida", "substituida": "Substituída",
-                 "gravando": "Gravando", "gravada": "Gravada", "gravada_com_conflitos": "Gravada com conflitos"}
+                 "gravando": "Gravando", "gravada": "Gravada", "gravada_com_conflitos": "Gravada com conflitos",
+                 "cancelada": "Cancelada"}
 # o selo do estado da contagem (a lista e a contagem aberta): espera o PCM em azul, gravando em âmbar, gravada em verde, com
-# conflito em vermelho; a recusada e a substituída, neutras (não há o que fazer nelas)
+# conflito em vermelho; a recusada, a substituída e a cancelada, neutras (não há o que fazer nelas)
 TOM_ESTADO = {"nova": "info", "revisada": "info", "recontagem_pedida": "neutro", "substituida": "neutro", "gravando": "alerta",
-              "gravada": "ok", "gravada_com_conflitos": "critico"}
+              "gravada": "ok", "gravada_com_conflitos": "critico", "cancelada": "neutro"}
 ROTULO_SITUACAO = {"para_cima": "Para cima", "para_baixo": "Para baixo", "zerar": "Zerar", "sem_alteracao": "Sem alteração",
                    "nao_tocada": "Não será tocada", "curadoria": "Curadoria"}
 # os seis grupos da confirmação, na ordem das `contas.SITUACOES`: (título, o que acontece com a peça nele)
@@ -293,7 +294,8 @@ ROTULO_EVENTO = {"contagem_recebida": "Contagem recebida", "aprovada": "Aprovada
                  "requisicao_travada": "Requisição travada (confira no Fracttal)",
                  "transferencia_vinculo": "Peça vinculada para a transferência", "transferencia_saida": "Transferência: saída",
                  "transferencia_entrada": "Transferência: entrada", "transferencia_falha": "Transferência não feita",
-                 "transferencia_travada": "Transferência sem resposta (confira no Fracttal)"}
+                 "transferencia_travada": "Transferência sem resposta (confira no Fracttal)",
+                 "contagem_cancelada": "Contagem cancelada"}
 # o selo de cada evento, pelas quatro famílias do mockup do Spare Parts (Levi, 27/10/2026): a gravação no Fracttal em verde, a
 # curadoria em âmbar, a aprovação e a revisão em azul, o conflito e o erro em vermelho. A cor só reforça a palavra (o rótulo)
 SELO_EVENTO = {"peca_gravada": "ok", "regua_gravada": "ok", "curadoria": "alerta", "conflito": "critico", "erro": "critico",
@@ -793,8 +795,10 @@ def _evento(c: dict, quem: dict, tipo: str, item: dict | None = None, **mais) ->
 
 
 def revisar(cfg, contagem_id: str, pedido, quem: dict | None) -> dict:
-    """Tira uma peça do lote, corrige o número contado, pede a recontagem só das peças marcadas ou a da contagem inteira.
-    `pedido`: `{"acao": "tirar" | "corrigir" | "recontagem_itens" | "recontagem", "id_item"?, "itens"?, "valor"?, "motivo",
+    """Tira uma peça do lote, corrige o número contado, pede a recontagem só das peças marcadas ou a da contagem inteira, ou
+    cancela a contagem (16/11/2026: a repetida que o técnico mandou de novo no mês; morta como a recusada, mas o técnico não
+    recebe pedido nenhum).
+    `pedido`: `{"acao": "tirar" | "corrigir" | "recontagem_itens" | "recontagem" | "cancelar", "id_item"?, "itens"?, "valor"?, "motivo",
     "sistema"?, "confirmo"?}`. Levanta `Recusa` (nada foi gravado) com o status e o texto; devolve `{"ok", "n", "mensagem",
     "estado"}` (`n`: quantos eventos foram gravados).
 
@@ -806,8 +810,8 @@ def revisar(cfg, contagem_id: str, pedido, quem: dict | None) -> dict:
     if not isinstance(pedido, dict):
         raise Recusa(400, "Pedido sem corpo: mande a ação e o motivo em JSON.")
     acao = A._txt(pedido.get("acao"))
-    if acao not in ("tirar", "corrigir", "recontagem_itens", "recontagem"):
-        raise Recusa(400, "Ação desconhecida: tirar, corrigir, recontagem_itens ou recontagem.")
+    if acao not in ("tirar", "corrigir", "recontagem_itens", "recontagem", "cancelar"):
+        raise Recusa(400, "Ação desconhecida: tirar, corrigir, recontagem_itens, recontagem ou cancelar.")
     if quem is None:
         if not cfg.get("NEXUS_PESSOA_HMAC"):
             raise Recusa(409, "O servidor não está configurado para registrar quem revisa (falta a NEXUS_PESSOA_HMAC); avise a T.I.")
@@ -826,7 +830,8 @@ def revisar(cfg, contagem_id: str, pedido, quem: dict | None) -> dict:
     texto = {"tirar": "Peça tirada do lote.", "corrigir": "Número corrigido.",
              "recontagem_itens": (f"Recontagem pedida de {n} {'peça' if n == 1 else 'peças'}: "
                                   f"{'ela sai' if n == 1 else 'elas saem'} deste lote, e o resto da contagem segue."),
-             "recontagem": "Recontagem pedida: nada será gravado desta contagem."}[acao]
+             "recontagem": "Recontagem pedida: nada será gravado desta contagem.",
+             "cancelar": "Contagem cancelada: nada será gravado dela, e o técnico não recebe pedido nenhum."}[acao]
     return {"ok": True, "n": n, "mensagem": texto, "estado": novo["estado"]}
 
 
@@ -899,11 +904,17 @@ def _revisar(cfg, contagem_id: str, pedido: dict, quem: dict, acao: str, motivo:
         raise Recusa(503, str(ex)) from None
     if c is None:
         raise Recusa(404, "Contagem não encontrada: atualize a página.")
-    if not c["aprovavel"]:
+    # cancelar vale também para a que ainda espera o PCM e não se aprova (a velha, a do contrato do App violado): é a que mais
+    # se quer tirar da lista. As outras ações só na que se aprova
+    if acao == "cancelar" and c["estado"] not in leitura.REVISAVEIS:
+        raise Recusa(409, f"Esta contagem não se cancela: {c['motivo_nao_aprovavel'] or ROTULO_ESTADO.get(c['estado'], '')}.")
+    if acao != "cancelar" and not c["aprovavel"]:
         raise Recusa(409, f"Esta contagem não se revisa: {c['motivo_nao_aprovavel']}.")
     if _foi_para_a_gravacao(cfg, contagem_id):
         raise Recusa(409, FOI_GRAVAR)
-    if acao == "recontagem_itens":
+    if acao == "cancelar":
+        eventos = [_evento(c, quem, "contagem_cancelada", dados={"motivo": motivo})]
+    elif acao == "recontagem_itens":
         eventos = [_evento(c, quem, "recontagem_item_pedida", i, dados={"motivo": motivo})
                    for i in _a_recontar(cfg, contagem_id, c, pedido.get("itens"))]
     else:

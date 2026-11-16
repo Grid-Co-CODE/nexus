@@ -1239,41 +1239,35 @@ table.alm-t{width:100%;border-collapse:collapse;font-size:13px;color:var(--tinta
 .alm-barra{display:inline-block;width:46px;height:5px;margin-left:6px;overflow:hidden;vertical-align:middle;border-radius:3px;
   background:var(--linha-forte)}
 .alm-barra i{display:block;height:100%;background:var(--alerta)}
-.alm-barra--larga{width:100%;margin:10px 0 0}
-.alm-barra--larga i{background:var(--verde)}
-.alm-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px}
-.alm-card{padding:12px;background:var(--superficie-2);border:1px solid var(--linha);border-radius:10px}
-.alm-card h3{margin:0;font:600 14px var(--font-sans);color:var(--tinta)}
-.alm-card > .alm-det{margin:2px 0 8px}
-.alm-card-n{display:grid;grid-template-columns:1fr 1fr;gap:4px 10px;font-size:12.5px;color:var(--tinta-2)}
-.alm-card-n b{color:var(--tinta)}
-.alm-card-n .alm-ruim b{color:var(--critico)}
-.alm-card-n .alm-aviso{font-size:12.5px}
-.alm-card-n .alm-aviso b{color:var(--alerta)}
-/* a última contagem gravada e o valor em estoque por curva (30/10/2026): duas linhas curtas entre os números e a barra */
-.alm-card-info{margin-top:10px;font-size:12.5px;color:var(--tinta-2)}
-.alm-card-info p{margin:3px 0}
-.alm-card-info b{color:var(--tinta)}
-.alm-card-info .alm-aviso{font-size:12.5px}
-/* "Ver peças": o botão do cartão e o painel que ele abre. O cartão aberto ocupa a linha inteira da grade (a tabela de sete
-   colunas não cabe em 260 px); abaixo de 640 px a grade já é de uma coluna e a tabela vira cartão (a regra `.alm-t`) */
-.alm-ver{margin-top:12px}
+/* o Por almoxarifado em lista (16/11/2026; eram cartões desde 25/10): um almoxarifado por linha, cada um no seu `<tbody>`, com
+   a linha das peças logo abaixo. As regras olham só as linhas da lista (`> tbody > tr > td`), e nada desce para a tabela das
+   peças que abre dentro dela */
+.alm-lista > tbody > tr > td{vertical-align:middle}
+.alm-linha{scroll-margin-top:calc(var(--topo) + 12px)}
+.alm-lista .alm-nome{font-weight:600;color:var(--tinta)}
+.alm-lista > tbody > tr > td .alm-ruim b{color:var(--critico)}
+.alm-lista > tbody > tr > td .alm-aviso{font-size:inherit}
+.alm-lista > tbody > tr > td .alm-aviso b{color:var(--alerta)}
+.alm-lista > tbody > tr > td.alm-acao{width:1%;text-align:right;white-space:nowrap}
+.alm-linha--aberta > tr:first-child > td{border-bottom-color:transparent}
+.alm-linha--destaque > tr:first-child > td{background:var(--verde-a16)}
+.alm-lista > tbody > tr.alm-pecas-linha > td{padding:0 8px 12px;background:var(--superficie-2)}
+/* "Ver peças": o botão no fim da linha e a seta que diz se está aberto */
 .alm-ver::after{content:"";width:6px;height:6px;margin:-3px 0 0 2px;border:solid currentColor;border-width:0 2px 2px 0;
   transform:rotate(45deg);transition:transform .15s}
 .alm-ver[aria-expanded=true]::after{margin-top:3px;transform:rotate(-135deg)}
-.alm-card--aberto{grid-column:1 / -1}
-/* o almoxarifado que o saldo do ciclo não traz (11/11/2026): a borda tracejada diz "ainda sem saldo", e o selo e a frase dizem
-   por quê (a cor só reforça a palavra) */
-.alm-card--sem-saldo{border-style:dashed}
-.alm-sem-saldo{margin:6px 0 0;font-size:12.5px;line-height:1.5;color:var(--tinta-2)}
+/* o almoxarifado que o saldo do ciclo não traz (11/11/2026): o selo e a frase dizem por quê (a cor só reforça a palavra) */
+.alm-sem-saldo{font-size:12.5px;line-height:1.5;color:var(--tinta-2)}
 .alm-sem-saldo .inv-selo{margin-right:4px}
+/* da Reposição ao almoxarifado: o link é o nome, sem a cor de link no nome da usina */
+.alm-ir{color:var(--tinta);text-decoration:underline;text-decoration-color:var(--linha-forte);text-underline-offset:3px}
+.alm-ir:hover,.alm-ir:focus-visible{color:var(--verde-texto);text-decoration-color:currentColor}
 /* os vistos antes (a revisão de 11/11/2026): recolhidos depois dos cartões, uma linha por almoxarifado */
 .alm-vistos{margin-top:12px;font-size:13px;color:var(--tinta-2)}
 .alm-vistos summary{cursor:pointer;padding:6px 0}
 .alm-vistos-lista{margin:4px 0 0;padding-left:18px;line-height:1.7}
 .alm-vistos-lista .alm-det{display:inline}
-.alm-pecas{margin-top:12px}
-.alm-pecas-msg{margin:0;font-size:13px;color:var(--mudo)}
+.alm-pecas-msg{margin:8px 0 0;font-size:13px;color:var(--mudo)}
 .alm-pecas-msg:empty{display:none}
 @media (max-width:640px){
   .alm-t thead{display:none}
@@ -1285,6 +1279,16 @@ table.alm-t{width:100%;border-collapse:collapse;font-size:13px;color:var(--tinta
   .alm-v{min-width:0;text-align:right}
   .alm-t .num{white-space:normal}
   .alm-t tr[data-fl-vazio] td::before{content:none}
+  /* a lista do Por almoxarifado (16/11/2026): o "Ver peças" sem rótulo, à direita, e a linha das peças é a tabela delas
+     inteira (que vira os cartões dela), não um par rótulo e valor */
+  .alm-t td.alm-acao::before{content:none}
+  .alm-t td.alm-acao{justify-content:flex-end}
+  .alm-lista > tbody > tr > td.alm-acao{width:auto}      /* o 1% da tabela larga jogava o botão para fora do cartão */
+  .alm-t td.alm-acao:empty{display:none}
+  .alm-t td.alm-pecas-td{display:block;padding:0;text-align:left}
+  .alm-t td.alm-pecas-td::before{content:none}
+  .alm-lista > tbody > tr.alm-pecas-linha{margin-top:-4px;padding:4px 0 0;border:0;background:none}
+  .alm-lista > tbody > tr.alm-pecas-linha > td{padding:0;background:none}
 }
 
 /* ── Inventário do almoxarifado (26/10/2026, Levi): a lista das contagens do App, a contagem aberta, a auditoria, a régua e a

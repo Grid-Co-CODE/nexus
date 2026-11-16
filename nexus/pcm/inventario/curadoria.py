@@ -368,6 +368,7 @@ def sugestoes_de_classificacao(cfg, mapa: dict | None) -> dict[str, dict]:
 # o estado da lista das contagens (`leitura.ESTADOS`) como a curadoria o diz: a contagem aprovada, gravando ou gravada não se
 # decide mais, nem a recusada nem a substituída
 _DA_LEITURA = {"nova": "aberta", "revisada": "aberta", "recontagem_pedida": "recontagem", "substituida": "substituida",
+               "cancelada": "cancelada",
                "gravando": "gravada", "gravada": "gravada", "gravada_com_conflitos": "gravada"}
 
 
@@ -394,7 +395,8 @@ _PORQUE = {"gravada": ("já foi gravada no Fracttal (ou a gravação já começo
                        "já tinha sido gravada no Fracttal (ou a gravação já tinha começado)"),
            "recontagem": ("foi recusada (recontagem pedida)", "já tinha sido recusada (recontagem pedida)"),
            "substituida": ("foi substituída por uma contagem mais nova do almoxarifado",
-                           "já tinha sido substituída por uma contagem mais nova do almoxarifado")}
+                           "já tinha sido substituída por uma contagem mais nova do almoxarifado"),
+           "cancelada": ("foi cancelada pelo PCM", "já tinha sido cancelada pelo PCM")}
 
 
 FOI_GRAVAR = ("Esta contagem já foi para a gravação: o lote foi congelado na aprovação, e a decisão não entra mais nele. Faça "

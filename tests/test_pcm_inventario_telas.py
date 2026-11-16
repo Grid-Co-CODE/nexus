@@ -497,6 +497,32 @@ def test_revisar_tirar_corrigir_recontagem(app, inv, falso, monkeypatch):
     assert falso.chamadas == ["ler"]
 
 
+def test_cancelar_a_contagem(app, inv, falso, monkeypatch):
+    """O PCM, 16/11/2026: "colocar um botão no inventário de cancelar auditoria". O técnico manda de novo o inventário que já
+    tinha feito no mês (em produção, a mesma pessoa contou o mesmo almoxarifado em 12/11 e em 16/11), e a repetida esperava a
+    revisão do PCM. Cancelar grava o `contagem_cancelada` no nome de quem cancelou, com o motivo só cifrado e sem a cópia para o
+    técnico (o App não recebe pedido nenhum); a contagem sai da revisão, nada vai ao Fracttal, e cancelar de novo é 409."""
+    _cenario(inv)
+    c = _pcm(app, monkeypatch)
+    html = c.get(f"{LISTA}/C-1").get_data(as_text=True)
+    assert 'data-rev="cancelar"' in html and ">Cancelar a contagem</button>" in html
+    assert _revisar(c, {"acao": "cancelar", "motivo": ""}).status_code == 400            # o motivo é obrigatório
+    r = _revisar(c, {"acao": "cancelar", "motivo": "contagem repetida no mês"})
+    assert r.status_code == 200 and r.get_json()["estado"] == "cancelada"
+    assert "Contagem cancelada" in r.get_json()["mensagem"]
+    e = _eventos(app)[-1]
+    assert e["tipo"] == "contagem_cancelada" and not e["id_item"] and e["contagem_id"] == "C-1"
+    assert e["pessoa_hmac"] == codigo_da_pessoa(CHAVE, EMAIL)
+    assert F.decifrar(app.config, F.ABA_EVENTO, e) == {"motivo": "contagem repetida no mês"} and not e.get("motivo_tecnico")
+    assert L.contagens(app.config)[0]["estado"] == "cancelada"
+    html = c.get(f"{LISTA}/C-1").get_data(as_text=True)
+    assert ">Cancelada<" in html and 'data-rev="' not in html
+    assert ">Cancelada<" in c.get(LISTA).get_data(as_text=True)                           # na lista também
+    assert _lote(c).status_code == 409                                                    # nada a aprovar
+    assert _revisar(c, {"acao": "cancelar", "motivo": "de novo"}).status_code == 409
+    assert falso.chamadas == []                                                           # cancelar não fala com o Fracttal
+
+
 def test_o_motivo_so_existe_cifrado(app, inv, falso, monkeypatch, tmp_path):
     """O motivo é texto livre e a API do banco tem leitura aberta: nem o arquivo do livro, nem uma coluna em claro o guarda."""
     _cenario(inv)

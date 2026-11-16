@@ -600,11 +600,39 @@ def test_ajuda_da_reposicao_diz_qual_coluna_o_app_nao_traz(app, almox, monkeypat
 # ── 30/10/2026, itens 1 e 9: abrir um almoxarifado mostra as peças, a última contagem gravada e o valor por curva ─────────
 
 def _cartao(html, nome):
-    """O `<article>` do cartão do almoxarifado `nome` na aba Por almoxarifado."""
-    achados = [a.split("</article>")[0] for a in html.split('<article class="alm-card')[1:]
-               if f"<h3>{nome}</h3>" in a.split("</article>")[0]]
-    assert achados, f"sem cartão de {nome}"
+    """A linha do almoxarifado `nome` na aba Por almoxarifado: o `<tbody>` dele na lista (16/11/2026; era um cartão), com a
+    linha dos números e a das peças, que abre embaixo."""
+    achados = [a.split("</tbody>")[0] for a in html.split('<tbody class="alm-linha')[1:]
+               if f'<b class="alm-nome">{nome}</b>' in a.split("</tbody>")[0]]
+    assert achados, f"sem a linha de {nome}"
     return achados[0]
+
+
+def test_por_almoxarifado_e_uma_lista(app, almox, monkeypatch):
+    """O PCM, 16/11/2026: "pediu pra essa parte ser em lista e não em cards". Uma tabela, um almoxarifado por linha, com os
+    números em colunas e o "Ver peças" no fim da linha; nenhum cartão."""
+    html = _abrir(app, monkeypatch).get_data(as_text=True)
+    painel = re.search(r'data-painel="almoxarifados".*?</section>', html, re.S).group(0)
+    assert '<article class="alm-card' not in painel and '<table class="alm-t alm-lista"' in painel
+    cab = re.search(r"<thead>(.*?)</thead>", painel, re.S).group(1)
+    for coluna in ("Almoxarifado", "Peças", "Abaixo", "No limite", "Sem mínimo", "Zeradas", "Última contagem gravada"):
+        assert f">{coluna}</th>" in cab, coluna
+    assert "Valor em estoque" not in cab                     # o App deste teste não traz o custo: a coluna nem existe
+    assert 'id="almox-10"' in painel and 'id="almox-20"' in painel
+    linha = _cartao(html, "Almoxarifado 10")
+    for rotulo in ("Almoxarifado", "Peças", "Abaixo", "No limite", "Sem mínimo", "Zeradas"):
+        assert f'data-r="{rotulo}"' in linha, rotulo                        # a linha vira cartão a 375 px, com o rótulo
+
+
+def test_a_reposicao_leva_ao_almoxarifado(app, almox, monkeypatch):
+    """O PCM, 16/11/2026: "no de reposição quando a gente apertasse na usina já fosse pra essa por almoxarifado". O
+    almoxarifado da linha da Reposição é um link para a linha dele no Por almoxarifado (a aba e a âncora no endereço, que
+    abre a aba certa também numa aba nova do navegador); o script troca a aba, desce até a linha e abre as peças."""
+    html = _abrir(app, monkeypatch).get_data(as_text=True)
+    rep = re.search(r'data-painel="reposicao".*?</section>', html, re.S).group(0)
+    assert 'href="?aba=almoxarifados#almox-10" data-ir-almox="10"' in rep
+    assert "data-ir-almox" in html.split('data-painel="avariadas"')[1]        # o script que segue o link
+    assert "location.hash" in html
 
 
 def _codigos(html):
@@ -762,7 +790,9 @@ def test_cartao_sem_o_livro_das_contagens_nao_diz_nada(app, almox, monkeypatch):
     visao.limpar()
     assert R.resumo(app.config)["ultimas"] is None
     cartao = _cartao(_abrir(app, monkeypatch).get_data(as_text=True), "Almoxarifado 10")
-    assert "contagem gravada" not in cartao and "nunca contado" not in cartao
+    # na lista (16/11/2026) a coluna fica, com o traço de "não lido"; nunca a frase de quem leu e não achou
+    assert "sem contagem gravada na janela lida" not in cartao and "nunca contado" not in cartao
+    assert re.search(r'data-r="Última contagem gravada"><span class="alm-v"><span class="mudo"[^>]*>–</span>', cartao)
 
 
 def test_cartao_inventario_nao_leu(app, almox, monkeypatch):
@@ -776,7 +806,8 @@ def test_cartao_inventario_nao_leu(app, almox, monkeypatch):
     visao.limpar()
     r = _abrir(app, monkeypatch)
     cartao = _cartao(r.get_data(as_text=True), "Almoxarifado 10")
-    assert r.status_code == 200 and "contagem gravada" not in cartao and "nunca contado" not in cartao
+    assert r.status_code == 200 and "sem contagem gravada na janela lida" not in cartao and "nunca contado" not in cartao
+    assert re.search(r'data-r="Última contagem gravada"><span class="alm-v"><span class="mudo"[^>]*>–</span>', cartao)
     assert "Inventário</a>" in r.get_data(as_text=True)                       # a aba segue, sem o número
 
 
@@ -820,10 +851,14 @@ def test_a_data_da_ultima_contagem_e_a_de_brasilia(app, inventario, monkeypatch)
     assert "20/10/2026" in cartao and "21/10/2026" not in cartao
 
 
-def test_o_vao_do_alm_det_e_so_do_cartao():
-    """O `.alm-det{margin:2px 0 8px}` do cartão pegava também o "falta N" e o "zerada" da tabela das peças que abre dentro dele."""
+def test_o_css_e_o_da_lista_e_nao_o_dos_cartoes():
+    """Os cartões saíram em 16/11/2026 (a lista): o CSS deles também. As peças abrem na linha de baixo, que ocupa a largura da
+    tabela e, a 375 px, não vira par rótulo e valor (a regra do `.alm-t td`): é a tabela das peças inteira. E nada da linha do
+    almoxarifado desce para a tabela das peças (era o `.alm-card .alm-det`, que pegava o "falta N" de dentro)."""
     css = (Path(__file__).resolve().parent.parent / "nexus" / "static" / "pcm.css").read_text("utf-8")
-    assert ".alm-card > .alm-det{" in css and ".alm-card .alm-det{" not in css
+    assert ".alm-card" not in css and ".alm-lista" in css
+    assert ".alm-t td.alm-pecas-td{display:block" in css and ".alm-t td.alm-pecas-td::before{content:none}" in css
+    assert ".alm-lista .alm-det{" not in css and ".alm-lista > tbody > tr > td" in css
 
 
 def test_valor_por_curva(app, almox, monkeypatch):
@@ -856,7 +891,8 @@ def test_valor_sem_nenhuma_peca_na_conta_e_traco(app, almox, monkeypatch):
     c = {c["id"]: c for c in T.montar().dados["por_almoxarifado"]}["40"]
     assert c["nao_informado"] == 2 and c["sem_custo"] == 0 and c["valor"]["total"] == 0.0
     cartao = _cartao(_abrir(app, monkeypatch).get_data(as_text=True), "Almoxarifado 40")
-    assert re.search(r'Valor em estoque: <span class="mudo">–</span>', cartao) and "R$ 0,00" not in cartao
+    assert re.search(r'data-r="Valor em estoque" class="num"><span class="alm-v"><span class="mudo">–</span>', cartao)
+    assert "R$ 0,00" not in cartao
     assert "sem custo no Fracttal" not in cartao
 
 

@@ -105,7 +105,9 @@ def test_contrato_do_livro():
                               "requisicao_travada",
                               # a transferência entre almoxarifados (12/11/2026): no fim
                               "transferencia_vinculo", "transferencia_saida", "transferencia_entrada",
-                              "transferencia_falha", "transferencia_travada")
+                              "transferencia_falha", "transferencia_travada",
+                              # a contagem cancelada pelo PCM (16/11/2026): no fim
+                              "contagem_cancelada")
     assert F.CAB_REGUA == ["decidida_em", "data_id", "id_almoxarifado", "usina_id", "id_item", "codigo",
                            "sugestao_min_qtd", "sugestao_max_qtd", "recomendado_min_qtd", "recomendado_max_qtd",
                            "acordado_min_qtd", "acordado_max_qtd", "gravado_fracttal", "pessoa_id", "pessoa_hmac",

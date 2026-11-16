@@ -169,13 +169,24 @@
   {% elif gravacao %}<p class="inv-espera">O lote foi para a gravação no Fracttal: o andamento está na etapa Gravação.</p>
   {% else %}<p class="inv-espera">Nada a aprovar: {{ c.motivo_nao_aprovavel or 'esta contagem não se aprova' }}.</p>{% endif %}
 
-  {% if pode and c.aprovavel %}
+  {# cancelar (16/11/2026, o PCM: "colocar um botão no inventário de cancelar auditoria"): a contagem que ainda espera o PCM,
+     mesmo a que não se aprova (a velha, a do contrato do App violado), é a repetida que o técnico mandou de novo no mês #}
+  {% set cancelavel = pode and c.estado in ('nova', 'revisada') and not gravacao %}
+  {% if pode and (c.aprovavel or cancelavel) %}
   {# os textos da recontagem dizem o que o App faz (04/11/2026, `app_com_recontagem`, o livro com o "Recontagem de"): o de hoje
      não lê os pedidos, e o PCM combina com o técnico; o novo os mostra a ele. A ajuda daqui e a da caixa (TEXTOS) são as mesmas #}
+  {% if c.aprovavel %}
   <div class="inv-rodape inv-rodape--fim">
     <button type="button" class="gc-btn gc-btn--ui gc-btn--contorno" data-rev="recontagem">Recontar a contagem inteira</button>
     <span class="alm-ajuda">{% if app_com_recontagem %}Recusa a contagem inteira: nada é gravado, e o técnico recebe no App o pedido de contar este almoxarifado de novo. Para recontar só algumas peças, marque-as na Aprovação.{% else %}Recusa a contagem inteira: nada é gravado. O App ainda não avisa o técnico: combine com ele uma contagem nova deste almoxarifado. Para recontar só algumas peças, marque-as na Aprovação.{% endif %}</span>
   </div>
+  {% endif %}
+  {% if cancelavel %}
+  <div class="inv-rodape inv-rodape--fim">
+    <button type="button" class="gc-btn gc-btn--ui gc-btn--contorno" data-rev="cancelar">Cancelar a contagem</button>
+    <span class="alm-ajuda">Para a contagem repetida ou que não deve valer: nada é gravado dela, e o técnico não recebe pedido nenhum no App. Se ela tinha tirado do caminho uma contagem anterior ainda não gravada, a anterior volta para a revisão. Se ela era a única contagem do mês deste almoxarifado, o App volta a deixar contá-lo (no celular, em até 30 minutos ou ao abrir a Ronda).</span>
+  </div>
+  {% endif %}
 
   <dialog class="q-det" id="inv-rev" aria-label="Revisar a contagem" data-url="{{ raiz }}/t/pcm/pecas/inventario/{{ c.contagem_id|urlencode }}/revisar">
     <div class="q-det-corpo">
@@ -213,7 +224,8 @@
         corrigir: ['Corrigir o número', 'O Fracttal recebe este número no lugar do que o técnico contou. A auditoria guarda os dois e o motivo.', 'Corrigir'],
         // os da recontagem pela versão do App (`app_com_recontagem`): a caixa não promete o que o App de hoje não faz
         recontagem_itens: ['Pedir recontagem das marcadas', '{% if app_com_recontagem %}Só as peças marcadas voltam ao técnico no App e saem deste lote (ficam em "não será tocada"); o resto da contagem segue para aprovar e gravar. O motivo vale para todas e fica na auditoria; o pedido aparece em "Recontagens pedidas", na lista do Inventário, até a recontagem chegar.{% else %}Só as peças marcadas saem deste lote (ficam em "não será tocada") e o resto da contagem segue para aprovar e gravar. O App ainda não avisa o técnico: combine a recontagem com ele e grave o resto antes de ele mandar a contagem nova (a contagem nova substitui a que ainda não foi gravada). O motivo vale para todas e fica na auditoria; o pedido aparece em "Recontagens pedidas", na lista do Inventário.{% endif %}', 'Pedir recontagem'],
-        recontagem: ['Recontar a contagem inteira', '{% if app_com_recontagem %}Recusa a contagem inteira: nada é gravado, e o técnico recebe no App o pedido de contar este almoxarifado de novo. Para recontar só algumas peças, marque-as na Aprovação.{% else %}Recusa a contagem inteira: nada é gravado. O App ainda não avisa o técnico: combine com ele uma contagem nova deste almoxarifado. Para recontar só algumas peças, marque-as na Aprovação.{% endif %}', 'Recontar a contagem inteira']
+        recontagem: ['Recontar a contagem inteira', '{% if app_com_recontagem %}Recusa a contagem inteira: nada é gravado, e o técnico recebe no App o pedido de contar este almoxarifado de novo. Para recontar só algumas peças, marque-as na Aprovação.{% else %}Recusa a contagem inteira: nada é gravado. O App ainda não avisa o técnico: combine com ele uma contagem nova deste almoxarifado. Para recontar só algumas peças, marque-as na Aprovação.{% endif %}', 'Recontar a contagem inteira'],
+        cancelar: ['Cancelar a contagem', 'Para a contagem repetida ou que não deve valer: nada é gravado dela no Fracttal, e o técnico não recebe pedido nenhum no App. Se ela tinha tirado do caminho uma contagem anterior ainda não gravada, a anterior volta para a revisão. Se ela era a única contagem do mês deste almoxarifado, o App volta a deixar contá-lo (no celular, em até 30 minutos ou ao abrir a Ronda). O motivo fica na auditoria.', 'Cancelar a contagem']
       };
       var atual = null;
       function mostrar(msg) { erro.textContent = msg || ''; erro.hidden = !msg; }

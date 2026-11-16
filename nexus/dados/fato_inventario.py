@@ -89,7 +89,11 @@ TIPOS_EVENTO = ("contagem_recebida", "aprovada", "peca_gravada", "conflito", "er
                 # depois e o movimento do Fracttal; a entrada só com o destino relido), a falha e a trava (a resposta que não
                 # veio). As linhas de uma transferência levam o mesmo código do Nexus no `lote`
                 "transferencia_vinculo", "transferencia_saida", "transferencia_entrada", "transferencia_falha",
-                "transferencia_travada")
+                "transferencia_travada",
+                # a contagem cancelada pelo PCM (16/11/2026, o PCM: "colocar um botão no inventário de cancelar auditoria"): a
+                # repetida que o técnico mandou de novo no mês. Morta como a recusada, mas sem pedido ao técnico: o App não a
+                # lê como pedido, só deixa de contá-la como a que atende uma recontagem
+                "contagem_cancelada")
 # os eventos que levam o motivo ao técnico: o App mostra o pedido de recontagem (a da peça e a da contagem inteira); a peça
 # tirada e o número corrigido não voltam ao técnico
 TIPOS_MOTIVO_TECNICO = ("recontagem_pedida", "recontagem_item_pedida")

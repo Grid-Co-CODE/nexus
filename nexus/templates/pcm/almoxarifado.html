@@ -21,12 +21,13 @@
 <div class="pg alm">
 <p class="gc-eyebrow">PCM · Almoxarifado</p>
 <div class="gc-titulo-explica"><h1 class="titulo-pagina">Almoxarifado</h1>
-{% call explica('Entenda esta tela') %}<p><b>Por almoxarifado.</b> Cada cartão é um almoxarifado do Fracttal. A barra é a parte
-  das peças acima do mínimo. A última contagem gravada é a do inventário (a mais nova entre as gravadas no Fracttal). O valor em
+{% call explica('Entenda esta tela') %}<p><b>Por almoxarifado.</b> Cada linha é um almoxarifado do Fracttal; o "Ver peças" abre as
+  peças dele logo abaixo. Na Reposição, o almoxarifado de cada peça leva à linha dele aqui. A barra ao lado das peças é a parte
+  acima do mínimo. A última contagem gravada é a do inventário (a mais nova entre as gravadas no Fracttal). O valor em
   estoque é o saldo vezes o custo unitário do Fracttal, somado por Curva ABC do cadastro da peça; a peça com saldo e sem custo
-  fica fora da soma, e o cartão diz quantas.</p>
+  fica fora da soma, e a linha diz quantas.</p>
 <p><b>O almoxarifado sem saldo ainda.</b> Ele aparece assim que sobe qualquer dado: o saldo do ciclo do App, uma contagem do
-  inventário ou o histórico do Nexus. Sem linha no saldo do ciclo, o cartão não mostra número e diz por quê. Contagem enviada:
+  inventário ou o histórico do Nexus. Sem linha no saldo do ciclo, a linha não mostra número e diz por quê. Contagem enviada:
   é a gravação da contagem no Fracttal que liga as peças ao almoxarifado, e o saldo vem no ciclo do App seguinte a ela.
   Contagem gravada: o saldo vem no próximo ciclo; se o ciclo já passou sem trazê-lo, confira no Fracttal as peças ligadas.</p>
 <p><b>Vistos antes.</b> O almoxarifado que o histórico do Nexus já viu e que o ciclo de agora não traz, sem contagem (sem peça
@@ -108,7 +109,9 @@
     <tbody>
     {% for x in lista %}
     <tr{{ filtro(x.almox, x.familia, x.busca) }}>
-      <td data-r="Almoxarifado"><span class="alm-v">{{ x.almox }}{% if x.usina %}<span class="alm-det">{{ x.usina }}</span>{% endif %}</span></td>
+      {# o almoxarifado leva à linha dele no Por almoxarifado (16/11/2026, o PCM: "no de reposição quando a gente apertasse na
+         usina já fosse pra essa por almoxarifado"): a aba e a âncora no endereço, e o script abaixo troca a aba sem recarregar #}
+      <td data-r="Almoxarifado"><span class="alm-v"><a class="alm-ir" href="?aba=almoxarifados#almox-{{ x.id_almox }}" data-ir-almox="{{ x.id_almox }}">{{ x.almox }}{% if x.usina %}<span class="alm-det">{{ x.usina }}</span>{% endif %}</a></span></td>
       <td data-r="Peça"><span class="alm-v"><span class="alm-cod">{{ x.codigo }}</span> {{ x.nome }}</span></td>
       <td data-r="Família"><span class="alm-v">{{ x.familia }}</span></td>
       {# o mesmo quadradinho da Aprovação do inventário (pcm.css, .inv-crit); sem número, "–" e nunca um nível chutado. As duas
@@ -148,58 +151,64 @@
   {# como se lê cada cartão está no "!" do título; aqui só o que muda com o dado #}
   {% if not d.tem_custo %}<p class="alm-ajuda">O App ainda não traz o custo: por enquanto os cartões não mostram o valor.</p>{% endif %}
   {% for m in d.avisos_sem_saldo or [] %}<div class="cn-erro cn-aviso" role="status">{{ m }}</div>{% endfor %}
-  <div class="alm-cards">
+  {# a lista (16/11/2026, o PCM: "pediu pra essa parte ser em lista e não em cards"; eram cartões desde 25/10): um
+     almoxarifado por linha, cada um no seu `<tbody>` (a linha dos números e a das peças, que abre embaixo dela). O `id`
+     almox-<ID> é o endereço que a Reposição usa para trazer o PCM até a linha. Abaixo de 640 px cada linha vira cartão, pelo
+     `data-r` (a regra `.alm-t`). Sem `data-fl-grupo`: a barra do filtro some nesta aba, como antes #}
+  <table class="alm-t alm-lista">
+    <thead><tr><th>Almoxarifado</th><th class="num">Peças</th><th class="num">Abaixo</th><th class="num">No limite</th>
+      <th class="num">Sem mínimo</th><th class="num">Zeradas</th><th>Última contagem gravada</th>
+      {%- if d.tem_custo %}<th class="num">Valor em estoque</th>{% endif %}
+      <th><span class="sr-only">Peças do almoxarifado</span></th></tr></thead>
+  {% set ncol = 9 if d.tem_custo else 8 %}
   {% for c in cartoes %}
+    <tbody class="alm-linha{% if c.sem_saldo %} alm-linha--sem-saldo{% endif %}" id="almox-{{ c.id }}">
+    <tr>
+      <td data-r="Almoxarifado"><span class="alm-v"><b class="alm-nome">{{ c.nome }}</b>
+        <span class="alm-det">{% if c.usina %}{{ c.usina }}{% else %}<span class="alm-ruim">usina não ligada</span> (ligar em Base → Ligações){% if c.sem_saldo and c.local %} · no Fracttal: {{ c.local }}{% endif %}{% endif %}</span></span></td>
     {% if c.sem_saldo %}
-    {# o almoxarifado que o saldo do ciclo não traz (11/11/2026): só com contagem do App ou só no histórico do Nexus. Nenhum
-       número (sem saldo não há peça, mínimo nem valor) e sem "Ver peças"; o porquê vem do `_porque_sem_saldo` #}
-    <article class="alm-card alm-card--sem-saldo">
-      <h3>{{ c.nome }}</h3>
-      <p class="alm-det">{% if c.usina %}{{ c.usina }}{% else %}<span class="alm-ruim">usina não ligada</span> (ligar em Base → Ligações){% if c.local %} · no Fracttal: {{ c.local }}{% endif %}{% endif %}</p>
-      <p class="alm-sem-saldo"><span class="inv-selo">sem saldo ainda</span> {{ c.porque }}</p>
-      {% if c.ultima_contagem %}<div class="alm-card-info"><p>Última contagem gravada: <b>{{ c.ultima_contagem }}</b></p></div>{% endif %}
-    </article>
+      {# o almoxarifado que o saldo do ciclo não traz (11/11/2026): só com contagem do App ou só no histórico do Nexus. Nenhum
+         número (sem saldo não há peça, mínimo nem valor) e sem "Ver peças"; o porquê vem do `_porque_sem_saldo` #}
+      <td data-r="Situação" colspan="5"><span class="alm-v alm-sem-saldo"><span class="inv-selo">sem saldo ainda</span> {{ c.porque }}</span></td>
+      <td data-r="Última contagem gravada"><span class="alm-v">{% if c.ultima_contagem %}<b>{{ c.ultima_contagem }}</b>{% else %}<span class="mudo">–</span>{% endif %}</span></td>
+      {% if d.tem_custo %}<td data-r="Valor em estoque" class="num"><span class="alm-v"><span class="mudo">–</span></span></td>{% endif %}
+      <td class="alm-acao"></td>
     {% else %}
-    <article class="alm-card">
-      <h3>{{ c.nome }}</h3>
-      <p class="alm-det">{% if c.usina %}{{ c.usina }}{% else %}<span class="alm-ruim">usina não ligada</span> (ligar em Base → Ligações){% endif %}</p>
-      <div class="alm-card-n">
-        <span><b>{{ c.pecas }}</b> peças</span>
-        <span{% if c.abaixo %} class="alm-ruim"{% endif %}><b>{{ c.abaixo }}</b> abaixo · <b>{{ c.no_limite }}</b> no limite</span>
-        <span{% if c.sem_minimo %} class="alm-aviso"{% endif %}><b>{{ c.sem_minimo }}</b> sem mínimo</span>
-        <span><b>{{ c.zeradas }}</b> zeradas</span>
-        {% if c.saldo_unitario %}<span><b>{{ c.saldo_unitario }}</b> de saldo unitário</span>{% endif %}
-        {% if c.nao_informado %}<span class="alm-aviso"><b>{{ c.nao_informado }}</b> sem saldo informado</span>{% endif %}
-      </div>
-      <div class="alm-card-info">
-        {# None = o inventário não deu para ler agora, ou o App ainda não publica o livro das contagens: a linha some. "" = o livro
-           foi lido e não tem uma gravada deste almoxarifado: o livro do App é uma janela que anda, e "nunca contado" diria mais
-           do que se sabe #}
-        {% if c.ultima_contagem is not none %}<p>Última contagem gravada: {% if c.ultima_contagem %}<b>{{ c.ultima_contagem }}</b>{% else %}<span class="mudo">sem contagem gravada na janela lida</span>{% endif %}</p>{% endif %}
-        {# sem a coluna de custo no livro (o App de antes) não há valor nem cobrança; com ela, a soma pela metade AVISA. Nenhuma
-           peça na conta (todas sem saldo informado, ou sem o custo): "–", nunca um "R$ 0,00" inventado (a revisão final de
-           04/11/2026: o almoxarifado em que o Fracttal não deu saldo nenhum aparecia valendo zero) #}
-        {% if c.valor %}
-        <p>Valor em estoque: {% if c.valor.total %}<b>{{ c.valor_txt.total }}</b>{% else %}<span class="mudo">–</span>{% endif %}
-          {% if c.valor.total and d.tem_curva %}<span class="alm-det">A {{ c.valor_txt.A }} · B {{ c.valor_txt.B }} · C {{ c.valor_txt.C }}{% if c.valor.sem_curva %} · sem curva {{ c.valor_txt.sem_curva }}{% endif %}</span>
-          {%- elif c.valor.total %}<span class="alm-det">o App ainda não traz a curva</span>{% endif %}</p>
-        {% if c.sem_custo %}<p class="alm-aviso">{{ c.sem_custo }} peça{{ 's' if c.sem_custo != 1 else '' }} sem custo no Fracttal</p>{% endif %}
-        {% endif %}
-      </div>
-      <span class="alm-barra alm-barra--larga" title="{{ c.pct_ok }}% acima do mínimo"><i style="width:{{ c.pct_ok }}%"></i></span>
+      <td data-r="Peças" class="num"><span class="alm-v"><b>{{ c.pecas }}</b><span class="alm-barra" title="{{ c.pct_ok }}% acima do mínimo"><i style="width:{{ c.pct_ok }}%"></i></span></span></td>
+      <td data-r="Abaixo" class="num"><span class="alm-v{% if c.abaixo %} alm-ruim{% endif %}"><b>{{ c.abaixo }}</b></span></td>
+      <td data-r="No limite" class="num"><span class="alm-v"><b>{{ c.no_limite }}</b>{% if c.saldo_unitario %}<span class="alm-det">+{{ c.saldo_unitario }} de saldo unitário</span>{% endif %}</span></td>
+      <td data-r="Sem mínimo" class="num"><span class="alm-v{% if c.sem_minimo %} alm-aviso{% endif %}"><b>{{ c.sem_minimo }}</b></span></td>
+      <td data-r="Zeradas" class="num"><span class="alm-v"><b>{{ c.zeradas }}</b>{% if c.nao_informado %}<span class="alm-det alm-aviso">{{ c.nao_informado }} sem saldo informado</span>{% endif %}</span></td>
+      {# None = o inventário não deu para ler agora, ou o App ainda não publica o livro das contagens: "–". "" = o livro foi lido
+         e não tem uma gravada deste almoxarifado: o livro do App é uma janela que anda, e "nunca contado" diria mais do que se
+         sabe #}
+      <td data-r="Última contagem gravada"><span class="alm-v">{% if c.ultima_contagem %}<b>{{ c.ultima_contagem }}</b>{% elif c.ultima_contagem is not none %}<span class="mudo">sem contagem gravada na janela lida</span>{% else %}<span class="mudo" title="o inventário não foi lido agora">–</span>{% endif %}</span></td>
+      {# sem a coluna de custo no livro (o App de antes) não há valor nem cobrança; com ela, a soma pela metade AVISA. Nenhuma
+         peça na conta (todas sem saldo informado, ou sem o custo): "–", nunca um "R$ 0,00" inventado (a revisão final de
+         04/11/2026: o almoxarifado em que o Fracttal não deu saldo nenhum aparecia valendo zero) #}
+      {% if d.tem_custo %}<td data-r="Valor em estoque" class="num"><span class="alm-v">{% if c.valor and c.valor.total %}<b>{{ c.valor_txt.total }}</b>
+        {%- if d.tem_curva %}<span class="alm-det">A {{ c.valor_txt.A }} · B {{ c.valor_txt.B }} · C {{ c.valor_txt.C }}{% if c.valor.sem_curva %} · sem curva {{ c.valor_txt.sem_curva }}{% endif %}</span>
+        {%- else %}<span class="alm-det">o App ainda não traz a curva</span>{% endif %}
+        {%- else %}<span class="mudo">–</span>{% endif %}
+        {%- if c.valor and c.sem_custo %}<span class="alm-det alm-aviso">{{ c.sem_custo }} peça{{ 's' if c.sem_custo != 1 else '' }} sem custo no Fracttal</span>{% endif %}</span></td>{% endif %}
       {# as peças chegam no 1º clique (um fetch do pedaço _almox_pecas.html), não na página: são centenas de linhas por almoxarifado.
-         O botão guarda o endereço e o estado (aria-expanded); o painel é o que ele controla #}
-      <button type="button" class="gc-btn gc-btn--ui gc-btn--contorno alm-ver" data-ver-pecas aria-expanded="false" aria-controls="alm-pecas-{{ c.id }}" data-url="{{ raiz }}/t/pcm/pecas/almox/{{ c.id|urlencode }}">Ver peças</button>
-      {# o `aria-live` fica só na mensagem ("lendo…" e o erro), que já existe antes do texto: no painel inteiro o leitor de tela leria as
-         centenas de linhas que chegam #}
-      <div class="alm-pecas" id="alm-pecas-{{ c.id }}" role="region" aria-label="Peças de {{ c.nome }}" hidden>
+         O botão guarda o endereço e o estado (aria-expanded); a linha de baixo é o que ele abre #}
+      <td class="alm-acao"><button type="button" class="gc-btn gc-btn--ui gc-btn--contorno alm-ver" data-ver-pecas aria-expanded="false" aria-controls="alm-pecas-{{ c.id }}" data-url="{{ raiz }}/t/pcm/pecas/almox/{{ c.id|urlencode }}">Ver peças</button></td>
+    {% endif %}
+    </tr>
+    {% if not c.sem_saldo %}
+    {# o `aria-live` fica só na mensagem ("lendo…" e o erro), que já existe antes do texto: na região inteira o leitor de tela leria
+       as centenas de linhas que chegam #}
+    <tr class="alm-pecas-linha" hidden><td class="alm-pecas-td" colspan="{{ ncol }}">
+      <div class="alm-pecas" id="alm-pecas-{{ c.id }}" role="region" aria-label="Peças de {{ c.nome }}">
         <p class="alm-pecas-msg" data-pecas-msg aria-live="polite"></p>
         <div data-pecas-corpo></div>
       </div>
-    </article>
+    </td></tr>
     {% endif %}
+    </tbody>
   {% endfor %}
-  </div>
+  </table>
   {# os vistos antes (a revisão de 11/11/2026): os almoxarifados só do histórico, recolhidos, com o dia em que um ciclo os viu
      pela última vez; fora dos cartões e do número do alto #}
   {% if d.vistos_antes %}
@@ -289,6 +298,33 @@
     }
     gatilhos.forEach(function (b) { b.addEventListener('click', function () { abrir(b.dataset.aba); }); });
     abrir(new URL(location.href).searchParams.get('aba') || 'reposicao');
+    // da Reposição à linha do almoxarifado (16/11/2026): troca a aba, desce até a linha, destaca e abre as peças. O link é um
+    // endereço de verdade (?aba=almoxarifados#almox-<ID>): aberto numa aba nova, a âncora do endereço faz o mesmo ao carregar
+    function irAoAlmox(id) {
+      var linha = document.getElementById('almox-' + id);
+      if (!linha) return false;
+      abrir('almoxarifados');
+      var u = new URL(location.href); u.hash = 'almox-' + id; history.replaceState(null, '', u);
+      // as peças chegam depois (o fetch do "Ver peças"), e só com elas a página tem altura para trazer o almoxarifado ao alto: a
+      // linha rola agora e de novo quando elas chegam (`data-rolar`). O `scroll-margin-top` do .alm-linha desconta o topo fixo
+      var ver = linha.querySelector('[data-ver-pecas]');
+      if (ver && ver.getAttribute('aria-expanded') !== 'true') { linha.dataset.rolar = '1'; ver.click(); }
+      linha.scrollIntoView({block: 'start'});
+      linha.classList.add('alm-linha--destaque');
+      setTimeout(function () { linha.classList.remove('alm-linha--destaque'); }, 2500);
+      return true;
+    }
+    document.addEventListener('click', function (ev) {
+      var a = ev.target.closest ? ev.target.closest('[data-ir-almox]') : null;
+      if (a && irAoAlmox(a.getAttribute('data-ir-almox'))) ev.preventDefault();
+    });
+    // o endereço com a âncora: ao carregar (o link aberto numa aba nova) e quando só a âncora muda na mesma página
+    function daAncora() {
+      var m = /^#almox-(.+)$/.exec(location.hash || '');
+      if (m) irAoAlmox(decodeURIComponent(m[1]));
+    }
+    window.addEventListener('load', daAncora);
+    window.addEventListener('hashchange', daAncora);
     // a fonte chega depois e alarga as abas: a aba aberta volta para o meio
     window.addEventListener('load', function () {
       centrar(abas.filter(function (b) { return b.getAttribute('aria-selected') === 'true'; })[0]);
@@ -297,8 +333,9 @@
 </script>
 <script>
   // "Ver peças" (item 1, 30/10/2026): as peças de um almoxarifado chegam no 1º clique, de um pedaço HTML do servidor (a mesma
-  // conta guardada da página, sem ler o Fracttal), e não vêm na página (seriam centenas de linhas por cartão). Aberto de novo,
-  // o que já chegou só reaparece; se falhar, o próximo clique tenta de novo. O cartão aberto ocupa a linha inteira do painel
+  // conta guardada da página, sem ler o Fracttal), e não vêm na página (seriam centenas de linhas por almoxarifado). Aberto de
+  // novo, o que já chegou só reaparece; se falhar, o próximo clique tenta de novo. Desde 16/11/2026 (a lista) as peças abrem na
+  // linha de baixo do almoxarifado, que ocupa a largura da tabela
   (function () {
     var rota = window.nexusRota || String;
     // a mensagem ("lendo…", o erro) e as peças são dois lugares do painel: a mensagem é o único `aria-live`
@@ -308,7 +345,7 @@
     }
     Array.prototype.slice.call(document.querySelectorAll('[data-ver-pecas]')).forEach(function (botao) {
       var painel = document.getElementById(botao.getAttribute('aria-controls'));
-      var cartao = botao.closest('.alm-card');
+      var linha = botao.closest('.alm-linha'), abaixo = painel.closest('.alm-pecas-linha');
       var estado = '';                                      // '' = ainda não buscou, 'lendo' ou 'pronto'
       function buscar() {
         estado = 'lendo';
@@ -323,6 +360,8 @@
             painel.querySelector('[data-pecas-msg]').textContent = '';
             painel.querySelector('[data-pecas-corpo]').innerHTML = html;
             estado = 'pronto';
+            // aberto pelo link da Reposição: com as peças na página, a linha vai ao alto (ver `irAoAlmox`)
+            if (linha.dataset.rolar) { delete linha.dataset.rolar; linha.scrollIntoView({block: 'start'}); }
           });
         }).catch(function () {
           estado = '';
@@ -332,8 +371,8 @@
       botao.addEventListener('click', function () {
         var abrir = botao.getAttribute('aria-expanded') !== 'true';
         botao.setAttribute('aria-expanded', String(abrir));
-        painel.hidden = !abrir;
-        cartao.classList.toggle('alm-card--aberto', abrir);
+        abaixo.hidden = !abrir;
+        linha.classList.toggle('alm-linha--aberta', abrir);
         if (abrir && !estado) buscar();
       });
     });

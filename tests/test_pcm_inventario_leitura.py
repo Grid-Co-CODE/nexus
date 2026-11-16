@@ -70,7 +70,7 @@ def inv(app, banco, tmp_path, monkeypatch):  # noqa: F811
 # ── o estado de cada contagem, pelos eventos ─────────────────────────────────────────────────────────────────────────────
 def test_o_contrato_dos_estados():
     assert L.ESTADOS == ("nova", "revisada", "recontagem_pedida", "substituida", "gravando", "gravada",
-                         "gravada_com_conflitos")
+                         "gravada_com_conflitos", "cancelada")         # a cancelada pelo PCM, 16/11/2026
 
 
 def test_estados_pelos_eventos(app, inv):
@@ -177,6 +177,34 @@ def test_a_recontagem_pedida_nao_substitui_as_boas(app, inv):
     por = _por_id(app)
     assert (por["C-BOA"]["estado"], por["C-RECUSADA"]["estado"]) == ("nova", "recontagem_pedida")
     assert por["C-BOA"]["aprovavel"]
+
+
+def test_a_contagem_cancelada_e_morta_e_a_de_antes_volta(app, inv):
+    """O "Cancelar contagem" (16/11/2026, o PCM: "colocar um botão no inventário de cancelar auditoria"): o técnico manda de novo
+    o inventário que já tinha feito, e a repetida, a mais nova, tirava a de antes do caminho (substituída). Cancelada pelo PCM,
+    ela é morta como a recusada: não se aprova, não substitui ninguém, e a de antes volta a valer."""
+    _publicar(inv,
+              _linha("C-DE-ANTES", "L1", "501", "3", contada=_iso(dias_atras=2)),
+              _linha("C-REPETIDA", "L1", "501", "3", contada=_iso(dias_atras=1)))
+    assert _por_id(app)["C-DE-ANTES"]["estado"] == "substituida"
+    _gravar(app, _ev("C-REPETIDA", "contagem_cancelada"))
+    por = _por_id(app)
+    assert (por["C-DE-ANTES"]["estado"], por["C-REPETIDA"]["estado"]) == ("nova", "cancelada")
+    assert por["C-DE-ANTES"]["aprovavel"] and not por["C-REPETIDA"]["aprovavel"]
+    assert por["C-REPETIDA"]["motivo_nao_aprovavel"] == "cancelada pelo PCM"
+    assert L.estado_dos_eventos([{"tipo": "contagem_cancelada"}]) == "cancelada" and "cancelada" in L.MORTAS
+
+
+def test_a_contagem_cancelada_nao_atende_pedido_de_recontagem(app, inv):
+    """O pedido de recontagem da 501 na C-1 só é atendido por uma contagem que serve: a C-2, que a contou depois, foi cancelada
+    pelo PCM, e o pedido segue esperando o técnico (como com a recusada)."""
+    _publicar(inv,
+              _linha("C-1", "L1", "501", "3", contada=_iso(dias_atras=2)),
+              _linha("C-2", "L1", "501", "6", contada=_iso(horas=2)))
+    _gravar(app, _ev("C-1", "recontagem_item_pedida", 501, quando=_iso(dias_atras=1), codigo="SP-501"),
+            _ev("C-2", "contagem_cancelada", quando=_iso(horas=1)))
+    r = L.recontagens(app.config)
+    assert [p["contagem_id"] for p in r["esperando"]] == ["C-1"] and r["atendidas"] == []
 
 
 @pytest.mark.parametrize("quebrada", [
