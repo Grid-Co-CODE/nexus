@@ -816,7 +816,7 @@ a.ins-titulo:hover{color:var(--verde-texto)}
 .ia-tab th{padding:6px 10px 6px 0;text-align:left;font:600 11px/14px var(--font-sans);color:var(--mudo);white-space:nowrap;
   border-bottom:1px solid var(--linha)}
 .ia-tab td{padding:7px 10px 7px 0;border-bottom:1px solid var(--linha);white-space:nowrap}
-.ia-tab .ia-tab-num{text-align:right;font-variant-numeric:tabular-nums}
+.ia-tab th.ia-tab-num,.ia-tab td.ia-tab-num{text-align:right;font-variant-numeric:tabular-nums}
 .ia-usina{color:var(--tinta);font-weight:600;text-decoration:underline;text-decoration-color:var(--linha-forte);text-underline-offset:3px}
 .ia-usina:hover{color:var(--verde-texto);text-decoration-color:var(--verde-texto)}
 .ia-csv{margin-left:auto}

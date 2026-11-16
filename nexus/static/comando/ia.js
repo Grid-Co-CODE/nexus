@@ -35,13 +35,16 @@
   // a tabela do Markdown ("| a | b |", a linha "|---|" e as linhas): a da carteira lista as usinas (16/11/2026)
   function celulas(l) { return l.replace(/^\|/, '').replace(/\|$/, '').split('|').map(function (c) { return c.trim(); }); }
   function tabela(cab, corpo) {
-    var num = /^[-−]?[\d.,]+\s*(%|h|d|dias|MWp|kWh|MWh)?$/;
-    return '<div class="ia-tab-rola"><table class="ia-tab"><thead><tr>' + cab.map(function (c) { return '<th>' + c + '</th>'; }).join('') +
+    // a coluna de número inteira à direita, com o cabeçalho: número (com %, h, d...), o "—" de sem dado e o "*" de nota
+    var num = /^[-−]?[\d.,]+\s*(%|h|d|dias|MWp|kWh|MWh)?\*?$/, vazio = /^(—|-|)$/;
+    var colNum = cab.map(function (_c, i) {
+      var vs = corpo.map(function (l) { return l[i] == null ? '' : l[i]; });
+      return vs.some(function (v) { return num.test(v); }) && vs.every(function (v) { return num.test(v) || vazio.test(v); });
+    });
+    var cl = function (i) { return colNum[i] ? ' class="ia-tab-num"' : ''; };
+    return '<div class="ia-tab-rola"><table class="ia-tab"><thead><tr>' + cab.map(function (c, i) { return '<th' + cl(i) + '>' + c + '</th>'; }).join('') +
       '</tr></thead><tbody>' + corpo.map(function (l) {
-        return '<tr>' + cab.map(function (_c, i) {
-          var v = l[i] == null ? '' : l[i];
-          return '<td' + (num.test(v) ? ' class="ia-tab-num"' : '') + '>' + v + '</td>';
-        }).join('') + '</tr>';
+        return '<tr>' + cab.map(function (_c, i) { return '<td' + cl(i) + '>' + (l[i] == null ? '' : l[i]) + '</td>'; }).join('') + '</tr>';
       }).join('') + '</tbody></table></div>';
   }
   // o mínimo de Markdown que as IAs escrevem: parágrafo, lista com "-" ou "*" ou "1.", tabela, **negrito** e *itálico*
