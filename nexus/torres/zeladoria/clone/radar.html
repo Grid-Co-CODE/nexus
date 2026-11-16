@@ -10021,9 +10021,14 @@ function finLegendaGrafHtml(itens){ return '<div class="fx-leg-graf" data-fin-le
 var FIN_LEG = { real: 'background:var(--fx-real)', aberto: 'background:var(--fx-aberto)', prov: 'background:repeating-linear-gradient(135deg,var(--warn) 0 3px,#F4D8A6 3px 6px)', sim: 'background:repeating-linear-gradient(135deg,var(--info) 0 3px,#D4D5F4 3px 6px)',
   meta: 'background:none;border-top:2px dashed var(--ink);height:0;width:16px;border-radius:0;vertical-align:3px' };
 var FIN_COR_P = '#7FC795';   /* primarizado lançado: verde claro (era cinza #6B6880, pedido do Analista 2026-11-06) */
+/* Mês já fechado (antes do mês atual): o previsto (realizado + a pagar + provisão) deixa de fazer sentido — o que
+   não foi pago virou "sobra" (não é mais um gasto por vir). Pedido pontual do Victor, 2026-11-16: no gráfico, a
+   barra do mês fechado mostra só o realizado; a sobra fica explicada embaixo, em "Composição do previsto"
+   (finSobraDetalheHtml), e não mais empilhada na barra como se ainda fosse acontecer. */
+function finMesFechado(m){ return m < finMesAtual(); }
 function finGraficoHtml(info){
   var u = finUi(), sim = !!u.cenarioId, atual = finMesAtual();
-  var max = Math.max.apply(null, info.map(function(i){ return Math.max(sim ? i.previstoSimulado : i.previsto, i.meta); })) * 1.12 || 1;
+  var max = Math.max.apply(null, info.map(function(i){ return Math.max(finMesFechado(i.mes) ? i.realizado : (sim ? i.previstoSimulado : i.previsto), i.meta); })) * 1.12 || 1;
   var W = finLarguraSvg(), H = 320, pl = 56, pr = 10, pt = 26, pb = 44, bw = (W - pl - pr) / info.length;
   function y(v){ return pt + (H - pt - pb) * (1 - v / max); }
   function hh(v){ return (H - pt - pb) * v / max; }
@@ -10031,11 +10036,12 @@ function finGraficoHtml(info){
     '<pattern id="fx-hs" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="6" height="6" fill="var(--info-soft)"/><rect width="2.5" height="6" fill="var(--info)"/></pattern></defs>';
   for (var k = 0; k <= 4; k++) { var vv = max / 4 * k; g += '<line x1="' + pl + '" x2="' + (W - pr) + '" y1="' + y(vv) + '" y2="' + y(vv) + '" style="stroke:var(--border)"/><text x="' + (pl - 8) + '" y="' + (y(vv) + 4) + '" text-anchor="end" font-size="11">' + finK(vv) + '</text>'; }
   info.forEach(function(i, ix){
-    var x = pl + ix * bw, bx = x + bw * 0.18, w = bw * 0.64, yy = y(0);
+    var x = pl + ix * bw, bx = x + bw * 0.18, w = bw * 0.64, yy = y(0), fechado = finMesFechado(i.mes);
     if (i.mes === u.mes) g += '<rect x="' + (x + 2) + '" y="' + (pt - 18) + '" width="' + (bw - 4) + '" height="' + (H - pt - pb + 18) + '" rx="8" style="fill:var(--accent-soft)"/>';
-    [[i.realizado, 'fill:var(--good)'], [i.aPagar, 'fill:var(--fx-aberto)'], [i.provisao, 'fill:url(#fx-hp)']].forEach(function(p){ if (p[0] > 0) { yy -= hh(p[0]); g += '<rect x="' + bx + '" y="' + yy + '" width="' + w + '" height="' + hh(p[0]) + '" style="' + p[1] + '"/>'; } });
-    if (sim && i.simulado > 0) { yy -= hh(i.simulado); g += '<rect x="' + bx + '" y="' + yy + '" width="' + w + '" height="' + hh(i.simulado) + '" style="fill:url(#fx-hs);stroke:var(--info)" stroke-dasharray="3 2"/>'; }
-    var top = sim ? i.previstoSimulado : i.previsto;
+    var partes = fechado ? [[i.realizado, 'fill:var(--good)']] : [[i.realizado, 'fill:var(--good)'], [i.aPagar, 'fill:var(--fx-aberto)'], [i.provisao, 'fill:url(#fx-hp)']];
+    partes.forEach(function(p){ if (p[0] > 0) { yy -= hh(p[0]); g += '<rect x="' + bx + '" y="' + yy + '" width="' + w + '" height="' + hh(p[0]) + '" style="' + p[1] + '"/>'; } });
+    if (!fechado && sim && i.simulado > 0) { yy -= hh(i.simulado); g += '<rect x="' + bx + '" y="' + yy + '" width="' + w + '" height="' + hh(i.simulado) + '" style="fill:url(#fx-hs);stroke:var(--info)" stroke-dasharray="3 2"/>'; }
+    var top = fechado ? i.realizado : (sim ? i.previstoSimulado : i.previsto);
     g += '<line data-fin-meta-linha="' + i.mes + '" x1="' + (x + bw * 0.08) + '" x2="' + (x + bw * 0.92) + '" y1="' + y(i.meta) + '" y2="' + y(i.meta) + '" style="stroke:var(--ink)" stroke-width="2" stroke-dasharray="5 3"/>';
     /* rótulo logo acima da barra; só quando a linha da meta passa perto do topo da barra (até 16px abaixo, ou acima
        a ponto de cruzar o próprio texto, ~22px = altura do rótulo + folga) ele sobe para cima da meta.
@@ -10044,12 +10050,13 @@ function finGraficoHtml(info){
     if (top > 0) g += '<text data-fin-rotulo-mes="' + i.mes + '" data-fin-topo="' + yTopo + '" data-fin-acima-meta="' + (metaPerto ? 1 : 0) + '" x="' + (x + bw / 2) + '" y="' + ((metaPerto ? Math.min(yTopo, yMeta) : yTopo) - 7) + '" text-anchor="middle" font-size="11.5" font-weight="700" style="fill:' + (top > i.meta ? 'var(--critical)' : 'var(--ink)') + ';paint-order:stroke;stroke:var(--surface);stroke-width:4px;stroke-linejoin:round">' + finK(top) + '</text>';
     g += '<text x="' + (x + bw / 2) + '" y="' + (H - pb + 18) + '" text-anchor="middle" font-size="11.5" font-weight="' + (i.mes === atual ? 700 : 500) + '"' + (i.mes === atual ? ' style="fill:var(--accent)"' : '') + '>' + finMesNome(i.mes).replace('/20', '/') + '</text>';
     if (i.mes === atual) g += '<text x="' + (x + bw / 2) + '" y="' + (H - pb + 32) + '" text-anchor="middle" font-size="9.5" font-weight="700" style="fill:var(--accent)">ATUAL</text>';
-    var tip = finMesNome(i.mes) + '\nRealizado ' + finR0(i.realizado) + '\nLançado a pagar ' + finR0(i.aPagar) + '\nProvisão a alinhar ' + finR0(i.provisao) + '\nPrevisto ' + finR0(i.previsto) + (sim ? '\n+ Simulado ' + finR0(i.simulado) + '\nPrevisto + simulado ' + finR0(i.previstoSimulado) : '') + '\nMeta ' + finR0(i.meta);
+    var tip = fechado ? finMesNome(i.mes) + ' · mês fechado\nRealizado ' + finR0(i.realizado) + (r2(i.aPagar + i.provisao) > 0.5 ? '\nSobra (não usada, não conta mais como previsto) ' + finR0(r2(i.aPagar + i.provisao)) : '') + '\nMeta ' + finR0(i.meta)
+      : finMesNome(i.mes) + '\nRealizado ' + finR0(i.realizado) + '\nLançado a pagar ' + finR0(i.aPagar) + '\nProvisão a alinhar ' + finR0(i.provisao) + '\nPrevisto ' + finR0(i.previsto) + (sim ? '\n+ Simulado ' + finR0(i.simulado) + '\nPrevisto + simulado ' + finR0(i.previstoSimulado) : '') + '\nMeta ' + finR0(i.meta);
     g += '<rect class="fx-hit" data-fin-mes="' + i.mes + '" x="' + x + '" y="' + (pt - 18) + '" width="' + bw + '" height="' + (H - pt - pb + 18) + '" fill="transparent"><title>' + esc(tip) + '</title></rect>';
   });
   return '<div class="fx-card"><h3>Mês a mês <small>' + ({ G: 'Geral', T: 'Terceirizados', P: 'Primarizados' })[u.escopo] + (sim ? ' · com simulação' : '') + '</small></h3>' +
     finLegendaGrafHtml([[FIN_LEG.real, 'Realizado (pago)'], [FIN_LEG.aberto, 'Lançado a pagar'], [FIN_LEG.prov, 'Provisão · alinhar financeiro']].concat(sim ? [[FIN_LEG.sim, 'Simulado']] : []).concat([[FIN_LEG.meta, 'Meta do mês'], ['background:var(--accent-soft)', 'Mês selecionado']])) +
-    '<p class="fx-hint">Altura da barra = <b>previsto</b> (realizado + lançado a pagar + provisão). Número em cima = previsto do mês (vermelho = acima da meta). Clique num mês para ver o detalhe.</p>' +
+    '<p class="fx-hint">Altura da barra = <b>previsto</b> (realizado + lançado a pagar + provisão); num mês já fechado é só o <b>realizado</b> — o que sobrou de lançado a pagar/provisão virou "sobra" e aparece explicado em "Composição do previsto" (abaixo). Número em cima (vermelho = acima da meta). Clique num mês para ver o detalhe.</p>' +
     '<svg viewBox="0 0 ' + W + ' ' + H + '" width="100%" data-fin-grafico="1" style="display:block;margin-top:8px;max-height:' + (H + 20) + 'px;">' + g + '</svg></div>';
 }
 /* Composição do previsto: mês selecionado ou média mensal dos meses visíveis a partir do mês atual. */
@@ -10094,31 +10101,54 @@ function finPrimProvisaoHtml(meses, media){
   if (r.semLigar > 0.5) h += '<div class="fx-hint" data-fin-prim-sem-ligar="1" style="margin-top:4px;">' + finR0(r.semLigar) + ' lançados ainda sem ligar a uma provisão: até ligar (Lançar no financeiro), contam junto com o que sobrou da provisão.</div>';
   return h + '</div>';
 }
+/* Detalha a "Sobra" de um mês fechado (o que ficou lançado a pagar ou provisionado e nunca foi pago) — pedido
+   pontual do Victor, 2026-11-16, pra não precisar abrir o "Exportar relatório" só pra ver isso. */
+function finSobraDetalheHtml(mes, sobraValor){
+  if (!(sobraValor > 0.5)) return '<p class="fx-hint" style="margin-top:10px;">Não sobrou saldo — todo o previsto de ' + finMesNome(mes) + ' foi realizado.</p>';
+  var ctx = finCtx(), itemPorId = {}; (state.finItens || []).forEach(function(it){ itemPorId[it.id] = it; });
+  var itens = ctx.lanc.filter(function(l){ return l.mes === mes && !l.pago && l.via !== 'Thopen'; }).map(function(l){
+    return { nome: finNomeFornecedor(l.fornecedorId, l.fornecedorNome, l.tipo) + (l.usina ? ' (' + l.usina + ')' : ''), valor: l.valor, txt: 'lançado a pagar e não pago' };
+  }).concat(finProvisoesAtivas().filter(function(pv){ return pv.mes === mes && pv.via !== 'Thopen' && finSaldoProvisao(pv) > 0.5; }).map(function(pv){
+    var it = itemPorId[pv.itemId] || {};
+    return { nome: (it.descricao || pv.itemId) + ' — ' + finNomeFornecedor(pv.fornecedorId, pv.fornecedorNome, pv.tipo, pv.fornecedorADefinir), valor: finSaldoProvisao(pv), txt: FIN_REL_STATUS_PROV[finStatusProvisao(pv)] || finStatusProvisao(pv) };
+  })).sort(function(a, b){ return b.valor - a.valor; });
+  return '<div class="fx-hint" style="margin-top:10px;"><b>Sobra de ' + finMesNome(mes) + ' (não conta mais como previsto): ' + finR0(sobraValor) + '</b> — ficou disso:' +
+    '<ul style="margin:4px 0 0;padding-left:18px;">' + itens.map(function(x){ return '<li>' + esc(x.nome) + ' — ' + finR0(x.valor) + ' (' + esc(x.txt) + ')</li>'; }).join('') + '</ul>' +
+    '<div style="margin-top:4px;">Use o botão "Explicar pro Financeiro" pra gerar o texto pronto com esse detalhe.</div></div>';
+}
 function finComposicaoHtml(info, meses){
-  var u = finUi(), atual = finMesAtual(), cen = !!u.cenarioId;
-  var base = u.base === 'media' ? info.filter(function(i){ return i.mes >= atual; }) : info.filter(function(i){ return i.mes === u.mes; });
+  var u = finUi(), atual = finMesAtual(), cen = !!u.cenarioId, mediaModo = u.base === 'media';
+  var base = mediaModo ? info.filter(function(i){ return i.mes >= atual; }) : info.filter(function(i){ return i.mes === u.mes; });
   if (!base.length) base = info.filter(function(i){ return i.mes === u.mes; });
-  var n = base.length || 1, F = {}, meta = 0, T = 0, P = 0, V = 0, S = 0;
+  /* mês já fechado: "previsto" não existe mais — só o que foi realizado conta; o resto (a pagar + provisão que não
+     foi usada) vira "Sobra", explicada em finSobraDetalheHtml (pedido pontual do Victor, 2026-11-16). A "média
+     mensal à frente" nunca cai aqui, porque já filtra só mês >= atual. */
+  var fechado = !mediaModo && base.length === 1 && finMesFechado(base[0].mes);
+  var n = base.length || 1, F = {}, meta = 0, T = 0, P = 0, V = 0, S = 0, Sobra = 0;
   base.forEach(function(i){
-    meta += i.meta / n; T += (i.porTipo.T.realizado + i.porTipo.T.aPagar) / n; P += (i.porTipo.P.realizado + i.porTipo.P.aPagar) / n; V += i.provisao / n; S += i.simulado / n;
+    meta += i.meta / n;
+    if (fechado) { T += i.porTipo.T.realizado / n; P += i.porTipo.P.realizado / n; Sobra += (i.aPagar + i.provisao) / n; }
+    else { T += (i.porTipo.T.realizado + i.porTipo.T.aPagar) / n; P += (i.porTipo.P.realizado + i.porTipo.P.aPagar) / n; V += i.provisao / n; }
+    S += i.simulado / n;
     i.linhas.forEach(function(L){
       var o = F[L.chave] || (F[L.chave] = { nome: L.nome, tipo: L.tipo, lanc: 0, prov: 0, sim: 0, servicos: [] });
       o.lanc += (L.realizado + L.aPagar) / n; o.prov += L.provisao / n; o.sim += L.simulado / n;
       L.servicos.forEach(function(s){ if (o.servicos.indexOf(s) === -1) o.servicos.push(s); });
     });
   });
-  var CAT = [{ k: 'T', n: 'Terceirizados · lançado', s: 'pago + a pagar (PCM)', cor: 'var(--good)', v: T }, { k: 'P', n: 'Primarizados · lançado', s: 'equipes próprias (Equipe)', cor: FIN_COR_P, v: P }, { k: 'V', n: 'Provisão · alinhar financeiro', s: 'decidido, fora do PCM', cor: 'var(--warn)', v: V }];
-  if (cen) CAT.push({ k: 'S', n: 'Simulado', s: (finCenariosAtivos().find(function(c){ return c.id === u.cenarioId; }) || {}).nome || '', cor: 'var(--info)', v: S });
-  var prev = T + P + V, tot = prev + (cen ? S : 0), escala = Math.max(tot, meta) || 1, alvo = cen ? tot : prev;
-  function hatch(k){ return k === 'V' ? 'background-image:repeating-linear-gradient(135deg,var(--warn) 0 6px,var(--warn) 6px 12px);' : k === 'S' ? 'background-image:repeating-linear-gradient(135deg,var(--info) 0 6px,var(--info) 6px 12px);' : ''; }
-  var sub = (u.base === 'media' && base.length > 1 ? 'média de ' + finMesNome(base[0].mes) + ' a ' + finMesNome(base[base.length - 1].mes) : finMesNome(base[0].mes)) + ' · previsto ' + finR0(prev) + '/mês' + (cen ? ' · + simulado ' + finR0(S) : '');
+  var CAT = fechado
+    ? [{ k: 'T', n: 'Terceirizados · realizado', s: 'pago (PCM)', cor: 'var(--good)', v: T }, { k: 'P', n: 'Primarizados · realizado', s: 'pago (equipes próprias)', cor: FIN_COR_P, v: P }].concat(Sobra > 0.5 ? [{ k: 'X', n: 'Sobra · não utilizada', s: 'ficou lançado/provisionado e não foi pago', cor: 'var(--ink-muted)', v: Sobra }] : [])
+    : [{ k: 'T', n: 'Terceirizados · lançado', s: 'pago + a pagar (PCM)', cor: 'var(--good)', v: T }, { k: 'P', n: 'Primarizados · lançado', s: 'equipes próprias (Equipe)', cor: FIN_COR_P, v: P }, { k: 'V', n: 'Provisão · alinhar financeiro', s: 'decidido, fora do PCM', cor: 'var(--warn)', v: V }].concat(cen ? [{ k: 'S', n: 'Simulado', s: (finCenariosAtivos().find(function(c){ return c.id === u.cenarioId; }) || {}).nome || '', cor: 'var(--info)', v: S }] : []);
+  var prev = fechado ? r2(T + P) : r2(T + P + V), tot = fechado ? r2(prev + Sobra) : r2(prev + (cen ? S : 0)), escala = Math.max(tot, meta) || 1, alvo = fechado ? prev : (cen ? tot : prev);
+  function hatch(k){ return k === 'V' ? 'background-image:repeating-linear-gradient(135deg,var(--warn) 0 6px,var(--warn) 6px 12px);' : k === 'S' ? 'background-image:repeating-linear-gradient(135deg,var(--info) 0 6px,var(--info) 6px 12px);' : k === 'X' ? 'background-image:repeating-linear-gradient(135deg,var(--ink-muted) 0 6px,var(--border) 6px 12px);' : ''; }
+  var sub = (mediaModo && base.length > 1 ? 'média de ' + finMesNome(base[0].mes) + ' a ' + finMesNome(base[base.length - 1].mes) : finMesNome(base[0].mes)) + (fechado ? ' · mês fechado · realizado ' + finR0(prev) + '/mês' : ' · previsto ' + finR0(prev) + '/mês') + (cen && !fechado ? ' · + simulado ' + finR0(S) : '');
   var h = '<div class="fx-card"><div class="fx-top"><h3>Composição do previsto <small>' + sub + '</small></h3>' +
     '<div class="fx-ctl"><span class="fx-lbl">Base</span><div class="fx-seg"><button type="button" class="' + (u.base !== 'media' ? 'on' : '') + '" data-fin-base="mes">Mês selecionado</button><button type="button" class="' + (u.base === 'media' ? 'on' : '') + '" data-fin-base="media">Média mensal à frente</button></div></div></div>';
   h += '<div class="fx-comp"><div><div class="fx-cat-wrap"><div class="fx-cat-bar">' + CAT.filter(function(c){ return c.v > 0; }).map(function(c){ var w = c.v / escala * 100; return '<div style="width:' + w + '%;background:' + c.cor + ';' + hatch(c.k) + (c.k === 'P' ? 'color:#173B22;' : '') + '" title="' + esc(c.n) + ': ' + finR0(c.v) + '/mês">' + (w >= 17 ? '<b>' + esc(c.n.split(' ·')[0]) + '</b><span>' + finR0(c.v) + '</span>' : '') + '</div>'; }).join('') + '</div>' +
     '<div class="fx-cat-meta" style="left:' + (meta / escala * 100) + '%"><i>Meta ' + finR0(meta) + '</i></div>' +
     '<div class="fx-cat-over" style="color:' + (alvo > meta ? 'var(--critical)' : 'var(--good)') + '">' + (alvo > meta ? '+' + finR0(alvo - meta) + ' acima da meta' : finR0(meta - alvo) + ' abaixo da meta') + '</div></div>';
   h += '<div class="fx-cat-cards">' + CAT.map(function(c){ return '<div style="--c:' + c.cor + '"><small>' + esc(c.n) + '</small><b class="num">' + finR0(c.v) + '</b><em>' + (meta ? Math.round(c.v / meta * 100) : 0) + '% da meta · ' + esc(c.s) + '</em></div>'; }).join('') + '</div>' +
-    (u.escopo !== 'T' ? finPrimProvisaoHtml(base.map(function(i){ return i.mes; }), u.base === 'media' && base.length > 1) : '') + '</div>';
+    (u.escopo !== 'T' ? finPrimProvisaoHtml(base.map(function(i){ return i.mes; }), mediaModo && base.length > 1) : '') + (fechado ? finSobraDetalheHtml(base[0].mes, Sobra) : '') + '</div>';
   var rows = Object.keys(F).map(function(k){ var o = F[k]; o.t = o.lanc + o.prov + o.sim; return o; }).filter(function(o){ return o.t > 0.5; }).sort(function(a, b){ return b.t - a.t; });
   var mx = rows.length ? rows[0].t : 1;
   h += '<div>' + finLegendaGrafHtml([['background:var(--good)', 'Terceirizado lançado'], ['background:' + FIN_COR_P, 'Primarizado lançado'], [FIN_LEG.prov, 'Provisão']].concat(cen ? [[FIN_LEG.sim, 'Simulado']] : [])) + '<div class="fx-rk h"><span>Fornecedor / frente</span><span></span><span style="text-align:right">R$/mês</span><span style="text-align:right">% meta</span></div><div class="fx-rk-lista">' +
@@ -11142,7 +11172,7 @@ function finExplicarTexto(R){
   L.push('Em ' + R.mesFechadoNome + ', o previsto era ' + M(R.fech.previsto) + ' (meta ' + M(R.fech.meta) + ').');
   L.push('Fechamos com ' + M(R.fech.realizado) + ' realmente pago — ' + pago + '% do previsto.');
   if (R.saldo > 0.5) {
-    L.push('Ficou um saldo de ' + M(R.saldo) + ' que não foi usado dentro do mês:');
+    L.push('Ficou uma sobra de ' + M(R.saldo) + ' que não foi usada dentro do mês (não conta mais como previsto):');
     if (R.fech.aPagar > 0.5) L.push('  - ' + M(R.fech.aPagar) + ' já estava lançado para pagar e ainda não foi pago.');
     if (R.fech.provisao > 0.5) L.push('  - ' + M(R.fech.provisao) + ' estava provisionado e não chegou a ser lançado no financeiro.');
     if (R.aPagarLista.length) {
@@ -11155,7 +11185,7 @@ function finExplicarTexto(R){
       R.abertos.slice(0, 15).forEach(function(x){ L.push('    · ' + x.item + ' — ' + x.fornecedor + ' — ' + M(x.saldo) + ' (' + x.status + ')'); });
       if (R.abertos.length > 15) L.push('    · … e mais ' + (R.abertos.length - 15) + ' (ver "Exportar relatório")');
     }
-    L.push('Esse saldo continua contando no previsto até alguém pagar, lançar, alinhar ou cancelar essas provisões/parcelas.');
+    L.push('Essa sobra some do gráfico e da composição do mês assim que alguém pagar, lançar, alinhar ou cancelar essas provisões/parcelas; até lá, ainda aparece somada no "previsto" da tabela mensal e do relatório completo.');
   } else {
     L.push('Não sobrou saldo — todo o previsto de ' + R.mesFechadoNome + ' foi pago.');
   }
