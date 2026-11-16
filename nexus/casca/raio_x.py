@@ -162,6 +162,9 @@ def _maquina(s0, s1, v0: dict, v1: dict, janela_s: float):
             "livre_gb": _decimal(mem.get("MemAvailable", 0) / gb), "total_gb": _decimal(mem["MemTotal"] / gb),
             # a barra da memória na aba Agora (16/11/2026): quanto da máquina está tomado
             "usada_pct": round(100.0 * max(0, mem["MemTotal"] - mem.get("MemAvailable", 0)) / mem["MemTotal"]),
+            # o total da aba Memória (16/11/2026, Levi: "na parte de memória eu senti falta do total de memória")
+            "usada_gb": _decimal(max(0, mem["MemTotal"] - mem.get("MemAvailable", 0)) / gb),
+            "swap_total_gb": _decimal(swap_total / gb),
             "tem_swap": swap_total > 0, "swap_gb": _decimal(max(0, swap_total - mem.get("SwapFree", 0)) / gb),
             "trocando_mb_s": _troca_mb_s(v0, v1, janela_s),
             "nexus_mb": round(eu.get("VmRSS", 0) / 1024), "nexus_swap_mb": round(eu.get("VmSwap", 0) / 1024),
@@ -420,8 +423,10 @@ def _quem_ocupa(teto: int = 6):
                      "processos": g["n"]} for p, g in grupos.items()),
                    key=lambda x: (-(x["mem_mb"] + x["swap_mb"]), x["programa"]))
     resto = lista[teto:]
+    # a linha do total da tabela (16/11/2026): todos os programas, os da lista e os outros
     return {"programas": lista[:teto], "outros": len(resto), "outros_mem_mb": sum(x["mem_mb"] for x in resto),
-            "outros_swap_mb": sum(x["swap_mb"] for x in resto)}
+            "outros_swap_mb": sum(x["swap_mb"] for x in resto), "total_mem_mb": sum(x["mem_mb"] for x in lista),
+            "total_swap_mb": sum(x["swap_mb"] for x in lista), "total_processos": sum(x["processos"] for x in lista)}
 
 
 def _processador(janela_s: float = 1.0) -> dict:

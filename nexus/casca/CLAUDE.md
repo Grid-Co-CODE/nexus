@@ -372,6 +372,11 @@ OS Creator, que roda DENTRO do processo do Nexus (a ponte, sem proxy).
     (crítico/alerta só nos dois sinais acima; o resto em neutro, a cor é do estado), a carga 1/5/15 min em barras contra os
     núcleos e a memória da máquina numa barra (`_maquina` → `usada_pct`). As frases de antes ficam embaixo de cada número
     (os testes as conferem: mudou a frase, muda o teste);
+  - **Memória**: no alto, **o total da máquina** (16/11/2026, Levi: "na parte de memória eu senti falta do total de
+    memória"): Total, Em uso (o total menos o disponível, `_maquina` → `usada_gb`/`usada_pct`), Livres, Swap em uso (de
+    `swap_total_gb`) e o Nexus, com a barra do total; na tabela dos programas, a linha **Todos os programas** (os da lista e
+    os outros, `_quem_ocupa` → `total_mem_mb`/`total_swap_mb`/`total_processos`). A soma dos programas não fecha com o
+    "Em uso" da máquina (o kernel e o cache não são programa; a compartilhada conta uma vez por programa);
   - **Uso do OS Creator**: os números grandes dos 7 dias e as 24 horas em colunas (o pico por minuto contra a cota, com a
     cor e a palavra da hora na cota); a tabela das 24 horas fica fechada em "Ver as 24 horas em tabela". Nesta seção, o
     único `style` aceito é `width:N%` ou `height:N%` (`test_sem_cor_fixa`);

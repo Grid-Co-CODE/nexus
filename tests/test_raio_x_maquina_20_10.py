@@ -35,6 +35,8 @@ def test_le_o_processador_o_disco_e_a_memoria_da_maquina(monkeypatch):
     assert (m["ocupado"], m["disco"]) == (30, 40)
     assert (m["livre_gb"], m["total_gb"], m["swap_gb"], m["tem_swap"]) == ("0,4", "3,8", "1,2", True)
     assert (m["nexus_mb"], m["nexus_swap_mb"]) == (650, 100)
+    # o total da aba Memória (16/11/2026): o em uso é o total menos o disponível, e o swap total
+    assert m["usada_gb"] == "3,4" and m["usada_pct"] == round(100 * 3.4 / 3.8) and m["swap_total_gb"]
     assert (m["pressao_mem"], m["pressao_io"]) == (12.5, 30.1)
 
 
@@ -66,6 +68,10 @@ def test_a_pagina_mostra_a_memoria_e_a_espera_do_disco(app, logado, monkeypatch)
     assert "swap 1,2 GB em uso, trocando 3,0 MB/s agora" in h and "o Nexus usa 650 MB, 100 MB dele no swap" in h
     assert "processador da máquina 30%, esperando o disco 40%" in h
     assert "esperando memória 12,5% e disco 30,1% do tempo" in h
+    # a aba Memória com o total da máquina no alto e a linha de todos os programas
+    mem = h[h.index('data-rx-painel="memoria"'):h.index('data-rx-painel="pedidos"')]
+    assert "Memória da máquina, no total" in mem and ">3,8 GB</p>" in mem and ">3,4 GB</p>" in mem
+    assert ">0,4 GB</p>" in mem and ">1,2 GB</p>" in mem and "Sem leitura de memória aqui" not in mem
 
 
 def test_a_pagina_sem_o_linux_fica_como_era(app, logado, monkeypatch):

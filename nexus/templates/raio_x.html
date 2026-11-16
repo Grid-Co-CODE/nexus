@@ -90,6 +90,25 @@
 
 {# ── Memória ───────────────────────────────────────────────────────────────────────────────────────────────────── #}
 <div class="rx-painel" data-rx-painel="memoria"{% if aba != 'memoria' %} hidden{% endif %}>
+{# o total da máquina no alto (16/11/2026, Levi: "na parte de memória eu senti falta do total de memória"): o total, o em
+   uso, o livre e o swap, e a barra do total com o em uso; só no Linux (o /proc) #}
+{% set m = cpu.maquina %}
+{% if m and m.usada_gb is defined %}
+<section class="cad-secao rx-total">
+  <h2>Memória da máquina, no total</h2>
+  <div class="rx-kpis">
+    <div><p class="rx-tile-r">Total</p><p class="rx-grande gc-num">{{ m.total_gb }} GB</p></div>
+    <div><p class="rx-tile-r">Em uso</p><p class="rx-grande gc-num">{{ m.usada_gb }} GB</p><p class="rx-de">{{ m.usada_pct }}% do total</p></div>
+    <div><p class="rx-tile-r">Livres</p><p class="rx-grande gc-num">{{ m.livre_gb }} GB</p></div>
+    <div><p class="rx-tile-r">Swap em uso</p>{% if m.tem_swap %}<p class="rx-grande gc-num">{{ m.swap_gb }} GB</p><p class="rx-de">de {{ m.swap_total_gb }} GB{% if m.trocando_mb_s != "0" %}; <span class="rx-tom--alerta">trocando {{ m.trocando_mb_s }} MB/s agora</span>{% endif %}</p>{% else %}<p class="rx-grande gc-num">—</p><p class="rx-de">sem swap</p>{% endif %}</div>
+    <div><p class="rx-tile-r">O Nexus</p><p class="rx-grande gc-num">{{ m.nexus_mb }} MB</p>{% if m.nexus_swap_mb %}<p class="rx-de">e {{ m.nexus_swap_mb }} MB no swap</p>{% endif %}</div>
+  </div>
+  <div class="rx-total-barra">
+    <span class="rx-barra rx-barra--larga rx-barra--mem" aria-hidden="true"><i style="width:{{ m.usada_pct }}%"></i></span>
+    <p class="rx-de"><span class="rx-legenda"><i class="rx-pilha-mem"></i>em uso {{ m.usada_gb }} GB</span><span class="rx-legenda"><i class="rx-legenda-livre"></i>livres {{ m.livre_gb }} GB</span>de {{ m.total_gb }} GB</p>
+  </div>
+</section>
+{% endif %}
 {% if quem %}{% set lista = quem.anterior if quem.atrasado else quem %}
 <section class="cad-secao">
   <h2>Quem ocupa a memória da máquina</h2>
@@ -102,6 +121,8 @@
         <td class="rx-col-barra"><span class="rx-pilha" aria-hidden="true"><i class="rx-pilha-mem" style="width:{{ (p.mem_mb * 100 / maior)|round|int if maior else 0 }}%"></i><i class="rx-pilha-swap" style="width:{{ (p.swap_mb * 100 / maior)|round|int if maior else 0 }}%"></i></span></td>
         <td class="gc-num">{{ p.mem_mb }} MB</td><td class="gc-num">{{ p.swap_mb }} MB</td><td class="gc-num">{{ p.processos }}</td></tr>
     {% endfor %}</tbody>
+    {% if lista.total_mem_mb is defined %}<tfoot><tr class="rx-total-linha"><th scope="row">Todos os programas{% if lista.outros %} (com os {{ lista.outros }} outros){% endif %}</th><td class="rx-col-barra"></td>
+      <td class="gc-num">{{ lista.total_mem_mb }} MB</td><td class="gc-num">{{ lista.total_swap_mb }} MB</td><td class="gc-num">{{ lista.total_processos }}</td></tr></tfoot>{% endif %}
   </table></div>
   <p class="cad-pe"><span class="rx-legenda"><i class="rx-pilha-mem"></i>memória</span> <span class="rx-legenda"><i class="rx-pilha-swap"></i>no swap</span> {% if lista.outros %}E mais {{ lista.outros }} programa{{ "s" if lista.outros != 1 }}: {{ lista.outros_mem_mb }} MB de memória, {{ lista.outros_swap_mb }} MB no swap. {% endif %}A memória de cada programa é a própria de cada processo, somada, mais a compartilhada uma vez só (os buffers do banco aparecem em todo processo dele).</p>
   {% endif %}
@@ -135,7 +156,7 @@
 {% if nexus %}{{ dentro(nexus, "Dentro do Nexus", "Nexus", "Estimado por amostra pelo próprio Nexus a cada 10 min (casca/memoria_nexus.py): as variáveis dos módulos dele e do OS Creator, e as extensões do app.", prazo_memoria) }}{% endif %}
 {% if worker %}{{ dentro(worker, "Dentro do worker da plataforma", "worker", "Estimado por amostra pelo próprio worker a cada 10 min (o faxineiro dele, no PerformancePainel).", prazo_memoria) }}{% endif %}
 {% if web %}{{ dentro(web, "Dentro do web da plataforma", "web", "Estimado por amostra pelo próprio web a cada 10 min (no PerformancePainel); o web não descarta cache nenhum, só devolve a memória livre.", prazo_memoria) }}{% endif %}
-{% if not quem and not nexus and not worker and not web %}<p class="cad-vazio">Sem leitura de memória aqui: ela vem do /proc do Linux e dos relatórios do servidor.</p>{% endif %}
+{% if not quem and not nexus and not worker and not web and not (m and m.usada_gb is defined) %}<p class="cad-vazio">Sem leitura de memória aqui: ela vem do /proc do Linux e dos relatórios do servidor.</p>{% endif %}
 </div>
 
 {# ── Pedidos e tarefas ─────────────────────────────────────────────────────────────────────────────────────────── #}

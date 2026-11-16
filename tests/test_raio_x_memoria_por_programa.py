@@ -59,6 +59,9 @@ def test_soma_por_programa_com_a_memoria_compartilhada_uma_vez_so(monkeypatch):
         ("postgres", 300 + 400, 30, 3),            # a memória própria somada; os buffers compartilhados, uma vez só
         ("gnome-shell", 200, 300, 1)]
     assert (q["outros"], q["outros_mem_mb"], q["outros_swap_mb"]) == (4, 80 + 30 + 40 + 60, 5)
+    # o total da tabela (16/11/2026): os da lista e os outros
+    assert (q["total_mem_mb"], q["total_swap_mb"]) == (900 + 600 + 700 + 200 + 210, 1200 + 160 + 30 + 300 + 5)
+    assert q["total_processos"] == sum(p["processos"] for p in q["programas"]) + 4
 
 
 def test_a_linha_de_comando_nao_aparece(monkeypatch):
