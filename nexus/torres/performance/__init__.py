@@ -227,6 +227,7 @@ from . import clima_tela  # noqa: E402,F401
 from . import mapa_tela  # noqa: E402,F401
 from . import coletas_tela  # noqa: E402,F401
 from . import furos_tela  # noqa: E402,F401
+from . import sala_tela  # noqa: E402,F401
 
 
 # ── Quadro da equipe (04/11/2026) ───────────────────────────────────────────────────────────────────────────────────

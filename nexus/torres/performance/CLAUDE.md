@@ -19,3 +19,9 @@ real no menu. A fonte do tempo real na lateral, o que falta acompanhar na frente
 estação. Nesta 1ª entrega ela só lê. A tela, as regras do dono e as próximas entregas estão na plataforma:
 `docs/sala-de-controle.md` e `plataforma/CLAUDE.md` (seção "Sala de controle da Performance"). O mapa da porta única passou
 a 17 telas (assinatura `db2b2cf9380d2b67`, nos dois lados). Quem a vê: marcar em Base → Acessos, como as outras.
+
+**A Sala de controle lê o "abaixo dos demais" daqui** (16/11/2026, entrega 3 dela): `GET /t/performance/sala-de-controle/abaixo?mes=`
+(`sala_tela.py`) devolve o mesmo resultado do mural da Coletas (`servico.furos_mural`, só com os BDs do banco), para a
+tela da plataforma mostrar sem refazer a conta. Abre para quem tem a tela "Sala de controle" (o caminho fica debaixo
+dela), sem depender de ter a Coletas; o resultado fica no mesmo cofre do mural. Prova: `tests/test_coletas.py`
+(`test_a_sala_de_controle_le_o_abaixo_dos_demais_daqui`).

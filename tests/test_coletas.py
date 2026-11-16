@@ -611,3 +611,19 @@ def test_a_recoleta_pela_api_pv_fica_desligada_no_nexus(coletas):
     assert '<button class="btn2" id="rcAbrir" hidden>' in html
     for m in ("recoleta_opcoes", "recoleta_fatias", "recoleta_parte", "recoleta_montar"):
         assert coletas.post("/t/performance/coletas/api/" + m, json={"args": []}).status_code == 404
+
+
+def test_a_sala_de_controle_le_o_abaixo_dos_demais_daqui(coletas, app):
+    """A Sala de controle da Performance (a tela é da plataforma) lê o "abaixo dos demais" do dono da conta: a mesma do
+    mural da Coletas, só com os BDs do banco. Abre para quem tem a tela dela, sem depender de ter a Coletas (16/11/2026)."""
+    from nexus.auth import setor_telas
+    servico._MURAL.clear()
+    r = coletas.get("/t/performance/sala-de-controle/abaixo?mes=2026-10")
+    assert r.status_code == 200
+    d = r.get_json()
+    assert "linhas" in d and d["ini"] == "2026-10-01" and d["limiar"] == servico._mural.LIMIAR
+    assert coletas.get("/t/performance/sala-de-controle/abaixo?mes=x").status_code == 400
+    with app.test_request_context():
+        assert setor_telas.pode("/t/performance/sala-de-controle/abaixo", {"performance/sala-de-controle"})
+        assert not setor_telas.pode("/t/performance/sala-de-controle/abaixo", {"performance/coletas"})
+    servico._MURAL.clear()
