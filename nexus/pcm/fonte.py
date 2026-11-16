@@ -117,6 +117,43 @@ def ler_gestao(config) -> Leitura:
     return _ler(config, "NEXUS_PCM_GESTAO_FONTE", URL_GESTAO, _validar_gestao)
 
 
+_POR_TRAS: set[str] = set()          # as fontes que uma leitura por trás já está baixando
+
+
+def ler_gestao_sem_esperar(config) -> Leitura | None:
+    """A cópia do gestao_pcm.json que já está na memória, mesmo vencida, sem esperar o GitHub: se ela venceu ou não existe,
+    a leitura de sempre (`ler_gestao`) roda por trás, e a próxima conta pega a nova. None = ainda não há cópia (logo
+    depois de o Nexus subir). Arquivo local (os testes, o PC com a fonte num arquivo) lê na hora.
+
+    16/11/2026, a tela do Levi ("doidera"): o Comando › Usinas preso 37 s em `_baixar`, logo depois de uma publicação. Cada
+    publicação reinicia o Nexus e esvazia as cópias; a Visão do responsável completava a APR do dia das PT com este arquivo
+    (14,9 MB, até 30 s do GitHub) e a página inteira esperava por um detalhe da lista de PT."""
+    fonte = str(config.get("NEXUS_PCM_GESTAO_FONTE") or os.environ.get("NEXUS_PCM_GESTAO_FONTE") or URL_GESTAO)
+    if not fonte.startswith(("http://", "https://")) or config.get("TESTING"):
+        return ler_gestao(config)
+    em_cache = _cache.get(fonte)
+    if em_cache and time.monotonic() - em_cache[0] < TTL_S:
+        return ler_gestao(config)                    # dentro do prazo: sai na hora, sem rede
+    with _trava:
+        ja = fonte in _POR_TRAS
+        _POR_TRAS.add(fonte)
+    if not ja:
+        from flask import current_app
+        app = current_app._get_current_object()
+
+        def baixar():
+            try:
+                with app.app_context():
+                    ler_gestao(app.config)
+            except Exception:                        # noqa: BLE001 — a próxima conta tenta de novo
+                pass
+            finally:
+                with _trava:
+                    _POR_TRAS.discard(fonte)
+        threading.Thread(target=baixar, daemon=True, name="pcm-gestao-por-tras").start()
+    return Leitura(em_cache[1], fonte, baixado_em=em_cache[2], velha=True) if em_cache else None
+
+
 def ler_mpas(config) -> Leitura:
     return _ler(config, "NEXUS_PCM_MPAS_FONTE", URL_MPAS, _validar_mpas)
 

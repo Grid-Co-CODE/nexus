@@ -1533,10 +1533,12 @@ def _completar_apr_dia(pts) -> None:
         return
     try:
         from ..pcm import fonte as pcm_fonte
-        lg = pcm_fonte.ler_gestao(current_app.config)
+        # sem esperar o GitHub (16/11/2026: logo depois de uma publicação, o Comando › Usinas ficou 37 s preso baixando
+        # este arquivo de 14,9 MB): sem cópia ainda, a PT fica como o App mandou e a próxima conta (até 5 min) completa
+        lg = pcm_fonte.ler_gestao_sem_esperar(current_app.config)
     except Exception:       # noqa: BLE001 — sem as tarefas do Fracttal, a PT fica como o App mandou
         return
-    if lg.dados is None:
+    if lg is None or lg.dados is None:
         return
     versao = lg.dados.get("dataHash") or lg.dados.get("geradoEm") or id(lg.dados)
     if _APR_DIA_INDICE.get("versao") != versao:

@@ -122,3 +122,24 @@ def test_o_304_do_github_renova_a_copia_em_memoria(app, monkeypatch):
         assert len(baixados) == 2, baixados                # a 1ª baixa; a 2ª só pergunta e renova; as outras usam a cópia
     finally:
         fonte._cache.pop(URL_B, None)
+
+
+def test_a_tela_nao_espera_o_github_sem_copia(leitor, monkeypatch):
+    """16/11/2026 ("doidera"): logo depois de uma publicação, o Comando › Usinas ficou 37 s preso em `_baixar` (a APR do
+    dia das PT lia o gestao_pcm.json). Sem cópia, a leitura sem esperar volta None na hora e baixa por trás; a próxima
+    pega a cópia."""
+    app, solta, entrou, baixados = leitor
+    monkeypatch.setitem(app.config, "TESTING", False)
+    with app.test_request_context():
+        t0 = time.monotonic()
+        assert fonte.ler_gestao_sem_esperar(app.config) is None
+        assert time.monotonic() - t0 < 1                      # não esperou o download
+        assert entrou.wait(2)                                  # o download começou por trás
+        assert fonte.ler_gestao_sem_esperar(app.config) is None   # o segundo pedido não abre outro download
+        solta.set()
+        for _ in range(50):
+            if URL_A in fonte._cache:
+                break
+            time.sleep(0.05)
+        lg = fonte.ler_gestao_sem_esperar(app.config)
+        assert lg is not None and lg.dados["tarefas"] and baixados.count(URL_A) == 1
