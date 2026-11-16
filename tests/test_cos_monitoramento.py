@@ -372,3 +372,35 @@ def test_a_tela_filtra_enquanto_digita_com_a_mesma_regra(tela):
     assert r.returncode == 0, r.stderr
     import json
     assert json.loads(r.stdout) == [True, False, ["tres", "usinas"]]
+
+
+# --- o que o Monitoramento do COS lê, para a Sala de controle da Performance (16/11/2026) -----------------------------
+def test_a_sala_de_controle_le_a_lista_e_os_inversores_do_cos(ligada, logado, monkeypatch, app):
+    """Levi: "A lista de usinas do Monitoramento do COS [...] puxe a lista". A Sala (tela da plataforma) lê do Nexus, que
+    tem a chave da Ronda COS: as usinas do Monitoramento e os inversores de agora, para conferir a fonte dela contra o
+    logger. Abre para quem tem a tela da Sala, sem depender de ter o Monitoramento do COS."""
+    from nexus.auth import setor_telas
+    scada = {"versao": 1, "cartoes": [{"pid": "scada-exa", "pac_total_kw": 812.4, "situacao": {"chave": "GERANDO", "texto": "Gerando"},
+                                       "inversores": [{"id": "EXA01:1", "nome": "Inversor 1.1", "modbus_id": 1, "pac": 61.2, "estado": "ok",
+                                                       "veredito": "GERANDO", "mppts": [{"indice": 1, "strings": [{"corrente": 6.1}, {"corrente": 0}]}],
+                                                       "strings_sem_mppt": [{"corrente": 5.9}, {"corrente": None}]}]}]}
+    _servir(monkeypatch, {"/api/nexus/geracao": _geracao(), "/api/nexus/geracao/scada": scada})
+    r = logado.get("/t/performance/sala-de-controle/cos/usinas")
+    assert r.status_code == 200
+    us = r.get_json()["usinas"]
+    assert "Usina Exemplo Um" in [u["nome"] for u in us] and all("curva" not in u for u in us)
+    assert {u["fonte"] for u in us} <= {"SCADA Grid", "SunOP"} and all("kw" in u and "situacao" in u for u in us)
+    r = logado.get("/t/performance/sala-de-controle/cos/inversores")
+    assert r.status_code == 200
+    assert r.get_json()["cartoes"] == [{"pid": "scada-exa", "kw": 812.4, "situacao": "Gerando", "inversores": [
+        {"id": "EXA01:1", "nome": "Inversor 1.1", "modbus_id": 1, "kw": 61.2, "estado": "ok", "veredito": "GERANDO",
+         "strings": 4, "com_corrente": 2}]}]
+    with app.test_request_context():
+        assert setor_telas.pode("/t/performance/sala-de-controle/cos/usinas", {"performance/sala-de-controle"})
+        assert not setor_telas.pode("/t/performance/sala-de-controle/cos/usinas", {"cos/monitoramento"})
+
+
+def test_sem_a_ronda_cos_a_sala_recebe_o_motivo(logado):
+    r = logado.get("/t/performance/sala-de-controle/cos/usinas")
+    assert r.status_code == 503 and "não está ligada" in r.get_json()["erro"]
+    assert logado.get("/t/performance/sala-de-controle/cos/inversores").status_code == 503

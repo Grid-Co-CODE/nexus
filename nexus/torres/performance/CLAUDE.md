@@ -32,3 +32,10 @@ o põe no sino, por USINA ("3 strings em 2 inversores · 5 trackers"), só para 
 plataforma: vale a cópia de 2 min por pessoa, lida por trás; a falha é tentada de novo depois de 5 min. O número do sino
 soma as USINAS, não as strings. Some quando a pessoa abre o inversor (ou os trackers) na Sala. Prova:
 `tests/test_sala_novas_sino.py`.
+
+**A Sala de controle lê o que o Monitoramento do COS lê** (16/11/2026; Levi: "A lista de usinas do Monitoramento do COS
+[...] puxe a lista"): `GET /t/performance/sala-de-controle/cos/usinas` (as usinas do Monitoramento, pelo
+`andamento.ler_geracao` e o `cos.monitoramento._linha`) e `/cos/inversores` (os cartões do SCADA da Ronda COS enxutos, pelo
+`andamento.ler_ao_vivo`, 30 s de cópia), em `sala_tela.py`. É a chave do Andamento deste servidor que lê; a tela da
+plataforma só pede ao Nexus. Abre para quem tem a tela da Sala, sem depender de ter o Monitoramento do COS. Prova:
+`tests/test_cos_monitoramento.py` (os dois últimos testes).
