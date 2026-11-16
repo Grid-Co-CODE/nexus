@@ -223,7 +223,8 @@ p.cos-inv-mppt-cab{font-weight:600;letter-spacing:.04em;text-transform:uppercase
 .cos-rele-tab { width: 100%; border-collapse: collapse; margin: .2rem 0 .5rem; }
 .cos-rele-tab th, .cos-rele-tab td { padding: .22rem .5rem; text-align: left; }
 .cos-rele-tab th.n, .cos-rele-tab td.n { text-align: right; font-variant-numeric: tabular-nums; }
-.cos-rele-freq { margin: .2rem 0 .4rem; font-variant-numeric: tabular-nums; }
+.cos-rele-freq { margin: .2rem 0 .3rem; font-variant-numeric: tabular-nums; }
+.cos-rele-pot, .cos-rele-fp { margin: .2rem 0; font-variant-numeric: tabular-nums; opacity: .9; }
 .cos-rele-falta-h { margin: .5rem 0 .2rem; font-size: .9em; font-weight: 600; }
 .cos-rele-faltas-v { margin: 0; opacity: .85; font-variant-numeric: tabular-nums; }
 .cos-rele-disj { margin: .2rem 0 .4rem; font-variant-numeric: tabular-nums; }

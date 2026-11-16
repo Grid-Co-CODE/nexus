@@ -1083,8 +1083,10 @@
   // só quando há atuação. Só aparece se a usina tem relé. (potência: o URP6000 manda 0xFFFF aqui = sem
   // leitura, então foi removida.)
   function braw(v) { return v == null || isNaN(v) ? "—" : fmtKW.format(v); }
-  // tensao do rele em kV (o valor cru ja e primario, ~V): 14809 -> "14,81". O rele le ~6% acima do HMI (calibracao dele).
+  // tensao do rele em kV: o coletor ja manda V REAL (escala do perfil do modelo): 13883 -> "13,88".
   function releKv(v) { return v == null || isNaN(v) ? "—" : fmt2.format(v / 1000); }
+  // corrente (A) / cosphi — 2 casas; o coletor ja manda o valor real.
+  function releNum(v) { return v == null || isNaN(v) ? "—" : fmt2.format(v); }
   // Proteções do URP6000 (códigos ANSI) -> nome amigável, para a grade e os cards de trip.
   var RELE_FAMILIAS = [
     ["27", "Subtensão"], ["59", "Sobretensão"],
@@ -1100,9 +1102,8 @@
     var fase = { A: "fase A", B: "fase B", C: "fase C", N: "neutro", "0": "sequência zero" }[suf] || suf;
     return releNomeFamilia(fam) + (fase ? " · " + fase : "") + "  (" + code + ")";
   }
-  // cbStatus (holding 162) é uma PALAVRA DE STATUS; o disjuntor é o bit 4 (0x10): ligado = fechado.
-  // Lido como BIT (robusto a outros bits da palavra). ⚠ bit 4 inferido com a usina gerando — confirmar quando abrir.
-  function releDisjuntor(d) { return d == null || isNaN(d) ? "—" : (d & 16) ? "Fechado" : "Aberto"; }
+  // disjuntor: o servidor manda 1 (fechado) / 0 (aberto) / null (desconhecido) — ja interpretado do perfil.
+  function releDisjuntor(d) { return d === 1 ? "Fechado" : d === 0 ? "Aberto" : "—"; }
   // monta UM card de relé (uma cabine) e devolve as referências; atualizado em `atualizarUmRele`.
   function montarCardRele(rl, idx) {
     var br = bloco("Relé — " + (rl.cabine || ("Cabine " + (idx + 1))), "");
@@ -1127,6 +1128,8 @@
     });
     tm.appendChild(tbm); br.appendChild(tm);
     card.freq = document.createElement("p"); card.freq.className = "cos-rele-freq"; br.appendChild(card.freq);
+    card.pot = document.createElement("p"); card.pot.className = "cos-rele-pot"; br.appendChild(card.pot);
+    card.fp = document.createElement("p"); card.fp.className = "cos-rele-fp"; br.appendChild(card.fp);
     card.disj = document.createElement("p"); card.disj.className = "cos-rele-disj"; br.appendChild(card.disj);
     card.faltas = document.createElement("div"); card.faltas.className = "cos-rele-faltas"; br.appendChild(card.faltas);
     return card;
@@ -1153,14 +1156,24 @@
     escrever(card.det, "textContent", !r.responde ? "sem comunicação" : (r.mins_atras != null ? "lido há " + r.mins_atras + " min" : "ao vivo"));
     var m = r.medidas || {};
     ["A", "B", "C"].forEach(function (f) {
-      escrever(card.med["i" + f], "textContent", braw(m["i" + f]));
+      escrever(card.med["i" + f], "textContent", releNum(m["i" + f]));
       escrever(card.med["v" + f], "textContent", releKv(m["v" + f]));
     });
-    escrever(card.freq, "textContent", "Frequência: " + (m.freq == null || isNaN(m.freq) ? "—" : fmt2.format(m.freq) + " Hz"));
+    var temp = (m.temp == null || isNaN(m.temp)) ? "" : "   ·   Temperatura: " + fmt2.format(m.temp) + " °C";
+    escrever(card.freq, "textContent", "Frequência: " + (m.freq == null || isNaN(m.freq) ? "—" : fmt2.format(m.freq) + " Hz") + temp);
+    // Potência e fator de potência por fase — só aparecem quando o relé entrega (modelo que não dá: linha some).
+    var temPot = [m.pA, m.pB, m.pC].some(function (x) { return x != null && !isNaN(x); });
+    escrever(card.pot, "textContent", !temPot ? "" : ("Potência: A " + braw(m.pA) + " · B " + braw(m.pB) + " · C " + braw(m.pC) + " kW" +
+      (m.pTot == null || isNaN(m.pTot) ? "" : "   (total " + braw(m.pTot) + ")")));
+    card.pot.style.display = temPot ? "" : "none";
+    var temFp = [m.cosA, m.cosB, m.cosC].some(function (x) { return x != null && !isNaN(x); });
+    escrever(card.fp, "textContent", !temFp ? "" : ("Fator de potência: A " + releNum(m.cosA) + " · B " + releNum(m.cosB) + " · C " + releNum(m.cosC)));
+    card.fp.style.display = temFp ? "" : "none";
     escrever(card.disj, "textContent", "Disjuntor: " + releDisjuntor(r.disjuntor));
     var ff = r.faltas || {};
     var chavesF = ["ifA", "ifB", "ifC", "ifN", "vfA", "vfB", "vfC"];
-    var temFalta = trips.length > 0 || chavesF.some(function (k) { return ff[k]; });
+    var temDadoFalta = chavesF.some(function (k) { return ff[k] != null; });
+    var temFalta = temDadoFalta && (trips.length > 0 || chavesF.some(function (k) { return ff[k]; }));
     var sigF = (temFalta ? 1 : 0) + "|" + chavesF.map(function (k) { return ff[k]; }).join(",");
     if (card.faltas._sig !== sigF) {
       card.faltas._sig = sigF; card.faltas.textContent = "";
