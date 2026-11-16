@@ -2,52 +2,130 @@
 {% block titulo %}Raio-X do Nexus{% endblock %}
 {% block conteudo %}
 {# O Raio-X (14/10/2026, Levi: "O nexus está muito lento, carregando bem devagar"): o que o processo faz agora. Só
-   administrador, fora do menu. Regra e porquê em nexus/casca/raio_x.py. #}
+   administrador, fora do menu. Regra e porquê em nexus/casca/raio_x.py.
+   16/11/2026, Levi: "vamos elegantizar a parte de raio-x [...] como a gente separa por categoria, deixou várias abinhas
+   ali dentro da página [...] deixa bem visual [...] bem cara de televisão": a faixa do parecer no alto (`raio_x.parecer`),
+   as abas (`raio_x.ABAS`, ?aba=; o raio-x.js troca sem recarregar) e a aba Agora em anéis e barras. Tela cheia e
+   "Atualizar sozinho" para deixar numa TV. As frases dos números são as de antes (os testes as conferem). #}
 <link rel="stylesheet" href="{{ url_for('static', filename='cadastro.css') }}">
-<p class="gc-eyebrow">Base · Raio-X</p>
-<h1 class="titulo-pagina">Raio-X do Nexus</h1>
-<p class="cad-sub">O que este processo está fazendo agora ({{ quando }}). <a href="{{ url_for('torre_base.raio_x') }}">Ler de novo</a> · <a href="#uso-os-creator">Uso do OS Creator</a> · <a href="#canto-central">Canto central</a></p>
-
-<div class="cad-numeros">
-  <div><div class="r">Pedidos em andamento</div><div class="v gc-num">{{ pedidos|length }}{% if threads %} de {{ threads }}{% endif %}</div><div class="d">{% if threads and pedidos|length >= threads %}todas as threads ocupadas: a fila espera{% else %}threads do waitress{% endif %}</div></div>
-  <div><div class="r">Processador do Nexus</div><div class="v gc-num">{{ cpu.pct }}%</div><div class="d">em 1 s; 100% = um núcleo inteiro{% if cpu.nucleos %} (a máquina tem {{ cpu.nucleos }}){% endif %}</div></div>
-  {% if teto %}<div><div class="r">OS Creator</div><div class="v gc-num">{{ teto.em_uso }} de {{ teto.teto }}</div><div class="d">threads em uso agora; {{ teto.recusados }} pedido{{ "s" if teto.recusados != 1 }} voltou{{ "aram" if teto.recusados != 1 }} "ocupado"{% if teto.ultimo_txt %} (o último às {{ teto.ultimo_txt }}){% endif %}</div></div>{% endif %}
-  {% set m = cpu.maquina %}
-  <div><div class="r">Carga da máquina</div><div class="v gc-num">{{ cpu.carga|join(" · ") if cpu.carga else "—" }}</div><div class="d">1, 5 e 15 min{% if not cpu.carga %} (só no Linux){% endif %}{% if m %}; agora: processador da máquina {{ m.ocupado }}%, esperando o disco {{ m.disco }}%{% endif %}</div></div>
-  {% if m %}<div><div class="r">Memória da máquina</div><div class="v gc-num">{{ m.livre_gb }} GB livres</div><div class="d">de {{ m.total_gb }} GB; {% if m.tem_swap %}swap {{ m.swap_gb }} GB em uso{% if m.trocando_mb_s != "0" %}, trocando {{ m.trocando_mb_s }} MB/s agora{% endif %}{% else %}sem swap{% endif %}; o Nexus usa {{ m.nexus_mb }} MB{% if m.nexus_swap_mb %}, {{ m.nexus_swap_mb }} MB dele no swap{% endif %}{% if m.pressao_mem is not none and m.pressao_io is not none %}; algo parado esperando memória {{ "%.1f"|format(m.pressao_mem)|replace(".", ",") }}% e disco {{ "%.1f"|format(m.pressao_io)|replace(".", ",") }}% do tempo (10 s){% endif %}{% set tt = m.teto %}{% if tt %}. <b>Teto do Nexus</b>{% if tt.max_mb is none and tt.high_mb is none %}: nenhum{% else %}:{% if tt.high_mb is not none %} aperta acima de {{ tt.high_mb }} MB{% endif %}{% if tt.max_mb is not none %}{% if tt.high_mb is not none %},{% endif %} máximo {{ tt.max_mb }} MB{% endif %}{% endif %}{% if tt.swap_max_mb is not none %}, swap até {{ tt.swap_max_mb }} MB{% endif %} ({% if tt.conteiner %}contêiner, {% endif %}grupo {{ tt.onde }}){% if tt.apertos %}; o Linux apertou o Nexus {{ tt.apertos }} vezes{% endif %}{% if tt.no_teto %}, {{ tt.no_teto }} no máximo{% endif %}{% if tt.oom %}, {{ tt.oom }} encerrado por falta de memória{% endif %}{% endif %}{% set td = m.teto_deploy %}{% if td %}; o deploy conferiu em {{ td.hora }}: {{ td.texto }}{% endif %}</div></div>{% endif %}
+<div class="rx" data-rx>
+<div class="rx-topo">
+  <div>
+    <p class="gc-eyebrow">Base · Raio-X</p>
+    <h1 class="titulo-pagina">Raio-X do Nexus</h1>
+    <p class="cad-sub">O que este processo está fazendo agora ({{ quando }}). <a href="{{ url_for('torre_base.raio_x', aba=aba) }}" data-rx-ler>Ler de novo</a></p>
+  </div>
+  <div class="rx-acoes">
+    <label class="rx-sozinho" title="Lê a página de novo a cada 30 segundos, na mesma aba"><input type="checkbox" id="rx-sozinho" data-rx-sozinho> Atualizar sozinho (30 s)</label>
+    <button type="button" class="gc-btn gc-btn--ui gc-btn--contorno" data-rx-cheia><i class="ph ph-corners-out" aria-hidden="true"></i> Tela cheia</button>
+  </div>
 </div>
 
-{% if travamentos %}<div class="cad-aviso cad-aviso--{{ 'critico' if travamentos.classe == 'critico' else ('alerta' if travamentos.classe == 'alerta' else 'ok') }}"><i class="ph ph-clock-countdown"></i><div><strong>{{ travamentos.rotulo }}.</strong> {{ travamentos.detalhe }}{% if travamentos.titulo %}<br><span class="mudo">{{ travamentos.titulo }}</span>{% endif %}</div></div>{% endif %}
-{% if not ligado %}<div class="cad-aviso cad-aviso--info"><i class="ph ph-info"></i><div>O registro dos pedidos só liga no servidor (servir.py): aqui não há pedidos para mostrar.</div></div>{% endif %}
+{# o parecer: o estado numa palavra, na cor dele, e os motivos; severidade sempre com a palavra, nunca só a cor #}
+<div class="rx-parecer rx-parecer--{{ parecer.tom }}" role="status">
+  <span class="rx-parecer-luz" aria-hidden="true"></span>
+  <div>
+    <p class="rx-parecer-t">{{ parecer.titulo }}</p>
+    {% if parecer.itens %}<ul class="rx-parecer-itens">{% for tom, texto in parecer.itens %}<li class="rx-tom--{{ tom }}">{{ texto }}</li>{% endfor %}</ul>
+    {% else %}<p class="rx-parecer-d">Nenhuma fila nas threads, nenhum pedido preso em 24 h, o OS Creator abaixo do teto e a máquina sem trocar com o swap.</p>{% endif %}
+  </div>
+</div>
 
+<nav class="gc-subabas rx-abas" aria-label="Partes do Raio-X">
+  {% for id, nome in abas %}
+  <a href="?aba={{ id }}{% if id == 'uso' %}#uso-os-creator{% endif %}" data-rx-aba="{{ id }}"{% if id == aba %} aria-current="page"{% endif %}>{{ nome }}{% if id == 'pedidos' %} <span class="rx-conta gc-num">{{ pedidos|length }}</span>{% endif %}</a>
+  {% endfor %}
+</nav>
+
+{% macro anel(pct, tom="") %}<svg class="rx-anel" viewBox="0 0 36 36" aria-hidden="true"><circle class="rx-anel-fundo" cx="18" cy="18" r="15.9155"/><circle class="rx-anel-valor{% if tom %} rx-anel--{{ tom }}{% endif %}" cx="18" cy="18" r="15.9155" pathLength="100" stroke-dasharray="{{ [[pct, 0]|max, 100]|min }} 100"/></svg>{% endmacro %}
+
+{# ── Agora ─────────────────────────────────────────────────────────────────────────────────────────────────────── #}
+<div class="rx-painel" data-rx-painel="agora"{% if aba != 'agora' %} hidden{% endif %}>
+  {% set m = cpu.maquina %}
+  <div class="rx-tiles">
+    {% set cheio = threads and pedidos|length >= threads %}
+    <article class="rx-tile">
+      <p class="rx-tile-r">Pedidos em andamento</p>
+      <div class="rx-tile-anel">{{ anel(((pedidos|length) * 100 / threads)|round|int if threads else 0, 'critico' if cheio else '') }}
+        <p class="rx-tile-centro"><span class="rx-grande gc-num{% if cheio %} rx-tom--critico{% endif %}">{{ pedidos|length }}</span>{% if threads %}<span class="rx-de">de {{ threads }}</span>{% endif %}</p></div>
+      <p class="rx-tile-d">{% if cheio %}todas as threads ocupadas: a fila espera{% else %}threads do waitress{% endif %}</p>
+    </article>
+    <article class="rx-tile">
+      <p class="rx-tile-r">Processador do Nexus</p>
+      <div class="rx-tile-anel">{{ anel(cpu.pct) }}
+        <p class="rx-tile-centro"><span class="rx-grande gc-num">{{ cpu.pct }}%</span></p></div>
+      <p class="rx-tile-d">em 1 s; 100% = um núcleo inteiro{% if cpu.nucleos %} (a máquina tem {{ cpu.nucleos }}){% endif %}</p>
+    </article>
+    {% if teto %}{% set no_teto = teto.teto and teto.em_uso >= teto.teto %}
+    <article class="rx-tile">
+      <p class="rx-tile-r">OS Creator</p>
+      <div class="rx-tile-anel">{{ anel((teto.em_uso * 100 / teto.teto)|round|int if teto.teto else 0, 'alerta' if no_teto else '') }}
+        <p class="rx-tile-centro"><span class="rx-grande gc-num{% if no_teto %} rx-tom--alerta{% endif %}">{{ teto.em_uso }}</span><span class="rx-de">de {{ teto.teto }}</span></p></div>
+      <p class="rx-tile-d">threads em uso agora; {{ teto.recusados }} pedido{{ "s" if teto.recusados != 1 }} voltou{{ "aram" if teto.recusados != 1 }} "ocupado"{% if teto.ultimo_txt %} (o último às {{ teto.ultimo_txt }}){% endif %}</p>
+    </article>
+    {% endif %}
+    <article class="rx-tile rx-tile--largo">
+      <p class="rx-tile-r">Carga da máquina</p>
+      {% if cpu.carga %}
+      <div class="rx-cargas">{% for c in cpu.carga %}<div class="rx-carga"><span class="rx-media gc-num">{{ "%.2f"|format(c)|replace(".", ",") }}</span><span class="rx-barra rx-barra--larga" aria-hidden="true"><i style="width:{{ [(c * 100 / (cpu.nucleos or 1))|round|int, 100]|min }}%"></i></span><span class="rx-de">{{ ("1 min", "5 min", "15 min")[loop.index0] }}</span></div>{% endfor %}</div>
+      {% else %}<p class="rx-grande gc-num">—</p>{% endif %}
+      <p class="rx-tile-d">1, 5 e 15 min{% if not cpu.carga %} (só no Linux){% endif %}{% if cpu.nucleos and cpu.carga %}; a barra cheia é a carga de {{ cpu.nucleos }} (um por núcleo){% endif %}{% if m %}; agora: processador da máquina {{ m.ocupado }}%, esperando o disco {{ m.disco }}%{% endif %}</p>
+      {% if m %}<div class="rx-duas">
+        <div><span class="rx-de">Processador da máquina</span><span class="rx-barra rx-barra--larga" aria-hidden="true"><i style="width:{{ [m.ocupado, 100]|min }}%"></i></span><span class="rx-media gc-num">{{ m.ocupado }}%</span></div>
+        <div><span class="rx-de">Esperando o disco</span><span class="rx-barra rx-barra--larga" aria-hidden="true"><i style="width:{{ [m.disco, 100]|min }}%"></i></span><span class="rx-media gc-num">{{ m.disco }}%</span></div>
+      </div>{% endif %}
+    </article>
+    {% if m %}
+    <article class="rx-tile rx-tile--largo">
+      <p class="rx-tile-r">Memória da máquina</p>
+      <p class="rx-mem"><span class="rx-grande gc-num">{{ m.livre_gb }} GB</span> <span class="rx-de">livres de {{ m.total_gb }} GB</span></p>
+      {% if m.usada_pct is defined %}<span class="rx-barra rx-barra--larga rx-barra--mem" aria-hidden="true"><i style="width:{{ m.usada_pct }}%"></i></span>{% endif %}
+      <p class="rx-tile-d">de {{ m.total_gb }} GB; {% if m.tem_swap %}swap {{ m.swap_gb }} GB em uso{% if m.trocando_mb_s != "0" %}, trocando {{ m.trocando_mb_s }} MB/s agora{% endif %}{% else %}sem swap{% endif %}; o Nexus usa {{ m.nexus_mb }} MB{% if m.nexus_swap_mb %}, {{ m.nexus_swap_mb }} MB dele no swap{% endif %}{% if m.pressao_mem is not none and m.pressao_io is not none %}; algo parado esperando memória {{ "%.1f"|format(m.pressao_mem)|replace(".", ",") }}% e disco {{ "%.1f"|format(m.pressao_io)|replace(".", ",") }}% do tempo (10 s){% endif %}{% set tt = m.teto %}{% if tt %}. <b>Teto do Nexus</b>{% if tt.max_mb is none and tt.high_mb is none %}: nenhum{% else %}:{% if tt.high_mb is not none %} aperta acima de {{ tt.high_mb }} MB{% endif %}{% if tt.max_mb is not none %}{% if tt.high_mb is not none %},{% endif %} máximo {{ tt.max_mb }} MB{% endif %}{% endif %}{% if tt.swap_max_mb is not none %}, swap até {{ tt.swap_max_mb }} MB{% endif %} ({% if tt.conteiner %}contêiner, {% endif %}grupo {{ tt.onde }}){% if tt.apertos %}; o Linux apertou o Nexus {{ tt.apertos }} vezes{% endif %}{% if tt.no_teto %}, {{ tt.no_teto }} no máximo{% endif %}{% if tt.oom %}, {{ tt.oom }} encerrado por falta de memória{% endif %}{% endif %}{% set td = m.teto_deploy %}{% if td %}; o deploy conferiu em {{ td.hora }}: {{ td.texto }}{% endif %}</p>
+    </article>
+    {% endif %}
+  </div>
+  {% if travamentos %}<div class="cad-aviso cad-aviso--{{ 'critico' if travamentos.classe == 'critico' else ('alerta' if travamentos.classe == 'alerta' else 'ok') }}"><i class="ph ph-clock-countdown"></i><div><strong>{{ travamentos.rotulo }}.</strong> {{ travamentos.detalhe }}{% if travamentos.titulo %}<br><span class="mudo">{{ travamentos.titulo }}</span>{% endif %}</div></div>{% endif %}
+  {% if not ligado %}<div class="cad-aviso cad-aviso--info"><i class="ph ph-info"></i><div>O registro dos pedidos só liga no servidor (servir.py): aqui não há pedidos para mostrar.</div></div>{% endif %}
+</div>
+
+{# ── Memória ───────────────────────────────────────────────────────────────────────────────────────────────────── #}
+<div class="rx-painel" data-rx-painel="memoria"{% if aba != 'memoria' %} hidden{% endif %}>
 {% if quem %}{% set lista = quem.anterior if quem.atrasado else quem %}
 <section class="cad-secao">
   <h2>Quem ocupa a memória da máquina</h2>
   {% if quem.atrasado %}<p class="cad-pe">O /proc não respondeu em {{ "%g"|format(prazo_memoria) }} s: a máquina está esperando o disco (o swap). {% if lista %}Abaixo, a lista das {{ quem.anterior_quando }}.{% else %}Leia de novo em instantes.{% endif %}</p>{% endif %}
-  {% if lista %}
-  <div class="cad-rolagem cad-rolagem--secao"><table class="cad-tabela">
-    <thead><tr><th>Programa</th><th>Memória</th><th>No swap</th><th>Processos</th></tr></thead>
+  {% if lista %}{% set maior = lista.programas|map(attribute='mem_mb')|max + lista.programas|map(attribute='swap_mb')|max if lista.programas else 0 %}
+  <div class="cad-rolagem cad-rolagem--secao"><table class="cad-tabela rx-tabela">
+    <thead><tr><th>Programa</th><th class="rx-col-barra">Memória e swap</th><th>Memória</th><th>No swap</th><th>Processos</th></tr></thead>
     <tbody>{% for p in lista.programas %}
-      <tr><td><span class="gc-dado">{{ p.programa }}</span></td><td class="gc-num">{{ p.mem_mb }} MB</td><td class="gc-num">{{ p.swap_mb }} MB</td><td class="gc-num">{{ p.processos }}</td></tr>
+      <tr><td><span class="gc-dado">{{ p.programa }}</span></td>
+        <td class="rx-col-barra"><span class="rx-pilha" aria-hidden="true"><i class="rx-pilha-mem" style="width:{{ (p.mem_mb * 100 / maior)|round|int if maior else 0 }}%"></i><i class="rx-pilha-swap" style="width:{{ (p.swap_mb * 100 / maior)|round|int if maior else 0 }}%"></i></span></td>
+        <td class="gc-num">{{ p.mem_mb }} MB</td><td class="gc-num">{{ p.swap_mb }} MB</td><td class="gc-num">{{ p.processos }}</td></tr>
     {% endfor %}</tbody>
   </table></div>
-  <p class="cad-pe">{% if lista.outros %}E mais {{ lista.outros }} programa{{ "s" if lista.outros != 1 }}: {{ lista.outros_mem_mb }} MB de memória, {{ lista.outros_swap_mb }} MB no swap. {% endif %}A memória de cada programa é a própria de cada processo, somada, mais a compartilhada uma vez só (os buffers do banco aparecem em todo processo dele).</p>
+  <p class="cad-pe"><span class="rx-legenda"><i class="rx-pilha-mem"></i>memória</span> <span class="rx-legenda"><i class="rx-pilha-swap"></i>no swap</span> {% if lista.outros %}E mais {{ lista.outros }} programa{{ "s" if lista.outros != 1 }}: {{ lista.outros_mem_mb }} MB de memória, {{ lista.outros_swap_mb }} MB no swap. {% endif %}A memória de cada programa é a própria de cada processo, somada, mais a compartilhada uma vez só (os buffers do banco aparecem em todo processo dele).</p>
   {% endif %}
 </section>
 {% endif %}
 
 {# Dentro de um processo da plataforma de Performance: o worker (20/10/2026) e o web (21/10/2026), cada um com o relatório
-   que ele mesmo grava a cada 10 min (PerformancePainel); `quem` = "worker" ou "web" #}
+   que ele mesmo grava a cada 10 min (PerformancePainel); `quem` = "worker" ou "web". A barra de cada variável é agora e
+   1 h antes, na mesma escala: a que cresce é a que está enchendo a máquina #}
 {% macro dentro(rel, titulo, quem, origem, prazo) %}{% set w = rel.anterior if rel.atrasado else rel %}
 <section class="cad-secao">
   <h2>{{ titulo }}</h2>
   {% if rel.atrasado %}<p class="cad-pe">O relatório do {{ quem }} não respondeu em {{ "%g"|format(prazo) }} s.{% if w %} Abaixo, o lido às {{ rel.anterior_quando }}.{% endif %}</p>{% endif %}
   {% if w %}
-  <p class="cad-pe">Relatório das {{ w.quando }} (há {{ w.idade_min }} min): o {{ quem }} ocupa {{ w.rss_mb }} MB{% if w.swap_mb %} e {{ w.swap_mb }} MB no swap{% endif %}{% if w.antes_quando %}; às {{ w.antes_quando }}, {{ w.rss_antes_mb }} MB{% if w.swap_antes_mb %} e {{ w.swap_antes_mb }} MB no swap{% endif %}{% endif %}.{% if w.velho %} <strong>O {{ quem }} não anota há {{ w.idade_min }} min (anota a cada 10): pode estar parado.</strong>{% endif %}</p>
-  <div class="cad-rolagem cad-rolagem--secao"><table class="cad-tabela">
-    <thead><tr><th>Variável</th><th>Agora</th><th>{% if w.antes_quando %}Às {{ w.antes_quando }}{% else %}1 h antes{% endif %}</th><th>Itens</th></tr></thead>
+  <p class="cad-pe">Relatório das {{ w.quando }} (há {{ w.idade_min }} min): o {{ quem }} ocupa {{ w.rss_mb }} MB{% if w.swap_mb %} e {{ w.swap_mb }} MB no swap{% endif %}{% if w.antes_quando %}; às {{ w.antes_quando }}, {{ w.rss_antes_mb }} MB{% if w.swap_antes_mb %} e {{ w.swap_antes_mb }} MB no swap{% endif %}{% endif %}.{% if w.velho %} <strong class="rx-tom--alerta">O {{ quem }} não anota há {{ w.idade_min }} min (anota a cada 10): pode estar parado.</strong>{% endif %}</p>
+  {% set agora_max = w.caches|map(attribute='mb')|max if w.caches else 0 %}
+  {% set antes_max = w.caches|rejectattr('antes_mb', 'none')|map(attribute='antes_mb')|max if w.caches|rejectattr('antes_mb', 'none')|list else 0 %}
+  {% set escala = [agora_max or 0, antes_max or 0]|max %}
+  <div class="cad-rolagem cad-rolagem--secao"><table class="cad-tabela rx-tabela">
+    <thead><tr><th>Variável</th><th class="rx-col-barra">Agora e antes</th><th>Agora</th><th>{% if w.antes_quando %}Às {{ w.antes_quando }}{% else %}1 h antes{% endif %}</th><th>Itens</th></tr></thead>
     <tbody>{% for c in w.caches %}
-      <tr><td><span class="gc-dado">{{ c.nome }}</span></td><td class="gc-num">{{ c.mb|round|int }} MB</td><td class="gc-num">{% if c.antes_mb is not none %}{{ c.antes_mb|round|int }} MB{% else %}—{% endif %}</td><td class="gc-num">{{ c.itens if c.itens is defined and c.itens is not none else "—" }}</td></tr>
+      <tr><td><span class="gc-dado">{{ c.nome }}</span></td>
+        <td class="rx-col-barra"><span class="rx-par" aria-hidden="true"><span class="rx-barra rx-barra--larga"><i style="width:{{ (c.mb * 100 / escala)|round|int if escala else 0 }}%"></i></span>{% if c.antes_mb is not none %}<span class="rx-barra rx-barra--larga rx-barra--antes"><i style="width:{{ (c.antes_mb * 100 / escala)|round|int if escala else 0 }}%"></i></span>{% endif %}</span></td>
+        <td class="gc-num">{{ c.mb|round|int }} MB</td><td class="gc-num">{% if c.antes_mb is not none %}{{ c.antes_mb|round|int }} MB{% else %}—{% endif %}</td><td class="gc-num">{{ c.itens if c.itens is defined and c.itens is not none else "—" }}</td></tr>
     {% endfor %}</tbody>
   </table></div>
   <p class="cad-pe">{{ origem }} A variável que cresce de uma coluna para a outra é a que está enchendo a máquina.{% if w.parcial %} Este relatório parou no teto de tempo: faltam variáveis.{% endif %}</p>
@@ -57,43 +135,79 @@
 {% if nexus %}{{ dentro(nexus, "Dentro do Nexus", "Nexus", "Estimado por amostra pelo próprio Nexus a cada 10 min (casca/memoria_nexus.py): as variáveis dos módulos dele e do OS Creator, e as extensões do app.", prazo_memoria) }}{% endif %}
 {% if worker %}{{ dentro(worker, "Dentro do worker da plataforma", "worker", "Estimado por amostra pelo próprio worker a cada 10 min (o faxineiro dele, no PerformancePainel).", prazo_memoria) }}{% endif %}
 {% if web %}{{ dentro(web, "Dentro do web da plataforma", "web", "Estimado por amostra pelo próprio web a cada 10 min (no PerformancePainel); o web não descarta cache nenhum, só devolve a memória livre.", prazo_memoria) }}{% endif %}
+{% if not quem and not nexus and not worker and not web %}<p class="cad-vazio">Sem leitura de memória aqui: ela vem do /proc do Linux e dos relatórios do servidor.</p>{% endif %}
+</div>
 
+{# ── Pedidos e tarefas ─────────────────────────────────────────────────────────────────────────────────────────── #}
+<div class="rx-painel" data-rx-painel="pedidos"{% if aba != 'pedidos' %} hidden{% endif %}>
 <section class="cad-secao">
   <h2>Pedidos em andamento, do mais antigo</h2>
   {% if threads_atrasado %}<p class="cad-pe">A lista de threads não respondeu em {{ "%g"|format(prazo_memoria) }} s: a máquina está esperando o disco (o swap).{% if threads_quando %} Abaixo, a das {{ threads_quando }} (os tempos são daquela hora).{% else %} Ainda não há uma lista anterior.{% endif %}</p>{% endif %}
   {% if pedidos %}
-  <div class="cad-rolagem cad-rolagem--secao"><table class="cad-tabela">
-    <thead><tr><th>Há</th><th>Pedido</th><th>Onde está</th><th>Esperando</th></tr></thead>
-    <tbody>{% for p in pedidos %}
-      <tr><td class="gc-num">{{ p.ha }}</td><td><span class="gc-dado">{{ p.metodo }} {{ p.caminho }}</span></td><td>{{ p.quem }}<br><span class="mudo">{{ p.onde }}</span></td><td>{{ p.como }}</td></tr>
-    {% endfor %}</tbody>
-  </table></div>
+  <ul class="rx-fila">{% for p in pedidos %}
+    <li><span class="rx-ha gc-num">{{ p.ha }}</span>
+      <div class="rx-fila-o"><p class="rx-fila-t"><span class="gc-dado">{{ p.metodo }} {{ p.caminho }}</span></p>
+        <p class="rx-fila-d">{{ p.quem }}<br><span class="mudo">{{ p.onde }}</span></p></div>
+      <span class="rx-fila-como">{{ p.como }}</span></li>
+  {% endfor %}</ul>
   {% else %}<p class="cad-vazio">Nenhum pedido em andamento além deste.</p>{% endif %}
 </section>
 
 <section class="cad-secao">
   <h2>Tarefas de fundo</h2>
   {% if outras %}
-  <div class="cad-rolagem cad-rolagem--secao"><table class="cad-tabela">
-    <thead><tr><th>Tarefa</th><th>Onde está</th><th>Fazendo</th></tr></thead>
-    <tbody>{% for t in outras %}
-      <tr><td><span class="gc-dado">{{ t.nome }}</span></td><td>{{ t.quem }}<br><span class="mudo">{{ t.onde }}</span></td><td>{{ t.como }}</td></tr>
-    {% endfor %}</tbody>
-  </table></div>
+  <ul class="rx-fila">{% for t in outras %}
+    <li><span class="rx-ha rx-ha--tarefa" aria-hidden="true"><i class="ph ph-gear-six"></i></span>
+      <div class="rx-fila-o"><p class="rx-fila-t"><span class="gc-dado">{{ t.nome }}</span></p>
+        <p class="rx-fila-d">{{ t.quem }}<br><span class="mudo">{{ t.onde }}</span></p></div>
+      <span class="rx-fila-como">{{ t.como }}</span></li>
+  {% endfor %}</ul>
   {% else %}<p class="cad-vazio">Nenhuma tarefa de fundo agora.</p>{% endif %}
 </section>
+</div>
 
+{# ── Uso do OS Creator ─────────────────────────────────────────────────────────────────────────────────────────── #}
 {# O uso do OS Creator nos últimos 7 dias (31/10/2026, etapa 0 do canto central do OS Creator): o antes e o depois de cada
    mudança e os horários de pico de verdade. A conta e o porquê estão em nexus/casca/raio_x.py (`montar_uso_os`). #}
 {% macro n(x) %}{{ "{:,}".format(x).replace(",", ".") }}{% endmacro %}
 {% macro dur(ms) %}{% if ms is none %}—{% elif ms >= 1000 %}{{ "%.1f"|format(ms / 1000)|replace(".", ",") }} s{% else %}{{ ms }} ms{% endif %}{% endmacro %}
+<div class="rx-painel" data-rx-painel="uso"{% if aba != 'uso' %} hidden{% endif %}>
 <section class="cad-secao rx-uso" id="uso-os-creator">
   <h2>Uso do OS Creator, últimos 7 dias</h2>
   {% if not uso.tem %}
   <p class="cad-pe"><strong>Sem medição ainda.</strong> {{ uso.motivo }}</p>
-  {% else %}
+  {% else %}{% set r7 = uso.resumo %}{% set tom7 = 'critico' if r7.pico >= uso.cota else ('alerta' if r7.pico >= 0.8 * uso.cota else '') %}
+  <div class="rx-kpis">
+    <div><p class="rx-tile-r">Cliques</p><p class="rx-grande gc-num">{{ n(r7.cliques) }}</p></div>
+    <div><p class="rx-tile-r">Automáticos</p><p class="rx-grande gc-num">{{ n(r7.automaticos) }}</p></div>
+    <div><p class="rx-tile-r">Pedidos ao Fracttal</p><p class="rx-grande gc-num">{{ n(r7.fracttal) }}</p></div>
+    <div><p class="rx-tile-r">Recusados (406/429)</p><p class="rx-grande gc-num{% if r7.recusas %} rx-tom--critico{% endif %}">{{ n(r7.recusas) }}</p></div>
+    <div><p class="rx-tile-r">Maior pico por minuto</p><p class="rx-grande gc-num{% if tom7 %} rx-tom--{{ tom7 }}{% endif %}">{{ r7.pico }}<span class="rx-de"> de {{ uso.cota }}</span></p>
+      <span class="rx-barra rx-barra--larga rx-barra--cota{% if tom7 %} rx-barra--{{ tom7 }}{% endif %}" aria-hidden="true"><i style="width:{{ [(r7.pico * 100 / uso.cota)|round|int, 100]|min }}%"></i></span></div>
+  </div>
   <p class="cad-pe">{{ uso.banco_txt }}</p>
   <p class="cad-pe">Em 7 dias: {{ n(uso.resumo.cliques) }} cliques e {{ n(uso.resumo.automaticos) }} pedidos das telas sozinhas; {{ n(uso.resumo.fracttal) }} pedidos ao Fracttal{% if uso.resumo.recusas %}, {{ n(uso.resumo.recusas) }} recusados por excesso (406/429){% endif %}{% if uso.resumo.esperas %}, {{ n(uso.resumo.esperas) }} esperaram a vez no porteiro do Nexus (até {{ uso.teto }} por minuto, {{ uso.teto_fundo }} deles de fundo){% endif %}; o maior pico foi de <strong{% if uso.resumo.pico >= uso.cota %} class="rx-tom--critico"{% elif uso.resumo.pico >= 0.8 * uso.cota %} class="rx-tom--alerta"{% endif %}>{{ uso.resumo.pico }} por minuto</strong>{% if uso.resumo.pico %} (dia {{ uso.resumo.pico_dia }}{% if uso.resumo.pico_hora is not none %}, às {{ "%02d"|format(uso.resumo.pico_hora) }}h{% endif %}){% endif %}, contra a cota de {{ uso.cota }} por minuto para a empresa toda (o OS Creator, o App de Campo e os robôs do Nexus).</p>
+
+  <h3 class="rx-sub">Por hora do dia (a soma dos 7 dias, hora de Brasília)</h3>
+  {# as 24 horas lado a lado: a coluna é o pico por minuto contra a cota (a cor e a palavra na hora que encostou nela; a
+     palavra fica no title e na tabela logo abaixo); o número em cima é o pico #}
+  <div class="rx-horas24" role="img" aria-label="Pico de pedidos ao Fracttal por minuto em cada hora do dia, contra a cota de {{ uso.cota }}">
+    {% for h in uso.horas %}<div class="rx-hora{% if h.tom %} rx-hora--{{ h.tom }}{% endif %}" title="{{ h.rotulo }}: pico {{ h.pico }} por minuto{% if h.situacao %} ({{ h.situacao }}){% endif %}, {{ n(h.cliques) }} cliques">
+      <span class="rx-hora-n gc-num">{{ h.pico or "" }}</span>
+      <span class="rx-hora-col" aria-hidden="true"><i style="height:{{ h.pct_cota }}%"></i></span>
+      <span class="rx-hora-r">{{ h.rotulo[:2] }}</span></div>{% endfor %}
+  </div>
+  <details class="rx-detalhe"><summary>Ver as 24 horas em tabela</summary>
+  <div class="cad-rolagem cad-rolagem--secao"><table class="cad-tabela rx-horas">
+    <thead><tr><th>Hora</th><th>Cliques</th><th>Automáticos</th><th>Pedidos ao Fracttal</th><th>Esperaram a vez</th><th>Maior pico por minuto (cota {{ uso.cota }})</th></tr></thead>
+    <tbody>{% for h in uso.horas %}
+      <tr><td class="gc-num rx-nowrap">{{ h.rotulo }}</td>
+        <td class="rx-c"><span class="rx-barra" aria-hidden="true"><i style="width:{{ h.pct_cliques }}%"></i></span><span class="rx-n">{{ n(h.cliques) }}</span></td>
+        <td class="num">{{ n(h.automaticos) }}</td><td class="num">{{ n(h.fracttal) }}</td><td class="num">{{ n(h.esperas) }}</td>
+        <td class="rx-c"><span class="rx-barra rx-barra--cota{% if h.tom %} rx-barra--{{ h.tom }}{% endif %}" aria-hidden="true"><i style="width:{{ h.pct_cota }}%"></i></span><span class="rx-n{% if h.tom %} rx-tom--{{ h.tom }}{% endif %}">{{ h.pico }}</span>{% if h.situacao %} <span class="{{ 'rx-tom--' ~ h.tom }}">{{ h.situacao }}</span>{% endif %}</td></tr>
+    {% endfor %}</tbody>
+  </table></div>
+  </details>
 
   <h3 class="rx-sub">Por dia</h3>
   <div class="cad-rolagem cad-rolagem--secao"><table class="cad-tabela">
@@ -105,23 +219,12 @@
     {% endfor %}</tbody>
   </table></div>
 
-  <h3 class="rx-sub">Por hora do dia (a soma dos 7 dias, hora de Brasília)</h3>
-  <div class="cad-rolagem cad-rolagem--secao"><table class="cad-tabela rx-horas">
-    <thead><tr><th>Hora</th><th>Cliques</th><th>Automáticos</th><th>Pedidos ao Fracttal</th><th>Esperaram a vez</th><th>Maior pico por minuto (cota {{ uso.cota }})</th></tr></thead>
-    <tbody>{% for h in uso.horas %}
-      <tr><td class="gc-num rx-nowrap">{{ h.rotulo }}</td>
-        <td class="rx-c"><span class="rx-barra" aria-hidden="true"><i style="width:{{ h.pct_cliques }}%"></i></span><span class="rx-n">{{ n(h.cliques) }}</span></td>
-        <td class="num">{{ n(h.automaticos) }}</td><td class="num">{{ n(h.fracttal) }}</td><td class="num">{{ n(h.esperas) }}</td>
-        <td class="rx-c"><span class="rx-barra rx-barra--cota{% if h.tom %} rx-barra--{{ h.tom }}{% endif %}" aria-hidden="true"><i style="width:{{ h.pct_cota }}%"></i></span><span class="rx-n{% if h.tom %} rx-tom--{{ h.tom }}{% endif %}">{{ h.pico }}</span>{% if h.situacao %} <span class="{{ 'rx-tom--' ~ h.tom }}">{{ h.situacao }}</span>{% endif %}</td></tr>
-    {% endfor %}</tbody>
-  </table></div>
-
   <h3 class="rx-sub">As {{ uso.rotas|length }} telas mais pedidas</h3>
-  {% if uso.rotas %}
+  {% if uso.rotas %}{% set topo = uso.rotas|map(attribute='cliques')|max or 1 %}
   <div class="cad-rolagem cad-rolagem--secao"><table class="cad-tabela">
     <thead><tr><th>Tela</th><th>Cliques</th><th>Automáticos</th><th>Mediana</th><th>p95</th><th>Pedidos ao Fracttal</th><th>Erros</th><th>Ocupado (503)</th></tr></thead>
     <tbody>{% for r in uso.rotas %}
-      <tr><td><span class="gc-dado">{{ r.rota }}</span></td><td class="num">{{ n(r.cliques) }}</td><td class="num">{{ n(r.automaticos) }}</td>
+      <tr><td><span class="gc-dado">{{ r.rota }}</span></td><td class="rx-c"><span class="rx-barra" aria-hidden="true"><i style="width:{{ (r.cliques * 100 / topo)|round|int }}%"></i></span><span class="rx-n">{{ n(r.cliques) }}</span></td><td class="num">{{ n(r.automaticos) }}</td>
         <td class="num">{{ dur(r.p50_ms) }}</td><td class="num">{{ dur(r.p95_ms) }}</td><td class="num">{{ n(r.fracttal) }}</td><td class="num">{{ n(r.erros) }}</td><td class="num">{{ n(r.ocupado) }}</td></tr>
     {% endfor %}</tbody>
   </table></div>
@@ -140,24 +243,32 @@
   <p class="cad-pe">O corte por setor mora só no disco do servidor, por dia, e fica 30 dias (aqui, os últimos 7): nunca vai ao banco, porque há setor de uma ou duas pessoas e o banco é de leitura aberta e não apaga. O pedido que o teto recusou não tem sessão e fica fora dele.</p>
   {% else %}<p class="cad-pe">Sem corte por setor ainda: ele só existe no servidor, que o guarda no disco dele.</p>{% endif %}
   {% endif %}
+</section>
+</div>
 
-  {# O canto central do OS Creator (31/10/2026; item 0 da 3.1+3.2 e a 3.2): o estado de cada peça resumido (os ativos e a lista
-     de OS), para conferir de fora a 1ª noite dos leitores. Só contagens, datas, ids e motivos (nunca texto de ativo, de OS ou
-     nome). As linhas saem prontas de nexus/casca/raio_x.py (`_secao_canto_central`). #}
-  {% macro peca(p, titulo) %}
-  <h3 class="rx-sub">{{ titulo }}</h3>
+{# ── Canto central ─────────────────────────────────────────────────────────────────────────────────────────────── #}
+{# O canto central do OS Creator (31/10/2026; item 0 da 3.1+3.2 e a 3.2): o estado de cada peça resumido (os ativos e a lista
+   de OS), para conferir de fora a 1ª noite dos leitores. Só contagens, datas, ids e motivos (nunca texto de ativo, de OS ou
+   nome). As linhas saem prontas de nexus/casca/raio_x.py (`_secao_canto_central`). #}
+{% macro peca(p, titulo) %}
+<article class="cad-secao">
+  <h2>{{ titulo }}</h2>
   {% if p.linhas %}
-  <div class="cad-rolagem cad-rolagem--secao"><table class="cad-tabela">
+  <div class="cad-rolagem cad-rolagem--secao"><table class="cad-tabela rx-peca">
     <tbody>{% for rotulo, frase in p.linhas %}
-      <tr><td>{{ rotulo }}</td><td>{{ frase }}</td></tr>
+      <tr><th scope="row">{{ rotulo }}</th><td>{{ frase }}</td></tr>
     {% endfor %}</tbody>
   </table></div>
   {% else %}<p class="cad-pe">{{ p.motivo }}</p>{% endif %}
-  {% endmacro %}
-  <div id="canto-central">
+</article>
+{% endmacro %}
+<div class="rx-painel" data-rx-painel="canto"{% if aba != 'canto' %} hidden{% endif %}>
+<section class="rx-pecas" id="canto-central">
   {{ peca(canto.ativos, "Ativos centrais") }}
   {{ peca(canto.os, "Lista central de OS") }}
   {{ peca(canto.catalogos, "Catálogos pequenos") }}
-  </div>
 </section>
+</div>
+</div>
+<script src="{{ url_for('static', filename='raio-x.js') }}" defer></script>
 {% endblock %}

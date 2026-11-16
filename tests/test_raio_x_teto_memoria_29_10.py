@@ -63,7 +63,9 @@ def test_a_tela_mostra_o_teto(monkeypatch):
     from flask import Flask, render_template_string
     app = Flask(__name__, template_folder=str(TEMPLATES))
     trecho = (TEMPLATES / "raio_x.html").read_text(encoding="utf-8")
-    linha = next(l for l in trecho.splitlines() if "Memória da máquina" in l)
+    # o ladrilho da memória na aba Agora (16/11/2026): do título ao fim dele
+    ini = trecho.index("Memória da máquina")
+    linha = trecho[trecho.rindex("\n", 0, ini):trecho.index("</article>", ini)]
     m = {"livre_gb": "7,0", "total_gb": "14,9", "tem_swap": True, "swap_gb": "2,0", "trocando_mb_s": "0",
          "nexus_mb": 707, "nexus_swap_mb": 1481, "pressao_mem": None, "pressao_io": None,
          "teto": {"onde": "/system.slice/nexus.service", "conteiner": False, "max_mb": None, "high_mb": 700,

@@ -62,7 +62,7 @@ def test_a_pagina_mostra_a_memoria_e_a_espera_do_disco(app, logado, monkeypatch)
     cpu["maquina"]["trocando_mb_s"] = "3,0"
     monkeypatch.setattr(R, "_processador", lambda janela_s=1.0: dict(cpu, pct=13, nucleos=4, carga=[2.51, 2.87, 3.91]))
     h = logado.get("/t/base/raio-x").get_data(as_text=True)
-    assert "Memória da máquina" in h and "0,4 GB livres" in h and "de 3,8 GB" in h
+    assert "Memória da máquina" in h and ">0,4 GB</span>" in h and "livres de 3,8 GB" in h and "de 3,8 GB" in h
     assert "swap 1,2 GB em uso, trocando 3,0 MB/s agora" in h and "o Nexus usa 650 MB, 100 MB dele no swap" in h
     assert "processador da máquina 30%, esperando o disco 40%" in h
     assert "esperando memória 12,5% e disco 30,1% do tempo" in h

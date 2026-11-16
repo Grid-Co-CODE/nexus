@@ -359,6 +359,24 @@ Levi, 14/10/2026 às 09:20: "O nexus está muito lento"; "quando clico no OS Cre
 "pq depende da TI se o OS Creator Web faz parte do Nexus???". Medido de fora: o /saude do Nexus de 0,5 a 30 s (às vezes 60
 s), a plataforma e a API do banco, no mesmo servidor, em 0,2 s: as threads do waitress presas esperando o Fracttal pelo
 OS Creator, que roda DENTRO do processo do Nexus (a ponte, sem proxy).
+- **O desenho do Raio-X (16/11/2026)**, Levi: "vamos elegantizar a parte de raio-x [...] como a gente separa por
+  categoria, deixou várias abinhas ali dentro da página [...] deixa bem visual [...] bem cara de televisão":
+  - no alto, **o parecer** (`raio_x.parecer`): "Tudo respondendo", "Atenção" ou "Gargalo agora", com os motivos. Só os
+    sinais que a página já tinha, **sem régua nova**: todas as threads ocupadas (crítico), os pedidos presos das 24 h (o tom
+    do `presos.cartao`), o OS Creator no teto de threads, a máquina trocando com o swap neste segundo e o relatório de
+    memória que parou de anotar (`WORKER_VELHO_MIN`; o atrasado não conta: não se sabe). Régua nova aqui pede o OK do Levi;
+  - **as abas** (`raio_x.ABAS`, `?aba=`): Agora, Memória, Pedidos e tarefas, Uso do OS Creator e Canto central. A página
+    traz todas (a leitura é uma só) e mostra uma; o `static/raio-x.js` troca sem recarregar e põe a aba no endereço (o "Ler
+    de novo" fica nela). Aba desconhecida = Agora;
+  - **Agora**: os anéis (SVG, `stroke-dasharray`) dos pedidos × threads, do processador do Nexus e do OS Creator × teto
+    (crítico/alerta só nos dois sinais acima; o resto em neutro, a cor é do estado), a carga 1/5/15 min em barras contra os
+    núcleos e a memória da máquina numa barra (`_maquina` → `usada_pct`). As frases de antes ficam embaixo de cada número
+    (os testes as conferem: mudou a frase, muda o teste);
+  - **Uso do OS Creator**: os números grandes dos 7 dias e as 24 horas em colunas (o pico por minuto contra a cota, com a
+    cor e a palavra da hora na cota); a tabela das 24 horas fica fechada em "Ver as 24 horas em tabela". Nesta seção, o
+    único `style` aceito é `width:N%` ou `height:N%` (`test_sem_cor_fixa`);
+  - **Tela cheia** (só o Raio-X, a TV) e **Atualizar sozinho (30 s)** (a marca fica no navegador, `nexus.raiox.sozinho`).
+  Prova: `tests/test_raio_x_abas_16_11.py` e os 13 arquivos `test_raio_x*`/`test_*raio_x*` de antes.
 - **Raio-X** (`/t/base/raio-x`, `casca/raio_x.py`; só administrador, sem item no menu): os pedidos em andamento e onde
   cada um espera, as tarefas de fundo, o processador, a carga da máquina, o teto do OS Creator e os travamentos de 24 h
   e, desde 31/10/2026, **o uso do OS Creator nos últimos 7 dias** (a seção "Uso do OS Creator", mais abaixo).

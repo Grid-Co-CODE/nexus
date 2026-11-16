@@ -644,6 +644,107 @@ details.csv-extra>.cad-sub{padding:0 14px 12px}
 .rx-tom--alerta{color:var(--alerta);font-weight:600}
 .rx-tom--critico{color:var(--critico);font-weight:600}
 
+/* Raio-X em abas, com cara de TV (16/11/2026, Levi: "deixa bem visual [...] bem cara de televisão"). Um nível de
+   superfície (os ladrilhos e as seções direto no fundo); a cor é do estado (o parecer, o anel e a hora no teto ou na cota),
+   o resto em neutro. Os anéis são SVG (o stroke-dasharray, atributo); as barras, a largura (ou a altura, nas 24 horas). */
+.rx-topo{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap}
+.rx-acoes{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:8px}
+.rx-sozinho{display:inline-flex;align-items:center;gap:8px;font-size:13px;color:var(--tinta-2);cursor:pointer}
+.rx-sozinho input{width:16px;height:16px;margin:0;accent-color:var(--verde);cursor:pointer}
+.rx-parecer{display:flex;gap:18px;align-items:flex-start;margin:18px 0 0;padding:18px 22px;border-radius:var(--raio-md);
+  background:var(--superficie);border:1px solid var(--linha);border-left:4px solid var(--ok-cheio)}
+.rx-parecer--alerta{border-left-color:var(--alerta-cheio)}
+.rx-parecer--critico{border-left-color:var(--critico-cheio)}
+.rx-parecer-luz{flex:none;width:14px;height:14px;margin-top:10px;border-radius:50%;background:var(--ok-cheio);
+  box-shadow:0 0 0 6px var(--verde-suave)}
+.rx-parecer--alerta .rx-parecer-luz{background:var(--alerta-cheio);box-shadow:0 0 0 6px var(--alerta-a08)}
+.rx-parecer--critico .rx-parecer-luz{background:var(--critico-cheio);box-shadow:0 0 0 6px var(--critico-suave)}
+.rx-parecer-t{margin:0;font:800 clamp(24px,2.4vw,34px)/1.15 var(--font-display);color:var(--tinta)}
+.rx-parecer-d{margin:6px 0 0;font-size:13px;line-height:1.45;color:var(--tinta-2)}
+.rx-parecer-itens{margin:8px 0 0;padding:0;list-style:none;display:flex;flex-direction:column;gap:3px;font-size:14px}
+.rx-abas{margin-top:20px}
+.rx-conta{display:inline-block;min-width:20px;padding:0 6px;margin-left:4px;border-radius:10px;background:var(--superficie-3);
+  color:var(--tinta-2);font-size:11px;line-height:18px;text-align:center}
+.rx-painel{padding-top:16px}
+.rx-tiles{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:14px;margin-bottom:16px}
+.rx-tile{grid-column:span 2;display:flex;flex-direction:column;gap:12px;min-width:0;padding:18px 20px;background:var(--superficie);
+  border:1px solid var(--linha);border-radius:var(--raio-md)}
+.rx-tile--largo{grid-column:span 3}
+.rx-tile-r{margin:0;font:700 11px/14px var(--font-sans);letter-spacing:.06em;text-transform:uppercase;color:var(--mudo)}
+.rx-tile-anel{position:relative;width:150px;height:150px;align-self:center}
+.rx-anel{width:100%;height:100%;transform:rotate(-90deg)}
+.rx-anel-fundo{fill:none;stroke:var(--superficie-3);stroke-width:3.2}
+.rx-anel-valor{fill:none;stroke:var(--info-cheio);stroke-width:3.2;stroke-linecap:round}
+.rx-anel--alerta{stroke:var(--alerta-cheio)}
+.rx-anel--critico{stroke:var(--critico-cheio)}
+.rx-tile-centro{position:absolute;inset:0;margin:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px}
+.rx-grande{margin:0;font:700 clamp(30px,3vw,44px)/1 var(--font-sans);font-variant-numeric:tabular-nums;color:var(--tinta)}
+.rx-de{font-size:12px;line-height:16px;color:var(--mudo)}
+.rx-tile-d{margin:0;font-size:12px;line-height:17px;color:var(--tinta-2)}
+.rx-cargas{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+.rx-carga{display:flex;flex-direction:column;gap:6px}
+.rx-media{font:700 26px/1 var(--font-sans);font-variant-numeric:tabular-nums;color:var(--tinta)}
+.rx-barra.rx-barra--larga{display:block;width:100%;height:8px;margin:0;border-radius:4px}
+.rx-duas{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.rx-duas>div{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 10px;align-items:center}
+.rx-duas .rx-de{grid-column:1 / -1}
+.rx-duas .rx-media{font-size:16px}
+.rx-mem{margin:0;display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.rx-barra.rx-barra--mem{height:12px;border-radius:6px}
+.rx-col-barra{width:32%;min-width:140px}
+.rx-pilha{display:flex;height:10px;border-radius:5px;overflow:hidden;background:var(--superficie-3)}
+.rx-pilha i{display:block;height:100%}
+.rx-pilha-mem{background:var(--info-cheio)}
+.rx-pilha-swap{background:var(--fraco)}
+.rx-legenda{display:inline-flex;align-items:center;gap:5px;margin-right:10px;color:var(--tinta-2)}
+.rx-legenda i{display:inline-block;width:10px;height:10px;border-radius:2px}
+.rx-par{display:flex;flex-direction:column;gap:3px}
+.rx-barra--antes i{background:var(--fraco)}
+.rx-fila{list-style:none;margin:0;padding:4px 0}
+.rx-fila li{display:grid;grid-template-columns:auto minmax(0,1fr) minmax(0,auto);gap:14px;align-items:center;padding:10px 16px;
+  border-top:1px solid var(--linha)}
+.rx-fila li:first-child{border-top:0}
+.rx-ha{min-width:76px;padding:7px 10px;border-radius:var(--raio-controle);background:var(--superficie-3);text-align:center;
+  font:700 15px/1.2 var(--font-sans);font-variant-numeric:tabular-nums;color:var(--tinta)}
+.rx-ha--tarefa{font-size:18px;color:var(--mudo)}
+.rx-fila-o{min-width:0}
+.rx-fila-t,.rx-fila-d{margin:0;overflow-wrap:anywhere}
+.rx-fila-d{margin-top:2px;font-size:12px;line-height:16px;color:var(--tinta-2)}
+.rx-fila-como{font-size:13px;color:var(--tinta-2);text-align:right}
+.rx-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));border-bottom:1px solid var(--linha)}
+.rx-kpis>div{display:flex;flex-direction:column;gap:8px;padding:16px 18px;border-left:1px solid var(--linha)}
+.rx-kpis>div:first-child{border-left:0}
+.rx-horas24{display:grid;grid-template-columns:repeat(24,minmax(0,1fr));gap:4px;align-items:end;height:160px;margin:8px 16px 14px}
+.rx-hora{display:flex;flex-direction:column;align-items:center;gap:4px;height:100%;min-width:0}
+.rx-hora-col{flex:1;display:flex;align-items:flex-end;width:100%;overflow:hidden;border-radius:4px 4px 2px 2px;
+  background:var(--superficie-3)}
+.rx-hora-col i{display:block;width:100%;background:var(--ok-cheio)}
+.rx-hora--alerta .rx-hora-col i{background:var(--alerta-cheio)}
+.rx-hora--critico .rx-hora-col i{background:var(--critico-cheio)}
+.rx-hora-n{height:13px;font-size:11px;line-height:13px;color:var(--tinta-2)}
+.rx-hora-r{font-size:10px;line-height:12px;color:var(--mudo)}
+.rx-detalhe{margin:0 16px 10px}
+.rx-detalhe>summary{cursor:pointer;padding:6px 0;font-size:12.5px;font-weight:600;color:var(--verde-texto)}
+.rx-detalhe>.cad-rolagem{margin:4px -16px 0}
+.rx-peca th{width:30%;text-align:left;font-weight:600;color:var(--tinta-2);vertical-align:top}
+/* a TV: o Raio-X em tela cheia, sem o menu, com os números maiores */
+.rx:fullscreen{overflow:auto;padding:28px 40px;background:var(--fundo)}
+.rx:fullscreen .rx-tile-anel{width:200px;height:200px}
+.rx:fullscreen .rx-grande{font-size:58px}
+@media (max-width:1100px){
+  .rx-tiles{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .rx-tile{grid-column:auto}
+  .rx-tile--largo{grid-column:1 / -1}
+}
+@media (max-width:820px){
+  .rx-tiles{grid-template-columns:minmax(0,1fr)}
+  .rx-duas{grid-template-columns:minmax(0,1fr)}
+  .rx-fila li{grid-template-columns:auto minmax(0,1fr)}
+  .rx-fila-como{grid-column:2;text-align:left}
+  .rx-horas24{gap:2px;height:120px;margin:8px 10px 12px}
+  .rx-hora-n{display:none}
+}
+
 /* Acessos, 07/11/2026: seções recolhidas (Administradores, os históricos) com a contagem no título, e a caixa de cada
    torre com as 5 primeiras telas à vista e o resto em "Mais N" (Levi: "padronizar o tamanho") */
 details.ace-recolhe>summary{list-style:none;display:flex;align-items:center;gap:10px;cursor:pointer;padding:12px 16px;

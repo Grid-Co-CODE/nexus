@@ -43,7 +43,7 @@ import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from flask import current_app, render_template, session
+from flask import current_app, render_template, request, session
 
 from . import presos as P
 
@@ -160,6 +160,8 @@ def _maquina(s0, s1, v0: dict, v1: dict, janela_s: float):
     swap_total = mem.get("SwapTotal", 0)
     return {"ocupado": round(100.0 * max(0, total - ocioso - disco) / total), "disco": round(100.0 * disco / total),
             "livre_gb": _decimal(mem.get("MemAvailable", 0) / gb), "total_gb": _decimal(mem["MemTotal"] / gb),
+            # a barra da memória na aba Agora (16/11/2026): quanto da máquina está tomado
+            "usada_pct": round(100.0 * max(0, mem["MemTotal"] - mem.get("MemAvailable", 0)) / mem["MemTotal"]),
             "tem_swap": swap_total > 0, "swap_gb": _decimal(max(0, swap_total - mem.get("SwapFree", 0)) / gb),
             "trocando_mb_s": _troca_mb_s(v0, v1, janela_s),
             "nexus_mb": round(eu.get("VmRSS", 0) / 1024), "nexus_swap_mb": round(eu.get("VmSwap", 0) / 1024),
@@ -1072,6 +1074,34 @@ def _secao_canto_central(app=None) -> dict:
     return pecas
 
 
+ABAS = (("agora", "Agora"), ("memoria", "Memória"), ("pedidos", "Pedidos e tarefas"), ("uso", "Uso do OS Creator"),
+        ("canto", "Canto central"))
+
+
+def parecer(pedidos, threads: int, teto, maquina, travamentos, relatorios) -> dict:
+    """A faixa do alto do Raio-X (16/11/2026, Levi: "vamos elegantizar a parte de raio-x [...] deixa bem visual [...] bem
+    cara de televisão"): o estado agora numa palavra e os motivos, {"tom": "ok" | "alerta" | "critico", "titulo",
+    "itens": [(tom, texto)]}. Só os sinais que a página já tinha, sem régua nova: todas as threads ocupadas (a fila
+    espera), os pedidos presos das últimas 24 h (`presos.cartao`), o OS Creator no teto de threads, a máquina trocando
+    com o swap neste segundo e o relatório de memória que parou de anotar (`WORKER_VELHO_MIN`). `relatorios` = pares
+    (nome, relatório) do Nexus, do worker e do web."""
+    itens = []
+    if threads and len(pedidos) >= threads:
+        itens.append(("critico", f"Todas as {threads} threads do Nexus ocupadas: a fila espera"))
+    if travamentos and travamentos.get("classe") in ("critico", "alerta"):
+        itens.append((travamentos["classe"], travamentos["rotulo"]))
+    if teto and teto.get("teto") and teto.get("em_uso", 0) >= teto["teto"]:
+        itens.append(("alerta", f"O OS Creator está no teto: {teto['em_uso']} de {teto['teto']} threads em uso"))
+    if maquina and maquina.get("trocando_mb_s") not in (None, "0"):
+        itens.append(("alerta", f"A máquina está trocando com o swap agora ({maquina['trocando_mb_s']} MB/s)"))
+    for nome, rel in relatorios:
+        if rel and not rel.get("atrasado") and rel.get("velho"):
+            itens.append(("alerta", f"O {nome} não anota a memória há {rel['idade_min']} min"))
+    tom = "critico" if any(t == "critico" for t, _ in itens) else ("alerta" if itens else "ok")
+    titulo = {"ok": "Tudo respondendo", "alerta": "Atenção", "critico": "Gargalo agora"}[tom]
+    return {"tom": tom, "titulo": titulo, "itens": itens}
+
+
 def registrar_raio_x(bp) -> None:
     @bp.route("/raio-x")
     def raio_x():
@@ -1087,11 +1117,17 @@ def registrar_raio_x(bp) -> None:
         teto = teto.estado() if teto is not None else None
         if teto and teto["ultimo_recusado"]:
             teto["ultimo_txt"] = time.strftime("%d/%m %H:%M", time.localtime(teto["ultimo_recusado"]))
+        threads = getattr(estado, "threads", 0)
+        cpu, worker, web, nexus = _processador(), _worker_plataforma(), _web_plataforma(), _dentro_do_nexus(app)
+        travamentos = P.cartao(app) if estado is not None else None
+        aba = request.args.get("aba") if request.args.get("aba") in dict(ABAS) else "agora"
         return render_template("raio_x.html", pedidos=pedidos, outras=outras, ligado=estado is not None, teto=teto,
-                               threads=getattr(estado, "threads", 0), cpu=_processador(), quem=_memoria_por_programa(),
-                               worker=_worker_plataforma(), web=_web_plataforma(), prazo_memoria=PRAZO_MEMORIA_S,
-                               nexus=_dentro_do_nexus(app), uso=_secao_uso_os(app), canto=_secao_canto_central(app),
+                               threads=threads, cpu=cpu, quem=_memoria_por_programa(),
+                               worker=worker, web=web, prazo_memoria=PRAZO_MEMORIA_S,
+                               nexus=nexus, uso=_secao_uso_os(app), canto=_secao_canto_central(app),
                                threads_atrasado=threads_atrasado,
                                threads_quando=lista.get("anterior_quando") if threads_atrasado else None,
-                               travamentos=P.cartao(app) if estado is not None else None,
+                               travamentos=travamentos, abas=ABAS, aba=aba,
+                               parecer=parecer(pedidos, threads, teto, cpu.get("maquina"), travamentos,
+                                               (("Nexus", nexus), ("worker", worker), ("web", web))),
                                quando=time.strftime("%d/%m/%Y %H:%M:%S"))

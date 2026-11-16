@@ -20,7 +20,8 @@ def test_so_administrador(app, cliente):
 def test_sem_o_registro_diz_e_mostra_o_processador(app, logado, monkeypatch):
     monkeypatch.setattr(R, "_processador", lambda janela_s=1.0: {"pct": 37, "nucleos": 4, "carga": [0.5, 0.4, 0.3]})
     h = logado.get("/t/base/raio-x").get_data(as_text=True)
-    assert "Raio-X do Nexus" in h and "37%" in h and "0.5 · 0.4 · 0.3" in h
+    # a carga em três números com a barra de cada um (16/11/2026, o Raio-X em abas)
+    assert "Raio-X do Nexus" in h and "37%" in h and all(c in h for c in (">0,50<", ">0,40<", ">0,30<"))
     assert "O registro dos pedidos só liga no servidor" in h
 
 
@@ -50,6 +51,7 @@ def test_mostra_o_pedido_preso_e_a_tarefa_de_fundo_com_onde_cada_um_esta(app, lo
     finally:
         solta.set()
         t1.join(), t2.join()
-    assert "GET /os/api/performance/contagens" in h and "1 min 35 s" in h and "1 de 16" in h
+    assert "GET /os/api/performance/contagens" in h and "1 min 35 s" in h
+    assert '>1</span><span class="rx-de">de 16</span>' in h                  # o anel: 1 pedido de 16 threads
     assert "nexus-pre-carga" in h and "esperando outra thread" in h and "waitress-3" not in h
     assert "100%" in h

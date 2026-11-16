@@ -503,7 +503,8 @@ def test_sem_cor_fixa(app, logado, banco, vivo):
         assert not re.search(r"#[0-9a-fA-F]{3,8}\b", t) and "rgba(" not in t, arquivo
     sec = _secao(logado.get("/t/base/raio-x").get_data(as_text=True))
     estilos = re.findall(r'style="([^"]*)"', sec)
-    assert estilos and all(re.fullmatch(r"width:\d{1,3}%", e) for e in estilos), estilos
+    # desde 16/11/2026 as 24 horas são colunas: a altura também (a cor continua só por classe)
+    assert estilos and all(re.fullmatch(r"(?:width|height):\d{1,3}%", e) for e in estilos), estilos
     assert not re.search(r"#[0-9a-fA-F]{3,8}\b|rgba?\(", sec)
     # o tom é classe (palavra e cor por token), e a palavra vem junto: nunca só a cor
     assert "rx-tom--critico" in sec and "na cota" in sec and "rx-tom--alerta" in sec and "perto da cota" in sec
