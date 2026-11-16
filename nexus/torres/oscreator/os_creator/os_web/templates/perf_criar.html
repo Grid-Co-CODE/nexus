@@ -8,7 +8,9 @@
          data-tem-modos="{{ 1 if tem_modos else 0 }}" data-tracker="{{ 1 if eh_tracker else 0 }}"
          data-aba-ticket="{{ aba_ticket }}"
          data-sug-usina="{{ sugestao.usina }}" data-sug-ativo="{{ sugestao.ativo }}" data-sug-obs="{{ sugestao.obs }}"
-         data-sug-ospai="{{ sugestao.os_pai }}" data-sug-resp="{{ sugestao.resp }}" data-sug-modo="{{ sugestao.modo }}">
+         data-sug-ospai="{{ sugestao.os_pai }}" data-sug-resp="{{ sugestao.resp }}" data-sug-modo="{{ sugestao.modo }}"
+         data-sug-lista="{{ sugestao.lista | tojson | forceescape }}" data-sug-obsos="{{ sugestao.obs_os }}"
+         data-sug-evento="{{ sugestao.evento }}">
   <div class="os-topo-linha">
     <a class="os-btn secondary os-voltar" href="/os/performance">← Planos</a>
     <span class="os-head-ic">{{ icone(plano.icone, '#A6E22E', 20) }}</span>

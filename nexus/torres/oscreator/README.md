@@ -3363,3 +3363,13 @@ dia por este pedido.
   08:00 que a IA pôs no campo); Performance e Engenharia pela delas, com `origem: "ia"`, que leva só a programada de 6
   dias às 08:00 (a Urgente segue com a dela; a tela sem a IA, com os 7 dias); subtarefa nenhuma, mesmo se vier no corpo.
 - Prova: `tests/test_oscreator_pedir_com_ia_15_11.py`.
+
+## O link de criar OS de Performance com vários inversores (16/11/2026, a Sala de controle)
+
+A Sala de controle da Plataforma de Performance marca inversores e pede UMA OS (Levi: "1 OS só para todos [...] E a data
+do evento foi quando aconteceu"). O link de `/os/performance/criar` passou a aceitar, além dos campos de sempre:
+`ativo` e `obs` REPETIDOS, na mesma ordem (a tela marca todos; com mais de um, o agrupar em UMA OS com várias tarefas
+entra sozinho, como já era), `obs_os` (a observação da OS inteira, que só existe na agrupada) e `evento`
+(`AAAA-MM-DDTHH:MM`, a "Data do evento"; fora do formato ou no futuro, a tela fica com o agora). O link antigo, de um
+ativo (o do Tempo real), segue igual. A regra é `perf_web.sugestao_do_link`; a página aplica em `aplicarSugestao`
+(`perf.js`) e diz o que marcou e o que não achou na usina. Prova: `tests/test_oscreator_perf_link_varios.py`.

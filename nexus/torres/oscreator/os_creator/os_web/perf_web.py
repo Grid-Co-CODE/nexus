@@ -485,3 +485,25 @@ def validar_lista(bruta) -> tuple[list, str]:
             item["tipo_rotulo"] = str(it.get("tipo_rotulo") or "do plano").strip()[:40]
         out.append(item)
     return out, ""
+
+
+# ── O link que chega pronto (Tempo real e Sala de controle da Plataforma de Performance) ──────────────────────────
+# Até 16/11/2026 o link trazia UM ativo e a observação dele. A Sala de controle marca vários inversores e pede UMA OS
+# (Levi: "1 OS só para todos [...] E a data do evento foi quando aconteceu"): `ativo` e `obs` podem vir REPETIDOS, na
+# mesma ordem (a tela marca todos e, com mais de um, o agrupar entra sozinho, como sempre); `obs_os` é a observação da
+# OS inteira e `evento` (AAAA-MM-DDTHH:MM) a data do evento. O link antigo, de um ativo, segue igual.
+SUGESTAO_ATIVOS_MAX = 40
+_RX_EVENTO = re.compile(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}")
+
+
+def sugestao_do_link(args) -> dict:
+    """O que a tela de criar OS recebe do link: os campos de sempre mais `lista` ([{ativo, obs}]), `obs_os` e `evento`.
+    `evento` fora do formato, ou no futuro, não entra (a tela fica com o agora)."""
+    s = {k: args.get(k, "") for k in ("usina", "ativo", "obs", "os_pai", "resp", "modo")}
+    ativos = [" ".join(str(a).split()) for a in args.getlist("ativo")][:SUGESTAO_ATIVOS_MAX]
+    obss = [str(o) for o in args.getlist("obs")]
+    s["lista"] = [{"ativo": a, "obs": obss[i] if i < len(obss) else ""} for i, a in enumerate(ativos) if a]
+    s["obs_os"] = (args.get("obs_os") or "")[:4000]
+    ev = (args.get("evento") or "").strip()[:16]
+    s["evento"] = ev if _RX_EVENTO.fullmatch(ev) and ev <= dt.datetime.now(BRT).strftime("%Y-%m-%dT%H:%M") else ""
+    return s

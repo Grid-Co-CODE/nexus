@@ -28,6 +28,11 @@
   let limite = PAGINA;
   let sug = {usina: root.dataset.sugUsina, ativo: root.dataset.sugAtivo, obs: root.dataset.sugObs, os_pai: root.dataset.sugOspai,
              resp: root.dataset.sugResp, modo: root.dataset.sugModo};
+  // o link da Sala de controle (16/11/2026): vários ativos numa OS só, a observação da OS inteira e a data do evento
+  let sugLista = []; try { sugLista = JSON.parse(root.dataset.sugLista || '[]') || []; } catch (e) { sugLista = []; }
+  if (!sugLista.length && sug.ativo) sugLista = [{ativo: sug.ativo, obs: sug.obs}];
+  let sugObsOs = root.dataset.sugObsos || '';
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(root.dataset.sugEvento || '')) $('dt_prog').value = root.dataset.sugEvento;
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
   const norm = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
   const apiErro = (j, r) => (j && j.erro) ? (j.login ? j.erro + ' Entre de novo em /os/login.' : j.erro) : ('HTTP ' + r.status);
@@ -353,15 +358,22 @@
       .catch(e => { resumo.textContent = '⚠ plano: ' + e; });
   }
 
-  function aplicarSugestao() {                             // deep link da plataforma: marca o inversor + observação + OS pai
-    if (!sug.ativo) return;
-    const alvo = norm(sug.ativo); const numAlvo = (alvo.match(/(\d+(?:\.\d+)?)\s*$/) || [])[1];
-    let al = alvos.find(a => norm(a.label) === alvo || (numAlvo && (norm(a.label).match(/(\d+(?:\.\d+)?)\s*$/) || [])[1] === numAlvo));
-    if (!al) al = alvos.find(a => norm(a.label).includes(alvo));
-    if (al) { checked.add(al.id); if (sug.obs) obs[al.id] = sug.obs; if (sug.os_pai) ospai[al.id] = sug.os_pai; repop();
-      hint.textContent = 'Ativo ' + al.label + ' pré-selecionado pela plataforma.'; }
-    else hint.textContent = '⚠ Não achei "' + sug.ativo + '" nesta usina — marque o ativo à mão.';
-    sug.ativo = '';
+  function aplicarSugestao() {                             // deep link da plataforma: marca os inversores + observação + OS pai
+    if (!sugLista.length) return;
+    const achados = [], faltam = [];
+    sugLista.forEach(s => {
+      const alvo = norm(s.ativo); const numAlvo = (alvo.match(/(\d+(?:\.\d+)?)\s*$/) || [])[1];
+      let al = alvos.find(a => norm(a.label) === alvo || (numAlvo && (norm(a.label).match(/(\d+(?:\.\d+)?)\s*$/) || [])[1] === numAlvo));
+      if (!al) al = alvos.find(a => norm(a.label).includes(alvo));
+      if (al) { checked.add(al.id); if (s.obs) obs[al.id] = s.obs; if (sug.os_pai && sugLista.length === 1) ospai[al.id] = sug.os_pai; achados.push(al.label); }
+      else faltam.push(s.ativo);
+    });
+    // a observação da OS inteira só existe na agrupada (mais de um ativo); com um só, ela já é a observação do ativo
+    if (sugObsOs && achados.length > 1) { $('ed_obs_os').value = sugObsOs; if (sug.os_pai) $('ed_pai_os').value = sug.os_pai; }
+    repop();
+    hint.textContent = (achados.length ? (achados.length === 1 ? 'Ativo ' + achados[0] + ' pré-selecionado' : achados.length + ' ativos pré-selecionados (' + achados.join(', ') + ')') + ' pela plataforma.' : '')
+      + (faltam.length ? ' ⚠ Não achei ' + faltam.map(f => '"' + f + '"').join(', ') + ' nesta usina — marque à mão.' : '');
+    sugLista = []; sugObsOs = '';
   }
 
   async function carregarResp() {

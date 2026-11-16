@@ -390,7 +390,7 @@ def performance_criar():
     return render_template("perf_criar.html", conta=_conta(), aba="criar", plano=plano, clientes=clientes, usinas=usinas,
                            tem_modos=perf_web.tem_modos(frase), modos=perf_web.MODOS, coluna_qtd=perf_web.coluna_qtd(frase),
                            aba_ticket=perf_web.aba_ticket(frase), eh_tracker=perf_web.eh_tracker(frase),
-                           sugestao={k: request.args.get(k, "") for k in ("usina", "ativo", "obs", "os_pai", "resp", "modo")},
+                           sugestao=perf_web.sugestao_do_link(request.args),
                            agora=dt.datetime.now(perf_web.BRT).strftime("%Y-%m-%dT%H:%M"),
                            programada=(dt.datetime.now(perf_web.BRT) + dt.timedelta(minutes=10)).strftime("%Y-%m-%dT%H:%M"))
 
