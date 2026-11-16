@@ -146,6 +146,12 @@ download do pdf da OS". No quiz, "resposta" é o técnico executar a OS.
 
 ## Comando > Usinas e o prontuário (11/11/2026)
 
+**O prontuário pelo NOME da usina (16/11/2026).** `GET /t/comando/usinas/abrir?nome=<usina>` (`usina_pelo_nome`) acha a
+usina na mesma lista do Comando > Usinas, sem acento nem caixa, e redireciona ao prontuário dela; nenhuma ou mais de uma
+casando, à lista com a busca (`?q=`) preenchida. Quem usa: a Sala de controle da Performance (tela da plataforma, que
+não conhece o id do cadastro do Nexus), no botão "Prontuário da usina". Levi: "O prontuário da UFV está em NEXUS >
+COMANDO > USINAS, ao clicar na UFV abre o prontuário". Prova: `tests/test_comando_usinas.py`.
+
 Levi: "Em comando quero a mesma visão de Início > Usinas do mockup" (o R18). A tela era o lugar reservado da casca; virou
 `/t/comando/usinas` (`usinas.py` + `torres/comando/templates/comando/usinas.html`, `static/comando-usinas.js`): a faixa
 com uma barra por usina na cor do estado de agora, a legenda, os filtros na própria página (`filtro-local.js`: cliente,

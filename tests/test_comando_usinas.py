@@ -222,3 +222,19 @@ def test_os_filtros_do_painel_e_o_motivo():
     assert nomes(CU.filtrar(r, {"responsavel": ["Fulano", "Beltrano"], "meta": ["na_meta"]})) == ["Brodowski 1"]
     assert nomes(CU.filtrar(r, {"cliente": [], "estado": []})) == ["Altair", "Brodowski 1", "Coração 1"]
     assert CU.resumo(r)["responsaveis"] == ["Beltrano", "Fulano", "Sem responsável O&M"]
+
+
+def test_o_prontuario_abre_pelo_nome_da_usina(logado, monkeypatch):
+    """A Sala de controle da Performance (tela da plataforma) não conhece o id do cadastro do Nexus: abre o prontuário
+    pelo nome (16/11/2026). Uma usina casando, vai a ela; nenhuma ou mais de uma, à lista com a busca preenchida."""
+    import nexus.torres.comando as TC
+    monkeypatch.setattr(TC, "_usinas_montadas", lambda: {"linhas": [
+        {"usina_id": 7, "usina": "Usina Açaí 1"}, {"usina_id": 8, "usina": "Usina Açaí 2"},
+        {"usina_id": 9, "usina": "Repetida"}, {"usina_id": 10, "usina": "repetida"}]})
+    r = logado.get("/t/comando/usinas/abrir?nome=usina%20acai%201")
+    assert r.status_code == 302 and r.headers["Location"].endswith("/t/comando/usinas/7")
+    r = logado.get("/t/comando/usinas/abrir?nome=Usina%20Nova")
+    assert r.status_code == 302 and r.headers["Location"].endswith("/t/comando/usinas?q=Usina%20Nova")
+    r = logado.get("/t/comando/usinas/abrir?nome=Repetida")              # duas com o mesmo nome: sem palpite
+    assert r.headers["Location"].endswith("/t/comando/usinas?q=Repetida")
+    assert logado.get("/t/comando/usinas/abrir").headers["Location"].endswith("/t/comando/usinas")

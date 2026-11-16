@@ -260,6 +260,27 @@ def usinas():
         op_conformidade=list(CU.CONFORMIDADES.items()), q=request.args.get("q", ""))
 
 
+@bp.route("/usinas/abrir")
+def usina_pelo_nome():
+    """O prontuário pelo NOME da usina (16/11/2026, Levi: "O prontuário da UFV está em NEXUS > COMANDO > USINAS, ao clicar
+    na UFV abre o prontuário"): a Sala de controle da Performance (tela da plataforma, que não conhece o id do cadastro
+    do Nexus) abre por aqui. Acha a usina na MESMA lista do Comando > Usinas, pelo nome sem acento nem caixa; uma só
+    casando, vai ao prontuário dela; nenhuma (ou mais de uma), à lista já com a busca preenchida."""
+    import unicodedata
+    from urllib.parse import quote
+
+    def norm(s):
+        s = unicodedata.normalize("NFD", str(s or "")).encode("ascii", "ignore").decode().lower()
+        return " ".join(re.sub(r"[^a-z0-9 ]", " ", s).split())
+
+    nome = " ".join((request.args.get("nome") or "").split())[:120]
+    alvo = norm(nome)
+    achadas = [x for x in (_usinas_montadas().get("linhas") or []) if alvo and norm(x.get("usina")) == alvo and x.get("usina_id")]
+    if len(achadas) == 1:
+        return redirect(na_raiz(f"/t/comando/usinas/{int(achadas[0]['usina_id'])}"))
+    return redirect(na_raiz("/t/comando/usinas") + ("?q=" + quote(nome) if nome else ""))
+
+
 @bp.route("/usinas/<int:usina_id>")
 def usina(usina_id):
     """O prontuário da usina no Comando (11/11/2026, Levi: o clique na usina "No próprio Comando", como o prontuário do
