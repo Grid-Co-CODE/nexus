@@ -1,28 +1,16 @@
 /* os_creator/os_web/static/solic_ia.css — o Pedir com IA (15/11/2026): a caixa de texto no alto da Nova solicitação, que
-   preenche a própria tela (Levi: "tudo é preenchido dentro da tela original mesmo"). A cara é a do prompt, em fonte fixa,
-   pensada no escuro ("um visual meio prompt ali para a pessoa se sentir mesmo que tá fazendo uma coisa séria"). COR SÓ POR
-   TOKEN: as --sia-* do escuro aqui e o par do claro logo abaixo, pelos --osc-* do os.css; o fundo é a cor da página com
-   transparência (color-mix), sem cor nova. */
-:root{
-  --sia-veu:rgba(5,8,16,.55); --sia-vidro:color-mix(in srgb,var(--bg) 82%,transparent);
-  --sia-campo:color-mix(in srgb,var(--bg) 70%,transparent); --sia-linha:var(--card-b);
-  --sia-texto:var(--txt); --sia-mudo:var(--muted); --sia-mudo-2:var(--muted2);
-  --sia-lima:var(--btn); --sia-sobre-lima:var(--btn-txt); --sia-lima-suave:rgba(152,200,56,.12); --sia-lima-borda:rgba(152,200,56,.42);
-  --sia-azul:#7ea8f0;
-  --sia-alerta:#f3d99b; --sia-alerta-fundo:rgba(240,180,41,.10); --sia-alerta-b:rgba(240,180,41,.35);
-  --sia-critico:#f5766b; --sia-critico-fundo:rgba(245,118,107,.08); --sia-critico-b:rgba(245,118,107,.40);
-  --sia-ok:var(--verde); --sia-sombra:rgba(0,0,0,.55);
+   preenche a própria tela (Levi: "tudo é preenchido dentro da tela original mesmo"). A cara é a do prompt, em fonte fixa
+   ("um visual meio prompt ali para a pessoa se sentir mesmo que tá fazendo uma coisa séria"), e ESCURA NOS DOIS TEMAS,
+   como um terminal (Levi, 15/11/2026, no tema claro: "estilo dark tá? vi que o branco tá estourado"). COR SÓ POR TOKEN:
+   as --sia-* são as cores do tema escuro do os.css, as MESMAS nos dois temas (o bloco vale para o :root e para o claro),
+   como a foto ampliada do nexus.css ("iguais nos dois temas"). */
+:root,html[data-tema="claro"]{
+  --sia-vidro:rgba(9,13,24,.96); --sia-linha:#232a3d;
+  --sia-texto:#e6e8ef; --sia-mudo:#8a90a2; --sia-mudo-2:#9aa0b4;
+  --sia-lima:#98c838; --sia-sobre-lima:#14161f; --sia-lima-suave:rgba(152,200,56,.12); --sia-lima-borda:rgba(152,200,56,.42);
+  --sia-sec:#262b3b; --sia-sec-txt:#cdd2e0;
+  --sia-alerta:#f3d99b; --sia-critico:#f5766b; --sia-ok:#8fce3f; --sia-sombra:rgba(0,0,0,.55);
   --sia-mono:ui-monospace,"Cascadia Mono","SFMono-Regular",Consolas,"Liberation Mono",monospace;
-}
-html[data-tema="claro"]{
-  --sia-veu:var(--osc-veu); --sia-vidro:color-mix(in srgb,var(--osc-pagina) 86%,transparent);
-  --sia-campo:color-mix(in srgb,var(--osc-cartao) 80%,transparent); --sia-linha:var(--osc-linha-forte);
-  --sia-texto:var(--osc-texto); --sia-mudo:var(--osc-mudo); --sia-mudo-2:var(--osc-texto-2);
-  --sia-lima:var(--osc-musgo); --sia-sobre-lima:var(--osc-sobre-escuro); --sia-lima-suave:var(--osc-lima-suave); --sia-lima-borda:var(--osc-musgo-borda);
-  --sia-azul:var(--osc-info);
-  --sia-alerta:var(--osc-alerta); --sia-alerta-fundo:var(--osc-alerta-suave); --sia-alerta-b:var(--osc-alerta-borda);
-  --sia-critico:var(--osc-critico); --sia-critico-fundo:var(--osc-critico-suave); --sia-critico-b:var(--osc-critico-borda);
-  --sia-ok:var(--osc-ok); --sia-sombra:var(--osc-sombra-alta);
 }
 
 /* ── a caixa ── */
@@ -30,7 +18,8 @@ html[data-tema="claro"]{
 .sia-barra{margin:0 0 12px;padding:9px 12px 8px;border:1px solid var(--sia-lima-borda);border-radius:12px;
   background:var(--sia-vidro);color:var(--sia-texto);font-family:var(--sia-mono);box-shadow:0 10px 30px -18px var(--sia-sombra)}
 .sia-barra input,.sia-barra textarea,.sia-barra button{font-family:var(--sia-mono)}
-.sia-abrir.on{border-color:var(--sia-lima);color:var(--sia-lima)}
+.sia-abrir.on{border-color:var(--verde);color:var(--verde)}       /* fora da caixa: segue o tema da página */
+:where(html[data-tema="claro"]) .sia-barra{box-shadow:0 8px 24px -16px var(--sia-sombra)}   /* na página clara, a sombra curta */
 .sia-prompt{display:flex;align-items:flex-end;gap:8px}
 .sia-sinal{font-size:16px;font-weight:700;color:var(--sia-lima);line-height:36px}
 body.os-form .sia-prompt textarea{flex:1 1 auto;min-width:0;min-height:36px;max-height:160px;resize:none;border:none;border-radius:0;
@@ -38,6 +27,7 @@ body.os-form .sia-prompt textarea{flex:1 1 auto;min-width:0;min-height:36px;max-
 body.os-form .sia-prompt textarea::placeholder{color:var(--sia-mudo)}
 .sia-barra .os-btn{min-height:36px;font-size:12px;font-weight:700;white-space:nowrap}
 .sia-enviar{background:var(--sia-lima);color:var(--sia-sobre-lima);border-color:var(--sia-lima)}
+.sia-barra .os-btn.secondary{background:var(--sia-sec);color:var(--sia-sec-txt);border-color:var(--sia-linha)}
 .sia-barra .os-btn:disabled{opacity:.5;cursor:default}
 .sia-barra .os-btn:focus-visible{outline:2px solid var(--sia-lima);outline-offset:2px}
 .sia-linha{margin:6px 0 0 18px;font-size:12px;line-height:1.5;color:var(--sia-mudo-2)}
@@ -47,15 +37,39 @@ body.os-form .sia-prompt textarea::placeholder{color:var(--sia-mudo)}
 .sia-aviso{color:var(--sia-alerta)}
 .sia-erro{color:var(--sia-critico)}
 .sia-modelo{margin-left:6px;font-size:10.5px;color:var(--sia-mudo)}
+
+/* o que falta: uma pergunta por linha, a resposta ao lado (as respostas alinhadas numa coluna só) */
+.sia-perguntas[hidden]{display:none!important}
+.sia-perguntas{margin:8px 0 2px 18px;display:grid;grid-template-columns:minmax(0,max-content) minmax(200px,1fr);
+  column-gap:14px;row-gap:3px;align-items:center;font-size:12px;line-height:1.5}
+.sia-falta,.sia-dica-r{grid-column:1 / -1}
+.sia-falta{color:var(--sia-alerta);font-weight:700}
+.sia-dica-r{margin-top:2px;font-size:11px}
+/* cara de prompt (Levi: "deixe mais bonito! porém estilo CMD"): "? Pergunta  › resposta". Sem linha: o campo cresce com
+   o que se escreve (field-sizing), o cursor é verde, e o campo da vez acende a seta e ganha um fundo leve */
+.sia-q{color:var(--sia-alerta)}
+.sia-q::before{content:"?";margin-right:8px;font-weight:700;color:var(--sia-alerta)}
+.sia-campo{display:inline-flex;align-items:center;gap:7px;justify-self:start;max-width:100%;padding:1px 8px 1px 6px;
+  border-radius:6px;transition:background-color .12s}
+.sia-campo:focus-within{background:var(--sia-lima-suave)}
+.sia-seta{font-weight:700;color:var(--sia-mudo)}
+.sia-campo:focus-within .sia-seta{color:var(--sia-lima)}
+body.os-form .sia-perguntas .sia-r{field-sizing:content;min-width:16ch;max-width:100%;min-height:0;height:auto;
+  padding:2px 0;border:none;border-radius:0;box-shadow:none;outline:none;background:transparent;color:var(--sia-texto);
+  caret-color:var(--sia-lima);font-family:var(--sia-mono);font-size:12px;line-height:1.5}
+body.os-form .sia-perguntas .sia-r::placeholder{color:var(--sia-mudo);font-style:italic}
+body.os-form .sia-perguntas .sia-r:disabled{opacity:.5}
 .sia-pensando,.sia-seg{color:var(--sia-mudo)}
 .sia-cursor{display:inline-block;width:7px;height:13px;margin-left:4px;vertical-align:-2px;background:var(--sia-lima);animation:sia-pisca 1s steps(1) infinite}
 @keyframes sia-pisca{50%{opacity:0}}
 @media (prefers-reduced-motion:reduce){.sia-cursor{animation:none}}
-:where(html[data-tema="claro"]) .sia-barra{box-shadow:0 8px 24px -18px var(--sia-sombra)}
 
 @media (max-width:640px){
   .sia-prompt{flex-wrap:wrap}
   body.os-form .sia-prompt textarea{flex:1 1 calc(100% - 24px)}
   .sia-barra .os-btn{flex:1 1 0}
   .sia-linha{margin-left:0}
+  /* no celular a resposta vai embaixo da pergunta */
+  .sia-perguntas{margin-left:0;grid-template-columns:minmax(0,1fr)}
+  .sia-campo{margin-bottom:4px}
 }

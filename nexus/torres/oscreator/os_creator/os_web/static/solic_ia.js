@@ -11,7 +11,7 @@
   if (!barra || !tela) return;
   var form = document.getElementById("sia_form"), txt = document.getElementById("sia_txt"),
       btnEnviar = document.getElementById("sia_enviar"), btnLimpar = document.getElementById("sia_limpar"),
-      linha = document.getElementById("sia_msg");
+      linha = document.getElementById("sia_msg"), caixaPerg = document.getElementById("sia_perguntas");
   var setor = barra.getAttribute("data-setor"), dicaInicial = linha.innerHTML, placeInicial = txt.placeholder;
   var preenchida = false, ocupado = false;
 
@@ -48,6 +48,8 @@
     // a usina pelo nome dela (sem o cliente e o estado); sem a usina, o cliente que achou
     if (f.usina) partes.push(esc(f.usina_curta || f.usina)); else if (f.cliente) partes.push(esc(f.cliente));
     if (f.ativo) partes.push("<b>" + esc(f.ativo.curto || f.ativo.label || f.ativo.code) + "</b>");
+    if (f.responsavel_escolhido) partes.push("para " + esc(f.responsavel_escolhido.name));
+    if (f.evento_br) partes.push("evento " + esc(f.evento_br));
     if (f.com_subtarefas) {                                         // só a tela do PCM tem o tema e as subtarefas
       partes.push(f.tema ? "tema " + esc(f.tema_nome) : "sem tema");
       var naTela = (tela.estado().subtarefas || []).length;        // o que a tela tem agora (a pessoa pode ter tirado alguma)
@@ -57,11 +59,54 @@
     return partes.join(" · ");
   }
 
-  function fim() { ocupado = false; btnEnviar.disabled = false; btnLimpar.disabled = false; txt.focus(); }
+  // ── o que falta: uma pergunta por linha, a resposta ao lado; Tab passa para a próxima, Enter envia todas (Levi,
+  //    15/11/2026: "pode quebrar o texto, aí a pessoa pode responder ao lado da pergunta, apertando tab para passar a linha").
+  //    O que vem depois do "?" ("Sem resposta, fica o horário de agora.") vira a dica dentro do campo. ──
+  function respostasCampos() { return caixaPerg ? caixaPerg.querySelectorAll(".sia-r") : []; }
+  function mostrarPerguntas(lista) {
+    if (!caixaPerg) return;
+    caixaPerg.innerHTML = "";
+    caixaPerg.hidden = !lista.length;
+    if (!lista.length) return;
+    var tit = document.createElement("div");
+    tit.className = "sia-falta"; tit.textContent = "Falta:";
+    caixaPerg.appendChild(tit);
+    lista.forEach(function (p, i) {
+      var q = String(p), corte = q.indexOf("?") + 1, rotulo = corte > 0 ? q.slice(0, corte) : q, resto = corte > 0 ? q.slice(corte).trim() : "";
+      // cara de prompt (Levi: "deixe mais bonito! porém estilo CMD"): "? Pergunta  › resposta", sem linha embaixo
+      var lb = document.createElement("label"), inp = document.createElement("input"), campo = document.createElement("span"),
+          seta = document.createElement("span");
+      lb.className = "sia-q"; lb.htmlFor = "sia_r" + i; lb.textContent = rotulo;
+      inp.type = "text"; inp.id = "sia_r" + i; inp.className = "sia-r"; inp.maxLength = 200; inp.autocomplete = "off";
+      inp.placeholder = resto || "sua resposta"; inp.setAttribute("data-pergunta", rotulo);
+      inp.addEventListener("keydown", function (e) {
+        if (e.key === "Enter" && !e.isComposing) { e.preventDefault(); enviar(); }
+      });
+      campo.className = "sia-campo"; seta.className = "sia-seta"; seta.textContent = "›"; seta.setAttribute("aria-hidden", "true");
+      campo.appendChild(seta); campo.appendChild(inp);
+      caixaPerg.appendChild(lb); caixaPerg.appendChild(campo);
+    });
+    var dica = document.createElement("div");
+    dica.className = "sia-dica sia-dica-r"; dica.textContent = "Responda ao lado: Tab passa para a próxima, Enter envia. Ou escolha na tela.";
+    caixaPerg.appendChild(dica);
+  }
+  // cada resposta vai com a pergunta dela, numa linha: a IA lê "Quem é o responsável? Fulano"
+  function respostas() {
+    return Array.prototype.map.call(respostasCampos(), function (c) {
+      return c.value.trim() ? c.getAttribute("data-pergunta") + " " + c.value.trim() : "";
+    }).filter(Boolean);
+  }
+  function travar(sim) { Array.prototype.forEach.call(respostasCampos(), function (c) { c.disabled = sim; }); }
+
+  function fim() {
+    ocupado = false; btnEnviar.disabled = false; btnLimpar.disabled = false; travar(false);
+    var primeira = respostasCampos()[0];                          // com pergunta, o cursor já vai para a 1ª resposta
+    (primeira || txt).focus();
+  }
   function enviar() {
-    var t = txt.value.trim();
+    var t = [txt.value.trim()].concat(respostas()).filter(Boolean).join("\n");
     if (!t || ocupado) return;
-    ocupado = true; btnEnviar.disabled = true; btnLimpar.disabled = true;
+    ocupado = true; btnEnviar.disabled = true; btnLimpar.disabled = true; travar(true);
     var t0 = Date.now();
     // quem demora é a IA, não o catálogo (que já está na memória do Nexus): a frase diz isso (Levi achou que era o catálogo)
     dizer('<span class="sia-pensando">a IA está escrevendo a OS<span class="sia-seg"></span><span class="sia-cursor"></span></span>');
@@ -89,9 +134,8 @@
           txt.placeholder = "Peça uma mudança: “troque para o inversor 2.2”, “título mais curto”…";
           var m = nomeModelo(f.ia_info);
           // o que o pedido disse e o catálogo não tem vem antes de tudo (Levi: "poderia ter um aviso ativo x não encontrado")
-          var naoAchou = (f.avisos || []).map(function (a) { return '<span class="sia-erro">' + esc(a) + "</span> "; }).join("");
-          var falta = naoAchou + ((f.perguntas || []).length
-            ? '<span class="sia-aviso">Falta: ' + esc(f.perguntas.join(" ")) + " Responda aqui ou escolha na tela.</span> " : "");
+          var falta = (f.avisos || []).map(function (a) { return '<span class="sia-erro">' + esc(a) + "</span> "; }).join("");
+          mostrarPerguntas(f.perguntas || []);
           var tk = (f.ia_info && f.ia_info.tokens) || {};
           var dica = tk.entrada != null ? ' title="tokens: ' + tk.entrada + ' de entrada, ' + tk.saida + ' de saída'
             + (tk.raciocinio ? ", " + tk.raciocinio + " de raciocínio" : "") + '"' : "";
@@ -105,7 +149,7 @@
   btnLimpar.addEventListener("click", function () {
     if (ocupado) return;
     Promise.resolve(tela.limpar()).then(function () {
-      preenchida = false; txt.value = ""; ajustar(); txt.placeholder = placeInicial;
+      preenchida = false; txt.value = ""; ajustar(); txt.placeholder = placeInicial; mostrarPerguntas([]);
       linha.innerHTML = dicaInicial; txt.focus();
     });
   });

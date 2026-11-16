@@ -14,9 +14,18 @@
     <button type="button" class="os-btn secondary" id="sia_limpar" title="Tira tudo o que está na tela, da IA e o digitado">Limpar</button>
   </form>
   <div class="sia-linha" id="sia_msg" aria-live="polite">
+    {% if (ia.setores.get(ia_setor) or {}).get('subtarefas') %}
     <span class="sia-dica">A IA preenche esta tela com o tema e as subtarefas; confira e crie. Para mudar algo, peça de novo
       (“troque para o inversor 2.2”, “acrescente uma subtarefa de foto”). Data programada: daqui a {{ ia.dias }} dias
       ({{ ia.programada }}).</span>
+    {% else %}
+    <span class="sia-dica">A IA preenche esta tela com o ativo, o pedido, o responsável e a data do evento; confira e crie.
+      Para mudar algo, peça de novo (“troque para o inversor 2.2”, “para o Fulano”).
+      Data programada: daqui a {{ ia.dias }} dias ({{ ia.programada }}).</span>
+    {% endif %}
   </div>
+  {# o que falta, uma pergunta por linha com a resposta ao lado (Levi, 15/11/2026: "pode quebrar o texto, aí a pessoa pode
+     responder ao lado da pergunta, apertando tab para passar a linha"); o solic_ia.js monta #}
+  <div class="sia-perguntas" id="sia_perguntas" hidden></div>
 </section>
 {% endif %}

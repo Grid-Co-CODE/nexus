@@ -3325,8 +3325,10 @@ dia por este pedido.
 - **A IA só propõe; o catálogo decide** (`os_web/solic_ia.py`): cliente e usina pelo nome mais parecido do catálogo, o
   ativo pelo nome com os números iguais ("inversor 2.1" nunca vira o 2.3), empate fica para a pessoa; o tema só se for da
   lista e do tipo do ativo (a regra da Nova solicitação); as subtarefas são as do tema (ou a base) mais até 5 que o pedido
-  pede, só com tipo do editor. O que não casou vira a linha "Falta: …" embaixo da caixa, e a pessoa responde nela ou
-  escolhe na tela. O ativo que o pedido diz e a usina não tem vem antes, em vermelho (`avisos`: Ativo "inversor 1.5" não
+  pede, só com tipo do editor. O que não casou vira o bloco "Falta:" embaixo da caixa, uma pergunta por linha com o campo
+  da resposta ao lado, com cara de prompt ("? Pergunta  › resposta", sem linha; Levi: "porém estilo CMD") (Levi, 15/11/2026: "pode quebrar o texto, aí a pessoa pode responder ao lado da pergunta, apertando
+  tab para passar a linha"): Tab passa para a próxima, Enter envia todas, e cada resposta vai à IA junto da pergunta dela
+  ("Quem é o responsável? Fulano"); o que vem depois do "?" vira a dica do campo. Ou a pessoa escolhe na tela. O ativo que o pedido diz e a usina não tem vem antes, em vermelho (`avisos`: Ativo "inversor 1.5" não
   encontrado na …; Levi, 15/11/2026, no 1.5 de SMP100, cujo grupo 1 vai até o 1.4: "poderia ter um aviso ativo x não
   encontrado"), e os do mesmo grupo viram as opções da pergunta (`solic_ia.vizinhos`: o 1.1 a 1.4). A linha, o aviso e a
   pergunta citam a usina pelo nome dela, sem o cliente e o estado (`usina_curta`); sem a usina, o cliente (Levi: "deixa
@@ -3344,6 +3346,13 @@ dia por este pedido.
   lista de temas nem vai à IA. Levi, 15/11/2026: "quando vou para performance ou engenharia e escrevo um prompt ele abre
   subtarefa do nada, se não tem a opção acho que ele não deveria inventar" (a 1ª versão da barra punha ali um cartão de
   subtarefas que a tela não tem; saiu).
+- **O responsável e a data do evento (Engenharia e Performance):** Levi, 15/11/2026: "os campos em aberto poderiam ser
+  perguntados lá em cima. Então, assim, quem é o responsável? (...) Quando foi o evento?", e o pedido "para o Fulano fazer
+  uma inspeção" vinha sem o Fulano marcado. A IA devolve o nome como foi dito e a data (AAAA-MM-DD HH:MM; no futuro não
+  vale); quem acha a pessoa é a equipe do setor, a mesma lista do campo da tela (`solic_ia.responsavel_da_pista`; duas
+  pessoas com o mesmo nome viram opções). A lista NÃO vai à IA (nome de pessoa não sai para o OpenRouter). O que falta
+  vira as perguntas "Quem é o responsável?" e "Quando foi o evento?" lá em cima, e a pessoa responde ao lado; o que a tela
+  já tinha (`anterior`) fica. Custo medido: ~100 tokens a mais no pedido (~3%), e casar o nome leva 5 ms.
 - **Quem cria é o botão de sempre:** PCM pela Nova solicitação (`/os/api/solic/criar`, com a data sugerida de 6 dias às
   08:00 que a IA pôs no campo); Performance e Engenharia pela delas, com `origem: "ia"`, que leva só a programada de 6
   dias às 08:00 (a Urgente segue com a dela; a tela sem a IA, com os 7 dias); subtarefa nenhuma, mesmo se vier no corpo.

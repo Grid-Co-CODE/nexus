@@ -302,12 +302,16 @@
   //    subtarefas (Levi, 15/11/2026: "se não tem a opção acho que ele não deveria inventar"). O responsável é a pessoa
   //    quem escolhe. ──
   const INICIO = {usinas: cbUsi.innerHTML, evento: dtEvento.value};
+  let cargaResp = Promise.resolve();                  // a lista da equipe (o responsável da IA só entra com ela pronta)
   const temOpcao = (sel, v) => Array.prototype.some.call(sel.options, (o) => o.value === String(v));
   window.SolicForm = {
     estado() {
       return {cliente: cbCli.value, usina: cbUsi.value, tipo: cbTipo.value,
               ativo: ativos.filter((a) => marcados.has(String(a.id))).map((a) => a.curto || a.label).join('; '),
-              titulo: edDesc.value, descricao: taProb.value};
+              titulo: edDesc.value, descricao: taProb.value,
+              // o que a pessoa (ou a IA) já pôs: o próximo pedido não pergunta de novo
+              responsavel: (pessoas.find((p) => String(p.id_personnel) === cbResp.value) || {}).name || '',
+              evento: dtEvento.value !== INICIO.evento ? dtEvento.value : ''};
     },
     async preencher(f) {
       if (f.cliente && cbCli.value !== f.cliente && temOpcao(cbCli, f.cliente)) { cbCli.value = f.cliente; await trocarCliente(); }
@@ -318,6 +322,13 @@
       busca.value = ''; limite = PAGINA; pintar();
       if (f.titulo) edDesc.value = f.titulo;
       if (f.descricao) taProb.value = f.descricao;
+      // o responsável que o pedido disse ("pedir para o Fulano") e a data do evento
+      await cargaResp;
+      const resp = f.responsavel_escolhido;
+      if (resp && temOpcao(cbResp, resp.id_personnel)) {
+        cbResp.value = String(resp.id_personnel); cbResp.dispatchEvent(new Event('change', {bubbles: true}));
+      }
+      if (f.evento) dtEvento.value = f.evento;
       iaAtivo = true;
       mostrarData(); contar(); regrasAnexo();
     },
@@ -331,5 +342,5 @@
     }
   };
 
-  carregarResponsaveis();
+  cargaResp = carregarResponsaveis();
 })();

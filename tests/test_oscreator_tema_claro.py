@@ -41,6 +41,10 @@ COR = re.compile(r"#[0-9a-fA-F]{3,8}\b|\b(?:rgba?|hsla?|hwb|lab|lch|oklab|oklch)
 # sempre escura, como a do Nexus (--foto-*): foto se olha no escuro. Dentro dele as variáveis voltam ao escuro.
 FICA_ESCURO = {("os_acoes.css", ".visor"), ("os_acoes.css", ".visor-img img"), ("os_acoes.css", ".visor-lado"),
                ("os_acoes.css", ".visor-cap")}
+# A caixa do Pedir com IA é um terminal, escura nos dois temas (Levi, 15/11/2026: "estilo dark tá? vi que o branco tá
+# estourado"): o texto dela se mede contra o fundo dela, não contra a página clara. Fora da caixa só o botão que a abre.
+FUNDO_DA_CAIXA = {"solic_ia.css": "var(--sia-vidro)"}
+FORA_DA_CAIXA = (".sia-abrir",)
 # A cor de DADO que é a mesma nos dois temas, com texto escuro por cima: a do avatar de cada pessoa no quadro do
 # Acompanhamento (acomp_web.cor_avatar), como a cor da pessoa no Quadro da equipe do Nexus.
 VARIAVEIS_DO_DADO = {"--av"}
@@ -492,6 +496,9 @@ def _contrastes_do_claro():
             f = _fundo(d["bg"], vs)
             if f:
                 fundos = [_sobre(f, [255, 255, 255, 1.0])]
+        if not fundos and arq in FUNDO_DA_CAIXA and not sel.startswith(FORA_DA_CAIXA):
+            caixa = _fundo(FUNDO_DA_CAIXA[arq], vs)
+            fundos = [_sobre(caixa, [255, 255, 255, 1.0]), _sobre(caixa, _rgba("#f5f6f8"))]
         if not fundos:
             fundos = [[255, 255, 255, 1.0], _rgba("#f5f6f8")]
         pior = min(_razao(_sobre(texto, b) if texto[3] < 1 else texto, b) for b in fundos)

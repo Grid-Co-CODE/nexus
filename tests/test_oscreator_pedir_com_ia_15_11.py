@@ -148,7 +148,7 @@ def test_na_engenharia_e_na_performance_a_ia_nao_inventa_tema_nem_subtarefa(ia):
     recebe a lista de temas, e o criar não manda subtarefa mesmo se vier no corpo."""
     for setor in ("performance", "engenharia"):
         f = ia.post("/os/api/solic/ia/preencher", json={"setor": setor, "texto": "baixa performance no inversor 1.1"}).get_json()
-        assert f["ativo"]["id"] == 2 and f["responsavel"] is True and f["pronta"]
+        assert f["ativo"]["id"] == 2 and f["responsavel"] is True
         assert f["tema"] == "" and f["subtarefas"] == [] and f["temas"] == [] and f["com_subtarefas"] is False
         sistema = ia.pedidos[-1]["sistema"]
         assert "inversor_inspecao" not in sistema and '"subtarefas"' not in sistema and '"tema"' not in sistema
@@ -164,10 +164,65 @@ def test_na_engenharia_e_na_performance_a_ia_nao_inventa_tema_nem_subtarefa(ia):
 def test_o_que_falta_vira_pergunta(ia):
     ia.resposta["j"] = {"cliente": "Cliente X", "titulo": "Trocar o fusível", "descricao": "Queimou."}
     f = ia.post("/os/api/solic/ia/preencher", json={"setor": "engenharia", "texto": "trocar o fusível"}).get_json()
-    assert f["cliente"] == "Cliente X" and f["usina"] == "" and f["perguntas"] == ["Em qual usina?"] and not f["pronta"]
+    assert f["cliente"] == "Cliente X" and f["usina"] == "" and f["perguntas"][0] == "Em qual usina?" and not f["pronta"]
     # a resposta da pessoa vai com a ficha de antes
     ia.post("/os/api/solic/ia/preencher", json={"setor": "engenharia", "texto": "na usina teste 1", "anterior": f["anterior"]})
     assert "Trocar o fusível" in ia.pedidos[-1]["usuario"] and "na usina teste 1" in ia.pedidos[-1]["usuario"]
+
+
+def test_o_responsavel_e_o_evento_saem_do_pedido_e_o_que_falta_vira_pergunta(ia):
+    """Levi, 15/11/2026: "os campos em aberto poderiam ser perguntados lá em cima. Então, assim, quem é o responsável? A
+    pessoa vai digitar o nome. Quando foi o evento?"; e "pedir para o Fulano fazer uma inspeção" sem o Fulano marcado."""
+    ontem = dt.datetime.now(IA.BRT) - dt.timedelta(days=1)
+    ia.resposta["j"] = dict(RESPOSTA, responsavel="a Ana", evento=ontem.strftime("%Y-%m-%d 15:00"))
+    f = ia.post("/os/api/solic/ia/preencher", json={"setor": "engenharia", "texto": "pede para a Ana o inversor 1.1"}).get_json()
+    assert f["responsavel_escolhido"] == {"id_personnel": 501, "name": "Ana Teste Silva"}
+    assert f["evento"] == ontem.strftime("%Y-%m-%dT15:00") and f["pronta"] and f["perguntas"] == []
+    # a lista da equipe não vai à IA: só o pedido, com o nome que a pessoa escreveu
+    sistema = ia.pedidos[-1]["sistema"]
+    assert '"responsavel"' in sistema and '"evento"' in sistema and "Agora é" in sistema
+    assert "Ana Teste Silva" not in sistema and "Bruno Souza" not in sistema
+    # sem o responsável e sem o evento: as duas perguntas lá em cima, e a ficha não fica pronta
+    ia.resposta["j"] = dict(RESPOSTA)
+    g = ia.post("/os/api/solic/ia/preencher", json={"setor": "engenharia", "texto": "o inversor 1.1"}).get_json()
+    assert g["perguntas"] == ["Quem é o responsável?", "Quando foi o evento? Sem resposta, fica o horário de agora."]
+    assert g["responsavel_escolhido"] is None and g["evento"] == "" and not g["pronta"]
+    # a resposta vale junto do que a tela já tinha: o responsável escolhido à mão e o evento ficam
+    anterior = {"responsavel": "Bruno Souza", "evento": ontem.strftime("%Y-%m-%dT09:30")}
+    h = ia.post("/os/api/solic/ia/preencher", json={"setor": "engenharia", "texto": "título mais curto",
+                                                     "anterior": anterior}).get_json()
+    assert h["responsavel_escolhido"]["id_personnel"] == 502 and h["evento"] == ontem.strftime("%Y-%m-%dT09:30")
+    # quem não é da equipe vira aviso; o evento no futuro não vale
+    amanha = dt.datetime.now(IA.BRT) + dt.timedelta(days=2)
+    ia.resposta["j"] = dict(RESPOSTA, responsavel="Zeca", evento=amanha.strftime("%Y-%m-%d 10:00"))
+    k = ia.post("/os/api/solic/ia/preencher", json={"setor": "engenharia", "texto": "para o Zeca"}).get_json()
+    assert k["avisos"][0] == '"Zeca" não está na equipe da Engenharia.' and "no futuro" in k["avisos"][1]
+    assert k["perguntas"][0] == "Quem é o responsável?" and k["evento"] == ""
+    # o PCM não tem responsável nem evento na tela: nada disso vai à IA nem vira pergunta
+    ia.resposta["j"] = dict(RESPOSTA)
+    m = ia.post("/os/api/solic/ia/preencher", json={"setor": "pcm", "texto": "o inversor 1.1"}).get_json()
+    assert m["perguntas"] == [] and m["pronta"] and '"responsavel"' not in ia.pedidos[-1]["sistema"]
+    js = ia.get("/os/static/solic_eng.js").get_data(as_text=True)
+    assert "f.responsavel_escolhido" in js and "f.evento" in js and "await cargaResp" in js
+    # as perguntas viram campos (resposta ao lado, Tab, Enter envia) e cada resposta vai com a pergunta dela
+    barra = ia.get("/os/static/solic_ia.js").get_data(as_text=True)
+    assert "mostrarPerguntas(f.perguntas" in barra and 'data-pergunta' in barra and "concat(respostas())" in barra
+
+
+def test_o_nome_da_pessoa_casa_pela_equipe():
+    equipe = [{"id_personnel": 1, "name": "Ana Teste Silva"}, {"id_personnel": 2, "name": "Ana Outra Lima"},
+              {"id_personnel": 3, "name": "Bruno Souza"}]
+    assert IA.responsavel_da_pista("para o Bruno", equipe)[0]["id_personnel"] == 3
+    assert IA.responsavel_da_pista("Ana Teste", equipe)[0]["id_personnel"] == 1
+    achado, cand = IA.responsavel_da_pista("Ana", equipe)              # duas Anas: a pessoa escolhe
+    assert achado is None and {x["id_personnel"] for x in cand} == {1, 2}
+    assert IA.responsavel_da_pista("Anna", equipe) == (None, [])       # parecido demais com ninguém: nenhuma opção
+    assert IA.responsavel_da_pista("", equipe) == (None, [])
+    agora = dt.datetime(2026, 11, 15, 19, 0, tzinfo=IA.BRT)
+    assert IA.evento_do_pedido("2026-11-14", agora)[0] == dt.datetime(2026, 11, 14, 8, 0, tzinfo=IA.BRT)
+    assert IA.evento_do_pedido("2026-11-15T07:10", agora)[0] == dt.datetime(2026, 11, 15, 7, 10, tzinfo=IA.BRT)
+    assert IA.evento_do_pedido("ontem", agora) == (None, "") and IA.evento_do_pedido("", agora) == (None, "")
+    assert IA.evento_do_pedido("2026-11-16 08:00", agora)[0] is None
 
 
 def test_sem_a_chave_a_tela_diz_e_nada_vai_a_ia(ia, monkeypatch):
@@ -201,6 +256,10 @@ def test_a_caixa_de_texto_mora_na_tela_de_sempre_das_tres(ia):
         for s in ('id="sia" hidden', 'data-setor="%s"' % setor, "data-sia-abrir", 'id="sia_limpar"', ">Limpar<",
                   "daqui a 6 dias", "solic_ia.js", "solic_ia.css"):
             assert s in h, (url, s)
+        # o que falta, uma pergunta por linha com a resposta ao lado (Levi: "apertando tab para passar a linha")
+        assert 'id="sia_perguntas"' in h, url
+        # a dica diz o que a tela recebe: tema e subtarefas só no PCM
+        assert ("com o tema e as subtarefas" in h) == (setor == "pcm") and ("o responsável e a data" in h) == (setor != "pcm")
         # a caixa fica no alto da tela de sempre, antes do 1º campo; a janela e a ficha de antes não existem mais
         assert h.index('id="sia"') < h.index('id="cb_cli') and "sia_veu" not in h and "sia_ficha" not in h
     assert "window.SolicForm" in ia.get("/os/solicitacao").get_data(as_text=True)          # o PCM preenche pela tela

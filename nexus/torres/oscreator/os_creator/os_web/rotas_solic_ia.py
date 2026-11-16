@@ -15,6 +15,7 @@ from . import solic_eng_web as reg
 from . import solic_ia as IA
 from . import solic_web as sw
 from . import tradicional_web as trad
+from . import rotas
 from .rotas import exige_sessao
 
 bp = Blueprint("os_web_solic_ia", __name__, url_prefix="/os")
@@ -31,6 +32,17 @@ def _chave() -> str:
 # NEXUS_PEDIR_COM_IA=1 libera para todos). O OS Creator sozinho (sem a ponte) não tem a marca: liberado.
 IA_LIBERADA = "os_web.ia_liberada"
 EM_TESTE = "O Pedir com IA está em teste: por enquanto só os administradores do Nexus o usam."
+
+
+def _equipe(setor: str) -> list:
+    """A equipe do setor, a mesma lista do campo Responsável da tela (o catálogo em memória, sem ir ao Fracttal). Sem ela,
+    o responsável fica para a pessoa escolher: o Pedir com IA não cai por isso."""
+    if not IA.setor_de(setor)["responsavel"]:
+        return []
+    try:
+        return reg.equipe(rotas.responsaveis_fracttal(), setor)[0]
+    except Exception:  # noqa: BLE001  (catálogo fora: a pergunta "Quem é o responsável?" fica, e a pessoa escolhe na tela)
+        return []
 
 
 def _liberada() -> bool:
@@ -98,7 +110,7 @@ def preencher():
     anterior = corpo.get("anterior") if isinstance(corpo.get("anterior"), dict) else None
     opcoes_c1 = _opcoes_c1() if setor == "pcm" else []
     codigos = IA.codigos_das_usinas(assets)
-    res = IA.chamar(chave, IA.instrucoes(setor, temas, usinas, agora.date(), [o["txt"] for o in opcoes_c1], codigos),
+    res = IA.chamar(chave, IA.instrucoes(setor, temas, usinas, agora, [o["txt"] for o in opcoes_c1], codigos),
                     IA.mensagem(texto, anterior))
     if res.get("erro"):
         return jsonify({"erro": res["erro"]}), 502
@@ -112,7 +124,8 @@ def preencher():
         lido["cliente"] = next((c for c, lista in usinas.items() if pelo_codigo in lista), lido.get("cliente"))
     f = IA.ficha(setor, lido, assets, clientes, lambda c: usinas.get(c) or [],
                  lambda u: reg.ativos_da_usina(assets, u, api._asset_short_name), temas,
-                 lambda tema, tipo: sp.de_api(sw.subtarefas_do_tema(tema, tipo)), agora, nome_tipo=reg.rotulo_tipo)
+                 lambda tema, tipo: sp.de_api(sw.subtarefas_do_tema(tema, tipo)), agora, nome_tipo=reg.rotulo_tipo,
+                 pessoas=_equipe(setor), anterior=anterior)
     if setor == "pcm":
         _com_c1(f, opcoes_c1, pista=str(lido.get("classif1") or ""))
     f["anterior"] = IA.resumo(f)
