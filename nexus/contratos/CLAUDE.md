@@ -25,9 +25,55 @@ cliente lá para bases, contestações, você vai jogar para o comando, prévia 
 
 **Prévia: visão do contrato** (12/11/2026, `/t/comando/visao-do-contrato`, de todos): o mockup que a área de Contratos pediu para a
 avaliação de Contratos e dos setores, `nexus/static/previa/visao-do-contrato.html` (a mesma
-página do `docs/mockups/visao-do-contrato` da plataforma), numa moldura; dentro do Nexus ele esconde o topo dele. Dados
-fictícios, nada grava. Quando a visão do contrato virar tela de verdade, ela entra na tela Clientes (a "Gestão de
-contratos (a estruturar)") e a prévia sai.
+página do `docs/mockups/visao-do-contrato` da plataforma), numa moldura; dentro do Nexus ele esconde o topo dele. Nada
+grava. Sem a planilha de controle importada, os dados são fictícios; com ela, são os reais (seção abaixo).
+
+## A planilha de controle de obrigações na visão do contrato (16/11/2026; `controle.py`)
+
+O pedido veio do retorno do supervisor de contratos na prévia: "Só não encontrei algum setor que fale sobre renovação
+contratual e/ou ajuste contratual de 12 meses. Essas datas são importantes para a gestão de contratos". O Levi, com a
+pasta do Backoffice: "ATUALIZE AGORA COM DADOS REAIS!".
+
+- **A fonte é a planilha da própria área:** `Controle_Obrigacoes_Contratos_GridCo_R00.xlsx`, no SharePoint (Gridco › 4.
+  O&M › 17. Backoffice › 2. Contratos). As abas que entram:
+  - **Carteira:** uma linha por cliente e recorte, com o supervisor, a vigência, a data-base e o índice do reajuste, o
+    aviso prévio de renovação, o SLA, a pasta e as observações, tirados dos contratos pela área;
+  - **Calendario:** uma linha por obrigação, com o vencimento, o alerta, o executor e o status;
+  - **Usinas:** as usinas de cada cliente, do Fracttal.
+
+  O Nexus acha as colunas pelo nome, então a coluna pode mudar de lugar. A linha "— EXEMPLO" da planilha não entra.
+- **Onde mora.** O administrador importa a planilha na própria tela (`POST /t/comando/visao-do-contrato/importar`). O
+  resultado vai para a pasta de dados do servidor, `contratos/controle_obrigacoes.json`.
+  - **NUNCA no repositório**, que é público, e nunca no banco de leitura aberta: a planilha tem nomes, valores e cláusulas.
+  - A planilha errada é recusada e a que estava fica.
+  - `GET .../dados.json` entrega o importado, com as contas de hoje; a conta do cliente e o Modo cliente não leem (403).
+- **As contas (`com_datas`), as duas que a área pediu:**
+  - **Renovação:** avisar até o fim da vigência menos o aviso prévio.
+  - **Próximo reajuste:** o 1º aniversário da data-base, contado a partir de 12 meses dela, que ainda não passou. Hoje
+    conta, e 29/02 vira 28/02.
+  - Com elas vêm os dias até cada data, as obrigações em atraso e o tom de cada obrigação: entregue; atrasada; dentro do
+    "Alerta com antecedência" da própria linha (sem ele, 1 semana, a régua da prévia); prevista.
+  - O gestor do contrato é o supervisor da linha "Contrato (nível geral)"; sem essa linha, o supervisor único do cliente.
+    As outras linhas viram as carteiras, cada uma com o supervisor e as usinas dela.
+- **A página (`static/previa/visao-do-contrato.html`)** pede os dados ao Nexus. Sem resposta (fora do Nexus ou sem
+  importação), fica no exemplo fictício. Com resposta:
+  - abre em **Todos os contratos**: uma tabela com o gestor, a vigência, até quando avisar a renovação, o próximo
+    reajuste e as obrigações em atraso. Em cima a vigência (ou o aviso) vencida, depois quem tem atraso, depois a data mais
+    perto;
+  - cada contrato traz na linha de fatos **Vigência, Renovação (avisar até), Próximo reajuste e Usinas**, e a ficha da
+    planilha;
+  - **Regras** traz as quatro que a planilha tem (vigência, renovação, reajuste, SLA); **Calendário** traz as obrigações
+    reais (o mês, as atrasadas, as próximas e a lista inteira);
+  - Atendimento, Entregáveis, Metas e Financeiro dizem "Sem dado real ainda": a planilha não traz, e o exemplo fictício
+    não se mistura com o contrato de verdade.
+- **Medido em 16/11/2026** com a planilha real: 16 contratos e 60 obrigações. Batem com as colunas automáticas da
+  planilha, por exemplo:
+  - Athon: vigência vencida em 25/08/2026 e próximo reajuste em 25/02/2027;
+  - Élis: reajuste em 01/12/2026.
+- Prova: `tests/test_contratos_controle.py`, com uma planilha inventada (mesmas abas e colunas, nada real).
+
+Quando a visão do contrato virar tela de verdade, ela entra na tela Clientes (a "Gestão de contratos (a estruturar)") e a
+prévia sai.
 
 **Enxuta desde a noite de 12/11/2026** (Levi: "pode tirar o prontuário, tá? Não tem nada a ver" e "É quase a tela
 inteira, só de nada com nada [...] A gente está vendo o quê? Regras do contrato. Então, tem que mostrar regras do

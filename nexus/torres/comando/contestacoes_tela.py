@@ -138,5 +138,100 @@ def contestacao_atualizar(linha_id):
 @bp.route("/visao-do-contrato")
 def visao_do_contrato():
     """Comando › Prévia: visão do contrato (12/11/2026): o mockup (static/previa/visao-do-contrato.html) numa moldura,
-    para Contratos e os setores avaliarem. Dados fictícios, nada grava."""
-    return render_template("comando/visao_do_contrato.html", torre=TORRE, tela=TORRE.tela("visao-do-contrato"))
+    para Contratos e os setores avaliarem. Desde 16/11/2026, com a planilha de controle de obrigações importada, a página
+    mostra os contratos de verdade (`nexus/contratos/controle.py`); sem ela, o exemplo fictício."""
+    real = _controle_lido()
+    return render_template("comando/visao_do_contrato.html", torre=TORRE, tela=TORRE.tela("visao-do-contrato"),
+                           real=real, admin=bool(session.get("admin")),
+                           aviso=session.pop(_AVISO_CT, None), erro=session.pop(_ERRO_CT, None))
+
+
+# ── a planilha de controle de obrigações (16/11/2026) ─────────────────────────────────────────────────────────────────
+# Retorno do supervisor de contratos na prévia: "Só não encontrei algum setor que fale sobre renovação contratual e/ou
+# ajuste contratual de 12 meses. Essas datas são importantes para a gestão de contratos"; Levi: "ATUALIZE AGORA COM DADOS
+# REAIS!". A planilha da área (Backoffice › 2. Contratos) é importada aqui e fica na pasta de dados do servidor: o
+# repositório é público e a planilha tem nomes, valores e cláusulas. A leitura é só para quem está logado e não é cliente.
+_AVISO_CT, _ERRO_CT = "contrato_aviso", "contrato_erro"
+VISAO = "/t/comando/visao-do-contrato"
+
+
+def _caminho_controle():
+    from flask import current_app
+
+    from ...cadastro.ligacoes import pasta_dados
+    from ...contratos import controle as K
+    return pasta_dados(current_app.config) / "contratos" / K.ARQUIVO
+
+
+def _controle_lido() -> dict | None:
+    """O que foi importado ({arquivo, importado_em, importado_por, contratos, obrigacoes}) ou None."""
+    import json
+    try:
+        p = _caminho_controle()
+        return json.loads(p.read_text(encoding="utf-8")) if p.exists() else None
+    except Exception:            # noqa: BLE001 — arquivo estragado: a tela volta ao exemplo, e o log diz
+        _log.exception("Visão do contrato: não li o controle de obrigações importado")
+        return None
+
+
+def _so_interno():
+    from ...auth import setor_telas as ST
+    if session.get("via") == "cliente" or ST.em_modo_cliente():
+        abort(403)
+
+
+@bp.route("/visao-do-contrato/dados.json")
+def visao_do_contrato_dados():
+    """Os contratos e as obrigações importados, com as contas de hoje (`controle.com_datas`), para a página da prévia.
+    Sem importação: {"ok": false}, e a página fica no exemplo."""
+    from flask import jsonify
+
+    from ...campo import visao
+    from ...contratos import controle as K
+    _so_interno()
+    d = _controle_lido()
+    if not d:
+        resp = jsonify(ok=False)
+    else:
+        resp = jsonify(ok=True, **K.com_datas(d, visao._agora().date()))
+    resp.headers["Cache-Control"] = "no-store"
+    return resp
+
+
+@bp.route("/visao-do-contrato/importar", methods=["POST"])
+def visao_do_contrato_importar():
+    """O administrador sobe a planilha de controle de obrigações (.xlsx); o Nexus confere as abas e as colunas, lê e
+    guarda o resultado na pasta de dados. A planilha errada não apaga a que estava."""
+    import json
+    import os
+
+    from ...campo import visao
+    from ...contratos import controle as K
+    if _de_outro_site():
+        abort(403)
+    if not session.get("admin"):
+        abort(403)
+    f = request.files.get("planilha")
+    if not f or not f.filename:
+        session[_ERRO_CT] = "Escolha a planilha de controle de obrigações (.xlsx)."
+        return redirect(na_raiz(VISAO))
+    conteudo = f.read()
+    if len(conteudo) > 20 * 1024 * 1024:
+        session[_ERRO_CT] = "A planilha passa de 20 MB: não é a de controle de obrigações."
+        return redirect(na_raiz(VISAO))
+    try:
+        d = K.ler_planilha(conteudo, os.path.basename(f.filename))
+    except K.PlanilhaInvalida as ex:
+        session[_ERRO_CT] = f"Não importei: {ex}. A que estava continua."
+        return redirect(na_raiz(VISAO))
+    u = session.get("usuario")
+    d.update(importado_em=visao._agora().strftime("%Y-%m-%dT%H:%M"),
+             importado_por=(u.get("nome") or u.get("email") or "") if isinstance(u, dict) else "")
+    p = _caminho_controle()
+    p.parent.mkdir(parents=True, exist_ok=True)
+    tmp = p.with_suffix(".tmp")
+    tmp.write_text(json.dumps(d, ensure_ascii=False), encoding="utf-8")
+    os.replace(tmp, p)
+    session[_AVISO_CT] = (f"Planilha importada: {len(d['contratos'])} contratos e {len(d['obrigacoes'])} obrigações. "
+                          "A visão do contrato já mostra os dados dela.")
+    return redirect(na_raiz(VISAO))
