@@ -8651,7 +8651,7 @@ function modalOSContrato(){
     '<div class="modal-body">' +
       (escolher ? fieldSelectKV('osc-contrato', 'Contrato *', lista.map(function(x){ return [x.id, (x.nome || contratoFornecedorNome(x))]; })) : '') +
       '<div class="field"><label for="osc-usina">Usina *</label><select id="osc-usina">' + opcoesUsinasOSContrato(cBase, o) + '</select></div>' +
-      '<div class="field-row">' + fieldSelectKV('osc-servico', 'Serviço *', [['ROÇAGEM','Roçagem'], ['LIMPEZA DE MÓDULOS','Lavagem (limpeza de módulos)']]) + fieldSelectKV('osc-origem', 'Origem *', OS_ORIGENS) + '</div>' +
+      '<div class="field-row">' + fieldSelectKV('osc-servico', 'Serviço *', [['ROÇAGEM','Roçagem'], ['LIMPEZA DE MÓDULOS','Lavagem (limpeza de módulos)'], ['PODA QUÍMICA','Poda química']]) + fieldSelectKV('osc-origem', 'Origem *', OS_ORIGENS) + '</div>' +
       '<div class="field-row">' + field('osc-data-acionamento', 'Data do acionamento / solicitação', 'date') + field('osc-numero', 'Nº da OS (PCM)', 'text') + '</div>' +
       '<div class="cell-muted" style="font-size:11px;margin:-6px 0 8px;">Em "Acionamento" a data é obrigatória — o app conta quantos dias o fornecedor levou pra regularizar.</div>' +
       '<div style="font-size:11px;text-transform:uppercase;letter-spacing:.04em;font-weight:700;color:var(--ink-muted);margin:10px 0 6px;border-top:1px solid var(--border);padding-top:10px;">Cronograma (datas previstas)</div>' +
