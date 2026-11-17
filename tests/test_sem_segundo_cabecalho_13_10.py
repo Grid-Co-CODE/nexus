@@ -81,11 +81,13 @@ def test_no_celular_fica_so_o_avatar_ao_lado_do_sino():
                    if ".botao-menu" in b)
     # linha 1, a marca e o Menu; linha 2, o sino e o avatar (o Setor, o Tema e o Sair moram no menu da conta, 03/11/2026;
     # numa linha só, a 375 px, o "Nexus" da marca entrava por baixo do Menu)
-    # desde 12/11/2026 o sininho das demandas (a bandeja) vem antes do botão do OS Creator, na mesma linha
-    assert "grid-template-columns:minmax(0,1fr) auto auto auto;" in celular
+    # desde 12/11/2026 o sininho das demandas (a bandeja) vem antes do botão do OS Creator, na mesma linha, e desde
+    # 16/11/2026 o aviso do Fora da programação vem depois dele, antes do avatar
+    assert "grid-template-columns:minmax(0,1fr) auto auto auto auto;" in celular
     assert ".sino-topo.sino-dem{grid-column:2;grid-row:2}" in celular and ".sino-topo{grid-column:3;grid-row:2}" in celular
-    assert ".conta-topo{grid-column:4;grid-row:2}" in celular
-    assert ".botao-menu{display:inline-flex;grid-column:2 / 5;grid-row:1;justify-self:end}" in celular
+    assert ".sino-topo.sino-fora{grid-column:4;grid-row:2}" in celular
+    assert ".conta-topo{grid-column:5;grid-row:2}" in celular
+    assert ".botao-menu{display:inline-flex;grid-column:2 / 6;grid-row:1;justify-self:end}" in celular
     assert "troca-tema" not in celular and ".sair{" not in celular
     # e lá dentro o rótulo do Tema e o do Sair ficam sempre à vista (eram escondidos na barra estreita)
     assert ".rotulo-tema{display:none}" not in CSS and ".rotulo-sair{display:none}" not in CSS
