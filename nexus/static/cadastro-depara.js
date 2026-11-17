@@ -58,10 +58,11 @@
     var nome = alvo.exibicao || alvo.nome;
     var sub = (alvo.exibicao && alvo.nome && alvo.nome !== alvo.exibicao ? alvo.nome : '') +
               (alvo.esp ? (alvo.exibicao && alvo.nome !== alvo.exibicao ? ' · ' : '') + alvo.esp + ' str' : '');
-    var lapis = invId != null
+    // na tela Equipamentos (17/11/2026) não há lápis: o cadastro está logo abaixo, na tabela dos inversores
+    var lapis = invId != null && E
       ? '<button type="button" class="dpx-lapis" data-dpx-editar="' + esc(invId) + '"' + (dica ? ' data-dpx-dica="' + esc(dica) + '"' : '') +
         ' aria-label="Editar ' + esc(nome) + ' no cadastro" title="Editar no cadastro"><i class="ph ph-pencil-simple" aria-hidden="true"></i></button>'
-      : '<span class="gc-status gc-status--neutro" title="Este inversor está no cadastro que a plataforma lê (a aba Equipamentos), e não na estrutura do Nexus">só na aba</span>';
+      : invId != null ? '' : '<span class="gc-status gc-status--neutro" title="Este inversor está no cadastro que a plataforma lê (a aba Equipamentos), e não na estrutura do Nexus">só na aba</span>';
     return '<div class="dpx-pc"><span class="dpx-pc-txt"><span>' + esc(nome) + '</span>' + (sub ? '<small class="gc-dado">' + esc(sub) + '</small>' : '') + '</span>' + lapis + '</div>';
   }
 
@@ -141,6 +142,8 @@
         CARTOES = j.cartoes || [];
         lido.textContent = j.lido_em ? 'lido ' + j.lido_em : '';
         desenhar();
+        // a coluna "Na fonte" da tabela dos inversores (cadastro-equipamentos.js) lê o que os cartões dizem
+        document.dispatchEvent(new CustomEvent('eq-fontes', {detail: CARTOES}));
       })
       .catch(function () { lido.textContent = ''; $('[data-dpx-cartoes]', raiz).innerHTML = '<p class="eq-vazio">Sem conexão com o Nexus.</p>'; });
   }

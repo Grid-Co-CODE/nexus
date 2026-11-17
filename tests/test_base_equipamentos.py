@@ -321,7 +321,9 @@ def test_a_tela_mostra_a_lista_e_os_dois_passos_sem_fracttal_e_sem_ligar_nada_so
     # com a potência real na ficha, é ela que vale (a aba Equipamentos bate com a real), e a contratual fica à vista
     html = cli.get("/t/base/equipamentos?usina=2").get_data(as_text=True)
     dados = json.loads(html.split('id="eq-dados">')[1].split("</script>")[0])
-    assert (dados["kwp_usina"], dados["kwp_de"]) == (500.0, "real") and "contratual 400,0 kWp" in html
+    # o nome e a potência saíram do alto da usina (17/11/2026, Levi: "o nome e potência da UFV já se repete em baixo"):
+    # a potência da conferência vai nos quadros do editor
+    assert (dados["kwp_usina"], dados["kwp_de"]) == (500.0, "real") and 'class="eq-kwp"' not in html
 
 
 def test_ligar_o_fracttal_pela_tela_e_a_decisao_das_ligacoes(app_eq, cli):

@@ -4,28 +4,52 @@
 {% from "_explica.html" import explica %}
 {# Base > Equipamentos das usinas (13/10/2026, Levi: "Temos que substituir a aba equipamentos aproveitando o que tem lá e
    usando o Nexus como ponto de partida"; "Não quero que faça as conexões automaticamente, quero poder ver e fazer de forma
-   versátil"). À esquerda, as usinas do Registro mestre; à direita, a usina aberta em 2 passos: as chaves do supervisório
-   (a "Usina Supervisório") e a tabela dos equipamentos nas colunas da aba Equipamentos. Sem Fracttal (Levi, 13/10/2026:
-   "já temos a ligação com o Fractall pelo registro mestre que é o código da UFV [...] tem que funcionar mais como uma
-   tabela que nem era na TEquipamentos do BD_Performance"; ligar ao OS Creator fica para depois): saíram o passo do nome
-   do Fracttal e o ativo do Fracttal de cada cabine e inversor (a leitura dos ~22 mil ativos levava 6,7 s a cada usina
-   aberta). Nada liga sozinho. Regras em nexus/cadastro/estrutura_usina.py. #}
+   versátil"). À esquerda, as usinas do Registro mestre com os filtros; à direita, a usina aberta. Regras em
+   nexus/cadastro/estrutura_usina.py.
+   Enxuta em 17/11/2026 (Levi, com as fotos da Rio do Peixe I e II):
+   1. "Tire esse KPIS": os quatro números do alto saíram;
+   2. "Troque esse monte de texto por apenas um título o resto fica em exclamação!": cada parte é só o título; as
+      explicações são parágrafos do "!" do título da tela (uma tela, um "!");
+   3. "Esses filtros devem ficar padrão histórico de OS do OS Creator, mesmas funcionalidades e padrões, só que lateral!":
+      a busca e o botão Filtros (static/filtros-os.js) na coluna da lista;
+   4. o "N de Inversores" da cabine gera os inversores "Inversor 1.1", "1.2"… (cadastro-equipamentos.js);
+   5. "essa parte de chaves quero recolhida e o nome e potência da UFV já se repete em baixo": as chaves num <details>
+      fechado; o nome e a potência saíram do alto da usina (a potência está nos quadros do editor);
+   6. "Centralize os cabeçalhos! Todos";
+   7. "Da para deixar tudo numa tela só! Tudo fica na equipamentos, vai ter uma parte onde eu escolho qual a fonte de
+      dados e ele tenta lincar em uma outra coluna, caso não consiga eu mesmo linko": a aba De-para saiu. A usina aberta
+      tem "Fontes de dados" (ligar a fonte que ainda não chega em usina nenhuma, a mais parecida já escolhida, e os
+      cartões das que chegam) e a tabela dos inversores ganhou a coluna "Na fonte". #}
 {% macro kwp(v) %}{% if v is none %}—{% else %}{{ '{:,.1f}'.format(v).replace(',', 'X').replace('.', ',').replace('X', '.') }}{% endif %}{% endmacro %}
-{% macro mantem() %}{% for k, v in volta.items() %}<input type="hidden" name="{{ k }}" value="{{ v }}">{% endfor %}{% endmacro %}
+{% macro mantem() %}{% for k, v in volta.items() %}{% if v is string %}<input type="hidden" name="{{ k }}" value="{{ v }}">{% else %}{% for x in v %}<input type="hidden" name="{{ k }}" value="{{ x }}">{% endfor %}{% endif %}{% endfor %}{% endmacro %}
 <link rel="stylesheet" href="{{ url_for('static', filename='cadastro.css') }}">
+<div class="eq-pagina">
 <p class="gc-eyebrow">Base · Equipamentos das usinas</p>
 <div class="cad-topo">
   <div>
     <div class="gc-titulo-explica"><h1 class="titulo-pagina">Equipamentos das usinas</h1>
     {% call explica('Como funciona') %}
-<p><strong>Equipamentos.</strong> O que cada usina do Registro mestre tem: as chaves do supervisório (a "Usina Supervisório"), as cabines e os inversores, com strings e kWp, nas colunas da aba Equipamentos. É o cadastro que a plataforma, o gêmeo e o coletor leem na chave marcada "no lugar da aba".</p>
-<p><strong>De-para.</strong> Como cada fonte (API PV, Athon, Axis, scadaGridco…) chega nesse cadastro, inversor a inversor. A fonte que manda um nome que o cadastro não tem fica sem par: ou se liga ao inversor certo ("Ligar a…", o editor da plataforma), ou se corrige o cadastro ali mesmo, no lápis.</p>
-<p><strong>As três luzes da lista.</strong> Chave do supervisório, equipamentos (o kWp dos inversores fecha com o Registro mestre) e de-para (a pior fonte da usina). Apagada: sem leitura.</p>
-<p><strong>Nada liga sozinho.</strong> As chaves da aba vêm ordenadas pelo nome parecido, com o porquê escrito; quem escolhe é você. Só o Salvar grava (livro nexus_estrutura_usina).</p>
+<p><strong>O que é.</strong> O que cada usina do Registro mestre tem: as chaves do supervisório (a "Usina Supervisório"), as cabines e os inversores, com strings e kWp, nas colunas da aba Equipamentos. É o cadastro que a plataforma, o gêmeo e o coletor leem na chave marcada "no lugar da aba". Nada grava até o Salvar (livro nexus_estrutura_usina).</p>
+<p><strong>A lista.</strong> As três luzes de cada usina: chave do supervisório, equipamentos (o kWp dos inversores fecha com o Registro mestre) e fonte de dados (a pior fonte da usina). Apagada: sem leitura. Os filtros valem no Aplicar.</p>
+<p><strong>Fontes de dados.</strong> Cada fonte (API PV, Athon, scadaGridco…) chega numa usina pela chave que ela usa. A fonte cuja chave não está ligada a usina nenhuma aparece para ligar: a mais parecida com o nome da usina já vem escolhida, e o Ligar faz da chave dela uma chave desta usina. As que já chegam mostram, inversor a inversor, o que a fonte manda e com quem casou; o "Ligar a…" decide o par na tela da plataforma.</p>
+<p><strong>Na fonte.</strong> A coluna da tabela dos inversores diz o nome que a fonte manda para cada um. O que não casou se escolhe ali: o nome escolhido vai para o Equipamento Supervisório, e com o Salvar a plataforma passa a casar pelo nome.</p>
+<p><strong>Chaves do supervisório.</strong> O nome que o supervisório dá à usina. Uma usina pode ter mais de uma: a Altair tem seis na aba, uma com as cabines e uma por cabine com os inversores. Cada chave serve a uma usina só.</p>
+<p><strong>Cabines e inversores.</strong> O "N de Inversores" da cabine cria os inversores com o nome da cabine ("Inversor 1.1", "1.2"…); depois é só preencher as strings. Sem a potência do inversor, conta a da cabine dividida pelos inversores dela (calculado).</p>
+<p><strong>No lugar da aba.</strong> A chave marcada passa a ser lida do Nexus pela plataforma, pelo gêmeo, pelas Ligações e pelo coletor (quando ligado nele), e não mais da aba Equipamentos. Antes de marcar, veja a coluna "Diferença com a aba": é o que muda para eles.</p>
+<p><strong>Ligar pela aba.</strong> Liga cada chave da aba à usina pela Usina Fractall dela e traz a estrutura das usinas que ainda não têm. A usina que já tem algo gravado à mão fica como está.</p>
+<p><strong>Refazer a visão.</strong> A visão no formato da aba é refeita a cada gravação desta tela; o botão refaz quando o nome, o cliente ou a potência mudaram no Registro mestre.</p>
     {% endcall %}</div>
-    <p class="cad-sub">O que cada usina tem, e como cada fonte chega nela.{% if aba_lida_em %} Aba Equipamentos lida em {{ aba_lida_em }}.{% endif %}</p>
+    {% if aba_lida_em %}<p class="cad-sub">Aba Equipamentos lida em {{ aba_lida_em }}.</p>{% endif %}
   </div>
   <div class="fr-acoes">
+    {% if n_no_lugar or n_visao %}<form method="post" action="{{ url_for('torre_base.equipamentos_visao') }}" class="eq-form-inline">
+      {% if painel %}<input type="hidden" name="usina" value="{{ painel.usina.id }}">{% endif %}{{ mantem() }}
+      <button class="gc-btn gc-btn--ui gc-btn--contorno" type="submit"{% if not pode_gravar %} disabled{% endif %}><i class="ph ph-arrows-clockwise"></i> Refazer a visão</button>
+    </form>{% endif %}
+    <form method="post" action="{{ url_for('torre_base.equipamentos_ligar_aba') }}" class="eq-form-inline eq-guarda" data-confirmar="Ligar {{ auto.n_chaves }} chave(s) da aba em {{ auto.n_usinas }} usina(s) e trazer a estrutura delas? Grava no banco.">
+      {{ mantem() }}
+      <button class="gc-btn gc-btn--ui gc-btn--contorno" type="submit"{% if not pode_gravar or not auto.n_chaves %} disabled{% endif %} title="{{ auto.ja_ligadas }} chave(s) da aba já ligada(s)"><i class="ph ph-link"></i> {% if auto.n_chaves %}Ligar pela aba ({{ auto.n_chaves }}){% else %}Ligar pela aba{% endif %}</button>
+    </form>
     <a class="gc-btn gc-btn--ui gc-btn--contorno" href="{{ url_for('torre_base.equipamentos', reler=1, usina=painel.usina.id if painel else None, **volta) }}"><i class="ph ph-arrows-clockwise"></i> Ler de novo</a>
   </div>
 </div>
@@ -37,119 +61,82 @@
   Sem a <span class="gc-dado">GRIDCO_SQL_TOKEN</span>, as chaves do supervisório e a estrutura ficam só para ver.</div></div>{% endif %}
 {% if erro_aba %}<div class="cad-aviso cad-aviso--alerta" role="alert"><i class="ph ph-table"></i><div><strong>Não consegui ler a aba Equipamentos.</strong>
   {{ erro_aba }}. As sugestões de chave e o "Trazer da aba" ficam sem ela.</div></div>{% endif %}
-
-{% macro pct(a, b) %}{{ ((100 * a / b) if b else 0)|round(1) }}{% endmacro %}
-<nav class="gc-subabas" aria-label="Partes da tela">
-  <a href="{{ url_for('torre_base.equipamentos', usina=painel.usina.id if painel else None, q=q or None, cliente=cliente or None) }}"{% if not aba %} aria-current="page"{% endif %}><i class="ph ph-cpu" aria-hidden="true"></i> Equipamentos</a>
-  <a href="{{ url_for('torre_base.equipamentos', aba='depara', usina=painel.usina.id if painel else None, q=q or None, cliente=cliente or None) }}"{% if aba == 'depara' %} aria-current="page"{% endif %}><i class="ph ph-arrows-left-right" aria-hidden="true"></i> De-para{% if dp.pendentes %} <span class="eqx-n gc-num" title="Usinas com pendência no de-para">{{ dp.pendentes }}</span>{% endif %}</a>
-</nav>
-<section class="eqx-kpis" aria-label="Números do alto">
-  <a class="eqx-kpi" href="{{ url_for('torre_base.equipamentos', filtro='sem_inversores', aba=aba or None) }}">
-    <span class="r">Usinas com equipamentos</span>
-    <span class="v gc-num">{{ n_inversores }}<small>de {{ total }}</small></span>
-    <span class="eqx-barra"><i style="width:{{ pct(n_inversores, total) }}%"></i></span>
-    <span class="d">{{ total - n_inversores }} sem inversores · {{ '{:,}'.format(n_strings).replace(',', '.') }} strings</span></a>
-  <a class="eqx-kpi" href="{{ url_for('torre_base.equipamentos', filtro='sem_chave', aba=aba or None) }}">
-    <span class="r">Chaves do supervisório</span>
-    <span class="v gc-num">{{ n_chaves_ligadas }}<small>de {{ n_chaves_aba }}</small></span>
-    <span class="eqx-barra"><i style="width:{{ pct(n_chaves_ligadas, n_chaves_aba) }}%"></i></span>
-    <span class="d">ligadas, das chaves da aba · {{ n_no_lugar }} no lugar da aba</span></a>
-  <a class="eqx-kpi" href="{{ url_for('torre_base.equipamentos', aba='depara') }}">
-    <span class="r">Fontes ligadas</span>
-    {% if dp.erro %}<span class="v">—</span><span class="d">sem leitura do de-para: {{ dp.erro }}</span>
-    {% else %}<span class="v gc-num">{{ dp.linhas_ok }}<small>de {{ dp.linhas }}</small></span>
-    <span class="eqx-barra"><i style="width:{{ pct(dp.linhas_ok, dp.linhas) }}%"></i></span>
-    <span class="d">usinas das fontes sem pendência</span>{% endif %}</a>
-  <a class="eqx-kpi" href="{{ url_for('torre_base.equipamentos', aba='depara', filtro='depara') }}">
-    <span class="r">Pendências do de-para</span>
-    <span class="v gc-num">{{ dp.pendentes if not dp.erro else '—' }}<small>usinas</small></span>
-    <span class="eqx-partes">{% if dp.sem_par %}<span class="gc-status gc-status--alerta">{{ dp.sem_par }} sem par</span>{% endif %}{% if dp.sem_usina %}<span class="gc-status gc-status--neutro">{{ dp.sem_usina|length }} fora do Nexus</span>{% endif %}{% if not dp.erro and not dp.pendentes %}<span class="gc-status gc-status--ok">nada pendente</span>{% endif %}</span></a>
-</section>
-{% if not aba and (n_no_lugar or n_visao) %}<form method="post" action="{{ url_for('torre_base.equipamentos_visao') }}" class="eq-refazer">
-  {% if painel %}<input type="hidden" name="usina" value="{{ painel.usina.id }}">{% endif %}{{ mantem() }}
-  <span class="mudo">A visão no formato da aba é refeita a cada gravação desta tela. Mudou o nome, o cliente ou a potência no Registro mestre?</span>
-  <button class="gc-btn gc-btn--ui gc-btn--contorno" type="submit"{% if not pode_gravar %} disabled{% endif %}><i class="ph ph-arrows-clockwise"></i> Refazer a visão</button>
-</form>{% endif %}
-
-{# Ligar pela aba Equipamentos (13/10/2026, Levi: "ligue automaticamente pelos dados que temos na aba equipamentos do
-   BD_Performance!"): o mesmo ciclo das Ligações (a Usina Fractall da aba -> o de-para do Fracttal -> a usina). #}
-{% if not aba %}<section class="cad-secao eq-auto" id="ligar-pela-aba">
-  <h2>Ligar pela aba Equipamentos</h2>
-  <div class="eq-corpo">
-    <p class="gc-ajuda">Liga cada chave da aba à usina do Registro mestre pela <b>Usina Fractall</b> dela (o mesmo caminho das Ligações entre bases) e traz da aba a estrutura das usinas que ainda não têm: cabines, inversores, nome no supervisório, potência e strings. A usina que já tem algo gravado à mão fica como está. Nada vai "no lugar da aba": isso continua sendo marcado chave a chave.</p>
-    <form method="post" action="{{ url_for('torre_base.equipamentos_ligar_aba') }}" class="eq-form-inline eq-guarda" data-confirmar="Ligar {{ auto.n_chaves }} chave(s) da aba em {{ auto.n_usinas }} usina(s) e trazer a estrutura delas? Grava no banco.">
-      {{ mantem() }}
-      <button class="gc-btn gc-btn--ui gc-btn--primario" type="submit"{% if not pode_gravar or not auto.n_chaves %} disabled{% endif %}><i class="ph ph-link"></i> {% if auto.n_chaves %}Ligar {{ auto.n_chaves }} chave{{ 's' if auto.n_chaves > 1 }} em {{ auto.n_usinas }} usina{{ 's' if auto.n_usinas > 1 }}{% else %}Nada novo para ligar pela aba{% endif %}</button>
-      <span class="mudo">{{ auto.ja_ligadas }} chave{{ 's' if auto.ja_ligadas != 1 }} da aba já ligada{{ 's' if auto.ja_ligadas != 1 }}</span>
-    </form>
-    {% if auto.fora %}
-    <details class="eq-ref">
-      <summary>{{ auto.fora|length }} chave{{ 's' if auto.fora|length > 1 }} da aba não liga{{ 'm' if auto.fora|length > 1 }} sozinha{{ 's' if auto.fora|length > 1 }}: o motivo de cada uma</summary>
-      <div class="cad-rolagem"><table class="cad-tabela">
-        <thead><tr><th>Usina Supervisório</th><th>Por que não ligou</th></tr></thead>
-        <tbody>{% for f in auto.fora %}<tr><td><span class="gc-dado">{{ f.chave }}</span></td><td>{{ f.motivo }}</td></tr>{% endfor %}</tbody>
-      </table></div>
-    </details>
-    {% endif %}
-  </div>
-</section>{% endif %}
+{% if auto.fora %}<details class="eq-ref eq-ref--alto">
+  <summary>{{ auto.fora|length }} chave{{ 's' if auto.fora|length > 1 }} da aba não liga{{ 'm' if auto.fora|length > 1 }} sozinha{{ 's' if auto.fora|length > 1 }} pela aba</summary>
+  <div class="cad-rolagem"><table class="cad-tabela">
+    <thead><tr><th>Usina Supervisório</th><th>Por que não ligou</th></tr></thead>
+    <tbody>{% for f in auto.fora %}<tr><td><span class="gc-dado">{{ f.chave }}</span></td><td>{{ f.motivo }}</td></tr>{% endfor %}</tbody>
+  </table></div>
+</details>{% endif %}
 
 <div class="eq-grade">
   <aside class="eq-lista" aria-label="Usinas do Registro mestre">
-    <form class="eq-lista-topo" method="get" action="{{ url_for('torre_base.equipamentos') }}">
+    {# os filtros no padrão do Histórico de OS (static/filtros-os.js): a busca e o botão Filtros, com o painel e as
+       etiquetas; as <select multiple> ficam escondidas guardando o valor, e o Aplicar envia #}
+    <form class="eq-lista-topo cn-filtros eq-filtros" method="get" action="{{ url_for('torre_base.equipamentos') }}" data-fo>
       {% if painel %}<input type="hidden" name="usina" value="{{ painel.usina.id }}">{% endif %}
-      <label class="gc-rotulo" for="eq-q">Buscar usina</label>
-      <input id="eq-q" name="q" class="gc-campo" value="{{ q }}" placeholder="Nome, código ou cidade" autocomplete="off">
-      {# o cliente (13/10/2026, Levi: "tem que dar para filtrar o cliente!"), com quantas usinas cada um tem #}
-      <select name="cliente" class="gc-campo" aria-label="Cliente" onchange="this.form.submit()">
-        <option value="">Todos os clientes</option>
-        {% for v, rot, n in clientes %}<option value="{{ v }}"{% if v == cliente %} selected{% endif %}>{{ rot }} ({{ n }})</option>{% endfor %}
-      </select>
-      {% if filtro %}<input type="hidden" name="filtro" value="{{ filtro }}">{% endif %}
-      {% if aba %}<input type="hidden" name="aba" value="{{ aba }}">{% endif %}
-      <noscript><button class="gc-btn gc-btn--ui gc-btn--contorno" type="submit">Filtrar</button></noscript>
-      <div class="eqx-chips" role="group" aria-label="Mostrar">
-        {% for v, rot, n in chips %}{% if not v or n or v == filtro %}<a class="eqx-chip" href="{{ url_for('torre_base.equipamentos', filtro=v or None, aba=aba or None, q=q or None, cliente=cliente or None, usina=painel.usina.id if painel else None) }}"{% if v == filtro %} aria-current="true"{% endif %}>{{ rot }} <b class="gc-num">{{ n }}</b></a>{% endif %}{% endfor %}
-      </div>
-      <p class="eq-lista-conta"><span class="gc-num" id="eq-conta">{{ lista|length }}</span> de {{ total }} usinas</p>
-      <p class="eqx-legenda" aria-hidden="true"><span><i class="eqx-luz eqx-luz--ok"></i>chave</span><span><i class="eqx-luz eqx-luz--ok"></i>equipamentos</span><span><i class="eqx-luz eqx-luz--ok"></i>de-para</span></p>
+      <input id="eq-q" type="search" name="q" class="gc-campo" value="{{ q }}" placeholder="Usina, código ou cidade" aria-label="Buscar usina" autocomplete="off">
+      <label class="cn-filtro-par"><span class="gc-rotulo">Cliente</span>
+        <select class="gc-campo" name="cliente" multiple data-todos="Todos os clientes">
+          {% for v, rot, n in clientes %}<option value="{{ v }}"{% if v in clientes_escolhidos %} selected{% endif %}>{{ rot }} ({{ n }})</option>{% endfor %}
+        </select></label>
+      <label class="cn-filtro-par"><span class="gc-rotulo">Situação</span>
+        <select class="gc-campo" name="filtro" multiple data-todos="Todas">
+          {% for v, rot, n in chips %}<option value="{{ v }}"{% if v in filtros_escolhidos %} selected{% endif %}>{{ rot }} ({{ n }})</option>{% endfor %}
+        </select></label>
+      <button type="submit" data-fo-some>Filtrar</button>
     </form>
+    <script src="{{ url_for('static', filename='filtros-os.js') }}"></script>
+    <p class="eq-lista-conta"><span class="gc-num" id="eq-conta">{{ lista|length }}</span> de {{ total }} usinas</p>
+    <p class="eqx-legenda" aria-hidden="true"><span><i class="eqx-luz eqx-luz--ok"></i>chave</span><span><i class="eqx-luz eqx-luz--ok"></i>equipamentos</span><span><i class="eqx-luz eqx-luz--ok"></i>fonte</span></p>
     <ul class="eq-itens" id="eq-itens">
       {% for x in lista %}
       <li data-busca="{{ (x.titulo ~ ' ' ~ (x.codigo or '') ~ ' ' ~ (x.cidade or ''))|lower }}">
         {% set rot = {'ok': 'ok', 'alerta': 'atenção', 'critico': 'falta', 'neutro': 'sem leitura'} %}
         <a class="eq-item eqx-item{% if painel and painel.usina.id == x.id %} eq-item--sel{% endif %}" href="{{ url_for('torre_base.equipamentos', usina=x.id, **volta) }}"{% if painel and painel.usina.id == x.id %} aria-current="page"{% endif %}>
           <span class="eq-item-nome">{{ x.nome }}</span>
-          <span class="eqx-luzes" role="img" aria-label="Chave: {{ rot[x.luzes[0]] }}; equipamentos: {{ rot[x.luzes[1]] }}; de-para: {{ rot[x.luzes[2]] }}">{% for l in x.luzes %}<i class="eqx-luz eqx-luz--{{ l }}"></i>{% endfor %}</span>
+          <span class="eqx-luzes" role="img" aria-label="Chave: {{ rot[x.luzes[0]] }}; equipamentos: {{ rot[x.luzes[1]] }}; fonte: {{ rot[x.luzes[2]] }}">{% for l in x.luzes %}<i class="eqx-luz eqx-luz--{{ l }}"></i>{% endfor %}</span>
           <span class="eq-item-cli">{{ x.cliente or 'sem cliente' }}{% if x.kwp %} · {{ kwp(x.kwp) }} kWp{% endif %}</span>
         </a>
       </li>
-      {% else %}<li class="eq-vazio">Nenhuma usina com essa busca.</li>{% endfor %}
+      {% else %}<li class="eq-vazio">Nenhuma usina com esses filtros.</li>{% endfor %}
     </ul>
   </aside>
 
   <div class="eq-painel">
   {% if painel %}{% set u = painel.usina %}
-    <div class="eq-cab-usina">
-      <div>
-        <p class="eq-cliente">{{ u.cliente or 'sem cliente' }}</p>
-        <h2 class="eq-titulo">{{ u.nome }}</h2>
-        <p class="eq-meta">{% if u.codigo %}<span class="gc-dado">{{ u.codigo }}</span> · {% endif %}{{ u.cidade or 'cidade —' }}{% if u.uf %}/{{ u.uf }}{% endif %}{% if u.status %} · {{ u.status }}{% endif %}{% if u.equipe %} · equipe {{ u.equipe }}{% endif %}
-          · <a href="{{ url_for('torre_base.cad_usina', id_=u.id) }}">abrir a ficha no Registro mestre</a></p>
-      </div>
-      <div class="eq-kwp"><span class="r">Potência {{ u.kwp_de or '' }} no Registro mestre</span><span class="v">{{ kwp(u.kwp) }} kWp</span>
-        {% if not u.kwp %}<span class="d">sem potência na ficha: a conferência fica sem a base</span>
-        {% elif u.kwp_de == 'contratual' %}<span class="d">sem a potência real na ficha: confere pela contratual</span>
-        {% elif u.kwp_contratual and u.kwp_contratual != u.kwp_real %}<span class="m">contratual {{ kwp(u.kwp_contratual) }} kWp</span>{% endif %}</div>
-    </div>
+    {# o alto da usina: só o que não se repete embaixo (o nome está na lista e na Usina Supervisório; a potência, nos
+       quadros do editor) #}
+    <p class="eq-meta eq-meta--alto">{{ u.cliente or 'sem cliente' }}{% if u.codigo %} · <span class="gc-dado">{{ u.codigo }}</span>{% endif %} · {{ u.cidade or 'cidade —' }}{% if u.uf %}/{{ u.uf }}{% endif %}{% if u.status %} · {{ u.status }}{% endif %}{% if u.equipe %} · equipe {{ u.equipe }}{% endif %}
+      · <a href="{{ url_for('torre_base.cad_usina', id_=u.id) }}">abrir a ficha no Registro mestre</a></p>
 
-    {% if aba == 'depara' %}
-    {% include "cadastro/_depara_painel.html" %}
-    {% else %}
-    <section class="cad-secao eq-passo" id="passo-chave">
-      <h2><span class="eq-num">1</span> Chaves do supervisório (Usina Supervisório) {% if painel.chaves %}<span class="cad-chip cad-chip--operacao">{{ painel.chaves|length }} ligada{{ 's' if painel.chaves|length > 1 }}</span>{% else %}<span class="cad-chip cad-chip--alerta">falta</span>{% endif %}</h2>
+    {# Fontes de dados (17/11/2026): ligar a fonte que ainda não chega em usina nenhuma e os cartões das que chegam #}
+    <section class="cad-secao eq-fontes" id="fontes">
+      <h2>Fontes de dados {% if painel.fontes %}<span class="cad-chip cad-chip--operacao">{{ painel.fontes|length }} chega{{ 'm' if painel.fontes|length > 1 }}</span>{% elif not dp.erro %}<span class="cad-chip cad-chip--alerta">nenhuma chega</span>{% endif %}</h2>
       <div class="eq-corpo">
-        <p class="gc-ajuda">O nome que o supervisório dá à usina (a "Usina Supervisório" da aba Equipamentos, a chave que a plataforma usa por dentro). Uma usina pode ter mais de uma: a Altair tem seis na aba, uma com as cabines e uma por cabine com os inversores. Cada chave serve a uma usina só.</p>
+        {% if dp.erro %}<p class="eq-vazio">Sem leitura do de-para da plataforma: {{ dp.erro }}.</p>
+        {% elif painel.fontes_livres %}
+        <form method="post" action="{{ url_for('torre_base.equipamentos_chave') }}" class="eq-form eq-guarda eq-fonte-ligar">
+          <input type="hidden" name="usina" value="{{ u.id }}"><input type="hidden" name="acao" value="ligar">{{ mantem() }}
+          <label class="gc-rotulo" for="eq-fonte">Ligar uma fonte a esta usina</label>
+          <div class="eq-form-linha">
+            <select id="eq-fonte" name="chave_nova" class="gc-campo"{% if not pode_gravar %} disabled{% endif %}>
+              {% set sug = painel.fontes_livres[0] if painel.fontes_livres[0].sugerida else none %}
+              {% if not sug %}<option value="">Escolha a fonte…</option>{% endif %}
+              {% for f in painel.fontes_livres %}<option value="{{ f.chave }}"{% if f.sugerida %} selected{% endif %}>{{ f.fonte }} · {{ f.chave }}{% if f.sugerida %} (parecida com esta usina){% endif %}</option>{% endfor %}
+            </select>
+            <button class="gc-btn gc-btn--ui gc-btn--primario" type="submit"{% if not pode_gravar %} disabled{% endif %}><i class="ph ph-link"></i> Ligar</button>
+          </div>
+        </form>
+        {% endif %}
+        {% if painel.fontes %}{% include "cadastro/_depara_painel.html" %}{% endif %}
+      </div>
+    </section>
+
+    {# as chaves do supervisório, recolhidas (17/11/2026, Levi: "essa parte de chaves quero recolhida") #}
+    <details class="cad-secao eq-passo ace-recolhe" id="passo-chave">
+      <summary><h2>Chaves do supervisório {% if painel.chaves %}<span class="cad-chip cad-chip--operacao">{{ painel.chaves|length }} ligada{{ 's' if painel.chaves|length > 1 }}</span>{% else %}<span class="cad-chip cad-chip--alerta">falta</span>{% endif %}</h2></summary>
+      <div class="eq-corpo">
         {% for c in painel.chaves %}
         <div class="eq-ligado">
           <span class="gc-dado">{{ c.usina_supervisorio }}</span>
@@ -178,14 +165,6 @@
             <button class="gc-btn gc-btn--ui gc-btn--primario" type="submit"{% if not pode_gravar %} disabled{% endif %}><i class="ph ph-link"></i> Ligar</button>
           </div>
         </form>
-      </div>
-    </section>
-
-    <section class="cad-secao eq-passo" id="passo-estrutura">
-      <h2><span class="eq-num">2</span> Equipamentos, nas colunas da aba Equipamentos</h2>
-      <div class="eq-corpo">
-        <p class="gc-ajuda">Como na aba: cada inversor com a Usina Supervisório por onde chega, o Equipamento Supervisório (o nome que tem lá), o Equipamento Parente (a cabine), a Potência e as Strings. Sem a potência do inversor, conta a da cabine dividida pelos inversores dela (calculado). Nada grava até o Salvar.</p>
-        <p class="gc-ajuda"><strong>No lugar da aba:</strong> a chave marcada passa a ser lida do Nexus pela plataforma, pelo gêmeo, pelas Ligações e pelo coletor (quando ligado nele), e não mais da aba Equipamentos. Antes de marcar, veja a coluna "Diferença com a aba": é o que muda para eles.</p>
         {% if painel.ref_tab %}
         <details class="eq-ref">
           <summary>O que a aba Equipamentos tem para {{ 'a chave ligada' if painel.ref_tab|length == 1 else 'as ' ~ painel.ref_tab|length ~ ' chaves ligadas' }}</summary>
@@ -203,21 +182,44 @@
           </div>
         </details>
         {% endif %}
+      </div>
+    </details>
+
+    <section class="cad-secao eq-passo" id="passo-estrutura">
+      <h2>Equipamentos</h2>
+      <div class="eq-corpo">
         <div id="eq-editor" class="eq-editor" data-pode-gravar="{{ '1' if pode_gravar else '0' }}">
           <noscript><p class="eq-vazio">A estrutura precisa do JavaScript ligado no navegador.</p></noscript>
         </div>
         <script type="application/json" id="eq-dados">{{ painel.editor|tojson }}</script>
       </div>
     </section>
-    {% endif %}
-  {% elif aba == 'depara' %}
-    {% include "cadastro/_depara_fora.html" %}
+  {% else %}
+    <section class="cad-secao dpx dpx-fora">
+      <h2>Escolha uma usina na lista</h2>
+      {% if dp.erro %}<div class="eq-corpo"><p class="eq-vazio">Sem leitura do de-para da plataforma: {{ dp.erro }}.</p></div>
+      {% elif dp.sem_usina %}
+      <div class="eq-corpo">
+        <h3 class="dpx-sub">Fontes que não chegam em usina nenhuma <span class="gc-status gc-status--neutro">{{ dp.sem_usina|length }}</span></h3>
+        <div class="cad-rolagem"><table class="cad-tabela dpx-tabela">
+          <thead><tr><th>Fonte</th><th>Chave na fonte</th><th>Situação</th></tr></thead>
+          <tbody>
+          {% for x in dp.sem_usina %}
+          <tr><td>{{ x.fonte_nome }}</td><td><span class="gc-dado">{{ x.usina }}</span></td>
+            <td><span class="gc-status gc-status--{{ x.luz }}">{{ (x.alertas[0].texto if x.alertas else 'ok')|truncate(90) }}</span></td></tr>
+          {% endfor %}
+          </tbody>
+        </table></div>
+      </div>
+      {% endif %}
+    </section>
   {% endif %}
   </div>
+</div>
 </div>
 
 <div class="fr-toast" id="eq-toast" role="status" aria-live="polite" hidden></div>
 
 <script src="{{ url_for('static', filename='cadastro-equipamentos.js') }}"></script>
-{% if aba == 'depara' %}<script src="{{ url_for('static', filename='cadastro-depara.js') }}"></script>{% endif %}
+{% if painel and painel.fontes %}<script src="{{ url_for('static', filename='cadastro-depara.js') }}"></script>{% endif %}
 {% endblock %}

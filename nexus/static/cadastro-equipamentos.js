@@ -55,7 +55,13 @@
 
   var D = JSON.parse(dados.textContent);
   var podeGravar = raiz.getAttribute('data-pode-gravar') === '1';
-  var st = null, base = '', seq = 0, gerando = null, cmpAberta = null;
+  var st = null, base = '', seq = 0, cmpAberta = null, chavesAbertas = false;
+  /* "Na fonte" (17/11/2026, Levi: "vai ter uma parte onde eu escolho qual a fonte de dados e ele tenta lincar em uma
+     outra coluna, caso não consiga eu mesmo linko"): o que os cartões das fontes dizem (cadastro-depara.js manda no
+     evento `eq-fontes`). NA_FONTE[id do inversor] = [{fonte, nome, modo}] dos pares que a plataforma já casou; LIVRES[id
+     da chave] = os nomes que a fonte manda e não casaram com ninguém, para escolher. Escolher grava no rascunho o nome no
+     Equipamento Supervisório: com o Salvar, a plataforma casa pelo nome. */
+  var NA_FONTE = null, LIVRES = {}, COMO = {};    // COMO[id da chave]: lido, sem_leitura, nome (liga pelo nome), erro
 
   function clonar(x) { return JSON.parse(JSON.stringify(x)); }
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return {'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]; }); }
@@ -136,9 +142,11 @@
   function desenhar() {
     var s = somas(), h = '', ro = podeGravar ? '' : ' disabled';
     /* chaves */
-    h += '<div class="eq-ed-sec"><div class="eq-ed-cab"><h3>Usina Supervisório</h3><span class="mudo">Tudo aqui vai no Salvar. Para ligar ou desligar uma chave, use o passo 1.</span></div>';
-    if (!st.chaves.length) h += '<p class="eq-vazio">Nenhuma chave ligada: ligue no passo 1 antes de montar os inversores (cada inversor diz por qual Usina Supervisório chega).</p>';
-    else {
+    var noLugar = st.chaves.filter(function (ch) { return ch.substitui_aba; }).length;
+    h += '<div class="eq-ed-sec"><button type="button" class="eq-ed-cab eq-ed-recolhe" data-acao="ver-chaves" aria-expanded="' + chavesAbertas + '"><h3>Usina Supervisório <span class="eq-n">' + st.chaves.length +
+      (st.chaves.length ? ' · no lugar da aba: ' + noLugar : '') + '</span></h3><i class="ph ph-caret-' + (chavesAbertas ? 'up' : 'down') + '" aria-hidden="true"></i></button>';
+    if (!st.chaves.length) h += '<p class="eq-vazio">Nenhuma chave ligada: ligue uma fonte ou uma chave acima antes de montar os inversores.</p>';
+    else if (chavesAbertas) {
       h += '<div class="cad-rolagem"><table class="cad-tabela eq-tab eq-tab-chaves"><thead><tr><th>Usina Supervisório</th><th>Usina (exibição)</th>' +
         '<th title="A linha da usina (UFV) e as das cabines saem nesta chave">Chave da usina</th><th class="num">Inversores</th>' +
         '<th>Full O&amp;M</th><th>String Box</th><th title="A plataforma, o gêmeo, as Ligações e o coletor (quando ligado) leem esta chave do Nexus">No lugar da aba</th><th>Diferença com a aba</th></tr></thead><tbody>';
@@ -168,24 +176,12 @@
       '<button type="button" class="gc-btn gc-btn--ui gc-btn--contorno" data-acao="nova-cabine"' + ro + '><i class="ph ph-plus"></i> Adicionar cabine</button></div>';
     if (!st.cabines.length) h += '<p class="eq-vazio">Nenhuma cabine. Adicione, ou traga da aba.</p>';
     else {
-      h += '<div class="cad-rolagem"><table class="cad-tabela eq-tab"><thead><tr><th>#</th><th>Equipamento</th><th class="num">Potência (kWp)</th><th class="num">N de Inversores</th><th></th></tr></thead><tbody>';
+      h += '<div class="cad-rolagem"><table class="cad-tabela eq-tab"><thead><tr><th>#</th><th>Equipamento</th><th class="num">Potência (kWp)</th><th class="num" title="Digite quantos: os inversores nascem com o nome da cabine (Inversor 1.1, 1.2…)">N de Inversores</th><th></th></tr></thead><tbody>';
       st.cabines.forEach(function (c, i) {
         h += '<tr><td class="id">' + (i + 1) + '</td><td>' + campo('cab', i, 'nome', c.nome, ' maxlength="120" aria-label="Nome da cabine ' + (i + 1) + '"') + '</td>' +
           '<td class="eq-w-num">' + campo('cab', i, 'potencia_kwp', paraCampo(c.potencia_kwp), ' inputmode="decimal" aria-label="kWp da cabine ' + esc(c.nome) + '"') + '</td>' +
-          '<td class="num" data-cont="' + esc(c.k) + '">' + invsDaCab(c.k).length + '</td>' +
-          '<td class="eq-acoes-linha"><button type="button" class="gc-btn gc-btn--ui gc-btn--contorno" data-acao="gerar" data-i="' + i + '"' + ro + '>Gerar inversores</button>' +
-          '<button type="button" class="gc-btn gc-btn--ui gc-btn--fantasma" data-acao="tirar-cabine" data-i="' + i + '"' + ro + ' aria-label="Remover a cabine ' + esc(c.nome) + '"><i class="ph ph-trash"></i></button></td></tr>';
-        if (gerando === c.k) {
-          var opCh = '<option value="">sem chave</option>' + st.chaves.map(function (ch) { return '<option value="' + ch.supervisorio_id + '"' + (st.chaves.length === 1 ? ' selected' : '') + '>' + esc(ch.chave) + '</option>'; }).join('');
-          h += '<tr class="eq-gerar"><td></td><td colspan="4"><div class="eq-gerar-form">' +
-            '<label>Quantos <input class="gc-campo" id="eq-g-n" inputmode="numeric" value="10"></label>' +
-            '<label>Strings cada <input class="gc-campo" id="eq-g-str" inputmode="numeric" placeholder="vazio = depois"></label>' +
-            '<label>kWp cada <input class="gc-campo" id="eq-g-kwp" inputmode="decimal" placeholder="vazio = calculado"></label>' +
-            '<label>Usina Supervisório <select class="gc-campo" id="eq-g-chave">' + opCh + '</select></label>' +
-            '<span class="mudo">Nomes "Inversor ' + (i + 1) + '.1", "' + (i + 1) + '.2"…, continuando os que a cabine já tem.</span>' +
-            '<button type="button" class="gc-btn gc-btn--ui gc-btn--primario" data-acao="gerar-ok" data-i="' + i + '">Gerar</button>' +
-            '<button type="button" class="gc-btn gc-btn--ui gc-btn--fantasma" data-acao="gerar-cancela">Cancelar</button></div></td></tr>';
-        }
+          '<td class="eq-w-num"><input class="gc-campo" data-acao-n="' + i + '" data-cont="' + esc(c.k) + '" inputmode="numeric" value="' + invsDaCab(c.k).length + '" aria-label="Quantos inversores na cabine ' + esc(c.nome) + '"' + ro + '></td>' +
+          '<td class="eq-acoes-linha"><button type="button" class="gc-btn gc-btn--ui gc-btn--fantasma" data-acao="tirar-cabine" data-i="' + i + '"' + ro + ' aria-label="Remover a cabine ' + esc(c.nome) + '"><i class="ph ph-trash"></i></button></td></tr>';
       });
       h += '</tbody></table></div>';
     }
@@ -198,13 +194,17 @@
     else {
       var opChaves = function (v) { return '<option value="">sem chave</option>' + st.chaves.map(function (ch) { return '<option value="' + ch.supervisorio_id + '"' + (ch.supervisorio_id === v ? ' selected' : '') + '>' + esc(ch.chave) + '</option>'; }).join(''); };
       var opCabs = function (v) { return '<option value="">sem cabine</option>' + st.cabines.map(function (c) { return '<option value="' + esc(c.k) + '"' + (c.k === v ? ' selected' : '') + '>' + esc(c.nome) + '</option>'; }).join(''); };
-      h += '<div class="cad-rolagem"><table class="cad-tabela eq-tab eq-tab-inv"><thead><tr><th>#</th><th>Usina Supervisório</th><th>Equipamento</th><th>Equipamento Supervisório</th><th>Equipamento Parente</th><th class="num">Potência (kWp)</th><th class="num">Strings Ativas</th><th></th></tr></thead><tbody>';
+      var comFonte = NA_FONTE !== null;
+      h += '<div class="cad-rolagem"><table class="cad-tabela eq-tab eq-tab-inv"><thead><tr><th>#</th><th>Usina Supervisório</th><th>Equipamento</th><th>Equipamento Supervisório</th>' +
+        (comFonte ? '<th title="O nome que a fonte manda para este inversor">Na fonte</th>' : '') +
+        '<th>Equipamento Parente</th><th class="num">Potência (kWp)</th><th class="num">Strings Ativas</th><th></th></tr></thead><tbody>';
       st.inversores.forEach(function (x, i) {
         var calc = kwpCalculado(x);
         h += '<tr' + (!x.chave && st.chaves.length ? ' class="eq-linha-falta"' : '') + '><td class="id">' + (i + 1) + '</td>' +
           '<td class="eq-w-chave"><select class="gc-campo" data-tipo="inv" data-i="' + i + '" data-campo="chave" aria-label="Usina Supervisório de ' + esc(x.nome) + '"' + ro + '>' + opChaves(x.chave) + '</select></td>' +
           '<td class="eq-w-nome">' + campo('inv', i, 'nome', x.nome, ' maxlength="120" aria-label="Equipamento ' + (i + 1) + '"') + '</td>' +
           '<td class="eq-w-sup">' + campo('inv', i, 'equipamento_supervisorio', x.equipamento_supervisorio, ' maxlength="120" placeholder="ex.: INVERSOR01" aria-label="Equipamento Supervisório de ' + esc(x.nome) + '"') + '</td>' +
+          (comFonte ? '<td class="eq-w-fonte">' + celFonte(x, i) + '</td>' : '') +
           '<td class="eq-w-cab"><select class="gc-campo" data-tipo="inv" data-i="' + i + '" data-campo="cabine" aria-label="Equipamento Parente de ' + esc(x.nome) + '"' + ro + '>' + opCabs(x.cabine) + '</select></td>' +
           '<td class="eq-w-num">' + campo('inv', i, 'potencia_kwp', paraCampo(x.potencia_kwp), ' inputmode="decimal" placeholder="' + (calc != null ? '≈ ' + fmt(calc) + ' calc.' : '') + '" aria-label="kWp de ' + esc(x.nome) + '"') + '</td>' +
           '<td class="eq-w-str">' + campo('inv', i, 'strings_esperadas_qtd', x.strings_esperadas_qtd == null ? '' : x.strings_esperadas_qtd, ' inputmode="numeric" aria-label="Strings Ativas de ' + esc(x.nome) + '"') + '</td>' +
@@ -248,7 +248,7 @@
     var s = somas();
     var pot = document.getElementById('eq-pot'); if (pot) pot.innerHTML = htmlPot();
     st.cabines.forEach(function (c) {
-      var td = raiz.querySelector('[data-cont="' + c.k + '"]'); if (td) td.textContent = invsDaCab(c.k).length;
+      var td = raiz.querySelector('[data-cont="' + c.k + '"]'); if (td && td !== document.activeElement) td.value = invsDaCab(c.k).length;
       raiz.querySelectorAll('select[data-campo="cabine"] option[value="' + c.k + '"]').forEach(function (o) { o.textContent = c.nome; });
     });
     raiz.querySelectorAll('input[data-tipo="inv"][data-campo="potencia_kwp"]').forEach(function (inp) {
@@ -279,6 +279,8 @@
       x.chave = t.value ? +t.value : null;
     } else if (c === 'cabine') {
       x.cabine = t.value || null;
+      // o inversor novo, com o nome que o Nexus deu, troca de nome junto com a cabine (Inversor 2.3 na cabine 2)
+      if (x.id == null && AUTO.test(x.nome)) { x.nome = ''; x.nome = nomeNaCabine(x.cabine ? cabPorK(x.cabine) : null); }
     } else {
       x[c] = t.value;
     }
@@ -293,28 +295,111 @@
     var t = e.target;
     if (!t.hasAttribute('data-campo') || (t.tagName !== 'SELECT' && t.type !== 'checkbox' && t.type !== 'radio')) return;
     var r = mudar(t);
-    if (t.getAttribute('data-campo') === 'chave' || t.getAttribute('data-tipo') === 'chave') desenhar(); else if (r) derivados();
+    if (t.getAttribute('data-campo') === 'chave' || t.getAttribute('data-campo') === 'cabine' || t.getAttribute('data-tipo') === 'chave') desenhar(); else if (r) derivados();
+  });
+  // "Na fonte": o nome escolhido vai para o Equipamento Supervisório do inversor (no rascunho; grava no Salvar)
+  raiz.addEventListener('change', function (e) {
+    var t = e.target;
+    if (t.hasAttribute('data-na-fonte')) {
+      var x = st.inversores[+t.getAttribute('data-na-fonte')]; if (!x) return;
+      x.equipamento_supervisorio = t.value;
+      desenhar();
+      if (t.value) avisar('“' + t.value + '” no Equipamento Supervisório de ' + x.nome + '. Com o Salvar, a plataforma casa pelo nome.', true);
+    } else if (t.hasAttribute('data-acao-n')) {
+      var n = lerNumero(t.value), i = +t.getAttribute('data-acao-n');
+      if (n == null || isNaN(n) || n !== Math.round(n) || n > 300) { t.setAttribute('aria-invalid', 'true'); avisar('Diga quantos inversores (de 0 a 300).', false); return; }
+      t.removeAttribute('aria-invalid');
+      ajustarQtd(i, n);
+    }
+  });
+
+  /* os inversores pela cabine (17/11/2026, Levi: "Quando eu adicionar inversor aparece sequencial: 1,2,3,4,5 porém o
+     ideal é conforme eu for adicionando as cabines vai renomeando de acordo com a cabine: inversor 1.1, 1.2 etc. Ou ao
+     invés de adicionar inversor de por inversor a pessoa pode digitar lá na tabela das cabines a quantidade de
+     inversores, aí já gera automático e eu só preencho as strings"). O nome é "Inversor <nº da cabine>.<nº na cabine>";
+     sem cabine, "Inversor <n>". */
+  var AUTO = /^Inversor \d+(\.\d+)?$/;
+  function nomeNaCabine(c) {
+    var i = st.cabines.indexOf(c), k = 0, nome;
+    if (i < 0) { k = st.inversores.length; do { nome = 'Inversor ' + (++k); } while (invPorNome(nome)); return nome; }
+    do { nome = 'Inversor ' + (i + 1) + '.' + (++k); } while (invPorNome(nome));
+    return nome;
+  }
+  function chavePadrao(c) {
+    // a chave dos inversores que a cabine já tem; sem eles, a única chave ligada
+    var dela = c ? invsDaCab(c.k).filter(function (x) { return x.chave; }) : [];
+    if (dela.length) return dela[dela.length - 1].chave;
+    return st.chaves.length === 1 ? st.chaves[0].supervisorio_id : null;
+  }
+  function novoInversor(c) {
+    var x = {id: null, nome: nomeNaCabine(c), chave: chavePadrao(c), cabine: c ? c.k : null, equipamento_supervisorio: '',
+             potencia_kwp: null, strings_esperadas_qtd: null, equipamento_id: null, codigo_fracttal: ''};
+    st.inversores.push(x);
+    return x;
+  }
+  // o "N de Inversores" da cabine: a mais, nascem com o nome da cabine; a menos, saem os novos e vazios do fim (o que
+  // já foi salvo, ou tem dado, não sai daqui: tira-se na tabela dos inversores)
+  function ajustarQtd(i, alvo) {
+    var c = st.cabines[i], dela = invsDaCab(c.k);
+    if (alvo > dela.length) {
+      for (var n = dela.length; n < alvo; n++) novoInversor(c);
+      desenhar();
+      avisar((alvo - dela.length) + ' inversor(es) na cabine ' + c.nome + '. Preencha as strings e salve.', true);
+      return;
+    }
+    var tirar = dela.length - alvo, tirados = 0;
+    for (var j = dela.length - 1; j >= 0 && tirados < tirar; j--) {
+      var x = dela[j];
+      if (x.id == null && !x.equipamento_supervisorio && x.potencia_kwp == null && x.strings_esperadas_qtd == null) {
+        st.inversores.splice(st.inversores.indexOf(x), 1); tirados++;
+      }
+    }
+    desenhar();
+    if (tirados < tirar) avisar('Saíram ' + tirados + ' de ' + tirar + ': os outros já estão salvos ou têm dado. Tire-os na tabela dos inversores.', false);
+  }
+
+  /* a coluna "Na fonte" */
+  function celFonte(x, i) {
+    var casou = x.id != null ? (NA_FONTE[x.id] || []) : [];
+    if (casou.length) {
+      return casou.map(function (f) {
+        var tom = f.modo === 'ordem' ? 'alerta' : 'ok';
+        return '<span class="eq-fonte-par" title="' + esc(f.fonte + (f.modo === 'ordem' ? ': casado pela ordem, a conferir' : '')) + '"><i class="eqx-luz eqx-luz--' + tom + '" aria-hidden="true"></i>' + esc(f.nome) + '</span>';
+      }).join('');
+    }
+    var livres = (x.chave != null && LIVRES[x.chave]) || [];
+    var usados = st.inversores.map(function (o) { return semAcento(o.equipamento_supervisorio); });
+    var op = livres.filter(function (n) { return usados.indexOf(semAcento(n)) < 0 || semAcento(n) === semAcento(x.equipamento_supervisorio); });
+    if (!op.length) {
+      var como = x.chave == null ? 'sem chave' : ({lido: 'não chega da fonte', sem_leitura: 'sem leitura da fonte', nome: 'liga pelo nome',
+                                                   erro: 'fonte não lida'}[COMO[x.chave]] || 'nenhuma fonte nesta chave');
+      return '<span class="mudo">' + como + '</span>';
+    }
+    return '<select class="gc-campo eq-fonte-esc" data-na-fonte="' + i + '" aria-label="O nome na fonte de ' + esc(x.nome) + '"' + (podeGravar ? '' : ' disabled') + '>' +
+      '<option value="">ligar a…</option>' + op.map(function (n) {
+        return '<option value="' + esc(n) + '"' + (semAcento(n) === semAcento(x.equipamento_supervisorio) ? ' selected' : '') + '>' + esc(n) + '</option>';
+      }).join('') + '</select>';
+  }
+  document.addEventListener('eq-fontes', function (e) {
+    NA_FONTE = {}; LIVRES = {}; COMO = {};
+    (e.detail || []).forEach(function (c) {
+      // a plataforma sem a lista da fonte (a leitura do ciclo dela) não diz "sem par": diz que não leu
+      if (c.supervisorio_id != null) {
+        var k = c.erro ? 'erro' : (!c.edita_inversor ? 'nome' : ((c.sem_leitura || !(c.linhas || []).length) ? 'sem_leitura' : 'lido'));
+        if (COMO[c.supervisorio_id] !== 'lido') COMO[c.supervisorio_id] = k;
+      }
+      (c.linhas || []).forEach(function (l) {
+        if (l.inversor_id != null && l.alvo) (NA_FONTE[l.inversor_id] = NA_FONTE[l.inversor_id] || []).push({fonte: c.fonte_nome, nome: l.fonte, modo: l.modo});
+        else if (!l.alvo && c.supervisorio_id != null && l.fonte) {
+          var lv = LIVRES[c.supervisorio_id] = LIVRES[c.supervisorio_id] || [];
+          if (lv.indexOf(l.fonte) < 0) lv.push(l.fonte);
+        }
+      });
+    });
+    if (st) desenhar();
   });
 
   /* os botões */
-  function gerar(i) {
-    var c = st.cabines[i], n = lerNumero(document.getElementById('eq-g-n').value);
-    var strings = lerNumero(document.getElementById('eq-g-str').value), kwp = lerNumero(document.getElementById('eq-g-kwp').value);
-    var chave = document.getElementById('eq-g-chave').value;
-    if (!n || isNaN(n) || n !== Math.round(n) || n > 300) { avisar('Diga quantos inversores (de 1 a 300).', false); return; }
-    if (isNaN(strings) || (strings != null && strings !== Math.round(strings))) { avisar('As strings têm de ser um número inteiro.', false); return; }
-    if (isNaN(kwp)) { avisar('O kWp tem de ser um número.', false); return; }
-    var k = invsDaCab(c.k).length, feitos = 0;
-    for (var j = 0; j < n; j++) {
-      var nome;
-      do { k++; nome = 'Inversor ' + (i + 1) + '.' + k; } while (invPorNome(nome));
-      st.inversores.push({id: null, nome: nome, chave: chave ? +chave : null, cabine: c.k, equipamento_supervisorio: '',
-                          potencia_kwp: kwp, strings_esperadas_qtd: strings, equipamento_id: null, codigo_fracttal: ''});
-      feitos++;
-    }
-    gerando = null; desenhar();
-    avisar(feitos + ' inversores gerados na cabine ' + c.nome + '. Preencha o nome no supervisório de cada um e salve.', true);
-  }
   function trazer() {
     var aba = D.aba || {}, cabNovas = 0, invNovos = 0, preench = 0, renomeados = 0;
     /* a chave da usina é a que tem a linha UFV na aba, se for uma só entre as ligadas */
@@ -413,12 +498,11 @@
       novaCab(nc, null); desenhar();
     }
     else if (a === 'novo-inversor') {
-      var n = st.inversores.length + 1, nome;
-      do { nome = 'Inversor ' + n++; } while (invPorNome(nome));
-      st.inversores.push({id: null, nome: nome, chave: st.chaves.length === 1 ? st.chaves[0].supervisorio_id : null, cabine: st.cabines.length === 1 ? st.cabines[0].k : null,
-                          equipamento_supervisorio: '', potencia_kwp: null, strings_esperadas_qtd: null, equipamento_id: null, codigo_fracttal: ''});
+      // na última cabine, com o nome dela (Inversor 3.4); sem cabine, Inversor <n>
+      novoInversor(st.cabines.length ? st.cabines[st.cabines.length - 1] : null);
       desenhar();
     }
+    else if (a === 'ver-chaves') { chavesAbertas = !chavesAbertas; desenhar(); }
     else if (a === 'tirar-cabine') {
       var c = st.cabines[i], dela = invsDaCab(c.k);
       if (dela.length && !window.confirm('A cabine ' + c.nome + ' tem ' + dela.length + ' inversor(es): eles ficam sem cabine (não somem). Remover a cabine?')) return;
@@ -426,13 +510,10 @@
       st.cabines.splice(i, 1); desenhar();
     }
     else if (a === 'tirar-inversor') { st.inversores.splice(i, 1); desenhar(); }
-    else if (a === 'gerar') { gerando = st.cabines[i].k; desenhar(); var g = document.getElementById('eq-g-n'); if (g) g.focus(); }
-    else if (a === 'gerar-ok') { gerar(i); }
-    else if (a === 'gerar-cancela') { gerando = null; desenhar(); }
     else if (a === 'trazer') { trazer(); }
     else if (a === 'distribuir') { distribuir(); }
     else if (a === 'ver-cmp') { var sid = +b.getAttribute('data-sid'); cmpAberta = cmpAberta === sid ? null : sid; desenhar(); }
-    else if (a === 'descartar') { if (!sujo() || window.confirm('Descartar as mudanças não salvas?')) { st = JSON.parse(base); gerando = null; desenhar(); } }
+    else if (a === 'descartar') { if (!sujo() || window.confirm('Descartar as mudanças não salvas?')) { st = JSON.parse(base); desenhar(); } }
     else if (a === 'salvar') { salvar(b); }
   });
   window.addEventListener('beforeunload', function (e) { if (sujo()) { e.preventDefault(); e.returnValue = ''; } });

@@ -947,3 +947,37 @@ details.ace-mais>summary:focus-visible{outline:2px solid var(--foco);outline-off
   .dpx-fonte>summary .dpx-cad{display:none}
   .dpx-ed-corpo{grid-template-columns:minmax(0,1fr)}
 }
+
+/* Equipamentos das usinas enxuta (17/11/2026, Levi, com as fotos da Rio do Peixe I e II): sem os números do alto, os textos
+   no "!", os filtros do Histórico de OS na lateral, as chaves recolhidas, "Centralize os cabeçalhos! Todos" e as fontes de
+   dados na mesma tela (a aba De-para saiu) */
+.eq-pagina .cad-tabela th,.eq-pagina .cad-tabela th.num{text-align:center}
+.eq-pagina .cad-topo .fr-acoes{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.eq-pagina .eq-form-inline{margin:0}
+.eq-ref--alto{margin:0 0 12px}
+/* os filtros na lateral: a busca em cima, o botão embaixo e o painel dentro da coluna (não por cima da usina aberta) */
+.eq-filtros .fo-barra{flex-direction:column;align-items:stretch;gap:8px}
+.eq-filtros .fo-busca{flex:none;max-width:none}
+.eq-filtros .fo-painel{position:static;width:auto;max-width:none;margin-top:4px;padding:12px;box-shadow:none}
+.eq-filtros .fo-grade{grid-template-columns:1fr}
+.eq-filtros .fo-rodape{flex-wrap:wrap}
+.eq-filtros .fo-dir{margin-left:0;width:100%;justify-content:flex-end}
+.eq-filtros .fo-etiquetas{margin-top:4px}
+.eq-filtros .fo-chip-v{max-width:150px}
+.eq-lista>.eq-lista-conta{padding:10px 12px 4px}
+.eq-lista>.eqx-legenda{padding:0 12px 10px;border-bottom:1px solid var(--linha)}
+.eq-meta--alto{margin:0 0 12px}
+/* as fontes de dados: ligar a fonte e os cartões das que chegam */
+.eq-fontes>h2{display:flex;align-items:center;gap:10px}
+.dpx--embutido{border:0;background:transparent}
+.dpx--embutido .dpx-topo{padding:0 0 8px;border-bottom:0;justify-content:flex-end}
+/* a Usina Supervisório do editor, recolhida */
+.eq-ed-recolhe{width:100%;background:transparent;border:0;padding:0;color:inherit;font:inherit;cursor:pointer;text-align:left}
+.eq-ed-recolhe .ph{color:var(--mudo)}
+.eq-ed-recolhe:hover h3{color:var(--verde-texto)}
+/* a coluna "Na fonte" */
+.eq-fonte-par{display:inline-flex;align-items:center;gap:6px;font-family:var(--font-mono);font-size:12px;white-space:nowrap}
+.eq-fonte-par+.eq-fonte-par{margin-left:8px}
+.eq-fonte-par .eqx-luz{height:10px}
+.eq-w-fonte{min-width:130px}
+.eq-fonte-esc{min-width:120px}

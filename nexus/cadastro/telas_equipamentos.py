@@ -44,8 +44,6 @@ TITULO = "Equipamentos das usinas"
 _BRT = timezone(timedelta(hours=-3))
 FILTROS = (("", "Todas"), ("sem_chave", "Sem chave"), ("sem_inversores", "Sem inversores"),
            ("potencia", "kWp não fecha"), ("depara", "De-para pendente"))
-# as duas abas da tela (13/11/2026, Levi: "o equipamentos das usinas tem que ser junto do de para de equipamentos")
-ABAS = ("", "depara")
 SEM_CLIENTE = "-"            # o valor do filtro de cliente para as usinas sem cliente no Registro mestre
 _CHAVE_AVISO = "equipamentos_aviso"
 
@@ -201,18 +199,23 @@ def contexto(srv, cfg, args) -> dict:
         lista.append(x)
     lista.sort(key=lambda x: E.norm(x["titulo"]))
     q = str(args.get("q") or "").strip()[:120]
-    filtro = args.get("filtro") if args.get("filtro") in dict(FILTROS) else ""
+    # os filtros no padrão do Histórico de OS, na lateral (17/11/2026, Levi: "Esses filtros devem ficar padrão histórico
+    # de OS do OS Creator, mesmas funcionalidades e padrões, só que lateral!"): listas de marcar (a=1&a=2), que valem no
+    # Aplicar. Dentro de uma lista, qualquer um dos marcados (ou); entre as listas, todas (e)
+    def _lista(nome):
+        v = args.getlist(nome) if hasattr(args, "getlist") else ([args.get(nome)] if args.get(nome) else [])
+        return [str(x) for x in v if x]
+    filtros = [f for f in _lista("filtro") if f in dict(FILTROS) and f]
     # o cliente (13/10/2026, Levi: "tem que dar para filtrar o cliente!"): o do Registro mestre de cada usina, com
     # quantas usinas ele tem; SEM_CLIENTE = as usinas sem cliente na ficha. Só vale um cliente que está na lista
     por_cliente = Counter(x["cliente"] or "" for x in lista)
     clientes = sorted(((c or SEM_CLIENTE, c or "Sem cliente", n) for c, n in por_cliente.items()),
                       key=lambda c: (c[0] == SEM_CLIENTE, E.norm(c[1])))
-    cliente = str(args.get("cliente") or "")
-    if cliente not in {c[0] for c in clientes}:
-        cliente = ""
+    validos = {c[0] for c in clientes}
+    cli_escolhidos = [c for c in _lista("cliente") if c in validos]
 
     def na_busca(x):
-        if cliente and (x["cliente"] or SEM_CLIENTE) != cliente:
+        if cli_escolhidos and (x["cliente"] or SEM_CLIENTE) not in cli_escolhidos:
             return False
         return not q or E.norm(q) in E.norm(f"{x['titulo']} {x['codigo']} {x['cidade'] or ''}")
 
@@ -222,25 +225,25 @@ def contexto(srv, cfg, args) -> dict:
                 "potencia": x["pot"] in ("perto", "nao_fecha"), "depara": x["luzes"][2] in ("alerta", "critico")}[f]
 
     def passa(x):
-        return na_busca(x) and no_filtro(x, filtro)
+        return na_busca(x) and (not filtros or any(no_filtro(x, f) for f in filtros))
     buscadas = [x for x in lista if na_busca(x)]
-    chips = [(v, rot, sum(1 for x in buscadas if no_filtro(x, v))) for v, rot in FILTROS]
-    aba_tela = args.get("aba") if args.get("aba") in ABAS else ""
+    chips = [(v, rot, sum(1 for x in buscadas if no_filtro(x, v))) for v, rot in FILTROS if v]
     sel = D._id(args.get("usina"))
     aberta = next((x for x in lista if x["id"] == sel), None)
     info = _info_usinas(srv, cfg, usinas)
     painel = _painel(aberta, est, aba, fr_nomes, fr_dono, nome_usina, info) if aberta else None
     if painel:
         painel["fontes"] = dp["por_usina"].get(aberta["id"], [])
+        painel["fontes_livres"] = fontes_livres(dp["sem_usina"], aberta["nome"])
     aviso = session.pop(_CHAVE_AVISO, None)
     pode_gravar = bool(cfg.get("GRIDCO_SQL_TOKEN")) and not est.get("erro")
     # o que a "Ligar pela aba Equipamentos" ligaria agora, e o que fica de fora com o motivo (13/10/2026)
     auto = E.proposta_pela_aba(aba["chaves"], L.ler(cfg), est, {u["id"] for u in usinas}) if not aba.get("erro") else \
         {"ligar": {}, "fora": [], "ja_ligadas": 0}
     auto = dict(auto, n_chaves=sum(len(v) for v in auto["ligar"].values()), n_usinas=len(auto["ligar"]))
-    return {"lista": [x for x in lista if passa(x)], "total": len(lista), "q": q, "filtro": filtro, "filtros": FILTROS,
-            "chips": chips, "aba": aba_tela, "dp": dp, "nome_usina": nome_usina,
-            "cliente": cliente, "clientes": clientes,
+    return {"lista": [x for x in lista if passa(x)], "total": len(lista), "q": q, "filtros_escolhidos": filtros,
+            "filtros": FILTROS, "chips": chips, "dp": dp, "nome_usina": nome_usina,
+            "clientes_escolhidos": cli_escolhidos, "clientes": clientes,
             "painel": painel, "aviso": aviso, "erro_livro": est.get("erro") or "", "livro_velho": est.get("velha", False),
             "erro_aba": aba.get("erro") or "", "aba_lida_em": _hora(aba.get("lido_em")), "fr_lido": fr_lido,
             "sem_token": not cfg.get("GRIDCO_SQL_TOKEN"), "pode_gravar": pode_gravar,
@@ -253,22 +256,40 @@ def contexto(srv, cfg, args) -> dict:
             "n_chaves_ligadas": sum(1 for c in aba["chaves"] if any(
                 s["usina_supervisorio"] == c and not s["excluido"] for s in est["supervisorios"])),
             "auto": auto,
-            "volta": {k: v for k, v in (("q", q), ("filtro", filtro), ("cliente", cliente), ("aba", aba_tela)) if v}}
+            "volta": {k: v for k, v in (("q", q), ("filtro", filtros), ("cliente", cli_escolhidos)) if v}}
+
+
+def fontes_livres(sem_usina: list, nome_usina: str) -> list:
+    """As linhas das fontes que não chegam em usina nenhuma do Nexus (a chave delas não está ligada), para ligar na usina
+    aberta (17/11/2026, Levi, no Rio do Peixe I e II com a SCADA Grid Apolo: "Diz que nenhuma fonte chega na usina sendo
+    que temos SCADA Grid Apolo! [...] vai ter uma parte onde eu escolho qual a fonte de dados e ele tenta lincar [...] caso
+    não consiga eu mesmo linko"). A mais parecida com o nome da usina primeiro; com nota de 0,6 ou mais, ela já vem
+    escolhida (`sugerida`). Ligar = a chave que a fonte usa vira chave desta usina (o mesmo Ligar das chaves)."""
+    out = []
+    for x in sem_usina or []:
+        chave = E.texto(x.get("usina"))
+        if not chave:
+            continue
+        out.append({"fonte": x.get("fonte_nome") or x.get("fonte") or "", "chave": chave, "luz": x.get("luz") or "ok",
+                    "nota": round(_parecido(chave, nome_usina), 3)})
+    out.sort(key=lambda f: (-f["nota"], E.norm(f["fonte"]), E.norm(f["chave"])))
+    if out and out[0]["nota"] >= 0.6:
+        out[0]["sugerida"] = True
+    return out
 
 
 def _volta(usina=None, ancora: str = "") -> str:
-    """A mesma tela, com a busca e o filtro de antes (só os conhecidos, nunca um endereço vindo do formulário)."""
+    """A mesma tela, com a busca e os filtros de antes (só os conhecidos, nunca um endereço vindo do formulário)."""
     q = {}
     busca = (request.form.get("q") or "").strip()[:120]
     if busca:
         q["q"] = busca
-    if request.form.get("filtro") in dict(FILTROS) and request.form.get("filtro"):
-        q["filtro"] = request.form["filtro"]
-    cliente = (request.form.get("cliente") or "").strip()[:120]
-    if cliente:                                     # vai como parâmetro do endereço (url_for codifica); a tela confere
-        q["cliente"] = cliente
-    if request.form.get("aba") in ABAS and request.form.get("aba"):
-        q["aba"] = request.form["aba"]
+    filtros = [f for f in request.form.getlist("filtro") if f in dict(FILTROS) and f]
+    if filtros:
+        q["filtro"] = filtros
+    clientes = [c.strip()[:120] for c in request.form.getlist("cliente") if c.strip()][:50]
+    if clientes:                                    # vai como parâmetro do endereço (url_for codifica); a tela confere
+        q["cliente"] = clientes
     if usina:
         q["usina"] = usina
     return url_for("torre_base.equipamentos", **q) + (f"#{ancora}" if ancora else "")

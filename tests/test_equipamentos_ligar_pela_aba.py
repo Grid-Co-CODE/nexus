@@ -78,7 +78,7 @@ def test_a_estrutura_vem_da_aba_como_o_trazer_da_tela():
 
 def test_o_botao_liga_e_grava_a_estrutura_e_a_segunda_vez_nao_muda_nada(cli, banco):  # noqa: F811
     html = cli.get("/t/base/equipamentos").get_data(as_text=True)
-    assert "Ligar 3 chaves em 1 usina" in html and "Pedra do Sal" in html and "sem a Usina Fractall na aba" in html
+    assert "Ligar pela aba (3)" in html and "Pedra do Sal" in html and "sem a Usina Fractall na aba" in html
     r = cli.post("/t/base/equipamentos/ligar-aba", data={})
     aviso = cli.get(r.headers["Location"]).get_data(as_text=True)
     assert "Ligado pela aba Equipamentos: 3 chave(s) em 1 usina(s), com 2 cabine(s), 4 inversor(es)" in aviso
@@ -90,7 +90,7 @@ def test_o_botao_liga_e_grava_a_estrutura_e_a_segunda_vez_nao_muda_nada(cli, ban
     assert set(inv) == {"Inversor 1.1", "Inversor 1.2", "Inversor 2.1", "Inversor 2.2"}
     assert inv["Inversor 1.1"]["equipamento_supervisorio"] == "INVERSOR01" and float(inv["Inversor 1.1"]["potencia_kwp"]) == 250
     r = cli.post("/t/base/equipamentos/ligar-aba", data={})
-    assert "Nada novo para ligar pela aba" in cli.get(r.headers["Location"]).get_data(as_text=True)
+    assert "> Ligar pela aba</button>" in cli.get(r.headers["Location"]).get_data(as_text=True)
     assert len(_estado(banco)["inv"]) == 4
 
 
@@ -98,7 +98,7 @@ def test_usina_com_estrutura_feita_a_mao_fica_como_esta(cli, banco):  # noqa: F8
     r = cli.post("/t/base/equipamentos/chave", data={"usina": 1, "acao": "ligar", "chave": "Outra Chave"})
     assert r.status_code == 303
     html = cli.get("/t/base/equipamentos").get_data(as_text=True)
-    assert "Nada novo para ligar pela aba" in html and "já tem estrutura gravada" in html
+    assert "> Ligar pela aba</button>" in html and "já tem estrutura gravada" in html
     r = cli.post("/t/base/equipamentos/ligar-aba", data={})
-    assert "Nada novo para ligar pela aba" in cli.get(r.headers["Location"]).get_data(as_text=True)
+    assert "> Ligar pela aba</button>" in cli.get(r.headers["Location"]).get_data(as_text=True)
     assert {s["usina_supervisorio"] for s in _estado(banco)["sup"]} == {"Outra Chave"}

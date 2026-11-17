@@ -35,7 +35,7 @@ pendência "Valores parecidos na mesma lista" aparece na Qualidade sem link (nã
 | `fracttal_pessoal.py` + `telas_fracttal.py` | tela Base → Acessos → Pessoas e setores: o pessoal do Fracttal ao lado do cadastro de pessoas (12/10/2026) |
 | `setores.py` | o setor de cada pessoa do Fracttal e a lista de setores, no livro `nexus_setores` do banco (12/10/2026) |
 | `ligacao_campo.py` | a ligação por ID do que o App de Campo grava: `usina_id` pelo `de_para`, `pessoa_id` pelo nome e `codigo_da_pessoa` (o HMAC do e-mail que o App manda). Morava em `campo/ligacao_cadastro.py` até 08/11/2026 (32 módulos, inclusive 5 fatos de `dados/`, iam ao Campo buscar a chave comum); o endereço antigo reexporta daqui para os ramos em andamento |
-| `estrutura_usina.py` + `telas_equipamentos.py` + `depara_fontes.py` | tela Base → Equipamentos das usinas (com a aba De-para desde 13/11/2026, o de-para da plataforma lido pela ponte): a usina ligada à mão às chaves do supervisório e os equipamentos dela nas colunas da aba Equipamentos (cabines, inversores, strings, potência), no livro `nexus_estrutura_usina` (13/10/2026; sem Fracttal na tela) |
+| `estrutura_usina.py` + `telas_equipamentos.py` + `depara_fontes.py` | tela Base → Equipamentos das usinas (com as fontes de dados na mesma tela desde 17/11/2026, o de-para da plataforma lido pela ponte): a usina ligada à mão às chaves do supervisório e os equipamentos dela nas colunas da aba Equipamentos (cabines, inversores, strings, potência), no livro `nexus_estrutura_usina` (13/10/2026; sem Fracttal na tela) |
 | `telas.py` | as rotas, penduradas nas torres Base e Pessoas |
 
 Campo novo entra em `esquema.py`, e as telas, a importação e a lista acompanham sozinhas.
@@ -398,7 +398,60 @@ Prova: `tests/test_base_acessos_nexus_field.py`.
 
 > Desde 05/11/2026 o guia "Como funciona" e a dica do (!) antigo ficam juntos na exclamação amarela do título (`explica`, `_explica.html`); o guia deixou de ser uma seção do painel vazio.
 
-### A aba De-para e as três luzes (13/11/2026; `depara_fontes.py`, `cadastro-depara.js`, `cadastro/_depara_*.html`)
+### Enxuta e numa tela só (17/11/2026)
+
+Levi, com as fotos da Rio do Peixe I e II, pediu sete coisas, e cada uma virou uma regra da tela:
+
+1. **"Tire esse KPIS"**: os quatro números do alto saíram.
+2. **"Troque esse monte de texto por apenas um título o resto fica em exclamação!"**: cada parte da tela é só o título.
+   As explicações viraram parágrafos do "!" do título da tela, que é um só por tela.
+   - "Ligar pela aba" e "Refazer a visão" são botões no alto, ao lado do "Ler de novo".
+   - A lista das chaves que não ligam sozinhas fica num `<details>`.
+3. **"Esses filtros devem ficar padrão histórico de OS do OS Creator, mesmas funcionalidades e padrões, só que
+   lateral!"**: o formulário da lista leva `data-fo` (`static/filtros-os.js`).
+   - Tem a busca e o botão Filtros, com o painel dentro da coluna (`.eq-filtros`, não por cima da usina aberta) e as
+     etiquetas.
+   - Cliente e Situação são listas de marcar (`?cliente=a&cliente=b`, `?filtro=x&filtro=y`). Dentro de uma lista vale
+     qualquer um; entre as listas, todas.
+   - Os filtros seguem nos endereços e nas gravações (`volta`, `_volta`, com as listas).
+4. **"conforme eu for adicionando as cabines vai renomeando de acordo com a cabine: inversor 1.1, 1.2 [...] a pessoa
+   pode digitar lá na tabela das cabines a quantidade de inversores, aí já gera automático"**:
+   - O "N de Inversores" da cabine é um campo (`ajustarQtd`). A mais, nascem "Inversor <nº da cabine>.<n>", com a chave
+     dos inversores da cabine (sem eles, a única chave ligada). A menos, saem só os novos e vazios do fim; o que já foi
+     salvo ou tem dado se tira na tabela.
+   - O "Adicionar inversor" põe o novo na última cabine, com o nome dela.
+   - O inversor novo com o nome que o Nexus deu troca de nome junto quando muda de cabine.
+   - O "Gerar inversores" saiu.
+5. **"essa parte de chaves quero recolhida e o nome e potência da UFV já se repete em baixo"**:
+   - As chaves do supervisório ficam num `<details class="ace-recolhe">` fechado, e a Usina Supervisório do editor
+     também abre num clique.
+   - O alto da usina é uma linha (cliente, código, cidade, a ficha); a potência fica nos quadros do editor.
+6. **"Centralize os cabeçalhos! Todos"**: `.eq-pagina .cad-tabela th`.
+7. **"Da para deixar tudo numa tela só! [...] vai ter uma parte onde eu escolho qual a fonte de dados e ele tenta lincar
+   em uma outra coluna, caso não consiga eu mesmo linko"** (o Rio do Peixe dizia "nenhuma fonte chega" com a SCADA Grid
+   Apolo na plataforma, porque a chave dela não estava ligada a usina nenhuma). A aba De-para saiu (`?aba=depara` é
+   ignorado), e a usina aberta tem:
+   - **Fontes de dados.** O "Ligar uma fonte a esta usina" lista as linhas do de-para que não chegam em usina nenhuma
+     (`fontes_livres`). A mais parecida com o nome da usina vem primeiro e, com nota de 0,6 ou mais, já escolhida.
+   - Ligar = a chave que a fonte usa vira chave desta usina (o mesmo POST `/equipamentos/chave`, com `chave_nova`).
+   - Embaixo ficam os cartões das fontes que chegam (`_depara_painel.html`, por fetch), **sem o lápis e sem o "No
+     cadastro"**: o cadastro está logo abaixo, e dois rascunhos da mesma usina na mesma página brigariam pelo selo.
+   - **A coluna "Na fonte"** na tabela dos inversores. Os cartões mandam o evento `eq-fontes` e o editor monta:
+     - o nome que a fonte manda para cada inversor casado (verde; amarelo quando casado pela ordem);
+     - para o que não casou, uma lista com os nomes que a fonte manda sem par naquela chave.
+
+     Escolher põe o nome no Equipamento Supervisório (rascunho), e com o Salvar a plataforma casa pelo nome. Onde a
+     plataforma não tem a lista da fonte, a coluna diz "sem leitura da fonte", nunca "sem par".
+   - Sem usina aberta, a tela mostra as fontes que não chegam em usina nenhuma.
+
+Prova: `tests/test_base_equipamentos_depara_fontes.py`, `tests/test_base_equipamentos.py` e
+`tests/test_equipamentos_ligar_pela_aba.py`. Conferido em 17/11/2026 na prévia, com o dado de produção e o de-para de
+13/11:
+- na Céu Azul, a coluna mostra o INVERSOR01 casado no 3.1, oferece o INVERSOR09 no 3.7 e diz "sem leitura da fonte" na
+  Céu Azul I;
+- digitar 10 no "N de Inversores" da UG 03 criou o 3.9 e o 3.10.
+
+### As fontes de dados e as três luzes (13/11/2026 numa aba, 17/11/2026 na mesma tela; `depara_fontes.py`, `cadastro-depara.js`, `cadastro/_depara_*.html`)
 
 Levi, 13/11/2026: "o equipamentos das usinas tem que ser junto do de para de equipamentos, pois um complementa o outro,
 certo? E no de para do equipamento, tem que ser possível editar o equipamento da usina. Deixa a visualização dos dois
@@ -406,10 +459,9 @@ parecida [...] o mais visual possível". A prévia aprovada: `docs/mockups/equip
 plataforma). O item **De-para de equipamentos** saiu do menu (`dentro_de="equipamentos"`): o endereço segue, e o botão
 "De-para completo" da aba leva a ele.
 
-- **As duas abas** (`?aba=depara`, `ABAS`): os mesmos números do alto em ladrilhos (cada um filtra), a mesma lista com
-  as fichas do filtro (com a contagem; "De-para pendente" é novo) e **três luzes** por usina: chave do supervisório,
-  equipamentos (o kWp dos inversores fecha com o Registro mestre: `_luz_equip`) e de-para (a pior fonte da usina).
-  Apagada = sem leitura, nunca verde. O "Ligar pela aba" e o "Refazer a visão" ficam só na aba Equipamentos.
+- **As três luzes** por usina na lista: chave do supervisório, equipamentos (o kWp dos inversores fecha com o Registro
+  mestre: `_luz_equip`) e fonte (a pior fonte da usina). Apagada = sem leitura, nunca verde. A Situação "De-para
+  pendente" filtra pela terceira.
 - **De onde vem o de-para:** da PLATAFORMA, só leitura, pela ponte (`X-Nexus-Leitura`, `ponte.enviar`, tempo-limite de
   20 s e não os 150 da ponte, guardado 2 min): `/api/admin/de-para` (o diagnóstico) e `/api/admin/de-para/usina` (a
   usina de uma fonte, sem o `cadastro_usinas`). A plataforma deixa a chave ler **só esses dois caminhos exatos**
@@ -419,20 +471,19 @@ plataforma). O item **De-para de equipamentos** saiu do menu (`dentro_de="equipa
 - **Como a linha chega à usina** (`por_usina`): pela chave (`usina_supervisorio`, no `norm`) e, sem ela, pelo nome de
   exibição gravado no Nexus quando ele é de UMA chave só (a API PV escreve "Alto Paraná 1"; a chave é "Alto Parana 1
   (40)"). Medido em 13/11/2026: 155 das 179 linhas pela chave, 18 pela exibição, 6 sem usina no Nexus (a chave está
-  na aba, sem ligação). Essas 6 aparecem na aba De-para sem usina aberta ("Na fonte, fora do Nexus").
+  na aba, sem ligação). Essas aparecem no "Ligar uma fonte a esta usina" de cada usina e na tela sem usina aberta.
 - **Os pares** (`pares`): um cartão por fonte; cada par é UMA linha da grade de três colunas (a fonte, o fio, o cadastro),
   para a cor do "sem par" atravessar a coluna do meio (Levi, 13/11, com a foto: "a coluna Liga está cortando a cor
   amarelo"). O fio vem do `origem` da plataforma: nome/código = liga, tela = decidido, ordem = conferir, sem = sem par.
   O alvo é o do cadastro que a PLATAFORMA lê (a aba, ou a visão do Nexus na chave no lugar da aba); o inversor do Nexus
-  vai junto quando casa (o nome no supervisório e, sem ele, o nome do equipamento), e só então o lápis aparece ("só na
-  aba" quando não casa). Fonte sem a lista de inversores (a tabela do ciclo não tem a usina) = **"sem a lista da
+  vai junto quando casa (o nome no supervisório e, sem ele, o nome do equipamento): é por ele que a coluna "Na fonte"
+  sabe a linha ("só na aba" quando o alvo não está na estrutura do Nexus). Fonte sem a lista de inversores (a tabela do ciclo não tem a usina) = **"sem a lista da
   fonte"**, nunca "não chega da fonte" (o cadastro inteiro sobraria, e isso não se sabe). A fonte que liga pelo nome
-  (Athon, Axis) não tem pares: o cartão traz os alertas e o cadastro com o lápis.
-- **O lápis** edita o inversor do CADASTRO (a estrutura do Nexus) e grava pela **mesma rota** do Salvar da aba
-  Equipamentos (`/equipamentos/salvar`, a usina inteira com o selo). **Na chave que a plataforma ainda lê da aba Excel
-  (`substitui_aba` falso), o Salvar pergunta** (Levi, 13/11/2026, "Pergunta ao salvar"): mostra as diferenças Nexus ×
-  aba do que está salvo (`comparacao`) e dá "Salvar e passar a valer na plataforma" (marca a chave no lugar da aba) ou
-  "Salvar só no Nexus". O "+ No cadastro" do inversor sem par abre o mesmo editor, com o nome que a fonte manda.
+  (Athon, Axis) não tem pares: o cartão traz os alertas e o cadastro.
+- **Corrigir o cadastro é no editor da própria tela** (desde 17/11/2026, o lápis e o "+ No cadastro" dos cartões não
+  aparecem: o `cadastro-depara.js` só os mostra com o `dpx-dados`, que a tela não manda mais; o código do diálogo ficou). **Na chave que a plataforma ainda lê da aba Excel
+  (`substitui_aba` falso), o Salvar pergunta** (Levi, 13/11/2026, "Pergunta ao salvar"), com as diferenças Nexus × aba
+  do que está salvo (`comparacao`).
 - **O "Ligar a…"** decide o par na tela da PLATAFORMA, numa janela por cima: `/equipamentos/fontes/janela?editar=fonte|id`
   é uma página sem o base.html (a casca toma a janela quando está numa moldura) que leva o passe da porta única a
   `/admin/de-para?janela=1&editar=…`. Quando o editor de lá fecha, ele avisa (`{gc: 'depara-fechar'}`), a página do
@@ -480,15 +531,16 @@ de entender para você, quando eu for fazer não vou entender nada".
   tela: 160 das 263 chaves iguais à aba; as outras com as diferenças do modelo (a cabine é da usina e sai na chave da
   usina, a potência da UFV é a do Registro mestre, o nome do Fracttal vem das Ligações, nome de inversor repetido entre
   chaves). Prova: `tests/test_equipamentos_ligar_pela_aba.py`.
-- **O ponto de partida é a usina do Registro mestre.** À esquerda, as 258 usinas (busca enquanto se digita; filtro de
-  CLIENTE, o da ficha no Registro mestre, com quantas usinas cada um tem e "Sem cliente" (13/10/2026, Levi: "tem que dar
-  para filtrar o cliente!"); filtros sem chave, sem inversores, potência que não fecha; os filtros seguem ao abrir uma
-  usina e depois de cada gravação); à direita, a usina aberta em 2 passos.
-- **1. Chaves do supervisório:** a "Usina Supervisório" da aba Equipamentos (`bd_performance · Equipamentos`), a chave que
+- **O ponto de partida é a usina do Registro mestre.** À esquerda, as 258 usinas (busca enquanto se digita; os filtros
+  do Histórico de OS na lateral: Cliente, o da ficha no Registro mestre, com quantas usinas cada um tem e "Sem cliente"
+  (13/10/2026, Levi: "tem que dar para filtrar o cliente!"), e Situação: sem chave, sem inversores, kWp não fecha,
+  de-para pendente; os filtros seguem ao abrir uma usina e depois de cada gravação); à direita, a usina aberta: Fontes
+  de dados, Chaves do supervisório (recolhida) e Equipamentos.
+- **Chaves do supervisório:** a "Usina Supervisório" da aba Equipamentos (`bd_performance · Equipamentos`), a chave que
   a plataforma usa por dentro. Uma usina pode ter várias; **uma chave serve a uma usina só** (a de outra usina é
   recusada). As opções vêm ordenadas, com o porquê escrito ("nome parecido"), nenhuma escolhida. Chave digitada que não está na aba liga, com aviso para conferir o nome exato. **Desligar a chave nunca
   apaga inversor:** os que chegavam por ela ficam na usina sem chave, à vista para ganhar outra.
-- **2. Equipamentos, nas colunas da aba** (editor em JavaScript sobre um rascunho; só o Salvar grava, de uma vez, por
+- **Equipamentos, nas colunas da aba** (editor em JavaScript sobre um rascunho; só o Salvar grava, de uma vez, por
   fetch com JSON, e recebe de volta o estado gravado com os IDs novos, sem recarregar). As tabelas usam os nomes da aba:
   Cabines (UG): Equipamento, Potência (kWp), N de Inversores; Inversores: Usina Supervisório, Equipamento, Equipamento
   Supervisório, Equipamento Parente, Potência (kWp), Strings Ativas. **A cabine é da usina** e o inversor diz a chave por
@@ -496,7 +548,7 @@ de entender para você, quando eu for fazer não vou entender nada".
   UG fica numa chave e os inversores dela em outra (a Altair: "Altair" com a UFV e as 5 UG, e "Altair 1 (73)" a
   "Altair 5 (77)" com os inversores; 1.311 dos 2.201 inversores da aba apontam para UG de outra chave). Ajudas, todas
   só no rascunho: **Trazer da aba** (as chaves ligadas; só preenche o vazio e nunca apaga; nome repetido de outra chave
-  ganha a chave no nome), **Gerar inversores** numa cabine ("Inversor c.n", continuando a numeração), **Distribuir
+  ganha a chave no nome), o **N de Inversores** da cabine ("Inversor c.n", continuando a numeração), **Distribuir
   potência** (cabine sem kWp = o que falta da usina ÷ as vazias; inversor sem kWp = o que falta da cabine ÷ os vazios).
 - **Potência:** a da usina é a **real** do Registro mestre (`potencia_real`, MWp × 1.000) e, sem ela, a contratual (a
   tela diz qual). Medido em 13/10: a aba bate com a real (Araputanga 1: real 3,469 MWp, contratual 3,25; UFV da aba

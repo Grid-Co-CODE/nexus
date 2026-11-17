@@ -197,29 +197,34 @@ def _liga_brodowski(cli):
     assert r.status_code == 303
 
 
-def test_as_duas_abas_e_as_tres_luzes_na_lista(app_eq, cli, plataforma):
+def test_uma_tela_so_sem_numeros_no_alto_e_as_tres_luzes_na_lista(app_eq, cli, plataforma):
+    """17/11/2026, Levi: "Tire esse KPIS" e "Da para deixar tudo numa tela só!": sem as abas e sem os quatro números."""
     app_eq.config.update(CFG)
     _liga_brodowski(cli)
     html = cli.get("/t/base/equipamentos").get_data(as_text=True)
-    assert 'class="gc-subabas"' in html and "De-para" in html and "Usinas com equipamentos" in html
-    assert 'title="Usinas com pendência no de-para">1</span>' in html          # a Brodowski, pela pv
+    assert 'class="gc-subabas"' not in html and 'class="eqx-kpis"' not in html and "Usinas com equipamentos" not in html
     lista = html.split('id="eq-itens"')[1]
-    assert 'aria-label="Chave: ok; equipamentos: atenção; de-para: atenção"' in lista
-    assert 'aria-label="Chave: falta; equipamentos: sem leitura; de-para: sem leitura"' in lista   # Matões 100
-    # o filtro do de-para pendente
+    assert 'aria-label="Chave: ok; equipamentos: atenção; fonte: atenção"' in lista
+    assert 'aria-label="Chave: falta; equipamentos: sem leitura; fonte: sem leitura"' in lista   # Matões 100
+    # os filtros no padrão do Histórico de OS, na lateral: listas de marcar, e dentro da lista vale qualquer um
+    assert 'data-fo>' in html and 'name="filtro" multiple' in html and 'name="cliente" multiple' in html
     html = cli.get("/t/base/equipamentos?filtro=depara").get_data(as_text=True)
     itens = html.split('id="eq-itens"')[1]
     assert "Brodowski" in itens and "Matões 100" not in itens
+    itens = cli.get("/t/base/equipamentos?filtro=depara&filtro=sem_chave").get_data(as_text=True).split('id="eq-itens"')[1]
+    assert "Brodowski" in itens and "Matões 100" in itens
 
 
-def test_a_aba_de_para_da_usina_com_os_cartoes_por_fetch(app_eq, cli, plataforma):
+def test_as_fontes_da_usina_na_mesma_tela_com_os_cartoes_por_fetch(app_eq, cli, plataforma):
+    """As fontes que chegam ficam em "Fontes de dados" da usina, na mesma página do editor; sem o lápis dos cartões (o
+    dpx-dados): dois rascunhos da mesma usina na mesma página brigariam pelo selo."""
     app_eq.config.update(CFG)
     _liga_brodowski(cli)
-    html = cli.get("/t/base/equipamentos?aba=depara&usina=1").get_data(as_text=True)
-    assert "/static/cadastro-depara.js" in html and 'id="dpx"' in html and 'id="dpx-editor"' in html
-    assert 'id="passo-chave"' not in html and "Ligar pela aba Equipamentos" not in html
-    dados = json.loads(html.split('id="dpx-dados">')[1].split("</script>")[0])
-    assert dados["usina_id"] == 1 and dados["salvar_url"].endswith("/t/base/equipamentos/salvar") and dados["pode_gravar"]
+    html = cli.get("/t/base/equipamentos?usina=1").get_data(as_text=True)
+    assert "/static/cadastro-depara.js" in html and 'id="dpx"' in html and 'id="fontes"' in html
+    assert 'id="passo-chave"' in html and 'id="eq-editor"' in html and 'id="dpx-dados"' not in html
+    # as chaves recolhidas (Levi: "essa parte de chaves quero recolhida")
+    assert '<details class="cad-secao eq-passo ace-recolhe" id="passo-chave">' in html
     j = cli.get("/t/base/equipamentos/fontes?usina=1", headers=JSON_).get_json()
     assert j["ok"] and [c["fonte"] for c in j["cartoes"]] == ["pv", "sunop"]
     assert [x["fonte"] for x in j["cartoes"][0]["linhas"]] == ["INVERSOR01", "INVERSOR05", "INVERSOR05", "INVERSOR09"]
@@ -228,11 +233,28 @@ def test_a_aba_de_para_da_usina_com_os_cartoes_por_fetch(app_eq, cli, plataforma
     assert cli.get("/t/base/equipamentos/fontes?usina=1", headers={"Sec-Fetch-Site": "cross-site"}).status_code == 403
 
 
-def test_a_aba_de_para_sem_usina_mostra_as_linhas_fora_do_nexus(app_eq, cli, plataforma):
+def test_a_fonte_que_nao_chega_em_usina_nenhuma_se_liga_na_usina(app_eq, cli, plataforma):
+    """17/11/2026, Levi, no Rio do Peixe I e II: "Diz que nenhuma fonte chega na usina sendo que temos SCADA Grid Apolo!
+    [...] vai ter uma parte onde eu escolho qual a fonte de dados e ele tenta lincar [...] caso não consiga eu mesmo
+    linko". Sem usina aberta, a lista delas; com a usina aberta, o Ligar com a fonte para escolher."""
     app_eq.config.update(CFG)
-    html = cli.get("/t/base/equipamentos?aba=depara").get_data(as_text=True)
-    assert "Na fonte, fora do Nexus" in html and "Usina Fantasma (9)" in html
-    assert 'data-dpx-ligar="pv|777"' in html and 'id="dpx-janela"' in html
+    html = cli.get("/t/base/equipamentos").get_data(as_text=True)
+    assert "Fontes que não chegam em usina nenhuma" in html and "Usina Fantasma (9)" in html
+    html = cli.get("/t/base/equipamentos?usina=1").get_data(as_text=True)
+    sel = html.split('id="eq-fonte"')[1].split("</select>")[0]
+    assert 'value="Usina Fantasma (9)"' in sel and 'name="chave_nova"' in html.split('class="eq-form eq-guarda eq-fonte-ligar"')[1]
+
+
+def test_a_fonte_mais_parecida_com_a_usina_vem_escolhida():
+    from nexus.cadastro import telas_equipamentos as TE
+    linhas = [{"fonte_nome": "Thopen · API PV", "usina": "Usina Fantasma (9)", "luz": "critico"},
+              {"fonte_nome": "scadaGridco · Apolo", "usina": "Rio do Peixe I e II", "luz": "ok"},
+              {"fonte_nome": "Axis", "usina": "", "luz": "ok"}]
+    f = TE.fontes_livres(linhas, "Rio do Peixe I e II")
+    assert [x["chave"] for x in f] == ["Rio do Peixe I e II", "Usina Fantasma (9)"] and f[0].get("sugerida")
+    assert not f[1].get("sugerida")
+    # nada parecido: nenhuma vem escolhida (a pessoa escolhe)
+    assert not any(x.get("sugerida") for x in TE.fontes_livres(linhas, "Marabá 200"))
 
 
 def test_sem_a_ponte_a_tela_abre_e_diz_que_nao_leu(cli, plataforma):
@@ -264,8 +286,8 @@ def test_salvar_pela_aba_de_para_passa_a_chave_a_valer(app_eq, cli, plataforma):
     """O lápis grava pela mesma rota do Salvar, com a chave marcada no lugar da aba quando a pessoa escolhe."""
     app_eq.config.update(CFG)
     _liga_brodowski(cli)
-    html = cli.get("/t/base/equipamentos?aba=depara&usina=1").get_data(as_text=True)
-    d = json.loads(html.split('id="dpx-dados">')[1].split("</script>")[0])
+    html = cli.get("/t/base/equipamentos?usina=1").get_data(as_text=True)
+    d = json.loads(html.split('id="eq-dados">')[1].split("</script>")[0])
     ch = dict(d["chaves"][0], substitui_aba=True)
     corpo = {"usina_id": 1, "selo": d["selo"], "chaves": [ch], "cabines": [],
              "inversores": [{"id": None, "nome": "Inversor 1.9", "chave": ch["supervisorio_id"], "cabine": None,
