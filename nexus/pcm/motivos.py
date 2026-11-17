@@ -51,6 +51,7 @@ import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+from ..cadastro import setor_ids as SID
 from ..dados import fatos as D
 from ..dados import livros
 from ..dados.equipamento import canon, equipamento_id
@@ -66,8 +67,11 @@ ABAS = (ABA_MOTIVO, ABA_MARCA, ABA_BACKOFFICE)
 # põe na OS quando o técnico justifica com este motivo (e tira quando ele troca ou tira a justificativa). Quem etiqueta é
 # o App, com o login do técnico: a justificativa chega ao Nexus pelo servidor do App, sem esse login (pacote
 # _propostas/etiqueta-motivo do App)
+# `setor_id` (16/11/2026, no FIM): o setor que o motivo CITA, pelo ID do `dim_setor` (Base → Acessos → Pessoas e
+# setores); quem é dele recebe o aviso da tarefa que sai da programação com o motivo (`fora_avisos.py`). Vazio = o
+# padrão pelo ID do motivo (`SETOR_PADRAO`: o livro de antes não tem a coluna); "0" = nenhum setor, escolhido no cadastro
 CAB_MOTIVO = ("motivo_id", "nome", "descricao", "tira_da_programacao", "criado_em", "alterado_em", "excluido",
-              "alterado_por_hmac", "etiqueta_fracttal")
+              "alterado_por_hmac", "etiqueta_fracttal", "setor_id")
 CAB_MARCA = ("decidida_em", "data_id", "item_id", "os", "codigo_ativo", "equipamento_id", "tarefa_chave", "motivo_id",
              "semana", "origem", "decidida_por_hmac", "dados_cifrados")
 CAB_BACKOFFICE = ("decidida_em", "data_id", "nome_hmac", "na_lista", "decidida_por_hmac", "dados_cifrados")
@@ -80,6 +84,7 @@ ORIGENS = ("quadro", "painel", "app")       # app: o técnico pelo App de Campo 
 _BRT = timezone(timedelta(hours=-3))
 _TRAVA = threading.Lock()
 _CACHE: dict = {}
+_RENOVANDO = {"thread": None}
 
 # Os 11 do pedido (Levi, 16/10/2026) e o 12º do mesmo dia, na ordem e com o texto dele, os nomes na regra dele do mesmo dia ("Padronizar texto:
 # sempre a primeira letra maiúscula o resto minúscula conforme regra gramatical"; `padronizar`): (nome, descrição, tira
@@ -104,6 +109,12 @@ CADASTRO_INICIAL = (
     # o 12º, pedido pelo Levi no mesmo dia, com a lista do técnico no App ("Sim, tira", como as condições climáticas)
     ("Vegetação alta impossibilitando ação", "", True),
 )
+# O setor que cada motivo do pedido CITA (16/11/2026, Levi: "fora da programação deve notificar quem é daquele setor caso
+# o setor seja citado!"): os que são setores, pelo ID do motivo (1 e 3 do CADASTRO_INICIAL, conferidos no livro do
+# servidor em 16/11/2026) e pelo ID do setor. O 2, Chamados (garantia), fica sem: em 16/11/2026 não havia setor Chamados
+# ativo em Base → Acessos (o aviso não chegaria a ninguém); o PCM escolhe no cadastro. Vale quando a coluna `setor_id`
+# está vazia (o livro de antes dela); o Cadastro de motivos troca e tira
+SETOR_PADRAO = {1: SID.ENGENHARIA, 3: SID.PERFORMANCE}
 
 
 class Recusada(ValueError):
@@ -219,7 +230,27 @@ def _motivo(x: dict) -> dict | None:
     return {"id": mid, "nome": " ".join(D._txt(x.get("nome")).split()), "descricao": D._txt(x.get("descricao")),
             "tira": _sim(x.get("tira_da_programacao")), "criado_em": D._txt(x.get("criado_em")),
             "alterado_em": D._txt(x.get("alterado_em")), "excluido": _sim(x.get("excluido")),
-            "alterado_por_hmac": D._txt(x.get("alterado_por_hmac")), "etiqueta": _etiqueta(x.get("etiqueta_fracttal"))}
+            "alterado_por_hmac": D._txt(x.get("alterado_por_hmac")), "etiqueta": _etiqueta(x.get("etiqueta_fracttal")),
+            "setor_id": _setor_do_motivo(mid, x.get("setor_id"))}
+
+
+def _setor_do_motivo(mid, v) -> int | None:
+    """O setor que o motivo cita: o ID gravado, o padrão do ID do motivo com a coluna vazia, ou nenhum ("0")."""
+    t = D._txt(v)
+    if t == "":
+        return SETOR_PADRAO.get(mid)
+    return D._id(t)
+
+
+def _setor_escolhido(v) -> str:
+    """O setor que veio do cadastro, como vai ao livro: o ID, ou "0" (nenhum). Texto que não é ID não passa: o setor se
+    liga pelo ID, nunca pelo nome (Levi, 04/11/2026: "não podemos ficar dependente de texto")."""
+    t = D._txt(v)
+    if t in ("", "0"):
+        return "0"
+    if not t.isdigit() or len(t) > 6 or not D._id(t):
+        raise Recusada("O setor do motivo não foi reconhecido: escolha um da lista.")
+    return str(int(t))
 
 
 def _etiqueta(v) -> str:
@@ -229,7 +260,8 @@ def _etiqueta(v) -> str:
 
 def cadastro_inicial() -> list[dict]:
     return [{"id": i, "nome": n, "descricao": d, "tira": t, "criado_em": "", "alterado_em": "", "excluido": False,
-             "alterado_por_hmac": "", "etiqueta": ""} for i, (n, d, t) in enumerate(CADASTRO_INICIAL, start=1)]
+             "alterado_por_hmac": "", "etiqueta": "", "setor_id": SETOR_PADRAO.get(i)}
+            for i, (n, d, t) in enumerate(CADASTRO_INICIAL, start=1)]
 
 
 def _estado(cru: dict) -> dict:
@@ -257,6 +289,29 @@ def ler(cfg, forcar: bool = False) -> dict:
     g = dict(e, erro="", lido_em=time.time())
     _CACHE[chave] = g
     return g
+
+
+def copia(cfg) -> dict | None:
+    """O livro como está guardado, sem esperar o banco (o aviso do topo, em toda página; `fora_avisos.py`): vencido ou
+    ausente, a leitura começa por trás e vale o que há (nada, logo depois de subir). O modelo das cópias do sino
+    (`comando/avisos.copia`)."""
+    g = _CACHE.get(str(_arquivo_local(cfg) or "banco"))
+    if (g is None or time.time() - (g.get("lido_em") or 0) >= TTL_S) and not cfg.get("TESTING"):
+        t = _RENOVANDO["thread"]
+        if t is None or not t.is_alive():
+            from flask import current_app
+            app = current_app._get_current_object()
+
+            def rodar():
+                with app.app_context():
+                    try:
+                        ler(app.config, forcar=True)
+                    except Exception:    # noqa: BLE001 — o aviso só fica com a cópia de antes
+                        log.warning("Motivos do PCM: a cópia do aviso do topo não renovou", exc_info=True)
+            t = threading.Thread(target=rodar, name="nexus-motivos", daemon=True)
+            _RENOVANDO["thread"] = t
+            t.start()
+    return g if g and g.get("lido_em") else None
 
 
 def limpar() -> None:
@@ -502,7 +557,8 @@ def _gravar_lote(cfg, mudancas: list) -> list:
         if not [m for m in (_motivo(x) for x in cru[ABA_MOTIVO]) if m]:
             cru[ABA_MOTIVO] = [{"motivo_id": m["id"], "nome": m["nome"], "descricao": m["descricao"],
                                 "tira_da_programacao": "sim" if m["tira"] else "não", "criado_em": _iso(_agora()),
-                                "alterado_em": "", "excluido": "", "alterado_por_hmac": "", "etiqueta_fracttal": ""}
+                                "alterado_em": "", "excluido": "", "alterado_por_hmac": "", "etiqueta_fracttal": "",
+                                "setor_id": str(m["setor_id"] or 0)}
                                for m in cadastro_inicial()]
         saidas, depende, sujo = [], [], False
         for mudar in mudancas:
@@ -664,12 +720,15 @@ def _descricao(d) -> str:
 
 
 def cadastro(cfg, acao: str, usuario: dict | None, motivo_id=None, nome=None, descricao=None,
-             tira=None, etiqueta=None) -> dict:
+             tira=None, etiqueta=None, setor=None) -> dict:
     """O cadastro dos motivos (administrador e setor PCM): `acao` criar | editar | excluir. Excluir não apaga: marca
     `excluido = sim` e o ID não volta; as tarefas com ele perdem o motivo (a confirmação da tela diz quantas).
-    `etiqueta` (19/10/2026): o nome da etiqueta do Fracttal; None = não mexe (quem edita sem o campo), "" = sem etiqueta."""
+    `etiqueta` (19/10/2026): o nome da etiqueta do Fracttal; None = não mexe (quem edita sem o campo), "" = sem etiqueta.
+    `setor` (16/11/2026): o ID do setor que o motivo cita (o aviso do Fora da programação); None = não mexe, "" ou "0" =
+    nenhum."""
     cod_quem, _ = _quem(cfg, usuario)
     mid = D._id(motivo_id) if motivo_id not in (None, "") else None
+    setor_novo = None if setor is None else _setor_escolhido(setor)
 
     def mudar(cru):
         motivos = [m for m in (_motivo(x) for x in cru[ABA_MOTIVO]) if m]
@@ -680,7 +739,8 @@ def cadastro(cfg, acao: str, usuario: dict | None, motivo_id=None, nome=None, de
                 raise Recusada(f"Já existe o motivo {n}.")
             novo = {"motivo_id": max((m["id"] for m in motivos), default=0) + 1, "nome": n, "descricao": d,
                     "tira_da_programacao": "sim" if tira else "não", "criado_em": agora, "alterado_em": "",
-                    "excluido": "", "alterado_por_hmac": cod_quem, "etiqueta_fracttal": _etiqueta(etiqueta)}
+                    "excluido": "", "alterado_por_hmac": cod_quem, "etiqueta_fracttal": _etiqueta(etiqueta),
+                    "setor_id": setor_novo or "0"}
             cru[ABA_MOTIVO].append(novo)
             return {"acao": acao, "motivo_id": novo["motivo_id"], "nome": n}, True
         linha = next((x for x in cru[ABA_MOTIVO] if D._id(x.get("motivo_id")) == mid and not _sim(x.get("excluido"))),
@@ -693,12 +753,15 @@ def cadastro(cfg, acao: str, usuario: dict | None, motivo_id=None, nome=None, de
                 raise Recusada(f"Já existe o motivo {n}.")
             t = "sim" if tira else "não"
             e = _etiqueta(linha.get("etiqueta_fracttal")) if etiqueta is None else _etiqueta(etiqueta)
+            # o setor como vale hoje (o padrão do ID, no livro sem a coluna) é o que se compara e o que fica
+            s_antes = str(_setor_do_motivo(mid, linha.get("setor_id")) or 0)
+            s = s_antes if setor_novo is None else setor_novo
             if (" ".join(D._txt(linha.get("nome")).split()) == n and D._txt(linha.get("descricao")) == d
                     and ("sim" if _sim(linha.get("tira_da_programacao")) else "não") == t
-                    and _etiqueta(linha.get("etiqueta_fracttal")) == e):
+                    and _etiqueta(linha.get("etiqueta_fracttal")) == e and s == s_antes):
                 return {"acao": acao, "motivo_id": mid, "nome": n, "mudou": False}, False
             linha.update(nome=n, descricao=d, tira_da_programacao=t, alterado_em=agora, alterado_por_hmac=cod_quem,
-                         etiqueta_fracttal=e)
+                         etiqueta_fracttal=e, setor_id=s)
             return {"acao": acao, "motivo_id": mid, "nome": n, "mudou": True}, True
         if acao == "excluir":
             linha.update(excluido="sim", alterado_em=agora, alterado_por_hmac=cod_quem)

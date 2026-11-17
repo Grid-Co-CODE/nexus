@@ -135,7 +135,10 @@ download do pdf da OS". No quiz, "resposta" é o técnico executar a OS.
   (Levi, 05/11/2026: "cada vez que clico em marcar como lida a tela atualiza... atrapalha a experiência do usuário"): o
   aviso sai da lista, o número do botão e o do título descem, e o sino fica aberto; o que não gravou diz "Não marcou:
   tente de novo". Sem JavaScript (ou sem resposta que se leia, como o login vencido), o formulário volta para a mesma tela,
-  como antes. O lido vale em qualquer computador (o banco). **Mora em `/t/comando/`** porque o Caddy do servidor só manda ao Nexus a raiz, `/t/*` e poucos outros
+  como antes. O lido vale em qualquer computador (o banco). O script roda em cada caixa do topo com `data-lidas` (a do OS
+  Creator e, desde 16/11/2026, a do Fora da programação, `F:<item_id>:<desde>`, tipo `fora`, `nexus/pcm/CLAUDE.md`), cada
+  uma com o botão e os textos dela: de 12 a 16/11 ele pegava a 1ª caixa do topo, a das Demandas, e o Marcar como lida do
+  OS Creator voltou a recarregar a tela. **Mora em `/t/comando/`** porque o Caddy do servidor só manda ao Nexus a raiz, `/t/*` e poucos outros
   caminhos: nasceu em `/avisos/lida` (04/11/2026), que no servidor caía na plataforma, e o Marcar como lida não gravava
   (`tests/test_rotas_no_caminho_do_nexus.py` pegou; regra em `nexus/casca/CLAUDE.md`, "Regras que já custaram caro").
   O portão por setor abre o caminho a quem tem uma tela do Comando, e a Caixa de entrada é de todo setor; "aviso" no

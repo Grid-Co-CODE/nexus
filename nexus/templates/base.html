@@ -71,7 +71,7 @@
   {% if sino is not none %}<details class="sino-topo">
     <summary class="gc-btn gc-btn--ui gc-btn--fantasma sino-bt" aria-label="Avisos: {{ sino.n }}" title="Avisos das suas OS, menções e pedidos para o seu setor">
       <i class="ph ph-{{ sino.icone_os or 'clipboard-text' }}" aria-hidden="true"></i>{% if sino.n %}<b class="sino-n{% if sino.criticos %} sino-n--critico{% endif %}">{{ sino.n }}</b>{% endif %}</summary>
-    <div class="sino-caixa" role="region" aria-label="Avisos">
+    <div class="sino-caixa" role="region" aria-label="Avisos" data-lidas data-rotulo="Avisos" data-um=" aviso das suas OS" data-varios=" avisos das suas OS" data-vazio="Nada novo para você.">
       {# os avisos das OS da pessoa (04/11/2026, comando/avisos.py): o clique abre o card da OS (o mesmo do Histórico, com o
          PDF) por cima da tela; sem JavaScript, a página da OS. "Marcar como lida" é um formulário, como o tema, que o script
          abaixo manda por fetch, sem recarregar a tela (05/11/2026) #}
@@ -95,8 +95,30 @@
       {% if not sino.n %}<p class="sino-vazio">Nada novo para você.</p>{% endif %}
       <a class="gc-btn gc-btn--ui gc-btn--contorno sino-todos" href="{{ raiz }}/t/comando/caixa-de-entrada">Abrir a Caixa de entrada</a>
     </div>
-  </details>
-  {% if sino.n_avisos %}{% include "oscreator/card_os_abrir.html" %}
+  </details>{% endif %}
+  {# o aviso do Fora da programação ao setor citado (16/11/2026; casca._sino_fora, pcm/fora_avisos.py): as tarefas que
+     seguem fora da programação com um motivo que cita o setor da pessoa, até ela marcar como lida. Ao lado do botão do OS
+     Creator (Levi: "a notificação fica ao lado da notificação do OS Creator"); o clique abre o card da OS, como os avisos
+     das OS. Só aparece para o setor que algum motivo cita #}
+  {% if sino_fora is not none %}<details class="sino-topo sino-fora">
+    <summary class="gc-btn gc-btn--ui gc-btn--fantasma sino-bt" aria-label="Fora da programação: {{ sino_fora.n }}" title="Fora da programação: as tarefas com um motivo que cita o seu setor">
+      <i class="ph ph-calendar-x" aria-hidden="true"></i>{% if sino_fora.n %}<b class="sino-n">{{ sino_fora.n }}</b>{% endif %}</summary>
+    {% set fora_um = ' tarefa fora da programação cita o setor ' ~ sino_fora.setor %}
+    {% set fora_varios = ' tarefas fora da programação citam o setor ' ~ sino_fora.setor %}
+    {% set fora_vazio = 'Nenhuma tarefa fora da programação cita o setor ' ~ sino_fora.setor ~ '.' %}
+    <div class="sino-caixa" role="region" aria-label="Fora da programação" data-lidas data-rotulo="Fora da programação" data-um="{{ fora_um }}" data-varios="{{ fora_varios }}" data-vazio="{{ fora_vazio }}">
+      {% if sino_fora.n %}<p class="sino-t sino-t-avisos" data-n="{{ sino_fora.n }}"><b>{{ sino_fora.n }}{{ fora_um if sino_fora.n == 1 else fora_varios }}</b></p>
+      <ul class="sino-avisos">{% for a in sino_fora.itens %}<li>
+        <a class="sino-aviso" href="{{ raiz }}/os/_nexus/card/folio/{{ a.os }}" data-os-wid="" data-os-folio="{{ a.os }}" data-os-status=""><span class="sino-sev sino-sev--info">{{ a.motivo }}</span> OS {{ a.os }} · {{ a.tarefa }}<small class="sino-aviso-d">{{ a.detalhe }}</small></a>
+        <form method="post" action="{{ raiz }}/t/comando/aviso/lida"><input type="hidden" name="aviso" value="{{ a.id }}"><input type="hidden" name="voltar" value="{{ caminho_completo }}"><button type="submit" class="sino-lida">Marcar como lida</button></form>
+      </li>{% endfor %}</ul>
+      <form method="post" action="{{ raiz }}/t/comando/aviso/lida" class="sino-lidas"><input type="hidden" name="todos" value="fora"><input type="hidden" name="voltar" value="{{ caminho_completo }}"><button type="submit" class="sino-lida">Marcar todas como lidas</button></form>
+      {% else %}<p class="sino-vazio">{{ fora_vazio }}</p>{% endif %}
+      {# o link só para quem tem a tela (o setor citado pode não ter: o portão o barraria) #}
+      {% if sino_fora.pode_abrir %}<a class="gc-btn gc-btn--ui gc-btn--contorno sino-todos" href="{{ raiz }}/t/pcm/fora-da-programacao">Abrir o Fora da programação</a>{% endif %}
+    </div>
+  </details>{% endif %}
+  {% if (sino and sino.n_avisos) or (sino_fora and sino_fora.n) %}{% include "oscreator/card_os_abrir.html" %}
   <script>
     document.querySelectorAll('.sino-aviso').forEach(function (a) {
       a.addEventListener('click', function (ev) {
@@ -107,20 +129,24 @@
     });
     // o "Marcar como lida" sem recarregar a tela (Levi, 05/11/2026: "cada vez que clico em marcar como lida a tela
     // atualiza... atrapalha a experiência do usuário"): o formulário vai por fetch, o aviso sai da lista, os números descem
-    // e o sino fica aberto. Sem resposta que se leia (o login vencido, a rede), o formulário de sempre
+    // e o sino fica aberto. Sem resposta que se leia (o login vencido, a rede), o formulário de sempre. Uma vez por caixa
+    // com "Marcar como lida" (`data-lidas`: a do OS Creator e a do Fora da programação, 16/11/2026), cada uma com o
+    // botão e os textos dela: até 16/11 o script pegava a 1ª caixa do topo, que desde 12/11 é a das Demandas, e o
+    // "Marcar como lida" do OS Creator voltava a recarregar a tela
     (function () {
-      var caixa = document.querySelector('.sino-caixa');
-      if (!caixa || !window.fetch || !window.FormData) return;
+      if (!window.fetch || !window.FormData) return;
+      document.querySelectorAll('.sino-caixa[data-lidas]').forEach(function (caixa) {
+      var botao = caixa.closest('details').querySelector('.sino-bt'), rotulo = caixa.getAttribute('data-rotulo') || 'Avisos';
       function descer(k) {
-        var bt = document.querySelector('.sino-bt'), b = bt && bt.querySelector('.sino-n');
+        var bt = botao, b = bt && bt.querySelector('.sino-n');
         var n = Math.max(0, (parseInt(b ? b.textContent : '0', 10) || 0) - k);
         if (b) { if (n) b.textContent = n; else b.remove(); }
-        if (bt) bt.setAttribute('aria-label', 'Avisos: ' + n);
+        if (bt) bt.setAttribute('aria-label', rotulo + ': ' + n);
         var t = caixa.querySelector('.sino-t-avisos'), ul = caixa.querySelector('.sino-avisos');
         var na = Math.max(0, (parseInt(t ? t.getAttribute('data-n') : '0', 10) || 0) - k);
         if (t && na) {
           t.setAttribute('data-n', na);
-          t.querySelector('b').textContent = na + (na === 1 ? ' aviso das suas OS' : ' avisos das suas OS');
+          t.querySelector('b').textContent = na + caixa.getAttribute(na === 1 ? 'data-um' : 'data-varios');
           if (ul && !ul.querySelector('li')) {        // os visíveis acabaram, e há mais: o clique traz os próximos
             var li = document.createElement('li'), a = document.createElement('a');
             a.className = 'sino-aviso'; a.href = location.href; a.textContent = 'Mostrar os outros ' + na;
@@ -130,7 +156,7 @@
           [t, ul, caixa.querySelector('.sino-lidas')].forEach(function (e) { if (e) e.remove(); });
         }
         if (!n && !caixa.querySelector('.sino-vazio')) {
-          var p = document.createElement('p'); p.className = 'sino-vazio'; p.textContent = 'Nada novo para você.';
+          var p = document.createElement('p'); p.className = 'sino-vazio'; p.textContent = caixa.getAttribute('data-vazio');
           caixa.insertBefore(p, caixa.querySelector('.sino-todos'));
         }
       }
@@ -150,8 +176,9 @@
           })
           .catch(function () { f.submit(); });
       });
+      });
     })();
-  </script>{% endif %}{% endif %}
+  </script>{% endif %}
   <label for="abre-menu" class="gc-btn gc-btn--ui gc-btn--contorno botao-menu"><i class="ph ph-list"></i> Menu</label>
   {# O menu da conta (03/11/2026, Levi: "esse negócio de tema e setor fique oculto nessa barra inicial, que só apareça
      quando clica no nome; aí vai ter: Setor, tema e sair"): no topo fica só quem entrou; o clique abre o Setor, o Tema e o

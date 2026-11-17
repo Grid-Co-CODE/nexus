@@ -321,6 +321,19 @@ abaixo foi decisão dele (perguntada antes, pela regra "me pergunte antes de bot
   letra na cor, sem o fundo (Levi, 18/10: "Tire as bordas vermelhas e laranjas, deixe só as fontes!", `q-mp--texto`);
   no Quadro segue com o fundo. Com a marca da OS
   valendo na linha, trocar ou tirar mexe nela (em todos os ativos).
+- **O aviso ao setor citado** (16/11/2026, `fora_avisos.py`; Levi: "fora da programação deve notificar quem é daquele
+  setor caso o setor seja citado! a notificação fica ao lado da notificação do OS Creator"): quem é do setor que o MOTIVO
+  cita vê, no topo, ao lado do botão do OS Creator (ícone `calendar-x`), as tarefas que seguem fora da programação com o
+  motivo, com a OS, a tarefa, a usina, a justificativa e quem marcou; o clique abre o card da OS, e "Marcar como lida" /
+  "Marcar todas como lidas" gravam o `leu` no livro dos avisos do sino (`F:<item_id>:<desde>`, `comando/avisos.py`). A
+  tarefa que volta à programação sai sozinha; trocar só a observação não avisa de novo; o motivo que sai e volta, avisa.
+  O setor do motivo é a coluna **"Avisa o setor"** do Cadastro (`dim_motivo.setor_id`, o ID de Base → Acessos, nunca o
+  nome; "0" = nenhum). Com a coluna vazia (o livro de antes de 16/11) vale o padrão pelo ID do motivo
+  (`motivos.SETOR_PADRAO`): Engenharia e Performance. Chamados (garantia) ficou sem: em 16/11/2026 não havia setor
+  Chamados ativo em Base → Acessos, e o PCM escolhe quem recebe. O texto da justificativa não conta (citar um setor no
+  texto não avisa). O botão só aparece para setor que algum motivo cita, e só lê as cópias (`motivos.copia`, sem esperar o
+  banco). Medido em 16/11/2026: 171 tarefas fora, 5 de Engenharia e 1 de Performance. Prova:
+  `tests/test_pcm_fora_aviso_setor.py`.
 - **O dado:** livro `nexus_pcm_motivos` (registrado no catálogo antes de existir; nasce com a 1ª gravação, que leva o
   cadastro inicial junto): `dim_motivo`, `fato_decisao_motivo` (só acrescenta, vale a última de cada tarefa) e
   `fato_decisao_backoffice` (vale a última de cada nome). Tarefa, usina, observação, nome do backoffice e quem marcou só

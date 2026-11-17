@@ -940,7 +940,8 @@ def test_a_etiqueta_do_fracttal_de_cada_motivo(app, logado, tela):
     dim_motivo), a tela a edita na própria linha (com as etiquetas que já existem nas OS como sugestão) e o arquivo do
     App leva a etiqueta em `motivos`: quem etiqueta é o App, com o login do técnico (o pacote _propostas/etiqueta-motivo)."""
     cfg = app.config
-    assert M.CAB_MOTIVO[-1] == "etiqueta_fracttal"
+    # no fim, depois dela só o setor que o motivo cita (16/11/2026, test_pcm_fora_aviso_setor.py)
+    assert M.CAB_MOTIVO[-2:] == ("etiqueta_fracttal", "setor_id")
     am = next(m for m in M.ativos(M.ler(cfg, forcar=True)) if m["nome"] == "Aguardando material")
     assert am["etiqueta"] == ""
     M.cadastro(cfg, "editar", PESSOA, motivo_id=am["id"], nome=am["nome"], descricao=am["descricao"], tira=am["tira"],

@@ -676,7 +676,8 @@ def fora_cadastro():
     acao = f.get("acao") or ""
     try:
         r = M.cadastro(cfg, acao, _usuario(), motivo_id=f.get("motivo_id"), nome=f.get("nome"),
-                       descricao=f.get("descricao"), tira=f.get("tira") == "1", etiqueta=f.get("etiqueta"))
+                       descricao=f.get("descricao"), tira=f.get("tira") == "1", etiqueta=f.get("etiqueta"),
+                       setor=f.get("setor_id"))
     except M.Recusada as ex:
         session["pcm_motivos_aviso"] = {"erro": str(ex)}
     else:
@@ -1893,7 +1894,23 @@ def _ctx_cadastro(cfg) -> dict:
     vig.pop("_ilegiveis", None)
     conta = Counter(m["motivo_id"] for m in vig.values())
     aviso = session.pop("pcm_motivos_aviso", None) or {}
-    motivos = [dict(m, n=conta.get(m["id"], 0)) for m in M.ativos(est)]
+    setores = _setores_do_cadastro()
+    nome_setor = {s["id"]: s["nome"] for s in setores}
+    motivos = [dict(m, n=conta.get(m["id"], 0),
+                    setor_nome=nome_setor.get(m.get("setor_id")) or (f"Setor {m['setor_id']}" if m.get("setor_id") else ""))
+               for m in M.ativos(est)]
     return {"motivos": motivos, "inicial": est.get("inicial"), "etiquetas": _etiquetas_sugeridas(cfg, motivos),
             "erro_banco": est.get("erro") or "", "pode": pode_programar(), "ok": aviso.get("ok"),
-            "erro": aviso.get("erro"), "lido": datetime.now(_BRT).strftime("%H:%M")}
+            "erro": aviso.get("erro"), "lido": datetime.now(_BRT).strftime("%H:%M"), "setores": setores}
+
+
+def _setores_do_cadastro() -> list[dict]:
+    """[{id, nome}]: os setores ativos de Base → Acessos → Pessoas e setores, para a coluna "Avisa o setor" (16/11/2026),
+    da cópia de 1 minuto do portão. Banco fora: lista vazia (o select mostra só o setor de agora de cada motivo)."""
+    from ..cadastro import setores as CS
+    try:
+        st = ST._setores_no_clique(*ST._banco())
+        return [{"id": s["setor_id"], "nome": s["nome"]} for s in CS.ativos(st.get("setores") or [])]
+    except Exception:            # noqa: BLE001
+        log.warning("Cadastro de motivos: os setores não foram lidos", exc_info=True)
+        return []

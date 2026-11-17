@@ -598,6 +598,37 @@ def _sino_demandas():
         return None
 
 
+def _sino_fora() -> dict | None:
+    """O aviso do Fora da programação ao setor citado (16/11/2026, `pcm/fora_avisos.py`; Levi: "fora da programação deve
+    notificar quem é daquele setor caso o setor seja citado! a notificação fica ao lado da notificação do OS Creator"):
+    as tarefas que seguem fora da programação com um motivo que cita o setor da pessoa e que ela ainda não marcou como
+    lidas. Só para quem tem setor e só se algum motivo o cita (sem isso, o botão não aparece); só das cópias (a dos
+    motivos e a dos avisos). O administrador pela senha (sem pessoa) não tem."""
+    if not session.get("logado") or session.get("via") == "cliente" or setor_telas.em_modo_cliente():
+        return None
+    try:
+        from ..comando import avisos as AV
+        from ..pcm import fora_avisos as FA
+        a = setor_telas.acesso()
+        setor = a.get("setor") or {}
+        meu = AV._codigo(str((session.get("usuario") or {}).get("email") or "").strip().lower())
+        if not setor.get("id") or not meu:
+            return None
+        itens = FA.para_o_sino(current_app.config, setor["id"], AV.lidos(AV.copia(), meu))
+        if itens is None:
+            return None
+        for i in itens:
+            i["detalhe"] = " · ".join(x for x in (
+                i["usina"], i["obs"][:140] + ("…" if len(i["obs"]) > 140 else ""),
+                ("pelo App" if i["pelo_app"] else "pelo PCM") + (f", {i['quem']}" if i["quem"] else ""),
+                f"desde {i['quando_txt']}" if i["quando_txt"] else "") if x)
+        return {"n": len(itens), "itens": itens[:8], "ids": [i["id"] for i in itens], "setor": setor.get("nome") or "",
+                "pode_abrir": a.get("tudo") or "pcm/fora-da-programacao" in (a.get("telas") or set())}
+    except Exception:            # noqa: BLE001 — o aviso nunca derruba uma página
+        current_app.logger.exception("aviso do Fora da programação")
+        return None
+
+
 def _perf_do_sino() -> dict | None:
     """O novo da Sala de controle da Performance, por usina (16/11/2026, `performance/sala_novas.py`): o que parou desde
     a 1ª vez que a pessoa abriu a Sala, segue parado e ela ainda não abriu. Só para quem tem a tela, e só da cópia (a
@@ -648,6 +679,8 @@ def avisos_lida():
     ids = request.form.getlist("aviso")
     if request.form.get("todos") == "1":
         ids = [a["id"] for a in AV.para_o_sino(usuario)]
+    elif request.form.get("todos") == "fora":    # o "Marcar todas" do aviso do Fora da programação (16/11/2026)
+        ids = list((_sino_fora() or {}).get("ids") or [])
     # o sino da página pede por fetch e espera JSON (Levi, 05/11/2026: "cada vez que clico em marcar como lida a tela
     # atualiza... atrapalha a experiência do usuário"): grava e responde, sem recarregar; o formulário sem JavaScript volta
     quer_json = "application/json" in (request.headers.get("Accept") or "")
@@ -691,6 +724,8 @@ def instalar_contexto(app) -> None:
             "sino": _sino(),
             # o sininho das demandas entre setores (12/11/2026), ao lado: ver `_sino_demandas`
             "sino_dem": _sino_demandas(),
+            # o aviso do Fora da programação ao setor citado (16/11/2026), ao lado do OS Creator: ver `_sino_fora`
+            "sino_fora": _sino_fora(),
             # o Modo cliente do administrador (07/11/2026): o cliente que ele está vendo, e o código dos formulários
             # (`cliente_modo`, não `modo_cliente`: a Visão do cliente passa o seu próprio `modo_cliente`, que venceria)
             "cliente_modo": session.get("modo_cliente") if setor_telas.em_modo_cliente() else None,

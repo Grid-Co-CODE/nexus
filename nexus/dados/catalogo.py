@@ -241,8 +241,10 @@ FATOS = (
                     "de OS e nunca gravada aqui: só o leu dela), S:<código da solicitação>, A:<id da OS> (a OS criada "
                     "para a pessoa, 08/11/2026) ou L:<id de quem criou, ou um código curto do nome>:<minuto da criação> "
                     "(o lote de OS criadas para a pessoa) ou C:<id da OS> (a OS da solicitação da pessoa que foi cancelada, "
-                    "11/11/2026; como o S: lido das solicitações do Fracttal pelo REST, nunca gravado aqui: só o leu); "
-                    "tipo execucao, solicitacao, atribuida ou cancelada; os_id e folio da OS; destino_hmac = o código do NOME de quem pediu a solicitação (o "
+                    "11/11/2026; como o S: lido das solicitações do Fracttal pelo REST, nunca gravado aqui: só o leu) "
+                    "ou F:<item_id da tarefa>:<desde AAAAMMDDHHMM> (a tarefa fora da programação com um motivo que cita "
+                    "o setor da pessoa, 16/11/2026, lida do nexus_pcm_motivos: só o leu); "
+                    "tipo execucao, solicitacao, atribuida, cancelada ou fora; os_id e folio da OS; destino_hmac = o código do NOME de quem pediu a solicitação (o "
                     "Fracttal só traz o nome; prefixo nome:, separado do código do e-mail). Os nomes (quem pediu, quem "
                     "aprovou) só cifrados (Cofre). Só acrescenta: nada se edita nem se apaga"),
     # 12/11/2026 (Levi: "os setores consigam conversar entre si sem ter que especificamente criar um OS"): as demandas
@@ -761,7 +763,9 @@ FATOS = (
          fontes=("nexus_pcm_motivos · fato_decisao_motivo",),
          janela_origem="o Nexus é a fonte (só acrescenta: o que vale é a última decisão de cada tarefa)",
          observacao="o motivo liga pelo motivo_id à dim_motivo do mesmo livro (o cadastro: excluir marca excluido = "
-                    "sim e o ID não volta; a marca de motivo excluído deixa de valer). tira_da_programacao = sim: a "
+                    "sim e o ID não volta; a marca de motivo excluído deixa de valer). dim_motivo.setor_id (16/11/2026) "
+                    "liga o motivo ao setor que ele cita, pelo setor_id do dim_setor (nexus_setores; vazio = o padrão "
+                    "pelo motivo_id, 0 = nenhum): quem é do setor recebe o aviso da tarefa. tira_da_programacao = sim: a "
                     "geração da semana não programa a tarefa e o robô do PCM a tira da semana em curso. A tarefa entra "
                     "como tarefa_chave (a mesma conta da programação e do fechamento) e o texto, a usina, a observação "
                     "e quem marcou vão só cifrados em dados_cifrados (regra 8). As três abas vão juntas a cada "

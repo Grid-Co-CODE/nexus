@@ -62,9 +62,12 @@ CANCELADA = 4
 LOTE_MIN = 3                      # tantas OS da mesma pessoa no mesmo minuto viram um aviso só
 # E:<id da OS>:<data de fim, AAAAMMDDHHMM> (a OS executada de novo é outro aviso), S:<código da solicitação>, A:<id da OS> (a
 # OS criada para a pessoa), L:<quem criou>:<minuto da criação, AAAAMMDDHHMM> (o lote) ou C:<id da OS> (a OS da solicitação
-# da pessoa que foi cancelada, 11/11/2026)
-AVISO_RE = re.compile(r"E:\d{1,12}:\d{12}|S:[A-Za-z0-9_\-]{1,40}|A:\d{1,12}|L:[0-9a-f]{1,12}:\d{12}|C:\d{1,12}")
-TIPO_DO_PREFIXO = {"E": "execucao", "S": "solicitacao", "A": "atribuida", "L": "atribuida", "C": "cancelada"}
+# da pessoa que foi cancelada, 11/11/2026) ou F:<item_id da tarefa>:<desde, AAAAMMDDHHMM> (a tarefa fora da programação com
+# um motivo que cita o setor da pessoa, 16/11/2026, `pcm/fora_avisos.py`; só o leu dela se grava aqui)
+AVISO_RE = re.compile(r"E:\d{1,12}:\d{12}|S:[A-Za-z0-9_\-]{1,40}|A:\d{1,12}|L:[0-9a-f]{1,12}:\d{12}|C:\d{1,12}"
+                      r"|F:[0-9a-f]{16}:\d{12}")
+TIPO_DO_PREFIXO = {"E": "execucao", "S": "solicitacao", "A": "atribuida", "L": "atribuida", "C": "cancelada",
+                   "F": "fora"}
 MAX_POR_VEZ = 200            # quantos avisos um "Marcar todas" grava de uma vez
 TTL_S = 60
 _BRT = timezone(timedelta(hours=-3))
