@@ -133,7 +133,7 @@ def montar(linhas: list[dict], fontes: dict, agora: datetime) -> dict:
     cos, chamados = fontes.get("cos") or {}, fontes.get("chamados") or {}
     man, vivos, nomes = fontes.get("manutencao") or {}, fontes.get("vivos") or {}, fontes.get("nomes_equip") or {}
 
-    usinas, os_usina = {}, {}
+    usinas, os_usina, brutos = {}, {}, {}
     tab_usinas, tab_chamados = [], []
     n_cham, por_cliente = 0, {}
     for l in sorted(linhas or [], key=lambda x: _t(x.get("usina")).lower()):
@@ -170,6 +170,10 @@ def montar(linhas: list[dict], fontes: dict, agora: datetime) -> dict:
             str(urg) if mu else "—",
             str(len(abertos)), f"{max(dias)} d" if dias else "—", ", ".join(fabs) or "—",
             f"{len(ins)} ({ins_c} críticos)" if ins else "0", pend or "—"]))
+        # os mesmos números, crus, para a pontuação do dossiê do cliente (`dossie_cliente.pontuar`): sem refazer conta
+        brutos[nome] = {"disp": chave_disp, "atingimento": _float(l.get("atingimento")), "estado": l.get("estado"),
+                        "desligamentos": m_cos["parou"] if m_cos else 0, "atrasadas": _int(l.get("os_atrasadas")),
+                        "urgentes": urg if mu else None, "extintores": _int(l.get("extintores_vencidos")) or 0}
         for c in abertos:
             n_cham += 1
             os_ = _t(c.get("os"))
@@ -218,14 +222,21 @@ def montar(linhas: list[dict], fontes: dict, agora: datetime) -> dict:
         ("O que ficou de fora", "o próprio Nexus",
          ["- " + a for a in fontes.get("avisos") or []] or ["- Todas as fontes responderam."]),
     ]
-    linhas_txt = list(cab)
-    for n, (titulo, fonte, corpo) in enumerate(secoes, 1):
-        linhas_txt += ["", f"## {n}. {titulo}", "", f"Fonte: {fonte}.", ""] + corpo
-    texto = "\n".join(linhas_txt).rstrip() + "\n"
+    texto = juntar(cab, secoes)
     return {"texto": texto, "tokens_estimados": round(len(texto) / 4), "usinas": usinas, "os_usina": os_usina,
             "n_usinas": len(usinas), "n_chamados": n_cham,
             # as tabelas, para as respostas prontas (sem IA) das perguntas sugeridas
-            "tab_usinas": tab_usinas, "tab_chamados": tab_chamados, "mes": MESES[hoje.month - 1]}
+            "tab_usinas": tab_usinas, "tab_chamados": tab_chamados, "mes": MESES[hoje.month - 1],
+            # o cabeçalho, as seções e os números crus, para o dossiê do cliente (`dossie_cliente.montar`)
+            "como_ler": cab[cab.index("## Como ler") + 2:], "secoes": secoes, "brutos": brutos}
+
+
+def juntar(cab: list[str], secoes: list[tuple[str, str, list[str]]]) -> str:
+    """O cabeçalho e as seções numeradas ("## 1. Título", a fonte e o corpo) num texto só."""
+    linhas_txt = list(cab)
+    for n, (titulo, fonte, corpo) in enumerate(secoes, 1):
+        linhas_txt += ["", f"## {n}. {titulo}", "", f"Fonte: {fonte}.", ""] + corpo
+    return "\n".join(linhas_txt).rstrip() + "\n"
 
 
 # ── as respostas prontas: as perguntas sugeridas, contadas pelo Nexus, sem IA (16/11/2026) ──────────────────────────────

@@ -14,8 +14,8 @@ De onde vem cada coluna (a fonte da tela dona; nada se inventa):
 - Conformidade: os extintores vencidos (o PPCI, a conta da Segurança que a Visão já traz) e a usina sem as luvas
   isolantes na última ronda (o EPC, `hseq.epi.luvas`).
 
-O Score de saúde do mockup ficou FORA (Levi, 11/11/2026: "Fora por agora"): o Nexus não tem essa nota e criar uma é regra
-nova. A ordem é o estado de agora (o mais grave primeiro), dentro dele a OS do COS mais antiga e depois o atingimento (o
+O Score de saúde do mockup ficou FORA da tela (Levi, 11/11/2026: "Fora por agora"): o Nexus não tem essa nota e criar uma é
+regra nova. Desde 16/11/2026 ela existe só no dossiê do cliente em .md (`dossie_cliente.py`, a régua escolhida pelo Levi). A ordem é o estado de agora (o mais grave primeiro), dentro dele a OS do COS mais antiga e depois o atingimento (o
 pior primeiro).
 """
 import unicodedata
@@ -218,6 +218,7 @@ def montar(linhas_visao: list[dict], cadastro: dict, cos: dict | None, insights:
             "os_atrasadas": man.get("atrasadas_os", 0) if com_os else None,
             "insights": None if insights is None else insights.get(uid, 0),
             "conformidade": conf, "conformidade_ok": not conf and not sem_fonte, "conformidade_sem_fonte": sem_fonte,
+            "extintores_vencidos": (ext or {}).get("vencidos") or 0,
             "conf_chave": "pendencia" if conf else ("sem_leitura" if sem_fonte else "em_dia")})
         x = out[-1]
         # o que a busca da página olha (`filtro-local.js` compara sem acento e sem caixa)

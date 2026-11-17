@@ -27,6 +27,7 @@ muito boa"; e "construa o que você sugere"). PRD e tarefas no formato do Taskma
 | `../casca/__init__.py` (`_sino`) + `base.html` | O sino do topo |
 | `avisos.py` + `../casca/__init__.py` (`_avisos_do_sino`, `POST /t/comando/aviso/lida`) | Os avisos das OS de cada pessoa no sino ("OS x concluída pelo técnico", "Sua solicitação gerou uma OS" e, desde 08/11/2026, "OS x criada para você"; desde 11/11/2026, tudo da OS da solicitação, com a cancelada) e o Marcar como lida: o livro `nexus_avisos · fato_evento_aviso` |
 | `demandas_regras.py` + `demandas.py` + `../torres/comando/demandas_tela.py` | As demandas entre setores (12/11/2026): a regra do prazo e dos avisos, o livro `nexus_demandas` e as telas (o bloco da Caixa, a Nova demanda, os Temas do setor e o sininho); ver a seção abaixo |
+| `carteira_ia.py` + `dossie_cliente.py` | O dossiê da carteira para a Nexus IA do Comando › Usinas e o dossiê do cliente em .md, com as UFVs pontuadas (16/11/2026); ver as seções abaixo |
 | `solicitacoes_fracttal.py` | As solicitações do Fracttal que viraram OS (REST `work_requests`, por trás, a cada 5 min, na memória) e o motivo das OS delas canceladas, para os avisos de quem pediu (11/11/2026); desde 12/11/2026 também o mapa OS → quem pediu, da leitura inteira (~400 dias, 100 por página, uma vez por dia), para o filtro Solicitante do Histórico de OS (`ligar_historico`, o gancho da ponte). Desde 16/11/2026 o solicitante de cada OS sai de um índice montado uma vez por leitura (`_da_leitura`), e a `versao_do_mapa` só muda quando o solicitante de alguma OS muda (ela faz o Histórico refazer as linhas guardadas; com a hora da leitura no lugar, isso era de 5 em 5 min) |
 
 ## As regras da Fase 1 (e de onde cada uma lê)
@@ -210,7 +211,8 @@ do vídeo wall.
 **A 2ª rodada (12/11/2026, Levi, com o print da tabela).** A etiqueta do Agora é o GRUPO (Normal, Atenção, Crítico, Sem comunicação, Sem leitura) e embaixo, numa linha só, o motivo (`usinas.motivo`: "Desligamento", "Inversor em falha", "Tracker parado", "String sem corrente", "Falha de comunicação"...); a OS, a idade e a etapa saíram da célula e ficam no prontuário. O Agora e a Conformidade centralizados; na coluna Usina só o código da UFV, sem o prefixo do cliente ("THPN-FRN100" vira "FRN100"). O quadradinho da faixa mostra na hora a usina e o motivo da cor. Os filtros viraram o modelo do Histórico de OS de verdade ("o cliente seja digitável tal qual é em histórico de OS [...] no mesmo estilo e mesmas funções"): desde o mesmo dia é o componente do Nexus (`static/filtros-os.js`, `fo-*`; ver `nexus/casca/CLAUDE.md`), montado sobre as `<select multiple>` do formulário `data-fo` desta tela (a cópia própria, `cmu-fl-*`, saiu). Os filtros (`usinas.FILTROS`, vários valores por filtro): Cliente, Responsável da UFV (o Responsável O&M da ficha), Agora, Meta do mês (a régua da Visão gerencial: na meta 97% ou mais, atenção 90 a 97%, abaixo de 90%, sem meta) e Conformidade (com pendência, em dia, sem leitura). As "OS atrasadas" são as do bloco Manutenção da Visão do responsável: OS com tarefa aberta e a Data Programada vencida há mais de 10 dias (a régua do PCM), do retrato das OS do Fracttal no banco; a etiqueta diz isso ao passar o mouse.
 
 **Fora, por decisão do Levi (11/11/2026):** o Score de saúde do mockup ("Fora por agora": o Nexus não tem essa nota, e
-criar uma é regra nova). **O clique na usina** abre o prontuário no próprio Comando ("No próprio Comando"),
+criar uma é regra nova). Desde 16/11/2026 a nota existe só no dossiê do cliente em .md (a régua do R18 mais a
+disponibilidade, escolhida pelo Levi; seção "O dossiê do cliente" abaixo); a tela segue sem ela. **O clique na usina** abre o prontuário no próprio Comando ("No próprio Comando"),
 `/t/comando/usinas/<id>` (a seção abaixo). O CSS da lista usa o prefixo `cmu-` (o `cu-` é da Central, no campo.css).
 
 Prova: `tests/test_comando_usinas.py` (as colunas, a fonte que falta sem 0, os insights vivos, a lista e o prontuário) e a
@@ -750,6 +752,41 @@ e correlacionar com as usinas com baixa disponibilidade e performance". Levi, co
     mandar "Executar as corretivas atrasadas" à Manutenção.
 
 Prova: `tests/test_comando_carteira_ia.py`.
+
+## O dossiê do cliente em .md, com as UFVs pontuadas (16/11/2026; `nexus/comando/dossie_cliente.py`)
+
+Levi: "seria interessante o dossiê em .MD do cliente! Pontuando as UFVs!". Com o exemplo da Athon na mão, ele fez três
+escolhas: a régua do Score de saúde do mockup R18 **mais a disponibilidade**, o **uso interno** (e para leitura por IA) e
+o botão no **Comando › Usinas**.
+
+- **O que sai:** o dossiê da carteira (`carteira_ia.montar`, via `_carteira_ia(cliente)`) só com as usinas do cliente.
+  - Na frente vem a seção 1, "Pontuação das UFVs": o resumo (média e quantas em risco, atenção e em dia), o ranking da pior
+    para a melhor, com o que tirou pontos de cada uma, e a régua escrita por extenso.
+  - Depois vêm as seções da carteira: Resumo do cliente, Usinas, Totais, Chamados, O que ficou de fora.
+  - Sem o nome das pessoas, como o da carteira.
+- **A régua (`pontuar`).** Cada usina começa com 100 e perde pelo que pesa hoje. As constantes moram no topo do arquivo; a
+  régua é do Levi, e mudar um peso é parâmetro, que se combina com ele antes.
+  - Meta do mês abaixo de 95%: 0,6 ponto por ponto percentual, até 35.
+  - Disponibilidade do mês abaixo de 98%: 1 ponto por ponto percentual, até 20. Sem a disponibilidade publicada: −3.
+  - Estado agora no COS: crítico −20, atenção −8, sem comunicação −6. Sem leitura não pesa, e o dossiê diz quantas ficaram
+    sem leitura.
+  - OS urgente não iniciada: −12 cada. OS atrasada, na régua do PCM: −5 cada.
+  - Extintor vencido: −10.
+  - 3 ou mais desligamentos no mês: −8.
+  - O mínimo é 0. Níveis: 80 a 100 em dia; 55 a 79 atenção; abaixo de 55 risco.
+  - A pendência da EPC do R18 ficou fora: o Nexus não tem a fonte.
+- **O caso que pôs a disponibilidade na régua:** a Capitão Poço 100, com 85,3% em novembro e 26,4 h parada, saía com 80
+  ("em dia") pela régua do R18 sozinha. Com a disponibilidade, sai com 67 (atenção).
+- **Os números são os da carteira, crus** (`carteira_ia.montar(...)["brutos"]`, com o `extintores_vencidos` da linha do
+  Comando › Usinas): a pontuação é a única conta nova.
+- **A rota:** `GET /t/comando/usinas/dossie-do-cliente.md?cliente=<nome>` baixa o arquivo
+  `dossie-cliente-<cliente>-AAAA-MM-DD.md`.
+  - Cliente fora da lista: 404.
+  - A conta do cliente e o Modo cliente não baixam (403): o arquivo traz as OS e o status dos chamados.
+- **O botão:** aparece no Comando › Usinas com um cliente só no filtro. Sem filtro, a tela diz como chegar a ele.
+- **Medido em 16/11/2026, no PC:** a Thopen (81 usinas) saiu em 8,2 s; no servidor, as cópias de 5 min já estão quentes.
+
+Prova: `tests/test_comando_dossie_cliente.py`.
 
 ## O diagnóstico do dia da IA no prontuário (14/11/2026; `nexus/comando/diagnostico.py`)
 

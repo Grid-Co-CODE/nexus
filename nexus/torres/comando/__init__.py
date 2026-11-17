@@ -678,12 +678,15 @@ def usina_ia_demanda(usina_id):
 # e correlacionar com as usinas com baixa disponibilidade e performance". Levi, com o esboço na mão: "libera para todos e
 # só no Comando › Usinas, pode construir". A caixa fica no alto da lista, embutida (comando-usinas.js pede o pedaço); o
 # dossiê e as instruções moram em nexus/comando/carteira_ia.py; a IA, a troca e a blindagem são as do prontuário.
-def _carteira_ia() -> dict:
-    """O dossiê da carteira de agora, das mesmas cópias que a lista e o prontuário já leem (as de 5 min)."""
+def _carteira_ia(cliente: str | None = None) -> dict:
+    """O dossiê da carteira de agora, das mesmas cópias que a lista e o prontuário já leem (as de 5 min). Com `cliente`,
+    só as usinas dele (o dossiê do cliente)."""
     from ...campo import visao
     from ...comando import carteira_ia as CI
     from .prontuario_dados import _de_todas
     m = _usinas_montadas()
+    if cliente is not None:
+        m = {**m, "linhas": [l for l in m["linhas"] if (l.get("cliente") or "") == cliente]}
     lei = _de_todas()
     d = lei.dados or {}
     avisos = list(m.get("avisos") or []) + list((d.get("erros") or {}).values())
@@ -799,6 +802,26 @@ def carteira_dossie_md():
     if not session.get("admin"):
         abort(403)
     resp = current_app.response_class(_carteira_ia()["texto"], mimetype="text/markdown")
+    resp.headers["Cache-Control"] = "no-store"
+    return resp
+
+
+@bp.route("/usinas/dossie-do-cliente.md")
+def cliente_dossie_md():
+    """O dossiê do cliente em Markdown, com as UFVs pontuadas (16/11/2026, Levi: "seria interessante o dossiê em .MD do
+    cliente! Pontuando as UFVs!"; `nexus/comando/dossie_cliente.py`). O botão aparece no Comando › Usinas filtrado por um
+    cliente. É de uso interno (traz as OS e o status dos chamados): a conta do cliente e o Modo cliente não baixam."""
+    from ...auth import setor_telas
+    from ...campo import visao
+    from ...comando import dossie_cliente as DC
+    if session.get("via") == "cliente" or setor_telas.em_modo_cliente():
+        abort(403)
+    cliente = (request.args.get("cliente") or "").strip()
+    if not cliente or not any((l.get("cliente") or "") == cliente for l in _usinas_montadas()["linhas"]):
+        abort(404)
+    d = DC.montar(cliente, _carteira_ia(cliente), visao._agora())
+    resp = current_app.response_class(d["texto"], mimetype="text/markdown; charset=utf-8")
+    resp.headers["Content-Disposition"] = f'attachment; filename="{d["arquivo"]}"'
     resp.headers["Cache-Control"] = "no-store"
     return resp
 

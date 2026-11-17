@@ -9,7 +9,7 @@
    nos filtros o cliente seja digitável tal qual é em histórico de OS [...] no mesmo estilo e mesmas funções"), pelo
    padrão do Nexus (static/filtros-os.js monta a barra, o painel, o Aplicar e as etiquetas com as <select multiple>
    deste formulário); e a tabela que ordena pelo cabeçalho, com o cabeçalho mais escuro e as linhas alternadas
-   (comando-usinas.js). A conta mora em nexus/comando/usinas.py; o Score de saúde do mockup ficou fora. #}
+   (comando-usinas.js). A conta mora em nexus/comando/usinas.py; o Score de saúde do mockup ficou fora da tela (desde 16/11/2026 só no dossiê do cliente, nexus/comando/dossie_cliente.py). #}
 {% macro pct(x) %}{% if x is none %}—{% else %}{{ ('%.0f'|format(x)) }}%{% endif %}{% endmacro %}
 <div class="campo-nativa">
   <div class="cn-cab">
@@ -49,6 +49,10 @@
       <span class="mudo cmu-conta"><b class="gc-num" data-cmu-conta>{{ linhas|length }}</b> de {{ r.total }} usinas</span>
     </form>
     <script src="{{ url_for('static', filename='filtros-os.js') }}"></script>
+    {# o dossiê do cliente em .md, com as UFVs pontuadas (16/11/2026, Levi: "seria interessante o dossiê em .MD do
+       cliente! Pontuando as UFVs!"): o botão com um cliente no filtro; sem ele, a dica de como chegar #}
+    {% set cli = escolhidos.get('cliente', []) %}
+    <p class="cmu-dossie">{% if cli|length == 1 %}<a class="gc-btn gc-btn--ui gc-btn--contorno" href="{{ raiz }}/t/comando/usinas/dossie-do-cliente.md?cliente={{ cli[0]|urlencode }}" download><i class="ph ph-file-arrow-down" aria-hidden="true"></i> Baixar o dossiê do cliente {{ cli[0] }} (.md)</a><span class="mudo">As UFVs pontuadas, da pior para a melhor, com o que tirou pontos. Uso interno.</span>{% else %}<span class="mudo">Para baixar o dossiê de um cliente (.md), com as UFVs pontuadas, filtre por um cliente.</span>{% endif %}</p>
 
     <div class="cn-tab cmu-tab"><table data-cmu-tabela>
       <thead><tr>

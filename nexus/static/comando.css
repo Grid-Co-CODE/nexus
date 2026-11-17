@@ -214,6 +214,8 @@ a.ins-titulo:hover{color:var(--verde-texto)}
    a conta das usinas à direita */
 .cmu-filtros{margin-top:14px}
 .cmu-filtros .cmu-conta{margin-left:auto;font-size:12.5px}
+.cmu-dossie{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;margin:10px 0 0;font-size:12.5px}
+.cmu-dossie .gc-btn{gap:6px}
 
 /* Comando → Caixa de entrada: as demandas entre setores (12/11/2026; comando/_demandas.html, a prévia aprovada em
    docs/mockups/demandas-entre-setores). Uma superfície só (a lista e o detalhe), sem faixa colorida na linha: o prazo é o
