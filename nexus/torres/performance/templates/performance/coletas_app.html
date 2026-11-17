@@ -416,7 +416,7 @@
   </div></div>
 
 {% endraw %}<script src="{{ url_for('static', filename='coletas/furos.js') }}"></script>
-<script src="{{ url_for('static', filename='coletas/filtros.js') }}" defer></script>{% raw %}
+<script src="{{ url_for('static', filename='coletas/filtros.js') }}" defer></script>{% if recoleta %}<script src="{{ url_for('static', filename='coletas/recoleta.js') }}" defer></script>{% endif %}{% raw %}
 <script>
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));

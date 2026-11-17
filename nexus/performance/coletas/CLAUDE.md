@@ -241,10 +241,20 @@ As duas precisam do Python além do relatório de furos; no .exe usam o BD que a
     recusa da plataforma e nada é gasto.
   - **As travas de custo moram na plataforma** (`recoleta_apipv.py`): a reserva da coleta da noite, o teto de 150 consultas
     por dia e 8 plantas × 7 dias por pedido. A tela mostra o custo e o que resta antes de a pessoa confirmar.
-  - **Fontes:** hoje só a API PV, conta principal (usinas do BD_Thopen). As outras entram quando a plataforma tiver a
-    rota de cada uma, na ordem combinada com o chat da Coleta: banco da Thopen, scadaGridco, SolarEdge, API PV conta
-    oem@, SunOp, chuva.
-  - Prova: `test_a_recoleta_busca_na_fonte_e_sai_pela_mesma_montagem` e `test_a_recoleta_so_abre_para_quem_tem_a_tela_dela`.
+  - **As sete fontes** (17/11/2026): `recoleta_fontes.py` (o cliente único das rotas `/api/recoleta/<fonte>?formato=bd`
+    da plataforma, dona da regra e da credencial de cada fonte) e `static/coletas/recoleta.js` (do NEXUS, por cima do
+    painel gerado do .exe: o seletor de Fonte, a chave Chuva e o custo antes de buscar). Fontes, na ordem da tela (primeiro
+    o que não gasta cota): banco da Thopen (`pg`), SCADA Grid Co. (`scada`), API PV conta principal (`apipv`), SolarEdge,
+    API PV conta oem@ (`oem`), SunOp e chuva. Os métodos `fontes_*` da sessão: `fontes_plantas` (a usina da tela é a ABA
+    do BD, com todos os ids dela; fica de fora a que não tem aba ou cujo BD não foi lido, e a tela diz), `fontes_simular`
+    (o custo, sem buscar nada), `fontes_plano` + `fontes_parte` (um pedido por vez, dentro dos tetos `max_plantas` e
+    `max_dias` que cada fonte informa) e `fontes_montar` (a MESMA `montagem.montar`). Regras que vêm do contrato: nulo não
+    vem e nunca vira 0; a chuva só preenche célula vazia; o dia que a fonte marca como fora do ar ENTRA com aviso severo
+    e a pessoa decide (a Crateus tem 40 de 50 inversores parados de verdade); a fonte que não devolve nada vira erro com
+    o motivo, não planilha vazia. A recusa da plataforma (teto, reserva da noite, fonte fora) chega à tela como veio.
+    O script da tela só é servido a quem pode recoletar.
+  - Prova: `tests/test_coletas_recoleta_fontes.py` (plataforma dublada com as respostas do contrato) e, da recoleta do
+    .exe, `test_a_recoleta_busca_na_fonte_e_sai_pela_mesma_montagem` e `test_a_recoleta_so_abre_para_quem_tem_a_tela_dela`.
 - Trazer uma versão do .exe que a Coleta ainda está mexendo: a pasta pode ter trabalho sem release (o `mural.py` estava lá
   antes da 1.0.11). Sincronize do commit da release (`git archive <release>` da pasta `ferramentas/conversor/conversor`
   para fora e `--origem` nela, mantendo o fim de linha da pasta) ou espere a pasta ficar limpa.

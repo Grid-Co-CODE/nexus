@@ -22,7 +22,8 @@ from . import TORRE, bp
 # Os métodos que a página do Conversor chama (os mesmos da Api do app.py do .exe, sem os da janela do Windows)
 METODOS = {"estado", "responder_usina", "separar", "dado_bruto", "remover", "limpar", "reler_bds", "converter",
            "novo_lote", "lote_pronto", "furos_mural", "furos_paradas",
-           "recoleta_opcoes", "recoleta_fatias", "recoleta_parte", "recoleta_montar"}
+           "recoleta_opcoes", "recoleta_fatias", "recoleta_parte", "recoleta_montar",
+           "fontes_lista", "fontes_plantas", "fontes_simular", "fontes_plano", "fontes_parte", "fontes_montar"}
 # A recoleta busca na fonte e gasta cota paga (a da API PV é dividida com a coleta da noite): só para quem tem a tela
 # "Recoleta pelas fontes" (por dentro da Coletas) em Base > Acessos. Levi, 17/11/2026: "pode!", com a permissão à parte.
 TELA_RECOLETA = "coletas/recoleta"
@@ -115,11 +116,23 @@ def coletas_api(metodo):
     try:
         if metodo == "estado":
             return _json(s.estado())
-        if metodo.startswith("recoleta_"):
+        if metodo.startswith(("recoleta_", "fontes_")):
             if not _pode_recoletar():
                 return _json({"erro": "A recoleta pela fonte gasta cota e é liberada por pessoa: peça a tela \"Recoleta "
                                       "pelas fontes\" em Base > Acessos."}, 403)
             app = current_app._get_current_object()
+            if metodo.startswith("fontes_"):       # as sete fontes (recoleta_fontes.py), pela tela do Nexus
+                from ...performance.coletas import recoleta_fontes as RF
+                if metodo == "fontes_lista":
+                    return _json([{"id": i, "nome": n} for i, n in RF.FONTES])
+                if metodo == "fontes_plantas":
+                    return _json(s.fontes_plantas(str(args[0]), servico.chave_recoleta(app.config)))
+                if metodo in ("fontes_simular", "fontes_plano"):
+                    return _json(getattr(s, metodo)(str(args[0]), str(args[1]), str(args[2]), str(args[3]),
+                                                    bool(args[4]), bool(args[5]), bool(args[6])))
+                if metodo == "fontes_parte":
+                    return _json(s.fontes_parte(int(args[0])))
+                return _json(s.fontes_montar())
             if metodo == "recoleta_opcoes":
                 return _json(s.recoleta_opcoes(servico.chave_recoleta(app.config),
                                                lambda: servico.furos_portal(s, _fabrica_do_banco(app))))

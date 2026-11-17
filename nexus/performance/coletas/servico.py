@@ -24,6 +24,7 @@ import traceback
 
 from . import motor  # noqa: F401 — o motor como `conversor`
 from . import pg
+from . import recoleta_fontes as RF
 from conversor import furos as _furos  # noqa: E402
 from conversor import montagem  # noqa: E402
 from conversor import mural as _mural  # noqa: E402
@@ -360,6 +361,117 @@ class SessaoNexus(Sessao):
         res["totais"]["separados"] = 0
         res["hora"], res["origem"] = agora.strftime("%H:%M"), "recoleta"
         res["recoleta"] = {"usina": usina, "celulas": len(cel)}
+        self.resultado = res
+        return self._fechar_resultado(res)
+
+    # ------------------------------------------------------------ recoleta pelas fontes (recoleta_fontes.py, 17/11/2026)
+    # O mesmo desenho da recoleta do .exe, para as sete fontes: a lista de usinas da fonte, o custo antes (simular), os
+    # pedidos um a um com o andamento na tela e, no fim, a MESMA montagem da conversão. O estado fica na sessão (`_rf`).
+    _VENCEU = {"erro": "Abra de novo a recoleta (a lista de usinas venceu)."}
+
+    def fontes_plantas(self, fonte, chave):
+        """As usinas que dá para recoletar nesta fonte: as que ela conhece e que têm aba num BD lido."""
+        if not chave:
+            return {"erro": "Este Nexus não tem a chave da recoleta (NEXUS_SSO_CHAVE ou CONVERSOR_RECOLETA_CHAVE)."}
+        try:
+            info = RF.plantas(fonte, chave)
+        except RF.Falha as e:
+            return {"erro": str(e)}
+        except Exception as e:                 # noqa: BLE001 — a tela mostra o motivo
+            traceback.print_exc()
+            return {"erro": "%s: %s" % (type(e).__name__, e)}
+        ctx = self.ctx()
+        mapa, sem_aba, sem_bd = {}, [], set()
+        for usina, x in RF.por_usina(info.get("plantas")).items():
+            if ctx.bd(x["destino"]) is None:
+                sem_bd.add(x["destino"])
+            elif ctx.aba(x["destino"], usina) is None:
+                sem_aba.append(usina)
+            else:
+                mapa[usina] = x
+        self._rf = {"fonte": fonte, "chave": chave, "mapa": mapa, "max_dias": info.get("max_dias"),
+                    "max_plantas": info.get("max_plantas"), "plano": [], "respostas": [], "pedido": None}
+        return {"fonte": fonte, "nome": RF.NOMES[fonte],
+                "usinas": [{"usina": u, "destino": x["destino"], "plantas": len(x["ids"])} for u, x in sorted(mapa.items())],
+                "sem_aba": sorted(sem_aba), "sem_bd": sorted(sem_bd), "paga": bool(info.get("paga")),
+                "teto": info.get("teto"), "cota_restante": info.get("cota_restante"), "max_dias": info.get("max_dias")}
+
+    def _rf_de(self, fonte, usina):
+        rf = getattr(self, "_rf", None)
+        return rf if rf and rf["fonte"] == fonte and usina in rf["mapa"] else None
+
+    def fontes_simular(self, fonte, usina, ini, fim, geracao, etm, chuva):
+        """Quanto esta recoleta gasta, antes de a pessoa confirmar: a plataforma faz a conta e nada é buscado."""
+        rf = self._rf_de(fonte, usina)
+        if not rf:
+            return dict(self._VENCEU)
+        try:
+            pl = RF.plano(rf["mapa"][usina]["ids"], dt.date.fromisoformat(ini), dt.date.fromisoformat(fim),
+                          rf["max_plantas"], rf["max_dias"])
+            total, resta, teto = 0, None, None
+            for ids, a, b in pl:
+                r = RF.pedir(fonte, rf["chave"], ids, a, b, geracao, etm, chuva, simular=True)
+                total += int(r.get("consultas") or 0)
+                resta, teto = r.get("cota_restante"), r.get("teto")
+        except RF.Falha as e:
+            return {"erro": str(e)}
+        except ValueError:
+            return {"erro": "Período inválido."}
+        return {"consultas": total, "cota_restante": resta, "teto": teto, "pedidos": len(pl)}
+
+    def fontes_plano(self, fonte, usina, ini, fim, geracao, etm, chuva):
+        rf = self._rf_de(fonte, usina)
+        if not rf:
+            return dict(self._VENCEU)
+        try:
+            rf["plano"] = RF.plano(rf["mapa"][usina]["ids"], dt.date.fromisoformat(ini), dt.date.fromisoformat(fim),
+                                   rf["max_plantas"], rf["max_dias"])
+        except ValueError:
+            return {"erro": "Período inválido."}
+        rf["respostas"], rf["pedido"] = [], (usina, bool(geracao), bool(etm), bool(chuva))
+        return {"pedidos": [[a.isoformat(), b.isoformat(), len(ids)] for ids, a, b in rf["plano"]]}
+
+    def fontes_parte(self, i):
+        """Um pedido à plataforma (um bloco de plantas num trecho de dias). A tela chama um por vez."""
+        rf = getattr(self, "_rf", None)
+        if not rf or not rf.get("pedido") or not 0 <= int(i) < len(rf["plano"]):
+            return dict(self._VENCEU)
+        _usina, geracao, etm, chuva = rf["pedido"]
+        ids, a, b = rf["plano"][int(i)]
+        try:
+            r = RF.pedir(rf["fonte"], rf["chave"], ids, a, b, geracao, etm, chuva)
+        except RF.Falha as e:
+            return {"erro": str(e)}
+        rf["respostas"].append(r)
+        return {"ok": True, "consultas": r.get("consultas"), "cota_restante": r.get("cota_restante")}
+
+    def fontes_montar(self, agora=None):
+        """O que veio da fonte vira células e passa pela MESMA montagem da conversão (a tela 2 de sempre)."""
+        rf = getattr(self, "_rf", None)
+        if not rf or not rf.get("pedido"):
+            return dict(self._VENCEU)
+        usina = rf["pedido"][0]
+        destino, nome = rf["mapa"][usina]["destino"], RF.NOMES[rf["fonte"]]
+        cel, av = RF.celulas(rf["respostas"], usina, destino)
+        if not cel:
+            return {"erro": "%s não devolveu nenhum valor de %s no período.%s"
+                            % (nome, usina, (" " + " ".join(t for _n, t in av[:2])) if av else "")}
+        self._convertendo.set()
+        try:
+            avisos = [montagem.Aviso(n, "Recoleta %s: %s" % (usina, t)) for n, t in av]
+            agora = agora or dt.datetime.now()
+            pasta = os.path.join(self.pasta_saida, agora.strftime("%d-%m"))
+            res = montagem.montar([(c, RF.FONTE_DA_MONTAGEM % nome) for c in cel], self.ctx(), pasta, carimbo=agora,
+                                  avisos=avisos)
+        except Exception as e:                 # noqa: BLE001 — a tela mostra o motivo
+            traceback.print_exc()
+            return {"erro": "%s: %s" % (type(e).__name__, e)}
+        finally:
+            self._convertendo.clear()
+        res["totais"]["arquivos"] = 0
+        res["totais"]["separados"] = 0
+        res["hora"], res["origem"] = agora.strftime("%H:%M"), "recoleta"
+        res["recoleta"] = {"usina": usina, "celulas": len(cel), "fonte": nome}
         self.resultado = res
         return self._fechar_resultado(res)
 

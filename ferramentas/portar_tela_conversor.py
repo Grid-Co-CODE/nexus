@@ -314,7 +314,10 @@ def gerar_pagina(index_html: str) -> str:
                "filtros: css")
     t = _troca(t, '<script src="furos.js"></script>',
                "{% endraw %}<script src=\"{{ url_for('static', filename='coletas/furos.js') }}\"></script>\n"
-               "<script src=\"{{ url_for('static', filename='coletas/filtros.js') }}\" defer></script>{% raw %}", "furos.js")
+               "<script src=\"{{ url_for('static', filename='coletas/filtros.js') }}\" defer></script>"
+               # a recoleta pelas sete fontes (static/coletas/recoleta.js, do Nexus): só para quem pode recoletar
+               "{% if recoleta %}<script src=\"{{ url_for('static', filename='coletas/recoleta.js') }}\" defer></script>"
+               "{% endif %}{% raw %}", "furos.js")
     # A recoleta pela fonte gasta cota paga (a da API PV é dividida com a coleta da noite): o botão só aparece para quem
     # tem a tela "Recoleta pelas fontes" em Base > Acessos (`coletas/recoleta`, por dentro da Coletas; Levi, 17/11/2026:
     # "pode!", com a permissão à parte). De 13 a 17/11 ficou escondido para todos; as rotas recoleta_* conferem a mesma
