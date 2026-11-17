@@ -382,8 +382,8 @@ def test_a_sala_de_controle_le_a_lista_e_os_inversores_do_cos(ligada, logado, mo
     from nexus.auth import setor_telas
     scada = {"versao": 1, "cartoes": [{"pid": "scada-exa", "pac_total_kw": 812.4, "situacao": {"chave": "GERANDO", "texto": "Gerando"},
                                        "inversores": [{"id": "EXA01:1", "nome": "Inversor 1.1", "modbus_id": 1, "pac": 61.2, "estado": "ok",
-                                                       "veredito": "GERANDO", "mppts": [{"indice": 1, "strings": [{"corrente": 6.1}, {"corrente": 0}]}],
-                                                       "strings_sem_mppt": [{"corrente": 5.9}, {"corrente": None}]}]}]}
+                                                       "veredito": "GERANDO", "mppts": [{"indice": 1, "strings": [{"indice": 1, "corrente": 6.1}, {"indice": 2, "corrente": 0}]}],
+                                                       "strings_sem_mppt": [{"indice": 3, "corrente": 5.9}, {"corrente": None}]}]}]}
     _servir(monkeypatch, {"/api/nexus/geracao": _geracao(), "/api/nexus/geracao/scada": scada})
     r = logado.get("/t/performance/sala-de-controle/cos/usinas")
     assert r.status_code == 200
@@ -394,7 +394,7 @@ def test_a_sala_de_controle_le_a_lista_e_os_inversores_do_cos(ligada, logado, mo
     assert r.status_code == 200
     assert r.get_json()["cartoes"] == [{"pid": "scada-exa", "kw": 812.4, "situacao": "Gerando", "inversores": [
         {"id": "EXA01:1", "nome": "Inversor 1.1", "modbus_id": 1, "kw": 61.2, "estado": "ok", "veredito": "GERANDO",
-         "strings": 4, "com_corrente": 2}]}]
+         "strings": 4, "com_corrente": 2, "ss": [[1, 6.1], [2, 0], [3, 5.9]]}]}]      # a string sem índice não entra na conferência
     with app.test_request_context():
         assert setor_telas.pode("/t/performance/sala-de-controle/cos/usinas", {"performance/sala-de-controle"})
         assert not setor_telas.pode("/t/performance/sala-de-controle/cos/usinas", {"cos/monitoramento"})

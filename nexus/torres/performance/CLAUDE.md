@@ -41,4 +41,5 @@ plataforma só pede ao Nexus. Abre para quem tem a tela da Sala, sem depender de
 `tests/test_cos_monitoramento.py` (os três últimos testes). **E as strings do dia** (16/11, noite; "a leitura das
 strings e inversores na API COS > MONITORAMENTO é super rápida [...] aplique"): `/cos/entradas?inv=<logger>:<modbus>&dia=`
 devolve o EntradasDoDia da Ronda COS sem mexer, pela mesma `ler_ao_vivo` e as mesmas cópias da janela dos inversores
-(60 s hoje, que vai sem o dia; 1 h o dia que passou). A Sala usa na curva de strings das usinas da API PV com logger.
+(60 s hoje, que vai sem o dia; 1 h o dia que passou). A Sala usa na curva de strings das usinas da API PV com logger. Desde 17/11 o `/cos/inversores` manda também `ss`
+(o índice e a corrente de agora de cada string): a Sala confere por ele a ligação do inversor antes de usar a curva.

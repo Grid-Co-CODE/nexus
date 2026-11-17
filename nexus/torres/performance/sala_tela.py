@@ -82,9 +82,12 @@ def sala_cos_inversores():
         for i in c.get("inversores") or []:
             ss = [s for m in (i.get("mppts") or []) for s in (m.get("strings") or [])] + list(i.get("strings_sem_mppt") or [])
             cs = [_corrente(s) for s in ss]
+            # `ss` (17/11/2026): a corrente de AGORA de cada string, pelo índice dela, para a Sala conferir a ligação do
+            # inversor antes de usar a curva do logger (as strings com e sem corrente têm de ser as mesmas nas duas fontes)
             invs.append({"id": i.get("id"), "nome": i.get("nome"), "modbus_id": i.get("modbus_id"), "kw": i.get("pac"),
                          "estado": i.get("estado"), "veredito": i.get("veredito"), "strings": len(ss),
-                         "com_corrente": sum(1 for v in cs if v is not None and v > 0)})
+                         "com_corrente": sum(1 for v in cs if v is not None and v > 0),
+                         "ss": [[s.get("indice"), _corrente(s)] for s in ss if isinstance(s, dict) and s.get("indice") is not None]})
         sit = c.get("situacao")
         cartoes.append({"pid": c.get("pid"), "kw": c.get("pac_total_kw"),
                         "situacao": (sit.get("texto") or sit.get("chave")) if isinstance(sit, dict) else sit, "inversores": invs})
