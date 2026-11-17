@@ -1705,21 +1705,14 @@ button.rd-etiqueta{background:transparent;font-family:inherit;cursor:pointer}
 /* Os cartões por responsável da Central de atenção (e da APR e PT), limpos (Levi, 03/11/2026: "quero mais minimalista...
    já tem um vermelho na lateral e a barra também fica vermelha... dói é os olhos!"): uma superfície só, sem a borda
    colorida; a cor num ponto pequeno ao lado da palavra (a cor nunca sozinha); a barra neutra, só com o que foi feito. */
-.cn-equipe--min{gap:14px;border-left-width:1px}
-.cn-equipe--min .cn-eq-titulo > b{font-size:16px}
 .cn-min-st{display:inline-flex;align-items:center;gap:6px;flex:none;margin-top:2px;font:600 12.5px/18px var(--font-sans);
   color:var(--tinta-2);font-variant-numeric:tabular-nums;white-space:nowrap}
 .cn-min-st::before,.cn-min-motivos span::before{content:"";flex:none;width:7px;height:7px;border-radius:50%;background:var(--mudo)}
 .cn-min-st--ok::before,.cn-min-motivos .ok::before{background:var(--ok)}
 .cn-min-st--alerta::before,.cn-min-motivos .alerta::before{background:var(--alerta)}
 .cn-min-st--critico::before,.cn-min-motivos .critico::before{background:var(--critico)}
-.cn-min-num{display:flex;align-items:baseline;flex-wrap:wrap;gap:4px 8px}
-.cn-min-num b{font:600 28px/32px var(--font-sans);letter-spacing:-.02em;font-variant-numeric:tabular-nums;color:var(--tinta)}
-.cn-min-num span{font-size:12.5px;color:var(--mudo)}
 .cn-min-barra{height:4px;border-radius:999px;background:var(--superficie-3);overflow:hidden}
 .cn-min-barra span{display:block;height:100%;border-radius:inherit;background:var(--tinta-2);opacity:.5}
-.cn-min-leg{margin-top:-6px;font-size:12px;color:var(--mudo);font-variant-numeric:tabular-nums}
-.cn-min-leg b{font-weight:600;color:var(--tinta-2)}
 .cn-min-motivos{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:12px;color:var(--tinta-2);font-variant-numeric:tabular-nums}
 .cn-min-motivos span{display:inline-flex;align-items:center;gap:6px}
 .cn-min-motivos span::before{width:6px;height:6px}
@@ -2402,3 +2395,18 @@ tr.rd-linha--ativa td{background:var(--verde-suave)}
 .eqtv-mapa{min-height:0;min-width:0}
 .eqtv .eq-quadro{height:100%;box-sizing:border-box}
 .eqtv .eq-palco{flex:1;height:auto}
+/* a Central de atenção por responsável em tabela (16/11/2026, Levi: "Central de atenção em formato de tabela por linhas!"):
+   uma linha por Responsável UFV, a linha inteira leva ao kanban (rondas) ou às PT dela; a cor só no ponto ao lado do
+   número, e a barra do em dia neutra */
+.cn-resp-tab th:first-child,.cn-resp-tab td:first-child{text-align:left}
+.cn-resp-tab .n{font-variant-numeric:tabular-nums}
+.cn-resp-tab th .cn-min-st{margin:0;font:inherit;color:inherit}
+.cn-resp-tab td .cn-min-st{margin:0;font-weight:600;color:var(--tinta)}
+.cn-resp-linha{cursor:pointer}
+.cn-resp-linha:hover td{background:var(--superficie-2)}
+.cn-resp-nome{font-weight:600;color:var(--tinta);text-decoration:none}
+.cn-resp-nome:hover,.cn-resp-nome:focus-visible{color:var(--verde-texto);text-decoration:underline}
+.cn-resp-linha--sem .cn-resp-nome{color:var(--tinta-2);font-weight:500}
+.cn-resp-dia{min-width:150px}
+.cn-resp-dia .cn-min-barra{display:block;width:120px;margin:6px auto 2px}
+.cn-resp-dia small{color:var(--mudo);font-variant-numeric:tabular-nums}

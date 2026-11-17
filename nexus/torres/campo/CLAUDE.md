@@ -599,10 +599,10 @@ As constantes ficam no topo do arquivo; cada função diz a regra no docstring.
   fica como o App mandou, com o dia marcado. Levi, 11/10: "aparece como 'APR do dia'? sendo que está ligado a atividade de
   um ativo no fractal".
 - **"Esperando o De acordo" é a MESMA tela da Central > Permissões de trabalho** (Levi, 05/10): as duas incluem
-  `templates/campo/_pt_esperando.html` (desde 24/10/2026 as duas só pedem os cartões por responsável e a tabela; a da
+  `templates/campo/_pt_esperando.html` (desde 24/10/2026 as duas só pedem o Por responsável, uma linha por pessoa
+  desde 16/11/2026, e a tabela; a da
   APR e PT leva a coluna Responsável no lugar da região, `coluna_responsavel`; tabela com a OS em verde,
-  Equipamento, Espera no fim e a linha que abre o detalhe). Mudou uma, mudou a outra (o teste compara os cartões das
-  duas).
+  Equipamento, Espera no fim e a linha que abre o detalhe). Mudou uma, mudou a outra (os testes conferem as duas).
 - **Tela de PT** (Levi, 05/10; desde 24/10/2026 a regra está em `nexus/torres/hseq/CLAUDE.md`, "APR e PT"): abas
   "Esperando o De acordo" (cartões por responsável ou tabela) e "Histórico" (todas as decididas, de 20 em 20, por
   situação; só tabela). Filtros de cliente, usina e Responsável UFV com a conta de cada opção, nas duas abas; o cartão
@@ -651,20 +651,22 @@ As constantes ficam no topo do arquivo; cada função diz a regra no docstring.
     usa o mesmo `_pt_esperando.html` com os modos dela); os endereços de antes (`modo=equipes`, `regioes`, `gestores`,
     `supervisores`) abrem Por responsável (`_modo_central`). O responsável é o **Responsável UFV**, o Responsável O&M da
     ficha da usina (`usinas.responsavel_om_id`; confirmado pelo Levi em 12/10: "é o Responsável O&M mesmo"), não o
-    gestor de contrato. **Os cartões por responsável são limpos** (Levi, 03/11/2026: "quero mais minimalista... já tem um
-    vermelho na lateral e a barra também fica vermelha... dói é os olhos!"; `cn-equipe--min`, nas duas abas e na APR
-    e PT): sem a borda colorida, sem o vermelho na barra e sem o número colorido; a cor fica num ponto pequeno ao lado
-    da palavra ("48% feitas", "7 paradas"; a cor nunca sozinha), e a barra, neutra, mostra só o que foi feito.
-    Prova: `tests/test_campo_central_cartoes_limpos_0311.py`. **Rondas pendentes:** um cartão por responsável (`visao.por_responsavel`: as usinas dele,
-    pendentes por status, feitas = as não pendentes, o %), e o responsável escolhido (no cartão ou no filtro) abre o
-    **kanban** (`visao.kanban`, `COLUNAS_KANBAN`): Nunca teve ronda | Ronda pendente (com o motivo e quem fez a última) |
-    Ronda feita (a usina em dia). Cada usina do kanban diz a **equipe** com o rótulo ("pode ser uma ou mais": a do
-    cadastro e as dos técnicos que a tela Técnicos por usina do PCM põe nela, `visao.equipes_das_usinas`, na conta
-    guardada da Central; medido em 19/10: as 131 usinas com equipe no cadastro, 125 com técnico, nenhuma com duas). O
-    cartão da usina leva ao histórico de rondas dela. **Permissões de trabalho:** um cartão por responsável com as PT
-    esperando nas usinas dele (`visao.pt_por_responsavel`: quantas, quantas paradas há mais de 2 h, as usinas e as
-    equipes; a soma bate com as 24 PT de 19/10); o cartão leva à tabela das PT dele. "Sem responsável O&M" tem cartão
-    próprio, por último.
+    gestor de contrato. **Uma linha por responsável, em tabela, desde 16/11/2026** (Levi: "Central de atenção em
+    formato de tabela por linhas!"; eram cartões; `table.cn-resp-tab`, nas duas abas e na APR e PT, que inclui o mesmo
+    pedaço): o nome é o link e a linha inteira leva aonde o cartão levava. **A cor só no ponto** (Levi, 03/11/2026:
+    "quero mais minimalista... dói é os olhos!"): o ponto colorido ao lado do rótulo da coluna e do número da parada /
+    aguardando; nenhum número ou fundo colorido, e a barra do Em dia neutra. Provas:
+    `tests/test_campo_central_tabela_16_11.py` e `tests/test_campo_central_cartoes_limpos_0311.py`. **Rondas
+    pendentes:** colunas Responsável UFV (com as equipes embaixo) | Usinas | Pendentes | Nunca teve ronda | Sem ronda |
+    Ronda longa pendente | Em dia (o %, a barra e "x de y"); `visao.por_responsavel`: as usinas dele, pendentes por
+    status, feitas = as não pendentes. O responsável escolhido (na linha ou no filtro) abre o **kanban** (`visao.kanban`,
+    `COLUNAS_KANBAN`): Nunca teve ronda | Ronda pendente (com o motivo e quem fez a última) | Ronda feita (a usina em
+    dia). Cada usina do kanban diz a **equipe** com o rótulo ("pode ser uma ou mais": a do cadastro e as dos técnicos
+    que a tela Técnicos por usina do PCM põe nela, `visao.equipes_das_usinas`, na conta guardada da Central; medido em
+    19/10: as 131 usinas com equipe no cadastro, 125 com técnico, nenhuma com duas). O cartão da usina leva ao histórico
+    de rondas dela. **Permissões de trabalho:** colunas Responsável UFV | PT esperando | Paradas há mais de 2 h |
+    Aguardando | Usinas | Equipes (`visao.pt_por_responsavel`; a soma bate com as 24 PT de 19/10); a linha leva à
+    tabela das PT dele. "Sem responsável O&M" tem linha própria, por último.
   - **Os filtros** (Levi, 19/10/2026: "tire o filtro de região do brasil, região de campo, gestor de contrato e
     responsável O&M. Deixe responsável UFV, cliente, UFV, equipe e o canto para escrever", nas duas abas): Responsável
     UFV, Cliente, UFV e Equipe (`FILTROS_CENTRAL`) e a busca, em cascata como em Extintores (cada lista com o que existe

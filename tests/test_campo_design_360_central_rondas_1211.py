@@ -24,8 +24,9 @@ def test_o_cartao_do_responsavel_sem_a_lista_de_equipes(banco, logado):
     ("12 equipes"), e as equipes estão no kanban dela."""
     for url in ("/t/campo/atencao", "/t/campo/atencao?vista=pt"):
         html = logado.get(url).get_data(as_text=True)
-        assert 'class="cn-equipe cn-equipe--min' in html and "cn-sup-equipes" not in html, url
-        assert re.search(r"\d+ equipes?</span>", html), url
+        # (uma linha por responsável desde 16/11/2026: a conta das equipes na linha ou na coluna Equipes)
+        assert 'class="cn-resp-tab"' in html and "cn-sup-equipes" not in html, url
+        assert re.search(r"\d+ equipes?</span>", html) or '<th class="n">Equipes</th>' in html, url
 
 
 def test_o_total_das_pendentes_com_a_composicao(banco, logado):

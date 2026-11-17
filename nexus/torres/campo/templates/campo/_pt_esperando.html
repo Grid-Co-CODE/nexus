@@ -13,21 +13,28 @@
 {% macro equipamento(p) %}{{ p.ativo or p.codigo or '—' }}{% if p.codigo and p.codigo != p.ativo %}<span class="det m">{{ p.codigo }}</span>{% endif %}{% endmacro %}
 {% if modo == 'responsaveis' %}
 {# por Responsável UFV (a Central de atenção, Levi, 19/10/2026: "Em permissão de trabalho deixe por responsável"): as PT
-   esperando nas usinas de cada um; o cartão leva à tabela das PT dele #}
-{# limpo como o cartão das rondas (Levi, 03/11/2026: "quero mais minimalista... dói é os olhos!"): sem a borda e sem o
-   número coloridos; a cor num ponto pequeno, ao lado da palavra #}
-<div class="cn-equipes">
-  {% for s in cartoes_resp_pt %}
-    <a class="cn-equipe cn-equipe--min cn-sup{% if s.responsavel == sem_responsavel %} cn-sup--sem{% endif %}" href="{{ url(modo='tabela', responsavel=s.responsavel, f=None) }}">
-      <div class="cn-eq-cab">
-        <div class="cn-eq-titulo"><b>{{ s.responsavel }}</b><span class="cn-min-st cn-min-st--{{ 'critico' if s.parada else 'alerta' }}">{{ (s.parada ~ ' parada' ~ ('s' if s.parada != 1 else '')) if s.parada else 'aguardando' }}</span></div>
-        <span>{{ 'PT de usinas sem responsável UFV no cadastro' if s.responsavel == sem_responsavel else 'Responsável UFV' }} · {{ s.usinas }} usina{{ 's' if s.usinas != 1 }} com PT esperando · {{ s.equipes|length }} equipe{{ 's' if s.equipes|length != 1 }}</span>
-      </div>
-      <div class="cn-min-num"><b>{{ s.pts }}</b><span>PT esperando o De acordo</span></div>
-      <div class="cn-min-motivos">{% if s.parada %}<span class="critico">{{ s.parada }} parada{{ 's' if s.parada != 1 }} há mais de 2 h</span>{% endif %}{% if s.pts - s.parada %}<span class="alerta">{{ s.pts - s.parada }} aguardando</span>{% endif %}</div>
-    </a>
-  {% else %}<p class="mudo">Nenhuma PT esperando com esses filtros.</p>{% endfor %}
-</div>
+   esperando nas usinas de cada um, uma linha por pessoa (16/11/2026, Levi: "Central de atenção em formato de tabela por
+   linhas!"; eram cartões); a linha leva à tabela das PT dela. A cor num ponto pequeno, ao lado do número (03/11/2026) #}
+<div class="cn-tab"><table class="cn-resp-tab">
+  <thead><tr><th>Responsável UFV</th><th class="n">PT esperando</th><th class="n"><span class="cn-min-st cn-min-st--critico">Paradas há mais de 2 h</span></th>
+    <th class="n"><span class="cn-min-st cn-min-st--alerta">Aguardando</span></th><th class="n">Usinas</th><th class="n">Equipes</th></tr></thead>
+  <tbody>
+  {% for s in cartoes_resp_pt %}{% set sem = s.responsavel == sem_responsavel %}{% set ag = s.pts - s.parada %}
+    <tr class="cn-resp-linha{% if sem %} cn-resp-linha--sem{% endif %}" data-href="{{ url(modo='tabela', responsavel=s.responsavel, f=None) }}">
+      <td><a class="cn-resp-nome" href="{{ url(modo='tabela', responsavel=s.responsavel, f=None) }}">{{ s.responsavel }}</a>{% if sem %}<span class="det">PT de usinas sem responsável UFV no cadastro</span>{% endif %}</td>
+      <td class="n"><b>{{ s.pts }}</b></td>
+      <td class="n">{% if s.parada %}<span class="cn-min-st cn-min-st--critico">{{ s.parada }}</span>{% else %}<span class="mudo">0</span>{% endif %}</td>
+      <td class="n">{% if ag %}<span class="cn-min-st cn-min-st--alerta">{{ ag }}</span>{% else %}<span class="mudo">0</span>{% endif %}</td>
+      <td class="n">{{ s.usinas }}</td><td class="n">{{ s.equipes|length }}</td>
+    </tr>
+  {% else %}<tr><td colspan="6" class="mudo">Nenhuma PT esperando com esses filtros.</td></tr>{% endfor %}
+  </tbody></table></div>
+<script>
+  // a linha inteira leva aonde o nome leva (o nome é o link, para o teclado e o leitor de tela)
+  document.querySelectorAll('.cn-resp-tab tr[data-href]').forEach(function (tr) {
+    tr.addEventListener('click', function (ev) { if (!ev.target.closest('a')) { location.href = tr.getAttribute('data-href'); } });
+  });
+</script>
 {% elif modo == 'equipes' %}
 <div class="cn-equipes">
   {% for c in cartoes %}{% set cor = 'critico' if c.parada else 'alerta' %}

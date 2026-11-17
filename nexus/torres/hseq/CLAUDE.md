@@ -497,8 +497,9 @@ os PDFs) e em `nexus/campo` (`visao.pts`, `pt_fracttal`, `decisao_pt`): a regra 
 - **Só por responsável, e os filtros de cliente, usina e responsável** (24/10/2026, Levi: "Tire por equipe e por região
   de campo e deixe apenas por responsável"; "Em tabela tire a coluna região e coloque a coluna responsável"; "Tire o
   filtro de região e gestor de contrato e região do brasil. Quero filtro para cliente, usina e responsável com contador
-  para cada! Quero os mesmos filtros no histórico!"). A aba Esperando abre nos cartões por Responsável UFV (o mesmo
-  `visao.pt_por_responsavel` da Central; o cartão leva à tabela dele) ou na Tabela, que leva a coluna Responsável no
+  para cada! Quero os mesmos filtros no histórico!"). A aba Esperando abre no Por responsável (o mesmo
+  `visao.pt_por_responsavel` da Central; uma linha por Responsável UFV desde 16/11/2026, quando a Central virou tabela
+  por linhas; a linha leva à tabela dele) ou na Tabela, que leva a coluna Responsável no
   lugar da região (`coluna_responsavel`: o pedaço é o mesmo da Central, que segue com a região). Os filtros
   (`FILTROS_PT`: Cliente, Usina, Responsável UFV) vão em cascata, cada opção com quantas PT tem com os outros filtros
   ("Thopen (12)"), nas duas abas; a busca fica (o número da OS acha a PT: a TST procurou a da OS 16866 no Fracttal, onde

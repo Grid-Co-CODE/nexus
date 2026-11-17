@@ -10,21 +10,10 @@
    Só usina mobilizada; a PT esperando aparece sempre. #}
 {# O "homem de capacete" (Levi, 05/10) é um ícone desenhado, não emoji: a regra da casa é sem emoji na interface #}
 {% macro capacete() %}<svg class="cn-capacete" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6.5 10a5.5 5.5 0 0 1 11 0"/><path d="M4.5 10.2h15"/><path d="M12 4.5v2.8"/><path d="M8.2 11.2a3.8 3.8 0 0 0 7.6 0"/><path d="M5 21a7 7 0 0 1 14 0"/></svg>{% endmacro %}
-{% set no_cartao = {'nunca': ('nunca teve ronda', 'nunca tiveram ronda'), 'sem_ronda': ('sem ronda há 7 d ou mais', 'sem ronda há 7 d ou mais'),
-                    'longa_pendente': ('com a longa pendente', 'com a longa pendente'),
-                    'sem_os': ('sem OS no Fracttal', 'sem OS no Fracttal'), 'incompleta': ('com evidência incompleta', 'com evidência incompleta')} %}
-{# os números da ronda de um cartão (equipe ou supervisor): pendentes, % feitas com a barra, total e o detalhe por status #}
-{# o cartão do responsável, limpo (Levi, 03/11/2026: "quero mais minimalista... já tem um vermelho na lateral e a barra
-   também fica vermelha... dói é os olhos!"): sem a borda colorida e sem o vermelho na barra; a cor fica num ponto pequeno
-   ao lado da palavra (a cor nunca sozinha), e a barra, neutra, mostra só o que foi feito. Um leigo lê o cartão (Levi,
-   05/10): o número e, ao lado, o que ele é #}
+{# a cor num ponto pequeno ao lado da palavra (Levi, 03/11/2026: "quero mais minimalista... dói é os olhos!"), e a barra,
+   neutra, mostra só o que foi feito #}
 {% macro pct_feitas(c) %}{% set pct = c.pct_feitas %}<span class="cn-min-st cn-min-st--{{ 'neutro' if pct is none else ('ok' if pct >= 80 else ('alerta' if pct >= 50 else 'critico')) }}" title="{{ c.feitas }} de {{ c.usinas }} usinas com a ronda em dia">{{ '—' if pct is none else pct ~ '%' }} feitas</span>{% endmacro %}
-{% macro numeros_ronda(c) %}
-        <div class="cn-min-num"><b>{{ c.pendentes }}</b><span>usina{{ 's' if c.pendentes != 1 }} pendente{{ 's' if c.pendentes != 1 }} de ronda</span></div>
-        <div class="cn-min-barra" role="img" aria-label="{{ c.feitas }} de {{ c.usinas }} usinas com a ronda em dia">{% if c.usinas %}<span style="width: {{ (100 * c.feitas / c.usinas)|round(1) }}%"></span>{% endif %}</div>
-        <div class="cn-min-leg"><b>{{ c.feitas }}</b> de <b>{{ c.usinas }}</b> usina{{ 's' if c.usinas != 1 }} com a ronda em dia</div>
-        {% if c.pendentes %}<div class="cn-min-motivos">{% for s, (rot, cor2) in status.items() if c[s] %}<span class="{{ cor2 }}">{{ c[s] }} {{ no_cartao[s][0 if c[s] == 1 else 1] }}</span>{% endfor %}</div>{% endif %}
-{% endmacro %}
+{% macro n0(v) %}{% if v %}{{ v }}{% else %}<span class="mudo">0</span>{% endif %}{% endmacro %}
 <div class="campo-nativa">
   <div class="cn-cab">
     <div><p class="gc-eyebrow">{{ torre.nome }}</p><div class="gc-titulo-explica"><h1 class="cn-titulo">{{ tela.nome }}</h1>
@@ -91,21 +80,30 @@
   {% endif %}
 
   {% if modo == 'responsaveis' %}
-  {# um cartão por Responsável UFV (o Responsável O&M da ficha; Levi, 12/10/2026): as usinas dele, pendentes e feitas; o
-     cartão abre o kanban #}
-  <div class="cn-equipes">
-    {% for s in cartoes_resp %}
-      <a class="cn-equipe cn-equipe--min cn-sup{% if s.responsavel == sem_responsavel %} cn-sup--sem{% endif %}" href="{{ url(responsavel=s.responsavel, modo=None, equipe=None, f=None) }}">
-        <div class="cn-eq-cab">
-          <div class="cn-eq-titulo"><b>{{ s.responsavel }}</b>{{ pct_feitas(s) }}</div>
-          <span>{{ 'usinas sem responsável UFV no cadastro' if s.responsavel == sem_responsavel else 'Responsável UFV' }} · {{ s.usinas }} usina{{ 's' if s.usinas != 1 }} · {{ s.n_equipes }} equipe{{ 's' if s.n_equipes != 1 }}</span>
-        </div>
-        {{ numeros_ronda(s) }}
-      </a>
+  {# uma linha por Responsável UFV (o Responsável O&M da ficha; Levi, 12/10/2026), em tabela desde 16/11/2026 (Levi:
+     "Central de atenção em formato de tabela por linhas!"; eram cartões): as usinas dele, as pendentes por motivo e as
+     em dia; a linha abre o kanban dele #}
+  <div class="cn-tab"><table class="cn-resp-tab">
+    <thead><tr><th>Responsável UFV</th><th class="n">Usinas</th><th class="n">Pendentes</th>
+      {% for s, (rot, cor) in status.items() %}<th class="n"><span class="cn-min-st cn-min-st--{{ cor }}">{{ rot }}</span></th>{% endfor %}<th>Em dia</th></tr></thead>
+    <tbody>
+    {% for s in cartoes_resp %}{% set sem = s.responsavel == sem_responsavel %}
+      <tr class="cn-resp-linha{% if sem %} cn-resp-linha--sem{% endif %}" data-href="{{ url(responsavel=s.responsavel, modo=None, equipe=None, f=None) }}">
+        <td><a class="cn-resp-nome" href="{{ url(responsavel=s.responsavel, modo=None, equipe=None, f=None) }}">{{ s.responsavel }}</a><span class="det">{{ 'sem responsável UFV no cadastro · ' if sem }}{{ s.n_equipes }} equipe{{ 's' if s.n_equipes != 1 }}</span></td>
+        <td class="n">{{ s.usinas }}</td><td class="n"><b>{{ n0(s.pendentes) }}</b></td>
+        {% for k in status %}<td class="n">{{ n0(s[k]) }}</td>{% endfor %}
+        <td class="cn-resp-dia">{{ pct_feitas(s) }}<span class="cn-min-barra" role="img" aria-label="{{ s.feitas }} de {{ s.usinas }} usinas com a ronda em dia">{% if s.usinas %}<span style="width: {{ (100 * s.feitas / s.usinas)|round(1) }}%"></span>{% endif %}</span><small>{{ s.feitas }} de {{ s.usinas }}</small></td>
+      </tr>
     {% else %}
-      <p class="mudo">Nenhum responsável com esses filtros.</p>
+      <tr><td colspan="{{ 4 + status|length }}" class="mudo">Nenhum responsável com esses filtros.</td></tr>
     {% endfor %}
-  </div>
+    </tbody></table></div>
+  <script>
+  // a linha inteira leva aonde o nome leva (o nome é o link, para o teclado e o leitor de tela)
+  document.querySelectorAll('.cn-resp-tab tr[data-href]').forEach(function (tr) {
+    tr.addEventListener('click', function (ev) { if (!ev.target.closest('a')) { location.href = tr.getAttribute('data-href'); } });
+  });
+</script>
   {% elif modo == 'kanban' %}
   {# o kanban do responsável (Levi, 12/10/2026: "Ao clicar aparecerá um kanban com essas três colunas!"): as usinas dele
      em três colunas; o status sai da ronda (não se arrasta) e o cartão leva ao histórico de rondas da usina #}

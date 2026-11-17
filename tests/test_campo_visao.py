@@ -265,14 +265,15 @@ def test_central_abre_por_responsavel_e_a_equipe_e_filtro(banco, logado):
     # Levi, 19/10/2026: "Uma visão só por responsável serve!" e os filtros "responsável UFV, cliente, UFV, equipe e o
     # canto para escrever" (a região do Brasil saiu)
     html = logado.get("/t/campo/atencao").get_data(as_text=True)
-    assert 'class="cn-equipes"' in html and "<table>" not in html and 'aria-current="page">Por responsável</a>' in html
-    assert "<b>" + visao.SEM_RESPONSAVEL.replace("&", "&amp;") + "</b>" in html and "feitas" in html   # sem a ficha: o "Sem"
+    # uma linha por responsável desde 16/11/2026 (eram cartões; test_campo_central_tabela_16_11.py)
+    assert 'class="cn-resp-tab"' in html and "<table>" not in html and 'aria-current="page">Por responsável</a>' in html
+    assert ">" + visao.SEM_RESPONSAVEL.replace("&", "&amp;") + "</a>" in html and "feitas" in html   # sem a ficha: o "Sem"
     html = logado.get("/t/campo/atencao?modo=tabela&equipe=SP+Norte+01").get_data(as_text=True)
     corpo = html[html.index("<tbody>"):html.index("</tbody>")]
     assert "Altair" in corpo and "Coração 1" not in corpo and '<option value="SP Norte 01" selected>' in html
     assert 'id="cn-regiao"' not in html and 'id="cn-uf"' not in html
     html = logado.get("/t/campo/atencao?vista=pt").get_data(as_text=True)
-    assert "PT esperando o De acordo" in html
+    assert ">PT esperando</th>" in html
 def test_a_tela_de_pt_e_so_por_responsavel_com_os_filtros_de_cliente_usina_e_responsavel(banco, logado):
     """Levi, 24/10/2026: "Tire por equipe e por região de campo e deixe apenas por responsável"; "Tire o filtro de região
     e gestor de contrato e região do brasil. Quero filtro para cliente, usina e responsável com contador para cada!"."""
@@ -280,7 +281,8 @@ def test_a_tela_de_pt_e_so_por_responsavel_com_os_filtros_de_cliente_usina_e_res
     html = logado.get("/t/hseq/apr-pt").get_data(as_text=True)
     assert 'aria-current="page">Por responsável</a>' in html and ">Tabela</a>" in html
     assert ">Por equipe</a>" not in html and ">Por região de campo</a>" not in html
-    assert "<b>2</b><span>PT esperando o De acordo" in html and "1 parada há mais de 2 h" in html
+    # (uma linha por responsável desde 16/11/2026: as 2 PT, 1 parada há mais de 2 h)
+    assert '<td class="n"><b>2</b></td>' in html and '<span class="cn-min-st cn-min-st--critico">1</span>' in html
     for antigo in ('id="cn-regiao"', 'id="cn-regiao-campo"', 'id="cn-gestor"'):
         assert antigo not in html
     assert _re.findall(r'<select class="gc-campo" id="pt-(\w+)" name="(\w+)"', html) == [
@@ -288,7 +290,7 @@ def test_a_tela_de_pt_e_so_por_responsavel_com_os_filtros_de_cliente_usina_e_res
     assert '<option value="Thopen">Thopen (2)</option>' in html and '<option value="Altair">Altair (2)</option>' in html
     # o endereço de antes (por região, por gestor, a equipe) cai no Por responsável e não filtra
     antigo = logado.get("/t/hseq/apr-pt?modo=regioes&regiao_campo=Sul+01&gestor=Ciclano+Chefe").get_data(as_text=True)
-    assert 'aria-current="page">Por responsável</a>' in antigo and "<b>2</b><span>PT esperando" in antigo
+    assert 'aria-current="page">Por responsável</a>' in antigo and '<td class="n"><b>2</b></td>' in antigo
 
 
 def test_tela_de_pt_tabela_com_o_responsavel_e_historico(banco, logado):
@@ -319,7 +321,7 @@ def test_tela_de_pt_tabela_com_o_responsavel_e_historico(banco, logado):
 
 def test_o_cartao_do_responsavel_leva_a_tabela_dele(banco, logado):
     html = logado.get("/t/hseq/apr-pt").get_data(as_text=True)
-    i = html.index('<a class="cn-equipe cn-equipe--min')
+    i = html.index('<a class="cn-resp-nome"')
     href = html[i:html.index(">", i)].split('href="')[1].split('"')[0].replace("&amp;", "&")
     assert href.startswith("?modo=tabela&responsavel=")
     tabela = logado.get("/t/hseq/apr-pt" + href).get_data(as_text=True)
