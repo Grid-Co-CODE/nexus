@@ -300,7 +300,7 @@
         <div class="vazio" id="semarq">Nenhum arquivo ainda. O app reconhece a fonte e a usina pelo conteúdo; se não tiver certeza, pergunta.</div>
         <div class="row">
           <span class="mut" id="contagem"></span>
-          <span><button class="btn2" id="rcAbrir" hidden>Recoletar pela API</button> <button class="btn2" id="limpar">Limpar</button> <button class="btn" id="converter" disabled>Converter</button></span>
+          <span><button class="btn2" id="rcAbrir"{% endraw %}{% if not recoleta %} hidden{% endif %}{% raw %}>Recoletar pela API</button> <button class="btn2" id="limpar">Limpar</button> <button class="btn" id="converter" disabled>Converter</button></span>
         </div>
       </div>
     </section>

@@ -605,12 +605,107 @@ def test_as_paradas_passam_pela_api_da_tela(coletas):
     assert r == SEM_PARADAS
 
 
-def test_a_recoleta_pela_api_pv_fica_desligada_no_nexus(coletas):
-    """1.0.14: a recoleta gasta a cota paga da API PV; no Nexus fica escondida e sem método até o Levi decidir."""
-    html = coletas.get("/t/performance/coletas/app").get_data(as_text=True)
-    assert '<button class="btn2" id="rcAbrir" hidden>' in html
+# ── a recoleta pela fonte (Conversor 1.0.14), ligada no Nexus em 17/11/2026 por permissão ─────────────────────────
+def _plataforma_dublada(monkeypatch):
+    """A rota da plataforma (/api/recoleta/apipv) dublada: nada sai para a rede. -> a lista dos pedidos feitos."""
+    pedidos = []
+
+    def pedir(rota, chave_, corpo=None, timeout=180):
+        pedidos.append((rota, chave_, corpo))
+        if rota.endswith("/plantas"):
+            return {"plantas": [{"id": 7, "nome": "Planta Teste (7)", "cadastro": "Teste"}], "max_dias": 7,
+                    "restam_hoje": 150, "teto_dia": 150}
+        return {"plantas": {"7": {"dias": {"2026-10-14": {"ger": {"INV A": 1500.0, "INV B": 1400.0}, "ipoa": 6.1,
+                                                          "ghi": 5.0}}}}, "chamadas": 2, "restam": 148}
+    monkeypatch.setattr(servico._recoleta, "_pedir", pedir)
+    return pedidos
+
+
+def _banco_com_a_planta(p):
+    """O banco de mentira com a aba Equipamentos dizendo onde a usina Teste está na fonte."""
+    b = BancoDeMentira(p)
+    linhas = [[None, "Cliente", "Teste", "Planta Teste (7)", None, "UFV", None, None],
+              [None, "Cliente", "Teste", "Planta Teste (7)", None, "Inversor 1.1", "INV A", "UFV"],
+              [None, "Cliente", "Teste", "Planta Teste (7)", None, "Inversor 1.2", "INV B", "UFV"]]
+    b.sheets["bd_performance"]["Equipamentos"] = {"id": 900, "sheet_name": "Equipamentos", "header_row": 3}
+    b.rows[900] = [{"row_number": i + 4, "headers": _CAB_EQ, "values": v} for i, v in enumerate(linhas)]
+    return b
+
+
+def _api(c, metodo, *args):
+    return c.post("/t/performance/coletas/api/" + metodo, json={"args": list(args)})
+
+
+def test_a_recoleta_busca_na_fonte_e_sai_pela_mesma_montagem(coletas, app, tmp_path, monkeypatch):
+    """Levi (17/11/2026): "quero formas de coletar os dados novamente pelas nossas fontes de dados e gerar uma planilha
+    para colar nos BDs". A usina sai da aba Equipamentos do banco, o dado da plataforma (dublada) e o resultado é a
+    conversão de sempre: célula vazia recebe, a planilha baixa pelo índice, nada grava no BD."""
+    p = _bd_excel(tmp_path)
+    app.config.update(NEXUS_COLETAS_BANCO=lambda: _banco_com_a_planta(p), CONVERSOR_RECOLETA_CHAVE="chave-de-teste")
+    servico._PORTAL.clear()
+    pedidos = _plataforma_dublada(monkeypatch)
+    assert '<button class="btn2" id="rcAbrir">Recoletar pela API</button>' in coletas.get("/t/performance/coletas/app").get_data(as_text=True)
+    for _ in range(50):
+        if _api(coletas, "estado").get_json()["bd_pronto"]:
+            break
+        time.sleep(0.1)
+    op = _api(coletas, "recoleta_opcoes").get_json()
+    assert op["usinas"] == [{"usina": "Teste", "destino": "BD_Performance", "plantas": ["Planta Teste"], "n_inv": 2}]
+    assert op["restam_hoje"] == 150 and pedidos[0][:2] == ("/api/recoleta/apipv/plantas", "chave-de-teste")
+    assert _api(coletas, "recoleta_fatias", "2026-10-14", "2026-10-14").get_json() == [["2026-10-14", "2026-10-14"]]
+    parte = _api(coletas, "recoleta_parte", "Teste", "2026-10-14", "2026-10-14", True, True, True).get_json()
+    assert parte == {"ok": True, "chamadas": 2, "restam": 148}
+    assert pedidos[-1][2] == {"ids": [7], "ini": "2026-10-14", "fim": "2026-10-14", "geracao": True, "etm": True}
+    res = _api(coletas, "recoleta_montar", "Teste", True, True).get_json()
+    assert not res.get("erro") and res["origem"] == "recoleta" and res["recoleta"] == {"usina": "Teste", "celulas": 4}
+    assert res["totais"]["novo"] >= 3 and res["pasta"] == ""
+    assert res["saidas"] and res["saidas"][0]["indice"] == 0 and os.sep not in res["saidas"][0]["caminho"]
+    assert any("veio do banco" in a["texto"] for a in res["avisos"])
+    assert coletas.get("/t/performance/coletas/planilha/0").status_code == 200
+
+
+def test_a_recoleta_so_abre_para_quem_tem_a_tela_dela(coletas, app, monkeypatch):
+    """A recoleta gasta cota paga (a da API PV é dividida com a coleta da noite): ter a Coletas não basta. Sem a tela
+    "Recoleta pelas fontes" o botão sai escondido, as rotas recusam e nada chega à plataforma."""
+    from nexus.auth import setor_telas
+    app.config["CONVERSOR_RECOLETA_CHAVE"] = "chave-de-teste"
+    servico._PORTAL.clear()
+    pedidos = _plataforma_dublada(monkeypatch)
+    telas = {"performance/coletas"}
+    monkeypatch.setattr(setor_telas, "acesso", lambda: {"tudo": False, "telas": telas, "setor": None, "erro": ""})
+    assert '<button class="btn2" id="rcAbrir" hidden>' in coletas.get("/t/performance/coletas/app").get_data(as_text=True)
     for m in ("recoleta_opcoes", "recoleta_fatias", "recoleta_parte", "recoleta_montar"):
-        assert coletas.post("/t/performance/coletas/api/" + m, json={"args": []}).status_code == 404
+        r = _api(coletas, m, "Teste", "2026-10-14", "2026-10-14", True, True)
+        assert r.status_code == 403 and "Base > Acessos" in r.get_json()["erro"]
+    assert pedidos == []
+    telas.add("performance/coletas/recoleta")
+    assert '<button class="btn2" id="rcAbrir">' in coletas.get("/t/performance/coletas/app").get_data(as_text=True)
+    assert _api(coletas, "recoleta_opcoes").status_code == 200 and pedidos
+
+
+def test_a_tela_da_recoleta_mora_dentro_da_coletas(app):
+    from nexus.torres.performance import TORRE
+    t = TORRE.tela("coletas/recoleta")
+    assert t.nome == "Recoleta pelas fontes" and t.dentro_de == "coletas"
+
+
+def test_a_chave_da_recoleta_sai_do_ambiente_do_nexus_sem_nada_no_git():
+    import hashlib
+    import hmac
+    sso = "s" * 40
+    esperado = hmac.new(sso.encode(), servico.ROTULO_RECOLETA, hashlib.sha256).hexdigest()
+    assert servico.chave_recoleta({"NEXUS_SSO_CHAVE": sso}) == esperado and len(esperado) == 64
+    assert servico.chave_recoleta({"NEXUS_SSO_CHAVE": sso, "CONVERSOR_RECOLETA_CHAVE": " posta pela TI "}) == "posta pela TI"
+    assert servico.chave_recoleta({}) == ""
+
+
+def test_sem_chave_a_recoleta_diz_o_motivo_e_nao_pede_nada(coletas, app, monkeypatch):
+    servico._PORTAL.clear()
+    pedidos = _plataforma_dublada(monkeypatch)
+    monkeypatch.delenv("CONVERSOR_RECOLETA_CHAVE", raising=False)
+    app.config.pop("CONVERSOR_RECOLETA_CHAVE", None)
+    app.config["NEXUS_SSO_CHAVE"] = ""
+    assert "chave da recoleta" in _api(coletas, "recoleta_opcoes").get_json()["erro"] and pedidos == []
 
 
 def test_a_sala_de_controle_le_o_abaixo_dos_demais_daqui(coletas, app):

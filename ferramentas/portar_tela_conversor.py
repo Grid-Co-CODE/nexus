@@ -315,11 +315,13 @@ def gerar_pagina(index_html: str) -> str:
     t = _troca(t, '<script src="furos.js"></script>',
                "{% endraw %}<script src=\"{{ url_for('static', filename='coletas/furos.js') }}\"></script>\n"
                "<script src=\"{{ url_for('static', filename='coletas/filtros.js') }}\" defer></script>{% raw %}", "furos.js")
-    # A recoleta pela API PV (1.0.14) fica DESLIGADA no Nexus: ela gasta a cota paga da API PV (o servidor da plataforma
-    # atende pela chave X-Recoleta-Chave, o HMAC da PV_PASSWORD) e, aqui, qualquer pessoa com a tela Coletas poderia
-    # gastar. Ligar é decisão do Levi (13/11/2026): falta a chave no servidor do Nexus e os métodos recoleta_* na lista.
+    # A recoleta pela fonte gasta cota paga (a da API PV é dividida com a coleta da noite): o botão só aparece para quem
+    # tem a tela "Recoleta pelas fontes" em Base > Acessos (`coletas/recoleta`, por dentro da Coletas; Levi, 17/11/2026:
+    # "pode!", com a permissão à parte). De 13 a 17/11 ficou escondido para todos; as rotas recoleta_* conferem a mesma
+    # permissão no servidor (`coletas_tela._pode_recoletar`), o botão escondido é só para não oferecer o que não abre.
     t = _troca(t, '<button class="btn2" id="rcAbrir">Recoletar pela API</button>',
-               '<button class="btn2" id="rcAbrir" hidden>Recoletar pela API</button>', "recoleta desligada")
+               '<button class="btn2" id="rcAbrir"{% endraw %}{% if not recoleta %} hidden{% endif %}{% raw %}>'
+               'Recoletar pela API</button>', "recoleta por permissão")
     t = _troca(t, "const api = () => window.pywebview.api;", SHIM, "api")
     t = _troca(t, BDS_VELHO, BDS_NOVO, "bds")
     t = _troca(t, INICIAR_VELHO, INICIAR_NOVO, "iniciar")

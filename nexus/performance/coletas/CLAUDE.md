@@ -221,11 +221,26 @@ As duas precisam do Python além do relatório de furos; no .exe usam o BD que a
   subida dos BDs, como no .exe; só a conta feita com as paradas fora do ar não fica guardada. Nos testes as paradas são
   dubladas (`_paradas_sem_rede` em tests/test_coletas.py). Prova de 13/11 até 11/11: 130 usinas com parada, 21 OS abertas;
   mural 177/193 iguais ao .exe em dias E status (os 16 de novo a Segredo).
-- **Recoleta pela API PV (1.0.14) DESLIGADA no Nexus** (13/11/2026): o botão "Recoletar pela API" sai escondido pelo
-  `portar_tela_conversor.py` e os métodos `recoleta_*` não estão em `METODOS` (404). Motivo: a recoleta gasta a cota PAGA
-  da API PV (o servidor da plataforma atende por `X-Recoleta-Chave`, o HMAC da PV_PASSWORD; teto de 150/dia) e aqui
-  qualquer pessoa com a tela Coletas poderia gastar. Ligar é decisão do Levi: precisa da chave no servidor do Nexus (sem
-  ir ao git, o repositório é público) e dos 4 métodos na lista, por pessoa logada.
+- **Recoleta pela fonte (1.0.14), LIGADA por permissão** (17/11/2026; de 13 a 17/11 ficou desligada para todos). Levi, no
+  chat da Coleta: "quero formas de coletar os dados novamente pelas nossas fontes de dados e gerar uma planilha para colar
+  nos BDs"; aqui: "pode!", com a permissão à parte. A pessoa escolhe usina, período e o que quer; a plataforma busca na
+  fonte e devolve o dado cru; a Coletas passa pela MESMA `montagem.montar` e sai a prévia e a planilha de colar. Nada grava.
+  - **Quem pode:** a tela `coletas/recoleta` ("Recoleta pelas fontes", `dentro_de="coletas"`, sem item no menu), marcada
+    por setor em Base > Acessos. Ter a Coletas não basta: a recoleta gasta cota paga (a da API PV é dividida com a coleta
+    da noite; em 14/11 uma recoleta de 3 dias a esgotou e 75 usinas ficaram sem resposta). Sem a tela, o botão "Recoletar
+    pela API" sai escondido e os `recoleta_*` respondem 403 (`coletas_tela._pode_recoletar`); o administrador sempre pode.
+  - **Os quatro métodos** (`SessaoNexus.recoleta_opcoes/_fatias/_parte/_montar`) são cópia dos da Api do .exe (app.py),
+    com duas trocas: o "onde está na fonte" vem da aba Equipamentos do banco (`furos_portal`) e a chave vem do ambiente.
+  - **A chave** (`servico.chave_recoleta`): a `CONVERSOR_RECOLETA_CHAVE` do .env, se a T.I. puser, ou o HMAC-SHA256 da
+    `NEXUS_SSO_CHAVE` com o rótulo `nexus/coletas/recoleta/v1`. Nada no git (o repositório é público). A plataforma tem
+    de aceitar esse HMAC ao lado da chave do .exe (`plataforma/recoleta_apipv.py`); enquanto não aceitar, a tela mostra a
+    recusa da plataforma e nada é gasto.
+  - **As travas de custo moram na plataforma** (`recoleta_apipv.py`): a reserva da coleta da noite, o teto de 150 consultas
+    por dia e 8 plantas × 7 dias por pedido. A tela mostra o custo e o que resta antes de a pessoa confirmar.
+  - **Fontes:** hoje só a API PV, conta principal (usinas do BD_Thopen). As outras entram quando a plataforma tiver a
+    rota de cada uma, na ordem combinada com o chat da Coleta: banco da Thopen, scadaGridco, SolarEdge, API PV conta
+    oem@, SunOp, chuva.
+  - Prova: `test_a_recoleta_busca_na_fonte_e_sai_pela_mesma_montagem` e `test_a_recoleta_so_abre_para_quem_tem_a_tela_dela`.
 - Trazer uma versão do .exe que a Coleta ainda está mexendo: a pasta pode ter trabalho sem release (o `mural.py` estava lá
   antes da 1.0.11). Sincronize do commit da release (`git archive <release>` da pasta `ferramentas/conversor/conversor`
   para fora e `--origem` nela, mantendo o fim de linha da pasta) ou espere a pasta ficar limpa.

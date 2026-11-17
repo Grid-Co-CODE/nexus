@@ -12,6 +12,8 @@ servidor: o "só dia fechado" usa a data do arquivo como a hora da baixa) e o re
 acompanha perguntando o estado.
 """
 import datetime as dt
+import hashlib
+import hmac
 import os
 import re
 import shutil
@@ -26,6 +28,7 @@ from conversor import furos as _furos  # noqa: E402
 from conversor import montagem  # noqa: E402
 from conversor import mural as _mural  # noqa: E402
 from conversor import paradas as _paradas  # noqa: E402
+from conversor import recoleta as _recoleta  # noqa: E402
 from conversor.nucleo import BD_PERFORMANCE, BD_THOPEN  # noqa: E402
 from conversor.sessao import Sessao  # noqa: E402
 
@@ -266,6 +269,11 @@ class SessaoNexus(Sessao):
             r = super().converter(agora)
         finally:
             self._convertendo.clear()
+        return self._fechar_resultado(r)
+
+    def _fechar_resultado(self, r):
+        """O resultado da montagem como a tela do Nexus o recebe: a planilha pelo índice (nada de caminho do servidor) e
+        o aviso de que o banco anda atrás do Excel. Vale para a conversão de arquivo e para a recoleta."""
         self.saidas = [s["caminho"] for s in r.get("saidas") or []]
         for i, s in enumerate(r.get("saidas") or []):
             s["caminho"] = os.path.basename(s["caminho"])
@@ -283,6 +291,78 @@ class SessaoNexus(Sessao):
                     % (destino, b.lido_em.strftime("%d/%m às %H:%M"), b.lido_em.strftime("%d/%m")), None, destino))
         return r
 
+    # ------------------------------------------------------------ recoleta pela fonte (Conversor 1.0.14)
+    # Os quatro métodos são os da Api do .exe (app.py: recoleta_opcoes, _fatias, _parte, _montar), com duas trocas de
+    # servidor: a chave vem do ambiente do Nexus (`chave_recoleta`) e o "onde está no portal" vem da aba Equipamentos do
+    # banco (`furos_portal`). Quem pode chamar é a rota que decide (a tela "Recoleta pelas fontes" de Base > Acessos).
+    def recoleta_opcoes(self, chave, portal):
+        """As usinas que dá para recoletar: as do cadastro (aba Equipamentos) com planta na fonte e aba num BD lido."""
+        if not chave:
+            return {"erro": "Este Nexus não tem a chave da recoleta (NEXUS_SSO_CHAVE ou CONVERSOR_RECOLETA_CHAVE)."}
+        try:
+            info = _recoleta.plantas(chave)
+            m = _recoleta.mapa(portal() if callable(portal) else portal, info.get("plantas") or [])
+        except _recoleta.Falha as e:
+            return {"erro": str(e)}
+        except Exception as e:                 # noqa: BLE001 — a tela mostra o motivo
+            traceback.print_exc()
+            return {"erro": "%s: %s" % (type(e).__name__, e)}
+        ctx = self.ctx()
+        us = []
+        for usina, x in sorted(m.items()):
+            d = _recoleta.destino_de(ctx, usina)
+            if d:
+                us.append({"usina": usina, "destino": d, "plantas": [n for _, n in x["plantas"]], "n_inv": len(x["inv"])})
+        self._rec = {"chave": chave, "mapa": m}
+        return {"usinas": us, "max_dias": info.get("max_dias"), "restam_hoje": info.get("restam_hoje"),
+                "teto_dia": info.get("teto_dia")}
+
+    def recoleta_fatias(self, ini, fim):
+        a, b = dt.date.fromisoformat(ini), dt.date.fromisoformat(fim)
+        return [[x.isoformat(), y.isoformat()] for x, y in _recoleta.fatias(a, b)]
+
+    def recoleta_parte(self, usina, ini, fim, geracao, etm, primeira=False):
+        """Uma fatia (até 7 dias) na plataforma. A tela chama uma por vez e mostra o andamento."""
+        rec = getattr(self, "_rec", None)
+        if not rec or usina not in rec["mapa"]:
+            return {"erro": "Abra de novo a recoleta (a lista de usinas venceu)."}
+        if primeira:
+            rec["respostas"] = []
+        try:
+            r = _recoleta.pedir_fatia(rec["chave"], [i for i, _ in rec["mapa"][usina]["plantas"]],
+                                      dt.date.fromisoformat(ini), dt.date.fromisoformat(fim), bool(geracao), bool(etm))
+        except _recoleta.Falha as e:
+            return {"erro": str(e)}
+        rec.setdefault("respostas", []).append(r)
+        return {"ok": True, "chamadas": r.get("chamadas"), "restam": r.get("restam")}
+
+    def recoleta_montar(self, usina, geracao, etm, agora=None):
+        """As fatias recebidas viram células e passam pela MESMA montagem da conversão (a tela 2 de sempre)."""
+        rec = getattr(self, "_rec", None) or {}
+        m = (rec.get("mapa") or {}).get(usina)
+        if not m:
+            return {"erro": "Abra de novo a recoleta (a lista de usinas venceu)."}
+        self._convertendo.set()
+        try:
+            ctx = self.ctx()
+            destino = _recoleta.destino_de(ctx, usina)
+            cel, av = _recoleta.celulas(rec.get("respostas") or [], usina, destino, m, bool(geracao), bool(etm))
+            avisos = [montagem.Aviso(n, "Recoleta %s: %s" % (usina, t)) for n, t in av]
+            agora = agora or dt.datetime.now()
+            pasta = os.path.join(self.pasta_saida, agora.strftime("%d-%m"))
+            res = montagem.montar([(c, _recoleta.FONTE) for c in cel], ctx, pasta, carimbo=agora, avisos=avisos)
+        except Exception as e:                 # noqa: BLE001 — a tela mostra o motivo
+            traceback.print_exc()
+            return {"erro": "%s: %s" % (type(e).__name__, e)}
+        finally:
+            self._convertendo.clear()
+        res["totais"]["arquivos"] = 0
+        res["totais"]["separados"] = 0
+        res["hora"], res["origem"] = agora.strftime("%H:%M"), "recoleta"
+        res["recoleta"] = {"usina": usina, "celulas": len(cel)}
+        self.resultado = res
+        return self._fechar_resultado(res)
+
     def fechar(self):
         for destino, b in list(self.bds.items()):
             if self.origem_bd.get(destino) == "arquivo":
@@ -290,6 +370,22 @@ class SessaoNexus(Sessao):
         self.bds.clear()
         shutil.rmtree(self._tmp, ignore_errors=True)
         shutil.rmtree(self._pasta, ignore_errors=True)
+
+
+# ------------------------------------------------------------------------- a chave da recoleta
+# A plataforma só atende a recoleta a quem manda X-Recoleta-Chave. O .exe a lê de um arquivo na pasta da equipe; o Nexus
+# a calcula no próprio ambiente, sem nada no git: a CONVERSOR_RECOLETA_CHAVE, se a T.I. a puser no .env, ou um HMAC da
+# NEXUS_SSO_CHAVE (a mesma nos dois servidores, a da porta única) com um rótulo fixo. A plataforma aceita esse HMAC ao
+# lado da chave do .exe (`plataforma/recoleta_apipv.py`): mudou o rótulo aqui, muda lá.
+ROTULO_RECOLETA = b"nexus/coletas/recoleta/v1"
+
+
+def chave_recoleta(cfg):
+    v = str(cfg.get("CONVERSOR_RECOLETA_CHAVE") or os.environ.get("CONVERSOR_RECOLETA_CHAVE") or "").strip()
+    if v:
+        return v
+    sso = str(cfg.get("NEXUS_SSO_CHAVE") or "").strip()
+    return hmac.new(sso.encode("utf-8"), ROTULO_RECOLETA, hashlib.sha256).hexdigest() if sso else ""
 
 
 # ------------------------------------------------------------------------- as sessões de todo mundo

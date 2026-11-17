@@ -78,6 +78,15 @@ TORRE = Torre(
              "O que este relatório de portal, SCADA ou datalogger traz que ainda falta no BD, e onde colar?",
              "os arquivos que a pessoa solta; BD_Performance e BD_Thopen do banco (com o mapa de fórmulas da coleta) ou "
              "o Excel solto junto; os furos de coleta calculados do banco e das paradas do COS"),
+        # A recoleta pela fonte (17/11/2026, Levi no chat da Coleta: "quero formas de coletar os dados novamente pelas
+        # nossas fontes de dados e gerar uma planilha para colar nos BDs"; aqui: "pode!"): mora dentro da Coletas, mas é
+        # uma permissão à parte porque busca na fonte e gasta cota paga (a da API PV é dividida com a coleta da noite).
+        # Sem item no menu; marcar em Base > Acessos libera o botão "Recoletar pela API" e as rotas recoleta_*
+        Tela("coletas/recoleta", "Recoleta pelas fontes",
+             "O que falta no BD e dá para buscar de novo direto na fonte, sem baixar relatório?",
+             "a fonte de cada usina pela plataforma (hoje a API PV, conta principal); passa pela mesma montagem da "
+             "conversão e sai como planilha para colar",
+             dentro_de="coletas"),
         # O nome de cada fonte por extenso, de fontes.NOMES (Levi, 09/10/2026: "Quero as fontes por extenso também, não só sigla")
         Tela("clima", "Clima e risco",
              f"Onde há aviso do {F.extenso('inmet')}, foco de queimada ou risco de fogo perto das usinas?",

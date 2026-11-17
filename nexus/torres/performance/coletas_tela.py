@@ -12,7 +12,7 @@ import os
 import tempfile
 import uuid
 
-from flask import Response, abort, current_app, render_template, request, send_file, session
+from flask import Response, abort, current_app, redirect, render_template, request, send_file, session, url_for
 
 from ...cadastro.ligacoes import pasta_dados
 from ...dados.conexao import SemBanco, base_de
@@ -21,7 +21,17 @@ from . import TORRE, bp
 
 # Os métodos que a página do Conversor chama (os mesmos da Api do app.py do .exe, sem os da janela do Windows)
 METODOS = {"estado", "responder_usina", "separar", "dado_bruto", "remover", "limpar", "reler_bds", "converter",
-           "novo_lote", "lote_pronto", "furos_mural", "furos_paradas"}
+           "novo_lote", "lote_pronto", "furos_mural", "furos_paradas",
+           "recoleta_opcoes", "recoleta_fatias", "recoleta_parte", "recoleta_montar"}
+# A recoleta busca na fonte e gasta cota paga (a da API PV é dividida com a coleta da noite): só para quem tem a tela
+# "Recoleta pelas fontes" (por dentro da Coletas) em Base > Acessos. Levi, 17/11/2026: "pode!", com a permissão à parte.
+TELA_RECOLETA = "coletas/recoleta"
+
+
+def _pode_recoletar():
+    from ...auth import setor_telas
+    a = setor_telas.acesso()
+    return bool(a["tudo"]) or setor_telas.chave(TORRE.id, TELA_RECOLETA) in a["telas"]
 
 
 def _pasta(*partes):
@@ -87,7 +97,13 @@ def coletas():
 
 @bp.route("/coletas/app")
 def coletas_app():
-    return render_template("performance/coletas_app.html", tela=TORRE.tela("coletas"))
+    return render_template("performance/coletas_app.html", tela=TORRE.tela("coletas"), recoleta=_pode_recoletar())
+
+
+@bp.route("/coletas/recoleta")
+def coletas_recoleta():
+    """O endereço da permissão "Recoleta pelas fontes": a recoleta mora dentro da Coletas, na tela 1 do Conversor."""
+    return redirect(url_for("torre_performance.coletas"))
 
 
 @bp.route("/coletas/api/<metodo>", methods=["POST"])
@@ -99,6 +115,20 @@ def coletas_api(metodo):
     try:
         if metodo == "estado":
             return _json(s.estado())
+        if metodo.startswith("recoleta_"):
+            if not _pode_recoletar():
+                return _json({"erro": "A recoleta pela fonte gasta cota e é liberada por pessoa: peça a tela \"Recoleta "
+                                      "pelas fontes\" em Base > Acessos."}, 403)
+            app = current_app._get_current_object()
+            if metodo == "recoleta_opcoes":
+                return _json(s.recoleta_opcoes(servico.chave_recoleta(app.config),
+                                               lambda: servico.furos_portal(s, _fabrica_do_banco(app))))
+            if metodo == "recoleta_fatias":
+                return _json(s.recoleta_fatias(str(args[0]), str(args[1])))
+            if metodo == "recoleta_parte":
+                return _json(s.recoleta_parte(str(args[0]), str(args[1]), str(args[2]), bool(args[3]), bool(args[4]),
+                                              bool(args[5]) if len(args) > 5 else False))
+            return _json(s.recoleta_montar(str(args[0]), bool(args[1]), bool(args[2])))
         if metodo == "reler_bds":
             s.carregar_bds()
             return _json(s.estado())
