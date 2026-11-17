@@ -313,6 +313,6 @@ def visao_do_contrato_importar():
     tmp = p.with_suffix(".tmp")
     tmp.write_text(json.dumps(d, ensure_ascii=False), encoding="utf-8")
     os.replace(tmp, p)
-    session[_AVISO_CT] = (f"Planilha importada: {len(d['contratos'])} contratos e {len(d['obrigacoes'])} obrigações. "
-                          "A visão do contrato já mostra os dados dela.")
+    session[_AVISO_CT] = (f"Planilha importada: {len(d['contratos'])} contratos, {len(d['obrigacoes'])} obrigações e "
+                          f"{len(d.get('adicionais') or [])} serviços adicionais. A visão do contrato já mostra os dados dela.")
     return redirect(na_raiz(VISAO))

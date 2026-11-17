@@ -21,7 +21,13 @@ CAB_CAL = ["Carteira *", "Cliente\n(auto)", "Recorte\n(auto)", "Supervisor\n(aut
            "Data de\nentrega", "Evidência (link)", "Observações", "Dias até\nvencer"]
 
 
-def _planilha() -> bytes:
+CAB_ADIC = ["Carteira *", "Cliente\n(auto)", "Recorte\n(auto)", "Supervisor\n(auto)", "Usina", "Serviço executado *",
+            "Nº OS Fracttal", "Data de\nexecução *", "Pedido / aviso do cliente\n(quem, como, quando)", "Base contratual",
+            "Valor estimado\n(R$)", "Memória enviada\nem", "Resposta do\ncliente", "Valor aprovado\n(R$)", "BM / competência",
+            "Nº da NF", "Data do\nfaturamento", "Observações"]
+
+
+def _planilha(com_abas_novas: bool = True) -> bytes:
     wb = openpyxl.Workbook()
     wb.active.title = "LEIA-ME"
     ws = wb.create_sheet("Carteira")
@@ -56,6 +62,16 @@ def _planilha() -> bytes:
                "Mensal", d(2026, 12, 20), 5, "Supervisor de Contratos", "Não iniciado"])
     wc.append(["Beta GD | Todas", "Beta GD", "Todas", "Pessoa Um", "Reunião periódica com cliente", "Reunião de outubro",
                None, "Mensal", d(2026, 10, 20), 5, "Supervisor de Contratos", "Entregue", d(2026, 10, 20)])
+    # 17/11/2026: a sem vencimento (a planilha a leva à pauta como SEM DATA), a cancelada vencida (não é atraso) e dois
+    # entregáveis entregues, um no prazo e um com atraso
+    wc.append(["Beta GD | Todas", "Beta GD", "Todas", "Pessoa Um", "Documentação (SSMA, seguro, garantia, licença)",
+               "Apólice de seguro", None, "Anual", None, None, "Supervisor de Contratos", "A levantar"])
+    wc.append(["Beta GD | Todas", "Beta GD", "Todas", "Pessoa Um", "Entregável ao cliente (RMO, relatório)", "RMO cancelado",
+               None, "Mensal", d(2026, 9, 10), None, "Performance", "Cancelado / não se aplica"])
+    wc.append(["Beta GD | Todas", "Beta GD", "Todas", "Pessoa Um", "Entregável ao cliente (RMO, relatório)", "RMO de setembro",
+               None, "Mensal", d(2026, 10, 10), None, "Performance", "Entregue", d(2026, 10, 9)])
+    wc.append(["Beta GD | Todas", "Beta GD", "Todas", "Pessoa Um", "Entregável ao cliente (RMO, relatório)", "RMO de agosto",
+               None, "Mensal", d(2026, 9, 10), None, "Performance", "Entregue", d(2026, 9, 15)])
     wu = wb.create_sheet("Usinas")
     for _ in range(3):
         wu.append(["texto de cima"])
@@ -63,6 +79,30 @@ def _planilha() -> bytes:
     wu.append(["SA-ZZ100", "Solar Alfa", "Zeta 1", "PA", "Norte", "", ""])
     wu.append(["SA-AA100", "Solar Alfa", "Alfa 1", "PA", "Norte", "", ""])
     wu.append(["SA-SS100", "Solar Alfa", "Sul 1", "PR", "Sul", "", ""])
+    if com_abas_novas:
+        wa = wb.create_sheet("Adicionais")
+        wa.append(["E-CTR-04 · MEMÓRIA DE COBRANÇA DE ADICIONAIS"])
+        wa.append(["Prazo da memória: 10 dias após a execução"])
+        wa.append(CAB_ADIC)
+        wa.append(["Beta GD | Todas", "Beta GD", "Todas", "Pessoa Um", "Usina X", "Troca de fusíveis — EXEMPLO", None,
+                   d(2026, 9, 20), None, None, 1850])
+        linhas = [  # serviço, execução, estimado, memória enviada, resposta, aprovado, BM, faturamento
+            ("Hora extra noturna", d(2026, 10, 2), 1000, d(2026, 10, 5), "Aprovado", 900, "BM 20 (out/26)", d(2026, 11, 3)),
+            ("Frete de inversor", d(2026, 10, 9), 500, d(2026, 10, 12), "Aprovado parcial", 400, "BM 21 (nov/26)", None),
+            ("Troca de cabos", d(2026, 10, 10), 2000, d(2026, 10, 13), "Pendente", None, "BM 21 (nov/26)", None),
+            ("Roçagem extra", d(2026, 11, 1), 300, None, None, None, None, None),          # memória atrasada (11/11)
+            ("Limpeza extra", d(2026, 11, 10), None, None, None, None, None, None),        # memória a enviar (até 20/11)
+            ("Visita recusada", d(2026, 10, 20), 700, d(2026, 10, 21), "Reprovado", None, None, None)]
+        for serv, ex, est, mem, resp, apr, bm, fat in linhas:
+            wa.append(["Beta GD | Todas", "Beta GD", "Todas", "Pessoa Um", "Usina Beta 1", serv, "100", ex, None, None, est,
+                       mem, resp, apr, bm, None, fat])
+        wk = wb.create_sheet("Cadastros")
+        wk.append(["Cadastros e parâmetros"])
+        wk.append(["PARÂMETRO", "VALOR", "ORIGEM"])
+        for rot, v in (("Meta · entregáveis ao cliente no prazo", 0.95), ("Meta · obrigações vencidas em aberto (60 dias)", 0),
+                       ("Meta · adicionais executados e faturados", 0.9), ("Meta · cobertura de escopo (trimestral)", 1),
+                       ("Antecedência padrão de alerta (dias)", 7), ("Prazo da memória de cobrança (dias após execução)", 10)):
+            wk.append([rot, v, "Estrutura R02"])
     out = io.BytesIO()
     wb.save(out)
     return out.getvalue()
@@ -83,8 +123,9 @@ def test_le_a_carteira_juntando_o_contrato_de_cada_cliente():
     assert por["Beta GD"]["gestor"] == "Pessoa Um" and por["Beta GD"]["recortes"] == []
     assert por["Gama"]["nao_localizado"] and por["Gama"]["fim"] is None
     # a linha de exemplo da planilha ("— EXEMPLO") não entra
-    assert [o["descricao"] for o in d["obrigacoes"]] == ["Reunião de outubro", "BM 20 (competência out/26)",
-                                                        "Reajuste anual pelo IPCA", "Reunião mensal"]
+    assert [o["descricao"] for o in d["obrigacoes"]] == ["RMO cancelado", "RMO de agosto", "RMO de setembro",
+                                                        "Reunião de outubro", "BM 20 (competência out/26)",
+                                                        "Reajuste anual pelo IPCA", "Reunião mensal", "Apólice de seguro"]
 
 
 def test_a_planilha_errada_e_recusada():
@@ -124,7 +165,8 @@ def test_as_datas_de_renovacao_e_reajuste_e_o_que_esta_em_atraso():
     assert b["avisar_ate"] is None and b["proximo_reajuste"] is None and b["proxima_data"] == "2027-06-23"
     tons = {o["descricao"]: o["tom"] for o in d["obrigacoes"]}
     assert tons == {"BM 20 (competência out/26)": "critico", "Reajuste anual pelo IPCA": "alerta",
-                    "Reunião mensal": "neutro", "Reunião de outubro": "ok"}
+                    "Reunião mensal": "neutro", "Reunião de outubro": "ok", "Apólice de seguro": "sem_data",
+                    "RMO cancelado": "cancelado", "RMO de setembro": "ok", "RMO de agosto": "ok"}
     assert d["hoje"] == "2026-11-16"
 
 
@@ -141,7 +183,7 @@ def test_importar_e_ler_pela_tela(logado, tmp_path):
                     content_type="multipart/form-data")
     assert r.status_code == 302
     html = logado.get("/t/comando/visao-do-contrato").get_data(as_text=True)
-    assert "Planilha importada: 3 contratos e 4 obrigações" in html and "Dados <b>reais</b>" in html
+    assert "Planilha importada: 3 contratos, 8 obrigações e 6 serviços adicionais" in html and "Dados <b>reais</b>" in html
     assert (tmp_path / "contratos" / K.ARQUIVO).exists()
     j = logado.get("/t/comando/visao-do-contrato/dados.json").get_json()
     assert j["ok"] and [c["cliente"] for c in j["contratos"]] == ["Beta GD", "Gama", "Solar Alfa"]
@@ -168,6 +210,51 @@ def test_a_pagina_le_os_dados_do_nexus_e_nao_guarda_nenhum(cliente):
     r.close()
     assert '"../../t/comando/visao-do-contrato/dados.json"' in p and "function vTodos()" in p
     assert "Renovação: avisar até" in p and "Próximo reajuste" in p
-    assert "Sem dado real ainda" in p
+    # 17/11/2026: Entregáveis, Financeiro e Metas com o dado real; só o Atendimento diz que a planilha não tem
+    assert "Sem dado real ainda" not in p and "A planilha não tem o atendimento por usina" in p
+    assert "entregaveis: rEntregaveis, financeiro: rFinanceiro, metas: rMetas" in p
+    assert "Falta importar a planilha de novo" in p
     # o link da pasta só abre se for do SharePoint (a planilha é texto livre)
     assert r"/^https:\/\/[a-z0-9.-]+\.sharepoint\.com\//i" in p
+
+
+def test_le_as_abas_que_faltavam_com_as_regras_das_formulas_da_planilha():
+    """Levi, 17/11/2026: "na fonte que eu mandei não tem nada de atendimento, entregáveis, metas e financeiro???????????".
+    A planilha tem a Adicionais (o financeiro), a Cadastros (as metas) e, no Calendario, os entregáveis e as obrigações
+    sem data; o Nexus só lia 3 das 8 abas. As regras são as das fórmulas da planilha, com o hoje de quem abre."""
+    bruto = K.ler_planilha(_planilha())
+    assert bruto["abas"] == ["Carteira", "Calendario", "Usinas", "Adicionais", "Cadastros"]
+    assert bruto["parametros"] == {"meta_entregaveis": 0.95, "meta_vencidas": 0, "meta_adicionais": 0.9,
+                                   "meta_cobertura": 1, "alerta_padrao": 7, "prazo_memoria": 10}
+    d = K.com_datas(bruto, HOJE)
+    # a obrigação sem vencimento entra (era descartada) e vai por último
+    assert d["obrigacoes"][-1]["descricao"] == "Apólice de seguro" and d["obrigacoes"][-1]["tom"] == "sem_data"
+    # "conta no KPI de entregáveis": Entregável ou Medição, e não cancelado; "entregue no prazo": entrega até o vencimento
+    por = {o["descricao"]: o for o in d["obrigacoes"]}
+    assert [o["descricao"] for o in d["obrigacoes"] if o["entregavel"]] == [
+        "RMO de agosto", "RMO de setembro", "BM 20 (competência out/26)"]
+    assert (por["RMO de setembro"]["no_prazo"], por["RMO de agosto"]["no_prazo"],
+            por["BM 20 (competência out/26)"]["no_prazo"]) == (True, False, None)
+    assert por["RMO de setembro"]["mes"] == "2026-10" and por["Apólice de seguro"]["mes"] is None
+    # a cancelada vencida não é atraso
+    assert next(c for c in d["contratos"] if c["cliente"] == "Beta GD")["atrasadas"] == 0
+    # a Situação da memória de cobrança, coluna a coluna da fórmula; o exemplo não entra
+    sit = {a["servico"]: (a["situacao"], a["valor"], a["faturado"], a["mes"]) for a in d["adicionais"]}
+    assert sit == {"Hora extra noturna": ("Faturado", 900.0, True, "2026-10"),
+                   "Frete de inversor": ("Aprovado — faturar", 400.0, False, "2026-10"),
+                   "Troca de cabos": ("Aguardando cliente", 2000.0, False, "2026-10"),
+                   "Roçagem extra": ("Memória atrasada", 300.0, False, "2026-11"),
+                   "Limpeza extra": ("Memória a enviar", 0.0, False, "2026-11"),
+                   "Visita recusada": ("Reprovado", 700.0, False, "2026-10")}
+    assert d["abas"] == bruto["abas"]
+
+
+def test_a_planilha_sem_as_abas_novas_e_a_importacao_antiga_seguem_valendo():
+    """A revisão da planilha sem Adicionais e Cadastros importa; a importação de antes de 17/11/2026 (sem "abas") abre e a
+    página pede para importar de novo nas partes que dependem delas."""
+    bruto = K.ler_planilha(_planilha(com_abas_novas=False))
+    assert bruto["abas"] == ["Carteira", "Calendario", "Usinas"] and bruto["adicionais"] == [] and bruto["parametros"] == {}
+    antiga = {k: v for k, v in bruto.items() if k not in ("abas", "adicionais", "parametros")}
+    d = K.com_datas(antiga, HOJE)
+    assert d["abas"] == ["Carteira", "Calendario", "Usinas"] and d["adicionais"] == []
+    assert next(o for o in d["obrigacoes"] if o["descricao"] == "Reajuste anual pelo IPCA")["tom"] == "alerta"   # 7 dias padrão

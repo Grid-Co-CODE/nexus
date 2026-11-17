@@ -35,11 +35,26 @@ contratual e/ou ajuste contratual de 12 meses. Essas datas são importantes para
 pasta do Backoffice: "ATUALIZE AGORA COM DADOS REAIS!".
 
 - **A fonte é a planilha da própria área:** `Controle_Obrigacoes_Contratos_GridCo_R00.xlsx`, no SharePoint (Gridco › 4.
-  O&M › 17. Backoffice › 2. Contratos). As abas que entram:
+  O&M › 17. Backoffice › 2. Contratos). Ela tem 8 abas. As que entram:
   - **Carteira:** uma linha por cliente e recorte, com o supervisor, a vigência, a data-base e o índice do reajuste, o
     aviso prévio de renovação, o SLA, a pasta e as observações, tirados dos contratos pela área;
-  - **Calendario:** uma linha por obrigação, com o vencimento, o alerta, o executor e o status;
-  - **Usinas:** as usinas de cada cliente, do Fracttal.
+  - **Calendario:** uma linha por obrigação, com o vencimento, o alerta, o executor e o status. A linha **sem vencimento
+    entra** (a planilha a leva à pauta como SEM DATA);
+  - **Usinas:** as usinas de cada cliente, do Fracttal;
+  - **Adicionais** (desde 17/11/2026): a memória de cobrança (E-CTR-04), um serviço feito fora do valor fixo por linha,
+    com o valor, a resposta do cliente, o BM e a NF;
+  - **Cadastros** (desde 17/11/2026): as metas da Estrutura R02 (entregáveis no prazo 95%, vencidas em aberto 0,
+    adicionais faturados 90%, cobertura de escopo 100%), a antecedência padrão do alerta (7 dias) e o prazo da memória
+    (10 dias).
+
+  Adicionais e Cadastros são opcionais: a planilha sem elas ainda importa. **A Pauta_Semanal e a Indicadores_Mes não se
+  leem:** são somas por supervisor das colunas do Calendario e da Adicionais, e o Nexus soma as mesmas colunas por
+  contrato. O LEIA-ME é texto.
+
+  **Como isso foi descoberto (17/11/2026):** a tela dizia "Sem dado real ainda" em Atendimento, Entregáveis, Metas e
+  Financeiro, porque só 3 das 8 abas eram lidas. Levi: "na fonte que eu mandei não tem nada de atendimento, entregáveis,
+  metas e financeiro???????????". Tinha, menos o atendimento por usina. Antes de dizer que a fonte não traz, abra a fonte
+  inteira.
 
   O Nexus acha as colunas pelo nome, então a coluna pode mudar de lugar. A linha "— EXEMPLO" da planilha não entra.
 - **Onde mora.** O administrador importa a planilha na própria tela (`POST /t/comando/visao-do-contrato/importar`). O
@@ -51,8 +66,19 @@ pasta do Backoffice: "ATUALIZE AGORA COM DADOS REAIS!".
   - **Renovação:** avisar até o fim da vigência menos o aviso prévio.
   - **Próximo reajuste:** o 1º aniversário da data-base, contado a partir de 12 meses dela, que ainda não passou. Hoje
     conta, e 29/02 vira 28/02.
-  - Com elas vêm os dias até cada data, as obrigações em atraso e o tom de cada obrigação: entregue; atrasada; dentro do
-    "Alerta com antecedência" da própria linha (sem ele, 1 semana, a régua da prévia); prevista.
+  - Com elas vêm os dias até cada data e as obrigações em atraso.
+  - **As colunas que a planilha calcula por fórmula são refeitas no Nexus**, com o hoje de quem abre, porque as fórmulas
+    usam o HOJE() e o valor guardado pelo Excel é o do dia em que alguém salvou. Cada regra cita a fórmula em
+    `controle.py`:
+    - o semáforo (`tom`): entregue; cancelada; sem data; vencida; dentro do alerta da linha (sem ele, o da Cadastros);
+      no prazo;
+    - "conta no KPI de entregáveis" (`entregavel`): tipo Entregável ou Medição, e não cancelada;
+    - "entregue no prazo" (`no_prazo`): a entrega até o vencimento;
+    - a situação do adicional: Faturado; Reprovado; Memória atrasada ou a enviar (a execução mais 10 dias); Aprovado,
+      faturar; Aguardando cliente. O valor é o aprovado, ou o estimado.
+  - **Prova de 17/11/2026** com a planilha real e o hoje que o Excel usou (10/11/2026): 75 de 75 obrigações e 8 de 8
+    adicionais iguais às colunas da planilha. Outubro somado por supervisor bate com a Indicadores_Mes (Marcelo
+    Martineli: 1 entregável, 0 no prazo; Danuth Fernandes: 3 adicionais, R$ 9.054).
   - O gestor do contrato é o supervisor da linha "Contrato (nível geral)"; sem essa linha, o supervisor único do cliente.
     As outras linhas viram as carteiras, cada uma com o supervisor e as usinas dela.
 - **A página (`static/previa/visao-do-contrato.html`)** pede os dados ao Nexus. Sem resposta (fora do Nexus ou sem
@@ -64,8 +90,14 @@ pasta do Backoffice: "ATUALIZE AGORA COM DADOS REAIS!".
     planilha;
   - **Regras** traz as quatro que a planilha tem (vigência, renovação, reajuste, SLA); **Calendário** traz as obrigações
     reais (o mês, as atrasadas, as próximas e a lista inteira);
-  - Atendimento, Entregáveis, Metas e Financeiro dizem "Sem dado real ainda": a planilha não traz, e o exemplo fictício
-    não se mistura com o contrato de verdade.
+  - **Entregáveis:** as linhas que contam no KPI de entregáveis, com a situação e a data de entrega;
+  - **Financeiro:** os serviços adicionais (executado, faturado, a faturar, memória atrasada) e as medições (BM). A
+    planilha não traz a mensalidade nem o valor do contrato, e a tela diz isso;
+  - **Metas:** as contas da Indicadores_Mes só do contrato, mês a mês (o entregável no mês do vencimento, o adicional no da
+    execução), contra as metas da Cadastros, e as vencidas em aberto hoje. A cobertura de escopo é manual na planilha,
+    por supervisor, e não entra;
+  - **Atendimento:** a planilha não tem o atendimento por usina, e a tela diz isso e aponta onde está o que ela tem;
+  - a importação de antes de 17/11/2026 não tem Adicionais nem Cadastros: Financeiro e Metas pedem para importar de novo.
 - **Navegar (17/11/2026, Levi: "ARRUME ESSA LISTA FEIA, DEIXE NO PADRÃO NEXUS", "Não tá pegando tema claro" e "As
   linhas de clientes devem ser clicáveis com um botão de voltar!")**:
   - a troca de contrato é a lista do Nexus (a da busca de usina), não a nativa do navegador: o cliente, o gestor embaixo,
@@ -78,8 +110,8 @@ pasta do Backoffice: "ATUALIZE AGORA COM DADOS REAIS!".
     acompanha a troca ao vivo (MutationObserver); em tela cheia, o cookie `nexus_tema`. Os tokens do claro são cópia do
     bloco `:root[data-tema="claro"]` do `nexus.css`: mudou lá, muda aqui. Cor fixa não entra (nem nos gráficos SVG do
     exemplo: a cor vai no `style`, com `var()`).
-- **Medido em 16/11/2026** com a planilha real: 16 contratos e 60 obrigações. Batem com as colunas automáticas da
-  planilha, por exemplo:
+- **Medido em 16/11/2026** com a planilha real: 16 contratos e 60 obrigações com vencimento (75 com as 15 sem data, que
+  entraram em 17/11/2026), e 8 serviços adicionais. Batem com as colunas automáticas da planilha, por exemplo:
   - Athon: vigência vencida em 25/08/2026 e próximo reajuste em 25/02/2027;
   - Élis: reajuste em 01/12/2026.
 - Prova: `tests/test_contratos_controle.py`, com uma planilha inventada (mesmas abas e colunas, nada real).
