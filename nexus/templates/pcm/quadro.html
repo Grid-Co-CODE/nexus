@@ -90,62 +90,68 @@
 {% endif %}
 
 {% if sem %}
-{# Os filtros (27/10/2026, Levi: "melhor posicionamento dos filtros acima para ter mais espaço na tela para ver o card das
-   OSs"; "prefiro fundo transparente e o buscar em baixo isolado dos opcionais"; "quero poder escolher mais de uma opção"):
-   cada filtro é um chip sem fundo que abre a lista com caixas de marcar (aplica ao fechar a lista ou no "Aplicar"); a
-   conta da semana e as Reprogramações na mesma linha; a busca embaixo, sozinha. Vários valores vão repetidos na URL
-   (`tipo=MPA&tipo=MPM`) e o `quadro.varios` os lê. #}
-<form class="q-barra" method="get" data-q-barra>
+{# Os filtros no modelo A do Histórico de OS (16/11/2026, Levi: "Quadro da semana quero os filtros no mesmo padrão de
+   qualidade e funcionalidades do filtro de Histórico de OS > OS Creator!"): a barra de uma linha (a busca, o botão Filtros
+   com a contagem e as Reprogramações), as etiquetas do que está aplicado, cada uma com o × que tira só aquela, e o painel
+   com os seis campos e o Aplicar no rodapé. Nada filtra antes do Aplicar; fechar sem aplicar descarta. A cascata (cada
+   lista só com o que existe com os outros filtros) é recontada na página enquanto se marca, pelas linhas de `q.painel`
+   (`quadro.painel_filtros`); o comportamento está em static/pcm-quadro-filtros.js. Vários valores vão repetidos na URL
+   (`tipo=MPA&tipo=MPM`) e o `quadro.varios` os lê. De 27/10 a 16/11/2026 cada filtro era um chip que aplicava ao fechar. #}
+<form class="q-barra" method="get" action="{{ raiz }}/t/pcm/quadro" data-q-barra>
   <input type="hidden" name="semana" value="{{ sem.week }}">
   {% if rodada %}<input type="hidden" name="rodada" value="{{ rodada }}">{% endif %}
-  <div class="q-barra-l">
-  {% for campo, rot, todos in [("equipe", "Equipe", "Todas"), ("resp", "Responsável", "Todos"), ("cliente", "Cliente", "Todos"),
-                               ("tipo", "Tipo", "Todos"), ("estado", "Situação", "Todas"), ("turno", "Turno", "Todos")] %}
-  {% set sel = (filtros[campo] or '').split('|') | reject('equalto', '') | list %}
-  <details class="q-ms{% if sel %} q-ms--ativo{% endif %}" data-ms>
-    <summary><span class="q-ms-r">{{ rot }}</span><span class="q-ms-v">{% if not sel %}{{ todos }}{% elif sel|length == 1 %}{{ sel[0] }}{% else %}{{ sel|length }} escolhidos{% endif %}</span><i class="ph ph-caret-down"></i></summary>
-    <div class="q-ms-caixa" role="group" aria-label="{{ rot }}">
+  <div class="qf-barra" id="qf_barra">
+    <label class="q-busca qf-busca"><i class="ph ph-magnifying-glass" aria-hidden="true"></i>
+      <input id="q" name="q" value="{{ filtros.q or '' }}" placeholder="Buscar OS, usina, tarefa, equipamento…" autocomplete="off"
+             aria-label="Buscar" enterkeyhint="search"></label>
+    <button type="button" class="qf-btn" id="qf_botao" aria-haspopup="dialog" aria-expanded="false" aria-controls="qf_painel"><i class="ph ph-funnel-simple" aria-hidden="true"></i>Filtros<span class="qf-badge" id="qf_n"{% if not etiquetas %} hidden{% endif %}>{{ etiquetas|length }}</span></button>
+    {% if rp_url %}<a class="gc-btn gc-btn--ui gc-btn--contorno q-rp-link" href="#reprogramacoes" data-rp-abrir
+       title="Reprogramações da semana em curso"><i class="ph ph-list-checks"></i> Reprogramações</a>{% endif %}
+    <div class="qf-veu" id="qf_veu" hidden></div>
+    <div class="qf-painel" id="qf_painel" role="dialog" aria-label="Filtros" tabindex="-1" hidden>
+      <div class="qf-painel-topo"><h2>Filtros</h2>
+        <button type="button" class="qf-fechar" id="qf_fechar" aria-label="Fechar os filtros sem aplicar"><i class="ph ph-x" aria-hidden="true"></i></button></div>
+      <div class="qf-painel-corpo"><div class="qf-grade">
+      {% for campo, rot, todos, plural in campos_painel %}
+      {% set sel = (filtros[campo] or '').split('|') | reject('equalto', '') | list %}
+      {% set conta = dict(q.opcoes[campo]) %}
       {% set da_fama = (q.opcoes_fora or {}).get(campo) or {} %}
-      {% for v, n in q.opcoes[campo] %}
-      <label class="q-ms-op"><input type="checkbox" name="{{ campo }}" value="{{ v }}"{% if v in sel %} checked{% endif %}>
-        <span>{{ v }}</span><small class="gc-num">{{ n }}</small>{% if da_fama.get(v) %}<small class="q-ms-fama">+{{ da_fama[v] }} FAMA</small>{% endif %}</label>
-      {% else %}<p class="q-ms-vazio">Nada para escolher com os outros filtros.</p>{% endfor %}
-      <div class="q-ms-pe"><button type="button" class="q-ms-nenhum" data-ms-nenhum>Desmarcar</button>
-        <button type="submit" class="gc-btn gc-btn--ui gc-btn--primario">Aplicar</button></div>
+      <div class="qf-cel" data-filtro="{{ campo }}">
+        <span class="qf-rot" id="qf_rot_{{ campo }}">{{ rot }}</span>
+        <details class="qf-multi{% if sel %} qf-tem{% endif %}" data-nome="{{ campo }}">
+          <summary aria-labelledby="qf_rot_{{ campo }} qf_val_{{ campo }}"><span class="qf-multi-txt" data-todos="{{ todos }}" data-plural="{{ plural }}" id="qf_val_{{ campo }}">{% if not sel %}{{ todos }}{% elif sel|length == 1 %}{{ sel[0] }}{% else %}{{ sel|length }} {{ plural }}{% endif %}</span><i class="ph ph-caret-down" aria-hidden="true"></i></summary>
+          <div class="qf-lista" role="group" aria-labelledby="qf_rot_{{ campo }}">
+            <input type="search" class="qf-lista-busca" placeholder="Digite para filtrar…" autocomplete="off" spellcheck="false"
+                   aria-label="Filtrar {{ rot|lower }}">
+            {% for v in q.painel.valores[campo] %}
+            <label class="qf-op"{% if v not in conta %} hidden{% endif %} title="{{ v }}">
+              <input type="checkbox" name="{{ campo }}" value="{{ v }}"{% if v in sel %} checked{% endif %}>
+              <span>{{ v }}</span><small class="gc-num">{{ conta.get(v, 0) }}</small>{% if da_fama.get(v) %}<small class="q-ms-fama">+{{ da_fama[v] }} FAMA</small>{% else %}<small class="q-ms-fama" hidden></small>{% endif %}</label>
+            {% endfor %}
+            <p class="qf-vazio"{% if conta %} hidden{% endif %}>Nada para escolher com os outros filtros.</p>
+          </div>
+        </details>
+      </div>
+      {% endfor %}
+      </div></div>
+      <div class="qf-rodape">
+        <button type="button" class="gc-btn gc-btn--fantasma qf-limpar" id="qf_limpar">Limpar</button>
+        <div class="qf-dir"><span id="qf_nalt" aria-live="polite">Sem alterações</span>
+          <button type="button" class="gc-btn gc-btn--primario" id="qf_aplicar" disabled>Aplicar</button></div>
+      </div>
     </div>
-  </details>
-  {% endfor %}
-  {% if tem_filtro %}<a class="q-limpar" href="{{ (url_limpar)|na_raiz }}"><i class="ph ph-x"></i> Limpar</a>{% endif %}
+  </div>
+  <div class="qf-etiquetas" id="qf_etiquetas" role="group" aria-label="Filtros aplicados"{% if not etiquetas %} hidden{% endif %}>
+    {% for e in etiquetas %}<span class="qf-chip" data-filtro="{{ e.campo }}"><i>{{ e.rot }}</i> <span class="qf-chip-v" title="{{ e.todos }}">{{ e.texto }}</span><a class="qf-chip-x" href="{{ (e.href)|na_raiz }}" aria-label="Tirar o filtro {{ e.rot }}: {{ e.texto }}"><i class="ph ph-x" aria-hidden="true"></i></a></span>
+    {% endfor %}<a class="qf-link" id="qf_limpar_tudo" href="{{ (url_limpar)|na_raiz }}">Limpar tudo</a>
+  </div>
   <p class="pcm-conta q-conta"><b class="gc-num">{{ q.total }}</b>{% if q.total != q.total_semana %} de {{ q.total_semana }}{% endif %}
     tarefas · {{ q.horas }}{% if q.novas is not none %} · <b class="gc-num">{{ q.novas }}</b>
     {{ 'criada' if q.novas == 1 else 'criadas' }} após o plano{% endif %}{% if q.sem_dia %} · {{ q.sem_dia }} sem dia{% endif %}{% if q.fama and q.fama.total_semana %} · <b class="gc-num">{{ q.fama.total }}</b>{% if q.fama.total != q.fama.total_semana %} de {{ q.fama.total_semana }}{% endif %} OS da FAMA{% if q.fama.gravado_em %} · livro da FAMA gravado em {{ q.fama.gravado_em }}{% endif %}{% endif %}{% if filtro_gestor %} · filtrado em
     {{ filtros.resp }}, o gestor de contrato que entrou{% endif %}</p>
-  {% if rp_url %}<a class="gc-btn gc-btn--ui gc-btn--contorno q-rp-link" href="#reprogramacoes" data-rp-abrir
-     title="Reprogramações da semana em curso"><i class="ph ph-list-checks"></i> Reprogramações</a>{% endif %}
-  </div>
-  <label class="q-busca"><i class="ph ph-magnifying-glass" aria-hidden="true"></i>
-    <input id="q" name="q" value="{{ filtros.q or '' }}" placeholder="Buscar OS, usina, tarefa, equipamento…" autocomplete="off"
-           aria-label="Buscar"></label>
 </form>
-<script>
-  /* os chips de múltipla escolha: um aberto por vez; clicar fora ou Esc fecha; fechar com a escolha mudada aplica */
-  (function () {
-    var f = document.querySelector("[data-q-barra]"); if (!f) return;
-    var chips = Array.prototype.slice.call(f.querySelectorAll("[data-ms]"));
-    function estado(d) { return Array.prototype.map.call(d.querySelectorAll("input:checked"), function (i) { return i.value; }).join("|"); }
-    chips.forEach(function (d) {
-      d.dataset.antes = estado(d);
-      d.addEventListener("toggle", function () {
-        if (d.open) { chips.forEach(function (o) { if (o !== d) o.open = false; }); return; }
-        if (estado(d) !== d.dataset.antes) f.submit();
-      });
-      var nenhum = d.querySelector("[data-ms-nenhum]");
-      if (nenhum) nenhum.addEventListener("click", function () { d.querySelectorAll("input").forEach(function (i) { i.checked = false; }); });
-    });
-    document.addEventListener("click", function (ev) { chips.forEach(function (d) { if (d.open && !d.contains(ev.target)) d.open = false; }); });
-    document.addEventListener("keydown", function (ev) { if (ev.key === "Escape") chips.forEach(function (d) { if (d.open) { d.open = false; d.querySelector("summary").focus(); } }); });
-  })();
-</script>
+<script type="application/json" id="qf_dados">{{ q.painel|tojson }}</script>
+<script src="{{ url_for('static', filename='pcm-quadro-filtros.js') }}"></script>
 
 {# O cartão da OS da FAMA (11/11/2026, fase 1): só de leitura (sem a janela de reprogramar, que é da programação), com a
    borda tracejada de quem não está na programação, a marca FAMA e a severidade em cor e palavra. Não conta no número nem

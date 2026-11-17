@@ -601,6 +601,41 @@ def opcoes_com_outras(rows: list[dict], outras: list[dict], filtros: dict | None
     return out, contas
 
 
+# Os campos do painel de filtros (16/11/2026, o modelo A do Histórico de OS): (campo, rótulo, o "todos" e o plural do
+# "N selecionad..."), na ordem da tela. Equipe e Situação são femininas, como "3 selecionadas" da Usina no Histórico.
+CAMPOS_PAINEL = (("equipe", "Equipe", "Todas", "selecionadas"), ("resp", "Responsável", "Todos", "selecionados"),
+                 ("cliente", "Cliente", "Todos", "selecionados"), ("tipo", "Tipo", "Todos", "selecionados"),
+                 ("estado", "Situação", "Todas", "selecionadas"), ("turno", "Turno", "Todos", "selecionados"))
+
+
+def painel_filtros(rows: list[dict], outras: list[dict], filtros: dict | None = None) -> dict:
+    """O que o painel de filtros precisa para recontar a cascata na página, enquanto a pessoa marca (16/11/2026): com o
+    Aplicar do modelo A, nada vai ao servidor até o fim, e a lista montada pelo servidor diria as contas do que já estava
+    aplicado (escolhida a RN Sul 01 no painel, o Tipo seguiria oferecendo o que só a SP Leste 02 tem). Vão as linhas da
+    semana com a busca aplicada (ela vale para todos os filtros e só muda pelo servidor), uma por tarefa, em números: o
+    índice do valor de cada campo em `valores` (-1 = sem valor, que nenhum filtro lista). `fora` são as `outras` (as OS da
+    FAMA), contadas à parte como no `opcoes_com_outras`. Os `valores` de cada campo são todos os da busca, na ordem do
+    `opcoes`, e mais os escolhidos que ela não tem (a tela não esconde o filtro que vale): a página só esconde e reconta."""
+    filtros = filtros or {}
+    so_busca = {"q": filtros.get("q")}
+    linhas, fora = filtrar(rows, so_busca), filtrar(outras or [], so_busca)
+    valores = {}
+    for campo, valor_de in _DO_FILTRO.items():
+        tem = {valor_de(r) for r in linhas + fora} - {""}
+        ordem = {"estado": ESTADOS, "turno": TURNOS_CARTAO}.get(campo)
+        lista = [v for v in ordem if v in tem] if ordem else sorted(tem, key=_norm)
+        for escolhido in sorted(varios(filtros.get(campo)), key=_norm):
+            if escolhido not in lista:
+                lista.append(escolhido)
+        valores[campo] = lista
+    indice = {c: {v: i for i, v in enumerate(lst)} for c, lst in valores.items()}
+
+    def _numeros(r):
+        return [indice[c].get(valor_de(r), -1) for c, valor_de in _DO_FILTRO.items()]
+    return {"campos": list(_DO_FILTRO), "valores": valores, "linhas": [_numeros(r) for r in linhas],
+            "fora": [_numeros(r) for r in fora]}
+
+
 # Vários valores por filtro (27/10/2026, Levi: "nos filtros também quero poder escolher mais de uma opção"): cada um aceita
 # valores, separados por "|" no valor (a tela manda `equipe=A&equipe=B`, e o `telas._ctx_quadro` junta). O "|" não
 # aparece em equipe, responsável, cliente, tipo, situação nem turno; os links e a fila de reprogramação levam o valor
@@ -828,7 +863,8 @@ def montar(sem: dict, publicadas: list[dict], filtros: dict, todos: bool = False
             "pend_total": len(sem.get("pendentes") or []), "pend_sel": len(pend),
             "horas": _horas(sum(_num(r.get("duracao")) for r in sel)), "tem_criacao": tem_criacao,
             "novas": sum(1 for r in sel if criada_apos_o_plano(r, janela)) if tem_criacao else None,
-            "janela": janela, "opcoes": op, "opcoes_fora": op_fora}
+            "janela": janela, "opcoes": op, "opcoes_fora": op_fora,
+            "painel": painel_filtros(rows, list(outras_opcoes or []), filtros)}
 
 
 # ── a fila que volta da página ──────────────────────────────────────────────────────────────────────────────

@@ -2,8 +2,9 @@
 quero poder escolher mais de uma opção"; "quero o mesmo [a exclamação dos Extintores] para ocultar esse texto enorme").
 
 O que estes testes seguram: `quadro.varios` lê "A|B"; o `filtrar`, as pendentes e as opções aceitam vários valores; a tela
-lê a URL repetida (`tipo=MPA&tipo=MPM`) e também o "A|B" que os links das semanas levam; o chip diz quantos foram
-escolhidos e deixa as caixas marcadas; os textos longos estão na exclamação e não soltos na página."""
+lê a URL repetida (`tipo=MPA&tipo=MPM`) e também o "A|B" que os links das semanas levam; o campo do painel de filtros
+diz quantos foram escolhidos e deixa as caixas marcadas (desde 16/11/2026 os filtros estão no modelo A do Histórico de OS:
+`test_pcm_quadro_filtros_painel.py`); os textos longos estão na exclamação e não soltos na página."""
 from datetime import date
 
 from nexus.pcm import quadro as Q
@@ -41,7 +42,7 @@ def test_tela_le_a_url_repetida_e_o_valor_dos_links(app, logado, tmp_path, monke
     app.config.update(NEXUS_PCM_FONTE=str(_banco(tmp_path)), NEXUS_PCM_TRABALHO=str(tmp_path / "trab"))
     html = logado.get("/t/pcm/quadro?semana=2026-W41&tipo=MPA&tipo=MPM").get_data(as_text=True)
     assert html.count("data-cartao=") == 3
-    assert "2 escolhidos" in html and 'class="q-ms q-ms--ativo"' in html
+    assert ">2 selecionados</span>" in html and 'class="qf-multi qf-tem" data-nome="tipo"' in html
     assert 'name="tipo" value="MPA" checked' in html and 'name="tipo" value="MPM" checked' in html
     # os links das semanas levam os filtros como "MPA|MPM", e a tela os lê do mesmo jeito
     assert "tipo=MPA%7CMPM" in html
@@ -49,7 +50,7 @@ def test_tela_le_a_url_repetida_e_o_valor_dos_links(app, logado, tmp_path, monke
     assert html.count("data-cartao=") == 3
 
 
-def test_tela_tem_a_exclamacao_e_a_busca_embaixo(app, logado, tmp_path, monkeypatch):
+def test_tela_tem_a_exclamacao_e_a_busca_na_barra_fora_do_painel(app, logado, tmp_path, monkeypatch):
     monkeypatch.setattr(Q, "hoje", lambda: date(2026, 10, 7))
     app.config.update(NEXUS_PCM_FONTE=str(_banco(tmp_path)), NEXUS_PCM_TRABALHO=str(tmp_path / "trab"))
     html = logado.get("/t/pcm/quadro").get_data(as_text=True)
@@ -57,6 +58,7 @@ def test_tela_tem_a_exclamacao_e_a_busca_embaixo(app, logado, tmp_path, monkeypa
     # os textos longos estão na exclamação (o details do aviso), não num parágrafo solto antes dos filtros
     assert 'class="gc-explica"' in topo and "Como o Quadro lê e conta a semana" in topo
     assert "sábado 03/10 00:00" in topo and 'class="pcm-fonte"' not in topo
-    # a busca vem depois dos chips, sozinha
+    # a busca fica na barra, isolada dos opcionais: eles moram no painel de filtros (16/11/2026, o modelo A)
     barra = html.split('class="q-barra"', 1)[1].split("</form>", 1)[0]
-    assert barra.index('data-ms') < barra.index('name="q"')
+    assert barra.index('name="q"') < barra.index('id="qf_painel"')
+    assert 'name="q"' not in barra.split('id="qf_painel"', 1)[1]

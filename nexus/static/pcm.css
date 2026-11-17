@@ -1698,15 +1698,13 @@ details.inv-card:not([open])>summary{border-bottom:0}
      reprogramações o que o arquivo é e quando vale) foram para a exclamação amarela da Segurança (`hseq/_legenda.html`,
      estilo no hseq.css, que a página carrega): "quero o mesmo para ocultar esse texto enorme". Os erros seguem à vista.
    - Os filtros: "melhor posicionamento dos filtros acima para ter mais espaço na tela para ver o card das OSs"; "esse
-     fundo azul tá escroto, prefiro fundo transparente e o buscar em baixo isolado dos opcionais"; "nos filtros também quero
-     poder escolher mais de uma opção". Cada filtro é um chip sem fundo que abre a lista com caixas de marcar; o escolhido
-     fica verde; a busca vem sozinha embaixo; a conta da semana e as Reprogramações ficam na linha dos chips.
+     fundo azul tá escroto, prefiro fundo transparente"; "nos filtros também quero poder escolher mais de uma opção". Desde
+     16/11/2026 estão no modelo A do Histórico de OS (a seção "QUADRO: os filtros no modelo A", logo abaixo).
    - O cartão: "um tamanho padrão por OS"; o "Reprog." ao lado do tipo (MPM, MPA, PREVENTIVA...); depois a usina e o título
      em até duas linhas; o texto 20% menor e a altura junto (112 px). O motivo, quando há, vai na linha do tipo, cortado em
      "…" (o inteiro no title), para não reservar uma linha vazia ("tá sobrando um pouco de espaço abaixo, junta mais").
    - Os números do topo de cada dia saíram da fonte de título ("todos tortos") para a do texto, em negrito, 30% menores.
-   - As colunas mostram 4 OS por vez ("limite em 4 OSs por coluna"), com rolagem própria e a barra fina do Nexus.
-   Abaixo de 640 px os chips ficam dois por linha e a lista abre presa ao pé da tela. */
+   - As colunas mostram 4 OS por vez ("limite em 4 OSs por coluna"), com rolagem própria e a barra fina do Nexus. */
 .q-topo{align-items:center;margin-bottom:10px}
 .q-titulo{display:flex;align-items:center;gap:10px}
 .q-titulo .titulo-pagina{margin:0}
@@ -1715,44 +1713,126 @@ details.inv-card:not([open])>summary{border-bottom:0}
 .rp-cab .rp-sub{margin:0}
 
 .q-barra{display:grid;gap:8px;margin:0 0 10px}
-.q-barra-l{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
 .q-busca{display:flex;align-items:center;gap:6px;max-width:560px;height:34px;padding:0 10px;border:1px solid var(--linha);
   border-radius:var(--raio-tag);color:var(--mudo)}
 .q-busca:focus-within{border-color:var(--verde-a35)}
 .q-busca input{flex:1;min-width:0;border:0;outline:0;background:transparent;color:var(--tinta);font:500 13px var(--font-sans)}
-.q-limpar{display:inline-flex;align-items:center;gap:4px;height:32px;padding:0 10px;font:600 12.5px var(--font-sans);
-  color:var(--mudo);text-decoration:none}
-.q-limpar:hover{color:var(--tinta)}
 /* a conta quebra a linha só quando não cabe: presa numa linha (nowrap), a conta com a FAMA ("N de M OS da FAMA · livro da
    FAMA gravado em ...", 11/11/2026) alargava o quadro de 641 a 673 px e com o menu ao lado, e a página rolava de lado */
-.q-conta{margin:0 4px 0 auto;font-size:12.5px}
+.q-conta{margin:0;font-size:12.5px}
 .q-conta b{color:var(--tinta);font-weight:700}
-.q-barra .q-rp-link{margin:0;height:32px;padding:0 12px}
-.q-ms{position:relative}
-.q-ms>summary{list-style:none;display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 10px;border:1px solid var(--linha);
-  border-radius:var(--raio-tag);cursor:pointer;font:500 13px var(--font-sans);color:var(--tinta);white-space:nowrap}
-.q-ms>summary::-webkit-details-marker{display:none}
-.q-ms>summary:hover{border-color:var(--linha-forte)}
-.q-ms>summary:focus-visible{outline:2px solid var(--foco);outline-offset:2px}
-.q-ms-r{font:700 10px/1 var(--font-sans);letter-spacing:.05em;text-transform:uppercase;color:var(--mudo)}
-.q-ms-v{max-width:150px;overflow:hidden;text-overflow:ellipsis}
-.q-ms>summary i{font-size:12px;color:var(--mudo);transition:transform .15s}
-.q-ms[open]>summary i{transform:rotate(180deg)}
-.q-ms--ativo>summary{border-color:var(--verde-a35);color:var(--verde-texto)}
-.q-ms--ativo .q-ms-r{color:var(--verde-texto)}
-.q-ms-caixa{position:absolute;z-index:40;top:calc(100% + 6px);left:0;min-width:240px;max-width:340px;padding:6px;
-  max-height:min(380px,calc(100vh - 220px));overflow:auto;border:1px solid var(--linha-forte);border-radius:var(--raio-md);
-  background:var(--superficie-3);box-shadow:0 8px 24px var(--sombra)}
-.q-ms-op{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:6px;font-size:13px;color:var(--tinta);cursor:pointer}
-.q-ms-op:hover{background:var(--superficie-2)}
-.q-ms-op span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.q-ms-op small{color:var(--mudo);font-size:11.5px}
-.q-ms-op input{accent-color:var(--verde-texto);margin:0}
-.q-ms-vazio{margin:6px 8px;font-size:12.5px;color:var(--mudo)}
-.q-ms-pe{position:sticky;bottom:-6px;display:flex;justify-content:space-between;align-items:center;gap:8px;margin:6px -6px -6px;
-  padding:8px;border-top:1px solid var(--linha);background:var(--superficie-3)}
-.q-ms-nenhum{border:0;background:transparent;color:var(--mudo);font:600 12.5px var(--font-sans);cursor:pointer;padding:4px}
-.q-ms-nenhum:hover{color:var(--tinta)}
+.q-barra .q-rp-link{margin:0 0 0 auto;height:34px;padding:0 12px}
+
+/* ── QUADRO: os filtros no modelo A do Histórico de OS (16/11/2026) ──────────────────────────────────────────────────────
+   Levi: "Quadro da semana quero os filtros no mesmo padrão de qualidade e funcionalidades do filtro de Histórico de OS > OS
+   Creator!". O desenho é o do Histórico (os.css, "HISTÓRICO: os filtros no modelo A"): a barra de uma linha, as etiquetas do
+   que está aplicado logo abaixo e o painel suspenso preso ao botão Filtros, com os campos em duas colunas e o Aplicar no
+   rodapé; no celular, a folha de baixo para cima. As cores são as do Nexus, como as da Gestão PCM: o verde é a ação (o
+   Aplicar, a contagem do botão, o ponto do que mudou, pelo --foco, que no claro é o musgo) e também o escolhido (a
+   etiqueta e a marca da lista, no verde suave); o preto, o azul e o lima do OS Creator não entram (a Zeladoria, 03/11/2026:
+   "bote aquele azul nexus para ficar no padrão nexus"). Os controles que nascem com [hidden] no HTML têm a regra própria:
+   o display das classes venceria o atributo. */
+.qf-barra{position:relative;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.qf-busca{flex:1 1 260px;min-width:200px}
+.qf-btn{display:inline-flex;align-items:center;gap:8px;height:34px;padding:0 12px;border:1px solid var(--linha);
+  border-radius:var(--raio-tag);background:transparent;color:var(--tinta);font:500 13px var(--font-sans);white-space:nowrap;cursor:pointer}
+.qf-btn:hover{border-color:var(--linha-forte)}
+.qf-btn[aria-expanded="true"]{border-color:var(--foco)}
+.qf-btn>i{font-size:15px;color:var(--mudo)}
+.qf-btn:focus-visible,.qf-chip-x:focus-visible,.qf-link:focus-visible,.qf-fechar:focus-visible,
+.qf-multi>summary:focus-visible{outline:2px solid var(--foco);outline-offset:2px}
+.qf-badge{display:inline-grid;place-items:center;min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:var(--verde);
+  color:var(--sobre-verde);font:700 11px/1 var(--font-sans)}
+.qf-badge[hidden]{display:none}
+/* as etiquetas: uma por filtro aplicado; o × tira aquele filtro e aplica na hora (é um link) */
+.qf-etiquetas{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.qf-etiquetas[hidden]{display:none}
+.qf-chip{display:inline-flex;align-items:center;gap:6px;max-width:100%;height:28px;padding:0 4px 0 11px;border-radius:999px;
+  background:var(--verde-suave);border:1px solid var(--verde-a60);color:var(--tinta);font-size:12.5px}
+.qf-chip>i{font-style:normal;color:var(--mudo)}
+.qf-chip-v{max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.qf-chip-x{display:grid;place-items:center;flex:none;width:22px;height:22px;border-radius:50%;color:var(--mudo);text-decoration:none}
+.qf-chip-x:hover{background:var(--verde);color:var(--sobre-verde)}
+.qf-chip-x i{font-size:12px}
+.qf-link{padding:4px 2px;color:var(--verde-texto);font-size:12.5px;font-weight:600;text-decoration:none}
+.qf-link:hover{text-decoration:underline}
+/* o painel suspenso */
+.qf-painel{position:absolute;top:calc(100% + 8px);left:0;z-index:40;width:560px;max-width:100%;box-sizing:border-box;padding:16px;
+  border-radius:var(--raio-md);background:var(--superficie);border:1px solid var(--linha-forte);box-shadow:0 18px 50px var(--sombra);
+  color:var(--tinta)}
+.qf-painel[hidden]{display:none}
+.qf-painel:focus{outline:none}
+.qf-painel-topo{display:flex;align-items:center;justify-content:space-between;margin:0 0 12px}
+.qf-painel-topo h2{margin:0;font:600 13px var(--font-sans);color:var(--mudo)}
+.qf-fechar{display:none;place-items:center;width:32px;height:32px;padding:0;border:0;border-radius:8px;background:transparent;
+  color:var(--mudo);cursor:pointer}
+.qf-grade{display:grid;grid-template-columns:1fr 1fr;gap:12px 14px}
+.qf-cel{position:relative;min-width:0}
+.qf-rot{display:block;margin-bottom:5px;font:700 10.5px/1.2 var(--font-sans);letter-spacing:.05em;text-transform:uppercase;color:var(--mudo)}
+/* o campo que mudou em relação ao aplicado ganha o ponto */
+.qf-cel.mudou>.qf-multi::after{content:"";position:absolute;top:-3px;right:-3px;width:8px;height:8px;border-radius:50%;
+  background:var(--foco);box-shadow:0 0 0 2px var(--superficie);pointer-events:none}
+.qf-multi{position:relative}
+.qf-multi>summary{list-style:none;display:flex;align-items:center;justify-content:space-between;gap:8px;height:36px;padding:0 12px;
+  border:1px solid var(--linha-forte);border-radius:var(--raio-tag);background:var(--superficie-2);color:var(--mudo);font-size:13px;
+  cursor:pointer}
+.qf-multi>summary::-webkit-details-marker{display:none}
+.qf-multi>summary:hover{border-color:var(--mudo)}
+.qf-multi.qf-tem>summary{color:var(--tinta)}
+.qf-multi[open]>summary{border-color:var(--foco)}
+.qf-multi>summary>i{flex:none;font-size:12px;transition:transform .15s}
+.qf-multi[open]>summary>i{transform:rotate(180deg)}
+.qf-multi-txt{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.qf-lista{position:absolute;z-index:20;top:calc(100% + 6px);left:0;right:0;max-height:260px;overflow:auto;padding:0 6px 6px;
+  border-radius:var(--raio-md);background:var(--superficie-2);border:1px solid var(--linha-forte);box-shadow:0 14px 34px var(--sombra)}
+/* a caixa de busca fica parada no topo da lista, cobrindo o que rola por baixo */
+.qf-lista-busca{position:sticky;top:0;z-index:1;display:block;width:100%;box-sizing:border-box;height:34px;margin:0 0 4px;padding:0 10px;
+  border:1px solid var(--linha-forte);border-radius:8px;background:var(--superficie);color:var(--tinta);font:inherit;font-size:13px;
+  box-shadow:0 0 0 6px var(--superficie-2)}
+.qf-lista-busca:focus{outline:none;border-color:var(--foco)}
+.qf-lista-busca::placeholder{color:var(--mudo);opacity:1}
+.qf-op{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:8px;font-size:13px;color:var(--tinta);cursor:pointer}
+.qf-op[hidden],.qf-op.qf-fora{display:none}
+.qf-op:hover{background:var(--superficie-3)}
+.qf-op.on{background:var(--verde-suave)}
+.qf-op input{flex:none;width:16px;height:16px;margin:0;accent-color:var(--verde)}
+.qf-op span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.qf-op small{color:var(--mudo);font-size:11.5px}
+.qf-op .q-ms-fama[hidden]{display:none}
+.qf-vazio{margin:6px 8px;font-size:12.5px;color:var(--mudo)}
+.qf-vazio[hidden]{display:none}
+.qf-rodape{display:flex;align-items:center;gap:10px;margin-top:16px;padding-top:14px;border-top:1px solid var(--linha)}
+.qf-dir{margin-left:auto;display:flex;align-items:center;gap:10px}
+.qf-dir>span{color:var(--mudo);font-size:12.5px}
+.qf-rodape .gc-btn:disabled{opacity:.45;cursor:not-allowed}
+.qf-veu{display:none}
+@media (prefers-reduced-motion:no-preference){
+  .qf-painel{animation:qf-desce .14s ease-out}
+  @keyframes qf-desce{from{opacity:0;transform:translateY(-4px)}}
+}
+/* celular (menos de 640 px): o painel é uma folha de baixo para cima, na largura toda, com o rodapé fixo e as listas no
+   fluxo (uma lista solta por cima seria cortada pela rolagem da folha) */
+@media (max-width:639px){
+  .qf-busca{flex:1 1 100%;min-width:0;max-width:none}
+  .qf-btn{flex:1 1 auto;justify-content:center}
+  .q-barra .q-rp-link{margin-left:0;flex:1 1 auto;justify-content:center}
+  .qf-veu{display:block;position:fixed;inset:0;z-index:39;background:var(--veu)}
+  .qf-veu[hidden]{display:none}
+  .qf-painel{position:fixed;top:auto;right:0;bottom:0;left:0;width:auto;max-width:none;max-height:88vh;padding:0;
+    border-radius:16px 16px 0 0;border-bottom:0;display:flex;flex-direction:column}
+  .qf-painel[hidden]{display:none}
+  .qf-painel::before{content:"";flex:none;width:36px;height:4px;margin:8px auto 0;border-radius:2px;background:var(--linha-forte)}
+  .qf-painel-topo{flex:none;margin:0;padding:8px 8px 4px 16px}
+  .qf-fechar{display:grid}
+  .qf-painel-corpo{flex:1 1 auto;min-height:0;overflow-y:auto;padding:8px 16px 12px}
+  .qf-grade{grid-template-columns:1fr}
+  .qf-lista{position:static;margin-top:6px;max-height:240px;box-shadow:none}
+  .qf-rodape{flex:none;margin:0;padding:12px 16px calc(12px + env(safe-area-inset-bottom));background:var(--superficie)}
+}
+@media (max-width:639px) and (prefers-reduced-motion:no-preference){
+  .qf-painel{animation-name:qf-sobe}
+  @keyframes qf-sobe{from{opacity:0;transform:translateY(28px)}}
+}
 
 .q-col-n{font:800 20px/24px var(--font-sans);letter-spacing:-.01em;font-variant-numeric:tabular-nums lining-nums}
 .q-cartoes{max-height:calc(4 * 112px + 3 * 8px + 20px);overflow-y:auto;overscroll-behavior:contain;
@@ -1779,12 +1859,7 @@ details.inv-card:not([open])>summary{border-bottom:0}
 .q-cartao .q-tur{font-size:8.8px;line-height:13px;padding:0 5px}
 .q-cartao .q-tur::before{width:5px;height:5px}
 @media (max-width:640px){
-  .q-ms{flex:1 1 calc(50% - 6px);min-width:0}
-  .q-ms>summary{width:100%;box-sizing:border-box}
-  .q-ms-v{flex:1;max-width:none}
-  .q-ms-caixa{position:fixed;left:16px;right:16px;top:auto;bottom:16px;max-width:none;max-height:60vh}
-  .q-busca{max-width:none}
-  .q-conta{flex:1 1 100%;margin:2px 4px 0;white-space:normal}
+  .q-conta{white-space:normal}
 }
 
 /* ── As OS da FAMA no Quadro (11/11/2026, fase 1: só aparecem; nexus/pcm/fama_quadro.py) ──────────────────────────────

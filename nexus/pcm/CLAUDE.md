@@ -1897,7 +1897,8 @@ Levi: "Os filtros tem que se auto filtrar também, pelo o que vi nenhum tem rela
 uma string". Cada filtro lista só o que existe com os OUTROS filtros aplicados (escolhida a equipe, o Responsável e o
 Cliente só listam os dela); o filtro não restringe a si mesmo (dá para trocar de equipe sem limpar o resto); a opção
 escolhida fica na lista mesmo quando a combinação não tem nada (a tela não esconde o filtro que está valendo). Vale para:
-Quadro da semana (`quadro.opcoes`, com quantas tarefas cada opção tem), Tarefas e OS (`semana.facetas`, com as contas) e
+Quadro da semana (`quadro.opcoes`, com quantas tarefas cada opção tem, e recontada no painel enquanto se marca pelo
+`quadro.painel_filtros`), Tarefas e OS (`semana.facetas`, com as contas) e
 as 7 listas de cima da Gestão PCM (`gestao.recortar(tarefas, filtros).escolhas`, sem contas: o número da matriz diz o
 resto; OS, Solicitação e período também restringem as listas). Testes: `test_filtros_de_tarefas_em_cascata`,
 `test_filtros_do_quadro_em_cascata`, `test_filtros_de_cima_em_cascata` e
@@ -2040,14 +2041,26 @@ ainda não começou e não foi ao App; `?rodada=` abre qualquer rodada, também 
   - os textos longos (de onde lê, o que reprogramar faz, a semana do PCM, "criadas após o plano"; no bloco das
     reprogramações, o que o arquivo é e quando vale) estão na **exclamação amarela da Segurança** (`hseq/_legenda.html`,
     `aviso`; a página carrega o `hseq.css`): "quero o mesmo para ocultar esse texto enorme". O erro de leitura segue à vista;
-  - os **filtros** são chips sem fundo que abrem a lista com caixas de marcar e aplicam ao fechar ou no "Aplicar"; o
-    escolhido fica verde ("2 escolhidos"); a busca vem sozinha embaixo; a conta e as Reprogramações na linha dos chips;
+  - os **filtros** estão no **modelo A do Histórico de OS** desde 16/11/2026 (Levi: "Quadro da semana quero os filtros no
+    mesmo padrão de qualidade e funcionalidades do filtro de Histórico de OS > OS Creator!"): a barra de uma linha (a
+    busca, o botão Filtros com a contagem dos aplicados e as Reprogramações), as etiquetas do que está aplicado (o × é o
+    endereço sem aquele filtro; "Limpar tudo" volta à semana sem filtro nem busca) e o painel com os seis campos em duas
+    colunas e o rodapé Limpar · "N alterações" · Aplicar. Nada filtra antes do Aplicar; fechar sem aplicar (Esc, clique
+    fora, o botão de novo, o × da folha) descarta; o Enter na busca manda o que está aplicado. Toda lista é digitável
+    (sem acento nem caixa, setas, Enter marca; Esc fecha a lista e o seguinte, o painel); abaixo de 640 px o painel é
+    uma folha de baixo para cima. **A cascata é recontada na página enquanto se marca** (`quadro.painel_filtros`: as
+    linhas da semana com a busca aplicada, em números, no `#qf_dados`; o `static/pcm-quadro-filtros.js` conta cada opção
+    pelos OUTROS campos, a FAMA à parte); a página traz todas as opções da busca e esconde as que a cascata tira. O
+    `os_busca.js` do OS Creator não é carregado: viraria campo de busca todo `<select>` da página (a janela da OS).
+    Cores do Nexus, como a Gestão PCM (o verde é a ação e o escolhido), não o preto, azul e lima do OS Creator;
   - o **cartão** tem altura fixa (112 px): a OS e a situação; o tipo com o "Reprog." e o motivo (cortado em "…", inteiro
     no `title`); a usina numa linha; o título em até duas; o pé (hora, turno, horas, Nª sem). O texto é 20% menor que o de
     antes de 27/10, e os números do topo de cada dia saíram da fonte de título para a do texto, em negrito, 30% menores;
   - cada **coluna mostra 4 OS** ("limite em 4 OSs por coluna") e rola sozinha, com a barra fina do Nexus.
   Provar: `tests/test_pcm_quadro_filtros_varios.py` (os vários valores no `filtrar`, nas pendentes, nas opções e no
-  `_ctx_quadro`, e a tela com a exclamação e os chips) e a tela numa cópia de prova (1440 e 375 px, escuro e claro).
+  `_ctx_quadro`, e a tela com a exclamação), `tests/test_pcm_quadro_filtros_painel.py` (o modelo A: as contas do
+  `painel_filtros`, o HTML, o CSS e o comportamento no node pelo DOM de mentira do Histórico, `historico_pagina_falsa.js`
+  com o `script_js`) e a tela numa cópia de prova (1366 e 375 px, escuro e claro).
 - **A janela da OS** (Levi, 18/10/2026; `tests/test_pcm_quadro_janela_js.py` a abre no node): os cartões do topo são
   Tipo, Situação, Criticidade, Semanas na fila e Reprogramada (a seção "Situação da OS" de baixo saiu, e com ela o
   Status da OS, Em paralelo, Termografia, Origem e Etiqueta); Onde e Quem lado a lado e o Quando embaixo (o dia da

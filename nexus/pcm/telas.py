@@ -1359,10 +1359,21 @@ def _ctx_quadro(cfg, args, erro: str | None = None) -> dict | None:
         "copiar": "Esta semana foi gerada no PC do PCM: a fila de reprogramação é para copiar e colar no painel do PCM.",
     }.get(dest["id"], "A semana já acabou: aqui é só para consulta.")
     ctx["ok_link"] = f"/t/pcm/gerar?semana={sem['week']}" if feito == "salvo" else ""
+    # as etiquetas dos filtros aplicados (16/11/2026, o modelo A do Histórico de OS): uma por campo do painel, com o × que
+    # é o endereço de agora sem aquele campo (tira só ele e aplica na hora); a busca não vira etiqueta (ela está à vista).
+    # O caminho do Quadro, e não "?..." relativo: a página de erro do Reprogramar é servida em /t/pcm/quadro/reprogramar
+    etiquetas = []
+    for campo, rot, _todos, plural in Q.CAMPOS_PAINEL:
+        vs = sorted(Q.varios(filtros.get(campo)), key=lambda v: v.lower())
+        if vs:
+            etiquetas.append({"campo": campo, "rot": rot, "texto": vs[0] if len(vs) == 1 else f"{len(vs)} {plural}",
+                              "todos": ", ".join(vs),
+                              "href": "/t/pcm/quadro?" + urlencode({k: v for k, v in sel_qs.items() if k != campo})})
     return dict(ctx, sem=sem, q=q, filtros=filtros, filtro_gestor=filtro_gestor, destino=dest, pode=pode,
+                campos_painel=Q.CAMPOS_PAINEL, etiquetas=etiquetas,
                 rodada=base["rodada"], chips=_chips_quadro(base, extra), origem_txt=origem_txt, dados=dados,
                 tem_filtro=any(filtros.values()),
-                url_limpar="?" + urlencode({k: v for k, v in sel_qs.items() if k in ("semana", "rodada")}),
+                url_limpar="/t/pcm/quadro?" + urlencode({k: v for k, v in sel_qs.items() if k in ("semana", "rodada")}),
                 url_todos="?" + urlencode(dict(sel_qs, todos="1")),
                 url_pendentes="?" + urlencode(dict(sel_qs, pend="1", **({"todos": "1"} if todos else {}))) + "#pendentes",
                 abrir_pendentes=args.get("pend") == "1" or (any(filtros.values()) and q["pend_sel"] <= 80),
