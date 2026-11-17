@@ -5,9 +5,12 @@
    A busca e os filtros são da própria página (static/filtro-local.js; 25/10/2026, Levi: "cada pesquisa faz um
    carregamento novo na tabela que já está carregada"): todas as linhas vêm, cada uma com o que cada filtro olha
    (data-f-*). O campo Setor de cada linha vem só com o setor dela, e a lista inteira entra ao tocar nele (o
-   <template id="fr-opcoes">): com a lista em cada uma das ~180 linhas a página passava de 300 KB. #}
+   <template id="fr-opcoes">): com a lista em cada uma das ~180 linhas a página passava de 300 KB.
+   Quem não está no Fracttal (17/11/2026, Levi: "tem que ter a opção de inserir uma pessoa que não está no fracttal"):
+   o "Incluir pessoa" ao lado de Setores, e a pessoa na mesma lista com a etiqueta "fora do Fracttal" e o "Tirar da
+   lista" (nexus/cadastro/pessoas_fora.py). #}
 <div class="fr-acoes fr-acoes--aba">
-  <p class="cad-sub">O pessoal do Fracttal, quem disso está no cadastro de pessoas do Nexus e o setor de cada um.{% if lido_em %} Fracttal lido em {{ lido_em }}.{% endif %}</p>
+  <p class="cad-sub">O pessoal do Fracttal e quem foi incluído aqui, quem disso está no cadastro de pessoas do Nexus e o setor de cada um.{% if lido_em %} Fracttal lido em {{ lido_em }}.{% endif %}</p>
   <a class="gc-btn gc-btn--ui gc-btn--contorno" href="{{ url_for('torre_base.acessos', aba='pessoas', reler=1) }}"><i class="ph ph-arrows-clockwise"></i> Ler o Fracttal de novo</a>
   <span class="fr-dica">
     <button type="button" class="fr-dica-botao" aria-label="Como esta aba funciona" aria-describedby="fr-dica-texto"><i class="ph ph-warning-circle" aria-hidden="true"></i></button>
@@ -17,6 +20,9 @@
         cadastro de pessoas é o time de campo: quem é do escritório ainda não tem ficha.</span>
       <span><strong>Setor.</strong> O Fracttal não diz o setor de ninguém. Crie a lista em Setores e escolha o de cada
         pessoa na coluna Setor, ou marque várias e aplique de uma vez. Vai para o banco, sem nome nem e-mail.</span>
+      <span><strong>Fora do Fracttal.</strong> Quem entra no Nexus pela conta Microsoft da Grid e não tem conta no
+        Fracttal entra na lista por "Incluir pessoa", com o nome e o e-mail da Grid, e ganha o setor como as outras. O
+        nome e o e-mail vão cifrados no banco. "Tirar da lista" a deixa sem setor.</span>
       <span><strong>Leitura.</strong> O Fracttal fica guardado por 1 hora; o botão ao lado lê de novo.</span>
       <span><strong>Nexus Field.</strong> Quem entrou no app com login, pelo que o App de Campo publica de hora em hora:
         a versão e o último acesso do celular que a pessoa usa. Quem não aparece não abriu o Nexus Field com login (o
@@ -29,6 +35,8 @@
 {% if aviso %}<div class="cad-aviso cad-aviso--{{ aviso.tom }}" role="status"><i class="ph ph-{{ 'check-circle' if aviso.tom == 'ok' else 'x-circle' }}"></i><div>{{ aviso.texto }}</div></div>{% endif %}
 {% if erro %}<div class="cad-aviso cad-aviso--{{ 'alerta' if velha else 'critico' }}" role="alert"><i class="ph ph-plugs"></i><div>
   <strong>{{ 'Mostrando a última leitura boa.' if velha else 'Não consegui ler o Fracttal.' }}</strong> {{ erro }}</div></div>{% endif %}
+{% if erro_fora %}<div class="cad-aviso cad-aviso--alerta" role="alert"><i class="ph ph-database"></i><div><strong>Não consegui ler do banco quem foi incluído fora do Fracttal.</strong>
+  {{ erro_fora }}. A lista aparece só com o Fracttal.</div></div>{% endif %}
 {% if erro_cadastro %}<div class="cad-aviso cad-aviso--critico" role="alert"><i class="ph ph-database"></i><div><strong>Não consegui ler o cadastro de pessoas do banco.</strong>
   {{ erro_cadastro }}. A lista do Fracttal aparece, sem a ligação com as fichas.</div></div>{% endif %}
 {% if sem_chave %}<div class="cad-aviso cad-aviso--alerta"><i class="ph ph-key"></i><div><strong>Sem a chave do cadastro.</strong>
@@ -89,7 +97,26 @@
 </form>
 
 <div class="cad-barra-tabela">
-  <p class="cad-conta"><span class="gc-num" data-fl-conta="fr">{{ visiveis|length }}</span> de <span class="gc-num">{{ total }}</span> pessoas · <span class="gc-num">{{ sem_setor }}</span> sem setor{% if nf.versao_atual %} · Nexus Field mais novo: <span class="gc-num">{{ nf.versao_atual }}</span>{% endif %}. Origem pelo domínio do e-mail: gridco.com.br é da Grid Co.; o resto é externo.</p>
+  <p class="cad-conta"><span class="gc-num" data-fl-conta="fr">{{ visiveis|length }}</span> de <span class="gc-num">{{ total }}</span> pessoas{% if n_fora %} (<span class="gc-num">{{ n_fora }}</span> fora do Fracttal){% endif %} · <span class="gc-num">{{ sem_setor }}</span> sem setor{% if nf.versao_atual %} · Nexus Field mais novo: <span class="gc-num">{{ nf.versao_atual }}</span>{% endif %}. Origem pelo domínio do e-mail: gridco.com.br é da Grid Co.; o resto é externo.</p>
+  <details class="cad-colunas fr-incluir" id="fr-incluir">
+    <summary class="gc-btn gc-btn--ui gc-btn--contorno"><i class="ph ph-user-plus"></i> Incluir pessoa</summary>
+    <div class="cad-colunas-painel fr-incluir-painel">
+      <p class="gc-ajuda">Para quem não está no Fracttal e entra no Nexus pela conta Microsoft da Grid. O nome e o e-mail vão cifrados no banco.</p>
+      <form method="post" action="{{ url_for('torre_base.fracttal_pessoa_fora') }}" class="fr-incluir-form">
+        <input type="hidden" name="volta" value="{{ volta }}"><input type="hidden" name="acao" value="incluir">
+        <label class="gc-rotulo" for="fr-in-nome">Nome</label>
+        <input id="fr-in-nome" class="gc-campo" name="nome" maxlength="80" required autocomplete="off" placeholder="Nome e sobrenome"{% if not pode_incluir %} disabled{% endif %}>
+        <label class="gc-rotulo" for="fr-in-email">E-mail da Grid</label>
+        <input id="fr-in-email" class="gc-campo" name="email" type="email" maxlength="120" required autocomplete="off" placeholder="nome@gridco.com.br"{% if not pode_incluir %} disabled{% endif %}>
+        <label class="gc-rotulo" for="fr-in-setor">Setor</label>
+        <select id="fr-in-setor" class="gc-campo" name="setor_id"{% if not pode_incluir %} disabled{% endif %}>
+          <option value="">a definir</option>{% for st in setores %}<option value="{{ st.setor_id }}">{{ st.nome }}</option>{% endfor %}
+        </select>
+        <button class="gc-btn gc-btn--ui gc-btn--primario" type="submit"{% if not pode_incluir %} disabled{% endif %}><i class="ph ph-plus"></i> Incluir</button>
+        {% if not pode_incluir %}<p class="gc-ajuda gc-ajuda--erro">Este Nexus não grava a pessoa: falta a chave do banco, a do cadastro ou a do código da pessoa.</p>{% endif %}
+      </form>
+    </div>
+  </details>
   <details class="cad-colunas fr-setores" id="fr-setores"{% if abrir_setores %} open{% endif %}>
     <summary class="gc-btn gc-btn--ui gc-btn--contorno"><i class="ph ph-tag"></i> Setores ({{ setores|length }})</summary>
     <div class="cad-colunas-painel fr-setores-painel">
@@ -116,15 +143,19 @@
   <table class="cad-tabela fr-tabela">
     <thead><tr>
       <th class="fr-marca"><input type="checkbox" id="fr-todas" aria-label="Marcar todas as pessoas da lista"{% if not pode_gravar_setor or not setores %} disabled{% endif %}></th>
-      <th>Nome no Fracttal</th><th>E-mail</th><th>Acesso</th><th>Nexus Field</th><th>Ficha no Nexus</th><th>Vínculo</th><th>Equipe</th><th>Setor</th>
+      <th>Nome</th><th>E-mail</th><th>Acesso</th><th>Nexus Field</th><th>Ficha no Nexus</th><th>Vínculo</th><th>Equipe</th><th>Setor</th>
     </tr></thead>
     <tbody>
     {% for x in linhas %}
     <tr id="p-{{ x.id }}" data-fl-linha data-f-ligacao="{{ 'ligadas' if x.ficha else 'sem_ficha' }}" data-f-acesso="{{ x.acesso }}" data-f-origem="{{ x.origem }}" data-f-setor="{{ x.setor_id or 'sem' }}" data-f-field="{{ x.f_field }}" data-busca-base="{{ x.busca_base }}" data-f-busca="{{ x.busca }}"{% if x.id not in visiveis %} hidden{% endif %}>
       <td class="fr-marca"><input type="checkbox" class="fr-marcar" name="pessoa" value="{{ x.id }}" form="fr-lote" aria-label="Marcar {{ x.nome }}"{% if not pode_gravar_setor or not setores %} disabled{% endif %}></td>
-      <td>{{ x.nome or '—' }}{% if x.origem != 'Grid Co.' %} <span class="cad-chip cad-chip--operacao" title="{{ x.dominio }}">externo</span>{% endif %}</td>
+      <td>{{ x.nome or '—' }}{% if x.fora %} <span class="cad-chip cad-chip--info" title="Pessoa incluída aqui: não tem conta no Fracttal">fora do Fracttal</span>{% if x.no_fracttal_tambem %} <span class="cad-chip cad-chip--alerta" title="O mesmo e-mail apareceu no Fracttal: tire esta linha e use a do Fracttal">agora no Fracttal</span>{% endif %}
+        <form method="post" action="{{ url_for('torre_base.fracttal_pessoa_fora') }}" class="fr-tirar">
+          <input type="hidden" name="volta" value="{{ volta }}"><input type="hidden" name="acao" value="tirar"><input type="hidden" name="pessoa" value="{{ x.id }}">
+          <button type="submit" class="fr-tirar-bt" data-confirmar="Tirar {{ x.nome or 'esta pessoa' }} da lista? A pessoa fica sem setor e deixa de ver as telas do setor."{% if not pode_incluir %} disabled{% endif %}>Tirar da lista</button>
+        </form>{% elif x.origem != 'Grid Co.' %} <span class="cad-chip cad-chip--operacao" title="{{ x.dominio }}">externo</span>{% endif %}</td>
       <td><span class="gc-dado">{{ x.email or '—' }}</span></td>
-      <td>{% if x.conta_ativa %}{{ x.acesso }}{% else %}<span class="cad-chip cad-chip--alerta">{{ x.acesso }}{% if x.acesso != 'sem acesso' %} · conta inativa{% endif %}</span>{% endif %}</td>
+      <td>{% if x.fora %}<span class="mudo">sem conta</span>{% elif x.conta_ativa %}{{ x.acesso }}{% else %}<span class="cad-chip cad-chip--alerta">{{ x.acesso }}{% if x.acesso != 'sem acesso' %} · conta inativa{% endif %}</span>{% endif %}</td>
       {# o Nexus Field (13/11/2026): a versão do celular do último acesso (a antiga em alerta), quando e qual celular #}
       <td class="fr-nf">{% if x.field %}{% set nf_x = x.field %}
         <span class="{{ 'cad-chip cad-chip--alerta' if nf_x.antiga else 'fr-nf-v' }}"{% if nf_x.antiga %} title="Abaixo da versão mais nova ({{ nf.versao_atual }})"{% endif %}>{{ nf_x.versao or 'sem versão' }}{% if nf_x.antiga %} · antiga{% endif %}</span>

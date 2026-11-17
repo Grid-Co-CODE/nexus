@@ -698,7 +698,8 @@ FATOS = (
          "administrador na aba Pessoas e setores de Base → Acessos",
          _d(data=("id", "data_id (o dia de Brasília da decisão)"),
             pessoa=("id", "pessoa_id quando a pessoa do Fracttal tem ficha (o critério do login; pessoa_ligada_por diz "
-                          "como; vazio = sem ficha) + fracttal_id (o id_personnel) + pessoa_hmac (o código do e-mail)")),
+                          "como; vazio = sem ficha) + fracttal_id (o id_personnel; acima de 900.000.000, a pessoa "
+                          "fora do Fracttal, nexus_pessoas_fora_fracttal) + pessoa_hmac (o código do e-mail)")),
          tipo="sem_medida", chave=("decidida_em", "fracttal_id"),
          fontes=("nexus_setores · fato_decisao_setor",),
          janela_origem="o Nexus é a fonte (só acrescenta: o setor de cada pessoa é a última decisão dela)",
@@ -1816,6 +1817,17 @@ LIVROS = (
           "nexus/cadastro/setores.py, pela tela Base > Acessos > Pessoas e setores", False,
           "registrado em 12/10/2026 antes de existir: nasce com o 1º setor criado na tela; a tela lê com cache de "
           "1 minuto e relê o banco antes de cada gravação",
+          so_cresce=True),
+    # quem não está no Fracttal (17/11/2026, Levi: "tem que ter a opção de inserir uma pessoa que não está no fracttal"):
+    # a pessoa entra em Pessoas e setores e o setor dela vai no nexus_setores pelo id da faixa reservada
+    Livro("nexus_pessoas_fora_fracttal", ("dim_pessoa_fora_fracttal",),
+          "a cada Incluir pessoa e Tirar da lista na aba Pessoas e setores de Base → Acessos",
+          "nexus/cadastro/pessoas_fora.py, pela tela Base > Acessos > Pessoas e setores", False,
+          "registrado em 17/11/2026 antes de existir: nasce com a 1ª pessoa incluída. 1 linha = 1 pessoa, o estado de "
+          "agora (trocado inteiro sob a trava, relido antes e conferido depois; tirar marca ativa = não e o id não "
+          "volta). pessoa_fora_id a partir de 900.000.001 (o Fracttal ia até 2.072.681 em 17/11/2026): é ele que vai no "
+          "fracttal_id do fato_decisao_setor. Nome e e-mail só cifrados (Cofre, a chave do cadastro); a pessoa liga pelo "
+          "pessoa_hmac (o código do e-mail, como o login acha o setor); quem mudou só como HMAC",
           so_cresce=True),
     Livro("nexus_estrutura_usina", ("dim_supervisorio", "dim_cabine", "dim_inversor", "aba_equipamentos"),
           "a cada ligação de chave e a cada Salvar da tela Equipamentos das usinas, e a cada Salvar do modo de-para do "

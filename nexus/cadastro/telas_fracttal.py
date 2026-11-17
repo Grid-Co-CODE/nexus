@@ -17,6 +17,7 @@ from urllib.parse import parse_qsl, urlencode
 from flask import current_app, jsonify, redirect, render_template, request, session, url_for
 
 from . import fracttal_pessoal as FP
+from . import pessoas_fora as PF
 from . import setores as S
 from ..auth.sessao import email_da_sessao as _meu_email
 from ..auth.origem import de_outro_site as _de_outro_site
@@ -130,7 +131,12 @@ def _relacao(cfg, lido: dict) -> tuple[dict, str]:
     except Exception as ex:      # noqa: BLE001 — banco fora (ou teste sem banco): a tela diz e mostra só o Fracttal
         pessoas_cad, equipes, erro_cadastro = [], [], f"{type(ex).__name__}: {str(ex)[:160]}"
     nome_equipe = {D._id(e.get("equipe_id")): str(e.get("nome") or "") for e in equipes}
-    rel = FP.ligar(lido["pessoas"], FP.fichas(pessoas_cad, cfg.get("NEXUS_CHAVE_CADASTRO")), nome_equipe)
+    # as pessoas incluídas aqui, que não estão no Fracttal (17/11/2026, `pessoas_fora.py`): entram na mesma lista, ligadas
+    # às fichas pelo mesmo critério, e o setor delas vai pelo id da faixa reservada
+    fora = PF.ler()
+    rel = FP.ligar(list(lido["pessoas"]) + fora["pessoas"], FP.fichas(pessoas_cad, cfg.get("NEXUS_CHAVE_CADASTRO")),
+                   nome_equipe)
+    rel["erro_fora"] = fora.get("erro") or ""
     return rel, erro_cadastro
 
 
@@ -160,6 +166,10 @@ def contexto(cfg, args) -> dict:
         if sid:
             n_setor[sid] = n_setor.get(sid, 0) + 1
     setores = [dict(s, n=n_setor.get(s["setor_id"], 0)) for s in S.ativos(st["setores"])]
+    # a pessoa incluída aqui cujo e-mail apareceu depois no Fracttal: as duas linhas ficam, e a de fora pede para sair
+    emails_fracttal = {x["email"] for x in rel["linhas"] if x["email"] and not x.get("fora")}
+    for x in rel["linhas"]:
+        x["no_fracttal_tambem"] = bool(x.get("fora") and x["email"] in emails_fracttal)
     # o Nexus Field de cada pessoa (13/11/2026, Levi: "conseguimos saber que já instalou o nexus field e logou sem eu ter
     # que ficar cadastrando?"): o livro que o App publica, casado pelo código do e-mail da linha (nada de e-mail no banco)
     from ..campo import field_aparelhos as NF
@@ -188,7 +198,10 @@ def contexto(cfg, args) -> dict:
     filtros = {"q": q, "ligacao": ligacao, "acesso": acesso, "origem": origem, "setor": setor, "field": field,
                "todas_fichas": "" if so_ativas else "1"}
     aviso = session.pop(_CHAVE_AVISO, None)
-    return {"rel": rel, "linhas": rel["linhas"], "visiveis": visiveis, "total": len(lido["pessoas"]),
+    return {"rel": rel, "linhas": rel["linhas"], "visiveis": visiveis, "total": len(rel["linhas"]),
+            "n_fora": sum(1 for x in rel["linhas"] if x.get("fora")), "erro_fora": rel.get("erro_fora") or "",
+            "pode_incluir": (bool(cfg.get("GRIDCO_SQL_TOKEN")) and bool(cfg.get("NEXUS_PESSOA_HMAC"))
+                             and bool(cfg.get("NEXUS_CHAVE_CADASTRO"))),
             "erro": lido.get("erro") or "",
             "erro_cadastro": erro_cadastro,
             "velha": lido.get("velha", False), "lido_em": lido_em, "sem_chave": not cfg.get("NEXUS_CHAVE_CADASTRO"),
@@ -266,6 +279,60 @@ def _gravar_setor():
                       gravadas=r["gravadas"], setor=r["setor"], setor_id=setor_id)
 
 
+def _pessoa_fora():
+    """POST da pessoa fora do Fracttal (17/11/2026, Levi: "tem que ter a opção de inserir uma pessoa que não está no
+    fracttal"): acao = incluir (nome, email, setor_id) ou tirar (pessoa). Incluir grava a pessoa e, com um setor, a
+    decisão do setor dela; tirar a tira da lista e a deixa sem setor."""
+    from ..campo import visao
+    from ..dados import fatos as D
+    cfg = current_app.config
+    if _de_outro_site():
+        return _responder(False, "Pedido de outro site: nada foi gravado.", 403)
+    acao, quem = request.form.get("acao"), _meu_email()
+    lido = FP.ler_pessoal()
+    if not lido["pessoas"]:
+        return _responder(False, f"Não consegui ler o Fracttal ({lido.get('erro') or 'vazio'}): nada foi gravado (é por ele "
+                                 "que se sabe se a pessoa já está na lista).", 503)
+    try:
+        if acao == "incluir":
+            bruto = (request.form.get("setor_id") or "").strip()
+            setor_id = D._id(bruto) if bruto else None
+            if bruto and not setor_id:
+                return _responder(False, "Setor inválido: nada foi gravado.", 400)
+            nova = PF.incluir(request.form.get("nome"), request.form.get("email"),
+                              [x["email"] for x in lido["pessoas"]], cfg, quem)
+            esquecer()
+            texto = f"{nova['nome']} entrou na lista"
+            if setor_id:
+                rel, _ = _relacao(cfg, lido)
+                linha = next((x for x in rel["linhas"] if x["id"] == nova["id"]), dict(nova, ficha=None, por=""))
+                try:
+                    r = S.definir([linha], setor_id, cfg, visao._base(), visao._sessao(), quem_email=quem)
+                    texto += f", no setor {r['setor']}"
+                except Exception as ex:      # noqa: BLE001 — a pessoa ficou; o setor se escolhe na linha
+                    log.error("Pessoas fora do Fracttal: o setor da pessoa nova não gravou (%s: %s).", type(ex).__name__,
+                              ex)
+                    texto += f"; o setor não foi gravado ({ex if isinstance(ex, S.Recusada) else type(ex).__name__}): " \
+                             "escolha na linha dela"
+            return _responder(True, texto + ".", ancora=f"p-{nova['id']}")
+        if acao == "tirar":
+            pid = D._id(request.form.get("pessoa"))
+            antes = PF.tirar(pid, cfg, quem)
+            esquecer()
+            st = _ler_setores(forcar=True)
+            if S.vigentes(st["decisoes"]).get(pid):
+                S.definir([dict(antes or {"id": pid, "email": ""}, ficha=None, por="")], None, cfg, visao._base(),
+                          visao._sessao(), quem_email=quem)
+            return _responder(True, f"{(antes or {}).get('nome') or 'A pessoa'} saiu da lista e ficou sem setor.")
+        return _responder(False, "Ação desconhecida: nada foi gravado.", 400)
+    except (PF.Recusada, S.Recusada) as ex:
+        return _responder(False, str(ex), 409)
+    except Exception as ex:      # noqa: BLE001 — a gravação ou a conferência falhou: a tela diz, nada some calado
+        log.error("Pessoas fora do Fracttal: a gravação falhou (%s: %s).", type(ex).__name__, ex)
+        return _responder(False, f"A gravação no banco falhou ({type(ex).__name__}). Releia a página e tente de novo.",
+                          500)
+
+
 def _gravar_lista():
     """POST da lista de setores: acao = criar (nome), renomear (setor_id, nome) ou excluir (setor_id)."""
     from ..campo import visao
@@ -299,7 +366,7 @@ def _gravar_lista():
 
 def registrar_fracttal(bp) -> None:
     """O endereço antigo da tela (`/t/base/fracttal`) leva à aba Pessoas e setores de Acessos, com os filtros; e os dois
-    POST do setor."""
+    POST do setor, e o da pessoa fora do Fracttal (17/11/2026)."""
     @bp.route("/fracttal")
     def fracttal():
         pares = [("aba", "pessoas")] + [(k, v[:120]) for k, v in request.args.items(multi=True)
@@ -317,3 +384,9 @@ def registrar_fracttal(bp) -> None:
         if not session.get("admin"):
             return _sem_permissao()
         return _gravar_lista()
+
+    @bp.route("/fracttal/pessoa-fora", methods=["POST"])
+    def fracttal_pessoa_fora():
+        if not session.get("admin"):
+            return _sem_permissao()
+        return _pessoa_fora()

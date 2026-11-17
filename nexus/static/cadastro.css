@@ -451,6 +451,19 @@ details.cad-dif summary{cursor:pointer;padding:9px 12px;color:var(--tinta-2);fon
 .fr-lote-conta{font-size:13px;color:var(--tinta-2);margin-right:4px}
 .fr-lote-conta b{color:var(--tinta)}
 .fr-setores-painel{width:min(560px,100%);gap:8px}
+/* o "Incluir pessoa" (17/11/2026): quem não está no Fracttal, ao lado de Setores; o "Tirar da lista" é um link discreto
+   na linha da pessoa, embaixo do nome */
+.fr-incluir-painel{width:min(380px,calc(100vw - 32px))}
+.fr-incluir-form{display:grid;gap:6px;margin:0}
+.fr-incluir-form .gc-rotulo{margin:4px 0 0}
+.fr-incluir-form .gc-btn{justify-self:start;margin-top:6px}
+.fr-incluir-form .gc-ajuda{margin:4px 0 0}
+.fr-tirar{display:block;margin:2px 0 0}
+.fr-tirar-bt{background:none;border:0;padding:0;font:inherit;font-size:12px;color:var(--mudo);text-decoration:underline;
+  text-underline-offset:2px;cursor:pointer}
+.fr-tirar-bt:hover{color:var(--critico)}
+.fr-tirar-bt:focus-visible{outline:2px solid var(--foco);outline-offset:2px}
+.fr-tirar-bt:disabled{cursor:default;text-decoration:none}
 .fr-setor-linha{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0}
 .fr-setor-linha .gc-campo{flex:1 1 180px;min-width:0}
 .fr-setor-n{font-size:12px;color:var(--mudo);white-space:nowrap;min-width:76px}

@@ -369,6 +369,33 @@ e-mails pessoais); filtro Origem e a etiqueta "externo" na linha.
   trouxer os campos que as telas do OS Creator usam (o `active` e o `id_account`, que esta tela nunca viu no REST, entre
   eles; README do OS Creator, "Os catálogos pequenos num lugar só").
 
+### Quem não está no Fracttal (`pessoas_fora.py`; 17/11/2026)
+
+Levi: "Na parte de base > acessos > pessoas e setores tem que ter a opção de inserir uma pessoa que não está no
+fracttal". Para quê: o setor de quem entra no Nexus é o daqui, e a lista era só o pessoal do Fracttal. Quem entra pela
+conta Microsoft da Grid sem ter conta no Fracttal (escritório que não usa o Fracttal, quem acabou de chegar) ficava "Sem
+setor, fale com o responsável", sem como ganhar um.
+- **Na tela:** "Incluir pessoa" ao lado de Setores (o mesmo painel dele): nome, e-mail da Grid e setor (opcional). A
+  pessoa entra na MESMA lista, com a etiqueta "fora do Fracttal", "sem conta" na coluna Acesso (o filtro Acesso no
+  Fracttal ganha "Fora do Fracttal"), ligada às fichas pelo mesmo critério do login, e o setor muda pela linha como o das
+  outras. "Tirar da lista" (embaixo do nome, com a pergunta antes) a tira e a deixa SEM SETOR: fora da lista, ela não abre
+  tela de setor nenhum. A contagem diz quantos estão fora do Fracttal.
+- **Recusa:** e-mail que não é da Grid (gridco.com.br; é com a conta Microsoft da Grid que a pessoa entra, quem é de fora
+  não teria como entrar), e-mail que já está no Fracttal (a pessoa já está na lista), a mesma pessoa duas vezes (pelo
+  código do e-mail), nome com menos de 3 letras; sem a `GRIDCO_SQL_TOKEN`, a `NEXUS_PESSOA_HMAC` ou a
+  `NEXUS_CHAVE_CADASTRO` a tela avisa e nada grava. Só administrador, POST só da própria página.
+- **O e-mail que depois aparece no Fracttal:** as duas linhas ficam, e a de fora ganha "agora no Fracttal" (tire-a e use
+  a do Fracttal).
+- **O dado:** livro `nexus_pessoas_fora_fracttal` · `dim_pessoa_fora_fracttal` (registrado no catálogo antes da 1ª
+  gravação): 1 linha = 1 pessoa, o estado de agora, trocado inteiro sob a trava (relido antes, conferido depois); tirar
+  marca `ativa = não` e o id não volta. Nome e e-mail só cifrados (Cofre, contexto `banco/pessoas_fora/<id>`); a pessoa
+  pelo `pessoa_hmac`. **O id começa em 900.000.001** (o Fracttal ia de 1.352.379 a 2.072.681 em 17/11/2026), e é ele que
+  vai no `fracttal_id` do `fato_decisao_setor`: por isso o setor, o portão por setor (que acha a pessoa do login pelo
+  código do e-mail), o "excluir setor" e a aba dos administradores do App valem para ela sem mudar nada lá
+  (`pessoas_fora.e_de_fora` diz se um id é da faixa). A cópia do livro dura 1 minuto, e a gravação a deixa em dia.
+Prova: `tests/test_base_pessoas_fora_fracttal_17_11.py` (o login acha o setor dela; nada em claro no banco; as recusas;
+tirar deixa sem setor) e a bancada local com o banco e o Fracttal falsos (incluir pela tela, o setor na linha).
+
 ### A coluna Nexus Field (13/11/2026)
 
 Levi, pela sessão Nexus Field: "conseguimos saber que já instalou o nexus field e logou sem eu ter que ficar

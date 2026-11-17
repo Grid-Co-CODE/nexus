@@ -184,6 +184,12 @@ Campo), pelo `pessoa_id` quando tem ficha (critério do login, `pessoa_ligada_po
 nunca (regra 8). As duas abas vão juntas a cada gravação (gravar sem uma a apagaria), sobre o livro relido do banco na
 hora (leitura que falha não grava). Registrado antes de existir: nasce com o 1º setor criado na tela.
 
+**Pessoas fora do Fracttal (17/11/2026):** a mesma aba inclui quem não tem conta no Fracttal (Levi: "tem que ter a opção
+de inserir uma pessoa que não está no fracttal"): livro `nexus_pessoas_fora_fracttal` · `dim_pessoa_fora_fracttal` (1
+linha = 1 pessoa, o estado de agora; tirar marca `ativa = não` e o id não volta), nome e e-mail só cifrados, a pessoa pelo
+`pessoa_hmac`. O `pessoa_fora_id` começa em 900.000.001, uma faixa que o Fracttal não usa, e vai no `fracttal_id` do
+`fato_decisao_setor`: o setor dela segue a regra do setor do pessoal sem coluna nova. Detalhe em `nexus/cadastro/CLAUDE.md`.
+
 **Estrutura das usinas (13/10/2026):** a tela Base · Equipamentos das usinas (só admin) grava o livro
 `nexus_estrutura_usina` (`nexus/cadastro/estrutura_usina.py`): `dim_supervisorio` (1 linha = 1 chave do supervisório
 ligada a 1 usina; a chave é de uma usina só), `dim_cabine` (1 linha = 1 cabine da usina, com kWp) e `dim_inversor` (1
