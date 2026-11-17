@@ -29,7 +29,8 @@ def test_a_barra_lateral_mostra_as_fotos_citadas(quadro, logado):
     assert _imgs(tarde) == [f"/t/campo/aprovacao/15102/foto/{ID['tarde']}"]
     # o cartão do quadro segue sem foto (05/11/2026)
     quadro_html = logado.get("/t/campo/aprovacao?responsavel=*").get_data(as_text=True)
-    assert "<img" not in quadro_html.split('<div class="apq-quadro"', 1)[1]
+    cartoes = re.findall(r'<article class="apq-cartao".*?</article>', quadro_html, re.S)
+    assert cartoes and not any("<img" in c for c in cartoes)
 
 
 def _anexo(caminho, tarefa=""):
@@ -75,3 +76,14 @@ def test_o_fracttal_fora_nao_derruba_a_rota(quadro, logado, monkeypatch):
 def _sem_lista_guardada():
     yield
     prefiltro_fundo.limpar_fotos_da_os()
+
+
+def test_a_foto_inteira_abre_por_cima_e_nao_numa_aba(quadro, logado):
+    """Conferido em produção em 17/11/2026: o S3 do Fracttal manda a foto como "binary/octet-stream"; na miniatura o
+    navegador reconhece a imagem, mas aberta numa aba nova ela baixaria em vez de aparecer. A foto inteira abre numa
+    janela por cima da tela (o <dialog>), sem sair da Aprovação."""
+    rep = logado.get("/t/campo/aprovacao/15088/detalhe").get_data(as_text=True)
+    assert 'class="apq-foto-img"' in rep and 'target="_blank"' not in rep
+    html = logado.get("/t/campo/aprovacao?responsavel=*").get_data(as_text=True)
+    assert re.search(r'<dialog class="cr-modal apq-foto-grande" id="apq-foto-grande"', html)
+    assert "closest('.apq-foto-img')" in html and "showModal" in html

@@ -2606,7 +2606,9 @@ Aprovação e Triagem usam a lógica do App copiada, não refeita, para o númer
       Thopen, id 96). O total diz o recorte ("na Usina X", "executadas por Y"). Prova: `test_campo_aprovacao_filtros_15_11.py`.
     - **As fotos citadas aparecem na barra lateral (16/11/2026**, Levi: "Aprovação de OS quando tiver algo que cita
       Fotos tem que carregar as fotos!"): em cada fato que cita foto (foto tarde, repetida, que não abriu, GPS longe), a
-      miniatura de cada uma (`loading="lazy"`, abre inteira numa aba) com o nome embaixo, que segue abrindo o card. A
+      miniatura de cada uma (`loading="lazy"`) com o nome embaixo, que segue abrindo o card; a miniatura abre a foto
+      inteira por cima da tela (`dialog#apq-foto-grande`), NÃO numa aba: conferido em produção em 17/11, o S3 do
+      Fracttal manda a foto como "binary/octet-stream" (o `<img>` reconhece; a aba nova baixaria o arquivo). A
       barra abre só da memória, como antes; cada imagem vem da rota `aprovacao/<id_wo>/foto/<id>`, que lê a lista de
       anexos da OS no Fracttal (1 pedido, guardado 10 min por OS, `prefiltro_fundo.endereco_da_foto`) e leva (302) ao
       arquivo no S3; só foto da OS da fila e só https; o Fracttal fora dá 503 e a barra segue. O endereço e a imagem não

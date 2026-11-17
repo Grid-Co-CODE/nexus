@@ -129,6 +129,12 @@
   </details>
 </div>
 {# a barra lateral da OS (a das Rondas: 1/3 da tela, à direita); o detalhe vem da rota no clique #}
+{# a foto inteira por cima da tela (17/11/2026, conferido em produção: o S3 do Fracttal manda a foto como
+   "binary/octet-stream", e numa aba nova ela baixaria em vez de aparecer) #}
+<dialog class="cr-modal apq-foto-grande" id="apq-foto-grande" aria-label="Foto da OS">
+  <div class="cr-modal-barra"><button type="button" class="gc-btn gc-btn--contorno" data-apq-foto-fechar>Fechar</button></div>
+  <img alt="">
+</dialog>
 <aside class="rd-gaveta apq-gaveta" id="apq-gaveta" role="dialog" aria-modal="false" aria-labelledby="apq-g-titulo" hidden>
   <button type="button" class="rd-fechar rd-gaveta-fechar" data-apq-g-fechar aria-label="Fechar o detalhe da OS" title="Fechar (Esc)">&times;</button>
   <div class="rd-gaveta-corpo"></div>
@@ -159,6 +165,7 @@
     var quadroEl = document.querySelector('[data-apq-rota]'), ROTA = quadroEl.getAttribute('data-apq-rota');
     var POR_VEZ = parseInt(quadroEl.getAttribute('data-apq-por-vez'), 10) || 30;
     var csvLink = document.querySelector('[data-apq-csv]');
+    var fotoGrande = document.getElementById('apq-foto-grande');
     var andando = false;
     function semAcento(s) { return String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase(); }
     function pedir(url, corpo) {
@@ -348,6 +355,16 @@
       if (ev.target.closest('[data-apq-g-fechar]')) { fecharGaveta(); return; }
       var mais = ev.target.closest('[data-apq-mais]');
       if (mais) { if (!mais.disabled) { maisCartoes(mais); } return; }
+      // a miniatura da foto abre a foto inteira por cima (não numa aba: lá o arquivo do S3 baixaria)
+      var fg = ev.target.closest('.apq-foto-img');
+      if (fg && fotoGrande.showModal) {
+        ev.preventDefault();
+        var im = fotoGrande.querySelector('img'), mini = fg.querySelector('img');
+        im.src = fg.getAttribute('href'); im.alt = mini ? mini.alt : 'Foto da OS';
+        fotoGrande.showModal();
+        return;
+      }
+      if (ev.target.closest('[data-apq-foto-fechar]') || ev.target === fotoGrande) { fotoGrande.close(); return; }
       var card = ev.target.closest('[data-apq-card]');
       if (card) { abrirCard(card.getAttribute('data-apq-card'), card.getAttribute('data-folio')); return; }
       // o PDF da OS (05/11/2026: "Quero o botão de baixar o PDF da OS!"): o do OS Creator, como nas OSs em verificação do
@@ -398,6 +415,7 @@
       if (ev.target.closest('[data-apq-ver]') || !ev.target.closest('input, label, button, a')) { abrirGaveta(c); }
     });
     document.addEventListener('keydown', function (ev) {
+      if (ev.key === 'Escape' && fotoGrande.open) { return; }       // o Esc fecha a foto (o <dialog>), não a barra
       if (ev.key === 'Escape' && !gaveta.hidden) { fecharGaveta(); return; }
       if (ev.key === 'Enter' && ev.target.matches && ev.target.matches('.apq-cartao')) { ev.preventDefault(); abrirGaveta(ev.target); }
     });
