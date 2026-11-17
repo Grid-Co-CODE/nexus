@@ -134,10 +134,33 @@ class Chaveiro:
 
 
 def coleta_vale(pessoa_id: int, tecnicos: dict, piloto: set, teste=frozenset()) -> bool:
-    """Só se coleta técnico de campo ativo (o dict de `pessoas_de_campo`) que esteja no piloto; fora da fase de
-    piloto ainda não existe "todos", então piloto vazio = ninguém. A pessoa de teste (09/11/2026, `piloto_teste`) vale
-    sem ser técnica de campo: o administrador a pôs no piloto marcada como teste."""
+    """Só se coleta técnico de campo ativo (o dict de `pessoas_de_campo`) que esteja entre os coletados (`coletados`:
+    quem instalou o app, desde 17/11/2026, mais quem o administrador pôs). A pessoa de teste (09/11/2026,
+    `piloto_teste`) vale sem ser técnica de campo: o administrador a pôs marcada como teste."""
     return pessoa_id in piloto and (pessoa_id in tecnicos or pessoa_id in teste)
+
+
+def coletados(piloto: set, com_app: set, fora: set) -> set:
+    """Quem o Nexus Field coleta (e o mapa mostra), antes da conferência de técnico de campo ativo (17/11/2026, Levi:
+    "Quero que os técnicos que apareçam no mapa sejam os mesmos que instalaram o app e não só os que botei no piloto!"):
+    quem tem o app instalado (a chave do aparelho ativa), menos quem o administrador tirou (a última decisão dele é
+    sair), mais quem o administrador pôs (o técnico que ainda não instalou e a pessoa de teste)."""
+    return set(piloto) | (set(com_app) - set(fora))
+
+
+def piloto_fora(decisoes: list[dict]) -> set:
+    """Quem o administrador tirou da coleta: a última decisão dele é sair (por `instante`; empate = a ordem recebida).
+    Com o app instalado, só esta decisão para a coleta."""
+    ultima: dict[int, tuple[str, bool]] = {}
+    for d in decisoes:
+        try:
+            pid = int(d.get("pessoa_id"))
+        except (TypeError, ValueError):
+            continue
+        inst = str(d.get("instante") or "")
+        if pid not in ultima or inst >= ultima[pid][0]:
+            ultima[pid] = (inst, _sim(d.get("no_piloto")))
+    return {pid for pid, (_, sim) in ultima.items() if not sim}
 
 
 def _sim(v) -> bool:

@@ -53,6 +53,7 @@ log = logging.getLogger(__name__)
 CHAVE_EXT = "nexus_equipe"
 PILOTO_S = 60                    # a decisão do piloto vale em até 1 min
 TECNICOS_S = 5 * 60              # quem é técnico de campo ativo no cadastro
+COM_APP_S = 5 * 60               # quem instalou o Nexus Field (o livro do App sai de hora em hora, aos :25)
 TETO_FALHA_S = 60                # o banco ou a Microsoft que falhou: a próxima ida só depois disto
 
 _TRAVA_APP = threading.Lock()
@@ -89,12 +90,14 @@ def _email_normal(email) -> str:
 
 
 class Piloto(frozenset):
-    """Quem está no piloto (o conjunto, como sempre) e, em `teste`, quem dele é pessoa de teste (09/11/2026): quem lê só
-    o conjunto segue igual."""
+    """Quem está no piloto (o conjunto, como sempre); em `teste`, quem dele é pessoa de teste (09/11/2026); em `fora`,
+    quem o administrador tirou (17/11/2026: com o app instalado, só isso para a coleta). Quem lê só o conjunto segue
+    igual."""
 
-    def __new__(cls, ids=(), teste=()):
+    def __new__(cls, ids=(), teste=(), fora=()):
         p = super().__new__(cls, ids)
         p.teste = frozenset(teste) & p
+        p.fora = frozenset(fora) - p
         return p
 
 
@@ -215,6 +218,7 @@ class Servico:
         self._ms_falhou_em: float | None = None
         self._piloto = _Copia("o piloto (nexus_equipe_piloto)", PILOTO_S, self._ler_piloto)
         self._tecnicos = _Copia("os técnicos de campo do cadastro", TECNICOS_S, self._ler_tecnicos)
+        self._com_app = _Copia("quem instalou o Nexus Field", COM_APP_S, self._ler_com_app)
 
     # ── o banco ──────────────────────────────────────────────────────────────────────────────────────────────────
     def _ler_livro(self, livro: str, aba: str) -> list[dict]:
@@ -227,7 +231,7 @@ class Servico:
 
     def _ler_piloto(self) -> frozenset:
         decisoes = self._ler_livro(LIVRO_PILOTO, ABA_PILOTO)
-        return Piloto(AP.piloto_atual(decisoes), AP.piloto_teste(decisoes))
+        return Piloto(AP.piloto_atual(decisoes), AP.piloto_teste(decisoes), AP.piloto_fora(decisoes))
 
     def _ler_tecnicos(self) -> frozenset:
         from nexus.campo import visao
@@ -237,6 +241,24 @@ class Servico:
         if not ids:
             raise RuntimeError("o cadastro veio sem nenhum técnico de campo")
         return ids
+
+    def _ler_com_app(self) -> frozenset:
+        """Quem instalou o Nexus Field e entrou com login: o livro que o App publica (`campo/field_aparelhos.py`, o
+        mesmo da coluna Nexus Field de Base > Acessos), casado pelo código do e-mail de cada ficha do cadastro (nada de
+        e-mail no banco). Sem a chave do código, ninguém (a coleta segue pelo piloto e pelas chaves dos aparelhos)."""
+        from nexus.campo import field_aparelhos as NF
+        from nexus.campo import visao
+        from nexus.cadastro.ligacao_campo import codigo_da_pessoa
+        with self._app.app_context():
+            nf = NF.ler()
+            if nf.get("erro"):
+                raise RuntimeError(f"o livro do App não foi lido ({nf['erro']})")
+            por, chave = nf.get("por_pessoa") or {}, self._app.config.get("NEXUS_PESSOA_HMAC")
+            if not por or not chave:
+                return frozenset()
+            linhas = visao._livro("cadastro_nexus", "pessoas")
+        return frozenset(pid for pid, email in fichas_decifradas(linhas, self.cofre)
+                         if email and codigo_da_pessoa(chave, email) in por)
 
     def chaves_prontas(self, agora: datetime | None = None) -> bool:
         """O livro das chaves já foi lido (ou acabou de ser). Até lá, nenhuma chave vale nem é emitida: as rotas
@@ -298,11 +320,23 @@ class Servico:
             raise BancoFora("o cadastro do Nexus veio vazio do banco; tente de novo em instantes")
         return pessoa_pelo_email(email, fichas_decifradas(linhas, self.cofre))
 
+    def coletados(self, piloto) -> "Piloto":
+        """Quem o Nexus Field coleta (17/11/2026, Levi: "Quero que os técnicos que apareçam no mapa sejam os mesmos que
+        instalaram o app e não só os que botei no piloto!"): quem tem a chave do aparelho ativa, menos quem o
+        administrador tirou, mais quem ele pôs (`aparelhos.coletados`). Antes de lidas as chaves, só o piloto."""
+        com_app = set(self.chaveiro.pessoas()) if self._chaves_lidas else set()
+        try:
+            com_app |= set(self._com_app.valor(_agora().timestamp()))
+        except Exception as e:          # noqa: BLE001 — o livro do App fora: a coleta segue pelo piloto e pelas chaves
+            log.warning("equipe: não li quem instalou o Nexus Field (%s); vale o piloto", type(e).__name__)
+        return Piloto(AP.coletados(piloto, com_app, piloto.fora), getattr(piloto, "teste", ()), piloto.fora)
+
     def coleta_vale(self, pessoa_id, agora: datetime) -> bool:
-        """Técnico de campo ativo E no piloto. O piloto vem antes: quem está fora dele nem custa a leitura do cadastro.
-        `AindaLendo` (a 1ª leitura em curso noutro pedido) e `BancoFora` (sem leitura boa) sobem: 503 na rota."""
+        """Técnico de campo ativo E coletado (com o app ou posto pelo administrador, e não tirado). Os coletados vêm
+        antes: quem está fora nem custa a leitura do cadastro. `AindaLendo` (a 1ª leitura em curso noutro pedido) e
+        `BancoFora` (sem leitura boa) sobem: 503 na rota."""
         ts = agora.timestamp()
-        piloto = self._piloto.valor(ts)
+        piloto = self.coletados(self._piloto.valor(ts))
         if pessoa_id not in piloto:
             return False
         teste = getattr(piloto, "teste", frozenset())
@@ -312,10 +346,10 @@ class Servico:
         return AP.coleta_vale(pessoa_id, tecnicos, piloto, teste)
 
     def piloto(self, agora: datetime | None = None) -> frozenset | None:
-        """Quem está no piloto agora: a MESMA cópia de 1 min que decide a coleta (a tela do mapa não mostra quem o
-        celular não manda). None = nenhuma leitura boa ainda (a tela avisa); `AindaLendo` sobe."""
+        """Quem é coletado agora (`coletados`): a MESMA regra e a mesma cópia de 1 min que decidem a coleta (a tela do
+        mapa não mostra quem o celular não manda). None = nenhuma leitura boa ainda (a tela avisa); `AindaLendo` sobe."""
         try:
-            return self._piloto.valor((agora or _agora()).timestamp())
+            return self.coletados(self._piloto.valor((agora or _agora()).timestamp()))
         except BancoFora:
             return None
 

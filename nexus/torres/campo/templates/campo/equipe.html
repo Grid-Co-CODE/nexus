@@ -39,9 +39,10 @@
         {% endcall %}
         {% else %}
         {% call explica('O que é coletado, quem vê e por quanto tempo') %}
-          <p><b>O que é coletado.</b> A posição do celular de cada técnico de campo do piloto, pelo Nexus Field: da
-          primeira abertura do app no dia até as 22h na hora do técnico, a cada 2 minutos em deslocamento e mais espaçado parado. Só o técnico
-          de campo ativo do cadastro e escolhido para o piloto é coletado.</p>
+          <p><b>O que é coletado.</b> A posição do celular de cada técnico de campo que instalou o Nexus Field e entrou com
+          login: da primeira abertura do app no dia até as 22h na hora do técnico, a cada 2 minutos em deslocamento e mais
+          espaçado parado. Só o técnico de campo ativo do cadastro é coletado, e o administrador pode parar a coleta de
+          alguém.</p>
           <p><b>Quem vê.</b> Os setores PCM, COS, Performance, Supervisão Campo e Responsáveis UFV, e os administradores do
           Nexus. Cada abertura do mapa, de cada rota e de cada percurso fica registrada (quem abriu, quando, de quem e, no
           percurso, de que período), para responder a um pedido da LGPD.</p>
@@ -115,7 +116,7 @@
     </form>
     {# o filtro suspenso (10/11/2026, Levi: "a estrutura de filtros usando como referência os filtros de histórico de OS, um filtro suspenso e simples"): o campo-filtros.js monta o botão Filtros, o painel com o Aplicar e as etiquetas com as listas deste formulário #}
     <script src="{{ url_for('static', filename='campo-filtros.js') }}"></script>
-    <p class="eq-resumo">{% for n, rot, tom in resumo %}<span class="cn-pill cn-{{ tom }}">{{ n }} {{ rot }}</span>{% else %}<span class="mudo">{{ 'Nenhum técnico do piloto neste filtro.' if filtro.tem else 'Nenhum técnico no piloto da coleta agora.' }}</span>{% endfor %}</p>
+    <p class="eq-resumo">{% for n, rot, tom in resumo %}<span class="cn-pill cn-{{ tom }}">{{ n }} {{ rot }}</span>{% else %}<span class="mudo">{{ 'Nenhum técnico com o Nexus Field neste filtro.' if filtro.tem else 'Nenhum técnico no piloto da coleta agora.' }}</span>{% endfor %}</p>
     {% endif %}
   </div>
   {% endif %}
@@ -266,7 +267,7 @@
        visão de técnico e rotas pode ficar em uma botão do eventos como 'Técnico e Rotas'... vai até o limite do mapa e
        vai tendo a barra de rolagem"): abre nos eventos; o botão leva à lista de técnicos (?painel=tecnicos); o técnico
        escolhido abre a gaveta dele #}
-    <aside class="eq-lado{% if painel_ev %} eq-lado--ev{% endif %}" aria-label="{{ 'As usinas no mapa' if usinas else ('Os eventos do dia' if painel_ev else 'Os técnicos do piloto') }}">
+    <aside class="eq-lado{% if painel_ev %} eq-lado--ev{% endif %}" aria-label="{{ 'As usinas no mapa' if usinas else ('Os eventos do dia' if painel_ev else 'Os técnicos com o Nexus Field') }}">
       {% if usinas %}
       {# o Usinas (11/11/2026): a lista das usinas do mapa, pelo nome; com o clima, a etiqueta do nível de cada uma #}
       <section class="eq-grupo eq-usinas-lista">
@@ -392,18 +393,21 @@
         </ul>
       </section>
       {% else %}
-      <p class="eq-vazio">Nenhum técnico no piloto da coleta{{ ' neste filtro' if filtro.tem }}.</p>
+      <p class="eq-vazio">Nenhum técnico com o Nexus Field{{ ' neste filtro' if filtro.tem }}.</p>
       {% endfor %}
       {% endif %}
     </aside>
   </div>
 
   {% if admin and not usinas %}
-  {# o piloto (só administradores): no piloto, o Nexus Field só coleta quem foi escolhido aqui (padrão: ninguém) #}
+  {# a coleta (só administradores). Desde 17/11/2026 (Levi: "Quero que os técnicos que apareçam no mapa sejam os mesmos
+     que instalaram o app e não só os que botei no piloto!") o Nexus Field coleta quem instalou o app; aqui se para a
+     coleta de alguém ou se liga a de quem ainda não aparece como instalado. O livro continua o do piloto #}
   <details class="eq-piloto"{% if piloto_msg %} open{% endif %}>
-    <summary><b>Piloto da coleta</b> <span>{{ no_piloto }} técnico{{ 's' if no_piloto != 1 }} no piloto · só administradores</span></summary>
-    <p class="eq-nota">O Nexus Field só coleta o técnico de campo ativo do cadastro que está no piloto (padrão: ninguém). A
-      decisão vai ao livro do piloto com o código de quem decidiu, e vale para o celular no próximo envio.</p>
+    <summary><b>Coleta do Nexus Field</b> <span>{{ no_piloto }} técnico{{ 's' if no_piloto != 1 }} com a coleta ligada · só administradores</span></summary>
+    <p class="eq-nota">O Nexus Field coleta o técnico de campo ativo do cadastro que instalou o app e entrou com login. Aqui
+      se para a coleta de alguém ou se liga a de quem ainda não aparece como instalado. A decisão vai ao livro com o
+      código de quem decidiu, e vale para o celular no próximo envio.</p>
     {# o Celular pronto (10/11/2026, Levi: "tem como sabermos qual o técnico não aceitou tudo?"): pelos ajustes que o Nexus
        Field 1.2.2 manda em cada envio (campo/equipe/celulares.py) #}
     <p class="eq-nota"><b>Celular pronto</b>: o termo novo aceito, a localização precisa, o "Permitir o tempo todo", a bateria
@@ -419,8 +423,8 @@
           <input type="hidden" name="no_piloto" value="{{ 'nao' if t.no_piloto else 'sim' }}">
           {% if t.teste %}<input type="hidden" name="teste" value="1">{% endif %}
           {% if t.celular %}<span class="cn-pill cn-{{ t.celular.tom }} eq-celular">{{ t.celular.texto }}</span>{% endif %}
-          {% if t.no_piloto %}<span class="cn-pill cn-ok">no piloto</span>{% endif %}
-          <button class="gc-btn gc-btn--contorno" type="submit">{{ 'Tirar do piloto' if t.no_piloto else 'Pôr no piloto' }}</button>
+          {% if t.no_piloto %}<span class="cn-pill cn-ok">coleta ligada</span>{% endif %}
+          <button class="gc-btn gc-btn--contorno" type="submit">{{ 'Parar a coleta' if t.no_piloto else 'Ligar a coleta' }}</button>
         </form></li>
       {% else %}<li class="eq-vazio">Nenhum técnico de campo ativo no cadastro.</li>{% endfor %}
     </ul>
@@ -432,7 +436,7 @@
       <input type="hidden" name="teste" value="1">
       <label class="gc-rotulo" for="eq-teste-pessoa">Pessoa de teste (não é técnica de campo; fica fora da conta dos técnicos)</label>
       <select class="gc-campo" id="eq-teste-pessoa" name="pessoa_id">{% for pid, nome in pessoas_teste %}<option value="{{ pid }}">{{ nome }}</option>{% endfor %}</select>
-      <button class="gc-btn gc-btn--contorno" type="submit">Pôr no piloto como teste</button>
+      <button class="gc-btn gc-btn--contorno" type="submit">Ligar a coleta como teste</button>
     </form>
     {% endif %}
   </details>

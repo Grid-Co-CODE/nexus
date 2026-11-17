@@ -248,6 +248,29 @@ def test_registro_fora_do_piloto_devolve_coleta_false(app, cliente, banco, ms):
     assert S.do_app(app).chaveiro.eventos_novos() == []                    # ninguém recebeu chave
 
 
+
+def test_quem_instalou_o_app_registra_e_e_coletado_sem_estar_no_piloto(app, cliente, banco, ms):
+    """17/11/2026, Levi: "Quero que os técnicos que apareçam no mapa sejam os mesmos que instalaram o app e não só os
+    que botei no piloto!". O técnico fora do piloto que aparece no livro do App (instalou e entrou com login) ganha a
+    chave e a coleta; a saída que o administrador grava para a coleta dele mesmo com o app."""
+    from nexus.cadastro.ligacao_campo import codigo_da_pessoa
+    from nexus.campo import field_aparelhos as NF
+    hmac_ = "h" * 32
+    app.config.update(NEXUS_PESSOA_HMAC=hmac_)
+    _aba(banco, NF.LIVRO, NF.ABA, [{NF.C_PESSOA: codigo_da_pessoa(hmac_, EMAIL[FORA_DO_PILOTO]), NF.C_APARELHO: "Moto G35",
+                                    NF.C_VERSAO: "NexusField/1.2.4", NF.C_INSTALADO: "2026-11-10T08:00:00",
+                                    NF.C_ACESSO: "2026-11-17T08:00:00"}])
+    visao.limpar()
+    r = _registrar(cliente, token="token:" + EMAIL[FORA_DO_PILOTO])
+    assert r.status_code == 200 and r.get_json()["coleta"] is True and r.get_json()["chave"]
+    # o desligado e a supervisora seguem fora, mesmo que instalem: só o técnico de campo ativo
+    assert _registrar(cliente, token="token:" + EMAIL[DESLIGADO]).get_json() == {"coleta": False}
+    # o administrador para a coleta dele: vale mesmo com o app
+    _aba(banco, LIVRO_PILOTO, ABA_PILOTO, PILOTO + [_decisao(FORA_DO_PILOTO, "não", "2026-11-17T12:00:00Z")])
+    visao.limpar()
+    S.do_app(app).esquecer_piloto()
+    assert _registrar(cliente, token="token:" + EMAIL[FORA_DO_PILOTO]).get_json() == {"coleta": False}
+
 # ── quem é: só o e-mail exato da ficha ───────────────────────────────────────────────────────────────────────────────
 def _com_a_5a_ficha(banco, ficha):
     """O cadastro com a 5ª ficha, que entra no piloto como técnica de campo ativa (só a identidade decide)."""

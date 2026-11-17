@@ -455,7 +455,7 @@ def test_o_filtro_estreita_o_mapa_a_lista_e_o_resumo(cliente, pontos, setor):
     assert f'<option value="{SUP_CENTRO}" selected>' in html
     # os dois juntos valem juntos: o supervisor da Centro e a equipe Leste não têm ninguém, e a tela diz
     _, html = _html(cliente, query_string={"supervisor": SUP_CENTRO, "equipe": LESTE, **TECNICOS})
-    assert _no_painel(html) == set() and "Nenhum técnico do piloto neste filtro." in html
+    assert _no_painel(html) == set() and "Nenhum técnico com o Nexus Field neste filtro." in html
 
 
 @pytest.mark.parametrize("pedido", [{"supervisor": 999}, {"equipe": 999}, {"supervisor": SUP_OESTE}, {"equipe": OESTE},

@@ -1604,8 +1604,23 @@ essencial", e só dentro da LGPD. A coleta é da casca Android (repositório do 
 (`/t/campo/equipe`), na Usinas 360°, logo depois da Visão do cliente. O plano está em
 `docs/superpowers/plans/2026-11-08-mapa-de-equipe.md`.
 
-**Estado:** no ar desde 08/11/2026 (Nexus `36b19a9`), gravação ligada no servidor em 09/11/2026; a coleta só vale para
-quem o administrador pôs no piloto. **10/11/2026:** o ponto exato para todos e o Ver percurso (ver "O ponto exato e o
+**Estado:** no ar desde 08/11/2026 (Nexus `36b19a9`), gravação ligada no servidor em 09/11/2026. **Desde 17/11/2026 a
+coleta vale para quem instalou o app** (Levi: "Quero que os técnicos que apareçam no mapa sejam os mesmos que instalaram o
+app e não só os que botei no piloto!").
+- **Coletados** (`aparelhos.coletados`, `servico.coletados`): o piloto, mais quem tem o app, menos quem o administrador
+  tirou (a última decisão dele é sair, `piloto_fora`); depois, a mesma conferência de técnico de campo ativo.
+- **"Tem o app"** são duas fontes:
+  - a chave do aparelho ativa;
+  - o livro do App `aparelhos_nexus_field_app_campo · Aparelhos` (`campo/field_aparelhos.py`, o mesmo da coluna Nexus
+    Field de Base > Acessos), casado pelo código do e-mail de cada ficha (`_ler_com_app`, cópia de 5 min).
+- Sem o livro do App (fora ou sem a `NEXUS_PESSOA_HMAC`), vale o piloto e as chaves: a coleta nunca para por isso.
+- O registro do celular usa a mesma regra: quem instalou ganha a chave e a coleta no próximo registro.
+- **Na tela**, o bloco do administrador virou "Coleta do Nexus Field", com os botões "Parar a coleta" e "Ligar a coleta":
+  - parar grava a saída no livro do piloto;
+  - ligar serve a quem ainda não aparece como instalado e à pessoa de teste.
+- O termo da LGPD continua no próprio app, que só coleta depois de aceito.
+- Prova: `test_quem_instalou_o_app_registra_e_e_coletado_sem_estar_no_piloto` (rotas) e
+  `test_quem_instalou_o_app_e_coletado_e_a_saida_do_administrador_vale` (regra). **10/11/2026:** o ponto exato para todos e o Ver percurso (ver "O ponto exato e o
 percurso" abaixo), pedido do Levi pela sessão Nexus Field; sobe com o OK dele.
 
 ### As peças

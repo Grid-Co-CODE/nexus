@@ -109,3 +109,15 @@ def test_a_pessoa_de_teste_vale_pela_ultima_decisao_e_so_no_piloto():
     assert AP.coleta_vale(7, {}, AP.piloto_atual(d), AP.piloto_teste(d)) is True       # sem ser de campo
     assert AP.coleta_vale(8, {}, AP.piloto_atual(d), AP.piloto_teste(d)) is False      # de campo? não: fora
     assert AP.coleta_vale(9, {}, AP.piloto_atual(d), AP.piloto_teste(d)) is False      # saiu
+
+
+def test_quem_instalou_o_app_e_coletado_e_a_saida_do_administrador_vale():
+    """17/11/2026, Levi: "Quero que os técnicos que apareçam no mapa sejam os mesmos que instalaram o app e não só os
+    que botei no piloto!". Coletados = o piloto + quem tem o app, menos quem o administrador tirou."""
+    from nexus.campo.equipe import aparelhos as AP
+    d = [{"pessoa_id": 1, "instante": "2026-11-09T15:00:00Z", "no_piloto": 1},
+         {"pessoa_id": 2, "instante": "2026-11-09T15:00:00Z", "no_piloto": 1},
+         {"pessoa_id": 2, "instante": "2026-11-17T09:00:00Z", "no_piloto": 0}]       # o administrador tirou o 2
+    assert AP.piloto_fora(d) == {2} and AP.piloto_atual(d) == {1}
+    assert AP.coletados(AP.piloto_atual(d), {2, 3}, AP.piloto_fora(d)) == {1, 3}    # o 3 só tem o app
+    assert AP.coletados(set(), set(), set()) == set()
