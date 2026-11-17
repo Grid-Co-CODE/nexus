@@ -7,6 +7,25 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css">
+<script>
+/* o tema do Nexus (17/11/2026, Levi: "Não tá pegando tema claro, arrume"): esta página é um documento à parte, numa
+   moldura, e não herdava o data-tema da casca, então ficava sempre no escuro. Ela lê o tema da casca (mesma origem) antes
+   da 1ª pintura e acompanha a troca pelo botão do topo; aberta em tela cheia, lê o cookie nexus_tema ou a reserva
+   nexus.tema, como o _tema_cabeca.html. */
+(function () {
+  var raiz = document.documentElement, casca = null;
+  try { if (window.self !== window.top) casca = window.parent.document.documentElement; } catch (e) { casca = null; }
+  function guardado() {
+    var m = document.cookie.match(/(?:^|;\s*)nexus_tema=(claro|escuro)(?:;|$)/);
+    if (m) return m[1];
+    try { return localStorage.getItem("nexus.tema"); } catch (e) { return null; }
+  }
+  function aplica() { raiz.setAttribute("data-tema", (casca ? casca.getAttribute("data-tema") : guardado()) === "claro" ? "claro" : "escuro"); }
+  aplica();
+  if (casca && window.MutationObserver) new MutationObserver(aplica).observe(casca, {attributes: true, attributeFilter: ["data-tema"]});
+  window.addEventListener("storage", function (ev) { if (ev.key === "nexus.tema") aplica(); });
+})();
+</script>
 <style>
 /* Mockup da Visão do contrato (pedido da área de Contratos, 12/11/2026), para a avaliação de Contratos e dos setores. Tokens do
    nexus.css (tema escuro navy, verde Grid). Dados ilustrativos: cliente, CNPJ, pessoas e usinas são fictícios.
@@ -45,10 +64,30 @@
   --info:#7fb8ff;--info-suave:rgba(91,157,255,.14);
   --font-sans:"Poppins",system-ui,sans-serif;--font-mono:"IBM Plex Mono",Consolas,monospace;
   --raio-tag:6px;--raio-controle:8px;--raio-md:10px;--rolagem:#243154;--rolagem-hover:#34426b;
+  --verde-hover:#8bbf00;--sombra:rgba(0,0,0,.4);--veu:rgba(5,8,16,.65);--fora-do-mes:rgba(0,0,0,.18);
+  /* as barras dos gráficos do exemplo (metas e financeiro), que eram cor fixa no desenho */
+  --barra-ok:#2f8f5b;--barra-aprovada:#4ade80;--barra-alerta:#ffd83d;--barra-severo:#ff8f3c;--barra-critico:#ff5b6e;
+  --barra-futura:#3a4766;--barra-extra:#7fb8ff;
+}
+/* o tema claro: os mesmos valores do bloco :root[data-tema="claro"] do nexus.css (página quase branca, a tabela num cinza
+   claro, verde Grid só como superfície e o musgo no texto, semáforo com contraste AA) */
+:root[data-tema="claro"]{
+  --fundo:#ffffff;--superficie:#e9ecf1;--superficie-2:#e3e7ed;--superficie-3:#dde2e9;--barra:#eef2f7;
+  --tinta:#1f2937;--tinta-2:#475569;--mudo:#525c6b;--fraco:#545e6e;
+  --linha:rgba(15,23,42,.10);--linha-forte:rgba(15,23,42,.18);
+  --verde:#a9db21;--verde-suave:rgba(169,219,33,.18);--verde-texto:#566610;--sobre-verde:#0d1526;
+  --ok:#14612f;--ok-suave:rgba(31,136,61,.12);--alerta:#7a5200;--alerta-suave:rgba(230,175,46,.18);
+  --severo:#a33d00;--severo-suave:rgba(247,140,60,.16);--critico:#a81f2c;--critico-suave:rgba(220,53,69,.09);
+  --info:#0954ad;--info-suave:rgba(9,105,218,.08);
+  --rolagem:#c3c9d3;--rolagem-hover:#a3abb8;
+  --verde-hover:#9bcb1a;--sombra:rgba(15,23,42,.16);--veu:rgba(15,23,42,.32);--fora-do-mes:rgba(15,23,42,.05);
+  --barra-ok:#1f7a4d;--barra-aprovada:#3dbb68;--barra-alerta:#f0b429;--barra-severo:#f59342;--barra-critico:#ef5d6e;
+  --barra-futura:#c3c9d3;--barra-extra:#5c9cf5;
 }
 /* a barra de rolagem do Nexus (a mesma do nexus.css): a padrão do navegador, clara e com setas, destoava do navy dentro
    da moldura (Levi, 12/11/2026: "esse scroll branco aí é zoado") */
 html{color-scheme:dark;scrollbar-width:thin;scrollbar-color:var(--rolagem) transparent}
+html[data-tema="claro"]{color-scheme:light}
 ::-webkit-scrollbar{width:8px;height:8px}
 ::-webkit-scrollbar-track{background:transparent}
 ::-webkit-scrollbar-thumb{background:var(--rolagem);border-radius:8px}
@@ -74,11 +113,44 @@ html.embutido main{padding:16px 2px 40px;max-width:none}
 
 /* o contrato em duas linhas */
 .ct-linha{display:flex;align-items:baseline;gap:6px 14px;flex-wrap:wrap}
-.ct-nome{position:relative;display:inline-flex;align-items:center;max-width:100%}
-.ct-nome select{appearance:none;-webkit-appearance:none;border:0;background:transparent;padding:0 26px 0 0;margin:0;cursor:pointer;
-  font:700 22px/1.25 var(--font-sans);letter-spacing:-.02em;color:var(--tinta);max-width:100%;text-overflow:ellipsis;border-radius:6px;field-sizing:content}
-.ct-nome select option{font:400 14px var(--font-sans);background:var(--superficie);color:var(--tinta)}
-.ct-nome .ph{position:absolute;right:4px;top:50%;margin-top:-8px;font-size:16px;color:var(--mudo);pointer-events:none}
+/* a troca de contrato (17/11/2026, Levi: "ARRUME ESSA LISTA FEIA, DEIXE NO PADRÃO NEXUS"): a lista nativa do navegador
+   (o item marcado em cinza claro, fora do tema) virou a lista do Nexus, a mesma da busca de usina (campo.css, .rd-usinas):
+   o cliente e, embaixo, o gestor; o atraso à direita; a busca no alto quando a lista é longa; setas, Enter e Esc */
+.ct-escolha{position:relative;display:inline-flex;max-width:100%}
+.ct-escolha-btn{display:inline-flex;align-items:center;gap:8px;max-width:100%;border:0;background:transparent;padding:0 4px 0 0;margin:0;cursor:pointer;
+  font:700 22px/1.25 var(--font-sans);letter-spacing:-.02em;color:var(--tinta);border-radius:6px;text-align:left}
+.ct-escolha-btn span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ct-escolha-btn .ph{flex:none;font-size:16px;color:var(--mudo);transition:transform .15s}
+.ct-escolha-btn:hover .ph{color:var(--tinta)}
+.ct-escolha-btn[aria-expanded="true"] .ph{transform:rotate(180deg)}
+.ct-pop{position:absolute;z-index:30;top:calc(100% + 6px);left:0;width:360px;max-width:calc(100vw - 24px);padding:6px;
+  border:1px solid var(--linha-forte);border-radius:var(--raio-md);background:var(--superficie);box-shadow:0 16px 40px var(--sombra)}
+.ct-pop[hidden]{display:none}
+.ct-busca{display:flex;align-items:center;gap:8px;margin:0 0 6px;padding:0 10px;border:1px solid var(--linha-forte);border-radius:var(--raio-controle);background:var(--fundo)}
+.ct-busca:focus-within{border-color:var(--verde-texto)}
+.ct-busca .ph{font-size:15px;color:var(--mudo)}
+.ct-busca input{flex:1;min-width:0;border:0;background:transparent;padding:8px 0;font-size:13px;outline:0}
+.ct-lista{list-style:none;margin:0;padding:0;max-height:min(380px,62vh);overflow:auto}
+.ct-lista li[role="option"]{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:1px 12px;padding:8px 10px;border-radius:6px;cursor:pointer}
+.ct-lista li[role="option"] b{font:600 13.5px/18px var(--font-sans);color:var(--tinta);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ct-lista li[role="option"] small{grid-column:1;font-size:12px;color:var(--mudo)}
+.ct-lista li[role="option"] .pill{grid-column:2;grid-row:1 / span 2}
+.ct-lista li[role="option"]:hover,.ct-lista li.marcada{background:var(--superficie-2)}
+.ct-lista li[aria-selected="true"] b{color:var(--verde-texto)}
+.ct-lista li.ct-todos{margin-bottom:4px;box-shadow:0 1px 0 var(--linha)}
+.ct-lista li[hidden]{display:none}
+.ct-nada{padding:10px;font-size:13px;color:var(--mudo)}
+/* o Voltar do contrato aberto para a lista de todos (17/11/2026) */
+.ct-voltar{margin:0 0 12px;text-decoration:none;color:var(--tinta-2)}
+.ct-voltar .ph{font-size:15px}
+/* a linha do cliente em Todos os contratos abre o contrato (17/11/2026, Levi: "As linhas de clientes devem ser clicáveis
+   com um botão de voltar!"): a linha inteira, com o nome como link para o teclado */
+.tab tr[data-ir]{cursor:pointer}
+.tab tr[data-ir]:hover td{background:var(--superficie-2)}
+.tab tr[data-ir] a{color:var(--verde-texto);font-weight:600;text-decoration:none}
+.tab tr[data-ir]:hover a{text-decoration:underline}
+.tab td.ir{width:1%;padding-left:0;color:var(--mudo);vertical-align:middle}
+.tab tr[data-ir]:hover td.ir{color:var(--tinta)}
 .ct-cod{color:var(--tinta-2);font-size:13px}
 .ct-tipo{color:var(--mudo);font-size:13px}
 /* o gestor do contrato, quando há: na 1ª linha, à vista sem abrir a ficha */
@@ -129,7 +201,7 @@ h3{margin:0;font:600 13.5px/1.3 var(--font-sans)}
 .btn{display:inline-flex;align-items:center;gap:8px;padding:7px 13px;border-radius:var(--raio-controle);border:1px solid var(--linha-forte);background:transparent;cursor:pointer;font-weight:600;font-size:12.5px;white-space:nowrap}
 .btn:hover{background:var(--superficie-2)}
 .btn--prim{background:var(--verde);border-color:var(--verde);color:var(--sobre-verde)}
-.btn--prim:hover{background:#8bbf00}
+.btn--prim:hover{background:var(--verde-hover)}
 .nota{font-size:12px;color:var(--mudo);margin:10px 0 0;max-width:86ch}
 .nota b{color:var(--tinta-2)}
 .bloco{margin-top:26px}
@@ -154,7 +226,7 @@ h3{margin:0;font:600 13.5px/1.3 var(--font-sans)}
 .nome{font-weight:600}
 .sub{display:block;color:var(--mudo);font-size:11.5px;margin-top:2px}
 .antes{display:block;color:var(--mudo);font-size:12px;margin-top:3px}
-.antes s{color:var(--fraco);text-decoration-color:rgba(255,255,255,.3)}
+.antes s{color:var(--fraco);text-decoration-color:var(--linha-forte)}
 .vazio-c{color:var(--fraco)}
 .hist{list-style:none;margin:0;padding:2px 0 2px 14px;border-left:2px solid var(--linha-forte);font-size:12.5px;display:grid;gap:10px}
 .hist li span{display:block;color:var(--tinta-2);margin-top:2px}
@@ -177,7 +249,7 @@ tr.hist-l td{background:var(--barra)}
 .cal .dsem{padding:8px 10px;font:500 11.5px/1 var(--font-sans);color:var(--mudo);background:var(--barra);border-bottom:1px solid var(--linha)}
 .cal .dia{min-height:96px;padding:7px 7px 8px;border-right:1px solid var(--linha);border-bottom:1px solid var(--linha);display:flex;flex-direction:column;gap:4px;min-width:0}
 .cal .dia:nth-child(7n){border-right:0}
-.cal .dia.fora{background:rgba(0,0,0,.18)}
+.cal .dia.fora{background:var(--fora-do-mes)}
 .cal .dia.hoje{box-shadow:inset 0 0 0 1px var(--verde)}
 .cal .n{font:600 12px/1 var(--font-mono);color:var(--tinta-2);margin-bottom:2px}
 .cal .dia.hoje .n{color:var(--verde-texto)}
@@ -229,19 +301,19 @@ tr.extra td:first-child{box-shadow:inset 3px 0 0 var(--info)}
 
 /* diálogo e aviso */
 dialog{width:min(540px,94vw);background:var(--superficie);color:var(--tinta);border:1px solid var(--linha-forte);border-radius:12px;padding:22px}
-dialog::backdrop{background:rgba(5,8,16,.65)}
+dialog::backdrop{background:var(--veu)}
 dialog h2{font-size:17px}
 .campo{display:grid;gap:5px;margin-top:12px}
 .campo label{font:500 12px/1 var(--font-sans);color:var(--mudo)}
 .campo input,.campo select,.campo textarea{width:100%;padding:8px 10px;border-radius:var(--raio-controle);border:1px solid var(--linha-forte);background:var(--superficie-2)}
 .dupla{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .acoes{display:flex;gap:8px;margin-top:18px;padding-top:14px;border-top:1px solid var(--linha)}
-.toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:var(--superficie-3);border:1px solid var(--linha-forte);padding:10px 16px;border-radius:var(--raio-controle);font-size:12.5px;z-index:60;box-shadow:0 10px 30px rgba(0,0,0,.4)}
+.toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:var(--superficie-3);border:1px solid var(--linha-forte);padding:10px 16px;border-radius:var(--raio-controle);font-size:12.5px;z-index:60;box-shadow:0 10px 30px var(--sombra)}
 .rodape{margin-top:36px;color:var(--fraco);font-size:11.5px}
 
 @media (max-width:1100px){.grade2{grid-template-columns:minmax(0,1fr)}.kpis{grid-template-columns:repeat(3,minmax(0,1fr))}.kpi:nth-child(3){border-right:0}.kpi:nth-child(-n+3){border-bottom:1px solid var(--linha)}.ficha{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media (max-width:820px){main{padding:14px 16px 40px}.resumo{grid-template-columns:repeat(2,minmax(0,1fr))}.resumo div:nth-child(2){border-right:0}.resumo div:nth-child(3){padding-left:0}.cal .dia{min-height:64px}.ev{font-size:10px}.ct-mais{margin-left:0}}
-@media (max-width:640px){.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.kpi{border-bottom:1px solid var(--linha)}.kpi:nth-child(3){border-right:1px solid var(--linha)}.kpi:nth-child(2n){border-right:0}.ficha{grid-template-columns:minmax(0,1fr)}.ct-nome select{font-size:18px}.dupla{grid-template-columns:1fr}}
+@media (max-width:640px){.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.kpi{border-bottom:1px solid var(--linha)}.kpi:nth-child(3){border-right:1px solid var(--linha)}.kpi:nth-child(2n){border-right:0}.ficha{grid-template-columns:minmax(0,1fr)}.ct-escolha-btn{font-size:18px}.dupla{grid-template-columns:1fr}}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;scroll-behavior:auto!important}}
 </style>
 </head>
@@ -380,6 +452,80 @@ var FIN = [];
 var STATUS_FIN = {paga: ["Paga", "t-ok"], aprovada: ["Aprovada", "t-verde"], aprovacao: ["Em aprovação do cliente", "t-alerta"],
   atencao: ["Ponto de atenção", "t-severo"], futura: ["Lançamento futuro", "t-neutro"]};
 
+/* a lista do Nexus que troca o contrato. `opcoes`: [{i, nome, sub, atraso}], com o i = -1 para "Todos os contratos" */
+function escolha(opcoes, atual) {
+  var cur = opcoes.filter(function (o) { return o.i === atual; })[0] || opcoes[0], longa = opcoes.length > 8;
+  return '<div class="ct-escolha" data-escolha><button type="button" class="ct-escolha-btn" aria-haspopup="listbox" aria-expanded="false" aria-controls="ct-lista" aria-label="Contrato: ' + esc(cur.nome) + '. Trocar de contrato">' +
+    "<span>" + esc(cur.nome) + '</span><i class="ph ph-caret-down" aria-hidden="true"></i></button>' +
+    '<div class="ct-pop" hidden>' + (longa ? '<label class="ct-busca"><i class="ph ph-magnifying-glass" aria-hidden="true"></i><span class="so-leitor">Buscar cliente</span>' +
+      '<input type="search" placeholder="Buscar cliente" autocomplete="off" role="combobox" aria-expanded="true" aria-controls="ct-lista" aria-autocomplete="list"></label>' : "") +
+    '<ul class="ct-lista" id="ct-lista" role="listbox" aria-label="Contratos" tabindex="-1">' + opcoes.map(function (o) {
+      return '<li role="option" id="ct-op-' + (o.i + 1) + '" data-ir="' + o.i + '"' + (o.i < 0 ? ' class="ct-todos"' : "") + (o.i === atual ? ' aria-selected="true"' : "") + "><b>" + esc(o.nome) + "</b>" +
+        (o.sub ? "<small>" + esc(o.sub) + "</small>" : "") + (o.atraso ? '<span class="pill t-critico" title="' + o.atraso + ' em atraso">' + o.atraso + "</span>" : "") + "</li>";
+    }).join("") + '<li class="ct-nada" role="presentation" hidden>Nenhum cliente com esse nome</li></ul></div></div>';
+}
+function semAcento(t) { return String(t).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim(); }
+var aberta = null;      // a lista aberta: {raiz, botao, pop, campo, itens, marcada}
+function abreEscolha(raiz) {
+  var botao = raiz.querySelector(".ct-escolha-btn"), pop = raiz.querySelector(".ct-pop");
+  aberta = {raiz: raiz, botao: botao, pop: pop, campo: pop.querySelector("input"), itens: [].slice.call(pop.querySelectorAll('li[role="option"]')), marcada: -1};
+  pop.hidden = false; botao.setAttribute("aria-expanded", "true");
+  var sel = aberta.itens.findIndex(function (li) { return li.getAttribute("aria-selected") === "true"; });
+  if (aberta.campo) { aberta.campo.value = ""; filtraEscolha(); aberta.campo.focus(); } else pop.querySelector(".ct-lista").focus();
+  marcaEscolha(sel < 0 ? 0 : sel, true);
+}
+function fechaEscolha(devolveFoco) {
+  if (!aberta) return;
+  aberta.pop.hidden = true; aberta.botao.setAttribute("aria-expanded", "false");
+  if (devolveFoco) aberta.botao.focus();
+  aberta = null;
+}
+function visiveisEscolha() { return aberta.itens.filter(function (li) { return !li.hidden; }); }
+function marcaEscolha(k, absoluto) {
+  var vs = absoluto ? aberta.itens : visiveisEscolha(), alvo = aberta.campo || aberta.pop.querySelector(".ct-lista");
+  aberta.itens.forEach(function (li) { li.classList.remove("marcada"); });
+  if (!vs.length) { aberta.marcada = -1; alvo.removeAttribute("aria-activedescendant"); return; }
+  var li = vs[Math.max(0, Math.min(k, vs.length - 1))];
+  aberta.marcada = visiveisEscolha().indexOf(li);
+  li.classList.add("marcada"); li.scrollIntoView({block: "nearest"}); alvo.setAttribute("aria-activedescendant", li.id);
+}
+function filtraEscolha() {
+  var q = semAcento(aberta.campo.value), n = 0;
+  aberta.itens.forEach(function (li) { li.hidden = q !== "" && semAcento(li.textContent).indexOf(q) < 0; if (!li.hidden) n += 1; });
+  aberta.pop.querySelector(".ct-nada").hidden = n > 0;
+  marcaEscolha(0);
+}
+function teclaEscolha(ev) {
+  if (!aberta) return;
+  if (ev.key === "ArrowDown") { ev.preventDefault(); marcaEscolha(aberta.marcada + 1); }
+  else if (ev.key === "ArrowUp") { ev.preventDefault(); marcaEscolha(aberta.marcada - 1); }
+  else if (ev.key === "Home" && !aberta.campo) { ev.preventDefault(); marcaEscolha(0); }
+  else if (ev.key === "End" && !aberta.campo) { ev.preventDefault(); marcaEscolha(1e9); }
+  else if (ev.key === "Enter") { ev.preventDefault(); var li = visiveisEscolha()[aberta.marcada]; if (li) { fechaEscolha(false); irPara(+li.getAttribute("data-ir")); } }
+  else if (ev.key === "Escape") { ev.preventDefault(); fechaEscolha(true); }
+  else if (ev.key === "Tab") fechaEscolha(false);
+}
+document.addEventListener("keydown", teclaEscolha);
+document.addEventListener("mousedown", function (ev) { if (aberta && !aberta.raiz.contains(ev.target)) fechaEscolha(false); });
+
+/* ── o endereço: o contrato aberto e a aba vão no endereço (#/c/<cliente>/<aba>; "#/" é Todos os contratos), para o
+   Voltar do navegador também voltar à lista (17/11/2026) ───────────────────────────────────────────────────────────── */
+function lista() { return REAL ? REAL.contratos : CONTRATOS; }
+function chave(i) { return REAL ? REAL.contratos[i].cliente : CONTRATOS[i].cod; }
+function rota(ct, aba) { return ct >= 0 ? "#/c/" + encodeURIComponent(chave(ct)) + "/" + (aba || "regras") : "#/"; }
+function irPara(ct) { var novo = rota(ct, ct === estado.ct ? estado.aba : "regras"); if (location.hash === novo) render(); else location.hash = novo; }
+function lerEndereco() {
+  var r = (location.hash || "").replace(/^#\/?/, "").split("/"), aba = r[0], ct = REAL ? -1 : 0;
+  if (r[0] === "c") {
+    var k = decodeURIComponent(r[1] || ""), L = lista();
+    for (var i = 0; i < L.length; i++) if (chave(i) === k) { ct = i; break; }
+    aba = r[2];
+  } else if (r[0] === "contrato") aba = r[1];        // o endereço antigo ("#/contrato/regras") segue abrindo a aba
+  else if (REAL && r[0]) ct = -1;
+  estado.ct = ct;
+  estado.aba = ABAS.some(function (a) { return a[0] === aba; }) ? aba : "regras";
+}
+
 /* ── utilidades ─────────────────────────────────────────────────────────────────────────────────────────────── */
 var ABAS = [["regras", "Regras"], ["calendario", "Calendário"], ["atendimento", "Atendimento"], ["entregaveis", "Entregáveis"], ["metas", "Metas"], ["financeiro", "Financeiro"]];
 var estado = {ct: 0, aba: "regras", soAcordadas: false, grupos: {}, abertoHist: {}, ficha: false, atModo: "usina", entModo: "usina", kpi: "disp", agrup: "mes"};
@@ -409,9 +555,9 @@ function spark(h, meta, w, hh) {
   var px = function (i) { return 2 + i * (w - 4) / (h.length - 1); }, py = function (v) { return hh - 3 - (v - min) * (hh - 6) / (max - min); };
   var ult = h[h.length - 1];
   return '<svg viewBox="0 0 ' + w + " " + hh + '" preserveAspectRatio="none" aria-hidden="true">' +
-    '<line x1="0" x2="' + w + '" y1="' + py(meta).toFixed(1) + '" y2="' + py(meta).toFixed(1) + '" stroke="rgba(255,255,255,.22)" stroke-dasharray="3 3"/>' +
-    '<polyline points="' + h.map(function (v, i) { return px(i).toFixed(1) + "," + py(v).toFixed(1); }).join(" ") + '" fill="none" stroke="#96a0b4" stroke-width="1.5" vector-effect="non-scaling-stroke"/>' +
-    '<circle cx="' + px(h.length - 1).toFixed(1) + '" cy="' + py(ult).toFixed(1) + '" r="2.6" fill="' + (ult >= meta ? "#4ade80" : "#ff5b6e") + '"/></svg>';
+    '<line x1="0" x2="' + w + '" y1="' + py(meta).toFixed(1) + '" y2="' + py(meta).toFixed(1) + '" style="stroke:var(--linha-forte)" stroke-dasharray="3 3"/>' +
+    '<polyline points="' + h.map(function (v, i) { return px(i).toFixed(1) + "," + py(v).toFixed(1); }).join(" ") + '" fill="none" style="stroke:var(--mudo)" stroke-width="1.5" vector-effect="non-scaling-stroke"/>' +
+    '<circle cx="' + px(h.length - 1).toFixed(1) + '" cy="' + py(ult).toFixed(1) + '" r="2.6" style="fill:var(' + (ult >= meta ? "--ok" : "--critico") + ')"/></svg>';
 }
 
 /* ── o contrato: duas linhas, as abas e a parte escolhida ──────────────────────────────────────────────────────── */
@@ -421,15 +567,14 @@ function vContrato() {
     .concat(ATRASADAS_ANTES.map(function (e) { return e.nome + " (" + e.quando + ")"; }));
   var atrasadas = emAtraso.length;
   // o nome do cliente É a troca de contrato: um controle a menos no alto da tela
-  var h = '<div class="ct-linha"><label class="ct-nome"><span class="so-leitor">Contrato</span><select id="selCt">' +
-    CONTRATOS.map(function (k, i) { return '<option value="' + i + '"' + (i === estado.ct ? " selected" : "") + ">" + esc(k.cliente) + "</option>"; }).join("") +
-    '</select><i class="ph ph-caret-down" aria-hidden="true"></i></label><span class="ct-cod num">' + c.cod + '</span><span class="ct-tipo">' + c.nome + "</span>" +
+  var h = '<div class="ct-linha">' + escolha(CONTRATOS.map(function (k, i) { return {i: i, nome: k.cliente, sub: k.cod + ", " + k.nome}; }), estado.ct) +
+    '<span class="ct-cod num">' + c.cod + '</span><span class="ct-tipo">' + c.nome + "</span>" +
     (c.gestor ? '<span class="ct-gestor"><i class="ph ph-user-circle" aria-hidden="true"></i><small>Gestor do contrato</small>' + esc(c.gestor) + "</span>" : "") +
     (estado.ct ? "" : '<button class="linkbtn ct-mais" data-ficha aria-expanded="' + estado.ficha + '">Dados do contrato<i class="ph ph-caret-' + (estado.ficha ? "up" : "down") + '" aria-hidden="true"></i></button>') + "</div>";
   // cada cliente tem o contrato dele (as regras, o calendário, o financeiro); no mockup só o primeiro tem dados
   if (estado.ct) {
     return h + '<div class="vazio"><h2>O mockup só tem os dados da ' + esc(CONTRATOS[0].cliente) + '</h2><p>Na tela de verdade cada cliente abre o contrato dele: as regras, o calendário, o atendimento, os entregáveis, as metas e o financeiro são separados por contrato, e o que se acorda com um não muda o do outro.</p>' +
-      '<button class="btn" data-voltar-ct>Voltar para a ' + esc(CONTRATOS[0].cliente) + "</button></div>";
+      '<button class="btn" data-ir="0">Voltar para a ' + esc(CONTRATOS[0].cliente) + "</button></div>";
   }
   h += '<dl class="fatos"><div><dt>Vigência</dt><dd>até 28/02/2028<small>faltam 15 meses</small></dd></div>' +
     '<div><dt>Mensalidade</dt><dd class="num">' + brl(195347.20) + "</dd></div>" +
@@ -445,11 +590,11 @@ function vContrato() {
   }
   // o gestor do contrato sempre vê o que está em atraso, em toda aba, e recebe o aviso no sino até resolver
   if (atrasadas) {
-    h += '<p class="atraso" role="status"><i class="ponto p-critico" aria-hidden="true"></i><b>' + atrasadas + " em atraso</b><span>" + esc(emAtraso.join(" e ")) + '</span><a class="linkbtn" href="#/calendario">Ver no calendário</a>' +
+    h += '<p class="atraso" role="status"><i class="ponto p-critico" aria-hidden="true"></i><b>' + atrasadas + " em atraso</b><span>" + esc(emAtraso.join(" e ")) + '</span><a class="linkbtn" href="' + rota(estado.ct, "calendario") + '">Ver no calendário</a>' +
       '<span class="atraso-sino"><i class="ph ph-bell" aria-hidden="true"></i>' + (c.gestor ? "No sino de " + esc(c.gestor) + ", todo dia, até resolver" : "Contrato sem gestor: o aviso vai para o setor Contratos") + "</span></p>";
   }
   h += '<nav class="abas" aria-label="Partes do contrato">' + ABAS.map(function (a) {
-    return '<a href="#/' + a[0] + '"' + (estado.aba === a[0] ? ' aria-current="page"' : "") + ">" + a[1] +
+    return '<a href="' + rota(estado.ct, a[0]) + '"' + (estado.aba === a[0] ? ' aria-current="page"' : "") + ">" + a[1] +
       (a[0] === "calendario" && atrasadas ? '<b title="' + atrasadas + ' atrasadas">' + atrasadas + "</b>" : "") + "</a>";
   }).join("") + "</nav>";
   return h + ({regras: pRegras, calendario: pCalendario, atendimento: pAtendimento, entregaveis: pEntregaveis, metas: pMetas, financeiro: pFinanceiro}[estado.aba])();
@@ -589,14 +734,14 @@ function grafico(k) {
   var vals = g.v.concat([k.meta]), min = Math.floor(Math.min.apply(null, vals) - 2), max = Math.ceil(Math.max.apply(null, vals) + 1);
   var y = function (v) { return top + (max - v) * (H - pe - top) / (max - min); }, n = g.v.length, slot = (W - 50) / n, bw = Math.min(46, slot * .55);
   var s = '<svg viewBox="0 0 ' + W + " " + H + '" role="img" aria-label="' + esc(k.nome) + ' por período, com a meta">';
-  for (var t = 0; t <= 4; t++) { var v = min + (max - min) * t / 4; s += '<line x1="44" x2="' + W + '" y1="' + y(v) + '" y2="' + y(v) + '" stroke="rgba(255,255,255,.06)"/><text x="38" y="' + (y(v) + 4) + '" fill="#767d92" font-size="10.5" text-anchor="end" font-family="IBM Plex Mono">' + pct(v, 0) + "</text>"; }
+  for (var t = 0; t <= 4; t++) { var v = min + (max - min) * t / 4; s += '<line x1="44" x2="' + W + '" y1="' + y(v) + '" y2="' + y(v) + '" style="stroke:var(--linha)"/><text x="38" y="' + (y(v) + 4) + '" style="fill:var(--fraco)" font-size="10.5" text-anchor="end" font-family="IBM Plex Mono">' + pct(v, 0) + "</text>"; }
   g.v.forEach(function (v, i) {
     var x = 50 + i * slot + (slot - bw) / 2;
-    s += '<rect x="' + x + '" y="' + y(v) + '" width="' + bw + '" height="' + (H - pe - y(v)) + '" rx="3" fill="' + (v >= k.meta ? "#2f8f5b" : "#ff5b6e") + '" opacity="' + (i === n - 1 ? 1 : .85) + '"><title>' + esc(g.rot[i] + ": " + pct(v) + k.unid) + "</title></rect>" +
-      '<text x="' + (x + bw / 2) + '" y="' + (y(v) - 5) + '" fill="#c3cad7" font-size="10.5" text-anchor="middle" font-family="IBM Plex Mono">' + pct(v) + "</text>" +
-      '<text x="' + (x + bw / 2) + '" y="' + (H - 10) + '" fill="#96a0b4" font-size="10.5" text-anchor="middle">' + esc(g.rot[i]) + "</text>";
+    s += '<rect x="' + x + '" y="' + y(v) + '" width="' + bw + '" height="' + (H - pe - y(v)) + '" rx="3" style="fill:var(' + (v >= k.meta ? "--barra-ok" : "--barra-critico") + ')" opacity="' + (i === n - 1 ? 1 : .85) + '"><title>' + esc(g.rot[i] + ": " + pct(v) + k.unid) + "</title></rect>" +
+      '<text x="' + (x + bw / 2) + '" y="' + (y(v) - 5) + '" style="fill:var(--tinta-2)" font-size="10.5" text-anchor="middle" font-family="IBM Plex Mono">' + pct(v) + "</text>" +
+      '<text x="' + (x + bw / 2) + '" y="' + (H - 10) + '" style="fill:var(--mudo)" font-size="10.5" text-anchor="middle">' + esc(g.rot[i]) + "</text>";
   });
-  return s + '<line x1="44" x2="' + W + '" y1="' + y(k.meta) + '" y2="' + y(k.meta) + '" stroke="#ffd83d" stroke-dasharray="5 4"/><text x="' + (W - 2) + '" y="' + (y(k.meta) - 5) + '" fill="#ffd83d" font-size="10.5" text-anchor="end">meta ' + pct(k.meta) + k.unid + "</text></svg>";
+  return s + '<line x1="44" x2="' + W + '" y1="' + y(k.meta) + '" y2="' + y(k.meta) + '" style="stroke:var(--alerta)" stroke-dasharray="5 4"/><text x="' + (W - 2) + '" y="' + (y(k.meta) - 5) + '" style="fill:var(--alerta)" font-size="10.5" text-anchor="end">meta ' + pct(k.meta) + k.unid + "</text></svg>";
 }
 /* Metas: aqui os indicadores SÃO o conteúdo. Seis numa faixa só (uma caixa, não seis); o clique escolhe o do gráfico,
    e o agrupamento fica no gráfico, que é o que ele muda */
@@ -624,7 +769,7 @@ function pFinanceiro() {
   var aReceber = FIN.filter(function (p) { return /aprovacao|aprovada/.test(p.st); }).reduce(function (s, p) { return s + p.valor; }, 0);
   var futuro = FIN.filter(function (p) { return p.st === "futura"; }).reduce(function (s, p) { return s + p.valor; }, 0);
   var extras = FIN.filter(function (p) { return p.extra; }).length;
-  var h = '<div class="regua"><h2>Entradas de 2026</h2><a class="linkbtn" href="#/regras">Ver as regras de medição e faturamento</a></div>';
+  var h = '<div class="regua"><h2>Entradas de 2026</h2><a class="linkbtn" href="' + rota(estado.ct, "regras") + '">Ver as regras de medição e faturamento</a></div>';
   h += '<dl class="resumo"><div><dt>Previsto no ano</dt><dd>' + brl(tot) + "<small>12 mensalidades e " + extras + " extras</small></dd></div>" +
     '<div><dt>Recebido</dt><dd class="c-ok">' + brl(recebido) + "<small>9 parcelas, 1 com desconto</small></dd></div>" +
     '<div><dt>A receber, já medido</dt><dd class="c-alerta">' + brl(aReceber) + "<small>em aprovação ou aprovado</small></dd></div>" +
@@ -637,11 +782,11 @@ function pFinanceiro() {
   for (var m = 0; m < 12; m++) {
     var ps = FIN.filter(function (p) { return p.comp === m; }), acum = 0, x = 10 + m * slot + (slot - bw) / 2;
     ps.forEach(function (p) {
-      var a = p.valor / max * (H - 30), cor = {paga: "#2f8f5b", atencao: "#ff8f3c", aprovacao: "#ffd83d", aprovada: "#4ade80", futura: "#3a4766"}[p.st] || "#3a4766";
-      s += '<rect x="' + x + '" y="' + (H - 22 - acum - a) + '" width="' + bw + '" height="' + a + '" rx="2" fill="' + cor + '"' + (p.extra ? ' stroke="#7fb8ff" stroke-width="1.5"' : "") + "><title>" + esc(p.ref + ": " + brl(p.valor)) + "</title></rect>";
+      var a = p.valor / max * (H - 30), cor = {paga: "--barra-ok", atencao: "--barra-severo", aprovacao: "--barra-alerta", aprovada: "--barra-aprovada", futura: "--barra-futura"}[p.st] || "--barra-futura";
+      s += '<rect x="' + x + '" y="' + (H - 22 - acum - a) + '" width="' + bw + '" height="' + a + '" rx="2" style="fill:var(' + cor + ')' + (p.extra ? ';stroke:var(--barra-extra)" stroke-width="1.5"' : '"') + "><title>" + esc(p.ref + ": " + brl(p.valor)) + "</title></rect>";
       acum += a;
     });
-    s += '<text x="' + (x + bw / 2) + '" y="' + (H - 6) + '" fill="#96a0b4" font-size="10.5" text-anchor="middle">' + MESES[m] + "</text>";
+    s += '<text x="' + (x + bw / 2) + '" y="' + (H - 6) + '" style="fill:var(--mudo)" font-size="10.5" text-anchor="middle">' + MESES[m] + "</text>";
   }
   h += s + "</svg></div>";
   h += '<div class="bloco rolavel"><table class="tab"><thead><tr><th>Competência</th><th>Referente a</th><th class="r">Valor</th><th>Medição prevista</th><th>Status</th><th>Ponto de atenção</th></tr></thead><tbody>' +
@@ -697,9 +842,10 @@ dlg.addEventListener("click", function (e) { if (e.target.closest("[data-fechar]
 /* ── rotas e eventos ─────────────────────────────────────────────────────────────────────────────────────────── */
 var main = document.getElementById("main");
 function render() {
-  // "#/regras"; o endereço antigo ("#/contrato/regras") segue abrindo a mesma aba
-  var r = (location.hash || "#/regras").replace("#/", "").split("/"), aba = r[0] === "contrato" ? r[1] : r[0];
-  estado.aba = ABAS.some(function (a) { return a[0] === aba; }) ? aba : "regras";
+  fechaEscolha(false);
+  var ctAntes = estado.ct;
+  lerEndereco();
+  if (estado.ct !== ctAntes) estado.ficha = false;
   if (REAL) {
     main.innerHTML = vReal() + '<p class="rodape">Dados reais da planilha de controle de obrigações de Contratos (Backoffice › 2. Contratos)' +
       (REAL.importado_em ? ", importada em " + dBR(REAL.importado_em.slice(0, 10)) + " às " + REAL.importado_em.slice(11, 16) : "") +
@@ -708,14 +854,17 @@ function render() {
   }
   main.innerHTML = vContrato() + '<p class="rodape">Mockup para avaliação: o cliente, o CNPJ, as pessoas e as usinas são fictícios, “hoje” é 13/11/2026 e nada aqui grava.</p>';
 }
-var ultimaAba = "";
-window.addEventListener("hashchange", function () { render(); if (estado.aba !== ultimaAba) window.scrollTo(0, 0); ultimaAba = estado.aba; });
+var ultimaAba = "", ultimoCt = null;
+window.addEventListener("hashchange", function () {
+  render();
+  if (estado.aba !== ultimaAba || estado.ct !== ultimoCt) window.scrollTo(0, 0);
+  ultimaAba = estado.aba; ultimoCt = estado.ct;
+});
 main.addEventListener("click", function (e) {
   var b;
   if ((b = e.target.closest("[data-regras]"))) { estado.soAcordadas = b.getAttribute("data-regras") === "acordadas"; render(); }
   else if (e.target.closest("[data-ficha]")) { estado.ficha = !estado.ficha; render(); }
   else if ((b = e.target.closest("[data-grupo]"))) { var g = b.getAttribute("data-grupo"); estado.grupos[g] = !estado.grupos[g]; render(); }
-  else if (e.target.closest("[data-voltar-ct]")) { estado.ct = 0; render(); }
   else if ((b = e.target.closest("[data-hist]"))) { var i = b.getAttribute("data-hist"); estado.abertoHist[i] = !estado.abertoHist[i]; render(); }
   else if ((b = e.target.closest("[data-ajustar]"))) dlgRegra(+b.getAttribute("data-ajustar"));
   else if (e.target.closest("[data-nova-regra]")) dlgRegra(null);
@@ -724,12 +873,19 @@ main.addEventListener("click", function (e) {
   else if ((b = e.target.closest("[data-kpi]"))) { estado.kpi = b.getAttribute("data-kpi"); render(); }
   else if ((b = e.target.closest("[data-agrup]"))) { estado.agrup = b.getAttribute("data-agrup"); render(); }
   else if (e.target.closest("[data-nova-entrada]")) dlgEntrada();
-  else if ((b = e.target.closest("[data-ct]"))) { estado.ct = +b.getAttribute("data-ct"); estado.ficha = false; render(); window.scrollTo(0, 0); }
+  else if ((b = e.target.closest(".ct-escolha-btn"))) { if (aberta) fechaEscolha(true); else abreEscolha(b.closest("[data-escolha]")); }
+  else if ((b = e.target.closest('.ct-lista li[role="option"]'))) { fechaEscolha(false); irPara(+b.getAttribute("data-ir")); }
+  // a linha do cliente (e o "Voltar para a ..." do exemplo); o link do nome segue sozinho
+  else if ((b = e.target.closest("[data-ir]")) && !e.target.closest("a")) irPara(+b.getAttribute("data-ir"));
+});
+main.addEventListener("input", function (e) { if (aberta && e.target === aberta.campo) filtraEscolha(); });
+main.addEventListener("mousemove", function (e) {
+  var li = aberta && e.target.closest('.ct-lista li[role="option"]');
+  if (li && !li.classList.contains("marcada")) marcaEscolha(visiveisEscolha().indexOf(li));
 });
 main.addEventListener("change", function (e) {
   var t = e.target;
-  if (t.id === "selCt") { estado.ct = +t.value; estado.ficha = false; render(); }
-  else if (t.hasAttribute("data-marco")) {
+  if (t.hasAttribute("data-marco")) {
     var m = MARCOS[+t.getAttribute("data-marco")]; m.u[t.getAttribute("data-u")] = t.checked;
     CARIMBO[m.nome] = EU + " · " + agoraTxt().slice(0, 5) + " " + agoraTxt().slice(11); render();
     toast(t.checked ? "Marcado como concluído no mês, com o seu nome e a hora." : "Desmarcado; o registro fica no histórico.");
@@ -789,9 +945,12 @@ function fichaReal(c) {
 
 function vReal() {
   var c = estado.ct >= 0 ? REAL.contratos[estado.ct] : null;
-  var h = '<div class="ct-linha"><label class="ct-nome"><span class="so-leitor">Contrato</span><select id="selCt"><option value="-1"' + (c ? "" : " selected") + ">Todos os contratos</option>" +
-    REAL.contratos.map(function (k, i) { return '<option value="' + i + '"' + (i === estado.ct ? " selected" : "") + ">" + esc(k.cliente) + "</option>"; }).join("") +
-    '</select><i class="ph ph-caret-down" aria-hidden="true"></i></label>';
+  // a lista em ordem de nome (como a nativa era), com "Todos os contratos" no alto
+  var ops = REAL.contratos.map(function (k, i) { return {i: i, nome: k.cliente, sub: k.gestor ? "Gestor: " + k.gestor : "sem gestor", atraso: k.atrasadas}; })
+    .sort(function (a, b) { return a.nome.localeCompare(b.nome, "pt-BR"); });
+  ops.unshift({i: -1, nome: "Todos os contratos", sub: REAL.contratos.length + " contratos"});
+  var h = (c ? '<a class="btn ct-voltar" href="#/" data-voltar><i class="ph ph-arrow-left" aria-hidden="true"></i>Voltar para todos os contratos</a>' : "") +
+    '<div class="ct-linha">' + escolha(ops, estado.ct);
   if (!c) return h + "</div>" + vTodos();
   h += (c.gestor ? '<span class="ct-gestor"><i class="ph ph-user-circle" aria-hidden="true"></i><small>Gestor do contrato</small>' + esc(c.gestor) + "</span>" : "") +
     '<button class="linkbtn ct-mais" data-ficha aria-expanded="' + estado.ficha + '">Dados do contrato<i class="ph ph-caret-' + (estado.ficha ? "up" : "down") + '" aria-hidden="true"></i></button></div>';
@@ -805,9 +964,9 @@ function vReal() {
   if (atr.length > 3) itens.push("e mais " + (atr.length - 3));
   var n = atr.length + (vencido(c) ? 1 : 0);
   if (n) h += '<p class="atraso" role="status"><i class="ponto p-critico" aria-hidden="true"></i><b>' + n + " em atraso</b><span>" + esc(itens.join("; ")) + "</span>" +
-    (atr.length ? '<a class="linkbtn" href="#/calendario">Ver no calendário</a>' : "") + "</p>";
+    (atr.length ? '<a class="linkbtn" href="' + rota(estado.ct, "calendario") + '">Ver no calendário</a>' : "") + "</p>";
   h += '<nav class="abas" aria-label="Partes do contrato">' + ABAS.map(function (a) {
-    return '<a href="#/' + a[0] + '"' + (estado.aba === a[0] ? ' aria-current="page"' : "") + ">" + a[1] +
+    return '<a href="' + rota(estado.ct, a[0]) + '"' + (estado.aba === a[0] ? ' aria-current="page"' : "") + ">" + a[1] +
       (a[0] === "calendario" && atr.length ? '<b title="' + atr.length + ' atrasadas">' + atr.length + "</b>" : "") + "</a>";
   }).join("") + "</nav>";
   return h + ({regras: rRegras, calendario: rCalendario}[estado.aba] || rSemFonte)(c);
@@ -829,15 +988,16 @@ function vTodos() {
   }
   return '<div class="regua"><h2>' + REAL.contratos.length + " contratos</h2><span class=\"mudo\">" + venc + " com a vigência vencida; " +
     comAtr + (comAtr === 1 ? " com obrigação em atraso" : " com obrigações em atraso") + "</span></div>" +
-    '<div class="rolavel"><table class="tab"><thead><tr><th>Cliente</th><th>Gestor do contrato</th><th>Vigência até</th><th>Renovação: avisar até</th><th>Próximo reajuste</th><th class="r">Em atraso</th></tr></thead><tbody>' +
+    '<div class="rolavel"><table class="tab"><thead><tr><th>Cliente</th><th>Gestor do contrato</th><th>Vigência até</th><th>Renovação: avisar até</th><th>Próximo reajuste</th><th class="r">Em atraso</th><th class="ir"><span class="so-leitor">Abrir</span></th></tr></thead><tbody>' +
     ordem.map(function (x) {
       var c = x.c;
-      return '<tr><td><button class="linkbtn" data-ct="' + x.i + '">' + esc(c.cliente) + "</button>" + (c.nao_localizado ? '<small class="mudo"> contrato não localizado</small>' : "") + "</td>" +
+      return '<tr data-ir="' + x.i + '"><td><a href="' + rota(x.i) + '">' + esc(c.cliente) + "</a>" + (c.nao_localizado ? '<small class="mudo"> contrato não localizado</small>' : "") + "</td>" +
         "<td>" + (c.gestor ? esc(c.gestor) : '<span class="mudo">sem gestor</span>') + "</td>" +
         "<td>" + data(c.fim, c.dias_fim, "sem data") + "</td>" +
         "<td>" + data(c.avisar_ate, c.dias_aviso, c.fim ? "sem aviso prévio" : "—") + "</td>" +
         "<td>" + (c.proximo_reajuste ? data(c.proximo_reajuste, c.dias_reajuste) + '<small class="mudo">; ' + esc(c.indice) + "</small>" : '<span class="mudo">' + esc(c.indice || "sem índice") + "</span>") + "</td>" +
-        '<td class="r">' + (c.atrasadas ? '<span class="pill t-critico">' + c.atrasadas + "</span>" : '<span class="mudo">0</span>') + "</td></tr>";
+        '<td class="r">' + (c.atrasadas ? '<span class="pill t-critico">' + c.atrasadas + "</span>" : '<span class="mudo">0</span>') + "</td>" +
+        '<td class="ir"><i class="ph ph-caret-right" aria-hidden="true"></i></td></tr>';
     }).join("") + "</tbody></table></div>";
 }
 
@@ -888,7 +1048,7 @@ fetch(new URL("../../t/comando/visao-do-contrato/dados.json", location.href), {c
   .then(function (r) { return r.ok ? r.json() : null; })
   .then(function (d) {
     if (d && d.ok && d.contratos && d.contratos.length) {
-      REAL = d; estado.ct = -1;
+      REAL = d;
       var selo = document.querySelector(".selo-mock"); if (selo) selo.textContent = "Dados reais da planilha de controle";
     }
   })

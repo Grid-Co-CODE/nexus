@@ -66,6 +66,18 @@ pasta do Backoffice: "ATUALIZE AGORA COM DADOS REAIS!".
     reais (o mês, as atrasadas, as próximas e a lista inteira);
   - Atendimento, Entregáveis, Metas e Financeiro dizem "Sem dado real ainda": a planilha não traz, e o exemplo fictício
     não se mistura com o contrato de verdade.
+- **Navegar (17/11/2026, Levi: "ARRUME ESSA LISTA FEIA, DEIXE NO PADRÃO NEXUS", "Não tá pegando tema claro" e "As
+  linhas de clientes devem ser clicáveis com um botão de voltar!")**:
+  - a troca de contrato é a lista do Nexus (a da busca de usina), não a nativa do navegador: o cliente, o gestor embaixo,
+    o atraso à direita, a busca sem acento quando passa de 8, e setas, Enter e Esc;
+  - a linha inteira do cliente em Todos os contratos abre o contrato (o nome é link, para o teclado); o contrato aberto
+    tem o botão **Voltar para todos os contratos**;
+  - o contrato e a aba vão no endereço da moldura (`#/c/<cliente>/<aba>`; `#/` é Todos os contratos), então o Voltar do
+    navegador também volta à lista. Os endereços antigos (`#/regras`, `#/contrato/regras`) seguem abrindo;
+  - **tema**: a página é um documento à parte e não herda o `data-tema` da casca. Ela lê o da casca antes da 1ª pintura e
+    acompanha a troca ao vivo (MutationObserver); em tela cheia, o cookie `nexus_tema`. Os tokens do claro são cópia do
+    bloco `:root[data-tema="claro"]` do `nexus.css`: mudou lá, muda aqui. Cor fixa não entra (nem nos gráficos SVG do
+    exemplo: a cor vai no `style`, com `var()`).
 - **Medido em 16/11/2026** com a planilha real: 16 contratos e 60 obrigações. Batem com as colunas automáticas da
   planilha, por exemplo:
   - Athon: vigência vencida em 25/08/2026 e próximo reajuste em 25/02/2027;

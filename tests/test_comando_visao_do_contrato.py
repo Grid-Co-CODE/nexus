@@ -42,7 +42,7 @@ def test_o_mockup_e_so_o_contrato_e_abre_nas_regras(cliente):
     # as seis partes do contrato, abrindo nas Regras
     assert ('var ABAS = [["regras", "Regras"], ["calendario", "Calendário"], ["atendimento", "Atendimento"], '
             '["entregaveis", "Entregáveis"], ["metas", "Metas"], ["financeiro", "Financeiro"]]') in pagina
-    assert '(location.hash || "#/regras")' in pagina
+    assert 'estado.aba = ABAS.some(function (a) { return a[0] === aba; }) ? aba : "regras";' in pagina
     # um controle só nas Regras (Todas | Acordadas): saíram os filtros por categoria, a ficha de seis caixas e o
     # seletor de contrato separado (o nome do cliente é a troca); a regra nova é a última linha da tabela
     assert pagina.count("data-cat") == 0 and 'class="chip' not in pagina
@@ -72,7 +72,7 @@ def test_a_barra_de_rolagem_do_nexus_as_regras_recolhidas_e_o_atraso_sempre_a_vi
     assert pagina.index('class="atraso" role="status"') < pagina.index('<nav class="abas" aria-label="Partes do contrato">')
     assert " em atraso</b>" in pagina and ", todo dia, até resolver" in pagina
     # cada cliente com o contrato dele: o nome troca o contrato (sem o aviso que desfazia a escolha)
-    assert "CONTRATOS[estado.ct]" in pagina and "estado.ct = +t.value" in pagina and 't.value = "0"' not in pagina
+    assert "CONTRATOS[estado.ct]" in pagina and "escolha(CONTRATOS.map(" in pagina and 't.value = "0"' not in pagina
 
 
 def test_o_gestor_do_contrato_aparece_quando_o_contrato_tem_um(cliente):
@@ -89,3 +89,33 @@ def test_o_gestor_do_contrato_aparece_quando_o_contrato_tem_um(cliente):
     assert "<th>Cliente</th><th>Gestor do contrato</th>" in pagina and "sem gestor</span>" in pagina
     assert "<dt>Gestora</dt>" not in pagina                                             # saiu da linha de fatos
 
+
+def test_a_lista_do_nexus_o_tema_claro_e_a_linha_que_abre_o_contrato(cliente):
+    """Levi, 17/11/2026, em Comando > Prévia: visão do contrato: "1 - ARRUME ESSA LISTA FEIA, DEIXE NO PADRÃO NEXUS",
+    "2 - Não tá pegando tema claro, arrume" e "3 - As linhas de clientes devem ser clicáveis com um botão de voltar!"."""
+    from pathlib import Path
+    r = cliente.get(MOCKUP)
+    pagina = r.get_data(as_text=True)
+    r.close()
+    # 1. a lista nativa do navegador saiu: a troca de contrato é a lista do Nexus, com busca e teclado
+    assert "selCt" not in pagina and "ct-nome" not in pagina
+    assert 'role="listbox"' in pagina and 'aria-haspopup="listbox"' in pagina and 'placeholder="Buscar cliente"' in pagina
+    assert 'ev.key === "ArrowDown"' in pagina and 'ev.key === "Escape"' in pagina and 'ev.key === "Enter"' in pagina
+    assert 'ops.unshift({i: -1, nome: "Todos os contratos"' in pagina
+    # 2. o tema: o da casca antes da 1ª pintura e a troca ao vivo; em tela cheia, o cookie. Os tokens do claro são os do
+    #    nexus.css, e nenhuma cor fixa ficou nos gráficos do exemplo
+    cabeca = pagina.split("<style>", 1)[0]
+    assert "window.parent.document.documentElement" in cabeca and 'attributeFilter: ["data-tema"]' in cabeca
+    assert "nexus_tema=(claro|escuro)" in cabeca and 'localStorage.getItem("nexus.tema")' in cabeca
+    assert 'html[data-tema="claro"]{color-scheme:light}' in pagina
+    css = (Path(__file__).resolve().parents[1] / "nexus" / "static" / "nexus.css").read_text(encoding="utf-8")
+    for token in ("--fundo:#ffffff", "--superficie:#e9ecf1", "--tinta:#1f2937", "--verde-texto:#566610", "--critico:#a81f2c"):
+        assert token in css and token in pagina
+    script = pagina.split("<body>", 1)[1]
+    assert 'fill="#' not in script and 'stroke="#' not in script and "rgba(255,255,255" not in script
+    # 3. a linha do cliente abre o contrato; o contrato aberto tem o Voltar; o endereço leva o contrato (o Voltar do
+    #    navegador também volta à lista)
+    assert "'<tr data-ir=\"' + x.i + '\"><td><a href=\"' + rota(x.i)" in pagina
+    assert 'e.target.closest("[data-ir]")) && !e.target.closest("a")' in pagina
+    assert 'class="btn ct-voltar" href="#/"' in pagina and "Voltar para todos os contratos" in pagina
+    assert 'return ct >= 0 ? "#/c/" + encodeURIComponent(chave(ct))' in pagina
