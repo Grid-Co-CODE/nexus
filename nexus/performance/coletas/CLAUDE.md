@@ -225,10 +225,14 @@ As duas precisam do Python além do relatório de furos; no .exe usam o BD que a
   chat da Coleta: "quero formas de coletar os dados novamente pelas nossas fontes de dados e gerar uma planilha para colar
   nos BDs"; aqui: "pode!", com a permissão à parte. A pessoa escolhe usina, período e o que quer; a plataforma busca na
   fonte e devolve o dado cru; a Coletas passa pela MESMA `montagem.montar` e sai a prévia e a planilha de colar. Nada grava.
-  - **Quem pode:** a tela `coletas/recoleta` ("Recoleta pelas fontes", `dentro_de="coletas"`, sem item no menu), marcada
-    por setor em Base > Acessos. Ter a Coletas não basta: a recoleta gasta cota paga (a da API PV é dividida com a coleta
-    da noite; em 14/11 uma recoleta de 3 dias a esgotou e 75 usinas ficaram sem resposta). Sem a tela, o botão "Recoletar
-    pela API" sai escondido e os `recoleta_*` respondem 403 (`coletas_tela._pode_recoletar`); o administrador sempre pode.
+  - **Quem pode: só quem é do setor Performance** (Levi, 17/11/2026, pelo chat da Coleta: "só quem é do setor
+    Performance", também nas fontes pagas; antes ele tinha dito "só admin" e corrigiu). É a tela `coletas/recoleta`
+    ("Recoleta pelas fontes", `dentro_de="coletas"`, sem item no menu) com `do_setor=SID.PERFORMANCE`: quem é do setor a
+    tem sem marcar nada; outro setor só se o Levi marcar em Base > Acessos; o administrador sempre pode. Ter a Coletas não
+    basta: a recoleta gasta cota paga (a da API PV é dividida com a coleta da noite; em 14/11 uma recoleta de 3 dias a
+    esgotou e 75 usinas ficaram sem resposta). Sem a tela, o botão "Recoletar pela API" sai escondido e os `recoleta_*`
+    respondem 403 (`coletas_tela._pode_recoletar`). A plataforma não sabe quem é a pessoa (a chave é uma só): a trava é
+    daqui.
   - **Os quatro métodos** (`SessaoNexus.recoleta_opcoes/_fatias/_parte/_montar`) são cópia dos da Api do .exe (app.py),
     com duas trocas: o "onde está na fonte" vem da aba Equipamentos do banco (`furos_portal`) e a chave vem do ambiente.
   - **A chave** (`servico.chave_recoleta`): a `CONVERSOR_RECOLETA_CHAVE` do .env, se a T.I. puser, ou o HMAC-SHA256 da

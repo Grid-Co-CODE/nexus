@@ -687,6 +687,14 @@ def test_a_tela_da_recoleta_mora_dentro_da_coletas(app):
     from nexus.torres.performance import TORRE
     t = TORRE.tela("coletas/recoleta")
     assert t.nome == "Recoleta pelas fontes" and t.dentro_de == "coletas"
+    # Levi (17/11/2026): "só quem é do setor Performance", também nas fontes pagas: o setor é o dono da tela e a vê sem
+    # marcar em Base > Acessos; quem é de outro setor não vê o botão nem passa pela rota
+    from nexus.auth import setor_telas
+    from nexus.cadastro import setor_ids as SID
+    with app.test_request_context():
+        assert "performance/coletas/recoleta" in setor_telas.das_do_setor(SID.PERFORMANCE)
+        outros = [v for k, v in vars(SID).items() if k.isupper() and isinstance(v, int) and v != SID.PERFORMANCE]
+        assert outros and not any("performance/coletas/recoleta" in setor_telas.das_do_setor(x) for x in outros)
 
 
 def test_a_chave_da_recoleta_sai_do_ambiente_do_nexus_sem_nada_no_git():
