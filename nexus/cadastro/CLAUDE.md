@@ -463,12 +463,34 @@ Levi, com as fotos da Rio do Peixe I e II, pediu sete coisas, e cada uma virou u
    - Ligar = a chave que a fonte usa vira chave desta usina (o mesmo POST `/equipamentos/chave`, com `chave_nova`).
    - Embaixo ficam os cartões das fontes que chegam (`_depara_painel.html`, por fetch), **sem o lápis e sem o "No
      cadastro"**: o cadastro está logo abaixo, e dois rascunhos da mesma usina na mesma página brigariam pelo selo.
-   - **A coluna "Na fonte"** na tabela dos inversores. Os cartões mandam o evento `eq-fontes` e o editor monta:
-     - o nome que a fonte manda para cada inversor casado (verde; amarelo quando casado pela ordem);
-     - para o que não casou, uma lista com os nomes que a fonte manda sem par naquela chave.
-
-     Escolher põe o nome no Equipamento Supervisório (rascunho), e com o Salvar a plataforma casa pelo nome. Onde a
-     plataforma não tem a lista da fonte, a coluna diz "sem leitura da fonte", nunca "sem par".
+   - **O Equipamento Supervisório pela fonte (a ligação de verdade, 17/11/2026 à tarde).** A 1ª versão tinha a coluna
+     "Na fonte", e escolher só punha o nome no Equipamento Supervisório do Nexus. Levi, na Rio do Peixe I e II: "esse
+     ligar aí só aparece que não está ligado no tempo real e não deixa a pessoa fazer uma ligação real"; "esse na fonte
+     é a mesma coisa que equipamento supervisório [...] o na fonte eu acho que seria a leitura da fonte em si". Não
+     valia por dois motivos, medidos no dado real: a chave não estava no lugar da aba (a plataforma lia a aba), e na API
+     PV pelo id, na conta oem@ e no scadaGridco a plataforma liga o inversor da fonte ao do cadastro pelo livro DELA
+     (`nexus_depara`, id da fonte → nome do cadastro), nunca pelo Equipamento Supervisório. Hoje:
+     - a coluna "Na fonte" saiu e o **Equipamento Supervisório** é a leitura da fonte: na chave com uma fonte que a
+       plataforma liga inversor a inversor e que ela leu (`EqLigacao.fontesPorChave`, `static/eq-ligacao.js`), a célula
+       é a lista dos inversores da fonte, com o ligado a este escolhido (luz verde; amarela = escolhido e não salvo) e,
+       nos outros, "hoje no Inversor X". Sem essa fonte (a Athon e a Axis ligam pelo nome; sem leitura) continua
+       digitado. O inversor do Nexus é o do cadastro da plataforma pelo nome no supervisório e, sem ele, pelo nome
+       (`alvoDo`, a régua do `_inversor_do_nexus`); o que a plataforma não tem diz "fora do cadastro da plataforma";
+     - os cartões levam `alvos` (o cadastro que a plataforma lê, `pares`), e o `nome` do alvo é o que o decidir aceita;
+     - **o Salvar grava a ligação na plataforma**: a estrutura primeiro (o Nexus) e, só com ela gravada, cada fonte num
+       POST ao `/api/admin/de-para/decidir` (o mesmo do editor De-para de lá; `{id da fonte: nome do cadastro}`). Pelo
+       navegador: o Nexus dá o passe da porta única (`POST /equipamentos/fontes/passe`, 60 s, uma vez, só admin e da
+       mesma origem), o fetch o leva ao `/painel/nexus/entrar` (abre a sessão da plataforma, como a janela "Ligar a…") e
+       grava. A ponte (a chave de leitura) segue só de leitura. Escolher o inversor da fonte que estava noutro o tira de
+       lá; o que perde uma ligação decidida na tela manda "" (desfaz); a do código ou do nome não se desfaz por lá.
+       Depois de gravar os cartões se releem (`eq-fontes-reler`) e mostram como a plataforma ficou;
+     - **a Usina Supervisório se preenche sozinha**: com UMA chave na usina, o inversor sem chave entra nela no rascunho
+       (aviso na tela; o Salvar grava). Caso: os 20 inversores da Rio do Peixe nasceram antes de a chave ser ligada
+       pelas Fontes de dados, todos sem chave; era escolher linha a linha. Com duas ou mais chaves, a pessoa escolhe.
+     Prova: `tests/test_base_equipamentos_ligacao_real.py` (a conta no node, a rota do passe, os alvos). Na Rio do Peixe
+     a fonte numera 1.1–1.10 e 2.1–2.10 (por planta) e o cadastro 1.1–4.5 (por skid): são os mesmos 20 inversores, e
+     pelas strings a fonte 1.6–1.10 é o 2.1–2.5 do cadastro, a 2.1–2.5 é o 3.1–3.5 e a 2.6–2.10 é o 4.1–4.5 (o 2.x da
+     fonte ligado ao 2.x do cadastro dava 20/18 e 18/20 no tempo real).
    - Sem usina aberta, a tela mostra as fontes que não chegam em usina nenhuma.
 
 Prova: `tests/test_base_equipamentos_depara_fontes.py`, `tests/test_base_equipamentos.py` e

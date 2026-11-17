@@ -56,12 +56,18 @@
   var D = JSON.parse(dados.textContent);
   var podeGravar = raiz.getAttribute('data-pode-gravar') === '1';
   var st = null, base = '', seq = 0, cmpAberta = null, chavesAbertas = false;
-  /* "Na fonte" (17/11/2026, Levi: "vai ter uma parte onde eu escolho qual a fonte de dados e ele tenta lincar em uma
-     outra coluna, caso não consiga eu mesmo linko"): o que os cartões das fontes dizem (cadastro-depara.js manda no
-     evento `eq-fontes`). NA_FONTE[id do inversor] = [{fonte, nome, modo}] dos pares que a plataforma já casou; LIVRES[id
-     da chave] = os nomes que a fonte manda e não casaram com ninguém, para escolher. Escolher grava no rascunho o nome no
-     Equipamento Supervisório: com o Salvar, a plataforma casa pelo nome. */
-  var NA_FONTE = null, LIVRES = {}, COMO = {};    // COMO[id da chave]: lido, sem_leitura, nome (liga pelo nome), erro
+  /* O Equipamento Supervisório pela fonte (17/11/2026). Levi, na Rio do Peixe I e II: "esse ligar aí só aparece que não
+     está ligado no tempo real e não deixa a pessoa fazer uma ligação real"; "esse na fonte é a mesma coisa que
+     equipamento supervisório. A diferença é que um é digitado, o outro não. O na fonte eu acho que seria a leitura da
+     fonte em si". A coluna "Na fonte" (que só punha o nome escolhido no Equipamento Supervisório do Nexus, sem efeito no
+     tempo real) virou o próprio Equipamento Supervisório: na chave com uma fonte que a plataforma liga inversor a
+     inversor, ele é o inversor da fonte ligado a este, lido dos cartões (cadastro-depara.js manda no evento
+     `eq-fontes`), e escolher grava a LIGAÇÃO no livro da plataforma com o Salvar (eq-ligacao.js, `gravarLigacoes`). Sem
+     essa fonte (a Athon liga pelo nome; sem leitura), continua digitado. FONTES[id da chave] = as fontes dela
+     (`EqLigacao.fontesPorChave`); LIGA[fonte|id da usina na fonte] = {nome do cadastro: id da fonte ou ""}, o rascunho
+     das ligações. */
+  var L = window.EqLigacao;
+  var FONTES = null, LIGA = {}, COMO = {};        // COMO[id da chave]: lido, sem_leitura, nome (liga pelo nome), erro
 
   function clonar(x) { return JSON.parse(JSON.stringify(x)); }
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return {'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]; }); }
@@ -78,9 +84,24 @@
     D.selo = ed.selo;
     st = {chaves: clonar(ed.chaves), cabines: clonar(ed.cabines), inversores: clonar(ed.inversores)};
     base = JSON.stringify(st);
+    /* a Usina Supervisório que se preenche sozinha (17/11/2026, Levi: "a usina supervisório primeiro, que se é ligado à
+       fonte lá em cima na base, esse usina supervisório já deve preencher automaticamente"). Na Rio do Peixe I e II os 20
+       inversores nasceram antes de a chave ser ligada pelas Fontes de dados, e ficaram sem chave: era escolher a chave
+       linha a linha. Com UMA chave na usina, o inversor sem chave entra nela no rascunho (o Salvar grava); com duas ou
+       mais, a escolha é da pessoa (a Altair tem seis). */
+    chaveSozinha();
     desenhar();
   }
-  sujo = function () { return st !== null && JSON.stringify(st) !== base; };
+  function chaveSozinha() {
+    var sozinha = st.chaves.length === 1 ? st.chaves[0] : null, entraram = 0;
+    if (sozinha) st.inversores.forEach(function (x) { if (x.chave == null) { x.chave = sozinha.supervisorio_id; entraram++; } });
+    if (entraram) avisar(entraram + (entraram === 1 ? ' inversor sem chave entrou' : ' inversores sem chave entraram') + ' na “' +
+                         sozinha.chave + '”, a única chave desta usina. Salve para gravar.', true);
+  }
+  function ligaPendente() {
+    return Object.keys(LIGA).some(function (fk) { var f = fontePorChave(fk); return f && Object.keys(L.decisoes(f, LIGA[fk])).length; });
+  }
+  sujo = function () { return st !== null && (JSON.stringify(st) !== base || ligaPendente()); };
   function cabPorK(k) { for (var i = 0; i < st.cabines.length; i++) if (st.cabines[i].k === k) return st.cabines[i]; return null; }
   function cabPorNome(n) { var t = semAcento(n); for (var i = 0; i < st.cabines.length; i++) if (semAcento(st.cabines[i].nome) === t) return st.cabines[i]; return null; }
   function invPorNome(n) { var t = semAcento(n); for (var i = 0; i < st.inversores.length; i++) if (semAcento(st.inversores[i].nome) === t) return st.inversores[i]; return null; }
@@ -194,17 +215,15 @@
     else {
       var opChaves = function (v) { return '<option value="">sem chave</option>' + st.chaves.map(function (ch) { return '<option value="' + ch.supervisorio_id + '"' + (ch.supervisorio_id === v ? ' selected' : '') + '>' + esc(ch.chave) + '</option>'; }).join(''); };
       var opCabs = function (v) { return '<option value="">sem cabine</option>' + st.cabines.map(function (c) { return '<option value="' + esc(c.k) + '"' + (c.k === v ? ' selected' : '') + '>' + esc(c.nome) + '</option>'; }).join(''); };
-      var comFonte = NA_FONTE !== null;
-      h += '<div class="cad-rolagem"><table class="cad-tabela eq-tab eq-tab-inv"><thead><tr><th>#</th><th>Usina Supervisório</th><th>Equipamento</th><th>Equipamento Supervisório</th>' +
-        (comFonte ? '<th title="O nome que a fonte manda para este inversor">Na fonte</th>' : '') +
+      h += '<div class="cad-rolagem"><table class="cad-tabela eq-tab eq-tab-inv"><thead><tr><th>#</th><th>Usina Supervisório</th><th>Equipamento</th>' +
+        '<th title="O inversor como a fonte o manda. Com uma fonte que a plataforma liga inversor a inversor, vem dela e se escolhe na lista: o Salvar grava a ligação na plataforma, e o tempo real passa a usá-la. Sem essa fonte, digite o nome como o supervisório o escreve.">Equipamento Supervisório</th>' +
         '<th>Equipamento Parente</th><th class="num">Potência (kWp)</th><th class="num">Strings Ativas</th><th></th></tr></thead><tbody>';
       st.inversores.forEach(function (x, i) {
         var calc = kwpCalculado(x);
         h += '<tr' + (!x.chave && st.chaves.length ? ' class="eq-linha-falta"' : '') + '><td class="id">' + (i + 1) + '</td>' +
           '<td class="eq-w-chave"><select class="gc-campo" data-tipo="inv" data-i="' + i + '" data-campo="chave" aria-label="Usina Supervisório de ' + esc(x.nome) + '"' + ro + '>' + opChaves(x.chave) + '</select></td>' +
           '<td class="eq-w-nome">' + campo('inv', i, 'nome', x.nome, ' maxlength="120" aria-label="Equipamento ' + (i + 1) + '"') + '</td>' +
-          '<td class="eq-w-sup">' + campo('inv', i, 'equipamento_supervisorio', x.equipamento_supervisorio, ' maxlength="120" placeholder="ex.: INVERSOR01" aria-label="Equipamento Supervisório de ' + esc(x.nome) + '"') + '</td>' +
-          (comFonte ? '<td class="eq-w-fonte">' + celFonte(x, i) + '</td>' : '') +
+          '<td class="eq-w-sup">' + celSup(x, i) + '</td>' +
           '<td class="eq-w-cab"><select class="gc-campo" data-tipo="inv" data-i="' + i + '" data-campo="cabine" aria-label="Equipamento Parente de ' + esc(x.nome) + '"' + ro + '>' + opCabs(x.cabine) + '</select></td>' +
           '<td class="eq-w-num">' + campo('inv', i, 'potencia_kwp', paraCampo(x.potencia_kwp), ' inputmode="decimal" placeholder="' + (calc != null ? '≈ ' + fmt(calc) + ' calc.' : '') + '" aria-label="kWp de ' + esc(x.nome) + '"') + '</td>' +
           '<td class="eq-w-str">' + campo('inv', i, 'strings_esperadas_qtd', x.strings_esperadas_qtd == null ? '' : x.strings_esperadas_qtd, ' inputmode="numeric" aria-label="Strings Ativas de ' + esc(x.nome) + '"') + '</td>' +
@@ -297,14 +316,19 @@
     var r = mudar(t);
     if (t.getAttribute('data-campo') === 'chave' || t.getAttribute('data-campo') === 'cabine' || t.getAttribute('data-tipo') === 'chave') desenhar(); else if (r) derivados();
   });
-  // "Na fonte": o nome escolhido vai para o Equipamento Supervisório do inversor (no rascunho; grava no Salvar)
+  // o inversor da fonte escolhido para este: só o rascunho das ligações (grava no Salvar, na plataforma)
   raiz.addEventListener('change', function (e) {
     var t = e.target;
-    if (t.hasAttribute('data-na-fonte')) {
-      var x = st.inversores[+t.getAttribute('data-na-fonte')]; if (!x) return;
-      x.equipamento_supervisorio = t.value;
+    if (t.hasAttribute('data-liga')) {
+      var fk = t.getAttribute('data-liga'), alvo = t.getAttribute('data-alvo'), f = fontePorChave(fk), v = t.value;
+      if (!f) return;
+      var r = LIGA[fk] = LIGA[fk] || {};
+      // o mesmo inversor da fonte escolhido antes para outro, no rascunho, sai de lá (um da fonte é um do cadastro)
+      if (v) Object.keys(r).forEach(function (k) { if (k !== alvo && r[k] === v) delete r[k]; });
+      r[alvo] = v;
+      if ((L.efetiva(f, {}).porAlvo[alvo] || [])[0] === v || (!v && !(L.efetiva(f, {}).porAlvo[alvo] || []).length)) delete r[alvo];
+      if (!Object.keys(L.decisoes(f, r)).length) delete LIGA[fk];
       desenhar();
-      if (t.value) avisar('“' + t.value + '” no Equipamento Supervisório de ' + x.nome + '. Com o Salvar, a plataforma casa pelo nome.', true);
     } else if (t.hasAttribute('data-acao-n')) {
       var n = lerNumero(t.value), i = +t.getAttribute('data-acao-n');
       if (n == null || isNaN(n) || n !== Math.round(n) || n > 300) { t.setAttribute('aria-invalid', 'true'); avisar('Diga quantos inversores (de 0 a 300).', false); return; }
@@ -358,46 +382,96 @@
     if (tirados < tirar) avisar('Saíram ' + tirados + ' de ' + tirar + ': os outros já estão salvos ou têm dado. Tire-os na tabela dos inversores.', false);
   }
 
-  /* a coluna "Na fonte" */
-  function celFonte(x, i) {
-    var casou = x.id != null ? (NA_FONTE[x.id] || []) : [];
-    if (casou.length) {
-      return casou.map(function (f) {
-        var tom = f.modo === 'ordem' ? 'alerta' : 'ok';
-        return '<span class="eq-fonte-par" title="' + esc(f.fonte + (f.modo === 'ordem' ? ': casado pela ordem, a conferir' : '')) + '"><i class="eqx-luz eqx-luz--' + tom + '" aria-hidden="true"></i>' + esc(f.nome) + '</span>';
-      }).join('');
+  /* a coluna Equipamento Supervisório */
+  function fontePorChave(fk) {
+    var achada = null;
+    Object.keys(FONTES || {}).forEach(function (sid) { (FONTES[sid] || []).forEach(function (f) { if (f.chave === fk) achada = f; }); });
+    return achada;
+  }
+  function celSup(x, i) {
+    var fs = FONTES && x.chave != null ? (FONTES[x.chave] || []) : [];
+    if (!fs.length) {
+      // sem fonte que ligue inversor a inversor: digitado, como a aba (a Athon e a Axis ligam pelo nome que mandam)
+      var dica = x.chave != null && COMO[x.chave] === 'nome' ? ' title="Nesta fonte o inversor liga pelo nome que ela manda: escreva-o como ela escreve"' : '';
+      return campo('inv', i, 'equipamento_supervisorio', x.equipamento_supervisorio, ' maxlength="120" placeholder="ex.: INVERSOR01" aria-label="Equipamento Supervisório de ' + esc(x.nome) + '"' + dica);
     }
-    var livres = (x.chave != null && LIVRES[x.chave]) || [];
-    var usados = st.inversores.map(function (o) { return semAcento(o.equipamento_supervisorio); });
-    var op = livres.filter(function (n) { return usados.indexOf(semAcento(n)) < 0 || semAcento(n) === semAcento(x.equipamento_supervisorio); });
-    if (!op.length) {
-      var como = x.chave == null ? 'sem chave' : ({lido: 'não chega da fonte', sem_leitura: 'sem leitura da fonte', nome: 'liga pelo nome',
-                                                   erro: 'fonte não lida'}[COMO[x.chave]] || 'nenhuma fonte nesta chave');
-      return '<span class="mudo">' + como + '</span>';
+    return fs.map(function (f) { return selLiga(x, f, fs.length > 1); }).join('');
+  }
+  function selLiga(x, f, comNome) {
+    var a = L.alvoDo(x, f), pre = comNome ? '<small class="mudo eq-liga-fonte">' + esc(f.fonte_nome) + '</small>' : '';
+    if (!a) {
+      return '<span class="eq-liga">' + pre + '<span class="mudo" title="A plataforma lê o cadastro desta chave da aba Equipamentos, e a aba não tem “' + esc(x.nome) +
+        '”. Salve e marque a chave “No lugar da aba” para a plataforma conhecê-lo; aí ele se liga aqui.">fora do cadastro da plataforma</span></span>';
     }
-    return '<select class="gc-campo eq-fonte-esc" data-na-fonte="' + i + '" aria-label="O nome na fonte de ' + esc(x.nome) + '"' + (podeGravar ? '' : ' disabled') + '>' +
-      '<option value="">ligar a…</option>' + op.map(function (n) {
-        return '<option value="' + esc(n) + '"' + (semAcento(n) === semAcento(x.equipamento_supervisorio) ? ' selected' : '') + '>' + esc(n) + '</option>';
-      }).join('') + '</select>';
+    var ef = L.efetiva(f, LIGA[f.chave]), meus = ef.porAlvo[a.nome] || [], sel = meus[0] || '';
+    var mudou = !!(LIGA[f.chave] && Object.prototype.hasOwnProperty.call(LIGA[f.chave], a.nome));
+    var exib = function (nome) { var b = f.alvos.filter(function (y) { return y.nome === nome; })[0]; return (b && (b.exibicao || b.nome)) || nome; };
+    var op = '<option value="">' + (meus.length ? 'sem ligação' : 'ligar a…') + '</option>' + f.linhas.map(function (l) {
+      var outro = ef.porId[l.id] && ef.porId[l.id] !== a.nome ? ef.porId[l.id] : null;
+      var rot = (l.rotulo && l.rotulo !== l.id ? l.rotulo : 'id ' + l.id + ' (sem nome na fonte)') + (l.repetido ? ' · id ' + l.id : '') + (outro ? ' · hoje no ' + exib(outro) : '') +
+                (l.hoje ? '' : ' · não leu hoje');
+      return '<option value="' + esc(l.id) + '"' + (l.id === sel ? ' selected' : '') + '>' + esc(rot) + '</option>';
+    }).join('');
+    var tom = mudou ? 'alerta' : (meus.length ? 'ok' : ''), dica = mudou ? 'Escolhido agora: grava com o Salvar' :
+      (meus.length ? 'Ligado na plataforma (' + f.fonte_nome + ')' : 'Sem ligação: o tempo real não sabe as esperadas deste inversor');
+    return '<span class="eq-liga">' + pre + '<i class="eqx-luz' + (tom ? ' eqx-luz--' + tom : '') + '" role="img" aria-label="' + esc(dica) + '" title="' + esc(dica) + '"></i>' +
+      '<select class="gc-campo eq-liga-esc" data-liga="' + esc(f.chave) + '" data-alvo="' + esc(a.nome) + '" aria-label="O inversor de ' + esc(f.fonte_nome) + ' ligado a ' + esc(x.nome) + '"' + (podeGravar ? '' : ' disabled') + '>' + op + '</select>' +
+      (meus.length > 1 ? '<span class="gc-status gc-status--alerta" title="A fonte manda ' + meus.length + ' inversores ligados a este: escolha um">' + meus.length + ' da fonte</span>' : '') + '</span>';
   }
   document.addEventListener('eq-fontes', function (e) {
-    NA_FONTE = {}; LIVRES = {}; COMO = {};
+    COMO = {};
     (e.detail || []).forEach(function (c) {
       // a plataforma sem a lista da fonte (a leitura do ciclo dela) não diz "sem par": diz que não leu
       if (c.supervisorio_id != null) {
         var k = c.erro ? 'erro' : (!c.edita_inversor ? 'nome' : ((c.sem_leitura || !(c.linhas || []).length) ? 'sem_leitura' : 'lido'));
         if (COMO[c.supervisorio_id] !== 'lido') COMO[c.supervisorio_id] = k;
       }
-      (c.linhas || []).forEach(function (l) {
-        if (l.inversor_id != null && l.alvo) (NA_FONTE[l.inversor_id] = NA_FONTE[l.inversor_id] || []).push({fonte: c.fonte_nome, nome: l.fonte, modo: l.modo});
-        else if (!l.alvo && c.supervisorio_id != null && l.fonte) {
-          var lv = LIVRES[c.supervisorio_id] = LIVRES[c.supervisorio_id] || [];
-          if (lv.indexOf(l.fonte) < 0) lv.push(l.fonte);
-        }
-      });
     });
+    FONTES = L.fontesPorChave(e.detail || []);
+    // o rascunho das ligações de uma fonte que sumiu da leitura não vale mais
+    Object.keys(LIGA).forEach(function (fk) { if (!fontePorChave(fk)) delete LIGA[fk]; });
     if (st) desenhar();
   });
+
+  /* a ligação gravada na plataforma: o passe da porta única abre a sessão dela neste navegador (como a janela "Ligar
+     a…"), e cada fonte vai num POST ao `/api/admin/de-para/decidir`, o mesmo do editor De-para de lá */
+  function pedidosLiga() {
+    return Object.keys(LIGA).map(function (fk) {
+      var f = fontePorChave(fk), inv = f ? L.decisoes(f, LIGA[fk]) : {};
+      return f && Object.keys(inv).length ? {fonte: f.fonte, id: String(f.plant_id), inversores: inv} : null;
+    }).filter(Boolean);
+  }
+  function json(r) { return r.json().catch(function () { return {ok: false, motivo: 'resposta inesperada (' + r.status + ')'}; }); }
+  function gravarLigacoes(pedidos) {
+    var feitas = 0;
+    return fetch(D.passe_url, {method: 'POST', credentials: 'same-origin', headers: {'Accept': 'application/json'}})
+      .then(json)
+      .then(function (p) {
+        if (!p.ok) throw new Error(p.motivo || 'sem o passe da plataforma');
+        var corpo = new URLSearchParams();
+        corpo.set('passe', p.passe);
+        return fetch(p.entrar, {method: 'POST', credentials: 'same-origin', body: corpo, redirect: 'manual'}).then(function (r) {
+          if (r.type !== 'opaqueredirect' && !(r.status >= 200 && r.status < 400)) throw new Error('a plataforma recusou o passe (' + r.status + ')');
+          return p.decidir;
+        });
+      })
+      .then(function (url) {
+        return pedidos.reduce(function (cadeia, ped) {
+          return cadeia.then(function () {
+            return fetch(url, {method: 'POST', credentials: 'same-origin', body: JSON.stringify(ped),
+                               headers: {'Content-Type': 'application/json', 'Accept': 'application/json'}})
+              .then(function (r) {
+                return json(r).then(function (j) {
+                  if (!r.ok || !j.ok) throw new Error((j.error || j.motivo || 'a plataforma respondeu ' + r.status) +
+                                                      (feitas ? ' (' + feitas + ' ligação(ões) de antes já gravada(s))' : ''));
+                  feitas += j.gravadas || Object.keys(ped.inversores).length;
+                });
+              });
+          });
+        }, Promise.resolve());
+      })
+      .then(function () { return feitas; });
+  }
 
   /* os botões */
   function trazer() {
@@ -476,16 +550,34 @@
     if (comDif.length && !window.confirm('Com o Salvar, ' + comDif.map(function (ch) { return ch.chave; }).join(', ') +
         ' passa' + (comDif.length > 1 ? 'm' : '') + ' a ser lida' + (comDif.length > 1 ? 's' : '') + ' do Nexus, e não da aba, e a coluna "Diferença com a aba" mostra diferenças (do que está salvo). Salvar mesmo assim?')) return;
     var corpo = {usina_id: D.usina_id, selo: D.selo, chaves: st.chaves, cabines: st.cabines, inversores: st.inversores};
+    var estrutura = JSON.stringify(st) !== base, ligacoes = pedidosLiga();
     botao.disabled = true;
-    fetch(D.salvar_url, {method: 'POST', credentials: 'same-origin', body: JSON.stringify(corpo),
-                         headers: {'Content-Type': 'application/json', 'Accept': 'application/json'}})
-      .then(function (r) { return r.json().catch(function () { return {ok: false, erro: 'Resposta inesperada (' + r.status + '): nada foi gravado.'}; }); })
-      .then(function (j) {
-        botao.disabled = false;
-        if (!j.ok) { avisar(j.erro || 'Não gravou.', false); return; }
-        if (j.comparacao) D.comparacao = j.comparacao;
-        carregar(j.editor);
-        avisar(j.aviso || 'Salvo.', true);
+    // a estrutura primeiro (o Nexus); as ligações depois (a plataforma), só com a estrutura gravada
+    (estrutura || !ligacoes.length
+      ? fetch(D.salvar_url, {method: 'POST', credentials: 'same-origin', body: JSON.stringify(corpo),
+                             headers: {'Content-Type': 'application/json', 'Accept': 'application/json'}})
+          .then(function (r) { return r.json().catch(function () { return {ok: false, erro: 'Resposta inesperada (' + r.status + '): nada foi gravado.'}; }); })
+          .then(function (j) {
+            if (!j.ok) { avisar(j.erro || 'Não gravou.', false); return null; }
+            if (j.comparacao) D.comparacao = j.comparacao;
+            carregar(j.editor);
+            return j.aviso || 'Salvo.';
+          })
+      : Promise.resolve(''))
+      .then(function (aviso) {
+        if (aviso === null) { botao.disabled = false; return; }
+        if (!ligacoes.length) { botao.disabled = false; avisar(aviso, true); return; }
+        return gravarLigacoes(ligacoes).then(function (n) {
+          LIGA = {};
+          botao.disabled = false;
+          desenhar();
+          avisar((aviso ? aviso + ' ' : '') + n + (n === 1 ? ' ligação gravada' : ' ligações gravadas') + ' na plataforma: o tempo real usa a partir da próxima leitura da fonte.', true);
+          document.dispatchEvent(new CustomEvent('eq-fontes-reler'));
+        }, function (ex) {
+          botao.disabled = false;
+          estado();
+          avisar((aviso ? aviso + ' ' : '') + 'A ligação não foi gravada na plataforma: ' + ex.message + '. O que você escolheu continua aqui: tente o Salvar de novo.', false);
+        });
       })
       .catch(function () { botao.disabled = false; avisar('Sem conexão: nada foi gravado.', false); });
   }
@@ -513,7 +605,7 @@
     else if (a === 'trazer') { trazer(); }
     else if (a === 'distribuir') { distribuir(); }
     else if (a === 'ver-cmp') { var sid = +b.getAttribute('data-sid'); cmpAberta = cmpAberta === sid ? null : sid; desenhar(); }
-    else if (a === 'descartar') { if (!sujo() || window.confirm('Descartar as mudanças não salvas?')) { st = JSON.parse(base); desenhar(); } }
+    else if (a === 'descartar') { if (!sujo() || window.confirm('Descartar as mudanças não salvas?')) { st = JSON.parse(base); LIGA = {}; chaveSozinha(); desenhar(); } }
     else if (a === 'salvar') { salvar(b); }
   });
   window.addEventListener('beforeunload', function (e) { if (sujo()) { e.preventDefault(); e.returnValue = ''; } });

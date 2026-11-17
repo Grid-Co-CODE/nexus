@@ -288,6 +288,9 @@
     });
   }
 
+  // a tabela dos inversores gravou ligações na plataforma: os cartões (e a coluna Equipamento Supervisório) se releem
+  document.addEventListener('eq-fontes-reler', function () { ler(true); });
+
   document.addEventListener('click', function (ev) {
     var b = ev.target.closest('button');
     if (!b || b.disabled) return;

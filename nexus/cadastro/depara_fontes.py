@@ -7,9 +7,10 @@ parecida". A prévia aprovada mora em `docs/mockups/equipamentos-e-depara` (repo
 O de-para é da PLATAFORMA (o livro `nexus_depara`, a tela `/admin/de-para`): aqui só se LÊ, pela ponte só de leitura
 (`X-Nexus-Leitura`, `nexus/performance/ponte.py`), o diagnóstico (`/api/admin/de-para`) e a usina aberta
 (`/api/admin/de-para/usina`). A plataforma deixa a chave ler só esses dois caminhos exatos (`leitura_nexus._GET_EXATO`) e
-não abre a API PV em pedido do Nexus: o que a fonte "manda hoje" é o da tabela do ciclo dela. Decidir um par continua na
-tela da plataforma (o "Ligar a…" abre o editor dela numa janela por cima, pela porta única); corrigir o CADASTRO (o
-lápis) é o editor da estrutura do Nexus.
+não abre a API PV em pedido do Nexus: o que a fonte "manda hoje" é o da tabela do ciclo dela. Decidir um par grava no
+livro da plataforma: pelo editor dela numa janela por cima ("Ligar a…", pela porta única) ou, desde 17/11/2026, pela
+coluna Equipamento Supervisório da tabela dos inversores, que manda o `/api/admin/de-para/decidir` do navegador com o
+passe da porta única (`static/eq-ligacao.js`; por isso os pares levam os `alvos`). A ponte segue só de leitura.
 
 Como a linha do diagnóstico chega à usina do Nexus: a `usina` dela é a chave do cadastro (a "Usina Supervisório"), e a
 estrutura liga cada chave a uma usina do Registro mestre. Pelo `norm` (sem acento, caixa e espaços repetidos: o cadastro
@@ -169,7 +170,11 @@ def pares(det: dict, invs_nexus: list) -> dict:
     por_nome = {}
     for a in alvos:
         por_nome.setdefault(str(a.get("nome") or ""), a)
-    rot = [str(i.get("nome_api") or i.get("nome") or i.get("id") or "") for i in det.get("inversores") or []]
+    # o rótulo é o nome que a FONTE dá ao inversor: o da API (`nome_api`) e, sem ele, o do código (`codigo`: no
+    # scadaGridco, o nome do equipamento, "Inversor 1.6"), nunca o decidido na tela (o `nome` é o do cadastro). Na
+    # usina do scadaGridco ligada pela tabela dos inversores (17/11/2026), o lado da fonte passava a repetir o cadastro
+    rot = [str(i.get("nome_api") or i.get("codigo") or i.get("nome") or i.get("id") or "")
+           for i in det.get("inversores") or []]
     vezes = {r: rot.count(r) for r in rot}
     usados, linhas = set(), []
     for i, r in zip(det.get("inversores") or [], rot):
@@ -192,7 +197,12 @@ def pares(det: dict, invs_nexus: list) -> dict:
         inv = _inversor_do_nexus(a, invs_nexus)
         sobra.append({"alvo": {"nome": a.get("nome"), "exibicao": a.get("exibicao"), "esp": a.get("esp")},
                       "inversor_id": inv["id"] if inv else None, "sem_leitura": sem_leitura})
-    return {"linhas": linhas, "sobra": sobra, "sem_leitura": sem_leitura}
+    # os inversores do cadastro que a PLATAFORMA lê (a aba, ou a visão do Nexus na chave no lugar da aba), na ordem dela:
+    # a tabela dos inversores liga cada um ao inversor da fonte (17/11/2026), e o `nome` é o valor que o
+    # `/api/admin/de-para/decidir` aceita (na API PV o nome no supervisório, "INVERSOR01"; no scadaGridco o nome do
+    # equipamento, "Inversor 2.1"). Inversor do Nexus que não está aqui a plataforma não conhece: não se liga
+    return {"linhas": linhas, "sobra": sobra, "sem_leitura": sem_leitura,
+            "alvos": [{"nome": a.get("nome"), "exibicao": a.get("exibicao"), "esp": a.get("esp")} for a in alvos]}
 
 
 def cartoes(cfg, linhas: list, est_usina: dict, forcar: bool = False) -> list:
@@ -210,7 +220,7 @@ def cartoes(cfg, linhas: list, est_usina: dict, forcar: bool = False) -> list:
              "no_lugar_da_aba": bool(ch.get("substitui_aba")), "luz": ln["luz"], "liga": ln.get("liga"),
              "nomes_inversor": ln.get("nomes_inversor"), "inv_fonte": ln.get("inv_fonte"), "inv_esp": ln.get("inv_esp"),
              "str_esp": ln.get("str_esp"), "alertas": ln.get("alertas") or [], "edita_inversor": bool(ln.get("edita_inversor")),
-             "linhas": [], "sobra": [], "sem_leitura": False, "erro": "", "nota": "", "provisorio": ""}
+             "linhas": [], "sobra": [], "alvos": [], "sem_leitura": False, "erro": "", "nota": "", "provisorio": ""}
         if c["edita_inversor"] and ln.get("plant_id") is not None:
             det = ler_usina(cfg, ln["fonte"], ln["plant_id"], forcar)
             if det.get("erro"):

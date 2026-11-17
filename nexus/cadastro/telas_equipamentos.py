@@ -171,7 +171,8 @@ def _painel(u: dict, est: dict, aba: dict, fr_nomes, fr_dono, nome_usina: dict, 
                            nome_registro=u["nome"],
                            comparacao=E.comparar_usina(d, info.get(u["id"]), aba["chaves"]) if not aba.get("erro") else {},
                            ativos_url=url_for("torre_base.equipamentos_ativos", usina=u["id"]),
-                           salvar_url=url_for("torre_base.equipamentos_salvar"))}
+                           salvar_url=url_for("torre_base.equipamentos_salvar"),
+                           passe_url=url_for("torre_base.equipamentos_fontes_passe"))}
 
 
 def _luz_equip(x: dict) -> str:
@@ -655,6 +656,33 @@ def _janela_depara():
     return resp
 
 
+def _passe_ligar():
+    """`POST /t/base/equipamentos/fontes/passe`: o passe para a tabela dos inversores gravar a ligação na plataforma
+    (17/11/2026, Levi, na Rio do Peixe I e II: "esse ligar aí só aparece que não está ligado no tempo real e não deixa a
+    pessoa fazer uma ligação real"). Até aqui escolher na coluna "Na fonte" só punha o nome no Equipamento Supervisório do
+    Nexus, e o tempo real não via: a plataforma liga o inversor da fonte ao do cadastro pelo livro dela (`nexus_depara`,
+    o id da fonte → o nome do cadastro), e lia a aba, não o Nexus, para a chave. A ligação de verdade é a mesma do editor
+    De-para da plataforma (`/api/admin/de-para/decidir`), feita pelo navegador de quem está na tela: o passe da porta
+    única (60 s, uma vez, quem está logado) abre a sessão da plataforma, como a janela "Ligar a…", e o fetch grava. A
+    ponte (a chave de leitura) continua só de leitura. O JSON diz os dois endereços, na base da plataforma."""
+    from ..performance import porta
+    from ..torres.moldura import _passe, estado_da_porta
+    if _de_outro_site():
+        return _recusa_json("Pedido de outro site.", 403)
+    estado = estado_da_porta()
+    if not estado["ligada"]:
+        return _recusa_json(f"A plataforma não abre neste servidor: {estado['motivo']}. A ligação se faz pelo "
+                            "\"Abrir na plataforma\" do cartão da fonte.", 409)
+    destino = porta.destino_permitido("/admin/de-para")
+    if not destino:
+        return _recusa_json("O De-para de equipamentos não é uma tela da plataforma neste Nexus.", 409)
+    base = estado["plataforma"]
+    r = jsonify(ok=True, passe=_passe(destino), entrar=f"{base}/painel/nexus/entrar",
+                decidir=f"{base}/api/admin/de-para/decidir")
+    r.headers["Cache-Control"] = "no-store"         # o passe leva o e-mail e vale uma vez
+    return r
+
+
 def registrar_equipamentos(bp) -> None:
     """Pendura a tela na torre Base (`/t/base/equipamentos`), vencendo o placeholder, e as ações dela."""
     @bp.route("/equipamentos")
@@ -711,3 +739,8 @@ def registrar_equipamentos(bp) -> None:
     @_tela(TITULO)
     def equipamentos_fontes_janela(srv):  # noqa: ARG001 — o decorador garante administrador
         return _janela_depara()
+
+    @bp.route("/equipamentos/fontes/passe", methods=["POST"])
+    @_tela(TITULO)
+    def equipamentos_fontes_passe(srv):  # noqa: ARG001 — o decorador garante administrador
+        return _passe_ligar()

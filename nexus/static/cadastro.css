@@ -545,7 +545,7 @@ details.cad-dif summary{cursor:pointer;padding:9px 12px;color:var(--tinta-2);fon
 .eq-tab-inv{min-width:940px}
 .eq-w-nome{min-width:116px}
 .eq-w-chave{min-width:128px}
-.eq-w-sup{min-width:108px}
+.eq-w-sup{min-width:150px}
 .eq-w-cab{min-width:84px}
 .eq-w-num{width:82px}
 .eq-w-str{width:62px}
@@ -989,9 +989,9 @@ details.ace-mais>summary:focus-visible{outline:2px solid var(--foco);outline-off
 .eq-ed-recolhe{width:100%;background:transparent;border:0;padding:0;color:inherit;font:inherit;cursor:pointer;text-align:left}
 .eq-ed-recolhe .ph{color:var(--mudo)}
 .eq-ed-recolhe:hover h3{color:var(--verde-texto)}
-/* a coluna "Na fonte" */
-.eq-fonte-par{display:inline-flex;align-items:center;gap:6px;font-family:var(--font-mono);font-size:12px;white-space:nowrap}
-.eq-fonte-par+.eq-fonte-par{margin-left:8px}
-.eq-fonte-par .eqx-luz{height:10px}
-.eq-w-fonte{min-width:130px}
-.eq-fonte-esc{min-width:120px}
+/* o Equipamento Supervisório pela fonte: a luz da ligação e o inversor da fonte (17/11/2026) */
+.eq-w-sup .eq-liga{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.eq-w-sup .eq-liga+.eq-liga{margin-top:4px}
+.eq-liga .eqx-luz{height:10px;flex:0 0 auto}
+.eq-liga-esc{min-width:130px;flex:1 1 130px}
+.eq-liga-fonte{flex-basis:100%;font-size:11px}

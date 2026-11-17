@@ -19,7 +19,11 @@
    7. "Da para deixar tudo numa tela só! Tudo fica na equipamentos, vai ter uma parte onde eu escolho qual a fonte de
       dados e ele tenta lincar em uma outra coluna, caso não consiga eu mesmo linko": a aba De-para saiu. A usina aberta
       tem "Fontes de dados" (ligar a fonte que ainda não chega em usina nenhuma, a mais parecida já escolhida, e os
-      cartões das que chegam) e a tabela dos inversores ganhou a coluna "Na fonte". #}
+      cartões das que chegam) e a tabela dos inversores ganhou a coluna "Na fonte".
+   No mesmo dia, à tarde (Levi: "esse ligar aí só aparece que não está ligado no tempo real e não deixa a pessoa fazer uma
+   ligação real"; "o na fonte eu acho que seria a leitura da fonte em si"; "esse usina supervisório já deve preencher
+   automaticamente"): a coluna "Na fonte" virou o Equipamento Supervisório (o inversor da fonte, e o Salvar grava a
+   ligação na plataforma: eq-ligacao.js), e o inversor sem chave entra na única chave da usina. #}
 {% macro kwp(v) %}{% if v is none %}—{% else %}{{ '{:,.1f}'.format(v).replace(',', 'X').replace('.', ',').replace('X', '.') }}{% endif %}{% endmacro %}
 {% macro mantem() %}{% for k, v in volta.items() %}{% if v is string %}<input type="hidden" name="{{ k }}" value="{{ v }}">{% else %}{% for x in v %}<input type="hidden" name="{{ k }}" value="{{ x }}">{% endfor %}{% endif %}{% endfor %}{% endmacro %}
 <link rel="stylesheet" href="{{ url_for('static', filename='cadastro.css') }}">
@@ -32,7 +36,8 @@
 <p><strong>O que é.</strong> O que cada usina do Registro mestre tem: as chaves do supervisório (a "Usina Supervisório"), as cabines e os inversores, com strings e kWp, nas colunas da aba Equipamentos. É o cadastro que a plataforma, o gêmeo e o coletor leem na chave marcada "no lugar da aba". Nada grava até o Salvar (livro nexus_estrutura_usina).</p>
 <p><strong>A lista.</strong> As três luzes de cada usina: chave do supervisório, equipamentos (o kWp dos inversores fecha com o Registro mestre) e fonte de dados (a pior fonte da usina). Apagada: sem leitura. Os filtros valem no Aplicar.</p>
 <p><strong>Fontes de dados.</strong> Cada fonte (API PV, Athon, scadaGridco…) chega numa usina pela chave que ela usa. A fonte cuja chave não está ligada a usina nenhuma aparece para ligar: a mais parecida com o nome da usina já vem escolhida, e o Ligar faz da chave dela uma chave desta usina. As que já chegam mostram, inversor a inversor, o que a fonte manda e com quem casou; o "Ligar a…" decide o par na tela da plataforma.</p>
-<p><strong>Na fonte.</strong> A coluna da tabela dos inversores diz o nome que a fonte manda para cada um. O que não casou se escolhe ali: o nome escolhido vai para o Equipamento Supervisório, e com o Salvar a plataforma passa a casar pelo nome.</p>
+<p><strong>Equipamento Supervisório.</strong> O inversor como a fonte o manda. Na chave com uma fonte que a plataforma liga inversor a inversor (API PV, scadaGridco), ele vem da própria fonte: a lista mostra o inversor dela ligado a este (luz verde) e os outros que ela manda. Trocar e Salvar grava a ligação na plataforma, a mesma do De-para de equipamentos, e o tempo real passa a usá-la na próxima leitura da fonte: as strings esperadas deste inversor valem para o da fonte. Sem essa fonte (a Athon e a Axis ligam pelo nome que mandam), digite o nome como o supervisório o escreve.</p>
+<p><strong>Usina Supervisório dos inversores.</strong> Com uma chave só na usina, o inversor sem chave entra nela sozinho; com mais de uma, escolha.</p>
 <p><strong>Chaves do supervisório.</strong> O nome que o supervisório dá à usina. Uma usina pode ter mais de uma: a Altair tem seis na aba, uma com as cabines e uma por cabine com os inversores. Cada chave serve a uma usina só.</p>
 <p><strong>Cabines e inversores.</strong> O "N de Inversores" da cabine cria os inversores com o nome da cabine ("Inversor 1.1", "1.2"…); depois é só preencher as strings. Sem a potência do inversor, conta a da cabine dividida pelos inversores dela (calculado).</p>
 <p><strong>No lugar da aba.</strong> A chave marcada passa a ser lida do Nexus pela plataforma, pelo gêmeo, pelas Ligações e pelo coletor (quando ligado nele), e não mais da aba Equipamentos. Antes de marcar, veja a coluna "Diferença com a aba": é o que muda para eles.</p>
@@ -220,6 +225,7 @@
 
 <div class="fr-toast" id="eq-toast" role="status" aria-live="polite" hidden></div>
 
+<script src="{{ url_for('static', filename='eq-ligacao.js') }}"></script>
 <script src="{{ url_for('static', filename='cadastro-equipamentos.js') }}"></script>
 {% if painel and painel.fontes %}<script src="{{ url_for('static', filename='cadastro-depara.js') }}"></script>{% endif %}
 {% endblock %}
