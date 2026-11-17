@@ -12454,7 +12454,7 @@ function modalPlanejado(){
     '<div class="modal-head"><h3>' + (p ? 'Serviço planejado — ' + esc(p.usinaNome) : '+ Serviço planejado (sem contrato)') + '</h3><button class="modal-close" data-close="overlay-planejado">&times;</button></div>' +
     '<div class="modal-body"><datalist id="pln-usinas">' + usinasOpts + '</datalist>' +
       '<div class="field"><label for="pln-usina">Usina *</label><input id="pln-usina" list="pln-usinas" placeholder="Escolha do cadastro"' + (p ? ' disabled' : '') + '></div>' +
-      '<div class="field-row"><div class="field"><label for="pln-servico">Serviço</label><select id="pln-servico"><option value="ROÇAGEM">Roçagem</option><option value="LIMPEZA DE MÓDULOS">Lavagem</option></select></div>' +
+      '<div class="field-row"><div class="field"><label for="pln-servico">Serviço</label><select id="pln-servico"><option value="ROÇAGEM">Roçagem</option><option value="LIMPEZA DE MÓDULOS">Lavagem</option><option value="PODA QUÍMICA">Poda química</option></select></div>' +
       '<div class="field"><label for="pln-status">Situação</label><select id="pln-status"><option value="proposto">Proposto</option><option value="confirmado">Confirmado</option><option value="feito">Feito</option></select></div></div>' +
       '<div class="field-row">' + field('pln-inicio', 'Início *', 'date') + field('pln-fim', 'Fim *', 'date') + '</div>' +
       '<div id="pln-partes-aviso" class="cell-muted" style="font-size:11.5px;margin:-4px 0 8px;"></div>' +
