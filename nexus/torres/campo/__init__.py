@@ -1889,7 +1889,8 @@ def _detalhe_da_os(o: dict, f: dict | None, m: dict | None = None) -> dict:
     fechado = max((str(t.get("fechado_app") or "") for t in o["tarefas"]), default="")
     fotos = {}
     for n, a in enumerate((f or {}).get("anexos") or [], 1):
-        fotos[a["id"]] = {"rot": f"p{n:02d}", "campo": a.get("desc") or "", "tarefa": texto.get(str(a.get("tarefa") or ""), ""),
+        fotos[a["id"]] = {"id": a["id"], "rot": f"p{n:02d}", "campo": a.get("desc") or "",
+                          "tarefa": texto.get(str(a.get("tarefa") or ""), ""),
                           "anexada": _hora_do_app(a.get("anexada")) if a.get("anexada") else "",
                           "abriu": a.get("hash") is not None or "hash" not in a}
     tarefas = [{"texto": t.get("tarefa") or "(sem título)", "ativo": t.get("ativo") or "", "tecnico": t.get("tecnico") or "—",
@@ -1898,8 +1899,8 @@ def _detalhe_da_os(o: dict, f: dict | None, m: dict | None = None) -> dict:
                 "motivos": [txt for cor, txt in campo_aprovacao.motivos(t) if cor != "ok"] if t.get("pelo_app") else []}
                for t in o["tarefas"]]
     # as fotos da leitura rápida (o campo e a tarefa), com o número da leitura das fotos quando ela já passou pela OS
-    fotos_m = {x["id"]: fotos.get(x["id"]) or {"rot": "foto", "campo": x.get("desc") or "", "anexada": "", "abriu": True,
-                                               "tarefa": texto.get(str(x.get("tarefa") or ""), "")}
+    fotos_m = {x["id"]: fotos.get(x["id"]) or {"id": x["id"], "rot": "foto", "campo": x.get("desc") or "", "anexada": "",
+                                               "abriu": True, "tarefa": texto.get(str(x.get("tarefa") or ""), "")}
                for x in (m or {}).get("fotos") or []}
     por_id = {str(t.get("id_wt") or ""): d for t, d in zip(o["tarefas"], tarefas)}
     fatos = []
@@ -1966,6 +1967,32 @@ def aprovacao_detalhe(id_wo):
                            nome_coluna=NOME_DA_COLUNA | {"fora": "Fora do pré-filtro"},
                            horas_tarde=prefiltro.parametros(current_app.config)["horas_tarde"],
                            sem_responsavel=visao.SEM_RESPONSAVEL, sem_cadastro=SEM_CADASTRO)
+
+
+@bp.route("/aprovacao/<int:id_wo>/foto/<foto_id>")
+def aprovacao_foto(id_wo, foto_id):
+    """Uma foto citada na barra lateral da OS (Levi, 16/11/2026: "Aprovação de OS quando tiver algo que cita Fotos tem que
+    carregar as fotos!"): leva ao arquivo no S3, pela lista de anexos da OS (1 pedido ao Fracttal, guardado 10 min por
+    OS: `prefiltro_fundo.endereco_da_foto`). A barra lateral abre só da memória, como antes; cada imagem vem depois, por
+    aqui. Só a OS da fila e só foto dela; o Fracttal fora dá 503 (a imagem não aparece; a barra segue)."""
+    from ...campo import prefiltro_fundo
+    if not re.fullmatch(r"[0-9a-f]{16}", foto_id or ""):
+        abort(404)
+    leitura = campo_aprovacao.fila_toda(campo_aprovacao.FILA_INTEIRA)
+    folio = next((str(x.get("os") or "") for x in (leitura.dados or {}).get("linhas") or []
+                  if str(x.get("id_wo") or "") == str(id_wo)), "")
+    if not folio:
+        abort(404)
+    try:
+        url = prefiltro_fundo.endereco_da_foto(folio, foto_id)
+    except Exception:           # noqa: BLE001 — o Fracttal fora ou recusando: sem a imagem, a barra lateral segue
+        _log_campo.exception("Aprovação de OS: a lista de anexos da OS %s não veio", folio)
+        abort(503)
+    if not url:
+        abort(404)
+    r = redirect(url, code=302)
+    r.headers["Cache-Control"] = "private, max-age=300"
+    return r
 
 
 @bp.route("/aprovacao/<int:id_wo>/conferir", methods=["POST"])

@@ -4,7 +4,9 @@
    com a prova: a foto (o número, o campo e a tarefa) e a hora; a tarefa fechada fora do App. As fotos abrem no card da
    OS (o do OS Creator), como no Histórico. O Aprovar daqui é o do cartão (a mesma confirmação e a mesma conferência). #}
 {% set tom = {'pronta': 'ok', 'duvida': 'alerta', 'nao_ok': 'critico'}.get(o.coluna, 'neutro') %}
-{% macro foto(x) %}<button type="button" class="apq-foto" data-apq-card="{{ o.id_wo }}" data-folio="{{ o.os }}" title="Abrir o card da OS {{ o.os }}, com as fotos"><i class="ph ph-image" aria-hidden="true"></i>{{ x.rot }}{% if x.campo %} · {{ x.campo }}{% endif %}</button>{% endmacro %}
+{# a foto citada aparece (Levi, 16/11/2026: "quando tiver algo que cita Fotos tem que carregar as fotos!"): a imagem vem da
+   rota `aprovacao_foto` depois de a barra abrir (loading lazy), e abre inteira numa aba; o nome segue abrindo o card #}
+{% macro foto(x) %}<figure class="apq-foto-fig">{% if x.id %}<a class="apq-foto-img" href="{{ url_for('torre_campo.aprovacao_foto', id_wo=o.id_wo, foto_id=x.id) }}" target="_blank" rel="noopener" title="Abrir a foto {{ x.rot }} inteira"><img src="{{ url_for('torre_campo.aprovacao_foto', id_wo=o.id_wo, foto_id=x.id) }}" loading="lazy" alt="Foto {{ x.rot }}{% if x.campo %} · {{ x.campo }}{% endif %}"></a>{% endif %}<figcaption><button type="button" class="apq-foto" data-apq-card="{{ o.id_wo }}" data-folio="{{ o.os }}" title="Abrir o card da OS {{ o.os }}, com as fotos"><i class="ph ph-image" aria-hidden="true"></i>{{ x.rot }}{% if x.campo %} · {{ x.campo }}{% endif %}</button></figcaption></figure>{% endmacro %}
 <header class="apq-g-cab">
   {# a idade sem cor (15/11/2026), como no cartão #}
   <p class="gc-eyebrow">OS em verificação · {{ 'hoje' if o.espera_d == 0 else 'há ' ~ o.espera_d ~ ' dias' }}</p>

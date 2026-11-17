@@ -2590,6 +2590,14 @@ Aprovação e Triagem usam a lógica do App copiada, não refeita, para o númer
       Todos (o responsável do login cortaria a usina de outro); a usina sem OS na fila abre vazia, com o nome do cadastro
       na lista. O nome repetido na lista leva o cliente (em produção há duas "Linhares 1": a da Axis, id 27, e a da
       Thopen, id 96). O total diz o recorte ("na Usina X", "executadas por Y"). Prova: `test_campo_aprovacao_filtros_15_11.py`.
+    - **As fotos citadas aparecem na barra lateral (16/11/2026**, Levi: "Aprovação de OS quando tiver algo que cita
+      Fotos tem que carregar as fotos!"): em cada fato que cita foto (foto tarde, repetida, que não abriu, GPS longe), a
+      miniatura de cada uma (`loading="lazy"`, abre inteira numa aba) com o nome embaixo, que segue abrindo o card. A
+      barra abre só da memória, como antes; cada imagem vem da rota `aprovacao/<id_wo>/foto/<id>`, que lê a lista de
+      anexos da OS no Fracttal (1 pedido, guardado 10 min por OS, `prefiltro_fundo.endereco_da_foto`) e leva (302) ao
+      arquivo no S3; só foto da OS da fila e só https; o Fracttal fora dá 503 e a barra segue. O endereço e a imagem não
+      se guardam (o id é o caminho no S3; o resto do endereço pode mudar). O cartão do quadro segue sem foto (05/11/2026:
+      "nem precisa mostrar a foto de cara"). Prova: `test_campo_aprovacao_fotos_16_11.py`.
     - **O desenho de 15/11/2026** (Levi, "desenho: Ok" às duas réguas recomendadas na revisão da Usinas 360°): **30 OS
       por seção de cada vez** (`POR_VEZ`; as três colunas, Ainda conferindo e Fora do pré-filtro), com o **Ver mais** no
       pé da coluna, que pede os próximos 30 à rota `aprovacao/cartoes?secao=&de=` (o cartão é o mesmo,

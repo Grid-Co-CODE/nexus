@@ -8,7 +8,8 @@ hora de anexação (o `Last-Modified` do arquivo: o REST de anexos não dá data
 bytes não ficam. A imagem é baixada porque a regra da foto repetida compara a própria imagem (o hash sem o carimbo):
 a mesma foto anexada em dois campos ganha nome e carimbo diferentes. Miniatura não se guarda mais (Levi, 05/11/2026: "nem
 precisa mostrar a foto de cara não... pode mostrar o nome das fotos"): o cartão mostra o nome, e o clique abre o card da
-OS, onde as fotos estão.
+OS, onde as fotos estão. Desde 16/11/2026 a barra lateral da OS mostra as fotos citadas nos fatos (Levi: "quando tiver
+algo que cita Fotos tem que carregar as fotos!"), pela rota que pede a lista de anexos na hora (`endereco_da_foto`).
 
 - Roda depois de cada releitura da fila (`aprovacao._reler`) e no boot, numa thread declarada de fundo no porteiro do
   Fracttal; uma volta por vez, no máximo `NEXUS_PREFILTRO_POR_VOLTA` OS, com `NEXUS_PREFILTRO_PAUSA_S` entre elas (também
@@ -254,6 +255,40 @@ def _listar(folio: str) -> list[dict]:
     return rest
 
 
+def id_da_foto(caminho: str) -> str:
+    """O id da foto: o caminho no S3 (que não muda; o resto do endereço pode mudar), o mesmo nas duas leituras."""
+    return hashlib.sha1(caminho.encode("utf-8")).hexdigest()[:16]
+
+
+# As fotos de cada OS para a barra lateral da Aprovação (16/11/2026, Levi: "Aprovação de OS quando tiver algo que cita
+# Fotos tem que carregar as fotos!"): {folio: (lido_em, {id da foto: endereço})}. A lista de anexos é lida na hora em que
+# a 1ª imagem é pedida (1 pedido ao Fracttal) e guardada FOTOS_TTL_S; só em memória: o endereço do S3 pode mudar, e a
+# imagem não se guarda (desde 05/11/2026)
+FOTOS_TTL_S = 600
+_FOTOS_DA_OS: dict = {}
+
+
+def endereco_da_foto(folio: str, foto_id: str) -> str | None:
+    """O endereço da foto `foto_id` da OS, pela lista de anexos guardada (ou lida agora). Só foto (IMG) e só https."""
+    agora = time.time()
+    g = _FOTOS_DA_OS.get(folio)
+    if g is None or agora - g[0] >= FOTOS_TTL_S:
+        mapa = {}
+        for a in _listar(folio):
+            url = str(a.get("value") or "")
+            caminho = urlsplit(url).path
+            if url.startswith("https://") and IMG.search(caminho):
+                mapa.setdefault(id_da_foto(caminho), url)
+        for k in [k for k, (t, _m) in list(_FOTOS_DA_OS.items()) if agora - t >= FOTOS_TTL_S]:
+            _FOTOS_DA_OS.pop(k, None)
+        g = _FOTOS_DA_OS[folio] = (agora, mapa)
+    return g[1].get(foto_id)
+
+
+def limpar_fotos_da_os() -> None:
+    _FOTOS_DA_OS.clear()
+
+
 def _ler_os(tarefas: list[dict], p: dict, velho: dict | None = None, do_app: set[str] | None = None) -> dict:
     """Os fatos da OS. `velho` = os da leitura anterior: as fotos já lidas não são baixadas de novo. `do_app` = as tarefas
     da OS fechadas pelo App: só as fotos delas são baixadas (a foto sem tarefa, só se a OS inteira foi pelo App); None =
@@ -271,7 +306,7 @@ def _ler_os(tarefas: list[dict], p: dict, velho: dict | None = None, do_app: set
             continue
         if do_app is not None and not (tarefa in do_app if tarefa else toda_do_app):
             continue                              # a foto da tarefa fora do App não é julgada: não é baixada
-        id_ = hashlib.sha1(caminho.encode("utf-8")).hexdigest()[:16]
+        id_ = id_da_foto(caminho)
         if id_ in urls:                           # o mesmo arquivo listado duas vezes não vira "p02 é a mesma de p02"
             continue
         urls[id_] = url
@@ -364,7 +399,7 @@ def _ler_meta(tarefas: list[dict], do_app: set[str] | None = None) -> dict:
         tarefa = str(a.get("id_work_order_task") or "")
         if not IMG.search(caminho) or (tarefa and tarefa not in ids):
             continue
-        id_ = hashlib.sha1(caminho.encode("utf-8")).hexdigest()[:16]      # o mesmo id da leitura das fotos
+        id_ = id_da_foto(caminho)                                          # o mesmo id da leitura das fotos
         if id_ in vistos:
             continue
         vistos.add(id_)
@@ -494,6 +529,7 @@ def pedir_conferencia(app) -> None:
 
 def limpar() -> None:
     _FATOS.clear()
+    _FOTOS_DA_OS.clear()
     _FALHAS.clear()
     _META.clear()
     _ESTADO.update(lendo=False, erro="", erro_em=0.0)
