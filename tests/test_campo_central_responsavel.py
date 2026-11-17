@@ -62,8 +62,9 @@ def test_cartoes_por_responsavel_e_o_kanban_das_tres_colunas(com_responsavel):
 def test_tela_por_responsavel_e_o_kanban_ao_clicar(com_responsavel, logado):
     html = logado.get("/t/campo/atencao?modo=responsaveis").get_data(as_text=True)
     assert 'aria-current="page">Por responsável</a>' in html and "<table>" not in html
-    assert "<b>Ciclano Chefe</b>" in html and "<b>Beltrano Supervisor</b>" in html
-    assert "responsavel=Ciclano+Chefe" in html                                   # o cartão abre o kanban dele
+    # uma linha por responsável desde 16/11/2026 (eram cartões; test_campo_central_tabela_16_11.py): o nome é o link
+    assert ">Ciclano Chefe</a>" in html and ">Beltrano Supervisor</a>" in html
+    assert "responsavel=Ciclano+Chefe" in html                                   # a linha abre o kanban dele
     # o clique (ou o filtro) abre o kanban: três colunas, cada usina na sua, e o cartão leva ao histórico da usina
     html = logado.get("/t/campo/atencao?responsavel=Ciclano+Chefe").get_data(as_text=True)
     assert 'class="cn-kanban"' in html and '<option value="Ciclano Chefe" selected>' in html
@@ -87,7 +88,7 @@ def test_usina_sem_responsavel_vai_para_o_cartao_proprio(banco, logado):
     """No banco falso de antes (sem `responsavel_om_id`), as três usinas são do "Sem responsável O&M", que tem cartão
     próprio (tracejado) e o kanban dele."""
     html = logado.get("/t/campo/atencao?modo=responsaveis").get_data(as_text=True)
-    assert "<b>" + visao.SEM_RESPONSAVEL.replace("&", "&amp;") + "</b>" in html and "cn-sup--sem" in html
+    assert ">" + visao.SEM_RESPONSAVEL.replace("&", "&amp;") + "</a>" in html and "cn-resp-linha--sem" in html
     html = logado.get("/t/campo/atencao", query_string={"responsavel": visao.SEM_RESPONSAVEL}).get_data(as_text=True)
     col = _colunas(html)
     assert "Coração 1" in col["nunca"] and "Altair" in col["pendente"] and "Brodowski 1" in col["feita"]
@@ -111,16 +112,16 @@ def test_a_central_so_tem_por_responsavel_e_a_tabela(com_responsavel, logado):
     # os endereços de antes (por equipe, região de campo, gestor, supervisor) abrem por responsável
     for modo in ("equipes", "regioes", "gestores", "supervisores"):
         html = logado.get(f"/t/campo/atencao?modo={modo}").get_data(as_text=True)
-        assert 'aria-current="page">Por responsável</a>' in _seg(html) and "<b>Ciclano Chefe</b>" in html, modo
+        assert 'aria-current="page">Por responsável</a>' in _seg(html) and ">Ciclano Chefe</a>" in html, modo
 
 
 def test_pt_por_responsavel_e_o_cartao_leva_a_tabela_dele(com_responsavel, logado):
     html = logado.get("/t/campo/atencao?vista=pt").get_data(as_text=True)
-    cartoes = html[html.index('class="cn-equipes"'):html.index('</main>')]
-    # a PT-1 (parada) e a PT-2 são da Altair, do Ciclano Chefe; o Beltrano não tem PT esperando: sem cartão
-    assert "<b>Ciclano Chefe</b>" in cartoes and "Beltrano Supervisor" not in cartoes and "Responsável UFV" in cartoes
-    assert "<b>2</b><span>PT esperando o De acordo" in cartoes and "1 parada há mais de 2 h" in cartoes
-    href = re.search(r'<a class="cn-equipe[^"]*" href="([^"]*)"', cartoes).group(1).replace("&amp;", "&")
+    cartoes = html[html.index('class="cn-resp-tab"'):html.index('</main>')]          # uma linha por responsável (16/11)
+    # a PT-1 (parada) e a PT-2 são da Altair, do Ciclano Chefe; o Beltrano não tem PT esperando: sem linha
+    assert ">Ciclano Chefe</a>" in cartoes and "Beltrano Supervisor" not in cartoes and "Responsável UFV" in cartoes
+    assert '<td class="n"><b>2</b></td>' in cartoes and '<span class="cn-min-st cn-min-st--critico">1</span>' in cartoes
+    href = re.search(r'<a class="cn-resp-nome" href="([^"]*)"', cartoes).group(1).replace("&amp;", "&")
     assert "modo=tabela" in href and "responsavel=Ciclano+Chefe" in href and "vista=pt" in href
     tabela = logado.get("/t/campo/atencao" + href).get_data(as_text=True)
     assert tabela.count('class="cn-link cn-os"') == 2
