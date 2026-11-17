@@ -316,7 +316,7 @@ def test_a_pessoa_sem_a_tela_nao_ve_o_link_nem_o_botao_dela(tela, logado, monkey
     Criar OS; sem tela do Comando, sem a conversa."""
     from nexus.auth import setor_telas
     monkeypatch.setattr(setor_telas, "liberadas_do_menu", lambda: {"campo/responsaveis", "campo/rondas"})
-    html = logado.get("/t/campo/responsaveis?modo=usina&usina=1").get_data(as_text=True)
+    html = logado.get("/t/comando/usinas/1").get_data(as_text=True)     # (a aba da Usinas 360° saiu em 16/11/2026)
     # o endereço do OS Creator na página (o `/t/os/...` do menu lateral da casca é outra coisa: é a tela do Nexus)
     assert 'href="/os/tradicional' not in html and 'href="/os/solicitacao' not in html and "pu-menu-caixa" not in html
     assert "/t/comando/conversa/usina/1" not in html and "Abrir os Insights" not in html
@@ -324,26 +324,6 @@ def test_a_pessoa_sem_a_tela_nao_ve_o_link_nem_o_botao_dela(tela, logado, monkey
     assert "data-pu-rel" in html                                               # o relatório é da própria tela
 
 
-def test_a_aba_da_usinas_360_mostra_o_mesmo_prontuario(tela, logado):
-    """"essa visão irá substituir a central da usina": a aba mostra a mesma página, com a busca das usinas no alto e a
-    janela desta tela (o dia a dia, os extintores e a decisão da PT abrem por cima)."""
-    html = logado.get("/t/campo/responsaveis?modo=usina&usina=1").get_data(as_text=True)
-    assert ">Prontuário da usina</a>" in html and "Central da usina" not in html.split("<main", 1)[-1].split("<script", 1)[0]
-    assert '<h2 class="cu-nome cmu-nome">Altair ' in html and "<h1 class=\"cu-nome" not in html
-    assert 'class="pu-painel"' in html and 'id="pu-perf"' in html and "comando.css" in html
-    assert 'action="/t/campo/responsaveis/usina/1/relatorio.pdf"' in html
-    # o card da OS da tela, uma vez só (o prontuário não inclui outro)
-    assert html.count("window.NexusOsCard = window.NexusOsCard") == 1
-    # as PT esperando o De acordo abrem a decisão na janela da tela; o dia a dia e os extintores também
-    seg = _cartao(html, "seg")
-    assert seg.count('data-cr-painel="/t/campo/responsaveis/pt/') == 2 and "Decidir a PT" in seg
-    assert "/t/campo/responsaveis/usina/1/extintores" in seg
-    perf = _cartao(html, "perf")
-    for k in ("meta", "pr", "disp"):
-        assert f'data-cr-painel="/t/campo/responsaveis/usina/1/{k}"' in perf, k
-    # no Comando, a PT leva à aba (lá não há a janela da decisão)
-    comando = _cartao(logado.get("/t/comando/usinas/1").get_data(as_text=True), "seg")
-    assert "data-cr-painel" not in comando and "/t/campo/responsaveis?modo=usina&amp;usina=1#pu-seg" in comando
 
 
 def test_strings_e_trackers_do_que_esta_fora_agora():

@@ -1493,6 +1493,13 @@ button.pn-it:hover{background:var(--superficie-2)}
   text-transform:uppercase;color:var(--mudo)}
 .pn-perf-cab span:nth-child(n+4){text-align:right}
 .pn-it--perf .pn-barra{width:100%}
+/* o "Ver prontuário" ao lado da linha (16/11/2026): a linha segue abrindo o dia a dia da meta; o link abre a usina */
+.pn-perf > li{display:flex;align-items:center;gap:8px}
+.pn-perf > li > .pn-it{flex:1;min-width:0}
+.pn-pront{flex:none;padding:4px 10px;border:1px solid var(--linha-forte);border-radius:999px;font:600 12px/16px var(--font-sans);
+  color:var(--tinta-2);text-decoration:none;white-space:nowrap}
+.pn-pront:hover{border-color:var(--verde-texto);color:var(--verde-texto)}
+.pn-pront:focus-visible{outline:2px solid var(--foco);outline-offset:2px}
 .pn-c{font:600 13px/18px var(--font-mono);text-align:right;white-space:nowrap}
 .pn-c small{font:500 11.5px/15px var(--font-sans);color:var(--mudo)}
 /* as PT pendentes no cabeçalho (29/10/2026: "PTs pendentes pode ficar como um KPI que quando o supervisor clicasse ele
@@ -1783,14 +1790,6 @@ tr.rd-linha--ativa td{background:var(--verde-suave)}
 /* a Central da usina (04/11/2026, a aba da Visão do responsável), numa superfície só (à la Nexus, sem azul em camadas).
    2ª rodada no mesmo dia ("está simples demais e as linhas estão muito coladas"): o cabeçalho com as pessoas, os quadros
    com o ícone num selo, as linhas separadas por um fio com respiro, o ponto da situação e a contagem de cada linha */
-/* a busca da usina à direita, na linha das abas (05/11/2026: "Quero o 'Buscar usinas' do lado direito paralelizando com
-   os botões a visão dos responsáveis!"); a lista abre no foco, por cima, como nas Rondas */
-.cu-topo{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px 16px;margin-top:18px}
-.cu-topo > .cn-filtros{margin-top:0}
-.cu-busca{display:flex;flex:0 1 380px;min-width:0}
-.cu-busca .rd-usina{flex:1 1 auto}
-.cu-busca .rd-campo input{width:100%}
-.cu-vazio{margin:14px 0 0;font-size:13.5px}
 .cu-cab{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:14px 24px;margin-top:22px}
 .cu-nome{margin:0;font:700 26px/1.2 var(--font-sans);letter-spacing:-.01em;color:var(--tinta)}
 .cu-onde{margin:5px 0 0;font-size:13.5px;color:var(--mudo)}
@@ -1851,7 +1850,6 @@ tr.rd-linha--ativa td{background:var(--verde-suave)}
 .cu-rel-chips input:focus-visible + span{outline:2px solid var(--foco);outline-offset:2px}
 .cu-rel-t{margin:0 0 4px}
 @media (max-width:900px){.cu-grade{grid-template-columns:1fr}}
-@media (max-width:700px){.cu-busca{flex:1 1 100%}}
 @media (max-width:480px){.cu-q .cr-dl{grid-template-columns:1fr}.cu-q .cr-dl > dd{padding-top:0;border-top:0}
   .cu-gente li{flex:1 1 100%}}
 /* a Visão do cliente (05/11/2026, fase 1; a tela do mockup da sugestão, no desenho do Nexus): uma superfície só */

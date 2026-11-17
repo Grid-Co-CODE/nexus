@@ -490,6 +490,12 @@ def responsaveis():
     próprio, pelo login), as usinas dele nos dois blocos: Performance (meta, PR, disponibilidade) e Acompanhamento
     (rondas, PT, chamados, extintores); em cada um, o que pede foco, o que pede acompanhamento e o que pode esperar.
     Filtros de responsável, cliente e busca; "Todos" vai como "*"."""
+    # a aba "Prontuário da usina" saiu (Levi, 16/11/2026: "Tire a opção de prontuário da Visão do Responsável, no painel na
+    # parte de performance vai ter a opção 'ver prontuário' e vai para a parte de UFV"): o endereço guardado vai ao
+    # prontuário do Comando > Usinas (o endereço de hoje; o chat do Comando vai mover a tela, e o antigo segue valendo)
+    if request.args.get("modo") == "usina":
+        uid = visao.D._id(request.args.get("usina"))
+        return redirect(na_raiz(f"/t/comando/usinas/{uid}" if uid else "/t/comando/usinas"))
     leitura = campo_resp.visao_responsaveis()
     d = leitura.dados
     # o bloco Manutenção no limite de quem olha: o parâmetro (o campo do bloco) vence o cookie; sem os dois, 30
@@ -546,8 +552,8 @@ def responsaveis():
         # o responsável logado nunca vê os cartões dos outros responsáveis; o Painel, o Ranking das equipes e a Visão
         # geral das usinas dele, sim (18/10/2026; o Painel em 28/10/2026). Com "Todos" escolhido não há um responsável:
         # fica a Visão geral de todas, como antes
-        modo = modo if modo in ("painel", "geral", "usina") else ("painel" if responsavel else "geral")
-    elif modo not in ("cartoes", "geral", "painel", "usina"):
+        modo = modo if modo in ("painel", "geral") else ("painel" if responsavel else "geral")
+    elif modo not in ("cartoes", "geral", "painel"):
         modo = "painel" if responsavel else "cartoes"
     # a Visão geral (18/10/2026, Levi: "uma visão onde unifica todas as usinas"): todas as usinas do filtro numa lista
     # só, e o clique num bloco, nível ou número do resumo filtra (`filtro`, a condição daquele número no `soma`)
@@ -574,19 +580,6 @@ def responsaveis():
     # Ranking das equipes desde 09/11/2026
     from ...campo import painel_responsavel as campo_painel
     painel = campo_painel.montar(responsavel or "Todos os responsáveis", usinas) if modo == "painel" else None
-    # a Central da usina (Levi, 04/11/2026, "como aba alternativa"): a busca com TODAS as usinas da Visão (sem o filtro
-    # de responsável, de cliente e da busca: buscar é ir à usina) e a usina escolhida
-    central = _central_da_usina(todas) if modo == "usina" else None
-    # desde 12/11/2026 a aba mostra o prontuário da usina, a página do Comando > Usinas (Levi: "essa visão irá substituir
-    # a central da usina"): a Central segue como a conta que o alimenta. Se a montagem cair, a aba avisa e a busca segue
-    prontuario = None
-    if central and central.get("u"):
-        try:
-            from ..comando.prontuario_dados import contexto as _prontuario
-            uid = central["u"]["usina_id"]
-            prontuario = _prontuario(uid, cu=central, rel_url=f"/t/campo/responsaveis/usina/{uid}/relatorio.pdf")
-        except Exception:        # noqa: BLE001
-            _log_campo.exception("o prontuário da usina não montou")
     nomes = sorted({u.get("responsavel") or visao.SEM_RESPONSAVEL for u in todas} | ({responsavel} if responsavel else set()),
                    key=lambda n: (n == visao.SEM_RESPONSAVEL, n))
     # a faixa "Parada agora" (18/10/2026): as OS de parada abertas nas usinas DO FILTRO, a mais antiga primeiro
@@ -603,7 +596,7 @@ def responsaveis():
                                            for bb, nome, txt in campo_resp.BLOCOS if bb == b],
         base_pequena=visao.BASE_PEQUENA,
         responsavel_logado=logado, limite=limite, faixa=faixa, faixa_max=FAIXA_MAX, estado_os=tarefas_os.estado(),
-        central=central, prontuario=prontuario, iniciais=_iniciais,
+        iniciais=_iniciais,
         foto_os=campo_resp.foto_das_os(((d.get("info") or {}).get("manut") or {}).get("gerado_em"), visao._agora()),
         usinas=usinas, cartoes=campo_resp.por_responsavel(base), resumo=campo_resp.soma(responsavel or "Todos", usinas),
         blocos=[(b, nome, txt, campo_resp.bloco(usinas, b)) for b, nome, txt in campo_resp.BLOCOS],

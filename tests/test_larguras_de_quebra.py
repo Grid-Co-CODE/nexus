@@ -15,7 +15,7 @@ PADRAO = {480, 640, 820, 900, 1100, 1180}
 # as que já existiam em 08/11/2026: a migrar, tela por tela (só diminuem)
 LEGADO = {
     "nexus/static/cadastro.css": {560: 5, 760: 1, 980: 1},
-    "nexus/static/campo.css": {560: 2, 600: 1, 700: 5, 760: 4, 800: 1, 860: 1, 980: 1, 1080: 1, 1280: 1, 1366: 1},
+    "nexus/static/campo.css": {560: 2, 600: 1, 700: 4, 760: 4, 800: 1, 860: 1, 980: 1, 1080: 1, 1280: 1, 1366: 1},
     "nexus/static/clima.css": {700: 1},
     "nexus/static/dados.css": {600: 1},
     "nexus/static/engenharia-folha.css": {600: 2},

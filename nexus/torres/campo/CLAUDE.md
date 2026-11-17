@@ -1273,9 +1273,23 @@ pelo bloco clicado, o resumo ao lado, só as usinas): `docs/superpowers/specs/20
 - **Prova (18/10/2026, o cadastro e o banco reais, só lidos):** 127 usinas no mapa e 4 sem coordenada; o resumo da usina
   clicada; o mapa recolorido pela Manutenção; a 1440 e a 375 px, nos dois temas, sem rolagem de lado.
 
-### A aba da usina da Visão do responsável: a Central (04/11/2026), o prontuário desde 12/11/2026
+### A aba da usina da Visão do responsável: SAIU em 16/11/2026 (a Central de 04/11, o prontuário de 12/11)
 
-**O que vale hoje (12/11/2026).** Levi: "essa visão irá substituir a central da usina". A aba (`modo=usina`) se chama
+**O que vale hoje (16/11/2026).** Levi: "Tire a opção de prontuário da Visão do Responsável, no painel na parte de
+performance vai ter a opção 'ver prontuário' e vai para a parte de UFV". A aba "Prontuário da usina" (`modo=usina`)
+saiu: o endereço guardado (`?modo=usina&usina=<id>`) leva (302) ao prontuário do Comando > Usinas
+(`/t/comando/usinas/<id>`; sem usina, à lista). Cada usina do quadro **Performance do Painel** ganhou o **"Ver
+prontuário"** (`a.pn-pront`, ao lado da linha, que segue abrindo o dia a dia da meta), que abre a página da usina no
+Comando > Usinas pelo endereço de hoje: o chat do Comando vai mover a tela para `/t/campo/usinas` e o antigo segue
+valendo (308). No prontuário do Comando, a PT esperando o De acordo levava à aba ("Decidir na Usinas 360°"): agora
+leva à página da PT (`pt_aprovar`). Saíram com a aba: a busca à direita das abas, a janela desta tela sobre o
+prontuário (o `pu_na_aba` do `_prontuario.html` não é mais ligado por ninguém) e o CSS `.cu-topo`, `.cu-busca`,
+`.cu-vazio`. **Ficam:** a conta da Central (`_central_da_usina` + `central_usina.py`), que o prontuário do Comando usa,
+e as rotas `responsaveis/usina/<id>/<painel>` (as janelas do Painel e da Visão geral) e `.../relatorio.pdf`. Prova:
+`test_campo_prontuario_sai_da_visao_16_11.py`; os testes da conta da Central rodam no prontuário do Comando
+(`test_campo_central_usina_0411.py`).
+
+**O que valeu de 12/11 a 16/11/2026.** Levi: "essa visão irá substituir a central da usina". A aba (`modo=usina`) se chama
 "Prontuário da usina" e mostra a MESMA página do Comando > Usinas (`comando/_prontuario.html`; a forma, as fontes e as
 regras estão em `nexus/comando/CLAUDE.md`, seção "O prontuário da usina"). O que é DAQUI e segue: a busca com todas as
 usinas, à direita das abas; a conta da Central (`_central_da_usina` + `central_usina.py`: a linha da Visão no limite de

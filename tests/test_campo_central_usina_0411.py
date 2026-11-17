@@ -23,42 +23,30 @@ from nexus.dados import fato_chamado as F
 
 
 def _central(logado, args=""):
-    return logado.get("/t/campo/responsaveis?modo=usina" + args).get_data(as_text=True)
+    """O prontuário da usina: desde 16/11/2026 só no Comando > Usinas (Levi: "Tire a opção de prontuário da Visão do
+    Responsável"; a aba saiu e o endereço dela leva para lá, tests/test_campo_prontuario_sai_da_visao_16_11.py)."""
+    return logado.get("/t/comando/usinas/" + re.search(r"usina=(\d+)", args).group(1)).get_data(as_text=True)
 
 
-def test_a_aba_fica_ao_lado_das_outras_e_busca_todas_as_usinas(tela, logado):
-    html = logado.get("/t/campo/responsaveis?responsavel=*&modo=geral").get_data(as_text=True)
-    assert ">Prontuário da usina</a>" in html and "modo=usina" in html
-    html = _central(logado, "&responsavel=Ciclano+Chefe")
-    # a busca traz TODAS as usinas da Visão, sem o filtro do responsável (decisão do Levi: as 131, para quem abre a tela)
-    for uid in (1, 2, 3):
-        assert f'id="rd-us-{uid}"' in html
-    assert 'name="modo" value="usina"' in html
-    # o responsável, o cliente e a busca da lista não valem na Central
-    assert 'id="cr-responsavel"' not in html and 'id="cr-cliente"' not in html
 
 
 def test_a_usina_escolhida_traz_os_numeros_da_linha_dela_na_visao(tela, logado):
     html = _central(logado, "&usina=1")
     a = _por_usina()["Altair"]
-    assert '<h2 class="cu-nome cmu-nome">Altair ' in html
+    assert '<h1 class="cu-nome cmu-nome">Altair ' in html                      # (no Comando > Usinas desde 16/11/2026)
     # os números são os da linha da Altair na Visão (o mesmo do Painel e da Visão geral), no painel do alto
     painel = html.split('class="pu-painel"', 1)[1].split('class="pu-faixa"', 1)[0]
     for txt in (a["perf"]["valores"]["meta"]["txt"], a["perf"]["valores"]["disp"]["txt"]):
         assert txt in painel
-    assert "Performance do mês" in painel and "/t/campo/responsaveis/usina/1/meta" in html
+    assert "Performance do mês" in painel
     # as pendências: a ronda longa pendente, e o cartão de cada assunto
     assert "Ronda longa pendente" in html and "Segurança do trabalho" in html and "Chamados e garantias" in html
     # chamados: o aberto (16034) com o card da OS
     assert 'data-pu-os="16034"' in html
-    # PT: as duas que esperam o De acordo abrem a decisão na janela desta tela
-    assert html.count("/t/campo/responsaveis/pt/") >= 2
+    # PT: as duas que esperam o De acordo abrem a página da PT (a janela era da aba, que saiu em 16/11/2026)
+    assert html.count('href="/t/campo/pt/') >= 2
 
 
-def test_sem_o_script_a_busca_acha_pelo_nome(tela, logado):
-    assert '<h2 class="cu-nome cmu-nome">Coração 1 ' in _central(logado, "&nome=coracao")
-    html = _central(logado, "&nome=nao+existe")
-    assert 'Nenhuma usina com o nome "nao existe"' in html and "cu-nome" not in html
 
 
 def test_os_chamados_finalizados_no_mes(tela, banco):
@@ -119,7 +107,7 @@ def test_os_meses_do_relatorio_e_o_padrao_o_anterior():
 def test_a_central_tem_o_botao_e_a_janela_do_relatorio(tela, logado):
     html = _central(logado, "&usina=1")
     assert "data-pu-rel" in html and 'id="pu-rel"' in html
-    assert "/t/campo/responsaveis/usina/1/relatorio.pdf" in html
+    assert "/t/comando/usinas/1/relatorio.pdf" in html                          # o do Comando > Usinas
     from nexus.campo import relatorio_usina as RU
     for k, rot in RU.TEMAS:                                       # os quatro temas, todos marcados
         assert f'value="{k}" checked> {rot}' in html
@@ -235,7 +223,7 @@ def test_a_exclamacao_amarela_ao_lado_do_titulo_leva_a_leitura_e_as_reguas(tela,
     lido às" do canto) e "A exclamação tem que ficar ao lado do título e tem que ter o destaque em amarelo conforme
     segurança > extintores": o cabeçalho de todas as abas da Visão fica só com o título e o "!" do padrão do Nexus
     (`_explica.html`, o mesmo dia), que leva também a hora da leitura."""
-    for args in ("modo=usina", "modo=usina&usina=1", "responsavel=*&modo=geral", "responsavel=*&modo=cartoes",
+    for args in ("responsavel=*&modo=geral", "responsavel=*&modo=cartoes",
                  "modo=ranking", "modo=painel&responsavel=*"):
         html = logado.get("/t/campo/responsaveis?" + args).get_data(as_text=True)
         assert 'class="cn-frescor"' not in html and '<details class="cr-info">' not in html, args
@@ -247,29 +235,8 @@ def test_a_exclamacao_amarela_ao_lado_do_titulo_leva_a_leitura_e_as_reguas(tela,
             assert f"<dt>{regua}</dt>" in cab and texto[:30] in cab, (args, regua)
 
 
-def test_sem_usina_escolhida_so_o_campo_de_busca(tela, logado):
-    """"Quando não tem nenhum usina não precisa amontoar um monte de card de usinas, deixa só a parte de pesquisar
-    mesmo!": a lista abre no foco, por cima, como nas Rondas (a lista aberta em grade da 2ª rodada saiu)."""
-    html = _central(logado)
-    assert 'id="rd-us-1"' in html                                 # as usinas seguem na busca, para filtrar
-    assert 'role="listbox" aria-label="Usinas" hidden>' in html
-    assert "rd-usinas--aberta" not in html and "data-rd-aberta" not in html
-    assert "busca_aberta" not in BUSCA.read_text(encoding="utf-8")
 
 
-def test_a_busca_fica_a_direita_na_linha_das_abas(tela, logado):
-    """"Quero o 'Buscar usinas' do lado direito paralelizando com os botões a visão dos responsáveis!"."""
-    for args in ("", "&usina=1"):
-        html = _central(logado, args)
-        topo = html.split('<div class="cu-topo">', 1)[1]
-        assert topo.index('class="cn-seg"') < topo.index("data-rd-usina"), args
-        assert html.index('<div class="cu-topo">') < html.index('class="cn-seg"'), args
-        if args:
-            assert topo.index("data-rd-usina") < topo.index('class="cu-cab"'), args
-    css = CSS.read_text(encoding="utf-8")
-    assert re.search(r"\.cu-topo\{[^}]*display:flex[^}]*justify-content:space-between", css)
-    # nas outras abas, a busca da usina não aparece
-    assert "data-rd-usina" not in logado.get("/t/campo/responsaveis?responsavel=*&modo=geral").get_data(as_text=True)
 
 
 def test_o_relatorio_pergunta_o_mes_primeiro(tela, logado):
@@ -321,21 +288,6 @@ def test_os_chamados_so_mostram_a_linha_que_tem_chamado(tela, banco, logado):
     assert "Nenhum chamado de garantia aberto." in ch and "pu-lista" not in ch
 
 
-def test_a_pt_esperando_o_de_acordo_abre_a_decisao_na_janela(tela, logado):
-    """"o KPI de PT já tem a informação, ao clicar no KPI aparece o mesmo card que aparece em visão do responsável >
-    painel" (05/11/2026): no prontuário (12/11/2026) cada PT esperando o De acordo fica no cartão da Segurança e abre a
-    decisão na janela desta tela, sem a lista no meio; a lista do Painel segue como era."""
-    html = _central(logado, "&usina=1")
-    assert 'id="cu-pts-lista"' not in html and "data-cu-pts" not in html and "Pedidas no mês" not in html
-    seg = _quadro(html, "pu-seg")
-    assert "2 esperando o De acordo" in seg
-    assert seg.count('class="cn-link cr-abre cr-link-botao" data-cr-painel="/t/campo/responsaveis/pt/') == 2
-    # a lista do Painel (a mesma macro de sempre)
-    painel = logado.get("/t/campo/responsaveis?modo=painel&responsavel=*").get_data(as_text=True)
-    pl = painel.split('<template id="pn-pts-lista">', 1)[1].split("</template>", 1)[0]
-    assert '<ol class="pn-lista pn-lista--jan"' in pl and pl.count('class="pn-it cr-abre"') >= 2
-    # sem PT esperando, o cartão diz que não há (a Coração 1)
-    assert "nenhuma esperando o De acordo" in _quadro(_central(logado, "&usina=3"), "pu-seg")
 
 
 def test_o_eixo_com_passo_quebrado_mostra_a_casa_decimal():
