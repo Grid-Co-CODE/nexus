@@ -151,13 +151,29 @@ vive só na memória da tela. Sem a chave, a tela lista as contestações com "c
 **O par de 13/10/2026** está em `C:\GridcoAuto\entrega-ti\contestacoes-chaves-2026-10-13\` (a privada no
 `.segredo`, nunca impressa): perder a privada é perder o que já foi gravado; a cópia em cofre é item da virada.
 
-**A tela.** Uma aba por setor com a contagem; a mais nova em cima: quando chegou (Brasília), a usina, o dia contestado,
-o que contesta, o cliente e o contato, a mensagem, o que ele via na tela, o Teams ("recebeu"; "não recebeu" em vermelho =
-o Teams recusou; "só no Nexus" em cinza = o setor não tem fluxo, o caso do COS, e não é falha: `_avisado`) e o
-responsável. Tela nova nasce FECHADA para os setores (Base → Acessos): o administrador vê;
-marcar "Contestações" para Performance, COS e Zeladoria. **Que setor recebe o quê** (o 5080 decide, `thopen/contestacao.py`):
-geração, string e tracker → Performance; disponibilidade e desligamento → COS (Levi, 15/10/2026: "Disponibilidade e
-desligamento vão para o setor de COS"); ronda → Zeladoria.
+**A tela (o redesenho de 16/11/2026, Levi: "Sobre contestações quero um rebranding! Tire esse 'Pegar pra mim' qualquer
+um daquele setor pode editar e salvar por tanto que salve quem foi que fez isso! deixe mais utilizável").** Uma fila por
+setor, sem dono, num nível de superfície (os itens da lista e o card são os únicos cartões; a cor é só da situação):
+- **as abas dos setores** só quando a sessão vê mais de um (o administrador), com as **abertas** de cada um;
+- **os números do alto**: Sem resposta (alerta), Em andamento (info), Resolvidas (ok) e a mais antiga sem resposta (há
+  quantos dias, e a usina); cada um leva à lista dele (a mais antiga, direto ao card dela);
+- **a lista à esquerda**: Abertas | Resolvidas; nas abertas, a sem resposta primeiro, e cada grupo com a mais nova em
+  cima. O item mostra a situação, há quanto tempo chegou, a usina, o dia e o que contesta, e a última atualização com
+  quem escreveu (ou "Ninguém do setor respondeu ainda"; na resolvida, quem resolveu e quando);
+- **o card à direita** (`_contestacao_card.html`, também pela rota `/card`, que a lista troca sem reler a página:
+  `static/comando-contestacoes.js`): a usina, o dia contestado, quando chegou, o Teams ("recebeu"; "o Teams recusou o
+  aviso" em vermelho; "só no Nexus" = o setor não tem fluxo, o caso do COS, e não é falha: `_avisado`), a situação com
+  Marcar como resolvida / Reabrir, o que o cliente disse, o que ele via na tela naquele dia, o campo de escrever ("Fica
+  registrada como <nome>, com a data e a hora") e a história, a mais nova em cima;
+- **o endereço guarda a escolhida** (`?setor=&ver=&c=`): o aviso do topo leva direto a ela, e a aba do setor é a dela. No
+  celular (até 899px) o card vem abaixo da lista e só aparece quando a pessoa escolhe uma;
+- **sem JavaScript** tudo funciona por link e formulário (volta com o aviso, 303); com ele, a gravação é por JSON
+  (`X-Nexus-Parte`), a recusa aparece no próprio formulário sem perder o texto, e o que gravou relê a página na
+  contestação (os números, a lista e o aviso do topo em dia).
+Tela nova nasce FECHADA para os setores (Base → Acessos): o administrador vê; marcar "Contestações" para Performance, COS
+e Zeladoria. **Que setor recebe o quê** (o 5080 decide, `thopen/contestacao.py`): geração, string e tracker →
+Performance; disponibilidade e desligamento → COS (Levi, 15/10/2026: "Disponibilidade e desligamento vão para o setor de
+COS"); ronda → Zeladoria.
 
 **Cada setor vê só a sua** (Levi, 15/10/2026: "O setor só vê a contestação do próprio setor, exceto administrador"):
 `_setores_visiveis` — administrador (a lista de agora; o Nexus recalcula `session["admin"]` a cada pedido), todas; quem
@@ -165,25 +181,40 @@ tem setor, só a de mesmo nome (os setores do Nexus são "Performance", "COS" e 
 setor, nenhuma ("Nenhuma contestação para o seu setor"); portão por setor desligado (`NEXUS_ACESSO_POR_SETOR=0`,
 testes), todas. **O servidor barra**, não só a tela: o card e as ações de uma contestação de outro setor dão 404.
 
-**O acompanhamento** (Levi, 15/10/2026: "um botão 'Pegar para mim' ao clicar nesse botão o usuário se torna o
-responsável por aquela demanda. Ao clicar na linha, vai aparecer um card sobrepondo a tela com um blur de fundo onde o
-responsável poderá inserir atualizações sobre a demanda com data e hora salva"), em `nexus/contratos/tratamento.py`:
-- **Pegar para mim**: quem entrou com login de pessoa (Fracttal ou Microsoft; a senha de administrador não diz quem é)
-  vira o responsável. Com dono, só o administrador passa para si ("Assumir" na linha).
-- **O card** (o `<dialog class="cr-modal">` da Visão do responsável, fundo desfocado): a contestação, o cliente, o
-  responsável desde quando e as atualizações (a mais nova em cima, com data, hora e quem). Só o responsável de agora
-  escreve; o resto do setor lê. A atualização grava sem sair do card e a contagem da linha acompanha na hora (o evento
-  `close` do `<dialog>` não disparou no navegador do painel: nada depende dele).
+**O acompanhamento** (`nexus/contratos/tratamento.py`). Nasceu em 15/10/2026 com dono (o "Pegar para mim": só o
+responsável escrevia; o administrador "Assumia"). **Desde 16/11/2026 o setor inteiro responde**: quem vê a contestação (o
+setor dela, ou o administrador) e entrou com um login de pessoa (Fracttal ou Microsoft; a senha de administrador não diz
+quem é, e por isso não escreve) escreve a atualização, marca como resolvida e reabre. Cada evento guarda quem e quando; nada
+se edita nem se apaga. O POST do "Pegar para mim" de uma aba antiga não grava: volta à contestação com o aviso.
+- **A situação** (a escolha do Levi no mesmo dia: "Sim, com Resolvida"): **resolvida** = o último `resolvida`/`reaberta`
+  é um `resolvida`; senão **em andamento** = já tem atualização; senão **sem resposta**. Resolver sem escrever vale (o
+  setor decide); reaberta sem atualização volta a sem resposta (e ao aviso). Resolver a resolvida, ou reabrir a aberta, é
+  recusado (o livro é relido sob a trava antes de gravar).
 - **O dado**: livro `nexus_contestacoes_tratamento` · `fato_tratamento_contestacao` (fato `tratamento_contestacao` no
-  catálogo, registrado antes da 1ª gravação). 1 linha = 1 evento (`responsavel` ou `atualizacao`) sobre a linha do
-  `thopen_contestacoes` (`contestacao_linha_id`); só acrescenta, sob a trava, relido antes e conferido depois. O
-  responsável é o do último `responsavel` **pela ordem de gravação** (dois eventos no mesmo segundo ficavam na ordem do
-  id, ao acaso). Quem (nome e e-mail) e o texto só cifrados (Cofre, a chave do cadastro); a pessoa pelo `pessoa_hmac`.
+  catálogo, registrado antes da 1ª gravação). 1 linha = 1 evento (`atualizacao`, `resolvida`, `reaberta` e, só na
+  história, o `responsavel` gravado até 15/11/2026, que aparece como "Ficou com a demanda" e não dá nem tira nada) sobre
+  a linha do `thopen_contestacoes` (`contestacao_linha_id`); só acrescenta, sob a trava, relido antes e conferido depois.
+  A ordem é **a da gravação** (`_em_ordem`: pela hora e, no mesmo segundo, pela posição no livro; pelo id, resolver e
+  reabrir no mesmo segundo ficavam ao acaso). Quem (nome e e-mail) e o texto só cifrados (Cofre, a chave do cadastro); a
+  pessoa pelo `pessoa_hmac`; o `evento` em claro, que é o que o aviso do topo lê (`situacoes`).
+- **No banco em 16/11/2026** havia 9 contestações (2 da Performance, 3 do COS, 3 da Zeladoria abertas sem resposta; a da
+  Altair com o "Pegar para mim" e sem atualização; só a TESTE de 13/10 da Guaratinguetá V com uma atualização).
 
-**Ainda não tem** (fica para quando o Levi pedir): status da demanda (concluída), soltar a demanda, filtro por usina ou
-cliente, outros dashboards.
+**O aviso do topo** (16/11/2026, Levi: "as contestações também devem notificar nas notificações lá de cima, a que não é do
+OS Creator!"; `nexus/contratos/aviso.py` e `casca._contestacoes_do_sino`): a bandeja das demandas, ao lado do botão do OS
+Creator, traz as contestações **sem resposta** do setor da pessoa, a mais nova em cima, com o que contesta, o dia e há
+quantos dias espera; o clique leva ao card. **As escolhas do Levi**: sai para o setor inteiro, ao mesmo tempo, na 1ª
+atualização de qualquer um dele ou quando alguém resolve ("1ª resposta do setor"); o administrador recebe só a do setor
+dele ("Só a do setor dele"); o administrador sem um setor de contestação recebe as três (minha leitura: é quem coordena, e
+não tem "o dele"). Só para quem abre a tela Contestações; a senha de administrador (sem pessoa) não tem bandeja. A cópia
+dos dois livros dura 1 minuto e é relida por trás (nenhuma página espera o banco); quem grava pela tela já vê o aviso
+sumir na página seguinte (`aviso.anotar`). Nada se decifra para o aviso: a usina, o dia e os itens vão em claro.
 
-**Como provar.** `python -m pytest -q tests/test_contratos_contestacoes.py` (banco falso; com
+**Ainda não tem** (fica para quando o Levi pedir): filtro por usina ou cliente, editar uma atualização já gravada, aviso
+por e-mail ou Teams, outros dashboards.
+
+**Como provar.** `python -m pytest -q tests/test_contratos_contestacoes.py` (banco falso: o setor que escreve sem dono,
+Resolvida e Reabrir, a ordem no mesmo segundo, o setor que só vê a sua, o aviso do topo e o administrador; com
 `PLATAFORMA_REPO=<clone da plataforma>` o teste cruzado cifra com o código do 5080 e abre aqui). Em 13/10/2026, ponta a
 ponta no banco de verdade: uma contestação TESTE pelo clique no gráfico do 5080 de ensaio (Guaratinguetá V, 06/10,
 Geração + Ronda) gravou 2 linhas (Performance e Zeladoria); lida pela API aberta, nenhum nome, e-mail, mensagem ou kWh

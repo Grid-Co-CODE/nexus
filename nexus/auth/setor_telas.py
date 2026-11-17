@@ -72,7 +72,10 @@ RENOMEADAS = {"performance/relatorio": "relatorios/relatorio",
               "performance/relatorio-semanal": "relatorios/relatorio-semanal",
               "contratos/contestacoes": "comando/contestacoes",
               "contratos/previa": "comando/visao-do-contrato",
-              "contratos/acessos": "base/acessos-clientes"}
+              "contratos/acessos": "base/acessos-clientes",
+              # 16/11/2026: a Usinas saiu do Comando para a Usinas 360° (Levi: "Usinas sai de comando e vai para Usinas
+              # 360 abaixo de Visão do responsável!"); o endereço antigo responde 308 (nexus/torres/comando, `bp_usinas`)
+              "comando/usinas": "campo/usinas"}
 # A torre que saiu do menu e só guarda os endereços antigos (nexus/torres/contratos: cada um responde um
 # redirecionamento para a tela nova). O portão deixa passar: sem isto, quem não é administrador recebia a recusa no
 # endereço salvo, em vez de chegar à tela nova, que tem o portão dela.

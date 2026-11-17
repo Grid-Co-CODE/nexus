@@ -183,17 +183,17 @@ def test_registro_do_mes_e_o_teto(tmp_path):
 def test_a_caixa_vem_embutida_e_para_todos(tela, logado):
     """16/11/2026, Levi: "libera para todos" (era só administrador); e o retorno do time: "Tem que ser a caixa de texto
     para a IA sem abrir uma janela". A caixa vem por trás para o lugar embaixo do Insights."""
-    p = logado.get("/t/comando/usinas/1").get_data(as_text=True)
-    assert 'data-pu-ia="/t/comando/usinas/1/ia?parcial=1"' in p and "/static/comando/ia.js" in p
-    h = logado.get("/t/comando/usinas/1/ia?parcial=1").get_data(as_text=True)
-    assert "<html" not in h.lower() and 'data-ia-url="/t/comando/usinas/1/ia/perguntar"' in h
+    p = logado.get("/t/campo/usinas/1").get_data(as_text=True)
+    assert 'data-pu-ia="/t/campo/usinas/1/ia?parcial=1"' in p and "/static/comando/ia.js" in p
+    h = logado.get("/t/campo/usinas/1/ia?parcial=1").get_data(as_text=True)
+    assert "<html" not in h.lower() and 'data-ia-url="/t/campo/usinas/1/ia/perguntar"' in h
     assert "Como foi a performance no mês?" in h and "Nenhuma IA ligada neste servidor" in h and "sem chave" in h
     assert "sobre a Altair" in h
-    assert "<html" in logado.get("/t/comando/usinas/1/ia").get_data(as_text=True).lower()     # a página inteira
+    assert "<html" in logado.get("/t/campo/usinas/1/ia").get_data(as_text=True).lower()     # a página inteira
     with logado.session_transaction() as s:
         s["admin"] = False
-    assert logado.get("/t/comando/usinas/1/ia?parcial=1").status_code == 200
-    assert logado.post("/t/comando/usinas/1/ia/perguntar", json={"pergunta": "?", "modelos": []}).status_code == 400
+    assert logado.get("/t/campo/usinas/1/ia?parcial=1").status_code == 200
+    assert logado.post("/t/campo/usinas/1/ia/perguntar", json={"pergunta": "?", "modelos": []}).status_code == 400
 
 
 def test_perguntar_monta_o_dossie_de_agora_e_registra(tela, logado, monkeypatch, tmp_path):
@@ -207,11 +207,11 @@ def test_perguntar_monta_o_dossie_de_agora_e_registra(tela, logado, monkeypatch,
         visto.update(ids=ids, dossie=dossie, pergunta=pergunta, historico=historico, setores=setores)
         return [{"id": "gemini-flash", "ok": True, "texto": "Bem.", "custo_usd": 0.01}]
     monkeypatch.setattr(IA, "perguntar", perguntar)
-    h = logado.get("/t/comando/usinas/1/ia?parcial=1").get_data(as_text=True)
+    h = logado.get("/t/campo/usinas/1/ia?parcial=1").get_data(as_text=True)
     # marcado de início: o 1º modelo com chave (a Anthropic sem chave fica de fora)
     assert 'value="gemini-flash" data-ia-modelo checked' in h and 'value="gemini-pro" data-ia-modelo>' in h
     assert 'value="opus" data-ia-modelo disabled' in h and "Nenhuma IA ligada" not in h and "US$ 0,00" in h
-    r = logado.post("/t/comando/usinas/1/ia/perguntar", json={
+    r = logado.post("/t/campo/usinas/1/ia/perguntar", json={
         "pergunta": "  Por que   caiu? ", "modelos": ["gemini-flash"], "historico": [{"pergunta": "a", "resposta": "b"}]})
     j = r.get_json()
     assert r.status_code == 200 and j["ok"] and j["respostas"][0]["texto"] == "Bem." and j["gasto"] == 0.01
@@ -219,12 +219,12 @@ def test_perguntar_monta_o_dossie_de_agora_e_registra(tela, logado, monkeypatch,
     assert "Ciclano Chefe" not in visto["dossie"]                       # as pessoas vão pelo papel
     assert len(list((tmp_path / "ia").glob("perguntas-*.jsonl"))) == 1
     # sem pergunta, sem modelo, de outro site, teto estourado
-    assert logado.post("/t/comando/usinas/1/ia/perguntar", json={"pergunta": " ", "modelos": ["x"]}).status_code == 400
-    assert logado.post("/t/comando/usinas/1/ia/perguntar", json={"pergunta": "?", "modelos": []}).status_code == 400
-    assert logado.post("/t/comando/usinas/1/ia/perguntar", json={"pergunta": "?", "modelos": ["opus"]},
+    assert logado.post("/t/campo/usinas/1/ia/perguntar", json={"pergunta": " ", "modelos": ["x"]}).status_code == 400
+    assert logado.post("/t/campo/usinas/1/ia/perguntar", json={"pergunta": "?", "modelos": []}).status_code == 400
+    assert logado.post("/t/campo/usinas/1/ia/perguntar", json={"pergunta": "?", "modelos": ["opus"]},
                        headers={"Sec-Fetch-Site": "cross-site"}).status_code == 403
     logado.application.config["NEXUS_IA_TETO_USD"] = "0.01"
-    r = logado.post("/t/comando/usinas/1/ia/perguntar", json={"pergunta": "?", "modelos": ["gemini-flash"]})
+    r = logado.post("/t/campo/usinas/1/ia/perguntar", json={"pergunta": "?", "modelos": ["gemini-flash"]})
     assert r.status_code == 429 and "teto do mês" in r.get_json()["erro"]
 
 
@@ -348,10 +348,10 @@ def test_o_pedido_de_relatorio_pelo_tema_e_pelo_mes():
 
 def test_o_relatorio_baixa_sem_chamar_a_ia(tela, logado, monkeypatch):
     monkeypatch.setattr(IA, "perguntar", lambda *a, **k: (_ for _ in ()).throw(AssertionError("chamou a IA")))
-    j = logado.post("/t/comando/usinas/1/ia/perguntar", json={"pergunta": "me manda o relatório só de chamados",
+    j = logado.post("/t/campo/usinas/1/ia/perguntar", json={"pergunta": "me manda o relatório só de chamados",
                                                               "modelos": ["opus"]}).get_json()
     assert j["ok"] and j["respostas"] == [] and j["relatorio"]["temas"] == ["Chamados de garantia"]
-    assert j["relatorio"]["url"].startswith("/t/comando/usinas/1/relatorio.pdf?mes=") and "tema=chamados" in j["relatorio"]["url"]
+    assert j["relatorio"]["url"].startswith("/t/campo/usinas/1/relatorio.pdf?mes=") and "tema=chamados" in j["relatorio"]["url"]
 
 
 def test_a_acao_vira_demanda_pela_regra_da_caixa_de_entrada(tela, logado, monkeypatch):
@@ -366,16 +366,16 @@ def test_a_acao_vira_demanda_pela_regra_da_caixa_de_entrada(tela, logado, monkey
     monkeypatch.setattr(DM, "abrir", abrir)
     corpo = {"para_hmac": "abc", "para_setor_id": 3, "tema_id": "t1", "titulo": "Analisar o tracker",
              "descricao": "Sugerido pelo Nexus IA", "os": 16453, "novo_id": "dx1"}
-    j = logado.post("/t/comando/usinas/1/ia/demanda", json=corpo).get_json()
+    j = logado.post("/t/campo/usinas/1/ia/demanda", json=corpo).get_json()
     assert j["ok"] and "Que eu pedi" in j["aviso"]
     assert visto["form"]["usinas"] == ["1"] and visto["form"]["para_setor_id"] == "3" and visto["form"]["os"] == "16453"
-    r = logado.post("/t/comando/usinas/1/ia/demanda", json=dict(corpo, titulo="recusa"))
+    r = logado.post("/t/campo/usinas/1/ia/demanda", json=dict(corpo, titulo="recusa"))
     assert r.status_code == 400 and "Nada foi enviado" in r.get_json()["erro"]
-    assert logado.post("/t/comando/usinas/1/ia/demanda", json=corpo,
+    assert logado.post("/t/campo/usinas/1/ia/demanda", json=corpo,
                        headers={"Sec-Fetch-Site": "cross-site"}).status_code == 403
     with logado.session_transaction() as s:
         s["admin"] = False
-    assert logado.post("/t/comando/usinas/1/ia/demanda", json=corpo).status_code == 200       # todos, desde 16/11/2026
+    assert logado.post("/t/campo/usinas/1/ia/demanda", json=corpo).status_code == 200       # todos, desde 16/11/2026
 
 
 def test_a_janela_leva_os_setores_com_pessoas_e_temas(tela, logado, monkeypatch):
@@ -389,12 +389,12 @@ def test_a_janela_leva_os_setores_com_pessoas_e_temas(tela, logado, monkeypatch)
         {"hmac": "h2", "nome": "Bia", "setor_id": 5, "setor_nome": "Segurança"}])
     monkeypatch.setattr(DM, "temas", lambda *a, **k: [{"tema_id": "t1", "nome": "Análise", "setor_id": 3,
                                                        "prazo_dias_uteis": 5, "ativo": True}])
-    h = logado.get("/t/comando/usinas/1/ia?parcial=1").get_data(as_text=True)
+    h = logado.get("/t/campo/usinas/1/ia?parcial=1").get_data(as_text=True)
     dados = json.loads(h.split("data-ia-setores>")[1].split("</script>")[0])
     # o setor sem pessoa nem tema lido também vai (a IA conhece todos; o botão diz o que falta)
     assert [(s["nome"], len(s["pessoas"]), len(s["temas"])) for s in dados] == [
         ("Engenharia", 1, 1), ("PCM", 0, 0), ("Segurança", 1, 0)]
-    assert 'data-ia-demanda-url="/t/comando/usinas/1/ia/demanda"' in h
+    assert 'data-ia-demanda-url="/t/campo/usinas/1/ia/demanda"' in h
 
 
 def test_a_area_chamados_e_destino_do_chat_com_as_pessoas_marcadas(tela, logado, monkeypatch):
@@ -415,7 +415,7 @@ def test_a_area_chamados_e_destino_do_chat_com_as_pessoas_marcadas(tela, logado,
          "area": "Chamados"}])
 
     def setores():
-        h = logado.get("/t/comando/usinas/1/ia?parcial=1").get_data(as_text=True)
+        h = logado.get("/t/campo/usinas/1/ia?parcial=1").get_data(as_text=True)
         return {s["nome"]: s for s in json.loads(h.split("data-ia-setores>")[1].split("</script>")[0])}
     monkeypatch.setattr(AR, "ler", lambda cfg: {})
     d = setores()
@@ -455,7 +455,7 @@ def test_as_instrucoes_pedem_a_conclusao_primeiro_e_a_engenharia_na_recorrencia(
 
 
 def test_as_sugestoes_no_alto_e_o_criar_os_dos_setores_que_recebem_os(tela, logado):
-    h = logado.get("/t/comando/usinas/1/ia?parcial=1").get_data(as_text=True)
+    h = logado.get("/t/campo/usinas/1/ia?parcial=1").get_data(as_text=True)
     # a caixa, as sugestões embaixo dela e a conversa por último (16/11/2026: embutida, sem o "vazio" da janela)
     assert h.index("data-ia-form") < h.index('class="ia-sugestoes"') < h.index("data-ia-conversa") and "data-ia-vazio" not in h
     criar = json.loads(h.split("data-ia-criar-os>")[1].split("</script>")[0])
@@ -467,7 +467,7 @@ def test_as_sugestoes_no_alto_e_o_criar_os_dos_setores_que_recebem_os(tela, loga
 def test_o_modelo_padrao_e_o_nemotron_e_fica_escondido_no_i(tela, logado):
     logado.application.config.update(OPENROUTER_API_KEY="k", GEMINI_API_KEY="g")
     assert IA.padrao(logado.application.config) == "nemotron"
-    h = logado.get("/t/comando/usinas/1/ia?parcial=1").get_data(as_text=True)
+    h = logado.get("/t/campo/usinas/1/ia?parcial=1").get_data(as_text=True)
     assert '<details class="ia-info">' in h and "Responde: <b>Nemotron 3 Ultra grátis</b>" in h
     assert 'value="nemotron" data-ia-modelo checked' in h and 'value="gemini-lite" data-ia-modelo>' in h
     # o padrão sem chave: vale o primeiro com chave

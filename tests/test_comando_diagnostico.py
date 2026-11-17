@@ -76,23 +76,23 @@ def test_a_rota_faz_uma_vez_e_todos_leem_o_mesmo(tela, logado, monkeypatch, tmp_
         return [{"id": "nemotron", "rotulo": "Nemotron", "ok": True, "texto": RESPOSTA, "custo_usd": 0}]
     monkeypatch.setattr(IA, "perguntar", perguntar)
     # o prontuário traz o lugar do diagnóstico, no lugar da frase do parecer
-    h = logado.get("/t/comando/usinas/1").get_data(as_text=True)
-    assert 'data-pu-diag="/t/comando/usinas/1/ia/diagnostico"' in h and "data-pu-diag-frase" in h
+    h = logado.get("/t/campo/usinas/1").get_data(as_text=True)
+    assert 'data-pu-diag="/t/campo/usinas/1/ia/diagnostico"' in h and "data-pu-diag-frase" in h
     assert "<span data-pu-diag-selo>" in h            # o JS troca o título do parecer por "Nexus IA Insights"
-    j = logado.get("/t/comando/usinas/1/ia/diagnostico").get_json()
+    j = logado.get("/t/campo/usinas/1/ia/diagnostico").get_json()
     assert j["estado"] == "pronto" and j["diag"]["tem_que_fazer"][0]["texto"].startswith("Programar a ronda")
     assert chamadas == [DG.PEDIDO]
     # a segunda abertura (a mesma pessoa ou outra) lê o guardado: a IA não é chamada de novo
-    assert logado.get("/t/comando/usinas/1/ia/diagnostico").get_json()["estado"] == "pronto" and len(chamadas) == 1
+    assert logado.get("/t/campo/usinas/1/ia/diagnostico").get_json()["estado"] == "pronto" and len(chamadas) == 1
     # a usina que não existe
-    assert logado.get("/t/comando/usinas/987654/ia/diagnostico").status_code == 404
+    assert logado.get("/t/campo/usinas/987654/ia/diagnostico").status_code == 404
     # sem chave de IA nenhuma: fica o parecer
     for k in ("OPENROUTER_API_KEY", "GEMINI_API_KEY", "GROQ_API_KEY"):
         logado.application.config.pop(k, None)
     for p in IA.PROVEDORES.values():
         monkeypatch.delenv(p["chave"], raising=False)
     (tmp_path / "ia" / "diagnosticos").rename(tmp_path / "ia" / "antes")
-    assert logado.get("/t/comando/usinas/1/ia/diagnostico").get_json() == {"estado": "sem_ia"}
+    assert logado.get("/t/campo/usinas/1/ia/diagnostico").get_json() == {"estado": "sem_ia"}
 
 
 def test_garantia_e_da_performance_e_a_rede_do_cos():

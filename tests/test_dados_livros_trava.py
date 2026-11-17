@@ -116,8 +116,8 @@ def test_os_livros_que_so_crescem_estao_declarados_no_catalogo():
 
 
 def test_contestacao_pega_com_a_listagem_vazia_nao_apaga_o_historico(app):
-    # o caso de verdade, por um módulo: o "Pegar para mim" relê o livro, a listagem falha, ele vê vazio e grava só a
-    # linha nova; a trava recusa e as duas linhas que havia continuam
+    # o caso de verdade, por um módulo: a atualização da contestação (era o "Pegar para mim", até 16/11/2026) relê o livro,
+    # a listagem falha, ela vê vazio e gravaria só a linha nova; a trava recusa e as duas linhas que havia continuam
     from nexus.cadastro.cifra import gerar_chave
     from nexus.contratos import tratamento as TR
     api = ApiPGFalsa()
@@ -131,7 +131,7 @@ def test_contestacao_pega_com_a_listagem_vazia_nao_apaga_o_historico(app):
         with app.app_context():
             api.omitir.add(TR.LIVRO)
             with pytest.raises(livros.GravacaoRecusada):
-                TR.pegar("a9", "performance", {"email": "ana.lima@gridco.com.br", "nome": "Ana Lima"}, admin=False)
+                TR.atualizar("a9", "performance", {"email": "ana.lima@gridco.com.br", "nome": "Ana Lima"}, "Vendo")
             api.omitir.clear()
             assert [l["id"] for l in api.linhas(TR.LIVRO, TR.ABA)] == ["e0", "e1"]
             assert "ana lima" not in json.dumps(api.linhas(TR.LIVRO, TR.ABA), default=str).lower()

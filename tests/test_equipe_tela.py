@@ -172,7 +172,8 @@ def _acessos(srv):
 def test_a_tela_esta_logo_depois_da_visao_do_cliente_e_e_dos_cinco_setores():
     from nexus.torres.campo import TORRE
     ids = [t.id for t in TORRE.telas]
-    assert ids.index("equipe") == ids.index("cliente") + 1
+    # a Usinas veio do Comando em 16/11/2026 e entra entre as duas (no menu da Grid, logo abaixo da Visão do responsável)
+    assert ids.index("equipe") == ids.index("usinas") + 1 == ids.index("cliente") + 2
     t = TORRE.tela("equipe")
     assert t.nome == "Mapa de equipe" and set(t.do_setor) == {SID.PCM, SID.COS, SID.PERFORMANCE,
                                                                SID.SUPERVISAO_CAMPO, SID.RESPONSAVEL_UFV}

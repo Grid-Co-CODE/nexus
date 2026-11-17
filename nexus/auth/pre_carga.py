@@ -55,7 +55,7 @@ CABECALHO = "X-Nexus-Pre-Carga"
 # tela do menu, e as cópias dele (as de todas as usinas: o mês a mês, o COS, as tarefas, a Visão do responsável, as PT)
 # só enchiam no 1º clique numa usina. Medido no PC em 16/11: a 1ª usina 51,9 s, as seguintes 0,1 s. Junto com a lista do
 # Comando › Usinas, a pré-carga abre também o prontuário da 1ª usina da lista: as cópias são de todas as usinas
-PRONTUARIO_JUNTO = "comando/usinas"
+PRONTUARIO_JUNTO = "campo/usinas"          # a Usinas saiu do Comando para a Usinas 360° em 16/11/2026
 
 
 def ligada(cfg) -> bool:
@@ -211,10 +211,10 @@ def _prontuario_junto(cliente, cabecalhos, html: str) -> None:
     """Abre o prontuário da 1ª usina da lista do Comando › Usinas (`PRONTUARIO_JUNTO`), para as cópias dele ficarem
     quentes. O diagnóstico do dia da IA não roda aqui: quem o pede é o navegador, depois da página."""
     import re
-    m = re.search(r'/t/comando/usinas/(\d+)"', html or "")
+    m = re.search(r'/t/campo/usinas/(\d+)"', html or "")
     if not m:
         return
-    st = cliente.get(f"/t/comando/usinas/{m.group(1)}", headers=cabecalhos).status_code
+    st = cliente.get(f"/t/campo/usinas/{m.group(1)}", headers=cabecalhos).status_code
     if st >= 400:
         log.warning("Pré-carga: o prontuário da usina %s respondeu %s.", m.group(1), st)
 

@@ -197,7 +197,7 @@ def _pode(usina_id: int) -> dict:
 
 def contexto(usina_id: int, cu: dict | None = None, rel_url: str = "") -> dict | None:
     """Tudo o que o `comando/_prontuario.html` pede, para as duas portas da mesma página: o Comando > Usinas
-    (/t/comando/usinas/<id>) e a aba Central da usina da Usinas 360°, que esta página substituiu (Levi, 12/11/2026: "essa
+    (/t/campo/usinas/<id>) e a aba Central da usina da Usinas 360°, que esta página substituiu (Levi, 12/11/2026: "essa
     visão irá substituir a central da usina"). `cu` = a Central já calculada por quem chama (a aba da Usinas 360°);
     `rel_url` = o endereço do relatório em PDF de quem chama. None = a usina não está na lista (não mobilizada)."""
     from ...campo import responsaveis as campo_resp

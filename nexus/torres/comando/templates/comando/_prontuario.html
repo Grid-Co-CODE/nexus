@@ -9,17 +9,16 @@
    (abre ao clicar, e cada número e cada pendência do alto abrem o cartão deles e fecham os outros). A conta é
    nexus/comando/prontuario.py; cada fonte que não abre fica de fora com o aviso. Um nível de superfície.
    Pede: x (a linha da lista), cu (a Central), p (prontuario_dados.montar), insights, severidades, regras, avisos,
-   iniciais, sem_responsavel. `pu_na_aba` = a página está na aba da Usinas 360°, que tem a janela dela (`cr-modal`, o
-   `data-cr-painel`): lá o dia a dia, os extintores e a decisão da PT abrem por cima; no Comando, a PT leva à aba. O
-   card da OS (oscreator/card_os_abrir.html) vem de quem inclui. O link da tela que a pessoa não abre não aparece
+   iniciais, sem_responsavel. A aba "Prontuário da usina" da Visão do responsável (que tinha a janela dela e o
+   `pu_na_aba`) saiu em 16/11/2026: a página só existe na Usinas (/t/campo/usinas/<id>), e a PT esperando abre a página
+   dela. O card da OS (oscreator/card_os_abrir.html) vem de quem inclui. O link da tela que a pessoa não abre não aparece
    (`p.pode`). #}
 {% from "campo/_graficos.html" import geracao %}
 {% macro os_botao(n, wid='') %}{% if n %}<button type="button" class="cn-link pu-os" data-pu-os="{{ n }}" data-pu-wid="{{ wid or '' }}" title="Abrir o card da OS {{ n }}">OS {{ n }}</button>{% endif %}{% endmacro %}
-{% macro linhas(ls, marca=none, perf=false) %}
+{% macro linhas(ls, marca=none) %}
   <dl class="cr-dl">
-    {% for i in ls %}{% set jan = {'Meta do mês': 'meta', 'PR': 'pr', 'Disponibilidade': 'disp', 'Ativos falhando': 'ativos'}.get(i.rot) if perf and pu_na_aba else none %}<dt{% if marca and marca.get(i.rot) %} class="cu-dt cu-dt--{{ marca[i.rot] }}"{% endif %}>{{ i.rot }}</dt>
+    {% for i in ls %}<dt{% if marca and marca.get(i.rot) %} class="cu-dt cu-dt--{{ marca[i.rot] }}"{% endif %}>{{ i.rot }}</dt>
     <dd>{% if i.forte %}<b>{{ i.forte }}</b> · {% endif %}{{ i.resto }}{% if i.get('ronda') %} · {{ i.ronda.txt }}{% endif %}{% if i.get('alerta') %} · <span class="cn-t-alerta">{{ i.alerta }}</span>{% endif %}
-      {% if jan %}<button type="button" class="cr-dia-a-dia cr-abre" data-cr-painel="{{ url_for('torre_campo.responsaveis_painel', usina_id=x.usina_id, painel=jan) }}">{{ 'ver os ativos' if jan == 'ativos' else 'dia a dia' }}</button>{% endif %}
       {% for it in i.itens %}<span class="it">{% if it.get('agora') %}<span class="cr-agora">Agora</span>{% endif %}{% if it.get('os_card') %}{{ os_botao(it.os_card.folio, it.os_card.wid) }}{% else %}<b>{{ it.forte }}</b>{% endif %}{% if it.txt %} · {{ it.txt }}{% endif %}{% if it.get('sem_decisao') %} · <span class="cn-t-critico">{{ it.sem_decisao }}</span>{% endif %}</span>{% endfor %}
       {% if i.get('mais') %}<span class="it mudo">e mais {{ i.mais }}</span>{% endif %}</dd>{% endfor %}
   </dl>
@@ -48,7 +47,7 @@
   <header class="cu-cab">
     <div class="cu-id">
       <p class="gc-eyebrow">Prontuário da usina</p>
-      {% set T = 'h2' if pu_na_aba else 'h1' %}<{{ T }} class="cu-nome cmu-nome">{{ x.usina }} <span class="cn-pill cn-{{ x.estado_tom }}">{{ x.estado_rot }}</span>{% if x.detalhe %}<span class="pu-motivo">{{ x.detalhe }}</span>{% endif %}</{{ T }}>
+      <h1 class="cu-nome cmu-nome">{{ x.usina }} <span class="cn-pill cn-{{ x.estado_tom }}">{{ x.estado_rot }}</span>{% if x.detalhe %}<span class="pu-motivo">{{ x.detalhe }}</span>{% endif %}</h1>
       <p class="cu-onde">{{ x.cliente or '—' }}{% if x.cluster %} · {{ x.cluster }}{% endif %}{% if x.tipologia %} · {{ x.tipologia }}{% endif %}{% if x.mwp is not none %} · {{ ('%.1f'|format(x.mwp))|replace('.', ',') }} MWp{% endif %}{% if u.cidade %} · {{ u.cidade }}{% if u.uf %}/{{ u.uf }}{% endif %}{% endif %}{% if x.codigo %} · <span class="cmu-cod">{{ x.codigo }}</span>{% endif %}</p>
     </div>
     {# as ações: criar a OS pelas formas de hoje do OS Creator (a avulsa e a solicitação já com a usina); o relatório do
@@ -68,7 +67,7 @@
          administrador vê o atalho enquanto a pergunta não existe na tela; o endereço abre para quem abre o prontuário #}
       {# o dossiê e a conversa abrem na janela por cima (13/11/2026; prontuario.js); o href fica para o botão do meio #}
       {# o Nexus IA saiu daqui: a caixa fica embaixo do Nexus IA Insights, sem janela (16/11/2026) #}
-      {% if p.admin %}<a class="gc-btn gc-btn--ui gc-btn--contorno" data-pu-jan="{{ raiz }}/t/comando/usinas/{{ x.usina_id }}/dossie?parcial=1" data-pu-jan-t="Dossiê para a IA · {{ x.usina }}" href="{{ raiz }}/t/comando/usinas/{{ x.usina_id }}/dossie" title="O texto do prontuário inteiro, do jeito que a IA lê"><i class="ph ph-file-text" aria-hidden="true"></i> Dossiê para a IA</a>{% endif %}
+      {% if p.admin %}<a class="gc-btn gc-btn--ui gc-btn--contorno" data-pu-jan="{{ raiz }}/t/campo/usinas/{{ x.usina_id }}/dossie?parcial=1" data-pu-jan-t="Dossiê para a IA · {{ x.usina }}" href="{{ raiz }}/t/campo/usinas/{{ x.usina_id }}/dossie" title="O texto do prontuário inteiro, do jeito que a IA lê"><i class="ph ph-file-text" aria-hidden="true"></i> Dossiê para a IA</a>{% endif %}
       {% if p.pode.conversa %}<a class="gc-btn gc-btn--ui gc-btn--contorno" data-pu-jan="{{ raiz }}/t/comando/conversa/usina/{{ x.usina_id }}/janela" data-pu-jan-t="Conversa · {{ x.usina }}" href="{{ raiz }}/t/comando/conversa/usina/{{ x.usina_id }}" title="Conversar sobre a usina e pedir a outro setor"><i class="ph ph-chats" aria-hidden="true"></i> Conversa{% if p.conversa.n %} <b class="cu-n">{{ p.conversa.n }}</b>{% endif %}</a>{% endif %}
     </div>
   </header>
@@ -83,7 +82,7 @@
      parecer agora, vai ter o diagnóstico da IA [...] o que é que está pendente, o que é que dá para fazer [...] direcione
      o supervisor"). O selo continua o do parecer (a conta das regras); a frase vira a situação da IA e embaixo vêm o que
      ele tem que fazer, o que pode fazer e o que está pendente com outros, recolhível. Sem a IA, fica o parecer (prontuario.js) #}
-  <section class="pu-parecer pu-parecer--{{ p.parecer.nivel }} pu-diag" aria-labelledby="pu-par-t" data-pu-diag="{{ raiz }}/t/comando/usinas/{{ x.usina_id }}/ia/diagnostico" data-pu-diag-usina="{{ x.usina_id }}" data-pu-diag-nome="{{ x.usina }}">
+  <section class="pu-parecer pu-parecer--{{ p.parecer.nivel }} pu-diag" aria-labelledby="pu-par-t" data-pu-diag="{{ raiz }}/t/campo/usinas/{{ x.usina_id }}/ia/diagnostico" data-pu-diag-usina="{{ x.usina_id }}" data-pu-diag-nome="{{ x.usina }}">
     <div class="pu-diag-linha">
       <span class="pu-par-selo"><i class="pu-ponto pu-ponto--{{ p.parecer.nivel }}" aria-hidden="true"></i><span data-pu-diag-selo>{{ p.parecer.titulo }}</span></span>
       <h2 class="pu-par-t" id="pu-par-t" data-pu-diag-frase>{{ p.parecer.frase }}</h2>
@@ -96,7 +95,7 @@
   {# a Nexus IA na tela, para todos (16/11/2026, Levi: "libera para todos"; o retorno do time: "Tem que ser a caixa de texto
      para a IA sem abrir uma janela"): a caixa de pergunta embaixo do Insights, aberta para digitar; vem por trás
      (prontuario.js pede o pedaço de comando/_ia.html), e a página não espera por ela #}
-  <div class="pu-ia" data-pu-ia="{{ raiz }}/t/comando/usinas/{{ x.usina_id }}/ia?parcial=1"></div>
+  <div class="pu-ia" data-pu-ia="{{ raiz }}/t/campo/usinas/{{ x.usina_id }}/ia?parcial=1"></div>
 
   {# o painel, o visual na frente (Levi, 12/11/2026: "os KPIs principais de performance, meta, OS, pendências [...] de
      uma forma mais visual [...] o que está mais importante na frente, e ali aprofundando abaixo"): a Performance do mês
@@ -190,11 +189,8 @@
             <td class="gc-num">{{ m.disp }}{% if m.h_perdidas %}<small>{{ m.h_perdidas }}</small>{% endif %}</td></tr>{% endfor %}
         </tbody></table></div>
       {% endif %}
-      {% if outras %}{{ linhas(outras, perf=true) }}{% endif %}
+      {% if outras %}{{ linhas(outras) }}{% endif %}
       {% if not cu.graf_ger and not p.meses and not outras %}<p class="pu-nota">Sem meta, PR ou disponibilidade publicados para a usina neste mês.</p>{% endif %}
-      {% if pu_na_aba and u.perf.det %}
-      <p class="pu-pe pu-pe--bts"><span class="mudo">Dia a dia:</span>{% for k, rot in (('meta', 'Meta'), ('pr', 'PR'), ('disp', 'Disponibilidade')) %}<button type="button" class="cn-link cr-link-botao cr-abre" data-cr-painel="{{ url_for('torre_campo.responsaveis_painel', usina_id=x.usina_id, painel=k) }}">{{ rot }}</button>{% endfor %}</p>
-      {% endif %}
     {% endcall %}
 
     {# as OS: o que pede ação primeiro (a parada de agora, as atrasadas, as pausadas), depois as OS de cada estado; cada
@@ -295,12 +291,11 @@
       <dl class="cr-dl">
         <dt class="cu-dt cu-dt--{{ 'alerta' if pta else 'ok' }}">PT</dt>
         <dd>{% if pta %}<b class="cn-t-alerta">{{ pta }} esperando o De acordo</b>{% else %}<span class="cn-t-ok">nenhuma esperando o De acordo</span>{% endif %}{% if p.pts_n %} · {{ p.pts_n }} em 90 dias{% endif %}
-          {% if pu_na_aba %}{% for t in p.pts_espera %}<span class="it"><button type="button" class="cn-link cr-abre cr-link-botao" data-cr-painel="{{ url_for('torre_campo.responsaveis_pt', numero=t.numero, ativo=t.codigo, volta=request.full_path) }}" title="Abrir a PT {{ t.numero }} para decidir">Decidir a PT {{ t.numero }}</button>{% if t.tarefa %} · {{ t.tarefa }}{% endif %}{% if t.parada %} · <b class="cn-t-critico">parada{% if t.hoje %} agora{% endif %}</b>{% endif %}</span>{% endfor %}
           {# a PT esperando abre a página dela para decidir (16/11/2026: a aba da Usinas 360° que decidia na janela saiu) #}
-          {% elif p.pode.central %}{% for t in p.pts_espera %}<span class="it"><a class="cn-link" href="{{ url_for('torre_campo.pt_aprovar', numero=t.numero, ativo=t.codigo) }}" title="Abrir a PT {{ t.numero }} para decidir">Decidir a PT {{ t.numero }}</a>{% if t.tarefa %} · {{ t.tarefa }}{% endif %}</span>{% endfor %}{% endif %}
+          {% if p.pode.central %}{% for t in p.pts_espera %}<span class="it"><a class="cn-link" href="{{ url_for('torre_campo.pt_aprovar', numero=t.numero, ativo=t.codigo) }}" title="Abrir a PT {{ t.numero }} para decidir">Decidir a PT {{ t.numero }}</a>{% if t.tarefa %} · {{ t.tarefa }}{% endif %}</span>{% endfor %}{% endif %}
           {% for t in p.pts %}<span class="it"><span class="gc-num">{{ t.dia }}</span> · {{ t.situacao }}{% if t.solicitante %} · {{ t.solicitante }}{% endif %}{% if t.os %} · {{ os_botao(t.os) }}{% endif %}</span>{% endfor %}</dd>
         <dt class="cu-dt cu-dt--{{ 'critico' if ext and ext.vencidos else ('alerta' if ext and (ext.a_vencer or ext.sem_conferir) else ('ok' if ext else 'neutro')) }}">Extintores</dt>
-        <dd>{% if ext %}{% if ext.vencidos %}<b class="cn-t-critico">{{ ext.vencidos }} {{ 'vencido' if ext.vencidos == 1 else 'vencidos' }}</b> de {{ ext.total }}{% else %}<span class="cn-t-ok">{{ ext.total }} em dia</span>{% endif %}{% if ext.a_vencer %} · {{ ext.a_vencer }} a vencer{% endif %}{% if ext.sem_conferir %} · {{ ext.sem_conferir }} sem conferência{% endif %}{% if ext.dias_ultima is not none %} · conferidos há {{ ext.dias_ultima }} {{ 'dia' if ext.dias_ultima == 1 else 'dias' }}{% endif %}{% else %}<span class="mudo">sem extintor cadastrado</span>{% endif %}{% if ext and ext.total %}{% set u_ext = url_for('torre_campo.responsaveis_painel', usina_id=x.usina_id, painel='extintores') %} · {% if pu_na_aba %}<button type="button" class="cn-link cr-link-botao cr-abre" data-cr-painel="{{ u_ext }}">ver os extintores</button>{% else %}{# no Comando › Usinas, a mesma lista na janela por cima (15/11/2026, Levi: "não tem como ver quais são esses 13 que estão sem conferência") #}<a class="cn-link" data-pu-jan="{{ u_ext }}" data-pu-jan-t="Extintores · {{ x.usina }}" href="{{ url_for('torre_campo.responsaveis_painel', usina_id=x.usina_id, painel='extintores') }}">ver os extintores</a>{% endif %}{% endif %}</dd>
+        <dd>{% if ext %}{% if ext.vencidos %}<b class="cn-t-critico">{{ ext.vencidos }} {{ 'vencido' if ext.vencidos == 1 else 'vencidos' }}</b> de {{ ext.total }}{% else %}<span class="cn-t-ok">{{ ext.total }} em dia</span>{% endif %}{% if ext.a_vencer %} · {{ ext.a_vencer }} a vencer{% endif %}{% if ext.sem_conferir %} · {{ ext.sem_conferir }} sem conferência{% endif %}{% if ext.dias_ultima is not none %} · conferidos há {{ ext.dias_ultima }} {{ 'dia' if ext.dias_ultima == 1 else 'dias' }}{% endif %}{% else %}<span class="mudo">sem extintor cadastrado</span>{% endif %}{% if ext and ext.total %}{% set u_ext = url_for('torre_campo.responsaveis_painel', usina_id=x.usina_id, painel='extintores') %} · {# no Comando › Usinas, a mesma lista na janela por cima (15/11/2026, Levi: "não tem como ver quais são esses 13 que estão sem conferência") #}<a class="cn-link" data-pu-jan="{{ u_ext }}" data-pu-jan-t="Extintores · {{ x.usina }}" href="{{ url_for('torre_campo.responsaveis_painel', usina_id=x.usina_id, painel='extintores') }}">ver os extintores</a>{% endif %}</dd>
         <dt class="cu-dt cu-dt--{{ 'critico' if p.luvas and p.luvas.situacao == 'sem_luvas' else ('ok' if p.luvas and p.luvas.situacao == 'com_luvas' else 'neutro') }}">Luvas isolantes</dt>
         <dd>{% if not p.luvas %}<span class="mudo">sem leitura</span>{% elif p.luvas.situacao == 'com_luvas' %}<span class="cn-t-ok">na usina na última ronda</span>{% elif p.luvas.situacao == 'sem_luvas' %}<b class="cn-t-critico">sem luvas na última ronda</b>{% else %}<span class="mudo">ainda sem verificação nas rondas</span>{% endif %}{% if p.luvas and p.luvas.dias is not none %} · há {{ p.luvas.dias }} {{ 'dia' if p.luvas.dias == 1 else 'dias' }}{% endif %}</dd>
         {% if cu.seguranca %}

@@ -160,14 +160,14 @@ def telas(monkeypatch, banco):
 
 
 def test_a_lista_e_o_prontuario(logado, telas, monkeypatch):
-    html = logado.get("/t/comando/usinas?cliente=Thopen").get_data(as_text=True)
+    html = logado.get("/t/campo/usinas?cliente=Thopen").get_data(as_text=True)
     assert "3 usinas mobilizadas" in html and "Score" not in html
     assert html.index(">Altair<") < html.index(">Brodowski 1<")                # o crítico antes do normal
     assert ">Crítico<" in html and "<small>Desligamento</small>" in html and "fotografia das" in html
     assert "OS 7001" not in html.split("data-cmu-tabela", 1)[1]                 # a OS fica para o prontuário
     assert 'data-dica-usina="Altair" data-dica-motivo="Crítico: Desligamento"' in html
     assert ">ALT100<" in html and ">THPN-ALT100<" not in html                   # só o código da UFV
-    assert 'href="/t/comando/usinas/1"' in html and ">ALT100<" in html
+    assert 'href="/t/campo/usinas/1"' in html and ">ALT100<" in html
     assert '<option value="Thopen" selected>' in html                           # o filtro do endereço já vem marcado
     # 12/11/2026 (o modelo do Histórico de OS): o cliente filtra a tabela no servidor; a faixa segue com todas
     tabela = html.split("data-cmu-tabela", 1)[1]
@@ -188,15 +188,15 @@ def test_a_lista_e_o_prontuario(logado, telas, monkeypatch):
               "acomp": {"valores": {k: {"txt": "—", "cls": "neutro"} for k in ("ronda", "chamados", "pt")}, "det": []}},
         "erros": {}, "pessoas": {"supervisor": "", "gestor": "", "tecnicos": []}, "ocorrencias": [], "seguranca": [],
         "ronda_pendente": [], "os_pendentes": [], "os_linhas": [], "ronda_limpeza": [], "graf_ger": None})
-    p = logado.get("/t/comando/usinas/1").get_data(as_text=True)
+    p = logado.get("/t/campo/usinas/1").get_data(as_text=True)
     assert "Prontuário da usina" in p and "Altair sem geração há 2 dias" in p and "Crítico" in p
     # 12/11/2026: o parecer numa linha, o painel e os cartões fechados (tests/test_comando_prontuario.py); a ocorrência
     # aberta no COS entra nas pendências e no cartão do COS, com a OS abrindo o card dela
     assert 'class="pu-parecer pu-parecer--critico pu-diag"' in p and "Pede ação agora" in p   # o diagnóstico do dia entra no lugar (14/11/2026)
     assert "No COS: Desligamento" in p and 'data-pu-os="7001"' in p
     assert "/t/cos/ronda?cliente=Thopen" in p
-    assert 'href="/t/comando/usinas"' in p and 'href="/os/tradicional?ativo=THPN-ALT100"><b>OS avulsa</b>' in p
-    assert logado.get("/t/comando/usinas/999").status_code == 404
+    assert 'href="/t/campo/usinas"' in p and 'href="/os/tradicional?ativo=THPN-ALT100"><b>OS avulsa</b>' in p
+    assert logado.get("/t/campo/usinas/999").status_code == 404
 
 
 
@@ -231,10 +231,10 @@ def test_o_prontuario_abre_pelo_nome_da_usina(logado, monkeypatch):
     monkeypatch.setattr(TC, "_usinas_montadas", lambda: {"linhas": [
         {"usina_id": 7, "usina": "Usina Açaí 1"}, {"usina_id": 8, "usina": "Usina Açaí 2"},
         {"usina_id": 9, "usina": "Repetida"}, {"usina_id": 10, "usina": "repetida"}]})
-    r = logado.get("/t/comando/usinas/abrir?nome=usina%20acai%201")
-    assert r.status_code == 302 and r.headers["Location"].endswith("/t/comando/usinas/7")
-    r = logado.get("/t/comando/usinas/abrir?nome=Usina%20Nova")
-    assert r.status_code == 302 and r.headers["Location"].endswith("/t/comando/usinas?q=Usina%20Nova")
-    r = logado.get("/t/comando/usinas/abrir?nome=Repetida")              # duas com o mesmo nome: sem palpite
-    assert r.headers["Location"].endswith("/t/comando/usinas?q=Repetida")
-    assert logado.get("/t/comando/usinas/abrir").headers["Location"].endswith("/t/comando/usinas")
+    r = logado.get("/t/campo/usinas/abrir?nome=usina%20acai%201")
+    assert r.status_code == 302 and r.headers["Location"].endswith("/t/campo/usinas/7")
+    r = logado.get("/t/campo/usinas/abrir?nome=Usina%20Nova")
+    assert r.status_code == 302 and r.headers["Location"].endswith("/t/campo/usinas?q=Usina%20Nova")
+    r = logado.get("/t/campo/usinas/abrir?nome=Repetida")              # duas com o mesmo nome: sem palpite
+    assert r.headers["Location"].endswith("/t/campo/usinas?q=Repetida")
+    assert logado.get("/t/campo/usinas/abrir").headers["Location"].endswith("/t/campo/usinas")

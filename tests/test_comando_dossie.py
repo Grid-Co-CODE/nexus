@@ -23,7 +23,7 @@ def _ctx(logado):
     from flask import session
 
     from nexus.torres.comando.prontuario_dados import contexto
-    with logado.application.test_request_context("/t/comando/usinas/1"):
+    with logado.application.test_request_context("/t/campo/usinas/1"):
         session.update(logado=True, admin=True)
         return contexto(1)
 
@@ -53,7 +53,7 @@ def test_uma_secao_por_assunto_na_mesma_ordem_e_com_a_fonte(tela, logado):
 def test_o_numero_do_dossie_e_o_do_prontuario(tela, logado):
     ctx = _ctx(logado)
     p, texto = ctx["p"], DS.montar(ctx, AGORA)["texto"]
-    html = logado.get("/t/comando/usinas/1").get_data(as_text=True)
+    html = logado.get("/t/campo/usinas/1").get_data(as_text=True)
     # o parecer e cada ponto de atenção, com a gravidade em palavras
     assert f"- Em uma frase: {p['parecer']['frase']}" in texto and "- Parecer: Pede ação agora (crítico)" in texto
     assert p["parecer"]["frase"] in html
@@ -141,45 +141,45 @@ def test_nada_do_desenho_da_tela_vai_no_texto(tela, logado):
 
 
 def test_a_pagina_e_o_texto_puro(tela, logado):
-    r = logado.get("/t/comando/usinas/1/dossie")
+    r = logado.get("/t/campo/usinas/1/dossie")
     html = r.get_data(as_text=True)
     assert r.status_code == 200 and "Dossiê para a IA" in html and "data-ds-texto" in html and "data-ds-copiar" in html
     assert "# Dossiê da usina Altair" in html and "Tokens, estimativa" in html
-    assert 'href="/t/comando/usinas/1/dossie.md?baixar=1"' in html and 'href="/t/comando/usinas/1"' in html
-    md = logado.get("/t/comando/usinas/1/dossie.md")
+    assert 'href="/t/campo/usinas/1/dossie.md?baixar=1"' in html and 'href="/t/campo/usinas/1"' in html
+    md = logado.get("/t/campo/usinas/1/dossie.md")
     assert md.status_code == 200 and md.mimetype == "text/markdown" and md.headers["Cache-Control"] == "no-store"
     assert md.headers["Content-Disposition"] == 'inline; filename="dossie-THPN-ALT100.md"'
     assert md.get_data(as_text=True).startswith("# Dossiê da usina Altair\n")
-    baixar = logado.get("/t/comando/usinas/1/dossie.md?baixar=1")
+    baixar = logado.get("/t/campo/usinas/1/dossie.md?baixar=1")
     assert baixar.headers["Content-Disposition"] == 'attachment; filename="dossie-THPN-ALT100.md"'
-    assert logado.get("/t/comando/usinas/999/dossie").status_code == 404
-    assert logado.get("/t/comando/usinas/999/dossie.md").status_code == 404
+    assert logado.get("/t/campo/usinas/999/dossie").status_code == 404
+    assert logado.get("/t/campo/usinas/999/dossie.md").status_code == 404
 
 
 def test_o_dossie_abre_na_janela_por_cima_do_prontuario(tela, logado):
     """13/11/2026, Levi: "o dossiê para IA também tem que ser daquela mesma forma [...] Pode abrir uma janelinha na
     frente, sobrepor uma tela. Não precisa ser algo que leva para um link": o atalho abre o miolo (`?parcial=1`) na
     janela do prontuário; o href fica para o botão do meio."""
-    p = logado.get("/t/comando/usinas/1").get_data(as_text=True)
-    assert 'data-pu-jan="/t/comando/usinas/1/dossie?parcial=1" data-pu-jan-t="Dossiê para a IA · Altair"' in p
+    p = logado.get("/t/campo/usinas/1").get_data(as_text=True)
+    assert 'data-pu-jan="/t/campo/usinas/1/dossie?parcial=1" data-pu-jan-t="Dossiê para a IA · Altair"' in p
     assert 'id="pu-jan"' in p and "data-pu-jan-corpo" in p
-    r = logado.get("/t/comando/usinas/1/dossie?parcial=1")
+    r = logado.get("/t/campo/usinas/1/dossie?parcial=1")
     h = r.get_data(as_text=True)
     assert r.status_code == 200 and "<!doctype" not in h.lower() and "<html" not in h        # só o miolo, sem a casca
     assert "data-ds-texto" in h and "data-ds-copiar" in h and "# Dossiê da usina Altair" in h and "Tokens, estimativa" in h
-    assert 'href="/t/comando/usinas/1/dossie.md?baixar=1"' in h and "<h1" not in h       # o título é o da janela
+    assert 'href="/t/campo/usinas/1/dossie.md?baixar=1"' in h and "<h1" not in h       # o título é o da janela
     js = (RAIZ / "nexus" / "static" / "comando" / "prontuario.js").read_text(encoding="utf-8")
     assert "[data-ds-copiar]" in js and "[data-pu-jan]" in js
 
 
 def test_o_atalho_no_prontuario_e_so_do_administrador(tela, logado):
-    assert 'href="/t/comando/usinas/1/dossie"' in logado.get("/t/comando/usinas/1").get_data(as_text=True)
+    assert 'href="/t/campo/usinas/1/dossie"' in logado.get("/t/campo/usinas/1").get_data(as_text=True)
     with logado.session_transaction() as s:
         s["admin"] = False
-    html = logado.get("/t/comando/usinas/1").get_data(as_text=True)
+    html = logado.get("/t/campo/usinas/1").get_data(as_text=True)
     assert "/dossie" not in html
     # o endereço segue abrindo para quem abre o prontuário: é o mesmo dado
-    assert logado.get("/t/comando/usinas/1/dossie").status_code == 200
+    assert logado.get("/t/campo/usinas/1/dossie").status_code == 200
 
 
 RAIZ = __import__('pathlib').Path(__file__).resolve().parents[1]
@@ -242,7 +242,7 @@ def test_a_engenharia_e_as_anotacoes_do_responsavel_entram_no_dossie(tela, logad
 def test_a_pagina_le_a_engenharia_e_as_observacoes_das_telas_donas(tela, logado):
     """O endereço monta os `extras` com as fontes de verdade (aqui, o banco de teste): o texto diz o que cada uma
     respondeu, e a fonte que não abre não derruba o dossiê."""
-    texto = logado.get("/t/comando/usinas/1/dossie.md").get_data(as_text=True)
+    texto = logado.get("/t/campo/usinas/1/dossie.md").get_data(as_text=True)
     assert "## 6. Engenharia" in texto and "## 13. Anotações do responsável" in texto
     eng = texto.split("## 6. Engenharia", 1)[1].split("## 7. ", 1)[0]
     # a Confiabilidade do cenário de teste tem o Inversor 1 em crítico

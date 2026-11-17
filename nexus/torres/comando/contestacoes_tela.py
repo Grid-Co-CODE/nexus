@@ -55,84 +55,165 @@ def _achar(linha_id: str):
     abort(404)
 
 
+def _quando_txt(dias) -> str:
+    if dias is None:
+        return ""
+    return "hoje" if dias <= 0 else ("ontem" if dias == 1 else f"há {dias} dias")
+
+
+def _com_acompanhamento(lista: list[dict], trat: dict, hoje) -> list[dict]:
+    """Cada contestação com o acompanhamento dela (`t`: a situação, os eventos, a última atualização), o rótulo e o tom da
+    situação e há quantos dias chegou."""
+    out = []
+    for x in lista:
+        t = trat.get(str(x["id"])) or TR.VAZIO
+        rot, tom = TR.SITUACOES[t["situacao"]]
+        dias = (hoje - x["quando"].date()).days if x["quando"] else None
+        out.append(dict(x, t=t, sit_rot=rot, sit_tom=tom, dias=dias, chegou_txt=_quando_txt(dias)))
+    return out
+
+
+def _endereco(setor, ver, c=None) -> str:
+    """O endereço da fila (sem o prefixo: o template passa pelo |na_raiz, o redirect pelo na_raiz)."""
+    from urllib.parse import urlencode
+    q = {"setor": setor}
+    if ver == "resolvidas":
+        q["ver"] = ver
+    if c:
+        q["c"] = c
+    return CONTESTACOES + "?" + urlencode(q)
+
+
 @bp.route("/contestacoes")
 def contestacoes():
-    """Uma aba por setor que a sessão vê (Performance, COS, Zeladoria), a contestação mais nova em cima: quando chegou, a
-    usina, o dia contestado, o que o cliente contestou, quem é e como responder, a mensagem e o que ele via na tela
-    naquele dia, se o Teams do setor recebeu o aviso e quem é o responsável (ou o "Pegar para mim"). A linha abre o card
-    das atualizações. Nome, contato e mensagem só com a chave privada deste Nexus."""
+    """A fila das contestações do setor (o redesenho de 16/11/2026, Levi: "quero um rebranding! Tire esse 'Pegar pra
+    mim' qualquer um daquele setor pode editar e salvar por tanto que salve quem foi que fez isso! deixe mais
+    utilizável"): uma aba por setor que a sessão vê, os números do alto (sem resposta, em andamento, resolvidas, a mais
+    antiga sem resposta), a lista das abertas (ou das resolvidas) à esquerda, a sem resposta primeiro, e a contestação
+    escolhida à direita, com o que o cliente disse, o que ele via, o acompanhamento e o campo de escrever, para quem é do
+    setor. Nome, contato e mensagem só com a chave privada deste Nexus."""
+    from datetime import datetime
     d = CT.contestacoes()
     vis = _setores_visiveis()
     setores = [(s, rot) for s, rot in CT.SETORES if s in vis]
-    setor = request.args.get("setor") if request.args.get("setor") in vis else (setores[0][0] if setores else None)
     try:
         trat, trat_erro = TR.estado(), None
-    except Exception as e:      # noqa: BLE001 — sem o livro do acompanhamento, a lista segue sem os responsáveis
+    except Exception as e:      # noqa: BLE001 — sem o livro do acompanhamento, a lista segue sem a situação
         trat, trat_erro = {}, f"Não consegui ler o acompanhamento ({type(e).__name__})"
-    lista = (d["por_setor"].get(setor) or []) if setor else []
+    hoje = datetime.now(CT._BRT).date()
+    # a escolhida pelo endereço (o aviso do topo leva a ela): a aba é a do setor dela, entre os que a sessão vê
+    c = str(request.args.get("c") or "")
+    setor = request.args.get("setor") if request.args.get("setor") in vis else None
+    if c:
+        setor = next((s for s in vis for x in d["por_setor"].get(s) or [] if str(x["id"]) == c), setor)
+    setor = setor or (setores[0][0] if setores else None)
+    todas = _com_acompanhamento((d["por_setor"].get(setor) or []) if setor else [], trat, hoje)
+    abertas = [x for x in todas if x["t"]["situacao"] != "resolvida"]
+    # a sem resposta primeiro (é o que pede alguém), cada grupo com a mais nova em cima (a ordem de `todas`)
+    abertas.sort(key=lambda x: x["t"]["situacao"] != "sem_resposta")
+    resolvidas = [x for x in todas if x["t"]["situacao"] == "resolvida"]
+    ver = "resolvidas" if request.args.get("ver") == "resolvidas" else "abertas"
+    lista = resolvidas if ver == "resolvidas" else abertas
+    sel = next((x for x in todas if str(x["id"]) == c), None)
+    auto = sel is None
+    sel = sel or (lista[0] if lista else None)
+    sem = [x for x in todas if x["t"]["situacao"] == "sem_resposta"]
+    numeros = {"sem_resposta": len(sem), "em_andamento": sum(1 for x in todas if x["t"]["situacao"] == "em_andamento"),
+               "resolvidas": len(resolvidas), "mais_antiga": max(sem, key=lambda x: x["dias"] or 0) if sem else None}
+    abertas_de = {s: sum(1 for x in d["por_setor"].get(s) or []
+                         if (trat.get(str(x["id"])) or TR.VAZIO)["situacao"] != "resolvida") for s, _ in setores}
     from ...auth import setor_telas as ST
     meu_setor = (ST.acesso().get("setor") or {}).get("nome") if not session.get("admin") else None
     return render_template("comando/contestacoes.html", torre=TORRE, tela=TORRE.tela("contestacoes"), d=d,
-                           setores=setores, setor=setor, lista=lista, trat=trat, trat_erro=trat_erro,
-                           meu=TR.codigo(session.get("usuario")), admin=bool(session.get("admin")), meu_setor=meu_setor,
+                           setores=setores, setor=setor, setor_rot=dict(CT.SETORES).get(setor, setor), lista=lista,
+                           ver=ver, sel=sel, auto=auto, numeros=numeros, abertas_de=abertas_de, trat_erro=trat_erro,
+                           n_abertas=len(abertas), meu_setor=meu_setor, endereco=_endereco,
+                           card=_contexto_card(sel, trat_erro) if sel else None,
                            aviso=session.pop(_AVISO, None), erro=session.pop(_ERRO, None))
 
 
-@bp.route("/contestacoes/<linha_id>/pegar", methods=["POST"])
-def contestacao_pegar(linha_id):
-    """'Pegar para mim': a pessoa do login vira a responsável pela demanda e volta à lista do setor."""
-    if _de_outro_site():
-        abort(403)
-    x, _ = _achar(linha_id)
-    try:
-        TR.pegar(x["id"], x["setor"], session.get("usuario"), bool(session.get("admin")))
-        session[_AVISO] = f"A contestação de {x['usina']} agora é sua."
-    except TR.Recusada as e:
-        session[_ERRO] = str(e)
-    except Exception as e:      # noqa: BLE001 — banco fora: a tela diz, nada mudou
-        _log.exception("Contestações: pegar a demanda %s não gravou", linha_id)
-        session[_ERRO] = f"Não consegui gravar no banco ({type(e).__name__}). Nada mudou; tente de novo em instantes."
-    return redirect(na_raiz(f"{CONTESTACOES}?setor={x['setor']}"), code=303)
+def _eu() -> str:
+    u = session.get("usuario") or {}
+    return " ".join(str(u.get("nome") or "").split()) or str(u.get("email") or "")
 
 
-def _card(x, aviso="", erro="", texto=""):
+def _contexto_card(x, lido=None) -> dict:
+    """O que o card da contestação precisa: ela com o acompanhamento, quem está escrevendo e se pode escrever."""
+    return {"x": x, "t": x["t"], "lido": lido, "eu": _eu(), "com_login": bool(TR.codigo(session.get("usuario"))),
+            "setor_rot": dict(CT.SETORES).get(x["setor"], x["setor"]), "admin": bool(session.get("admin"))}
+
+
+def _card(x):
+    from datetime import datetime
     try:
-        t = TR.estado().get(str(x["id"])) or {"responsavel": None, "atualizacoes": []}
-        lido = None
+        trat, lido = TR.estado(), None
     except Exception as e:      # noqa: BLE001 — banco fora: o card diz, sem um "nenhuma atualização" falso
-        t, lido = {"responsavel": None, "atualizacoes": []}, f"Não consegui ler o acompanhamento ({type(e).__name__})"
-    meu = TR.codigo(session.get("usuario"))
-    resp = t["responsavel"]
-    return render_template("comando/_contestacao_card.html", x=x, t=t, resp=resp, lido=lido,
-                           sou_resp=bool(resp and meu and resp["hmac"] == meu), admin=bool(session.get("admin")),
-                           com_login=bool(meu), aviso=aviso, erro=erro, texto=texto,
-                           setor_rot=dict(CT.SETORES).get(x["setor"], x["setor"]))
+        trat, lido = {}, f"Não consegui ler o acompanhamento ({type(e).__name__})"
+    x = _com_acompanhamento([x], trat, datetime.now(CT._BRT).date())[0]
+    return render_template("comando/_contestacao_card.html", **_contexto_card(x, lido))
 
 
 @bp.route("/contestacoes/<linha_id>/card")
 def contestacao_card(linha_id):
-    """O card por cima da lista (o pedaço de página que o <dialog> mostra): a contestação, o responsável e as
-    atualizações com a data e a hora; o campo de escrever só para o responsável."""
+    """O card da contestação (o pedaço de página do lado direito): a lista troca o card sem reler a página."""
     x, _ = _achar(linha_id)
     return _card(x)
 
 
-@bp.route("/contestacoes/<linha_id>/atualizacao", methods=["POST"])
-def contestacao_atualizar(linha_id):
-    """Grava a atualização do responsável e devolve o card de novo (com a nova, ou com o motivo e o texto digitado)."""
+def _gravar(linha_id, acao, ok):
+    """As três ações do card (escrever, resolver, reabrir): POST só da própria página, da contestação que a sessão vê. Com
+    o JavaScript da página (o cabeçalho X-Nexus-Parte), a resposta é JSON e o texto digitado fica no campo quando não
+    grava; sem ele, volta à lista com o aviso."""
     if _de_outro_site():
         abort(403)
     x, _ = _achar(linha_id)
-    texto = request.form.get("texto") or ""
+    parte = bool(request.headers.get("X-Nexus-Parte"))
+    ver = "resolvidas" if request.form.get("ver") == "resolvidas" else "abertas"
     try:
-        TR.atualizar(x["id"], x["setor"], session.get("usuario"), texto)
+        acao(x)
+        erro = None
     except TR.Recusada as e:
-        return _card(x, erro=str(e), texto=texto)
-    except Exception as e:      # noqa: BLE001 — banco fora: o texto digitado não se perde
-        _log.exception("Contestações: a atualização da demanda %s não gravou", linha_id)
-        return _card(x, erro=f"Não consegui gravar no banco ({type(e).__name__}). Tente de novo em instantes.",
-                     texto=texto)
-    return _card(x, aviso="Atualização salva")
+        erro = str(e)
+    except Exception as e:      # noqa: BLE001 — banco fora: nada mudou, a tela diz
+        _log.exception("Contestações: a gravação da contestação %s não foi", linha_id)
+        erro = f"Não consegui gravar no banco ({type(e).__name__}). Nada mudou; tente de novo em instantes."
+    if parte:
+        from flask import jsonify
+        if erro:
+            return jsonify({"ok": False, "erro": erro}), 409
+        session[_AVISO] = ok              # a página relê na contestação e diz o que gravou
+        return jsonify({"ok": True, "aviso": ok})
+    session[_ERRO if erro else _AVISO] = erro or ok
+    return redirect(na_raiz(_endereco(x["setor"], ver, x["id"])) + "#ct-detalhe", code=303)
+
+
+@bp.route("/contestacoes/<linha_id>/atualizacao", methods=["POST"])
+def contestacao_atualizar(linha_id):
+    """Grava a atualização de quem está na sessão (qualquer um do setor, 16/11/2026), com a data e a hora."""
+    return _gravar(linha_id, lambda x: TR.atualizar(x["id"], x["setor"], session.get("usuario"),
+                                                    request.form.get("texto") or ""), "Atualização salva")
+
+
+@bp.route("/contestacoes/<linha_id>/resolver", methods=["POST"])
+def contestacao_resolver(linha_id):
+    return _gravar(linha_id, lambda x: TR.resolver(x["id"], x["setor"], session.get("usuario")),
+                   "Contestação marcada como resolvida")
+
+
+@bp.route("/contestacoes/<linha_id>/reabrir", methods=["POST"])
+def contestacao_reabrir(linha_id):
+    return _gravar(linha_id, lambda x: TR.reabrir(x["id"], x["setor"], session.get("usuario")), "Contestação reaberta")
+
+
+@bp.route("/contestacoes/<linha_id>/pegar", methods=["POST"])
+def contestacao_pegar(linha_id):
+    """O "Pegar para mim" saiu em 16/11/2026 (Levi: "Tire esse 'Pegar pra mim'"): a aba aberta de antes que ainda o
+    aperta volta à contestação, sem gravar nada, para escrever direto."""
+    if _de_outro_site():
+        abort(403)
+    x, _ = _achar(linha_id)
+    session[_AVISO] = "Não precisa mais pegar a contestação: qualquer pessoa do setor escreve a atualização."
+    return redirect(na_raiz(_endereco(x["setor"], "abertas", x["id"])) + "#ct-detalhe", code=303)
 
 
 @bp.route("/visao-do-contrato")

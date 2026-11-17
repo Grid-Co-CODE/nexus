@@ -571,28 +571,36 @@ def _sino_demandas():
     """O sininho das demandas entre setores (12/11/2026; nexus/comando/demandas.py): para quem recebeu, a nova, o prazo
     apertando (faltam 2 dias, falta 1, vence hoje), a vencida e a devolvida; para o setor de quem recebeu, a vencida (Levi,
     12/11: "quem recebeu + todo o setor"); para quem pediu, a respondida (o ok ou a devolução) e o pedido de informação.
-    Só da cópia do livro: nenhuma página espera o banco por causa dele. O administrador pela senha (sem pessoa) não tem."""
+    E, desde 16/11/2026, as contestações sem resposta do setor (`_contestacoes_do_sino`; Levi: "as contestações também
+    devem notificar nas notificações lá de cima, a que não é do OS Creator!"). Só das cópias dos livros: nenhuma página
+    espera o banco por causa dele. O administrador pela senha (sem pessoa) não tem."""
     if not session.get("logado") or session.get("via") == "cliente" or setor_telas.em_modo_cliente():
         return None
     try:
-        from ..comando import demandas as D
         from ..torres.comando import _meu_hmac
-        from ..torres.comando.demandas_tela import _meu_setor
-        if D.faltam_chaves():
-            return None
-        meu, setor = _meu_hmac(), _meu_setor()
+        meu = _meu_hmac()
         if not meu:
             return None
-        itens = []
-        for a in D.avisos_do_sino(meu, (setor or {}).get("id")):
-            aba = "para" if a["para_mim"] else ("pedi" if a["pedi"] else "setor")
-            rot = _DEM_ROTULO.get(a["tipo"]) or ("Falta 1 dia" if a["dias_restantes"] == 1 else
-                                                 f"Faltam {a['dias_restantes']} dias")
-            quem = (f"para {a['para_nome']}" if (a["pedi"] or not a["para_mim"]) and a["para_nome"]
-                    else f"de {a['de_nome']}" if a["de_nome"] else "")
-            itens.append({"link": f"/t/comando/caixa-de-entrada?dem={aba}&d={a['demanda_id']}#demandas", "rotulo": rot,
-                          "tom": a["tom"], "titulo": a["titulo_curto"] or "Demanda", "detalhe": quem})
-        return {"n": len(itens), "criticos": sum(1 for i in itens if i["tom"] == "critico"), "itens": itens[:8]}
+        itens, com_demandas = [], False
+        from ..comando import demandas as D
+        if not D.faltam_chaves():
+            from ..torres.comando.demandas_tela import _meu_setor
+            com_demandas, setor = True, _meu_setor()
+            for a in D.avisos_do_sino(meu, (setor or {}).get("id")):
+                aba = "para" if a["para_mim"] else ("pedi" if a["pedi"] else "setor")
+                rot = _DEM_ROTULO.get(a["tipo"]) or ("Falta 1 dia" if a["dias_restantes"] == 1 else
+                                                     f"Faltam {a['dias_restantes']} dias")
+                quem = (f"para {a['para_nome']}" if (a["pedi"] or not a["para_mim"]) and a["para_nome"]
+                        else f"de {a['de_nome']}" if a["de_nome"] else "")
+                itens.append({"link": f"/t/comando/caixa-de-entrada?dem={aba}&d={a['demanda_id']}#demandas", "rotulo": rot,
+                              "tom": a["tom"], "titulo": a["titulo_curto"] or "Demanda", "detalhe": quem})
+        ct = _contestacoes_do_sino()
+        if not com_demandas and ct is None:
+            return None
+        ct = ct or []
+        return {"n": len(itens) + len(ct), "criticos": sum(1 for i in itens if i["tom"] == "critico"),
+                "itens": itens[:8], "n_demandas": len(itens), "com_demandas": com_demandas,
+                "contestacoes": ct[:6], "n_contestacoes": len(ct)}
     except Exception:            # noqa: BLE001 — o sininho nunca derruba uma página
         current_app.logger.exception("sininho das demandas")
         return None
@@ -626,6 +634,43 @@ def _sino_fora() -> dict | None:
                 "pode_abrir": a.get("tudo") or "pcm/fora-da-programacao" in (a.get("telas") or set())}
     except Exception:            # noqa: BLE001 — o aviso nunca derruba uma página
         current_app.logger.exception("aviso do Fora da programação")
+        return None
+
+
+def _contestacoes_do_sino() -> list | None:
+    """As contestações SEM RESPOSTA do setor da pessoa, para a bandeja (16/11/2026, `contratos/aviso.py`, as escolhas do
+    Levi: some na 1ª resposta de qualquer um do setor ou quando alguém resolve; o administrador recebe só a do setor dele).
+    None = a pessoa não tem a tela Contestações, ou não tem setor de contestação e não é administrador (a bandeja não
+    aparece por causa delas); [] = tem, e nada espera. A falha aqui não tira as demandas."""
+    try:
+        from ..contratos import aviso as AV
+        from ..contratos import contestacoes as CT
+        a = setor_telas.acesso()
+        if not (a["tudo"] or "comando/contestacoes" in a["telas"]):
+            return None
+        from ..torres.comando.contestacoes_tela import _sem_acento
+        from ..torres.comando.demandas_tela import _meu_setor
+        nome = _sem_acento((_meu_setor() or {}).get("nome"))
+        todos = tuple(s for s, _ in CT.SETORES)
+        if nome in todos:
+            setores = (nome,)
+        elif session.get("admin"):
+            setores = todos              # o administrador sem setor de contestação: as três (é quem coordena)
+        else:
+            return None
+        rotulos = dict(CT.SETORES)
+        out = []
+        for x in AV.sem_resposta(setores):
+            dias = x["dias"]
+            quando = "" if dias is None else ("chegou hoje" if dias <= 0 else
+                                             "chegou ontem" if dias == 1 else f"há {dias} dias sem resposta")
+            detalhe = " · ".join(v for v in ((", ".join(x["itens"])), (f"dia {x['dia']}" if x["dia"] else ""), quando,
+                                            (rotulos.get(x["setor"], "") if len(setores) > 1 else "")) if v)
+            out.append({"link": f"/t/comando/contestacoes?setor={x['setor']}&c={x['id']}#ct-detalhe",
+                        "titulo": x["usina"] or "Contestação", "detalhe": detalhe})
+        return out
+    except Exception:            # noqa: BLE001
+        current_app.logger.exception("sininho: as contestações")
         return None
 
 
@@ -705,6 +750,10 @@ def instalar_contexto(app) -> None:
     def _contexto():
         blueprint = request.blueprint or ""
         torre_atual = blueprint.removeprefix("torre_") if blueprint.startswith("torre_") else None
+        # a torre do endereço, quando é de uma torre (16/11/2026): a Usinas mora no código do Comando (o `bp_usinas`) e no
+        # menu da Usinas 360°, em /t/campo/usinas; pelo nome do blueprint, o menu não abria a torre certa
+        if request.path.startswith("/t/"):
+            torre_atual = request.path[3:].split("/", 1)[0] or torre_atual
         a = setor_telas.acesso()
         menu = montar_menu(app.extensions["nexus_torres"], torre_atual, _telas_prontas(app),
                            None if a["tudo"] else a["telas"],

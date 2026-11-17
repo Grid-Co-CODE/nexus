@@ -15,7 +15,7 @@ import re
 import secrets
 import time
 
-from flask import abort, current_app, redirect, render_template, request, session, url_for
+from flask import Blueprint, abort, current_app, redirect, render_template, request, session, url_for
 
 from ...comando import estado as ES
 from ...comando import motor as MO
@@ -36,35 +36,60 @@ TORRE = Torre(
     # Sala de comando e o Kanban, que eram só o lugar reservado; o Tempo de resposta fica por dentro da Prévia do contrato
     # (a página segue no endereço); os Temas do setor viraram uma aba das demandas na Caixa de entrada
     telas=[
+        # a ordem do menu (16/11/2026, Levi: "Ordem comando 1 - Caixa de entrada [...] 3 - Visão de contrato 4 - Metas do
+        # book 5 - Contestações 6 - Nexus insights"); a Usinas, que era a 2ª, foi para a Usinas 360° no mesmo dia (Levi:
+        # "Usinas sai de comando e vai para Usinas 360 abaixo de Visão do responsável!"; as rotas, no `bp_usinas` abaixo)
         Tela("caixa-de-entrada", "Caixa de entrada",
              "O que é meu para fazer hoje, por prazo e valor?",
              "Itens de trabalho do Nexus (insights, OS, chamados, solicitações)", de_todos=True),
-        Tela("insights", "Nexus Insights",
-             "Que regra cruzou as fontes e apontou um problema com dono?",
-             "Regras R01 a R13 do motor de correlação"),
-        Tela("tempo-de-resposta", "Tempo de resposta",
-             "Que área responde no prazo, e quais pedidos estão atrasados?",
-             "Pedidos entre áreas, com prazo (nexus_pedidos)", dentro_de="visao-do-contrato"),
-        # a tela do mockup "Início > Usinas" (11/11/2026, nexus/comando/usinas.py)
-        Tela("usinas", "Usinas",
-             "Como está cada usina agora, e o que cada setor diz dela?",
-             "Visão do responsável, tempo real, Nexus Insights, extintores e luvas das rondas + cadastro do Nexus"),
-        Tela("metas", "Metas do book",
-             "Quais KPIs do book R02 estão fora da meta e piorando?",
-             "Aba KPIs do Plano de Documentação"),
         # da torre Contratos e clientes, que saiu do menu (12/11/2026, Levi: "contestações, você vai jogar para o
         # comando, prévia visão do contrato, você vai jogar no comando"; as views em contestacoes_tela.py). A prévia é de
         # todos, para cada setor avaliar sem liberar um por um (o pedido: a avaliação de Contratos e dos outros setores)
-        Tela("contestacoes", "Contestações",
-             "O que os clientes contestaram nos dashboards, e para qual setor?",
-             "Dashboard Thopen: a contestação de cada dia, gravada cifrada no banco (livro thopen_contestacoes)"),
         Tela("visao-do-contrato", "Prévia: visão do contrato",
              "Como fica a visão do contrato?",
              "Mockup para avaliação, com dados fictícios: nada grava", de_todos=True),
+        Tela("tempo-de-resposta", "Tempo de resposta",
+             "Que área responde no prazo, e quais pedidos estão atrasados?",
+             "Pedidos entre áreas, com prazo (nexus_pedidos)", dentro_de="visao-do-contrato"),
+        Tela("metas", "Metas do book",
+             "Quais KPIs do book R02 estão fora da meta e piorando?",
+             "Aba KPIs do Plano de Documentação"),
+        Tela("contestacoes", "Contestações",
+             "O que os clientes contestaram nos dashboards, e o que o setor já respondeu?",
+             "Dashboard Thopen: a contestação de cada dia, gravada cifrada no banco (livro thopen_contestacoes)"),
+        Tela("insights", "Nexus Insights",
+             "Que regra cruzou as fontes e apontou um problema com dono?",
+             "Regras R01 a R13 do motor de correlação"),
     ],
 )
 
 bp = TORRE.criar_blueprint(__name__)
+
+# A Usinas mudou para a Usinas 360° (16/11/2026, Levi: "Usinas sai de comando e vai para Usinas 360 abaixo de Visão do
+# responsável!"): a tela é da torre Campo (o id e o /t/campo ficaram quando ela virou "Usinas 360°") e o endereço é
+# /t/campo/usinas, que o menu, o portão por setor (`campo/usinas`) e a busca do menu leem; o código não mudou de lugar
+# (a lista e o prontuário usam o que é daqui: os insights, as demandas, a IA). O endereço antigo /t/comando/usinas/...
+# responde 308 para o novo, com o resto do caminho e o filtro (a Sala de controle da plataforma abre por ele), e a marca
+# que o setor tinha em "comando/usinas" vale para "campo/usinas" (`setor_telas.RENOMEADAS`)
+USINAS = "/t/campo/usinas"
+bp_usinas = Blueprint("torre_campo_usinas", __name__, url_prefix=USINAS)
+bp.record_once(lambda estado: estado.app.register_blueprint(bp_usinas))
+
+
+def _torre_usinas():
+    """(a torre, a tela) da Usinas no menu: a Usinas 360° (o eyebrow e o item que acende são os dela)."""
+    t = next((x for x in current_app.extensions.get("nexus_torres", []) if x.id == "campo"), None)
+    return (t, t.tela("usinas")) if t else (TORRE, None)
+
+
+@bp.route("/usinas", defaults={"resto": ""}, methods=("GET", "POST"))
+@bp.route("/usinas/<path:resto>", methods=("GET", "POST"))
+def usinas_mudou(resto):
+    """O endereço antigo da Usinas (até 16/11/2026): 308 para o mesmo caminho em /t/campo/usinas, com o filtro (308, e
+    não 302, para a pergunta à IA de uma aba aberta no endereço antigo ainda chegar como POST)."""
+    q = request.query_string.decode("utf-8", "ignore")
+    destino = na_raiz(USINAS + (f"/{resto}" if resto else "")) + (f"?{q}" if q else "")
+    return redirect(destino, code=308)
 
 _CODIGO, _AVISO = "insights_codigo", "insights_aviso"
 # as áreas que se notifica: as torres de operação (o Comando e o OS Creator não recebem pedido)
@@ -235,7 +260,7 @@ def _usinas_montadas() -> dict:
             "insights_calculando": insights is None, "vivos": vivos, "visao": d}
 
 
-@bp.route("/usinas")
+@bp_usinas.route("")
 def usinas():
     """Comando > Usinas (11/11/2026, Levi: "Em comando quero a mesma visão de Início > Usinas do mockup"): todas as usinas
     mobilizadas, com o estado de agora e o que cada tela dona diz delas (`nexus/comando/usinas.py`). Sem o Score de saúde
@@ -252,7 +277,7 @@ def usinas():
     todas = m["linhas"]
     r = CU.resumo(todas)
     return render_template(
-        "comando/usinas.html", torre=TORRE, tela=TORRE.tela("usinas"), linhas=CU.filtrar(todas, escolhidos),
+        "comando/usinas.html", torre=_torre_usinas()[0], tela=_torre_usinas()[1], linhas=CU.filtrar(todas, escolhidos),
         todas=todas, r=r, legenda=CU.LEGENDA, estados=CU.ESTADOS, erro=m["erro"], avisos=m["avisos"],
         insights_calculando=m["insights_calculando"], cos_ts=m["cos_ts"], escolhidos=escolhidos,
         op_clientes=[(c, c) for c in r["clientes"]], op_responsaveis=[(x, x) for x in r["responsaveis"]],
@@ -260,7 +285,7 @@ def usinas():
         op_conformidade=list(CU.CONFORMIDADES.items()), q=request.args.get("q", ""))
 
 
-@bp.route("/usinas/abrir")
+@bp_usinas.route("/abrir")
 def usina_pelo_nome():
     """O prontuário pelo NOME da usina (16/11/2026, Levi: "O prontuário da UFV está em NEXUS > COMANDO > USINAS, ao clicar
     na UFV abre o prontuário"): a Sala de controle da Performance (tela da plataforma, que não conhece o id do cadastro
@@ -277,11 +302,11 @@ def usina_pelo_nome():
     alvo = norm(nome)
     achadas = [x for x in (_usinas_montadas().get("linhas") or []) if alvo and norm(x.get("usina")) == alvo and x.get("usina_id")]
     if len(achadas) == 1:
-        return redirect(na_raiz(f"/t/comando/usinas/{int(achadas[0]['usina_id'])}"))
-    return redirect(na_raiz("/t/comando/usinas") + ("?q=" + quote(nome) if nome else ""))
+        return redirect(na_raiz(f"/t/campo/usinas/{int(achadas[0]['usina_id'])}"))
+    return redirect(na_raiz("/t/campo/usinas") + ("?q=" + quote(nome) if nome else ""))
 
 
-@bp.route("/usinas/<int:usina_id>")
+@bp_usinas.route("/<int:usina_id>")
 def usina(usina_id):
     """O prontuário da usina no Comando (11/11/2026, Levi: o clique na usina "No próprio Comando", como o prontuário do
     mockup): a linha dela na lista, a Central da usina (a mesma conta da Usinas 360°, `_central_da_usina`) em leitura e
@@ -290,13 +315,13 @@ def usina(usina_id):
     atenção, o mês a mês, o histórico do COS, a zeladoria semanal, as rondas, os equipamentos com OS aberta, os chamados,
     a segurança, as demandas, a composição da ficha e a linha do tempo (`prontuario_dados.montar`)."""
     from .prontuario_dados import contexto as _prontuario
-    ctx = _prontuario(usina_id, rel_url=f"/t/comando/usinas/{usina_id}/relatorio.pdf")
+    ctx = _prontuario(usina_id, rel_url=f"/t/campo/usinas/{usina_id}/relatorio.pdf")
     if ctx is None:
         abort(404)
-    return render_template("comando/usina.html", torre=TORRE, tela=TORRE.tela("usinas"), **ctx)
+    return render_template("comando/usina.html", torre=_torre_usinas()[0], tela=_torre_usinas()[1], **ctx)
 
 
-@bp.route("/usinas/<int:usina_id>/relatorio.pdf")
+@bp_usinas.route("/<int:usina_id>/relatorio.pdf")
 def usina_relatorio(usina_id):
     """O relatório da usina em PDF (o do cliente, `campo/relatorio_usina.py`) pelo endereço do Comando: a mesma conta da
     Usinas 360° (`responsaveis_usina_relatorio`), para quem tem o Comando > Usinas e não a Visão do responsável."""
@@ -383,7 +408,7 @@ def _dossie(usina_id: int):
     return ctx, DS.montar(ctx, visao._agora(), extras=_extras_do_dossie(usina_id, (ctx.get("x") or {}).get("codigo") or ""))
 
 
-@bp.route("/usinas/<int:usina_id>/dossie")
+@bp_usinas.route("/<int:usina_id>/dossie")
 def usina_dossie(usina_id):
     """O dossiê da usina para a IA (12/11/2026, Levi: "Monte o dossiê da usina inteira, para a gente usar com a IA
     futuramente, do jeito que uma IA possa ver facilmente"): tudo o que o prontuário junta, no texto que a IA vai ler
@@ -394,10 +419,10 @@ def usina_dossie(usina_id):
     # precisa ser algo que leva para um link"): só o miolo, sem a casca
     if request.args.get("parcial") == "1":
         return render_template("comando/_dossie_corpo.html", x=ctx["x"], d=d, na_janela=True)
-    return render_template("comando/dossie.html", torre=TORRE, tela=TORRE.tela("usinas"), x=ctx["x"], d=d)
+    return render_template("comando/dossie.html", torre=_torre_usinas()[0], tela=_torre_usinas()[1], x=ctx["x"], d=d)
 
 
-@bp.route("/usinas/<int:usina_id>/dossie.md")
+@bp_usinas.route("/<int:usina_id>/dossie.md")
 def usina_dossie_md(usina_id):
     """O mesmo dossiê em texto puro (Markdown), para colar numa conversa com a IA ou para o Nexus IA mandar pela API.
     `?baixar=1` baixa o arquivo. Sem cópia em cache: o dossiê é de agora."""
@@ -416,7 +441,7 @@ def usina_dossie_md(usina_id):
 # 16/11/2026, Levi: "libera para todos": quem abre o prontuário pergunta (era só administrador, no teste). E a caixa fica
 # na própria tela, embaixo do Nexus IA Insights, sem janela (retorno do time: "Tem que ser a caixa de texto para a IA sem
 # abrir uma janela"): o prontuario.js pede o pedaço desta rota e o põe no lugar. O teto do mês segue valendo para todos.
-@bp.route("/usinas/<int:usina_id>/ia")
+@bp_usinas.route("/<int:usina_id>/ia")
 def usina_ia(usina_id):
     from ...comando import ia as IA
     from .prontuario_dados import contexto as _prontuario
@@ -428,7 +453,7 @@ def usina_ia(usina_id):
                  teto=IA.teto(cfg), max_pergunta=IA.MAX_PERGUNTA, setores=_ia_setores(), criar_os=_ia_criar_os())
     if request.args.get("parcial") == "1":          # a janela por cima do prontuário
         return render_template("comando/_ia.html", **dados)
-    return render_template("comando/ia.html", torre=TORRE, tela=TORRE.tela("usinas"), **dados)
+    return render_template("comando/ia.html", torre=_torre_usinas()[0], tela=_torre_usinas()[1], **dados)
 
 
 def _setores_ativos() -> list[dict]:
@@ -554,11 +579,11 @@ def _ia_relatorio(usina_id: int, pedido: dict) -> dict:
     temas = dict(RU.TEMAS)
     q = urlencode([("mes", pedido["mes"])] + [("tema", t) for t in pedido["temas"]])
     aviso = (f"O relatório tem só os três últimos meses: vai o de {rotulo.lower()}." if pedido.get("mes_fora") else "")
-    return {"url": na_raiz(f"/t/comando/usinas/{usina_id}/relatorio.pdf?{q}"), "mes": rotulo,
+    return {"url": na_raiz(f"/t/campo/usinas/{usina_id}/relatorio.pdf?{q}"), "mes": rotulo,
             "temas": [temas[t] for t in pedido["temas"]], "aviso": aviso}
 
 
-@bp.route("/usinas/<int:usina_id>/ia/perguntar", methods=["POST"])
+@bp_usinas.route("/<int:usina_id>/ia/perguntar", methods=["POST"])
 def usina_ia_perguntar(usina_id):
     """JSON {pergunta, modelos: [ids], historico: [{pergunta, resposta}]} -> {ok, respostas, dossie_tokens, gasto, teto}.
     O dossiê é montado AGORA (o mesmo do "Dossiê para a IA"), uma vez para todos os modelos pedidos."""
@@ -601,7 +626,7 @@ def usina_ia_perguntar(usina_id):
     return resp
 
 
-@bp.route("/usinas/<int:usina_id>/ia/diagnostico")
+@bp_usinas.route("/<int:usina_id>/ia/diagnostico")
 def usina_ia_diagnostico(usina_id):
     """O diagnóstico do dia da IA, no lugar do parecer do prontuário (14/11/2026, Levi: "Sempre que a pessoa for abrir o
     prontuário da usina, abrir o diagnóstico da IA [...] uma pessoa diferente abrir também no mesmo dia, usar o mesmo
@@ -648,7 +673,7 @@ def usina_ia_diagnostico(usina_id):
     return resp
 
 
-@bp.route("/usinas/<int:usina_id>/ia/demanda", methods=["POST"])
+@bp_usinas.route("/<int:usina_id>/ia/demanda", methods=["POST"])
 def usina_ia_demanda(usina_id):
     """A ação de outro setor que a resposta sugeriu, mandada como demanda (JSON {para_hmac, para_setor_id, tema_id,
     titulo, descricao, os, novo_id}): a mesma Nova demanda da Caixa de entrada (`demandas.abrir`, as mesmas recusas),
@@ -700,7 +725,7 @@ def _carteira_ia(cliente: str | None = None) -> dict:
                                    "vivos": m.get("vivos") or {}, "avisos": avisos}, visao._agora())
 
 
-@bp.route("/usinas/ia")
+@bp_usinas.route("/ia")
 def carteira_ia():
     """A caixa da Nexus IA da carteira, como pedaço de página para o alto do Comando › Usinas (sem janela)."""
     from ...comando import carteira_ia as CI
@@ -709,12 +734,12 @@ def carteira_ia():
     n = len(_usinas_montadas()["linhas"])
     return render_template("comando/_ia.html", modelos=IA.disponiveis(cfg), padrao=IA.padrao(cfg), sugestoes=CI.SUGESTOES,
                            gasto=IA.gasto_do_mes(cfg), teto=IA.teto(cfg), max_pergunta=IA.MAX_PERGUNTA,
-                           setores=_ia_setores(), criar_os=_ia_criar_os(), ia_base="/t/comando/usinas/ia",
+                           setores=_ia_setores(), criar_os=_ia_criar_os(), ia_base="/t/campo/usinas/ia",
                            ia_sobre=f"sobre a carteira inteira: {n} usinas",
                            ia_exemplo="Ex.: quais usinas com chamado aberto estão com a disponibilidade baixa?")
 
 
-@bp.route("/usinas/ia/perguntar", methods=["POST"])
+@bp_usinas.route("/ia/perguntar", methods=["POST"])
 def carteira_ia_perguntar():
     """JSON {pergunta, modelos, historico} -> {ok, respostas, ...}, como a da usina, com o dossiê da carteira de agora e
     as instruções dela. Cada resposta leva `usinas` ({nome: o prontuário}) das usinas que cita, e cada ação as
@@ -756,7 +781,7 @@ def carteira_ia_perguntar():
     for r in respostas:
         if not r.get("ok"):
             continue
-        r["usinas"] = {n: na_raiz(f"/t/comando/usinas/{uid}")
+        r["usinas"] = {n: na_raiz(f"/t/campo/usinas/{uid}")
                        for n, uid in CI.usinas_citadas(r.get("texto") or "", dz["usinas"]).items()}
         for a in r.get("acoes") or []:
             uids = {por_nome[n.lower()] for n in a.get("usinas") or [] if n.lower() in por_nome}
@@ -770,7 +795,7 @@ def carteira_ia_perguntar():
     return resp
 
 
-@bp.route("/usinas/ia/demanda", methods=["POST"])
+@bp_usinas.route("/ia/demanda", methods=["POST"])
 def carteira_ia_demanda():
     """A ação de outro setor da resposta da carteira, mandada como demanda: a mesma Nova demanda (`demandas.abrir`), com
     as usinas da ação (só as da lista do Comando › Usinas)."""
@@ -796,7 +821,7 @@ def carteira_ia_demanda():
                    aviso="Demanda enviada. Ela está em \u201cQue eu pedi\u201d, na Caixa de entrada, e quem recebeu é avisado no sininho.")
 
 
-@bp.route("/usinas/dossie-da-carteira.md")
+@bp_usinas.route("/dossie-da-carteira.md")
 def carteira_dossie_md():
     """O dossiê da carteira em texto (o que a IA lê), para o administrador conferir."""
     if not session.get("admin"):
@@ -806,7 +831,7 @@ def carteira_dossie_md():
     return resp
 
 
-@bp.route("/usinas/dossie-do-cliente.md")
+@bp_usinas.route("/dossie-do-cliente.md")
 def cliente_dossie_md():
     """O dossiê do cliente em Markdown, com as UFVs pontuadas (16/11/2026, Levi: "seria interessante o dossiê em .MD do
     cliente! Pontuando as UFVs!"; `nexus/comando/dossie_cliente.py`). O botão aparece no Comando › Usinas filtrado por um

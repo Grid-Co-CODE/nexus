@@ -1,7 +1,7 @@
 """Os filtros de usina e de técnico da Aprovação de OS (Levi, 15/11/2026, repassado pelo chat do Comando: "na parte de
 filtro de aprovação de OS, tem que ter o filtro de usina [...] Também tem que ter o filtro do técnico, que seria quem
 executou a OS [...] a ideia seria já vir filtrado na usina correta"). O "Aprovar 7 OS em verificação" do prontuário da
-usina abria a fila inteira; agora manda `?usina=<usina_id>` (o id do cadastro, o mesmo de /t/comando/usinas/<id>).
+usina abria a fila inteira; agora manda `?usina=<usina_id>` (o id do cadastro, o mesmo de /t/campo/usinas/<id>).
 
 A fila dos testes (test_campo_aprovacao_responsavel.py): na Usina A (id 1, "SP 01" no Fracttal, responsável Ciclano
 Chefe) 15002 (Técnico 7), 15088, 15102 e 17001 (fora do pré-filtro); na Usina C (id 3, "SC 01", responsável Beltrano

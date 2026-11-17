@@ -136,19 +136,19 @@ def test_a_caixa_esta_na_tela_para_todos(tela, logado):
     administrador, e a pergunta também (a de antes respondia 403)."""
     with logado.session_transaction() as s:
         s["admin"] = False
-    p = logado.get("/t/comando/usinas/1").get_data(as_text=True)
-    assert 'data-pu-ia="/t/comando/usinas/1/ia?parcial=1"' in p and "/static/comando/ia.js" in p
-    assert 'data-pu-jan="/t/comando/usinas/1/ia?parcial=1"' not in p
-    h = logado.get("/t/comando/usinas/1/ia?parcial=1")
+    p = logado.get("/t/campo/usinas/1").get_data(as_text=True)
+    assert 'data-pu-ia="/t/campo/usinas/1/ia?parcial=1"' in p and "/static/comando/ia.js" in p
+    assert 'data-pu-jan="/t/campo/usinas/1/ia?parcial=1"' not in p
+    h = logado.get("/t/campo/usinas/1/ia?parcial=1")
     assert h.status_code == 200 and 'class="ia ia--embutida"' in h.get_data(as_text=True)
-    assert logado.post("/t/comando/usinas/1/ia/perguntar", json={"pergunta": "?", "modelos": []}).status_code == 400
-    lista = logado.get("/t/comando/usinas").get_data(as_text=True)
-    assert 'data-cmu-ia="/t/comando/usinas/ia"' in lista and "/static/comando/ia.js" in lista
-    c = logado.get("/t/comando/usinas/ia").get_data(as_text=True)
-    assert 'data-ia-url="/t/comando/usinas/ia/perguntar"' in c and "sobre a carteira inteira" in c
+    assert logado.post("/t/campo/usinas/1/ia/perguntar", json={"pergunta": "?", "modelos": []}).status_code == 400
+    lista = logado.get("/t/campo/usinas").get_data(as_text=True)
+    assert 'data-cmu-ia="/t/campo/usinas/ia"' in lista and "/static/comando/ia.js" in lista
+    c = logado.get("/t/campo/usinas/ia").get_data(as_text=True)
+    assert 'data-ia-url="/t/campo/usinas/ia/perguntar"' in c and "sobre a carteira inteira" in c
     assert "Chamados abertos × disponibilidade e performance" in c
     # o texto do dossiê da carteira, só para o administrador
-    assert logado.get("/t/comando/usinas/dossie-da-carteira.md").status_code == 403
+    assert logado.get("/t/campo/usinas/dossie-da-carteira.md").status_code == 403
 
 
 def test_a_pergunta_da_carteira_usa_o_dossie_e_as_instrucoes_dela(tela, logado, monkeypatch, tmp_path):
@@ -162,14 +162,14 @@ def test_a_pergunta_da_carteira_usa_o_dossie_e_as_instrucoes_dela(tela, logado, 
         return [{"id": "nemotron", "ok": True, "texto": f"A {nome} pesa mais.", "custo_usd": 0,
                  "acoes": [{"setor": "Chamados", "acao": "Cobrar", "os": None, "usinas": [nome.upper(), "Marte"]}]}]
     monkeypatch.setattr(IA, "perguntar", perguntar)
-    r = logado.post("/t/comando/usinas/ia/perguntar", json={"pergunta": "Chamados × disponibilidade", "modelos": ["nemotron"]})
+    r = logado.post("/t/campo/usinas/ia/perguntar", json={"pergunta": "Chamados × disponibilidade", "modelos": ["nemotron"]})
     j = r.get_json()
     assert r.status_code == 200 and j["ok"] and visto["instrucoes"] == CI.INSTRUCOES
     assert visto["dossie"].startswith("# Dossiê da carteira de usinas")
     resp = j["respostas"][0]
     (nome, url), = resp["usinas"].items()
-    assert url.startswith("/t/comando/usinas/") and resp["acoes"][0]["usinas_ids"] == [int(url.rsplit("/", 1)[1])]
-    assert logado.post("/t/comando/usinas/ia/perguntar", json={"pergunta": "?", "modelos": ["x"]},
+    assert url.startswith("/t/campo/usinas/") and resp["acoes"][0]["usinas_ids"] == [int(url.rsplit("/", 1)[1])]
+    assert logado.post("/t/campo/usinas/ia/perguntar", json={"pergunta": "?", "modelos": ["x"]},
                        headers={"Sec-Fetch-Site": "cross-site"}).status_code == 403
 
 
@@ -177,9 +177,9 @@ def test_a_demanda_da_carteira_vai_com_as_usinas_da_lista(tela, logado, monkeypa
     from nexus.comando import demandas as DM
     visto = {}
     monkeypatch.setattr(DM, "abrir", lambda form, anexos, usuario: visto.update(form=form) or {"demanda_id": "d1"})
-    lista = logado.get("/t/comando/usinas").get_data(as_text=True)
-    ids = re.findall(r"/t/comando/usinas/(\d+)\"", lista)
-    r = logado.post("/t/comando/usinas/ia/demanda", json={"para_hmac": "h", "para_setor_id": "2:Chamados", "tema_id": "t",
+    lista = logado.get("/t/campo/usinas").get_data(as_text=True)
+    ids = re.findall(r"/t/campo/usinas/(\d+)\"", lista)
+    r = logado.post("/t/campo/usinas/ia/demanda", json={"para_hmac": "h", "para_setor_id": "2:Chamados", "tema_id": "t",
                                                          "titulo": "Cobrar", "descricao": "x", "usinas": f"{ids[0]},99999"})
     assert r.status_code == 200 and visto["form"]["usinas"] == [ids[0]]          # a usina fora da lista não vai
 
@@ -203,6 +203,6 @@ def test_as_perguntas_sugeridas_saem_prontas_e_certas_sem_ia(tela, logado, monke
     assert CI.resposta_pronta("Por que a Colíder 1 está com 0%?", dz) is None
     # pela rota: a sugerida não chama a IA
     monkeypatch.setattr(IA, "perguntar", lambda *a, **k: (_ for _ in ()).throw(AssertionError("chamou a IA")))
-    j = logado.post("/t/comando/usinas/ia/perguntar", json={"pergunta": CI.SUGESTOES[3], "modelos": ["nemotron"]}).get_json()
+    j = logado.post("/t/campo/usinas/ia/perguntar", json={"pergunta": CI.SUGESTOES[3], "modelos": ["nemotron"]}).get_json()
     r = j["respostas"][0]
     assert j["ok"] and r["sem_ia"] and r["rotulo"] == "Contado pelo Nexus"

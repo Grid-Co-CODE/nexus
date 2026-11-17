@@ -12,7 +12,7 @@ from test_oscreator_tema_claro import _login_do_fracttal
 
 from nexus.torres.oscreator import ponte
 
-DE = "/t/comando/usinas/1"
+DE = "/t/campo/usinas/1"
 
 
 def _abrir(cliente, url, de=DE):
@@ -23,7 +23,7 @@ def test_sem_o_login_do_fracttal_a_moldura_diz_como_entrar_e_volta(logado):
     h = _abrir(logado, "/os/tradicional?ativo=THPN-ALT100").get_data(as_text=True)
     assert "Para criar a OS, entre pelo Fracttal" in h and 'id="nx_cr"' not in h
     # o login do OS Creator, voltando ao prontuário de onde a pessoa saiu (o mesmo /card/voltar do card e do chamado)
-    assert 'href="/os/login?next=%2Fos%2F_nexus%2Fcard%2Fvoltar%3Fde%3D%2Ft%2Fcomando%2Fusinas%2F1"' in h
+    assert 'href="/os/login?next=%2Fos%2F_nexus%2Fcard%2Fvoltar%3Fde%3D%2Ft%2Fcampo%2Fusinas%2F1"' in h
     assert 'target="_top"' in h
 
 
@@ -46,7 +46,7 @@ def test_as_cinco_formas_do_prontuario_abrem_e_o_resto_nao(app, logado):
     for _rot, _sub, url, _leva in CRIAR_OS:
         r = _abrir(logado, url)
         assert r.status_code == 200 and f'src="{url}?janela=1"' in r.get_data(as_text=True), url
-    for fora in ("/os/login", "/os/api/tradicional/criar", "/os/", "/t/comando/usinas", "https://exemplo.invalid/os/tradicional",
+    for fora in ("/os/login", "/os/api/tradicional/criar", "/os/", "/t/campo/usinas", "https://exemplo.invalid/os/tradicional",
                  "//exemplo.invalid/os/tradicional", "/os/tradicional/../login", ""):
         assert _abrir(logado, fora).status_code == 404, fora
 

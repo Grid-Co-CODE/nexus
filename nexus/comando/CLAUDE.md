@@ -150,6 +150,20 @@ download do pdf da OS". No quiz, "resposta" é o técnico executar a OS.
 
 ## Comando > Usinas e o prontuário (11/11/2026)
 
+**Mudou para a Usinas 360° em 16/11/2026** (Levi: "Usinas sai de comando e vai para Usinas 360 abaixo de Visão do
+responsável!"; no mesmo dia, a ordem do Comando: "1 - Caixa de entrada [...] 3 - Visão de contrato 4 - Metas do book 5 -
+Contestações 6 - Nexus insights"). A tela é da torre `campo`, logo abaixo da Visão do responsável, e o endereço é
+**`/t/campo/usinas`** (a lista, o prontuário `/t/campo/usinas/<id>`, o PDF, o dossiê, a IA da usina e da carteira, os
+dossiês em .md): é ele que o menu, o portão por setor (`campo/usinas`), a busca do menu e a pré-carga leem. **O código
+não mudou de lugar**: as 15 rotas são do `bp_usinas` (blueprint `torre_campo_usinas`, em `torres/comando/__init__.py`),
+porque usam o que é do Comando (os insights, as demandas, a IA); os templates seguem em `comando/`, com a torre e a tela
+da Usinas 360° (`_torre_usinas`). **O endereço antigo** `/t/comando/usinas/...` responde **308** para o mesmo caminho em
+`/t/campo/usinas`, com o filtro (308 para a pergunta à IA de uma aba antiga chegar como POST; a Sala de controle da
+plataforma ainda abre por ele). **A marca do setor** em "comando/usinas" vale para "campo/usinas"
+(`setor_telas.RENOMEADAS`). O menu acende a torre pelo endereço quando ele é de uma torre (`casca.instalar_contexto`:
+pelo nome do blueprint, a Usinas abria o Comando). Abaixo, "Comando > Usinas" e `/t/comando/usinas` são o nome e o
+endereço de quando cada coisa foi feita. Prova: `tests/test_comando_ordem_usinas_16_11.py`.
+
 **O prontuário pelo NOME da usina (16/11/2026).** `GET /t/comando/usinas/abrir?nome=<usina>` (`usina_pelo_nome`) acha a
 usina na mesma lista do Comando > Usinas, sem acento nem caixa, e redireciona ao prontuário dela; nenhuma ou mais de uma
 casando, à lista com a busca (`?q=`) preenchida. Quem usa: a Sala de controle da Performance (tela da plataforma, que
@@ -455,6 +469,9 @@ escolher o setor chamados, mas no back-end entender que é um setor de performan
   falta 1, vence hoje), a vencida e a devolvida; para o setor de quem recebeu, a vencida ("Quem recebeu + todo o setor");
   para quem pediu, a respondida e o pedido de informação. A nova vence o prazo de 2 dias na ordem (a prévia mostrava
   "Nova demanda"). Só da cópia do livro (`demandas.copia`, 1 minuto, relida por trás): nenhuma página espera o banco.
+  Desde 16/11/2026 a mesma bandeja traz as **contestações sem resposta** do setor (seção própria, "Abrir as
+  contestações"; a regra em `nexus/contratos/CLAUDE.md`, "O aviso do topo"): a bandeja aparece por elas mesmo sem as
+  chaves das demandas, e o número soma as duas.
 
 **Os dados** (`nexus_demandas`, registrado no catálogo antes da 1ª gravação; o Nexus é a fonte, só acrescenta):
 `dim_tema` (1 versão de 1 tema; vale a última por `tema_id`), `fato_demanda`, `fato_demanda_usina` e

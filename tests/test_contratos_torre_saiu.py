@@ -14,7 +14,8 @@ def test_a_torre_saiu_do_menu_e_as_telas_foram_para_o_comando_e_a_base(logado):
     torres = {t.id: t for t in descobrir_torres()}
     assert "contratos" not in torres
     comando = [s.id for s in torres["comando"].telas]
-    assert comando[-2:] == ["contestacoes", "visao-do-contrato"] and torres["comando"].tela("visao-do-contrato").de_todos
+    # as duas telas que vieram estão no Comando (a ordem do menu mudou em 16/11/2026: test_comando_ordem_usinas_16_11.py)
+    assert {"contestacoes", "visao-do-contrato"} <= set(comando) and torres["comando"].tela("visao-do-contrato").de_todos
     base = [s.id for s in torres["base"].telas]
     assert base.index("acessos-clientes") == base.index("acessos") + 1
     html = logado.get("/").get_data(as_text=True)

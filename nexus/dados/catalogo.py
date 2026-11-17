@@ -327,14 +327,17 @@ FATOS = (
     # inserir atualizações sobre a demanda com data e hora salva"). O Nexus é a FONTE; registrado antes da 1ª gravação
     Fato("tratamento_contestacao", "Acompanhamento da contestação", "comando",
          "nexus_contestacoes_tratamento · fato_tratamento_contestacao",
-         "1 linha = 1 evento (responsável que pegou, ou atualização escrita) sobre 1 contestação × 1 setor",
+         "1 linha = 1 evento (atualização escrita, resolvida, reaberta; e o responsável que pegou, até 15/11/2026) "
+         "sobre 1 contestação × 1 setor",
          _d(data=("id", "data_id (o dia de Brasília do evento)"),
-            pessoa=("cod", "pessoa_hmac (o código do e-mail de quem pegou ou escreveu)")),
+            pessoa=("cod", "pessoa_hmac (o código do e-mail de quem escreveu, resolveu ou reabriu)")),
          tipo="sem_medida", chave=("id",), fontes=("nexus_contestacoes_tratamento · fato_tratamento_contestacao",),
          janela_origem="o Nexus é a fonte",
          observacao="contestacao_linha_id liga à linha do thopen_contestacoes (o id dela, 1 contestação × 1 setor); "
-                    "evento = responsavel (o responsável de agora é o do último) ou atualizacao. Quem (nome e e-mail) e "
-                    "o texto só cifrados (Cofre, a chave do cadastro). Só acrescenta: nada se edita nem se apaga"),
+                    "evento = atualizacao, resolvida ou reaberta (16/11/2026: o setor inteiro responde, sem dono; a "
+                    "situação é a do último resolvida/reaberta) e responsavel (o 'Pegar para mim', só até 15/11/2026). "
+                    "Quem (nome e e-mail) e o texto só cifrados (Cofre, a chave do cadastro); o evento em claro (o aviso "
+                    "do topo lê). Só acrescenta: nada se edita nem se apaga"),
     # a passagem de turno do COS (R12 do Fillipe: "a passagem é registrada no sistema; sem registro, ela não aconteceu").
     # Nada disso existia na Ronda COS (26/10/2026). O Nexus é a FONTE; registrado antes da 1ª gravação
     Fato("passagem_turno", "Passagem de turno do COS", "cos", "nexus_cos_turno · fato_passagem_turno",
@@ -1602,7 +1605,7 @@ LIVROS = (
           "63/63; a pessoa, fora do cadastro, só com o nome cifrado), conferido por GET em 09/10",
           so_cresce=True),
     Livro("nexus_contestacoes_tratamento", ("fato_tratamento_contestacao",),
-          "a cada \"Pegar para mim\" e a cada atualização na tela Contestações",
+          "a cada atualização, resolvida e reaberta na tela Contestações (o \"Pegar para mim\" saiu em 16/11/2026)",
           "nexus/contratos/tratamento.py, pela tela Comando > Contestações", False,
           "registrado em 15/10/2026 antes da 1ª gravação (regra 10): nasce na 1ª demanda que alguém pega",
           so_cresce=True),

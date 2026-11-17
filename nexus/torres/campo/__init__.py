@@ -65,6 +65,14 @@ TORRE = Torre(
              "Como estão agora as usinas de um cliente, e o que responder a ele sem abrir cinco telas?",
              "Tempo real da plataforma (só leitura) + Gerencial + Andamento da Ronda COS + OS e programação no banco",
              do_cliente=True, so_do_cliente=True),
+        # (depois da Visão do cliente na lista, que só o cliente vê: no menu da Grid a Usinas fica logo abaixo da Visão do
+        # responsável, e no do cliente a Visão do cliente segue logo depois dela)
+        # a lista das usinas e o prontuário de cada uma (11/11/2026), que vieram do Comando em 16/11/2026 (Levi: "Usinas sai
+        # de comando e vai para Usinas 360 abaixo de Visão do responsável!"): o código ficou em nexus/torres/comando (o
+        # `bp_usinas`, com o endereço /t/campo/usinas), e o endereço antigo /t/comando/usinas leva para cá
+        Tela("usinas", "Usinas",
+             "Como está cada usina agora, e o que cada setor diz dela?",
+             "Visão do responsável, tempo real, Nexus Insights, extintores e luvas das rondas + cadastro do Nexus"),
         # o Mapa de equipe (08/11/2026; o pedido do Levi: "identificar onde o técnico está e qual seria a melhor rota para
         # ele"): a posição dos técnicos do piloto do Nexus Field, nas rotas de equipe_tela.py. Os donos são a regra escrita
         # no aviso ao técnico (quem vê), e a rota a confere de novo: a marca de outro setor em Base → Acessos não abre o mapa
@@ -419,7 +427,7 @@ def _central_da_usina(todas: list[dict], usina_id: int | None = None) -> dict:
     from ...campo import central_usina as CU
     from ...campo import painel_responsavel as campo_painel
     nome = request.args.get("nome", "").strip()
-    # `usina_id`: o prontuário do Comando > Usinas (11/11/2026) pede a usina pelo endereço dele, /t/comando/usinas/<id>
+    # `usina_id`: o prontuário do Comando > Usinas (11/11/2026) pede a usina pelo endereço dele, /t/campo/usinas/<id> (até 16/11/2026, /t/comando/usinas)
     uid = usina_id or visao.D._id(request.args.get("usina")) or CU.achar(todas, nome)
     u = next((x for x in todas if x["usina_id"] == uid), None)
     out = {"busca": [(i, n, s, url_for("torre_campo.responsaveis", modo="usina", usina=i))
@@ -492,10 +500,10 @@ def responsaveis():
     Filtros de responsável, cliente e busca; "Todos" vai como "*"."""
     # a aba "Prontuário da usina" saiu (Levi, 16/11/2026: "Tire a opção de prontuário da Visão do Responsável, no painel na
     # parte de performance vai ter a opção 'ver prontuário' e vai para a parte de UFV"): o endereço guardado vai ao
-    # prontuário do Comando > Usinas (o endereço de hoje; o chat do Comando vai mover a tela, e o antigo segue valendo)
+    # prontuário da Usinas (que veio do Comando para a Usinas 360° no mesmo dia: /t/campo/usinas)
     if request.args.get("modo") == "usina":
         uid = visao.D._id(request.args.get("usina"))
-        return redirect(na_raiz(f"/t/comando/usinas/{uid}" if uid else "/t/comando/usinas"))
+        return redirect(na_raiz(f"/t/campo/usinas/{uid}" if uid else "/t/campo/usinas"))
     leitura = campo_resp.visao_responsaveis()
     d = leitura.dados
     # o bloco Manutenção no limite de quem olha: o parâmetro (o campo do bloco) vence o cookie; sem os dois, 30
@@ -1798,7 +1806,7 @@ def aprovacao():
     responsável da UFV"); cliente e busca respondem na página, sem recarregar.
     A usina e o técnico também vão ao servidor (Levi, 15/11/2026: "tem que ter o filtro de usina [...] Também tem que ter o
     filtro do técnico, que seria quem executou a OS [...] a ideia seria já vir filtrado na usina correta"): `?usina=` é o
-    id do cadastro (o de /t/comando/usinas/<id>, que o "Aprovar N OS em verificação" do prontuário manda) e `?tecnico=`
+    id do cadastro (o de /t/campo/usinas/<id>, que o "Aprovar N OS em verificação" do prontuário manda) e `?tecnico=`
     o nome de quem executou alguma tarefa da OS no Fracttal. A usina pedida no endereço abre com o responsável em Todos:
     o responsável do login cortaria a usina de outro responsável que ele foi ver."""
     from ...campo import prefiltro, prefiltro_fundo

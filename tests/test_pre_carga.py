@@ -164,8 +164,8 @@ def test_a_lista_do_comando_leva_junto_o_prontuario_da_primeira_usina():
             class R:
                 status_code = 200
             return R()
-    PC._prontuario_junto(Cliente(), {}, '<a href="/t/comando/usinas/60">Marabá 200</a><a href="/t/comando/usinas/59">x</a>')
-    assert pedidos == ["/t/comando/usinas/60"]
+    PC._prontuario_junto(Cliente(), {}, '<a href="/t/campo/usinas/60">Marabá 200</a><a href="/t/campo/usinas/59">x</a>')
+    assert pedidos == ["/t/campo/usinas/60"]
     PC._prontuario_junto(Cliente(), {}, "<p>sem usina</p>")
-    assert pedidos == ["/t/comando/usinas/60"]
-    assert PC.PRONTUARIO_JUNTO == "comando/usinas"
+    assert pedidos == ["/t/campo/usinas/60"]
+    assert PC.PRONTUARIO_JUNTO == "campo/usinas"

@@ -23,7 +23,7 @@
   {# a Nexus IA da carteira (16/11/2026, retorno do time: "Eu queria a IA fora do ambiente da usina [...] ver todos os
      chamados em aberto e correlacionar com as usinas com baixa disponibilidade e performance"; Levi: "só no Comando ›
      Usinas"): a caixa embutida, sem janela, aberta para todos; vem por trás (comando-usinas.js) #}
-  <div class="cmu-ia" data-cmu-ia="{{ raiz }}/t/comando/usinas/ia"></div>
+  <div class="cmu-ia" data-cmu-ia="{{ raiz }}/t/campo/usinas/ia"></div>
 
   <section class="cmu-quadro" aria-label="Usinas">
     {# a faixa: uma barra por usina; passar o mouse diz a usina e o motivo da cor (12/11/2026) #}
@@ -52,7 +52,7 @@
     {# o dossiê do cliente em .md, com as UFVs pontuadas (16/11/2026, Levi: "seria interessante o dossiê em .MD do
        cliente! Pontuando as UFVs!"): o botão com um cliente no filtro; sem ele, a dica de como chegar #}
     {% set cli = escolhidos.get('cliente', []) %}
-    <p class="cmu-dossie">{% if cli|length == 1 %}<a class="gc-btn gc-btn--ui gc-btn--contorno" href="{{ raiz }}/t/comando/usinas/dossie-do-cliente.md?cliente={{ cli[0]|urlencode }}" download><i class="ph ph-file-arrow-down" aria-hidden="true"></i> Baixar o dossiê do cliente {{ cli[0] }} (.md)</a><span class="mudo">As UFVs pontuadas, da pior para a melhor, com o que tirou pontos. Uso interno.</span>{% else %}<span class="mudo">Para baixar o dossiê de um cliente (.md), com as UFVs pontuadas, filtre por um cliente.</span>{% endif %}</p>
+    <p class="cmu-dossie">{% if cli|length == 1 %}<a class="gc-btn gc-btn--ui gc-btn--contorno" href="{{ raiz }}/t/campo/usinas/dossie-do-cliente.md?cliente={{ cli[0]|urlencode }}" download><i class="ph ph-file-arrow-down" aria-hidden="true"></i> Baixar o dossiê do cliente {{ cli[0] }} (.md)</a><span class="mudo">As UFVs pontuadas, da pior para a melhor, com o que tirou pontos. Uso interno.</span>{% else %}<span class="mudo">Para baixar o dossiê de um cliente (.md), com as UFVs pontuadas, filtre por um cliente.</span>{% endif %}</p>
 
     <div class="cn-tab cmu-tab"><table data-cmu-tabela>
       <thead><tr>
@@ -74,7 +74,7 @@
             data-o-tipologia="{{ x.tipologia }}" data-o-agora="{{ loop.index0 }}" data-o-ating="{{ x.atingimento if x.atingimento is not none else '' }}"
             data-o-pr="{{ x.pr if x.pr is not none else '' }}" data-o-os="{{ x.os_abertas if x.os_abertas is not none else '' }}"
             data-o-insights="{{ x.insights if x.insights is not none else '' }}" data-cmu-uid="{{ x.usina_id }}">
-          <td class="cmu-esq"><a class="cmu-usina" href="{{ raiz }}/t/comando/usinas/{{ x.usina_id }}"><b>{{ x.usina }}</b>{% if x.codigo_ufv %}<span class="cmu-cod">{{ x.codigo_ufv }}</span>{% endif %}</a></td>
+          <td class="cmu-esq"><a class="cmu-usina" href="{{ raiz }}/t/campo/usinas/{{ x.usina_id }}"><b>{{ x.usina }}</b>{% if x.codigo_ufv %}<span class="cmu-cod">{{ x.codigo_ufv }}</span>{% endif %}</a></td>
           <td class="cmu-esq">{{ x.cliente or '—' }}</td>
           <td class="cmu-esq">{{ x.cluster or '—' }}</td>
           <td class="gc-num">{% if x.mwp is not none %}{{ ('%.1f'|format(x.mwp))|replace('.', ',') }}{% else %}—{% endif %}</td>

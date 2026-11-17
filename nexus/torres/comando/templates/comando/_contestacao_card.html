@@ -1,50 +1,79 @@
-{# O card de uma contestação (15/10/2026, Levi: "Ao clicar na linha, vai aparecer um card sobrepondo a tela com um blur de
-   fundo onde o responsável poderá inserir atualizações sobre a demanda com data e hora salva"). Pedaço de página: entra
-   no <dialog> da lista (contestacoes.html). Só o responsável de agora escreve; o resto do setor lê. #}
-<div class="ct-card">
-  <p class="gc-eyebrow">Contestação · {{ setor_rot }}</p>
-  <h2>{{ x.usina }}</h2>
-  <p class="ct-sub">Dia contestado {% if x.ini %}{{ x.ini.strftime('%d/%m/%Y') }}{% if x.fim and x.fim != x.ini %} a {{ x.fim.strftime('%d/%m/%Y') }}{% endif %}{% else %}—{% endif %}
-    · recebida {{ x.quando.strftime('%d/%m/%Y às %H:%M') if x.quando else '—' }}
-    {% if x.itens %}· {{ x.itens|join(', ') }}{% endif %}</p>
+{# O card de uma contestação, à direita da lista (16/11/2026, o redesenho; Levi: "qualquer um daquele setor pode editar e
+   salvar por tanto que salve quem foi que fez isso!"). Entra na página (contestacoes.html) e volta sozinho pela rota
+   `contestacao_card`, quando a lista troca a escolhida sem reler a página. Quem vê a contestação (o setor dela, ou o
+   administrador) e entrou com o login dele escreve, marca como resolvida e reabre; cada evento fica com o nome, a data e
+   a hora. O "responsavel" de antes (o "Pegar para mim", até 15/11/2026) aparece na história, sem dar nem tirar nada. #}
+{% set ver_atual = request.args.get('ver') if request.args.get('ver') == 'resolvidas' else 'abertas' %}
+{% set base_ct = '/t/comando/contestacoes/' ~ x.id %}
+<article class="ct-det{% if auto %} ct-det--auto{% endif %}" id="ct-detalhe" data-ct-id="{{ x.id }}" aria-label="Contestação de {{ x.usina }}">
+  <header class="ct-det-cab">
+    <div>
+      <p class="gc-eyebrow">Contestação · {{ setor_rot }}</p>
+      <h2 class="ct-det-usina">{{ x.usina }}</h2>
+      <p class="ct-det-sub">Dia contestado <b>{% if x.ini %}{{ x.ini.strftime('%d/%m/%Y') }}{% if x.fim and x.fim != x.ini %} a {{ x.fim.strftime('%d/%m/%Y') }}{% endif %}{% else %}—{% endif %}</b>
+        · chegou {{ x.quando.strftime('%d/%m/%Y às %H:%M') if x.quando else '—' }}{% if x.chegou_txt %} ({{ x.chegou_txt }}){% endif %}
+        · {% if x.avisado %}o Teams do setor recebeu{% elif x.avisado is none %}só no Nexus (o setor não tem aviso no Teams){% else %}<span class="cn-t-critico">o Teams recusou o aviso</span>{% endif %}</p>
+    </div>
+    <div class="ct-det-acao">
+      <span class="gc-status gc-status--{{ x.sit_tom }}">{{ x.sit_rot }}</span>
+      {% if t.situacao == 'resolvida' %}
+        {% if t.resolvida %}<span class="mudo">por {{ t.resolvida.nome or 'alguém do setor' }}, {{ t.resolvida.quando_txt }}</span>{% endif %}
+        {% if com_login %}<form method="post" action="{{ (base_ct ~ '/reabrir')|na_raiz }}" data-ct-acao data-rota="{{ base_ct }}/reabrir">
+          <input type="hidden" name="ver" value="{{ ver_atual }}">
+          <button class="gc-btn gc-btn--contorno" type="submit">Reabrir</button></form>{% endif %}
+      {% elif com_login %}
+        <form method="post" action="{{ (base_ct ~ '/resolver')|na_raiz }}" data-ct-acao data-rota="{{ base_ct }}/resolver">
+          <input type="hidden" name="ver" value="{{ ver_atual }}">
+          <button class="gc-btn gc-btn--contorno" type="submit">Marcar como resolvida</button></form>
+      {% endif %}
+    </div>
+  </header>
+  {% if x.itens %}<div class="ct-chips" aria-label="O que o cliente contesta">{% for i in x.itens %}<span class="ct-chip">{{ i }}</span>{% endfor %}</div>{% endif %}
 
-  {% if aviso %}<div class="cn-erro cn-aviso" role="status"><b>{{ aviso }}.</b></div>{% endif %}
-  {% if erro %}<div class="cn-erro" role="alert"><b>Nada foi gravado.</b> {{ erro }}</div>{% endif %}
-  {% if lido %}<div class="cn-erro" role="alert"><b>{{ lido }}.</b></div>{% endif %}
+  {% if lido %}<div class="cn-erro" role="alert" style="margin-top:14px"><b>{{ lido }}.</b> O acompanhamento não aparece agora.</div>{% endif %}
 
-  <div class="ct-bloco">
-    <h3>O cliente</h3>
-    {% if x.aberto %}<p style="margin:0 0 6px"><b>{{ x.nome }}</b>{% if x.contato %} · {{ x.contato }}{% endif %}</p>
-      <p style="margin:0;white-space:pre-wrap">{{ x.mensagem or 'Sem mensagem.' }}</p>
+  <section class="ct-sec">
+    <h3 class="ui-kicker">O que o cliente disse</h3>
+    {% if x.aberto %}
+      <p class="ct-cliente"><b>{{ x.nome or 'Cliente' }}</b>{% if x.contato %} · {{ x.contato }}{% endif %}</p>
+      <p class="ct-msg">{{ x.mensagem or 'Sem mensagem.' }}</p>
+    {% elif x.aberto is false %}<p class="cn-t-critico" style="margin:0">A cifra desta contestação não abre com a chave deste Nexus.</p>
     {% else %}<p class="mudo" style="margin:0">O nome, o contato e a mensagem do cliente vão cifrados e não abrem neste Nexus.</p>{% endif %}
-  </div>
+  </section>
 
-  <div class="ct-bloco">
-    <h3>Responsável</h3>
-    {% if resp %}<p style="margin:0">{{ resp.nome or 'responsável' }}{% if sou_resp %} (você){% endif %} <span class="mudo">· desde {{ resp.quando_txt }}</span></p>
-    {% else %}<p class="mudo" style="margin:0">Ninguém pegou esta demanda ainda: use "Pegar para mim" na lista.</p>{% endif %}
-  </div>
+  {% if x.tela %}
+  <section class="ct-sec">
+    <h3 class="ui-kicker">O que ele via na tela naquele dia</h3>
+    <dl class="ct-tela">{% for rot, v in x.tela %}<div><dt>{{ rot }}</dt><dd>{{ v }}</dd></div>{% endfor %}</dl>
+  </section>
+  {% endif %}
 
-  <div class="ct-bloco">
-    <h3>Atualizações</h3>
-    {% if t.atualizacoes %}
-    <ul class="ct-linha">
-      {% for a in t.atualizacoes|reverse %}
-      <li><span class="ct-q">{{ a.quando_txt }}<span class="ct-quem">{{ a.nome }}</span></span><span class="ct-t">{{ a.texto or '—' }}</span></li>
-      {% endfor %}
-    </ul>
-    {% else %}<p class="mudo" style="margin:0">Nenhuma atualização ainda.</p>{% endif %}
-
-    {% if sou_resp %}
-    <form class="ct-form" method="post" action="{{ ('/t/comando/contestacoes/' ~ x.id ~ '/atualizacao')|na_raiz }}" data-ct-atualizar>
-      <label class="gc-rotulo" for="ct-texto">Nova atualização (fica com a data e a hora de agora)</label>
-      <textarea id="ct-texto" name="texto" class="gc-campo" maxlength="2000" required>{{ texto }}</textarea>
-      <div><button class="gc-btn gc-btn--ui gc-btn--primario" type="submit">Salvar atualização</button></div>
+  <section class="ct-sec">
+    <h3 class="ui-kicker">Acompanhamento do setor</h3>
+    {% if com_login %}
+    <form class="ct-form" method="post" action="{{ (base_ct ~ '/atualizacao')|na_raiz }}" data-ct-acao data-rota="{{ base_ct }}/atualizacao">
+      <input type="hidden" name="ver" value="{{ ver_atual }}">
+      <label class="gc-rotulo" for="ct-texto-{{ x.id }}">Nova atualização</label>
+      <textarea id="ct-texto-{{ x.id }}" name="texto" class="gc-campo" maxlength="2000" required placeholder="O que o setor apurou, o que respondeu ao cliente, o que falta"></textarea>
+      <div class="ct-form-pe"><span class="mudo">Fica registrada como {{ eu or 'você' }}, com a data e a hora.</span>
+        <button class="gc-btn gc-btn--primario" type="submit">Salvar atualização</button></div>
     </form>
-    {% elif resp %}
-    <p class="mudo" style="margin:10px 0 0">Só {{ resp.nome or 'o responsável' }} escreve atualização{% if admin %}; para passar a demanda para você, use "Assumir" na lista{% endif %}.</p>
-    {% elif not com_login %}
-    <p class="mudo" style="margin:10px 0 0">Entre com o seu login (Fracttal ou Microsoft) para pegar e acompanhar a demanda.</p>
+    {% else %}
+    <p class="mudo" style="margin:0">Entre com o seu login (Fracttal ou Microsoft) para escrever: a senha de administrador não diz quem é a pessoa, e cada atualização guarda quem a escreveu.</p>
     {% endif %}
-  </div>
-</div>
+
+    {% if t.eventos %}
+    <ol class="ct-hist" aria-label="O que o setor já registrou, o mais novo em cima">
+      {% for e in t.eventos|reverse %}
+      {% set marco = e.evento != 'atualizacao' %}
+      <li class="ct-ev{% if marco %} ct-ev--marco ct-ev--{{ e.evento }}{% endif %}">
+        <span class="ct-ev-q">{{ e.quando_txt }}<span class="ct-ev-quem">{{ e.nome or 'Alguém do setor' }}</span></span>
+        <span class="ct-ev-t">{% if e.evento == 'atualizacao' %}{{ e.texto or '—' }}{% elif e.evento == 'resolvida' %}Marcou como resolvida{% elif e.evento == 'reaberta' %}Reabriu a contestação{% else %}Ficou com a demanda (o "Pegar para mim" de antes){% endif %}</span>
+      </li>
+      {% endfor %}
+    </ol>
+    {% else %}
+    <p class="mudo" style="margin:14px 0 0">Ninguém do setor respondeu ainda.</p>
+    {% endif %}
+  </section>
+</article>

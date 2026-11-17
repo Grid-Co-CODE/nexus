@@ -100,10 +100,11 @@ def test_cifra_copiada_para_outra_linha_nao_abre(banco, app):
 def test_tela_tem_uma_aba_por_setor(banco, logado):
     r = logado.get("/t/comando/contestacoes")
     html = r.get_data(as_text=True)
-    assert r.status_code == 200 and "Performance<i>2</i>" in html and "Zeladoria<i>1</i>" in html
+    assert r.status_code == 200 and ">Performance <span class=\"mudo\">2 abertas</span>" in html
+    assert ">Zeladoria <span class=\"mudo\">1 aberta</span>" in html
     assert "Ana Souza" in html and "ana@cliente.com.br" in html and "Altair" in html
     z = logado.get("/t/comando/contestacoes?setor=zeladoria").get_data(as_text=True)
-    assert "não recebeu" in z and "Altair" not in z
+    assert "o Teams recusou o aviso" in z and "Altair" not in z
 
 
 def test_teste_cruzado_com_o_codigo_do_5080():
@@ -127,12 +128,14 @@ def test_teste_cruzado_com_o_codigo_do_5080():
         sys.path.remove(os.path.join(raiz, "thopen"))
 
 
-# ── O acompanhamento (Levi, 15/10/2026): "Pegar para mim", o card das atualizações e o setor que só vê o seu ──────────
+# ── O acompanhamento: desde 16/11/2026 o setor inteiro responde, sem dono (Levi: "Tire esse 'Pegar pra mim' qualquer
+# um daquele setor pode editar e salvar por tanto que salve quem foi que fez isso!"), com Resolvida e Reabrir ─────────────
 from nexus.cadastro.cifra import gerar_chave  # noqa: E402
 from nexus.contratos import tratamento as TR  # noqa: E402
 
 ANA = {"email": "ana.lima@gridco.com.br", "nome": "Ana Lima"}
 BETO = {"email": "beto.souza@gridco.com.br", "nome": "Beto Souza"}
+MESMO_SITE = {"Sec-Fetch-Site": "same-origin"}
 
 
 @pytest.fixture
@@ -147,39 +150,52 @@ def _como(cli, usuario, admin=False):
     return cli
 
 
-def test_pegar_para_mim_e_so_o_administrador_assume(trat, app):
-    TR.pegar("a1", "performance", ANA, admin=False)
-    r = TR.estado()["a1"]["responsavel"]
-    assert r["nome"] == "Ana Lima" and r["hmac"] == TR.codigo(ANA)
-    with pytest.raises(TR.Recusada, match="já é sua"):
-        TR.pegar("a1", "performance", ANA, admin=False)
-    with pytest.raises(TR.Recusada, match="já tem responsável"):
-        TR.pegar("a1", "performance", BETO, admin=False)
-    TR.pegar("a1", "performance", BETO, admin=True)                     # o administrador assume
-    assert TR.estado()["a1"]["responsavel"]["nome"] == "Beto Souza"
-    with pytest.raises(TR.Recusada, match="login"):                       # a senha de administrador não diz quem é
-        TR.pegar("b1", "performance", None, admin=True)
-    # a API do banco tem leitura aberta: nem o nome nem o e-mail em claro
-    lin = trat.linhas(TR.LIVRO, TR.ABA)
-    assert len(lin) == 2 and list(lin[0]) == list(TR.CAB)
-    # o nome e o e-mail inteiros: um pedaço curto ("ana") aparece por acaso numa cifra em base64 (~1 em 150 rodadas)
-    claro = json.dumps(lin, ensure_ascii=False, default=str).lower()
-    assert "ana lima" not in claro and ANA["email"] not in claro and "beto souza" not in claro
-
-
-def test_so_o_responsavel_escreve_e_a_atualizacao_fica_com_a_hora(trat, app):
-    with pytest.raises(TR.Recusada, match="Pegar para mim"):
-        TR.atualizar("a1", "performance", ANA, "Verificando com a equipe")
-    TR.pegar("a1", "performance", ANA, admin=False)
+def test_qualquer_um_do_setor_escreve_e_cada_atualizacao_guarda_quem(trat, app):
     with pytest.raises(TR.Recusada, match="Escreva"):
         TR.atualizar("a1", "performance", ANA, "   ")
     TR.atualizar("a1", "performance", ANA, "Verificando   com a equipe\n\nOS aberta no Fracttal")
-    with pytest.raises(TR.Recusada, match="Só o responsável"):
-        TR.atualizar("a1", "performance", BETO, "outro")
-    (a,) = TR.estado()["a1"]["atualizacoes"]
-    assert a["texto"] == "Verificando com a equipe\n\nOS aberta no Fracttal" and a["nome"] == "Ana Lima"
-    assert a["quando"] is not None and "às" in a["quando_txt"]
-    assert "verificando" not in json.dumps(trat.linhas(TR.LIVRO, TR.ABA), default=str).lower()
+    TR.atualizar("a1", "performance", BETO, "Liguei para o cliente")              # outro do setor, sem pegar nada
+    t = TR.estado()["a1"]
+    assert [(a["nome"], a["texto"]) for a in t["atualizacoes"]] == [
+        ("Ana Lima", "Verificando com a equipe\n\nOS aberta no Fracttal"), ("Beto Souza", "Liguei para o cliente")]
+    assert t["situacao"] == "em_andamento" and t["ultima"]["nome"] == "Beto Souza" and "às" in t["ultima"]["quando_txt"]
+    with pytest.raises(TR.Recusada, match="login"):                                  # a senha de administrador não diz quem
+        TR.atualizar("b1", "performance", None, "sem pessoa")
+    assert not hasattr(TR, "pegar")
+    # a API do banco tem leitura aberta: nem o nome, nem o e-mail, nem o texto em claro; o evento, sim (o aviso lê)
+    lin = trat.linhas(TR.LIVRO, TR.ABA)
+    assert len(lin) == 2 and list(lin[0]) == list(TR.CAB) and [l["evento"] for l in lin] == ["atualizacao"] * 2
+    claro = json.dumps(lin, ensure_ascii=False, default=str).lower()
+    assert "ana lima" not in claro and ANA["email"] not in claro and "beto souza" not in claro
+    assert "verificando" not in claro and "liguei" not in claro
+
+
+def test_resolvida_e_reaberta_e_a_situacao_de_cada_uma(trat, app):
+    assert TR.estado().get("a1") is None and TR.VAZIO["situacao"] == "sem_resposta"
+    TR.resolver("a1", "performance", ANA)                     # resolver sem escrever vale (o setor decide)
+    t = TR.estado()["a1"]
+    assert t["situacao"] == "resolvida" and t["resolvida"]["nome"] == "Ana Lima"
+    with pytest.raises(TR.Recusada, match="já está resolvida"):
+        TR.resolver("a1", "performance", BETO)
+    TR.reabrir("a1", "performance", BETO)
+    assert TR.estado()["a1"]["situacao"] == "sem_resposta"   # reaberta sem atualização volta a esperar resposta
+    with pytest.raises(TR.Recusada, match="não está resolvida"):
+        TR.reabrir("a1", "performance", BETO)
+    TR.atualizar("a1", "performance", BETO, "Respondido por e-mail")
+    TR.resolver("a1", "performance", BETO)
+    TR.reabrir("a1", "performance", ANA)
+    assert TR.estado()["a1"]["situacao"] == "em_andamento"
+    assert [e["evento"] for e in TR.estado()["a1"]["eventos"]] == ["resolvida", "reaberta", "atualizacao", "resolvida",
+                                                                  "reaberta"]
+    # a situação só pelo evento (em claro), sem abrir nada: é o que o aviso do topo lê
+    assert TR.situacoes(trat.linhas(TR.LIVRO, TR.ABA)) == {"a1": "em_andamento"}
+
+
+def test_a_ordem_e_a_da_gravacao_no_mesmo_segundo():
+    lin = [{"id": "z9", "registrado_em": "2026-11-16T12:00:00Z", "contestacao_linha_id": "a1", "evento": "resolvida"},
+           {"id": "a0", "registrado_em": "2026-11-16T12:00:00Z", "contestacao_linha_id": "a1", "evento": "reaberta"}]
+    assert TR.situacoes(lin) == {"a1": "sem_resposta"}         # pelo id, o "a0" viria antes e ficaria resolvida
+    assert TR.situacoes(list(reversed(lin))) == {"a1": "resolvida"}
 
 
 def test_o_setor_so_ve_a_contestacao_dele_e_o_administrador_ve_todas(trat, app, cliente, monkeypatch):
@@ -188,11 +204,13 @@ def test_o_setor_so_ve_a_contestacao_dele_e_o_administrador_ve_todas(trat, app, 
     monkeypatch.setattr(ST, "acesso", lambda: {"tudo": False, "telas": set(), "setor": setor["v"], "erro": ""})
     _como(cliente, ANA)
     html = cliente.get("/t/comando/contestacoes").get_data(as_text=True)
-    assert "Zeladoria<i>1</i>" in html and "Performance<i>" not in html and "Altair" not in html
+    assert "Contestação · Zeladoria" in html and "Performance <span" not in html and "Altair" not in html
     # a de outro setor nem abre (o servidor barra, não só a tela)
     assert cliente.get("/t/comando/contestacoes?setor=performance").get_data(as_text=True).count("Altair") == 0
+    assert cliente.get("/t/comando/contestacoes?c=b1").get_data(as_text=True).count("Altair") == 0
     assert cliente.get("/t/comando/contestacoes/a1/card").status_code == 404
-    assert cliente.post("/t/comando/contestacoes/a1/pegar", headers={"Sec-Fetch-Site": "same-origin"}).status_code == 404
+    for acao in ("atualizacao", "resolver", "reabrir", "pegar"):
+        assert cliente.post(f"/t/comando/contestacoes/a1/{acao}", data={"texto": "x"}, headers=MESMO_SITE).status_code == 404
     assert cliente.get("/t/comando/contestacoes/a2/card").status_code == 200
     setor["v"] = {"id": SID.ENGENHARIA, "nome": "Engenharia"}                              # setor sem contestação: nenhuma
     html = cliente.get("/t/comando/contestacoes").get_data(as_text=True)
@@ -200,28 +218,111 @@ def test_o_setor_so_ve_a_contestacao_dele_e_o_administrador_ve_todas(trat, app, 
     app.config["NEXUS_ADMINS"] = BETO["email"]                              # administrador (a lista de agora): todas
     _como(cliente, BETO, admin=True)
     html = cliente.get("/t/comando/contestacoes").get_data(as_text=True)
-    assert "Performance<i>2</i>" in html and "Zeladoria<i>1</i>" in html
+    assert ">Performance <span class=\"mudo\">2 abertas</span>" in html and ">Zeladoria <span" in html
 
 
-def test_tela_pegar_abrir_o_card_e_escrever(trat, app, cliente):
+def test_a_tela_escreve_resolve_e_reabre_sem_pegar(trat, app, cliente):
     _como(cliente, ANA)
     html = cliente.get("/t/comando/contestacoes").get_data(as_text=True)
-    assert html.count(">Pegar para mim</button>") == 2 and 'data-ct-card="/t/comando/contestacoes/a1/card"' in html
-    r = cliente.post("/t/comando/contestacoes/a1/pegar", headers={"Sec-Fetch-Site": "same-origin"})
-    assert r.status_code == 303 and r.headers["Location"].endswith("/t/comando/contestacoes?setor=performance")
-    html = cliente.get("/t/comando/contestacoes").get_data(as_text=True)
-    assert "agora é sua" in html and "Ana Lima (você)" in html and "0 atualizações" in html
-    card = cliente.get("/t/comando/contestacoes/a1/card").get_data(as_text=True)
-    assert "data-ct-atualizar" in card and "Nenhuma atualização ainda" in card and "Ana Souza" in card
-    r = cliente.post("/t/comando/contestacoes/a1/atualizacao", data={"texto": "Liguei para o cliente"},
-                     headers={"Sec-Fetch-Site": "same-origin"})
-    card = r.get_data(as_text=True)
-    assert r.status_code == 200 and "Atualização salva" in card and "Liguei para o cliente" in card
-    # outra pessoa do setor lê o card, mas não escreve; de outro site, nada grava
+    assert "Pegar para mim" not in html and "Assumir" not in html
+    assert html.count('class="gc-status gc-status--alerta">Sem resposta<') == 3        # as duas da lista e o card
+    assert 'data-ct-card="/t/comando/contestacoes/a1/card"' in html and 'data-ct-card="/t/comando/contestacoes/b1/card"' in html
+    assert 'id="ct-detalhe"' in html and "Marcar como resolvida" in html and "Fica registrada como Ana Lima" in html
+    assert "comando-contestacoes.js" in html
+    # sem JavaScript: grava e volta à contestação com o aviso
+    r = cliente.post("/t/comando/contestacoes/a1/atualizacao", data={"texto": "Liguei para o cliente"}, headers=MESMO_SITE)
+    assert r.status_code == 303 and r.headers["Location"].endswith("/t/comando/contestacoes?setor=performance&c=a1#ct-detalhe")
+    html = cliente.get("/t/comando/contestacoes?setor=performance&c=a1").get_data(as_text=True)
+    assert "Atualização salva" in html and "Liguei para o cliente" in html and "Em andamento" in html
+    # com o JavaScript (X-Nexus-Parte): JSON, e a recusa diz por quê, sem gravar
+    r = cliente.post("/t/comando/contestacoes/a1/atualizacao", data={"texto": "  "},
+                     headers=dict(MESMO_SITE, **{"X-Nexus-Parte": "1"}))
+    assert r.status_code == 409 and "Escreva" in r.get_json()["erro"]
+    # outra pessoa do setor escreve e resolve (sem dono)
     _como(cliente, BETO)
+    r = cliente.post("/t/comando/contestacoes/a1/resolver", data={"ver": "abertas"}, headers=dict(MESMO_SITE, **{"X-Nexus-Parte": "1"}))
+    assert r.status_code == 200 and r.get_json()["ok"]
     card = cliente.get("/t/comando/contestacoes/a1/card").get_data(as_text=True)
-    assert "Liguei para o cliente" in card and "data-ct-atualizar" not in card and "Só Ana Lima escreve" in card
-    assert cliente.post("/t/comando/contestacoes/b1/pegar", headers={"Sec-Fetch-Site": "cross-site"}).status_code == 403
+    assert "Liguei para o cliente" in card and "Ana Lima" in card and "Marcou como resolvida" in card and "Reabrir" in card
+    abertas = cliente.get("/t/comando/contestacoes?setor=performance").get_data(as_text=True)
+    assert 'data-ct-id="a1"' not in abertas and "Resolvidas<i>1</i>" in abertas
+    resolv = cliente.get("/t/comando/contestacoes?setor=performance&ver=resolvidas").get_data(as_text=True)
+    assert 'data-ct-id="a1"' in resolv and "Resolvida por <b>Beto Souza</b>" in resolv
+    # o "Pegar para mim" de uma aba antiga não grava: leva à contestação
+    n = len(trat.linhas(TR.LIVRO, TR.ABA))
+    r = cliente.post("/t/comando/contestacoes/b1/pegar", headers=MESMO_SITE)
+    assert r.status_code == 303 and "c=b1" in r.headers["Location"] and len(trat.linhas(TR.LIVRO, TR.ABA)) == n
+    # de outro site, nada grava
+    for acao in ("atualizacao", "resolver", "reabrir", "pegar"):
+        assert cliente.post(f"/t/comando/contestacoes/b1/{acao}", data={"texto": "x"},
+                            headers={"Sec-Fetch-Site": "cross-site"}).status_code == 403
+    assert len(trat.linhas(TR.LIVRO, TR.ABA)) == n
+
+
+def test_o_responsavel_de_antes_fica_na_historia(trat, app, cliente):
+    # o "Pegar para mim" gravado até 15/11/2026: aparece na história, e a contestação segue sem resposta (e no aviso)
+    with app.test_request_context():
+        ev = TR._gravar("b1", "performance", "responsavel", ANA)
+    trat._id(TR.LIVRO, TR.ABA)["linhas"] = [{"headers": list(TR.CAB), "values": [ev.get(c) for c in TR.CAB]}]
+    assert TR.estado()["b1"]["situacao"] == "sem_resposta"
+    _como(cliente, BETO)
+    card = cliente.get("/t/comando/contestacoes/b1/card").get_data(as_text=True)
+    assert "Ficou com a demanda" in card and "Ana Lima" in card and "Ninguém do setor respondeu ainda" not in card
+
+
+# ── o aviso do topo (16/11/2026, Levi: "as contestações também devem notificar nas notificações lá de cima, a que não é
+# do OS Creator!"): a sem resposta do setor, até a 1ª resposta de qualquer um dele ou até resolver ──────────────────────
+def _bandeja(html):
+    i = html.index('class="sino-topo sino-dem"')
+    return html[i:html.index("</details>", i)]
+
+
+def test_a_bandeja_traz_a_sem_resposta_do_setor_ate_a_primeira_resposta(trat, app, cliente, monkeypatch):
+    from nexus.auth import setor_telas as ST
+    from nexus.comando import demandas as D
+    from nexus.torres.comando import demandas_tela as DT
+    monkeypatch.setattr(D, "faltam_chaves", lambda: ["sem as chaves das demandas neste teste"])
+    setor = {"v": {"id": SID.PERFORMANCE, "nome": "Performance"}, "telas": {"comando/contestacoes"}}
+    monkeypatch.setattr(ST, "acesso", lambda: {"tudo": False, "telas": setor["telas"], "setor": setor["v"], "erro": ""})
+    monkeypatch.setattr(DT, "_meu_setor", lambda: setor["v"])
+    _como(cliente, ANA)
+    b = _bandeja(cliente.get("/t/comando/contestacoes").get_data(as_text=True))
+    assert "2 contestações sem resposta" in b and "Altair" in b and "Guaratinguetá V" in b
+    assert "/t/comando/contestacoes?setor=performance&amp;c=b1#ct-detalhe" in b and "Abrir as contestações" in b
+    assert 'aria-label="Demandas e contestações: 2"' in b and "Abrir as demandas" not in b
+    # a 1ª resposta de qualquer um do setor tira para todos; resolver também
+    cliente.post("/t/comando/contestacoes/a1/atualizacao", data={"texto": "Vendo"}, headers=MESMO_SITE)
+    _como(cliente, BETO)
+    b = _bandeja(cliente.get("/t/comando/contestacoes").get_data(as_text=True))
+    assert "1 contestação sem resposta" in b and "Altair" in b and "Guaratinguetá V" not in b
+    cliente.post("/t/comando/contestacoes/b1/resolver", headers=MESMO_SITE)
+    b = _bandeja(cliente.get("/t/comando/contestacoes").get_data(as_text=True))
+    assert "sem resposta" not in b and "Nenhuma contestação espera o seu setor agora." in b
+    # quem é de outro setor de contestação recebe a dele; quem não tem a tela, nenhuma (e sem demandas, sem bandeja)
+    setor["v"] = {"id": SID.ZELADORIA, "nome": "Zeladoria"}
+    b = _bandeja(cliente.get("/t/comando/contestacoes").get_data(as_text=True))
+    assert "1 contestação sem resposta" in b and "Guaratinguetá V" in b
+    setor["telas"] = set()
+    assert 'class="sino-topo sino-dem"' not in cliente.get("/").get_data(as_text=True)
+
+
+def test_o_administrador_recebe_so_a_do_setor_dele(trat, app, cliente, monkeypatch):
+    from nexus.auth import setor_telas as ST
+    from nexus.comando import demandas as D
+    from nexus.torres.comando import demandas_tela as DT
+    monkeypatch.setattr(D, "faltam_chaves", lambda: ["sem as chaves das demandas neste teste"])
+    setor = {"v": {"id": SID.ZELADORIA, "nome": "Zeladoria"}}
+    monkeypatch.setattr(ST, "acesso", lambda: {"tudo": True, "telas": set(), "setor": setor["v"], "erro": ""})
+    monkeypatch.setattr(DT, "_meu_setor", lambda: setor["v"])
+    app.config["NEXUS_ADMINS"] = BETO["email"]               # o Nexus recalcula o administrador a cada pedido
+    _como(cliente, BETO, admin=True)
+    b = _bandeja(cliente.get("/").get_data(as_text=True))
+    assert "1 contestação sem resposta" in b and "Guaratinguetá V" in b and "Altair" not in b
+    setor["v"] = None                                        # o administrador sem setor de contestação: as três
+    b = _bandeja(cliente.get("/").get_data(as_text=True))
+    assert "3 contestações sem resposta" in b and "Performance" in b and "Zeladoria" in b
+    _como(cliente, None, admin=True)                          # a senha de administrador (sem pessoa): sem bandeja
+    assert 'class="sino-topo sino-dem"' not in cliente.get("/").get_data(as_text=True)
 
 
 def test_catalogo_registra_o_acompanhamento():
@@ -242,7 +343,8 @@ def test_disponibilidade_e_desligamento_sao_do_cos(trat, app, cliente, monkeypat
     monkeypatch.setattr(ST, "acesso", lambda: {"tudo": False, "telas": set(), "setor": {"id": SID.COS, "nome": "COS"}, "erro": ""})
     _como(cliente, ANA)
     html = cliente.get("/t/comando/contestacoes").get_data(as_text=True)
-    assert "COS<i>1</i>" in html and "Mandaguaçu" in html and "Performance<i>" not in html and "Zeladoria<i>" not in html
+    assert "Contestação · COS" in html and "Mandaguaçu" in html and "Performance <span" not in html
+    assert "Zeladoria <span" not in html and "Guaratinguetá" not in html
 
 
 def test_setor_sem_teams_aparece_so_no_nexus_e_nao_como_recusa(trat, app, cliente, monkeypatch):

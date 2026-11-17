@@ -58,14 +58,21 @@
      ver o comentário do tema) #}
   {# o sininho das demandas entre setores (12/11/2026; casca._sino_demandas): o que pede você nas demandas, com o prazo;
      leva direto à demanda na Caixa de entrada. Ícone de bandeja, ao lado do botão do OS Creator (a prévia aprovada) #}
+  {# desde 16/11/2026 a mesma bandeja traz as contestações sem resposta do setor (casca._contestacoes_do_sino; Levi: "as
+     contestações também devem notificar nas notificações lá de cima, a que não é do OS Creator!"): saem na 1ª resposta
+     de qualquer um do setor ou quando alguém resolve #}
   {% if sino_dem is not none %}<details class="sino-topo sino-dem">
-    <summary class="gc-btn gc-btn--ui gc-btn--fantasma sino-bt" aria-label="Demandas: {{ sino_dem.n }}" title="Demandas: o que outros setores pediram para você e o que você pediu">
+    <summary class="gc-btn gc-btn--ui gc-btn--fantasma sino-bt" aria-label="Demandas e contestações: {{ sino_dem.n }}" title="Demandas e contestações: o que outros setores pediram para você, o que você pediu e o que os clientes contestaram para o seu setor">
       <i class="ph ph-tray" aria-hidden="true"></i>{% if sino_dem.n %}<b class="sino-n sino-n--dem{% if sino_dem.criticos %} sino-n--critico{% endif %}">{{ sino_dem.n }}</b>{% endif %}</summary>
-    <div class="sino-caixa" role="region" aria-label="Demandas">
-      {% if sino_dem.n %}<p class="sino-t"><b>{{ sino_dem.n }} {{ 'demanda pede você' if sino_dem.n == 1 else 'demandas pedem você' }}</b></p>
-      <ul>{% for a in sino_dem.itens %}<li><a href="{{ raiz }}{{ a.link }}"><span class="sino-sev sino-sev--{{ a.tom }}">{{ a.rotulo }}</span> {{ a.titulo }}{% if a.detalhe %}<small class="sino-aviso-d">{{ a.detalhe }}</small>{% endif %}</a></li>{% endfor %}</ul>
-      {% else %}<p class="sino-vazio">Nenhuma demanda pede você agora.</p>{% endif %}
-      <a class="gc-btn gc-btn--ui gc-btn--contorno sino-todos" href="{{ raiz }}/t/comando/caixa-de-entrada#demandas">Abrir as demandas</a>
+    <div class="sino-caixa" role="region" aria-label="Demandas e contestações">
+      {% if sino_dem.itens %}<p class="sino-t"><b>{{ sino_dem.n_demandas }} {{ 'demanda pede você' if sino_dem.n_demandas == 1 else 'demandas pedem você' }}</b></p>
+      <ul>{% for a in sino_dem.itens %}<li><a href="{{ raiz }}{{ a.link }}"><span class="sino-sev sino-sev--{{ a.tom }}">{{ a.rotulo }}</span> {{ a.titulo }}{% if a.detalhe %}<small class="sino-aviso-d">{{ a.detalhe }}</small>{% endif %}</a></li>{% endfor %}</ul>{% endif %}
+      {% if sino_dem.n_contestacoes %}<p class="sino-t"><b>{{ sino_dem.n_contestacoes }} {{ 'contestação sem resposta' if sino_dem.n_contestacoes == 1 else 'contestações sem resposta' }}</b></p>
+      <ul>{% for c in sino_dem.contestacoes %}<li><a href="{{ raiz }}{{ c.link }}"><span class="sino-sev sino-sev--alerta">Contestação</span> {{ c.titulo }}{% if c.detalhe %}<small class="sino-aviso-d">{{ c.detalhe }}</small>{% endif %}</a></li>{% endfor %}</ul>
+      {% if sino_dem.n_contestacoes > sino_dem.contestacoes|length %}<p class="sino-vazio">e mais {{ sino_dem.n_contestacoes - sino_dem.contestacoes|length }}, nas Contestações</p>{% endif %}{% endif %}
+      {% if not sino_dem.n %}<p class="sino-vazio">{{ 'Nenhuma demanda pede você agora.' if sino_dem.com_demandas else 'Nenhuma contestação espera o seu setor agora.' }}</p>{% endif %}
+      {% if sino_dem.com_demandas %}<a class="gc-btn gc-btn--ui gc-btn--contorno sino-todos" href="{{ raiz }}/t/comando/caixa-de-entrada#demandas">Abrir as demandas</a>{% endif %}
+      {% if sino_dem.n_contestacoes %}<a class="gc-btn gc-btn--ui gc-btn--contorno sino-todos" href="{{ raiz }}/t/comando/contestacoes">Abrir as contestações</a>{% endif %}
     </div>
   </details>{% endif %}
   {% if sino is not none %}<details class="sino-topo">

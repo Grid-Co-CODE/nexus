@@ -1,20 +1,24 @@
 """O acompanhamento das contestações dos clientes (Levi, 15/10/2026: "Nas contestações do Nexus precisamos ter uma forma
-de acompanhar a demanda, um botão 'Pegar para mim' ao clicar nesse botão o usuário se torna o responsável por aquela
-demanda. Ao clicar na linha, vai aparecer um card sobrepondo a tela com um blur de fundo onde o responsável poderá inserir
-atualizações sobre a demanda com data e hora salva").
+de acompanhar a demanda [...] onde o responsável poderá inserir atualizações sobre a demanda com data e hora salva").
+
+Desde 16/11/2026 o setor inteiro responde (Levi: "Tire esse 'Pegar pra mim' qualquer um daquele setor pode editar e salvar
+por tanto que salve quem foi que fez isso!"): quem vê a contestação (o setor dela, ou o administrador) e entrou com um login
+de pessoa (Fracttal ou Microsoft) escreve a atualização, marca como resolvida e reabre; cada evento guarda quem e quando.
+Não há mais dono: o "responsavel" gravado até 15/11 segue na história ("ficou com a demanda"), sem dar nem tirar nada.
 
 O Nexus é a FONTE deste fato: livro `nexus_contestacoes_tratamento` · `fato_tratamento_contestacao`, registrado no
 catálogo antes da 1ª gravação (regra 10). Grão: 1 linha = 1 EVENTO sobre 1 contestação de 1 setor (a linha do
-`thopen_contestacoes`, pelo `id` dela): `responsavel` (alguém pegou a demanda) ou `atualizacao` (o responsável escreveu).
-Só acrescenta: o responsável de agora é o do último `responsavel`, e as atualizações saem na ordem. Nada se edita nem se
-apaga (o banco guarda a história).
+`thopen_contestacoes`, pelo `id` dela): `atualizacao` (alguém do setor escreveu), `resolvida` e `reaberta` (16/11/2026) e,
+só na história, `responsavel` (o "Pegar para mim", até 15/11/2026). Só acrescenta: a situação de agora sai dos eventos na
+ordem de gravação (`situacoes`), e nada se edita nem se apaga (o banco guarda a história).
+
+A situação (16/11/2026, a escolha do Levi: "Sim, com Resolvida"): **resolvida** = o último `resolvida`/`reaberta` é um
+`resolvida`; senão **em andamento** = já tem atualização; senão **sem resposta**. A sem resposta vai para o aviso do topo
+do setor (`contratos/aviso.py`) até a 1ª atualização ou até alguém resolver.
 
 A API do banco tem LEITURA ABERTA (nexus/dados/CLAUDE.md, regra 8): quem (nome e e-mail) e o texto vão só CIFRADOS com a
-chave do cadastro (o Cofre, como a Observação do responsável); a pessoa liga pelo código do e-mail (`pessoa_hmac`).
-
-Quem faz o quê: pega quem entrou com um login de pessoa (Fracttal ou Microsoft) e vê a contestação (o setor dela, ou o
-administrador). Contestação que já tem dono só muda de mãos por um administrador ("Assumir"). Só o responsável de agora
-escreve atualização; o resto do setor lê.
+chave do cadastro (o Cofre, como a Observação do responsável); a pessoa liga pelo código do e-mail (`pessoa_hmac`). O
+`evento` vai em claro: é o que o aviso do topo lê sem abrir nada.
 """
 import json
 import threading
@@ -30,7 +34,10 @@ LIVRO, NOME_LIVRO = "nexus_contestacoes_tratamento", "Nexus · acompanhamento da
 ABA = "fato_tratamento_contestacao"
 CAB = ("id", "registrado_em", "data_id", "contestacao_linha_id", "setor", "evento", "pessoa_hmac", "quem_cifrado",
        "texto_cifrado")
-EVENTOS = ("responsavel", "atualizacao")
+# o "responsavel" (o "Pegar para mim") só se lê: ninguém mais grava (16/11/2026)
+EVENTOS = ("responsavel", "atualizacao", "resolvida", "reaberta")
+SITUACOES = {"sem_resposta": ("Sem resposta", "alerta"), "em_andamento": ("Em andamento", "info"),
+             "resolvida": ("Resolvida", "ok")}
 TEXTO_MAX = 2000
 _BRT = timezone(timedelta(hours=-3))
 _TRAVA = threading.Lock()       # o livro é trocado inteiro: duas ações juntas não se apagam
@@ -90,23 +97,53 @@ def _abre(cofre, l: dict) -> dict:
             "texto": texto}
 
 
+def _em_ordem(linhas: list[dict]) -> list[dict]:
+    """As linhas na ordem da gravação: pela hora e, no mesmo segundo, pela posição no livro (o livro só acrescenta, no
+    fim). Pela hora e pelo id, dois eventos no mesmo segundo (resolver e reabrir logo depois) ficavam ao acaso."""
+    ordem = {id(l): i for i, l in enumerate(linhas)}
+    return sorted(linhas, key=lambda l: (_quando(l.get("registrado_em")) or datetime.min.replace(tzinfo=_BRT),
+                                         ordem[id(l)]))
+
+
+def _situacao(eventos: list[str]) -> str:
+    fecha = [e for e in eventos if e in ("resolvida", "reaberta")]
+    if fecha and fecha[-1] == "resolvida":
+        return "resolvida"
+    return "em_andamento" if "atualizacao" in eventos else "sem_resposta"
+
+
+def situacoes(linhas: list[dict]) -> dict:
+    """{linha_id: situação} só pelo `evento` (em claro), sem abrir nada: é o que o aviso do topo lê. A linha sem nenhum
+    evento não está aqui (é "sem_resposta")."""
+    por: dict = {}
+    for l in _em_ordem(linhas):
+        por.setdefault(str(l.get("contestacao_linha_id") or ""), []).append(str(l.get("evento") or ""))
+    return {k: _situacao(v) for k, v in por.items()}
+
+
 def estado(linhas: list[dict] | None = None) -> dict:
-    """{linha_id: {"responsavel": evento | None, "atualizacoes": [evento, a mais antiga primeiro]}} — o responsável de
-    agora é o do último `responsavel`. `linhas` = o livro (os testes passam; a tela lê do banco)."""
+    """{linha_id: {"situacao", "eventos": [evento, o mais antigo primeiro], "atualizacoes": [só as escritas],
+    "resolvida": o evento que resolveu (se está resolvida), "ultima": a última atualização}}. `linhas` = o livro (os
+    testes passam; a tela lê do banco)."""
     cofre = _cofre_ou_nada()
-    eventos = [_abre(cofre, l) for l in (ler_todas() if linhas is None else linhas)]
-    # a ordem é a da gravação (o livro só acrescenta, no fim): dois eventos no mesmo segundo (pegar e o administrador
-    # assumir logo depois) ficavam na ordem do id, ao acaso, e o responsável podia sair o de antes
-    ordem = {id(e): i for i, e in enumerate(eventos)}
-    eventos.sort(key=lambda e: (e["quando"] or datetime.min.replace(tzinfo=_BRT), ordem[id(e)]))
+    brutas = _em_ordem(ler_todas() if linhas is None else linhas)
     out: dict = {}
-    for e in eventos:
-        x = out.setdefault(e["linha"], {"responsavel": None, "atualizacoes": []})
-        if e["evento"] == "responsavel":
-            x["responsavel"] = e
-        elif e["evento"] == "atualizacao":
+    for l in brutas:
+        e = _abre(cofre, l)
+        x = out.setdefault(e["linha"], {"situacao": "sem_resposta", "eventos": [], "atualizacoes": [],
+                                        "resolvida": None, "ultima": None})
+        x["eventos"].append(e)
+        if e["evento"] == "atualizacao":
             x["atualizacoes"].append(e)
+            x["ultima"] = e
+    for x in out.values():
+        x["situacao"] = _situacao([e["evento"] for e in x["eventos"]])
+        if x["situacao"] == "resolvida":
+            x["resolvida"] = next(e for e in reversed(x["eventos"]) if e["evento"] == "resolvida")
     return out
+
+
+VAZIO = {"situacao": "sem_resposta", "eventos": [], "atualizacoes": [], "resolvida": None, "ultima": None}
 
 
 def codigo(usuario) -> str | None:
@@ -144,34 +181,44 @@ def _publicar(linhas: list[dict]) -> None:
                     base=base, token=current_app.config["GRIDCO_SQL_TOKEN"], sessao=sessao)
 
 
-def pegar(linha_id: str, setor: str, usuario: dict, admin: bool) -> dict:
-    """A pessoa do login vira a responsável. Livre: qualquer um que vê a contestação pega. Com dono: só o administrador
-    assume (a demanda não troca de mãos sem quem coordena)."""
-    nova = _gravar(linha_id, setor, "responsavel", usuario)
+def _acrescentar(nova: dict, conferir=None) -> dict:
+    """Relê o livro sob a trava, confere a situação de agora (`conferir(situacao)` recusa) e grava o evento no fim; depois
+    a cópia do aviso do topo já sabe dele (quem gravou vê o aviso sumir na página seguinte)."""
     with _TRAVA:
         linhas = ler_todas()
-        atual = estado(linhas).get(str(linha_id), {}).get("responsavel")
-        if atual and atual["hmac"] == nova["pessoa_hmac"]:
-            raise Recusada("Esta demanda já é sua")
-        if atual and not admin:
-            raise Recusada(f"Esta demanda já tem responsável ({atual['nome'] or 'outra pessoa'}): só um administrador "
-                           "passa para outra pessoa")
+        if conferir:
+            conferir(situacoes(linhas).get(nova["contestacao_linha_id"], "sem_resposta"))
         _publicar(linhas + [nova])
+    try:
+        from . import aviso
+        aviso.anotar(nova)
+    except Exception:           # noqa: BLE001 — a cópia do aviso se acerta na próxima leitura
+        current_app.logger.exception("Contestações: a cópia do aviso não anotou o evento")
     return nova
 
 
 def atualizar(linha_id: str, setor: str, usuario: dict, texto: str) -> dict:
-    """Uma atualização do responsável, com a data e a hora de agora. Só o responsável de agora escreve."""
+    """Uma atualização, com a data, a hora e quem escreveu. Qualquer um que vê a contestação escreve (16/11/2026): quem
+    vê, a tela já conferiu (o setor dela, ou o administrador)."""
     texto = "\n".join(" ".join(l.split()) for l in str(texto or "").strip().splitlines()).strip()
     if not texto:
         raise Recusada("Escreva a atualização antes de salvar")
     if len(texto) > TEXTO_MAX:
         raise Recusada(f"A atualização passou de {TEXTO_MAX} caracteres")
-    nova = _gravar(linha_id, setor, "atualizacao", usuario, texto)
-    with _TRAVA:
-        linhas = ler_todas()
-        atual = estado(linhas).get(str(linha_id), {}).get("responsavel")
-        if not atual or atual["hmac"] != nova["pessoa_hmac"]:
-            raise Recusada("Só o responsável pela demanda escreve atualização: use \"Pegar para mim\" antes")
-        _publicar(linhas + [nova])
-    return nova
+    return _acrescentar(_gravar(linha_id, setor, "atualizacao", usuario, texto))
+
+
+def resolver(linha_id: str, setor: str, usuario: dict) -> dict:
+    """Marca como resolvida (16/11/2026): sai das abertas e do aviso do topo; fica quem e quando."""
+    def conferir(sit):
+        if sit == "resolvida":
+            raise Recusada("Esta contestação já está resolvida")
+    return _acrescentar(_gravar(linha_id, setor, "resolvida", usuario), conferir)
+
+
+def reabrir(linha_id: str, setor: str, usuario: dict) -> dict:
+    """Reabre a resolvida: volta às abertas, com a situação que tinha (em andamento, ou sem resposta e no aviso)."""
+    def conferir(sit):
+        if sit != "resolvida":
+            raise Recusada("Esta contestação não está resolvida")
+    return _acrescentar(_gravar(linha_id, setor, "reaberta", usuario), conferir)

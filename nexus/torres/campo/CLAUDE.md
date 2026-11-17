@@ -9,6 +9,12 @@ rota quebrar. No menu, logo abaixo de Comando (`ordem=5`; no mesmo dia: "usina 3
 Zeladoria logo abaixo de Chamados (`ordem=55`). O Nexus não tem busca no menu: nada a normalizar no "°".
 Abaixo, "Campo · App" é o nome de quando cada coisa foi feita.
 
+**A Usinas (a lista das usinas e o prontuário) entrou aqui em 16/11/2026**, como 2º item, logo abaixo da Visão do
+responsável (Levi: "Usinas sai de comando e vai para Usinas 360 abaixo de Visão do responsável!"): o endereço é
+`/t/campo/usinas` e a chave `campo/usinas`, mas o código e os templates ficaram no Comando (o `bp_usinas` de
+`nexus/torres/comando/__init__.py`); a regra e a prova estão no `nexus/comando/CLAUDE.md`, seção "Comando > Usinas e o
+prontuário".
+
 A visão do Nexus sobre o trabalho de campo. **Nenhuma tela abre o painel do App nem aponta para o Azure** (Levi,
 05/10/2026: "quero parar de referenciar o Azure e ter uma visão nossa!"): todas leem o banco do Nexus (API db_performace).
 Leia também o `CLAUDE.md` da raiz e, antes de pôr dado novo no banco, o `nexus/dados/CLAUDE.md` (PRIORIDADE 0).

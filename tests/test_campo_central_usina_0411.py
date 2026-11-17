@@ -25,7 +25,7 @@ from nexus.dados import fato_chamado as F
 def _central(logado, args=""):
     """O prontuário da usina: desde 16/11/2026 só no Comando > Usinas (Levi: "Tire a opção de prontuário da Visão do
     Responsável"; a aba saiu e o endereço dela leva para lá, tests/test_campo_prontuario_sai_da_visao_16_11.py)."""
-    return logado.get("/t/comando/usinas/" + re.search(r"usina=(\d+)", args).group(1)).get_data(as_text=True)
+    return logado.get("/t/campo/usinas/" + re.search(r"usina=(\d+)", args).group(1)).get_data(as_text=True)
 
 
 
@@ -107,7 +107,7 @@ def test_os_meses_do_relatorio_e_o_padrao_o_anterior():
 def test_a_central_tem_o_botao_e_a_janela_do_relatorio(tela, logado):
     html = _central(logado, "&usina=1")
     assert "data-pu-rel" in html and 'id="pu-rel"' in html
-    assert "/t/comando/usinas/1/relatorio.pdf" in html                          # o do Comando > Usinas
+    assert "/t/campo/usinas/1/relatorio.pdf" in html                            # o da Usinas (era do Comando)
     from nexus.campo import relatorio_usina as RU
     for k, rot in RU.TEMAS:                                       # os quatro temas, todos marcados
         assert f'value="{k}" checked> {rot}' in html
@@ -178,7 +178,7 @@ def test_o_relatorio_so_desenha_os_campos_escolhidos(tela, logado):
     num = texto("&campo=perf_numeros")
     assert "Atingimento da meta" in num and "Performance e disponibilidade" not in num and "Resumo do mês" not in num
     # pelo endereço do Comando, o mesmo PDF
-    r = logado.get(f"/t/comando/usinas/1/relatorio.pdf?mes={mes}&campo=perf_numeros")
+    r = logado.get(f"/t/campo/usinas/1/relatorio.pdf?mes={mes}&campo=perf_numeros")
     assert "Performance e disponibilidade" not in "".join(p.get_text() for p in fitz.open(stream=r.data, filetype="pdf"))
 
 

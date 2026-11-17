@@ -249,7 +249,7 @@ def _cartao(html, sec):
 
 
 def test_o_prontuario_abre_pelo_parecer_e_pelo_painel_com_os_cartoes_fechados(tela, logado):
-    html = logado.get("/t/comando/usinas/1").get_data(as_text=True)
+    html = logado.get("/t/campo/usinas/1").get_data(as_text=True)
     assert '<h1 class="cu-nome cmu-nome">Altair ' in html and "Prontuário da usina" in html
     # o parecer numa linha, antes do painel; o painel antes dos cartões
     assert html.index('class="pu-parecer pu-parecer--') < html.index('class="pu-painel"') < html.index('id="pu-perf"')
@@ -273,7 +273,7 @@ def test_o_prontuario_abre_pelo_parecer_e_pelo_painel_com_os_cartoes_fechados(te
 
 
 def test_as_acoes_do_alto_criam_a_os_e_o_ticket_com_a_usina_e_baixam_o_relatorio(tela, logado):
-    html = logado.get("/t/comando/usinas/1").get_data(as_text=True)
+    html = logado.get("/t/campo/usinas/1").get_data(as_text=True)
     acoes = html.split('class="pu-acoes"', 1)[1].split("</header>", 1)[0]
     # o Criar OS abre as cinco formas de hoje do OS Creator; a avulsa e a solicitação já com a usina; sem o ticket
     menu = acoes.split('class="pu-menu-caixa"', 1)[1].split("</div>", 1)[0]
@@ -297,7 +297,7 @@ def test_as_acoes_do_alto_criam_a_os_e_o_ticket_com_a_usina_e_baixam_o_relatorio
     assert "nexusRota('/os/_nexus/criar')" in js and "d.nexusCriarOs !== 1" in js and "jan.showModal()" in js
     # o relatório do cliente em PDF pelo endereço do próprio Comando: o mês (o anterior marcado) e os temas
     jan = html.split('id="pu-rel"', 1)[1].split("</dialog>", 1)[0]
-    assert 'action="/t/comando/usinas/1/relatorio.pdf"' in jan and "Qual mês?" in jan
+    assert 'action="/t/campo/usinas/1/relatorio.pdf"' in jan and "Qual mês?" in jan
     # o que entra no PDF: cada tema com os campos dele, todos marcados ("editar os campos que eu quero que apareça")
     from nexus.campo import relatorio_usina as RU
     # os 5 temas e o Geral, cada um recolhido (14/11/2026: "tem que vir recolhido por setores"; os religamentos entram)
@@ -306,9 +306,9 @@ def test_as_acoes_do_alto_criam_a_os_e_o_ticket_com_a_usina_e_baixam_o_relatorio
     assert jan.count('name="tema"') == 5 and jan.count('name="campo"') == len(RU.CAMPOS) == jan.count(" checked> ") - 6
     for k, _tema, rot in RU.CAMPOS:
         assert f'name="campo" value="{k}" checked> {rot}' in jan, k
-    r = logado.get(f"/t/comando/usinas/1/relatorio.pdf?mes={HOJE.strftime('%Y-%m')}")
+    r = logado.get(f"/t/campo/usinas/1/relatorio.pdf?mes={HOJE.strftime('%Y-%m')}")
     assert r.status_code == 200 and r.mimetype == "application/pdf" and r.data[:5] == b"%PDF-"
-    assert logado.get("/t/comando/usinas/999/relatorio.pdf").status_code == 404
+    assert logado.get("/t/campo/usinas/999/relatorio.pdf").status_code == 404
 
 
 def test_a_pessoa_sem_a_tela_nao_ve_o_link_nem_o_botao_dela(tela, logado, monkeypatch):
@@ -316,7 +316,7 @@ def test_a_pessoa_sem_a_tela_nao_ve_o_link_nem_o_botao_dela(tela, logado, monkey
     Criar OS; sem tela do Comando, sem a conversa."""
     from nexus.auth import setor_telas
     monkeypatch.setattr(setor_telas, "liberadas_do_menu", lambda: {"campo/responsaveis", "campo/rondas"})
-    html = logado.get("/t/comando/usinas/1").get_data(as_text=True)     # (a aba da Usinas 360° saiu em 16/11/2026)
+    html = logado.get("/t/campo/usinas/1").get_data(as_text=True)       # (a aba da Usinas 360° saiu em 16/11/2026)
     # o endereço do OS Creator na página (o `/t/os/...` do menu lateral da casca é outra coisa: é a tela do Nexus)
     assert 'href="/os/tradicional' not in html and 'href="/os/solicitacao' not in html and "pu-menu-caixa" not in html
     assert "/t/comando/conversa/usina/1" not in html and "Abrir os Insights" not in html

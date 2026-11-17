@@ -74,20 +74,20 @@ def test_o_dossie_do_cliente_poe_o_ranking_na_frente():
 
 
 def test_o_botao_e_a_rota_do_dossie_do_cliente(tela, logado):
-    lista = logado.get("/t/comando/usinas").get_data(as_text=True)
+    lista = logado.get("/t/campo/usinas").get_data(as_text=True)
     assert "filtre por um cliente" in lista and "dossie-do-cliente.md" not in lista
     sel = lista.split('name="cliente"', 1)[1].split("</select>", 1)[0]
     cliente = re.findall(r'<option value="([^"]+)"', sel)[0]
-    filtrada = logado.get("/t/comando/usinas", query_string={"cliente": cliente}).get_data(as_text=True)
-    assert "/t/comando/usinas/dossie-do-cliente.md?cliente=" in filtrada and f"Baixar o dossiê do cliente {cliente}" in filtrada
-    r = logado.get("/t/comando/usinas/dossie-do-cliente.md", query_string={"cliente": cliente})
+    filtrada = logado.get("/t/campo/usinas", query_string={"cliente": cliente}).get_data(as_text=True)
+    assert "/t/campo/usinas/dossie-do-cliente.md?cliente=" in filtrada and f"Baixar o dossiê do cliente {cliente}" in filtrada
+    r = logado.get("/t/campo/usinas/dossie-do-cliente.md", query_string={"cliente": cliente})
     assert r.status_code == 200 and r.mimetype == "text/markdown"
     assert r.headers["Content-Disposition"].startswith('attachment; filename="dossie-cliente-')
     t = r.get_data(as_text=True)
     assert t.startswith(f"# Dossiê do cliente {cliente}") and "## 1. Pontuação das UFVs" in t
-    assert logado.get("/t/comando/usinas/dossie-do-cliente.md", query_string={"cliente": "Marte"}).status_code == 404
-    assert logado.get("/t/comando/usinas/dossie-do-cliente.md").status_code == 404
+    assert logado.get("/t/campo/usinas/dossie-do-cliente.md", query_string={"cliente": "Marte"}).status_code == 404
+    assert logado.get("/t/campo/usinas/dossie-do-cliente.md").status_code == 404
     # uso interno: a conta do cliente não baixa
     with logado.session_transaction() as s:
         s["via"] = "cliente"
-    assert logado.get("/t/comando/usinas/dossie-do-cliente.md", query_string={"cliente": cliente}).status_code in (302, 403)
+    assert logado.get("/t/campo/usinas/dossie-do-cliente.md", query_string={"cliente": cliente}).status_code in (302, 403)
