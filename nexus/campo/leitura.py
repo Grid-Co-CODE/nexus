@@ -30,6 +30,7 @@ def limpar_cache():
     from . import aprovacao, regras_app
     limpar()
     importlib.reload(regras_app)
+    aprovacao._embrulhar_a_copia()        # a cópia recarregada volta sem a fila em pedaços da Aprovação (16/11/2026)
     aprovacao.limpar()
 
 

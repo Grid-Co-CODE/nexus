@@ -2632,6 +2632,24 @@ Aprovação e Triagem usam a lógica do App copiada, não refeita, para o númer
     fazia a sua. Agora `aprovacao.fila_toda` guarda a conta da fila inteira até a fila mudar (`_PRONTA`, pela hora da
     leitura), feita logo depois da releitura e ao subir com a fila do disco (`_preparar`), e a tela filtra sobre ela. A OS
     que sai da fila (`tirar_da_fila`) sai da conta pronta também, e fica anotada por 20 min para a releitura que começou antes não a devolver ao quadro (08/11/2026). Prova: `test_a_visita_nao_refaz_a_conta_da_fila`.
+  - **A conta do App em pedaços (16/11/2026, desempenho)**: a regra copiada devolve no máximo 200 linhas por chamada e
+    percorre a fila INTEIRA em cada uma, e a `fila_toda` a chamava uma vez por página. Medido com a fila de verdade
+    (6.511 tarefas, 33 páginas): 215 mil passagens por tarefa e 7,7 s de processador com tudo quente (23 s frio); no
+    reinício das 21:13 de 16/11 a conta do boot (`nexus-fila-conta`) usou um núcleo inteiro por 22 s. A regra copiada
+    não se edita: `aprovacao._linhas_da_fila` faz UMA chamada sobre a fila inteira (o resumo, os baldes, a janela) e
+    entrega a fila à regra em pedaços de uma página (`_PEDACO`), cada tarefa uma vez, sem as repetidas (vale a 1ª, como
+    na regra), juntando as linhas na ordem dela (a espera, a maior primeiro; sem data, no fim; o empate na ordem da
+    fila). O que a regra relia a cada chamada (o cadastro, as notas, as rondas) vale pela conta inteira (`_DA_CONTA`).
+    As duas marcas são da thread que faz a conta (contextvars): outra thread e qualquer chamada fora da conta veem a
+    fila inteira e leem como sempre. As quatro funções da cópia são embrulhadas por fora (`_embrulhar_a_copia`: ao
+    importar a `aprovacao`, antes de cada conta inteira e depois de a `leitura.limpar_cache` recarregar a cópia, que
+    volta sem o embrulho; a suíte inteira pegou isso em 16/11, quando o teste novo só passava sozinho); o arquivo da
+    cópia não muda, e o teste de fidelidade compara o arquivo. **Se o total em
+    pedaços não bater com o que a própria regra contou na fila inteira, vale o caminho de antes, página a página, e o
+    log avisa** (a regra do App mudou de um jeito que os pedaços não acompanham: por exemplo, uma conta que dependa de
+    outras tarefas da fila). Na fila de verdade: as mesmas 6.425 linhas, na mesma ordem, com o mesmo resumo, em 0,4 s
+    (de 7,7 s); a `fila_toda` inteira, 0,5 s. Prova: `tests/test_campo_aprovacao_em_pedacos_16_11.py` (a regra de
+    verdade sobre 450 tarefas de mentira, com repetida, sem data e fora da janela).
   - **A conta sem refazer o que não muda (05/11/2026, desempenho)**: a 1ª visita depois do deploy esperou 97 s (o Raio-X:
     "trabalhando" na `/t/campo/aprovacao`, 15 presos em 24 h). A cópia da regra devolve 200 linhas por chamada e a conta
     junta ~28 páginas; a cada página a fonte (`fonte_pg._do_app`) remontava o registro do App inteiro e as rondas, e cada

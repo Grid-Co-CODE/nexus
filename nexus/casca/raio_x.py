@@ -38,6 +38,7 @@ import json
 import logging
 import os
 import re
+import shlex
 import sys
 import threading
 import time
@@ -1214,8 +1215,52 @@ DEPLOY_RECENTE_S = 15 * 60       # o script do repositório grava o nexus-teto a
 
 
 def _sem_valores(texto: str) -> str:
-    """A linha sem o que vem depois de um `=` (`--token=abc` e `CHAVE=x` viram `--token=…` e `CHAVE=…`)."""
-    return re.sub(r"=\S+", "=…", texto)
+    """A linha sem o que pode ser segredo: o que vem depois de um `=` (`--token=abc` e `CHAVE=x` viram `--token=…` e
+    `CHAVE=…`), o usuário e a senha de um endereço (`https://conta:senha@host` vira `https://…@host`) e qualquer
+    sequência longa de letras e números (um token solto)."""
+    texto = re.sub(r"=\S+", "=…", texto)
+    texto = re.sub(r"://[^/@\s]+@", "://…@", texto)
+    return re.sub(r"[A-Za-z0-9_\-]{24,}", "…", texto)
+
+
+# O que o script de um timer faz com o Nexus (16/11/2026): o servidor atualiza o Nexus por um timer da plataforma, com um
+# script que não está em nenhum dos dois repositórios. Do script que o `ExecStart` de um timer ligado aponta, saem só as
+# linhas que citam o Nexus, o git ou o systemctl, sem valores, no máximo MAX_LINHAS_DE_SCRIPT.
+_LINHA_DE_DEPLOY = re.compile(r"nexus|\bgit\b|systemctl|restart|\bpip\b", re.I)
+MAX_LINHAS_DE_SCRIPT = 14
+MAX_SCRIPT_BYTES = 200_000
+
+
+def _scripts_do_execstart(caminho_da_unidade: Path) -> list:
+    """Os arquivos que o ExecStart de uma unidade manda rodar (o comando e os argumentos que são arquivos)."""
+    achados = []
+    for linha in caminho_da_unidade.read_text(encoding="utf-8", errors="replace").splitlines():
+        chave, sep, valor = linha.strip().partition("=")
+        if not sep or chave != "ExecStart":
+            continue
+        try:
+            pedacos = shlex.split(valor)             # o caminho entre aspas (com espaço) é um pedaço só
+        except ValueError:
+            pedacos = valor.split()
+        for pedaco in pedacos:
+            p = Path(pedaco.lstrip("-@!+:"))
+            if p.is_absolute() and p.suffix in (".sh", ".py", "") and p not in achados:
+                achados.append(p)
+    return achados
+
+
+def _linhas_de_deploy_do_script(script: Path) -> list:
+    try:
+        if not script.is_file() or script.stat().st_size > MAX_SCRIPT_BYTES:
+            return []
+        texto = script.read_bytes()
+        if b"\x00" in texto[:4096]:                    # um binário (o python, o bash): não é o script
+            return []
+        linhas = [l.strip() for l in texto.decode("utf-8", errors="replace").splitlines()]
+    except OSError as e:
+        return [f"não abriu ({type(e).__name__})"]
+    achadas = [_sem_valores(l)[:200] for l in linhas if l and not l.startswith("#") and _LINHA_DE_DEPLOY.search(l)]
+    return achadas[:MAX_LINHAS_DE_SCRIPT] + (["(…)"] if len(achadas) > MAX_LINHAS_DE_SCRIPT else [])
 
 
 def _ha_quanto(segundos: float) -> str:
@@ -1281,7 +1326,24 @@ def _como_o_servidor_atualiza(pasta_git=None, unidades=None, cron=None):
             timers = sorted(p.name for p in (base / "timers.target.wants").iterdir())
             linhas.append(("Timers ligados", ", ".join(timers) or "nenhum"))
         except OSError:
-            pass
+            timers = []
+        # o que cada timer ligado DESTA pasta manda rodar (os do sistema moram em /lib e ficam de fora), cite ou não o
+        # Nexus: o servidor o atualiza pelo timer da plataforma, com um script de fora dos repositórios
+        ja = {r for r, _t in linhas}
+        for timer in timers:
+            for nome in (timer, timer.rsplit(".", 1)[0] + ".service"):
+                arq = base / nome
+                try:
+                    if not arq.is_file():
+                        continue
+                    if nome not in ja:
+                        linhas.append((nome, _linhas_da_unidade(arq) or "sem linha de execução"))
+                        ja.add(nome)
+                    for script in _scripts_do_execstart(arq):
+                        for achada in _linhas_de_deploy_do_script(script):
+                            linhas.append((script.name, achada))
+                except OSError as e:
+                    linhas.append((nome, f"não abriu ({type(e).__name__})"))
     if not achou_unidade:
         linhas.append(("Unidades do systemd que citam o Nexus", "nenhuma"))
     for origem in (cron if cron is not None else CRON_DO_SISTEMA):

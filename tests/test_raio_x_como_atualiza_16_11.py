@@ -118,3 +118,66 @@ def test_a_pagina_mostra_o_diagnostico_recolhido(logado, monkeypatch):
     monkeypatch.setattr(R, "_como_o_servidor_atualiza", lambda: 1 / 0)       # o diagnóstico nunca derruba o Raio-X
     r = logado.get("/t/base/raio-x")
     assert r.status_code == 200 and "Como este servidor atualiza" not in r.get_data(as_text=True)
+
+
+# ── o que o timer da plataforma manda rodar (o que o Raio-X das 22:12 de 16/11/2026 mostrou faltar) ─────────────────
+# No servidor não há timer do Nexus: quem o atualiza é um timer da plataforma, com um script que não está em nenhum dos
+# dois repositórios e cuja unidade nem cita o Nexus. O bloco passa a mostrar a unidade de todo timer ligado daquela pasta
+# e, do script que ela manda rodar, só as linhas que citam o Nexus, o git, o pip ou o systemctl, sem nada que possa ser
+# segredo.
+def _com_o_timer_da_plataforma(tmp_path):
+    git, unidades, cron = _servidor(tmp_path)
+    script = tmp_path / "atualiza-tudo.sh"
+    script.write_text("\n".join([
+        "#!/bin/bash",
+        "# comentário que cita o nexus",
+        "cd /srv/plataforma && git pull https://bot:ghp_abcdefghijklmnopqrstuvwxyz0123456789@github.com/x/y.git",
+        "echo outra coisa",
+        "cd /srv/nexus && git pull --ff-only",
+        "TOKEN=segredo-do-script /srv/nexus/.venv/bin/pip install -r requirements.txt",
+        "systemctl restart nexus",
+        "curl -H 'Authorization: Bearer abcdefghijklmnopqrstuvwxyzABCD0123456789' https://exemplo.invalid/restart",
+    ]) + "\n", encoding="utf-8")
+    (unidades / "plataforma-update.timer").write_text("[Timer]\nOnUnitActiveSec=1min\n", encoding="utf-8")
+    (unidades / "plataforma-update.service").write_text(
+        "[Service]\nType=oneshot\nExecStart=/bin/bash '" + script.as_posix() + "'\n", encoding="utf-8")
+    (unidades / "timers.target.wants" / "plataforma-update.timer").write_text("", encoding="utf-8")
+    (unidades / "timers.target.wants" / "apt-daily.timer").write_text("", encoding="utf-8")     # do sistema: sem arquivo aqui
+    return git, unidades, cron
+
+
+def test_o_script_do_timer_ligado_aparece_so_com_as_linhas_do_deploy(tmp_path):
+    git, unidades, cron = _com_o_timer_da_plataforma(tmp_path)
+    t = _texto(R._como_o_servidor_atualiza(pasta_git=git, unidades=(str(unidades),), cron=(str(cron),)))
+    assert "plataforma-update.timer: OnUnitActiveSec=1min" in t
+    assert "plataforma-update.service: ExecStart=/bin/bash " in t          # a unidade que nem cita o Nexus
+    assert "atualiza-tudo.sh: cd /srv/nexus && git pull --ff-only" in t
+    assert "atualiza-tudo.sh: systemctl restart nexus" in t
+    assert "atualiza-tudo.sh: cd /srv/plataforma && git pull https://…@github.com/x/y.git" in t
+    assert "atualiza-tudo.sh: TOKEN=… /srv/nexus/.venv/bin/pip install -r requirements.txt" in t
+    assert "outra coisa" not in t and "comentário que cita" not in t and "apt-daily.timer:" not in t
+    assert "atualiza-tudo.sh: curl -H 'Authorization: Bearer …' https://exemplo.invalid/restart" in t
+    for segredo in ("ghp_", "abcdefghijklmnop", "segredo-do-script", "bot:"):
+        assert segredo not in t, segredo
+
+
+def test_a_unidade_ja_listada_nao_aparece_duas_vezes(tmp_path):
+    git, unidades, cron = _com_o_timer_da_plataforma(tmp_path)
+    linhas = R._como_o_servidor_atualiza(pasta_git=git, unidades=(str(unidades),), cron=(str(cron),))
+    rotulos = [r for r, _t in linhas]
+    assert rotulos.count("atualiza-nexus.timer") == 1 and rotulos.count("atualiza-nexus.service") == 1
+
+
+def test_script_grande_binario_ou_que_nao_abre_nao_derruba(tmp_path, monkeypatch):
+    git, unidades, cron = _com_o_timer_da_plataforma(tmp_path)
+    script = tmp_path / "atualiza-tudo.sh"
+    script.write_bytes(b"\x7fELF\x00\x00binario que cita nexus e git\n")
+    t = _texto(R._como_o_servidor_atualiza(pasta_git=git, unidades=(str(unidades),), cron=(str(cron),)))
+    assert "atualiza-tudo.sh:" not in t and "plataforma-update.service" in t
+    script.write_text("systemctl restart nexus\n" * 40, encoding="utf-8")                  # muitas linhas: corta
+    linhas = R._como_o_servidor_atualiza(pasta_git=git, unidades=(str(unidades),), cron=(str(cron),))
+    do_script = [x for r, x in linhas if r == "atualiza-tudo.sh"]
+    assert len(do_script) == R.MAX_LINHAS_DE_SCRIPT + 1 and do_script[-1] == "(…)"
+    monkeypatch.setattr(R, "MAX_SCRIPT_BYTES", 10)                                         # grande demais: nem lê
+    t = _texto(R._como_o_servidor_atualiza(pasta_git=git, unidades=(str(unidades),), cron=(str(cron),)))
+    assert "atualiza-tudo.sh:" not in t

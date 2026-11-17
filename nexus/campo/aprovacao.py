@@ -19,6 +19,7 @@ Agora sai em 2 de uma vez, com 1 min de pausa depois de uma recusa (`paciente`),
 (`dados/campo/fila_aprovacao.json.gz`): o reinício a põe na memória na hora e só relê se ela tem mais de 10 min.
 """
 import contextlib
+import contextvars
 import gzip
 import json
 import logging
@@ -66,6 +67,107 @@ class _Pedido:
 
     def __init__(self, params):
         self.params = dict(params)
+
+
+# A CONTA DO APP EM PEDAÇOS (Desempenho, 16/11/2026). A regra copiada do App (`regras_app._fila_supervisao`) devolve no
+# máximo 200 linhas por chamada e percorre a fila INTEIRA em cada uma; a `fila_toda` a chamava uma vez por página. Medido
+# com a fila de verdade (6.511 tarefas, 33 páginas): 215 mil passagens por tarefa e 8,4 s de processador com tudo quente
+# (23 s frio). No reinício das 21:13 de 16/11 esta conta (`nexus-fila-conta`) usou um núcleo inteiro por 22 s, e foi nela que
+# o Raio-X voltou a abrir em 7 s. A regra copiada não se edita; muda o que ela recebe:
+# - a fila vai a ela em pedaços de uma página (`_PEDACO`), cada tarefa uma vez, e as linhas são juntadas na ordem dela;
+# - o que ela relia a cada chamada (o cadastro, as notas e as rondas) vale pela conta inteira (`_DA_CONTA`).
+# As duas marcas valem só na thread que faz a conta (contextvars): outra thread, e qualquer chamada fora da conta, vê a
+# fila inteira e lê como sempre. Na fila de verdade: as mesmas 6.425 linhas, na mesma ordem, em 0,6 s.
+TAM_PAGINA = 200              # o teto da regra do App por chamada
+_PEDACO: contextvars.ContextVar = contextvars.ContextVar("nexus_fila_pedaco", default=None)
+_DA_CONTA: contextvars.ContextVar = contextvars.ContextVar("nexus_fila_da_conta", default=None)
+_LEMBRADAS = ("_qlog_por_os", "_rondas_os_por_folio", "_pessoa_por_nome")
+_ORIGINAIS: dict = {}         # as funções da cópia por baixo do que este módulo embrulhou
+
+
+def _no_minuto(args) -> tuple:
+    """A chave de uma leitura dentro da conta: a janela da regra do App sai com a hora da chamada (os microssegundos
+    mudam a cada uma); dentro de uma conta de segundos, é a mesma janela."""
+    return tuple(x.replace(second=0, microsecond=0) if isinstance(x, datetime) else x for x in args)
+
+
+def _fila_bruta_em_pedacos(*a, **k):
+    pedaco = _PEDACO.get()
+    return pedaco if pedaco is not None else _ORIGINAIS["_fila_bruta"](*a, **k)
+
+
+def _lembrada(nome):
+    def leitura_da_conta(*a, **k):
+        memo = _DA_CONTA.get()
+        if memo is None or k:
+            return _ORIGINAIS[nome](*a, **k)
+        chave = (nome, _no_minuto(a))
+        if chave not in memo:
+            memo[chave] = _ORIGINAIS[nome](*a)
+        return memo[chave]
+    return leitura_da_conta
+
+
+def _embrulhar_a_copia() -> None:
+    """Põe a fila em pedaços e a memória da conta por baixo de quatro funções da cópia do App. O arquivo da cópia não
+    muda (o teste de fidelidade compara o arquivo); fora de uma conta inteira, cada uma faz o de sempre. Refaz-se sozinho:
+    a função que não está embrulhada (a cópia foi recarregada, `leitura.limpar_cache`) é embrulhada de novo, e a que está
+    fica como está. Chamado ao importar este módulo, antes de cada conta inteira e depois de recarregar a cópia."""
+    for nome in ("_fila_bruta",) + _LEMBRADAS:
+        atual = getattr(regras_app, nome)
+        if getattr(atual, "_nexus_embrulho", False):
+            continue
+        _ORIGINAIS[nome] = atual
+        nova = _fila_bruta_em_pedacos if nome == "_fila_bruta" else _lembrada(nome)
+        nova._nexus_embrulho = True
+        setattr(regras_app, nome, nova)
+
+
+_embrulhar_a_copia()
+
+
+def _pagina(p: dict, escopo: dict, pag: int) -> dict:
+    return regras_app._fila_supervisao(_Pedido({**p, "pag": str(pag), "tam": str(TAM_PAGINA)}), escopo)
+
+
+def _linhas_da_fila(p: dict, escopo: dict) -> tuple[dict, list]:
+    """(a 1ª página da regra do App sobre a fila inteira: o resumo, os baldes e a janela; todas as linhas, na ordem
+    dela). A fila de uma página sai numa chamada. A maior vai à regra em pedaços de uma página, sem as tarefas repetidas
+    (vale a 1ª, como na regra), e as linhas são ordenadas como ela ordena (a espera, a maior primeiro; sem data, no fim;
+    o empate na ordem da fila). Se o total não bater com o que a própria regra contou na fila inteira, vale o caminho de
+    antes, página a página, e o log avisa: a regra do App mudou de um jeito que os pedaços não acompanham."""
+    _embrulhar_a_copia()          # a cópia recarregada perde o embrulho: sem ele os pedaços não valem
+    conta = _DA_CONTA.set({})
+    try:
+        primeira = _pagina(p, escopo, 1)
+        todas = list(primeira.get("linhas") or [])
+        paginas = int((primeira.get("pagina") or {}).get("paginas") or 1)
+        if paginas <= 1:
+            return primeira, todas
+        vistos, unica = set(), []
+        for w in regras_app._FILA_CACHE.get("linhas") or []:
+            k = w.get("id_work_orders_tasks") or w.get("id_work_order")
+            if k not in vistos:
+                vistos.add(k)
+                unica.append(w)
+        em_pedacos = []
+        for i in range(0, len(unica), TAM_PAGINA):
+            pedaco = _PEDACO.set(unica[i:i + TAM_PAGINA])
+            try:
+                em_pedacos += _pagina(p, escopo, 1).get("linhas") or []
+            finally:
+                _PEDACO.reset(pedaco)
+        esperado = (primeira.get("resumo") or {}).get("tarefas")
+        if esperado is None or len(em_pedacos) == esperado:
+            em_pedacos.sort(key=lambda x: (x.get("espera_d") is None, -(x.get("espera_d") or 0)))
+            return primeira, em_pedacos
+        logging.warning("fila da Aprovação: em pedaços saíram %d linhas e a regra do App contou %s; a conta vai página a "
+                        "página", len(em_pedacos), esperado)
+        for pag in range(2, paginas + 1):
+            todas += _pagina(p, escopo, pag).get("linhas") or []
+        return primeira, todas
+    finally:
+        _DA_CONTA.reset(conta)
 
 
 def em_segundo_plano(fn):
@@ -284,14 +386,7 @@ def fila_toda(params: dict) -> Leitura:
     escopo = ESCOPO_ADMIN
 
     def calcular():
-        pag, todas, primeira = 1, [], None
-        while True:
-            d = regras_app._fila_supervisao(_Pedido({**p, "pag": str(pag), "tam": "200"}), escopo)
-            primeira = primeira or d
-            todas += d.get("linhas") or []
-            if pag >= int((d.get("pagina") or {}).get("paginas") or 1):
-                break
-            pag += 1
+        primeira, todas = _linhas_da_fila(p, escopo)     # a regra do App, com a fila em pedaços (16/11/2026)
         crua = {w.get("id_work_orders_tasks") or w.get("id_work_order"): w for w in regras_app._FILA_CACHE.get("linhas") or []}
         fechado = _ultimo_fechamento_no_app()
         comp = _composicao_da_nota()

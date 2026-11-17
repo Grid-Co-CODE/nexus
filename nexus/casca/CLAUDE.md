@@ -842,9 +842,15 @@ administrador) mostra:
   `nexus-espera`, `FETCH_HEAD`, `ORIG_HEAD`): de quando é, ou que não existe;
 - as unidades do systemd que citam o Nexus (`/etc/systemd/system/*.service` e `*.timer`, e os `.d/*.conf` delas), só
   com as linhas que dizem o que roda (`User`, `WorkingDirectory`, `ExecStart`, `OnCalendar`, `OnUnitActiveSec`, `Unit`,
-  `MemoryHigh`, `MemoryMax`, `Restart`), os timers ligados e as linhas do cron do sistema que citam o Nexus.
+  `MemoryHigh`, `MemoryMax`, `Restart`), os timers ligados e as linhas do cron do sistema que citam o Nexus;
+- **a unidade de todo timer ligado daquela pasta, cite ou não o Nexus, e o que o script dela faz** (a leitura das 22:12
+  de 16/11 mostrou que não há timer do Nexus no servidor: quem o atualiza é um timer da plataforma, com um script que
+  não está em nenhum dos dois repositórios): do arquivo que o `ExecStart` aponta saem só as linhas que citam o Nexus, o
+  git, o pip ou o systemctl, no máximo 14 (`_linhas_de_deploy_do_script`); binário, arquivo grande ou que não abre fica
+  de fora.
 **Nunca um valor de variável:** as linhas `Environment` e `EnvironmentFile` não saem, e o que vem depois de um `=` numa
-linha de comando vira `…` (pode ser segredo). É diagnóstico: **sai quando o deploy do servidor estiver entendido e
+linha de comando vira `…` (pode ser segredo); o usuário e a senha de um endereço (`https://conta:senha@host`) e
+qualquer sequência longa de letras e números (um token solto) também (`_sem_valores`). É diagnóstico: **sai quando o deploy do servidor estiver entendido e
 acertado** (fila do `DESEMPENHO.md`, item 3). Prova: `tests/test_raio_x_como_atualiza_16_11.py`.
 
 ## Chaves do Nexus (Base → Chaves das fontes → aba Nexus, 14/10/2026)

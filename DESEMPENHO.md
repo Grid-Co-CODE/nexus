@@ -149,6 +149,7 @@ total da hora (1 linha por hora), e o pico do total não é a soma dos picos de 
 | 16/11 | "qual o motivo do processador estar estourando assim?": o Raio-X dava só o total (231%, 167%, 242%) | faltava o instrumento: "trabalhando" é a linha em que a thread está, não o gasto dela | o Raio-X lê o processador de cada thread pelo /proc na janela de 1 s e mostra quem usou (cartão do processador e aba Pedidos e tarefas) | este |
 | 16/11 | o reinício das 17:47 lido thread por thread: o Raio-X abrindo em 7 a 24 s por 3,5 min, sem um culpado | umas dez tarefas de subida juntas, cada uma com 10 a 40% de um núcleo (a releitura da fila da Aprovação 37-39%, a conta dela 23%, a pré-carga até 21% e já aos 17 s, os chamados 17%, o pré-filtro 14% mais 4 threads). O Nexus roda uma conta por vez: N tarefas juntas deixam o clique com 1/(N+1) do processador. Ensaio: pedido de 51 ms leva 1.413 ms com 8 tarefas juntas e 153 ms com uma por vez | a fila de subida (`nexus/casca/subida.py`): as contas do Campo, a conta e a releitura da fila da Aprovação e os livros do SSO uma por vez; a pré-carga e o pré-filtro só depois de 5 min e da fila vazia; vale 15 min depois do boot; o Raio-X mostra a fila. A porcentagem por thread passa a usar a janela da própria leitura | este |
 | 16/11 | Clima e risco frio: 14 s de processador numa tela só, a cada deploy e a cada 6 h (era o item 3 da fila) | medido numa cópia local: 4,8 dos 6,2 s de processador da tela eram o LZW do GeoTIFF do INPE em Python puro (172 tiles, 10 MB que viram 86 MB) | o fluxo de cada tile vai ao libtiff do Pillow, em C, num TIFF mínimo de 8 bits (`geotiff._lzw_rapido`); o decodificador de Python fica de reserva e diz o erro do fluxo ruim. Nas 172 tiles reais: bytes idênticos, 0,43 s contra 5,0 s; a tela fria foi de 6,2 para 1,2 s de processador | este |
+| 16/11 | a conta da fila da Aprovação (`nexus-fila-conta`): um núcleo inteiro por 22 s no reinício das 21:13, e de novo a cada releitura da fila | medido no PC com a fila de verdade (6.511 tarefas): a regra copiada do App devolve 200 linhas por chamada e percorre a fila inteira em cada uma; a `fila_toda` a chamava 33 vezes (215 mil passagens por tarefa), 7,7 s de processador com tudo quente e 23 s frio | a fila vai à regra em pedaços de uma página, cada tarefa uma vez, e o cadastro, as notas e as rondas valem pela conta inteira (`aprovacao._linhas_da_fila`; a regra copiada não muda; se o total não bater, volta ao página a página e avisa). Na fila de verdade: as mesmas 6.425 linhas na mesma ordem, 0,4 s | este |
 
 ## A fila
 
@@ -160,12 +161,15 @@ total da hora (1 linha por hora), e o pico do total não é a soma dos picos de 
    no swap da máquina velha (some no próximo reinício ou com `swapoff -a && swapon -a`). **Próximo passo:** ler o
    "Dentro do Nexus" do Raio-X (24/10) e cortar o que for cópia esquecida; o roteiro da T.I. (tetos da plataforma,
    proteção do Nexus) não foi aplicado.
-3. **Como o servidor faz o deploy** (16/11/2026): o Raio-X do servidor mostrou que o Nexus roda de uma pasta que não é a
-   do roteiro e que o arquivo que o `deploy/atualizar.sh` grava a cada 2 min não existe lá, com o teto de memória de 3 GB
-   de pé: tudo indica que o servidor não roda o script do repositório, e aí a regra de um reinício por hora, a espera da
-   gravação do inventário e a retirada do teto não valem. O bloco "Como este servidor atualiza" do Raio-X (aba Agora, só
-   no Linux) diz de onde roda, o que o deploy deixou na pasta do git e o que o systemd e o cron mandam rodar. Lido o
-   bloco: escrever para a T.I. o que apontar para o `deploy/atualizar.sh` do clone em execução, e tirar o bloco depois.
+3. **O servidor NÃO usa o `deploy/atualizar.sh`** (confirmado pelo Raio-X às 22:12 de 16/11/2026): o Nexus roda de
+   outra pasta que não a do roteiro, com um arquivo de entrada de fora do repositório; nenhum dos arquivos que o script
+   grava existe na pasta do git (nem o `nexus-instalado`, de 10/10); não há timer do Nexus, e quem o atualiza é um timer
+   da plataforma. Então NÃO valem no servidor: a regra de um reinício por hora (16/11), a espera da gravação do
+   inventário antes do reinício (26/10), a conferência do boot antes de trocar a pasta (10/10) e a retirada do teto de
+   memória (30/10; a unidade tem 700 MB / 1 GB escritos e o teto de pé é 3 GB). O bloco "Como este servidor atualiza"
+   do Raio-X (aba Agora, só no Linux) mostra a unidade de cada timer ligado e as linhas de deploy do script dela. Falta:
+   ler o script por ali, levar ao Levi o texto para a T.I. (o timer chamar o `deploy/atualizar.sh` do clone em execução,
+   ou o script deles ganhar as mesmas regras) e tirar o bloco depois.
 4. **Conta fria pós-deploy** (~15 s na 1ª abertura de uma tela nos ~5 min depois de cada push; 15 a 20 min de servidor
    pesado com reinícios seguidos). O agrupamento saiu em 16/11/2026 (um reinício por hora no horário útil). Falta o
    reinício sem frio, que o Levi pediu no mesmo dia ("siga"): o processo novo já subir com as cópias prontas. Dois Nexus
