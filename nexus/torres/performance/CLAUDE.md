@@ -38,4 +38,7 @@ soma as USINAS, não as strings. Some quando a pessoa abre o inversor (ou os tra
 `andamento.ler_geracao` e o `cos.monitoramento._linha`) e `/cos/inversores` (os cartões do SCADA da Ronda COS enxutos, pelo
 `andamento.ler_ao_vivo`, 30 s de cópia), em `sala_tela.py`. É a chave do Andamento deste servidor que lê; a tela da
 plataforma só pede ao Nexus. Abre para quem tem a tela da Sala, sem depender de ter o Monitoramento do COS. Prova:
-`tests/test_cos_monitoramento.py` (os dois últimos testes).
+`tests/test_cos_monitoramento.py` (os três últimos testes). **E as strings do dia** (16/11, noite; "a leitura das
+strings e inversores na API COS > MONITORAMENTO é super rápida [...] aplique"): `/cos/entradas?inv=<logger>:<modbus>&dia=`
+devolve o EntradasDoDia da Ronda COS sem mexer, pela mesma `ler_ao_vivo` e as mesmas cópias da janela dos inversores
+(60 s hoje, que vai sem o dia; 1 h o dia que passou). A Sala usa na curva de strings das usinas da API PV com logger.

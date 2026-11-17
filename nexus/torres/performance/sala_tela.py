@@ -7,6 +7,8 @@ fica debaixo dela, `setor_telas.pode`); não depende de ter a Coletas. Nada grav
 guardado pela subida dos BDs (o mesmo cofre da Coletas: quem abriu uma já aqueceu a outra).
 """
 import datetime as dt
+import re
+from urllib.parse import urlencode
 
 from flask import current_app, request
 
@@ -87,3 +89,33 @@ def sala_cos_inversores():
         cartoes.append({"pid": c.get("pid"), "kw": c.get("pac_total_kw"),
                         "situacao": (sit.get("texto") or sit.get("chave")) if isinstance(sit, dict) else sit, "inversores": invs})
     return _json({"cartoes": cartoes})
+
+
+# ── As strings de um inversor no dia, pelo logger (16/11/2026, noite) ───────────────────────────────────────────────
+# Levi: "a leitura das strings e inversores na API COS > MONITORAMENTO é super rápida, veja como é feito e se dá para
+# aplicar". É rápida porque não pergunta ao portal na hora: a Ronda COS GRAVA as entradas de cada inversor de 5 em 5 min
+# (a scada_entradas, 45 dias) e o Nexus guarda a resposta (60 s para hoje, 1 h para o dia que passou), uma leitura só
+# para todo mundo. A curva de strings da Sala, nas usinas que o Tempo real lê de outra API (a API PV leva de 20 s a 2 min
+# por usina e dia), passa a vir daqui quando a usina tem logger. O contrato é o EntradasDoDia da Ronda COS, sem mexer:
+# {"strings": [{indice, mppt}], "mppts", "pontos": [{em, s: [centésimos de A], ma}], "passo_min", "dia", "primeiro_dia"}.
+_SALA_INVERSOR = re.compile(r"([A-Za-z0-9_-]{1,40}):(\d{1,5})")        # o id do inversor no COS: "<logger>:<modbus>"
+_SALA_DIA = re.compile(r"\d{4}-\d{2}-\d{2}")
+
+
+@bp.route("/sala-de-controle/cos/entradas")
+def sala_cos_entradas():
+    """?inv=<logger>:<modbus>&dia=AAAA-MM-DD (sem o dia, hoje) → o EntradasDoDia do inversor, ou {"erro"} (400 | 503)."""
+    from ...cos import andamento as AND
+    m = _SALA_INVERSOR.fullmatch(request.args.get("inv", ""))
+    dia = request.args.get("dia", "")
+    if not m or (dia and not _SALA_DIA.fullmatch(dia)):
+        return _json({"erro": "peça ?inv=<logger>:<modbus> e, se quiser, &dia=AAAA-MM-DD"}, 400)
+    hoje = AND.agora().date().isoformat()
+    if dia == hoje:
+        dia = ""                                  # hoje vai sem o dia: a mesma cópia que a janela do Monitoramento usa
+    q = urlencode({"logger": m.group(1), "modbus": m.group(2), **({"dia": dia} if dia else {})})
+    dados, erro = AND.ler_ao_vivo(current_app.config, "/api/nexus/geracao/scada-entradas?" + q,
+                                  AND.TTL_DIA_PASSADO_S if dia and dia < hoje else AND.TTL_ENTRADAS_S)
+    if dados is None:
+        return _json({"erro": erro or "o histórico das strings não respondeu"}, 503)
+    return _json(dados)

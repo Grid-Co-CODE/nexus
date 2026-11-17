@@ -400,7 +400,40 @@ def test_a_sala_de_controle_le_a_lista_e_os_inversores_do_cos(ligada, logado, mo
         assert not setor_telas.pode("/t/performance/sala-de-controle/cos/usinas", {"cos/monitoramento"})
 
 
+def test_a_sala_le_as_strings_do_dia_pelo_logger_com_a_copia_do_monitoramento(ligada, logado, monkeypatch, app):
+    """Levi, 16/11/2026: "a leitura das strings e inversores na API COS > MONITORAMENTO é super rápida [...] aplique". A
+    curva de strings da Sala vem do histórico gravado pela Ronda COS (5 em 5 min), pela mesma leitura e a mesma cópia da
+    janela dos inversores do Monitoramento: hoje sem o dia (60 s), o dia que passou com 1 h, e um pedido só no Andamento."""
+    from nexus.auth import setor_telas
+    entradas = {"versao": 1, "usina_id": "EXA01", "modbus_id": 2, "dia": "2026-11-08", "passo_min": 5,
+                "strings": [{"indice": 1, "mppt": 1}, {"indice": 2, "mppt": 1}], "mppts": [{"indice": 1}],
+                "pontos": [{"em": "2026-11-08T13:00:00.000Z", "s": [612, 0]}]}
+    pedidos = _servir(monkeypatch, {"/api/nexus/geracao/scada-entradas": entradas})
+    relogio = [1000.0]
+    monkeypatch.setattr(AND.time, "monotonic", lambda: relogio[0])
+    base = "/t/performance/sala-de-controle/cos/entradas"
+    r = logado.get(base + "?inv=EXA01:2&dia=2026-11-08")
+    assert r.status_code == 200 and r.get_json()["pontos"][0]["s"] == [612, 0]
+    assert pedidos[-1][0] == "/api/nexus/geracao/scada-entradas?logger=EXA01&modbus=2&dia=2026-11-08"
+    relogio[0] += 600                                              # dez minutos depois, o dia que passou sai da cópia
+    logado.get(base + "?inv=EXA01:2&dia=2026-11-08")
+    assert len(pedidos) == 1
+    logado.get(base + "?inv=EXA01:2&dia=" + AGORA.date().isoformat())   # hoje vai sem o dia (a cópia da janela do COS)
+    assert pedidos[-1][0] == "/api/nexus/geracao/scada-entradas?logger=EXA01&modbus=2"
+    logado.get(base + "?inv=EXA01:2")
+    assert len(pedidos) == 2
+    relogio[0] += 61                                               # hoje vence em 60 s
+    logado.get(base + "?inv=EXA01:2")
+    assert len(pedidos) == 3
+    for ruim in ("?inv=EXA01", "?inv=../auth:1", "?inv=EXA01:2&dia=ontem", ""):
+        assert logado.get(base + ruim).status_code == 400
+    assert len(pedidos) == 3                                       # pedido torto nem sai daqui
+    with app.test_request_context():
+        assert setor_telas.pode(base, {"performance/sala-de-controle"}) and not setor_telas.pode(base, {"cos/monitoramento"})
+
+
 def test_sem_a_ronda_cos_a_sala_recebe_o_motivo(logado):
     r = logado.get("/t/performance/sala-de-controle/cos/usinas")
     assert r.status_code == 503 and "não está ligada" in r.get_json()["erro"]
     assert logado.get("/t/performance/sala-de-controle/cos/inversores").status_code == 503
+    assert logado.get("/t/performance/sala-de-controle/cos/entradas?inv=EXA01:2").status_code == 503
