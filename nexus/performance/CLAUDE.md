@@ -389,7 +389,11 @@ quer dizer, em linguagem de quem não é da meteorologia), `visao` (o que a tela
 - **O Pillow não abre o GeoTIFF do INPE.** É um COG de 64 bits (BitsPerSample 64, LZW, tiles de 256, 8699 x 8899): o plugin
   TIFF do Pillow só tem modo para float de 32 bits (`UnidentifiedImageError`, "unknown pixel mode", medido com o 12.2), e
   rasterio e shapely estão vetados (sem dependência nova). `geotiff.py` lê só o cabeçalho e a tile de cada usina, por `Range`,
-  e decodifica o LZW em Python puro (bytes idênticos aos do Pillow nas 1190 tiles do T0). Aceita **só o formato medido**
+  e decodifica o LZW (bytes idênticos aos do Pillow nas 1190 tiles do T0). **Desde 16/11/2026 o LZW de cada tile vai
+  primeiro ao libtiff do Pillow, em C** (`geotiff._lzw_rapido`: o fluxo da tile embrulhado num TIFF mínimo de 8 bits, uma
+  faixa só), e o decodificador de Python (`_lzw_python`) fica de reserva (o Pillow sem o libtiff, o fluxo curto ou com
+  código inválido) e é quem diz o erro. Medido nas 172 tiles reais que o Clima lê frio: bytes idênticos, 0,43 s contra
+  5,0 s; o Clima frio gastava 4,8 dos 6,2 s de processador da tela no LZW, e esfria a cada deploy e a cada 6 h. Aceita **só o formato medido**
   (little-endian, tiles, LZW sem predictor, float64, EPSG:4326, PixelIsArea, escala + tiepoint no canto); o que mudar vira
   `GeoTiffErro` dizendo o que achou, e a tela diz que o formato do INPE mudou. Custo medido (160 usinas, 4 dias em paralelo):
   ~7 s e ~4,6 MB na leitura fria, uma vez a cada 6 h (ou quando o conjunto de usinas muda).

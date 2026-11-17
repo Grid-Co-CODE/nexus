@@ -458,3 +458,58 @@ def test_200_sem_last_modified_depois_de_um_cabecalho_com_data_tambem_e_arquivo_
     with pytest.raises(GT.GeoTiffErro) as e:
         gt.amostrar(*centro(20, 3))
     assert "trocado" in str(e.value).lower()
+
+
+# ── o LZW pelo libtiff do Pillow, em C, com o de Python de reserva (16/11/2026) ─────────────────────────────
+# O caso: o Clima frio custava 14 s de processador (medido numa cópia local em 16/11/2026: 4,8 dos 6,2 s da tela eram o LZW
+# em Python puro, 172 tiles), e ele esfria a cada deploy. As 172 tiles reais do INPE pelo libtiff: bytes idênticos, 0,43 s
+# contra 5,0 s. O decodificador de Python segue no módulo: é a reserva (o Pillow sem o libtiff, o fluxo que ele recusa) e
+# quem diz o erro do fluxo ruim.
+def test_o_lzw_rapido_da_os_mesmos_bytes_que_o_de_python():
+    dados = _dados_variados()
+    pos = 0
+    for fluxo, originais in fluxos_lzw(dados, 2048):
+        rapido = GT._lzw_rapido(fluxo, originais)
+        assert rapido is not None, "o libtiff do Pillow não leu o fluxo que o próprio Pillow comprimiu"
+        assert rapido == GT._lzw_python(fluxo, originais) == dados[pos:pos + originais]
+        pos += originais
+    # e para no tamanho pedido, como o de Python
+    (fluxo, _), = fluxos_lzw(bytes(range(256)), 256)
+    assert GT._lzw_rapido(fluxo, 100) == bytes(range(100))
+
+
+def test_a_tile_boa_nem_passa_pelo_decodificador_de_python(monkeypatch):
+    dados = _dados_variados()
+    (fluxo, originais) = fluxos_lzw(dados, 2048)[0]
+    monkeypatch.setattr(GT, "_lzw_python", lambda d, n: 1 / 0)
+    assert GT.descomprimir_lzw(fluxo, originais) == dados[:originais]
+
+
+def test_sem_o_caminho_rapido_o_de_python_responde(monkeypatch):
+    dados = _dados_variados()
+    (fluxo, originais) = fluxos_lzw(dados, 2048)[0]
+    monkeypatch.setattr(GT, "_lzw_rapido", lambda d, n: None)            # o Pillow sem o libtiff, ou o fluxo que ele recusa
+    assert GT.descomprimir_lzw(fluxo, originais) == dados[:originais]
+
+
+def test_o_fluxo_ruim_segue_com_o_erro_e_o_resultado_do_de_python():
+    assert GT._lzw_rapido(_bits([256, 65, 400, 257]), 10) is None        # o libtiff recusa: quem responde é o de Python
+    with pytest.raises(GT.GeoTiffErro, match="fora da tabela"):
+        GT.descomprimir_lzw(_bits([256, 65, 400, 257]), 10)
+    (fluxo, _), = fluxos_lzw(bytes(range(200)) * 5, 200)
+    cortado = fluxo[:len(fluxo) // 2]
+    assert GT.descomprimir_lzw(cortado, 1000) == GT._lzw_python(cortado, 1000)      # o curto, igual ao de antes
+    assert GT._lzw_rapido(b"", 10) is None and GT._lzw_rapido(fluxo, 0) is None
+
+
+def test_o_caminho_rapido_nunca_devolve_tamanho_errado(monkeypatch):
+    """O que o libtiff devolver com outro tamanho não vale: quem chama confia no tamanho para ler os doubles."""
+    from PIL import Image
+
+    class Curta:
+        def tobytes(self):
+            return b"abc"
+    (fluxo, originais), = fluxos_lzw(bytes(range(200)), 200)
+    assert GT._lzw_rapido(fluxo, originais) == bytes(range(200))
+    monkeypatch.setattr(Image, "open", lambda *a, **k: Curta())
+    assert GT._lzw_rapido(fluxo, originais) is None

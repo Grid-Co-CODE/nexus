@@ -823,7 +823,29 @@ estourando assim?"; e, com a leitura por thread na mão, "pode seguir com a fila
 - **No Raio-X**, aba Pedidos e tarefas, na primeira hora depois de subir: "Fila de subida", com quem tem a vez, quem
   espera e o que já passou (quanto levou e quanto esperou). É como se confere, do navegador, que ela funcionou.
 - **Prova:** `tests/test_casca_subida.py` (a ordem, o prazo da lenta, a que quebra, a janela, a calma, o Raio-X e os
-  pontos de entrada).
+  pontos de entrada). No servidor, depois do deploy das 21:13 de 16/11/2026: as quatro tarefas rodaram em ordem (22 s,
+  14 s, 22 s e 55 s), o processador não passou de ~107% (antes, 122 a 272%) e o Raio-X abriu em 1,2 a 1,5 s (antes, 7 a
+  24 s), com dois picos de ~7 s enquanto uma tarefa sozinha usava um núcleo inteiro.
+
+## Como este servidor atualiza: o diagnóstico do Raio-X (16/11/2026)
+
+Levi: "resolva o que consegue!". Depois do deploy das 21:13 de 16/11 o Raio-X do servidor disse "não leu o arquivo que o
+deploy grava: não existe", com o Nexus rodando de uma pasta que não é a do roteiro e o teto de memória de 3 GB de pé (o
+`deploy/atualizar.sh` o tiraria sozinho): tudo indica que o servidor não roda o script do repositório, e aí a regra de um
+reinício por hora, a espera da gravação do inventário e a retirada do teto não valem lá. Ninguém do Nexus tem acesso ao
+servidor. `raio_x._como_o_servidor_atualiza` (aba Agora, recolhido em "Como este servidor atualiza"; só no Linux, só
+administrador) mostra:
+- a **leitura**: se algum dos arquivos que o script do repositório grava (`nexus-teto`, a cada rodada do timer;
+  `nexus-reiniciado`, `nexus-espera`) tem menos de 15 min, é ele que roda; senão, não é;
+- a pasta do código em execução e a pasta do git;
+- cada arquivo do deploy na pasta do git (`nexus-instalado` com o commit, `nexus-reiniciado`, `nexus-teto`,
+  `nexus-espera`, `FETCH_HEAD`, `ORIG_HEAD`): de quando é, ou que não existe;
+- as unidades do systemd que citam o Nexus (`/etc/systemd/system/*.service` e `*.timer`, e os `.d/*.conf` delas), só
+  com as linhas que dizem o que roda (`User`, `WorkingDirectory`, `ExecStart`, `OnCalendar`, `OnUnitActiveSec`, `Unit`,
+  `MemoryHigh`, `MemoryMax`, `Restart`), os timers ligados e as linhas do cron do sistema que citam o Nexus.
+**Nunca um valor de variável:** as linhas `Environment` e `EnvironmentFile` não saem, e o que vem depois de um `=` numa
+linha de comando vira `…` (pode ser segredo). É diagnóstico: **sai quando o deploy do servidor estiver entendido e
+acertado** (fila do `DESEMPENHO.md`, item 3). Prova: `tests/test_raio_x_como_atualiza_16_11.py`.
 
 ## Chaves do Nexus (Base → Chaves das fontes → aba Nexus, 14/10/2026)
 

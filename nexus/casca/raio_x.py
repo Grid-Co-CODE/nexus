@@ -37,6 +37,7 @@ Nada é gravado nem vai à rede (a leitura do uso no banco é a exceção, por t
 import json
 import logging
 import os
+import re
 import sys
 import threading
 import time
@@ -1196,6 +1197,123 @@ def _estado_da_lista_de_os(mod, prazo_s: float = PRAZO_MEMORIA_S) -> dict:
     return e
 
 
+# COMO ESTE SERVIDOR FAZ O DEPLOY (16/11/2026, Levi: "resolva o que consegue!"). Depois do deploy das 21:13 o Raio-X do
+# servidor disse "não leu o arquivo que o deploy grava: não existe", com o Nexus rodando de uma pasta que não é a do
+# roteiro, e o teto de memória de 3 GB, que o `deploy/atualizar.sh` tiraria sozinho, seguia lá: tudo indica que o
+# servidor não roda o script deste repositório, e aí a regra de um reinício por hora, a espera da gravação do inventário e
+# a retirada do teto não valem lá. Ninguém do Nexus tem acesso ao servidor: o Raio-X mostra, só para administrador, de onde
+# o Nexus roda, o que o deploy deixou na pasta do git e de quando é, e o que as unidades do systemd e o cron que citam o
+# Nexus mandam rodar. Nunca um valor de variável (pode ser segredo). É diagnóstico: sai quando o deploy do servidor
+# estiver entendido e acertado.
+UNIDADES_DO_SISTEMA = ("/etc/systemd/system",)
+CRON_DO_SISTEMA = ("/etc/cron.d", "/etc/crontab")
+ARQUIVOS_DO_DEPLOY = ("nexus-instalado", "nexus-reiniciado", "nexus-teto", "nexus-espera", "FETCH_HEAD", "ORIG_HEAD")
+_LINHAS_DE_UNIDADE = ("User", "WorkingDirectory", "ExecStartPre", "ExecStart", "OnCalendar", "OnBootSec",
+                      "OnUnitActiveSec", "Unit", "MemoryHigh", "MemoryMax", "Restart")
+DEPLOY_RECENTE_S = 15 * 60       # o script do repositório grava o nexus-teto a cada rodada do timer (2 min)
+
+
+def _sem_valores(texto: str) -> str:
+    """A linha sem o que vem depois de um `=` (`--token=abc` e `CHAVE=x` viram `--token=…` e `CHAVE=…`)."""
+    return re.sub(r"=\S+", "=…", texto)
+
+
+def _ha_quanto(segundos: float) -> str:
+    s = max(0, int(segundos))
+    if s < 3600:
+        return f"há {max(1, s // 60)} min"
+    if s < 2 * 86400:
+        return f"há {s // 3600} h"
+    return f"há {s // 86400} dias"
+
+
+def _linhas_da_unidade(caminho: Path) -> str:
+    achadas = []
+    for linha in caminho.read_text(encoding="utf-8", errors="replace").splitlines():
+        chave, sep, valor = linha.strip().partition("=")
+        if sep and chave in _LINHAS_DE_UNIDADE:
+            achadas.append(f"{chave}={_sem_valores(valor.strip())}")
+    return "; ".join(achadas)
+
+
+def _como_o_servidor_atualiza(pasta_git=None, unidades=None, cron=None):
+    """[(rótulo, texto)] do diagnóstico acima; None fora do Linux (o PC), a não ser que as pastas venham (os testes)."""
+    if pasta_git is None and unidades is None and cron is None and not sys.platform.startswith("linux"):
+        return None
+    from . import versao
+    agora = time.time()
+    git = Path(pasta_git) if pasta_git is not None else versao.pasta_do_git()
+    linhas = [("Código em execução", str(Path(__file__).resolve().parents[2])), ("Pasta do git", str(git))]
+    mais_novo = None
+    for nome in ARQUIVOS_DO_DEPLOY:
+        arq = git / nome
+        try:
+            quando = arq.stat().st_mtime
+            texto = time.strftime("gravado em %d/%m às %H:%M", time.localtime(quando)) + f" ({_ha_quanto(agora - quando)})"
+            if nome == "nexus-instalado":
+                texto = arq.read_text(encoding="utf-8", errors="replace").strip()[:12] + ", " + texto
+            if nome in ("nexus-teto", "nexus-reiniciado", "nexus-espera"):
+                mais_novo = quando if mais_novo is None else max(mais_novo, quando)
+        except FileNotFoundError:
+            texto = "não existe"
+        except OSError as e:
+            texto = f"não abriu ({type(e).__name__})"
+        linhas.append((nome, texto))
+    achou_unidade = False
+    for pasta in (unidades if unidades is not None else UNIDADES_DO_SISTEMA):
+        base = Path(pasta)
+        try:
+            arquivos = sorted(p for p in base.iterdir() if p.suffix in (".service", ".timer") and p.is_file())
+        except OSError:
+            arquivos = []
+        for arq in arquivos:
+            try:
+                cita = "nexus" in arq.name.lower() or "nexus" in arq.read_text(encoding="utf-8", errors="replace").lower()
+                if not cita:
+                    continue
+                achou_unidade = True
+                linhas.append((arq.name, _linhas_da_unidade(arq) or "sem linha de execução"))
+                for extra in sorted((base / (arq.name + ".d")).glob("*.conf")):
+                    linhas.append((f"{arq.name}.d/{extra.name}", _linhas_da_unidade(extra) or "sem linha de execução"))
+            except OSError as e:
+                linhas.append((arq.name, f"não abriu ({type(e).__name__})"))
+        try:
+            timers = sorted(p.name for p in (base / "timers.target.wants").iterdir())
+            linhas.append(("Timers ligados", ", ".join(timers) or "nenhum"))
+        except OSError:
+            pass
+    if not achou_unidade:
+        linhas.append(("Unidades do systemd que citam o Nexus", "nenhuma"))
+    for origem in (cron if cron is not None else CRON_DO_SISTEMA):
+        base = Path(origem)
+        try:
+            arquivos = sorted(p for p in base.iterdir() if p.is_file()) if base.is_dir() else [base]
+        except OSError:
+            arquivos = []
+        for arq in arquivos:
+            try:
+                for linha in arq.read_text(encoding="utf-8", errors="replace").splitlines():
+                    if "nexus" in linha.lower() and not linha.lstrip().startswith("#"):
+                        linhas.append((arq.name, _sem_valores(linha.strip())[:220]))
+            except OSError:
+                continue
+    if mais_novo is not None and agora - mais_novo < DEPLOY_RECENTE_S:
+        leitura = f"o deploy do repositório gravou {_ha_quanto(agora - mais_novo)} nesta pasta do git: é ele que roda aqui"
+    else:
+        leitura = ("o deploy/atualizar.sh do repositório NÃO está rodando neste clone (ele grava o nexus-teto a cada 2 min): "
+                   "a regra de um reinício por hora, a espera da gravação do inventário e a retirada do teto de memória "
+                   "não valem aqui. As unidades abaixo dizem quem atualiza o Nexus")
+    return [("Leitura", leitura)] + linhas
+
+
+def _diagnostico_do_deploy():
+    try:
+        return _como_o_servidor_atualiza()
+    except Exception:                       # noqa: BLE001 - o diagnóstico nunca derruba a página
+        log.exception("Raio-X: não consegui montar o diagnóstico do deploy")
+        return None
+
+
 UMA_HORA_S = 3600
 
 
@@ -1280,6 +1398,7 @@ def registrar_raio_x(bp) -> None:
                                threads_atrasado=threads_atrasado,
                                threads_quando=lista.get("anterior_quando") if threads_atrasado else None,
                                travamentos=travamentos, abas=ABAS, aba=aba, subida=_fila_de_subida(),
+                               como_atualiza=_diagnostico_do_deploy(),
                                parecer=parecer(pedidos, threads, teto, cpu.get("maquina"), travamentos,
                                                (("Nexus", nexus), ("worker", worker), ("web", web))),
                                quando=time.strftime("%d/%m/%Y %H:%M:%S"))

@@ -88,6 +88,14 @@
   </div>
   {% if travamentos %}<div class="cad-aviso cad-aviso--{{ 'critico' if travamentos.classe == 'critico' else ('alerta' if travamentos.classe == 'alerta' else 'ok') }}"><i class="ph ph-clock-countdown"></i><div><strong>{{ travamentos.rotulo }}.</strong> {{ travamentos.detalhe }}{% if travamentos.titulo %}<br><span class="mudo">{{ travamentos.titulo }}</span>{% endif %}</div></div>{% endif %}
   {% if not ligado %}<div class="cad-aviso cad-aviso--info"><i class="ph ph-info"></i><div>O registro dos pedidos só liga no servidor (servir.py): aqui não há pedidos para mostrar.</div></div>{% endif %}
+  {# como este servidor faz o deploy (16/11/2026): diagnóstico, só no Linux; sai quando o deploy de lá estiver acertado #}
+  {% if como_atualiza %}
+  <details class="rx-detalhe"><summary>Como este servidor atualiza</summary>
+  <div class="cad-rolagem cad-rolagem--secao"><table class="cad-tabela rx-peca">
+    <tbody>{% for rotulo, texto in como_atualiza %}<tr><th scope="row">{{ rotulo }}</th><td>{{ texto }}</td></tr>{% endfor %}</tbody>
+  </table></div>
+  </details>
+  {% endif %}
 </div>
 
 {# ── Memória ───────────────────────────────────────────────────────────────────────────────────────────────────── #}

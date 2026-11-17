@@ -17,10 +17,14 @@ formato do INPE mudou, em vez de mostrar um número lido do jeito errado.
 
 Verificado em 06/10/2026 contra o arquivo real: o decodificador LZW daqui devolve bytes idênticos aos do decodificador do
 Pillow nas 1190 tiles do T0 (10 s no arquivo inteiro), e o mapa decodificado tem a América do Sul com o norte em cima.
+Desde 16/11/2026 o fluxo de cada tile vai primeiro ao libtiff do Pillow, em C (`_lzw_rapido`, 12 vezes mais rápido nas
+tiles reais), e o decodificador de Python daqui é a reserva e quem diz o erro do fluxo ruim.
 """
+import io
 import math
 import struct
 import sys
+import warnings
 from array import array
 from collections import OrderedDict
 from concurrent.futures import ThreadPoolExecutor
@@ -56,7 +60,42 @@ class Amostra:
     origem: str
 
 
+# O LZW em C, pelo libtiff do Pillow (16/11/2026). O Pillow não abre o GeoTIFF do INPE (64 bits), mas o libtiff dele
+# decodifica o FLUXO LZW de uma tile se ela vier num TIFF mínimo de 8 bits: uma faixa só, `esperado` x 1. Medido nas 172
+# tiles reais que o Clima lê frio: bytes idênticos aos do decodificador de Python, 0,43 s contra 5,0 s. O caso: o Clima
+# frio gastava 4,8 dos 6,2 s de processador da tela no LZW em Python puro, e esfria a cada deploy e a cada 6 h; no Nexus,
+# que roda uma conta Python por vez, isso é tempo tirado do clique de todo mundo. Sem dependência nova (o Pillow já é do
+# Nexus). Cabeçalho + IFD de 9 tags + o fluxo: a faixa começa no byte 126.
+_LZW_TAGS = ((256, 4), (257, 4), (258, 3), (259, 3), (262, 3), (273, 4), (277, 3), (278, 4), (279, 4))
+_LZW_INICIO = 8 + 2 + len(_LZW_TAGS) * 12 + 4
+
+
+def _lzw_rapido(dados: bytes, esperado: int):
+    """O fluxo LZW decodificado pelo libtiff do Pillow, ou None quando ele não dá exatamente `esperado` bytes (o Pillow sem
+    o libtiff, o fluxo curto ou com código que não existe): aí quem responde, e diz o erro, é o `_lzw_python`."""
+    if esperado <= 0 or not dados:
+        return None
+    try:
+        from PIL import Image
+        valores = (esperado, 1, 8, 5, 1, _LZW_INICIO, 1, 1, len(dados))
+        ifd = struct.pack("<H", len(_LZW_TAGS)) + b"".join(
+            struct.pack("<HHII", tag, tipo, 1, v) for (tag, tipo), v in zip(_LZW_TAGS, valores)) + struct.pack("<I", 0)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            saida = Image.open(io.BytesIO(b"II*\x00" + struct.pack("<I", 8) + ifd + bytes(dados))).tobytes()
+    except Exception:                       # noqa: BLE001 - qualquer recusa do Pillow: o decodificador de Python responde
+        return None
+    return saida if len(saida) == esperado else None
+
+
 def descomprimir_lzw(dados: bytes, esperado: int) -> bytes:
+    """O LZW de uma tile: pelo libtiff do Pillow (`_lzw_rapido`, em C) e, quando ele não lê o fluxo inteiro, pelo
+    decodificador de Python (`_lzw_python`), que devolve o que deu ou levanta GeoTiffErro, como sempre."""
+    rapido = _lzw_rapido(dados, esperado)
+    return rapido if rapido is not None else _lzw_python(dados, esperado)
+
+
+def _lzw_python(dados: bytes, esperado: int) -> bytes:
     """LZW do TIFF: códigos de 9 a 12 bits, bit mais significativo primeiro, 256 = limpar a tabela, 257 = fim, e a largura
     sobe um código antes do que seria preciso ("early change"). Para ao chegar a `esperado` bytes. Devolve menos se o fluxo
     acabou antes (quem chama confere o tamanho); levanta GeoTiffErro se um código não existe."""
