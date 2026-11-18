@@ -54,6 +54,21 @@
 
   <section class="pm-sec" aria-labelledby="pm-feito-t">
     <h2 class="pm-t" id="pm-feito-t">O que foi feito no ativo</h2>
+    {% if d.guardado is not none %}
+    {# o mês já saiu das fontes de 90 dias: valem as contagens do fechamento guardado (fato_atividade_usina_mes) #}
+    {% set g = d.guardado %}
+    {% if g.tem %}
+    <ul class="pm-lista">
+      <li><b>{{ g.rondas }}</b> ronda{{ '' if g.rondas == 1 else 's' }} no mês{% if g.rondas_txt %}: {{ g.rondas_txt }}{% endif %}</li>
+      <li><b>{{ g.tarefas_total }}</b> tarefa{{ '' if g.tarefas_total == 1 else 's' }} de manutenção executada{{ '' if g.tarefas_total == 1 else 's' }}, pelo registro do App de campo{% if g.tarefas %}:
+        {% for t, qt, os_ in g.tarefas %}{{ t }} {{ qt }} (em {{ os_ }} OS){{ ', ' if not loop.last }}{% endfor %}{% endif %}</li>
+      <li>Zeladoria feita em <b>{{ g.zeladoria_dias }}</b> dia{{ '' if g.zeladoria_dias == 1 else 's' }} do mês</li>
+      <li><b>{{ g.pt }}</b> PT pedida{{ '' if g.pt == 1 else 's' }} no mês</li>
+      <li><b>{{ g.chamados_finalizados }}</b> chamado{{ '' if g.chamados_finalizados == 1 else 's' }} de garantia finalizado{{ '' if g.chamados_finalizados == 1 else 's' }} e <b>{{ g.chamados_abertos }}</b> aberto{{ '' if g.chamados_abertos == 1 else 's' }} no mês</li>
+    </ul>
+    <p class="mudo pm-nota">Números do fechamento guardado do mês: as fontes guardam 90 dias e já não têm o detalhe de cada ronda e de cada tarefa.</p>
+    {% else %}<p class="mudo">Sem dado guardado deste mês: ele saiu das fontes antes de o Nexus guardar o fechamento.</p>{% endif %}
+    {% else %}
     <ul class="pm-lista">
       {% if d.rondas is defined and d.rondas is not none %}
       <li><b>{{ d.rondas|length }}</b> ronda{{ '' if d.rondas|length == 1 else 's' }} no mês{% if d.rondas %}:
@@ -69,6 +84,7 @@
         {% for c in d.chamados.mes %}OS {{ c.os }} ({{ c.equip }}{% if c.fabricante %}, {{ c.fabricante }}{% endif %}){{ ', ' if not loop.last }}{% endfor %}{% endif %}</li>
       {% else %}<li class="mudo">Chamados de garantia: sem leitura.</li>{% endif %}
     </ul>
+    {% endif %}
   </section>
 
   <section class="pm-sec" aria-labelledby="pm-par-t">

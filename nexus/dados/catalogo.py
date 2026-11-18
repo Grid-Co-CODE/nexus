@@ -34,7 +34,7 @@ import re
 from dataclasses import dataclass
 
 from . import almoxarifado, fato_chamado, fato_chamado_aberto, fato_inventario, fato_pt, fato_ronda, fato_tarefa_os, fato_uso_os, fatos, geracao
-from . import almox_usinas, fato_os_fama, programacao
+from . import almox_usinas, fato_atividade_mes, fato_os_fama, programacao
 from ..zeladoria import tabelas as zeladoria_tabelas
 from ..sso import tabelas as sso_tabelas
 
@@ -1366,6 +1366,22 @@ FATOS = (
     # As tarefas das OS do Fracttal lidas pelo próprio Nexus (18/10/2026, Levi: "pegando tudo do Fracttal ou Nexus, sem
     # fontes externas!"): o que o gestao_pcm.json do robô do PCM dava às telas, agora no banco, de hora em hora
     # (nexus/campo/tarefas_os.py). Registrado antes de existir: o livro nasce na 1ª gravação, depois do ensaio
+    # O que foi feito em cada usina em cada mês, guardado depois que as fontes esquecem (18/11/2026, Levi, sobre o
+    # prontuário por mês: "o que foi feito no ativo"; guardar o fechamento do mês: "Ok", "faça funcionar"). Registrado
+    # antes da 1ª gravação
+    Fato("atividade_usina_mes", "O que foi feito na usina no mês", "campo",
+         "nexus_fatos (fechamento, ronda, PT) + nexus_os · fato_tarefa_os + nexus_chamados · fato_chamado",
+         fato_atividade_mes.GRAO,
+         _d(data=("id", "data_id_mes (o dia 1º do mês, AAAAMM01)"),
+            usina=("id", "usina_id (a do fato de origem, já ligada lá)")),
+         tipo=fato_atividade_mes.TIPO, chave=fato_atividade_mes.CHAVE, medidas=_m(fato_atividade_mes.MEDIDAS),
+         fontes=_fontes(fato_atividade_mes.FONTES), janela_origem=fato_atividade_mes.JANELA_ORIGEM,
+         estado="conformado", conformado_em="nexus_atividade_mes · fato_atividade_usina_mes",
+         observacao="foto do mês por tipo de atividade: tarefas executadas (pelo tipo da OS, sem a devolvida), rondas "
+                    "(pelo tipo), zeladoria (em dias), PT e chamados abertos e finalizados. O mês é recalculado "
+                    "enquanto cabe inteiro nas fontes (o dia 1º a até 85 dias; elas guardam 90) e depois fica como foi "
+                    "gravado; a linha de mês aberto que some da conta fica com zero (o fato não encolhe). Não grava "
+                    "com fonte vazia nem com o fato do banco relido vazio"),
     Fato("tarefa_os", "Tarefa de OS do Fracttal", "pcm",
          "fora do banco: API REST do Fracttal (work_orders, uma linha por tarefa)", fato_tarefa_os.GRAO,
          _d(data=("id", "data_id_criacao, data_id_programada, data_id_fim (dia de Brasília)"),
@@ -1563,6 +1579,11 @@ LIVROS = (
           "quando o REST não o dá) e fora_do_fracttal_desde (data_id em que o código deixou de vir; o código fica). "
           "foto_em = o dia em que a linha mudou pela última vez. A leitura do banco curta não grava",
           so_cresce=True),
+    Livro("nexus_atividade_mes", ("fato_atividade_usina_mes", "qualidade", "atualizacao"),
+          "de hora em hora (:40), pela mescla por mês; grava só quando o sha das linhas muda",
+          "nexus/dados/carga.py + fato_atividade_mes.py", False,
+          "registrado em 18/11/2026, antes de existir: o mês fora da janela das fontes fica como foi gravado",
+          so_cresce=("fato_atividade_usina_mes",)),
     Livro("nexus_programacao", ("fato_programacao", "qualidade", "atualizacao"),
           "de hora em hora (:40), pela mescla por semana; grava só quando o sha das linhas muda",
           "nexus/dados/carga.py + programacao.py (o histórico: ferramentas/carregar_programacao_historica.py)", True,

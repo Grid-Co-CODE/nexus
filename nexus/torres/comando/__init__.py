@@ -343,7 +343,7 @@ def _usina_mes(usina_id: int, mes: str, hoje):
     usinas = _usinas()
     if usinas and usina_id not in usinas:
         abort(404)
-    d = RU.dados(usina_id, mes, hoje)
+    d = DM.dados(usina_id, mes, hoje)
     if not d.get("usina"):
         abort(404)
     # o tema que não abriu fica None (a página diz "sem leitura"), e o número que falta fica None ("sem dado")
@@ -364,7 +364,8 @@ def _usina_mes(usina_id: int, mes: str, hoje):
         chamados_fin=[c for c in ch if c.get("situacao") == "concluido" and do_mes(c.get("fim"))],
         chamados_ab=[c for c in ch if do_mes(c.get("ini"))],
         nomes_tema={"perf": "a performance", "rondas": "as rondas", "manut": "a manutenção",
-                    "religamentos": "as paradas do COS", "chamados": "os chamados de garantia"})
+                    "religamentos": "as paradas do COS", "chamados": "os chamados de garantia",
+                    "guardado": "o fechamento guardado"})
 
 
 @bp_usinas.route("/<int:usina_id>/relatorio.pdf")
@@ -812,7 +813,7 @@ def usina_dossie_do_mes(usina_id):
     usinas = _usinas()
     if not mes or (usinas and usina_id not in usinas):
         abort(404)
-    resp = current_app.response_class(DM.dossie(RU.dados(usina_id, mes, hoje)), mimetype="text/markdown")
+    resp = current_app.response_class(DM.dossie(DM.dados(usina_id, mes, hoje)), mimetype="text/markdown")
     resp.headers["Cache-Control"] = "no-store"
     return resp
 
@@ -840,7 +841,7 @@ def _diagnostico_do_mes(usina_id: int, mes: str):
         out = {"estado": "preparando", "mes": mes}
     else:
         try:
-            d = RU.dados(usina_id, mes, visao._agora().date())
+            d = DM.dados(usina_id, mes, visao._agora().date())
         except BaseException:
             DG.soltar(cfg, usina_id, ch)
             raise

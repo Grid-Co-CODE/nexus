@@ -22,6 +22,10 @@ Livros que esta carga mantém (registrados em `catalogo.LIVROS`):
   (`_programacao`): a fonte guarda 4 semanas, então a carga lê o fato do banco, troca só as semanas do arquivo e mantém
   as outras. Leitura que falha ou volta vazia com o livro existente não grava (o fato não encolhe); grava só quando o
   sha das linhas muda.
+- `nexus_atividade_mes` (18/11/2026): `fato_atividade_usina_mes`, `qualidade`, `atualizacao`, pela MESCLA POR MÊS
+  (`_atividade_mes`): o que foi feito em cada usina em cada mês, contado dos fatos desta carga e de dois livros do
+  banco (as tarefas das OS e os chamados). O mês que ainda cabe inteiro nas fontes é recontado; o que saiu fica como
+  foi gravado. Fonte vazia, ou o fato do banco relido vazio, não grava; grava só quando o sha das linhas muda.
 
 Montado e NÃO gravado (só `ferramentas/carregar_dados.py --ensaio`, até a decisão do Levi):
 - `nexus_geracao · fato_geracao_usina_dia` (`montar_geracao`, cadência DIÁRIA; decisão 8: publicar o de-para das abas,
@@ -49,6 +53,7 @@ from datetime import datetime, timedelta, timezone
 
 from . import almoxarifado as almox
 from . import calendario, equipamento, fato_almoxarifado, fato_pt, fato_ronda, fatos, geracao, historico, livros
+from . import fato_atividade_mes, fato_chamado, fato_tarefa_os
 from . import programacao
 from .conexao import base_de as _base
 
@@ -456,6 +461,19 @@ def montar(config, sessao, agora: datetime | None = None, *, ensaio: bool = Fals
         rel["grava"] = sorted(gravar)
     elif ensaio and tab_p:
         nao_grava[programacao.LIVRO] = tab_p
+    # ── o que foi feito em cada usina em cada mês (18/11/2026: a mescla por mês) ──────────────────────────────────
+    # livro próprio e isolado (regra 13): o que falha aqui só deixa de gravar este fato nesta hora
+    try:
+        tab_a, grava_a, rel["atividade_mes"] = _atividade_mes(le, fat, falhou, agora, iso, maquina)
+    except Exception as e:      # noqa: BLE001
+        falhou["atividade_usina_mes"] = _erro(e)
+        log.warning("carga de dados: a atividade do mês falhou, não gravada nesta hora: %s", falhou["atividade_usina_mes"])
+        tab_a, grava_a, rel["atividade_mes"] = None, False, {"erro": falhou["atividade_usina_mes"]}
+    if grava_a:
+        gravar[fato_atividade_mes.LIVRO] = tab_a
+        rel["grava"] = sorted(gravar)
+    elif ensaio and tab_a:
+        nao_grava[fato_atividade_mes.LIVRO] = tab_a
     if ensaio:
         if eqt is not None and not publicar_eq:
             nao_grava[equipamento.LIVRO] = eqt          # para medir o tamanho; gravar, só quando mudar
@@ -540,6 +558,53 @@ def _programacao(le: "_Leitor", dados, lido_em, lig, m, equip, hist_q, iso, maqu
     if rm["ids_repetidos"]:
         return tab, False, dict(rel, nao_grava=f"{rm['ids_repetidos']} programacao_id repetidos no fato mesclado")
     return tab, mudou, rel
+
+
+def _atividade_mes(le: "_Leitor", fat: dict, falhou: dict, agora: datetime, iso: str,
+                   maquina: str) -> tuple[dict | None, bool, dict]:
+    """(tabelas do `nexus_atividade_mes` ou None, gravar nesta hora?, resumo só com contagens).
+
+    18/11/2026 (Levi, sobre guardar o fechamento de cada mês: "Ok", "faça funcionar"): as fontes do que foi feito na usina
+    guardam 90 dias, então a carga conta os meses que ainda cabem inteiros nelas (`fato_atividade_mes.meses_abertos`), lê
+    o fato que está no banco e mantém os outros meses como estão (`mesclar`). NÃO grava nesta hora:
+    - se a ronda ou a PT falhou nesta carga, ou se uma das cinco fontes veio vazia: o mês não é contado pela metade (e a
+      última conta de um mês, antes de ele sair da janela, não pode ser a de uma hora com a fonte fora);
+    - se a leitura das tarefas das OS ou dos chamados falhou;
+    - com o livro existente, se a leitura do fato falhou ou veio vazia: gravar trocaria os meses guardados pelos da
+      janela, e a API não devolve o que se apagou (o fato não encolhe);
+    - sem mudança (o sha das linhas é o da última gravação)."""
+    am = fato_atividade_mes
+    if "ronda" in falhou or "pt" in falhou or "fato_ronda" not in fat or "fato_pt" not in fat:
+        return None, False, {"nao_grava": "a ronda ou a PT falhou nesta carga: o mês não é contado sem elas"}
+    try:
+        tarefas = le.ler(fato_tarefa_os.LIVRO, fato_tarefa_os.ABA)
+        chamados = le.ler(fato_chamado.LIVRO, fato_chamado.ABA)
+    except Exception as e:      # noqa: BLE001 — sem a fonte, a conta do mês sairia menor
+        return None, False, {"nao_grava": f"leitura das tarefas das OS ou dos chamados falhou ({type(e).__name__})"}
+    fontes = {"fechamento": fat["fato_fechamento"][1], "ronda": fat["fato_ronda"][1], "pt": fat["fato_pt"][1],
+              "tarefas das OS": tarefas, "chamados": chamados}
+    vazias = sorted(nome for nome, linhas in fontes.items() if not linhas)
+    if vazias:
+        return None, False, {"nao_grava": "fonte vazia nesta hora (" + ", ".join(vazias) + "): o mês não é contado "
+                                          "pela metade"}
+    abertos = am.meses_abertos(agora.astimezone(_BRT).date())
+    novas = am.montar(fat["fato_fechamento"], fat["fato_ronda"], fat["fato_pt"], tarefas, chamados, abertos, iso)
+    existe = bool(le.abas(am.LIVRO))
+    no_banco = []
+    if existe:
+        try:
+            no_banco = le.ler(am.LIVRO, am.ABA)
+        except Exception as e:      # noqa: BLE001 — sem o fato do banco, gravar apagaria os meses guardados
+            return None, False, {"nao_grava": f"leitura do fato no banco falhou ({type(e).__name__}): o fato não encolhe"}
+        if not no_banco:
+            return None, False, {"nao_grava": "o livro existe e o fato veio vazio: o fato não encolhe"}
+    linhas = am.mesclar(no_banco, novas, abertos, iso)
+    ant = _ler_ou(le, am.LIVRO, "atualizacao", []) if existe else []
+    ant = dict(ant[0]) if ant else {}
+    mudou = str(ant.get("sha_linhas") or "") != am.sha_linhas(linhas)
+    tab = am.tabelas(linhas, iso, maquina, abertos, {"fontes": {nome: len(l) for nome, l in fontes.items()}})
+    return tab, mudou, {"linhas": len(linhas), "linhas_no_banco": len(no_banco), "meses_recalculados": abertos,
+                        "meses": am.meses_das_linhas(linhas), "mudou": mudou}
 
 
 def montar_geracao(config, sessao, agora: datetime | None = None, *, apelidos=None, de_para=None) -> tuple:
@@ -817,8 +882,9 @@ def rodar(config, sessao=None, *, gravar=True, forcar=False, agora=None) -> dict
         for t in a_gravar.values():
             t["atualizacao"][1][0][2] = dur
         nomes = {equipamento.LIVRO: equipamento.NOME, LIVRO_DIM: NOME_DIM, LIVRO_FATOS: NOME_FATOS,
-                 programacao.LIVRO: programacao.NOME_LIVRO}
-        # só estes quatro livros são desta carga (a programação desde 08/10/2026, decisão 7: mescla por semana); outro
+                 programacao.LIVRO: programacao.NOME_LIVRO, fato_atividade_mes.LIVRO: fato_atividade_mes.NOME_LIVRO}
+        # só estes cinco livros são desta carga (a programação desde 08/10/2026, decisão 7: mescla por semana; a
+        # atividade do mês desde 18/11/2026: mescla por mês); outro
         # aqui (a geração) é erro de programação, nunca uma gravação calada: espera a decisão 8 do Levi
         fora = set(a_gravar) - set(nomes)
         if fora:

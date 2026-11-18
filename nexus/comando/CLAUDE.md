@@ -1043,8 +1043,13 @@ relatório e tudo".
 - **O que NÃO dá:** ver as pendências como estavam no fim do mês. `fato_tarefa_os`, os chamados abertos, os extintores e
   os insights só têm o estado de agora; por isso a seção se chama "Segue pendente hoje". E as rondas, as tarefas
   executadas, as PT e os chamados concluídos ficam 90 dias nas fontes: **outubro some delas em janeiro de 2027**. O
-  fechamento guardado de cada mês (o Levi deu o ok em 18/11) ainda não foi feito; sem ele, o mês fechado perde essas
-  partes depois de 90 dias. O PDF também só oferece o mês atual e os dois anteriores (`relatorio_usina.MESES`).
+  PDF também só oferece o mês atual e os dois anteriores (`relatorio_usina.MESES`).
+- **O fechamento guardado** (18/11/2026, Levi: "Ok", "faça funcionar"): o `nexus_atividade_mes ·
+  fato_atividade_usina_mes` guarda as contagens do que foi feito em cada usina em cada mês (as regras e o ensaio:
+  `nexus/dados/CLAUDE.md`). `diagnostico_mes.dados` devolve o mês com `guardado`: None enquanto o mês cabe inteiro nas
+  fontes (a página lê delas, com o detalhe), e as contagens guardadas (`feito_guardado`) quando o mês já saiu. Aí a
+  página e o dossiê do mês mostram os números do fechamento guardado, sem a lista de cada ronda; sem linha guardada é
+  "sem dado guardado", nunca zero. As pendências seguem as de hoje.
 - **O Nexus IA Insights do mês** (`diagnostico_mes`):
   - a IA lê o **dossiê do mês** (`dossie(d)`: o fechamento em texto, sem o nome das pessoas; dá para ler em
     `/t/campo/usinas/<id>/dossie-do-mes.md?mes=AAAA-MM`, e é por ele que se confere o diagnóstico);
