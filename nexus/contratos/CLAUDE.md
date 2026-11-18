@@ -43,6 +43,11 @@ OBRIGATÓRIO (arquivo ou o texto colado), o administrador liga o gestor a uma pe
   CIFRADO (Cofre); os arquivos da prova no disco do servidor (`contratos_edicoes/<id>/`). A mesma mudança em vários
   itens (a regra igual nos seis contratos da 2C) é um lote: uma linha por item, a prova guardada uma vez, e uma entrada
   no histórico.
+- **Mais PDFs depois (18/11/2026 à tarde).** O Levi mandou os PDFs de mais clientes depois que a importação saiu da
+  tela. As fichas novas entram por um caminho interno do administrador, sem botão na tela
+  (`POST /t/comando/contratos/carga-fichas`, `edicao.juntar_fichas`): cliente novo entra na carga; cliente que já tinha
+  ficha é trocado só se ninguém editou um contrato lido ou uma regra dele (a troca muda os ids). A data de cada cliente
+  fica em `por_cliente`, e a história diz quando os PDFs dele foram lidos.
 - **Quem edita.** O administrador, e o gestor do contrato daquele cliente: a pessoa ligada pelo administrador (Editar
   dados → Gestor do contrato) ou, enquanto ninguém escolheu, a ÚNICA pessoa com setor cujo nome é igual ao da planilha
   (nunca se chuta). Trocar o gestor e as metas é só do administrador. A página só mostra o lápis para quem pode, e o

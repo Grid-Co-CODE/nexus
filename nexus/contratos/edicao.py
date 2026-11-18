@@ -158,7 +158,7 @@ def carga(controle: dict | None, fichas_doc: dict | None) -> dict:
                 st["regra"]["r" + _h(K._chave(cli), k.get("id") or k.get("arquivo"), i, r.get("categoria"), r.get("nome"))] = \
                     {**r, "_cliente": cli, "contrato_id": kid}
     info = {"planilha": {k: controle.get(k) for k in ("arquivo", "importado_em", "importado_por")} if controle else None,
-            "fichas": {k: (fichas_doc or {}).get(k) for k in ("arquivo", "importado_em", "importado_por")} if fichas_doc else None,
+            "fichas": {k: (fichas_doc or {}).get(k) for k in ("arquivo", "importado_em", "importado_por", "por_cliente")} if fichas_doc else None,
             "documentos": documentos}
     return {"itens": st, "info": info}
 
@@ -613,13 +613,38 @@ def historico(base: dict, mudancas: list[dict], cliente: str) -> list[dict]:
                       f"{_dbr(pl.get('importado_em'))})")
     if fx and cliente in (info.get("documentos") or {}):
         docs = (info["documentos"][cliente] or {}).get("documentos") or []
-        partes.append(f"{len(docs)} PDF{'s' if len(docs) != 1 else ''} do contrato lidos em {_dbr(fx.get('importado_em'))}: " +
+        quando = ((fx.get("por_cliente") or {}).get(cliente) or {}).get("importado_em") or fx.get("importado_em")
+        partes.append(f"{len(docs)} PDF{'s' if len(docs) != 1 else ''} do contrato lidos em {_dbr(quando)}: " +
                       "; ".join(str(d.get("arquivo") or "") for d in docs))
     out.append({"edicao_id": "", "quando": _dbr(pl.get("importado_em") or fx.get("importado_em")), "quem": "Carga inicial",
                 "item_tipo": "Carga inicial", "item": "", "evento": "carga", "campos": [],
                 "motivo": "O ponto de partida: " + " e ".join(partes) if partes else "O ponto de partida", "prova_texto": "",
                 "anexos": []})
     return out
+
+
+def juntar_fichas(atual: dict | None, novas: list[dict], clientes: list[str], mudancas: list[dict], quando: str,
+                  quem: str, arquivo: str) -> tuple[dict, list[str], list[str]]:
+    """As fichas novas na carga (18/11/2026 à tarde: mais PDFs depois que a importação saiu da tela). Cliente sem ficha
+    entra; cliente com ficha é TROCADO só se ninguém editou um contrato lido ou uma regra dele (a troca muda os ids, e a
+    mudança ficaria apontando para nada); senão fica como está e volta em `recusados`. A data de cada cliente fica em
+    `por_cliente`, para a história dizer quando os PDFs dele foram lidos. Volta (o documento novo, entraram, recusados)."""
+    doc = dict(atual or {"fichas": []})
+    por = {K._chave(f["cliente"]): f for f in doc.get("fichas") or []}
+    nomes = {K._chave(c): c for c in clientes}
+    editados = {K._chave(m.get("cliente")) for m in mudancas if m.get("item_tipo") in ("contrato", "regra")}
+    entraram, recusados = [], []
+    por_cliente = dict(doc.get("por_cliente") or {})
+    for f in novas:
+        ch = K._chave(f["cliente"])
+        if ch in por and ch in editados:
+            recusados.append(f["cliente"])
+            continue
+        por[ch] = f
+        entraram.append(f["cliente"])
+        por_cliente[nomes.get(ch, f["cliente"])] = {"importado_em": quando, "importado_por": quem, "arquivo": arquivo}
+    doc.update(fichas=list(por.values()), por_cliente=por_cliente)
+    return doc, entraram, recusados
 
 
 def _dbr(iso) -> str:

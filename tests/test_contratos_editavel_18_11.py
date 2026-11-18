@@ -203,3 +203,38 @@ def test_a_pagina_pede_motivo_e_prova_e_mostra_o_lapis_so_para_quem_edita(client
     assert 'if (tipo === "parametros" ? !R.admin : !pode(c)) return "";' in js            # o lápis
     assert '["historico", "Histórico"]' in js and "Aplicar a" in js
     assert "nexusPedir" in js and "/t/comando/contratos/" in js
+
+
+def test_mais_fichas_entram_pelo_caminho_do_administrador_e_nao_trocam_o_que_foi_editado(carga, cliente):
+    """18/11/2026 à tarde: o Levi mandou os PDFs de mais clientes depois que a importação saiu da tela ("finaliza"). As
+    fichas novas entram por um caminho interno do administrador (sem nada na tela); a do cliente que alguém já editou
+    não é trocada (a troca mudaria os ids das regras)."""
+    gama = {"cliente": "Gama", "documentos": [{"arquivo": "g.pdf", "tipo": "contrato", "assinado": True}],
+            "contratos": [{"id": "G-1", "regras": [{"categoria": "SLA", "nome": "Chegada", "vigente": "Até 8 h", "ref": {"pagina": 2}}]}]}
+    alfa2 = dict(FICHA, contratos=[dict(FICHA["contratos"][0], id="ALFA-NOVO")])
+
+    def mandar(cli, fichas):
+        r = cli.post("/t/comando/contratos/carga-fichas", data={"fichas": (io.BytesIO(json.dumps(fichas).encode()), "f.json")},
+                     content_type="multipart/form-data")
+        return r.status_code, r.get_json()
+
+    # só o administrador; a tela não tem botão
+    assert mandar(_como(cliente, "gestora@gridco.com.br"), [gama])[0] == 403
+    adm = _como(cliente, "admin@gridco.com.br", admin=True)
+    assert "carga-fichas" not in adm.get("/t/comando/contratos").get_data(as_text=True)
+    st, r = mandar(adm, [gama])
+    assert st == 200 and r["entraram"] == ["Gama"] and r["regras"] == 1
+    d = adm.get("/t/comando/contratos/dados.json").get_json()
+    assert set(d["fichas"]) == {"Solar Alfa", "Gama"}
+    h = adm.get("/t/comando/contratos/historico.json", query_string={"cliente": "Gama"}).get_json()["historico"]
+    assert "g.pdf" in h[-1]["motivo"]
+    # a Solar Alfa sem edição é trocada; depois de editada, não
+    st, r = mandar(adm, [alfa2])
+    assert r["entraram"] == ["SOLAR ALFA"]
+    d = adm.get("/t/comando/contratos/dados.json").get_json()
+    rid = d["fichas"]["Solar Alfa"]["contratos"][0]["regras"][0]["_id"]
+    assert [k["id"] for k in d["fichas"]["Solar Alfa"]["contratos"]] == ["ALFA-NOVO"]
+    assert _editar(adm, item_tipo="regra", item_id=rid, evento="alteracao", cliente="Solar Alfa", valores={"vigente": "Até 5 h"},
+                   motivo="Ajuste combinado", prova_texto="Ata da reunião com o cliente.")[0] == 200
+    st, r = mandar(adm, [FICHA])
+    assert st == 200 and r["entraram"] == [] and r["recusados"] == ["SOLAR ALFA"]

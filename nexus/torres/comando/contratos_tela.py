@@ -168,6 +168,50 @@ def contratos_editar():
     return jsonify(ok=True, **r)
 
 
+@bp.route("/contratos/carga-fichas", methods=["POST"])
+def contratos_carga_fichas():
+    """Mais fichas lidas dos PDFs na carga inicial (18/11/2026 à tarde: o Levi mandou os PDFs de mais clientes depois que a
+    importação saiu da tela). Caminho interno do administrador, sem botão na tela (Levi: "Tire essas opções de subir
+    arquivos"): quem lê os PDFs fora do Nexus manda o .json por aqui. Cliente novo entra; cliente que já tinha ficha é
+    trocado só se ninguém editou um contrato lido ou uma regra dele (`edicao.juntar_fichas`). JSON na resposta."""
+    import os
+
+    from ...campo import visao
+    from ...contratos import controle as K
+    from ...contratos import fichas as F
+    if _de_outro_site():
+        abort(403)
+    _so_interno()
+    if not session.get("admin"):
+        abort(403)
+    f = request.files.get("fichas")
+    if not f or not f.filename:
+        return jsonify(ok=False, erro="Mande o arquivo das fichas (.json)"), 400
+    conteudo = f.read(20 * 1024 * 1024 + 1)
+    if len(conteudo) > 20 * 1024 * 1024:
+        return jsonify(ok=False, erro="O arquivo passa de 20 MB"), 400
+    try:
+        novas = F.ler(json.loads(conteudo.decode("utf-8-sig")))
+    except (ValueError, UnicodeDecodeError) as ex:
+        return jsonify(ok=False, erro=str(ex) if isinstance(ex, F.FichasInvalidas) else "não é um .json válido"), 400
+    controle = _json_da_pasta(K.ARQUIVO) or {}
+    try:
+        mud = E.abrir(E.ler_banco())
+    except Exception as e:       # noqa: BLE001 — sem saber das edições, não troca nada
+        return jsonify(ok=False, erro=f"Não li as edições do banco ({type(e).__name__}): nada foi trocado"), 503
+    u = _usuario()
+    doc, entraram, recusados = E.juntar_fichas(_json_da_pasta(F.ARQUIVO), novas, [c["cliente"] for c in controle.get("contratos") or []],
+                                               mud, visao._agora().strftime("%Y-%m-%dT%H:%M"), u.get("nome") or u.get("email") or "",
+                                               os.path.basename(f.filename))
+    p = _pasta_contratos() / F.ARQUIVO
+    p.parent.mkdir(parents=True, exist_ok=True)
+    tmp = p.with_suffix(".tmp")
+    tmp.write_text(json.dumps(doc, ensure_ascii=False), encoding="utf-8")
+    os.replace(tmp, p)
+    return jsonify(ok=True, entraram=entraram, recusados=recusados,
+                   regras=sum(len(c.get("regras") or []) for x in novas if x["cliente"] in entraram for c in x["contratos"]))
+
+
 @bp.route("/contratos/anexo/<edicao_id>/<int:n>")
 def contratos_anexo(edicao_id, n):
     """A prova de uma mudança, para quem é da Grid (o cliente não abre)."""
