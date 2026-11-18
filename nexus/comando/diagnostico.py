@@ -14,6 +14,8 @@ vai ter o diagnóstico da IA [...] o que é que está pendente, o que é que dá
   pedido `PEDIDO`; a resposta é um JSON (`ler`), e a OS citada só vale se está no dossiê.
 - Falhou (limite, provedor fora): o erro fica guardado 20 minutos (`ESPERA_ERRO_S`) e depois tenta de novo; até lá vale o
   parecer de sempre.
+- Enquanto o de hoje é feito, a tela mostra o último que deu certo, com a data dele (`anterior`; 18/11/2026, Levi:
+  "demora 40 segundos para uma resposta após eu abrir a usina"; "faz o A"). Só o de até `MAX_DIAS_ANTERIOR` dias.
 """
 from __future__ import annotations
 
@@ -22,7 +24,7 @@ import logging
 import os
 import re
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
 from . import ia as IA
@@ -33,6 +35,8 @@ MODELO_PADRAO = "nemotron"       # o grátis com a melhor nota no teste de 14/11
                                  # (com a chave da NVIDIA, o mesmo Nemotron vai por ela: `modelo`)
 ESPERA_ERRO_S = 20 * 60          # o erro guardado vale isto; depois a próxima abertura tenta de novo
 TRAVA_MORTA_S = 5 * 60           # a trava mais velha que isto é de um pedido que morreu (o servidor reiniciou)
+MAX_DIAS_ANTERIOR = 7            # o diagnóstico mais velho que isto não aparece enquanto o de hoje é feito (o de sexta
+                                 # serve na segunda; o da semana retrasada já fala de outra usina)
 MAX_ITENS = {"tem_que_fazer": 4, "pode_fazer": 3, "pendente": 4}
 MAX_ITEM, MAX_SITUACAO, MAX_PEDIDO = 160, 320, 600
 
@@ -180,6 +184,29 @@ def guardado(cfg, usina_id: int, dia: str | None = None) -> dict | None:
     if not d.get("ok") and time.time() - float(d.get("ts") or 0) > ESPERA_ERRO_S:
         return None
     return d
+
+
+def anterior(cfg, usina_id: int, dia: str | None = None) -> dict | None:
+    """O último diagnóstico que deu certo ANTES do dia, de até `MAX_DIAS_ANTERIOR` dias: o que a tela mostra enquanto o
+    de hoje é feito (18/11/2026: o primeiro a abrir a usina no dia esperava 40 s pela IA, com pensamento, olhando o
+    parecer de sempre). O que falhou, o estragado e o do próprio dia não servem. None: não há."""
+    dia = dia or hoje()
+    try:
+        base = datetime.fromisoformat(dia)
+    except ValueError:
+        return None
+    for n in range(1, MAX_DIAS_ANTERIOR + 1):
+        pasta = _pasta(cfg, f"{base - timedelta(days=n):%Y-%m-%d}")
+        arq = pasta / f"{int(usina_id)}.json" if pasta else None
+        if not arq or not arq.exists():
+            continue
+        try:
+            d = json.loads(arq.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        if d.get("ok") and (d.get("diag") or d.get("texto")):
+            return d
+    return None
 
 
 def travar(cfg, usina_id: int, dia: str | None = None) -> bool:

@@ -169,9 +169,18 @@
       .then(function (j) {
         if (j.estado === 'pronto' || j.estado === 'texto') { desenharDiag(el, j); return; }
         if (j.estado === 'preparando') {
-          fonte.textContent = 'A IA está fazendo o diagnóstico do dia desta usina. Quem abrir depois já vê pronto.';
+          // o último diagnóstico entra na hora, com a data dele, e fica até o de hoje chegar (18/11/2026, Levi: "demora
+          // 40 segundos para uma resposta após eu abrir a usina"); sem ele, o parecer de sempre e o aviso
+          if (j.anterior && (j.anterior.estado === 'pronto' || j.anterior.estado === 'texto')) {
+            if (!el._puAnterior) { el._puAnterior = true; desenharDiag(el, j.anterior); }
+            if (j.anterior.diag) el.querySelector('[data-pu-diag-selo]').textContent = 'Nexus IA Insights · de ' + (j.anterior.data || 'antes');
+            fonte.textContent = 'Este é o diagnóstico de ' + (j.anterior.data || 'antes') + (j.anterior.hora ? ', das ' + j.anterior.hora : '') +
+              '. O de hoje está sendo feito e entra aqui sozinho.';
+          } else {
+            fonte.textContent = 'A IA está fazendo o diagnóstico do dia desta usina. Quem abrir depois já vê pronto.';
+          }
           fonte.hidden = false;
-          if (vez < 36) { setTimeout(function () { carregarDiag(el, vez + 1); }, 5000); }
+          if (vez < 60) { setTimeout(function () { carregarDiag(el, vez + 1); }, 3000); }
           return;
         }
         if (j.estado === 'erro' || j.estado === 'teto') {

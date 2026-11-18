@@ -938,7 +938,16 @@ o que é que ele tem que fazer".
 - **Um por usina por dia** (o dia de Brasília), guardado em `<NEXUS_DADOS>/ia/diagnosticos/AAAA-MM-DD/<usina>.json`.
   - A primeira abertura do dia pega a trava (`<usina>.andamento`, criada de forma exclusiva), monta o dossiê na hora e
     manda a IA fazer numa thread à parte. A rota responde "preparando" e a página não espera.
-  - Quem abre enquanto isso vê "preparando", e o JS pergunta de novo a cada 5 s.
+  - Quem abre enquanto isso vê "preparando", e o JS pergunta de novo a cada 3 s.
+  - **Enquanto o de hoje é feito, a tela mostra o último que deu certo** (18/11/2026, Levi: "demora 40 segundos para
+    uma resposta após eu abrir a usina"; à proposta de mostrar o de ontem enquanto o de hoje fica pronto: "faz o A").
+    - Com o "preparando", a rota manda `anterior` (`diagnostico.anterior`: o último ok dos `MAX_DIAS_ANTERIOR`, 7,
+      dias antes; o de sexta serve na segunda, o mais velho não).
+    - A tela desenha esse diagnóstico inteiro, com o selo "Nexus IA Insights · de dd/mm" e a linha "Este é o
+      diagnóstico de dd/mm [...] O de hoje está sendo feito e entra aqui sozinho", e troca pelo de hoje quando chega.
+    - Sem diagnóstico anterior (a usina que ninguém abriu na semana), fica o parecer de sempre com o aviso, como antes.
+    - O diagnóstico de hoje não ficou mais rápido: ele segue com pensamento (o Busca/Pensamento é só da caixa de
+      pergunta). Prova: `tests/test_comando_diagnostico_anterior_18_11.py`.
   - Quem abre depois lê o guardado, sem chamar a IA.
   - A trava com mais de 5 min é de um pedido que morreu (o servidor reiniciou) e é refeita.
 - **A IA:** é a do Nexus IA (`ia.perguntar`), com as mesmas instruções e blindagem. O pedido é o `PEDIDO`:

@@ -706,8 +706,10 @@ def usina_ia_diagnostico(usina_id):
     prontuário da usina, abrir o diagnóstico da IA [...] uma pessoa diferente abrir também no mesmo dia, usar o mesmo
     diagnóstico [...] Para não ficar gastando token à toa"). JSON {estado: pronto | texto | preparando | erro | teto |
     sem_ia, diag, ...}. O guardado do dia volta na hora; sem ele, a primeira abertura pega a trava, monta o dossiê e manda
-    fazer numa thread à parte (a página não espera), e as outras veem "preparando" até ficar pronto. Abre para quem abre o
-    prontuário (as regras e o guardado: nexus/comando/diagnostico.py)."""
+    fazer numa thread à parte (a página não espera), e as outras veem "preparando" até ficar pronto. Com o "preparando"
+    vai o último diagnóstico que deu certo (`anterior`), que a tela mostra com a data dele até o de hoje chegar
+    (18/11/2026, Levi: "demora 40 segundos para uma resposta após eu abrir a usina"). Abre para quem abre o prontuário
+    (as regras e o guardado: nexus/comando/diagnostico.py)."""
     import threading
 
     from flask import jsonify
@@ -740,6 +742,10 @@ def usina_ia_diagnostico(usina_id):
         else:
             threading.Thread(target=DG.gerar, args=args, daemon=True, name=f"diagnostico-{usina_id}").start()
             out = {"estado": "preparando"}
+    if out.get("estado") == "preparando":
+        ant = DG.anterior(cfg, usina_id, dia)
+        if ant:
+            out["anterior"] = DG.para_tela(ant)
     resp = jsonify(out)
     resp.headers["Cache-Control"] = "no-store"
     return resp
