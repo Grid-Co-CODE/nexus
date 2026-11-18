@@ -253,6 +253,24 @@ As duas precisam do Python além do relatório de furos; no .exe usam o BD que a
     e a pessoa decide (a Crateus tem 40 de 50 inversores parados de verdade); a fonte que não devolve nada vira erro com
     o motivo, não planilha vazia. A recusa da plataforma (teto, reserva da noite, fonte fora) chega à tela como veio.
     O script da tela só é servido a quem pode recoletar.
+  - **A lista de usinas sem demora** (18/11/2026, Levi: "a leitura de usinas da fonte demora muito"). Medido: a demora
+    era daqui, não da plataforma (que responde em 0,2 a 0,7 s): para saber quais usinas têm aba, o `fontes_plantas` lia
+    do banco a aba INTEIRA de cada uma (14 s para as 75 da API PV). Agora confere só o NOME da aba (`ctx.abas`); quem lê a
+    aba é a montagem, e só a da usina pedida. A exceção é a SolarEdge, cuja lista a plataforma busca na fonte na 1ª
+    chamada (44 s): por isso a lista de cada fonte fica guardada 10 min no processo (`recoleta_fontes._PLANTAS`, uma
+    busca por fonte de cada vez, a recusa não fica guardada) e abrir o painel (`fontes_lista`) já a busca em fundo para
+    todas (`aquecer`). O saldo da cota que vem na lista é corrigido a cada pedido de verdade (`anotar_cota`); o custo
+    antes de buscar vem sempre do `simular`, na hora.
+  - **A Fonte e a Usina são a lista digitável do Nexus** (18/11/2026, Levi, sobre a caixa nativa do navegador: "essa
+    lista de usinas também tá escrota, quero ao estilo nexus!"): as `zf-*` do Histórico de OS (`static/zeladoria/
+    filtros.css`), de uma escolha, com a busca, as setas e o Esc; a caixa nativa do .exe fica escondida. O ajuste de
+    tamanho mora em `static/coletas/coletas.css` (`.rc-lista`).
+  - **A lista não vence com o reinício do Nexus** (18/11/2026, Levi, com o painel aberto e uma publicação no meio:
+    "a lista fica vencendo ainda, resolva!"). O que a recoleta guarda (a lista da fonte, o plano, as respostas) mora na
+    memória da sessão, e o Nexus reinicia a cada publicação. O `fontes_simular` e o `fontes_plano` refazem a lista
+    sozinhos (`_rf_ou_refaz`, com a chave que a rota passa; espera os BDs do banco ficarem prontos); só a busca perdida
+    no MEIO volta com `refazer: true`, e a tela recomeça a busca sozinha, uma vez (`ir(true)` no recoleta.js). A usina
+    que saiu da lista da fonte dá o motivo, não "venceu".
   - Prova: `tests/test_coletas_recoleta_fontes.py` (plataforma dublada com as respostas do contrato) e, da recoleta do
     .exe, `test_a_recoleta_busca_na_fonte_e_sai_pela_mesma_montagem` e `test_a_recoleta_so_abre_para_quem_tem_a_tela_dela`.
 - Trazer uma versão do .exe que a Coleta ainda está mexendo: a pasta pode ter trabalho sem release (o `mural.py` estava lá

@@ -16,6 +16,9 @@ ser do mês atual, o que foi feito no ativo". E, à pergunta se o mês fechado t
   conferido com o do mês e, se não bate, refaz uma vez pensando (a mesma regra do diagnóstico do dia).
 - O que NÃO dá: ver as pendências como estavam no fim do mês. As fontes só guardam o que está aberto agora; por isso a
   seção se chama "o que segue pendente hoje".
+- O mês que já saiu das fontes de 90 dias (as rondas, as tarefas executadas, as PT, os chamados concluídos) lê o
+  fechamento guardado, o `nexus_atividade_mes · fato_atividade_usina_mes` (`dados`, `feito_guardado`): só as contagens,
+  sem o detalhe de cada ronda. Sem linha guardada é "sem dado guardado", nunca zero.
 """
 from __future__ import annotations
 
@@ -76,6 +79,50 @@ def mes_fechado(valor, hoje: date) -> str | None:
     vigente, o de antes do banco e o que não é mês: aí vale o prontuário de sempre."""
     v = str(valor or "").strip()
     return v if any(m == v and not vigente for m, _r, vigente in meses(hoje)) else None
+
+
+# ── os dados do mês: das fontes enquanto cabe nelas, do fechamento guardado depois ───────────────────────────────────
+def dados(uid: int, mes: str, hoje: date, ler_fato=None) -> dict:
+    """O mês da usina (`relatorio_usina.dados`), com `guardado`:
+    - None enquanto o mês cabe inteiro nas fontes (`fato_atividade_mes.meses_abertos`): a página lê delas, com o detalhe;
+    - o `feito_guardado` quando o mês já saiu delas: o que as fontes devolvem aí (listas vazias) não quer dizer que nada
+      foi feito, e o que vale é o fechamento guardado. O fato que não abre vira `erros["guardado"]`.
+    `ler_fato` (teste) devolve as linhas do fato; na tela é a cópia de 2 min do banco (`visao._livro`)."""
+    from ..campo import relatorio_usina as RU
+    from ..dados import fato_atividade_mes as AM
+    d = RU.dados(uid, mes, hoje)
+    mes_id = int(mes[:4]) * 100 + int(mes[5:7])
+    if mes_id in AM.meses_abertos(hoje):
+        d["guardado"] = None
+        return d
+    try:
+        if ler_fato is None:
+            from ..campo import visao
+            linhas = visao._livro(AM.LIVRO, AM.ABA)
+        else:
+            linhas = ler_fato()
+        d["guardado"] = feito_guardado(AM.do_mes(linhas, uid, mes_id))
+    except Exception as e:      # noqa: BLE001 — o fato fora do ar: a página diz que não leu; o resto do mês vale
+        d.setdefault("erros", {})["guardado"] = type(e).__name__
+        d["guardado"] = {"tem": False}
+    return d
+
+
+def feito_guardado(do_mes: dict) -> dict:
+    """O que foi feito no mês, das linhas guardadas ({atividade: (eventos, OS)}, `fato_atividade_mes.do_mes`):
+    {tem, rondas, rondas_txt, tarefas [(tipo, tarefas, OS)], tarefas_total, zeladoria_dias, pt, chamados_abertos,
+    chamados_finalizados}. Sem linha nenhuma, {"tem": False}: o mês não foi guardado (não é zero)."""
+    if not do_mes:
+        return {"tem": False}
+    rondas = {a[len("ronda_"):]: n for a, (n, _os) in do_mes.items() if a.startswith("ronda_") and n}
+    nomes = {"curta": ("curta", "curtas"), "longa": ("longa", "longas"), "sem_tipo": ("sem tipo", "sem tipo")}
+    partes = [f"{n} {nomes.get(t, (t, t))[0 if n == 1 else 1]}" for t, n in sorted(rondas.items())]
+    tarefas = sorted(((a[len("tarefa_"):].replace("_", " ").capitalize(), n, os_) for a, (n, os_) in do_mes.items()
+                      if a.startswith("tarefa_") and n), key=lambda x: (-x[1], x[0]))
+    um = lambda a: (do_mes.get(a) or (0, 0))[0]                 # noqa: E731
+    return {"tem": True, "rondas": sum(rondas.values()), "rondas_txt": " e ".join(partes), "tarefas": tarefas,
+            "tarefas_total": sum(n for _t, n, _o in tarefas), "zeladoria_dias": um("zeladoria"), "pt": um("pt"),
+            "chamados_abertos": um("chamado_aberto"), "chamados_finalizados": um("chamado_finalizado")}
 
 
 # ── o dossiê do mês ──────────────────────────────────────────────────────────────────────────────────────────────────
@@ -141,6 +188,25 @@ def dossie(d: dict) -> str:
                 f"OS {x['os']}" if x.get("os") else "", f"proteções: {x['protecoes']}" if x.get("protecoes") else "",
                 str(x.get("relato") or "")[:220]) if p))
     out += ["", "## 3. O que foi feito no ativo no mês", ""]
+    g = d.get("guardado")
+    if g is not None:
+        # o mês já saiu das fontes de 90 dias: valem as contagens do fechamento guardado, sem o detalhe de cada ronda
+        if "guardado" in erros:
+            out.append("- O que foi feito no mês: sem leitura do fechamento guardado.")
+        elif not g.get("tem"):
+            out.append("- O que foi feito no mês: sem dado guardado (o mês saiu das fontes antes de o Nexus guardar o "
+                       "fechamento dele).")
+        else:
+            out.append("- Os números abaixo são do fechamento guardado do mês: as fontes guardam 90 dias e já não têm o "
+                       "detalhe de cada ronda e de cada tarefa.")
+            out.append(f"- Rondas feitas no mês: {g['rondas']}" + (f" ({g['rondas_txt']})" if g["rondas_txt"] else ""))
+            out.append(f"- Tarefas de manutenção executadas no mês, pelo registro do App de campo: {g['tarefas_total']}" + (
+                " (" + "; ".join(f"{t}: {n} em {o} OS" for t, n, o in g["tarefas"]) + ")" if g["tarefas"] else ""))
+            out.append(f"- Zeladoria feita em {g['zeladoria_dias']} dia{'' if g['zeladoria_dias'] == 1 else 's'} do mês")
+            out.append(f"- PT pedidas no mês: {g['pt']}")
+            out.append(f"- Chamados de garantia abertos no mês: {g['chamados_abertos']}")
+            out.append(f"- Chamados de garantia finalizados no mês: {g['chamados_finalizados']}")
+        return _pendente(out, d, erros)
     if "rondas" in erros or d.get("rondas") is None:
         out.append("- Rondas: sem leitura.")
     else:
@@ -179,6 +245,12 @@ def dossie(d: dict) -> str:
         for c in fin:
             if c not in abertos:
                 out.append(f"  - OS {c.get('os')} · {c.get('equip')} · {c.get('fabricante') or 'fabricante ' + SEM_DADO} · finalizado em {_dm(c.get('fim'))}")
+    return _pendente(out, d, erros)
+
+
+def _pendente(out: list, d: dict, erros: dict) -> str:
+    """A última seção do dossiê do mês (o que segue aberto HOJE) e o texto pronto."""
+    ch = d.get("chamados")
     hoje = d.get("hoje")
     out += ["", f"## 4. O que segue pendente hoje ({hoje:%d/%m/%Y})" if hoje else "## 4. O que segue pendente hoje", ""]
     if d.get("manut") and "manut" not in erros:

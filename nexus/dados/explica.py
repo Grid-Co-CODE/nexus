@@ -107,6 +107,7 @@ RESUMO = {
     # ── PCM ──
     "programacao": "A agenda semanal de manutenção montada pelo PCM",
     "tarefa_os": "Cada tarefa das OS abertas no Fracttal e a zeladoria feita",
+    "atividade_usina_mes": "O que foi feito em cada usina em cada mês, guardado para sempre",
     "os_fama": "Cada OS que o cliente abriu na FAMA para a Grid, com a usina do Nexus",
     # ── OS Creator ──
     "uso_os_hora": "O uso de cada tela do OS Creator, hora a hora",
@@ -414,6 +415,10 @@ PARA_QUE = {
     "programacao": "A agenda semanal de manutenção que o PCM monta: que tarefa, em que usina, com qual equipe e em "
                    "que dia e hora. Serve para comparar o planejado com o que o campo fez e ver a carga de cada "
                    "equipe. O Nexus guarda as semanas desde a W21 de 2026, além das 4 que o arquivo do PCM guarda.",
+    "atividade_usina_mes": "Guarda, para cada usina e cada mês, quantas rondas, tarefas executadas (por tipo), dias de "
+                           "zeladoria, PT e chamados de garantia abertos e finalizados houve. As fontes desses números "
+                           "guardam só 90 dias; esta tabela conta enquanto o mês ainda está nelas e depois mantém o mês "
+                           "como ficou. Serve para o prontuário da usina mostrar o que foi feito num mês antigo.",
     "tarefa_os": "Guarda cada tarefa das OS abertas no Fracttal (em processo e em verificação) e a zeladoria feita nos "
                  "últimos 90 dias, lidas pelo próprio Nexus de hora em hora: a usina, o equipamento, o tipo, a data "
                  "programada e em que pé está. É de onde a Visão do responsável conta as OS abertas e atrasadas e a "

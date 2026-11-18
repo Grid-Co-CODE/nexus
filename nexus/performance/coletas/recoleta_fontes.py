@@ -20,6 +20,8 @@ Custo: as fontes pagas (`paga`) têm teto por dia e a reserva da coleta da noite
 o custo ANTES (`simular`). Quem pode usar é o Nexus que decide (`coletas_tela._pode_recoletar`: só o setor Performance).
 """
 import datetime as dt
+import threading
+import time
 
 from . import motor  # noqa: F401 — o motor como `conversor`
 from conversor import recoleta as _recoleta  # noqa: E402
@@ -39,9 +41,48 @@ def _rota(fonte, plantas=False):
     return "/api/recoleta/%s%s?formato=bd" % (fonte, "/plantas" if plantas else "")
 
 
+# A lista de usinas de cada fonte fica guardada 10 min, para todo mundo (Levi, 18/11/2026: "a leitura de usinas da fonte
+# demora muito, já fazemos essa leitura em performance > sala de controle"). Medido nesse dia: a plataforma responde em
+# 0,2 a 0,7 s, menos a SolarEdge na 1ª chamada (44 s, a lista de sites vem da fonte na hora); com a lista guardada e
+# aquecida ao abrir o painel (`aquecer`), trocar de fonte não espera. Uma busca por fonte de cada vez: quem pede a mesma
+# fonte no meio espera a que já está indo, não dispara outra. A recusa não fica guardada. O saldo da cota que vem junto
+# envelhece com a lista: `anotar_cota` o corrige a cada pedido de verdade, e o `simular` traz o número da hora.
+VALE_PLANTAS_S = 600
+_PLANTAS = {}                                  # fonte -> (quando, resposta)
+_TRAVAS = {f: threading.Lock() for f, _n in FONTES}
+
+
 def plantas(fonte, chave):
-    r = _recoleta._pedir(_rota(fonte, True), chave)
-    return r if isinstance(r, dict) else {"plantas": r or []}
+    rota = _rota(fonte, True)                  # recusa a fonte desconhecida antes de qualquer coisa
+    with _TRAVAS[fonte]:
+        g = _PLANTAS.get(fonte)
+        if g and time.time() - g[0] < VALE_PLANTAS_S:
+            return g[1]
+        r = _recoleta._pedir(rota, chave)
+        r = r if isinstance(r, dict) else {"plantas": r or []}
+        _PLANTAS[fonte] = (time.time(), r)
+        return r
+
+
+def anotar_cota(fonte, resta):
+    g = _PLANTAS.get(fonte)
+    if g and resta is not None:
+        g[1]["cota_restante"] = resta
+
+
+def aquecer(chave):
+    """Ao abrir o painel: busca em fundo a lista de cada fonte que ainda não está guardada. Não espera nem levanta."""
+    def vai(fonte):
+        try:
+            plantas(fonte, chave)
+        except Exception:                      # noqa: BLE001 — aquecer é extra: a tela pede de novo e mostra o motivo
+            pass
+    if not chave:
+        return
+    for fonte, _nome in FONTES:
+        g = _PLANTAS.get(fonte)
+        if not (g and time.time() - g[0] < VALE_PLANTAS_S):
+            threading.Thread(target=vai, args=(fonte,), daemon=True, name="nexus-recoleta-" + fonte).start()
 
 
 def por_usina(lista):

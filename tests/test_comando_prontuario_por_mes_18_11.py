@@ -189,3 +189,61 @@ def test_o_prontuario_tem_o_seletor_de_mes_e_o_mes_fechado_abre_o_fechamento(tel
     # o mês que não existe (ou o vigente) abre o prontuário de sempre; a usina que não existe, 404
     assert "Prontuário da usina" in logado.get("/t/campo/usinas/1?mes=2026-09").get_data(as_text=True)
     assert logado.get("/t/campo/usinas/987654?mes=2026-10").status_code == 404
+
+
+# ── 3ª parte: o mês que já saiu das fontes de 90 dias lê o fechamento guardado ───────────────────────────────────────
+# As rondas, as tarefas executadas, as PT e os chamados concluídos ficam 90 dias nas fontes: outubro some delas em
+# janeiro. O `fato_atividade_usina_mes` (nexus/dados/fato_atividade_mes.py) guarda as contagens do mês; quando o mês já
+# não cabe nas fontes, o prontuário e o dossiê do mês leem dele. Sem linha guardada, é "sem dado guardado", nunca zero.
+from nexus.dados import fato_atividade_mes as AM  # noqa: E402
+
+GUARDADO = [dict(zip(AM.CAB, l)) for l in (
+    ["a1", 20261001, 1, AM.LIGADA_POR, "ronda_curta", 5, 5, "x"], ["a2", 20261001, 1, AM.LIGADA_POR, "ronda_longa", 2, 2, "x"],
+    ["a3", 20261001, 1, AM.LIGADA_POR, "tarefa_corretiva", 8, 8, "x"], ["a4", 20261001, 1, AM.LIGADA_POR, "tarefa_mpm", 17, 1, "x"],
+    ["a5", 20261001, 1, AM.LIGADA_POR, "zeladoria", 2, 2, "x"], ["a6", 20261001, 1, AM.LIGADA_POR, "pt", 27, 20, "x"],
+    ["a7", 20261001, 1, AM.LIGADA_POR, "chamado_aberto", 2, 2, "x"], ["a8", 20261001, 1, AM.LIGADA_POR, "chamado_finalizado", 1, 1, "x"])]
+
+
+def test_o_mes_fora_da_janela_das_fontes_le_o_fechamento_guardado(monkeypatch):
+    from nexus.campo import relatorio_usina as RU
+    vazio = _d()                      # o que as fontes devolvem depois de 90 dias: listas vazias, que não são "nada feito"
+    vazio.update(rondas=[], hoje=date(2027, 2, 10))
+    vazio["manut"] = {"feitas": [], "abertas": [{"tipo": "Corretiva", "os": 4}], "zeladoria": []}
+    vazio["chamados"] = {"mes": [], "em_aberto": 3}
+    monkeypatch.setattr(RU, "dados", lambda uid, mes, hoje: dict(vazio))
+    d = DM.dados(1, "2026-10", date(2027, 2, 10), ler_fato=lambda: GUARDADO)
+    g = d["guardado"]
+    assert g["tem"] and g["rondas"] == 7 and g["zeladoria_dias"] == 2 and g["pt"] == 27
+    assert g["tarefas_total"] == 25 and g["tarefas"] == [("Mpm", 17, 1), ("Corretiva", 8, 8)]
+    assert (g["chamados_abertos"], g["chamados_finalizados"]) == (2, 1)
+    t = DM.dossie(d)
+    for linha in ("- Rondas feitas no mês: 7 (5 curtas e 2 longas)",
+                  "- Tarefas de manutenção executadas no mês, pelo registro do App de campo: 25 (Mpm: 17 em 1 OS; Corretiva: 8 em 8 OS)",
+                  "- Zeladoria feita em 2 dias do mês", "- PT pedidas no mês: 27",
+                  "- Chamados de garantia abertos no mês: 2", "- Chamados de garantia finalizados no mês: 1",
+                  "- OS em aberto hoje: 4 (Corretiva: 4)"):
+        assert linha in t, linha
+    assert "fechamento guardado" in t and "Rondas feitas no mês: 0" not in t
+    # o mês que ainda cabe nas fontes segue lendo delas, com o detalhe (o fato nem é lido)
+    vivo = DM.dados(1, "2026-10", date(2026, 11, 18), ler_fato=lambda: (_ for _ in ()).throw(AssertionError("leu o fato")))
+    assert vivo["guardado"] is None
+    # sem linha guardada para a usina naquele mês: "sem dado guardado", nunca zero
+    d = DM.dados(1, "2026-10", date(2027, 2, 10), ler_fato=lambda: [])
+    assert d["guardado"] == {"tem": False} and "- O que foi feito no mês: sem dado guardado" in DM.dossie(d)
+    # o fato que não abre: sem leitura
+    def falha():
+        raise RuntimeError("banco fora")
+    d = DM.dados(1, "2026-10", date(2027, 2, 10), ler_fato=falha)
+    assert d["guardado"] == {"tem": False} and d["erros"]["guardado"] == "RuntimeError"
+
+
+def test_a_pagina_do_mes_antigo_mostra_o_fechamento_guardado(tela, logado, banco, monkeypatch):
+    from test_campo_responsaveis import _aba
+    monkeypatch.setattr(AM, "meses_abertos", lambda hoje, *a: [])           # outubro já não cabe nas fontes
+    _aba(banco, AM.LIVRO, AM.ABA, GUARDADO)
+    m = logado.get("/t/campo/usinas/1?mes=2026-10").get_data(as_text=True)
+    assert "<b>7</b> rondas no mês" in m and "5 curtas e 2 longas" in m
+    assert "<b>25</b> tarefas de manutenção executadas" in m and "Mpm 17 (em 1 OS)" in m
+    assert "fechamento guardado" in m
+    r = logado.get("/t/campo/usinas/1/dossie-do-mes.md?mes=2026-10").get_data(as_text=True)
+    assert "- Rondas feitas no mês: 7 (5 curtas e 2 longas)" in r

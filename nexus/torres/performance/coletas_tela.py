@@ -124,12 +124,14 @@ def coletas_api(metodo):
             if metodo.startswith("fontes_"):       # as sete fontes (recoleta_fontes.py), pela tela do Nexus
                 from ...performance.coletas import recoleta_fontes as RF
                 if metodo == "fontes_lista":
+                    RF.aquecer(servico.chave_recoleta(app.config))   # as listas de usinas vêm em fundo: trocar de fonte não espera
                     return _json([{"id": i, "nome": n} for i, n in RF.FONTES])
                 if metodo == "fontes_plantas":
                     return _json(s.fontes_plantas(str(args[0]), servico.chave_recoleta(app.config)))
                 if metodo in ("fontes_simular", "fontes_plano"):
                     return _json(getattr(s, metodo)(str(args[0]), str(args[1]), str(args[2]), str(args[3]),
-                                                    bool(args[4]), bool(args[5]), bool(args[6])))
+                                                    bool(args[4]), bool(args[5]), bool(args[6]),
+                                                    chave=servico.chave_recoleta(app.config)))
                 if metodo == "fontes_parte":
                     return _json(s.fontes_parte(int(args[0])))
                 return _json(s.fontes_montar())

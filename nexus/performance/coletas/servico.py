@@ -367,12 +367,21 @@ class SessaoNexus(Sessao):
     # ------------------------------------------------------------ recoleta pelas fontes (recoleta_fontes.py, 17/11/2026)
     # O mesmo desenho da recoleta do .exe, para as sete fontes: a lista de usinas da fonte, o custo antes (simular), os
     # pedidos um a um com o andamento na tela e, no fim, a MESMA montagem da conversão. O estado fica na sessão (`_rf`).
-    _VENCEU = {"erro": "Abra de novo a recoleta (a lista de usinas venceu)."}
+    # O que a recoleta guarda (a lista da fonte, o plano, as respostas) mora na memória desta sessão, e o Nexus reinicia
+    # a cada publicação, várias vezes por dia: em 18/11/2026 o Levi, com o painel aberto, levou "Abra de novo a recoleta
+    # (a lista de usinas venceu)" logo depois de uma ("e a lista fica vencendo ainda, resolva!"). Agora o simular e o
+    # plano refazem a lista sozinhos (`_rf_ou_refaz`); só o que se perdeu no MEIO de uma busca (as respostas já recebidas)
+    # volta como `refazer`, e a tela recomeça a busca sozinha, uma vez.
+    _VENCEU = {"erro": "O Nexus reiniciou no meio desta recoleta e o que já tinha vindo se perdeu. Clique em Recoletar de novo.",
+               "refazer": True}
 
     def fontes_plantas(self, fonte, chave):
         """As usinas que dá para recoletar nesta fonte: as que ela conhece e que têm aba num BD lido."""
         if not chave:
             return {"erro": "Este Nexus não tem a chave da recoleta (NEXUS_SSO_CHAVE ou CONVERSOR_RECOLETA_CHAVE)."}
+        # logo depois de um reinício a sessão ainda está lendo os BDs do banco em fundo: sem esperar, toda usina sairia
+        # como "BD não foi lido" e a lista viria vazia
+        self.pronto.wait(25)
         try:
             info = RF.plantas(fonte, chave)
         except RF.Falha as e:
@@ -381,14 +390,20 @@ class SessaoNexus(Sessao):
             traceback.print_exc()
             return {"erro": "%s: %s" % (type(e).__name__, e)}
         ctx = self.ctx()
-        mapa, sem_aba, sem_bd = {}, [], set()
+        mapa, sem_aba, sem_bd, nomes = {}, [], set(), {}
         for usina, x in RF.por_usina(info.get("plantas")).items():
-            if ctx.bd(x["destino"]) is None:
-                sem_bd.add(x["destino"])
-            elif ctx.aba(x["destino"], usina) is None:
-                sem_aba.append(usina)
-            else:
+            d = x["destino"]
+            if ctx.bd(d) is None:
+                sem_bd.add(d)
+                continue
+            # só o NOME da aba: `ctx.aba` leria do banco a aba inteira de cada usina (18/11/2026: 14 s para as 75 da API
+            # PV, só para saber se existem). Quem lê a aba é a montagem, e só a da usina pedida
+            if d not in nomes:
+                nomes[d] = set(ctx.abas(d))
+            if usina in nomes[d]:
                 mapa[usina] = x
+            else:
+                sem_aba.append(usina)
         self._rf = {"fonte": fonte, "chave": chave, "mapa": mapa, "max_dias": info.get("max_dias"),
                     "max_plantas": info.get("max_plantas"), "plano": [], "respostas": [], "pedido": None}
         return {"fonte": fonte, "nome": RF.NOMES[fonte],
@@ -400,11 +415,26 @@ class SessaoNexus(Sessao):
         rf = getattr(self, "_rf", None)
         return rf if rf and rf["fonte"] == fonte and usina in rf["mapa"] else None
 
-    def fontes_simular(self, fonte, usina, ini, fim, geracao, etm, chuva):
-        """Quanto esta recoleta gasta, antes de a pessoa confirmar: a plataforma faz a conta e nada é buscado."""
+    def _rf_ou_refaz(self, fonte, usina, chave):
+        """O estado da recoleta desta fonte e usina; sem ele (o Nexus reiniciou, ou a pessoa trocou de fonte em outra
+        aba), refaz a lista da fonte na hora. -> (rf, None) ou (None, {"erro"})."""
         rf = self._rf_de(fonte, usina)
+        if rf:
+            return rf, None
+        r = self.fontes_plantas(fonte, chave)
+        if r.get("erro"):
+            return None, r
+        rf = self._rf_de(fonte, usina)
+        if rf:
+            return rf, None
+        return None, {"erro": "%s não está na lista de %s (ou não tem aba num BD lido). Escolha a usina de novo."
+                              % (usina, RF.NOMES.get(fonte, fonte))}
+
+    def fontes_simular(self, fonte, usina, ini, fim, geracao, etm, chuva, chave=None):
+        """Quanto esta recoleta gasta, antes de a pessoa confirmar: a plataforma faz a conta e nada é buscado."""
+        rf, erro = self._rf_ou_refaz(fonte, usina, chave)
         if not rf:
-            return dict(self._VENCEU)
+            return erro
         try:
             pl = RF.plano(rf["mapa"][usina]["ids"], dt.date.fromisoformat(ini), dt.date.fromisoformat(fim),
                           rf["max_plantas"], rf["max_dias"])
@@ -419,10 +449,10 @@ class SessaoNexus(Sessao):
             return {"erro": "Período inválido."}
         return {"consultas": total, "cota_restante": resta, "teto": teto, "pedidos": len(pl)}
 
-    def fontes_plano(self, fonte, usina, ini, fim, geracao, etm, chuva):
-        rf = self._rf_de(fonte, usina)
+    def fontes_plano(self, fonte, usina, ini, fim, geracao, etm, chuva, chave=None):
+        rf, erro = self._rf_ou_refaz(fonte, usina, chave)
         if not rf:
-            return dict(self._VENCEU)
+            return erro
         try:
             rf["plano"] = RF.plano(rf["mapa"][usina]["ids"], dt.date.fromisoformat(ini), dt.date.fromisoformat(fim),
                                    rf["max_plantas"], rf["max_dias"])
@@ -443,6 +473,7 @@ class SessaoNexus(Sessao):
         except RF.Falha as e:
             return {"erro": str(e)}
         rf["respostas"].append(r)
+        RF.anotar_cota(rf["fonte"], r.get("cota_restante"))
         return {"ok": True, "consultas": r.get("consultas"), "cota_restante": r.get("cota_restante")}
 
     def fontes_montar(self, agora=None):

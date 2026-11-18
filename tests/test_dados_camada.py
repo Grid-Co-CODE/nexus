@@ -17,6 +17,7 @@ from nexus.cos import normalizacoes_banco
 from nexus.dados import calendario, carga, catalogo, equipamento, fato_pt, fato_ronda, fatos, geracao, historico, livros
 from nexus.dados import fato_almoxarifado, fato_chamado, fato_inventario, fato_tarefa_os, fato_uso_os, programacao
 from nexus.dados import fato_chamado_aberto, fato_os_fama
+from nexus.dados import fato_atividade_mes as AM
 from nexus.dados import telas as telas_dados
 
 BASE = "http://pg.falso"
@@ -76,6 +77,7 @@ def test_todo_fato_declara_tipo_chave_e_medidas_com_unidade():
 
 
 CABS = {"fechamento": fatos.CAB_FECHAMENTO, "ronda": fato_ronda.CAB_RONDA, "pt": fato_pt.CAB_PT,
+        "atividade_usina_mes": AM.CAB,
         "programacao": programacao.CAB_PROGRAMACAO, "geracao_usina_dia": geracao.CAB_USINA_DIA,
         "geracao_inversor_dia": geracao.CAB_INVERSOR_DIA, "chamado": fato_chamado.CAB_CHAMADO,
         "tarefa_os": fato_tarefa_os.CAB_TAREFA_OS, "saldo_almox": fato_almoxarifado.CAB_SALDO,
@@ -606,7 +608,7 @@ def test_ensaio_monta_a_programacao_e_nao_grava_nada(banco):
     api, cfg = banco
     grava, montados, rel = carga.montar(cfg, api, datetime(2026, 10, 5, 15, 40, tzinfo=BRT), ensaio=True)
     assert api.syncs == 0                                              # montar nunca grava
-    assert set(grava) <= {carga.LIVRO_DIM, carga.LIVRO_FATOS, equipamento.LIVRO, programacao.LIVRO}
+    assert set(grava) <= {carga.LIVRO_DIM, carga.LIVRO_FATOS, equipamento.LIVRO, programacao.LIVRO, AM.LIVRO}
     # o livro ainda não existe: a carga gravaria as semanas do arquivo
     cab, linhas = grava[programacao.LIVRO][programacao.ABA]
     assert len(linhas) == 1 and rel["programacao"]["fora_do_plano"] == 1 and rel["programacao"]["mudou"]
@@ -786,3 +788,69 @@ def test_carga_nao_troca_a_programacao_pelo_arquivo_degradado(banco):
     assert r["programacao"]["semanas_degradadas"] == [20261005] and "degradado" in r["programacao"]["nao_grava"]
     p = {x["data_id_semana"]: x for x in livros.ler(BASE, api, programacao.LIVRO, programacao.ABA)}
     assert p[20261005]["os"] == "15499"                                 # a W41 do banco ficou
+
+
+# ── o que foi feito em cada usina em cada mês (18/11/2026; `fato_atividade_mes.py`) ──────────────────────────────────
+# Levi, sobre o prontuário por mês: "o que foi feito no ativo"; e guardar o fechamento de cada mês (as fontes guardam 90
+# dias): "Ok", "faça funcionar". A conta do fato está em tests/test_dados_atividade_mes.py; aqui, a carga.
+def _fontes_do_banco(api):
+    """A zeladoria feita e um chamado aberto, nos livros que outros módulos gravam (a carga só os lê)."""
+    _aba(api, fato_tarefa_os.LIVRO, fato_tarefa_os.ABA, [
+        {"fracttal_tarefa_id": 9001, "os": 900, "usina_id": 3, "data_id_fim": 20261002, "tipo_tarefa": "zeladoria",
+         "estado_tarefa": "finalizada", "status_os": "finalizada"}])
+    _aba(api, fato_chamado.LIVRO, fato_chamado.ABA, [
+        {"os": 16034, "data_id_abertura": 20261002, "data_id_fim": None, "usina_id": 3, "situacao": "aberto"}])
+
+
+def _atividade(api):
+    return {(x["usina_id"], x["data_id_mes"], x["atividade"]): (x["eventos_qtd"], x["os_qtd"], x["calculado_em"])
+            for x in livros.ler(BASE, api, AM.LIVRO, AM.ABA)}
+
+
+def test_carga_grava_a_atividade_do_mes_e_o_mes_que_saiu_da_janela_fica_como_esta(banco):
+    api, cfg = banco
+    _fontes_do_banco(api)
+    r = carga.rodar(cfg, api, agora=datetime(2026, 10, 5, 15, 40, tzinfo=BRT))
+    assert r["gravado"][AM.LIVRO][AM.ABA] == r["atividade_mes"]["linhas"] > 0 and r["atividade_mes"]["mudou"]
+    # o fato é a conta dos fatos que a mesma carga gravou e dos dois livros lidos
+    le = lambda livro, aba: livros.ler(BASE, api, livro, aba)                 # noqa: E731
+    esperado = AM.montar(le("nexus_fatos", "fato_fechamento"), le("nexus_fatos", "fato_ronda"), le("nexus_fatos", "fato_pt"),
+                         le(fato_tarefa_os.LIVRO, fato_tarefa_os.ABA), le(fato_chamado.LIVRO, fato_chamado.ABA),
+                         AM.meses_abertos(date(2026, 10, 5)), "x")
+    antes = _atividade(api)
+    i = {c: k for k, c in enumerate(AM.CAB)}
+    assert {k: v[:2] for k, v in antes.items()} == {(l[i["usina_id"]], l[i["data_id_mes"]], l[i["atividade"]]):
+                                                    (l[i["eventos_qtd"]], l[i["os_qtd"]]) for l in esperado}
+    assert antes[(3, 20261001, "zeladoria")][:2] == (1, 1) and antes[(3, 20261001, "chamado_aberto")][:2] == (1, 1)
+    assert any(a.startswith("tarefa_") for _u, _m, a in antes) and any(a.startswith("ronda_") for _u, _m, a in antes)
+    q = {x["fato"]: x for x in livros.ler(BASE, api, AM.LIVRO, "qualidade")}
+    assert q["atividade_usina_mes"]["pct_usina"] == 100.0
+    assert catalogo.LIVRO_POR_NOME[AM.LIVRO].so_cresce == (AM.ABA,)
+    # a hora seguinte, sem nada novo: não regrava
+    g, _m, rel = carga.montar(cfg, api, datetime(2026, 10, 5, 16, 40, tzinfo=BRT))
+    assert AM.LIVRO not in g and rel["atividade_mes"]["mudou"] is False
+    # janeiro: setembro e outubro saíram da janela das fontes. Entra uma tarefa de janeiro; os meses velhos ficam como
+    # foram gravados, com o `calculado_em` de outubro (o fake não esquece as linhas velhas, e mesmo assim não reconta)
+    _aba(api, "fechamentos_app_campo", "Fechamentos", [_fech(), _fech(OS="15378", Tarefa="Outra"),
+                                                       _fech(OS="20001", **{"Registrado em": "2027-01-08T15:00:00.000Z"})])
+    r = carga.rodar(cfg, api, agora=datetime(2027, 1, 10, 15, 40, tzinfo=BRT), forcar=True)
+    depois = _atividade(api)
+    assert r["atividade_mes"]["meses_recalculados"] == [202611, 202612, 202701]
+    assert {k: v for k, v in depois.items() if k[1] < 20261101} == antes               # intocados, até a hora da conta
+    assert [k for k in depois if k[1] == 20270101] and len(depois) == len(antes) + 1
+
+
+def test_carga_nao_grava_a_atividade_do_mes_com_fonte_vazia_nem_com_o_fato_do_banco_vazio(banco):
+    api, cfg = banco
+    # sem os chamados e sem as tarefas das OS no banco (a fixture de sempre): o mês não é contado pela metade
+    r = carga.rodar(cfg, api, agora=datetime(2026, 10, 5, 15, 40, tzinfo=BRT))
+    assert AM.LIVRO not in r["gravado"] and "vazia" in r["atividade_mes"]["nao_grava"]
+    assert r["gravado"]["nexus_fatos"]["fato_fechamento"] == 2                          # o resto andou
+    assert AM.LIVRO not in api.workbooks
+    # o livro existe e o fato veio vazio na leitura: gravar trocaria os meses guardados pelos da janela
+    _fontes_do_banco(api)
+    _aba(api, AM.LIVRO, AM.ABA, [])
+    _aba(api, AM.LIVRO, "atualizacao", [{"gerado_em": "2026-10-05T14:40:00-03:00", "sha_linhas": "y"}])
+    r = carga.rodar(cfg, api, agora=datetime(2026, 10, 5, 16, 40, tzinfo=BRT), forcar=True)
+    assert AM.LIVRO not in r["gravado"] and "não encolhe" in r["atividade_mes"]["nao_grava"]
+    assert livros.ler(BASE, api, AM.LIVRO, AM.ABA) == []

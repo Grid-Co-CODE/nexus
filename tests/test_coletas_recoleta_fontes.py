@@ -114,11 +114,12 @@ def test_a_recoleta_de_uma_fonte_mostra_o_custo_antes_e_sai_pela_mesma_montagem(
     assert pl["usinas"] == [{"usina": "Teste", "destino": "BD_Performance", "plantas": 2}]
     assert pl["sem_aba"] == ["Aba que não existe"] and pl["sem_bd"] == ["BD_Thopen"]      # o BD_Thopen de mentira não leu
     assert pl["paga"] and pl["teto"] == 150 and pl["cota_restante"] == 147
-    assert pedidos[0][:2] == ("/api/recoleta/apipv/plantas?formato=bd", "chave-de-teste")
+    # abrir o painel (fontes_lista) já busca em fundo a lista de cada fonte: uma vez por fonte, com a chave do Nexus
+    assert ("/api/recoleta/apipv/plantas?formato=bd", "chave-de-teste") in [p[:2] for p in pedidos]
     arg = ("apipv", "Teste", "2026-10-14", "2026-10-14", True, True, False)
     sim = _api(tela, "fontes_simular", *arg).get_json()
     assert sim == {"consultas": 10, "cota_restante": 147, "teto": 150, "pedidos": 2}        # 2 plantas, 1 por pedido
-    assert all(c["simular"] for _r, _k, c in pedidos[1:])                                  # até aqui, nada foi buscado
+    assert all(c["simular"] for r, _k, c in pedidos if "/plantas" not in r)                # até aqui, nada foi buscado
     plano = _api(tela, "fontes_plano", *arg).get_json()
     assert plano == {"pedidos": [["2026-10-14", "2026-10-14", 1], ["2026-10-14", "2026-10-14", 1]]}
     assert _api(tela, "fontes_parte", 0).get_json() == {"ok": True, "consultas": 2, "cota_restante": 145}
@@ -146,8 +147,38 @@ def test_fonte_sem_cota_diz_que_nao_custa_e_a_recusa_da_plataforma_chega_como_ve
     monkeypatch.setattr(RF._recoleta, "_pedir", recusa)
     assert "teto de 150" in _api(tela, "fontes_plantas", "apipv").get_json()["erro"]
     assert _api(tela, "fontes_plantas", "xyz").get_json()["erro"].startswith("Fonte desconhecida")
-    assert "venceu" in _api(tela, "fontes_parte", 0).get_json()["erro"]                  # sem plano, nada é pedido
-    assert "venceu" in _api(tela, "fontes_montar").get_json()["erro"]
+    assert _api(tela, "fontes_parte", 0).get_json()["refazer"] is True                  # sem plano, nada é pedido
+    assert _api(tela, "fontes_montar").get_json()["refazer"] is True
+
+
+def test_o_reinicio_do_nexus_nao_faz_a_lista_vencer(tela, monkeypatch):
+    """18/11/2026 (Levi, com o painel aberto e uma publicação do Nexus no meio: "a lista fica vencendo ainda, resolva!").
+    O que a recoleta guarda mora na memória da sessão e some a cada reinício: o custo e o plano refazem a lista sozinhos;
+    só a busca perdida no meio pede para recomeçar (`refazer`), e a tela recomeça sozinha."""
+    pedidos = _plataforma(monkeypatch)
+    _bd_pronto(tela)
+    arg = ("apipv", "Teste", "2026-10-14", "2026-10-14", True, True, False)
+    assert _api(tela, "fontes_plantas", "apipv").status_code == 200
+
+    def reinicia():
+        for s in servico._SESSOES.values():
+            s.__dict__.pop("_rf", None)                 # a memória da sessão depois de um reinício
+        RF._PLANTAS.clear()
+    reinicia()
+    assert _api(tela, "fontes_simular", *arg).get_json()["consultas"] == 10              # refez a lista e fez a conta
+    reinicia()
+    assert len(_api(tela, "fontes_plano", *arg).get_json()["pedidos"]) == 2
+    assert _api(tela, "fontes_parte", 0).get_json()["ok"]
+    reinicia()                                                                           # no MEIO da busca
+    r = _api(tela, "fontes_parte", 1).get_json()
+    assert r["refazer"] is True and "reiniciou" in r["erro"]
+    # a tela recomeça: plano de novo e a busca inteira
+    assert len(_api(tela, "fontes_plano", *arg).get_json()["pedidos"]) == 2
+    assert _api(tela, "fontes_parte", 0).get_json()["ok"] and _api(tela, "fontes_parte", 1).get_json()["ok"]
+    assert _api(tela, "fontes_montar").get_json()["recoleta"]["celulas"] == 4
+    # a usina que saiu da lista da fonte: o motivo, não "venceu"
+    erro = _api(tela, "fontes_simular", "apipv", "Outra usina", "2026-10-14", "2026-10-14", True, True, False).get_json()["erro"]
+    assert "não está na lista de API PV" in erro and pedidos
 
 
 def test_a_fonte_que_nao_devolve_nada_diz_isso_em_vez_de_planilha_vazia(tela, monkeypatch):
@@ -172,3 +203,58 @@ def test_as_fontes_so_abrem_para_quem_pode_recoletar(tela, monkeypatch):
     for m in ("fontes_lista", "fontes_plantas", "fontes_simular", "fontes_plano", "fontes_parte", "fontes_montar"):
         assert _api(tela, m, "apipv", "Teste", "2026-10-14", "2026-10-14", True, True, False).status_code == 403
     assert pedidos == []
+
+
+# ── a lista de usinas sem demora (18/11/2026; Levi: "a leitura de usinas da fonte demora muito") ───────────────────
+@pytest.fixture(autouse=True)
+def _sem_lista_guardada():
+    """A lista de usinas de cada fonte fica guardada 10 min no processo: cada teste começa sem ela."""
+    RF._PLANTAS.clear()
+    yield
+    RF._PLANTAS.clear()
+
+
+def test_a_lista_de_usinas_nao_le_aba_nenhuma_do_banco(tela, app, monkeypatch):
+    """Medido em 18/11/2026: para saber quais usinas têm aba, a tela lia do banco a aba INTEIRA de cada uma (14 s para
+    as 75 da API PV). Basta o nome da aba; quem lê a aba é a montagem, e só a da usina pedida."""
+    _plataforma(monkeypatch)
+    _bd_pronto(tela)
+    lidas = []
+    real = BancoDeMentira.linhas
+    monkeypatch.setattr(BancoDeMentira, "linhas", lambda self, sid: lidas.append(sid) or real(self, sid))
+    pl = _api(tela, "fontes_plantas", "apipv").get_json()
+    assert [u["usina"] for u in pl["usinas"]] == ["Teste"] and pl["sem_aba"] == ["Aba que não existe"]
+    assert lidas == []
+
+
+def test_a_lista_de_cada_fonte_fica_guardada_e_o_saldo_acompanha_o_que_foi_gasto(tela, monkeypatch):
+    pedidos = _plataforma(monkeypatch)
+    _bd_pronto(tela)
+    _api(tela, "fontes_plantas", "apipv")
+    _api(tela, "fontes_plantas", "apipv")
+    assert len([p for p in pedidos if "/plantas" in p[0]]) == 1               # a 2ª vez não foi à plataforma
+    _api(tela, "fontes_plantas", "pg")
+    assert len([p for p in pedidos if "/plantas" in p[0]]) == 2               # outra fonte, outra lista
+    _api(tela, "fontes_plantas", "apipv")                                     # de volta à API PV: da lista guardada
+    _api(tela, "fontes_plano", "apipv", "Teste", "2026-10-14", "2026-10-14", True, True, False)
+    _api(tela, "fontes_parte", 0)
+    assert _api(tela, "fontes_plantas", "apipv").get_json()["cota_restante"] == 145   # o saldo da lista guardada andou
+
+
+def test_abrir_o_painel_ja_busca_em_fundo_a_lista_de_todas_as_fontes_e_a_recusa_nao_fica_guardada(tela, monkeypatch):
+    pedidos = _plataforma(monkeypatch)
+    _api(tela, "fontes_lista")
+    for _ in range(50):
+        if len(RF._PLANTAS) == len(RF.FONTES):
+            break
+        time.sleep(0.05)
+    assert sorted(RF._PLANTAS) == sorted(f for f, _n in RF.FONTES)
+    assert len([p for p in pedidos if "/plantas" in p[0]]) == len(RF.FONTES)
+    RF._PLANTAS.clear()
+
+    def recusa(rota, chave_, corpo=None, timeout=180):
+        raise RF.Falha("a SolarEdge não devolveu a lista de usinas")
+    monkeypatch.setattr(RF._recoleta, "_pedir", recusa)
+    with pytest.raises(RF.Falha):
+        RF.plantas("solaredge", "chave")
+    assert "solaredge" not in RF._PLANTAS
