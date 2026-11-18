@@ -210,23 +210,49 @@ p.cos-inv-mppt-cab{font-weight:600;letter-spacing:.04em;text-transform:uppercase
 .cos-inv-sgi-nome{display:inline-flex;align-items:center;gap:6px}
 .cos-inv-chip[aria-pressed="true"] .cos-inv-cor{height:6px}
 
-/* o cartao do rele de proteccao na ficha (16/11/2026): SO LAYOUT; cores herdadas do bloco, para nao mexer no contraste */
-.cos-rele-status { margin: .3rem 0 .5rem; }
-.cos-rele-ativos { margin: .45rem 0 .1rem; padding-left: 1.1rem; color: var(--alerta); font-weight: 600; }
-.cos-rele-ativos li { margin: .12rem 0; }
-.cos-rele-grade { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 6px; margin: .4rem 0 .7rem; }
-.cos-rele-grade.muda { opacity: .45; }
-.cos-rele-fn { display: flex; flex-direction: column; gap: 1px; padding: 6px 9px; border-radius: 8px; color: var(--mudo); background: var(--superficie-2); border: 1px solid var(--linha); transition: box-shadow .15s, border-color .15s; }
-.cos-rele-fn b { font: 700 13px/1.25 var(--font-sans); color: var(--tinta-2); letter-spacing: .02em; }
-.cos-rele-fn small { font-size: 10.5px; line-height: 1.15; color: var(--mudo); }
-.cos-rele-fn.ativa { color: var(--alerta); background: var(--alerta-suave); border-color: var(--alerta); box-shadow: 0 0 0 1px var(--alerta) inset, 0 0 10px -2px var(--alerta); }
-.cos-rele-fn.ativa b, .cos-rele-fn.ativa small { color: var(--alerta); }
-.cos-rele-faltas { margin-top: .3rem; }
-.cos-rele-tab { width: 100%; border-collapse: collapse; margin: .2rem 0 .5rem; }
-.cos-rele-tab th, .cos-rele-tab td { padding: .22rem .5rem; text-align: left; }
-.cos-rele-tab th.n, .cos-rele-tab td.n { text-align: right; font-variant-numeric: tabular-nums; }
-.cos-rele-freq { margin: .2rem 0 .3rem; font-variant-numeric: tabular-nums; }
-.cos-rele-pot, .cos-rele-fp { margin: .2rem 0; font-variant-numeric: tabular-nums; opacity: .9; }
-.cos-rele-falta-h { margin: .5rem 0 .2rem; font-size: .9em; font-weight: 600; }
-.cos-rele-faltas-v { margin: 0; opacity: .85; font-variant-numeric: tabular-nums; }
-.cos-rele-disj { margin: .2rem 0 .4rem; font-variant-numeric: tabular-nums; }
+/* a secao do rele de protecao na ficha (refeita 18/11/2026, no tema da tela): o DISJUNTOR em destaque, cartoes no
+   estilo dos inversores (superficie-2, raio 12), as barras na cor das curvas (--verde-texto), as protecoes que atuaram
+   em cartao proprio e as etiquetas das monitoradas. Quebra pela largura DO BLOCO (ficha estreita em tela larga). */
+.cos-rele { container-type: inline-size; }
+.cos-rele-faixa { display: grid; grid-template-columns: minmax(230px, 1.6fr) repeat(3, minmax(130px, 1fr)); gap: 12px; margin-bottom: 12px; }
+.cos-rele-cartao { border: 1px solid var(--linha); border-radius: 12px; padding: 10px 12px; background: var(--superficie-2); display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.cos-rele-cartao .cn-pill { align-self: flex-start; }
+.cos-rele-rot { font-size: 12px; color: var(--mudo); }
+.cos-rele-val { font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.cos-rele-val small { font-weight: 400; color: var(--mudo); font-size: 11px; margin-left: 4px; }
+.cos-rele-dj { flex-direction: row; align-items: center; gap: 12px; padding: 12px 14px; }
+.cos-rele-dj svg { display: block; flex: none; }
+.cos-rele-dj-estado { font-size: 22px; font-weight: 700; line-height: 1.1; }
+.cos-rele-dj-sub { font-size: 12px; color: var(--tinta-2); }
+.cos-rele-dj--fechado { border-color: var(--ok); background: var(--ok-suave); color: var(--ok); }
+.cos-rele-dj--aberto { border: 2px solid var(--critico); background: var(--critico-suave); color: var(--critico); padding: 11px 13px; }
+.cos-rele-dj--nada { border-style: dashed; border-color: var(--linha-forte); color: var(--mudo); }
+/* com atuacao, a protecao ocupa o resto da faixa ao lado do disjuntor (frequencia e temperatura descem): cabe de 1 a 11 */
+.cos-rele-faixa .cos-rele-prot--atuou { grid-column: span 3; }
+.cos-rele-trips { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 6px; margin-top: 4px; }
+.cos-rele-trip { display: flex; flex-direction: column; justify-content: center; gap: 1px; min-height: 52px; padding: 6px 10px; border-radius: 8px; border: 1px solid var(--critico); background: var(--critico-suave); }
+.cos-rele-trip b { font-size: 17px; font-weight: 700; line-height: 1.1; color: var(--critico); font-variant-numeric: tabular-nums; }
+.cos-rele-trip small { font-size: 11px; line-height: 1.25; color: var(--tinta); }
+.cos-rele-fases { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; margin-bottom: 12px; }
+.cos-rele-fase { gap: 6px; padding: 10px 12px 8px; }
+.cos-rele-fase--semmed { border: 2px solid var(--alerta); padding: 9px 11px 7px; }
+.cos-rele-fase-cab { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.cos-rele-fase-cab b { font-size: 13px; font-weight: 600; }
+.cos-rele-linha { display: grid; grid-template-columns: 18px 1fr; align-items: center; height: 24px; border-radius: 6px; outline: none; }
+.cos-rele-linha:hover, .cos-rele-linha:focus-visible { background: var(--linha); }
+.cos-rele-letra { color: var(--mudo); font-size: 12px; text-align: center; }
+.cos-rele-trilho { position: relative; height: 100%; border-left: 1px solid var(--linha-forte); }
+.cos-rele-trilho [hidden] { display: none; }
+.cos-rele-barra { position: absolute; left: 0; top: 7px; height: 10px; background: var(--verde-texto); border-radius: 0 4px 4px 0; }
+.cos-rele-num { position: absolute; top: 3px; padding-left: 7px; font-size: 12px; font-weight: 500; color: var(--tinta); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.cos-rele-semmed { position: absolute; left: 7px; top: 3px; color: var(--alerta); font-size: 12px; font-weight: 500; white-space: nowrap; }
+.cos-rele-pe { font-size: 12px; color: var(--mudo); }
+.cos-rele-falta-grade { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 8px; margin: 6px 0 12px; }
+.cos-rele-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 4px; }
+.cos-rele-chip { display: inline-flex; align-items: baseline; gap: 5px; padding: 3px 10px; border-radius: 999px; font-size: 11.5px; color: var(--mudo); border: 1px solid var(--linha); white-space: nowrap; }
+.cos-rele-chip b { color: var(--tinta-2); font-weight: 600; font-variant-numeric: tabular-nums; }
+.cos-rele-chip.ativa { color: var(--critico); border-color: var(--critico); background: var(--critico-suave); font-weight: 500; }
+.cos-rele-chip.ativa b { color: var(--critico); }
+.cos-rele-chips.muda, .cos-rele-fases.muda, .cos-rele-cartao.muda { opacity: .45; }
+@container (max-width: 640px) { .cos-rele-faixa { grid-template-columns: 1fr 1fr; } .cos-rele-faixa .cos-rele-dj, .cos-rele-faixa .cos-rele-prot--atuou { grid-column: 1 / -1; } }
+@container (max-width: 300px) { .cos-rele-faixa { grid-template-columns: 1fr; } }

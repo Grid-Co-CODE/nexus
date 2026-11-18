@@ -463,7 +463,8 @@
     ZOOM_MIN: ZOOM_MIN, DE: DE, ATE: ATE, limitarTrecho: limitarTrecho, aproximar: aproximar, deslizar: deslizar,
     novoTrecho: novoTrecho, seguirPonta: seguirPonta, recortar: recortar, maximoNoTrecho: maximoNoTrecho, textoDoTrecho: textoDoTrecho,
     faixaDoTrecho: faixaDoTrecho, escalaJusta: escalaJusta, limitarFaixa: limitarFaixa, caixaDoArraste: caixaDoArraste,
-    LIMIAR_Y_PX: LIMIAR_Y_PX, LIMIAR_X_PX: LIMIAR_X_PX, maisPerto: maisPerto, visiveis: visiveis };
+    LIMIAR_Y_PX: LIMIAR_Y_PX, LIMIAR_X_PX: LIMIAR_X_PX, maisPerto: maisPerto, visiveis: visiveis,
+    releSemMedicao: releSemMedicao, releDesequilibrio: releDesequilibrio, releFaseDoCodigo: releFaseDoCodigo, releDisjuntor: releDisjuntor };
   if (typeof document === "undefined") { return; }       // no node (o teste), só as contas
 
   // ── a API: o login (no final, o passe do Nexus em CFG.sessao; no protótipo, o da Ronda COS deste navegador) ───────
@@ -1078,98 +1079,206 @@
     return i.veredito === "FALHA" ? (i.descricao_falha || i.estado) : (e.grupo === "semcom" ? "não responde ao SCADA: pode estar gerando" : (e.grupo ? i.estado : ""));
   }
 
-  // o cartão do relé de proteção na ficha (16/11/2026): grade de proteções com os ATUADOS em destaque,
-  // medidas por fase em V/A reais (o relé já aplica TP/TC), freq em Hz, disjuntor interpretado e faltas
-  // só quando há atuação. Só aparece se a usina tem relé. (potência: o URP6000 manda 0xFFFF aqui = sem
-  // leitura, então foi removida.)
+  // o relé de proteção na ficha: ver `montarCardRele` (refeita 18/11/2026). Só aparece se a usina tem relé.
   function braw(v) { return v == null || isNaN(v) ? "—" : fmtKW.format(v); }
   // tensao do rele em kV: o coletor ja manda V REAL (escala do perfil do modelo): 13883 -> "13,88".
   function releKv(v) { return v == null || isNaN(v) ? "—" : fmt2.format(v / 1000); }
   // corrente (A) / cosphi — 2 casas; o coletor ja manda o valor real.
   function releNum(v) { return v == null || isNaN(v) ? "—" : fmt2.format(v); }
-  // Proteções do URP6000 (códigos ANSI) -> nome amigável, para a grade e os cards de trip.
+  // Proteções do URP6000 (códigos ANSI) -> nome amigável, para os cartões de trip e as etiquetas.
   var RELE_FAMILIAS = [
     ["27", "Subtensão"], ["59", "Sobretensão"],
     ["50", "Sobrecorrente instantânea"], ["51", "Sobrecorrente temporizada"],
     ["67", "Direcional"], ["81", "Frequência"],
     ["32", "Potência direcional"], ["37", "Subpotência"],
-    ["78", "Salto de vetor"], ["47", "Sequência de fase"], ["86", "Bloqueio (86)"]
+    ["78", "Salto de vetor"], ["47", "Sequência de fase"], ["86", "Bloqueio"]
   ];
   function releFamilia(code) { var m = String(code).match(/^\d+/); return m ? m[0] : String(code); }
   function releNomeFamilia(fam) { for (var i = 0; i < RELE_FAMILIAS.length; i++) { if (RELE_FAMILIAS[i][0] === fam) { return RELE_FAMILIAS[i][1]; } } return "Proteção " + fam; }
-  function releNomeTrip(code) {
-    var fam = releFamilia(code), suf = String(code).slice(fam.length).replace(/^-/, "");
-    var fase = { A: "fase A", B: "fase B", C: "fase C", N: "neutro", "0": "sequência zero" }[suf] || suf;
-    return releNomeFamilia(fam) + (fase ? " · " + fase : "") + "  (" + code + ")";
+  // o resto do código depois da família: "67B" -> "fase B", "59N" -> "neutro", "81" -> "".
+  function releFaseDoCodigo(code) {
+    var suf = String(code).slice(releFamilia(code).length).replace(/^-/, "");
+    return { A: "fase A", B: "fase B", C: "fase C", N: "neutro", "0": "sequência zero" }[suf] || suf;
   }
-  // disjuntor: o servidor manda 1 (fechado) / 0 (aberto) / null (desconhecido) — ja interpretado do perfil.
-  function releDisjuntor(d) { return d === 1 ? "Fechado" : d === 0 ? "Aberto" : "—"; }
-  // monta UM card de relé (uma cabine) e devolve as referências; atualizado em `atualizarUmRele`.
+  // disjuntor: o servidor manda 1 (fechado) / 0 (aberto) / null (desconhecido) — já interpretado do perfil.
+  function releDisjuntor(d) { return d === 1 ? "Fechado" : d === 0 ? "Aberto" : "Sem leitura"; }
+  // ⚠ FASE SEM MEDIÇÃO (18/11/2026, Céu Azul 1): corrente EXATAMENTE 0 com outra fase em carga (> 1 A) não é
+  // "zero medido" — é o TC ou a entrada do relé que não traz a corrente. Medido no próprio relé: a máxima da
+  // fase A nunca passou de 2 A enquanto B e C chegavam a 33 e 24 A. Mostrar 0 ali seria afirmar o que ninguém mediu.
+  function releSemMedicao(vals) {
+    return vals.map(function (x, i) {
+      return x === 0 && vals.some(function (y, j) { return j !== i && y != null && y > 1; });
+    });
+  }
+  // desequilíbrio entre fases: o maior desvio da média, em % da média; null sem as três fases medidas.
+  function releDesequilibrio(vals, sem) {
+    var m = vals.filter(function (x, i) { return x != null && !isNaN(x) && !(sem && sem[i]); });
+    if (m.length !== 3) { return null; }
+    var media = (m[0] + m[1] + m[2]) / 3;
+    if (!media) { return null; }
+    return Math.max(Math.abs(m[0] - media), Math.abs(m[1] - media), Math.abs(m[2] - media)) / media * 100;
+  }
+  var fmt1 = new Intl.NumberFormat("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+  var RELE_SVG = "http://www.w3.org/2000/svg";
+  // o desenho do disjuntor: fechado = a lâmina liga os dois bornes; aberto = a lâmina levantada; sem leitura = tracejada
+  function releIconeDj(estado) {
+    var s = document.createElementNS(RELE_SVG, "svg");
+    var at = { width: "40", height: "40", viewBox: "0 0 40 40", fill: "none", stroke: "currentColor", "stroke-width": "2.5", "stroke-linecap": "round", "aria-hidden": "true" };
+    Object.keys(at).forEach(function (k) { s.setAttribute(k, at[k]); });
+    function el(tag, a) { var e = document.createElementNS(RELE_SVG, tag); Object.keys(a).forEach(function (k) { e.setAttribute(k, a[k]); }); s.appendChild(e); }
+    el("line", { x1: 2, y1: 21, x2: 8, y2: 21 }); el("line", { x1: 32, y1: 21, x2: 38, y2: 21 });
+    if (estado === 0) { el("line", { x1: 9, y1: 21, x2: 28, y2: 9 }); }
+    else { el("line", estado === 1 ? { x1: 9, y1: 21, x2: 31, y2: 21 } : { x1: 9, y1: 21, x2: 31, y2: 21, "stroke-dasharray": "3 4" }); }
+    el("circle", { cx: 8, cy: 21, r: 2.6, fill: "currentColor" }); el("circle", { cx: 32, cy: 21, r: 2.6, fill: "currentColor" });
+    return s;
+  }
+  function releDiv(cls, texto) { var d = document.createElement("div"); d.className = cls; if (texto != null) { d.textContent = texto; } return d; }
+  // um cartão de corrente ou de tensão por fase, no estilo dos cartões de inversor: média no canto, barra por fase
+  function releCartaoFase(titulo, unidade) {
+    var c = { unidade: unidade, linhas: [] };
+    c.el = releDiv("cos-rele-cartao cos-rele-fase");
+    var cab = releDiv("cos-rele-fase-cab");
+    var b = document.createElement("b"); b.textContent = titulo; cab.appendChild(b);
+    c.media = document.createElement("span"); c.media.className = "cos-rele-val"; cab.appendChild(c.media);
+    c.el.appendChild(cab);
+    ["A", "B", "C"].forEach(function (f) {
+      var l = releDiv("cos-rele-linha"); l.tabIndex = 0;
+      var letra = document.createElement("span"); letra.className = "cos-rele-letra"; letra.textContent = f; letra.setAttribute("aria-hidden", "true"); l.appendChild(letra);
+      var tr = releDiv("cos-rele-trilho"); l.appendChild(tr);
+      var barra = releDiv("cos-rele-barra"); tr.appendChild(barra);
+      var num = releDiv("cos-rele-num"); tr.appendChild(num);
+      var sem = releDiv("cos-rele-semmed", "⚠︎ sem medição: verificar TC"); sem.hidden = true; tr.appendChild(sem);
+      c.el.appendChild(l); c.linhas.push({ f: f, el: l, barra: barra, num: num, sem: sem });
+    });
+    c.pe = releDiv("cos-rele-pe"); c.el.appendChild(c.pe);
+    return c;
+  }
+  function releAtualizarFase(c, vals, ehCorrente) {
+    var sem = ehCorrente ? releSemMedicao(vals) : [false, false, false];
+    var ok = vals.map(function (x, i) { return x != null && !isNaN(x) && !sem[i]; });
+    var medidos = vals.filter(function (x, i) { return ok[i]; });
+    var teto = Math.max.apply(null, medidos.concat([0])) * 1.22 || 1;   // folga para o número na ponta da barra
+    c.linhas.forEach(function (l, i) {
+      var x = vals[i], p = ok[i] ? x / teto * 100 : 0;
+      l.sem.hidden = !sem[i]; l.barra.hidden = !ok[i]; l.num.hidden = sem[i];
+      escrever(l.barra.style, "width", p + "%"); escrever(l.num.style, "left", p + "%");
+      escrever(l.num, "textContent", ok[i] ? fmt2.format(x) : "—");
+      var txt = sem[i] ? "sem medição, verificar TC" : (ok[i] ? fmt2.format(x) + " " + c.unidade : "sem leitura");
+      escrever(l.el, "title", "Fase " + l.f + " · " + txt);
+      l.el.setAttribute("aria-label", "Fase " + l.f + ": " + txt);
+    });
+    c.el.classList.toggle("cos-rele-fase--semmed", sem.some(Boolean));
+    var faltam = ["A", "B", "C"].filter(function (_, i) { return sem[i]; });
+    var sig = medidos.join(",") + "|" + faltam.join("");
+    if (c.media._sig !== sig) {
+      c.media._sig = sig; c.media.textContent = "";
+      if (medidos.length) {
+        c.media.appendChild(document.createTextNode(fmt2.format(medidos.reduce(function (a, b) { return a + b; }, 0) / medidos.length) + " " + c.unidade));
+        var sm = document.createElement("small");
+        sm.textContent = faltam.length ? "média de " + ["A", "B", "C"].filter(function (_, i) { return ok[i]; }).join(" e ") : "média";
+        c.media.appendChild(sm);
+      }
+    }
+    var d = releDesequilibrio(vals, sem);
+    escrever(c.pe, "textContent",
+      ehCorrente && vals.every(function (x) { return x === 0; }) ? "Sem corrente nas três fases"
+      : d !== null ? "Desequilíbrio entre fases " + fmt1.format(d) + " %"
+      : sem.some(Boolean) ? "Desequilíbrio: sem cálculo (fase sem medição)" : "Desequilíbrio: sem leitura das três fases");
+  }
+  // ⚠ A SEÇÃO DO RELÉ NA FICHA (refeita 18/11/2026, pedido do dono: "precisa deixar o status do disjuntor em
+  // evidência, melhorar os gráficos pra ficar no tema da tela, os trips e etc"). Faixa de cima: o DISJUNTOR em
+  // destaque, a proteção, a frequência e a temperatura; depois corrente e tensão por fase em cartões iguais aos dos
+  // inversores; as proteções que atuaram em cartão próprio; e as etiquetas das monitoradas, que só acendem ao atuar.
+  // Potência e fator de potência SAÍRAM até a leitura deles ser corrigida (hoje: ~2x a soma dos inversores, e o FP
+  // em escala errada — mostrar seria afirmar números que não batem).
   function montarCardRele(rl, idx) {
     var br = bloco("Relé — " + (rl.cabine || ("Cabine " + (idx + 1))), "");
-    var card = { secao: br, det: br._detalhe };
-    card.status = document.createElement("div"); card.status.className = "cos-rele-status"; br.appendChild(card.status);
-    card.grade = document.createElement("div"); card.grade.className = "cos-rele-grade"; card.badges = {};
+    br.classList.add("cos-rele");
+    var card = { secao: br, det: br._detalhe, badges: {} };
+    var faixa = releDiv("cos-rele-faixa");
+    card.dj = releDiv("cos-rele-cartao cos-rele-dj"); card.dj.setAttribute("role", "status");
+    card.djIcone = document.createElement("span"); card.dj.appendChild(card.djIcone);
+    var djTxt = document.createElement("div");
+    djTxt.appendChild(releDiv("cos-rele-rot", "Disjuntor"));
+    card.djEstado = releDiv("cos-rele-dj-estado"); djTxt.appendChild(card.djEstado);
+    card.djSub = releDiv("cos-rele-dj-sub"); djTxt.appendChild(card.djSub);
+    card.dj.appendChild(djTxt); faixa.appendChild(card.dj);
+    card.prot = releDiv("cos-rele-cartao");
+    card.protRot = releDiv("cos-rele-rot", "Proteção"); card.prot.appendChild(card.protRot);
+    card.status = releDiv("cos-rele-status"); card.prot.appendChild(card.status); faixa.appendChild(card.prot);
+    var fq = releDiv("cos-rele-cartao"); fq.appendChild(releDiv("cos-rele-rot", "Frequência"));
+    card.freq = releDiv("cos-rele-val"); fq.appendChild(card.freq); faixa.appendChild(fq);
+    var tp = releDiv("cos-rele-cartao"); tp.appendChild(releDiv("cos-rele-rot", "Temperatura do relé"));
+    card.temp = releDiv("cos-rele-val"); tp.appendChild(card.temp); faixa.appendChild(tp);
+    br.appendChild(faixa);
+    var fases = releDiv("cos-rele-fases");
+    card.ci = releCartaoFase("Corrente por fase", "A"); fases.appendChild(card.ci.el);
+    card.cv = releCartaoFase("Tensão por fase", "kV"); fases.appendChild(card.cv.el);
+    br.appendChild(fases); card.fasesEl = fases; card.fq = fq; card.tp = tp;
+    card.faltas = releDiv("cos-rele-faltas"); br.appendChild(card.faltas);
+    br.appendChild(releDiv("cos-rele-rot", "Proteções monitoradas"));
+    card.chips = releDiv("cos-rele-chips");
     RELE_FAMILIAS.forEach(function (fn) {
-      var b = document.createElement("span"); b.className = "cos-rele-fn"; b.title = fn[0] + " — " + fn[1];
-      var c = document.createElement("b"); c.textContent = fn[0]; b.appendChild(c);
-      var nm = document.createElement("small"); nm.textContent = fn[1]; b.appendChild(nm);
-      card.grade.appendChild(b); card.badges[fn[0]] = b;
+      var ch = document.createElement("span"); ch.className = "cos-rele-chip"; ch.title = fn[0] + " — " + fn[1];
+      var b = document.createElement("b"); b.textContent = fn[0]; ch.appendChild(b);
+      ch.appendChild(document.createTextNode(fn[1]));
+      var fase = document.createElement("span"); ch.appendChild(fase);
+      card.chips.appendChild(ch); card.badges[fn[0]] = { el: ch, fase: fase };
     });
-    br.appendChild(card.grade);
-    var tm = document.createElement("table"); tm.className = "cos-rele-tab";
-    tm.innerHTML = "<thead><tr><th>Fase</th><th class='n'>Corrente (A)</th><th class='n'>Tensão (kV)</th></tr></thead>";
-    var tbm = document.createElement("tbody"); card.med = {};
-    ["A", "B", "C"].forEach(function (f) {
-      var tr = document.createElement("tr");
-      var tdf = document.createElement("td"); tdf.textContent = "Fase " + f; tr.appendChild(tdf);
-      ["i", "v"].forEach(function (q) { var td = document.createElement("td"); td.className = "n"; tr.appendChild(td); card.med[q + f] = td; });
-      tbm.appendChild(tr);
-    });
-    tm.appendChild(tbm); br.appendChild(tm);
-    card.freq = document.createElement("p"); card.freq.className = "cos-rele-freq"; br.appendChild(card.freq);
-    card.pot = document.createElement("p"); card.pot.className = "cos-rele-pot"; br.appendChild(card.pot);
-    card.fp = document.createElement("p"); card.fp.className = "cos-rele-fp"; br.appendChild(card.fp);
-    card.disj = document.createElement("p"); card.disj.className = "cos-rele-disj"; br.appendChild(card.disj);
-    card.faltas = document.createElement("div"); card.faltas.className = "cos-rele-faltas"; br.appendChild(card.faltas);
+    br.appendChild(card.chips);
     return card;
   }
   function atualizarUmRele(card, r) {
     var trips = r.trips || [];
-    var sigT = trips.join(",") + "|" + (r.responde ? 1 : 0) + "|" + (r.mins_atras == null ? "" : r.mins_atras);
+    var atuou = !!r.responde && trips.length > 0;
+    escrever(card.det, "textContent", !r.responde ? "sem comunicação" : (r.mins_atras != null ? "lido há " + r.mins_atras + " min" : "ao vivo"));
+    // disjuntor — sem comunicação, não se afirma o estado velho
+    var dj = r.responde ? r.disjuntor : null;
+    var sigD = dj + "|" + (r.responde ? 1 : 0);
+    if (card.dj._sig !== sigD) {
+      card.dj._sig = sigD;
+      card.dj.classList.toggle("cos-rele-dj--fechado", dj === 1);
+      card.dj.classList.toggle("cos-rele-dj--aberto", dj === 0);
+      card.dj.classList.toggle("cos-rele-dj--nada", dj !== 0 && dj !== 1);
+      card.djIcone.textContent = ""; card.djIcone.appendChild(releIconeDj(dj));
+      card.djEstado.textContent = releDisjuntor(dj);
+      card.djSub.textContent = dj === 1 ? "usina conectada à rede" : dj === 0 ? "usina desconectada da rede"
+        : (r.responde ? "o relé não informou o disjuntor" : "relé sem comunicação");
+    }
+    // proteção: o selo e, quando atuou, cada proteção num cartão; as etiquetas acendem junto
+    var sigT = trips.join(",") + "|" + (r.responde ? 1 : 0);
     if (card.status._sig !== sigT) {
       card.status._sig = sigT; card.status.textContent = "";
-      if (!r.responde) {
-        card.status.appendChild(pilula("neutro", "Sem comunicação com o relé" + (r.mins_atras != null ? " · há " + r.mins_atras + " min" : "")));
-      } else if (trips.length) {
-        card.status.appendChild(pilula("alerta", "Atuação de proteção"));
-        var ul = document.createElement("ul"); ul.className = "cos-rele-ativos";
-        trips.forEach(function (t) { var li = document.createElement("li"); li.textContent = releNomeTrip(t); ul.appendChild(li); });
-        card.status.appendChild(ul);
-      } else {
-        card.status.appendChild(pilula("ok", "Sem atuação"));
-      }
-      var fam = {}; trips.forEach(function (t) { fam[releFamilia(t)] = true; });
-      Object.keys(card.badges).forEach(function (k) { card.badges[k].classList.toggle("ativa", !!fam[k]); });
-      card.grade.classList.toggle("muda", !r.responde);
+      card.prot.classList.toggle("cos-rele-prot--atuou", atuou);
+      card.protRot.textContent = "Proteção" + (atuou && trips.length > 1 ? " · " + trips.length + " atuadas" : "");
+      if (!r.responde) { card.status.appendChild(pilula("neutro", "Sem comunicação")); }
+      else if (trips.length) {
+        card.status.appendChild(pilula("critico", "Atuou"));
+        var g = releDiv("cos-rele-trips");
+        trips.forEach(function (t) {
+          var k = releDiv("cos-rele-trip"); k.title = t + " — " + releNomeFamilia(releFamilia(t));
+          var b = document.createElement("b"); b.textContent = t; k.appendChild(b);
+          var sm = document.createElement("small"); sm.textContent = releNomeFamilia(releFamilia(t)); k.appendChild(sm);
+          var fs = releFaseDoCodigo(t); if (fs) { var s2 = document.createElement("small"); s2.textContent = fs; k.appendChild(s2); }
+          g.appendChild(k);
+        });
+        card.status.appendChild(g);
+      } else { card.status.appendChild(pilula("ok", "Sem atuação")); }
+      var fam = {}; trips.forEach(function (t) { var f = releFamilia(t); (fam[f] = fam[f] || []).push(releFaseDoCodigo(t)); });
+      Object.keys(card.badges).forEach(function (k) {
+        var on = atuou && !!fam[k], fases = on ? fam[k].filter(Boolean) : [];
+        card.badges[k].el.classList.toggle("ativa", on);
+        card.badges[k].fase.textContent = fases.length ? " · " + fases.join(", ") : "";
+      });
+      // sem comunicação: os números são os da última leitura — apagados, para a tela não os afirmar como de agora
+      [card.chips, card.fasesEl, card.fq, card.tp].forEach(function (el) { el.classList.toggle("muda", !r.responde); });
     }
-    escrever(card.det, "textContent", !r.responde ? "sem comunicação" : (r.mins_atras != null ? "lido há " + r.mins_atras + " min" : "ao vivo"));
     var m = r.medidas || {};
-    ["A", "B", "C"].forEach(function (f) {
-      escrever(card.med["i" + f], "textContent", releNum(m["i" + f]));
-      escrever(card.med["v" + f], "textContent", releKv(m["v" + f]));
-    });
-    var temp = (m.temp == null || isNaN(m.temp)) ? "" : "   ·   Temperatura: " + fmt2.format(m.temp) + " °C";
-    escrever(card.freq, "textContent", "Frequência: " + (m.freq == null || isNaN(m.freq) ? "—" : fmt2.format(m.freq) + " Hz") + temp);
-    // Potência e fator de potência por fase — só aparecem quando o relé entrega (modelo que não dá: linha some).
-    var temPot = [m.pA, m.pB, m.pC].some(function (x) { return x != null && !isNaN(x); });
-    escrever(card.pot, "textContent", !temPot ? "" : ("Potência: A " + braw(m.pA) + " · B " + braw(m.pB) + " · C " + braw(m.pC) + " kW" +
-      (m.pTot == null || isNaN(m.pTot) ? "" : "   (total " + braw(m.pTot) + ")")));
-    card.pot.style.display = temPot ? "" : "none";
-    var temFp = [m.cosA, m.cosB, m.cosC].some(function (x) { return x != null && !isNaN(x); });
-    escrever(card.fp, "textContent", !temFp ? "" : ("Fator de potência: A " + releNum(m.cosA) + " · B " + releNum(m.cosB) + " · C " + releNum(m.cosC)));
-    card.fp.style.display = temFp ? "" : "none";
-    escrever(card.disj, "textContent", "Disjuntor: " + releDisjuntor(r.disjuntor));
+    escrever(card.freq, "textContent", m.freq == null || isNaN(m.freq) ? "—" : fmt2.format(m.freq) + " Hz");
+    escrever(card.temp, "textContent", m.temp == null || isNaN(m.temp) ? "—" : fmt1.format(m.temp) + " °C");
+    releAtualizarFase(card.ci, [m.iA, m.iB, m.iC], true);
+    releAtualizarFase(card.cv, [m.vA, m.vB, m.vC].map(function (v) { return v == null || isNaN(v) ? null : v / 1000; }), false);
+    // o que o relé registrou na atuação (só depois de um trip)
     var ff = r.faltas || {};
     var chavesF = ["ifA", "ifB", "ifC", "ifN", "vfA", "vfB", "vfC"];
     var temDadoFalta = chavesF.some(function (k) { return ff[k] != null; });
@@ -1178,10 +1287,16 @@
     if (card.faltas._sig !== sigF) {
       card.faltas._sig = sigF; card.faltas.textContent = "";
       if (temFalta) {
-        var h = document.createElement("h4"); h.className = "cos-rele-falta-h"; h.textContent = "Última falta (o que o relé mediu na atuação)"; card.faltas.appendChild(h);
-        var p = document.createElement("p"); p.className = "cos-rele-faltas-v";
-        p.textContent = "Corrente: A " + braw(ff.ifA) + " · B " + braw(ff.ifB) + " · C " + braw(ff.ifC) + " · N " + braw(ff.ifN) + " (A)   ·   Tensão: A " + braw(ff.vfA) + " · B " + braw(ff.vfB) + " · C " + braw(ff.vfC) + " (V)";
-        card.faltas.appendChild(p);
+        card.faltas.appendChild(releDiv("cos-rele-rot", "Registrado pelo relé no trip"));
+        var gf = releDiv("cos-rele-falta-grade");
+        [["Corrente A", ff.ifA, "A"], ["Corrente B", ff.ifB, "A"], ["Corrente C", ff.ifC, "A"], ["Neutro", ff.ifN, "A"],
+         ["Tensão A", ff.vfA, "kV"], ["Tensão B", ff.vfB, "kV"], ["Tensão C", ff.vfC, "kV"]].forEach(function (x) {
+          if (x[1] == null) { return; }
+          var cf = releDiv("cos-rele-cartao"); cf.appendChild(releDiv("cos-rele-rot", x[0]));
+          cf.appendChild(releDiv("cos-rele-val", x[2] === "A" ? braw(x[1]) + " A" : releKv(x[1]) + " kV"));
+          gf.appendChild(cf);
+        });
+        card.faltas.appendChild(gf);
       }
     }
   }

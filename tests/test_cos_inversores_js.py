@@ -423,3 +423,29 @@ def test_a_curva_interrompe_onde_ninguem_mediu_em_vez_de_ligar_com_uma_reta():
     assert com_vao == [[720, 700], [725, 650], [740, None], [755, 225], [760, 230]]
     assert de_15 == [[720, 700], [735, 650], [750, 600]]          # passo de 15: nada a partir
     assert lim5 == 7.5 and lim15 == 22.5 and lim_vazio == 7.5
+
+
+# --- a seção do relé (refeita 18/11/2026) -------------------------------------------------------------
+
+def test_rele_fase_sem_medicao_e_so_zero_com_outra_fase_em_carga():
+    """Céu Azul 1 (18/11/2026): a fase A em 0 com B e C em carga é TC/entrada do relé que não traz a corrente
+    (a máxima da fase A nunca passou de 2 A) — "sem medição", não zero medido. Zero nas três (disjuntor aberto),
+    corrente baixa de madrugada e leitura ausente NÃO são sem medição."""
+    r = rodar("console.log(JSON.stringify([[0, 13.95, 13.59], [0, 0, 0], [0.4, 0, 0.5], [13.6, 13.5, 13.0], [null, 13, 13]]"
+              ".map(N.releSemMedicao)))")
+    assert r == [[True, False, False], [False, False, False], [False, False, False], [False, False, False], [False, False, False]]
+
+
+def test_rele_desequilibrio_entre_fases():
+    r = rodar("console.log(JSON.stringify([N.releDesequilibrio([13.59, 13.48, 13.01]), N.releDesequilibrio([19.79, 19.75, 19.87]),"
+              " N.releDesequilibrio([0, 13.95, 13.59], [true, false, false]), N.releDesequilibrio([0, 0, 0]), N.releDesequilibrio([13, null, 13])]))")
+    assert round(r[0], 1) == 2.6   # Céu Azul 2, corrente
+    assert round(r[1], 1) == 0.3   # Céu Azul 2, tensão
+    assert r[2] is None            # fase sem medição: não se calcula com duas
+    assert r[3] is None            # sem corrente
+    assert r[4] is None            # leitura ausente
+
+
+def test_rele_fase_do_codigo_e_disjuntor():
+    r = rodar("console.log(JSON.stringify([['67B', '59N', '81', '27A', '86'].map(N.releFaseDoCodigo), [1, 0, null].map(N.releDisjuntor)]))")
+    assert r == [["fase B", "neutro", "", "fase A", ""], ["Fechado", "Aberto", "Sem leitura"]]
