@@ -338,6 +338,21 @@ FATOS = (
                     "situação é a do último resolvida/reaberta) e responsavel (o 'Pegar para mim', só até 15/11/2026). "
                     "Quem (nome e e-mail) e o texto só cifrados (Cofre, a chave do cadastro); o evento em claro (o aviso "
                     "do topo lê). Só acrescenta: nada se edita nem se apaga"),
+    # as edições dos contratos (18/11/2026, Levi: "Eu quero que essas informações sejam editáveis [...] Só gestores de
+    # contrato ou administradores podem editar, e tudo com histórico"). O Nexus é a FONTE; registrado antes da 1ª gravação
+    Fato("edicao_contrato", "Edição do contrato", "comando", "nexus_contratos_edicoes · fato_edicao_contrato",
+         "1 linha = 1 mudança (incluir, alterar ou retirar) de 1 item de 1 contrato: os dados do contrato, um contrato "
+         "lido do PDF, uma regra, uma obrigação, um serviço adicional ou as metas",
+         _d(data=("id", "data_id (o dia de Brasília da mudança)"),
+            pessoa=("cod", "pessoa_hmac (o código do e-mail de quem mudou)")),
+         tipo="sem_medida", chave=("edicao_id",), fontes=("nexus_contratos_edicoes · fato_edicao_contrato",),
+         janela_origem="o Nexus é a fonte",
+         observacao="contrato_chave = o id do cliente (c + sha1 do nome normalizado); item_tipo e item_id dizem o que "
+                    "mudou (o id fixo da carga inicial, ou o novo do item incluído); evento = inclusao, alteracao ou "
+                    "retirada. O que era, o que ficou, o motivo, a prova (o texto colado e a lista dos anexos) e quem "
+                    "(nome e e-mail) só cifrados (Cofre, a chave do cadastro); os arquivos da prova no disco do servidor "
+                    "(contratos_edicoes/<edicao_id>/). O estado de agora = a carga inicial (a planilha de 16/11 e as fichas "
+                    "dos PDFs de 18/11, na pasta de dados) + as mudanças na ordem. Só acrescenta: nada se apaga"),
     # a passagem de turno do COS (R12 do Fillipe: "a passagem é registrada no sistema; sem registro, ela não aconteceu").
     # Nada disso existia na Ronda COS (26/10/2026). O Nexus é a FONTE; registrado antes da 1ª gravação
     Fato("passagem_turno", "Passagem de turno do COS", "cos", "nexus_cos_turno · fato_passagem_turno",
@@ -1609,6 +1624,12 @@ LIVROS = (
           "a cada atualização, resolvida e reaberta na tela Contestações (o \"Pegar para mim\" saiu em 16/11/2026)",
           "nexus/contratos/tratamento.py, pela tela Comando > Contestações", False,
           "registrado em 15/10/2026 antes da 1ª gravação (regra 10): nasce na 1ª demanda que alguém pega",
+          so_cresce=True),
+    Livro("nexus_contratos_edicoes", ("fato_edicao_contrato",),
+          "a cada mudança salva na tela Comando > Contratos (pelo gestor do contrato ou pelo administrador)",
+          "nexus/contratos/edicao.py, pela tela Comando > Contratos", False,
+          "registrado em 18/11/2026 antes da 1ª gravação (regra 10): nasce na 1ª mudança salva. O conteúdo só cifrado "
+          "(Cofre); os anexos da prova no disco do servidor",
           so_cresce=True),
     Livro("nexus_cos_turno", ("fato_passagem_turno",),
           "a cada passagem registrada e a cada \"Assumi o turno\" (tela COS > Passagem de turno)",

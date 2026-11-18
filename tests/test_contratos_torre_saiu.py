@@ -15,13 +15,14 @@ def test_a_torre_saiu_do_menu_e_as_telas_foram_para_o_comando_e_a_base(logado):
     assert "contratos" not in torres
     comando = [s.id for s in torres["comando"].telas]
     # as duas telas que vieram estão no Comando (a ordem do menu mudou em 16/11/2026: test_comando_ordem_usinas_16_11.py)
-    assert {"contestacoes", "visao-do-contrato"} <= set(comando) and torres["comando"].tela("visao-do-contrato").de_todos
+    # a Prévia: visão do contrato virou Contratos em 18/11/2026 (test_contratos_editavel_18_11.py)
+    assert {"contestacoes", "contratos"} <= set(comando) and torres["comando"].tela("contratos").de_todos
     base = [s.id for s in torres["base"].telas]
     assert base.index("acessos-clientes") == base.index("acessos") + 1
     html = logado.get("/").get_data(as_text=True)
     menu = html.split('<nav class="menu"', 1)[1].split("</nav>", 1)[0]
     assert "Contratos e clientes" not in menu and "/t/contratos/" not in html
-    for endereco, nome in (("/t/comando/contestacoes", "Contestações"), ("/t/comando/visao-do-contrato", "Prévia: visão do contrato")):
+    for endereco, nome in (("/t/comando/contestacoes", "Contestações"), ("/t/comando/contratos", "Contratos")):
         assert re.search(r'<a href="%s"[^>]*>\s*%s' % (re.escape(endereco), re.escape(nome)), menu), endereco
     # desde 13/11/2026 os acessos do cliente são uma aba de Base → Acessos (Levi: "Vai virar uma abinha chamada acessos
     # do cliente"): fora do menu, dentro das abas de Acessos
@@ -42,7 +43,7 @@ def test_o_endereco_antigo_leva_a_tela_nova(logado):
     # o filtro e o resto do caminho vão junto: o link do aviso do Teams abre no setor certo
     assert destino("/t/contratos/contestacoes?setor=zeladoria") == (308, "/t/comando/contestacoes?setor=zeladoria")
     assert destino("/t/contratos/contestacoes/a1/card") == (308, "/t/comando/contestacoes/a1/card")
-    assert destino("/t/contratos/previa") == (308, "/t/comando/visao-do-contrato")
+    assert destino("/t/contratos/previa") == (308, "/t/comando/contratos")
     assert destino("/t/contratos/acessos") == (308, "/t/base/acessos-clientes")
     # 308: o formulário de uma aba que ficou aberta no endereço antigo chega à tela nova com o método e o corpo
     assert destino("/t/contratos/acessos", "post") == (308, "/t/base/acessos-clientes")
@@ -50,7 +51,7 @@ def test_o_endereco_antigo_leva_a_tela_nova(logado):
     # o que não tem sucessora (os avisos de "em construção") leva ao Início, sem 404
     for sem_sucessora in ("/t/contratos/clientes", "/t/contratos/onboarding", "/t/contratos/portal", "/t/contratos/"):
         assert destino(sem_sucessora) == (302, "/"), sem_sucessora
-    assert logado.get("/t/comando/visao-do-contrato").status_code == 200
+    assert logado.get("/t/comando/contratos").status_code == 200
 
 
 def test_a_marca_do_setor_na_tela_antiga_vale_na_nova():
@@ -60,7 +61,7 @@ def test_a_marca_do_setor_na_tela_antiga_vale_na_nova():
                 # a decisão mais nova ganha, com o nome antigo ou com o novo
                 {"setor_id": 9, "tela": "contratos/contestacoes", "liberada": True, "decidida_em": "2026-10-13T12:00:00+00:00"},
                 {"setor_id": 9, "tela": "comando/contestacoes", "liberada": False, "decidida_em": "2026-11-13T12:00:00+00:00"}]
-    assert ST.vigentes(decisoes) == {7: {"comando/contestacoes", "base/acessos-clientes"}, 8: {"comando/visao-do-contrato"}}
+    assert ST.vigentes(decisoes) == {7: {"comando/contestacoes", "base/acessos-clientes"}, 8: {"comando/contratos"}}
 
 
 def test_o_portao_por_setor_nao_barra_o_endereco_antigo(app):

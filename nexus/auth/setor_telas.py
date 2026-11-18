@@ -71,7 +71,9 @@ LIVRES = frozenset({"auth.entrar", "auth.sair", "casca.tema", "casca.saude", "st
 RENOMEADAS = {"performance/relatorio": "relatorios/relatorio",
               "performance/relatorio-semanal": "relatorios/relatorio-semanal",
               "contratos/contestacoes": "comando/contestacoes",
-              "contratos/previa": "comando/visao-do-contrato",
+              "contratos/previa": "comando/contratos",
+              # 18/11/2026: a Prévia: visão do contrato virou Contratos (nexus/torres/comando/contratos_tela.py)
+              "comando/visao-do-contrato": "comando/contratos",
               "contratos/acessos": "base/acessos-clientes",
               # 16/11/2026: a Usinas saiu do Comando para a Usinas 360° (Levi: "Usinas sai de comando e vai para Usinas
               # 360 abaixo de Visão do responsável!"); o endereço antigo responde 308 (nexus/torres/comando, `bp_usinas`)

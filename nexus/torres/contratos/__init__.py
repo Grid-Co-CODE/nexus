@@ -21,7 +21,7 @@ from ...prefixo import na_raiz
 
 # a tela antiga → o endereço novo; o que vem depois da tela (o card, o pegar, a atualização) vai junto
 DESTINOS = {"contestacoes": "/t/comando/contestacoes",
-            "previa": "/t/comando/visao-do-contrato",
+            "previa": "/t/comando/contratos",
             "acessos": "/t/base/acessos-clientes"}
 
 bp = Blueprint("torre_contratos", __name__, url_prefix="/t/contratos")

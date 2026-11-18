@@ -7,7 +7,7 @@ cliente lá para bases, contestações, você vai jogar para o comando, prévia 
 | Tela | Onde está | View e template |
 |---|---|---|
 | **Contestações** (13/10/2026) | Comando, `/t/comando/contestacoes` | `nexus/torres/comando/contestacoes_tela.py`, `comando/contestacoes.html` e `_contestacao_card.html` |
-| **Prévia: visão do contrato** (12/11/2026) | Comando, `/t/comando/visao-do-contrato`, de todos | o mesmo módulo, `comando/visao_do_contrato.html` |
+| **Contratos** (a Prévia: visão do contrato de 12/11/2026; editável desde 18/11/2026) | Comando, `/t/comando/contratos`, de todos (o endereço `/t/comando/visao-do-contrato` leva a ele) | `nexus/torres/comando/contratos_tela.py`, `comando/contratos.html`, `static/contratos.js` e `contratos.css` |
 | **Acessos dos clientes** (14/10/2026) | Base → Acessos, a aba "Acessos do cliente" (`/t/base/acessos-clientes`, desde 13/11/2026 fora do menu; as outras abas de Acessos são outra coisa: o que cada setor do Nexus vê) | `nexus/torres/base/acessos_clientes_tela.py`, `nexus/templates/acessos_dos_clientes.html` |
 | Clientes, Onboarding de cliente, Comunicação por cliente, Portal do cliente | saíram: eram só o aviso de "em construção" | — |
 
@@ -18,15 +18,44 @@ cliente lá para bases, contestações, você vai jogar para o comando, prévia 
   filtro (`?setor=`); 308 e não 302 para o formulário de uma aba aberta no endereço antigo ainda gravar. A tela sem
   sucessora leva ao Início.
 - **A marca do setor vale na tela nova** (`setor_telas.RENOMEADAS`: `contratos/contestacoes` → `comando/contestacoes`,
-  `contratos/previa` → `comando/visao-do-contrato`, `contratos/acessos` → `base/acessos-clientes`): ninguém perdeu o que
+  `contratos/previa` e `comando/visao-do-contrato` → `comando/contratos`, `contratos/acessos` → `base/acessos-clientes`): ninguém perdeu o que
   via, e o banco não foi regravado. O portão por setor deixa o endereço antigo passar (`setor_telas.TORRES_EXTINTAS`);
   quem decide é a tela de destino.
 - Prova: `tests/test_contratos_torre_saiu.py`. O menu passou de 14 para 13 torres.
 
-**Prévia: visão do contrato** (12/11/2026, `/t/comando/visao-do-contrato`, de todos): o mockup que a área de Contratos pediu para a
-avaliação de Contratos e dos setores, `nexus/static/previa/visao-do-contrato.html` (a mesma
-página do `docs/mockups/visao-do-contrato` da plataforma), numa moldura; dentro do Nexus ele esconde o topo dele. Nada
-grava. Sem a planilha de controle importada, os dados são fictícios; com ela, são os reais (seção abaixo).
+## Comando › Contratos: editável, com histórico (18/11/2026; `edicao.py`)
+
+Era a **Prévia: visão do contrato** (12/11/2026): um mockup numa moldura, que passou a mostrar a planilha de controle
+(16/11) e as fichas dos PDFs (18/11), as duas subidas por campos de importação. Levi, 18/11/2026: "Tire essas opções de
+subir arquivos. Primeiro que o arquivo JSON você mesmo criou [...] Eu quero que essas informações sejam editáveis [...]
+Só gestores de contrato ou administradores podem editar, e tudo com histórico. Nesse histórico deve ter quem mudou, o
+que mudou, quando mudou, o motivo porque mudou, anexar alguma coisa [...] um e-mail, uma mensagem, algo" e "deixar muita
+informação em cima [...] rouba metade do espaço da tela [...] Arrume isso". Escolhas dele no mesmo dia: o anexo é
+OBRIGATÓRIO (arquivo ou o texto colado), o administrador liga o gestor a uma pessoa, tudo é editável, o nome é Contratos.
+
+- **Sem importação.** As duas importações saíram da tela. O que tinha sido importado (`contratos/controle_obrigacoes.json`
+  e `contratos/fichas_contratos.json` na pasta de dados) é a **carga inicial**, e não muda mais; daí em diante tudo muda
+  na própria tela. Cada coisa editável é um ITEM com id fixo tirado da carga: `cliente` (os dados do contrato da
+  planilha), `contrato` (cada PDF lido), `regra`, `obrigacao`, `adicional` e `parametros` (as metas da Cadastros).
+- **O registro.** Livro `nexus_contratos_edicoes` · `fato_edicao_contrato` (no catálogo antes da 1ª gravação; só
+  acrescenta). 1 linha = 1 mudança de 1 item (incluir, alterar, retirar). O estado de agora = a carga + as mudanças na
+  ordem. Retirar esconde o item; a história fica. O conteúdo (o que era, o que ficou, o motivo, a prova, quem) vai só
+  CIFRADO (Cofre); os arquivos da prova no disco do servidor (`contratos_edicoes/<id>/`). A mesma mudança em vários
+  itens (a regra igual nos seis contratos da 2C) é um lote: uma linha por item, a prova guardada uma vez, e uma entrada
+  no histórico.
+- **Quem edita.** O administrador, e o gestor do contrato daquele cliente: a pessoa ligada pelo administrador (Editar
+  dados → Gestor do contrato) ou, enquanto ninguém escolheu, a ÚNICA pessoa com setor cujo nome é igual ao da planilha
+  (nunca se chuta). Trocar o gestor e as metas é só do administrador. A página só mostra o lápis para quem pode, e o
+  servidor confere de novo (`edicao.pode_editar`).
+- **O que é obrigatório.** Motivo (5 caracteres ou mais) e prova: o arquivo (PDF, imagem, .eml, .msg, .doc(x), .xlsx,
+  .txt; até 5 arquivos, 10 MB cada, o conteúdo tem de bater com a extensão) ou o texto colado do e-mail ou da mensagem.
+  "Nada mudou" também não grava.
+- **A tela.** O topo é UMA linha (a troca de contrato é o título; o gestor e o Editar dados na mesma linha), a linha de
+  fatos é curta, o atraso é um chip, e não há título repetido, linha de "de onde vêm os dados" nem rodapé. As abas:
+  Regras (as categorias, com Incluir regra, e os Dados do contrato no fim), Calendário, Atendimento, Entregáveis,
+  Metas, Financeiro e **Histórico** (quem, quando, o que era e o que ficou, o motivo e a prova; a carga inicial no
+  fim). A linha editada leva a marca "editado" (quem e quando no título).
+- Prova: `tests/test_contratos_editavel_18_11.py`.
 
 ## A planilha de controle de obrigações na visão do contrato (16/11/2026; `controle.py`)
 
@@ -57,8 +86,9 @@ pasta do Backoffice: "ATUALIZE AGORA COM DADOS REAIS!".
   inteira.
 
   O Nexus acha as colunas pelo nome, então a coluna pode mudar de lugar. A linha "— EXEMPLO" da planilha não entra.
-- **Onde mora.** O administrador importa a planilha na própria tela (`POST /t/comando/visao-do-contrato/importar`). O
-  resultado vai para a pasta de dados do servidor, `contratos/controle_obrigacoes.json`.
+- **Onde mora.** Foi importada pelo administrador em 16/11/2026 (reimportada em 17/11 com as 8 abas) e ficou na pasta de
+  dados do servidor, `contratos/controle_obrigacoes.json`, como a carga inicial da tela Contratos. A importação saiu
+  da tela em 18/11/2026: daí em diante, o que muda se edita na tela, com histórico (seção acima).
   - **NUNCA no repositório**, que é público, e nunca no banco de leitura aberta: a planilha tem nomes, valores e cláusulas.
   - A planilha errada é recusada e a que estava fica.
   - `GET .../dados.json` entrega o importado, com as contas de hoje; a conta do cliente e o Modo cliente não leem (403).
@@ -81,8 +111,8 @@ pasta do Backoffice: "ATUALIZE AGORA COM DADOS REAIS!".
     Martineli: 1 entregável, 0 no prazo; Danuth Fernandes: 3 adicionais, R$ 9.054).
   - O gestor do contrato é o supervisor da linha "Contrato (nível geral)"; sem essa linha, o supervisor único do cliente.
     As outras linhas viram as carteiras, cada uma com o supervisor e as usinas dela.
-- **A página (`static/previa/visao-do-contrato.html`)** pede os dados ao Nexus. Sem resposta (fora do Nexus ou sem
-  importação), fica no exemplo fictício. Com resposta:
+- **A página** (desde 18/11/2026 a tela Contratos, `static/contratos.js`; o exemplo fictício da prévia saiu) pede os
+  dados ao Nexus e:
   - abre em **Todos os contratos**: uma tabela com o gestor, a vigência, até quando avisar a renovação, o próximo
     reajuste e as obrigações em atraso. Em cima a vigência (ou o aviso) vencida, depois quem tem atraso, depois a data mais
     perto;
@@ -128,9 +158,11 @@ analisar e fazer algo melhor?", "completa tudo!" e "faça por subagentes para me
   setor que executa e a prova: arquivo, página, cláusula e trecho literal. O que o contrato não diz vem em `lacunas`.
 - **Como se confiou.** Um script procura cada trecho no texto da página citada. O que não bate (tabela que no PDF é
   imagem, transcrita) vai a um revisor que tenta derrubar o item olhando a imagem da página.
-- **Onde mora.** O administrador importa o .json na tela (`POST /t/comando/visao-do-contrato/importar-fichas`), que
-  confere o formato e guarda em `contratos/fichas_contratos.json` na pasta de dados. NUNCA no repositório (é público). O
-  `dados.json` entrega as fichas casadas com o cliente da planilha pelo nome sem acento e sem caixa.
+- **Onde mora.** Foi importado uma vez, em 18/11/2026, e ficou em `contratos/fichas_contratos.json` na pasta de dados
+  (NUNCA no repositório, que é público), como parte da carga inicial da tela Contratos; a importação saiu da tela no
+  mesmo dia (Levi: "o arquivo JSON você mesmo criou. Então alguém teria que transformar em JSON [...] isso não faz
+  sentido"). O `fichas.ler` segue conferindo o formato; a ficha casa com o cliente da planilha pelo nome sem acento e
+  sem caixa (`fichas.por_cliente`).
 - **Na tela.** Regras: as 11 categorias recolhidas; a linha abre o trecho e a página; "Mudadas por aditivo" é o único
   controle. Cliente com vários contratos do mesmo modelo (2C, GreenYellow, Axis): a regra igual em todos aparece uma vez
   com "todos". Embaixo, "A planilha de controle e o contrato não batem" (fim da vigência, aviso prévio, índice) e "O que

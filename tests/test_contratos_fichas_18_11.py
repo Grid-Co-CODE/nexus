@@ -50,52 +50,6 @@ def test_casa_o_cliente_com_o_da_planilha_pelo_nome():
     assert set(por) == {"Solar Alfa", "Cliente Sem Planilha"} and por["Solar Alfa"] is FICHA
 
 
-def test_so_o_administrador_importa_o_errado_nao_apaga_e_o_dados_json_entrega(logado, tmp_path):
-    logado.application.config.update(NEXUS_DADOS=str(tmp_path))
-    r = logado.post("/t/comando/visao-do-contrato/importar", data={"planilha": (io.BytesIO(_planilha()), "controle.xlsx")},
-                    content_type="multipart/form-data")
-    assert r.status_code == 302
-    html = logado.get("/t/comando/visao-do-contrato").get_data(as_text=True)
-    assert 'name="fichas"' in html and "/t/comando/visao-do-contrato/importar-fichas" in html
-    assert "fichas" not in logado.get("/t/comando/visao-do-contrato/dados.json").get_json()
-    # o arquivo errado é recusado e não grava nada
-    r = logado.post("/t/comando/visao-do-contrato/importar-fichas", data={"fichas": (io.BytesIO(b"{nao e json"), "f.json")},
-                    content_type="multipart/form-data")
-    assert r.status_code == 302 and "Não importei as fichas" in logado.get("/t/comando/visao-do-contrato").get_data(as_text=True)
-    assert not (tmp_path / "contratos" / F.ARQUIVO).exists()
-    corpo = json.dumps([FICHA], ensure_ascii=False).encode("utf-8")
-    r = logado.post("/t/comando/visao-do-contrato/importar-fichas", data={"fichas": (io.BytesIO(corpo), "fichas.json")},
-                    content_type="multipart/form-data")
-    assert r.status_code == 302
-    assert "Fichas importadas: 1 clientes, 1 contratos e 2 regras" in logado.get("/t/comando/visao-do-contrato").get_data(as_text=True)
-    j = logado.get("/t/comando/visao-do-contrato/dados.json").get_json()
-    assert list(j["fichas"]) == ["Solar Alfa"] and j["fichas"]["Solar Alfa"]["contratos"][0]["id"] == "ALFA-NORTE"
-    assert j["fichas_info"]["arquivo"] == "fichas.json"
-    # quem não é administrador não importa
-    with logado.session_transaction() as s:
-        s["admin"] = False
-    r = logado.post("/t/comando/visao-do-contrato/importar-fichas", data={"fichas": (io.BytesIO(corpo), "f.json")},
-                    content_type="multipart/form-data")
-    assert r.status_code == 403
-
-
-def test_a_pagina_mostra_as_regras_com_a_prova_e_o_que_nao_bate(cliente):
-    p = cliente.get("/static/previa/visao-do-contrato.html")
-    pagina = p.get_data(as_text=True)
-    p.close()
-    # a regra abre o trecho literal e a página; a mudada por aditivo mostra o antes riscado
-    assert "function rRegrasContrato(c, f)" in pagina and 'class="rg" data-rg="' in pagina and 'class="trecho"' in pagina
-    assert "antes: <s>" in pagina
-    # a planilha e o contrato que não batem, e o que o contrato não diz
-    assert "A planilha de controle e o contrato não batem" in pagina and "O que o contrato não diz" in pagina
-    # as outras abas trazem o que o contrato pede
-    for t in ('"O que o contrato pede"', '"O atendimento que o contrato pede"', '"Rotinas que o contrato pede"',
-              '"Metas, bônus e penalidades do contrato"', "Valor no contrato"):
-        assert t in pagina
-    # nenhum dado de contrato na página (o repositório é público): vem do dados.json
-    assert "fichaDe(c)" in pagina and "REAL.fichas" in pagina
-
-
 def test_o_contrato_completa_so_o_vazio_da_planilha_e_diz_de_onde_veio():
     """Levi, 18/11/2026: "faça um rework lá nos contratos e bote os dados que faltam!"."""
     k1 = {"id": "K1", "vigencia": {"inicio": "2025-06-10", "fim": "2028-06-10", "ref": {"pagina": 14}},
@@ -118,20 +72,3 @@ def test_o_contrato_completa_so_o_vazio_da_planilha_e_diz_de_onde_veio():
     cheio = dict(vazio, fim="2027-01-01", indice="IGP-M")
     b = F.completar([cheio], {"Alfa": f})[0]
     assert (b["fim"], b["indice"]) == ("2027-01-01", "IGP-M") and "fim" not in b["origem"] and "indice" not in b["origem"]
-
-
-def test_o_dados_json_calcula_a_renovacao_com_o_dado_completado(logado, tmp_path):
-    logado.application.config.update(NEXUS_DADOS=str(tmp_path))
-    logado.post("/t/comando/visao-do-contrato/importar", data={"planilha": (io.BytesIO(_planilha()), "controle.xlsx")},
-                content_type="multipart/form-data")
-    # Beta GD não tem aviso prévio na planilha; o contrato traz 60 dias
-    beta = {"cliente": "beta gd", "documentos": [], "contratos": [{"id": "B1", "renovacao": {"aviso_previo_dias": 60, "ref": {"pagina": 3}},
-                                                                    "valor": {"mensal": 2000.0}, "regras": []}]}
-    corpo = json.dumps([beta]).encode("utf-8")
-    logado.post("/t/comando/visao-do-contrato/importar-fichas", data={"fichas": (io.BytesIO(corpo), "f.json")},
-                content_type="multipart/form-data")
-    j = logado.get("/t/comando/visao-do-contrato/dados.json").get_json()
-    b = next(c for c in j["contratos"] if c["cliente"] == "Beta GD")
-    # fim 23/06/2027 (planilha) menos 60 dias (contrato)
-    assert b["aviso_dias"] == 60 and b["avisar_ate"] == "2027-04-24" and b["origem"]["aviso_dias"]["contrato"] == "B1"
-    assert b["valor_mensal"] == 2000.0

@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block titulo %}{{ tela.nome }}{% endblock %}
+{% block conteudo %}
+<link rel="stylesheet" href="{{ url_for('static', filename='contratos.css') }}">
+{# Comando › Contratos (18/11/2026). Era a "Prévia: visão do contrato" numa moldura, com importação de planilha e de fichas.
+   Levi, 18/11/2026: "Tire essas opções de subir arquivos [...] Eu quero que essas informações sejam editáveis [...] Só
+   gestores de contrato ou administradores podem editar, e tudo com histórico" e "deixar muita informação em cima [...]
+   rouba metade do espaço da tela [...] Arrume isso". Por isso a página não tem título visível nem linha de "de onde vêm os
+   dados": o topo é a troca de contrato (contratos.js), e a origem de cada dado está no próprio dado. Regras em
+   nexus/contratos/CLAUDE.md. #}
+<div class="ctr" id="ctr" data-dados="{{ '/t/comando/contratos/dados.json'|na_raiz }}"
+     data-historico="{{ '/t/comando/contratos/historico.json'|na_raiz }}" data-editar="{{ '/t/comando/contratos/editar'|na_raiz }}">
+  <h1 class="so-leitor">{{ tela.nome }}</h1>
+  {% if not tem_carga %}
+  <div class="ctr-vazio"><h2>Os contratos ainda não chegaram a este Nexus</h2>
+    <p>A carga inicial (a planilha de controle de Contratos e as fichas dos PDFs) não está na pasta de dados deste servidor.</p></div>
+  {% else %}
+  <div id="ctr-main" aria-live="polite"><p class="mudo" style="padding:18px 0">Lendo os contratos…</p></div>
+  {% endif %}
+</div>
+<dialog class="ctr-dlg ctr" id="ctr-dlg" aria-labelledby="ctr-dlg-t"></dialog>
+<script src="{{ url_for('static', filename='contratos.js') }}" defer></script>
+{% endblock %}

@@ -45,12 +45,15 @@ TORRE = Torre(
         # da torre Contratos e clientes, que saiu do menu (12/11/2026, Levi: "contestações, você vai jogar para o
         # comando, prévia visão do contrato, você vai jogar no comando"; as views em contestacoes_tela.py). A prévia é de
         # todos, para cada setor avaliar sem liberar um por um (o pedido: a avaliação de Contratos e dos outros setores)
-        Tela("visao-do-contrato", "Prévia: visão do contrato",
-             "Como fica a visão do contrato?",
-             "Mockup para avaliação, com dados fictícios: nada grava", de_todos=True),
+        # 18/11/2026: a Prévia virou Contratos, editável pelo gestor do contrato e pelo administrador, com histórico
+        # (Levi: "Tire essas opções de subir arquivos [...] Eu quero que essas informações sejam editáveis"; o nome
+        # "Contratos" foi a escolha dele; as views em contratos_tela.py; o endereço antigo leva ao novo)
+        Tela("contratos", "Contratos",
+             "O que cada contrato pede, o que vence e o que está em atraso?",
+             "A planilha de controle de Contratos e os PDFs dos contratos, editáveis com histórico", de_todos=True),
         Tela("tempo-de-resposta", "Tempo de resposta",
              "Que área responde no prazo, e quais pedidos estão atrasados?",
-             "Pedidos entre áreas, com prazo (nexus_pedidos)", dentro_de="visao-do-contrato"),
+             "Pedidos entre áreas, com prazo (nexus_pedidos)", dentro_de="contratos"),
         Tela("metas", "Metas do book",
              "Quais KPIs do book R02 estão fora da meta e piorando?",
              "Aba KPIs do Plano de Documentação"),
@@ -1210,3 +1213,4 @@ def conversa_acao():
 from . import demandas_tela  # noqa: E402,F401
 # as Contestações e a Prévia do contrato, vindas da torre Contratos e clientes (12/11/2026)
 from . import contestacoes_tela  # noqa: E402,F401
+from . import contratos_tela  # noqa: E402,F401

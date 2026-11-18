@@ -21,7 +21,7 @@ TELAS = ["cos/mesa", "cos/ocorrencias", "pcm/quadro", "campo/aprovacao", "campo/
 # 13/10/2026); os relatórios são molduras da plataforma e não entram na pré-carga
 QUENTES = {"cos/mesa", "cos/ocorrencias", "pcm/quadro", "campo/rondas", "relatorios/central",
            "comando/caixa-de-entrada",   # a Caixa é de todo setor (03/11/2026)
-           "comando/visao-do-contrato"}  # e a Prévia do contrato (12/11/2026)
+           "comando/contratos"}  # e a Prévia do contrato (12/11/2026)
 
 
 @pytest.fixture
@@ -58,7 +58,7 @@ def test_o_primeiro_clique_de_quem_tem_setor_aquece_as_telas_dele(ligada):
     # 12/11/2026: a Prévia do contrato foi para o Comando (a torre Contratos e clientes saiu do menu): deixou de ser a 1ª
     # tela de uma torre e entra no resto do Comando
     assert list(e["ultimo"]) == ["comando/caixa-de-entrada", "campo/rondas", "cos/mesa", "pcm/quadro", "relatorios/central",
-                                 "comando/visao-do-contrato", "cos/ocorrencias"]
+                                 "comando/contratos", "cos/ocorrencias"]
 
 
 def test_uma_vez_por_minuto_e_so_o_que_esfriou(ligada):

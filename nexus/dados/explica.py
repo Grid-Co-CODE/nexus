@@ -38,6 +38,7 @@ RESUMO = {
     "evento_aviso": "Os avisos das OS no sino: solicitação que virou OS e quem já leu",
     "versao_subtarefas": "As subtarefas padrão de cada atividade da Performance",
     "tratamento_contestacao": "Quem pegou cada contestação do cliente e o que escreveu sobre ela",
+    "edicao_contrato": "Cada mudança nos contratos: quem mudou, o quê, quando, o motivo e a prova",
     "passagem_turno": "Quem passou cada turno do COS, o que deixou pendente e quem assumiu",
     "normalizacao": "Quando cada usina voltou pela hora do COS, o tipo e as proteções",
     "ocorrencia_aberta": "As paradas que o COS ainda não normalizou, com o começo e o ativo",
@@ -189,6 +190,10 @@ PARA_QUE = {
                          "a hora. Serve para cobrar as ações que vencem, ver as ocorrências abertas de cada usina na "
                          "Visão geral e, com o tempo, saber o que se repete por usina e equipamento. O texto e quem "
                          "escreveu vão cifrados; a tela Usinas 360° → Ocorrências mostra.",
+    "edicao_contrato": "Guarda cada mudança feita na tela Comando > Contratos: o item (os dados do contrato, uma regra, "
+                       "uma obrigação, um serviço adicional, as metas), o que era e o que ficou, quem mudou e quando, o "
+                       "motivo e a prova (o e-mail, a mensagem ou o documento). Só o gestor do contrato e o administrador "
+                       "mudam; o conteúdo vai cifrado.",
     "tratamento_contestacao": "Guarda o acompanhamento de cada contestação do cliente: quem pegou a demanda (\"Pegar "
                               "para mim\") e cada atualização que o responsável escreveu, com o dia e a hora. Quem e o "
                               "texto vão cifrados; a tela Comando → Contestações mostra.",

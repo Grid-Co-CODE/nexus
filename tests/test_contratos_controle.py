@@ -170,54 +170,6 @@ def test_as_datas_de_renovacao_e_reajuste_e_o_que_esta_em_atraso():
     assert d["hoje"] == "2026-11-16"
 
 
-def test_importar_e_ler_pela_tela(logado, tmp_path):
-    logado.application.config.update(NEXUS_DADOS=str(tmp_path))
-    assert logado.get("/t/comando/visao-do-contrato/dados.json").get_json() == {"ok": False}
-    html = logado.get("/t/comando/visao-do-contrato").get_data(as_text=True)
-    assert "fictícios" in html and 'name="planilha"' in html
-    # a planilha errada não importa e não apaga nada
-    r = logado.post("/t/comando/visao-do-contrato/importar", data={"planilha": (io.BytesIO(b"x"), "x.xlsx")},
-                    content_type="multipart/form-data")
-    assert r.status_code == 302 and "Não importei" in logado.get("/t/comando/visao-do-contrato").get_data(as_text=True)
-    r = logado.post("/t/comando/visao-do-contrato/importar", data={"planilha": (io.BytesIO(_planilha()), "controle.xlsx")},
-                    content_type="multipart/form-data")
-    assert r.status_code == 302
-    html = logado.get("/t/comando/visao-do-contrato").get_data(as_text=True)
-    assert "Planilha importada: 3 contratos, 8 obrigações e 6 serviços adicionais" in html and "Dados <b>reais</b>" in html
-    assert (tmp_path / "contratos" / K.ARQUIVO).exists()
-    j = logado.get("/t/comando/visao-do-contrato/dados.json").get_json()
-    assert j["ok"] and [c["cliente"] for c in j["contratos"]] == ["Beta GD", "Gama", "Solar Alfa"]
-    assert j["contratos"][2]["avisar_ate"] == "2026-05-27" and j["arquivo"] == "controle.xlsx"
-
-
-def test_so_o_administrador_importa_e_o_cliente_nao_le(logado, tmp_path):
-    logado.application.config.update(NEXUS_DADOS=str(tmp_path))
-    with logado.session_transaction() as s:
-        s["admin"] = False
-    r = logado.post("/t/comando/visao-do-contrato/importar", data={"planilha": (io.BytesIO(_planilha()), "c.xlsx")},
-                    content_type="multipart/form-data")
-    assert r.status_code == 403 and not (tmp_path / "contratos").exists()
-    assert 'name="planilha"' not in logado.get("/t/comando/visao-do-contrato").get_data(as_text=True)
-    with logado.session_transaction() as s:
-        s["via"] = "cliente"
-    assert logado.get("/t/comando/visao-do-contrato/dados.json").status_code in (302, 403)
-
-
-def test_a_pagina_le_os_dados_do_nexus_e_nao_guarda_nenhum(cliente):
-    """O repositório é público: a página não tem dado de contrato; pede ao Nexus e, sem resposta, fica no exemplo."""
-    r = cliente.get("/static/previa/visao-do-contrato.html")
-    p = r.get_data(as_text=True)
-    r.close()
-    assert '"../../t/comando/visao-do-contrato/dados.json"' in p and "function vTodos()" in p
-    assert "Renovação: avisar até" in p and "Próximo reajuste" in p
-    # 17/11/2026: Entregáveis, Financeiro e Metas com o dado real; só o Atendimento diz que a planilha não tem
-    assert "Sem dado real ainda" not in p and "A planilha não tem o atendimento por usina" in p
-    assert "entregaveis: rEntregaveis, financeiro: rFinanceiro, metas: rMetas" in p
-    assert "Falta importar a planilha de novo" in p
-    # o link da pasta só abre se for do SharePoint (a planilha é texto livre)
-    assert r"/^https:\/\/[a-z0-9.-]+\.sharepoint\.com\//i" in p
-
-
 def test_le_as_abas_que_faltavam_com_as_regras_das_formulas_da_planilha():
     """Levi, 17/11/2026: "na fonte que eu mandei não tem nada de atendimento, entregáveis, metas e financeiro???????????".
     A planilha tem a Adicionais (o financeiro), a Cadastros (as metas) e, no Calendario, os entregáveis e as obrigações
