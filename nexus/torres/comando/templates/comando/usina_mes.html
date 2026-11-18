@@ -60,7 +60,7 @@
         {% for r in d.rondas %}{{ r.get('data', '')[8:10] }}/{{ r.get('data', '')[5:7] }} ({{ r.get('tipo') or 'ronda' }}{% if r.get('sujidade') is not none %}, sujidade {{ r.get('sujidade') }}{% endif %}{% if r.get('vegetacao') is not none %}, vegetação {{ r.get('vegetacao') }}{% endif %}){{ ', ' if not loop.last }}{% endfor %}{% endif %}</li>
       {% else %}<li class="mudo">Rondas: sem leitura.</li>{% endif %}
       {% if d.manut %}
-      <li><b>{{ tarefas }}</b> tarefa{{ '' if tarefas == 1 else 's' }} de manutenção executada{{ '' if tarefas == 1 else 's' }}{% if d.manut.feitas %}:
+      <li><b>{{ tarefas }}</b> tarefa{{ '' if tarefas == 1 else 's' }} de manutenção executada{{ '' if tarefas == 1 else 's' }}, pelo registro do App de campo{% if d.manut.feitas %}:
         {% for x in d.manut.feitas %}{{ x.tipo }} {{ x.tarefas }} (em {{ x.os }} OS){{ ', ' if not loop.last }}{% endfor %}{% endif %}</li>
       {% if d.manut.zeladoria %}<li>Zeladoria feita em {% for z in d.manut.zeladoria %}{{ '%02d/%02d'|format(z.day, z.month) }}{{ ', ' if not loop.last }}{% endfor %}</li>{% endif %}
       {% else %}<li class="mudo">Manutenção: sem leitura.</li>{% endif %}

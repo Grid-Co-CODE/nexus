@@ -84,7 +84,7 @@ def test_o_dossie_do_mes_traz_os_numeros_do_mes_o_que_foi_feito_e_o_que_segue_pe
                   "- Desligamentos (a geração parou): 2",
                   "- Registros sem a geração parar (não é desligamento): 1",
                   "- Rondas feitas no mês: 2",
-                  "- Tarefas de manutenção executadas no mês: 15 (Preventiva: 12 em 2 OS; Corretiva: 3 em 3 OS)",
+                  "- Tarefas de manutenção executadas no mês, pelo registro do App de campo: 15 (Preventiva: 12 em 2 OS; Corretiva: 3 em 3 OS)",
                   "- Zeladoria feita em: 15/10",
                   "- Chamados de garantia finalizados no mês: 1",
                   "- Chamados de garantia em aberto hoje: 3",
@@ -122,6 +122,7 @@ def test_o_diagnostico_do_mes_e_lido_conferido_e_guardado_um_por_usina_por_mes(t
     chamadas = []
 
     def perguntar(c, ids, dossie, pergunta, *a, **k):
+        assert k.get("instrucoes") == DM.INSTRUCOES          # as instruções do mês, não as do chat da usina
         chamadas.append((k.get("pensar"), dossie.startswith("# Fechamento de outubro de 2026"), pergunta == DM.PEDIDO))
         txt = RESPOSTA_MES if k.get("pensar") else RESPOSTA_MES.replace("com 2 desligamentos", "com 16 desligamentos")
         return [{"id": "haiku", "rotulo": "Claude Haiku 5.5", "ok": True, "texto": txt, "custo_usd": 0.001, "ms": 7000}]
@@ -133,6 +134,20 @@ def test_o_diagnostico_do_mes_e_lido_conferido_e_guardado_um_por_usina_por_mes(t
     tela_ = DM.para_tela(DM.guardado(cfg, 1, "2026-10"))
     assert tela_["estado"] == "pronto" and tela_["mes"] == "2026-10" and tela_["diag"]["feito"][0]["texto"].startswith("2 rondas")
     assert DM.guardado(cfg, 1, "2026-09") is None and DM.guardado(cfg, 2, "2026-10") is None
+    # a recusa não é diagnóstico (no teste em produção, a Castelo do Piauí voltou com "Só respondo sobre a usina deste
+    # prontuário", e isso ficou guardado como o Insights de outubro): sem o bloco, refaz pensando; se insistir, é erro,
+    # que vale 20 minutos, e a próxima abertura tenta de novo. O guardado sem diagnóstico também é refeito
+    chamadas.clear()
+    monkeypatch.setattr(IA, "perguntar", lambda c, ids, dossie, pergunta, *a, **k: chamadas.append(k.get("pensar")) or [
+        {"id": "haiku", "rotulo": "Claude Haiku 5.5", "ok": True, "texto": "Só respondo sobre a usina deste prontuário, com o dossiê dela."}])
+    g = DM.gerar(cfg, 5, d)
+    assert chamadas == [False, True] and not g["ok"] and "formato" in g["erro"]
+    assert DM.para_tela(DM.guardado(cfg, 5, "2026-10"))["estado"] == "erro"
+    arq5 = tmp_path / "ia" / "diagnosticos" / "mes" / "2026-10" / "5.json"
+    arq5.write_text(json.dumps({"ok": True, "mes": "2026-10", "texto": "Só respondo sobre a usina.", "diag": None,
+                                "versao": DG.VERSAO, "ts": 1}), encoding="utf-8")
+    assert DM.guardado(cfg, 5, "2026-10") is None
+    assert "sem o nome" not in DM.INSTRUCOES and "DADO" in DM.INSTRUCOES and "fechamento" in DM.INSTRUCOES.lower()
     # o pedido do mês não traz número de exemplo (a lição do "16 desligamentos" do diagnóstico do dia)
     assert not re.search(r"\d{2,}", DM.PEDIDO.split("</diagnostico>", 1)[1])
 
@@ -147,7 +162,7 @@ def test_a_rota_do_diagnostico_com_mes_fechado_faz_uma_vez_e_guarda(tela, logado
     monkeypatch.setattr(IA, "perguntar", perguntar)
     j = logado.get("/t/campo/usinas/1/ia/diagnostico?mes=2026-10").get_json()
     assert j["estado"] == "pronto" and j["mes"] == "2026-10" and j["diag"]["situacao"] == "Outubro fechou bem."
-    assert chamadas == ["# Fechamento de outubro de 2026 da usina Altair"]
+    assert chamadas[-1] == "# Fechamento de outubro de 2026 da usina Altair" and len(chamadas) == 1
     assert logado.get("/t/campo/usinas/1/ia/diagnostico?mes=2026-10").get_json()["estado"] == "pronto" and len(chamadas) == 1
     assert logado.get("/t/campo/usinas/987654/ia/diagnostico?mes=2026-10").status_code == 404
     # o mês que não é fechado (o vigente, o de antes do banco) cai no diagnóstico do dia, como sempre

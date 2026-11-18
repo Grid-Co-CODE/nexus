@@ -1055,6 +1055,17 @@ relatório e tudo".
   - vai em Busca; cada "N desligamentos" é conferido com o número do mês e, se não bate, refaz uma vez pensando; se
     insistir, a tela escreve "A conferir";
   - a rota é a mesma do diagnóstico (`/ia/diagnostico?mes=AAAA-MM`); a tela é o `static/comando/prontuario-mes.js`.
+- **O teste em produção com 5 usinas de clientes diferentes** (18/11/2026, Levi: "faça teste com 5 usinas de clientes
+  diferente!"): Mandaguaçu (Thopen), Capitão Poço 100 (Athon), Colíder 1 (Renogrid), Castelo do Piauí (GreenYellow) e
+  Quixadá 2 (Sal Energia), outubro de 2026. A página abriu (200) e o PDF do mês saiu nas cinco; o diagnóstico levou de 3
+  a 18 s; os números citados estavam no fechamento e os desligamentos bateram (14, 81, 6, 1).
+  - **A recusa:** na Castelo do Piauí a IA voltou com "Só respondo sobre a usina deste prontuário, com o dossiê dela" no
+    lugar do diagnóstico, e isso ficou guardado como o Insights de outubro. As instruções do chat da usina
+    (`ia.INSTRUCOES`) mandam recusar o que não é pergunta sobre a usina. Por isso o mês tem as instruções dele
+    (`diagnostico_mes.INSTRUCOES`), a resposta sem o bloco refaz uma vez pensando e, se insistir, é erro (20 min),
+    nunca guardado; o guardado sem diagnóstico é refeito.
+  - **"Tarefas executadas" é o registro do App de campo:** a Colíder 1 saiu com "nenhuma tarefa executada no mês". A
+    fonte são os fechamentos do App; o dossiê e a página dizem "pelo registro do App de campo".
 - **Conferido em 18/11/2026 na bancada, com o banco de produção (só leitura):** outubro da Capitão Poço 100 abriu com
   meta 67% (577,0 de 860,1 MWh), PR 68,2%, disponibilidade 59,7% (150,0 h paradas) e 81 desligamentos, o mesmo número
   da tabela por mês do dossiê da usina.
