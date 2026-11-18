@@ -553,7 +553,11 @@ prontuário (é o mesmo dado); o atalho "Dossiê para a IA" no prontuário apare
   "Responsável O&M: definido" ou "não definido" fica, porque "ninguém cuida" é informação. O texto livre que alguém
   escreveu (a descrição da demanda, a última mensagem da conversa) vai como foi escrito. O cliente e o código da usina
   ficam: não são dado pessoal, e o código já traz o cliente. `com_pessoas=True` existe para quando o Levi decidir que os
-  nomes podem ir; hoje nenhuma rota o usa;
+  nomes podem ir; hoje nenhuma rota o usa. **A evidência do Insight que cita uma pessoa sai** (18/11/2026, conferindo o
+  dossiê da Mandaguaçu a pedido do Levi: a regra R11, usina sem ronda, escreve "técnico da última: <nome>", e o nome ia
+  ao provedor da IA): sem os nomes, `_insights` tira a evidência que começa pelo papel de uma pessoa (técnico,
+  responsável, supervisor, gestor, solicitante, coordenador) e a que traz um nome conhecido do prontuário; as outras
+  evidências e a ação ficam. Prova: `test_o_nome_na_evidencia_do_insight_nao_vai_a_ia`;
 - os tokens são ESTIMATIVA (4 caracteres por token): a conta exata só a API dá.
 
 **O que aconteceu em cada parada** (14/11/2026, Levi: "Quando eu perguntei por que a usina caiu, a IA não conseguiu

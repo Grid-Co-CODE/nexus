@@ -29,6 +29,7 @@ e de causa raiz) e as observações do Responsável O&M. Quem lê essas fontes �
 
 Funções puras: recebem o contexto pronto e devolvem o texto; o teste prova que o número do dossiê é o da tela.
 """
+import re
 from datetime import date, datetime
 
 from . import prontuario as PR
@@ -472,7 +473,27 @@ def _seguranca(u: dict, cu: dict, p: dict, com_pessoas: bool) -> list[str]:
     return out
 
 
-def _insights(ctx: dict) -> list[str]:
+# a evidência do Insight que cita uma pessoa pelo rótulo (a R11 escreve "técnico da última: <nome>")
+_RX_EVID_PESSOA = re.compile(r"^\s*(t[eé]cnicos?|respons[aá]ve(l|is)|supervisor(a|es)?|gestor(a|es)?|solicitante|coordenador(a)?)\b[^:]*:", re.I)
+
+
+def _nomes_do_prontuario(ctx: dict) -> list[str]:
+    """Os nomes das pessoas que o prontuário conhece (responsável, gestor, supervisor e técnicos da usina)."""
+    x, cu = ctx.get("x") or {}, ctx.get("cu") or {}
+    u, pessoas = cu.get("u") or {}, cu.get("pessoas") or {}
+    nomes = [x.get("responsavel"), u.get("responsavel"), u.get("gestor"), pessoas.get("gestor"), pessoas.get("supervisor"),
+             *(pessoas.get("tecnicos") or [])]
+    return [n for n in dict.fromkeys(_t(n) for n in nomes) if len(n) >= 5]
+
+
+def _insights(ctx: dict, com_pessoas: bool = False) -> list[str]:
+    """Sem os nomes (o dossiê que vai à IA), a evidência que cita uma pessoa sai: a que começa pelo papel dela ("técnico
+    da última: ...") e a que traz um nome conhecido do prontuário (18/11/2026: o nome do técnico da última ronda ia ao
+    provedor da IA pela evidência da R11, num dossiê que diz "sem o nome")."""
+    nomes = [] if com_pessoas else [n.lower() for n in _nomes_do_prontuario(ctx)]
+
+    def cabe(e: str) -> bool:
+        return com_pessoas or not (_RX_EVID_PESSOA.match(e) or any(n in e.lower() for n in nomes))
     vivos = ctx.get("insights") or []
     if (ctx.get("x") or {}).get("insights") is None:
         return ["- Os Insights ainda estão sendo calculados: sem leitura agora."]
@@ -486,8 +507,9 @@ def _insights(ctx: dict) -> list[str]:
         out.append(f"- [{(s[0].lower() if s else _t(i.get('sev')))}] {_t(i.get('titulo'))}")
         out.append("  - " + _junta(f"regra {_t(i.get('regra'))}: {_t(r.get('nome'))}" if r.get("nome") else f"regra {_t(i.get('regra'))}",
                                    f"indicador: {_t(r.get('kpi'))}" if r.get("kpi") else "", f"prazo: {s[2]}" if len(s) > 2 else ""))
-        if i.get("evid"):
-            out.append("  - evidência: " + "; ".join(_t(e) for e in i["evid"]))
+        evid = [e for e in (_t(e) for e in i.get("evid") or []) if e and cabe(e)]
+        if evid:
+            out.append("  - evidência: " + "; ".join(evid))
         if _t(i.get("acao")):
             out.append(f"  - ação sugerida: {_t(i.get('acao'))}")
     return out
@@ -624,7 +646,7 @@ def montar(ctx: dict, agora: datetime, com_pessoas: bool = False, extras: dict |
     corpos = (_identificacao(x, u, cu, p, com_pessoas), _parecer(p, com_pessoas), _performance(u, cu, p),
               _cos(x, p) + [""] + _religamentos(extras),
               _os(u, p, com_pessoas), _engenharia(u, extras, com_pessoas), _equipamentos(p), _strings(p), _chamados(p),
-              _rondas(u, p, com_pessoas), _seguranca(u, cu, p, com_pessoas), _insights(ctx),
+              _rondas(u, p, com_pessoas), _seguranca(u, cu, p, com_pessoas), _insights(ctx, com_pessoas),
               _observacoes(extras, com_pessoas), _demandas(p, com_pessoas), _linha(p, com_pessoas), _composicao(p),
               _fora(ctx, p, cu, extras))
     dias = p.get("linha_dias") or PR.LINHA_DO_TEMPO_DIAS

@@ -306,3 +306,23 @@ def test_o_prontuario_le_o_relato_e_as_protecoes_do_banco():
                            "fora_do_escopo_oem": "0", "protecoes": " 27C ", "relato_cliente": "Causa: falta de energia.",
                            "relato_continuacao": ""}], date(2026, 11, 14))
     assert h["ultimas"][0]["protecoes"] == "27C" and h["ultimas"][0]["relato"] == "Causa: falta de energia."
+
+
+def test_o_nome_na_evidencia_do_insight_nao_vai_a_ia(tela, logado):
+    """18/11/2026, conferindo o dossiê da Mandaguaçu a pedido do Levi ("veja como está o dossiê"): a regra R11 (usina sem
+    ronda) escreve na evidência "técnico da última: <nome>", e a seção dos Insights levava o nome ao provedor da IA num
+    dossiê que diz "Pessoas: citadas pelo papel, sem o nome". Sem os nomes, a evidência que cita uma pessoa sai; a que
+    cita um nome conhecido do prontuário também. Com os nomes pedidos (a tela de quem pode ver), fica."""
+    ctx = _ctx(logado)
+    ctx["x"]["insights"] = 1
+    ctx["insights"] = [{"regra": "R11", "sev": "critico", "titulo": "Sem ronda há 42 dias",
+                        "evid": ["última ronda em 07/10", "técnico da última: Beltrano de Tal"],
+                        "acao": "Programar a ronda da usina com o PCM e o técnico da região."},
+                       {"regra": "R13", "sev": "critico", "titulo": "Chamado parado",
+                        "evid": [f"falado com {NOMES[0]} em 01/11", "Sungrow · Inversor"], "acao": ""}]
+    sem = DS.montar(ctx, AGORA)["texto"]
+    assert "Beltrano de Tal" not in sem and "técnico da última" not in sem and NOMES[0] not in sem
+    assert "  - evidência: última ronda em 07/10" in sem and "  - evidência: Sungrow · Inversor" in sem
+    assert "ação sugerida: Programar a ronda da usina com o PCM e o técnico da região." in sem     # a ação não cita pessoa
+    com = DS.montar(ctx, AGORA, com_pessoas=True)["texto"]
+    assert "técnico da última: Beltrano de Tal" in com and f"falado com {NOMES[0]} em 01/11" in com
