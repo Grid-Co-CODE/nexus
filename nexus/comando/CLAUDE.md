@@ -987,7 +987,7 @@ o que é que ele tem que fazer".
       novembro" (6 era o de outubro; novembro tinha 11), "2 strings fora" (era 1) e "Inversor 1" no lugar do 2.8. Por
       isso a conferência é pelo mês dito e ganhou as strings. Rodada contra os 12 diagnósticos guardados da prova, ela
       aponta os 3 que erraram e nenhum dos 9 certos. O nome do equipamento trocado ainda não tem conferência;
-    - **`VERSAO`** (4 desde as travas do "Não deve poder") vai no guardado: o diagnóstico de outra versão é refeito na próxima abertura (os de 18/11 feitos
+    - **`VERSAO`** (5; a 4 foi a das travas do "Não deve poder") vai no guardado: o diagnóstico de outra versão é refeito na próxima abertura (os de 18/11 feitos
       com o pedido antigo saem assim), e ainda serve de "anterior" enquanto o novo é feito. Mudou o pedido ou a
       conferência de um jeito que invalida os guardados: sobe a `VERSAO`;
     - o dossiê (formato 6) diz "Última ronda: nunca rondada", sem o 999.
@@ -1004,6 +1004,12 @@ o que é que ele tem que fazer".
       não está refaz pensando e, se insistir, vai para o "A conferir";
     - rodadas contra os 18 diagnósticos guardados da prova: tiram os itens de "sem dado" da Poconé e da Colíder 1,
       apontam o "Inversor 1" da Colíder 1 e não tocam nos outros 13. `VERSAO` 4.
+  - **O que já tem demanda aberta com o setor não é pedido de novo** (18/11/2026, do mapa da Nexus IA; Levi: "o resto
+    faça!"). O `PEDIDO` manda pôr o assunto em "pendente", com `{"ver": "demandas"}`. E o servidor garante pela OS:
+    `demandas_abertas` lê do dossiê as demandas da usina que ainda esperam o setor (Nova, Em análise, Devolvida) e têm
+    OS; o item que pediria algo ao MESMO setor com a MESMA OS perde o "Solicitar", ganha o "Visualizar" das demandas e
+    leva `ja_pedido`. A demanda concluída, a que espera quem pediu e a de outro setor não seguram pedido novo. Sem OS
+    não há como casar com certeza: aí vale só a regra do pedido. `VERSAO` 5.
   - **Erro de outro tipo que aparecer** ganha a conferência dele em `conferir`, com o caso. Prova:
     `tests/test_comando_diagnostico_confere_18_11.py`.
   - Quem abre depois lê o guardado, sem chamar a IA.

@@ -124,7 +124,7 @@ def test_o_numero_que_nao_bate_e_refeito_pensando_e_se_insistir_a_tela_avisa(tmp
     chamadas = _ia_de_mentira(monkeypatch, [_resp("Com 16 desligamentos em novembro."), _resp("Com 11 desligamentos em novembro.")])
     d = DG.gerar(cfg, 1, DOSSIE, 100, "2026-11-18")
     assert chamadas == [False, True] and d["diag"]["situacao"] == "Com 11 desligamentos em novembro." and not d.get("conferir")
-    assert d["refeito"] is True and d["versao"] == DG.VERSAO == 4
+    assert d["refeito"] is True and d["versao"] == DG.VERSAO == 5
     linhas = next((tmp_path / "ia").glob("perguntas-*.jsonl")).read_text(encoding="utf-8").splitlines()
     assert len(linhas) == 2                                    # as duas chamadas entram no registro (e no teto)
     # as duas erram: fica a última, e a tela recebe o aviso do que não bateu
@@ -197,6 +197,46 @@ def test_o_equipamento_citado_tem_que_estar_no_dossie():
     assert _falhas("Tracker 5 parado e Cabine 3 desligada.", dossie=DOSSIE_EQUIP) == [
         "Cabine 3: não está no dossiê com esse nome", "Tracker 5: não está no dossiê com esse nome"]
     assert _falhas("Verificar os inversores 2.8 e a string 22.", dossie=DOSSIE_EQUIP) == []
+
+
+def test_o_que_ja_tem_demanda_aberta_com_o_setor_nao_e_pedido_de_novo():
+    # o mapa da Nexus IA (18/11/2026): o Insights sugeria mandar de novo o pedido que já estava na caixa do setor. O
+    # dossiê traz as demandas da usina; a que espera o setor (Nova, Em análise, Devolvida) e tem a OS do item vira
+    # "pendente com o setor", com o Visualizar das demandas no lugar do Solicitar
+    regra = next(l for l in DG.PEDIDO.splitlines() if l.startswith("- Demanda já aberta"))
+    assert "não peça de novo" in regra and '{"ver": "demandas"}' in regra
+    dossie = DOSSIE + """
+## 9. Chamados de garantia
+
+| OS | Equipamento |
+| 17316 | Inversor 2.3 |
+| 17400 | Tracker 7 |
+| 17500 | Tracker 9 |
+
+## 14. Demandas entre setores e conversa
+
+- Cobrar a Sungrow pelo chamado do inversor 2.3; de Performance para Chamados; tema: Cobrança ao fabricante; Em análise (VENCIDA); prazo 10/11/2026; OS 17316
+  - pedido: Cobrar o retorno do fabricante.
+- Vincular a OS ao chamado; de Performance para Chamados; Concluída; prazo 01/11/2026; OS 17400
+- Rever o ajuste de proteção; de Performance para Engenharia; Aguardando quem pediu; OS 17500
+- Conversa da usina: 0 mensagens
+
+## 15. Linha do tempo
+"""
+    assert DG.demandas_abertas(dossie) == {"17316": "chamados"}          # só a que espera o setor, pela OS
+    setores = [{"setor_id": 2, "nome": "Chamados"}, {"setor_id": 3, "nome": "Engenharia"}]
+    d = DG.ler(_resp("Ok.", pendente=[
+        {"item": "Cobrar a Sungrow pelo chamado da OS 17316", "os": 17316, "destino": {"pedir": "Chamados"}, "pedido": "Cobrar."},
+        {"item": "Vincular a OS 17400 ao chamado", "os": 17400, "destino": {"pedir": "Chamados"}, "pedido": "Vincular."},
+        {"item": "Pedir à Engenharia a análise da OS 17316", "os": 17316, "destino": {"pedir": "Engenharia"}, "pedido": "Analisar."}]),
+        dossie, setores)
+    ja, concluida, outro_setor = d["pendente"]
+    assert ja["destino"] == {"tipo": "ver", "onde": "demandas"} and ja["pedido"] == "" and ja["ja_pedido"] is True
+    assert ja["ver"] == "demandas"
+    # a demanda concluída não segura um pedido novo; a aberta com OUTRO setor também não
+    assert concluida["destino"]["tipo"] == "pedir" and concluida["pedido"] == "Vincular." and "ja_pedido" not in concluida
+    assert outro_setor["destino"]["setor"] == "Engenharia" and "ja_pedido" not in outro_setor
+    assert DG.demandas_abertas("# sem a seção") == {}
 
 
 def test_a_usina_nunca_rondada_nao_sai_com_999_dias(tela, logado):

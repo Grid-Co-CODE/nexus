@@ -37,7 +37,7 @@ ESPERA_ERRO_S = 20 * 60          # o erro guardado vale isto; depois a próxima 
 TRAVA_MORTA_S = 5 * 60           # a trava mais velha que isto é de um pedido que morreu (o servidor reiniciou)
 # a versão do pedido e da conferência: o guardado de outra versão é refeito na próxima abertura (18/11/2026: o pedido
 # trazia um exemplo com "16 desligamentos", e duas usinas saíram com 16 no lugar de 11 e de 3)
-VERSAO = 4
+VERSAO = 5
 # o diagnóstico vai em Busca, sem o pensamento do Claude (18/11/2026, Levi, com a 1ª abertura do dia em 40 s: "diagnóstico
 # em busca, rode alguns diagnósticos e bata os dados para ver se a informação está confiável"). True volta a pensar
 PENSAR = False
@@ -67,6 +67,7 @@ Responda SÓ com o bloco abaixo, em JSON válido, sem nada antes ou depois, sem 
 - OS: executar, iniciar ou concluir uma OS é do técnico de campo, que o supervisor coordena: vai em "tem_que_fazer" como cobrança da equipe (com "ver": "os"), nunca como pedido a outro setor (nem à Manutenção). Das não iniciadas, só entram as urgentes (religamento, corretiva emergencial) e as atrasadas; as "no prazo" não entram em lista nenhuma.
 - Tarefa pausada: o supervisor não libera a pausa. Diga o motivo e de quem depende ("Como ler a pausa", no §5); vai em "pendente", e só pede algo ao setor do motivo se a tarefa pesa (geração parada, equipamento em falha).
 - Chamados de garantia: cobrar o fabricante, o andamento e juntar uma OS a um chamado é da área Chamados ("pedir": "Chamados", com o tema dela: "Cobrança ao fabricante", "Vincular OS ao chamado de garantia"...). Juntar a OS ao chamado é a sugestão do Insight pelo mesmo equipamento: o dossiê não diz se já estão ligadas, então o item é pedir a Chamados para avaliar, nunca afirmar que não estão.
+- Demanda já aberta (a seção das demandas entre setores): não peça de novo o que já tem demanda aberta com o setor. O assunto vai em "pendente", dizendo que aguarda o setor (e que está vencida, quando estiver), com "destino": {"ver": "demandas"} e sem "pedido".
 - Cada assunto numa lista só: o que o supervisor tem que fazer não se repete em "pendente"; "pendente" é só o que espera outra pessoa ou empresa.
 - Lista vazia quando não houver nada."""
 
@@ -115,6 +116,28 @@ def _ver(x: dict) -> str:
     return onde if onde in VER else ""
 
 
+# as situações da demanda em que ela ainda espera quem recebeu (`demandas_regras.ABERTAS`, pelo rótulo do dossiê)
+_ESPERA_O_SETOR = ("nova", "em analise", "devolvida")
+
+
+def demandas_abertas(dossie: str) -> dict[str, str]:
+    """{OS: o setor que recebeu (sem acento)} das demandas da usina que ainda esperam o setor (Nova, Em análise,
+    Devolvida) e têm OS, lidas da seção das demandas do dossiê. É por elas que o item que pediria a MESMA coisa de novo
+    vira "pendente com o setor" (18/11/2026: o Insights sugeria mandar de novo o pedido que já estava na caixa)."""
+    m = re.search(r"^## \d+\. Demandas entre setores[^\n]*\n(.*?)(?=^## |\Z)", dossie or "", re.S | re.M)
+    out = {}
+    for linha in (m.group(1).splitlines() if m else []):
+        if not linha.startswith("- "):
+            continue
+        partes = [p.strip() for p in linha[2:].split(";")]
+        setor = next((p.split(" para ", 1)[1] for p in partes if p.startswith("de ") and " para " in p), "")
+        espera = any(_sem_acento(p.replace("(VENCIDA)", "")) in _ESPERA_O_SETOR for p in partes)
+        os_ = next((p[3:].strip() for p in partes if re.fullmatch(r"OS \d{4,6}", p)), "")
+        if setor and espera and os_:
+            out[os_] = _sem_acento(setor)
+    return out
+
+
 def ler(texto: str, dossie: str, setores: list[dict] | None = None) -> dict | None:
     """O JSON da resposta -> {situacao, tem_que_fazer, pode_fazer, pendente}, cada item {texto, os, os_tipo}. None quando
     não veio o JSON (a tela mostra o texto como veio). A OS que não está no dossiê sai do item (uma OS inventada não vira
@@ -131,6 +154,7 @@ def ler(texto: str, dossie: str, setores: list[dict] | None = None) -> dict | No
     if not isinstance(j, dict) or not str(j.get("situacao") or "").strip():
         return None
     mapa = IA.os_do_dossie(dossie)
+    ja_abertas = demandas_abertas(dossie)
     out = {"situacao": _limpo(j.get("situacao"), MAX_SITUACAO)}
     # as OS da frase, com o tipo (a tela abre o card ou o Raio X): só as que o dossiê tem
     out["situacao_os"] = {n: mapa[n] for n in re.findall(r"(?<![\d.,])(\d{4,6})(?![\d.,]\d)", out["situacao"]) if n in mapa}
@@ -153,8 +177,13 @@ def ler(texto: str, dossie: str, setores: list[dict] | None = None) -> dict | No
             # o pedido pronto ao setor (16/11/2026, Levi: "solicitar o time de chamados, cobrança de fabricante, STI [...]
             # Tudo isso já pronto"): só com o "pedir"
             pedido = _limpo(x.get("pedido"), MAX_PEDIDO) if destino and destino.get("tipo") == "pedir" else ""
-            itens.append({"texto": txt, "os": os_, "os_tipo": mapa.get(os_, ""), "destino": destino, "ver": _ver(x),
-                          "pedido": pedido})
+            item = {"texto": txt, "os": os_, "os_tipo": mapa.get(os_, ""), "destino": destino, "ver": _ver(x),
+                    "pedido": pedido}
+            # a mesma OS já tem demanda aberta com o mesmo setor: não se pede de novo; o botão leva às demandas da usina
+            if (destino and destino.get("tipo") == "pedir" and os_
+                    and ja_abertas.get(os_) == _sem_acento(destino.get("setor"))):
+                item.update(destino={"tipo": "ver", "onde": "demandas"}, ver="demandas", pedido="", ja_pedido=True)
+            itens.append(item)
         out[lista] = itens
     return out
 
