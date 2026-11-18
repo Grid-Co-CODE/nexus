@@ -249,7 +249,8 @@ def ate_a_meia_noite_utc(agora: datetime | None = None) -> int:
     return max(60, int((amanha - agora).total_seconds()))
 
 
-def _chamar_rodizio(cfg, m: "Modelo", dossie: str, msgs: list, contexto: str = "", instrucoes: str = "") -> dict:
+def _chamar_rodizio(cfg, m: "Modelo", dossie: str, msgs: list, contexto: str = "", instrucoes: str = "",
+                    pensar: bool = True) -> dict:
     """A pergunta pela 1ª vaga livre; a barrada descansa e a pergunta vai à próxima. Todas em descanso: tenta mesmo assim a
     que volta primeiro. Erro que não é da chave (o modelo, a rede) não gasta as outras vagas."""
     nome = PROVEDORES[m.provedor]["nome"]
@@ -261,7 +262,8 @@ def _chamar_rodizio(cfg, m: "Modelo", dossie: str, msgs: list, contexto: str = "
         sorted(ks, key=lambda x: parados.get(impressao(x[1]), {}).get("ate", 0))[:1]
     ultimo = {}
     for vaga, k in livres:
-        r = _chamar(m, k, dossie, msgs, contexto, *((instrucoes,) if instrucoes else ()))
+        r = _chamar(m, k, dossie, msgs, contexto, *((instrucoes,) if instrucoes else ()),
+                    **({} if pensar else {"pensar": False}))
         st = r.get("status")
         if not r.get("erro"):
             if len(ks) > 1:
@@ -345,12 +347,18 @@ MAX_SAIDA_ANTHROPIC = 16000      # fora do "low" o Haiku pensa mais, e o pensame
 _COM_RESERVA = ("claude-opus-5-5", "claude-sonnet-5-5")     # os que têm modelo de reserva no servidor (beta)
 
 
-def _pedido_anthropic(m: Modelo, dossie: str, msgs: list, contexto: str = "", instrucoes: str = "") -> dict:
+def _pedido_anthropic(m: Modelo, dossie: str, msgs: list, contexto: str = "", instrucoes: str = "",
+                      pensar: bool = True) -> dict:
     """O pedido à Anthropic, o mesmo com e sem fluxo. O dossiê vai num bloco do system com cache (a pergunta de seguimento
-    na mesma usina relê o dossiê do cache, a 10% do preço). O esforço é o do `ESFORCO` (o Haiku 5.5 em "medium")."""
+    na mesma usina relê o dossiê do cache, a 10% do preço). O esforço é o do `ESFORCO` (o Haiku 5.5 em "medium").
+
+    `pensar=False` é o modo Busca da caixa da pergunta (18/11/2026, Levi: "pode ter a opção Busca/Pensamento. O botão
+    fica no busca mas se a pessoa quiser que pense ela ativa o pensamento"): o pedido leva `thinking: disabled`, e o
+    modelo escreve só a resposta. Na pergunta que levou 17,1 s, cerca de 1.800 dos 2.231 tokens de saída eram o
+    rascunho que ele faz antes de responder. O bloco do dossiê não muda, então o cache dele vale nos dois modos."""
     esforco = ESFORCO.get(m.modelo, "low")
-    return dict(model=m.modelo, max_tokens=MAX_SAIDA_ANTHROPIC if esforco != "low" else MAX_SAIDA, messages=msgs,
-                output_config={"effort": esforco},
+    return dict(model=m.modelo, max_tokens=MAX_SAIDA_ANTHROPIC if esforco != "low" and pensar else MAX_SAIDA, messages=msgs,
+                output_config={"effort": esforco}, **({} if pensar else {"thinking": {"type": "disabled"}}),
                 system=[{"type": "text", "text": f"{instrucoes or INSTRUCOES}\n\n{contexto}" if contexto
                          else (instrucoes or INSTRUCOES)},
                         {"type": "text", "text": f"<dossie>\n{dossie}\n</dossie>", "cache_control": {"type": "ephemeral"}}])
@@ -377,8 +385,24 @@ def _erro_anthropic(anthropic, m: Modelo, ex: Exception) -> dict | None:
     return None
 
 
-def _resultado_anthropic(r) -> dict:
-    """A mensagem pronta da Anthropic no formato das chamadas: {texto, entrada, saida, cache_lido, cache_gravado...}."""
+def _recusou_o_sem_pensamento(anthropic, ex: Exception, pedido: dict) -> bool:
+    """A Anthropic respondeu 400 ao `thinking: disabled`? O parâmetro não pôde ser provado contra a API de verdade em
+    18/11/2026 (a chave só existe no servidor): se o modelo não aceitar, o pedido é refeito sem ele (o modelo pensa), em
+    vez de a pergunta do modo Busca, que é o padrão da tela, cair toda vez nas grátis."""
+    return ("thinking" in pedido and isinstance(ex, anthropic.APIStatusError) and getattr(ex, "status_code", 0) == 400
+            and "thinking" in str(getattr(ex, "message", "") or ex).lower())
+
+
+def _resultado_anthropic(r, pedido: dict | None = None) -> dict:
+    """A mensagem pronta da Anthropic no formato das chamadas: {texto, entrada, saida, cache_lido, cache_gravado...}, com
+    o `modo` em que o pedido foi de fato ("busca", sem pensamento, ou "pensamento")."""
+    out = _lido_da_anthropic(r)
+    if pedido is not None and not out.get("erro"):
+        out["modo"] = "busca" if "thinking" in pedido else "pensamento"
+    return out
+
+
+def _lido_da_anthropic(r) -> dict:
     if r.stop_reason == "refusal":
         return {"erro": "O modelo recusou responder a esta pergunta."}
     texto = "\n".join(b.text for b in r.content if getattr(b, "type", "") == "text").strip()
@@ -391,7 +415,8 @@ def _resultado_anthropic(r) -> dict:
             "parou": "limite de tamanho" if r.stop_reason == "max_tokens" else "", "servido_por": r.model}
 
 
-def _chamar_anthropic(m: Modelo, k: str, dossie: str, msgs: list, contexto: str = "", instrucoes: str = "") -> dict:
+def _chamar_anthropic(m: Modelo, k: str, dossie: str, msgs: list, contexto: str = "", instrucoes: str = "",
+                      pensar: bool = True) -> dict:
     """Pelo SDK oficial (o pedido: `_pedido_anthropic`). No Opus 5.5 e no Sonnet 5.5 (pelo NEXUS_IA_MODELOS), a recusa
     por engano cai num modelo de reserva (`fallbacks: "default"`); o Haiku 5.5 não tem essa reserva no servidor, e a
     recusa dele vai às grátis (`perguntar`)."""
@@ -400,21 +425,32 @@ def _chamar_anthropic(m: Modelo, k: str, dossie: str, msgs: list, contexto: str 
     except ImportError:
         return {"erro": "O SDK da Anthropic (pacote anthropic) não está instalado neste servidor."}
     cli = anthropic.Anthropic(api_key=k, timeout=TEMPO_S, max_retries=1)
-    pedido = _pedido_anthropic(m, dossie, msgs, contexto, instrucoes)
-    try:
+
+    def enviar(pedido):
         if m.modelo in _COM_RESERVA:
-            r = cli.beta.messages.create(betas=["server-side-fallback-2026-07-01"], fallbacks="default", **pedido)
-        else:
-            r = cli.messages.create(**pedido)
+            return cli.beta.messages.create(betas=["server-side-fallback-2026-07-01"], fallbacks="default", **pedido)
+        return cli.messages.create(**pedido)
+
+    pedido = _pedido_anthropic(m, dossie, msgs, contexto, instrucoes, pensar)
+    try:
+        try:
+            r = enviar(pedido)
+        except Exception as ex:      # noqa: BLE001
+            if not _recusou_o_sem_pensamento(anthropic, ex, pedido):
+                raise
+            log.warning("IA: a Anthropic recusou o pedido sem pensamento do %s; refeito com pensamento.", m.modelo)
+            pedido = _pedido_anthropic(m, dossie, msgs, contexto, instrucoes)
+            r = enviar(pedido)
     except Exception as ex:      # noqa: BLE001 — o que não é do SDK sobe
         erro = _erro_anthropic(anthropic, m, ex)
         if erro is None:
             raise
         return erro
-    return _resultado_anthropic(r)
+    return _resultado_anthropic(r, pedido)
 
 
-def _fluxo_anthropic(m: Modelo, k: str, dossie: str, msgs: list, contexto: str = "", instrucoes: str = ""):
+def _fluxo_anthropic(m: Modelo, k: str, dossie: str, msgs: list, contexto: str = "", instrucoes: str = "",
+                     pensar: bool = True):
     """A mesma chamada, em fluxo (18/11/2026): entrega ("pensando", "") quando o modelo começa a pensar, ("texto",
     trecho) a cada pedaço da resposta e, no fim, ("resultado", o mesmo dicionário do `_chamar_anthropic`). Só conta o
     `content_block_delta` de texto: o SDK repete o mesmo trecho num evento derivado ("text"), que não é lido."""
@@ -424,22 +460,30 @@ def _fluxo_anthropic(m: Modelo, k: str, dossie: str, msgs: list, contexto: str =
         yield "resultado", {"erro": "O SDK da Anthropic (pacote anthropic) não está instalado neste servidor."}
         return
     cli = anthropic.Anthropic(api_key=k, timeout=TEMPO_S, max_retries=1)
-    try:
-        with cli.messages.stream(**_pedido_anthropic(m, dossie, msgs, contexto, instrucoes)) as fluxo:
-            for ev in fluxo:
-                tipo = getattr(ev, "type", "")
-                if tipo == "content_block_start" and getattr(getattr(ev, "content_block", None), "type", "") == "thinking":
-                    yield "pensando", ""
-                elif tipo == "content_block_delta" and getattr(getattr(ev, "delta", None), "type", "") == "text_delta":
-                    yield "texto", getattr(ev.delta, "text", "") or ""
-            r = fluxo.get_final_message()
-    except Exception as ex:      # noqa: BLE001 — o que não é do SDK sobe
-        erro = _erro_anthropic(anthropic, m, ex)
-        if erro is None:
-            raise
-        yield "resultado", erro
-        return
-    yield "resultado", _resultado_anthropic(r)
+    pedido = _pedido_anthropic(m, dossie, msgs, contexto, instrucoes, pensar)
+    for tentativa in (1, 2):
+        try:
+            with cli.messages.stream(**pedido) as fluxo:
+                for ev in fluxo:
+                    tipo = getattr(ev, "type", "")
+                    if tipo == "content_block_start" and getattr(getattr(ev, "content_block", None), "type", "") == "thinking":
+                        yield "pensando", ""
+                    elif tipo == "content_block_delta" and getattr(getattr(ev, "delta", None), "type", "") == "text_delta":
+                        yield "texto", getattr(ev.delta, "text", "") or ""
+                r = fluxo.get_final_message()
+            break
+        except Exception as ex:      # noqa: BLE001 — o que não é do SDK sobe
+            # a recusa do `thinking: disabled` vem na abertura do fluxo, antes de qualquer texto: refaz pensando
+            if tentativa == 1 and _recusou_o_sem_pensamento(anthropic, ex, pedido):
+                log.warning("IA: a Anthropic recusou o pedido sem pensamento do %s; refeito com pensamento.", m.modelo)
+                pedido = _pedido_anthropic(m, dossie, msgs, contexto, instrucoes)
+                continue
+            erro = _erro_anthropic(anthropic, m, ex)
+            if erro is None:
+                raise
+            yield "resultado", erro
+            return
+    yield "resultado", _resultado_anthropic(r, pedido)
 
 
 def _erro_http(nome: str, r) -> dict:
@@ -508,9 +552,11 @@ def _chamar_compativel(m: Modelo, k: str, dossie: str, msgs: list, contexto: str
             "parou": "limite de tamanho" if esc.get("finish_reason") == "length" else ""}
 
 
-def _chamar(m: Modelo, k: str, dossie: str, msgs: list, contexto: str = "", instrucoes: str = "") -> dict:
+def _chamar(m: Modelo, k: str, dossie: str, msgs: list, contexto: str = "", instrucoes: str = "",
+            pensar: bool = True) -> dict:
+    """A chamada do provedor do modelo. O `pensar` só vale para a Anthropic (o modo Busca ou Pensamento da tela)."""
     if m.provedor == "anthropic":
-        return _chamar_anthropic(m, k, dossie, msgs, contexto, instrucoes)
+        return _chamar_anthropic(m, k, dossie, msgs, contexto, instrucoes, pensar)
     if m.provedor == "gemini":
         return _chamar_gemini(m, k, dossie, msgs, contexto, instrucoes)
     return _chamar_compativel(m, k, dossie, msgs, contexto, instrucoes)
@@ -538,9 +584,10 @@ def listar_modelos(cfg, provedor: str) -> list[str]:
 
 # ── a pergunta ───────────────────────────────────────────────────────────────────────────────────────────────────────
 def responder(cfg, m: Modelo, dossie: str, pergunta: str, historico=None, setores=None, meu_setor: str = "",
-              instrucoes: str = "") -> dict:
+              instrucoes: str = "", pensar: bool = True) -> dict:
     """Uma resposta de um modelo: {id, rotulo, provedor, ok, texto, erro, ms, entrada, saida, cache_lido, cache_gravado,
-    custo_usd, preco_oficial, parou, numeros}."""
+    custo_usd, preco_oficial, parou, numeros} e, no Claude, `modo` ("busca" ou "pensamento"). `pensar=False` é o modo
+    Busca da tela (só o Claude tem os dois modos; nos outros provedores não muda nada)."""
     base = _base(m)
     k = chave(cfg, m.provedor)
     if not k:
@@ -549,10 +596,11 @@ def responder(cfg, m: Modelo, dossie: str, pergunta: str, historico=None, setore
     try:
         ctx = _contexto([neutro(s) for s in setores], neutro(meu_setor)) if setores is not None else ""
         extra = (instrucoes,) if instrucoes else ()      # as da carteira; sem elas, as da usina
+        modo = {"pensar": False} if not pensar and m.provedor == "anthropic" else {}
         if m.provedor in VAGAS:
-            chamada = lambda: _chamar_rodizio(cfg, m, neutro(dossie), _mensagens(historico, pergunta), ctx, *extra)  # noqa: E731
+            chamada = lambda: _chamar_rodizio(cfg, m, neutro(dossie), _mensagens(historico, pergunta), ctx, *extra, **modo)  # noqa: E731
         else:
-            chamada = lambda: _chamar(m, k, neutro(dossie), _mensagens(historico, pergunta), ctx, *extra)  # noqa: E731
+            chamada = lambda: _chamar(m, k, neutro(dossie), _mensagens(historico, pergunta), ctx, *extra, **modo)  # noqa: E731
         # o teto do tempo inteiro (16/11/2026: no servidor, o Nemotron grátis levou 146,8 s para voltar vazio; o OpenRouter
         # manda espaços enquanto processa, e o tempo de leitura do `requests` nunca vence). Passou do teto, a pergunta
         # segue sem esta resposta (e vai ao próximo grátis); a chamada termina sozinha por trás
@@ -599,7 +647,7 @@ def _acabar(cfg, m: Modelo, r: dict, ms: int, dossie: str, setores) -> dict:
     links = {n: mapa[n] for n in re.findall(r"(?<![\d.,])(\d{4,6})(?![\d.,]\d)", texto) if n in mapa}
     return dict(base, ok=True, texto=texto, acoes=acoes, os=links, ms=ms, entrada=e, saida=s, cache_lido=cl, cache_gravado=cg,
                 custo_usd=custo(m, e, s, cl, cg), parou=r.get("parou") or "", servido_por=r.get("servido_por") or "",
-                numeros=numeros_conferidos(texto, dossie))
+                numeros=numeros_conferidos(texto, dossie), **({"modo": r["modo"]} if r.get("modo") else {}))
 
 
 class _AoVivo:
@@ -625,7 +673,7 @@ class _AoVivo:
 
 
 def responder_em_fluxo(cfg, m: Modelo, dossie: str, pergunta: str, historico=None, setores=None, meu_setor: str = "",
-                       instrucoes: str = ""):
+                       instrucoes: str = "", pensar: bool = True):
     """A resposta de um modelo da Anthropic, em fluxo: ("pensando", ""), ("texto", trecho)... e, por último, ("fim", a
     mesma resposta do `responder`). A chamada roda numa thread à parte, e os eventos chegam por uma fila: é o que deixa
     valer o teto do tempo (`TEMPO_TOTAL_S`) para o PRIMEIRO texto e, depois dele, para o intervalo entre um trecho e o
@@ -640,7 +688,7 @@ def responder_em_fluxo(cfg, m: Modelo, dossie: str, pergunta: str, historico=Non
 
     def trabalho():
         try:
-            for ev in _fluxo_anthropic(m, k, neutro(dossie), _mensagens(historico, pergunta), ctx, instrucoes):
+            for ev in _fluxo_anthropic(m, k, neutro(dossie), _mensagens(historico, pergunta), ctx, instrucoes, pensar):
                 fila.put(ev)
         except Exception as ex:      # noqa: BLE001 — a falha vira a resposta de erro, como no `responder`
             log.exception("IA: %s falhou no fluxo", m.id)
@@ -669,7 +717,7 @@ def responder_em_fluxo(cfg, m: Modelo, dossie: str, pergunta: str, historico=Non
 
 
 def perguntar_em_fluxo(cfg, ids: list[str], dossie: str, pergunta: str, historico=None, setores=None,
-                       meu_setor: str = "", instrucoes: str = ""):
+                       meu_setor: str = "", instrucoes: str = "", pensar: bool = True):
     """A pergunta com o texto aparecendo enquanto é escrito (18/11/2026, Levi, com a resposta do Haiku em 17,1 s numa
     pergunta simples: "demorou muito"; a tela ficava parada até a resposta chegar inteira). Entrega ("pensando", ""),
     ("texto", trecho)... e, por último, UM ("fim", a lista de respostas do `perguntar`).
@@ -683,10 +731,10 @@ def perguntar_em_fluxo(cfg, ids: list[str], dossie: str, pergunta: str, historic
     m = escolhidos[0] if len(escolhidos) == 1 else None
     if not (m and m.provedor == "anthropic" and m.modelo not in _COM_RESERVA and chave(cfg, m.provedor)
             and pago_liberado(cfg)):
-        yield "fim", perguntar(cfg, ids, dossie, pergunta, historico, setores, meu_setor, instrucoes)
+        yield "fim", perguntar(cfg, ids, dossie, pergunta, historico, setores, meu_setor, instrucoes, pensar)
         return
     r = None
-    for tipo, dado in responder_em_fluxo(cfg, m, dossie, pergunta, historico, setores, meu_setor, instrucoes):
+    for tipo, dado in responder_em_fluxo(cfg, m, dossie, pergunta, historico, setores, meu_setor, instrucoes, pensar):
         if tipo == "fim":
             r = dado
         else:
@@ -720,8 +768,9 @@ def _bateu_o_limite(r: dict) -> bool:
 
 
 def perguntar(cfg, ids: list[str], dossie: str, pergunta: str, historico=None, setores=None,
-              meu_setor: str = "", instrucoes: str = "") -> list[dict]:
-    """Os modelos pedidos, em paralelo, na ordem pedida. Id desconhecido é ignorado.
+              meu_setor: str = "", instrucoes: str = "", pensar: bool = True) -> list[dict]:
+    """Os modelos pedidos, em paralelo, na ordem pedida. Id desconhecido é ignorado. `pensar=False` é o modo Busca da
+    caixa da pergunta (o Claude responde sem pensar antes); quem não diz (o diagnóstico do dia) segue pensando.
 
     A troca (14/11/2026, Levi: "eu poderia criar umas 3 ou 4 contas com essa API de Nemotron. E aí, caso uma ultrapasse a
     cota, a gente começa a usar a outra"): os termos do OpenRouter proíbem várias contas para contornar o limite (seção
@@ -749,7 +798,7 @@ def perguntar(cfg, ids: list[str], dossie: str, pergunta: str, historico=None, s
                          erro=f"O teto do mês da Nexus IA (US$ {teto(cfg):.2f}) foi atingido e nenhuma IA grátis respondeu.")]
         escolhidos = gratis
     with ThreadPoolExecutor(max_workers=min(8, len(escolhidos))) as ex:
-        out = list(ex.map(lambda m: responder(cfg, m, dossie, pergunta, historico, setores, meu_setor, instrucoes),
+        out = list(ex.map(lambda m: responder(cfg, m, dossie, pergunta, historico, setores, meu_setor, instrucoes, pensar),
                           escolhidos))
     # o pago que não respondeu vai às grátis, com o motivo na resposta (`_pago_as_gratis`)
     if len(escolhidos) == 1 and not out[0].get("ok") and escolhidos[0].entrada > 0 and chave(cfg, escolhidos[0].provedor):
@@ -1088,7 +1137,8 @@ def registrar(cfg, usina_id: int, pergunta: str, respostas: list[dict], quem: st
                                     "erro": r.get("erro") or "", "ms": r.get("ms"), "entrada": r.get("entrada"),
                                     "saida": r.get("saida"), "cache_lido": r.get("cache_lido"),
                                     "custo_usd": r.get("custo_usd") or 0, "numeros": r.get("numeros"),
-                                    "dossie_tokens": dossie_tokens}, ensure_ascii=False) + "\n")
+                                    "dossie_tokens": dossie_tokens, "modo": r.get("modo") or ""},
+                                   ensure_ascii=False) + "\n")
     except OSError as ex:
         log.error("IA: o registro das perguntas não foi gravado (%s).", ex)
 

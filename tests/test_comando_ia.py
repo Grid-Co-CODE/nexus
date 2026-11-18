@@ -218,7 +218,7 @@ def test_perguntar_monta_o_dossie_de_agora_e_registra(tela, logado, monkeypatch,
         {"id": "opus", "rotulo": "Opus", "provedor": "anthropic", "modelo": "claude-opus-5-5", "entrada": 4, "saida": 20}]))
     visto = {}
 
-    def perguntar(cfg, ids, dossie, pergunta, historico=None, setores=None, meu_setor=""):
+    def perguntar(cfg, ids, dossie, pergunta, historico=None, setores=None, meu_setor="", pensar=True):
         visto.update(ids=ids, dossie=dossie, pergunta=pergunta, historico=historico, setores=setores)
         return [{"id": "gemini-flash", "ok": True, "texto": "Bem.", "custo_usd": 0.01}]
     monkeypatch.setattr(IA, "perguntar", perguntar)

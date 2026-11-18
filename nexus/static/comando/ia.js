@@ -25,7 +25,11 @@
    fluxo e o corpo é lido em pedaços: "texto" entra no cartão ao vivo (pelo mesmo `texto()`, que escapa tudo antes), e
    o "fim" traz o JSON de sempre, que troca o cartão ao vivo pelo definitivo (as citações limpas, as OS clicáveis, as
    ações, o custo). A resposta que não vem em fluxo (a recusa, o relatório, o navegador sem leitura em pedaços) segue
-   o caminho de sempre. */
+   o caminho de sempre.
+
+   18/11/2026: Busca ou Pensamento (Levi: "O botão fica no busca mas se a pessoa quiser que pense ela ativa o
+   pensamento"). O modo marcado vai no JSON da pergunta (`modo`); em Busca o Claude responde direto, em Pensamento ele
+   raciocina antes (demora mais). O pé do cartão diz quando a resposta foi com pensamento. */
 (function () {
   'use strict';
   // [{pergunta, resposta}] de cada caixa (a da usina e a da carteira podem estar em telas diferentes; cada uma a dela)
@@ -164,7 +168,8 @@
       '<p class="ia-r-pe">' + conf + '<span class="mudo">' + (r.sem_ia
         // a pergunta sugerida da carteira, contada pelo Nexus (16/11/2026: na hora e certa, sem IA)
         ? 'Contado pelo Nexus com o dado de agora, sem IA · ' + num(r.ms / 1000, 1) + ' s'
-        : num(r.ms / 1000, 1) + ' s · ' + num(r.entrada + (r.cache_lido || 0)) + ' → ' + num(r.saida) + ' tokens · ' + custo) +
+        : num(r.ms / 1000, 1) + ' s · ' + num(r.entrada + (r.cache_lido || 0)) + ' → ' + num(r.saida) + ' tokens · ' + custo +
+          (r.modo === 'pensamento' ? ' · com pensamento' : '')) +
       '</span>' + csv + '</p></article>';
   }
 
@@ -243,6 +248,7 @@
     var lendo = turno.querySelector('.ia-lendo'), t0 = Date.now();
     var base = lendo ? lendo.textContent.replace(/…$/, '') : '';
     // o texto ao vivo: um modelo só, a caixa com a rota em fluxo e o navegador que lê o corpo em pedaços
+    var marcadoModo = raiz.querySelector('[data-ia-modo]:checked'), modo = marcadoModo ? marcadoModo.value : 'busca';
     var fluxoUrl = raiz.getAttribute('data-ia-fluxo-url');
     var aoVivo = !!(fluxoUrl && marcados.length === 1 && window.ReadableStream && window.TextDecoder);
     var relogio = lendo ? setInterval(function () {
@@ -279,7 +285,7 @@
     fetch(aoVivo ? fluxoUrl : raiz.getAttribute('data-ia-url'), {
       method: 'POST', credentials: 'same-origin',
       headers: {'Content-Type': 'application/json', 'Accept': aoVivo ? 'text/event-stream, application/json' : 'application/json'},
-      body: JSON.stringify({pergunta: pergunta, modelos: marcados, historico: hist(raiz)})
+      body: JSON.stringify({pergunta: pergunta, modelos: marcados, historico: hist(raiz), modo: modo})
     }).then(function (r) {
       if (aoVivo && r.body && (r.headers.get('Content-Type') || '').indexOf('text/event-stream') === 0) return lerFluxo(r, evento);
       return r.json().catch(function () { return {ok: false, erro: 'Resposta inesperada (' + r.status + ').'}; });

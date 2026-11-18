@@ -43,9 +43,18 @@
     {% for m in modelos|unique(attribute='provedor') %}{{ m.motivo }}{{ ' ' if not loop.last }}{% endfor %}</div></div>
   {% endif %}
 
-  <form class="ia-form" data-ia-form>
+  {# Busca ou Pensamento (18/11/2026, Levi: "O botão fica no busca mas se a pessoa quiser que pense ela ativa o
+     pensamento"): só o Claude tem os dois modos; sem a chave dele o botão não faria nada, e não aparece #}
+  {% set com_claude = modelos|selectattr('provedor', 'equalto', 'anthropic')|selectattr('tem_chave')|list %}
+  <form class="ia-form{% if com_claude %} ia-form--modo{% endif %}" data-ia-form>
     <label class="ia-sr" for="ia-pergunta-{{ base|replace('/', '-') }}">Pergunta</label>
     <textarea id="ia-pergunta-{{ base|replace('/', '-') }}" name="pergunta" rows="1" maxlength="{{ max_pergunta }}" placeholder="{{ ia_exemplo if ia_exemplo is defined and ia_exemplo else 'Ex.: por que a usina caiu em outubro?' }}" data-ia-pergunta{% if not com_chave %} disabled{% endif %}></textarea>
+    {% if com_claude %}
+    <div class="ia-modo" role="radiogroup" aria-label="Como a IA responde">
+      <label class="ia-modo-op" title="Responde direto pelo dossiê: mais rápido"><input type="radio" name="ia-modo-{{ base|replace('/', '-') }}" value="busca" data-ia-modo checked><span><i class="ph ph-magnifying-glass" aria-hidden="true"></i> Busca</span></label>
+      <label class="ia-modo-op" title="A IA raciocina antes de responder: demora mais. Para a pergunta que cruza vários dados"><input type="radio" name="ia-modo-{{ base|replace('/', '-') }}" value="pensamento" data-ia-modo><span><i class="ph ph-brain" aria-hidden="true"></i> Pensamento</span></label>
+    </div>
+    {% endif %}
     <button type="submit" class="gc-btn gc-btn--ui gc-btn--primario" data-ia-enviar{% if not com_chave %} disabled{% endif %}><i class="ph ph-paper-plane-right" aria-hidden="true"></i> Perguntar</button>
   </form>
   <div class="ia-sugestoes" role="group" aria-label="Perguntas sugeridas">{% for s in sugestoes %}<button type="button" class="ia-sugestao" data-ia-sugestao>{{ s }}</button>{% endfor %}</div>

@@ -891,9 +891,20 @@ a.ins-titulo:hover{color:var(--verde-texto)}
 .ia-form textarea{width:100%;box-sizing:border-box;resize:vertical;min-height:44px;padding:9px 12px;border:1px solid var(--linha-forte);
   border-radius:var(--raio-controle);background:var(--superficie-2);color:var(--tinta);font:400 14px/1.45 var(--font-sans)}
 .ia-form textarea:focus-visible{outline:2px solid var(--foco);outline-offset:1px}
+/* Busca ou Pensamento (18/11/2026): dois botões num só, ao lado do Perguntar; o marcado em verde suave */
+.ia-form--modo{grid-template-columns:minmax(0,1fr) auto auto}
+.ia-modo{display:inline-flex;border:1px solid var(--linha-forte);border-radius:var(--raio-controle);background:var(--superficie-2);overflow:hidden}
+.ia-modo-op{position:relative;display:flex}
+.ia-modo-op+.ia-modo-op{border-left:1px solid var(--linha-forte)}
+.ia-modo-op input{position:absolute;inset:0;width:100%;height:100%;margin:0;opacity:0;cursor:pointer}
+.ia-modo-op span{display:inline-flex;align-items:center;gap:6px;min-height:34px;padding:0 12px;color:var(--mudo);
+  font:600 12.5px/1 var(--font-sans);white-space:nowrap}
+.ia-modo-op input:checked+span{background:var(--verde-suave);color:var(--verde-texto)}
+.ia-modo-op input:focus-visible+span{outline:2px solid var(--foco);outline-offset:-2px}
 .ia-pe{margin:0;font-size:12px}
 @media (max-width:900px){.ia-respostas--2,.ia-respostas--3{grid-template-columns:minmax(0,1fr)}.ia-pergunta{max-width:100%}}
-@media (max-width:640px){.ia-form{grid-template-columns:minmax(0,1fr)}}
+@media (max-width:640px){.ia-form{grid-template-columns:minmax(0,1fr)}
+  .ia-form--modo{grid-template-columns:minmax(0,1fr) auto}.ia-form--modo textarea{grid-column:1/-1}.ia-modo{justify-self:start}}
 /* Nexus IA, 14/11/2026: as citações, as OS clicáveis, as ações para outro setor (a Nova demanda ali mesmo) e o relatório */
 .ia-cita{display:inline-block;margin:0 2px;padding:0 6px;border-radius:var(--raio-tag);background:var(--superficie-3);
   color:var(--mudo);font:600 10.5px/17px var(--font-sans);vertical-align:1px;white-space:nowrap}

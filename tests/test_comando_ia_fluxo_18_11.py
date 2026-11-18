@@ -42,16 +42,27 @@ def _eventos(trechos):
 def sdk(monkeypatch):
     """O SDK da Anthropic de mentira: `messages.stream(**pedido)` devolve os eventos de `sdk.trechos` e a mensagem
     final; `sdk.erro` (o nome de uma exceção do SDK) faz a abertura do fluxo falhar, `sdk.no_meio` faz cair depois do
-    primeiro trecho, e `sdk.espera` (segundos) atrasa o primeiro evento."""
-    estado = types.SimpleNamespace(pedidos=[], trechos=TRECHOS, erro="", no_meio="", espera=0)
+    primeiro trecho, e `sdk.espera` (segundos) atrasa o primeiro evento. `messages.create(**pedido)` é a chamada sem
+    fluxo, com as mesmas falhas. `sdk.recusa_o_sem_pensamento` faz a API responder 400 ao pedido com `thinking`."""
+    estado = types.SimpleNamespace(pedidos=[], trechos=TRECHOS, erro="", no_meio="", espera=0, recusa_o_sem_pensamento=False)
+
+    def _abrir(k):
+        if estado.recusa_o_sem_pensamento and "thinking" in k:
+            ex = falso.APIStatusError("thinking: disabled is not supported for this model")
+            ex.status_code = 400
+            raise ex
+        if estado.erro:
+            raise getattr(falso, estado.erro)("falhou")
 
     class _Uso:
         input_tokens, output_tokens, cache_read_input_tokens, cache_creation_input_tokens = 16, 2231, 0, 18263
 
     class _Fluxo:
+        def __init__(self, k=None):
+            self.k = k or {}
+
         def __enter__(self):
-            if estado.erro:
-                raise getattr(falso, estado.erro)("falhou")
+            _abrir(self.k)
             return self
 
         def __exit__(self, *a):
@@ -68,9 +79,14 @@ def sdk(monkeypatch):
             return types.SimpleNamespace(stop_reason="end_turn", model="claude-haiku-5-5", usage=_Uso(),
                                          content=[types.SimpleNamespace(type="text", text="".join(estado.trechos))])
 
+    def _criar(**k):
+        estado.pedidos.append(k)
+        _abrir(k)
+        return _Fluxo(k).get_final_message()
+
     class _Cli:
         def __init__(self, **kw):
-            self.messages = types.SimpleNamespace(stream=lambda **k: estado.pedidos.append(k) or _Fluxo())
+            self.messages = types.SimpleNamespace(stream=lambda **k: estado.pedidos.append(k) or _Fluxo(k), create=_criar)
 
     falso = types.ModuleType("anthropic")
     falso.Anthropic = _Cli

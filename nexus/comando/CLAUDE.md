@@ -649,6 +649,26 @@ Gemini, Groq, Grok [...] Qualquer IA que dê para puxar a API para fazermos o te
     - **Como provar:** `tests/test_comando_ia_fluxo_18_11.py` (o SDK é um dublê). O transporte foi conferido em
       18/11 com o waitress de verdade e um dublê lento: 1º trecho em 1,8 s e um a cada 0,12 s, como o dublê mandava.
       Atrás do Caddy o `text/event-stream` não é juntado (e a rota manda `X-Accel-Buffering: no`).
+  - **Busca ou Pensamento** (18/11/2026, Levi: "pode ter a opção Busca/Pensamento. O botão fica no busca mas se a
+    pessoa quiser que pense ela ativa o pensamento"). Na pergunta de 17,1 s, cerca de 1.800 dos 2.231 tokens de saída
+    eram o rascunho que o Haiku faz antes de responder. Como funciona:
+    - A caixa (a da usina e a da carteira) tem os dois botões ao lado do Perguntar, com **Busca marcado**. O marcado vai
+      no JSON da pergunta (`modo`); só `"pensamento"` faz pensar, e sem o campo ou com outro valor vale Busca
+      (`_ia_pensar`, nas três rotas da pergunta).
+    - Em Busca, o pedido leva `thinking: {"type": "disabled"}` e `max_tokens` `MAX_SAIDA`; em Pensamento, vai como
+      antes. O esforço (`ESFORCO`) e o bloco do dossiê não mudam, então o cache do dossiê vale nos dois modos.
+    - **Só o Claude tem os dois modos.** Sem a chave da Anthropic os botões não aparecem; nos outros provedores o
+      `pensar` não muda nada.
+    - **Quem não diz o modo segue pensando** (`pensar=True` é o padrão do `perguntar` e do `responder`): o diagnóstico
+      do dia não passa pela caixa e continua com pensamento.
+    - A resposta do Claude traz `modo` ("busca" ou "pensamento"), o pé do cartão diz "com pensamento", e o registro do
+      mês guarda o modo (para comparar o tempo dos dois).
+    - **A recusa do `thinking: disabled` não derruba a pergunta:** o parâmetro não pôde ser provado contra a API de
+      verdade (a chave só existe no servidor). Se a Anthropic responder 400 falando de `thinking`, o pedido é refeito
+      sem ele (`_recusou_o_sem_pensamento`), a resposta vem com `modo: "pensamento"` e o log avisa. Sem isso, o modo
+      padrão da tela cairia toda vez nas grátis.
+    - **Como provar:** `tests/test_comando_ia_modo_18_11.py`. No servidor: a mesma pergunta nos dois modos, e o pé do
+      cartão mostra o tempo, os tokens de saída e o "com pensamento".
   - Os grátis: o Nemotron pelo OpenRouter e pela NVIDIA, o Gemini Flash-Lite e o GPT-OSS 120B no Groq.
   - **A chave da Anthropic se cola na tela** (18/11/2026, Levi: "onde devo colar?"): Base › Chaves das fontes › IA, a
     vaga "Anthropic: Claude Haiku 5.5" (`VAGAS["anthropic"]`, cifrada; a da tela vence a `ANTHROPIC_API_KEY` do .env).

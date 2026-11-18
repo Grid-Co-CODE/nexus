@@ -611,7 +611,14 @@ def _ia_pedido(usina_id: int):
     historico = [h for h in (b.get("historico") or []) if isinstance(h, dict)][-IA.MAX_HISTORICO:]
     _ctx, d = _dossie(usina_id)
     return None, {"pergunta": pergunta, "ids": ids, "historico": historico, "dossie": d, "quem": _meu_hmac(),
-                  "setores": [s["nome"] for s in _ia_setores()], "meu_setor": _ia_meu_setor()}
+                  "setores": [s["nome"] for s in _ia_setores()], "meu_setor": _ia_meu_setor(), "pensar": _ia_pensar(b)}
+
+
+def _ia_pensar(b: dict) -> bool:
+    """O modo da pergunta (18/11/2026, Levi: "pode ter a opção Busca/Pensamento. O botão fica no busca mas se a pessoa
+    quiser que pense ela ativa o pensamento"): só `modo: "pensamento"` faz o Claude pensar antes de responder. Sem o
+    campo, ou com outro valor, vale Busca (a resposta direta, mais rápida)."""
+    return str(b.get("modo") or "").strip().lower() == "pensamento"
 
 
 def _ia_fecho(usina_id: int, p: dict, respostas: list) -> dict:
@@ -641,7 +648,7 @@ def usina_ia_perguntar(usina_id):
         return recusa
     cfg = current_app.config
     respostas = IA.perguntar(cfg, p["ids"], p["dossie"]["texto"], p["pergunta"], p["historico"], setores=p["setores"],
-                             meu_setor=p["meu_setor"])
+                             meu_setor=p["meu_setor"], pensar=p["pensar"])
     IA.registrar(cfg, usina_id, p["pergunta"], respostas, p["quem"], p["dossie"]["tokens_estimados"])
     resp = jsonify(**_ia_fecho(usina_id, p, respostas))
     resp.headers["Cache-Control"] = "no-store"
@@ -672,7 +679,7 @@ def usina_ia_perguntar_fluxo(usina_id):
 
     def gerar():
         fluxo = IA.perguntar_em_fluxo(cfg, p["ids"], p["dossie"]["texto"], p["pergunta"], p["historico"],
-                                      setores=p["setores"], meu_setor=p["meu_setor"])
+                                      setores=p["setores"], meu_setor=p["meu_setor"], pensar=p["pensar"])
         respostas = None
         try:
             yield evento("inicio")
@@ -840,7 +847,7 @@ def carteira_ia_perguntar():
     else:
         setores = [s["nome"] for s in _ia_setores()]
         respostas = IA.perguntar(cfg, ids, dz["texto"], pergunta, historico, setores=setores,
-                                 meu_setor=_ia_meu_setor(), instrucoes=CI.INSTRUCOES)
+                                 meu_setor=_ia_meu_setor(), instrucoes=CI.INSTRUCOES, pensar=_ia_pensar(b))
     for r in respostas:
         if not r.get("ok"):
             continue

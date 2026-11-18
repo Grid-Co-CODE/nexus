@@ -155,7 +155,7 @@ def test_a_pergunta_da_carteira_usa_o_dossie_e_as_instrucoes_dela(tela, logado, 
     logado.application.config.update(NEXUS_DADOS=str(tmp_path))
     visto = {}
 
-    def perguntar(cfg, ids, dossie, pergunta, historico=None, setores=None, meu_setor="", instrucoes=""):
+    def perguntar(cfg, ids, dossie, pergunta, historico=None, setores=None, meu_setor="", instrucoes="", pensar=True):
         visto.update(dossie=dossie, instrucoes=instrucoes)
         nome = next(l[2:-2].split(" | ")[0] for l in dossie.splitlines() if l.startswith("| ") and "---" not in l
                     and not l.startswith("| Usina |") and not l.startswith("| OS |"))
