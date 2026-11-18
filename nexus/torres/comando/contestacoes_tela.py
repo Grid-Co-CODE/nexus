@@ -294,11 +294,15 @@ def visao_do_contrato_dados():
     if not d:
         resp = jsonify(ok=False)
     else:
-        out = K.com_datas(d, visao._agora().date())
-        # as fichas lidas dos PDFs dos contratos (18/11/2026), casadas com o cliente da planilha
+        # as fichas lidas dos PDFs dos contratos (18/11/2026), casadas com o cliente da planilha; o que a planilha não
+        # tem e o contrato tem entra antes das contas (a renovação e o reajuste saem do dado completado)
         fx = _fichas_lidas()
-        if fx and fx.get("fichas"):
-            out["fichas"] = F.por_cliente(fx["fichas"], [c["cliente"] for c in out["contratos"]])
+        fichas = F.por_cliente(fx["fichas"], [c["cliente"] for c in d.get("contratos") or []]) if fx and fx.get("fichas") else {}
+        if fichas:
+            d = {**d, "contratos": F.completar(d.get("contratos") or [], fichas)}
+        out = K.com_datas(d, visao._agora().date())
+        if fichas:
+            out["fichas"] = fichas
             out["fichas_info"] = {k: fx.get(k) for k in ("arquivo", "importado_em", "importado_por")}
         resp = jsonify(ok=True, **out)
     resp.headers["Cache-Control"] = "no-store"

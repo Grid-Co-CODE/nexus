@@ -137,6 +137,13 @@ analisar e fazer algo melhor?", "completa tudo!" e "faça por subagentes para me
   o contrato não diz". Nas outras abas, o que o contrato pede: SLA no Atendimento, Rotinas no Calendário, Entregáveis,
   Metas (disponibilidade, bônus, penalidades) e Financeiro (valor mensal, medição, adicionais). Todos os contratos ganha
   a coluna "Regras do contrato" (ou "PDF não lido").
+- **O contrato completa a planilha (18/11/2026, Levi: "faça um rework lá nos contratos e bote os dados que
+  faltam!"; `fichas.completar`).** Só o VAZIO da planilha: início e fim da vigência (o mais cedo entre os contratos do
+  cliente), aviso prévio e índice (só quando os contratos que trazem dizem o mesmo), data-base (só se for data) e o valor
+  mensal (a soma dos contratos que trazem, com quantos trazem e se há minuta). Quando a planilha tem o dado, vale o dela
+  e a diferença vai para "A planilha de controle e o contrato não batem". Cada campo completado leva `origem` (contrato e
+  página) e a tela marca "do contrato". A renovação e o reajuste são calculados depois, com o dado completado. A página
+  da prova mostra o intervalo (`ref.pagina_fim`) quando a tabela continua na página seguinte (achado da revisão).
 - **18/11/2026, os 5 clientes com PDF** (Athon, Axis, 2C, GreenYellow, Thopen): o que cada leitor achou que o Levi ou a
   área de Contratos precisa decidir está nas `lacunas` e nas `observacoes` de cada ficha. Os outros 11 clientes não
   mandaram PDF.

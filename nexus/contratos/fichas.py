@@ -15,6 +15,8 @@ Puro: nada de rede nem Flask.
 """
 from __future__ import annotations
 
+import re
+
 from .controle import _chave
 
 ARQUIVO = "fichas_contratos.json"
@@ -53,6 +55,61 @@ def ler(dados) -> list[dict]:
                 if not isinstance(r.get("ref"), dict):
                     raise FichasInvalidas(f"regra de {f['cliente']} sem a referência (arquivo, página, cláusula)")
     return dados
+
+
+def _origem(k: dict, campo: str, n: int, total: int) -> dict:
+    return {"fonte": "contrato", "contrato": k.get("id") or k.get("arquivo"), "ref": (k.get(campo) or {}).get("ref"),
+            "de": n, "total": total}
+
+
+def completar(contratos: list[dict], fichas: dict[str, dict]) -> list[dict]:
+    """O que a planilha de controle não tem e o contrato lido tem (18/11/2026, Levi: "bote os dados que faltam!").
+
+    Só preenche o VAZIO: quando a planilha tem o dado, vale o dela, e a diferença aparece na tela ("A planilha de controle
+    e o contrato não batem"). Cada campo preenchido leva em `origem` de qual contrato e de que página veio, e a tela marca
+    "do contrato". Regras, uma a uma:
+    - início e fim da vigência: o mais cedo entre os contratos do cliente que trazem a data (o 1º a vencer é o que pede
+      atenção); o contrato que não traz a data não entra na conta;
+    - aviso prévio e índice de reajuste: só quando todos os contratos que trazem o dado dizem o mesmo (dois valores
+      diferentes não viram um: a tela mostra cada um nas regras);
+    - data-base do reajuste: só a que é uma data (a "data da assinatura" escrita por extenso não é);
+    - valor mensal: a soma dos contratos que trazem o valor, com quantos trazem e se há minuta (sem assinatura) entre eles.
+    """
+    out = []
+    for c in contratos:
+        f = fichas.get(c["cliente"])
+        if not f:
+            out.append(c)
+            continue
+        c, ks, origem = dict(c), f.get("contratos") or [], {}
+        for campo, chave in (("inicio", "inicio"), ("fim", "fim")):
+            if not c.get(campo):
+                ds = sorted((str((k.get("vigencia") or {}).get(chave)), i) for i, k in enumerate(ks)
+                            if re.match(r"^\d{4}-\d{2}-\d{2}$", str((k.get("vigencia") or {}).get(chave) or "")))
+                if ds:
+                    c[campo] = ds[0][0]
+                    origem[campo] = _origem(ks[ds[0][1]], "vigencia", len(ds), len(ks))
+        for campo, bloco, chave in (("aviso_dias", "renovacao", "aviso_previo_dias"), ("indice", "reajuste", "indice")):
+            if c.get(campo) in (None, ""):
+                tem = [(k, (k.get(bloco) or {}).get(chave)) for k in ks if (k.get(bloco) or {}).get(chave) not in (None, "")]
+                if tem and len({str(v) for _, v in tem}) == 1:
+                    c[campo] = int(tem[0][1]) if campo == "aviso_dias" else str(tem[0][1])
+                    origem[campo] = _origem(tem[0][0], bloco, len(tem), len(ks))
+        if not c.get("data_base"):
+            tem = [(k, (k.get("reajuste") or {}).get("data_base")) for k in ks
+                   if re.match(r"^\d{4}-\d{2}-\d{2}$", str((k.get("reajuste") or {}).get("data_base") or ""))]
+            if tem and len({v for _, v in tem}) == 1:
+                c["data_base"] = tem[0][1]
+                origem["data_base"] = _origem(tem[0][0], "reajuste", len(tem), len(ks))
+        valores = [(k.get("valor") or {}).get("mensal") for k in ks]
+        nums = [float(v) for v in valores if isinstance(v, (int, float)) and not isinstance(v, bool)]
+        if nums:
+            c["valor_mensal"] = round(sum(nums), 2)
+            c["valor_info"] = {"com_valor": len(nums), "contratos": len(ks),
+                               "minuta": any(d.get("assinado") is False for d in f.get("documentos") or [])}
+        c["origem"] = origem
+        out.append(c)
+    return out
 
 
 def por_cliente(fichas: list[dict], clientes: list[str]) -> dict[str, dict]:

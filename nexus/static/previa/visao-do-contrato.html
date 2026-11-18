@@ -933,17 +933,17 @@ function vencido(c) { return (c.dias_fim != null && c.dias_fim < 0) || (c.dias_f
 
 function fatoVig(c) {
   if (!c.fim) return par("Vigência", "sem data<small>" + (c.nao_localizado ? "contrato não localizado" : "a planilha não traz o fim") + "</small>");
-  return '<div><dt>Vigência</dt><dd' + (c.dias_fim < 0 ? ' class="c-critico"' : "") + '>até <span class="num">' + dBR(c.fim) + "</span><small>" +
+  return '<div><dt>Vigência</dt><dd' + (c.dias_fim < 0 ? ' class="c-critico"' : "") + '>até <span class="num">' + dBR(c.fim) + "</span>" + doContrato(c, ["fim"]) + "<small>" +
     (c.dias_fim < 0 ? "vencida há " + nDias(c.dias_fim) : falta(c.dias_fim)) + "</small></dd></div>";
 }
 function fatoRenov(c) {
   if (!c.avisar_ate) return par("Renovação", "sem prazo<small>" + (c.fim ? "o contrato não traz aviso prévio" : "sem o fim da vigência") + "</small>");
-  return '<div><dt>Renovação</dt><dd' + (c.dias_aviso < 0 ? ' class="c-critico"' : "") + '>avisar até <span class="num">' + dBR(c.avisar_ate) + "</span><small>" +
+  return '<div><dt>Renovação</dt><dd' + (c.dias_aviso < 0 ? ' class="c-critico"' : "") + '>avisar até <span class="num">' + dBR(c.avisar_ate) + "</span>" + doContrato(c, ["aviso_dias", "fim"]) + "<small>" +
     c.aviso_dias + " dias antes do fim; " + (c.dias_aviso < 0 ? "passou há " + nDias(c.dias_aviso) : quando(c.dias_aviso)) + "</small></dd></div>";
 }
 function fatoReaj(c) {
   if (!c.proximo_reajuste) return par("Reajuste", "sem data-base<small>" + esc(c.indice || "a planilha não traz o índice") + "</small>");
-  return par("Próximo reajuste", '<span class="num">' + dBR(c.proximo_reajuste) + "</span><small>" + quando(c.dias_reajuste) + "; " + esc(c.indice) + "</small>");
+  return par("Próximo reajuste", '<span class="num">' + dBR(c.proximo_reajuste) + "</span>" + doContrato(c, ["data_base", "indice"]) + "<small>" + quando(c.dias_reajuste) + "; " + esc(c.indice) + "</small>");
 }
 function fichaReal(c) {
   var vig = c.inicio || c.fim ? "<b>" + (c.inicio ? dBR(c.inicio) : "sem início") + " a " + (c.fim ? dBR(c.fim) : "sem fim") + "</b>" : "sem datas na planilha";
@@ -969,7 +969,7 @@ function vReal() {
   if (!c) return h + "</div>" + vTodos();
   h += (c.gestor ? '<span class="ct-gestor"><i class="ph ph-user-circle" aria-hidden="true"></i><small>Gestor do contrato</small>' + esc(c.gestor) + "</span>" : "") +
     '<button class="linkbtn ct-mais" data-ficha aria-expanded="' + estado.ficha + '">Dados do contrato<i class="ph ph-caret-' + (estado.ficha ? "up" : "down") + '" aria-hidden="true"></i></button></div>';
-  h += '<dl class="fatos">' + fatoVig(c) + fatoRenov(c) + fatoReaj(c) + par("Usinas", '<span class="num">' + c.usinas.length + "</span>") + "</dl>";
+  h += '<dl class="fatos">' + fatoVig(c) + fatoRenov(c) + fatoReaj(c) + fatoValor(c) + par("Usinas", '<span class="num">' + c.usinas.length + "</span>") + "</dl>";
   if (estado.ficha) h += fichaReal(c);
   // o que está em atraso fica à vista em toda aba: a vigência ou o aviso de renovação vencidos e as obrigações vencidas
   var atr = obrDe(c).filter(function (o) { return o.tom === "critico"; }), itens = [];
@@ -1003,14 +1003,15 @@ function vTodos() {
   }
   return '<div class="regua"><h2>' + REAL.contratos.length + " contratos</h2><span class=\"mudo\">" + venc + " com a vigência vencida; " +
     comAtr + (comAtr === 1 ? " com obrigação em atraso" : " com obrigações em atraso") + "</span></div>" +
-    '<div class="rolavel"><table class="tab"><thead><tr><th>Cliente</th><th>Gestor do contrato</th><th>Vigência até</th><th>Renovação: avisar até</th><th>Próximo reajuste</th><th class="r">Em atraso</th>' + (REAL.fichas ? '<th class="r">Regras do contrato</th>' : "") + '<th class="ir"><span class="so-leitor">Abrir</span></th></tr></thead><tbody>' +
+    '<div class="rolavel"><table class="tab"><thead><tr><th>Cliente</th><th>Gestor do contrato</th><th>Vigência até</th><th>Renovação: avisar até</th><th>Próximo reajuste</th>' + (REAL.fichas ? '<th class="r">Valor mensal<span class="sub" style="margin:0">do contrato</span></th>' : "") + '<th class="r">Em atraso</th>' + (REAL.fichas ? '<th class="r">Regras do contrato</th>' : "") + '<th class="ir"><span class="so-leitor">Abrir</span></th></tr></thead><tbody>' +
     ordem.map(function (x) {
       var c = x.c;
       return '<tr data-ir="' + x.i + '"><td><a href="' + rota(x.i) + '">' + esc(c.cliente) + "</a>" + (c.nao_localizado ? '<small class="mudo"> contrato não localizado</small>' : "") + "</td>" +
         "<td>" + (c.gestor ? esc(c.gestor) : '<span class="mudo">sem gestor</span>') + "</td>" +
-        "<td>" + data(c.fim, c.dias_fim, "sem data") + "</td>" +
-        "<td>" + data(c.avisar_ate, c.dias_aviso, c.fim ? "sem aviso prévio" : "—") + "</td>" +
+        "<td>" + data(c.fim, c.dias_fim, "sem data") + doContrato(c, ["fim"]) + "</td>" +
+        "<td>" + data(c.avisar_ate, c.dias_aviso, c.fim ? "sem aviso prévio" : "—") + doContrato(c, ["aviso_dias"]) + "</td>" +
         "<td>" + (c.proximo_reajuste ? data(c.proximo_reajuste, c.dias_reajuste) + '<small class="mudo">; ' + esc(c.indice) + "</small>" : '<span class="mudo">' + esc(c.indice || "sem índice") + "</span>") + "</td>" +
+        (REAL.fichas ? '<td class="r num">' + (c.valor_mensal != null ? brl(c.valor_mensal) : '<span class="mudo">—</span>') + "</td>" : "") +
         '<td class="r">' + (c.atrasadas ? '<span class="pill t-critico">' + c.atrasadas + "</span>" : '<span class="mudo">0</span>') + "</td>" +
         (REAL.fichas ? '<td class="r">' + (fichaDe(c) ? '<span class="num">' + fichaDe(c).contratos.reduce(function (s, k) { return s + (k.regras || []).length; }, 0) + "</span>" : '<span class="mudo">PDF não lido</span>') + "</td>" : "") +
         '<td class="ir"><i class="ph ph-caret-right" aria-hidden="true"></i></td></tr>';
@@ -1031,7 +1032,26 @@ function rotuloK(k) {
   var us = (k.usinas || []).map(function (u) { return u.nome; }).filter(Boolean);
   return k.id ? String(k.id) : us.length ? us.slice(0, 2).join(", ") + (us.length > 2 ? " e mais " + (us.length - 2) : "") : k.arquivo;
 }
-function refTxt(ref) { return ref ? (ref.clausula ? "cl. " + esc(ref.clausula) + ", " : "") + "p. " + esc(ref.pagina) : ""; }
+function refTxt(ref) {
+  if (!ref) return "";
+  return (ref.clausula ? "cl. " + esc(ref.clausula) + ", " : "") + "p. " + esc(ref.pagina) + (ref.pagina_fim && ref.pagina_fim !== ref.pagina ? "–" + esc(ref.pagina_fim) : "");
+}
+/* o dado que a planilha não tinha e veio do contrato lido (18/11/2026, Levi: "bote os dados que faltam!"): a marca diz de
+   onde, e o título diz de qual contrato e página */
+function doContrato(c, campos) {
+  var o = (c.origem || {}), x = campos.map(function (k) { return o[k]; }).filter(Boolean)[0];
+  if (!x) return "";
+  var t = "Do contrato " + (x.contrato || "") + (x.ref ? ", " + (x.ref.clausula ? "cl. " + x.ref.clausula + ", " : "") + "p. " + x.ref.pagina : "") +
+    (x.total > 1 ? " (" + x.de + " de " + x.total + " contratos trazem)" : "") + ". A planilha de controle não tem.";
+  return ' <span class="pill t-info" title="' + esc(t) + '">do contrato</span>';
+}
+function fatoValor(c) {
+  if (c.valor_mensal == null) return "";
+  var i = c.valor_info || {};
+  var nota = i.contratos > 1 ? (i.com_valor < i.contratos ? "soma de " + i.com_valor + " de " + i.contratos + " contratos; os outros não escrevem" : "soma dos " + i.contratos + " contratos") : "do contrato lido";
+  return '<div><dt>Valor mensal</dt><dd><span class="num">' + brl(c.valor_mensal) + "</span>" + ' <span class="pill t-info" title="Somado dos contratos lidos dos PDFs. A planilha de controle não tem valor.">do contrato</span>' +
+    "<small>" + nota + (i.minuta ? "; há minuta sem assinatura" : "") + "</small></dd></div>";
+}
 function vale(r) { return r.vigente != null && r.vigente !== "" ? r.vigente : r.contratual; }
 // as regras das categorias pedidas, juntando a mesma regra (categoria, nome e o que vale) de contratos diferentes
 function grupos(f, cats, soAlteradas) {
