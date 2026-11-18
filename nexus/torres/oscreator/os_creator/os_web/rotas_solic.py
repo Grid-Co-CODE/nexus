@@ -406,7 +406,9 @@ def fila():
         # o id do responsável é o id_personnel do api.get_responsaveis (= id_responsible da OS, como no app)
         pessoas=[{"id": p.get("id_personnel"), "nome": p.get("name") or ""} for p in pessoas if p.get("id_personnel")],
         etiquetas=[{"id": e.get("id"), "nome": e.get("description") or ""} for e in etiquetas if e.get("id")],
-        tipos=[t.get("description") for t in (tipos.get("tipos") or []) if t.get("description")],
+        # a Inspeção não é oferecida: nasceria Corretiva (`api.tipo_que_nasce`, 18/11/2026)
+        tipos=[t.get("description") for t in (tipos.get("tipos") or [])
+               if t.get("description") and t.get("description") != api.TIPO_QUE_VIRA_CORRETIVA],
         cl1=[t.get("description") for t in (tipos.get("c1") or []) if t.get("description")],
         cl2=[t.get("description") for t in (tipos.get("c2") or []) if t.get("description")],
         status=[{"id": i, "cod": cod, "rot": rot} for i, cod, rot in status],

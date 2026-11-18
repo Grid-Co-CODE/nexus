@@ -88,7 +88,9 @@ def api_tipos():
     24 h e em disco, 31/10/2026; era uma cópia por processo que nunca vencia), e a criticidade fixa (5 níveis, default
     Médio)."""
     d = catalogos.tipos_classif() or {}
-    return jsonify({"tipos": d.get("tipos") or [], "c1": d.get("c1") or [], "c2": d.get("c2") or [],
+    # a Inspeção não é oferecida: nasceria Corretiva (`api.tipo_que_nasce`, 18/11/2026)
+    tipos = [t for t in (d.get("tipos") or []) if (t or {}).get("description") != api.TIPO_QUE_VIRA_CORRETIVA]
+    return jsonify({"tipos": tipos, "c1": d.get("c1") or [], "c2": d.get("c2") or [],
                     "criticidades": [{"id": i, "description": n} for n, i in api.CRITICIDADES],
                     "crit_default": api.CRITICIDADE_DEFAULT, "nenhuma": trad.NENHUMA})
 

@@ -3146,6 +3146,21 @@ fundo que nem quando vamos criar OS." O menu e a janela são da plataforma (Moni
   cliente, o relatório (um PDF; dois clientes, um .zip) e a planilha; a 375 px a página não rola para o lado e a caixa
   dos avisos fica na tela.
 
+## A Inspeção nasce Corretiva no OS Creator Web (18/11/2026)
+- **A regra** (Levi: "para as próximas OSs de inspeção ... configure para o tipo de tarefa nascer como corretiva, o resto do
+  passado já se foi"): toda OS avulsa que pediria o tipo Inspeção nasce Corretiva (`api.tipo_que_nasce`, chamada pelo
+  `create_os_rpc`: Fila do PCM, Criar OS do zero, Clonar, Nova solicitação da Performance e da Engenharia). A Fila do PCM e
+  o Criar OS do zero não oferecem mais a Inspeção. A OS já criada não muda.
+- **O caso:** a OS 19361 (inspeção de inversor por alarme de ventoinha) nasceu Inspeção pela Fila do PCM (solicitação
+  4342). O técnico respondeu que era preciso abrir chamado, mas o App só pergunta "O equipamento ficou resolvido em
+  campo?" em corretiva, corretiva emergencial e religamento (`chamado_garantia.TIPOS_ORIGEM`), e o chamado não nasceu. A
+  administrativa dela foi criada à mão em 18/11/2026 (OS 19884, filha da 19361).
+- **O que não muda:** a inspeção de CHAMADO (o formulário do fabricante, `create_inspecao_chamado`, pelo
+  `create_planned_os`) segue Inspeção: é pelo tipo Inspeção que a administrativa dela nasce (o relógio do Nexus e o do
+  App). O "Inspeção e Normalização" do COS é outro tipo. A Inspeção Geral do Inversor da Performance já saía Corretiva
+  desde 29/10/2026.
+- **Como provar:** `tests/test_oscreator_inspecao_corretiva_18_11.py`.
+
 ## Garantias: a equipe de chamados pela tela, o Clonar com a OS pai e o chamado no Raio X sem moldura (16/11/2026)
 - **A equipe de chamados** (Levi: "passe todas as OSs para a responsável"; no quiz, "as abertas e as novas"): o botão
   "Equipe: <nome>" no alto do quadro, só para o administrador do Nexus (`ponte` põe `os_web.admin_nexus` no pedido),

@@ -79,6 +79,25 @@ TASK_TYPE_MAIN = {
 }
 TASK_TYPES = list(TASK_TYPE_MAIN.keys())   # opções do dropdown "Tipo de Tarefa" (Step 2)
 
+# A INSPEÇÃO NASCE CORRETIVA (18/11/2026, Levi: "para as próximas OSs de inspeção ... configure para o tipo de tarefa nascer
+# como corretiva, o resto do passado já se foi"). Caso que criou a regra: a OS 19361 (inspeção de inversor por alarme de
+# ventoinha) nasceu Inspeção pela Fila do PCM; o técnico respondeu que era preciso abrir chamado, mas o App só pergunta "O
+# equipamento ficou resolvido em campo?" em corretiva, corretiva emergencial e religamento (`chamado_garantia.TIPOS_ORIGEM`),
+# e o chamado não nasceu. Vale para toda OS avulsa (`create_os_rpc`: Fila do PCM, Criar OS do zero, Clonar, Nova
+# solicitação da Performance e da Engenharia). A inspeção de CHAMADO (a do formulário do fabricante,
+# `create_inspecao_chamado`) nasce pelo `create_planned_os` e segue Inspeção: é pelo tipo Inspeção que a administrativa
+# dela nasce. O tipo "Inspeção e Normalização" do COS é outro tipo e não muda.
+TIPO_QUE_VIRA_CORRETIVA = "Inspeção"
+
+
+def tipo_que_nasce(main_id, task_type) -> tuple:
+    """(id, nome) do tipo com que a OS avulsa nasce: a Inspeção vira Corretiva; o resto fica como veio."""
+    insp = TASK_TYPE_MAIN.get(TIPO_QUE_VIRA_CORRETIVA)
+    nome = " ".join(str(task_type or "").split()).lower()
+    if (main_id is not None and main_id == insp) or nome in ("inspeção", "inspecao"):
+        return TASK_TYPE_MAIN["Corretiva"], "Corretiva"
+    return main_id, task_type
+
 # Criticidade → id_priorities (1=Muito alto, 2=Alto, 3=Médio, 4=Baixo, 5=Muito baixo).
 # Confirmado pela cURL de criação. O usuário escolhe no dropdown; default = Médio (3).
 ID_PRIORITIES = 2                              # fallback p/ chamadas antigas (clone) sem criticidade
@@ -680,6 +699,7 @@ def create_os_rpc(asset: dict, description: str, task_type: str, subtasks: list,
         main_id = tipo_main_ao_vivo(task_type)
     if main_id is None:
         raise FracttalError(f"Tipo de tarefa desconhecido: {task_type}")
+    main_id, task_type = tipo_que_nasce(main_id, task_type)          # a Inspeção nasce Corretiva (18/11/2026)
     prio = tipo.get("id_priorities")
     if prio is None:
         prio = ID_PRIORITIES
