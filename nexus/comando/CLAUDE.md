@@ -978,10 +978,23 @@ o que é que ele tem que fazer".
       novembro" (6 era o de outubro; novembro tinha 11), "2 strings fora" (era 1) e "Inversor 1" no lugar do 2.8. Por
       isso a conferência é pelo mês dito e ganhou as strings. Rodada contra os 12 diagnósticos guardados da prova, ela
       aponta os 3 que erraram e nenhum dos 9 certos. O nome do equipamento trocado ainda não tem conferência;
-    - **`VERSAO`** (3) vai no guardado: o diagnóstico de outra versão é refeito na próxima abertura (os de 18/11 feitos
+    - **`VERSAO`** (4 desde as travas do "Não deve poder") vai no guardado: o diagnóstico de outra versão é refeito na próxima abertura (os de 18/11 feitos
       com o pedido antigo saem assim), e ainda serve de "anterior" enquanto o novo é feito. Mudou o pedido ou a
       conferência de um jeito que invalida os guardados: sobe a `VERSAO`;
     - o dossiê (formato 6) diz "Última ronda: nunca rondada", sem o 999.
+  - **"Não deve poder"** (Levi, 18/11/2026, quando soube que a IA ainda podia trocar o nome de um equipamento ou criar
+    item a partir de "sem dado"). Duas travas no servidor, depois da IA:
+    - **o item que nasce de "sem dado" não chega à tela** (`tirar_sem_dado`): sai das três listas o item que diz isso
+      com as próprias palavras ("sem dado", "sem leitura", "o dossiê não traz") e o que fala de um assunto que o dossiê
+      marca como sem dado numa linha só dele ("- Extintores: sem dado." vira o assunto "extintor";
+      `assuntos_sem_dado`). A linha que diz mais ("- Agora: sem leitura do COS (...)") não vira assunto. A situação
+      fica: dizer que não há dado pode; virar tarefa de alguém, não. O item misto ("Extintores sem conferência e luvas
+      nunca verificadas") sai inteiro;
+    - **o equipamento citado tem que estar no dossiê** (`equipamentos_fora`, dentro do `conferir`): inversor, cabine e
+      tracker citados pelo número, aceitando o zero à esquerda e os apelidos das fontes ("INVR2.8", "ETKR1.103"). O que
+      não está refaz pensando e, se insistir, vai para o "A conferir";
+    - rodadas contra os 18 diagnósticos guardados da prova: tiram os itens de "sem dado" da Poconé e da Colíder 1,
+      apontam o "Inversor 1" da Colíder 1 e não tocam nos outros 13. `VERSAO` 4.
   - **Erro de outro tipo que aparecer** ganha a conferência dele em `conferir`, com o caso. Prova:
     `tests/test_comando_diagnostico_confere_18_11.py`.
   - Quem abre depois lê o guardado, sem chamar a IA.

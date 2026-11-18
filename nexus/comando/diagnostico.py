@@ -37,7 +37,7 @@ ESPERA_ERRO_S = 20 * 60          # o erro guardado vale isto; depois a próxima 
 TRAVA_MORTA_S = 5 * 60           # a trava mais velha que isto é de um pedido que morreu (o servidor reiniciou)
 # a versão do pedido e da conferência: o guardado de outra versão é refeito na próxima abertura (18/11/2026: o pedido
 # trazia um exemplo com "16 desligamentos", e duas usinas saíram com 16 no lugar de 11 e de 3)
-VERSAO = 3
+VERSAO = 4
 # o diagnóstico vai em Busca, sem o pensamento do Claude (18/11/2026, Levi, com a 1ª abertura do dia em 40 s: "diagnóstico
 # em busca, rode alguns diagnósticos e bata os dados para ver se a informação está confiável"). True volta a pensar
 PENSAR = False
@@ -204,13 +204,88 @@ def _frase(texto: str, ini: int, fim: int) -> str:
     return texto[a:b]
 
 
+# ── o item que nasce de "sem dado" e o equipamento que não está no dossiê ─────────────────────────────────────────────
+# Levi, 18/11/2026, quando soube que a IA ainda podia trocar o nome de um equipamento ou criar item a partir de "sem
+# dado": "Não deve poder". Os casos da prova em produção: a Poconé ("Verificar os extintores, cuja situação o dossiê não
+# traz"), a Colíder 1 ("Extintores sem conferência", com "Extintores: sem dado" no dossiê, e "Inversor 1 com falha de
+# comunicação", onde o dossiê tinha o Inversor 2.8).
+_RX_ASSUNTO_SEM_DADO = re.compile(r"^- ([^:\n]{2,25}): sem (?:dado|leitura)\.?[ \t]*$", re.M)
+_RX_FALA_SEM_DADO = re.compile(r"\bsem dado\b|\bsem leitura\b|dossie nao (?:traz|diz|informa|tem)\b|"
+                               r"nao (?:retornou|retornaram|traz|trazem) (?:leitura|dado)")
+_EQUIPAMENTO = {"inversor": ("inversores", "inversor", "invr", "inv"), "cabine": ("cabines", "cabine", "cabn"),
+                "tracker": ("trackers", "tracker", "etkr", "tkr")}
+_RX_EQUIPAMENTO = re.compile(r"\b(inversor|cabine|tracker)(?:es|s)?\s+(\d{1,3}(?:\.\d{1,3})*)", re.I)
+
+
+def _plano(txt) -> str:
+    return _sem_acento(txt)
+
+
+def assuntos_sem_dado(dossie: str) -> list[str]:
+    """Os assuntos que o dossiê marca como "sem dado" ou "sem leitura" numa linha só deles ("- Extintores: sem dado."):
+    no singular e sem acento ("extintor"); a sigla fica como é ("PR"). A linha que diz mais ("- Agora: sem leitura do
+    COS (a fonte não respondeu...)") não entra: o assunto dela ("agora") é palavra de qualquer frase."""
+    out = []
+    for m in _RX_ASSUNTO_SEM_DADO.finditer(dossie or ""):
+        bruto = m.group(1).strip()
+        if bruto.isupper() and len(bruto) <= 4:
+            a = bruto
+        else:
+            pal = _plano(bruto).split()
+            if pal and len(pal[-1]) > 4:
+                pal[-1] = pal[-1][:-2] if pal[-1].endswith("es") else pal[-1].rstrip("s")
+            a = " ".join(pal)
+        if a and a not in out:
+            out.append(a)
+    return out
+
+
+def _nasce_de_sem_dado(texto: str, assuntos: list[str]) -> bool:
+    plano = _plano(texto)
+    if _RX_FALA_SEM_DADO.search(plano):
+        return True
+    return any(re.search(rf"\b{re.escape(a)}\b", texto) if a.isupper() else re.search(rf"\b{re.escape(a)}", plano)
+               for a in assuntos)
+
+
+def tirar_sem_dado(diag: dict | None, dossie: str) -> int:
+    """Tira das três listas o item que nasce de dado que o dossiê não tem: o que diz isso com as próprias palavras ("sem
+    dado", "o dossiê não traz") e o que fala de um assunto que o dossiê marca como sem dado. Devolve quantos saíram (e
+    guarda em `sem_dado_tirados`). A situação fica: dizer que não há dado pode; virar tarefa de alguém, não."""
+    if not diag:
+        return 0
+    assuntos = assuntos_sem_dado(dossie)
+    n = 0
+    for lista in MAX_ITENS:
+        ficam = [x for x in diag.get(lista) or [] if not _nasce_de_sem_dado(x.get("texto") or "", assuntos)]
+        n += len(diag.get(lista) or []) - len(ficam)
+        diag[lista] = ficam
+    diag["sem_dado_tirados"] = n
+    return n
+
+
+def equipamentos_fora(textos: list[str], dossie: str) -> list[str]:
+    """Os inversores, as cabines e os trackers citados pelo número que o dossiê não tem com esse número (aceita o zero à
+    esquerda e os apelidos das fontes: "INVR2.8", "ETKR1.103")."""
+    baixo = (dossie or "").lower()
+    fora = set()
+    for t in textos:
+        for m in _RX_EQUIPAMENTO.finditer(t or ""):
+            tipo, ident = m.group(1).lower(), m.group(2)
+            numero = r"\.".join("0*" + str(int(p)) for p in ident.split("."))
+            if not re.search(r"(?:" + "|".join(_EQUIPAMENTO[tipo]) + r")\s*-?\s*" + numero + r"(?!\d|\.\d)", baixo):
+                fora.add(f"{tipo.capitalize()} {ident}")
+    return sorted(fora)
+
+
 def conferir(diag: dict | None, dossie: str, dia: str | None = None) -> list[str]:
     """O que o diagnóstico diz e o dossiê não sustenta, em frases para a tela. Confere, na situação, nos itens e nos
     pedidos:
     - cada "N desligamentos" contra a tabela por mês do COS: o N tem que ser o do mês dito na mesma frase (dois meses
       ditos: o de um deles ou a soma); sem mês dito, o do mês corrente (o diagnóstico é do mês corrente); com o mês
       corrente fora da tabela, um número dela;
-    - cada "N strings fora" contra as strings fora agora: o total ou o de um inversor.
+    - cada "N strings fora" contra as strings fora agora: o total ou o de um inversor;
+    - cada inversor, cabine ou tracker citado pelo número: tem que estar no dossiê com esse número.
     Sem a tabela ou sem a linha no dossiê, aquela conferência não é feita."""
     if not diag:
         return []
@@ -244,6 +319,7 @@ def conferir(diag: dict | None, dossie: str, dia: str | None = None) -> list[str
         falhas += [f"{n} string{'' if n == 1 else 's'} fora: o dossiê tem {st['total']} fora agora"
                    + (f" ({', '.join(str(x) for x in st['por_inversor'])} por inversor)" if len(st["por_inversor"]) > 1 else "")
                    for n in fora]
+    falhas += [f"{nome}: não está no dossiê com esse nome" for nome in equipamentos_fora(textos, dossie)]
     return falhas
 
 
@@ -366,7 +442,9 @@ def gerar(cfg, usina_id: int, dossie: str, dossie_tokens: int = 0, dia: str | No
                           setores=[s["nome"] for s in setores or []], pensar=pensar)
         IA.registrar(cfg, usina_id, "[diagnóstico do dia]", rs, "diagnostico-do-dia", dossie_tokens)
         r = rs[0] if rs else {"ok": False, "erro": "Nenhuma IA ligada para o diagnóstico."}
-        return r, (ler(r.get("texto") or "", dossie, setores) if r.get("ok") else None)
+        diag = ler(r.get("texto") or "", dossie, setores) if r.get("ok") else None
+        tirar_sem_dado(diag, dossie)        # o item que nasce de "sem dado" não chega à tela (Levi: "Não deve poder")
+        return r, diag
 
     try:
         r, diag = uma_vez(PENSAR)

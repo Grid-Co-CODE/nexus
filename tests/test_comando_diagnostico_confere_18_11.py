@@ -124,7 +124,7 @@ def test_o_numero_que_nao_bate_e_refeito_pensando_e_se_insistir_a_tela_avisa(tmp
     chamadas = _ia_de_mentira(monkeypatch, [_resp("Com 16 desligamentos em novembro."), _resp("Com 11 desligamentos em novembro.")])
     d = DG.gerar(cfg, 1, DOSSIE, 100, "2026-11-18")
     assert chamadas == [False, True] and d["diag"]["situacao"] == "Com 11 desligamentos em novembro." and not d.get("conferir")
-    assert d["refeito"] is True and d["versao"] == DG.VERSAO == 3
+    assert d["refeito"] is True and d["versao"] == DG.VERSAO == 4
     linhas = next((tmp_path / "ia").glob("perguntas-*.jsonl")).read_text(encoding="utf-8").splitlines()
     assert len(linhas) == 2                                    # as duas chamadas entram no registro (e no teto)
     # as duas erram: fica a última, e a tela recebe o aviso do que não bateu
@@ -149,6 +149,54 @@ def test_o_diagnostico_do_pedido_antigo_e_refeito_e_ainda_serve_de_anterior(tmp_
     arq.write_text(json.dumps(velho), encoding="utf-8")
     assert DG.guardado(cfg, 1, "2026-11-18") is None           # é refeito na próxima abertura
     assert DG.anterior(cfg, 1, "2026-11-19")["dia"] == "2026-11-18"      # mas serve de "anterior" enquanto o novo é feito
+
+
+# Levi, 18/11/2026, quando eu disse que a IA ainda podia trocar o nome de um equipamento ou criar item a partir de "sem
+# dado": "Não deve poder". Os casos da prova: a Poconé ("Verificar os extintores, cuja situação o dossiê não traz"), a
+# Colíder 1 ("Extintores sem conferência", com "Extintores: sem dado" no dossiê; e "Inversor 1 com falha de comunicação",
+# onde o dossiê tinha o Inversor 2.8)
+DOSSIE_EQUIP = DOSSIE + """
+## 11. Segurança
+
+- Extintores: sem dado.
+- PR: sem dado
+- Agora: sem leitura do COS (a fonte não respondeu ou a usina não está na fotografia). Não quer dizer normal.
+- Luvas de alta tensão: nunca verificadas na ronda
+
+## 5. OS
+
+- OS 17607; "[CLD100-INVR2.8] - Religamento do CLD100-INVR2.8"; corretiva emergencial · Inversor 2.8 SOLAREDGE
+- Tracker 01.103 Brametal Bi-motor (CPP100-ETKR1.103); Cabine 2 desligada; Trackers parados agora: Tracker 4, Tracker 41
+"""
+
+
+def test_o_item_que_nasce_de_sem_dado_nao_chega_a_tela():
+    assert DG.assuntos_sem_dado(DOSSIE_EQUIP) == ["extintor", "PR"]            # só a linha que é só "sem dado"; o "Agora" não
+    diag = DG.ler(_resp("Usina sem performance no dossiê; o PR não tem dado.", tem_que_fazer=[
+        {"acao": "Programar a primeira ronda da usina com o PCM", "os": None},
+        {"acao": "Verificar as luvas de alta tensão, nunca verificadas na ronda", "os": None}],
+        pode_fazer=[{"acao": "Verificar os extintores, cuja situação o dossiê não traz", "os": None},
+                    {"acao": "Pedir à Performance a análise do PR abaixo do previsto", "os": None}],
+        pendente=[{"item": "Leitura de performance do mês sem dado: o COS e a Performance não retornaram leitura", "os": None},
+                  {"item": "Extintores sem conferência na ronda", "os": None},
+                  {"item": "A Cabine 2 está desligada agora, aguardando a concessionária", "os": None}]), DOSSIE_EQUIP)
+    assert DG.tirar_sem_dado(diag, DOSSIE_EQUIP) == 4 and diag["sem_dado_tirados"] == 4
+    assert [x["texto"] for x in diag["tem_que_fazer"]] == ["Programar a primeira ronda da usina com o PCM",
+                                                           "Verificar as luvas de alta tensão, nunca verificadas na ronda"]
+    assert diag["pode_fazer"] == [] and [x["texto"] for x in diag["pendente"]] == [
+        "A Cabine 2 está desligada agora, aguardando a concessionária"]                # o "agora" não é assunto sem dado
+    assert diag["situacao"].endswith("o PR não tem dado.")          # dizer que não há dado pode; virar item, não
+    assert DG.tirar_sem_dado(None, DOSSIE_EQUIP) == 0
+
+
+def test_o_equipamento_citado_tem_que_estar_no_dossie():
+    assert _falhas("Inversor 2.8 sem comunicação, Tracker 01.103 e Tracker 1.103 parados, Cabine 2 desligada, "
+                   "inversor 2.8 de novo e o Tracker 4.", dossie=DOSSIE_EQUIP) == []
+    f = _falhas("Inversor 1 com falha de comunicação desde 27/10.", dossie=DOSSIE_EQUIP)
+    assert len(f) == 1 and "Inversor 1" in f[0] and "não está no dossiê" in f[0]
+    assert _falhas("Tracker 5 parado e Cabine 3 desligada.", dossie=DOSSIE_EQUIP) == [
+        "Cabine 3: não está no dossiê com esse nome", "Tracker 5: não está no dossiê com esse nome"]
+    assert _falhas("Verificar os inversores 2.8 e a string 22.", dossie=DOSSIE_EQUIP) == []
 
 
 def test_a_usina_nunca_rondada_nao_sai_com_999_dias(tela, logado):
