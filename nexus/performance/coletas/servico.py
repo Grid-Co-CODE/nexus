@@ -381,14 +381,20 @@ class SessaoNexus(Sessao):
             traceback.print_exc()
             return {"erro": "%s: %s" % (type(e).__name__, e)}
         ctx = self.ctx()
-        mapa, sem_aba, sem_bd = {}, [], set()
+        mapa, sem_aba, sem_bd, nomes = {}, [], set(), {}
         for usina, x in RF.por_usina(info.get("plantas")).items():
-            if ctx.bd(x["destino"]) is None:
-                sem_bd.add(x["destino"])
-            elif ctx.aba(x["destino"], usina) is None:
-                sem_aba.append(usina)
-            else:
+            d = x["destino"]
+            if ctx.bd(d) is None:
+                sem_bd.add(d)
+                continue
+            # só o NOME da aba: `ctx.aba` leria do banco a aba inteira de cada usina (18/11/2026: 14 s para as 75 da API
+            # PV, só para saber se existem). Quem lê a aba é a montagem, e só a da usina pedida
+            if d not in nomes:
+                nomes[d] = set(ctx.abas(d))
+            if usina in nomes[d]:
                 mapa[usina] = x
+            else:
+                sem_aba.append(usina)
         self._rf = {"fonte": fonte, "chave": chave, "mapa": mapa, "max_dias": info.get("max_dias"),
                     "max_plantas": info.get("max_plantas"), "plano": [], "respostas": [], "pedido": None}
         return {"fonte": fonte, "nome": RF.NOMES[fonte],
@@ -443,6 +449,7 @@ class SessaoNexus(Sessao):
         except RF.Falha as e:
             return {"erro": str(e)}
         rf["respostas"].append(r)
+        RF.anotar_cota(rf["fonte"], r.get("cota_restante"))
         return {"ok": True, "consultas": r.get("consultas"), "cota_restante": r.get("cota_restante")}
 
     def fontes_montar(self, agora=None):

@@ -14,3 +14,13 @@
 /* o caminho para a aba "Furos de coleta" do Nexus, no lugar do Resumo e do Detalhe do .exe (16/11/2026) */
 .cf-ir{text-decoration:none;color:var(--verde-texto);font-weight:600}
 .cf-ir:hover{color:var(--tinta)}
+/* a recoleta pelas fontes (static/coletas/recoleta.js): a Fonte e a Usina na lista digitável do Nexus (as zf-*), no lugar da
+   caixa nativa do navegador (Levi, 18/11/2026: "essa lista de usinas também tá escrota, quero ao estilo nexus!") */
+.rc{overflow:visible}
+.rc-lista{min-width:220px}
+.rc-lista.rc-u{flex:1;min-width:280px}
+.rc-lista .zf-lista{text-transform:none;letter-spacing:0;font-size:13px}
+.rc-lista .zf-lista-cab[disabled]{opacity:.6;cursor:default}
+.rc-lista .zf-lista-corpo{z-index:30}
+.rc-lista .zf-ops{max-height:280px}
+.rc-lista .rc-sub{float:right;margin-left:14px;color:var(--mudo);font-size:12px;font-weight:400}
