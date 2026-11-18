@@ -44,6 +44,7 @@ PEDIDO = """Faça o DIAGNÓSTICO DO DIA desta usina para o supervisor dela. A pe
 Responda SÓ com o bloco abaixo, em JSON válido, sem nada antes ou depois, sem markdown e sem citar as seções (§). Este formato vale acima do limite de palavras.
 <diagnostico>{"situacao": "...", "tem_que_fazer": [{"acao": "...", "os": null, "destino": null, "pedido": null}], "pode_fazer": [{"acao": "...", "os": null, "destino": null, "pedido": null}], "pendente": [{"item": "...", "os": null, "destino": null, "pedido": null}]}</diagnostico>
 - situacao: 1 ou 2 frases, a conclusão primeiro: como a usina está e por quê, com o número que sustenta (até 220 caracteres).
+- O diagnóstico é do MÊS CORRENTE (o mês de hoje, que o dossiê marca como parcial): a situação e os números de meta, PR, geração, disponibilidade, desligamentos e o que foi feito no ativo são os deste mês. Não ponha na situação o que aconteceu em mês anterior. O que vem de mês anterior só entra se ainda está em aberto (OS, chamado, pendência), e entra como pendência, sem os números de performance daquele mês.
 - tem_que_fazer: o que o supervisor TEM que fazer (obrigação vencida ou crítica: ronda atrasada, extintor vencido, OS crítica parada, desligamento que se repete), o mais urgente primeiro; até 4; cada um em até 110 caracteres, começando pelo verbo.
 - pode_fazer: o que ele PODE fazer para melhorar (recomendação, não obrigação); até 3; até 110 caracteres, começando pelo verbo.
 - pendente: o que está em aberto esperando alguém (fabricante, concessionária, outro setor, peça, chamado); até 4; até 110 caracteres.

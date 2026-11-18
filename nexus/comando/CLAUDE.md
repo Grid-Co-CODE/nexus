@@ -967,6 +967,14 @@ o que é que ele tem que fazer".
 - **Abre para quem abre o prontuário**, não só para o administrador. O dossiê não leva o nome das pessoas.
 - **"D-1":** a performance do dossiê vai até ontem; as pendências são as da hora da primeira abertura. A linha de baixo
   diz isso, com a hora e o modelo.
+- **O diagnóstico é do mês corrente** (18/11/2026, Levi, com o Insights dizendo "Outubro teve 7 desligamentos; novembro
+  está em 91% da meta": "O insights e todo o prontuário deve funcionar por mês! [...] quero sempre no mês vigente, o que
+  fica pendente do último mês ou dia ainda aparece porém em relação a meta, PR, geração tem que ser do mês atual, o que
+  foi feito no ativo"). O `PEDIDO` manda: a situação e os números de meta, PR, geração, disponibilidade, desligamentos e
+  o que foi feito são os do mês de hoje; o que vem de mês anterior só entra se ainda está em aberto, como pendência, sem
+  a performance de lá. O dossiê segue trazendo o mês a mês (o chat responde "como foi outubro?"). É a 1ª parte do
+  prontuário por mês; o seletor de mês (a partir de outubro) é a seguinte. Prova:
+  `tests/test_comando_prontuario_por_mes_18_11.py`.
 - **Sem a IA** fica o parecer de sempre:
   - sem chave nenhuma, o estado é `sem_ia` e a tela não mostra aviso;
   - com o teto do mês estourado, o diagnóstico sai por uma grátis (o pago para; desde 18/11/2026);
