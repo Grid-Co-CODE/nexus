@@ -261,6 +261,17 @@ As duas precisam do Python além do relatório de furos; no .exe usam o BD que a
     busca por fonte de cada vez, a recusa não fica guardada) e abrir o painel (`fontes_lista`) já a busca em fundo para
     todas (`aquecer`). O saldo da cota que vem na lista é corrigido a cada pedido de verdade (`anotar_cota`); o custo
     antes de buscar vem sempre do `simular`, na hora.
+  - **A lista já lida aparece na hora, sempre** (18/11/2026, Levi, na mesma tarde: "está demorando muito para aparecer
+    a lista de usinas, lamentável"). Medido às 15:06, as sete rotas `/plantas` ao mesmo tempo: 0,4 a 3 s, menos a da API
+    PV e a da Chuva, 37,6 s cada (a plataforma guarda a lista de plantas da API PV só 5 min e a API PV estava lenta); e
+    os 10 min daqui se perdiam a cada publicação do Nexus (5 em 40 min nessa tarde). Agora a última lista boa de cada
+    fonte dorme em disco (`<pasta de dados>/coletas/recoleta/plantas_<fonte>.json`; a rota diz onde, `RF.guardar_em`) e
+    sai na hora mesmo passados os 10 min ou depois de um reinício: a renovação corre em fundo (uma por fonte, nova
+    tentativa só depois de 30 s) e a resposta vem com `renovando: true` e SEM o saldo de cota (o número seria de outra
+    hora; o `simular` traz o da hora). A tela pergunta de novo de 5 em 5 s, por até 1 min, e troca a lista quando a nova
+    chega, mantendo a usina escolhida; nunca no meio de uma busca. Só espera a plataforma quem nunca leu a fonte ou a
+    leu há mais de 7 dias. A renovação que falha deixa a lista que estava; a lista vazia não cobre a boa do disco. A
+    usina que saiu da fonte nesse intervalo é recusada pela plataforma no pedido, com o motivo.
   - **A Fonte e a Usina são a lista digitável do Nexus** (18/11/2026, Levi, sobre a caixa nativa do navegador: "essa
     lista de usinas também tá escrota, quero ao estilo nexus!"): as `zf-*` do Histórico de OS (`static/zeladoria/
     filtros.css`), de uma escolha, com a busca, as setas e o Esc; a caixa nativa do .exe fica escondida. O ajuste de

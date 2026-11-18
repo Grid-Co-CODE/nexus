@@ -123,6 +123,7 @@ def coletas_api(metodo):
             app = current_app._get_current_object()
             if metodo.startswith("fontes_"):       # as sete fontes (recoleta_fontes.py), pela tela do Nexus
                 from ...performance.coletas import recoleta_fontes as RF
+                RF.guardar_em(_pasta("recoleta"))  # a última lista de cada fonte dorme aqui: o reinício não a perde
                 if metodo == "fontes_lista":
                     RF.aquecer(servico.chave_recoleta(app.config))   # as listas de usinas vêm em fundo: trocar de fonte não espera
                     return _json([{"id": i, "nome": n} for i, n in RF.FONTES])

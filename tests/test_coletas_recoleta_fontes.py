@@ -208,10 +208,14 @@ def test_as_fontes_so_abrem_para_quem_pode_recoletar(tela, monkeypatch):
 # ── a lista de usinas sem demora (18/11/2026; Levi: "a leitura de usinas da fonte demora muito") ───────────────────
 @pytest.fixture(autouse=True)
 def _sem_lista_guardada():
-    """A lista de usinas de cada fonte fica guardada 10 min no processo: cada teste começa sem ela."""
-    RF._PLANTAS.clear()
+    """A lista de usinas de cada fonte fica guardada no processo e em disco: cada teste começa sem ela."""
+    def limpa():
+        RF._PLANTAS.clear()
+        RF._TENTOU.clear()
+        RF.guardar_em(None)
+    limpa()
     yield
-    RF._PLANTAS.clear()
+    limpa()
 
 
 def test_a_lista_de_usinas_nao_le_aba_nenhuma_do_banco(tela, app, monkeypatch):
@@ -251,6 +255,7 @@ def test_abrir_o_painel_ja_busca_em_fundo_a_lista_de_todas_as_fontes_e_a_recusa_
     assert sorted(RF._PLANTAS) == sorted(f for f, _n in RF.FONTES)
     assert len([p for p in pedidos if "/plantas" in p[0]]) == len(RF.FONTES)
     RF._PLANTAS.clear()
+    RF.guardar_em(None)                                                       # fonte nunca lida: nem na memória nem em disco
 
     def recusa(rota, chave_, corpo=None, timeout=180):
         raise RF.Falha("a SolarEdge não devolveu a lista de usinas")
@@ -258,3 +263,79 @@ def test_abrir_o_painel_ja_busca_em_fundo_a_lista_de_todas_as_fontes_e_a_recusa_
     with pytest.raises(RF.Falha):
         RF.plantas("solaredge", "chave")
     assert "solaredge" not in RF._PLANTAS
+
+
+# ── a lista aparece na hora (18/11/2026; Levi: "está demorando muito para aparecer a lista de usinas, lamentável") ──
+def _envelhece(tmp_path, fonte, segundos):
+    """A lista em disco como se tivesse sido lida há `segundos`, e a memória como depois de um reinício do Nexus."""
+    import json
+    a = os.path.join(str(tmp_path), "coletas", "recoleta", "plantas_%s.json" % fonte)
+    with open(a, encoding="utf-8") as f:
+        d = json.load(f)
+    d["quando"] = time.time() - segundos
+    with open(a, "w", encoding="utf-8") as f:
+        json.dump(d, f)
+    RF._PLANTAS.clear()
+    RF._TENTOU.clear()
+
+
+def test_a_lista_ja_lida_aparece_na_hora_depois_do_reinicio_e_se_renova_em_fundo(tela, tmp_path, monkeypatch):
+    """Medido em 18/11/2026 às 15:06: a plataforma levou 37,6 s na lista da API PV, e o Nexus perdia a dele a cada
+    publicação. A última lista boa fica em disco: sai na hora, sem o saldo velho, e a nova vem em fundo."""
+    import threading
+    pedidos = _plataforma(monkeypatch)
+    _bd_pronto(tela)
+    assert _api(tela, "fontes_plantas", "apipv").get_json()["renovando"] is False
+    n = len([p for p in pedidos if "/plantas" in p[0]])
+
+    # reinício do Nexus com a lista de 2 min: vale como estava, sem ir à plataforma
+    _envelhece(tmp_path, "apipv", 120)
+    pl = _api(tela, "fontes_plantas", "apipv").get_json()
+    assert [u["usina"] for u in pl["usinas"]] == ["Teste"] and pl["renovando"] is False and pl["cota_restante"] == 147
+    assert len([p for p in pedidos if "/plantas" in p[0]]) == n
+
+    # reinício com a lista de 1 h e a plataforma LENTA: a lista sai na hora, sem saldo, e a busca corre em fundo
+    solta, real = threading.Event(), RF._recoleta._pedir
+
+    def lenta(rota, chave_, corpo=None, timeout=180):
+        solta.wait(5)
+        return real(rota, chave_, corpo, timeout)
+    monkeypatch.setattr(RF._recoleta, "_pedir", lenta)
+    _envelhece(tmp_path, "apipv", 3600)
+    t0 = time.time()
+    pl = _api(tela, "fontes_plantas", "apipv").get_json()
+    assert time.time() - t0 < 2 and [u["usina"] for u in pl["usinas"]] == ["Teste"]
+    assert pl["renovando"] is True and pl["cota_restante"] is None and pl["paga"]
+    assert _api(tela, "fontes_plantas", "apipv").get_json()["renovando"] is True     # a 2ª pergunta não dispara outra busca
+    solta.set()
+    for _ in range(60):
+        if time.time() - RF._PLANTAS["apipv"][0] < 60:
+            break
+        time.sleep(0.05)
+    assert len([p for p in pedidos if "/plantas" in p[0]]) == n + 1                  # uma busca só, em fundo
+    pl = _api(tela, "fontes_plantas", "apipv").get_json()
+    assert pl["renovando"] is False and pl["cota_restante"] == 147                   # a nova chegou, com o saldo da hora
+
+
+def test_a_renovacao_que_falha_deixa_a_lista_que_estava_e_a_velha_demais_espera_a_plataforma(tela, tmp_path, monkeypatch):
+    pedidos = _plataforma(monkeypatch)
+    _bd_pronto(tela)
+    _api(tela, "fontes_plantas", "apipv")
+    real = RF._recoleta._pedir
+
+    def recusa(rota, chave_, corpo=None, timeout=180):
+        raise RF.Falha("a plataforma não respondeu")
+    monkeypatch.setattr(RF._recoleta, "_pedir", recusa)
+    _envelhece(tmp_path, "apipv", 3600)
+    pl = _api(tela, "fontes_plantas", "apipv").get_json()
+    assert [u["usina"] for u in pl["usinas"]] == ["Teste"] and pl["renovando"] is True   # segue com a que tinha
+    time.sleep(0.2)
+    assert [u["usina"] for u in _api(tela, "fontes_plantas", "apipv").get_json()["usinas"]] == ["Teste"]
+
+    # mais de 7 dias: não serve para mostrar; a pessoa espera a plataforma e vê o motivo se ela recusar
+    _envelhece(tmp_path, "apipv", 8 * 86400)
+    assert "não respondeu" in _api(tela, "fontes_plantas", "apipv").get_json()["erro"]
+    monkeypatch.setattr(RF._recoleta, "_pedir", real)
+    n = len([p for p in pedidos if "/plantas" in p[0]])
+    pl = _api(tela, "fontes_plantas", "apipv").get_json()
+    assert pl["renovando"] is False and len([p for p in pedidos if "/plantas" in p[0]]) == n + 1

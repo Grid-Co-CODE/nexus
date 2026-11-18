@@ -409,7 +409,9 @@ class SessaoNexus(Sessao):
         return {"fonte": fonte, "nome": RF.NOMES[fonte],
                 "usinas": [{"usina": u, "destino": x["destino"], "plantas": len(x["ids"])} for u, x in sorted(mapa.items())],
                 "sem_aba": sorted(sem_aba), "sem_bd": sorted(sem_bd), "paga": bool(info.get("paga")),
-                "teto": info.get("teto"), "cota_restante": info.get("cota_restante"), "max_dias": info.get("max_dias")}
+                "teto": info.get("teto"), "cota_restante": info.get("cota_restante"), "max_dias": info.get("max_dias"),
+                # a lista guardada saiu na hora e a nova vem em fundo: a tela pergunta de novo (recoleta_fontes.plantas)
+                "renovando": bool(info.get("renovando"))}
 
     def _rf_de(self, fonte, usina):
         rf = getattr(self, "_rf", None)

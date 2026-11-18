@@ -20,8 +20,11 @@ Custo: as fontes pagas (`paga`) têm teto por dia e a reserva da coleta da noite
 o custo ANTES (`simular`). Quem pode usar é o Nexus que decide (`coletas_tela._pode_recoletar`: só o setor Performance).
 """
 import datetime as dt
+import json
+import os
 import threading
 import time
+import traceback
 
 from . import motor  # noqa: F401 — o motor como `conversor`
 from conversor import recoleta as _recoleta  # noqa: E402
@@ -47,21 +50,99 @@ def _rota(fonte, plantas=False):
 # aquecida ao abrir o painel (`aquecer`), trocar de fonte não espera. Uma busca por fonte de cada vez: quem pede a mesma
 # fonte no meio espera a que já está indo, não dispara outra. A recusa não fica guardada. O saldo da cota que vem junto
 # envelhece com a lista: `anotar_cota` o corrige a cada pedido de verdade, e o `simular` traz o número da hora.
+#
+# A lista NUNCA faz a pessoa esperar se já foi lida uma vez (Levi, na mesma tarde: "está demorando muito para aparecer a
+# lista de usinas, lamentável"). Medido às 15:06: a plataforma levou 37,6 s na lista da API PV e na da Chuva (ela guarda
+# a lista de plantas só 5 min e a API PV estava lenta), e os 10 min daqui se perdiam a cada publicação do Nexus (5 em
+# 40 min nessa tarde). Agora a última lista boa de cada fonte dorme em disco (`guardar_em`, a pasta de dados do Nexus) e
+# sai NA HORA, mesmo passados os 10 min ou depois de um reinício; a renovação corre em fundo e a resposta vem marcada
+# `renovando`, para a tela perguntar de novo e trocar a lista se ela mudou. A lista velha não mostra saldo de cota (o
+# número seria de outra hora). Só espera a plataforma quem nunca leu a fonte, ou a leu há mais de 7 dias.
 VALE_PLANTAS_S = 600
+VELHA_DEMAIS_S = 7 * 86400
+TENTAR_DE_NOVO_S = 30                          # a renovação em fundo que falhou não se repete a cada clique
 _PLANTAS = {}                                  # fonte -> (quando, resposta)
 _TRAVAS = {f: threading.Lock() for f, _n in FONTES}
+_TENTOU = {}                                   # fonte -> quando a última renovação em fundo começou
+_PASTA = {"p": None}
+
+
+def guardar_em(pasta):
+    """Onde a última lista de cada fonte dorme entre um reinício e outro (quem diz é a rota; None = só na memória)."""
+    _PASTA["p"] = pasta or None
+
+
+def _arquivo(fonte):
+    return os.path.join(_PASTA["p"], "plantas_%s.json" % fonte) if _PASTA["p"] else None
+
+
+def _do_disco(fonte):
+    try:
+        with open(_arquivo(fonte), encoding="utf-8") as f:
+            d = json.load(f)
+        quando, r = float(d["quando"]), d["resposta"]
+    except Exception:                          # noqa: BLE001 — sem arquivo, ou arquivo ruim: é como nunca ter lido
+        return None
+    if not isinstance(r, dict) or not r.get("plantas") or not 0 <= time.time() - quando <= VELHA_DEMAIS_S:
+        return None
+    return quando, r
+
+
+def _buscar(fonte, chave):
+    r = _recoleta._pedir(_rota(fonte, True), chave)
+    r = r if isinstance(r, dict) else {"plantas": r or []}
+    agora = time.time()
+    _PLANTAS[fonte] = (agora, r)
+    a = _arquivo(fonte)
+    if a and r.get("plantas"):                 # a lista vazia não cobre a boa que está em disco
+        try:
+            os.makedirs(os.path.dirname(a), exist_ok=True)
+            with open(a + ".tmp", "w", encoding="utf-8") as f:
+                json.dump({"quando": agora, "resposta": r}, f, ensure_ascii=False)
+            os.replace(a + ".tmp", a)
+        except OSError:
+            traceback.print_exc()
+    return r
+
+
+def _renovar(fonte, chave):
+    """Renova a lista em fundo, uma por fonte de cada vez. Falhou, a que estava fica (e a tela segue com ela)."""
+    agora = time.time()
+    if agora - _TENTOU.get(fonte, 0) < TENTAR_DE_NOVO_S:
+        return
+    _TENTOU[fonte] = agora
+
+    def vai():
+        if not _TRAVAS[fonte].acquire(blocking=False):
+            return
+        try:
+            g = _PLANTAS.get(fonte)
+            if not (g and time.time() - g[0] < VALE_PLANTAS_S):
+                _buscar(fonte, chave)
+        except Exception:                      # noqa: BLE001 — a recusa aparece no simular e no pedido de verdade
+            pass
+        finally:
+            _TRAVAS[fonte].release()
+    threading.Thread(target=vai, daemon=True, name="nexus-recoleta-" + fonte).start()
 
 
 def plantas(fonte, chave):
-    rota = _rota(fonte, True)                  # recusa a fonte desconhecida antes de qualquer coisa
+    _rota(fonte, True)                         # recusa a fonte desconhecida antes de qualquer coisa
+    g = _PLANTAS.get(fonte)
+    if g is None:
+        g = _do_disco(fonte)
+        if g:
+            g = _PLANTAS.setdefault(fonte, g)
+    if g and time.time() - g[0] < VALE_PLANTAS_S:
+        return g[1]
+    if g:                                      # passou dos 10 min: sai a que temos, sem o saldo velho, e renova em fundo
+        _renovar(fonte, chave)
+        return dict(g[1], cota_restante=None, renovando=True)
     with _TRAVAS[fonte]:
         g = _PLANTAS.get(fonte)
         if g and time.time() - g[0] < VALE_PLANTAS_S:
             return g[1]
-        r = _recoleta._pedir(rota, chave)
-        r = r if isinstance(r, dict) else {"plantas": r or []}
-        _PLANTAS[fonte] = (time.time(), r)
-        return r
+        return _buscar(fonte, chave)
 
 
 def anotar_cota(fonte, resta):

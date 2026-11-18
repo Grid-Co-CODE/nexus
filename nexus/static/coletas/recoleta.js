@@ -130,11 +130,31 @@
     const pedida = E.fonte, r = await chama("fontes_plantas", [pedida]);
     if (pedida !== E.fonte) return;
     if (!r || r.erro) { st((r && r.erro) || "sem resposta", true); LU.definir([], "indisponível"); return; }
+    mostrar(r);
+    if (r.renovando) renovar(pedida, 0);
+  }
+
+  function mostrar(r) {
     E.info = r; E.us = r.usinas || [];
     LU.definir(E.us.map(x => ({v: x.usina, t: x.usina, sub: x.destino.replace("BD_", "") + " · " + plantas(x.plantas)})),
       E.us.length ? "escolha a usina" : "nenhuma usina com aba no BD");
     LU.desligar(!E.us.length);
+    E.usina = LU.valor();                                        // a usina escolhida fica, se ainda está na lista
     validar();
+  }
+
+  // A lista que o Nexus tinha guardada sai na hora e a nova vem da plataforma em fundo (18/11/2026, Levi: "está demorando
+  // muito para aparecer a lista de usinas"; a plataforma levou 37 s na da API PV). A tela pergunta de novo de 5 em 5 s,
+  // por até 1 min, e troca a lista quando a nova chega; nunca no meio de uma busca (a pergunta refaz o estado no Nexus).
+  function renovar(pedida, n) {
+    setTimeout(async () => {
+      if (pedida !== E.fonte || box.hidden) return;
+      if (E.ocupado) return renovar(pedida, n);
+      const r = await chama("fontes_plantas", [pedida]);
+      if (pedida !== E.fonte || E.ocupado || !r || r.erro) return;
+      mostrar(r);
+      if (r.renovando && n < 11) renovar(pedida, n + 1);
+    }, 5000);
   }
 
   async function abrirPainel() {
