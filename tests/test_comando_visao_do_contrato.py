@@ -46,7 +46,8 @@ def test_o_mockup_e_so_o_contrato_e_abre_nas_regras(cliente):
     # um controle só nas Regras (Todas | Acordadas): saíram os filtros por categoria, a ficha de seis caixas e o
     # seletor de contrato separado (o nome do cliente é a troca); a regra nova é a última linha da tabela
     assert pagina.count("data-cat") == 0 and 'class="chip' not in pagina
-    assert pagina.count('seg("Quais regras"') == 1 and "data-ficha" in pagina
+    # um "Quais regras" por modo (o exemplo e as regras lidas do contrato, 18/11/2026): segue um controle só por aba
+    assert pagina.count('seg("Quais regras"') == 2 and "data-ficha" in pagina
     assert pagina.index('class="tab') < pagina.index("data-nova-regra><i")
     assert "btn--prim\" data-nova" not in pagina
 

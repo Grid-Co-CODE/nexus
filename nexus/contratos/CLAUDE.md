@@ -116,6 +116,31 @@ pasta do Backoffice: "ATUALIZE AGORA COM DADOS REAIS!".
   - Élis: reajuste em 01/12/2026.
 - Prova: `tests/test_contratos_controle.py`, com uma planilha inventada (mesmas abas e colunas, nada real).
 
+## As fichas dos contratos, lidas dos PDFs (18/11/2026; `fichas.py`)
+
+Levi, 17/11/2026, depois da tabela do que a planilha tem por cliente: "e se eu salvar os PDFs dos contratos para você
+analisar e fazer algo melhor?", "completa tudo!" e "faça por subagentes para melhor confiabilidade".
+
+- **De onde vem.** Os PDFs (contrato, aditivos e anexos) de cada cliente foram lidos FORA do Nexus, um leitor por
+  cliente, num formato único: cada regra com a categoria (11: SLA, Entregáveis, Rotinas, Disponibilidade e desempenho,
+  Penalidades, Benefícios, Medição e faturamento, Adicionais e hora extra, Rescisão, Seguros e documentação, Outras
+  obrigações), o que vale hoje (`vigente`), o que era antes quando um aditivo mudou (`contratual` + `alterado_por`), o
+  setor que executa e a prova: arquivo, página, cláusula e trecho literal. O que o contrato não diz vem em `lacunas`.
+- **Como se confiou.** Um script procura cada trecho no texto da página citada. O que não bate (tabela que no PDF é
+  imagem, transcrita) vai a um revisor que tenta derrubar o item olhando a imagem da página.
+- **Onde mora.** O administrador importa o .json na tela (`POST /t/comando/visao-do-contrato/importar-fichas`), que
+  confere o formato e guarda em `contratos/fichas_contratos.json` na pasta de dados. NUNCA no repositório (é público). O
+  `dados.json` entrega as fichas casadas com o cliente da planilha pelo nome sem acento e sem caixa.
+- **Na tela.** Regras: as 11 categorias recolhidas; a linha abre o trecho e a página; "Mudadas por aditivo" é o único
+  controle. Cliente com vários contratos do mesmo modelo (2C, GreenYellow, Axis): a regra igual em todos aparece uma vez
+  com "todos". Embaixo, "A planilha de controle e o contrato não batem" (fim da vigência, aviso prévio, índice) e "O que
+  o contrato não diz". Nas outras abas, o que o contrato pede: SLA no Atendimento, Rotinas no Calendário, Entregáveis,
+  Metas (disponibilidade, bônus, penalidades) e Financeiro (valor mensal, medição, adicionais). Todos os contratos ganha
+  a coluna "Regras do contrato" (ou "PDF não lido").
+- **18/11/2026, os 5 clientes com PDF** (Athon, Axis, 2C, GreenYellow, Thopen): o que cada leitor achou que o Levi ou a
+  área de Contratos precisa decidir está nas `lacunas` e nas `observacoes` de cada ficha. Os outros 11 clientes não
+  mandaram PDF.
+
 Quando a visão do contrato virar tela de verdade, ela entra na tela Clientes (a "Gestão de contratos (a estruturar)") e a
 prévia sai.
 

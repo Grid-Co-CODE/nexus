@@ -255,6 +255,25 @@ def _controle_lido() -> dict | None:
         return None
 
 
+def _caminho_fichas():
+    from flask import current_app
+
+    from ...cadastro.ligacoes import pasta_dados
+    from ...contratos import fichas as F
+    return pasta_dados(current_app.config) / "contratos" / F.ARQUIVO
+
+
+def _fichas_lidas() -> dict | None:
+    """As fichas dos contratos importadas ({arquivo, importado_em, importado_por, fichas}) ou None (18/11/2026)."""
+    import json
+    try:
+        p = _caminho_fichas()
+        return json.loads(p.read_text(encoding="utf-8")) if p.exists() else None
+    except Exception:            # noqa: BLE001 — arquivo estragado: a tela segue só com a planilha, e o log diz
+        _log.exception("Visão do contrato: não li as fichas dos contratos importadas")
+        return None
+
+
 def _so_interno():
     from ...auth import setor_telas as ST
     if session.get("via") == "cliente" or ST.em_modo_cliente():
@@ -270,11 +289,18 @@ def visao_do_contrato_dados():
     from ...campo import visao
     from ...contratos import controle as K
     _so_interno()
+    from ...contratos import fichas as F
     d = _controle_lido()
     if not d:
         resp = jsonify(ok=False)
     else:
-        resp = jsonify(ok=True, **K.com_datas(d, visao._agora().date()))
+        out = K.com_datas(d, visao._agora().date())
+        # as fichas lidas dos PDFs dos contratos (18/11/2026), casadas com o cliente da planilha
+        fx = _fichas_lidas()
+        if fx and fx.get("fichas"):
+            out["fichas"] = F.por_cliente(fx["fichas"], [c["cliente"] for c in out["contratos"]])
+            out["fichas_info"] = {k: fx.get(k) for k in ("arquivo", "importado_em", "importado_por")}
+        resp = jsonify(ok=True, **out)
     resp.headers["Cache-Control"] = "no-store"
     return resp
 
@@ -315,4 +341,46 @@ def visao_do_contrato_importar():
     os.replace(tmp, p)
     session[_AVISO_CT] = (f"Planilha importada: {len(d['contratos'])} contratos, {len(d['obrigacoes'])} obrigações e "
                           f"{len(d.get('adicionais') or [])} serviços adicionais. A visão do contrato já mostra os dados dela.")
+    return redirect(na_raiz(VISAO))
+
+
+@bp.route("/visao-do-contrato/importar-fichas", methods=["POST"])
+def visao_do_contrato_importar_fichas():
+    """O administrador sobe as fichas dos contratos (.json, 18/11/2026): as regras lidas dos PDFs de cada cliente, com a
+    página e o trecho de cada uma. O Nexus confere o formato (`contratos/fichas.py`) e guarda na pasta de dados; o arquivo
+    errado não apaga o que estava."""
+    import json
+    import os
+
+    from ...campo import visao
+    from ...contratos import fichas as F
+    if _de_outro_site():
+        abort(403)
+    if not session.get("admin"):
+        abort(403)
+    f = request.files.get("fichas")
+    if not f or not f.filename:
+        session[_ERRO_CT] = "Escolha o arquivo das fichas dos contratos (.json)."
+        return redirect(na_raiz(VISAO))
+    conteudo = f.read()
+    if len(conteudo) > 20 * 1024 * 1024:
+        session[_ERRO_CT] = "O arquivo passa de 20 MB: não é o das fichas dos contratos."
+        return redirect(na_raiz(VISAO))
+    try:
+        fichas = F.ler(json.loads(conteudo.decode("utf-8-sig")))
+    except (ValueError, UnicodeDecodeError) as ex:
+        msg = str(ex) if isinstance(ex, F.FichasInvalidas) else "não é um .json válido"
+        session[_ERRO_CT] = f"Não importei as fichas: {msg}. As que estavam continuam."
+        return redirect(na_raiz(VISAO))
+    u = session.get("usuario")
+    d = {"arquivo": os.path.basename(f.filename), "importado_em": visao._agora().strftime("%Y-%m-%dT%H:%M"),
+         "importado_por": (u.get("nome") or u.get("email") or "") if isinstance(u, dict) else "", "fichas": fichas}
+    p = _caminho_fichas()
+    p.parent.mkdir(parents=True, exist_ok=True)
+    tmp = p.with_suffix(".tmp")
+    tmp.write_text(json.dumps(d, ensure_ascii=False), encoding="utf-8")
+    os.replace(tmp, p)
+    n = sum(len(c.get("regras") or []) for x in fichas for c in x["contratos"])
+    session[_AVISO_CT] = (f"Fichas importadas: {len(fichas)} clientes, {sum(len(x['contratos']) for x in fichas)} contratos e "
+                          f"{n} regras. A visão do contrato já mostra o que cada contrato pede.")
     return redirect(na_raiz(VISAO))

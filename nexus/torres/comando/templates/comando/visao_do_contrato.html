@@ -27,6 +27,13 @@
     <input id="ct-planilha" type="file" name="planilha" accept=".xlsx" required>
     <button class="gc-btn gc-btn--ui gc-btn--contorno" type="submit">Importar</button>
   </form>
+  {# as fichas lidas dos PDFs dos contratos (18/11/2026): as regras com a página e o trecho de cada uma #}
+  <form class="ct-importar" method="post" action="{{ raiz }}/t/comando/visao-do-contrato/importar-fichas" enctype="multipart/form-data"
+        style="display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;margin-top:6px;font-size:12.5px">
+    <label class="mudo" for="ct-fichas">Fichas dos contratos, lidas dos PDFs (.json):</label>
+    <input id="ct-fichas" type="file" name="fichas" accept=".json,application/json" required>
+    <button class="gc-btn gc-btn--ui gc-btn--contorno" type="submit">Importar</button>
+  </form>
   {% endif %}
   <iframe class="previa-moldura" title="Prévia: visão do contrato" src="{{ url_for('static', filename='previa/visao-do-contrato.html') }}"
           style="display:block;width:100%;height:calc(100vh - 192px);min-height:480px;margin-top:12px;border:0;border-top:1px solid var(--linha);background:var(--fundo)"></iframe>

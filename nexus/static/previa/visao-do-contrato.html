@@ -245,6 +245,15 @@ tr.hist-l td{background:var(--barra)}
 .p-sem_data{background:transparent;box-shadow:inset 0 0 0 1.5px var(--info)}
 .p-cancelado{background:transparent;box-shadow:inset 0 0 0 1px var(--linha-forte)}
 .ev.sem_data{border-color:var(--info)}.ev.cancelado{border-color:var(--linha-forte);color:var(--mudo)}
+/* as regras lidas dos PDFs dos contratos (18/11/2026): a linha abre a prova (o trecho literal, a página e a cláusula) */
+.tab tr.rg{cursor:pointer}
+.tab tr.rg:hover td{background:var(--superficie-2)}
+.tab tr.rg[aria-expanded="true"] td{border-bottom-color:transparent}
+.tab tr.rg-det td{background:var(--barra);padding-top:4px}
+.trecho{margin:0 0 6px;padding:2px 0 2px 12px;border-left:2px solid var(--linha-forte);color:var(--tinta-2);font-size:12.5px;max-width:110ch}
+.trecho small{display:block;color:var(--mudo);font-size:11.5px;margin-top:3px}
+.onde{white-space:nowrap;color:var(--mudo);font-size:12px}
+.lacunas{margin:6px 0 0;padding-left:18px;color:var(--tinta-2);font-size:12.5px;display:grid;gap:4px;max-width:110ch}
 .legenda{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--mudo)}
 .legenda span{display:inline-flex;align-items:center;gap:6px}
 
@@ -853,7 +862,8 @@ function render() {
   if (REAL) {
     main.innerHTML = vReal() + '<p class="rodape">Dados reais da planilha de controle de obrigações de Contratos (Backoffice › 2. Contratos)' +
       (REAL.importado_em ? ", importada em " + dBR(REAL.importado_em.slice(0, 10)) + " às " + REAL.importado_em.slice(11, 16) : "") +
-      ". “Hoje” é " + dBR(REAL.hoje) + ". Nada aqui grava: para atualizar, importe a planilha de novo.</p>";
+      ". “Hoje” é " + dBR(REAL.hoje) + ". Nada aqui grava: para atualizar, importe a planilha de novo." +
+      (REAL.fichas_info ? " As regras dos contratos vêm dos PDFs, lidos e importados em " + dBR((REAL.fichas_info.importado_em || "").slice(0, 10)) + "." : "") + "</p>";
     return;
   }
   main.innerHTML = vContrato() + '<p class="rodape">Mockup para avaliação: o cliente, o CNPJ, as pessoas e as usinas são fictícios, “hoje” é 13/11/2026 e nada aqui grava.</p>';
@@ -866,7 +876,8 @@ window.addEventListener("hashchange", function () {
 });
 main.addEventListener("click", function (e) {
   var b;
-  if ((b = e.target.closest("[data-regras]"))) { estado.soAcordadas = b.getAttribute("data-regras") === "acordadas"; render(); }
+  if ((b = e.target.closest("[data-rg]"))) { var rg = b.getAttribute("data-rg"); regraAberta[rg] = !regraAberta[rg]; render(); }
+  else if ((b = e.target.closest("[data-regras]"))) { estado.soAcordadas = b.getAttribute("data-regras") === "acordadas"; render(); }
   else if (e.target.closest("[data-ficha]")) { estado.ficha = !estado.ficha; render(); }
   else if ((b = e.target.closest("[data-grupo]"))) { var g = b.getAttribute("data-grupo"); estado.grupos[g] = !estado.grupos[g]; render(); }
   else if ((b = e.target.closest("[data-hist]"))) { var i = b.getAttribute("data-hist"); estado.abertoHist[i] = !estado.abertoHist[i]; render(); }
@@ -992,7 +1003,7 @@ function vTodos() {
   }
   return '<div class="regua"><h2>' + REAL.contratos.length + " contratos</h2><span class=\"mudo\">" + venc + " com a vigência vencida; " +
     comAtr + (comAtr === 1 ? " com obrigação em atraso" : " com obrigações em atraso") + "</span></div>" +
-    '<div class="rolavel"><table class="tab"><thead><tr><th>Cliente</th><th>Gestor do contrato</th><th>Vigência até</th><th>Renovação: avisar até</th><th>Próximo reajuste</th><th class="r">Em atraso</th><th class="ir"><span class="so-leitor">Abrir</span></th></tr></thead><tbody>' +
+    '<div class="rolavel"><table class="tab"><thead><tr><th>Cliente</th><th>Gestor do contrato</th><th>Vigência até</th><th>Renovação: avisar até</th><th>Próximo reajuste</th><th class="r">Em atraso</th>' + (REAL.fichas ? '<th class="r">Regras do contrato</th>' : "") + '<th class="ir"><span class="so-leitor">Abrir</span></th></tr></thead><tbody>' +
     ordem.map(function (x) {
       var c = x.c;
       return '<tr data-ir="' + x.i + '"><td><a href="' + rota(x.i) + '">' + esc(c.cliente) + "</a>" + (c.nao_localizado ? '<small class="mudo"> contrato não localizado</small>' : "") + "</td>" +
@@ -1001,11 +1012,122 @@ function vTodos() {
         "<td>" + data(c.avisar_ate, c.dias_aviso, c.fim ? "sem aviso prévio" : "—") + "</td>" +
         "<td>" + (c.proximo_reajuste ? data(c.proximo_reajuste, c.dias_reajuste) + '<small class="mudo">; ' + esc(c.indice) + "</small>" : '<span class="mudo">' + esc(c.indice || "sem índice") + "</span>") + "</td>" +
         '<td class="r">' + (c.atrasadas ? '<span class="pill t-critico">' + c.atrasadas + "</span>" : '<span class="mudo">0</span>') + "</td>" +
+        (REAL.fichas ? '<td class="r">' + (fichaDe(c) ? '<span class="num">' + fichaDe(c).contratos.reduce(function (s, k) { return s + (k.regras || []).length; }, 0) + "</span>" : '<span class="mudo">PDF não lido</span>') + "</td>" : "") +
         '<td class="ir"><i class="ph ph-caret-right" aria-hidden="true"></i></td></tr>';
     }).join("") + "</tbody></table></div>";
 }
 
+/* ── as fichas dos contratos (18/11/2026) ───────────────────────────────────────────────────────────────────────────
+   Levi, 17/11/2026: "e se eu salvar os PDFs dos contratos para você analisar e fazer algo melhor?" e "completa tudo!".
+   Cada regra veio do PDF com a categoria, o que vale hoje, o que era antes (quando um aditivo mudou), o setor e a prova:
+   o arquivo, a página, a cláusula e o trecho literal (conferido por script contra o texto da página). A linha abre a
+   prova. Cliente com vários contratos do mesmo modelo (2C, GreenYellow, Axis): a regra igual em todos aparece uma vez,
+   com "todos"; a que muda, uma vez por contrato. O que o contrato não diz vem das `lacunas` e aparece como tal. */
+var CATS_CONTRATO = ["SLA", "Entregáveis", "Rotinas", "Disponibilidade e desempenho", "Penalidades", "Benefícios", "Medição e faturamento",
+  "Adicionais e hora extra", "Rescisão", "Seguros e documentação", "Outras obrigações"];
+var regraAberta = {};
+function fichaDe(c) { return REAL.fichas ? REAL.fichas[c.cliente] || null : null; }
+function rotuloK(k) {
+  var us = (k.usinas || []).map(function (u) { return u.nome; }).filter(Boolean);
+  return k.id ? String(k.id) : us.length ? us.slice(0, 2).join(", ") + (us.length > 2 ? " e mais " + (us.length - 2) : "") : k.arquivo;
+}
+function refTxt(ref) { return ref ? (ref.clausula ? "cl. " + esc(ref.clausula) + ", " : "") + "p. " + esc(ref.pagina) : ""; }
+function vale(r) { return r.vigente != null && r.vigente !== "" ? r.vigente : r.contratual; }
+// as regras das categorias pedidas, juntando a mesma regra (categoria, nome e o que vale) de contratos diferentes
+function grupos(f, cats, soAlteradas) {
+  var g = [], por = {};
+  f.contratos.forEach(function (k) {
+    (k.regras || []).forEach(function (r) {
+      if (cats.indexOf(r.categoria) < 0 || (soAlteradas && !r.alterado_por)) return;
+      var ch = r.categoria + "|" + String(r.nome || "").toLowerCase() + "|" + String(vale(r) || "").toLowerCase();
+      if (!por[ch]) { por[ch] = {ch: ch, r: r, ks: []}; g.push(por[ch]); }
+      por[ch].ks.push({k: k, r: r});
+    });
+  });
+  return g;
+}
+function tabelaRegras(f, lista, cliente) {
+  var varios = f.contratos.length > 1;
+  return '<div class="rolavel"><table class="tab"><thead><tr><th>Regra</th><th>Vale hoje</th>' + (varios ? "<th>Contratos</th>" : "") + '<th>Onde</th></tr></thead><tbody>' +
+    lista.map(function (x) {
+      var r = x.r, id = cliente + "|" + x.ch, aberto = !!regraAberta[id];
+      var quais = !varios ? "" : x.ks.length === f.contratos.length ? "todos" : x.ks.map(function (y) { return esc(rotuloK(y.k)); }).join("; ");
+      var h = '<tr class="rg" data-rg="' + esc(id) + '" aria-expanded="' + aberto + '"><td><span class="nome">' + esc(r.nome) + "</span>" + (r.setor ? '<span class="sub">' + esc(r.setor) + "</span>" : "") + "</td>" +
+        "<td>" + (vale(r) ? esc(vale(r)) : '<span class="vazio-c">não escrito</span>') +
+        (r.alterado_por ? '<span class="antes">antes: <s>' + esc(r.contratual || "não previsto") + "</s>; mudou no " + esc(r.alterado_por.arquivo || "aditivo") + "</span>" : "") + "</td>" +
+        (varios ? '<td class="sub" style="margin:0">' + quais + "</td>" : "") + '<td class="onde">' + refTxt(r.ref) + (x.ks.length > 1 ? " e mais " + (x.ks.length - 1) : "") + "</td></tr>";
+      if (aberto) {
+        h += '<tr class="rg-det"><td colspan="' + (varios ? 4 : 3) + '">' + x.ks.map(function (y) {
+          var rr = y.r, a = rr.alterado_por;
+          return (varios ? '<b class="sub" style="margin:4px 0">' + esc(rotuloK(y.k)) + "</b>" : "") +
+            (rr.trecho ? '<p class="trecho">“' + esc(rr.trecho) + "”<small>" + esc((rr.ref || {}).arquivo || "") + ", " + refTxt(rr.ref) + "</small></p>" : "") +
+            (a && a.trecho ? '<p class="trecho">“' + esc(a.trecho) + "”<small>" + esc(a.arquivo || "") + ", " + refTxt(a) + (a.resumo ? ". " + esc(a.resumo) : "") + "</small></p>" : "");
+        }).join("") + "</td></tr>";
+      }
+      return h;
+    }).join("") + "</tbody></table></div>";
+}
+// um bloco de regras do contrato numa aba (vazio quando o contrato não foi lido ou não tem regra dessas categorias)
+function blocoContrato(c, cats, titulo) {
+  var f = fichaDe(c);
+  if (!f) return "";
+  var g = grupos(f, cats, false);
+  if (!g.length) return '<div class="bloco"><h3>' + titulo + '</h3><p class="mudo">O contrato não traz regra disso.</p></div>';
+  return '<div class="bloco"><h3>' + titulo + ' <span class="fonte">' + g.length + (g.length === 1 ? " regra" : " regras") + ", lidas do contrato; a linha abre o trecho</span></h3>" + tabelaRegras(f, g, c.cliente) + "</div>";
+}
+// a planilha de controle diz uma coisa e o contrato outra: o que a área precisa acertar
+function divergencias(c, f) {
+  function sem(t) { return String(t == null ? "" : t).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim(); }
+  var linhas = [];
+  f.contratos.forEach(function (k) {
+    var nome = f.contratos.length > 1 ? " (" + esc(rotuloK(k)) + ")" : "";
+    var fim = (k.vigencia || {}).fim, aviso = (k.renovacao || {}).aviso_previo_dias, ind = (k.reajuste || {}).indice;
+    if (fim && fim !== c.fim) linhas.push(["Fim da vigência" + nome, c.fim ? dBR(c.fim) : "não traz", dBR(fim), (k.vigencia || {}).ref]);
+    if (aviso != null && aviso !== c.aviso_dias) linhas.push(["Aviso prévio de renovação" + nome, c.aviso_dias != null ? c.aviso_dias + " dias" : "não traz", aviso + " dias", (k.renovacao || {}).ref]);
+    if (ind && sem(c.indice).indexOf(sem(ind)) < 0 && sem(ind).indexOf(sem(c.indice) || "@") < 0) linhas.push(["Índice de reajuste" + nome, c.indice ? esc(c.indice) : "não traz", esc(ind), (k.reajuste || {}).ref]);
+  });
+  if (!linhas.length) return "";
+  return '<div class="bloco"><h3>A planilha de controle e o contrato não batem <span class="fonte">' + linhas.length + (linhas.length === 1 ? " ponto" : " pontos") + " para a área de Contratos acertar</span></h3>" +
+    '<div class="rolavel"><table class="tab"><thead><tr><th>Item</th><th>A planilha diz</th><th>O contrato diz</th><th>Onde</th></tr></thead><tbody>' +
+    linhas.map(function (l) { return "<tr><td>" + l[0] + "</td><td>" + l[1] + '</td><td class="c-alerta">' + l[2] + '</td><td class="onde">' + refTxt(l[3]) + "</td></tr>"; }).join("") + "</tbody></table></div></div>";
+}
+function documentosTxt(f) {
+  var docs = {};
+  f.documentos.forEach(function (d) { docs[d.tipo] = (docs[d.tipo] || 0) + 1; });
+  var nomes = {contrato: ["contrato", "contratos"], aditivo: ["aditivo", "aditivos"], anexo: ["anexo", "anexos"], minuta: ["minuta", "minutas"]};
+  var partes = Object.keys(docs).map(function (t) { var n = nomes[t] || [t, t]; return docs[t] + " " + (docs[t] === 1 ? n[0] : n[1]); });
+  var semAssinatura = f.documentos.filter(function (d) { return d.assinado === false; }).length;
+  return partes.join(", ") + (semAssinatura ? " (" + semAssinatura + " sem assinatura)" : "");
+}
+function rRegrasContrato(c, f) {
+  var alteradas = 0;
+  f.contratos.forEach(function (k) { (k.regras || []).forEach(function (r) { if (r.alterado_por) alteradas++; }); });
+  var h = '<div class="regua"><h2>Regras do contrato</h2>' + (alteradas ? seg("Quais regras", "data-regras", estado.soAcordadas ? "acordadas" : "todas", [["todas", "Todas"], ["acordadas", "Mudadas por aditivo", alteradas]]) : "") + "</div>" +
+    '<p class="nota" style="margin:-4px 0 12px">Lidas de ' + documentosTxt(f) + ". Clique na regra para ver o trecho e a página. A área de Contratos ainda confere cada uma.</p>" +
+    '<div class="rolavel"><table class="tab"><tbody>';
+  CATS_CONTRATO.forEach(function (cat) {
+    var g = grupos(f, [cat], estado.soAcordadas);
+    if (!g.length) return;
+    var aberto = estado.soAcordadas || !!estado.grupos[cat], mud = g.filter(function (x) { return x.r.alterado_por; }).length;
+    h += '<tr class="grupo"><td><button data-grupo="' + esc(cat) + '" aria-expanded="' + aberto + '"><i class="ph ph-caret-' + (aberto ? "down" : "right") + '" aria-hidden="true"></i>' + esc(cat) +
+      '<span class="g-n">' + g.length + (g.length === 1 ? " regra" : " regras") + (mud ? ", " + mud + " mudada" + (mud === 1 ? "" : "s") + " por aditivo" : "") + "</span></button></td></tr>";
+    if (aberto) h += '<tr><td style="padding:0">' + tabelaRegras(f, g, c.cliente) + "</td></tr>";
+  });
+  h += "</tbody></table></div>" + divergencias(c, f);
+  // a mesma lacuna em vários contratos do mesmo modelo aparece uma vez, com "todos" ou os contratos dela
+  var lac = [], porTxt = {};
+  f.contratos.forEach(function (k) { (k.lacunas || []).forEach(function (l) {
+    if (!porTxt[l]) { porTxt[l] = []; lac.push(l); }
+    porTxt[l].push(rotuloK(k));
+  }); });
+  function quem(l) { return f.contratos.length < 2 ? "" : porTxt[l].length === f.contratos.length ? " (todos)" : " (" + porTxt[l].join("; ") + ")"; }
+  if (lac.length) h += '<div class="bloco"><h3>O que o contrato não diz <span class="fonte">' + lac.length + "</span></h3><ul class=\"lacunas\">" + lac.map(function (l) { return "<li>" + esc(l) + '<span class="mudo">' + esc(quem(l)) + "</span></li>"; }).join("") + "</ul></div>";
+  return h;
+}
+
 function rRegras(c) {
+  var fc = fichaDe(c);
+  if (fc) return rRegrasContrato(c, fc);
   var linhas = [["Vigência", c.inicio || c.fim ? (c.inicio ? dBR(c.inicio) : "sem início") + " a " + (c.fim ? dBR(c.fim) : "sem fim") : ""],
     ["Renovação", c.aviso_dias != null ? "Aviso prévio de " + c.aviso_dias + " dias antes do fim da vigência" : ""],
     ["Reajuste", (c.indice || "") + (c.data_base ? "; data-base " + dBR(c.data_base) : "")],
@@ -1036,6 +1158,7 @@ function rCalendario(c) {
   h += '<aside class="lista-lat"><h3>Atrasadas</h3><ul>' + (atrasadas.map(item).join("") || '<li class="mudo">Nenhuma.</li>') +
     "</ul><h3>Próximas</h3><ul>" + (proximas.map(item).join("") || '<li class="mudo">Nenhuma na planilha.</li>') + "</ul>" +
     (semData.length ? "<h3>Sem data</h3><ul>" + semData.map(item).join("") + "</ul>" : "") + "</aside></div>";
+  h += blocoContrato(c, ["Rotinas"], "Rotinas que o contrato pede");
   h += '<div class="bloco"><h3>Todas as obrigações do contrato na planilha (' + obr.length + ')</h3>' + (obr.length ? '<div class="rolavel"><table class="tab"><thead><tr><th>Vencimento</th><th>Obrigação</th><th>Tipo</th><th>Executor</th><th>Status</th></tr></thead><tbody>' +
     obr.map(function (o) {
       return '<tr><td class="num"><i class="ponto p-' + o.tom + '" aria-hidden="true"></i> ' + (o.vencimento ? dBR(o.vencimento) : '<span class="mudo">sem data</span>') + "</td><td>" + esc(o.descricao) + (o.clausula ? '<small class="mudo"> (' + esc(o.clausula) + ")</small>" : "") +
@@ -1072,6 +1195,9 @@ function contraMeta(n, d, meta) {
 function metaTxt(m) { return m == null ? "sem meta na planilha" : "meta " + pct(100 * m, 0) + "%"; }
 
 function rEntregaveis(c) {
+  return blocoContrato(c, ["Entregáveis"], "O que o contrato pede") + rEntregaveisPlanilha(c);
+}
+function rEntregaveisPlanilha(c) {
   var lista = obrDe(c).filter(function (o) { return o.entregavel; }), par = REAL.parametros || {};
   var vencidos = lista.filter(function (o) { return o.tom === "ok" || o.tom === "critico"; });
   var noPrazo = lista.filter(function (o) { return o.no_prazo; }).length;
@@ -1090,7 +1216,21 @@ function rEntregaveis(c) {
     }).join("") + "</tbody></table></div>";
 }
 
+function valorContrato(c) {
+  var f = fichaDe(c);
+  if (!f) return "";
+  var h = '<div class="bloco"><h3>Valor no contrato</h3><div class="rolavel"><table class="tab"><thead><tr><th>Contrato</th><th class="r">Valor mensal</th><th>Como está escrito</th><th>Reajuste</th><th>Onde</th></tr></thead><tbody>';
+  f.contratos.forEach(function (k) {
+    var v = k.valor || {}, rj = k.reajuste || {};
+    h += "<tr><td>" + esc(rotuloK(k)) + '</td><td class="r num">' + (typeof v.mensal === "number" ? brl(v.mensal) : '<span class="vazio-c">não escrito</span>') + "</td><td>" + esc(v.texto || "") +
+      "</td><td>" + esc(rj.texto || rj.indice || "") + '</td><td class="onde">' + refTxt(v.ref) + "</td></tr>";
+  });
+  return h + "</tbody></table></div></div>" + blocoContrato(c, ["Medição e faturamento", "Adicionais e hora extra"], "Medição, faturamento e adicionais no contrato");
+}
 function rFinanceiro(c) {
+  return rFinanceiroPlanilha(c) + valorContrato(c);
+}
+function rFinanceiroPlanilha(c) {
   if (!temAba("Adicionais")) return reimportar("Adicionais");
   var ad = REAL.adicionais.filter(function (a) { return a.cliente === c.cliente; });
   var bms = obrDe(c).filter(function (o) { return String(o.tipo).slice(0, 7) === "Medição"; });
@@ -1123,6 +1263,9 @@ function rFinanceiro(c) {
 }
 
 function rMetas(c) {
+  return rMetasPlanilha(c) + blocoContrato(c, ["Disponibilidade e desempenho", "Benefícios", "Penalidades"], "Metas, bônus e penalidades do contrato");
+}
+function rMetasPlanilha(c) {
   if (!temAba("Cadastros") || !temAba("Adicionais")) return reimportar(temAba("Cadastros") ? "Adicionais" : "Cadastros");
   var par = REAL.parametros || {}, obr = obrDe(c), ad = REAL.adicionais.filter(function (a) { return a.cliente === c.cliente; });
   var vencidas = obr.filter(function (o) { return o.tom === "critico"; }).length, mesHoje = REAL.hoje.slice(0, 7);
@@ -1149,8 +1292,10 @@ function notaMetas() {
   return '<p class="nota">As contas da aba Indicadores_Mes da planilha (lá, por supervisor; aqui, só deste contrato): o entregável conta no mês do vencimento e o adicional no mês da execução. As metas vêm da aba Cadastros. A cobertura de escopo é preenchida à mão na planilha, por supervisor, e não entra aqui.</p>';
 }
 
-function rSemFonte() {
-  // só o Atendimento: a planilha não tem o atendimento por usina (17/11/2026)
+function rSemFonte(c) {
+  // só o Atendimento: a planilha não tem o atendimento por usina (17/11/2026); o contrato diz o SLA (18/11/2026)
+  if (c && fichaDe(c)) return blocoContrato(c, ["SLA"], "O atendimento que o contrato pede") +
+    '<p class="nota">O atendimento feito em cada usina (as OS do mês) não está na planilha de controle nem no contrato.</p>';
   return '<div class="vazio"><h2>A planilha não tem o atendimento por usina</h2><p>A planilha de controle não registra o que foi feito em cada usina no mês. O que ela tem sobre atender o cliente está nas outras partes: o SLA do contrato em Regras, as reuniões periódicas no Calendário e os serviços extras por usina no Financeiro.</p></div>';
 }
 
