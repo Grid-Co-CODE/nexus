@@ -34,7 +34,7 @@ from datetime import date, datetime
 
 from . import prontuario as PR
 
-VERSAO = 5
+VERSAO = 6
 # a cor da tela em palavras (a régua é a de cada tela dona; aqui só o nome)
 GRAVIDADE = {"critico": "crítico", "alerta": "atenção", "atencao": "atenção", "semcom": "sem comunicação",
              "info": "informativo", "ok": "em dia", "neutro": ""}
@@ -416,9 +416,14 @@ def _chamados(p: dict) -> list[str]:
 def _rondas(u: dict, p: dict, com_pessoas: bool) -> list[str]:
     r, out = u.get("ronda") or {}, []
     dias = PR._int(r.get("dias"))
+    # 999 é a marca de "nunca teve ronda" da Visão (`visao.cobertura`), não uma conta de dias (18/11/2026: o dossiê da
+    # Poconé dizia "há 999 dias; nunca rondada", e o diagnóstico da IA repetiu os 999 dias)
+    nunca = dias is not None and dias >= 999
+    quando = "" if nunca else ("hoje" if dias == 0 else f"há {dias} {'dia' if dias == 1 else 'dias'}")
     out.append("- Última ronda: " + (SEM_DADO + " (nenhuma ronda lida em 90 dias)" if dias is None else
-                                     _junta("hoje" if dias == 0 else f"há {dias} {'dia' if dias == 1 else 'dias'}", _dia(r.get("ultima")),
-                                            PR._RONDA_TIPO.get(r.get("tipo"), ""), r.get("obs"))))
+                                     _junta(quando, "" if nunca else _dia(r.get("ultima")),
+                                            PR._RONDA_TIPO.get(r.get("tipo"), ""),
+                                            r.get("obs") or ("nunca rondada" if nunca else ""))))
     rd = p.get("rondas")
     if rd is None:
         out.append("- Histórico de rondas: sem leitura.")

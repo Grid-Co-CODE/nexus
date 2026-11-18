@@ -950,6 +950,34 @@ o que é que ele tem que fazer".
     - Prova: `tests/test_comando_diagnostico_anterior_18_11.py`.
   - **O diagnóstico vai em Busca** (`PENSAR = False`, desde 18/11/2026): o Claude escreve só o diagnóstico, sem o
     rascunho de antes. Voltar a pensar é trocar a constante. Prova: `tests/test_comando_ia_modo_18_11.py`.
+- **A prova do diagnóstico em Busca e a conferência contra o dossiê** (18/11/2026, Levi: "diagnóstico em busca, rode
+  alguns diagnósticos e bata os dados para ver se a informação está confiável").
+  - **O que se rodou, em produção:** o diagnóstico de 4 usinas de clientes diferentes (Colíder 1, Capitão Poço 100,
+    Castelo do Piauí, Poconé), em Busca, e o dossiê de cada uma na mesma hora. Três saíram em cerca de 7 s e uma em 37 s
+    (com pensamento, a 1ª abertura levava 40 s, e o da Mandaguaçu das 08:39 passou dos 60 s e caiu na IA grátis).
+  - **O que bateu:** os 52 números citados estavam no dossiê, e nenhuma OS era inventada. Na Capitão Poço 100, PR, meta,
+    disponibilidade, desligamentos, strings, trackers, extintores e chamados conferiram com o dossiê.
+  - **O que não bateu:**
+    - a Colíder 1 saiu com "16 desligamentos em novembro" (o dossiê: 11), e a Castelo do Piauí com "16 desligamentos em
+      30 dias" (o dossiê: 3 em novembro e 2 em outubro). O 16 era o do exemplo que o próprio `PEDIDO` trazia ("com 17
+      normalizações e 16 com a geração parada, são 16 desligamentos"). **"O número está no dossiê" não prova que é o
+      daquela conta**, e **regra do pedido se escreve sem número de exemplo**;
+    - a Castelo do Piauí pediu "programar a ronda" com a última ronda feita no dia (o que estava vencida era a
+      zeladoria);
+    - a Colíder 1 pediu "extintores sem conferência" onde o dossiê dizia "Extintores: sem dado";
+    - a Poconé repetiu "há 999 dias" da linha da ronda do dossiê (999 é a marca de "nunca" da Visão).
+  - **O que mudou:**
+    - o `PEDIDO` manda usar a coluna "Desligamentos (a geração parou)" da tabela por mês, na linha do mês corrente, e
+      ganhou a regra da ronda e a do "sem dado";
+    - **`conferir`** compara cada "N desligamentos" do diagnóstico (situação, itens e pedidos) com a tabela por mês do
+      dossiê (`desligamentos_do_dossie`). O que não bate é refeito UMA vez com pensamento; se insistir, vale o refeito
+      e a tela escreve "A conferir: ..." na linha de baixo. As duas chamadas entram no registro e no teto;
+    - **`VERSAO`** (2) vai no guardado: o diagnóstico de outra versão é refeito na próxima abertura (os de 18/11 feitos
+      com o pedido antigo saem assim), e ainda serve de "anterior" enquanto o novo é feito. Mudou o pedido ou a
+      conferência de um jeito que invalida os guardados: sobe a `VERSAO`;
+    - o dossiê (formato 6) diz "Última ronda: nunca rondada", sem o 999.
+  - **Erro de outro tipo que aparecer** ganha a conferência dele em `conferir`, com o caso. Prova:
+    `tests/test_comando_diagnostico_confere_18_11.py`.
   - Quem abre depois lê o guardado, sem chamar a IA.
   - A trava com mais de 5 min é de um pedido que morreu (o servidor reiniciou) e é refeita.
 - **A IA:** é a do Nexus IA (`ia.perguntar`), com as mesmas instruções e blindagem. O pedido é o `PEDIDO`:

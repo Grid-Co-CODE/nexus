@@ -35,6 +35,9 @@ MODELO_PADRAO = "nemotron"       # o grátis com a melhor nota no teste de 14/11
                                  # (com a chave da NVIDIA, o mesmo Nemotron vai por ela: `modelo`)
 ESPERA_ERRO_S = 20 * 60          # o erro guardado vale isto; depois a próxima abertura tenta de novo
 TRAVA_MORTA_S = 5 * 60           # a trava mais velha que isto é de um pedido que morreu (o servidor reiniciou)
+# a versão do pedido e da conferência: o guardado de outra versão é refeito na próxima abertura (18/11/2026: o pedido
+# trazia um exemplo com "16 desligamentos", e duas usinas saíram com 16 no lugar de 11 e de 3)
+VERSAO = 2
 # o diagnóstico vai em Busca, sem o pensamento do Claude (18/11/2026, Levi, com a 1ª abertura do dia em 40 s: "diagnóstico
 # em busca, rode alguns diagnósticos e bata os dados para ver se a informação está confiável"). True volta a pensar
 PENSAR = False
@@ -51,7 +54,9 @@ Responda SÓ com o bloco abaixo, em JSON válido, sem nada antes ou depois, sem 
 - tem_que_fazer: o que o supervisor TEM que fazer (obrigação vencida ou crítica: ronda atrasada, extintor vencido, OS crítica parada, desligamento que se repete), o mais urgente primeiro; até 4; cada um em até 110 caracteres, começando pelo verbo.
 - pode_fazer: o que ele PODE fazer para melhorar (recomendação, não obrigação); até 3; até 110 caracteres, começando pelo verbo.
 - pendente: o que está em aberto esperando alguém (fabricante, concessionária, outro setor, peça, chamado); até 4; até 110 caracteres.
-- Cada número com o nome que o dossiê dá a ele. Desligamento é só a parada em que a geração parou: com 17 normalizações e 16 com a geração parada, são 16 desligamentos (a perda de comunicação não conta).
+- Cada número com o nome que o dossiê dá a ele. Desligamento é só a parada em que a geração parou (a perda de comunicação não conta): o número de desligamentos é o da coluna "Desligamentos (a geração parou)" da tabela por mês da seção do COS, na linha do mês corrente. Não conte as linhas das paradas e não use outro número no lugar.
+- Ronda: só peça para programar a ronda quando o dossiê diz que ela está atrasada ou sem cobertura. Zeladoria vencida não é ronda: é pedido à Zeladoria.
+- O que o dossiê marca como "sem dado" ou "sem leitura" não vira item nem conclusão: não é zero, nem "sem conferência", nem pendência.
 - "os": o número de uma OS do dossiê ligada ao item, ou null. Nunca invente OS, pendência ou número.
 - "destino": para onde o supervisor vai a partir do item, ou null:
   - {"pedir": "<nome exato de um setor da lista <setores>>", "tema": "<nome exato de um tema desse setor, da lista TEMAS abaixo, ou null>"} quando o item é pedir ou cobrar algo de outro setor (ex.: "Solicitar à Engenharia a revisão dos ajustes", "Cobrar o retorno dos chamados"). O que depende da concessionária (a rede, a tensão, o chamado com a distribuidora) é pedido ao COS, que abre o chamado com a rede. Os chamados de garantia (cobrar o retorno do fabricante, o andamento do chamado) são da área Chamados, dentro da Performance: peça a "Chamados" quando estiver na lista; senão, à Performance.
@@ -154,6 +159,40 @@ def ler(texto: str, dossie: str, setores: list[dict] | None = None) -> dict | No
     return out
 
 
+# ── a conferência contra o dossiê (18/11/2026) ───────────────────────────────────────────────────────────────────────
+# Levi: "rode alguns diagnósticos e bata os dados para ver se a informação está confiável". Na prova, os 52 números de 4
+# diagnósticos estavam no dossiê, e ainda assim dois erraram o número de desligamentos: "estar no dossiê" não prova que
+# o número é o daquela conta. Esta conferência é da conta que errou: o número de desligamentos tem que ser um dos da
+# tabela por mês. Erro de outro tipo que aparecer ganha a conferência dele aqui, com o caso.
+_RX_TABELA_MES = re.compile(r"^\| Mês \| Desligamentos \(a geração parou\)[^\n]*\n\|[ :|-]+\n((?:\|[^\n]*\n?)+)", re.M)
+_RX_DESLIGAMENTOS = re.compile(r"(?<![\d.,])(\d{1,4})\s+desligamentos?\b", re.I)
+
+
+def desligamentos_do_dossie(dossie: str) -> dict[str, int]:
+    """{mês: desligamentos (a geração parou)} da tabela por mês da seção do COS. Vazio: o dossiê não trouxe a tabela."""
+    m = _RX_TABELA_MES.search(dossie or "")
+    out = {}
+    for linha in (m.group(1).splitlines() if m else []):
+        cel = [c.strip() for c in linha.strip().strip("|").split("|")]
+        if len(cel) >= 2 and cel[1].isdigit():
+            out[cel[0]] = int(cel[1])
+    return out
+
+
+def conferir(diag: dict | None, dossie: str) -> list[str]:
+    """O que o diagnóstico diz e o dossiê não sustenta, em frases para a tela. Hoje confere o número de desligamentos
+    (na situação, nos itens e nos pedidos) contra a tabela por mês. Sem a tabela, não há o que conferir."""
+    por_mes = desligamentos_do_dossie(dossie)
+    if not diag or not por_mes:
+        return []
+    textos = [diag.get("situacao") or ""] + [x.get(k) or "" for lista in MAX_ITENS for x in diag.get(lista) or []
+                                             for k in ("texto", "pedido")]
+    fora = sorted({int(n) for t in textos for n in _RX_DESLIGAMENTOS.findall(t)} - set(por_mes.values()))
+    tabela = "; ".join(f"{mes}: {n}" for mes, n in por_mes.items())
+    return [f"{n} desligamento{'' if n == 1 else 's'}: o dossiê não tem esse número na tabela por mês ({tabela})"
+            for n in fora]
+
+
 # ── o guardado do dia ────────────────────────────────────────────────────────────────────────────────────────────────
 def hoje(agora: datetime | None = None) -> str:
     return f"{(agora or datetime.now(IA._BRT)):%Y-%m-%d}"
@@ -186,6 +225,8 @@ def guardado(cfg, usina_id: int, dia: str | None = None) -> dict | None:
     except (OSError, ValueError):
         return None
     if not d.get("ok") and time.time() - float(d.get("ts") or 0) > ESPERA_ERRO_S:
+        return None
+    if int(d.get("versao") or 1) != VERSAO:          # feito com o pedido de outra versão: refaz na próxima abertura
         return None
     return d
 
@@ -265,19 +306,35 @@ def gerar(cfg, usina_id: int, dossie: str, dossie_tokens: int = 0, dia: str | No
     """Faz o diagnóstico, guarda e solta a trava. Roda numa thread à parte (a rota não espera); no teste, na hora."""
     dia = dia or hoje()
     pasta = _pasta(cfg, dia)
-    try:
+
+    def uma_vez(pensar: bool):
         rs = IA.perguntar(cfg, [modelo(cfg)], dossie, PEDIDO + lista_de_temas(setores),
-                          setores=[s["nome"] for s in setores or []], pensar=PENSAR)
-        r = rs[0] if rs else {"ok": False, "erro": "Nenhuma IA ligada para o diagnóstico."}
+                          setores=[s["nome"] for s in setores or []], pensar=pensar)
         IA.registrar(cfg, usina_id, "[diagnóstico do dia]", rs, "diagnostico-do-dia", dossie_tokens)
+        r = rs[0] if rs else {"ok": False, "erro": "Nenhuma IA ligada para o diagnóstico."}
+        return r, (ler(r.get("texto") or "", dossie, setores) if r.get("ok") else None)
+
+    try:
+        r, diag = uma_vez(PENSAR)
+        # o número que não bate com o dossiê: refaz UMA vez, pensando (mais lento e mais cuidadoso); se insistir, vale
+        # o refeito, e a tela avisa o que ficou a conferir
+        falhas, refeito = conferir(diag, dossie), False
+        if falhas and not PENSAR:
+            r2, diag2 = uma_vez(True)
+            if r2.get("ok") and diag2:
+                r, diag, falhas, refeito = r2, diag2, conferir(diag2, dossie), True
         agora = datetime.now(IA._BRT)
         d = {"usina_id": int(usina_id), "dia": dia, "ts": time.time(), "gerado_em": agora.isoformat(timespec="seconds"),
              "ok": bool(r.get("ok")), "modelo": r.get("id") or "", "rotulo": r.get("rotulo") or "",
-             "troca": r.get("troca") or "", "erro": r.get("erro") or "", "ms": r.get("ms")}
+             "troca": r.get("troca") or "", "erro": r.get("erro") or "", "ms": r.get("ms"), "versao": VERSAO}
         if r.get("ok"):
-            d["diag"] = ler(r.get("texto") or "", dossie, setores)
+            d["diag"] = diag
             d["texto"] = "" if d["diag"] else IA.limpar_citacoes(r.get("texto") or "")[:3000]
             d["numeros"] = r.get("numeros")
+            if refeito:
+                d["refeito"] = True
+            if falhas:
+                d["conferir"] = falhas
         if pasta:
             pasta.mkdir(parents=True, exist_ok=True)
             (pasta / f"{int(usina_id)}.json").write_text(json.dumps(d, ensure_ascii=False), encoding="utf-8")
@@ -300,4 +357,5 @@ def para_tela(d: dict) -> dict:
     em = d.get("gerado_em") or ""
     return {"estado": "pronto" if d.get("diag") else "texto", "diag": d.get("diag"), "texto": d.get("texto") or "",
             "rotulo": d.get("rotulo") or "", "troca": d.get("troca") or "", "dia": d.get("dia") or "",
-            "hora": em[11:16], "data": f"{em[8:10]}/{em[5:7]}" if len(em) >= 10 else ""}
+            "hora": em[11:16], "data": f"{em[8:10]}/{em[5:7]}" if len(em) >= 10 else "",
+            **({"conferir": d["conferir"]} if d.get("conferir") else {})}

@@ -153,7 +153,9 @@
     }
     fonte.textContent = 'Diagnóstico da IA de ' + (j.data || 'hoje') + (j.hora ? ', feito às ' + j.hora : '') +
       (j.rotulo ? ' pelo ' + j.rotulo : '') + ', com a performance até ontem e as pendências daquela hora. ' +
-      'É um por dia: quem abrir hoje vê este mesmo.' + (j.troca ? ' ' + j.troca : '');
+      'É um por dia: quem abrir hoje vê este mesmo.' + (j.troca ? ' ' + j.troca : '') +
+      // o que a conferência do Nexus não achou no dossiê (18/11/2026: o número de desligamentos)
+      (j.conferir && j.conferir.length ? ' A conferir: ' + j.conferir.join('; ') + '.' : '');
     fonte.hidden = false;
     if (corpo.innerHTML) {
       bt.hidden = false;

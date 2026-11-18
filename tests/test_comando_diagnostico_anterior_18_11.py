@@ -25,7 +25,7 @@ def _guarda(tmp_path, usina_id, dia, ok=True, diag=DIAG, hora="10:57:00"):
     pasta = tmp_path / "ia" / "diagnosticos" / dia
     pasta.mkdir(parents=True, exist_ok=True)
     d = {"usina_id": usina_id, "dia": dia, "ts": time.time(), "gerado_em": f"{dia}T{hora}-03:00", "ok": ok,
-         "rotulo": "Claude Haiku 5.5", "erro": "" if ok else "limite de uso"}
+         "rotulo": "Claude Haiku 5.5", "erro": "" if ok else "limite de uso", "versao": DG.VERSAO}
     if ok:
         d["diag"] = diag
     (pasta / f"{usina_id}.json").write_text(json.dumps(d, ensure_ascii=False), encoding="utf-8")
