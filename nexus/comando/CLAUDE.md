@@ -1023,6 +1023,44 @@ o que é que ele tem que fazer".
 Prova: `tests/test_comando_diagnostico.py` (o JSON e a OS fora do dossiê; um por dia, a trava, o erro de 20 min, a trava
 morta; a rota faz uma vez e a segunda abertura não chama a IA; sem chave fica o parecer; a marca no `neutro`).
 
+### O prontuário por mês e o Insights do mês fechado (18/11/2026; `nexus/comando/diagnostico_mes.py`)
+
+Levi: "O insights e todo o prontuário deve funcionar por mês! Começando por outubro mas quando eu abrir o prontuário quero
+sempre no mês vigente, o que fica pendente do último mês ou dia ainda aparece porém em relação a meta, PR, geração tem que
+ser do mês atual, o que foi feito no ativo". E, à pergunta se o mês fechado teria diagnóstico da IA: "Sim! Com direito a
+relatório e tudo".
+
+- **O seletor de mês** fica no alto do prontuário (`comando/_meses.html`): do vigente até outubro de 2026
+  (`PRIMEIRO_MES`, o 1º mês do banco de performance; `diagnostico_mes.meses`). Sem `mes` no endereço é o vigente, o
+  prontuário de sempre, com o diagnóstico do dia. A Central da usina da Usinas 360° usa o mesmo `_prontuario.html` e não
+  tem o seletor (a rota dela não manda `meses_sel`).
+- **O mês fechado** (`/t/campo/usinas/<id>?mes=AAAA-MM`, `_usina_mes`, `comando/usina_mes.html`) é a página do
+  fechamento: o Insights do mês, o mês em números (meta, PR, disponibilidade, desligamentos), o que foi feito no ativo
+  (rondas, tarefas executadas, zeladoria, chamados), as paradas do COS e o que segue pendente HOJE, com o botão do
+  relatório em PDF do mês. `mes` que não é mês fechado (o vigente, antes de outubro, lixo) abre o prontuário de sempre.
+- **De onde vem o dado:** do `campo/relatorio_usina.dados(uid, mes, hoje)`, o mesmo do PDF, que já recortava o mês.
+  Nenhuma conta nova. Tema que não abriu é "sem leitura"; número que falta é "sem dado".
+- **O que NÃO dá:** ver as pendências como estavam no fim do mês. `fato_tarefa_os`, os chamados abertos, os extintores e
+  os insights só têm o estado de agora; por isso a seção se chama "Segue pendente hoje". E as rondas, as tarefas
+  executadas, as PT e os chamados concluídos ficam 90 dias nas fontes: **outubro some delas em janeiro de 2027**. O
+  fechamento guardado de cada mês (o Levi deu o ok em 18/11) ainda não foi feito; sem ele, o mês fechado perde essas
+  partes depois de 90 dias. O PDF também só oferece o mês atual e os dois anteriores (`relatorio_usina.MESES`).
+- **O Nexus IA Insights do mês** (`diagnostico_mes`):
+  - a IA lê o **dossiê do mês** (`dossie(d)`: o fechamento em texto, sem o nome das pessoas; dá para ler em
+    `/t/campo/usinas/<id>/dossie-do-mes.md?mes=AAAA-MM`, e é por ele que se confere o diagnóstico);
+  - o pedido (`PEDIDO`) devolve a situação e três listas: o que pesou no mês, o que foi feito e o que segue pendente.
+    Sem número de exemplo (a lição do "16 desligamentos" do diagnóstico do dia);
+  - é **um por usina por mês**, guardado em `<NEXUS_DADOS>/ia/diagnosticos/mes/AAAA-MM/<usina>.json`. A trava, o
+    guardado, a versão e o erro de 20 min são os do diagnóstico do dia, com a chave `mes/AAAA-MM`;
+  - vai em Busca; cada "N desligamentos" é conferido com o número do mês e, se não bate, refaz uma vez pensando; se
+    insistir, a tela escreve "A conferir";
+  - a rota é a mesma do diagnóstico (`/ia/diagnostico?mes=AAAA-MM`); a tela é o `static/comando/prontuario-mes.js`.
+- **Conferido em 18/11/2026 na bancada, com o banco de produção (só leitura):** outubro da Capitão Poço 100 abriu com
+  meta 67% (577,0 de 860,1 MWh), PR 68,2%, disponibilidade 59,7% (150,0 h paradas) e 81 desligamentos, o mesmo número
+  da tabela por mês do dossiê da usina.
+
+Prova: `tests/test_comando_prontuario_por_mes_18_11.py`.
+
 ### Strings e trackers no prontuário e no dossiê (16/11/2026, Levi, na Aparecida 3)
 
 "Tem dois inversores que ficaram com string sem corrente. Essa informação de string, tempo real, string tracker, não está

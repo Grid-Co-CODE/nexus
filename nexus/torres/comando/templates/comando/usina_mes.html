@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% block titulo %}{{ d.usina }} · {{ mes_rot }}{% endblock %}
+{% block conteudo %}
+<link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='comando.css') }}">
+{# O prontuário de um MÊS FECHADO (18/11/2026, Levi: "O insights e todo o prontuário deve funcionar por mês! Começando por
+   outubro [...] em relação a meta, PR, geração tem que ser do mês atual, o que foi feito no ativo"; e sobre o Insights do
+   mês: "Sim! Com direito a relatório e tudo"). O mês vigente é o prontuário de sempre (comando/usina.html); esta página é
+   o fechamento: o Insights do mês (a IA, um por usina por mês), os números do mês, o que foi feito, as paradas e o que
+   segue pendente HOJE. Os dados são os do relatório em PDF (campo/relatorio_usina.dados); as regras do mês e do
+   diagnóstico moram em nexus/comando/diagnostico_mes.py. #}
+{% macro n(v, casas=1) %}{% if v is none %}—{% else %}{{ ('%.' ~ casas ~ 'f')|format(v)|replace('.', ',') }}{% endif %}{% endmacro %}
+<div class="campo-nativa pm">
+  <p class="cmu-volta"><a class="cn-link" href="{{ raiz }}/t/campo/usinas"><i class="ph ph-arrow-left" aria-hidden="true"></i> Usinas</a></p>
+  {% for tema, e in d.erros.items() %}<div class="cn-erro cn-aviso" role="status"><span>Não consegui ler {{ nomes_tema.get(tema, tema) }} deste mês: essa parte ficou de fora, o resto da página vale.</span></div>{% endfor %}
+
+  <header class="cu-cab">
+    <div class="cu-id">
+      <p class="gc-eyebrow">Prontuário da usina · mês fechado</p>
+      <h1 class="cu-nome cmu-nome">{{ d.usina }} <span class="pm-mes">{{ mes_rot }}</span></h1>
+      <p class="cu-onde">{{ d.cliente or '—' }}{% if d.cidade %} · {{ d.cidade }}{% if d.uf %}/{{ d.uf }}{% endif %}{% endif %}{% if d.potencia_mwp is not none %} · {{ n(d.potencia_mwp) }} MWp{% endif %}</p>
+    </div>
+    <div class="pu-acoes">
+      <a class="gc-btn gc-btn--ui gc-btn--contorno" href="{{ raiz }}/t/campo/usinas/{{ d.uid }}/relatorio.pdf?mes={{ mes }}" title="O relatório da usina deste mês, em PDF"><i class="ph ph-file-pdf" aria-hidden="true"></i> Relatório de {{ d.mes_txt }}</a>
+    </div>
+  </header>
+  {% include "comando/_meses.html" %}
+
+  {# o Nexus IA Insights do mês: um por usina por mês, guardado; a página não espera por ele (prontuario-mes.js) #}
+  <section class="pu-parecer pu-diag pm-diag" aria-labelledby="pm-diag-t" data-pm-diag="{{ raiz }}/t/campo/usinas/{{ d.uid }}/ia/diagnostico?mes={{ mes }}" data-pm-mes="{{ d.mes_txt }}">
+    <div class="pu-diag-linha">
+      <span class="pu-par-selo"><span>Nexus IA Insights · {{ d.mes_txt }}</span></span>
+      <h2 class="pu-par-t" id="pm-diag-t" data-pm-frase>A IA está lendo o fechamento de {{ d.mes_txt }}…</h2>
+    </div>
+    <div class="pu-diag-corpo" data-pm-corpo hidden></div>
+    <p class="pu-diag-fonte" data-pm-fonte hidden></p>
+  </section>
+
+  <section class="pm-sec" aria-labelledby="pm-num-t">
+    <h2 class="pm-t" id="pm-num-t">O mês em números <span class="mudo">· de {{ '%02d/%02d'|format(d.ini.day, d.ini.month) }} a {{ '%02d/%02d'|format(d.fim.day, d.fim.month) }}</span></h2>
+    {% if d.perf %}
+    <div class="pm-kpis">
+      <div class="pm-kpi pm-kpi--{{ cls.meta }}"><span class="pm-kpi-r">Meta do mês</span><b>{% if meta.atingimento is not none %}{{ n(meta.atingimento, 0) }}%{% else %}sem dado{% endif %}</b>
+        <span class="pm-kpi-s">{% if meta.prod_kwh is not none and meta.meta_kwh %}{{ n(meta.prod_kwh / 1000) }} de {{ n(meta.meta_kwh / 1000) }} MWh{% else %}sem geração publicada{% endif %}</span></div>
+      <div class="pm-kpi"><span class="pm-kpi-r">PR</span><b>{% if meta.pr is not none %}{{ n(meta.pr) }}%{% else %}sem dado{% endif %}</b>
+        <span class="pm-kpi-s">{% if meta.pr_meta is not none %}previsto {{ n(meta.pr_meta) }}%{% else %}sem previsto{% endif %}</span></div>
+      <div class="pm-kpi pm-kpi--{{ cls.disp }}"><span class="pm-kpi-r">Disponibilidade</span><b>{% if disp.disp is not none %}{{ n(disp.disp) }}%{% else %}sem dado{% endif %}</b>
+        <span class="pm-kpi-s">{% if disp.h_perdidas is not none %}{{ n(disp.h_perdidas) }} h paradas{% else %}sem horas publicadas{% endif %}</span></div>
+      <div class="pm-kpi"><span class="pm-kpi-r">Desligamentos</span><b>{% if desligamentos is not none %}{{ desligamentos }}{% else %}sem leitura{% endif %}</b>
+        <span class="pm-kpi-s">paradas em que a geração parou</span></div>
+    </div>
+    {% else %}<p class="mudo">Sem leitura da performance deste mês.</p>{% endif %}
+  </section>
+
+  <section class="pm-sec" aria-labelledby="pm-feito-t">
+    <h2 class="pm-t" id="pm-feito-t">O que foi feito no ativo</h2>
+    <ul class="pm-lista">
+      {% if d.rondas is defined and d.rondas is not none %}
+      <li><b>{{ d.rondas|length }}</b> ronda{{ '' if d.rondas|length == 1 else 's' }} no mês{% if d.rondas %}:
+        {% for r in d.rondas %}{{ r.get('data', '')[8:10] }}/{{ r.get('data', '')[5:7] }} ({{ r.get('tipo') or 'ronda' }}{% if r.get('sujidade') is not none %}, sujidade {{ r.get('sujidade') }}{% endif %}{% if r.get('vegetacao') is not none %}, vegetação {{ r.get('vegetacao') }}{% endif %}){{ ', ' if not loop.last }}{% endfor %}{% endif %}</li>
+      {% else %}<li class="mudo">Rondas: sem leitura.</li>{% endif %}
+      {% if d.manut %}
+      <li><b>{{ tarefas }}</b> tarefa{{ '' if tarefas == 1 else 's' }} de manutenção executada{{ '' if tarefas == 1 else 's' }}{% if d.manut.feitas %}:
+        {% for x in d.manut.feitas %}{{ x.tipo }} {{ x.tarefas }} (em {{ x.os }} OS){{ ', ' if not loop.last }}{% endfor %}{% endif %}</li>
+      {% if d.manut.zeladoria %}<li>Zeladoria feita em {% for z in d.manut.zeladoria %}{{ '%02d/%02d'|format(z.day, z.month) }}{{ ', ' if not loop.last }}{% endfor %}</li>{% endif %}
+      {% else %}<li class="mudo">Manutenção: sem leitura.</li>{% endif %}
+      {% if d.chamados %}
+      <li><b>{{ chamados_fin|length }}</b> chamado{{ '' if chamados_fin|length == 1 else 's' }} de garantia finalizado{{ '' if chamados_fin|length == 1 else 's' }} e <b>{{ chamados_ab|length }}</b> aberto{{ '' if chamados_ab|length == 1 else 's' }} no mês{% if chamados_fin or chamados_ab %}:
+        {% for c in d.chamados.mes %}OS {{ c.os }} ({{ c.equip }}{% if c.fabricante %}, {{ c.fabricante }}{% endif %}){{ ', ' if not loop.last }}{% endfor %}{% endif %}</li>
+      {% else %}<li class="mudo">Chamados de garantia: sem leitura.</li>{% endif %}
+    </ul>
+  </section>
+
+  <section class="pm-sec" aria-labelledby="pm-par-t">
+    <h2 class="pm-t" id="pm-par-t">Paradas do mês <span class="mudo">· registradas pelo COS</span></h2>
+    {% if d.religamentos is defined and d.religamentos is not none %}
+    {% if d.religamentos %}
+    <div class="ia-tab-rola"><table class="ia-tab">
+      <thead><tr><th>Início</th><th>O que parou</th><th>Tempo fora</th><th>A geração parou</th><th>Proteções</th><th>OS</th></tr></thead>
+      <tbody>{% for x in d.religamentos %}<tr><td>{{ x.ini.strftime('%d/%m %H:%M') }}</td><td>{{ x.tipo }}</td><td>{{ x.fora or '—' }}</td><td>{{ 'sim' if x.parou else 'não' }}</td><td>{{ x.protecoes or '—' }}</td><td>{{ x.os or '—' }}</td></tr>{% endfor %}</tbody>
+    </table></div>
+    {% else %}<p class="mudo">Nenhuma parada registrada pelo COS neste mês.</p>{% endif %}
+    {% else %}<p class="mudo">Paradas do COS: sem leitura.</p>{% endif %}
+  </section>
+
+  <section class="pm-sec" aria-labelledby="pm-pend-t">
+    <h2 class="pm-t" id="pm-pend-t">Segue pendente hoje <span class="mudo">· {{ d.hoje.strftime('%d/%m/%Y') }}</span></h2>
+    <ul class="pm-lista">
+      {% if d.manut %}<li><b>{{ os_abertas }}</b> OS em aberto{% if d.manut.abertas %}: {% for x in d.manut.abertas %}{{ x.tipo }} {{ x.os }}{{ ', ' if not loop.last }}{% endfor %}{% endif %}</li>{% else %}<li class="mudo">OS em aberto: sem leitura.</li>{% endif %}
+      {% if d.chamados %}<li><b>{{ d.chamados.em_aberto }}</b> chamado{{ '' if d.chamados.em_aberto == 1 else 's' }} de garantia em aberto</li>{% else %}<li class="mudo">Chamados em aberto: sem leitura.</li>{% endif %}
+    </ul>
+    <p class="mudo pm-nota">As pendências são as de hoje: o Nexus não guarda como elas estavam no último dia do mês. O detalhe de cada uma está no <a class="cn-link" href="{{ raiz }}/t/campo/usinas/{{ d.uid }}">mês vigente</a>.</p>
+  </section>
+</div>
+{% include "oscreator/card_os_abrir.html" %}
+<script src="{{ url_for('static', filename='comando/prontuario-mes.js') }}" defer></script>
+{% endblock %}

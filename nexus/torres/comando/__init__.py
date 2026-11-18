@@ -317,11 +317,54 @@ def usina(usina_id):
     métricas, pendências, insights e etc. Deixe forma visual agradável e direta!") junta também o resumo do que pede
     atenção, o mês a mês, o histórico do COS, a zeladoria semanal, as rondas, os equipamentos com OS aberta, os chamados,
     a segurança, as demandas, a composição da ficha e a linha do tempo (`prontuario_dados.montar`)."""
+    from ...campo import visao
+    from ...comando import diagnostico_mes as DM
     from .prontuario_dados import contexto as _prontuario
+    # o mês (18/11/2026, Levi: "O insights e todo o prontuário deve funcionar por mês! Começando por outubro mas quando eu
+    # abrir o prontuário quero sempre no mês vigente"): sem `mes`, ou com o vigente, é o prontuário de sempre; o mês
+    # fechado (de outubro de 2026 em diante) abre a página do fechamento
+    hoje = visao._agora().date()
+    mes = DM.mes_fechado(request.args.get("mes"), hoje)
+    if mes:
+        return _usina_mes(usina_id, mes, hoje)
     ctx = _prontuario(usina_id, rel_url=f"/t/campo/usinas/{usina_id}/relatorio.pdf")
     if ctx is None:
         abort(404)
-    return render_template("comando/usina.html", torre=_torre_usinas()[0], tela=_torre_usinas()[1], **ctx)
+    return render_template("comando/usina.html", torre=_torre_usinas()[0], tela=_torre_usinas()[1],
+                           meses_sel=DM.meses(hoje), mes_uid=usina_id, **ctx)
+
+
+def _usina_mes(usina_id: int, mes: str, hoje):
+    """O prontuário do mês fechado: o fechamento da usina naquele mês, com os dados do relatório em PDF
+    (`relatorio_usina.dados`, que recorta o mês) e o que segue pendente hoje. O Insights do mês vem por trás
+    (`usina_ia_diagnostico` com `?mes=`). As regras: nexus/comando/diagnostico_mes.py."""
+    from ...campo import relatorio_usina as RU
+    from ...comando import diagnostico_mes as DM
+    usinas = _usinas()
+    if usinas and usina_id not in usinas:
+        abort(404)
+    d = RU.dados(usina_id, mes, hoje)
+    if not d.get("usina"):
+        abort(404)
+    # o tema que não abriu fica None (a página diz "sem leitura"), e o número que falta fica None ("sem dado")
+    for tema in ("perf", "rondas", "manut", "religamentos", "chamados"):
+        d.setdefault(tema, None)
+    perf = d.get("perf") or {}
+    meta = {k: (perf.get("meta") or {}).get(k) for k in ("prod_kwh", "meta_kwh", "atingimento", "pr", "pr_meta")}
+    disp = {k: (perf.get("disp") or {}).get(k) for k in ("disp", "h_perdidas")}
+    ch = (d.get("chamados") or {}).get("mes") or []
+    do_mes = lambda dia: bool(dia) and (dia.year, dia.month) == (d["ini"].year, d["ini"].month)  # noqa: E731
+    return render_template(
+        "comando/usina_mes.html", torre=_torre_usinas()[0], tela=_torre_usinas()[1], d=d, mes=mes, mes_uid=usina_id,
+        mes_rot=dict((m, r) for m, r, _v in DM.meses(hoje)).get(mes, mes), meses_sel=DM.meses(hoje), meta=meta, disp=disp,
+        cls={"meta": RU._cls_meta(meta.get("atingimento")) if meta.get("atingimento") is not None else "",
+             "disp": RU._cls_disp(disp.get("disp")) if disp.get("disp") is not None else ""},
+        desligamentos=DM.desligamentos(d), tarefas=sum(x["tarefas"] for x in (d.get("manut") or {}).get("feitas") or []),
+        os_abertas=sum(x["os"] for x in (d.get("manut") or {}).get("abertas") or []),
+        chamados_fin=[c for c in ch if c.get("situacao") == "concluido" and do_mes(c.get("fim"))],
+        chamados_ab=[c for c in ch if do_mes(c.get("ini"))],
+        nomes_tema={"perf": "a performance", "rondas": "as rondas", "manut": "a manutenção",
+                    "religamentos": "as paradas do COS", "chamados": "os chamados de garantia"})
 
 
 @bp_usinas.route("/<int:usina_id>/relatorio.pdf")
@@ -714,12 +757,18 @@ def usina_ia_diagnostico(usina_id):
 
     from flask import jsonify
 
+    from ...campo import visao
     from ...comando import diagnostico as DG
+    from ...comando import diagnostico_mes as DM
     from ...comando import ia as IA
     usinas = _usinas()
     if usinas and usina_id not in usinas:
         abort(404)
     cfg = current_app.config
+    # o mês fechado tem o diagnóstico DO MÊS (um por usina por mês, guardado); sem `mes`, ou com o vigente, o do dia
+    mes = DM.mes_fechado(request.args.get("mes"), visao._agora().date())
+    if mes:
+        return _diagnostico_do_mes(usina_id, mes)
     dia = DG.hoje()
     d = DG.guardado(cfg, usina_id, dia)
     if d:
@@ -746,6 +795,61 @@ def usina_ia_diagnostico(usina_id):
         ant = DG.anterior(cfg, usina_id, dia)
         if ant:
             out["anterior"] = DG.para_tela(ant)
+    resp = jsonify(out)
+    resp.headers["Cache-Control"] = "no-store"
+    return resp
+
+
+@bp_usinas.route("/<int:usina_id>/dossie-do-mes.md")
+def usina_dossie_do_mes(usina_id):
+    """O fechamento do mês em texto (Markdown), o mesmo que a IA lê para o diagnóstico do mês (`?mes=AAAA-MM`, só mês
+    fechado): é por ele que se confere o diagnóstico. Abre para quem abre o prontuário (sem o nome das pessoas)."""
+    from ...campo import relatorio_usina as RU
+    from ...campo import visao
+    from ...comando import diagnostico_mes as DM
+    hoje = visao._agora().date()
+    mes = DM.mes_fechado(request.args.get("mes"), hoje)
+    usinas = _usinas()
+    if not mes or (usinas and usina_id not in usinas):
+        abort(404)
+    resp = current_app.response_class(DM.dossie(RU.dados(usina_id, mes, hoje)), mimetype="text/markdown")
+    resp.headers["Cache-Control"] = "no-store"
+    return resp
+
+
+def _diagnostico_do_mes(usina_id: int, mes: str):
+    """O Nexus IA Insights do mês fechado: JSON {estado: pronto | texto | preparando | erro | sem_ia, mes, diag}. O
+    guardado volta na hora; sem ele, a primeira abertura pega a trava, lê o fechamento do mês e manda a IA fazer numa
+    thread à parte. As regras: nexus/comando/diagnostico_mes.py."""
+    import threading
+
+    from flask import jsonify
+
+    from ...campo import relatorio_usina as RU
+    from ...campo import visao
+    from ...comando import diagnostico as DG
+    from ...comando import diagnostico_mes as DM
+    cfg = current_app.config
+    ch = DM.chave(mes)
+    g = DM.guardado(cfg, usina_id, mes)
+    if g:
+        out = DM.para_tela(g)
+    elif not DG.disponivel(cfg):
+        out = {"estado": "sem_ia", "mes": mes}
+    elif DG.em_andamento(cfg, usina_id, ch) or not DG.travar(cfg, usina_id, ch):
+        out = {"estado": "preparando", "mes": mes}
+    else:
+        try:
+            d = RU.dados(usina_id, mes, visao._agora().date())
+        except BaseException:
+            DG.soltar(cfg, usina_id, ch)
+            raise
+        if cfg.get("TESTING"):
+            out = DM.para_tela(DM.gerar(dict(cfg), usina_id, d))
+        else:
+            threading.Thread(target=DM.gerar, args=(dict(cfg), usina_id, d), daemon=True,
+                             name=f"diagnostico-mes-{usina_id}").start()
+            out = {"estado": "preparando", "mes": mes}
     resp = jsonify(out)
     resp.headers["Cache-Control"] = "no-store"
     return resp

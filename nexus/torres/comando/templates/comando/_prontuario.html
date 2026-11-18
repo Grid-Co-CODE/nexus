@@ -71,6 +71,7 @@
       {% if p.pode.conversa %}<a class="gc-btn gc-btn--ui gc-btn--contorno" data-pu-jan="{{ raiz }}/t/comando/conversa/usina/{{ x.usina_id }}/janela" data-pu-jan-t="Conversa · {{ x.usina }}" href="{{ raiz }}/t/comando/conversa/usina/{{ x.usina_id }}" title="Conversar sobre a usina e pedir a outro setor"><i class="ph ph-chats" aria-hidden="true"></i> Conversa{% if p.conversa.n %} <b class="cu-n">{{ p.conversa.n }}</b>{% endif %}</a>{% endif %}
     </div>
   </header>
+  {% include "comando/_meses.html" %}
   <ul class="cu-gente" aria-label="Quem atende a usina">
     {{ pessoa('Responsável O&M', u.responsavel if u.responsavel != sem_responsavel else '', 'sem responsável') }}
     {{ pessoa('Supervisor de Campo', cu.pessoas.supervisor if cu.pessoas.supervisor != 'vaga' else '', 'vaga') }}

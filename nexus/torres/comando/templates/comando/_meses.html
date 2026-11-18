@@ -1,0 +1,11 @@
+{# O seletor de mês do prontuário (18/11/2026, Levi: "Começando por outubro mas quando eu abrir o prontuário quero sempre no
+   mês vigente"): do vigente até outubro de 2026 (`diagnostico_mes.meses`). O vigente é o prontuário de sempre (sem `mes`
+   no endereço); o fechado abre a página do fechamento (`?mes=AAAA-MM`). `mes` = o mês da página ('' no vigente). #}
+{% if meses_sel is defined and meses_sel and meses_sel|length > 1 %}
+<nav class="pu-meses" aria-label="Mês do prontuário">
+  <span class="pu-meses-r">Mês</span>
+  {% for m, rot, vigente in meses_sel %}
+  <a class="pu-mes-op" href="{{ raiz }}/t/campo/usinas/{{ mes_uid }}{% if not vigente %}?mes={{ m }}{% endif %}"{% if (mes is defined and mes == m) or (vigente and not (mes is defined and mes)) %} aria-current="page"{% endif %}>{{ rot }}{% if vigente %} <span class="pu-mes-vig">em curso</span>{% endif %}</a>
+  {% endfor %}
+</nav>
+{% endif %}
