@@ -194,5 +194,5 @@
 .ctr-toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:var(--superficie-3);border:1px solid var(--linha-forte);padding:10px 16px;border-radius:8px;font-size:12.5px;z-index:60;box-shadow:0 10px 30px var(--sombra)}
 
 @media (max-width:1100px){.ctr-grade{grid-template-columns:minmax(0,1fr)}}
-@media (max-width:720px){.ctr-campos{grid-template-columns:1fr}.ctr-hist > li{grid-template-columns:1fr}.ctr-resumo-dl{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:640px){.ctr-campos{grid-template-columns:1fr}.ctr-hist > li{grid-template-columns:1fr}.ctr-resumo-dl{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media (prefers-reduced-motion:reduce){.ctr *{transition:none!important}}

@@ -38,7 +38,7 @@ RESUMO = {
     "evento_aviso": "Os avisos das OS no sino: solicitação que virou OS e quem já leu",
     "versao_subtarefas": "As subtarefas padrão de cada atividade da Performance",
     "tratamento_contestacao": "Quem pegou cada contestação do cliente e o que escreveu sobre ela",
-    "edicao_contrato": "Cada mudança nos contratos: quem mudou, o quê, quando, o motivo e a prova",
+    "edicao_contrato": "Cada mudança nos contratos: quem, o quê, quando, o motivo e a prova",
     "passagem_turno": "Quem passou cada turno do COS, o que deixou pendente e quem assumiu",
     "normalizacao": "Quando cada usina voltou pela hora do COS, o tipo e as proteções",
     "ocorrencia_aberta": "As paradas que o COS ainda não normalizou, com o começo e o ativo",
