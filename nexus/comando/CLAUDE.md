@@ -970,9 +970,15 @@ o que é que ele tem que fazer".
     - o `PEDIDO` manda usar a coluna "Desligamentos (a geração parou)" da tabela por mês, na linha do mês corrente, e
       ganhou a regra da ronda e a do "sem dado";
     - **`conferir`** compara cada "N desligamentos" do diagnóstico (situação, itens e pedidos) com a tabela por mês do
-      dossiê (`desligamentos_do_dossie`). O que não bate é refeito UMA vez com pensamento; se insistir, vale o refeito
-      e a tela escreve "A conferir: ..." na linha de baixo. As duas chamadas entram no registro e no teto;
-    - **`VERSAO`** (2) vai no guardado: o diagnóstico de outra versão é refeito na próxima abertura (os de 18/11 feitos
+      dossiê (`desligamentos_do_dossie`): o N tem que ser o do mês dito na mesma frase; sem mês dito, o do mês corrente.
+      E cada "N strings fora" com as strings fora agora (`strings_do_dossie`: o total ou o de um inversor). O que não
+      bate é refeito UMA vez com pensamento; se insistir, vale o refeito e a tela escreve "A conferir: ..." na linha de
+      baixo. As duas chamadas entram no registro e no teto;
+    - **a 2ª rodada, com o pedido já corrigido** (6 usinas): 5 bateram, e a Colíder 1 saiu com "6 desligamentos em
+      novembro" (6 era o de outubro; novembro tinha 11), "2 strings fora" (era 1) e "Inversor 1" no lugar do 2.8. Por
+      isso a conferência é pelo mês dito e ganhou as strings. Rodada contra os 12 diagnósticos guardados da prova, ela
+      aponta os 3 que erraram e nenhum dos 9 certos. O nome do equipamento trocado ainda não tem conferência;
+    - **`VERSAO`** (3) vai no guardado: o diagnóstico de outra versão é refeito na próxima abertura (os de 18/11 feitos
       com o pedido antigo saem assim), e ainda serve de "anterior" enquanto o novo é feito. Mudou o pedido ou a
       conferência de um jeito que invalida os guardados: sobe a `VERSAO`;
     - o dossiê (formato 6) diz "Última ronda: nunca rondada", sem o 999.

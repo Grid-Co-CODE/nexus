@@ -37,7 +37,7 @@ ESPERA_ERRO_S = 20 * 60          # o erro guardado vale isto; depois a próxima 
 TRAVA_MORTA_S = 5 * 60           # a trava mais velha que isto é de um pedido que morreu (o servidor reiniciou)
 # a versão do pedido e da conferência: o guardado de outra versão é refeito na próxima abertura (18/11/2026: o pedido
 # trazia um exemplo com "16 desligamentos", e duas usinas saíram com 16 no lugar de 11 e de 3)
-VERSAO = 2
+VERSAO = 3
 # o diagnóstico vai em Busca, sem o pensamento do Claude (18/11/2026, Levi, com a 1ª abertura do dia em 40 s: "diagnóstico
 # em busca, rode alguns diagnósticos e bata os dados para ver se a informação está confiável"). True volta a pensar
 PENSAR = False
@@ -163,7 +163,8 @@ def ler(texto: str, dossie: str, setores: list[dict] | None = None) -> dict | No
 # Levi: "rode alguns diagnósticos e bata os dados para ver se a informação está confiável". Na prova, os 52 números de 4
 # diagnósticos estavam no dossiê, e ainda assim dois erraram o número de desligamentos: "estar no dossiê" não prova que
 # o número é o daquela conta. Esta conferência é da conta que errou: o número de desligamentos tem que ser um dos da
-# tabela por mês. Erro de outro tipo que aparecer ganha a conferência dele aqui, com o caso.
+# tabela por mês, na linha do mês dito (na 2ª rodada, a Colíder 1 saiu com o 6 de outubro como se fosse de novembro, e
+# com "2 strings fora" onde havia 1). Erro de outro tipo que aparecer ganha a conferência dele aqui, com o caso.
 _RX_TABELA_MES = re.compile(r"^\| Mês \| Desligamentos \(a geração parou\)[^\n]*\n\|[ :|-]+\n((?:\|[^\n]*\n?)+)", re.M)
 _RX_DESLIGAMENTOS = re.compile(r"(?<![\d.,])(\d{1,4})\s+desligamentos?\b", re.I)
 
@@ -179,18 +180,71 @@ def desligamentos_do_dossie(dossie: str) -> dict[str, int]:
     return out
 
 
-def conferir(diag: dict | None, dossie: str) -> list[str]:
-    """O que o diagnóstico diz e o dossiê não sustenta, em frases para a tela. Hoje confere o número de desligamentos
-    (na situação, nos itens e nos pedidos) contra a tabela por mês. Sem a tabela, não há o que conferir."""
-    por_mes = desligamentos_do_dossie(dossie)
-    if not diag or not por_mes:
+_RX_STRINGS_AGORA = re.compile(r"^- Strings fora agora: (\d+)[^\n]*\n((?:  - [^\n]*\n?)*)", re.M)
+_RX_STRINGS_DO_INVERSOR = re.compile(r"^  - [^:\n]+: (\d+) strings?\b", re.M)
+_RX_STRINGS_FORA = re.compile(r"(?<![\d.,])(\d{1,3})\s+strings?\s+fora\b", re.I)
+_MESES = ("janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro",
+          "dezembro")
+
+
+def strings_do_dossie(dossie: str) -> dict:
+    """{"total", "por_inversor": [n de cada inversor]} das strings fora agora, da seção Strings e trackers. Vazio: o
+    dossiê não trouxe a linha."""
+    m = _RX_STRINGS_AGORA.search(dossie or "")
+    if not m:
+        return {}
+    return {"total": int(m.group(1)), "por_inversor": [int(n) for n in _RX_STRINGS_DO_INVERSOR.findall(m.group(2))]}
+
+
+def _frase(texto: str, ini: int, fim: int) -> str:
+    """A frase em volta do trecho [ini, fim): do ponto final anterior ao próximo (o ponto de "1.065,4" não é fim)."""
+    cortes = [m.end() for m in re.finditer(r"[.;!?](?=\s|$)", texto)]
+    a = max([c for c in cortes if c <= ini], default=0)
+    b = min([c for c in cortes if c >= fim], default=len(texto))
+    return texto[a:b]
+
+
+def conferir(diag: dict | None, dossie: str, dia: str | None = None) -> list[str]:
+    """O que o diagnóstico diz e o dossiê não sustenta, em frases para a tela. Confere, na situação, nos itens e nos
+    pedidos:
+    - cada "N desligamentos" contra a tabela por mês do COS: o N tem que ser o do mês dito na mesma frase (dois meses
+      ditos: o de um deles ou a soma); sem mês dito, o do mês corrente (o diagnóstico é do mês corrente); com o mês
+      corrente fora da tabela, um número dela;
+    - cada "N strings fora" contra as strings fora agora: o total ou o de um inversor.
+    Sem a tabela ou sem a linha no dossiê, aquela conferência não é feita."""
+    if not diag:
         return []
     textos = [diag.get("situacao") or ""] + [x.get(k) or "" for lista in MAX_ITENS for x in diag.get(lista) or []
                                              for k in ("texto", "pedido")]
-    fora = sorted({int(n) for t in textos for n in _RX_DESLIGAMENTOS.findall(t)} - set(por_mes.values()))
+    falhas = []
+    por_mes = desligamentos_do_dossie(dossie)
+    corrente = _MESES[int((dia or hoje())[5:7]) - 1]
+    fora = set()
+    for t in textos if por_mes else ():
+        for m in _RX_DESLIGAMENTOS.finditer(t):
+            n, frase = int(m.group(1)), _frase(t, m.start(), m.end()).lower()
+            ditos = [mes for mes in por_mes if mes in frase]
+            if len(ditos) > 1:
+                certos = {por_mes[x] for x in ditos} | {sum(por_mes[x] for x in ditos)}
+            elif ditos:
+                certos = {por_mes[ditos[0]]}
+            elif corrente in por_mes:
+                certos = {por_mes[corrente]}
+            else:
+                certos = set(por_mes.values())
+            if n not in certos:
+                fora.add(n)
     tabela = "; ".join(f"{mes}: {n}" for mes, n in por_mes.items())
-    return [f"{n} desligamento{'' if n == 1 else 's'}: o dossiê não tem esse número na tabela por mês ({tabela})"
-            for n in fora]
+    falhas += [f"{n} desligamento{'' if n == 1 else 's'}: não bate com a tabela por mês do dossiê ({tabela})"
+               for n in sorted(fora)]
+    st = strings_do_dossie(dossie)
+    if st:
+        certos = {st["total"], *st["por_inversor"]}
+        fora = sorted({int(n) for t in textos for n in _RX_STRINGS_FORA.findall(t)} - certos)
+        falhas += [f"{n} string{'' if n == 1 else 's'} fora: o dossiê tem {st['total']} fora agora"
+                   + (f" ({', '.join(str(x) for x in st['por_inversor'])} por inversor)" if len(st["por_inversor"]) > 1 else "")
+                   for n in fora]
+    return falhas
 
 
 # ── o guardado do dia ────────────────────────────────────────────────────────────────────────────────────────────────
@@ -318,11 +372,11 @@ def gerar(cfg, usina_id: int, dossie: str, dossie_tokens: int = 0, dia: str | No
         r, diag = uma_vez(PENSAR)
         # o número que não bate com o dossiê: refaz UMA vez, pensando (mais lento e mais cuidadoso); se insistir, vale
         # o refeito, e a tela avisa o que ficou a conferir
-        falhas, refeito = conferir(diag, dossie), False
+        falhas, refeito = conferir(diag, dossie, dia), False
         if falhas and not PENSAR:
             r2, diag2 = uma_vez(True)
             if r2.get("ok") and diag2:
-                r, diag, falhas, refeito = r2, diag2, conferir(diag2, dossie), True
+                r, diag, falhas, refeito = r2, diag2, conferir(diag2, dossie, dia), True
         agora = datetime.now(IA._BRT)
         d = {"usina_id": int(usina_id), "dia": dia, "ts": time.time(), "gerado_em": agora.isoformat(timespec="seconds"),
              "ok": bool(r.get("ok")), "modelo": r.get("id") or "", "rotulo": r.get("rotulo") or "",

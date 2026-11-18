@@ -34,7 +34,14 @@ DOSSIE = """# Dossiê da usina Exemplo
 | outubro | 6 | 3 | 9 |
 
 - [crítico] 17 religamentos em 30 dias em Usina inteira
+
+## 8. Strings e trackers
+
+- Strings fora agora: 4, em 2 inversores
+  - Inversor 1.4: 1 strings (4.0), fora desde 01/11 09:15, perda até agora 1.065,4 kWh
+  - Inversor 2.1: 3 strings (ST 07, ST 10, ST 11), fora desde 15/11 06:20, perda até agora 941,4 kWh
 """
+DIA = "2026-11-18"
 
 
 def _resp(situacao, **k):
@@ -63,15 +70,41 @@ def test_a_conferencia_le_a_tabela_por_mes_e_aponta_o_numero_que_nao_bate():
     assert DG.desligamentos_do_dossie(DOSSIE) == {"novembro": 11, "outubro": 6}
     assert DG.desligamentos_do_dossie("# Dossiê sem COS") == {}
     certo = DG.ler(_resp("Meta em 82%, com 11 desligamentos em novembro e 17 religamentos em 30 dias."), DOSSIE)
-    assert DG.conferir(certo, DOSSIE) == []
+    assert DG.conferir(certo, DOSSIE, DIA) == []
     errado = DG.ler(_resp("Meta em 82%, com 16 desligamentos da geração em novembro.",
                           pendente=[{"item": "Análise dos 16 desligamentos em 30 dias", "os": None}]), DOSSIE)
-    falhas = DG.conferir(errado, DOSSIE)
+    falhas = DG.conferir(errado, DOSSIE, DIA)
     assert len(falhas) == 1 and "16 desligamentos" in falhas[0] and "novembro: 11" in falhas[0] and "outubro: 6" in falhas[0]
     # "1 desligamento" no singular também é conferido; sem a tabela no dossiê, não há o que conferir
-    assert DG.conferir(DG.ler(_resp("Teve 1 desligamento no mês."), DOSSIE), DOSSIE)
-    assert DG.conferir(errado, "# Dossiê sem COS") == []
-    assert DG.conferir(None, DOSSIE) == []
+    assert DG.conferir(DG.ler(_resp("Teve 1 desligamento no mês."), DOSSIE), DOSSIE, DIA)
+    assert DG.conferir(errado, "# Dossiê sem COS", DIA) == []
+    assert DG.conferir(None, DOSSIE, DIA) == []
+
+
+def _falhas(situacao, dia=DIA, dossie=DOSSIE):
+    return DG.conferir(DG.ler(_resp(situacao), dossie), dossie, dia)
+
+
+def test_o_numero_tem_que_ser_o_do_mes_dito_e_sem_mes_dito_o_do_mes_corrente():
+    # a 2ª rodada da prova, com o pedido já corrigido: a Colíder 1 saiu com "6 desligamentos com a geração parada em
+    # novembro" (6 era o de outubro; novembro tinha 11). O número estava na tabela, na linha errada
+    assert "6 desligamentos" in _falhas("Usina em alerta, com 6 desligamentos com a geração parada em novembro e 17 religamentos.")[0]
+    assert _falhas("Em outubro foram 6 desligamentos.") == []                      # o mês dito é o da linha
+    assert _falhas("Foram 17 desligamentos em outubro e novembro, 6 e 11.") == []  # dois meses ditos: cada um ou a soma
+    assert _falhas("Com 11 desligamentos registrados no mês.") == []               # sem mês dito: o corrente (novembro)
+    assert _falhas("Com 6 desligamentos registrados no mês.")                      # o de outubro não é o do mês
+    assert _falhas("Há 16 desligamentos nos últimos 30 dias.")                     # a conta de 30 dias não está no dossiê
+    # o mês corrente sem linha na tabela (dezembro): não dá para dizer qual é o certo; vale um número da tabela
+    assert _falhas("Com 11 desligamentos no mês.", dia="2026-12-02") == [] and _falhas("Com 9 desligamentos no mês.", dia="2026-12-02")
+
+
+def test_as_strings_fora_sao_as_do_dossie():
+    # a mesma Colíder 1: "Verificar as 2 strings fora no Inversor 1.4" (o dossiê: 1 string fora, no Inversor 1.4)
+    assert DG.strings_do_dossie(DOSSIE) == {"total": 4, "por_inversor": [1, 3]}
+    f = _falhas("Verificar as 2 strings fora no Inversor 1.4.")
+    assert len(f) == 1 and "2 strings fora" in f[0] and "4" in f[0]
+    assert _falhas("Verificar 1 string fora no Inversor 1.4 e as 3 strings fora do Inversor 2.1, 4 strings fora ao todo.") == []
+    assert _falhas("Com 2 strings fora.", dossie="# Dossiê sem a seção das strings") == []
 
 
 def _ia_de_mentira(monkeypatch, respostas):
@@ -91,7 +124,7 @@ def test_o_numero_que_nao_bate_e_refeito_pensando_e_se_insistir_a_tela_avisa(tmp
     chamadas = _ia_de_mentira(monkeypatch, [_resp("Com 16 desligamentos em novembro."), _resp("Com 11 desligamentos em novembro.")])
     d = DG.gerar(cfg, 1, DOSSIE, 100, "2026-11-18")
     assert chamadas == [False, True] and d["diag"]["situacao"] == "Com 11 desligamentos em novembro." and not d.get("conferir")
-    assert d["refeito"] is True and d["versao"] == DG.VERSAO
+    assert d["refeito"] is True and d["versao"] == DG.VERSAO == 3
     linhas = next((tmp_path / "ia").glob("perguntas-*.jsonl")).read_text(encoding="utf-8").splitlines()
     assert len(linhas) == 2                                    # as duas chamadas entram no registro (e no teto)
     # as duas erram: fica a última, e a tela recebe o aviso do que não bateu
