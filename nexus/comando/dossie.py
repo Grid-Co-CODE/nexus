@@ -367,17 +367,37 @@ def _strings(p: dict) -> list[str]:
     return out
 
 
+MIN_SO_PREVENTIVA = 5       # a partir de quantos equipamentos só de preventiva eles saem da tabela para uma linha
+
+
 def _equipamentos(p: dict) -> list[str]:
     e = p.get("equip_todos") or p.get("equip") or {}
     if not e.get("itens"):
         return ["- Nenhum equipamento com tarefa de OS aberta ou chamado de garantia aberto."]
+    # o equipamento só com tarefa de preventiva (sem corretiva, pausa nem chamado) não tem linha própria: vai numa linha
+    # só, pelo nome, agrupado pelas OS (18/11/2026: na Mandaguaçu eram 30 linhas de cabines, QGBT e transformadores
+    # repetindo as duas OS de preventiva, que o §5 já lista em cada OS). Com poucos, a tabela fica inteira
+    simples = [i for i in e["itens"] if list(i.get("tipos") or []) == ["preventiva"] and not i.get("pausadas")
+               and not i.get("chamado")]
+    if len(simples) < MIN_SO_PREVENTIVA:
+        simples = []
     linhas = []
     for i in e["itens"]:
+        if any(i is s for s in simples):
+            continue
         ch = i.get("chamado") or {}
         linhas.append([i.get("nome"), i.get("codigo"), i.get("abertas"), i.get("pausadas"),
                        ", ".join(str(o) for o in i.get("os") or []), ", ".join(i.get("tipos") or []),
                        _junta(f"OS {ch['os']}" if ch.get("os") else "", ch.get("fabricante"), ch.get("situacao"), sep=", ") if ch else ""])
     out = _tabela(["Equipamento", "Código", "Tarefas abertas", "Pausadas", "OS", "Tipos de tarefa", "Chamado de garantia aberto"], linhas)
+    if simples:
+        grupos: dict = {}
+        for i in simples:
+            grupos.setdefault(tuple(str(o) for o in i.get("os") or []), []).append(_t(i.get("nome")))
+        partes = [("OS " + (" e ".join([", ".join(oss[:-1]), oss[-1]]) if len(oss) > 1 else oss[0]) + ": " if oss else "")
+                  + ", ".join(nomes) for oss, nomes in grupos.items()]
+        out += ([""] if out else []) + [f"- Só com tarefa de preventiva aberta, sem corretiva, pausa nem chamado "
+                                        f"({len(simples)} equipamentos): " + "; ".join(partes)]
     if e.get("mais"):
         out += ["", f"E mais {e['mais']} equipamentos com tarefa aberta (de {e.get('ativos')} no total)."]
     return out
@@ -457,8 +477,16 @@ def _seguranca(u: dict, cu: dict, p: dict, com_pessoas: bool) -> list[str]:
                          sep=", ")
     else:
         ult_txt = f"última verificação em {_dia(ult)}" if ult else ""
-    out.append("- Luvas de alta tensão: " + (SEM_DADO if not lv else _junta(
-        _LUVAS.get(_t(lv.get("situacao")), _t(lv.get("situacao")).replace("_", " ")), ult_txt)))
+    # "sem_verificacao" na Segurança vale para quem nunca verificou e para quem verificou há mais de 30 dias
+    # (`hseq/epi._situacao`): com uma verificação registrada, não é "nunca" (18/11/2026: o dossiê da Mandaguaçu dizia
+    # "nunca verificadas na ronda; última verificação em 07/10/2026")
+    sit = _t((lv or {}).get("situacao"))
+    if sit == "sem_verificacao" and ult:
+        dias = PR._int((lv or {}).get("dias"))
+        sit_txt = f"sem verificação há {dias} dias" if dias is not None else "sem verificação no prazo"
+    else:
+        sit_txt = _LUVAS.get(sit, sit.replace("_", " "))
+    out.append("- Luvas de alta tensão: " + (SEM_DADO if not lv else _junta(sit_txt, ult_txt)))
     espera = p.get("pts_espera") or []
     out.append(f"- PT (permissão de trabalho) esperando o De acordo: {len(espera)}")
     for pt in espera:

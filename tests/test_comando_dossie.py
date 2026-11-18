@@ -57,7 +57,9 @@ def test_o_numero_do_dossie_e_o_do_prontuario(tela, logado):
     # o parecer e cada ponto de atenção, com a gravidade em palavras
     assert f"- Em uma frase: {p['parecer']['frase']}" in texto and "- Parecer: Pede ação agora (crítico)" in texto
     assert p["parecer"]["frase"] in html
-    assert len(p["atencao"]) == 10 and f"O que pede atenção agora ({len(p['atencao'])})" in texto
+    # 9 pontos: eram 10 até 18/11/2026, com o "1 extintor vencido" contado duas vezes (a Visão e o Insight R07 com o
+    # mesmo título; tests/test_comando_dossie_consertos_18_11.py)
+    assert len(p["atencao"]) == 9 and f"O que pede atenção agora ({len(p['atencao'])})" in texto
     for i in p["atencao"]:
         assert i["titulo"] in texto
     assert "- [crítico] Meta do mês em 85%: abaixo de 90% (a Visão gerencial chama de Abaixo)" in texto

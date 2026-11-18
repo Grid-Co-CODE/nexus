@@ -112,7 +112,10 @@ def r03_religamentos(equipamentos: list[dict]) -> list[dict]:
 # ── R05 ─────────────────────────────────────────────────────────────────────────────────────────────────────────────
 def r05_sem_comunicacao(abertas: list[dict], nome_usina) -> list[dict]:
     """A ocorrência de falha de comunicação aberta há mais de 24 h (o retrato da hora das abertas da Thopen, no banco:
-    `nexus_cos_normalizacoes · fato_ocorrencia_aberta`)."""
+    `nexus_cos_normalizacoes · fato_ocorrencia_aberta`). Quando a ocorrência cita o equipamento, o título e a ação são
+    dele, e não da usina (18/11/2026, o dossiê da Mandaguaçu: "sem comunicação há 283 dias" era a falha de comunicação
+    do INV2.8, aberta no COS desde 07/02; das 30 abertas daquele dia, 23 citavam o equipamento). A evidência diz desde
+    quando a ocorrência está aberta no COS."""
     out = []
     for o in abertas:
         if "COMUNICA" not in str(o.get("tipo_falha") or "").upper():
@@ -125,14 +128,18 @@ def r05_sem_comunicacao(abertas: list[dict], nome_usina) -> list[dict]:
             continue
         usina = nome_usina(o.get("usina_id")) or _txt(o.get("usina_codigo"))
         os_ = _txt(o.get("os"))
+        equip = _txt(o.get("equipamentos_citados"))[:60]
+        desde = _dia(o.get("data_id_inicio"))
         out.append(_insight(
             "R05", _txt(o.get("registro")) or f"{usina}:{os_}",
             "critico" if dias >= COMUNICACAO_CRITICO_DIAS else "atencao",
-            f"{usina}: sem comunicação há {dias} {'dia' if dias == 1 else 'dias'}",
-            [f"OS {os_}" if os_ else "ainda sem OS", "a geração parou (resposta do operador)" if str(o.get("geracao_parou"))
-             in ("1", "1.0", "True", "true") else ""],
-            "Acionar a TI e o campo para a comunicação: sem ela, a usina some do tempo real e a disponibilidade fica sem "
-            "medida.", usina, "/t/cos/ronda?cliente=Thopen", _dia(o.get("data_id_inicio"))))
+            f"{usina}: {equip + ' ' if equip else ''}sem comunicação há {dias} {'dia' if dias == 1 else 'dias'}",
+            [f"OS {os_}" if os_ else "ainda sem OS", f"aberta no COS em {desde.strftime('%d/%m/%Y')}" if desde else "",
+             "a geração parou (resposta do operador)" if str(o.get("geracao_parou")) in ("1", "1.0", "True", "true") else ""],
+            ("Acionar a TI e o campo para a comunicação do equipamento: sem ela, ele some do tempo real e a falha dele fica "
+             "sem medida." if equip else
+             "Acionar a TI e o campo para a comunicação: sem ela, a usina some do tempo real e a disponibilidade fica sem "
+             "medida."), usina, "/t/cos/ronda?cliente=Thopen", desde))
     return out
 
 

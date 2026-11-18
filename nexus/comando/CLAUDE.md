@@ -34,7 +34,7 @@ muito boa"; e "construa o que você sugere"). PRD e tarefas no formato do Taskma
 | Regra | Torre dona | Fonte |
 |---|---|---|
 | R03 religamento repetido na mesma cabine (3+ em 30 dias) | cos | `cos/religamentos.painel` sobre `andamento.ler_ocorrencias` de cada cliente |
-| R05 sem comunicação há mais de 24 h | cos | o banco: `nexus_cos_normalizacoes · fato_ocorrencia_aberta` (só Thopen) |
+| R05 sem comunicação há mais de 24 h (com o equipamento citado, o título e a ação são dele: "INV2.8 sem comunicação há 283 dias", e não a usina; a evidência diz desde quando está aberta no COS; 18/11/2026) | cos | o banco: `nexus_cos_normalizacoes · fato_ocorrencia_aberta` (só Thopen) |
 | R06* OS corretiva aberta em ativo que já tem chamado de garantia | chamados | o banco: `nexus_os · fato_tarefa_os` × `nexus_chamados · fato_chamado` (pelo `equipamento_id`) |
 | R07 extintor vencido | hseq | `hseq/extintores.extintores` + `decisoes.separar` (sem os excluídos) + `por_usina` |
 | R09 equipe acima da capacidade na semana | pcm | o banco do robô do PCM (`pcm/fonte.ler`): `resumo` da `semana_ativa`, `hh_util > hh_disp` |
@@ -345,6 +345,13 @@ nenhuma tela a lê; as correntes das strings só existem na moldura da plataform
 tem as abertas; as concluídas estão no Histórico de OS do OS Creator); as características da UFV (pediria um livro
 novo no cadastro). Entram quando a fonte existir, cada uma pela tela dona.
 
+**O ponto de atenção não conta em dobro (18/11/2026**, achado no dossiê da Mandaguaçu, Levi: "pode fazer todos os
+consertos necessários!"): o Insight com o MESMO título de um ponto que a Visão do responsável ou o COS já apontou
+(`prontuario.atencao`, pelo título sem acento, caixa nem ponto final: "1 extintor vencido" da Visão e da R07, "Sem ronda
+há 42 dias" da Visão e da R11) não entra de novo. O ponto fica uma vez, na seção da tela dona, com o tom mais grave dos
+dois e a ação do Insight no detalhe quando a Visão não trouxe detalhe. A frase do parecer e as Pendências do painel
+contam assim (a Mandaguaçu dizia 11 pontos críticos onde eram 9). Prova: `tests/test_comando_dossie_consertos_18_11.py`.
+
 **Prova.** `tests/test_comando_prontuario.py` (a conta do parecer, do painel e do cartão das OS; as OS de cada estado na
 tela dona; as formas do Criar OS apontando para rotas que o OS Creator tem; o ligador geral ligando o código pela regra da casa; a página nas
 duas portas, o relatório pelo Comando e o que a pessoa sem a tela não vê), `tests/test_campo_central_usina_0411.py` (a aba) e `tests/test_comando_usinas.py`. E a renderização com o
@@ -558,6 +565,16 @@ prontuário (é o mesmo dado); o atalho "Dossiê para a IA" no prontuário apare
   ao provedor da IA): sem os nomes, `_insights` tira a evidência que começa pelo papel de uma pessoa (técnico,
   responsável, supervisor, gestor, solicitante, coordenador) e a que traz um nome conhecido do prontuário; as outras
   evidências e a ação ficam. Prova: `test_o_nome_na_evidencia_do_insight_nao_vai_a_ia`;
+- **os consertos de 18/11/2026** (a conferência do dossiê da Mandaguaçu; `tests/test_comando_dossie_consertos_18_11.py`):
+  as **luvas** "sem_verificacao" com uma verificação registrada saem "sem verificação há N dias" (a situação da
+  Segurança vale para quem nunca verificou e para quem verificou há mais de 30 dias; o dossiê dizia "nunca verificadas
+  na ronda; última verificação em 07/10"); e na seção dos **equipamentos** quem só tem tarefa de preventiva (sem
+  corretiva, pausa nem chamado) sai da tabela para UMA linha, pelo nome, agrupado pelas OS, a partir de 5
+  (`MIN_SO_PREVENTIVA`): eram 23 a 30 linhas repetindo as duas OS de preventiva, que a seção das OS já lista. O dossiê
+  ficou 4 a 8% menor nas três usinas conferidas, sem perder nenhum número de OS. **O que NÃO foi cortado, de
+  propósito:** a tabela "As N mais recentes" do COS (as instruções da IA citam a coluna "A geração parou") e os
+  eventos do COS e dos chamados na linha do tempo (a ordem no tempo entre as fontes é o que ela dá). O dossiê não é o
+  que pesa na espera da IA (17 a 30 mil caracteres): o que pesa é o pensamento do modelo e a resposta sem streaming;
 - os tokens são ESTIMATIVA (4 caracteres por token): a conta exata só a API dá.
 
 **O que aconteceu em cada parada** (14/11/2026, Levi: "Quando eu perguntei por que a usina caiu, a IA não conseguiu

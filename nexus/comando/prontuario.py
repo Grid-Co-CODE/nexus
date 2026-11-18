@@ -38,6 +38,8 @@ De onde vem cada parte:
 - a composição: a ficha da usina no cadastro (os rótulos são os de `cadastro/esquema.py`) e a estrutura do Nexus;
 - a linha do tempo: as rondas, as normalizações do COS, as PT, os chamados e as OS abertas, numa lista só, por dia.
 """
+import re
+import unicodedata
 from datetime import date, datetime, timedelta, timezone
 
 from . import usinas as CU
@@ -139,6 +141,12 @@ def sem_o_nome(titulo: str, usina: str) -> str:
     return t
 
 
+def _chave_do_ponto(titulo) -> str:
+    """O título sem acento, sem caixa e sem o ponto final: o mesmo ponto dito pela Visão do responsável e por um Insight."""
+    t = unicodedata.normalize("NFD", str(titulo or "")).encode("ascii", "ignore").decode().lower()
+    return re.sub(r"\s+", " ", t).strip(" .")
+
+
 def atencao(u: dict | None, os_cos: list | None, insights: list | None, demandas=(), usina: str = "") -> list[dict]:
     """O que pede atenção agora na usina, o mais grave primeiro: [{tom, titulo, detalhe, secao}]. `u` = a linha da
     Visão do responsável (com `perf`, `manut` e `acomp`); `os_cos` = as ocorrências abertas do COS já classificadas
@@ -154,11 +162,20 @@ def atencao(u: dict | None, os_cos: list | None, insights: list | None, demandas
         partes = [o.get("os_rotulo") or "", f"aberta {o['ha']}" if o.get("ha") else "", o.get("etapa") or ""]
         itens.append({"tom": o.get("tom") or "alerta", "titulo": f"No COS: {o.get('motivo') or o.get('rotulo') or 'ocorrência aberta'}",
                       "detalhe": " · ".join(p for p in partes if p), "secao": "cos"})
+    # o Insight com o MESMO título de um ponto que a Visão (ou o COS) já apontou não conta de novo (18/11/2026, o dossiê
+    # da Mandaguaçu: "1 extintor vencido" e "Sem ronda há 42 dias" vinham da Visão e das regras R07 e R11, e a frase
+    # dizia "11 pontos críticos" onde eram 9). O ponto fica uma vez, na seção da tela dona, com o tom mais grave dos
+    # dois e a ação do Insight no detalhe, se a Visão não trouxe detalhe
+    ja = {_chave_do_ponto(i["titulo"]): i for i in itens}
     for i in insights or []:
         if i.get("sev") in ("critico", "atencao"):
-            itens.append({"tom": "critico" if i["sev"] == "critico" else "alerta",
-                          "titulo": sem_o_nome(i.get("titulo"), usina), "detalhe": str(i.get("acao") or ""),
-                          "secao": "insights"})
+            tom, titulo = "critico" if i["sev"] == "critico" else "alerta", sem_o_nome(i.get("titulo"), usina)
+            mesmo = ja.get(_chave_do_ponto(titulo))
+            if mesmo is not None:
+                mesmo["tom"] = "critico" if "critico" in (mesmo["tom"], tom) else mesmo["tom"]
+                mesmo["detalhe"] = mesmo["detalhe"] or str(i.get("acao") or "")
+                continue
+            itens.append({"tom": tom, "titulo": titulo, "detalhe": str(i.get("acao") or ""), "secao": "insights"})
     for d in demandas or []:
         if (d.get("estado") or {}).get("vencida"):
             itens.append({"tom": "critico", "titulo": f"Demanda vencida: {d.get('titulo') or ''}",
