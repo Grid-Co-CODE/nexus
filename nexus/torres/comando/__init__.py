@@ -1002,6 +1002,20 @@ def carteira_ia_demanda():
                    aviso="Demanda enviada. Ela está em \u201cQue eu pedi\u201d, na Caixa de entrada, e quem recebeu é avisado no sininho.")
 
 
+@bp_usinas.route("/ia/uso")
+def ia_uso():
+    """O painel de uso da Nexus IA no mês, para o administrador (18/11/2026): o gasto contra o teto, a projeção do mês e
+    as contas por dia, por origem, por modo e por modelo, lidas do registro (`ia.uso`). Só contas: nem o texto das
+    perguntas, nem quem perguntou."""
+    from ...comando import ia as IA
+    if not session.get("admin"):
+        abort(403)
+    resp = current_app.make_response(render_template("comando/ia_uso.html", torre=_torre_usinas()[0],
+                                                     tela=_torre_usinas()[1], u=IA.uso(current_app.config)))
+    resp.headers["Cache-Control"] = "no-store"
+    return resp
+
+
 @bp_usinas.route("/dossie-da-carteira.md")
 def carteira_dossie_md():
     """O dossiê da carteira em texto (o que a IA lê), para o administrador conferir."""

@@ -1126,6 +1126,82 @@ def gasto_do_mes(cfg, agora: datetime | None = None) -> float:
     return round(total, 4)
 
 
+# ── o uso do mês (o painel do administrador, 18/11/2026) ─────────────────────────────────────────────────────────────
+# O gasto e o tempo só apareciam no rodapé de cada cartão: não dava para saber quanto do teto o diagnóstico diário
+# consome, nem comparar Busca com Pensamento. O painel lê o registro do mês e mostra SÓ contas: nem o texto das
+# perguntas, nem quem perguntou.
+_ORIGENS = (("[diagnóstico do dia]", "Diagnóstico do dia"), ("[diagnóstico do mês", "Diagnóstico do mês"),
+            ("[carteira]", "Pergunta na carteira"))
+_MODOS = {"busca": "Busca", "pensamento": "Pensamento"}
+_MESES_NOME = ("janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro",
+               "novembro", "dezembro")
+
+
+def _agora_brt() -> datetime:
+    return datetime.now(_BRT)
+
+
+def _grupos(linhas: list[dict], chave) -> list[dict]:
+    """As linhas agrupadas por `chave(linha)`, na ordem em que cada grupo aparece: {nome, n, ok, falhas, custo, s_medio
+    (das que deram certo), saida_media (tokens de saída das que deram certo)}."""
+    por: dict = {}
+    for l in linhas:
+        g = por.setdefault(chave(l), {"n": 0, "ok": 0, "custo": 0.0, "ms": [], "saida": []})
+        g["n"] += 1
+        g["custo"] += float(l.get("custo_usd") or 0)
+        if l.get("ok"):
+            g["ok"] += 1
+            if l.get("ms") is not None:
+                g["ms"].append(float(l["ms"]))
+            if l.get("saida") is not None:
+                g["saida"].append(float(l["saida"]))
+    return [{"nome": nome, "n": g["n"], "ok": g["ok"], "falhas": g["n"] - g["ok"], "custo": round(g["custo"], 4),
+             "s_medio": round(sum(g["ms"]) / len(g["ms"]) / 1000, 1) if g["ms"] else None,
+             "saida_media": round(sum(g["saida"]) / len(g["saida"])) if g["saida"] else None} for nome, g in por.items()]
+
+
+def uso(cfg, agora: datetime | None = None) -> dict:
+    """O uso da Nexus IA no mês, do registro (`perguntas-AAAA-MM.jsonl`): {mes, respostas, gasto, teto, projecao (o gasto
+    até hoje levado ao mês inteiro), dias (o mais novo primeiro), origens, modos, modelos, falhas [(o erro, quantas)]}.
+    Sem o registro, tudo zerado. Linha estragada é pulada."""
+    agora = agora or _agora_brt()
+    arq = _arquivo_do_mes(cfg, agora)
+    linhas = []
+    if arq and arq.exists():
+        with arq.open(encoding="utf-8") as f:
+            for bruta in f:
+                try:
+                    l = json.loads(bruta)
+                except ValueError:
+                    continue
+                if isinstance(l, dict):
+                    linhas.append(l)
+    gasto = round(sum(float(l.get("custo_usd") or 0) for l in linhas), 4)
+    import calendar
+    dias_do_mes = calendar.monthrange(agora.year, agora.month)[1]
+
+    def origem(l):
+        p = str(l.get("pergunta") or "")
+        return next((nome for marca, nome in _ORIGENS if p.startswith(marca)), "Pergunta na usina")
+
+    def dia(l):
+        em = str(l.get("em") or "")
+        return f"{em[8:10]}/{em[5:7]}" if len(em) >= 10 else "sem data"
+
+    erros: dict = {}
+    for l in linhas:
+        if not l.get("ok"):
+            e = str(l.get("erro") or "sem resposta").strip().rstrip(".")[:90]
+            erros[e] = erros.get(e, 0) + 1
+    por_dia = _grupos(sorted(linhas, key=lambda l: str(l.get("em") or ""), reverse=True), dia)
+    return {"mes": f"{_MESES_NOME[agora.month - 1]} de {agora.year}", "respostas": len(linhas), "gasto": gasto,
+            "teto": teto(cfg), "projecao": round(gasto / agora.day * dias_do_mes, 2), "dias": por_dia,
+            "origens": _grupos(linhas, origem),
+            "modos": _grupos(linhas, lambda l: _MODOS.get(str(l.get("modo") or ""), "Sem modo (IA grátis ou falha)")),
+            "modelos": _grupos(linhas, lambda l: str(l.get("modelo") or "sem modelo")),
+            "falhas": sorted(erros.items(), key=lambda x: (-x[1], x[0]))}
+
+
 def teto(cfg) -> float:
     try:
         return float(cfg.get("NEXUS_IA_TETO_USD") or TETO_PADRAO_USD)

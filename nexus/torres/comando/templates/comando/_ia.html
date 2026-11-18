@@ -33,7 +33,7 @@
           </label>
           {% endfor %}
         </fieldset>
-        <p class="ia-pe mudo">Gasto do mês: <b class="gc-num" data-ia-gasto>US$ {{ ('%.2f'|format(gasto)).replace('.', ',') }}</b> de US$ {{ ('%.2f'|format(teto)).replace('.', ',') }}. A resposta vem só do dossiê de agora, sem o nome das pessoas.</p>
+        <p class="ia-pe mudo">Gasto do mês: <b class="gc-num" data-ia-gasto>US$ {{ ('%.2f'|format(gasto)).replace('.', ',') }}</b> de US$ {{ ('%.2f'|format(teto)).replace('.', ',') }}. A resposta vem só do dossiê de agora, sem o nome das pessoas.{% if session.get('admin') %} <a class="cn-link" href="{{ raiz }}/t/campo/usinas/ia/uso" target="_blank" rel="noopener">Ver o uso do mês</a>{% endif %}</p>
       </div>
     </details>
   </div>

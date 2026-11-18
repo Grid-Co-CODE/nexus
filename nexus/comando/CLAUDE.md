@@ -694,6 +694,15 @@ Gemini, Groq, Grok [...] Qualquer IA que dê para puxar a API para fazermos o te
   Anthropic (crédito pré-pago, sem recarga automática). Cada
   resposta vai para `<NEXUS_DADOS>/ia/perguntas-AAAA-MM.jsonl` (usina, modelo, pergunta, resposta, tempo, tokens, custo,
   o HMAC de quem perguntou): é o material da comparação e a conta do teto. Teste sem `NEXUS_DADOS` não grava.
+- **O painel de uso** (18/11/2026; `ia.uso`, `/t/campo/usinas/ia/uso`, `comando/ia_uso.html`): só o administrador
+  abre (o link fica no "i" da caixa). Lê o registro do mês e mostra só contas: o gasto contra o teto, a projeção do mês
+  (o gasto até hoje no ritmo dos dias que passaram) e as respostas por origem (pergunta na usina, na carteira,
+  diagnóstico do dia, diagnóstico do mês), por modo (Busca, Pensamento), por modelo e por dia, com as falhas do mês.
+  Não mostra o texto das perguntas nem quem perguntou. O caso: o gasto e o tempo só apareciam no rodapé de cada
+  cartão, e não dava para saber quanto do teto o diagnóstico diário consome. Prova: `tests/test_comando_ia_uso_18_11.py`.
+- **O dossiê vai ao modelo sem o minuto da linha "Gerado em"** (18/11/2026; `ia.para_o_modelo`): a linha fica no alto e
+  mudava a cada minuto; o cache da Anthropic só vale com o bloco do dossiê idêntico, então a pergunta de seguimento um
+  minuto depois relia tudo pelo preço cheio. O dia fica; a tela "Dossiê para a IA" segue com a hora.
 - **A rodada de teste:** `python ferramentas/ia_comparar.py --usinas 68,23 [--modelos opus,grok] [--teto 5]` faz as
   perguntas do Levi a todos os modelos com chave, para cada usina, e escreve uma página HTML (e o JSON) com as respostas
   lado a lado e o resumo por modelo (tempo médio, custo, erros, números do dossiê). Para no `--teto` (US$).

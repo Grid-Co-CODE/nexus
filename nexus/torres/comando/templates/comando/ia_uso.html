@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block titulo %}Uso da Nexus IA{% endblock %}
+{% block conteudo %}
+<link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='comando.css') }}">
+{# O painel de uso da Nexus IA (18/11/2026), só para o administrador: o gasto do mês contra o teto, a projeção e as contas
+   por dia, por origem, por modo e por modelo, do registro das respostas (nexus/comando/ia.py, `uso`). Só contas: nem o
+   texto das perguntas, nem quem perguntou. #}
+{% macro us(v, casas=2) %}US$ {{ ('%.' ~ casas ~ 'f')|format(v)|replace('.', ',') }}{% endmacro %}
+{% macro n(v, casas=1) %}{% if v is none %}—{% else %}{{ ('%.' ~ casas ~ 'f')|format(v)|replace('.', ',') }}{% endif %}{% endmacro %}
+{% macro tabela(titulo, primeira, linhas, nota='') %}
+<section class="pm-sec">
+  <h2 class="pm-t">{{ titulo }}{% if nota %} <span class="mudo">· {{ nota }}</span>{% endif %}</h2>
+  {% if linhas %}
+  <div class="ia-tab-rola"><table class="ia-tab">
+    <thead><tr><th>{{ primeira }}</th><th class="ia-tab-num">Respostas</th><th class="ia-tab-num">Falhas</th><th class="ia-tab-num">Tempo médio</th><th class="ia-tab-num">Tokens de saída (média)</th><th class="ia-tab-num">Custo</th></tr></thead>
+    <tbody>{% for g in linhas %}<tr><td>{{ g.nome }}</td><td class="ia-tab-num">{{ g.n }}</td><td class="ia-tab-num">{{ g.falhas }}</td><td class="ia-tab-num">{% if g.s_medio is not none %}{{ n(g.s_medio) }} s{% else %}—{% endif %}</td><td class="ia-tab-num">{{ g.saida_media if g.saida_media is not none else '—' }}</td><td class="ia-tab-num">{{ us(g.custo, 4) }}</td></tr>{% endfor %}</tbody>
+  </table></div>
+  {% else %}<p class="mudo">Nenhuma resposta registrada neste mês.</p>{% endif %}
+</section>
+{% endmacro %}
+<div class="campo-nativa pm">
+  <p class="cmu-volta"><a class="cn-link" href="{{ raiz }}/t/campo/usinas"><i class="ph ph-arrow-left" aria-hidden="true"></i> Usinas</a></p>
+  <header class="cu-cab">
+    <div class="cu-id">
+      <p class="gc-eyebrow">Nexus IA · só o administrador vê</p>
+      <h1 class="cu-nome cmu-nome">Uso da Nexus IA <span class="pm-mes">{{ u.mes }}</span></h1>
+      <p class="cu-onde">As contas saem do registro de cada resposta. Não mostra o texto das perguntas nem quem perguntou.</p>
+    </div>
+  </header>
+
+  <section class="pm-sec">
+    <h2 class="pm-t">O mês</h2>
+    <div class="pm-kpis">
+      <div class="pm-kpi pm-kpi--{{ 'critico' if u.gasto >= u.teto else ('alerta' if u.gasto >= u.teto * 0.8 else 'ok') }}"><span class="pm-kpi-r">Gasto do mês</span><b>{{ us(u.gasto) }}</b><span class="pm-kpi-s">teto de {{ us(u.teto) }}; passou, respondem as IAs grátis</span></div>
+      <div class="pm-kpi pm-kpi--{{ 'critico' if u.projecao >= u.teto else ('alerta' if u.projecao >= u.teto * 0.8 else 'ok') }}"><span class="pm-kpi-r">Projeção do mês</span><b>{{ us(u.projecao) }}</b><span class="pm-kpi-s">o gasto até hoje, no ritmo dos dias que passaram</span></div>
+      <div class="pm-kpi"><span class="pm-kpi-r">Respostas</span><b>{{ u.respostas }}</b><span class="pm-kpi-s">perguntas e diagnósticos, uma por modelo que respondeu</span></div>
+      <div class="pm-kpi"><span class="pm-kpi-r">Falhas</span><b>{{ u.falhas|sum(attribute=1) }}</b><span class="pm-kpi-s">respostas que não saíram (a pergunta seguiu para outra IA)</span></div>
+    </div>
+  </section>
+
+  {{ tabela('Por origem', 'De onde veio', u.origens) }}
+  {{ tabela('Por modo', 'Modo', u.modos, 'Busca responde direto; Pensamento raciocina antes') }}
+  {{ tabela('Por modelo', 'Modelo', u.modelos) }}
+  {{ tabela('Por dia', 'Dia', u.dias, 'o mais recente primeiro') }}
+
+  <section class="pm-sec">
+    <h2 class="pm-t">Falhas do mês</h2>
+    {% if u.falhas %}
+    <ul class="pm-lista">{% for erro, qtd in u.falhas %}<li><b>{{ qtd }}</b> · {{ erro }}</li>{% endfor %}</ul>
+    {% else %}<p class="mudo">Nenhuma falha registrada neste mês.</p>{% endif %}
+  </section>
+</div>
+{% endblock %}
