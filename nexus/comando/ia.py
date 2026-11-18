@@ -312,6 +312,17 @@ def neutro(texto) -> str:
     return _RX_MARCAS.sub(lambda m: "‹" + m.group(0)[1:], str(texto or ""))
 
 
+_RX_GERADO_EM = re.compile(r"^(- Gerado em: \d{2}/\d{2}/\d{4}) às \d{2}:\d{2}", re.M)
+
+
+def para_o_modelo(dossie: str) -> str:
+    """O dossiê como vai ao provedor: sem as marcas que separam o pedido (`neutro`) e sem o MINUTO da linha "Gerado em"
+    (18/11/2026). A linha fica no alto e mudava a cada minuto; o cache da Anthropic só vale com o bloco do dossiê
+    idêntico, então a pergunta de seguimento feita um minuto depois relia tudo pelo preço cheio. O dia fica (a IA
+    precisa saber que dia é); a tela "Dossiê para a IA" segue mostrando a hora."""
+    return _RX_GERADO_EM.sub(r"\1", neutro(dossie), count=1)
+
+
 def _mensagens(historico, pergunta) -> list[dict]:
     msgs = []
     for h in (historico or [])[-MAX_HISTORICO:]:
@@ -598,9 +609,9 @@ def responder(cfg, m: Modelo, dossie: str, pergunta: str, historico=None, setore
         extra = (instrucoes,) if instrucoes else ()      # as da carteira; sem elas, as da usina
         modo = {"pensar": False} if not pensar and m.provedor == "anthropic" else {}
         if m.provedor in VAGAS:
-            chamada = lambda: _chamar_rodizio(cfg, m, neutro(dossie), _mensagens(historico, pergunta), ctx, *extra, **modo)  # noqa: E731
+            chamada = lambda: _chamar_rodizio(cfg, m, para_o_modelo(dossie), _mensagens(historico, pergunta), ctx, *extra, **modo)  # noqa: E731
         else:
-            chamada = lambda: _chamar(m, k, neutro(dossie), _mensagens(historico, pergunta), ctx, *extra, **modo)  # noqa: E731
+            chamada = lambda: _chamar(m, k, para_o_modelo(dossie), _mensagens(historico, pergunta), ctx, *extra, **modo)  # noqa: E731
         # o teto do tempo inteiro (16/11/2026: no servidor, o Nemotron grátis levou 146,8 s para voltar vazio; o OpenRouter
         # manda espaços enquanto processa, e o tempo de leitura do `requests` nunca vence). Passou do teto, a pergunta
         # segue sem esta resposta (e vai ao próximo grátis); a chamada termina sozinha por trás
@@ -688,7 +699,7 @@ def responder_em_fluxo(cfg, m: Modelo, dossie: str, pergunta: str, historico=Non
 
     def trabalho():
         try:
-            for ev in _fluxo_anthropic(m, k, neutro(dossie), _mensagens(historico, pergunta), ctx, instrucoes, pensar):
+            for ev in _fluxo_anthropic(m, k, para_o_modelo(dossie), _mensagens(historico, pergunta), ctx, instrucoes, pensar):
                 fila.put(ev)
         except Exception as ex:      # noqa: BLE001 — a falha vira a resposta de erro, como no `responder`
             log.exception("IA: %s falhou no fluxo", m.id)

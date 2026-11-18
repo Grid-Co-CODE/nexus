@@ -95,6 +95,24 @@ def test_a_anthropic_que_recusa_o_sem_pensamento_responde_pensando(sdk, tmp_path
     assert not r["ok"] and len(sdk.pedidos) == 1
 
 
+def test_o_dossie_vai_ao_modelo_sem_o_minuto_em_que_foi_gerado(sdk, tmp_path):
+    # a linha "Gerado em: dd/mm/aaaa às HH:MM" fica no alto do dossiê e muda a cada minuto. O cache da Anthropic só vale
+    # com o bloco do dossiê idêntico: com o minuto, a pergunta de seguimento feita um minuto depois relia os 18 mil
+    # tokens pelo preço cheio. A tela "Dossiê para a IA" segue mostrando a hora; o que vai ao modelo leva só o dia
+    cfg = _cfg(tmp_path)
+    d1 = ("# Dossiê da usina X\n\n- Gerado em: 18/11/2026 às 10:57, horário de Brasília\n\n"
+          "## 3. Performance\n- PR: 78,4%\n")
+    d2 = d1.replace("10:57", "10:58")
+    IA.perguntar(cfg, ["haiku"], d1, "Como foi?", pensar=False)
+    um = sdk.pedidos[-1]["system"][1]["text"]
+    IA.perguntar(cfg, ["haiku"], d2, "E o PR?", pensar=False)
+    assert sdk.pedidos[-1]["system"][1]["text"] == um
+    assert "- Gerado em: 18/11/2026, horário de Brasília" in um and "10:57" not in um and "- PR: 78,4%" in um
+    list(IA.perguntar_em_fluxo(cfg, ["haiku"], d2, "E a meta?", pensar=False))
+    assert sdk.pedidos[-1]["system"][1]["text"] == um
+    assert IA.para_o_modelo("sem a linha") == "sem a linha"
+
+
 # ── as rotas e a tela ────────────────────────────────────────────────────────────────────────────────────────────────
 def _lidos(resp):
     return [json.loads(l[6:]) for l in resp.get_data(as_text=True).split("\n") if l.startswith("data: ")]
