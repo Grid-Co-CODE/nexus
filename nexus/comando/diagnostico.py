@@ -35,6 +35,9 @@ MODELO_PADRAO = "nemotron"       # o grátis com a melhor nota no teste de 14/11
                                  # (com a chave da NVIDIA, o mesmo Nemotron vai por ela: `modelo`)
 ESPERA_ERRO_S = 20 * 60          # o erro guardado vale isto; depois a próxima abertura tenta de novo
 TRAVA_MORTA_S = 5 * 60           # a trava mais velha que isto é de um pedido que morreu (o servidor reiniciou)
+# o diagnóstico vai em Busca, sem o pensamento do Claude (18/11/2026, Levi, com a 1ª abertura do dia em 40 s: "diagnóstico
+# em busca, rode alguns diagnósticos e bata os dados para ver se a informação está confiável"). True volta a pensar
+PENSAR = False
 MAX_DIAS_ANTERIOR = 7            # o diagnóstico mais velho que isto não aparece enquanto o de hoje é feito (o de sexta
                                  # serve na segunda; o da semana retrasada já fala de outra usina)
 MAX_ITENS = {"tem_que_fazer": 4, "pode_fazer": 3, "pendente": 4}
@@ -264,7 +267,7 @@ def gerar(cfg, usina_id: int, dossie: str, dossie_tokens: int = 0, dia: str | No
     pasta = _pasta(cfg, dia)
     try:
         rs = IA.perguntar(cfg, [modelo(cfg)], dossie, PEDIDO + lista_de_temas(setores),
-                          setores=[s["nome"] for s in setores or []])
+                          setores=[s["nome"] for s in setores or []], pensar=PENSAR)
         r = rs[0] if rs else {"ok": False, "erro": "Nenhuma IA ligada para o diagnóstico."}
         IA.registrar(cfg, usina_id, "[diagnóstico do dia]", rs, "diagnostico-do-dia", dossie_tokens)
         agora = datetime.now(IA._BRT)

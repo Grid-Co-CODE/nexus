@@ -770,7 +770,7 @@ def _bateu_o_limite(r: dict) -> bool:
 def perguntar(cfg, ids: list[str], dossie: str, pergunta: str, historico=None, setores=None,
               meu_setor: str = "", instrucoes: str = "", pensar: bool = True) -> list[dict]:
     """Os modelos pedidos, em paralelo, na ordem pedida. Id desconhecido é ignorado. `pensar=False` é o modo Busca da
-    caixa da pergunta (o Claude responde sem pensar antes); quem não diz (o diagnóstico do dia) segue pensando.
+    caixa da pergunta e do diagnóstico do dia (o Claude responde sem pensar antes); quem não diz segue pensando.
 
     A troca (14/11/2026, Levi: "eu poderia criar umas 3 ou 4 contas com essa API de Nemotron. E aí, caso uma ultrapasse a
     cota, a gente começa a usar a outra"): os termos do OpenRouter proíbem várias contas para contornar o limite (seção

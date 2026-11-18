@@ -659,8 +659,9 @@ Gemini, Groq, Grok [...] Qualquer IA que dê para puxar a API para fazermos o te
       antes. O esforço (`ESFORCO`) e o bloco do dossiê não mudam, então o cache do dossiê vale nos dois modos.
     - **Só o Claude tem os dois modos.** Sem a chave da Anthropic os botões não aparecem; nos outros provedores o
       `pensar` não muda nada.
-    - **Quem não diz o modo segue pensando** (`pensar=True` é o padrão do `perguntar` e do `responder`): o diagnóstico
-      do dia não passa pela caixa e continua com pensamento.
+    - **Quem não diz o modo segue pensando** (`pensar=True` é o padrão do `perguntar` e do `responder`). **O diagnóstico
+      do dia diz Busca** (`diagnostico.PENSAR = False`; 18/11/2026, Levi: "diagnóstico em busca, rode alguns diagnósticos e
+      bata os dados para ver se a informação está confiável"): a 1ª abertura do dia levava 40 s com pensamento.
     - A resposta do Claude traz `modo` ("busca" ou "pensamento"), o pé do cartão diz "com pensamento", e o registro do
       mês guarda o modo (para comparar o tempo dos dois).
     - **A recusa do `thinking: disabled` não derruba a pergunta:** o parâmetro não pôde ser provado contra a API de
@@ -946,8 +947,9 @@ o que é que ele tem que fazer".
     - A tela desenha esse diagnóstico inteiro, com o selo "Nexus IA Insights · de dd/mm" e a linha "Este é o
       diagnóstico de dd/mm [...] O de hoje está sendo feito e entra aqui sozinho", e troca pelo de hoje quando chega.
     - Sem diagnóstico anterior (a usina que ninguém abriu na semana), fica o parecer de sempre com o aviso, como antes.
-    - O diagnóstico de hoje não ficou mais rápido: ele segue com pensamento (o Busca/Pensamento é só da caixa de
-      pergunta). Prova: `tests/test_comando_diagnostico_anterior_18_11.py`.
+    - Prova: `tests/test_comando_diagnostico_anterior_18_11.py`.
+  - **O diagnóstico vai em Busca** (`PENSAR = False`, desde 18/11/2026): o Claude escreve só o diagnóstico, sem o
+    rascunho de antes. Voltar a pensar é trocar a constante. Prova: `tests/test_comando_ia_modo_18_11.py`.
   - Quem abre depois lê o guardado, sem chamar a IA.
   - A trava com mais de 5 min é de um pedido que morreu (o servidor reiniciou) e é refeita.
 - **A IA:** é a do Nexus IA (`ia.perguntar`), com as mesmas instruções e blindagem. O pedido é o `PEDIDO`:

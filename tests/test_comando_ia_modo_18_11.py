@@ -5,7 +5,8 @@ pensamento".
 
 Como funciona: a caixa da pergunta tem os dois modos, com Busca marcado. Em Busca, o Claude responde direto pelo dossiê
 (`thinking: disabled` no pedido, `max_tokens` menor); em Pensamento, o pedido vai como antes. O modo vai no JSON da
-pergunta (`modo`), e sem ele vale Busca. O diagnóstico do dia não passa por aqui e continua pensando. Se a Anthropic
+pergunta (`modo`), e sem ele vale Busca. O diagnóstico do dia também vai em Busca (no mesmo dia, Levi: "diagnóstico em
+busca, rode alguns diagnósticos e bata os dados para ver se a informação está confiável"). Se a Anthropic
 recusar o `thinking: disabled`, o pedido é refeito sem ele, e a resposta diz que foi com pensamento. Nenhum teste vai
 à rede: o SDK é um dublê."""
 import inspect
@@ -38,8 +39,22 @@ def test_em_busca_o_pedido_vai_sem_pensamento_e_em_pensamento_como_antes():
     assert busca["system"] == pensa["system"] and busca["messages"] == pensa["messages"]
 
 
+def test_o_diagnostico_do_dia_vai_em_busca(tmp_path, monkeypatch):
+    # a 1ª abertura do dia levava 40 s com pensamento (Levi, 18/11/2026); em Busca o Claude escreve só o diagnóstico
+    from nexus.comando import diagnostico as DG
+    visto = {}
+
+    def perguntar(cfg, ids, dossie, pergunta, *a, **k):
+        visto.update(k)
+        return [{"id": "haiku", "rotulo": "Claude Haiku 5.5", "ok": True, "texto": '<diagnostico>{"situacao": "Ok."}</diagnostico>'}]
+    monkeypatch.setattr(IA, "perguntar", perguntar)
+    assert DG.PENSAR is False
+    assert DG.gerar({"NEXUS_DADOS": str(tmp_path), "ANTHROPIC_API_KEY": "k"}, 1, DOSSIE, 100, "2026-11-18")["ok"]
+    assert visto["pensar"] is False
+
+
 def test_quem_nao_diz_o_modo_pensa_como_antes():
-    # o diagnóstico do dia chama o `perguntar` sem o modo: continua pensando (é a análise pesada)
+    # o padrão das funções segue "pensar": quem quer Busca diz (a caixa da pergunta e o diagnóstico do dia dizem)
     for f in (IA.perguntar, IA.responder, IA.perguntar_em_fluxo, IA.responder_em_fluxo):
         assert inspect.signature(f).parameters["pensar"].default is True, f.__name__
 
