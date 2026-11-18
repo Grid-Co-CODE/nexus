@@ -586,44 +586,110 @@ def _ia_relatorio(usina_id: int, pedido: dict) -> dict:
             "temas": [temas[t] for t in pedido["temas"]], "aviso": aviso}
 
 
-@bp_usinas.route("/<int:usina_id>/ia/perguntar", methods=["POST"])
-def usina_ia_perguntar(usina_id):
-    """JSON {pergunta, modelos: [ids], historico: [{pergunta, resposta}]} -> {ok, respostas, dossie_tokens, gasto, teto}.
-    O dossiê é montado AGORA (o mesmo do "Dossiê para a IA"), uma vez para todos os modelos pedidos."""
+def _ia_pedido(usina_id: int):
+    """A conferência comum às duas rotas da pergunta (a de sempre e a em fluxo). Devolve (a resposta pronta, None) na
+    recusa e no pedido de relatório, ou (None, o pedido conferido, com o dossiê montado AGORA: o mesmo do "Dossiê para
+    a IA", uma vez para todos os modelos pedidos)."""
     from flask import jsonify
 
+    from ...campo import visao
     from ...comando import ia as IA
     if _de_outro_site():
-        return jsonify(ok=False, erro="Pedido de outro site."), 403
+        return (jsonify(ok=False, erro="Pedido de outro site."), 403), None
     b = request.get_json(silent=True) or {}
     pergunta = IA.limpar_pergunta(b.get("pergunta"))
     ids = [str(i) for i in (b.get("modelos") or []) if isinstance(i, str)][:10]
     if not pergunta:
-        return jsonify(ok=False, erro="Escreva a pergunta."), 400
+        return (jsonify(ok=False, erro="Escreva a pergunta."), 400), None
     if not ids:
-        return jsonify(ok=False, erro="Escolha ao menos um modelo."), 400
-    cfg = current_app.config
+        return (jsonify(ok=False, erro="Escolha ao menos um modelo."), 400), None
     # o pedido de relatório baixa o PDF do prontuário, sem gastar pedido da IA (14/11/2026, Levi: "se eu pedisse um
     # relatório já baixa um automático que já temos criado [...] se eu pedir só chamado vem filtrado só chamado")
-    from ...campo import visao
     rel = IA.pedido_de_relatorio(pergunta, visao._agora().date())
     if rel:
-        return jsonify(ok=True, relatorio=_ia_relatorio(usina_id, rel), respostas=[])
-    # o teto do mês não barra a pergunta (18/11/2026): passou, o pago para e as grátis respondem (`IA.perguntar`)
-    teto = IA.teto(cfg)
+        return jsonify(ok=True, relatorio=_ia_relatorio(usina_id, rel), respostas=[]), None
     historico = [h for h in (b.get("historico") or []) if isinstance(h, dict)][-IA.MAX_HISTORICO:]
     _ctx, d = _dossie(usina_id)
-    setores = [s["nome"] for s in _ia_setores()]
-    respostas = IA.perguntar(cfg, ids, d["texto"], pergunta, historico, setores=setores, meu_setor=_ia_meu_setor())
-    IA.registrar(cfg, usina_id, pergunta, respostas, _meu_hmac(), d["tokens_estimados"])
-    # a oferta do relatório do tema da conversa (14/11/2026, Levi: "baixar relatório de religamento, baixar relatório de
-    # COS, baixar relatório de performance"): o PDF do prontuário só com aquele tema, no mês da conversa
+    return None, {"pergunta": pergunta, "ids": ids, "historico": historico, "dossie": d, "quem": _meu_hmac(),
+                  "setores": [s["nome"] for s in _ia_setores()], "meu_setor": _ia_meu_setor()}
+
+
+def _ia_fecho(usina_id: int, p: dict, respostas: list) -> dict:
+    """O que a tela recebe com as respostas: o tamanho do dossiê, o gasto do mês, o teto e a oferta do relatório do tema
+    da conversa (14/11/2026, Levi: "baixar relatório de religamento, baixar relatório de COS, baixar relatório de
+    performance"): o PDF do prontuário só com aquele tema, no mês da conversa."""
+    from ...campo import visao
+    from ...comando import ia as IA
+    cfg = current_app.config
     primeira = next((r for r in respostas if r.get("ok")), {})
-    mes = IA.mes_da_conversa(pergunta, visao._agora().date())
-    relatorios = [_ia_relatorio(usina_id, {"temas": [t], "mes": mes}) for t in IA.temas_da_conversa(pergunta, primeira.get("texto") or "")]
-    resp = jsonify(ok=True, respostas=respostas, dossie_tokens=d["tokens_estimados"], gasto=IA.gasto_do_mes(cfg),
-                   teto=teto, relatorios=relatorios)
+    mes = IA.mes_da_conversa(p["pergunta"], visao._agora().date())
+    relatorios = [_ia_relatorio(usina_id, {"temas": [t], "mes": mes})
+                  for t in IA.temas_da_conversa(p["pergunta"], primeira.get("texto") or "")]
+    return {"ok": True, "respostas": respostas, "dossie_tokens": p["dossie"]["tokens_estimados"],
+            "gasto": IA.gasto_do_mes(cfg), "teto": IA.teto(cfg), "relatorios": relatorios}
+
+
+@bp_usinas.route("/<int:usina_id>/ia/perguntar", methods=["POST"])
+def usina_ia_perguntar(usina_id):
+    """JSON {pergunta, modelos: [ids], historico: [{pergunta, resposta}]} -> {ok, respostas, dossie_tokens, gasto, teto}.
+    O teto do mês não barra a pergunta (18/11/2026): passou, o pago para e as grátis respondem (`IA.perguntar`)."""
+    from flask import jsonify
+
+    from ...comando import ia as IA
+    recusa, p = _ia_pedido(usina_id)
+    if recusa is not None:
+        return recusa
+    cfg = current_app.config
+    respostas = IA.perguntar(cfg, p["ids"], p["dossie"]["texto"], p["pergunta"], p["historico"], setores=p["setores"],
+                             meu_setor=p["meu_setor"])
+    IA.registrar(cfg, usina_id, p["pergunta"], respostas, p["quem"], p["dossie"]["tokens_estimados"])
+    resp = jsonify(**_ia_fecho(usina_id, p, respostas))
     resp.headers["Cache-Control"] = "no-store"
+    return resp
+
+
+@bp_usinas.route("/<int:usina_id>/ia/perguntar/fluxo", methods=["POST"])
+def usina_ia_perguntar_fluxo(usina_id):
+    """A mesma pergunta, com o texto chegando enquanto a IA escreve (18/11/2026, Levi, com a resposta do Haiku em 17,1 s
+    numa pergunta simples: "demorou muito"; à pergunta "Quer que o texto apareça enquanto a IA escreve?": "Sim"). O
+    pedido é o da rota de sempre, e a recusa e o relatório voltam em JSON, iguais. A resposta é `text/event-stream`,
+    uma linha `data: {json}` por evento, com `t`: "inicio" (o dossiê está montado e a pergunta saiu), "pensando",
+    "texto" (o trecho em `d`) e "fim" (o mesmo JSON da rota de sempre). O registro do gasto acontece mesmo com a tela
+    fechada no meio: a resposta termina por trás, porque a Anthropic cobra por ela do mesmo jeito. As regras de quando
+    há texto ao vivo: `IA.perguntar_em_fluxo`."""
+    import json
+
+    from flask import stream_with_context
+
+    from ...comando import ia as IA
+    recusa, p = _ia_pedido(usina_id)
+    if recusa is not None:
+        return recusa
+    cfg = current_app.config
+
+    def evento(t: str, **k) -> str:
+        return "data: " + json.dumps(dict(k, t=t), ensure_ascii=False) + "\n\n"
+
+    def gerar():
+        fluxo = IA.perguntar_em_fluxo(cfg, p["ids"], p["dossie"]["texto"], p["pergunta"], p["historico"],
+                                      setores=p["setores"], meu_setor=p["meu_setor"])
+        respostas = None
+        try:
+            yield evento("inicio")
+            for tipo, dado in fluxo:
+                if tipo == "fim":
+                    respostas = dado
+                else:
+                    yield evento(tipo, d=dado)
+        finally:
+            if respostas is None:           # a tela fechou no meio: a resposta termina por trás, para o gasto entrar
+                respostas = next((dado for tipo, dado in fluxo if tipo == "fim"), [])
+            IA.registrar(cfg, usina_id, p["pergunta"], respostas, p["quem"], p["dossie"]["tokens_estimados"])
+        yield evento("fim", **_ia_fecho(usina_id, p, respostas))
+
+    resp = current_app.response_class(stream_with_context(gerar()), mimetype="text/event-stream")
+    resp.headers["Cache-Control"] = "no-store"
+    resp.headers["X-Accel-Buffering"] = "no"        # o proxy não junta os pedaços
     return resp
 
 

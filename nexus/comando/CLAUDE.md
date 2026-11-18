@@ -622,6 +622,33 @@ Gemini, Groq, Grok [...] Qualquer IA que dê para puxar a API para fazermos o te
     foi `high` por algumas horas em 18/11/2026 e voltou no mesmo dia: Levi, achando a resposta lenta, "bote no potência
     média") e `max_tokens` 16.000 (`MAX_SAIDA_ANTHROPIC`: o pensamento conta dentro). Ele não tem a reserva da
     Anthropic para a recusa: o Opus e o Sonnet, pelo `NEXUS_IA_MODELOS`, vão com `fallbacks: "default"` e esforço `low`.
+  - **O texto aparece enquanto o Haiku escreve** (18/11/2026, Levi, com a linha "17,1 s · 16 → 2.231 tokens" numa
+    pergunta simples: "demorou muito"; à pergunta "Quer que o texto apareça enquanto a IA escreve?": "Sim"). A resposta
+    não fica mais rápida; a tela é que para de esperar por ela inteira. Como funciona:
+    - A rota `POST /t/campo/usinas/<id>/ia/perguntar/fluxo` recebe o mesmo pedido da de sempre e responde
+      `text/event-stream`, uma linha `data: {json}` por evento, com `t`: `inicio` (dossiê montado, pergunta enviada),
+      `pensando`, `texto` (o trecho em `d`) e `fim` (o MESMO JSON da rota de sempre). A recusa (400, 403, 404) e o pedido
+      de relatório voltam em JSON, iguais. A conferência do pedido e o fecho são comuns às duas rotas (`_ia_pedido`,
+      `_ia_fecho`).
+    - `IA.perguntar_em_fluxo` só dá texto ao vivo com UM modelo da Anthropic marcado, com chave e dentro do teto do
+      mês. Outro provedor, o modo de comparar, o teto atingido, o Opus e o Sonnet (têm a reserva do servidor na chamada
+      sem fluxo): só o `fim`, pelo `perguntar`. A caixa da carteira não tem a rota (o template só põe
+      `data-ia-fluxo-url` na da usina).
+    - **O bloco `<acoes>` nunca aparece ao vivo** (`_AoVivo` corta nele e segura o "<ac" até saber o que é). O texto ao
+      vivo é o cru do modelo; o definitivo (citações limpas, OS clicáveis, ações, números conferidos, custo) vem no
+      `fim`, e a tela troca o cartão. Mexeu no acabamento da resposta: é no `_acabar`, que vale com e sem fluxo.
+    - **O Haiku que falha, antes ou no meio do texto, vai às grátis** (`_pago_as_gratis`, a mesma do `perguntar`): o
+      `fim` traz a resposta delas com o motivo, e a tela troca o que já tinha aparecido.
+    - **O teto do tempo (`TEMPO_TOTAL_S`) vale para o primeiro texto** e, depois dele, para o intervalo entre um trecho
+      e o próximo. A chamada roda numa thread à parte e os eventos chegam por uma fila (é o que deixa o teto valer).
+    - **A tela fechada no meio ainda registra o gasto:** a rota termina de ler a resposta por trás (`finally` do
+      gerador), porque a Anthropic cobra por ela, e é do registro que sai o gasto que para o pago no teto.
+    - Na tela (`ia.js`): o corpo é lido em pedaços (`lerFluxo`), o cartão ao vivo é desenhado pelo mesmo `texto()` do
+      definitivo (escapa tudo antes) a cada 60 ms **por tempo, não por quadro** (com a aba em segundo plano o navegador
+      para os quadros). Navegador sem leitura em pedaços, ou resposta que não é fluxo: o caminho de sempre.
+    - **Como provar:** `tests/test_comando_ia_fluxo_18_11.py` (o SDK é um dublê). O transporte foi conferido em
+      18/11 com o waitress de verdade e um dublê lento: 1º trecho em 1,8 s e um a cada 0,12 s, como o dublê mandava.
+      Atrás do Caddy o `text/event-stream` não é juntado (e a rota manda `X-Accel-Buffering: no`).
   - Os grátis: o Nemotron pelo OpenRouter e pela NVIDIA, o Gemini Flash-Lite e o GPT-OSS 120B no Groq.
   - **A chave da Anthropic se cola na tela** (18/11/2026, Levi: "onde devo colar?"): Base › Chaves das fontes › IA, a
     vaga "Anthropic: Claude Haiku 5.5" (`VAGAS["anthropic"]`, cifrada; a da tela vence a `ANTHROPIC_API_KEY` do .env).

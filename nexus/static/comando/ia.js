@@ -18,7 +18,14 @@
    abrir uma janela"), embaixo do Nexus IA Insights no prontuário e no alto do Comando › Usinas (a da carteira). A pergunta
    mais nova vem em cima, logo abaixo da caixa; "Limpar" recolhe a conversa. A resposta da carteira traz tabela (o
    Markdown "| a | b |"), cada usina citada vira link do prontuário dela (`r.usinas`, que o servidor confere no dossiê) e a
-   tabela baixa para o Excel. */
+   tabela baixa para o Excel.
+
+   18/11/2026: o texto aparece enquanto a IA escreve (Levi, com a resposta do Haiku em 17,1 s numa pergunta simples:
+   "demorou muito"). Com UM modelo marcado e a caixa com `data-ia-fluxo-url` (a da usina), a pergunta vai à rota em
+   fluxo e o corpo é lido em pedaços: "texto" entra no cartão ao vivo (pelo mesmo `texto()`, que escapa tudo antes), e
+   o "fim" traz o JSON de sempre, que troca o cartão ao vivo pelo definitivo (as citações limpas, as OS clicáveis, as
+   ações, o custo). A resposta que não vem em fluxo (a recusa, o relatório, o navegador sem leitura em pedaços) segue
+   o caminho de sempre. */
 (function () {
   'use strict';
   // [{pergunta, resposta}] de cada caixa (a da usina e a da carteira podem estar em telas diferentes; cada uma a dela)
@@ -184,6 +191,28 @@
     });
   }
 
+  // o corpo em fluxo: "data: {json}" e uma linha em branco por evento. Cada evento vai ao `aoEvento`; a promessa
+  // resolve com o "fim" (o JSON de sempre), ou com o erro quando o corpo acaba sem ele (a conexão caiu no meio)
+  function lerFluxo(r, aoEvento) {
+    var leitor = r.body.getReader(), dec = new TextDecoder('utf-8'), resto = '', fim = null;
+    function passo() {
+      return leitor.read().then(function (x) {
+        resto += dec.decode(x.value || new Uint8Array(0), {stream: !x.done});
+        var partes = resto.split('\n\n');
+        resto = partes.pop();
+        partes.forEach(function (p) {
+          if (p.indexOf('data: ') !== 0) return;
+          var e;
+          try { e = JSON.parse(p.slice(6)); } catch (err) { return; }
+          if (e.t === 'fim') fim = e; else aoEvento(e);
+        });
+        if (x.done) return fim || {ok: false, erro: 'A resposta parou no meio: pergunte de novo.'};
+        return passo();
+      });
+    }
+    return passo();
+  }
+
   var respostas = {};          // as respostas de cada pergunta, para a demanda achar a ação e o texto
   var seq = 0;
   function enviar(raiz, pergunta) {
@@ -213,17 +242,50 @@
     // correndo dizem que está trabalhando
     var lendo = turno.querySelector('.ia-lendo'), t0 = Date.now();
     var base = lendo ? lendo.textContent.replace(/…$/, '') : '';
+    // o texto ao vivo: um modelo só, a caixa com a rota em fluxo e o navegador que lê o corpo em pedaços
+    var fluxoUrl = raiz.getAttribute('data-ia-fluxo-url');
+    var aoVivo = !!(fluxoUrl && marcados.length === 1 && window.ReadableStream && window.TextDecoder);
     var relogio = lendo ? setInterval(function () {
       var s = Math.round((Date.now() - t0) / 1000);
-      if (s >= 2) lendo.textContent = base + '… ' + s + ' s' + (s >= 20 ? ' (a IA grátis pode levar até 1 minuto)' : '');
+      if (s >= 2) lendo.textContent = base + '… ' + s + ' s' + (s >= 20 && !aoVivo ? ' (a IA grátis pode levar até 1 minuto)' : '');
     }, 1000) : null;
-    fetch(raiz.getAttribute('data-ia-url'), {
+    // o cartão ao vivo: nasce no primeiro trecho, com o cabeçalho do modelo marcado (o mesmo do cartão definitivo,
+    // para a troca no fim não empurrar o texto). O redesenho é por tempo (a cada 60 ms), e não por quadro: com a aba
+    // em segundo plano o navegador para os quadros, e o texto só apareceria no fim
+    var vivo = null, escrito = '', pintar = 0;
+    function aviso(t) { base = t; if (lendo && lendo.isConnected) lendo.textContent = t + '…'; }
+    function evento(e) {
+      if (e.t === 'inicio') { aviso('Dossiê lido, perguntando à IA'); return; }
+      if (e.t === 'pensando') { aviso('A IA está pensando'); return; }
+      if (e.t !== 'texto') return;
+      escrito += e.d || '';
+      if (!vivo) {
+        if (relogio) { clearInterval(relogio); relogio = null; }
+        var caixa = turno.querySelector('.ia-respostas'), marcado = raiz.querySelector('[data-ia-modelo]:checked');
+        var rotulo = marcado && marcado.closest('label'), nome = rotulo && rotulo.querySelector('.ia-modelo-nome');
+        var prov = rotulo && rotulo.querySelector('.ia-modelo-prov');
+        caixa.innerHTML = '<article class="ia-r ia-r--vivo"><div class="ia-r-cab"><b>' + esc(nome ? nome.textContent : 'Nexus IA') +
+          '</b><span class="mudo">' + esc(prov ? prov.textContent : '') + '</span></div><div class="ia-r-texto" data-ia-vivo></div>' +
+          '<p class="ia-r-pe"><span class="mudo">Escrevendo…</span></p></article>';
+        vivo = caixa.querySelector('[data-ia-vivo]');
+      }
+      if (pintar) return;
+      pintar = setTimeout(function () {
+        pintar = 0;
+        // o marcador de lista que acabou de chegar sozinho ("- ") espera o texto dele para aparecer
+        if (vivo && vivo.isConnected) vivo.innerHTML = texto(escrito.replace(/\n\s*[-*•]\s*$/, ''), null, '', null);
+      }, 60);
+    }
+    fetch(aoVivo ? fluxoUrl : raiz.getAttribute('data-ia-url'), {
       method: 'POST', credentials: 'same-origin',
-      headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
+      headers: {'Content-Type': 'application/json', 'Accept': aoVivo ? 'text/event-stream, application/json' : 'application/json'},
       body: JSON.stringify({pergunta: pergunta, modelos: marcados, historico: hist(raiz)})
     }).then(function (r) {
+      if (aoVivo && r.body && (r.headers.get('Content-Type') || '').indexOf('text/event-stream') === 0) return lerFluxo(r, evento);
       return r.json().catch(function () { return {ok: false, erro: 'Resposta inesperada (' + r.status + ').'}; });
     }).then(function (j) {
+      vivo = null;
+      if (pintar) { clearTimeout(pintar); pintar = 0; }
       var caixa = turno.querySelector('.ia-respostas');
       if (!j.ok) { caixa.innerHTML = '<p class="ia-r-erro" role="alert">' + esc(j.erro || 'Não respondeu.') + '</p>'; return; }
       if (j.relatorio) { caixa.className = 'ia-respostas'; relatorio(caixa, j.relatorio); return; }

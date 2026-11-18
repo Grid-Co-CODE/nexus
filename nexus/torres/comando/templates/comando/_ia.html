@@ -7,7 +7,8 @@
    nexus/comando/carteira_ia.py (a carteira). #}
 {% set com_chave = modelos|selectattr('tem_chave')|list %}
 {% set base = ia_base if ia_base is defined and ia_base else '/t/campo/usinas/' ~ x.usina_id ~ '/ia' %}
-<div class="ia ia--embutida" data-ia data-ia-url="{{ raiz }}{{ base }}/perguntar" data-ia-demanda-url="{{ raiz }}{{ base }}/demanda" data-ia-raiz="{{ raiz }}">
+{# o texto aparecendo enquanto a IA escreve (18/11/2026): só a caixa da usina tem a rota em fluxo; a da carteira não #}
+<div class="ia ia--embutida" data-ia data-ia-url="{{ raiz }}{{ base }}/perguntar"{% if not (ia_base is defined and ia_base) %} data-ia-fluxo-url="{{ raiz }}{{ base }}/perguntar/fluxo"{% endif %} data-ia-demanda-url="{{ raiz }}{{ base }}/demanda" data-ia-raiz="{{ raiz }}">
   {# para onde a resposta pode mandar demanda: os setores, as pessoas e os temas (a Nova demanda da Caixa de entrada) #}
   <script type="application/json" data-ia-setores>{{ setores|tojson }}</script>
   <script type="application/json" data-ia-criar-os>{{ criar_os|tojson }}</script>

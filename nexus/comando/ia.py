@@ -26,7 +26,9 @@ from __future__ import annotations
 
 import json
 import logging
+import queue
 import re
+import threading
 import time
 import unicodedata
 from concurrent.futures import ThreadPoolExecutor
@@ -340,42 +342,43 @@ ESFORCO = {"claude-haiku-5-5": "medium"}
 MAX_SAIDA_ANTHROPIC = 16000      # fora do "low" o Haiku pensa mais, e o pensamento conta dentro do max_tokens
 
 
-def _chamar_anthropic(m: Modelo, k: str, dossie: str, msgs: list, contexto: str = "", instrucoes: str = "") -> dict:
-    """Pelo SDK oficial. O dossiê vai num bloco do system com cache (a pergunta de seguimento na mesma usina relê o
-    dossiê do cache, a 10% do preço). O esforço é o do `ESFORCO` (o Haiku 5.5 em "medium"). No Opus 5.5 e no Sonnet 5.5
-    (pelo NEXUS_IA_MODELOS), a recusa por engano cai num modelo de reserva (`fallbacks: "default"`); o Haiku 5.5 não tem
-    essa reserva no servidor, e a recusa dele vai às grátis (`perguntar`)."""
-    try:
-        import anthropic
-    except ImportError:
-        return {"erro": "O SDK da Anthropic (pacote anthropic) não está instalado neste servidor."}
-    cli = anthropic.Anthropic(api_key=k, timeout=TEMPO_S, max_retries=1)
+_COM_RESERVA = ("claude-opus-5-5", "claude-sonnet-5-5")     # os que têm modelo de reserva no servidor (beta)
+
+
+def _pedido_anthropic(m: Modelo, dossie: str, msgs: list, contexto: str = "", instrucoes: str = "") -> dict:
+    """O pedido à Anthropic, o mesmo com e sem fluxo. O dossiê vai num bloco do system com cache (a pergunta de seguimento
+    na mesma usina relê o dossiê do cache, a 10% do preço). O esforço é o do `ESFORCO` (o Haiku 5.5 em "medium")."""
     esforco = ESFORCO.get(m.modelo, "low")
-    pedido = dict(model=m.modelo, max_tokens=MAX_SAIDA_ANTHROPIC if esforco != "low" else MAX_SAIDA, messages=msgs,
-                  output_config={"effort": esforco},
-                  system=[{"type": "text", "text": f"{instrucoes or INSTRUCOES}\n\n{contexto}" if contexto
-                           else (instrucoes or INSTRUCOES)},
-                          {"type": "text", "text": f"<dossie>\n{dossie}\n</dossie>", "cache_control": {"type": "ephemeral"}}])
-    try:
-        if m.modelo in ("claude-opus-5-5", "claude-sonnet-5-5"):
-            r = cli.beta.messages.create(betas=["server-side-fallback-2026-07-01"], fallbacks="default", **pedido)
-        else:
-            r = cli.messages.create(**pedido)
-    except anthropic.NotFoundError:
+    return dict(model=m.modelo, max_tokens=MAX_SAIDA_ANTHROPIC if esforco != "low" else MAX_SAIDA, messages=msgs,
+                output_config={"effort": esforco},
+                system=[{"type": "text", "text": f"{instrucoes or INSTRUCOES}\n\n{contexto}" if contexto
+                         else (instrucoes or INSTRUCOES)},
+                        {"type": "text", "text": f"<dossie>\n{dossie}\n</dossie>", "cache_control": {"type": "ephemeral"}}])
+
+
+def _erro_anthropic(anthropic, m: Modelo, ex: Exception) -> dict | None:
+    """O erro do SDK em português, ou None quando a exceção não é dele (aí sobe para quem chamou)."""
+    if isinstance(ex, anthropic.NotFoundError):
         return {"erro": f"A Anthropic não tem o modelo “{m.modelo}”.", "modelo_inexistente": True}
-    except anthropic.AuthenticationError:
+    if isinstance(ex, anthropic.AuthenticationError):
         return {"erro": "A chave da Anthropic foi recusada (Base › Chaves das fontes › IA).", "status": 401}
-    except anthropic.RateLimitError:
+    if isinstance(ex, anthropic.RateLimitError):
         return {"erro": "A Anthropic pediu para esperar (limite de uso): tente de novo em instantes.", "status": 429}
-    except anthropic.APIStatusError as ex:
+    if isinstance(ex, anthropic.APIStatusError):
         msg = str(getattr(ex, "message", "") or ex)
         if "credit balance" in msg.lower():
             # a conta sem crédito responde 400 com este texto: a chave vale, falta pôr crédito
             return {"erro": "A conta da Anthropic está sem crédito (a chave vale): ponha crédito em platform.claude.com.",
                     "status": 402}
-        return {"erro": f"A Anthropic respondeu {ex.status_code}: {msg[:200]}", "status": getattr(ex, "status_code", 0)}
-    except anthropic.APIConnectionError as ex:
+        return {"erro": f"A Anthropic respondeu {getattr(ex, 'status_code', 0)}: {msg[:200]}",
+                "status": getattr(ex, "status_code", 0)}
+    if isinstance(ex, anthropic.APIConnectionError):
         return {"erro": f"Sem conexão com a Anthropic ({type(ex).__name__})."}
+    return None
+
+
+def _resultado_anthropic(r) -> dict:
+    """A mensagem pronta da Anthropic no formato das chamadas: {texto, entrada, saida, cache_lido, cache_gravado...}."""
     if r.stop_reason == "refusal":
         return {"erro": "O modelo recusou responder a esta pergunta."}
     texto = "\n".join(b.text for b in r.content if getattr(b, "type", "") == "text").strip()
@@ -386,6 +389,57 @@ def _chamar_anthropic(m: Modelo, k: str, dossie: str, msgs: list, contexto: str 
             "cache_lido": getattr(u, "cache_read_input_tokens", 0) or 0,
             "cache_gravado": getattr(u, "cache_creation_input_tokens", 0) or 0,
             "parou": "limite de tamanho" if r.stop_reason == "max_tokens" else "", "servido_por": r.model}
+
+
+def _chamar_anthropic(m: Modelo, k: str, dossie: str, msgs: list, contexto: str = "", instrucoes: str = "") -> dict:
+    """Pelo SDK oficial (o pedido: `_pedido_anthropic`). No Opus 5.5 e no Sonnet 5.5 (pelo NEXUS_IA_MODELOS), a recusa
+    por engano cai num modelo de reserva (`fallbacks: "default"`); o Haiku 5.5 não tem essa reserva no servidor, e a
+    recusa dele vai às grátis (`perguntar`)."""
+    try:
+        import anthropic
+    except ImportError:
+        return {"erro": "O SDK da Anthropic (pacote anthropic) não está instalado neste servidor."}
+    cli = anthropic.Anthropic(api_key=k, timeout=TEMPO_S, max_retries=1)
+    pedido = _pedido_anthropic(m, dossie, msgs, contexto, instrucoes)
+    try:
+        if m.modelo in _COM_RESERVA:
+            r = cli.beta.messages.create(betas=["server-side-fallback-2026-07-01"], fallbacks="default", **pedido)
+        else:
+            r = cli.messages.create(**pedido)
+    except Exception as ex:      # noqa: BLE001 — o que não é do SDK sobe
+        erro = _erro_anthropic(anthropic, m, ex)
+        if erro is None:
+            raise
+        return erro
+    return _resultado_anthropic(r)
+
+
+def _fluxo_anthropic(m: Modelo, k: str, dossie: str, msgs: list, contexto: str = "", instrucoes: str = ""):
+    """A mesma chamada, em fluxo (18/11/2026): entrega ("pensando", "") quando o modelo começa a pensar, ("texto",
+    trecho) a cada pedaço da resposta e, no fim, ("resultado", o mesmo dicionário do `_chamar_anthropic`). Só conta o
+    `content_block_delta` de texto: o SDK repete o mesmo trecho num evento derivado ("text"), que não é lido."""
+    try:
+        import anthropic
+    except ImportError:
+        yield "resultado", {"erro": "O SDK da Anthropic (pacote anthropic) não está instalado neste servidor."}
+        return
+    cli = anthropic.Anthropic(api_key=k, timeout=TEMPO_S, max_retries=1)
+    try:
+        with cli.messages.stream(**_pedido_anthropic(m, dossie, msgs, contexto, instrucoes)) as fluxo:
+            for ev in fluxo:
+                tipo = getattr(ev, "type", "")
+                if tipo == "content_block_start" and getattr(getattr(ev, "content_block", None), "type", "") == "thinking":
+                    yield "pensando", ""
+                elif tipo == "content_block_delta" and getattr(getattr(ev, "delta", None), "type", "") == "text_delta":
+                    yield "texto", getattr(ev.delta, "text", "") or ""
+            r = fluxo.get_final_message()
+    except Exception as ex:      # noqa: BLE001 — o que não é do SDK sobe
+        erro = _erro_anthropic(anthropic, m, ex)
+        if erro is None:
+            raise
+        yield "resultado", erro
+        return
+    yield "resultado", _resultado_anthropic(r)
 
 
 def _erro_http(nome: str, r) -> dict:
@@ -487,8 +541,7 @@ def responder(cfg, m: Modelo, dossie: str, pergunta: str, historico=None, setore
               instrucoes: str = "") -> dict:
     """Uma resposta de um modelo: {id, rotulo, provedor, ok, texto, erro, ms, entrada, saida, cache_lido, cache_gravado,
     custo_usd, preco_oficial, parou, numeros}."""
-    base = {"id": m.id, "rotulo": m.rotulo, "provedor": PROVEDORES[m.provedor]["nome"], "modelo": m.modelo,
-            "preco_oficial": m.preco_oficial}
+    base = _base(m)
     k = chave(cfg, m.provedor)
     if not k:
         return dict(base, ok=False, erro=f"Falta a {PROVEDORES[m.provedor]['chave']} no servidor.")
@@ -513,7 +566,18 @@ def responder(cfg, m: Modelo, dossie: str, pergunta: str, historico=None, setore
     except Exception as ex:      # noqa: BLE001 — um provedor quebrado não derruba os outros
         log.exception("IA: %s falhou", m.id)
         r = {"erro": f"Falhou ({type(ex).__name__})."}
-    ms = round((time.monotonic() - t0) * 1000)
+    return _acabar(cfg, m, r, round((time.monotonic() - t0) * 1000), dossie, setores)
+
+
+def _base(m: Modelo) -> dict:
+    return {"id": m.id, "rotulo": m.rotulo, "provedor": PROVEDORES[m.provedor]["nome"], "modelo": m.modelo,
+            "preco_oficial": m.preco_oficial}
+
+
+def _acabar(cfg, m: Modelo, r: dict, ms: int, dossie: str, setores) -> dict:
+    """O que a chamada devolveu (`r`) vira a resposta da tela: o erro em português, ou o texto sem o bloco das ações e
+    com as citações limpas, as ações, as OS do dossiê, os números conferidos e o custo. Igual com e sem fluxo."""
+    base = _base(m)
     if r.get("erro"):
         erro = r["erro"]
         if r.get("modelo_inexistente"):
@@ -536,6 +600,116 @@ def responder(cfg, m: Modelo, dossie: str, pergunta: str, historico=None, setore
     return dict(base, ok=True, texto=texto, acoes=acoes, os=links, ms=ms, entrada=e, saida=s, cache_lido=cl, cache_gravado=cg,
                 custo_usd=custo(m, e, s, cl, cg), parou=r.get("parou") or "", servido_por=r.get("servido_por") or "",
                 numeros=numeros_conferidos(texto, dossie))
+
+
+class _AoVivo:
+    """O texto que pode aparecer enquanto o modelo escreve: tudo até o bloco `<acoes>` (que vem no fim e vira os botões
+    de "Pedir a outro setor"; na tela, cru, seria um JSON solto). O fim de um trecho que pode ser o começo da marca
+    ("<ac") fica guardado até o próximo trecho dizer o que é; o "<" de "PR < 70%" passa."""
+    MARCA = "<acoes"
+
+    def __init__(self):
+        self.guardado, self.fechou = "", False
+
+    def passar(self, trecho: str) -> str:
+        if self.fechou:
+            return ""
+        t = self.guardado + (trecho or "")
+        i = t.lower().find(self.MARCA)
+        if i >= 0:
+            self.fechou, self.guardado = True, ""
+            return t[:i]
+        n = next((n for n in range(min(len(self.MARCA) - 1, len(t)), 0, -1) if self.MARCA.startswith(t[-n:].lower())), 0)
+        self.guardado = t[len(t) - n:] if n else ""
+        return t[:len(t) - n] if n else t
+
+
+def responder_em_fluxo(cfg, m: Modelo, dossie: str, pergunta: str, historico=None, setores=None, meu_setor: str = "",
+                       instrucoes: str = ""):
+    """A resposta de um modelo da Anthropic, em fluxo: ("pensando", ""), ("texto", trecho)... e, por último, ("fim", a
+    mesma resposta do `responder`). A chamada roda numa thread à parte, e os eventos chegam por uma fila: é o que deixa
+    valer o teto do tempo (`TEMPO_TOTAL_S`) para o PRIMEIRO texto e, depois dele, para o intervalo entre um trecho e o
+    próximo. Passou, a resposta é o erro de "Demorou mais", e a pergunta vai às grátis (`perguntar_em_fluxo`)."""
+    k = chave(cfg, m.provedor)
+    if not k:
+        yield "fim", dict(_base(m), ok=False, erro=f"Falta a {PROVEDORES[m.provedor]['chave']} no servidor.")
+        return
+    t0 = time.monotonic()
+    ctx = _contexto([neutro(s) for s in setores], neutro(meu_setor)) if setores is not None else ""
+    fila: queue.Queue = queue.Queue()
+
+    def trabalho():
+        try:
+            for ev in _fluxo_anthropic(m, k, neutro(dossie), _mensagens(historico, pergunta), ctx, instrucoes):
+                fila.put(ev)
+        except Exception as ex:      # noqa: BLE001 — a falha vira a resposta de erro, como no `responder`
+            log.exception("IA: %s falhou no fluxo", m.id)
+            fila.put(("resultado", {"erro": f"Falhou ({type(ex).__name__})."}))
+
+    threading.Thread(target=trabalho, name="nexus-ia-fluxo", daemon=True).start()
+    vivo, r, prazo, pensou = _AoVivo(), None, t0 + TEMPO_TOTAL_S, False
+    while r is None:
+        try:
+            tipo, dado = fila.get(timeout=max(0.05, prazo - time.monotonic()))
+        except queue.Empty:
+            r = {"erro": f"Demorou mais de {TEMPO_TOTAL_S} s para responder."}
+            break
+        if tipo == "resultado":
+            r = dado
+        elif tipo == "pensando":
+            if not pensou:
+                pensou = True
+                yield "pensando", ""
+        elif tipo == "texto":
+            prazo = time.monotonic() + TEMPO_TOTAL_S
+            visivel = vivo.passar(dado)
+            if visivel:
+                yield "texto", visivel
+    yield "fim", _acabar(cfg, m, r, round((time.monotonic() - t0) * 1000), dossie, setores)
+
+
+def perguntar_em_fluxo(cfg, ids: list[str], dossie: str, pergunta: str, historico=None, setores=None,
+                       meu_setor: str = "", instrucoes: str = ""):
+    """A pergunta com o texto aparecendo enquanto é escrito (18/11/2026, Levi, com a resposta do Haiku em 17,1 s numa
+    pergunta simples: "demorou muito"; a tela ficava parada até a resposta chegar inteira). Entrega ("pensando", ""),
+    ("texto", trecho)... e, por último, UM ("fim", a lista de respostas do `perguntar`).
+
+    O texto ao vivo existe com UM modelo da Anthropic marcado, com chave e dentro do teto do mês. Fora disso (outro
+    provedor, o modo de comparar, o teto atingido, o Opus e o Sonnet, que têm a reserva do servidor na chamada sem
+    fluxo), só o "fim", com o `perguntar` de sempre. O Haiku que falha, antes ou no meio do texto, vai às grátis como no
+    `perguntar`, e o "fim" traz a resposta delas com o motivo (a tela troca o que já tinha aparecido)."""
+    por_id = {m.id: m for m in modelos(cfg)}
+    escolhidos = [por_id[i] for i in dict.fromkeys(ids) if i in por_id]
+    m = escolhidos[0] if len(escolhidos) == 1 else None
+    if not (m and m.provedor == "anthropic" and m.modelo not in _COM_RESERVA and chave(cfg, m.provedor)
+            and pago_liberado(cfg)):
+        yield "fim", perguntar(cfg, ids, dossie, pergunta, historico, setores, meu_setor, instrucoes)
+        return
+    r = None
+    for tipo, dado in responder_em_fluxo(cfg, m, dossie, pergunta, historico, setores, meu_setor, instrucoes):
+        if tipo == "fim":
+            r = dado
+        else:
+            yield tipo, dado
+    yield "fim", [r] if r.get("ok") else _pago_as_gratis(cfg, por_id, m, r, dossie, pergunta, historico, setores,
+                                                         meu_setor, instrucoes)
+
+
+def _pago_as_gratis(cfg, por_id: dict, pago: Modelo, falha: dict, dossie: str, pergunta: str, historico, setores,
+                    meu_setor: str, instrucoes: str) -> list[dict]:
+    """O pago que não respondeu (18/11/2026, a chave da Anthropic do Levi com crédito contado): qualquer falha do Haiku
+    vai às grátis, e a resposta diz por quê (a pessoa não fica sem resposta porque o crédito acabou). Sem grátis que
+    responda, volta a falha do pago."""
+    for mid in TROCA_GRATIS:
+        m = por_id.get(mid)
+        if not m or not chave(cfg, m.provedor):
+            continue
+        r = responder(cfg, m, dossie, pergunta, historico, setores, meu_setor, instrucoes)
+        if r.get("ok"):
+            r["troca"] = (f"O {pago.rotulo} não respondeu ({(falha.get('erro') or '').rstrip('.')}): "
+                          f"quem respondeu foi o {m.rotulo}.")
+            return [r]
+    return [falha]
 
 
 def _bateu_o_limite(r: dict) -> bool:
@@ -577,19 +751,10 @@ def perguntar(cfg, ids: list[str], dossie: str, pergunta: str, historico=None, s
     with ThreadPoolExecutor(max_workers=min(8, len(escolhidos))) as ex:
         out = list(ex.map(lambda m: responder(cfg, m, dossie, pergunta, historico, setores, meu_setor, instrucoes),
                           escolhidos))
-    # o pago que não respondeu (18/11/2026, a chave da Anthropic do Levi com crédito contado): qualquer falha do Haiku vai
-    # às grátis, e a resposta diz por quê (a pessoa não fica sem resposta porque o crédito acabou)
+    # o pago que não respondeu vai às grátis, com o motivo na resposta (`_pago_as_gratis`)
     if len(escolhidos) == 1 and not out[0].get("ok") and escolhidos[0].entrada > 0 and chave(cfg, escolhidos[0].provedor):
-        for mid in TROCA_GRATIS:
-            m = por_id.get(mid)
-            if not m or not chave(cfg, m.provedor):
-                continue
-            r = responder(cfg, m, dossie, pergunta, historico, setores, meu_setor, instrucoes)
-            if r.get("ok"):
-                r["troca"] = (f"O {escolhidos[0].rotulo} não respondeu ({(out[0].get('erro') or '').rstrip('.')}): "
-                              f"quem respondeu foi o {m.rotulo}.")
-                return [r]
-        return out
+        return _pago_as_gratis(cfg, por_id, escolhidos[0], out[0], dossie, pergunta, historico, setores, meu_setor,
+                               instrucoes)
     if len(escolhidos) == 1 and _bateu_o_limite(out[0]) and escolhidos[0].entrada == 0:
         # o limite do dia é da conta do provedor (vale para todos os grátis dele): aí a troca é para outro provedor. A
         # resposta vazia ou demorada é do modelo: aí vale o outro grátis do mesmo provedor (a reserva do OpenRouter)
