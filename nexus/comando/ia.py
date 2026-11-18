@@ -108,7 +108,7 @@ class Modelo:
 # A Anthropic pela tabela dela (13/11/2026); o resto, referência de sites de terceiros em out-nov/2026 (os nomes mudam:
 # `NEXUS_IA_MODELOS` troca a lista sem deploy, e o erro de "modelo não existe" lista os que o provedor tem)
 # 18/11/2026, Levi, com a chave da Anthropic na mão: "quero usar só o haiku 5.5 na qualidade alta". O Opus e o Sonnet
-# saíram da lista (voltam pelo NEXUS_IA_MODELOS, se um dia ele quiser); o Haiku vai com o esforço alto (`ESFORCO`)
+# saíram da lista (voltam pelo NEXUS_IA_MODELOS, se um dia ele quiser); o esforço do Haiku está em `ESFORCO`
 MODELOS_PADRAO = (
     Modelo("haiku", "Claude Haiku 5.5", "anthropic", "claude-haiku-5-5", 0.10, 0.50, True),
     # o mesmo Nemotron 3 Ultra direto na NVIDIA (14/11/2026): o catálogo dela (integrate.api.nvidia.com) tem o modelo com
@@ -333,15 +333,16 @@ def _sistema(dossie: str, contexto: str = "", instrucoes: str = "") -> str:
         f"{ins}\n\n<dossie>\n{dossie}\n</dossie>"
 
 
-# o esforço de cada modelo da Anthropic (18/11/2026, Levi: "quero usar só o haiku 5.5 na qualidade alta"): o Haiku 5.5
-# vai em "high" (o padrão dele é "medium"); o que não está aqui, "low" (é conversa, não código)
-ESFORCO = {"claude-haiku-5-5": "high"}
-MAX_SAIDA_ANTHROPIC = 16000      # com o esforço alto o Haiku pensa mais, e o pensamento conta dentro do max_tokens
+# o esforço de cada modelo da Anthropic: o Haiku 5.5 vai em "medium", o padrão dele (18/11/2026, Levi, no mesmo dia em
+# que pediu "o haiku 5.5 na qualidade alta" e achou a resposta lenta: "bote no potência média"; no "high" ele pensa mais
+# antes de escrever, e a tela só mostra a resposta inteira); o que não está aqui, "low" (é conversa, não código)
+ESFORCO = {"claude-haiku-5-5": "medium"}
+MAX_SAIDA_ANTHROPIC = 16000      # fora do "low" o Haiku pensa mais, e o pensamento conta dentro do max_tokens
 
 
 def _chamar_anthropic(m: Modelo, k: str, dossie: str, msgs: list, contexto: str = "", instrucoes: str = "") -> dict:
     """Pelo SDK oficial. O dossiê vai num bloco do system com cache (a pergunta de seguimento na mesma usina relê o
-    dossiê do cache, a 10% do preço). O esforço é o do `ESFORCO` (o Haiku 5.5 em "high"). No Opus 5.5 e no Sonnet 5.5
+    dossiê do cache, a 10% do preço). O esforço é o do `ESFORCO` (o Haiku 5.5 em "medium"). No Opus 5.5 e no Sonnet 5.5
     (pelo NEXUS_IA_MODELOS), a recusa por engano cai num modelo de reserva (`fallbacks: "default"`); o Haiku 5.5 não tem
     essa reserva no servidor, e a recusa dele vai às grátis (`perguntar`)."""
     try:

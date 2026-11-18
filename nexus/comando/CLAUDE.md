@@ -597,8 +597,9 @@ Gemini, Groq, Grok [...] Qualquer IA que dê para puxar a API para fazermos o te
   Nada de quem pergunta vai ao provedor. A IA só responde: não grava, não abre OS, não usa ferramenta.
 - **Os modelos** (`MODELOS_PADRAO`): da Anthropic, **só o Claude Haiku 5.5** (18/11/2026, Levi: "quero usar só o haiku
   5.5 na qualidade alta"; o Opus e o Sonnet voltam pelo `NEXUS_IA_MODELOS`).
-  - O Haiku vai pelo SDK `anthropic`, com o dossiê num bloco com cache, **esforço `high`** (`ESFORCO`; o padrão dele é
-    `medium`) e `max_tokens` 16.000 (`MAX_SAIDA_ANTHROPIC`: o pensamento conta dentro). Ele não tem a reserva da
+  - O Haiku vai pelo SDK `anthropic`, com o dossiê num bloco com cache, **esforço `medium`** (`ESFORCO`, o padrão dele;
+    foi `high` por algumas horas em 18/11/2026 e voltou no mesmo dia: Levi, achando a resposta lenta, "bote no potência
+    média") e `max_tokens` 16.000 (`MAX_SAIDA_ANTHROPIC`: o pensamento conta dentro). Ele não tem a reserva da
     Anthropic para a recusa: o Opus e o Sonnet, pelo `NEXUS_IA_MODELOS`, vão com `fallbacks: "default"` e esforço `low`.
   - Os grátis: o Nemotron pelo OpenRouter e pela NVIDIA, o Gemini Flash-Lite e o GPT-OSS 120B no Groq.
   - **A chave da Anthropic se cola na tela** (18/11/2026, Levi: "onde devo colar?"): Base › Chaves das fontes › IA, a

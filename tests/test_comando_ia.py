@@ -80,7 +80,7 @@ def test_o_historico_vai_curto_e_so_com_pares_completos():
 
 
 # ── cada provedor, no formato dele ───────────────────────────────────────────────────────────────────────────────────
-def test_anthropic_o_haiku_em_esforco_alto_e_o_opus_com_reserva(monkeypatch):
+def test_anthropic_o_haiku_em_esforco_medio_e_o_opus_com_reserva(monkeypatch):
     pedidos = []
 
     class _Uso:
@@ -113,9 +113,10 @@ def test_anthropic_o_haiku_em_esforco_alto_e_o_opus_com_reserva(monkeypatch):
     assert "<dossie>" in k["system"][1]["text"] and k["messages"][-1] == {"role": "user", "content": "Por que caiu?"}
     IA.responder(cfg, next(m for m in IA.MODELOS_PADRAO if m.id == "haiku"), DOSSIE, "?")
     tipo, k = pedidos[-1]
-    # o Haiku 5.5 na qualidade alta, com espaço para pensar (o pensamento conta no max_tokens), sem a reserva do servidor
+    # o Haiku 5.5 no esforço médio (18/11/2026, Levi, achando a resposta lenta no alto: "bote no potência média"), com
+    # espaço para pensar (o pensamento conta no max_tokens), sem a reserva do servidor
     assert tipo == "normal" and "fallbacks" not in k and k["model"] == "claude-haiku-5-5"
-    assert k["output_config"] == {"effort": "high"} and k["max_tokens"] == IA.MAX_SAIDA_ANTHROPIC
+    assert k["output_config"] == {"effort": "medium"} and k["max_tokens"] == IA.MAX_SAIDA_ANTHROPIC
     # a recusa vira erro escrito, nunca resposta vazia
     _Msg.stop_reason = "refusal"
     assert IA.responder(cfg, IA.MODELOS_PADRAO[0], DOSSIE, "?")["erro"] == "O modelo recusou responder a esta pergunta."

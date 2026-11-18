@@ -336,12 +336,13 @@ CHAVES = {
         "escolha": (("1", "1 · liga o Mapa de equipe nesta máquina"), ("0", "0 · desliga")),
     },
     # a Anthropic (18/11/2026, Levi: "adapte o nexus para receber essa chave e dar prioridade a ela na aba usinas [...]
-    # quero usar só o haiku 5.5 na qualidade alta"): com ela, a Nexus IA das usinas responde pelo Claude Haiku 5.5 em
-    # esforço alto, e as grátis do OpenRouter ficam de reserva (nexus/comando/ia.py: `PREFERIDOS`, `ESFORCO`, `perguntar`)
+    # quero usar só o haiku 5.5 na qualidade alta"; no mesmo dia, pela demora, "bote no potência média"): com ela, a Nexus
+    # IA das usinas responde pelo Claude Haiku 5.5 no esforço médio, e as grátis do OpenRouter ficam de reserva
+    # (nexus/comando/ia.py: `PREFERIDOS`, `ESFORCO`, `perguntar`)
     "ANTHROPIC_API_KEY": {
         "nome": "Anthropic: Claude Haiku 5.5 (vem antes das grátis)",
         "para": "a Nexus IA das usinas (o Pergunte à Nexus IA no prontuário e no alto da lista de usinas, e o diagnóstico "
-                "do dia) responder pelo Claude Haiku 5.5, em qualidade alta. Com ela, o Haiku vem marcado e as grátis do "
+                "do dia) responder pelo Claude Haiku 5.5. Com ela, o Haiku vem marcado e as grátis do "
                 "OpenRouter ficam de reserva: se ele não responder (sem crédito, limite, chave recusada), a pergunta vai "
                 "a elas. É paga pelo uso, e o teto do mês da Nexus IA vale",
         "arquivo": "",
