@@ -595,11 +595,21 @@ Gemini, Groq, Grok [...] Qualquer IA que dê para puxar a API para fazermos o te
   mês corrente é parcial, até 180 palavras, sem emojis) e o dossiê de AGORA, inteiro (`_dossie`, o mesmo da tela "Dossiê
   para a IA", sem o nome das pessoas). Mais as 3 últimas perguntas e respostas (a de seguimento: "e no mês passado?").
   Nada de quem pergunta vai ao provedor. A IA só responde: não grava, não abre OS, não usa ferramenta.
-- **Os modelos** (`MODELOS_PADRAO`): Claude Opus 5.5, Sonnet 5.5 e Haiku 5.5 (SDK `anthropic`, o dossiê num bloco com
-  cache, esforço `low`; no Opus e no Sonnet, `fallbacks: "default"`, a reserva da Anthropic para a recusa por engano),
-  Gemini 2.5 Pro e Flash (REST `generateContent`), Grok (xAI), GPT-OSS 120B no Groq e DeepSeek pelo OpenRouter (os três
-  pelo `chat/completions`). A chave de cada provedor no `.env` do servidor: `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`,
-  `XAI_API_KEY`, `GROQ_API_KEY`, `OPENROUTER_API_KEY`; sem ela o modelo aparece "sem chave" e não é chamado. **Os nomes
+- **Os modelos** (`MODELOS_PADRAO`): da Anthropic, **só o Claude Haiku 5.5** (18/11/2026, Levi: "quero usar só o haiku
+  5.5 na qualidade alta"; o Opus e o Sonnet voltam pelo `NEXUS_IA_MODELOS`).
+  - O Haiku vai pelo SDK `anthropic`, com o dossiê num bloco com cache, **esforço `high`** (`ESFORCO`; o padrão dele é
+    `medium`) e `max_tokens` 16.000 (`MAX_SAIDA_ANTHROPIC`: o pensamento conta dentro). Ele não tem a reserva da
+    Anthropic para a recusa: o Opus e o Sonnet, pelo `NEXUS_IA_MODELOS`, vão com `fallbacks: "default"` e esforço `low`.
+  - Os grátis: o Nemotron pelo OpenRouter e pela NVIDIA, o Gemini Flash-Lite e o GPT-OSS 120B no Groq.
+  - **A chave da Anthropic se cola na tela** (18/11/2026, Levi: "onde devo colar?"): Base › Chaves das fontes › IA, a
+    vaga "Anthropic: Claude Haiku 5.5" (`VAGAS["anthropic"]`, cifrada; a da tela vence a `ANTHROPIC_API_KEY` do .env).
+    O Salvar confere pela ficha do Haiku 5.5 na API de modelos (`chaves._conferir_anthropic`, sem gastar crédito).
+  - **Com a chave, o Haiku vem marcado** (`PREFERIDOS` começa por ele): no Pergunte à Nexus IA do prontuário e da lista
+    de usinas, e no diagnóstico do dia (`diagnostico.modelo` usa o `padrao`). **As grátis ficam de reserva:** o Haiku que
+    não responde (sem crédito, a conta responde 400 "credit balance"; chave recusada; limite; rede; recusa; vazio) passa a
+    pergunta às grátis (`TROCA_GRATIS`), e a resposta diz por quê.
+  - A chave dos outros provedores segue no `.env` do servidor (`GEMINI_API_KEY`, `XAI_API_KEY`, `GROQ_API_KEY`) ou na
+    tela (as 3 do OpenRouter); sem ela o modelo aparece "sem chave" e não é chamado. **Os nomes
   dos modelos mudam todo mês:** `NEXUS_IA_MODELOS` (JSON) troca a lista sem deploy, e o erro de "modelo não existe"
   lista os que o provedor tem para a chave (`listar_modelos`). Os preços da Anthropic são da tabela dela; os outros são
   de referência (sites de terceiros, out-nov/2026), marcados "(ref.)": servem para comparar.
@@ -607,7 +617,11 @@ Gemini, Groq, Grok [...] Qualquer IA que dê para puxar a API para fazermos o te
   cada uma com o tempo, os tokens, o custo estimado e **quantos números da resposta estão no dossiê**
   (`numeros_conferidos`: conta número com casa decimal ou a partir de 32, sem as citações "§3", as datas e o ano; o que
   não está no dossiê é cálculo da IA ou invenção, e é por ali que se confere).
-- **Teto e registro:** `NEXUS_IA_TETO_USD` (padrão 20) por mês; passou, o POST recusa (429) e diz como subir. Cada
+- **Teto e registro:** `NEXUS_IA_TETO_USD` (**padrão US$ 10** desde 18/11/2026, Levi: "tem como limitarmos o uso dessa
+  chave em 10$?") por mês. Só os pagos somam (a grátis custa 0), então é o teto do Haiku. **Passou, o pago para e as
+  grátis respondem** (`pago_liberado`, `perguntar`): a pergunta não é recusada, o Haiku não vem marcado, e a resposta diz
+  que o teto foi atingido. É uma conta estimada pelos tokens (preço da tabela); o limite garantido é o da conta da
+  Anthropic (crédito pré-pago, sem recarga automática). Cada
   resposta vai para `<NEXUS_DADOS>/ia/perguntas-AAAA-MM.jsonl` (usina, modelo, pergunta, resposta, tempo, tokens, custo,
   o HMAC de quem perguntou): é o material da comparação e a conta do teto. Teste sem `NEXUS_DADOS` não grava.
 - **A rodada de teste:** `python ferramentas/ia_comparar.py --usinas 68,23 [--modelos opus,grok] [--teto 5]` faz as
@@ -877,7 +891,7 @@ o que é que ele tem que fazer".
   diz isso, com a hora e o modelo.
 - **Sem a IA** fica o parecer de sempre:
   - sem chave nenhuma, o estado é `sem_ia` e a tela não mostra aviso;
-  - com o teto do mês estourado, a tela diz que o teto foi atingido;
+  - com o teto do mês estourado, o diagnóstico sai por uma grátis (o pago para; desde 18/11/2026);
   - quando a IA falha, a tela mostra o motivo e o erro fica guardado 20 min (`ESPERA_ERRO_S`); depois a próxima
     abertura tenta de novo.
 - **Medido na Capitão Poço 100 (14/11):** o Nemotron levou cerca de 40 s; a segunda abertura leu o guardado em 0,01 s.

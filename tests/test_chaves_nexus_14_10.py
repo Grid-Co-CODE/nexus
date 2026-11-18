@@ -302,3 +302,36 @@ def test_a_chave_4_e_so_do_os_creator(app, admin, monkeypatch):
     with app.app_context():
         assert IA.chave_os_creator(app.config) == chave4
         assert IA.vagas(app.config, "openrouter") == [] and IA.chave(app.config, "openrouter") == ""
+
+
+def test_a_chave_da_anthropic_e_conferida_pela_ficha_do_haiku(monkeypatch):
+    """18/11/2026, Levi: "consegui uma chave API do claude [...] onde devo colar?" (Base › Chaves das fontes › IA). A
+    conferência lê a ficha do Claude Haiku 5.5 (não gasta crédito); a recusada e o formato errado não gravam."""
+    import sys
+    import types
+
+    from nexus.auth import chaves as CH
+    assert CH.CHAVES["ANTHROPIC_API_KEY"]["grupo"] == "ia"
+    pedidos = []
+
+    class _Erro(Exception):
+        status_code = 401
+
+    class _Cli:
+        def __init__(self, **kw):
+            self.models = types.SimpleNamespace(retrieve=lambda mid: pedidos.append((kw["api_key"], mid)))
+    falso = types.ModuleType("anthropic")
+    falso.Anthropic = _Cli
+    for nome in ("AuthenticationError", "PermissionDeniedError", "NotFoundError", "APIStatusError", "APIConnectionError"):
+        setattr(falso, nome, type(nome, (_Erro,), {}))
+    monkeypatch.setitem(sys.modules, "anthropic", falso)
+    chave = "sk-ant-api03-" + "a" * 40
+    assert "Haiku 5.5" in CH._conferir_anthropic(chave) and pedidos == [(chave, "claude-haiku-5-5")]
+    with pytest.raises(CH.Recusada, match="sk-ant-"):
+        CH._conferir_anthropic("sk-or-v1-" + "a" * 40)                  # a do OpenRouter no lugar errado
+
+    def recusa(mid):
+        raise falso.AuthenticationError("x")
+    _Cli.__init__ = lambda self, **kw: setattr(self, "models", types.SimpleNamespace(retrieve=recusa))
+    with pytest.raises(CH.Recusada, match="recusou"):
+        CH._conferir_anthropic(chave)

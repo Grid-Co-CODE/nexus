@@ -609,10 +609,8 @@ def usina_ia_perguntar(usina_id):
     rel = IA.pedido_de_relatorio(pergunta, visao._agora().date())
     if rel:
         return jsonify(ok=True, relatorio=_ia_relatorio(usina_id, rel), respostas=[])
-    gasto, teto = IA.gasto_do_mes(cfg), IA.teto(cfg)
-    if gasto >= teto:
-        return jsonify(ok=False, erro=f"O teto do mês do Nexus IA (US$ {teto:.2f}) foi atingido: US$ {gasto:.2f} "
-                                      "gastos. Para subir, mude a NEXUS_IA_TETO_USD no servidor."), 429
+    # o teto do mês não barra a pergunta (18/11/2026): passou, o pago para e as grátis respondem (`IA.perguntar`)
+    teto = IA.teto(cfg)
     historico = [h for h in (b.get("historico") or []) if isinstance(h, dict)][-IA.MAX_HISTORICO:]
     _ctx, d = _dossie(usina_id)
     setores = [s["nome"] for s in _ia_setores()]
@@ -655,8 +653,6 @@ def usina_ia_diagnostico(usina_id):
         out = {"estado": "sem_ia"}
     elif DG.em_andamento(cfg, usina_id, dia):
         out = {"estado": "preparando"}
-    elif IA.gasto_do_mes(cfg) >= IA.teto(cfg):
-        out = {"estado": "teto"}
     elif not DG.travar(cfg, usina_id, dia):
         out = {"estado": "preparando"}
     else:
@@ -761,10 +757,8 @@ def carteira_ia_perguntar():
     if not ids:
         return jsonify(ok=False, erro="Escolha ao menos um modelo."), 400
     cfg = current_app.config
-    gasto, teto = IA.gasto_do_mes(cfg), IA.teto(cfg)
-    if gasto >= teto:
-        return jsonify(ok=False, erro=f"O teto do mês do Nexus IA (US$ {teto:.2f}) foi atingido: US$ {gasto:.2f} "
-                                      "gastos. Para subir, mude a NEXUS_IA_TETO_USD no servidor."), 429
+    # o teto do mês não barra a pergunta (18/11/2026): passou, o pago para e as grátis respondem (`IA.perguntar`)
+    teto = IA.teto(cfg)
     historico = [h for h in (b.get("historico") or []) if isinstance(h, dict)][-IA.MAX_HISTORICO:]
     t0 = time.monotonic()
     dz = _carteira_ia()

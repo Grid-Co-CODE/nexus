@@ -203,6 +203,30 @@ def _conferir_openrouter(valor: str) -> str:
 
 # as 3 vagas do OpenRouter (14/11/2026, Levi: "troca as keys da nvidea pelo do openrouter mesmo! aí fica 3"): a aba IA
 # das Chaves das fontes; a ordem é a do rodízio (nexus/comando/ia.py, `vagas`). A 1ª é a OPENROUTER_API_KEY de sempre
+def _conferir_anthropic(valor: str) -> str:
+    """A chave da Anthropic (18/11/2026, Levi: "consegui uma chave API do claude para brincar na parte de usinas"): começa
+    com sk-ant-. Confere pela ficha do Claude Haiku 5.5 na API de modelos (`models.retrieve`), que não gasta crédito:
+    recusada (401, 403) não grava, e a conta sem o Haiku 5.5 também não (é o único modelo que a Nexus IA usa dela)."""
+    if not re.fullmatch(r"sk-ant-[A-Za-z0-9_\-]{20,300}", valor or ""):
+        raise Recusada("Isto não parece uma chave da Anthropic (ela começa com sk-ant-): nada foi gravado.")
+    try:
+        import anthropic
+    except ImportError:
+        raise Recusada("O SDK da Anthropic (pacote anthropic) não está instalado neste servidor: nada foi gravado.") from None
+    try:
+        anthropic.Anthropic(api_key=valor, timeout=30, max_retries=0).models.retrieve("claude-haiku-5-5")
+    except (anthropic.AuthenticationError, anthropic.PermissionDeniedError) as e:
+        raise Recusada(f"A Anthropic recusou a chave ({e.status_code}): vencida, apagada ou copiada pela metade. Nada foi "
+                       "gravado.") from None
+    except anthropic.NotFoundError:
+        raise Recusada("A chave vale, mas esta conta da Anthropic não tem o Claude Haiku 5.5: nada foi gravado.") from None
+    except anthropic.APIStatusError as e:
+        raise Recusada(f"A Anthropic respondeu {e.status_code}: nada foi gravado; tente de novo.") from None
+    except anthropic.APIConnectionError as e:
+        raise Recusada(f"Não consegui falar com a Anthropic ({type(e).__name__}): nada foi gravado; tente de novo.") from None
+    return "a Anthropic reconheceu a chave e o Claude Haiku 5.5"
+
+
 _VAGA_OPENROUTER = {
     "para": "a Nexus IA (o Pergunte à Nexus IA e o diagnóstico do dia no prontuário) responder pelo Nemotron 3 Ultra "
             "grátis do OpenRouter (50 pedidos por dia por conta grátis; 1.000 com US$ 10 de crédito). Quando esta chave "
@@ -310,6 +334,20 @@ CHAVES = {
         # não é segredo: uma escolha, e a tela diz como está (09/11/2026, a 1ª tentativa no servidor: o campo de senha
         # recebeu o que o navegador preencheu sozinho, e a tela recusou "use 1 (liga) ou 0 (desliga)")
         "escolha": (("1", "1 · liga o Mapa de equipe nesta máquina"), ("0", "0 · desliga")),
+    },
+    # a Anthropic (18/11/2026, Levi: "adapte o nexus para receber essa chave e dar prioridade a ela na aba usinas [...]
+    # quero usar só o haiku 5.5 na qualidade alta"): com ela, a Nexus IA das usinas responde pelo Claude Haiku 5.5 em
+    # esforço alto, e as grátis do OpenRouter ficam de reserva (nexus/comando/ia.py: `PREFERIDOS`, `ESFORCO`, `perguntar`)
+    "ANTHROPIC_API_KEY": {
+        "nome": "Anthropic: Claude Haiku 5.5 (vem antes das grátis)",
+        "para": "a Nexus IA das usinas (o Pergunte à Nexus IA no prontuário e no alto da lista de usinas, e o diagnóstico "
+                "do dia) responder pelo Claude Haiku 5.5, em qualidade alta. Com ela, o Haiku vem marcado e as grátis do "
+                "OpenRouter ficam de reserva: se ele não responder (sem crédito, limite, chave recusada), a pergunta vai "
+                "a elas. É paga pelo uso, e o teto do mês da Nexus IA vale",
+        "arquivo": "",
+        "dica": "a chave criada em platform.claude.com, em API Keys (começa com sk-ant-)",
+        "grupo": "ia",
+        "conferir": _conferir_anthropic,
     },
     # o OpenRouter (14/11/2026): 3 vagas, na ordem do rodízio; a da tela vence a do .env (nexus/comando/ia.py, `vagas`)
     "OPENROUTER_API_KEY": dict(_VAGA_OPENROUTER, nome="OpenRouter: chave 1 (a primeira a ser usada)",

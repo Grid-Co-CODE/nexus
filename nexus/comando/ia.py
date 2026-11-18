@@ -45,7 +45,9 @@ TEMPO_TOTAL_S = 60              # o teto do tempo inteiro de uma resposta (o Ope
 MAX_SAIDA = 8000                # tokens de saída (o raciocínio dos modelos que pensam conta aqui dentro)
 MAX_PERGUNTA = 600
 MAX_HISTORICO = 3               # as últimas perguntas e respostas que voltam junto (a pergunta de seguimento)
-TETO_PADRAO_USD = 20.0
+# o teto do mês (18/11/2026, Levi, com a chave da Anthropic: "tem como limitarmos o uso dessa chave em 10$?"): só os
+# modelos pagos somam (o grátis custa 0), então é o teto do Haiku. Passou, o Haiku para e as grátis respondem
+TETO_PADRAO_USD = 10.0
 
 INSTRUCOES = """Você é o Nexus IA, o analista de O&M de usinas solares da Grid Co. Você responde perguntas sobre UMA usina usando só o dossiê dela, que vem abaixo entre <dossie> e </dossie>. O dossiê é a fotografia do prontuário da usina no Nexus (performance, COS, OS, Engenharia, equipamentos, chamados, rondas, segurança, insights, demandas e a linha do tempo), cada seção numerada e com a fonte.
 
@@ -105,9 +107,9 @@ class Modelo:
 
 # A Anthropic pela tabela dela (13/11/2026); o resto, referência de sites de terceiros em out-nov/2026 (os nomes mudam:
 # `NEXUS_IA_MODELOS` troca a lista sem deploy, e o erro de "modelo não existe" lista os que o provedor tem)
+# 18/11/2026, Levi, com a chave da Anthropic na mão: "quero usar só o haiku 5.5 na qualidade alta". O Opus e o Sonnet
+# saíram da lista (voltam pelo NEXUS_IA_MODELOS, se um dia ele quiser); o Haiku vai com o esforço alto (`ESFORCO`)
 MODELOS_PADRAO = (
-    Modelo("opus", "Claude Opus 5.5", "anthropic", "claude-opus-5-5", 4.0, 20.0, True),
-    Modelo("sonnet", "Claude Sonnet 5.5", "anthropic", "claude-sonnet-5-5", 2.0, 10.0, True),
     Modelo("haiku", "Claude Haiku 5.5", "anthropic", "claude-haiku-5-5", 0.10, 0.50, True),
     # o mesmo Nemotron 3 Ultra direto na NVIDIA (14/11/2026): o catálogo dela (integrate.api.nvidia.com) tem o modelo com
     # o mesmo nome; o grátis da NVIDIA é por pedidos por minuto (cerca de 40), sem a cota de 50 por dia do OpenRouter
@@ -167,7 +169,10 @@ def chave(cfg, provedor: str) -> str:
 # O descanso fica em `<NEXUS_DADOS>/ia/vagas.json`, pela impressão da chave (sha256, 12 caracteres): nunca a chave.
 # A NVIDIA direto ficou sem vaga na tela: vale a NVIDIA_API_KEY do .env, se um dia houver.
 VAGAS = {"openrouter": ("OPENROUTER_API_KEY", "OPENROUTER_API_KEY_2", "OPENROUTER_API_KEY_3"),
-         "nvidia": ("NVIDIA_API_KEY",)}
+         "nvidia": ("NVIDIA_API_KEY",),
+         # a chave da Anthropic na tela (18/11/2026, Levi: "consegui uma chave API do claude para brincar na parte de usinas
+         # [...] onde devo colar?"): Base › Chaves das fontes › IA, cifrada; a da tela vence a do .env
+         "anthropic": ("ANTHROPIC_API_KEY",)}
 # a 4ª chave do OpenRouter, só do OS Creator (15/11/2026, Levi: "esse 4° slot terá o objetivo de servir demandas do OS
 # Creator"): fica fora das VAGAS (a Nexus IA não a usa, e o OS Creator não gasta as da Nexus IA)
 CHAVE_OS_CREATOR = "OPENROUTER_API_KEY_OS_CREATOR"
@@ -279,7 +284,7 @@ def disponiveis(cfg) -> list[dict]:
     for m in modelos(cfg):
         p = PROVEDORES[m.provedor]
         tem = bool(chave(cfg, m.provedor))
-        falta = ("Falta a chave do OpenRouter (Base › Chaves das fontes › IA)." if m.provedor == "openrouter"
+        falta = (f"Falta a chave do {p['nome']} (Base › Chaves das fontes › IA)." if m.provedor in ("openrouter", "anthropic")
                  else f"Falta a {p['chave']} no servidor ({p['onde']}).")
         out.append(dict(asdict(m), provedor_nome=p["nome"], tem_chave=tem, motivo="" if tem else falta))
     return out
@@ -328,16 +333,25 @@ def _sistema(dossie: str, contexto: str = "", instrucoes: str = "") -> str:
         f"{ins}\n\n<dossie>\n{dossie}\n</dossie>"
 
 
+# o esforço de cada modelo da Anthropic (18/11/2026, Levi: "quero usar só o haiku 5.5 na qualidade alta"): o Haiku 5.5
+# vai em "high" (o padrão dele é "medium"); o que não está aqui, "low" (é conversa, não código)
+ESFORCO = {"claude-haiku-5-5": "high"}
+MAX_SAIDA_ANTHROPIC = 16000      # com o esforço alto o Haiku pensa mais, e o pensamento conta dentro do max_tokens
+
+
 def _chamar_anthropic(m: Modelo, k: str, dossie: str, msgs: list, contexto: str = "", instrucoes: str = "") -> dict:
     """Pelo SDK oficial. O dossiê vai num bloco do system com cache (a pergunta de seguimento na mesma usina relê o
-    dossiê do cache, a 10% do preço). Esforço baixo: é conversa, não código. No Opus 5.5 e no Sonnet 5.5, a recusa por
-    engano cai num modelo de reserva (`fallbacks: "default"`), em vez de a pessoa ficar sem resposta."""
+    dossiê do cache, a 10% do preço). O esforço é o do `ESFORCO` (o Haiku 5.5 em "high"). No Opus 5.5 e no Sonnet 5.5
+    (pelo NEXUS_IA_MODELOS), a recusa por engano cai num modelo de reserva (`fallbacks: "default"`); o Haiku 5.5 não tem
+    essa reserva no servidor, e a recusa dele vai às grátis (`perguntar`)."""
     try:
         import anthropic
     except ImportError:
         return {"erro": "O SDK da Anthropic (pacote anthropic) não está instalado neste servidor."}
     cli = anthropic.Anthropic(api_key=k, timeout=TEMPO_S, max_retries=1)
-    pedido = dict(model=m.modelo, max_tokens=MAX_SAIDA, messages=msgs, output_config={"effort": "low"},
+    esforco = ESFORCO.get(m.modelo, "low")
+    pedido = dict(model=m.modelo, max_tokens=MAX_SAIDA_ANTHROPIC if esforco != "low" else MAX_SAIDA, messages=msgs,
+                  output_config={"effort": esforco},
                   system=[{"type": "text", "text": f"{instrucoes or INSTRUCOES}\n\n{contexto}" if contexto
                            else (instrucoes or INSTRUCOES)},
                           {"type": "text", "text": f"<dossie>\n{dossie}\n</dossie>", "cache_control": {"type": "ephemeral"}}])
@@ -349,16 +363,23 @@ def _chamar_anthropic(m: Modelo, k: str, dossie: str, msgs: list, contexto: str 
     except anthropic.NotFoundError:
         return {"erro": f"A Anthropic não tem o modelo “{m.modelo}”.", "modelo_inexistente": True}
     except anthropic.AuthenticationError:
-        return {"erro": "A chave da Anthropic foi recusada (ANTHROPIC_API_KEY)."}
+        return {"erro": "A chave da Anthropic foi recusada (Base › Chaves das fontes › IA).", "status": 401}
     except anthropic.RateLimitError:
-        return {"erro": "A Anthropic pediu para esperar (limite de uso): tente de novo em instantes."}
+        return {"erro": "A Anthropic pediu para esperar (limite de uso): tente de novo em instantes.", "status": 429}
     except anthropic.APIStatusError as ex:
-        return {"erro": f"A Anthropic respondeu {ex.status_code}: {str(ex.message)[:200]}"}
+        msg = str(getattr(ex, "message", "") or ex)
+        if "credit balance" in msg.lower():
+            # a conta sem crédito responde 400 com este texto: a chave vale, falta pôr crédito
+            return {"erro": "A conta da Anthropic está sem crédito (a chave vale): ponha crédito em platform.claude.com.",
+                    "status": 402}
+        return {"erro": f"A Anthropic respondeu {ex.status_code}: {msg[:200]}", "status": getattr(ex, "status_code", 0)}
     except anthropic.APIConnectionError as ex:
         return {"erro": f"Sem conexão com a Anthropic ({type(ex).__name__})."}
     if r.stop_reason == "refusal":
         return {"erro": "O modelo recusou responder a esta pergunta."}
     texto = "\n".join(b.text for b in r.content if getattr(b, "type", "") == "text").strip()
+    if not texto:
+        return {"erro": "A Anthropic voltou sem texto (resposta vazia)."}
     u = r.usage
     return {"texto": texto, "entrada": u.input_tokens or 0, "saida": u.output_tokens or 0,
             "cache_lido": getattr(u, "cache_read_input_tokens", 0) or 0,
@@ -536,9 +557,38 @@ def perguntar(cfg, ids: list[str], dossie: str, pergunta: str, historico=None, s
     escolhidos = [por_id[i] for i in dict.fromkeys(ids) if i in por_id]
     if not escolhidos:
         return []
+    # o teto do mês atingido: o pago não é chamado, e a pergunta vai às grátis (com o motivo na resposta)
+    if not pago_liberado(cfg) and any(m.entrada > 0 for m in escolhidos):
+        gratis = [m for m in escolhidos if m.entrada == 0]
+        if not gratis:
+            for mid in TROCA_GRATIS:
+                m = por_id.get(mid)
+                if not m or not chave(cfg, m.provedor):
+                    continue
+                r = responder(cfg, m, dossie, pergunta, historico, setores, meu_setor, instrucoes)
+                if r.get("ok"):
+                    r["troca"] = (f"O teto do mês da Nexus IA (US$ {teto(cfg):.2f}) foi atingido: o "
+                                  f"{escolhidos[0].rotulo} parou até o mês que vem, e quem respondeu foi o {m.rotulo}.")
+                    return [r]
+            return [dict(id=escolhidos[0].id, rotulo=escolhidos[0].rotulo, ok=False,
+                         erro=f"O teto do mês da Nexus IA (US$ {teto(cfg):.2f}) foi atingido e nenhuma IA grátis respondeu.")]
+        escolhidos = gratis
     with ThreadPoolExecutor(max_workers=min(8, len(escolhidos))) as ex:
         out = list(ex.map(lambda m: responder(cfg, m, dossie, pergunta, historico, setores, meu_setor, instrucoes),
                           escolhidos))
+    # o pago que não respondeu (18/11/2026, a chave da Anthropic do Levi com crédito contado): qualquer falha do Haiku vai
+    # às grátis, e a resposta diz por quê (a pessoa não fica sem resposta porque o crédito acabou)
+    if len(escolhidos) == 1 and not out[0].get("ok") and escolhidos[0].entrada > 0 and chave(cfg, escolhidos[0].provedor):
+        for mid in TROCA_GRATIS:
+            m = por_id.get(mid)
+            if not m or not chave(cfg, m.provedor):
+                continue
+            r = responder(cfg, m, dossie, pergunta, historico, setores, meu_setor, instrucoes)
+            if r.get("ok"):
+                r["troca"] = (f"O {escolhidos[0].rotulo} não respondeu ({(out[0].get('erro') or '').rstrip('.')}): "
+                              f"quem respondeu foi o {m.rotulo}.")
+                return [r]
+        return out
     if len(escolhidos) == 1 and _bateu_o_limite(out[0]) and escolhidos[0].entrada == 0:
         # o limite do dia é da conta do provedor (vale para todos os grátis dele): aí a troca é para outro provedor. A
         # resposta vazia ou demorada é do modelo: aí vale o outro grátis do mesmo provedor (a reserva do OpenRouter)
@@ -696,14 +746,22 @@ def mes_da_conversa(pergunta: str, hoje) -> str:
 # da NVIDIA (Base › Chaves das fontes › IA: "Aí boto a chave e já vou usando"), o Nemotron vai pela NVIDIA; sem ela, pelo
 # OpenRouter
 MODELO_PADRAO = "nemotron"
-PREFERIDOS = ("nemotron-nvidia", "nemotron")
+# a chave da Anthropic na tela põe o Haiku 5.5 na frente (18/11/2026, Levi: "dar prioridade a ela na aba usinas"); sem
+# ela, o Nemotron de sempre
+PREFERIDOS = ("haiku", "nemotron-nvidia", "nemotron")
+
+
+def pago_liberado(cfg) -> bool:
+    """O gasto do mês ainda cabe no teto (`NEXUS_IA_TETO_USD`, padrão US$ 10): os modelos pagos podem responder."""
+    return gasto_do_mes(cfg) < teto(cfg)
 
 
 def padrao(cfg) -> str:
     """O modelo que vem marcado: o NEXUS_IA_PADRAO, se tem chave; senão o 1º dos preferidos com chave; senão o primeiro com
-    chave; "" sem nenhum."""
+    chave; "" sem nenhum. Com o teto do mês atingido, os pagos não vêm marcados."""
     lista = disponiveis(cfg)
-    com = [m["id"] for m in lista if m.get("tem_chave")]
+    livre = pago_liberado(cfg)
+    com = [m["id"] for m in lista if m.get("tem_chave") and (livre or not m.get("entrada"))]
     quer = str(cfg.get("NEXUS_IA_PADRAO") or "").strip()
     for mid in ((quer,) if quer else ()) + PREFERIDOS:
         if mid in com:

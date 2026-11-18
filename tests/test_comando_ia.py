@@ -38,8 +38,8 @@ def test_sem_chave_o_modelo_aparece_e_nao_e_chamado(monkeypatch):
     chamados = []
     monkeypatch.setattr(IA, "_chamar", lambda *a: chamados.append(a) or {"texto": "x"})
     d = {m["id"]: m for m in IA.disponiveis({"GEMINI_API_KEY": "g"})}
-    assert d["gemini-lite"]["tem_chave"] and not d["opus"]["tem_chave"] and not d["nemotron"]["tem_chave"]
-    assert "ANTHROPIC_API_KEY" in d["opus"]["motivo"] and "console.anthropic.com" in d["opus"]["motivo"]
+    assert d["gemini-lite"]["tem_chave"] and not d["haiku"]["tem_chave"] and not d["nemotron"]["tem_chave"]
+    assert "Base › Chaves das fontes › IA" in d["haiku"]["motivo"]          # a chave da Anthropic se cola na tela
     r = IA.responder({}, IA.modelos({})[0], DOSSIE, "Como foi o mês?")
     assert not r["ok"] and "Falta a ANTHROPIC_API_KEY" in r["erro"] and chamados == []
 
@@ -53,9 +53,17 @@ def test_a_lista_troca_pelo_env_e_o_json_errado_nao_derruba():
 
 
 def test_o_custo_conta_o_cache_da_anthropic():
-    opus = next(m for m in IA.MODELOS_PADRAO if m.id == "opus")
-    # 1.000 de entrada a US$ 4, 10.000 lidos do cache a 10%, 300 de saída a US$ 20
-    assert IA.custo(opus, 1000, 300, cache_lido=10000) == pytest.approx((4000 + 4000 + 6000) / 1e6)
+    haiku = next(m for m in IA.MODELOS_PADRAO if m.id == "haiku")
+    # 1.000 de entrada a US$ 0,10, 10.000 lidos do cache a 10%, 300 de saída a US$ 0,50
+    assert IA.custo(haiku, 1000, 300, cache_lido=10000) == pytest.approx((100 + 100 + 150) / 1e6)
+
+
+def test_so_o_haiku_da_anthropic_e_ele_vem_marcado_com_a_chave():
+    """18/11/2026, Levi: "dar prioridade a ela na aba usinas [...] quero usar só o haiku 5.5 na qualidade alta"."""
+    assert [m.id for m in IA.MODELOS_PADRAO if m.provedor == "anthropic"] == ["haiku"]
+    assert IA.padrao({"OPENROUTER_API_KEY": "sk-or-x"}) == "nemotron"
+    assert IA.padrao({"OPENROUTER_API_KEY": "sk-or-x", "ANTHROPIC_API_KEY": "sk-ant-x"}) == "haiku"
+    assert IA.TETO_PADRAO_USD == 10.0
 
 
 # ── os números da resposta que estão no dossiê ───────────────────────────────────────────────────────────────────────
@@ -72,7 +80,7 @@ def test_o_historico_vai_curto_e_so_com_pares_completos():
 
 
 # ── cada provedor, no formato dele ───────────────────────────────────────────────────────────────────────────────────
-def test_anthropic_com_o_dossie_em_cache_esforco_baixo_e_reserva_no_opus(monkeypatch):
+def test_anthropic_o_haiku_em_esforco_alto_e_o_opus_com_reserva(monkeypatch):
     pedidos = []
 
     class _Uso:
@@ -95,7 +103,8 @@ def test_anthropic_com_o_dossie_em_cache_esforco_baixo_e_reserva_no_opus(monkeyp
         setattr(falso, nome, type(nome, (Exception,), {}))
     monkeypatch.setitem(sys.modules, "anthropic", falso)
     cfg = {"ANTHROPIC_API_KEY": "k"}
-    r = IA.responder(cfg, next(m for m in IA.MODELOS_PADRAO if m.id == "opus"), DOSSIE, "Por que caiu?")
+    opus = IA.Modelo("opus", "Claude Opus 5.5", "anthropic", "claude-opus-5-5", 4.0, 20.0, True)   # pelo NEXUS_IA_MODELOS
+    r = IA.responder(cfg, opus, DOSSIE, "Por que caiu?")
     assert r["ok"] and r["texto"] == "Caiu." and (r["entrada"], r["saida"], r["cache_lido"]) == (120, 80, 9000)
     tipo, k = pedidos[1]
     assert tipo == "beta" and k["fallbacks"] == "default" and k["betas"] == ["server-side-fallback-2026-07-01"]
@@ -103,7 +112,10 @@ def test_anthropic_com_o_dossie_em_cache_esforco_baixo_e_reserva_no_opus(monkeyp
     assert k["system"][0]["text"] == IA.INSTRUCOES and k["system"][1]["cache_control"] == {"type": "ephemeral"}
     assert "<dossie>" in k["system"][1]["text"] and k["messages"][-1] == {"role": "user", "content": "Por que caiu?"}
     IA.responder(cfg, next(m for m in IA.MODELOS_PADRAO if m.id == "haiku"), DOSSIE, "?")
-    assert pedidos[-1][0] == "normal" and "fallbacks" not in pedidos[-1][1]
+    tipo, k = pedidos[-1]
+    # o Haiku 5.5 na qualidade alta, com espaço para pensar (o pensamento conta no max_tokens), sem a reserva do servidor
+    assert tipo == "normal" and "fallbacks" not in k and k["model"] == "claude-haiku-5-5"
+    assert k["output_config"] == {"effort": "high"} and k["max_tokens"] == IA.MAX_SAIDA_ANTHROPIC
     # a recusa vira erro escrito, nunca resposta vazia
     _Msg.stop_reason = "refusal"
     assert IA.responder(cfg, IA.MODELOS_PADRAO[0], DOSSIE, "?")["erro"] == "O modelo recusou responder a esta pergunta."
@@ -140,6 +152,8 @@ def test_grok_groq_e_openrouter_pelo_chat_completions(monkeypatch):
     lista = [{"id": m.id, "rotulo": m.rotulo, "provedor": m.provedor, "modelo": m.modelo, "entrada": m.entrada,
               "saida": m.saida} for m in IA.MODELOS_PADRAO]
     lista.append({"id": "grok", "rotulo": "Grok", "provedor": "xai", "modelo": "grok-x", "entrada": 2, "saida": 6})
+    lista.append({"id": "opus", "rotulo": "Claude Opus 5.5", "provedor": "anthropic", "modelo": "claude-opus-5-5",
+                  "entrada": 4, "saida": 20})
     cfg = {"XAI_API_KEY": "k", "GROQ_API_KEY": "k", "OPENROUTER_API_KEY": "k", "NEXUS_IA_MODELOS": json.dumps(lista)}
     assert "grok" not in [m.id for m in IA.MODELOS_PADRAO]
     rs = IA.perguntar(cfg, ["grok", "groq-oss", "nemotron", "opus"], DOSSIE, "Qual a tendência?")
@@ -223,9 +237,10 @@ def test_perguntar_monta_o_dossie_de_agora_e_registra(tela, logado, monkeypatch,
     assert logado.post("/t/campo/usinas/1/ia/perguntar", json={"pergunta": "?", "modelos": []}).status_code == 400
     assert logado.post("/t/campo/usinas/1/ia/perguntar", json={"pergunta": "?", "modelos": ["opus"]},
                        headers={"Sec-Fetch-Site": "cross-site"}).status_code == 403
+    # o teto estourado não barra mais a pergunta (18/11/2026): o pago para e as grátis respondem (`IA.perguntar`)
     logado.application.config["NEXUS_IA_TETO_USD"] = "0.01"
     r = logado.post("/t/campo/usinas/1/ia/perguntar", json={"pergunta": "?", "modelos": ["gemini-flash"]})
-    assert r.status_code == 429 and "teto do mês" in r.get_json()["erro"]
+    assert r.status_code == 200
 
 
 # ── a rodada de comparação (ferramentas/ia_comparar.py) ──────────────────────────────────────────────────────────────
@@ -530,3 +545,25 @@ def test_a_chave_do_openrouter_vem_das_vagas_e_a_nvidia_so_do_env():
     assert IA.padrao({"NVIDIA_API_KEY": "nvapi-x", "OPENROUTER_API_KEY": "k"}) == "nemotron-nvidia"
     falta = next(m for m in IA.disponiveis({}) if m["id"] == "nemotron")["motivo"]
     assert falta == "Falta a chave do OpenRouter (Base › Chaves das fontes › IA)."
+
+
+def test_o_haiku_que_falha_ou_passa_do_teto_vai_as_gratis(monkeypatch, tmp_path):
+    """18/11/2026, Levi: "tem como limitarmos o uso dessa chave em 10$?". Passado o teto do mês, o Haiku não é chamado e
+    a grátis responde, com o motivo; sem crédito na conta (ou qualquer falha dele), também."""
+    chamados = []
+
+    def falso(cfg, m, *a, **k):
+        chamados.append(m.id)
+        if m.id == "haiku":
+            return {"id": "haiku", "rotulo": m.rotulo, "ok": False, "erro": "A conta da Anthropic está sem crédito."}
+        return {"id": m.id, "rotulo": m.rotulo, "ok": True, "texto": "Resposta grátis.", "custo_usd": 0}
+    monkeypatch.setattr(IA, "responder", falso)
+    cfg = {"NEXUS_DADOS": str(tmp_path), "ANTHROPIC_API_KEY": "sk-ant-x", "OPENROUTER_API_KEY": "sk-or-x"}
+    r = IA.perguntar(cfg, ["haiku"], DOSSIE, "?")
+    assert chamados == ["haiku", "nemotron"] and r[0]["ok"] and "sem crédito" in r[0]["troca"]
+    # o teto do mês: o Haiku nem é chamado
+    IA.registrar(cfg, 1, "?", [{"id": "haiku", "ok": True, "texto": "x", "custo_usd": 10.5}], "abc", 100)
+    chamados.clear()
+    r = IA.perguntar(cfg, ["haiku"], DOSSIE, "?")
+    assert chamados == ["nemotron"] and "teto do mês" in r[0]["troca"] and "US$ 10,00" not in r[0]["troca"]
+    assert IA.padrao(cfg) == "nemotron"                              # e não vem marcado na tela
