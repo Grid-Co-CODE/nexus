@@ -265,6 +265,12 @@ As duas precisam do Python além do relatório de furos; no .exe usam o BD que a
     lista de usinas também tá escrota, quero ao estilo nexus!"): as `zf-*` do Histórico de OS (`static/zeladoria/
     filtros.css`), de uma escolha, com a busca, as setas e o Esc; a caixa nativa do .exe fica escondida. O ajuste de
     tamanho mora em `static/coletas/coletas.css` (`.rc-lista`).
+  - **A lista não vence com o reinício do Nexus** (18/11/2026, Levi, com o painel aberto e uma publicação no meio:
+    "a lista fica vencendo ainda, resolva!"). O que a recoleta guarda (a lista da fonte, o plano, as respostas) mora na
+    memória da sessão, e o Nexus reinicia a cada publicação. O `fontes_simular` e o `fontes_plano` refazem a lista
+    sozinhos (`_rf_ou_refaz`, com a chave que a rota passa; espera os BDs do banco ficarem prontos); só a busca perdida
+    no MEIO volta com `refazer: true`, e a tela recomeça a busca sozinha, uma vez (`ir(true)` no recoleta.js). A usina
+    que saiu da lista da fonte dá o motivo, não "venceu".
   - Prova: `tests/test_coletas_recoleta_fontes.py` (plataforma dublada com as respostas do contrato) e, da recoleta do
     .exe, `test_a_recoleta_busca_na_fonte_e_sai_pela_mesma_montagem` e `test_a_recoleta_so_abre_para_quem_tem_a_tela_dela`.
 - Trazer uma versão do .exe que a Coleta ainda está mexendo: a pasta pode ter trabalho sem release (o `mural.py` estava lá

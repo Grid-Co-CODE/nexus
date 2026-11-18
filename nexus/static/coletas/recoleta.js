@@ -150,8 +150,10 @@
     LF.escolher(r[0].id);                                        // a 1ª é a que não gasta cota (banco da Thopen)
   }
 
-  async function ir() {
-    const u = usina(); if (!u || E.ocupado) return;
+  // O Nexus reinicia a cada publicação e a busca em andamento mora na memória dele: se uma parte volta com `refazer`,
+  // a busca recomeça sozinha, UMA vez (18/11/2026, Levi: "a lista fica vencendo ainda, resolva!")
+  async function ir(denovo) {
+    const u = usina(); if (!u || (E.ocupado && denovo !== true)) return;
     const [g, e, c] = oQue();
     E.ocupado = true; clearTimeout(E.relogio); E.vez++; q("#rcIr").disabled = true;
     const fim = (t, erro) => { E.ocupado = false; if (t) st(t, erro); else validar(); q("#rcIr").disabled = !usina(); };
@@ -161,11 +163,13 @@
     for (let i = 0; i < ps.length; i++) {
       st("Recoletando " + u.usina + ": " + ddmm(ps[i][0]) + " a " + ddmm(ps[i][1]) + (ps.length > 1 ? " (" + (i + 1) + " de " + ps.length + ")" : "") + "…");
       const r = await chama("fontes_parte", [i]);
+      if (r && r.refazer && denovo !== true) { st("O Nexus reiniciou: recomeçando a busca…"); return ir(true); }
       if (!r || r.erro) return fim((r && r.erro) || "sem resposta", true);
       if (E.info && r.cota_restante != null) E.info.cota_restante = r.cota_restante;
     }
     st("Comparando com o BD…");
     const res = await chama("fontes_montar", []);
+    if (res && res.refazer && denovo !== true) { st("O Nexus reiniciou: recomeçando a busca…"); return ir(true); }
     if (!res || res.erro) return fim((res && res.erro) || "sem resposta", true);
     app.res = res;
     $("#status").textContent = "Recoleta de " + u.usina + " (" + nomeDaFonte() + ") pronta às " + res.hora;
@@ -181,6 +185,6 @@
   }
 
   abrir.onclick = abrirPainel;
-  q("#rcIr").onclick = ir;
+  q("#rcIr").onclick = () => ir();
   ["#rcIni", "#rcFim", "#rcGer", "#rcEtm", "#rcChuva"].forEach(i => { q(i).oninput = validar; q(i).onchange = validar; });
 })();

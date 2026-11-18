@@ -130,7 +130,8 @@ def coletas_api(metodo):
                     return _json(s.fontes_plantas(str(args[0]), servico.chave_recoleta(app.config)))
                 if metodo in ("fontes_simular", "fontes_plano"):
                     return _json(getattr(s, metodo)(str(args[0]), str(args[1]), str(args[2]), str(args[3]),
-                                                    bool(args[4]), bool(args[5]), bool(args[6])))
+                                                    bool(args[4]), bool(args[5]), bool(args[6]),
+                                                    chave=servico.chave_recoleta(app.config)))
                 if metodo == "fontes_parte":
                     return _json(s.fontes_parte(int(args[0])))
                 return _json(s.fontes_montar())

@@ -147,8 +147,38 @@ def test_fonte_sem_cota_diz_que_nao_custa_e_a_recusa_da_plataforma_chega_como_ve
     monkeypatch.setattr(RF._recoleta, "_pedir", recusa)
     assert "teto de 150" in _api(tela, "fontes_plantas", "apipv").get_json()["erro"]
     assert _api(tela, "fontes_plantas", "xyz").get_json()["erro"].startswith("Fonte desconhecida")
-    assert "venceu" in _api(tela, "fontes_parte", 0).get_json()["erro"]                  # sem plano, nada é pedido
-    assert "venceu" in _api(tela, "fontes_montar").get_json()["erro"]
+    assert _api(tela, "fontes_parte", 0).get_json()["refazer"] is True                  # sem plano, nada é pedido
+    assert _api(tela, "fontes_montar").get_json()["refazer"] is True
+
+
+def test_o_reinicio_do_nexus_nao_faz_a_lista_vencer(tela, monkeypatch):
+    """18/11/2026 (Levi, com o painel aberto e uma publicação do Nexus no meio: "a lista fica vencendo ainda, resolva!").
+    O que a recoleta guarda mora na memória da sessão e some a cada reinício: o custo e o plano refazem a lista sozinhos;
+    só a busca perdida no meio pede para recomeçar (`refazer`), e a tela recomeça sozinha."""
+    pedidos = _plataforma(monkeypatch)
+    _bd_pronto(tela)
+    arg = ("apipv", "Teste", "2026-10-14", "2026-10-14", True, True, False)
+    assert _api(tela, "fontes_plantas", "apipv").status_code == 200
+
+    def reinicia():
+        for s in servico._SESSOES.values():
+            s.__dict__.pop("_rf", None)                 # a memória da sessão depois de um reinício
+        RF._PLANTAS.clear()
+    reinicia()
+    assert _api(tela, "fontes_simular", *arg).get_json()["consultas"] == 10              # refez a lista e fez a conta
+    reinicia()
+    assert len(_api(tela, "fontes_plano", *arg).get_json()["pedidos"]) == 2
+    assert _api(tela, "fontes_parte", 0).get_json()["ok"]
+    reinicia()                                                                           # no MEIO da busca
+    r = _api(tela, "fontes_parte", 1).get_json()
+    assert r["refazer"] is True and "reiniciou" in r["erro"]
+    # a tela recomeça: plano de novo e a busca inteira
+    assert len(_api(tela, "fontes_plano", *arg).get_json()["pedidos"]) == 2
+    assert _api(tela, "fontes_parte", 0).get_json()["ok"] and _api(tela, "fontes_parte", 1).get_json()["ok"]
+    assert _api(tela, "fontes_montar").get_json()["recoleta"]["celulas"] == 4
+    # a usina que saiu da lista da fonte: o motivo, não "venceu"
+    erro = _api(tela, "fontes_simular", "apipv", "Outra usina", "2026-10-14", "2026-10-14", True, True, False).get_json()["erro"]
+    assert "não está na lista de API PV" in erro and pedidos
 
 
 def test_a_fonte_que_nao_devolve_nada_diz_isso_em_vez_de_planilha_vazia(tela, monkeypatch):
