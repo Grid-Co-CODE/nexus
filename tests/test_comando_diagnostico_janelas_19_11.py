@@ -67,7 +67,7 @@ def test_o_como_ler_explica_as_tres_janelas():
 
 def test_o_formato_do_dossie_e_o_do_diagnostico_mudaram_de_versao():
     # o guardado com o pedido antigo é refeito na próxima abertura (`diagnostico.guardado` olha a VERSAO)
-    assert DS.VERSAO == 7 and DG.VERSAO == 6
+    assert DS.VERSAO >= 7 and DG.VERSAO == 6      # o dossiê foi a 8 no mesmo dia, com a programação do PCM e o contrato
 
 
 # ── o pedido e a conferência ─────────────────────────────────────────────────────────────────────────────────────────

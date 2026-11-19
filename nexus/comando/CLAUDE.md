@@ -1210,6 +1210,44 @@ NORMALIZADA (a usina voltou), e a parada de hoje ainda está aberta, fora dela. 
   "A conferir".
 - Seção nova no dossiê entra com a janela dela escrita. Prova: `tests/test_comando_diagnostico_janelas_19_11.py`.
 
+### A programação do PCM e o contrato no dossiê (19/11/2026; `nexus/comando/dossie_fontes.py`)
+
+Levi, 19/11/2026: "Fontes novas, nesta ordem: Programação do PCM: confirme se a semana seguinte já está no banco antes da
+segunda. Contratos: garantia de disponibilidade, PR próprio e prazos de atendimento, sem valores em reais. Comentários dos
+analistas: só depois de montar o de-para entre o código da fonte e a usina. No lugar do nome do autor, informe o setor".
+As duas primeiras entraram; a terceira espera o de-para (abaixo).
+
+- **Onde entram:** seções **17 (Programação do PCM)** e **18 (Contrato)**, no FIM; "O que ficou de fora" virou a 19. No
+  meio, mudariam o número das seções que o pedido da IA cita (o §4 do COS e o §5 das OS, em `ia.py` e
+  `diagnostico.py`). `dossie.VERSAO = 8`. O "Como ler" diz que a programação é o PLANEJADO (o feito está nas OS) e manda
+  comparar a disponibilidade do mês com a garantia do contrato, quando houver.
+- **Programação** (`programacao_da_usina`): o `nexus_programacao · fato_programacao`, a semana corrente e a seguinte
+  (`responsaveis._programacao_recente`, o mesmo leitor da Visão do cliente). Uma linha por tarefa = os blocos do mesmo
+  dia, da mesma OS e do mesmo tipo: dia, hora do 1º bloco, tipo, OS, duração somada e o estado (da última carga, de hora
+  em hora). O fato não tem nome de pessoa nem o texto da tarefa. **A semana seguinte, medida no banco em 19/11/2026:** o
+  PCM a gera na sexta à noite (17:54 a 20:18 nas 8 últimas semanas; em agosto e setembro, quinta à noite), 2,2 dias
+  antes da segunda, e a carga de hora em hora a traz. De segunda à sexta à tarde ela não existe: a seção diz "o PCM
+  ainda não publicou", nunca "nada programado" (`seguinte_publicada` é do fato inteiro, não da usina). Mais de 30
+  tarefas na semana: as 30 primeiras e "e mais N".
+- **Contrato** (`contrato_da_usina`): as fichas do Comando › Contratos (`contratos/edicao.visao`, pelo
+  `gerencial_tela._contratos`). A garantia de disponibilidade é a da Visão gerencial (`gerencial.garantia_de_
+  disponibilidade`); as outras regras da categoria "Disponibilidade e desempenho" (o PR próprio mora ali) vêm com o
+  texto vigente em até 200 caracteres; os prazos, da categoria "SLA" (nome, prazo e cláusula; até 14). **Nenhum valor em
+  reais:** Penalidades, Medição e as outras categorias não entram, e um "R$ 123" dentro de um texto vira "(valor no
+  contrato)". Cliente com vários contratos: vale o que lista a usina (pelo nome ou pelo código); sem um só, as regras de
+  todos, sem repetir, e a seção diz isso. Sem ficha do cliente: "sem dado: o contrato ainda não foi lido" (não é "não
+  garante"). Medido com as fichas da produção de 18/11: contrato lido em 142 de 144 usinas, garantia em 109, ligadas a
+  um contrato só 126; nenhum "R$" no dossiê.
+- **Uma leitura para todas as usinas** (`_guardado_do_dossie`, 10 minutos por app): o Insights de madrugada monta 144
+  dossiês em fila; a programação das duas semanas e as fichas são lidas uma vez. O erro não se guarda: a fonte vai para
+  "O que ficou de fora" e a usina seguinte tenta de novo.
+- **Comentários dos analistas da Performance: NÃO entraram.** Moram no `plataforma_estado · comentarios` com a chave
+  `<fonte>:<plant_id>`, sem o nome da usina, e com o nome de quem escreveu (na coluna e dentro do texto automático).
+  Falta o de-para `<fonte>:<plant_id>` → usina; quando entrarem, o autor vai pelo SETOR, nunca pelo nome.
+- Prova: `tests/test_comando_dossie_fontes_19_11.py`. **Falta ver no servidor:** as duas seções no dossiê de uma usina
+  (o contrato só abre lá: a carga inicial dos contratos mora na pasta de dados do servidor) e, sábado, a semana de 23/11
+  na seção.
+
 ### O Insights de madrugada, em lote (19/11/2026; `nexus/comando/diagnostico_noite.py`, `torres/comando/noite_laco.py`)
 
 Levi, 19/11/2026: "Madrugada em lote, com teto de US$ 12. O lote só garante a resposta em até 24 h, então comece logo

@@ -388,7 +388,22 @@ def usina_relatorio(usina_id):
     return responsaveis_usina_relatorio(usina_id)
 
 
-def _extras_do_dossie(usina_id: int, codigo: str = "") -> dict:
+def _guardado_do_dossie(chave, ler, ttl_s: int = 600):
+    """A leitura que serve a TODAS as usinas (a programação das duas semanas, as fichas dos contratos), guardada 10 minutos
+    por app: o Insights de madrugada monta 144 dossiês em fila e não pode ler o mesmo livro 144 vezes. O erro não se
+    guarda: sobe, e a fonte vai para "O que ficou de fora"."""
+    import time
+    guarda = current_app.extensions.setdefault("nexus_dossie_fontes", {})
+    g = guarda.get(chave)
+    if g and time.time() < g[0]:
+        return g[1]
+    valor = ler()
+    guarda.clear() if len(guarda) > 8 else None
+    guarda[chave] = (time.time() + ttl_s, valor)
+    return valor
+
+
+def _extras_do_dossie(usina_id: int, codigo: str = "", x: dict | None = None) -> dict:
     """O que os setores sabem da usina e o prontuário ainda não mostra (Levi, 12/11/2026, conferindo o dossiê: "tá indo o
     que a engenharia tá vendo [...] tá indo alguma anotação de supervisão"): os ativos com sinal na Confiabilidade com os
     números de lá, os ativos em acompanhamento pela Engenharia, os relatórios de FMEA e de causa raiz e as observações do
@@ -451,9 +466,36 @@ def _extras_do_dossie(usina_id: int, codigo: str = "") -> dict:
         return [{"equipamento": e.rotulo, "total": e.total, "repete": e.repete, "reincidente": e.reincidente,
                  "desfechos": [(RE.DESFECHOS[k][0], n) for k, n in e.desfechos.items()], "tipos": e.tipos, "os": e.os,
                  "ultima": e.ultima.strftime("%d/%m %H:%M") if e.ultima else ""} for e in (p.itens if p else [])]
+    def programacao():
+        """A programação do PCM: a semana corrente e a seguinte (19/11/2026; `dossie_fontes.programacao_da_usina`)."""
+        from datetime import timedelta
+
+        from ...campo import responsaveis as R
+        from ...comando import dossie_fontes as DF
+        from ...dados.calendario import data_id
+        hoje = visao._agora().date()
+        segunda = hoje - timedelta(days=hoje.weekday())
+        linhas = _guardado_do_dossie(("programacao", segunda), lambda: R._programacao_recente(
+            {data_id(segunda), data_id(segunda + timedelta(days=7))}))
+        return DF.programacao_da_usina(linhas, usina_id, hoje)
+
+    def contrato():
+        """O que o contrato pede: a garantia, o PR e os prazos, sem valor em reais (19/11/2026; `dossie_fontes`)."""
+        from ...comando import dossie_fontes as DF
+        from .gerencial_tela import _contratos
+        hoje = visao._agora().date()
+
+        def fichas():
+            v, aviso = _contratos(hoje)
+            if v is None:
+                raise RuntimeError(aviso or "o Comando › Contratos não abriu")
+            return v.get("fichas") or {}
+        return DF.contrato_da_usina(_guardado_do_dossie(("contratos", hoje), fichas), (x or {}).get("cliente") or "",
+                                    (x or {}).get("usina") or "", codigo)
     return {"ativos": tentar("a Confiabilidade", ativos), "acompanhamentos": tentar("o acompanhamento da Engenharia", acompanhamentos),
             "relatorios": tentar("os relatórios de falha", relatorios), "observacoes": tentar("as observações", observacoes),
-            "religamentos": tentar("os religamentos do COS", religamentos)}
+            "religamentos": tentar("os religamentos do COS", religamentos),
+            "programacao": tentar("a programação do PCM", programacao), "contrato": tentar("o Comando › Contratos", contrato)}
 
 
 def _dossie(usina_id: int):
@@ -464,7 +506,8 @@ def _dossie(usina_id: int):
     ctx = _prontuario(usina_id)
     if ctx is None:
         abort(404)
-    return ctx, DS.montar(ctx, visao._agora(), extras=_extras_do_dossie(usina_id, (ctx.get("x") or {}).get("codigo") or ""))
+    x = ctx.get("x") or {}
+    return ctx, DS.montar(ctx, visao._agora(), extras=_extras_do_dossie(usina_id, x.get("codigo") or "", x))
 
 
 @bp_usinas.route("/<int:usina_id>/dossie")
