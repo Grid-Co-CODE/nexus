@@ -47,7 +47,7 @@ ganha um. É ele que o Claude lê antes de mexer: lendo o `.md` da pasta, não p
 | Torres (como criar tela; a tabela de cada torre, inclusive Chamados, Pessoas e Comando, que ainda são atalho ou placeholder) | `nexus/torres/CLAUDE.md` |
 | Base (Registro mestre, Equipamentos das usinas, Chaves das fontes; Acessos na casca, com a aba Pessoas e setores, a antiga Integração Fracttal; Governança nos dados) | `nexus/cadastro/CLAUDE.md` |
 | Relatórios (Central de emissão: os quatro do PCM, o executivo do PCM e os da Performance; o setor de cada relatório) | `nexus/pcm/relatorios/CLAUDE.md`, `nexus/pcm/relatorio_exec/CLAUDE.md` e `nexus/torres/CLAUDE.md` |
-| Contratos e clientes (Contestações do cliente, vindas do Dashboard Thopen) | `nexus/torres/contratos/CLAUDE.md` |
+| Contratos (Comando › Contratos: o contrato editável com histórico, os Pontos de atenção e de divergência e a visão por setor, desde 19/11/2026; Contestações do cliente, vindas do Dashboard Thopen) | `nexus/contratos/CLAUDE.md` |
 | Comando (desde 03/11/2026: o motor de insights com as regras que cruzam as fontes, a Caixa de entrada por setor, o Assumir e o Concluir no banco e o sino no topo; as fases seguintes, conversa e pedidos entre setores, no PRD do Taskmaster em `.taskmaster/`) | `nexus/comando/CLAUDE.md` |
 | COS | `nexus/torres/cos/CLAUDE.md` |
 | Usinas 360° (era Campo · App até 05/11/2026; o id e o /t/campo ficaram): a usina por inteiro, do responsável e, a seguir, do cliente | `nexus/torres/campo/CLAUDE.md` |

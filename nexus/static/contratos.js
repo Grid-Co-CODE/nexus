@@ -17,10 +17,18 @@
   var CAMINHO = window.nexusRota("/t/comando/contratos/");
   var R = null, HIST = {}, regraAberta = {}, aberta = null, ultimaAba = "", ultimoCt = null;
   var estado = {ct: -1, aba: "regras", grupos: {}, soAditivo: false, verRegras: "todas", temas: {}, mesCal: 0};
-  var ABAS = [["regras", "Regras"], ["calendario", "Calendário"], ["atendimento", "Atendimento"], ["entregaveis", "Entregáveis"],
+  var ABAS = [["regras", "Regras"], ["pontos", "Pontos"], ["calendario", "Calendário"], ["atendimento", "Atendimento"], ["entregaveis", "Entregáveis"],
     ["metas", "Metas"], ["financeiro", "Financeiro"], ["historico", "Histórico"]];
   var CATS = ["SLA", "Entregáveis", "Rotinas", "Disponibilidade e desempenho", "Penalidades", "Benefícios", "Medição e faturamento",
     "Adicionais e hora extra", "Rescisão", "Seguros e documentação", "Outras obrigações"];
+  // os setores que executam, na ordem da operação (Levi, 19/11/2026: "separar por setor [...] ordenar por setor, pelo
+  // menos, e aí botar uma linha grossa [...] para poder separar os setores"); a regra sem setor vem no fim
+  var SETORES = ["Supervisão de Campo", "COS", "Performance", "PCM", "Engenharia de O&M", "Zeladoria", "HSEQ", "Contratos", "Financeiro"];
+  function setorDe(x) { var s = (x && x.r ? x.r : x || {}).setor || ""; return SETORES.indexOf(s) >= 0 ? s : ""; }
+  // os blocos que abrem e fecham (o pedido da área de Contratos, 19/11/2026: "que eles possa minimizar/maximizar [...] se
+  // eu quero acessar somente os entregáveis que eu lancei, preciso ficar com tudo aquilo em aberto"); o navegador lembra
+  var DOBRAS = {rec: false, unica: false, lanc: true};
+  try { Object.assign(DOBRAS, JSON.parse(localStorage.getItem("nexus.contratos.dobras") || "{}")); } catch (e) { /* sem localStorage: o padrão */ }
   var MESES = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
 
   /* ── utilidades ─────────────────────────────────────────────────────────────────────────────────────────────────── */
@@ -189,9 +197,10 @@
       if (!iso) return '<span class="mudo">' + rot + "</span>";
       return '<span class="num' + (dias < 0 ? " c-critico" : "") + '">' + dBR(iso) + '</span><small class="mudo"> ' + quando(dias) + "</small>";
     }
-    return '<div class="ctr-topo">' + escolha(opcoes(), -1) + '<span class="ctr-resumo">' + R.contratos.length + " contratos; " + venc + " com a vigência vencida; " + comAtr + " com obrigação em atraso</span></div>" +
+    return '<div class="ctr-topo">' + escolha(opcoes(), -1) + '<span class="ctr-resumo">' + R.contratos.length + " contratos; " + venc + " com a vigência vencida; " + comAtr + " com obrigação em atraso; " +
+      R.contratos.filter(function (c) { return c.pontos_atencao || c.pontos_divergencia; }).length + " com ponto a resolver</span></div>" +
       '<div class="ctr-rol" style="margin-top:10px"><table class="ctr-tab"><thead><tr><th>Cliente</th><th>Gestor do contrato</th><th>Vigência até</th><th>Renovação: avisar até</th><th>Próximo reajuste</th>' +
-      '<th class="r">Valor mensal</th><th class="r">Em atraso</th><th class="r">Regras</th><th class="ir"><span class="so-leitor">Abrir</span></th></tr></thead><tbody>' +
+      '<th class="r">Valor mensal</th><th class="r">Em atraso</th><th class="r">Pontos</th><th class="r">Regras</th><th class="ir"><span class="so-leitor">Abrir</span></th></tr></thead><tbody>' +
       ordem.map(function (x) {
         var c = x.c, f = fichaDe(c), nr = f ? f.contratos.reduce(function (s, k) { return s + (k.regras || []).length; }, 0) : 0;
         return '<tr data-ir="' + x.i + '"><td><a href="' + rota(x.i) + '">' + esc(c.cliente) + "</a></td>" +
@@ -201,9 +210,19 @@
           "<td>" + (c.proximo_reajuste ? data(c.proximo_reajuste, c.dias_reajuste) : '<span class="mudo">' + esc(String(c.indice || "sem índice").slice(0, 40)) + "</span>") + "</td>" +
           '<td class="r num">' + (c.valor_mensal != null ? brl(c.valor_mensal) : '<span class="mudo">—</span>') + "</td>" +
           '<td class="r">' + (c.atrasadas ? '<span class="ctr-pill t-critico">' + c.atrasadas + "</span>" : '<span class="mudo">0</span>') + "</td>" +
+          '<td class="r" style="white-space:nowrap">' + pontosCel(x.i, c) + "</td>" +
           '<td class="r">' + (nr ? '<span class="num">' + nr + "</span>" : '<span class="mudo">PDF não lido</span>') + "</td>" +
           '<td class="ir"><i class="ph ph-caret-right" aria-hidden="true"></i></td></tr>';
-      }).join("") + "</tbody></table></div>";
+      }).join("") + "</tbody></table></div>" +
+      ((R.radar_sem_contrato || []).length ? '<p class="ctr-nota">Pontos do Radar da Zeladoria sem contrato com o mesmo nome aqui: ' + R.radar_sem_contrato.map(esc).join(", ") +
+        ". Acerte o nome do cliente no Radar ou nos dados do contrato para eles entrarem.</p>" : "");
+  }
+  // os pontos abertos de um contrato, em Todos os contratos: o número de cada tipo, e o clique leva à aba Pontos
+  function pontosCel(i, c) {
+    var a = c.pontos_atencao || 0, d = c.pontos_divergencia || 0;
+    if (!a && !d) return '<span class="mudo">0</span>';
+    return '<a class="ctr-pts" href="' + rota(i, "pontos") + '">' + (a ? '<span class="ctr-pill t-critico" title="' + a + ' de atenção">' + a + "</span>" : "") +
+      (d ? ' <span class="ctr-pill t-alerta" title="' + d + ' de divergência">' + d + "</span>" : "") + "</a>";
   }
 
   /* ── um contrato: o topo numa linha, os fatos, as abas ──────────────────────────────────────────────────────────── */
@@ -218,18 +237,19 @@
       (n ? '<div><a class="ctr-atraso" href="' + rota(estado.ct, atr ? "calendario" : "regras") + '"><i class="ctr-ponto p-critico" aria-hidden="true"></i>' + n + " em atraso</a></div>" : "") + "</dl>";
     h += '<nav class="ctr-abas" aria-label="Partes do contrato">' + ABAS.map(function (a) {
       return '<a href="' + rota(estado.ct, a[0]) + '"' + (estado.aba === a[0] ? ' aria-current="page"' : "") + ">" + a[1] +
-        (a[0] === "calendario" && atr ? "<b>" + atr + "</b>" : "") + "</a>";
+        (a[0] === "calendario" && atr ? "<b>" + atr + "</b>" : "") +
+        (a[0] === "pontos" && (c.pontos_atencao || c.pontos_divergencia) ? '<b class="' + (c.pontos_atencao ? "" : "b-alerta") + '">' + ((c.pontos_atencao || 0) + (c.pontos_divergencia || 0)) + "</b>" : "") + "</a>";
     }).join("") + "</nav>";
-    var f = {regras: rRegras, calendario: rCalendario, atendimento: rAtendimento, entregaveis: rEntregaveis, metas: rMetas, financeiro: rFinanceiro, historico: rHistorico}[estado.aba];
+    var f = {regras: rRegras, pontos: rPontos, calendario: rCalendario, atendimento: rAtendimento, entregaveis: rEntregaveis, metas: rMetas, financeiro: rFinanceiro, historico: rHistorico}[estado.aba];
     return h + f(c);
   }
 
-  /* ── o retorno da Ana Barros (chamada de 18/11/2026) ─────────────────────────────────────────────────────────────
+  /* ── o retorno da gestora que pediu a visão do contrato (chamada de 18/11/2026) ─────────────────────────────────────────────────────────────
      - os códigos do contrato (MPLP.3, MPCP.1, P52S) viram etiqueta depois do nome (Levi: "esse MPLP eu colocaria como uma
        tag [...] na frente eu creio que esteja atrapalhando a leitura");
      - o que se repete numa categoria (expurgos, multas, exclusões, disponibilidade) vira um item com a lista dentro (Ana:
        "tem vários expurgos [...] a gente pode juntar num só"; Levi: "agrupar expurgos, multas [...] tudo que se repete");
-     - a regra prioritária (a estrela do gestor) fica no alto; o comentário fica na regra, com quem e quando (a Danuth);
+     - a regra prioritária (a estrela do gestor) fica no alto; o comentário fica na regra, com quem e quando (pedido da área de Contratos);
      - a ação leve (estrela, comentário, check de entregue, descartar sugestão) não pede motivo nem prova (Levi: "só quem e
        quando"). */
   var COD = "[A-Z]{2,6}\\d*(?:\\.\\d+)?(?:\\s*\\/\\s*[A-Z]{2,6}\\d*(?:\\.\\d+)?)*";
@@ -267,6 +287,15 @@
     if (!ref) return "";
     return (ref.clausula ? "cl. " + esc(ref.clausula) + ", " : "") + (ref.pagina ? "p. " + esc(ref.pagina) + (ref.pagina_fim && ref.pagina_fim !== ref.pagina ? "–" + esc(ref.pagina_fim) : "") : "");
   }
+  // a etiqueta curta da cláusula (Levi, 19/11/2026: "uma tagzinha [...] da cláusula do contrato [...] uma forma mais
+  // resumida"): o servidor monta (fichas.clausula_curta); a referência inteira fica na dica
+  function clTag(ref) {
+    if (!ref) return "";
+    var pg = ref.pagina ? "p. " + ref.pagina + (ref.pagina_fim && ref.pagina_fim !== ref.pagina ? "–" + ref.pagina_fim : "") : "";
+    var dica = [ref.arquivo, ref.clausula ? "cláusula " + ref.clausula : "", pg].filter(Boolean).join(", ");
+    return (ref.curta ? '<span class="ctr-cl" title="' + esc(dica) + '">' + esc(ref.curta) + "</span>" : "") +
+      (pg ? '<small class="mudo"' + (ref.curta ? "" : ' title="' + esc(dica) + '"') + "> " + esc(pg) + "</small>" : "");
+  }
   function vale(r) { return r.vigente != null && r.vigente !== "" ? r.vigente : r.contratual; }
   function grupos(f, cats, soAditivo) {
     var g = [], por = {};
@@ -280,17 +309,18 @@
     });
     return g;
   }
-  function linhaRegra(c, f, x, varios) {
-    var r = x.r, id = c.cliente + "|" + x.ch, ab = !!regraAberta[id], ids = x.ks.map(function (y) { return y.r._id; });
+  function linhaRegra(c, f, x, varios, op) {
+    op = op || {};
+    var r = x.r, subTxt = op.sub === "categoria" ? r.categoria : op.sub === "" ? "" : r.setor, id = c.cliente + "|" + x.ch, ab = !!regraAberta[id], ids = x.ks.map(function (y) { return y.r._id; });
     var quais = !varios ? "" : x.ks.length === f.contratos.length ? "todos" : x.ks.map(function (y) { return esc(rotuloK(y.k)); }).join("; ");
     var pri = prioritaria(x), coms = comentariosDe(ids);
     var estrela = pode(c) ? '<button type="button" class="ctr-estrela" data-prior="' + esc(ids.join(",")) + '" aria-pressed="' + pri + '" title="' + (pri ? "Tirar das prioritárias" : "Marcar como prioritária") +
       '"><i class="ph' + (pri ? "-fill" : "") + ' ph-star" aria-hidden="true"></i><span class="so-leitor">Prioritária</span></button>' : (pri ? '<i class="ph-fill ph-star ctr-estrela-fixa" title="Prioritária" aria-label="Prioritária"></i>' : "");
     var h = '<tr class="rg" data-rg="' + esc(id) + '" aria-expanded="' + ab + '"><td>' + estrela + '<span class="nome">' + nomeHtml(r.nome) + "</span>" + editado(r, ["nome", "vigente", "categoria", "setor"]) +
       (coms.length ? ' <span class="ctr-ncom" title="' + coms.length + (coms.length === 1 ? " comentário" : " comentários") + '"><i class="ph ph-chat-circle" aria-hidden="true"></i>' + coms.length + "</span>" : "") +
-      (r.setor ? '<span class="sub">' + esc(r.setor) + "</span>" : "") + "</td><td>" + (vale(r) ? esc(vale(r)) : '<span class="vazio-c">não escrito</span>') +
+      (subTxt ? '<span class="sub">' + esc(subTxt) + "</span>" : "") + "</td><td>" + (vale(r) ? esc(vale(r)) : '<span class="vazio-c">não escrito</span>') +
       (r.alterado_por ? '<span class="antes">antes: <s>' + esc(r.contratual || "não previsto") + "</s>; mudou no " + esc(r.alterado_por.arquivo || "aditivo") + "</span>" : "") + "</td>" +
-      (varios ? '<td class="ctr-quais">' + quais + "</td>" : "") + '<td class="onde">' + (r.ref ? refTxt(r.ref) : r._incluido ? "incluída no Nexus" : "") +
+      (varios ? '<td class="ctr-quais">' + quais + "</td>" : "") + '<td class="onde">' + (r.ref ? clTag(r.ref) : r._incluido ? "incluída no Nexus" : "") +
       (x.ks.length > 1 ? " e mais " + (x.ks.length - 1) : "") + "</td></tr>";
     if (ab) {
       h += '<tr class="rg-det"><td colspan="' + (varios ? 4 : 3) + '">' + x.ks.map(function (y) {
@@ -303,7 +333,7 @@
     }
     return h;
   }
-  // os comentários da regra: quem, quando e o texto; quem vê o contrato comenta (a Danuth, na chamada de 18/11/2026)
+  // os comentários da regra: quem, quando e o texto; quem vê o contrato comenta (pedido da área de Contratos, 18/11/2026)
   function blocoComentarios(c, ids) {
     var coms = comentariosDe(ids);
     return '<div class="ctr-coms"><b class="sub" style="margin:8px 0 4px">Comentários</b>' + coms.map(function (k) {
@@ -312,47 +342,46 @@
     }).join("") + '<form class="ctr-com-form" data-comentar="' + esc(ids[0]) + '"><label class="so-leitor" for="ctr-com-' + esc(ids[0]) + '">Comentar</label>' +
       '<textarea id="ctr-com-' + esc(ids[0]) + '" rows="2" placeholder="Escreva um comentário (ex.: alinhado com o cliente em 18/11)"></textarea><button type="submit" class="gc-btn gc-btn--ui gc-btn--contorno">Comentar</button></form></div>';
   }
-  // a tabela: o que se repete por tema (2 ou mais) vira um subgrupo recolhido, com a lista dentro
-  function tabelaRegras(c, f, lista, semTemas) {
-    var varios = f.contratos.filter(function (k) { return k._id !== "geral"; }).length > 1, por = {}, ordem = [];
+  // a tabela: o que se repete por tema (2 ou mais) vira um subgrupo recolhido, com a lista dentro; com op.porSetor, as
+  // regras vêm por setor (SETORES), cada setor aberto por uma linha grossa com o nome
+  function corpoRegras(c, f, lista, varios, semTemas, op, setor) {
+    var por = {}, ordem = [], h = "";
     lista.forEach(function (x) {
       var t = semTemas ? "" : tema(x.r.nome), k = t || ("_" + x.ch);
       if (!por[k]) { por[k] = []; ordem.push(k); }
       por[k].push(x);
     });
-    var h = '<div class="ctr-rol"><table class="ctr-tab"><thead><tr><th>Regra</th><th>Vale hoje</th>' + (varios ? "<th>Contratos</th>" : "") + "<th>Onde</th></tr></thead><tbody>";
     ordem.forEach(function (k) {
       var xs = por[k];
-      if (k.charAt(0) === "_" || xs.length < 2) { xs.forEach(function (x) { h += linhaRegra(c, f, x, varios); }); return; }
-      var chave = c.cliente + "|tema|" + xs[0].r.categoria + "|" + k, ab = !!estado.temas[chave];
+      if (k.charAt(0) === "_" || xs.length < 2) { xs.forEach(function (x) { h += linhaRegra(c, f, x, varios, op); }); return; }
+      var chave = c.cliente + "|tema|" + xs[0].r.categoria + "|" + setor + "|" + k, ab = !!estado.temas[chave];
       h += '<tr class="ctr-subgrupo"><td colspan="' + (varios ? 4 : 3) + '"><button type="button" data-subgrupo="' + esc(chave) + '" aria-expanded="' + ab + '"><i class="ph ph-caret-' + (ab ? "down" : "right") +
         '" aria-hidden="true"></i>' + esc(k) + ' <span class="mudo">' + xs.length + " itens</span></button></td></tr>";
-      if (ab) xs.forEach(function (x) { h += linhaRegra(c, f, x, varios); });
+      if (ab) xs.forEach(function (x) { h += linhaRegra(c, f, x, varios, op); });
     });
+    return h;
+  }
+  function tabelaRegras(c, f, lista, semTemas, op) {
+    op = op || {};
+    var varios = f.contratos.filter(function (k) { return k._id !== "geral"; }).length > 1, ncol = varios ? 4 : 3;
+    var h = '<div class="ctr-rol"><table class="ctr-tab"><thead><tr><th>Regra</th><th>Vale hoje</th>' + (varios ? "<th>Contratos</th>" : "") + "<th>Cláusula</th></tr></thead><tbody>";
+    if (op.porSetor) {
+      var por = {};
+      lista.forEach(function (x) { var s = setorDe(x); (por[s] = por[s] || []).push(x); });
+      SETORES.concat([""]).forEach(function (s) {
+        if (!por[s]) return;
+        h += '<tr class="ctr-setor"><td colspan="' + ncol + '">' + esc(s || "Sem setor") + ' <span class="mudo">' + por[s].length + "</span></td></tr>" +
+          corpoRegras(c, f, por[s], varios, semTemas, op, s);
+      });
+    } else h += corpoRegras(c, f, lista, varios, semTemas, op, "");
     return h + "</tbody></table></div>";
   }
-  function blocoContrato(c, cats, titulo) {
+  function blocoContrato(c, cats, titulo, op) {
     var f = fichaDe(c);
     if (!f) return "";
     var g = grupos(f, cats, false);
     if (!g.length) return '<div class="ctr-bloco"><h3>' + titulo + '</h3><p class="mudo">O contrato não traz regra disso.</p></div>';
-    return '<div class="ctr-bloco"><h3>' + titulo + ' <span class="ctr-fonte">' + g.length + (g.length === 1 ? " regra" : " regras") + "; a linha abre o trecho do contrato</span></h3>" + tabelaRegras(c, f, g) + "</div>";
-  }
-  function divergencias(c, f) {
-    function sem(t) { return semAcento(t == null ? "" : t); }
-    var linhas = [];
-    f.contratos.forEach(function (k) {
-      if (k._id === "geral") return;
-      var nome = f.contratos.length > 1 ? " (" + esc(rotuloK(k)) + ")" : "";
-      var fim = (k.vigencia || {}).fim, aviso = (k.renovacao || {}).aviso_previo_dias, ind = (k.reajuste || {}).indice;
-      if (fim && fim !== c.fim) linhas.push(["Fim da vigência" + nome, c.fim ? dBR(c.fim) : "não traz", dBR(fim), (k.vigencia || {}).ref]);
-      if (aviso != null && aviso !== c.aviso_dias) linhas.push(["Aviso prévio de renovação" + nome, c.aviso_dias != null ? c.aviso_dias + " dias" : "não traz", aviso + " dias", (k.renovacao || {}).ref]);
-      if (ind && sem(c.indice).indexOf(sem(ind)) < 0 && sem(ind).indexOf(sem(c.indice) || "@") < 0) linhas.push(["Índice de reajuste" + nome, c.indice ? esc(c.indice) : "não traz", esc(ind), (k.reajuste || {}).ref]);
-    });
-    if (!linhas.length) return "";
-    return '<div class="ctr-bloco"><h3>Os dados do contrato e o PDF não batem <span class="ctr-fonte">' + linhas.length + (linhas.length === 1 ? " ponto" : " pontos") + " para acertar em Editar dados</span></h3>" +
-      '<div class="ctr-rol"><table class="ctr-tab"><thead><tr><th>Item</th><th>Os dados do contrato dizem</th><th>O PDF diz</th><th>Onde</th></tr></thead><tbody>' +
-      linhas.map(function (l) { return "<tr><td>" + l[0] + "</td><td>" + l[1] + '</td><td class="c-alerta">' + l[2] + '</td><td class="onde">' + refTxt(l[3]) + "</td></tr>"; }).join("") + "</tbody></table></div></div>";
+    return '<div class="ctr-bloco"><h3>' + titulo + ' <span class="ctr-fonte">' + g.length + (g.length === 1 ? " regra" : " regras") + "; a linha abre o trecho do contrato</span></h3>" + tabelaRegras(c, f, g, false, op) + "</div>";
   }
   function dadosDoContrato(c) {
     var linhas = [["Contrato", c.referencia || ""], ["Vigência", c.inicio || c.fim ? (c.inicio ? dBR(c.inicio) : "sem início") + " a " + (c.fim ? dBR(c.fim) : "sem fim") : ""],
@@ -369,15 +398,28 @@
       f.contratos.forEach(function (k) { (k.regras || []).forEach(function (r) { if (r.alterado_por) alteradas++; }); });
       var modo = estado.verRegras || "todas";
       h += '<div class="ctr-regua"><span class="ctr-fonte">' + f.contratos.reduce(function (s, k) { return s + (k.regras || []).length; }, 0) + " regras, lidas dos PDFs e editadas aqui; a linha abre o trecho, a página e os comentários</span>" +
-        seg("Quais regras", "data-regras", modo, [["todas", "Todas"], ["prioritarias", "Prioritárias", pri.length]].concat(alteradas ? [["aditivo", "Mudadas por aditivo", alteradas]] : [])) + "</div>";
-      if (modo === "prioritarias" || (modo === "todas" && pri.length)) {
+        seg("Quais regras", "data-regras", modo, [["todas", "Por categoria"], ["setor", "Por setor"], ["prioritarias", "Prioritárias", pri.length]].concat(alteradas ? [["aditivo", "Mudadas por aditivo", alteradas]] : [])) + "</div>";
+      var geral = modo === "todas" || modo === "setor";
+      if (modo === "prioritarias" || (geral && pri.length)) {
         h += '<div class="ctr-bloco" style="margin-top:0"><h3>Prioritárias <span class="ctr-fonte">' + pri.length + "; as que o gestor acompanha de perto</span></h3>" +
           (pri.length ? tabelaRegras(c, f, pri, true) : '<p class="mudo">Nenhuma ainda.' + (pode(c) ? " Marque a estrela de uma regra para ela ficar aqui no alto." : "") + "</p>") + "</div>";
       }
       if (modo !== "prioritarias") {
-        if (modo === "todas" && !pri.length && pode(c)) h += '<p class="ctr-nota" style="margin:-4px 0 10px">Marque com a estrela as regras prioritárias de acompanhamento: elas ficam no alto.</p>';
+        if (geral && !pri.length && pode(c)) h += '<p class="ctr-nota" style="margin:-4px 0 10px">Marque com a estrela as regras prioritárias de acompanhamento: elas ficam no alto.</p>';
         h += '<div class="ctr-rol"><table class="ctr-tab"><tbody>';
-        CATS.forEach(function (cat) {
+        // por setor (o pedido de 19/11/2026: "a parte por setor (oq performance atende, o que zeladoria etc)"): o que o
+        // contrato pede de cada setor, na ordem das categorias
+        if (modo === "setor") {
+          var todasS = grupos(f, CATS, false).sort(function (a, b) { return CATS.indexOf(a.r.categoria) - CATS.indexOf(b.r.categoria); });
+          SETORES.concat([""]).forEach(function (s) {
+            var g = todasS.filter(function (x) { return setorDe(x) === s; });
+            if (!g.length) return;
+            var chave = "setor:" + s, ab = !!estado.grupos[chave];
+            h += '<tr class="grupo"><td><button data-grupo="' + esc(chave) + '" aria-expanded="' + ab + '"><i class="ph ph-caret-' + (ab ? "down" : "right") + '" aria-hidden="true"></i>' + esc(s || "Sem setor") +
+              '<span class="g-n">' + g.length + (g.length === 1 ? " regra" : " regras") + "</span></button></td></tr>";
+            if (ab) h += '<tr><td style="padding:0">' + tabelaRegras(c, f, g, false, {sub: "categoria"}) + "</td></tr>";
+          });
+        } else CATS.forEach(function (cat) {
           var g = grupos(f, [cat], modo === "aditivo");
           if (!g.length) return;
           var ab = modo === "aditivo" || !!estado.grupos[cat], mud = g.filter(function (x) { return x.r.alterado_por; }).length;
@@ -385,7 +427,7 @@
             '<span class="g-n">' + g.length + (g.length === 1 ? " regra" : " regras") + (mud ? ", " + mud + " por aditivo" : "") + "</span></button></td></tr>";
           if (ab) h += '<tr><td style="padding:0">' + tabelaRegras(c, f, g) + "</td></tr>";
         });
-        h += novo(c, "regra", "Incluir regra") + "</tbody></table></div>" + divergencias(c, f);
+        h += novo(c, "regra", "Incluir regra") + "</tbody></table></div>";
         var lac = [], porTxt = {};
         f.contratos.forEach(function (k) { (k.lacunas || []).forEach(function (l) { if (!porTxt[l]) { porTxt[l] = []; lac.push(l); } porTxt[l].push(rotuloK(k)); }); });
         if (lac.length) h += '<div class="ctr-bloco"><details><summary><h3 style="display:inline">O que o PDF não diz <span class="ctr-fonte">' + lac.length + "</span></h3></summary><ul class=\"lacunas\">" + lac.map(function (l) {
@@ -398,6 +440,41 @@
     }
     return h + dadosDoContrato(c);
   }
+  /* ── os pontos de atenção e de divergência (19/11/2026; nexus/contratos/pontos.py) ────────────────────────────────
+     O pedido: "uma parte bacana também de ponto de atenção e pontos de divergência do contrato" (o "Pontos a resolver"
+     do Radar da Zeladoria). Resolver pede o que se decidiu, o motivo e a prova (Levi: "Com motivo e prova"). */
+  var NIVEL = {atencao: ["Atenção", "t-critico"], divergencia: ["Divergência", "t-alerta"]};
+  var ORIGEM = {conta: "conta do Nexus", leitor: "lido dos PDFs", planilha: "dados do contrato × PDF", radar: "Radar da Zeladoria", incluido: "incluído"};
+  function pontosDe(c) { return (R.pontos || {})[c.cliente] || []; }
+  function linhaPonto(c, p) {
+    var n = NIVEL[p.nivel] || NIVEL.atencao, res = p.resolvido;
+    var origem = p.origem === "incluido" ? "incluído por " + esc(p.quem) + " em " + esc(p.quando) : ORIGEM[p.origem] || "";
+    var acao = "";
+    if (pode(c)) {
+      if (res) acao = '<button type="button" class="ctr-link" data-ed-tipo="resolucao" data-ed-ids="' + esc(res.id) + '" data-ed-cliente="' + esc(c.cliente) + '">reabrir</button>';
+      else acao = '<button type="button" class="gc-btn gc-btn--ui gc-btn--contorno" data-ed-tipo="resolucao" data-ed-novo="1" data-ed-cliente="' + esc(c.cliente) +
+        '" data-ed-preset="' + esc(JSON.stringify({ponto_id: p.id, ponto_texto: (p.tema + ": " + p.texto).slice(0, 280)})) + '">Resolver</button>' +
+        (p.origem === "incluido" ? " " + lapis(c, "ponto", [p.id], "Editar este ponto") : "");
+    }
+    return '<tr class="ctr-ponto-l"><td><span class="ctr-pill ' + (res ? "t-neutro" : n[1]) + '">' + n[0] + "</span></td><td><b>" + esc(p.tema) + "</b> " + esc(p.texto) +
+      (p.prevalece ? '<span class="sub">Prevalece: ' + esc(p.prevalece) + "</span>" : "") +
+      (res ? '<span class="sub">Resolvido por ' + esc(res.quem) + " em " + esc(res.quando) + ": " + esc(res.como) + "</span>" : "") +
+      '</td><td class="ctr-quais">' + (p.onde ? '<span title="' + esc(p.onde_inteiro || p.onde) + '">' + esc(p.onde) + "</span><br>" : "") + origem + (p.setor ? "; " + esc(p.setor) : "") + '</td><td class="r" style="white-space:nowrap">' + acao + "</td></tr>";
+  }
+  function rPontos(c) {
+    var ps = pontosDe(c), ab = ps.filter(function (p) { return !p.resolvido; }), rs = ps.filter(function (p) { return p.resolvido; });
+    var na = ab.filter(function (p) { return p.nivel === "atencao"; }).length;
+    var h = '<div class="ctr-regua"><span class="ctr-fonte">' + (ab.length ? ab.length + (ab.length === 1 ? " aberto" : " abertos") + ": " + na + " de atenção e " + (ab.length - na) + " de divergência" : "Nenhum ponto aberto") +
+      ". Atenção: vencido ou vencendo em até 60 dias, falta documento ou outro ponto a resolver. Divergência: documentos do mesmo contrato dizem coisas diferentes (alinhar com o cliente qual vale).</span></div>";
+    if (!R.radar_lido) h += '<p class="ctr-nota c-alerta">Os pontos do Radar da Zeladoria não vieram agora: os outros estão aqui; recarregue em alguns minutos.</p>';
+    h += '<div class="ctr-rol"><table class="ctr-tab ctr-tab-pontos"><thead><tr><th>Tipo</th><th>Ponto</th><th>De onde</th><th></th></tr></thead><tbody>' +
+      (ab.length ? ab.map(function (p) { return linhaPonto(c, p); }).join("") : '<tr><td colspan="4" class="mudo">Nenhum ponto aberto neste contrato.</td></tr>') +
+      novo(c, "ponto", "Incluir ponto de atenção ou divergência") + "</tbody></table></div>";
+    if (rs.length) h += '<div class="ctr-bloco"><details><summary><h3 style="display:inline">Resolvidos <span class="ctr-fonte">' + rs.length + "</span></h3></summary>" +
+      '<div class="ctr-rol"><table class="ctr-tab ctr-tab-pontos"><tbody>' + rs.map(function (p) { return linhaPonto(c, p); }).join("") + "</tbody></table></div></details></div>";
+    return h;
+  }
+
   /* ── o calendário (as obrigações da planilha, editáveis) ────────────────────────────────────────────────────────── */
   var SIT = {ok: ["Entregue", "t-ok"], critico: ["Vencida", "t-critico"], alerta: ["Vence logo", "t-alerta"], neutro: ["No prazo", "t-neutro"], sem_data: ["Sem data", "t-info"], cancelado: ["Cancelada", "t-neutro"]};
   function selo(o) {
@@ -507,7 +584,7 @@
           oc.filter(function (x) { return x.dia === di; }).map(function (x) { return '<span class="ctr-ev ' + x.tom + '" title="' + esc(x.rec.nome + (x.entrega ? ", entregue (" + x.entrega._quem + ")" : "")) + '">' + (x.entrega ? '<i class="ph ph-check" aria-hidden="true"></i> ' : "") + esc(x.rec.nome) + "</span>"; }).join("")) + "</div>";
     }
     h += "</div>";
-    // ao lado: as entregas do mês com o check (Ana: "vai dando o checkzinho que foi entregue"), e as obrigações da planilha
+    // ao lado: as entregas do mês com o check (a gestora: "vai dando o checkzinho que foi entregue"), e as obrigações da planilha
     var porDia = {}; oc.forEach(function (x) { (porDia[x.dia] = porDia[x.dia] || []).push(x); });
     h += '<aside class="ctr-lat"><h3>Entregas de ' + MESES[mes] + "</h3>" + (oc.length ? Object.keys(porDia).map(function (d) {
       return '<p class="ctr-dia-t">' + dBR(d) + "</p><ul class=\"ctr-entregas\">" + porDia[d].map(function (x) {
@@ -538,7 +615,7 @@
   }
   /* ── atendimento, entregáveis, metas, financeiro ────────────────────────────────────────────────────────────────── */
   function rAtendimento(c) {
-    var b = blocoContrato(c, ["SLA"], "O atendimento que o contrato pede");
+    var b = blocoContrato(c, ["SLA"], "O atendimento que o contrato pede", {porSetor: true, sub: ""});
     return (b || '<div class="ctr-vazio"><p>Sem PDF do contrato lido: o SLA está nos Dados do contrato, na aba Regras.</p></div>') +
       '<p class="ctr-nota">O atendimento feito em cada usina (as OS do mês) não está na planilha de controle nem no contrato.</p>';
   }
@@ -546,16 +623,23 @@
     var lista = obrDe(c).filter(function (o) { return o.entregavel; }), par0 = R.parametros || {}, f = fichaDe(c), h = "";
     var vencidos = lista.filter(function (o) { return o.tom === "ok" || o.tom === "critico"; }), noPrazo = lista.filter(function (o) { return o.no_prazo; }).length;
     if (f) {
-      // Ana, 18/11/2026: "ter uma que é uma entrega única e ter um que seja recorrências"
+      // a gestora que pediu a visão, 18/11/2026: "ter uma que é uma entrega única e ter um que seja recorrências"
       var g = grupos(f, ["Entregáveis"], false), rec = [], unica = [];
       g.forEach(function (x) { (/mensal|semanal|quinzenal|trimestral|semestral|anual|diari|todo |toda |cada |por mes|por semana/.test(semAcento([x.r.periodicidade, x.r.prazo, vale(x.r), x.r.nome].join(" "))) ? rec : unica).push(x); });
-      h += '<div class="ctr-bloco" style="margin-top:6px"><h3>Recorrentes <span class="ctr-fonte">' + rec.length + "; o que o contrato pede de novo a cada período (o calendário mostra as datas)</span></h3>" +
-        (rec.length ? tabelaRegras(c, f, rec, true) : '<p class="mudo">Nenhuma.</p>') + "</div>";
-      h += '<div class="ctr-bloco"><h3>Entrega única <span class="ctr-fonte">' + unica.length + "; uma vez, num marco do contrato</span></h3>" + (unica.length ? tabelaRegras(c, f, unica, true) : '<p class="mudo">Nenhuma.</p>') + "</div>";
+      h += dobra("rec", "Recorrentes", rec.length + "; o que o contrato pede de novo a cada período (o calendário mostra as datas)",
+        function () { return rec.length ? tabelaRegras(c, f, rec, true, {porSetor: true, sub: ""}) : '<p class="mudo">Nenhuma.</p>'; }, "margin-top:6px");
+      h += dobra("unica", "Entrega única", unica.length + "; uma vez, num marco do contrato",
+        function () { return unica.length ? tabelaRegras(c, f, unica, true, {porSetor: true, sub: ""}) : '<p class="mudo">Nenhuma.</p>'; });
     }
-    return h + '<div class="ctr-bloco"><h3>Entregáveis e medições lançados <span class="ctr-fonte">' + lista.length + "; " + noPrazo + " de " + vencidos.length +
-      " já vencidos entregues no prazo" + (par0.meta_entregaveis != null ? "; meta " + pct(100 * par0.meta_entregaveis, 0) + "%" : "") + "</span></h3>" +
-      tabelaObrig(c, lista, {tipo: "Entregável ao cliente (RMO, relatório)", status: "Não iniciado"}, "Incluir entregável") + "</div>";
+    return h + dobra("lanc", "Entregáveis e medições lançados", lista.length + "; " + noPrazo + " de " + vencidos.length +
+      " já vencidos entregues no prazo" + (par0.meta_entregaveis != null ? "; meta " + pct(100 * par0.meta_entregaveis, 0) + "%" : ""),
+      function () { return tabelaObrig(c, lista, {tipo: "Entregável ao cliente (RMO, relatório)", status: "Não iniciado"}, "Incluir entregável"); });
+  }
+  // um bloco que abre e fecha pelo título; recolhido, só o título e a contagem
+  function dobra(id, titulo, fonte, corpo, estilo) {
+    var ab = !!DOBRAS[id];
+    return '<div class="ctr-bloco"' + (estilo ? ' style="' + estilo + '"' : "") + '><h3><button type="button" class="ctr-dobra" data-dobra="' + id + '" aria-expanded="' + ab + '"><i class="ph ph-caret-' +
+      (ab ? "down" : "right") + '" aria-hidden="true"></i>' + titulo + ' <span class="ctr-fonte">' + fonte + "</span></button></h3>" + (ab ? corpo() : "") + "</div>";
   }
   function contraMeta(n, d, meta) {
     if (!d) return '<span class="mudo">—</span>';
@@ -582,10 +666,10 @@
       }).join("") + "</tbody></table></div>";
     else h += '<p class="mudo">Ainda não há entregável vencido nem serviço adicional para medir.</p>';
     return h + '<p class="ctr-nota">As contas da aba Indicadores_Mes da planilha de controle, só deste contrato: o entregável conta no mês do vencimento e o adicional no da execução.</p>' +
-      blocoContrato(c, ["Disponibilidade e desempenho", "Benefícios", "Penalidades"], "Metas, bônus e penalidades do contrato");
+      blocoContrato(c, ["Disponibilidade e desempenho", "Benefícios", "Penalidades"], "Metas, bônus e penalidades do contrato", {porSetor: true, sub: "categoria"});
   }
   var SIT_ADIC = {"Faturado": "t-ok", "Aprovado — faturar": "t-verde", "Aguardando cliente": "t-alerta", "Memória a enviar": "t-neutro", "Memória atrasada": "t-critico", "Reprovado": "t-neutro"};
-  // Ana, 18/11/2026: "o supervisor conseguir também sinalizar que para março vai existir esse acréscimo [...] ou uma
+  // a gestora que pediu a visão, 18/11/2026: "o supervisor conseguir também sinalizar que para março vai existir esse acréscimo [...] ou uma
   // penalidade de menos tanto [...] aqui é a rotina financeira do contrato [...] pode ser uma tabelinha"
   function mesAMes(c) {
     var hj = new Date(R.hoje + "T12:00:00"), lan = (R.lancamentos || []).filter(function (l) { return l.cliente === c.cliente; }), ad = adicDe(c), meses = {};
@@ -674,6 +758,16 @@
     if (tipo === "parametros") return R.parametros || {};
     if (tipo === "obrigacao") return R.obrigacoes.filter(function (o) { return o._id === id; })[0];
     if (tipo === "adicional") return R.adicionais.filter(function (a) { return a._id === id; })[0];
+    if (tipo === "ponto" || tipo === "resolucao") {
+      var achou = null;
+      Object.keys(R.pontos || {}).forEach(function (cli) {
+        R.pontos[cli].forEach(function (p) {
+          if (tipo === "ponto" && p.id === id) achou = {nivel: p.nivel === "atencao" ? "Atenção" : "Divergência", texto: p.texto, setor: p.setor};
+          if (tipo === "resolucao" && p.resolvido && p.resolvido.id === id) achou = {ponto_id: p.id, ponto_texto: p.tema + ": " + p.texto, como: p.resolvido.como, _editado: p.resolvido._editado};
+        });
+      });
+      return achou;
+    }
     var achado = null;
     Object.keys(R.fichas || {}).forEach(function (cli) {
       R.fichas[cli].contratos.forEach(function (k) {
@@ -685,7 +779,7 @@
   }
   function pega(item, campo) { var x = item; campo.split(".").forEach(function (p) { x = x && typeof x === "object" ? x[p] : undefined; }); return x; }
   var ROTULO = {cliente: "Dados do contrato", contrato: "Contrato lido do PDF", regra: "Regra", obrigacao: "Obrigação", adicional: "Serviço adicional", parametros: "Metas e prazos",
-    recorrencia: "Recorrência do calendário", lancamento: "Lançamento do financeiro"};
+    recorrencia: "Recorrência do calendário", lancamento: "Lançamento do financeiro", ponto: "Ponto de atenção ou divergência", resolucao: "Ponto resolvido"};
   function campoHtml(spec, valor, c) {
     var nome = spec[0], rot = spec[1], tipo = spec[2], extra = spec[3], id = "ctr-f-" + nome.replace(/\W/g, "_"), v = valor == null ? "" : valor, h;
     if (extra === "so_admin" && !R.admin) return "";
@@ -716,8 +810,10 @@
         ids.map(function (i) { var k = null; Object.keys(R.fichas).forEach(function (x) { R.fichas[x].contratos.forEach(function (kk) { (kk.regras || []).forEach(function (r) { if (r._id === i) k = kk; }); }); });
           return '<option value="' + esc(i) + '">Só ' + esc(k ? rotuloK(k) : i) + "</option>"; }).join("") + "</select></div>";
     }
-    var retiravel = !novoItem && ["regra", "obrigacao", "adicional"].indexOf(tipo) >= 0;
-    dlg.innerHTML = '<form method="dialog" novalidate><h2 id="ctr-dlg-t">' + (novoItem ? "Incluir: " : "Editar: ") + esc(ROTULO[tipo] || tipo) + "</h2>" +
+    var retiravel = !novoItem && ["regra", "obrigacao", "adicional", "ponto", "resolucao"].indexOf(tipo) >= 0;
+    var titulo = tipo === "resolucao" ? (novoItem ? "Resolver o ponto" : "Ponto resolvido") : (novoItem ? "Incluir: " : "Editar: ") + (ROTULO[tipo] || tipo);
+    dlg.innerHTML = '<form method="dialog" novalidate><h2 id="ctr-dlg-t">' + esc(titulo) + "</h2>" +
+      (tipo === "resolucao" && item.ponto_texto ? '<p class="ctr-nota" style="margin:0 0 8px">' + esc(item.ponto_texto) + "</p>" : "") +
       '<p class="ctr-dlg-sub">' + esc(cli || "Todos os contratos") + ". A mudança vai ao histórico com o seu nome, a hora, o motivo e a prova.</p>" +
       '<div class="ctr-campos">' + aplicar + specs.map(function (s) { return campoHtml(s, pega(item, s[0]), c); }).join("") + "</div>" +
       (item.origem_regra && novoItem ? '<p class="ctr-nota">Vem de uma regra do contrato: a prova é o trecho dela, e o motivo é opcional.</p>' : "") +
@@ -726,7 +822,7 @@
       '<input id="ctr-f-provas" type="file" multiple accept=".pdf,.png,.jpg,.jpeg,.webp,.txt,.eml,.msg,.doc,.docx,.xlsx"></div>' +
       '<div class="ctr-campo largo"><label for="ctr-f-prova-texto">ou cole aqui o texto do e-mail ou da mensagem</label><textarea id="ctr-f-prova-texto" rows="3"></textarea></div></div>' +
       '<p class="ctr-dlg-erro" role="alert" hidden></p><div class="ctr-dlg-botoes"><button type="submit" class="gc-btn gc-btn--ui gc-btn--primario" data-evento="' + (novoItem ? "inclusao" : "alteracao") + '">Salvar</button>' +
-      '<button type="button" class="gc-btn gc-btn--ui gc-btn--contorno" data-fechar>Cancelar</button>' + (retiravel ? '<button type="submit" class="gc-btn gc-btn--ui gc-btn--contorno ctr-retirar" data-evento="retirada">Retirar</button>' : "") + "</div></form>";
+      '<button type="button" class="gc-btn gc-btn--ui gc-btn--contorno" data-fechar>Cancelar</button>' + (retiravel ? '<button type="submit" class="gc-btn gc-btn--ui gc-btn--contorno ctr-retirar" data-evento="retirada">' + (tipo === "resolucao" ? "Reabrir o ponto" : "Retirar") + "</button>" : "") + "</div></form>";
     var form = dlg.querySelector("form");
     dlg.querySelector("[data-fechar]").onclick = function () { dlg.close(); };
     form.onsubmit = function (ev) {
@@ -741,7 +837,7 @@
       fd.append("motivo", form.querySelector("#ctr-f-motivo").value);
       fd.append("prova_texto", form.querySelector("#ctr-f-prova-texto").value);
       [].forEach.call(form.querySelector("#ctr-f-provas").files, function (f) { fd.append("provas", f, f.name); });
-      if (evento === "retirada" && !window.confirm("Retirar este item? Ele sai da tela e fica no histórico.")) return;
+      if (evento === "retirada" && !window.confirm(tipo === "resolucao" ? "Reabrir este ponto? A resolução sai e fica no histórico." : "Retirar este item? Ele sai da tela e fica no histórico.")) return;
       [].forEach.call(form.querySelectorAll("button"), function (x) { x.disabled = true; });
       erro.hidden = true;
       pedir(CAMINHO + "editar", {method: "POST", body: fd, headers: {"Accept": "application/json", "X-Nexus-Parte": "1"}}).then(function (r) {
@@ -780,6 +876,8 @@
       leve(cAtual, "regra", b.getAttribute("data-prior").split(","), "alteracao", {prioritaria: on ? "sim" : "nao"}, on ? "Marcada como prioritária." : "Tirada das prioritárias."); return; }
     if ((b = e.target.closest("[data-subgrupo]"))) { var tk = b.getAttribute("data-subgrupo"); estado.temas[tk] = !estado.temas[tk]; render(); return; }
     if ((b = e.target.closest("[data-tirar-com]"))) { if (window.confirm("Tirar este comentário? Ele fica no histórico.")) leve(cAtual, "comentario", [b.getAttribute("data-tirar-com")], "retirada", {}, "Comentário tirado."); return; }
+    if ((b = e.target.closest("[data-dobra]"))) { var dk = b.getAttribute("data-dobra"); DOBRAS[dk] = !DOBRAS[dk];
+      try { localStorage.setItem("nexus.contratos.dobras", JSON.stringify(DOBRAS)); } catch (er) { /* sem localStorage: vale até recarregar */ } render(); return; }
     if ((b = e.target.closest("[data-mes]"))) { var dm = +b.getAttribute("data-mes"); estado.mesCal = dm ? (estado.mesCal || 0) + dm : 0; render(); return; }
     if ((b = e.target.closest("[data-confirmar]"))) { var pz = JSON.parse(b.getAttribute("data-confirmar")); b.disabled = true;
       var fdc = new FormData(); fdc.append("item_id", ""); fdc.append("item_tipo", "recorrencia"); fdc.append("evento", "inclusao"); fdc.append("cliente", cAtual.cliente);

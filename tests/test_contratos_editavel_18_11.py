@@ -241,7 +241,7 @@ def test_mais_fichas_entram_pelo_caminho_do_administrador_e_nao_trocam_o_que_foi
 
 
 def test_o_retorno_da_ana_comentario_prioridade_recorrencia_entrega_e_lancamento(carga, cliente):
-    """A chamada com a Ana Barros (18/11/2026): o comentário de quem vê o contrato (pedido da Danuth), a regra prioritária,
+    """A chamada com a gestora que pediu a visão do contrato (18/11/2026): o comentário de quem vê o contrato (pedido da área de Contratos), a regra prioritária,
     a recorrência do calendário (a sugerida do contrato vem com a regra como prova), o check de entregue e o lançamento do
     financeiro mês a mês. O que não muda o contrato não pede motivo nem prova (Levi: "só quem e quando")."""
     adm = _como(cliente, "admin@gridco.com.br", admin=True)

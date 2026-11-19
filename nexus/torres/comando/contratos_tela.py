@@ -77,6 +77,20 @@ def _pessoas() -> list[dict]:
         return []
 
 
+def _radar() -> list[dict] | None:
+    """As linhas de `zeladoria_contratual` do Radar da Zeladoria (o que o contrato de cada cliente pede de zeladoria, com o
+    alerta escrito por quem levantou), lidas da cópia em memória da torre (5 min). Fora do ar ou sem a cópia: None, e a
+    aba Pontos diz que os da Zeladoria não vieram agora (nunca some calado)."""
+    try:
+        from flask import current_app
+
+        from ...zeladoria import leitura
+        return list((leitura.estado(current_app.config).get("abas") or {}).get("zeladoria_contratual") or [])
+    except Exception as e:       # noqa: BLE001 — o Radar fora não derruba os contratos
+        _log.warning("Contratos: os pontos do Radar da Zeladoria não vieram agora (%s: %s)", type(e).__name__, e)
+        return None
+
+
 @bp.route("/contratos")
 def contratos():
     """A página: o JavaScript pede o dados.json e desenha. Sem a carga inicial no servidor, a página diz isso."""
@@ -116,7 +130,7 @@ def contratos_dados():
             _log.exception("Contratos: não li as edições do banco")
             mud, erro = [], f"Não li as edições do banco ({type(e).__name__}): o que aparece pode estar sem as últimas mudanças"
         st = E.aplicar(base, mud)
-        out = E.visao(base, st, visao._agora().date(), pessoas, _meu_hmac(), admin)
+        out = E.visao(base, st, visao._agora().date(), pessoas, _meu_hmac(), admin, radar=_radar())
         out.update(ok=True, erro_edicoes=erro, campos={t: [list(c[:3]) + [list(c[3]) if isinstance(c[3], tuple) else c[3]]
                                                            for c in E.CAMPOS[t]] for t in E.CAMPOS},
                    pessoas=pessoas if admin else [], eu=_usuario().get("nome") or "")
