@@ -154,6 +154,8 @@
     fonte.textContent = 'Diagnóstico da IA de ' + (j.data || 'hoje') + (j.hora ? ', feito às ' + j.hora : '') +
       (j.rotulo ? ' pelo ' + j.rotulo : '') + ', com a performance até ontem e as pendências daquela hora. ' +
       'É um por dia: quem abrir hoje vê este mesmo.' + (j.troca ? ' ' + j.troca : '') +
+      // o insight reaproveitado de madrugada (19/11/2026): o dossiê da usina está idêntico ao daquele dia
+      (j.sem_mudanca_desde ? ' O dossiê da usina não mudou desde ' + j.sem_mudanca_desde + ': o diagnóstico é o daquele dia.' : '') +
       // o que a conferência do Nexus não achou no dossiê (18/11/2026: o número de desligamentos)
       (j.conferir && j.conferir.length ? ' A conferir: ' + j.conferir.join('; ') + '.' : '');
     fonte.hidden = false;

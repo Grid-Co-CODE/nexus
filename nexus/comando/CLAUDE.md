@@ -689,8 +689,8 @@ Gemini, Groq, Grok [...] Qualquer IA que dê para puxar a API para fazermos o te
   cada uma com o tempo, os tokens, o custo estimado e **quantos números da resposta estão no dossiê**
   (`numeros_conferidos`: conta número com casa decimal ou a partir de 32, sem as citações "§3", as datas e o ano; o que
   não está no dossiê é cálculo da IA ou invenção, e é por ali que se confere).
-- **Teto e registro:** `NEXUS_IA_TETO_USD` (**padrão US$ 10** desde 18/11/2026, Levi: "tem como limitarmos o uso dessa
-  chave em 10$?") por mês. Só os pagos somam (a grátis custa 0), então é o teto do Haiku. **Passou, o pago para e as
+- **Teto e registro:** `NEXUS_IA_TETO_USD` (**padrão US$ 12** desde 19/11/2026, Levi: "Madrugada em lote, com teto de
+  US$ 12"; era US$ 10, o do piloto, de 18/11) por mês. Só os pagos somam (a grátis custa 0), então é o teto do Haiku. **Passou, o pago para e as
   grátis respondem** (`pago_liberado`, `perguntar`): a pergunta não é recusada, o Haiku não vem marcado, e a resposta diz
   que o teto foi atingido. É uma conta estimada pelos tokens (preço da tabela); o limite garantido é o da conta da
   Anthropic (crédito pré-pago, sem recarga automática). Cada
@@ -1209,6 +1209,41 @@ NORMALIZADA (a usina voltou), e a parada de hoje ainda está aberta, fora dela. 
   parada aberta agora, sem "normalizad" na mesma frase, é falha: refaz uma vez pensando e, se insistir, a tela escreve
   "A conferir".
 - Seção nova no dossiê entra com a janela dela escrita. Prova: `tests/test_comando_diagnostico_janelas_19_11.py`.
+
+### O Insights de madrugada, em lote (19/11/2026; `nexus/comando/diagnostico_noite.py`, `torres/comando/noite_laco.py`)
+
+Levi, 19/11/2026: "Madrugada em lote, com teto de US$ 12. O lote só garante a resposta em até 24 h, então comece logo
+depois da meia-noite e, se às 6h ainda faltar alguma usina, gere essas direto. Registre quantas caíram nessa rede de
+segurança". A conta que levou a isso, medida no dia: a 1ª abertura de uma usina levava até 48 s (a 2ª, 0,1 s); só 12 de
+144 dossiês ficaram idênticos de 18/11 para 19/11, então sobram cerca de 132 chamadas por noite, US$ 12 a 16 por mês
+chamando direto e a metade em lote (Message Batches da Anthropic, 50% do preço).
+
+- **O relógio** (`passo`, de 5 em 5 minutos; horário de Brasília): **00:10** prepara e manda o lote (até 05:30; depois
+  disso não vale mandar); enquanto o lote roda, cada passo olha se acabou; **06:00** é a rede de segurança; a noite que
+  não rodou (servidor fora) ainda tem a rede até as **7h**, e depois o dia segue sob demanda, como antes.
+- **Reaproveitar** (`preparar`): o insight guarda a `assinatura` do dossiê (`diagnostico.assinatura`: o sha256 do texto
+  sem a linha "- Gerado em:"). Dossiê de hoje com a mesma assinatura do insight de ontem = o de ontem vale para hoje,
+  gravado com `reaproveitado_de` (o dia em que foi FEITO, que atravessa vários dias iguais), e a tela diz "O dossiê da
+  usina não mudou desde dd/mm" (`para_tela.sem_mudanca_desde`, `prontuario.js`). Insight guardado antes de 19/11 não tem
+  a assinatura e não é reaproveitado: a 1ª noite manda todas.
+- **O lote** leva o MESMO pedido da chamada direta em Busca (`ia.pedido_do_lote`, que usa o `_pedido_anthropic`: mudou
+  um, mudou o outro). A resposta passa pela leitura e pela conferência de sempre (`colher`); a que não confere é
+  guardada com o "A conferir" e vai a um **2º lote, pensando** (o "refaz uma vez pensando" da chamada direta). Custo
+  registrado pela metade (`ia.DESCONTO_DO_LOTE`), com `lote: true`, na pergunta "[diagnóstico do dia]": entra no teto.
+- **A rede das 6h** (`rede`): cancela o lote que ainda roda e gera DIRETO (`diagnostico.gerar`) toda usina sem o insight
+  de hoje. As contas da noite (`contas`: usinas, reaproveitados, ja_tinham, pelo_lote, refeitos, **rede**,
+  sem_insight) ficam no estado, no log e no painel de uso (`/t/campo/usinas/ia/uso`, "Insights de madrugada").
+- **Estado:** `<NEXUS_DADOS>/ia/noite/AAAA-MM-DD.json` (o servidor que reinicia no meio retoma dele; o envio só é gravado
+  depois de criado o lote, então o reinício durante o preparo recomeça sem lote em dobro). O dossiê de cada usina do
+  lote fica em `<NEXUS_DADOS>/ia/noite/<dia>/<usina>.md` até a noite fechar (a conferência precisa dele) e é apagado.
+- **Quando não roda:** sem o Haiku da Anthropic com chave (`fase = "sem_ia"`: IA grátis não tem lote) ou com o teto do
+  mês atingido (`fase = "teto"`). Nos dois o dia segue sob demanda. **Quem liga** é o `campo.instalar`
+  (`noite_laco.ligar`), nunca o `create_app`; `NEXUS_IA_NOITE=0` desliga, e o PC (`NEXUS_CAMPO_AQUECER=0`) não liga:
+  duas máquinas com a mesma chave mandariam dois lotes.
+- **Sem nome de pessoa:** o passo roda num pedido de mentira, com a sessão vazia, e o dossiê é o mesmo da tela.
+- Prova: `tests/test_comando_diagnostico_noite_19_11.py` (cliente de lote de mentira; nenhuma chamada à Anthropic).
+  **Falta provar no servidor:** a 1ª noite (quantas vieram pelo lote, quantas caíram na rede) e o teto mostrado no
+  painel (o `.env` do servidor pode trazer `NEXUS_IA_TETO_USD` e vencer o padrão).
 
 ## A Visão gerencial (teste) (19/11/2026; `nexus/comando/gerencial.py`, `torres/comando/gerencial_tela.py`, `static/gerencial.js`)
 

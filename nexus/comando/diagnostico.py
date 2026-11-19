@@ -374,6 +374,43 @@ def conferir(diag: dict | None, dossie: str, dia: str | None = None) -> list[str
     return falhas
 
 
+# ── a assinatura do dossiê e o registro guardado ────────────────────────────────────────────────────────────────────
+_RX_LINHA_GERADO = re.compile(r"^- Gerado em:[^\n]*\n?", re.M)
+
+
+def assinatura(dossie: str) -> str:
+    """O dossiê reduzido a uma marca (sha256), sem a linha "Gerado em" (a única que muda sozinha de um dia para o outro).
+    Dois dossiês com a mesma assinatura são IDÊNTICOS: o insight de um vale para o outro (19/11/2026, Levi: "Se o dossiê
+    de uma usina estiver idêntico ao do dia anterior, reaproveite o insight em vez de chamar o Haiku")."""
+    import hashlib
+    return hashlib.sha256(_RX_LINHA_GERADO.sub("", dossie or "").encode("utf-8")).hexdigest()
+
+
+def registro(usina_id, dia: str, r: dict, diag: dict | None, falhas: list[str], refeito: bool = False, dossie: str = "") -> dict:
+    """O que fica guardado de um diagnóstico (o mesmo formato na chamada direta e no lote da madrugada)."""
+    agora = datetime.now(IA._BRT)
+    d = {"usina_id": int(usina_id), "dia": dia, "ts": time.time(), "gerado_em": agora.isoformat(timespec="seconds"),
+         "ok": bool(r.get("ok")), "modelo": r.get("id") or "", "rotulo": r.get("rotulo") or "",
+         "troca": r.get("troca") or "", "erro": r.get("erro") or "", "ms": r.get("ms"), "versao": VERSAO,
+         "dossie_sha": assinatura(dossie) if dossie else ""}
+    if r.get("ok"):
+        d["diag"] = diag
+        d["texto"] = "" if d["diag"] else IA.limpar_citacoes(r.get("texto") or "")[:3000]
+        d["numeros"] = r.get("numeros")
+        if refeito:
+            d["refeito"] = True
+        if falhas:
+            d["conferir"] = falhas
+    return d
+
+
+def gravar(cfg, d: dict) -> None:
+    pasta = _pasta(cfg, d["dia"])
+    if pasta:
+        pasta.mkdir(parents=True, exist_ok=True)
+        (pasta / f"{int(d['usina_id'])}.json").write_text(json.dumps(d, ensure_ascii=False), encoding="utf-8")
+
+
 # ── o guardado do dia ────────────────────────────────────────────────────────────────────────────────────────────────
 def hoje(agora: datetime | None = None) -> str:
     return f"{(agora or datetime.now(IA._BRT)):%Y-%m-%d}"
@@ -506,21 +543,8 @@ def gerar(cfg, usina_id: int, dossie: str, dossie_tokens: int = 0, dia: str | No
             r2, diag2 = uma_vez(True)
             if r2.get("ok") and diag2:
                 r, diag, falhas, refeito = r2, diag2, conferir(diag2, dossie, dia), True
-        agora = datetime.now(IA._BRT)
-        d = {"usina_id": int(usina_id), "dia": dia, "ts": time.time(), "gerado_em": agora.isoformat(timespec="seconds"),
-             "ok": bool(r.get("ok")), "modelo": r.get("id") or "", "rotulo": r.get("rotulo") or "",
-             "troca": r.get("troca") or "", "erro": r.get("erro") or "", "ms": r.get("ms"), "versao": VERSAO}
-        if r.get("ok"):
-            d["diag"] = diag
-            d["texto"] = "" if d["diag"] else IA.limpar_citacoes(r.get("texto") or "")[:3000]
-            d["numeros"] = r.get("numeros")
-            if refeito:
-                d["refeito"] = True
-            if falhas:
-                d["conferir"] = falhas
-        if pasta:
-            pasta.mkdir(parents=True, exist_ok=True)
-            (pasta / f"{int(usina_id)}.json").write_text(json.dumps(d, ensure_ascii=False), encoding="utf-8")
+        d = registro(usina_id, dia, r, diag, falhas, refeito, dossie)
+        gravar(cfg, d)
         return d
     except Exception as ex:      # noqa: BLE001 — a thread não pode morrer calada
         log.exception("Diagnóstico do dia: a usina %s falhou", usina_id)
@@ -541,4 +565,7 @@ def para_tela(d: dict) -> dict:
     return {"estado": "pronto" if d.get("diag") else "texto", "diag": d.get("diag"), "texto": d.get("texto") or "",
             "rotulo": d.get("rotulo") or "", "troca": d.get("troca") or "", "dia": d.get("dia") or "",
             "hora": em[11:16], "data": f"{em[8:10]}/{em[5:7]}" if len(em) >= 10 else "",
+            # o insight que veio de um dia anterior porque o dossiê não mudou (a madrugada, `diagnostico_noite.py`)
+            **({"sem_mudanca_desde": f"{d['reaproveitado_de'][8:10]}/{d['reaproveitado_de'][5:7]}"}
+               if len(str(d.get("reaproveitado_de") or "")) >= 10 else {}),
             **({"conferir": d["conferir"]} if d.get("conferir") else {})}

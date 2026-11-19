@@ -49,7 +49,7 @@ MAX_PERGUNTA = 600
 MAX_HISTORICO = 3               # as últimas perguntas e respostas que voltam junto (a pergunta de seguimento)
 # o teto do mês (18/11/2026, Levi, com a chave da Anthropic: "tem como limitarmos o uso dessa chave em 10$?"): só os
 # modelos pagos somam (o grátis custa 0), então é o teto do Haiku. Passou, o Haiku para e as grátis respondem
-TETO_PADRAO_USD = 10.0
+TETO_PADRAO_USD = 12.0         # 19/11/2026, Levi: "Madrugada em lote, com teto de US$ 12" (era 10, o do piloto)
 
 INSTRUCOES = """Você é o Nexus IA, o analista de O&M de usinas solares da Grid Co. Você responde perguntas sobre UMA usina usando só o dossiê dela, que vem abaixo entre <dossie> e </dossie>. O dossiê é a fotografia do prontuário da usina no Nexus (performance, COS, OS, Engenharia, equipamentos, chamados, rondas, segurança, insights, demandas e a linha do tempo), cada seção numerada e com a fonte.
 
@@ -374,6 +374,33 @@ def _pedido_anthropic(m: Modelo, dossie: str, msgs: list, contexto: str = "", in
                 system=[{"type": "text", "text": f"{instrucoes or INSTRUCOES}\n\n{contexto}" if contexto
                          else (instrucoes or INSTRUCOES)},
                         {"type": "text", "text": f"<dossie>\n{dossie}\n</dossie>", "cache_control": {"type": "ephemeral"}}])
+
+
+# ── o lote (Message Batches): o Insights de madrugada (`diagnostico_noite.py`) ──────────────────────────────────────
+DESCONTO_DO_LOTE = 0.5          # o lote da Anthropic sai a 50% do preço da chamada direta
+
+
+def cliente_anthropic(cfg):
+    """O cliente do SDK para o lote da madrugada (criar, consultar, ler os resultados e cancelar)."""
+    import anthropic
+    return anthropic.Anthropic(api_key=chave(cfg, "anthropic"), timeout=TEMPO_S, max_retries=2)
+
+
+def pedido_do_lote(m: Modelo, dossie: str, pergunta: str, setores=None, pensar: bool = False) -> dict:
+    """O pedido de UMA usina no lote: o MESMO que o `responder` manda na chamada direta (o dossiê como vai ao modelo, a
+    pergunta, os setores), para o insight do lote e o da tela saírem da mesma instrução. O lote não aceita fluxo nem
+    modelo de reserva, e o pedido do Haiku não leva nenhum dos dois."""
+    ctx = _contexto([neutro(s) for s in setores], "") if setores is not None else ""
+    return _pedido_anthropic(m, para_o_modelo(dossie), _mensagens(None, pergunta), ctx, "", pensar)
+
+
+def resposta_do_lote(cfg, m: Modelo, mensagem, pedido: dict, dossie: str, setores) -> dict:
+    """A mensagem que voltou no lote, no formato da resposta direta (`_acabar`), com o custo pela metade e `lote`."""
+    r = _acabar(cfg, m, _resultado_anthropic(mensagem, pedido), 0, dossie, setores)
+    if r.get("ok"):
+        r["custo_usd"] = round(float(r.get("custo_usd") or 0) * DESCONTO_DO_LOTE, 6)
+        r["lote"] = True
+    return r
 
 
 def _erro_anthropic(anthropic, m: Modelo, ex: Exception) -> dict | None:

@@ -63,7 +63,7 @@ def test_so_o_haiku_da_anthropic_e_ele_vem_marcado_com_a_chave():
     assert [m.id for m in IA.MODELOS_PADRAO if m.provedor == "anthropic"] == ["haiku"]
     assert IA.padrao({"OPENROUTER_API_KEY": "sk-or-x"}) == "nemotron"
     assert IA.padrao({"OPENROUTER_API_KEY": "sk-or-x", "ANTHROPIC_API_KEY": "sk-ant-x"}) == "haiku"
-    assert IA.TETO_PADRAO_USD == 10.0
+    assert IA.TETO_PADRAO_USD == 12.0          # 19/11/2026: o teto subiu com o Insights de madrugada em lote
 
 
 # ── os números da resposta que estão no dossiê ───────────────────────────────────────────────────────────────────────
@@ -563,8 +563,8 @@ def test_o_haiku_que_falha_ou_passa_do_teto_vai_as_gratis(monkeypatch, tmp_path)
     r = IA.perguntar(cfg, ["haiku"], DOSSIE, "?")
     assert chamados == ["haiku", "nemotron"] and r[0]["ok"] and "sem crédito" in r[0]["troca"]
     # o teto do mês: o Haiku nem é chamado
-    IA.registrar(cfg, 1, "?", [{"id": "haiku", "ok": True, "texto": "x", "custo_usd": 10.5}], "abc", 100)
+    IA.registrar(cfg, 1, "?", [{"id": "haiku", "ok": True, "texto": "x", "custo_usd": IA.TETO_PADRAO_USD + 0.5}], "abc", 100)
     chamados.clear()
     r = IA.perguntar(cfg, ["haiku"], DOSSIE, "?")
-    assert chamados == ["nemotron"] and "teto do mês" in r[0]["troca"] and "US$ 10,00" not in r[0]["troca"]
+    assert chamados == ["nemotron"] and "teto do mês" in r[0]["troca"] and "US$ 12.00" in r[0]["troca"]
     assert IA.padrao(cfg) == "nemotron"                              # e não vem marcado na tela

@@ -142,7 +142,7 @@ def test_sem_texto_ao_vivo_com_outro_provedor_comparando_ou_com_o_teto(sdk, tmp_
     eventos, fim = _rodar(cfg, ids=("nemotron",))
     assert [t for t, _d in eventos] == ["fim"] and fim[0]["texto"] == "nemotron respondeu." and sdk.pedidos == []
     # o teto do mês atingido: o Haiku não é chamado, a grátis responde (a regra do `perguntar`)
-    IA.registrar(cfg, 1, "?", [{"id": "haiku", "ok": True, "texto": "x", "custo_usd": 10.5}], "abc", 100)
+    IA.registrar(cfg, 1, "?", [{"id": "haiku", "ok": True, "texto": "x", "custo_usd": IA.TETO_PADRAO_USD + 0.5}], "abc", 100)
     eventos, fim = _rodar(cfg)
     assert [t for t, _d in eventos] == ["fim"] and "teto do mês" in fim[0]["troca"] and sdk.pedidos == []
 

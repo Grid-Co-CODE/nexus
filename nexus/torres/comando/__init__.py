@@ -1030,8 +1030,10 @@ def ia_uso():
     from ...comando import ia as IA
     if not session.get("admin"):
         abort(403)
+    from ...comando import diagnostico_noite as NT
     resp = current_app.make_response(render_template("comando/ia_uso.html", torre=_torre_usinas()[0],
-                                                     tela=_torre_usinas()[1], u=IA.uso(current_app.config)))
+                                                     tela=_torre_usinas()[1], u=IA.uso(current_app.config),
+                                                     noites=NT.resumo(current_app.config)))
     resp.headers["Cache-Control"] = "no-store"
     return resp
 

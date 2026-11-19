@@ -35,6 +35,11 @@ def instalar(app):
     # máquina por vez (NEXUS_OS_PUBLICAR=0 desliga). É a fonte do bloco Manutenção da Visão do responsável
     from . import tarefas_os
     tarefas_os.ligar(app)
+    # o Insights de madrugada, em lote (19/11/2026, Levi: "gerar de noite, fora do período solar, para todas as usinas"):
+    # a partir das 00:10 reaproveita o insight do dossiê idêntico e manda o resto num lote da Anthropic; às 6h, o que
+    # faltar é gerado direto (NEXUS_IA_NOITE=0 desliga; no PC, com NEXUS_CAMPO_AQUECER=0, não liga)
+    from ..torres.comando import noite_laco
+    noite_laco.ligar(app)
     # o Responsável UFV de cada usina no livro de técnicos por usina (30/10/2026, a fase 3): de hora em hora, para o App
     # mandar e assinar a PT pelo responsável do Nexus (NEXUS_RESPONSAVEIS=0 desliga numa máquina)
     from ..pcm import responsaveis
