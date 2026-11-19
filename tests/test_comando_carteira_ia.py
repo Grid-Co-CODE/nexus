@@ -192,14 +192,17 @@ def test_as_perguntas_sugeridas_saem_prontas_e_certas_sem_ia(tela, logado, monke
     dz = CI.montar([_linha(1, "Colíder 1"), _linha(2, "Colíder 2", atingimento=98.0, os_atrasadas=0)], f, AGORA)
     cruz = CI.resposta_pronta("Chamados abertos × disponibilidade e performance", dz)
     assert cruz.startswith("**2 usinas têm chamado de garantia aberto (2 chamados).**")
-    assert cruz.index("| Colíder 1 |") < cruz.index("| Colíder 2 |")              # a pior disponibilidade primeiro
+    assert cruz.index("- **Colíder 1** (") < cruz.index("- **Colíder 2** (")      # a pior disponibilidade primeiro
+    # em texto, em lista (19/11/2026, Levi: "não gostei que essas respostas prontas trazem tabelas"): nenhuma tabela
+    assert "|" not in cruz and "chamado aberto, o mais antigo há 98 dias (SolarEdge)." in cruz
     meta = CI.resposta_pronta("quais usinas estão abaixo da meta no mês", dz)          # sem acento, sem "?", minúscula
-    assert "**2 de 2 usinas estão abaixo da meta de novembro**" in meta and meta.index("| Colíder 1 |") < meta.index("| Colíder 2 |")
-    assert "**1 desligamentos em novembro, em 1 usinas**" in CI.resposta_pronta(CI.SUGESTOES[2], dz)
+    assert "**2 de 2 usinas estão abaixo da meta de novembro**" in meta and meta.index("- **Colíder 1**") < meta.index("- **Colíder 2**")
+    assert "**1 desligamento em novembro, em 1 usina**" in CI.resposta_pronta(CI.SUGESTOES[2], dz)
     fab = CI.resposta_pronta(CI.SUGESTOES[3], dz)
-    assert "| SolarEdge | 1 | 1 | 98 dias |" in fab and "| STI | 1 | 1 | 6 dias |" in fab
+    assert "- **SolarEdge**: 1 chamado aberto em 1 usina, o mais antigo há 98 dias." in fab
+    assert "- **STI**: 1 chamado aberto em 1 usina, o mais antigo há 6 dias." in fab and "|" not in fab
     os_ = CI.resposta_pronta(CI.SUGESTOES[4], dz)
-    assert os_.startswith("**1 usinas têm OS urgente não iniciada ou atrasada:** 1 urgentes") and "| Colíder 1 |" in os_
+    assert os_.startswith("**1 usina tem OS urgente não iniciada ou atrasada:** 1 urgente") and "- **Colíder 1** (" in os_
     assert CI.resposta_pronta("Por que a Colíder 1 está com 0%?", dz) is None
     # pela rota: a sugerida não chama a IA
     monkeypatch.setattr(IA, "perguntar", lambda *a, **k: (_ for _ in ()).throw(AssertionError("chamou a IA")))

@@ -826,13 +826,16 @@ e correlacionar com as usinas com baixa disponibilidade e performance". Levi, co
 - **As instruções** são as da carteira (`carteira_ia.INSTRUCOES`, que vão no lugar das da usina por `instrucoes=` do
   `ia.perguntar`):
   - a conclusão primeiro;
-  - a lista de usinas em tabela, com o nome exato;
+  - a lista de usinas em TÓPICOS, nunca em tabela (19/11/2026, Levi: "não gostei que essas respostas prontas trazem
+    tabelas [...] parece algo montado e não algo inteligente [...] eu quero respostas em texto, listadinho, bonitinho"):
+    um tópico por usina, o nome exato em negrito no começo e os números numa frase, até 10; vale também para a IA do
+    prontuário (`ia.INSTRUCOES`);
   - quando a pergunta diz "baixa" sem número, a IA escolhe um corte e diz qual foi;
   - o número que não fecha com os outros da mesma usina é dado a conferir;
   - as mesmas regras de OS, garantia e concessionária do prontuário.
 - **A resposta:**
   - cada usina citada vira link do prontuário, noutra aba (`r.usinas`, conferido no dossiê);
-  - a tabela baixa para o Excel (CSV com ";" e BOM);
+  - se a IA ainda assim escrever uma tabela, a tela a mostra e ela baixa para o Excel (CSV com ";" e BOM);
   - a ação para outro setor leva as usinas dela (`usinas_ids`: os nomes do dossiê e a usina da OS do chamado) e sai
     pela mesma Nova demanda (`/t/comando/usinas/ia/demanda`), só com usinas da lista.
 - **Medido em 16/11/2026** (o banco de produção lido do PC): 144 usinas e 272 chamados abertos em 73 delas. O tamanho do
@@ -853,6 +856,10 @@ e correlacionar com as usinas com baixa disponibilidade e performance". Levi, co
     - desligamentos do mês;
     - chamados por fabricante;
     - OS urgentes e atrasadas.
+    Desde 19/11/2026 em texto, como lista (o pedido do Levi acima): a conclusão em negrito, um tópico por usina (ou
+    fabricante) com o nome em negrito e os números numa frase, até 10 (`MAX_ITENS`); as outras vão pelo nome numa linha
+    "Também entram N usinas: ..." (até 25 nomes, cada um vira link do prontuário), para nenhuma sumir. A parte sem
+    dado ("—") fica fora da frase, e as horas paradas só aparecem quando passam de zero.
 
     A pergunta escrita pela pessoa vai à IA, e a tela conta os segundos enquanto ela pensa.
   - **O dossiê traz as contas prontas** ("Totais contados pelo Nexus"): os chamados por fabricante, a carteira por
