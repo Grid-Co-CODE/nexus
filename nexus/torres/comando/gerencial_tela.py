@@ -120,6 +120,53 @@ def visao_gerencial():
     return render_template("comando/gerencial.html", torre=TORRE, tela=TORRE.tela("visao-gerencial"))
 
 
+_ORDEM_SEV = {"critico": 0, "atencao": 1, "info": 2}
+
+
+def _sem_a_usina(titulo: str, usina: str) -> str:
+    """"Usina X: CAB1 sem comunicação" vira "CAB1 sem comunicação": na tela da usina, o nome dela já está no alto."""
+    pre = f"{usina}: "
+    return titulo[len(pre):] if usina and titulo.startswith(pre) and len(titulo) > len(pre) else titulo
+
+
+@bp.route("/visao-gerencial/usina/<int:uid>/insights.json")
+def visao_gerencial_insights(uid: int):
+    """O que o Nexus Insights aponta AGORA na usina, para a tela da usina juntar com a nota do contrato (19/11/2026, Levi:
+    "clicando na usina, eu queria que a informação fosse uma mescla do que a gente tem agora com o que a gente tem no Nexus
+    Insights"). Os insights vivos (não concluídos) da usina, do mais grave para o menos, com o que a regra viu, o que
+    fazer, a torre dona e com quem está; o resto (responder, assumir, a conversa) fica no Nexus Insights, aberto pelo
+    `abrir`. A janela é sempre AGORA: o filtro de mês da tela vale para a nota, não para os insights."""
+    from urllib.parse import quote
+
+    from ...comando import regras as RG
+    from ...prefixo import na_raiz
+    from . import ES, MO, PD, _com_estado, _meu_hmac, _nomes_das_torres, _usinas_montadas, _ve_o_insight
+    _so_interno()
+    m = _usinas_montadas()
+    vivos = [i for i in (m.get("vivos") or {}).get(uid) or [] if _ve_o_insight(i)]
+    lista = _com_estado(vivos, ES.atual(), _meu_hmac(), MO.torres_da_pessoa(), peds=PD.por_objeto(PD.atual()))
+    nomes = _nomes_das_torres()
+    out = []
+    for i in sorted(lista, key=lambda x: (_ORDEM_SEV.get(x["sev"], 9), x.get("regra") or "", x["id"])):
+        if i["pedidos"]:
+            com_quem = ", ".join(f"{p['nome']}: {p['sit_rotulo'] if p.get('situacao') in ('atrasado', 'hoje') else p['rotulo']}"
+                                 for p in i["pedidos"])
+        elif i["estado"] == "assumiu":
+            com_quem = "Com você" if i["meu"] else (f"Com {i['por']}" if i["por"] else "Assumido")
+        else:
+            com_quem = "Ninguém avisado"
+        out.append({"id": i["id"], "regra": i["regra"], "regra_nome": i["regra_nome"], "sev": i["sev"],
+                    "sev_rot": i["sev_rot"], "sev_tom": i["sev_tom"], "titulo": _sem_a_usina(i.get("titulo") or "", i.get("usina") or ""),
+                    "torre_nome": nomes.get(i.get("torre"), i.get("torre") or ""), "evid": list(i.get("evid") or [])[:6],
+                    "acao": i.get("acao") or "", "link": na_raiz(i["link"]) if i.get("link") else "",
+                    "abrir": na_raiz("/t/comando/insights") + f"?abrir={quote(i['id'], safe='')}#ins-{i['id'].replace(':', '-')}",
+                    "com_quem": com_quem, "estado": i["estado"]})
+    resp = jsonify({"ok": True, "janela": "agora", "calculando": bool(m.get("insights_calculando")), "insights": out,
+                    "contas": {k: sum(1 for x in out if x["sev"] == k) for k in RG.SEVERIDADES}})
+    resp.headers["Cache-Control"] = "no-store"
+    return resp
+
+
 @bp.route("/visao-gerencial/dados.json")
 def visao_gerencial_dados():
     """O portfólio de agora: clientes, usinas, o contrato de cada cliente e a nota de cada usina em cada mês do filtro."""

@@ -5,14 +5,18 @@
    portfólio, "algo bem performático focando no MWp e o símbolo da Grid, alguma animação" e "Símbolo da grid em verde 3D";
    para o cliente, "algo diferenciado" (o parque em blocos) com "um score de contratos" em cima dos blocos, "a cor do bloco
    segue a nota do contrato" e "quando eu clicar na UFV tem que explicar esse número"; "é bom estar filtrado por mês sempre
-   mostrando o mês atual"; na usina, "um botão que leva para o prontuário da usina".
+   mostrando o mês atual"; na usina, "um botão que leva para o prontuário da usina". No mesmo dia, depois de ver no ar: no
+   cliente, "quando desce um scroll, aparece a animação dessas informações do cliente indo para cima e diminuindo [...] e os
+   cardzinhos também iriam subir" (a barra que se forma no alto, `encolher`); na usina, "uma mescla do que a gente tem agora
+   com o que a gente tem no Nexus Insights" (`capaUsina` + `carregarInsights`).
 
    Os dados vêm do dados.json da tela (`torres/comando/gerencial_tela.py`); a nota e os textos que a explicam chegam
    prontos do servidor (`nexus/comando/gerencial.py`): aqui só se desenha. Nada de contrato mora neste arquivo.
    O nível e o mês ficam no endereço (?cliente=&usina=&mes=), para o Voltar do navegador subir um nível.
    As cores do canvas são as dos tokens do tema (lidas a cada desenho): a tela vale no escuro e no claro.
    A animação roda sempre, de propósito (o Windows do Levi manda "movimento reduzido": ele nunca veria).
-   Para fotografar a animação parada num instante: &t=8 começa a 8 s do início e &foco=1 deixa o 2º item em foco. */
+   Para fotografar a animação parada num instante: &t=8 começa a 8 s do início e &foco=1 deixa o 2º item em foco; no
+   cliente, &rolar=200 desce a página 200 px (a barra do alto já aberta). */
 (function () {
   "use strict";
   var raiz = document.getElementById("vg"), tela = document.getElementById("vg-tela");
@@ -31,6 +35,10 @@
   function cli(nome) { return D.clientes.filter(function (c) { return c.cliente === nome; })[0]; }
   function usinas(k) { return k + (k === 1 ? " usina" : " usinas"); }
   function minuscula(t) { return t.charAt(0).toLowerCase() + t.slice(1); }
+  function cartao(i, k) {
+    return '<div class="vg-card" data-vg-card="' + i + '"><span class="vg-card-rot">' + esc(k.rot) + "</span><b" + (k.tom ? ' class="vg-t-' + k.tom + '"' : "") + ">" + esc(k.val) + "</b>" +
+      (k.det ? "<small>" + esc(k.det) + "</small>" : "") + "</div>";
+  }
   /* a usina sem meta e sem PR publicados fica cinza na saúde, mesmo tendo pontos (como o cliente sem performance) */
   function tomSaude(u) { var m = u.meses[D.mes_atual] || {}; return m.meta == null && m.pr == null ? "neutro" : tom(u.pontos); }
 
@@ -80,9 +88,14 @@
   function obrigacoes(c) { var k = c.obrigacoes_atrasadas; return k ? ' <span class="vg-chip vg-chip--alerta">' + (k === 1 ? "1 obrigação atrasada" : k + " obrigações atrasadas") + "</span>" : ""; }
   function nota(v) { return v == null ? '<span class="mudo">fora</span>' : '<span class="vg-pt vg-t-' + tom(v) + '">' + v + "</span>"; }
   function avisos() { return D.avisos.length ? '<p class="vg-aviso">Ficou de fora agora: ' + D.avisos.map(esc).join("; ") + ".</p>" : ""; }
-  function rodape() {
-    return '<p class="vg-nota" style="margin-top:26px">Dado de ' + esc(D.gerado) + ". Os valores e as datas vêm do Comando › Contratos; a saúde e a nota de cada usina, do que o Nexus já mede. " +
-      "A nota de cumprimento do contrato está em teste: os pesos ainda esperam aprovação.</p>";
+  function rodape() { return '<p class="vg-dado">Dado de ' + esc(D.gerado) + ".</p>"; }
+  /* o "!" amarelo ao lado do nome, o padrão do Nexus (`templates/_explica.html`, a mesma marcação; o base.html fecha ao
+     clicar fora e no Esc). Levi, 19/11/2026: "essas informações poderiam estar em uma exclamação ao lado do nome". Uma tela,
+     um "!": o como ler, de onde vem e o que está em teste viram parágrafos dele. */
+  var DE_ONDE = "<p><b>De onde vem.</b> Os valores e as datas, do Comando › Contratos; a saúde e a nota de cada usina, do que o Nexus já mede. A nota de cumprimento do contrato está em teste: os pesos ainda esperam aprovação.</p>";
+  function explica(titulo, html) {
+    return '<details class="gc-explica vg-explica"><summary class="gc-explica-bt" title="' + esc(titulo) + '" aria-label="' + esc(titulo) + '">!</summary>' +
+      '<section class="gc-explica-caixa" aria-label="' + esc(titulo) + '"><p class="gc-explica-t"><b>' + esc(titulo) + '</b></p><div class="gc-explica-texto">' + html + "</div></section></details>";
   }
   function barras() { requestAnimationFrame(function () { [].forEach.call(tela.querySelectorAll(".vg-lin .vg-trilho i"), function (b) { b.style.width = b.getAttribute("data-w"); }); }); }
 
@@ -91,9 +104,8 @@
     var T = D.totais, mx = D.clientes.length ? D.clientes[0].mwp || 1 : 1;
     return avisos() + '<section class="vg-pot"><canvas id="vg-cv" role="img" aria-label="Anel com a potência de cada cliente em volta do símbolo da Grid; a lista abaixo traz os mesmos números"></canvas>' +
       '<div class="vg-sim" id="vg-sim" aria-hidden="true"><div class="vg-brilho"></div><div class="vg-3d" id="vg-3d"></div></div>' +
-      '<div class="vg-txt"><p class="vg-sobre">Portfólio Grid Co.</p><div class="vg-num"><span id="vg-n">' + n(T.mwp, 1) + "</span><small>MWp</small></div>" +
+      '<div class="vg-txt"><div class="vg-sobre">Portfólio Grid Co. ' + explica("Como ler o portfólio", "<p>O anel reparte os " + n(T.mwp, 1) + " MWp por cliente, do maior para o menor, com um fio na cor da saúde das usinas dele. Cada ponto é uma usina: o tamanho é a potência e a cor, a saúde (verde em dia, amarelo em atenção, vermelho em risco, cinza sem performance publicada).</p>" + DE_ONDE) + '</div><div class="vg-num"><span id="vg-n">' + n(T.mwp, 1) + "</span><small>MWp</small></div>" +
       '<p class="vg-leg">sob gestão, em ' + usinas(T.usinas) + " de " + T.clientes + " clientes" + (T.valor ? ", por " + brl(T.valor) + " ao mês" : "") + '.</p><div class="vg-foco" id="vg-foco"></div></div></section>' +
-      '<p class="vg-nota">O anel reparte os ' + n(T.mwp, 1) + " MWp por cliente, do maior para o menor, com um fio na cor da saúde das usinas dele. Cada ponto é uma usina: o tamanho é a potência e a cor, a saúde (verde em dia, amarelo em atenção, vermelho em risco, cinza sem performance publicada).</p>" +
       '<h2>Potência por cliente</h2><div class="vg-rola"><table class="vg-tab"><thead><tr><th>Cliente</th><th>Potência</th><th class="vg-n">Do portfólio</th><th class="vg-n">Usinas</th><th class="vg-n">Valor mensal</th><th>Saúde</th><th>Usinas</th><th>Contrato</th></tr></thead><tbody>' +
       D.clientes.map(function (c) {
         var k = {critico: 0, alerta: 0, ok: 0}, tot = Math.max(1, c.usinas_n);
@@ -195,16 +207,43 @@
      portfólio dá a altura máxima); a COR e o NÚMERO da tampa são a nota de cumprimento do contrato no mês do filtro. As
      mais altas ficam no fundo, para nenhuma esconder outra. Os riscos que sobem são a energia (quem tem mais MWp solta
      mais) e a faixa clara que atravessa é só luz. */
+  /* os cartões do cliente (a nota do contrato, o fim dele e as obrigações): na capa, grandes; na barra, viram etiqueta */
+  function cartoesCliente(c, sm, m) {
+    var ks = [{rot: "Cumprimento do contrato", val: sm.nota == null ? "—" : String(sm.nota), tom: tom(sm.nota),
+      det: sm.nota == null ? "sem item medido em " + m.curto : "de 100 em " + m.curto + ", média de " + usinas(sm.usinas),
+      chip: sm.nota == null ? "contrato sem nota" : "contrato " + sm.nota}];
+    if (!c.tem_contrato) ks.push({rot: "Fim do contrato", val: "sem ficha", tom: "neutro", det: "o contrato não foi lido", chip: "sem ficha de contrato"});
+    else if (c.dias_fim == null) ks.push({rot: "Fim do contrato", val: "sem data", tom: "neutro", det: "o contrato lido não diz o fim", chip: "sem data de fim"});
+    else if (c.dias_fim < 0) ks.push({rot: "Fim do contrato", val: "vencido", tom: "critico", det: "há " + (-c.dias_fim) + " dias, em " + dBR(c.fim), chip: "vencido há " + (-c.dias_fim) + " dias"});
+    else ks.push({rot: "Fim do contrato", val: c.dias_fim < 365 ? c.dias_fim + " dias" : dBR(c.fim), tom: c.dias_fim < 365 ? "alerta" : "ok",
+      det: c.dias_fim < 365 ? "para vencer, em " + dBR(c.fim) : "em " + c.dias_fim + " dias", chip: c.dias_fim < 365 ? "vence em " + c.dias_fim + " dias" : "até " + dBR(c.fim)});
+    var k = c.obrigacoes_atrasadas || 0;
+    if (!c.tem_contrato) ks.push({rot: "Obrigações", val: "—", tom: "neutro", det: "sem ficha de contrato", chip: ""});
+    else ks.push({rot: "Obrigações", val: k ? String(k) : "em dia", tom: k ? "alerta" : "ok", det: k ? (k === 1 ? "atrasada no controle de Contratos" : "atrasadas no controle de Contratos") : "nenhuma atrasada no controle de Contratos",
+      chip: k ? (k === 1 ? "1 obrigação atrasada" : k + " obrigações atrasadas") : "obrigações em dia"});
+    return ks;
+  }
+  function explicaParque(m) {
+    return "<p>Cada bloco é uma usina: a altura é a potência, na mesma régua para todos os clientes. A cor e o número na tampa são o cumprimento do contrato da usina em " + m.nome + (m.atual ? ", até ontem" : ", mês fechado") +
+      ", de 0 a 100 (verde " + D.regua.em_dia + " ou mais, amarelo de " + D.regua.atencao + " a " + (D.regua.em_dia - 1) + ", vermelho abaixo de " + D.regua.atencao + ", cinza sem nota): a média de disponibilidade, geração e PR, rotinas e prazos de OS, cada item comparando o que o contrato pede com o que o Nexus mediu. Clique no bloco para ver a conta.</p>";
+  }
+  function legenda(c) { return "em " + usinas(c.usinas_n) + (c.valor ? ", por " + brl(c.valor) + " ao mês" + (c.minuta ? " (com minuta)" : "") + "." : D.contratos_ok ? ", sem valor no contrato lido." : "."); }
+  /* a barra que se forma no alto quando a página desce: o nome, os MWp, as usinas e o valor por mês e os cartões viram
+     etiqueta. Só desenho (aria-hidden): o mesmo texto está na capa, que o leitor de tela lê. */
+  function barraCliente(c, ks) {
+    return '<div class="vg-barra" id="vg-barra" aria-hidden="true"><i class="vg-barra-fundo"></i><div class="vg-barra-in"><span class="vg-b-nome" data-vg-alvo="nome">' + esc(c.cliente) + "</span>" +
+      '<span class="vg-b-mwp" data-vg-alvo="mwp">' + n(c.mwp, 1) + "<small>MWp</small></span>" +
+      '<span class="vg-b-leg" data-vg-alvo="leg">' + usinas(c.usinas_n) + (c.valor ? " · " + brl(c.valor) + " por mês" : "") + "</span>" +
+      '<span class="vg-b-cards">' + ks.map(function (k, i) { return k.chip ? '<span class="vg-b-chip vg-t-' + k.tom + '" data-vg-alvo="card-' + i + '">' + esc(k.chip) + "</span>" : ""; }).join("") + "</span></div></div>";
+  }
   function capaCliente(c) {
-    var sm = c.score[E.mes] || {}, m = oMes(E.mes), mx = mwpMax();
-    return avisos() + '<section class="vg-pot"><canvas id="vg-cv" role="img" aria-label="O parque do cliente em blocos: a altura de cada bloco é a potência da usina; a cor e o número são a nota de cumprimento do contrato; a lista abaixo traz os mesmos números"></canvas>' +
-      '<div class="vg-txt"><div class="vg-topo"><p class="vg-trilha">' + lk({}, "Portfólio Grid Co.") + " / cliente</p>" + seletorMes() + '</div><p class="vg-nome">' + esc(c.cliente) + "</p>" +
-      '<div class="vg-num vg-num--cli"><span id="vg-n">' + n(c.mwp, 1) + "</span><small>MWp</small></div>" +
-      '<p class="vg-leg">em ' + usinas(c.usinas_n) + (c.valor ? ", por " + brl(c.valor) + " ao mês" + (c.minuta ? " (com minuta)" : "") + "." : D.contratos_ok ? ", sem valor no contrato lido." : ".") + "</p>" +
-      '<p class="vg-ctr">Contrato: ' + contrato(c) + obrigacoes(c) + "</p>" +
-      '<p class="vg-ctr">Cumprimento do contrato: ' + (sm.nota == null ? '<span class="mudo">sem item medido</span>' : '<strong class="vg-t-' + tom(sm.nota) + '">' + sm.nota + "</strong> de 100 em " + m.curto + ", na média de " + usinas(sm.usinas)) + '</p><div class="vg-foco" id="vg-foco"></div></div></section>' +
-      '<p class="vg-nota">Cada bloco é uma usina: a altura é a potência, na mesma régua para todos os clientes. A cor e o número na tampa são o cumprimento do contrato da usina em ' + m.nome + (m.atual ? ", até ontem" : ", mês fechado") +
-      ", de 0 a 100 (verde " + D.regua.em_dia + " ou mais, amarelo de " + D.regua.atencao + " a " + (D.regua.em_dia - 1) + ", vermelho abaixo de " + D.regua.atencao + ", cinza sem nota): a média de disponibilidade, geração e PR, rotinas e prazos de OS, cada item comparando o que o contrato pede com o que o Nexus mediu. Clique no bloco para ver a conta.</p>" +
+    var sm = c.score[E.mes] || {}, m = oMes(E.mes), mx = mwpMax(), ks = cartoesCliente(c, sm, m);
+    return avisos() + barraCliente(c, ks) + '<section class="vg-pot"><canvas id="vg-cv" role="img" aria-label="O parque do cliente em blocos: a altura de cada bloco é a potência da usina; a cor e o número são a nota de cumprimento do contrato; a lista abaixo traz os mesmos números"></canvas>' +
+      '<div class="vg-txt"><div class="vg-topo"><p class="vg-trilha">' + lk({}, "Portfólio Grid Co.") + " / cliente</p>" + seletorMes() + '</div><div class="vg-nome-l"><p class="vg-nome" data-vg-voa="nome">' + esc(c.cliente) + "</p>" + explica("Como ler o parque", explicaParque(m) + DE_ONDE) + "</div>" +
+      '<div class="vg-num vg-num--cli" data-vg-voa="mwp"><span id="vg-n">' + n(c.mwp, 1) + "</span><small>MWp</small></div>" +
+      '<p class="vg-leg" data-vg-voa="leg">' + legenda(c) + "</p>" +
+      '<div class="vg-cards">' + ks.map(function (k, i) { return k.chip ? cartao(i, k) : cartao("x" + i, k); }).join("") + "</div>" +
+      '<div class="vg-foco" id="vg-foco"></div></div></section>' +
       '<h2>Potência por usina</h2><div class="vg-rola"><table class="vg-tab"><thead><tr><th>Usina</th><th>Potência</th><th>Contrato</th><th>Disponibilidade</th><th>Geração e PR</th><th>Rotinas</th><th>Prazos de OS</th><th class="vg-n">Valor mensal</th></tr></thead><tbody>' +
       c.usinas.map(function (u) { var sc = u.score[E.mes];
         return '<tr class="vg-lin"' + alvo({cliente: c.cliente, usina: u.usina}) + '><td class="vg-nm">' + lk({cliente: c.cliente, usina: u.usina}, u.usina) + '</td><td><span class="vg-trilho" style="width:200px"><i data-w="' + (100 * (u.mwp || 0) / mx) + '%"></i></span> <span class="vg-forte">' + n(u.mwp, 1) + " MWp</span></td>" +
@@ -307,25 +346,145 @@
     cancelAnimationFrame(ANIMA.id); ANIMA.id = requestAnimationFrame(quadro);
   }
 
-  /* ── a usina: a tela que EXPLICA a nota (Levi: "quando eu clicar na UFV tem que explicar esse número") ───────────
-     A nota à esquerda e, à direita, cada item com o que o contrato pede, o que o Nexus mediu e a conta que deu a nota. */
+  /* ── a usina: a nota do contrato e o Nexus Insights, lado a lado ──────────────────────────────────────────────────
+     Levi, 19/11/2026: "quando eu clicar na UFV tem que explicar esse número" e, depois, "eu queria que a informação fosse
+     uma mescla do que a gente tem agora com o que a gente tem no Nexus Insights". À esquerda, a nota do mês com a conta de
+     cada item (o que o contrato pede, o que o Nexus mediu); à direita, o que as regras do Nexus Insights apontam AGORA na
+     usina (pedido à parte, `carregarInsights`): o que a regra viu, o que fazer e com quem está. Responder, assumir e a
+     conversa ficam no Nexus Insights, aberto pelo link de cada um. */
   function capaUsina(c, u) {
     var sc = u.score[E.mes], m = oMes(E.mes), fora = sc.itens.filter(function (i) { return i.nota == null; }), med = sc.itens.filter(function (i) { return i.nota != null; });
     var prontuario = raiz.getAttribute("data-prontuario") + encodeURIComponent(u.uid) + (m.atual ? "" : "?mes=" + encodeURIComponent(m.id));
+    var fim = !c.tem_contrato ? {val: "sem ficha", tom: "neutro", det: "o contrato não foi lido"} : c.dias_fim == null ? {val: "sem data", tom: "neutro", det: "o contrato lido não diz o fim"}
+      : c.dias_fim < 0 ? {val: "vencido", tom: "critico", det: "há " + (-c.dias_fim) + " dias"} : {val: c.dias_fim < 365 ? c.dias_fim + " dias" : dBR(c.fim), tom: c.dias_fim < 365 ? "alerta" : "ok", det: c.dias_fim < 365 ? "para vencer, em " + dBR(c.fim) : "em " + c.dias_fim + " dias"};
+    var ks = [{rot: "Pontuação da usina no Nexus", val: u.pontos == null ? "—" : String(u.pontos), tom: u.pontos == null ? "neutro" : tom(u.pontos), det: "a saúde de agora, de 0 a 100"},
+      {rot: "Fim do contrato", val: fim.val, tom: fim.tom, det: fim.det},
+      {rot: "Valor no contrato", val: u.valor == null ? "—" : brl(u.valor), tom: u.valor == null ? "neutro" : "", det: u.valor == null ? (D.contratos_ok ? "sem ligação com o contrato" : "contratos fora agora") : "por mês"}];
     return avisos() + '<p class="vg-trilha" style="margin-bottom:8px">' + lk({}, "Portfólio Grid Co.") + " / " + lk({cliente: c.cliente}, c.cliente) + " / usina</p>" +
-      '<div class="vg-topo"><p class="vg-usina">' + esc(u.usina) + '</p><span class="vg-acoes">' + seletorMes() + (u.uid == null ? "" : '<a class="vg-botao" href="' + esc(prontuario) + '">Abrir o prontuário</a>') + "</span></div>" +
-      '<p class="vg-lead">' + n(u.mwp, 1) + " MWp" + (u.valor != null ? ", " + brlCheio(u.valor) + " por mês no contrato" : D.contratos_ok ? ", sem ligação com o valor do contrato" : "") + ".</p>" +
-      '<div class="vg-exp"><div><div class="vg-score vg-t-' + tom(sc.nota) + '">' + (sc.nota == null ? "—" : sc.nota) + '</div><p class="vg-score-rot">Cumprimento do contrato</p>' +
-      '<p class="mudo" style="margin-top:4px">em ' + m.nome + (m.atual ? ", até ontem" : ", mês fechado") + ", de 0 a 100.</p>" +
-      '<p style="margin-top:18px">' + (sc.nota == null ? (med.length ? "Só um dos quatro itens pôde ser medido nesta usina: com um item só não há nota." : "Nenhum dos quatro itens pôde ser medido nesta usina.")
+      '<div class="vg-topo"><div class="vg-nome-l"><p class="vg-usina">' + esc(u.usina) + "</p>" + explica("Como ler a nota e os insights",
+        "<p><b>A nota do contrato</b> é uma proposta em teste: os quatro itens têm o mesmo peso, item sem garantia no contrato ou sem dado fica fora, e usina com menos de dois itens medidos fica sem nota. Os números da conta ainda esperam aprovação.</p>" +
+        "<p><b>Os insights</b> são os do Nexus Insights (Comando): as regras que cruzam as fontes do Nexus e apontam um problema com dono. São os de agora (o filtro de mês vale para a nota, não para eles), e o que está concluído não aparece.</p>" + DE_ONDE) +
+      '</div><span class="vg-acoes">' + seletorMes() + (u.uid == null ? "" : '<a class="vg-botao" href="' + esc(prontuario) + '">Abrir o prontuário</a>') + "</span></div>" +
+      '<p class="vg-lead">' + n(u.mwp, 1) + " MWp de " + esc(c.cliente) + ".</p>" +
+      '<div class="vg-cards vg-cards--usina">' + ks.map(function (k, i) { return cartao("u" + i, k); }).join("") + "</div>" +
+      '<div class="vg-mescla"><section class="vg-lado" aria-labelledby="vg-h-ctr"><h2 id="vg-h-ctr">Cumprimento do contrato</h2>' +
+      '<div class="vg-grande"><div class="vg-score vg-t-' + tom(sc.nota) + '">' + (sc.nota == null ? "—" : sc.nota) + '</div><div><p class="vg-score-rot">de 100 em ' + m.nome + (m.atual ? ", até ontem" : ", mês fechado") + "</p>" +
+      "<p>" + (sc.nota == null ? (med.length ? "Só um dos quatro itens pôde ser medido nesta usina: com um item só não há nota." : "Nenhum dos quatro itens pôde ser medido nesta usina.")
         : "É a média dos " + med.length + " itens medidos: " + med.map(function (i) { return i.nota; }).join(" + ") + ", dividido por " + med.length + ".") + "</p>" +
-      (fora.length ? '<p class="mudo">Fora da conta: ' + fora.map(function (i) { return minuscula(i.nome); }).join(", ") + ".</p>" : "") +
-      '<ul class="vg-fatos"><li><span>Pontuação da usina no Nexus</span><b>' + (u.pontos == null ? "—" : u.pontos) + "</b></li><li><span>Fim do contrato</span><b>" +
-      (!c.tem_contrato ? "sem ficha" : c.dias_fim == null ? "sem data" : c.dias_fim < 0 ? "venceu há " + (-c.dias_fim) + " dias" : "em " + c.dias_fim + " dias") + "</b></li></ul></div>" +
-      "<div>" + sc.itens.map(function (it) { return '<section class="vg-item"><header><h3>' + esc(it.nome) + '</h3><span class="vg-trilho"><i class="vg-b-' + tom(it.nota) + '" style="width:' + (it.nota || 0) + '%"></i></span><span class="vg-v vg-t-' + tom(it.nota) + '">' + (it.nota == null ? "fora" : it.nota) + "</span></header>" +
-        "<dl><dt>O contrato pede</dt><dd>" + esc(it.pede) + "</dd><dt>O Nexus mediu</dt><dd>" + esc(it.mediu) + "</dd><dt>A conta</dt><dd>" + esc(it.conta) + "</dd></dl></section>"; }).join("") + "</div></div>" +
-      '<p class="vg-nota" style="margin-top:26px">A nota é uma proposta em teste: os quatro itens têm o mesmo peso, item sem garantia no contrato ou sem dado fica fora, e usina com menos de dois itens medidos fica sem nota. Os números da conta ainda esperam aprovação.</p>' + rodape();
+      (fora.length ? '<p class="mudo">Fora da conta: ' + fora.map(function (i) { return minuscula(i.nome); }).join(", ") + ".</p>" : "") + "</div></div>" +
+      sc.itens.map(function (it) { return '<section class="vg-item"><header><h3>' + esc(it.nome) + '</h3><span class="vg-trilho"><i class="vg-b-' + tom(it.nota) + '" style="width:' + (it.nota || 0) + '%"></i></span><span class="vg-v vg-t-' + tom(it.nota) + '">' + (it.nota == null ? "fora" : it.nota) + "</span></header>" +
+        "<dl><dt>O contrato pede</dt><dd>" + esc(it.pede) + "</dd><dt>O Nexus mediu</dt><dd>" + esc(it.mediu) + "</dd><dt>A conta</dt><dd>" + esc(it.conta) + "</dd></dl></section>"; }).join("") + "</section>" +
+      '<section class="vg-lado" aria-labelledby="vg-h-ins"><h2 id="vg-h-ins">Nexus Insights</h2>' +
+      '<div class="vg-grande"><div class="vg-score vg-t-neutro" id="vg-ins-n">…</div><div><p class="vg-score-rot" id="vg-ins-rot">Lendo o que as regras apontam agora…</p>' +
+      '<p class="mudo">Agora, hoje: o filtro de mês vale para a nota do contrato, não para os insights.</p><span class="vg-seg vg-seg--ins" id="vg-ins-seg"></span></div></div>' +
+      '<div id="vg-ins-lista"></div></section></div>' +
+      rodape();
   }
+  var SEV = ["critico", "atencao", "info"], SEV_ROT = {critico: ["crítico", "críticos"], atencao: ["de atenção", "de atenção"], info: ["informativo", "informativos"]}, SEV_TOM = {critico: "critico", atencao: "alerta", info: "info"};
+  function carregarInsights(u) {
+    var url = raiz.getAttribute("data-insights").replace("/0/", "/" + encodeURIComponent(u.uid) + "/"), alvoUid = u.uid;
+    pedir(url).then(function (d) {
+      if (E.usina !== u.usina || !document.getElementById("vg-ins-lista")) return;      // a pessoa já saiu da usina
+      if (!d || !d.ok) throw new Error("sem dados");
+      var tot = d.insights.length, nEl = document.getElementById("vg-ins-n"), rot = document.getElementById("vg-ins-rot"), seg = document.getElementById("vg-ins-seg"), lista = document.getElementById("vg-ins-lista");
+      if (d.calculando && !tot) { nEl.textContent = "…"; rot.textContent = "A conta dos insights está sendo feita agora (o Nexus acabou de subir). Recarregue em meio minuto."; return; }
+      nEl.textContent = tot; nEl.className = "vg-score vg-t-" + (d.contas.critico ? "critico" : d.contas.atencao ? "alerta" : tot ? "neutro" : "ok");
+      rot.textContent = tot ? (tot === 1 ? "insight aberto nesta usina agora" : "insights abertos nesta usina agora") : "nenhum insight aberto nesta usina agora";
+      rot.insertAdjacentHTML("afterend", tot ? '<p class="vg-ins-contas">' + SEV.filter(function (k) { return d.contas[k]; }).map(function (k) { var q = d.contas[k]; return '<span class="vg-sev vg-sev--' + SEV_TOM[k] + '">' + q + " " + SEV_ROT[k][q === 1 ? 0 : 1] + "</span>"; }).join("") + "</p>" : "");
+      seg.innerHTML = tot ? SEV.map(function (k) { return '<i class="vg-b-' + (k === "info" ? "neutro" : SEV_TOM[k]) + '" style="width:' + (100 * d.contas[k] / tot) + '%"></i>'; }).join("") : "";
+      seg.style.display = tot ? "" : "none";
+      lista.innerHTML = tot ? d.insights.map(function (i, k) {
+        return '<details class="vg-ins"' + (k === 0 ? " open" : "") + '><summary><span class="vg-sev vg-sev--' + esc(i.sev_tom) + '">' + esc(i.sev_rot) + '</span><span class="vg-ins-o"><b>' + esc(i.titulo) + "</b><small>" + esc(i.regra_nome) + " · " + esc(i.torre_nome) + "</small></span>" +
+          '<span class="vg-ins-com">' + esc(i.com_quem) + "</span></summary><div class=\"vg-ins-corpo\">" +
+          (i.evid.length ? '<p class="vg-rot">O que a regra viu</p><ul>' + i.evid.map(function (e) { return "<li>" + esc(e) + "</li>"; }).join("") + "</ul>" : "") +
+          '<p class="vg-rot">O que fazer</p><p>' + esc(i.acao) + "</p>" +
+          '<p class="vg-ins-links">' + (i.link ? '<a href="' + esc(i.link) + '">Abrir a tela</a>' : "") + '<a href="' + esc(i.abrir) + '">Abrir no Nexus Insights</a></p></div></details>'; }).join("")
+        : '<p class="mudo vg-ins-vazio">Nenhuma regra do Nexus Insights aponta problema nesta usina agora.</p>';
+    }).catch(function (e) {
+      if (E.usina !== u.usina) return;
+      var rot = document.getElementById("vg-ins-rot"), nEl = document.getElementById("vg-ins-n");
+      if (nEl) nEl.textContent = "—";
+      if (rot) rot.textContent = "Não li os insights agora" + (e && e.message && e.message !== "sem dados" ? " (" + e.message + ")" : "") + ". A nota do contrato ao lado não depende deles.";
+    });
+    return alvoUid;
+  }
+
+  /* ── o cabeçalho do cliente que sobe e encolhe (19/11/2026, Levi: "quando desce um scroll, aparece a animação dessas
+     informações do cliente indo para cima e diminuindo [...] e os cardzinhos também iriam subir") ────────────────────
+     Ao passar de ABRE px descendo, a barra do alto ABRE numa animação de tempo: o nome, os MWp e a legenda da barra saem
+     do lugar e do tamanho que têm na capa e vão encolhendo até o lugar deles; os cartões sobem e somem um depois do outro,
+     e as etiquetas descem no lugar. Abaixo de FECHA px, o caminho de volta. A 1ª versão era presa à posição do scroll, e
+     parar no meio deixava os dois textos um em cima do outro (Levi: "dá uma bugada, não está soando como animação!"):
+     agora o scroll só decide abrir ou fechar, e a animação sempre termina. O estado final é de classe (vg-barra--aberta,
+     vg-cli-aberta); a animação só leva até ele. */
+  var ABRE = 90, FECHA = 40, VOO = {pend: false, aberta: false, anims: []}, CURVA = "cubic-bezier(.2,.8,.2,1)";
+  function parar() { VOO.anims.forEach(function (a) { try { a.cancel(); } catch (e) { /* já terminou */ } }); VOO.anims = []; }
+  function anima(el, quadros, ms, atraso) {
+    if (!el || !el.animate) return null;
+    var a = el.animate(quadros, {duration: ms, delay: atraso || 0, easing: CURVA, fill: "backwards"});
+    VOO.anims.push(a);
+    return a;
+  }
+  function pares(barra) {
+    return [].map.call(tela.querySelectorAll("[data-vg-voa],[data-vg-card]"), function (el) {
+      var card = el.getAttribute("data-vg-card"), chave = card == null ? el.getAttribute("data-vg-voa") : "card-" + card;
+      return {el: el, alvo: barra.querySelector('[data-vg-alvo="' + chave + '"]'), card: card != null, i: card == null ? 0 : +card || 0};
+    });
+  }
+  function resto() { return [tela.querySelector(".vg-txt .vg-topo"), tela.querySelector(".vg-txt .vg-explica"), document.getElementById("vg-foco")]; }
+  /* de onde cada pedaço da barra sai: o canto e o tamanho do pedaço da capa (a escala é a das letras, para a legenda de duas
+     linhas não virar uma letra enorme) */
+  function origem(p) {
+    var r = p.el.getBoundingClientRect(), a = p.alvo.getBoundingClientRect();
+    var s = parseFloat(getComputedStyle(p.el).fontSize) / (parseFloat(getComputedStyle(p.alvo).fontSize) || 1);
+    return "translate(" + (r.left - a.left).toFixed(1) + "px," + (r.top - a.top).toFixed(1) + "px) scale(" + (s || 1).toFixed(3) + ")";
+  }
+  function abrir(barra, sem) {
+    parar(); VOO.aberta = true;
+    var ps = pares(barra), de = ps.map(function (p) { return p.alvo && !p.card ? origem(p) : null; }), rect = ps.map(function (p) { return p.el.getBoundingClientRect(); });
+    barra.classList.add("vg-barra--aberta"); tela.classList.add("vg-cli-aberta");
+    if (sem) return;
+    anima(barra.firstChild, [{opacity: 0, transform: "translateY(-10px)"}, {opacity: 1, transform: "none"}], 380, 200);
+    ps.forEach(function (p, k) {
+      if (p.card) {
+        anima(p.el, [{opacity: 1, transform: "none"}, {opacity: 0, transform: "translateY(-22px) scale(.92)"}], 340, 60 + p.i * 70);
+        if (p.alvo) { var a = p.alvo.getBoundingClientRect(), r = rect[k];
+          anima(p.alvo, [{opacity: 0, transform: "translate(" + (r.left - a.left).toFixed(1) + "px," + (r.top - a.top).toFixed(1) + "px) scale(1.3)"}, {opacity: 1, offset: 0.4}, {opacity: 1, transform: "none"}], 620, 160 + p.i * 80); }
+      } else {
+        anima(p.el, [{opacity: 1}, {opacity: 0}], 120, 0);
+        if (p.alvo) anima(p.alvo, [{opacity: 1, transform: de[k]}, {opacity: 1, transform: "none"}], 640, k * 45);
+      }
+    });
+    resto().forEach(function (el) { anima(el, [{opacity: 1}, {opacity: 0}], 220, 0); });
+  }
+  function fechar(barra) {
+    parar(); VOO.aberta = false;
+    barra.classList.remove("vg-barra--aberta"); tela.classList.remove("vg-cli-aberta");
+    var ps = pares(barra);
+    anima(barra.firstChild, [{opacity: 1}, {opacity: 0}], 260, 0);
+    ps.forEach(function (p, k) {
+      if (p.card) {
+        if (p.alvo) anima(p.alvo, [{opacity: 1}, {opacity: 0, transform: "translateY(-6px)"}], 200, p.i * 40);
+        anima(p.el, [{opacity: 0, transform: "translateY(-22px) scale(.92)"}, {opacity: 1, transform: "none"}], 420, 120 + p.i * 70);
+      } else if (p.alvo) {
+        var para = origem(p);
+        anima(p.alvo, [{opacity: 1, transform: "none"}, {opacity: 1, transform: para, offset: 0.92}, {opacity: 0, transform: para}], 560, k * 40);
+        anima(p.el, [{opacity: 0}, {opacity: 0, offset: 0.85}, {opacity: 1}], 600, k * 40);
+      } else anima(p.el, [{opacity: 0}, {opacity: 1}], 300, 0);
+    });
+    resto().forEach(function (el) { anima(el, [{opacity: 0}, {opacity: 1}], 360, 200); });
+  }
+  function encolher(sem) {
+    VOO.pend = false;
+    var barra = document.getElementById("vg-barra");
+    if (!barra) return;
+    var y = window.scrollY || window.pageYOffset || 0;
+    if (!VOO.aberta && y > ABRE) abrir(barra, sem === true);
+    else if (VOO.aberta && y < FECHA) fechar(barra);
+  }
+  function pedirEncolher() { if (!VOO.pend) { VOO.pend = true; requestAnimationFrame(encolher); } }
+  window.addEventListener("scroll", pedirEncolher, {passive: true});
+  window.addEventListener("resize", pedirEncolher);
 
   /* ── o desenho ────────────────────────────────────────────────────────────────────────────────────────────────── */
   function desenhar() {
@@ -338,7 +497,8 @@
     var nivel = u ? "u" : c ? "c" : "p";
     tela.innerHTML = nivel === "u" ? capaUsina(c, u) : nivel === "c" ? capaCliente(c) : capaPortfolio();
     if (nivel !== nivelAntes) { window.scrollTo(0, 0); nivelAntes = nivel; }
-    if (nivel === "p") iniciarPotencia(); else if (nivel === "c") iniciarParque(c);
+    parar(); VOO.aberta = false; tela.classList.remove("vg-cli-aberta");
+    if (nivel === "p") iniciarPotencia(); else if (nivel === "c") { iniciarParque(c); var rolar = +(new URLSearchParams(location.search).get("rolar") || 0); if (rolar) window.scrollTo(0, rolar); encolher(true); } else carregarInsights(u);
   }
   tela.addEventListener("click", function (ev) {
     var b = ev.target.closest("[data-vg-mes]");

@@ -1432,6 +1432,42 @@ Prova:
   cumprimento 79 (131 com nota, 12 abaixo de 55); Renogrid o pior (50, caiu 6, puxado pelos Prazos de OS e Rotinas);
   183 insights críticos e 183 de atenção (conferido na contagem do motor: são iguais de fato).
 
+### O cabeçalho do cliente que sobe e a usina com o Nexus Insights (19/11/2026, à tarde)
+
+Levi, 19/11/2026, depois de ver no ar: no cliente, "quando desce um scroll, aparece a animação dessas informações do cliente
+indo para cima e diminuindo. Então, ficaria Athon, tantos MWp pico, 10 usinas, tantos por mês, e os cardzinhos também iriam
+subir"; na usina, "eu queria que a informação fosse uma mescla do que a gente tem agora com o que a gente tem no Nexus
+Insights".
+
+- **O cliente** ganhou três cartões na capa (a nota do contrato no mês, o fim do contrato e as obrigações atrasadas; sem
+  ficha de contrato, "sem ficha" e "—", nunca "em dia"). Ao descer além de `ABRE` (90 px), a barra presa logo abaixo do
+  topo do Nexus ABRE numa animação de tempo (`encolher`, `abrir`, `fechar`, Web Animations): o nome, os MWp e a
+  legenda (usinas e valor por mês) saem do lugar e do tamanho da capa e encolhem até a barra; os cartões sobem e somem um
+  depois do outro e as etiquetas descem no lugar. Acima de `FECHA` (40 px), o caminho de volta. A 1ª versão era presa à
+  posição do scroll e, parada no meio, deixava os dois textos sobrepostos (Levi: "dá uma bugada, não está soando como
+  animação!"): o scroll só decide abrir ou fechar, e o estado final é de classe (`vg-barra--aberta`, `vg-cli-aberta`). A
+  barra é só desenho (`aria-hidden`): o mesmo texto está na capa. Até 1100 px a barra perde a legenda; até 820 px, as
+  etiquetas além da 1ª. `&rolar=200` abre a página já descida.
+- **O "!" ao lado do nome** (Levi: "essas informações poderiam estar em uma exclamação ao lado do nome"): o como ler de
+  cada nível (o anel do portfólio, os blocos do cliente, a nota e os insights da usina) e o de onde vem saíram do texto
+  solto e foram para o "!" amarelo padrão do Nexus (a mesma marcação do `_explica.html`), ao lado de "Portfólio Grid
+  Co.", do nome do cliente e do nome da usina. Embaixo de cada nível ficou só a hora do dado.
+- **A usina** virou duas colunas: à esquerda a nota do contrato com a conta de cada item (como era); à direita o **Nexus
+  Insights** da usina, pedido à parte (`/t/comando/visao-gerencial/usina/<uid>/insights.json`): os insights abertos (não
+  concluídos), do mais grave para o menos, cada um com o selo de gravidade, o título (sem o nome da usina, que já está no
+  alto), a regra, a torre, com quem está, o que a regra viu, o que fazer, "Abrir a tela" e "Abrir no Nexus Insights"
+  (responder, assumir e a conversa ficam lá). A janela é AGORA: o filtro de mês vale para a nota, não para os insights, e
+  a tela diz isso. Embaixo do título, três cartões: a pontuação no Nexus, o fim do contrato e o valor no contrato.
+- **A ligação do insight à usina passou a usar o id** (`regras._insight(..., usina_id=)`, `usinas.uid_do_insight`).
+  Conferindo a mescla contra a tela do Nexus Insights com o dado real, 142 de 144 usinas batiam: os 3 insights da Macaíba
+  1 caíam em outra usina de mesmo nome no cadastro (a ligação era só pelo nome sem acento, e o último homônimo vencia; a
+  Linhares 1 tem duas usinas mobilizadas com o mesmo nome). As regras que sabem o id o gravam (R05, R06, R07, R11, R13; a
+  N01 quando a normalização traz); sem ele (R03, que só tem o nome), vale o nome, como antes. Vale também para a contagem
+  de insights do Usinas 360° › Usinas, que lê o mesmo `_usinas_montadas`. Depois do conserto, na bancada: dos 366 insights
+  abertos no Nexus Insights, 362 aparecem na usina certa e nenhum se repete; os 4 de fora não são de usina da carteira (2
+  de uma usina fora das 144 e 2 de equipe do PCM, a R09).
+- Prova: `tests/test_comando_gerencial_mescla_19_11.py`.
+
 ## Contestações e Prévia: visão do contrato (no Comando desde 12/11/2026)
 
 Vieram da torre Contratos e clientes, que saiu do menu (Levi, 12/11/2026: "contestações, você vai jogar para o comando,
