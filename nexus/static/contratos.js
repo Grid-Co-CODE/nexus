@@ -16,7 +16,7 @@
   // o caminho passa pelo nexusRota (o prefixo em que o Nexus roda); o nexusPedir não dobra o prefixo
   var CAMINHO = window.nexusRota("/t/comando/contratos/");
   var R = null, HIST = {}, regraAberta = {}, aberta = null, ultimaAba = "", ultimoCt = null;
-  var estado = {ct: -1, aba: "regras", grupos: {}, soAditivo: false};
+  var estado = {ct: -1, aba: "regras", grupos: {}, soAditivo: false, verRegras: "todas", temas: {}, mesCal: 0};
   var ABAS = [["regras", "Regras"], ["calendario", "Calendário"], ["atendimento", "Atendimento"], ["entregaveis", "Entregáveis"],
     ["metas", "Metas"], ["financeiro", "Financeiro"], ["historico", "Histórico"]];
   var CATS = ["SLA", "Entregáveis", "Rotinas", "Disponibilidade e desempenho", "Penalidades", "Benefícios", "Medição e faturamento",
@@ -224,6 +224,40 @@
     return h + f(c);
   }
 
+  /* ── o retorno da Ana Barros (chamada de 18/11/2026) ─────────────────────────────────────────────────────────────
+     - os códigos do contrato (MPLP.3, MPCP.1, P52S) viram etiqueta depois do nome (Levi: "esse MPLP eu colocaria como uma
+       tag [...] na frente eu creio que esteja atrapalhando a leitura");
+     - o que se repete numa categoria (expurgos, multas, exclusões, disponibilidade) vira um item com a lista dentro (Ana:
+       "tem vários expurgos [...] a gente pode juntar num só"; Levi: "agrupar expurgos, multas [...] tudo que se repete");
+     - a regra prioritária (a estrela do gestor) fica no alto; o comentário fica na regra, com quem e quando (a Danuth);
+     - a ação leve (estrela, comentário, check de entregue, descartar sugestão) não pede motivo nem prova (Levi: "só quem e
+       quando"). */
+  var COD = "[A-Z]{2,6}\\d*(?:\\.\\d+)?(?:\\s*\\/\\s*[A-Z]{2,6}\\d*(?:\\.\\d+)?)*";
+  function codigos(nome) {
+    var t = String(nome || ""), tags = [], m;
+    if ((m = t.match(new RegExp("^\\s*(" + COD + ")\\s*[–—-]\\s*")))) { tags = tags.concat(m[1].split(/\s*\/\s*/)); t = t.slice(m[0].length); }
+    t = t.replace(new RegExp("\\s*\\((" + COD + ")\\)\\s*"), function (x, g) { tags = tags.concat(g.split(/\s*\/\s*/)); return " "; }).trim();
+    return {texto: t || String(nome || ""), tags: tags};
+  }
+  function nomeHtml(nome) {
+    var x = codigos(nome);
+    return esc(x.texto) + x.tags.map(function (t) { return ' <span class="ctr-tag">' + esc(t) + "</span>"; }).join("");
+  }
+  var TEMAS = [["expurgo", "Expurgos"], ["multa", "Multas"], ["exclus", "Exclusões"], ["indisponibilidade", "Disponibilidade"], ["disponibilidade", "Disponibilidade"]];
+  function tema(nome) { var n = semAcento(nome); for (var i = 0; i < TEMAS.length; i++) if (n.indexOf(TEMAS[i][0]) >= 0) return TEMAS[i][1]; return ""; }
+  function prioritaria(x) { return x.ks.some(function (y) { return y.r.prioritaria === true; }); }
+  function comentariosDe(ids) { return (R.comentarios || []).filter(function (k) { return ids.indexOf(k.alvo_id) >= 0; }); }
+  // a ação leve: grava sem motivo nem prova e relê
+  function leve(c, tipo, ids, evento, valores, msg) {
+    var fd = new FormData();
+    (ids || [""]).forEach(function (i) { fd.append("item_id", i); });
+    fd.append("item_tipo", tipo); fd.append("evento", evento); fd.append("cliente", c ? c.cliente : "");
+    fd.append("valores", JSON.stringify(valores || {})); fd.append("motivo", ""); fd.append("prova_texto", "");
+    return pedir(CAMINHO + "editar", {method: "POST", body: fd, headers: {"Accept": "application/json", "X-Nexus-Parte": "1"}})
+      .then(function () { if (c) delete HIST[c.cliente]; if (msg) toast(msg); return carregar(); })
+      .catch(function (e) { toast((e && e.message) || "Não consegui gravar agora."); });
+  }
+
   /* ── as regras do contrato (lidas dos PDFs; incluídas e editadas aqui) ──────────────────────────────────────────── */
   function rotuloK(k) {
     var us = (k.usinas || []).map(function (u) { return u.nome; }).filter(Boolean);
@@ -246,27 +280,56 @@
     });
     return g;
   }
-  function tabelaRegras(c, f, lista) {
-    var varios = f.contratos.filter(function (k) { return k._id !== "geral"; }).length > 1;
-    return '<div class="ctr-rol"><table class="ctr-tab"><thead><tr><th>Regra</th><th>Vale hoje</th>' + (varios ? "<th>Contratos</th>" : "") + "<th>Onde</th></tr></thead><tbody>" +
-      lista.map(function (x) {
-        var r = x.r, id = c.cliente + "|" + x.ch, ab = !!regraAberta[id], ids = x.ks.map(function (y) { return y.r._id; });
-        var quais = !varios ? "" : x.ks.length === f.contratos.length ? "todos" : x.ks.map(function (y) { return esc(rotuloK(y.k)); }).join("; ");
-        var h = '<tr class="rg" data-rg="' + esc(id) + '" aria-expanded="' + ab + '"><td><span class="nome">' + esc(r.nome) + "</span>" + editado(r, ["nome", "vigente", "categoria", "setor"]) +
-          (r.setor ? '<span class="sub">' + esc(r.setor) + "</span>" : "") + "</td><td>" + (vale(r) ? esc(vale(r)) : '<span class="vazio-c">não escrito</span>') +
-          (r.alterado_por ? '<span class="antes">antes: <s>' + esc(r.contratual || "não previsto") + "</s>; mudou no " + esc(r.alterado_por.arquivo || "aditivo") + "</span>" : "") + "</td>" +
-          (varios ? '<td class="sub" style="margin:0">' + quais + "</td>" : "") + '<td class="onde">' + (r.ref ? refTxt(r.ref) : r._incluido ? "incluída no Nexus" : "") +
-          (x.ks.length > 1 ? " e mais " + (x.ks.length - 1) : "") + "</td></tr>";
-        if (ab) {
-          h += '<tr class="rg-det"><td colspan="' + (varios ? 4 : 3) + '">' + x.ks.map(function (y) {
-            var rr = y.r, a = rr.alterado_por;
-            return (varios ? '<b class="sub" style="margin:4px 0">' + esc(rotuloK(y.k)) + "</b>" : "") +
-              (rr.trecho ? '<p class="trecho">“' + esc(rr.trecho) + "”<small>" + esc((rr.ref || {}).arquivo || "") + ", " + refTxt(rr.ref) + "</small></p>" : "") +
-              (a && a.trecho ? '<p class="trecho">“' + esc(a.trecho) + "”<small>" + esc(a.arquivo || "") + ", " + refTxt(a) + (a.resumo ? ". " + esc(a.resumo) : "") + "</small></p>" : "");
-          }).join("") + (pode(c) ? '<p style="margin:6px 0 2px">' + lapis(c, "regra", ids, "Editar esta regra").replace("</button>", "Editar</button>") + "</p>" : "") + "</td></tr>";
-        }
-        return h;
-      }).join("") + "</tbody></table></div>";
+  function linhaRegra(c, f, x, varios) {
+    var r = x.r, id = c.cliente + "|" + x.ch, ab = !!regraAberta[id], ids = x.ks.map(function (y) { return y.r._id; });
+    var quais = !varios ? "" : x.ks.length === f.contratos.length ? "todos" : x.ks.map(function (y) { return esc(rotuloK(y.k)); }).join("; ");
+    var pri = prioritaria(x), coms = comentariosDe(ids);
+    var estrela = pode(c) ? '<button type="button" class="ctr-estrela" data-prior="' + esc(ids.join(",")) + '" aria-pressed="' + pri + '" title="' + (pri ? "Tirar das prioritárias" : "Marcar como prioritária") +
+      '"><i class="ph' + (pri ? "-fill" : "") + ' ph-star" aria-hidden="true"></i><span class="so-leitor">Prioritária</span></button>' : (pri ? '<i class="ph-fill ph-star ctr-estrela-fixa" title="Prioritária" aria-label="Prioritária"></i>' : "");
+    var h = '<tr class="rg" data-rg="' + esc(id) + '" aria-expanded="' + ab + '"><td>' + estrela + '<span class="nome">' + nomeHtml(r.nome) + "</span>" + editado(r, ["nome", "vigente", "categoria", "setor"]) +
+      (coms.length ? ' <span class="ctr-ncom" title="' + coms.length + (coms.length === 1 ? " comentário" : " comentários") + '"><i class="ph ph-chat-circle" aria-hidden="true"></i>' + coms.length + "</span>" : "") +
+      (r.setor ? '<span class="sub">' + esc(r.setor) + "</span>" : "") + "</td><td>" + (vale(r) ? esc(vale(r)) : '<span class="vazio-c">não escrito</span>') +
+      (r.alterado_por ? '<span class="antes">antes: <s>' + esc(r.contratual || "não previsto") + "</s>; mudou no " + esc(r.alterado_por.arquivo || "aditivo") + "</span>" : "") + "</td>" +
+      (varios ? '<td class="sub" style="margin:0">' + quais + "</td>" : "") + '<td class="onde">' + (r.ref ? refTxt(r.ref) : r._incluido ? "incluída no Nexus" : "") +
+      (x.ks.length > 1 ? " e mais " + (x.ks.length - 1) : "") + "</td></tr>";
+    if (ab) {
+      h += '<tr class="rg-det"><td colspan="' + (varios ? 4 : 3) + '">' + x.ks.map(function (y) {
+        var rr = y.r, a = rr.alterado_por;
+        return (varios ? '<b class="sub" style="margin:4px 0">' + esc(rotuloK(y.k)) + "</b>" : "") +
+          (rr.trecho ? '<p class="trecho">“' + esc(rr.trecho) + "”<small>" + esc((rr.ref || {}).arquivo || "") + ", " + refTxt(rr.ref) + "</small></p>" : "") +
+          (a && a.trecho ? '<p class="trecho">“' + esc(a.trecho) + "”<small>" + esc(a.arquivo || "") + ", " + refTxt(a) + (a.resumo ? ". " + esc(a.resumo) : "") + "</small></p>" : "");
+      }).join("") + (pode(c) ? '<p style="margin:6px 0 2px">' + lapis(c, "regra", ids, "Editar esta regra").replace("</button>", "Editar</button>") + "</p>" : "") +
+        blocoComentarios(c, ids) + "</td></tr>";
+    }
+    return h;
+  }
+  // os comentários da regra: quem, quando e o texto; quem vê o contrato comenta (a Danuth, na chamada de 18/11/2026)
+  function blocoComentarios(c, ids) {
+    var coms = comentariosDe(ids);
+    return '<div class="ctr-coms"><b class="sub" style="margin:8px 0 4px">Comentários</b>' + coms.map(function (k) {
+      return '<p class="ctr-com"><b>' + esc(k._quem) + '</b> <span class="mudo">' + esc(k._quando) + "</span>" +
+        (k._meu || R.admin ? ' <button type="button" class="ctr-link" data-tirar-com="' + esc(k._id) + '">tirar</button>' : "") + "<br>" + esc(k.texto) + "</p>";
+    }).join("") + '<form class="ctr-com-form" data-comentar="' + esc(ids[0]) + '"><label class="so-leitor" for="ctr-com-' + esc(ids[0]) + '">Comentar</label>' +
+      '<textarea id="ctr-com-' + esc(ids[0]) + '" rows="2" placeholder="Escreva um comentário (ex.: alinhado com o cliente em 18/11)"></textarea><button type="submit" class="gc-btn gc-btn--ui gc-btn--contorno">Comentar</button></form></div>';
+  }
+  // a tabela: o que se repete por tema (2 ou mais) vira um subgrupo recolhido, com a lista dentro
+  function tabelaRegras(c, f, lista, semTemas) {
+    var varios = f.contratos.filter(function (k) { return k._id !== "geral"; }).length > 1, por = {}, ordem = [];
+    lista.forEach(function (x) {
+      var t = semTemas ? "" : tema(x.r.nome), k = t || ("_" + x.ch);
+      if (!por[k]) { por[k] = []; ordem.push(k); }
+      por[k].push(x);
+    });
+    var h = '<div class="ctr-rol"><table class="ctr-tab"><thead><tr><th>Regra</th><th>Vale hoje</th>' + (varios ? "<th>Contratos</th>" : "") + "<th>Onde</th></tr></thead><tbody>";
+    ordem.forEach(function (k) {
+      var xs = por[k];
+      if (k.charAt(0) === "_" || xs.length < 2) { xs.forEach(function (x) { h += linhaRegra(c, f, x, varios); }); return; }
+      var chave = c.cliente + "|tema|" + xs[0].r.categoria + "|" + k, ab = !!estado.temas[chave];
+      h += '<tr class="ctr-subgrupo"><td colspan="' + (varios ? 4 : 3) + '"><button type="button" data-subgrupo="' + esc(chave) + '" aria-expanded="' + ab + '"><i class="ph ph-caret-' + (ab ? "down" : "right") +
+        '" aria-hidden="true"></i>' + esc(k) + ' <span class="mudo">' + xs.length + " itens</span></button></td></tr>";
+      if (ab) xs.forEach(function (x) { h += linhaRegra(c, f, x, varios); });
+    });
+    return h + "</tbody></table></div>";
   }
   function blocoContrato(c, cats, titulo) {
     var f = fichaDe(c);
@@ -302,32 +365,39 @@
   function rRegras(c) {
     var f = fichaDe(c), h = "";
     if (f) {
-      var alteradas = 0;
+      var alteradas = 0, todas = grupos(f, CATS, false), pri = todas.filter(prioritaria);
       f.contratos.forEach(function (k) { (k.regras || []).forEach(function (r) { if (r.alterado_por) alteradas++; }); });
-      h += '<div class="ctr-regua"><span class="ctr-fonte">' + f.contratos.reduce(function (s, k) { return s + (k.regras || []).length; }, 0) + " regras, lidas dos PDFs e editadas aqui; a linha abre o trecho e a página</span>" +
-        (alteradas ? seg("Quais regras", "data-regras", estado.soAditivo ? "aditivo" : "todas", [["todas", "Todas"], ["aditivo", "Mudadas por aditivo", alteradas]]) : "") + "</div>";
-      h += '<div class="ctr-rol"><table class="ctr-tab"><tbody>';
-      CATS.forEach(function (cat) {
-        var g = grupos(f, [cat], estado.soAditivo);
-        if (!g.length) return;
-        var ab = estado.soAditivo || !!estado.grupos[cat], mud = g.filter(function (x) { return x.r.alterado_por; }).length;
-        h += '<tr class="grupo"><td><button data-grupo="' + esc(cat) + '" aria-expanded="' + ab + '"><i class="ph ph-caret-' + (ab ? "down" : "right") + '" aria-hidden="true"></i>' + esc(cat) +
-          '<span class="g-n">' + g.length + (g.length === 1 ? " regra" : " regras") + (mud ? ", " + mud + " por aditivo" : "") + "</span></button></td></tr>";
-        if (ab) h += '<tr><td style="padding:0">' + tabelaRegras(c, f, g) + "</td></tr>";
-      });
-      h += novo(c, "regra", "Incluir regra") + "</tbody></table></div>" + divergencias(c, f);
-      var lac = [], porTxt = {};
-      f.contratos.forEach(function (k) { (k.lacunas || []).forEach(function (l) { if (!porTxt[l]) { porTxt[l] = []; lac.push(l); } porTxt[l].push(rotuloK(k)); }); });
-      if (lac.length) h += '<div class="ctr-bloco"><details><summary><h3 style="display:inline">O que o PDF não diz <span class="ctr-fonte">' + lac.length + "</span></h3></summary><ul class=\"lacunas\">" + lac.map(function (l) {
-        return "<li>" + esc(l) + '<span class="mudo">' + (f.contratos.length < 2 ? "" : porTxt[l].length === f.contratos.length ? " (todos)" : " (" + esc(porTxt[l].join("; ")) + ")") + "</span></li>";
-      }).join("") + "</ul></details></div>";
+      var modo = estado.verRegras || "todas";
+      h += '<div class="ctr-regua"><span class="ctr-fonte">' + f.contratos.reduce(function (s, k) { return s + (k.regras || []).length; }, 0) + " regras, lidas dos PDFs e editadas aqui; a linha abre o trecho, a página e os comentários</span>" +
+        seg("Quais regras", "data-regras", modo, [["todas", "Todas"], ["prioritarias", "Prioritárias", pri.length]].concat(alteradas ? [["aditivo", "Mudadas por aditivo", alteradas]] : [])) + "</div>";
+      if (modo === "prioritarias" || (modo === "todas" && pri.length)) {
+        h += '<div class="ctr-bloco" style="margin-top:0"><h3>Prioritárias <span class="ctr-fonte">' + pri.length + "; as que o gestor acompanha de perto</span></h3>" +
+          (pri.length ? tabelaRegras(c, f, pri, true) : '<p class="mudo">Nenhuma ainda.' + (pode(c) ? " Marque a estrela de uma regra para ela ficar aqui no alto." : "") + "</p>") + "</div>";
+      }
+      if (modo !== "prioritarias") {
+        if (modo === "todas" && !pri.length && pode(c)) h += '<p class="ctr-nota" style="margin:-4px 0 10px">Marque com a estrela as regras prioritárias de acompanhamento: elas ficam no alto.</p>';
+        h += '<div class="ctr-rol"><table class="ctr-tab"><tbody>';
+        CATS.forEach(function (cat) {
+          var g = grupos(f, [cat], modo === "aditivo");
+          if (!g.length) return;
+          var ab = modo === "aditivo" || !!estado.grupos[cat], mud = g.filter(function (x) { return x.r.alterado_por; }).length;
+          h += '<tr class="grupo"><td><button data-grupo="' + esc(cat) + '" aria-expanded="' + ab + '"><i class="ph ph-caret-' + (ab ? "down" : "right") + '" aria-hidden="true"></i>' + esc(cat) +
+            '<span class="g-n">' + g.length + (g.length === 1 ? " regra" : " regras") + (mud ? ", " + mud + " por aditivo" : "") + "</span></button></td></tr>";
+          if (ab) h += '<tr><td style="padding:0">' + tabelaRegras(c, f, g) + "</td></tr>";
+        });
+        h += novo(c, "regra", "Incluir regra") + "</tbody></table></div>" + divergencias(c, f);
+        var lac = [], porTxt = {};
+        f.contratos.forEach(function (k) { (k.lacunas || []).forEach(function (l) { if (!porTxt[l]) { porTxt[l] = []; lac.push(l); } porTxt[l].push(rotuloK(k)); }); });
+        if (lac.length) h += '<div class="ctr-bloco"><details><summary><h3 style="display:inline">O que o PDF não diz <span class="ctr-fonte">' + lac.length + "</span></h3></summary><ul class=\"lacunas\">" + lac.map(function (l) {
+          return "<li>" + esc(l) + '<span class="mudo">' + (f.contratos.length < 2 ? "" : porTxt[l].length === f.contratos.length ? " (todos)" : " (" + esc(porTxt[l].join("; ")) + ")") + "</span></li>";
+        }).join("") + "</ul></details></div>";
+      }
     } else {
       h += '<div class="ctr-vazio"><p>Este cliente não tem PDF de contrato lido: nenhuma regra ainda.' + (pode(c) ? " Inclua as regras aqui; cada uma vai ao histórico." : "") + "</p></div>";
       if (pode(c)) h += '<div class="ctr-rol"><table class="ctr-tab"><tbody>' + novo(c, "regra", "Incluir regra") + "</tbody></table></div>";
     }
     return h + dadosDoContrato(c);
   }
-
   /* ── o calendário (as obrigações da planilha, editáveis) ────────────────────────────────────────────────────────── */
   var SIT = {ok: ["Entregue", "t-ok"], critico: ["Vencida", "t-critico"], alerta: ["Vence logo", "t-alerta"], neutro: ["No prazo", "t-neutro"], sem_data: ["Sem data", "t-info"], cancelado: ["Cancelada", "t-neutro"]};
   function selo(o) {
@@ -343,28 +413,129 @@
           "</td><td>" + selo(o) + '</td><td class="num">' + (o.entrega ? dBR(o.entrega) : '<span class="mudo">—</span>') + '</td><td class="r">' + lapis(c, "obrigacao", [o._id], "Editar esta obrigação") + "</td></tr>";
       }).join("") + novo(c, "obrigacao", rotuloNovo || "Incluir obrigação", preset) + "</tbody></table></div>";
   }
+  // os feriados nacionais (os fixos e os da Páscoa): o dia útil não cai neles
+  function pascoa(a) {
+    var b = a % 19, c = Math.floor(a / 100), d = a % 100, e = Math.floor(c / 4), f = c % 4, g = Math.floor((c + 8) / 25), h = Math.floor((c - g + 1) / 3),
+      i = (19 * b + c - e - h + 15) % 30, k = Math.floor(d / 4), l = d % 4, m = (32 + 2 * f + 2 * k - i - l) % 7, n = Math.floor((b + 11 * i + 22 * m) / 451),
+      mes = Math.floor((i + m - 7 * n + 114) / 31), dia = ((i + m - 7 * n + 114) % 31) + 1;
+    return new Date(a, mes - 1, dia);
+  }
+  function iso(d) { return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); }
+  function feriados(a) {
+    var p = pascoa(a), f = {};
+    ["01-01", "04-21", "05-01", "09-07", "10-12", "11-02", "11-15", "11-20", "12-25"].forEach(function (x) { f[a + "-" + x] = 1; });
+    [-48, -47, -2, 60].forEach(function (k) { f[iso(new Date(p.getFullYear(), p.getMonth(), p.getDate() + k))] = 1; });
+    return f;
+  }
+  function diasUteis(a, m) {
+    var fer = feriados(a), out = [], n = new Date(a, m + 1, 0).getDate();
+    for (var d = 1; d <= n; d++) { var x = new Date(a, m, d), w = x.getDay(); if (w !== 0 && w !== 6 && !fer[iso(x)]) out.push(iso(x)); }
+    return out;
+  }
+  var DSEM = {domingo: 0, segunda: 1, "terça": 2, quarta: 3, quinta: 4, sexta: 5, "sábado": 6};
+  var PASSO = {trimestral: 3, semestral: 6, anual: 12};
+  // os dias do mês em que a recorrência cai (vazio quando falta o dia: a lista diz "defina o dia")
+  function ocorrencias(rec, a, m) {
+    var out = [], n = new Date(a, m + 1, 0).getDate();
+    if (rec.frequencia === "semanal") {
+      if (DSEM[rec.dia_semana] == null) return [];
+      for (var d = 1; d <= n; d++) if (new Date(a, m, d).getDay() === DSEM[rec.dia_semana]) out.push(iso(new Date(a, m, d)));
+    } else {
+      var passo = PASSO[rec.frequencia] || 1;
+      if (passo > 1) { if (!rec.mes_inicio) return []; if (((m + 1 - rec.mes_inicio) % passo + passo) % passo) return []; }
+      if (rec.dia_util) { var u = diasUteis(a, m); if (u[rec.dia_util - 1]) out.push(u[rec.dia_util - 1]); }
+      else if (rec.dia_mes) out.push(iso(new Date(a, m, Math.min(rec.dia_mes, n))));
+    }
+    return out.filter(function (x) { return (!rec.inicio || x >= rec.inicio) && (!rec.fim || x <= rec.fim); });
+  }
+  function quandoRec(rec) {
+    var f = rec.frequencia || "", d = rec.frequencia === "semanal" ? (rec.dia_semana ? "às " + rec.dia_semana + "s" : "") :
+      rec.dia_util ? rec.dia_util + "º dia útil" : rec.dia_mes ? "dia " + rec.dia_mes : "";
+    return f + (d ? ", " + d : "") + (PASSO[f] && rec.mes_inicio ? " (a partir de " + MESES[rec.mes_inicio - 1] + ")" : "") + (d || f === "" ? "" : "; defina o dia");
+  }
+  // as sugeridas: as regras do contrato com frequência escrita (e o dia, quando o texto traz); a do mesmo nome em vários
+  // contratos do cliente sai uma vez; a confirmada e a descartada não voltam
+  function sugeridas(c) {
+    var f = fichaDe(c), out = [], vistas = {};
+    if (!f) return out;
+    var confirmadas = {}; (R.recorrencias || []).forEach(function (r) { if (r.origem_regra) confirmadas[r.origem_regra] = 1; });
+    f.contratos.forEach(function (k) {
+      (k.regras || []).forEach(function (r) {
+        if (["Entregáveis", "Outras obrigações", "Medição e faturamento"].indexOf(r.categoria) < 0) return;
+        var t = semAcento([r.nome, r.periodicidade, r.prazo, r.vigente].join(" "));
+        if (/sob demanda|conforme necessidade|quando solicitado/.test(t)) return;
+        var freq = /semanal|toda (segunda|terca|quarta|quinta|sexta)/.test(t) ? "semanal" : /trimestral/.test(t) ? "trimestral" : /semestral/.test(t) ? "semestral" :
+          /anual/.test(t) ? "anual" : /mensal|do mes|todo mes|cada mes/.test(t) ? "mensal" : "";
+        if (!freq) return;
+        var s = {nome: codigos(r.nome).texto, frequencia: freq, origem_regra: r._id, tipo: /medicao|faturamento|bm\b/.test(t) ? "Medição / faturamento (BM)" : /reuniao/.test(t) ? "Reunião periódica com cliente" : "Entregável ao cliente (RMO, relatório)", setor: r.setor || ""};
+        var m;
+        if (freq === "semanal") { m = t.match(/(segunda|terca|quarta|quinta|sexta)/); if (m) s.dia_semana = {terca: "terça"}[m[1]] || m[1]; }
+        else if ((m = t.match(/(\d+)\s*[ºo°]?\s*dia util/))) s.dia_util = +m[1];
+        else if ((m = t.match(/ate o dia (\d+)|dia (\d+) de cada mes|todo dia (\d+)/))) s.dia_mes = +(m[1] || m[2] || m[3]);
+        var ch = semAcento(s.nome) + "|" + freq;
+        if (vistas[ch] || confirmadas[r._id] || (R.descartes || []).indexOf("s" + r._id) >= 0) { vistas[ch] = 1; return; }
+        vistas[ch] = 1; s.id = "s" + r._id; s.regra = vale(r);
+        out.push(s);
+      });
+    });
+    return out;
+  }
+  function tomOc(dia, entregue) {
+    if (entregue) return "ok";
+    var dias = Math.round((new Date(dia + "T12:00:00") - new Date(R.hoje + "T12:00:00")) / 864e5);
+    return dias < 0 ? "critico" : dias <= 7 ? "alerta" : "neutro";
+  }
   function rCalendario(c) {
-    var obr = obrDe(c), hj = new Date(R.hoje + "T12:00:00"), ano = hj.getFullYear(), mes = hj.getMonth();
-    var ini = new Date(ano, mes, 1).getDay(), nd = new Date(ano, mes + 1, 0).getDate(), total = Math.ceil((ini + nd) / 7) * 7;
+    var obr = obrDe(c), hj = new Date(R.hoje + "T12:00:00"), base = new Date(hj.getFullYear(), hj.getMonth() + (estado.mesCal || 0), 1);
+    var ano = base.getFullYear(), mes = base.getMonth(), nd = new Date(ano, mes + 1, 0).getDate(), ini = new Date(ano, mes, 1).getDay(), total = Math.ceil((ini + nd) / 7) * 7;
     var titulo = MESES[mes].charAt(0).toUpperCase() + MESES[mes].slice(1) + " de " + ano;
-    var h = '<div class="ctr-regua"><h2>' + titulo + '</h2><div class="ctr-legenda"><span><i class="ctr-ponto p-ok"></i>entregue</span><span><i class="ctr-ponto p-alerta"></i>no alerta</span><span><i class="ctr-ponto p-critico"></i>atrasada</span><span><i class="ctr-ponto p-neutro"></i>prevista</span><span><i class="ctr-ponto p-sem_data"></i>sem data</span></div></div>';
+    var recs = (R.recorrencias || []).filter(function (r) { return r.cliente === c.cliente; }), ent = (R.entregas || []).filter(function (e) { return e.cliente === c.cliente; });
+    var oc = [];
+    recs.forEach(function (r) { ocorrencias(r, ano, mes).forEach(function (d) {
+      var e = ent.filter(function (x) { return x.recorrencia_id === r._id && x.data === d; })[0];
+      oc.push({rec: r, dia: d, entrega: e, tom: tomOc(d, e)});
+    }); });
+    oc.sort(function (a, b) { return a.dia.localeCompare(b.dia) || a.rec.nome.localeCompare(b.rec.nome); });
+    var h = '<div class="ctr-regua"><span class="ctr-mesnav"><button type="button" class="ctr-lapis" data-mes="-1" title="Mês anterior"><i class="ph ph-caret-left" aria-hidden="true"></i><span class="so-leitor">Mês anterior</span></button><h2>' + titulo +
+      '</h2><button type="button" class="ctr-lapis" data-mes="1" title="Próximo mês"><i class="ph ph-caret-right" aria-hidden="true"></i><span class="so-leitor">Próximo mês</span></button>' +
+      (estado.mesCal ? '<button type="button" class="ctr-link" data-mes="0">hoje</button>' : "") + '</span><div class="ctr-legenda"><span><i class="ctr-ponto p-ok"></i>entregue</span><span><i class="ctr-ponto p-alerta"></i>em até 7 dias</span><span><i class="ctr-ponto p-critico"></i>atrasada</span><span><i class="ctr-ponto p-neutro"></i>prevista</span><span><i class="ctr-ponto p-sem_data"></i>sem data</span></div></div>';
     h += '<div class="ctr-grade"><div class="ctr-cal" role="grid" aria-label="' + titulo + '">' + ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"].map(function (d) { return '<div class="dsem">' + d + "</div>"; }).join("");
     for (var i = 0; i < total; i++) {
-      var dia = i - ini + 1, fora = dia < 1 || dia > nd, eHoje = !fora && dia === hj.getDate();
-      var iso = ano + "-" + String(mes + 1).padStart(2, "0") + "-" + String(dia).padStart(2, "0");
-      var doDia = fora ? [] : obr.filter(function (o) { return o.vencimento === iso; });
+      var dia = i - ini + 1, fora = dia < 1 || dia > nd, eHoje = !fora && iso(new Date(ano, mes, dia)) === R.hoje, di = fora ? "" : iso(new Date(ano, mes, dia));
       h += '<div class="dia' + (fora ? " fora" : "") + (eHoje ? " hoje" : "") + '"><span class="n">' + (fora ? "" : dia) + (eHoje ? " hoje" : "") + "</span>" +
-        doDia.map(function (o) { return '<span class="ctr-ev ' + o.tom + '" title="' + esc(o.descricao + (o.executor ? ", " + o.executor : "") + ", " + o.status) + '">' + esc(o.tipo || o.descricao) + "</span>"; }).join("") + "</div>";
+        (fora ? "" : obr.filter(function (o) { return o.vencimento === di; }).map(function (o) { return '<span class="ctr-ev ' + o.tom + '" title="' + esc(o.descricao + (o.executor ? ", " + o.executor : "") + ", " + o.status) + '">' + esc(o.tipo || o.descricao) + "</span>"; }).join("") +
+          oc.filter(function (x) { return x.dia === di; }).map(function (x) { return '<span class="ctr-ev ' + x.tom + '" title="' + esc(x.rec.nome + (x.entrega ? ", entregue (" + x.entrega._quem + ")" : "")) + '">' + (x.entrega ? '<i class="ph ph-check" aria-hidden="true"></i> ' : "") + esc(x.rec.nome) + "</span>"; }).join("")) + "</div>";
     }
     h += "</div>";
-    var atr = obr.filter(function (o) { return o.tom === "critico"; }), prox = obr.filter(function (o) { return o.tom === "alerta" || o.tom === "neutro"; }).slice(0, 8), sd = obr.filter(function (o) { return o.tom === "sem_data"; });
+    // ao lado: as entregas do mês com o check (Ana: "vai dando o checkzinho que foi entregue"), e as obrigações da planilha
+    var porDia = {}; oc.forEach(function (x) { (porDia[x.dia] = porDia[x.dia] || []).push(x); });
+    h += '<aside class="ctr-lat"><h3>Entregas de ' + MESES[mes] + "</h3>" + (oc.length ? Object.keys(porDia).map(function (d) {
+      return '<p class="ctr-dia-t">' + dBR(d) + "</p><ul class=\"ctr-entregas\">" + porDia[d].map(function (x) {
+        return '<li><label class="ctr-check"><input type="checkbox" data-entregar="' + esc(x.rec._id + "|" + x.dia) + '"' + (x.entrega ? ' data-entrega-id="' + esc(x.entrega._id) + '" checked' : "") + (pode(c) ? "" : " disabled") + '><i class="ctr-ponto p-' + x.tom + '" aria-hidden="true"></i><span>' + esc(x.rec.nome) +
+          (x.entrega ? '<small>entregue: ' + esc(x.entrega._quem) + ", " + esc(x.entrega._quando) + "</small>" : x.rec.setor ? "<small>" + esc(x.rec.setor) + "</small>" : "") + "</span></label></li>";
+      }).join("") + "</ul>";
+    }).join("") : '<p class="mudo" style="font-size:12.5px">Nenhuma recorrência confirmada cai neste mês.</p>');
+    var atr = obr.filter(function (o) { return o.tom === "critico"; }), prox = obr.filter(function (o) { return o.tom === "alerta" || o.tom === "neutro"; }).slice(0, 6), sd = obr.filter(function (o) { return o.tom === "sem_data"; });
     function item(o) { return '<li><i class="ctr-ponto p-' + o.tom + '"></i><span>' + esc(o.descricao) + "<small>" + (o.vencimento ? (o.tom === "critico" ? "venceu em " : "vence em ") + dBR(o.vencimento) : esc(o.status || "sem vencimento")) + (o.executor ? ", " + esc(o.executor) : "") + "</small></span></li>"; }
-    h += '<aside class="ctr-lat"><h3>Atrasadas</h3><ul>' + (atr.map(item).join("") || '<li class="mudo">Nenhuma.</li>') + "</ul><h3>Próximas</h3><ul>" + (prox.map(item).join("") || '<li class="mudo">Nenhuma.</li>') + "</ul>" +
+    h += "<h3>Obrigações atrasadas</h3><ul>" + (atr.map(item).join("") || '<li class="mudo">Nenhuma.</li>') + "</ul><h3>Próximas</h3><ul>" + (prox.map(item).join("") || '<li class="mudo">Nenhuma.</li>') + "</ul>" +
       (sd.length ? "<h3>Sem data</h3><ul>" + sd.map(item).join("") + "</ul>" : "") + "</aside></div>";
+    // as recorrências: as sugeridas do contrato para confirmar, e as confirmadas
+    var sug = sugeridas(c);
+    if (sug.length) h += '<div class="ctr-bloco"><h3>Sugeridas do contrato <span class="ctr-fonte">' + sug.length + "; o gestor confirma (entra no calendário) ou descarta</span></h3><div class=\"ctr-rol\"><table class=\"ctr-tab\"><thead><tr><th>Entrega ou rotina</th><th>Quando</th><th>O que o contrato diz</th><th></th></tr></thead><tbody>" +
+      sug.map(function (x) {
+        var completo = x.frequencia === "semanal" ? !!x.dia_semana : PASSO[x.frequencia] ? false : !!(x.dia_util || x.dia_mes);
+        var preset = esc(JSON.stringify({nome: x.nome, tipo: x.tipo, frequencia: x.frequencia, dia_semana: x.dia_semana || "", dia_util: x.dia_util || "", dia_mes: x.dia_mes || "", setor: x.setor, origem_regra: x.origem_regra}));
+        return "<tr><td>" + esc(x.nome) + "</td><td>" + esc(quandoRec(x)) + '</td><td class="sub" style="margin:0">' + esc(String(x.regra || "").slice(0, 160)) + '</td><td class="r" style="white-space:nowrap">' +
+          (pode(c) ? (completo ? '<button type="button" class="gc-btn gc-btn--ui gc-btn--contorno" data-confirmar="' + preset + '">Confirmar</button> ' :
+            '<button type="button" class="gc-btn gc-btn--ui gc-btn--contorno" data-ed-tipo="recorrencia" data-ed-novo="1" data-ed-cliente="' + esc(c.cliente) + '" data-ed-preset="' + preset + '">Definir o dia</button> ') +
+            '<button type="button" class="ctr-link" data-descartar="' + esc(x.id) + '">descartar</button>' : "") + "</td></tr>";
+      }).join("") + "</tbody></table></div></div>";
+    h += '<div class="ctr-bloco"><h3>Recorrências do calendário <span class="ctr-fonte">' + recs.length + "</span></h3><div class=\"ctr-rol\"><table class=\"ctr-tab\"><thead><tr><th>Entrega ou rotina</th><th>Quando</th><th>Setor</th><th></th></tr></thead><tbody>" +
+      recs.map(function (r) { return "<tr><td>" + nomeHtml(r.nome) + editado(r, ["nome", "frequencia", "dia_util", "dia_mes", "dia_semana"]) + "</td><td>" + esc(quandoRec(r)) + "</td><td>" + esc(r.setor || "") + '</td><td class="r">' + lapis(c, "recorrencia", [r._id], "Editar esta recorrência") + "</td></tr>"; }).join("") +
+      novo(c, "recorrencia", "Incluir recorrência", {tipo: "Entregável ao cliente (RMO, relatório)"}) + "</tbody></table></div></div>";
     h += '<div class="ctr-bloco"><h3>Todas as obrigações (' + obr.length + ")</h3>" + tabelaObrig(c, obr) + "</div>";
     return h + blocoContrato(c, ["Rotinas"], "Rotinas que o contrato pede");
   }
-
   /* ── atendimento, entregáveis, metas, financeiro ────────────────────────────────────────────────────────────────── */
   function rAtendimento(c) {
     var b = blocoContrato(c, ["SLA"], "O atendimento que o contrato pede");
@@ -372,9 +543,17 @@
       '<p class="ctr-nota">O atendimento feito em cada usina (as OS do mês) não está na planilha de controle nem no contrato.</p>';
   }
   function rEntregaveis(c) {
-    var lista = obrDe(c).filter(function (o) { return o.entregavel; }), par0 = R.parametros || {};
+    var lista = obrDe(c).filter(function (o) { return o.entregavel; }), par0 = R.parametros || {}, f = fichaDe(c), h = "";
     var vencidos = lista.filter(function (o) { return o.tom === "ok" || o.tom === "critico"; }), noPrazo = lista.filter(function (o) { return o.no_prazo; }).length;
-    return blocoContrato(c, ["Entregáveis"], "O que o contrato pede") + '<div class="ctr-bloco"><h3>Entregáveis e medições lançados <span class="ctr-fonte">' + lista.length + "; " + noPrazo + " de " + vencidos.length +
+    if (f) {
+      // Ana, 18/11/2026: "ter uma que é uma entrega única e ter um que seja recorrências"
+      var g = grupos(f, ["Entregáveis"], false), rec = [], unica = [];
+      g.forEach(function (x) { (/mensal|semanal|quinzenal|trimestral|semestral|anual|diari|todo |toda |cada |por mes|por semana/.test(semAcento([x.r.periodicidade, x.r.prazo, vale(x.r), x.r.nome].join(" "))) ? rec : unica).push(x); });
+      h += '<div class="ctr-bloco" style="margin-top:6px"><h3>Recorrentes <span class="ctr-fonte">' + rec.length + "; o que o contrato pede de novo a cada período (o calendário mostra as datas)</span></h3>" +
+        (rec.length ? tabelaRegras(c, f, rec, true) : '<p class="mudo">Nenhuma.</p>') + "</div>";
+      h += '<div class="ctr-bloco"><h3>Entrega única <span class="ctr-fonte">' + unica.length + "; uma vez, num marco do contrato</span></h3>" + (unica.length ? tabelaRegras(c, f, unica, true) : '<p class="mudo">Nenhuma.</p>') + "</div>";
+    }
+    return h + '<div class="ctr-bloco"><h3>Entregáveis e medições lançados <span class="ctr-fonte">' + lista.length + "; " + noPrazo + " de " + vencidos.length +
       " já vencidos entregues no prazo" + (par0.meta_entregaveis != null ? "; meta " + pct(100 * par0.meta_entregaveis, 0) + "%" : "") + "</span></h3>" +
       tabelaObrig(c, lista, {tipo: "Entregável ao cliente (RMO, relatório)", status: "Não iniciado"}, "Incluir entregável") + "</div>";
   }
@@ -406,7 +585,35 @@
       blocoContrato(c, ["Disponibilidade e desempenho", "Benefícios", "Penalidades"], "Metas, bônus e penalidades do contrato");
   }
   var SIT_ADIC = {"Faturado": "t-ok", "Aprovado — faturar": "t-verde", "Aguardando cliente": "t-alerta", "Memória a enviar": "t-neutro", "Memória atrasada": "t-critico", "Reprovado": "t-neutro"};
+  // Ana, 18/11/2026: "o supervisor conseguir também sinalizar que para março vai existir esse acréscimo [...] ou uma
+  // penalidade de menos tanto [...] aqui é a rotina financeira do contrato [...] pode ser uma tabelinha"
+  function mesAMes(c) {
+    var hj = new Date(R.hoje + "T12:00:00"), lan = (R.lancamentos || []).filter(function (l) { return l.cliente === c.cliente; }), ad = adicDe(c), meses = {};
+    var ini = c.inicio ? new Date(c.inicio + "T12:00:00") : null, de = new Date(hj.getFullYear(), hj.getMonth() - 11, 1);
+    if (ini && ini > de) de = new Date(ini.getFullYear(), ini.getMonth(), 1);
+    for (var d = new Date(de); d <= new Date(hj.getFullYear(), hj.getMonth() + 1, 1); d = new Date(d.getFullYear(), d.getMonth() + 1, 1)) meses[d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0")] = 1;
+    lan.forEach(function (l) { if (l.mes) meses[l.mes] = 1; });
+    var lista = Object.keys(meses).sort().reverse(), mensal = c.valor_mensal;
+    function soma(l) { return l.reduce(function (s, x) { return s + (+x.valor || 0); }, 0); }
+    var h = '<div class="ctr-regua"><h2>Mês a mês</h2><span class="ctr-fonte">a mensalidade do contrato, os serviços adicionais e o que o gestor lança (acréscimos, penalidades)</span></div>' +
+      '<div class="ctr-rol"><table class="ctr-tab"><thead><tr><th>Mês</th><th class="r">Mensalidade</th><th class="r">Adicionais</th><th class="r">Acréscimos</th><th class="r">Penalidades e descontos</th><th class="r">Total previsto</th></tr></thead><tbody>' +
+      lista.map(function (m) {
+        var a = soma(ad.filter(function (x) { return x.mes === m; })), mais = soma(lan.filter(function (x) { return x.mes === m && (x.tipo === "Acréscimo" || x.tipo === "Outro"); })),
+          menos = soma(lan.filter(function (x) { return x.mes === m && (x.tipo === "Penalidade" || x.tipo === "Desconto"); })), p = m.split("-");
+        return "<tr><td>" + MESES[+p[1] - 1] + " de " + p[0] + '</td><td class="r num">' + (mensal != null ? brl(mensal) : '<span class="mudo">—</span>') + '</td><td class="r num">' + (a ? brl(a) : '<span class="mudo">—</span>') +
+          '</td><td class="r num">' + (mais ? brl(mais) : '<span class="mudo">—</span>') + '</td><td class="r num' + (menos ? " c-critico" : "") + '">' + (menos ? "−" + brl(menos) : '<span class="mudo">—</span>') +
+          '</td><td class="r num">' + (mensal != null ? brl(mensal + a + mais - menos) : '<span class="mudo">—</span>') + "</td></tr>";
+      }).join("") + "</tbody></table></div>";
+    h += '<div class="ctr-bloco"><h3>Lançamentos <span class="ctr-fonte">' + lan.length + "</span></h3><div class=\"ctr-rol\"><table class=\"ctr-tab\"><thead><tr><th>Mês</th><th>Tipo</th><th class=\"r\">Valor</th><th>Descrição</th><th></th></tr></thead><tbody>" +
+      lan.sort(function (a, b) { return String(b.mes).localeCompare(String(a.mes)); }).map(function (l) {
+        return "<tr><td>" + esc(l.mes) + "</td><td>" + esc(l.tipo) + '</td><td class="r num">' + brl(+l.valor || 0) + "</td><td>" + esc(l.descricao || "") + '<span class="sub">' + esc(l._quem) + ", " + esc(l._quando) + '</span></td><td class="r">' + lapis(c, "lancamento", [l._id], "Editar este lançamento") + "</td></tr>";
+      }).join("") + novo(c, "lancamento", "Incluir lançamento (acréscimo, penalidade, desconto)", {mes: R.hoje.slice(0, 7), tipo: "Acréscimo"}) + "</tbody></table></div></div>";
+    return h;
+  }
   function rFinanceiro(c) {
+    return mesAMes(c) + '<div class="ctr-bloco">' + rFinanceiroAdic(c) + "</div>";
+  }
+  function rFinanceiroAdic(c) {
     var ad = adicDe(c), bms = obrDe(c).filter(function (o) { return String(o.tipo).slice(0, 7) === "Medição"; });
     function soma(l) { return l.reduce(function (s, a) { return s + a.valor; }, 0); }
     var fat = ad.filter(function (a) { return a.faturado; }), aFat = ad.filter(function (a) { return !a.faturado && a.situacao !== "Reprovado"; });
@@ -477,12 +684,15 @@
     return achado;
   }
   function pega(item, campo) { var x = item; campo.split(".").forEach(function (p) { x = x && typeof x === "object" ? x[p] : undefined; }); return x; }
-  var ROTULO = {cliente: "Dados do contrato", contrato: "Contrato lido do PDF", regra: "Regra", obrigacao: "Obrigação", adicional: "Serviço adicional", parametros: "Metas e prazos"};
+  var ROTULO = {cliente: "Dados do contrato", contrato: "Contrato lido do PDF", regra: "Regra", obrigacao: "Obrigação", adicional: "Serviço adicional", parametros: "Metas e prazos",
+    recorrencia: "Recorrência do calendário", lancamento: "Lançamento do financeiro"};
   function campoHtml(spec, valor, c) {
     var nome = spec[0], rot = spec[1], tipo = spec[2], extra = spec[3], id = "ctr-f-" + nome.replace(/\W/g, "_"), v = valor == null ? "" : valor, h;
     if (extra === "so_admin" && !R.admin) return "";
+    if (extra === "oculto") return '<input type="hidden" data-campo="' + nome + '" value="' + esc(v) + '">';
     if (tipo === "longo") h = '<textarea id="' + id + '" data-campo="' + nome + '" rows="3">' + esc(v) + "</textarea>";
     else if (tipo === "data") h = '<input id="' + id + '" data-campo="' + nome + '" type="date" value="' + esc(String(v).slice(0, 10)) + '">';
+    else if (tipo === "mes") h = '<input id="' + id + '" data-campo="' + nome + '" type="month" value="' + esc(String(v).slice(0, 7)) + '">';
     else if (tipo === "lista") h = '<select id="' + id + '" data-campo="' + nome + '">' + (extra || []).map(function (o) { return '<option value="' + esc(o) + '"' + (o === v ? " selected" : "") + ">" + (o ? esc(o) : "—") + "</option>"; }).join("") +
       (v && (extra || []).indexOf(v) < 0 ? '<option value="' + esc(v) + '" selected>' + esc(v) + "</option>" : "") + "</select>";
     else if (tipo === "pessoa") h = '<select id="' + id + '" data-campo="' + nome + '"><option value="">— ninguém ligado —</option>' + (R.pessoas || []).map(function (p) {
@@ -510,7 +720,8 @@
     dlg.innerHTML = '<form method="dialog" novalidate><h2 id="ctr-dlg-t">' + (novoItem ? "Incluir: " : "Editar: ") + esc(ROTULO[tipo] || tipo) + "</h2>" +
       '<p class="ctr-dlg-sub">' + esc(cli || "Todos os contratos") + ". A mudança vai ao histórico com o seu nome, a hora, o motivo e a prova.</p>" +
       '<div class="ctr-campos">' + aplicar + specs.map(function (s) { return campoHtml(s, pega(item, s[0]), c); }).join("") + "</div>" +
-      '<div class="ctr-prova"><div class="ctr-campo largo"><label for="ctr-f-motivo">Motivo da mudança <span class="obrig">(obrigatório)</span></label><textarea id="ctr-f-motivo" rows="2" required></textarea></div>' +
+      (item.origem_regra && novoItem ? '<p class="ctr-nota">Vem de uma regra do contrato: a prova é o trecho dela, e o motivo é opcional.</p>' : "") +
+      '<div class="ctr-prova"><div class="ctr-campo largo"><label for="ctr-f-motivo">Motivo da mudança <span class="obrig">' + (item.origem_regra && novoItem ? "(opcional)" : "(obrigatório)") + '</span></label><textarea id="ctr-f-motivo" rows="2"></textarea></div>' +
       '<div class="ctr-campo largo"><label for="ctr-f-provas">Prova: o e-mail, a mensagem ou o documento <span class="obrig">(obrigatório: o arquivo ou o texto colado)</span></label>' +
       '<input id="ctr-f-provas" type="file" multiple accept=".pdf,.png,.jpg,.jpeg,.webp,.txt,.eml,.msg,.doc,.docx,.xlsx"></div>' +
       '<div class="ctr-campo largo"><label for="ctr-f-prova-texto">ou cole aqui o texto do e-mail ou da mensagem</label><textarea id="ctr-f-prova-texto" rows="3"></textarea></div></div>' +
@@ -553,7 +764,7 @@
     fechaEscolha(false);
     var antes = estado.ct;
     lerEndereco();
-    if (estado.ct !== antes) estado.soAditivo = false;
+    if (estado.ct !== antes) { estado.soAditivo = false; estado.verRegras = "todas"; estado.mesCal = 0; }
     raiz.innerHTML = (R.erro_edicoes ? '<p class="c-alerta" role="status" style="margin:0 0 8px">' + esc(R.erro_edicoes) + "</p>" : "") +
       (estado.ct >= 0 ? vCliente(R.contratos[estado.ct]) : vTodos());
   }
@@ -564,15 +775,42 @@
   });
   raiz.addEventListener("click", function (e) {
     var b;
+    var cAtual = estado.ct >= 0 ? R.contratos[estado.ct] : null;
+    if ((b = e.target.closest("[data-prior]"))) { e.stopPropagation(); var on = b.getAttribute("aria-pressed") !== "true";
+      leve(cAtual, "regra", b.getAttribute("data-prior").split(","), "alteracao", {prioritaria: on ? "sim" : "nao"}, on ? "Marcada como prioritária." : "Tirada das prioritárias."); return; }
+    if ((b = e.target.closest("[data-subgrupo]"))) { var tk = b.getAttribute("data-subgrupo"); estado.temas[tk] = !estado.temas[tk]; render(); return; }
+    if ((b = e.target.closest("[data-tirar-com]"))) { if (window.confirm("Tirar este comentário? Ele fica no histórico.")) leve(cAtual, "comentario", [b.getAttribute("data-tirar-com")], "retirada", {}, "Comentário tirado."); return; }
+    if ((b = e.target.closest("[data-mes]"))) { var dm = +b.getAttribute("data-mes"); estado.mesCal = dm ? (estado.mesCal || 0) + dm : 0; render(); return; }
+    if ((b = e.target.closest("[data-confirmar]"))) { var pz = JSON.parse(b.getAttribute("data-confirmar")); b.disabled = true;
+      var fdc = new FormData(); fdc.append("item_id", ""); fdc.append("item_tipo", "recorrencia"); fdc.append("evento", "inclusao"); fdc.append("cliente", cAtual.cliente);
+      fdc.append("valores", JSON.stringify(pz)); fdc.append("motivo", ""); fdc.append("prova_texto", "");
+      pedir(CAMINHO + "editar", {method: "POST", body: fdc, headers: {"Accept": "application/json", "X-Nexus-Parte": "1"}}).then(function () { delete HIST[cAtual.cliente]; toast("Confirmada: está no calendário e no histórico."); carregar(); })
+        .catch(function (er) { b.disabled = false; toast((er && er.message) || "Não consegui gravar agora."); }); return; }
+    if ((b = e.target.closest("[data-descartar]"))) { leve(cAtual, "descarte", [""], "inclusao", {sugestao_id: b.getAttribute("data-descartar")}, "Sugestão descartada."); return; }
     if ((b = e.target.closest("[data-ed-tipo]"))) { e.preventDefault(); abrirEdicao(b); }
     else if ((b = e.target.closest("[data-rg]"))) { var rg = b.getAttribute("data-rg"); regraAberta[rg] = !regraAberta[rg]; render(); }
-    else if ((b = e.target.closest("[data-regras]"))) { estado.soAditivo = b.getAttribute("data-regras") === "aditivo"; render(); }
+    else if ((b = e.target.closest("[data-regras]"))) { estado.verRegras = b.getAttribute("data-regras"); estado.soAditivo = estado.verRegras === "aditivo"; render(); }
     else if ((b = e.target.closest("[data-grupo]"))) { var g = b.getAttribute("data-grupo"); estado.grupos[g] = !estado.grupos[g]; render(); }
     else if ((b = e.target.closest(".ctr-escolha-btn"))) { if (aberta) fechaEscolha(true); else abreEscolha(b.closest("[data-escolha]")); }
     else if ((b = e.target.closest('.ctr-lista li[role="option"]'))) { fechaEscolha(false); irPara(+b.getAttribute("data-ir")); }
     else if ((b = e.target.closest("[data-ir]")) && !e.target.closest("a")) irPara(+b.getAttribute("data-ir"));
   });
   raiz.addEventListener("input", function (e) { if (aberta && e.target === aberta.campo) filtraEscolha(); });
+  raiz.addEventListener("change", function (e) {
+    var b = e.target.closest("[data-entregar]");
+    if (!b) return;
+    var c = R.contratos[estado.ct], par = b.getAttribute("data-entregar").split("|");
+    if (b.checked) leve(c, "entrega", [""], "inclusao", {recorrencia_id: par[0], data: par[1]}, "Marcada como entregue.");
+    else leve(c, "entrega", [b.getAttribute("data-entrega-id")], "retirada", {}, "Entrega desmarcada.");
+  });
+  raiz.addEventListener("submit", function (e) {
+    var f = e.target.closest("[data-comentar]");
+    if (!f) return;
+    e.preventDefault();
+    var t = f.querySelector("textarea").value.trim();
+    if (!t) return;
+    leve(R.contratos[estado.ct], "comentario", [""], "inclusao", {alvo_tipo: "regra", alvo_id: f.getAttribute("data-comentar"), texto: t}, "Comentário salvo.");
+  });
   raiz.addEventListener("mousemove", function (e) {
     var li = aberta && e.target.closest('.ctr-lista li[role="option"]');
     if (li && !li.classList.contains("marcada")) marcaEscolha(visiveis().indexOf(li));

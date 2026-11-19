@@ -60,6 +60,24 @@ OBRIGATÓRIO (arquivo ou o texto colado), o administrador liga o gestor a uma pe
   Regras (as categorias, com Incluir regra, e os Dados do contrato no fim), Calendário, Atendimento, Entregáveis,
   Metas, Financeiro e **Histórico** (quem, quando, o que era e o que ficou, o motivo e a prova; a carga inicial no
   fim). A linha editada leva a marca "editado" (quem e quando no título).
+- **O retorno da Ana Barros (chamada de 18/11/2026; Levi escolheu: comenta quem vê o contrato; prioridade e comentário
+  sem prova, só quem e quando; recorrências sugeridas e o gestor confirma; Atendimento e Histórico depois dos exemplos de
+  relatório dela):**
+  - **Prioritárias:** a estrela do gestor (campo `prioritaria` da regra, sem prova) põe a regra no alto das Regras;
+    "Prioritárias" é a 2ª opção do controle.
+  - **O que se repete vira um item:** dentro da categoria, as regras de um mesmo tema (expurgo, multa, exclusão,
+    disponibilidade; 2 ou mais) ficam num subgrupo recolhido (`tema` no JS). O atributo é `data-subgrupo`: o `data-tema`
+    é o do tema claro/escuro no `<html>` e pegava todo clique.
+  - **Comentário na regra** (pedido da Danuth): item `comentario`, de quem vê o contrato, sem prova; sai só pelo autor ou
+    pelo administrador; a linha mostra quantos.
+  - **Calendário:** item `recorrencia` (semanal com o dia da semana; mensal no Nº dia útil ou no dia do mês; trimestral,
+    semestral e anual a partir de um mês), com os feriados nacionais no dia útil. As **sugeridas** saem das regras com
+    frequência escrita; "Confirmar" grava com a regra como prova (o servidor tira o trecho) e "descartar" grava um
+    `descarte`. Cada data tem o **check de entregue** (item `entrega`, sem prova). O mês anda (‹ ›).
+  - **Entregáveis:** o código do contrato (MPLP.3, MPCP.1, P52S) vira etiqueta depois do nome; as regras se dividem em
+    Recorrentes e Entrega única.
+  - **Financeiro mês a mês:** a mensalidade do contrato, os adicionais do mês, e os `lancamento` do gestor (acréscimo,
+    penalidade, desconto; com motivo e prova), com o total previsto.
 - Prova: `tests/test_contratos_editavel_18_11.py`.
 
 ## A planilha de controle de obrigações na visão do contrato (16/11/2026; `controle.py`)

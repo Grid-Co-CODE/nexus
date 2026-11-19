@@ -238,3 +238,71 @@ def test_mais_fichas_entram_pelo_caminho_do_administrador_e_nao_trocam_o_que_foi
                    motivo="Ajuste combinado", prova_texto="Ata da reunião com o cliente.")[0] == 200
     st, r = mandar(adm, [FICHA])
     assert st == 200 and r["entraram"] == [] and r["recusados"] == ["SOLAR ALFA"]
+
+
+def test_o_retorno_da_ana_comentario_prioridade_recorrencia_entrega_e_lancamento(carga, cliente):
+    """A chamada com a Ana Barros (18/11/2026): o comentário de quem vê o contrato (pedido da Danuth), a regra prioritária,
+    a recorrência do calendário (a sugerida do contrato vem com a regra como prova), o check de entregue e o lançamento do
+    financeiro mês a mês. O que não muda o contrato não pede motivo nem prova (Levi: "só quem e quando")."""
+    adm = _como(cliente, "admin@gridco.com.br", admin=True)
+    d = adm.get("/t/comando/contratos/dados.json").get_json()
+    rid = d["fichas"]["Solar Alfa"]["contratos"][0]["regras"][0]["_id"]
+    sem = dict(motivo="", prova_texto="")
+    # quem vê o contrato comenta, sem ser gestor; tirar o comentário é do autor (ou do administrador)
+    fora = _como(cliente, "outra@gridco.com.br")
+    st, r = _editar(fora, item_tipo="comentario", evento="inclusao", cliente="Solar Alfa", **sem,
+                    valores={"alvo_tipo": "regra", "alvo_id": rid, "texto": "Alinhado com o cliente em 18/11"})
+    assert st == 200
+    cid = r["item_ids"][0]
+    d = fora.get("/t/comando/contratos/dados.json").get_json()
+    k = next(x for x in d["comentarios"] if x["_id"] == cid)
+    assert k["alvo_id"] == rid and k["_quem"] == "Outra" and k["_meu"]
+    gest = _como(cliente, "gestora@gridco.com.br")
+    assert _editar(gest, item_tipo="comentario", item_id=cid, evento="retirada", cliente="Solar Alfa", valores={}, **sem)[0] == 400
+    # a prioridade: do gestor ou do administrador, sem prova; quem não é gestor não marca
+    fora = _como(cliente, "outra@gridco.com.br")
+    assert _editar(fora, item_tipo="regra", item_id=rid, evento="alteracao", cliente="Solar Alfa", valores={"prioritaria": "sim"}, **sem)[0] == 400
+    adm = _como(cliente, "admin@gridco.com.br", admin=True)        # o cliente de teste é um só: volta ao administrador
+    assert _editar(adm, item_tipo="regra", item_id=rid, evento="alteracao", cliente="Solar Alfa", valores={"prioritaria": "sim"}, **sem)[0] == 200
+    d = adm.get("/t/comando/contratos/dados.json").get_json()
+    assert d["fichas"]["Solar Alfa"]["contratos"][0]["regras"][0]["prioritaria"] is True
+    # mudar o texto da regra continua pedindo motivo e prova
+    assert _editar(adm, item_tipo="regra", item_id=rid, evento="alteracao", cliente="Solar Alfa", valores={"vigente": "Até 5 h"}, **sem)[0] == 400
+    # a recorrência confirmada da regra: a prova é o trecho dela; a manual pede motivo e prova
+    rec = {"nome": "Relatório mensal", "tipo": "Entregável ao cliente (RMO, relatório)", "frequencia": "mensal", "dia_util": "5"}
+    st, r = _editar(adm, item_tipo="recorrencia", evento="inclusao", cliente="Solar Alfa", valores=dict(rec, origem_regra=rid), **sem)
+    assert st == 200
+    rec_id = r["item_ids"][0]
+    assert _editar(adm, item_tipo="recorrencia", evento="inclusao", cliente="Solar Alfa", valores=rec, **sem)[0] == 400
+    h = adm.get("/t/comando/contratos/historico.json", query_string={"cliente": "Solar Alfa"}).get_json()["historico"]
+    conf = next(x for x in h if x["item_tipo"] == "Recorrência do calendário")
+    assert conf["motivo"] == "Confirmada a partir da regra do contrato" and "Regra do contrato" in conf["prova_texto"]
+    # o check de entregue (e desmarcar), sem prova
+    st, r = _editar(adm, item_tipo="entrega", evento="inclusao", cliente="Solar Alfa", valores={"recorrencia_id": rec_id, "data": "2026-11-07"}, **sem)
+    assert st == 200
+    eid = r["item_ids"][0]
+    assert any(x["_id"] == eid for x in adm.get("/t/comando/contratos/dados.json").get_json()["entregas"])
+    assert _editar(adm, item_tipo="entrega", item_id=eid, evento="retirada", cliente="Solar Alfa", valores={}, **sem)[0] == 200
+    # descartar uma sugestão
+    assert _editar(adm, item_tipo="descarte", evento="inclusao", cliente="Solar Alfa", valores={"sugestao_id": "s" + rid}, **sem)[0] == 200
+    assert "s" + rid in adm.get("/t/comando/contratos/dados.json").get_json()["descartes"]
+    # o lançamento do financeiro: pede motivo e prova; o mês é aaaa-mm
+    lan = {"mes": "2026-11", "tipo": "Acréscimo", "valor": "1.850,00", "descricao": "Hora extra aprovada"}
+    assert _editar(adm, item_tipo="lancamento", evento="inclusao", cliente="Solar Alfa", valores=lan, **sem)[0] == 400
+    assert _editar(adm, item_tipo="lancamento", evento="inclusao", cliente="Solar Alfa", valores=dict(lan, mes="11/2026"),
+                   motivo="Hora extra do cliente", prova_texto="E-mail do cliente aprovando a hora extra.")[0] == 400
+    assert _editar(adm, item_tipo="lancamento", evento="inclusao", cliente="Solar Alfa", valores=lan,
+                   motivo="Hora extra do cliente", prova_texto="E-mail do cliente aprovando a hora extra.")[0] == 200
+    lancs = adm.get("/t/comando/contratos/dados.json").get_json()["lancamentos"]
+    assert lancs[0]["valor"] == 1850.0 and lancs[0]["mes"] == "2026-11"
+
+
+def test_a_tela_do_retorno_da_ana(cliente):
+    r = cliente.get("/static/contratos.js")
+    js = r.get_data(as_text=True)
+    r.close()
+    # o atributo do subgrupo não é o data-tema (o tema claro/escuro do Nexus mora no <html data-tema>)
+    assert "data-subgrupo" in js and 'closest("[data-tema]")' not in js
+    for t in ("function codigos(nome)", "function linhaRegra(", "function blocoComentarios(", "function sugeridas(c)", "function ocorrencias(rec, a, m)",
+              "function feriados(a)", "function mesAMes(c)", '"Prioritárias"', "Entrega única", "Sugeridas do contrato"):
+        assert t in js, t

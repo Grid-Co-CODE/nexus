@@ -49,7 +49,15 @@ LIVRO, NOME_LIVRO = "nexus_contratos_edicoes", "Nexus · edições dos contratos
 ABA = "fato_edicao_contrato"
 CAB = ("edicao_id", "registrado_em", "data_id", "contrato_chave", "item_tipo", "item_id", "evento", "pessoa_hmac",
        "dados_cifrados")
-TIPOS_ITEM = ("cliente", "contrato", "regra", "obrigacao", "adicional", "parametros")
+TIPOS_ITEM = ("cliente", "contrato", "regra", "obrigacao", "adicional", "parametros",
+              # o retorno da Ana Barros (chamada de 18/11/2026): o comentário (pedido da Danuth), a recorrência do calendário
+              # e o check de entregue, a sugestão descartada e o lançamento do financeiro mês a mês
+              "comentario", "recorrencia", "entrega", "descarte", "lancamento")
+# o que não muda o contrato não pede motivo nem prova, só quem e quando (Levi, 18/11/2026: "Não: só quem e quando")
+LEVES = ("comentario", "entrega", "descarte")
+FREQUENCIAS = ("semanal", "mensal", "trimestral", "semestral", "anual")
+DIAS_SEMANA = ("segunda", "terça", "quarta", "quinta", "sexta", "sábado", "domingo")
+TIPOS_LANCAMENTO = ("Acréscimo", "Penalidade", "Desconto", "Outro")
 EVENTOS = ("inclusao", "alteracao", "retirada")
 MOTIVO_MIN, MOTIVO_MAX, PROVA_MIN, PROVA_MAX, TEXTO_MAX = 5, 2000, 10, 20000, 4000
 ID_EDICAO = re.compile(r"e[0-9a-f]{11}")
@@ -84,7 +92,10 @@ CAMPOS: dict[str, tuple] = {
     "regra": (("categoria", "Categoria", "lista", F.CATEGORIAS), ("nome", "Regra", "texto", None),
               ("vigente", "Vale hoje", "longo", None), ("setor", "Setor que executa", "lista", ("",) + SETORES),
               ("prazo", "Prazo", "texto", None), ("periodicidade", "Periodicidade", "texto", None),
-              ("contrato_id", "Contrato", "contrato", None)),
+              ("contrato_id", "Contrato", "contrato", None),
+              # a regra prioritária fica no alto das Regras (Ana Barros, 18/11/2026: "uma seleção de prioritárias [...] o
+              # próprio supervisor [...] vai setando as mais prioritárias de acompanhamento")
+              ("prioritaria", "Prioritária", "booleano", "oculto")),
     "obrigacao": (("tipo", "Tipo", "lista", TIPOS_OBRIGACAO), ("descricao", "Obrigação", "longo", None),
                   ("clausula", "Cláusula / origem", "texto", None), ("periodicidade", "Periodicidade", "texto", None),
                   ("vencimento", "Vencimento", "data", None), ("alerta_dias", "Avisar com antecedência (dias)", "inteiro", None),
@@ -98,6 +109,21 @@ CAMPOS: dict[str, tuple] = {
                   ("valor_aprovado", "Valor aprovado (R$)", "numero", None), ("bm", "BM / competência", "texto", None),
                   ("nf", "Nº da NF", "texto", None), ("faturamento", "Data do faturamento", "data", None),
                   ("observacoes", "Observações", "longo", None)),
+    "comentario": (("alvo_tipo", "Sobre", "lista", ("regra", "cliente", "contrato", "obrigacao", "adicional", "recorrencia")),
+                   ("alvo_id", "Item", "texto", "oculto"), ("texto", "Comentário", "longo", None)),
+    "recorrencia": (("nome", "Entrega ou rotina", "texto", None), ("tipo", "Tipo", "lista", TIPOS_OBRIGACAO),
+                    ("frequencia", "Frequência", "lista", FREQUENCIAS),
+                    ("dia_semana", "Dia da semana (semanal)", "lista", ("",) + DIAS_SEMANA),
+                    ("dia_util", "Nº do dia útil do mês (ex.: 5 = 5º dia útil)", "inteiro", None),
+                    ("dia_mes", "Ou o dia do mês", "inteiro", None),
+                    ("mes_inicio", "Mês de partida (trimestral, semestral, anual: 1 a 12)", "inteiro", None),
+                    ("setor", "Setor que entrega", "lista", ("",) + SETORES),
+                    ("inicio", "Vale a partir de", "data", None), ("fim", "Vale até", "data", None),
+                    ("origem_regra", "Regra do contrato", "texto", "oculto")),
+    "entrega": (("recorrencia_id", "Recorrência", "texto", "oculto"), ("data", "Data", "data", None)),
+    "descarte": (("sugestao_id", "Sugestão", "texto", "oculto"),),
+    "lancamento": (("mes", "Mês (aaaa-mm)", "mes", None), ("tipo", "Tipo", "lista", TIPOS_LANCAMENTO),
+                   ("valor", "Valor (R$)", "numero", None), ("descricao", "Descrição", "longo", None)),
     "parametros": (("meta_entregaveis", "Meta de entregáveis no prazo (0 a 1)", "numero", "so_admin"),
                    ("meta_vencidas", "Meta de obrigações vencidas em aberto", "numero", "so_admin"),
                    ("meta_adicionais", "Meta de adicionais faturados (0 a 1)", "numero", "so_admin"),
@@ -107,8 +133,12 @@ CAMPOS: dict[str, tuple] = {
 }
 # o que é obrigatório ao incluir
 OBRIGATORIOS = {"regra": ("categoria", "nome", "vigente"), "obrigacao": ("tipo", "descricao", "status"),
+                "comentario": ("alvo_id", "texto"), "recorrencia": ("nome", "frequencia"), "entrega": ("recorrencia_id", "data"),
+                "descarte": ("sugestao_id",), "lancamento": ("mes", "tipo", "valor"),
                 "adicional": ("servico",)}
-ROTULO_ITEM = {"cliente": "Dados do contrato", "contrato": "Contrato", "regra": "Regra", "obrigacao": "Obrigação",
+ROTULO_ITEM = {"comentario": "Comentário", "recorrencia": "Recorrência do calendário", "entrega": "Entrega",
+               "descarte": "Sugestão descartada", "lancamento": "Lançamento do financeiro",
+               "cliente": "Dados do contrato", "contrato": "Contrato", "regra": "Regra", "obrigacao": "Obrigação",
                "adicional": "Serviço adicional", "parametros": "Metas e prazos"}
 
 
@@ -244,7 +274,7 @@ def aplicar(base: dict, mudancas: list[dict]) -> dict:
             continue
         marca = {"quem": m.get("quem", {}).get("nome") or "", "quando": m["quando_txt"], "edicao_id": m["edicao_id"]}
         if m["evento"] == "inclusao":
-            item = {"_cliente": m.get("cliente") or "", "_incluido": marca}
+            item = {"_cliente": m.get("cliente") or "", "_incluido": marca, "_autor": m.get("hmac") or ""}
             for campo, v in (m.get("depois") or {}).items():
                 _poe(item, campo, v)
             st[tipo][iid] = item
@@ -324,6 +354,17 @@ def visao(base: dict, st: dict, hoje: date, pessoas: list[dict], meu_hmac: str |
     out["fichas"] = fichas
     out["parametros_editado"] = par.get("_editado") or {}
     out["admin"] = admin
+
+    def lista(tipo):
+        return [{**{a: b for a, b in x.items() if not a.startswith("_")}, "_id": i, "cliente": x.get("_cliente") or "",
+                 "_quem": (x.get("_incluido") or {}).get("quem") or "", "_quando": (x.get("_incluido") or {}).get("quando") or "",
+                 "_meu": bool(meu_hmac and x.get("_autor") == meu_hmac), "_editado": x.get("_editado") or {}}
+                for i, x in vivos.get(tipo, {}).items()]
+    out["comentarios"] = lista("comentario")
+    out["recorrencias"] = lista("recorrencia")
+    out["entregas"] = lista("entrega")
+    out["descartes"] = [x.get("sugestao_id") for x in vivos.get("descarte", {}).values()]
+    out["lancamentos"] = lista("lancamento")
     return out
 
 
@@ -429,6 +470,16 @@ def _valor(tipo: str, opcoes, v, rotulo: str, contratos_do_cliente=()):
         return t
     if tipo == "pessoa":
         return t.lower()
+    if tipo == "booleano":
+        if t.lower() in ("1", "sim", "true", "s"):
+            return True
+        if t.lower() in ("0", "nao", "não", "false", "n"):
+            return False
+        raise Recusada(f"{rotulo}: sim ou não")
+    if tipo == "mes":
+        if not re.fullmatch(r"\d{4}-(0[1-9]|1[0-2])", t):
+            raise Recusada(f"{rotulo}: escreva o mês como aaaa-mm")
+        return t
     return t
 
 
@@ -455,19 +506,32 @@ def gravar(base: dict, item_tipo: str, item_ids, evento: str, cliente: str, valo
     if not cod or not cfg.get("GRIDCO_SQL_TOKEN"):
         raise Recusada("Este Nexus não tem as chaves de gravação (NEXUS_PESSOA_HMAC e GRIDCO_SQL_TOKEN)")
     motivo = str(motivo or "").strip()
-    if len(motivo) < MOTIVO_MIN:
-        raise Recusada("Escreva o motivo da mudança")
+    prova_texto = str(prova_texto or "").replace("\r\n", "\n").strip()
     if len(motivo) > MOTIVO_MAX:
         raise Recusada(f"O motivo passou de {MOTIVO_MAX} caracteres")
-    prova_texto = str(prova_texto or "").replace("\r\n", "\n").strip()
     if len(prova_texto) > PROVA_MAX:
         raise Recusada(f"O texto colado passou de {PROVA_MAX} caracteres: anexe o arquivo")
     lista = provas(arquivos)
-    if not lista and len(prova_texto) < PROVA_MIN:
-        raise Recusada("Anexe a prova (o e-mail, a mensagem, o documento) ou cole o texto dela: sem prova, nada é gravado")
+    # leve: não muda o contrato (o comentário, o check de entregue, a sugestão descartada, a regra marcada prioritária)
+    leve = item_tipo in LEVES or (item_tipo == "regra" and evento == "alteracao" and set(valores or {}) <= {"prioritaria"})
     with _TRAVA:
         linhas = ler_banco()
         st = aplicar(base, abrir(linhas))
+        # a recorrência confirmada a partir de uma regra do contrato: a prova é o trecho da regra, e o motivo diz isso
+        origem = st["regra"].get(str((valores or {}).get("origem_regra") or "")) if item_tipo == "recorrencia" else None
+        if origem and evento == "inclusao" and not lista and len(prova_texto) < PROVA_MIN:
+            ref = origem.get("ref") or {}
+            prova_texto = (f'Regra do contrato "{origem.get("nome") or ""}": "{origem.get("trecho") or origem.get("vigente") or ""}" '
+                           f'({ref.get("arquivo") or ""}, p. {ref.get("pagina") or ""})')
+            motivo = motivo or "Confirmada a partir da regra do contrato"
+        if leve:
+            motivo = motivo or {"comentario": "Comentário", "entrega": "Marcou a entrega", "descarte": "Descartou a sugestão",
+                                "regra": "Mudou a prioridade"}.get(item_tipo, "")
+        else:
+            if len(motivo) < MOTIVO_MIN:
+                raise Recusada("Escreva o motivo da mudança")
+            if not lista and len(prova_texto) < PROVA_MIN:
+                raise Recusada("Anexe a prova (o e-mail, a mensagem, o documento) ou cole o texto dela: sem prova, nada é gravado")
         planos = []                       # (item_id, cliente, atual, antes, depois) de cada item
         for item_id in item_ids:
             if item_tipo == "parametros":
@@ -491,7 +555,12 @@ def gravar(base: dict, item_tipo: str, item_ids, evento: str, cliente: str, valo
                 c = st["cliente"].get(id_cliente(cli))
                 if not c or c.get("_retirado"):
                     raise Recusada("Cliente não encontrado: atualize a página")
-                if not pode_editar(c, pessoas, cod, admin):
+                if item_tipo == "comentario":
+                    if evento == "retirada" and not admin and atual.get("_autor") != cod:
+                        raise Recusada("Só quem escreveu o comentário, ou um administrador, tira o comentário")
+                    if evento == "alteracao":
+                        raise Recusada("O comentário não se edita: escreva outro")
+                elif not pode_editar(c, pessoas, cod, admin):
                     raise Recusada("Só o gestor deste contrato ou um administrador edita")
                 if planos and cli != planos[0][1]:
                     raise Recusada("Uma mudança é de um cliente só")
@@ -573,6 +642,15 @@ def _rotulo(tipo: str, item: dict, st: dict) -> str:
         return str(item.get("servico") or "")[:120]
     if tipo == "contrato":
         return str(item.get("id") or item.get("arquivo") or "Contrato")
+    if tipo == "comentario":
+        return str(item.get("texto") or "")[:120]
+    if tipo == "recorrencia":
+        return str(item.get("nome") or "")[:120]
+    if tipo == "entrega":
+        rec = st.get("recorrencia", {}).get(str(item.get("recorrencia_id") or "")) or {}
+        return f"{rec.get('nome') or 'Entrega'} de {_dbr(item.get('data'))}"
+    if tipo == "lancamento":
+        return f"{item.get('tipo') or ''} de {item.get('mes') or ''}: {str(item.get('descricao') or '')[:80]}"
     return ROTULO_ITEM.get(tipo, tipo)
 
 
