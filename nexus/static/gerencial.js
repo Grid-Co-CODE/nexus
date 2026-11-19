@@ -268,6 +268,7 @@
     function sorteia() { var x = Math.random() * somaM, lo = 0, hi = acum.length - 1; while (lo < hi) { var mid = (lo + hi) >> 1; if (acum[mid] < x) lo = mid + 1; else hi = mid; } return blocos[lo]; }
     var hAlto = Math.max.apply(null, blocos.map(function (b) { return b.h; }).concat([0.14])), EL0 = 0.6, cam = {fi: Math.PI / 4, el: EL0}, rato = {x: 0, y: 0, px: 0, py: 0, dentro: false};
     var PULA = +(q0.get("t") || 0), hover = -1, hoverLinha = q0.get("foco") == null ? -1 : +q0.get("foco"), ultimoHover = -2, t0 = null, ultimo = 0, cred = 0, parts = [], G = {};
+    PARQUE.cv = cv; PARQUE.blocos = blocos; PARQUE.linhas = linhas; PARQUE.voou = false;
     function geo() { var w = cv.clientWidth, h = cv.clientHeight, dpr = window.devicePixelRatio || 1;
       if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); }
       var estreito = w < 860, x0 = estreito ? 0 : w * 0.4, larg = w - x0 - 10, diag = (cols + rows) * 0.7071;
@@ -304,7 +305,7 @@
       var ordem = blocos.slice().sort(function (p1, p2) { return (p1.x - p2.x) * Math.sin(cam.fi) + (p1.y - p2.y) * Math.cos(cam.fi); });
       var faixa = ((t * 0.16) % 1) * ((cols + rows) * 0.7071 + 6) - (cols + rows) * 0.35 - 3;
       ordem.forEach(function (b) { var x = Math.max(0, Math.min(1, (t - 0.2 - b.atraso) / 0.85)), sobe = x <= 0 ? 0 : 1 + 2.2 * Math.pow(x - 1, 3) + 1.2 * Math.pow(x - 1, 2);
-        var on = hover === b.k, apag = hover >= 0 && !on; b.sobe += ((on ? 0.16 : 0) - b.sobe) * 0.2;
+        var on = hover === b.k, apag = (hover >= 0 && !on) || b.fora; b.sobe += ((on ? 0.16 : 0) - b.sobe) * 0.2;
         var hh = b.h * sobe, z0 = b.sobe, m = LADO / 2, x0 = b.x - m, x1 = b.x + m, y0 = b.y - m, y1 = b.y + m; b.hh = hh + z0;
         var A = proj(x0, y0, hh + z0), B = proj(x1, y0, hh + z0), Dd = proj(x1, y1, hh + z0), Ee = proj(x0, y1, hh + z0), B0 = proj(x1, y0, z0), D0 = proj(x1, y1, z0), E0 = proj(x0, y1, z0);
         b.pol = [[A, B, Dd, Ee], [B, Dd, D0, B0], [Ee, Dd, D0, E0]];
@@ -315,14 +316,15 @@
         if (!apag) { var d = (b.x - b.y) * 0.7071 - faixa, luz = Math.exp(-d * d / 0.9); if (luz > 0.02) face(c2, b.pol[0], rgba(COR.branco, (0.5 * luz).toFixed(3)));
           c2.strokeStyle = rgba(COR.branco, on ? 0.9 : 0.28); c2.lineWidth = on ? 1.6 : 1; c2.beginPath(); c2.moveTo(A[0], A[1]); c2.lineTo(B[0], B[1]); c2.lineTo(Dd[0], Dd[1]); c2.lineTo(Ee[0], Ee[1]); c2.closePath(); c2.stroke(); }
         /* o número na tampa: a nota de cumprimento do contrato da usina no mês; sem nota, sem número */
-        if (b.sc.nota != null && sobe > 0.85) { var fs = Math.max(10, Math.min(17, S * 0.27));
+        if (b.sc.nota != null && sobe > 0.85 && !b.fora) { var fs = Math.max(10, Math.min(17, S * 0.27));
           c2.font = "700 " + fs.toFixed(1) + 'px Poppins, "Segoe UI", sans-serif'; c2.textAlign = "center"; c2.textBaseline = "middle"; c2.fillStyle = rgba(COR.escuro, apag ? 0.45 : 0.92);
           c2.fillText(String(b.sc.nota), (A[0] + Dd[0]) / 2, (A[1] + Dd[1]) / 2 + 0.5); c2.textAlign = "left"; } });
       /* a energia subindo */
       if (t > 1.4 && blocos.length) { cred += dt * (3 + Math.min(14, n0 * 0.5)); while (cred >= 1) { cred--; parts.push({b: sorteia(), t: 0, dur: 1 + Math.random() * 0.6, ox: Math.random() - 0.5, oy: Math.random() - 0.5}); } }
       c2.lineWidth = 2; c2.lineCap = "round";
       for (i = parts.length - 1; i >= 0; i--) { var pt = parts[i]; pt.t += dt; var f = pt.t / pt.dur; if (f >= 1) { parts.splice(i, 1); continue; }
-        b = pt.b; var z = b.hh + 0.12 + 1.3 * f, p1 = proj(b.x + pt.ox * LADO * 0.8, b.y + pt.oy * LADO * 0.8, z), p2 = proj(b.x + pt.ox * LADO * 0.8, b.y + pt.oy * LADO * 0.8, z - 0.24 - 0.12 * f);
+        b = pt.b; if (b.fora) { parts.splice(i, 1); continue; }
+        var z = b.hh + 0.12 + 1.3 * f, p1 = proj(b.x + pt.ox * LADO * 0.8, b.y + pt.oy * LADO * 0.8, z), p2 = proj(b.x + pt.ox * LADO * 0.8, b.y + pt.oy * LADO * 0.8, z - 0.24 - 0.12 * f);
         c2.strokeStyle = rgba(COR.claro, ((hover >= 0 && hover !== b.k ? 0.12 : 0.85) * Math.sin(Math.PI * f)).toFixed(3)); c2.beginPath(); c2.moveTo(p1[0], p1[1]); c2.lineTo(p2[0], p2[1]); c2.stroke(); }
       /* quem está sob o mouse: testa da frente para o fundo */
       var novo = hoverLinha;
@@ -342,7 +344,7 @@
     cv.addEventListener("mouseleave", function () { rato.dentro = false; rato.x = 0; rato.y = 0; });
     cv.addEventListener("click", function () { if (hover >= 0) ir({cliente: c.cliente, usina: blocos[hover].u.usina, mes: E.mes}); });
     linhas.forEach(function (l, i) { l.addEventListener("mouseenter", function () { hoverLinha = i; }); l.addEventListener("mouseleave", function () { hoverLinha = -1; }); });
-    geo(); foco(); barras();
+    geo(); foco();
     cancelAnimationFrame(ANIMA.id); ANIMA.id = requestAnimationFrame(quadro);
   }
 
@@ -479,8 +481,82 @@
     var barra = document.getElementById("vg-barra");
     if (!barra) return;
     var y = window.scrollY || window.pageYOffset || 0;
-    if (!VOO.aberta && y > ABRE) abrir(barra, sem === true);
-    else if (VOO.aberta && y < FECHA) fechar(barra);
+    if (y > ABRE) { if (!VOO.aberta) abrir(barra, sem === true); if (!PARQUE.voou) voar(sem === true); }
+    else if (y < FECHA) { if (VOO.aberta) fechar(barra); if (PARQUE.voou) voltar(); }
+  }
+  /* ── os blocos que descem e encontram a barra da sua usina (19/11/2026, Levi: "Faça animação de quando eu descer. Essas
+     barras, tipo, descerem e encontrarem cada uma barra, encontrar sua usina") ─────────────────────────────────────────
+     Junto com a barra do alto (ABRE), cada bloco do parque solta uma gota com a tampa dele (a cor da nota): ela CAI na
+     vertical até a altura da linha da usina na tabela, achatando em barra, e DESLIZA até a barra de potência, que enche
+     quando ela chega (e pisca). O bloco fica apagado no parque (`b.fora`). Subindo (FECHA), o caminho de volta: a gota sai
+     da barra, que esvazia, e sobe para o bloco, que acende. As gotas moram no documento (position:absolute em coordenadas
+     da página): quem continua rolando durante o voo as vê chegar no lugar certo. No cliente, a barra de potência começa
+     vazia (o número em MWp ao lado está sempre lá). Uma gota por usina; o intervalo entre elas encolhe para o cliente
+     grande (81 usinas) não esperar 6 segundos. */
+  var PARQUE = {cv: null, blocos: [], linhas: [], voou: false, anims: [], gotas: [], timers: []};
+  function pararGotas() {
+    PARQUE.anims.forEach(function (a) { try { a.cancel(); } catch (e) { /* já terminou */ } });
+    PARQUE.gotas.forEach(function (g) { if (g.parentNode) g.parentNode.removeChild(g); });
+    PARQUE.timers.forEach(clearTimeout);
+    PARQUE.anims = []; PARQUE.gotas = []; PARQUE.timers = [];
+  }
+  function retBloco(b) {
+    var p = b.pol && b.pol[0];
+    if (!PARQUE.cv || !p) return null;
+    var r = PARQUE.cv.getBoundingClientRect(), xs = p.map(function (q) { return q[0]; }), ys = p.map(function (q) { return q[1]; });
+    var x0 = Math.min.apply(null, xs), y0 = Math.min.apply(null, ys);
+    return {x: r.left + window.scrollX + x0, y: r.top + window.scrollY + y0, w: Math.max(4, Math.max.apply(null, xs) - x0), h: Math.max(4, Math.max.apply(null, ys) - y0)};
+  }
+  function retBarra(lin) {
+    var tr = lin && lin.querySelector(".vg-trilho"), i = tr && tr.querySelector("i");
+    if (!i) return null;
+    var r = tr.getBoundingClientRect();
+    return {x: r.left + window.scrollX, y: r.top + window.scrollY, w: Math.max(3, r.width * (parseFloat(i.getAttribute("data-w")) || 0) / 100), h: r.height || 8, i: i};
+  }
+  function largura(i, cheia, brilho) {
+    i.style.transition = "none"; i.style.width = cheia ? i.getAttribute("data-w") : "0"; void i.offsetWidth; i.style.transition = "";
+    if (brilho && i.animate) PARQUE.anims.push(i.animate([{filter: "brightness(2.2)"}, {filter: "none"}], {duration: 650, easing: "ease-out"}));
+  }
+  /* a gota: mora no retângulo de chegada e voa por transform a partir do de saída, passando pelo canto (x do bloco, y da
+     barra); a tampa do bloco é um losango, e o losango vira retângulo no caminho */
+  var LOSANGO = "polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%)", RETANGULO = "polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%)";
+  function gota(de, meio, para, cor1, cor2, de_losango, atraso, ms, aoFim) {
+    var g = document.createElement("i");
+    g.className = "vg-gota"; g.style.left = para.x + "px"; g.style.top = para.y + "px"; g.style.width = para.w + "px"; g.style.height = para.h + "px";
+    document.body.appendChild(g); PARQUE.gotas.push(g);
+    function tr(r) { return "translate(" + (r.x - para.x).toFixed(1) + "px," + (r.y - para.y).toFixed(1) + "px) scale(" + (r.w / para.w).toFixed(4) + "," + (r.h / para.h).toFixed(4) + ")"; }
+    var cai = "cubic-bezier(.55,0,.9,.45)", desliza = "cubic-bezier(.2,.8,.2,1)";
+    var a = g.animate([
+      {transform: tr(de), background: cor1, clipPath: de_losango ? LOSANGO : RETANGULO, opacity: 1, easing: de_losango ? cai : desliza, offset: 0},
+      {transform: tr(meio), background: cor1, clipPath: RETANGULO, opacity: 1, easing: de_losango ? desliza : cai, offset: 0.55},
+      {transform: "none", background: cor2, clipPath: de_losango ? RETANGULO : LOSANGO, opacity: 1, offset: 1}], {duration: ms, delay: atraso, fill: "none"});
+    a.onfinish = function () { if (g.parentNode) g.parentNode.removeChild(g); aoFim(); };
+    PARQUE.anims.push(a);
+  }
+  function voar(sem) {
+    if (!PARQUE.cv || PARQUE.voou) return;
+    pararGotas(); PARQUE.voou = true;
+    var n = PARQUE.blocos.length, passo = Math.min(70, 1100 / Math.max(1, n));
+    PARQUE.blocos.forEach(function (b, k) {
+      var para = retBarra(PARQUE.linhas[k]), de = sem ? null : retBloco(b);
+      if (!para) { b.fora = true; return; }
+      if (!de) { b.fora = true; largura(para.i, true, false); return; }
+      var meio = {x: de.x, y: para.y, w: de.w, h: para.h}, atraso = k * passo;
+      PARQUE.timers.push(setTimeout(function () { b.fora = true; }, atraso));
+      gota(de, meio, para, b.topo, COR.verde, true, atraso, 1050, function () { largura(para.i, true, true); });
+    });
+  }
+  function voltar() {
+    if (!PARQUE.voou) return;
+    pararGotas(); PARQUE.voou = false;
+    var n = PARQUE.blocos.length, passo = Math.min(45, 700 / Math.max(1, n));
+    PARQUE.blocos.forEach(function (b, k) {
+      var de = retBarra(PARQUE.linhas[k]), para = retBloco(b);
+      if (de) largura(de.i, false, false);
+      if (!de || !para) { b.fora = false; return; }
+      var meio = {x: para.x, y: de.y, w: para.w, h: de.h};
+      gota(de, meio, para, COR.verde, b.topo, false, k * passo, 850, function () { b.fora = false; });
+    });
   }
   function pedirEncolher() { if (!VOO.pend) { VOO.pend = true; requestAnimationFrame(encolher); } }
   window.addEventListener("scroll", pedirEncolher, {passive: true});
@@ -497,7 +573,7 @@
     var nivel = u ? "u" : c ? "c" : "p";
     tela.innerHTML = nivel === "u" ? capaUsina(c, u) : nivel === "c" ? capaCliente(c) : capaPortfolio();
     if (nivel !== nivelAntes) { window.scrollTo(0, 0); nivelAntes = nivel; }
-    parar(); VOO.aberta = false; tela.classList.remove("vg-cli-aberta");
+    parar(); VOO.aberta = false; tela.classList.remove("vg-cli-aberta"); pararGotas(); PARQUE.cv = null; PARQUE.voou = false;
     if (nivel === "p") iniciarPotencia(); else if (nivel === "c") { iniciarParque(c); var rolar = +(new URLSearchParams(location.search).get("rolar") || 0); if (rolar) window.scrollTo(0, rolar); encolher(true); } else carregarInsights(u);
   }
   tela.addEventListener("click", function (ev) {

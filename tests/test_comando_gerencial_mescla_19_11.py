@@ -131,3 +131,12 @@ def test_as_explicacoes_de_cada_nivel_moram_no_ponto_de_exclamacao_ao_lado_do_no
     assert "vg-nota" not in JS and "vg-nota" not in CSS
     for texto in ("Cada bloco é uma usina", "O anel reparte", "é uma proposta em teste", "Os insights</b> são os do Nexus Insights"):
         assert texto in JS, texto
+
+
+def test_ao_descer_cada_bloco_desce_e_encontra_a_barra_da_sua_usina():
+    """Levi, 19/11/2026, depois de aprovar a barra do alto: "Faça animação de quando eu descer. Essas barras, tipo,
+    descerem e encontrarem cada uma barra, encontrar sua usina". Ao descer, cada bloco do parque cai até a linha da usina
+    dele na tabela e vira a barra de potência; o bloco fica apagado no parque. Subindo, o caminho de volta."""
+    assert "function voar" in JS and "function voltar" in JS and "vg-gota" in CSS and "b.fora" in JS
+    # no cliente, a barra de potência só enche quando o bloco chega (no portfólio, enche ao abrir, como era)
+    assert JS.count("geo(); foco(); barras();") == 1

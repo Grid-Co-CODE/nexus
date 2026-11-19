@@ -1448,6 +1448,15 @@ Insights".
   animação!"): o scroll só decide abrir ou fechar, e o estado final é de classe (`vg-barra--aberta`, `vg-cli-aberta`). A
   barra é só desenho (`aria-hidden`): o mesmo texto está na capa. Até 1100 px a barra perde a legenda; até 820 px, as
   etiquetas além da 1ª. `&rolar=200` abre a página já descida.
+- **Os blocos que descem até a barra da usina** (Levi, no mesmo dia: "Faça animação de quando eu descer. Essas barras,
+  tipo, descerem e encontrarem cada uma barra, encontrar sua usina"): junto com a barra do alto (`ABRE`), a tampa de cada
+  bloco (a cor da nota, em losango) CAI na vertical até a altura da linha da usina na tabela, vira barra e DESLIZA até a
+  barra de potência, que enche quando ela chega e pisca (`voar`, `gota`). O bloco fica apagado no parque (`b.fora`: sem
+  número e sem a energia). Subindo (`FECHA`), o caminho de volta (`voltar`). As gotas moram no documento
+  (`position:absolute`), então quem rola durante o voo as vê chegar no lugar certo; o intervalo entre elas encolhe no
+  cliente grande. No cliente, a barra de potência começa vazia até o voo (o número em MWp ao lado está sempre lá); no
+  portfólio, enche ao abrir, como era. Provado no Edge comandado (19/11/2026, Athon): as 10 barras cheias depois da
+  descida, nenhuma gota sobrando, vazias de novo ao subir e cheias de novo na 2ª descida.
 - **O "!" ao lado do nome** (Levi: "essas informações poderiam estar em uma exclamação ao lado do nome"): o como ler de
   cada nível (o anel do portfólio, os blocos do cliente, a nota e os insights da usina) e o de onde vem saíram do texto
   solto e foram para o "!" amarelo padrão do Nexus (a mesma marcação do `_explica.html`), ao lado de "Portfólio Grid

@@ -90,6 +90,8 @@
 .vg-trilho{display:inline-block;height:8px;border-radius:4px;background:var(--superficie-2);overflow:hidden;vertical-align:middle}
 .vg-trilho i{display:block;height:100%;background:var(--verde)}
 .vg-lin .vg-trilho i{width:0;transition:width 1.3s cubic-bezier(.2,.7,.2,1)}
+/* a gota que leva a tampa do bloco até a barra da usina (19/11/2026): sem fundo fora do voo (a animação dá a cor) */
+.vg-gota{position:absolute;z-index:5;display:block;border-radius:2px;pointer-events:none;transform-origin:0 0;will-change:transform}
 .vg-seg{display:inline-flex;height:8px;border-radius:4px;overflow:hidden;background:var(--superficie-2);vertical-align:middle}
 .vg-seg i{display:block;height:100%}
 .vg-pt{font-weight:700;font-variant-numeric:lining-nums tabular-nums}
