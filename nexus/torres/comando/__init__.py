@@ -257,9 +257,10 @@ def _usinas_montadas() -> dict:
         nome_para_uid.update({CU._norm(f.get("codigo")): uid for uid, f in cadastro.items() if f.get("codigo")})
         est = ES.atual()
         todos = (lei_ins.dados or {}).get("insights") or []
-        insights = CU.insights_por_usina(todos, est, nome_para_uid)
+        uids = set(cadastro)
+        insights = CU.insights_por_usina(todos, est, nome_para_uid, uids)
         for i in todos:
-            uid = nome_para_uid.get(CU._norm(i.get("usina")))
+            uid = CU.uid_do_insight(i, nome_para_uid, uids)
             if uid and ((est.get(i.get("id")) or {}).get("evento")) != "concluiu":
                 vivos.setdefault(uid, []).append(i)
     sem_luvas = None
