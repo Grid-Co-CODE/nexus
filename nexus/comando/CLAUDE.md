@@ -29,6 +29,7 @@ muito boa"; e "construa o que você sugere"). PRD e tarefas no formato do Taskma
 | `demandas_regras.py` + `demandas.py` + `../torres/comando/demandas_tela.py` | As demandas entre setores (12/11/2026): a regra do prazo e dos avisos, o livro `nexus_demandas` e as telas (o bloco da Caixa, a Nova demanda, os Temas do setor e o sininho); ver a seção abaixo |
 | `carteira_ia.py` + `dossie_cliente.py` | O dossiê da carteira para a Nexus IA do Comando › Usinas e o dossiê do cliente em .md, com as UFVs pontuadas (16/11/2026); ver as seções abaixo |
 | `gerencial.py` + `../torres/comando/gerencial_tela.py` + `comando/gerencial.html` + `static/gerencial.js` e `.css` | A Visão gerencial (teste), 19/11/2026: o portfólio que afunila (portfólio → cliente → usina) e a nota de cumprimento do contrato por usina; ver a seção abaixo |
+| `insights_portfolio.py` + `../torres/comando/insights_tela.py` + `comando/_insights_portfolio.html` + `static/comando-insights.js` | O Comando › Nexus Insights com a Nexus IA no alto e o portfólio em funil (19/11/2026): cliente → porquê → usina → prontuário; ver a seção abaixo |
 | `solicitacoes_fracttal.py` | As solicitações do Fracttal que viraram OS (REST `work_requests`, por trás, a cada 5 min, na memória) e o motivo das OS delas canceladas, para os avisos de quem pediu (11/11/2026); desde 12/11/2026 também o mapa OS → quem pediu, da leitura inteira (~400 dias, 100 por página, uma vez por dia), para o filtro Solicitante do Histórico de OS (`ligar_historico`, o gancho da ponte). Desde 16/11/2026 o solicitante de cada OS sai de um índice montado uma vez por leitura (`_da_leitura`), e a `versao_do_mapa` só muda quando o solicitante de alguma OS muda (ela faz o Histórico refazer as linhas guardadas; com a hora da leitura no lugar, isso era de 5 em 5 min) |
 
 ## As regras da Fase 1 (e de onde cada uma lê)
@@ -1252,6 +1253,59 @@ anual da Athon é comparada com o mês.
 Prova:
 - `tests/test_comando_gerencial_19_11.py`: cada item da nota, o que fica fora, o mês fechado, a garantia, o valor por usina, a montagem, as rondas do mês guardado, a tela, o dados.json (sem nome de pessoa) e o cliente barrado;
 - com o dado real (bancada só de leitura, 19/11/2026): os totais, o valor de cada cliente, as garantias e o valor por usina iguais aos do mockup aprovado; 131 usinas com nota em novembro (média 76).
+
+## O Nexus Insights com a Nexus IA e o portfólio em funil (19/11/2026; `insights_portfolio.py`, `torres/comando/insights_tela.py`)
+
+Pedido do Levi, com o Insights do mockup R18 aberto: "vai mostrar o portfólio, a saúde dos portfólios, como é que está
+sendo o cumprimento, como é que está a pontuação, e aí ele conseguir entender o que está acontecendo e fazer perguntas
+para o Haiku 5.5". A 1ª versão (um tabelão de clientes com KPI grande) ele recusou: "eu quero o chat por cima [...] uns
+KPIs gigantes não serve [...] cliente tal, tá ruim por causa disso. Usina tal. Aí vai ter a opção abrir prontuário da
+usina [...] É funil". Por isso a ordem da tela `/t/comando/insights`, de cima para baixo:
+
+1. **A caixa da Nexus IA** (a mesma `comando/_ia.html`, com `ia_base=/t/comando/insights/ia`): o dossiê da carteira
+   (`carteira_ia`) mais duas seções (`secoes_dossie`, numeradas a partir de 6): o cumprimento do contrato e a saúde por
+   cliente e por usina, com o item que puxa a nota; e os insights abertos do motor (até 60, os críticos primeiro). As
+   instruções (`INSTRUCOES`) mandam não recalcular a nota e citar o mês e o item. O modelo é o de sempre (`IA.padrao`).
+   As perguntas sugeridas (`SUGESTOES`) são na voz de quem cobra, uma por cadeira (Levi: "perguntas que um CEO, que um
+   gerente de contratos, que um head faria, que um supervisor faria [...] Tocando na ferida"): o cliente com mais motivo
+   para reclamar, onde o contrato está sendo descumprido e com que número, as 5 usinas que mais sobem a nota, o que
+   piorou e qual setor responde (por isso a tabela dos insights leva o "Setor dono", a torre da regra), e as usinas sem
+   ronda e as OS urgentes paradas. Pergunta nova só entra se o dossiê de agora a responde.
+2. **O portfólio** (`/t/comando/insights/portfolio`, o pedaço `_insights_portfolio.html`): uma linha de parecer
+   (`_parecer`: a nota do portfólio, os clientes abaixo de 55, os que caíram 5 pontos ou mais), a faixa baixa dos
+   números (cumprimento, abaixo de 55, saúde, insights abertos, tamanho do portfólio) e o funil: à esquerda os clientes
+   do pior cumprimento para o melhor, cada um com a faixa de blocos (uma usina por bloco, na cor da nota) e o item que
+   puxa; à direita o cliente escolhido (o pior abre sozinho) com o porquê em texto (`_motivo_cliente`), a média de cada
+   item da nota nas usinas que o mediram (`_itens_do_cliente`) e as usinas da pior para a melhor, todas numa rolagem fina
+   (a do Nexus) dentro do painel. O painel tem a ALTURA DE 7 CLIENTES da lista (Levi, 19/11/2026: "o mesmo tamanho de 7
+   cards de clientes [...] caso a quantidade de usinas passe, você só bota um scroll"; por isso a linha do cliente tem
+   altura fixa, `--inf-cli`) e fica parado enquanto a lista rola, para o cliente lá de baixo abrir à vista. Cada usina abre com os quatro itens e o que o Nexus mediu, os insights abertos dela (o link leva ao
+   cartão do insight na lista de baixo, `?abrir=`), o **Abrir prontuário** (`/t/campo/usinas/<uid>`) e o **Perguntar à
+   Nexus IA** com a pergunta pronta, que o `comando-insights.js` escreve na caixa do alto e manda.
+3. **A lista do motor de regras**, como era (os números dela agora na mesma altura baixa, `.inf-numeros`).
+
+Regras:
+- A conta é a da Visão gerencial (`gerencial_tela.dados_gerencial`, cópia de 1 minuto): nada se recalcula aqui. O mês é
+  o vigente, parcial até ontem; a comparação é com o mês anterior.
+- **Sem o valor dos contratos** no pedaço e no dossiê da IA (ele é da Visão gerencial, que só o administrador e o setor
+  marcado abrem); o "Ver na Visão gerencial" só aparece para quem a abre (`_pode_gerencial`). Sem nome de pessoa.
+- O porquê só fala do que foi medido: item que nenhuma usina mediu fica fora; usina sem nota diz quantos itens tem.
+- O insight vai ao cliente pelo nome da usina normalizado (sem acento, minúsculo); insight sem usina conhecida conta só
+  no total do alto.
+- Os dois pedaços vêm por trás para a lista do motor abrir na hora: a conta fria do portfólio levou 26 a 30 s no PC
+  (19/11/2026, 144 usinas); o pedaço tem ~480 KB (23 KB com gzip).
+
+Desenho: um nível de superfície (a lista de clientes no fundo, o cliente escolhido é o único cartão, as usinas são
+linhas dentro dele); cor só para estado. A faixa de blocos e as barras dos itens são o desenho do Tracker e do BarList do
+Tremor, feitos à mão (sem biblioteca).
+
+Prova:
+- `tests/test_comando_insights_portfolio.py`: a ordem dos clientes e os totais, o porquê do cliente e da usina, o parecer,
+  as seções do dossiê sem o valor do contrato, a página com os dois pedaços, o funil (o pior aberto, o prontuário, a
+  pergunta pronta) e a pergunta levando o dossiê ampliado;
+- com o dado real (bancada só de leitura, 19/11/2026, sem os contratos e o COS no PC): 144 usinas, 16 clientes, 521,0 MWp;
+  cumprimento 79 (131 com nota, 12 abaixo de 55); Renogrid o pior (50, caiu 6, puxado pelos Prazos de OS e Rotinas);
+  183 insights críticos e 183 de atenção (conferido na contagem do motor: são iguais de fato).
 
 ## Contestações e Prévia: visão do contrato (no Comando desde 12/11/2026)
 

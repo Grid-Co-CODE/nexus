@@ -934,6 +934,13 @@ def carteira_ia_perguntar():
     """JSON {pergunta, modelos, historico} -> {ok, respostas, ...}, como a da usina, com o dossiê da carteira de agora e
     as instruções dela. Cada resposta leva `usinas` ({nome: o prontuário}) das usinas que cita, e cada ação as
     `usinas_ids` dela (os nomes do dossiê e a usina da OS do chamado)."""
+    return _perguntar_carteira()
+
+
+def _perguntar_carteira(extra=None, instrucoes: str | None = None, prefixo: str = "[carteira] "):
+    """A pergunta sobre a carteira (o corpo da rota acima). O Comando › Nexus Insights (19/11/2026) a usa com o dossiê
+    ampliado: `extra` = a função que devolve o texto das seções a mais (chamada só quando a pergunta vai à IA, não na
+    resposta pronta) e `instrucoes` = as dele."""
     from flask import jsonify
 
     from ...comando import carteira_ia as CI
@@ -964,8 +971,9 @@ def carteira_ia_perguntar():
                       "custo_usd": 0.0, "preco_oficial": True, "numeros": {"n": 0, "no_dossie": 0, "fora": []}}]
     else:
         setores = [s["nome"] for s in _ia_setores()]
-        respostas = IA.perguntar(cfg, ids, dz["texto"], pergunta, historico, setores=setores,
-                                 meu_setor=_ia_meu_setor(), instrucoes=CI.INSTRUCOES, pensar=_ia_pensar(b))
+        texto = dz["texto"] + ("\n" + extra() if extra else "")
+        respostas = IA.perguntar(cfg, ids, texto, pergunta, historico, setores=setores,
+                                 meu_setor=_ia_meu_setor(), instrucoes=instrucoes or CI.INSTRUCOES, pensar=_ia_pensar(b))
     for r in respostas:
         if not r.get("ok"):
             continue
@@ -976,7 +984,7 @@ def carteira_ia_perguntar():
             if a.get("os") is not None and str(a["os"]) in dz["os_usina"]:
                 uids.add(dz["os_usina"][str(a["os"])])
             a["usinas_ids"] = sorted(uids)
-    IA.registrar(cfg, 0, "[carteira] " + pergunta, respostas, _meu_hmac(), dz["tokens_estimados"])
+    IA.registrar(cfg, 0, prefixo + pergunta, respostas, _meu_hmac(), dz["tokens_estimados"])
     resp = jsonify(ok=True, respostas=respostas, dossie_tokens=dz["tokens_estimados"], gasto=IA.gasto_do_mes(cfg),
                    teto=teto, relatorios=[])
     resp.headers["Cache-Control"] = "no-store"
@@ -1414,3 +1422,5 @@ from . import demandas_tela  # noqa: E402,F401
 from . import contestacoes_tela  # noqa: E402,F401
 from . import contratos_tela  # noqa: E402,F401
 from . import gerencial_tela  # noqa: E402,F401
+# o Nexus Insights com o portfólio no alto e a Nexus IA (19/11/2026)
+from . import insights_tela  # noqa: E402,F401

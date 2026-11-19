@@ -17,7 +17,12 @@
   {% if erro_estado %}<div class="cn-erro cn-aviso" role="status"><b>Não li os avisos e os retornos agora ({{ erro_estado }}).</b> A lista segue sem eles.</div>{% endif %}
   {% if not tem_login %}<div class="cn-erro cn-aviso" role="status">Entre com o seu login (Microsoft ou Fracttal) para notificar, responder e assumir: a senha de administrador não diz quem é a pessoa.</div>{% endif %}
 
-  <div class="cn-numeros">
+  {# a Nexus IA no alto e o portfólio em funil logo abaixo (19/11/2026, Levi: "eu quero o chat por cima [...] aí tem os
+     KPIs, tem explicando o que está acontecendo com cada usina [...] É funil"): vêm por trás (comando-insights.js) #}
+  <div class="cmu-ia inf-ia" data-ins-pedaco="{{ raiz }}/t/comando/insights/ia"></div>
+  <div data-ins-pedaco="{{ raiz }}/t/comando/insights/portfolio"><p class="mudo ins-lendo">Lendo o portfólio…</p></div>
+  <h2 class="ins-sub" id="ins-lista">Insights do motor de regras</h2>
+  <div class="cn-numeros inf-numeros">
     {% for k, s in severidades.items() %}
     <a href="?sev={{ k }}"{% if sev == k %} aria-current="page"{% endif %}><span class="gc-rotulo">{{ s[0] }}s</span><span class="v">{{ contas[k] }}</span><span class="d">{{ s[2] }}</span></a>
     {% endfor %}
@@ -55,4 +60,6 @@
 </div>
 <script src="{{ url_for('static', filename='comando/conversa.js') }}" defer></script>
 <script src="{{ url_for('static', filename='comando/insights.js') }}" defer></script>
+<script src="{{ url_for('static', filename='comando-insights.js') }}" defer></script>
+<script src="{{ url_for('static', filename='comando/ia.js') }}" defer></script>
 {% endblock %}

@@ -121,11 +121,18 @@ def visao_gerencial():
 @bp.route("/visao-gerencial/dados.json")
 def visao_gerencial_dados():
     """O portfólio de agora: clientes, usinas, o contrato de cada cliente e a nota de cada usina em cada mês do filtro."""
+    _so_interno()
+    resp = jsonify(dados_gerencial())
+    resp.headers["Cache-Control"] = "no-store"
+    return resp
+
+
+def dados_gerencial() -> dict:
+    """O portfólio de agora (`gerencial.montar`), na cópia de 1 minuto por aplicação: a conta junta cinco fontes (1,5 s
+    com todas quentes, medido na bancada em 19/11/2026) e não muda de pessoa para pessoa (não leva nome nem o que cada um
+    pode editar). O Comando › Nexus Insights lê a mesma cópia (19/11/2026), sem o valor dos contratos."""
     from ...campo import visao
     from ...comando import gerencial as G
-    _so_interno()
-    # a cópia de 1 minuto, por aplicação: a conta junta cinco fontes (1,5 s com todas quentes, medido na bancada em
-    # 19/11/2026) e não muda de pessoa para pessoa (não leva nome nem o que cada um pode editar)
     copia = current_app.extensions.setdefault("nexus_gerencial", {})
     if not copia.get("dados") or time.time() - copia.get("ts", 0) > COPIA_S:
         agora = visao._agora()
@@ -134,6 +141,4 @@ def visao_gerencial_dados():
         if aviso:
             avisos.append(aviso)
         copia.update(dados=G.montar(usinas, contratos, agora.date(), agora.strftime("%d/%m/%Y às %H:%M"), avisos), ts=time.time())
-    resp = jsonify(copia["dados"])
-    resp.headers["Cache-Control"] = "no-store"
-    return resp
+    return copia["dados"]

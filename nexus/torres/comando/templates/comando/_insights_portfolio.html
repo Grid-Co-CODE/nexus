@@ -1,0 +1,131 @@
+{# O portfólio do Comando › Nexus Insights, em funil (19/11/2026). Levi, com o Insights do mockup R18: "vai mostrar o
+   portfólio, a saúde dos portfólios, como é que está sendo o cumprimento, como é que está a pontuação"; e, vendo a 1ª
+   versão (um tabelão com KPI grande): "a ideia é o quê? Ó, cliente tal, tá ruim por causa disso. Usina tal. Aí vai ter
+   a opção abrir prontuário da usina [...] É funil. Vamos afunilando a pessoa que tá vendo".
+   Então: uma linha de parecer, os números numa faixa baixa, e o funil — à esquerda os clientes do pior cumprimento para
+   o melhor (a faixa de blocos é uma usina cada, na cor da nota); à direita o cliente escolhido, na altura de 7 clientes
+   da lista (Levi: "o mesmo tamanho de 7 cards de clientes [...] caso a quantidade de usinas passe, você só bota um
+   scroll"): o porquê em texto, a
+   média de cada item da nota e as usinas, cada uma com o porquê, os insights abertos, o "Abrir prontuário" e a pergunta
+   pronta para a Nexus IA (que fica no alto da página). A conta é a da Visão gerencial (nexus/comando/insights_portfolio.py),
+   sem o valor dos contratos. Vem por trás (comando-insights.js), que também troca o cliente e manda a pergunta. #}
+{% macro n1(v) %}{% if v is none %}—{% else %}{{ '{:,.1f}'.format(v).replace(',', 'X').replace('.', ',').replace('X', '.') }}{% endif %}{% endmacro %}
+{% macro delta(d, desde='') %}{% if d %}<span class="ins-delta ins-delta--{{ 'cai' if d < 0 else 'sobe' }}" title="{{ 'Caiu' if d < 0 else 'Subiu' }} {{ d|abs }} desde {{ desde }}">{{ '↓' if d < 0 else '↑' }}{{ d|abs }}</span>{% endif %}{% endmacro %}
+{% macro usina(u, r) %}
+            <li><details class="inf-us">
+              <summary>
+                <i class="inf-ponto inf-fundo--{{ u.tom }}" aria-hidden="true"></i>
+                <span class="inf-us-nome">{{ u.usina }}</span>
+                <span class="inf-us-nota">{% if u.nota is none %}<span class="mudo">—</span>{% else %}<b class="gc-num ins-tom--{{ u.tom }}">{{ u.nota }}</b>{{ delta(u.delta, r.mes_ant) }}{% endif %}</span>
+                <span class="inf-us-motivo">{{ u.motivo }}</span>
+                <span class="inf-us-ins">{% if u.criticos %}<span class="inf-tag inf-tag--critico">{{ u.criticos }} crítico{{ 's' if u.criticos != 1 }}</span>{% endif %}{% if u.atencao %}<span class="inf-tag inf-tag--alerta">{{ u.atencao }} atenção</span>{% endif %}</span>
+                <i class="ph ph-caret-down inf-seta" aria-hidden="true"></i>
+              </summary>
+              <div class="inf-us-corpo">
+                <dl class="inf-us-itens">
+                  {% for i in u.itens %}
+                  <div><dt>{{ i.nome }}</dt><dd>{% if i.nota is none %}<b class="mudo">fora</b>{% else %}<b class="gc-num ins-tom--{{ i.tom }}">{{ i.nota }}</b>{% endif %}<span>{{ i.mediu }}</span></dd></div>
+                  {% endfor %}
+                </dl>
+                {% if u.insights %}
+                <ul class="inf-us-lista" aria-label="Insights abertos">
+                  {% for i in u.insights[:5] %}
+                  <li><span class="inf-tag inf-tag--{{ {'critico': 'critico', 'atencao': 'alerta'}.get(i.sev, 'neutro') }}">{{ {'critico': 'crítico', 'atencao': 'atenção'}.get(i.sev, 'info') }}</span>
+                    <span><a href="?abrir={{ i.id|urlencode }}#ins-{{ i.id|replace(':', '-') }}">{{ i.titulo or i.regra_nome }}</a>
+                    {% if i.acao %}<small>{{ i.acao }}</small>{% endif %}</span></li>
+                  {% endfor %}
+                  {% if u.insights|length > 5 %}<li class="mudo">e mais {{ u.insights|length - 5 }} na lista abaixo</li>{% endif %}
+                </ul>
+                {% endif %}
+                <div class="inf-acoes">
+                  {% if u.uid %}<a class="gc-btn gc-btn--ui gc-btn--primario" href="{{ raiz }}/t/campo/usinas/{{ u.uid }}"><i class="ph ph-file-text" aria-hidden="true"></i> Abrir prontuário</a>{% endif %}
+                  <button type="button" class="gc-btn gc-btn--ui gc-btn--contorno" data-inf-perguntar="{% if u.nota is none %}O que falta para a usina {{ u.usina }} ter nota de cumprimento do contrato em {{ r.mes }}?{% else %}Por que a usina {{ u.usina }} está com {{ u.nota }} de cumprimento do contrato em {{ r.mes }}? O que fazer primeiro?{% endif %}"><i class="ph ph-sparkle" aria-hidden="true"></i> Perguntar à Nexus IA</button>
+                </div>
+              </div>
+            </details></li>
+{% endmacro %}
+{% if not r.ok %}
+<div class="cn-erro cn-aviso" role="status"><span>Não montei o portfólio agora ({{ r.erro }}). A lista dos insights abaixo vale.</span></div>
+{% else %}{% set t = r.totais %}
+<section class="inf" aria-label="Portfólio">
+  <div class="inf-cab">
+    <h2>Portfólio</h2>
+    <span class="mudo">Cumprimento do contrato de {{ r.mes }}, até ontem{% if r.gerado %} · conta de {{ r.gerado }}{% endif %}</span>
+  </div>
+  <p class="inf-parecer">{{ r.parecer }}</p>
+  {% if r.avisos %}<p class="mudo inf-aviso">Sem leitura agora: {{ r.avisos|join('; ') }}. O resto vale.</p>{% endif %}
+
+  <dl class="inf-kpis">
+    <div><dt>Cumprimento do contrato</dt>
+      <dd><b class="gc-num ins-tom--{{ t.tom }}">{{ t.nota if t.nota is not none else '—' }}</b>
+        {% if t.nota is not none %}<span class="inf-barra" aria-hidden="true"><i class="inf-fundo--{{ t.tom }}" style="width:{{ t.nota }}%"></i></span>{% endif %}
+        <small>{{ t.em_dia }} de {{ t.com_nota }} usinas em dia</small></dd></div>
+    <div><dt>Abaixo de 55</dt>
+      <dd><b class="gc-num{% if t.abaixo %} ins-tom--critico{% endif %}">{{ t.abaixo }}</b><small>usina{{ 's' if t.abaixo != 1 }} em risco no contrato</small></dd></div>
+    <div><dt>Saúde</dt>
+      <dd><b class="gc-num ins-tom--{{ t.saude_tom }}">{{ t.saude if t.saude is not none else '—' }}</b>
+        {% if t.saude is not none %}<span class="inf-barra" aria-hidden="true"><i class="inf-fundo--{{ t.saude_tom }}" style="width:{{ t.saude }}%"></i></span>{% endif %}
+        <small>{{ t.em_risco }} usina{{ 's' if t.em_risco != 1 }} em risco</small></dd></div>
+    <div><dt>Insights abertos</dt>
+      <dd><a class="inf-kpi-link" href="?sev=critico#ins-lista"><b class="gc-num{% if t.criticos %} ins-tom--critico{% endif %}">{{ t.criticos }}</b><small>críticos · {{ t.atencao }} de atenção</small></a></dd></div>
+    <div><dt>Portfólio</dt>
+      <dd><b class="gc-num">{{ t.usinas }}</b><small>usinas · {{ t.clientes }} clientes · {{ n1(t.mwp) }} MWp</small></dd></div>
+  </dl>
+
+  <div class="inf-funil">
+    <div class="inf-funil-cab">
+      <h3>Onde aperta</h3>
+      <span class="mudo">Do pior cliente para o melhor. Escolha um para descer até a usina e abrir o prontuário.</span>
+    </div>
+    <div class="inf-grade">
+      <ol class="inf-clientes" aria-label="Clientes">
+        {% for c in r.clientes %}
+        <li><button type="button" class="inf-cli" data-inf-cli="inf-p-{{ loop.index }}" aria-controls="inf-p-{{ loop.index }}" aria-pressed="{{ 'true' if loop.first else 'false' }}">
+          <span class="inf-cli-l1"><span class="inf-cli-nome">{{ c.cliente }}</span>
+            <span class="inf-cli-nota">{% if c.nota is none %}<span class="mudo">sem nota</span>{% else %}<b class="gc-num ins-tom--{{ c.tom }}">{{ c.nota }}</b>{{ delta(c.delta, r.mes_ant) }}{% endif %}</span></span>
+          <span class="inf-trilha" aria-hidden="true">{% for u in c.usinas %}<i class="inf-fundo--{{ u.tom }}"></i>{% endfor %}</span>
+          <span class="inf-cli-l3">{% if c.puxa %}{{ c.puxa.nome }} puxa ({{ c.puxa.media }}){% elif c.nota is none %}falta dado medido{% else %}em dia{% endif %}{% if c.abaixo %} · {{ c.abaixo }} abaixo de 55{% endif %}{% if c.criticos %} · <span class="ins-tom--critico">{{ c.criticos }} crítico{{ 's' if c.criticos != 1 }}</span>{% endif %}</span>
+        </button></li>
+        {% endfor %}
+      </ol>
+
+      <div class="inf-paineis">
+        {% for c in r.clientes %}
+        <article class="inf-painel" id="inf-p-{{ loop.index }}" aria-label="{{ c.cliente }}"{% if not loop.first %} hidden{% endif %}>
+          <header class="inf-p-cab">
+            <div>
+              <h3>{{ c.cliente }}</h3>
+              <p class="mudo">{{ c.usinas_n }} usina{{ 's' if c.usinas_n != 1 }} · {{ n1(c.mwp) }} MWp{% if c.saude is not none %} · saúde <span class="ins-tom--{{ c.saude_tom }}">{{ c.saude }}</span>{% endif %}</p>
+            </div>
+            <div class="inf-p-nota">
+              {% if c.nota is none %}<b class="mudo">—</b>{% else %}<b class="gc-num ins-tom--{{ c.tom }}">{{ c.nota }}</b>{% endif %}
+              <span>cumprimento do contrato em {{ r.mes }}{% if c.delta %}<br>{{ delta(c.delta, r.mes_ant) }} desde {{ r.mes_ant }}{% elif c.nota_ant is not none %}<br>{{ c.nota_ant }} em {{ r.mes_ant }}{% endif %}</span>
+            </div>
+          </header>
+          <p class="inf-porque">{{ c.motivo }}</p>
+          {% if c.itens %}
+          <ul class="inf-itens" aria-label="A média de cada item da nota">
+            {% for i in c.itens %}
+            <li><span class="inf-item-nome">{{ i.nome }}</span>
+              <span class="inf-barra inf-barra--larga" aria-hidden="true"><i class="inf-fundo--{{ i.tom }}" style="width:{{ i.media }}%"></i></span>
+              <b class="gc-num ins-tom--{{ i.tom }}">{{ i.media }}</b><small class="mudo">em {{ i.n }}</small></li>
+            {% endfor %}
+          </ul>
+          {% endif %}
+          <div class="inf-acoes">
+            <button type="button" class="gc-btn gc-btn--ui gc-btn--contorno" data-inf-perguntar="{% if c.nota is none %}O que falta para o cliente {{ c.cliente }} ter nota de cumprimento do contrato em {{ r.mes }}?{% else %}Por que o cliente {{ c.cliente }} está com {{ c.nota }} de cumprimento do contrato em {{ r.mes }}? O que fazer primeiro?{% endif %}"><i class="ph ph-sparkle" aria-hidden="true"></i> Perguntar à Nexus IA</button>
+            {% if pode_gerencial %}<a class="gc-btn gc-btn--ui gc-btn--fantasma" href="{{ raiz }}/t/comando/visao-gerencial?cliente={{ c.cliente|urlencode }}">Ver na Visão gerencial</a>{% endif %}
+          </div>
+
+          <h4 class="inf-us-tit">Usinas, da pior para a melhor <span class="mudo">· {{ c.usinas|length }}</span></h4>
+          {# a altura do painel é a de 7 clientes da lista (Levi, 19/11/2026); passou disso, as usinas rolam aqui dentro #}
+          <div class="inf-p-rolagem" tabindex="0" aria-label="Usinas de {{ c.cliente }}">
+            <ul class="inf-usinas">{% for u in c.usinas %}{{ usina(u, r) }}{% endfor %}</ul>
+          </div>
+        </article>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</section>
+{% endif %}

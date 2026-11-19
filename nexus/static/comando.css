@@ -960,3 +960,141 @@ a.ins-titulo:hover{color:var(--verde-texto)}
 .ia-rel-txt{margin:0;font-size:13.5px}
 .ia-rel-estado{margin:0;font-size:12.5px}
 @media (max-width:640px){.ia-acao{grid-template-columns:minmax(0,1fr)}.ia-demanda{grid-template-columns:minmax(0,1fr)}}
+
+/* Comando › Nexus Insights em funil (19/11/2026, comando/_insights_portfolio.html). Levi: "eu quero o chat por cima [...]
+   uns KPIs gigantes não serve [...] cliente tal, tá ruim por causa disso. Usina tal. Aí vai ter a opção abrir prontuário
+   [...] É funil". Um nível de superfície: a lista de clientes direto no fundo, o cliente escolhido é o único cartão, e
+   dentro dele as usinas são linhas (nada de cartão dentro de cartão). Cor só para estado: a nota, a barra e o bloco de
+   cada usina na faixa (o desenho do Tracker e do BarList do Tremor, sem a biblioteca). */
+.ins-tom--ok{color:var(--ok)}
+.ins-tom--alerta{color:var(--alerta)}
+.ins-tom--critico{color:var(--critico)}
+.ins-tom--neutro{color:var(--mudo)}
+.inf-fundo--ok{background:var(--ok)}
+.inf-fundo--alerta{background:var(--alerta)}
+.inf-fundo--critico{background:var(--critico)}
+.inf-fundo--neutro{background:var(--linha-forte)}
+.ins-delta{margin-left:4px;font:600 12px/1 var(--font-sans);white-space:nowrap;font-variant-numeric:tabular-nums}
+.ins-delta--cai{color:var(--critico)}
+.ins-delta--sobe{color:var(--ok)}
+.ins-lendo{margin:18px 0 0;font-size:12.5px}
+
+.inf-ia{margin:18px 0 0}
+.inf{margin:22px 0 6px}
+.inf-cab{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+.inf-cab h2{margin:0;font:600 16px/22px var(--font-sans);color:var(--tinta)}
+.inf-cab .mudo,.inf-aviso{font-size:12.5px}
+.inf-parecer{margin:6px 0 0;max-width:92ch;font-size:14px;line-height:21px;color:var(--tinta-2)}
+.inf-aviso{margin:6px 0 0}
+
+/* a faixa dos números: baixa, numa linha, o número na cor da régua e a barra contra 100 */
+.inf-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));margin:14px 0 0;
+  border-top:1px solid var(--linha);border-bottom:1px solid var(--linha)}
+.inf-kpis > div{padding:10px 16px 11px;border-left:1px solid var(--linha);min-width:0}
+.inf-kpis > div:first-child{border-left:0;padding-left:0}
+.inf-kpis dt{font-size:12px;line-height:16px;color:var(--mudo)}
+.inf-kpis dd{margin:3px 0 0;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.inf-kpis b{font:600 20px/24px var(--font-sans);letter-spacing:-.01em}
+.inf-kpis small{flex-basis:100%;font-size:12px;line-height:16px;color:var(--mudo)}
+.inf-kpis .inf-barra{flex:1 1 60px;max-width:110px}
+.inf-kpi-link{display:flex;align-items:center;gap:8px;flex-wrap:wrap;color:inherit;text-decoration:none}
+.inf-kpi-link:hover small{color:var(--tinta)}
+.inf-barra{display:block;height:6px;border-radius:999px;background:var(--superficie-3);overflow:hidden}
+.inf-barra > i{display:block;height:100%;border-radius:inherit}
+
+/* o funil: clientes à esquerda, o escolhido à direita */
+.inf-funil{margin:22px 0 0}
+.inf-funil-cab{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin:0 0 10px}
+.inf-funil-cab h3{margin:0;font:600 15px/20px var(--font-sans);color:var(--tinta)}
+.inf-funil-cab .mudo{font-size:12.5px}
+/* a linha do cliente tem altura fixa: o painel ao lado mede 7 delas (Levi, 19/11/2026: "o mesmo tamanho de 7 cards de
+   clientes") e fica parado enquanto a lista rola, para o cliente lá de baixo abrir à vista */
+.inf-grade{--inf-cli:84px;display:grid;grid-template-columns:minmax(250px,320px) minmax(0,1fr);gap:18px;align-items:start}
+.inf-clientes{list-style:none;margin:0;padding:0;border-top:1px solid var(--linha)}
+.inf-clientes > li{border-bottom:1px solid var(--linha)}
+.inf-cli{display:grid;gap:6px;align-content:center;box-sizing:border-box;width:100%;height:var(--inf-cli);
+  padding:8px 12px 8px 14px;border:0;background:transparent;color:inherit;
+  text-align:left;cursor:pointer;font:inherit;box-shadow:inset 3px 0 0 transparent}
+.inf-cli:hover{background:var(--superficie)}
+.inf-cli[aria-pressed="true"]{background:var(--superficie);box-shadow:inset 3px 0 0 var(--verde)}
+.inf-cli:focus-visible{outline:2px solid var(--foco);outline-offset:-2px}
+.inf-cli-l1{display:flex;align-items:baseline;gap:8px}
+.inf-cli-nome{flex:1;min-width:0;font:600 14px/19px var(--font-sans);color:var(--tinta);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.inf-cli-nota b{font:600 16px/19px var(--font-sans)}
+.inf-cli-nota .mudo{font-size:12px}
+.inf-trilha{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(1px,9px);gap:2px;height:14px;overflow:hidden}
+.inf-trilha > i{border-radius:2px}
+.inf-cli-l3{font-size:12px;line-height:16px;color:var(--mudo);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+.inf-paineis{position:sticky;top:calc(var(--topo, 56px) + 12px)}
+.inf-painel{display:flex;flex-direction:column;box-sizing:border-box;height:calc(7 * (var(--inf-cli) + 1px));
+  padding:16px 18px 0;border:1px solid var(--linha);
+  border-radius:var(--raio-md);background:var(--superficie)}
+.inf-painel[hidden]{display:none}
+.inf-painel > *{flex:none}
+/* a rolagem das usinas, a do Nexus (fina, na cor --rolagem do nexus.css) */
+.inf-painel > .inf-p-rolagem{flex:1 1 auto;min-height:0;overflow-y:auto;margin:6px -18px 0;padding:0 18px 12px;
+  scrollbar-width:thin;scrollbar-color:var(--rolagem) transparent;overscroll-behavior:contain}
+.inf-p-rolagem:focus-visible{outline:2px solid var(--foco);outline-offset:-2px}
+.inf-p-rolagem .inf-usinas{margin:0}
+.inf-p-cab{display:flex;justify-content:space-between;gap:16px;align-items:flex-start}
+.inf-p-cab h3{margin:0;font:600 18px/24px var(--font-sans);color:var(--tinta)}
+.inf-p-cab p{margin:2px 0 0;font-size:12.5px}
+.inf-p-nota{display:flex;align-items:center;gap:10px;text-align:right}
+.inf-p-nota b{font:600 30px/32px var(--font-sans);letter-spacing:-.02em}
+.inf-p-nota span{font-size:12px;line-height:16px;color:var(--mudo);text-align:left}
+.inf-porque{margin:12px 0 0;max-width:80ch;font-size:14px;line-height:21px;color:var(--tinta)}
+.inf-itens{list-style:none;margin:14px 0 0;padding:0;display:grid;gap:8px;max-width:620px}
+.inf-itens li{display:grid;grid-template-columns:130px minmax(0,1fr) 32px 52px;align-items:center;gap:10px;font-size:13px}
+.inf-item-nome{color:var(--tinta-2)}
+.inf-itens b{text-align:right;font-weight:600}
+.inf-itens small{font-size:11.5px}
+.inf-acoes{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0 0}
+.inf-us-tit{margin:18px 0 0;font:600 13px/18px var(--font-sans);color:var(--mudo)}
+.inf-us-tit .mudo{font-weight:400}
+.inf-usinas{list-style:none;margin:6px 0 0;padding:0}
+.inf-usinas > li{border-top:1px solid var(--linha)}
+.inf-us > summary{display:grid;grid-template-columns:10px minmax(120px,190px) 64px minmax(0,1fr) auto 16px;align-items:center;
+  gap:10px;padding:10px 2px;cursor:pointer;list-style:none}
+.inf-us > summary::-webkit-details-marker{display:none}
+.inf-us > summary:hover .inf-us-nome{color:var(--verde-texto)}
+.inf-us > summary:focus-visible{outline:2px solid var(--foco);outline-offset:2px}
+.inf-ponto{width:8px;height:8px;border-radius:50%}
+.inf-us-nome{font:600 13.5px/18px var(--font-sans);color:var(--tinta);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.inf-us-nota b{font-weight:600}
+.inf-us-motivo{font-size:12.5px;line-height:17px;color:var(--tinta-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.inf-us-ins{display:flex;gap:4px}
+.inf-seta{color:var(--mudo)}
+.inf-us[open] .inf-seta{transform:rotate(180deg)}
+.inf-us[open] .inf-us-motivo{white-space:normal}
+.inf-tag{display:inline-block;padding:2px 7px;border-radius:var(--raio-tag);font:600 11px/15px var(--font-sans);white-space:nowrap}
+.inf-tag--critico{color:var(--critico);background:var(--critico-suave)}
+.inf-tag--alerta{color:var(--alerta);background:var(--alerta-suave)}
+.inf-tag--neutro{color:var(--mudo);background:var(--superficie-2)}
+.inf-us-corpo{padding:2px 0 14px 20px}
+.inf-us-itens{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px 18px;margin:0}
+.inf-us-itens dt{font-size:12px;color:var(--mudo)}
+.inf-us-itens dd{margin:2px 0 0;display:flex;gap:8px;align-items:baseline;font-size:12.5px;line-height:17px;color:var(--tinta-2)}
+.inf-us-itens dd b{font:600 15px/18px var(--font-sans);min-width:26px}
+.inf-us-lista{list-style:none;margin:12px 0 0;padding:0;display:grid;gap:6px;font-size:13px}
+.inf-us-lista li{display:grid;grid-template-columns:64px minmax(0,1fr);gap:8px;align-items:baseline}
+.inf-us-lista .inf-tag{justify-self:start}
+.inf-us-lista a{color:var(--tinta);font-weight:500;text-decoration:none}
+.inf-us-lista a:hover{color:var(--verde-texto);text-decoration:underline}
+.inf-us-lista small{display:block;margin-top:2px;font-size:12px;line-height:16px;color:var(--mudo)}
+
+/* os números do motor de regras, na mesma altura baixa da faixa do portfólio */
+.inf-numeros .v{font-size:20px;line-height:24px}
+.inf-numeros > a,.inf-numeros > span{padding:10px 16px}
+
+@media (max-width:900px){
+  .inf-grade{grid-template-columns:minmax(0,1fr)}
+  .inf-paineis{position:static}
+  .inf-painel{height:auto;padding-bottom:6px}
+  .inf-painel > .inf-p-rolagem{overflow:visible;margin:6px 0 0;padding:0}
+  .inf-us > summary{grid-template-columns:10px minmax(0,1fr) auto 16px}
+  .inf-us-motivo,.inf-us-ins{grid-column:2 / -1}
+  .inf-itens li{grid-template-columns:110px minmax(0,1fr) 32px}
+  .inf-itens small{display:none}
+  .inf-kpis > div:first-child{padding-left:16px}
+}
