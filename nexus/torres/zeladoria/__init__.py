@@ -12,6 +12,7 @@ Até a troca a torre só lê: quem edita é o Radar, e a cópia do Supabase roda
 `docs/superpowers/specs/2026-11-03-zeladoria-no-nexus-design.md`.
 """
 import json
+import logging
 import re
 from pathlib import Path
 
@@ -19,6 +20,7 @@ from flask import (Response, abort, current_app, jsonify, redirect, render_templ
                    url_for)
 
 from ...casca import tema_do_pedido
+from ...dados import textos_reservados as TR
 from ...prefixo import na_raiz
 from ...zeladoria import gravacao, leitura
 from ...zeladoria.tabelas import TabelaDesconhecida
@@ -64,9 +66,14 @@ TORRE = Torre(
 )
 
 bp = TORRE.criar_blueprint(__name__)
+log = logging.getLogger(__name__)
 
 CLONE = Path(__file__).resolve().parent / "clone" / "radar.html"
-_CLONE = {"texto": None, "tokens": None}
+_CLONE = {"texto": None, "tokens": None, "fichas": [], "marca": None, "restaurado": None, "faltam": []}
+# os textos reservados do clone (19/11/2026, Levi: "`radar.html`: o valor de contrato e as citações de clientes passam a
+# vir do banco, por uma rota que exige login"): o arquivo versionado guarda fichas, e o texto de cada uma mora cifrado no
+# livro `nexus_textos_reservados` (nexus/dados/textos_reservados.py). A página servida é a de antes, caractere por caractere
+AREA_RESERVADA = "zeladoria_radar"
 NEXUS_CSS = Path(__file__).resolve().parents[2] / "static" / "nexus.css"
 # os seletores dos tokens no nexus.css e o que eles viram dentro do clone: o atributo do Radar (data-theme, que o
 # <html> do clone sempre tem) dá a força para vencer o CSS do clone, e o data-tema="claro" do Nexus escolhe o claro
@@ -115,11 +122,30 @@ for _t in TORRE.telas:
     bp.add_url_rule(f"/{_t.id}", f"tela_{_t.id.replace('-', '_')}", _tela(_t.id))
 
 
-@bp.route("/app")
-def app_radar():
-    """O clone, com a configuração e a ponte nos dois marcadores (ver clone/ORIGEM.md)."""
+def _clone_restaurado() -> tuple:
+    """(o clone com cada ficha trocada pelo texto reservado do banco, as fichas que ficaram sem texto). Refaz só quando
+    os textos mudam (a leitura do banco tem cópia de 5 minutos). Sem leitura boa do banco, o clone sai com as fichas e a
+    rota avisa no cabeçalho: a ficha à vista é melhor do que um texto inventado, e a página seguinte tenta de novo."""
     if _CLONE["texto"] is None:
         _CLONE["texto"] = CLONE.read_text(encoding="utf-8")
+        _CLONE["fichas"] = TR.fichas_em(_CLONE["texto"])
+    lido = TR.ler(AREA_RESERVADA)
+    textos = lido["textos"]
+    marca = hash(tuple(sorted(textos.items())))
+    if _CLONE["marca"] != marca or _CLONE["restaurado"] is None:
+        faltam = [f for f in _CLONE["fichas"] if f not in textos]
+        if faltam:
+            log.error("Zeladoria: %s ficha(s) do clone sem texto reservado no banco (%s)%s", len(faltam),
+                      ", ".join(faltam[:6]), f"; leitura: {lido['erro']}" if lido.get("erro") else "")
+        _CLONE["restaurado"], _CLONE["faltam"] = TR.restaurar(_CLONE["texto"], textos), faltam
+        _CLONE["marca"] = marca
+    return _CLONE["restaurado"], _CLONE["faltam"]
+
+
+@bp.route("/app")
+def app_radar():
+    """O clone, com os textos reservados de volta, a configuração e a ponte nos dois marcadores (ver clone/ORIGEM.md)."""
+    clone, faltam = _clone_restaurado()
     aba = request.args.get("aba")
     if aba not in ABAS.values():
         aba = "overview"
@@ -148,10 +174,13 @@ def app_radar():
              f'<link rel="stylesheet" href="{url_for("static", filename="zeladoria/filtros.css")}">\n'
              f'<script src="{url_for("static", filename="zeladoria/filtros.js")}"></script>')
     atributos = f'data-theme="{tema}"' + (' data-tema="claro"' if claro else "")
-    html = (_CLONE["texto"].replace('<html lang="pt-BR">', f'<html lang="pt-BR" {atributos}>', 1)
+    html = (clone.replace('<html lang="pt-BR">', f'<html lang="pt-BR" {atributos}>', 1)
             .replace('<style id="zeladoria-paleta">', tokens_do_nexus() + '<style id="zeladoria-paleta">', 1)
             .replace("<!--ZELADORIA:CONFIG-->", config).replace("<!--ZELADORIA:PONTE-->", ponte))
-    return Response(html, mimetype="text/html", headers={"Cache-Control": "no-store"})
+    cab = {"Cache-Control": "no-store"}
+    if faltam:
+        cab["X-Nexus-Textos-Reservados"] = f"faltam {len(faltam)}"
+    return Response(html, mimetype="text/html", headers=cab)
 
 
 def _quem(est):

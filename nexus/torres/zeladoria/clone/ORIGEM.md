@@ -26,6 +26,12 @@ programa: o HEAD da zeladoria; ver "Como entregar" no `CLAUDE.md` da torre). A f
 - **O e-mail de exemplo do login** virou `voce@empresa.com.br`.
 - **O visual da Zeladoria (etapa 3):** a paleta com as três cores, as fontes do Nexus, as cores fixas viradas variável, sem emoji, o tema vindo do Nexus e as regras de tela estreita (`vestir`).
 
+## Os textos reservados (19/11/2026)
+
+Os nomes de cliente e de fornecedor e os valores deste arquivo viraram fichas; o texto de cada uma mora cifrado no banco do
+Nexus, e a rota com login o devolve (ver "Os textos reservados do clone" no `CLAUDE.md` da torre). O Radar original, com os
+nomes, segue fora do repositório.
+
 ## Rodar de novo
 
 Só se o Radar voltar a ser editado fora do Nexus (depois de 11/11 não há por quê; editar o clone direto e depois rodar a

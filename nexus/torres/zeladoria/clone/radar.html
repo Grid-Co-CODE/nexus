@@ -756,20 +756,20 @@ var state = { fornecedores: [], cotacoes: [], periodos: [], log: [], lixeiraUi: 
    total/meta/projeção/mês-a-mês do Financeiro principal (reporte à parte). */
 var FORMAS_PAGAMENTO_EQUIPE = ['Pix diária', 'Paytrack', 'Cartão Clara', 'Cartão Caju', 'Pix ou Boleto Faturado'];
 /* Formas de pagamento da Simulação de gastos futuros (pedido pontual, 2026-09) — soma as formas
-   da Equipe + "Grid"/"Thopen" (mesmo "via" do financeiro de Terceirizados) + uma opção "Outra
+   da Equipe + "Grid"/"Zlcliente01" (mesmo "via" do financeiro de Terceirizados) + uma opção "Outra
    (especificar)" que libera um campo de texto livre (`sgj-forma-outra`) pra forma que não estiver
    em nenhuma lista fixa. Só usada na Simulação — não mexe em `FORMAS_PAGAMENTO_EQUIPE` (Gastos do
    Equipe de verdade continua com as 5 formas de sempre). */
 var FORMA_SIMULACAO_OUTRA = 'Outra (especificar)';
-var FORMAS_SIMULACAO_GASTO_EQUIPE = FORMAS_PAGAMENTO_EQUIPE.concat(['Grid', 'Thopen', FORMA_SIMULACAO_OUTRA]);
+var FORMAS_SIMULACAO_GASTO_EQUIPE = FORMAS_PAGAMENTO_EQUIPE.concat(['Grid', 'Zlcliente01', FORMA_SIMULACAO_OUTRA]);
 /* Mesma Simulação, agora também em "Mês a mês - Terceirizados" (pedido pontual, 2026-09-29).
    Um "escopo" por tela — cada um com sua chave própria em "state.config" (lançamentos de um não
    aparecem no outro), seu prefixo de ID e sua lista de formas. Terceirizados só tem as vias de
-   verdade do financeiro (Grid/Thopen) + "Outra". "simulacaoEscopo" diz qual escopo o modal
+   verdade do financeiro (Grid/Zlcliente01) + "Outra". "simulacaoEscopo" diz qual escopo o modal
    aberto está editando (setado em openNova/openEditar a partir do "data-simulacao-escopo"). */
 var SIMULACAO_ESCOPOS = {
   equipe: { chave: 'simulacao_gastos_equipe', chaveCenarios: 'simulacao_cenarios_equipe', prefixo: 'SGJ-', formas: FORMAS_SIMULACAO_GASTO_EQUIPE },
-  terceirizados: { chave: 'simulacao_gastos_terceirizados', chaveCenarios: 'simulacao_cenarios_terceirizados', prefixo: 'SGT-', formas: ['Grid', 'Thopen', FORMA_SIMULACAO_OUTRA] }
+  terceirizados: { chave: 'simulacao_gastos_terceirizados', chaveCenarios: 'simulacao_cenarios_terceirizados', prefixo: 'SGT-', formas: ['Grid', 'Zlcliente01', FORMA_SIMULACAO_OUTRA] }
 };
 var ui = { tab: (window.ZELADORIA_ABA || 'overview'), fornChip:'todos', fornBusca:'', fornEstado:'todos', fornUsina:'todos', cotChip:'todas', cotBusca:'', cotView:'lista', lixTipo:'todos',
   fornSubAba:'fornecedores', colabBusca:'', colabExpandido:null,
@@ -1254,7 +1254,7 @@ function usinaById(id){ return (state.usinas || []).find(function(u){ return u.i
    distintos com uma "Usina X" cada), retorna null em vez de arriscar pegar a errada — nesse
    caso o usuário escolhe pela lista de sugestões, que mostra "Usina - Cliente" (rotuloUsina). */
 /* Texto de usina → cadastro (refeito 2026-10-06). Cotação/andamento/extras gravam a usina como
-   "Usina - Cliente" (rotuloUsina) e às vezes de outro jeito ("IPIXUNA DO PARÁ - 2C" × cadastro
+   "Usina - Cliente" (rotuloUsina) e às vezes de outro jeito ("IPIXUNA DO PARÁ - Zlcliente03" × cadastro
    "Ipixuna do Pará 1"). Ordem: nome exato → rótulo "Usina - Cliente" exato → nome + cliente →
    casamento solto (casarUsinaSolto) com o cliente → casamento solto só pelo nome. Sem acento e
    sem caixa; só devolve quando sobra UMA usina (nome ambíguo, ex. "Linhares 1" de 2 clientes,
@@ -1297,7 +1297,7 @@ function semAcentoLower(s){
 }
 /* Casamento da planilha de Criticidade (base de rondas) com o cadastro de Usinas. A coluna
    "Usina" dessa planilha vem no formato "Cliente - Nome da Usina - UF" (ordem diferente de
-   `rotuloUsina`) — ex.: "Athon - Capitão Poço 1 - PA". Prioridade de resolução:
+   `rotuloUsina`) — ex.: "Zlcliente02 - Capitão Poço 1 - PA". Prioridade de resolução:
    1) vínculo manual salvo em `c.usinaId` (ver "Vincular usina" na tabela, quando o automático
       não acha) — sempre vence, nunca é sobrescrito por uma reimportação da planilha;
    2) casa por Cliente + Nome (a dupla que realmente identifica a usina, evita pegar a usina
@@ -1310,12 +1310,12 @@ function semAcentoLower(s){
    escrevem a mesma usina de jeitos diferentes. Esta etapa entra depois das exatas e entende:
    - usina agrupada no cadastro: "União 1 e 2", "Bom Jesus 1,2 e 3", "Petrolina 1 a 3",
      "Rio do Peixe I e II" ↔ ronda "União 1" (o número da ronda tem que estar no grupo);
-   - romanos (I, II…) e numeração Athon "100/200" ↔ "1/2" ("Timon 1" = "Timon 100");
+   - romanos (I, II…) e numeração Zlcliente02 "100/200" ↔ "1/2" ("Timon 1" = "Timon 100");
    - parênteses, "de/do/da", espaços duplos ("Córrego do Sapucaia" = "Córrego de Sapucaia");
-   - apelidos de cliente (Faro = Faro Energy, Utragaz = Ultragaz, Solier = Sal Energia);
+   - apelidos de cliente (ZLTRECHO02);
    - 1 letra de diferença em nome longo ("Riacho Fundo" × "Riacho Funco").
    Só devolve quando sobra UMA usina candidata. */
-var CLIENTE_ALIAS = { 'faro': 'faro energy', 'utragaz': 'ultragaz', 'solier': 'sal energia' };
+var CLIENTE_ALIAS = { ZLTRECHO01 };
 var ROMANOS = { i: 1, ii: 2, iii: 3, iv: 4, v: 5, vi: 6 };
 function clienteNorm(s){ var c = semAcentoLower(s); return CLIENTE_ALIAS[c] || c; }
 function clientesCompativeis(a, b){ a = clienteNorm(a); b = clienteNorm(b); return !!a && !!b && (a === b || a.indexOf(b) === 0 || b.indexOf(a) === 0); }
@@ -2317,16 +2317,16 @@ function mesesJanelaSimulacao(){
   return out;
 }
 /* Parcelas estimadas de UMA cotação simulada, conforme a forma de pagamento escolhida --
-   espelha as mesmas contas já usadas em onSalvarOrcamento (Grid 30/35/35%, Thopen 1 parcela,
+   espelha as mesmas contas já usadas em onSalvarOrcamento (Grid 30/35/35%, Zlcliente01 1 parcela,
    Outra parcelas livres), só que aqui é hipotético: nunca vira linha de verdade em
-   financeiro_parcelas, só um array em memória pra somar nos 3 meses da janela. Thopen (NF +30d)
+   financeiro_parcelas, só um array em memória pra somar nos 3 meses da janela. Zlcliente01 (NF +30d)
    não tem uma "data do serviço" real ainda nessa fase -- aproxima o mês-base +1 (mesma lógica
    de "um mês adiante da referência"), deixando claro na tela que é estimativa. */
 function parcelasSimuladas(cotacao, cfg){
   var valor = cotacao.valor || 0;
   var base = mesBaseSimulacao();
   function mesOffset(n){ var d = new Date(base.getFullYear(), base.getMonth() + n, 1); return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0'); }
-  if (cfg.forma === 'Thopen') {
+  if (cfg.forma === 'Zlcliente01') {
     return [{ mesKey: mesOffset(1), valor: valor }];
   }
   if (cfg.forma === 'Outra') {
@@ -2347,15 +2347,15 @@ function parcelasSimuladas(cotacao, cfg){
 function calcularSimulacaoAprovacao(){
   var janela = mesesJanelaSimulacao();
   /* "Já confirmado/provisionado" precisa somar Terceirizado (Financeiro principal, via ≠
-     Thopen) + Primarizado (Gastos da Equipe, ledger separado que nunca entra em
+     Zlcliente01) + Primarizado (Gastos da Equipe, ledger separado que nunca entra em
      financeiroAtivos()) — pedido pontual, 2026-09: antes só contava Terceirizado, deixando de
      fora todo o custo da equipe própria. Guarda os 2 separados pra mostrar a quebra na tela
      (Terceirizado / Primarizado / os dois juntos), igual o padrão já usado em "Mês a mês -
      Geral". Primarizado entra SEM Paytrack (pedido pontual logo em seguida, 2026-09) — mesma
-     ideia de Thopen ficar de fora do Terceirizado: pra algumas contas o Analista precisa do total
+     ideia de Zlcliente01 ficar de fora do Terceirizado: pra algumas contas o Analista precisa do total
      sem ela, e aqui na simulação é sempre a versão sem. */
   var confirmadoTercPorMes = {};
-  financeiroPorMes(financeiroAtivos().filter(function(f){ return f.via !== 'Thopen'; })).forEach(function(m){ confirmadoTercPorMes[m.key] = m.total; });
+  financeiroPorMes(financeiroAtivos().filter(function(f){ return f.via !== 'Zlcliente01'; })).forEach(function(m){ confirmadoTercPorMes[m.key] = m.total; });
   var confirmadoPrimPorMes = {};
   gastosEquipePorMes(gastosEquipeAtivos().filter(function(g){ return g.formaPagamento !== 'Paytrack'; })).forEach(function(m){ confirmadoPrimPorMes[m.key] = m.total; });
   var simuladoPorMes = {}; janela.forEach(function(m){ simuladoPorMes[m.key] = 0; });
@@ -3203,7 +3203,7 @@ function renderAndamento(){
   return html;
 }
 
-/* ---------- Farol Contratual (Thopen — compromisso do 1º ano de zeladoria) ----------
+/* ---------- Farol Contratual (Zlcliente01 — compromisso do 1º ano de zeladoria) ----------
    Verifica, por usina em OPERAÇÃO, se roçagem (Supressão Vegetal) e lavagem (Limpeza de
    Módulos) foram feitas dentro da janela contratual contada a partir da data de mobilização.
    Poda química é rastreada mas não entra na meta. Três origens de serviço, mescladas com
@@ -3496,7 +3496,7 @@ function renderAnaliseServicos(){
   var responsavelList = Array.from(new Set(respBase.map(function(i){ return i.usina.responsavelOM; }).filter(Boolean))).sort(function(a,b){ return a.localeCompare(b,'pt-BR'); });
   if (responsavelList.indexOf(ui.analiseResponsavel) === -1) ui.analiseResponsavel = 'todos';
 
-  var html = '<div class="cell-muted" style="font-size:12.5px;margin-bottom:14px;">Roçagens e lavagens feitas por terceiros em cada usina em operação, contra o prazo contratual contado a partir da mobilização. Clientes sem regra cadastrada aparecem como "Regra não definida" — hoje só a Thopen tem regra (12 meses, 1 roçagem e 1 lavagem, avaliadas separadamente).</div>';
+  var html = '<div class="cell-muted" style="font-size:12.5px;margin-bottom:14px;">Roçagens e lavagens feitas por terceiros em cada usina em operação, contra o prazo contratual contado a partir da mobilização. Clientes sem regra cadastrada aparecem como "Regra não definida" — hoje só a Zlcliente01 tem regra (12 meses, 1 roçagem e 1 lavagem, avaliadas separadamente).</div>';
 
   html += '<div class="chiprow" style="align-items:center;">';
   html += '<input type="text" class="search-box" id="flt-analise-busca" placeholder="Usina, cidade, técnico…" value="' + esc(ui.analiseBusca) + '">';
@@ -3592,8 +3592,8 @@ function renderAnaliseServicos(){
     '<li>Período contado da data de mobilização, comparado com a data de término do serviço — roçagem e lavagem avaliadas separadamente.</li>' +
     '<li>Poda química é rastreada mas não entra na meta de roçagem/lavagem.</li>' +
     '<li>Serviço sem data de término conta em "qualquer data", mas não no período.</li>' +
-    '<li>Clientes sem regra cadastrada aparecem como "Regra não definida" (hoje só a Thopen tem regra própria).</li>' +
-    '<li>Import inicial da planilha histórica já excluiu serviços feitos pelo cliente (Estrutura "Cliente Realizou" ou empresa "Feito pela Thopen"/"fez").</li>' +
+    '<li>Clientes sem regra cadastrada aparecem como "Regra não definida" (hoje só a Zlcliente01 tem regra própria).</li>' +
+    '<li>Import inicial da planilha histórica já excluiu serviços feitos pelo cliente (Estrutura "Cliente Realizou" ou empresa "Feito pela Zlcliente01"/"fez").</li>' +
     '<li>Universo: só usinas com status "OPERAÇÃO" no cadastro de Usinas.</li>' +
   '</ul></div>';
   html += '<div class="card" style="padding:16px;"><h3 style="margin:0 0 8px;font-size:13px;">Usinas de responsabilidade do cliente (' + qtdCliente + ')</h3>' +
@@ -3687,7 +3687,7 @@ function onDesmarcarResponsabilidadeCliente(usinaId){
 function metaMensalZeladoria(){ var v = state.config && state.config.meta_mensal_zeladoria; var n = Number(v); return (v != null && !isNaN(n)) ? n : 130000; }
 /* Meta previsto por mês (pedido pontual, 2026-09) — antes era um único valor pra todo mês
    ("meta mensal de zeladoria"); agora cada mês pode ter o seu próprio previsto (ex.: setembro
-   130 mil, outubro 150 mil), guardado como uma chave a mais em `state.config`
+   ZLVALOR12), guardado como uma chave a mais em `state.config`
    ('meta_mensal_AAAA-MM') -- sem tabela/coluna nova, `rf_config` já persiste QUALQUER chave que
    apareça em `state.config` (upsert genérico em syncTudo). Mês sem override cai no valor
    padrão de `metaMensalZeladoria()` — nunca quebra pra meses antigos/nunca configurados.
@@ -3874,10 +3874,10 @@ function financeiroPctVsMetaHtml(total, meta){
   return '<span class="mono" style="color:' + cor + ';font-weight:700;">' + texto + '</span>';
 }
 /* ---------- Acompanhamento de Pagamentos (item 8) ----------
-   Thopen paga 30 dias depois da NF; a Grid paga em 3 parcelas (30% no dia do serviço, 35% em
+   Zlcliente01 paga 30 dias depois da NF; a Grid paga em 3 parcelas (30% no dia do serviço, 35% em
    +30d, 35% em +60d) — essas parcelas já vêm discriminadas linha a linha na planilha semanal
    (campos parcela/numeroParcelas), então não precisa gerar nada, só acompanhar as datas que já
-   existem. Esta seção mostra TODAS as parcelas (Grid + Thopen) por urgência de pagamento, pra
+   existem. Esta seção mostra TODAS as parcelas (Grid + Zlcliente01) por urgência de pagamento, pra
    cobrar quem estiver perto do vencimento ou já atrasado — diferente do resto da aba
    Financeiro (KPIs/mês-a-mês/projeção/rankings), que conta só Grid, pra não misturar com o
    gasto mensal da Grid que já existia. */
@@ -3928,10 +3928,10 @@ function acompCelula(f, campo, tipo, largura){
 
   if (tipo === 'via') {
     if (!editando) {
-      return '<span class="acomp-cell" data-acomp-editar="' + esc(chave) + '" title="Duplo clique para editar"><span class="pill pill-neutral">' + esc(f.via === 'Thopen' ? 'Thopen' : 'Grid') + '</span></span>';
+      return '<span class="acomp-cell" data-acomp-editar="' + esc(chave) + '" title="Duplo clique para editar"><span class="pill pill-neutral">' + esc(f.via === 'Zlcliente01' ? 'Zlcliente01' : 'Grid') + '</span></span>';
     }
     return '<select data-acomp-campo="via" data-acomp-id="' + esc(f.id) + '" style="' + estilo + '">' +
-      ['Grid','Thopen'].map(function(v){ return '<option' + (v === (f.via||'Grid') ? ' selected' : '') + '>' + v + '</option>'; }).join('') +
+      ['Grid','Zlcliente01'].map(function(v){ return '<option' + (v === (f.via||'Grid') ? ' selected' : '') + '>' + v + '</option>'; }).join('') +
       '</select>';
   }
   if (tipo === 'situacao') {
@@ -4016,7 +4016,7 @@ function salvarCampoAcomp(el){
   }
 }
 function renderFinanceiroAcompanhamento(ativos){
-  var html = '<div class="cell-muted" style="font-size:12px;margin:-4px 0 14px;">Todas as parcelas (Grid + Thopen) por data de vencimento — pra bater com o financeiro e cobrar o que estiver perto de vencer ou já atrasado. A visão "Mês a mês" ao lado conta só Grid, pra não misturar com o gasto mensal.</div>';
+  var html = '<div class="cell-muted" style="font-size:12px;margin:-4px 0 14px;">Todas as parcelas (Grid + Zlcliente01) por data de vencimento — pra bater com o financeiro e cobrar o que estiver perto de vencer ou já atrasado. A visão "Mês a mês" ao lado conta só Grid, pra não misturar com o gasto mensal.</div>';
 
   /* Filtros de Mês/Cliente/Fornecedor/Usina — escopo pro quadro de KPIs E pra tabela abaixo,
      igual ao padrão de Cidade/UF no topo da aba Financeiro: filtram tudo, não só a tabela.
@@ -4037,8 +4037,8 @@ function renderFinanceiroAcompanhamento(ativos){
   var acomp = acompanhamentoFiltrar(ativos);
   var ativosDoMes = acomp.ativosDoMes, filtrados = acomp.filtrados;
 
-  var porVia = { Grid: 0, Thopen: 0 };
-  ativosDoMes.forEach(function(f){ porVia[f.via === 'Thopen' ? 'Thopen' : 'Grid']++; });
+  var porVia = { Grid: 0, Zlcliente01: 0 };
+  ativosDoMes.forEach(function(f){ porVia[f.via === 'Zlcliente01' ? 'Zlcliente01' : 'Grid']++; });
   var porStatus = {}, porStatusValor = {};
   ativosDoMes.forEach(function(f){ var s = statusPagamento(f); porStatus[s] = (porStatus[s]||0) + 1; porStatusValor[s] = (porStatusValor[s]||0) + (f.valorParcela||0); });
   /* "Pendentes" = tudo que ainda não tem data realizado de pagamento (Atrasado + Vence em breve
@@ -4060,7 +4060,7 @@ function renderFinanceiroAcompanhamento(ativos){
   html += kpiTile('Valor real a pagar', fmtMoney(valorRealAPagar), 'pendentes − congeladas', '');
   html += kpiTile('Já pagas', porStatus['Pago']||0, (porStatus['Pago']||0) ? (fmtMoney(porStatusValor['Pago']) + ' já quitados') : 'com data realizado pagamento', 'tint-good');
   html += kpiTile('Via Grid', porVia.Grid, 'parcelas', '');
-  html += kpiTile('Via Thopen', porVia.Thopen, 'parcelas — pagas 30d após a NF', '');
+  html += kpiTile('Via Zlcliente01', porVia.Zlcliente01, 'parcelas — pagas 30d após a NF', '');
   html += '</div>';
 
   html += '<div class="chiprow" style="align-items:center;">';
@@ -4069,7 +4069,7 @@ function renderFinanceiroAcompanhamento(ativos){
   html += multiSelectFiltro('finAcompCliente', clientesList, ui.finAcompCliente, null, 'Cliente');
   html += multiSelectFiltro('finAcompFornecedor', fornecedoresList, ui.finAcompFornecedor, null, 'Fornecedor');
   html += multiSelectFiltro('finAcompUsina', usinasList, ui.finAcompUsina, null, 'Usina');
-  html += multiSelectFiltro('finAcompVia', ['Grid','Thopen'], ui.finAcompVia, null, 'Via');
+  html += multiSelectFiltro('finAcompVia', ['Grid','Zlcliente01'], ui.finAcompVia, null, 'Via');
   html += multiSelectFiltro('finAcompStatus', ['Atrasado','Vence em breve','A vencer','Pago','Sem data prevista'].concat(STATUS_PAGAMENTO_MANUAIS), ui.finAcompStatus, null, 'Status');
   html += '<button class="btn btn-ghost btn-sm" id="btn-limpar-filtros-fin-acomp">Limpar filtros</button>';
   html += '<button class="btn btn-ghost btn-sm" id="btn-fin-historico-geral" style="margin-left:auto;" title="Quem mudou o quê nas parcelas, e quando">Histórico de alterações</button>';
@@ -4320,25 +4320,25 @@ function dataHoraCurtaSimulacao(iso){
 /* "Quanto vai ficar somando com o que já está previsto": tabela dos próximos N meses (3/6/12,
    `ui.simHorizonte`) a partir do mês atual — TODO mês aparece, mesmo sem simulação: previsto na
    planilha (via Grid) + simulado (caixa, já com o 30/35/35 da Grid) = total, vs. meta do mês.
-   Simulado via Thopen fica numa coluna à parte e FORA da meta (mesma regra do financeiro real). */
+   Simulado via Zlcliente01 fica numa coluna à parte e FORA da meta (mesma regra do financeiro real). */
 function projecaoSimulacaoTerceirizadosHtml(realPorMes, pagamentos){
   var H = [3,6,12].indexOf(ui.simHorizonte) >= 0 ? ui.simHorizonte : 6;
-  var simGrid = {}, simThopen = {}, temThopen = false;
+  var simGrid = {}, simZlcliente01 = {}, temZlcliente01 = false;
   pagamentos.forEach(function(x){
-    if (x.formaPagamento === 'Thopen') { simThopen[x.mes] = (simThopen[x.mes]||0) + (x.valor||0); temThopen = true; }
+    if (x.formaPagamento === 'Zlcliente01') { simZlcliente01[x.mes] = (simZlcliente01[x.mes]||0) + (x.valor||0); temZlcliente01 = true; }
     else simGrid[x.mes] = (simGrid[x.mes]||0) + (x.valor||0);
   });
   var html = '<div class="card card-pad sgt-projecao" style="margin-bottom:14px;">';
   html += '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px;"><h3 class="section-title" style="margin:0;">Próximos meses — previsto na planilha + simulação</h3><div class="chiprow" style="margin:0;align-items:center;"><span class="cell-muted" style="font-size:12px;">Mostrar</span>';
   [3,6,12].forEach(function(n){ html += '<button type="button" class="btn btn-sm ' + (H===n?'btn-primary':'btn-ghost') + '" data-sim-horizonte="' + n + '">' + n + ' meses</button>'; });
   html += '</div></div>';
-  html += '<div class="cell-muted" style="font-size:11.5px;margin-bottom:8px;">"Previsto na planilha" = parcelas via Grid já importadas pra aquele mês (pagas ou não). "Simulado" já vem distribuído como é pago (Grid = 30% no mês + 35% em 30 dias + 35% em 60 dias). O % compara o total contra a meta do mês.' + (temThopen ? ' Simulações via Thopen aparecem à parte e não entram na meta da Grid.' : '') + '</div>';
-  html += '<div class="table-wrap"><table><thead><tr><th>Mês</th><th style="text-align:right;">Previsto na planilha</th><th style="text-align:right;">+ Simulado</th><th style="text-align:right;">= Total</th><th style="text-align:right;">Meta do mês</th><th style="text-align:right;">Diferença</th>' + (temThopen ? '<th style="text-align:right;">Simulado Thopen</th>' : '') + '</tr></thead><tbody>';
+  html += '<div class="cell-muted" style="font-size:11.5px;margin-bottom:8px;">"Previsto na planilha" = parcelas via Grid já importadas pra aquele mês (pagas ou não). "Simulado" já vem distribuído como é pago (Grid = 30% no mês + 35% em 30 dias + 35% em 60 dias). O % compara o total contra a meta do mês.' + (temZlcliente01 ? ' Simulações via Zlcliente01 aparecem à parte e não entram na meta da Grid.' : '') + '</div>';
+  html += '<div class="table-wrap"><table><thead><tr><th>Mês</th><th style="text-align:right;">Previsto na planilha</th><th style="text-align:right;">+ Simulado</th><th style="text-align:right;">= Total</th><th style="text-align:right;">Meta do mês</th><th style="text-align:right;">Diferença</th>' + (temZlcliente01 ? '<th style="text-align:right;">Simulado Zlcliente01</th>' : '') + '</tr></thead><tbody>';
   var somaPlan = 0, somaSim = 0, somaMeta = 0, somaTh = 0;
   var mesAtual = mesAnoKey(hoje());
   for (var i = 0; i < H; i++) {
     var k = mesAnoKey(analiseAddMeses(mesAtual + '-01', i));
-    var plan = realPorMes[k] || 0, sim = Math.round((simGrid[k] || 0) * 100) / 100, tot = plan + sim, meta = metaDoMes(k), th = simThopen[k] || 0;
+    var plan = realPorMes[k] || 0, sim = Math.round((simGrid[k] || 0) * 100) / 100, tot = plan + sim, meta = metaDoMes(k), th = simZlcliente01[k] || 0;
     somaPlan += plan; somaSim += sim; somaMeta += meta; somaTh += th;
     var farol = financeiroFarolClasse(tot, meta);
     var cor = farol === 'tint-critical' ? 'var(--critical)' : farol === 'tint-warn' ? 'var(--warn)' : 'var(--good)';
@@ -4349,9 +4349,9 @@ function projecaoSimulacaoTerceirizadosHtml(realPorMes, pagamentos){
       '<td class="mono" style="text-align:right;font-weight:700;color:' + cor + ';">' + fmtMoney(tot) + '</td>' +
       '<td class="mono" style="text-align:right;">' + fmtMoney(meta) + '</td>' +
       '<td class="mono" style="text-align:right;color:' + cor + ';">' + (tot - meta > 0 ? '+' : '') + fmtMoney(tot - meta) + (pct != null ? ' <span style="font-size:11px;">(' + (pct > 0 ? '+' : '') + pct.toFixed(1).replace('.', ',') + '%)</span>' : '') + '</td>' +
-      (temThopen ? '<td class="mono" style="text-align:right;">' + (th ? fmtMoney(th) : '<span class="cell-muted">—</span>') + '</td>' : '') + '</tr>';
+      (temZlcliente01 ? '<td class="mono" style="text-align:right;">' + (th ? fmtMoney(th) : '<span class="cell-muted">—</span>') + '</td>' : '') + '</tr>';
   }
-  html += '<tr style="border-top:2px solid var(--border);"><td><b>Total ' + H + ' meses</b></td><td class="mono" style="text-align:right;font-weight:700;">' + fmtMoney(somaPlan) + '</td><td class="mono" style="text-align:right;font-weight:700;">' + fmtMoney(somaSim) + '</td><td class="mono" style="text-align:right;font-weight:700;">' + fmtMoney(somaPlan + somaSim) + '</td><td class="mono" style="text-align:right;font-weight:700;">' + fmtMoney(somaMeta) + '</td><td class="mono" style="text-align:right;font-weight:700;">' + (somaPlan + somaSim - somaMeta > 0 ? '+' : '') + fmtMoney(somaPlan + somaSim - somaMeta) + '</td>' + (temThopen ? '<td class="mono" style="text-align:right;font-weight:700;">' + fmtMoney(somaTh) + '</td>' : '') + '</tr>';
+  html += '<tr style="border-top:2px solid var(--border);"><td><b>Total ' + H + ' meses</b></td><td class="mono" style="text-align:right;font-weight:700;">' + fmtMoney(somaPlan) + '</td><td class="mono" style="text-align:right;font-weight:700;">' + fmtMoney(somaSim) + '</td><td class="mono" style="text-align:right;font-weight:700;">' + fmtMoney(somaPlan + somaSim) + '</td><td class="mono" style="text-align:right;font-weight:700;">' + fmtMoney(somaMeta) + '</td><td class="mono" style="text-align:right;font-weight:700;">' + (somaPlan + somaSim - somaMeta > 0 ? '+' : '') + fmtMoney(somaPlan + somaSim - somaMeta) + '</td>' + (temZlcliente01 ? '<td class="mono" style="text-align:right;font-weight:700;">' + fmtMoney(somaTh) + '</td>' : '') + '</tr>';
   html += '</tbody></table></div></div>';
   return html;
 }
@@ -4380,7 +4380,7 @@ function renderSimulacaoGastoEquipe(escopo, parcelasGrid){
   html += '<div class="table-toolbar" style="margin-bottom:10px;"><span class="count">' + cenarios.length + ' <span class="n">simulação(ões) salva(s)</span></span><button class="btn btn-primary btn-sm" id="btn-nova-simulacao-gasto-equipe"' + attrEscopo + '>+ Nova simulação</button></div>';
   if (!cenarios.length) {
     if (ehTerc) html += projecaoSimulacaoTerceirizadosHtml(realPorMes, []);
-    html += '<div class="empty-note">Nenhuma simulação lançada ainda. Clique em "+ Nova simulação", adicione os fornecedores/usinas (ex.: ' + (ehTerc ? 'Terra Forte, R$ 720.000 em 12 parcelas, Grid' : '"Diesel extra", R$ 2.000, Pix diária') + ') e salve.</div>';
+    html += '<div class="empty-note">Nenhuma simulação lançada ainda. Clique em "+ Nova simulação", adicione os fornecedores/usinas (ex.: ' + (ehTerc ? 'Zlfornecedor06, ZLVALOR01, Grid' : '"Diesel extra", R$ 2.000, Pix diária') + ') e salve.</div>';
     return html;
   }
 
@@ -4443,8 +4443,8 @@ function renderSimulacaoGastoEquipe(escopo, parcelasGrid){
     html += '<div class="card card-pad" data-sim-mes-card="' + mesKey + '" style="margin-bottom:12px;">';
     html += '<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px;"><h3 style="margin:0;font-size:13.5px;">' + esc(mesAnoLabel(mesKey + '-01')) + ' <span class="cell-muted" style="font-size:11px;font-weight:400;">a pagar</span></h3><span class="mono" style="font-weight:700;">' + fmtMoney(totalMes) + '</span></div>';
     if (ehTerc) {
-      var thopenMes = itens.reduce(function(a,x){ return a + (x.formaPagamento === 'Thopen' ? (x.valor||0) : 0); }, 0);
-      var simGridMes = Math.round((totalMes - thopenMes) * 100) / 100;
+      var zlcliente01Mes = itens.reduce(function(a,x){ return a + (x.formaPagamento === 'Zlcliente01' ? (x.valor||0) : 0); }, 0);
+      var simGridMes = Math.round((totalMes - zlcliente01Mes) * 100) / 100;
       var realMes = realPorMes[mesKey] || 0, metaMes = metaDoMes(mesKey), comSim = realMes + simGridMes;
       var pct = metaMes ? ((comSim - metaMes) / metaMes) * 100 : null;
       var farol = financeiroFarolClasse(comSim, metaMes);
@@ -4454,7 +4454,7 @@ function renderSimulacaoGastoEquipe(escopo, parcelasGrid){
         '<span>+ Simulado: <b class="mono">' + fmtMoney(simGridMes) + '</b></span>' +
         '<span>= Com simulação: <b class="mono">' + fmtMoney(comSim) + '</b></span>' +
         '<span>Previsto do mês: <b class="mono">' + fmtMoney(metaMes) + '</b>' + (pct != null ? ' <b style="color:' + corPct + ';">(' + (pct > 0 ? '+' : '') + pct.toFixed(1).replace('.', ',') + '% vs previsto)</b>' : '') + '</span>' +
-        (thopenMes ? '<span>Thopen simulado (fora da meta): <b class="mono">' + fmtMoney(thopenMes) + '</b></span>' : '') +
+        (zlcliente01Mes ? '<span>Zlcliente01 simulado (fora da meta): <b class="mono">' + fmtMoney(zlcliente01Mes) + '</b></span>' : '') +
         '</div>';
     }
     itens.forEach(function(p){
@@ -4623,12 +4623,12 @@ function criarItemSimulacao(dados){
   div.className = 'sgj-item';
   div.style.cssText = 'border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:10px;background:var(--surface-2, transparent);';
   div.innerHTML = '<div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;margin-bottom:4px;">' +
-      '<label style="flex:2 1 220px;display:flex;flex-direction:column;gap:3px;font-size:11.5px;font-weight:700;">Fornecedor / usina / o que é *<input type="text" class="sgj-item-denominacao" list="sgj-denominacoes" placeholder="ex.: Ecoclean" style="' + SGJ_INPUT_CSS + 'font-weight:400;"></label>' +
+      '<label style="flex:2 1 220px;display:flex;flex-direction:column;gap:3px;font-size:11.5px;font-weight:700;">Fornecedor / usina / o que é *<input type="text" class="sgj-item-denominacao" list="sgj-denominacoes" placeholder="ex.: Zlfornecedor03" style="' + SGJ_INPUT_CSS + 'font-weight:400;"></label>' +
       '<label style="flex:1 1 160px;display:flex;flex-direction:column;gap:3px;font-size:11.5px;font-weight:700;">Forma de pagamento *<select class="sgj-item-forma" style="' + SGJ_INPUT_CSS + 'font-weight:400;">' + formas.map(function(f){ return '<option>' + esc(f) + '</option>'; }).join('') + '</select></label>' +
       '<input type="text" class="sgj-item-forma-outra" placeholder="Qual forma?" style="display:none;flex:1 1 140px;' + SGJ_INPUT_CSS + '">' +
       '<button type="button" class="btn btn-ghost btn-sm" data-sgj-item-remover title="Remover este item">item</button>' +
     '</div>' +
-    '<div class="sgj-item-grid-hint cell-muted" style="font-size:11px;margin:0 0 8px;display:none;">Grid: informe só o <b>mês de início</b> e o <b>valor total</b> — o app divide sozinho em <b>30% no mês de início + 35% no mês seguinte + 35% no outro</b>. <button type="button" class="link-btn" data-sgj-parcelar style="font-size:11px;">Parcelar em vários meses? (ex.: R$ 720 mil em 12x a partir do mês que você escolher) →</button></div>' +
+    '<div class="sgj-item-grid-hint cell-muted" style="font-size:11px;margin:0 0 8px;display:none;">Grid: informe só o <b>mês de início</b> e o <b>valor total</b> — o app divide sozinho em <b>30% no mês de início + 35% no mês seguinte + 35% no outro</b>. <button type="button" class="link-btn" data-sgj-parcelar style="font-size:11px;">Parcelar em vários meses? (ex.: ZLVALOR10 a partir do mês que você escolher) →</button></div>' +
     '<div class="sgj-faixas"></div>' +
     '<button type="button" class="link-btn" data-sgj-add-faixa style="margin:0 0 6px;">+ Adicionar período (outro valor)</button>' +
     '<button type="button" class="link-btn" data-sgj-add-faixa-grid style="margin:0 0 6px;display:none;">+ Adicionar outro valor total (Grid)</button>' +
@@ -4648,7 +4648,7 @@ function criarItemSimulacao(dados){
   }
   selForma.addEventListener('change', syncForma);
   /* Atalho (pedido pontual, 2026-09-30): com Grid marcada (padrão), o "Total parcelado" some —
-     o Analista não achava onde parcelar "720 mil em 12x". Um clique troca o item pra forma
+     o Analista não achava onde parcelar "ZLVALOR11". Um clique troca o item pra forma
      "Outra: Parcelado mensal" e o período pra "Total parcelado" (aproveita mês de início e total). */
   div.querySelector('[data-sgj-parcelar]').addEventListener('click', function(){
     var faixas = Array.prototype.slice.call(div.querySelectorAll('.sgj-faixa'));
@@ -4732,8 +4732,8 @@ function modalSimulacaoGastoEquipe(){
     '<div class="modal-head"><h3>' + (editingPrevisto ? 'Editar previsto decidido' : (c ? 'Editar simulação' : (duplicandoCenarioSimulacaoNome ? 'Duplicar simulação' : '+ Nova simulação'))) + '</h3><button class="modal-close" data-close="overlay-simulacao-gasto-equipe">&times;</button></div>' +
       (editingPrevisto ? '<div class="cell-muted" style="font-size:11.5px;padding:8px 20px 0;">Você está editando a cópia congelada do previsto decidido — a simulação original não muda.</div>' : '') + (duplicandoCenarioSimulacaoNome && !c ? '<div class="cell-muted" style="font-size:11.5px;padding:8px 20px 0;">Cópia de <b>' + esc(duplicandoCenarioSimulacaoNome) + '</b> — ajuste o que quiser e salve como simulação nova. A original continua igual.</div>' : '') +
     '<div class="modal-body">' +
-      '<div class="field"><label for="sgj-nome">Nome da simulação *</label><input id="sgj-nome" type="text" placeholder="ex.: Cenário out/26 com Terra Forte" value="' + esc(c ? c.nome : '') + '"></div>' +
-      '<div class="cell-muted" style="font-size:11.5px;margin-bottom:10px;">Um item por fornecedor/usina, cada um com sua forma de pagamento e um ou mais períodos — "Valor por mês" (ex.: Ecoclean R$ 55.000 de out a dez + R$ 80.439,63 de jan a set) ou "Total parcelado" (ex.: Terra Forte R$ 720.000 em 12 parcelas começando em out). Com forma "Grid" é só informar o mês de início e o valor total — o app divide em 30% no início + 35% no mês seguinte + 35% no outro.</div>' +
+      '<div class="field"><label for="sgj-nome">Nome da simulação *</label><input id="sgj-nome" type="text" placeholder="ex.: Cenário out/26 com Zlfornecedor06" value="' + esc(c ? c.nome : '') + '"></div>' +
+      '<div class="cell-muted" style="font-size:11.5px;margin-bottom:10px;">Um item por fornecedor/usina, cada um com sua forma de pagamento e um ou mais períodos — "Valor por mês" (ex.: Zlfornecedor03 ZLVALOR02) ou "Total parcelado" (ex.: Zlfornecedor06 ZLVALOR01 começando em out). Com forma "Grid" é só informar o mês de início e o valor total — o app divide em 30% no início + 35% no mês seguinte + 35% no outro.</div>' +
       '<datalist id="sgj-denominacoes">' + Object.keys(nomesSugeridos).sort(function(a,b){ return a.localeCompare(b,'pt-BR'); }).map(function(n){ return '<option value="' + esc(n) + '">'; }).join('') + '</datalist>' +
       '<div id="sgj-itens-lista"></div>' +
       '<button type="button" class="btn btn-ghost btn-sm" id="btn-add-item-simulacao" style="margin-bottom:10px;">+ Adicionar outro fornecedor / usina</button>' +
@@ -4903,7 +4903,7 @@ function semanaEquipeRowHtml(s, gastosTodos, expandida){
 }
 /* Planejado do mês na aba da Equipe (pedido do Analista, 2026-11-09: "já fiz o planejado dele do mês na simulação, preciso
    que esteja explícito na aba dele"). O planejado mensal é a soma das provisões PRIMARIZADAS do Financeiro executivo
-   naquele mês (Rota Equipe Nordeste/Sudeste, Aluguel…; canceladas e Thopen fora) — mesma conta do quadro "Primarizados:
+   naquele mês (Rota Equipe Nordeste/Sudeste, Aluguel…; canceladas e Zlcliente01 fora) — mesma conta do quadro "Primarizados:
    provisionado × lançado" da Visão executiva, sem os filtros de lá. Mostra também a soma das semanas planejadas que
    começam no mês e o que já foi lançado (gastos da Equipe do mês), com sobrou/estourou. Só mostra, não muda conta. */
 /* ---------- Relatório dos Primarizados (Equipe) para o Financeiro ----------
@@ -5230,7 +5230,7 @@ function orcamentoEquipeSemanalBlocoHtml(gastosTodos){
 function kpiCardsEquipeHtml(gastosEscopo, periodoOrc, periodoLabel){
   /* "Total sem Paytrack" (pedido pontual, 2026-09) — Paytrack é só mais uma forma de pagamento
      dentro de FORMAS_PAGAMENTO_EQUIPE, mas pra algumas contas o Analista precisa do total SEM ela
-     (mesma ideia de Thopen ficar de fora do total Grid no Financeiro principal). Mostrado ao
+     (mesma ideia de Zlcliente01 ficar de fora do total Grid no Financeiro principal). Mostrado ao
      lado do "Total lançado" de sempre (que continua sendo COM Paytrack) — as duas versões
      sempre visíveis, sem precisar trocar de filtro pra ver uma ou outra. */
   var gastosSemPaytrack = gastosEscopo.filter(function(g){ return g.formaPagamento !== 'Paytrack'; });
@@ -5517,8 +5517,8 @@ function renderMesAMesEquipe(){
 /* Simulações na visão Geral (pedido pontual, 2026-09-29): 2 seletores (Terceirizados /
    Primarizados) — "Nenhuma", "Todas somadas" ou uma simulação específica do histórico de cada
    escopo. Entram como CAIXA (pagamentosCenariosSimulacao, Grid já 30/35/35) em colunas próprias
-   ("Sim. Terc." / "Sim. Prim."), somando no total dos cards/gráfico/KPIs. Simulação via Thopen
-   fica de fora — mesma regra do real desta tela (ativosGrid exclui via Thopen). */
+   ("Sim. Terc." / "Sim. Prim."), somando no total dos cards/gráfico/KPIs. Simulação via Zlcliente01
+   fica de fora — mesma regra do real desta tela (ativosGrid exclui via Zlcliente01). */
 function cenariosEscolhidosGeral(escopo, escolha){
   var ativos = cenariosSimulacaoAtivos(escopo);
   if (!escolha || escolha === 'nenhuma') return [];
@@ -5536,10 +5536,10 @@ function seletorSimulacaoGeralHtml(escopo, rotulo, uiKey){
     opts.map(function(o){ return '<option value="' + esc(o[0]) + '"' + (o[0] === atual ? ' selected' : '') + '>' + esc(o[1]) + '</option>'; }).join('') + '</select></label>';
 }
 function renderMesAMesGeral(ativosGrid){
-  ativosGrid = ativosGrid || financeiroAtivos().filter(function(f){ return f.via !== 'Thopen'; });
+  ativosGrid = ativosGrid || financeiroAtivos().filter(function(f){ return f.via !== 'Zlcliente01'; });
   var gastosEquipe = gastosEquipeAtivos();
-  var simTercPag = pagamentosCenariosSimulacao(cenariosEscolhidosGeral('terceirizados', ui.finGeralSimTerc)).filter(function(x){ return x.formaPagamento !== 'Thopen'; });
-  var simPrimPag = pagamentosCenariosSimulacao(cenariosEscolhidosGeral('equipe', ui.finGeralSimPrim)).filter(function(x){ return x.formaPagamento !== 'Thopen'; });
+  var simTercPag = pagamentosCenariosSimulacao(cenariosEscolhidosGeral('terceirizados', ui.finGeralSimTerc)).filter(function(x){ return x.formaPagamento !== 'Zlcliente01'; });
+  var simPrimPag = pagamentosCenariosSimulacao(cenariosEscolhidosGeral('equipe', ui.finGeralSimPrim)).filter(function(x){ return x.formaPagamento !== 'Zlcliente01'; });
   var modoAdot = !!(ui.finGeralPrev && ui.finGeralPrev !== 'nenhum');
   var escAdot = !modoAdot ? [] : (ui.finGeralPrev === 'ambos' ? ['terceirizados','equipe'] : [ui.finGeralPrev]);
   if (modoAdot) { simTercPag = []; simPrimPag = []; }
@@ -5548,7 +5548,7 @@ function renderMesAMesGeral(ativosGrid){
   html += '<div class="chiprow sgg-sim-bar" style="align-items:center;gap:12px;margin:0 0 14px;flex-wrap:wrap;' + (modoAdot ? 'opacity:.45;pointer-events:none;' : '') + '"' + (modoAdot ? ' title="Desligado enquanto o previsto adotado estiver ligado"' : '') + '><span class="cell-muted" style="font-size:12px;font-weight:700;">Somar simulações:</span>' +
     seletorSimulacaoGeralHtml('terceirizados', 'Terceirizados', 'finGeralSimTerc') +
     seletorSimulacaoGeralHtml('equipe', 'Primarizados', 'finGeralSimPrim') +
-    (comSim ? '<span class="pill pill-neutral" style="font-size:11px;">valores simulados somados ao real (Grid já em 30/35/35; Thopen fica de fora)</span>' : '') + '</div>';
+    (comSim ? '<span class="pill pill-neutral" style="font-size:11px;">valores simulados somados ao real (Grid já em 30/35/35; Zlcliente01 fica de fora)</span>' : '') + '</div>';
   html += '<div class="chiprow" style="align-items:center;gap:12px;margin:-6px 0 14px;flex-wrap:wrap;"><span class="cell-muted" style="font-size:12px;font-weight:700;">Previsto adotado:</span>' + selectFiltro('flt-fin-geral-prev', ['nenhum','ambos','terceirizados','equipe'], ui.finGeralPrev || 'nenhum', { nenhum: 'Não usar', ambos: 'Terceirizados + Primarizados', terceirizados: 'Só Terceirizados', equipe: 'Só Primarizados' }) +
     (modoAdot ? '<span class="pill pill-good" style="font-size:11px;">previsto congelado = já lançado até a simulação + simulado; o que entra depois abate do simulado</span>' : '') + '</div>';
 
@@ -5773,7 +5773,7 @@ function acompanhamentoFiltrar(ativos){
   });
   var statusOrdem = { 'Atrasado':0, 'Vence em breve':1, 'A vencer':2, 'Pago':3, 'Sem data prevista':4 };
   var filtrados = ativosEscopo.filter(function(f){
-    if (!msfTodos(ui.finAcompVia) && !msfMatches(ui.finAcompVia, (f.via === 'Thopen' ? 'Thopen' : 'Grid'))) return false;
+    if (!msfTodos(ui.finAcompVia) && !msfMatches(ui.finAcompVia, (f.via === 'Zlcliente01' ? 'Zlcliente01' : 'Grid'))) return false;
     if (!msfTodos(ui.finAcompStatus) && !msfMatches(ui.finAcompStatus, statusPagamento(f))) return false;
     return true;
   }).sort(function(a,b){
@@ -5793,11 +5793,11 @@ function renderFinanceiro(){
   var usinaInfoFin = {};
   todosOriginal.forEach(function(f){ usinaInfoFin[f.id] = usinasCadastroDoFinanceiro(f); });
   var ativos = financeiroComCidadeUf();
-  /* "Via" (Rodada 10, item 8): Thopen paga 30d depois da NF, é acompanhado à parte e NÃO conta
+  /* "Via" (Rodada 10, item 8): Zlcliente01 paga 30d depois da NF, é acompanhado à parte e NÃO conta
      no gasto mensal da Grid abaixo (KPIs/mês-a-mês/gráfico/projeção/rankings) — pra não
      misturar os dois. A tabela de detalhe e a sub-aba "Acompanhamento" continuam mostrando
      ambas as vias. */
-  var ativosGrid = ativos.filter(function(f){ return f.via !== 'Thopen'; });
+  var ativosGrid = ativos.filter(function(f){ return f.via !== 'Zlcliente01'; });
   var meta = metaMensalZeladoria();
   var html = '';
 
@@ -5955,7 +5955,7 @@ function renderFinanceiro(){
   var projecao = financeiroProjecaoFutura(ativosGrid);
   html += '<div class="card card-pad" style="margin-bottom:20px;">';
   html += '<h3 class="section-title" style="margin:0 0 2px;">Projeção dos próximos meses</h3>';
-  html += '<div class="cell-muted" style="font-size:11.5px;margin-bottom:10px;">Todo mês que tiver parcela ainda não paga na planilha aparece aqui — inclusive um mês distante, tipo março do ano que vem, se já tiver parcela lançada pra lá. A coluna "Previsto do mês" é editável — dá pra dar um valor diferente pra cada mês (ex.: setembro 130 mil, outubro 150 mil), não fica preso numa meta só. "% vs previsto" mostra, mês a mês, se está economizando ou estourando.</div>';
+  html += '<div class="cell-muted" style="font-size:11.5px;margin-bottom:10px;">Todo mês que tiver parcela ainda não paga na planilha aparece aqui — inclusive um mês distante, tipo março do ano que vem, se já tiver parcela lançada pra lá. A coluna "Previsto do mês" é editável — dá pra dar um valor diferente pra cada mês (ex.: setembro ZLVALOR12), não fica preso numa meta só. "% vs previsto" mostra, mês a mês, se está economizando ou estourando.</div>';
   if (projecao.length === 0) {
     html += '<div class="empty-note" style="padding:8px 0;">Nenhuma parcela em aberto com data prevista futura.</div>';
   } else {
@@ -5973,7 +5973,7 @@ function renderFinanceiro(){
   }
   html += '</div>';
 
-  var listaRankings = (periodoExplicito ? ativos.filter(function(f){ return periodo.matches(f); }) : ativos).filter(function(f){ return f.via !== 'Thopen'; });
+  var listaRankings = (periodoExplicito ? ativos.filter(function(f){ return periodo.matches(f); }) : ativos).filter(function(f){ return f.via !== 'Zlcliente01'; });
   var sufixoMes = periodoExplicito ? (' — ' + periodo.label) : '';
   html += '<div class="grid" style="grid-template-columns:1fr 1fr;gap:14px;margin-bottom:20px;">';
   html += financeiroRankingHtml('Por fornecedor' + sufixoMes, financeiroPorFornecedor(listaRankings), 8);
@@ -6007,7 +6007,7 @@ function renderFinanceiro(){
     if (!msfTodos(ui.finInvestimento) && !msfMatches(ui.finInvestimento, f.investimento)) return false;
     if (!msfTodos(ui.finStatus) && !msfMatches(ui.finStatus, f.status)) return false;
     if (periodoExplicito && !periodo.matches(f)) return false;
-    if (!msfTodos(ui.finVia) && !msfMatches(ui.finVia, (f.via === 'Thopen' ? 'Thopen' : 'Grid'))) return false;
+    if (!msfTodos(ui.finVia) && !msfMatches(ui.finVia, (f.via === 'Zlcliente01' ? 'Zlcliente01' : 'Grid'))) return false;
     return true;
   }).sort(function(a,b){ return (b.dataPrevistoPagamento||'').localeCompare(a.dataPrevistoPagamento||''); });
 
@@ -6017,7 +6017,7 @@ function renderFinanceiro(){
   html += multiSelectFiltro('finInvestimento', investimentosList, ui.finInvestimento, null, 'Serviço');
   html += multiSelectFiltro('finStatus', statusList, ui.finStatus, null, 'Status');
   html += selectFiltro('flt-fin-mes', ['todos'].concat(mesesList), ui.finMes, Object.assign({todos:'Mês (todos)'}, mesesSet));
-  html += multiSelectFiltro('finVia', ['Grid','Thopen'], ui.finVia, null, 'Via');
+  html += multiSelectFiltro('finVia', ['Grid','Zlcliente01'], ui.finVia, null, 'Via');
   html += '<button class="btn btn-ghost btn-sm" id="btn-limpar-filtros-fin">Limpar filtros</button>';
   html += '</div>';
 
@@ -6030,7 +6030,7 @@ function renderFinanceiro(){
     html += '<td><div style="font-weight:600;">' + rotuloUsinasParcelaHtml(f) + '</div><div class="cell-muted" style="font-size:11px;">' + esc(f.cliente||'') + '</div></td>';
     html += '<td>' + esc(f.investimento||'—') + '</td>';
     html += '<td>' + esc(f.fornecedor||'—') + '</td>';
-    html += '<td><span class="pill pill-neutral">' + esc(f.via === 'Thopen' ? 'Thopen' : 'Grid') + '</span></td>';
+    html += '<td><span class="pill pill-neutral">' + esc(f.via === 'Zlcliente01' ? 'Zlcliente01' : 'Grid') + '</span></td>';
     html += '<td class="mono">' + (f.parcela||'?') + '/' + (f.numeroParcelas||'?') + '</td>';
     html += '<td class="mono"' + (neg ? ' style="color:var(--critical);font-weight:700;"' : '') + '>' + fmtMoney(f.valorParcela) + '</td>';
     html += '<td class="mono">' + fmtDate(f.dataPrevistoPagamento) + '</td>';
@@ -7256,7 +7256,7 @@ function renderLixeira(){
      (tipo 'danomodulo'). Estoque de sobressalentes fica pra uma fase 2. */
 var DANO_CAUSAS = ['Roçagem / supressão vegetal', 'Limpeza de módulos', 'Poda química', 'Transporte / movimentação', 'Clima (vento, granizo, raio)', 'Vandalismo / furto', 'Outra'];
 var DANO_REPOSICAO = [['pendente','Pendente'], ['sobressalente','Usando sobressalente'], ['aguardando_compra','Aguardando compra'], ['substituido','Substituído']];
-var DANO_RESSARC_FORMA = [['a_definir','A definir'], ['desconto_parcela','Desconto em parcela'], ['reembolso','Reembolso do fornecedor'], ['faturamento_thopen','Faturamento Thopen'], ['sem_cobranca','Sem cobrança']];
+var DANO_RESSARC_FORMA = [['a_definir','A definir'], ['desconto_parcela','Desconto em parcela'], ['reembolso','Reembolso do fornecedor'], ['faturamento_zlcliente01','Faturamento Zlcliente01'], ['sem_cobranca','Sem cobrança']];
 var DANO_RESSARC_STATUS = [['a_apurar','A apurar'], ['cobrado','Cobrado'], ['recuperado','Recuperado'], ['sem_cobranca','Sem cobrança']];
 var editingDanoId = null;
 function rotuloDe(lista, v){ var x = lista.find(function(o){ return o[0] === v; }); return x ? x[1] : (v || '—'); }
@@ -7841,7 +7841,7 @@ function danoDaLinhaPlanilha(o){
   }
   var st = semAcentoLower(o.status || ''), forma = 'a_definir', status = 'a_apurar';
   if (/desconto/.test(st)) { forma = 'desconto_parcela'; status = 'recuperado'; }
-  else if (/thopen/.test(st) && /faturamento/.test(st)) { forma = 'faturamento_thopen'; status = 'a_apurar'; }
+  else if (/zlcliente01/.test(st) && /faturamento/.test(st)) { forma = 'faturamento_zlcliente01'; status = 'a_apurar'; }
   else if (/nao recebeu/.test(st)) { forma = 'desconto_parcela'; status = 'a_apurar'; }
   var obs = o.obs == null ? '' : String(o.obs).trim(), obsN = semAcentoLower(obs);
   if (/desconto/.test(obsN) && /feito/.test(obsN)) { forma = 'desconto_parcela'; status = 'recuperado'; }
@@ -7929,14 +7929,13 @@ function danoParaLinha(d){
 }
 
 /* ---------- Contratos Anuais (Fase 1, pedido pontual, 2026-10-02) ----------
-   Contratos anuais de zeladoria (EcoClean e Terra Forte, Sudeste/MS/MT/PR): o fornecedor fica com
+   Contratos anuais de zeladoria (Zlfornecedor01 e Zlfornecedor06, Sudeste/MS/MT/PR): o fornecedor fica com
    usinas específicas pra roçagem contínua (vegetação ≤ limite, padrão 30 cm) e/ou lavagens por
    solicitação (1 ou 2 por usina no período). O serviço NÃO entra por cotação nem gera pagamento
    próprio — o pagamento são as parcelas mensais do contrato (plano editável; "Gerar parcelas no
    Financeiro" cria provisionamento com várias usinas; "Reaplicar plano" mexe só nas não pagas).
-   Fontes: "Resumo Zeladoria - Eco Clean x Terra Forte.xlsx" (aba "Valores por Usina" = escopo) e o
-   formulário do contrato EcoClean (vigência 05/10/2026 + 12 meses, R$ 888.956,67 = 3×55.000 +
-   9×80.439,63). Decisões do Analista: sem prazo/multa por enquanto; área/módulos DO CONTRATO
+   Fontes: "Resumo Zeladoria - Zlfornecedor02 x Zlfornecedor06.xlsx" (aba "Valores por Usina" = escopo) e o
+   formulário do contrato Zlfornecedor01 (ZLVALOR03). Decisões do Analista: sem prazo/multa por enquanto; área/módulos DO CONTRATO
    guardados no escopo (mostrando a diferença pro cadastro); visão de cobertura de todas as usinas
    em operação (contrato / primarizado / cotação / sem cobertura).
    Realizado = serviços da linha do tempo do Farol Contratual (analiseTimelinePorUsina: lançamentos
@@ -8254,7 +8253,7 @@ function atualizarResumoPlanoContrato(){
 function openNovoContrato(){
   editingContratoId = null; render();
   document.getElementById('ctr-limite').value = 30;
-  document.getElementById('ctr-preco-extra').value = 1.6;
+  document.getElementById('ctr-preco-extra').value = ZLVALOR05;
   document.getElementById('overlay-contrato').classList.add('open');
 }
 function openEditarContrato(id){
@@ -8810,11 +8809,11 @@ function marcarConflitosCronograma(itens){
     });
   });
 }
-/* Layout novo (pedido pontual, 2026-10-08, inspirado no "Cronograma Thopen — Executivo"): uma
+/* Layout novo (pedido pontual, 2026-10-08, inspirado no "Cronograma Zlcliente01 — Executivo"): uma
    linha por usina com UF e criticidade atual (V = vegetação, S = sujidade; 5 vermelho, 4 laranja,
    3 cinza), roçagem em cima e lavagem embaixo NA MESMA LINHA, e as datas escritas ao lado de cada
    barra. Sem separar por equipe: os filtros decidem — Cliente e Fornecedor/executor são de escolha
-   múltipla (ex.: Thopen E outra; EcoClean E Terra Forte), mais Estado, Supervisor e serviço.
+   múltipla (ex.: Zlcliente01 E outra; Zlfornecedor01 E Zlfornecedor06), mais Estado, Supervisor e serviço.
    Planejados (diarista/técnico/fornecedor local) entram junto; = emergencial. */
 function chipNivelTL(rotulo, v){
   if (v == null) return '<span class="tl-crit" style="font-size:9.5px;color:var(--ink-muted);margin-left:3px;">' + rotulo + '—</span>';
@@ -9151,7 +9150,7 @@ function onArquivoCronogramaSelecionado(ev){
 /* ---------- Contratos Anuais — Fase 4: lavagem extra + indicadores (pedido pontual, 2026-10-05) ----------
    Lavagem além das previstas no contrato vira uma COTAÇÃO de verdade (`cotacoes.extra_contrato_id`),
    que segue a Fila de Aprovação de sempre (Analista → Head; decisão do Analista: aprovação dele e do
-   Head). Valor EDITÁVEL (sugere módulos × preço da lavagem extra do contrato, padrão R$ 1,60 —
+   Head). Valor EDITÁVEL (sugere módulos × preço da lavagem extra do contrato, padrão ZLVALOR04 —
    o contrato ainda está sendo fechado) e forma de pagamento livre (`forma_pagamento_extra`, Grid
    por padrão). Depois de aprovada, "Gerar pagamento" abre o "+ Novo orçamento" do Financeiro já
    preenchido (fornecedor, usina, forma, valor, obs com o nº da cotação — é pela obs que o app sabe
@@ -9159,7 +9158,7 @@ function onArquivoCronogramaSelecionado(ev){
    como "+N extra"), mas, concluída, entra no Farol como qualquer cotação.
    Indicadores: previsto até hoje (plano), pago (Financeiro), serviços realizados no período, custo
    médio por serviço, extras; e "Relatório do contrato (.csv)". */
-var FORMAS_EXTRA = ['Grid (3 parcelas: 30% + 35% em 30d + 35% em 60d)', 'Thopen (1 parcela, 30d após a NF)', 'Outra (parcelas livres)'];
+var FORMAS_EXTRA = ['Grid (3 parcelas: 30% + 35% em 30d + 35% em 60d)', 'Zlcliente01 (1 parcela, 30d após a NF)', 'Outra (parcelas livres)'];
 var extraContexto = null; /* {contratoId, itemId} */
 function extrasDoContrato(c){ return (state.cotacoes || []).filter(function(x){ return !x.excluido && x.extraContratoId === c.id; }); }
 function situacaoExtra(x){
@@ -9194,7 +9193,7 @@ function openExtraContrato(contratoId, itemId){
   if (!c.fornecedorId) { showToast('O fornecedor do contrato precisa estar no cadastro de Fornecedores pra virar cotação — cadastre e edite o contrato.'); return; }
   extraContexto = { contratoId: contratoId, itemId: itemId }; render();
   document.getElementById('ex-modulos').value = item.modulos || '';
-  document.getElementById('ex-preco').value = c.precoLavagemExtraModulo != null ? c.precoLavagemExtraModulo : 1.6;
+  document.getElementById('ex-preco').value = c.precoLavagemExtraModulo != null ? c.precoLavagemExtraModulo : ZLVALOR05;
   recalcularValorExtra();
   document.getElementById('overlay-extra-contrato').classList.add('open');
 }
@@ -9308,7 +9307,7 @@ function cotacaoEhExtra(id){ var x = (state.cotacoes || []).find(function(k){ re
      a pagar); estouro = total − previsto quando passa.
    - Primarizados: Realizado = gastos da Equipe lançados no mês; Falta realizar = previsto − realizado;
      Total = máx(previsto, realizado).
-   Valores do previsto em caixa (Grid 30/35/35 via pagamentosCenariosSimulacao); Thopen fica de fora
+   Valores do previsto em caixa (Grid 30/35/35 via pagamentosCenariosSimulacao); Zlcliente01 fica de fora
    (mesma regra da meta/visão Geral). Guardado em state.config['previsto_decidido_<escopo>'] (JSON).
    Aparece no topo da Simulação de cada escopo (adotar/editar/histórico) e em "Mês a mês - Geral"
    (seletor "Previsto decidido"). */
@@ -9324,7 +9323,7 @@ function previstoDecididoPorMes(escopo){
   lista.forEach(function(p, idx){
     var ate = lista[idx + 1] ? lista[idx + 1].aPartirDe : null;
     pagamentosCenariosSimulacao([{ nome: p.nome, itens: p.itens || [] }]).forEach(function(x){
-      if (x.formaPagamento === 'Thopen') return;
+      if (x.formaPagamento === 'Zlcliente01') return;
       if (x.mes < p.aPartirDe || (ate && x.mes >= ate)) return;
       out[x.mes] = Math.round(((out[x.mes] || 0) + (x.valor || 0)) * 100) / 100;
     });
@@ -9336,8 +9335,7 @@ function previstoDecididoPorMes(escopo){
    - Corte = última edição da simulação de origem (p.corte, editável; fallback: atualizadoEm/
      criadoEm da simulação de origem, depois adotadoEm). Lançamento com criado_em ≤ corte é
      BASE (fica por fora, somado ao simulado); o que entrou depois do corte ABATE do simulado,
-     sem duplicar. Ex.: out/2026 Equipe — locação R$ 6.000 lançada em 18/09 (base) + simulado
-     43.289 = previsto 49.289; diárias/hospedagem lançadas em 02/10 depois do corte saem dos 43.289.
+     sem duplicar. Ex.: out/2026 Equipe — ZLVALOR06.
    - Terceirizados: lançamento = parcela via Grid pelo mês de pagamento PREVISTO (mesma régua do
      "Mês a mês - Geral"); pago = tem data de realizado. Primarizados: gastos da Equipe pela data.
    - Total do mês = base + máx(simulado, lançado depois); estouro = lançado depois − simulado. */
@@ -9350,7 +9348,7 @@ function corteDoPrevisto(p, escopo){
 function lancamentosPorMes(escopo){
   var out = {};
   function add(k, valor, criadoEm, pago){ if (!k) return; (out[k] = out[k] || []).push({ valor: valor || 0, criadoEm: criadoEm || null, pago: pago }); }
-  if (escopo === 'terceirizados') financeiroAtivos().filter(function(f){ return f.via !== 'Thopen'; }).forEach(function(f){ add(mesAnoKey(f.dataPrevistoPagamento), f.valorParcela, f.criadoEm, !!f.dataRealizadoPagamento); });
+  if (escopo === 'terceirizados') financeiroAtivos().filter(function(f){ return f.via !== 'Zlcliente01'; }).forEach(function(f){ add(mesAnoKey(f.dataPrevistoPagamento), f.valorParcela, f.criadoEm, !!f.dataRealizadoPagamento); });
   else gastosEquipeAtivos().forEach(function(g){ add(mesAnoKey(g.data), g.valor, g.criadoEm, true); });
   return out;
 }
@@ -9399,7 +9397,7 @@ function linhasPrevistoXRealizado(escopos){
 function tabelaPrevistoXRealizadoHtml(escopos, titulo){
   var linhas = linhasPrevistoXRealizado(escopos);
   var html = '<div class="card card-pad prev-tabela" data-prev-escopos="' + escopos.join(',') + '" style="margin-bottom:14px;"><h3 class="section-title" style="margin:0 0 4px;">' + esc(titulo) + '</h3>' +
-    '<div class="cell-muted" style="font-size:11.5px;margin-bottom:8px;">Previsto = o que já estava lançado quando a simulação foi fechada + o simulado. O que foi lançado depois sai de dentro do simulado (não soma por fora). Thopen fica de fora.</div>';
+    '<div class="cell-muted" style="font-size:11.5px;margin-bottom:8px;">Previsto = o que já estava lançado quando a simulação foi fechada + o simulado. O que foi lançado depois sai de dentro do simulado (não soma por fora). Zlcliente01 fica de fora.</div>';
   if (!linhas.length) return html + '<div class="empty-note">Nenhuma simulação adotada como previsto ainda.</div></div>';
   var mesAtual = mesAnoKey(hoje());
   html += '<div class="table-wrap"><table style="min-width:0;"><thead><tr><th>Mês</th><th style="text-align:right;">Previsto</th><th style="text-align:right;">Já lançado antes</th><th style="text-align:right;">Simulado</th><th style="text-align:right;">Lançado depois (abate)</th><th style="text-align:right;">Falta</th><th style="text-align:right;">Total projetado</th></tr></thead><tbody>';
@@ -9424,7 +9422,7 @@ function tabelaPrevistoXRealizadoHtml(escopos, titulo){
    TODO número da tela nova sai de finMesInfo(); nenhuma outra parte do app soma por conta própria.
    - Lançamentos: parcela do PCM = tipo T, mês da data PREVISTA, pago = tem data realizada, fornecedor ligado
      pelo nome do cadastro ou pelo apelido (fin_fornecedor_alias); gasto da Equipe = tipo P, sempre pago, mês da
-     data, fornecedor = a equipe. Via Thopen fica fora da meta (só em foraMetaThopen).
+     data, fornecedor = a equipe. Via Zlcliente01 fica fora da meta (só em foraMetaZlcliente01).
    - Conciliação (finConciliar): SÓ vínculo confirmado (janela "Lançar no financeiro", 2026-11-06); a antiga regra
      automática (mesmo tipo, mês, via e fornecedor/equipe) virou sugestão em finCandidatos. Provisões em ordem de
      promoção; cada lançamento abate no máximo o seu valor no total e nenhuma provisão recebe mais do que o seu valor.
@@ -9444,14 +9442,14 @@ function finLinhaParaCenario(r){ return { id: r.id, nome: r.nome, origem: r.orig
 function finLinhaParaItem(r){
   return { id: r.id, cenarioId: r.cenario_id, ordem: r.ordem || 0, descricao: r.descricao, tipo: r.tipo, fornecedorId: r.fornecedor_id || null, fornecedorNome: r.fornecedor_nome || null,
     forma: r.forma, valor: Number(r.valor) || 0, nMeses: r.n_meses || 1, entradaPct: Number(r.entrada_pct) || 0, mesInicio: r.mes_inicio, agenda: Array.isArray(r.agenda) ? r.agenda : [],
-    via: r.via === 'Thopen' ? 'Thopen' : 'Grid', usina: r.usina || null, cliente: r.cliente || null, servico: r.servico || null, promovidoEm: r.promovido_em || null, promovidoPor: r.promovido_por || null,
+    via: r.via === 'Zlcliente01' ? 'Zlcliente01' : 'Grid', usina: r.usina || null, cliente: r.cliente || null, servico: r.servico || null, promovidoEm: r.promovido_em || null, promovidoPor: r.promovido_por || null,
     fornecedorADefinir: !!r.fornecedor_a_definir, fornecedorDefinidoPor: r.fornecedor_definido_por || null, fornecedorDefinidoEm: r.fornecedor_definido_em || null,
     criadoEm: r.criado_em || null, excluido: !!r.excluido };
 }
 function finLinhaParaProvisao(r){
   return { id: r.id, itemId: r.item_id, cenarioId: r.cenario_id, tipo: r.tipo, fornecedorId: r.fornecedor_id || null, fornecedorNome: r.fornecedor_nome || null, fornecedorADefinir: !!r.fornecedor_a_definir,
     conciliarAPartirDe: r.conciliar_a_partir_de || null,
-    via: r.via === 'Thopen' ? 'Thopen' : 'Grid', mes: r.mes, valor: Number(r.valor) || 0, promovidoEm: r.promovido_em, promovidoPor: r.promovido_por || null,
+    via: r.via === 'Zlcliente01' ? 'Zlcliente01' : 'Grid', mes: r.mes, valor: Number(r.valor) || 0, promovidoEm: r.promovido_em, promovidoPor: r.promovido_por || null,
     fechamento: r.fechamento || null, fechadoPor: r.fechado_por || null, fechadoEm: r.fechado_em || null, observacao: r.observacao || null, criadoEm: r.criado_em || null, excluido: !!r.excluido };
 }
 function finLinhaParaVinculo(r){ return { id: r.id, provisaoId: r.provisao_id, origem: r.origem, parcelaId: r.parcela_id, valor: r.valor == null ? null : Number(r.valor), observacao: r.observacao || null, criadoPor: r.criado_por || null, criadoEm: r.criado_em || null, excluido: !!r.excluido }; }
@@ -9521,7 +9519,7 @@ function finCtx(){
   financeiroAtivos().forEach(function(f){
     var m = mesAnoKey(f.dataPrevistoPagamento); if (!m) return;
     lanc.push({ chave: 'pcm:' + f.id, origem: 'pcm', id: f.id, tipo: 'T', mes: m, valor: Number(f.valorParcela) || 0, pago: !!f.dataRealizadoPagamento,
-      fornecedorId: porNome[finNomeNorm(f.fornecedor)] || null, fornecedorNome: f.fornecedor || null, via: f.via === 'Thopen' ? 'Thopen' : 'Grid', criadoMs: tsMs(f.criadoEm),
+      fornecedorId: porNome[finNomeNorm(f.fornecedor)] || null, fornecedorNome: f.fornecedor || null, via: f.via === 'Zlcliente01' ? 'Zlcliente01' : 'Grid', criadoMs: tsMs(f.criadoEm),
       servico: [f.investimento, f.ufv].filter(Boolean).join(' · '), usina: f.ufv || null, cliente: f.cliente || null, investimento: f.investimento || null });
   });
   gastosEquipeAtivos().forEach(function(g){
@@ -9747,7 +9745,7 @@ function finMesInfo(m, opcoes){
   function ok(t){ return esc === 'G' || esc === t; }
   function zero(){ return { realizado: 0, aPagar: 0, provisao: 0, simulado: 0 }; }
   var R = { mes: m, escopo: esc, cenarioId: opcoes.cenarioId || null, realizado: 0, aPagar: 0, provisao: 0, simulado: 0, previsto: 0, previstoSimulado: 0,
-    meta: metaDoMes(m), orcamento: finOrcamentoDoMes(m), foraMetaThopen: 0, porTipo: { T: zero(), P: zero() }, linhas: [], filtrado: !!F };
+    meta: metaDoMes(m), orcamento: finOrcamentoDoMes(m), foraMetaZlcliente01: 0, porTipo: { T: zero(), P: zero() }, linhas: [], filtrado: !!F };
   /* linhas = mesma soma, quebrada por fornecedor/equipe (composição, ranking e detalhe do mês usam só isto) */
   var porLinha = {};
   function linha(tipo, fornId, nome, aDefinir){
@@ -9758,14 +9756,14 @@ function finMesInfo(m, opcoes){
   ctx.lanc.forEach(function(l){
     if (l.mes !== m || !ok(l.tipo)) return;
     if (F && !finPassaFiltro(finRegistroLanc(l, ctx), F)) return;
-    if (l.via === 'Thopen') { R.foraMetaThopen += l.valor; return; }
+    if (l.via === 'Zlcliente01') { R.foraMetaZlcliente01 += l.valor; return; }
     soma(l.tipo, l.pago ? 'realizado' : 'aPagar', l.valor, linha(l.tipo, l.fornecedorId, l.fornecedorNome), l.servico);
   });
   finProvisoesAtivas().forEach(function(pv){
     if (pv.mes !== m || !ok(pv.tipo)) return;
     if (F && !finPassaFiltro(finRegistroProvisao(pv, ctx), F)) return;
     var s = finSaldoProvisao(pv);
-    if (pv.via === 'Thopen') { R.foraMetaThopen += s; return; }
+    if (pv.via === 'Zlcliente01') { R.foraMetaZlcliente01 += s; return; }
     var it = (state.finItens || []).find(function(x){ return x.id === pv.itemId; });
     var Lp = linha(pv.tipo, pv.fornecedorId, pv.fornecedorNome, pv.fornecedorADefinir);
     soma(pv.tipo, 'provisao', s, Lp, s > 0 && it ? it.descricao : null);
@@ -9773,12 +9771,12 @@ function finMesInfo(m, opcoes){
   });
   var cen = opcoes.cenarioId && finCenariosAtivos().find(function(c){ return c.id === opcoes.cenarioId; });
   if (cen) finItensDoCenario(cen.id).forEach(function(it){
-    if (it.promovidoEm || !ok(it.tipo) || it.via === 'Thopen') return;
+    if (it.promovidoEm || !ok(it.tipo) || it.via === 'Zlcliente01') return;
     if (F && !finPassaFiltro(finRegistroItem(it, 'simulado', it.cenarioId, it.fornecedorId, it.fornecedorNome, it.fornecedorADefinir, it.tipo, ctx), F)) return;
     var v = finDistribuir(it)[m] || 0;
     if (v) soma(it.tipo, 'simulado', v, linha(it.tipo, it.fornecedorId, it.fornecedorNome, it.fornecedorADefinir), it.descricao);
   });
-  ['realizado', 'aPagar', 'provisao', 'simulado', 'foraMetaThopen'].forEach(function(k){ R[k] = r2(R[k]); });
+  ['realizado', 'aPagar', 'provisao', 'simulado', 'foraMetaZlcliente01'].forEach(function(k){ R[k] = r2(R[k]); });
   ['T', 'P'].forEach(function(t){ Object.keys(R.porTipo[t]).forEach(function(k){ R.porTipo[t][k] = r2(R.porTipo[t][k]); }); });
   R.linhas = Object.keys(porLinha).map(function(k){ var L = porLinha[k]; ['realizado', 'aPagar', 'provisao', 'simulado'].forEach(function(c){ L[c] = r2(L[c]); }); L.total = r2(L.realizado + L.aPagar + L.provisao + L.simulado); return L; })
     .filter(function(L){ return Math.abs(L.total) >= 0.005; }).sort(function(a, b){ return b.total - a.total; });
@@ -9958,8 +9956,7 @@ function finKpisHtml(i){
     '</div>';
 }
 /* Frase da faixa — começa sempre pela distância até a meta (pedido do Analista):
-   "Em out/2026, o previsto está R$ 82.447 (+55%) acima da meta. Ele usa 39,7% da faixa entre meta e orçamento e
-   deixa R$ 125.455 de folga até o orçamento." · acima do orçamento: "… acima da meta e R$ X acima do orçamento."
+   "Em out/2026, o previsto está ZLVALOR07 até o orçamento." · acima do orçamento: "… acima da meta e R$ X acima do orçamento."
    · abaixo: "… está R$ X (−6%) abaixo da meta." mes = null → sem "Em mês," (frase do simulado). */
 function finFraseFaixa(mes, sujeito, val, meta, orc){
   var d = val - meta, pct = meta ? Math.round(d / meta * 100) : 0, ini = mes ? 'Em ' + finMesNome(mes) + ', ' + sujeito : sujeito.charAt(0).toUpperCase() + sujeito.slice(1);
@@ -10061,21 +10058,21 @@ function finGraficoHtml(info){
 }
 /* Composição do previsto: mês selecionado ou média mensal dos meses visíveis a partir do mês atual. */
 /* Primarizados: provisionado × lançado (pedido do Analista, 2026-11-06: "saber se o que eu lancei ficou dentro do que estava
-   provisionado, se sobrou ou se estourou"). Por mês: provisionado = soma das provisões primarizadas (canceladas e Thopen
+   provisionado, se sobrou ou se estourou"). Por mês: provisionado = soma das provisões primarizadas (canceladas e Zlcliente01
    fora), lançado = gastos da Equipe do mês; diferença = sobrou / estourou. Embaixo, quanto de cada provisão já foi coberto
    por gasto ligado (Lançar no financeiro) e quanto foi lançado sem ligar. Mesmos filtros da tela. Só mostra, não muda conta. */
 function finPrimProvisao(meses, semFiltro){
   var ctx = finCtx(), F = semFiltro ? null : finFiltrosNorm(finFiltrosTela()), r = { prov: 0, lanc: 0, ligado: 0, itens: {} };
   meses.forEach(function(m){
     finProvisoesAtivas().forEach(function(pv){
-      if (pv.mes !== m || pv.tipo !== 'P' || pv.via === 'Thopen' || pv.fechamento === 'cancelada') return;
+      if (pv.mes !== m || pv.tipo !== 'P' || pv.via === 'Zlcliente01' || pv.fechamento === 'cancelada') return;
       if (F && !finPassaFiltro(finRegistroProvisao(pv, ctx), F)) return;
       var c = ctx.conc[pv.id], lig = c ? c.vinculado : 0, it = (state.finItens || []).find(function(x){ return x.id === pv.itemId; }) || {};
       var nome = it.descricao || pv.itemId, o = r.itens[nome] || (r.itens[nome] = { nome: nome, prov: 0, ligado: 0 });
       o.prov += pv.valor; o.ligado += lig; r.prov += pv.valor; r.ligado += lig;
     });
     ctx.lanc.forEach(function(l){
-      if (l.mes !== m || l.tipo !== 'P' || l.via === 'Thopen') return;
+      if (l.mes !== m || l.tipo !== 'P' || l.via === 'Zlcliente01') return;
       if (F && !finPassaFiltro(finRegistroLanc(l, ctx), F)) return;
       r.lanc += l.valor;
     });
@@ -10106,9 +10103,9 @@ function finPrimProvisaoHtml(meses, media){
 function finSobraDetalheHtml(mes, sobraValor){
   if (!(sobraValor > 0.5)) return '<p class="fx-hint" style="margin-top:10px;">Não sobrou saldo — todo o previsto de ' + finMesNome(mes) + ' foi realizado.</p>';
   var ctx = finCtx(), itemPorId = {}; (state.finItens || []).forEach(function(it){ itemPorId[it.id] = it; });
-  var itens = ctx.lanc.filter(function(l){ return l.mes === mes && !l.pago && l.via !== 'Thopen'; }).map(function(l){
+  var itens = ctx.lanc.filter(function(l){ return l.mes === mes && !l.pago && l.via !== 'Zlcliente01'; }).map(function(l){
     return { nome: finNomeFornecedor(l.fornecedorId, l.fornecedorNome, l.tipo) + (l.usina ? ' (' + l.usina + ')' : ''), valor: l.valor, txt: 'lançado a pagar e não pago' };
-  }).concat(finProvisoesAtivas().filter(function(pv){ return pv.mes === mes && pv.via !== 'Thopen' && finSaldoProvisao(pv) > 0.5; }).map(function(pv){
+  }).concat(finProvisoesAtivas().filter(function(pv){ return pv.mes === mes && pv.via !== 'Zlcliente01' && finSaldoProvisao(pv) > 0.5; }).map(function(pv){
     var it = itemPorId[pv.itemId] || {};
     return { nome: (it.descricao || pv.itemId) + ' — ' + finNomeFornecedor(pv.fornecedorId, pv.fornecedorNome, pv.tipo, pv.fornecedorADefinir), valor: finSaldoProvisao(pv), txt: FIN_REL_STATUS_PROV[finStatusProvisao(pv)] || finStatusProvisao(pv) };
   })).sort(function(a, b){ return b.valor - a.valor; });
@@ -10163,7 +10160,7 @@ function finComposicaoHtml(info, meses){
 /* Pagamentos do mês por semana (pedido do Analista, 2026-11-06): o mês selecionado, semana de segunda a domingo, com
    data, usina, fornecedor, serviço e valor. Mesmo escopo e filtros da finMesInfo: parcelas do Acompanhamento pela
    data prevista, gastos da Equipe pela data (juntados por dia + equipe) e, no fim, o que ainda é provisão (sem dia).
-   Thopen entra na lista (é pagamento) mas fica marcado, porque não conta na meta. */
+   Zlcliente01 entra na lista (é pagamento) mas fica marcado, porque não conta na meta. */
 function finPagamentosMes(m, op){
   op = op || {};
   var escopo = op.escopo || 'G', ctx = finCtx(), F = finFiltrosNorm(op.filtros), linhas = [], equipe = {}, semData = [], fin = {}, gj = {};
@@ -10176,7 +10173,7 @@ function finPagamentosMes(m, op){
     if (l.origem === 'pcm') {
       var p = fin[l.id] || {};
       linhas.push({ data: String(p.dataPrevistoPagamento || '').slice(0, 10), usina: l.usina, forn: finNomeFornecedor(l.fornecedorId, l.fornecedorNome, 'T'), servico: l.investimento,
-        parc: p.numeroParcelas > 1 ? 'parcela ' + p.parcela + '/' + p.numeroParcelas : '', valor: l.valor, pago: l.pago, thopen: l.via === 'Thopen', tipo: 'T' });
+        parc: p.numeroParcelas > 1 ? 'parcela ' + p.parcela + '/' + p.numeroParcelas : '', valor: l.valor, pago: l.pago, zlcliente01: l.via === 'Zlcliente01', tipo: 'T' });
       return;
     }
     var g = gj[l.id] || {}, d = String(g.data || '').slice(0, 10), k = d + '|' + (l.fornecedorId || '');
@@ -10191,14 +10188,14 @@ function finPagamentosMes(m, op){
     if (F && !finPassaFiltro(finRegistroProvisao(pv, ctx), F)) return;
     var sd = finSaldoProvisao(pv); if (!(sd > 0)) return;
     var it = (state.finItens || []).find(function(x){ return x.id === pv.itemId; }) || {};
-    semData.push({ usina: it.usina || null, forn: finNomeFornecedor(pv.fornecedorId, pv.fornecedorNome, pv.tipo, pv.fornecedorADefinir), servico: it.descricao || null, valor: sd, aDefinir: !!pv.fornecedorADefinir, thopen: pv.via === 'Thopen', tipo: pv.tipo });
+    semData.push({ usina: it.usina || null, forn: finNomeFornecedor(pv.fornecedorId, pv.fornecedorNome, pv.tipo, pv.fornecedorADefinir), servico: it.descricao || null, valor: sd, aDefinir: !!pv.fornecedorADefinir, zlcliente01: pv.via === 'Zlcliente01', tipo: pv.tipo });
   });
   linhas.sort(function(a, b){ return a.data.localeCompare(b.data) || a.forn.localeCompare(b.forn, 'pt-BR'); });
   semData.sort(function(a, b){ return b.valor - a.valor; });
   return { linhas: linhas, semData: semData };
 }
 function finPagamentosMesHtml(m, op){
-  var r = finPagamentosMes(m, op), p = m.split('-'), ult = new Date(+p[0], +p[1], 0).getDate(), semanas = [], porSem = {}, total = 0, thopen = 0;
+  var r = finPagamentosMes(m, op), p = m.split('-'), ult = new Date(+p[0], +p[1], 0).getDate(), semanas = [], porSem = {}, total = 0, zlcliente01 = 0;
   function ddmm(d){ return String(d).slice(8, 10) + '/' + String(d).slice(5, 7); }
   function iso(dt){ return dt.getFullYear() + '-' + String(dt.getMonth() + 1).padStart(2, '0') + '-' + String(dt.getDate()).padStart(2, '0'); }
   r.linhas.forEach(function(l){
@@ -10211,8 +10208,8 @@ function finPagamentosMesHtml(m, op){
   function ln(l, data){
     var nome = [l.usina, l.forn].filter(Boolean).join(' – '), det = [l.servico, l.parc].filter(Boolean).join(' · ');
     var pills = (l.pago ? ' <span class="fx-pill fx-p-ok">pago</span>' : '') + (l.tipo === 'P' ? ' <span class="fx-pill fx-p-i">primarizado</span>' : '') +
-      (l.aDefinir ? ' <span class="fx-pill fx-p-w">fornecedor a definir</span>' : '') + (l.thopen ? ' <span class="fx-pill">Thopen · fora da meta</span>' : '');
-    total = r2(total + l.valor); if (l.thopen) thopen = r2(thopen + l.valor);
+      (l.aDefinir ? ' <span class="fx-pill fx-p-w">fornecedor a definir</span>' : '') + (l.zlcliente01 ? ' <span class="fx-pill">Zlcliente01 · fora da meta</span>' : '');
+    total = r2(total + l.valor); if (l.zlcliente01) zlcliente01 = r2(zlcliente01 + l.valor);
     return '<div class="fx-pg-ln"><span class="num">' + data + '</span><span>' + esc(nome) + (det ? ' <small>(' + esc(det) + ')</small>' : '') + pills + '</span><span class="v num">' + finR0(l.valor) + '</span></div>';
   }
   var h = '<div class="fx-card" data-fin-pagamentos="' + m + '"><h3>Pagamentos de ' + finMesNome(m) + ' por semana <small>troque o mês clicando no gráfico ou na tabela</small></h3>';
@@ -10227,7 +10224,7 @@ function finPagamentosMesHtml(m, op){
       r.semData.map(function(l){ return ln(l, '—'); }).join('') + '</div>';
   }
   h += '<div class="fx-pg-tot"><span>Total de ' + finMesNome(m) + '</span><span class="num" data-fin-pg-total="1">' + finR0(total) + '</span></div>';
-  if (thopen) h += '<p class="fx-hint">Inclui ' + finR0(thopen) + ' via Thopen, que não contam na meta (por isso o total aqui pode passar do previsto).</p>';
+  if (zlcliente01) h += '<p class="fx-hint">Inclui ' + finR0(zlcliente01) + ' via Zlcliente01, que não contam na meta (por isso o total aqui pode passar do previsto).</p>';
   return h + '</div>';
 }
 function finTabelaHtml(info){
@@ -10354,7 +10351,7 @@ function finCenariosHtml(){
       '<input type="number" name="entrada" value="40" min="0" max="100" step="1" title="% de entrada">' +
       '<button type="button" class="btn btn-primary btn-sm" data-fin-add-item="' + esc(cn.id) + '">+ Item</button>' +
       '<div class="fx-agenda-linha" style="grid-column:1/-1;font-size:12px;color:var(--ink-2);">Usina <input type="text" name="usina" placeholder="(opcional)" style="flex:1 1 160px;"> Cliente <input type="text" name="cliente" placeholder="(opcional)" style="flex:1 1 140px;"></div>' +
-      '<div class="fx-agenda" data-fin-agenda style="display:none;"><span>Mês a mês: cada faixa = de / até / valor POR mês (ex.: out a dez 55.000, jan a set 80.439,63).</span>' +
+      '<div class="fx-agenda" data-fin-agenda style="display:none;"><span>Mês a mês: cada faixa = de / até / valor POR mês (ex.: ZLVALOR09).</span>' +
         finLinhaAgendaHtml(proxMes, proxMes, '') + '<div><button type="button" class="btn btn-ghost btn-sm" data-fin-agenda-mais>+ Faixa</button></div></div>' +
       '</div></div>';
   });
@@ -10819,11 +10816,11 @@ function finRelDados(de, ate, usarFiltros){
   var porMes = meses.map(function(m){
     var i = finMesInfo(m, op);
     return { mes: m, rotulo: finMesNome(m), meta: i.meta, orcamento: i.orcamento, realizado: i.realizado, aPagar: i.aPagar, provisao: i.provisao, previsto: i.previsto,
-      simulado: i.simulado, previstoSimulado: i.previstoSimulado, thopen: i.foraMetaThopen, T: i.porTipo.T, P: i.porTipo.P };
+      simulado: i.simulado, previstoSimulado: i.previstoSimulado, zlcliente01: i.foraMetaZlcliente01, T: i.porTipo.T, P: i.porTipo.P };
   });
   var somaK = function(lista, k){ return r2(lista.reduce(function(a, x){ return a + (Number(x[k]) || 0); }, 0)); };
   var tot = {};
-  ['meta', 'orcamento', 'realizado', 'aPagar', 'provisao', 'previsto', 'simulado', 'previstoSimulado', 'thopen'].forEach(function(k){ tot[k] = somaK(porMes, k); });
+  ['meta', 'orcamento', 'realizado', 'aPagar', 'provisao', 'previsto', 'simulado', 'previstoSimulado', 'zlcliente01'].forEach(function(k){ tot[k] = somaK(porMes, k); });
   ['T', 'P'].forEach(function(t){ tot[t] = {}; ['realizado', 'aPagar', 'provisao', 'simulado'].forEach(function(k){ tot[t][k] = r2(porMes.reduce(function(a, x){ return a + x[t][k]; }, 0)); }); });
   /* 2. lançamentos (Acompanhamento + gastos das equipes primarizadas) com a ligação às provisões */
   var provsDoLanc = {};
@@ -10836,7 +10833,7 @@ function finRelDados(de, ate, usarFiltros){
       data: String(p ? (p.dataPrevistoPagamento || '') : (g.data || '')).slice(0, 10), dataPaga: String(p ? (p.dataRealizadoPagamento || '') : (g.data || '')).slice(0, 10),
       situacao: l.pago ? 'Realizado (pago)' : 'A pagar', fornecedor: finNomeFornecedor(l.fornecedorId, l.fornecedorNome, l.tipo), usina: l.usina || '', cliente: l.cliente || '',
       servico: l.investimento || '', parcela: p && p.numeroParcelas ? (p.parcela || '?') + '/' + p.numeroParcelas : '', valorTotal: p && p.valorPrevistoTotal != null ? p.valorPrevistoTotal : null,
-      valor: r2(l.valor), via: l.via, foraMeta: l.via === 'Thopen', conciliado: conc, semProvisao: r2(l.valor - conc),
+      valor: r2(l.valor), via: l.via, foraMeta: l.via === 'Zlcliente01', conciliado: conc, semProvisao: r2(l.valor - conc),
       provisoes: lig.map(function(x){ return x.pv.id + ' ' + ((itemPorId[x.pv.itemId] || {}).descricao || ''); }).join('; '),
       forma: g ? (g.formaPagamento || '') : '', colaborador: col ? col.nome : '', nf: p ? (p.numeroNotaFiscal || '') : '', classe: p ? (p.classeContabil || '') : '',
       codigo: p ? (p.codigo || '') : '', obs: p ? (p.observacao || '') : (g.descricao || '') };
@@ -10846,7 +10843,7 @@ function finRelDados(de, ate, usarFiltros){
     var it = itemPorId[pv.itemId] || {}, c = ctx.conc[pv.id] || { vinculado: 0, parcelas: [] }, st = finStatusProvisao(pv);
     return { id: pv.id, itemId: pv.itemId, item: it.descricao || '', cenario: cenNome[pv.cenarioId] || pv.cenarioId || '', tipo: tipoTxt(pv.tipo),
       fornecedor: finNomeFornecedor(pv.fornecedorId, pv.fornecedorNome, pv.tipo, pv.fornecedorADefinir), aDefinir: !!pv.fornecedorADefinir,
-      usina: it.usina || '', cliente: it.cliente || '', servico: it.servico || '', forma: FIN_FORMA_TXT[it.forma] || it.forma || '', via: pv.via, foraMeta: pv.via === 'Thopen',
+      usina: it.usina || '', cliente: it.cliente || '', servico: it.servico || '', forma: FIN_FORMA_TXT[it.forma] || it.forma || '', via: pv.via, foraMeta: pv.via === 'Zlcliente01',
       mes: pv.mes, valor: r2(pv.valor), conciliado: r2(c.vinculado), saldo: finSaldoProvisao(pv), status: FIN_REL_STATUS_PROV[st] || st,
       promovidoEm: pv.promovidoEm ? String(pv.promovidoEm).slice(0, 10) : '', promovidoPor: pv.promovidoPor || '', fechadoEm: pv.fechadoEm ? String(pv.fechadoEm).slice(0, 10) : '',
       fechadoPor: pv.fechadoPor || '', obs: pv.observacao || '', parcelas: c.parcelas };
@@ -10861,7 +10858,7 @@ function finRelDados(de, ate, usarFiltros){
   /* 4. simulado (cenário somado na tela) */
   var sim = [];
   if (cen) finItensDoCenario(cen.id).forEach(function(it){
-    if (it.promovidoEm || !ok(it.tipo) || it.via === 'Thopen') return;
+    if (it.promovidoEm || !ok(it.tipo) || it.via === 'Zlcliente01') return;
     if (F && !finPassaFiltro(finRegistroItem(it, 'simulado', it.cenarioId, it.fornecedorId, it.fornecedorNome, it.fornecedorADefinir, it.tipo, ctx), F)) return;
     var d = finDistribuir(it);
     meses.forEach(function(m){ if (d[m]) sim.push({ itemId: it.id, item: it.descricao || '', tipo: tipoTxt(it.tipo), fornecedor: finNomeFornecedor(it.fornecedorId, it.fornecedorNome, it.tipo, it.fornecedorADefinir),
@@ -10876,18 +10873,18 @@ function finRelDados(de, ate, usarFiltros){
     var o = {};
     base.forEach(function(b){
       var k = b[campo] || '(sem ' + ({ fornecedor: 'fornecedor', usina: 'usina', cliente: 'cliente', servico: 'serviço' })[campo] + ')';
-      var x = o[k] || (o[k] = { nome: k, realizado: 0, aPagar: 0, provisao: 0, simulado: 0, thopen: 0, qtd: 0 });
+      var x = o[k] || (o[k] = { nome: k, realizado: 0, aPagar: 0, provisao: 0, simulado: 0, zlcliente01: 0, qtd: 0 });
       x.qtd++;
-      if (!b.meta) x.thopen += b.valor;
+      if (!b.meta) x.zlcliente01 += b.valor;
       else if (b.situacao === 'Realizado (pago)') x.realizado += b.valor;
       else if (b.situacao === 'A pagar') x.aPagar += b.valor;
       else if (b.situacao === 'Simulado') x.simulado += b.valor;
       else x.provisao += b.valor;
     });
-    return Object.keys(o).map(function(k){ var x = o[k]; ['realizado', 'aPagar', 'provisao', 'simulado', 'thopen'].forEach(function(c){ x[c] = r2(x[c]); }); x.previsto = r2(x.realizado + x.aPagar + x.provisao); return x; })
+    return Object.keys(o).map(function(k){ var x = o[k]; ['realizado', 'aPagar', 'provisao', 'simulado', 'zlcliente01'].forEach(function(c){ x[c] = r2(x[c]); }); x.previsto = r2(x.realizado + x.aPagar + x.provisao); return x; })
       .sort(function(a, b){ return b.previsto - a.previsto || b.simulado - a.simulado; });
   };
-  /* fornecedor × mês (previsto, sem simulado e sem Thopen) */
+  /* fornecedor × mês (previsto, sem simulado e sem Zlcliente01) */
   var mat = {};
   base.forEach(function(b){ if (!b.meta || b.situacao === 'Simulado') return; var x = mat[b.fornecedor] || (mat[b.fornecedor] = { nome: b.fornecedor, tipo: b.tipo, meses: {}, total: 0 }); x.meses[b.mes] = r2((x.meses[b.mes] || 0) + b.valor); x.total = r2(x.total + b.valor); });
   var matriz = Object.keys(mat).map(function(k){ return mat[k]; }).sort(function(a, b){ return b.total - a.total; });
@@ -10895,8 +10892,8 @@ function finRelDados(de, ate, usarFiltros){
   var sem = {};
   lanc.forEach(function(l){
     if (!l.data) return;
-    var seg = equipeRelSegunda(l.data), x = sem[seg] || (sem[seg] = { de: seg, ate: equipeRelMais(seg, 6), realizado: 0, aPagar: 0, thopen: 0, qtd: 0 });
-    x.qtd++; if (l.foraMeta) x.thopen = r2(x.thopen + l.valor); else if (l.situacao === 'A pagar') x.aPagar = r2(x.aPagar + l.valor); else x.realizado = r2(x.realizado + l.valor);
+    var seg = equipeRelSegunda(l.data), x = sem[seg] || (sem[seg] = { de: seg, ate: equipeRelMais(seg, 6), realizado: 0, aPagar: 0, zlcliente01: 0, qtd: 0 });
+    x.qtd++; if (l.foraMeta) x.zlcliente01 = r2(x.zlcliente01 + l.valor); else if (l.situacao === 'A pagar') x.aPagar = r2(x.aPagar + l.valor); else x.realizado = r2(x.realizado + l.valor);
   });
   var semanas = Object.keys(sem).sort().map(function(k){ var x = sem[k]; x.total = r2(x.realizado + x.aPagar); return x; });
   /* alterações e motivos feitas dentro do período */
@@ -10937,7 +10934,7 @@ function finRelPlanilhas(R){
     ['Previsto (realizado + a pagar + provisão)', T.previsto, 1], ['   Realizado (pago)', T.realizado, 1], ['   Lançado a pagar', T.aPagar, 1], ['   Provisão (falta lançar no financeiro)', T.provisao, 1],
     [difMeta > 0 ? 'Previsto ACIMA da meta' : 'Previsto abaixo da meta', Math.abs(difMeta), 1], ['% da meta (previsto ÷ meta)', T.meta ? r2(T.previsto / T.meta * 100) + '%' : '—', 0],
     ['% já realizado do previsto', T.previsto ? r2(T.realizado / T.previsto * 100) + '%' : '—', 0],
-    ['Simulado (cenário somado)', T.simulado, 1], ['Previsto + simulado', T.previstoSimulado, 1], ['Thopen (fora da meta, não entra no previsto)', T.thopen, 1],
+    ['Simulado (cenário somado)', T.simulado, 1], ['Previsto + simulado', T.previstoSimulado, 1], ['Zlcliente01 (fora da meta, não entra no previsto)', T.zlcliente01, 1],
     ['Terceirizados — previsto', r2(T.T.realizado + T.T.aPagar + T.T.provisao), 1], ['Primarizados — previsto', r2(T.P.realizado + T.P.aPagar + T.P.provisao), 1],
     ['Provisões em aberto (falta lançar)', R.aAlinhar.qtd + ' provisão(ões) · ' + fmtMoney(R.aAlinhar.valor), 0],
     ['   com fornecedor a definir', R.aDefinir.qtd + ' · ' + fmtMoney(R.aDefinir.valor), 0],
@@ -10950,19 +10947,19 @@ function finRelPlanilhas(R){
   var aR = aba('Resumo', ['Indicador', 'Valor'], res.map(function(x){ return [x[0], x[1]]; }), [], [48, 70]);
   aR.moedaLinhas = []; res.forEach(function(x, i){ if (x[2]) aR.moedaLinhas.push(i); });
   aba('Por mês', ['Mês', 'Meta', 'Orçamento', 'Realizado (pago)', 'A pagar', 'Provisão', 'Previsto', 'Previsto − meta', '% da meta', 'Simulado', 'Previsto + simulado',
-    'Terc. realizado', 'Terc. a pagar', 'Terc. provisão', 'Prim. realizado', 'Prim. a pagar', 'Prim. provisão', 'Thopen (fora da meta)'],
+    'Terc. realizado', 'Terc. a pagar', 'Terc. provisão', 'Prim. realizado', 'Prim. a pagar', 'Prim. provisão', 'Zlcliente01 (fora da meta)'],
     R.porMes.map(function(x){ return [x.rotulo, x.meta, x.orcamento, x.realizado, x.aPagar, x.provisao, x.previsto, r2(x.previsto - x.meta), finRelPct(x.previsto, x.meta), x.simulado, x.previstoSimulado,
-      x.T.realizado, x.T.aPagar, x.T.provisao, x.P.realizado, x.P.aPagar, x.P.provisao, x.thopen]; })
+      x.T.realizado, x.T.aPagar, x.T.provisao, x.P.realizado, x.P.aPagar, x.P.provisao, x.zlcliente01]; })
       .concat([['Total', T.meta, T.orcamento, T.realizado, T.aPagar, T.provisao, T.previsto, difMeta, finRelPct(T.previsto, T.meta), T.simulado, T.previstoSimulado,
-        T.T.realizado, T.T.aPagar, T.T.provisao, T.P.realizado, T.P.aPagar, T.P.provisao, T.thopen]]),
+        T.T.realizado, T.T.aPagar, T.T.provisao, T.P.realizado, T.P.aPagar, T.P.provisao, T.zlcliente01]]),
     [1, 2, 3, 4, 5, 6, 7, 9, 10, 11, 12, 13, 14, 15, 16, 17], [12, 14, 14, 16, 14, 14, 15, 15, 10, 14, 16, 14, 14, 14, 14, 14, 14, 16], [8]);
   aba('Fornecedor x mês', ['Fornecedor', 'Tipo'].concat(R.meses.map(MN)).concat(['Total previsto']),
     R.matriz.map(function(x){ return [x.nome, x.tipo].concat(R.meses.map(function(m){ return x.meses[m] || 0; })).concat([x.total]); })
       .concat([['Total', ''].concat(R.meses.map(function(m){ return r2(R.matriz.reduce(function(a, x){ return a + (x.meses[m] || 0); }, 0)); })).concat([r2(R.matriz.reduce(function(a, x){ return a + x.total; }, 0))])]),
     fc(R.meses.length + 1, 2), [36, 13].concat(R.meses.map(function(){ return 13; })).concat([16]));
   var quebra = function(nome, titulo, lista){
-    aba(nome, [titulo, 'Realizado (pago)', 'A pagar', 'Provisão', 'Previsto', '% do previsto', 'Simulado', 'Thopen (fora da meta)', 'Nº de linhas'],
-      lista.map(function(x){ return [x.nome, x.realizado, x.aPagar, x.provisao, x.previsto, finRelPct(x.previsto, T.previsto), x.simulado, x.thopen, x.qtd]; }),
+    aba(nome, [titulo, 'Realizado (pago)', 'A pagar', 'Provisão', 'Previsto', '% do previsto', 'Simulado', 'Zlcliente01 (fora da meta)', 'Nº de linhas'],
+      lista.map(function(x){ return [x.nome, x.realizado, x.aPagar, x.provisao, x.previsto, finRelPct(x.previsto, T.previsto), x.simulado, x.zlcliente01, x.qtd]; }),
       [1, 2, 3, 4, 6, 7], [40, 16, 14, 14, 15, 12, 14, 16, 10], [5]);
   };
   quebra('Por fornecedor', 'Fornecedor / equipe', R.porFornecedor); quebra('Por usina', 'Usina', R.porUsina); quebra('Por cliente', 'Cliente', R.porCliente); quebra('Por serviço', 'Serviço / item', R.porServico);
@@ -10975,18 +10972,18 @@ function finRelPlanilhas(R){
     [3, 9, 10], [10, 34, 10, 16, 12, 16, 28, 24, 12, 16, 16, 34]);
   aba('Lançamentos', ['Data prevista', 'Data paga', 'Mês', 'Situação', 'Tipo', 'Origem', 'Fornecedor / equipe', 'Usina', 'Cliente', 'Serviço / tipo de gasto', 'Parcela', 'Valor do contrato', 'Valor', 'Via', 'Conta na meta',
     'Ligado a provisão', 'Sem provisão', 'Provisões ligadas', 'Forma de pagamento', 'Colaborador', 'Nº NF', 'Classe contábil', 'Código', 'ID', 'Observação / descrição'],
-    R.lanc.map(function(l){ return [fd(l.data), l.situacao === 'A pagar' ? '' : fd(l.dataPaga), MN(l.mes), l.situacao, l.tipo, l.origem, l.fornecedor, l.usina, l.cliente, l.servico, l.parcela, l.valorTotal, l.valor, l.via, l.foraMeta ? 'Não (Thopen)' : 'Sim',
+    R.lanc.map(function(l){ return [fd(l.data), l.situacao === 'A pagar' ? '' : fd(l.dataPaga), MN(l.mes), l.situacao, l.tipo, l.origem, l.fornecedor, l.usina, l.cliente, l.servico, l.parcela, l.valorTotal, l.valor, l.via, l.foraMeta ? 'Não (Zlcliente01)' : 'Sim',
       l.conciliado, l.semProvisao, l.provisoes, l.forma, l.colaborador, l.nf, l.classe, l.codigo, l.id, l.obs]; })
       .concat([['Total', '', '', '', '', '', '', '', '', '', '', '', r2(R.lanc.reduce(function(a, l){ return a + l.valor; }, 0))]]),
     [11, 12, 15, 16], [12, 12, 10, 16, 12, 24, 28, 24, 16, 26, 9, 16, 14, 8, 12, 14, 14, 30, 16, 20, 10, 14, 10, 12, 36]);
-  aba('Por semana', ['Semana (seg–dom)', 'Início', 'Fim', 'Realizado (pago)', 'A pagar', 'Total', 'Thopen (fora da meta)', 'Nº de lançamentos'],
-    R.semanas.map(function(s){ return ['Semana de ' + fmtDate(s.de).slice(0, 5), fd(s.de), fd(s.ate), s.realizado, s.aPagar, s.total, s.thopen, s.qtd]; }), [3, 4, 5, 6], [20, 12, 12, 16, 14, 14, 16, 12]);
+  aba('Por semana', ['Semana (seg–dom)', 'Início', 'Fim', 'Realizado (pago)', 'A pagar', 'Total', 'Zlcliente01 (fora da meta)', 'Nº de lançamentos'],
+    R.semanas.map(function(s){ return ['Semana de ' + fmtDate(s.de).slice(0, 5), fd(s.de), fd(s.ate), s.realizado, s.aPagar, s.total, s.zlcliente01, s.qtd]; }), [3, 4, 5, 6], [20, 12, 12, 16, 14, 14, 16, 12]);
   if (R.cenario) aba('Simulação', ['Item', 'Tipo', 'Fornecedor', 'Usina', 'Cliente', 'Forma', 'Total do item', 'Mês', 'Valor no mês'],
     R.sim.map(function(s){ return [s.item, s.tipo, s.fornecedor, s.usina, s.cliente, s.forma, s.totalItem, MN(s.mes), s.valor]; }), [6, 8], [36, 12, 28, 24, 16, 18, 16, 10, 14]);
   aba('Alterações e motivos', ['Quando', 'Quem', 'Onde', 'Item / parcela', 'O que mudou', 'Motivo', 'Motivo original (se editado)'],
     R.alteracoes.map(function(a){ return [a.quando, a.quem, a.onde, a.alvo, a.mudou, a.motivo, a.original]; }), [], [16, 28, 22, 34, 60, 50, 30]);
   aba('Base (tabela dinâmica)', ['Mês', 'Mês (AAAA-MM)', 'Tipo', 'Situação', 'Conta na meta', 'Fornecedor / equipe', 'Usina', 'Cliente', 'Serviço / item', 'Origem', 'Referência', 'Data', 'Valor'],
-    R.base.map(function(b){ return [MN(b.mes), b.mes, b.tipo, b.situacao, b.meta ? 'Sim' : 'Não (Thopen)', b.fornecedor, b.usina, b.cliente, b.servico, b.origem, b.ref, fd(b.data), b.valor]; }),
+    R.base.map(function(b){ return [MN(b.mes), b.mes, b.tipo, b.situacao, b.meta ? 'Sim' : 'Não (Zlcliente01)', b.fornecedor, b.usina, b.cliente, b.servico, b.origem, b.ref, fd(b.data), b.valor]; }),
     [12], [10, 10, 12, 26, 12, 28, 24, 16, 30, 26, 12, 12, 14]);
   return abas;
 }
@@ -11016,8 +11013,8 @@ function finRelHtml(R){
   var M = function(v){ return v == null ? '—' : fmtMoney(v); }, P = function(v, t){ return t ? (v / t * 100).toFixed(1).replace('.', ',') + '%' : '—'; };
   var D = function(v){ return (v > 0.5 ? '+' : v < -0.5 ? '−' : '') + M(Math.abs(v)); }, T = R.tot, difMeta = r2(T.previsto - T.meta), acima = difMeta > 0.5;
   var quebra = function(lista, titulo, n){
-    return '<table class="t"><thead><tr><th>' + titulo + '</th><th class="n">Realizado</th><th class="n">A pagar</th><th class="n">Provisão</th><th class="n">Previsto</th><th class="n">%</th>' + (R.cenario ? '<th class="n">Simulado</th>' : '') + '<th class="n">Thopen</th><th style="width:16%"></th></tr></thead><tbody>' +
-      lista.slice(0, n).map(function(x){ return '<tr><td>' + esc(x.nome) + '</td><td class="n">' + M(x.realizado) + '</td><td class="n">' + M(x.aPagar) + '</td><td class="n">' + M(x.provisao) + '</td><td class="n"><b>' + M(x.previsto) + '</b></td><td class="n">' + P(x.previsto, T.previsto) + '</td>' + (R.cenario ? '<td class="n">' + M(x.simulado) + '</td>' : '') + '<td class="n">' + (x.thopen ? M(x.thopen) : '—') + '</td><td><div class="bar"><span style="width:' + (T.previsto ? Math.max(0, Math.min(100, x.previsto / T.previsto * 100)) : 0) + '%"></span></div></td></tr>'; }).join('') +
+    return '<table class="t"><thead><tr><th>' + titulo + '</th><th class="n">Realizado</th><th class="n">A pagar</th><th class="n">Provisão</th><th class="n">Previsto</th><th class="n">%</th>' + (R.cenario ? '<th class="n">Simulado</th>' : '') + '<th class="n">Zlcliente01</th><th style="width:16%"></th></tr></thead><tbody>' +
+      lista.slice(0, n).map(function(x){ return '<tr><td>' + esc(x.nome) + '</td><td class="n">' + M(x.realizado) + '</td><td class="n">' + M(x.aPagar) + '</td><td class="n">' + M(x.provisao) + '</td><td class="n"><b>' + M(x.previsto) + '</b></td><td class="n">' + P(x.previsto, T.previsto) + '</td>' + (R.cenario ? '<td class="n">' + M(x.simulado) + '</td>' : '') + '<td class="n">' + (x.zlcliente01 ? M(x.zlcliente01) : '—') + '</td><td><div class="bar"><span style="width:' + (T.previsto ? Math.max(0, Math.min(100, x.previsto / T.previsto * 100)) : 0) + '%"></span></div></td></tr>'; }).join('') +
       (lista.length > n ? '<tr><td colspan="9" class="mut">… e mais ' + (lista.length - n) + ' (lista completa no Excel)</td></tr>' : '') + '</tbody></table>';
   };
   var h = '<div class="capa"><div><div class="marca">GridCo · Zeladoria</div><h1>Relatório Financeiro — Visão executiva</h1>' +
@@ -11031,19 +11028,19 @@ function finRelHtml(R){
     '<div><small>Lançado a pagar</small><b>' + M(T.aPagar) + '</b><em>' + P(T.aPagar, T.previsto) + ' do previsto</em></div>' +
     '<div><small>Provisão (falta lançar)</small><b>' + M(T.provisao) + '</b><em>' + R.aAlinhar.qtd + ' provisão(ões) em aberto</em></div>' +
     '<div><small>Terceirizados · Primarizados</small><b style="font-size:12.5px">' + M(r2(T.T.realizado + T.T.aPagar + T.T.provisao)) + ' · ' + M(r2(T.P.realizado + T.P.aPagar + T.P.provisao)) + '</b><em>previsto de cada tipo</em></div>' +
-    '<div><small>' + (R.cenario ? 'Previsto + simulado' : 'Thopen (fora da meta)') + '</small><b>' + M(R.cenario ? T.previstoSimulado : T.thopen) + '</b><em>' + (R.cenario ? 'simulado ' + M(T.simulado) : 'não entra no previsto') + '</em></div></div>';
+    '<div><small>' + (R.cenario ? 'Previsto + simulado' : 'Zlcliente01 (fora da meta)') + '</small><b>' + M(R.cenario ? T.previstoSimulado : T.zlcliente01) + '</b><em>' + (R.cenario ? 'simulado ' + M(T.simulado) : 'não entra no previsto') + '</em></div></div>';
   var dest = [];
   dest.push(acima ? '<b class="r">O previsto passa a meta em ' + M(difMeta) + '</b> (' + P(T.previsto, T.meta) + ' da meta).' : 'O previsto está <b class="g">' + M(-difMeta) + ' abaixo da meta</b> (' + P(T.previsto, T.meta) + ' da meta).');
   if (R.mesMaior && R.meses.length > 1) dest.push('Mês mais pressionado: <b>' + esc(R.mesMaior.rotulo) + '</b> — previsto ' + M(R.mesMaior.previsto) + ' × meta ' + M(R.mesMaior.meta) + ' (' + D(r2(R.mesMaior.previsto - R.mesMaior.meta)) + ').');
   if (R.porFornecedor[0]) dest.push('Maior fornecedor: <b>' + esc(R.porFornecedor[0].nome) + '</b> — ' + M(R.porFornecedor[0].previsto) + ' (' + P(R.porFornecedor[0].previsto, T.previsto) + ' do previsto).');
   if (R.aAlinhar.qtd) dest.push('<b>' + R.aAlinhar.qtd + ' provisão(ões)</b> ainda sem lançamento no financeiro: ' + M(R.aAlinhar.valor) + (R.aDefinir.qtd ? ' (' + R.aDefinir.qtd + ' com fornecedor a definir: ' + M(R.aDefinir.valor) + ')' : '') + '.');
   if (R.lancSemProvisao > 0.5) dest.push('Parcelas terceirizadas sem provisão ligada: ' + M(R.lancSemProvisao) + ' (gastos que não estavam planejados ou ainda não foram ligados).');
-  if (T.thopen) dest.push('Thopen (fora da meta): ' + M(T.thopen) + ' — não entra no previsto.');
+  if (T.zlcliente01) dest.push('Zlcliente01 (fora da meta): ' + M(T.zlcliente01) + ' — não entra no previsto.');
   if (R.alteracoes.length) dest.push(R.alteracoes.length + ' alteração(ões) com motivo no período (seção 6).');
   h += '<ul class="dest">' + dest.map(function(x){ return '<li>' + x + '</li>'; }).join('') + '</ul>';
-  h += '<h2>2. Mês a mês</h2><table class="t"><thead><tr><th>Mês</th><th class="n">Meta</th><th class="n">Realizado</th><th class="n">A pagar</th><th class="n">Provisão</th><th class="n">Previsto</th><th class="n">Previsto − meta</th><th class="n">% meta</th><th class="n">Terceirizados</th><th class="n">Primarizados</th>' + (R.cenario ? '<th class="n">Simulado</th>' : '') + '<th class="n">Thopen</th></tr></thead><tbody>' +
-    R.porMes.map(function(x){ var d = r2(x.previsto - x.meta); return '<tr><td>' + esc(x.rotulo) + '</td><td class="n">' + M(x.meta) + '</td><td class="n">' + M(x.realizado) + '</td><td class="n">' + M(x.aPagar) + '</td><td class="n">' + M(x.provisao) + '</td><td class="n"><b>' + M(x.previsto) + '</b></td><td class="n ' + (d > 0.5 ? 'r' : 'g') + '">' + D(d) + '</td><td class="n">' + P(x.previsto, x.meta) + '</td><td class="n">' + M(r2(x.T.realizado + x.T.aPagar + x.T.provisao)) + '</td><td class="n">' + M(r2(x.P.realizado + x.P.aPagar + x.P.provisao)) + '</td>' + (R.cenario ? '<td class="n">' + M(x.simulado) + '</td>' : '') + '<td class="n">' + (x.thopen ? M(x.thopen) : '—') + '</td></tr>'; }).join('') +
-    '<tr class="tot"><td>Total</td><td class="n">' + M(T.meta) + '</td><td class="n">' + M(T.realizado) + '</td><td class="n">' + M(T.aPagar) + '</td><td class="n">' + M(T.provisao) + '</td><td class="n">' + M(T.previsto) + '</td><td class="n ' + (acima ? 'r' : 'g') + '">' + D(difMeta) + '</td><td class="n">' + P(T.previsto, T.meta) + '</td><td class="n">' + M(r2(T.T.realizado + T.T.aPagar + T.T.provisao)) + '</td><td class="n">' + M(r2(T.P.realizado + T.P.aPagar + T.P.provisao)) + '</td>' + (R.cenario ? '<td class="n">' + M(T.simulado) + '</td>' : '') + '<td class="n">' + M(T.thopen) + '</td></tr></tbody></table>';
+  h += '<h2>2. Mês a mês</h2><table class="t"><thead><tr><th>Mês</th><th class="n">Meta</th><th class="n">Realizado</th><th class="n">A pagar</th><th class="n">Provisão</th><th class="n">Previsto</th><th class="n">Previsto − meta</th><th class="n">% meta</th><th class="n">Terceirizados</th><th class="n">Primarizados</th>' + (R.cenario ? '<th class="n">Simulado</th>' : '') + '<th class="n">Zlcliente01</th></tr></thead><tbody>' +
+    R.porMes.map(function(x){ var d = r2(x.previsto - x.meta); return '<tr><td>' + esc(x.rotulo) + '</td><td class="n">' + M(x.meta) + '</td><td class="n">' + M(x.realizado) + '</td><td class="n">' + M(x.aPagar) + '</td><td class="n">' + M(x.provisao) + '</td><td class="n"><b>' + M(x.previsto) + '</b></td><td class="n ' + (d > 0.5 ? 'r' : 'g') + '">' + D(d) + '</td><td class="n">' + P(x.previsto, x.meta) + '</td><td class="n">' + M(r2(x.T.realizado + x.T.aPagar + x.T.provisao)) + '</td><td class="n">' + M(r2(x.P.realizado + x.P.aPagar + x.P.provisao)) + '</td>' + (R.cenario ? '<td class="n">' + M(x.simulado) + '</td>' : '') + '<td class="n">' + (x.zlcliente01 ? M(x.zlcliente01) : '—') + '</td></tr>'; }).join('') +
+    '<tr class="tot"><td>Total</td><td class="n">' + M(T.meta) + '</td><td class="n">' + M(T.realizado) + '</td><td class="n">' + M(T.aPagar) + '</td><td class="n">' + M(T.provisao) + '</td><td class="n">' + M(T.previsto) + '</td><td class="n ' + (acima ? 'r' : 'g') + '">' + D(difMeta) + '</td><td class="n">' + P(T.previsto, T.meta) + '</td><td class="n">' + M(r2(T.T.realizado + T.T.aPagar + T.T.provisao)) + '</td><td class="n">' + M(r2(T.P.realizado + T.P.aPagar + T.P.provisao)) + '</td>' + (R.cenario ? '<td class="n">' + M(T.simulado) + '</td>' : '') + '<td class="n">' + M(T.zlcliente01) + '</td></tr></tbody></table>';
   h += '<h2>3. Por fornecedor / equipe</h2>' + quebra(R.porFornecedor, 'Fornecedor', 30);
   if (R.meses.length > 1 && R.meses.length <= 12) h += '<h3>Previsto por fornecedor × mês (15 maiores)</h3><table class="t sm"><thead><tr><th>Fornecedor</th>' + R.meses.map(function(m){ return '<th class="n">' + esc(finMesCurto(m)) + '</th>'; }).join('') + '<th class="n">Total</th></tr></thead><tbody>' +
     R.matriz.slice(0, 15).map(function(x){ return '<tr><td>' + esc(x.nome) + '</td>' + R.meses.map(function(m){ return '<td class="n">' + (x.meses[m] ? M(x.meses[m]) : '—') + '</td>'; }).join('') + '<td class="n"><b>' + M(x.total) + '</b></td></tr>'; }).join('') + '</tbody></table>';
@@ -11052,14 +11049,14 @@ function finRelHtml(R){
   h += '<h2 class="quebra">5. Provisões em aberto (falta lançar no financeiro)</h2>';
   if (!abertas.length) h += '<p class="mut">Nenhuma provisão em aberto no período.</p>';
   else h += '<table class="t det"><thead><tr><th>Mês</th><th>Provisão</th><th>Item</th><th>Fornecedor</th><th>Usina</th><th>Tipo</th><th class="n">Provisionado</th><th class="n">Já lançado</th><th class="n">Saldo</th><th>Situação</th></tr></thead><tbody>' +
-    abertas.map(function(p){ return '<tr><td>' + esc(finMesCurto(p.mes)) + '</td><td>' + esc(p.id) + '</td><td>' + esc(p.item) + '</td><td>' + esc(p.fornecedor) + '</td><td>' + esc(p.usina || '—') + '</td><td>' + esc(p.tipo) + '</td><td class="n">' + M(p.valor) + '</td><td class="n">' + M(p.conciliado) + '</td><td class="n"><b>' + M(p.saldo) + '</b></td><td class="sm">' + esc(p.status) + (p.foraMeta ? ' · Thopen' : '') + '</td></tr>'; }).join('') +
+    abertas.map(function(p){ return '<tr><td>' + esc(finMesCurto(p.mes)) + '</td><td>' + esc(p.id) + '</td><td>' + esc(p.item) + '</td><td>' + esc(p.fornecedor) + '</td><td>' + esc(p.usina || '—') + '</td><td>' + esc(p.tipo) + '</td><td class="n">' + M(p.valor) + '</td><td class="n">' + M(p.conciliado) + '</td><td class="n"><b>' + M(p.saldo) + '</b></td><td class="sm">' + esc(p.status) + (p.foraMeta ? ' · Zlcliente01' : '') + '</td></tr>'; }).join('') +
     '<tr class="tot"><td colspan="6">Total (' + abertas.length + ')</td><td class="n">' + M(r2(abertas.reduce(function(a, p){ return a + p.valor; }, 0))) + '</td><td class="n">' + M(r2(abertas.reduce(function(a, p){ return a + p.conciliado; }, 0))) + '</td><td class="n">' + M(r2(abertas.reduce(function(a, p){ return a + p.saldo; }, 0))) + '</td><td></td></tr></tbody></table>';
   h += '<h2>6. Alterações e motivos</h2>';
   if (!R.alteracoes.length) h += '<p class="mut">Nenhuma alteração com motivo no período.</p>';
   else h += '<table class="t det"><thead><tr><th>Quando</th><th>Quem</th><th>Onde</th><th>Item / parcela</th><th>O que mudou</th><th>Motivo</th></tr></thead><tbody>' +
     R.alteracoes.slice(0, 40).map(function(a){ return '<tr><td>' + esc(a.quando) + '</td><td>' + esc(a.quem) + '</td><td>' + esc(a.onde) + '</td><td>' + esc(a.alvo) + '</td><td>' + esc(a.mudou) + '</td><td>' + esc(a.motivo) + '</td></tr>'; }).join('') +
     (R.alteracoes.length > 40 ? '<tr><td colspan="6" class="mut">… e mais ' + (R.alteracoes.length - 40) + ' (lista completa no Excel)</td></tr>' : '') + '</tbody></table>';
-  h += '<div class="rod">Fontes: Visão executiva do Financeiro (Zeladoria) — Acompanhamento de Pagamentos, gastos das equipes primarizadas e provisões promovidas da simulação. Previsto = realizado + a pagar + provisão; Thopen fica fora da meta. O detalhe completo (todos os lançamentos, provisões, conciliação e a base para tabela dinâmica) está no Excel. Valores em R$.</div>';
+  h += '<div class="rod">Fontes: Visão executiva do Financeiro (Zeladoria) — Acompanhamento de Pagamentos, gastos das equipes primarizadas e provisões promovidas da simulação. Previsto = realizado + a pagar + provisão; Zlcliente01 fica fora da meta. O detalhe completo (todos os lançamentos, provisões, conciliação e a base para tabela dinâmica) está no Excel. Valores em R$.</div>';
   var css = relCss() + '@page{size:A4 landscape;margin:10mm}.k4{grid-template-columns:repeat(4,1fr)}.t.sm td,.t.sm th{font-size:8.6px;padding:2px 4px}';
   return '<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>' + esc('Relatório Financeiro ' + R.rotuloPeriodo) + '</title><style>' + css + '</style></head><body>' + h +
     '<script>window.onload=function(){setTimeout(function(){window.print();},350);};<\/script></body></html>';
@@ -11144,11 +11141,11 @@ function finExplicarDados(mesFechado, de, ate){
   if (!mesFechado || !de || !ate || de > ate) return null;
   var ctx = finCtx(), itemPorId = {}; (state.finItens || []).forEach(function(it){ itemPorId[it.id] = it; });
   var fech = finMesInfo(mesFechado, { escopo: 'G', cenarioId: null, filtros: null }), saldo = r2(fech.aPagar + fech.provisao);
-  var abertos = finProvisoesAtivas().filter(function(pv){ return pv.mes === mesFechado && pv.via !== 'Thopen' && finSaldoProvisao(pv) > 0.5; }).map(function(pv){
+  var abertos = finProvisoesAtivas().filter(function(pv){ return pv.mes === mesFechado && pv.via !== 'Zlcliente01' && finSaldoProvisao(pv) > 0.5; }).map(function(pv){
     var it = itemPorId[pv.itemId] || {};
     return { item: it.descricao || pv.itemId, fornecedor: finNomeFornecedor(pv.fornecedorId, pv.fornecedorNome, pv.tipo, pv.fornecedorADefinir), saldo: finSaldoProvisao(pv), status: FIN_REL_STATUS_PROV[finStatusProvisao(pv)] || finStatusProvisao(pv) };
   }).sort(function(a, b){ return b.saldo - a.saldo; });
-  var aPagarLista = ctx.lanc.filter(function(l){ return l.mes === mesFechado && !l.pago && l.via !== 'Thopen'; }).map(function(l){
+  var aPagarLista = ctx.lanc.filter(function(l){ return l.mes === mesFechado && !l.pago && l.via !== 'Zlcliente01'; }).map(function(l){
     return { fornecedor: finNomeFornecedor(l.fornecedorId, l.fornecedorNome, l.tipo), usina: l.usina || '', valor: l.valor };
   }).sort(function(a, b){ return b.valor - a.valor; });
   var porMes = finExplicarAlteracoesPorMes(de, ate, itemPorId), mesesFuturos = Object.keys(porMes).filter(function(m){ return m >= finMesAtual(); }).sort();
@@ -11588,7 +11585,7 @@ function painelAdotadoMesHtml(m){
    denominação, com a parte 30/35/35) e lançado depois (abate do simulado). Mesma régua de
    resumoAdotadoPorMes, então as somas batem com o card do mês. */
 function lancadosDoMesDetalhe(escopo, mes){
-  if (escopo === 'terceirizados') return financeiroAtivos().filter(function(f){ return f.via !== 'Thopen' && mesAnoKey(f.dataPrevistoPagamento) === mes; }).map(function(f){
+  if (escopo === 'terceirizados') return financeiroAtivos().filter(function(f){ return f.via !== 'Zlcliente01' && mesAnoKey(f.dataPrevistoPagamento) === mes; }).map(function(f){
     return { valor: f.valorParcela || 0, criadoEm: f.criadoEm, titulo: f.fornecedor || '—', detalhe: [f.ufv, f.investimento, f.numeroParcelas > 1 ? 'parcela ' + (f.parcela || '?') + '/' + f.numeroParcelas : ''].filter(Boolean).join(' · '), situacao: f.dataRealizadoPagamento ? 'pago ' + fmtDate(f.dataRealizadoPagamento) : 'a pagar ' + fmtDate(f.dataPrevistoPagamento) };
   });
   return gastosEquipeAtivos().filter(function(g){ return mesAnoKey(g.data) === mes; }).map(function(g){
@@ -11613,7 +11610,7 @@ function detalhePrevistoMesHtml(m){
     lancadosDoMesDetalhe(par[0], m.key).forEach(function(l){ var t = tsMs(l.criadoEm); (corte != null && t != null && t <= corte ? base : depois).push(l); });
     var porItem = {};
     if (p) pagamentosCenariosSimulacao([{ nome: p.nome, itens: p.itens || [] }]).forEach(function(x){
-      if (x.formaPagamento === 'Thopen' || x.mes !== m.key) return;
+      if (x.formaPagamento === 'Zlcliente01' || x.mes !== m.key) return;
       var k = x.denominacao || '(sem nome)', it = porItem[k] = porItem[k] || { titulo: k, valor: 0, partes: [] };
       it.valor = r2(it.valor + (x.valor || 0));
       if (x.parte) it.partes.push(x.parte + (x.mesOrigem && x.mesOrigem !== x.mes ? ' de ' + mesAnoLabel(x.mesOrigem + '-01') : ''));
@@ -11801,7 +11798,7 @@ function onSalvarDadosContrato(){
 }
 
 /* ---------- Criticidade → Sem empresa (2026-10-05): usinas em operação que não estão em
-   contrato anual (EcoClean/Terra Forte), nem na rota da Equipe, nem com cotação de terceirizado
+   contrato anual (Zlfornecedor01/Zlfornecedor06), nem na rota da Equipe, nem com cotação de terceirizado
    ou equipe própria (em andamento ou feita nos últimos 12 meses) — é o status 'sem' de
    coberturaUsinas(). Ordena pela pior criticidade (vegetação ou sujidade) pra mostrar primeiro
    as críticas que estão sem ninguém. ---------- */
@@ -11821,7 +11818,7 @@ function renderSemEmpresa(){
   ultimaListaSemEmpresaExport = lista;
   var c5 = todas.filter(function(x){ return pior(x) >= 5; }).length, c4 = todas.filter(function(x){ return pior(x) === 4; }).length,
       c3 = todas.filter(function(x){ return pior(x) === 3; }).length, cSem = todas.filter(function(x){ return pior(x) === -1; }).length;
-  var html = '<div class="cell-muted" style="font-size:12px;margin:-6px 0 12px;">Usinas em operação <b>sem nenhuma empresa</b>: fora dos contratos anuais (EcoClean / Terra Forte), fora da rota da Equipe e sem cotação de terceirizado ou equipe própria (em andamento ou feita nos últimos 12 meses). Criticidade = última ronda de vegetação e sujidade.</div>';
+  var html = '<div class="cell-muted" style="font-size:12px;margin:-6px 0 12px;">Usinas em operação <b>sem nenhuma empresa</b>: fora dos contratos anuais (Zlfornecedor01 / Zlfornecedor06), fora da rota da Equipe e sem cotação de terceirizado ou equipe própria (em andamento ou feita nos últimos 12 meses). Criticidade = última ronda de vegetação e sujidade.</div>';
   html += '<div class="grid kpi-row" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));">';
   [['todos', 'Sem empresa', todas.length, 'usinas em operação', todas.length ? 'tint-warn' : 'tint-good'],
    ['5', 'Criticidade 5', c5, 'vegetação ou sujidade', c5 ? 'tint-critical' : ''],
@@ -12518,7 +12515,7 @@ function onExcluirPlanejado(){
 
 /* ---------- importação do cronograma executivo (.html com `const SCEN={A:[…],B:[…]}`) ----------
    Cada item {u, uf, s:R|L, crit, i, f, forn, fixed, parts}. Executor decide o destino:
-   - "Eco Clean…" / "Terra Forte…" → OS do contrato (atualiza datas da OS existente da mesma usina +
+   - "Zlfornecedor02…" / "Zlfornecedor06…" → OS do contrato (atualiza datas da OS existente da mesma usina +
      serviço, ou cria) como CONFIRMADO (decisão do Analista); usina fora do escopo → escolher: incluir
      no escopo, incluir NO LUGAR de outra usina, ou lançar como planejado;
    - "Rota da Equipe…" → confere/atualiza as datas da parada;
@@ -12546,7 +12543,7 @@ function lerCronogramaHtml(txt){
   var cliente = Object.keys(clientes).find(function(c){ return semAcentoLower(cab).indexOf(semAcentoLower(c)) >= 0; }) || null;
   return { cenarios: cenarios, rotulos: rotulos, cliente: cliente };
 }
-/* Formato "por estado" (2026-10-09, "Cronograma Zeladoria Thopen · Etapa 1"): uma constante em
+/* Formato "por estado" (2026-10-09, "Cronograma Zeladoria Zlcliente01 · Etapa 1"): uma constante em
    MAIÚSCULAS (ex.: ETAPA1) = [[nome do estado, UF, [{u, c, R, L}]]], datas "dd/mm" (ano tirado do
    título), R/L = [início, fim] ou {parts:[[a,b],…]}, SEM executor. Cada constante vira um
    "cenário". O executor é deduzido depois, em planoImportCrono (executorDeduzido). Literal JS →
@@ -12576,11 +12573,11 @@ function lerCronogramaPorEstado(txt){
   }
   return Object.keys(out).length ? out : null;
 }
-/* Formato "ROWS" (2026-10-22, "Campanha de Regularização — Usinas Thopen / Demais Clientes"):
+/* Formato "ROWS" (2026-10-22, "Campanha de Regularização — Usinas Zlcliente01 / Demais Clientes"):
    const ROWS=[["Usina" ou "Usina · Cliente", UF, V, S, [{k:"R"|"L", seg:[[a,b],…], st, lbl}]]]. O
-   EXECUTOR e as datas REAIS vêm no texto do lbl, separados por " · ": "09/10–24/10 · Terra Forte · real
+   EXECUTOR e as datas REAIS vêm no texto do lbl, separados por " · ": "09/10–24/10 · Zlfornecedor06 · real
    15/10 – em andamento", "Rota Equipe", "um fornecedor", "outro fornecedor (contrato anual ES)", "executor a definir (…)",
-   "stand by · Eco Clean". st: done/prog/late/hold (stand by)/pend (executor a definir). Linha só com
+   "stand by · Zlfornecedor02". st: done/prog/late/hold (stand by)/pend (executor a definir). Linha só com
    "ann" (aniversário sem data) é ignorada. Datas "dd/mm": mês < 6 num arquivo que também tem mês ≥ 9 =
    ano seguinte. Literal JS → JSON; nada do arquivo é executado. */
 function executorDoRotuloCrono(lbl){
@@ -12628,7 +12625,7 @@ function lerCronogramaRows(txt){
 /* Arquivo sem executor: entre o que JÁ está lançado pra essa usina+serviço (parada da rota, OS aberta
    de contrato, planejado em aberto), fica o que tem as datas MAIS PARECIDAS com as do arquivo (soma
    da diferença de início e fim, em dias). Caso real: Aparecida 3 / Marajoara 1 / Sorocaba tinham OS
-   da Terra Forte em dez–jan E diarista planejado nas datas do arquivo — fica o diarista. Nada lançado
+   da Zlfornecedor06 em dez–jan E diarista planejado nas datas do arquivo — fica o diarista. Nada lançado
    → contrato do escopo → "A definir". */
 function executorDeduzido(u, servico, ini, fim, incluirFeitos){
   function dist(a, b){ if (!a || !b) return 9999; return Math.abs(analiseDiasEntre(a, ini)) + Math.abs(analiseDiasEntre(b, fim)); }
@@ -12678,7 +12675,7 @@ function planoImportCrono(linhas, cliente){
     }
     var fornArq = String(x.forn || '');
     /* cotação já lançada no app para essa usina+serviço (o arquivo não aponta contrato nem rota) */
-    if (!/^\s*rota\b|eco ?clean|terra ?forte/i.test(fornArq)) {
+    if (!/^\s*rota\b|zlfornecedor05|zlfornecedor07/i.test(fornArq)) {
       var cs = cotacoesDaUsina(u.id, servico).filter(function(c){ var pl = planoDoObjetoServico(c.cot, c.cot.dataPrevista); var ref = c.cot.dataExecucaoInicio || pl.ini; return !ref || perto(ref, a.ini, 45) || (x.ri && perto(c.cot.dataExecucaoInicio, x.ri, 10)); });
       if (cs.length) { a.tipo = 'cot-existe'; a.sel = false; a.cotExiste = cs[0].cot; a.motivo = 'Já é a cotação de ' + nomeFornecedor(cs[0].cot.fornecedorId) + ' no app — não mexe'; acoes.push(a); return; }
     }
@@ -12697,7 +12694,7 @@ function planoImportCrono(linhas, cliente){
       if (!par) { a.tipo = 'rota-criar'; a.novaParadaChave = 'novo:' + u.id; a.sel = false; a.motivo = [a.motivo, (rotaEquipeAtiva().some(function(r){ return r.usinaId === u.id; }) ? 'a usina está na rota, mas sem esse serviço' : 'a usina não está na rota') + ' — nova data: o import só corrige datas; confira e marque se for isso mesmo'].filter(Boolean).join(' · '); }
       else { a.parada = par; a.tipo = 'rota-atualizar'; }
     } else {
-      var c = (/eco ?clean|terra ?forte/i.test(forn) || x.fornDeduzido) ? contratoDoExecutorTexto(forn) : null;
+      var c = (/zlfornecedor05|zlfornecedor07/i.test(forn) || x.fornDeduzido) ? contratoDoExecutorTexto(forn) : null;
       if (c) {
         a.contrato = c; a.equipe = (forn.match(/\(([^)]+)\)/) || [])[1] || null;
         var noEscopo = (c.escopo || []).some(function(i){ return i.usinaId === u.id; });
@@ -12768,8 +12765,8 @@ function renderImportCrono(){
     (chaves.length > 1 ? '<b>Cenário:</b><select id="ic-cenario">' + chaves.map(function(k){ return '<option value="' + esc(k) + '"' + (k === I.cenario ? ' selected' : '') + '>' + esc(I.rotulos[k] || ('Cenário ' + k)) + '</option>'; }).join('') + '</select>' : '') +
     (I.cliente ? '<span class="pill pill-neutral">cliente: ' + esc(I.cliente) + '</span>' : '') +
     '<span class="cell-muted">' + acoes.length + ' serviço(s) no arquivo · <b>' + nSel + ' marcado(s) pra aplicar</b>: ' + Object.keys(cont).map(function(t){ return cont[t] + ' ' + IC_TIPO[t].toLowerCase(); }).join(' · ') + '</span></div>';
-  if (acoes.some(function(a){ return a.x.fornDeduzido; })) html += '<div class="banner banner-warn" style="margin-bottom:8px;font-size:12px;">Este arquivo não diz quem executa cada serviço. O app deduziu: <b>Rota da Equipe</b> se a usina está na rota; <b>OS do contrato</b> se a usina está no escopo da Eco Clean / Terra Forte; senão o executor do planejado que já existia, ou <b>"A definir"</b>. Confira a coluna Executor.</div>';
-  html += '<div class="cell-muted" style="font-size:11.5px;margin-bottom:8px;">EcoClean/Terra Forte entram como OS do contrato <b>Confirmado</b>. Os demais executores viram <b>Planejado</b> (emergencial quando a usina está no escopo de um contrato). Usinas e serviços que não estão no arquivo ficam como estão. Itens com criticidade atual baixa vêm desmarcados — marque se quiser.</div>';
+  if (acoes.some(function(a){ return a.x.fornDeduzido; })) html += '<div class="banner banner-warn" style="margin-bottom:8px;font-size:12px;">Este arquivo não diz quem executa cada serviço. O app deduziu: <b>Rota da Equipe</b> se a usina está na rota; <b>OS do contrato</b> se a usina está no escopo da Zlfornecedor02 / Zlfornecedor06; senão o executor do planejado que já existia, ou <b>"A definir"</b>. Confira a coluna Executor.</div>';
+  html += '<div class="cell-muted" style="font-size:11.5px;margin-bottom:8px;">Zlfornecedor01/Zlfornecedor06 entram como OS do contrato <b>Confirmado</b>. Os demais executores viram <b>Planejado</b> (emergencial quando a usina está no escopo de um contrato). Usinas e serviços que não estão no arquivo ficam como estão. Itens com criticidade atual baixa vêm desmarcados — marque se quiser.</div>';
   html += '<div class="table-wrap"><table class="ic-tabela" style="min-width:0;"><thead><tr><th><input type="checkbox" id="ic-todos" style="width:auto;" title="Marcar/desmarcar todos"' + (nSel === acoes.length ? ' checked' : '') + '></th><th>Usina</th><th>Serviço</th><th>Datas (arquivo)</th><th>Executor</th><th>O que acontece</th><th>Obs.</th></tr></thead><tbody>';
   acoes.forEach(function(a, k){
     var datas = a.partes ? a.partes.map(function(t){ return fmtDate(t[0]).slice(0, 5) + '–' + fmtDate(t[1]).slice(0, 5); }).join(' · ') : (fmtDate(a.ini).slice(0, 5) + ' – ' + fmtDate(a.fim).slice(0, 5));
@@ -13068,8 +13065,8 @@ function bindEventsCronoPublico(app){
   if (bp) bp.addEventListener('click', function(){ ui.cronoMotivoPendente = []; ui.cronoMotivoTxt = ''; render(); });
   app.querySelectorAll('[data-crono-motivo]').forEach(function(inp){ inp.addEventListener('change', function(){ salvarMotivoAlteracoes([inp.getAttribute('data-crono-motivo')], inp.value); showToast('Motivo atualizado.'); }); });
 }
-/* Duplicar parcela (2026-10-09, pedido do Analista). Caso real: as parcelas da Terra Forte foram
-   ajustadas à mão (out/2026 virou 2 × R$ 30 mil) e ficou faltando a última (09/2027). "⧉" copia a
+/* Duplicar parcela (2026-10-09, pedido do Analista). Caso real: as parcelas da Zlfornecedor06 foram
+   ajustadas à mão (out/2026 virou ZLVALOR08) e ficou faltando a última (09/2027). "⧉" copia a
    parcela com TODOS os dados (cliente, usinas, fornecedor, serviço, via, total, situação,
    observação, grupo do contrato); só pede a nova data prevista e o valor. A cópia nasce sem
    pagamento, NF ou status de pagamento. Se a parcela é de um contrato (grupoOrcamentoId), a cópia
@@ -13429,7 +13426,7 @@ function modalReprovarLote(){
     '<div class="modal-head"><h3>Reprovar ' + sel.length + ' cotação(ões)</h3><button class="modal-close" id="btn-aprov-rep-fechar">&times;</button></div><div class="modal-body">' +
     '<div class="cell-muted" style="font-size:12px;max-height:120px;overflow:auto;margin:-4px 0 10px;">' + sel.map(function(c){ return esc(c.usina) + ' · ' + esc(nomeServicoCurto(c.servico)) + ' · ' + esc(nomeFornecedor(c.fornecedorId)); }).join('<br>') + '</div>' +
     '<div class="field"><label for="aprov-rep-motivo">Motivo</label><select id="aprov-rep-motivo">' + APROV_MOTIVOS.map(function(m){ return '<option>' + esc(m) + '</option>'; }).join('') + '</select></div>' +
-    '<div class="field"><label for="aprov-rep-obs">Detalhe (opcional)</label><input type="text" id="aprov-rep-obs" placeholder="Ex.: entrou no contrato da Terra Forte"></div>' +
+    '<div class="field"><label for="aprov-rep-obs">Detalhe (opcional)</label><input type="text" id="aprov-rep-obs" placeholder="Ex.: entrou no contrato da Zlfornecedor06"></div>' +
     '<p class="cell-muted" style="font-size:11.5px;margin:0 0 8px;">Elas saem da fila e ficam no histórico como reprovadas, com o motivo.</p>' +
     '<div class="modal-actions"><button class="btn btn-ghost" id="btn-aprov-rep-cancelar">Cancelar</button><button class="btn btn-primary" id="btn-aprov-rep-confirmar" style="background:var(--critical);border-color:var(--critical);">Reprovar ' + sel.length + '</button></div>' +
     '</div></div></div>';
@@ -13470,7 +13467,7 @@ function bindEventsAprovLote(app){
   var bc = document.getElementById('btn-aprov-rep-confirmar'); if (bc) bc.addEventListener('click', onReprovarLote);
 }
 /* Exportar o cronograma em PDF (2026-10-15, pedido do Analista). O chefe tirou print do Planejamento
-   e pediu para virar arquivo: "Cronograma de Zeladoria — Usinas Thopen". Folha A4 deitada, uma linha
+   e pediu para virar arquivo: "Cronograma de Zeladoria — Usinas Zlcliente01". Folha A4 deitada, uma linha
    por usina (UF + chips V/S da criticidade), roçagem em cima e lavagem embaixo, barras com as mesmas
    cores do app (claro = planejado, listrado = em andamento, cheio = finalizado, listras vermelhas =
    atraso), datas e "real … – em andamento" ao lado da barra, linha vermelha de hoje, paginação
@@ -13878,16 +13875,16 @@ function candidatosOS(o, ignorarId){
   ordensServicoAtivas().forEach(function(x){ if (x.id === ignorarId || x.id === o.id) return; var v = vinculoEfetivoOS(x, true); if (v) ocupados[v] = true; });
   return itensParaOS().filter(function(i){ return i.usinaId === o.usinaId && i.servico === o.servico && !ocupados[i.chave]; });
 }
-/* executor da OS × executor do serviço: Equipe só casa com a Rota da Equipe; Eco Clean/Terra Forte com o contrato */
+/* executor da OS × executor do serviço: Equipe só casa com a Rota da Equipe; Zlfornecedor02/Zlfornecedor06 com o contrato */
 function penalidadeExecutorOS(fornOS, i){
   var f = semAcentoLower(fornOS || ''), lab = semAcentoLower(i.fonteLabel || '');
   if (!f) return 0;
   var ehEquipe = /equipe|primariz/.test(f);
   if (i.fonte === 'rota') return ehEquipe ? 0 : 25;
   if (ehEquipe) return 25;
-  if (/eco ?clean/.test(f)) return /eco ?clean/.test(lab) ? 0 : 25;
-  if (/terra ?forte/.test(f)) return /terra ?forte/.test(lab) ? 0 : 25;
-  if (/eco ?clean|terra ?forte/.test(lab)) return 25;
+  if (/zlfornecedor05/.test(f)) return /zlfornecedor05/.test(lab) ? 0 : 25;
+  if (/zlfornecedor07/.test(f)) return /zlfornecedor07/.test(lab) ? 0 : 25;
+  if (/zlfornecedor05|zlfornecedor07/.test(lab)) return 25;
   return 0;
 }
 function melhorVinculoOS(o, ignorarId){
@@ -14098,7 +14095,7 @@ function modalOSColar(){
   var C = ui.osColar, prev = C.preview;
   var html = '<div class="overlay open" id="overlay-os-colar"><div class="modal" style="max-width:980px;width:96vw;"><div class="modal-head"><h3>Colar lista de OS</h3><button class="modal-close" id="btn-os-colar-fechar">&times;</button></div><div class="modal-body" style="max-height:76vh;overflow:auto;">';
   if (!prev) {
-    html += '<p class="cell-muted" style="font-size:12px;margin:0 0 6px;">Cole uma OS por linha, do jeito que vem do PCM. Ex.: <span class="mono">UFV ALTAIR - LAVAGEM DE MÓDULOS - DATA 12/10 - ECO CLEAN - OS 15222</span>. Linha entre <b>~ … ~</b> entra como concluída. Nº de OS que já existe só é atualizado.</p>';
+    html += '<p class="cell-muted" style="font-size:12px;margin:0 0 6px;">Cole uma OS por linha, do jeito que vem do PCM. Ex.: <span class="mono">UFV ALTAIR - LAVAGEM DE MÓDULOS - DATA 12/10 - ZLFORNECEDOR04 - OS 15222</span>. Linha entre <b>~ … ~</b> entra como concluída. Nº de OS que já existe só é atualizado.</p>';
     html += '<textarea id="os-colar-txt" rows="14" style="width:100%;font-family:monospace;font-size:12px;padding:8px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--ink);">' + esc(C.texto || '') + '</textarea>';
     html += '<div class="modal-actions"><button class="btn btn-ghost" id="btn-os-colar-cancelar">Cancelar</button><button class="btn btn-primary" id="btn-os-colar-ler">Ler lista</button></div>';
   } else {
@@ -14217,7 +14214,7 @@ function modalOSJustificar(){
 }
 function criarServicoDaOS(o){
   var u = o.usinaId ? usinaById(o.usinaId) : null; if (!u) { ui.osEditar = o.id; render(); showToast('Escolha a usina da OS antes.'); return; }
-  var c = /eco ?clean|terra ?forte/i.test(o.fornecedor || '') ? contratoDoExecutorTexto(o.fornecedor) : null, item = c ? (c.escopo || []).find(function(i){ return i.usinaId === u.id; }) : null;
+  var c = /zlfornecedor05|zlfornecedor07/i.test(o.fornecedor || '') ? contratoDoExecutorTexto(o.fornecedor) : null, item = c ? (c.escopo || []).find(function(i){ return i.usinaId === u.id; }) : null;
   if (c && item) {
     openNovaOSContrato(c.id, item.id);
     var sv = document.getElementById('osc-servico'); if (sv) sv.value = o.servico === 'LIMPEZA DE MÓDULOS' ? 'LIMPEZA DE MÓDULOS' : 'ROÇAGEM';
@@ -14428,7 +14425,7 @@ function renderShell(){
     documentacao: 'Painel de documentação por tipo (estilo SSO) — a origem do farol de cada fornecedor',
     lixeira: 'Itens excluídos, recuperáveis até serem excluídos em definitivo',
     planejamento: 'Cronograma da zeladoria: planejado × real de cada usina e serviço — o que está planejado, em andamento, finalizado e atrasado',
-    contratos: 'Contratos anuais (EcoClean, Terra Forte…): vigência, usinas e serviços de cada fornecedor, previsto × realizado, alertas de +90 dias sem roçagem e criticidade 4/5 — e a cobertura de todas as usinas em operação',
+    contratos: 'Contratos anuais (Zlfornecedor01, Zlfornecedor06…): vigência, usinas e serviços de cada fornecedor, previsto × realizado, alertas de +90 dias sem roçagem e criticidade 4/5 — e a cobertura de todas as usinas em operação',
     danos: 'Quem, onde, quando e quanto: ocorrências de módulos danificados, reposição física, ressarcimento financeiro e pendências — com ranking por fornecedor, usina e supervisor',
     usuarios: 'Aprove solicitações de acesso e defina o papel de cada pessoa (HEAD, Analista ou Outro)',
   };
@@ -15012,7 +15009,7 @@ function historicoSimulacoesRepasseEquipeHtml(historico){
 }
 /* Cadastrar orçamento direto na Acompanhamento de Pagamentos (pedido pontual, 2026-09) — gera
    a(s) linha(s) de financeiro_parcelas sozinho a partir da forma de pagamento escolhida:
-   Thopen (1 parcela, NF+30d), Grid (3 parcelas 30%/35%/35%, no dia do serviço / +30d / +60d) ou
+   Zlcliente01 (1 parcela, NF+30d), Grid (3 parcelas 30%/35%/35%, no dia do serviço / +30d / +60d) ou
    Outra (parcelas livres, quantidade e valor definidos à mão). As linhas nascem com
    `statusManual = STATUS_MANUAL_PROVISIONAMENTO` — é orçamento provisionado, ainda não
    confirmado pelo financeiro; edite a Situação na tabela quando confirmar. */
@@ -15074,9 +15071,9 @@ function modalNovoOrcamento(){
       fieldSelectKV('no-cliente','Cliente *', clientesOpts) +
       '<div class="field"><label>Usina(s) (UFV) * <span class="cell-muted" style="font-weight:400;">— marque todas as usinas que este contrato cobre (valor único, sem rateio)</span></label>' + pickerUsinasHtml('no', []) + '</div>' +
       fieldSelectKV('no-fornecedor','Fornecedor', fornecedoresOpts) +
-      fieldSelect('no-forma','Forma de pagamento *', ['Thopen (1 parcela, 30d após a NF)','Grid (3 parcelas: 30% + 35% em 30d + 35% em 60d)','Outra (parcelas livres)']) +
+      fieldSelect('no-forma','Forma de pagamento *', ['Zlcliente01 (1 parcela, 30d após a NF)','Grid (3 parcelas: 30% + 35% em 30d + 35% em 60d)','Outra (parcelas livres)']) +
       '<div class="field-row" id="no-bloco-valor-total">' + field('no-valor-total','Valor total (R$) *','number') + '</div>' +
-      '<div class="field-row" id="no-bloco-thopen" style="display:none;">' + field('no-data-nf','Data da NF *','date') + '</div>' +
+      '<div class="field-row" id="no-bloco-zlcliente01" style="display:none;">' + field('no-data-nf','Data da NF *','date') + '</div>' +
       '<div class="field-row" id="no-bloco-grid" style="display:none;">' + field('no-data-servico','Data do serviço *','date') + '</div>' +
       '<div id="no-bloco-outra" style="display:none;">' +
         '<div id="no-parcelas-outras"></div>' +
@@ -15322,7 +15319,7 @@ function modalSimulacaoAprovacao(){
           '<input type="checkbox" data-sim-check="' + c.id + '"' + (cfg.selecionado ? ' checked' : '') + ' style="width:auto;">' +
           '<span>' + esc(nomeFornecedor(c.fornecedorId)) + ' <span class="cell-muted mono" style="font-size:11.5px;">' + fmtMoney(c.valor) + '</span></span></label>';
         html += '<select data-sim-forma="' + c.id + '" style="width:auto;">' +
-          ['Grid','Thopen','Outra'].map(function(f){ return '<option value="' + f + '"' + (cfg.forma === f ? ' selected' : '') + '>' + (f === 'Grid' ? 'Grid (30/35/35%)' : f === 'Thopen' ? 'Thopen (1 parcela)' : 'Outra (parcelas livres)') + '</option>'; }).join('') +
+          ['Grid','Zlcliente01','Outra'].map(function(f){ return '<option value="' + f + '"' + (cfg.forma === f ? ' selected' : '') + '>' + (f === 'Grid' ? 'Grid (30/35/35%)' : f === 'Zlcliente01' ? 'Zlcliente01 (1 parcela)' : 'Outra (parcelas livres)') + '</option>'; }).join('') +
           '</select>';
         html += '<input type="number" min="1" step="1" data-sim-parcelas="' + c.id + '" value="' + (cfg.parcelasOutra||1) + '" title="Número de parcelas" style="width:64px;' + (cfg.forma === 'Outra' ? '' : 'display:none;') + '">';
         html += '</div>';
@@ -17355,8 +17352,8 @@ function onUsinaOrcamentoChange(){
 }
 function onFormaOrcamentoChange(){
   var forma = document.getElementById('no-forma').value;
-  var ehThopen = forma.indexOf('Thopen') === 0, ehGrid = forma.indexOf('Grid') === 0, ehOutra = forma.indexOf('Outra') === 0;
-  document.getElementById('no-bloco-thopen').style.display = ehThopen ? '' : 'none';
+  var ehZlcliente01 = forma.indexOf('Zlcliente01') === 0, ehGrid = forma.indexOf('Grid') === 0, ehOutra = forma.indexOf('Outra') === 0;
+  document.getElementById('no-bloco-zlcliente01').style.display = ehZlcliente01 ? '' : 'none';
   document.getElementById('no-bloco-grid').style.display = ehGrid ? '' : 'none';
   document.getElementById('no-bloco-outra').style.display = ehOutra ? '' : 'none';
   document.getElementById('no-bloco-valor-total').style.display = ehOutra ? 'none' : '';
@@ -17384,14 +17381,14 @@ function onSalvarOrcamento(){
   var fornecedor = document.getElementById('no-fornecedor').value.trim() || null;
   var obs = document.getElementById('no-obs').value.trim() || null;
   var forma = document.getElementById('no-forma').value;
-  var ehThopen = forma.indexOf('Thopen') === 0, ehGrid = forma.indexOf('Grid') === 0;
+  var ehZlcliente01 = forma.indexOf('Zlcliente01') === 0, ehGrid = forma.indexOf('Grid') === 0;
 
   var parcelasNovas = [];
-  if (ehThopen) {
+  if (ehZlcliente01) {
     var dataNf = document.getElementById('no-data-nf').value;
-    var valorTotalThopen = parseFloat(document.getElementById('no-valor-total').value);
-    if (!dataNf || isNaN(valorTotalThopen) || valorTotalThopen <= 0) { showToast('Preencha a data da NF e o valor total.'); return; }
-    parcelasNovas.push({ parcela: 1, numeroParcelas: 1, valorParcela: valorTotalThopen, valorPrevistoTotal: valorTotalThopen, dataPrevistoPagamento: somarDias(dataNf, 30), via: 'Thopen' });
+    var valorTotalZlcliente01 = parseFloat(document.getElementById('no-valor-total').value);
+    if (!dataNf || isNaN(valorTotalZlcliente01) || valorTotalZlcliente01 <= 0) { showToast('Preencha a data da NF e o valor total.'); return; }
+    parcelasNovas.push({ parcela: 1, numeroParcelas: 1, valorParcela: valorTotalZlcliente01, valorPrevistoTotal: valorTotalZlcliente01, dataPrevistoPagamento: somarDias(dataNf, 30), via: 'Zlcliente01' });
   } else if (ehGrid) {
     var dataServico = document.getElementById('no-data-servico').value;
     var valorTotalGrid = parseFloat(document.getElementById('no-valor-total').value);
@@ -17423,7 +17420,7 @@ function onSalvarOrcamento(){
      ou as N de "Outra") ganham um grupoOrcamentoId em comum -- é o que permite, depois, mudar
      a Situação de UMA parcela do grupo e propagar pras outras de uma vez (ver
      salvarCampoAcomp), em vez de caçar parcela por parcela em meses diferentes. Só faz sentido
-     quando há mais de uma parcela; Thopen (1 parcela) fica sem grupo. */
+     quando há mais de uma parcela; Zlcliente01 (1 parcela) fica sem grupo. */
   var grupoId = null;
   if (parcelasNovas.length > 1) {
     var numsGrupo = (state.financeiro||[]).map(function(f){ return parseInt((f.grupoOrcamentoId||'GRP-0').replace('GRP-',''),10) || 0; });
@@ -18129,15 +18126,15 @@ function onArquivoFinanceiroSelecionado(ev){
             if (obj[k] != null && obj[k] !== '') { var n = Number(obj[k]); obj[k] = isNaN(n) ? null : n; } else obj[k] = null;
           });
           /* "Via Pagamento" é opcional na planilha (coluna nova) — qualquer coisa que não
-             comece com "Thopen" (vazio, ausente, ou outro texto) vira "Grid", preservando o
+             comece com "Zlcliente01" (vazio, ausente, ou outro texto) vira "Grid", preservando o
              comportamento de hoje (tudo contando como gasto Grid) pra planilhas antigas. */
           var viaPlanilha = String(obj.via||'').trim();
-          obj.via = /^thopen/i.test(viaPlanilha) ? 'Thopen' : 'Grid';
+          obj.via = /^zlcliente01/i.test(viaPlanilha) ? 'Zlcliente01' : 'Grid';
           var chave = chaveFinanceiro(obj);
           var existente = existentesPorChave[chave];
           if (existente) {
             /* Célula vazia na planilha nunca apaga o que já foi preenchido no app (2026-10-27):
-               fornecedor e observação ficam como estavam, e via vazia não desfaz um Thopen
+               fornecedor e observação ficam como estavam, e via vazia não desfaz um Zlcliente01
                marcado à mão. Valor preenchido na planilha continua atualizando normalmente. */
             if (!viaPlanilha) delete obj.via;
             CAMPOS_FIN_NAO_APAGAR.forEach(function(k){
