@@ -147,15 +147,29 @@ não precisa tanto se a gente tem informação [...] linka com as ocorrências d
 gente tem no COS [...] se naquele dia teve desligamento, foi de que horas até que horas [...] mais visual também, por
 cliente [...] por tamanho do furo [...] diminua as informações". Medido na bancada antes: abrir a Crateús dava um painel
 de 4.989 px com 40 linhas de validação (uma por item, cinco campos cada). Ficou assim:
-- **quatro números** (usinas com furo pendente, dias com furo, completude, dias com furo em que o COS registrou algo);
-  saíram o "Mais números", o "Paradas sem OS" da frente, os selos da lista e a visão "Detalhe por equipamento" (o CSV
-  continua com tudo, e os filtros de Situação cobrem inoperante e parada sem OS);
+- **a cor é a CAUSA do furo pelo COS** (2ª rodada do mesmo dia; Levi: "é justificado se foi queda. Agora, se foi falha
+  de comunicação, a gente tem que resolver isso [...] uma cor para o que foi justificado em questão de geração, uma cor
+  que tem furo e foi falha de comunicação [...] e conseguir filtrar esses pontos [...] melhora o contraste"). Na tira, no
+  mapa e nas barras: **roxo** (o token `--semcom`) = furo pendente num dia em que o COS registrou falha de comunicação
+  (qualquer trecho do dia; a usina gerava e o dado não veio: resolver); **vermelho** = furo sem justificativa; com um
+  **traço azul embaixo**, o COS tem uma queda curta no dia, que não justifica; **azul** = justificado por queda (a regra
+  do R01); **verde cheio** = validado (a 40% sumia no navy); **cinza** = completo; **vazado** = falta só IPOA ou GHI.
+  Perguntado, o Levi **manteve as 6 h de sol** para a queda justificar (19/11/2026, com os números: 123 dias de furo em 35
+  usinas só com queda curta, mediana 1,7 h): a conta do R01 não mudou. Atenção: a falha de comunicação EM ABERTO pinta
+  todos os dias desde que abriu; em 19/11 eram 35 abertas, 21 há mais de 30 dias (Ipixuna 1 e 2 desde 09/01, Crateús
+  desde 23/08): o mês inteiro dessas usinas sai roxo, e o registro velho no COS é ele mesmo um ponto a resolver;
+- **os quatro contadores do alto filtram**: falha de comunicação, sem justificativa (com quantos têm queda curta),
+  justificado por queda e validado pela equipe, em dias e usinas, com os outros filtros e sem o de Situação; o clique
+  troca a Situação por aquele ponto e o 2º clique volta ao padrão. A completude foi para a linha das fontes. Saíram o
+  "Mais números", os selos da lista e a visão "Detalhe por equipamento" (o CSV continua com tudo);
+- **a lista abre só no "Furo pendente"** (o padrão da Situação; Levi: "tirasse dessa lista [...] o que está
+  justificado"); a etiqueta mostra o filtro e o × traz as outras. Novas opções de Situação: falha de comunicação, sem
+  justificativa, queda curta, dia justificado por queda, dia validado;
 - **o tamanho do furo por cliente**: uma barra por cliente, o maior em cima, somando os dias com furo pendente das usinas
-  dele: vermelho, a usina toda sem dado; amarelo, parte da geração; listrado (na tira, vazado), só IPOA ou GHI (sem a separação, a
-  estação sem sensor fazia quase toda usina ter "17 de 17 dias" e igualava o furo pequeno ao grande). O clique filtra;
-- **a lista**: usina, a **tira do mês** (um quadrado por dia no pior estado do dia; o ponto embaixo = o COS registrou
-  algo na usina naquele dia, e o `title` diz o quê e de que hora a que hora), o furo pendente em dias com o que falta numa
-  linha, e as ocorrências do COS no mês. Ordem: o maior furo primeiro;
+  dele, roxo e vermelho como na tira. O clique filtra;
+- **a lista**: usina, a **tira do mês** (o `title` de cada dia diz a causa e a ocorrência do COS com as horas), o furo
+  pendente em dias com o que falta numa linha, e os dias com falha de comunicação. Ordem: o maior furo primeiro;
+- **o Mês** fica na linha e na altura da busca e do Filtros, sem o rótulo em cima ("tá desalinhado [...] tá feião");
 - **o detalhe**: "O que o COS registrou" (só as dos dias com furo e as que explicam o dia; "Ver as N" mostra todas):
   início → fim ou "em aberto", a duração, a falha, o equipamento, a OS, se a geração parou, e a etiqueta "explica o dia"
   ou "no dia do furo". Embaixo, o **mapa do mês** com a linha do COS no alto, e a validação NELE: clica-se no dia com

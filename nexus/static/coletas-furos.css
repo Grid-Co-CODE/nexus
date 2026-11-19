@@ -5,6 +5,15 @@
 .fr-avisos .aviso{margin:14px 0 0;max-width:920px}
 .fr-carregando{margin:28px 0}
 .fr-numeros{margin-top:22px}
+.fr-cont{all:unset;box-sizing:border-box;display:flex;flex-direction:column;padding:16px 20px;border-left:1px solid var(--linha);cursor:pointer;min-width:0}
+.fr-cont:first-child{border-left:0}
+.fr-cont:hover{background:var(--superficie-3)}
+.fr-cont:focus-visible{outline:2px solid var(--foco);outline-offset:-2px}
+.fr-cont[aria-pressed="true"]{background:var(--superficie-3);box-shadow:inset 0 -3px 0 var(--verde)}
+.fr-cont .r{display:flex;align-items:center;gap:8px}
+.fr-cont .r .fr-q{width:12px;height:12px}
+.fr-cont .v small{font:500 13px/18px var(--font-sans);color:var(--mudo);letter-spacing:0}
+.fr-completude{font-size:12px;line-height:18px;margin:10px 0 0;display:inline}
 .fr-numeros .v small{font:500 14px/20px var(--font-sans);color:var(--mudo);letter-spacing:0}
 .fr-v--critico{color:var(--critico)}
 .fr-v--alerta{color:var(--alerta)}
@@ -13,8 +22,13 @@
 
 .fr-barra{display:flex;align-items:flex-start;gap:12px 16px;flex-wrap:wrap;margin:26px 0 0}
 .fr-filtros-caixa{flex:1 1 440px;min-width:0}
-.fr-filtros .fr-mes{display:flex;flex-direction:column;gap:4px}
-.fr-filtros .fr-mes .gc-campo{min-width:170px}
+/* o Mês na altura e no desenho da busca e do Filtros (o .fo-campo/.fo-btn do nexus.css): sem o rótulo em cima, que o
+   descia e o desalinhava (Levi, 19/11/2026: "tá desalinhado com o buscador e os filtros, tá feião") */
+.fr-filtros .fr-mes{display:flex;align-items:center}
+.fr-mes-sel{height:36px;min-width:170px;padding:0 30px 0 12px;border-radius:10px;border:1px solid var(--linha-forte);background-color:var(--barra);
+  color:var(--tinta);font:500 13px/1 var(--font-sans);cursor:pointer}
+.fr-mes-sel:hover{border-color:var(--mudo)}
+.fr-mes-sel:focus-visible{outline:none;border-color:var(--info-a42);box-shadow:0 0 0 3px var(--info-a10)}
 .fr-acoes{display:flex;align-items:center;gap:8px;margin-left:auto;position:relative}
 .fr-menu{position:relative}
 .fr-menu>summary{list-style:none;cursor:pointer}
@@ -37,12 +51,11 @@
 .fr-cli-nome{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .fr-cli-barra{display:flex;height:10px;border-radius:5px;background:var(--barra);overflow:hidden}
 .fr-cli-barra i{display:block;height:100%}
-.fr-cli-u{background:var(--critico-cheio)}
-.fr-cli-dg{background:var(--alerta-cheio)}
-.fr-cli-dt{background:repeating-linear-gradient(135deg,var(--alerta-cheio) 0 2px,transparent 2px 5px)}
+.fr-cli-com{background:var(--semcom)}
+.fr-cli-sem{background:var(--critico-cheio)}
 .fr-cli-num{white-space:nowrap;font-size:12px}
 .fr-cli-num b{font-size:14px;color:var(--tinta)}
-.fr-cli-sem{font-size:12px;line-height:18px;margin:8px 10px 0}
+.fr-cli-sem-furo{font-size:12px;line-height:18px;margin:8px 10px 0}
 .fr-cli-link{all:unset;cursor:pointer;color:var(--tinta-2);text-decoration:underline;text-underline-offset:2px}
 .fr-cli-link:hover{color:var(--tinta)}
 
@@ -88,17 +101,21 @@
 .fr-tira{display:inline-flex;gap:2px;padding-bottom:6px}
 .fr-q{position:relative;display:block;width:11px;height:16px;border-radius:2px;background:var(--superficie-3)}
 .fr-legenda .fr-q{width:10px;height:12px}
-.fr-q--u{background:var(--critico-cheio)}
-.fr-q--f{background:var(--alerta-cheio)}
-/* só IPOA ou GHI: o quadrado VAZADO em amarelo (a geração está lá, falta a estação); cheio a 40% ele se confundia com o
-   validado (verde a 40%) no tema escuro */
-.fr-q--t{background:transparent;box-shadow:inset 0 0 0 2px var(--alerta-cheio)}
-.fr-q--c{background:var(--verde-a40)}
+/* as cores pela CAUSA do furo (Levi, 19/11/2026: "uma cor para o que foi justificado em questão de geração, uma cor que tem
+   furo e foi falha de comunicação [...] melhora um pouco o contraste"): roxo (o token semcom, "sem comunicação") = furo com
+   falha de comunicação no COS, a resolver; vermelho = furo sem justificativa; azul = justificado por queda; verde CHEIO =
+   validado (a 40% ele sumia no navy); cinza = completo. Vazado = só IPOA ou GHI; traço azul embaixo = queda curta no COS */
+.fr-q--m{background:var(--semcom)}
+.fr-q--s{background:var(--critico-cheio)}
 .fr-q--e{background:var(--info-cheio)}
-.fr-q--o{background:var(--ok-suave)}
-.fr-q--n{background:var(--superficie-3)}
-.fr-q--cos::after{content:"";position:absolute;left:50%;bottom:-6px;width:4px;height:4px;margin-left:-2px;border-radius:50%;background:var(--tinta)}
-.fr-legenda .fr-q--cos{margin-bottom:6px}
+.fr-q--c{background:var(--ok-cheio)}
+.fr-q--o{background:var(--superficie-3)}
+.fr-q--n{background:transparent;box-shadow:inset 0 0 0 1px var(--linha-forte)}
+.fr-q--m.fr-q--t{background:transparent;box-shadow:inset 0 0 0 2px var(--semcom)}
+.fr-q--s.fr-q--t{background:transparent;box-shadow:inset 0 0 0 2px var(--critico-cheio)}
+.fr-q--qc::after{content:"";position:absolute;left:0;right:0;bottom:-5px;height:3px;border-radius:2px;background:var(--info-cheio)}
+.fr-legenda .fr-q--qc{margin-bottom:5px}
+.fr-txt-com{color:var(--semcom)}
 
 .fr-selo{display:inline-block;font:600 11px/16px var(--font-sans);padding:2px 8px;border-radius:var(--raio-tag);background:var(--superficie-2);color:var(--tinta-2)}
 .fr-selo--alerta{color:var(--alerta);background:var(--alerta-suave)}
@@ -126,7 +143,10 @@
   border-bottom:1px solid var(--linha-forte);white-space:nowrap}
 .fr-sub td{padding:7px 12px;border-bottom:1px solid var(--linha);vertical-align:top}
 .fr-oc-quando{white-space:nowrap}
-.fr-oc-tab tr.fr-oc-nofuro>td:first-child{box-shadow:inset 3px 0 0 var(--alerta-cheio)}
+.fr-oc-tab tr.fr-oc-nofuro>td:first-child{box-shadow:inset 3px 0 0 var(--critico-cheio)}
+.fr-oc-tab tr.fr-oc-com>td:first-child{box-shadow:inset 3px 0 0 var(--semcom)}
+.fr-oc-tab tr.fr-oc-com b{color:var(--semcom)}
+.fr-oc-tab tr.fr-oc-just>td:first-child{box-shadow:inset 3px 0 0 var(--info-cheio)}
 
 .fr-chave{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12px;line-height:16px;color:var(--mudo);flex:1 1 320px}
 .fr-chave span{display:inline-flex;align-items:center;gap:6px}
@@ -144,20 +164,20 @@
 .fr-heat td.fr-clic{cursor:pointer}
 .fr-heat td.fr-clic:hover{box-shadow:inset 0 0 0 2px var(--tinta-2)}
 .fr-heat td.fr-on{box-shadow:inset 0 0 0 2px var(--fundo),0 0 0 2px var(--verde)}
-.fr-c-o{background:var(--ok-suave)}
+.fr-c-o{background:var(--superficie-3)}
+.fr-c-m{background:var(--semcom)}
 .fr-c-v{background:var(--critico-cheio)}
 .fr-c-x{background:var(--critico-escuro)}
 .fr-c-z{background:var(--alerta-cheio)}
 .fr-c-d{background:var(--severo-cheio)}
 .fr-c-a{background:var(--anomalo)}
 .fr-c-e{background:var(--info-cheio)}
-/* o validado é calmo (o verde Grid a 40%): numa usina toda validada, o olho tem de ir ao vermelho que sobrou, não ao verde */
-.fr-c-c{background:var(--verde-a40)}
-.fr-c-i{background:var(--semcom-cheio)}
+.fr-c-c{background:var(--ok-cheio)}
+.fr-c-i{background:var(--fraco)}
 .fr-c-p,.fr-c-w,.fr-c-n{background:var(--superficie-3)}
 /* a linha do COS: cinza forte = teve ocorrência; azul = a ocorrência explica o dia pela regra do R01 */
-.fr-c-cos{background:var(--tinta-2)}
-.fr-c-cose{background:var(--info-cheio)}
+.fr-c-cos{background:var(--mudo)}
+.fr-heat td.fr-c-qc,.fr-chave .fr-c-qc{background:transparent;box-shadow:inset 0 0 0 2px var(--info-cheio)}
 .fr-c-nada{background:transparent;box-shadow:inset 0 0 0 1px var(--linha)}
 
 /* a barra única de validação, embaixo do mapa */

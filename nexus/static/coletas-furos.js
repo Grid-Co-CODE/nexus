@@ -188,6 +188,13 @@
     return (s <= a ? "00:00" : hm(s)) + " às " + (e >= b ? "24:00" : hm(e));
   }
   var ocCurto = function (p, j, d) { return p.oc[j][2] + " " + noDia(p, j, d); };
+  // falha de comunicação: o tipo de falha do COS (139 em novembro); com a usina gerando, é o furo que a equipe resolve
+  var ehCom = function (o) { return /comunica/i.test(o[2]); };
+  // as horas da ocorrência dentro da janela solar (06-18 h) do dia: a régua das 6 h do R01
+  function solNoDia(p, j, d) {
+    var t = tempos(p)[j], a = iniDia(d) + 6 * 36e5, b = iniDia(d) + 18 * 36e5;
+    return Math.max(0, Math.min(t[1], b) - Math.max(t[0], a)) / 36e5;
+  }
 
   // ── a conta de cada usina (calc da tela da analista) ─────────────────────────────────────────────────────────────
   var M = function () { return DB.months[MONTH]; }, P = function () { return M().plants; };
@@ -275,31 +282,41 @@
     var invP = pend.filter(function (t) { return t.tipo === "Inversor"; }), ks = {};
     pend.forEach(function (t) { ks[kindLbl(t.tipo)] = 1; });
     var kl = Object.keys(ks), kinds = kl.length === 2 ? "Geração + ETM" : (kl.length ? kl[0] : "");
-    // o dia da usina, para a tira do mês (Levi, 19/11/2026: "algo mais visual [...] por tamanho do furo"): o pior estado
-    // do dia. u = a usina toda sem dado; f = falta a geração de parte dos equipamentos; t = só o IPOA ou o GHI (a estação
-    // sem dado com a geração toda lá pesa menos: era o que fazia 17 de 17 dias em quase toda usina); todos pendentes.
-    // c = o furo do dia está validado; e = uma parada explicou o dia; n = usina sem geração no dia; o = completo
-    var t0 = tempos(p), dia = [], ocd = [], dd = 0, du = 0, dg = 0, cosF = 0, ocF = {};
+    // o dia da usina, para a tira do mês, pela CAUSA (Levi, 19/11/2026: "é justificado se foi queda. Agora, se foi falha de
+    // comunicação, a gente tem que resolver isso [...] uma cor para o que foi justificado em questão de geração, uma cor que
+    // tem furo e foi falha de comunicação [...] e conseguir filtrar esses pontos"). Com furo pendente no dia:
+    //   m = o COS registrou falha de comunicação no dia (o furo a resolver: a usina gerava e o dado não veio);
+    //   s = furo sem justificativa no COS; com `q`, o COS tem uma queda curta no dia, que pela regra do R01 não justifica
+    //       (o Levi manteve as 6 h de sol, 19/11/2026: uma queda de 20 min não explica o dia inteiro sem dado);
+    //   `t` = falta só o IPOA ou o GHI (o quadrado vazado).
+    // Sem furo pendente: c = validado pela equipe; e = justificado por queda (a parada de 6 h ou mais que a regra aceitou);
+    // n = usina sem geração no dia; o = completo.
+    var t0 = tempos(p), oc = p.oc || [], dia = [], ocd = [], com = [], dd = 0, du = 0, dCom = 0, dSem = 0, dQ = 0, dJ = 0, dV = 0, cosF = 0, ocF = {};
     p.days.forEach(function (d, k) {
-      var s = "o", tem = false, pu = false, pg = false, pe = false;
+      var tem = false, pu = false, pg = false, pe = false;
       items.forEach(function (t) {
         if (t.idx.indexOf(k) < 0) return;
         tem = true;
         if (k in t.vr) return;
         if (t.tipo === "UFV") pu = true; else if (t.tipo === "Inversor") pg = true; else pe = true;
       });
-      s = pu ? "u" : pg ? "f" : pe ? "t" : tem ? "c" : p.eqs.some(function (e) { return e.st[k] === "e"; }) ? "e" :
-        p.eqs.length && p.eqs.filter(isGen).every(function (e) { return e.st[k] === "p"; }) ? "n" : "o";
       var a = iniDia(d), b = a + 864e5, js = [];
       t0.forEach(function (t, j) { if (t[0] < b && t[1] > a) js.push(j); });
-      if (pu || pg || pe) { dd++; if (pu) du++; else if (pg) dg++; if (js.length) { cosF++; js.forEach(function (j) { ocF[j] = 1; }); } }
-      dia.push(s); ocd.push(js);
+      var cm = js.some(function (j) { return ehCom(oc[j]); });
+      var q = !cm && js.some(function (j) { return oc[j][5] === "s" && !ehCom(oc[j]) && solNoDia(p, j, d) < 6; });
+      var pend = pu || pg || pe, x = { s: "o", t: pend && !pu && !pg, q: pend && q };
+      if (pend) { x.s = cm ? "m" : "s"; dd++; if (pu) du++; if (cm) dCom++; else { dSem++; if (q) dQ++; } if (js.length) { cosF++; js.forEach(function (j) { ocF[j] = 1; }); } }
+      else if (tem) { x.s = "c"; dV++; }
+      else if (p.eqs.some(function (e) { return e.st[k] === "e"; })) { x.s = "e"; dJ++; }
+      else if (p.eqs.length && p.eqs.filter(isGen).every(function (e) { return e.st[k] === "p"; })) x.s = "n";
+      dia.push(x); ocd.push(js); com.push(cm);
     });
     return { kinds: kinds, cmt: items.filter(function (t) { return t.ent && t.ent.o; }).length, ufv: ufv, items: items, pend: pend, done: done,
       cp: cp, cellT: cellT, comp: comp, empty: empty, sit: sit, sev: sev, ex: ex,
       noos: (p.os || []).filter(function (o) { return o[6] === "A"; }).length, ipF: ipP ? ipP.pi.length : 0, ghF: ghP ? ghP.pi.length : 0,
       invF: invP.length, nInv: p.eqs.filter(isGen).length, pendN: pend.length, confN: done.length, inop: inop, inopN: inop.length,
-      dia: dia, ocd: ocd, dd: dd, du: du, dg: dg, dt: dd - du - dg, cosF: cosF, ocF: ocF, ocN: (p.oc || []).length, ocFN: Object.keys(ocF).length };
+      dia: dia, ocd: ocd, com: com, dd: dd, du: du, dCom: dCom, dSem: dSem, dQ: dQ, dJ: dJ, dV: dV, cosF: cosF, ocF: ocF,
+      ocN: (p.oc || []).length, ocFN: Object.keys(ocF).length };
   }
   // a parada que cobre o dia troca o estado por "e" (ausência esperada); "o" e "a" nunca mudam (§6.4)
   function applyOS() {
@@ -335,9 +352,13 @@
   }
 
   // ── os filtros (static/filtros-os.js monta a barra, o painel e as etiquetas a partir destas <select>) ──────────────
-  var SITS = [["falha", "Furo pendente"], ["conf", "Validado"], ["ok", "Sem falha"], ["cos", "Com ocorrência do COS no dia do furo"],
-    ["os", "Com ausência explicada por parada"], ["noos", "Com parada sem OS"], ["ipoa", "IPOA pendente"], ["ghi", "GHI pendente"],
+  // as causas do furo pelo COS viraram filtro (Levi, 19/11/2026: "eu quero esses pontos e eu quero conseguir filtrar esses
+  // pontos"); a lista abre só no "Furo pendente": o justificado sai dela ("tirasse dessa lista [...] o que está justificado")
+  var SITS = [["falha", "Furo pendente"], ["com", "Furo com falha de comunicação no COS"], ["semj", "Furo sem justificativa no COS"],
+    ["qc", "Furo com queda curta no COS (menos de 6 h)"], ["os", "Com dia justificado por queda"], ["val", "Com dia validado pela equipe"],
+    ["conf", "Tudo validado"], ["ok", "Sem falha"], ["noos", "Com parada sem OS"], ["ipoa", "IPOA pendente"], ["ghi", "GHI pendente"],
     ["inv", "Equipamento de geração com furo"], ["inop", "Com equipamento inoperante"]];
+  var SIT_PADRAO = ["falha"];
   function lerFiltros() {
     var f = $("fr-filtros"), o = {};
     if (!f || !f.elements.cliente) return null;
@@ -347,7 +368,7 @@
     return o;
   }
   function montarFiltros() {
-    var antes = lerFiltros() || { cliente: [], carteira: [], fonte: [], status: [], sit: [], tipo: "", zero: "1", paradas: "1", validados: "1", q: "" };
+    var antes = lerFiltros() || { cliente: [], carteira: [], fonte: [], status: [], sit: SIT_PADRAO.slice(), tipo: "", zero: "1", paradas: "1", validados: "1", q: "" };
     var ps = P();
     function unicos(fn) { var s = {}; ps.forEach(function (p) { var v = fn(p); if (v !== null) s[v] = 1; }); return Object.keys(s).sort(function (a, b) { return a.localeCompare(b, "pt-BR"); }); }
     function lista(nome, rotulo, ops, marcados) {
@@ -364,7 +385,9 @@
     f.id = "fr-filtros"; f.className = "fr-filtros"; f.setAttribute("data-fo", "local");
     f.addEventListener("submit", function (e) { e.preventDefault(); });
     f.innerHTML =
-      '<label class="fr-mes"><span class="gc-rotulo">Mês</span><select name="mes" class="gc-campo" data-fo-fora>' + MKEYS.slice().reverse().map(function (k) {
+      // o mês na mesma linha e na mesma altura da busca e do Filtros (Levi, 19/11/2026: "esse mês aí tá desalinhado com o
+      // buscador e os filtros, tá feião"): sem o rótulo em cima, que o descia; o nome fica para o leitor de tela
+      '<label class="fr-mes"><select name="mes" class="fr-mes-sel" aria-label="Mês" data-fo-fora>' + MKEYS.slice().reverse().map(function (k) {
         return '<option value="' + k + '"' + (k === MONTH ? " selected" : "") + ">" + mlabel(k) + "</option>";
       }).join("") + "</select></label>" +
       '<input type="search" name="q" placeholder="Buscar usina" aria-label="Buscar usina" value="' + esc(antes.q) + '">' +
@@ -397,8 +420,9 @@
     s.dispatchEvent(new Event("change", { bubbles: true }));
   }
   function linhas() { return P().map(function (p) { return { p: p, m: calc(p) }; }); }
-  function filtrar(todas) {
+  function filtrar(todas, semSituacao) {
     var f = lerFiltros(), q = norm(f.q);
+    if (semSituacao) f.sit = [];
     return todas.filter(function (x) {
       var p = x.p, m = x.m;
       if (f.cliente.length && f.cliente.indexOf(p.cliente) < 0) return false;
@@ -412,7 +436,8 @@
       if (f.tipo === "ambos" && m.kinds !== "Geração + ETM") return false;
       if (f.sit.length && !f.sit.some(function (s) {
         return s === "falha" || s === "conf" || s === "ok" ? m.sit === s : s === "ipoa" ? m.ipF : s === "ghi" ? m.ghF : s === "inop" ? m.inopN :
-          s === "os" ? m.ex : s === "noos" ? m.noos : s === "inv" ? m.invF : s === "cos" ? m.cosF : false;
+          s === "os" ? m.dJ || m.ex : s === "noos" ? m.noos : s === "inv" ? m.invF : s === "com" ? m.dCom : s === "semj" ? m.dSem :
+          s === "qc" ? m.dQ : s === "val" ? m.dV : false;
       })) return false;
       return true;
     });
@@ -420,16 +445,25 @@
 
   // ── o desenho ────────────────────────────────────────────────────────────────────────────────────────────────
   var rid = function (p) { return p.src + "|" + p.usina; };
-  function numero(r, v, d, tom) { return '<div><div class="r">' + r + '</div><div class="v gc-num' + (tom ? " fr-v--" + tom : "") + '">' + v + '</div><div class="d">' + d + "</div></div>"; }
-  function desenharNumeros(rows) {
-    var soma = function (k) { return rows.reduce(function (a, r) { return a + r.m[k]; }, 0); };
-    var falha = rows.filter(function (r) { return r.m.sit === "falha"; }).length, crit = rows.filter(function (r) { return r.m.sit === "falha" && r.m.sev === "cr"; }).length;
-    var cT = soma("cellT"), cP = soma("cp"), dd = soma("dd"), du = soma("du"), dt = soma("dt"), cf = soma("cosF");
-    $("fr-numeros").innerHTML =
-      numero("Usinas com furo pendente", falha + ' <small>de ' + rows.length + "</small>", crit ? crit + " sem coleta ou com menos da metade do dado" : "nenhuma em falha crítica", falha ? (crit ? "critico" : "alerta") : "ok") +
-      numero("Dias com furo", dd, dd ? "somando as usinas: " + du + " com a usina toda sem dado, " + dt + " só de IPOA ou GHI" : "nenhum dia pendente", dd ? "alerta" : "ok") +
-      numero("Completude", cT ? ((1 - cP / cT) * 100).toFixed(1).replace(".", ",") + "%" : "—", "das células esperadas até " + fmtD(M().end)) +
-      numero("Com ocorrência no COS", cf + (dd ? ' <small>de ' + dd + "</small>" : ""), "dias com furo em que o COS registrou algo na usina");
+  // os contadores do alto são os pontos da tira, e o clique filtra a lista por eles (Levi, 19/11/2026: "eu quero esses
+  // pontos e eu quero conseguir filtrar esses pontos [...] pode ter um contador ali em cima"); contam as usinas com os
+  // outros filtros de agora, menos o de Situação, que é o que o contador troca
+  var CONT = [["com", "Falha de comunicação", "dCom", "furo com falha de comunicação no COS: resolver"],
+    ["semj", "Sem justificativa", "dSem", "furo sem queda que o justifique no COS"],
+    ["os", "Justificado por queda", "dJ", "parada do COS de 6 h ou mais: não é furo"],
+    ["val", "Validado pela equipe", "dV", "furo com motivo registrado"]];
+  function desenharNumeros(base) {
+    var sel = varios("sit"), cT = 0, cP = 0;
+    base.forEach(function (r) { cT += r.m.cellT; cP += r.m.cp; });
+    $("fr-numeros").innerHTML = CONT.map(function (c) {
+      var dias = 0, us = 0, q = 0, on = sel.length === 1 && sel[0] === c[0];
+      base.forEach(function (r) { var v = r.m[c[2]]; dias += v; if (v) us++; if (c[0] === "semj") q += r.m.dQ; });
+      return '<button type="button" class="fr-cont" data-sit="' + c[0] + '" aria-pressed="' + on + '">' +
+        '<span class="r"><i class="fr-q fr-q--' + ({ com: "m", semj: "s", os: "e", val: "c" }[c[0]]) + '" aria-hidden="true"></i>' + c[1] + "</span>" +
+        '<span class="v gc-num">' + dias + ' <small>' + (dias === 1 ? "dia" : "dias") + " · " + us + (us === 1 ? " usina" : " usinas") + "</small></span>" +
+        '<span class="d">' + c[3] + (q ? "; " + q + " com queda curta (menos de 6 h)" : "") + "</span></button>";
+    }).join("");
+    $("fr-completude").textContent = cT ? "Completude de " + ((1 - cP / cT) * 100).toFixed(1).replace(".", ",") + "% das células esperadas até " + fmtD(M().end) + ". " : "";
   }
   function desenharFontes() {
     var f = DB.fontes || {}, s = DB.stats || {}, bd = f.bd || {}, partes = [];
@@ -449,12 +483,13 @@
     $("fr-avisos").innerHTML = av.map(function (t) { return '<p class="aviso">' + esc(t) + "</p>"; }).join("");
   }
   // o tamanho do furo por cliente (Levi, 19/11/2026: "mais visual também, por cliente, sabe, por tamanho do furo"): a barra
-  // é a soma dos dias com furo das usinas dele, em vermelho a parte em que faltou a usina toda; o clique filtra
+  // é a soma dos dias com furo pendente das usinas dele, pela causa: roxo, falha de comunicação no COS; vermelho, sem
+  // justificativa. O clique filtra
   function desenharClientes(todas) {
     var cs = {}, sel = varios("cliente");
     todas.forEach(function (x) {
-      var c = cs[x.p.cliente] = cs[x.p.cliente] || { n: 0, f: 0, dd: 0, du: 0, dg: 0, dt: 0 };
-      c.n++; c.dd += x.m.dd; c.du += x.m.du; c.dg += x.m.dg; c.dt += x.m.dt; if (x.m.sit === "falha") c.f++;
+      var c = cs[x.p.cliente] = cs[x.p.cliente] || { n: 0, f: 0, dd: 0, com: 0, sem: 0 };
+      c.n++; c.dd += x.m.dd; c.com += x.m.dCom; c.sem += x.m.dSem; if (x.m.sit === "falha") c.f++;
     });
     var nomes = Object.keys(cs).sort(function (a, b) { return a.localeCompare(b, "pt-BR"); });
     var com = nomes.filter(function (k) { return cs[k].dd; }).sort(function (a, b) { return cs[b].dd - cs[a].dd; }), sem = nomes.filter(function (k) { return !cs[k].dd; });
@@ -463,28 +498,32 @@
       var c = cs[k], on = sel.length === 1 && sel[0] === k;
       return '<button type="button" class="fr-cli' + (sel.length && !on ? " fr-cli--fora" : "") + '" data-cli="' + esc(k) + '" aria-pressed="' + on + '">' +
         '<span class="fr-cli-nome">' + esc(k) + "</span>" +
-        '<span class="fr-cli-barra" title="' + c.du + " dia(s) com a usina toda sem dado, " + c.dg + " com parte da geração faltando, " + c.dt + ' só de IPOA ou GHI">' +
-        ["u", "dg", "dt"].map(function (s) { var v = s === "u" ? c.du : c[s]; return '<i class="fr-cli-' + s + '" style="width:' + (100 * v / max).toFixed(2) + '%"></i>'; }).join("") + "</span>" +
-        '<span class="fr-cli-num"><b class="gc-num">' + c.dd + "</b> " + (c.dd === 1 ? "dia" : "dias") + ' <span class="mudo">· ' + c.f + " de " + c.n + (c.n === 1 ? " usina" : " usinas") + "</span></span></button>";
-    }).join("") + (sem.length ? '<p class="fr-cli-sem mudo">Sem furo pendente: ' + sem.map(function (k) {
+        '<span class="fr-cli-barra" title="' + c.com + " dia(s) com falha de comunicação no COS, " + c.sem + ' sem justificativa">' +
+        '<i class="fr-cli-com" style="width:' + (100 * c.com / max).toFixed(2) + '%"></i><i class="fr-cli-sem" style="width:' + (100 * c.sem / max).toFixed(2) + '%"></i></span>' +
+        '<span class="fr-cli-num"><b class="gc-num">' + c.dd + "</b> " + (c.dd === 1 ? "dia" : "dias") + (c.com ? ' <span class="fr-txt-com">· ' + c.com + " de comunicação</span>" : "") +
+        ' <span class="mudo">· ' + c.f + " de " + c.n + (c.n === 1 ? " usina" : " usinas") + "</span></span></button>";
+    }).join("") + (sem.length ? '<p class="fr-cli-sem-furo mudo">Sem furo pendente: ' + sem.map(function (k) {
       return '<button type="button" class="fr-cli-link" data-cli="' + esc(k) + '">' + esc(k) + "</button>";
     }).join(", ") + "</p>" : "") + (com.length ? "" : '<p class="mudo">Nenhum cliente com furo pendente neste mês.</p>');
   }
-  var DIA_T = { u: "a usina toda sem dado", f: "falta a geração de parte dos equipamentos", t: "falta só o IPOA ou o GHI", c: "furo validado", e: "explicado por parada", n: "usina sem geração no dia", o: "completo" };
+  var DIA_T = { m: "furo com falha de comunicação no COS", s: "furo sem justificativa no COS", c: "furo validado pela equipe",
+    e: "justificado por queda (parada do COS de 6 h ou mais)", n: "usina sem geração no dia", o: "completo" };
+  function classeDia(x) { return "fr-q fr-q--" + x.s + (x.t ? " fr-q--t" : "") + (x.q ? " fr-q--qc" : ""); }
   function tira(p, m) {
-    return '<span class="fr-tira">' + m.dia.map(function (s, k) {
+    return '<span class="fr-tira">' + m.dia.map(function (x, k) {
       var js = m.ocd[k], d = p.days[k];
-      return '<i class="fr-q fr-q--' + s + (js.length ? " fr-q--cos" : "") + '" title="' + fmtD(d) + ": " + DIA_T[s] +
+      return '<i class="' + classeDia(x) + '" title="' + fmtD(d) + ": " + DIA_T[x.s] + (x.t ? " (falta só o IPOA ou o GHI)" : "") +
+        (x.q ? " (o COS tem uma queda curta, que não justifica o dia)" : "") +
         (js.length ? " · COS: " + esc(js.map(function (j) { return ocCurto(p, j, d); }).join("; ")) : "") + '"></i>';
     }).join("") + "</span>";
   }
-  var COLS = [["usina", "Usina"], ["dia", "O mês, dia a dia"], ["tam", "Furo pendente", 1], ["oc", "COS no mês", 1]];
+  var COLS = [["usina", "Usina"], ["dia", "O mês, dia a dia"], ["tam", "Furo pendente", 1], ["com", "Falha de comunicação", 1]];
   function ordenar(rows) {
     var o = ORD;
     var val = function (x) {
       var m = x.m;
-      // o tamanho: os dias com furo; no empate, o da usina toda e o de geração vêm antes do só de IPOA ou GHI
-      return o.k === "usina" ? x.p.usina : o.k === "oc" ? m.ocFN * 1e4 + m.ocN : m.dd * 1e6 + m.du * 1e4 + m.dg * 1e2 + (m.sit === "conf" ? 1 : 0) + m.cp / 1e7;
+      // o tamanho: os dias com furo pendente; no empate, os de falha de comunicação e os da usina toda primeiro
+      return o.k === "usina" ? x.p.usina : o.k === "com" ? m.dCom * 1e4 + m.dd : m.dd * 1e6 + m.dCom * 1e3 + m.du * 10 + (m.sit === "conf" ? 1 : 0) + m.cp / 1e7;
     };
     rows.sort(function (a, b) {
       var x = val(a), y = val(b);
@@ -496,11 +535,10 @@
       case "usina": return '<td class="fr-usina"><i class="ph ph-caret-right fr-seta" aria-hidden="true"></i><span><b>' + esc(p.usina) + '</b><small class="mudo">' + esc(p.cliente) + (p.carteira && p.carteira !== "—" && p.carteira !== p.cliente ? " · " + esc(p.carteira) : "") + "</small></span></td>";
       case "dia": return '<td class="fr-td-tira">' + tira(p, m) + "</td>";
       case "tam":
-        if (m.dd) return '<td class="n fr-tam"><b class="gc-num fr-tam-n fr-tam-n--' + m.sev + '">' + m.dd + '</b> <span class="mudo">' + (m.dd === 1 ? "dia" : "dias") + '</span><small>' + esc(oQueFalta(m)) + "</small></td>";
-        return '<td class="n fr-tam">' + (m.sit === "conf" ? '<span class="fr-okt">validado</span>' : '<span class="mudo">completo</span>') + (m.ex ? '<small>' + m.ex + " célula(s) explicada(s) por parada</small>" : "") + "</td>";
-      case "oc":
-        if (!m.ocN) return '<td class="n"><span class="mudo">nenhuma</span></td>';
-        return '<td class="n"><b class="gc-num">' + m.ocN + '</b>' + (m.ocFN ? '<small class="fr-oc-furo">' + m.ocFN + (m.ocFN === 1 ? " no dia do furo" : " nos dias do furo") + "</small>" : "") + "</td>";
+        if (m.dd) return '<td class="n fr-tam"><b class="gc-num fr-tam-n">' + m.dd + '</b> <span class="mudo">' + (m.dd === 1 ? "dia" : "dias") + '</span><small>' + esc(oQueFalta(m)) + "</small></td>";
+        return '<td class="n fr-tam">' + (m.sit === "conf" ? '<span class="fr-okt">validado</span>' : '<span class="mudo">completo</span>') + (m.dJ ? '<small>' + m.dJ + (m.dJ === 1 ? " dia justificado" : " dias justificados") + " por queda</small>" : "") + "</td>";
+      case "com":
+        return '<td class="n">' + (m.dCom ? '<b class="gc-num fr-txt-com">' + m.dCom + '</b> <span class="mudo">' + (m.dCom === 1 ? "dia" : "dias") + "</span>" : '<span class="mudo">—</span>') + "</td>";
     }
     return "<td></td>";
   }
@@ -546,7 +584,7 @@
       h += '<div class="fr-rola"><table class="fr-sub fr-oc-tab"><thead><tr><th>Quando</th><th>Ocorrência</th><th>OS</th><th>Geração</th><th></th></tr></thead><tbody>' +
         mostrar.map(function (j) {
           var o = oc[j];
-          return '<tr class="' + (m.ocF[j] ? "fr-oc-nofuro" : "") + '"><td class="gc-num fr-oc-quando">' + dh(t[j][0]) + " → " + (o[6] ? '<b class="fr-pend">em aberto</b>' : dh(t[j][1])) +
+          return '<tr class="' + (ehCom(o) ? "fr-oc-com" : o[7] ? "fr-oc-just" : m.ocF[j] ? "fr-oc-nofuro" : "") + '"><td class="gc-num fr-oc-quando">' + dh(t[j][0]) + " → " + (o[6] ? '<b class="fr-pend">em aberto</b>' : dh(t[j][1])) +
             ' <span class="mudo">(' + dur(t[j][1] - t[j][0]) + ")</span></td><td><b>" + esc(o[2]) + "</b>" + (o[3] ? ' <span class="mudo">' + esc(o[3]) + "</span>" : "") + "</td>" +
             '<td class="gc-num">' + (o[4] ? esc(o[4]) : '<span class="fr-selo fr-selo--alerta">sem OS</span>') + "</td>" +
             "<td>" + (o[5] === "s" ? "parou" : o[5] === "n" ? "seguiu" : '<span class="mudo">não informado</span>') + "</td>" +
@@ -571,10 +609,11 @@
       var bs = furoDe(e, z);
       return e.st.split("").map(function (c, i) {
         var u = (m.ufv && Dset[i] && isGen(e)) ? m.ufv : null, rr = u ? u.vr[i] : ((t && bs.indexOf(c) >= 0) ? t.vr[i] : "");
-        return rr ? (rr === "fora_op" ? "i" : "c") : c;
+        // o furo pendente num dia com falha de comunicação no COS sai em roxo: é o que a equipe tem de resolver
+        return rr ? (rr === "fora_op" ? "i" : "c") : (m.com[i] && bs.indexOf(c) >= 0 ? "m" : c);
       });
     }
-    if (m.ufv) ls.push({ nome: "Usina toda sem dado", itens: [m.ufv], cel: p.days.map(function (_d, i) { return Dset[i] ? (m.ufv.vr[i] ? (m.ufv.vr[i] === "fora_op" ? "i" : "c") : "v") : "n"; }) });
+    if (m.ufv) ls.push({ nome: "Usina toda sem dado", itens: [m.ufv], cel: p.days.map(function (_d, i) { return Dset[i] ? (m.ufv.vr[i] ? (m.ufv.vr[i] === "fora_op" ? "i" : "c") : (m.com[i] ? "m" : "v")) : "n"; }) });
     p.eqs.forEach(function (e) {
       var t = byN[e.nome];
       if (!sa && !t && e.st.indexOf("e") < 0) return;
@@ -607,17 +646,22 @@
     var nsel = Object.keys(dsel).length;
     var sugN = m.pend.filter(function (t) { return suggest(p, t); }).length;
     var h = '<section class="fr-mapa"><div class="fr-mapa-topo"><h3 class="fr-h3">Mapa do mês</h3><div class="fr-chave">' +
-      [["v", "Sem dado"], ["z", "Zerado"], ["d", "IPOA só estimado"], ["a", "Valor anômalo"], ["e", "Explicado por parada"], ["c", "Validado"], ["i", "Inoperante"], ["o", "Coletado"]]
+      [["m", "Sem dado, com falha de comunicação no COS"], ["v", "Sem dado"], ["z", "Zerado"], ["d", "IPOA só estimado"], ["a", "Valor anômalo"],
+        ["e", "Justificado por queda"], ["c", "Validado"], ["i", "Inoperante"], ["o", "Coletado"]]
         .map(function (x) { return '<span><i class="fr-c fr-c-' + x[0] + '"></i>' + x[1] + "</span>"; }).join("") +
-      '<span><i class="fr-c fr-c-cos"></i>Ocorrência no COS</span></div>' +
+      '<span><i class="fr-c fr-c-qc"></i>Queda curta no COS (não justifica)</span><span><i class="fr-c fr-c-cos"></i>Outra ocorrência no COS</span></div>' +
       (sugN ? '<button type="button" class="gc-btn gc-btn--contorno fr-mini" data-a="sug" data-id="' + esc(id) + '" title="Aplica a sugestão do Nexus a cada item pendente que tem uma">Aceitar as sugestões (' + sugN + ")</button>" : "") +
       '<button type="button" class="gc-btn gc-btn--fantasma fr-mini" data-a="all" data-id="' + esc(id) + '">' + (TODOS.has(id) ? "Só os equipamentos com furo" : "Todos os equipamentos (" + p.eqs.length + ")") + "</button></div>";
     if (!ls.length && !(p.oc || []).length) return h + '<p class="mudo">Nenhum equipamento com furo ou parada neste mês.</p></section>';
     h += '<div class="fr-rola"><table class="fr-heat"><thead><tr><th></th>' + days.map(function (d) { return '<th class="gc-num">' + d + "</th>"; }).join("") + "</tr></thead><tbody>";
     if ((p.oc || []).length) {
       h += '<tr class="fr-heat-cos"><th>COS</th>' + days.map(function (d, i) {
-        var js = m.ocd[i];
-        return '<td class="fr-c ' + (js.length ? (js.some(function (j) { return p.oc[j][7]; }) ? "fr-c-cose" : "fr-c-cos") : "fr-c-nada") + '"' +
+        // a linha do COS pela causa: roxo, falha de comunicação; azul, queda que justifica (6 h ou mais de sol); contorno
+        // azul, queda curta; cinza, outra ocorrência (string, tracker)
+        var js = m.ocd[i], oc = p.oc, cls = !js.length ? "fr-c-nada" : js.some(function (j) { return ehCom(oc[j]); }) ? "fr-c-m" :
+          js.some(function (j) { return oc[j][5] === "s" && solNoDia(p, j, d) >= 6; }) ? "fr-c-e" :
+          js.some(function (j) { return oc[j][5] === "s"; }) ? "fr-c-qc" : "fr-c-cos";
+        return '<td class="fr-c ' + cls + '"' +
           (js.length ? ' title="' + fmtD(d) + " · " + esc(js.map(function (j) { var o = p.oc[j]; return o[2] + " " + noDia(p, j, d) + (o[4] ? " (OS " + o[4] + ")" : "") + (o[5] === "s" ? ", geração parou" : o[5] === "n" ? ", geração seguiu" : ""); }).join("; ")) + '"' : "") + "></td>";
       }).join("") + "</tr>";
     }
@@ -665,7 +709,7 @@
   function render() {
     if (!DB || !MONTH) return;
     var todas = linhas(), rows = filtrar(todas);
-    desenharNumeros(rows);
+    desenharNumeros(filtrar(todas, true));
     desenharFontes();
     desenharClientes(todas);
     $("fr-titulo-lista").textContent = "Usinas (" + rows.length + (rows.length !== todas.length ? " de " + todas.length : "") + ")";
@@ -856,6 +900,12 @@
     var b = e.target.closest("[data-cli]"); if (!b) return;
     var k = b.getAttribute("data-cli"), sel = varios("cliente");
     porValores("cliente", sel.length === 1 && sel[0] === k ? [] : [k]);
+  });
+  // o contador filtra pelo ponto dele; clicar de novo volta ao padrão (só o furo pendente)
+  $("fr-numeros").addEventListener("click", function (e) {
+    var b = e.target.closest("[data-sit]"); if (!b) return;
+    var k = b.getAttribute("data-sit"), sel = varios("sit");
+    porValores("sit", sel.length === 1 && sel[0] === k ? SIT_PADRAO : [k]);
   });
   $("fr-csv").addEventListener("click", csv);
   $("fr-exportar").addEventListener("click", function () {
