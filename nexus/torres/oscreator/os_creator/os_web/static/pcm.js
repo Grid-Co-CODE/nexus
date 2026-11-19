@@ -24,6 +24,7 @@
   const cbCli = $('cb_cli'), cbUsi = $('cb_usi'), cbTipo = $('cb_tipo'), busca = $('busca');
   const ckSem = $('ck_sem_plano'), descLbl = $('desc_lbl'), edDesc = $('ed_desc');
   const famLbl = $('fam_lbl'), cbFam = $('cb_familia'), bPlanos = $('b_planos'), avisoPlanos = $('aviso_planos');
+  const cbTipoP = $('cb_tipo_plano'), tipoPLbl = $('tipo_plano_lbl'), cbTurno = $('cb_turno'), turnoLbl = $('turno_lbl');
   const bComPlano = $('b_complano'), bAll = $('b_all'), bNone = $('b_none'), tbody = $('tbody'), selLbl = $('sel_lbl');
   const bulkDate = $('bulk_date'), obs = $('obs'), cbResp = $('cb_resp'), bResp = $('b_resp');
   const ospaiIn = $('ospai_in'), ospaiLista = $('ospai_lista'), btn = $('btn_criar'), hint = $('hint'), res = $('resultado');
@@ -92,7 +93,12 @@
   }
 
   // ── a tabela (_has_plan / _refresh / _fill_row / _fill_planos) ──
-  const planosDe = (aid, f) => (planosByAsset[aid] || []).filter((p) => f == null || p.family === f);
+  // o tipo de plano e o turno (19/11/2026, sugestão do PCM) filtram junto com a família; "(todos)" = qualquer um
+  const planosDe = (aid, f) => {
+    const tp = cbTipoP.value || null, tu = cbTurno.value || null;
+    return (planosByAsset[aid] || []).filter((p) => (f == null || p.family === f) && (tp == null || p.tipo === tp) && (tu == null || p.turno === tu));
+  };
+  const comFiltro = () => !!(cbTipoP.value || cbTurno.value);   // a linha sem plano diz se foi a família ou o filtro
   function temPlano(aid, f) {                                // _has_plan: só conta o ativo já carregado
     return aid != null && loadedFor.has(aid) && planosDe(aid, f).length > 0;
   }
@@ -139,7 +145,7 @@
     }
     if (!loadedFor.has(aid)) return {c1: dim('clique em “Carregar planos”'), c2: '', c3: dim('—'), c4: ''};
     const ps = planosDe(aid, fam()).slice().sort((x, y) => cmp(String(x.description || '').toLowerCase(), String(y.description || '').toLowerCase()));
-    if (!ps.length) return {sem: true, c1: esc('— sem plano nesta família —'), c2: '—', c3: '—', c4: ''};
+    if (!ps.length) return {sem: true, c1: esc(comFiltro() ? '— sem plano neste filtro —' : '— sem plano nesta família —'), c2: '—', c3: '—', c4: ''};
     // tem plano(s): o combo abre no primeiro com "grid" no nome (o [Grid Co.]), senão no primeiro — pcm_web.plano_padrao
     let gi = ps.findIndex((p) => String(p.description || '').toLowerCase().includes('grid'));
     if (gi < 0) gi = 0;
@@ -254,7 +260,7 @@
     let msg = esc(checked.size + ' marcado(s)');
     if (loadedFor.size) {
       msg += ' · ' + com + ' com plano';
-      if (sem) msg += ' · <span class="pcm-red">' + sem + ' SEM plano nesta família</span>';
+      if (sem) msg += ' · <span class="pcm-red">' + sem + (comFiltro() ? ' SEM plano neste filtro' : ' SEM plano nesta família') + '</span>';
     }
     selLbl.innerHTML = msg;
   }
@@ -312,8 +318,8 @@
   // ── "Sem plano de tarefas" (_on_sem_plano): família, Carregar e Só com plano inativos; aparece a descrição ──
   ckSem.onchange = () => {
     semPlano = ckSem.checked;
-    cbFam.disabled = bPlanos.disabled = bComPlano.disabled = semPlano;
-    famLbl.classList.toggle('desab', semPlano);
+    cbFam.disabled = bPlanos.disabled = bComPlano.disabled = cbTipoP.disabled = cbTurno.disabled = semPlano;
+    [famLbl, tipoPLbl, turnoLbl].forEach((l) => l.classList.toggle('desab', semPlano));
     descLbl.hidden = edDesc.hidden = !semPlano;
     refresh();
   };
@@ -342,6 +348,10 @@
     // "(todas)" + as famílias; o combo volta para a PRIMEIRA família a cada carga, como no app
     cbFam.innerHTML = '<option value="">(todas)</option>' + fams.map(opcao).join('');
     cbFam.value = j.familia || '';
+    // o tipo de plano: "(todos)" + os tipos dos planos carregados; o que a pessoa tinha escolhido fica, se ainda existe
+    const tipoAntes = cbTipoP.value, tipos = j.tipos || [];
+    cbTipoP.innerHTML = '<option value="">(todos)</option>' + tipos.map((t) => '<option value="' + esc(t.chave) + '">' + esc(t.nome) + '</option>').join('');
+    cbTipoP.value = tipos.some((t) => t.chave === tipoAntes) ? tipoAntes : '';
     hint.textContent = j.n_planos ? j.n_planos + ' plano(s) em ' + fams.length + ' família(s).' : 'Nenhum plano encontrado p/ os ativos marcados.';
     refresh();                                               // re-ordena com plano no topo + preenche
   }
@@ -518,6 +528,8 @@
   cbTipo.onchange = refresh;
   busca.oninput = refresh;
   cbFam.onchange = refresh;                                  // re-ordena (com plano no topo) + re-preenche
+  cbTipoP.onchange = refresh;                                // o tipo de plano e o turno, como a família
+  cbTurno.onchange = refresh;
   refresh();
   carregarResp(false);
 })();

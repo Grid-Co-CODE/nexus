@@ -50,11 +50,24 @@
         <button type="button" class="os-btn secondary" id="b_planos">Carregar planos</button>
       </div>
     </div>
+    {# 19/11/2026 (sugestão do PCM pelo Sugestões do Nexus): o tipo de plano (o que o plano traz entre colchetes no começo
+       do nome) e o turno (a palavra noturno ou noturna no nome). Filtram os planos de cada linha, como a família; de
+       saída ficam em "(todos)" e a tela é a de antes. A regra mora no pcm_web.py (tipo_do_plano, turno_do_plano) #}
+    <div class="pcm-filtros">
+      <div class="os-campo">
+        <span class="os-lbl" id="tipo_plano_lbl">Tipo de plano</span>
+        <select id="cb_tipo_plano" data-busca="1" autocomplete="off" title="O que o plano traz entre colchetes no começo do nome, como [Grid Co.]"><option value="">(carregue os planos)</option></select>
+      </div>
+      <div class="os-campo">
+        <span class="os-lbl" id="turno_lbl">Turno</span>
+        <select id="cb_turno" data-osb="nativo" autocomplete="off" title="Noturna: o plano com noturno ou noturna no nome. Diurna: os outros"><option value="" selected>(todos)</option><option value="diurna">Diurna</option><option value="noturna">Noturna</option></select>
+      </div>
+    </div>
     <p class="os-erro" id="aviso_planos" hidden></p>
     <div class="os-linha-ativos">
       <span class="os-lbl">Ativos <i>*</i> <small>(marque um ou vários — o plano aparece após carregar)</small></span>
       <span class="os-cresce"></span>
-      <button type="button" class="os-btn secondary mini" id="b_complano" title="Marca apenas os ativos que têm plano nesta família (desmarca os demais)">Só com plano</button>
+      <button type="button" class="os-btn secondary mini" id="b_complano" title="Marca apenas os ativos que têm plano nesta família, no tipo e no turno escolhidos (desmarca os demais)">Só com plano</button>
       <button type="button" class="os-btn secondary mini" id="b_all">Selecionar todos</button>
       <button type="button" class="os-btn secondary mini" id="b_none">Limpar</button>
     </div>

@@ -14,6 +14,7 @@ Constantes copiadas do app de propósito: o módulo de lá importa PyQt6 no topo
 from __future__ import annotations
 import datetime as dt
 import re
+import unicodedata
 
 
 FAM_ORDER = ["Handover", "MPM", "MPA", "MPS", "MPQ", "MPW", "MPT"]    # steps/pcm.py::_FAM_ORDER
@@ -180,11 +181,61 @@ def montar_planos(planos_api, ids, familia=None, visiveis=None, conhecidos=()) -
         idt = plano_padrao(por_ativo.get(aid, []), fam)
         if idt is not None and idt not in conhecidos:
             pares.append((idt, aid))
-    corpo = {"familias": familias, "familia": fam, "n_planos": len(planos),
+    corpo = {"familias": familias, "familia": fam, "n_planos": len(planos), "tipos": tipos_ordenados(planos),
              "por_ativo": {str(aid): [{"id_task": p.get("id_task"), "description": p.get("description"),
-                                       "family": p.get("family")} for p in ps]
+                                       "family": p.get("family"),
+                                       "tipo": chave_tipo(tipo_do_plano(p.get("description"))),
+                                       "turno": turno_do_plano(p.get("description"))} for p in ps]
                            for aid, ps in por_ativo.items()}}
     return corpo, pares
+
+
+# ── o tipo de plano e o turno (19/11/2026) ───────────────────────────────────────────────────────
+# Sugestão de uma pessoa do PCM pelo Sugestões do Nexus: "além da família de plano, possamos também escolher o tipo de
+# plano em lista suspensa, se é grid, [...] e os demais tipos de plano de cliente das tarefas. Bem como, uma
+# caixa de seleção se é atividade diurna (todas as atividades que não contenham noturna ou noturno no título) ou
+# noturna". O tipo é o que o plano traz entre colchetes no COMEÇO do nome ("[Grid Co.] - MPA - Inversor"): a lista sai
+# dos planos carregados, e não de uma lista escrita aqui (o cliente novo aparece sozinho). Os dois são filtros da tela
+# (`pcm.js`), como a família; de saída ficam em "(todos)" e a tela é a de antes.
+_TIPO = re.compile(r"\s*\[\s*([^\]]*?)\s*\]")
+_NOTURNA = re.compile(r"\bnoturn[ao]s?\b")
+TURNO_DIURNA, TURNO_NOTURNA = "diurna", "noturna"
+
+
+def _sem_acento(s) -> str:
+    return "".join(c for c in unicodedata.normalize("NFD", str(s or "")) if unicodedata.category(c) != "Mn").lower()
+
+
+def tipo_do_plano(desc):
+    """'[Grid Co.] - MPA - Inversor' → 'Grid Co.', como está escrito. None: o plano sem colchetes no começo do nome (o
+    Handover) ou com eles vazios."""
+    m = _TIPO.match(str(desc or ""))
+    return (" ".join(m.group(1).split()) or None) if m else None
+
+
+def chave_tipo(nome) -> str:
+    """O tipo sem acento, sem caixa e só com letras, números e o "+": 'Grid Co.' e 'GRID CO' são o mesmo tipo; o "+" fica
+    porque separa dois tipos de plano do mesmo cliente. '' = sem tipo."""
+    return re.sub(r"[^a-z0-9+]", "", _sem_acento(nome))
+
+
+def turno_do_plano(desc) -> str:
+    """'noturna' quando o nome do plano traz a palavra noturno ou noturna (a regra do pedido); senão, 'diurna'."""
+    return TURNO_NOTURNA if _NOTURNA.search(_sem_acento(desc)) else TURNO_DIURNA
+
+
+def tipos_ordenados(planos) -> list:
+    """[{chave, nome}] dos tipos dos planos: o Grid na frente (é o plano que a linha mostra de saída, `plano_padrao`),
+    depois em ordem alfabética. O nome é a grafia mais usada de cada tipo."""
+    grafias: dict = {}
+    for p in planos or []:
+        nome = tipo_do_plano(p.get("description"))
+        ch = chave_tipo(nome)
+        if ch:
+            grafias.setdefault(ch, {}).setdefault(nome, 0)
+            grafias[ch][nome] += 1
+    out = [{"chave": ch, "nome": max(sorted(g), key=g.get)} for ch, g in grafias.items()]
+    return sorted(out, key=lambda t: (0 if "grid" in t["chave"] else 1, _sem_acento(t["nome"])))
 
 
 # ── criação (espelho de _criar / _criar_sem_plano) ───────────────────────────────────────────────

@@ -1146,6 +1146,26 @@ massa" do card Plano de tarefas (`pcm.html`, `/os/pcm`), ao lado de Manhã (07:0
 põe 17:00 em todas as linhas marcadas e mantém o dia de cada uma (`pcm.js`, o mesmo `editores` dos outros dois). O app de
 mesa não tem o botão. Prova: `tests/test_oscreator_card_por_ativo_28_10.py::test_a_clonagem_de_planos_tem_a_noite_17h`.
 
+## Clonagem de planos: o tipo de plano e o turno (19/11/2026)
+
+Sugestão de uma pessoa do PCM pelo Sugestões do Nexus: "além da família de plano, possamos também escolher o tipo de plano
+em lista suspensa [...] e os demais tipos de plano de cliente das tarefas. Bem como, uma caixa de seleção se é atividade
+diurna (todas as atividades que não contenham noturna ou noturno no título) ou noturna". No card Plano de tarefas
+(`pcm.html`, `/os/pcm`), embaixo da Família do plano, dois filtros que valem junto com ela:
+- **Tipo de plano:** o que o plano traz entre colchetes no COMEÇO do nome (`[Grid Co.] - MPA - Inversor` → Grid Co.;
+  `pcm_web.tipo_do_plano`). A lista sai dos planos carregados, não de uma lista escrita no código: o tipo de cliente novo
+  aparece sozinho. Grafias diferentes do mesmo tipo se juntam (`chave_tipo`: sem acento, sem caixa, só letras, números
+  e o "+", que separa dois tipos do mesmo cliente); o Grid vem na frente. O plano sem colchetes (o Handover) não tem tipo
+  e só aparece em "(todos)".
+- **Turno:** Noturna = o plano com a palavra noturno ou noturna no nome; Diurna = os outros (`turno_do_plano`).
+De saída os dois ficam em "(todos)" e a tela é a de antes (a linha abre no plano com "grid", `plano_padrao`). Com um filtro
+escolhido, a linha mostra só os planos dele; o ativo sem plano no filtro fica vermelho, embaixo, com "sem plano neste
+filtro", e o "Só com plano" o desmarca. O tipo escolhido fica ao carregar os planos de novo, se ainda existe. O "Sem plano
+de tarefas" desliga os dois, como a família. O servidor só manda o `tipo` e o `turno` de cada plano e a lista `tipos`
+(`montar_planos`); quem filtra é o `pcm.js` (`planosDe`). A criação da OS não mudou: vai o plano que a linha mostra.
+Prova: `tests/test_oscreator_pcm_tipo_turno.py`; na bancada (o clone sozinho, Fracttal falso, 6 ativos e 8 planos
+inventados), no navegador: os filtros, a contagem de subtarefas que acompanha, o "Só com plano" e 375 px sem rolagem.
+
 ## Nova solicitação e Criar OS: os ativos do cliente numa leitura só, e a Engenharia de 10 em 10 (28/10/2026)
 
 Levi: "Em solicitação > PCM, quando pesquisa o cliente carrega, quando pesquiso a usina carrega novamente. na minha cabeça
