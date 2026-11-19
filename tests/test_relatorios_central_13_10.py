@@ -92,7 +92,9 @@ def test_a_performance_ve_os_tres_relatorios_sem_marcar_nada(app, setores):
     with app.app_context():
         assert ST.das_do_setor(SID.PERFORMANCE) == ST.das_do_setor({"id": SID.PERFORMANCE, "nome": "Performance e Dados"}) \
             == {f"relatorios/{t}" for t in RELATORIOS} | {"comando/caixa-de-entrada", "comando/contratos",
-                                                          "performance/equipe", "campo/equipe"}
+                                                          "performance/equipe", "campo/equipe",
+                                                          "performance/coletas/recoleta"}
+        # a Recoleta pelas fontes é do setor Performance desde 17/11/2026 (Levi: "so quem e do setor Performance")
         # a Caixa é de todos (03/11); o Quadro da equipe da Performance (04/11); o Mapa de equipe (08/11/2026) é dos
         # cinco setores que veem a posição do técnico: PCM, COS, Performance, Supervisão Campo e Responsáveis UFV
         # os do PCM (14/10/2026) são do setor PCM: os relatórios (nexus/pcm/relatorios, tests/test_relatorios_pcm.py) e o
