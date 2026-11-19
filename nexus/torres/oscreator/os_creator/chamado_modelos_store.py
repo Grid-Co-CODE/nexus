@@ -74,6 +74,53 @@ CLONES = R.CLONES
 _estado = {"banco": None, "lido": 0.0, "proxima": 0.0, "erro": ""}
 _trava = threading.Lock()
 
+# ── o canal reservado (19/11/2026) ──────────────────────────────────────────────────────────────────────────────────
+# O canal de abertura que traz e-mail saiu do código (`chamado_spec.RESERVADO`; o repositório é público) e mora cifrado
+# no banco do Nexus (`nexus/dados/textos_reservados.py`, área `oscreator_canal`). O gancho é posto pela ponte do Nexus
+# (`nexus/torres/oscreator/canais_reservados.py`): () -> {fornecedor: canal}. Não foi para a aba `chamado_modelos`
+# porque ela guarda em claro, num banco de leitura aberta, e a linha `MARCA:` gravada lá congela as subtarefas do
+# fabricante também para o App de Campo. Sem o gancho (o OS Creator fora do Nexus), fica o texto do RESERVADO.
+CANAIS_RESERVADOS = None
+_canais = {"marca": None, "lido": {}}
+
+
+def _reservados() -> dict:
+    """{fornecedor: canal} do banco, pelo gancho. A leitura que falha devolve a última boa: o banco que cai depois de
+    lido não tira o canal da tela."""
+    if CANAIS_RESERVADOS is None:
+        return {}
+    try:
+        _canais["lido"] = dict(CANAIS_RESERVADOS() or {})
+    except Exception:                                    # noqa: BLE001 — banco fora: vale o que já foi lido
+        pass
+    return _canais["lido"]
+
+
+def _canal_do_codigo() -> dict:
+    """O canal de cada fornecedor como o código o diz, com o texto do banco no lugar de cada RESERVADO (só deles: o
+    banco não troca o canal que o código escreve)."""
+    canal = dict(_ORIG["CANAL"])
+    do_banco = _reservados()
+    for m, c in canal.items():
+        if c == cs.RESERVADO and do_banco.get(m):
+            canal[m] = do_banco[m]
+    return canal
+
+
+def canais_em_dia():
+    """Antes de cada rota do OS Creator no Nexus (a ponte registra): quando o canal reservado lido do banco muda (a 1ª
+    leitura, uma publicação nova), ele entra no `chamado_spec.CANAL`. Barato: o gancho tem cópia de 5 minutos. Nunca
+    levanta."""
+    if CANAIS_RESERVADOS is None:
+        return
+    try:
+        marca = tuple(sorted(_reservados().items()))
+        if marca != _canais["marca"]:
+            aplicar()
+            _canais["marca"] = marca
+    except Exception:                                    # noqa: BLE001 — a rota nunca cai por causa do canal
+        pass
+
 
 def agora_iso() -> str:
     return dt.datetime.now(dt.timezone(dt.timedelta(hours=-3))).replace(microsecond=0).isoformat()
@@ -87,7 +134,7 @@ chave_valida = R.chave_valida
 
 def semente() -> dict:
     """Os blocos como estão no código — o valor inicial e a rede de segurança (com o canal daqui)."""
-    return R.semente(_ORIG["CANAL"])
+    return R.semente(_canal_do_codigo())
 
 
 # ── leitura ───────────────────────────────────────────────────────────────────────────────────────────────────
@@ -118,7 +165,7 @@ def efetivo(banco: dict = None) -> dict:
     """Cada bloco como vale AGORA: o do banco quando existe, o do código quando não. `origem` diz qual."""
     if banco is None:
         banco = _estado["banco"] or {}
-    return R.efetivo(banco, _ORIG["CANAL"])
+    return R.efetivo(banco, _canal_do_codigo())
 
 
 _trocar_dict = R._trocar_dict
@@ -129,7 +176,7 @@ def aplicar(banco: dict = None):
     canal de abertura de cada fornecedor no `chamado_spec.CANAL`. Sem banco (ou `{}`), volta ao código puro."""
     banco_efetivo = (_estado["banco"] or {}) if banco is None else banco
     R.aplicar(banco_efetivo)
-    canal = dict(_ORIG["CANAL"])
+    canal = _canal_do_codigo()
     for ch, v in efetivo(banco_efetivo).items():
         if ch.startswith("MARCA:") and not v.get("arquivado"):
             canal[ch[6:]] = str(v.get("canal") or "")

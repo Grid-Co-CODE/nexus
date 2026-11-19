@@ -3444,3 +3444,24 @@ entra sozinho, como já era), `obs_os` (a observação da OS inteira, que só ex
 (`AAAA-MM-DDTHH:MM`, a "Data do evento"; fora do formato ou no futuro, a tela fica com o agora). O link antigo, de um
 ativo (o do Tempo real), segue igual. A regra é `perf_web.sugestao_do_link`; a página aplica em `aplicarSugestao`
 (`perf.js`) e diz o que marcou e o que não achou na usina. Prova: `tests/test_oscreator_perf_link_varios.py`.
+
+## O canal de abertura com e-mail mora no banco do Nexus (19/11/2026)
+
+Levi, 19/11/2026: "OS Creator: os e-mails dos fabricantes vão para uma tabela de cadastro no banco" e "quem tiver um acesso
+do Nexus vai ter a informação completa". O repositório é público, e o `chamado_spec.CANAL` trazia o endereço de e-mail de
+quatro fabricantes (três com cara de pessoa).
+
+- **No código** o canal desses quatro é `chamado_spec.RESERVADO` (um texto que diz que o endereço mora no banco). Os
+  comentários do `chamado_garantia/spec.py` não trazem mais endereço.
+- **No banco:** o texto inteiro de cada canal, cifrado, no livro `nexus_textos_reservados`, área `oscreator_canal` (a
+  chave é o fabricante; `nexus/dados/CLAUDE.md`, "Os textos reservados"). Gravado em 19/11/2026 e lido de volta igual.
+- **Na tela:** a ponte liga o gancho `chamado_modelos_store.CANAIS_RESERVADOS` (`canais_reservados.py`) e confere o canal
+  antes de cada rota do clone (`canais_em_dia`); o "Como abrir", o Raio X, o Controle de fornecedores e o texto de
+  abertura mostram o canal inteiro, como antes. O canal salvo no Controle de fornecedores (a linha `MARCA:`) segue
+  vencendo. Sem leitura do banco, a tela diz que o canal é reservado: nunca "não documentado".
+- **Por que não a aba `os_creator · chamado_modelos`:** ela guarda em claro, num banco de leitura aberta, e a linha
+  `MARCA:` gravada lá congela as subtarefas do fabricante também para o App de Campo e para o app de mesa.
+- **Fabricante novo com e-mail no canal:** `python -I ferramentas/textos_reservados.py publicar --area oscreator_canal
+  --termos <json fora do repositório>` e `RESERVADO` no `CANAL`. O canal digitado no Controle de fornecedores vai para a
+  aba `chamado_modelos` em claro, como sempre foi: endereço de e-mail não se digita ali.
+- Prova: `tests/test_oscreator_canal_reservado_19_11.py`.
