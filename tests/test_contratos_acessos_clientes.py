@@ -71,8 +71,8 @@ def _token(link):
 
 
 def test_cria_a_conta_cifrada_e_o_link_de_uso_unico(banco):
-    conta, link = AC.criar("  Ana   Souza ", "Ana@Thopen.com.br", ["Polaris", "Thopen"], "cliente",
-                           {"email": "levi@gridco.com.br"})
+    conta, link = AC.criar("  Ana   Souza ", "Ana@cliente-a.exemplo.test", ["Polaris", "Thopen"], "cliente",
+                           {"email": "admin.teste@gridco.com.br"})
     tk = _token(link)
     [l] = banco.linhas(AC.LIVRO, AC.ABA)
     assert list(l) == list(AC.CAB)
@@ -83,25 +83,25 @@ def test_cria_a_conta_cifrada_e_o_link_de_uso_unico(banco):
     # a API do banco tem leitura aberta: nada da pessoa em claro, nem o token
     tudo = json.dumps(l, ensure_ascii=False, default=str).lower()
     # o nome e o e-mail inteiros: um pedaço curto ("ana") aparece por acaso numa cifra em base64
-    assert "ana souza" not in tudo and "ana@thopen.com.br" not in tudo and tk.lower() not in tudo
+    assert "ana souza" not in tudo and "ana@cliente-a.exemplo.test" not in tudo and tk.lower() not in tudo
     cid = l["conta_id"]
     assert json.loads(_abrir(l["dados_5080"], f"nexus_acessos_clientes/{cid}/dados_5080", PRIV)) == \
-        {"nome": "Ana Souza", "email": "ana@thopen.com.br", "usuario": "ana@thopen.com.br"}
-    assert json.loads(Cofre(CHAVE_CAD).decifrar(l["dados_nexus"], AC.ctx_nexus(cid)))["email"] == "ana@thopen.com.br"
+        {"nome": "Ana Souza", "email": "ana@cliente-a.exemplo.test", "usuario": "ana@cliente-a.exemplo.test"}
+    assert json.loads(Cofre(CHAVE_CAD).decifrar(l["dados_nexus"], AC.ctx_nexus(cid)))["email"] == "ana@cliente-a.exemplo.test"
     assert l["alterada_por_hmac"] and "levi" not in l["alterada_por_hmac"]
-    assert conta == {"conta_id": cid, "nome": "Ana Souza", "email": "ana@thopen.com.br", "usuario": "ana@thopen.com.br"}
+    assert conta == {"conta_id": cid, "nome": "Ana Souza", "email": "ana@cliente-a.exemplo.test", "usuario": "ana@cliente-a.exemplo.test"}
 
 
 def test_selo_preso_a_conta(banco):
-    AC.criar("Ana", "ana@thopen.com.br", ["Thopen"], "cliente", None)
+    AC.criar("Ana", "ana@cliente-a.exemplo.test", ["Thopen"], "cliente", None)
     [l] = banco.linhas(AC.LIVRO, AC.ABA)
     with pytest.raises(Exception):
         _abrir(l["dados_5080"], "nexus_acessos_clientes/outra/dados_5080", PRIV)
 
 
 def test_recusas(banco, app):
-    AC.criar("Ana", "ana@thopen.com.br", ["Thopen"], "cliente", None)
-    for args, frase in ((("Ana 2", "ANA@thopen.com.br", ["Copel"], "cliente"), "Já existe"),
+    AC.criar("Ana", "ana@cliente-a.exemplo.test", ["Thopen"], "cliente", None)
+    for args, frase in ((("Ana 2", "ANA@cliente-a.exemplo.test", ["Copel"], "cliente"), "Já existe"),
                         (("", "x@y.com", ["Thopen"], "cliente"), "nome"),
                         (("Bia", "com espaço", ["Thopen"], "cliente"), "usuário precisa"),
                         (("Bia", "ab", ["Thopen"], "cliente"), "usuário precisa"),
@@ -115,13 +115,13 @@ def test_recusas(banco, app):
 
 
 def test_papel_grid_ve_todas_as_carteiras(banco):
-    AC.criar("Levi", "levi@gridco.com.br", [], "grid", None)
+    AC.criar("Pessoa Grid", "admin.teste@gridco.com.br", [], "grid", None)
     [l] = banco.linhas(AC.LIVRO, AC.ABA)
     assert (l["papel"], l["carteiras"]) == ("grid", "Thopen;Copel;Matrix;Polaris")
 
 
 def test_link_novo_troca_o_anterior_e_sela_de_novo_para_a_publica_atual(banco, app):
-    _, link1 = AC.criar("Ana", "ana@thopen.com.br", ["Thopen"], "cliente", None)
+    _, link1 = AC.criar("Ana", "ana@cliente-a.exemplo.test", ["Thopen"], "cliente", None)
     [l] = banco.linhas(AC.LIVRO, AC.ABA)
     priv2, pub2 = _par()                                        # o par do painel foi trocado
     app.config["NEXUS_ACESSOS_5080_PUBLICA"] = pub2
@@ -133,7 +133,7 @@ def test_link_novo_troca_o_anterior_e_sela_de_novo_para_a_publica_atual(banco, a
 
 
 def test_desativar_apaga_o_link_e_bloqueia_link_novo(banco):
-    AC.criar("Ana", "ana@thopen.com.br", ["Thopen"], "cliente", None)
+    AC.criar("Ana", "ana@cliente-a.exemplo.test", ["Thopen"], "cliente", None)
     cid = banco.linhas(AC.LIVRO, AC.ABA)[0]["conta_id"]
     AC.definir_status(cid, False, None)
     l = banco.linhas(AC.LIVRO, AC.ABA)[0]
@@ -147,8 +147,8 @@ def test_desativar_apaga_o_link_e_bloqueia_link_novo(banco):
 
 
 def test_lista_com_a_senha_do_livro_do_5080(banco):
-    _, link = AC.criar("Ana", "ana@thopen.com.br", ["Thopen"], "cliente", None)
-    AC.criar("Bia", "bia@copel.com", ["Copel"], "cliente", None)
+    _, link = AC.criar("Ana", "ana@cliente-a.exemplo.test", ["Thopen"], "cliente", None)
+    AC.criar("Bia", "bia@cliente-b.exemplo.test", ["Copel"], "cliente", None)
     d = AC.contas()
     assert [c["nome"] for c in d["contas"]] == ["Ana", "Bia"] and all(c["link"] == "pendente" for c in d["contas"])
     # a Ana definiu a senha pelo link: o 5080 grava a linha com o hash do link
@@ -159,7 +159,7 @@ def test_lista_com_a_senha_do_livro_do_5080(banco):
         {"headers": ["id", "conta_id", "definida_em", "convite_hash", "senha_cifrada"],
          "values": ["s1", ana["conta_id"], "2026-10-14T13:00:00Z", h, "cs1:xx"]}]
     ana = next(c for c in AC.contas()["contas"] if c["nome"] == "Ana")
-    assert ana["link"] == "" and ana["senha_em"] == "14/10/2026" and ana["email"] == "ana@thopen.com.br"
+    assert ana["link"] == "" and ana["senha_em"] == "14/10/2026" and ana["email"] == "ana@cliente-a.exemplo.test"
 
 
 def test_banco_fora_diz_e_nao_lista_vazio(app):
@@ -184,7 +184,7 @@ def _codigo(cli):
 def test_tela_cria_e_mostra_o_link_uma_vez(banco, logado):
     cod = _codigo(logado)
     r = logado.post("/t/base/acessos-clientes", data={"codigo": cod, "acao": "criar", "nome": "Ana Souza",
-                                                  "email": "ana@thopen.com.br", "carteira": ["Thopen"], "papel": "cliente"},
+                                                  "email": "ana@cliente-a.exemplo.test", "carteira": ["Thopen"], "papel": "cliente"},
                     headers={"Sec-Fetch-Site": "same-origin"})
     assert r.status_code == 303
     html = logado.get("/t/base/acessos-clientes").get_data(as_text=True)
@@ -207,10 +207,10 @@ def test_tela_recusa_sem_codigo_de_outro_site_e_quem_nao_e_admin(banco, logado):
 
 def test_recusa_volta_com_o_que_foi_digitado(banco, logado):
     cod = _codigo(logado)
-    r = logado.post("/t/base/acessos-clientes", data={"codigo": cod, "acao": "criar", "nome": "Bia", "email": "bia@copel.com",
+    r = logado.post("/t/base/acessos-clientes", data={"codigo": cod, "acao": "criar", "nome": "Bia", "email": "bia@cliente-b.exemplo.test",
                                                   "papel": "cliente"}, headers={"Sec-Fetch-Site": "same-origin"})
     html = r.get_data(as_text=True)
-    assert r.status_code == 400 and "carteira" in html and 'value="bia@copel.com"' in html
+    assert r.status_code == 400 and "carteira" in html and 'value="bia@cliente-b.exemplo.test"' in html
 
 
 def test_catalogo_registra_os_dois_livros():
