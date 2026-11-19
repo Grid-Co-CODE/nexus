@@ -151,7 +151,7 @@ de 4.989 px com 40 linhas de validação (uma por item, cinco campos cada). Fico
   saíram o "Mais números", o "Paradas sem OS" da frente, os selos da lista e a visão "Detalhe por equipamento" (o CSV
   continua com tudo, e os filtros de Situação cobrem inoperante e parada sem OS);
 - **o tamanho do furo por cliente**: uma barra por cliente, o maior em cima, somando os dias com furo pendente das usinas
-  dele: vermelho, a usina toda sem dado; laranja, parte da geração; laranja claro, só IPOA ou GHI (sem a separação, a
+  dele: vermelho, a usina toda sem dado; amarelo, parte da geração; listrado (na tira, vazado), só IPOA ou GHI (sem a separação, a
   estação sem sensor fazia quase toda usina ter "17 de 17 dias" e igualava o furo pequeno ao grande). O clique filtra;
 - **a lista**: usina, a **tira do mês** (um quadrado por dia no pior estado do dia; o ponto embaixo = o COS registrou
   algo na usina naquele dia, e o `title` diz o quê e de que hora a que hora), o furo pendente em dias com o que falta numa

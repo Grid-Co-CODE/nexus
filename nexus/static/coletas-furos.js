@@ -34,6 +34,9 @@
     { k: "corrigido", l: "Dado já corrigido, não é falha", ap: "both" },
     { k: "outro", l: "Outro (descreva no comentário)", ap: "both" }];
   var MOTL = {}; MOT.forEach(function (m) { MOTL[m.k] = m.l; });
+  // o motivo curto, para a linha do mapa (o longo fica no `title` e na lista de escolha)
+  var MOTC = { sem_ipoa: "sem sensor de IPOA", sem_ghi: "sem sensor de GHI", coleta_alt: "outra fonte", fora_op: "inoperante",
+    nao_mob: "não mobilizada", os: "parada com OS", zero_real: "zero real", corrigido: "já corrigido", outro: "outro" };
   var UFVN = "Furo de coleta da UFV toda";
   var isGen = function (e) { return e.nome !== "IPOA" && e.nome !== "GHI"; };
   var kindLbl = function (t) { return (t === "IPOA" || t === "GHI") ? "ETM" : "Geração"; };
@@ -528,11 +531,16 @@
   // ── o detalhe da usina: o que o COS registrou, e o mapa do mês com a validação ─────────────────────────────────
   function ocorrencias(p, m, id) {
     var oc = p.oc || [], cong = (p.os || []).filter(function (o) { return o[0] !== "C"; }), t = tempos(p);
-    var todas = OCTODAS.has(id), mostrar = oc.map(function (_o, j) { return j; }).filter(function (j) { return todas || m.ocF[j] || oc[j][7]; });
+    // por padrão, as seis que mais dizem sobre o furo (a que explica o dia, a em aberto, a mais longa), em ordem de data;
+    // "Ver as N" mostra todas (a Crateús tinha 20, quase todas desligamentos de minutos à noite)
+    var todas = OCTODAS.has(id), rel = oc.map(function (_o, j) { return j; }).filter(function (j) { return m.ocF[j] || oc[j][7]; });
+    var mostrar = todas ? oc.map(function (_o, j) { return j; }) : rel.slice().sort(function (a, b) {
+      return (oc[b][7] - oc[a][7]) || (oc[b][6] - oc[a][6]) || ((t[b][1] - t[b][0]) - (t[a][1] - t[a][0]));
+    }).slice(0, 6).sort(function (a, b) { return a - b; });
     var h = '<section class="fr-oc"><div class="fr-oc-topo"><h3 class="fr-h3">O que o COS registrou</h3><span class="mudo">' +
       (oc.length ? oc.length + (oc.length === 1 ? " ocorrência" : " ocorrências") + " em " + MN[MES()] + "; " + m.ocFN + " nos dias com furo" : "nenhuma ocorrência em " + MN[MES()]) + "</span>" +
       (oc.length && mostrar.length < oc.length ? '<button type="button" class="gc-btn gc-btn--fantasma fr-mini" data-a="octodas" data-id="' + esc(id) + '">Ver as ' + oc.length + "</button>" : "") +
-      (todas && oc.length > m.ocFN ? '<button type="button" class="gc-btn gc-btn--fantasma fr-mini" data-a="octodas" data-id="' + esc(id) + '">Só as dos dias com furo</button>' : "") + "</div>";
+      (todas && oc.length > 6 ? '<button type="button" class="gc-btn gc-btn--fantasma fr-mini" data-a="octodas" data-id="' + esc(id) + '">Só as principais</button>' : "") + "</div>";
     if (oc.length && !mostrar.length) h += '<p class="mudo fr-oc-nada">Nenhuma ocorrência do COS nos dias com furo: o furo não tem explicação registrada.</p>';
     if (mostrar.length || cong.length) {
       h += '<div class="fr-rola"><table class="fr-sub fr-oc-tab"><thead><tr><th>Quando</th><th>Ocorrência</th><th>OS</th><th>Geração</th><th></th></tr></thead><tbody>' +
@@ -543,7 +551,7 @@
             '<td class="gc-num">' + (o[4] ? esc(o[4]) : '<span class="fr-selo fr-selo--alerta">sem OS</span>') + "</td>" +
             "<td>" + (o[5] === "s" ? "parou" : o[5] === "n" ? "seguiu" : '<span class="mudo">não informado</span>') + "</td>" +
             "<td>" + (o[7] ? '<span class="fr-tag fr-tag--e" title="Parada de 6 h ou mais entre 6h e 18h, com geração parada: pela regra do R01 o dia não é furo">explica o dia</span>' :
-              m.ocF[j] ? '<span class="fr-tag fr-tag--f">no dia do furo</span>' : "") + "</td></tr>";
+              m.ocF[j] ? "" : '<span class="mudo">fora dos dias com furo</span>') + "</td></tr>";
         }).join("") +
         cong.map(function (o) {
           return "<tr><td class=\"gc-num fr-oc-quando\">" + esc(o[4]) + " → " + esc(o[5]) + "</td><td><b>" + esc(o[3]) + '</b> <span class="mudo">' + esc(o[2]) + "</span></td><td class=\"gc-num\">" +
@@ -587,10 +595,10 @@
     var t = l.itens[0];
     if (!t) return '<span class="mudo">sem furo</span>';
     var s = suggest(p, t), ms = {};
-    Object.keys(t.vr).forEach(function (k) { ms[MOTL[t.vr[k]] || t.vr[k]] = 1; });
-    if (t.ok) return '<span class="fr-okt" title="' + esc(Object.keys(ms).join(" / ")) + '">validado</span>';
+    Object.keys(t.vr).forEach(function (k) { ms[MOTC[t.vr[k]] || t.vr[k]] = 1; });
+    if (t.ok) return '<span class="fr-okt">validado · ' + esc(Object.keys(ms).join(", ")) + "</span>";
     if (t.nv) return '<span class="fr-parc">' + t.nv + " de " + t.idx.length + " dias validados</span>";
-    return '<span class="fr-pend">pendente</span>' + (s ? ' <span class="fr-sug" title="' + esc(s[1]) + '">sugestão: ' + esc(MOTL[s[0]].replace(/ \(.*\)$/, "")) + "</span>" : "");
+    return '<span class="fr-pend">pendente</span>' + (s ? ' <span class="fr-sug" title="Sugestão do Nexus: ' + esc(MOTL[s[0]] + ". " + s[1]) + '">· sugestão: ' + esc(MOTC[s[0]]) + "</span>" : "");
   }
   function mapa(p, m, id) {
     var ls = linhasDoMapa(p, m, id), days = p.days, dsel = {}, isel = 0;
