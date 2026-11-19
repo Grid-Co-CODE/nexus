@@ -86,10 +86,22 @@ def _conta() -> dict:
 
 
 # ── porta ─────────────────────────────────────────────────────────────────────
+def _na_janela_da_sala(prox: str) -> bool:
+    """O `next` do login é a criação aberta pela janela da Sala de controle (`janela=1` e `origem=sala-de-controle...`)?
+    Só muda o DESENHO do login (fica na janela, 19/11/2026); quem entra e para onde volta seguem iguais."""
+    from urllib.parse import parse_qs, urlsplit
+    try:
+        q = parse_qs(urlsplit(prox or "").query)
+    except ValueError:
+        return False
+    return (q.get("janela") or [""])[0] == "1" and str((q.get("origem") or [""])[0]).startswith("sala-de-controle")
+
+
 def _tela_login(erro=None, email="", prox="", aviso=None, sso_aberto=False, status=200):
     # `sso_aberto` sobrevive porque as rotas do OAuth ainda o passam ao devolver erro; a tela
     # simplesmente nao o usa mais desde que o login virou so e-mail e senha (Levi, 21/09).
-    return render_template("login.html", erro=erro, email=email, next=prox, aviso=aviso), status
+    return render_template("login.html", erro=erro, email=email, next=prox, aviso=aviso,
+                           em_janela=_na_janela_da_sala(prox)), status
 
 
 def _abrir_sessao(jwt: str, email: str, prox: str, conta: dict | None = None):

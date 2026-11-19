@@ -1520,3 +1520,8 @@ conferências moram em `nexus/auth/microsoft.py`; a ida, a volta e a sessão, no
   Acompanhamento, e não a Mesa em construção), com "N de M prontas"; torre sem nenhuma (Comando, Contratos, Relatórios)
   vira um cartão que não é link, tracejado, com "Em construção". Prova: `tests/test_casca_inicio.py`.
 - Edge "localhost recusou": o waitress tem de escutar em `127.0.0.1` **e** `[::1]`.
+- **`GET /t/_janela/entrou`** (19/11/2026, `casca.janela_entrou`): onde termina o login que a Sala de controle abre numa
+  janela à parte (o cartão "entre de novo" dela). Avisa quem abriu (`postMessage({gc: "nexus-entrou"})`, só se for da
+  mesma origem) e fecha. Atrás do login de sempre; no `setor_telas.LIVRES` porque `_janela` não é torre. Debaixo de
+  `/t/` pelo Caddy, como o `/t/menu/busca`. Prova: `tests/test_sala_janela_19_11.py`. A regra inteira está no
+  `nexus/torres/performance/CLAUDE.md` ("A janela de criar OS da Sala de controle").

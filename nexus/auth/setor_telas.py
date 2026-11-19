@@ -61,7 +61,10 @@ _CACHE: dict = {}
 # login do Nexus; quem decide o que ela vê é o perfil do SSO (`nexus/sso/regras.py`), como no site, e não o setor
 # o `casca.menu_busca` (14/11/2026): a pergunta e as telas de dentro para a busca do menu, só as que a pessoa já vê (sem
 # setor, nada); não é tela, e o `pode` o barraria por não ser de torre nenhuma
-LIVRES = frozenset({"auth.entrar", "auth.sair", "casca.tema", "casca.saude", "static", "sso.voltar", "casca.menu_busca"})
+# `casca.janela_entrou` (19/11/2026): onde termina o login que a Sala de controle abre numa janela à parte; não é tela de
+# torre, e o `pode` a barraria para quem tem setor (a página só avisa a Sala e fecha)
+LIVRES = frozenset({"auth.entrar", "auth.sair", "casca.tema", "casca.saude", "static", "sso.voltar", "casca.menu_busca",
+                    "casca.janela_entrou"})
 # Telas que mudaram de endereço: a decisão gravada com o nome antigo vale para o novo (a mais nova de cada setor × tela
 # ganha, pela hora, como sempre). 13/10/2026: o Criador de relatório e o Relatório semanal saíram da Performance para
 # Relatórios → Central de emissão (Levi: "Sai da parte de Performance!"); quem já os via continua vendo.

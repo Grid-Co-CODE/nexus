@@ -37,6 +37,33 @@
   const norm = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
   const apiErro = (j, r) => (j && j.erro) ? (j.login ? j.erro + ' Entre de novo em /os/login.' : j.erro) : ('HTTP ' + r.status);
 
+  // ── os sugeridos no topo (19/11/2026) ─────────────────────────────────────────────────────────────────────────────
+  // Levi: "quando eu selecionasse um item e ele fosse reconhecido no Fractal, ele também já aparecesse ali no topo do OS
+  // Creator"; e nos trackers, "por mais que não tenha um de para específico, ele avisa, não tem de para de trackers para
+  // essa usina. Mas ele já abre a opção ali de criar OS". Funções puras (o teste as roda no node).
+  // Os achados vão para o topo da tabela, na ordem em que vieram; o resto, na ordem de sempre. A ordem fica fixa: quem
+  // chama reordena a lista uma vez, ao aplicar o link, e marcar ou desmarcar depois não mexe nela.
+  function comSugeridosNoTopo(lista, ids) {
+    const pos = new Map();
+    (ids || []).forEach((id, k) => { if (!pos.has(id)) pos.set(id, k); });
+    return (lista || []).map((a, k) => [a, k]).sort((x, y) => {
+      const px = pos.has(x[0].id) ? pos.get(x[0].id) : Infinity, py = pos.has(y[0].id) ? pos.get(y[0].id) : Infinity;
+      return (px === py ? 0 : px < py ? -1 : 1) || x[1] - y[1];
+    }).map(p => p[0]);
+  }
+  // O aviso do topo: {html, alerta}. `origem` é a do link (a Sala manda "sala-de-controle..."); no plano de tracker, o que
+  // não foi achado é a falta do de-para de trackers da usina, e a lista já é só de estruturas de tracker
+  function avisoDoTopo(achados, faltam, tracker, origem) {
+    const partes = [], aspas = l => l.map(f => '"' + esc(f) + '"').join(', ');
+    const quem = /^sala-de-controle/.test(String(origem || '')) ? 'pela Sala de controle' : 'pelo link que abriu esta tela';
+    if (achados.length) partes.push('<span>Pré-selecionado ' + quem + ': <b>' + achados.map(esc).join(', ') + '</b></span>');
+    if (faltam.length) partes.push('<span class="os-sug-falta">' + (tracker
+      ? 'Não há de-para de trackers desta usina com o Fracttal (não achei ' + aspas(faltam) + '). A lista abaixo já está só com as estruturas de tracker: procure o tracker e marque.'
+      : 'Não achei ' + aspas(faltam) + ' nesta usina no Fracttal: marque à mão.') + '</span>');
+    return {html: partes.join(''), alerta: faltam.length > 0};
+  }
+  // ── fim dos sugeridos no topo
+
   function tituloDe(a) {
     if (modo === 'etm') return ETM_TITULO;
     if (modo === 'usina') return USINA_TITULO;
@@ -331,6 +358,7 @@
     const usi = cbUsi.value;
     alvos = []; checked = new Set(); obs = {}; ospai = {}; imgs = {}; qtd = {}; limite = PAGINA; repop();
     resumo.textContent = 'Selecione a usina para carregar o plano.'; hint.textContent = '';
+    if (!sugLista.length && $('sug_topo')) $('sug_topo').hidden = true;     // o aviso do link é da usina do link
     if (!usi) return;
     hint.textContent = 'buscando ativos com o plano…';
     const r = await OsCarga.buscar('/os/api/performance/alvos?usina=' + encodeURIComponent(usi) + '&frase=' + encodeURIComponent(FRASE), undefined, 'Buscando os ativos da usina…');
@@ -360,16 +388,19 @@
 
   function aplicarSugestao() {                             // deep link da plataforma: marca os inversores + observação + OS pai
     if (!sugLista.length) return;
-    const achados = [], faltam = [];
+    const achados = [], faltam = [], achadosIds = [];
     sugLista.forEach(s => {
       const alvo = norm(s.ativo); const numAlvo = (alvo.match(/(\d+(?:\.\d+)?)\s*$/) || [])[1];
       let al = alvos.find(a => norm(a.label) === alvo || (numAlvo && (norm(a.label).match(/(\d+(?:\.\d+)?)\s*$/) || [])[1] === numAlvo));
       if (!al) al = alvos.find(a => norm(a.label).includes(alvo));
-      if (al) { checked.add(al.id); if (s.obs) obs[al.id] = s.obs; if (sug.os_pai && sugLista.length === 1) ospai[al.id] = sug.os_pai; achados.push(al.label); }
+      if (al) { checked.add(al.id); if (s.obs) obs[al.id] = s.obs; if (sug.os_pai && sugLista.length === 1) ospai[al.id] = sug.os_pai; achados.push(al.label); achadosIds.push(al.id); }
       else faltam.push(s.ativo);
     });
     // a observação da OS inteira só existe na agrupada (mais de um ativo); com um só, ela já é a observação do ativo
     if (sugObsOs && achados.length > 1) { $('ed_obs_os').value = sugObsOs; if (sug.os_pai) $('ed_pai_os').value = sug.os_pai; }
+    alvos = comSugeridosNoTopo(alvos, achadosIds);         // os achados no topo da tabela (uma vez: a ordem fica)
+    const topo = $('sug_topo');
+    if (topo) { const av = avisoDoTopo(achados, faltam, isTracker, root.dataset.sugOrigem); topo.innerHTML = av.html; topo.classList.toggle('alerta', av.alerta); topo.hidden = !av.html; }
     repop();
     hint.textContent = (achados.length ? (achados.length === 1 ? 'Ativo ' + achados[0] + ' pré-selecionado' : achados.length + ' ativos pré-selecionados (' + achados.join(', ') + ')') + ' pela plataforma.' : '')
       + (faltam.length ? ' ⚠ Não achei ' + faltam.map(f => '"' + f + '"').join(', ') + ' nesta usina — marque à mão.' : '');

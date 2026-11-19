@@ -552,6 +552,13 @@ aparece quando clicamos em uma OS no histórico do OS Creator Web. Como fazem pa
   `_JANELA_OS`: sem o topo e o aviso `{gc: "os-criada"}` quando a criação dá certo), e a do meio passa o aviso à tela do
   Nexus como `{nexusCriarOs: 1, tipo: 'criada', mensagem, falhas}`; o Esc, como `{nexusCriarOs: 1, tipo: 'fechar'}`.
   Teste: `tests/test_oscreator_criar_por_cima.py`.
+- **A janela de criar OS da Sala de controle** (19/11/2026; a regra inteira em `nexus/torres/performance/CLAUDE.md`): a
+  Sala (página da plataforma) abre a criação com `janela=1&origem=sala-de-controle...`. Com a `origem` da Sala, a tela
+  fica maior (`html.os-sala{zoom:1.5}`, posto pelo `<head>` do `base.html`); o login que cai nela (o `next` traz a
+  janela da Sala: `_tela_login`, `em_janela`) fica na janela em vez de subir à Sala; e o criar OS de Performance
+  (`perf.js`: `comSugeridosNoTopo`, `avisoDoTopo`, o `#sug_topo` do `perf_criar.html`) põe os ativos do link que o
+  Fracttal reconheceu no topo da tabela e diz no alto o que veio e o que faltou (no tracker, a falta do de-para de
+  trackers da usina). Teste: `tests/test_sala_janela_19_11.py`.
 - **O X do card** ficava escondido atrás do cabeçalho fixo dele, também no Histórico (`.os-modal-x` com z-index 2, o
   `.det-top` com 3, e o clique caía no cabeçalho). Passou a 4, no `os.css`.
 - **Como provar:** `tests/test_torre_oscreator.py` (a moldura, o aviso sem login, o `ir`) e

@@ -43,3 +43,29 @@ strings e inversores na API COS > MONITORAMENTO é super rápida [...] aplique")
 devolve o EntradasDoDia da Ronda COS sem mexer, pela mesma `ler_ao_vivo` e as mesmas cópias da janela dos inversores
 (60 s hoje, que vai sem o dia; 1 h o dia que passou). A Sala usa na curva de strings das usinas da API PV com logger. Desde 17/11 o `/cos/inversores` manda também `ss`
 (o índice e a corrente de agora de cada string): a Sala confere por ele a ligação do inversor antes de usar a curva.
+
+**A janela de criar OS da Sala de controle** (19/11/2026; Levi: "quando tiver deslogado do Fractal, aparecer só um pop-up
+só um cardzinho no meio para logar, porque ele redireciona para uma aba do OS Creator que eu não consigo voltar para a sala
+de comando"; "dobre o tamanho também do card do OS Creator quando abre"; "quando eu selecionasse um item e ele fosse
+reconhecido no Fractal, ele também já aparecesse ali no topo do OS Creator"). A Sala abre `/os/performance/criar?...&janela=1
+&origem=sala-de-controle...` num iframe dela (frames: a casca do Nexus > a Sala, página da plataforma > a janela). O que o
+Nexus faz para ela:
+- **O login que cai na janela não leva a pessoa embora.** São duas portas: (a) o Nexus aberto pelo **Fracttal** cuja sessão
+  caiu: a ponte `encerrar` → `/entrar` dentro da janela, e o `entrar.html` chama `window.parent.gcSalaEntrar(motivo)` quando
+  o pai não é o topo, é da mesma origem e tem a função (senão, troca a janela de cima como sempre); a Sala mostra o cartão
+  e abre o Entrar numa janela à parte com `next=/t/_janela/entrou`, que avisa a Sala (`{gc: "nexus-entrou"}`, só para a
+  mesma origem) e fecha (`casca.janela_entrou`, no `setor_telas.LIVRES`). (b) O Nexus aberto pela **Microsoft** (ou pela
+  senha de administrador) sem o login do Fracttal do OS Creator: o `exige_sessao` manda ao `/os/login`, e o login saía da
+  moldura pelo `__osTopo` da ponte, que sobe até a página de baixo da casca, a própria Sala. Agora o `_tela_login` diz
+  `em_janela` quando o `next` traz `janela=1` e `origem=sala-de-controle...`, e o login fica na janela, maior (`os-sala`);
+  depois de entrar, o `next` volta à criação na mesma janela. **Atenção para a Sala:** no caso (b) o `/os/_nexus/sessao`
+  responde `{"ok": true}` (só confere quem entrou pelo Fracttal); quem diz se o OS Creator tem o login do Fracttal é o
+  `/os/_nexus/quem` (e-mail vazio = não tem).
+- **Maior para ler:** `html.os-sala{zoom:1.5}` (os.css do OS Creator), posto pelo `<head>` do `base.html` só com `janela=1`
+  e `origem=sala-de-controle`; a janela do Tempo real e a do prontuário (também `janela=1`) seguem como estavam.
+- **Os reconhecidos no topo:** o `perf.js` (`comSugeridosNoTopo`, `avisoDoTopo`) põe os ativos do link que o Fracttal
+  reconheceu no topo da tabela (na ordem em que vieram, uma vez: marcar e desmarcar não reordena) e o aviso
+  `#sug_topo` no alto da tela; o que não foi achado vai no mesmo aviso, em cor de alerta. No plano de tracker, "Não há
+  de-para de trackers desta usina com o Fracttal (não achei ...)": a lista já é só de estruturas de tracker (o
+  `perf_alvos.get_performance_alvos` do plano de tracker devolve o generalizado, os conjuntos e os individuais, nada mais).
+- Prova: `tests/test_sala_janela_19_11.py` (o Entrar e o recorte dos sugeridos rodados no node).

@@ -18,12 +18,29 @@
     (function () {
       try {
         if (window.top === window.self) return;
-        var t = window.top.location, motivo = {{ (motivo or '')|tojson }};
+        var motivo = {{ (motivo or '')|tojson }};
+        // A JANELA DE CRIAR OS DA SALA DE CONTROLE (Levi, 19/11/2026: "quando tiver deslogado do Fractal, aparecer só um
+        // pop-up só um cardzinho no meio para logar, porque ele redireciona para uma aba [...] que eu não consigo voltar
+        // para a sala de comando"). A Sala (página da plataforma, na mesma origem, entre a casca e a janela) abre a
+        // criação num iframe; trocar a janela de cima levava a pessoa embora com tudo o que ela estava vendo. Quando o pai
+        // NÃO é o topo, é da mesma origem e tem o `gcSalaEntrar`, quem cuida do login é a Sala: o cartão no meio dela,
+        // com o Entrar numa janela à parte (`/t/_janela/entrou` avisa a volta). Qualquer erro de acesso: como sempre.
+        try {
+          var p = window.parent;
+          if (p !== window.top && p.location.origin === location.origin && typeof p.gcSalaEntrar === "function") {
+            p.gcSalaEntrar(motivo);
+            document.documentElement.classList.add("entrar-na-sala");
+            return;
+          }
+        } catch (e) {}
+        var t = window.top.location;
         window.top.location.replace(nexusRota("/entrar") + "?next=" + encodeURIComponent(t.pathname + t.search)
                                     + (motivo ? "&motivo=" + encodeURIComponent(motivo) : ""));
       } catch (e) {}
     })();
   </script>
+  <style>.entrar-na-sala-aviso{display:none}html.entrar-na-sala .entrar-na-sala-aviso{display:block}
+    html.entrar-na-sala main.entrar>*:not(.entrar-logo):not(.entrar-na-sala-aviso){display:none!important}</style>
 </head>
 <body class="pagina-entrar">
 {# a usina sem fim atrás da porta (07/11/2026; static/entrar-usina.js desenha, o nexus.css pinta, seção "Entrar") #}
@@ -33,6 +50,7 @@
   <img src="{{ url_for('static', filename='grid-h-branco.png') }}" alt="Grid Co." class="entrar-logo">
   <h1 class="titulo-pagina">Nexus</h1>
   <p class="entrar-lead">A operação e a manutenção das usinas da Grid Co. num lugar só.</p>
+  <p class="entrar-aviso entrar-na-sala-aviso" role="status">A sessão caiu: entre de novo pelo cartão da Sala de controle.</p>
   {% if aviso %}<p class="entrar-aviso" role="status">{{ aviso }}</p>{% endif %}
   {% set acao = raiz ~ '/entrar' ~ ('?next=' ~ (destino|urlencode) if destino and destino != '/' else '') %}
   {% if modo == 'convite' %}

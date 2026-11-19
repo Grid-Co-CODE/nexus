@@ -497,6 +497,20 @@ def menu_busca():
     return resp
 
 
+@bp.route("/t/_janela/entrou")
+def janela_entrou():
+    """Onde termina o login que a Sala de controle abre numa janela própria (Levi, 19/11/2026: "quando tiver deslogado do
+    Fractal, aparecer só um pop-up só um cardzinho no meio para logar, porque ele redireciona para uma aba do OS Creator
+    que eu não consigo voltar para a sala de comando"). A Sala mostra um cartão no meio dela e abre o Entrar numa janela
+    à parte com `next=/t/_janela/entrou`; feito o login (Fracttal ou Microsoft), a janela cai aqui, avisa quem a abriu
+    (`{gc: "nexus-entrou"}`, só se for da MESMA origem) e fecha; a Sala segue com tudo o que estava vendo. Atrás do login
+    de sempre; não é tela de torre (`_janela` não é torre), por isso está no `setor_telas.LIVRES`. Debaixo de `/t/` pelo
+    mesmo motivo do `/t/menu/busca` (o Caddy só manda ao Nexus a raiz, `/t/*`, `/entrar` e mais poucos)."""
+    resp = current_app.make_response(render_template("janela_entrou.html"))
+    resp.headers["Cache-Control"] = "no-store"
+    return resp
+
+
 @bp.route("/saude")
 def saude():
     # Público de propósito (monitoramento do servidor). Não diz nada além de "está de pé", o commit e, havendo, o commit

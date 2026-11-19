@@ -10,7 +10,7 @@
          data-sug-usina="{{ sugestao.usina }}" data-sug-ativo="{{ sugestao.ativo }}" data-sug-obs="{{ sugestao.obs }}"
          data-sug-ospai="{{ sugestao.os_pai }}" data-sug-resp="{{ sugestao.resp }}" data-sug-modo="{{ sugestao.modo }}"
          data-sug-lista="{{ sugestao.lista | tojson | forceescape }}" data-sug-obsos="{{ sugestao.obs_os }}"
-         data-sug-evento="{{ sugestao.evento }}">
+         data-sug-evento="{{ sugestao.evento }}" data-sug-origem="{{ request.args.get('origem', '') }}">
   <div class="os-topo-linha">
     <a class="os-btn secondary os-voltar" href="/os/performance">← Planos</a>
     <span class="os-head-ic">{{ icone(plano.icone, '#A6E22E', 20) }}</span>
@@ -22,6 +22,8 @@
     </div>
     {% endif %}
   </div>
+  {# o que veio do link (a Sala de controle, o Tempo real): os achados no Fracttal e o que faltou, no TOPO (19/11/2026) #}
+  <div class="os-sug-topo" id="sug_topo" hidden></div>
 
   <div class="os-cardf"><div class="os-cardf-h"><span class="os-badge">1</span><span class="os-cardf-t">Ativo</span></div>
     <div class="os-linha2">

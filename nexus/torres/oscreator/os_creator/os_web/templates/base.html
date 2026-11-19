@@ -7,7 +7,13 @@
    (a casca já mostra os dois); a tela aberta SOZINHA no navegador — link da Plataforma, favorito, botão do meio — vai
    para a casca (/os/) com ela numa aba. Ficam fora: a própria casca, o login (que sai da aba e toma a janela: a sessão
    caiu dentro de uma aba) e o ?solo=1. #}
-{% if sem_abas %}
+{% if sem_abas and em_janela %}
+{# o login que cai DENTRO da janela de criar OS da Sala de controle (19/11/2026, `_tela_login`: o `next` traz `janela=1` e
+   `origem=sala-de-controle`) fica nela, como um cartão, e não toma a Sala: até aqui o __osTopo da ponte subia até a página
+   de baixo da casca, que é a própria Sala, e ela virava a tela de login do OS Creator. Feito o login, o `next` volta à
+   criação, na mesma janela #}
+<script>document.documentElement.classList.add("os-embutido", "os-janela", "os-sala");</script>
+{% elif sem_abas %}
 {# o login não tem abas nem script na tela (test_os_web_sso); só sai da aba em que a sessão caiu e toma a janela #}
 <script>try { if (window.top !== window.self) window.top.location.href = location.href; } catch (e) {}</script>
 {% else %}
@@ -15,7 +21,14 @@
 (function () {
   var h = document.documentElement, dentro;
   try { dentro = window.top !== window.self; } catch (e) { dentro = true; }
-  if (dentro) { h.classList.add("os-embutido"); return; }
+  if (dentro) {
+    h.classList.add("os-embutido");
+    // aberto pela janela de criar OS da Sala de controle (Levi, 19/11/2026: "dobre o tamanho também do card do OS Creator
+    // quando abre"): maior para ler (`html.os-sala`, no os.css). Só a Sala: a janela do Tempo real e a do prontuário
+    // (também `janela=1`) seguem como estavam
+    if (/[?&]janela=1(&|$)/.test(location.search) && /[?&]origem=sala-de-controle/.test(location.search)) h.classList.add("os-sala");
+    return;
+  }
   if (h.getAttribute("data-casca") === "1") return;
   if (location.pathname === "/os/" || location.pathname === "/os" || /[?&]solo=1(&|$)/.test(location.search)) return;
   location.replace("/os/?aba=" + encodeURIComponent(location.pathname + location.search + location.hash));

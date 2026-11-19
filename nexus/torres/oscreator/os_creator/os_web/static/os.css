@@ -1029,3 +1029,20 @@ html[data-tema="claro"]{
 :where(html[data-tema="claro"]) .eng-sup-nome,:where(html[data-tema="claro"]) .eng-titulo{color:var(--osc-texto)!important}
 :where(html[data-tema="claro"]) .eng-sup-quadro{background:var(--osc-secao)!important}
 
+
+/* ── a Sala de controle (19/11/2026) ──────────────────────────────────────────────────────────────────────────────────
+   O OS Creator aberto pela janela de criar OS da Sala (Levi: "dobre o tamanho também do card do OS Creator quando abre"):
+   o corpo é 13 px e a janela da Sala ocupa quase a tela toda; com o zoom de 1,5 a letra fica perto de 19 px. A classe vem
+   do <head> do base.html (só com `janela=1` e `origem=sala-de-controle`). E o que a Sala mandou, no TOPO da tela
+   ("quando eu selecionasse um item e ele fosse reconhecido no Fractal, ele também já aparecesse ali no topo"): o
+   reconhecido em verde; o que não foi achado (no tracker, a falta do de-para), em cor de alerta. */
+html.os-sala{zoom:1.5}
+.os-sug-topo{display:flex;flex-direction:column;gap:4px;margin:10px 0 2px;padding:9px 12px;border-radius:10px;
+  background:rgba(143,206,63,.10);border:1px solid rgba(143,206,63,.40);color:#e6e8ef;font-size:13px}
+.os-sug-topo[hidden]{display:none}
+.os-sug-topo b{color:var(--verde)}
+.os-sug-topo.alerta{background:rgba(245,166,35,.10);border-color:rgba(245,166,35,.45)}
+.os-sug-topo .os-sug-falta{color:#f5c877}
+:where(html[data-tema="claro"]) .os-sug-topo{background:var(--osc-sucesso-suave, rgba(86,102,16,.08));border-color:var(--osc-sucesso-borda, rgba(86,102,16,.35));color:var(--osc-texto, #1e293b)}
+:where(html[data-tema="claro"]) .os-sug-topo.alerta{background:var(--osc-alerta-suave);border-color:var(--osc-alerta-borda)}
+:where(html[data-tema="claro"]) .os-sug-topo .os-sug-falta{color:var(--osc-alerta)}
