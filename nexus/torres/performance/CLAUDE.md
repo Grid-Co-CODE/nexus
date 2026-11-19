@@ -65,8 +65,9 @@ Nexus faz para ela:
   e `origem=sala-de-controle`; a janela do Tempo real e a do prontuário (também `janela=1`) seguem como estavam.
 - **Os reconhecidos no topo:** o `perf.js` (`comSugeridosNoTopo`, `avisoDoTopo`) põe os ativos do link que o Fracttal
   reconheceu no topo da tabela (na ordem em que vieram, uma vez: marcar e desmarcar não reordena) e o aviso
-  `#sug_topo` no alto da tela; o que não foi achado vai no mesmo aviso, em cor de alerta. No plano de tracker, "Não há
-  de-para de trackers desta usina com o Fracttal (não achei ...)": a lista já é só de estruturas de tracker (o
+  `#sug_topo` no alto da tela; o que não foi achado vai no mesmo aviso, em cor de alerta. No plano de tracker, "Não achei
+  ... no de-para de trackers desta usina com o Fracttal" (serve à usina sem de-para e ao id errado numa usina com de-para;
+  antes dizia "Não há de-para" mesmo quando só aquele id não batia, 19/11/2026): a lista já é só de estruturas de tracker (o
   `perf_alvos.get_performance_alvos` do plano de tracker devolve o generalizado, os conjuntos e os individuais, nada mais).
   A usina do link que não se acha (`avisoUsinaFalta`, 19/11/2026) também vai no aviso: conferido em produção, a Sala
   mandava "PEII" e o Fracttal tem "Axis - Petrolina 2 - PE"; o perf.js só casa por igual ou contém, nada era escolhido e o

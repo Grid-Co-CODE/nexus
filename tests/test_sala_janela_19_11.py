@@ -222,7 +222,7 @@ console.log(JSON.stringify(r));
     inv = r["inv"]
     assert inv["alerta"] is False and "Pré-selecionado pela Sala de controle: <b>Inversor 1.3, Inversor 1.4</b>" in inv["html"]
     trk = r["trk"]
-    assert trk["alerta"] is True and 'Não há de-para de trackers desta usina com o Fracttal (não achei "TRK 41")' in trk["html"]
+    assert trk["alerta"] is True and 'Não achei "TRK 41" no de-para de trackers desta usina com o Fracttal.' in trk["html"]
     assert "A lista abaixo já está só com as estruturas de tracker: procure o tracker e marque." in trk["html"]
     falta = r["falta"]
     assert falta["alerta"] is True and "Pré-selecionado pelo link que abriu esta tela" in falta["html"]

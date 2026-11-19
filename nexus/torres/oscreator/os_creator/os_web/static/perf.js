@@ -52,13 +52,14 @@
     }).map(p => p[0]);
   }
   // O aviso do topo: {html, alerta}. `origem` é a do link (a Sala manda "sala-de-controle..."); no plano de tracker, o que
-  // não foi achado é a falta do de-para de trackers da usina, e a lista já é só de estruturas de tracker
+  // não foi achado não está no de-para de trackers (a usina sem de-para ou só aquele id errado: o texto serve aos dois,
+  // 19/11/2026), e a lista já é só de estruturas de tracker
   function avisoDoTopo(achados, faltam, tracker, origem) {
     const partes = [], aspas = l => l.map(f => '"' + esc(f) + '"').join(', ');
     const quem = /^sala-de-controle/.test(String(origem || '')) ? 'pela Sala de controle' : 'pelo link que abriu esta tela';
     if (achados.length) partes.push('<span>Pré-selecionado ' + quem + ': <b>' + achados.map(esc).join(', ') + '</b></span>');
     if (faltam.length) partes.push('<span class="os-sug-falta">' + (tracker
-      ? 'Não há de-para de trackers desta usina com o Fracttal (não achei ' + aspas(faltam) + '). A lista abaixo já está só com as estruturas de tracker: procure o tracker e marque.'
+      ? 'Não achei ' + aspas(faltam) + ' no de-para de trackers desta usina com o Fracttal. A lista abaixo já está só com as estruturas de tracker: procure o tracker e marque.'
       : 'Não achei ' + aspas(faltam) + ' nesta usina no Fracttal: marque à mão.') + '</span>');
     return {html: partes.join(''), alerta: faltam.length > 0};
   }
