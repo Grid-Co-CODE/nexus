@@ -2804,3 +2804,31 @@ alto, a separação por tema e o texto curto, "para quem tem pouco tempo, porém
   de carregar. **O iframe não tem color-scheme próprio**: herda o do Nexus, o mesmo que a tela do telefone declara; com
   `color-scheme:normal` no iframe o navegador pintava um retângulo atrás do telefone no tema escuro.
 - Prova: `tests/test_campo_guia_app_21_11.py` (guia de mentira + o pacote de verdade: toda tela citada existe).
+
+## Limitações de potência (19/11/2026; `nexus/campo/limitacoes.py`, `limitacoes_tela.py`, `campo/limitacoes.html`)
+
+Levi, 19/11/2026: "crie, na parte de usina 360, um campo onde as pessoas consigam colocar limitações de potência dos
+inversores. E aí vai ser usado também para o cálculo dos expurgos. Aí aquela limitação de potência pode ser de todos os
+inversores ou só de alguns, de acordo com os inversores do fractal". É o 1º pedaço dos expurgos de contrato (os outros: o
+cálculo na nota do contrato e o cruzamento com a planilha de tickets).
+
+- **A tela** (`/t/campo/limitacoes`, logo abaixo de Usinas; dona: a Performance): o formulário em cima e a lista embaixo
+  (as em andamento primeiro). Escolhida a usina, aparecem os inversores do Fracttal dela (família INVR da dimensão de
+  equipamento, `estrutura_usina.ativos_da_usina`, a mesma régua de código que a disponibilidade usa), com "Todos os
+  inversores". O "!" explica para que serve e cada campo.
+- **Os campos** são os da aba "Inv. com lim. de potência" da planilha de tickets (90 linhas, parada desde 09/2026), para o
+  time trocar a planilha pelo Nexus: inversores, potência nominal de cada um (kW), limite em % da nominal liberado, causa,
+  responsabilidade da Grid Co. (sim, não, parcial: é ela que decide o expurgo), clipagem (a "Gravidade" da planilha),
+  início, fim (vazio = segue limitado) e os comentários para o cliente e geral.
+- **O livro** `nexus_limitacao_inversor · fato_versao_limitacao` (no catálogo antes da 1ª gravação; só cresce): 1 linha =
+  1 versão (registrou, alterou, encerrou, excluiu); vale a última de cada `limitacao_id`. A causa, os comentários e o nome
+  de quem registrou vão cifrados (regra 8). O mesmo envio duas vezes não duplica (`novo_id`).
+- **Quem registra**: quem entrou com o login (Fracttal ou Microsoft); a senha de administrador não diz quem é, e o
+  formulário fica desligado com o aviso.
+- **Sem a potência nominal** a limitação é guardada, mas não entra no cálculo do expurgo (a lista mostra "sem a
+  potência"); nada de potência inventada. A potência AC nominal por inversor não existe no Nexus (só o kWp DC da
+  Base › Equipamentos, e ligado ao código do Fracttal em poucos inversores).
+- **Para o expurgo**: `limitacoes.no_periodo(usina_id, inicio, fim)` devolve as que tocam o período, com `kw_limitados`
+  (nominal × inversores × (1 − limite)).
+- Sem banco, a tela abre e diz o que faltou. Prova: `tests/test_campo_limitacoes_19_11.py` (banco de mentira).
+

@@ -211,9 +211,26 @@ FATOS = (
                     "também conta como ler); mencoes_pessoas = os códigos do e-mail (pessoa_hmac) mencionados e "
                     "mencoes_areas = as torres mencionadas, separados por vírgula. O nome de quem escreveu e o texto "
                     "só cifrados (Cofre). Só acrescenta: nada se edita nem se apaga"),
-    # 05/11/2026 (Levi: "Quero que no OS Creator > Performance tenha um campo para subtarefas, que vamos poder editar as
-    # subtarefas padrões de cada atividade!"): o padrão editado de cada atividade, que toda OS nova dela já leva. O plano
-    # do Fracttal não muda. Registrado antes da 1ª gravação
+    # 19/11/2026 (Levi: "crie, na parte de usina 360, um campo onde as pessoas consigam colocar limitações de potência dos
+    # inversores. E aí vai ser usado também para o cálculo dos expurgos"): o cadastro do time em Usinas 360° › Limitações
+    # de potência, que substitui a aba "Inv. com lim. de potência" da planilha de tickets. Registrado antes da 1ª gravação
+    Fato("versao_limitacao", "Versão de uma limitação de potência de inversores", "performance",
+         "nexus_limitacao_inversor · fato_versao_limitacao",
+         "1 linha = 1 versão de um registro de limitação de potência de inversores de 1 usina (registrou, alterou, "
+         "encerrou ou excluiu); vale a última versão de cada limitacao_id",
+         _d(data=("id", "data_id (o dia de Brasília em que a versão foi registrada); data_id_inicio e data_id_fim, o "
+                        "período da limitação"),
+            usina=("id", "usina_id (escolhida na tela, do cadastro)"),
+            equipamento=("cod", "inversores: os códigos dos inversores do Fracttal separados por ponto e vírgula (* = "
+                                "todos os da usina)"),
+            pessoa=("id", "pessoa_hmac de quem registrou (o código do e-mail do login)")),
+         tipo="sem_medida", chave=("versao_id",), fontes=("nexus_limitacao_inversor · fato_versao_limitacao",),
+         janela_origem="o Nexus é a fonte (só acrescenta: vale a última versão de cada limitação)",
+         observacao="potencia_nominal_kw = a potência nominal de cada inversor limitado (vazio = não informada: não entra "
+                    "no expurgo); limite_pct = o percentual da nominal que fica liberado; inversores_qtd = quantos "
+                    "inversores (com *, os da usina no Fracttal no dia do registro); responsabilidade_grid = sim, nao ou "
+                    "parcial (decide o expurgo); clipagem = problemas, sem ou conforme. A causa, os comentários e o "
+                    "nome de quem registrou só cifrados (Cofre). Nada se edita nem se apaga"),
     Fato("versao_subtarefas", "Versão das subtarefas padrão de uma atividade da Performance", "performance",
          "nexus_subtarefas_performance · fato_versao_subtarefas",
          "1 linha = 1 versão salva da lista de subtarefas de 1 atividade da Performance no OS Creator (salvou) ou a volta "
@@ -1738,6 +1755,11 @@ LIVROS = (
           "a cada solicitação aprovada no OS Creator e a cada Marcar como lida no sino",
           "nexus/comando/avisos.py, pelo sino do topo e pela aprovação da Fila do PCM (rotas_solic.AO_APROVAR)", False,
           "registrado em 04/11/2026 antes da 1ª gravação (regra 10): nasce no 1º aviso de solicitação ou de lido",
+          so_cresce=True),
+    Livro("nexus_limitacao_inversor", ("fato_versao_limitacao",),
+          "a cada registro, alteração, encerramento ou exclusão de uma limitação de potência em Usinas 360°",
+          "nexus/campo/limitacoes.py, pela tela Usinas 360° › Limitações de potência", False,
+          "registrado em 19/11/2026 antes da 1ª gravação (regra 10): nasce na 1ª limitação registrada",
           so_cresce=True),
     Livro("nexus_subtarefas_performance", ("fato_versao_subtarefas",),
           "a cada Salvar padrão ou Voltar ao do Fracttal das subtarefas de uma atividade da Performance",
