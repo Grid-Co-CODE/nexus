@@ -235,3 +235,23 @@ def do_mes(linhas, usina_id: int, mes: int) -> dict[str, tuple[int, int]]:
         if lin[_I["usina_id"]] == int(usina_id) and (lin[_I["data_id_mes"]] or 0) // 100 == int(mes):
             out[lin[_I["atividade"]]] = (lin[_I["eventos_qtd"]] or 0, lin[_I["os_qtd"]] or 0)
     return out
+
+
+def rondas_por_mes(linhas) -> tuple[dict, set]:
+    """({(usina_id, AAAAMM): rondas feitas}, {os meses AAAAMM que o fato tem}), numa passada só (a Visão gerencial pede
+    as rondas das 144 usinas de cada mês fechado: `do_mes` usina a usina relia o fato inteiro 144 vezes)."""
+    rondas, meses = {}, set()
+    for l in linhas or []:
+        lin = _linha_tipada(l)
+        mes = (lin[_I["data_id_mes"]] or 0) // 100
+        meses.add(mes)
+        if str(lin[_I["atividade"]] or "").startswith("ronda_"):
+            chave = (lin[_I["usina_id"]], mes)
+            rondas[chave] = rondas.get(chave, 0) + (lin[_I["eventos_qtd"]] or 0)
+    return rondas, meses
+
+
+def rondas_do_mes(rondas: dict, meses: set, usina_id: int, mes: int):
+    """As rondas da usina no mês (AAAAMM). O mês que o fato tem é a conta de verdade: a usina sem linha de ronda (ou sem
+    atividade nenhuma, que não ganha linha) fez ZERO ronda. O mês que o fato não tem não foi guardado: None, nunca zero."""
+    return rondas.get((int(usina_id), int(mes)), 0) if int(mes) in meses else None

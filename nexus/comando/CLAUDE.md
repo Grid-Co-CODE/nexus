@@ -28,6 +28,7 @@ muito boa"; e "construa o que você sugere"). PRD e tarefas no formato do Taskma
 | `avisos.py` + `../casca/__init__.py` (`_avisos_do_sino`, `POST /t/comando/aviso/lida`) | Os avisos das OS de cada pessoa no sino ("OS x concluída pelo técnico", "Sua solicitação gerou uma OS" e, desde 08/11/2026, "OS x criada para você"; desde 11/11/2026, tudo da OS da solicitação, com a cancelada) e o Marcar como lida: o livro `nexus_avisos · fato_evento_aviso` |
 | `demandas_regras.py` + `demandas.py` + `../torres/comando/demandas_tela.py` | As demandas entre setores (12/11/2026): a regra do prazo e dos avisos, o livro `nexus_demandas` e as telas (o bloco da Caixa, a Nova demanda, os Temas do setor e o sininho); ver a seção abaixo |
 | `carteira_ia.py` + `dossie_cliente.py` | O dossiê da carteira para a Nexus IA do Comando › Usinas e o dossiê do cliente em .md, com as UFVs pontuadas (16/11/2026); ver as seções abaixo |
+| `gerencial.py` + `../torres/comando/gerencial_tela.py` + `comando/gerencial.html` + `static/gerencial.js` e `.css` | A Visão gerencial (teste), 19/11/2026: o portfólio que afunila (portfólio → cliente → usina) e a nota de cumprimento do contrato por usina; ver a seção abaixo |
 | `solicitacoes_fracttal.py` | As solicitações do Fracttal que viraram OS (REST `work_requests`, por trás, a cada 5 min, na memória) e o motivo das OS delas canceladas, para os avisos de quem pediu (11/11/2026); desde 12/11/2026 também o mapa OS → quem pediu, da leitura inteira (~400 dias, 100 por página, uma vez por dia), para o filtro Solicitante do Histórico de OS (`ligar_historico`, o gancho da ponte). Desde 16/11/2026 o solicitante de cada OS sai de um índice montado uma vez por leitura (`_da_leitura`), e a `versao_do_mapa` só muda quando o solicitante de alguma OS muda (ela faz o Histórico refazer as linhas guardadas; com a hora da leitura no lugar, isso era de 5 em 5 min) |
 
 ## As regras da Fase 1 (e de onde cada uma lê)
@@ -1178,6 +1179,79 @@ Prova:
 - `tests/test_comando_prontuario.py`: as não iniciadas;
 - `tests/test_comando_diagnostico.py`: as regras e o pedido pronto;
 - `tests/test_comando_ia.py`: a área Chamados no chat.
+
+## A Visão gerencial (teste) (19/11/2026; `nexus/comando/gerencial.py`, `torres/comando/gerencial_tela.py`, `static/gerencial.js`)
+
+**Para que serve.** Levi, 18/11/2026, com o prontuário da usina no ar: "já conseguimos falar muito bem com quem está
+focado no campo, mas e para a gestão? Como a gestão pode acompanhar as carteiras, como está por cliente" e "Quero uma visão
+do portfólio inteiro puxando mensal por contratos da parte de COMANDO > CONTRATOS. Portfólio Grid Co, clientes, usinas, MWp
+e valor mensal, depois vai afunilando, clientes e depois usinas". O desenho foi aprovado em mockup com dado real (15 capas,
+depois as três que ficaram) e ele mandou: "sobe como Visão gerencial (teste)". O "(teste)" é do nome: a régua da nota ainda
+espera o OK dele.
+
+**A tela** (`/t/comando/visao-gerencial`; não é de todos: tem o valor dos contratos, e só a vê o administrador e o setor
+que ele marcar em Base › Acessos; o cliente nunca abre). Três níveis, com o nível e o mês no endereço
+(`?cliente=&usina=&mes=`; o Voltar do navegador sobe um nível):
+
+| Nível | O que mostra | Pedido do Levi |
+|---|---|---|
+| Portfólio | Os MWp contando, o símbolo da Grid em verde 3D, o anel que reparte os MWp por cliente (com o fio da saúde) e cada usina como um ponto (tamanho = MWp, cor = saúde) | "algo bem performático focando no MWp e o símbolo da Grid, alguma animação" e "Símbolo da grid em verde 3D" |
+| Cliente | O parque em blocos: a altura é a potência (a mesma régua para todos os clientes), a COR e o NÚMERO da tampa são a nota do contrato no mês | "algo diferenciado", "um score de contratos" em cima dos blocos e "a cor do bloco segue a nota do contrato" |
+| Usina | A nota e os quatro itens, cada um com o que o contrato pede, o que o Nexus mediu e a conta; o botão "Abrir o prontuário" (leva `?mes=` no mês fechado) | "quando eu clicar na UFV tem que explicar esse número" e "um botão que leva para o prontuário da usina" |
+
+O filtro de mês (cliente e usina) abre SEMPRE no vigente (Levi: "é bom estar filtrado por mês sempre mostrando o mês
+atual") e vai até `diagnostico_mes.PRIMEIRO_MES`. A animação roda sempre, de propósito (o Windows do Levi manda "movimento
+reduzido"). As cores do canvas são as dos tokens do tema, lidas a cada desenho (vale no claro e no escuro). O símbolo 3D é
+o PNG `static/comando/grid-simbolo.png` (o desenho da marca com fundo transparente) como máscara de 26 camadas; só balança,
+nunca dá a volta (de costas a marca apareceria espelhada).
+
+**De onde vem cada dado** (`gerencial_tela._usinas` e `_contratos`; fonte que não abre vira aviso na tela e o resto vale):
+
+| Dado | Fonte |
+|---|---|
+| usinas, cliente, MWp, meta, PR e OS de agora | a conta do Usinas 360° › Usinas (`_usinas_montadas`) e a Visão do responsável (a ronda, o plano da semana e as OS do bloco Manutenção) |
+| disponibilidade, e a meta e o PR dos meses fechados | o mês a mês do prontuário (`prontuario_dados._de_todas`: `disps` e `metas`) |
+| as rondas do mês fechado | o fechamento guardado (`fato_atividade_mes.rondas_por_mes`); o mês que o fato tem é zero de verdade para a usina sem ronda, e o que ele não tem é None |
+| a saúde de cada usina | a pontuação do dossiê do cliente (`dossie_cliente.pontuar`); a saúde média do cliente só existe com meta ou PR publicados |
+| valor mensal, vigência, obrigações em atraso, a garantia de disponibilidade e o valor de cada usina | o Comando › Contratos (`contratos/edicao.visao`, SÓ LEITURA: o módulo é de outra conversa); o nome do gestor não sai daqui |
+
+O dados.json tem uma cópia de 1 minuto por aplicação (`COPIA_S`): a conta leva 1,5 s com as fontes quentes e não muda de
+pessoa para pessoa.
+
+**A nota de cumprimento do contrato** (`gerencial.nota_do_contrato`; PROPOSTA). O Comando › Contratos não tem nota (as
+regras lidas dos PDFs são texto e as obrigações não têm usina). Perguntado, o Levi escolheu o cumprimento do contrato por
+usina com quatro itens; cada um vale de 0 a 100 e a nota é a média simples dos itens medidos:
+
+| Item | O contrato pede | A conta |
+|---|---|---|
+| Disponibilidade | A garantida lida na regra do contrato (`garantia_de_disponibilidade`: a 1ª regra de "Disponibilidade e desempenho" com "disponibilidade" no nome e um percentual) | 100 se cumpriu; cada ponto percentual abaixo tira 20 |
+| Geração e PR | A meta de geração do mês e o PR previsto do Nexus | Média dos dois, cada um com teto de 100 |
+| Rotinas | Ronda a cada 7 dias (a régua R11) e o plano da semana do PCM | No vigente: média da ronda (cada dia além de 7 tira 10) e do plano; no fechado: as rondas do mês contra uma por semana |
+| Prazos de OS | Nenhuma urgente parada nem atrasada (a régua do PCM) | Cada urgente tira 25, cada atrasada tira 10 |
+
+O que fica FORA (sem dado não se inventa, e zero não cobre dado):
+- o item sem garantia no contrato (7 dos 16 contratos não garantem disponibilidade) ou sem dado no Nexus;
+- o PR acima de 100%: é leitura errada (uma usina com 558,7% em outubro valeria nota cheia com o teto);
+- a ronda da usina nunca rondada pelo App (a E1 é corretiva por demanda: a régua de ronda não é dela);
+- no mês fechado, os prazos de OS (a pendência que o Nexus tem é a de hoje) e o plano da semana (não fica guardado por mês);
+- a usina com menos de dois itens medidos fica SEM nota (a E1 sairia com 100 só por não ter OS atrasada).
+
+As faixas da cor são as da pontuação do dossiê do cliente (80 e 55). A média arredonda meio para cima (92,5 vira 93: é a
+conta que a tela mostra).
+
+**O valor de cada usina** (`valores_por_usina`): o contrato escreve o nome da usina do jeito dele. Liga pelo mesmo nome
+(sem acento, romano em número), pelo código da usina dentro do nome do contrato, ou pelo nome sem o número quando ele é
+único no cadastro do cliente E no contrato e a potência bate (15%); "União 1 e 2" soma as duas linhas. O resto fica "sem
+ligação": não se chuta. Em 18/11/2026 ligavam 79 das 144 (Thopen 62 de 81; Elis nenhuma). O conserto de fundo é o
+Contratos guardar o código da usina.
+
+**Em aberto com o Levi** (não mexer sem ele): os números da régua (20, 7 dias, 10, 25 e 10; o mínimo de 2 itens) e as três
+escolhas do mês fechado; o contrato com PR próprio (Athon, GreenYellow, Apolo) ainda usa o previsto do Nexus; a garantia
+anual da Athon é comparada com o mês.
+
+Prova:
+- `tests/test_comando_gerencial_19_11.py`: cada item da nota, o que fica fora, o mês fechado, a garantia, o valor por usina, a montagem, as rondas do mês guardado, a tela, o dados.json (sem nome de pessoa) e o cliente barrado;
+- com o dado real (bancada só de leitura, 19/11/2026): os totais, o valor de cada cliente, as garantias e o valor por usina iguais aos do mockup aprovado; 131 usinas com nota em novembro (média 76).
 
 ## Contestações e Prévia: visão do contrato (no Comando desde 12/11/2026)
 

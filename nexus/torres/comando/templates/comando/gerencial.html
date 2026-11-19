@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block titulo %}{{ tela.nome }}{% endblock %}
+{% block conteudo %}
+<link rel="stylesheet" href="{{ url_for('static', filename='gerencial.css') }}">
+{# Comando › Visão gerencial (teste), 19/11/2026. Levi: "Quero uma visão do portfólio inteiro puxando mensal por contratos
+   da parte de COMANDO > CONTRATOS [...] depois vai afunilando, clientes e depois usinas" e, com o mockup aprovado, "sobe
+   como Visão gerencial (teste)". A página não tem dado nenhum: o gerencial.js pede o dados.json e desenha os três níveis
+   (o portfólio, o parque do cliente e a nota da usina). Regras em nexus/comando/CLAUDE.md. #}
+<div class="vg" id="vg" data-dados="{{ '/t/comando/visao-gerencial/dados.json'|na_raiz }}"
+     data-prontuario="{{ '/t/campo/usinas/'|na_raiz }}" data-simbolo="{{ url_for('static', filename='comando/grid-simbolo.png') }}">
+  <h1 class="so-leitor">{{ tela.nome }}</h1>
+  <div id="vg-tela" aria-live="polite"><p class="mudo" style="padding:18px 0">Lendo o portfólio…</p></div>
+</div>
+<script src="{{ url_for('static', filename='gerencial.js') }}" defer></script>
+{% endblock %}

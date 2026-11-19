@@ -16,8 +16,9 @@ from nexus.torres import descobrir_torres, montar_menu
 def test_a_ordem_do_comando_e_a_usinas_na_usinas_360():
     torres = {t.id: t for t in descobrir_torres()}
     menu = {m["id"]: [t["nome"] for t in m["telas"]] for m in montar_menu(list(torres.values()), None)}
+    # a Visão gerencial (teste) entrou em 19/11/2026 no FIM: a ordem que o Levi ditou para os outros não muda
     assert menu["comando"] == ["Caixa de entrada", "Contratos", "Metas do book", "Contestações",
-                               "Nexus Insights"]
+                               "Nexus Insights", "Visão gerencial (teste)"]
     assert menu["campo"][:2] == ["Visão do responsável", "Usinas"]
     assert torres["comando"].tela("usinas") is None and torres["campo"].tela("usinas") is not None
 

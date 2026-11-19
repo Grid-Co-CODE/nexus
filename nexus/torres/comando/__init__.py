@@ -63,6 +63,13 @@ TORRE = Torre(
         Tela("insights", "Nexus Insights",
              "Que regra cruzou as fontes e apontou um problema com dono?",
              "Regras R01 a R13 do motor de correlação"),
+        # 19/11/2026: o portfólio para a gestão, que afunila em cliente e usina e dá a nota de cumprimento do contrato
+        # (Levi: "Como a gestão pode acompanhar as carteiras, como está por cliente" e, com o mockup aprovado, "sobe como
+        # Visão gerencial (teste)"; as views em gerencial_tela.py). Fica no FIM do menu: a ordem dos outros itens é a que o Levi ditou em 16/11/2026, e a tela nova não a mexe.
+        # Não é de todos: tem o valor dos contratos, e só a vê o administrador e o setor que ele marcar em Base › Acessos
+        Tela("visao-gerencial", "Visão gerencial (teste)",
+             "Como está o portfólio, cliente por cliente e usina por usina, contra o que cada contrato pede?",
+             "Comando › Contratos (valor mensal e garantias), Usinas 360° (meta, PR, disponibilidade, OS e rondas)"),
     ],
 )
 
@@ -1406,3 +1413,4 @@ from . import demandas_tela  # noqa: E402,F401
 # as Contestações e a Prévia do contrato, vindas da torre Contratos e clientes (12/11/2026)
 from . import contestacoes_tela  # noqa: E402,F401
 from . import contratos_tela  # noqa: E402,F401
+from . import gerencial_tela  # noqa: E402,F401

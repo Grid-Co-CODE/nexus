@@ -1,0 +1,99 @@
+/* Comando › Visão gerencial (teste), 19/11/2026: o portfólio que afunila (portfólio → cliente → usina). O desenho foi
+   aprovado pelo Levi em mockup com dado real ("Ficou do caralho", "tá massa! sobe"). Um nível de superfície só: nada de
+   cartão dentro de cartão; a cor é sempre estado (a saúde ou a nota do contrato) ou a marca (o verde do símbolo). Toda cor
+   vem dos tokens do tema (tests/test_tema.py): as do canvas, o gerencial.js lê dos mesmos tokens. */
+/* o título da página existe só para o leitor de tela: a capa de cada nível já diz onde se está */
+.vg .so-leitor{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.vg-trilha{margin:0;font-size:13px;color:var(--mudo)}
+.vg a{color:inherit;text-decoration:underline;text-decoration-color:var(--linha-forte);text-underline-offset:3px;cursor:pointer}
+.vg a:hover{text-decoration-color:var(--verde)}
+.vg-topo{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px 14px;margin:0 0 10px}
+.vg-acoes{display:flex;align-items:center;gap:12px;flex:none}
+.vg h2{margin:0 0 12px;font:700 16px/1.3 var(--font-display)}
+.vg-nota{margin:0 0 30px;max-width:100ch;font-size:12px;color:var(--mudo)}
+.vg-aviso{margin:0 0 14px;font-size:13px;color:var(--alerta)}
+
+/* o filtro de mês (abre sempre no vigente) e o botão do prontuário, a única ação cheia da tela */
+.vg-meses{display:inline-flex;flex:none;border:1px solid var(--linha-forte);border-radius:8px;overflow:hidden;pointer-events:auto}
+.vg-meses button{padding:6px 12px;border:0;background:none;color:var(--mudo);font:600 12.5px/1.4 var(--font-sans);cursor:pointer}
+.vg-meses button+button{border-left:1px solid var(--linha-forte)}
+.vg-meses button[aria-pressed=true]{background:var(--verde-suave);color:var(--verde-texto)}
+.vg a.vg-botao{display:inline-block;flex:none;padding:8px 16px;border-radius:8px;background:var(--verde);color:var(--sobre-verde);font:600 13.5px/1.4 var(--font-sans);text-decoration:none;pointer-events:auto}
+.vg a.vg-botao:hover{background:var(--verde-hover)}
+
+/* a capa: o texto à esquerda e o desenho (canvas) ocupando a área toda. A animação roda sempre, de propósito: quem pediu
+   foi o Levi, e o Windows dele manda "movimento reduzido" (ele nunca veria se a tela obedecesse). */
+.vg-pot{position:relative;height:640px;margin:0 0 22px}
+.vg-pot canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+.vg-txt{position:absolute;left:0;top:50%;transform:translateY(-50%);width:430px;max-width:100%;pointer-events:none}
+.vg-txt a{pointer-events:auto}
+.vg-sobre{margin:0 0 10px;font:700 18px/1.2 var(--font-display);color:var(--tinta-2)}
+.vg-nome{margin:0 0 14px;font:800 54px/1.02 var(--font-display);letter-spacing:-.02em}
+.vg-num{display:flex;align-items:baseline;gap:12px;font:800 128px/.95 var(--font-display);letter-spacing:-.035em;font-variant-numeric:lining-nums tabular-nums}
+.vg-num--cli{font-size:92px}
+.vg-num small{font:700 30px/1 var(--font-display);letter-spacing:0;color:var(--verde-texto)}
+.vg-leg{margin:16px 0 0;font-size:17px;line-height:1.45;color:var(--tinta-2)}
+.vg-ctr{margin:10px 0 0;font-size:14px;color:var(--tinta-2)}
+.vg-foco{margin-top:26px;padding-top:18px;border-top:1px solid var(--linha-forte);min-height:124px}
+.vg-foco b{display:block;font:700 21px/1.2 var(--font-display)}
+.vg-foco span{display:block;margin-top:5px;color:var(--tinta-2)}
+.vg-foco strong{color:var(--tinta);font-weight:600}
+
+/* o símbolo da Grid em verde 3D: o PNG da marca é a máscara de camadas empilhadas na profundidade (o gerencial.js põe a
+   máscara e a cor de cada camada); a da frente leva o verde claro com o brilho que anda com o giro */
+.vg-sim{position:absolute;pointer-events:none;perspective:820px;opacity:0}
+.vg-brilho{position:absolute;inset:-24%;border-radius:50%;background:radial-gradient(closest-side,var(--verde-a35),var(--verde-suave) 56%,transparent 74%)}
+.vg-3d{position:absolute;inset:0;transform-style:preserve-3d;will-change:transform}
+.vg-3d i{position:absolute;inset:0;-webkit-mask-size:contain;mask-size:contain;-webkit-mask-repeat:no-repeat;mask-repeat:no-repeat;-webkit-mask-position:center;mask-position:center}
+.vg-3d i.vg-frente{background-image:linear-gradient(105deg,transparent 41%,var(--sobre-barra) 50%,transparent 59%),linear-gradient(135deg,var(--lima-cheio),var(--verde) 46%,var(--verde-hover));background-size:300% 100%,100% 100%;background-repeat:no-repeat}
+
+/* as listas de baixo: os mesmos números do desenho, para ler e para afunilar pelo teclado */
+.vg-rola{overflow-x:auto}
+.vg-tab{width:100%;border-collapse:collapse;font-size:13px}
+.vg-tab th{padding:8px 14px 8px 0;text-align:left;font-weight:600;font-size:12px;color:var(--mudo);border-bottom:1px solid var(--linha-forte);white-space:nowrap}
+.vg-tab td{padding:10px 14px 10px 0;border-bottom:1px solid var(--linha);vertical-align:middle;color:var(--tinta-2)}
+.vg-tab .vg-n{text-align:right;font-variant-numeric:lining-nums tabular-nums}
+.vg-tab td.vg-nm{color:var(--tinta);font-weight:600;white-space:nowrap}
+.vg-tab td.vg-forte{color:var(--tinta);font-weight:600;font-variant-numeric:lining-nums tabular-nums}
+.vg-tab tr.vg-lin{cursor:pointer}
+.vg-tab tr.vg-lin.vg-ativo td{background:var(--verde-suave)}
+.vg-trilho{display:inline-block;height:8px;border-radius:4px;background:var(--superficie-2);overflow:hidden;vertical-align:middle}
+.vg-trilho i{display:block;height:100%;background:var(--verde)}
+.vg-lin .vg-trilho i{width:0;transition:width 1.3s cubic-bezier(.2,.7,.2,1)}
+.vg-seg{display:inline-flex;height:8px;border-radius:4px;overflow:hidden;background:var(--superficie-2);vertical-align:middle}
+.vg-seg i{display:block;height:100%}
+.vg-pt{font-weight:700;font-variant-numeric:lining-nums tabular-nums}
+.vg-t-ok{color:var(--ok)}.vg-t-alerta{color:var(--alerta)}.vg-t-critico{color:var(--critico)}.vg-t-neutro{color:var(--mudo)}
+.vg-trilho i.vg-b-ok,.vg-seg i.vg-b-ok{background:var(--ok-cheio)}
+.vg-trilho i.vg-b-alerta,.vg-seg i.vg-b-alerta{background:var(--alerta-cheio)}
+.vg-trilho i.vg-b-critico,.vg-seg i.vg-b-critico{background:var(--critico-cheio)}
+.vg-trilho i.vg-b-neutro{background:var(--fraco)}
+.vg-chip{display:inline-block;padding:1px 8px;border-radius:6px;background:var(--superficie-2);color:var(--tinta-2);font-size:11.5px;font-weight:600;white-space:nowrap}
+.vg-chip--critico{background:var(--critico-suave);color:var(--critico)}
+.vg-chip--alerta{background:var(--alerta-suave);color:var(--alerta)}
+
+/* a tela que explica a nota do contrato: o número e os quatro itens, separados por fio (sem cartão) */
+.vg-usina{margin:0;font:800 30px/1.15 var(--font-display);letter-spacing:-.01em}
+.vg-lead{margin:0 0 22px;font-size:15px;color:var(--tinta-2)}
+.vg-exp{display:grid;grid-template-columns:minmax(240px,300px) minmax(0,1fr);gap:48px;align-items:start}
+.vg-score{font:800 132px/.9 var(--font-display);letter-spacing:-.04em;font-variant-numeric:lining-nums tabular-nums}
+.vg-score-rot{margin:10px 0 0;font:700 17px/1.3 var(--font-display)}
+.vg-exp p{margin:8px 0 0;color:var(--tinta-2)}
+.vg-fatos{margin:22px 0 0;padding:0;list-style:none}
+.vg-fatos li{display:flex;justify-content:space-between;gap:16px;padding:10px 0;border-bottom:1px solid var(--linha)}
+.vg-fatos li span{color:var(--mudo)}.vg-fatos li b{font-weight:600}
+.vg-item{padding:18px 0 20px;border-top:1px solid var(--linha-forte)}
+.vg-item header{display:flex;align-items:center;gap:18px;margin-bottom:12px}
+.vg-item h3{margin:0;width:170px;flex:none;font:700 17px/1.2 var(--font-display)}
+.vg-item .vg-trilho{flex:1;height:10px;border-radius:5px}
+.vg-item .vg-v{width:64px;flex:none;text-align:right;font:800 26px/1 var(--font-display);font-variant-numeric:lining-nums tabular-nums}
+.vg-item dl{display:grid;grid-template-columns:140px minmax(0,1fr);gap:5px 18px;margin:0;font-size:13.5px}
+.vg-item dt{color:var(--mudo)}.vg-item dd{margin:0;color:var(--tinta-2)}
+
+@media (max-width:900px){
+  .vg-pot{height:auto}.vg-pot canvas{position:relative;height:440px}
+  .vg-txt{position:static;transform:none;width:auto;margin-top:6px}
+  .vg-num{font-size:84px}.vg-num--cli{font-size:64px}.vg-nome{font-size:38px}
+  .vg-exp{grid-template-columns:minmax(0,1fr);gap:24px}.vg-score{font-size:96px}
+  .vg-item h3{width:120px}.vg-item dl{grid-template-columns:minmax(0,1fr)}
+}
