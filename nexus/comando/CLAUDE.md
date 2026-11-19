@@ -1188,6 +1188,28 @@ Prova:
 - `tests/test_comando_diagnostico.py`: as regras e o pedido pronto;
 - `tests/test_comando_ia.py`: a área Chamados no chat.
 
+### Cada dado declara a sua janela de tempo (19/11/2026)
+
+O achado do Levi no Insights: "o resumo do mês diz '0 desligamentos com a geração parada' enquanto o título fala do SKID 2
+parado hoje. Cada dado precisa declarar a sua janela de tempo (hoje, até ontem, mês parcial) para que o texto não se
+contradiga". As duas frases estavam certas, cada uma na janela dela: a tabela por mês do COS só conta a parada JÁ
+NORMALIZADA (a usina voltou), e a parada de hoje ainda está aberta, fora dela. O dossiê não dizia isso.
+
+- **As três janelas** (`dossie.COMO_LER`): AGORA/HOJE (o COS agora, as OS, as pendências, a última ronda); ATÉ ONTEM (a
+  meta, a geração, o PR e a disponibilidade do mês corrente, que é parcial); NO MÊS, SÓ AS JÁ NORMALIZADAS (os
+  desligamentos da tabela por mês).
+- **No dossiê** (`VERSAO = 7`): o COS agora vem como "Agora (hoje, a fotografia do COS neste momento)"; a tabela por mês
+  diz "só as paradas JÁ NORMALIZADAS"; com equipamento parado agora, uma linha avisa que essa ocorrência NÃO ENTRA na
+  tabela (a falha de comunicação não é parada e não gera o aviso: `grupo != "sem_com"`); a performance diz "até ontem
+  (hoje não entra)". A linha "Agora: sem leitura do COS" ficou como era (a conferência reconhece o "sem leitura" por ela).
+- **No pedido** (`diagnostico.PEDIDO`, `VERSAO = 6`: os guardados com o pedido antigo são refeitos na próxima abertura): a
+  regra "Janela de tempo" manda cada número levar a janela, e proíbe "zero/nenhum desligamento" com parada aberta hoje
+  sem dizer "já normalizados" e sem citar a parada na mesma frase.
+- **Na conferência** (`diagnostico.conferir` + `paradas_abertas`): o "zero desligamentos" (0, zero, nenhum, sem) dito com
+  parada aberta agora, sem "normalizad" na mesma frase, é falha: refaz uma vez pensando e, se insistir, a tela escreve
+  "A conferir".
+- Seção nova no dossiê entra com a janela dela escrita. Prova: `tests/test_comando_diagnostico_janelas_19_11.py`.
+
 ## A Visão gerencial (teste) (19/11/2026; `nexus/comando/gerencial.py`, `torres/comando/gerencial_tela.py`, `static/gerencial.js`)
 
 **Para que serve.** Levi, 18/11/2026, com o prontuário da usina no ar: "já conseguimos falar muito bem com quem está

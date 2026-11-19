@@ -124,7 +124,7 @@ def test_o_numero_que_nao_bate_e_refeito_pensando_e_se_insistir_a_tela_avisa(tmp
     chamadas = _ia_de_mentira(monkeypatch, [_resp("Com 16 desligamentos em novembro."), _resp("Com 11 desligamentos em novembro.")])
     d = DG.gerar(cfg, 1, DOSSIE, 100, "2026-11-18")
     assert chamadas == [False, True] and d["diag"]["situacao"] == "Com 11 desligamentos em novembro." and not d.get("conferir")
-    assert d["refeito"] is True and d["versao"] == DG.VERSAO == 5
+    assert d["refeito"] is True and d["versao"] == DG.VERSAO
     linhas = next((tmp_path / "ia").glob("perguntas-*.jsonl")).read_text(encoding="utf-8").splitlines()
     assert len(linhas) == 2                                    # as duas chamadas entram no registro (e no teto)
     # as duas erram: fica a última, e a tela recebe o aviso do que não bateu

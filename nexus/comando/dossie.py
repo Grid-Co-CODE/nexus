@@ -34,7 +34,7 @@ from datetime import date, datetime
 
 from . import prontuario as PR
 
-VERSAO = 6
+VERSAO = 7
 # a cor da tela em palavras (a régua é a de cada tela dona; aqui só o nome)
 GRAVIDADE = {"critico": "crítico", "alerta": "atenção", "atencao": "atenção", "semcom": "sem comunicação",
              "info": "informativo", "ok": "em dia", "neutro": ""}
@@ -133,6 +133,7 @@ def _performance(u: dict, cu: dict, p: dict) -> list[str]:
     out = []
     if perf.get("periodo"):
         out.append(f"- O mês corrente é parcial: os números cobrem {perf['periodo']}.")
+        out.append("- Janela da meta, da geração, do PR e da disponibilidade do mês corrente: até ontem (hoje não entra).")
     if not perf.get("medidores"):
         out.append(f"- Meta, PR e disponibilidade do mês: {SEM_DADO}.")
     for m in perf.get("medidores") or []:
@@ -165,12 +166,20 @@ def _cos(x: dict, p: dict) -> list[str]:
     if x.get("estado") == "sem_leitura":
         out = ["- Agora: sem leitura do COS (a fonte não respondeu ou a usina não está na fotografia). Não quer dizer normal."]
     elif ocs:
-        out = [f"- Agora: {len(ocs)} {'ocorrência aberta' if len(ocs) == 1 else 'ocorrências abertas'}"]
+        out = [f"- {AGORA_COS}: {len(ocs)} {'ocorrência aberta' if len(ocs) == 1 else 'ocorrências abertas'}"]
         for o in ocs:
             out.append("  - " + _junta(_com_g(o.get("motivo") or o.get("rotulo") or "ocorrência", o.get("tom")), o.get("os_rotulo"),
                                        f"aberta {o['ha']}" if o.get("ha") else "", o.get("etapa")))
+        # a parada aberta agora ainda não foi normalizada: está FORA da tabela por mês (19/11/2026, Levi: o Insights dizia
+        # "0 desligamentos com a geração parada" e, no título, "SKID 2 parado hoje"; as duas frases estavam certas, cada
+        # uma na janela dela, e o dossiê não dizia a janela). A falha de comunicação não é parada: não entra neste aviso
+        paradas = sum(1 for o in ocs if o.get("grupo") != "sem_com")
+        if paradas:
+            out.append(f"- {paradas} {'ocorrência aberta' if paradas == 1 else 'ocorrências abertas'} agora com equipamento "
+                       "parado ou em falha NÃO ENTRA na tabela por mês abaixo (ela só conta as paradas já normalizadas): ao "
+                       "falar do mês, diga \"desligamentos já normalizados\" e cite à parte o que está parado hoje.")
     else:
-        out = ["- Agora: nenhuma ocorrência aberta."]
+        out = [f"- {AGORA_COS}: nenhuma ocorrência aberta."]
     cos = p.get("cos") or {}
     if not cos.get("total"):
         return out + ["- Histórico de normalizações: nenhuma registrada no banco para esta usina."]
@@ -180,7 +189,8 @@ def _cos(x: dict, p: dict) -> list[str]:
     out.append(f"- Normalizações registradas: {cos['total']}. Desligamento é só a normalização em que a geração parou "
                "(\"A geração parou: sim\"); a perda de comunicação sem a geração parar não é desligamento.")
     if cos.get("por_mes"):
-        out += ["", "Por mês:"] + _tabela(["Mês", "Desligamentos (a geração parou)", "Sem a geração parar (não é desligamento)",
+        out += ["", "Por mês (janela: só as paradas JÁ NORMALIZADAS, em que a usina já voltou; o mês corrente é parcial, até "
+                    "agora):"] + _tabela(["Mês", "Desligamentos (a geração parou)", "Sem a geração parar (não é desligamento)",
                                           "Normalizações no total"],
                                          [[m.get("rot"), m.get("parou"), (m.get("n") or 0) - (m.get("parou") or 0), m.get("n")]
                                           for m in cos["por_mes"]])
@@ -628,6 +638,10 @@ NAO_INICIADAS_LER = ("Como ler as não iniciadas: urgente (religamento, religame
                      "(programada há mais de 10 dias, a régua do PCM) pesam; \"no prazo\" não é atraso nem pendência do "
                      "supervisor e não se cobra")
 
+# o rótulo do COS agora, com a janela escrita (a linha "Agora: sem leitura do COS" fica como era: a conferência do
+# diagnóstico reconhece o "sem leitura" por ela)
+AGORA_COS = "Agora (hoje, a fotografia do COS neste momento)"
+
 COMO_LER = (
     "- Este documento é tudo o que o Nexus sabe da usina neste instante. O que não está escrito aqui, o Nexus não sabe.",
     "- \"sem dado\" quer dizer que a fonte não tem o valor: não é zero nem \"está normal\". \"sem leitura\" quer dizer que "
@@ -636,6 +650,12 @@ COMO_LER = (
     "é a da tela do Nexus que é dona do número, não uma opinião.",
     "- Cada seção diz a `Fonte`: a tela do Nexus de onde o dado veio. Ao responder, cite a seção ou a fonte.",
     "- O mês corrente é parcial; compare com a cobertura em dias antes de concluir sobre meta e geração.",
+    # 19/11/2026, Levi: "Cada dado precisa declarar a sua janela de tempo (hoje, até ontem, mês parcial) para que o texto
+    # não se contradiga"
+    "- Cada número tem a sua JANELA de tempo, e ela vem escrita junto dele: AGORA ou HOJE (o COS agora, as OS, as "
+    "pendências, a última ronda); ATÉ ONTEM (a meta, a geração, o PR e a disponibilidade do mês corrente, que é parcial); "
+    "e NO MÊS, SÓ AS JÁ NORMALIZADAS (os desligamentos da tabela por mês: a parada aberta agora não está nela). Não junte "
+    "números de janelas diferentes sem dizer a janela de cada um.",
     "- Numa tabela, \"—\" quer dizer que não há o que dizer naquela célula (nenhuma OS, nenhuma pendência) ou que a fonte "
     "não tem o valor.",
     "- Siglas: OS = ordem de serviço do Fracttal; PT = permissão de trabalho; COS = centro de operações, que acompanha a "
