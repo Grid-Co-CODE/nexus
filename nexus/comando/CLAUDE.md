@@ -1266,11 +1266,12 @@ usina [...] É funil". Por isso a ordem da tela `/t/comando/insights`, de cima p
    (`carteira_ia`) mais duas seções (`secoes_dossie`, numeradas a partir de 6): o cumprimento do contrato e a saúde por
    cliente e por usina, com o item que puxa a nota; e os insights abertos do motor (até 60, os críticos primeiro). As
    instruções (`INSTRUCOES`) mandam não recalcular a nota e citar o mês e o item. O modelo é o de sempre (`IA.padrao`).
-   As perguntas sugeridas (`SUGESTOES`) são na voz de quem cobra, uma por cadeira (Levi: "perguntas que um CEO, que um
-   gerente de contratos, que um head faria, que um supervisor faria [...] Tocando na ferida"): o cliente com mais motivo
-   para reclamar, onde o contrato está sendo descumprido e com que número, as 5 usinas que mais sobem a nota, o que
-   piorou e qual setor responde (por isso a tabela dos insights leva o "Setor dono", a torre da regra), e as usinas sem
-   ronda e as OS urgentes paradas. Pergunta nova só entra se o dossiê de agora a responde.
+   As perguntas sugeridas (`SUGESTOES`) são uma por cadeira (Levi: "perguntas que um CEO, que um gerente de contratos,
+   que um head faria, que um supervisor faria"), no TOM DE QUEM ACOMPANHA, não de quem acusa: a 1ª leva ("reclamar de
+   nós", "usar contra nós") ele mandou suavizar no mesmo dia, porque "outras pessoas também terão acesso". Hoje: os
+   clientes que pedem mais atenção, os itens do contrato abaixo do esperado e onde, as 5 usinas que mais ajudam a nota,
+   o que mudou e qual setor acompanha (por isso a tabela dos insights leva o "Setor dono", a torre da regra), e as usinas
+   há mais tempo sem ronda e as OS urgentes aguardando. Pergunta nova só entra se o dossiê de agora a responde.
 2. **O portfólio** (`/t/comando/insights/portfolio`, o pedaço `_insights_portfolio.html`): uma linha de parecer
    (`_parecer`: a nota do portfólio, os clientes abaixo de 55, os que caíram 5 pontos ou mais), a faixa baixa dos
    números (cumprimento, abaixo de 55, saúde, insights abertos, tamanho do portfólio) e o funil: à esquerda os clientes

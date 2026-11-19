@@ -60,7 +60,7 @@ def insights_ia():
                            gasto=IA.gasto_do_mes(cfg), teto=IA.teto(cfg), max_pergunta=IA.MAX_PERGUNTA,
                            setores=_ia_setores(), criar_os=_ia_criar_os(), ia_base="/t/comando/insights/ia",
                            ia_sobre=f"sobre o portfólio: {n} usinas, o cumprimento do contrato, a saúde e os insights abertos",
-                           ia_exemplo="Ex.: o que eu respondo ao cliente que está abaixo de 55 no contrato?")
+                           ia_exemplo="Ex.: o que explica a nota do contrato de um cliente abaixo de 55?")
 
 
 @bp.route("/insights/ia/perguntar", methods=["POST"])

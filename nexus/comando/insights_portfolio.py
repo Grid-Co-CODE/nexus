@@ -276,11 +276,12 @@ Neste Nexus Insights o dossiê traz também o cumprimento do contrato e a saúde
 - Quando falar de uma nota, diga o mês (o atual é parcial) e o item que a puxa para baixo.
 - Os insights abertos são o que o Nexus já apontou: cite a severidade e a ação proposta."""
 
-# As perguntas sugeridas na voz de quem cobra (Levi, 19/11/2026: "perguntas que um CEO, que um gerente de contratos,
-# que um head faria, que um supervisor faria [...] Tocando na ferida"). Todas se respondem com o dossiê de agora (o
-# cumprimento por item, a variação do mês, os insights com o setor dono, a ronda e as OS de cada usina).
-SUGESTOES = ("Qual cliente tem mais motivo para reclamar de nós hoje, e com que argumento?",                 # CEO
-             "Onde estamos descumprindo o contrato neste mês, com o número que o cliente pode usar contra nós?",  # contratos
-             "Quais 5 usinas, resolvidas esta semana, mais sobem a nota do portfólio?",                      # head
-             "O que piorou do mês passado para este, e qual setor responde por cada piora?",                 # head
-             "Quais usinas estão sem ronda há mais tempo e quais OS urgentes estão paradas?")                # supervisor
+# As perguntas sugeridas, uma por cadeira (Levi, 19/11/2026: "perguntas que um CEO, que um gerente de contratos, que um
+# head faria, que um supervisor faria"), no tom de quem acompanha, não de quem acusa: a tela é aberta por várias pessoas
+# (Levi, no mesmo dia: "suavize essas perguntas, outras pessoas também terão acesso"). Todas se respondem com o dossiê de
+# agora (o cumprimento por item, a variação do mês, os insights com o setor dono, a ronda e as OS de cada usina).
+SUGESTOES = ("Quais clientes pedem mais atenção neste mês, e por quê?",                                  # diretoria
+             "Em quais itens do contrato estamos abaixo do esperado neste mês, e em quais usinas?",       # contratos
+             "Quais 5 usinas, tratadas esta semana, mais ajudam a nota do portfólio?",                    # head
+             "O que mudou do mês passado para este, e qual setor acompanha cada ponto?",                  # head
+             "Quais usinas estão há mais tempo sem ronda e quais OS urgentes aguardam início?")           # supervisor
