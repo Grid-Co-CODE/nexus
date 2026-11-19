@@ -31,6 +31,15 @@
 
 /* o tamanho do furo por cliente: uma barra por cliente, o maior em cima; vermelho = a usina toda sem dado */
 .fr-kicker-nota{text-transform:none;letter-spacing:0;font-weight:400;margin-left:8px}
+/* o tamanho do furo por cliente recolhe (Levi: "a parte desse dashboard pode ser recolhível também, para ocupar menos espaço") */
+.fr-dobra-cli>summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:8px;width:max-content;max-width:100%}
+.fr-dobra-cli>summary::-webkit-details-marker{display:none}
+.fr-dobra-cli>summary .ui-kicker{margin:0}
+.fr-dobra-cli>summary .ph{color:var(--mudo);transition:none}
+.fr-dobra-cli[open]>summary .ph{transform:rotate(90deg)}
+.fr-dobra-cli>summary:hover .ui-kicker{color:var(--tinta)}
+.fr-dobra-cli>summary:focus-visible{outline:2px solid var(--foco);outline-offset:2px}
+.fr-dobra-cli[open]>summary{margin-bottom:10px}
 .fr-clientes{display:flex;flex-direction:column;gap:2px;max-width:980px}
 .fr-cli{all:unset;box-sizing:border-box;display:grid;grid-template-columns:minmax(110px,190px) minmax(0,1fr) minmax(170px,auto);align-items:center;gap:14px;
   padding:6px 10px;border-radius:var(--raio-tag);cursor:pointer;font-size:13px;line-height:18px;color:var(--tinta)}
@@ -71,9 +80,13 @@
 .fr-leg-grupo+.fr-leg-grupo{margin-left:auto}
 .fr-legenda .fr-q{display:inline-block}
 
-.fr-caixa{overflow-x:auto;background:var(--superficie);border:1px solid var(--linha);border-radius:var(--raio-md)}
+/* sem rolagem própria na tela larga: com ela, o cabeçalho da tabela não consegue ficar preso ao rolar a página (Levi,
+   19/11/2026: "quando [...] estiver rolando, não deve sumir o cabeçalho [...] nem da tabela, nem do Kanban"); na tela
+   estreita a caixa volta a rolar de lado (abaixo, no @media) */
+.fr-caixa{background:var(--superficie);border:1px solid var(--linha);border-radius:var(--raio-md)}
 .fr-tabela{width:100%;border-collapse:collapse;font-size:13px;line-height:20px}
-.fr-tabela>thead th{background:var(--superficie-2);text-align:left;padding:0;white-space:nowrap}
+.fr-tabela>thead th{background:var(--superficie-2);text-align:left;padding:0;white-space:nowrap;position:sticky;
+  top:calc(var(--topo) + var(--fr-cab-h, 0px));z-index:4;box-shadow:0 1px 0 var(--linha)}
 .fr-tabela>thead th button,.fr-tabela>thead th.fr-th-tira>span{all:unset;box-sizing:border-box;display:flex;align-items:center;gap:6px;width:100%;padding:11px 16px;
   font:700 11px/14px var(--font-sans);letter-spacing:.05em;text-transform:uppercase;color:var(--mudo)}
 .fr-tabela>thead th button{cursor:pointer}
@@ -194,7 +207,9 @@
 
 .fr-kanban{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;align-items:start}
 .fr-kan-col{display:flex;flex-direction:column;gap:8px;padding:10px;background:var(--superficie);border:1px solid var(--linha);border-radius:var(--raio-md);min-width:0}
-.fr-kan-col>header{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:2px 8px;padding:2px 4px 6px;border-bottom:1px solid var(--linha)}
+.fr-kan-col>header{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:2px 8px;padding:10px 14px 8px;margin:-10px -10px 0;
+  border-bottom:1px solid var(--linha);position:sticky;top:calc(var(--topo) + var(--fr-cab-h, 0px));z-index:3;background:var(--superficie);
+  border-radius:var(--raio-md) var(--raio-md) 0 0}
 .fr-kan-col>header b{font-size:13px}
 .fr-kan-col>header .gc-num{font-weight:700;color:var(--tinta)}
 .fr-kan-col>header small{grid-column:1 / -1;font-size:11px;line-height:15px}
@@ -214,6 +229,7 @@
 .fr-recado--erro{border-color:var(--critico)}
 
 @media (max-width:899px){
+  .fr-caixa{overflow-x:auto}
   .fr-acoes{margin-left:0}
   .fr-painel{padding:16px 14px 20px}
   .fr-cli{grid-template-columns:minmax(90px,140px) minmax(0,1fr);}

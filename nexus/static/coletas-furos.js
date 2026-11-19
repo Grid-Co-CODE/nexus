@@ -968,6 +968,19 @@
     var tr = [].filter.call(document.querySelectorAll("tr.fr-linha"), function (x) { return x.getAttribute("data-id") === id; })[0];
     if (tr) tr.scrollIntoView({ block: "start" });
   });
+  // a altura do cabeçalho fixo da lista vai para o CSS: o cabeçalho da tabela e o das colunas do Kanban prendem logo abaixo
+  (function () {
+    var cab = document.querySelector(".fr-cab-lista");
+    function medir() { document.documentElement.style.setProperty("--fr-cab-h", (cab ? cab.offsetHeight : 0) + "px"); }
+    if (cab && window.ResizeObserver) new ResizeObserver(medir).observe(cab);
+    medir();
+  })();
+  // o bloco do tamanho por cliente lembra se a pessoa o recolheu
+  (function () {
+    var d = $("fr-dobra-cli"), k = "nexus.furos.clientes.aberto";
+    try { if (localStorage.getItem(k) === "0") d.open = false; } catch (e) {}
+    d.addEventListener("toggle", function () { try { localStorage.setItem(k, d.open ? "1" : "0"); } catch (e) {} });
+  })();
   $("fr-csv").addEventListener("click", csv);
   $("fr-exportar").addEventListener("click", function () {
     $("fr-menu").open = false;

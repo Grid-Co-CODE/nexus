@@ -10,6 +10,7 @@ import datetime as dt
 import io
 import json
 import os
+import re
 
 import pytest
 
@@ -455,7 +456,9 @@ def test_a_tela_3_esconde_o_resumo_e_o_detalhe_e_aponta_para_a_aba(furos):
     peca = open(os.path.join(raiz, "nexus", "static", "coletas", "filtros.js"), encoding="utf-8").read()
     assert '.fz-tab[data-t="res"], .fz-tab[data-t="det"]' in peca and '"/furos-de-coleta"' in peca and 'target="_top"' in peca
     js = open(os.path.join(raiz, "nexus", "static", "coletas-furos.js"), encoding="utf-8").read()
-    assert "nexusPedir(CFG.conf" in js and "localStorage." not in js         # a validação é do servidor, não do navegador
+    # a validação é do servidor, não do navegador: o navegador só lembra se o bloco por cliente está recolhido (19/11/2026)
+    assert "nexusPedir(CFG.conf" in js
+    assert 'k = "nexus.furos.clientes.aberto"' in js and set(re.findall(r"localStorage\.\w+\(([^,)]*)", js)) == {"k"}
     assert "base: (base[k] || {}).t" in js                                    # cada mudança leva o `t` que a tela viu
 
 

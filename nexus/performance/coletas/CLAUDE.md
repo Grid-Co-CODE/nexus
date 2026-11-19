@@ -169,7 +169,11 @@ de 4.989 px com 40 linhas de validação (uma por item, cinco campos cada). Fico
   vermelhos juntos à direita** (usina toda, parcial, com queda curta, só IPOA ou GHI). Conta com os outros filtros e sem
   o de Situação. A completude foi para a linha das fontes. Saíram também a faixa colorida à esquerda de cada linha ("essa
   barra lateral [...] eu não tô entendendo para que serve"), o "Mais números", os selos e a visão "Detalhe por
-  equipamento" (o CSV continua com tudo);
+  equipamento" (o CSV continua com tudo). **Embaixo da legenda prendem também o cabeçalho da tabela e o de cada coluna
+  do Kanban** (4ª rodada: "não deve sumir o cabeçalho [...] nem da tabela, nem do Kanban"): a altura da legenda vai
+  para `--fr-cab-h` (um `ResizeObserver`) e os dois prendem em `--topo + --fr-cab-h`. Para isso a caixa da tabela NÃO
+  rola de lado na tela larga (rolagem própria prende o `sticky` nela); abaixo de 900 px volta a rolar. O "Tamanho do
+  furo por cliente" recolhe ("pode ser recolhível também, para ocupar menos espaço"), e o navegador lembra a escolha;
 - **a lista abre só no "Furo pendente"** (o padrão da Situação; Levi: "tirasse dessa lista [...] o que está
   justificado"); a etiqueta mostra o filtro e o × traz as outras. Opções de Situação para cada cor da legenda;
 - **Kanban** ("dá para ter em Kanban também?"): uma coluna por causa (falha de comunicação, usina toda, parcial, só IPOA

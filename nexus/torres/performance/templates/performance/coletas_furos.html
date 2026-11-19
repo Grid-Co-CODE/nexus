@@ -70,8 +70,10 @@
     </div>
   </div>
 
-  <h2 class="ui-kicker">Tamanho do furo por cliente <span class="fr-kicker-nota">dias com furo pendente, somando as usinas, nas cores da legenda. Clique para filtrar.</span></h2>
-  <div class="fr-clientes" id="fr-clientes" role="group" aria-label="Filtrar por cliente"></div>
+  <details class="fr-dobra-cli" id="fr-dobra-cli" open>
+    <summary><i class="ph ph-caret-right" aria-hidden="true"></i><h2 class="ui-kicker">Tamanho do furo por cliente <span class="fr-kicker-nota">dias com furo pendente, somando as usinas, nas cores da legenda. Clique para filtrar.</span></h2></summary>
+    <div class="fr-clientes" id="fr-clientes" role="group" aria-label="Filtrar por cliente"></div>
+  </details>
 
   {# fixo no alto ao rolar: quantas usinas, a visão e o que cada cor quer dizer, com a contagem de dias que filtra
      (Levi, 19/11/2026: "quando eu estiver scrollando, a parte que mostra a quantidade de usinas e o que cada cor
