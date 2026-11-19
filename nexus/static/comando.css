@@ -980,13 +980,15 @@ a.ins-titulo:hover{color:var(--verde-texto)}
 .ins-lendo{margin:18px 0 0;font-size:12.5px}
 
 /* a caixa da IA presa no alto ao rolar (Levi, 19/11/2026: "ele tem que ficar fixo lá em cima. Então, se eu der um
-   scroll, ele continua"): o fundo da página em volta dela cobre o que passa por baixo; presa, as sugestões e o "sobre"
-   se recolhem e a conversa rola dentro dela, para a caixa não tomar a tela */
+   scroll, ele continua"): o fundo da página em volta dela cobre o que passa por baixo; presa, só o "sobre" se recolhe
+   (as perguntas sugeridas ficam: "cadê as perguntas?") e a conversa rola dentro dela, para a caixa não tomar a tela.
+   A caixa de texto com o dobro da altura, para ter cara de chat ("aumente o tamanho dessa caixa de texto em 2") */
 .inf-ia-marco{height:1px;margin-top:8px}
 .inf-ia{position:sticky;top:var(--topo, 60px);z-index:6;margin:0;padding:10px 0;background:var(--fundo)}
 .inf-ia--presa{border-bottom:1px solid var(--linha)}
-.inf-ia--presa .ia-sugestoes,.inf-ia--presa .ia-sobre{display:none}
-.inf-ia--presa .ia-conversa{max-height:min(40vh, 380px);overflow-y:auto;scrollbar-width:thin;
+.inf-ia--presa .ia-sobre{display:none}
+.inf-ia .ia-form textarea{min-height:88px}
+.inf-ia--presa .ia-conversa{max-height:min(30vh, 300px);overflow-y:auto;scrollbar-width:thin;
   scrollbar-color:var(--rolagem) transparent;overscroll-behavior:contain}
 .inf-lista-link{margin:22px 0 0;font-size:13px}
 .inf{margin:22px 0 6px}

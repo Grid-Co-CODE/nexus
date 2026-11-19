@@ -1273,7 +1273,9 @@ usina [...] É funil". Por isso a ordem da tela `/t/comando/insights`, de cima p
    (Levi, 19/11/2026: "ele tem que ficar fixo lá em cima. Então, se eu der um scroll, ele continua"): `.inf-ia` é
    sticky logo abaixo do topo do Nexus; quando o marco logo acima dela passa do topo (conferido a cada rolagem no
    `comando-insights.js`; com o IntersectionObserver a volta ao alto às vezes não soltava), ela ganha `inf-ia--presa`:
-   as sugestões e o "sobre" se recolhem (235 → 133 px) e a conversa rola dentro dela (até 40% da tela). O dossiê da carteira
+   só o "sobre" se recolhe e a conversa rola dentro dela (até 30% da tela). As perguntas sugeridas FICAM à vista
+   (a 1ª versão as recolhia; Levi: "cadê as perguntas?"), e a caixa de texto tem o dobro da altura, 88 px ("aumente
+   o tamanho dessa caixa de texto em 2 para passar a sensação de chat"). O dossiê da carteira
    (`carteira_ia`) mais duas seções (`secoes_dossie`, numeradas a partir de 6): o cumprimento do contrato e a saúde por
    cliente e por usina, com o item que puxa a nota; e os insights abertos do motor (até 60, os críticos primeiro). As
    instruções (`INSTRUCOES`) mandam não recalcular a nota e citar o mês e o item. O modelo é o de sempre (`IA.padrao`).
