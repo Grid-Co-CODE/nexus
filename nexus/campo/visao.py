@@ -1637,6 +1637,10 @@ def zeladoria() -> leitura.Leitura:
 # e o código sem dono fica sem nome (nunca o código na tela). Não é o Ranking que saiu em 08/10 (comparação por região).
 LIVRO_RANKING = "ranking_app_campo"
 _MES_RANKING = re.compile(r"^\d{4}-\d{2}$")
+# o ciclo do dia 20 ao 19 (App v362, Levi 19/11/2026): o "Mês" segue AAAA-MM e é o NOME do ciclo (o mês em que ele
+# termina: 2026-11 = 20/10 a 19/11); as datas vêm no fim do livro, em "Início do ciclo" e "Fim do ciclo". Até 2026-10 o
+# ciclo era o mês do calendário. O livro de antes da v362 não tem as colunas: a tela segue pelo mês
+_DIA_RANKING = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 # a régua de cada mês vem nas colunas do próprio livro (o App a lê dos App Settings PLACAR_*): a tela explica com os números
 # que valem, e não com os de quando ela foi escrita
 _REGUA_RANKING = (("piso", "Piso da nota"), ("teto", "Teto de tarefas"), ("anula_max", "Anulação máxima"),
@@ -1664,8 +1668,9 @@ def _pessoa_do_ranking(r: dict, nome: str, email: str = "") -> dict:
 
 
 def ranking_pontos() -> leitura.Leitura:
-    """{"meses": [{"mes", "classificacao", "fora", "calculado_em", "regua", "vale"}], "sem_nome"}, o mês mais novo
-    primeiro. `classificacao` na ordem do App (a posição dele); `fora` = fora do ciclo, pelos pontos."""
+    """{"meses": [{"mes", "inicio", "fim", "classificacao", "fora", "calculado_em", "regua", "vale"}], "sem_nome"}, o
+    ciclo mais novo primeiro. `inicio`/`fim` = as datas do ciclo que o App publica (AAAA-MM-DD; "" no livro de antes da
+    v362). `classificacao` na ordem do App (a posição dele); `fora` = fora do ciclo, pelos pontos."""
     def calcular():
         quem = _quem()
         meses, sem_nome = {}, 0
@@ -1673,8 +1678,12 @@ def ranking_pontos() -> leitura.Leitura:
             mes = str(r.get("Mês") or "").strip()[:7]
             if not _MES_RANKING.match(mes):
                 continue
-            m = meses.setdefault(mes, {"mes": mes, "classificacao": [], "fora": [], "calculado_em": "", "vale": "",
-                                       "regua": {}})
+            m = meses.setdefault(mes, {"mes": mes, "inicio": "", "fim": "", "classificacao": [], "fora": [],
+                                       "calculado_em": "", "vale": "", "regua": {}})
+            for k, col in (("inicio", "Início do ciclo"), ("fim", "Fim do ciclo")):
+                dia = str(r.get(col) or "").strip()[:10]
+                if not m[k] and _DIA_RANKING.match(dia):
+                    m[k] = dia
             nome = _nome(quem, r.get("Técnico (HMAC)"))
             sem_nome += 0 if nome else 1
             (m["classificacao"] if _sim(r.get("No ciclo")) else m["fora"]).append(

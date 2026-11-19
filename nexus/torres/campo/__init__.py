@@ -1557,6 +1557,48 @@ def _nome_do_mes(mes: str) -> str:
         return mes
 
 
+def _hoje_brt() -> date:
+    return datetime.now(_BRT).date()
+
+
+def _dm(dia: str) -> str:
+    return f"{dia[8:10]}/{dia[5:7]}"
+
+
+def _rotulo_do_ciclo(m: dict) -> dict:
+    """Como a tela diz o ciclo: {"nome" (a opção da lista), "de" e "em" (dentro da frase)}. Com as datas que o App publica
+    desde a v362 (Levi, 19/11/2026: o ciclo do dia 20 ao 19, com o nome do mês em que termina): "Ciclo de novembro
+    (20/10 a 19/11)". O livro de antes, sem as datas, segue pelo mês ("outubro de 2026")."""
+    if m.get("inicio") and m.get("fim"):
+        try:
+            nome = f"ciclo de {MESES_PT[int(m['mes'][5:7]) - 1]} ({_dm(m['inicio'])} a {_dm(m['fim'])})"
+        except (ValueError, IndexError):
+            nome = ""
+        if nome:
+            return {"nome": nome[:1].upper() + nome[1:], "de": f"do {nome}", "em": f"no {nome}"}
+    nome = _nome_do_mes(m["mes"])
+    return {"nome": nome, "de": f"de {nome}", "em": f"em {nome}"}
+
+
+def _ciclo_corrente(meses: list[dict], hoje: date) -> dict | None:
+    """O ciclo que vale hoje: o que tem o dia de hoje entre as datas do App (vira no dia 20, não no dia 1); sem as datas,
+    ou antes de o App publicar o ciclo novo (o dia 20 até os :25), o mais novo do livro."""
+    h = hoje.isoformat()
+    return next((m for m in meses if m.get("inicio") and m.get("fim") and m["inicio"] <= h <= m["fim"]),
+                meses[0] if meses else None)
+
+
+def _dias_nos_dois_ciclos(meses: list[dict], atual: dict) -> str:
+    """Os dias que contam no ciclo anterior e também neste (Levi, 19/11/2026: na virada para o dia 20, os dias 20 a 31/10
+    contam em outubro e em novembro, só nesta virada), pelas datas que o App publica; "" quando não há sobreposição."""
+    antes = next((m for m in meses if m["mes"] < atual["mes"]), None)
+    if not (antes and atual.get("inicio") and antes.get("fim") and antes.get("inicio") and atual["inicio"] <= antes["fim"]):
+        return ""
+    return (f"Os dias {_dm(atual['inicio'])} a {_dm(antes['fim'])} contam no ciclo de "
+            f"{MESES_PT[int(antes['mes'][5:7]) - 1]} e também no de {MESES_PT[int(atual['mes'][5:7]) - 1]}, por decisão "
+            "da virada para o ciclo do dia 20 ao 19.")
+
+
 def _hora_do_app(iso: str) -> str:
     """A hora de uma tarefa no extrato do App ("2026-10-10T17:00", sem fuso) em Brasília, "10/10 14:00": o App grava em
     UTC, como o "Registrado em" dos fechamentos (`fatos.data_do_registro`)."""
@@ -1580,7 +1622,8 @@ def _hora_brt(iso: str) -> str:
 def ranking():
     leitura = visao.ranking_pontos()
     meses = leitura.dados.get("meses") or []
-    atual = next((m for m in meses if m["mes"] == request.args.get("mes")), meses[0] if meses else None)
+    # o ciclo corrente vira no dia 20 (App v362): o escolhido na lista, ou o que tem o dia de hoje
+    atual = next((m for m in meses if m["mes"] == request.args.get("mes")), None) or _ciclo_corrente(meses, _hoje_brt())
     todos = (atual["classificacao"] + atual["fora"]) if atual else []
     regioes = sorted({p["regiao"] for p in todos if p["regiao"]}, key=str.lower)
     regiao = request.args.get("regiao") or ""
@@ -1597,6 +1640,8 @@ def ranking():
     return render_template("campo/ranking.html", **_comum(
         "ranking", leitura, meses=meses, atual=atual, regioes=regioes, regiao=regiao, classificacao=classificacao,
         fora=fora, nome_do_mes=_nome_do_mes, calculado=_hora_brt(atual["calculado_em"]) if atual else "",
+        rotulo=_rotulo_do_ciclo, por_ciclo=any(m.get("inicio") for m in meses),
+        dias_nos_dois=_dias_nos_dois_ciclos(meses, atual) if atual else "",
         tarefas_de=lambda p: por.get((atual["mes"], p.get("hmac")), []) if atual else [],
         tarefas_publicado=bool((tarefas.dados or {}).get("publicado")), hora_do_app=_hora_do_app,
         media=round(sum(p["total"] for p in classificacao) / len(classificacao)) if classificacao else None))

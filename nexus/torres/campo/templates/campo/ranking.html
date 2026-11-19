@@ -12,11 +12,13 @@
 {% macro pts(n) %}{{ '{:,}'.format(n or 0).replace(',', '.') }}{% endmacro %}
 {% macro pct(n) %}{{ (n ~ '%') if n is not none else '—' }}{% endmacro %}
 {% if atual %}
-  {% set mes_txt = nome_do_mes(atual.mes) %}
+  {# o ciclo do dia 20 ao 19 (App v362, 19/11/2026): "Ciclo de novembro (20/10 a 19/11)" com as datas que o App
+     publica; o livro de antes, sem elas, segue pelo mês ("outubro de 2026") #}
+  {% set c = rotulo(atual) %}
   {% set g = atual.regua %}
   {# o "fora do ciclo" do App, explicado pela régua que ele publicou no mês #}
   {# a regra é a do App (confirmada pela sessão dele em 18/10/2026): vale a primeira que pegar #}
-  {% set dica_fora = 'Fora do ciclo: fica sem posição na classificação de ' ~ mes_txt ~ ' quem tem menos de '
+  {% set dica_fora = 'Fora do ciclo: fica sem posição na classificação ' ~ c.de ~ ' quem tem menos de '
        ~ (g.get('min_tarefas') if g.get('min_tarefas') is not none else 'o mínimo de')
        ~ ' tarefas registradas no mês (contam todas, inclusive as devolvidas e as de 0 ponto; ronda não conta) ou, tendo o mínimo, menos de '
        ~ ((g.get('min_cumprimento') ~ '%') if g.get('min_cumprimento') is not none else 'o mínimo')
@@ -34,8 +36,10 @@
   {% call explica('Como o App calcula cada coluna') %}
     {# a procedência num lugar só (15/11/2026): o "calculado em" fica no canto; a hora em que o Nexus leu o livro vem aqui,
        como nas outras telas revisadas (até ali era a barra "livro do ranking do App · lido às") #}
-    <p><b>Como o App calcula.</b> O placar é de {{ mes_txt }} (o App chama o mês de ciclo): o App calcula e publica aqui de
-    hora em hora, e o Nexus não recalcula{% if lido %} (lido pelo Nexus às {{ lido }}){% endif %}.</p>
+    <p><b>Como o App calcula.</b> O placar é {{ c.de }}{% if atual.inicio %} (desde novembro de 2026 o ciclo vai do dia 20 ao 19 e leva o nome do
+    mês em que termina){% else %} (o App chama o mês de ciclo){% endif %}: o App calcula e publica aqui de
+    hora em hora, e o Nexus não recalcula{% if lido %} (lido pelo Nexus às {{ lido }}){% endif %}.{% if dias_nos_dois %}
+    {{ dias_nos_dois }}{% endif %}</p>
     <dl class="gc-explica-termos">
       {{ termo('Total') }}<dd>A soma que define a posição: pontos de tarefas + pontos de rondas + bônus. No empate, fica na
         frente quem tem mais tarefas contadas.</dd>
@@ -70,7 +74,7 @@
     <div><p class="gc-eyebrow">{{ torre.nome }}</p>
       <div class="gc-titulo-explica"><h1 class="cn-titulo">{{ tela.nome }}</h1>{% if atual %}{{ como_ler() }}{% endif %}</div>
       <p class="cn-pergunta">{{ tela.pergunta }}</p></div>
-    <div class="cn-frescor">placar do mês do App{% if calculado %}<br><b>calculado em {{ calculado }}</b>{% endif %}</div>
+    <div class="cn-frescor">placar do {{ 'ciclo' if por_ciclo else 'mês' }} do App{% if calculado %}<br><b>calculado em {{ calculado }}</b>{% endif %}</div>
   </div>
   {% if leitura.erro %}<div class="cn-erro" role="alert"><b>{{ leitura.erro }}.</b></div>{% endif %}
 
@@ -80,9 +84,9 @@
   </tbody></table></div>
   {% else %}
   <form class="cn-barra-filtros" method="get" data-fs>
-    <span class="gc-rotulo">Mês</span>
-    <select class="gc-campo" name="mes" aria-label="Mês da classificação" onchange="this.form.submit()" data-fs-fora>
-      {% for m in meses %}<option value="{{ m.mes }}"{% if m.mes == atual.mes %} selected{% endif %}>{{ nome_do_mes(m.mes) }}</option>{% endfor %}
+    <span class="gc-rotulo">{{ 'Ciclo' if por_ciclo else 'Mês' }}</span>
+    <select class="gc-campo" name="mes" aria-label="{{ 'Ciclo' if por_ciclo else 'Mês' }} da classificação" onchange="this.form.submit()" data-fs-fora>
+      {% for m in meses %}<option value="{{ m.mes }}"{% if m.mes == atual.mes %} selected{% endif %}>{{ rotulo(m).nome }}</option>{% endfor %}
     </select>
     <select class="gc-campo" name="regiao" aria-label="Região" onchange="this.form.submit()">
       <option value="">todas as regiões</option>{% for r in regioes %}<option value="{{ r }}"{% if r == regiao %} selected{% endif %}>{{ r }}</option>{% endfor %}
@@ -110,7 +114,7 @@
         {% elif not tarefas_publicado %}
         <p class="mudo">A lista das OS ainda não chegou do App: ele vai publicar, de hora em hora, cada tarefa devolvida, abaixo do piso ou anulada, com o motivo.</p>
         {% else %}
-        <p class="mudo">O App não listou tarefas desta pessoa em {{ mes_txt }}.</p>
+        <p class="mudo">O App não listou tarefas desta pessoa {{ c.em }}.</p>
         {% endif %}
       </td></tr>
   {% endmacro %}
@@ -118,7 +122,7 @@
   {% if podio %}
   {# o pódio das olimpíadas: o 1º no meio e no degrau mais alto, o 2º à esquerda, o 3º à direita (a ordem da página
      segue 1º, 2º e 3º: quem lê a tela ouve nessa ordem; quem arruma é o campo.css) #}
-  <div class="rk-podio" aria-label="Pódio de {{ mes_txt }}">
+  <div class="rk-podio" aria-label="Pódio {{ c.de }}">
     {% for p in podio %}
     <div class="rk-lugar rk-{{ loop.index }}">
       <div class="rk-cartao">
@@ -143,7 +147,7 @@
     <span><span class="gc-rotulo">Média do mês</span><span class="v">{{ pts(media) if media is not none else '—' }}</span><span class="d">pontos por técnico classificado</span></span>
   </div>
 
-  <h2 class="ui-kicker">Classificação de {{ mes_txt }}</h2>
+  <h2 class="ui-kicker">Classificação {{ c.de }}</h2>
   <div class="cn-tab"><table>
     {# a região vai embaixo do nome e devolvidas e anuladas numa coluna só: com 13 colunas, a 1.400 px a última saía da
        tela e o nome quebrava em três linhas (visto no navegador em 13/10/2026) #}
@@ -166,7 +170,7 @@
         <td>{{ p.devolvidas }} · {{ p.anuladas }}{% if abre %} <i class="ph ph-caret-down rk-seta" aria-hidden="true"></i>{% endif %}</td></tr>
       {% if abre %}{{ lista_do_app(p, 11) }}{% endif %}
     {% else %}
-      <tr><td colspan="11" class="cn-vazio">Ninguém classificado {{ 'nesta região ' if regiao }}em {{ mes_txt }} ainda.</td></tr>
+      <tr><td colspan="11" class="cn-vazio">Ninguém classificado {{ 'nesta região ' if regiao }}{{ c.em }} ainda.</td></tr>
     {% endfor %}
     </tbody></table></div>
 

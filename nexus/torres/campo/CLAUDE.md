@@ -84,8 +84,16 @@ só**: o "calculado em" no canto; a hora em que o Nexus leu o livro foi para o "
 
 - **Quem calcula é o App, e o Nexus não recalcula** (`visao.ranking_pontos`, `campo/ranking.html`): o App publica o
   placar no livro `ranking_app_campo` (aba `Ranking`), de hora em hora aos :25, junto com os outros livros: 1 linha =
-  1 técnico × 1 mês (o corrente e o anterior), com quem está FORA DO CICLO (o motivo, sem posição). Recalcular já deu
+  1 técnico × 1 ciclo (o corrente e o anterior), com quem está FORA DO CICLO (o motivo, sem posição). Recalcular já deu
   errado aqui: a nota do coletor batia com a do painel do App em 14% das tarefas (05/10).
+- **O ciclo do dia 20 ao 19** (App v362, pedido do Levi de 19/11/2026): o "Mês" segue AAAA-MM e é o NOME do ciclo, o mês
+  em que ele termina (2026-11 = 20/10 a 19/11; 2026-12 = 20/11 a 19/12; até 2026-10, o mês do calendário); as datas vêm
+  nas duas últimas colunas dos dois livros, "Início do ciclo" e "Fim do ciclo" (AAAA-MM-DD, dias de Brasília). A tela
+  rotula "Ciclo de novembro (20/10 a 19/11)" (`_rotulo_do_ciclo`; o filtro vira "Ciclo") e abre no ciclo que tem o dia
+  de hoje (`_ciclo_corrente`: vira no dia 20, não no dia 1; no dia 20, até a publicação dos :25, fica o mais novo do
+  livro). Nada é recalculado. Os dias 20 a 31/10 contam em outubro e em novembro (decisão do Levi, só nesta virada): o
+  "!" diz isso pelas datas que o App publicou (`_dias_nos_dois_ciclos`, sem data no código). O livro de antes da v362,
+  sem as colunas, segue pelo mês, como antes. A corrida do campeão (set, out e nov) fecha em 19/11 e é do App.
 - **Pessoa só pelo HMAC do e-mail** (`Técnico (HMAC)`, a API é de leitura aberta); o nome sai do cadastro do App na hora,
   e código sem dono fica "—" (a tela diz quantas linhas vieram sem nome), nunca o código.
 - **O nome é o "Nome padrão" do cadastro, e o pódio traz o e-mail** (03/11/2026, Fillipe Figueiró: o 3º de outubro saiu
@@ -97,7 +105,7 @@ só**: o "calculado em" no canto; a hora em que o Nexus leu o livro foi para o "
   fechamento: um técnico fez quase tudo na SP Leste 02 e saiu na SP Leste 05, onde fechou 3 tarefas).
 - **As colunas são um contrato**: a tela lê pelo NOME, e `tests/test_campo_ranking_pontos.py` (`COLUNAS_DO_APP`) tem a
   mesma lista do `NEXUS_COLUNAS["ranking"]` do App, na ordem dele. A régua do mês (piso, teto, anulação, teto das
-  rondas, mínimos, bônus) vem nas oito últimas colunas, e o "Como o App calcula" da tela usa esses números. Coluna nova
+  rondas, mínimos, bônus) vem nas oito colunas depois do "Calculado em", e o "Como o App calcula" da tela usa esses números. Coluna nova
   só no FIM, dos dois lados.
 - **Tela:** o mês (o corrente e o anterior) e a região que o App escreve; o pódio (os três primeiros), os números, a
   classificação e o "Fora do ciclo". Com uma região escolhida, a posição continua a do mês inteiro ("3º lugar no

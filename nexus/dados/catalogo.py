@@ -585,16 +585,19 @@ FATOS = (
     # calcula é o App (`_ciclo_v2`, régua PLACAR_V2), que publica o mês corrente e o anterior de hora em hora; a linha do
     # mês corrente muda a cada publicação até o mês fechar (foto acumulada). Tela: Campo · App > Ranking de pontos
     Fato("ranking_pontos", "Ranking de pontos do ciclo", "campo", "ranking_app_campo · Ranking",
-         "1 linha = 1 técnico × 1 mês do ciclo de pontos (o placar como o App o calculou na hora da publicação)",
-         _d(data=("cod", "Mês (AAAA-MM)"), pessoa=("hmac", "Técnico (HMAC)"), equipe=("nome", "Região")),
+         "1 linha = 1 técnico × 1 ciclo de pontos (o placar como o App o calculou na hora da publicação)",
+         _d(data=("cod", "Mês (AAAA-MM, o nome do ciclo); Início e Fim do ciclo (AAAA-MM-DD, desde a v362)"),
+            pessoa=("hmac", "Técnico (HMAC)"), equipe=("nome", "Região")),
          tipo="snapshot_acumulado", chave=("Mês", "Técnico (HMAC)"),
          medidas=_m((("total_pts", "pts", "aditiva"), ("tarefas_pts", "pts", "aditiva"), ("rondas_pts", "pts", "aditiva"),
                      ("bonus_pts", "pts", "aditiva"), ("tarefas_qtd", "qtd", "aditiva"), ("rondas_qtd", "qtd", "aditiva"),
                      ("devolvidas_qtd", "qtd", "aditiva"), ("nota_media_pts", "pts", "nao"),
                      ("cumprimento_pct", "%", "nao"), ("pontualidade_pct", "%", "nao"))),
-         fontes=("ranking_app_campo · Ranking",), janela_origem="o mês corrente e o anterior (App)",
+         fontes=("ranking_app_campo · Ranking",), janela_origem="o ciclo corrente e o anterior (App)",
          observacao="quem calcula é o App; o Nexus mostra, não recalcula (recalcular a nota deu 14% de acerto em 05/10). "
-                    "A régua do mês vem nas colunas do próprio livro. Até o App publicar, o livro não existe"),
+                    "A régua do mês vem nas colunas do próprio livro. Desde a v362 (19/11/2026) o ciclo vai do dia 20 ao "
+                    "19 e o Mês é o nome dele (o mês em que termina: 2026-11 = 20/10 a 19/11); até 2026-10, o mês do "
+                    "calendário. Até o App publicar, o livro não existe"),
     # as tarefas que não pontuaram cheio no placar (18/10/2026, Levi: "Quando tiver OSs devolvidas ou anuladas quero que
     # dê para clicar na linha e mostre qual foi a OS e o motivo!"): quem calcula e publica é o App (o extrato dele não vai
     # ao banco, e a anulação depende da ordem por pontos: a sessão do App, 18/10/2026). Registrado antes da 1ª publicação.
@@ -605,7 +608,7 @@ FATOS = (
          _d(data=("cod", "Mês (AAAA-MM); Registrado em"), pessoa=("hmac", "Técnico (HMAC)"), os=("cod", "OS")),
          tipo="snapshot_acumulado", chave=("Mês", "Técnico (HMAC)", "OS", "Tarefa", "Situação"),
          medidas=_m((("nota_pts", "pts", "nao"), ("pontos_pts", "pts", "aditiva"))),
-         fontes=("ranking_tarefas_app_campo · Tarefas",), janela_origem="o mês corrente e o anterior (App)",
+         fontes=("ranking_tarefas_app_campo · Tarefas",), janela_origem="o ciclo corrente e o anterior (App)",
          observacao="quem lista é o App (_ciclo_v2, a v287), do mesmo cálculo do placar: por pessoa e mês as linhas "
                     "batem com Devolvidas, Anuladas e Abaixo do piso do ranking_app_campo. Situação = devolvida, abaixo "
                     "do piso ou anulada (a anulada é uma tarefa boa que caiu pelas abaixo do piso do mês); Pontos = os "

@@ -4,6 +4,7 @@ livro `ranking_app_campo`; o Nexus mostra o que veio, sem recalcular. Pessoas de
 test_campo_visao; a pessoa chega como o código (HMAC) do e-mail, e o nome sai do cadastro do App."""
 import json
 import re
+from datetime import date
 from pathlib import Path
 
 import pytest
@@ -21,7 +22,7 @@ REGUA = {"Piso da nota": 70, "Teto de tarefas": 70, "Anulação máxima": 35, "T
 SEM_DONO = "f" * 24
 
 
-def _linha(mes, email, total, posicao=None, regiao="SP Norte 01", motivo="", regua="ligado", **extra):
+def _linha(mes, email, total, posicao=None, regiao="SP Norte 01", motivo="", regua="ligado", inicio="", fim="", **extra):
     linha = {"Mês": mes, "Posição": posicao, "No ciclo": "Sim" if posicao else "Não", "Motivo fora do ciclo": motivo,
              "Técnico (HMAC)": codigo_da_pessoa(CHAVE, email) if email else SEM_DONO, "Região": regiao,
              "Total (pts)": total, "Tarefas (pts)": total - 300, "Rondas (pts)": 200, "Bônus (pts)": 100,
@@ -29,7 +30,7 @@ def _linha(mes, email, total, posicao=None, regiao="SP Norte 01", motivo="", reg
              "Tarefas contadas": 38, "Acima do teto": 0, "Abaixo do piso": 2, "Anuladas": 2, "Devolvidas": 1,
              "Nota média": 88, "Rondas": 9, "Rondas no teto": "Não", "Programado": 20, "Concluído": 18,
              "Cumprimento (%)": 90, "Pontualidade (%)": 75, "Sequência (dias)": 4, "Sem GPS": 1, "Régua": regua,
-             "Calculado em": "2026-10-13T21:25:00Z", **REGUA}
+             "Calculado em": "2026-10-13T21:25:00Z", **REGUA, "Início do ciclo": inicio, "Fim do ciclo": fim}
     linha.update(extra)
     return linha
 
@@ -151,7 +152,9 @@ COLUNAS_DO_APP = ["Mês", "Posição", "No ciclo", "Motivo fora do ciclo", "Téc
                   "Anuladas", "Devolvidas", "Nota média", "Rondas", "Rondas no teto", "Programado", "Concluído",
                   "Cumprimento (%)", "Pontualidade (%)", "Sequência (dias)", "Sem GPS", "Régua", "Calculado em",
                   "Piso da nota", "Teto de tarefas", "Anulação máxima", "Teto das rondas (pts)", "Mínimo de tarefas",
-                  "Mínimo de cumprimento (%)", "Bônus programação (%)", "Bônus preventivas (%)"]
+                  "Mínimo de cumprimento (%)", "Bônus programação (%)", "Bônus preventivas (%)",
+                  # a v362 do App (19/11/2026): o ciclo do dia 20 ao 19, com as datas no fim
+                  "Início do ciclo", "Fim do ciclo"]
 
 
 def test_a_tela_so_le_colunas_que_o_app_publica():
@@ -331,3 +334,76 @@ def test_o_nome_e_o_padrao_do_cadastro_e_o_podio_traz_o_email(banco, app, logado
     assert "Fulano Sousa" not in html
     # na tabela, o e-mail fica no título da célula do nome (a linha não cresce)
     assert 'class="rk-tec" title="fulano.mendes@exemplo.test">Fulano Mendes' in html
+
+
+# ── o ciclo do dia 20 ao 19 (App v362; Levi, 19/11/2026) ───────────────────────────────────────────────────────────
+# O "Mês" segue AAAA-MM e é o NOME do ciclo (o mês em que ele termina): 2026-11 = 20/10 a 19/11, 2026-12 = 20/11 a
+# 19/12; até 2026-10, o mês do calendário. As datas vêm em "Início do ciclo" e "Fim do ciclo". O Nexus não recalcula:
+# rotula com as datas do App e vira o ciclo corrente no dia 20.
+NOVEMBRO = [_linha("2026-11", "ana@exemplo.test", 700, 1, inicio="2026-10-20", fim="2026-11-19"),
+            _linha("2026-11", "bruno@exemplo.test", 500, 2, inicio="2026-10-20", fim="2026-11-19")]
+OUTUBRO_CAL = [_linha("2026-10", "ana@exemplo.test", 1480, 1, inicio="2026-10-01", fim="2026-10-31")]
+DEZEMBRO = [_linha("2026-12", "carla@exemplo.test", 90, 1, regiao="SC Oeste 01", inicio="2026-11-20", fim="2026-12-19")]
+
+
+def _hoje(monkeypatch, iso):
+    from nexus.torres import campo as torre
+    monkeypatch.setattr(torre, "_hoje_brt", lambda: date.fromisoformat(iso))
+
+
+def _livro(banco, linhas):
+    _aba(banco, "ranking_app_campo", "Ranking", linhas)
+    visao.limpar()
+
+
+def test_o_ciclo_vem_das_colunas_do_app(ranking):
+    _livro(ranking, NOVEMBRO + OUTUBRO_CAL)
+    m = {x["mes"]: x for x in visao.ranking_pontos().dados["meses"]}
+    assert (m["2026-11"]["inicio"], m["2026-11"]["fim"]) == ("2026-10-20", "2026-11-19")
+    assert (m["2026-10"]["inicio"], m["2026-10"]["fim"]) == ("2026-10-01", "2026-10-31")
+
+
+def test_o_livro_de_antes_da_v362_segue_pelo_mes(ranking):
+    m = visao.ranking_pontos().dados["meses"][0]
+    assert m["mes"] == "2026-10" and m["inicio"] == "" and m["fim"] == ""
+
+
+def test_a_tela_rotula_o_ciclo_com_as_datas_do_app(ranking, logado, monkeypatch):
+    _hoje(monkeypatch, "2026-11-19")
+    _livro(ranking, NOVEMBRO + OUTUBRO_CAL)
+    html = logado.get("/t/campo/ranking").get_data(as_text=True)
+    t = _texto(html)
+    assert "Classificação do ciclo de novembro (20/10 a 19/11)" in t
+    assert 'aria-label="Pódio do ciclo de novembro (20/10 a 19/11)"' in html
+    assert '<span class="gc-rotulo">Ciclo</span>' in html
+    opcoes = re.findall(r'<option value="(2026-\d\d)"[^>]*>([^<]+)</option>', html)
+    assert opcoes == [("2026-11", "Ciclo de novembro (20/10 a 19/11)"), ("2026-10", "Ciclo de outubro (01/10 a 31/10)")]
+
+
+def test_o_ciclo_corrente_vira_no_dia_20_e_nao_no_dia_1(ranking, logado, monkeypatch):
+    """Com o ciclo de dezembro já publicado, o dia 19/11 ainda é novembro e o dia 20/11 já é dezembro."""
+    _livro(ranking, DEZEMBRO + NOVEMBRO)
+    _hoje(monkeypatch, "2026-11-19")
+    assert re.search(r'<option value="2026-11" selected>', logado.get("/t/campo/ranking").get_data(as_text=True))
+    _hoje(monkeypatch, "2026-11-20")
+    assert re.search(r'<option value="2026-12" selected>', logado.get("/t/campo/ranking").get_data(as_text=True))
+    _hoje(monkeypatch, "2026-12-01")
+    assert re.search(r'<option value="2026-12" selected>', logado.get("/t/campo/ranking").get_data(as_text=True))
+
+
+def test_antes_do_app_publicar_o_ciclo_novo_fica_o_mais_novo(ranking, logado, monkeypatch):
+    """No dia 20, até a publicação dos :25, o livro ainda tem novembro e outubro: fica o mais novo, não some."""
+    _livro(ranking, NOVEMBRO + OUTUBRO_CAL)
+    _hoje(monkeypatch, "2026-11-20")
+    assert re.search(r'<option value="2026-11" selected>', logado.get("/t/campo/ranking").get_data(as_text=True))
+
+
+def test_os_dias_que_contam_nos_dois_ciclos_sao_ditos(ranking, logado, monkeypatch):
+    """Só nesta virada (Levi, 19/11/2026): os dias 20 a 31/10 contam em outubro e em novembro. A tela diz pelas datas
+    que o App publicou, sem data escrita no código."""
+    _hoje(monkeypatch, "2026-11-19")
+    _livro(ranking, NOVEMBRO + OUTUBRO_CAL)
+    t = _texto(logado.get("/t/campo/ranking").get_data(as_text=True))
+    assert "Os dias 20/10 a 31/10 contam no ciclo de outubro e também no de novembro" in t
+    t = _texto(logado.get("/t/campo/ranking?mes=2026-10").get_data(as_text=True))
+    assert "contam no ciclo de outubro e também" not in t
