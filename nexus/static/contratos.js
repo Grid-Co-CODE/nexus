@@ -247,7 +247,7 @@
   /* ── o retorno da gestora que pediu a visão do contrato (chamada de 18/11/2026) ─────────────────────────────────────────────────────────────
      - os códigos do contrato (MPLP.3, MPCP.1, P52S) viram etiqueta depois do nome (Levi: "esse MPLP eu colocaria como uma
        tag [...] na frente eu creio que esteja atrapalhando a leitura");
-     - o que se repete numa categoria (expurgos, multas, exclusões, disponibilidade) vira um item com a lista dentro (Ana:
+     - o que se repete numa categoria (expurgos, multas, exclusões, disponibilidade) vira um item com a lista dentro (a área de Contratos:
        "tem vários expurgos [...] a gente pode juntar num só"; Levi: "agrupar expurgos, multas [...] tudo que se repete");
      - a regra prioritária (a estrela do gestor) fica no alto; o comentário fica na regra, com quem e quando (pedido da área de Contratos);
      - a ação leve (estrela, comentário, check de entregue, descartar sugestão) não pede motivo nem prova (Levi: "só quem e

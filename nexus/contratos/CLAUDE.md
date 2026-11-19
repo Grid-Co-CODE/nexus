@@ -203,9 +203,8 @@ pasta do Backoffice: "ATUALIZE AGORA COM DADOS REAIS!".
     bloco `:root[data-tema="claro"]` do `nexus.css`: mudou lá, muda aqui. Cor fixa não entra (nem nos gráficos SVG do
     exemplo: a cor vai no `style`, com `var()`).
 - **Medido em 16/11/2026** com a planilha real: 16 contratos e 60 obrigações com vencimento (75 com as 15 sem data, que
-  entraram em 17/11/2026), e 8 serviços adicionais. Batem com as colunas automáticas da planilha, por exemplo:
-  - Athon: vigência vencida em 25/08/2026 e próximo reajuste em 25/02/2027;
-  - Élis: reajuste em 01/12/2026.
+  entraram em 17/11/2026), e 8 serviços adicionais. Batem com as colunas automáticas da planilha (a vigência vencida e
+  o próximo reajuste, contrato a contrato; as datas de cada cliente ficam na planilha e no banco, não aqui).
 - Prova: `tests/test_contratos_controle.py`, com uma planilha inventada (mesmas abas e colunas, nada real).
 
 ## As fichas dos contratos, lidas dos PDFs (18/11/2026; `fichas.py`)
@@ -227,7 +226,7 @@ analisar e fazer algo melhor?", "completa tudo!" e "faça por subagentes para me
   sem caixa (`fichas.por_cliente`).
 - **Na tela.** Regras: as 11 categorias recolhidas (ou os setores, desde 19/11/2026); a linha abre o trecho e a página;
   um controle só (Por categoria | Por setor | Prioritárias | Mudadas por aditivo). Cliente com vários contratos do mesmo
-  modelo (2C, GreenYellow, Axis): a regra igual em todos aparece uma vez com "todos". Embaixo, "O que o contrato não
+  modelo: a regra igual em todos aparece uma vez com "todos". Embaixo, "O que o contrato não
   diz"; a planilha × o PDF (fim da vigência, aviso prévio, índice) está na aba Pontos desde 19/11/2026. Nas outras abas, o que o contrato pede: SLA no Atendimento, Rotinas no Calendário, Entregáveis,
   Metas (disponibilidade, bônus, penalidades) e Financeiro (valor mensal, medição, adicionais). Todos os contratos ganha
   a coluna "Regras do contrato" (ou "PDF não lido").
@@ -238,7 +237,7 @@ analisar e fazer algo melhor?", "completa tudo!" e "faça por subagentes para me
   e a diferença vai para "A planilha de controle e o contrato não batem". Cada campo completado leva `origem` (contrato e
   página) e a tela marca "do contrato". A renovação e o reajuste são calculados depois, com o dado completado. A página
   da prova mostra o intervalo (`ref.pagina_fim`) quando a tabela continua na página seguinte (achado da revisão).
-- **18/11/2026, os 5 clientes com PDF** (Athon, Axis, 2C, GreenYellow, Thopen): o que cada leitor achou que o Levi ou a
+- **18/11/2026, os 5 clientes com PDF** (quais são, a tela Todos os contratos diz): o que cada leitor achou que o Levi ou a
   área de Contratos precisa decidir está nas `lacunas` e nas `observacoes` de cada ficha. Os outros 11 clientes não
   mandaram PDF.
 
