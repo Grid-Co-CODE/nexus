@@ -62,6 +62,12 @@
       : 'Não achei ' + aspas(faltam) + ' nesta usina no Fracttal: marque à mão.') + '</span>');
     return {html: partes.join(''), alerta: faltam.length > 0};
   }
+  // A USINA DO LINK QUE NÃO SE ACHOU (19/11/2026, conferido em produção: a Sala mandava "PEII" e o Fracttal tem "Axis -
+  // Petrolina 2 - PE"; nada era escolhido e o aviso do topo ficava escondido, sem dizer nada). Agora o aviso diz.
+  function avisoUsinaFalta(usina, origem) {
+    const quem = /^sala-de-controle/.test(String(origem || '')) ? ' (veio da Sala de controle)' : '';
+    return {html: '<span class="os-sug-falta">Não achei a usina <b>' + esc(usina) + '</b> no Fracttal' + quem + ': escolha o cliente e a usina à mão.</span>', alerta: true};
+  }
   // ── fim dos sugeridos no topo
 
   function tituloDe(a) {
@@ -599,5 +605,6 @@
   // arranque: modo do deep link, usina sugerida e responsáveis
   if (TEM_MODOS && (sug.modo === 'etm' || sug.modo === 'usina')) setModo(sug.modo); else setModo('geracao');
   carregarResp();
-  if (sug.usina) { const o = [...cbUsi.options].find(o => norm(o.value) === norm(sug.usina) || norm(o.value).includes(norm(sug.usina))); if (o) { cbUsi.value = o.value; onUsina(); } }
+  if (sug.usina) { const o = [...cbUsi.options].find(o => norm(o.value) === norm(sug.usina) || norm(o.value).includes(norm(sug.usina))); if (o) { cbUsi.value = o.value; onUsina(); }
+    else { const topo = $('sug_topo'); if (topo) { const av = avisoUsinaFalta(sug.usina, root.dataset.sugOrigem); topo.innerHTML = av.html; topo.classList.add('alerta'); topo.hidden = false; } } }
 })();

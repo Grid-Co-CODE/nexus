@@ -210,6 +210,8 @@ r.trk = avisoDoTopo([], ['TRK 41'], true, 'sala-de-controle-ocorrencia');
 r.falta = avisoDoTopo(['Inversor 1.3'], ['Inversor 9.9'], false, 'tempo-real');
 r.nada = avisoDoTopo([], [], false, 'sala-de-controle');
 r.escapa = avisoDoTopo(['<b>x</b>'], [], false, 'sala-de-controle');
+r.usina = avisoUsinaFalta('PEII', 'sala-de-controle');
+r.usina2 = avisoUsinaFalta('<i>X</i>', 'tempo-real');
 console.log(JSON.stringify(r));
 """.replace("CODIGO", js)
     p = subprocess.run([NODE, "-e", prog], capture_output=True, text=True, encoding="utf-8", timeout=60)
@@ -227,6 +229,11 @@ console.log(JSON.stringify(r));
     assert 'Não achei "Inversor 9.9" nesta usina no Fracttal: marque à mão.' in falta["html"]
     assert r["nada"] == {"html": "", "alerta": False}
     assert "<b>x</b>" not in r["escapa"]["html"] and "&lt;b&gt;x&lt;/b&gt;" in r["escapa"]["html"]
+    # a usina do link que não se achou (19/11/2026, a PEII): o aviso diz, em vez de ficar escondido
+    assert r["usina"] == {"html": '<span class="os-sug-falta">Não achei a usina <b>PEII</b> no Fracttal (veio da Sala de controle): escolha o cliente e a usina à mão.</span>', "alerta": True}
+    assert "&lt;i&gt;X&lt;/i&gt;" in r["usina2"]["html"] and "Sala de controle" not in r["usina2"]["html"]
+    perf = (WEB / "static" / "perf.js").read_text(encoding="utf-8")
+    assert "else { const topo = $('sug_topo'); if (topo) { const av = avisoUsinaFalta(sug.usina, root.dataset.sugOrigem);" in perf
 
 
 def test_o_plano_de_tracker_ja_devolve_so_as_estruturas_de_tracker(monkeypatch):
