@@ -1269,7 +1269,11 @@ para o Haiku 5.5". A 1ª versão (um tabelão de clientes com KPI grande) ele re
 KPIs gigantes não serve [...] cliente tal, tá ruim por causa disso. Usina tal. Aí vai ter a opção abrir prontuário da
 usina [...] É funil". Por isso a ordem da tela `/t/comando/insights`, de cima para baixo:
 
-1. **A caixa da Nexus IA** (a mesma `comando/_ia.html`, com `ia_base=/t/comando/insights/ia`): o dossiê da carteira
+1. **A caixa da Nexus IA** (a mesma `comando/_ia.html`, com `ia_base=/t/comando/insights/ia`), PRESA NO ALTO ao rolar
+   (Levi, 19/11/2026: "ele tem que ficar fixo lá em cima. Então, se eu der um scroll, ele continua"): `.inf-ia` é
+   sticky logo abaixo do topo do Nexus; quando o marco logo acima dela passa do topo (conferido a cada rolagem no
+   `comando-insights.js`; com o IntersectionObserver a volta ao alto às vezes não soltava), ela ganha `inf-ia--presa`:
+   as sugestões e o "sobre" se recolhem (235 → 133 px) e a conversa rola dentro dela (até 40% da tela). O dossiê da carteira
    (`carteira_ia`) mais duas seções (`secoes_dossie`, numeradas a partir de 6): o cumprimento do contrato e a saúde por
    cliente e por usina, com o item que puxa a nota; e os insights abertos do motor (até 60, os críticos primeiro). As
    instruções (`INSTRUCOES`) mandam não recalcular a nota e citar o mês e o item. O modelo é o de sempre (`IA.padrao`).
@@ -1285,12 +1289,22 @@ usina [...] É funil". Por isso a ordem da tela `/t/comando/insights`, de cima p
    do pior cumprimento para o melhor, cada um com a faixa de blocos (uma usina por bloco, na cor da nota) e o item que
    puxa; à direita o cliente escolhido (o pior abre sozinho) com o porquê em texto (`_motivo_cliente`), a média de cada
    item da nota nas usinas que o mediram (`_itens_do_cliente`) e as usinas da pior para a melhor, todas numa rolagem fina
-   (a do Nexus) dentro do painel. O painel tem a ALTURA DE 7 CLIENTES da lista (Levi, 19/11/2026: "o mesmo tamanho de 7
-   cards de clientes [...] caso a quantidade de usinas passe, você só bota um scroll"; por isso a linha do cliente tem
-   altura fixa, `--inf-cli`) e fica parado enquanto a lista rola, para o cliente lá de baixo abrir à vista. Cada usina abre com os quatro itens e o que o Nexus mediu, os insights abertos dela (o link leva ao
-   cartão do insight na lista de baixo, `?abrir=`), o **Abrir prontuário** (`/t/campo/usinas/<uid>`) e o **Perguntar à
+   (a do Nexus) dentro do painel. O painel vai ATÉ A ALTURA DE 10 CLIENTES da lista e é menor quando o cliente tem
+   poucas usinas (Levi, 19/11/2026: primeiro "o mesmo tamanho de 7 cards de clientes [...] caso a quantidade de usinas
+   passe, você só bota um scroll", depois "aumenta para 10 [...] se a usina for inferior, ele se ajusta à usina"; a
+   linha do cliente tem altura fixa, `--inf-cli`, e o painel usa `max-height`). A usina aberta faz o painel CRESCER o
+   que ela ocupa ("quando eu expandir a usina, o tamanho expande junto, para caber o texto": o `comando-insights.js`
+   soma a altura das abertas no `max-height`; fechou, volta), e o nome e o porquê dela deixam de ser cortados. O
+   painel não é mais sticky (o chat é): escolhido um cliente lá de baixo, a página sobe até o painel, logo abaixo do
+   chat. Cada usina abre com os quatro itens e o que o Nexus mediu, os insights abertos dela (o link leva ao
+   cartão do insight na lista do motor, `?abrir=`), o **Abrir prontuário** (`/t/campo/usinas/<uid>`) e o **Perguntar à
    Nexus IA** com a pergunta pronta, que o `comando-insights.js` escreve na caixa do alto e manda.
-3. **A lista do motor de regras**, como era (os números dela agora na mesma altura baixa, `.inf-numeros`).
+3. **A lista do motor de regras SAIU DA TELA** (Levi, 19/11/2026: "pode tirar esse insights do motor de baixo"): no
+   pé fica só o link "Ver a lista dos N insights abertos do motor de regras" (`?lista=1`). Ela continua inteira para
+   quem chega por link, porque o sino, a Caixa, a conversa (`_titulo`, agora com `?abrir=`) e a volta das ações levam
+   a ela: aparece com `?lista=1`, `?abrir=`, ou um filtro (`sev`, `regra`, `torre`, `concluidos`; o formulário dos
+   filtros leva `lista=1`). O "Ver as regras" da Caixa vai a `?lista=1#ins-regras`. O aviso do login e o dos retornos
+   só aparecem com a lista.
 
 Regras:
 - A conta é a da Visão gerencial (`gerencial_tela.dados_gerencial`, cópia de 1 minuto): nada se recalcula aqui. O mês é
@@ -1302,6 +1316,12 @@ Regras:
   no total do alto.
 - Os dois pedaços vêm por trás para a lista do motor abrir na hora: a conta fria do portfólio levou 26 a 30 s no PC
   (19/11/2026, 144 usinas); o pedaço tem ~480 KB (23 KB com gzip).
+- **O portfólio não segura o pedido** (`gerencial_tela.dados_gerencial_sem_esperar`, 19/11/2026): logo depois do deploy
+  das 14:29 o Levi abriu a tela e ficou em "Lendo o portfólio…" até a conta fria acabar ("cadê os clientes?"). Como o
+  motor dos insights: com a cópia em dia, ela; vencida (mais de 1 minuto), ela mesma na hora e a nova por trás; sem
+  cópia, a conta começa por trás e o pedaço volta "Montando o portfólio" com `data-ins-repetir`, que o
+  `comando-insights.js` pede de novo a cada 5 s (até 30 vezes; a falha de rede tenta de 10 em 10 s com o aviso no
+  lugar). A Visão gerencial segue com a `dados_gerencial`, que espera.
 
 Desenho: um nível de superfície (a lista de clientes no fundo, o cliente escolhido é o único cartão, as usinas são
 linhas dentro dele); cor só para estado. A faixa de blocos e as barras dos itens são o desenho do Tracker e do BarList do

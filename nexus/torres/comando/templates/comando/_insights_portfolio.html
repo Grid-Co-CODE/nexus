@@ -44,7 +44,10 @@
               </div>
             </details></li>
 {% endmacro %}
-{% if not r.ok %}
+{% if r.montando %}
+{# a conta fria depois de um deploy (19/11/2026): o comando-insights.js pede este pedaço de novo a cada 5 s #}
+<p class="mudo ins-lendo" role="status" data-ins-repetir="5">Montando o portfólio: a primeira conta depois de uma atualização do Nexus leva perto de 1 minuto. Esta parte aparece sozinha.</p>
+{% elif not r.ok %}
 <div class="cn-erro cn-aviso" role="status"><span>Não montei o portfólio agora ({{ r.erro }}). A lista dos insights abaixo vale.</span></div>
 {% else %}{% set t = r.totais %}
 <section class="inf" aria-label="Portfólio">

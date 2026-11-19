@@ -40,10 +40,14 @@ def _pode_gerencial() -> bool:
 @bp.route("/insights/portfolio")
 def insights_portfolio():
     """O pedaço do portfólio: os números do alto e um cliente por linha, do pior cumprimento para o melhor."""
-    from .gerencial_tela import dados_gerencial
+    from .gerencial_tela import dados_gerencial_sem_esperar
     _so_interno()
     try:
-        r = II.resumo(dados_gerencial(), _vivos(), RG.REGRAS)
+        g = dados_gerencial_sem_esperar()
+        if g is None:            # o Nexus acabou de subir: a conta começou por trás e a tela pede de novo sozinha
+            return render_template("comando/_insights_portfolio.html", r={"ok": False, "montando": True},
+                                   pode_gerencial=False, tom=II.tom)
+        r = II.resumo(g, _vivos(), RG.REGRAS)
     except Exception as ex:      # noqa: BLE001 — o portfólio fora não derruba a lista dos insights
         current_app.logger.exception("Nexus Insights: o portfólio não foi montado")
         r = {"ok": False, "erro": type(ex).__name__}

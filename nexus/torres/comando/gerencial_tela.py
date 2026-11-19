@@ -14,6 +14,7 @@ Só para quem é da Grid (o cliente não abre: a tela tem o valor dos contratos)
 resto vale. O nome do gestor do contrato não sai daqui (o dados.json não leva pessoa).
 """
 import logging
+import threading
 import time
 
 from flask import current_app, jsonify, render_template
@@ -23,6 +24,7 @@ from .contratos_tela import _so_interno
 
 _log = logging.getLogger(__name__)
 COPIA_S = 60
+_REFAZENDO: dict = {"thread": None}
 
 
 def _f(v):
@@ -142,3 +144,37 @@ def dados_gerencial() -> dict:
             avisos.append(aviso)
         copia.update(dados=G.montar(usinas, contratos, agora.date(), agora.strftime("%d/%m/%Y às %H:%M"), avisos), ts=time.time())
     return copia["dados"]
+
+
+def dados_gerencial_sem_esperar() -> dict | None:
+    """A cópia do portfólio para o Comando › Nexus Insights, sem segurar o pedido (19/11/2026). Logo depois do deploy das
+    14:29 o Levi abriu a tela e o portfólio ficou em "Lendo o portfólio…" até a conta fria terminar ("a tela mudou do
+    nada, cadê os clientes?"; carregou depois). Agora, como o motor dos insights (`motor.sem_esperar`): com a cópia em
+    dia, ela; vencida, ela mesma na hora e a nova se faz por trás; sem cópia (o Nexus acabou de subir), a conta começa por
+    trás e volta None, e a tela diz que está montando e pede de novo sozinha."""
+    if current_app.config.get("TESTING"):
+        return dados_gerencial()
+    copia = current_app.extensions.setdefault("nexus_gerencial", {})
+    if copia.get("dados") and time.time() - copia.get("ts", 0) <= COPIA_S:
+        return copia["dados"]
+    _refazer_por_tras()
+    return copia.get("dados")
+
+
+def _refazer_por_tras() -> None:
+    t = _REFAZENDO["thread"]
+    if t is not None and t.is_alive():
+        return
+    app = current_app._get_current_object()
+
+    def rodar():
+        with app.app_context():
+            try:
+                copia = app.extensions.setdefault("nexus_gerencial", {})
+                copia["ts"] = 0                      # vencida: a `dados_gerencial` refaz
+                dados_gerencial()
+            except Exception:    # noqa: BLE001 — a tela segue com a cópia velha, ou dizendo que está montando
+                _log.exception("Visão gerencial: a conta por trás falhou")
+    t = threading.Thread(target=rodar, name="nexus-gerencial", daemon=True)
+    _REFAZENDO["thread"] = t
+    t.start()

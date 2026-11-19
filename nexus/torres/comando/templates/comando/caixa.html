@@ -19,7 +19,7 @@
   {% if aviso %}<div class="cn-erro{% if aviso[0] == 'ok' %} ins-ok{% endif %}" role="{{ 'status' if aviso[0] == 'ok' else 'alert' }}"><b>{{ aviso[1] }}</b></div>{% endif %}
   {% if calculando %}<div class="cn-erro cn-aviso" role="status" data-recarregar="10" data-cx-fora-temas{% if so_temas %} hidden{% endif %}><b>A conta dos insights está sendo feita agora</b> (o Nexus acabou de subir; leva perto de meio minuto). A página se atualiza sozinha.</div>{% endif %}
   {% if lei.erro %}<div class="cn-erro" role="alert"><b>{{ lei.erro }}.</b></div>{% endif %}
-  {% if falhas %}<div class="cn-erro cn-aviso" role="status" data-cx-fora-temas{% if so_temas %} hidden{% endif %}>{{ falhas|length }} {{ 'regra não leu' if falhas|length == 1 else 'regras não leram' }} a fonte agora: o que elas apontariam pode faltar. <a href="{{ raiz }}/t/comando/insights">Ver as regras</a></div>{% endif %}
+  {% if falhas %}<div class="cn-erro cn-aviso" role="status" data-cx-fora-temas{% if so_temas %} hidden{% endif %}>{{ falhas|length }} {{ 'regra não leu' if falhas|length == 1 else 'regras não leram' }} a fonte agora: o que elas apontariam pode faltar. <a href="{{ raiz }}/t/comando/insights?lista=1#ins-regras">Ver as regras</a></div>{% endif %}
   {% if not tem_login %}<div class="cn-erro cn-aviso" role="status" data-cx-fora-temas{% if so_temas %} hidden{% endif %}>Entre com o seu login (Microsoft ou Fracttal) para notificar, responder e assumir: a senha de administrador não diz quem é a pessoa.</div>{% endif %}
 
   <div class="cn-numeros cx-numeros" data-cx-fora-temas{% if so_temas %} hidden{% endif %}>

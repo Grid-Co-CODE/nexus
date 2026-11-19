@@ -183,13 +183,16 @@ def _cliente(app, admin=False):
 def _aberta(c, url) -> str:
     """A página com o miolo de cada insight, como o navegador monta ao abrir as linhas (comando/insights.js): a lista
     vem só com as linhas, e o miolo de cada uma pela rota /insight/corpo."""
+    # a lista do motor saiu da tela do Insights (19/11/2026): ela abre com ?lista=1 (ou por link com ?abrir=)
+    if url == "/t/comando/insights":
+        url += "?lista=1"
     html = c.get(url).get_data(as_text=True)
     for u in re.findall(r'data-corpo="([^"]+)"', html):
         html += c.get(u.replace("&amp;", "&")).get_data(as_text=True)
     return html
 
 
-def _codigo(c, url="/t/comando/insights") -> str:
+def _codigo(c, url="/t/comando/insights?lista=1") -> str:
     return _aberta(c, url).split('name="codigo" value="', 1)[1].split('"', 1)[0]
 
 
@@ -266,7 +269,7 @@ def test_a_lista_vem_leve_e_o_miolo_quando_abre(app, banco, limpo, motor_dublado
     """03/11/2026, Levi: "cliquei em nexus insights e travou tudo". Com 327 insights, a página com todos os miolos dava
     2 MB, 1.310 formulários e 12.544 campos. Agora a lista vem só com as linhas; o miolo vem ao abrir (ou com ?abrir=)."""
     c = _cliente(app)
-    html = c.get("/t/comando/insights").get_data(as_text=True)
+    html = c.get("/t/comando/insights?lista=1").get_data(as_text=True)
     lista = html.split('class="ins-lista"', 1)[1].split("</ol>", 1)[0]
     assert "<form" not in lista and "a OS 16702 voltou e segue aberta" in lista
     assert lista.count("data-corpo=") == 2 and "comando/insights.js" in html
@@ -286,7 +289,7 @@ def test_sem_a_copia_a_tela_nao_espera_a_conta(app, banco, limpo, monkeypatch):
     monkeypatch.setattr(MO, "sem_esperar", lambda: None)
     monkeypatch.setattr(MO, "do_cache", lambda: None)
     c = _cliente(app)
-    for url in ("/t/comando/insights", "/t/comando/caixa-de-entrada"):
+    for url in ("/t/comando/insights?lista=1", "/t/comando/caixa-de-entrada"):
         r = c.get(url)
         html = r.get_data(as_text=True)
         assert r.status_code == 200 and "está sendo feita agora" in html and 'data-recarregar="10"' in html

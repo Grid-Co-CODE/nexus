@@ -14,6 +14,7 @@ import hmac
 import re
 import secrets
 import time
+from urllib.parse import quote
 
 from flask import Blueprint, abort, current_app, redirect, render_template, request, session, url_for
 
@@ -193,6 +194,10 @@ def insights():
     regra = a.get("regra", "") if a.get("regra") in RG.REGRAS else ""
     torre = a.get("torre", "")
     ver_concluidos = a.get("concluidos") == "1"
+    # a lista do motor saiu da tela (19/11/2026, Levi, com o portfólio em funil no alto: "pode tirar esse insights do
+    # motor de baixo"); ela continua para quem chega por link (o sino, a Caixa, a conversa e a volta das ações trazem
+    # ?abrir= ou um filtro) e pelo "Ver a lista" do pé da página (?lista=1)
+    mostrar_lista = bool(a.get("lista") or a.get("abrir") or sev or regra or torre or ver_concluidos)
     filtrada = [i for i in lista if (not sev or i["sev"] == sev) and (not regra or i["regra"] == regra)
                 and (not torre or i["torre"] == torre) and (ver_concluidos or i["estado"] != "concluiu")]
     vivos = [i for i in lista if i["estado"] != "concluiu"]
@@ -204,7 +209,7 @@ def insights():
     return render_template("comando/insights.html", **_contexto(
         torre=TORRE, tela=TORRE.tela("insights"), lei=lei, itens=filtrada, contas=contas, catalogo=catalogo,
         gerado=gerado, sev=sev, regra=regra, torre_f=torre, ver_concluidos=ver_concluidos, severidades=RG.SEVERIDADES,
-        calculando=lei is None,
+        calculando=lei is None, mostrar_lista=mostrar_lista, n_vivos=len(vivos),
         regras=RG.REGRAS, erro_estado=ES.ler()["erro"]))
 
 
@@ -1275,8 +1280,9 @@ def _titulo(ob: str, insights: list[dict], usinas: dict) -> tuple[str, str]:
     tipo, _, oid = ob.partition(":")
     if tipo == "insight":
         i = next((x for x in insights if x["id"] == oid), None)
+        # com o ?abrir=: a lista do motor só aparece na tela do Insights quando o link pede (19/11/2026)
         return ((i["titulo"] if i else f"Insight {oid} (a regra não aponta mais)"),
-                na_raiz("/t/comando/insights") + f"#ins-{oid.replace(':', '-')}")
+                na_raiz("/t/comando/insights") + f"?abrir={quote(oid)}#ins-{oid.replace(':', '-')}")
     if tipo == "os":
         return f"OS {oid}", ""
     return f"Usina {usinas.get(int(oid)) or oid}", ""

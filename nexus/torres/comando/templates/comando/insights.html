@@ -14,13 +14,19 @@
   {% if aviso %}<div class="cn-erro{% if aviso[0] == 'ok' %} ins-ok{% endif %}" role="{{ 'status' if aviso[0] == 'ok' else 'alert' }}"><b>{{ aviso[1] }}</b></div>{% endif %}
   {% if calculando %}<div class="cn-erro cn-aviso" role="status" data-recarregar="10"><b>A conta dos insights está sendo feita agora</b> (o Nexus acabou de subir; leva perto de meio minuto). A página se atualiza sozinha.</div>{% endif %}
   {% if lei.erro %}<div class="cn-erro" role="alert"><b>{{ lei.erro }}.</b></div>{% endif %}
-  {% if erro_estado %}<div class="cn-erro cn-aviso" role="status"><b>Não li os avisos e os retornos agora ({{ erro_estado }}).</b> A lista segue sem eles.</div>{% endif %}
-  {% if not tem_login %}<div class="cn-erro cn-aviso" role="status">Entre com o seu login (Microsoft ou Fracttal) para notificar, responder e assumir: a senha de administrador não diz quem é a pessoa.</div>{% endif %}
+  {% if erro_estado and mostrar_lista %}<div class="cn-erro cn-aviso" role="status"><b>Não li os avisos e os retornos agora ({{ erro_estado }}).</b> A lista segue sem eles.</div>{% endif %}
+  {% if not tem_login and mostrar_lista %}<div class="cn-erro cn-aviso" role="status">Entre com o seu login (Microsoft ou Fracttal) para notificar, responder e assumir: a senha de administrador não diz quem é a pessoa.</div>{% endif %}
 
   {# a Nexus IA no alto e o portfólio em funil logo abaixo (19/11/2026, Levi: "eu quero o chat por cima [...] aí tem os
      KPIs, tem explicando o que está acontecendo com cada usina [...] É funil"): vêm por trás (comando-insights.js) #}
+  {# a caixa da IA fica presa no alto ao rolar (19/11/2026, Levi: "a parte de chat do Nexus AI, ele tem que ficar fixo
+     lá em cima"); o marco logo acima diz ao comando-insights.js quando ela prendeu (aí as sugestões se recolhem) #}
+  <div class="inf-ia-marco" data-inf-ia-marco aria-hidden="true"></div>
   <div class="cmu-ia inf-ia" data-ins-pedaco="{{ raiz }}/t/comando/insights/ia"></div>
   <div data-ins-pedaco="{{ raiz }}/t/comando/insights/portfolio"><p class="mudo ins-lendo">Lendo o portfólio…</p></div>
+  {% if not mostrar_lista %}
+  <p class="mudo inf-lista-link"><a class="cn-link" href="?lista=1#ins-lista">Ver a lista dos {{ n_vivos }} insights abertos do motor de regras</a></p>
+  {% else %}
   <h2 class="ins-sub" id="ins-lista">Insights do motor de regras</h2>
   <div class="cn-numeros inf-numeros">
     {% for k, s in severidades.items() %}
@@ -30,6 +36,7 @@
   </div>
 
   <form class="cn-filtros" method="get">
+    <input type="hidden" name="lista" value="1">
     {% if sev %}<input type="hidden" name="sev" value="{{ sev }}">{% endif %}
     <label class="cn-filtro-par"><span class="gc-rotulo">Regra</span>
     <select class="gc-campo" name="regra" onchange="this.form.submit()"><option value="">Todas</option>
@@ -38,7 +45,7 @@
     <select class="gc-campo" name="torre" onchange="this.form.submit()"><option value="">Todas</option>
       {% for t in regras.values()|map(attribute='torre')|unique|sort %}<option value="{{ t }}"{% if t == torre_f %} selected{% endif %}>{{ nomes_torres.get(t, t) }}</option>{% endfor %}</select></label>
     <label class="ins-check"><input type="checkbox" name="concluidos" value="1"{% if ver_concluidos %} checked{% endif %} onchange="this.form.submit()"> Mostrar os concluídos</label>
-    {% if sev or regra or torre_f %}<a class="ins-limpar" href="?">Limpar os filtros</a>{% endif %}
+    {% if sev or regra or torre_f %}<a class="ins-limpar" href="?lista=1">Limpar os filtros</a>{% endif %}
     <noscript><button class="gc-btn gc-btn--ui" type="submit">Filtrar</button></noscript>
   </form>
 
@@ -46,7 +53,7 @@
   <ol class="ins-lista">{% for i in itens %}{{ cartao(i, nomes_torres, areas, retornos, codigo, voltar, tem_login, i.id == abrir, hoje) }}{% endfor %}</ol>
   {% else %}<p class="cn-vazio">{% if calculando %}A lista aparece assim que a conta terminar.{% elif sev or regra or torre_f %}Nenhum insight com estes filtros.{% else %}Nenhuma regra apontou problema agora. A conta se refaz a cada 5 minutos.{% endif %}</p>{% endif %}
 
-  <h2 class="ins-sub">As regras</h2>
+  <h2 class="ins-sub" id="ins-regras">As regras</h2>
   <div class="cn-tab"><table>
     <thead><tr><th class="ins-esq">Regra</th><th class="ins-esq">Torre</th><th class="ins-esq">Avisa</th><th class="ins-esq">De onde lê</th><th>Agora</th></tr></thead>
     <tbody>{% for r in catalogo %}
@@ -57,6 +64,7 @@
     {% endfor %}</tbody>
   </table></div>
   <p class="mudo ins-fora">Ainda fora: anomalia sem OS (calculada pela plataforma), a garantia vigente (falta a data de cada equipamento), EPC e o prazo do relatório mensal (sem fonte no Nexus).</p>
+  {% endif %}
 </div>
 <script src="{{ url_for('static', filename='comando/conversa.js') }}" defer></script>
 <script src="{{ url_for('static', filename='comando/insights.js') }}" defer></script>

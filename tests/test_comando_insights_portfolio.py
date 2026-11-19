@@ -87,6 +87,35 @@ def test_a_tela_traz_o_portfolio_e_a_ia_por_tras(tela, logado, monkeypatch):
     assert 'data-ia-url="/t/comando/insights/ia/perguntar"' in c and II.SUGESTOES[0] in c
 
 
+def test_sem_a_copia_o_portfolio_diz_que_esta_montando_e_pede_de_novo(tela, logado, monkeypatch):
+    """19/11/2026: logo depois do deploy a tela ficou em "Lendo o portfólio…" até a conta fria acabar ("cadê os
+    clientes?"). Sem a cópia, o pedaço volta na hora dizendo que está montando, e o script pede de novo."""
+    from nexus.torres.comando import gerencial_tela as GT
+    monkeypatch.setattr(GT, "dados_gerencial_sem_esperar", lambda: None)
+    p = logado.get("/t/comando/insights/portfolio").get_data(as_text=True)
+    assert 'data-ins-repetir="5"' in p and "Montando o portfólio" in p and "inf-clientes" not in p
+
+
+def test_a_copia_vencida_volta_na_hora_e_a_nova_se_faz_por_tras(tela, logado, monkeypatch):
+    from nexus.torres.comando import gerencial_tela as GT
+    app = logado.application
+    chamadas = []
+    monkeypatch.setattr(GT, "_refazer_por_tras", lambda: chamadas.append(1))
+    app.config["TESTING"] = False
+    try:
+        with app.test_request_context():
+            app.extensions["nexus_gerencial"] = {}
+            assert GT.dados_gerencial_sem_esperar() is None and chamadas == [1]          # sem cópia: começa e não espera
+            app.extensions["nexus_gerencial"] = {"dados": {"x": 1}, "ts": 0}
+            assert GT.dados_gerencial_sem_esperar() == {"x": 1} and chamadas == [1, 1]   # vencida: a velha, e refaz
+            import time as _t
+            app.extensions["nexus_gerencial"] = {"dados": {"x": 2}, "ts": _t.time()}
+            assert GT.dados_gerencial_sem_esperar() == {"x": 2} and chamadas == [1, 1]   # em dia: nada por trás
+    finally:
+        app.config["TESTING"] = True
+        app.extensions.pop("nexus_gerencial", None)
+
+
 def test_a_pergunta_do_insights_leva_o_dossie_ampliado(tela, logado, monkeypatch, tmp_path):
     from nexus.torres.comando import gerencial_tela as GT
     logado.application.config.update(NEXUS_DADOS=str(tmp_path))

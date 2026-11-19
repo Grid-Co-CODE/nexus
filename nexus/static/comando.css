@@ -979,7 +979,16 @@ a.ins-titulo:hover{color:var(--verde-texto)}
 .ins-delta--sobe{color:var(--ok)}
 .ins-lendo{margin:18px 0 0;font-size:12.5px}
 
-.inf-ia{margin:18px 0 0}
+/* a caixa da IA presa no alto ao rolar (Levi, 19/11/2026: "ele tem que ficar fixo lá em cima. Então, se eu der um
+   scroll, ele continua"): o fundo da página em volta dela cobre o que passa por baixo; presa, as sugestões e o "sobre"
+   se recolhem e a conversa rola dentro dela, para a caixa não tomar a tela */
+.inf-ia-marco{height:1px;margin-top:8px}
+.inf-ia{position:sticky;top:var(--topo, 60px);z-index:6;margin:0;padding:10px 0;background:var(--fundo)}
+.inf-ia--presa{border-bottom:1px solid var(--linha)}
+.inf-ia--presa .ia-sugestoes,.inf-ia--presa .ia-sobre{display:none}
+.inf-ia--presa .ia-conversa{max-height:min(40vh, 380px);overflow-y:auto;scrollbar-width:thin;
+  scrollbar-color:var(--rolagem) transparent;overscroll-behavior:contain}
+.inf-lista-link{margin:22px 0 0;font-size:13px}
 .inf{margin:22px 0 6px}
 .inf-cab{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
 .inf-cab h2{margin:0;font:600 16px/22px var(--font-sans);color:var(--tinta)}
@@ -1007,8 +1016,10 @@ a.ins-titulo:hover{color:var(--verde-texto)}
 .inf-funil-cab{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin:0 0 10px}
 .inf-funil-cab h3{margin:0;font:600 15px/20px var(--font-sans);color:var(--tinta)}
 .inf-funil-cab .mudo{font-size:12.5px}
-/* a linha do cliente tem altura fixa: o painel ao lado mede 7 delas (Levi, 19/11/2026: "o mesmo tamanho de 7 cards de
-   clientes") e fica parado enquanto a lista rola, para o cliente lá de baixo abrir à vista */
+/* a linha do cliente tem altura fixa: o painel ao lado vai até 10 delas (Levi, 19/11/2026: primeiro "o mesmo tamanho
+   de 7 cards de clientes", depois "aumenta para 10 [...] se a usina for inferior, ele se ajusta à usina"); a usina
+   aberta faz o painel crescer o que ela ocupa ("quando eu expandir a usina, o tamanho expande junto, para caber o
+   texto"; o comando-insights.js soma a altura) */
 .inf-grade{--inf-cli:84px;display:grid;grid-template-columns:minmax(250px,320px) minmax(0,1fr);gap:18px;align-items:start}
 .inf-clientes{list-style:none;margin:0;padding:0;border-top:1px solid var(--linha)}
 .inf-clientes > li{border-bottom:1px solid var(--linha)}
@@ -1026,8 +1037,7 @@ a.ins-titulo:hover{color:var(--verde-texto)}
 .inf-trilha > i{border-radius:2px}
 .inf-cli-l3{font-size:12px;line-height:16px;color:var(--mudo);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
-.inf-paineis{position:sticky;top:calc(var(--topo, 56px) + 12px)}
-.inf-painel{display:flex;flex-direction:column;box-sizing:border-box;height:calc(7 * (var(--inf-cli) + 1px));
+.inf-painel{display:flex;flex-direction:column;box-sizing:border-box;max-height:calc(10 * (var(--inf-cli) + 1px));
   padding:16px 18px 0;border:1px solid var(--linha);
   border-radius:var(--raio-md);background:var(--superficie)}
 .inf-painel[hidden]{display:none}
@@ -1066,7 +1076,7 @@ a.ins-titulo:hover{color:var(--verde-texto)}
 .inf-us-ins{display:flex;gap:4px}
 .inf-seta{color:var(--mudo)}
 .inf-us[open] .inf-seta{transform:rotate(180deg)}
-.inf-us[open] .inf-us-motivo{white-space:normal}
+.inf-us[open] .inf-us-motivo,.inf-us[open] .inf-us-nome{white-space:normal}
 .inf-tag{display:inline-block;padding:2px 7px;border-radius:var(--raio-tag);font:600 11px/15px var(--font-sans);white-space:nowrap}
 .inf-tag--critico{color:var(--critico);background:var(--critico-suave)}
 .inf-tag--alerta{color:var(--alerta);background:var(--alerta-suave)}
@@ -1089,8 +1099,7 @@ a.ins-titulo:hover{color:var(--verde-texto)}
 
 @media (max-width:900px){
   .inf-grade{grid-template-columns:minmax(0,1fr)}
-  .inf-paineis{position:static}
-  .inf-painel{height:auto;padding-bottom:6px}
+  .inf-painel{max-height:none !important;padding-bottom:6px}
   .inf-painel > .inf-p-rolagem{overflow:visible;margin:6px 0 0;padding:0}
   .inf-us > summary{grid-template-columns:10px minmax(0,1fr) auto 16px}
   .inf-us-motivo,.inf-us-ins{grid-column:2 / -1}
