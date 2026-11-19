@@ -20,11 +20,12 @@
   {{ termo('Como se conta') }}<dd>Cada célula é um equipamento num dia. A verificação vai até anteontem: vazio até lá é
     furo. Zero enquanto os outros inversores geraram também é furo. Parada com 6 horas ou mais entre 6h e 18h explica o
     dia. A OS 16493 e o cliente E1 ficam de fora. Na Ultragaz, valor acima de 5 vezes a mediana é coleta equivocada.</dd>
-  {{ termo('A tira do mês') }}<dd>Um quadrado por dia, pela causa: roxo, furo com falha de comunicação no COS (a usina
-    gerava e o dado não veio: resolver); vermelho, furo sem justificativa no COS; azul, justificado por queda; verde,
-    validado pela equipe; cinza, completo. Vazado: falta só o IPOA ou o GHI. Traço azul embaixo: o COS tem uma queda curta
-    no dia, que não justifica. Passe o mouse para ver a ocorrência e de que hora a que hora. Os contadores do alto filtram
-    a lista por cada um desses pontos.</dd>
+  {{ termo('A tira do mês') }}<dd>Um quadrado por dia, pela causa: verde, completo (todo o dado no dia: validado
+    automático) ou validado pela equipe; azul, justificado por queda; roxo, furo com falha de comunicação no COS (a usina
+    gerava e o dado não veio: resolver). Sem justificativa no COS: vermelho, a usina toda sem dado; laranja, parcial (um
+    inversor ou alguns); traço azul embaixo, o COS tem uma queda curta no dia, que não justifica; vazado, falta só o IPOA
+    ou o GHI. Passe o mouse para ver a ocorrência e de que hora a que hora. A legenda fica fixa no alto da lista, conta os
+    dias de cada cor e o clique filtra. Kanban: uma coluna por causa, a usina na causa que mais tem dias.</dd>
   {{ termo('O COS') }}<dd>Só justifica o dia (deixa de ser furo) a queda com geração parada de 6 horas ou mais entre 6h e
     18h, no equipamento que caiu. Falha de comunicação nunca justifica: é furo a coletar. Ao abrir a usina aparece o que o
     COS registrou, normalizado ou em aberto, com o início e o fim.</dd>
@@ -52,7 +53,6 @@
 <p class="fr-carregando mudo" id="fr-carregando">Lendo os furos…</p>
 
 <div id="fr-corpo" hidden>
-  <div class="gc-numeros fr-numeros" id="fr-numeros" role="group" aria-label="Filtrar pela causa do furo"></div>
   <p class="mudo fr-fontes"><span id="fr-completude"></span><span id="fr-fontes"></span></p>
 
   <div class="fr-barra">
@@ -70,19 +70,24 @@
     </div>
   </div>
 
-  <h2 class="ui-kicker">Tamanho do furo por cliente <span class="fr-kicker-nota">dias com furo pendente, somando as usinas: roxo, falha de comunicação no COS; vermelho, sem justificativa. Clique para filtrar.</span></h2>
+  <h2 class="ui-kicker">Tamanho do furo por cliente <span class="fr-kicker-nota">dias com furo pendente, somando as usinas, nas cores da legenda. Clique para filtrar.</span></h2>
   <div class="fr-clientes" id="fr-clientes" role="group" aria-label="Filtrar por cliente"></div>
 
+  {# fixo no alto ao rolar: quantas usinas, a visão e o que cada cor quer dizer, com a contagem de dias que filtra
+     (Levi, 19/11/2026: "quando eu estiver scrollando, a parte que mostra a quantidade de usinas e o que cada cor
+     significa precisa ficar fixa lá em cima") #}
   <div class="fr-cab-lista">
-    <h2 class="ui-kicker" id="fr-titulo-lista">Usinas</h2>
-    <div class="fr-legenda" aria-hidden="true">
-      <span><i class="fr-q fr-q--m"></i>falha de comunicação</span><span><i class="fr-q fr-q--s"></i>sem justificativa</span>
-      <span><i class="fr-q fr-q--s fr-q--qc"></i>com queda curta</span><span><i class="fr-q fr-q--e"></i>justificado por queda</span>
-      <span><i class="fr-q fr-q--c"></i>validado</span><span><i class="fr-q fr-q--o"></i>completo</span>
-      <span><i class="fr-q fr-q--s fr-q--t"></i>só IPOA ou GHI</span>
+    <div class="fr-cab-linha">
+      <h2 class="ui-kicker" id="fr-titulo-lista">Usinas</h2>
+      <div class="fr-visoes" role="group" aria-label="Visão da lista">
+        <button type="button" class="gc-chip" data-visao="tabela" aria-pressed="true">Tabela</button>
+        <button type="button" class="gc-chip" data-visao="kanban" aria-pressed="false">Kanban</button>
+      </div>
     </div>
+    <div class="fr-legenda" id="fr-legenda" role="group" aria-label="O que cada cor quer dizer; o clique filtra"></div>
   </div>
-  <div class="fr-caixa"><table class="fr-tabela" id="fr-tabela"><thead></thead><tbody></tbody></table></div>
+  <div class="fr-caixa" id="fr-caixa"><table class="fr-tabela" id="fr-tabela"><thead></thead><tbody></tbody></table></div>
+  <div class="fr-kanban" id="fr-kanban" hidden></div>
 </div>
 <div class="fr-recado" id="fr-recado" role="status" aria-live="polite" hidden></div>
 

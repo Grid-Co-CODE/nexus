@@ -307,6 +307,11 @@ def gerar_pagina(index_html: str) -> str:
                   '9.Pós Operação &gt; 1. Performance">Usar o relatório mais novo da pasta</button>',
                '<button class="btn2 fz-sm" id="fzNovo" title="Volta para o relatório mais novo que subiu ao Nexus">Usar o '
                'relatório mais novo no Nexus</button>', "furos: mais novo")
+    # a aba 3 do .exe ("Para coletar" e "Baixa performance") sai da tela do Nexus (Levi, 19/11/2026: "o furo de coleta no
+    # conversor pode tirar. Se já tem furo de coleta do lado, não tem porque ter furo de coleta no conversor"): a aba Furos
+    # de coleta, ao lado do Conversor, faz o trabalho dela. No .exe ela fica, porque lá não existe a aba ao lado
+    t = _troca(t, '<button id="aba3">3 · Furos de coleta</button>', '<button id="aba3" hidden>3 · Furos de coleta</button>',
+               "aba 3 fora do Nexus")
     # os filtros dos Furos no modelo do Histórico de OS (12/11/2026): o painel e as etiquetas da Zeladoria (zf-*) e a barra
     t = _troca(t, "</style>\n</head>",
                "</style>\n{% endraw %}<link rel=\"stylesheet\" href=\"{{ url_for('static', filename='zeladoria/filtros.css') }}\">\n"

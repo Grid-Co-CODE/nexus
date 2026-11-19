@@ -151,24 +151,37 @@ de 4.989 px com 40 linhas de validação (uma por item, cinco campos cada). Fico
   de comunicação, a gente tem que resolver isso [...] uma cor para o que foi justificado em questão de geração, uma cor
   que tem furo e foi falha de comunicação [...] e conseguir filtrar esses pontos [...] melhora o contraste"). Na tira, no
   mapa e nas barras: **roxo** (o token `--semcom`) = furo pendente num dia em que o COS registrou falha de comunicação
-  (qualquer trecho do dia; a usina gerava e o dado não veio: resolver); **vermelho** = furo sem justificativa; com um
-  **traço azul embaixo**, o COS tem uma queda curta no dia, que não justifica; **azul** = justificado por queda (a regra
-  do R01); **verde cheio** = validado (a 40% sumia no navy); **cinza** = completo; **vazado** = falta só IPOA ou GHI.
+  (qualquer trecho do dia; a usina gerava e o dado não veio: resolver); sem justificativa no COS, **vermelho** = a usina
+  toda sem dado no dia (o item "UFV toda", ou todos os equipamentos de geração) e **laranja** = parcial, um inversor ou
+  alguns (3ª rodada: "vermelho total é porque caiu a usina inteira [...] tal cor, é porque caiu parcialmente"); com um
+  **traço azul embaixo**, o COS tem uma queda curta no dia, que não justifica; **vazado** = falta só IPOA ou GHI;
+  **azul** = justificado por queda (a regra do R01); **verde cheio** = completo OU validado, a mesma cor ("a validação já
+  tem que ser automática [...] teve todas as gerações, automaticamente vai ficar verde": o dia com todo o dado é o
+  validado automático; o motivo da equipe continua para o furo que não tem dado).
   Perguntado, o Levi **manteve as 6 h de sol** para a queda justificar (19/11/2026, com os números: 123 dias de furo em 35
   usinas só com queda curta, mediana 1,7 h): a conta do R01 não mudou. Atenção: a falha de comunicação EM ABERTO pinta
   todos os dias desde que abriu; em 19/11 eram 35 abertas, 21 há mais de 30 dias (Ipixuna 1 e 2 desde 09/01, Crateús
   desde 23/08): o mês inteiro dessas usinas sai roxo, e o registro velho no COS é ele mesmo um ponto a resolver;
-- **os quatro contadores do alto filtram**: falha de comunicação, sem justificativa (com quantos têm queda curta),
-  justificado por queda e validado pela equipe, em dias e usinas, com os outros filtros e sem o de Situação; o clique
-  troca a Situação por aquele ponto e o 2º clique volta ao padrão. A completude foi para a linha das fontes. Saíram o
-  "Mais números", os selos da lista e a visão "Detalhe por equipamento" (o CSV continua com tudo);
+- **sem KPIs no alto** (3ª rodada: "Esses KPIs aí não servem de nada, sendo que tem a mesma coisa sendo dita embaixo"):
+  **a legenda é FIXA no alto da lista ao rolar** (`position:sticky` embaixo do `--topo`), com quantas usinas, a troca
+  Tabela/Kanban e cada cor com os dias dela; o clique na cor troca a Situação por aquele ponto e o 2º clique volta ao
+  padrão. Ordem pedida: o resto à esquerda (completo/validado, justificado por queda, falha de comunicação) e **os
+  vermelhos juntos à direita** (usina toda, parcial, com queda curta, só IPOA ou GHI). Conta com os outros filtros e sem
+  o de Situação. A completude foi para a linha das fontes. Saíram também a faixa colorida à esquerda de cada linha ("essa
+  barra lateral [...] eu não tô entendendo para que serve"), o "Mais números", os selos e a visão "Detalhe por
+  equipamento" (o CSV continua com tudo);
 - **a lista abre só no "Furo pendente"** (o padrão da Situação; Levi: "tirasse dessa lista [...] o que está
-  justificado"); a etiqueta mostra o filtro e o × traz as outras. Novas opções de Situação: falha de comunicação, sem
-  justificativa, queda curta, dia justificado por queda, dia validado;
+  justificado"); a etiqueta mostra o filtro e o × traz as outras. Opções de Situação para cada cor da legenda;
+- **Kanban** ("dá para ter em Kanban também?"): uma coluna por causa (falha de comunicação, usina toda, parcial, só IPOA
+  ou GHI; e "sem furo pendente" quando o filtro as traz), a usina na causa com mais dias; o cartão tem a tira e abre a
+  usina na tabela;
 - **o tamanho do furo por cliente**: uma barra por cliente, o maior em cima, somando os dias com furo pendente das usinas
-  dele, roxo e vermelho como na tira. O clique filtra;
+  dele, nas cores da tira. O clique filtra;
 - **a lista**: usina, a **tira do mês** (o `title` de cada dia diz a causa e a ocorrência do COS com as horas), o furo
   pendente em dias com o que falta numa linha, e os dias com falha de comunicação. Ordem: o maior furo primeiro;
+- **a aba "3 · Furos de coleta" do Conversor saiu da tela do Nexus** ("o furo de coleta no conversor pode tirar. Se já
+  tem furo de coleta do lado, não tem porque ter"): uma troca no `ferramentas/portar_tela_conversor.py` esconde o botão
+  da aba; no .exe ela fica;
 - **o Mês** fica na linha e na altura da busca e do Filtros, sem o rótulo em cima ("tá desalinhado [...] tá feião");
 - **o detalhe**: "O que o COS registrou" (só as dos dias com furo e as que explicam o dia; "Ver as N" mostra todas):
   início → fim ou "em aberto", a duração, a falha, o equipamento, a OS, se a geração parou, e a etiqueta "explica o dia"
