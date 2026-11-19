@@ -140,3 +140,12 @@ def test_ao_descer_cada_bloco_desce_e_encontra_a_barra_da_sua_usina():
     assert "function voar" in JS and "function voltar" in JS and "vg-gota" in CSS and "b.fora" in JS
     # no cliente, a barra de potência só enche quando o bloco chega (no portfólio, enche ao abrir, como era)
     assert JS.count("geo(); foco(); barras();") == 1
+
+
+def test_ao_descer_o_parque_recolhe_e_a_tabela_sobe_para_o_lugar_dele():
+    """Levi, 19/11/2026: "não vai ficar um espaço vazio cinza lá em cima [...] A tabela sobe e a tabela já fica ali [...]
+    Ela já ocupa esse espaço". Com a barra aberta, o parque (apagado) recolhe e a tabela sobe até logo abaixo da barra;
+    voltando ao alto, o parque abre de novo e os blocos sobem como na entrada."""
+    assert "function recolher" in JS and "function expandir" in JS and "PARQUE.replay" in JS
+    assert "overflowAnchor" in JS               # sem a âncora de rolagem do navegador, que seguraria a tabela no lugar
+    assert ".vg-cli-aberta .vg-pot" in CSS

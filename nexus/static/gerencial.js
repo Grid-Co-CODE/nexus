@@ -21,6 +21,9 @@
   "use strict";
   var raiz = document.getElementById("vg"), tela = document.getElementById("vg-tela");
   if (!raiz || !tela) return;
+  // o parque recolhe e abre embaixo de quem lê (`recolher`, `expandir`): a âncora de rolagem do navegador compensaria a
+  // mudança de altura e seguraria a tabela no lugar, que é justamente o que não se quer
+  document.documentElement.style.overflowAnchor = "none";
   var D = null, E = {cliente: "", usina: "", mes: ""}, ANIMA = {id: 0}, COR = {}, RGB = {}, nivelAntes = "";
   var TAU = Math.PI * 2;
 
@@ -269,6 +272,7 @@
     var hAlto = Math.max.apply(null, blocos.map(function (b) { return b.h; }).concat([0.14])), EL0 = 0.6, cam = {fi: Math.PI / 4, el: EL0}, rato = {x: 0, y: 0, px: 0, py: 0, dentro: false};
     var PULA = +(q0.get("t") || 0), hover = -1, hoverLinha = q0.get("foco") == null ? -1 : +q0.get("foco"), ultimoHover = -2, t0 = null, ultimo = 0, cred = 0, parts = [], G = {};
     PARQUE.cv = cv; PARQUE.blocos = blocos; PARQUE.linhas = linhas; PARQUE.voou = false;
+    PARQUE.replay = function () { t0 = null; parts.length = 0; cred = 0; };
     function geo() { var w = cv.clientWidth, h = cv.clientHeight, dpr = window.devicePixelRatio || 1;
       if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); }
       var estreito = w < 860, x0 = estreito ? 0 : w * 0.4, larg = w - x0 - 10, diag = (cols + rows) * 0.7071;
@@ -460,7 +464,7 @@
     resto().forEach(function (el) { anima(el, [{opacity: 1}, {opacity: 0}], 220, 0); });
   }
   function fechar(barra) {
-    parar(); VOO.aberta = false;
+    parar(); VOO.aberta = false; expandir();
     barra.classList.remove("vg-barra--aberta"); tela.classList.remove("vg-cli-aberta");
     var ps = pares(barra);
     anima(barra.firstChild, [{opacity: 1}, {opacity: 0}], 260, 0);
@@ -481,8 +485,10 @@
     var barra = document.getElementById("vg-barra");
     if (!barra) return;
     var y = window.scrollY || window.pageYOffset || 0;
-    if (y > ABRE) { if (!VOO.aberta) abrir(barra, sem === true); if (!PARQUE.voou) voar(sem === true); }
-    else if (y < FECHA) { if (VOO.aberta) fechar(barra); if (PARQUE.voou) voltar(); }
+    if (y > ABRE && !VOO.aberta) {
+      var de = sem === true ? [] : PARQUE.blocos.map(retBloco);
+      abrir(barra, sem === true); recolher(y, sem === true); voar(sem === true, de);
+    } else if (y < FECHA && VOO.aberta) { fechar(barra); voltar(); }
   }
   /* ── os blocos que descem e encontram a barra da sua usina (19/11/2026, Levi: "Faça animação de quando eu descer. Essas
      barras, tipo, descerem e encontrarem cada uma barra, encontrar sua usina") ─────────────────────────────────────────
@@ -533,12 +539,12 @@
     a.onfinish = function () { if (g.parentNode) g.parentNode.removeChild(g); aoFim(); };
     PARQUE.anims.push(a);
   }
-  function voar(sem) {
+  function voar(sem, deAntes) {
     if (!PARQUE.cv || PARQUE.voou) return;
     pararGotas(); PARQUE.voou = true;
     var n = PARQUE.blocos.length, passo = Math.min(70, 1100 / Math.max(1, n));
     PARQUE.blocos.forEach(function (b, k) {
-      var para = retBarra(PARQUE.linhas[k]), de = sem ? null : retBloco(b);
+      var para = retBarra(PARQUE.linhas[k]), de = sem ? null : (deAntes || [])[k];
       if (!para) { b.fora = true; return; }
       if (!de) { b.fora = true; largura(para.i, true, false); return; }
       var meio = {x: de.x, y: para.y, w: de.w, h: para.h}, atraso = k * passo;
@@ -546,17 +552,43 @@
       gota(de, meio, para, b.topo, COR.verde, true, atraso, 1050, function () { largura(para.i, true, true); });
     });
   }
+  /* a volta (19/11/2026, com o parque que recolhe): o parque abre de novo e os blocos SOBEM como na entrada (`replay`), e
+     as barras da tabela esvaziam; a gota que subia de volta não tinha para onde ir, com o parque fechado na hora da saída */
   function voltar() {
     if (!PARQUE.voou) return;
     pararGotas(); PARQUE.voou = false;
-    var n = PARQUE.blocos.length, passo = Math.min(45, 700 / Math.max(1, n));
-    PARQUE.blocos.forEach(function (b, k) {
-      var de = retBarra(PARQUE.linhas[k]), para = retBloco(b);
-      if (de) largura(de.i, false, false);
-      if (!de || !para) { b.fora = false; return; }
-      var meio = {x: para.x, y: de.y, w: para.w, h: de.h};
-      gota(de, meio, para, COR.verde, b.topo, false, k * passo, 850, function () { b.fora = false; });
-    });
+    PARQUE.linhas.forEach(function (lin) { var i = lin.querySelector(".vg-trilho i"); if (i) i.style.width = "0"; });
+    PARQUE.blocos.forEach(function (b) { b.fora = false; });
+    if (PARQUE.replay) PARQUE.replay();
+  }
+  /* ── o parque que recolhe (19/11/2026, Levi: "não vai ficar um espaço vazio cinza lá em cima [...] A tabela sobe e a
+     tabela já fica ali [...] Ela já ocupa esse espaço") ──────────────────────────────────────────────────────────────
+     Com a barra aberta, o parque (já apagado) fecha: a seção dele encolhe até a tabela ficar logo abaixo da barra do alto,
+     na rolagem em que a pessoa está, e a tabela sobe junto. A altura final é medida (a do cabeçalho da tabela encostando
+     na barra), não chutada. Para a rolagem não bater no fim da página (a de um cliente pequeno ficaria mais curta que a
+     tela, e o navegador puxaria a rolagem para o zero, que fecharia tudo de novo), a página guarda a altura que falta
+     embaixo enquanto o parque está fechado. */
+  function recolher(y, sem) {
+    var pot = tela.querySelector(".vg-pot"), h2 = pot && pot.parentNode.querySelector(".vg-pot ~ h2"), barra = document.getElementById("vg-barra");
+    if (!pot || !h2 || !barra) return;
+    var antes = pot.getBoundingClientRect().height, topoTela = tela.getBoundingClientRect().top + y;
+    tela.style.minHeight = Math.max(0, Math.ceil(y + window.innerHeight - topoTela + 8)) + "px";
+    pot.style.height = "0px";
+    var alvo = barra.getBoundingClientRect().bottom + 18, falta = Math.max(0, Math.round(alvo - h2.getBoundingClientRect().top));
+    pot.style.height = falta + "px";
+    var cv = pot.querySelector("canvas");
+    if (sem) return;
+    VOO.anims.push(pot.animate([{height: antes + "px"}, {height: falta + "px"}], {duration: 700, easing: CURVA, fill: "backwards"}));
+    if (cv) VOO.anims.push(cv.animate([{opacity: 1}, {opacity: 0}], {duration: 320, easing: "ease-out", fill: "backwards"}));
+  }
+  function expandir() {
+    var pot = tela.querySelector(".vg-pot");
+    if (!pot) return;
+    var antes = pot.getBoundingClientRect().height;
+    pot.style.height = ""; tela.style.minHeight = "";
+    var depois = pot.getBoundingClientRect().height, cv = pot.querySelector("canvas");
+    VOO.anims.push(pot.animate([{height: antes + "px"}, {height: depois + "px"}], {duration: 650, easing: CURVA, fill: "backwards"}));
+    if (cv) VOO.anims.push(cv.animate([{opacity: 0}, {opacity: 1}], {duration: 500, delay: 150, easing: "ease-out", fill: "backwards"}));
   }
   function pedirEncolher() { if (!VOO.pend) { VOO.pend = true; requestAnimationFrame(encolher); } }
   window.addEventListener("scroll", pedirEncolher, {passive: true});
@@ -573,7 +605,7 @@
     var nivel = u ? "u" : c ? "c" : "p";
     tela.innerHTML = nivel === "u" ? capaUsina(c, u) : nivel === "c" ? capaCliente(c) : capaPortfolio();
     if (nivel !== nivelAntes) { window.scrollTo(0, 0); nivelAntes = nivel; }
-    parar(); VOO.aberta = false; tela.classList.remove("vg-cli-aberta"); pararGotas(); PARQUE.cv = null; PARQUE.voou = false;
+    parar(); VOO.aberta = false; tela.classList.remove("vg-cli-aberta"); pararGotas(); PARQUE.cv = null; PARQUE.voou = false; tela.style.minHeight = "";
     if (nivel === "p") iniciarPotencia(); else if (nivel === "c") { iniciarParque(c); var rolar = +(new URLSearchParams(location.search).get("rolar") || 0); if (rolar) window.scrollTo(0, rolar); encolher(true); } else carregarInsights(u);
   }
   tela.addEventListener("click", function (ev) {

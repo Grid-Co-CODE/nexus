@@ -55,6 +55,9 @@
 .vg-barra-in>span,.vg-b-chip{opacity:0;transform-origin:0 0}
 /* o estado aberto é de classe (o gerencial.js só anima até ele): a barra cheia e, na capa, o que foi para ela some */
 .vg-barra--aberta .vg-barra-fundo,.vg-barra--aberta .vg-barra-in>span,.vg-barra--aberta .vg-b-chip{opacity:1}
+/* o parque fechado: a seção encolhe (a altura, o gerencial.js mede) e o desenho some */
+.vg-cli-aberta .vg-pot{overflow:hidden;margin-bottom:0}
+.vg-cli-aberta .vg-pot canvas{opacity:0}
 .vg-cli-aberta .vg-txt [data-vg-voa],.vg-cli-aberta .vg-txt [data-vg-card],.vg-cli-aberta .vg-txt .vg-topo,
 .vg-cli-aberta .vg-txt .vg-explica,.vg-cli-aberta .vg-txt .vg-foco{opacity:0}
 .vg-b-nome{font:800 21px/1.1 var(--font-display);letter-spacing:-.01em}

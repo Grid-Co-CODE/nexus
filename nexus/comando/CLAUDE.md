@@ -1457,6 +1457,15 @@ Insights".
   cliente grande. No cliente, a barra de potência começa vazia até o voo (o número em MWp ao lado está sempre lá); no
   portfólio, enche ao abrir, como era. Provado no Edge comandado (19/11/2026, Athon): as 10 barras cheias depois da
   descida, nenhuma gota sobrando, vazias de novo ao subir e cheias de novo na 2ª descida.
+- **O parque recolhe e a tabela sobe** (Levi, no mesmo dia: "não vai ficar um espaço vazio cinza lá em cima [...] A
+  tabela sobe e a tabela já fica ali [...] Ela já ocupa esse espaço"): com a barra aberta, a seção do parque (já
+  apagado) encolhe até o cabeçalho da tabela encostar na barra do alto, na rolagem em que a pessoa está (`recolher`; a
+  altura final é medida, não chutada), e as gotas caem já na tabela no lugar novo (os blocos são medidos ANTES de o
+  parque recolher; as linhas, DEPOIS). Voltando ao alto (`FECHA`), o parque abre de novo (`expandir`) e os blocos sobem
+  como na entrada (`PARQUE.replay`), com as barras esvaziando. Dois cuidados: a página guarda embaixo a altura que falta
+  enquanto o parque está fechado (no cliente pequeno, a página ficaria mais curta que a tela, o navegador puxaria a
+  rolagem para o zero e tudo fecharia de novo, num vai e volta), e a âncora de rolagem do navegador fica desligada
+  nesta página (`overflowAnchor`), senão ele compensaria a altura e seguraria a tabela no lugar.
 - **O "!" ao lado do nome** (Levi: "essas informações poderiam estar em uma exclamação ao lado do nome"): o como ler de
   cada nível (o anel do portfólio, os blocos do cliente, a nota e os insights da usina) e o de onde vem saíram do texto
   solto e foram para o "!" amarelo padrão do Nexus (a mesma marcação do `_explica.html`), ao lado de "Portfólio Grid
