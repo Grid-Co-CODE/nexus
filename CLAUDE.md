@@ -153,6 +153,11 @@ PerformancePainel.
   `.env`** (sem ele, pula): numa worktree, copie o `.env` antes da suíte (em 18/10/2026 três arquivos com nome passaram
   assim, pelas worktrees sem `.env`). O histórico do git
   anterior a 08/10/2026 ainda tem nomes (não se reescreve).
+- **Valor de contrato, citação de cliente ou de fornecedor e e-mail de terceiro não entram em arquivo versionado**
+  (19/11/2026, depois da varredura do histórico). E não se censura: o texto vai cifrado para o banco do Nexus e a tela de
+  quem está logado mostra tudo (Levi: "Tem que estar no banco do Nexus e aí quem tiver um acesso do Nexus vai ter a
+  informação completa"). O arquivo guarda a ficha; o livro `nexus_textos_reservados` guarda o texto. Regra, ferramenta e
+  prova: `nexus/dados/CLAUDE.md`, "Os textos reservados".
 - **Segredos** só no `.env` (gitignorado). Nunca imprima `NEXUS_SENHA_ADMIN` nem `NEXUS_SECRET_KEY`,
   nunca desligue o portão de login. Para validar tela atrás da senha, faça login por sessão lendo o `.env`.
 - Commit só quando pedido. Há deploy automático: push na `main` vai para produção em ~2 min, com restart. **No horário

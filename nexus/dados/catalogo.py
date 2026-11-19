@@ -1745,6 +1745,17 @@ LIVROS = (
           "(perf_web.SUBTAREFAS_PADRAO)", False,
           "registrado em 05/11/2026 antes da 1ª gravação (regra 10): nasce no 1º padrão salvo",
           so_cresce=True),
+    # 19/11/2026 (Levi: "Tirar os dados do repositório e levar para o banco do Nexus" e "Tem que estar no banco do Nexus e
+    # aí quem tiver um acesso do Nexus vai ter a informação completa"): o valor de contrato, a citação de cliente e de
+    # fornecedor do clone do Radar da Zeladoria e o canal de abertura dos fabricantes do OS Creator saíram do repositório,
+    # que é público; o arquivo guarda a ficha e este livro guarda o texto, cifrado. Registrado antes da 1ª gravação
+    Livro("nexus_textos_reservados", ("dim_texto_reservado",),
+          "quando um texto reservado entra ou muda (à mão, pela ferramenta; não há carga)",
+          "ferramentas/textos_reservados.py (nexus/dados/textos_reservados.py); quem lê: /t/zeladoria/app e o canal de "
+          "abertura dos fabricantes do OS Creator", False,
+          "registrado em 19/11/2026 antes da 1ª gravação (regra 10). 1 linha = 1 ficha de 1 área; em claro só a área, a "
+          "ficha e a data, o texto só cifrado (Cofre, preso à área e à ficha). Só cresce: ficha publicada não sai",
+          so_cresce=True),
     Livro("nexus_sugestoes", ("fato_sugestao", "fato_status_sugestao", "fato_resposta_sugestao"),
           "a cada sugestão mandada, a cada mudança de status e a cada resposta (Início > Sugestões)",
           "nexus/casca/sugestoes.py, pela aba Início > Sugestões", True,
