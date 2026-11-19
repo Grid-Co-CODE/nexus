@@ -290,7 +290,7 @@
       (coms.length ? ' <span class="ctr-ncom" title="' + coms.length + (coms.length === 1 ? " comentário" : " comentários") + '"><i class="ph ph-chat-circle" aria-hidden="true"></i>' + coms.length + "</span>" : "") +
       (r.setor ? '<span class="sub">' + esc(r.setor) + "</span>" : "") + "</td><td>" + (vale(r) ? esc(vale(r)) : '<span class="vazio-c">não escrito</span>') +
       (r.alterado_por ? '<span class="antes">antes: <s>' + esc(r.contratual || "não previsto") + "</s>; mudou no " + esc(r.alterado_por.arquivo || "aditivo") + "</span>" : "") + "</td>" +
-      (varios ? '<td class="sub" style="margin:0">' + quais + "</td>" : "") + '<td class="onde">' + (r.ref ? refTxt(r.ref) : r._incluido ? "incluída no Nexus" : "") +
+      (varios ? '<td class="ctr-quais">' + quais + "</td>" : "") + '<td class="onde">' + (r.ref ? refTxt(r.ref) : r._incluido ? "incluída no Nexus" : "") +
       (x.ks.length > 1 ? " e mais " + (x.ks.length - 1) : "") + "</td></tr>";
     if (ab) {
       h += '<tr class="rg-det"><td colspan="' + (varios ? 4 : 3) + '">' + x.ks.map(function (y) {
@@ -525,7 +525,7 @@
       sug.map(function (x) {
         var completo = x.frequencia === "semanal" ? !!x.dia_semana : PASSO[x.frequencia] ? false : !!(x.dia_util || x.dia_mes);
         var preset = esc(JSON.stringify({nome: x.nome, tipo: x.tipo, frequencia: x.frequencia, dia_semana: x.dia_semana || "", dia_util: x.dia_util || "", dia_mes: x.dia_mes || "", setor: x.setor, origem_regra: x.origem_regra}));
-        return "<tr><td>" + esc(x.nome) + "</td><td>" + esc(quandoRec(x)) + '</td><td class="sub" style="margin:0">' + esc(String(x.regra || "").slice(0, 160)) + '</td><td class="r" style="white-space:nowrap">' +
+        return "<tr><td>" + esc(x.nome) + "</td><td>" + esc(quandoRec(x)) + '</td><td class="ctr-quais">' + esc(String(x.regra || "").slice(0, 160)) + '</td><td class="r" style="white-space:nowrap">' +
           (pode(c) ? (completo ? '<button type="button" class="gc-btn gc-btn--ui gc-btn--contorno" data-confirmar="' + preset + '">Confirmar</button> ' :
             '<button type="button" class="gc-btn gc-btn--ui gc-btn--contorno" data-ed-tipo="recorrencia" data-ed-novo="1" data-ed-cliente="' + esc(c.cliente) + '" data-ed-preset="' + preset + '">Definir o dia</button> ') +
             '<button type="button" class="ctr-link" data-descartar="' + esc(x.id) + '">descartar</button>' : "") + "</td></tr>";

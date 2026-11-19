@@ -101,6 +101,9 @@
 .ctr-tab tr.rg-det td{background:var(--barra);padding-top:4px}
 .ctr .nome{font-weight:600}
 .ctr .sub{display:block;color:var(--mudo);font-size:11.5px;margin-top:2px}
+/* a célula com o texto miúdo (os contratos da regra, o que o contrato diz): o .sub é display:block e, numa <td>, tirava
+   a célula da linha da tabela e a jogava para baixo (Levi, 19/11/2026: a coluna Contratos "quebrando a linha") */
+.ctr-tab td.ctr-quais{color:var(--mudo);font-size:11.5px}
 .ctr .antes{display:block;color:var(--mudo);font-size:12px;margin-top:3px}
 .ctr .antes s{color:var(--fraco);text-decoration-color:var(--linha-forte)}
 .ctr .vazio-c{color:var(--fraco)}
