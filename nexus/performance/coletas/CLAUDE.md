@@ -138,11 +138,42 @@ pessoa gravou a mesma chave antes NADA do pedido entra (409) e a tela recarrega;
 **Antes de mexer no formato ou na fusão, rode os testes de `furos_conf`: perder validação é o erro que não pode acontecer.**
 
 **A tela** (`performance/coletas_furos.html`, `static/coletas-furos.js` e `.css`): a conta da tela da analista (itens, "UFV toda",
-Geração/ETM, validação por dia, vigência, sugestões, CSV) portada do template2.html dela, no desenho do `DESIGN.md`: o
-eyebrow, o título com o "!", cinco números na frente (o resto em "Mais números"), a lista começando pela usina e a situação
-com "o que falta" numa linha, e o detalhe (validar, paradas, mapa do mês) fechado até o clique. Os filtros são os do
-`static/filtros-os.js` (o padrão do Histórico de OS). Não tem "Salvar HTML"; Exportar e Importar ficam em "Validações".
-Saíram de propósito o filtro em cada coluna (o painel cobre) e os emojis.
+Geração/ETM, validação por dia, vigência, sugestões, CSV) portada do template2.html dela, no desenho do `DESIGN.md`. Os
+filtros são os do `static/filtros-os.js` (o padrão do Histórico de OS). Não tem "Salvar HTML"; Exportar e Importar ficam
+em "Validações". Saíram de propósito o filtro em cada coluna (o painel cobre) e os emojis.
+
+**O desenho de 19/11/2026.** Levi: "ao clicar, tá aparecendo uma linha grossa por campo que tá faltando [...] esse motivo
+não precisa tanto se a gente tem informação [...] linka com as ocorrências de normalizações ou que está em aberto que a
+gente tem no COS [...] se naquele dia teve desligamento, foi de que horas até que horas [...] mais visual também, por
+cliente [...] por tamanho do furo [...] diminua as informações". Medido na bancada antes: abrir a Crateús dava um painel
+de 4.989 px com 40 linhas de validação (uma por item, cinco campos cada). Ficou assim:
+- **quatro números** (usinas com furo pendente, dias com furo, completude, dias com furo em que o COS registrou algo);
+  saíram o "Mais números", o "Paradas sem OS" da frente, os selos da lista e a visão "Detalhe por equipamento" (o CSV
+  continua com tudo, e os filtros de Situação cobrem inoperante e parada sem OS);
+- **o tamanho do furo por cliente**: uma barra por cliente, o maior em cima, somando os dias com furo pendente das usinas
+  dele: vermelho, a usina toda sem dado; laranja, parte da geração; laranja claro, só IPOA ou GHI (sem a separação, a
+  estação sem sensor fazia quase toda usina ter "17 de 17 dias" e igualava o furo pequeno ao grande). O clique filtra;
+- **a lista**: usina, a **tira do mês** (um quadrado por dia no pior estado do dia; o ponto embaixo = o COS registrou
+  algo na usina naquele dia, e o `title` diz o quê e de que hora a que hora), o furo pendente em dias com o que falta numa
+  linha, e as ocorrências do COS no mês. Ordem: o maior furo primeiro;
+- **o detalhe**: "O que o COS registrou" (só as dos dias com furo e as que explicam o dia; "Ver as N" mostra todas):
+  início → fim ou "em aberto", a duração, a falha, o equipamento, a OS, se a geração parou, e a etiqueta "explica o dia"
+  ou "no dia do furo". Embaixo, o **mapa do mês** com a linha do COS no alto, e a validação NELE: clica-se no dia com
+  furo (ou no nome da linha, que marca os pendentes dela) e uma barra só valida (motivo, vigência, comentário). Item com
+  todos os dias de furo marcados recebe o motivo do item inteiro (`setConf`, com a vigência); marcado em parte, só os
+  dias, neste mês (`setDays`), como o "Só alguns dias" da analista. Comentário sem motivo grava só o comentário. **Os
+  inversores com o MESMO furo nos mesmos dias (mesmas cores, mesma validação, mesma marcação) viram uma linha**: em
+  novembro, 500 linhas de inversor viraram 75; a Crateús, de 40 para 2 de inversor (o painel caiu para 1.297 px). As
+  funções do modelo da validação (`setConf`, `setDays`, `setObs`, a sincronização) não mudaram.
+
+**O COS na tela** (`furos_r01.ocorrencias_cos`, a chave `oc` de cada usina). Toda ocorrência do COS da usina que toca o
+mês verificado, normalizada ou em aberto (a aberta vai até a hora da conta), com início, fim, falha, equipamentos, OS, se
+a geração parou e se a regra a usou ("explica o dia" = está nas paradas `os` da usina, pela OS e o início). **Não mexe na
+conta**: entram também a de menos de 6 h e a de "Geração parou" = não ou vazio (a falha de comunicação com a usina
+gerando é exatamente o furo a coletar). Fora do escopo, como no R01: a OS 16493 e o E1. Na usina agrupada, a ocorrência
+de um inversor vai só para a aba onde ele existe. Prova de 19/11 com o banco e o CSV do COS de 18/11: a conta com e sem
+`oc` é idêntica (e o teste `test_o_cos_inteiro_do_mes_vai_para_a_tela_com_as_horas_sem_mexer_na_conta`); 873
+ocorrências em 119 das 148 usinas; o JSON da conta foi de 460 KB para 546 KB.
 
 **A tela 3 do Conversor** segue com "Para coletar" e "Baixa performance", lendo a mesma conta por `/coletas/furos` (as
 validações de todos vão no `conf_arquivo`, na forma que ela entende: `furos_conf.para_tela3`). O Resumo e o Detalhe do .exe

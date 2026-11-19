@@ -160,6 +160,37 @@ def test_usina_agrupada_so_aplica_o_equipamento_que_existe_numa_so():
     assert res["stats"]["cos_rejeitados"]["usina agrupada: equipamento ambíguo"] == 1
 
 
+def test_o_cos_inteiro_do_mes_vai_para_a_tela_com_as_horas_sem_mexer_na_conta(monkeypatch):
+    """Levi, 19/11/2026: "linka com as ocorrências [...] do COS para responder [...] se naquele dia teve desligamento, foi
+    de que horas até que horas". Toda ocorrência do mês vai para `oc` (a de menos de 6 h, a de geração que seguiu, a em
+    aberto, até agora); só a que a regra do R01 usou leva o 1 de "explica o dia"; a OS 16493, o E1 e a que fica fora do
+    mês verificado não entram; e a conta é a mesma com e sem elas."""
+    linhas = [
+        cos(os="100", ini="05/11/2026 06:00", fim="05/11/2026 13:00", falha="Desligamento de cabine", eq="Cabine 1"),
+        cos(os="101", ini="05/11/2026 13:00", fim="05/11/2026 18:00", falha="Desligamento de inversor", eq="Inversor 2.1"),   # 5 h
+        cos(os="102", ini="02/11/2026 00:00", fim="02/11/2026 23:00", falha="Falha de comunicação", eq="", parou="não"),
+        cos(os="", ini="08/11/2026 06:00", fim="", falha="Desligamento de usina"),
+        cos(os="16493", ini="04/11/2026 00:00", fim="04/11/2026 23:00", falha="Desligamento de usina"),
+        cos(os="104", ini="04/11/2026 00:00", fim="04/11/2026 23:00", falha="Desligamento de usina", cliente="E1 Energia"),
+        cos(os="105", ini="09/11/2026 08:00", fim="09/11/2026 09:00", falha="Falha de comunicação", parou=""),   # depois de d-2
+    ]
+    res = gerar([("U", CAB, linhas_u())], linhas)
+    p, _ = st(res)
+    assert p["oc"] == [
+        ["2026-11-02T00:00", "2026-11-02T23:00", "Falha de comunicação", "", "102", "n", 0, 0],
+        ["2026-11-05T06:00", "2026-11-05T13:00", "Desligamento de cabine", "Cabine 1", "100", "s", 0, 1],
+        ["2026-11-05T13:00", "2026-11-05T18:00", "Desligamento de inversor", "Inversor 2.1", "101", "s", 0, 0],
+        ["2026-11-08T06:00", "2026-11-10T12:00", "Desligamento de usina", "", "", "s", 1, 1],
+    ]
+    assert res["stats"]["cos_ocorrencias"] == 4
+    monkeypatch.setattr(R, "ocorrencias_cos", lambda *a: 0)
+    sem = gerar([("U", CAB, linhas_u())], linhas)
+    p.pop("oc")
+    res["stats"].pop("cos_ocorrencias")
+    sem["stats"].pop("cos_ocorrencias")
+    assert json.dumps(res, sort_keys=True, default=str) == json.dumps(sem, sort_keys=True, default=str)
+
+
 def test_o_nome_do_cos_acha_a_aba_por_alias_combo_e_prefixo():
     def plantas(*nomes):
         return [{"usina": n, "eqs": []} for n in nomes]

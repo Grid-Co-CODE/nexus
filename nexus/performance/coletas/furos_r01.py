@@ -361,15 +361,16 @@ def _casa_equip(q, n, e):
                                    (q.startswith("Inversor") and nat(e["nome"]) == n))
 
 
-def registros_cos(linhas, plants, cad, agora):
-    """As paradas do COS de novembro em diante. `linhas` = dicts com as colunas do CSV da tela Ocorrências ("OS",
-    "Início", "Normalização", "Cliente", "Código da usina", "Usina", "Falha", "Equipamentos", "Geração parou"); `plants`
-    = as usinas do mês mais novo (os nomes das abas e os inversores de cada uma). -> (registros, rejeitados, sem aba)."""
-    def v(r, k):
-        x = r.get(k)
-        return None if x is None or (isinstance(x, str) and x.strip() == "") else x
+def _val(r, k):
+    x = r.get(k)
+    return None if x is None or (isinstance(x, str) and x.strip() == "") else x
+
+
+def _linhas_unicas(linhas):
+    """[(linha, início, normalização, OS)] sem repetição: a mesma OS numa linha fechada e noutra aberta vale a fechada;
+    linha repetida sai (§6.7.1). -> (linhas, quantas saíram)."""
+    v = _val
     rows = [(r, _hora_csv(v(r, "Início")), _hora_csv(v(r, "Normalização")), osid(v(r, "OS"))) for r in linhas]
-    # a mesma OS numa linha fechada e noutra aberta: vale a fechada; linha repetida sai (§6.7.1)
     fechadas = {o for _r, _i, f, o in rows if f is not None and o != ""}
     vistos, d = set(), []
     for x in rows:
@@ -381,7 +382,23 @@ def registros_cos(linhas, plants, cad, agora):
             continue
         vistos.add(k)
         d.append(x)
-    descartadas = len(rows) - len(d)
+    return d, len(rows) - len(d)
+
+
+def _fora_do_escopo(r, osn):
+    """A OS 16493 (sempre fora) e o cliente E1 (fora do escopo), §6.7. -> o motivo, ou ""."""
+    if osn in IGN:
+        return "16493"
+    cl = norm(_txt(_val(r, "Cliente")))
+    return "E1 fora do escopo" if cl == "e1" or cl.startswith("e1energia") else ""
+
+
+def registros_cos(linhas, plants, cad, agora):
+    """As paradas do COS de novembro em diante. `linhas` = dicts com as colunas do CSV da tela Ocorrências ("OS",
+    "Início", "Normalização", "Cliente", "Código da usina", "Usina", "Falha", "Equipamentos", "Geração parou"); `plants`
+    = as usinas do mês mais novo (os nomes das abas e os inversores de cada uma). -> (registros, rejeitados, sem aba)."""
+    v = _val
+    d, descartadas = _linhas_unicas(linhas)
     usinas = list(dict.fromkeys((_txt(v(r, "Código da usina")), _txt(v(r, "Usina"))) for r, *_ in d))
     resolve = Resolvedor(plants, cad, usinas)
     EQS = {p["usina"]: p["eqs"] for p in plants}
@@ -398,12 +415,9 @@ def registros_cos(linhas, plants, cad, agora):
         f = _txt(v(r, "Falha"))
         fn = norm(f)
         eqtxt = v(r, "Equipamentos") if isinstance(v(r, "Equipamentos"), str) else ""
-        if osn in IGN:
-            rj("16493")
-            continue
-        cl = norm(_txt(v(r, "Cliente")))
-        if cl == "e1" or cl.startswith("e1energia"):
-            rj("E1 fora do escopo")
+        fora = _fora_do_escopo(r, osn)
+        if fora:
+            rj(fora)
             continue
         gp = norm(v(r, "Geração parou")) if isinstance(v(r, "Geração parou"), str) else ""
         if not gp.startswith("sim"):
@@ -591,6 +605,68 @@ def cruzar(meses, recs_cos, congelado, cad):
     return stats
 
 
+# ── 4b. o que o COS registrou no mês, para a tela (não entra na conta) ────────────────────────────────────────────────
+def ocorrencias_cos(linhas, meses, cad, agora):
+    """Todas as ocorrências do COS de cada usina no mês, normalizadas e em aberto, com a hora de início e de fim: o
+    contexto do furo na tela (Levi, 19/11/2026: "linka com as ocorrências de normalizações ou que está em aberto [...]
+    se naquele dia teve desligamento, foi de que horas até que horas, e aí ficar mais óbvio").
+
+    NÃO mexe na conta: quem explica o dia continua sendo a regra do R01 (`registros_cos` + `cruzar`: "Geração parou" =
+    sim e 6 h na janela solar). Aqui entram também a parada de menos de 6 h e a de "Geração parou" = não ou vazio: a
+    falha de comunicação com a usina gerando é justamente o furo que a equipe tem de coletar, e a tela precisa mostrar
+    que ela existiu e quando. Fora do escopo, como no R01: a OS 16493 e o cliente E1.
+
+    Põe em cada usina `oc` = [[início, fim (ISO, minuto), falha, equipamentos, OS, geração parou ("s", "n" ou ""),
+    em aberto (1/0), explica o dia pela regra (1/0)]], só as que tocam o mês até o último dia verificado. A em aberto
+    vai até `agora`, como na conta (§6.7.5). -> quantas foram postas."""
+    if not linhas or not meses:
+        return 0
+    v = _val
+    ult = meses[max(meses)]["plants"]
+    d, _ = _linhas_unicas(linhas)
+    usinas = list(dict.fromkeys((_txt(v(r, "Código da usina")), _txt(v(r, "Usina"))) for r, *_ in d))
+    resolve = Resolvedor(ult, cad, usinas)
+    EQS = {p["usina"]: p["eqs"] for p in ult}
+    por_usina = {}
+    for r, ini, fim, osn in d:
+        if ini is None or _fora_do_escopo(r, osn):
+            continue
+        shs = resolve(_txt(v(r, "Usina")))
+        if not shs:
+            continue
+        eqtxt = v(r, "Equipamentos") if isinstance(v(r, "Equipamentos"), str) else ""
+        if len(shs) > 1:
+            # usina agrupada (Coração 1 e 2): a ocorrência de um inversor vai só para a aba onde ele existe (§6.7.7)
+            invs = re.findall(r"Inversor\s*\d+(?:\.\d+)?", eqtxt)
+            c = [sh for sh in shs if any(_casa_equip(q, nat(q), e) for q in invs for e in EQS.get(sh, []))]
+            shs = c or shs
+        gp = norm(v(r, "Geração parou")) if isinstance(v(r, "Geração parou"), str) else ""
+        aberta = fim is None
+        ate = agora if aberta else fim
+        if ate < ini:
+            continue
+        item = (ini, ate, _txt(v(r, "Falha")), eqtxt[:160], osn, "s" if gp.startswith("sim") else "n" if gp.startswith("nao") else "",
+                aberta)
+        for sh in shs:
+            por_usina.setdefault(norm(sh), []).append(item)
+    postas = 0
+    for m, mv in meses.items():
+        Y, MO = map(int, m.split("-"))
+        de, ate_mes = dt.datetime(Y, MO, 1), dt.datetime(Y, MO, mv["end"]) + dt.timedelta(days=1)
+        for p in mv["plants"]:
+            p.pop("oc", None)
+            lst = [x for x in por_usina.get(norm(p["usina"]), []) if x[0] < ate_mes and x[1] > de]
+            if not lst:
+                continue
+            # a que a regra do R01 usou para explicar algum dia está nas paradas da usina (`os`), com a OS e o início
+            usou = {(o[1], o[4]) for o in p.get("os") or [] if o[0] == "C"}
+            p["oc"] = [[x[0].isoformat(timespec="minutes"), x[1].isoformat(timespec="minutes"), x[2], x[3], x[4], x[5],
+                        1 if x[6] else 0, 1 if (x[4] or "s/ nº", x[0].strftime("%d/%m %H:%M")) in usou else 0]
+                       for x in sorted(set(lst), key=lambda x: (x[0], x[1], x[4]))]
+            postas += len(p["oc"])
+    return postas
+
+
 # ── 5. tudo junto ────────────────────────────────────────────────────────────────────────────────────────────────
 def gerar(livros, info_geral, base_ufv, cos_linhas, congelado, hoje, agora, desde=DESDE):
     """O relatório inteiro. `livros` = [("BD_Performance", abas), ("BD_Thopen", abas)] (ver `ler_abas`); `cos_linhas`
@@ -611,8 +687,9 @@ def gerar_de(planilhas, cad, cos_linhas, congelado, hoje, agora, desde=DESDE, ig
     recs, rej, unm = registros_cos(cos_linhas or [], ult, cad, agora)
     st = cruzar(meses, recs, congelado, cad)
     usados = len(recs)
+    oc = ocorrencias_cos(cos_linhas or [], meses, cad, agora)
     return {"months": meses, "rev": REV, "gen": agora.strftime("%d/%m/%Y %H:%M"),
-            "stats": dict(st, cos_registros=usados, cos_rejeitados=rej,
+            "stats": dict(st, cos_registros=usados, cos_ocorrencias=oc, cos_rejeitados=rej,
                           cos_sem_aba=sorted([[c, u, n] for (c, u), n in unm.items()], key=lambda x: -x[2]),
                           linhas_ignoradas=ignoradas, d1=d1_de(hoje).isoformat(),
                           congelado={m: len(v) for m, v in (congelado or {}).items()})}

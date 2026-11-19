@@ -20,9 +20,18 @@
   {{ termo('Como se conta') }}<dd>Cada célula é um equipamento num dia. A verificação vai até anteontem: vazio até lá é
     furo. Zero enquanto os outros inversores geraram também é furo. Parada com 6 horas ou mais entre 6h e 18h explica o
     dia. A OS 16493 e o cliente E1 ficam de fora. Na Ultragaz, valor acima de 5 vezes a mediana é coleta equivocada.</dd>
-  {{ termo('Como validar') }}<dd>Clique na usina. Escolha o motivo do item inteiro ou marque só alguns dias; o comentário
-    pode ir sem mudar a situação. A validação vale para todos que têm esta tela, e fica registrado quem validou e
-    quando. Nenhuma validação antiga é apagada ao importar.</dd>
+  {{ termo('A tira do mês') }}<dd>Um quadrado por dia: vermelho, a usina toda sem dado; laranja, falta a geração de parte
+    dos equipamentos; laranja claro, falta só o IPOA ou o GHI; verde, o furo foi validado; azul, uma parada explicou o dia. O ponto embaixo do quadrado
+    diz que o COS registrou alguma ocorrência na usina naquele dia; passe o mouse para ver qual e de que hora a que hora.</dd>
+  {{ termo('O COS') }}<dd>Ao abrir a usina aparece tudo o que o COS registrou nos dias com furo, normalizado ou em aberto,
+    com o início e o fim. Só explica o dia (deixa de ser furo) a parada com geração parada e 6 horas ou mais entre 6h e
+    18h; as outras ficam como informação: a falha de comunicação com a usina gerando é furo a coletar.</dd>
+  {{ termo('Como validar') }}<dd>Clique na usina. No mapa do mês, clique nos dias com furo, ou no nome da linha para
+    marcar todos os pendentes dela; escolha o motivo na barra de baixo e valide. Com todos os dias do item marcados, o
+    motivo vale para o item inteiro (e pode valer para todos os meses); com parte, só para os dias marcados. O
+    comentário pode ir sem mudar a situação. Inversores com o mesmo furo nos mesmos dias ficam numa linha só. A
+    validação vale para todos que têm esta tela, e fica registrado quem validou e quando. Nenhuma validação antiga é
+    apagada ao importar.</dd>
   {{ termo('Falha crítica', 'critico') }}<dd>A usina não teve nenhuma coleta no mês, ou menos da metade das células
     esperadas está preenchida.</dd>
   {{ termo('Falha', 'alerta') }}<dd>Há furo sem validação.</dd>
@@ -42,7 +51,6 @@
 
 <div id="fr-corpo" hidden>
   <div class="gc-numeros fr-numeros" id="fr-numeros"></div>
-  <details class="fr-mais" id="fr-mais"><summary>Mais números</summary><div class="fr-mais-grade" id="fr-mais-grade"></div></details>
   <p class="mudo fr-fontes" id="fr-fontes"></p>
 
   <div class="fr-barra">
@@ -60,14 +68,16 @@
     </div>
   </div>
 
-  <h2 class="ui-kicker">Por cliente <span class="fr-kicker-nota">usinas com furo pendente / total</span></h2>
+  <h2 class="ui-kicker">Tamanho do furo por cliente <span class="fr-kicker-nota">dias com furo pendente, somando as usinas: vermelho, a usina toda sem dado; laranja, parte da geração; claro, só IPOA ou GHI. Clique para filtrar.</span></h2>
   <div class="fr-clientes" id="fr-clientes" role="group" aria-label="Filtrar por cliente"></div>
 
   <div class="fr-cab-lista">
     <h2 class="ui-kicker" id="fr-titulo-lista">Usinas</h2>
-    <div class="fr-visoes" role="group" aria-label="Visão da lista">
-      <button type="button" class="gc-chip" data-visao="res" aria-pressed="true">Resumo</button>
-      <button type="button" class="gc-chip" data-visao="det" aria-pressed="false">Detalhe por equipamento</button>
+    <div class="fr-legenda" aria-hidden="true">
+      <span><i class="fr-q fr-q--u"></i>usina toda sem dado</span><span><i class="fr-q fr-q--f"></i>falta parte da geração</span>
+      <span><i class="fr-q fr-q--t"></i>só IPOA ou GHI</span>
+      <span><i class="fr-q fr-q--c"></i>validado</span><span><i class="fr-q fr-q--e"></i>explicado por parada</span>
+      <span><i class="fr-q fr-q--o"></i>completo</span><span><i class="fr-q fr-q--o fr-q--cos"></i>ocorrência no COS</span>
     </div>
   </div>
   <div class="fr-caixa"><table class="fr-tabela" id="fr-tabela"><thead></thead><tbody></tbody></table></div>

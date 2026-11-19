@@ -1,20 +1,24 @@
-/* static/coletas-furos.js — a aba "Furos de coleta" da tela Coletas (16/11/2026).
+/* static/coletas-furos.js — a aba "Furos de coleta" da tela Coletas (16/11/2026; redesenhada em 19/11/2026).
 
    É a tela do relatório R01 da analista de Performance (`Gerador_Furos_Coleta\template2.html`), com a conta dela portada função a função
-   (itens, "UFV toda", natureza Geração/ETM, validação por dia, vigência, sugestões, CSV) e três diferenças de propósito:
+   (itens, "UFV toda", natureza Geração/ETM, validação por dia, vigência, sugestões, CSV), e:
    - o dado vem do Nexus (`/coletas/furos/r01`: o banco e o COS), não de um HTML gerado à mão;
-   - a validação é de TODOS: o que era o localStorage de cada navegador vai ao servidor a cada mudança (só o que mudou, com
-     o `t` que esta tela viu; se outra pessoa mexeu na mesma chave antes, o servidor recusa e a tela recarrega);
-   - o desenho é o do Nexus (DESIGN.md): os números na frente, a lista começando pela usina e a situação, o detalhe fechado
-     até o clique, os filtros no padrão do Histórico de OS (static/filtros-os.js) e nenhum emoji.
-   A regra mora em nexus/performance/coletas/ (CLAUDE.md de lá). */
+   - a validação é de TODOS: vai ao servidor a cada mudança (só o que mudou, com o `t` que esta tela viu; se outra pessoa
+     mexeu na mesma chave antes, o servidor recusa e a tela recarrega);
+   - o desenho de 19/11/2026 (Levi: "ao clicar, tá aparecendo uma linha grossa por campo que tá faltando [...] linka com
+     as ocorrências [...] do COS para responder [...] se naquele dia teve desligamento, foi de que horas até que horas [...]
+     mais visual também, por cliente [...] por tamanho do furo [...] diminua as informações"): quatro números, o tamanho do
+     furo por cliente em barras, uma tira do mês por usina (um quadrado por dia, com o ponto do COS), e no clique o que o
+     COS registrou (com as horas) e o mapa do mês, onde se marca o dia e se valida numa barra só. Os inversores com o mesmo
+     furo nos mesmos dias viram UMA linha do mapa (Crateús: 40 linhas de validação viraram 2).
+   A regra mora em nexus/performance/coletas/ (CLAUDE.md de lá). Nenhum emoji; cor só por token. */
 (function () {
   "use strict";
   var CFG = JSON.parse(document.getElementById("fr-config").textContent);
   var $ = function (id) { return document.getElementById(id); };
-  var DB = null, CONF = {}, SERVIDOR = {}, REV = 0, MONTH = "", MKEYS = [], VISAO = "res";
-  var ORD = { res: { k: "pend", d: -1 }, det: { k: "pend", d: -1 } };
-  var ABERTAS = new Set(), TODOS = new Set(), DIAS = new Set(), PARADAS = new Set(), SEL = {};
+  var DB = null, CONF = {}, SERVIDOR = {}, REV = 0, MONTH = "", MKEYS = [];
+  var ORD = { k: "tam", d: -1 };
+  var ABERTAS = new Set(), TODOS = new Set(), OCTODAS = new Set(), SEL = {}, BARRA = {}, MAPA = {};
   var fila = Promise.resolve(), enviando = 0;
 
   var MN = ["", "janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
@@ -104,10 +108,6 @@
     if (obs !== undefined) c.o = obs;
     touch(c);
   }
-  function setVig(p, n, mode) {
-    var ref = entryRef(p, n); if (!ref) return;
-    if (mode === "*") toGlobal(p, n); else if (mode === "m") { CONF[ref].v = MONTH; touch(CONF[ref]); }
-  }
   function setObs(p, n, txt) {
     var ref = entryRef(p, n); if (!ref && !txt) return;
     var c = ref ? CONF[ref] : ensure(p, n, false);
@@ -164,6 +164,27 @@
     });
   }
   function mudar(fn) { fn(); sincronizar(); render(); }
+
+  // ── as horas (as ocorrências do COS chegam em ISO sem fuso, a hora de Brasília: o Date lê como hora local) ───────
+  var ANO = function () { return +MONTH.split("-")[0]; }, MES = function () { return +MONTH.split("-")[1]; };
+  var iniDia = function (d) { return new Date(ANO(), MES() - 1, d).getTime(); };
+  function hm(t) { var d = new Date(t); return pad(d.getHours()) + ":" + pad(d.getMinutes()); }
+  function dh(t) { var d = new Date(t); return pad(d.getDate()) + "/" + pad(d.getMonth() + 1) + " " + hm(t); }
+  function dur(ms) {
+    var mi = Math.max(0, Math.round(ms / 6e4)), h = Math.floor(mi / 60), r = mi % 60;
+    return h >= 48 ? Math.round(h / 24) + " dias" : h ? h + "h" + (r ? pad(r) : "") : r + " min";
+  }
+  function tempos(p) {
+    if (!p._t) p._t = (p.oc || []).map(function (o) { return [Date.parse(o[0]), Date.parse(o[1])]; });
+    return p._t;
+  }
+  // o pedaço da ocorrência dentro do dia: "08:10 às 15:30", "o dia todo"
+  function noDia(p, j, d) {
+    var t = tempos(p)[j], a = iniDia(d), b = a + 864e5, s = Math.max(t[0], a), e = Math.min(t[1], b);
+    if (s <= a && e >= b) return "o dia todo";
+    return (s <= a ? "00:00" : hm(s)) + " às " + (e >= b ? "24:00" : hm(e));
+  }
+  var ocCurto = function (p, j, d) { return p.oc[j][2] + " " + noDia(p, j, d); };
 
   // ── a conta de cada usina (calc da tela da analista) ─────────────────────────────────────────────────────────────
   var M = function () { return DB.months[MONTH]; }, P = function () { return M().plants; };
@@ -251,10 +272,31 @@
     var invP = pend.filter(function (t) { return t.tipo === "Inversor"; }), ks = {};
     pend.forEach(function (t) { ks[kindLbl(t.tipo)] = 1; });
     var kl = Object.keys(ks), kinds = kl.length === 2 ? "Geração + ETM" : (kl.length ? kl[0] : "");
+    // o dia da usina, para a tira do mês (Levi, 19/11/2026: "algo mais visual [...] por tamanho do furo"): o pior estado
+    // do dia. u = a usina toda sem dado; f = falta a geração de parte dos equipamentos; t = só o IPOA ou o GHI (a estação
+    // sem dado com a geração toda lá pesa menos: era o que fazia 17 de 17 dias em quase toda usina); todos pendentes.
+    // c = o furo do dia está validado; e = uma parada explicou o dia; n = usina sem geração no dia; o = completo
+    var t0 = tempos(p), dia = [], ocd = [], dd = 0, du = 0, dg = 0, cosF = 0, ocF = {};
+    p.days.forEach(function (d, k) {
+      var s = "o", tem = false, pu = false, pg = false, pe = false;
+      items.forEach(function (t) {
+        if (t.idx.indexOf(k) < 0) return;
+        tem = true;
+        if (k in t.vr) return;
+        if (t.tipo === "UFV") pu = true; else if (t.tipo === "Inversor") pg = true; else pe = true;
+      });
+      s = pu ? "u" : pg ? "f" : pe ? "t" : tem ? "c" : p.eqs.some(function (e) { return e.st[k] === "e"; }) ? "e" :
+        p.eqs.length && p.eqs.filter(isGen).every(function (e) { return e.st[k] === "p"; }) ? "n" : "o";
+      var a = iniDia(d), b = a + 864e5, js = [];
+      t0.forEach(function (t, j) { if (t[0] < b && t[1] > a) js.push(j); });
+      if (pu || pg || pe) { dd++; if (pu) du++; else if (pg) dg++; if (js.length) { cosF++; js.forEach(function (j) { ocF[j] = 1; }); } }
+      dia.push(s); ocd.push(js);
+    });
     return { kinds: kinds, cmt: items.filter(function (t) { return t.ent && t.ent.o; }).length, ufv: ufv, items: items, pend: pend, done: done,
       cp: cp, cellT: cellT, comp: comp, empty: empty, sit: sit, sev: sev, ex: ex,
       noos: (p.os || []).filter(function (o) { return o[6] === "A"; }).length, ipF: ipP ? ipP.pi.length : 0, ghF: ghP ? ghP.pi.length : 0,
-      invF: invP.length, nInv: p.eqs.filter(isGen).length, pendN: pend.length, confN: done.length, inop: inop, inopN: inop.length };
+      invF: invP.length, nInv: p.eqs.filter(isGen).length, pendN: pend.length, confN: done.length, inop: inop, inopN: inop.length,
+      dia: dia, ocd: ocd, dd: dd, du: du, dg: dg, dt: dd - du - dg, cosF: cosF, ocF: ocF, ocN: (p.oc || []).length, ocFN: Object.keys(ocF).length };
   }
   // a parada que cobre o dia troca o estado por "e" (ausência esperada); "o" e "a" nunca mudam (§6.4)
   function applyOS() {
@@ -276,27 +318,23 @@
     var r = e.cv && e.cv[i];
     return r ? r.map(function (j) { var o = p.os[j]; return (o[6] === "A" ? "parada do COS sem OS" : (o[0] === "T" ? "ticket " : "OS ") + o[1]) + " (" + o[2] + ")"; }).join("; ") : "";
   }
-  // "O que falta" numa linha só (Levi, 12/11/2026: o parecer na frente, o detalhe fechado): os dias de cada um ficam no
-  // `title` e no detalhe da usina
-  function falhaTxt(p, m) {
-    var seg = [], um = function (tipo) { return m.pend.filter(function (t) { return t.tipo === tipo; })[0]; };
-    if (m.empty && m.pendN === m.items.length && m.pendN) seg.push('<b class="fr-crit">Sem nenhuma coleta no mês</b>');
-    var uf = um("UFV"), ip = um("IPOA"), gh = um("GHI"), iv = m.pend.filter(function (t) { return t.tipo === "Inversor"; });
-    if (uf) seg.push('<span title="Dias ' + ranges(uf.pi, p.days) + '"><b class="fr-crit">Usina toda:</b> ' + uf.pi.length + (uf.pi.length === 1 ? " dia" : " dias") + "</span>");
-    if (ip) seg.push('<span title="Dias ' + ranges(ip.pi, p.days) + '"><b>IPOA:</b> ' + ip.pi.length + (ip.pi.length === 1 ? " dia" : " dias") + "</span>");
-    if (gh) seg.push('<span title="Dias ' + ranges(gh.pi, p.days) + '"><b>GHI:</b> ' + gh.pi.length + (gh.pi.length === 1 ? " dia" : " dias") + "</span>");
-    if (iv.length) seg.push('<span title="' + esc(iv.map(function (t) { return curto(t.nome); }).join(", ")) + '"><b>Geração:</b> ' + iv.length + " de " + m.nInv + (m.nInv === 1 ? " equipamento" : " equipamentos") + "</span>");
+  // o que falta, curto, para a lista (os dias de cada um ficam no mapa da usina)
+  function oQueFalta(m) {
+    var seg = [];
+    if (m.empty && m.pendN === m.items.length && m.pendN) seg.push("nenhuma coleta no mês");
+    else if (m.ufv && !m.ufv.ok) seg.push("usina toda em " + m.ufv.pi.length + (m.ufv.pi.length === 1 ? " dia" : " dias"));
+    if (m.ipF) seg.push("IPOA");
+    if (m.ghF) seg.push("GHI");
+    if (m.invF) seg.push(m.invF + " de " + m.nInv + (m.nInv === 1 ? " equipamento" : " equipamentos"));
     var an = m.pend.reduce(function (a, t) { return a + t.pi.filter(function (k) { return t.e.st[k] === "a"; }).length; }, 0);
-    if (an) seg.push('<span class="fr-anom" title="Valor muito acima do padrão: coleta equivocada">' + an + (an === 1 ? " valor anômalo" : " valores anômalos") + "</span>");
-    var pv = m.pend.filter(function (t) { return t.nv > 0; }).length;
-    if (pv) seg.push('<span class="mudo">' + pv + (pv === 1 ? " item validado em parte" : " itens validados em parte") + "</span>");
-    return seg.join('<span class="fr-sep" aria-hidden="true">·</span>');
+    if (an) seg.push(an + (an === 1 ? " valor anômalo" : " valores anômalos"));
+    return seg.join(" · ");
   }
 
   // ── os filtros (static/filtros-os.js monta a barra, o painel e as etiquetas a partir destas <select>) ──────────────
-  var SITS = [["falha", "Furo pendente"], ["conf", "Validado"], ["ok", "Sem falha"], ["os", "Com ausência explicada por parada"],
-    ["noos", "Com parada sem OS"], ["ipoa", "IPOA pendente"], ["ghi", "GHI pendente"], ["inv", "Equipamento de geração com furo"],
-    ["inop", "Com equipamento inoperante"]];
+  var SITS = [["falha", "Furo pendente"], ["conf", "Validado"], ["ok", "Sem falha"], ["cos", "Com ocorrência do COS no dia do furo"],
+    ["os", "Com ausência explicada por parada"], ["noos", "Com parada sem OS"], ["ipoa", "IPOA pendente"], ["ghi", "GHI pendente"],
+    ["inv", "Equipamento de geração com furo"], ["inop", "Com equipamento inoperante"]];
   function lerFiltros() {
     var f = $("fr-filtros"), o = {};
     if (!f || !f.elements.cliente) return null;
@@ -343,7 +381,7 @@
     [].slice.call(caixa.querySelectorAll(".fo-etiquetas")).forEach(function (x) { x.remove(); });
     caixa.replaceChild(f, $("fr-filtros"));
     f.addEventListener("change", function (e) {
-      if (e.target.name === "mes") { MONTH = e.target.value; ABERTAS.clear(); TODOS.clear(); SEL = {}; montarFiltros(); render(); return; }
+      if (e.target.name === "mes") { MONTH = e.target.value; ABERTAS.clear(); TODOS.clear(); OCTODAS.clear(); SEL = {}; montarFiltros(); render(); return; }
       if (e.target.name === "paradas") applyOS();
       render();
     });
@@ -371,7 +409,7 @@
       if (f.tipo === "ambos" && m.kinds !== "Geração + ETM") return false;
       if (f.sit.length && !f.sit.some(function (s) {
         return s === "falha" || s === "conf" || s === "ok" ? m.sit === s : s === "ipoa" ? m.ipF : s === "ghi" ? m.ghF : s === "inop" ? m.inopN :
-          s === "os" ? m.ex : s === "noos" ? m.noos : s === "inv" ? m.invF : false;
+          s === "os" ? m.ex : s === "noos" ? m.noos : s === "inv" ? m.invF : s === "cos" ? m.cosF : false;
       })) return false;
       return true;
     });
@@ -379,43 +417,22 @@
 
   // ── o desenho ────────────────────────────────────────────────────────────────────────────────────────────────
   var rid = function (p) { return p.src + "|" + p.usina; };
-  function situacao(m) {
-    if (m.sit === "falha") return m.sev === "cr" ? '<span class="gc-status gc-status--critico">Falha crítica</span>' : '<span class="gc-status gc-status--alerta">Falha</span>';
-    return m.sit === "conf" ? '<span class="gc-status gc-status--ok">Validado</span>' : '<span class="gc-status gc-status--neutro">Sem falha</span>';
-  }
-  function selos(m) {
-    var h = "";
-    if (m.inopN) h += '<span class="fr-selo fr-selo--inop" title="' + esc(m.inop.join(", ")) + '">' + m.inopN + " inoperante(s)</span>";
-    if (m.noos) h += '<span class="fr-selo fr-selo--alerta" title="Parada registrada no COS sem número de OS: conta para o furo, mas é ponto de atenção">' + m.noos + " parada(s) sem OS</span>";
-    if (m.cmt) h += '<span class="fr-selo" title="Itens com comentário">' + m.cmt + " comentário(s)</span>";
-    return h;
-  }
-  function tipos(m) {
-    return m.kinds ? m.kinds.split(" + ").map(function (k) { return '<span class="fr-tipo fr-tipo--' + (k === "ETM" ? "etm" : "ger") + '">' + k + "</span>"; }).join(" ") : '<span class="mudo">—</span>';
-  }
   function numero(r, v, d, tom) { return '<div><div class="r">' + r + '</div><div class="v gc-num' + (tom ? " fr-v--" + tom : "") + '">' + v + '</div><div class="d">' + d + "</div></div>"; }
   function desenharNumeros(rows) {
-    var n = function (k) { return rows.filter(function (r) { return r.m.sit === k; }).length; };
-    var soma = function (k) { return rows.reduce(function (a, r) { return a + r.m[k]; }, 0); }, com = function (k) { return rows.filter(function (r) { return r.m[k]; }).length; };
-    var cT = soma("cellT"), cP = soma("cp"), falha = n("falha"), crit = rows.filter(function (r) { return r.m.sit === "falha" && r.m.sev === "cr"; }).length;
-    var ger = rows.filter(function (r) { return /Geração/.test(r.m.kinds); }).length, etm = rows.filter(function (r) { return /ETM/.test(r.m.kinds); }).length;
+    var soma = function (k) { return rows.reduce(function (a, r) { return a + r.m[k]; }, 0); };
+    var falha = rows.filter(function (r) { return r.m.sit === "falha"; }).length, crit = rows.filter(function (r) { return r.m.sit === "falha" && r.m.sev === "cr"; }).length;
+    var cT = soma("cellT"), cP = soma("cp"), dd = soma("dd"), du = soma("du"), dt = soma("dt"), cf = soma("cosF");
     $("fr-numeros").innerHTML =
-      numero("Usinas com furo pendente", falha + ' <small>de ' + rows.length + "</small>", crit ? crit + " em falha crítica" : "nenhuma em falha crítica", falha ? (crit ? "critico" : "alerta") : "ok") +
-      numero("Furo de geração", ger, "inversor, medidor ou a usina toda") +
-      numero("Furo de ETM", etm, "IPOA ou GHI da estação") +
+      numero("Usinas com furo pendente", falha + ' <small>de ' + rows.length + "</small>", crit ? crit + " sem coleta ou com menos da metade do dado" : "nenhuma em falha crítica", falha ? (crit ? "critico" : "alerta") : "ok") +
+      numero("Dias com furo", dd, dd ? "somando as usinas: " + du + " com a usina toda sem dado, " + dt + " só de IPOA ou GHI" : "nenhum dia pendente", dd ? "alerta" : "ok") +
       numero("Completude", cT ? ((1 - cP / cT) * 100).toFixed(1).replace(".", ",") + "%" : "—", "das células esperadas até " + fmtD(M().end)) +
-      numero("Paradas sem OS", soma("noos"), com("noos") ? "em " + com("noos") + " usina(s): ponto de atenção" : "nenhuma no mês");
-    var par = function (r, v) { return '<div><span class="gc-rotulo">' + r + '</span><b class="gc-num">' + v + "</b></div>"; };
-    $("fr-mais-grade").innerHTML =
-      par("Usinas validadas", n("conf")) + par("Usinas sem falha", n("ok")) + par("Com IPOA pendente", com("ipF")) + par("Com GHI pendente", com("ghF")) +
-      par("Células explicadas por parada", soma("ex") + " em " + com("ex") + " usina(s)") + par("Equipamentos inoperantes", soma("inopN") + " em " + com("inopN") + " usina(s)") +
-      par("Equipamentos de geração com furo", soma("invF") + " de " + soma("nInv"));
+      numero("Com ocorrência no COS", cf + (dd ? ' <small>de ' + dd + "</small>" : ""), "dias com furo em que o COS registrou algo na usina");
   }
   function desenharFontes() {
     var f = DB.fontes || {}, s = DB.stats || {}, bd = f.bd || {}, partes = [];
     partes.push("Verificação de 01/" + MONTH.split("-")[1] + " a " + fmtD(M().end) + "/" + MONTH.split("-")[0] + ", " + P().length + " usinas");
     partes.push("banco: " + ["BD_Performance", "BD_Thopen"].map(function (k) { return k + " de " + (bd[k] ? bd[k].slice(0, 5) + " " + bd[k].slice(11) : "sem hora"); }).join(", "));
-    if (f.cos && f.cos.ligado) partes.push("COS: " + (s.cos_registros || 0) + " paradas com geração parada");
+    if (f.cos && f.cos.ligado) partes.push("COS: " + (s.cos_ocorrencias != null ? s.cos_ocorrencias + " ocorrências nas usinas" : (s.cos_registros || 0) + " paradas com geração parada"));
     partes.push("conta de " + (DB.gen || "").slice(0, 5) + " " + (DB.gen || "").slice(11));
     $("fr-fontes").textContent = partes.join(" · ") + ".";
     var av = [];
@@ -428,142 +445,214 @@
     if (DB.erro_conta) av.push("A última tentativa de refazer a conta falhou (" + DB.erro_conta + "). O que está na tela é a conta de " + (DB.gen || "antes") + ".");
     $("fr-avisos").innerHTML = av.map(function (t) { return '<p class="aviso">' + esc(t) + "</p>"; }).join("");
   }
+  // o tamanho do furo por cliente (Levi, 19/11/2026: "mais visual também, por cliente, sabe, por tamanho do furo"): a barra
+  // é a soma dos dias com furo das usinas dele, em vermelho a parte em que faltou a usina toda; o clique filtra
   function desenharClientes(todas) {
     var cs = {}, sel = varios("cliente");
-    todas.forEach(function (x) { var c = cs[x.p.cliente] = cs[x.p.cliente] || { n: 0, f: 0 }; c.n++; if (x.m.sit === "falha") c.f++; });
-    var chip = function (nome, v, f, n, on) { return '<button type="button" class="gc-chip" data-cli="' + esc(v) + '" aria-pressed="' + (on ? "true" : "false") + '">' + esc(nome) + ' <b class="gc-num' + (f ? " fr-pend" : "") + '">' + f + '</b><span class="mudo gc-num">/' + n + "</span></button>"; };
-    $("fr-clientes").innerHTML = chip("Todos", "", todas.filter(function (x) { return x.m.sit === "falha"; }).length, todas.length, !sel.length) +
-      Object.keys(cs).sort(function (a, b) { return a.localeCompare(b, "pt-BR"); }).map(function (k) { return chip(k, k, cs[k].f, cs[k].n, sel.length === 1 && sel[0] === k); }).join("");
+    todas.forEach(function (x) {
+      var c = cs[x.p.cliente] = cs[x.p.cliente] || { n: 0, f: 0, dd: 0, du: 0, dg: 0, dt: 0 };
+      c.n++; c.dd += x.m.dd; c.du += x.m.du; c.dg += x.m.dg; c.dt += x.m.dt; if (x.m.sit === "falha") c.f++;
+    });
+    var nomes = Object.keys(cs).sort(function (a, b) { return a.localeCompare(b, "pt-BR"); });
+    var com = nomes.filter(function (k) { return cs[k].dd; }).sort(function (a, b) { return cs[b].dd - cs[a].dd; }), sem = nomes.filter(function (k) { return !cs[k].dd; });
+    var max = com.length ? cs[com[0]].dd : 1;
+    $("fr-clientes").innerHTML = com.map(function (k) {
+      var c = cs[k], on = sel.length === 1 && sel[0] === k;
+      return '<button type="button" class="fr-cli' + (sel.length && !on ? " fr-cli--fora" : "") + '" data-cli="' + esc(k) + '" aria-pressed="' + on + '">' +
+        '<span class="fr-cli-nome">' + esc(k) + "</span>" +
+        '<span class="fr-cli-barra" title="' + c.du + " dia(s) com a usina toda sem dado, " + c.dg + " com parte da geração faltando, " + c.dt + ' só de IPOA ou GHI">' +
+        ["u", "dg", "dt"].map(function (s) { var v = s === "u" ? c.du : c[s]; return '<i class="fr-cli-' + s + '" style="width:' + (100 * v / max).toFixed(2) + '%"></i>'; }).join("") + "</span>" +
+        '<span class="fr-cli-num"><b class="gc-num">' + c.dd + "</b> " + (c.dd === 1 ? "dia" : "dias") + ' <span class="mudo">· ' + c.f + " de " + c.n + (c.n === 1 ? " usina" : " usinas") + "</span></span></button>";
+    }).join("") + (sem.length ? '<p class="fr-cli-sem mudo">Sem furo pendente: ' + sem.map(function (k) {
+      return '<button type="button" class="fr-cli-link" data-cli="' + esc(k) + '">' + esc(k) + "</button>";
+    }).join(", ") + "</p>" : "") + (com.length ? "" : '<p class="mudo">Nenhum cliente com furo pendente neste mês.</p>');
   }
-  var COLS = {
-    res: [["usina", "Usina"], ["sit", "Situação"], ["kinds", "Tipo de furo"], ["falha", "O que falta (dias sem dado)", 0, 1], ["pendN", "Pendentes", 1], ["confN", "Validados", 1], ["ex", "Com parada", 1]],
-    det: [["usina", "Usina"], ["sit", "Situação"], ["kinds", "Tipo de furo"], ["ipF", "Dias sem IPOA", 1], ["ghF", "Dias sem GHI", 1], ["invF", "Geração com furo", 1], ["cp", "Células com furo", 1], ["comp", "Completude", 1], ["inopN", "Inoperantes", 1]]
-  };
+  var DIA_T = { u: "a usina toda sem dado", f: "falta a geração de parte dos equipamentos", t: "falta só o IPOA ou o GHI", c: "furo validado", e: "explicado por parada", n: "usina sem geração no dia", o: "completo" };
+  function tira(p, m) {
+    return '<span class="fr-tira">' + m.dia.map(function (s, k) {
+      var js = m.ocd[k], d = p.days[k];
+      return '<i class="fr-q fr-q--' + s + (js.length ? " fr-q--cos" : "") + '" title="' + fmtD(d) + ": " + DIA_T[s] +
+        (js.length ? " · COS: " + esc(js.map(function (j) { return ocCurto(p, j, d); }).join("; ")) : "") + '"></i>';
+    }).join("") + "</span>";
+  }
+  var COLS = [["usina", "Usina"], ["dia", "O mês, dia a dia"], ["tam", "Furo pendente", 1], ["oc", "COS no mês", 1]];
   function ordenar(rows) {
-    var o = ORD[VISAO], sv = { falha: 2, conf: 1, ok: 0 };
+    var o = ORD;
     var val = function (x) {
-      var p = x.p, m = x.m, k = o.k;
-      return k === "sit" ? sv[m.sit] * 10 + (m.sev === "cr" ? 1 : 0) : k === "pend" ? (m.sit === "falha" ? 1e6 : m.sit === "conf" ? 5e5 : m.inopN ? 1e5 : 0) + (m.sev === "cr" ? 2e5 : 0) + m.cp : (k in m ? m[k] : (p[k] || ""));
+      var m = x.m;
+      // o tamanho: os dias com furo; no empate, o da usina toda e o de geração vêm antes do só de IPOA ou GHI
+      return o.k === "usina" ? x.p.usina : o.k === "oc" ? m.ocFN * 1e4 + m.ocN : m.dd * 1e6 + m.du * 1e4 + m.dg * 1e2 + (m.sit === "conf" ? 1 : 0) + m.cp / 1e7;
     };
-    rows.sort(function (a, b) { var x = val(a), y = val(b); return (x > y ? 1 : x < y ? -1 : 0) * o.d || (b.m.cp - a.m.cp) || a.p.usina.localeCompare(b.p.usina, "pt-BR"); });
-  }
-  function motOpts(ap, sel, ph) {
-    return '<option value="">' + (ph || "Pendente: escolha o motivo") + "</option>" + MOT.filter(function (x) { return x.ap === "both" || x.ap === ap; }).map(function (x) {
-      return '<option value="' + x.k + '"' + (sel === x.k ? " selected" : "") + ">" + x.l + "</option>";
-    }).join("");
-  }
-  function quando(ent) {
-    if (!ent || !ent.t) return "";
-    var d = new Date(ent.t);
-    if (isNaN(d)) return "";
-    return (ent.q ? esc(ent.q) + " · " : "") + pad(d.getDate()) + "/" + pad(d.getMonth() + 1) + " " + pad(d.getHours()) + ":" + pad(d.getMinutes());
-  }
-  function paradas(p, id) {
-    if (!p.os || !p.os.length) return "";
-    var cnt = p.os.map(function () { return 0; });
-    p.eqs.forEach(function (e) { if (e.cv) Object.keys(e.cv).forEach(function (k) { e.cv[k].forEach(function (j) { cnt[j]++; }); }); });
-    var fonte = { T: "Ticket", F: "Fracttal", C: "COS", "F+T": "Fracttal e ticket" };
-    return '<details class="fr-dobra"' + (PARADAS.has(id) ? " open" : "") + ' data-paradas="' + esc(id) + '"><summary>Paradas registradas nesta usina <b class="gc-num">' + p.os.length +
-      '</b><span class="mudo">cobre o dia a parada com 6 h ou mais entre 6h e 18h</span></summary><div class="fr-rola"><table class="fr-sub"><thead><tr><th>Fonte</th><th>OS</th><th>Equipamento</th><th>Classificação</th><th>Início</th><th>Fim</th><th class="n">Células cobertas</th></tr></thead><tbody>' +
-      p.os.map(function (o, j) {
-        return "<tr><td>" + (fonte[o[0]] || esc(o[0])) + "</td><td>" + (o[6] === "A" ? '<span class="fr-selo fr-selo--alerta">sem OS</span>' : esc(o[1])) + "</td><td>" + esc(o[2]) + "</td><td>" + esc(o[3]) +
-          '</td><td class="gc-num">' + esc(o[4]) + '</td><td class="gc-num">' + esc(o[5]) + '</td><td class="n gc-num">' + cnt[j] + "</td></tr>";
-      }).join("") + "</tbody></table></div></details>";
-  }
-  function mapa(p, m, id) {
-    var sa = TODOS.has(id), z = opt("zero") !== "0", days = p.days, byN = {}, Dset = {};
-    m.items.forEach(function (t) { byN[t.nome] = t; });
-    (m.ufv ? m.ufv.idx : []).forEach(function (k) { Dset[k] = 1; });
-    var eqs = p.eqs.filter(function (e) { return sa || byN[e.nome] || e.st.indexOf("e") >= 0 || (m.ufv && isGen(e)); });
-    var h = '<div class="fr-mapa-topo"><h3 class="fr-h3">Mapa do mês</h3><div class="fr-chave">' +
-      [["o", "Coletado"], ["v", "Vazio"], ["x", "Linha ausente"], ["z", "Zerado"], ["d", "IPOA só estimado"], ["a", "Valor anômalo"], ["e", "Explicado por parada"], ["c", "Validado"], ["i", "Inoperante"], ["p", "Usina sem geração"]]
-        .map(function (x) { return '<span><i class="fr-c fr-c-' + x[0] + '"></i>' + x[1] + "</span>"; }).join("") +
-      '</div><button type="button" class="gc-btn gc-btn--fantasma fr-mini" data-a="all" data-id="' + esc(id) + '">' + (sa ? "Mostrar só os equipamentos com falha" : "Mostrar todos os equipamentos (" + p.eqs.length + ")") + "</button></div>";
-    if (!eqs.length) return h + '<p class="mudo">Nenhum equipamento com furo ou parada neste mês.</p>';
-    h += '<div class="fr-rola"><table class="fr-heat"><thead><tr><th></th>' + days.map(function (d) { return '<th class="gc-num">' + d + "</th>"; }).join("") + "</tr></thead><tbody>";
-    if (m.ufv) {
-      h += '<tr><th>Usina toda' + (m.ufv.ok ? ' <small class="fr-okt">validado</small>' : "") + "</th>" + days.map(function (d, i) {
-        var c = Dset[i] ? (m.ufv.vr[i] ? (m.ufv.vr[i] === "fora_op" ? "i" : "c") : "v") : "n";
-        return '<td class="fr-c fr-c-' + c + '" title="' + (Dset[i] ? "Usina toda sem dado" + (m.ufv.vr[i] ? " (validado: " + esc(MOTL[m.ufv.vr[i]] || m.ufv.vr[i]) + ")" : "") : "sem furo da usina toda") + " · " + fmtD(d) + '"></td>';
-      }).join("") + "</tr>";
-    }
-    eqs.forEach(function (e) {
-      var t = byN[e.nome], bs = furoDe(e, z);
-      h += "<tr><th>" + esc(e.nome) + (t && t.ok ? ' <small class="fr-okt">validado</small>' : (t && t.nv ? ' <small class="mudo">parcial</small>' : "")) + "</th>" + e.st.split("").map(function (c, i) {
-        var u = (m.ufv && Dset[i] && isGen(e)) ? m.ufv : null, rr = u ? u.vr[i] : ((t && bs.indexOf(c) >= 0) ? t.vr[i] : ""), cc = rr ? (rr === "fora_op" ? "i" : "c") : c;
-        return '<td class="fr-c fr-c-' + cc + '" title="' + esc(e.nome) + " · " + fmtD(days[i]) + " · " + (c === "e" ? "ausência esperada: " + esc(paradaTxt(p, e, i)) : ESTADO[c]) +
-          (rr ? " (validado: " + esc(MOTL[rr] || rr) + ")" : "") + (u ? " · usina toda sem dado" : "") + '"></td>';
-      }).join("") + "</tr>";
+    rows.sort(function (a, b) {
+      var x = val(a), y = val(b);
+      return (typeof x === "string" ? x.localeCompare(y, "pt-BR") : (x > y ? 1 : x < y ? -1 : 0)) * o.d || a.p.usina.localeCompare(b.p.usina, "pt-BR");
     });
-    return h + "</tbody></table></div>";
-  }
-  function painel(p, m) {
-    var id = rid(p), att0 = 'data-id="' + esc(id) + '"';
-    var h = '<div class="fr-painel"><div class="fr-painel-topo"><div><b>' + esc(p.usina) + '</b> <span class="mudo">' + esc(p.cliente) + (p.carteira && p.carteira !== "—" && p.carteira !== p.cliente ? " · " + esc(p.carteira) : "") + " · " + esc(p.src) +
-      (p.supervisor ? " · supervisor " + esc(p.supervisor) : "") + (p.status ? " · " + esc(p.status) : "") + "</span></div></div>";
-    if (!m.items.length) return h + '<p class="mudo">Nenhum furo nesta usina com os critérios de agora.</p>' + paradas(p, id) + mapa(p, m, id) + "</div>";
-    h += '<div class="fr-lote"><h3 class="fr-h3">Validar os furos</h3><span class="fr-lote-acoes"><button type="button" class="gc-btn gc-btn--contorno fr-mini" data-a="sug" ' + att0 + ' title="Aplica a sugestão do Nexus a cada item pendente que tem uma">Aceitar as sugestões</button>' +
-      '<select class="gc-campo fr-sel" data-a="bulkmot" ' + att0 + ' aria-label="Motivo para todos os pendentes">' + motOpts("both", "", "Motivo para todos os pendentes") + "</select>" +
-      '<select class="gc-campo fr-sel fr-sel--curto" data-a="bulkvig" ' + att0 + ' aria-label="Vale para"><option value="m">só este mês</option><option value="*">todos os meses</option></select>' +
-      '<button type="button" class="gc-btn gc-btn--primario fr-mini" data-a="bulk" ' + att0 + ">Aplicar aos pendentes</button>" +
-      '<button type="button" class="gc-btn gc-btn--fantasma fr-mini" data-a="clear" ' + att0 + ">Limpar as validações</button></span></div>";
-    h += '<div class="fr-rola"><table class="fr-sub fr-itens"><thead><tr><th>Item</th><th>Dias com furo</th><th>Motivo do item inteiro</th><th>Vale para</th><th>Só alguns dias</th><th>Comentário</th></tr></thead><tbody>';
-    m.items.forEach(function (t) {
-      var s = suggest(p, t), ent = t.ent, ap = apOf(t.tipo), key = id + "|" + t.nome, sel = SEL[key] || (SEL[key] = {});
-      var rs = {}; Object.keys(t.vr).forEach(function (k) { rs[t.vr[k]] = 1; });
-      var rl = Object.keys(rs), selR = (t.nv === t.idx.length && rl.length === 1) ? rl[0] : "";
-      var vsel = ent && ent.v === "*" ? "*" : (ent && String(ent.v).indexOf(",") >= 0 ? "keep" : "m");
-      var att = att0 + ' data-n="' + esc(t.nome) + '"', nsel = Object.keys(sel).length;
-      var chips = t.idx.map(function (k) {
-        var d = p.days[k], r = t.vr[k];
-        return '<button type="button" class="fr-dia' + (r ? " fr-dia--v" : "") + '" data-a="chip" ' + att + ' data-day="' + d + '" aria-pressed="' + (sel[d] ? "true" : "false") + '" title="' + fmtD(d) + ": " + (r ? "validado, " + esc(MOTL[r] || r) : "pendente") + '">' + pad(d) + "</button>";
-      }).join("");
-      var estado = t.ok ? '<span class="fr-okt">validado</span>' : (t.nv ? '<span class="fr-parc">' + t.nv + " de " + t.idx.length + " dias validados</span>" : '<span class="fr-pend">pendente</span>');
-      h += "<tr><td><b>" + esc(t.tipo === "UFV" ? "Usina toda sem dado" : t.nome) + '</b> <span class="fr-tipo fr-tipo--' + (kindLbl(t.tipo) === "ETM" ? "etm" : "ger") + '">' + kindLbl(t.tipo) + "</span>" + '<span class="fr-item-estado">' + estado + "</span>" +
-        (t.tipo === "UFV" ? '<small class="mudo fr-item-nota">os ' + t.w + " equipamentos de geração no mesmo dia</small>" : "") +
-        (s && !t.ok ? '<small class="fr-item-nota fr-sug" title="' + esc(s[1]) + '">Sugestão: ' + esc(MOTL[s[0]]) + "</small>" : "") + "</td>" +
-        '<td><b class="gc-num">' + t.idx.length + '</b><small class="mudo fr-item-nota">' + ranges(t.idx, p.days) + "</small></td>" +
-        '<td><select class="gc-campo fr-sel" data-a="mot" ' + att + ' aria-label="Motivo de ' + esc(t.nome) + '">' + motOpts(ap, selR, t.nv && !selR ? "Validação parcial, por dia" : "") + "</select>" +
-        (ent && (ent.r || ent.dm) && quando(ent) ? '<small class="mudo fr-quem">' + quando(ent) + "</small>" : "") + "</td>" +
-        '<td><select class="gc-campo fr-sel fr-sel--curto" data-a="vig" ' + att + (t.nv ? "" : " disabled") + ' aria-label="Vale para"><option value="m"' + (vsel === "m" ? " selected" : "") + '>só este mês</option><option value="*"' + (vsel === "*" ? " selected" : "") + ">todos os meses</option>" +
-        (vsel === "keep" ? '<option value="keep" selected>meses ' + esc(String(ent.v).replace(/,/g, ", ")) + "</option>" : "") + "</select></td>" +
-        '<td><details class="fr-dias"' + ((DIAS.has(key) || nsel) ? " open" : "") + '><summary data-dk="' + esc(key) + '">' + (nsel ? nsel + " marcado(s)" : "Escolher os dias") + '</summary><div class="fr-dias-lista">' + chips + "</div>" +
-        '<div class="fr-dias-acoes"><select class="gc-campo fr-sel" data-a="dmot" ' + att + ' aria-label="Motivo dos dias marcados">' + motOpts(ap, "", "Motivo dos dias marcados") + "</select>" +
-        '<button type="button" class="gc-btn gc-btn--primario fr-mini" data-a="valdays" ' + att + ">Validar os marcados</button>" +
-        '<button type="button" class="gc-btn gc-btn--contorno fr-mini" data-a="unval" ' + att + ">Tirar a validação</button>" +
-        '<button type="button" class="gc-btn gc-btn--fantasma fr-mini" data-a="selpend" ' + att + ">Marcar os pendentes</button>" +
-        '<button type="button" class="gc-btn gc-btn--fantasma fr-mini" data-a="selall" ' + att + ">Marcar todos</button>" +
-        '<button type="button" class="gc-btn gc-btn--fantasma fr-mini" data-a="selnone" ' + att + ">Desmarcar</button></div></details></td>" +
-        '<td><input type="text" class="gc-campo fr-obs" data-a="obs" ' + att + ' value="' + esc(ent && ent.o ? ent.o : "") + '" placeholder="Não muda a situação" aria-label="Comentário de ' + esc(t.nome) + '" maxlength="2000"></td></tr>';
-    });
-    return h + "</tbody></table></div>" + paradas(p, id) + mapa(p, m, id) + "</div>";
   }
   function celula(k, p, m) {
     switch (k) {
       case "usina": return '<td class="fr-usina"><i class="ph ph-caret-right fr-seta" aria-hidden="true"></i><span><b>' + esc(p.usina) + '</b><small class="mudo">' + esc(p.cliente) + (p.carteira && p.carteira !== "—" && p.carteira !== p.cliente ? " · " + esc(p.carteira) : "") + "</small></span></td>";
-      case "sit": return '<td class="fr-sit">' + situacao(m) + selos(m) + "</td>";
-      case "kinds": return "<td>" + tipos(m) + "</td>";
-      case "falha": return '<td class="fr-falha">' + (falhaTxt(p, m) || '<span class="mudo">' + (m.sit === "conf" ? "Todo furo tem motivo registrado" : "Nada faltando no mês") + (m.ex ? ", " + m.ex + " célula(s) explicada(s) por parada" : "") + "</span>") + "</td>";
-      case "comp": return '<td class="n"><span class="fr-barra-comp" aria-hidden="true"><i style="width:' + (m.comp * 100).toFixed(0) + '%"></i></span><span class="gc-num">' + (m.comp * 100).toFixed(0) + "%</span></td>";
-      case "invF": return '<td class="n gc-num">' + m.invF + ' <small class="mudo">de ' + m.nInv + "</small></td>";
-      default: return '<td class="n gc-num">' + (m[k] || (k === "pendN" || k === "cp" ? 0 : "")) + "</td>";
+      case "dia": return '<td class="fr-td-tira">' + tira(p, m) + "</td>";
+      case "tam":
+        if (m.dd) return '<td class="n fr-tam"><b class="gc-num fr-tam-n fr-tam-n--' + m.sev + '">' + m.dd + '</b> <span class="mudo">' + (m.dd === 1 ? "dia" : "dias") + '</span><small>' + esc(oQueFalta(m)) + "</small></td>";
+        return '<td class="n fr-tam">' + (m.sit === "conf" ? '<span class="fr-okt">validado</span>' : '<span class="mudo">completo</span>') + (m.ex ? '<small>' + m.ex + " célula(s) explicada(s) por parada</small>" : "") + "</td>";
+      case "oc":
+        if (!m.ocN) return '<td class="n"><span class="mudo">nenhuma</span></td>';
+        return '<td class="n"><b class="gc-num">' + m.ocN + '</b>' + (m.ocFN ? '<small class="fr-oc-furo">' + m.ocFN + (m.ocFN === 1 ? " no dia do furo" : " nos dias do furo") + "</small>" : "") + "</td>";
     }
+    return "<td></td>";
   }
   function desenharTabela(rows) {
-    var cols = COLS[VISAO], o = ORD[VISAO], tb = $("fr-tabela");
-    tb.tHead.innerHTML = "<tr>" + cols.map(function (c) {
-      return '<th scope="col" class="' + (c[2] ? "n" : "") + '" data-k="' + c[0] + '"' + (o.k === c[0] ? ' aria-sort="' + (o.d > 0 ? "ascending" : "descending") + '"' : "") + '><button type="button">' + c[1] +
-        (o.k === c[0] ? '<i class="ph ph-caret-' + (o.d > 0 ? "up" : "down") + '" aria-hidden="true"></i>' : "") + "</button></th>";
+    var tb = $("fr-tabela");
+    tb.tHead.innerHTML = "<tr>" + COLS.map(function (c) {
+      if (c[0] === "dia") return '<th scope="col" class="fr-th-tira"><span>' + c[1] + ' <span class="fr-th-nota">' + fmtD(1) + " a " + fmtD(M().end) + "</span></span></th>";
+      return '<th scope="col" class="' + (c[2] ? "n" : "") + '" data-k="' + c[0] + '"' + (ORD.k === c[0] ? ' aria-sort="' + (ORD.d > 0 ? "ascending" : "descending") + '"' : "") + '><button type="button">' + c[1] +
+        (ORD.k === c[0] ? '<i class="ph ph-caret-' + (ORD.d > 0 ? "up" : "down") + '" aria-hidden="true"></i>' : "") + "</button></th>";
     }).join("") + "</tr>";
     ordenar(rows);
     var h = "";
     rows.forEach(function (x) {
       var p = x.p, m = x.m, id = rid(p), ab = ABERTAS.has(id);
       h += '<tr class="fr-linha fr-linha--' + (m.sit === "falha" ? m.sev : m.sit) + (ab ? " fr-aberta" : "") + '" data-id="' + esc(id) + '" tabindex="0" aria-expanded="' + (ab ? "true" : "false") + '">' +
-        cols.map(function (c) { return celula(c[0], p, m); }).join("") + "</tr>";
-      if (ab) h += '<tr class="fr-detalhe"><td colspan="' + cols.length + '">' + painel(p, m) + "</td></tr>";
+        COLS.map(function (c) { return celula(c[0], p, m); }).join("") + "</tr>";
+      if (ab) h += '<tr class="fr-detalhe"><td colspan="' + COLS.length + '">' + painel(p, m) + "</td></tr>";
     });
-    tb.tBodies[0].innerHTML = h || '<tr><td colspan="' + cols.length + '" class="fr-vazio">Nenhuma usina com estes filtros.</td></tr>';
+    tb.tBodies[0].innerHTML = h || '<tr><td colspan="' + COLS.length + '" class="fr-vazio">Nenhuma usina com estes filtros.</td></tr>';
+    // a barra de validação lembra o motivo, a vigência e o comentário escolhidos antes de marcar os dias
+    [].forEach.call(tb.querySelectorAll(".fr-acao[data-id]"), function (bx) {
+      var b = BARRA[bx.getAttribute("data-id")];
+      if (!b) return;
+      ["amot", "avig", "aobs"].forEach(function (a) { var el = bx.querySelector("[data-a=" + a + "]"); if (el && b[a] != null && !el.disabled) el.value = b[a]; });
+    });
+  }
+
+  // ── o detalhe da usina: o que o COS registrou, e o mapa do mês com a validação ─────────────────────────────────
+  function ocorrencias(p, m, id) {
+    var oc = p.oc || [], cong = (p.os || []).filter(function (o) { return o[0] !== "C"; }), t = tempos(p);
+    var todas = OCTODAS.has(id), mostrar = oc.map(function (_o, j) { return j; }).filter(function (j) { return todas || m.ocF[j] || oc[j][7]; });
+    var h = '<section class="fr-oc"><div class="fr-oc-topo"><h3 class="fr-h3">O que o COS registrou</h3><span class="mudo">' +
+      (oc.length ? oc.length + (oc.length === 1 ? " ocorrência" : " ocorrências") + " em " + MN[MES()] + "; " + m.ocFN + " nos dias com furo" : "nenhuma ocorrência em " + MN[MES()]) + "</span>" +
+      (oc.length && mostrar.length < oc.length ? '<button type="button" class="gc-btn gc-btn--fantasma fr-mini" data-a="octodas" data-id="' + esc(id) + '">Ver as ' + oc.length + "</button>" : "") +
+      (todas && oc.length > m.ocFN ? '<button type="button" class="gc-btn gc-btn--fantasma fr-mini" data-a="octodas" data-id="' + esc(id) + '">Só as dos dias com furo</button>' : "") + "</div>";
+    if (oc.length && !mostrar.length) h += '<p class="mudo fr-oc-nada">Nenhuma ocorrência do COS nos dias com furo: o furo não tem explicação registrada.</p>';
+    if (mostrar.length || cong.length) {
+      h += '<div class="fr-rola"><table class="fr-sub fr-oc-tab"><thead><tr><th>Quando</th><th>Ocorrência</th><th>OS</th><th>Geração</th><th></th></tr></thead><tbody>' +
+        mostrar.map(function (j) {
+          var o = oc[j];
+          return '<tr class="' + (m.ocF[j] ? "fr-oc-nofuro" : "") + '"><td class="gc-num fr-oc-quando">' + dh(t[j][0]) + " → " + (o[6] ? '<b class="fr-pend">em aberto</b>' : dh(t[j][1])) +
+            ' <span class="mudo">(' + dur(t[j][1] - t[j][0]) + ")</span></td><td><b>" + esc(o[2]) + "</b>" + (o[3] ? ' <span class="mudo">' + esc(o[3]) + "</span>" : "") + "</td>" +
+            '<td class="gc-num">' + (o[4] ? esc(o[4]) : '<span class="fr-selo fr-selo--alerta">sem OS</span>') + "</td>" +
+            "<td>" + (o[5] === "s" ? "parou" : o[5] === "n" ? "seguiu" : '<span class="mudo">não informado</span>') + "</td>" +
+            "<td>" + (o[7] ? '<span class="fr-tag fr-tag--e" title="Parada de 6 h ou mais entre 6h e 18h, com geração parada: pela regra do R01 o dia não é furo">explica o dia</span>' :
+              m.ocF[j] ? '<span class="fr-tag fr-tag--f">no dia do furo</span>' : "") + "</td></tr>";
+        }).join("") +
+        cong.map(function (o) {
+          return "<tr><td class=\"gc-num fr-oc-quando\">" + esc(o[4]) + " → " + esc(o[5]) + "</td><td><b>" + esc(o[3]) + '</b> <span class="mudo">' + esc(o[2]) + "</span></td><td class=\"gc-num\">" +
+            ({ T: "ticket ", F: "OS ", "F+T": "OS " }[o[0]] || "") + esc(o[1]) + '</td><td><span class="mudo">' + ({ T: "ticket", F: "Fracttal", "F+T": "Fracttal e ticket" }[o[0]] || esc(o[0])) +
+            '</span></td><td><span class="fr-tag fr-tag--e">explica o dia</span></td></tr>';
+        }).join("") + "</tbody></table></div>";
+    }
+    return h + "</section>";
+  }
+  // as linhas do mapa: a do COS, a da usina toda, o IPOA e o GHI, e os equipamentos de geração; os que têm o MESMO furo
+  // nos mesmos dias (mesmas cores, mesma validação, mesma marcação) viram uma linha só
+  function linhasDoMapa(p, m, id) {
+    var sa = TODOS.has(id), z = opt("zero") !== "0", byN = {}, Dset = {}, ls = [];
+    m.items.forEach(function (t) { byN[t.nome] = t; });
+    (m.ufv ? m.ufv.idx : []).forEach(function (k) { Dset[k] = 1; });
+    function cores(e, t) {
+      var bs = furoDe(e, z);
+      return e.st.split("").map(function (c, i) {
+        var u = (m.ufv && Dset[i] && isGen(e)) ? m.ufv : null, rr = u ? u.vr[i] : ((t && bs.indexOf(c) >= 0) ? t.vr[i] : "");
+        return rr ? (rr === "fora_op" ? "i" : "c") : c;
+      });
+    }
+    if (m.ufv) ls.push({ nome: "Usina toda sem dado", itens: [m.ufv], cel: p.days.map(function (_d, i) { return Dset[i] ? (m.ufv.vr[i] ? (m.ufv.vr[i] === "fora_op" ? "i" : "c") : "v") : "n"; }) });
+    p.eqs.forEach(function (e) {
+      var t = byN[e.nome];
+      if (!sa && !t && e.st.indexOf("e") < 0) return;
+      var cel = cores(e, t), selT = t ? Object.keys(SEL[id + "|" + t.nome] || {}).sort().join(",") : "";
+      var assin = isGen(e) ? cel.join("") + "|" + (t ? t.idx.join(",") + "|" + JSON.stringify(t.vr) + "|" + selT + "|" + (t.ent && t.ent.o ? t.ent.o : "") : "-") : null;
+      var ult = ls[ls.length - 1];
+      if (assin && ult && ult.assin === assin) { ult.eqs.push(e); if (t) ult.itens.push(t); return; }
+      ls.push({ nome: e.nome, eqs: [e], itens: t ? [t] : [], cel: cel, assin: assin });
+    });
+    return ls;
+  }
+  function rotulo(l) {
+    if (!l.eqs || l.eqs.length === 1) return esc(l.nome);
+    var ns = l.eqs.map(function (e) { return curto(e.nome); });
+    return l.eqs.length <= 3 ? "Inversores " + esc(ns.join(", ")) : esc(l.eqs.length + " inversores") + ' <span class="mudo">(' + esc(ns[0]) + " a " + esc(ns[ns.length - 1]) + ")</span>";
+  }
+  function estadoDe(p, l) {
+    var t = l.itens[0];
+    if (!t) return '<span class="mudo">sem furo</span>';
+    var s = suggest(p, t), ms = {};
+    Object.keys(t.vr).forEach(function (k) { ms[MOTL[t.vr[k]] || t.vr[k]] = 1; });
+    if (t.ok) return '<span class="fr-okt" title="' + esc(Object.keys(ms).join(" / ")) + '">validado</span>';
+    if (t.nv) return '<span class="fr-parc">' + t.nv + " de " + t.idx.length + " dias validados</span>";
+    return '<span class="fr-pend">pendente</span>' + (s ? ' <span class="fr-sug" title="' + esc(s[1]) + '">sugestão: ' + esc(MOTL[s[0]].replace(/ \(.*\)$/, "")) + "</span>" : "");
+  }
+  function mapa(p, m, id) {
+    var ls = linhasDoMapa(p, m, id), days = p.days, dsel = {}, isel = 0;
+    MAPA[id] = ls.map(function (l) { return l.itens.map(function (t) { return t.nome; }); });
+    m.items.forEach(function (t) { var ks = Object.keys(SEL[id + "|" + t.nome] || {}); if (ks.length) { isel++; ks.forEach(function (d) { dsel[d] = 1; }); } });
+    var nsel = Object.keys(dsel).length;
+    var sugN = m.pend.filter(function (t) { return suggest(p, t); }).length;
+    var h = '<section class="fr-mapa"><div class="fr-mapa-topo"><h3 class="fr-h3">Mapa do mês</h3><div class="fr-chave">' +
+      [["v", "Sem dado"], ["z", "Zerado"], ["d", "IPOA só estimado"], ["a", "Valor anômalo"], ["e", "Explicado por parada"], ["c", "Validado"], ["i", "Inoperante"], ["o", "Coletado"]]
+        .map(function (x) { return '<span><i class="fr-c fr-c-' + x[0] + '"></i>' + x[1] + "</span>"; }).join("") +
+      '<span><i class="fr-c fr-c-cos"></i>Ocorrência no COS</span></div>' +
+      (sugN ? '<button type="button" class="gc-btn gc-btn--contorno fr-mini" data-a="sug" data-id="' + esc(id) + '" title="Aplica a sugestão do Nexus a cada item pendente que tem uma">Aceitar as sugestões (' + sugN + ")</button>" : "") +
+      '<button type="button" class="gc-btn gc-btn--fantasma fr-mini" data-a="all" data-id="' + esc(id) + '">' + (TODOS.has(id) ? "Só os equipamentos com furo" : "Todos os equipamentos (" + p.eqs.length + ")") + "</button></div>";
+    if (!ls.length && !(p.oc || []).length) return h + '<p class="mudo">Nenhum equipamento com furo ou parada neste mês.</p></section>';
+    h += '<div class="fr-rola"><table class="fr-heat"><thead><tr><th></th>' + days.map(function (d) { return '<th class="gc-num">' + d + "</th>"; }).join("") + "</tr></thead><tbody>";
+    if ((p.oc || []).length) {
+      h += '<tr class="fr-heat-cos"><th>COS</th>' + days.map(function (d, i) {
+        var js = m.ocd[i];
+        return '<td class="fr-c ' + (js.length ? (js.some(function (j) { return p.oc[j][7]; }) ? "fr-c-cose" : "fr-c-cos") : "fr-c-nada") + '"' +
+          (js.length ? ' title="' + fmtD(d) + " · " + esc(js.map(function (j) { var o = p.oc[j]; return o[2] + " " + noDia(p, j, d) + (o[4] ? " (OS " + o[4] + ")" : "") + (o[5] === "s" ? ", geração parou" : o[5] === "n" ? ", geração seguiu" : ""); }).join("; ")) + '"' : "") + "></td>";
+      }).join("") + "</tr>";
+    }
+    ls.forEach(function (l, r) {
+      var furo = {}, sel = {}, todos = l.itens.length && l.itens.every(function (t) { return !t.pi.length || t.pi.every(function (k) { return (SEL[id + "|" + t.nome] || {})[p.days[k]]; }); });
+      l.itens.forEach(function (t) { t.idx.forEach(function (k) { furo[k] = 1; }); Object.keys(SEL[id + "|" + t.nome] || {}).forEach(function (d) { sel[d] = 1; }); });
+      var t0 = l.itens[0], cmt = l.itens.filter(function (t) { return t.ent && t.ent.o; })[0];
+      var nomes = l.eqs && l.eqs.length > 1 ? l.eqs.map(function (e) { return e.nome; }).join(", ") : "";
+      h += '<tr><th class="fr-rot' + (l.itens.length ? " fr-rot--clic" : "") + '"' + (l.itens.length ? ' data-a="linha" data-id="' + esc(id) + '" data-r="' + r + '" aria-pressed="' + (todos && l.itens.some(function (t) { return t.pi.length; }) ? "true" : "false") + '"' : "") +
+        ' title="' + esc((nomes ? nomes + ". " : "") + (l.itens.length ? "Clique para marcar os dias pendentes" : "") + (cmt ? ". Comentário: " + cmt.ent.o : "") + (t0 && t0.ent && t0.nv && quando(t0.ent) ? ". Validado por " + quando(t0.ent) : "")) + '">' +
+        '<span class="fr-rot-nome">' + rotulo(l) + "</span>" + (cmt ? '<i class="ph ph-chat-text fr-rot-cmt" aria-label="tem comentário"></i>' : "") + ' <span class="fr-rot-est">' + estadoDe(p, l) + "</span></th>" +
+        l.cel.map(function (c, i) {
+          var d = days[i], clic = !!furo[i] && l.itens.length;
+          return '<td class="fr-c fr-c-' + c + (clic ? " fr-clic" : "") + (sel[d] ? " fr-on" : "") + '"' + (clic ? ' data-a="cel" data-id="' + esc(id) + '" data-r="' + r + '" data-day="' + d + '"' : "") +
+            ' title="' + esc(l.nome) + " · " + fmtD(d) + " · " + (c === "e" && l.eqs ? "ausência esperada: " + esc(paradaTxt(p, l.eqs[0], i)) : c === "c" ? "validado" : c === "i" ? "inoperante" : (ESTADO[c] || "")) +
+            (m.ocd[i].length ? " · COS: " + esc(m.ocd[i].map(function (j) { return ocCurto(p, j, d); }).join("; ")) : "") + (clic ? (sel[d] ? " · marcado" : " · clique para marcar") : "") + '"></td>';
+        }).join("") + "</tr>";
+    });
+    h += "</tbody></table></div>";
+    // a barra única de validação: no lugar de uma linha por item com cinco campos (o desenho até 18/11/2026)
+    var um = isel === 1 ? m.items.filter(function (t) { return Object.keys(SEL[id + "|" + t.nome] || {}).length; })[0] : null;
+    var att = 'data-id="' + esc(id) + '"', des = nsel ? "" : " disabled";
+    h += '<div class="fr-acao" ' + att + '><span class="fr-acao-n">' + (nsel ? "<b>" + nsel + "</b> " + (nsel === 1 ? "dia marcado" : "dias marcados") + (isel > 1 ? " em " + isel + " itens" : um ? " em " + esc(um.tipo === "UFV" ? "usina toda" : um.nome) : "") :
+      '<span class="mudo">Clique nos dias com furo do mapa, ou no nome da linha, para marcar.</span>') + "</span>" +
+      '<select class="gc-campo fr-sel" data-a="amot" ' + att + des + ' aria-label="Motivo"><option value="">Motivo</option>' + MOT.map(function (x) { return '<option value="' + x.k + '">' + x.l + "</option>"; }).join("") + "</select>" +
+      '<select class="gc-campo fr-sel fr-sel--curto" data-a="avig" ' + att + des + ' aria-label="Vale para"><option value="m">só este mês</option><option value="*">todos os meses</option></select>' +
+      '<input type="text" class="gc-campo fr-obs" data-a="aobs" ' + att + des + ' maxlength="2000" placeholder="Comentário (opcional)" aria-label="Comentário" value="' + esc(um && um.ent && um.ent.o ? um.ent.o : "") + '">' +
+      '<button type="button" class="gc-btn gc-btn--primario fr-mini" data-a="aval" ' + att + des + ">Validar</button>" +
+      '<button type="button" class="gc-btn gc-btn--contorno fr-mini" data-a="atirar" ' + att + des + ">Tirar a validação</button>" +
+      '<button type="button" class="gc-btn gc-btn--fantasma fr-mini" data-a="apend" ' + att + (m.pend.length ? "" : " disabled") + ">Marcar todos os pendentes</button>" +
+      (nsel ? '<button type="button" class="gc-btn gc-btn--fantasma fr-mini" data-a="anada" ' + att + ">Desmarcar</button>" : "") + "</div>";
+    return h + "</section>";
+  }
+  function quando(ent) {
+    if (!ent || !ent.t) return "";
+    var d = new Date(ent.t);
+    if (isNaN(d)) return "";
+    return (ent.q ? ent.q + " em " : "") + pad(d.getDate()) + "/" + pad(d.getMonth() + 1) + " " + pad(d.getHours()) + ":" + pad(d.getMinutes());
+  }
+  function painel(p, m) {
+    return '<div class="fr-painel"><div class="fr-painel-topo"><b>' + esc(p.usina) + '</b> <span class="mudo">' + esc(p.cliente) + (p.carteira && p.carteira !== "—" && p.carteira !== p.cliente ? " · " + esc(p.carteira) : "") + " · " + esc(p.src) +
+      (p.supervisor ? " · supervisor " + esc(p.supervisor) : "") + (p.status ? " · " + esc(p.status) : "") + "</span></div>" +
+      ocorrencias(p, m, rid(p)) + mapa(p, m, rid(p)) + "</div>";
   }
   function render() {
     if (!DB || !MONTH) return;
@@ -587,37 +676,62 @@
 
   // ── os cliques ───────────────────────────────────────────────────────────────────────────────────────────────
   var porId = function (id) { return P().filter(function (p) { return rid(p) === id; })[0]; };
+  // validar o que está marcado: o item com TODOS os dias de furo marcados recebe o motivo do item inteiro (e a vigência
+  // escolhida); o marcado em parte, só os dias (neste mês), como o "Só alguns dias" da tela da analista
+  function validarMarcados(p, m, id, mot, vig, obs, tirar) {
+    var feitos = 0, recusados = 0, mo = MOT.filter(function (x) { return x.k === mot; })[0];
+    mudar(function () {
+      m.items.forEach(function (t) {
+        var s = SEL[id + "|" + t.nome] || {}, dias = Object.keys(s).map(Number);
+        if (!dias.length) return;
+        if (!tirar && mot && mo.ap !== "both" && mo.ap !== apOf(t.tipo)) { recusados++; return; }
+        var gap = t.idx.map(function (k) { return p.days[k]; }), todos = gap.every(function (d) { return s[d]; });
+        if (tirar) { if (todos) setConf(p, t.nome, ""); else setDays(p, t.nome, gap, dias, ""); }
+        else if (mot) { if (todos) setConf(p, t.nome, mot, vig); else setDays(p, t.nome, gap, dias, mot); }
+        if (!tirar && obs !== null && obs !== ((t.ent && t.ent.o) || "")) setObs(p, t.nome, obs);
+        feitos++;
+        delete SEL[id + "|" + t.nome];
+      });
+    });
+    delete BARRA[id];
+    if (recusados) recado(recusados + (recusados === 1 ? " item não aceita" : " itens não aceitam") + " esse motivo e " + (recusados === 1 ? "ficou marcado" : "ficaram marcados") + ": " + MOTL[mot] + ".", true);
+    else if (!tirar && !mot) recado("Comentário gravado em " + feitos + (feitos === 1 ? " item" : " itens") + ". A situação não muda.");
+  }
   function aoClicar(e) {
     var th = e.target.closest("th[data-k]");
     if (th) {
-      var o = ORD[VISAO], k = th.getAttribute("data-k");
-      if (k === "falha") return;
-      if (o.k === k) o.d *= -1; else { o.k = k; o.d = k === "usina" ? 1 : -1; }
+      var k = th.getAttribute("data-k");
+      if (ORD.k === k) ORD.d *= -1; else { ORD.k = k; ORD.d = k === "usina" ? 1 : -1; }
       render(); return;
     }
-    var b = e.target.closest("button[data-a]");
-    if (b) {
-      var p = porId(b.getAttribute("data-id")), a = b.getAttribute("data-a");
-      if (!p) return;
-      var m = calc(p), nome = b.getAttribute("data-n"), kS = b.getAttribute("data-id") + "|" + (nome || "");
-      var tI = nome ? m.items.filter(function (x) { return x.nome === nome; })[0] : null, S = SEL[kS] || (SEL[kS] = {});
-      var marcar = function (ks) { var n = {}; ks.forEach(function (k) { n[p.days[k]] = 1; }); SEL[kS] = n; };
-      if (a === "chip") { var d = +b.getAttribute("data-day"); if (S[d]) delete S[d]; else S[d] = 1; render(); }
-      else if (a === "selpend" && tI) { marcar(tI.pi); render(); }
-      else if (a === "selall" && tI) { marcar(tI.idx); render(); }
-      else if (a === "selnone") { SEL[kS] = {}; render(); }
-      else if ((a === "valdays" || a === "unval") && tI) {
-        var dias = Object.keys(S).map(Number), mot = "";
-        if (!dias.length) { recado("Marque os dias antes.", true); return; }
-        if (a === "valdays") {
-          var sl = b.closest(".fr-dias-acoes").querySelector("[data-a=dmot]");
-          mot = sl.value;
-          if (!mot) { sl.focus(); recado("Escolha o motivo dos dias marcados.", true); return; }
-        }
-        SEL[kS] = {};
-        mudar(function () { setDays(p, tI.nome, tI.idx.map(function (k) { return p.days[k]; }), dias, mot); });
-      }
-      else if (a === "all") { var id = b.getAttribute("data-id"); if (TODOS.has(id)) TODOS.delete(id); else TODOS.add(id); render(); }
+    var b = e.target.closest("[data-a]");
+    if (b && b.tagName !== "SELECT" && b.tagName !== "INPUT") {
+      var id = b.getAttribute("data-id"), p = porId(id), a = b.getAttribute("data-a");
+      if (!p || b.disabled) return;
+      var m = calc(p), linha = (MAPA[id] || [])[+b.getAttribute("data-r")] || [];
+      var itensDa = function (ns) { return m.items.filter(function (t) { return ns.indexOf(t.nome) >= 0; }); };
+      if (a === "cel") {
+        var d = +b.getAttribute("data-day"), its = itensDa(linha).filter(function (t) { return t.idx.some(function (k) { return p.days[k] === d; }); });
+        var liga = !its.every(function (t) { return (SEL[id + "|" + t.nome] || {})[d]; });
+        its.forEach(function (t) { var s = SEL[id + "|" + t.nome] = SEL[id + "|" + t.nome] || {}; if (liga) s[d] = 1; else delete s[d]; });
+        render();
+      } else if (a === "linha") {
+        var it = itensDa(linha), on = b.getAttribute("aria-pressed") === "true";
+        it.forEach(function (t) { var s = {}; if (!on) (t.pi.length ? t.pi : t.idx).forEach(function (k) { s[p.days[k]] = 1; }); SEL[id + "|" + t.nome] = s; });
+        render();
+      } else if (a === "apend") {
+        m.items.forEach(function (t) { var s = {}; t.pi.forEach(function (k) { s[p.days[k]] = 1; }); SEL[id + "|" + t.nome] = s; });
+        render();
+      } else if (a === "anada") {
+        m.items.forEach(function (t) { delete SEL[id + "|" + t.nome]; });
+        render();
+      } else if (a === "aval" || a === "atirar") {
+        var bx = b.closest(".fr-acao"), mot = bx.querySelector("[data-a=amot]").value, obsEl = bx.querySelector("[data-a=aobs]");
+        var obs = obsEl.value.trim();
+        if (a === "aval" && !mot && !obs) { bx.querySelector("[data-a=amot]").focus(); recado("Escolha o motivo dos dias marcados.", true); return; }
+        validarMarcados(p, m, id, mot, bx.querySelector("[data-a=avig]").value, obs === "" && !obsEl.defaultValue ? null : obs, a === "atirar");
+      } else if (a === "all") { if (TODOS.has(id)) TODOS.delete(id); else TODOS.add(id); render(); }
+      else if (a === "octodas") { if (OCTODAS.has(id)) OCTODAS.delete(id); else OCTODAS.add(id); render(); }
       else if (a === "sug") {
         var feitas = 0;
         mudar(function () {
@@ -631,40 +745,16 @@
         });
         recado(feitas ? feitas + " sugestão(ões) aplicada(s)." : "Nenhum item pendente desta usina tem sugestão.");
       }
-      else if (a === "clear") {
-        if (!m.items.some(function (t) { return t.nv; })) { recado("Esta usina não tem validação neste mês."); return; }
-        mudar(function () { m.items.forEach(function (t) { setConf(p, t.nome, ""); }); });
-      }
-      else if (a === "bulk") {
-        var cx = b.closest(".fr-lote"), bm = cx.querySelector("[data-a=bulkmot]").value, bv = cx.querySelector("[data-a=bulkvig]").value;
-        if (!bm) { cx.querySelector("[data-a=bulkmot]").focus(); recado("Escolha o motivo para aplicar aos pendentes.", true); return; }
-        var mo = MOT.filter(function (x) { return x.k === bm; })[0];
-        mudar(function () {
-          m.pend.forEach(function (t) {
-            if (mo.ap !== "both" && mo.ap !== apOf(t.tipo)) return;
-            if (t.nv) setDays(p, t.nome, t.idx.map(function (k) { return p.days[k]; }), t.pi.map(function (k) { return p.days[k]; }), bm);
-            else setConf(p, t.nome, bm, bv);
-          });
-        });
-      }
       return;
     }
-    var sm = e.target.closest("summary[data-dk]");
-    if (sm) { e.preventDefault(); var dk = sm.getAttribute("data-dk"); if (DIAS.has(dk)) DIAS.delete(dk); else DIAS.add(dk); render(); return; }
-    var sp = e.target.closest("details[data-paradas] > summary");
-    if (sp) { var pid = sp.parentNode.getAttribute("data-paradas"); if (PARADAS.has(pid)) PARADAS.delete(pid); else PARADAS.add(pid); return; }
-    if (e.target.closest("select,input,button,details,.fr-detalhe")) return;
+    if (e.target.closest("select,input,button,.fr-detalhe")) return;
     var tr = e.target.closest("tr.fr-linha");
     if (tr) { var rid_ = tr.getAttribute("data-id"); if (ABERTAS.has(rid_)) ABERTAS.delete(rid_); else ABERTAS.add(rid_); render(); }
   }
   function aoMudar(e) {
-    var t = e.target, a = t.getAttribute("data-a");
-    if (!a || a.indexOf("bulk") === 0 || a === "dmot") return;
-    var p = porId(t.getAttribute("data-id")), n = t.getAttribute("data-n");
-    if (!p) return;
-    if (a === "mot") mudar(function () { setConf(p, n, t.value, getEntry(p, n) ? "keep" : "m"); });
-    else if (a === "vig") mudar(function () { setVig(p, n, t.value); });
-    else if (a === "obs") mudar(function () { setObs(p, n, t.value.trim()); });
+    var t = e.target, a = t.getAttribute("data-a"), id = t.getAttribute("data-id");
+    if (!id || ["amot", "avig", "aobs"].indexOf(a) < 0) return;
+    (BARRA[id] = BARRA[id] || {})[a] = t.value;
   }
 
   // ── exportar e importar ──────────────────────────────────────────────────────────────────────────────────────
@@ -750,16 +840,14 @@
 
   $("fr-tabela").addEventListener("click", aoClicar);
   $("fr-tabela").addEventListener("change", aoMudar);
+  $("fr-tabela").addEventListener("input", aoMudar);
   $("fr-tabela").addEventListener("keydown", function (e) {
     if ((e.key === "Enter" || e.key === " ") && e.target.classList && e.target.classList.contains("fr-linha")) { e.preventDefault(); e.target.click(); }
   });
-  $("fr-clientes").addEventListener("click", function (e) { var b = e.target.closest("[data-cli]"); if (b) porValores("cliente", b.getAttribute("data-cli") ? [b.getAttribute("data-cli")] : []); });
-  [].forEach.call(document.querySelectorAll("[data-visao]"), function (b) {
-    b.addEventListener("click", function () {
-      VISAO = b.getAttribute("data-visao");
-      [].forEach.call(document.querySelectorAll("[data-visao]"), function (x) { x.setAttribute("aria-pressed", x === b ? "true" : "false"); });
-      render();
-    });
+  $("fr-clientes").addEventListener("click", function (e) {
+    var b = e.target.closest("[data-cli]"); if (!b) return;
+    var k = b.getAttribute("data-cli"), sel = varios("cliente");
+    porValores("cliente", sel.length === 1 && sel[0] === k ? [] : [k]);
   });
   $("fr-csv").addEventListener("click", csv);
   $("fr-exportar").addEventListener("click", function () {
