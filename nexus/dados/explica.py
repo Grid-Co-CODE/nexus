@@ -153,7 +153,7 @@ PARA_QUE = {
     "mensagem_conversa": "Guarda as mensagens que as pessoas trocam na conversa de cada insight, OS e usina, com quem "
                          "foi mencionado (uma pessoa ou uma área inteira) e quem já leu. Serve para a Caixa de entrada "
                          "e o sino avisarem quem foi chamado e para o combinado entre os setores ficar registrado.",
-    "versao_limitacao": "Guarda cada limitação de potência de inversores que o time registra em Usinas 360°: que "
+    "versao_limitacao": "Guarda cada limitação de potência de inversores que o time registra em Performance › Limitações de potência: que "
                         "inversores, quanto da potência ficou liberado, desde quando até quando, a causa e se a "
                         "responsabilidade é da Grid Co. Serve para o cálculo dos expurgos do contrato e para tirar a "
                         "aba de limitações da planilha de tickets.",

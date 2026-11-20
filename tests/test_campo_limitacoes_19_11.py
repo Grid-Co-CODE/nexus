@@ -18,7 +18,7 @@ from test_campo_visao import CHAVE_CADASTRO, _aba, banco  # noqa: F401  (banco �
 BRT = timezone(timedelta(hours=-3))
 INV = ["THPN-ALT100-INVR1.1", "THPN-ALT100-INVR1.2", "THPN-ALT100-INVR1.3"]
 CONTA = {"email": "analista.teste@exemplo.test", "nome": "Analista Teste"}
-URL = "/t/campo/limitacoes"
+URL = "/t/performance/limitacoes"
 
 
 @pytest.fixture
@@ -148,10 +148,14 @@ def _analista(cliente):
     return cliente
 
 
-def test_a_tela_esta_em_usinas_360_logo_abaixo_de_usinas(app):
-    from nexus.torres.campo import TORRE
+def test_a_tela_mora_na_performance_logo_depois_da_disponibilidade(app):
+    """Levi, 19/11/2026, à noite: "limitação de potência quero na parte de performance e quero algo bem feito e
+    construído!" (a 1ª versão ficava em Usinas 360°)."""
+    from nexus.torres.campo import TORRE as CAMPO
+    from nexus.torres.performance import TORRE
     ids = [t.id for t in TORRE.telas]
-    assert ids[ids.index("usinas") + 1] == "limitacoes" and TORRE.tela("limitacoes").nome == "Limitações de potência"
+    assert ids[ids.index("disponibilidade") + 1] == "limitacoes" and TORRE.tela("limitacoes").nome == "Limitações de potência"
+    assert CAMPO.tela("limitacoes") is None
 
 
 def test_a_tela_lista_e_o_formulario_traz_os_inversores_do_fracttal(cliente, app, com_inversores):
@@ -187,3 +191,55 @@ def test_sem_banco_a_tela_abre_e_diz_o_que_faltou(logado):
     r = logado.get(URL)
     html = r.get_data(as_text=True)
     assert r.status_code == 200 and "Não li o cadastro" in html and "Nenhuma limitação registrada" in html
+
+
+# ── o painel bem construído (19/11/2026, à noite) ────────────────────────────────────────────────────────────────────
+def test_o_resumo_conta_o_que_esta_em_andamento_e_o_que_vai_para_o_expurgo(app, com_inversores):
+    with app.test_request_context():
+        L.salvar(_dados(), CONTA)                                                          # 2 × 250 × 10% = 50 kW, não é da Grid
+        L.salvar(_dados(inversores=[INV[2]], responsabilidade="sim", limite_pct="80"), CONTA)   # 1 × 250 × 20% = 50 kW
+        L.salvar(_dados(potencia_nominal_kw="", inicio="2026-10-01T08:00", fim="2026-10-05T18:00"), CONTA)   # encerrada
+        r = L.resumo(L.vigentes())
+    assert (r["em_andamento"], r["usinas"], r["inversores"], r["kw_retidos"], r["encerradas"]) == (2, 1, 3, 100.0, 1)
+    assert r["para_expurgo"] == 1 and r["sem_potencia"] == 0          # a encerrada sem potência não conta como pendência agora
+    assert "2 limitações em andamento" in r["parecer"] and "100 kW" in r["parecer"] and "expurgo" in r["parecer"]
+
+
+def test_o_mapa_da_usina_acende_os_inversores_limitados_agora(app, com_inversores):
+    with app.test_request_context():
+        L.salvar(_dados(), CONTA)
+        mapa = L.mapa_da_usina(1, L.vigentes())
+    assert [(q["rotulo"], q["limitado"], q["limite_pct"]) for q in mapa] == [("1.1", True, 90.0), ("1.2", True, 90.0), ("1.3", False, None)]
+    assert mapa[0]["codigo"] == INV[0] and "Inversor 1.1" in mapa[0]["titulo"]
+
+
+def test_todos_os_inversores_acende_o_mapa_inteiro(app, com_inversores):
+    with app.test_request_context():
+        L.salvar(_dados(inversores=[], todos="1", limite_pct="70"), CONTA)
+        mapa = L.mapa_da_usina(1, L.vigentes())
+    assert all(q["limitado"] and q["limite_pct"] == 70.0 for q in mapa) and len(mapa) == 3
+
+
+def test_o_painel_traz_o_parecer_os_cartoes_e_o_mapa_e_as_encerradas_fechadas(cliente, app, com_inversores):
+    c = _analista(cliente)
+    with app.test_request_context():
+        L.salvar(_dados(), CONTA)
+        L.salvar(_dados(inicio="2026-10-01T08:00", fim="2026-10-05T18:00", causa="Troca de ventilador"), CONTA)
+    L.limpar()
+    html = c.get(URL).get_data(as_text=True)
+    assert "lp-parecer" in html and "1 limitação em andamento" in html
+    assert html.count('class="lp-kpi') >= 4 and "Potência retida agora" in html
+    assert 'class="lp-mapa' in html and html.count("lp-q lp-q--on") == 2 and html.count('class="lp-q"') == 1
+    assert '<details class="lp-encerradas"' in html and "Troca de ventilador" in html
+    assert "Thopen" in html                                                  # o cliente da usina, do cadastro
+
+
+def test_o_formulario_avisa_o_inversor_que_ja_esta_limitado(cliente, app, com_inversores):
+    c = _analista(cliente)
+    with app.test_request_context():
+        L.salvar(_dados(), CONTA)
+    L.limpar()
+    html = c.get(URL + "?usina=1").get_data(as_text=True)
+    assert "já limitado desde 10/11" in html and 'class="lp-form-painel" open' in html
+    assert 'data-lp-calc' in html and "limitacoes.js" in html
+

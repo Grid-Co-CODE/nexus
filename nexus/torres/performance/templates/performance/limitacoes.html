@@ -1,0 +1,154 @@
+{% extends "base.html" %}
+{% block titulo %}{{ tela.nome }}{% endblock %}
+{% block conteudo %}
+{% from "_explica.html" import explica, termo %}
+<link rel="stylesheet" href="{{ url_for('static', filename='limitacoes.css') }}">
+{# Performance › Limitações de potência (19/11/2026). Levi: "crie [...] um campo onde as pessoas consigam colocar limitações
+   de potência dos inversores. E aí vai ser usado também para o cálculo dos expurgos" e, à noite, "limitação de potência
+   quero na parte de performance e quero algo bem feito e construído!". A tela abre no parecer e nos cartões (o que está em
+   andamento agora); depois as usinas, cada uma com o mapa dos inversores do Fracttal aceso onde há limitação; as encerradas
+   fechadas no fim. O formulário mora num painel que o botão abre. Os campos são os da aba "Inv. com lim. de potência" da
+   planilha de tickets. A regra: nexus/campo/limitacoes.py; o livro: nexus_limitacao_inversor. #}
+{% macro numero(x) %}{{ br(x) }}{% endmacro %}
+{% macro resp_chip(r) %}{% if r == 'nao' %}<span class="lp-chip lp-chip--expurgo" title="Sem responsabilidade da Grid Co.: entra no expurgo do contrato">Não · expurgo</span>{% elif r == 'parcial' %}<span class="lp-chip lp-chip--parcial">Parcial</span>{% elif r == 'sim' %}<span class="lp-chip lp-chip--grid" title="A perda é da Grid Co.: não é expurgo">Sim · da Grid</span>{% else %}—{% endif %}{% endmacro %}
+{% macro celulas(v) %}
+    <td class="lp-col-inv">{% if v.todos %}<b>Todos</b>{% if v.inversores_qtd %} <span class="mudo">({{ v.inversores_qtd }})</span>{% endif %}{% else %}<b>{{ v.inversores|length }}</b> <small class="mudo">{{ v.inversores|join(', ') }}</small>{% endif %}</td>
+    <td class="lp-n"><b>{{ numero(v.limite_pct) }}%</b><small class="mudo">liberado</small></td>
+    <td class="lp-n">{% if v.kw_limitados is not none %}<b>{{ numero(v.kw_limitados) }} kW</b><small class="mudo">{{ numero(v.potencia_nominal_kw) }} kW cada</small>{% else %}<span class="lp-sem" title="{{ v.aviso }}">sem a potência</span>{% endif %}</td>
+    <td>{{ v.inicio_txt }}{% if v.fim_txt %}<small class="mudo">até {{ v.fim_txt }}</small>{% endif %}<small class="mudo">{{ v.duracao }}</small></td>
+    <td>{{ resp_chip(v.responsabilidade) }}{% if v.situacao == 'em_andamento' %}<small class="mudo">Em andamento</small>{% endif %}</td>
+    <td class="lp-causa">{{ v.causa or '—' }}{% if v.comentario_cliente %}<small class="mudo">Para o cliente: {{ v.comentario_cliente }}</small>{% endif %}{% if v.por %}<small class="mudo">Registrado por {{ v.por }}</small>{% endif %}</td>
+    <td class="lp-acoes-linha">{% if pode %}
+      <a href="{{ endereco|na_raiz }}?editar={{ v.limitacao_id }}#registrar">Editar</a>
+      <form method="post" action="{{ endereco|na_raiz }}"><input type="hidden" name="limitacao_id" value="{{ v.limitacao_id }}">
+        {% if v.situacao == 'em_andamento' %}<button class="lp-link" type="submit" name="acao" value="encerrar" title="Põe o fim agora">Encerrar</button>{% endif %}
+        <button class="lp-link lp-excluir" type="submit" name="acao" value="excluir" onclick="return confirm('Excluir esta limitação do cadastro? O histórico fica no banco.')">Excluir</button></form>
+    {% endif %}</td>
+{% endmacro %}
+
+<div class="lp">
+  <header class="lp-cab">
+    <div>
+      <p class="gc-eyebrow">{{ torre.nome }}</p>
+      <div class="lp-titulo"><h1 class="lp-h1">{{ tela.nome }}</h1>
+      {% call explica('Para que serve e como preencher') %}
+        <p><b>Para que serve.</b> Registrar quando um ou mais inversores ficam com a potência limitada: quanto ficou liberado,
+        desde quando, a causa e de quem é a responsabilidade. É daqui que a limitação entra no cálculo dos expurgos do contrato:
+        a perda que não é responsabilidade da Grid Co. e se justifica ao cliente. Substitui a aba "Inv. com lim. de potência"
+        da planilha de tickets.</p>
+        <dl class="gc-explica-termos">
+          {{ termo('Inversores') }}<dd>Os do Fracttal da usina (os mesmos que a disponibilidade lê pelo código), no mapa: o aceso
+            está limitado agora. "Todos os inversores" vale para os que a usina tem no Fracttal no dia do registro.</dd>
+          {{ termo('Potência nominal') }}<dd>A de cada inversor limitado, em kW. Sem ela a limitação fica guardada, mas não
+            entra no expurgo.</dd>
+          {{ termo('Limite') }}<dd>O percentual da potência nominal que fica liberado: 90 quer dizer que o inversor entrega no
+            máximo 90% da nominal.</dd>
+          {{ termo('Potência retida') }}<dd>O que deixa de estar disponível: inversores × potência nominal × (100% − limite).
+            2 inversores de 250 kW limitados a 90% retêm 50 kW.</dd>
+          {{ termo('Responsabilidade') }}<dd>Sim, parcial ou não. "Não" é expurgo: a perda se justifica ao cliente.</dd>
+          {{ termo('Fim') }}<dd>Em branco enquanto a limitação continua; "Encerrar" põe o fim na hora.</dd>
+        </dl>
+        <p>A causa, os comentários e o nome de quem registrou vão cifrados para o banco. Nada se apaga: editar, encerrar e
+        excluir viram versões novas, e o histórico fica.</p>
+      {% endcall %}</div>
+      <p class="lp-pergunta">{{ tela.pergunta }}</p>
+    </div>
+    <a class="gc-btn gc-btn--primario lp-novo" href="{{ endereco|na_raiz }}?nova=1#registrar">Registrar limitação</a>
+  </header>
+  {% if erro %}<div class="lp-erro" role="alert"><b>{{ erro }}.</b> Nada foi gravado.</div>{% endif %}
+  {% if erro_leitura %}<div class="lp-erro lp-erro--aviso" role="status"><b>Não li o cadastro agora ({{ erro_leitura }}).</b> A lista pode estar incompleta.</div>{% endif %}
+
+  <p class="lp-parecer">{{ resumo.parecer }}</p>
+  <div class="lp-kpis">
+    <div class="lp-kpi"><span>Em andamento</span><b>{{ resumo.em_andamento }}</b><small>{{ resumo.encerradas }} encerrada{{ 's' if resumo.encerradas != 1 }} no histórico</small></div>
+    <div class="lp-kpi"><span>Usinas afetadas</span><b>{{ resumo.usinas }}</b><small>com limitação agora</small></div>
+    <div class="lp-kpi"><span>Inversores limitados</span><b>{{ resumo.inversores }}</b><small>agora</small></div>
+    <div class="lp-kpi lp-kpi--destaque"><span>Potência retida agora</span><b>{{ resumo.kw_txt }} <i>kW</i></b><small>a menos do que a nominal</small></div>
+    <div class="lp-kpi{{ ' lp-kpi--alerta' if resumo.sem_potencia }}"><span>Sem potência informada</span><b>{{ resumo.sem_potencia }}</b><small>{{ 'fora do expurgo até preencher' if resumo.sem_potencia else 'todas com a potência' }}</small></div>
+  </div>
+
+  <details class="lp-form-painel"{% if abrir %} open{% endif %} id="registrar">
+    <summary>{{ 'Editar a limitação' if editando else 'Registrar uma limitação' }}</summary>
+    <div class="lp-form-corpo">
+    {% if not pode %}<p class="lp-erro lp-erro--aviso" role="status">Entre com o seu login (Fracttal ou Microsoft) para registrar: a senha de administrador não diz quem é.</p>{% endif %}
+    <form method="get" class="lp-usina" action="{{ endereco|na_raiz }}#registrar">
+      <label class="lp-campo"><span class="gc-rotulo">Usina</span>
+        <select class="gc-campo" name="usina" onchange="this.form.submit()"{% if editando %} disabled{% endif %}>
+          <option value="">Escolha a usina</option>
+          {% for uid, nome in usinas %}<option value="{{ uid }}"{% if form.usina_id == uid|string %} selected{% endif %}>{{ nome }}</option>{% endfor %}
+        </select></label>
+      <noscript><button class="gc-btn gc-btn--ui" type="submit">Ver os inversores</button></noscript>
+    </form>
+    {% if form.usina_id %}
+    <form method="post" action="{{ endereco|na_raiz }}" class="lp-grade" data-lp-form>
+      <input type="hidden" name="usina_id" value="{{ form.usina_id }}"><input type="hidden" name="novo_id" value="{{ form.novo_id }}">
+      {% if editando %}<input type="hidden" name="limitacao_id" value="{{ form.limitacao_id }}">{% endif %}
+      <fieldset class="lp-inv"{% if not pode %} disabled{% endif %}>
+        <legend class="gc-rotulo">Inversores limitados <span class="mudo">· do Fracttal</span></legend>
+        <label class="lp-todos"><input type="checkbox" name="todos" value="1" data-lp-todos data-qtd="{{ mapa_form|length }}"{% if form.todos %} checked{% endif %}> Todos os inversores{% if mapa_form %} ({{ mapa_form|length }}){% endif %}</label>
+        {% if mapa_form %}<div class="lp-tiles">
+          {% for q in mapa_form %}<label class="lp-t{{ ' lp-t--ja' if q.limitado }}" title="{{ q.titulo }}">
+            <input type="checkbox" name="inversores" value="{{ q.codigo }}"{% if q.codigo in (form.inversores or []) %} checked{% endif %}>
+            <span class="lp-t-rot">{{ q.rotulo }}</span>
+            {% if q.limitado %}<small class="lp-t-ja">já limitado desde {{ q.desde }} ({{ numero(q.limite_pct) }}%)</small>{% endif %}
+          </label>{% endfor %}
+        </div>
+        {% else %}<p class="mudo">{% if erro_inv %}Não li os inversores do Fracttal agora ({{ erro_inv }}).{% else %}Esta usina não tem inversor no Fracttal.{% endif %} Dá para registrar com "Todos os inversores".</p>{% endif %}
+      </fieldset>
+      <fieldset class="lp-dados"{% if not pode %} disabled{% endif %}>
+        <label class="lp-campo"><span class="gc-rotulo">Potência nominal de cada inversor (kW)</span><input class="gc-campo" name="potencia_nominal_kw" inputmode="decimal" value="{{ form.potencia_nominal_kw or '' }}" placeholder="250" data-lp-nominal></label>
+        <label class="lp-campo"><span class="gc-rotulo">Limite (% da nominal liberado)</span><input class="gc-campo" name="limite_pct" inputmode="decimal" value="{{ form.limite_pct or '' }}" placeholder="90" required data-lp-pct></label>
+        <p class="lp-calc lp-largo" data-lp-calc aria-live="polite">Marque os inversores e diga a potência e o limite: a potência retida aparece aqui.</p>
+        <div class="lp-campo lp-largo"><span class="gc-rotulo">Responsabilidade da Grid Co.?</span>
+          <div class="lp-seg" role="radiogroup" aria-label="Responsabilidade da Grid Co.">
+          {% for k, rot in [('nao', 'Não · expurgo'), ('parcial', 'Parcial'), ('sim', 'Sim · da Grid')] %}<label class="lp-seg-op"><input type="radio" name="responsabilidade" value="{{ k }}" required{% if form.responsabilidade == k %} checked{% endif %}><span>{{ rot }}</span></label>{% endfor %}
+          </div></div>
+        <label class="lp-campo"><span class="gc-rotulo">Início</span><input class="gc-campo" type="datetime-local" name="inicio" value="{{ form.inicio or '' }}" required></label>
+        <label class="lp-campo"><span class="gc-rotulo">Fim (em branco se continua)</span><input class="gc-campo" type="datetime-local" name="fim" value="{{ form.fim or '' }}"></label>
+        <label class="lp-campo lp-largo"><span class="gc-rotulo">Causa</span><input class="gc-campo" name="causa" maxlength="1500" value="{{ form.causa or '' }}" placeholder="Ex.: vazamento no trafo da cabine 1"></label>
+        <label class="lp-campo"><span class="gc-rotulo">Clipagem</span>
+          <select class="gc-campo" name="clipagem">{% for k, rot in clipagem.items() %}<option value="{{ k }}"{% if (form.clipagem or '') == k %} selected{% endif %}>{{ rot }}</option>{% endfor %}</select></label>
+        <span></span>
+        <label class="lp-campo lp-largo"><span class="gc-rotulo">Comentário para o cliente</span><textarea class="gc-campo" name="comentario_cliente" rows="2" maxlength="1500">{{ form.comentario_cliente or '' }}</textarea></label>
+        <label class="lp-campo lp-largo"><span class="gc-rotulo">Comentário geral</span><textarea class="gc-campo" name="comentario_geral" rows="2" maxlength="1500">{{ form.comentario_geral or '' }}</textarea></label>
+      </fieldset>
+      <div class="lp-acoes">
+        <button class="gc-btn gc-btn--primario" type="submit" name="acao" value="salvar"{% if not pode %} disabled{% endif %}>{{ 'Salvar a alteração' if editando else 'Registrar a limitação' }}</button>
+        <a class="lp-cancelar" href="{{ endereco|na_raiz }}">Cancelar</a>
+      </div>
+    </form>
+    {% endif %}
+    </div>
+  </details>
+
+  <section class="lp-andamento" aria-labelledby="lp-h-and">
+    <h2 id="lp-h-and" class="lp-h">Em andamento <span class="mudo">· {{ resumo.em_andamento }}</span></h2>
+    {% if grupos %}
+    {% for g in grupos %}
+    <article class="lp-usina-bloco">
+      <header class="lp-usina-cab">
+        <div><h3>{{ g.nome }}</h3>{% if g.cliente %}<span class="mudo">{{ g.cliente }}</span>{% endif %}</div>
+        <span class="lp-usina-kw">{% if g.kw %}{{ numero(g.kw) }} kW retidos{% endif %}</span>
+      </header>
+      {% if g.mapa %}<div class="lp-mapa" aria-label="Os inversores da usina no Fracttal; os acesos estão limitados agora">
+        {% for q in g.mapa %}<span class="{{ 'lp-q lp-q--on' if q.limitado else 'lp-q' }}" title="{{ q.titulo }}{% if q.limitado %} · limitado a {{ numero(q.limite_pct) }}% desde {{ q.desde }}{% endif %}">{{ q.rotulo }}{% if q.limitado %}<i>{{ numero(q.limite_pct) }}%</i>{% endif %}</span>{% endfor %}
+      </div>{% elif g.erro_inv %}<p class="mudo">Não li os inversores do Fracttal agora.</p>{% endif %}
+      <div class="lp-rola"><table class="lp-tab lp-tab--fixa"><colgroup><col class="lp-c-inv"><col class="lp-c-lim"><col class="lp-c-kw"><col class="lp-c-per"><col class="lp-c-resp"><col><col class="lp-c-acao"></colgroup><thead><tr><th>Inversores</th><th>Limite</th><th>Potência retida</th><th>Período</th><th>Responsabilidade</th><th>Causa</th><th></th></tr></thead>
+        <tbody>{% for v in g.lista %}<tr>{{ celulas(v) }}</tr>{% endfor %}</tbody></table></div>
+    </article>
+    {% endfor %}
+    {% elif not encerradas %}<p class="lp-vazio">Nenhuma limitação registrada ainda.</p>
+    {% else %}<p class="lp-vazio">Nenhuma limitação em andamento agora.</p>{% endif %}
+  </section>
+
+  {% if encerradas %}
+  <details class="lp-encerradas">
+    <summary>Encerradas <span class="mudo">· {{ encerradas|length }}</span></summary>
+    <div class="lp-rola"><table class="lp-tab lp-tab--fixa"><colgroup><col class="lp-c-usina"><col class="lp-c-inv"><col class="lp-c-lim"><col class="lp-c-kw"><col class="lp-c-per"><col class="lp-c-resp"><col><col class="lp-c-acao"></colgroup><thead><tr><th>Usina</th><th>Inversores</th><th>Limite</th><th>Potência retida</th><th>Período</th><th>Responsabilidade</th><th>Causa</th><th></th></tr></thead><tbody>
+      {% for v in encerradas %}<tr><td class="lp-nm">{{ (fichas.get(v.usina_id) or {}).get('nome') or ('usina ' ~ v.usina_id) }}</td>{{ celulas(v) }}</tr>{% endfor %}
+    </tbody></table></div>
+  </details>
+  {% endif %}
+</div>
+<script src="{{ url_for('static', filename='limitacoes.js') }}" defer></script>
+{% endblock %}

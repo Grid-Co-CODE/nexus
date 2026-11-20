@@ -51,6 +51,14 @@ TORRE = Torre(
         Tela("disponibilidade", "Disponibilidade",
              "Quanto tempo cada usina ficou disponível no mês, e o que a parou?",
              "Plataforma de Performance (antes só pelo Gerencial)"),
+        # as Limitações de potência dos inversores (19/11/2026; Levi: "crie [...] um campo onde as pessoas consigam colocar
+        # limitações de potência dos inversores. E aí vai ser usado também para o cálculo dos expurgos" e, à noite, "limitação
+        # de potência quero na parte de performance e quero algo bem feito e construído!"): uma tela do Nexus (não da
+        # plataforma), logo depois da Disponibilidade; as rotas em limitacoes_tela.py, a regra em nexus/campo/limitacoes.py
+        Tela("limitacoes", "Limitações de potência",
+             "Que inversores estão com a potência limitada agora, quanto isso retém e o que vai para o expurgo?",
+             "Cadastro do time no banco do Nexus (nexus_limitacao_inversor) + inversores do Fracttal",
+             do_setor=SID.PERFORMANCE),
         # O Criador de relatório e o Relatório semanal foram para Relatórios → Central de emissão em 13/10/2026 (Levi:
         # "Sai da parte de Performance!"); os endereços antigos levam para lá (`_relatorio_mudou`, abaixo)
         Tela("gemeo", "Gêmeo digital",
@@ -238,6 +246,7 @@ from . import mapa_tela  # noqa: E402,F401
 from . import coletas_tela  # noqa: E402,F401
 from . import furos_tela  # noqa: E402,F401
 from . import sala_tela  # noqa: E402,F401
+from . import limitacoes_tela  # noqa: E402,F401
 
 
 # ── Quadro da equipe (04/11/2026) ───────────────────────────────────────────────────────────────────────────────────

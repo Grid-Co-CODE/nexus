@@ -1,13 +1,19 @@
-"""Usinas 360° › Limitações de potência (19/11/2026): a tela do cadastro. A regra e o livro moram em
+"""Performance › Limitações de potência (19/11/2026): a tela do cadastro. A regra e o livro moram em
 `nexus/campo/limitacoes.py`; aqui só o HTTP. Fica num módulo à parte, importado no fim do `__init__` da torre, porque precisa
-do `bp` (como o `cliente_tela` e o `equipe_tela`).
+do `bp` (como o `sala_tela` e o `coletas_tela`).
 
-- `GET /t/campo/limitacoes`: a lista (as em andamento primeiro) e o formulário. `?usina=<id>` traz os inversores do Fracttal
-  daquela usina para marcar; `?editar=<limitacao_id>` abre o formulário com o registro.
-- `POST /t/campo/limitacoes`: `acao` = salvar, encerrar ou excluir. Só da própria página (pedido de outro site é 403).
-  Recusa volta à tela com o motivo e o que foi digitado; o que gravou vai para a lista (303), sem reenvio no F5.
+Levi, 19/11/2026: "crie [...] um campo onde as pessoas consigam colocar limitações de potência dos inversores" e, à noite,
+"limitação de potência quero na parte de performance e quero algo bem feito e construído!". A tela abre no parecer e nos
+cartões (o que está em andamento agora), depois as usinas com o mapa dos inversores do Fracttal aceso onde há limitação, e
+as encerradas fechadas no fim. O formulário mora num painel que o botão abre.
+
+- `GET /t/performance/limitacoes`: o painel. `?usina=<id>` abre o formulário com os inversores daquela usina (e avisa o que
+  já está limitado); `?editar=<limitacao_id>` abre o formulário com o registro; `?nova=1` só abre o formulário.
+- `POST /t/performance/limitacoes`: `acao` = salvar, encerrar ou excluir. Só da própria página (pedido de outro site é 403).
+  Recusa volta à tela com o motivo e o que foi digitado; o que gravou vai para o painel (303), sem reenvio no F5.
 """
 import uuid
+from datetime import datetime
 
 from flask import abort, redirect, render_template, request, session
 
@@ -17,6 +23,7 @@ from . import TORRE, bp
 
 CAMPOS = ("usina_id", "potencia_nominal_kw", "limite_pct", "causa", "responsabilidade", "clipagem", "inicio", "fim",
           "comentario_cliente", "comentario_geral", "limitacao_id", "novo_id", "todos")
+ENDERECO = "/t/performance/limitacoes"
 
 
 def _conta() -> dict:
@@ -36,13 +43,33 @@ def _form_de(v: dict) -> dict:
             "limitacao_id": v["limitacao_id"]}
 
 
+def _grupos(lista: list[dict], fichas: dict) -> list[dict]:
+    """As limitações EM ANDAMENTO por usina, com o mapa dos inversores do Fracttal de cada uma; a usina com mais potência
+    retida primeiro."""
+    por = {}
+    for v in lista:
+        if v["situacao"] == "em_andamento":
+            por.setdefault(v["usina_id"], []).append(v)
+    out = []
+    for uid, vs in por.items():
+        f = fichas.get(uid) or {}
+        inv = L.inversores_da_usina(uid)
+        out.append({"usina_id": uid, "nome": f.get("nome") or f"usina {uid}", "cliente": f.get("cliente") or "",
+                    "lista": vs, "mapa": L.mapa_da_usina(uid, lista, inv["lista"]), "erro_inv": inv["erro"],
+                    "kw": sum(v["kw_limitados"] or 0 for v in vs)})
+    return sorted(out, key=lambda g: (-g["kw"], g["nome"].lower()))
+
+
 def _pagina(form: dict | None = None, erro: str = "", status: int = 200):
     lido = L.ler()
     lista = L.vigentes(lido)
     try:
-        nomes = L.usinas()
+        fichas = L.fichas_usinas()
     except Exception as e:      # noqa: BLE001 — sem o cadastro, a página abre e diz; não dá para escolher a usina
-        nomes, erro = {}, erro or f"Não li o cadastro das usinas agora ({type(e).__name__})"
+        fichas, erro = {}, erro or f"Não li o cadastro das usinas agora ({type(e).__name__})"
+    agora = datetime.now(L._BRT)
+    for v in lista:
+        v["duracao"] = L.duracao_txt(v, agora)
     form = dict(form or {})
     editar = request.args.get("editar") or form.get("limitacao_id") or ""
     if editar and not form.get("usina_id"):
@@ -53,11 +80,16 @@ def _pagina(form: dict | None = None, erro: str = "", status: int = 200):
     form.setdefault("usina_id", str(uid or ""))
     form.setdefault("novo_id", uuid.uuid4().hex[:16])
     inv = L.inversores_da_usina(uid) if uid else {"lista": [], "erro": ""}
+    mapa_form = L.mapa_da_usina(uid, lista, inv["lista"], menos=form.get("limitacao_id") or "") if uid else []
+    abrir = bool(uid or (erro and form) or request.args.get("nova") or editar)
     resp = render_template(
-        "campo/limitacoes.html", torre=TORRE, tela=TORRE.tela("limitacoes"), lista=lista, nomes=nomes,
-        usinas=sorted(nomes.items(), key=lambda x: x[1].lower()), form=form, inversores=inv["lista"],
-        erro_inv=inv["erro"], erro=erro, erro_leitura=lido.get("erro") or "", pode=bool(_conta().get("email")),
-        responsabilidades=L.RESPONSABILIDADES, clipagem=L.CLIPAGEM, editando=bool(form.get("limitacao_id")))
+        "performance/limitacoes.html", torre=TORRE, tela=TORRE.tela("limitacoes"), lista=lista,
+        grupos=_grupos(lista, fichas), encerradas=[v for v in lista if v["situacao"] == "encerrada"],
+        resumo=L.resumo(lista), fichas=fichas,
+        usinas=sorted(((u, f["nome"]) for u, f in fichas.items()), key=lambda x: x[1].lower()),
+        form=form, mapa_form=mapa_form, erro_inv=inv["erro"], erro=erro, erro_leitura=lido.get("erro") or "",
+        pode=bool(_conta().get("email")), clipagem=L.CLIPAGEM, editando=bool(form.get("limitacao_id")),
+        abrir=abrir, br=L._br, endereco=ENDERECO)
     return resp, status
 
 
@@ -83,4 +115,4 @@ def limitacoes():
     except Exception as e:      # noqa: BLE001 — banco fora: a tela diz, e o que foi digitado não se perde
         return _pagina(form if acao == "salvar" else None,
                        erro=f"Não consegui gravar no banco ({type(e).__name__}). Tente de novo em instantes", status=503)
-    return redirect(na_raiz("/t/campo/limitacoes"), code=303)
+    return redirect(na_raiz(ENDERECO), code=303)

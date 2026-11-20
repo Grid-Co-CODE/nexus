@@ -1,4 +1,5 @@
-"""Limitações de potência dos inversores (19/11/2026): o cadastro do time, em Usinas 360° › Limitações de potência.
+"""Limitações de potência dos inversores (19/11/2026): o cadastro do time, em Performance › Limitações de potência
+(nasceu na Usinas 360° e veio para a Performance na mesma noite).
 
 Levi, 19/11/2026: "crie, na parte de usina 360, um campo onde as pessoas consigam colocar limitações de potência dos
 inversores. E aí vai ser usado também para o cálculo dos expurgos. Aí aquela limitação de potência pode ser de todos os
@@ -184,6 +185,90 @@ def no_periodo(usina_id: int, inicio: datetime, fim: datetime, lido: dict | None
     """As limitações da usina que tocam [inicio, fim): o que o cálculo do expurgo lê."""
     return [v for v in vigentes(lido) if v["usina_id"] == usina_id and v["inicio"] and v["inicio"] < fim
             and (v["fim"] is None or v["fim"] > inicio)]
+
+
+# ── o painel (19/11/2026, à noite: "quero algo bem feito e construído!") ───────────────────────────────────────────
+def _br(x, casas: int = 0) -> str:
+    if x is None:
+        return "—"
+    s = f"{x:,.{casas}f}" if casas else f"{x:,.0f}" if float(x).is_integer() else f"{x:,.1f}"
+    return s.replace(",", "§").replace(".", ",").replace("§", ".")
+
+
+def _plural(n: int, um: str, varios: str) -> str:
+    return f"{n} {um if n == 1 else varios}"
+
+
+def duracao_txt(v: dict, agora: datetime | None = None) -> str:
+    """ "há 9 dias" (em andamento) ou "durou 4 dias" (encerrada); abaixo de um dia, em horas."""
+    if not v.get("inicio"):
+        return ""
+    fim = v["fim"] if v.get("situacao") == "encerrada" and v.get("fim") else (agora or datetime.now(_BRT))
+    h = max(0.0, (fim - v["inicio"]).total_seconds() / 3600)
+    qto = _plural(int(h // 24), "dia", "dias") if h >= 24 else _plural(int(round(h)), "hora", "horas")
+    return ("durou " if v.get("situacao") == "encerrada" else "há ") + qto
+
+
+def resumo(lista: list[dict]) -> dict:
+    """Os cartões e a frase do alto: só o que está em andamento agora (a encerrada vai para o histórico)."""
+    andando = [v for v in lista if v["situacao"] == "em_andamento"]
+    usinas_ = {v["usina_id"] for v in andando}
+    inv = sum((v["inversores_qtd"] or 0) if v["todos"] else len(v["inversores"]) for v in andando)
+    kw = round(sum(v["kw_limitados"] for v in andando if v["kw_limitados"] is not None), 3)
+    sem = sum(1 for v in andando if v["potencia_nominal_kw"] is None)
+    expurgo = sum(1 for v in andando if v["responsabilidade"] == "nao")
+    parcial = sum(1 for v in andando if v["responsabilidade"] == "parcial")
+    if not andando:
+        parecer = "Nenhuma limitação em andamento agora."
+    else:
+        parecer = (f"{_plural(len(andando), 'limitação em andamento', 'limitações em andamento')} em "
+                   f"{_plural(len(usinas_), 'usina', 'usinas')}: {_plural(inv, 'inversor', 'inversores')}, "
+                   f"{_br(kw)} kW retidos.")
+        if expurgo:
+            parecer += (" 1 sem responsabilidade da Grid Co. (vai para o expurgo)." if expurgo == 1 else
+                        f" {expurgo} sem responsabilidade da Grid Co. (vão para o expurgo).")
+        if parcial:
+            parecer += f" {parcial} com responsabilidade parcial."
+        if sem:
+            parecer += (" Falta a potência nominal em uma: sem ela, não entra no expurgo." if sem == 1 else
+                        f" Falta a potência nominal em {sem}: sem ela, não entram no expurgo.")
+    return {"em_andamento": len(andando), "usinas": len(usinas_), "inversores": inv, "kw_retidos": kw,
+            "kw_txt": _br(kw), "sem_potencia": sem, "para_expurgo": expurgo, "parcial": parcial,
+            "encerradas": sum(1 for v in lista if v["situacao"] == "encerrada"), "parecer": parecer}
+
+
+_RX_ROTULO = re.compile(r"Inversor\s+([\d.]+)", re.I)
+_RX_CODIGO = re.compile(r"INVR([\d.]+)$", re.I)
+
+
+def rotulo(inv: dict) -> str:
+    """O nome curto do inversor no mapa ("1.1"): da descrição do Fracttal ("Inversor 1.1 Huawei ...") ou do código."""
+    m = _RX_ROTULO.search(inv.get("descricao") or "") or _RX_CODIGO.search(inv.get("codigo") or "")
+    return m.group(1) if m else (inv.get("codigo") or "?")[-6:]
+
+
+def mapa_da_usina(usina_id: int, lista: list[dict], inversores: list[dict] | None = None, menos: str = "") -> list[dict]:
+    """Um quadradinho por inversor do Fracttal da usina: aceso quando uma limitação EM ANDAMENTO o pega (a de menor
+    limite vale, se duas pegarem), com o percentual e desde quando. `menos` = a limitação que está sendo editada (não se
+    avisa contra ela mesma)."""
+    invs = inversores if inversores is not None else inversores_da_usina(usina_id)["lista"]
+    andando = [v for v in lista if v["usina_id"] == usina_id and v["situacao"] == "em_andamento" and v["limitacao_id"] != menos]
+    out = []
+    for inv in invs:
+        pegam = [v for v in andando if v["todos"] or inv["codigo"] in v["inversores"]]
+        v = min(pegam, key=lambda x: x["limite_pct"] if x["limite_pct"] is not None else 101) if pegam else None
+        out.append({"codigo": inv["codigo"], "rotulo": rotulo(inv), "titulo": f"{inv.get('descricao') or ''} · {inv['codigo']}".strip(" ·"),
+                    "limitado": v is not None, "limite_pct": v["limite_pct"] if v else None,
+                    "desde": v["inicio"].strftime("%d/%m") if v and v["inicio"] else ""})
+    return out
+
+
+def fichas_usinas() -> dict:
+    """{usina_id: {"nome", "cliente"}} do cadastro do Nexus (o cliente pelo cliente_id)."""
+    from . import visao
+    clientes = {_id(c.get("cliente_id")): _txt(c.get("nome")) for c in visao._livro("cadastro_nexus", "clientes")}
+    return {_id(u.get("usina_id")): {"nome": _txt(u.get("nome")), "cliente": clientes.get(_id(u.get("cliente_id")), "")}
+            for u in visao._livro("cadastro_nexus", "usinas") if _id(u.get("usina_id"))}
 
 
 # ── a gravação ───────────────────────────────────────────────────────────────────────────────────────────────────────

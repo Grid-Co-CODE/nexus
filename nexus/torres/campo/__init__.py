@@ -73,13 +73,6 @@ TORRE = Torre(
         Tela("usinas", "Usinas",
              "Como está cada usina agora, e o que cada setor diz dela?",
              "Visão do responsável, tempo real, Nexus Insights, extintores e luvas das rondas + cadastro do Nexus"),
-        # o cadastro das limitações de potência dos inversores (19/11/2026, Levi: "crie, na parte de usina 360, um campo onde as
-        # pessoas consigam colocar limitações de potência dos inversores. E aí vai ser usado também para o cálculo dos
-        # expurgos"): as rotas em limitacoes_tela.py; a regra e o livro em nexus/campo/limitacoes.py. Dona: a Performance
-        Tela("limitacoes", "Limitações de potência",
-             "Que inversores estão com a potência limitada, desde quando, por quê e de quem é a responsabilidade?",
-             "Cadastro do time no banco do Nexus (nexus_limitacao_inversor) + inversores do Fracttal",
-             do_setor=(SID.PERFORMANCE,)),
         # o Mapa de equipe (08/11/2026; o pedido do Levi: "identificar onde o técnico está e qual seria a melhor rota para
         # ele"): a posição dos técnicos do piloto do Nexus Field, nas rotas de equipe_tela.py. Os donos são a regra escrita
         # no aviso ao técnico (quem vê), e a rota a confere de novo: a marca de outro setor em Base → Acessos não abre o mapa
@@ -2111,6 +2104,3 @@ from . import cliente_tela  # noqa: E402,F401
 from . import equipe_tela  # noqa: E402,F401
 # o Guia do App de Campo (21/11/2026), em guia_tela.py
 from . import guia_tela  # noqa: E402,F401
-
-# as Limitações de potência (19/11/2026): as rotas em limitacoes_tela.py, pelo mesmo motivo
-from . import limitacoes_tela  # noqa: E402,F401

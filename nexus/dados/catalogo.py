@@ -212,7 +212,7 @@ FATOS = (
                     "mencoes_areas = as torres mencionadas, separados por vírgula. O nome de quem escreveu e o texto "
                     "só cifrados (Cofre). Só acrescenta: nada se edita nem se apaga"),
     # 19/11/2026 (Levi: "crie, na parte de usina 360, um campo onde as pessoas consigam colocar limitações de potência dos
-    # inversores. E aí vai ser usado também para o cálculo dos expurgos"): o cadastro do time em Usinas 360° › Limitações
+    # inversores. E aí vai ser usado também para o cálculo dos expurgos"): o cadastro do time em Performance › Limitações
     # de potência, que substitui a aba "Inv. com lim. de potência" da planilha de tickets. Registrado antes da 1ª gravação
     Fato("versao_limitacao", "Versão de uma limitação de potência de inversores", "performance",
          "nexus_limitacao_inversor · fato_versao_limitacao",
@@ -1757,8 +1757,8 @@ LIVROS = (
           "registrado em 04/11/2026 antes da 1ª gravação (regra 10): nasce no 1º aviso de solicitação ou de lido",
           so_cresce=True),
     Livro("nexus_limitacao_inversor", ("fato_versao_limitacao",),
-          "a cada registro, alteração, encerramento ou exclusão de uma limitação de potência em Usinas 360°",
-          "nexus/campo/limitacoes.py, pela tela Usinas 360° › Limitações de potência", False,
+          "a cada registro, alteração, encerramento ou exclusão de uma limitação de potência em Performance › Limitações de potência",
+          "nexus/campo/limitacoes.py, pela tela Performance › Limitações de potência", False,
           "registrado em 19/11/2026 antes da 1ª gravação (regra 10): nasce na 1ª limitação registrada",
           so_cresce=True),
     Livro("nexus_subtarefas_performance", ("fato_versao_subtarefas",),
