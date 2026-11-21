@@ -67,16 +67,19 @@
      - o Fora da programação (16/11/2026; casca._sino_fora, pcm/fora_avisos.py): as tarefas que seguem fora da
        programação com um motivo que cita o setor da pessoa, até ela marcar como lida; o clique abre o card da OS. Só para o
        setor que algum motivo cita.
-     O sino aparece quando uma das partes existe (o administrador pela senha, sem pessoa, não tem nenhuma). A explicação ao
+     Desde a 2ª rodada do mesmo dia, também o que era da Caixa de entrada no botão do OS Creator (os pedidos ao setor, as
+     menções e as usinas novas da Sala de controle; Levi: "a caixa de entrada tem que ser no sino").
+     O sino aparece quando uma das partes existe (o administrador pela senha só o vê com pedido, menção ou usina nova). A explicação ao
      passar o mouse é a lista `.sino-dica` dentro do botão (nexus.css), e não o title: o do navegador demora, sai
      cortado e não faz lista (Levi: "passar o mouse eu quero em formato de lista"). #}
-  {% if sino_dem is not none or sino_fora is not none %}
   {% set n_dem = sino_dem.n if sino_dem else 0 %}{% set n_fora = sino_fora.n if sino_fora else 0 %}
+  {% set n_cx = (sino.n_mencoes + sino.n_pedidos + sino.n_perf) if sino else 0 %}
+  {% if sino_dem is not none or sino_fora is not none or n_cx %}
   {% if sino_fora %}{% set fora_um = ' tarefa fora da programação cita o setor ' ~ sino_fora.setor %}
   {% set fora_varios = ' tarefas fora da programação citam o setor ' ~ sino_fora.setor %}{% endif %}
   <details class="sino-topo sino-dem">
-    <summary class="gc-btn gc-btn--ui gc-btn--fantasma sino-bt" aria-label="Notificações: {{ n_dem + n_fora }}">
-      <i class="ph ph-bell" aria-hidden="true"></i>{% if n_dem + n_fora %}<b class="sino-n sino-n--dem{% if sino_dem and sino_dem.criticos %} sino-n--critico{% endif %}">{{ n_dem + n_fora }}</b>{% endif %}<span class="sino-dica" aria-hidden="true"><span class="sino-dica-t">O que chega aqui</span><span class="sino-dica-i">As demandas entre setores que pedem você, com o prazo</span><span class="sino-dica-i">A resposta das demandas que você pediu</span><span class="sino-dica-i">As contestações de clientes que o seu setor ainda não respondeu</span><span class="sino-dica-i">As tarefas fora da programação do PCM com um motivo que cita o seu setor</span></span></summary>
+    <summary class="gc-btn gc-btn--ui gc-btn--fantasma sino-bt" aria-label="Notificações: {{ n_dem + n_fora + n_cx }}">
+      <i class="ph ph-bell" aria-hidden="true"></i>{% if n_dem + n_fora + n_cx %}<b class="sino-n sino-n--dem{% if (sino_dem and sino_dem.criticos) or (sino and sino.criticos) %} sino-n--critico{% endif %}">{{ n_dem + n_fora + n_cx }}</b>{% endif %}<span class="sino-dica" aria-hidden="true"><span class="sino-dica-t">O que chega aqui</span><span class="sino-dica-i">As demandas entre setores que pedem você, com o prazo, e a resposta das que você pediu</span><span class="sino-dica-i">Os pedidos para o seu setor</span><span class="sino-dica-i">As menções a você nas conversas da Caixa de entrada</span><span class="sino-dica-i">As contestações de clientes que o seu setor ainda não respondeu</span><span class="sino-dica-i">As tarefas fora da programação do PCM com um motivo que cita o seu setor</span><span class="sino-dica-i">As usinas com ocorrência nova na Sala de controle da Performance</span></span></summary>
     <div class="sino-caixa" role="region" aria-label="Notificações"{% if sino_fora %} data-lidas data-rotulo="Notificações" data-um="{{ fora_um }}" data-varios="{{ fora_varios }}" data-vazio="Nada novo nas notificações do seu setor."{% endif %}>
       {% if sino_dem %}
       {% if sino_dem.itens %}<p class="sino-t"><b>{{ sino_dem.n_demandas }} {{ 'demanda pede você' if sino_dem.n_demandas == 1 else 'demandas pedem você' }}</b></p>
@@ -85,6 +88,20 @@
       <ul>{% for c in sino_dem.contestacoes %}<li><a href="{{ raiz }}{{ c.link }}"><span class="sino-sev sino-sev--alerta">Contestação</span> {{ c.titulo }}{% if c.detalhe %}<small class="sino-aviso-d">{{ c.detalhe }}</small>{% endif %}</a></li>{% endfor %}</ul>
       {% if sino_dem.n_contestacoes > sino_dem.contestacoes|length %}<p class="sino-vazio">e mais {{ sino_dem.n_contestacoes - sino_dem.contestacoes|length }}, nas Contestações</p>{% endif %}{% endif %}
       {% if not sino_dem.n %}<p class="sino-vazio">{{ 'Nenhuma demanda pede você agora.' if sino_dem.com_demandas else 'Nenhuma contestação espera o seu setor agora.' }}</p>{% endif %}
+      {% endif %}
+      {# da Caixa de entrada (21/11/2026, Levi: "a caixa de entrada tem que ser no sino"): os pedidos às torres do setor
+         que esperam resposta ou passaram do prazo e as menções a ela nas conversas (comando/conversa.py); e as usinas com
+         ocorrência nova na Sala de controle da Performance. Vêm do `casca._sino`, como antes no botão do OS Creator #}
+      {% if sino %}
+      {% if sino.n_pedidos %}<p class="sino-t"><b>{{ sino.n_pedidos }} {{ 'pedido para o seu setor' if sino.n_pedidos == 1 else 'pedidos para o seu setor' }}</b></p>
+      <ul>{% for p in sino.pedidos %}<li><a href="{{ raiz }}{{ p.link }}"><span class="sino-sev sino-sev--{{ 'critico' if p.atrasado else 'pedido' }}">{{ 'Atrasado' if p.atrasado else 'Pedido' }}</span> {{ p.titulo }}</a></li>{% endfor %}</ul>{% endif %}
+      {% if sino.n_mencoes %}<p class="sino-t"><b>{{ sino.n_mencoes }} {{ 'menção sem ler' if sino.n_mencoes == 1 else 'menções sem ler' }}</b></p>
+      <ul>{% for m in sino.mencoes %}<li><a href="{{ raiz }}{{ m.link }}"><span class="sino-sev sino-sev--mencao">Menção</span> {{ m.titulo }}</a></li>{% endfor %}</ul>{% endif %}
+      {# o novo da Sala de controle da Performance, por usina (16/11/2026, casca._perf_do_sino): some quando a pessoa abre o
+         inversor (ou os trackers) lá #}
+      {% if sino.n_perf %}<p class="sino-t"><b>{{ sino.n_perf }} {{ 'usina com ocorrência nova na Performance' if sino.n_perf == 1 else 'usinas com ocorrência nova na Performance' }}</b></p>
+      <ul>{% for u in sino.perf %}<li><a href="{{ raiz }}/t/performance/sala-de-controle"><span class="sino-sev sino-sev--pedido">Nova</span> {{ u.usina }}{% if u.detalhe %}<small class="sino-aviso-d">{{ u.detalhe }}</small>{% endif %}</a></li>{% endfor %}</ul>
+      {% if sino.n_perf > sino.perf|length %}<p class="sino-vazio">e mais {{ sino.n_perf - sino.perf|length }}, na Sala de controle</p>{% endif %}{% endif %}
       {% endif %}
       {% if sino_fora %}
       {% if sino_fora.n %}<p class="sino-t sino-t-avisos" data-n="{{ sino_fora.n }}"><b>{{ sino_fora.n }}{{ fora_um if sino_fora.n == 1 else fora_varios }}</b></p>
@@ -95,16 +112,19 @@
       <form method="post" action="{{ raiz }}/t/comando/aviso/lida" class="sino-lidas"><input type="hidden" name="todos" value="fora"><input type="hidden" name="voltar" value="{{ caminho_completo }}"><button type="submit" class="sino-lida">Marcar todas como lidas</button></form>
       {% else %}<p class="sino-vazio">Nenhuma tarefa fora da programação cita o setor {{ sino_fora.setor }}.</p>{% endif %}
       {% endif %}
-      {% if sino_dem and sino_dem.com_demandas %}<a class="gc-btn gc-btn--ui gc-btn--contorno sino-todos" href="{{ raiz }}/t/comando/caixa-de-entrada#demandas">Abrir as demandas</a>{% endif %}
+      {% if sino or (sino_dem and sino_dem.com_demandas) %}<a class="gc-btn gc-btn--ui gc-btn--contorno sino-todos" href="{{ raiz }}/t/comando/caixa-de-entrada">Abrir a Caixa de entrada</a>{% endif %}
       {% if sino_dem and sino_dem.n_contestacoes %}<a class="gc-btn gc-btn--ui gc-btn--contorno sino-todos" href="{{ raiz }}/t/comando/contestacoes">Abrir as contestações</a>{% endif %}
       {# o link só para quem tem a tela (o setor citado pode não ter: o portão o barraria) #}
       {% if sino_fora and sino_fora.pode_abrir %}<a class="gc-btn gc-btn--ui gc-btn--contorno sino-todos" href="{{ raiz }}/t/pcm/fora-da-programacao">Abrir o Fora da programação</a>{% endif %}
     </div>
   </details>{% endif %}
+  {# o botão do OS Creator, SÓ com as OS (21/11/2026, Levi: "A do OS Creator tem que ser focada apenas em OS mesmo [...]
+     Talvez um capacete"): os avisos das OS da pessoa; as menções, os pedidos ao setor e as usinas novas da Sala de controle
+     foram para o sino. O ícone é o capacete (ph-hard-hat), e não mais o do OS Creator do menu #}
   {% if sino is not none %}<details class="sino-topo">
-    <summary class="gc-btn gc-btn--ui gc-btn--fantasma sino-bt" aria-label="Avisos: {{ sino.n }}">
-      <i class="ph ph-{{ sino.icone_os or 'clipboard-text' }}" aria-hidden="true"></i>{% if sino.n %}<b class="sino-n{% if sino.criticos %} sino-n--critico{% endif %}">{{ sino.n }}</b>{% endif %}<span class="sino-dica" aria-hidden="true"><span class="sino-dica-t">O que chega aqui</span><span class="sino-dica-i">A OS concluída pelo técnico</span><span class="sino-dica-i">A OS criada para você</span><span class="sino-dica-i">A solicitação que virou OS</span><span class="sino-dica-i">As menções a você nas conversas</span><span class="sino-dica-i">Os pedidos para o seu setor</span><span class="sino-dica-i">As usinas com ocorrência nova na Sala de controle da Performance</span></span></summary>
-    <div class="sino-caixa" role="region" aria-label="Avisos" data-lidas data-rotulo="Avisos" data-um=" aviso das suas OS" data-varios=" avisos das suas OS" data-vazio="Nada novo para você.">
+    <summary class="gc-btn gc-btn--ui gc-btn--fantasma sino-bt" aria-label="Avisos das OS: {{ sino.n_avisos }}">
+      <i class="ph ph-hard-hat" aria-hidden="true"></i>{% if sino.n_avisos %}<b class="sino-n">{{ sino.n_avisos }}</b>{% endif %}<span class="sino-dica" aria-hidden="true"><span class="sino-dica-t">O que chega aqui</span><span class="sino-dica-i">A OS concluída pelo técnico</span><span class="sino-dica-i">A OS criada para você</span><span class="sino-dica-i">A solicitação que virou OS</span></span></summary>
+    <div class="sino-caixa" role="region" aria-label="Avisos das OS" data-lidas data-rotulo="Avisos das OS" data-um=" aviso das suas OS" data-varios=" avisos das suas OS" data-vazio="Nenhum aviso das suas OS.">
       {# os avisos das OS da pessoa (04/11/2026, comando/avisos.py): o clique abre o card da OS (o mesmo do Histórico, com o
          PDF) por cima da tela; sem JavaScript, a página da OS. "Marcar como lida" é um formulário, como o tema, que o script
          abaixo manda por fetch, sem recarregar a tela (05/11/2026) #}
@@ -116,17 +136,7 @@
         <form method="post" action="{{ raiz }}/t/comando/aviso/lida"><input type="hidden" name="aviso" value="{{ a.id }}"><input type="hidden" name="voltar" value="{{ caminho_completo }}"><button type="submit" class="sino-lida">Marcar como lida</button></form>
       </li>{% endfor %}</ul>
       <form method="post" action="{{ raiz }}/t/comando/aviso/lida" class="sino-lidas"><input type="hidden" name="todos" value="1"><input type="hidden" name="voltar" value="{{ caminho_completo }}"><button type="submit" class="sino-lida">Marcar todas como lidas</button></form>{% endif %}
-      {% if sino.n_mencoes %}<p class="sino-t"><b>{{ sino.n_mencoes }} {{ 'menção sem ler' if sino.n_mencoes == 1 else 'menções sem ler' }}</b></p>
-      <ul>{% for m in sino.mencoes %}<li><a href="{{ raiz }}{{ m.link }}"><span class="sino-sev sino-sev--mencao">Menção</span> {{ m.titulo }}</a></li>{% endfor %}</ul>{% endif %}
-      {% if sino.n_pedidos %}<p class="sino-t"><b>{{ sino.n_pedidos }} {{ 'pedido para o seu setor' if sino.n_pedidos == 1 else 'pedidos para o seu setor' }}</b></p>
-      <ul>{% for p in sino.pedidos %}<li><a href="{{ raiz }}{{ p.link }}"><span class="sino-sev sino-sev--{{ 'critico' if p.atrasado else 'pedido' }}">{{ 'Atrasado' if p.atrasado else 'Pedido' }}</span> {{ p.titulo }}</a></li>{% endfor %}</ul>{% endif %}
-      {# o novo da Sala de controle da Performance, por usina (16/11/2026, casca._perf_do_sino): some quando a pessoa abre o
-         inversor (ou os trackers) lá #}
-      {% if sino.n_perf %}<p class="sino-t"><b>{{ sino.n_perf }} {{ 'usina com ocorrência nova na Performance' if sino.n_perf == 1 else 'usinas com ocorrência nova na Performance' }}</b></p>
-      <ul>{% for u in sino.perf %}<li><a href="{{ raiz }}/t/performance/sala-de-controle"><span class="sino-sev sino-sev--pedido">Nova</span> {{ u.usina }}{% if u.detalhe %}<small class="sino-aviso-d">{{ u.detalhe }}</small>{% endif %}</a></li>{% endfor %}</ul>
-      {% if sino.n_perf > sino.perf|length %}<p class="sino-vazio">e mais {{ sino.n_perf - sino.perf|length }}, na Sala de controle</p>{% endif %}{% endif %}
-      {% if not sino.n %}<p class="sino-vazio">Nada novo para você.</p>{% endif %}
-      <a class="gc-btn gc-btn--ui gc-btn--contorno sino-todos" href="{{ raiz }}/t/comando/caixa-de-entrada">Abrir a Caixa de entrada</a>
+      {% if not sino.n_avisos %}<p class="sino-vazio">Nenhum aviso das suas OS.</p>{% endif %}
     </div>
   </details>{% endif %}
   {% if (sino and sino.n_avisos) or (sino_fora and sino_fora.n) %}{% include "oscreator/card_os_abrir.html" %}

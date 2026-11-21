@@ -1257,13 +1257,15 @@ que é uma tela dentro de uma tela!".
 - **As notificações do topo, dois botões** (21/11/2026, Levi: "Una o 1 e o 3. E transforme o ícone em um sino [...] quando
   a pessoa passar o mouse, vai explicar o que chega nessa notificação" e "no ícone do OS Creator aparecesse também um
   texto explicando ao passar o mouse"):
-  1. o **sino** (`ph-bell`, `<details class="sino-topo sino-dem">`, aria-label "Notificações: N"): o que eram a bandeja
-     das demandas e contestações (`_sino_demandas`) e o calendário do Fora da programação (`_sino_fora`), cada parte com
-     a regra e o título dela dentro da caixa e os três botões de abrir no pé; o número é a soma das duas; aparece quando
-     uma das partes existe (o administrador pela senha não tem nenhuma). O "Marcar como lida" do Fora segue pelo mesmo
-     script (`data-lidas` na caixa só quando há a parte do Fora);
-  2. o **botão do OS Creator** (prancheta, `_sino`): os avisos das OS, as menções, os pedidos e as usinas novas da Sala
-     de controle, como era.
+  1. o **sino** (`ph-bell`, `<details class="sino-topo sino-dem">`, aria-label "Notificações: N"): as demandas e as
+     contestações (`_sino_demandas`), o Fora da programação (`_sino_fora`) e, desde a 2ª rodada do mesmo dia ("a caixa
+     de entrada tem que ser no sino"), os pedidos ao setor, as menções nas conversas e as usinas novas da Sala de controle
+     (de `_sino`). Cada parte com o título dela dentro da caixa; no pé, Abrir a Caixa de entrada, as contestações e o Fora.
+     O número é a soma; aparece quando uma das partes existe (o administrador pela senha só com pedido, menção ou usina
+     nova). O "Marcar como lida" do Fora segue pelo mesmo script (`data-lidas` só quando há a parte do Fora);
+  2. o **botão do OS Creator, só com as OS** ("A do OS Creator tem que ser focada apenas em OS mesmo"): os avisos das OS
+     da pessoa (`_sino`: concluída pelo técnico, criada para ela, solicitação que virou OS); o número é só o deles; o
+     ícone é o capacete (`ph-hard-hat`, "Talvez um capacete"), e não mais o do OS Creator do menu.
   O que chega em cada um aparece ao passar o mouse, EM LISTA ("passar o mouse eu quero em formato de lista"): a
   `.sino-dica` dentro do botão ("O que chega aqui" e um item por tipo de aviso; nexus.css), no lugar do `title` do
   navegador (demorava, saía cortado e não faz lista); some com a caixa aberta e na tela de toque.
