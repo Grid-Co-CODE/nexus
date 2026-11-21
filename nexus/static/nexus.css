@@ -779,18 +779,22 @@ mark.menu-achado{background:none;color:var(--tinta);font-weight:700;text-decorat
 
 /* o sino dos insights no topo (03/11/2026): o número de sem dono, vermelho com crítico; a lista curta por cima da tela */
 .sino-topo{position:relative}
-/* o que chega em cada notificação, ao passar o mouse (21/11/2026, Levi: "quando a pessoa passar o mouse, vai explicar o
-   que chega nessa notificação" e "no ícone do OS Creator aparecesse também um texto explicando"): o data-dica do
-   botão numa caixa embaixo dele, no lugar do title do navegador (demorava e saía cortado); some com a caixa aberta e
-   na tela de toque */
-.sino-bt[data-dica]::after{content:attr(data-dica);position:absolute;right:0;top:calc(100% + 10px);z-index:41;
-  width:max-content;max-width:300px;padding:9px 11px;border:1px solid var(--linha-forte);border-radius:8px;
-  background:var(--superficie);color:var(--tinta);box-shadow:var(--sombra);font:400 12.5px/1.45 var(--font-sans);
-  text-align:left;white-space:normal;opacity:0;visibility:hidden;pointer-events:none;transition:opacity .12s ease .3s}
-.sino-bt[data-dica]:hover::after,.sino-bt[data-dica]:focus-visible::after{opacity:1;visibility:visible}
-.sino-topo[open] > .sino-bt::after{display:none}
-@media (prefers-reduced-motion:reduce){.sino-bt[data-dica]::after{transition:none}}
-@media (hover:none){.sino-bt[data-dica]::after{display:none}}
+/* o que chega em cada notificação, ao passar o mouse, em LISTA (21/11/2026, Levi: "quando a pessoa passar o mouse, vai
+   explicar o que chega nessa notificação", "no ícone do OS Creator aparecesse também um texto explicando" e "passar o
+   mouse eu quero em formato de lista"): a `.sino-dica` dentro do botão, numa caixa embaixo dele, no lugar do title do
+   navegador (demorava, saía cortado e não fazia lista); some com a caixa aberta e na tela de toque */
+.sino-dica{position:absolute;right:0;top:calc(100% + 10px);z-index:41;display:block;width:max-content;max-width:320px;
+  padding:10px 12px;border:1px solid var(--linha-forte);border-radius:8px;background:var(--superficie);color:var(--tinta);
+  box-shadow:var(--sombra);font:400 12.5px/1.45 var(--font-sans);text-align:left;white-space:normal;
+  opacity:0;visibility:hidden;pointer-events:none;transition:opacity .12s ease .3s}
+.sino-dica-t{display:block;margin:0 0 6px;font-weight:600}
+.sino-dica-i{display:block;position:relative;padding-left:14px;color:var(--tinta-2)}
+.sino-dica-i + .sino-dica-i{margin-top:3px}
+.sino-dica-i::before{content:"";position:absolute;left:2px;top:.62em;width:5px;height:5px;border-radius:50%;background:var(--mudo)}
+.sino-bt:hover .sino-dica,.sino-bt:focus-visible .sino-dica{opacity:1;visibility:visible}
+.sino-topo[open] .sino-dica{display:none}
+@media (prefers-reduced-motion:reduce){.sino-dica{transition:none}}
+@media (hover:none){.sino-dica{display:none}}
 .sino-bt{position:relative;list-style:none;cursor:pointer}
 .sino-bt::-webkit-details-marker{display:none}
 .sino-bt .ph{font-size:18px}

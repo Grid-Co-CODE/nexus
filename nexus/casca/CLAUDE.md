@@ -1264,8 +1264,9 @@ que é uma tela dentro de uma tela!".
      script (`data-lidas` na caixa só quando há a parte do Fora);
   2. o **botão do OS Creator** (prancheta, `_sino`): os avisos das OS, as menções, os pedidos e as usinas novas da Sala
      de controle, como era.
-  O que chega em cada um aparece ao passar o mouse: o `data-dica` do botão, desenhado no `.sino-bt[data-dica]::after`
-  (nexus.css), no lugar do `title` do navegador (demorava e saía cortado); some com a caixa aberta e na tela de toque.
+  O que chega em cada um aparece ao passar o mouse, EM LISTA ("passar o mouse eu quero em formato de lista"): a
+  `.sino-dica` dentro do botão ("O que chega aqui" e um item por tipo de aviso; nexus.css), no lugar do `title` do
+  navegador (demorava, saía cortado e não faz lista); some com a caixa aberta e na tela de toque.
   No celular: o sino na coluna 2, o OS Creator na 3 e o avatar na 4.
 - **A ação da tela no topo:** o bloco `topo_acoes`, antes do sino. Hoje só o "Modo TV" do Painel NOC
   (`performance/moldura.html`); no celular ele some.

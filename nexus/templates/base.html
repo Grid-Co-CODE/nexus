@@ -68,14 +68,15 @@
        programação com um motivo que cita o setor da pessoa, até ela marcar como lida; o clique abre o card da OS. Só para o
        setor que algum motivo cita.
      O sino aparece quando uma das partes existe (o administrador pela senha, sem pessoa, não tem nenhuma). A explicação ao
-     passar o mouse é o `data-dica` (nexus.css), e não o title: o do navegador demora e sai cortado. #}
+     passar o mouse é a lista `.sino-dica` dentro do botão (nexus.css), e não o title: o do navegador demora, sai
+     cortado e não faz lista (Levi: "passar o mouse eu quero em formato de lista"). #}
   {% if sino_dem is not none or sino_fora is not none %}
   {% set n_dem = sino_dem.n if sino_dem else 0 %}{% set n_fora = sino_fora.n if sino_fora else 0 %}
   {% if sino_fora %}{% set fora_um = ' tarefa fora da programação cita o setor ' ~ sino_fora.setor %}
   {% set fora_varios = ' tarefas fora da programação citam o setor ' ~ sino_fora.setor %}{% endif %}
   <details class="sino-topo sino-dem">
-    <summary class="gc-btn gc-btn--ui gc-btn--fantasma sino-bt" aria-label="Notificações: {{ n_dem + n_fora }}" data-dica="Notificações do seu setor: as demandas entre setores que pedem você (com o prazo) e a resposta das que você pediu, as contestações de clientes que o seu setor ainda não respondeu e as tarefas fora da programação do PCM com um motivo que cita o seu setor.">
-      <i class="ph ph-bell" aria-hidden="true"></i>{% if n_dem + n_fora %}<b class="sino-n sino-n--dem{% if sino_dem and sino_dem.criticos %} sino-n--critico{% endif %}">{{ n_dem + n_fora }}</b>{% endif %}</summary>
+    <summary class="gc-btn gc-btn--ui gc-btn--fantasma sino-bt" aria-label="Notificações: {{ n_dem + n_fora }}">
+      <i class="ph ph-bell" aria-hidden="true"></i>{% if n_dem + n_fora %}<b class="sino-n sino-n--dem{% if sino_dem and sino_dem.criticos %} sino-n--critico{% endif %}">{{ n_dem + n_fora }}</b>{% endif %}<span class="sino-dica" aria-hidden="true"><span class="sino-dica-t">O que chega aqui</span><span class="sino-dica-i">As demandas entre setores que pedem você, com o prazo</span><span class="sino-dica-i">A resposta das demandas que você pediu</span><span class="sino-dica-i">As contestações de clientes que o seu setor ainda não respondeu</span><span class="sino-dica-i">As tarefas fora da programação do PCM com um motivo que cita o seu setor</span></span></summary>
     <div class="sino-caixa" role="region" aria-label="Notificações"{% if sino_fora %} data-lidas data-rotulo="Notificações" data-um="{{ fora_um }}" data-varios="{{ fora_varios }}" data-vazio="Nada novo nas notificações do seu setor."{% endif %}>
       {% if sino_dem %}
       {% if sino_dem.itens %}<p class="sino-t"><b>{{ sino_dem.n_demandas }} {{ 'demanda pede você' if sino_dem.n_demandas == 1 else 'demandas pedem você' }}</b></p>
@@ -101,8 +102,8 @@
     </div>
   </details>{% endif %}
   {% if sino is not none %}<details class="sino-topo">
-    <summary class="gc-btn gc-btn--ui gc-btn--fantasma sino-bt" aria-label="Avisos: {{ sino.n }}" data-dica="Avisos das suas OS: a OS concluída pelo técnico, a OS criada para você e a solicitação que virou OS. Também as menções a você nas conversas, os pedidos para o seu setor e as usinas com ocorrência nova na Sala de controle da Performance.">
-      <i class="ph ph-{{ sino.icone_os or 'clipboard-text' }}" aria-hidden="true"></i>{% if sino.n %}<b class="sino-n{% if sino.criticos %} sino-n--critico{% endif %}">{{ sino.n }}</b>{% endif %}</summary>
+    <summary class="gc-btn gc-btn--ui gc-btn--fantasma sino-bt" aria-label="Avisos: {{ sino.n }}">
+      <i class="ph ph-{{ sino.icone_os or 'clipboard-text' }}" aria-hidden="true"></i>{% if sino.n %}<b class="sino-n{% if sino.criticos %} sino-n--critico{% endif %}">{{ sino.n }}</b>{% endif %}<span class="sino-dica" aria-hidden="true"><span class="sino-dica-t">O que chega aqui</span><span class="sino-dica-i">A OS concluída pelo técnico</span><span class="sino-dica-i">A OS criada para você</span><span class="sino-dica-i">A solicitação que virou OS</span><span class="sino-dica-i">As menções a você nas conversas</span><span class="sino-dica-i">Os pedidos para o seu setor</span><span class="sino-dica-i">As usinas com ocorrência nova na Sala de controle da Performance</span></span></summary>
     <div class="sino-caixa" role="region" aria-label="Avisos" data-lidas data-rotulo="Avisos" data-um=" aviso das suas OS" data-varios=" avisos das suas OS" data-vazio="Nada novo para você.">
       {# os avisos das OS da pessoa (04/11/2026, comando/avisos.py): o clique abre o card da OS (o mesmo do Histórico, com o
          PDF) por cima da tela; sem JavaScript, a página da OS. "Marcar como lida" é um formulário, como o tema, que o script
