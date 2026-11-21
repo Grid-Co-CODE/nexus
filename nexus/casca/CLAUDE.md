@@ -1260,7 +1260,10 @@ que é uma tela dentro de uma tela!".
   1. o **sino** (`ph-bell`, `<details class="sino-topo sino-dem">`, aria-label "Notificações: N"): as demandas e as
      contestações (`_sino_demandas`), o Fora da programação (`_sino_fora`) e, desde a 2ª rodada do mesmo dia ("a caixa
      de entrada tem que ser no sino"), os pedidos ao setor, as menções nas conversas e as usinas novas da Sala de controle
-     (de `_sino`). Cada parte com o título dela dentro da caixa; no pé, Abrir a Caixa de entrada, as contestações e o Fora.
+     (de `_sino`). Cada parte com o título dela e o "Abrir" AO LADO do título ("Talvez poderia ser um botão ali do lado":
+     os três botões empilhados no pé saíram): demandas e pedidos e menções → Caixa de entrada (#demandas, #cx-pedidos,
+     #cx-mencoes), contestações → Contestações, usinas novas → Sala de controle, Fora → Fora da programação (só para
+     quem tem a tela). Com o sino vazio, o pé leva à Caixa de entrada.
      O número é a soma; aparece quando uma das partes existe (o administrador pela senha só com pedido, menção ou usina
      nova). O "Marcar como lida" do Fora segue pelo mesmo script (`data-lidas` só quando há a parte do Fora);
   2. o **botão do OS Creator, só com as OS** ("A do OS Creator tem que ser focada apenas em OS mesmo"): os avisos das OS

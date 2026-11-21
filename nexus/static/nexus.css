@@ -804,6 +804,11 @@ mark.menu-achado{background:none;color:var(--tinta);font-weight:700;text-decorat
 .sino-caixa{position:absolute;right:0;top:calc(100% + 10px);z-index:40;width:min(420px,calc(100vw - 32px));background:var(--superficie);
   border:1px solid var(--linha-forte);border-radius:var(--raio-md);box-shadow:0 12px 32px var(--sombra);padding:14px 16px;color:var(--tinta)}
 .sino-t{margin:0 0 8px;font-size:13.5px}
+/* o "Abrir" de cada parte do sino ao lado do título (21/11/2026), no lugar dos botões empilhados no pé */
+.sino-caixa .sino-t,.sino-caixa .sino-vazio{display:flex;align-items:baseline;justify-content:space-between;gap:12px}
+.sino-abrir{flex:none;font:600 12px/1 var(--font-sans);color:var(--verde-texto);text-decoration:none;padding:4px 6px;
+  margin:-4px -6px -4px 0;border-radius:4px}
+.sino-abrir:hover,.sino-abrir:focus-visible{background:var(--superficie-2);text-decoration:underline}
 .sino-caixa ul{list-style:none;margin:0 0 12px;padding:0;display:grid;gap:2px;max-height:360px;overflow:auto}
 .sino-caixa li a{display:block;padding:8px;border-radius:6px;color:var(--tinta);text-decoration:none;font-size:13px;line-height:1.4}
 .sino-caixa li a:hover,.sino-caixa li a:focus-visible{background:var(--superficie-2)}

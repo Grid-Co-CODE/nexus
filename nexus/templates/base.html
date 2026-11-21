@@ -82,9 +82,9 @@
       <i class="ph ph-bell" aria-hidden="true"></i>{% if n_dem + n_fora + n_cx %}<b class="sino-n sino-n--dem{% if (sino_dem and sino_dem.criticos) or (sino and sino.criticos) %} sino-n--critico{% endif %}">{{ n_dem + n_fora + n_cx }}</b>{% endif %}<span class="sino-dica" aria-hidden="true"><span class="sino-dica-t">O que chega aqui</span><span class="sino-dica-i">As demandas entre setores que pedem você, com o prazo, e a resposta das que você pediu</span><span class="sino-dica-i">Os pedidos para o seu setor</span><span class="sino-dica-i">As menções a você nas conversas da Caixa de entrada</span><span class="sino-dica-i">As contestações de clientes que o seu setor ainda não respondeu</span><span class="sino-dica-i">As tarefas fora da programação do PCM com um motivo que cita o seu setor</span><span class="sino-dica-i">As usinas com ocorrência nova na Sala de controle da Performance</span></span></summary>
     <div class="sino-caixa" role="region" aria-label="Notificações"{% if sino_fora %} data-lidas data-rotulo="Notificações" data-um="{{ fora_um }}" data-varios="{{ fora_varios }}" data-vazio="Nada novo nas notificações do seu setor."{% endif %}>
       {% if sino_dem %}
-      {% if sino_dem.itens %}<p class="sino-t"><b>{{ sino_dem.n_demandas }} {{ 'demanda pede você' if sino_dem.n_demandas == 1 else 'demandas pedem você' }}</b></p>
+      {% if sino_dem.itens %}<p class="sino-t"><b>{{ sino_dem.n_demandas }} {{ 'demanda pede você' if sino_dem.n_demandas == 1 else 'demandas pedem você' }}</b><a class="sino-abrir" href="{{ raiz }}/t/comando/caixa-de-entrada#demandas">Abrir</a></p>
       <ul>{% for a in sino_dem.itens %}<li><a href="{{ raiz }}{{ a.link }}"><span class="sino-sev sino-sev--{{ a.tom }}">{{ a.rotulo }}</span> {{ a.titulo }}{% if a.detalhe %}<small class="sino-aviso-d">{{ a.detalhe }}</small>{% endif %}</a></li>{% endfor %}</ul>{% endif %}
-      {% if sino_dem.n_contestacoes %}<p class="sino-t"><b>{{ sino_dem.n_contestacoes }} {{ 'contestação sem resposta' if sino_dem.n_contestacoes == 1 else 'contestações sem resposta' }}</b></p>
+      {% if sino_dem.n_contestacoes %}<p class="sino-t"><b>{{ sino_dem.n_contestacoes }} {{ 'contestação sem resposta' if sino_dem.n_contestacoes == 1 else 'contestações sem resposta' }}</b><a class="sino-abrir" href="{{ raiz }}/t/comando/contestacoes">Abrir</a></p>
       <ul>{% for c in sino_dem.contestacoes %}<li><a href="{{ raiz }}{{ c.link }}"><span class="sino-sev sino-sev--alerta">Contestação</span> {{ c.titulo }}{% if c.detalhe %}<small class="sino-aviso-d">{{ c.detalhe }}</small>{% endif %}</a></li>{% endfor %}</ul>
       {% if sino_dem.n_contestacoes > sino_dem.contestacoes|length %}<p class="sino-vazio">e mais {{ sino_dem.n_contestacoes - sino_dem.contestacoes|length }}, nas Contestações</p>{% endif %}{% endif %}
       {% if not sino_dem.n %}<p class="sino-vazio">{{ 'Nenhuma demanda pede você agora.' if sino_dem.com_demandas else 'Nenhuma contestação espera o seu setor agora.' }}</p>{% endif %}
@@ -93,29 +93,29 @@
          que esperam resposta ou passaram do prazo e as menções a ela nas conversas (comando/conversa.py); e as usinas com
          ocorrência nova na Sala de controle da Performance. Vêm do `casca._sino`, como antes no botão do OS Creator #}
       {% if sino %}
-      {% if sino.n_pedidos %}<p class="sino-t"><b>{{ sino.n_pedidos }} {{ 'pedido para o seu setor' if sino.n_pedidos == 1 else 'pedidos para o seu setor' }}</b></p>
+      {% if sino.n_pedidos %}<p class="sino-t"><b>{{ sino.n_pedidos }} {{ 'pedido para o seu setor' if sino.n_pedidos == 1 else 'pedidos para o seu setor' }}</b><a class="sino-abrir" href="{{ raiz }}/t/comando/caixa-de-entrada#cx-pedidos">Abrir</a></p>
       <ul>{% for p in sino.pedidos %}<li><a href="{{ raiz }}{{ p.link }}"><span class="sino-sev sino-sev--{{ 'critico' if p.atrasado else 'pedido' }}">{{ 'Atrasado' if p.atrasado else 'Pedido' }}</span> {{ p.titulo }}</a></li>{% endfor %}</ul>{% endif %}
-      {% if sino.n_mencoes %}<p class="sino-t"><b>{{ sino.n_mencoes }} {{ 'menção sem ler' if sino.n_mencoes == 1 else 'menções sem ler' }}</b></p>
+      {% if sino.n_mencoes %}<p class="sino-t"><b>{{ sino.n_mencoes }} {{ 'menção sem ler' if sino.n_mencoes == 1 else 'menções sem ler' }}</b><a class="sino-abrir" href="{{ raiz }}/t/comando/caixa-de-entrada#cx-mencoes">Abrir</a></p>
       <ul>{% for m in sino.mencoes %}<li><a href="{{ raiz }}{{ m.link }}"><span class="sino-sev sino-sev--mencao">Menção</span> {{ m.titulo }}</a></li>{% endfor %}</ul>{% endif %}
       {# o novo da Sala de controle da Performance, por usina (16/11/2026, casca._perf_do_sino): some quando a pessoa abre o
          inversor (ou os trackers) lá #}
-      {% if sino.n_perf %}<p class="sino-t"><b>{{ sino.n_perf }} {{ 'usina com ocorrência nova na Performance' if sino.n_perf == 1 else 'usinas com ocorrência nova na Performance' }}</b></p>
+      {% if sino.n_perf %}<p class="sino-t"><b>{{ sino.n_perf }} {{ 'usina com ocorrência nova na Performance' if sino.n_perf == 1 else 'usinas com ocorrência nova na Performance' }}</b><a class="sino-abrir" href="{{ raiz }}/t/performance/sala-de-controle">Abrir</a></p>
       <ul>{% for u in sino.perf %}<li><a href="{{ raiz }}/t/performance/sala-de-controle"><span class="sino-sev sino-sev--pedido">Nova</span> {{ u.usina }}{% if u.detalhe %}<small class="sino-aviso-d">{{ u.detalhe }}</small>{% endif %}</a></li>{% endfor %}</ul>
       {% if sino.n_perf > sino.perf|length %}<p class="sino-vazio">e mais {{ sino.n_perf - sino.perf|length }}, na Sala de controle</p>{% endif %}{% endif %}
       {% endif %}
       {% if sino_fora %}
-      {% if sino_fora.n %}<p class="sino-t sino-t-avisos" data-n="{{ sino_fora.n }}"><b>{{ sino_fora.n }}{{ fora_um if sino_fora.n == 1 else fora_varios }}</b></p>
+      {% if sino_fora.n %}<p class="sino-t sino-t-avisos" data-n="{{ sino_fora.n }}"><b>{{ sino_fora.n }}{{ fora_um if sino_fora.n == 1 else fora_varios }}</b>{% if sino_fora.pode_abrir %}<a class="sino-abrir" href="{{ raiz }}/t/pcm/fora-da-programacao">Abrir</a>{% endif %}</p>
       <ul class="sino-avisos">{% for a in sino_fora.itens %}<li>
         <a class="sino-aviso" href="{{ raiz }}/os/_nexus/card/folio/{{ a.os }}" data-os-wid="" data-os-folio="{{ a.os }}" data-os-status=""><span class="sino-sev sino-sev--info">{{ a.motivo }}</span> OS {{ a.os }} · {{ a.tarefa }}<small class="sino-aviso-d">{{ a.detalhe }}</small></a>
         <form method="post" action="{{ raiz }}/t/comando/aviso/lida"><input type="hidden" name="aviso" value="{{ a.id }}"><input type="hidden" name="voltar" value="{{ caminho_completo }}"><button type="submit" class="sino-lida">Marcar como lida</button></form>
       </li>{% endfor %}</ul>
       <form method="post" action="{{ raiz }}/t/comando/aviso/lida" class="sino-lidas"><input type="hidden" name="todos" value="fora"><input type="hidden" name="voltar" value="{{ caminho_completo }}"><button type="submit" class="sino-lida">Marcar todas como lidas</button></form>
-      {% else %}<p class="sino-vazio">Nenhuma tarefa fora da programação cita o setor {{ sino_fora.setor }}.</p>{% endif %}
+      {% else %}<p class="sino-vazio">Nenhuma tarefa fora da programação cita o setor {{ sino_fora.setor }}.{% if sino_fora.pode_abrir %}<a class="sino-abrir" href="{{ raiz }}/t/pcm/fora-da-programacao">Abrir</a>{% endif %}</p>{% endif %}
       {% endif %}
-      {% if sino or (sino_dem and sino_dem.com_demandas) %}<a class="gc-btn gc-btn--ui gc-btn--contorno sino-todos" href="{{ raiz }}/t/comando/caixa-de-entrada">Abrir a Caixa de entrada</a>{% endif %}
-      {% if sino_dem and sino_dem.n_contestacoes %}<a class="gc-btn gc-btn--ui gc-btn--contorno sino-todos" href="{{ raiz }}/t/comando/contestacoes">Abrir as contestações</a>{% endif %}
-      {# o link só para quem tem a tela (o setor citado pode não ter: o portão o barraria) #}
-      {% if sino_fora and sino_fora.pode_abrir %}<a class="gc-btn gc-btn--ui gc-btn--contorno sino-todos" href="{{ raiz }}/t/pcm/fora-da-programacao">Abrir o Fora da programação</a>{% endif %}
+      {# o "Abrir" de cada parte fica ao lado do título dela (21/11/2026, Levi: "tem abrir caixa de entrada, abrir as
+         contestações, ou abrir o fora de programação. Talvez poderia ser um botão ali do lado"); o do Fora só para quem
+         tem a tela (o portão barraria). Com o sino vazio, a Caixa de entrada no pé #}
+      {% if not (n_dem + n_fora + n_cx) and (sino or (sino_dem and sino_dem.com_demandas)) %}<a class="gc-btn gc-btn--ui gc-btn--contorno sino-todos" href="{{ raiz }}/t/comando/caixa-de-entrada">Abrir a Caixa de entrada</a>{% endif %}
     </div>
   </details>{% endif %}
   {# o botão do OS Creator, SÓ com as OS (21/11/2026, Levi: "A do OS Creator tem que ser focada apenas em OS mesmo [...]

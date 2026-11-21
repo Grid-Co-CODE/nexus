@@ -288,7 +288,8 @@ def test_a_bandeja_traz_a_sem_resposta_do_setor_ate_a_primeira_resposta(trat, ap
     _como(cliente, ANA)
     b = _bandeja(cliente.get("/t/comando/contestacoes").get_data(as_text=True))
     assert "2 contestações sem resposta" in b and "Altair" in b and "Guaratinguetá V" in b
-    assert "/t/comando/contestacoes?setor=performance&amp;c=b1#ct-detalhe" in b and "Abrir as contestações" in b
+    # o "Abrir" ao lado do título da parte (21/11/2026), no lugar do botão "Abrir as contestações" do pé
+    assert "/t/comando/contestacoes?setor=performance&amp;c=b1#ct-detalhe" in b and 'class="sino-abrir" href="/t/comando/contestacoes"' in b
     assert 'aria-label="Notificações: 2"' in b and "Abrir as demandas" not in b
     # a 1ª resposta de qualquer um do setor tira para todos; resolver também
     cliente.post("/t/comando/contestacoes/a1/atualizacao", data={"texto": "Vendo"}, headers=MESMO_SITE)
