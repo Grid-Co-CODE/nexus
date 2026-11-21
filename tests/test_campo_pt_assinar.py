@@ -60,6 +60,19 @@ def test_o_responsavel_ufv_da_ficha_decide_a_pt(com_responsavel):
     assert ok is False and "Responsável UFV" not in porque
 
 
+def test_o_link_fixo_lista_as_pts_para_o_de_acordo_de_quem_entrou(app, com_responsavel):
+    """O link para salvar no celular (Levi, 20/11/2026: "pode fazer um link específico para aprovação de PTs e APRs via
+    celular?"): as PTs que a pessoa da sessão pode decidir, cada uma abrindo o card de assinar dela."""
+    c = _sessao(app, RESP, "Responsável Exemplo")
+    html = c.get("/t/campo/pt/assinar").get_data(as_text=True)
+    assert "PTs para o seu De acordo" in html and 'href="/t/campo/pt/PT-1/assinar?ativo=THPN-ALT100-INVR1"' in html
+    assert "Salve este endereço no celular" in html
+    # quem não pode decidir nenhuma lê que não há, e quem o Nexus não acha no cadastro lê o que fazer
+    outro = _sessao(app, "ninguem@exemplo.test", "Ninguém Exemplo")
+    html = outro.get("/t/campo/pt/assinar").get_data(as_text=True)
+    assert "/t/campo/pt/PT-1/assinar" not in html and "O Nexus não achou você no cadastro de pessoas" in html
+
+
 def test_o_plantao_do_cos_vai_de_sexta_18h_a_segunda_6h():
     """Levi, 14/11/2026: "O pessoal do COS pode dar o de acordo a partir de sexta-feira, 6 horas da noite, até segunda,
     6 horas da manhã. Passou disso, só com o supervisor". No horário de Brasília."""

@@ -2334,6 +2334,13 @@ supervisor pode assinar, ao assinar ele vê também se tem mais alguma aberta pa
 - **Depois** (assinada, decidida antes ou sem permissão): "Outras PTs esperando nas suas usinas", da mais antiga para a
   mais nova, cada uma no próprio card (`decisao_pt.assinaveis`: as linhas esperando que a pessoa pode decidir, sem as
   que o Nexus já decidiu, menos a que o App recusou). Sem nenhuma: "Nenhuma outra PT esperando nas suas usinas".
+- **O link fixo para o celular** (20/11/2026, Levi: "pode fazer um link específico para aprovação de PTs e APRs via
+  celular?", depois de uma Responsável UFV não conseguir abrir o App no celular para o De acordo de uma PT de preventiva
+  anual): `/t/campo/pt/assinar` (rota `pt_assinar_lista`, template `pt_assinar_lista.html`), para salvar no celular. O
+  mesmo card, com as PTs esperando que a pessoa da sessão pode decidir (`decisao_pt.assinaveis`, da mais antiga para a
+  mais nova), cada uma abrindo o card de assinar dela. Sem nenhuma, diz isso. Para o COS fora do plantão, diz o plantão
+  e quem assina. Para quem o Nexus não acha no cadastro, diz o que fazer. A APR não tem aprovação: o técnico assina no
+  App, e ela aparece dentro da PT. Conferido a 375 px e no computador (22 PTs na lista do administrador, em 20/11).
 - **A PT que acabou de nascer**: o App publica o livro antes do e-mail (v315), mas a cópia do Nexus é de 5 min; o card
   que não acha a PT relê o livro na hora, no máximo uma vez por minuto (`_RELIDA_PT`).
 - Prova: `tests/test_campo_pt_assinar.py`. Bancada de 30/10 (dados reais, só leitura, decisão só na memória): 39 PT
