@@ -399,12 +399,18 @@ def _jwt(exp_s=3600, email="sup@exemplo.test"):
 
 
 def _entrar_no_fracttal(app, cliente, jwt, email="sup@exemplo.test", nome="Supervisor Teste"):
-    """O cookie do OS Creator, como o login do Fracttal dele grava."""
+    """Quem assina a PT: a pessoa da entrada do Nexus (desde 20/11/2026; a conta Microsoft), e o cookie do OS Creator,
+    como o login do Fracttal dele grava (ele segue só para a assinatura do técnico na APR de antes do App)."""
     from nexus.torres.oscreator import ponte
     clone = ponte.clone(app)
     valor = clone.session_interface.get_signing_serializer(clone).dumps(
         {"jwt": jwt, "conta": {"email": email, "nome": nome}})
     cliente.set_cookie("os_sessao", valor, path="/os")
+    with cliente.session_transaction() as s:
+        s["usuario"] = {"email": email, "nome": nome, "perfil": ""}
+    # o administrador de antes (a senha) segue administrador com o e-mail na sessão: os testes decidiam como ele
+    if cliente is not None and email not in str(app.config.get("NEXUS_ADMINS") or ""):
+        app.config["NEXUS_ADMINS"] = ",".join(x for x in (str(app.config.get("NEXUS_ADMINS") or ""), email) if x)
 
 
 def test_tela_de_aprovar_mostra_a_pt_inteira(banco, logado):
@@ -418,18 +424,23 @@ def test_tela_de_aprovar_mostra_a_pt_inteira(banco, logado):
     assert "não está no livro do App" in logado.get("/t/campo/pt/PT-9").get_data(as_text=True)
 
 
-def test_quem_assina_vem_do_login_do_fracttal_do_os_creator(app, banco, logado):
+def test_quem_assina_e_a_entrada_do_nexus(app, banco, logado):
+    """Desde 20/11/2026 (Levi: "assinar PT só com a entrada do Nexus"): quem assina é a pessoa da sessão do Nexus, a
+    conta Microsoft, sem o login do Fracttal. A senha de administrador não diz quem é: não assina."""
     assert logado.get("/os/_nexus/quem").get_json()["email"] == ""
-    _entrar_no_fracttal(app, logado, _jwt())
-    assert logado.get("/os/_nexus/quem").get_json() == {"email": "sup@exemplo.test", "nome": "Supervisor Teste"}
-    _entrar_no_fracttal(app, logado, _jwt(-60))                         # token do Fracttal vencido: não assina
-    assert logado.get("/os/_nexus/quem").get_json()["email"] == ""
+    c = app.test_client()
+    with c.session_transaction() as s:
+        s["logado"], s["admin"], s["via"], s["ms_ate"] = True, False, "microsoft", time.time() + 3600
+        s["usuario"] = {"email": "supervisora@exemplo.test", "nome": "Supervisora Campo", "perfil": ""}
+    assert c.get("/os/_nexus/quem").get_json() == {"email": "supervisora@exemplo.test", "nome": "Supervisora Campo"}
 
 
-def test_sem_login_do_fracttal_vai_ao_login_e_volta_para_a_pt(banco, logado):
+def test_sem_email_na_entrada_nao_assina_e_volta_para_a_pt(banco, logado):
+    """A senha de administrador não tem e-mail: a decisão não vai ao login do Fracttal (saiu em 20/11/2026), volta à PT
+    dizendo o que fazer, e nada é gravado."""
     r = logado.post("/os/_nexus/pt/PT-1/decidir", data={"decisao": "de_acordo"})
-    assert r.status_code == 302 and r.headers["Location"].startswith("/os/login?next=%2Fos%2F_nexus%2Fpt%2FPT-1%2Fvoltar")
-    assert logado.get("/os/_nexus/pt/PT-1/voltar").headers["Location"].endswith("/t/campo/pt/PT-1")
+    assert r.status_code == 302 and r.headers["Location"].endswith("/t/campo/pt/PT-1")
+    assert "entre com a sua conta Microsoft" in logado.get("/t/campo/pt/PT-1").get_data(as_text=True)
     assert "nexus_pt_decisoes" not in banco.workbooks
 
 
@@ -527,16 +538,16 @@ def test_a_volta_do_login_do_fracttal_traz_a_mesma_linha_da_pt(app, banco, logad
     _pt4_de_dois_equipamentos(banco)
     # a tela da linha do INVR2: o link de entrar e o pedido da assinatura do técnico levam a linha
     html = logado.get("/t/campo/pt/PT-4?ativo=THPN-ALT100-INVR2").get_data(as_text=True)
-    assert f'"{ENTRAR_INVR2}"' in html
     assert "/os/_nexus/pt/PT-4/assinatura-tecnico?ativo=THPN-ALT100-INVR2" in html
     assert logado.get("/os/_nexus/pt/PT-4/assinatura-tecnico?ativo=THPN-ALT100-INVR2").get_json()["entrar"] == ENTRAR_INVR2
     # a lista do HSEQ também pede a assinatura pela linha (o "entre com o seu login" de lá volta para ela)
     lista = logado.get("/t/hseq/apr-pt?modo=tabela").get_data(as_text=True)
     assert 'data-url="/os/_nexus/pt/PT-4/assinatura-tecnico?ativo=THPN-ALT100-INVR2"' in lista
-    # sem a sessão do Fracttal, o De acordo da linha do INVR2 vai ao login com a linha no `next`
+    # sem e-mail na entrada (a senha de administrador), o De acordo da linha do INVR2 volta para a MESMA linha
     r = logado.post("/os/_nexus/pt/PT-4/decidir", data={"decisao": "de_acordo", "codigo": "THPN-ALT100-INVR2"})
-    assert r.status_code == 302 and r.headers["Location"] == ENTRAR_INVR2
+    assert r.status_code == 302 and r.headers["Location"] == "/t/campo/pt/PT-4?ativo=THPN-ALT100-INVR2"
     assert "nexus_pt_decisoes" not in banco.workbooks
+    # o login do Fracttal da assinatura do técnico (a APR de antes do App) continua voltando à linha
     prox = parse_qs(urlsplit(ENTRAR_INVR2).query)["next"][0]
     assert prox == "/os/_nexus/pt/PT-4/voltar?ativo=THPN-ALT100-INVR2"
     # o formulário de login do OS Creator guarda o `next` inteiro, e o clone devolve a ele depois de entrar

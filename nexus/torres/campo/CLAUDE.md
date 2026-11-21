@@ -2242,10 +2242,15 @@ ou formulário de antes, ou um código que a PT não tem), a PT de uma linha abr
 equipamentos para escolher**, sem formulário; o `decidir` sem a linha também só aceita a PT de uma linha. Na de mais,
 escolher a 1ª seria chutar a qual ativo a decisão vale (revisão adversarial de 11/10/2026: a tela abria calada a 1ª e
 o formulário mandava o código dela, por fora da recusa do `decidir`).
-- **Quem assina: o login do Fracttal do OS Creator** (Levi: "utilize o login do fractal do OS Creator Web que já dá
-  certo!"). O OS Creator roda dentro do Nexus com sessão própria (cookie `os_sessao`, só em /os); por isso as rotas de
-  assinatura moram em `/os/_nexus/...` (`assinatura.py`): `quem` (o e-mail de quem entrou), `pt/<n>/decidir` (POST) e
-  `pt/<n>/voltar` (o OS Creator só devolve para /os depois do login). Token do Fracttal vencido (`exp`) não assina;
+- **Quem assina: a pessoa da entrada do Nexus** (a conta Microsoft, desde 20/11/2026; Levi: "Por qual motivo a PT,
+  para assinar a PT, você tem que entrar no Fracttal, sendo que é uma coisa exclusiva do app de campo?" e "assinar PT só
+  com a entrada do Nexus"). O App confirmou (v363) que não usa nada da conta do Fracttal de quem assina: aplica com o
+  token do técnico que pediu e lê só o código do e-mail (`decidida_por_hmac`); o segundo login travava quem assinava pelo
+  celular. De 05/10 a 20/11 foi o login do Fracttal do OS Creator ("utilize o login do fractal do OS Creator Web que já
+  dá certo!"), quando o Nexus entrava pelo Fracttal. As rotas seguem em `/os/_nexus/...` (`assinatura.py`): `quem` (a
+  pessoa da sessão do Nexus, `quem_decide`) e `pt/<n>/decidir` (POST; a coluna `login` diz "Nexus (conta Microsoft)").
+  A senha de administrador não tem e-mail: não assina, e a tela diz para entrar com a conta Microsoft. O login do
+  Fracttal fica só para ver a assinatura do técnico na APR de antes do App (`assinatura-tecnico`, `voltar`);
   pedido de outro site leva 403 ("Origem recusada."), pela régua da moldura da Performance, a mesma dos POST da Base
   e dos Acessos (`assinatura._de_outro_site`: o `Sec-Fetch-Site` do navegador, só `same-origin`; sem ele, o `Origin`).
   **Não comparar o `Origin` com o `request.host`**: no servidor da T.I. o Nexus não recebe o endereço público no Host,
@@ -2277,7 +2282,7 @@ o formulário mandava o código dela, por fora da recusa do `decidir`).
   daqui for mais nova que a recusa, a tela mostra o porquê e libera uma decisão nova (`decisao_pt.recusada_pelo_app`). A
   aba `decisoes` de antes (nunca gravada) não é lida.
 - **Quem pode decidir** (Levi, 09/10/2026): o Supervisor de Campo da região da usina (com a vaga aberta, o
-  Coordenador), o gestor de contrato da usina, o COS **só no plantão, de sexta 18h a segunda 6h de Brasília** (14/11/2026,
+  Coordenador), o gestor de contrato da usina, o COS **só no plantão, de sexta 18h a segunda 6h de Brasília e no feriado nacional inteiro** (o feriado desde 21/11/2026, Levi: "Sim, feriado conta como plantão"; o do calendário do Nexus, `decisao_pt.feriados_do_plantao`, sem o ponto facultativo, Carnaval e Corpus Christi: "Não, só feriado nacional"; as mesmas datas no aviso do App; 14/11/2026,
   Levi: "O pessoal do COS pode dar o de acordo a partir de sexta-feira, 6 horas da noite, até segunda, 6 horas da manhã.
   Passou disso, só com o supervisor"; vale o setor COS da pessoa do login em Base → Acessos, pelo código do e-mail, ou o
   vínculo COS da ficha: as 11 pessoas do setor COS não têm ficha, e até ali nenhuma conseguia assinar;

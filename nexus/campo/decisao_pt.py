@@ -1,7 +1,8 @@
 """A decisão da PT tomada no Nexus, gravada no banco (Levi, 05/10/2026: "Técnico faz APR e PT -> Chega no PG -> Atualiza
 para os stakeholders -> Atualiza na aprovação de PT -> Supervisor faz -> Fica salvo!").
 
-Quem assina entra com o login do Fracttal do OS Creator (Levi: "utilize o login do fractal do OS Creator Web que já dá
+Quem assina é a pessoa da entrada do Nexus (a conta Microsoft, desde 20/11/2026; até ali o login do Fracttal do OS
+Creator, `nexus/torres/campo/assinatura.py`). Na origem, o login do Fracttal (Levi: "utilize o login do fractal do OS Creator Web que já dá
 certo"): a sessão dele (cookie `os_sessao`, só em /os) traz o e-mail de quem entrou. Por isso as rotas que leem quem
 assina moram em /os/_nexus/... (`nexus/torres/campo/assinatura.py`).
 
@@ -27,7 +28,7 @@ técnico continua esperando a decisão pelo App.
 QUEM PODE DECIDIR (Levi, 09/10/2026: "A pessoa que pode aprovar a PT é: Supervisor de Campo, Gestor de contrato, admin
 ou pessoa do COS"): o Supervisor de Campo da região da usina (com a vaga aberta, o Coordenador de Campo), o gestor de
 contrato da usina, quem tem o vínculo COS no cadastro de pessoas e um administrador do Nexus (`aprovadores`,
-`pode_decidir`). Quem assina é a pessoa do login do Fracttal, achada no cadastro pelo e-mail ou pelo nome de UMA pessoa
+`pode_decidir`). Quem assina é a pessoa da entrada do Nexus, achada no cadastro pelo e-mail ou pelo nome de UMA pessoa
 (`_Base.pessoa_do_login`); sem a chave do cadastro, só o administrador decide. Quem PEDIU a PT nunca a decide, nem sendo
 administrador: é a regra do painel do App desde a 1ª PT real (28/09/2026, aprovada pelo próprio técnico, que também era
 administrador), e a v257 descarta calada a decisão de quem pediu.
@@ -68,16 +69,28 @@ DECISOES = {"de_acordo": "De acordo", "negada": "Não autorizo"}
 MOTIVO_MAX = 400
 _BRT = timezone(timedelta(hours=-3))
 _TRAVA = threading.Lock()      # um processo grava por vez: duas decisões juntas não se apagam (o livro é trocado inteiro)
-PLANTAO_COS = "de sexta 18h a segunda 6h"
+PLANTAO_COS = "de sexta 18h a segunda 6h e nos feriados"
 
 
 def _agora() -> datetime:
     return datetime.now(_BRT)
 
 
+def feriados_do_plantao(ano: int) -> set:
+    """Os feriados nacionais do ano em que o COS assina o dia inteiro, sem o ponto facultativo."""
+    from ..dados.calendario import nacionais_calculados
+    return {d for d, nome in nacionais_calculados(ano).items()
+            if "facultativo" not in str(nome).lower() and "carnaval" not in str(nome).lower()}
+
+
 def cos_no_plantao(agora: datetime | None = None) -> bool:
-    """O COS decide a PT só no plantão do fim de semana: de sexta 18h a segunda 6h, no horário de Brasília."""
+    """O COS decide a PT só no plantão: de sexta 18h a segunda 6h e no feriado nacional inteiro, no horário de Brasília
+    (Levi, 21/11/2026: "Sim, feriado conta como plantão"). O feriado é o do calendário do Nexus
+    (`calendario.nacionais_calculados`, a mesma conta do dia útil do Comando), sem o ponto facultativo (Carnaval e
+    Corpus Christi: "Não, só feriado nacional", no mesmo dia); o App usa as mesmas datas no aviso."""
     a = (agora or _agora()).astimezone(_BRT)
+    if a.date() in feriados_do_plantao(a.year):
+        return True
     return (a.weekday() == 4 and a.hour >= 18) or a.weekday() in (5, 6) or (a.weekday() == 0 and a.hour < 6)
 
 
@@ -264,7 +277,7 @@ def _linha(numero, codigo) -> tuple[dict, int]:
 
 
 def decidir(numero, decisao: str, motivo: str, email: str, nome: str = "", admin: bool = False,
-            codigo=None) -> dict:
+            codigo=None, login: str = "Nexus") -> dict:
     """Grava a decisão sobre UMA linha da PT (`codigo`: o código do ativo dela; ver `_linha`) e confere no banco.
     Recusa: decisão inválida, negar sem motivo, quem não pode decidir esta PT (`pode_decidir`, quem a pediu inclusive),
     PT ou linha que não existe, que já não está aguardando no livro do App ou que já tem decisão do Nexus (o primeiro que
@@ -278,7 +291,7 @@ def decidir(numero, decisao: str, motivo: str, email: str, nome: str = "", admin
         raise Recusada("Escreva o motivo: é o que o técnico lê quando a PT não é autorizada.")
     quem = codigo_da_pessoa(cfg.get("NEXUS_PESSOA_HMAC"), email)
     if not quem:
-        raise Recusada("Não sei quem está assinando: entre com o seu login do Fracttal.")
+        raise Recusada("Não sei quem está assinando: entre no Nexus com a sua conta.")
     if not cfg.get("GRIDCO_SQL_TOKEN"):
         raise Recusada("Este Nexus não tem a chave de gravação do banco (GRIDCO_SQL_TOKEN).")
     with _TRAVA:
@@ -303,7 +316,7 @@ def decidir(numero, decisao: str, motivo: str, email: str, nome: str = "", admin
         nova = {"decidida_em": agora.strftime("%Y-%m-%dT%H:%M:%SZ"),
                 "data_id": int(agora.astimezone(_BRT).strftime("%Y%m%d")), "pt": p["numero"], "os": str(p["os"] or ""),
                 "usina_id": p["usina_id"], "decisao": decisao, "motivo": motivo, "decidida_por_hmac": quem,
-                "login": "Fracttal (OS Creator)", "origem": "Nexus", "codigo_ativo": cod or None}
+                "login": login, "origem": "Nexus", "codigo_ativo": cod or None}
         nova["assinatura"] = assinatura(nova, cfg.get("NEXUS_PESSOA_HMAC"))
         linhas = [[d.get(c) for c in CAB] for d in linhas] + [[nova[c] for c in CAB]]
         livros.publicar(LIVRO, NOME_LIVRO, {ABA: (list(CAB), linhas)}, base=visao._base(),

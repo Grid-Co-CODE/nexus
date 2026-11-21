@@ -21,12 +21,15 @@ def _jwt(email, exp_s=3600):
 
 
 def _fracttal(app, cliente, email, nome):
-    """O cookie do OS Creator, como o login do Fracttal dele grava."""
+    """Quem assina: a pessoa da entrada do Nexus (desde 20/11/2026), e o cookie do OS Creator, como o login do Fracttal
+    dele grava (ele segue só para a assinatura do técnico na APR de antes do App)."""
     from nexus.torres.oscreator import ponte
     clone = ponte.clone(app)
     valor = clone.session_interface.get_signing_serializer(clone).dumps(
         {"jwt": _jwt(email), "conta": {"email": email, "nome": nome}})
     cliente.set_cookie("os_sessao", valor, path="/os")
+    with cliente.session_transaction() as s:
+        s["usuario"] = {"email": email, "nome": nome, "perfil": "Supervisor"}
 
 
 def _nexus(cliente, admin=False):
@@ -61,7 +64,7 @@ def test_o_detalhe_traz_a_assinatura_quem_assina_e_a_decisao_que_volta_para_a_li
     assert "Executante · assinatura da APR" in html
     assert 'action="/os/_nexus/pt/PT-1/decidir"' in html and '<input type="hidden" name="volta" value="/t/hseq/apr-pt?modo=tabela">' in html
     assert ("Quem assina</dt><dd>O Supervisor de Campo da Sudeste 03 (Supervisora Campo), o gestor de contrato "
-            "(Beltrano Supervisor), alguém do COS (de sexta 18h a segunda 6h) ou um administrador") in html
+            "(Beltrano Supervisor), alguém do COS (de sexta 18h a segunda 6h e nos feriados) ou um administrador") in html
     assert "O App ainda não lê a\n          decisão do Nexus" in html or "O App ainda não lê a" in html
 
 
@@ -81,8 +84,8 @@ def test_quem_pode_dar_o_de_acordo(banco, app, monkeypatch):
     assert decisao_pt.pode_decidir(visao.pt("PT-1"), "cos@exemplo.test") == (True, "COS")
     monkeypatch.setattr(decisao_pt, "_agora", lambda: datetime(2026, 11, 11, 10, tzinfo=decisao_pt._BRT))   # quarta
     ok, porque = decisao_pt.pode_decidir(visao.pt("PT-1"), "cos@exemplo.test")
-    assert ok is False and porque.startswith("O COS dá o De acordo só no plantão, de sexta 18h a segunda 6h.")
-    assert "alguém do COS (de sexta 18h a segunda 6h) ou um administrador" in decisao_pt.aprovadores(visao.pt("PT-1"))["texto"]
+    assert ok is False and porque.startswith("O COS dá o De acordo só no plantão, de sexta 18h a segunda 6h e nos feriados.")
+    assert "alguém do COS (de sexta 18h a segunda 6h e nos feriados) ou um administrador" in decisao_pt.aprovadores(visao.pt("PT-1"))["texto"]
 
 
 def test_quem_nao_pode_e_recusado_e_quem_pode_decide_pela_lista(banco, app, cliente):

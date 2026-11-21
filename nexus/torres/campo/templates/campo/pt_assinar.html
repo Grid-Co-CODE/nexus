@@ -5,7 +5,7 @@
 {# O card de assinar a PT (Levi, 30/10/2026, pelo chat do App de Campo): o botão do e-mail de PT aguardando abre aqui, no
    celular quase sempre. "Um layout próprio como se fosse um card no meio da tela dando um blur no fundo": o card fica
    por cima do Nexus desfocado, com uma superfície só. A decisão é a da tela da PT (`pt_aprovar.html`): a mesma linha
-   (PT × ativo), o login do Fracttal do OS Creator e o livro `nexus_pt_decisoes`. Sem o formulário (assinada, decidida
+   (PT × ativo), a entrada do Nexus de quem assina e o livro `nexus_pt_decisoes`. Sem o formulário (assinada, decidida
    antes ou sem permissão), as outras PTs esperando nas usinas da pessoa, cada uma no próprio card. #}
 {% macro situacao(p, extra='') %}{% set s = situacoes.get(p.situacao, (p.situacao, 'neutro')) %}<span class="cn-st cn-t-{{ s[1] }}{{ ' ' ~ extra if extra }}">{{ s[0] }}</span>{% endmacro %}
 <div class="pa-fundo">
@@ -82,38 +82,35 @@
       {% else %}
       {% if recusa_app %}<div class="cn-erro" role="alert"><b>O App não aplicou a decisão anterior do Nexus:</b> {{ recusa_app }}. Decida de novo.</div>{% endif %}
       <form method="post" action="{{ url_for('campo_assinatura.decidir', numero=p.numero) }}" class="pa-form" data-pa-form>
-        {# a linha decidida (o código do ativo vai ao banco e o App acha a linha por ele), a volta ao card depois de gravar e,
-           sem o login do Fracttal, a volta do login também ao card #}
+        {# a linha decidida (o código do ativo vai ao banco e o App acha a linha por ele) e a volta ao card depois de
+           gravar. Quem assina é a pessoa da entrada do Nexus (20/11/2026; até ali, o login do Fracttal) #}
         <input type="hidden" name="codigo" value="{{ p.codigo or '' }}">
         <input type="hidden" name="volta" value="{{ volta }}">
         <input type="hidden" name="card" value="1">
-        <p class="pa-quem" data-pa-quem="{{ url_for('campo_assinatura.quem') }}">Você assina com o seu login do Fracttal (o mesmo do OS Creator).</p>
+        <p class="pa-quem" data-pa-quem="{{ url_for('campo_assinatura.quem') }}">Você assina com a conta com que entrou.</p>
         <div class="pa-motivo" hidden>
           <label class="gc-rotulo" for="pa-motivo">Motivo do Não autorizo <span class="mudo">(o técnico lê)</span></label>
           <textarea class="gc-campo" id="pa-motivo" name="motivo" rows="3" maxlength="400"></textarea>
         </div>
         <div class="pa-botoes">
-          {# o endereço do login (já com o prefixo, `assinatura._login`) vai no data-: o botão só aparece pelo script #}
-          <a class="gc-btn gc-btn--primario" data-pa-entrar="{{ entrar }}" hidden>Entrar com o Fracttal para assinar</a>
           <button class="gc-btn gc-btn--primario" type="submit" name="decisao" value="de_acordo" data-pa-acordo>De acordo</button>
           <button class="gc-btn gc-btn--contorno cn-btn-negar" type="submit" name="decisao" value="negada" data-pa-negar>Não autorizo</button>
         </div>
         <p class="pa-texto mudo">Vale a primeira decisão, aqui ou no painel do App.</p>
       </form>
       <script>
-        // quem assina: a sessão do OS Creator (cookie só em /os). Sem ela, o botão leva ao login do Fracttal e volta a
-        // este card; os de decidir somem até lá. O Não autorizo pede o motivo antes (o 1º clique abre a caixa)
+        // quem assina: a pessoa da entrada do Nexus (20/11/2026). Sem e-mail na sessão (a senha de administrador), os
+        // botões somem e o texto diz o que fazer. O Não autorizo pede o motivo antes (o 1º clique abre a caixa)
         (function () {
           var f = document.querySelector('[data-pa-form]');
           if (!f) { return; }
-          var quem = f.querySelector('[data-pa-quem]'), entrar = f.querySelector('[data-pa-entrar]');
+          var quem = f.querySelector('[data-pa-quem]');
           var acordo = f.querySelector('[data-pa-acordo]'), negar = f.querySelector('[data-pa-negar]');
           var caixa = f.querySelector('.pa-motivo'), motivo = f.querySelector('textarea[name="motivo"]');
           fetch(quem.getAttribute('data-pa-quem'), {credentials: 'same-origin'}).then(function (r) { return r.json(); }).then(function (q) {
-            if (q.email) { quem.textContent = 'Assinando como ' + q.nome + ' (' + q.email + '), pelo login do Fracttal.'; return; }
-            quem.textContent = 'Para assinar, entre com o seu login do Fracttal (o mesmo do OS Creator). Você volta para este card.';
-            entrar.href = entrar.getAttribute('data-pa-entrar');
-            entrar.hidden = false; acordo.hidden = true; negar.hidden = true;
+            if (q.email) { quem.textContent = 'Assinando como ' + q.nome + ' (' + q.email + ').'; return; }
+            quem.textContent = 'Para assinar, entre com a sua conta Microsoft.';
+            acordo.hidden = true; negar.hidden = true;
           }).catch(function () {});
           acordo.addEventListener('click', function () { motivo.required = false; });
           negar.addEventListener('click', function (ev) {

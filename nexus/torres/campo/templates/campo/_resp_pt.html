@@ -1,6 +1,6 @@
 {# A PT por cima da Visão do responsável (12/10/2026, Levi: "não tirar a pessoa da tela pois ela vai ter que voltar para
    ver mais usinas, se pudesse aparecer sobreposto para o supervisor aprovar seria perfeito!"): a mesma linha da PT e a
-   mesma decisão da tela da PT (`pt_aprovar.html`), assinada com o login do Fracttal do OS Creator. Pedaço de página, sem
+   mesma decisão da tela da PT (`pt_aprovar.html`), assinada com a entrada do Nexus (até 20/11/2026, o login do Fracttal do OS Creator). Pedaço de página, sem
    a moldura: o <dialog> da tela o mostra, e o script de lá busca a assinatura do técnico e quem assina (script que vem
    no innerHTML não roda). Decidir grava e volta à Visão do responsável (`volta`), com os filtros dela. #}
 {% if erro %}<div class="cn-erro" role="alert"><b>{{ erro }}.</b></div>
@@ -58,7 +58,7 @@
     <form method="post" action="{{ url_for('campo_assinatura.decidir', numero=p.numero) }}" class="cn-form-decisao">
       <input type="hidden" name="codigo" value="{{ p.codigo or '' }}">
       {% if volta %}<input type="hidden" name="volta" value="{{ volta }}">{% endif %}
-      <p class="cn-quem" data-cr-quem="{{ url_for('campo_assinatura.quem') }}" data-cr-entrar="{{ entrar }}">Você assina com o seu login do Fracttal (o mesmo do OS Creator).</p>
+      <p class="cn-quem" data-cr-quem="{{ url_for('campo_assinatura.quem') }}">Você assina com a conta com que entrou.</p>
       {% if quem_assina %}<p class="mudo">Quem pode dar o De acordo: {{ quem_assina[0]|lower }}{{ quem_assina[1:] }}. Quem pediu a PT não a decide.</p>{% endif %}
       <label class="gc-rotulo" for="cr-motivo">Motivo <span class="mudo">(obrigatório para Não autorizo; o técnico lê)</span></label>
       <textarea class="gc-campo" id="cr-motivo" name="motivo" rows="3" maxlength="400"></textarea>
