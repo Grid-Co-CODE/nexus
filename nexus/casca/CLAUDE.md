@@ -1254,6 +1254,19 @@ que é uma tela dentro de uma tela!".
   JavaScript abre e fecha no clique; com ele, fecha ao clicar fora, no Esc, e o sino e o menu da conta não ficam abertos
   juntos. No celular: linha 1 a marca e o Menu, linha 2 o sino e o avatar (numa linha só, a 375 px, o "Nexus" da marca
   entrava por baixo do Menu).
+- **As notificações do topo, dois botões** (21/11/2026, Levi: "Una o 1 e o 3. E transforme o ícone em um sino [...] quando
+  a pessoa passar o mouse, vai explicar o que chega nessa notificação" e "no ícone do OS Creator aparecesse também um
+  texto explicando ao passar o mouse"):
+  1. o **sino** (`ph-bell`, `<details class="sino-topo sino-dem">`, aria-label "Notificações: N"): o que eram a bandeja
+     das demandas e contestações (`_sino_demandas`) e o calendário do Fora da programação (`_sino_fora`), cada parte com
+     a regra e o título dela dentro da caixa e os três botões de abrir no pé; o número é a soma das duas; aparece quando
+     uma das partes existe (o administrador pela senha não tem nenhuma). O "Marcar como lida" do Fora segue pelo mesmo
+     script (`data-lidas` na caixa só quando há a parte do Fora);
+  2. o **botão do OS Creator** (prancheta, `_sino`): os avisos das OS, as menções, os pedidos e as usinas novas da Sala
+     de controle, como era.
+  O que chega em cada um aparece ao passar o mouse: o `data-dica` do botão, desenhado no `.sino-bt[data-dica]::after`
+  (nexus.css), no lugar do `title` do navegador (demorava e saía cortado); some com a caixa aberta e na tela de toque.
+  No celular: o sino na coluna 2, o OS Creator na 3 e o avatar na 4.
 - **A ação da tela no topo:** o bloco `topo_acoes`, antes do sino. Hoje só o "Modo TV" do Painel NOC
   (`performance/moldura.html`); no celular ele some.
 - **O OS Creator dentro do Nexus sem o topo dele:** a ponte (`torres/oscreator/ponte.py`, `_MARCA_NO_NEXUS`) marca com

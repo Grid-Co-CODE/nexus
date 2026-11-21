@@ -701,15 +701,14 @@ mark.menu-achado{background:none;color:var(--tinta);font-weight:700;text-decorat
   /* Linha 1: marca + Menu. Linha 2: o sino e o avatar da conta, à direita (desde 03/11/2026 o Setor, o Tema e o Sair
      moram no menu da conta). Numa linha só a marca não cabe com o sino a 375 px: o "Nexus" entrava por baixo do Menu
      (visto no navegador). */
-  .topo{height:auto;display:grid;grid-template-columns:minmax(0,1fr) auto auto auto auto;padding:10px 16px;gap:10px}
+  .topo{height:auto;display:grid;grid-template-columns:minmax(0,1fr) auto auto auto;padding:10px 16px;gap:10px}
   .topo-espaco{grid-column:1;grid-row:2}
-  /* o sininho das demandas (12/11/2026) antes do botão do OS Creator e o aviso do Fora da programação (16/11/2026)
-     depois dele; sem eles (o administrador pela senha, o setor que nenhum motivo cita), a coluna fica vazia */
+  /* o sino das notificações do setor (as demandas, as contestações e o Fora da programação num só desde 21/11/2026)
+     antes do botão do OS Creator; sem ele (o administrador pela senha), a coluna fica vazia */
   .sino-topo.sino-dem{grid-column:2;grid-row:2}
   .sino-topo{grid-column:3;grid-row:2}
-  .sino-topo.sino-fora{grid-column:4;grid-row:2}
-  .conta-topo{grid-column:5;grid-row:2}
-  .botao-menu{display:inline-flex;grid-column:2 / 6;grid-row:1;justify-self:end}
+  .conta-topo{grid-column:4;grid-row:2}
+  .botao-menu{display:inline-flex;grid-column:2 / 5;grid-row:1;justify-self:end}
   /* No celular o menu já fica atrás do botão Menu; o trilho recolhido não se aplica. */
   .recolhe-menu{display:none}
   .menu-recolhido .menu{width:auto}
@@ -780,6 +779,18 @@ mark.menu-achado{background:none;color:var(--tinta);font-weight:700;text-decorat
 
 /* o sino dos insights no topo (03/11/2026): o número de sem dono, vermelho com crítico; a lista curta por cima da tela */
 .sino-topo{position:relative}
+/* o que chega em cada notificação, ao passar o mouse (21/11/2026, Levi: "quando a pessoa passar o mouse, vai explicar o
+   que chega nessa notificação" e "no ícone do OS Creator aparecesse também um texto explicando"): o data-dica do
+   botão numa caixa embaixo dele, no lugar do title do navegador (demorava e saía cortado); some com a caixa aberta e
+   na tela de toque */
+.sino-bt[data-dica]::after{content:attr(data-dica);position:absolute;right:0;top:calc(100% + 10px);z-index:41;
+  width:max-content;max-width:300px;padding:9px 11px;border:1px solid var(--linha-forte);border-radius:8px;
+  background:var(--superficie);color:var(--tinta);box-shadow:var(--sombra);font:400 12.5px/1.45 var(--font-sans);
+  text-align:left;white-space:normal;opacity:0;visibility:hidden;pointer-events:none;transition:opacity .12s ease .3s}
+.sino-bt[data-dica]:hover::after,.sino-bt[data-dica]:focus-visible::after{opacity:1;visibility:visible}
+.sino-topo[open] > .sino-bt::after{display:none}
+@media (prefers-reduced-motion:reduce){.sino-bt[data-dica]::after{transition:none}}
+@media (hover:none){.sino-bt[data-dica]::after{display:none}}
 .sino-bt{position:relative;list-style:none;cursor:pointer}
 .sino-bt::-webkit-details-marker{display:none}
 .sino-bt .ph{font-size:18px}
