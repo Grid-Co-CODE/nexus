@@ -1254,9 +1254,10 @@ para sugestões no início com uma tag de App de campo!" (no lugar de uma aba pr
   `POST <URL>/<id>/responder` com `{"resposta_id", "texto", "por": {"nome", "email"}}`. O `resposta_id` (`r` + 11
   hexadecimais) segura o 2º envio. Recusa do App com `{"erro": "..."}`, que vira o aviso da tela (400, 401, 404 e o 503
   do App sem a chave dele; a resposta com menos de 5 caracteres nem sai do Nexus). O lado do App é a v367 (21/11/2026).
-- **As chaves** (tela Base → Chaves do Nexus, que vence o `.env`): `NEXUS_APP_RELATOS_CHAVE` (32 caracteres ou mais, a
-  mesma do App Setting do servidor do App) e, se mudar, `NEXUS_APP_RELATOS_URL` (só https; padrão
-  `https://gridco-campo-mw.azurewebsites.net/api/app/nexus/relatos`). **Sem a chave o Nexus nem chama o App** e o
+- **A chave** (tela Base → Chaves do Nexus, que vence o `.env`): `NEXUS_APP_RELATOS_CHAVE` (32 caracteres ou mais, a
+  mesma do App Setting `NEXUS_RELATOS_CHAVE` do servidor do App; colada pelo Levi em 22/11/2026 00:10). O endereço
+  (`NEXUS_APP_RELATOS_URL`, padrão `https://gridco-campo-mw.azurewebsites.net/api/app/nexus/relatos`) só pelo `.env`:
+  saiu da tela em 22/11/2026 (Levi: "se o 'Relatos do App de Campo (endereço)' não é para usar então tira da tela!"). **Sem a chave o Nexus nem chama o App** e o
   administrador lê o porquê no alto das Sugestões recebidas.
 - **Onde aparece**: nas Sugestões recebidas, só para o administrador (o mesmo que lê as sugestões), na mesma linha-cartão,
   com a etiqueta **"App de campo"** no lugar do setor (na cor da marca; o filtro Setor e o Por setor ganham "App de campo"

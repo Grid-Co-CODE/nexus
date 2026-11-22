@@ -21,8 +21,8 @@ O contrato (versão 1; o App é quem serve, o Nexus é quem lê; mudou aqui, mud
   `{"erro": "o motivo em palavras"}`, que a tela mostra como veio: 404 relato que não existe, 400 `resposta_id` fora da
   forma ou texto com menos de 5 caracteres (aqui ele nem sai), 401 chave errada e 503 o App ainda sem a chave dele (a
   v367 do App, 21/11/2026, que não tem 409: responder relato resolvido também vale lá).
-- `<URL>` padrão: `https://gridco-campo-mw.azurewebsites.net/api/app/nexus/relatos`; a tela Base → Chaves do Nexus troca
-  (`NEXUS_APP_RELATOS_URL`). A chave (`NEXUS_APP_RELATOS_CHAVE`, 32 caracteres ou mais) é a mesma nos dois lados; sem ela
+- `<URL>` padrão: `https://gridco-campo-mw.azurewebsites.net/api/app/nexus/relatos`; o `.env` troca
+  (`NEXUS_APP_RELATOS_URL`; fora da tela de chaves desde 22/11/2026). A chave (`NEXUS_APP_RELATOS_CHAVE`, 32 caracteres ou mais) é a mesma nos dois lados; sem ela
   o Nexus nem chama o App e o administrador lê o porquê nas Sugestões.
 
 Quem lê e responde: o administrador do Nexus, o mesmo que lê as Sugestões recebidas. Responder pede o login (Microsoft ou
@@ -95,7 +95,9 @@ def ligado() -> bool:
 
 
 def _url() -> str:
-    return (_conf(NOME_URL) or URL_PADRAO).rstrip("/")
+    """O padrão do App ou o NEXUS_APP_RELATOS_URL do .env. Não mora em Base › Chaves do Nexus desde 22/11/2026 (Levi: "se
+    o 'Relatos do App de Campo (endereço)' não é para usar então tira da tela!"): se o App mudar de endereço, troca aqui."""
+    return (str(current_app.config.get(NOME_URL) or "").strip() or URL_PADRAO).rstrip("/")
 
 
 def _pedido(caminho: str = "", corpo: dict | None = None) -> urllib.request.Request:

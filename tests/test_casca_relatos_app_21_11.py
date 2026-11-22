@@ -284,13 +284,22 @@ def test_o_contador_do_administrador_soma_os_relatos_que_esperam_a_grid(app, app
     assert len(app_falso.pedidos) == antes
 
 
-def test_as_duas_chaves_moram_na_tela_de_chaves_e_a_curta_e_recusada():
-    assert "NEXUS_APP_RELATOS_CHAVE" in CH.CHAVES and "NEXUS_APP_RELATOS_URL" in CH.CHAVES
+def test_so_a_chave_mora_na_tela_de_chaves_e_a_curta_e_recusada():
+    """22/11/2026, Levi: "se o 'Relatos do App de Campo (endereço)' não é para usar então tira da tela!". O endereço
+    segue no código (o padrão do App, ou o NEXUS_APP_RELATOS_URL do .env), fora de Base › Chaves do Nexus."""
+    assert "NEXUS_APP_RELATOS_CHAVE" in CH.CHAVES and "NEXUS_APP_RELATOS_URL" not in CH.CHAVES
     with pytest.raises(CH.Recusada):
         CH.CHAVES["NEXUS_APP_RELATOS_CHAVE"]["conferir"]("curta")
-    with pytest.raises(CH.Recusada):
-        CH.CHAVES["NEXUS_APP_RELATOS_URL"]["conferir"]("http://sem-tls.exemplo.test/api")
     assert "caracteres" in CH.CHAVES["NEXUS_APP_RELATOS_CHAVE"]["conferir"]("z" * 40)
+
+
+def test_o_endereco_vem_do_env_ou_do_padrao(app):
+    with app.test_request_context("/"):
+        app.config.pop("NEXUS_APP_RELATOS_URL", None)
+        assert R._url() == R.URL_PADRAO
+        app.config["NEXUS_APP_RELATOS_URL"] = "https://outro.exemplo.test/api/relatos/"
+        assert R._url() == "https://outro.exemplo.test/api/relatos"
+        app.config.pop("NEXUS_APP_RELATOS_URL", None)
 
 
 # ── o filtro Tipo de demanda (21/11/2026, Levi: "nas sugestões deve dar para filtrar o Tipo de demanda Nexus/App de

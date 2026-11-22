@@ -159,18 +159,6 @@ def _conferir_relatos_chave(valor: str) -> str:
     return f"a chave tem {len(valor)} caracteres"
 
 
-def _conferir_relatos_url(valor: str) -> str:
-    """O endereço da rota dos relatos no servidor do App (21/11/2026): só https, porque a chave vai no cabeçalho."""
-    from urllib.parse import urlsplit
-    try:
-        partes = urlsplit(valor)
-    except ValueError:
-        partes = None
-    if not partes or partes.scheme != "https" or not partes.hostname:
-        raise Recusada("O endereço dos relatos do App precisa começar com https:// e ter o servidor: nada foi gravado.")
-    return f"o endereço vai a {partes.hostname}"
-
-
 def _conferir_guid(rotulo: str):
     """Os dois IDs do Mapa de equipe (08/11/2026, `nexus/campo/equipe/token_ms.py`): GUIDs de 8-4-4-4-12 caracteres
     hexadecimais, como o Entra ID mostra. Sem um token de verdade não há contra o que conferir (a prova é o celular
@@ -316,14 +304,8 @@ CHAVES = {
         "dica": "a mesma chave longa (32 caracteres ou mais) que está no App Setting do servidor do App de Campo",
         "conferir": _conferir_relatos_chave,
     },
-    "NEXUS_APP_RELATOS_URL": {
-        "nome": "Relatos do App de Campo (endereço)",
-        "para": "trocar o endereço da rota dos relatos no servidor do App (vazio: o padrão, "
-                "https://gridco-campo-mw.azurewebsites.net/api/app/nexus/relatos)",
-        "arquivo": "",
-        "dica": "o endereço https da rota do App que lista os relatos para o Nexus",
-        "conferir": _conferir_relatos_url,
-    },
+    # o endereço da rota (NEXUS_APP_RELATOS_URL) saiu daqui em 22/11/2026 (Levi: "se o 'Relatos do App de Campo
+    # (endereço)' não é para usar então tira da tela!"): vale o padrão do código ou o .env
     # o Mapa de equipe (08/11/2026): a página do App de Campo, dentro do Nexus Field, manda o ID token da Microsoft ao
     # registrar o celular, e o Nexus confere a assinatura, o público (o registro SPA do App) e o diretório (o da Grid).
     # Os dois IDs não são segredo (estão no JavaScript do App), mas ficam fora do repositório público, como o endereço

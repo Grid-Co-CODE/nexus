@@ -59,8 +59,8 @@ OPCIONAIS = ("NEXUS_CHAVE_CADASTRO", "NEXUS_ARMAZEM_LOCAL",
              # a fonte do Andamento não está ligada (o PC) cada volta só pula
              "NEXUS_NORMALIZACOES_PUBLICAR",
              # os relatos do App de Campo nas Sugestões do Início (21/11/2026, nexus/casca/relatos_app.py): a chave que o
-             # Nexus manda ao servidor do App (a mesma do App Setting de lá) e, se mudar, o endereço da rota. Também pela
-             # tela Base → Chaves do Nexus, que vence o .env. Sem a chave os relatos não aparecem e o resto segue igual
+             # Nexus manda ao servidor do App (a mesma do App Setting de lá; também pela tela Base → Chaves do Nexus, que
+             # vence o .env) e, se mudar, o endereço da rota (só aqui). Sem a chave os relatos não aparecem
              "NEXUS_APP_RELATOS_CHAVE", "NEXUS_APP_RELATOS_URL",
              # login pelo Fracttal (06/10/2026): e-mails (separados por vírgula) que entram como admin (o Cadastro)
              "NEXUS_ADMINS",
