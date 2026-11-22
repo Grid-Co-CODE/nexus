@@ -1474,6 +1474,10 @@ conferências moram em `nexus/auth/microsoft.py`; a ida, a volta e a sessão, no
 
 ## Regras que já custaram caro
 
+- **Variável da casca com nome próprio** (22/11/2026): um `{% set x = ... %}` no `base.html` passa por cima da variável `x`
+  que a view manda à tela. O sino de 21/11 criou `n_fora` (as tarefas do Fora da programação) e Base > Acessos > Pessoas e
+  setores perdeu o "(N fora do Fracttal)", que usa o mesmo nome. Virou `n_fora_sino`: o que a casca define leva o nome da
+  parte dela (`sino`, `menu`, `topo`). `tests/test_base_pessoas_fora_fracttal_17_11.py` pegou.
 - **Rota nova só nos caminhos que o Caddy manda ao Nexus** (13/10/2026, "Atualizações não carrega"): no servidor o
   Caddy divide por caminho (DEPLOY.md, 5b) e só a raiz exata, `/t/*`, `/entrar`, `/sair`, `/saude`, `/tema`, `/os/*` e
   `/static/*` (menos os três da plataforma) chegam ao Nexus. A aba Atualizações nasceu em `/atualizacoes`: abria nos testes

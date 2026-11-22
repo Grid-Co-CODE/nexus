@@ -25,7 +25,7 @@ O que o Nexus já registra e por isso já entra na conta:
 A ENERGIA que a geração e o PR somam: a das duas à potência nominal (a perda que a plataforma publica, kWp × horas de sol,
 e kW retidos × horas de sol) vezes a GERAÇÃO MÉDIA da usina nas horas de sol do mês (geração ÷ (kWp × 12 h × dias)). À
 nominal ela inflava o PR (22/11/2026, medido no dado real: a usina gera uns 20 a 30% da nominal na média das 12 h; o
-relatório de Performance da Ana pondera pela irradiação do dia, que o Nexus não tem por usina). Sem a potência ou os dias
+relatório de Performance da analista do setor pondera pela irradiação do dia, que o Nexus não tem por usina). Sem a potência ou os dias
 do mês, a energia não entra.
 As outras três (força maior, pedido ou responsabilidade da contratante, garantia ou erro do fabricante) o Nexus ainda não
 registra: a tela diz que o contrato as expurga e que elas ainda não entram.

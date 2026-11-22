@@ -8,7 +8,7 @@ from nexus.torres import descobrir_torres
 # o Ranking de pontos (13/10/2026) também é nosso: lê o livro ranking_app_campo que o App publica; o Mapa de equipe
 # (08/11/2026) lê as posições do Nexus Field
 NOSSAS = ("responsaveis", "usinas", "cliente", "equipe", "atencao", "aprovacao", "rondas", "zeladoria", "triagem",
-          "ranking")                 # a "usinas" veio do Comando em 16/11/2026
+          "ranking", "guia-app")     # a "usinas" veio do Comando em 16/11/2026; o Guia do App de Campo, 21/11/2026
 
 
 def _campo():
@@ -42,7 +42,12 @@ def test_nenhuma_tela_aponta_para_o_azure_nem_abre_moldura(logado):
     for t in _campo().telas:
         html = logado.get(f"/t/campo/{t.id}").get_data(as_text=True)
         assert "azurewebsites" not in html and "gridco-campo-mw" not in html, t.id
-        assert "<iframe" not in html and "Abrir no App" not in html, t.id
+        # moldura só a das telas do App desenhadas no próprio Nexus (o Guia do App de Campo, 21/11/2026, mostra as telas
+        # em /static/guia-app/); nunca a do App no Azure
+        molduras = re.findall(r"<iframe[^>]*\ssrc=\"([^\"]*)\"", html)
+        assert html.count("<iframe") == len(molduras), t.id
+        assert all(re.match(r"^(/[\w-]+)?/static/guia-app/", m) for m in molduras), (t.id, molduras)
+        assert "Abrir no App" not in html, t.id
         assert ("Em construção" in html) == (t.id not in NOSSAS), t.id
 
 

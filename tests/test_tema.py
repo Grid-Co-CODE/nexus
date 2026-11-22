@@ -294,6 +294,10 @@ def test_todo_var_usado_existe():
         definidos |= set(re.findall(r"""setProperty\(\s*['"](--[\w-]+)""", texto))
         for nome in re.findall(r"var\(\s*(--[\w-]+)", texto):
             usados.setdefault(nome, arq.name)
+    # o posto pelo JS do Nexus (a altura do cabeçalho dos Furos de coleta, --fr-cab-h, medida na tela, 19/11/2026): o
+    # setProperty do .js também define o token
+    for js in sorted(ESTATICO.glob("*.js")):
+        definidos |= set(re.findall(r"""setProperty\(\s*['"](--[\w-]+)""", js.read_text(encoding="utf-8")))
     faltam = {n: a for n, a in usados.items() if n not in definidos}
     assert faltam == {}, f"var() sem token: {faltam}"
 
