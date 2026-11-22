@@ -306,3 +306,27 @@ def test_o_filtro_tipo_de_demanda_separa_nexus_e_app_de_campo(app, app_falso):
     # o script da página lê a origem junto com o setor e quem solicitou
     script = next(s for s in html.split("<script>")[1:] if "sug-lista > li[data-sug-area]" in s)
     assert 'data-sug-filtro="origem"' in script and "data-sug-origem" in script
+
+
+# ── o App de verdade (v367, 21/11/2026): resposta curta e o App sem a chave ─────────────────────────────────────────
+def test_resposta_com_menos_de_5_caracteres_e_recusada_aqui(app, app_falso):
+    c = _cliente(app, admin=True)
+    _responder(c, texto="ok")
+    assert not [p for p in app_falso.pedidos if p["metodo"] == "POST"]
+    assert "A resposta precisa de 5 caracteres ou mais" in c.get(URL).get_data(as_text=True)
+
+
+def test_o_app_sem_a_chave_dele_vira_o_aviso_com_o_texto_do_app(app, app_falso):
+    app_falso.status_get = 503
+    app_falso.relatos = None
+    falso_get = app_falso.__call__
+
+    def com_503(req, timeout=None):
+        if req.get_method() == "GET":
+            app_falso.pedidos.append({"metodo": "GET", "url": req.full_url, "chave": None, "corpo": None})
+            raise urllib.error.HTTPError(req.full_url, 503, "erro", {}, io.BytesIO(json.dumps(
+                {"erro": "a chave do Nexus para os relatos não está configurada no App"}).encode()))
+        return falso_get(req, timeout)
+    R._abrir = com_503
+    html = _cliente(app, admin=True).get(URL).get_data(as_text=True)
+    assert "a chave do Nexus para os relatos não está configurada no App" in html

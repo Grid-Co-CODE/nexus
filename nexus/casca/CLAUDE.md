@@ -1252,7 +1252,8 @@ para sugestões no início com uma tag de App de campo!" (no lugar de uma aba pr
   mesmo trabalho): `GET <URL>` com `X-Nexus-Chave` → `{"versao": 1, "relatos": [...]}` (id, tipo, texto, tela, status,
   criado_em, autor {nome, email, papel, funcao}, versao_app, aparelho, mensagens [{texto, lado grid|campo, por, em}]);
   `POST <URL>/<id>/responder` com `{"resposta_id", "texto", "por": {"nome", "email"}}`. O `resposta_id` (`r` + 11
-  hexadecimais) segura o 2º envio. Recusa do App: 4xx com `{"erro": "..."}`, que vira o aviso da tela.
+  hexadecimais) segura o 2º envio. Recusa do App com `{"erro": "..."}`, que vira o aviso da tela (400, 401, 404 e o 503
+  do App sem a chave dele; a resposta com menos de 5 caracteres nem sai do Nexus). O lado do App é a v367 (21/11/2026).
 - **As chaves** (tela Base → Chaves do Nexus, que vence o `.env`): `NEXUS_APP_RELATOS_CHAVE` (32 caracteres ou mais, a
   mesma do App Setting do servidor do App) e, se mudar, `NEXUS_APP_RELATOS_URL` (só https; padrão
   `https://gridco-campo-mw.azurewebsites.net/api/app/nexus/relatos`). **Sem a chave o Nexus nem chama o App** e o

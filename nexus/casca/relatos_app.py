@@ -17,8 +17,10 @@ O contrato (versão 1; o App é quem serve, o Nexus é quem lê; mudou aqui, mud
   "versao_app", "aparelho", "mensagens": [{"id", "texto", "lado" (grid|campo), "por": {"nome"}, "em"}]}]}`. As
   mensagens são as respostas da Grid e o que o técnico escreveu depois (ao reabrir), na ordem em que aconteceram.
 - `POST <URL>/<id>/responder` com a mesma chave e `{"resposta_id": "r" + 11 hexadecimais, "texto", "por": {"nome",
-  "email"}}` → 200 `{"relato": {...}}`. O `resposta_id` segura o 2º envio (o App não grava outra). Recusa: 4xx com
-  `{"erro": "o motivo em palavras"}` (404 relato que não existe; 409 o que não aceita resposta), 401 chave errada.
+  "email"}}` → 200 `{"relato": {...}}`. O `resposta_id` segura o 2º envio (o App não grava outra). Recusa com
+  `{"erro": "o motivo em palavras"}`, que a tela mostra como veio: 404 relato que não existe, 400 `resposta_id` fora da
+  forma ou texto com menos de 5 caracteres (aqui ele nem sai), 401 chave errada e 503 o App ainda sem a chave dele (a
+  v367 do App, 21/11/2026, que não tem 409: responder relato resolvido também vale lá).
 - `<URL>` padrão: `https://gridco-campo-mw.azurewebsites.net/api/app/nexus/relatos`; a tela Base → Chaves do Nexus troca
   (`NEXUS_APP_RELATOS_URL`). A chave (`NEXUS_APP_RELATOS_CHAVE`, 32 caracteres ou mais) é a mesma nos dois lados; sem ela
   o Nexus nem chama o App e o administrador lê o porquê nas Sugestões.
@@ -53,6 +55,7 @@ STATUS = {"aberto": ("Aberto", "info"), "respondido": ("Respondido", "neutro"), 
           "resolvido": ("Resolvido", "ok")}
 ESPERAM_A_GRID = ("aberto", "reaberto")
 TITULO_MAX = 100
+MINIMO = 5           # o App recusa (400) a resposta com menos de 5 caracteres (v367, 21/11/2026): aqui ela nem sai
 _BRT = timezone(timedelta(hours=-3))
 _CACHE: dict = {}
 _RELENDO = {"thread": None}
@@ -116,7 +119,7 @@ def _chamar(req) -> dict:
             motivo = ""
         if ex.code == 401:
             raise FonteErro("o App recusou a chave do Nexus") from None
-        if motivo and 400 <= ex.code < 500:
+        if motivo:              # o App diz o motivo em palavras (4xx; e o 503 da chave que falta lá, na v367)
             raise FonteErro(motivo) from None
         if ex.code == 404:
             raise FonteErro("o App não tem a rota dos relatos para o Nexus, ou não achou o relato") from None
@@ -266,6 +269,8 @@ def responder(rid, texto, usuario, resposta_id, maximo: int) -> dict:
         raise Recusada("O formulário venceu: abra a aba de novo")
     if not texto:
         raise Recusada("Escreva a resposta")
+    if len(texto) < MINIMO:
+        raise Recusada(f"A resposta precisa de {MINIMO} caracteres ou mais")
     if len(texto) > maximo:
         raise Recusada(f"A resposta passa de {maximo} caracteres")
     corpo = {"resposta_id": _txt(resposta_id), "texto": texto,
