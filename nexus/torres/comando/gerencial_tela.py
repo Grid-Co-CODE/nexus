@@ -136,13 +136,18 @@ def _expurgos(hoje) -> tuple[dict, list[str]]:
         prox = (ini + timedelta(days=32)).replace(day=1)
         janelas[x["id"]] = (ini, datetime(hoje.year, hoje.month, hoje.day, tzinfo=tz) if x["atual"] else prox)
     try:
+        from ...cos import normalizacoes_banco as NB
+        # a queda é a OS de religamento que o COS ligou à geração parada (Levi, 22/11/2026: "vai contar lá"): as
+        # ocorrências normalizadas e as ainda abertas
+        cos = visao._livro(NB.LIVRO, NB.ABA) + visao._livro(NB.LIVRO, NB.ABA_ABERTAS)
         nomes = R.Nomes(visao._Base())
         linhas_os, linhas_dia = visao._livro(R.LIVRO_DISP, R.ABA_DISP_OS), visao._livro(R.LIVRO_DISP, R.ABA_DISP)
-        for mid in janelas:
-            out["rede"][mid] = EXP.rede_por_usina(linhas_os, linhas_dia, mid, lambda n, f: nomes.usina(n, fracttal=f)[0])
-    except Exception:            # noqa: BLE001 — sem as OS da disponibilidade, a queda da rede não sai da conta
-        _log.exception("Visão gerencial: as OS da disponibilidade (expurgo da rede) não abriram")
-        avisos.append("as OS de religamento (o expurgo da queda da rede)")
+        for mid, (ini, fim) in janelas.items():
+            out["rede"][mid] = EXP.rede_por_usina(cos, linhas_os, linhas_dia, mid, ini, fim,
+                                                  lambda n, f: nomes.usina(n, fracttal=f)[0])
+    except Exception:            # noqa: BLE001 — sem o COS ou as OS da disponibilidade, a queda da rede não sai da conta
+        _log.exception("Visão gerencial: as ocorrências do COS ou as OS da disponibilidade (expurgo da rede) não abriram")
+        avisos.append("as ocorrências do COS e as OS de religamento (o expurgo da queda da rede)")
     try:
         lido = L.ler()
         if lido.get("erro"):

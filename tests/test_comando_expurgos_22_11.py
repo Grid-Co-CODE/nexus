@@ -54,21 +54,46 @@ def test_contrato_sem_clausula_de_exclusao_nao_expurga_nada():
     assert E.do_contrato(None)["cats"] == {}
 
 
-# ── a queda da rede, pelas OS de religamento ────────────────────────────────────────────────────────────────────────
-def test_a_queda_da_rede_sai_das_os_de_religamento_pela_potencia_afetada():
-    dia = [{"mes": "2026-11", "dia": f"2026-11-{d:02d}", "usina": "Usina A", "usina_fracttal": "UA", "pot_kwp": 1000}
-           for d in range(1, 31)]
-    os_ = [{"mes": "2026-11", "os": "101", "usina": "Usina A", "usina_fracttal": "UA", "origem": "queda", "kwp": 500,
-            "duracao_sol_min": 240, "perda_kwh": 2000},
-           {"mes": "2026-11", "os": "102", "usina": "Usina A", "usina_fracttal": "UA", "origem": "equipamento", "kwp": 1000,
-            "duracao_sol_min": 600, "perda_kwh": 10000},
-           {"mes": "2026-10", "os": "90", "usina": "Usina A", "usina_fracttal": "UA", "origem": "queda", "kwp": 1000,
-            "duracao_sol_min": 600, "perda_kwh": 10000}]
-    r = E.rede_por_usina(os_, dia, "2026-11", lambda nome, fracttal: 7 if nome == "Usina A" else None)
+# ── a queda da rede: o tempo do COS, a potência da OS de religamento ────────────────────────────────────────────────
+DIA = [{"mes": "2026-11", "dia": f"2026-11-{d:02d}", "usina": "Usina A", "usina_fracttal": "UA", "pot_kwp": 1000}
+       for d in range(1, 31)]
+OS_ = [{"mes": "2026-11", "os": "101", "usina": "Usina A", "usina_fracttal": "UA", "origem": "queda", "kwp": 500,
+        "duracao_sol_min": 6000, "perda_kwh": 50000,                  # a OS ficou aberta 100 h de sol
+        "inicio": "2026-11-10T06:00:00", "fim": "2026-11-18T18:00:00"},
+       {"mes": "2026-11", "os": "102", "usina": "Usina A", "usina_fracttal": "UA", "origem": "equipamento", "kwp": 1000,
+        "duracao_sol_min": 600, "perda_kwh": 10000},
+       {"mes": "2026-11", "os": "103", "usina": "Usina A", "usina_fracttal": "UA", "origem": "queda", "kwp": 1000,
+        "duracao_sol_min": 600, "perda_kwh": 10000, "inicio": "2026-11-21T06:00:00", "fim": ""},
+       {"mes": "2026-11", "os": "104", "usina": "Usina A", "usina_fracttal": "UA", "origem": "queda", "kwp": 1000,
+        "duracao_sol_min": 60, "perda_kwh": 1000, "inicio": "2026-11-15T10:00:00", "fim": "2026-11-15T11:00:00"}]
+NOV = (datetime(2026, 11, 1, tzinfo=BRT), datetime(2026, 11, 22, tzinfo=BRT))
+
+
+def test_a_queda_e_o_tempo_que_o_cos_registrou_na_os_de_religamento_com_a_geracao_parada():
+    """Levi, 22/11/2026: "Sobre o OS de religamento, não. A gente vai contar como queda [...] que tá ali na parte de
+    ocorrências do COS. [...] Lá eles ligam o OS, um tipo de tarefa, se for religamento remoto ou não, e se houve queda
+    de geração. Então vai contar lá". Medido no mesmo dia: OS de religamento abertas o mês inteiro (252 h de sol) para
+    paradas que o COS registrou com 0 a 4 h; por isso o tempo é o do COS, e da OS vem só a potência afetada."""
+    cos = [{"os": "101", "os_relacionadas": "", "geracao_parou": 1,
+            "inicio": "2026-11-10T08:00:00-03:00", "normalizado_em": "2026-11-10T12:00:00-03:00"},
+           {"os": "102", "os_relacionadas": "", "geracao_parou": 1,                  # corretiva: equipamento, não rede
+            "inicio": "2026-11-11T08:00:00-03:00", "normalizado_em": "2026-11-11T18:00:00-03:00"},
+           {"os": "103", "os_relacionadas": "", "geracao_parou": 0,                  # a geração não parou
+            "inicio": "2026-11-12T08:00:00-03:00", "normalizado_em": "2026-11-12T18:00:00-03:00"},
+           {"os": "", "os_relacionadas": "", "geracao_parou": 1,
+            "inicio": "2026-11-13T08:00:00-03:00", "normalizado_em": "2026-11-13T18:00:00-03:00"}]
+    r = E.rede_por_usina(cos, OS_, DIA, "2026-11", *NOV, lambda n, f: 7)
     assert set(r) == {7}
-    assert round(r[7]["h_eq"], 3) == 2.0                 # 500 de 1000 kWp por 4 h
+    assert round(r[7]["h_eq"], 3) == 2.0                 # 500 de 1000 kWp por 4 h (e não as 100 h da OS)
     assert round(r[7]["delta_disp"], 4) == round(100 * 2 / (12 * 30), 4)
-    assert r[7]["kwh"] == 2000 and r[7]["os"] == ["101"]
+    assert r[7]["kwh"] == 500 * 4 and r[7]["os"] == ["101"] and r[7]["ocorrencias"] == 1
+
+
+def test_a_ocorrencia_ainda_aberta_conta_ate_o_fim_da_janela_e_a_relacionada_tambem_liga():
+    cos = [{"os": "", "os_relacionadas": "103", "geracao_parou": "1", "inicio": "2026-11-21T06:00:00-03:00",
+            "normalizado_em": ""}]
+    r = E.rede_por_usina(cos, OS_, DIA, "2026-11", *NOV, lambda n, f: 7)
+    assert r[7]["h_eq"] == 12.0 and r[7]["os"] == ["103"]
 
 
 # ── a limitação imposta, pelo cadastro ──────────────────────────────────────────────────────────────────────────────
@@ -97,13 +122,14 @@ GARANTIA = {"pct": 98.0, "nome": "Disponibilidade mínima", "texto": "98%", "cla
 
 def test_a_disponibilidade_devolve_as_horas_expurgadas_e_diz_o_numero_sem_o_expurgo():
     cont = E.do_contrato(_ficha(DISP))
-    ex = {"rede": {"h_eq": 5.4, "delta_disp": 1.5, "kwh": 2000.0, "os": ["101", "102"]}}
+    ex = {"rede": {"h_eq": 5.4, "delta_disp": 1.5, "kwh": 2000.0, "os": ["101", "102"], "ocorrencias": 3}}
     m = {"disp": 96.0, "meta": 90.0, "pr": 75.0, "pr_prev": 80.0, "prod_kwh": 90000.0, "meta_kwh": 100000.0}
     s = G.nota_do_contrato(GARANTIA, m, {}, False, 4, expurgo=E.aplicar(cont, m, ex))
     disp = next(i for i in s["itens"] if i["nome"] == "Disponibilidade")
     assert disp["nota"] == 100 - 20 * 0.5                # 97,5% com o expurgo: meio ponto abaixo de 98
     assert "97,5%" in disp["mediu"] and "96,0%" in disp["expurgo"]
-    assert "queda da rede" in disp["expurgo"] and "2 OS de religamento" in disp["expurgo"]
+    assert "queda da rede" in disp["expurgo"] and "3 ocorrências do COS com a geração parada" in disp["expurgo"]
+    assert "OS de religamento 101, 102" in disp["expurgo"]
     assert "Exclusões da disponibilidade" in disp["expurgo"] and "8.3.3" in disp["expurgo"]
     ger = next(i for i in s["itens"] if i["nome"] == "Geração e PR")
     assert "expurgo" not in ger or not ger["expurgo"].startswith("Somad")   # a cláusula de disponibilidade não mexe no PR
@@ -182,3 +208,32 @@ def test_a_montagem_aplica_o_expurgo_do_contrato_do_cliente():
     sem = G.montar(us, contratos, hoje, "agora")
     disp0 = next(i for i in sem["clientes"][0]["usinas"][0]["score"][fechado]["itens"] if i["nome"] == "Disponibilidade")
     assert disp0["nota"] == 60 and "Nenhuma queda da rede" in disp0["expurgo"]
+
+
+def test_so_sai_o_tempo_que_esta_na_os_e_no_cos_ao_mesmo_tempo():
+    """O COS pode registrar a parada mais longa que a OS (medido em 22/11/2026: com o tempo do COS inteiro, 47 usinas
+    batiam 100% em novembro). A disponibilidade oficial só descontou o tempo da OS: o expurgo devolve só a parte em que a
+    OS estava aberta E o COS diz que a geração parou."""
+    cos = [{"os": "104", "os_relacionadas": "", "geracao_parou": 1,
+            "inicio": "2026-11-15T08:00:00-03:00", "normalizado_em": "2026-11-15T18:00:00-03:00"},
+           {"os": "", "os_relacionadas": "104", "geracao_parou": 1,          # a mesma OS em outra ocorrência, sobreposta
+            "inicio": "2026-11-15T09:00:00-03:00", "normalizado_em": "2026-11-15T12:00:00-03:00"}]
+    r = E.rede_por_usina(cos, OS_, DIA, "2026-11", *NOV, lambda n, f: 7)
+    assert r[7]["h_eq"] == 1.0 and r[7]["os"] == ["104"] and r[7]["ocorrencias"] == 2
+
+
+def test_duas_os_da_mesma_parada_no_mesmo_horario_nao_contam_duas_vezes():
+    """Medido em 22/11/2026: usinas devolviam mais horas do que a disponibilidade oficial perdeu (Araçoiaba da Serra IB:
+    perdeu 1,5 h-eq e devolvia 4,8), porque duas OS da mesma parada somavam. Como na plataforma, no mesmo horário cada
+    equipamento conta uma vez e a soma tem o teto da usina inteira."""
+    os_ = [{"mes": "2026-11", "os": n, "usina": "Usina A", "usina_fracttal": "UA", "origem": "queda", "kwp": kwp,
+            "escopo": esc, "inicio": "2026-11-16T10:00:00", "fim": "2026-11-16T11:00:00"}
+           for n, kwp, esc in (("201", 1000, "usina inteira"), ("202", 1000, "usina inteira"),
+                               ("203", 300, "cabine 1"), ("204", 300, "cabine 2"))]
+    cos = [{"os": n, "os_relacionadas": "", "geracao_parou": 1, "inicio": "2026-11-16T10:00:00-03:00",
+            "normalizado_em": "2026-11-16T11:00:00-03:00"} for n in ("201", "202")]
+    assert E.rede_por_usina(cos, os_, DIA, "2026-11", *NOV, lambda n, f: 7)[7]["h_eq"] == 1.0
+    cos = [{"os": n, "os_relacionadas": "", "geracao_parou": 1, "inicio": "2026-11-16T10:00:00-03:00",
+            "normalizado_em": "2026-11-16T11:00:00-03:00"} for n in ("203", "204")]
+    r = E.rede_por_usina(cos, os_, DIA, "2026-11", *NOV, lambda n, f: 7)
+    assert round(r[7]["h_eq"], 3) == 0.6 and r[7]["kwh"] == 600       # duas cabines diferentes somam

@@ -1555,21 +1555,31 @@ cruzamento com a planilha de tickets. Em 22/11: "agora segue com o cálculo dos 
   expurga nada. A regra que diz o que NÃO é expurgo (SEMP: "Passivos de obra NÃO são expurgo") fica fora, e as que pedem
   aviso, evidência, protocolo ou validação viram "Para valer, o contrato pede" no texto (o Nexus não confere). Editar o
   texto da regra no Comando › Contratos muda o expurgo.
-- **O que entra na conta hoje** (o Nexus registra): a QUEDA DA REDE pelas OS de religamento que a plataforma publica
-  (`falhas_performance · disponibilidade_os`, origem `queda`, a família "por queda" da disponibilidade) e a LIMITAÇÃO
-  IMPOSTA pelo cadastro de Performance › Limitações (só a sem responsabilidade da Grid e com a potência). Força maior,
-  contratante e fabricante a tela cita, mas ainda não entram (o Nexus não registra esses eventos).
-- **A disponibilidade** devolve as horas de queda pela potência afetada: + 100 × h-eq ÷ (12 h × dias), com teto de 100
-  (evento de queda e de equipamento no mesmo horário é capado no total da plataforma; somar a queda inteira pode passar,
-  e o teto segura). Usina com duas linhas no Gerencial, pesada pela potência como a disponibilidade dela.
+- **O que entra na conta hoje** (o Nexus registra): a QUEDA DA REDE e a LIMITAÇÃO IMPOSTA (o cadastro de Performance ›
+  Limitações, só a sem responsabilidade da Grid e com a potência). Força maior, contratante e fabricante a tela cita, mas
+  ainda não entram (o Nexus não registra esses eventos).
+- **A queda da rede é a do COS** (Levi, 22/11/2026: "Sobre o OS de religamento, não. A gente vai contar como queda [...]
+  que tá ali na parte de ocorrências do COS. [...] Lá eles ligam o OS, um tipo de tarefa, se for religamento remoto ou
+  não, e se houve queda de geração. Então vai contar lá"; a 1ª versão, do mesmo dia, contava toda OS de religamento pelo
+  tempo da OS): a ocorrência do COS com a geração parada (`nexus_cos_normalizacoes`, normalizadas e abertas,
+  `geracao_parou` = 1) ligada a uma OS de religamento (a OS ou uma relacionada, família `queda` da
+  `falhas_performance · disponibilidade_os`). O TEMPO é o do COS (início à normalização; a aberta, até o fim da janela),
+  e só a parte em que a OS estava aberta (o que a disponibilidade oficial descontou); da OS vem a potência afetada. No
+  mesmo horário, cada equipamento conta uma vez (a maior fração) e a soma tem o teto da usina, como na plataforma. Medido
+  em 22/11: em novembro, 3.362 h de sol pelas OS contra 1.376 h pelo COS (OS de 252 h para paradas de 0 a 4 h).
+- **A disponibilidade** devolve essas horas: + 100 × h-eq ÷ (12 h × dias), com teto de 100. Usina com duas linhas no
+  Gerencial, pesada pela potência como a disponibilidade dela. **Limite conhecido:** a plataforma não publica a perda por
+  família por usina, então o expurgo não sabe quanto da perda oficial foi da queda; na Thopen, cuja disponibilidade a
+  plataforma calcula também pelo COS, ele pode devolver mais do que a queda descontou (22/11: Araçoiaba da Serra IB
+  perdeu 1,5 h-eq e o expurgo devolve 4,8), e o teto de 100 segura.
 - **A geração e o PR** somam a energia expurgada: a perda à potência nominal (a da plataforma, kWp × horas de sol; e
   kW retidos × horas de sol da limitação) VEZES a geração média da usina nas horas de sol do mês (geração ÷ (kWp × 12 h
   × dias)). À nominal o PR inflava (a usina gera uns 20 a 35% da nominal na média das 12 h; o relatório de Performance da
   Ana pondera pela irradiação do dia, que o Nexus não tem por usina). Sem a potência ou os dias, a energia não entra.
 - **A tela**: cada item afetado ganha "O expurgo do contrato" (o que saiu, as OS, a cláusula e o número sem o expurgo);
   o "!" da nota explica. O cliente leva `expurga` (as categorias que o contrato dele cita).
-- **Medido no dado real em 22/11/2026** (banco de verdade, contratos de produção de 18/11): em novembro 52 de 131 usinas
-  com nota mudaram (ganho médio de 12,6 pontos; o maior, 27), em outubro 63 de 130 (17,1; o maior, 42), quase tudo pela
-  queda da rede na disponibilidade (Capitão Poço 100 em outubro: 81 OS de religamento, de 59,7% para 99,1%). Os clientes
-  sem cláusula de exclusão (Renogrid, E1, Sal Energia, Qair, Elis Energia, Faro) não mudam.
+- **Medido no dado real em 22/11/2026** (banco de verdade, contratos de produção de 18/11), com a queda do COS: em
+  novembro 52 de 131 usinas com nota mudaram (ganho médio de 14,4 pontos; o maior, 33), em outubro 60 de 130 (16,4; o
+  maior, 50); por cliente em outubro, sem → com: Thopen 71 → 81, Athon 78 → 89, Axis 50 → 59, GreenYellow 78 → 82. Os
+  clientes sem cláusula de exclusão (Renogrid, E1, Sal Energia, Qair, Elis Energia, Faro) não mudam.
 - Prova: `tests/test_comando_expurgos_22_11.py` (contratos e números de mentira, a montagem inteira).
