@@ -1539,3 +1539,37 @@ execução pela lista central de mentira, a solicitação com os nomes cifrados,
 (os dois formulários no caminho da rota), o "Marcar todas", o caminho aberto no portão de todo setor e o gancho da
 aprovação) e o `test_aprovar_chama_o_gancho_do_aviso_de_quem_pediu` do
 `tests/test_oscreator_solic_pcm.py`.
+
+## Os expurgos do contrato na nota de cumprimento (22/11/2026; `nexus/comando/expurgos.py`)
+
+Levi, 19/11/2026: "una as informações de contrato, enfim, Nexus Insights, e aí aplique esses expurgos que estão no
+relatório"; a ordem combinada foi o cadastro das limitações (Performance › Limitações), depois este cálculo, depois o
+cruzamento com a planilha de tickets. Em 22/11: "agora segue com o cálculo dos expurgos".
+
+- **Quem diz o que expurga é o contrato (a "opção A")**: as regras de "Disponibilidade e desempenho" que falam em tirar
+  da conta (exclusão, expurgo, curtailment, "não incidem", "saem do tempo planejado") são lidas contra a LISTA DA GRID,
+  cinco categorias que vêm do modelo de proposta da Grid e dos contratos: queda da rede (distribuidora, transmissão, ONS,
+  agentes externos), limitação imposta (curtailment, restrição de injeção), força maior, pedido ou responsabilidade da
+  contratante, garantia ou erro do fabricante. A categoria só vale para o cliente se a cláusula dele a cita; a cláusula
+  diz também a que se aplica (disponibilidade, PR, ou os dois quando não diz). Contrato sem cláusula de exclusão não
+  expurga nada. A regra que diz o que NÃO é expurgo (SEMP: "Passivos de obra NÃO são expurgo") fica fora, e as que pedem
+  aviso, evidência, protocolo ou validação viram "Para valer, o contrato pede" no texto (o Nexus não confere). Editar o
+  texto da regra no Comando › Contratos muda o expurgo.
+- **O que entra na conta hoje** (o Nexus registra): a QUEDA DA REDE pelas OS de religamento que a plataforma publica
+  (`falhas_performance · disponibilidade_os`, origem `queda`, a família "por queda" da disponibilidade) e a LIMITAÇÃO
+  IMPOSTA pelo cadastro de Performance › Limitações (só a sem responsabilidade da Grid e com a potência). Força maior,
+  contratante e fabricante a tela cita, mas ainda não entram (o Nexus não registra esses eventos).
+- **A disponibilidade** devolve as horas de queda pela potência afetada: + 100 × h-eq ÷ (12 h × dias), com teto de 100
+  (evento de queda e de equipamento no mesmo horário é capado no total da plataforma; somar a queda inteira pode passar,
+  e o teto segura). Usina com duas linhas no Gerencial, pesada pela potência como a disponibilidade dela.
+- **A geração e o PR** somam a energia expurgada: a perda à potência nominal (a da plataforma, kWp × horas de sol; e
+  kW retidos × horas de sol da limitação) VEZES a geração média da usina nas horas de sol do mês (geração ÷ (kWp × 12 h
+  × dias)). À nominal o PR inflava (a usina gera uns 20 a 35% da nominal na média das 12 h; o relatório de Performance da
+  Ana pondera pela irradiação do dia, que o Nexus não tem por usina). Sem a potência ou os dias, a energia não entra.
+- **A tela**: cada item afetado ganha "O expurgo do contrato" (o que saiu, as OS, a cláusula e o número sem o expurgo);
+  o "!" da nota explica. O cliente leva `expurga` (as categorias que o contrato dele cita).
+- **Medido no dado real em 22/11/2026** (banco de verdade, contratos de produção de 18/11): em novembro 52 de 131 usinas
+  com nota mudaram (ganho médio de 12,6 pontos; o maior, 27), em outubro 63 de 130 (17,1; o maior, 42), quase tudo pela
+  queda da rede na disponibilidade (Capitão Poço 100 em outubro: 81 OS de religamento, de 59,7% para 99,1%). Os clientes
+  sem cláusula de exclusão (Renogrid, E1, Sal Energia, Qair, Elis Energia, Faro) não mudam.
+- Prova: `tests/test_comando_expurgos_22_11.py` (contratos e números de mentira, a montagem inteira).

@@ -38,6 +38,7 @@ import unicodedata
 from datetime import date
 
 from . import diagnostico_mes as DM
+from . import expurgos as EXP
 
 # ── a régua (proposta de 19/11/2026) ─────────────────────────────────────────────────────────────────────────────────
 POR_PONTO_DISP = 20            # cada ponto percentual de disponibilidade abaixo da garantida
@@ -144,12 +145,16 @@ def valores_por_usina(ficha: dict | None, usinas: list[dict]) -> dict:
 
 
 # ── a nota ───────────────────────────────────────────────────────────────────────────────────────────────────────────
-def nota_do_contrato(garantia: dict | None, m: dict, u: dict, atual: bool, semanas: int) -> dict:
-    """{nota (0 a 100, ou None), itens: [{nome, nota (ou None = fora), pede, mediu, conta}], medidos}.
+def nota_do_contrato(garantia: dict | None, m: dict, u: dict, atual: bool, semanas: int, expurgo: dict | None = None) -> dict:
+    """{nota (0 a 100, ou None), itens: [{nome, nota (ou None = fora), pede, mediu, conta[, expurgo]}], medidos}.
 
     `garantia` = `garantia_de_disponibilidade`; `m` = o mês: {meta, pr, pr_prev, disp} e, no fechado, {rondas}; `u` = o
     que é de agora: {ronda_dias, nunca_rondada, plano_pct, plano_txt, os_abertas, os_urgentes, os_atrasadas_n,
-    mais_antiga_d}; `atual` = o mês vigente (parcial, até ontem); `semanas` = quantas rondas o mês fechado pede."""
+    mais_antiga_d}; `atual` = o mês vigente (parcial, até ontem); `semanas` = quantas rondas o mês fechado pede.
+    `expurgo` (22/11/2026) = `expurgos.aplicar`: a nota usa o mês COM o expurgo do contrato, e a Disponibilidade e a
+    Geração e PR levam o texto do que saiu (a cláusula e o número sem o expurgo)."""
+    if expurgo:
+        m = expurgo["m"]
     itens, quando = [], (" no mês, até ontem." if atual else " no mês fechado.")
     disp = m.get("disp")
     if garantia:
@@ -231,6 +236,11 @@ def nota_do_contrato(garantia: dict | None, m: dict, u: dict, atual: bool, seman
                                 + (f", a mais antiga há {antiga} dias" if antiga else "") + "."),
                       "conta": f"Cada urgente tira {POR_URGENTE} e cada atrasada tira {POR_ATRASADA}."})
 
+    if expurgo:
+        for it in itens:
+            texto = {"Disponibilidade": expurgo.get("disp"), "Geração e PR": expurgo.get("ger")}.get(it["nome"])
+            if texto:
+                it["expurgo"] = texto
     medidos = [i["nota"] for i in itens if i["nota"] is not None]
     return {"nota": _arred(_media(medidos)) if len(medidos) >= MIN_ITENS else None, "itens": itens, "medidos": len(medidos)}
 
@@ -247,12 +257,16 @@ def meses(hoje: date) -> list[dict]:
     return out
 
 
-def montar(usinas: list[dict], contratos: dict | None, hoje: date, gerado: str, avisos: list[str] | None = None) -> dict:
+def montar(usinas: list[dict], contratos: dict | None, hoje: date, gerado: str, avisos: list[str] | None = None,
+           expurgos: dict | None = None) -> dict:
     """O que a página lê. `usinas` = uma por usina mobilizada: {uid, usina, cliente, codigo, mwp, pontos (a saúde, do
     dossiê do cliente), o que é de agora (ver `nota_do_contrato`) e `meses` {"AAAA-MM": {meta, pr, pr_prev, disp[,
     rondas]}}}. `contratos` = o `edicao.visao` do Comando › Contratos (as listas `contratos` e `fichas`), ou None quando
-    ele não abriu: a tela segue sem os valores e diz."""
+    ele não abriu: a tela segue sem os valores e diz. `expurgos` (22/11/2026) = {"rede": {"AAAA-MM": {uid: ...}},
+    "limitacao": {...}} (`expurgos.rede_por_usina` e `limitacao_por_usina`): o que cada contrato deixa tirar da conta
+    (`expurgos.do_contrato`) sai da nota de cada mês."""
     ms = meses(hoje)
+    ex = expurgos or {}
     atual = ms[0]["id"]
     por_chave = {chave_cliente(c.get("cliente")): c for c in (contratos or {}).get("contratos") or []}
     fichas = {chave_cliente(n): f for n, f in ((contratos or {}).get("fichas") or {}).items()}
@@ -263,11 +277,17 @@ def montar(usinas: list[dict], contratos: dict | None, hoje: date, gerado: str, 
     for nome, us in grupos.items():
         c, f = por_chave.get(chave_cliente(nome)), fichas.get(chave_cliente(nome))
         garantia = garantia_de_disponibilidade(f)
+        cont = EXP.do_contrato(f)
         valores = valores_por_usina(f, us)
         saida = []
         for u in sorted(us, key=lambda x: (-(x.get("mwp") or 0), str(x["usina"]).lower())):
             um = u.get("meses") or {}
-            score = {m["id"]: nota_do_contrato(garantia, um.get(m["id"]) or {}, u, m["atual"], m["semanas"]) for m in ms}
+            score = {}
+            for m in ms:
+                mm = um.get(m["id"]) or {}
+                exp = EXP.aplicar(cont, mm, {k: ((ex.get(k) or {}).get(m["id"]) or {}).get(u.get("uid")) or {}
+                                             for k in ("rede", "limitacao")})
+                score[m["id"]] = nota_do_contrato(garantia, mm, u, m["atual"], m["semanas"], expurgo=exp)
             saida.append({"uid": u.get("uid"), "usina": u["usina"], "mwp": u.get("mwp"), "pontos": u.get("pontos"),
                           "valor": valores.get(u["usina"]), "meses": {m["id"]: um.get(m["id"]) or {} for m in ms}, "score": score})
         notas = {m["id"]: [x["score"][m["id"]]["nota"] for x in saida if x["score"][m["id"]]["nota"] is not None] for m in ms}
@@ -281,6 +301,8 @@ def montar(usinas: list[dict], contratos: dict | None, hoje: date, gerado: str, 
             "tem_contrato": c is not None, "valor": (c or {}).get("valor_mensal"), "minuta": bool(info.get("minuta")),
             "inicio": (c or {}).get("inicio"), "fim": (c or {}).get("fim"), "dias_fim": (c or {}).get("dias_fim"),
             "obrigacoes_atrasadas": (c or {}).get("atrasadas") or 0, "disp_garantida": garantia,
+            # o que o contrato expurga (22/11/2026), na ordem da lista da Grid
+            "expurga": [EXP.CATEGORIAS[k][0] for k in EXP.CATEGORIAS if k in cont["cats"]],
             "score": {mid: {"nota": _arred(_media(v)) if v else None, "usinas": len(v)} for mid, v in notas.items()},
             "usinas": saida})
     clientes.sort(key=lambda x: (-x["mwp"], x["cliente"].lower()))

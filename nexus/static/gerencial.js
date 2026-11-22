@@ -369,6 +369,7 @@
     return avisos() + '<p class="vg-trilha" style="margin-bottom:8px">' + lk({}, "Portfólio Grid Co.") + " / " + lk({cliente: c.cliente}, c.cliente) + " / usina</p>" +
       '<div class="vg-topo"><div class="vg-nome-l"><p class="vg-usina">' + esc(u.usina) + "</p>" + explica("Como ler a nota e os insights",
         "<p><b>A nota do contrato</b> é uma proposta em teste: os quatro itens têm o mesmo peso, item sem garantia no contrato ou sem dado fica fora, e usina com menos de dois itens medidos fica sem nota. Os números da conta ainda esperam aprovação.</p>" +
+        "<p><b>Os expurgos</b> são os que a cláusula de exclusão do próprio contrato permite: a queda da rede (as OS de religamento) sai da disponibilidade e, quando o contrato diz, a energia dela e a da limitação imposta somam na geração e no PR. Cada item diz o que saiu, a cláusula e o número sem o expurgo; o que o contrato pede para o expurgo valer (aviso, evidência, validação) o Nexus não confere.</p>" +
         "<p><b>Os insights</b> são os do Nexus Insights (Comando): as regras que cruzam as fontes do Nexus e apontam um problema com dono. São os de agora (o filtro de mês vale para a nota, não para eles), e o que está concluído não aparece.</p>" + DE_ONDE) +
       '</div><span class="vg-acoes">' + seletorMes() + (u.uid == null ? "" : '<a class="vg-botao" href="' + esc(prontuario) + '">Abrir o prontuário</a>') + "</span></div>" +
       '<p class="vg-lead">' + n(u.mwp, 1) + " MWp de " + esc(c.cliente) + ".</p>" +
@@ -379,7 +380,7 @@
         : "É a média dos " + med.length + " itens medidos: " + med.map(function (i) { return i.nota; }).join(" + ") + ", dividido por " + med.length + ".") + "</p>" +
       (fora.length ? '<p class="mudo">Fora da conta: ' + fora.map(function (i) { return minuscula(i.nome); }).join(", ") + ".</p>" : "") + "</div></div>" +
       sc.itens.map(function (it) { return '<section class="vg-item"><header><h3>' + esc(it.nome) + '</h3><span class="vg-trilho"><i class="vg-b-' + tom(it.nota) + '" style="width:' + (it.nota || 0) + '%"></i></span><span class="vg-v vg-t-' + tom(it.nota) + '">' + (it.nota == null ? "fora" : it.nota) + "</span></header>" +
-        "<dl><dt>O contrato pede</dt><dd>" + esc(it.pede) + "</dd><dt>O Nexus mediu</dt><dd>" + esc(it.mediu) + "</dd><dt>A conta</dt><dd>" + esc(it.conta) + "</dd></dl></section>"; }).join("") + "</section>" +
+        "<dl><dt>O contrato pede</dt><dd>" + esc(it.pede) + "</dd><dt>O Nexus mediu</dt><dd>" + esc(it.mediu) + "</dd><dt>A conta</dt><dd>" + esc(it.conta) + "</dd>" + (it.expurgo ? "<dt>O expurgo do contrato</dt><dd>" + esc(it.expurgo) + "</dd>" : "") + "</dl></section>"; }).join("") + "</section>" +
       '<section class="vg-lado" aria-labelledby="vg-h-ins"><h2 id="vg-h-ins">Nexus Insights</h2>' +
       '<div class="vg-grande"><div class="vg-score vg-t-neutro" id="vg-ins-n">…</div><div><p class="vg-score-rot" id="vg-ins-rot">Lendo o que as regras apontam agora…</p>' +
       '<p class="mudo">Agora, hoje: o filtro de mês vale para a nota do contrato, não para os insights.</p><span class="vg-seg vg-seg--ins" id="vg-ins-seg"></span></div></div>' +

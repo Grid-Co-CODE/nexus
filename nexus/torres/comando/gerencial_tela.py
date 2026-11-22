@@ -89,14 +89,18 @@ def _usinas(hoje) -> tuple[list[dict], list[str]]:
         for x in ms:
             mid = x["id"]
             dd = (disps.get(mid) or {}).get(uid) or {}
-            if x["atual"]:
-                meses[mid] = {"meta": _f(l.get("atingimento")), "pr": _f(l.get("pr")), "pr_prev": _f(l.get("pr_meta")),
-                              "disp": _f(dd.get("disp"))}
-                continue
             mes_id = int(mid[:4]) * 100 + int(mid[5:7])
             mt = (metas.get(mes_id) or {}).get(uid) or {}
+            # a geração e a meta em kWh (22/11/2026): a energia que o contrato expurga se soma a elas
+            kwh = {"prod_kwh": _f(mt.get("prod_kwh")), "meta_kwh": _f(mt.get("meta_kwh")),
+                   # e a potência e os dias da disponibilidade: a geração média da usina nas horas de sol do mês
+                   "pot_kwp": _f(dd.get("pot_kwp")), "dias": _f(dd.get("dias"))}
+            if x["atual"]:
+                meses[mid] = {"meta": _f(l.get("atingimento")), "pr": _f(l.get("pr")), "pr_prev": _f(l.get("pr_meta")),
+                              "disp": _f(dd.get("disp")), **kwh}
+                continue
             meses[mid] = {"meta": _f(mt.get("atingimento")), "pr": _f(mt.get("pr")), "pr_prev": _f(mt.get("pr_meta")),
-                          "disp": _f(dd.get("disp")),
+                          "disp": _f(dd.get("disp")), **kwh,
                           # o mês que o fato tem é zero de verdade para a usina sem ronda; o que ele não tem, None
                           "rondas": AM.rondas_do_mes(rondas, meses_fato, uid, mes_id)}
         out.append({
@@ -110,6 +114,45 @@ def _usinas(hoje) -> tuple[list[dict], list[str]]:
             "os_urgentes": sum(1 for o in man.get("os_nao_iniciadas") or [] if isinstance(o, dict) and o.get("urgente")),
             "os_atrasadas_n": PR._int(man.get("atrasadas_os")) or 0, "mais_antiga_d": PR._int(man.get("maior_atraso")),
             "meses": meses})
+    return out, avisos
+
+
+def _expurgos(hoje) -> tuple[dict, list[str]]:
+    """O que o Nexus registra e os contratos podem expurgar (22/11/2026; a conta em `nexus/comando/expurgos.py`), por mês
+    do filtro e por usina: a queda da rede pelas OS de religamento que a plataforma publica (`falhas_performance ·
+    disponibilidade_os`, a mesma ligação pelo nome da disponibilidade) e a limitação imposta pelo cadastro de Performance ›
+    Limitações. Fonte que não abre vira aviso, e a nota segue sem o expurgo dela."""
+    from datetime import datetime, timedelta
+    from ...campo import limitacoes as L
+    from ...campo import responsaveis as R
+    from ...campo import visao
+    from ...comando import expurgos as EXP
+    from ...comando import gerencial as G
+    ms, out, avisos = G.meses(hoje), {"rede": {}, "limitacao": {}}, []
+    tz = L._BRT
+    janelas = {}
+    for x in ms:
+        ini = datetime(int(x["id"][:4]), int(x["id"][5:7]), 1, tzinfo=tz)
+        prox = (ini + timedelta(days=32)).replace(day=1)
+        janelas[x["id"]] = (ini, datetime(hoje.year, hoje.month, hoje.day, tzinfo=tz) if x["atual"] else prox)
+    try:
+        nomes = R.Nomes(visao._Base())
+        linhas_os, linhas_dia = visao._livro(R.LIVRO_DISP, R.ABA_DISP_OS), visao._livro(R.LIVRO_DISP, R.ABA_DISP)
+        for mid in janelas:
+            out["rede"][mid] = EXP.rede_por_usina(linhas_os, linhas_dia, mid, lambda n, f: nomes.usina(n, fracttal=f)[0])
+    except Exception:            # noqa: BLE001 — sem as OS da disponibilidade, a queda da rede não sai da conta
+        _log.exception("Visão gerencial: as OS da disponibilidade (expurgo da rede) não abriram")
+        avisos.append("as OS de religamento (o expurgo da queda da rede)")
+    try:
+        lido = L.ler()
+        if lido.get("erro"):
+            raise RuntimeError(lido["erro"])
+        lista = L.vigentes(lido)
+        for mid, (ini, fim) in janelas.items():
+            out["limitacao"][mid] = EXP.limitacao_por_usina(lista, ini, fim)
+    except Exception:            # noqa: BLE001 — sem o cadastro, a limitação imposta não sai da conta
+        _log.exception("Visão gerencial: o cadastro das limitações (expurgo da limitação imposta) não abriu")
+        avisos.append("o cadastro das limitações de potência (o expurgo da limitação imposta)")
     return out, avisos
 
 
@@ -189,7 +232,9 @@ def dados_gerencial() -> dict:
         contratos, aviso = _contratos(agora.date())
         if aviso:
             avisos.append(aviso)
-        copia.update(dados=G.montar(usinas, contratos, agora.date(), agora.strftime("%d/%m/%Y às %H:%M"), avisos), ts=time.time())
+        expurgos, avisos_exp = _expurgos(agora.date())
+        copia.update(dados=G.montar(usinas, contratos, agora.date(), agora.strftime("%d/%m/%Y às %H:%M"),
+                                    avisos + avisos_exp, expurgos=expurgos), ts=time.time())
     return copia["dados"]
 
 
