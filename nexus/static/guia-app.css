@@ -1,0 +1,50 @@
+/* Usinas 360° › Guia do App de Campo (21/11/2026). Um nível de superfície só: o fio separa as perguntas, o tema é texto
+   pequeno acima do título, e o que chama o olho são os telefones. Toda cor vem dos tokens do tema (tests/test_tema.py). */
+.gu{max-width:1360px}
+.gu-titulo{display:flex;align-items:center;gap:12px}
+.gu-h1{margin:2px 0 0;font:800 30px/1.15 var(--font-display);letter-spacing:-.01em}
+.gu-pergunta-tela{margin:6px 0 0;color:var(--tinta-2);font-size:14px}
+.gu-vazio{margin:20px 0;color:var(--mudo)}
+
+/* a busca e os temas no alto */
+.gu-busca{display:flex;align-items:center;gap:14px;margin:20px 0 10px;max-width:720px}
+.gu-busca .gc-campo{flex:1;font-size:15px;padding:10px 14px}
+.gu-conta{white-space:nowrap;font-size:13px}
+.gu-chips{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 22px}
+.gu-chip{padding:6px 13px;border:1px solid var(--linha-forte);border-radius:999px;background:none;color:var(--tinta-2);
+  font:600 13px/1.2 var(--font-sans);cursor:pointer}
+.gu-chip:hover{border-color:var(--verde)}
+.gu-chip[aria-pressed="true"]{border-color:var(--verde);background:var(--verde-suave);color:var(--verde-texto)}
+.gu-chip:focus-visible{outline:2px solid var(--verde);outline-offset:2px}
+
+/* a lista por tema ao lado e as perguntas */
+.gu-grade{display:grid;grid-template-columns:260px minmax(0,1fr);gap:34px;align-items:start}
+.gu-nav{position:sticky;top:76px;max-height:calc(100vh - 96px);overflow:auto;padding-right:6px;scrollbar-width:thin}
+.gu-nav-grupo+.gu-nav-grupo{margin-top:16px}
+.gu-nav-tema{margin:0 0 6px;font-size:12px;font-weight:700;color:var(--mudo)}
+.gu-nav ul{margin:0;padding:0;list-style:none}
+.gu-nav li a{display:block;padding:5px 0 5px 10px;border-left:2px solid var(--linha);color:var(--tinta-2);font-size:13px;
+  line-height:1.35;text-decoration:none}
+.gu-nav li a:hover{border-left-color:var(--verde);color:var(--tinta)}
+.gu-pergunta{padding:22px 0 26px;border-top:1px solid var(--linha-forte);scroll-margin-top:76px}
+.gu-pergunta:first-child{border-top:0;padding-top:0}
+.gu-tema{margin:0 0 4px;font-size:12px;font-weight:700;color:var(--verde-texto)}
+.gu-h2{margin:0 0 10px;font:700 21px/1.25 var(--font-display)}
+.gu-resumo{margin:0 0 16px;padding-left:18px;max-width:78ch;font-size:15px;line-height:1.55;color:var(--tinta)}
+.gu-resumo li+li{margin-top:4px}
+.gu-fones{display:flex;gap:18px;overflow-x:auto;padding:2px 2px 10px;scrollbar-width:thin}
+.gu-fone{flex:none;width:260px;margin:0}
+/* sem color-scheme próprio: a moldura herda o do Nexus (escuro ou claro), o mesmo que a tela do telefone declara; se os
+   dois não batem, o navegador pinta o fundo da moldura (o retângulo atrás do telefone) */
+.gu-fone iframe{display:block;width:260px;height:572px;border:0;background:transparent}
+.gu-fone figcaption{margin-top:8px;font-size:12.5px;line-height:1.4;color:var(--tinta-2)}
+.gu-sem-tela{margin:0 0 12px;font-size:13px}
+.gu-regras{margin:12px 0 0;max-width:86ch}
+.gu-regras>summary{cursor:pointer;font-weight:600;font-size:14px;color:var(--tinta)}
+.gu-regras ol,.gu-regras ul{margin:10px 0 0;padding-left:20px;font-size:13.5px;line-height:1.55;color:var(--tinta-2)}
+.gu-regras li+li{margin-top:6px}
+.gu-fonte{font-size:11.5px;color:var(--mudo)}
+.gu-incerto>summary{color:var(--alerta)}
+.gu-nada{margin:12px 0}
+
+@media (max-width:900px){.gu-grade{grid-template-columns:minmax(0,1fr)}.gu-nav{position:static;max-height:none}}

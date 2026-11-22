@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% block titulo %}{{ tela.nome }}{% endblock %}
+{% block conteudo %}
+{% from "_explica.html" import explica, termo %}
+<link rel="stylesheet" href="{{ url_for('static', filename='guia-app.css') }}">
+{# Usinas 360° › Guia do App de Campo (21/11/2026). Levi, pelo chat do App de Campo: "guia do app de campo [...] perguntas
+   que eu recebo recorrentemente [...] vai aparecer as telas e vai aparecer todas as regras ali embaixo"; em 22/11, a
+   busca no alto, a separação por tema e o texto curto, "para quem tem pouco tempo, porém busca entender". O conteúdo é do
+   App (nexus/campo/guia_app.py); os telefones são iframes que seguem o tema do Nexus (static/guia-app.js). #}
+<div class="gu">
+  <header class="gu-cab">
+    <p class="gc-eyebrow">{{ torre.nome }}</p>
+    <div class="gu-titulo"><h1 class="gu-h1">{{ tela.nome }}</h1>
+    {% call explica('Para que serve e de onde vem') %}
+      <p><b>Para que serve.</b> Responder as perguntas que mais chegam sobre o App de Campo, cada uma com as telas do App e
+      as regras. Primeiro o resumo; as regras completas ficam fechadas embaixo, com a fonte de cada uma.</p>
+      <dl class="gc-explica-termos">
+        {{ termo('Telas') }}<dd>Os telefones mostram o App no tema do Nexus: troque o tema no menu da sua conta e eles
+          trocam juntos. São do desenho novo do App, que ainda não foi publicado: o técnico pode ver um pouco diferente.
+          Os nomes de usina e de pessoa nas telas são de exemplo.</dd>
+        {{ termo('Fonte') }}<dd>No fim de cada regra: <code>fa</code> é o servidor do App (function_app.py),
+          <code>ch</code> a página do App (campo.html) e <code>vNNN</code> a versão do App que criou a regra.</dd>
+        {{ termo('Para conferir') }}<dd>O que o código não resolve sozinho e o PCM precisa conferir. Só o administrador e
+          o PCM veem.</dd>
+      </dl>
+      <p>O conteúdo vem do App de Campo{% if guia.app %} ({{ guia.app }}){% endif %}{% if guia.atualizado_em %}, atualizado em {{ guia.atualizado_em }}{% endif %}.</p>
+    {% endcall %}</div>
+    <p class="gu-pergunta-tela">{{ tela.pergunta }}</p>
+  </header>
+
+  {% if not guia.perguntas %}
+  <p class="gu-vazio">O guia ainda não chegou a este Nexus{% if guia.erro %} ({{ guia.erro }}){% endif %}. O conteúdo vem do App de Campo.</p>
+  {% else %}
+  <div class="gu-busca">
+    <input class="gc-campo" type="search" placeholder="Buscar: almoxarifado, pontos, tracker, câmera…" aria-label="Buscar no guia" data-guia-busca autocomplete="off">
+    <span class="mudo gu-conta" aria-live="polite"><b data-guia-conta>{{ guia.perguntas|length }}</b> {{ 'pergunta' if guia.perguntas|length == 1 else 'perguntas' }}</span>
+  </div>
+  <div class="gu-chips" role="group" aria-label="Temas">
+    <button type="button" class="gu-chip" data-guia-tema="" aria-pressed="true">Todos</button>
+    {% for nome, ps in guia.temas %}<button type="button" class="gu-chip" data-guia-tema="{{ nome }}" aria-pressed="false">{{ nome }}</button>{% endfor %}
+  </div>
+
+  <div class="gu-grade">
+    <nav class="gu-nav" aria-label="Perguntas por tema">
+      {% for nome, ps in guia.temas %}
+      <div class="gu-nav-grupo" data-guia-grupo="{{ nome }}">
+        <p class="gu-nav-tema">{{ nome }}</p>
+        <ul>{% for p in ps %}<li data-guia-item="{{ p.id }}"><a href="#p-{{ p.id }}">{{ p.titulo }}</a></li>{% endfor %}</ul>
+      </div>
+      {% endfor %}
+    </nav>
+
+    <div class="gu-lista">
+      {% for nome, ps in guia.temas %}{% for p in ps %}
+      <article class="gu-pergunta" id="p-{{ p.id }}" data-busca="{{ p.busca }}" data-guia-de="{{ nome }}">
+        <p class="gu-tema">{{ p.tema }}{% if p.publico %} <span class="mudo">· {{ p.publico|join(', ') }}</span>{% endif %}</p>
+        <h2 class="gu-h2">{{ p.titulo }}</h2>
+        {% if p.resumo %}<ul class="gu-resumo">{% for f in p.resumo %}<li>{{ f }}</li>{% endfor %}</ul>{% endif %}
+        {% if p.telas %}
+        <div class="gu-fones">
+          {% for t in p.telas %}
+          <figure class="gu-fone">
+            <iframe src="{{ url_for('static', filename='guia-app/' ~ t.arquivo, tema=tema) }}" title="{{ t.legenda or p.titulo }}" loading="lazy" data-guia-fone></iframe>
+            {% if t.legenda %}<figcaption>{{ t.legenda }}</figcaption>{% endif %}
+          </figure>
+          {% endfor %}
+        </div>
+        {% else %}<p class="mudo gu-sem-tela">As telas desta pergunta chegam na próxima leva.</p>{% endif %}
+        {% if p.regras %}
+        <details class="gu-regras">
+          <summary>Todas as regras ({{ p.regras|length }})</summary>
+          <ol>{% for r in p.regras %}<li>{{ r.texto }}{% if r.fonte %} <span class="gu-fonte">{{ r.fonte }}</span>{% endif %}</li>{% endfor %}</ol>
+        </details>
+        {% endif %}
+        {% if p.casos %}
+        <details class="gu-regras">
+          <summary>Casos que confundem ({{ p.casos|length }})</summary>
+          <ul>{% for c in p.casos %}<li>{{ c }}</li>{% endfor %}</ul>
+        </details>
+        {% endif %}
+        {% if ve_incerto and p.incerto %}
+        <details class="gu-regras gu-incerto">
+          <summary>Para conferir: administrador e PCM ({{ p.incerto|length }})</summary>
+          <ul>{% for c in p.incerto %}<li>{{ c }}</li>{% endfor %}</ul>
+        </details>
+        {% endif %}
+      </article>
+      {% endfor %}{% endfor %}
+      <p class="mudo gu-nada" data-guia-nada hidden>Nenhuma pergunta com essa busca. Tente outra palavra ou escolha Todos.</p>
+    </div>
+  </div>
+  {% endif %}
+</div>
+<script src="{{ url_for('static', filename='guia-app.js') }}" defer></script>
+{% endblock %}

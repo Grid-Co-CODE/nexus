@@ -2778,3 +2778,28 @@ relógio da conta do App só congela trocando `datetime.datetime` no módulo `da
 `from datetime import datetime` dentro da função (sem isso, com 6 mil tarefas, alguma vira de dia entre uma tela e a
 outra); e com `TESTING` ligado o `credencial()` do Fracttal só olha a credencial de teste. O receptor do
 `template_rendered` precisa de `weak=False` (o blinker guarda referência fraca e a lambda some).
+
+## Guia do App de Campo (21-22/11/2026; `nexus/campo/guia_app.py`, `guia_tela.py`, `campo/guia_app.html`)
+
+Levi, pelo chat do App de Campo: "guia do app de campo. E pode ficar no Usina 360 com nova sessão mesmo [...] perguntas que
+eu recebo recorrentemente [...] vai aparecer as telas e vai aparecer todas as regras ali embaixo"; "se o tema do Nexus
+estiver claro, vai aparecer o tema claro do celular; se estiver escuro, o tema escuro do celular". Em 22/11: a busca no
+alto, a separação por tema e o texto curto, "para quem tem pouco tempo, porém busca entender".
+
+- **Quem faz o quê**: o CONTEÚDO é do App de Campo (o pacote `C:\GridcoBuild\app-campo-docs\_propostas\guia-app-campo`,
+  montado pelo `_fonte/montar_guia.py` de lá); a TELA é daqui. Importar = copiar `guia.json` e a pasta `telas/` inteira
+  para `nexus/static/guia-app/` (sem o `index.html`, o README e o `_fonte`). O repositório é PÚBLICO: a montagem do App
+  troca usina, cliente e pessoa por fictícios (Cliente A, Usina Exemplo 1, Técnico Exemplo) e confere uma lista de nomes
+  proibidos; antes de importar, conferir de novo (nome, e-mail, telefone). O teste de larguras deixa `static/guia-app/` de
+  fora (o CSS do telefone é do App, como o clone da Zeladoria).
+- **A tela** (`/t/campo/guia-app`, a última da Usinas 360°): a busca sem acento (título, resumo, regras e casos; o
+  `data-busca` já vem sem acento do servidor), os chips de tema na ordem do `temas` do pacote (Todos primeiro), a lista
+  por tema ao lado (fixa no desktop) e cada pergunta com o resumo, os telefones (iframe de 260 × 572, `loading=lazy`),
+  "Todas as regras (N)" fechado com a fonte apagada no fim da frase (`[fa:...; vNNN]` do pacote vira `.gu-fonte`) e os
+  casos. A pergunta sem tela diz que elas vêm na próxima leva. O `incerto` ("Para conferir") só para o administrador e o
+  setor PCM (o README do pacote pede).
+- **O tema dos telefones**: o iframe nasce com `?tema=` do Nexus (`tema_do_pedido`) e o `static/guia-app.js` manda
+  `postMessage({tipo: 'tema', tema})` quando o `data-tema` do `<html>` troca (sem recarregar) e quando cada telefone acaba
+  de carregar. **O iframe não tem color-scheme próprio**: herda o do Nexus, o mesmo que a tela do telefone declara; com
+  `color-scheme:normal` no iframe o navegador pintava um retângulo atrás do telefone no tema escuro.
+- Prova: `tests/test_campo_guia_app_21_11.py` (guia de mentira + o pacote de verdade: toda tela citada existe).

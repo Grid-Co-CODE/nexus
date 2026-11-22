@@ -1,0 +1,589 @@
+{
+ "versao": 1,
+ "atualizado_em": "2026-11-22",
+ "app": "v366 no ar (regras lidas no código); telas no desenho novo do App (rebranding, ainda não publicado)",
+ "tema": "cada tela aceita ?tema=claro|escuro e a mensagem postMessage({tipo:'tema', tema})",
+ "temas": [
+  "PT e APR",
+  "Segurança",
+  "Almoxarifado",
+  "PCM e programação",
+  "Chamados",
+  "Ronda e trackers",
+  "Pontos",
+  "App no celular"
+ ],
+ "perguntas": [
+  {
+   "id": "pontos",
+   "titulo": "Como os pontos são calculados?",
+   "tema": "Pontos",
+   "publico": [
+    "técnico",
+    "supervisor",
+    "PCM"
+   ],
+   "resposta": "Cada tarefa concluída com GPS e nota de 70 ou mais vale a nota menos 60 (de 10 a 40 pontos). No ciclo, do dia 20 ao dia 19, somam as suas 70 melhores tarefas, mais as rondas (até 280) e os bônus das semanas em que você fechou a programação.",
+   "resumo": [
+    "Tarefa vale a nota menos 60: de 10 a 40 pontos.",
+    "Só as 70 melhores do ciclo somam; nota abaixo de 70 anula uma boa.",
+    "Rondas somam até 280; semana com a programação toda feita ganha +20%.",
+    "Para entrar no ranking: 10 tarefas e 70% da programação."
+   ],
+   "regras": [
+    "Ciclo: do dia 20 de um mês ao dia 19 do seguinte, pelo dia de Brasília, com o nome do mês em que termina. Hoje (22/11) é o ciclo de dezembro, de 20/11 a 19/12. Até outubro valia o mês do calendário; os dias 20 a 31/10 contaram em outubro e em novembro. [fa:42682-42706; v362]",
+    "Nota da tarefa, de 0 a 100: subtarefas obrigatórias 30, fotos pedidas 25, observação do achado 20, descrição das fotos 15, assinatura 10. O item que não se aplica sai da conta. A observação só é cobrada quando ele marca Falha ou Alerta (pelo menos 20 letras). [fa:3113, 3228-3280; v269]",
+    "Pontos da tarefa = nota − 60, só com nota de 70 ou mais e com GPS. Nota 70 dá 10; nota 100 dá 40. [fa:3296]",
+    "GPS: vale a posição da conclusão, a do início da mesma OS pelo mesmo técnico, ou a da ronda com foto. [fa:3284-3292, 3409-3451; v230, v241, v262]",
+    "Religamento (inclusive o remoto) e tarefa administrativa valem metade. [fa:42654-42673]",
+    "Devolvida pelo supervisor vale 0 até ser refeita e aprovada. [fa:42952-42965]",
+    "Teto: só as 70 melhores tarefas do ciclo somam; a nova entra no lugar da mais fraca. [fa:43208-43211]",
+    "Anulação: cada tarefa com nota abaixo de 70 derruba uma das que contam, a de menor ponto (até 35). [fa:43212-43219]",
+    "Desligamento que não normalizou: metade dos pontos na pausa e a outra metade quando a OS for finalizada, mesmo no ciclo seguinte. [fa:43058-43068; v302]",
+    "Rondas contam à parte, pela nota: curta até 15, longa até 35, extintores até 30 (uma por mês). Ponto = teto × (nota − 60) / 40; zero abaixo de 70. Teto de 280 por ciclo. [fa:3125-3144, 43229-43230]",
+    "Nota da ronda: foto 25, trackers 25, checklist 20, GPS na usina 15, ação prescrita 10, relato 5. [fa:25810-25811]",
+    "Bônus da semana (só em semana encerrada e com 5 ou mais tarefas programadas): +20% sobre os pontos da semana se concluiu tudo o que foi programado; +25% × a fração das preventivas terminadas até o domingo. Devolução na semana zera o bônus dela. A semana é do ciclo em que cai a segunda-feira. [fa:43232-43267, 42875]",
+    "Para entrar no ranking: pelo menos 10 tarefas registradas (até as que não pontuaram) e 70% da programação cumprida. [fa:43269-43280]",
+    "Programação cumprida: cada tarefa programada conta uma vez no ciclo, como feita se estiver em Finalizados ou Em Verificação. Dia que ainda não chegou não conta contra; feita antes do dia conta. [fa:42827-42913; v302]",
+    "Ordem: pelos pontos; no empate, quem tem mais tarefas contadas. Os 3 primeiros ganham prêmio no Caju (o valor não aparece no App). [fa:43005-43009, 43580-43583]",
+    "Pontualidade: a OS começou até 30 minutos depois do programado (adiantado também conta), uma vez por OS por dia, só nas OS da programação dele. É indicador: não soma ponto. [fa:3347, 3475-3483, 43291]"
+   ],
+   "casos": [
+    "Tarefa passada para a semana seguinte conta uma vez no cumprimento; na semana em que reaparece não entra na conta do bônus.",
+    "Tarefa pausada sem conclusão não tem ponto e, depois do dia programado, conta como não cumprida.",
+    "Inventário do almoxarifado hoje vale 0 ponto (decisão de 28/10). Os +50 por mês pedidos em 21/11 ainda não estão no App."
+   ],
+   "incerto": [
+    "Os valores são os padrões do código; as configurações PLACAR_* do servidor podem mudá-los sem versão nova (só o teto de 280 está documentado igual)."
+   ],
+   "telas": [
+    {
+     "arquivo": "telas/pontos-1.html",
+     "legenda": "O ciclo, a posição e os quatro indicadores"
+    },
+    {
+     "arquivo": "telas/pontos-2.html",
+     "legenda": "Por que uma tarefa não contou"
+    },
+    {
+     "arquivo": "telas/pontos-3.html",
+     "legenda": "A programação e o bônus da semana"
+    },
+    {
+     "arquivo": "telas/pontos-4.html",
+     "legenda": "Pontualidade: indicador, não soma ponto"
+    }
+   ]
+  },
+  {
+   "id": "tracker-parado",
+   "titulo": "Como o técnico vê o tracker parado?",
+   "tema": "Ronda e trackers",
+   "publico": [
+    "técnico",
+    "supervisor"
+   ],
+   "resposta": "Os trackers parados e sem comunicação da usina, vindos do tempo real, aparecem na ronda, na etapa Trackers, e o técnico responde cada um: Normalizado, Não normalizado ou Não se aplica.",
+   "resumo": [
+    "A lista vem do tempo real, na etapa Trackers da ronda.",
+    "Responda cada um: Normalizado, Não normalizado ou Não se aplica.",
+    "Com chamado aberto, o App só avisa; sem ligação, busque pela plaqueta."
+   ],
+   "regras": [
+    "A lista vem da plataforma de Performance (/api/campo/parados), lida aos :07 e :37, das 06:00 às 19:59 de Brasília. Ao abrir a ronda sem a lista do dia, o servidor busca só aquela usina. [fa:28762-28764, 28952-28966, 35866-35869]",
+    "Na Chegada, a linha Trackers mostra \"nenhum parado\" ou \"N parados · N sem comunicação · N com chamado aberto\". [ch:13942-13957]",
+    "Na etapa \"Trackers com desvio\", cada cartão mostra a cabine, o tracker, o ângulo atual e o alvo (o sem comunicação não tem ângulo) e desde quando. [ch:14060-14079]",
+    "A resposta é obrigatória: em branco conta como não verificado. As três respostas contam como respondido; os trackers valem 25% da nota da ronda. [ch:14792; fa:25779-25786, 25931]",
+    "Normalizado só registra. Não se aplica exige o motivo. Não normalizado abre o bloco do chamado. [ch:14793-14800]",
+    "Com chamado aberto no ativo (quadro de chamados do Nexus), o cartão avisa \"Chamado aberto · Inspeção OS …\" e diz \"Nada a fazer neste tracker nesta ronda.\": não pede resposta e não é pendência. [ch:14502-14509, 14784]",
+    "O chamado abre a OS de Inspeção no nome do técnico, com as perguntas do fabricante; é um por ativo e por dia de ronda. Sem sinal, \"a OS nasce quando reconectar\". [fa:16590-16767; ch:14729, 14762]",
+    "Tracker sem ligação com o Fracttal: o técnico digita o número da plaqueta e escolhe entre os ativos Estrutura Trackers da usina (até 8 candidatos); a escolha fica guardada para as próximas rondas. [ch:14580-14588, 14510-14525; fa:29038-29059]",
+    "Número repetido sem inversor vira um item só, sem chamado automático: registre na observação e avise o PCM. [fa:28874-28891; ch:14575-14595]",
+    "Cada tracker apontado vai ao Nexus no livro rondas_trackers_app_campo (motivo e observação cifrados). [fa:39057-39140]"
+   ],
+   "casos": [
+    "O tracker respondido que sai da lista do tempo real continua visível na ronda.",
+    "Uma usina sem a ligação com o Fracttal fica com a lista do dia até o dia seguinte."
+   ],
+   "incerto": [
+    "O chamado automático depende do ajuste RONDA_CHAMADO_NEXUS; a documentação diz desligado até ser ligado. Desligado, o Não normalizado só registra.",
+    "Não existe hoje uma tela de trackers fora da ronda: o rebranding propõe abrir pela Chegada.",
+    "Trackers sem ligação: o pedido à Performance (ligar todos os trackers da API aos ativos do Fracttal) segue sem resposta."
+   ],
+   "telas": [
+    {
+     "arquivo": "telas/tracker-parado-1.html",
+     "legenda": "Na chegada, a linha Trackers diz quantos estão parados"
+    },
+    {
+     "arquivo": "telas/tracker-parado-2.html",
+     "legenda": "A lista por cabine e inversor, com o chamado aberto avisado"
+    },
+    {
+     "arquivo": "telas/tracker-parado-3.html",
+     "legenda": "Não normalizado: motivo, ação e o chamado"
+    },
+    {
+     "arquivo": "telas/tracker-parado-4.html",
+     "legenda": "Sem ligação com o Fracttal: busca pela plaqueta"
+    }
+   ]
+  },
+  {
+   "id": "justificar",
+   "titulo": "Como o técnico justifica não ter feito uma tarefa?",
+   "tema": "PCM e programação",
+   "publico": [
+    "técnico",
+    "supervisor",
+    "PCM"
+   ],
+   "resposta": "Abra a OS, toque em Justificar na tarefa, escolha o motivo, escreva quando o App pedir e toque em Justificar. O motivo vai ao PCM no Nexus e vira uma linha na nota da OS no Fracttal.",
+   "resumo": [
+    "Abra a OS, toque em Justificar na tarefa e escolha o motivo.",
+    "Motivos de espera (material, cliente, clima) tiram a tarefa da programação.",
+    "Vai ao PCM no Nexus e vira uma linha na nota da OS."
+   ],
+   "regras": [
+    "O botão aparece em cada tarefa aberta (\"Trocar justificativa\" se ele já justificou). Não aparece em tarefa Finalizada ou Em Verificação, nem quando o PCM já pôs um motivo. [ch:3073-3080, 16958]",
+    "Os motivos vêm do cadastro do Nexus; primeiro os que tiram da programação, depois os outros. \"Chamados (garantia)\" e \"Sinistro\" não aparecem para o técnico. [ch:3047-3055]",
+    "\"Preciso de apoio do setor engenharia\", \"Preciso de apoio do setor performance\" e \"Priorizei outras atividades\" exigem o texto. Nos outros a observação é opcional. Até 500 caracteres.",
+    "Vale na hora no aparelho e sobe pela fila; sem sinal, sobe depois, com a hora em que foi feita. Não muda o estado da tarefa no Fracttal. [ch:2991-2999, 3130-3148]",
+    "Um motivo por tarefa: marcar outro troca. Vale por OS + ativo + nome da tarefa. [lição fora-da-programacao]",
+    "Quem tira a tarefa da programação é o robô do PCM (a cada ~26 min). Tarefa já iniciada ou pausada fica: \"Já iniciada: conclua ou pause.\" [fa:10715-10748; ch:2930]",
+    "Religamento nunca sai do App por motivo, nem o remoto. [fa:10703-10712; v306, v330]",
+    "Nota da OS no Fracttal: uma linha \"[DD/MM/AAAA HH:MM] - [tarefa] - motivo - [justificativa]\", hora de Brasília, escrita com o login do técnico. Só ao justificar ou trocar de motivo. [fa:11135-11152; v294, v300]",
+    "A etiqueta do motivo entra na OS; a que já estava na OS nunca sai. [lição v294]",
+    "Se o Nexus recusar, a marca some do aparelho e aparece \"OS #N: a justificativa não foi registrada\". Sem rede, o App tenta de novo até 8 vezes. [ch:5929]",
+    "Justificar não é pausar: a pausa (\"Pausar tarefa\") usa os motivos do Fracttal e vai para a execução, não para a nota. [ch:4615-4630, 9950-10019]"
+   ],
+   "casos": [
+    "\"Priorizei outras atividades\" não tira da programação: a tarefa continua na fila, Atrasada.",
+    "Nos pontos, só a tarefa que o robô tirou da programação deixa de contar no cumprimento e no bônus."
+   ],
+   "incerto": [
+    "A lista exata de motivos que tiram mora no Nexus (cadastro do PCM). Pela lição: os quatro Aguardando (cliente, concessionária, material, fabricante/terceiro), Condições climáticas adversas, Pendente recurso e Vegetação alta impossibilitando ação."
+   ],
+   "telas": [
+    {
+     "arquivo": "telas/justificar-1.html",
+     "legenda": "Cada tarefa aberta tem o botão Justificar"
+    },
+    {
+     "arquivo": "telas/justificar-2.html",
+     "legenda": "Os motivos que tiram da programação vêm primeiro"
+    },
+    {
+     "arquivo": "telas/justificar-3.html",
+     "legenda": "Três motivos exigem o texto"
+    },
+    {
+     "arquivo": "telas/justificar-4.html",
+     "legenda": "A tarefa justificada sai da fila e vai para a seção própria"
+    }
+   ]
+  },
+  {
+   "id": "almoxarifado",
+   "titulo": "Como funciona o almoxarifado?",
+   "tema": "Almoxarifado",
+   "publico": [
+    "técnico",
+    "PCM"
+   ],
+   "resposta": "A peça que você usou você lança na própria tarefa da OS; uma vez por mês você conta o almoxarifado da usina pela Ronda, sem ver o saldo; o PCM confere no Nexus e grava.",
+   "resumo": [
+    "Peça usada: lance na própria tarefa; o + para no saldo.",
+    "Uma vez por mês, conte o almoxarifado pela Ronda, sem ver o saldo.",
+    "Em branco é não contei; 0 é não tem. O PCM confere e grava no Nexus."
+   ],
+   "regras": [
+    "Lançar peça na tarefa vale para todos desde 16/10. A peça vai com o login do técnico; se o Fracttal recusar o perfil, a conta de serviço lança em nome dele. [fa:28255, 28283-28287; v278]",
+    "A busca mostra só peça com saldo maior que 0 no almoxarifado da usina, sem as avariadas. [fa:27415]",
+    "O + para no saldo; acima dele o Concluir trava com \"Quantidade acima do saldo\". [ch:11076, 11241, 11271; v292]",
+    "O saldo mostrado é o da leitura diária, a partir das 00:00 de Brasília. [fa:26760]",
+    "Metro, massa, kg e litro aceitam fração; unidade só número inteiro. [ch:11000-11002]",
+    "Usina sem almoxarifado: a busca vai ao catálogo geral e o PCM lança a peça. Não achou a peça: escreva nas observações qual e quanto, e o PCM lança. [ch:11097, 11104-11107]",
+    "Peça de outro almoxarifado só do mesmo cliente; de outro cliente o servidor recusa: \"Empréstimo entre clientes passa pelo PCM\". [fa:28351-28357; v339]",
+    "Almoxarifado compartilhado entre usinas é o PCM que marca no Nexus (Usinas e almoxarifados). [fa:26856-26874; v343]",
+    "Inventário: contagem cega (o App nem recebe o saldo). Em branco não é zero; só o 0 digitado zera. [fa:27607, 27667-27681]",
+    "Uma contagem por mês (de Brasília) por almoxarifado. Já contado, o cartão diz \"Contado em dd/mm\" e só a recontagem pedida pelo PCM reabre. [fa:28048-28071; ch:17344-17346; v358]",
+    "No Nexus (PCM → Almoxarifado → Inventário): Sistema × Contado × diferença; o PCM corrige, tira do lote, pede recontagem (com motivo, que chega ao técnico) ou grava. A gravação vai em lotes de 50. [Nexus pcm/CLAUDE.md:778-781]",
+    "Só o administrador e o setor PCM aprovam. Contagem com mais de 90 dias ou do futuro não se aprova. A mais nova substitui as que ainda não foram gravadas. [Nexus pcm/CLAUDE.md:788-796]"
+   ],
+   "casos": [
+    "Sem sinal, a lista de peças fica 12 h no aparelho e a contagem espera na fila como \"aguardando sinal\".",
+    "Peça recusada pelo Fracttal sai da fila com \"a peça não entrou na OS: avise o PCM\" e não trava a conclusão.",
+    "Peça fora do catálogo exige descrição, quantidade e foto, mais fabricante, modelo e número de série (cada um com foto ou \"Não tem\").",
+    "Almoxarifado sem peça ligada: \"Almoxarifado vazio\", com foto do local."
+   ],
+   "incerto": [
+    "Quando o saldo baixa: a peça cria uma requisição no Fracttal que o PCM aceita em Requisições; o aceite automático está desligado.",
+    "Inventário hoje vale 0 ponto; os +50 por mês pedidos em 21/11 ainda não estão no App."
+   ],
+   "telas": [
+    {
+     "arquivo": "telas/almoxarifado-1.html",
+     "legenda": "A peça entra na própria tarefa"
+    },
+    {
+     "arquivo": "telas/almoxarifado-2.html",
+     "legenda": "Só aparece o que tem saldo nesta usina"
+    },
+    {
+     "arquivo": "telas/almoxarifado-3.html",
+     "legenda": "Uma contagem por mês, sem ver o saldo"
+    },
+    {
+     "arquivo": "telas/almoxarifado-4.html",
+     "legenda": "Em branco é não contei; 0 é não tem"
+    }
+   ]
+  },
+  {
+   "id": "sincronizacao",
+   "titulo": "O registro está parado na Sincronização. Refaço o serviço?",
+   "tema": "App no celular",
+   "publico": [
+    "técnico",
+    "supervisor"
+   ],
+   "resposta": "Não. O registro está guardado no celular e sobe sozinho; só o \"Não registrado\" manda refazer.",
+   "resumo": [
+    "Está guardado no celular: não refaça o serviço.",
+    "O App tenta sozinho; depois de 8 vezes, toque em Sincronizar.",
+    "Só o \"Não registrado\" manda refazer."
+   ],
+   "regras": [
+    "O App envia sozinho a cada 3 minutos e quando o sinal volta. [ch DRENO_MS]",
+    "Depois de 8 tentativas ele para de tentar sozinho (\"Parou de tentar\") e diz: não refaça o serviço, toque em Sincronizar. [ch:5652, 5979-5980, 12457]",
+    "\"Registrado sem fotos\": as respostas e a conclusão foram gravadas, os anexos não; reconecte a conta Fracttal e anexe de novo pela tarefa. [ch:12455]",
+    "\"Na espera\": o limite do Fracttal (200 pedidos por minuto para a empresa toda); pode seguir trabalhando, não limpe os dados do App. [ch:5653-5655, 12402-12409]",
+    "Só o \"Não registrado\" manda refazer (ou avisar o PCM, se for peça). [ch:12456]"
+   ],
+   "casos": [
+    "Memória do aparelho cheia: \"Não feche o app e avise o PCM agora\"."
+   ],
+   "incerto": [],
+   "telas": [
+    {
+     "arquivo": "telas/sincronizacao-1.html",
+     "legenda": "Cada registro diz a situação e o que fazer"
+    }
+   ]
+  },
+  {
+   "id": "conta-fracttal",
+   "titulo": "Apareceu \"Conta Fracttal desconectada\"",
+   "tema": "App no celular",
+   "publico": [
+    "técnico"
+   ],
+   "resposta": "Toque em Conectar e entre no Fracttal com a sua conta: sem ela, nada do que você fizer está sendo gravado.",
+   "resumo": [
+    "Sem a conta, nada do que você faz é gravado.",
+    "Toque em Conectar e entre com a sua conta do Fracttal.",
+    "Se o Fracttal não te conhece, fale com o PCM."
+   ],
+   "regras": [
+    "A faixa vermelha diz \"Conta Fracttal desconectada · Nada que você fizer está sendo gravado\" com o botão Conectar. [ch:1919-1922]",
+    "Com internet, a ronda não abre sem a conta; sem sinal, vale a última conferência do aparelho. [ch:5037-5040, 5073-5078]",
+    "Sessão da Microsoft vencida: Sair, entrar com o mesmo e-mail e depois conectar o Fracttal. [ch:4883-4890]",
+    "Se o Fracttal não tem a pessoa cadastrada, aparece uma tela própria e quem resolve é o PCM. [ch:5081-5086; v266]"
+   ],
+   "casos": [
+    "Dois técnicos no mesmo aparelho: cada um precisa sair e entrar com a própria conta."
+   ],
+   "incerto": [],
+   "telas": [
+    {
+     "arquivo": "telas/conta-fracttal-1.html",
+     "legenda": "O aviso vermelho com o botão Conectar"
+    }
+   ]
+  },
+  {
+   "id": "os-sumiu",
+   "titulo": "A OS sumiu ou não aparece no App",
+   "tema": "PCM e programação",
+   "publico": [
+    "técnico",
+    "supervisor"
+   ],
+   "resposta": "O App mostra só a OS atribuída a você no Fracttal; a que saiu da programação fica numa seção à parte.",
+   "resumo": [
+    "Só aparece a OS em que você é o responsável no Fracttal.",
+    "Use a busca pelo número da OS.",
+    "Fora da programação ou pausada, ela fica numa seção própria."
+   ],
+   "regras": [
+    "Quem é o responsável no Fracttal decide quem vê a OS. [lição os-sem-dono-nao-aparece]",
+    "A OS atribuída que não está na programação entra como avulsa, com o selo \"Não programada\". [ch:7096]",
+    "A busca \"Buscar OS pelo número\" procura em todas as semanas baixadas. [ch:1979-1987]",
+    "Motivo que tira da programação: o robô do PCM tira a tarefa (a cada ~26 min) e ela vai para \"OSs fora da programação\". A iniciada e a feita ficam. [lição fora-da-programacao; v281]",
+    "A OS pausada vai para a seção \"OSs pausadas\". Religamento nunca sai por motivo. [v301, v306]"
+   ],
+   "casos": [
+    "OS atribuída à pessoa errada nenhuma máquina detecta: quem corrige é o COS ou o PCM."
+   ],
+   "incerto": [],
+   "telas": [
+    {
+     "arquivo": "telas/os-sumiu-1.html",
+     "legenda": "A seção das OSs fora da programação"
+    }
+   ]
+  },
+  {
+   "id": "pausar",
+   "titulo": "Não consigo iniciar. Como pauso e retomo?",
+   "tema": "PCM e programação",
+   "publico": [
+    "técnico"
+   ],
+   "resposta": "O Fracttal aceita uma tarefa aberta por pessoa, e a pausada também conta: pause ou conclua a outra antes.",
+   "resumo": [
+    "O Fracttal aceita uma tarefa aberta por pessoa.",
+    "Pause ou conclua a outra antes de iniciar.",
+    "A pausada fica em \"OSs pausadas\": toque em Retomar."
+   ],
+   "regras": [
+    "A mensagem é \"Você tem outra tarefa em andamento no Fracttal\"; o registro barrado fica na fila, não é descartado. [ch:4748-4758]",
+    "\"Pausa para Almoço\" pausa num toque; \"Outros\" exige o texto (pelo menos 3 letras). [ch:4615-4630]",
+    "A OS pausada sai da fila e fica na seção \"OSs pausadas\"; o Retomar a traz de volta. [ch:8305, 8335; v301]",
+    "O desligamento que não normalizou pausa a OS em vez de finalizar. [ch:8121-8126]",
+    "O servidor fecha sozinho a execução que ficou aberta e guarda o tempo dela. [lição pausar-nao-solta-a-trava]"
+   ],
+   "casos": [],
+   "incerto": [],
+   "telas": [
+    {
+     "arquivo": "telas/pausar-1.html",
+     "legenda": "As OSs pausadas, com o Retomar"
+    }
+   ]
+  },
+  {
+   "id": "apr",
+   "titulo": "Quando o App pede a APR do dia?",
+   "tema": "PT e APR",
+   "publico": [
+    "técnico",
+    "supervisor"
+   ],
+   "resposta": "Uma APR por OS por dia, no primeiro Iniciar; as outras tarefas da mesma OS iniciam direto.",
+   "resumo": [
+    "Uma APR por OS por dia, no primeiro Iniciar.",
+    "As outras tarefas da OS iniciam direto.",
+    "Apareceu risco novo: toque em Novo risco."
+   ],
+   "regras": [
+    "A unidade é técnico + OS + dia, para todos desde 09/10. [fa:7357; v276]",
+    "A pós-atividade do dia abre no primeiro Concluir do dia. [ch:9798-9806]",
+    "Novo risco só acrescenta, pede \"O que mudou?\" e foto e assinatura de novo. [ch:9679]",
+    "Retomar uma atividade que já tem APR não pede outra; na ronda vale a APR do dia da OS da ronda. [v276]",
+    "Sem sinal, a APR vai na frente da fila. [lição apr-por-os-e-dia]"
+   ],
+   "casos": [],
+   "incerto": [],
+   "telas": []
+  },
+  {
+   "id": "pt",
+   "titulo": "Quando pede PT e quem assina?",
+   "tema": "PT e APR",
+   "publico": [
+    "técnico",
+    "supervisor",
+    "COS"
+   ],
+   "resposta": "A PT vai dentro da APR quando você marca atividade crítica. Assina o supervisor da usina; no plantão e no feriado, o COS. Tudo pelo Nexus.",
+   "resumo": [
+    "Marcou atividade crítica na APR, a PT vai junto.",
+    "Assina o supervisor; de sexta 18h a segunda 6h e no feriado, o COS.",
+    "Tudo pelo Nexus. A PT vale 7 dias."
+   ],
+   "regras": [
+    "Seis atividades críticas: altura (acima de 2,00 m), escada, telhados, guindar e mover cargas, químicos, elétrica energizada. [fa:5695-5759]",
+    "No religamento de campo, a elétrica energizada já vem marcada. [ch:9648-9653]",
+    "O de acordo não trava o início; a PT negada pausa a OS. A PT vale 7 dias. [fa:5686]",
+    "O COS assina de sexta 18h a segunda 6h e nos feriados nacionais (PT_FERIADOS); no resto, o supervisor. Usina sem supervisor cadastrado vai ao COS. Quem pediu nunca assina. [fa:6264-6287, 6616-6643; v364]",
+    "A assinatura é no Nexus; o e-mail de PT aguardando leva o link do cartão da PT no Nexus. [v364, v365]"
+   ],
+   "casos": [],
+   "incerto": [],
+   "telas": []
+  },
+  {
+   "id": "camera",
+   "titulo": "Câmera do App ou do celular?",
+   "tema": "App no celular",
+   "publico": [
+    "técnico"
+   ],
+   "resposta": "A do App, que é o padrão: com ela o App fecha sozinho cerca de 5 vezes menos. A qualidade final é a mesma.",
+   "resumo": [
+    "Use a câmera do App: é o padrão.",
+    "Com ela o App fecha sozinho cerca de 5 vezes menos.",
+    "A qualidade final é a mesma nas duas."
+   ],
+   "regras": [
+    "O padrão é a câmera do App; se o aparelho negar, o App passa sozinho para a do celular. [ch:3595, 3602]",
+    "Vídeo vai sempre pela câmera do celular. [ch:3596]",
+    "Toda foto sai com no máximo 1280 px de largura, nas duas câmeras. [ch processarFoto; v344]",
+    "Medido de 13 a 21/11: câmera do App, 1,2 fechamento por mil fotos; câmera do celular, 6,6 por mil. [caixa-preta, 22/11]",
+    "Se o sistema fechou o App: confira as miniaturas e, se faltar, tire de novo. [ch:3544]"
+   ],
+   "casos": [],
+   "incerto": [
+    "Ainda ~43% das fotos saem pela câmera do celular; a causa não foi levantada."
+   ],
+   "telas": [
+    {
+     "arquivo": "telas/camera-1.html",
+     "legenda": "A escolha da câmera, explicada"
+    }
+   ]
+  },
+  {
+   "id": "ronda",
+   "titulo": "Ronda: curta ou longa, e por que não finaliza?",
+   "tema": "Ronda e trackers",
+   "publico": [
+    "técnico",
+    "supervisor"
+   ],
+   "resposta": "Na chegada, escolha a ronda e siga as etapas. Curta toda semana, longa a cada 15 dias, e sem foto não finaliza.",
+   "resumo": [
+    "Curta vence em 7 dias, longa em 15.",
+    "As mesmas 6 etapas nas duas, da Chegada ao Fechar.",
+    "Sem foto não finaliza."
+   ],
+   "regras": [
+    "Etapas: Chegada, Entrada e base, Perímetro, Campo, Trackers, Fechar (as mesmas na curta e na longa). [ch:13550-13553]",
+    "A curta vence em 7 dias e a longa em 15; a longa conta como curta. [ch:13878-13883, 13960-13964]",
+    "Na longa, \"Faltam N fotos da ronda longa\" trava o envio; a falta de foto trava a primeira finalização. [ch:15349-15354, 15430; v263]",
+    "A ronda cumpre a OS de ronda da fila do técnico. [ch:14054-14056]"
+   ],
+   "casos": [],
+   "incerto": [],
+   "telas": [
+    {
+     "arquivo": "telas/ronda-1.html",
+     "legenda": "A chegada, com a ronda sugerida"
+    },
+    {
+     "arquivo": "telas/ronda-2.html",
+     "legenda": "Etapa a etapa"
+    }
+   ]
+  },
+  {
+   "id": "extintores",
+   "titulo": "Extintores: o que tenho de fazer?",
+   "tema": "Segurança",
+   "publico": [
+    "técnico",
+    "Segurança"
+   ],
+   "resposta": "Uma conferência por mês em cada usina, extintor por extintor; o que não achar, marque Não reconhecido.",
+   "resumo": [
+    "Uma conferência por mês em cada usina.",
+    "Extintor por extintor; o que não achar, Não reconhecido.",
+    "Vale até 30 pontos e não pede APR."
+   ],
+   "regras": [
+    "Liberada para todos desde 12/10. [DOC 02_OPERAR:601]",
+    "Duas validades, recarga e teste hidrostático, valendo até o fim do mês; dá para digitar mês e ano. [v338]",
+    "O envio exige cada extintor conferido ou marcado Não reconhecido. [v267]",
+    "Não passa pelo Fracttal e não pede APR. Vale até 30 pontos pela nota, uma por mês. [fa:3125-3144]"
+   ],
+   "casos": [],
+   "incerto": [],
+   "telas": [
+    {
+     "arquivo": "telas/extintores-1.html",
+     "legenda": "A conferência do mês"
+    }
+   ]
+  },
+  {
+   "id": "verificacao",
+   "titulo": "Supervisor: a OS com tudo feito não foi para Verificação",
+   "tema": "PCM e programação",
+   "publico": [
+    "supervisor",
+    "PCM"
+   ],
+   "resposta": "Se o Fracttal barrar, o servidor sobe a OS sozinho depois de 15 minutos.",
+   "resumo": [
+    "Com tudo concluído, a OS sobe sozinha para Verificação em 15 minutos.",
+    "A que já esteve em Verificação é devolução: não sobe sozinha."
+   ],
+   "regras": [
+    "Sobe sozinha a OS em execução com todas as tarefas concluídas (alguma pelo App), que nunca esteve em Verificação, com a última conclusão há mais de 15 min. A passada é aos :15 e :45. [v335; DOC 02_OPERAR]",
+    "A que já esteve em Verificação é devolução e não sobe sozinha; o técnico vê \"OS devolvida pelo supervisor — refaça o que foi apontado\". [ch:7024]"
+   ],
+   "casos": [],
+   "incerto": [],
+   "telas": []
+  },
+  {
+   "id": "chamado",
+   "titulo": "Como o técnico abre um chamado de garantia?",
+   "tema": "Chamados",
+   "publico": [
+    "técnico",
+    "supervisor",
+    "time de chamados"
+   ],
+   "resposta": "Ao concluir a corretiva, responda \"Não, necessidade de abrir chamado\", escolha o fabricante se o App pedir e conclua: nasce a OS de Inspeção com as perguntas do fabricante. Conclua essa OS, e o time de chamados recebe a dele.",
+   "resumo": [
+    "Na corretiva, o Concluir pergunta se o equipamento ficou resolvido em campo.",
+    "Não resolveu: escolha o fabricante; nasce a OS de Inspeção na sua fila, no mesmo dia.",
+    "Conclua a Inspeção com as perguntas do fabricante: só então o time de chamados recebe a OS dele.",
+    "Ativo que já tem chamado aberto não abre outro."
+   ],
+   "regras": [
+    "Só abre de OS Corretiva, Corretiva Emergencial, Religamento ou Religamento Remoto. A Inspeção não abre chamado. [chamado_garantia/regras.py:84]",
+    "Só para Inversor, Estrutura Trackers, NCU, RSU, Estação Meteorológica (e os sensores), Cabine ou Skid. [chamado_garantia/spec.py:99-247]",
+    "Quando a OS aceita chamado, a resposta é obrigatória: sem ela o Concluir trava. Sem sinal ou sem a consulta, não trava. [ch:10472-10560, 12078]",
+    "Os fabricantes são os do Nexus (Chamados › Fabricantes), filtrados pelo tipo do equipamento. Marca já conhecida pelo cadastro pula a escolha. [ch:10609; v290]",
+    "O botão vira \"Concluir e abrir a OS de chamado\". Ao concluir, a Inspeção abre sozinha na tela: tipo Inspeção, etiqueta Aguardando Garantia, título \"[ativo] - Inspeção para chamado <marca>\", no nome de quem estava na OS. [ch:10426; chamado_garantia/regras.py:131]",
+    "As perguntas da Inspeção são as de base, mais as do tipo de equipamento, mais as do fabricante; a foto que ele exige é cobrada (aceita \"não se aplica\"). [chamado_garantia/spec.py:84-223; ch:10055-10063]",
+    "A OS do time de chamados (administrativa, \"Acompanhamento de chamado <marca>\") nasce só quando a Inspeção é realizada; uma por Inspeção, nunca para Inspeção cancelada. [v355]",
+    "Não se cria duas vezes: a chave é OS + ativo + data; na ronda, ativo + dia. [fa:15771, 16650]",
+    "Ativo com chamado aberto no quadro de chamados do Nexus não pergunta: \"este ativo já tem o chamado <nº> em aberto\", e o Concluir libera. [fa:16451; v361]",
+    "Sem sinal, o chamado vai para a fila: \"a OS de inspeção nasce quando o celular reconectar\". [ch:10426]",
+    "Na ronda, o tracker Não normalizado pode abrir o chamado do tracker (ver a pergunta do tracker parado). [ch:14562-14760]"
+   ],
+   "casos": [
+    "Na OS o ativo vem dela e não se troca; na ronda há o \"Trocar ativo\".",
+    "Ativo fora da usina ou que não existe: o servidor recusa e o registro é descartado.",
+    "Se o App não conseguiu ler o quadro do Nexus, ele pergunta normalmente."
+   ],
+   "incerto": [
+    "O chamado pela ronda depende do ajuste RONDA_CHAMADO_NEXUS, desligado em 18/11: hoje a ronda provavelmente não abre chamado.",
+    "A lista de fabricantes gravada no Nexus pode diferir das marcas do código do App."
+   ],
+   "telas": [
+    {
+     "arquivo": "telas/chamado-1.html",
+     "legenda": "O Concluir pergunta se ficou resolvido"
+    },
+    {
+     "arquivo": "telas/chamado-2.html",
+     "legenda": "Só os fabricantes deste tipo de equipamento"
+    },
+    {
+     "arquivo": "telas/chamado-3.html",
+     "legenda": "O App mostra as perguntas antes de concluir"
+    },
+    {
+     "arquivo": "telas/chamado-4.html",
+     "legenda": "A Inspeção nasce na fila do técnico"
+    }
+   ]
+  }
+ ]
+}

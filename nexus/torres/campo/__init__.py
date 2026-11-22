@@ -100,6 +100,12 @@ TORRE = Torre(
         # quem calcula é o App, que publica no livro ranking_app_campo (visao.ranking_pontos). Não é o Ranking de 08/10
         Tela("ranking", "Ranking de pontos", "Quem lidera a classificação de pontos do App no mês, e por quê?",
              "Livro ranking_app_campo (o placar do ciclo do App) no banco do Nexus"),
+        # o Guia do App de Campo (21/11/2026; Levi, pelo chat do App: "guia do app de campo. E pode ficar no Usina 360 com
+        # nova sessão mesmo"): as perguntas que mais chegam, com as telas do App e as regras. O conteúdo é do App
+        # (nexus/campo/guia_app.py); a tela, em guia_tela.py
+        Tela("guia-app", "Guia do App de Campo",
+             "Como funciona cada parte do App de Campo, com as telas e as regras?",
+             "Pacote do App de Campo (guia.json e as telas do App, em static/guia-app)"),
         # a Rotas do dia saiu do menu em 12/11/2026 (a revisão de desenho; Levi: "Segue pai"): era o lugar reservado, e
         # quem abria lia "Para construir esta tela, crie a view em nexus/torres/campo/", um aviso para programador. Volta
         # quando existir (a programação do PCM + a localização das usinas); o endereço guardado leva à Central
@@ -2096,3 +2102,5 @@ from . import cliente_tela  # noqa: E402,F401
 # o Mapa de equipe (08/11/2026): as três rotas públicas do contrato com o Nexus Field e a tela (o mapa, o Abrir rota e o
 # piloto), em equipe_tela.py
 from . import equipe_tela  # noqa: E402,F401
+# o Guia do App de Campo (21/11/2026), em guia_tela.py
+from . import guia_tela  # noqa: E402,F401

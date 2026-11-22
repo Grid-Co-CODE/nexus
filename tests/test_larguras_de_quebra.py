@@ -37,7 +37,9 @@ def _fora_do_padrao() -> dict:
     achadas = collections.defaultdict(collections.Counter)
     for p in sorted((raiz / "nexus").rglob("*.css")):
         rel = p.relative_to(raiz).as_posix()
-        if "zeladoria/clone" in rel:
+        # o clone da Zeladoria e os telefones do Guia do App de Campo (21/11/2026: o CSS do App, gerado pela montagem de
+        # lá; dentro do iframe de 260 px a largura é a do telefone, não a da tela do Nexus) são cópias de outro sistema
+        if "zeladoria/clone" in rel or "static/guia-app/" in rel:
             continue
         texto = re.sub(r"/\*.*?\*/", "", p.read_text(encoding="utf-8"), flags=re.S)
         for consulta in re.findall(r"@media[^{]*", texto):
