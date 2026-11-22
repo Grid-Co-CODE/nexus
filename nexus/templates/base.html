@@ -119,7 +119,7 @@
         {# o Fora da programação que cita o setor (casca._sino_fora): o clique abre o card da OS e já marca como lido #}
         {% if sino_fora %}{% for a in sino_fora.itens %}{{ aviso_nt('/os/_nexus/card/folio/' ~ a.os, 'calendar-x', 'OS ' ~ a.os ~ ' · ' ~ a.tarefa, 'Fora da programação · ' ~ a.motivo ~ (' · ' ~ a.detalhe if a.detalhe else ''), os={'wid': '', 'folio': a.os, 'status': ''}, lida=a.id, acao=('Ver no Fora da programação' if sino_fora.pode_abrir else ''), acao_href='/t/pcm/fora-da-programacao') }}{% endfor %}{% endif %}
         {# o novo da Sala de controle da Performance, por usina (casca._perf_do_sino): some quando a pessoa abre lá #}
-        {% if sino %}{% for u in sino.perf %}{{ aviso_nt('/t/performance/sala-de-controle', 'solar-panel', u.usina, 'Nova na Sala de controle' ~ (' · ' ~ u.detalhe if u.detalhe else ''), acao='Ver na Sala') }}{% endfor %}
+        {% if sino %}{% for u in sino.perf %}{{ aviso_nt(u.link or '/t/performance/sala-de-controle', 'solar-panel', u.usina, 'Nova na Sala de controle' ~ (' · ' ~ u.detalhe if u.detalhe else ''), acao='Ver na Sala') }}{% endfor %}
         {% if sino.n_perf > sino.perf|length %}<li class="nt-mais"><a href="{{ raiz }}/t/performance/sala-de-controle">E mais {{ sino.n_perf - sino.perf|length }} {{ 'usina' if sino.n_perf - sino.perf|length == 1 else 'usinas' }} na Sala de controle</a></li>{% endif %}{% endif %}
       </ul>
       {% else %}<p class="nt-vazio">Nada novo para você.</p>{% endif %}

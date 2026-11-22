@@ -32,6 +32,11 @@ o põe no sino, por USINA ("3 strings em 2 inversores · 5 trackers"), só para 
 plataforma: vale a cópia de 2 min por pessoa, lida por trás; a falha é tentada de novo depois de 5 min. O número do sino
 soma as USINAS, não as strings. Some quando a pessoa abre o inversor (ou os trackers) na Sala. Prova:
 `tests/test_sala_novas_sino.py`.
+O clique abre a Sala NA usina e nos equipamentos citados (22/11/2026, Levi: "tem que abrir exatamente na usina e nos
+equipamentos citados, se não, não serve"): a plataforma manda QUAIS inversores (`inv`) e trackers (`trk`) e o
+`sala_novas.link` monta `/t/performance/sala-de-controle?p=/painel/sala-de-controle?usina=&aba=&inv=&trk=`. O destino da
+porta vale até 2048 letras: a lista que não cabe sai do link (os trackers primeiro, depois os inversores) e a Sala aponta
+o novo da usina pela mesma regra. Quem lê o link é a Sala (`irParaNovo` no `sala_controle.html` da plataforma).
 
 **A Sala de controle lê o que o Monitoramento do COS lê** (16/11/2026; Levi: "A lista de usinas do Monitoramento do COS
 [...] puxe a lista"): `GET /t/performance/sala-de-controle/cos/usinas` (as usinas do Monitoramento, pelo

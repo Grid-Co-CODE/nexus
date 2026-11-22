@@ -11,6 +11,7 @@ leitura por trás. Na 1ª página depois de subir, ou da pessoa, não sai nada; 
 """
 import threading
 import time
+from urllib.parse import urlencode
 
 VALIDADE_S = 120
 ESPERA_FALHA_S = 300
@@ -41,9 +42,41 @@ def ler(cfg, email) -> dict | None:
     if not isinstance(d, dict) or not d.get("ok"):
         return None
     usinas = [{"usina": str(u.get("usina") or ""), "strings": int(u.get("strings") or 0), "inversores": int(u.get("inversores") or 0),
-               "trackers": int(u.get("trackers") or 0)} for u in d.get("usinas") or [] if isinstance(u, dict) and u.get("usina")]
+               "trackers": int(u.get("trackers") or 0), "inv": _lista(u.get("inv")), "trk": _lista(u.get("trk"))}
+              for u in d.get("usinas") or [] if isinstance(u, dict) and u.get("usina")]
     return {"total": int(d.get("total") or 0), "n_usinas": int(d.get("n_usinas") or len(usinas)), "usinas": usinas,
             "desde": d.get("desde") or ""}
+
+
+def _lista(v, teto=500) -> list:
+    """Os nomes dos inversores ou trackers que a plataforma mandou, só texto (número vira texto; o resto sai)."""
+    if not isinstance(v, list):
+        return []
+    return [str(x).strip()[:80] for x in v if isinstance(x, (str, int)) and not isinstance(x, bool) and str(x).strip()][:teto]
+
+
+SALA = "/t/performance/sala-de-controle"
+DESTINO_MAX = 1900               # a porta aceita destino de até 2048 letras (`porta.destino_permitido`); folga para o prefixo
+
+
+def link(u) -> str:
+    """O link do aviso de UMA usina: a Sala aberta nela e nos equipamentos citados (22/11/2026, Levi, com o print do sino:
+    "quando eu abrir uma notificação da sala de controle tem que abrir exatamente na usina e nos equipamentos citados, se
+    não, não serve"). Vai pelo `?p=` da moldura até `/painel/sala-de-controle?usina=&aba=&inv=&trk=`, que a Sala lê ao
+    abrir (`irParaNovo` no `sala_controle.html` da plataforma). Lista que não cabe no limite da porta sai do link (os
+    trackers primeiro, depois os inversores): a Sala, sem lista, aponta o novo da usina pela mesma regra. Sem usina, a Sala."""
+    from . import porta
+    nome = str((u or {}).get("usina") or "").strip()
+    if not nome:
+        return SALA
+    base = [("usina", nome), ("aba", "str" if int(u.get("strings") or 0) or not u.get("trk") else "trk")]
+    inv = [("inv", x) for x in _lista(u.get("inv"))]
+    trk = [("trk", x) for x in _lista(u.get("trk"))]
+    for extra in (inv + trk, inv, []):
+        destino = "/painel/sala-de-controle?" + urlencode(base + extra)
+        if len(destino) <= DESTINO_MAX and porta.destino_permitido(destino) == destino:
+            return SALA + "?" + urlencode({"p": destino})
+    return SALA
 
 
 def _atualizar(cfg, email, leitor) -> None:

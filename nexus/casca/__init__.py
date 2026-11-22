@@ -776,7 +776,9 @@ def _perf_do_sino() -> dict | None:
             return " · ".join(x for x in (
                 (pl(u["strings"], "string", "strings") + " em " + pl(u["inversores"], "inversor", "inversores")) if u["strings"] else "",
                 pl(u["trackers"], "tracker", "trackers") if u["trackers"] else "") if x)
-        return {"n_usinas": d["n_usinas"], "usinas": [{"usina": u["usina"], "detalhe": frase(u)} for u in d["usinas"]]}
+        # o link de cada aviso abre a Sala NA usina e nos equipamentos citados (22/11/2026, `sala_novas.link`)
+        return {"n_usinas": d["n_usinas"], "usinas": [{"usina": u["usina"], "detalhe": frase(u), "link": sala_novas.link(u)}
+                                                      for u in d["usinas"]]}
     except Exception:            # noqa: BLE001
         current_app.logger.exception("sino: o novo da Sala de controle")
         return None
