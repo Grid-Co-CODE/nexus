@@ -2442,6 +2442,10 @@ Aprovação e Triagem usam a lógica do App copiada, não refeita, para o númer
   `fx` fica** (o do Nexus nunca levanta `FxLimite`, e a cópia lê o `adiada` com `getattr`, valor padrão). No Nexus o
   que muda é só a releitura da fila da Aprovação em segundo plano (`aprovacao.py`, `paciente=True`): com o Fracttal
   recusando, ela insiste até 8 voltas de 60 s em vez de 4. As telas não mudam.
+- **22/11, App v368 (código `408ab23a2b7df88c`):** o teste acusou a `_rondas_os_pares`. No App ela ganhou o parâmetro
+  `trackers=False`, que pede a coluna `trackers` da ronda (o livro por tracker e as respostas avulsas do "Ver
+  trackers"). Decisão: recópia (Levi, 22/11/2026: "pode fazer as duas e subir"). Quem chama dentro da cópia não passa
+  o parâmetro: a leitura e as telas (Aprovação e Triagem) não mudam.
 - Trocados pelo Nexus no fim do arquivo gerado: `_tabela` e `tabela_qlog` (leem pela fonte do Nexus, `tabelas.py`),
   `tabela` (a dos tokens do Fracttal: só a partição `cadastro`; `tok` e `pt` recusadas), `fx` (Fracttal só GET,
   `fracttal.py`), `ident` (`pessoas.ident`) e `_varredura_carregar` (sempre `False`: sem blob do App).
