@@ -72,75 +72,75 @@
      O sino aparece quando uma das partes existe (o administrador pela senha só o vê com pedido, menção ou usina nova). A explicação ao
      passar o mouse é a lista `.sino-dica` dentro do botão (nexus.css), e não o title: o do navegador demora, sai
      cortado e não faz lista (Levi: "passar o mouse eu quero em formato de lista"). #}
+  {# As notificações em LISTA, como as do GitHub e do Facebook (21/11/2026, Levi, vendo os títulos com contagem, as
+     etiquetas e o "Abrir" de cada parte: "ficou muito feio. É melhor quando a pessoa tiver passando o mouse em cima da
+     notificação aparecer as ações que ela pode tomar [...] Como é que GitHub faz a notificação? [...] A gente tem que
+     pensar como um garçom mesmo. Ó, chegou isso daqui pra ti. Clicou em cima. Tchau"). Cada aviso é UMA linha: o ícone do
+     tipo (vermelho só no atrasado, no vencido e no cancelado), o que é e, embaixo, de onde veio. As ações aparecem ao
+     passar o mouse (`.nt-acoes`); o clique na linha abre, e o aviso que se marca como lido (o das OS e o do Fora da
+     programação) já sai como lido (o "garçom", no script abaixo). Os outros saem sozinhos quando a pessoa responde ou
+     abre, como antes. #}
+  {% macro aviso_nt(href, icone, titulo, meta, tom='', os=none, lida='', acao='', acao_href='') -%}
+  <li class="nt{% if tom %} nt--{{ tom }}{% endif %}"{% if lida %} data-nt-lida{% endif %}>
+    <a class="nt-a{% if os %} sino-aviso{% endif %}" href="{{ raiz }}{{ href }}"{% if os %} data-os-wid="{{ os.wid or '' }}" data-os-folio="{{ os.folio }}" data-os-status="{{ os.status or '' }}"{% endif %}>
+      <span class="nt-ic" aria-hidden="true"><i class="ph ph-{{ icone }}"></i></span>
+      <span class="nt-txt"><span class="nt-t">{{ titulo }}</span><span class="nt-m">{{ meta }}</span></span></a>
+    <span class="nt-acoes">{% if acao %}<a class="nt-acao" href="{{ raiz }}{{ acao_href or href }}">{{ acao }}</a>{% endif %}{% if lida %}<form method="post" action="{{ raiz }}/t/comando/aviso/lida"><input type="hidden" name="aviso" value="{{ lida }}"><input type="hidden" name="voltar" value="{{ caminho_completo }}"><button type="submit" class="nt-acao nt-acao--ic sino-lida" title="Marcar como lida" aria-label="Marcar como lida"><i class="ph ph-check" aria-hidden="true"></i></button></form>{% endif %}</span>
+  </li>
+  {%- endmacro %}
   {% set n_dem = sino_dem.n if sino_dem else 0 %}{% set n_fora = sino_fora.n if sino_fora else 0 %}
   {% set n_cx = (sino.n_mencoes + sino.n_pedidos + sino.n_perf) if sino else 0 %}
   {% if sino_dem is not none or sino_fora is not none or n_cx %}
-  {% if sino_fora %}{% set fora_um = ' tarefa fora da programação cita o setor ' ~ sino_fora.setor %}
-  {% set fora_varios = ' tarefas fora da programação citam o setor ' ~ sino_fora.setor %}{% endif %}
   <details class="sino-topo sino-dem">
-    <summary class="gc-btn gc-btn--ui gc-btn--fantasma sino-bt" aria-label="Notificações: {{ n_dem + n_fora + n_cx }}">
+    <summary class="gc-btn gc-btn--ui gc-btn--fantasma sino-bt" aria-label="Notificações: {{ n_dem + n_fora + n_cx }}" data-rotulo="Notificações">
       <i class="ph ph-bell" aria-hidden="true"></i>{% if n_dem + n_fora + n_cx %}<b class="sino-n sino-n--dem{% if (sino_dem and sino_dem.criticos) or (sino and sino.criticos) %} sino-n--critico{% endif %}">{{ n_dem + n_fora + n_cx }}</b>{% endif %}<span class="sino-dica" aria-hidden="true"><span class="sino-dica-t">O que chega aqui</span><span class="sino-dica-i">As demandas entre setores que pedem você, com o prazo, e a resposta das que você pediu</span><span class="sino-dica-i">Os pedidos para o seu setor</span><span class="sino-dica-i">As menções a você nas conversas da Caixa de entrada</span><span class="sino-dica-i">As contestações de clientes que o seu setor ainda não respondeu</span><span class="sino-dica-i">As tarefas fora da programação do PCM com um motivo que cita o seu setor</span><span class="sino-dica-i">As usinas com ocorrência nova na Sala de controle da Performance</span></span></summary>
-    <div class="sino-caixa" role="region" aria-label="Notificações"{% if sino_fora %} data-lidas data-rotulo="Notificações" data-um="{{ fora_um }}" data-varios="{{ fora_varios }}" data-vazio="Nada novo nas notificações do seu setor."{% endif %}>
-      {% if sino_dem %}
-      {% if sino_dem.itens %}<p class="sino-t"><b>{{ sino_dem.n_demandas }} {{ 'demanda pede você' if sino_dem.n_demandas == 1 else 'demandas pedem você' }}</b><a class="sino-abrir" href="{{ raiz }}/t/comando/caixa-de-entrada#demandas">Abrir</a></p>
-      <ul>{% for a in sino_dem.itens %}<li><a href="{{ raiz }}{{ a.link }}"><span class="sino-sev sino-sev--{{ a.tom }}">{{ a.rotulo }}</span> {{ a.titulo }}{% if a.detalhe %}<small class="sino-aviso-d">{{ a.detalhe }}</small>{% endif %}</a></li>{% endfor %}</ul>{% endif %}
-      {% if sino_dem.n_contestacoes %}<p class="sino-t"><b>{{ sino_dem.n_contestacoes }} {{ 'contestação sem resposta' if sino_dem.n_contestacoes == 1 else 'contestações sem resposta' }}</b><a class="sino-abrir" href="{{ raiz }}/t/comando/contestacoes">Abrir</a></p>
-      <ul>{% for c in sino_dem.contestacoes %}<li><a href="{{ raiz }}{{ c.link }}"><span class="sino-sev sino-sev--alerta">Contestação</span> {{ c.titulo }}{% if c.detalhe %}<small class="sino-aviso-d">{{ c.detalhe }}</small>{% endif %}</a></li>{% endfor %}</ul>
-      {% if sino_dem.n_contestacoes > sino_dem.contestacoes|length %}<p class="sino-vazio">e mais {{ sino_dem.n_contestacoes - sino_dem.contestacoes|length }}, nas Contestações</p>{% endif %}{% endif %}
-      {% if not sino_dem.n %}<p class="sino-vazio">{{ 'Nenhuma demanda pede você agora.' if sino_dem.com_demandas else 'Nenhuma contestação espera o seu setor agora.' }}</p>{% endif %}
-      {% endif %}
-      {# da Caixa de entrada (21/11/2026, Levi: "a caixa de entrada tem que ser no sino"): os pedidos às torres do setor
-         que esperam resposta ou passaram do prazo e as menções a ela nas conversas (comando/conversa.py); e as usinas com
-         ocorrência nova na Sala de controle da Performance. Vêm do `casca._sino`, como antes no botão do OS Creator #}
-      {% if sino %}
-      {% if sino.n_pedidos %}<p class="sino-t"><b>{{ sino.n_pedidos }} {{ 'pedido para o seu setor' if sino.n_pedidos == 1 else 'pedidos para o seu setor' }}</b><a class="sino-abrir" href="{{ raiz }}/t/comando/caixa-de-entrada#cx-pedidos">Abrir</a></p>
-      <ul>{% for p in sino.pedidos %}<li><a href="{{ raiz }}{{ p.link }}"><span class="sino-sev sino-sev--{{ 'critico' if p.atrasado else 'pedido' }}">{{ 'Atrasado' if p.atrasado else 'Pedido' }}</span> {{ p.titulo }}</a></li>{% endfor %}</ul>{% endif %}
-      {% if sino.n_mencoes %}<p class="sino-t"><b>{{ sino.n_mencoes }} {{ 'menção sem ler' if sino.n_mencoes == 1 else 'menções sem ler' }}</b><a class="sino-abrir" href="{{ raiz }}/t/comando/caixa-de-entrada#cx-mencoes">Abrir</a></p>
-      <ul>{% for m in sino.mencoes %}<li><a href="{{ raiz }}{{ m.link }}"><span class="sino-sev sino-sev--mencao">Menção</span> {{ m.titulo }}</a></li>{% endfor %}</ul>{% endif %}
-      {# o novo da Sala de controle da Performance, por usina (16/11/2026, casca._perf_do_sino): some quando a pessoa abre o
-         inversor (ou os trackers) lá #}
-      {% if sino.n_perf %}<p class="sino-t"><b>{{ sino.n_perf }} {{ 'usina com ocorrência nova na Performance' if sino.n_perf == 1 else 'usinas com ocorrência nova na Performance' }}</b><a class="sino-abrir" href="{{ raiz }}/t/performance/sala-de-controle">Abrir</a></p>
-      <ul>{% for u in sino.perf %}<li><a href="{{ raiz }}/t/performance/sala-de-controle"><span class="sino-sev sino-sev--pedido">Nova</span> {{ u.usina }}{% if u.detalhe %}<small class="sino-aviso-d">{{ u.detalhe }}</small>{% endif %}</a></li>{% endfor %}</ul>
-      {% if sino.n_perf > sino.perf|length %}<p class="sino-vazio">e mais {{ sino.n_perf - sino.perf|length }}, na Sala de controle</p>{% endif %}{% endif %}
-      {% endif %}
-      {% if sino_fora %}
-      {% if sino_fora.n %}<p class="sino-t sino-t-avisos" data-n="{{ sino_fora.n }}"><b>{{ sino_fora.n }}{{ fora_um if sino_fora.n == 1 else fora_varios }}</b>{% if sino_fora.pode_abrir %}<a class="sino-abrir" href="{{ raiz }}/t/pcm/fora-da-programacao">Abrir</a>{% endif %}</p>
-      <ul class="sino-avisos">{% for a in sino_fora.itens %}<li>
-        <a class="sino-aviso" href="{{ raiz }}/os/_nexus/card/folio/{{ a.os }}" data-os-wid="" data-os-folio="{{ a.os }}" data-os-status=""><span class="sino-sev sino-sev--info">{{ a.motivo }}</span> OS {{ a.os }} · {{ a.tarefa }}<small class="sino-aviso-d">{{ a.detalhe }}</small></a>
-        <form method="post" action="{{ raiz }}/t/comando/aviso/lida"><input type="hidden" name="aviso" value="{{ a.id }}"><input type="hidden" name="voltar" value="{{ caminho_completo }}"><button type="submit" class="sino-lida">Marcar como lida</button></form>
-      </li>{% endfor %}</ul>
-      <form method="post" action="{{ raiz }}/t/comando/aviso/lida" class="sino-lidas"><input type="hidden" name="todos" value="fora"><input type="hidden" name="voltar" value="{{ caminho_completo }}"><button type="submit" class="sino-lida">Marcar todas como lidas</button></form>
-      {% else %}<p class="sino-vazio">Nenhuma tarefa fora da programação cita o setor {{ sino_fora.setor }}.{% if sino_fora.pode_abrir %}<a class="sino-abrir" href="{{ raiz }}/t/pcm/fora-da-programacao">Abrir</a>{% endif %}</p>{% endif %}
-      {% endif %}
-      {# o "Abrir" de cada parte fica ao lado do título dela (21/11/2026, Levi: "tem abrir caixa de entrada, abrir as
-         contestações, ou abrir o fora de programação. Talvez poderia ser um botão ali do lado"); o do Fora só para quem
-         tem a tela (o portão barraria). Com o sino vazio, a Caixa de entrada no pé #}
-      {% if not (n_dem + n_fora + n_cx) and (sino or (sino_dem and sino_dem.com_demandas)) %}<a class="gc-btn gc-btn--ui gc-btn--contorno sino-todos" href="{{ raiz }}/t/comando/caixa-de-entrada">Abrir a Caixa de entrada</a>{% endif %}
+    <div class="sino-caixa nt-caixa" role="region" aria-label="Notificações" data-vazio="Nada novo para você.">
+      <div class="nt-cab"><b>Notificações</b>{% if n_fora %}<form method="post" action="{{ raiz }}/t/comando/aviso/lida" class="sino-lidas" data-n="{{ n_fora }}"><input type="hidden" name="todos" value="fora"><input type="hidden" name="voltar" value="{{ caminho_completo }}"><button type="submit" class="nt-todas">Marcar todas como lidas</button></form>{% endif %}</div>
+      {% if n_dem + n_fora + n_cx %}
+      <ul class="nt-lista">
+        {# as demandas entre setores (casca._sino_demandas): a que pede você e a resposta da que você pediu #}
+        {% if sino_dem %}{% for a in sino_dem.itens %}{{ aviso_nt(a.link, 'paper-plane-tilt', a.titulo, 'Demanda ' ~ a.rotulo|lower ~ (' · ' ~ a.detalhe if a.detalhe else ''), 'critico' if a.tom == 'critico' else '', acao='Abrir a demanda') }}{% endfor %}{% endif %}
+        {# os pedidos às torres do setor que esperam resposta ou passaram do prazo (casca._sino, Fase 3) #}
+        {% if sino %}{% for p in sino.pedidos %}{{ aviso_nt(p.link, 'tray-arrow-down', p.titulo, 'Pedido para o seu setor' ~ (' · atrasado' if p.atrasado else ''), 'critico' if p.atrasado else '', acao='Responder') }}{% endfor %}
+        {# as menções a ela nas conversas da Caixa de entrada (comando/conversa.py) #}
+        {% for m in sino.mencoes %}{{ aviso_nt(m.link, 'at', m.titulo, 'Menção a você numa conversa', acao='Ver a conversa') }}{% endfor %}{% endif %}
+        {# as contestações sem resposta do setor (casca._contestacoes_do_sino): saem na 1ª resposta ou ao resolver #}
+        {% if sino_dem %}{% for c in sino_dem.contestacoes %}{{ aviso_nt(c.link, 'chats-circle', c.titulo, 'Contestação sem resposta' ~ (' · ' ~ c.detalhe if c.detalhe else ''), acao='Responder') }}{% endfor %}
+        {% if sino_dem.n_contestacoes > sino_dem.contestacoes|length %}<li class="nt-mais"><a href="{{ raiz }}/t/comando/contestacoes">E mais {{ sino_dem.n_contestacoes - sino_dem.contestacoes|length }} {{ 'contestação sem resposta' if sino_dem.n_contestacoes - sino_dem.contestacoes|length == 1 else 'contestações sem resposta' }}</a></li>{% endif %}{% endif %}
+        {# o Fora da programação que cita o setor (casca._sino_fora): o clique abre o card da OS e já marca como lido #}
+        {% if sino_fora %}{% for a in sino_fora.itens %}{{ aviso_nt('/os/_nexus/card/folio/' ~ a.os, 'calendar-x', 'OS ' ~ a.os ~ ' · ' ~ a.tarefa, 'Fora da programação · ' ~ a.motivo ~ (' · ' ~ a.detalhe if a.detalhe else ''), os={'wid': '', 'folio': a.os, 'status': ''}, lida=a.id, acao=('Ver no Fora da programação' if sino_fora.pode_abrir else ''), acao_href='/t/pcm/fora-da-programacao') }}{% endfor %}{% endif %}
+        {# o novo da Sala de controle da Performance, por usina (casca._perf_do_sino): some quando a pessoa abre lá #}
+        {% if sino %}{% for u in sino.perf %}{{ aviso_nt('/t/performance/sala-de-controle', 'solar-panel', u.usina, 'Nova na Sala de controle' ~ (' · ' ~ u.detalhe if u.detalhe else ''), acao='Ver na Sala') }}{% endfor %}
+        {% if sino.n_perf > sino.perf|length %}<li class="nt-mais"><a href="{{ raiz }}/t/performance/sala-de-controle">E mais {{ sino.n_perf - sino.perf|length }} {{ 'usina' if sino.n_perf - sino.perf|length == 1 else 'usinas' }} na Sala de controle</a></li>{% endif %}{% endif %}
+      </ul>
+      {% else %}<p class="nt-vazio">Nada novo para você.</p>{% endif %}
+      {% if sino or (sino_dem and sino_dem.com_demandas) %}<a class="nt-pe" href="{{ raiz }}/t/comando/caixa-de-entrada">Ver tudo na Caixa de entrada</a>{% endif %}
     </div>
   </details>{% endif %}
   {# o botão do OS Creator, SÓ com as OS (21/11/2026, Levi: "A do OS Creator tem que ser focada apenas em OS mesmo [...]
-     Talvez um capacete"): os avisos das OS da pessoa; as menções, os pedidos ao setor e as usinas novas da Sala de controle
-     foram para o sino. O ícone é o capacete (ph-hard-hat), e não mais o do OS Creator do menu #}
+     Talvez um capacete"): os avisos das OS da pessoa (comando/avisos.py), na mesma lista do sino; o clique abre o card da
+     OS (o mesmo do Histórico, com o PDF) por cima da tela e já marca como lido. O ícone é o capacete (ph-hard-hat) #}
   {% if sino is not none %}<details class="sino-topo">
-    <summary class="gc-btn gc-btn--ui gc-btn--fantasma sino-bt" aria-label="Avisos das OS: {{ sino.n_avisos }}">
+    <summary class="gc-btn gc-btn--ui gc-btn--fantasma sino-bt" aria-label="Avisos das OS: {{ sino.n_avisos }}" data-rotulo="Avisos das OS">
       <i class="ph ph-hard-hat" aria-hidden="true"></i>{% if sino.n_avisos %}<b class="sino-n">{{ sino.n_avisos }}</b>{% endif %}<span class="sino-dica" aria-hidden="true"><span class="sino-dica-t">O que chega aqui</span><span class="sino-dica-i">A OS concluída pelo técnico</span><span class="sino-dica-i">A OS criada para você</span><span class="sino-dica-i">A solicitação que virou OS</span></span></summary>
-    <div class="sino-caixa" role="region" aria-label="Avisos das OS" data-lidas data-rotulo="Avisos das OS" data-um=" aviso das suas OS" data-varios=" avisos das suas OS" data-vazio="Nenhum aviso das suas OS.">
-      {# os avisos das OS da pessoa (04/11/2026, comando/avisos.py): o clique abre o card da OS (o mesmo do Histórico, com o
-         PDF) por cima da tela; sem JavaScript, a página da OS. "Marcar como lida" é um formulário, como o tema, que o script
-         abaixo manda por fetch, sem recarregar a tela (05/11/2026) #}
-      {% if sino.n_avisos %}<p class="sino-t sino-t-avisos" data-n="{{ sino.n_avisos }}"><b>{{ sino.n_avisos }} {{ 'aviso das suas OS' if sino.n_avisos == 1 else 'avisos das suas OS' }}</b></p>
-      <ul class="sino-avisos">{% for a in sino.avisos %}<li>
-        {%- set selo = {'execucao': ('ok', 'Executada'), 'atribuida': ('pedido', 'Para você'), 'cancelada': ('critico', 'Cancelada')}.get(a.tipo, ('mencao', 'Solicitação')) %}
+    <div class="sino-caixa nt-caixa" role="region" aria-label="Avisos das OS" data-vazio="Nenhum aviso das suas OS.">
+      <div class="nt-cab"><b>Avisos das OS</b>{% if sino.n_avisos %}<form method="post" action="{{ raiz }}/t/comando/aviso/lida" class="sino-lidas" data-n="{{ sino.n_avisos }}"><input type="hidden" name="todos" value="1"><input type="hidden" name="voltar" value="{{ caminho_completo }}"><button type="submit" class="nt-todas">Marcar todas como lidas</button></form>{% endif %}</div>
+      {% if sino.n_avisos %}
+      <ul class="nt-lista">{% for a in sino.avisos %}
+        {%- set selo = {'execucao': ('check-circle', 'Executada', ''), 'atribuida': ('user-plus', 'Para você', ''), 'cancelada': ('x-circle', 'Cancelada', 'critico')}.get(a.tipo, ('file-plus', 'Solicitação', '')) %}
         {# o lote de OS criadas para a pessoa (08/11/2026) leva à visão "Atribuídas a mim" do Histórico daquele dia, não a um card #}
-        {% if a.link %}<a class="sino-aviso-lista" href="{{ raiz }}{{ a.link }}">{% else %}<a class="sino-aviso" href="{{ raiz }}/os/_nexus/card/{% if a.wid %}{{ a.wid }}{% else %}folio/{{ a.folio }}{% endif %}?status={{ a.status|urlencode }}" data-os-wid="{{ a.wid or '' }}" data-os-folio="{{ a.folio }}" data-os-status="{{ a.status }}">{% endif %}<span class="sino-sev sino-sev--{{ selo[0] }}">{{ selo[1] }}</span> {{ a.titulo }}<small class="sino-aviso-d">{{ a.detalhe }} · {{ a.quando_txt }}</small></a>
-        <form method="post" action="{{ raiz }}/t/comando/aviso/lida"><input type="hidden" name="aviso" value="{{ a.id }}"><input type="hidden" name="voltar" value="{{ caminho_completo }}"><button type="submit" class="sino-lida">Marcar como lida</button></form>
-      </li>{% endfor %}</ul>
-      <form method="post" action="{{ raiz }}/t/comando/aviso/lida" class="sino-lidas"><input type="hidden" name="todos" value="1"><input type="hidden" name="voltar" value="{{ caminho_completo }}"><button type="submit" class="sino-lida">Marcar todas como lidas</button></form>{% endif %}
-      {% if not sino.n_avisos %}<p class="sino-vazio">Nenhum aviso das suas OS.</p>{% endif %}
+        {%- if a.link %}{{ aviso_nt(a.link, selo[0], a.titulo, [selo[1], a.detalhe, a.quando_txt]|select|join(' · '), selo[2], lida=a.id) }}
+        {%- else %}{{ aviso_nt('/os/_nexus/card/' ~ (a.wid if a.wid else 'folio/' ~ a.folio) ~ '?status=' ~ a.status|urlencode, selo[0], a.titulo, [selo[1], a.detalhe, a.quando_txt]|select|join(' · '), selo[2], os={'wid': a.wid, 'folio': a.folio, 'status': a.status}, lida=a.id) }}{% endif %}
+      {% endfor %}
+        {% if sino.n_avisos > sino.avisos|length %}<li class="nt-mais"><a href="{{ raiz }}{{ caminho_completo }}">E mais {{ sino.n_avisos - sino.avisos|length }} {{ 'aviso' if sino.n_avisos - sino.avisos|length == 1 else 'avisos' }}: marque estes e recarregue</a></li>{% endif %}
+      </ul>
+      {% else %}<p class="nt-vazio">Nenhum aviso das suas OS.</p>{% endif %}
     </div>
   </details>{% endif %}
   {% if (sino and sino.n_avisos) or (sino_fora and sino_fora.n) %}{% include "oscreator/card_os_abrir.html" %}
   <script>
+    // as notificações em lista (21/11/2026): o clique no aviso das OS (e no do Fora da programação) abre o card da OS por
+    // cima da tela, sem sair dela
     document.querySelectorAll('.sino-aviso').forEach(function (a) {
       a.addEventListener('click', function (ev) {
         if (!window.NexusOsCard) return;
@@ -148,55 +148,59 @@
         if (wid ? NexusOsCard.abrir(wid, op) : NexusOsCard.abrirFolio(op.folio, op)) ev.preventDefault();
       });
     });
-    // o "Marcar como lida" sem recarregar a tela (Levi, 05/11/2026: "cada vez que clico em marcar como lida a tela
-    // atualiza... atrapalha a experiência do usuário"): o formulário vai por fetch, o aviso sai da lista, os números descem
-    // e o sino fica aberto. Sem resposta que se leia (o login vencido, a rede), o formulário de sempre. Uma vez por caixa
-    // com "Marcar como lida" (`data-lidas`: a do OS Creator e a do Fora da programação, 16/11/2026), cada uma com o
-    // botão e os textos dela: até 16/11 o script pegava a 1ª caixa do topo, que desde 12/11 é a das Demandas, e o
-    // "Marcar como lida" do OS Creator voltava a recarregar a tela
+    // "Marcar como lida" sem recarregar a tela (Levi, 05/11/2026: "cada vez que clico em marcar como lida a tela
+    // atualiza... atrapalha a experiência do usuário"): o formulário vai por fetch, o aviso sai da lista e o número desce.
+    // E o "garçom" (21/11/2026, Levi: "Ó, chegou isso daqui pra ti. Clicou em cima. Tchau"): clicou no aviso que se marca,
+    // ele abre e já sai como lido. Sem resposta que se leia (o login vencido, a rede), o formulário de sempre.
     (function () {
       if (!window.fetch || !window.FormData) return;
-      document.querySelectorAll('.sino-caixa[data-lidas]').forEach(function (caixa) {
-      var botao = caixa.closest('details').querySelector('.sino-bt'), rotulo = caixa.getAttribute('data-rotulo') || 'Avisos';
-      function descer(k) {
-        var bt = botao, b = bt && bt.querySelector('.sino-n');
-        var n = Math.max(0, (parseInt(b ? b.textContent : '0', 10) || 0) - k);
-        if (b) { if (n) b.textContent = n; else b.remove(); }
-        if (bt) bt.setAttribute('aria-label', rotulo + ': ' + n);
-        var t = caixa.querySelector('.sino-t-avisos'), ul = caixa.querySelector('.sino-avisos');
-        var na = Math.max(0, (parseInt(t ? t.getAttribute('data-n') : '0', 10) || 0) - k);
-        if (t && na) {
-          t.setAttribute('data-n', na);
-          t.querySelector('b').textContent = na + caixa.getAttribute(na === 1 ? 'data-um' : 'data-varios');
-          if (ul && !ul.querySelector('li')) {        // os visíveis acabaram, e há mais: o clique traz os próximos
-            var li = document.createElement('li'), a = document.createElement('a');
-            a.className = 'sino-aviso'; a.href = location.href; a.textContent = 'Mostrar os outros ' + na;
-            li.appendChild(a); ul.appendChild(li);
-          }
-        } else if (t) {
-          [t, ul, caixa.querySelector('.sino-lidas')].forEach(function (e) { if (e) e.remove(); });
-        }
-        if (!n && !caixa.querySelector('.sino-vazio')) {
-          var p = document.createElement('p'); p.className = 'sino-vazio'; p.textContent = caixa.getAttribute('data-vazio');
-          caixa.insertBefore(p, caixa.querySelector('.sino-todos'));
-        }
+      function mandar(f) {
+        return fetch(f.action, {method: 'POST', body: new FormData(f), credentials: 'same-origin', keepalive: true,
+                                headers: {'Accept': 'application/json'}})
+          .then(function (r) { return r.json().then(function (j) { return {ok: r.ok && j.ok, j: j}; }); });
       }
-      caixa.addEventListener('submit', function (ev) {
-        var f = ev.target;
-        // a rota pelo nexusRota (o prefixo), como todo caminho do Nexus no JavaScript (tests/test_prefixo.py)
-        if (!f.matches('form[action$="' + nexusRota('/t/comando/aviso/lida') + '"]')) return;
-        ev.preventDefault();
-        var bt = f.querySelector('button'), todos = f.classList.contains('sino-lidas');
-        if (bt) bt.disabled = true;
-        fetch(f.action, {method: 'POST', body: new FormData(f), credentials: 'same-origin', headers: {'Accept': 'application/json'}})
-          .then(function (r) { return r.json().then(function (j) { return {ok: r.ok && j.ok, j: j}; }); })
-          .then(function (x) {
-            if (!x.ok) { if (bt) { bt.disabled = false; bt.textContent = 'Não marcou: tente de novo'; bt.title = x.j.erro || ''; } return; }
-            if (todos) { var t = caixa.querySelector('.sino-t-avisos'); descer(parseInt(t ? t.getAttribute('data-n') : '0', 10) || 0); }
-            else { var li = f.closest('li'); if (li) li.remove(); descer(1); }
-          })
-          .catch(function () { f.submit(); });
-      });
+      document.querySelectorAll('.sino-topo').forEach(function (det) {
+        var caixa = det.querySelector('.nt-caixa'), botao = det.querySelector('.sino-bt');
+        if (!caixa || !botao) return;
+        function descer(k) {
+          var b = botao.querySelector('.sino-n');
+          var n = Math.max(0, (parseInt(b ? b.textContent : '0', 10) || 0) - k);
+          if (b) { if (n) b.textContent = n; else b.remove(); }
+          botao.setAttribute('aria-label', (botao.getAttribute('data-rotulo') || 'Avisos') + ': ' + n);
+          var todas = caixa.querySelector('.sino-lidas');
+          if (todas) {
+            var resta = Math.max(0, (parseInt(todas.getAttribute('data-n'), 10) || 0) - k);
+            if (resta) todas.setAttribute('data-n', resta); else todas.remove();
+          }
+          var ul = caixa.querySelector('.nt-lista');
+          if (ul && !ul.querySelector('li.nt')) {
+            ul.remove();
+            var p = document.createElement('p'); p.className = 'nt-vazio'; p.textContent = caixa.getAttribute('data-vazio');
+            caixa.insertBefore(p, caixa.querySelector('.nt-pe'));
+          }
+        }
+        caixa.addEventListener('submit', function (ev) {
+          var f = ev.target;
+          // a rota pelo nexusRota (o prefixo), como todo caminho do Nexus no JavaScript (tests/test_prefixo.py)
+          if (!f.matches('form[action$="' + nexusRota('/t/comando/aviso/lida') + '"]')) return;
+          ev.preventDefault();
+          var bt = f.querySelector('button'), todos = f.classList.contains('sino-lidas');
+          if (bt) bt.disabled = true;
+          mandar(f).then(function (x) {
+            if (!x.ok) { if (bt) { bt.disabled = false; bt.title = 'Não marcou: tente de novo' + (x.j.erro ? ' (' + x.j.erro + ')' : ''); } return; }
+            if (todos) {
+              var k = parseInt(f.getAttribute('data-n'), 10) || 0;
+              caixa.querySelectorAll('li[data-nt-lida]').forEach(function (li) { li.remove(); });
+              descer(k);
+            } else { var li = f.closest('li'); if (li) li.remove(); descer(1); }
+          }).catch(function () { f.submit(); });
+        });
+        caixa.addEventListener('click', function (ev) {
+          var a = ev.target.closest && ev.target.closest('.nt-a'), li = a && a.closest('li[data-nt-lida]');
+          var f = li && li.querySelector('form');
+          if (!f) return;
+          mandar(f).then(function (x) { if (x.ok && li.parentNode) { li.remove(); descer(1); } }).catch(function () {});
+        });
       });
     })();
   </script>{% endif %}

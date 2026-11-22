@@ -110,9 +110,9 @@ def test_o_sino_usa_quem_a_pessoa_e_no_fracttal(app, banco, limpo, limpos, monke
         s.update(logado=True, admin=False, usuario=dict(PESSOA, nome="Fulana T."))
     html = c.get("/").get_data(as_text=True)
     sino = html.split('class="sino-topo"', 1)[1].split("</details>", 1)[0]
-    assert "2 avisos das suas OS" in sino
+    assert 'aria-label="Avisos das OS: 2"' in sino
     assert "OS 18900 concluída pelo técnico" in sino and "OS 18901 criada para você" in sino
-    assert ">Para você</span>" in sino and "sino-sev--pedido" in sino
+    assert "Para você · " in sino
     # o "Marcar todas" leva também o aviso novo
     c.post(LIDA, data={"todos": "1", "voltar": "/"})
     linhas = banco.linhas(AV.LIVRO, AV.ABA)
@@ -128,7 +128,7 @@ def test_o_lote_no_sino_leva_ao_historico(app, banco, limpo, limpos, monkeypatch
     with c.session_transaction() as s:
         s.update(logado=True, admin=False, usuario=dict(PESSOA))
     sino = c.get("/").get_data(as_text=True).split('class="sino-topo"', 1)[1].split("</details>", 1)[0]
-    assert "4 OS novas para você" in sino and 'class="sino-aviso-lista"' in sino
+    assert "4 OS novas para você" in sino and "data-os-folio" not in sino.split("4 OS novas para você")[0].rsplit("<li", 1)[1]
     assert "/os/historico?modo=atribuidas&amp;de=" in sino
     aid = re.search(r'name="aviso" value="(L:[^"]+)"', sino).group(1)
     c.post(LIDA, data={"aviso": aid, "voltar": "/"})

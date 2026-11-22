@@ -115,7 +115,7 @@ def test_o_pedido_no_insight_a_caixa_o_sino_e_o_painel(app, banco, limpo, motor_
     assert "/t/comando/conversa/insight/R07:1#ped-insight-R07-1" in secao
     # o pedido no sino das notificações (21/11/2026: "Os pedidos para o seu setor. Também é bom que seja no sino")
     sino = caixa.split('class="sino-topo sino-dem"', 1)[1].split("</details>", 1)[0]
-    assert "1 pedido para o seu setor" in sino and "/t/comando/conversa/insight/R07:1" in sino
+    assert "Pedido para o seu setor" in sino and "/t/comando/conversa/insight/R07:1" in sino
     pag = seg.get("/t/comando/conversa/insight/R07:1").get_data(as_text=True)
     assert "Responder por Segurança · HSEQ" in pag and "Responder por Usinas 360°" not in pag
     pid = next(l["pedido_id"] for l in banco.linhas(PD.LIVRO, PD.ABA) if l["torre"] == "hseq")

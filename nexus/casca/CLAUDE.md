@@ -1260,10 +1260,7 @@ que é uma tela dentro de uma tela!".
   1. o **sino** (`ph-bell`, `<details class="sino-topo sino-dem">`, aria-label "Notificações: N"): as demandas e as
      contestações (`_sino_demandas`), o Fora da programação (`_sino_fora`) e, desde a 2ª rodada do mesmo dia ("a caixa
      de entrada tem que ser no sino"), os pedidos ao setor, as menções nas conversas e as usinas novas da Sala de controle
-     (de `_sino`). Cada parte com o título dela e o "Abrir" AO LADO do título ("Talvez poderia ser um botão ali do lado":
-     os três botões empilhados no pé saíram): demandas e pedidos e menções → Caixa de entrada (#demandas, #cx-pedidos,
-     #cx-mencoes), contestações → Contestações, usinas novas → Sala de controle, Fora → Fora da programação (só para
-     quem tem a tela). Com o sino vazio, o pé leva à Caixa de entrada.
+     (de `_sino`).
      O número é a soma; aparece quando uma das partes existe (o administrador pela senha só com pedido, menção ou usina
      nova). O "Marcar como lida" do Fora segue pelo mesmo script (`data-lidas` só quando há a parte do Fora);
   2. o **botão do OS Creator, só com as OS** ("A do OS Creator tem que ser focada apenas em OS mesmo"): os avisos das OS
@@ -1272,6 +1269,18 @@ que é uma tela dentro de uma tela!".
   O que chega em cada um aparece ao passar o mouse, EM LISTA ("passar o mouse eu quero em formato de lista"): a
   `.sino-dica` dentro do botão ("O que chega aqui" e um item por tipo de aviso; nexus.css), no lugar do `title` do
   navegador (demorava, saía cortado e não faz lista); some com a caixa aberta e na tela de toque.
+  **As duas caixas são LISTAS, como as do GitHub e do Facebook** (21/11/2026, Levi, vendo os títulos com contagem, as
+  etiquetas e um "Abrir" ao lado de cada parte: "ficou muito feio. É melhor quando a pessoa tiver passando o mouse em
+  cima da notificação aparecer as ações [...] pensar como um garçom mesmo. Ó, chegou isso daqui pra ti. Clicou em cima.
+  Tchau"): o macro `aviso_nt` (base.html) faz cada aviso UMA linha — o ícone do tipo (demanda, pedido, menção,
+  contestação, Fora, Sala de controle; nas OS, executada, para você, solicitação, cancelada), o que é e, embaixo, de onde
+  veio. Vermelho só no ícone do atrasado, do vencido e do cancelado. Sem título por parte, sem etiqueta, sem botão
+  fixo: as ações (`.nt-acoes`: "Responder", "Ver a conversa", "Ver na Sala", "Ver no Fora da programação", o ✓ de
+  marcar como lida) aparecem ao passar o mouse pela linha (na tela de toque, à vista). O clique na linha abre; o aviso
+  que se marca como lido (o das OS e o do Fora, `li[data-nt-lida]`) já sai como lido no clique (o "garçom": o script
+  manda o formulário dele por fetch com keepalive). No alto, "Notificações" / "Avisos das OS" e o "Marcar todas como
+  lidas" (só quando há o que marcar); no pé do sino, "Ver tudo na Caixa de entrada". As regras do CSS são `.nt-caixa
+  .nt-*`: a `.sino-caixa li a` antiga vencia a `.nt-a` sozinha e empilhava o ícone em cima do texto.
   No celular: o sino na coluna 2, o OS Creator na 3 e o avatar na 4.
 - **A ação da tela no topo:** o bloco `topo_acoes`, antes do sino. Hoje só o "Modo TV" do Painel NOC
   (`performance/moldura.html`); no celular ele some.

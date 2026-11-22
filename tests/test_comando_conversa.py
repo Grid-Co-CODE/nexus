@@ -73,7 +73,7 @@ def test_a_conversa_no_insight_a_mencao_na_caixa_e_no_sino(app, banco, limpo, mo
     assert "Menções para você" in caixa and "2 extintores vencidos" in caixa and "para Segurança · HSEQ" in caixa
     # a menção no sino das notificações (21/11/2026: "a caixa de entrada tem que ser no sino"), e não no OS Creator
     sino = caixa.split('class="sino-topo sino-dem"', 1)[1].split("</details>", 1)[0]
-    assert "1 menção sem ler" in sino and "/t/comando/conversa/insight/R07:1" in sino
+    assert "Menção a você numa conversa" in sino and "/t/comando/conversa/insight/R07:1" in sino
     pag = seg.get("/t/comando/conversa/insight/R07:1").get_data(as_text=True)
     assert "dá para trocar antes de sexta?" in pag and "Abrir o insight" in pag
     seg.post("/t/comando/conversa/acao", data={"codigo": _codigo(seg, "/t/comando/caixa-de-entrada"),

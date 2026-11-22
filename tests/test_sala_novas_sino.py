@@ -105,9 +105,9 @@ def test_o_sino_do_topo_mostra_por_usina_para_quem_tem_a_tela(app, monkeypatch):
         s.update(logado=True, admin=True, usuario={"email": "pessoa@exemplo.test", "nome": "Pessoa"}, casca_codigo="x")
     monkeypatch.setattr(sala_novas, "do_sino", lambda cfg, email, **k: DADO if email == "pessoa@exemplo.test" else None)
     html = c.get("/").get_data(as_text=True)
-    assert "2 usinas com ocorrência nova na Performance" in html
+    assert html.count("Nova na Sala de controle") == 2
     assert "Usina Teste 1" in html and "3 strings em 2 inversores" in html and "2 trackers" in html
     assert "/t/performance/sala-de-controle" in html
     # sem novidade, o bloco não aparece
     monkeypatch.setattr(sala_novas, "do_sino", lambda cfg, email, **k: None)
-    assert "ocorrência nova na Performance" not in c.get("/").get_data(as_text=True)
+    assert "Nova na Sala de controle" not in c.get("/").get_data(as_text=True)

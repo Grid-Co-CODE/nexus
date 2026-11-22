@@ -184,7 +184,7 @@ def test_o_botao_do_topo_fica_ao_lado_do_os_creator_so_para_o_setor_citado(no_ap
     # no sino das notificações do setor, junto das demandas e das contestações (21/11/2026, Levi: "Una o 1 e o 3")
     assert 'class="sino-topo sino-dem"' in html and 'class="ph ph-bell"' in html
     assert 'aria-label="Notificações: 1"' in html
-    assert "1 tarefa fora da programação cita o setor Engenharia" in html
+    assert "Fora da programação · " in html and 'class="ph ph-calendar-x"' in html
     assert "OS 15596" in html and "Aguardando o parecer" in html
     assert "/os/_nexus/card/folio/15596" in html
     # o sino vem antes do botão do OS Creator, e os dois antes do Menu
@@ -202,8 +202,8 @@ def test_o_botao_vazio_do_setor_citado_e_o_link_para_quem_tem_a_tela(no_app, cfg
     _entrar(c, {"id": SID.PERFORMANCE, "nome": "Performance"}, monkeypatch, tudo=True)
     html = c.get("/").get_data(as_text=True)
     caixa = html.split('class="sino-topo sino-dem"')[1].split("</details>")[0]
-    assert "Nenhuma tarefa fora da programação cita o setor Performance." in caixa
-    assert "/t/pcm/fora-da-programacao" in caixa
+    # o setor citado sem tarefa agora: o sino segue, vazio
+    assert "Nada novo para você." in caixa and "/t/pcm/fora-da-programacao" not in caixa
 
 
 def test_marcar_todas_como_lidas_leva_so_os_do_fora(no_app, cfg, monkeypatch):
