@@ -151,6 +151,26 @@ def _conferir_cronograma(valor: str) -> str:
     return f"a chave tem {len(valor)} caracteres"
 
 
+def _conferir_relatos_chave(valor: str) -> str:
+    """A chave dos relatos do App de Campo (21/11/2026, `nexus/casca/relatos_app.py`): a mesma do App Setting do servidor
+    do App. Quem a tem lê os relatos dos técnicos e responde em nome da Grid, então ela é longa."""
+    if len(valor) < 32 or any(c.isspace() for c in valor):
+        raise Recusada("A chave dos relatos do App precisa de 32 caracteres ou mais, sem espaço: nada foi gravado.")
+    return f"a chave tem {len(valor)} caracteres"
+
+
+def _conferir_relatos_url(valor: str) -> str:
+    """O endereço da rota dos relatos no servidor do App (21/11/2026): só https, porque a chave vai no cabeçalho."""
+    from urllib.parse import urlsplit
+    try:
+        partes = urlsplit(valor)
+    except ValueError:
+        partes = None
+    if not partes or partes.scheme != "https" or not partes.hostname:
+        raise Recusada("O endereço dos relatos do App precisa começar com https:// e ter o servidor: nada foi gravado.")
+    return f"o endereço vai a {partes.hostname}"
+
+
 def _conferir_guid(rotulo: str):
     """Os dois IDs do Mapa de equipe (08/11/2026, `nexus/campo/equipe/token_ms.py`): GUIDs de 8-4-4-4-12 caracteres
     hexadecimais, como o Entra ID mostra. Sem um token de verdade não há contra o que conferir (a prova é o celular
@@ -285,6 +305,24 @@ CHAVES = {
         "arquivo": "",
         "dica": "uma chave longa (32 caracteres ou mais), a mesma que vai para quem lê o cronograma",
         "conferir": _conferir_cronograma,
+    },
+    # os relatos do App de Campo nas Sugestões do Início (21/11/2026, nexus/casca/relatos_app.py): o Nexus lê e responde
+    # pelo servidor do App, com esta chave no cabeçalho X-Nexus-Chave (a mesma do App Setting de lá)
+    "NEXUS_APP_RELATOS_CHAVE": {
+        "nome": "Relatos do App de Campo (chave do Nexus)",
+        "para": "ler os relatos dos técnicos (\"Reportar problema ou melhoria\") nas Sugestões do Início e responder a eles "
+                "pelo Nexus; o técnico lê a resposta em Meus relatos, no App",
+        "arquivo": "",
+        "dica": "a mesma chave longa (32 caracteres ou mais) que está no App Setting do servidor do App de Campo",
+        "conferir": _conferir_relatos_chave,
+    },
+    "NEXUS_APP_RELATOS_URL": {
+        "nome": "Relatos do App de Campo (endereço)",
+        "para": "trocar o endereço da rota dos relatos no servidor do App (vazio: o padrão, "
+                "https://gridco-campo-mw.azurewebsites.net/api/app/nexus/relatos)",
+        "arquivo": "",
+        "dica": "o endereço https da rota do App que lista os relatos para o Nexus",
+        "conferir": _conferir_relatos_url,
     },
     # o Mapa de equipe (08/11/2026): a página do App de Campo, dentro do Nexus Field, manda o ID token da Microsoft ao
     # registrar o celular, e o Nexus confere a assinatura, o público (o registro SPA do App) e o diretório (o da Grid).

@@ -414,6 +414,14 @@ a{color:inherit}
   border-radius:0 var(--raio-md) var(--raio-md) 0}
 .sug-resposta-cab{margin:0;font-size:12px;color:var(--mudo)}
 .sug-resposta-texto{margin:4px 0 0;font-size:13.5px;line-height:1.5;color:var(--tinta);white-space:pre-wrap;overflow-wrap:anywhere}
+/* os relatos do App de Campo nas Sugestões (21/11/2026, Levi: "pode ir para sugestões no início com uma tag de App de
+   campo!"): a etiqueta na cor da marca, no lugar do setor (o status segue o semáforo); a mensagem do técnico, escrita
+   no App ao reabrir, com o fio neutro, e a da Grid com o verde de sempre */
+.sug-lista .sug-cab > .sug-tag-app,.sug-tag-app{color:var(--verde-texto);background:var(--verde-suave)}
+.sug-app-meta{margin:0 0 4px;font-size:12.5px}
+.sug-resposta--campo{border-left-color:var(--linha-forte)}
+.sug-app-dono{margin:10px 0 0;font-size:12px}
+.sug-relatos-off{margin:0 0 10px}
 .sug-responder{display:grid;gap:6px;margin-top:14px;max-width:640px}
 .sug-responder .gc-campo{width:100%;box-sizing:border-box;resize:vertical;font-family:var(--font-sans)}
 .sug-responder .gc-btn{justify-self:start}

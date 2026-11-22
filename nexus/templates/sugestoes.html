@@ -102,9 +102,13 @@
 {% if admin %}
 <section class="sug-bloco sug-bloco--recebidas" aria-labelledby="sug-recebidas">
   <h2 class="sug-secao" id="sug-recebidas">Sugestões recebidas{% if recebidas %} <span class="sug-secao-n">({{ recebidas|length }})</span>{% endif %}</h2>
-  <p class="gc-ajuda sug-so-admin">Só os administradores veem esta lista. As que faltam concluir vêm primeiro; clique numa para abrir.</p>
+  <p class="gc-ajuda sug-so-admin">Só os administradores veem esta lista, com os relatos dos técnicos no App de Campo (a etiqueta "App de campo"). As que faltam concluir vêm primeiro; clique numa para abrir.</p>
   {% if aviso_status %}<p class="sug-aviso sug-aviso--{{ aviso_status[0] }}" role="{{ 'status' if aviso_status[0] == 'ok' else 'alert' }}"><i class="ph {{ 'ph-check-circle' if aviso_status[0] == 'ok' else 'ph-warning' }}" aria-hidden="true"></i> {{ aviso_status[1] }}</p>{% endif %}
   {% if erro_lista %}<p class="sug-aviso sug-aviso--erro">Não consegui ler as sugestões do banco agora ({{ erro_lista }}){% if recebidas %}: a lista é a da última leitura{% endif %}.</p>{% endif %}
+  {# os relatos do App de Campo (21/11/2026, Levi: "pode ir para sugestões no início com uma tag de App de campo!"): o App
+     é a fonte; o Nexus lê e responde pelo servidor do App (casca/relatos_app.py) #}
+  {% if not relatos_ligado %}<p class="gc-ajuda sug-relatos-off"><i class="ph ph-device-mobile" aria-hidden="true"></i> Os relatos do App de Campo ainda não chegam aqui: falta a chave "Relatos do App de Campo" em <a href="{{ '/t/base/chaves-fontes?aba=nexus'|na_raiz }}">Base › Chaves do Nexus</a>.</p>
+  {% elif erro_relatos %}<p class="sug-aviso sug-aviso--erro">Não li os relatos do App agora ({{ erro_relatos }}){% if recebidas|selectattr('origem', 'equalto', 'app')|list %}: os relatos são os da última leitura{% endif %}.</p>{% endif %}
   {% if not recebidas and not erro_lista %}
   <p class="aviso">Nenhuma sugestão ainda.</p>
   {% else %}
@@ -119,6 +123,11 @@
   <div class="sug-recebidas">
   <div class="sug-recebidas-principal">
   <form class="sug-filtros" method="get" data-fo="local">
+    {# o Tipo de demanda (21/11/2026, Levi: "nas sugestões deve dar para filtrar o Tipo de demanda Nexus/App de campo!"):
+       a sugestão escrita no Nexus e o relato do App de Campo #}
+    <label class="atu-filtro"><span class="gc-rotulo">Tipo de demanda</span>
+      <select class="gc-campo" name="origem" multiple data-todos="Todos os tipos" data-sug-filtro="origem">
+        {% for k, nome, n in por_origem %}<option value="{{ k }}">{{ nome }} ({{ n }})</option>{% endfor %}</select></label>
     <label class="atu-filtro"><span class="gc-rotulo">Setor</span>
       <select class="gc-campo" name="setor" multiple data-todos="Todos os setores" data-sug-filtro="area">
         {% for k, nome, n in por_area %}<option value="{{ k }}">{{ nome }} ({{ n }})</option>{% endfor %}</select></label>
@@ -130,7 +139,39 @@
   <script src="{{ url_for('static', filename='filtros-os.js') }}"></script>
   <ol class="sug-lista">
     {% for s in recebidas %}
-    <li class="sug-item" id="sug-{{ s.id }}" data-sug-quem="{{ quem_de.get(s.id, '') }}" data-sug-area="{{ s.area or '_sem' }}"><details class="sug-dobra">
+    {% if s.origem == 'app' %}
+    <li class="sug-item sug-item--app" id="sug-{{ s.id }}" data-sug-quem="{{ quem_de.get(s.id, '') }}" data-sug-origem="app" data-sug-area="{{ s.area }}"><details class="sug-dobra">
+      <summary class="sug-cab">
+        <span class="sug-quando">{{ s.quando_txt }}</span>
+        <span class="sug-resumo-titulo"><span class="sug-quem">{{ s.nome or 'Técnico sem o nome' }}</span> - {{ s.titulo }}</span>
+        {% if s.respostas %}<span class="sug-n-resp" title="Respostas da Grid"><i class="ph ph-chat-circle-text" aria-hidden="true"></i> {{ s.respostas|length }}</span>{% endif %}
+        <span class="atu-area sug-tag-app">App de campo</span>
+        <span class="gc-status gc-status--{{ s.status_tom }}">{{ s.status_rotulo }}</span>
+      </summary>
+      <div class="sug-corpo">
+      <p class="mudo sug-app-meta">{{ [s.papel, s.funcao, s.email]|select|join(' · ') }}</p>
+      <p class="mudo sug-app-meta">{{ ['Tela: ' ~ s.tela if s.tela else '', 'App ' ~ s.versao_app if s.versao_app else '', s.aparelho]|select|join(' · ') }}</p>
+      <p class="sug-texto">{{ s.descricao }}</p>
+      {% for m in s.mensagens %}<div class="sug-resposta{{ ' sug-resposta--campo' if m.lado == 'campo' }}"><p class="sug-resposta-cab"><i class="ph {{ 'ph-device-mobile' if m.lado == 'campo' else 'ph-arrow-bend-down-right' }}" aria-hidden="true"></i> {% if m.lado == 'campo' %}{{ m.nome or s.nome or 'O técnico' }} (no App){% else %}Resposta{% if m.nome %} de {{ m.nome }}{% endif %}{% endif %}{% if m.quando_txt %} em {{ m.quando_txt }}{% endif %}</p>
+        <p class="sug-resposta-texto">{{ m.texto }}</p></div>{% endfor %}
+      {% if s.status != 'resolvido' %}
+      {% if pode_responder_app %}
+      <form class="sug-responder" method="post" action="{{ url_for('casca.inicio', aba='sugestoes', acao='responder_app') }}">
+        <input type="hidden" name="codigo" value="{{ codigo }}">
+        <input type="hidden" name="relato" value="{{ s.rid }}">
+        <input type="hidden" name="novo_id" value="{{ novo_resposta_id() }}">
+        <label class="gc-rotulo" for="rp-{{ s.id }}">Responder a {{ s.nome or 'quem relatou' }}</label>
+        <textarea class="gc-campo" id="rp-{{ s.id }}" name="resposta" rows="3" maxlength="{{ resposta_max }}" required
+                  placeholder="A resposta vai ao App: o técnico lê em Meus relatos"></textarea>
+        <button class="gc-btn gc-btn--ui gc-btn--primario" type="submit"><i class="ph ph-paper-plane-tilt" aria-hidden="true"></i> Responder no App</button>
+      </form>
+      {% else %}<p class="mudo">Entre com o seu login (Microsoft ou Fracttal) para responder: a resposta vai ao técnico com o seu nome.</p>{% endif %}
+      {% endif %}
+      <p class="mudo sug-app-dono">Só quem relatou encerra, pelo App{% if s.status == 'resolvido' %}: este já foi resolvido{% endif %}.</p>
+      </div>
+    </details></li>
+    {% else %}
+    <li class="sug-item" id="sug-{{ s.id }}" data-sug-quem="{{ quem_de.get(s.id, '') }}" data-sug-origem="nexus" data-sug-area="{{ s.area or '_sem' }}"><details class="sug-dobra">
       {# a linha (11/11/2026, Levi: "O nome de quem sugeriu tem que vir primeiro. A ordem fica: Data, Nome e "-" e
          título"); o setor e o status depois. O nome no verde da Grid, e nem ele nem o título em negrito (12/11/2026,
          Levi: "quem solicitou também deve estar em nome verde grid. Verde grid não precisa estar em negrito, nem o
@@ -188,6 +229,7 @@
       </form>
       </div>
     </details></li>
+    {% endif %}
     {% endfor %}
     <li class="mudo sug-vazio" data-sug-vazio hidden>Nenhuma sugestão com esses filtros.</li>
   </ol>
@@ -212,15 +254,17 @@
   var nav = document.querySelector('.sug-setores');
   var selArea = document.querySelector('select[data-sug-filtro="area"]');
   var selQuem = document.querySelector('select[data-sug-filtro="quem"]');
+  var selOrigem = document.querySelector('select[data-sug-filtro="origem"]');
   var conta = document.querySelector('[data-sug-conta]'), vazio = document.querySelector('[data-sug-vazio]');
   function marcados(s) {
     return s ? Array.prototype.filter.call(s.options, function (o) { return o.selected; }).map(function (o) { return o.value; }) : [];
   }
   function filtrar() {
-    var areas = marcados(selArea), quem = marcados(selQuem), n = 0, daPessoa = 0, porArea = {};
+    var areas = marcados(selArea), quem = marcados(selQuem), origens = marcados(selOrigem), n = 0, daPessoa = 0, porArea = {};
     itens.forEach(function (li) {
       var a = li.getAttribute('data-sug-area');
-      var okQuem = !quem.length || quem.indexOf(li.getAttribute('data-sug-quem')) >= 0;
+      var okQuem = (!quem.length || quem.indexOf(li.getAttribute('data-sug-quem')) >= 0) &&
+                   (!origens.length || origens.indexOf(li.getAttribute('data-sug-origem')) >= 0);
       if (okQuem) { daPessoa++; porArea[a] = (porArea[a] || 0) + 1; }
       li.hidden = !(okQuem && (!areas.length || areas.indexOf(a) >= 0));
       if (!li.hidden) n++;
@@ -233,7 +277,7 @@
       if (num) num.textContent = k ? (porArea[k] || 0) : daPessoa;
     });
   }
-  [selArea, selQuem].forEach(function (s) { if (s) s.addEventListener('change', filtrar); });
+  [selArea, selQuem, selOrigem].forEach(function (s) { if (s) s.addEventListener('change', filtrar); });
   if (nav && selArea) nav.addEventListener('click', function (e) {
     var b = e.target.closest('button[data-sug-area]');
     if (!b) return;

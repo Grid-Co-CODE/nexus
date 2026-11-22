@@ -14,6 +14,7 @@ Base → Acessos), o tema (escuro ou claro) e o `/saude`. A cadeira saiu em 12/1
 | `nexus/casca/__init__.py` | `/` (Início, só com as torres do setor, e o cartão "Versão no ar"), `/tema` (troca sem JavaScript), `/saude` (`{"commit", "ok"}` e, com um commit esperando a vez de subir, `"espera"`) e o contexto dos templates (menu pelo setor, `setor`, `tema`) |
 | `nexus/casca/versao.py` + `templates/atualizacoes.html` | o cartão "Versão no ar" do Início (a hora do commit, o commit, desde quando está no ar e o commit que espera a vez de subir) e a aba Atualizações (`/?aba=atualizacoes`, só novidade, correção e desempenho, um mês por vez, por dia, com os cartões de commits por pessoa ao lado); seção "Versão no ar e Atualizações" abaixo |
 | `nexus/casca/sugestoes.py` + `templates/sugestoes.html` | a aba Sugestões (`/?aba=sugestoes`): o formulário de todos e a lista do administrador, o livro `nexus_sugestoes` e os anexos no disco; seção "Sugestões no Início" abaixo |
+| `nexus/casca/relatos_app.py` | os relatos do App de Campo nas Sugestões recebidas: lê e responde pelo servidor do App (o App é a fonte; nada no banco); seção "Relatos do App de Campo nas Sugestões" abaixo |
 | `nexus/casca/presos.py` | os pedidos presos: o que cada pedido esperava quando o Nexus parou de responder, no log (o cartão do Início saiu em 13/10; seção "Pedidos presos" abaixo) |
 | `nexus/casca/fracttal_conta.py` | o contador de pedidos ao Fracttal (31/10/2026): um gancho no `Session.send` que soma, por hora de Brasília × origem × método, os pedidos, as recusas (406/429), os erros, o pico por minuto e as esperas; e, no mesmo gancho, o porteiro (etapa 5): o Nexus até 150 pedidos por minuto, o fundo até 90; seção "Pedidos ao Fracttal" abaixo |
 | `nexus/casca/minutos_ocupados.py` | os minutos de toda hora que já têm dono no Nexus, num lugar só (31/10/2026, etapa 3 do canto central), e os de uma vez por dia (`DIARIOS`): o laço novo pede o próximo minuto livre (`proximo_livre`); bullet "Os minutos ocupados" na seção do Raio-X abaixo |
@@ -1234,6 +1235,50 @@ server".
     da pessoa para ela. Sai da cópia de 1 minuto; velha ou ausente, a releitura vai **por trás** (`contador`) e a aba
     sai sem número: o Início é a primeira página de todos e nunca espera o banco por causa dele.
 - **Prova**: `tests/test_casca_sugestoes_24_10.py`.
+
+## Relatos do App de Campo nas Sugestões (21/11/2026)
+
+Levi, pelo chat do App de Campo: "os relatos do pessoal de campo, que é muito importante. Podia até ficar ali no início do
+Nexus". No chat do Nexus, no mesmo dia, escolheu o caminho A, "Administradores" respondem e, por fim, "na verdade pode ir
+para sugestões no início com uma tag de App de campo!" (no lugar de uma aba própria).
+
+- **De onde vem**: o canal "Reportar problema ou melhoria" do App (rota `app/feedback` do servidor do App, tabela
+  `appfeedback`). O App é a FONTE do relato e do ciclo (aberto → respondido → resolvido, que só o autor encerra, ou
+  reaberto). **O Nexus não grava nada no banco**: o relato é texto livre com o nome do técnico, e a API do banco tem
+  leitura aberta (regra 8 de `nexus/dados/CLAUDE.md`). Um livro `relatos_app_campo` com o texto aberto foi descartado por
+  isso; o com o texto cifrado (caminho B) também, porque daria ao App a chave do cofre do Nexus e faria o status ter dois
+  donos.
+- **O contrato** (versão 1, no topo de `casca/relatos_app.py`; o App serve, o Nexus lê; mudou num lado, muda no outro no
+  mesmo trabalho): `GET <URL>` com `X-Nexus-Chave` → `{"versao": 1, "relatos": [...]}` (id, tipo, texto, tela, status,
+  criado_em, autor {nome, email, papel, funcao}, versao_app, aparelho, mensagens [{texto, lado grid|campo, por, em}]);
+  `POST <URL>/<id>/responder` com `{"resposta_id", "texto", "por": {"nome", "email"}}`. O `resposta_id` (`r` + 11
+  hexadecimais) segura o 2º envio. Recusa do App: 4xx com `{"erro": "..."}`, que vira o aviso da tela.
+- **As chaves** (tela Base → Chaves do Nexus, que vence o `.env`): `NEXUS_APP_RELATOS_CHAVE` (32 caracteres ou mais, a
+  mesma do App Setting do servidor do App) e, se mudar, `NEXUS_APP_RELATOS_URL` (só https; padrão
+  `https://gridco-campo-mw.azurewebsites.net/api/app/nexus/relatos`). **Sem a chave o Nexus nem chama o App** e o
+  administrador lê o porquê no alto das Sugestões recebidas.
+- **Onde aparece**: nas Sugestões recebidas, só para o administrador (o mesmo que lê as sugestões), na mesma linha-cartão,
+  com a etiqueta **"App de campo"** no lugar do setor (na cor da marca; o filtro Setor e o Por setor ganham "App de campo"
+  como um setor). A linha: a data, "Técnico - Tipo: a 1ª linha do texto", as respostas da Grid, a etiqueta e o status do
+  App (Aberto e Reaberto esperam a Grid; Resolvido vai para o fim, como a Concluída). Aberto: papel, função, e-mail, tela,
+  versão do App, aparelho, o texto e as mensagens na ordem (a do técnico, escrita no App ao reabrir, com o fio neutro).
+  **Não há troca de status pelo Nexus**: "Só quem relatou encerra, pelo App".
+- **O filtro Tipo de demanda** (21/11/2026, Levi, vendo a lista: "nas sugestões deve dar para filtrar o Tipo de
+  demanda Nexus/App de campo!"): o 1º dos filtros das recebidas, com "Nexus" (a sugestão escrita aqui) e "App de
+  campo" (o relato), cada um com a conta e só quando tem algum (`casca._contar_por_origem`). Cada linha leva
+  `data-sug-origem` (nexus|app), e o script da página filtra junto com o Setor e o Quem solicitou; o Por setor conta só
+  o que passa no tipo e na pessoa escolhidos.
+- **A resposta**: `POST /?aba=sugestoes&acao=responder_app` (só administrador; outro site e formulário vencido não
+  mandam). Vai ao App, que a grava como a do Admin/Supervisor de lá; o técnico lê em "Meus relatos". Pede o login
+  (Microsoft ou Fracttal): a resposta vai ao técnico com o nome de quem respondeu, e a senha de administrador não diz quem
+  é. O App fora ou que recusa vira aviso ("A resposta não foi enviada: ..."), nunca um 500. Depois de responder a cópia
+  vence e a lista é relida.
+- **O número da aba Sugestões** do administrador soma os relatos que esperam a Grid (aberto e reaberto). Sai da cópia de 1
+  minuto; velha, a releitura vai por trás (o Início nunca espera o App).
+- **O sino do topo** ficou de fora nesta 1ª versão (21/11/2026: outras conversas mexiam nele no mesmo dia; o número da aba
+  já avisa).
+- Prova: `tests/test_casca_relatos_app_21_11.py` (App falso: lista, etiqueta, mensagens, resolvido no fim, contrato
+  errado, App fora, resposta com a chave e o id, sem login, outro site, recusas 401/404/409/500, contador, chaves).
 
 ## Um cabeçalho só: quem entrou no topo do Nexus (13/10/2026)
 
