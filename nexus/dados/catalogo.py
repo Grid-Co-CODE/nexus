@@ -260,8 +260,10 @@ FATOS = (
                     "(o lote de OS criadas para a pessoa) ou C:<id da OS> (a OS da solicitação da pessoa que foi cancelada, "
                     "11/11/2026; como o S: lido das solicitações do Fracttal pelo REST, nunca gravado aqui: só o leu) "
                     "ou F:<item_id da tarefa>:<desde AAAAMMDDHHMM> (a tarefa fora da programação com um motivo que cita "
-                    "o setor da pessoa, 16/11/2026, lida do nexus_pcm_motivos: só o leu); "
-                    "tipo execucao, solicitacao, atribuida, cancelada ou fora; os_id e folio da OS; destino_hmac = o código do NOME de quem pediu a solicitação (o "
+                    "o setor da pessoa, 16/11/2026, lida do nexus_pcm_motivos: só o leu) ou P:<item_id da tarefa>:<desde "
+                    "AAAAMMDDHHMM> (a OS que a pessoa criou, pausada pelo técnico no App ou pelo PCM, 22/11/2026, lida do "
+                    "nexus_pcm_motivos: só o leu); "
+                    "tipo execucao, solicitacao, atribuida, cancelada, fora ou pausada; os_id e folio da OS; destino_hmac = o código do NOME de quem pediu a solicitação (o "
                     "Fracttal só traz o nome; prefixo nome:, separado do código do e-mail). Os nomes (quem pediu, quem "
                     "aprovou) só cifrados (Cofre). Só acrescenta: nada se edita nem se apaga"),
     # 12/11/2026 (Levi: "os setores consigam conversar entre si sem ter que especificamente criar um OS"): as demandas

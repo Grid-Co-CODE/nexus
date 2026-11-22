@@ -25,7 +25,7 @@ muito boa"; e "construa o que você sugere"). PRD e tarefas no formato do Taskma
 | `conversa.py` | A conversa presa ao objeto com @menção: o livro `nexus_conversas · fato_mensagem`, as menções não lidas (`para_mim`) e a lista do @ (`pessoas_mencionaveis`) |
 | `../torres/comando/templates/comando/_conversa.html` + `static/comando/conversa.js` | O componente da conversa (dentro de cada insight e na página da OS e da usina) e o @ |
 | `../casca/__init__.py` (`_sino`) + `base.html` | O sino do topo |
-| `avisos.py` + `../casca/__init__.py` (`_avisos_do_sino`, `POST /t/comando/aviso/lida`) | Os avisos das OS de cada pessoa no sino ("OS x concluída pelo técnico", "Sua solicitação gerou uma OS" e, desde 08/11/2026, "OS x criada para você"; desde 11/11/2026, tudo da OS da solicitação, com a cancelada) e o Marcar como lida: o livro `nexus_avisos · fato_evento_aviso` |
+| `avisos.py` + `../casca/__init__.py` (`_avisos_do_sino`, `POST /t/comando/aviso/lida`) | Os avisos das OS de cada pessoa no sino ("OS x concluída pelo técnico", "Sua solicitação gerou uma OS" e, desde 08/11/2026, "OS x criada para você"; desde 11/11/2026, tudo da OS da solicitação, com a cancelada; desde 22/11/2026, a OS pausada, em três linhas) e o Marcar como lida: o livro `nexus_avisos · fato_evento_aviso` |
 | `demandas_regras.py` + `demandas.py` + `../torres/comando/demandas_tela.py` | As demandas entre setores (12/11/2026): a regra do prazo e dos avisos, o livro `nexus_demandas` e as telas (o bloco da Caixa, a Nova demanda, os Temas do setor e o sininho); ver a seção abaixo |
 | `carteira_ia.py` + `dossie_cliente.py` | O dossiê da carteira para a Nexus IA do Comando › Usinas e o dossiê do cliente em .md, com as UFVs pontuadas (16/11/2026); ver as seções abaixo |
 | `gerencial.py` + `../torres/comando/gerencial_tela.py` + `comando/gerencial.html` + `static/gerencial.js` e `.css` | A Visão gerencial (teste), 19/11/2026: o portfólio que afunila (portfólio → cliente → usina) e a nota de cumprimento do contrato por usina; ver a seção abaixo |
@@ -124,6 +124,18 @@ download do pdf da OS". No quiz, "resposta" é o técnico executar a OS.
   programação semanal, as clonagens) dão "N OS novas para você", que leva à visão "Atribuídas a mim" do Histórico daquele
   dia (sem o card; o `aviso_id` é `L:<quem criou>:<minuto>`, com o id de quem criou ou um código curto do nome, nunca o
   nome). O selo é "Para você". Os técnicos de campo usam o App: o aviso serve a quem trabalha no Nexus.
+- **"OS x — Pausada pelo técnico"** (22/11/2026, Levi: "se ela foi concluída, se ela foi pausada"; `avisos.pausadas`): as OS
+  que a pessoa criou (a lista central, como o "concluída pelo técnico") com uma tarefa fora da programação: a marca que
+  vale do Fora (`pcm/motivos.vigentes`, guardada enquanto a cópia do livro é a mesma, porque decifra), com o motivo, quem
+  pôs e por onde ("pelo técnico" no App, "pelo PCM"). A pausa que a própria pessoa pôs não avisa; só as de `PAUSAS_DESDE`
+  (22/11/2026) em diante e nos últimos 7 dias. O id é `P:<item_id>:<desde>` (o mesmo começo do `F:` do sino do setor, outro
+  aviso: cada sino marca o seu), tipo `pausada`; nunca é gravado, só o lido dele.
+- **Três linhas por aviso** (22/11/2026, Levi: "OS número, traço, e aí o que aconteceu [...] ao lado de concluída pelo
+  técnico, a data e a hora [...] o ativo [...] vira uma terceira linha"; antes tudo ia numa 2ª linha cortada com
+  reticências, e a hora, no fim dela, quase nunca aparecia): `avisos.tres_linhas` dá a cada aviso `os_txt` e `acao` (1ª
+  linha, com a hora `dd/mm · HH:MM` à direita), `l2` = [[texto, tom], ...] (quem e o status, com a cor e a palavra:
+  Em verificação no âmbar, Concluída no verde, o motivo da cancelada no vermelho) e o `ativo` com a `atividade` (a 3ª: o
+  ativo da lista central e a descrição sem o "[Ativo] - " do começo). O `titulo` e o `detalhe` de antes seguem no aviso.
 - **Quem a pessoa é no Fracttal** (08/11/2026, `avisos._do_fracttal`, guardado 1 minuto): o id dela pela ligação de Base →
   Acessos → Pessoas e setores (a última decisão com o código do e-mail do login, a mesma que dá o setor), e a conta e o nome
   que o Fracttal grava pelo catálogo de pessoas do OS Creator (pelo id; sem a ligação, pelo e-mail). Até então o aviso de

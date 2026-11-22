@@ -80,11 +80,20 @@
      passar o mouse (`.nt-acoes`); o clique na linha abre, e o aviso que se marca como lido (o das OS e o do Fora da
      programação) já sai como lido (o "garçom", no script abaixo). Os outros saem sozinhos quando a pessoa responde ou
      abre, como antes. #}
-  {% macro aviso_nt(href, icone, titulo, meta, tom='', os=none, lida='', acao='', acao_href='') -%}
+  {# `tres`: o aviso das OS em três linhas (22/11/2026, Levi: "OS número, traço, e aí o que aconteceu [...] ao lado [...]
+     a data e a hora [...] o ativo [...] vira uma terceira linha"): a OS e o que aconteceu com a hora à direita; quem e o
+     status (com a cor e a palavra); o ativo e a atividade (comando/avisos.tres_linhas) #}
+  {% macro aviso_nt(href, icone, titulo, meta, tom='', os=none, lida='', acao='', acao_href='', tres=none) -%}
   <li class="nt{% if tom %} nt--{{ tom }}{% endif %}"{% if lida %} data-nt-lida{% endif %}>
     <a class="nt-a{% if os %} sino-aviso{% endif %}" href="{{ raiz }}{{ href }}"{% if os %} data-os-wid="{{ os.wid or '' }}" data-os-folio="{{ os.folio }}" data-os-status="{{ os.status or '' }}"{% endif %}>
       <span class="nt-ic" aria-hidden="true"><i class="ph ph-{{ icone }}"></i></span>
+      {%- if tres %}
+      <span class="nt-txt nt-txt3"><span class="nt-l1"><span class="nt-t">{% if tres.os_txt %}<b class="nt-os">{{ tres.os_txt }}</b> — {% endif %}{{ tres.acao }}</span>{% if tres.quando_txt %}<span class="nt-hora">{{ tres.quando_txt }}</span>{% endif %}</span>
+        {%- if tres.l2 %}<span class="nt-l2">{% for x in tres.l2 %}{% if not loop.first %} · {% endif %}{% if x[1] %}<span class="nt-st nt-st--{{ x[1] }}">{{ x[0] }}</span>{% else %}{{ x[0] }}{% endif %}{% endfor %}</span>{% endif %}
+        {%- if tres.ativo or tres.atividade %}<span class="nt-l3">{% if tres.ativo %}<b>{{ tres.ativo }}</b>{% endif %}{% if tres.ativo and tres.atividade %} — {% endif %}{{ tres.atividade }}</span>{% endif %}</span></a>
+      {%- else %}
       <span class="nt-txt"><span class="nt-t">{{ titulo }}</span><span class="nt-m">{{ meta }}</span></span></a>
+      {%- endif %}
     <span class="nt-acoes">{% if acao %}<a class="nt-acao" href="{{ raiz }}{{ acao_href or href }}">{{ acao }}</a>{% endif %}{% if lida %}<form method="post" action="{{ raiz }}/t/comando/aviso/lida"><input type="hidden" name="aviso" value="{{ lida }}"><input type="hidden" name="voltar" value="{{ caminho_completo }}"><button type="submit" class="nt-acao nt-acao--ic sino-lida" title="Marcar como lida" aria-label="Marcar como lida"><i class="ph ph-check" aria-hidden="true"></i></button></form>{% endif %}</span>
   </li>
   {%- endmacro %}
@@ -122,15 +131,15 @@
      OS (o mesmo do Histórico, com o PDF) por cima da tela e já marca como lido. O ícone é o capacete (ph-hard-hat) #}
   {% if sino is not none %}<details class="sino-topo">
     <summary class="gc-btn gc-btn--ui gc-btn--fantasma sino-bt" aria-label="Avisos das OS: {{ sino.n_avisos }}" data-rotulo="Avisos das OS">
-      <i class="ph ph-hard-hat" aria-hidden="true"></i>{% if sino.n_avisos %}<b class="sino-n">{{ sino.n_avisos }}</b>{% endif %}<span class="sino-dica" aria-hidden="true"><span class="sino-dica-t">O que chega aqui</span><span class="sino-dica-i">A OS concluída pelo técnico</span><span class="sino-dica-i">A OS criada para você</span><span class="sino-dica-i">A solicitação que virou OS</span></span></summary>
+      <i class="ph ph-hard-hat" aria-hidden="true"></i>{% if sino.n_avisos %}<b class="sino-n">{{ sino.n_avisos }}</b>{% endif %}<span class="sino-dica" aria-hidden="true"><span class="sino-dica-t">O que chega aqui</span><span class="sino-dica-i">A OS concluída pelo técnico</span><span class="sino-dica-i">A OS pausada</span><span class="sino-dica-i">A OS criada para você</span><span class="sino-dica-i">A solicitação que virou OS</span></span></summary>
     <div class="sino-caixa nt-caixa" role="region" aria-label="Avisos das OS" data-vazio="Nenhum aviso das suas OS.">
       <div class="nt-cab"><b>Avisos das OS</b>{% if sino.n_avisos %}<form method="post" action="{{ raiz }}/t/comando/aviso/lida" class="sino-lidas" data-n="{{ sino.n_avisos }}"><input type="hidden" name="todos" value="1"><input type="hidden" name="voltar" value="{{ caminho_completo }}"><button type="submit" class="nt-todas">Marcar todas como lidas</button></form>{% endif %}</div>
       {% if sino.n_avisos %}
       <ul class="nt-lista">{% for a in sino.avisos %}
-        {%- set selo = {'execucao': ('check-circle', 'Executada', ''), 'atribuida': ('user-plus', 'Para você', ''), 'cancelada': ('x-circle', 'Cancelada', 'critico')}.get(a.tipo, ('file-plus', 'Solicitação', '')) %}
+        {%- set selo = {'execucao': ('check-circle', 'Executada', ''), 'atribuida': ('user-plus', 'Para você', ''), 'cancelada': ('x-circle', 'Cancelada', 'critico'), 'pausada': ('pause-circle', 'Pausada', '')}.get(a.tipo, ('file-plus', 'Solicitação', '')) %}
         {# o lote de OS criadas para a pessoa (08/11/2026) leva à visão "Atribuídas a mim" do Histórico daquele dia, não a um card #}
-        {%- if a.link %}{{ aviso_nt(a.link, selo[0], a.titulo, [selo[1], a.detalhe, a.quando_txt]|select|join(' · '), selo[2], lida=a.id) }}
-        {%- else %}{{ aviso_nt('/os/_nexus/card/' ~ (a.wid if a.wid else 'folio/' ~ a.folio) ~ '?status=' ~ a.status|urlencode, selo[0], a.titulo, [selo[1], a.detalhe, a.quando_txt]|select|join(' · '), selo[2], os={'wid': a.wid, 'folio': a.folio, 'status': a.status}, lida=a.id) }}{% endif %}
+        {%- if a.link %}{{ aviso_nt(a.link, selo[0], a.titulo, [selo[1], a.detalhe, a.quando_txt]|select|join(' · '), selo[2], lida=a.id, tres=a if a.acao else none) }}
+        {%- else %}{{ aviso_nt('/os/_nexus/card/' ~ (a.wid if a.wid else 'folio/' ~ a.folio) ~ '?status=' ~ a.status|urlencode, selo[0], a.titulo, [selo[1], a.detalhe, a.quando_txt]|select|join(' · '), selo[2], os={'wid': a.wid, 'folio': a.folio, 'status': a.status}, lida=a.id, tres=a if a.acao else none) }}{% endif %}
       {% endfor %}
         {% if sino.n_avisos > sino.avisos|length %}<li class="nt-mais"><a href="{{ raiz }}{{ caminho_completo }}">E mais {{ sino.n_avisos - sino.avisos|length }} {{ 'aviso' if sino.n_avisos - sino.avisos|length == 1 else 'avisos' }}: marque estes e recarregue</a></li>{% endif %}
       </ul>

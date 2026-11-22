@@ -862,6 +862,22 @@ mark.menu-achado{background:none;color:var(--tinta);font-weight:700;text-decorat
 .nt-caixa .nt-t{font:500 13px/18px var(--font-sans);color:var(--tinta);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;
   overflow:hidden}
 .nt-caixa .nt-m{font-size:12px;line-height:16px;color:var(--mudo);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* os Avisos das OS em três linhas (22/11/2026, Levi: "OS número, traço, e aí o que aconteceu [...] ao lado [...] a data e a
+   hora [...] o ativo [...] vira uma terceira linha"): a OS e o que aconteceu com a hora à direita; quem e o status, com a
+   cor e a palavra; o ativo e a atividade. Nenhuma linha quebra: o que passa vira reticências, e a hora sempre aparece */
+.nt-caixa .nt-txt3{flex:1}
+.nt-caixa .nt-l1{display:flex;align-items:baseline;gap:10px;min-width:0}
+.nt-caixa .nt-l1 .nt-t{flex:1;min-width:0;display:block;white-space:nowrap;text-overflow:ellipsis}
+.nt-caixa .nt-os{font-weight:600}
+.nt-caixa .nt-hora{flex:none;font-size:11.5px;line-height:16px;color:var(--mudo);font-variant-numeric:tabular-nums}
+.nt-caixa .nt-l2,.nt-caixa .nt-l3{font-size:12px;line-height:16px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.nt-caixa .nt-l2{color:var(--tinta-2)}
+.nt-caixa .nt-l3{color:var(--mudo)}
+.nt-caixa .nt-l3 b{font-weight:600;color:var(--tinta-2)}
+.nt-caixa .nt-st{font-weight:600}
+.nt-caixa .nt-st--alerta{color:var(--alerta)}
+.nt-caixa .nt-st--ok{color:var(--ok)}
+.nt-caixa .nt-st--critico{color:var(--critico)}
 .nt-caixa .nt-acoes{position:absolute;right:10px;top:50%;transform:translateY(-50%);display:flex;gap:4px;align-items:center;
   padding-left:14px;background:linear-gradient(to right,transparent,var(--superficie-2) 14px);opacity:0;pointer-events:none}
 .nt-caixa .nt:hover .nt-acoes,.nt-caixa .nt:focus-within .nt-acoes{opacity:1;pointer-events:auto}

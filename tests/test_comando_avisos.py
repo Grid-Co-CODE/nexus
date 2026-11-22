@@ -95,7 +95,11 @@ def test_o_sino_mostra_o_aviso_abre_o_card_e_marcar_como_lida_tira(app, banco, l
     c = _cliente_de(app, PESSOA)
     html = c.get("/").get_data(as_text=True)
     sino = _sino(html)
-    assert 'aria-label="Avisos das OS: 1"' in sino and "OS 18374 concluída pelo técnico" in sino and "Marcar como lida" in sino
+    assert 'aria-label="Avisos das OS: 1"' in sino and "Marcar como lida" in sino
+    # três linhas (22/11/2026): a OS e o que aconteceu com a hora ao lado; quem executou e o status; a atividade
+    assert '<b class="nt-os">OS 18374</b> — Concluída pelo técnico' in sino and 'class="nt-hora"' in sino
+    assert 'Executada por Técnico Exemplo · <span class="nt-st nt-st--alerta">Em verificação</span>' in sino
+    assert 'class="nt-l3">Recomposição de String<' in sino
     assert "/os/_nexus/card/101?status=Em%20Verifica" in sino and "window.NexusOsCard" in html
     botao = sino.split("</summary>", 1)[0]                                # o botão leva o ícone do OS Creator, não o sino
     # o capacete desde 21/11/2026 (Levi: "a gente pode até mudar esse símbolo [...] Talvez um capacete"); o sino é das

@@ -1311,7 +1311,9 @@ que é uma tela dentro de uma tela!".
      O número é a soma; aparece quando uma das partes existe (o administrador pela senha só com pedido, menção ou usina
      nova). O "Marcar como lida" do Fora segue pelo mesmo script (`data-lidas` só quando há a parte do Fora);
   2. o **botão do OS Creator, só com as OS** ("A do OS Creator tem que ser focada apenas em OS mesmo"): os avisos das OS
-     da pessoa (`_sino`: concluída pelo técnico, criada para ela, solicitação que virou OS); o número é só o deles; o
+     da pessoa (`_sino`: concluída pelo técnico, pausada, criada para ela, solicitação que virou OS), cada um em TRÊS
+     linhas desde 22/11/2026 (o `aviso_nt(..., tres=a)`: a OS e o que aconteceu com a hora à direita, quem e o status, o
+     ativo e a atividade; regras `.nt-l1`, `.nt-l2`, `.nt-l3`, `.nt-hora`, `.nt-st--*`; `nexus/comando/CLAUDE.md`); o número é só o deles; o
      ícone é o capacete (`ph-hard-hat`, "Talvez um capacete"), e não mais o do OS Creator do menu.
   O que chega em cada um aparece ao passar o mouse, EM LISTA ("passar o mouse eu quero em formato de lista"): a
   `.sino-dica` dentro do botão ("O que chega aqui" e um item por tipo de aviso; nexus.css), no lugar do `title` do

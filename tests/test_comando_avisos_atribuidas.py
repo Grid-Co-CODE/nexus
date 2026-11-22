@@ -111,8 +111,8 @@ def test_o_sino_usa_quem_a_pessoa_e_no_fracttal(app, banco, limpo, limpos, monke
     html = c.get("/").get_data(as_text=True)
     sino = html.split('class="sino-topo"', 1)[1].split("</details>", 1)[0]
     assert 'aria-label="Avisos das OS: 2"' in sino
-    assert "OS 18900 concluída pelo técnico" in sino and "OS 18901 criada para você" in sino
-    assert "Para você · " in sino
+    assert '<b class="nt-os">OS 18900</b> — Concluída pelo técnico' in sino
+    assert '<b class="nt-os">OS 18901</b> — Criada para você' in sino
     # o "Marcar todas" leva também o aviso novo
     c.post(LIDA, data={"todos": "1", "voltar": "/"})
     linhas = banco.linhas(AV.LIVRO, AV.ABA)

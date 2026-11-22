@@ -59,15 +59,23 @@ ATRIBUIDAS_DESDE = "2026-11-08"   # o aviso de OS criada para a pessoa vale para
 # diante: sem isso, a 1ª leitura depois de subir avisaria de uma vez as solicitações do mês e os cancelamentos já sabidos
 SEGUIR_DESDE = "2026-11-11"
 CANCELADA = 4
+# a OS da pessoa pausada (22/11/2026): só as pausas deste dia em diante (sem isso, a 1ª leitura depois de subir avisaria de uma
+# vez as tarefas que já estavam fora da programação)
+PAUSAS_DESDE = "2026-11-22"
 LOTE_MIN = 3                      # tantas OS da mesma pessoa no mesmo minuto viram um aviso só
 # E:<id da OS>:<data de fim, AAAAMMDDHHMM> (a OS executada de novo é outro aviso), S:<código da solicitação>, A:<id da OS> (a
 # OS criada para a pessoa), L:<quem criou>:<minuto da criação, AAAAMMDDHHMM> (o lote) ou C:<id da OS> (a OS da solicitação
 # da pessoa que foi cancelada, 11/11/2026) ou F:<item_id da tarefa>:<desde, AAAAMMDDHHMM> (a tarefa fora da programação com
-# um motivo que cita o setor da pessoa, 16/11/2026, `pcm/fora_avisos.py`; só o leu dela se grava aqui)
+# um motivo que cita o setor da pessoa, 16/11/2026, `pcm/fora_avisos.py`; só o leu dela se grava aqui) ou P:<item_id da
+# tarefa>:<desde, AAAAMMDDHHMM> (a OS que a pessoa criou, pausada pelo técnico no App ou pelo PCM, 22/11/2026: o mesmo
+# começo do F:, outro aviso, porque cada sino marca o seu)
 AVISO_RE = re.compile(r"E:\d{1,12}:\d{12}|S:[A-Za-z0-9_\-]{1,40}|A:\d{1,12}|L:[0-9a-f]{1,12}:\d{12}|C:\d{1,12}"
-                      r"|F:[0-9a-f]{16}:\d{12}")
+                      r"|F:[0-9a-f]{16}:\d{12}|P:[0-9a-f]{16}:\d{12}")
 TIPO_DO_PREFIXO = {"E": "execucao", "S": "solicitacao", "A": "atribuida", "L": "atribuida", "C": "cancelada",
-                   "F": "fora"}
+                   "F": "fora", "P": "pausada"}
+# o status de cada aviso na 2ª linha, com a cor e a palavra (22/11/2026)
+STATUS_TXT = {"Em Verificação": ("Em verificação", "alerta"), "Concluída": ("Concluída", "ok"),
+              "Em Processo": ("Em processo", ""), "Cancelada": ("Cancelada", "critico")}
 MAX_POR_VEZ = 200            # quantos avisos um "Marcar todas" grava de uma vez
 TTL_S = 60
 _BRT = timezone(timedelta(hours=-3))
@@ -116,6 +124,33 @@ def _quando(iso):
     except ValueError:
         return None
     return (d if d.tzinfo else d.replace(tzinfo=timezone.utc)).astimezone(_BRT)
+
+
+_RX_ATIVO = re.compile(r"^\s*\[([^\]]{1,80})\]\s*-?\s*")
+
+
+def _ativo_e_atividade(ativo, descricao) -> tuple[str, str]:
+    """(o ativo, a atividade) da OS: o ativo da lista central e a descrição sem o "[Ativo] - " do começo (como o OS Creator
+    escreve o nome da OS); sem o ativo, o do começo da descrição."""
+    d, a = _txt(descricao), _txt(ativo)
+    m = _RX_ATIVO.match(d)
+    if m:
+        a, d = a or m.group(1).strip(), d[m.end():].strip()
+    return a, d
+
+
+def _status(nome) -> list:
+    """O status na 2ª linha: [texto, tom] (o tom é a cor; vazio, a cor do texto)."""
+    txt, tom = STATUS_TXT.get(_txt(nome), (_txt(nome), ""))
+    return [txt, tom] if txt else []
+
+
+def tres_linhas(acao: str, quem: list, ativo="", descricao="", os_txt: str = "") -> dict:
+    """Os campos das três linhas do aviso no sino (22/11/2026, Levi: "OS número, traço, e aí o que aconteceu [...] ao lado
+    de concluída pelo técnico, a data e a hora [...] o ativo [...] vira uma terceira linha"): `os_txt` e `acao` na 1ª (a hora
+    à direita sai do `quando`), `l2` = [[texto, tom], ...] (quem e o status) e o ativo com a atividade na 3ª."""
+    a, d = _ativo_e_atividade(ativo, descricao)
+    return {"os_txt": os_txt, "acao": acao, "l2": [x for x in quem if x and x[0]], "ativo": a[:60], "atividade": d[:90]}
 
 
 def _ctx(l: dict) -> str:
@@ -289,7 +324,11 @@ def execucoes(nome: str, agora: datetime | None = None, id_account=None) -> list
         out.append({"id": f"E:{r.id}:{fim.strftime('%Y%m%d%H%M')}", "tipo": "execucao", "wid": r.id,
                     "folio": _txt(r.folio), "status": EXECUTADA.get(r.status_id, ""), "quando": fim,
                     "titulo": f"OS {_txt(r.folio)} concluída pelo técnico",
-                    "detalhe": " · ".join(x for x in (executor, EXECUTADA.get(r.status_id, ""), _txt(r.descricao)[:70]) if x)})
+                    "detalhe": " · ".join(x for x in (executor, EXECUTADA.get(r.status_id, ""), _txt(r.descricao)[:70]) if x),
+                    **tres_linhas("Concluída pelo técnico",
+                                  [[f"Executada por {executor}" if executor else "", ""],
+                                   _status(EXECUTADA.get(r.status_id, ""))],
+                                  getattr(r, "ativo", ""), r.descricao, f"OS {_txt(r.folio)}")})
     _CACHE[("exec", meu)] = (lista.versao, time.time(), list(out))
     return out
 
@@ -341,13 +380,19 @@ def atribuidas(id_personnel, id_account=None, nome: str = "", agora: datetime | 
                         "quando": g[0][1], "titulo": f"{len(g)} OS novas para você",
                         "detalhe": " · ".join(x for x in (f"criadas por {criador}" if criador else "",
                                                            "Atribuídas a mim") if x),
-                        "link": f"/os/historico?modo=atribuidas&de={dia}&ate={dia}"})
+                        "link": f"/os/historico?modo=atribuidas&de={dia}&ate={dia}",
+                        **tres_linhas(f"{len(g)} OS novas para você",
+                                      [[f"Criadas por {criador}" if criador else "", ""], _status("Em Processo")],
+                                      "", "Veja em Atribuídas a mim, no Histórico")})
             continue
         for r, criada in g:
             out.append({"id": f"A:{r.id}", "tipo": "atribuida", "wid": r.id, "folio": _txt(r.folio),
                         "status": "Em Processo", "quando": criada, "titulo": f"OS {_txt(r.folio)} criada para você",
                         "detalhe": " · ".join(x for x in (f"por {criador}" if criador else "",
-                                                           _txt(r.descricao)[:70]) if x)})
+                                                           _txt(r.descricao)[:70]) if x),
+                        **tres_linhas("Criada para você", [[f"Por {criador}" if criador else "", ""],
+                                                           _status("Em Processo")],
+                                      getattr(r, "ativo", ""), r.descricao, f"OS {_txt(r.folio)}")})
     _CACHE[("atrib", idp)] = (lista.versao, time.time(), list(out))
     return out
 
@@ -378,10 +423,13 @@ def solicitacoes(nome, linhas: list[dict], agora: datetime | None = None, cofre=
             wid = int(l.get("os_id")) if l.get("os_id") not in (None, "") else None
         except (TypeError, ValueError):
             wid = None
+        aprovador = _txt(dados.get("aprovador"))
         out[aid] = {"id": aid, "tipo": "solicitacao", "wid": wid, "folio": folio, "status": "Em Processo", "quando": q,
                     "titulo": "Sua solicitação gerou uma OS",
-                    "detalhe": " · ".join(x for x in (f"Solicitação {sol}", f"OS {folio}" if folio else "",
-                                                       _txt(dados.get("aprovador"))) if x)}
+                    "detalhe": " · ".join(x for x in (f"Solicitação {sol}", f"OS {folio}" if folio else "", aprovador) if x),
+                    **tres_linhas("Gerada da sua solicitação" if folio else "Sua solicitação gerou uma OS",
+                                  [[f"Solicitação {sol}", ""], [f"Aprovada por {aprovador}" if aprovador else "", ""]],
+                                  os_txt=f"OS {folio}" if folio else "")}
     return list(out.values())
 
 
@@ -422,11 +470,16 @@ def da_solicitacao(id_account, email, nomes, eventos: list[dict], rest: list[dic
         aid = f"S:{s['codigo']}"
         if agora - criada <= janela and AVISO_RE.fullmatch(aid):
             folio = _txt(s.get("folio")) or _txt(rec.folio)
+            aprovador = _txt(s.get("aprovador"))
             out[aid] = {"id": aid, "tipo": "solicitacao", "wid": s["wid"], "folio": folio,
                         "status": EXECUTADA.get(rec.status_id, "Em Processo"), "quando": criada,
                         "titulo": "Sua solicitação gerou uma OS",
                         "detalhe": " · ".join(x for x in (f"Solicitação {s['codigo']}", f"OS {folio}" if folio else "",
-                                                           _txt(s.get("aprovador"))) if x)}
+                                                           aprovador) if x),
+                        **tres_linhas("Gerada da sua solicitação" if folio else "Sua solicitação gerou uma OS",
+                                      [[f"Solicitação {s['codigo']}", ""],
+                                       [f"Aprovada por {aprovador}" if aprovador else "", ""]],
+                                      getattr(rec, "ativo", ""), rec.descricao, f"OS {folio}" if folio else "")}
     for a in eventos or []:
         if a.get("wid") and a.get("quando") and a["quando"] >= desde:
             seguidas.setdefault(a["wid"], a["id"].partition(":")[2])
@@ -443,7 +496,11 @@ def da_solicitacao(id_account, email, nomes, eventos: list[dict], rest: list[dic
             out[aid] = {"id": aid, "tipo": "execucao", "wid": wid, "folio": folio, "status": EXECUTADA[rec.status_id],
                         "quando": fim, "titulo": f"OS {folio} da sua solicitação concluída pelo técnico",
                         "detalhe": " · ".join(x for x in (executor, EXECUTADA[rec.status_id], f"Solicitação {sol}", descr)
-                                              if x)}
+                                              if x),
+                        **tres_linhas("Concluída pelo técnico",
+                                      [[f"Executada por {executor}" if executor else "", ""],
+                                       _status(EXECUTADA[rec.status_id]), [f"da sua solicitação {sol}", ""]],
+                                      getattr(rec, "ativo", ""), rec.descricao, f"OS {folio}")}
         elif rec.status_id == CANCELADA and wid in (cancel or {}):
             c = cancel[wid]
             if agora - c["visto"] > janela:
@@ -452,8 +509,84 @@ def da_solicitacao(id_account, email, nomes, eventos: list[dict], rest: list[dic
             out[aid] = {"id": aid, "tipo": "cancelada", "wid": wid, "folio": folio, "status": "Cancelada",
                         "quando": c["visto"], "titulo": f"OS {folio} da sua solicitação foi cancelada",
                         "detalhe": " · ".join(x for x in (f"Motivo: {c['motivo']}" if c.get("motivo") else "",
-                                                           f"Solicitação {sol}", descr) if x)}
+                                                           f"Solicitação {sol}", descr) if x),
+                        **tres_linhas("Cancelada", [[f"Motivo: {c['motivo']}" if c.get("motivo") else "Cancelada",
+                                                     "critico"], [f"da sua solicitação {sol}", ""]],
+                                      getattr(rec, "ativo", ""), rec.descricao, f"OS {folio}")}
     return list(out.values())
+
+
+def _vigentes(cfg) -> tuple:
+    """(a cópia do livro dos motivos, as marcas que valem) do Fora da programação, guardadas enquanto a cópia é a mesma:
+    decifrar as marcas a cada página custaria em toda tela do Nexus (o mesmo cuidado do `pcm/fora_avisos.py`)."""
+    from ..pcm import motivos as M
+    est = M.copia(cfg)
+    if not est:
+        return None, {}
+    chave = ("vigentes", id(est), est.get("lido_em"))
+    guardado = _CACHE.get(chave)
+    if guardado is None:
+        for k in [k for k in _CACHE if isinstance(k, tuple) and k[:1] == ("vigentes",)]:
+            _CACHE.pop(k, None)
+        guardado = _CACHE[chave] = M.vigentes(cfg, est)
+    return est, guardado
+
+
+def pausadas(cfg, nome: str, agora: datetime | None = None, id_account=None) -> list[dict]:
+    """As OS que `nome` criou e que estão fora da programação (pausadas) desde PAUSAS_DESDE e nos últimos JANELA_DIAS (Levi,
+    22/11/2026: "OS número, traço, e aí o que aconteceu, se ela foi concluída, se ela foi pausada"). A pausa é a marca que vale
+    do Fora da programação (`pcm/motivos.vigentes`: o motivo, quem pôs e por onde, o App do técnico ou o PCM); a OS é da
+    pessoa pela lista central (as criadas por ela, como o "concluída pelo técnico"). A pausa que a própria pessoa pôs não
+    avisa. Sem a cópia do livro ou sem a lista central, nada."""
+    meu = _norm(nome)
+    if not meu or not cfg:
+        return []
+    agora = agora or datetime.now(_BRT)
+    try:
+        from ..pcm import motivos as M
+        est, vig = _vigentes(cfg)
+        if not est or not vig:
+            return []
+        oc = _os_central()
+        lista = oc.atual()
+        chave = ("pausa", meu, id(est), est.get("lido_em"), lista.versao)
+        guardado = _CACHE.get(chave)
+        if guardado and time.time() - guardado[0] < TTL_S:
+            return list(guardado[1])
+        de = _txt((lista.janela or ("", ""))[0])[:10]
+        if not de:
+            return []
+        pessoa = {"nome": nome}
+        if id_account is not None:
+            pessoa["id_account"] = id_account
+        sel = oc.filtrar("criadas", pessoa, de, agora.strftime("%Y-%m-%d"), status=[1, 2])
+    except Exception:            # noqa: BLE001 — sem o livro ou sem a lista central: sem o aviso da pausa
+        log.debug("avisos: a pausa das OS não respondeu", exc_info=True)
+        return []
+    por_folio = {_txt(r.folio): r for r in sel or [] if _txt(r.folio)}
+    piso = datetime.fromisoformat(PAUSAS_DESDE).replace(tzinfo=_BRT)
+    out = []
+    for iid, m in vig.items():
+        r = por_folio.get(_txt(m.get("os")))
+        if r is None or iid.startswith("_"):
+            continue
+        desde = M._brt(m.get("desde"))
+        quem = _txt(m.get("quem_motivo"))
+        if desde is None or desde < piso or agora - desde > timedelta(days=JANELA_DIAS) or (quem and _norm(quem) == meu):
+            continue
+        aid = "P:" + _txt(m.get("item_id") or iid) + ":" + re.sub(r"[^0-9]", "", _txt(m.get("desde")))[:12].ljust(12, "0")
+        if not AVISO_RE.fullmatch(aid):
+            continue
+        pelo_app = _txt(m.get("origem_motivo")) == "app"
+        out.append({"id": aid, "tipo": "pausada", "wid": r.id, "folio": _txt(r.folio),
+                    "status": EXECUTADA.get(r.status_id, "Em Processo"), "quando": desde,
+                    "titulo": f"OS {_txt(r.folio)} pausada " + ("pelo técnico" if pelo_app else "pelo PCM"),
+                    "detalhe": " · ".join(x for x in (quem, f"Motivo: {_txt(m.get('motivo'))}") if x),
+                    **tres_linhas("Pausada pelo técnico" if pelo_app else "Pausada pelo PCM",
+                                  [[quem, ""], [f"Motivo: {_txt(m.get('motivo'))}" if m.get("motivo") else "", ""]],
+                                  getattr(r, "ativo", ""), _txt(m.get("tarefa")) or r.descricao, f"OS {_txt(r.folio)}")})
+    _CACHE[chave] = (time.time(), list(out))
+    return out
 
 
 def lidos(linhas: list[dict], meu_hmac: str) -> set:
@@ -466,7 +599,8 @@ def lidos(linhas: list[dict], meu_hmac: str) -> set:
 
 
 def da_pessoa(nome: str, meu_hmac: str, linhas: list[dict], agora: datetime | None = None, cofre=None,
-              id_personnel=None, id_account=None, outros_nomes=(), email: str = "", rest=None, cancel=None) -> list[dict]:
+              id_personnel=None, id_account=None, outros_nomes=(), email: str = "", rest=None, cancel=None,
+              cfg=None) -> list[dict]:
     """Os avisos NÃO lidos da pessoa, do mais novo para o mais velho. `nome` é o do Fracttal quando o catálogo o tem;
     `outros_nomes`, o da sessão (a solicitação aprovada casa por qualquer um dos dois). `rest` e `cancel` são a última
     leitura das solicitações do Fracttal (`solicitacoes_fracttal.atuais`). O mesmo aviso por dois caminhos (a OS que a pessoa
@@ -476,7 +610,8 @@ def da_pessoa(nome: str, meu_hmac: str, linhas: list[dict], agora: datetime | No
     eventos = solicitacoes(nomes, linhas, agora, cofre)
     todos = {}
     for a in (execucoes(nome, agora, id_account) + atribuidas(id_personnel, id_account, nome, agora) + eventos
-              + da_solicitacao(id_account, email, nomes, eventos, rest or [], cancel or {}, agora)):
+              + da_solicitacao(id_account, email, nomes, eventos, rest or [], cancel or {}, agora)
+              + pausadas(cfg, nome, agora, id_account)):
         todos.setdefault(a["id"], a)
     return sorted((a for a in todos.values() if a["id"] not in ja), key=lambda a: a["quando"], reverse=True)
 
@@ -501,9 +636,10 @@ def para_o_sino(usuario) -> list[dict]:
         log.debug("avisos: as solicitações do Fracttal não responderam", exc_info=True)
         rest, cancel = [], {}
     itens = da_pessoa(nome_fracttal or nome, _codigo(email), copia(), cofre=cofre, id_personnel=idp, id_account=ida,
-                      outros_nomes=(nome,), email=email, rest=rest, cancel=cancel)
+                      outros_nomes=(nome,), email=email, rest=rest, cancel=cancel, cfg=current_app.config)
     for a in itens:
-        a["quando_txt"] = a["quando"].strftime("%d/%m %H:%M")
+        q = a["quando"].astimezone(_BRT) if a["quando"].tzinfo else a["quando"]
+        a["quando_txt"] = q.strftime("%d/%m · %H:%M")        # ao lado do que aconteceu (22/11/2026)
     return itens
 
 

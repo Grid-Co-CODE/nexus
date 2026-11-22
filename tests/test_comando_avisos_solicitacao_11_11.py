@@ -190,5 +190,6 @@ def test_o_sino_mostra_a_cancelada_com_o_selo(app, banco, limpo, avisos_limpos, 
         [_sol("4303", 203, "19203", conta=None, nome=PESSOA["nome"])],
         {203: {"motivo": "Duplicada", "visto": agora - timedelta(minutes=5)}}))
     sino = _sino(_cliente_de(app, PESSOA).get("/").get_data(as_text=True))
-    assert "OS 19203 da sua solicitação foi cancelada" in sino and "Motivo: Duplicada" in sino
-    assert 'sino-sev--critico">Cancelada' in sino or ">Cancelada<" in sino
+    # três linhas (22/11/2026): "OS 19203 — Cancelada", o motivo em vermelho com a solicitação, e a atividade
+    assert '<b class="nt-os">OS 19203</b> — Cancelada' in sino and "nt--critico" in sino
+    assert '<span class="nt-st nt-st--critico">Motivo: Duplicada</span> · da sua solicitação 4303' in sino
