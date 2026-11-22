@@ -1,11 +1,11 @@
 """CÓPIA da lógica de regras do App de Campo (function_app.py). NÃO EDITE: rode ferramentas/extrair_regras_campo.py.
 
-Origem: function_app.py do App, codigo 1d90c968dbc08416 (o número que o /api/health do App mostra quando é esta a
-versão no ar). Copiado em 13/11/2026 09:21. Sem comentários nem docstrings (o repositório é
+Origem: function_app.py do App, codigo 408ab23a2b7df88c (o número que o /api/health do App mostra quando é esta a
+versão no ar). Copiado em 22/11/2026 10:54. Sem comentários nem docstrings (o repositório é
 público); o porquê de cada regra está no código do App. Só o acesso a dado foi trocado (fim do arquivo).
 """
 # ruff: noqa
-CODIGO_APP = "1d90c968dbc08416"
+CODIGO_APP = "408ab23a2b7df88c"
 COPIADAS = ('ApiError', 'CADASTRO_TTL_S', 'ESTOURO_EXEC_MIN', 'ESTOURO_EXEC_X', 'ESTOURO_PREV_TETO', 'ESTOURO_PREV_X', 'FILA_TTL_S', 'FxLimite', 'LIMIARES_PADRAO', 'STATUS_IN_REVIEW', 'SUP_CAP_BACKLOG', 'TRIAGEM_ESTOURO', 'TRIAGEM_NOTA_OK', 'V2_PESOS', 'V2_PISO', 'VARREDURA_ESPERA_S', '_CAD', '_CANON', '_CATOV', '_CL_USINA', '_FILA_CACHE', '_SUPCAN', '_VARR', '_agora_iso', '_area_ok', '_cadastro_tab', '_canon_cluster', '_casa_nome', '_catalogo_ov', '_cluster_da_usina', '_clusters_por_email', '_concentracao', '_contar_fotos', '_dias_entre', '_duracao_ronda', '_estouro', '_estouro_causa', '_fila_bruta', '_fila_do_app', '_fila_supervisao', '_filtro_pessoas', '_fora', '_foto_campo_descrita', '_fx_wo_paralelo', '_gestao_prioridades', '_hoje', '_int0', '_janela', '_janela_str', '_lim_cache', '_limiares', '_link_fracttal_os', '_no_escopo', '_norm', '_obs_do_fechamento', '_parse_iso', '_pessoa_por_nome', '_preenchido_item', '_qlog_por_os', '_qualidade_os', '_qualidade_v2', '_ronda_resumo', '_rondas_os_pares', '_rondas_os_por_folio', '_sup_canon', '_sup_canon_mapa', '_sup_norm', '_triagem', '_txt_tarefa', '_usinas_do_cluster', '_v2_achou_falha', '_v2_e_na', '_v2_pede_foto', '_veredito_os', '_veredito_ronda', '_veredito_usina', 'tabela_limiares', 'tabela_ronda', 'tabela_ronda_ativos', 'tabela_ronda_os')
 ASSINATURAS_TROCADAS = {'_tabela': '583740a7d68b3a65', '_varredura_carregar': '377c494f9c294aaf', 'fx': 'e61f68ca593200e6', 'ident': 'a47f156debb43b7c', 'tabela': '666a04282aab3cbf', 'tabela_qlog': '95a72f1f98b561d4'}
 
@@ -1036,7 +1036,7 @@ def tabela_ronda_os():
     return _tabela('rondaos', '_table_ronda_os')
 
 
-def _rondas_os_pares(piso=None, respostas=False):
+def _rondas_os_pares(piso=None, respostas=False, trackers=False):
     oss = [dict(e) for e in tabela_ronda_os().query_entities("PartitionKey eq 'os'", select=['RowKey', 'folio', 'id_work_order', 'usina', 'data', 'tipo', 'email', 'ativo', 'em_revisao', 'erro', 'criada_em', 'reservado_em'])]
     if piso:
         oss = [o for o in oss if str(o.get('data') or '') >= piso]
@@ -1044,7 +1044,7 @@ def _rondas_os_pares(piso=None, respostas=False):
         return []
     p = min((str(o.get('data') or '9999-12-31') for o in oss))
     ron = {}
-    for r in tabela_ronda().query_entities("PartitionKey ge '%s'" % p, select=['PartitionKey', 'RowKey', 'email', 'nome', 'usina', 'cluster', 'qualidade', 'falhas', 'trk_total', 'trk_resp', 'inicio', 'fim', 'tipo', 'geo'] + (['respostas', 'multiItens'] if respostas else [])):
+    for r in tabela_ronda().query_entities("PartitionKey ge '%s'" % p, select=['PartitionKey', 'RowKey', 'email', 'nome', 'usina', 'cluster', 'qualidade', 'falhas', 'trk_total', 'trk_resp', 'inicio', 'fim', 'tipo', 'geo'] + (['respostas', 'multiItens'] if respostas else []) + (['trackers'] if trackers else [])):
         ron[str(r.get('PartitionKey') or ''), str(r.get('email') or '').lower(), _norm(r.get('usina'))] = r
     return [(o, ron.get((str(o.get('data') or ''), str(o.get('email') or '').lower(), _norm(o.get('usina')))) or {}) for o in oss]
 
