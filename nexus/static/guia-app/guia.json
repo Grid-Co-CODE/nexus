@@ -1,7 +1,7 @@
 {
  "versao": 1,
  "atualizado_em": "2026-11-22",
- "app": "v366 no ar (regras lidas no código); telas no desenho novo do App (rebranding, ainda não publicado)",
+ "app": "v368 no ar (22/11/2026): regras lidas no código; as telas são as do desenho novo, já publicado",
  "tema": "cada tela aceita ?tema=claro|escuro e a mensagem postMessage({tipo:'tema', tema})",
  "temas": [
   "PT e APR",
@@ -28,7 +28,8 @@
     "Tarefa vale a nota menos 60: de 10 a 40 pontos.",
     "Só as 70 melhores do ciclo somam; nota abaixo de 70 anula uma boa.",
     "Rondas somam até 280; semana com a programação toda feita ganha +20%.",
-    "Para entrar no ranking: 10 tarefas e 70% da programação."
+    "Para entrar no ranking: 10 tarefas e 70% da programação.",
+    "Contar o inventário do almoxarifado no mês vale +50 pontos, por fora do teto das rondas."
    ],
    "regras": [
     "Ciclo: do dia 20 de um mês ao dia 19 do seguinte, pelo dia de Brasília, com o nome do mês em que termina. Hoje (22/11) é o ciclo de dezembro, de 20/11 a 19/12. Até outubro valia o mês do calendário; os dias 20 a 31/10 contaram em outubro e em novembro. [fa:42682-42706; v362]",
@@ -46,15 +47,17 @@
     "Para entrar no ranking: pelo menos 10 tarefas registradas (até as que não pontuaram) e 70% da programação cumprida. [fa:43269-43280]",
     "Programação cumprida: cada tarefa programada conta uma vez no ciclo, como feita se estiver em Finalizados ou Em Verificação. Dia que ainda não chegou não conta contra; feita antes do dia conta. [fa:42827-42913; v302]",
     "Ordem: pelos pontos; no empate, quem tem mais tarefas contadas. Os 3 primeiros ganham prêmio no Caju (o valor não aparece no App). [fa:43005-43009, 43580-43583]",
-    "Pontualidade: a OS começou até 30 minutos depois do programado (adiantado também conta), uma vez por OS por dia, só nas OS da programação dele. É indicador: não soma ponto. [fa:3347, 3475-3483, 43291]"
+    "Pontualidade: a OS começou até 30 minutos depois do programado (adiantado também conta), uma vez por OS por dia, só nas OS da programação dele. É indicador: não soma ponto. [fa:3347, 3475-3483, 43291]",
+    "Inventário do almoxarifado: 50 pontos por almoxarifado contado, uma vez por mês, para quem enviou a contagem; soma fora do teto das rondas e dos bônus de semana. Vale desde 20/11/2026 (ciclo de dezembro). Se o PCM pedir recontagem, os 50 saem até a recontagem ser enviada (voltam para quem recontou). Contagem cancelada pelo PCM não pontua. [fa _v2_inventario; v368]"
    ],
    "casos": [
     "Tarefa passada para a semana seguinte conta uma vez no cumprimento; na semana em que reaparece não entra na conta do bônus.",
     "Tarefa pausada sem conclusão não tem ponto e, depois do dia programado, conta como não cumprida.",
-    "Inventário do almoxarifado hoje vale 0 ponto (decisão de 28/10). Os +50 por mês pedidos em 21/11 ainda não estão no App."
+    "O ciclo cruza dois meses do calendário: o mesmo almoxarifado pode dar 50 pontos duas vezes num ciclo (uma contagem em cada mês)."
    ],
    "incerto": [
-    "Os valores são os padrões do código; as configurações PLACAR_* do servidor podem mudá-los sem versão nova (só o teto de 280 está documentado igual)."
+    "Os valores são os padrões do código; as configurações PLACAR_* do servidor podem mudá-los sem versão nova (só o teto de 280 está documentado igual).",
+    "Recontagem pedida depois de o ciclo fechar muda o total daquele ciclo (a conta é pelo estado de agora)."
    ],
    "telas": [
     {
@@ -83,14 +86,16 @@
     "técnico",
     "supervisor"
    ],
-   "resposta": "Os trackers parados e sem comunicação da usina, vindos do tempo real, aparecem na ronda, na etapa Trackers, e o técnico responde cada um: Normalizado, Não normalizado ou Não se aplica.",
+   "resposta": "Os trackers parados e sem comunicação da usina, vindos do tempo real, aparecem na aba Ronda: pelo botão \"Ver trackers\" (sem começar ronda) ou na etapa Trackers da ronda. O técnico responde cada um: Normalizado, Não normalizado ou Não se aplica.",
    "resumo": [
-    "A lista vem do tempo real, na etapa Trackers da ronda.",
+    "A lista vem do tempo real da usina.",
+    "Na Ronda, toque em \"Ver trackers\": dá para responder sem começar a ronda.",
     "Responda cada um: Normalizado, Não normalizado ou Não se aplica.",
     "Com chamado aberto, o App só avisa; sem ligação, busque pela plaqueta."
    ],
    "regras": [
     "A lista vem da plataforma de Performance (/api/campo/parados), lida aos :07 e :37, das 06:00 às 19:59 de Brasília. Ao abrir a ronda sem a lista do dia, o servidor busca só aquela usina. [fa:28762-28764, 28952-28966, 35866-35869]",
+    "\"Ver trackers\", na chegada da Ronda, abre a lista para responder sem começar a ronda. A resposta fica guardada no aparelho e sobe pela fila de envio (não se perde sem sinal, não duplica); vale uma por técnico, usina, tracker e dia. Não dá pontos e não pede foto: a foto do defeito vai na OS de Inspeção. [ch rbTrkAbrir; fa app/trackers/veredito; v368]",
     "Na Chegada, a linha Trackers mostra \"nenhum parado\" ou \"N parados · N sem comunicação · N com chamado aberto\". [ch:13942-13957]",
     "Na etapa \"Trackers com desvio\", cada cartão mostra a cabine, o tracker, o ângulo atual e o alvo (o sem comunicação não tem ângulo) e desde quando. [ch:14060-14079]",
     "A resposta é obrigatória: em branco conta como não verificado. As três respostas contam como respondido; os trackers valem 25% da nota da ronda. [ch:14792; fa:25779-25786, 25931]",
@@ -99,16 +104,15 @@
     "O chamado abre a OS de Inspeção no nome do técnico, com as perguntas do fabricante; é um por ativo e por dia de ronda. Sem sinal, \"a OS nasce quando reconectar\". [fa:16590-16767; ch:14729, 14762]",
     "Tracker sem ligação com o Fracttal: o técnico digita o número da plaqueta e escolhe entre os ativos Estrutura Trackers da usina (até 8 candidatos); a escolha fica guardada para as próximas rondas. [ch:14580-14588, 14510-14525; fa:29038-29059]",
     "Número repetido sem inversor vira um item só, sem chamado automático: registre na observação e avise o PCM. [fa:28874-28891; ch:14575-14595]",
-    "Cada tracker apontado vai ao Nexus no livro rondas_trackers_app_campo (motivo e observação cifrados). [fa:39057-39140]"
+    "Cada tracker apontado vai ao Nexus no livro rondas_trackers_app_campo (motivo e observação cifrados). [fa:39057-39140]",
+    "O que foi respondido pelo \"Ver trackers\" entra como respondido na etapa Trackers da ronda do mesmo dia (só o que estava em branco). [ch rdTrazerAvulsas; v368]"
    ],
    "casos": [
     "O tracker respondido que sai da lista do tempo real continua visível na ronda.",
     "Uma usina sem a ligação com o Fracttal fica com a lista do dia até o dia seguinte."
    ],
    "incerto": [
-    "O chamado automático depende do ajuste RONDA_CHAMADO_NEXUS; a documentação diz desligado até ser ligado. Desligado, o Não normalizado só registra.",
-    "Não existe hoje uma tela de trackers fora da ronda: o rebranding propõe abrir pela Chegada.",
-    "Trackers sem ligação: o pedido à Performance (ligar todos os trackers da API aos ativos do Fracttal) segue sem resposta."
+    "Trackers sem ligação com o Fracttal: o pedido à Performance (ligar todos os trackers da API aos ativos do Fracttal) segue sem resposta."
    ],
    "telas": [
     {
@@ -195,7 +199,8 @@
    "resumo": [
     "Peça usada: lance na própria tarefa; o + para no saldo.",
     "Uma vez por mês, conte o almoxarifado pela Ronda, sem ver o saldo.",
-    "Em branco é não contei; 0 é não tem. O PCM confere e grava no Nexus."
+    "Em branco é não contei; 0 é não tem. O PCM confere e grava no Nexus.",
+    "Contou o almoxarifado no mês: +50 pontos. Recontagem pedida pelo PCM tira os 50 até você recontar."
    ],
    "regras": [
     "Lançar peça na tarefa vale para todos desde 16/10. A peça vai com o login do técnico; se o Fracttal recusar o perfil, a conta de serviço lança em nome dele. [fa:28255, 28283-28287; v278]",
@@ -209,7 +214,8 @@
     "Inventário: contagem cega (o App nem recebe o saldo). Em branco não é zero; só o 0 digitado zera. [fa:27607, 27667-27681]",
     "Uma contagem por mês (de Brasília) por almoxarifado. Já contado, o cartão diz \"Contado em dd/mm\" e só a recontagem pedida pelo PCM reabre. [fa:28048-28071; ch:17344-17346; v358]",
     "No Nexus (PCM → Almoxarifado → Inventário): Sistema × Contado × diferença; o PCM corrige, tira do lote, pede recontagem (com motivo, que chega ao técnico) ou grava. A gravação vai em lotes de 50. [Nexus pcm/CLAUDE.md:778-781]",
-    "Só o administrador e o setor PCM aprovam. Contagem com mais de 90 dias ou do futuro não se aprova. A mais nova substitui as que ainda não foram gravadas. [Nexus pcm/CLAUDE.md:788-796]"
+    "Só o administrador e o setor PCM aprovam. Contagem com mais de 90 dias ou do futuro não se aprova. A mais nova substitui as que ainda não foram gravadas. [Nexus pcm/CLAUDE.md:788-796]",
+    "Contar o inventário vale 50 pontos por almoxarifado, uma vez por mês, para quem enviou. Com recontagem pedida pelo PCM os 50 saem, a linha do Inventário na Ronda volta a ter o botão, com o motivo do PCM e \"+50 pts ao recontar\", e os pontos voltam quando a recontagem é enviada. [fa _v2_inventario; ch rdRbLinhaInv; v368]"
    ],
    "casos": [
     "Sem sinal, a lista de peças fica 12 h no aparelho e a contagem espera na fila como \"aguardando sinal\".",
@@ -218,8 +224,7 @@
     "Almoxarifado sem peça ligada: \"Almoxarifado vazio\", com foto do local."
    ],
    "incerto": [
-    "Quando o saldo baixa: a peça cria uma requisição no Fracttal que o PCM aceita em Requisições; o aceite automático está desligado.",
-    "Inventário hoje vale 0 ponto; os +50 por mês pedidos em 21/11 ainda não estão no App."
+    "Quando o saldo baixa: a peça cria uma requisição no Fracttal que o PCM aceita em Requisições; o aceite automático está desligado."
    ],
    "telas": [
     {
@@ -252,14 +257,16 @@
    "resumo": [
     "Está guardado no celular: não refaça o serviço.",
     "O App tenta sozinho; depois de 8 vezes, toque em Sincronizar.",
-    "Só o \"Não registrado\" manda refazer."
+    "Só o \"Não registrado\" manda refazer.",
+    "Com internet e um registro parado há mais de 1 hora, o App avisa na tela."
    ],
    "regras": [
     "O App envia sozinho a cada 3 minutos e quando o sinal volta. [ch DRENO_MS]",
     "Depois de 8 tentativas ele para de tentar sozinho (\"Parou de tentar\") e diz: não refaça o serviço, toque em Sincronizar. [ch:5652, 5979-5980, 12457]",
     "\"Registrado sem fotos\": as respostas e a conclusão foram gravadas, os anexos não; reconecte a conta Fracttal e anexe de novo pela tarefa. [ch:12455]",
     "\"Na espera\": o limite do Fracttal (200 pedidos por minuto para a empresa toda); pode seguir trabalhando, não limpe os dados do App. [ch:5653-5655, 12402-12409]",
-    "Só o \"Não registrado\" manda refazer (ou avisar o PCM, se for peça). [ch:12456]"
+    "Só o \"Não registrado\" manda refazer (ou avisar o PCM, se for peça). [ch:12456]",
+    "Aviso de registros parados: só com internet, quando um registro não enviado está parado há mais de 1 hora (ajuste do servidor, AVISO_PARADOS_MIN). Mostra até 3 registros, \"Sincronizar agora\" e \"Ver a Sincronização\"; fechado, não volta por 30 minutos. [ch rbAvisoParadosChecar; v368]"
    ],
    "casos": [
     "Memória do aparelho cheia: \"Não feche o app e avise o PCM agora\"."
@@ -289,7 +296,8 @@
     "A faixa vermelha diz \"Conta Fracttal desconectada · Nada que você fizer está sendo gravado\" com o botão Conectar. [ch:1919-1922]",
     "Com internet, a ronda não abre sem a conta; sem sinal, vale a última conferência do aparelho. [ch:5037-5040, 5073-5078]",
     "Sessão da Microsoft vencida: Sair, entrar com o mesmo e-mail e depois conectar o Fracttal. [ch:4883-4890]",
-    "Se o Fracttal não tem a pessoa cadastrada, aparece uma tela própria e quem resolve é o PCM. [ch:5081-5086; v266]"
+    "Se o Fracttal não tem a pessoa cadastrada, aparece uma tela própria e quem resolve é o PCM. [ch:5081-5086; v266]",
+    "Além da faixa vermelha, o App mostra o aviso \"Sua conta Fracttal desconectou\" ao abrir e de novo a cada tarefa iniciada, pausada ou concluída sem a conta. \"Agora não\" fecha; o registro continua guardado no aparelho. [ch rbAvisoConectar; v368]"
    ],
    "casos": [
     "Dois técnicos no mesmo aparelho: cada um precisa sair e entrar com a própria conta."
@@ -321,7 +329,8 @@
     "A OS atribuída que não está na programação entra como avulsa, com o selo \"Não programada\". [ch:7096]",
     "A busca \"Buscar OS pelo número\" procura em todas as semanas baixadas. [ch:1979-1987]",
     "Motivo que tira da programação: o robô do PCM tira a tarefa (a cada ~26 min) e ela vai para \"OSs fora da programação\". A iniciada e a feita ficam. [lição fora-da-programacao; v281]",
-    "A OS pausada vai para a seção \"OSs pausadas\". Religamento nunca sai por motivo. [v301, v306]"
+    "A OS pausada vai para a seção \"OSs pausadas\". Religamento nunca sai por motivo. [v301, v306]",
+    "OS nova: a OS que entrou hoje fora da programação e que você ainda não abriu aparece em âmbar, com \"Chegou às hh:mm\" (a hora em que foi criada no Fracttal), e um aviso no alto da aba Tarefas leva até ela. [ch rbNovaTk; v368]"
    ],
    "casos": [
     "OS atribuída à pessoa errada nenhuma máquina detecta: quem corrige é o COS ou o PCM."
@@ -555,7 +564,7 @@
     "Não se cria duas vezes: a chave é OS + ativo + data; na ronda, ativo + dia. [fa:15771, 16650]",
     "Ativo com chamado aberto no quadro de chamados do Nexus não pergunta: \"este ativo já tem o chamado <nº> em aberto\", e o Concluir libera. [fa:16451; v361]",
     "Sem sinal, o chamado vai para a fila: \"a OS de inspeção nasce quando o celular reconectar\". [ch:10426]",
-    "Na ronda, o tracker Não normalizado pode abrir o chamado do tracker (ver a pergunta do tracker parado). [ch:14562-14760]"
+    "Na Ronda (na etapa Trackers ou pelo \"Ver trackers\"), o tracker Não normalizado pode abrir o chamado do tracker: o técnico confirma em \"Abrir chamado\" e escolhe o fabricante. [ch:14562-14760]"
    ],
    "casos": [
     "Na OS o ativo vem dela e não se troca; na ronda há o \"Trocar ativo\".",
@@ -563,7 +572,7 @@
     "Se o App não conseguiu ler o quadro do Nexus, ele pergunta normalmente."
    ],
    "incerto": [
-    "O chamado pela ronda depende do ajuste RONDA_CHAMADO_NEXUS, desligado em 18/11: hoje a ronda provavelmente não abre chamado.",
+    "A abertura de chamado pelo tracker foi ligada em 22/11/2026 (ajuste RONDA_CHAMADO_NEXUS): conferir os primeiros chamados abertos por esse caminho.",
     "A lista de fabricantes gravada no Nexus pode diferir das marcas do código do App."
    ],
    "telas": [

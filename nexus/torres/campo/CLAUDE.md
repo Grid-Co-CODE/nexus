@@ -107,6 +107,13 @@ só**: o "calculado em" no canto; a hora em que o Nexus leu o livro foi para o "
   mesma lista do `NEXUS_COLUNAS["ranking"]` do App, na ordem dele. A régua do mês (piso, teto, anulação, teto das
   rondas, mínimos, bônus) vem nas oito colunas depois do "Calculado em", e o "Como o App calcula" da tela usa esses números. Coluna nova
   só no FIM, dos dois lados.
+- **O inventário do almoxarifado é uma parcela do total** (App v368, 22/11/2026; regra do Levi do mesmo dia): a coluna
+  "Inventário (pts)", a última do livro, e o "Total (pts)" já a inclui. Vale 50 pontos por almoxarifado contado no mês
+  do calendário, para quem enviou a contagem, por fora do teto das rondas e dos bônus, desde 20/11/2026 (o ciclo de
+  dezembro); a recontagem pedida pelo PCM tira os 50 até ser enviada, e o App lê esse estado do nosso
+  `nexus_almoxarifado_inventario · fato_evento_inventario`. A tela mostra a parcela (pódio "N de inventário", coluna
+  "Inventário", o termo no "!") só no ciclo em que alguém a tem: sem ela, tarefas + rondas + bônus não fechavam o total.
+  Prova: `tests/test_campo_ranking_inventario_22_11.py`.
 - **Tela:** o mês (o corrente e o anterior) e a região que o App escreve; o pódio (os três primeiros), os números, a
   classificação e o "Fora do ciclo". Com uma região escolhida, a posição continua a do mês inteiro ("3º lugar no
   mês"): é a que o técnico vê no App. Desde 18/10/2026 (Levi: "a classificação é mensal, estamos no mês de outubro") a
@@ -2803,6 +2810,9 @@ alto, a separação por tema e o texto curto, "para quem tem pouco tempo, porém
   `postMessage({tipo: 'tema', tema})` quando o `data-tema` do `<html>` troca (sem recarregar) e quando cada telefone acaba
   de carregar. **O iframe não tem color-scheme próprio**: herda o do Nexus, o mesmo que a tela do telefone declara; com
   `color-scheme:normal` no iframe o navegador pintava um retângulo atrás do telefone no tema escuro.
+- **Reimportado em 22/11/2026 com as regras da v368** (o pacote regerado pelo App: o texto de pontos, almoxarifado,
+  tracker parado, chamado, sincronização, conta Fracttal e OS sumiu; as 28 telas, iguais byte a byte). Só o `guia.json`
+  mudou.
 - Prova: `tests/test_campo_guia_app_21_11.py` (guia de mentira + o pacote de verdade: toda tela citada existe).
 
 ## Limitações de potência: mudou para a Performance (19/11/2026, noite)

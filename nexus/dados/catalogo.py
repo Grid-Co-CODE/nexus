@@ -607,7 +607,7 @@ FATOS = (
             pessoa=("hmac", "Técnico (HMAC)"), equipe=("nome", "Região")),
          tipo="snapshot_acumulado", chave=("Mês", "Técnico (HMAC)"),
          medidas=_m((("total_pts", "pts", "aditiva"), ("tarefas_pts", "pts", "aditiva"), ("rondas_pts", "pts", "aditiva"),
-                     ("bonus_pts", "pts", "aditiva"), ("tarefas_qtd", "qtd", "aditiva"), ("rondas_qtd", "qtd", "aditiva"),
+                     ("bonus_pts", "pts", "aditiva"), ("inventario_pts", "pts", "aditiva"), ("tarefas_qtd", "qtd", "aditiva"), ("rondas_qtd", "qtd", "aditiva"),
                      ("devolvidas_qtd", "qtd", "aditiva"), ("nota_media_pts", "pts", "nao"),
                      ("cumprimento_pct", "%", "nao"), ("pontualidade_pct", "%", "nao"))),
          fontes=("ranking_app_campo · Ranking",), janela_origem="o ciclo corrente e o anterior (App)",

@@ -1658,7 +1658,11 @@ def _pessoa_do_ranking(r: dict, nome: str, email: str = "") -> dict:
             "hmac": str(r.get("Técnico (HMAC)") or "").strip(),
             "total": n("Total (pts)"), "tarefas_pts": n("Tarefas (pts)"), "rondas_pts": n("Rondas (pts)"),
             "bonus": n("Bônus (pts)"), "bonus_prog": n("Bônus programação (pts)"),
-            "bonus_prev": n("Bônus preventivas (pts)"), "tarefas": n("Tarefas registradas"), "os": n("OS distintas"),
+            "bonus_prev": n("Bônus preventivas (pts)"),
+            # o inventário do almoxarifado (App v368, 22/11/2026): já está no "Total (pts)"; o livro de antes não tem a
+            # coluna (vem 0)
+            "inventario_pts": n("Inventário (pts)"),
+            "tarefas": n("Tarefas registradas"), "os": n("OS distintas"),
             "contadas": n("Tarefas contadas"), "acima_do_teto": n("Acima do teto"), "abaixo_do_piso": n("Abaixo do piso"),
             "anuladas": n("Anuladas"), "devolvidas": n("Devolvidas"), "nota_media": _int(r.get("Nota média")),
             "rondas": n("Rondas"), "rondas_no_teto": _sim(r.get("Rondas no teto")), "programado": n("Programado"),

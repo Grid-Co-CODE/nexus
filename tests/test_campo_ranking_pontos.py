@@ -30,7 +30,8 @@ def _linha(mes, email, total, posicao=None, regiao="SP Norte 01", motivo="", reg
              "Tarefas contadas": 38, "Acima do teto": 0, "Abaixo do piso": 2, "Anuladas": 2, "Devolvidas": 1,
              "Nota média": 88, "Rondas": 9, "Rondas no teto": "Não", "Programado": 20, "Concluído": 18,
              "Cumprimento (%)": 90, "Pontualidade (%)": 75, "Sequência (dias)": 4, "Sem GPS": 1, "Régua": regua,
-             "Calculado em": "2026-10-13T21:25:00Z", **REGUA, "Início do ciclo": inicio, "Fim do ciclo": fim}
+             "Calculado em": "2026-10-13T21:25:00Z", **REGUA, "Início do ciclo": inicio, "Fim do ciclo": fim,
+             "Inventário (pts)": 0}
     linha.update(extra)
     return linha
 
@@ -154,7 +155,9 @@ COLUNAS_DO_APP = ["Mês", "Posição", "No ciclo", "Motivo fora do ciclo", "Téc
                   "Piso da nota", "Teto de tarefas", "Anulação máxima", "Teto das rondas (pts)", "Mínimo de tarefas",
                   "Mínimo de cumprimento (%)", "Bônus programação (%)", "Bônus preventivas (%)",
                   # a v362 do App (19/11/2026): o ciclo do dia 20 ao 19, com as datas no fim
-                  "Início do ciclo", "Fim do ciclo"]
+                  "Início do ciclo", "Fim do ciclo",
+                  # a v368 (22/11/2026): o inventário do almoxarifado, já somado no "Total (pts)"
+                  "Inventário (pts)"]
 
 
 def test_a_tela_so_le_colunas_que_o_app_publica():
