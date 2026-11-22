@@ -21,7 +21,8 @@
 .gu-grade{display:grid;grid-template-columns:260px minmax(0,1fr);gap:34px;align-items:start}
 .gu-nav{position:sticky;top:76px;max-height:calc(100vh - 96px);overflow:auto;padding-right:6px;scrollbar-width:thin}
 .gu-nav-grupo+.gu-nav-grupo{margin-top:16px}
-.gu-nav-tema{margin:0 0 6px;font-size:12px;font-weight:700;color:var(--mudo)}
+/* o nome do setor em verde Grid, aqui e acima de cada pergunta (21/11/2026, Levi: "só quero o nome do setor em verde grid") */
+.gu-nav-tema{margin:0 0 6px;font-size:12px;font-weight:700;color:var(--verde-texto)}
 .gu-nav ul{margin:0;padding:0;list-style:none}
 .gu-nav li a{display:block;padding:5px 0 5px 10px;border-left:2px solid var(--linha);color:var(--tinta-2);font-size:13px;
   line-height:1.35;text-decoration:none}

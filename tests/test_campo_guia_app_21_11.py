@@ -143,3 +143,13 @@ def test_os_temas_seguem_a_ordem_que_o_pacote_manda(tmp_path, monkeypatch):
     G.limpar()
     assert [nome for nome, _ in G.carregar()["temas"]] == ["PCM e programação", "Pontos", "Chamados"]
     G.limpar()
+
+
+def test_acima_da_pergunta_so_o_nome_do_setor(app, guia):
+    """21/11/2026, Levi, vendo a tela no ar: "só quero o nome do setor em verde grid" (sem o público ao lado)."""
+    html = _cliente(app, admin=True).get(URL).get_data(as_text=True)
+    assert '<p class="gu-tema">Pontos</p>' in html
+    assert "· técnico" not in html
+    from pathlib import Path
+    css = (Path(__file__).resolve().parents[1] / "nexus" / "static" / "guia-app.css").read_text(encoding="utf-8")
+    assert ".gu-nav-tema{" in css and "color:var(--verde-texto)" in css.split(".gu-nav-tema{", 1)[1].split("}", 1)[0]

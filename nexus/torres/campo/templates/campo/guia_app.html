@@ -53,7 +53,8 @@
     <div class="gu-lista">
       {% for nome, ps in guia.temas %}{% for p in ps %}
       <article class="gu-pergunta" id="p-{{ p.id }}" data-busca="{{ p.busca }}" data-guia-de="{{ nome }}">
-        <p class="gu-tema">{{ p.tema }}{% if p.publico %} <span class="mudo">· {{ p.publico|join(', ') }}</span>{% endif %}</p>
+        {# só o nome do setor, em verde Grid (21/11/2026, Levi, vendo a tela no ar: "só quero o nome do setor em verde grid") #}
+        <p class="gu-tema">{{ p.tema }}</p>
         <h2 class="gu-h2">{{ p.titulo }}</h2>
         {% if p.resumo %}<ul class="gu-resumo">{% for f in p.resumo %}<li>{{ f }}</li>{% endfor %}</ul>{% endif %}
         {% if p.telas %}

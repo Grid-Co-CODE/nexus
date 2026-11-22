@@ -2796,7 +2796,8 @@ alto, a separação por tema e o texto curto, "para quem tem pouco tempo, porém
   `data-busca` já vem sem acento do servidor), os chips de tema na ordem do `temas` do pacote (Todos primeiro), a lista
   por tema ao lado (fixa no desktop) e cada pergunta com o resumo, os telefones (iframe de 260 × 572, `loading=lazy`),
   "Todas as regras (N)" fechado com a fonte apagada no fim da frase (`[fa:...; vNNN]` do pacote vira `.gu-fonte`) e os
-  casos. A pergunta sem tela diz que elas vêm na próxima leva. O `incerto` ("Para conferir") só para o administrador e o
+  casos. A pergunta sem tela diz que elas vêm na próxima leva. Acima de cada pergunta e nos grupos da lista, só o nome
+  do setor (o tema), em verde Grid (21/11/2026, Levi: "só quero o nome do setor em verde grid"): o público saiu. O `incerto` ("Para conferir") só para o administrador e o
   setor PCM (o README do pacote pede).
 - **O tema dos telefones**: o iframe nasce com `?tema=` do Nexus (`tema_do_pedido`) e o `static/guia-app.js` manda
   `postMessage({tipo: 'tema', tema})` quando o `data-tema` do `<html>` troca (sem recarregar) e quando cada telefone acaba
