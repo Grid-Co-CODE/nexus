@@ -25,6 +25,11 @@ def test_toda_tela_responde_logado(logado):
                 # a tela só do cliente (a Visão do cliente, 09/11/2026) leva quem é da Grid à Visão do responsável
                 assert resp.status_code == 302 and resp.headers["Location"].endswith("/t/campo/responsaveis"), tela.id
                 continue
+            if tela.dentro_de and resp.status_code == 302:
+                # a tela que é só a permissão de uma parte de outra (a Recoleta pelas fontes, 17/11/2026, mora dentro da
+                # Coletas): o endereço dela leva à tela de que ela faz parte
+                assert resp.headers["Location"].endswith(f"/t/{torre.id}/{tela.dentro_de}"), (torre.id, tela.id)
+                continue
             assert resp.status_code == 200, (torre.id, tela.id)
             assert tela.nome in resp.get_data(as_text=True)
 

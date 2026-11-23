@@ -50,9 +50,12 @@ ABA = "fato_edicao_contrato"
 CAB = ("edicao_id", "registrado_em", "data_id", "contrato_chave", "item_tipo", "item_id", "evento", "pessoa_hmac",
        "dados_cifrados")
 TIPOS_ITEM = ("cliente", "contrato", "regra", "obrigacao", "adicional", "parametros",
-              # o retorno da Ana Barros (chamada de 18/11/2026): o comentário (pedido da Danuth), a recorrência do calendário
+              # o retorno da gestora que pediu a visão do contrato (chamada de 18/11/2026): o comentário (pedido da área de Contratos), a recorrência do calendário
               # e o check de entregue, a sugestão descartada e o lançamento do financeiro mês a mês
-              "comentario", "recorrencia", "entrega", "descarte", "lancamento")
+              "comentario", "recorrencia", "entrega", "descarte", "lancamento",
+              # os pontos de atenção e de divergência (19/11/2026, `pontos.py`): o que o gestor inclui à mão e a resolução de
+              # qualquer ponto (com motivo e prova: decidir com o cliente qual documento vale é mudança de contrato)
+              "ponto", "resolucao")
 # o que não muda o contrato não pede motivo nem prova, só quem e quando (Levi, 18/11/2026: "Não: só quem e quando")
 LEVES = ("comentario", "entrega", "descarte")
 FREQUENCIAS = ("semanal", "mensal", "trimestral", "semestral", "anual")
@@ -93,7 +96,7 @@ CAMPOS: dict[str, tuple] = {
               ("vigente", "Vale hoje", "longo", None), ("setor", "Setor que executa", "lista", ("",) + SETORES),
               ("prazo", "Prazo", "texto", None), ("periodicidade", "Periodicidade", "texto", None),
               ("contrato_id", "Contrato", "contrato", None),
-              # a regra prioritária fica no alto das Regras (Ana Barros, 18/11/2026: "uma seleção de prioritárias [...] o
+              # a regra prioritária fica no alto das Regras (a gestora que pediu a visão, 18/11/2026: "uma seleção de prioritárias [...] o
               # próprio supervisor [...] vai setando as mais prioritárias de acompanhamento")
               ("prioritaria", "Prioritária", "booleano", "oculto")),
     "obrigacao": (("tipo", "Tipo", "lista", TIPOS_OBRIGACAO), ("descricao", "Obrigação", "longo", None),
@@ -122,6 +125,10 @@ CAMPOS: dict[str, tuple] = {
                     ("origem_regra", "Regra do contrato", "texto", "oculto")),
     "entrega": (("recorrencia_id", "Recorrência", "texto", "oculto"), ("data", "Data", "data", None)),
     "descarte": (("sugestao_id", "Sugestão", "texto", "oculto"),),
+    "ponto": (("nivel", "Tipo", "lista", ("Atenção", "Divergência")), ("texto", "O ponto", "longo", None),
+              ("setor", "Setor", "lista", ("",) + SETORES)),
+    "resolucao": (("ponto_id", "Ponto", "texto", "oculto"), ("ponto_texto", "Ponto", "texto", "oculto"),
+                  ("como", "Como ficou (o que se decidiu)", "longo", None)),
     "lancamento": (("mes", "Mês (aaaa-mm)", "mes", None), ("tipo", "Tipo", "lista", TIPOS_LANCAMENTO),
                    ("valor", "Valor (R$)", "numero", None), ("descricao", "Descrição", "longo", None)),
     "parametros": (("meta_entregaveis", "Meta de entregáveis no prazo (0 a 1)", "numero", "so_admin"),
@@ -135,11 +142,12 @@ CAMPOS: dict[str, tuple] = {
 OBRIGATORIOS = {"regra": ("categoria", "nome", "vigente"), "obrigacao": ("tipo", "descricao", "status"),
                 "comentario": ("alvo_id", "texto"), "recorrencia": ("nome", "frequencia"), "entrega": ("recorrencia_id", "data"),
                 "descarte": ("sugestao_id",), "lancamento": ("mes", "tipo", "valor"),
-                "adicional": ("servico",)}
+                "adicional": ("servico",), "ponto": ("nivel", "texto"), "resolucao": ("ponto_id", "como")}
 ROTULO_ITEM = {"comentario": "Comentário", "recorrencia": "Recorrência do calendário", "entrega": "Entrega",
                "descarte": "Sugestão descartada", "lancamento": "Lançamento do financeiro",
                "cliente": "Dados do contrato", "contrato": "Contrato", "regra": "Regra", "obrigacao": "Obrigação",
-               "adicional": "Serviço adicional", "parametros": "Metas e prazos"}
+               "adicional": "Serviço adicional", "parametros": "Metas e prazos",
+               "ponto": "Ponto de atenção ou divergência", "resolucao": "Ponto resolvido"}
 
 
 class Recusada(ValueError):
@@ -313,7 +321,8 @@ def pode_editar(cliente_item: dict, pessoas: list[dict], meu_hmac: str | None, a
 
 
 # ── o estado para a tela ─────────────────────────────────────────────────────────────────────────────────────────────
-def visao(base: dict, st: dict, hoje: date, pessoas: list[dict], meu_hmac: str | None, admin: bool) -> dict:
+def visao(base: dict, st: dict, hoje: date, pessoas: list[dict], meu_hmac: str | None, admin: bool,
+          radar: list[dict] | None = None) -> dict:
     """O que o dados.json entrega, no formato que a página lê (o mesmo da planilha e das fichas), com o estado de agora:
     as contas (`controle.com_datas`) depois de o contrato completar o vazio da planilha (`fichas.completar`)."""
     vivos = {t: {i: x for i, x in st[t].items() if not x.get("_retirado")} for t in st}
@@ -339,7 +348,11 @@ def visao(base: dict, st: dict, hoje: date, pessoas: list[dict], meu_hmac: str |
                 k = {"_id": "geral", "id": "Regras incluídas no Nexus", "regras": []}
                 f["contratos"].append(k)
                 por_k["geral|" + r["_cliente"]] = k
-        k["regras"].append({**{a: b for a, b in r.items() if a != "_cliente"}, "_id": rid})
+        rr = {**{a: b for a, b in r.items() if a != "_cliente"}, "_id": rid}
+        if isinstance(rr.get("ref"), dict) and rr["ref"].get("clausula"):
+            # a etiqueta curta da cláusula (Levi, 19/11/2026: "uma forma mais resumida dessa cláusula"); a inteira fica na dica
+            rr["ref"] = {**rr["ref"], "curta": F.clausula_curta(rr["ref"]["clausula"])}
+        k["regras"].append(rr)
     nomes = [c["cliente"] for c in clientes]
     fichas = {c: f for c, f in fichas.items() if c in nomes}
     obrig = [{**{a: b for a, b in o.items() if a != "_cliente"}, "cliente": o["_cliente"], "_id": i} for i, o in vivos["obrigacao"].items()]
@@ -365,6 +378,23 @@ def visao(base: dict, st: dict, hoje: date, pessoas: list[dict], meu_hmac: str |
     out["entregas"] = lista("entrega")
     out["descartes"] = [x.get("sugestao_id") for x in vivos.get("descarte", {}).values()]
     out["lancamentos"] = lista("lancamento")
+    # os pontos de atenção e de divergência (pontos.py): as contas, os leitores dos PDFs, a planilha × o PDF, o Radar da
+    # Zeladoria e os incluídos; a resolução de agora de cada um (a última não retirada)
+    from . import pontos as P
+    incluidos = {i: {**x, "_quem": (x.get("_incluido") or {}).get("quem") or "", "_quando": (x.get("_incluido") or {}).get("quando") or ""}
+                 for i, x in vivos.get("ponto", {}).items()}
+    resol = {}
+    for i, x in vivos.get("resolucao", {}).items():
+        resol[str(x.get("ponto_id") or "")] = {"id": i, "como": x.get("como") or "", "quem": (x.get("_incluido") or {}).get("quem") or "",
+                                                "quando": (x.get("_incluido") or {}).get("quando") or "", "_editado": x.get("_editado") or {}}
+    pts = P.todos(out["contratos"], fichas, radar, incluidos, resol, hoje)
+    out["pontos"] = pts["por_cliente"]
+    out["radar_sem_contrato"] = pts["radar_sem_contrato"]
+    out["radar_lido"] = pts["radar_lido"]
+    for c in out["contratos"]:
+        abertos = [p for p in out["pontos"].get(c["cliente"], []) if not p["resolvido"]]
+        c["pontos_atencao"] = sum(1 for p in abertos if p["nivel"] == "atencao")
+        c["pontos_divergencia"] = sum(1 for p in abertos if p["nivel"] == "divergencia")
     return out
 
 
@@ -512,6 +542,10 @@ def gravar(base: dict, item_tipo: str, item_ids, evento: str, cliente: str, valo
     if len(prova_texto) > PROVA_MAX:
         raise Recusada(f"O texto colado passou de {PROVA_MAX} caracteres: anexe o arquivo")
     lista = provas(arquivos)
+    if item_tipo == "resolucao" and evento == "inclusao":
+        from .pontos import ID_PONTO
+        if not ID_PONTO.match(str((valores or {}).get("ponto_id") or "")):
+            raise Recusada("Ponto inválido: atualize a página")
     # leve: não muda o contrato (o comentário, o check de entregue, a sugestão descartada, a regra marcada prioritária)
     leve = item_tipo in LEVES or (item_tipo == "regra" and evento == "alteracao" and set(valores or {}) <= {"prioritaria"})
     with _TRAVA:
@@ -651,6 +685,10 @@ def _rotulo(tipo: str, item: dict, st: dict) -> str:
         return f"{rec.get('nome') or 'Entrega'} de {_dbr(item.get('data'))}"
     if tipo == "lancamento":
         return f"{item.get('tipo') or ''} de {item.get('mes') or ''}: {str(item.get('descricao') or '')[:80]}"
+    if tipo == "ponto":
+        return str(item.get("texto") or "")[:120]
+    if tipo == "resolucao":
+        return str(item.get("ponto_texto") or item.get("ponto_id") or "Ponto")[:120]
     return ROTULO_ITEM.get(tipo, tipo)
 
 

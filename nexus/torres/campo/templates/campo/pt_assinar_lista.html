@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block titulo %}PTs para assinar{% endblock %}
+{% block conteudo %}
+<link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
+{# O link fixo para assinar PT pelo celular (Levi, 20/11/2026: "pode fazer um link específico para aprovação de PTs e
+   APRs via celular?"): o mesmo card por cima do Nexus desfocado do card de assinar (`pt_assinar.html`), com as PTs
+   esperando o De acordo de quem entrou. Cada uma abre o card dela, onde se assina. #}
+<div class="pa-fundo">
+  <article class="pa-card" aria-labelledby="pa-titulo">
+    <a class="pa-fechar cn-link" href="{{ raiz }}/" aria-label="Fechar e ir para o início do Nexus">Fechar</a>
+    <p class="gc-eyebrow">Permissões de trabalho</p>
+    <h1 id="pa-titulo" class="pa-titulo">PTs para o seu De acordo{% if lista %} <span class="pa-conta">{{ lista|length }}</span>{% endif %}</h1>
+    {% if leitura.erro %}
+    <div class="cn-erro" role="alert"><b>{{ leitura.erro }}.</b> Tente de novo em instantes.</div>
+    {% elif erro %}
+    <div class="cn-erro" role="alert"><b>{{ erro }}.</b> Tente de novo em instantes.</div>
+    {% elif lista %}
+    <p class="pa-texto mudo">Da mais antiga para a mais nova. Toque na PT para ver e assinar.</p>
+    <ul class="pa-lista">{% for o in lista %}
+      <li><a class="pa-item" href="{{ url_for('torre_campo.pt_assinar', numero=o.numero, ativo=o.codigo) }}">
+        <span class="pa-item-nome"><span class="m">{{ o.numero }}</span><span class="pa-det">{{ o.usina }}{% if o.ativo %} · {{ o.ativo }}{% endif %}</span></span>
+        {% if o.idade_min is not none %}<span class="pa-espera {{ 'cn-t-critico' if o.parada else 'cn-t-alerta' }}">há {{ idade_min(o.idade_min) }}</span>{% endif %}</a></li>{% endfor %}
+    </ul>
+    {% elif cos_fora %}
+    <p class="pa-texto">O COS dá o De acordo só no plantão, {{ plantao }}. Fora dele, assinam o Responsável UFV, o
+      Supervisor de Campo e o gestor de contrato da usina.</p>
+    {% elif not achada %}
+    <p class="pa-texto"><b>O Nexus não achou você no cadastro de pessoas.</b> Para assinar, o e-mail do seu login precisa
+      estar na sua ficha. Fale com o administrador do Nexus.</p>
+    {% else %}
+    <p class="pa-texto mudo">Nenhuma PT esperando o seu De acordo agora.</p>
+    {% endif %}
+    <p class="pa-pe mudo">Salve este endereço no celular. A APR não pede aprovação: o técnico assina no App, e ela aparece
+      dentro da PT.</p>
+  </article>
+</div>
+{% endblock %}

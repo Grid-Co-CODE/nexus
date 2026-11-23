@@ -571,11 +571,24 @@ def _canais_soltos(h):
     return out[:2]
 
 
+def _cab_scada(linhas):
+    """o cabeçalho do export do supervisório ("Nome do data point,Tempo,Valor,..."), ou None."""
+    cab = next((l for l in linhas if l.strip()), "").lstrip("﻿")
+    h0 = norm(cab)
+    return cab.strip() if h0.startswith("nome do data point") and "tempo" in h0 and "valor" in h0 else None
+
+
+def _ponto_irr(linha):
+    """a linha do export é de um ponto que vira IPOA ou GHI (o que o _pontos_scada lê)?"""
+    n = norm(linha.split(",", 1)[0])
+    return "irradia" in n and ("inclinada" in n or "horizontal" in n)
+
+
 def _formato_etm(linhas):
     """das primeiras linhas: {'tipo': 'scada'} | {'tipo': 'logger', 'sep', 'date', 'time', 'poa', 'ghi', 'nomes'} | None"""
     cab = next((l for l in linhas if l.strip()), "").lstrip("﻿")
     h0 = norm(cab)
-    if h0.startswith("nome do data point") and "tempo" in h0 and "valor" in h0:
+    if _cab_scada(linhas):
         if any("irradia" in norm(l) for l in linhas[1:6]):
             return {"tipo": "scada", "cab": cab.strip()}
         return None
@@ -742,10 +755,18 @@ class EtmPolaris(Leitor):
         try:
             cab = arq.cabeca(6)
             fmt = _formato_etm(cab)
+            primeira = cab[1:3]
+            if not fmt and _cab_scada(cab):
+                # O export vem ORDENADO pelo nome do ponto: "Comunicação_Solarimetrica" vem antes de "Irradiação_..."
+                # (São Bento V, 19/11/2026: 14 linhas de comunicação no alto, e o arquivo caía como "formato novo" no
+                # .exe e na Coletas do Nexus). Como no leitor da Apolo, olha a 1ª coluna do arquivo todo antes de desistir.
+                irr = next((l for l in arq.texto().splitlines()[1:] if _ponto_irr(l)), None)
+                if irr:
+                    fmt, primeira = {"tipo": "scada", "cab": _cab_scada(cab)}, [irr]
             if not fmt:
                 return None
             ult = _ultima_linha(arq.caminho)
-            amostra = [l for l in cab[1:3] + [ult] if l.strip()]
+            amostra = [l for l in primeira + [ult] if l.strip()]
             dias = [d for d in (_data_linha(l, fmt) for l in amostra) if d]
             prefixos = set()
             if fmt["tipo"] == "scada":

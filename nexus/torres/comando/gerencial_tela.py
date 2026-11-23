@@ -89,14 +89,18 @@ def _usinas(hoje) -> tuple[list[dict], list[str]]:
         for x in ms:
             mid = x["id"]
             dd = (disps.get(mid) or {}).get(uid) or {}
-            if x["atual"]:
-                meses[mid] = {"meta": _f(l.get("atingimento")), "pr": _f(l.get("pr")), "pr_prev": _f(l.get("pr_meta")),
-                              "disp": _f(dd.get("disp"))}
-                continue
             mes_id = int(mid[:4]) * 100 + int(mid[5:7])
             mt = (metas.get(mes_id) or {}).get(uid) or {}
+            # a geração e a meta em kWh (22/11/2026): a energia que o contrato expurga se soma a elas
+            kwh = {"prod_kwh": _f(mt.get("prod_kwh")), "meta_kwh": _f(mt.get("meta_kwh")),
+                   # e a potência e os dias da disponibilidade: a geração média da usina nas horas de sol do mês
+                   "pot_kwp": _f(dd.get("pot_kwp")), "dias": _f(dd.get("dias"))}
+            if x["atual"]:
+                meses[mid] = {"meta": _f(l.get("atingimento")), "pr": _f(l.get("pr")), "pr_prev": _f(l.get("pr_meta")),
+                              "disp": _f(dd.get("disp")), **kwh}
+                continue
             meses[mid] = {"meta": _f(mt.get("atingimento")), "pr": _f(mt.get("pr")), "pr_prev": _f(mt.get("pr_meta")),
-                          "disp": _f(dd.get("disp")),
+                          "disp": _f(dd.get("disp")), **kwh,
                           # o mês que o fato tem é zero de verdade para a usina sem ronda; o que ele não tem, None
                           "rondas": AM.rondas_do_mes(rondas, meses_fato, uid, mes_id)}
         out.append({
@@ -113,11 +117,102 @@ def _usinas(hoje) -> tuple[list[dict], list[str]]:
     return out, avisos
 
 
+def _expurgos(hoje) -> tuple[dict, list[str]]:
+    """O que o Nexus registra e os contratos podem expurgar (22/11/2026; a conta em `nexus/comando/expurgos.py`), por mês
+    do filtro e por usina: a queda da rede pelas OS de religamento que a plataforma publica (`falhas_performance ·
+    disponibilidade_os`, a mesma ligação pelo nome da disponibilidade) e a limitação imposta pelo cadastro de Performance ›
+    Limitações. Fonte que não abre vira aviso, e a nota segue sem o expurgo dela."""
+    from datetime import datetime, timedelta
+    from ...campo import limitacoes as L
+    from ...campo import responsaveis as R
+    from ...campo import visao
+    from ...comando import expurgos as EXP
+    from ...comando import gerencial as G
+    ms, out, avisos = G.meses(hoje), {"rede": {}, "limitacao": {}}, []
+    tz = L._BRT
+    janelas = {}
+    for x in ms:
+        ini = datetime(int(x["id"][:4]), int(x["id"][5:7]), 1, tzinfo=tz)
+        prox = (ini + timedelta(days=32)).replace(day=1)
+        janelas[x["id"]] = (ini, datetime(hoje.year, hoje.month, hoje.day, tzinfo=tz) if x["atual"] else prox)
+    try:
+        from ...cos import normalizacoes_banco as NB
+        # a queda é a OS de religamento que o COS ligou à geração parada (Levi, 22/11/2026: "vai contar lá"): as
+        # ocorrências normalizadas e as ainda abertas
+        cos = visao._livro(NB.LIVRO, NB.ABA) + visao._livro(NB.LIVRO, NB.ABA_ABERTAS)
+        nomes = R.Nomes(visao._Base())
+        linhas_os, linhas_dia = visao._livro(R.LIVRO_DISP, R.ABA_DISP_OS), visao._livro(R.LIVRO_DISP, R.ABA_DISP)
+        for mid, (ini, fim) in janelas.items():
+            out["rede"][mid] = EXP.rede_por_usina(cos, linhas_os, linhas_dia, mid, ini, fim,
+                                                  lambda n, f: nomes.usina(n, fracttal=f)[0])
+    except Exception:            # noqa: BLE001 — sem o COS ou as OS da disponibilidade, a queda da rede não sai da conta
+        _log.exception("Visão gerencial: as ocorrências do COS ou as OS da disponibilidade (expurgo da rede) não abriram")
+        avisos.append("as ocorrências do COS e as OS de religamento (o expurgo da queda da rede)")
+    try:
+        lido = L.ler()
+        if lido.get("erro"):
+            raise RuntimeError(lido["erro"])
+        lista = L.vigentes(lido)
+        for mid, (ini, fim) in janelas.items():
+            out["limitacao"][mid] = EXP.limitacao_por_usina(lista, ini, fim)
+    except Exception:            # noqa: BLE001 — sem o cadastro, a limitação imposta não sai da conta
+        _log.exception("Visão gerencial: o cadastro das limitações (expurgo da limitação imposta) não abriu")
+        avisos.append("o cadastro das limitações de potência (o expurgo da limitação imposta)")
+    return out, avisos
+
+
 @bp.route("/visao-gerencial")
 def visao_gerencial():
     """A página: o JavaScript pede o dados.json e desenha o portfólio, o parque do cliente e a nota da usina."""
     _so_interno()
     return render_template("comando/gerencial.html", torre=TORRE, tela=TORRE.tela("visao-gerencial"))
+
+
+_ORDEM_SEV = {"critico": 0, "atencao": 1, "info": 2}
+
+
+def _sem_a_usina(titulo: str, usina: str) -> str:
+    """"Usina X: CAB1 sem comunicação" vira "CAB1 sem comunicação": na tela da usina, o nome dela já está no alto."""
+    pre = f"{usina}: "
+    return titulo[len(pre):] if usina and titulo.startswith(pre) and len(titulo) > len(pre) else titulo
+
+
+@bp.route("/visao-gerencial/usina/<int:uid>/insights.json")
+def visao_gerencial_insights(uid: int):
+    """O que o Nexus Insights aponta AGORA na usina, para a tela da usina juntar com a nota do contrato (19/11/2026, Levi:
+    "clicando na usina, eu queria que a informação fosse uma mescla do que a gente tem agora com o que a gente tem no Nexus
+    Insights"). Os insights vivos (não concluídos) da usina, do mais grave para o menos, com o que a regra viu, o que
+    fazer, a torre dona e com quem está; o resto (responder, assumir, a conversa) fica no Nexus Insights, aberto pelo
+    `abrir`. A janela é sempre AGORA: o filtro de mês da tela vale para a nota, não para os insights."""
+    from urllib.parse import quote
+
+    from ...comando import regras as RG
+    from ...prefixo import na_raiz
+    from . import ES, MO, PD, _com_estado, _meu_hmac, _nomes_das_torres, _usinas_montadas, _ve_o_insight
+    _so_interno()
+    m = _usinas_montadas()
+    vivos = [i for i in (m.get("vivos") or {}).get(uid) or [] if _ve_o_insight(i)]
+    lista = _com_estado(vivos, ES.atual(), _meu_hmac(), MO.torres_da_pessoa(), peds=PD.por_objeto(PD.atual()))
+    nomes = _nomes_das_torres()
+    out = []
+    for i in sorted(lista, key=lambda x: (_ORDEM_SEV.get(x["sev"], 9), x.get("regra") or "", x["id"])):
+        if i["pedidos"]:
+            com_quem = ", ".join(f"{p['nome']}: {p['sit_rotulo'] if p.get('situacao') in ('atrasado', 'hoje') else p['rotulo']}"
+                                 for p in i["pedidos"])
+        elif i["estado"] == "assumiu":
+            com_quem = "Com você" if i["meu"] else (f"Com {i['por']}" if i["por"] else "Assumido")
+        else:
+            com_quem = "Ninguém avisado"
+        out.append({"id": i["id"], "regra": i["regra"], "regra_nome": i["regra_nome"], "sev": i["sev"],
+                    "sev_rot": i["sev_rot"], "sev_tom": i["sev_tom"], "titulo": _sem_a_usina(i.get("titulo") or "", i.get("usina") or ""),
+                    "torre_nome": nomes.get(i.get("torre"), i.get("torre") or ""), "evid": list(i.get("evid") or [])[:6],
+                    "acao": i.get("acao") or "", "link": na_raiz(i["link"]) if i.get("link") else "",
+                    "abrir": na_raiz("/t/comando/insights") + f"?abrir={quote(i['id'], safe='')}#ins-{i['id'].replace(':', '-')}",
+                    "com_quem": com_quem, "estado": i["estado"]})
+    resp = jsonify({"ok": True, "janela": "agora", "calculando": bool(m.get("insights_calculando")), "insights": out,
+                    "contas": {k: sum(1 for x in out if x["sev"] == k) for k in RG.SEVERIDADES}})
+    resp.headers["Cache-Control"] = "no-store"
+    return resp
 
 
 @bp.route("/visao-gerencial/dados.json")
@@ -142,7 +237,9 @@ def dados_gerencial() -> dict:
         contratos, aviso = _contratos(agora.date())
         if aviso:
             avisos.append(aviso)
-        copia.update(dados=G.montar(usinas, contratos, agora.date(), agora.strftime("%d/%m/%Y às %H:%M"), avisos), ts=time.time())
+        expurgos, avisos_exp = _expurgos(agora.date())
+        copia.update(dados=G.montar(usinas, contratos, agora.date(), agora.strftime("%d/%m/%Y às %H:%M"),
+                                    avisos + avisos_exp, expurgos=expurgos), ts=time.time())
     return copia["dados"]
 
 

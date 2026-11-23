@@ -37,7 +37,7 @@ ESPERA_ERRO_S = 20 * 60          # o erro guardado vale isto; depois a próxima 
 TRAVA_MORTA_S = 5 * 60           # a trava mais velha que isto é de um pedido que morreu (o servidor reiniciou)
 # a versão do pedido e da conferência: o guardado de outra versão é refeito na próxima abertura (18/11/2026: o pedido
 # trazia um exemplo com "16 desligamentos", e duas usinas saíram com 16 no lugar de 11 e de 3)
-VERSAO = 5
+VERSAO = 6
 # o diagnóstico vai em Busca, sem o pensamento do Claude (18/11/2026, Levi, com a 1ª abertura do dia em 40 s: "diagnóstico
 # em busca, rode alguns diagnósticos e bata os dados para ver se a informação está confiável"). True volta a pensar
 PENSAR = False
@@ -55,6 +55,7 @@ Responda SÓ com o bloco abaixo, em JSON válido, sem nada antes ou depois, sem 
 - pode_fazer: o que ele PODE fazer para melhorar (recomendação, não obrigação); até 3; até 110 caracteres, começando pelo verbo.
 - pendente: o que está em aberto esperando alguém (fabricante, concessionária, outro setor, peça, chamado); até 4; até 110 caracteres.
 - Cada número com o nome que o dossiê dá a ele. Desligamento é só a parada em que a geração parou (a perda de comunicação não conta): o número de desligamentos é o da coluna "Desligamentos (a geração parou)" da tabela por mês da seção do COS, na linha do mês corrente. Não conte as linhas das paradas e não use outro número no lugar.
+- Janela de tempo: cada número do texto leva a janela que o dossiê dá a ele: "hoje" ou "agora" (o COS agora, as OS, as pendências), "até ontem" (a meta, a geração, o PR e a disponibilidade do mês, que é parcial) e "normalizados no mês" (os desligamentos da tabela por mês, que só conta a parada em que a usina já voltou). A ocorrência aberta agora NÃO está na tabela por mês: com equipamento parado hoje, nunca escreva que o mês teve zero ou nenhum desligamento sem dizer "já normalizados" e sem citar a parada de hoje na mesma frase.
 - Ronda: só peça para programar a ronda quando o dossiê diz que ela está atrasada ou sem cobertura. Zeladoria vencida não é ronda: é pedido à Zeladoria.
 - O que o dossiê marca como "sem dado" ou "sem leitura" não vira item nem conclusão: não é zero, nem "sem conferência", nem pendência.
 - "os": o número de uma OS do dossiê ligada ao item, ou null. Nunca invente OS, pendência ou número.
@@ -307,6 +308,19 @@ def equipamentos_fora(textos: list[str], dossie: str) -> list[str]:
     return sorted(fora)
 
 
+_RX_AGORA_COS = re.compile(r"^- Agora[^\n:]*: (\d+) ocorrências? abertas?[^\n]*\n((?:  - [^\n]*\n?)*)", re.M)
+_RX_ZERO_DESLIGAMENTO = re.compile(r"\b(?:0|zero|nenhum|sem)\s+desligamentos?\b", re.I)
+
+
+def paradas_abertas(dossie: str) -> int:
+    """Quantas ocorrências abertas AGORA no COS são equipamento parado ou em falha (a falha de comunicação não é parada):
+    elas ainda não foram normalizadas e estão fora da tabela por mês do dossiê."""
+    m = _RX_AGORA_COS.search(dossie or "")
+    if not m:
+        return 0
+    return sum(1 for l in m.group(2).splitlines() if l.strip() and "comunica" not in _plano(l))
+
+
 def conferir(diag: dict | None, dossie: str, dia: str | None = None) -> list[str]:
     """O que o diagnóstico diz e o dossiê não sustenta, em frases para a tela. Confere, na situação, nos itens e nos
     pedidos:
@@ -315,6 +329,9 @@ def conferir(diag: dict | None, dossie: str, dia: str | None = None) -> list[str
       corrente fora da tabela, um número dela;
     - cada "N strings fora" contra as strings fora agora: o total ou o de um inversor;
     - cada inversor, cabine ou tracker citado pelo número: tem que estar no dossiê com esse número.
+    - o "zero desligamentos" (0, zero, nenhum, sem) dito com parada ABERTA agora no COS, sem a janela ("normalizados")
+      na mesma frase: a tabela por mês só conta a parada que já voltou (19/11/2026, Levi: o Insights dizia "0
+      desligamentos com a geração parada" e, no título, "SKID 2 parado hoje").
     Sem a tabela ou sem a linha no dossiê, aquela conferência não é feita."""
     if not diag:
         return []
@@ -349,7 +366,49 @@ def conferir(diag: dict | None, dossie: str, dia: str | None = None) -> list[str
                    + (f" ({', '.join(str(x) for x in st['por_inversor'])} por inversor)" if len(st["por_inversor"]) > 1 else "")
                    for n in fora]
     falhas += [f"{nome}: não está no dossiê com esse nome" for nome in equipamentos_fora(textos, dossie)]
+    abertas = paradas_abertas(dossie)
+    if abertas and any("normalizad" not in _frase(t, m.start(), m.end()).lower()
+                       for t in textos for m in _RX_ZERO_DESLIGAMENTO.finditer(t)):
+        falhas.append(f"zero desligamentos no mês: o dossiê tem {abertas} {'ocorrência aberta' if abertas == 1 else 'ocorrências abertas'} "
+                      "agora com equipamento parado, que ainda não entrou na contagem do mês (só as já normalizadas)")
     return falhas
+
+
+# ── a assinatura do dossiê e o registro guardado ────────────────────────────────────────────────────────────────────
+_RX_LINHA_GERADO = re.compile(r"^- Gerado em:[^\n]*\n?", re.M)
+
+
+def assinatura(dossie: str) -> str:
+    """O dossiê reduzido a uma marca (sha256), sem a linha "Gerado em" (a única que muda sozinha de um dia para o outro).
+    Dois dossiês com a mesma assinatura são IDÊNTICOS: o insight de um vale para o outro (19/11/2026, Levi: "Se o dossiê
+    de uma usina estiver idêntico ao do dia anterior, reaproveite o insight em vez de chamar o Haiku")."""
+    import hashlib
+    return hashlib.sha256(_RX_LINHA_GERADO.sub("", dossie or "").encode("utf-8")).hexdigest()
+
+
+def registro(usina_id, dia: str, r: dict, diag: dict | None, falhas: list[str], refeito: bool = False, dossie: str = "") -> dict:
+    """O que fica guardado de um diagnóstico (o mesmo formato na chamada direta e no lote da madrugada)."""
+    agora = datetime.now(IA._BRT)
+    d = {"usina_id": int(usina_id), "dia": dia, "ts": time.time(), "gerado_em": agora.isoformat(timespec="seconds"),
+         "ok": bool(r.get("ok")), "modelo": r.get("id") or "", "rotulo": r.get("rotulo") or "",
+         "troca": r.get("troca") or "", "erro": r.get("erro") or "", "ms": r.get("ms"), "versao": VERSAO,
+         "dossie_sha": assinatura(dossie) if dossie else ""}
+    if r.get("ok"):
+        d["diag"] = diag
+        d["texto"] = "" if d["diag"] else IA.limpar_citacoes(r.get("texto") or "")[:3000]
+        d["numeros"] = r.get("numeros")
+        if refeito:
+            d["refeito"] = True
+        if falhas:
+            d["conferir"] = falhas
+    return d
+
+
+def gravar(cfg, d: dict) -> None:
+    pasta = _pasta(cfg, d["dia"])
+    if pasta:
+        pasta.mkdir(parents=True, exist_ok=True)
+        (pasta / f"{int(d['usina_id'])}.json").write_text(json.dumps(d, ensure_ascii=False), encoding="utf-8")
 
 
 # ── o guardado do dia ────────────────────────────────────────────────────────────────────────────────────────────────
@@ -484,21 +543,8 @@ def gerar(cfg, usina_id: int, dossie: str, dossie_tokens: int = 0, dia: str | No
             r2, diag2 = uma_vez(True)
             if r2.get("ok") and diag2:
                 r, diag, falhas, refeito = r2, diag2, conferir(diag2, dossie, dia), True
-        agora = datetime.now(IA._BRT)
-        d = {"usina_id": int(usina_id), "dia": dia, "ts": time.time(), "gerado_em": agora.isoformat(timespec="seconds"),
-             "ok": bool(r.get("ok")), "modelo": r.get("id") or "", "rotulo": r.get("rotulo") or "",
-             "troca": r.get("troca") or "", "erro": r.get("erro") or "", "ms": r.get("ms"), "versao": VERSAO}
-        if r.get("ok"):
-            d["diag"] = diag
-            d["texto"] = "" if d["diag"] else IA.limpar_citacoes(r.get("texto") or "")[:3000]
-            d["numeros"] = r.get("numeros")
-            if refeito:
-                d["refeito"] = True
-            if falhas:
-                d["conferir"] = falhas
-        if pasta:
-            pasta.mkdir(parents=True, exist_ok=True)
-            (pasta / f"{int(usina_id)}.json").write_text(json.dumps(d, ensure_ascii=False), encoding="utf-8")
+        d = registro(usina_id, dia, r, diag, falhas, refeito, dossie)
+        gravar(cfg, d)
         return d
     except Exception as ex:      # noqa: BLE001 — a thread não pode morrer calada
         log.exception("Diagnóstico do dia: a usina %s falhou", usina_id)
@@ -519,4 +565,7 @@ def para_tela(d: dict) -> dict:
     return {"estado": "pronto" if d.get("diag") else "texto", "diag": d.get("diag"), "texto": d.get("texto") or "",
             "rotulo": d.get("rotulo") or "", "troca": d.get("troca") or "", "dia": d.get("dia") or "",
             "hora": em[11:16], "data": f"{em[8:10]}/{em[5:7]}" if len(em) >= 10 else "",
+            # o insight que veio de um dia anterior porque o dossiê não mudou (a madrugada, `diagnostico_noite.py`)
+            **({"sem_mudanca_desde": f"{d['reaproveitado_de'][8:10]}/{d['reaproveitado_de'][5:7]}"}
+               if len(str(d.get("reaproveitado_de") or "")) >= 10 else {}),
             **({"conferir": d["conferir"]} if d.get("conferir") else {})}

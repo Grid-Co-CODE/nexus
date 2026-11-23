@@ -7,7 +7,6 @@ import json
 import re
 import time
 from pathlib import Path
-from urllib.parse import parse_qs, urlsplit
 
 import pytest
 
@@ -60,6 +59,19 @@ def test_o_responsavel_ufv_da_ficha_decide_a_pt(com_responsavel):
     assert ok is False and "Responsável UFV" not in porque
 
 
+def test_o_link_fixo_lista_as_pts_para_o_de_acordo_de_quem_entrou(app, com_responsavel):
+    """O link para salvar no celular (Levi, 20/11/2026: "pode fazer um link específico para aprovação de PTs e APRs via
+    celular?"): as PTs que a pessoa da sessão pode decidir, cada uma abrindo o card de assinar dela."""
+    c = _sessao(app, RESP, "Responsável Exemplo")
+    html = c.get("/t/campo/pt/assinar").get_data(as_text=True)
+    assert "PTs para o seu De acordo" in html and 'href="/t/campo/pt/PT-1/assinar?ativo=THPN-ALT100-INVR1"' in html
+    assert "Salve este endereço no celular" in html
+    # quem não pode decidir nenhuma lê que não há, e quem o Nexus não acha no cadastro lê o que fazer
+    outro = _sessao(app, "ninguem@exemplo.test", "Ninguém Exemplo")
+    html = outro.get("/t/campo/pt/assinar").get_data(as_text=True)
+    assert "/t/campo/pt/PT-1/assinar" not in html and "O Nexus não achou você no cadastro de pessoas" in html
+
+
 def test_o_plantao_do_cos_vai_de_sexta_18h_a_segunda_6h():
     """Levi, 14/11/2026: "O pessoal do COS pode dar o de acordo a partir de sexta-feira, 6 horas da noite, até segunda,
     6 horas da manhã. Passou disso, só com o supervisor". No horário de Brasília."""
@@ -69,6 +81,12 @@ def test_o_plantao_do_cos_vai_de_sexta_18h_a_segunda_6h():
     assert decisao_pt.cos_no_plantao(h(14, 12)) and decisao_pt.cos_no_plantao(h(15, 23, 59))         # sábado e domingo
     assert decisao_pt.cos_no_plantao(h(16, 5, 59)) and not decisao_pt.cos_no_plantao(h(16, 6))       # segunda
     assert not decisao_pt.cos_no_plantao(h(11, 3))                                                    # quarta
+    # o feriado nacional inteiro também (Levi, 21/11/2026: "Sim, feriado conta como plantão"): Finados, uma segunda
+    assert decisao_pt.cos_no_plantao(h(2, 10)) and decisao_pt.cos_no_plantao(h(20, 9))               # e a Consciência Negra
+    # o ponto facultativo não ("Não, só feriado nacional"): Carnaval (terça) e Corpus Christi (quinta) de 2026
+    from datetime import datetime
+    assert not decisao_pt.cos_no_plantao(datetime(2026, 2, 17, 10, tzinfo=decisao_pt._BRT))
+    assert not decisao_pt.cos_no_plantao(datetime(2026, 6, 4, 10, tzinfo=decisao_pt._BRT))
 
 
 def test_o_setor_cos_dos_acessos_decide_a_pt_no_plantao(com_responsavel, monkeypatch):
@@ -107,15 +125,8 @@ def test_o_card_mostra_a_pt_e_a_assinatura_volta_ao_card_com_as_outras(app, com_
     assert f'<input type="hidden" name="volta" value="{CARD_PT1}">' in html
     assert '<input type="hidden" name="card" value="1">' in html
     assert "Outras PTs esperando" not in html                       # a lista vem depois de assinar
-    # sem o login do Fracttal: o login volta ao CARD, na mesma linha
-    r = c.post("/os/_nexus/pt/PT-1/decidir", data={"decisao": "de_acordo", "codigo": "THPN-ALT100-INVR1",
-                                                   "volta": CARD_PT1, "card": "1"})
-    prox = parse_qs(urlsplit(r.headers["Location"]).query)["next"][0]
-    assert prox == "/os/_nexus/pt/PT-1/voltar?ativo=THPN-ALT100-INVR1&card=1"
-    assert c.get(prox).headers["Location"] == CARD_PT1
-    assert "nexus_pt_decisoes" not in com_responsavel.workbooks
-    # com o login do Fracttal: grava, volta ao card com o aviso e as outras PTs das usinas dele (a PT-2, da Altair)
-    _entrar_no_fracttal(app, c, _jwt(email=RESP), RESP, "Responsável Exemplo")
+    # só com a entrada do Nexus, sem o login do Fracttal (20/11/2026): grava, volta ao card com o aviso e as outras PTs
+    # das usinas dele (a PT-2, da Altair)
     r = c.post("/os/_nexus/pt/PT-1/decidir", data={"decisao": "de_acordo", "codigo": "THPN-ALT100-INVR1",
                                                    "volta": CARD_PT1, "card": "1"})
     assert r.headers["Location"] == CARD_PT1

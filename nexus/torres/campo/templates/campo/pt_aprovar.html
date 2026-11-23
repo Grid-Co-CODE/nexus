@@ -3,7 +3,7 @@
 {% block conteudo %}
 {% from "_explica.html" import explica %}
 <link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
-{# Aprovação da PT no Nexus (05/10/2026): a PT do livro do App + a decisão assinada com o login do Fracttal do OS Creator,
+{# Aprovação da PT no Nexus (05/10/2026): a PT do livro do App + a decisão assinada com a entrada do Nexus (até 20/11/2026, o login do Fracttal do OS Creator),
    gravada no banco (nexus/campo/decisao_pt.py). Quem aplica no campo é o App. #}
 {# as linhas da PT de mais de um equipamento, cada uma com a sua situação: a da tela (`atual`) em negrito, as outras com
    o link de cada uma (`?ativo=`). Sem `atual`, todas com o link (a escolha) #}
@@ -117,7 +117,7 @@
       <form method="post" action="{{ raiz }}/os/_nexus/pt/{{ p.numero|urlencode }}/decidir" class="cn-form-decisao">
         {# a linha decidida: o código do ativo dela vai para o banco (codigo_ativo), e o App acha a linha por ele #}
         <input type="hidden" name="codigo" value="{{ p.codigo or '' }}">
-        <p class="cn-quem" id="cn-quem">Você assina com o seu login do Fracttal (o mesmo do OS Creator).</p>
+        <p class="cn-quem" id="cn-quem">Você assina com a conta com que entrou.</p>
         {% if quem_assina %}<p class="mudo">Quem pode dar o De acordo: {{ quem_assina[0]|lower }}{{ quem_assina[1:] }}. Quem pediu a PT não a decide.</p>{% endif %}
         <label class="gc-rotulo" for="cn-motivo">Motivo <span class="mudo">(obrigatório para Não autorizo; o técnico lê)</span></label>
         <textarea class="gc-campo" id="cn-motivo" name="motivo" rows="3" maxlength="400"></textarea>
@@ -127,17 +127,11 @@
         </div>
       </form>
       <script>
-        // quem está assinando: a sessão do OS Creator (cookie só em /os); sem login, o link leva ao login do Fracttal e
-        // volta para ESTA linha da PT (o `next` leva o código do ativo: só com o número, a volta abria a 1ª linha e a
-        // decisão caía no outro equipamento; revisão adversarial de 11/10/2026)
+        // quem está assinando: a pessoa da entrada do Nexus (20/11/2026; até ali, o login do Fracttal do OS Creator)
         fetch(nexusRota('/os/_nexus/quem'), {credentials: 'same-origin'}).then(function (r) { return r.json(); }).then(function (q) {
           var el = document.getElementById('cn-quem');
-          if (q.email) { el.textContent = 'Assinando como ' + q.nome + ' (' + q.email + '), pelo login do Fracttal.'; return; }
-          var a = document.createElement('a');
-          a.className = 'cn-link'; a.href = {{ entrar|tojson }}; a.textContent = 'entre com o seu login do Fracttal';
-          el.textContent = 'Para assinar, ';
-          el.appendChild(a);
-          el.appendChild(document.createTextNode(' (o mesmo do OS Creator).'));
+          if (q.email) { el.textContent = 'Assinando como ' + q.nome + ' (' + q.email + ').'; return; }
+          el.textContent = 'Para assinar, entre com a sua conta Microsoft.';
         }).catch(function () {});
       </script>
       {% endif %}

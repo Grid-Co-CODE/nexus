@@ -32,17 +32,26 @@ ESPERANDO = ["Fabricante", "Cliente", "Supervisor", "Pré-Operação",
 ESPERANDO_PADRAO = ESPERANDO[0]
 
 # Como o chamado é aberto em cada um (aparece de dica na tela — evita o operador procurar o doc).
+#
+# O canal que traz endereço de e-mail NÃO mora aqui desde 19/11/2026 (o repositório é público; Levi: "os e-mails dos
+# fabricantes vão para uma tabela de cadastro no banco" e "quem tiver um acesso do Nexus vai ter a informação completa").
+# O texto inteiro de cada um mora cifrado no banco do Nexus (livro `nexus_textos_reservados`, área `oscreator_canal`, a
+# chave é o fabricante) e o `chamado_modelos_store` o põe aqui, em memória, antes de cada rota (`canais_em_dia`): a tela
+# mostra o canal inteiro, como antes. Sem o Nexus (ou com o banco fora antes da 1ª leitura), a tela diz o texto abaixo.
+# Fabricante novo com e-mail no canal: publique o texto com `ferramentas/textos_reservados.py publicar --area
+# oscreator_canal` e ponha RESERVADO aqui; o endereço nunca vai para um arquivo versionado.
+RESERVADO = "Canal reservado: o endereço mora no banco do Nexus (sem leitura do banco agora; tente de novo em 1 minuto)"
 CANAL = {
-    "Axial":          "E-mail — sdantas@axialstructural.com e mmacedo@axialstructural.com",
+    "Axial":          RESERVADO,
     # CLONES (28/07): o PACOTE DE INFORMAÇÃO é o mesmo do fabricante de origem, mas o CANAL não
     # foi documentado — e canal é contato real, não se deduz por semelhança. Fica dito na tela
     # para ninguém abrir chamado da Romiotto no e-mail da Sigma Sensors por engano.
     "Brametal":       "Canal ainda não documentado — confirmar com a analista de chamados (processo espelhado no da STI)",
     "Romiotto":       "Canal ainda não documentado — confirmar com a analista de chamados (processo espelhado no da Hukseflux)",
-    "Canadian Solar": "E-mail service.latam@csisolar.com + evidências no Google Drive",
-    "Convert":        "Formulário de garantia (Valmont) — brazil_services@valmont.com em cópia",
+    "Canadian Solar": RESERVADO,
+    "Convert":        RESERVADO,
     "Huawei":         "Portal Digital Power — não precisa de login pra abrir",
-    "Hukseflux":      "E-mail Sigma Sensors — suporte@ e fabio@sigmasensors.com.br",
+    "Hukseflux":      RESERVADO,
     "Soltec":         "Soltec Service Desk — Central de Ajuda",
     "STI":            "Portal STI (login + código no e-mail) — Suporte Técnico › Novo Ticket",
     "Sungrow":        "Portal Sungrow (login) — Novo Ticket",

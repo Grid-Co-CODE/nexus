@@ -100,6 +100,12 @@ TORRE = Torre(
         # quem calcula é o App, que publica no livro ranking_app_campo (visao.ranking_pontos). Não é o Ranking de 08/10
         Tela("ranking", "Ranking de pontos", "Quem lidera a classificação de pontos do App no mês, e por quê?",
              "Livro ranking_app_campo (o placar do ciclo do App) no banco do Nexus"),
+        # o Guia do App de Campo (21/11/2026; Levi, pelo chat do App: "guia do app de campo. E pode ficar no Usina 360 com
+        # nova sessão mesmo"): as perguntas que mais chegam, com as telas do App e as regras. O conteúdo é do App
+        # (nexus/campo/guia_app.py); a tela, em guia_tela.py
+        Tela("guia-app", "Guia do App de Campo",
+             "Como funciona cada parte do App de Campo, com as telas e as regras?",
+             "Pacote do App de Campo (guia.json e as telas do App, em static/guia-app)"),
         # a Rotas do dia saiu do menu em 12/11/2026 (a revisão de desenho; Levi: "Segue pai"): era o lugar reservado, e
         # quem abria lia "Para construir esta tela, crie a view em nexus/torres/campo/", um aviso para programador. Volta
         # quando existir (a programação do PCM + a localização das usinas); o endereço guardado leva à Central
@@ -1117,6 +1123,30 @@ def pt_aprovar(numero):
 _RELIDA_PT = {"em": 0.0}
 
 
+@bp.route("/pt/assinar")
+def pt_assinar_lista():
+    """O link fixo para assinar PT pelo celular (Levi, 20/11/2026: "pode fazer um link específico para aprovação de PTs e
+    APRs via celular?", depois de uma Responsável UFV não conseguir abrir o App no celular para dar o De acordo numa PT
+    de preventiva anual). Um endereço só, para salvar no celular: as PTs esperando que a pessoa da sessão pode decidir
+    (`decisao_pt.assinaveis`, a mesma conta das "outras" do card), cada uma abrindo o card de assinar dela. A APR não tem
+    aprovação: o técnico a assina no App, e ela aparece dentro da PT."""
+    leitura = visao.pts()
+    u = session.get("usuario") or {}
+    email, nome, admin = u.get("email") or "", u.get("nome") or "", bool(session.get("admin"))
+    lista, erro, achada, cos_fora = [], "", True, False
+    if not leitura.erro:
+        try:
+            lista = decisao_pt.assinaveis(leitura.dados.get("aguardando") or [], email, nome, admin)
+            achada = admin or bool(visao.pessoa_do_login(email, nome)) or decisao_pt._do_setor_cos(email)
+            # o COS fora do plantão vê a lista vazia: o card diz por quê, em vez de parecer que não há PT
+            cos_fora = not lista and not decisao_pt.cos_no_plantao() and decisao_pt._do_setor_cos(email)
+        except Exception as e:      # noqa: BLE001 — sem o cadastro, a tela diz e não chuta a lista
+            erro = f"Não consegui montar a sua lista agora ({type(e).__name__})"
+    return render_template("campo/pt_assinar_lista.html", **_comum(
+        "pt", leitura, lista=lista, erro=erro, achada=achada, cos_fora=cos_fora, plantao=decisao_pt.PLANTAO_COS,
+        idade_min=_idade_min))
+
+
 @bp.route("/pt/<numero>/assinar")
 def pt_assinar(numero):
     """O card de assinar a PT (Levi, 30/10/2026, pelo chat do App de Campo: "a parte de abrir PT e assinar no e-mail
@@ -2072,3 +2102,5 @@ from . import cliente_tela  # noqa: E402,F401
 # o Mapa de equipe (08/11/2026): as três rotas públicas do contrato com o Nexus Field e a tela (o mapa, o Abrir rota e o
 # piloto), em equipe_tela.py
 from . import equipe_tela  # noqa: E402,F401
+# o Guia do App de Campo (21/11/2026), em guia_tela.py
+from . import guia_tela  # noqa: E402,F401

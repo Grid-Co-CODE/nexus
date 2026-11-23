@@ -49,7 +49,8 @@ FORA = frozenset({"engenharia/mesa", "engenharia/confiabilidade", "engenharia/eq
 # Mapa de equipe (08/11/2026) põe cada abertura na trilha da LGPD (quem abriu a posição de quem): aquecido aqui, com a
 # sessão interna de administrador, ele subiria o serviço e gravaria um "abriu_mapa" que ninguém abriu, a cada volta e a
 # cada boot (`aquecer_ao_subir`). Tela nova cuja abertura grava alguma coisa entra aqui.
-SEM_PRE_CARGA = frozenset({"campo/equipe"})
+# A Recoleta pelas fontes (17/11/2026) é só o endereço da permissão: leva à Coletas (302), que a pré-carga já abre.
+SEM_PRE_CARGA = frozenset({"campo/equipe", "performance/coletas/recoleta"})
 CABECALHO = "X-Nexus-Pre-Carga"
 # o prontuário da usina (16/11/2026, Levi: "Eu tô achando as usinas meio demoradas para abrir na primeira vez"): não é uma
 # tela do menu, e as cópias dele (as de todas as usinas: o mês a mês, o COS, as tarefas, a Visão do responsável, as PT)

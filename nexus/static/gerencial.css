@@ -10,7 +10,11 @@
 .vg-topo{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px 14px;margin:0 0 10px}
 .vg-acoes{display:flex;align-items:center;gap:12px;flex:none}
 .vg h2{margin:0 0 12px;font:700 16px/1.3 var(--font-display)}
-.vg-nota{margin:0 0 30px;max-width:100ch;font-size:12px;color:var(--mudo)}
+.vg-dado{margin:26px 0 0;font-size:12px;color:var(--mudo)}
+/* o "!" do Nexus ao lado do nome (o estilo é o do nexus.css); na capa, o texto não pega o mouse, o "!" pega */
+.vg-nome-l{display:flex;align-items:center;gap:12px}
+.vg-explica{pointer-events:auto}
+.vg-sobre .vg-explica{margin-left:6px}
 .vg-aviso{margin:0 0 14px;font-size:13px;color:var(--alerta)}
 
 /* o filtro de mês (abre sempre no vigente) e o botão do prontuário, a única ação cheia da tela */
@@ -27,13 +31,42 @@
 .vg-pot canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
 .vg-txt{position:absolute;left:0;top:50%;transform:translateY(-50%);width:430px;max-width:100%;pointer-events:none}
 .vg-txt a{pointer-events:auto}
-.vg-sobre{margin:0 0 10px;font:700 18px/1.2 var(--font-display);color:var(--tinta-2)}
+.vg-sobre{display:flex;align-items:center;margin:0 0 10px;font:700 18px/1.2 var(--font-display);color:var(--tinta-2)}
 .vg-nome{margin:0 0 14px;font:800 54px/1.02 var(--font-display);letter-spacing:-.02em}
 .vg-num{display:flex;align-items:baseline;gap:12px;font:800 128px/.95 var(--font-display);letter-spacing:-.035em;font-variant-numeric:lining-nums tabular-nums}
 .vg-num--cli{font-size:92px}
 .vg-num small{font:700 30px/1 var(--font-display);letter-spacing:0;color:var(--verde-texto)}
 .vg-leg{margin:16px 0 0;font-size:17px;line-height:1.45;color:var(--tinta-2)}
 .vg-ctr{margin:10px 0 0;font-size:14px;color:var(--tinta-2)}
+/* os cartões da capa (19/11/2026, "os cardzinhos"): um nível de superfície só, com o fio da linha (sem sombra) */
+.vg-cards{display:flex;flex-wrap:wrap;gap:10px;margin:20px 0 0;pointer-events:none}
+.vg-card{flex:1 1 0;min-width:118px;padding:11px 13px 12px;border:1px solid var(--linha-forte);border-radius:10px;background:var(--fundo);transform-origin:0 0;will-change:transform}
+.vg-card-rot{display:block;font-size:11.5px;font-weight:600;line-height:1.3;color:var(--mudo)}
+.vg-card b{display:block;margin-top:5px;font:800 24px/1.05 var(--font-display);letter-spacing:-.01em;font-variant-numeric:lining-nums tabular-nums;white-space:nowrap}
+.vg-card small{display:block;margin-top:4px;font-size:11.5px;line-height:1.35;color:var(--tinta-2)}
+.vg-cards--usina{margin:0 0 30px}.vg-cards--usina .vg-card{max-width:300px}
+
+/* a barra que se forma no alto quando a página do cliente desce: presa logo abaixo do topo do Nexus, sem ocupar lugar (a
+   margem negativa), invisível no alto da página e cheia no fim do voo (aberta pela classe vg-barra--aberta) */
+.vg-barra{position:sticky;top:var(--topo);z-index:6;height:62px;margin:0 0 -62px;pointer-events:none}
+.vg-barra-fundo{position:absolute;inset:0 -28px;background:var(--fundo);border-bottom:1px solid var(--linha-forte);opacity:0}
+/* o que voa sai da capa, abaixo da barra: o corte é só dos lados */
+.vg-barra-in{position:relative;display:flex;align-items:center;gap:22px;height:100%;white-space:nowrap;overflow-x:clip;overflow-y:visible}
+.vg-barra-in>span,.vg-b-chip{opacity:0;transform-origin:0 0}
+/* o estado aberto é de classe (o gerencial.js só anima até ele): a barra cheia e, na capa, o que foi para ela some */
+.vg-barra--aberta .vg-barra-fundo,.vg-barra--aberta .vg-barra-in>span,.vg-barra--aberta .vg-b-chip{opacity:1}
+/* o parque fechado: a seção encolhe (a altura, o gerencial.js mede) e o desenho some */
+.vg-cli-aberta .vg-pot{overflow:hidden;margin-bottom:0}
+.vg-cli-aberta .vg-pot canvas{opacity:0}
+.vg-cli-aberta .vg-txt [data-vg-voa],.vg-cli-aberta .vg-txt [data-vg-card],.vg-cli-aberta .vg-txt .vg-topo,
+.vg-cli-aberta .vg-txt .vg-explica,.vg-cli-aberta .vg-txt .vg-foco{opacity:0}
+.vg-b-nome{font:800 21px/1.1 var(--font-display);letter-spacing:-.01em}
+.vg-b-mwp{display:inline-flex;align-items:baseline;gap:5px;font:800 21px/1.1 var(--font-display);font-variant-numeric:lining-nums tabular-nums}
+.vg-b-mwp small{font:700 12px/1 var(--font-display);color:var(--verde-texto)}
+.vg-b-leg{font-size:13.5px;line-height:1.3;color:var(--tinta-2)}
+.vg-barra-in>.vg-b-cards{display:inline-flex;gap:8px;opacity:1}
+.vg-b-chip{display:inline-block;padding:3px 10px;border:1px solid var(--linha-forte);border-radius:7px;font-size:12px;font-weight:600;line-height:1.4}
+
 .vg-foco{margin-top:26px;padding-top:18px;border-top:1px solid var(--linha-forte);min-height:124px}
 .vg-foco b{display:block;font:700 21px/1.2 var(--font-display)}
 .vg-foco span{display:block;margin-top:5px;color:var(--tinta-2)}
@@ -60,6 +93,8 @@
 .vg-trilho{display:inline-block;height:8px;border-radius:4px;background:var(--superficie-2);overflow:hidden;vertical-align:middle}
 .vg-trilho i{display:block;height:100%;background:var(--verde)}
 .vg-lin .vg-trilho i{width:0;transition:width 1.3s cubic-bezier(.2,.7,.2,1)}
+/* a gota que leva a tampa do bloco até a barra da usina (19/11/2026): sem fundo fora do voo (a animação dá a cor) */
+.vg-gota{position:absolute;z-index:5;display:block;border-radius:2px;pointer-events:none;transform-origin:0 0;will-change:transform}
 .vg-seg{display:inline-flex;height:8px;border-radius:4px;overflow:hidden;background:var(--superficie-2);vertical-align:middle}
 .vg-seg i{display:block;height:100%}
 .vg-pt{font-weight:700;font-variant-numeric:lining-nums tabular-nums}
@@ -72,16 +107,40 @@
 .vg-chip--critico{background:var(--critico-suave);color:var(--critico)}
 .vg-chip--alerta{background:var(--alerta-suave);color:var(--alerta)}
 
-/* a tela que explica a nota do contrato: o número e os quatro itens, separados por fio (sem cartão) */
+/* a usina (19/11/2026, "uma mescla do que a gente tem agora com o que a gente tem no Nexus Insights"): a nota do contrato à
+   esquerda e o Nexus Insights à direita, cada lado com o seu número grande e, embaixo, o detalhe separado por fio */
 .vg-usina{margin:0;font:800 30px/1.15 var(--font-display);letter-spacing:-.01em}
 .vg-lead{margin:0 0 22px;font-size:15px;color:var(--tinta-2)}
-.vg-exp{display:grid;grid-template-columns:minmax(240px,300px) minmax(0,1fr);gap:48px;align-items:start}
-.vg-score{font:800 132px/.9 var(--font-display);letter-spacing:-.04em;font-variant-numeric:lining-nums tabular-nums}
-.vg-score-rot{margin:10px 0 0;font:700 17px/1.3 var(--font-display)}
-.vg-exp p{margin:8px 0 0;color:var(--tinta-2)}
-.vg-fatos{margin:22px 0 0;padding:0;list-style:none}
-.vg-fatos li{display:flex;justify-content:space-between;gap:16px;padding:10px 0;border-bottom:1px solid var(--linha)}
-.vg-fatos li span{color:var(--mudo)}.vg-fatos li b{font-weight:600}
+.vg-mescla{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:56px;align-items:start}
+.vg-lado h2{margin:0 0 14px;font:700 20px/1.2 var(--font-display)}
+.vg-grande{display:flex;align-items:flex-start;gap:22px;padding:0 0 22px}
+.vg-score{flex:none;font:800 104px/.88 var(--font-display);letter-spacing:-.04em;font-variant-numeric:lining-nums tabular-nums}
+.vg-score-rot{margin:6px 0 0;font:700 16px/1.3 var(--font-display)}
+.vg-grande p{margin:6px 0 0;font-size:13.5px;color:var(--tinta-2)}
+.vg-grande .vg-seg{display:flex;width:100%;max-width:260px;margin-top:12px}
+.vg-seg i.vg-b-neutro{background:var(--info)}
+
+/* o selo da gravidade, como no Nexus Insights: um ponto e a palavra (sem faixa nem borda colorida) */
+.vg-sev{display:inline-flex;align-items:center;gap:6px;font:600 12px/1 var(--font-sans);color:var(--tinta-2);white-space:nowrap}
+.vg-sev::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--mudo);flex:none}
+.vg-sev--critico{color:var(--critico)}.vg-sev--critico::before{background:var(--critico)}
+.vg-sev--alerta::before{background:var(--alerta)}.vg-sev--info::before{background:var(--info)}
+.vg-ins-contas{display:flex;flex-wrap:wrap;gap:6px 16px}
+.vg-ins{border-top:1px solid var(--linha-forte)}
+.vg-ins summary{display:grid;grid-template-columns:96px minmax(0,1fr) auto;gap:4px 14px;align-items:start;padding:14px 0;cursor:pointer;list-style:none}
+.vg-ins summary::-webkit-details-marker{display:none}
+.vg-ins summary .vg-sev{margin-top:3px}
+.vg-ins-o b{display:block;font-weight:600;line-height:1.35}
+.vg-ins-o small{display:block;margin-top:3px;font-size:12px;color:var(--mudo)}
+.vg-ins-com{font-size:12px;color:var(--tinta-2);text-align:right;max-width:190px}
+.vg-ins-corpo{padding:0 0 16px 110px;font-size:13.5px;color:var(--tinta-2)}
+.vg-ins-corpo p{margin:0}
+.vg-ins-corpo ul{margin:4px 0 0;padding-left:18px}
+.vg-ins-corpo li+li{margin-top:3px}
+.vg-rot{margin-top:12px!important;font-size:11.5px;font-weight:600;color:var(--mudo)}
+.vg-ins-corpo .vg-rot:first-child{margin-top:0!important}
+.vg-ins-links{display:flex;gap:18px;margin-top:12px!important}
+.vg-ins-vazio{padding:14px 0;border-top:1px solid var(--linha-forte)}
 .vg-item{padding:18px 0 20px;border-top:1px solid var(--linha-forte)}
 .vg-item header{display:flex;align-items:center;gap:18px;margin-bottom:12px}
 .vg-item h3{margin:0;width:170px;flex:none;font:700 17px/1.2 var(--font-display)}
@@ -90,10 +149,15 @@
 .vg-item dl{display:grid;grid-template-columns:140px minmax(0,1fr);gap:5px 18px;margin:0;font-size:13.5px}
 .vg-item dt{color:var(--mudo)}.vg-item dd{margin:0;color:var(--tinta-2)}
 
+@media (max-width:1180px){.vg-mescla{grid-template-columns:minmax(0,1fr);gap:34px}}
+/* a barra cabe numa tela de notebook (1366); mais estreita, perde a legenda e depois as etiquetas além da 1ª */
+@media (max-width:1100px){.vg-barra-in{gap:14px}.vg-barra-in>.vg-b-leg{display:none}}
+@media (max-width:820px){.vg-b-chip+.vg-b-chip{display:none}}
 @media (max-width:900px){
   .vg-pot{height:auto}.vg-pot canvas{position:relative;height:440px}
   .vg-txt{position:static;transform:none;width:auto;margin-top:6px}
   .vg-num{font-size:84px}.vg-num--cli{font-size:64px}.vg-nome{font-size:38px}
-  .vg-exp{grid-template-columns:minmax(0,1fr);gap:24px}.vg-score{font-size:96px}
+  .vg-score{font-size:84px}
+  .vg-ins summary{grid-template-columns:minmax(0,1fr)}.vg-ins-com{text-align:left;max-width:none}.vg-ins-corpo{padding-left:0}
   .vg-item h3{width:120px}.vg-item dl{grid-template-columns:minmax(0,1fr)}
 }

@@ -79,10 +79,10 @@ def _distribuidoras(**mudar):
                      "ucs": [{"parte": "", "uc": "1234567", "concessionaria": "CPFL PAULISTA", "chave": "CPFL_PAULISTA"}]},
                     {"codigo": "THPN-XYZ999", "nome": "Usina Sem Cadastro", "cidade": "", "uf": "",
                      "ucs": [{"parte": "", "uc": "999", "concessionaria": "COPEL", "chave": "COPEL"}]}],
-         "canais": [{"chave": "CPFL_PAULISTA", "nome": "CPFL_PAULISTA", "sms": None, "contato": "WhatsApp (19) 99908-8888"},
-                    {"chave": "CELESC", "nome": "Celesc", "sms": {"numero": "48196", "formato": "SEM LUZ <UC>",
+         "canais": [{"chave": "CPFL_PAULISTA", "nome": "CPFL_PAULISTA", "sms": None, "contato": "WhatsApp (19) 99999-0010"},
+                    {"chave": "CELESC", "nome": "Celesc", "sms": {"numero": "99900", "formato": "SEM LUZ <UC>",
                                                                   "confianca": "baixa"},
-                     "contato": "WhatsApp (48) 99860-0067 (só grupo B)"}],
+                     "contato": "WhatsApp (48) 99999-0020 (só grupo B)"}],
          "chamados": [{"registro": "r1", "os": "17001", "usina_codigo": "THPN-ALT100", "usina": "Altair 1", "parte": "",
                        "uc": "1234567", "concessionaria": "CPFL PAULISTA", "chave": "CPFL_PAULISTA", "protecoes": ["27"],
                        "estado": "SEM_PROTOCOLO", "criado_em": "2026-10-26T10:00:00-03:00",
@@ -133,11 +133,11 @@ def test_quem_aciono_e_a_distribuidora_de_cada_usina(tela):
     assert "Técnico Alfa" in altair and "(17) 98888-0002" in altair
     assert "Eletricista Beta" in altair and "(17) 97777-0003" in altair and "Beltrano Supervisor" in altair
     # a distribuidora, do Andamento: a UC e o canal para abrir à mão; o chamado sem protocolo pede ação
-    assert "CPFL PAULISTA" in altair and "UC 1234567" in altair and "WhatsApp (19) 99908-8888" in altair
+    assert "CPFL PAULISTA" in altair and "UC 1234567" in altair and "WhatsApp (19) 99999-0010" in altair
     assert "1 chamado pede ação" in altair
     coracao = _linha(html, "Coração 1")
     # sem UC na Ronda COS: a concessionária do cadastro, casada com o canal pela chave; a vaga de supervisor aparece
-    assert "Celesc" in coracao and "UC não está na Ronda COS" in coracao and "<b>48196</b>" in coracao
+    assert "Celesc" in coracao and "UC não está na Ronda COS" in coracao and "<b>99900</b>" in coracao
     assert "vaga" in coracao
     brodowski = _linha(html, "Brodowski 1")
     assert "sem concessionária no cadastro" in brodowski

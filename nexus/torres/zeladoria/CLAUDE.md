@@ -251,6 +251,30 @@ exporta: o botão e a janela estão no `FIN_NAV_SO_LEITURA`. Veio do Radar (o ú
   por fornecedor somam o mesmo com diferença de centavos (arredondamento linha a linha); o .xlsx baixou, o PDF abriu, e a
   janela cabe em 375 px. O texto das provisões migradas tem um emoji que é DADO (o item gravado), não da interface.
 
+## Os textos reservados do clone (19/11/2026)
+
+O `clone/radar.html` não traz mais valor de contrato nem nome de cliente e de fornecedor: no lugar de cada um há uma
+**ficha** (`Zlfornecedor01`, `zlcliente01`, `ZLVALOR03`, `ZLTRECHO01`), e o texto mora cifrado no banco do Nexus (livro
+`nexus_textos_reservados`, área `zeladoria_radar`; regra e ferramenta em `nexus/dados/CLAUDE.md`, "Os textos
+reservados"). Levi, 19/11/2026: "`radar.html`: o valor de contrato e as citações de clientes passam a vir do banco, por
+uma rota que exige login".
+
+- **A tela não mudou.** A rota `/t/zeladoria/app` (que exige login) lê o livro e devolve o texto no lugar de cada ficha
+  (`_clone_restaurado`): a ajuda, os exemplos, as regras (a regex do fornecedor, o apelido de cliente) e o nome da forma
+  de pagamento saem como sempre. Provado em 19/11: o clone restaurado pelo banco tem o mesmo sha256 do arquivo de antes.
+- **A ficha vale onde o nome estava:** `temZlcliente01` é a variável, `'faturamento_zlcliente01'` é a coluna do banco
+  (a página servida manda o nome de verdade), `/zlfornecedor05|zlfornecedor07/i` é a regra. Ao programar, use a ficha
+  que já existe para o mesmo nome (`python -I ferramentas/textos_reservados.py listar --area zeladoria_radar --abrir`
+  mostra, no seu terminal, o texto de cada uma).
+- **Nome ou valor novo** (um fornecedor novo no exemplo de uma tela, um preço de contrato): não escreva no arquivo.
+  Escolha uma ficha nova, publique o texto (`publicar`) e escreva a ficha. A trava
+  `tests/test_zeladoria_reservados_19_11.py` acusa o valor em reais e o número de contrato no arquivo e, com o `.env`, o
+  texto reservado que voltou.
+- **Banco fora** antes da 1ª leitura: a página abre com as fichas à vista e o cabeçalho `X-Nexus-Textos-Reservados:
+  faltam N`; a seguinte tenta de novo. Com uma leitura boa guardada, vale a última boa.
+- **Ficou de fora, de propósito:** os nomes das usinas (estão em todo o Nexus) e os exemplos que não são dado (o diesel
+  de R$ 2.000, a tolerância de R$ 1, os formatos de digitar valor).
+
 ## Como entregar (quem programa a Zeladoria)
 
 O HEAD da zeladoria (quem criou o Radar) programa a Zeladoria no Nexus desde 11/11/2026, com o papel **admin** no
@@ -262,6 +286,7 @@ subir, desfazer) está em `GUIA_GITHUB.md`, nesta pasta. Antes de subir:
    conferida no navegador, no computador e a 375 px.
 3. O repositório é público: nada de nome de colega, e-mail, dado de cliente ou segredo em arquivo versionado (cite pelo
    papel: "o HEAD", "o supervisor da equipe"); cor só por token; sem emoji; tudo em pt-BR.
+   Nome de cliente, de fornecedor e valor de contrato entram como ficha, com o texto no banco (a seção acima).
 4. O clone (`clone/radar.html`) agora se edita direto. O dado mora no banco do Nexus (os três livros `nexus_zeladoria_*`,
    pelo gravador): nada de Supabase, planilha ou JSON como banco. Tabela nova entra em `nexus/zeladoria/tabelas.py` e no
    catálogo antes da 1ª gravação (`nexus/dados/CLAUDE.md`).

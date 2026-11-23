@@ -10,7 +10,7 @@
 /* o tipo de plano e o turno (19/11/2026), lado a lado embaixo da família; em tela estreita, um embaixo do outro */
 .pcm-filtros{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr);gap:0 12px}
 .pcm-filtros .osb,.pcm-filtros select{width:100%;min-width:0}
-@media (max-width:560px){.pcm-filtros{grid-template-columns:minmax(0,1fr)}}
+@media (max-width:640px){.pcm-filtros{grid-template-columns:minmax(0,1fr)}}
 .os-lbl.desab{opacity:.45}
 /* desligado (usina sem cliente, tipo sem usina, família no "Sem plano"): o campo visível é a busca do os_busca */
 #pcm .osb-in:disabled,#pcm select:disabled{opacity:.45;cursor:not-allowed}

@@ -107,6 +107,13 @@ só**: o "calculado em" no canto; a hora em que o Nexus leu o livro foi para o "
   mesma lista do `NEXUS_COLUNAS["ranking"]` do App, na ordem dele. A régua do mês (piso, teto, anulação, teto das
   rondas, mínimos, bônus) vem nas oito colunas depois do "Calculado em", e o "Como o App calcula" da tela usa esses números. Coluna nova
   só no FIM, dos dois lados.
+- **O inventário do almoxarifado é uma parcela do total** (App v368, 22/11/2026; regra do Levi do mesmo dia): a coluna
+  "Inventário (pts)", a última do livro, e o "Total (pts)" já a inclui. Vale 50 pontos por almoxarifado contado no mês
+  do calendário, para quem enviou a contagem, por fora do teto das rondas e dos bônus, desde 20/11/2026 (o ciclo de
+  dezembro); a recontagem pedida pelo PCM tira os 50 até ser enviada, e o App lê esse estado do nosso
+  `nexus_almoxarifado_inventario · fato_evento_inventario`. A tela mostra a parcela (pódio "N de inventário", coluna
+  "Inventário", o termo no "!") só no ciclo em que alguém a tem: sem ela, tarefas + rondas + bônus não fechavam o total.
+  Prova: `tests/test_campo_ranking_inventario_22_11.py`.
 - **Tela:** o mês (o corrente e o anterior) e a região que o App escreve; o pódio (os três primeiros), os números, a
   classificação e o "Fora do ciclo". Com uma região escolhida, a posição continua a do mês inteiro ("3º lugar no
   mês"): é a que o técnico vê no App. Desde 18/10/2026 (Levi: "a classificação é mensal, estamos no mês de outubro") a
@@ -2242,10 +2249,15 @@ ou formulário de antes, ou um código que a PT não tem), a PT de uma linha abr
 equipamentos para escolher**, sem formulário; o `decidir` sem a linha também só aceita a PT de uma linha. Na de mais,
 escolher a 1ª seria chutar a qual ativo a decisão vale (revisão adversarial de 11/10/2026: a tela abria calada a 1ª e
 o formulário mandava o código dela, por fora da recusa do `decidir`).
-- **Quem assina: o login do Fracttal do OS Creator** (Levi: "utilize o login do fractal do OS Creator Web que já dá
-  certo!"). O OS Creator roda dentro do Nexus com sessão própria (cookie `os_sessao`, só em /os); por isso as rotas de
-  assinatura moram em `/os/_nexus/...` (`assinatura.py`): `quem` (o e-mail de quem entrou), `pt/<n>/decidir` (POST) e
-  `pt/<n>/voltar` (o OS Creator só devolve para /os depois do login). Token do Fracttal vencido (`exp`) não assina;
+- **Quem assina: a pessoa da entrada do Nexus** (a conta Microsoft, desde 20/11/2026; Levi: "Por qual motivo a PT,
+  para assinar a PT, você tem que entrar no Fracttal, sendo que é uma coisa exclusiva do app de campo?" e "assinar PT só
+  com a entrada do Nexus"). O App confirmou (v363) que não usa nada da conta do Fracttal de quem assina: aplica com o
+  token do técnico que pediu e lê só o código do e-mail (`decidida_por_hmac`); o segundo login travava quem assinava pelo
+  celular. De 05/10 a 20/11 foi o login do Fracttal do OS Creator ("utilize o login do fractal do OS Creator Web que já
+  dá certo!"), quando o Nexus entrava pelo Fracttal. As rotas seguem em `/os/_nexus/...` (`assinatura.py`): `quem` (a
+  pessoa da sessão do Nexus, `quem_decide`) e `pt/<n>/decidir` (POST; a coluna `login` diz "Nexus (conta Microsoft)").
+  A senha de administrador não tem e-mail: não assina, e a tela diz para entrar com a conta Microsoft. O login do
+  Fracttal fica só para ver a assinatura do técnico na APR de antes do App (`assinatura-tecnico`, `voltar`);
   pedido de outro site leva 403 ("Origem recusada."), pela régua da moldura da Performance, a mesma dos POST da Base
   e dos Acessos (`assinatura._de_outro_site`: o `Sec-Fetch-Site` do navegador, só `same-origin`; sem ele, o `Origin`).
   **Não comparar o `Origin` com o `request.host`**: no servidor da T.I. o Nexus não recebe o endereço público no Host,
@@ -2277,7 +2289,7 @@ o formulário mandava o código dela, por fora da recusa do `decidir`).
   daqui for mais nova que a recusa, a tela mostra o porquê e libera uma decisão nova (`decisao_pt.recusada_pelo_app`). A
   aba `decisoes` de antes (nunca gravada) não é lida.
 - **Quem pode decidir** (Levi, 09/10/2026): o Supervisor de Campo da região da usina (com a vaga aberta, o
-  Coordenador), o gestor de contrato da usina, o COS **só no plantão, de sexta 18h a segunda 6h de Brasília** (14/11/2026,
+  Coordenador), o gestor de contrato da usina, o COS **só no plantão, de sexta 18h a segunda 6h de Brasília e no feriado nacional inteiro** (o feriado desde 21/11/2026, Levi: "Sim, feriado conta como plantão"; o do calendário do Nexus, `decisao_pt.feriados_do_plantao`, sem o ponto facultativo, Carnaval e Corpus Christi: "Não, só feriado nacional"; as mesmas datas no aviso do App; 14/11/2026,
   Levi: "O pessoal do COS pode dar o de acordo a partir de sexta-feira, 6 horas da noite, até segunda, 6 horas da manhã.
   Passou disso, só com o supervisor"; vale o setor COS da pessoa do login em Base → Acessos, pelo código do e-mail, ou o
   vínculo COS da ficha: as 11 pessoas do setor COS não têm ficha, e até ali nenhuma conseguia assinar;
@@ -2334,6 +2346,13 @@ supervisor pode assinar, ao assinar ele vê também se tem mais alguma aberta pa
 - **Depois** (assinada, decidida antes ou sem permissão): "Outras PTs esperando nas suas usinas", da mais antiga para a
   mais nova, cada uma no próprio card (`decisao_pt.assinaveis`: as linhas esperando que a pessoa pode decidir, sem as
   que o Nexus já decidiu, menos a que o App recusou). Sem nenhuma: "Nenhuma outra PT esperando nas suas usinas".
+- **O link fixo para o celular** (20/11/2026, Levi: "pode fazer um link específico para aprovação de PTs e APRs via
+  celular?", depois de uma Responsável UFV não conseguir abrir o App no celular para o De acordo de uma PT de preventiva
+  anual): `/t/campo/pt/assinar` (rota `pt_assinar_lista`, template `pt_assinar_lista.html`), para salvar no celular. O
+  mesmo card, com as PTs esperando que a pessoa da sessão pode decidir (`decisao_pt.assinaveis`, da mais antiga para a
+  mais nova), cada uma abrindo o card de assinar dela. Sem nenhuma, diz isso. Para o COS fora do plantão, diz o plantão
+  e quem assina. Para quem o Nexus não acha no cadastro, diz o que fazer. A APR não tem aprovação: o técnico assina no
+  App, e ela aparece dentro da PT. Conferido a 375 px e no computador (22 PTs na lista do administrador, em 20/11).
 - **A PT que acabou de nascer**: o App publica o livro antes do e-mail (v315), mas a cópia do Nexus é de 5 min; o card
   que não acha a PT relê o livro na hora, no máximo uma vez por minuto (`_RELIDA_PT`).
 - Prova: `tests/test_campo_pt_assinar.py`. Bancada de 30/10 (dados reais, só leitura, decisão só na memória): 39 PT
@@ -2423,6 +2442,10 @@ Aprovação e Triagem usam a lógica do App copiada, não refeita, para o númer
   `fx` fica** (o do Nexus nunca levanta `FxLimite`, e a cópia lê o `adiada` com `getattr`, valor padrão). No Nexus o
   que muda é só a releitura da fila da Aprovação em segundo plano (`aprovacao.py`, `paciente=True`): com o Fracttal
   recusando, ela insiste até 8 voltas de 60 s em vez de 4. As telas não mudam.
+- **22/11, App v368 (código `408ab23a2b7df88c`):** o teste acusou a `_rondas_os_pares`. No App ela ganhou o parâmetro
+  `trackers=False`, que pede a coluna `trackers` da ronda (o livro por tracker e as respostas avulsas do "Ver
+  trackers"). Decisão: recópia (Levi, 22/11/2026: "pode fazer as duas e subir"). Quem chama dentro da cópia não passa
+  o parâmetro: a leitura e as telas (Aprovação e Triagem) não mudam.
 - Trocados pelo Nexus no fim do arquivo gerado: `_tabela` e `tabela_qlog` (leem pela fonte do Nexus, `tabelas.py`),
   `tabela` (a dos tokens do Fracttal: só a partição `cadastro`; `tok` e `pt` recusadas), `fx` (Fracttal só GET,
   `fracttal.py`), `ident` (`pessoas.ident`) e `_varredura_carregar` (sempre `False`: sem blob do App).
@@ -2766,3 +2789,37 @@ relógio da conta do App só congela trocando `datetime.datetime` no módulo `da
 `from datetime import datetime` dentro da função (sem isso, com 6 mil tarefas, alguma vira de dia entre uma tela e a
 outra); e com `TESTING` ligado o `credencial()` do Fracttal só olha a credencial de teste. O receptor do
 `template_rendered` precisa de `weak=False` (o blinker guarda referência fraca e a lambda some).
+
+## Guia do App de Campo (21-22/11/2026; `nexus/campo/guia_app.py`, `guia_tela.py`, `campo/guia_app.html`)
+
+Levi, pelo chat do App de Campo: "guia do app de campo. E pode ficar no Usina 360 com nova sessão mesmo [...] perguntas que
+eu recebo recorrentemente [...] vai aparecer as telas e vai aparecer todas as regras ali embaixo"; "se o tema do Nexus
+estiver claro, vai aparecer o tema claro do celular; se estiver escuro, o tema escuro do celular". Em 22/11: a busca no
+alto, a separação por tema e o texto curto, "para quem tem pouco tempo, porém busca entender".
+
+- **Quem faz o quê**: o CONTEÚDO é do App de Campo (o pacote `C:\GridcoBuild\app-campo-docs\_propostas\guia-app-campo`,
+  montado pelo `_fonte/montar_guia.py` de lá); a TELA é daqui. Importar = copiar `guia.json` e a pasta `telas/` inteira
+  para `nexus/static/guia-app/` (sem o `index.html`, o README e o `_fonte`). O repositório é PÚBLICO: a montagem do App
+  troca usina, cliente e pessoa por fictícios (Cliente A, Usina Exemplo 1, Técnico Exemplo) e confere uma lista de nomes
+  proibidos; antes de importar, conferir de novo (nome, e-mail, telefone). O teste de larguras deixa `static/guia-app/` de
+  fora (o CSS do telefone é do App, como o clone da Zeladoria).
+- **A tela** (`/t/campo/guia-app`, a última da Usinas 360°): a busca sem acento (título, resumo, regras e casos; o
+  `data-busca` já vem sem acento do servidor), os chips de tema na ordem do `temas` do pacote (Todos primeiro), a lista
+  por tema ao lado (fixa no desktop) e cada pergunta com o resumo, os telefones (iframe de 260 × 572, `loading=lazy`),
+  "Todas as regras (N)" fechado com a fonte apagada no fim da frase (`[fa:...; vNNN]` do pacote vira `.gu-fonte`) e os
+  casos. A pergunta sem tela diz que elas vêm na próxima leva. Acima de cada pergunta e nos grupos da lista, só o nome
+  do setor (o tema), em verde Grid (21/11/2026, Levi: "só quero o nome do setor em verde grid"): o público saiu. O `incerto` ("Para conferir") só para o administrador e o
+  setor PCM (o README do pacote pede).
+- **O tema dos telefones**: o iframe nasce com `?tema=` do Nexus (`tema_do_pedido`) e o `static/guia-app.js` manda
+  `postMessage({tipo: 'tema', tema})` quando o `data-tema` do `<html>` troca (sem recarregar) e quando cada telefone acaba
+  de carregar. **O iframe não tem color-scheme próprio**: herda o do Nexus, o mesmo que a tela do telefone declara; com
+  `color-scheme:normal` no iframe o navegador pintava um retângulo atrás do telefone no tema escuro.
+- **Reimportado em 22/11/2026 com as regras da v368** (o pacote regerado pelo App: o texto de pontos, almoxarifado,
+  tracker parado, chamado, sincronização, conta Fracttal e OS sumiu; as 28 telas, iguais byte a byte). Só o `guia.json`
+  mudou.
+- Prova: `tests/test_campo_guia_app_21_11.py` (guia de mentira + o pacote de verdade: toda tela citada existe).
+
+## Limitações de potência: mudou para a Performance (19/11/2026, noite)
+
+Levi: "limitação de potência quero na parte de performance". A tela é `/t/performance/limitacoes`; a regra continua em
+`nexus/campo/limitacoes.py`. Tudo em `nexus/torres/performance/CLAUDE.md`, seção "Limitações de potência".

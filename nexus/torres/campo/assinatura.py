@@ -1,5 +1,10 @@
-"""Quem assina a PT no Nexus: o login do Fracttal do OS Creator (Levi, 05/10/2026: "utilize o login do fractal do OS
-Creator Web que já dá certo!").
+"""Quem assina a PT no Nexus: a pessoa da entrada do Nexus, pela conta Microsoft (20/11/2026). De 05/10 a 20/11 foi o
+login do Fracttal do OS Creator (Levi, 05/10: "utilize o login do fractal do OS Creator Web que já dá certo!"), quando o
+Nexus ainda entrava pelo Fracttal. Levi, 20/11/2026: "Por qual motivo a PT, para assinar a PT, você tem que entrar no
+Fracttal, sendo que é uma coisa exclusiva do app de campo?"; o App confirmou (v363) que não usa nada da conta do
+Fracttal de quem assina: aplica com o token do técnico que pediu e lê só o código do e-mail (`decidida_por_hmac`). O
+segundo login travava quem assinava pelo celular. O Fracttal de quem olha segue só para ver a assinatura do técnico
+na APR de antes do App (`assinatura_tecnico`).
 
 O OS Creator roda dentro do Nexus (`nexus/torres/oscreator/ponte.py`) com sessão própria no cookie `os_sessao`, que o
 navegador só manda para /os. Por isso estas rotas moram em /os/_nexus/...: o roteador do Flask casa a parte fixa antes
@@ -102,9 +107,25 @@ def _login(numero, codigo=None, card=False) -> str:
     return na_raiz("/os/login") + "?next=" + quote(volta, safe="")
 
 
+def quem_decide() -> dict:
+    """{"email", "nome", "via"} da pessoa da entrada do Nexus, que assina a PT; {} sem e-mail na sessão (a senha de
+    administrador não diz quem é, e o App precisa do código do e-mail de quem decidiu)."""
+    u = session.get("usuario")
+    u = u if isinstance(u, dict) else {}
+    email = str(u.get("email") or "").strip().lower()
+    if not email:
+        return {}
+    return {"email": email, "nome": str(u.get("nome") or email), "via": str(session.get("via") or "")}
+
+
+SEM_EMAIL = ("Para assinar, entre com a sua conta Microsoft: a senha de administrador não diz quem assina, e o App "
+             "precisa do e-mail de quem decide.")
+
+
 @bp_assinatura.route("/os/_nexus/quem")
 def quem():
-    q = quem_assina()
+    """Quem assina a PT nas telas (o card, a tela da PT e a janela da Visão do responsável): a entrada do Nexus."""
+    q = quem_decide()
     return jsonify({"email": q.get("email", ""), "nome": q.get("nome", "")})
 
 
@@ -192,15 +213,15 @@ def decidir(numero):
     # a linha da PT que se decide: o código do ativo dela (o formulário de cada linha manda; "" = a linha sem ativo).
     # Sem o campo (formulário de antes de 11/10/2026), só a PT de uma linha se decide (`decisao_pt._linha`)
     codigo = request.form.get("codigo")
-    q = quem_assina()
-    if not q:
-        # sem o login do Fracttal: vai ao login e volta para a MESMA linha (revisão adversarial de 11/10/2026); o
-        # formulário do card de assinar volta ao card (`card=1`)
-        return redirect(_login(numero, codigo, card=request.form.get("card") == "1"))
     volta, tela = _volta(numero, codigo), _tela(numero, codigo)
+    q = quem_decide()
+    if not q:
+        session["pt_aviso"] = SEM_EMAIL
+        return redirect(volta)
     try:
         decisao_pt.decidir(numero, request.form.get("decisao", ""), request.form.get("motivo", ""), q["email"],
-                           q.get("nome", ""), bool(session.get("admin")), codigo=codigo)
+                           q.get("nome", ""), bool(session.get("admin")), codigo=codigo,
+                           login="Nexus (conta Microsoft)" if q.get("via") == "microsoft" else "Nexus")
     except decisao_pt.Recusada as e:
         session["pt_aviso"] = f"{numero}: {e}" if volta != tela else str(e)
         return redirect(volta)

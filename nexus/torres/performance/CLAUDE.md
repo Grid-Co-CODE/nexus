@@ -32,6 +32,11 @@ o põe no sino, por USINA ("3 strings em 2 inversores · 5 trackers"), só para 
 plataforma: vale a cópia de 2 min por pessoa, lida por trás; a falha é tentada de novo depois de 5 min. O número do sino
 soma as USINAS, não as strings. Some quando a pessoa abre o inversor (ou os trackers) na Sala. Prova:
 `tests/test_sala_novas_sino.py`.
+O clique abre a Sala NA usina e nos equipamentos citados (22/11/2026, Levi: "tem que abrir exatamente na usina e nos
+equipamentos citados, se não, não serve"): a plataforma manda QUAIS inversores (`inv`) e trackers (`trk`) e o
+`sala_novas.link` monta `/t/performance/sala-de-controle?p=/painel/sala-de-controle?usina=&aba=&inv=&trk=`. O destino da
+porta vale até 2048 letras: a lista que não cabe sai do link (os trackers primeiro, depois os inversores) e a Sala aponta
+o novo da usina pela mesma regra. Quem lê o link é a Sala (`irParaNovo` no `sala_controle.html` da plataforma).
 
 **A Sala de controle lê o que o Monitoramento do COS lê** (16/11/2026; Levi: "A lista de usinas do Monitoramento do COS
 [...] puxe a lista"): `GET /t/performance/sala-de-controle/cos/usinas` (as usinas do Monitoramento, pelo
@@ -74,3 +79,41 @@ Nexus faz para ela:
   aviso ficava escondido. A Sala passou a mandar o nome do Fracttal (a "Usina Fractall" do cadastro, o mesmo de-para do
   Criar OS do Tempo real: `/api/os-creator/fractall-usinas` da plataforma).
 - Prova: `tests/test_sala_janela_19_11.py` (o Entrar e o recorte dos sugeridos rodados no node).
+
+## Limitações de potência (19/11/2026; `nexus/campo/limitacoes.py`, `limitacoes_tela.py`, `performance/limitacoes.html`)
+
+Levi, 19/11/2026: "crie [...] um campo onde as pessoas consigam colocar limitações de potência dos inversores. E aí vai
+ser usado também para o cálculo dos expurgos. Aí aquela limitação de potência pode ser de todos os inversores ou só de
+alguns, de acordo com os inversores do fractal". Nasceu na Usinas 360° e, na mesma noite, veio para cá: "limitação de
+potência quero na parte de performance e quero algo bem feito e construído!". É o 1º pedaço dos expurgos de contrato (os
+outros: o cálculo na nota do contrato e o cruzamento com a planilha de tickets).
+
+- **A tela** (`/t/performance/limitacoes`, logo depois de Disponibilidade; `do_setor=PERFORMANCE`). De cima para baixo:
+  o parecer numa frase (`limitacoes.resumo`: quantas em andamento, em quantas usinas, inversores, kW retidos, o que vai
+  para o expurgo e o que está sem a potência); cinco cartões (em andamento, usinas, inversores, potência retida agora,
+  sem potência informada, este em âmbar quando > 0); o painel "Registrar uma limitação" FECHADO (abre pelo botão do alto,
+  pela usina escolhida, por `?editar=` ou quando a gravação foi recusada); as usinas em andamento, a de mais kW retidos
+  primeiro, cada uma com o MAPA dos inversores do Fracttal (`mapa_da_usina`: o aceso está limitado agora, com o %) e a
+  tabela das limitações; as encerradas num `<details>` fechado no fim.
+- **O formulário**: escolhida a usina (GET `?usina=`), os inversores do Fracttal viram quadrinhos clicáveis (família
+  INVR da dimensão de equipamento, `estrutura_usina.ativos_da_usina`, a mesma régua de código que a disponibilidade usa);
+  o que já tem limitação em andamento vem tracejado com "já limitado desde dd/mm (pct%)". "Todos os inversores" apaga a
+  escolha um a um. A conta da potência retida aparece enquanto se digita (`static/limitacoes.js`, só prévia; a que vale
+  é a do servidor). Responsabilidade em três botões: "Não · expurgo", "Parcial", "Sim · da Grid". O "!" ao lado do
+  título explica cada campo.
+- **Os campos** são os da aba "Inv. com lim. de potência" da planilha de tickets (90 linhas, parada desde 09/2026), para o
+  time trocar a planilha pelo Nexus: inversores, potência nominal de cada um (kW), limite em % da nominal liberado, causa,
+  responsabilidade da Grid Co. (sim, não, parcial: é ela que decide o expurgo), clipagem (a "Gravidade" da planilha),
+  início, fim (vazio = segue limitado) e os comentários para o cliente e geral.
+- **O livro** `nexus_limitacao_inversor · fato_versao_limitacao` (no catálogo antes da 1ª gravação; só cresce): 1 linha =
+  1 versão (registrou, alterou, encerrou, excluiu); vale a última de cada `limitacao_id`. A causa, os comentários e o nome
+  de quem registrou vão cifrados (regra 8). O mesmo envio duas vezes não duplica (`novo_id`).
+- **Quem registra**: quem entrou com o login (Fracttal ou Microsoft); a senha de administrador não diz quem é, e o
+  formulário fica desligado com o aviso.
+- **Sem a potência nominal** a limitação é guardada, mas não entra no cálculo do expurgo (a lista mostra "sem a
+  potência", o cartão conta); nada de potência inventada. A potência AC nominal por inversor não existe no Nexus (só o
+  kWp DC da Base › Equipamentos, e ligado ao código do Fracttal em poucos inversores).
+- **Para o expurgo**: `limitacoes.no_periodo(usina_id, inicio, fim)` devolve as que tocam o período, com `kw_limitados`
+  (nominal × inversores × (1 − limite)).
+- Sem banco, a tela abre e diz o que faltou. Prova: `tests/test_campo_limitacoes_19_11.py` (banco de mentira). Bancada
+  local com dado de mentira: `limitacoes_bancada.py` no scratchpad da conversa (porta 5107).

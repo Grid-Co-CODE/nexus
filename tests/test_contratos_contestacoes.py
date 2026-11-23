@@ -287,21 +287,23 @@ def test_a_bandeja_traz_a_sem_resposta_do_setor_ate_a_primeira_resposta(trat, ap
     monkeypatch.setattr(DT, "_meu_setor", lambda: setor["v"])
     _como(cliente, ANA)
     b = _bandeja(cliente.get("/t/comando/contestacoes").get_data(as_text=True))
-    assert "2 contestações sem resposta" in b and "Altair" in b and "Guaratinguetá V" in b
-    assert "/t/comando/contestacoes?setor=performance&amp;c=b1#ct-detalhe" in b and "Abrir as contestações" in b
-    assert 'aria-label="Demandas e contestações: 2"' in b and "Abrir as demandas" not in b
+    assert b.count("Contestação sem resposta") == 2 and "Altair" in b and "Guaratinguetá V" in b
+    # o "Abrir" ao lado do título da parte (21/11/2026), no lugar do botão "Abrir as contestações" do pé
+    # a lista do sino (21/11/2026): o clique abre a contestação; ao passar o mouse, "Responder"
+    assert "/t/comando/contestacoes?setor=performance&amp;c=b1#ct-detalhe" in b and ">Responder</a>" in b
+    assert 'aria-label="Notificações: 2"' in b and "Abrir as demandas" not in b
     # a 1ª resposta de qualquer um do setor tira para todos; resolver também
     cliente.post("/t/comando/contestacoes/a1/atualizacao", data={"texto": "Vendo"}, headers=MESMO_SITE)
     _como(cliente, BETO)
     b = _bandeja(cliente.get("/t/comando/contestacoes").get_data(as_text=True))
-    assert "1 contestação sem resposta" in b and "Altair" in b and "Guaratinguetá V" not in b
+    assert b.count("Contestação sem resposta") == 1 and "Altair" in b and "Guaratinguetá V" not in b
     cliente.post("/t/comando/contestacoes/b1/resolver", headers=MESMO_SITE)
     b = _bandeja(cliente.get("/t/comando/contestacoes").get_data(as_text=True))
-    assert "sem resposta" not in b and "Nenhuma contestação espera o seu setor agora." in b
+    assert "sem resposta" not in b and "Nada novo para você." in b
     # quem é de outro setor de contestação recebe a dele; quem não tem a tela, nenhuma (e sem demandas, sem bandeja)
     setor["v"] = {"id": SID.ZELADORIA, "nome": "Zeladoria"}
     b = _bandeja(cliente.get("/t/comando/contestacoes").get_data(as_text=True))
-    assert "1 contestação sem resposta" in b and "Guaratinguetá V" in b
+    assert b.count("Contestação sem resposta") == 1 and "Guaratinguetá V" in b
     setor["telas"] = set()
     assert 'class="sino-topo sino-dem"' not in cliente.get("/").get_data(as_text=True)
 
@@ -317,10 +319,10 @@ def test_o_administrador_recebe_so_a_do_setor_dele(trat, app, cliente, monkeypat
     app.config["NEXUS_ADMINS"] = BETO["email"]               # o Nexus recalcula o administrador a cada pedido
     _como(cliente, BETO, admin=True)
     b = _bandeja(cliente.get("/").get_data(as_text=True))
-    assert "1 contestação sem resposta" in b and "Guaratinguetá V" in b and "Altair" not in b
+    assert b.count("Contestação sem resposta") == 1 and "Guaratinguetá V" in b and "Altair" not in b
     setor["v"] = None                                        # o administrador sem setor de contestação: as três
     b = _bandeja(cliente.get("/").get_data(as_text=True))
-    assert "3 contestações sem resposta" in b and "Performance" in b and "Zeladoria" in b
+    assert b.count("Contestação sem resposta") == 3 and "Performance" in b and "Zeladoria" in b
     _como(cliente, None, admin=True)                          # a senha de administrador (sem pessoa): sem bandeja
     assert 'class="sino-topo sino-dem"' not in cliente.get("/").get_data(as_text=True)
 

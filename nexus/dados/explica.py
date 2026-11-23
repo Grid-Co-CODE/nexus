@@ -36,6 +36,7 @@ RESUMO = {
     "pedido_area": "Os pedidos de retorno a cada área, com o prazo e a resposta",
     "mensagem_conversa": "As mensagens com @menção de cada insight, OS e usina",
     "evento_aviso": "Os avisos das OS no sino: solicitação que virou OS e quem já leu",
+    "versao_limitacao": "As limitações de potência dos inversores, registradas pelo time",
     "versao_subtarefas": "As subtarefas padrão de cada atividade da Performance",
     "tratamento_contestacao": "Quem pegou cada contestação do cliente e o que escreveu sobre ela",
     "edicao_contrato": "Cada mudança nos contratos: quem, o quê, quando, o motivo e a prova",
@@ -152,6 +153,10 @@ PARA_QUE = {
     "mensagem_conversa": "Guarda as mensagens que as pessoas trocam na conversa de cada insight, OS e usina, com quem "
                          "foi mencionado (uma pessoa ou uma área inteira) e quem já leu. Serve para a Caixa de entrada "
                          "e o sino avisarem quem foi chamado e para o combinado entre os setores ficar registrado.",
+    "versao_limitacao": "Guarda cada limitação de potência de inversores que o time registra em Performance › Limitações de potência: que "
+                        "inversores, quanto da potência ficou liberado, desde quando até quando, a causa e se a "
+                        "responsabilidade é da Grid Co. Serve para o cálculo dos expurgos do contrato e para tirar a "
+                        "aba de limitações da planilha de tickets.",
     "versao_subtarefas": "Guarda cada versão das subtarefas padrão de uma atividade da Performance (a inspeção do inversor, "
                          "a recomposição de string, o tracker parado, a coleta de geração), com quem salvou e quando. "
                          "Serve para toda OS nova da atividade já sair com essas subtarefas, sem mexer no plano do "

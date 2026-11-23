@@ -47,7 +47,7 @@ ganha um. É ele que o Claude lê antes de mexer: lendo o `.md` da pasta, não p
 | Torres (como criar tela; a tabela de cada torre, inclusive Chamados, Pessoas e Comando, que ainda são atalho ou placeholder) | `nexus/torres/CLAUDE.md` |
 | Base (Registro mestre, Equipamentos das usinas, Chaves das fontes; Acessos na casca, com a aba Pessoas e setores, a antiga Integração Fracttal; Governança nos dados) | `nexus/cadastro/CLAUDE.md` |
 | Relatórios (Central de emissão: os quatro do PCM, o executivo do PCM e os da Performance; o setor de cada relatório) | `nexus/pcm/relatorios/CLAUDE.md`, `nexus/pcm/relatorio_exec/CLAUDE.md` e `nexus/torres/CLAUDE.md` |
-| Contratos e clientes (Contestações do cliente, vindas do Dashboard Thopen) | `nexus/torres/contratos/CLAUDE.md` |
+| Contratos (Comando › Contratos: o contrato editável com histórico, os Pontos de atenção e de divergência e a visão por setor, desde 19/11/2026; Contestações do cliente, vindas do Dashboard Thopen) | `nexus/contratos/CLAUDE.md` |
 | Comando (desde 03/11/2026: o motor de insights com as regras que cruzam as fontes, a Caixa de entrada por setor, o Assumir e o Concluir no banco e o sino no topo; as fases seguintes, conversa e pedidos entre setores, no PRD do Taskmaster em `.taskmaster/`) | `nexus/comando/CLAUDE.md` |
 | COS | `nexus/torres/cos/CLAUDE.md` |
 | Usinas 360° (era Campo · App até 05/11/2026; o id e o /t/campo ficaram): a usina por inteiro, do responsável e, a seguir, do cliente | `nexus/torres/campo/CLAUDE.md` |
@@ -153,6 +153,11 @@ PerformancePainel.
   `.env`** (sem ele, pula): numa worktree, copie o `.env` antes da suíte (em 18/10/2026 três arquivos com nome passaram
   assim, pelas worktrees sem `.env`). O histórico do git
   anterior a 08/10/2026 ainda tem nomes (não se reescreve).
+- **Valor de contrato, citação de cliente ou de fornecedor e e-mail de terceiro não entram em arquivo versionado**
+  (19/11/2026, depois da varredura do histórico). E não se censura: o texto vai cifrado para o banco do Nexus e a tela de
+  quem está logado mostra tudo (Levi: "Tem que estar no banco do Nexus e aí quem tiver um acesso do Nexus vai ter a
+  informação completa"). O arquivo guarda a ficha; o livro `nexus_textos_reservados` guarda o texto. Regra, ferramenta e
+  prova: `nexus/dados/CLAUDE.md`, "Os textos reservados".
 - **Segredos** só no `.env` (gitignorado). Nunca imprima `NEXUS_SENHA_ADMIN` nem `NEXUS_SECRET_KEY`,
   nunca desligue o portão de login. Para validar tela atrás da senha, faça login por sessão lendo o `.env`.
 - Commit só quando pedido. Há deploy automático: push na `main` vai para produção em ~2 min, com restart. **No horário

@@ -39,6 +39,18 @@
     </div>
   </section>
 
+  {# as noites do Insights de madrugada (19/11/2026): quantas usinas reaproveitaram o insight, quantas vieram do lote e
+     quantas caíram na rede de segurança das 6h (Levi: "Registre quantas caíram nessa rede de segurança") #}
+  <section class="pm-sec">
+    <h2 class="pm-t">Insights de madrugada <span class="mudo">· em lote a partir das 00:10; às 6h, o que faltar é gerado direto</span></h2>
+    {% if noites %}
+    <div class="ia-tab-rola"><table class="ia-tab">
+      <thead><tr><th>Noite</th><th class="ia-tab-num">Usinas</th><th class="ia-tab-num">Reaproveitadas</th><th class="ia-tab-num">Já tinham</th><th class="ia-tab-num">Pelo lote</th><th class="ia-tab-num">Refeitas pensando</th><th class="ia-tab-num">Rede de segurança</th><th class="ia-tab-num">Sem insight</th><th>Situação</th></tr></thead>
+      <tbody>{% for x in noites %}<tr><td>{{ x.dia[8:10] }}/{{ x.dia[5:7] }}</td><td class="ia-tab-num">{{ x.get('usinas', '—') }}</td><td class="ia-tab-num">{{ x.get('reaproveitados', '—') }}</td><td class="ia-tab-num">{{ x.get('ja_tinham', '—') }}</td><td class="ia-tab-num">{{ x.get('pelo_lote', '—') }}</td><td class="ia-tab-num">{{ x.get('refeitos', '—') }}</td><td class="ia-tab-num">{{ x.get('rede', '—') }}</td><td class="ia-tab-num">{{ x.get('sem_insight', '—') }}</td><td>{{ {'fim': 'fechada', 'lote_a': 'esperando o lote', 'lote_b': 'esperando o 2º lote', 'colhido': 'lote colhido, esperando as 6h', 'teto': 'não rodou: teto do mês atingido', 'sem_ia': 'não rodou: sem o Haiku com chave'}.get(x.fase, x.fase) }}</td></tr>{% endfor %}</tbody>
+    </table></div>
+    {% else %}<p class="mudo">Nenhuma noite registrada ainda.</p>{% endif %}
+  </section>
+
   {{ tabela('Por origem', 'De onde veio', u.origens) }}
   {{ tabela('Por modo', 'Modo', u.modos, 'Busca responde direto; Pensamento raciocina antes') }}
   {{ tabela('Por modelo', 'Modelo', u.modelos) }}

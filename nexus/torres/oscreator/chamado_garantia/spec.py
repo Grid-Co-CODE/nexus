@@ -183,7 +183,7 @@ POR_FABRICANTE = {
         _s("Corrente medida no painel PV (A)", "num", obrig=False, so_para={"Estrutura Trackers"}),
         _s("Testes executados em campo e valores medidos", "longo", chave="testes"),
     ],
-    # service.latam@csisolar.com + pastas no Drive: a lista de evidências é fechada, e o
+    # e-mail do fabricante (o endereço mora no banco do Nexus) + pastas no Drive: a lista de evidências é fechada, e o
     # datalogger tem série própria
     "Canadian Solar": [
         _s("Nº de série do datalogger (foto da etiqueta)", "texto", anexo=True, chave="serial_dl"),
@@ -195,7 +195,7 @@ POR_FABRICANTE = {
         _s("Vídeos das medições CA no conector (F-F, F-T, F-N, N-T)", "texto", anexo=True, obrig=False),
         _s("Vídeos do display (Information, Alarm, Version, Running)", "texto", anexo=True, obrig=False),
     ],
-    # suporte@sigmasensors.com.br — série, modelo, posição e acessórios já vêm do tipo ETM
+    # e-mail do fabricante (o endereço mora no banco do Nexus) — série, modelo, posição e acessórios já vêm do tipo ETM
     "Hukseflux": [],
     # forms.office.com da Valmont — item é a descrição da peça; TAG e quantidade já vêm do tipo
     "Convert": [
@@ -218,7 +218,7 @@ POR_FABRICANTE = {
     "Sungrow": [
         _s("Produto com problema (conforme catálogo Sungrow)", "texto", chave="produto"),
     ],
-    # sdantas@/mmacedo@axialstructural.com — e-mail simples: modelo, série, horário e ações
+    # e-mail do fabricante (o endereço mora no banco do Nexus) — e-mail simples: modelo, série, horário e ações
     "Axial": [],
 }
 # clones já assumidos no chamado_spec: mesma engenharia, representante diferente

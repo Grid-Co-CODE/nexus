@@ -57,10 +57,10 @@ OBRIGATÓRIO (arquivo ou o texto colado), o administrador liga o gestor a uma pe
   "Nada mudou" também não grava.
 - **A tela.** O topo é UMA linha (a troca de contrato é o título; o gestor e o Editar dados na mesma linha), a linha de
   fatos é curta, o atraso é um chip, e não há título repetido, linha de "de onde vêm os dados" nem rodapé. As abas:
-  Regras (as categorias, com Incluir regra, e os Dados do contrato no fim), Calendário, Atendimento, Entregáveis,
-  Metas, Financeiro e **Histórico** (quem, quando, o que era e o que ficou, o motivo e a prova; a carga inicial no
+  Regras (as categorias, com Incluir regra, e os Dados do contrato no fim), **Pontos** (seção abaixo), Calendário,
+  Atendimento, Entregáveis, Metas, Financeiro e **Histórico** (quem, quando, o que era e o que ficou, o motivo e a prova; a carga inicial no
   fim). A linha editada leva a marca "editado" (quem e quando no título).
-- **O retorno da Ana Barros (chamada de 18/11/2026; Levi escolheu: comenta quem vê o contrato; prioridade e comentário
+- **O retorno da gestora que pediu a visão do contrato (chamada de 18/11/2026; Levi escolheu: comenta quem vê o contrato; prioridade e comentário
   sem prova, só quem e quando; recorrências sugeridas e o gestor confirma; Atendimento e Histórico depois dos exemplos de
   relatório dela):**
   - **Prioritárias:** a estrela do gestor (campo `prioritaria` da regra, sem prova) põe a regra no alto das Regras;
@@ -68,7 +68,7 @@ OBRIGATÓRIO (arquivo ou o texto colado), o administrador liga o gestor a uma pe
   - **O que se repete vira um item:** dentro da categoria, as regras de um mesmo tema (expurgo, multa, exclusão,
     disponibilidade; 2 ou mais) ficam num subgrupo recolhido (`tema` no JS). O atributo é `data-subgrupo`: o `data-tema`
     é o do tema claro/escuro no `<html>` e pegava todo clique.
-  - **Comentário na regra** (pedido da Danuth): item `comentario`, de quem vê o contrato, sem prova; sai só pelo autor ou
+  - **Comentário na regra** (pedido da área de Contratos): item `comentario`, de quem vê o contrato, sem prova; sai só pelo autor ou
     pelo administrador; a linha mostra quantos.
   - **Calendário:** item `recorrencia` (semanal com o dia da semana; mensal no Nº dia útil ou no dia do mês; trimestral,
     semestral e anual a partir de um mês), com os feriados nacionais no dia útil. As **sugeridas** saem das regras com
@@ -79,6 +79,45 @@ OBRIGATÓRIO (arquivo ou o texto colado), o administrador liga o gestor a uma pe
   - **Financeiro mês a mês:** a mensalidade do contrato, os adicionais do mês, e os `lancamento` do gestor (acréscimo,
     penalidade, desconto; com motivo e prova), com o total previsto.
 - Prova: `tests/test_contratos_editavel_18_11.py`.
+
+## Pontos de atenção e de divergência, o setor e a cláusula (19/11/2026; `pontos.py`)
+
+O pedido de 19/11/2026, olhando o painel "Zeladoria Contratual por Cliente" do Radar da Zeladoria: "a parte por setor (oq
+performance atende, o que zeladoria etc)" e "ponto de atenção e pontos de divergência do contrato". O Levi, no mesmo dia:
+"uma tagzinha [...] da cláusula do contrato [...] uma forma mais resumida"; "separar por setor [...] ordenar por setor
+[...] e aí botar uma linha grossa"; e o pedido da área de Contratos para recolher os blocos de Entregáveis. Escolhas dele:
+**vencendo = 60 dias** (o Radar usa 90), o setor **só dentro do contrato**, resolver um ponto **com motivo e prova**, e
+em Entregáveis só os lançados abertos na 1ª vez.
+- **A aba Pontos** junta, sem copiar: as **contas** (Atenção: vigência vencida ou que vence em até 60 dias; o prazo de
+  avisar a renovação que passou ou chega nesses dias; o cliente sem contrato ou aditivo ASSINADO na pasta, só minuta ou só
+  anexo; o cliente sem PDF lido), os **leitores dos PDFs** (Divergência: o `divergencias` de cada contrato, com o que cada
+  documento diz e qual prevalece; os da 1ª leva ficaram no texto das `observacoes` e entram à mão, por "Incluir ponto"), a
+  **planilha × o PDF** (Divergência: fim, aviso prévio e índice; era o bloco "não batem" do fim das Regras) e o **Radar da
+  Zeladoria** (as linhas de `zeladoria_contratual` com alerta, lidas na hora pela `zeladoria.leitura`; o mesmo motivo em
+  várias usinas vira um ponto). O Radar casa com o contrato pelo nome do cliente sem acento e sem caixa, nunca por
+  palpite: o cliente do Radar sem contrato de mesmo nome aparece numa linha em Todos os contratos, para alguém acertar o
+  nome. Radar fora: a aba diz que os dele não vieram, e o resto aparece.
+- **Resolver** grava o item `resolucao` (o que se decidiu, com motivo e prova, no Histórico); **reabrir** é retirar a
+  resolução (motivo e prova também). O item `ponto` é o incluído à mão (Atenção ou Divergência, o texto e o setor). O id
+  do ponto leva o dado que o criou (`c:vigencia:<fim>`, `d:<contrato>:<n>`, `p:<contrato>:fim:<data>`, `z:<hash>`):
+  mudou o dado, nasce outro ponto, e a resolução velha não esconde o novo. Resolvido vai para "Resolvidos", recolhido.
+- **Na tela:** o número de abertos na aba (vermelho com Atenção, amarelo só com Divergência) e a coluna Pontos em Todos
+  os contratos, que leva à aba. "De onde" mostra a etiqueta curta da cláusula; a referência inteira na dica. No celular
+  (até 640 px) a linha empilha: o tipo e o Resolver em cima, o ponto e a origem embaixo.
+- **O setor de cada regra** vem dos leitores dos PDFs (9 nomes fixos, `edicao.SETORES`; em 19/11/2026, 3 de 3.905
+  regras sem setor). Regras ganhou **Por setor** no mesmo controle (Por categoria | Por setor | Prioritárias | Mudadas
+  por aditivo): cada setor abre o que o contrato pede dele, na ordem das categorias. Atendimento, Entregáveis e Metas
+  vêm **por setor**, na ordem da operação (`SETORES` do `contratos.js`), com uma linha grossa e neutra (`--tinta-2`; cor
+  só para estado) e o nome do setor abrindo cada um.
+- **A etiqueta da cláusula** (`fichas.clausula_curta`, posta em `ref.curta` pelo `edicao.visao`): o documento abreviado
+  e o 1º item ("Anexo II (Proposta Técnica), 4.7.2" → `Anx II · 4.7.2`; "Cláusula Vigésima Primeira, iii" → `Cl. 21 ·
+  iii`; "9 (c)" → `Cl. 9 (c)`). Medida em 19/11/2026 nas 3.978 regras lidas: nenhuma vazia, a maior com 20 caracteres.
+- **Entregáveis** abre e fecha cada bloco pelo título (Recorrentes, Entrega única, Entregáveis e medições lançados); na
+  1ª vez só os lançados abertos, e o navegador lembra (`localStorage` `nexus.contratos.dobras`).
+- **A coluna Contratos** (a regra igual em vários contratos) quebrava a linha: a célula tinha a classe `.sub`, que é
+  `display:block`, e numa `<td>` isso tira a célula da tabela. A célula de texto miúdo é `td.ctr-quais`.
+- Prova: `tests/test_contratos_pontos_19_11.py` (dados inventados). A prévia com os PDFs reais: a cópia de prova com
+  `NEXUS_DADOS` numa pasta de rascunho com as fichas e uma planilha mínima (nunca no repositório).
 
 ## A planilha de controle de obrigações na visão do contrato (16/11/2026; `controle.py`)
 
@@ -130,8 +169,8 @@ pasta do Backoffice: "ATUALIZE AGORA COM DADOS REAIS!".
     - a situação do adicional: Faturado; Reprovado; Memória atrasada ou a enviar (a execução mais 10 dias); Aprovado,
       faturar; Aguardando cliente. O valor é o aprovado, ou o estimado.
   - **Prova de 17/11/2026** com a planilha real e o hoje que o Excel usou (10/11/2026): 75 de 75 obrigações e 8 de 8
-    adicionais iguais às colunas da planilha. Outubro somado por supervisor bate com a Indicadores_Mes (Marcelo
-    Martineli: 1 entregável, 0 no prazo; Danuth Fernandes: 3 adicionais, R$ 9.054).
+    adicionais iguais às colunas da planilha. Outubro somado por supervisor bate com a Indicadores_Mes (um supervisor com 1 entregável e 0 no prazo,
+    outro com 3 adicionais).
   - O gestor do contrato é o supervisor da linha "Contrato (nível geral)"; sem essa linha, o supervisor único do cliente.
     As outras linhas viram as carteiras, cada uma com o supervisor e as usinas dela.
 - **A página** (desde 18/11/2026 a tela Contratos, `static/contratos.js`; o exemplo fictício da prévia saiu) pede os
@@ -164,9 +203,8 @@ pasta do Backoffice: "ATUALIZE AGORA COM DADOS REAIS!".
     bloco `:root[data-tema="claro"]` do `nexus.css`: mudou lá, muda aqui. Cor fixa não entra (nem nos gráficos SVG do
     exemplo: a cor vai no `style`, com `var()`).
 - **Medido em 16/11/2026** com a planilha real: 16 contratos e 60 obrigações com vencimento (75 com as 15 sem data, que
-  entraram em 17/11/2026), e 8 serviços adicionais. Batem com as colunas automáticas da planilha, por exemplo:
-  - Athon: vigência vencida em 25/08/2026 e próximo reajuste em 25/02/2027;
-  - Élis: reajuste em 01/12/2026.
+  entraram em 17/11/2026), e 8 serviços adicionais. Batem com as colunas automáticas da planilha (a vigência vencida e
+  o próximo reajuste, contrato a contrato; as datas de cada cliente ficam na planilha e no banco, não aqui).
 - Prova: `tests/test_contratos_controle.py`, com uma planilha inventada (mesmas abas e colunas, nada real).
 
 ## As fichas dos contratos, lidas dos PDFs (18/11/2026; `fichas.py`)
@@ -186,10 +224,10 @@ analisar e fazer algo melhor?", "completa tudo!" e "faça por subagentes para me
   mesmo dia (Levi: "o arquivo JSON você mesmo criou. Então alguém teria que transformar em JSON [...] isso não faz
   sentido"). O `fichas.ler` segue conferindo o formato; a ficha casa com o cliente da planilha pelo nome sem acento e
   sem caixa (`fichas.por_cliente`).
-- **Na tela.** Regras: as 11 categorias recolhidas; a linha abre o trecho e a página; "Mudadas por aditivo" é o único
-  controle. Cliente com vários contratos do mesmo modelo (2C, GreenYellow, Axis): a regra igual em todos aparece uma vez
-  com "todos". Embaixo, "A planilha de controle e o contrato não batem" (fim da vigência, aviso prévio, índice) e "O que
-  o contrato não diz". Nas outras abas, o que o contrato pede: SLA no Atendimento, Rotinas no Calendário, Entregáveis,
+- **Na tela.** Regras: as 11 categorias recolhidas (ou os setores, desde 19/11/2026); a linha abre o trecho e a página;
+  um controle só (Por categoria | Por setor | Prioritárias | Mudadas por aditivo). Cliente com vários contratos do mesmo
+  modelo: a regra igual em todos aparece uma vez com "todos". Embaixo, "O que o contrato não
+  diz"; a planilha × o PDF (fim da vigência, aviso prévio, índice) está na aba Pontos desde 19/11/2026. Nas outras abas, o que o contrato pede: SLA no Atendimento, Rotinas no Calendário, Entregáveis,
   Metas (disponibilidade, bônus, penalidades) e Financeiro (valor mensal, medição, adicionais). Todos os contratos ganha
   a coluna "Regras do contrato" (ou "PDF não lido").
 - **O contrato completa a planilha (18/11/2026, Levi: "faça um rework lá nos contratos e bote os dados que
@@ -199,7 +237,7 @@ analisar e fazer algo melhor?", "completa tudo!" e "faça por subagentes para me
   e a diferença vai para "A planilha de controle e o contrato não batem". Cada campo completado leva `origem` (contrato e
   página) e a tela marca "do contrato". A renovação e o reajuste são calculados depois, com o dado completado. A página
   da prova mostra o intervalo (`ref.pagina_fim`) quando a tabela continua na página seguinte (achado da revisão).
-- **18/11/2026, os 5 clientes com PDF** (Athon, Axis, 2C, GreenYellow, Thopen): o que cada leitor achou que o Levi ou a
+- **18/11/2026, os 5 clientes com PDF** (quais são, a tela Todos os contratos diz): o que cada leitor achou que o Levi ou a
   área de Contratos precisa decidir está nas `lacunas` e nas `observacoes` de cada ficha. Os outros 11 clientes não
   mandaram PDF.
 
@@ -224,7 +262,7 @@ aba da visão do contrato, que vale também quando ela virar tela de verdade:**
   contrato riscada embaixo; a regra que nunca mudou não leva selo nem autor (14 das 18);
 - **o que acrescenta é a última linha da tabela** (a regra nova, a entrada nova), não um botão verde no alto;
 - o cabeçalho da moldura no Nexus é **uma linha**: o título e o aviso de dados fictícios; sem a pergunta e sem a faixa
-  amarela. Prova: `tests/test_comando_visao_do_contrato.py`.
+  amarela (o teste do mockup saiu com ele).
 
 **3ª rodada, na mesma noite** (Levi: "esse scroll branco aí é zoado [...] deixa no estilo Nexus. E todas essas regras aí,
 deixa recolhido [...] eu quero ver entregáveis, quero ver SLA, a pessoa vai clicando [...] seria bom se fosse separado

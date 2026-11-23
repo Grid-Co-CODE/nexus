@@ -747,8 +747,8 @@ document.addEventListener('click', function (ev) {
   var dlg = document.getElementById('cr-modal');
   if (!dlg) { return; }
   var corpo = dlg.querySelector('.cr-modal-corpo');
-  // a PT na janela: a assinatura do técnico e quem assina vêm do login do Fracttal (cookie só em /os), como na tela da
-  // PT; o script que vem no pedaço de página não roda, então é daqui
+  // a PT na janela: a assinatura do técnico (a APR de antes do App, pelo login do Fracttal) e quem assina (a entrada do
+  // Nexus, desde 20/11/2026), como na tela da PT; o script que vem no pedaço de página não roda, então é daqui
   // a ronda na janela (18/10/2026): as fotos da OS chegam depois do card (o Fracttal só é lido quando ele abre); a
   // miniatura abre grande dentro do próprio card (a caixa de foto das Rondas ficaria por baixo da janela)
   function completarRonda() {
@@ -795,10 +795,8 @@ document.addEventListener('click', function (ev) {
     var quem = corpo.querySelector('[data-cr-quem]');
     if (quem) {
       fetch(quem.getAttribute('data-cr-quem'), {credentials: 'same-origin'}).then(function (r) { return r.json(); }).then(function (q) {
-        if (q.email) { quem.textContent = 'Assinando como ' + q.nome + ' (' + q.email + '), pelo login do Fracttal.'; return; }
-        var a = document.createElement('a'); a.className = 'cn-link'; a.href = quem.getAttribute('data-cr-entrar');
-        a.textContent = 'entre com o seu login do Fracttal';
-        quem.textContent = 'Para assinar, '; quem.appendChild(a); quem.appendChild(document.createTextNode(' (o mesmo do OS Creator).'));
+        if (q.email) { quem.textContent = 'Assinando como ' + q.nome + ' (' + q.email + ').'; return; }
+        quem.textContent = 'Para assinar, entre com a sua conta Microsoft.';
       }).catch(function () {});
     }
   }

@@ -25,7 +25,7 @@ muito boa"; e "construa o que você sugere"). PRD e tarefas no formato do Taskma
 | `conversa.py` | A conversa presa ao objeto com @menção: o livro `nexus_conversas · fato_mensagem`, as menções não lidas (`para_mim`) e a lista do @ (`pessoas_mencionaveis`) |
 | `../torres/comando/templates/comando/_conversa.html` + `static/comando/conversa.js` | O componente da conversa (dentro de cada insight e na página da OS e da usina) e o @ |
 | `../casca/__init__.py` (`_sino`) + `base.html` | O sino do topo |
-| `avisos.py` + `../casca/__init__.py` (`_avisos_do_sino`, `POST /t/comando/aviso/lida`) | Os avisos das OS de cada pessoa no sino ("OS x concluída pelo técnico", "Sua solicitação gerou uma OS" e, desde 08/11/2026, "OS x criada para você"; desde 11/11/2026, tudo da OS da solicitação, com a cancelada) e o Marcar como lida: o livro `nexus_avisos · fato_evento_aviso` |
+| `avisos.py` + `../casca/__init__.py` (`_avisos_do_sino`, `POST /t/comando/aviso/lida`) | Os avisos das OS de cada pessoa no sino ("OS x concluída pelo técnico", "Sua solicitação gerou uma OS" e, desde 08/11/2026, "OS x criada para você"; desde 11/11/2026, tudo da OS da solicitação, com a cancelada; desde 22/11/2026, a OS pausada, em três linhas) e o Marcar como lida: o livro `nexus_avisos · fato_evento_aviso` |
 | `demandas_regras.py` + `demandas.py` + `../torres/comando/demandas_tela.py` | As demandas entre setores (12/11/2026): a regra do prazo e dos avisos, o livro `nexus_demandas` e as telas (o bloco da Caixa, a Nova demanda, os Temas do setor e o sininho); ver a seção abaixo |
 | `carteira_ia.py` + `dossie_cliente.py` | O dossiê da carteira para a Nexus IA do Comando › Usinas e o dossiê do cliente em .md, com as UFVs pontuadas (16/11/2026); ver as seções abaixo |
 | `gerencial.py` + `../torres/comando/gerencial_tela.py` + `comando/gerencial.html` + `static/gerencial.js` e `.css` | A Visão gerencial (teste), 19/11/2026: o portfólio que afunila (portfólio → cliente → usina) e a nota de cumprimento do contrato por usina; ver a seção abaixo |
@@ -124,6 +124,18 @@ download do pdf da OS". No quiz, "resposta" é o técnico executar a OS.
   programação semanal, as clonagens) dão "N OS novas para você", que leva à visão "Atribuídas a mim" do Histórico daquele
   dia (sem o card; o `aviso_id` é `L:<quem criou>:<minuto>`, com o id de quem criou ou um código curto do nome, nunca o
   nome). O selo é "Para você". Os técnicos de campo usam o App: o aviso serve a quem trabalha no Nexus.
+- **"OS x — Pausada pelo técnico"** (22/11/2026, Levi: "se ela foi concluída, se ela foi pausada"; `avisos.pausadas`): as OS
+  que a pessoa criou (a lista central, como o "concluída pelo técnico") com uma tarefa fora da programação: a marca que
+  vale do Fora (`pcm/motivos.vigentes`, guardada enquanto a cópia do livro é a mesma, porque decifra), com o motivo, quem
+  pôs e por onde ("pelo técnico" no App, "pelo PCM"). A pausa que a própria pessoa pôs não avisa; só as de `PAUSAS_DESDE`
+  (22/11/2026) em diante e nos últimos 7 dias. O id é `P:<item_id>:<desde>` (o mesmo começo do `F:` do sino do setor, outro
+  aviso: cada sino marca o seu), tipo `pausada`; nunca é gravado, só o lido dele.
+- **Três linhas por aviso** (22/11/2026, Levi: "OS número, traço, e aí o que aconteceu [...] ao lado de concluída pelo
+  técnico, a data e a hora [...] o ativo [...] vira uma terceira linha"; antes tudo ia numa 2ª linha cortada com
+  reticências, e a hora, no fim dela, quase nunca aparecia): `avisos.tres_linhas` dá a cada aviso `os_txt` e `acao` (1ª
+  linha, com a hora `dd/mm · HH:MM` à direita), `l2` = [[texto, tom], ...] (quem e o status, com a cor e a palavra:
+  Em verificação no âmbar, Concluída no verde, o motivo da cancelada no vermelho) e o `ativo` com a `atividade` (a 3ª: o
+  ativo da lista central e a descrição sem o "[Ativo] - " do começo). O `titulo` e o `detalhe` de antes seguem no aviso.
 - **Quem a pessoa é no Fracttal** (08/11/2026, `avisos._do_fracttal`, guardado 1 minuto): o id dela pela ligação de Base →
   Acessos → Pessoas e setores (a última decisão com o código do e-mail do login, a mesma que dá o setor), e a conta e o nome
   que o Fracttal grava pelo catálogo de pessoas do OS Creator (pelo id; sem a ligação, pelo e-mail). Até então o aviso de
@@ -689,8 +701,8 @@ Gemini, Groq, Grok [...] Qualquer IA que dê para puxar a API para fazermos o te
   cada uma com o tempo, os tokens, o custo estimado e **quantos números da resposta estão no dossiê**
   (`numeros_conferidos`: conta número com casa decimal ou a partir de 32, sem as citações "§3", as datas e o ano; o que
   não está no dossiê é cálculo da IA ou invenção, e é por ali que se confere).
-- **Teto e registro:** `NEXUS_IA_TETO_USD` (**padrão US$ 10** desde 18/11/2026, Levi: "tem como limitarmos o uso dessa
-  chave em 10$?") por mês. Só os pagos somam (a grátis custa 0), então é o teto do Haiku. **Passou, o pago para e as
+- **Teto e registro:** `NEXUS_IA_TETO_USD` (**padrão US$ 12** desde 19/11/2026, Levi: "Madrugada em lote, com teto de
+  US$ 12"; era US$ 10, o do piloto, de 18/11) por mês. Só os pagos somam (a grátis custa 0), então é o teto do Haiku. **Passou, o pago para e as
   grátis respondem** (`pago_liberado`, `perguntar`): a pergunta não é recusada, o Haiku não vem marcado, e a resposta diz
   que o teto foi atingido. É uma conta estimada pelos tokens (preço da tabela); o limite garantido é o da conta da
   Anthropic (crédito pré-pago, sem recarga automática). Cada
@@ -1188,6 +1200,101 @@ Prova:
 - `tests/test_comando_diagnostico.py`: as regras e o pedido pronto;
 - `tests/test_comando_ia.py`: a área Chamados no chat.
 
+### Cada dado declara a sua janela de tempo (19/11/2026)
+
+O achado do Levi no Insights: "o resumo do mês diz '0 desligamentos com a geração parada' enquanto o título fala do SKID 2
+parado hoje. Cada dado precisa declarar a sua janela de tempo (hoje, até ontem, mês parcial) para que o texto não se
+contradiga". As duas frases estavam certas, cada uma na janela dela: a tabela por mês do COS só conta a parada JÁ
+NORMALIZADA (a usina voltou), e a parada de hoje ainda está aberta, fora dela. O dossiê não dizia isso.
+
+- **As três janelas** (`dossie.COMO_LER`): AGORA/HOJE (o COS agora, as OS, as pendências, a última ronda); ATÉ ONTEM (a
+  meta, a geração, o PR e a disponibilidade do mês corrente, que é parcial); NO MÊS, SÓ AS JÁ NORMALIZADAS (os
+  desligamentos da tabela por mês).
+- **No dossiê** (`VERSAO = 7`): o COS agora vem como "Agora (hoje, a fotografia do COS neste momento)"; a tabela por mês
+  diz "só as paradas JÁ NORMALIZADAS"; com equipamento parado agora, uma linha avisa que essa ocorrência NÃO ENTRA na
+  tabela (a falha de comunicação não é parada e não gera o aviso: `grupo != "sem_com"`); a performance diz "até ontem
+  (hoje não entra)". A linha "Agora: sem leitura do COS" ficou como era (a conferência reconhece o "sem leitura" por ela).
+- **No pedido** (`diagnostico.PEDIDO`, `VERSAO = 6`: os guardados com o pedido antigo são refeitos na próxima abertura): a
+  regra "Janela de tempo" manda cada número levar a janela, e proíbe "zero/nenhum desligamento" com parada aberta hoje
+  sem dizer "já normalizados" e sem citar a parada na mesma frase.
+- **Na conferência** (`diagnostico.conferir` + `paradas_abertas`): o "zero desligamentos" (0, zero, nenhum, sem) dito com
+  parada aberta agora, sem "normalizad" na mesma frase, é falha: refaz uma vez pensando e, se insistir, a tela escreve
+  "A conferir".
+- Seção nova no dossiê entra com a janela dela escrita. Prova: `tests/test_comando_diagnostico_janelas_19_11.py`.
+
+### A programação do PCM e o contrato no dossiê (19/11/2026; `nexus/comando/dossie_fontes.py`)
+
+Levi, 19/11/2026: "Fontes novas, nesta ordem: Programação do PCM: confirme se a semana seguinte já está no banco antes da
+segunda. Contratos: garantia de disponibilidade, PR próprio e prazos de atendimento, sem valores em reais. Comentários dos
+analistas: só depois de montar o de-para entre o código da fonte e a usina. No lugar do nome do autor, informe o setor".
+As duas primeiras entraram; a terceira espera o de-para (abaixo).
+
+- **Onde entram:** seções **17 (Programação do PCM)** e **18 (Contrato)**, no FIM; "O que ficou de fora" virou a 19. No
+  meio, mudariam o número das seções que o pedido da IA cita (o §4 do COS e o §5 das OS, em `ia.py` e
+  `diagnostico.py`). `dossie.VERSAO = 8`. O "Como ler" diz que a programação é o PLANEJADO (o feito está nas OS) e manda
+  comparar a disponibilidade do mês com a garantia do contrato, quando houver.
+- **Programação** (`programacao_da_usina`): o `nexus_programacao · fato_programacao`, a semana corrente e a seguinte
+  (`responsaveis._programacao_recente`, o mesmo leitor da Visão do cliente). Uma linha por tarefa = os blocos do mesmo
+  dia, da mesma OS e do mesmo tipo: dia, hora do 1º bloco, tipo, OS, duração somada e o estado (da última carga, de hora
+  em hora). O fato não tem nome de pessoa nem o texto da tarefa. **A semana seguinte, medida no banco em 19/11/2026:** o
+  PCM a gera na sexta à noite (17:54 a 20:18 nas 8 últimas semanas; em agosto e setembro, quinta à noite), 2,2 dias
+  antes da segunda, e a carga de hora em hora a traz. De segunda à sexta à tarde ela não existe: a seção diz "o PCM
+  ainda não publicou", nunca "nada programado" (`seguinte_publicada` é do fato inteiro, não da usina). Mais de 30
+  tarefas na semana: as 30 primeiras e "e mais N".
+- **Contrato** (`contrato_da_usina`): as fichas do Comando › Contratos (`contratos/edicao.visao`, pelo
+  `gerencial_tela._contratos`). A garantia de disponibilidade é a da Visão gerencial (`gerencial.garantia_de_
+  disponibilidade`); as outras regras da categoria "Disponibilidade e desempenho" (o PR próprio mora ali) vêm com o
+  texto vigente em até 200 caracteres; os prazos, da categoria "SLA" (nome, prazo e cláusula; até 14). **Nenhum valor em
+  reais:** Penalidades, Medição e as outras categorias não entram, e um "R$ 123" dentro de um texto vira "(valor no
+  contrato)". Cliente com vários contratos: vale o que lista a usina (pelo nome ou pelo código); sem um só, as regras de
+  todos, sem repetir, e a seção diz isso. Sem ficha do cliente: "sem dado: o contrato ainda não foi lido" (não é "não
+  garante"). Medido com as fichas da produção de 18/11: contrato lido em 142 de 144 usinas, garantia em 109, ligadas a
+  um contrato só 126; nenhum "R$" no dossiê.
+- **Uma leitura para todas as usinas** (`_guardado_do_dossie`, 10 minutos por app): o Insights de madrugada monta 144
+  dossiês em fila; a programação das duas semanas e as fichas são lidas uma vez. O erro não se guarda: a fonte vai para
+  "O que ficou de fora" e a usina seguinte tenta de novo.
+- **Comentários dos analistas da Performance: NÃO entraram.** Moram no `plataforma_estado · comentarios` com a chave
+  `<fonte>:<plant_id>`, sem o nome da usina, e com o nome de quem escreveu (na coluna e dentro do texto automático).
+  Falta o de-para `<fonte>:<plant_id>` → usina; quando entrarem, o autor vai pelo SETOR, nunca pelo nome.
+- Prova: `tests/test_comando_dossie_fontes_19_11.py`. **Falta ver no servidor:** as duas seções no dossiê de uma usina
+  (o contrato só abre lá: a carga inicial dos contratos mora na pasta de dados do servidor) e, sábado, a semana de 23/11
+  na seção.
+
+### O Insights de madrugada, em lote (19/11/2026; `nexus/comando/diagnostico_noite.py`, `torres/comando/noite_laco.py`)
+
+Levi, 19/11/2026: "Madrugada em lote, com teto de US$ 12. O lote só garante a resposta em até 24 h, então comece logo
+depois da meia-noite e, se às 6h ainda faltar alguma usina, gere essas direto. Registre quantas caíram nessa rede de
+segurança". A conta que levou a isso, medida no dia: a 1ª abertura de uma usina levava até 48 s (a 2ª, 0,1 s); só 12 de
+144 dossiês ficaram idênticos de 18/11 para 19/11, então sobram cerca de 132 chamadas por noite, US$ 12 a 16 por mês
+chamando direto e a metade em lote (Message Batches da Anthropic, 50% do preço).
+
+- **O relógio** (`passo`, de 5 em 5 minutos; horário de Brasília): **00:10** prepara e manda o lote (até 05:30; depois
+  disso não vale mandar); enquanto o lote roda, cada passo olha se acabou; **06:00** é a rede de segurança; a noite que
+  não rodou (servidor fora) ainda tem a rede até as **7h**, e depois o dia segue sob demanda, como antes.
+- **Reaproveitar** (`preparar`): o insight guarda a `assinatura` do dossiê (`diagnostico.assinatura`: o sha256 do texto
+  sem a linha "- Gerado em:"). Dossiê de hoje com a mesma assinatura do insight de ontem = o de ontem vale para hoje,
+  gravado com `reaproveitado_de` (o dia em que foi FEITO, que atravessa vários dias iguais), e a tela diz "O dossiê da
+  usina não mudou desde dd/mm" (`para_tela.sem_mudanca_desde`, `prontuario.js`). Insight guardado antes de 19/11 não tem
+  a assinatura e não é reaproveitado: a 1ª noite manda todas.
+- **O lote** leva o MESMO pedido da chamada direta em Busca (`ia.pedido_do_lote`, que usa o `_pedido_anthropic`: mudou
+  um, mudou o outro). A resposta passa pela leitura e pela conferência de sempre (`colher`); a que não confere é
+  guardada com o "A conferir" e vai a um **2º lote, pensando** (o "refaz uma vez pensando" da chamada direta). Custo
+  registrado pela metade (`ia.DESCONTO_DO_LOTE`), com `lote: true`, na pergunta "[diagnóstico do dia]": entra no teto.
+- **A rede das 6h** (`rede`): cancela o lote que ainda roda e gera DIRETO (`diagnostico.gerar`) toda usina sem o insight
+  de hoje. As contas da noite (`contas`: usinas, reaproveitados, ja_tinham, pelo_lote, refeitos, **rede**,
+  sem_insight) ficam no estado, no log e no painel de uso (`/t/campo/usinas/ia/uso`, "Insights de madrugada").
+- **Estado:** `<NEXUS_DADOS>/ia/noite/AAAA-MM-DD.json` (o servidor que reinicia no meio retoma dele; o envio só é gravado
+  depois de criado o lote, então o reinício durante o preparo recomeça sem lote em dobro). O dossiê de cada usina do
+  lote fica em `<NEXUS_DADOS>/ia/noite/<dia>/<usina>.md` até a noite fechar (a conferência precisa dele) e é apagado.
+- **Quando não roda:** sem o Haiku da Anthropic com chave (`fase = "sem_ia"`: IA grátis não tem lote) ou com o teto do
+  mês atingido (`fase = "teto"`). Nos dois o dia segue sob demanda. **Quem liga** é o `campo.instalar`
+  (`noite_laco.ligar`), nunca o `create_app`; `NEXUS_IA_NOITE=0` desliga, e o PC (`NEXUS_CAMPO_AQUECER=0`) não liga:
+  duas máquinas com a mesma chave mandariam dois lotes.
+- **Sem nome de pessoa:** o passo roda num pedido de mentira, com a sessão vazia, e o dossiê é o mesmo da tela.
+- Prova: `tests/test_comando_diagnostico_noite_19_11.py` (cliente de lote de mentira; nenhuma chamada à Anthropic).
+  **Falta provar no servidor:** a 1ª noite (quantas vieram pelo lote, quantas caíram na rede) e o teto mostrado no
+  painel (o `.env` do servidor pode trazer `NEXUS_IA_TETO_USD` e vencer o padrão).
+
 ## A Visão gerencial (teste) (19/11/2026; `nexus/comando/gerencial.py`, `torres/comando/gerencial_tela.py`, `static/gerencial.js`)
 
 **Para que serve.** Levi, 18/11/2026, com o prontuário da usina no ar: "já conseguimos falar muito bem com quem está
@@ -1337,6 +1444,60 @@ Prova:
   cumprimento 79 (131 com nota, 12 abaixo de 55); Renogrid o pior (50, caiu 6, puxado pelos Prazos de OS e Rotinas);
   183 insights críticos e 183 de atenção (conferido na contagem do motor: são iguais de fato).
 
+### O cabeçalho do cliente que sobe e a usina com o Nexus Insights (19/11/2026, à tarde)
+
+Levi, 19/11/2026, depois de ver no ar: no cliente, "quando desce um scroll, aparece a animação dessas informações do cliente
+indo para cima e diminuindo. Então, ficaria Athon, tantos MWp pico, 10 usinas, tantos por mês, e os cardzinhos também iriam
+subir"; na usina, "eu queria que a informação fosse uma mescla do que a gente tem agora com o que a gente tem no Nexus
+Insights".
+
+- **O cliente** ganhou três cartões na capa (a nota do contrato no mês, o fim do contrato e as obrigações atrasadas; sem
+  ficha de contrato, "sem ficha" e "—", nunca "em dia"). Ao descer além de `ABRE` (90 px), a barra presa logo abaixo do
+  topo do Nexus ABRE numa animação de tempo (`encolher`, `abrir`, `fechar`, Web Animations): o nome, os MWp e a
+  legenda (usinas e valor por mês) saem do lugar e do tamanho da capa e encolhem até a barra; os cartões sobem e somem um
+  depois do outro e as etiquetas descem no lugar. Acima de `FECHA` (40 px), o caminho de volta. A 1ª versão era presa à
+  posição do scroll e, parada no meio, deixava os dois textos sobrepostos (Levi: "dá uma bugada, não está soando como
+  animação!"): o scroll só decide abrir ou fechar, e o estado final é de classe (`vg-barra--aberta`, `vg-cli-aberta`). A
+  barra é só desenho (`aria-hidden`): o mesmo texto está na capa. Até 1100 px a barra perde a legenda; até 820 px, as
+  etiquetas além da 1ª. `&rolar=200` abre a página já descida.
+- **Os blocos que descem até a barra da usina** (Levi, no mesmo dia: "Faça animação de quando eu descer. Essas barras,
+  tipo, descerem e encontrarem cada uma barra, encontrar sua usina"): junto com a barra do alto (`ABRE`), a tampa de cada
+  bloco (a cor da nota, em losango) CAI na vertical até a altura da linha da usina na tabela, vira barra e DESLIZA até a
+  barra de potência, que enche quando ela chega e pisca (`voar`, `gota`). O bloco fica apagado no parque (`b.fora`: sem
+  número e sem a energia). Subindo (`FECHA`), o caminho de volta (`voltar`). As gotas moram no documento
+  (`position:absolute`), então quem rola durante o voo as vê chegar no lugar certo; o intervalo entre elas encolhe no
+  cliente grande. No cliente, a barra de potência começa vazia até o voo (o número em MWp ao lado está sempre lá); no
+  portfólio, enche ao abrir, como era. Provado no Edge comandado (19/11/2026, Athon): as 10 barras cheias depois da
+  descida, nenhuma gota sobrando, vazias de novo ao subir e cheias de novo na 2ª descida.
+- **O parque recolhe e a tabela sobe** (Levi, no mesmo dia: "não vai ficar um espaço vazio cinza lá em cima [...] A
+  tabela sobe e a tabela já fica ali [...] Ela já ocupa esse espaço"): com a barra aberta, a seção do parque (já
+  apagado) encolhe até o cabeçalho da tabela encostar na barra do alto, na rolagem em que a pessoa está (`recolher`; a
+  altura final é medida, não chutada), e as gotas caem já na tabela no lugar novo (os blocos são medidos ANTES de o
+  parque recolher; as linhas, DEPOIS). Voltando ao alto (`FECHA`), o parque abre de novo (`expandir`) e os blocos sobem
+  como na entrada (`PARQUE.replay`), com as barras esvaziando. Dois cuidados: a página guarda embaixo a altura que falta
+  enquanto o parque está fechado (no cliente pequeno, a página ficaria mais curta que a tela, o navegador puxaria a
+  rolagem para o zero e tudo fecharia de novo, num vai e volta), e a âncora de rolagem do navegador fica desligada
+  nesta página (`overflowAnchor`), senão ele compensaria a altura e seguraria a tabela no lugar.
+- **O "!" ao lado do nome** (Levi: "essas informações poderiam estar em uma exclamação ao lado do nome"): o como ler de
+  cada nível (o anel do portfólio, os blocos do cliente, a nota e os insights da usina) e o de onde vem saíram do texto
+  solto e foram para o "!" amarelo padrão do Nexus (a mesma marcação do `_explica.html`), ao lado de "Portfólio Grid
+  Co.", do nome do cliente e do nome da usina. Embaixo de cada nível ficou só a hora do dado.
+- **A usina** virou duas colunas: à esquerda a nota do contrato com a conta de cada item (como era); à direita o **Nexus
+  Insights** da usina, pedido à parte (`/t/comando/visao-gerencial/usina/<uid>/insights.json`): os insights abertos (não
+  concluídos), do mais grave para o menos, cada um com o selo de gravidade, o título (sem o nome da usina, que já está no
+  alto), a regra, a torre, com quem está, o que a regra viu, o que fazer, "Abrir a tela" e "Abrir no Nexus Insights"
+  (responder, assumir e a conversa ficam lá). A janela é AGORA: o filtro de mês vale para a nota, não para os insights, e
+  a tela diz isso. Embaixo do título, três cartões: a pontuação no Nexus, o fim do contrato e o valor no contrato.
+- **A ligação do insight à usina passou a usar o id** (`regras._insight(..., usina_id=)`, `usinas.uid_do_insight`).
+  Conferindo a mescla contra a tela do Nexus Insights com o dado real, 142 de 144 usinas batiam: os 3 insights da Macaíba
+  1 caíam em outra usina de mesmo nome no cadastro (a ligação era só pelo nome sem acento, e o último homônimo vencia; a
+  Linhares 1 tem duas usinas mobilizadas com o mesmo nome). As regras que sabem o id o gravam (R05, R06, R07, R11, R13; a
+  N01 quando a normalização traz); sem ele (R03, que só tem o nome), vale o nome, como antes. Vale também para a contagem
+  de insights do Usinas 360° › Usinas, que lê o mesmo `_usinas_montadas`. Depois do conserto, na bancada: dos 366 insights
+  abertos no Nexus Insights, 362 aparecem na usina certa e nenhum se repete; os 4 de fora não são de usina da carteira (2
+  de uma usina fora das 144 e 2 de equipe do PCM, a R09).
+- Prova: `tests/test_comando_gerencial_mescla_19_11.py`.
+
 ## Contestações e Prévia: visão do contrato (no Comando desde 12/11/2026)
 
 Vieram da torre Contratos e clientes, que saiu do menu (Levi, 12/11/2026: "contestações, você vai jogar para o comando,
@@ -1390,3 +1551,47 @@ execução pela lista central de mentira, a solicitação com os nomes cifrados,
 (os dois formulários no caminho da rota), o "Marcar todas", o caminho aberto no portão de todo setor e o gancho da
 aprovação) e o `test_aprovar_chama_o_gancho_do_aviso_de_quem_pediu` do
 `tests/test_oscreator_solic_pcm.py`.
+
+## Os expurgos do contrato na nota de cumprimento (22/11/2026; `nexus/comando/expurgos.py`)
+
+Levi, 19/11/2026: "una as informações de contrato, enfim, Nexus Insights, e aí aplique esses expurgos que estão no
+relatório"; a ordem combinada foi o cadastro das limitações (Performance › Limitações), depois este cálculo, depois o
+cruzamento com a planilha de tickets. Em 22/11: "agora segue com o cálculo dos expurgos".
+
+- **Quem diz o que expurga é o contrato (a "opção A")**: as regras de "Disponibilidade e desempenho" que falam em tirar
+  da conta (exclusão, expurgo, curtailment, "não incidem", "saem do tempo planejado") são lidas contra a LISTA DA GRID,
+  cinco categorias que vêm do modelo de proposta da Grid e dos contratos: queda da rede (distribuidora, transmissão, ONS,
+  agentes externos), limitação imposta (curtailment, restrição de injeção), força maior, pedido ou responsabilidade da
+  contratante, garantia ou erro do fabricante. A categoria só vale para o cliente se a cláusula dele a cita; a cláusula
+  diz também a que se aplica (disponibilidade, PR, ou os dois quando não diz). Contrato sem cláusula de exclusão não
+  expurga nada. A regra que diz o que NÃO é expurgo (SEMP: "Passivos de obra NÃO são expurgo") fica fora, e as que pedem
+  aviso, evidência, protocolo ou validação viram "Para valer, o contrato pede" no texto (o Nexus não confere). Editar o
+  texto da regra no Comando › Contratos muda o expurgo.
+- **O que entra na conta hoje** (o Nexus registra): a QUEDA DA REDE e a LIMITAÇÃO IMPOSTA (o cadastro de Performance ›
+  Limitações, só a sem responsabilidade da Grid e com a potência). Força maior, contratante e fabricante a tela cita, mas
+  ainda não entram (o Nexus não registra esses eventos).
+- **A queda da rede é a do COS** (Levi, 22/11/2026: "Sobre o OS de religamento, não. A gente vai contar como queda [...]
+  que tá ali na parte de ocorrências do COS. [...] Lá eles ligam o OS, um tipo de tarefa, se for religamento remoto ou
+  não, e se houve queda de geração. Então vai contar lá"; a 1ª versão, do mesmo dia, contava toda OS de religamento pelo
+  tempo da OS): a ocorrência do COS com a geração parada (`nexus_cos_normalizacoes`, normalizadas e abertas,
+  `geracao_parou` = 1) ligada a uma OS de religamento (a OS ou uma relacionada, família `queda` da
+  `falhas_performance · disponibilidade_os`). O TEMPO é o do COS (início à normalização; a aberta, até o fim da janela),
+  e só a parte em que a OS estava aberta (o que a disponibilidade oficial descontou); da OS vem a potência afetada. No
+  mesmo horário, cada equipamento conta uma vez (a maior fração) e a soma tem o teto da usina, como na plataforma. Medido
+  em 22/11: em novembro, 3.362 h de sol pelas OS contra 1.376 h pelo COS (OS de 252 h para paradas de 0 a 4 h).
+- **A disponibilidade** devolve essas horas: + 100 × h-eq ÷ (12 h × dias), com teto de 100. Usina com duas linhas no
+  Gerencial, pesada pela potência como a disponibilidade dela. **Limite conhecido:** a plataforma não publica a perda por
+  família por usina, então o expurgo não sabe quanto da perda oficial foi da queda; na Thopen, cuja disponibilidade a
+  plataforma calcula também pelo COS, ele pode devolver mais do que a queda descontou (22/11: Araçoiaba da Serra IB
+  perdeu 1,5 h-eq e o expurgo devolve 4,8), e o teto de 100 segura.
+- **A geração e o PR** somam a energia expurgada: a perda à potência nominal (a da plataforma, kWp × horas de sol; e
+  kW retidos × horas de sol da limitação) VEZES a geração média da usina nas horas de sol do mês (geração ÷ (kWp × 12 h
+  × dias)). À nominal o PR inflava (a usina gera uns 20 a 35% da nominal na média das 12 h; o relatório de Performance da
+  Ana pondera pela irradiação do dia, que o Nexus não tem por usina). Sem a potência ou os dias, a energia não entra.
+- **A tela**: cada item afetado ganha "O expurgo do contrato" (o que saiu, as OS, a cláusula e o número sem o expurgo);
+  o "!" da nota explica. O cliente leva `expurga` (as categorias que o contrato dele cita).
+- **Medido no dado real em 22/11/2026** (banco de verdade, contratos de produção de 18/11), com a queda do COS: em
+  novembro 52 de 131 usinas com nota mudaram (ganho médio de 14,4 pontos; o maior, 33), em outubro 60 de 130 (16,4; o
+  maior, 50); por cliente em outubro, sem → com: Thopen 71 → 81, Athon 78 → 89, Axis 50 → 59, GreenYellow 78 → 82. Os
+  clientes sem cláusula de exclusão (Renogrid, E1, Sal Energia, Qair, Elis Energia, Faro) não mudam.
+- Prova: `tests/test_comando_expurgos_22_11.py` (contratos e números de mentira, a montagem inteira).

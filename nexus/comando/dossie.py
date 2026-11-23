@@ -34,7 +34,7 @@ from datetime import date, datetime
 
 from . import prontuario as PR
 
-VERSAO = 6
+VERSAO = 8
 # a cor da tela em palavras (a régua é a de cada tela dona; aqui só o nome)
 GRAVIDADE = {"critico": "crítico", "alerta": "atenção", "atencao": "atenção", "semcom": "sem comunicação",
              "info": "informativo", "ok": "em dia", "neutro": ""}
@@ -133,6 +133,7 @@ def _performance(u: dict, cu: dict, p: dict) -> list[str]:
     out = []
     if perf.get("periodo"):
         out.append(f"- O mês corrente é parcial: os números cobrem {perf['periodo']}.")
+        out.append("- Janela da meta, da geração, do PR e da disponibilidade do mês corrente: até ontem (hoje não entra).")
     if not perf.get("medidores"):
         out.append(f"- Meta, PR e disponibilidade do mês: {SEM_DADO}.")
     for m in perf.get("medidores") or []:
@@ -165,12 +166,20 @@ def _cos(x: dict, p: dict) -> list[str]:
     if x.get("estado") == "sem_leitura":
         out = ["- Agora: sem leitura do COS (a fonte não respondeu ou a usina não está na fotografia). Não quer dizer normal."]
     elif ocs:
-        out = [f"- Agora: {len(ocs)} {'ocorrência aberta' if len(ocs) == 1 else 'ocorrências abertas'}"]
+        out = [f"- {AGORA_COS}: {len(ocs)} {'ocorrência aberta' if len(ocs) == 1 else 'ocorrências abertas'}"]
         for o in ocs:
             out.append("  - " + _junta(_com_g(o.get("motivo") or o.get("rotulo") or "ocorrência", o.get("tom")), o.get("os_rotulo"),
                                        f"aberta {o['ha']}" if o.get("ha") else "", o.get("etapa")))
+        # a parada aberta agora ainda não foi normalizada: está FORA da tabela por mês (19/11/2026, Levi: o Insights dizia
+        # "0 desligamentos com a geração parada" e, no título, "SKID 2 parado hoje"; as duas frases estavam certas, cada
+        # uma na janela dela, e o dossiê não dizia a janela). A falha de comunicação não é parada: não entra neste aviso
+        paradas = sum(1 for o in ocs if o.get("grupo") != "sem_com")
+        if paradas:
+            out.append(f"- {paradas} {'ocorrência aberta' if paradas == 1 else 'ocorrências abertas'} agora com equipamento "
+                       "parado ou em falha NÃO ENTRA na tabela por mês abaixo (ela só conta as paradas já normalizadas): ao "
+                       "falar do mês, diga \"desligamentos já normalizados\" e cite à parte o que está parado hoje.")
     else:
-        out = ["- Agora: nenhuma ocorrência aberta."]
+        out = [f"- {AGORA_COS}: nenhuma ocorrência aberta."]
     cos = p.get("cos") or {}
     if not cos.get("total"):
         return out + ["- Histórico de normalizações: nenhuma registrada no banco para esta usina."]
@@ -180,7 +189,8 @@ def _cos(x: dict, p: dict) -> list[str]:
     out.append(f"- Normalizações registradas: {cos['total']}. Desligamento é só a normalização em que a geração parou "
                "(\"A geração parou: sim\"); a perda de comunicação sem a geração parar não é desligamento.")
     if cos.get("por_mes"):
-        out += ["", "Por mês:"] + _tabela(["Mês", "Desligamentos (a geração parou)", "Sem a geração parar (não é desligamento)",
+        out += ["", "Por mês (janela: só as paradas JÁ NORMALIZADAS, em que a usina já voltou; o mês corrente é parcial, até "
+                    "agora):"] + _tabela(["Mês", "Desligamentos (a geração parou)", "Sem a geração parar (não é desligamento)",
                                           "Normalizações no total"],
                                          [[m.get("rot"), m.get("parou"), (m.get("n") or 0) - (m.get("parou") or 0), m.get("n")]
                                           for m in cos["por_mes"]])
@@ -602,8 +612,95 @@ def _composicao(p: dict) -> list[str]:
     return out[:-1]
 
 
+def _duracao(minutos: int) -> str:
+    return f"{minutos // 60} h {minutos % 60:02d}" if minutos >= 60 else f"{minutos} min"
+
+
+_ORDEM_STATUS = ("não iniciada", "em andamento", "pausada", "finalizada")
+
+
+def _no_plural(rotulo: str, n: int) -> str:
+    """"2 não iniciadas", "4 finalizadas"; "em andamento" não muda."""
+    return rotulo + "s" if n > 1 and rotulo.endswith("a") else rotulo
+
+
+def _programacao(extras: dict) -> list[str]:
+    """A programação do PCM da usina: a semana corrente e a seguinte (19/11/2026; `dossie_fontes.programacao_da_usina`).
+    A semana seguinte só existe depois que o PCM a publica (sexta à noite, medido no banco): antes disso a seção diz
+    "ainda não publicou", nunca "nada programado"."""
+    pg = extras.get("programacao")
+    if pg is None:
+        return ["- Sem leitura da programação do PCM agora. Não quer dizer que não há nada programado."]
+    out = ["- Janela: a semana corrente e a seguinte, como o PCM as publicou; o estado de cada tarefa é o da última carga "
+           "(de hora em hora). É o que está PLANEJADO, não o que foi feito. A semana seguinte só existe depois que o PCM "
+           "a publica, o que costuma ser na sexta à noite."]
+    for rotulo, s, publicada in (("Semana corrente", pg["corrente"], True),
+                                 ("Semana seguinte", pg["seguinte"], pg.get("seguinte_publicada"))):
+        if not publicada:
+            out.append(f"- {rotulo} ({s['periodo']}): o PCM ainda não publicou. Não quer dizer que não há nada programado.")
+            continue
+        n = len(s["tarefas"]) + s["a_mais"]
+        if not n:
+            out.append(f"- {rotulo} ({s['periodo']}): nenhuma tarefa programada para esta usina.")
+            continue
+        out.append(f"- {rotulo} ({s['periodo']}): {n} tarefa{'s' if n > 1 else ''} programada{'s' if n > 1 else ''}")
+        for t in s["tarefas"]:
+            ordem = [r for r in _ORDEM_STATUS if r in t["status"]] + sorted(r for r in t["status"] if r not in _ORDEM_STATUS)
+            estado = ", ".join(f"{t['status'][r]} {_no_plural(r, t['status'][r])}" if t["blocos"] > 1 else r for r in ordem)
+            out.append(f"  - {t['dia']}{' ' + t['hora'] if t['hora'] else ''} · {_t(t['tipo'])} · OS {t['os'] or 'sem número'} · "
+                       f"{_duracao(t['min'])}" + (f" em {t['blocos']} blocos" if t["blocos"] > 1 else "") + f" · {estado}"
+                       + (" · reprogramada" if t["reprogramada"] else ""))
+        if s["a_mais"]:
+            out.append(f"  - e mais {s['a_mais']} tarefa{'s' if s['a_mais'] > 1 else ''} nesta semana")
+    return out
+
+
+def _contrato(extras: dict) -> list[str]:
+    """O que o contrato do cliente pede para a usina: a garantia de disponibilidade, as outras regras de disponibilidade e
+    desempenho (o PR próprio entre elas) e os prazos de atendimento (19/11/2026; `dossie_fontes.contrato_da_usina`).
+    Nenhum valor em reais (Levi: "sem valores em reais")."""
+    c = extras.get("contrato")
+    if c is None:
+        return ["- Sem leitura do Comando › Contratos agora."]
+    if not c.get("contratos"):
+        return ["- Sem dado: o contrato deste cliente ainda não foi lido no Comando › Contratos. Não quer dizer que o "
+                "contrato não garante nada."]
+    out = ["- Janela: o contrato como está hoje no Comando › Contratos (a regra vigente, com os aditivos; não muda de um "
+           "dia para o outro). Valores em reais não entram neste documento."]
+    if c["contratos"] > 1:
+        out.append(f"- O cliente tem {c['contratos']} contratos: " + (
+            "as regras abaixo são as do contrato que lista esta usina." if c.get("ligada") else
+            "a usina não está na lista de um só deles, e as regras abaixo são as de todos, sem repetir."))
+    g = c.get("garantia")
+    if g:
+        pct = f"{g['pct']:g}".replace(".", ",")
+        out.append(f"- Garantia de disponibilidade: {pct}%" + (f" (cláusula {g['clausula']})" if g.get("clausula") else "")
+                   + (f": {_t(g['texto'])}" if g.get("texto") else ""))
+    else:
+        out.append("- Garantia de disponibilidade: o contrato lido não traz um percentual garantido (sem dado; não é 0%).")
+
+    def linhas(titulo, regras, a_mais, com_prazo):
+        if not regras:
+            return [f"- {titulo}: nenhuma regra lida no contrato."]
+        ls = [f"- {titulo}: {len(regras) + a_mais}"]
+        for r in regras:
+            cl = f" (cláusula {r['clausula']})" if r.get("clausula") else ""
+            if com_prazo and r.get("prazo"):
+                ls.append(f"  - {_t(r['nome'])}: {_t(r['prazo'])}{cl}")
+            else:
+                ls.append(f"  - {_t(r['nome'])}{cl}" + (f": {_t(r['texto'])}" if r.get("texto") else ""))
+        if a_mais:
+            ls.append(f"  - e mais {a_mais} no contrato (Comando › Contratos)")
+        return ls
+    out += linhas("Outras regras de disponibilidade e desempenho (o PR próprio do contrato, quando há, está aqui)",
+                  c.get("desempenho") or [], c.get("desempenho_a_mais") or 0, False)
+    out += linhas("Prazos de atendimento (SLA)", c.get("sla") or [], c.get("sla_a_mais") or 0, True)
+    return out
+
+
 _EXTRAS = (("ativos", "os números da Confiabilidade (Engenharia)"), ("acompanhamentos", "os ativos em acompanhamento pela Engenharia"),
-           ("relatorios", "os relatórios de falha da Engenharia"), ("observacoes", "as observações do responsável"))
+           ("relatorios", "os relatórios de falha da Engenharia"), ("observacoes", "as observações do responsável"),
+           ("programacao", "a programação do PCM"), ("contrato", "o Comando › Contratos (a garantia e os prazos do contrato)"))
 
 
 def _fora(ctx: dict, p: dict, cu: dict, extras: dict) -> list[str]:
@@ -628,6 +725,10 @@ NAO_INICIADAS_LER = ("Como ler as não iniciadas: urgente (religamento, religame
                      "(programada há mais de 10 dias, a régua do PCM) pesam; \"no prazo\" não é atraso nem pendência do "
                      "supervisor e não se cobra")
 
+# o rótulo do COS agora, com a janela escrita (a linha "Agora: sem leitura do COS" fica como era: a conferência do
+# diagnóstico reconhece o "sem leitura" por ela)
+AGORA_COS = "Agora (hoje, a fotografia do COS neste momento)"
+
 COMO_LER = (
     "- Este documento é tudo o que o Nexus sabe da usina neste instante. O que não está escrito aqui, o Nexus não sabe.",
     "- \"sem dado\" quer dizer que a fonte não tem o valor: não é zero nem \"está normal\". \"sem leitura\" quer dizer que "
@@ -636,6 +737,16 @@ COMO_LER = (
     "é a da tela do Nexus que é dona do número, não uma opinião.",
     "- Cada seção diz a `Fonte`: a tela do Nexus de onde o dado veio. Ao responder, cite a seção ou a fonte.",
     "- O mês corrente é parcial; compare com a cobertura em dias antes de concluir sobre meta e geração.",
+    # 19/11/2026, Levi: "Cada dado precisa declarar a sua janela de tempo (hoje, até ontem, mês parcial) para que o texto
+    # não se contradiga"
+    "- Cada número tem a sua JANELA de tempo, e ela vem escrita junto dele: AGORA ou HOJE (o COS agora, as OS, as "
+    "pendências, a última ronda); ATÉ ONTEM (a meta, a geração, o PR e a disponibilidade do mês corrente, que é parcial); "
+    "e NO MÊS, SÓ AS JÁ NORMALIZADAS (os desligamentos da tabela por mês: a parada aberta agora não está nela). Não junte "
+    "números de janelas diferentes sem dizer a janela de cada um.",
+    # 19/11/2026: as duas fontes novas (a programação do PCM e o contrato)
+    "- A programação do PCM (a seção dela) é o que está PLANEJADO para a semana, não o que foi feito: o que foi feito "
+    "está nas OS. O contrato (a seção dele) é o que o cliente contratou: ao falar da disponibilidade do mês, compare com a "
+    "garantia do contrato quando houver, dizendo que o mês corrente é parcial; sem garantia lida, não invente uma.",
     "- Numa tabela, \"—\" quer dizer que não há o que dizer naquela célula (nenhuma OS, nenhuma pendência) ou que a fonte "
     "não tem o valor.",
     "- Siglas: OS = ordem de serviço do Fracttal; PT = permissão de trabalho; COS = centro de operações, que acompanha a "
@@ -661,6 +772,10 @@ SECOES = (
     ("Demandas entre setores e conversa", "Comando › Caixa de entrada e a conversa da usina"),
     ("Linha do tempo", "Rondas, COS, PT, chamados e OS, numa lista só"),
     ("Composição da usina", "Base › Registro mestre (a ficha) e Base › Equipamentos das usinas"),
+    # 19/11/2026: as duas entram no FIM (antes do que ficou de fora) para não mudar o número das seções que o pedido da IA
+    # cita (o §4 do COS e o §5 das OS, em `ia.py` e `diagnostico.py`)
+    ("Programação do PCM", "PCM › Programação (a semana corrente e a seguinte, do `nexus_programacao`)"),
+    ("Contrato", "Comando › Contratos (as regras lidas do contrato do cliente)"),
     ("O que ficou de fora", "As fontes que não abriram ao gerar este dossiê"),
 )
 
@@ -681,7 +796,7 @@ def montar(ctx: dict, agora: datetime, com_pessoas: bool = False, extras: dict |
               _os(u, p, com_pessoas), _engenharia(u, extras, com_pessoas), _equipamentos(p), _strings(p), _chamados(p),
               _rondas(u, p, com_pessoas), _seguranca(u, cu, p, com_pessoas), _insights(ctx, com_pessoas),
               _observacoes(extras, com_pessoas), _demandas(p, com_pessoas), _linha(p, com_pessoas), _composicao(p),
-              _fora(ctx, p, cu, extras))
+              _programacao(extras), _contrato(extras), _fora(ctx, p, cu, extras))
     dias = p.get("linha_dias") or PR.LINHA_DO_TEMPO_DIAS
     linhas = [f"# Dossiê da usina {_t(x.get('usina'))}", "",
               f"- Documento: dossiê da usina, gerado pelo Nexus para leitura por IA (formato {VERSAO})",

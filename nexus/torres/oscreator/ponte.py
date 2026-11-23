@@ -431,6 +431,14 @@ def _criar_clone(app):
 
     from ...comando import ia as nexus_ia
     solic_ia.CHAVE = lambda: nexus_ia.chave_os_creator(app.config)
+    # o canal de abertura dos fabricantes que traz e-mail (19/11/2026): saiu do código, que é público, e vem cifrado do
+    # banco do Nexus (canais_reservados.py); conferido antes de cada rota do clone, para o "Como abrir", o Raio X e o
+    # Controle de fornecedores mostrarem o canal inteiro
+    import chamado_modelos_store as modelos_do_clone
+
+    from . import canais_reservados
+    modelos_do_clone.CANAIS_RESERVADOS = canais_reservados.ligar(app)
+    clone.before_request(modelos_do_clone.canais_em_dia)
     # o original fala http com a plataforma na mesma máquina; aqui o cookie segue o do Nexus (Secure no servidor)
     clone.config["SESSION_COOKIE_SECURE"] = bool(app.config.get("SESSION_COOKIE_SECURE"))
     # e mora no /os do Nexus, debaixo do prefixo em que ele roda (o clone fixa "/os", que debaixo de /nexus não ia ao

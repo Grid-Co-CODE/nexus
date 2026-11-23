@@ -420,6 +420,43 @@ Regra de uso e do porquê: `nexus/torres/campo/CLAUDE.md`, "Mapa de equipe".
   outras ações e nas linhas de antes delas (a linha da fila gravada antes da coluna vai com elas vazias). Quem abriu só
   por `pessoa_hmac` (o e-mail nunca vai ao banco). Só acrescenta.
 
+## Os textos reservados (19/11/2026; `textos_reservados.py`, `ferramentas/textos_reservados.py`)
+
+**Para que serve.** O repositório é público. Valor de contrato, citação de cliente e de fornecedor e o e-mail de um
+fabricante não ficam em arquivo versionado; mas quem está logado no Nexus vê a tela inteira. Levi, 19/11/2026, depois da
+varredura do histórico: "Tirar os dados do repositório e levar para o banco do Nexus" e "Eu não aceito só censurar e aí
+quem tiver no Nexus vê as coisas incompletas, não. Tem que estar no banco do Nexus e aí quem tiver um acesso do Nexus vai
+ter a informação completa".
+
+**Como.** O arquivo versionado guarda uma FICHA no lugar do texto; o livro `nexus_textos_reservados · dim_texto_reservado`
+guarda o texto. 1 linha = 1 ficha de 1 área (`texto_id` = `área/ficha`). Em claro só a área, a ficha e a data; o texto vai
+cifrado (Cofre, `NEXUS_CHAVE_CADASTRO`) e preso à área e à ficha: copiado para outra linha, não abre. Só cresce (ficha
+publicada não sai: o arquivo de uma versão antiga do Nexus ainda precisa dela). Não é fato nem tem carga: quem grava é a
+ferramenta, à mão, com a lista de termos FORA do repositório (a lista é o dado).
+
+- **As áreas** (`AREAS`): `zeladoria_radar` (o clone do Radar: 25 fichas em 19/11, os nomes de cliente e de fornecedor e os
+  valores; ver `nexus/torres/zeladoria/CLAUDE.md`) e `oscreator_canal` (o canal de abertura de 4 fabricantes; a chave é o
+  fabricante; ver o README do OS Creator). Área nova entra em `AREAS` e ganha quem leia.
+- **A ficha** tem formato fixo: `Zl`, `zl` ou `ZL` + `cliente`, `fornecedor`, `valor`, `trecho` ou `texto` + dois
+  algarismos (`Zlfornecedor01`, `ZLVALOR03`). Só letras e algarismos, para valer dentro de um nome do JS
+  (`temZlcliente01`), de uma regex, de um texto de tela e de um comentário. As palavras são fixas porque "Zl + letras +
+  algarismos" solto aparece por acaso no base64 de uma fonte embutida (medido no clone do Radar).
+- **Quem lê** chama `ler(área)` dentro do Nexus: cópia de 5 minutos por app; a leitura que falha (banco fora, sem a
+  chave) devolve a última boa com o erro e tenta de novo em 1 minuto. Sem nenhuma leitura boa, `textos` vem vazio: a
+  tela mostra a ficha e avisa, **nunca inventa o texto**. `restaurar(texto, fichas)` devolve o original, caractere por
+  caractere.
+- **Quem grava** segue esta ordem, com o `.env` do Nexus (`--env`): `reservar` em ensaio (troca na memória e confere que
+  a volta devolve o arquivo idêntico) → `publicar` (grava e LÊ DE VOLTA: cada texto tem de abrir igual) →
+  `reservar --gravar` (só grava o arquivo se o BANCO devolver o original idêntico) → `conferir --contra <original>` (o
+  sha256 do restaurado). O trecho comprido vai antes da palavra que ele contém; o texto curto que também é outra coisa
+  (um preço que é número do CSS, uma sigla que é cor) se reserva pelo contexto (`onde`).
+- **1ª gravação (19/11/2026 11:01 e 11:06):** 25 fichas da Zeladoria e 4 do OS Creator, 29 linhas; lidas de volta, todas
+  abrem iguais; lido sem a chave, o livro mostra só `cf1:...`. O clone restaurado pelo banco tem o mesmo sha256 do
+  original (`d6526235…`).
+- Prova: `tests/test_dados_textos_reservados_19_11.py` (banco de mentira). Com o `.env`, a trava
+  `test_nenhum_texto_reservado_voltou_para_o_arquivo_versionado` (em `tests/test_zeladoria_reservados_19_11.py`) lê o
+  livro e acusa o texto reservado que voltou para o clone, só pela ficha.
+
 ## As regras (valem para todo dado novo)
 
 1. **Grão e tipo escritos antes de tudo** ("1 linha = …"; transação, foto periódica, foto acumulada ou sem medida).

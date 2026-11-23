@@ -211,9 +211,26 @@ FATOS = (
                     "também conta como ler); mencoes_pessoas = os códigos do e-mail (pessoa_hmac) mencionados e "
                     "mencoes_areas = as torres mencionadas, separados por vírgula. O nome de quem escreveu e o texto "
                     "só cifrados (Cofre). Só acrescenta: nada se edita nem se apaga"),
-    # 05/11/2026 (Levi: "Quero que no OS Creator > Performance tenha um campo para subtarefas, que vamos poder editar as
-    # subtarefas padrões de cada atividade!"): o padrão editado de cada atividade, que toda OS nova dela já leva. O plano
-    # do Fracttal não muda. Registrado antes da 1ª gravação
+    # 19/11/2026 (Levi: "crie, na parte de usina 360, um campo onde as pessoas consigam colocar limitações de potência dos
+    # inversores. E aí vai ser usado também para o cálculo dos expurgos"): o cadastro do time em Performance › Limitações
+    # de potência, que substitui a aba "Inv. com lim. de potência" da planilha de tickets. Registrado antes da 1ª gravação
+    Fato("versao_limitacao", "Versão de uma limitação de potência de inversores", "performance",
+         "nexus_limitacao_inversor · fato_versao_limitacao",
+         "1 linha = 1 versão de um registro de limitação de potência de inversores de 1 usina (registrou, alterou, "
+         "encerrou ou excluiu); vale a última versão de cada limitacao_id",
+         _d(data=("id", "data_id (o dia de Brasília em que a versão foi registrada); data_id_inicio e data_id_fim, o "
+                        "período da limitação"),
+            usina=("id", "usina_id (escolhida na tela, do cadastro)"),
+            equipamento=("cod", "inversores: os códigos dos inversores do Fracttal separados por ponto e vírgula (* = "
+                                "todos os da usina)"),
+            pessoa=("id", "pessoa_hmac de quem registrou (o código do e-mail do login)")),
+         tipo="sem_medida", chave=("versao_id",), fontes=("nexus_limitacao_inversor · fato_versao_limitacao",),
+         janela_origem="o Nexus é a fonte (só acrescenta: vale a última versão de cada limitação)",
+         observacao="potencia_nominal_kw = a potência nominal de cada inversor limitado (vazio = não informada: não entra "
+                    "no expurgo); limite_pct = o percentual da nominal que fica liberado; inversores_qtd = quantos "
+                    "inversores (com *, os da usina no Fracttal no dia do registro); responsabilidade_grid = sim, nao ou "
+                    "parcial (decide o expurgo); clipagem = problemas, sem ou conforme. A causa, os comentários e o "
+                    "nome de quem registrou só cifrados (Cofre). Nada se edita nem se apaga"),
     Fato("versao_subtarefas", "Versão das subtarefas padrão de uma atividade da Performance", "performance",
          "nexus_subtarefas_performance · fato_versao_subtarefas",
          "1 linha = 1 versão salva da lista de subtarefas de 1 atividade da Performance no OS Creator (salvou) ou a volta "
@@ -243,8 +260,10 @@ FATOS = (
                     "(o lote de OS criadas para a pessoa) ou C:<id da OS> (a OS da solicitação da pessoa que foi cancelada, "
                     "11/11/2026; como o S: lido das solicitações do Fracttal pelo REST, nunca gravado aqui: só o leu) "
                     "ou F:<item_id da tarefa>:<desde AAAAMMDDHHMM> (a tarefa fora da programação com um motivo que cita "
-                    "o setor da pessoa, 16/11/2026, lida do nexus_pcm_motivos: só o leu); "
-                    "tipo execucao, solicitacao, atribuida, cancelada ou fora; os_id e folio da OS; destino_hmac = o código do NOME de quem pediu a solicitação (o "
+                    "o setor da pessoa, 16/11/2026, lida do nexus_pcm_motivos: só o leu) ou P:<item_id da tarefa>:<desde "
+                    "AAAAMMDDHHMM> (a OS que a pessoa criou, pausada pelo técnico no App ou pelo PCM, 22/11/2026, lida do "
+                    "nexus_pcm_motivos: só o leu); "
+                    "tipo execucao, solicitacao, atribuida, cancelada, fora ou pausada; os_id e folio da OS; destino_hmac = o código do NOME de quem pediu a solicitação (o "
                     "Fracttal só traz o nome; prefixo nome:, separado do código do e-mail). Os nomes (quem pediu, quem "
                     "aprovou) só cifrados (Cofre). Só acrescenta: nada se edita nem se apaga"),
     # 12/11/2026 (Levi: "os setores consigam conversar entre si sem ter que especificamente criar um OS"): as demandas
@@ -590,7 +609,7 @@ FATOS = (
             pessoa=("hmac", "Técnico (HMAC)"), equipe=("nome", "Região")),
          tipo="snapshot_acumulado", chave=("Mês", "Técnico (HMAC)"),
          medidas=_m((("total_pts", "pts", "aditiva"), ("tarefas_pts", "pts", "aditiva"), ("rondas_pts", "pts", "aditiva"),
-                     ("bonus_pts", "pts", "aditiva"), ("tarefas_qtd", "qtd", "aditiva"), ("rondas_qtd", "qtd", "aditiva"),
+                     ("bonus_pts", "pts", "aditiva"), ("inventario_pts", "pts", "aditiva"), ("tarefas_qtd", "qtd", "aditiva"), ("rondas_qtd", "qtd", "aditiva"),
                      ("devolvidas_qtd", "qtd", "aditiva"), ("nota_media_pts", "pts", "nao"),
                      ("cumprimento_pct", "%", "nao"), ("pontualidade_pct", "%", "nao"))),
          fontes=("ranking_app_campo · Ranking",), janela_origem="o ciclo corrente e o anterior (App)",
@@ -1739,11 +1758,27 @@ LIVROS = (
           "nexus/comando/avisos.py, pelo sino do topo e pela aprovação da Fila do PCM (rotas_solic.AO_APROVAR)", False,
           "registrado em 04/11/2026 antes da 1ª gravação (regra 10): nasce no 1º aviso de solicitação ou de lido",
           so_cresce=True),
+    Livro("nexus_limitacao_inversor", ("fato_versao_limitacao",),
+          "a cada registro, alteração, encerramento ou exclusão de uma limitação de potência em Performance › Limitações de potência",
+          "nexus/campo/limitacoes.py, pela tela Performance › Limitações de potência", False,
+          "registrado em 19/11/2026 antes da 1ª gravação (regra 10): nasce na 1ª limitação registrada",
+          so_cresce=True),
     Livro("nexus_subtarefas_performance", ("fato_versao_subtarefas",),
           "a cada Salvar padrão ou Voltar ao do Fracttal das subtarefas de uma atividade da Performance",
           "nexus/torres/oscreator/subtarefas_padrao.py, pela tela de criar OS da Performance no OS Creator "
           "(perf_web.SUBTAREFAS_PADRAO)", False,
           "registrado em 05/11/2026 antes da 1ª gravação (regra 10): nasce no 1º padrão salvo",
+          so_cresce=True),
+    # 19/11/2026 (Levi: "Tirar os dados do repositório e levar para o banco do Nexus" e "Tem que estar no banco do Nexus e
+    # aí quem tiver um acesso do Nexus vai ter a informação completa"): o valor de contrato, a citação de cliente e de
+    # fornecedor do clone do Radar da Zeladoria e o canal de abertura dos fabricantes do OS Creator saíram do repositório,
+    # que é público; o arquivo guarda a ficha e este livro guarda o texto, cifrado. Registrado antes da 1ª gravação
+    Livro("nexus_textos_reservados", ("dim_texto_reservado",),
+          "quando um texto reservado entra ou muda (à mão, pela ferramenta; não há carga)",
+          "ferramentas/textos_reservados.py (nexus/dados/textos_reservados.py); quem lê: /t/zeladoria/app e o canal de "
+          "abertura dos fabricantes do OS Creator", False,
+          "registrado em 19/11/2026 antes da 1ª gravação (regra 10). 1 linha = 1 ficha de 1 área; em claro só a área, a "
+          "ficha e a data, o texto só cifrado (Cofre, preso à área e à ficha). Só cresce: ficha publicada não sai",
           so_cresce=True),
     Livro("nexus_sugestoes", ("fato_sugestao", "fato_status_sugestao", "fato_resposta_sugestao"),
           "a cada sugestão mandada, a cada mudança de status e a cada resposta (Início > Sugestões)",

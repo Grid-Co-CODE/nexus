@@ -34,7 +34,7 @@ def test_uma_secao_por_assunto_na_mesma_ordem_e_com_a_fonte(tela, logado):
     assert texto.startswith("# Dossiê da usina Altair\n")
     assert "- Gerado em: 12/11/2026 às 22:00, horário de Brasília" in texto and f"(formato {DS.VERSAO})" in texto
     titulos = re.findall(r"^## (\d+)\. (.+)$", texto, flags=re.M)
-    assert [int(n) for n, _t in titulos] == list(range(1, 18))
+    assert [int(n) for n, _t in titulos] == list(range(1, len(DS.SECOES) + 1)) and len(DS.SECOES) == 19
     esperados = [t for t, _f in DS.SECOES]
     esperados[esperados.index("Linha do tempo")] = "Linha do tempo dos últimos 30 dias"
     assert [t for _n, t in titulos] == esperados and d["secoes"] == [t for t, _f in DS.SECOES]
@@ -103,11 +103,11 @@ def test_o_que_falta_esta_escrito_e_nao_vira_zero(tela, logado):
     assert "- Agora: sem leitura do COS (a fonte não respondeu ou a usina não está na fotografia). Não quer dizer normal." in texto
     assert "- OS abertas: sem leitura (as OS do Fracttal não chegaram ao banco). Não quer dizer zero." in texto
     assert "- Leitura semanal de sujidade e vegetação (zeladoria): sem dado." in texto
-    fora = texto.split("## 17. O que ficou de fora", 1)[1]
+    fora = texto.split("## 19. O que ficou de fora", 1)[1]
     assert "não abriram quando o dossiê foi gerado" in fora and "- o COS (a coluna Agora)" in fora
     # sem nada (a fonte inteira fora), o dossiê ainda sai inteiro, dizendo o que não tem
     vazio = DS.montar({"x": {"usina": "Usina X", "insights": None}, "cu": {}, "p": {}}, AGORA)["texto"]
-    assert len(re.findall(r"^## \d+\. ", vazio, flags=re.M)) == 17
+    assert len(re.findall(r"^## \d+\. ", vazio, flags=re.M)) == 19      # 19/11/2026: a programação do PCM e o contrato
     for frase in ("- Código: sem dado", "- Estado agora, pelo COS: sem dado", "- Meta, PR e disponibilidade do mês: sem dado.",
                   "- OS abertas: sem leitura", "- Última ronda: sem dado", "- Extintores: sem dado.",
                   "- Luvas de alta tensão: sem dado", "- Os Insights ainda estão sendo calculados: sem leitura agora.",
@@ -234,8 +234,8 @@ def test_a_engenharia_e_as_anotacoes_do_responsavel_entram_no_dossie(tela, logad
                                            "observacoes": []})["texto"]
     assert "- Ativos em acompanhamento pela Engenharia: nenhum nesta usina." in vazias
     assert "- Nenhuma observação registrada pelo responsável nesta usina." in vazias
-    assert "as observações do responsável" not in vazias.split("## 17. O que ficou de fora", 1)[1]
-    fechadas = DS.montar(ctx, AGORA, extras={})["texto"].split("## 17. O que ficou de fora", 1)[1]
+    assert "as observações do responsável" not in vazias.split("## 19. O que ficou de fora", 1)[1]
+    fechadas = DS.montar(ctx, AGORA, extras={})["texto"].split("## 19. O que ficou de fora", 1)[1]
     for fonte in ("- os números da Confiabilidade (Engenharia)", "- os ativos em acompanhamento pela Engenharia",
                   "- os relatórios de falha da Engenharia", "- as observações do responsável"):
         assert fonte in fechadas, fonte

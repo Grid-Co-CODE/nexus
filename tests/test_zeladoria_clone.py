@@ -61,7 +61,10 @@ def test_rota_da_equipe_casa_pelo_comeco(html):
     """O cronograma importado (arquivo do PCM) escreve "Rota do <supervisor>" com o nome de verdade: a regra que
     reconhecia a rota pelo nome não pode depender dele, senão as paradas da rota viram cotação."""
     assert "rota (do )?equipe" not in html
-    assert html.count(r"/^\s*rota\b") == 3 and r"/^\s*rota\b|eco ?clean" in html     # 2 sozinhas + 1 na alternância
+    # 2 sozinhas + 1 na alternância, que desde 19/11/2026 traz a ficha de cada fornecedor no lugar do nome (o nome mora no
+    # banco, nos textos reservados; a rota com login devolve a regra inteira: tests/test_zeladoria_reservados_19_11.py)
+    assert html.count(r"/^\s*rota\b") == 3
+    assert re.search(r"/\^\\s\*rota\\b\|zlfornecedor\d\d\|zlfornecedor\d\d/i", html)
 
 
 # ── o visual da Zeladoria (etapa 3, 03/11/2026): as três cores do Levi, as fontes do Nexus, sem emoji ──

@@ -487,10 +487,10 @@ def test_o_sininho_avisa_quem_recebe_quem_pediu_e_o_setor_na_vencida(app, cena):
     from datetime import timedelta
     did = _abrir_pela_api(app, cena)
     s = _sino(_cliente(app, JU).get(CAIXA).get_data(as_text=True))
-    assert 'class="sino-n sino-n--dem">1<' in s and ">Nova</span> Coração 2 sem meta" in s and "de Ana Souza" in s
+    assert 'class="sino-n sino-n--dem">1<' in s and "Coração 2 sem meta" in s and "Demanda nova · de Ana Souza" in s
     assert f"/t/comando/caixa-de-entrada?dem=para&amp;d={did}#demandas" in s
     # o colega do setor só é avisado na vencida; quem não tem nada a ver, nada
-    assert "Nenhuma demanda pede você agora." in _sino(_cliente(app, BRUNO).get(CAIXA).get_data(as_text=True))
+    assert "Nada novo para você." in _sino(_cliente(app, BRUNO).get(CAIXA).get_data(as_text=True))
     with app.test_request_context():
         depois = date.today() + timedelta(days=10)
         av = D.avisos_do_sino(_h(BRUNO["email"]), 1, hoje=depois)
@@ -499,7 +499,7 @@ def test_o_sininho_avisa_quem_recebe_quem_pediu_e_o_setor_na_vencida(app, cena):
         D.registrar(did, "respondeu", "Ligado.", JU)
     D.limpar()
     s = _sino(_cliente(app, ANA).get(CAIXA).get_data(as_text=True))
-    assert ">Respondida</span> Coração 2 sem meta" in s and "para Juliana Prado" in s and "dem=pedi" in s
+    assert "Coração 2 sem meta" in s and "Demanda respondida" in s and "para Juliana Prado" in s and "dem=pedi" in s
     # o administrador pela senha (sem pessoa) não tem o sininho das demandas
     c = app.test_client()
     with c.session_transaction() as ss:

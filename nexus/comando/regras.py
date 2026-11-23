@@ -83,10 +83,20 @@ def _id(v) -> int | None:
         return None
 
 
-def _insight(regra, objeto, sev, titulo, evid, acao, usina="", link="", desde=None) -> dict:
+def _uid(v):
+    try:
+        return int(float(v)) if v not in (None, "") else None
+    except (TypeError, ValueError):
+        return None
+
+
+def _insight(regra, objeto, sev, titulo, evid, acao, usina="", link="", desde=None, usina_id=None) -> dict:
     # o id sem espaço (03/11/2026: "R03:Junco 1:..." era recusado no Assumir e virava âncora inválida na página)
+    # `usina_id` (19/11/2026): a regra que sabe o id da usina o grava, e a ligação do insight à usina usa o id antes do
+    # nome (`usinas.uid_do_insight`). Só pelo nome, o homônimo do cadastro levava o insight para a usina errada: conferindo
+    # a Visão gerencial contra o Nexus Insights, os 3 insights da Macaíba 1 caíam em outra usina de mesmo nome
     return {"id": f"{regra}:{re.sub(r'[\s]+', '_', str(objeto).strip())}", "regra": regra, "sev": sev, "titulo": titulo, "evid": [e for e in evid if e],
-            "acao": acao, "torre": REGRAS[regra]["torre"], "usina": usina, "link": link, "desde": desde}
+            "acao": acao, "torre": REGRAS[regra]["torre"], "usina": usina, "link": link, "desde": desde, "usina_id": _uid(usina_id)}
 
 
 # ── R03 ─────────────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -139,7 +149,7 @@ def r05_sem_comunicacao(abertas: list[dict], nome_usina) -> list[dict]:
             ("Acionar a TI e o campo para a comunicação do equipamento: sem ela, ele some do tempo real e a falha dele fica "
              "sem medida." if equip else
              "Acionar a TI e o campo para a comunicação: sem ela, a usina some do tempo real e a disponibilidade fica sem "
-             "medida."), usina, "/t/cos/ronda?cliente=Thopen", desde))
+             "medida."), usina, "/t/cos/ronda?cliente=Thopen", desde, usina_id=o.get("usina_id")))
     return out
 
 
@@ -179,7 +189,7 @@ def r06_falha_com_chamado(tarefas_os: list[dict], chamados: list[dict], nome_usi
             [f"chamado na OS {_txt(c.get('os'))}" + (f" com {_txt(c.get('fabricante'))}" if c.get("fabricante") else ""),
              f"situação do chamado: {_txt(c.get('situacao'))}"],
             "Juntar a falha ao chamado com o fabricante em vez de tratar como corretiva comum: a garantia cobre o reparo.",
-            usina, "/t/chamados/garantias", criada))
+            usina, "/t/chamados/garantias", criada, usina_id=t.get("usina_id")))
     return out
 
 
@@ -198,7 +208,7 @@ def r07_extintores(por_usina: list[dict]) -> list[dict]:
             f"{usina}: {n} {'extintor vencido' if n == 1 else 'extintores vencidos'}",
             [f"de {u.get('qtd')} na usina" if u.get("qtd") else ""],
             "Programar a recarga ou o teste hidrostático e a troca na próxima ronda: extintor vencido é não conformidade "
-            "de PPCI.", usina, "/t/hseq/extintores"))
+            "de PPCI.", usina, "/t/hseq/extintores", usina_id=u.get("usina_id")))
     return out
 
 
@@ -239,7 +249,8 @@ def r11_sem_ronda(cobertura: list[dict]) -> list[dict]:
             f"{usina}: {'nenhuma ronda registrada' if nunca else f'sem ronda há {dias} dias'}",
             [f"a última em {c['ultima']:%d/%m}" if hasattr(c.get("ultima"), "strftime") else "",
              f"técnico da última: {_txt(c.get('tecnico'))}" if c.get("tecnico") else ""],
-            "Programar a ronda da usina com o PCM e o técnico da região.", usina, "/t/campo/rondas?aba=sem"))
+            "Programar a ronda da usina com o PCM e o técnico da região.", usina, "/t/campo/rondas?aba=sem",
+            usina_id=c.get("usina_id")))
     return out
 
 
@@ -262,7 +273,7 @@ def r13_chamado_parado(chamados_por_usina: dict, nome_usina) -> list[dict]:
                 [f"{_txt(c.get('fabricante'))}" + (f" · {_txt(c.get('componente'))}" if c.get("componente") else ""),
                  f"equipamento: {_txt(c.get('equip'))}" if c.get("equip") else ""],
                 "Cobrar o fabricante com o número do chamado e registrar o retorno na tela de Garantias.", usina,
-                "/t/chamados/garantias"))
+                "/t/chamados/garantias", usina_id=uid))
     return out
 
 
@@ -291,7 +302,7 @@ def n01_normalizadas(itens: list[dict]) -> list[dict]:
             else f"{_txt(i.get('usina'))}: a OS {i['os']} com a hora a corrigir no Fracttal",
             evid, "Finalizar a OS no Fracttal com a hora da volta registrada pelo COS: é ela que vale para MTTR e "
             "disponibilidade.", _txt(i.get("usina")), f"/t/cos/normalizacoes?q={_txt(i.get('os'))}",
-            i["volta"].date() if i.get("volta") else None))
+            i["volta"].date() if i.get("volta") else None, usina_id=i.get("usina_id")))
     return out
 
 

@@ -346,6 +346,11 @@ As duas precisam do Python além do relatório de furos; no .exe usam o BD que a
     que saiu da lista da fonte dá o motivo, não "venceu".
   - Prova: `tests/test_coletas_recoleta_fontes.py` (plataforma dublada com as respostas do contrato) e, da recoleta do
     .exe, `test_a_recoleta_busca_na_fonte_e_sai_pela_mesma_montagem` e `test_a_recoleta_so_abre_para_quem_tem_a_tela_dela`.
+- **1.0.15 (19/11/2026), o ETM do supervisório com a comunicação no alto:** a Coletas mostrou o "ETM (1).csv" da São
+  Bento V (export do supervisório, 10 a 19/11) como "formato novo" (Levi: "o coletor do nexus levou como formato novo"). O
+  export vem ordenado pelo nome do ponto, e as linhas de `Comunicação_Solarimetrica` vêm antes da irradiação; o
+  `polaris_etm` só olhava as 5 primeiras linhas. Sem irradiação no alto, ele olha a 1ª coluna do arquivo todo, como o
+  leitor da Apolo (só `leitores/polaris.py`; contrato e tela iguais). Sincronizado do commit da release (coleta `364edb3`).
 - Trazer uma versão do .exe que a Coleta ainda está mexendo: a pasta pode ter trabalho sem release (o `mural.py` estava lá
   antes da 1.0.11). Sincronize do commit da release (`git archive <release>` da pasta `ferramentas/conversor/conversor`
   para fora e `--origem` nela, mantendo o fim de linha da pasta) ou espere a pasta ficar limpa.

@@ -1,0 +1,101 @@
+/* Performance › Limitações de potência (19/11/2026; Levi: "quero algo bem feito e construído!"). Um nível de superfície só:
+   o fio separa, sem cartão dentro de cartão; a cor é estado (o inversor aceso, a responsabilidade) ou a marca. Toda cor vem
+   dos tokens do tema (tests/test_tema.py). */
+.lp{max-width:1360px}
+.lp-cab{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;margin:0 0 6px}
+.lp-titulo{display:flex;align-items:center;gap:12px}
+.lp-h1{margin:2px 0 0;font:800 30px/1.15 var(--font-display);letter-spacing:-.01em}
+.lp-pergunta{margin:6px 0 0;color:var(--tinta-2);font-size:14px}
+.lp-novo{flex:none;margin-top:18px}
+.lp-erro{margin:12px 0;padding:10px 14px;border:1px solid var(--critico);border-radius:8px;background:var(--critico-suave);color:var(--tinta);font-size:13.5px}
+.lp-erro--aviso{border-color:var(--alerta);background:var(--alerta-suave)}
+
+/* o parecer e os cartões: o que está em andamento agora, na frente */
+.lp-parecer{margin:18px 0 14px;max-width:110ch;font-size:16px;line-height:1.5;color:var(--tinta)}
+.lp-kpis{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;margin:0 0 22px}
+.lp-kpi{padding:12px 14px 13px;border:1px solid var(--linha-forte);border-radius:10px}
+.lp-kpi span{display:block;font-size:12px;font-weight:600;color:var(--mudo)}
+.lp-kpi b{display:block;margin-top:6px;font:800 28px/1 var(--font-display);font-variant-numeric:lining-nums tabular-nums}
+.lp-kpi b i{font-style:normal;font-size:14px;font-weight:700;color:var(--mudo)}
+.lp-kpi small{display:block;margin-top:6px;font-size:11.5px;color:var(--tinta-2)}
+.lp-kpi--destaque{border-color:var(--verde-a42);background:var(--verde-suave)}
+.lp-kpi--destaque b{color:var(--verde-texto)}
+.lp-kpi--alerta{border-color:var(--alerta);background:var(--alerta-suave)}
+.lp-kpi--alerta b{color:var(--alerta)}
+
+/* o painel do formulário: fechado, abre pelo botão do alto (ou pela usina escolhida) */
+.lp-form-painel{margin:0 0 24px;border:1px solid var(--linha-forte);border-radius:12px}
+.lp-form-painel>summary{padding:13px 16px;font:700 15px/1.3 var(--font-display);cursor:pointer;list-style:none}
+.lp-form-painel>summary::-webkit-details-marker{display:none}
+.lp-form-painel>summary::before{content:"+";display:inline-block;width:18px;color:var(--verde-texto)}
+.lp-form-painel[open]>summary::before{content:"−"}
+.lp-form-corpo{padding:4px 16px 18px;border-top:1px solid var(--linha)}
+.lp-usina{margin:12px 0 16px;max-width:420px}
+.lp-campo{display:flex;flex-direction:column;gap:5px}
+.lp-grade{display:grid;grid-template-columns:minmax(260px,420px) minmax(0,1fr);gap:22px 34px;align-items:start}
+.lp-grade fieldset{margin:0;padding:0;border:0;min-width:0}
+.lp-grade legend{margin:0 0 8px;padding:0}
+.lp-todos{display:flex;align-items:center;gap:8px;margin:0 0 10px;font-weight:600;font-size:13.5px;cursor:pointer}
+.lp-tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:8px;max-height:340px;overflow:auto;padding:2px}
+.lp-t{position:relative;display:flex;flex-direction:column;justify-content:center;min-height:52px;padding:8px 10px;border:1px solid var(--linha-forte);border-radius:8px;cursor:pointer}
+.lp-t input{position:absolute;opacity:0;pointer-events:none}
+.lp-t-rot{font:700 15px/1.1 var(--font-display);font-variant-numeric:lining-nums tabular-nums}
+.lp-t-ja{margin-top:4px;font-size:10.5px;line-height:1.25;color:var(--alerta)}
+.lp-t:hover{border-color:var(--verde)}
+.lp-t:has(input:checked){border-color:var(--verde);background:var(--verde-suave)}
+.lp-t:has(input:checked) .lp-t-rot{color:var(--verde-texto)}
+.lp-t:has(input:focus-visible){outline:2px solid var(--verde);outline-offset:2px}
+.lp-t--ja{border-style:dashed}
+.lp-inv[data-todos] .lp-t{opacity:.45;pointer-events:none}
+.lp-dados{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px 18px}
+.lp-largo{grid-column:1/-1}
+.lp-calc{margin:0;padding:10px 12px;border-radius:8px;background:var(--superficie-2);font-size:13.5px;color:var(--tinta-2)}
+.lp-calc b{color:var(--verde-texto)}
+.lp-seg{display:inline-flex;border:1px solid var(--linha-forte);border-radius:8px;overflow:hidden;align-self:flex-start}
+.lp-seg-op{position:relative;cursor:pointer}
+.lp-seg-op+.lp-seg-op{border-left:1px solid var(--linha-forte)}
+.lp-seg-op input{position:absolute;opacity:0;pointer-events:none}
+.lp-seg-op span{display:block;padding:8px 14px;font-size:13px;font-weight:600;color:var(--tinta-2)}
+.lp-seg-op:has(input:checked) span{background:var(--verde-suave);color:var(--verde-texto)}
+.lp-seg-op:has(input:focus-visible) span{outline:2px solid var(--verde);outline-offset:-2px}
+.lp-acoes{grid-column:1/-1;display:flex;align-items:center;gap:16px}
+.lp-cancelar{font-size:13px;color:var(--mudo)}
+
+/* as usinas em andamento: o mapa dos inversores e a tabela de cada uma */
+.lp-h{margin:4px 0 12px;font:700 18px/1.3 var(--font-display)}
+.lp-usina-bloco{padding:16px 0 18px;border-top:1px solid var(--linha-forte)}
+.lp-usina-cab{display:flex;align-items:baseline;justify-content:space-between;gap:14px;margin:0 0 12px}
+.lp-usina-cab h3{display:inline;margin:0 10px 0 0;font:700 17px/1.2 var(--font-display)}
+.lp-usina-kw{font-weight:700;color:var(--verde-texto);font-variant-numeric:lining-nums tabular-nums}
+.lp-mapa{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 12px}
+.lp-q{display:inline-flex;flex-direction:column;align-items:center;justify-content:center;min-width:46px;height:40px;padding:0 6px;border:1px solid var(--linha);border-radius:6px;font-size:12px;font-weight:600;color:var(--mudo);font-variant-numeric:lining-nums tabular-nums}
+.lp-q--on{border-color:var(--alerta);background:var(--alerta-suave);color:var(--tinta)}
+.lp-q i{font-style:normal;font-size:10.5px;font-weight:700;color:var(--alerta)}
+.lp-rola{overflow-x:auto}
+.lp-tab{width:100%;border-collapse:collapse;font-size:13px}
+.lp-tab th{padding:7px 14px 7px 0;text-align:left;font-size:11.5px;font-weight:600;color:var(--mudo);border-bottom:1px solid var(--linha-forte);white-space:nowrap}
+.lp-tab td{padding:10px 14px 10px 0;border-bottom:1px solid var(--linha);vertical-align:top;color:var(--tinta-2)}
+.lp-tab td b{color:var(--tinta);font-weight:600}
+.lp-tab td small{display:block;margin-top:3px}
+.lp-nm{color:var(--tinta);font-weight:600;white-space:nowrap}
+.lp-n{white-space:nowrap;font-variant-numeric:lining-nums tabular-nums}
+/* colunas fixas: as tabelas das usinas, uma embaixo da outra, alinham */
+.lp-tab--fixa{table-layout:fixed;min-width:1040px}
+.lp-tab--fixa td{overflow-wrap:anywhere}
+.lp-c-usina{width:150px}.lp-c-inv{width:200px}.lp-c-lim{width:84px}.lp-c-kw{width:112px}.lp-c-per{width:150px}.lp-c-resp{width:140px}.lp-c-acao{width:84px}
+.lp-sem{color:var(--alerta);font-size:12px;font-weight:600}
+.lp-chip{display:inline-block;padding:2px 9px;border-radius:999px;font-size:11.5px;font-weight:700;white-space:nowrap}
+.lp-chip--expurgo{background:var(--info-suave);color:var(--info)}
+.lp-chip--parcial{background:var(--alerta-suave);color:var(--alerta)}
+.lp-chip--grid{background:var(--critico-suave);color:var(--critico)}
+.lp-acoes-linha,.lp-acoes-linha form{display:flex;flex-direction:column;align-items:flex-start;gap:6px;white-space:nowrap}
+.lp-acoes-linha a,.lp-link{padding:0;border:0;background:none;color:var(--verde-texto);font:inherit;font-size:12.5px;cursor:pointer;text-decoration:underline;text-underline-offset:3px}
+.lp-excluir{color:var(--critico)}
+.lp-vazio{margin:6px 0 20px;color:var(--mudo)}
+.lp-encerradas{margin:18px 0 30px;border-top:1px solid var(--linha-forte)}
+.lp-encerradas>summary{padding:14px 0;font:700 16px/1.3 var(--font-display);cursor:pointer}
+
+@media (max-width:1100px){.lp-kpis{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media (max-width:900px){.lp-grade{grid-template-columns:minmax(0,1fr)}.lp-dados{grid-template-columns:minmax(0,1fr)}
+  .lp-cab{flex-direction:column}.lp-novo{margin-top:0}}
+@media (max-width:640px){.lp-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}

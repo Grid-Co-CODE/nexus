@@ -5,6 +5,7 @@ import io
 import os
 import secrets
 import subprocess
+from datetime import datetime, timezone
 from functools import lru_cache
 
 from flask import Blueprint, abort, current_app, jsonify, redirect, render_template, request, send_file, session, url_for
@@ -111,13 +112,24 @@ def _codigo() -> str:
 
 def _sugestoes_abertas():
     """O número ao lado de "Sugestões" nas abas do Início (28/10/2026): as não concluídas (de todos, para o
-    administrador; as da pessoa, para ela). Nunca segura a página: sem a cópia, a aba sai sem número."""
+    administrador; as da pessoa, para ela). Nunca segura a página: sem a cópia, a aba sai sem número. Para o
+    administrador, desde 21/11/2026, mais os relatos do App de Campo que esperam a Grid (aberto ou reaberto;
+    `casca/relatos_app.py`), que entraram na mesma lista."""
+    from . import relatos_app as R
     from . import sugestoes as S
+    admin = bool(session.get("admin"))
     try:
-        return S.contador(bool(session.get("admin")), _email_da_sessao())
+        n = S.contador(admin, _email_da_sessao())
     except Exception:            # noqa: BLE001 — o contador nunca derruba o Início
         current_app.logger.exception("contador das sugestões")
         return None
+    if n is None or not admin:
+        return n
+    try:
+        return n + (R.esperando() or 0)
+    except Exception:            # noqa: BLE001 — sem o App, conta só as sugestões
+        current_app.logger.exception("contador dos relatos do App")
+        return n
 
 
 def _sugestoes():
@@ -135,6 +147,8 @@ def _sugestoes():
         return _mudar_status_sugestao(S, admin)
     if request.method == "POST" and request.args.get("acao") == "responder":
         return _responder_sugestao(S, admin)
+    if request.method == "POST" and request.args.get("acao") == "responder_app":
+        return _responder_relato_app(S, admin)
     if request.method == "POST":
         erro, form = _enviar_sugestao(S, areas)
         if not erro:
@@ -156,14 +170,31 @@ def _sugestoes():
             from ..cadastro.ligacao_campo import codigo_da_pessoa
             meu = (codigo_da_pessoa(current_app.config.get("NEXUS_PESSOA_HMAC"), email) or "").lower()
             minhas = [x for x in lista if meu and x["pessoa_hmac"] == meu]
+    # os relatos do App de Campo (21/11/2026, Levi: "pode ir para sugestões no início com uma tag de App de campo!"): só o
+    # administrador, na mesma lista, com a etiqueta; o resolvido vai para o fim como a concluída (casca/relatos_app.py)
+    relatos = {"relatos": [], "erro": "", "ligado": False}
+    if admin:
+        from . import relatos_app as R
+        try:
+            relatos = R.ler()
+        except Exception as ex:  # noqa: BLE001 — o App nunca derruba as Sugestões
+            current_app.logger.exception("relatos do App")
+            relatos = {"relatos": [], "erro": f"{type(ex).__name__}", "ligado": True}
+        if relatos["relatos"]:
+            recebidas = sorted(recebidas + list(relatos["relatos"]),
+                               key=lambda x: x["quando"] or datetime.min.replace(tzinfo=timezone.utc), reverse=True)
+            recebidas = sorted(recebidas, key=lambda x: x.get("concluido", x.get("status") == "concluida"))
     por_quem, quem_de = _contar_por_quem(recebidas)
     resp = render_template("sugestoes.html", aba="sugestoes", areas=areas, form=form, erro=erro,
+                           relatos_ligado=relatos.get("ligado", False), erro_relatos=relatos.get("erro") or "",
+                           pode_responder_app=bool(email),
                            aviso=session.pop(_CHAVE_AVISO, None), codigo=_codigo(), novo_id=S.novo_id(),
                            tem_login=bool(str(usuario.get("email") or "").strip()), faltam=S.faltam_chaves(),
                            admin=admin, recebidas=recebidas, minhas=minhas, erro_lista=erro_lista,
                            aceitos=S.aceitos(), status_mudaveis=[(k, S.STATUS[k][0]) for k in S.STATUS_MUDAVEIS],
                            novo_resposta_id=S.novo_resposta_id, resposta_max=S.RESPOSTA_MAX,
                            por_area=_contar_por_area(recebidas), por_quem=por_quem, quem_de=quem_de,
+                           por_origem=_contar_por_origem(recebidas),
                            aviso_status=session.pop(_CHAVE_AVISO_STATUS, None),
                            sug_abertas=_sugestoes_abertas(),
                            max_mb=S.MAX_MB_ARQUIVO, max_arquivos=S.MAX_ARQUIVOS, max_total=S.MAX_MB_TOTAL,
@@ -252,6 +283,45 @@ def _responder_sugestao(S, admin: bool):
         session[_CHAVE_AVISO_STATUS] = ("erro", f"Não consegui gravar agora ({type(ex).__name__}). A resposta não foi "
                                                 "gravada.")
     return volta
+
+
+def _responder_relato_app(S, admin: bool):
+    """`POST /?aba=sugestoes&acao=responder_app` (21/11/2026): o administrador responde ao relato do App de Campo. A
+    resposta vai ao servidor do App (o caminho A: o App é a fonte do relato), que a grava como a do Admin/Supervisor de
+    lá; o técnico lê em Meus relatos. Nada fica no banco do Nexus. Volta ao relato, com o aviso."""
+    from ..auth.origem import de_outro_site as _de_outro_site
+    from . import relatos_app as R
+    if not admin:
+        abort(403)
+    rid = request.form.get("relato") or ""
+    volta = redirect(url_for("casca.inicio", aba="sugestoes") + (f"#sug-app-{rid}" if R.ID_RE.fullmatch(rid) else ""))
+    certo = session.get(_CHAVE_CODIGO) or ""
+    enviado = request.form.get("codigo") or ""
+    if _de_outro_site() or not certo or not hmac.compare_digest(enviado.encode(), certo.encode()):
+        session[_CHAVE_AVISO_STATUS] = ("erro", "O formulário venceu (a sessão mudou desde que a tela abriu): abra a aba "
+                                                "de novo. A resposta não foi enviada.")
+        return volta
+    usuario = session.get("usuario") if isinstance(session.get("usuario"), dict) else {}
+    try:
+        R.responder(rid, request.form.get("resposta"), usuario, request.form.get("novo_id"), S.RESPOSTA_MAX)
+        session[_CHAVE_AVISO_STATUS] = ("ok", "Resposta enviada ao App: o técnico lê em Meus relatos.")
+    except R.Recusada as ex:
+        session[_CHAVE_AVISO_STATUS] = ("erro", f"{ex}. A resposta não foi enviada.")
+    except R.FonteErro as ex:
+        session[_CHAVE_AVISO_STATUS] = ("erro", f"A resposta não foi enviada: {ex}.")
+    except Exception as ex:      # noqa: BLE001 — nunca um 500 por causa do App
+        current_app.logger.exception("resposta ao relato do App não enviada")
+        session[_CHAVE_AVISO_STATUS] = ("erro", f"Não consegui falar com o App agora ({type(ex).__name__}). A resposta "
+                                                "não foi enviada.")
+    return volta
+
+
+def _contar_por_origem(recebidas: list[dict]) -> list[tuple[str, str, int]]:
+    """(chave, nome, quantas) por tipo de demanda, para o filtro das recebidas (21/11/2026, Levi: "nas sugestões deve dar
+    para filtrar o Tipo de demanda Nexus/App de campo!"): a sugestão escrita no Nexus e o relato do App de Campo. Só o
+    tipo que tem alguma entra na lista."""
+    n_app = sum(1 for s in recebidas if s.get("origem") == "app")
+    return [(k, nome, n) for k, nome, n in (("nexus", "Nexus", len(recebidas) - n_app), ("app", "App de campo", n_app)) if n]
 
 
 def _contar_por_area(recebidas: list[dict]) -> list[tuple[str, str, int]]:
@@ -563,14 +633,13 @@ def _sino():
             tipo, _, oid = x["objeto"].partition(":")
             mencoes.append({"link": "/t/comando/conversa/" + tipo + "/" + oid, "n": x["n"],
                             "titulo": _titulo(x["objeto"])})
-        # o botão do topo leva o ícone do OS Creator do menu lateral, no lugar do sino (Levi, 04/11/2026: "quero que troque
-        # esse símbolo de sino pelo símbolo do OS Creator"): lido da torre, para os dois nunca divergirem
-        icone_os = next((t.icone for t in current_app.extensions.get("nexus_torres", []) if t.id == "os"), "clipboard-text")
+        # desde 21/11/2026 o botão do OS Creator mostra só os `avisos` (com o capacete); as menções, os pedidos e o `perf`
+        # vão para o sino das notificações do setor (base.html)
         # o novo da Sala de controle da Performance conta por USINA (16/11/2026): contar cada string encheria o número
         n_perf = perf["n_usinas"] if perf else 0
         return {"n": len(mencoes) + len(pedidos) + len(avisos) + n_perf, "criticos": sum(1 for p in pedidos if p["atrasado"]),
                 "mencoes": mencoes[:6], "n_mencoes": len(mencoes), "pedidos": pedidos[:6], "n_pedidos": len(pedidos),
-                "avisos": avisos[:8], "n_avisos": len(avisos), "icone_os": icone_os,
+                "avisos": avisos[:8], "n_avisos": len(avisos),
                 "perf": (perf or {}).get("usinas", [])[:6], "n_perf": n_perf}
     except Exception:            # noqa: BLE001 — o sino nunca derruba uma página
         current_app.logger.exception("sino dos insights")
@@ -707,7 +776,9 @@ def _perf_do_sino() -> dict | None:
             return " · ".join(x for x in (
                 (pl(u["strings"], "string", "strings") + " em " + pl(u["inversores"], "inversor", "inversores")) if u["strings"] else "",
                 pl(u["trackers"], "tracker", "trackers") if u["trackers"] else "") if x)
-        return {"n_usinas": d["n_usinas"], "usinas": [{"usina": u["usina"], "detalhe": frase(u)} for u in d["usinas"]]}
+        # o link de cada aviso abre a Sala NA usina e nos equipamentos citados (22/11/2026, `sala_novas.link`)
+        return {"n_usinas": d["n_usinas"], "usinas": [{"usina": u["usina"], "detalhe": frase(u), "link": sala_novas.link(u)}
+                                                      for u in d["usinas"]]}
     except Exception:            # noqa: BLE001
         current_app.logger.exception("sino: o novo da Sala de controle")
         return None

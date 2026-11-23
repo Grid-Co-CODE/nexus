@@ -117,3 +117,95 @@ def por_cliente(fichas: list[dict], clientes: list[str]) -> dict[str, dict]:
     Ficha de cliente que a planilha não tem entra com o próprio nome."""
     nomes = {_chave(c): c for c in clientes}
     return {nomes.get(_chave(f["cliente"]), f["cliente"]): f for f in fichas}
+
+
+# ── a etiqueta curta da cláusula ─────────────────────────────────────────────────────────────────────────────────────
+# Levi, 19/11/2026: "eu gostaria que nessas regras tivessem tipo uma tagzinha [...] da cláusula do contrato [...] Tá
+# dizendo ali, mas tem uma forma mais resumida dessa cláusula que a gente possa botar?". A referência que os leitores dos
+# PDFs escreveram é "<documento>, <item>" ("Anexo II (Proposta Técnica), 4.7.2"; "Cláusula Vigésima Primeira, iii"); um
+# terço dela passava de 25 caracteres. A etiqueta fica com o documento abreviado e o 1º número do item; a referência
+# inteira segue na dica e na linha aberta.
+_ORD_UNI = {"primeira": 1, "segunda": 2, "terceira": 3, "quarta": 4, "quinta": 5, "sexta": 6, "setima": 7, "oitava": 8,
+            "nona": 9}
+_ORD_DEZ = {"decima": 10, "vigesima": 20, "trigesima": 30, "quadragesima": 40, "quinquagesima": 50}
+_DOCS = ((r"condic\w* especific\w*", "CE"), (r"condic\w* gera\w*", "CG"), (r"quadro resumo", "QR"),
+         (r"criterio\w* tecnic\w*", "Crit. téc."), (r"termo de referencia", "TR"), (r"proposta", "Proposta"),
+         (r"plano de manutencao", "Plano manut."), (r"aditivo", "Aditivo"), (r"contrato", "Contrato"))
+_NUM = re.compile(r"(?<![\w.])(\d+(?:\.\d+)*(?:\s?\([a-z]{1,4}\))?)(?![\w])")
+_ROMANO_MIN = re.compile(r"(?<![\w])([ivx]{1,5})(?![\w])")
+
+
+def _sem_acento(t: str) -> str:
+    import unicodedata
+    return "".join(ch for ch in unicodedata.normalize("NFD", str(t)) if unicodedata.category(ch) != "Mn").lower()
+
+
+def _ordinal(t: str) -> int | None:
+    """"vigésima primeira" = 21; "décima" = 10; "quinta" = 5."""
+    ps, n = _sem_acento(t).split(), 0
+    for p in ps:
+        if p in _ORD_DEZ:
+            n += _ORD_DEZ[p]
+        elif p in _ORD_UNI:
+            n += _ORD_UNI[p]
+        else:
+            break
+    return n or None
+
+
+def clausula_curta(clausula) -> str:
+    """A etiqueta da cláusula: "Anx II · 4.7.2", "Cl. 21 · iii", "Cl. 9 (c)", "CE · 3.1". Vazio quando não há referência."""
+    t = " ".join(str(clausula or "").split())
+    if not t:
+        return ""
+    s = _sem_acento(t)
+    # o documento e o item: a 1ª vírgula separa ("Anexo IV – SLA, Tabela ..., item 4")
+    doc, _, item = t.partition(",")
+    sdoc = _sem_acento(doc)
+    rotulo = ""
+    m = re.search(r"\banexo\s+(?:n[ºo°.]?\s*)?([ivxlc]+|[a-z]|\d+)\b", sdoc)
+    if m:
+        rotulo = "Anx " + (m.group(1).upper() if not m.group(1).isdigit() else m.group(1))
+    elif re.match(r"^\s*anexo\b", sdoc):
+        m2 = re.search(r"\b([A-Z]{2,6})\b", doc)
+        rotulo = "Anx " + m2.group(1) if m2 else "Anexo"
+    elif re.match(r"^\s*clausula\b", sdoc):
+        resto = re.sub(r"^\s*cl[aá]usula\s*", "", doc, flags=re.I)
+        mn = _NUM.match(resto.strip())
+        rotulo = "Cl. " + (mn.group(1) if mn else str(_ordinal(resto) or "")).strip()
+        rotulo = rotulo.strip()
+    elif _NUM.match(sdoc.strip()):
+        # só o número: é a cláusula do corpo do contrato ("9 (c)", "2.12.1 (Relatório Mensal)")
+        return ("Cl. " + _NUM.match(t.strip()).group(1)).replace("  ", " ")
+    else:
+        for padrao, abrev in _DOCS:
+            if re.search(padrao, sdoc):
+                rotulo = abrev
+                break
+        else:
+            rotulo = doc.strip()[:14].rstrip(" -–(")
+    # o item: o que vem primeiro entre o código ("MCEI.12", "A.8"), o número ("item 4.11", "4.7.2") e, na cláusula, o
+    # romano miúdo ("iii"); o ano ("jan/2026") e o que está entre parênteses no nome do documento ("rev. 01") não contam
+    num = ""
+    partes = [item] if item else []
+    if not rotulo.startswith(("Anx", "Cl.")):
+        partes.append(re.sub(r"\([^)]*\)", " ", doc))
+    for parte in partes:
+        sp = _sem_acento(parte)
+        achados = []
+        mc = re.search(r"(?<![\w.])([A-Z]{1,6}\.\d+(?:\.\d+)*)(?![\w])", parte)
+        if mc:
+            achados.append((mc.start(), mc.group(1)))
+        for mn in _NUM.finditer(sp):
+            if not re.fullmatch(r"(19|20)\d\d", mn.group(1)):
+                achados.append((mn.start(), mn.group(1)))
+                break
+        mr = _ROMANO_MIN.search(sp)
+        if mr and rotulo.startswith("Cl."):
+            achados.append((mr.start(), mr.group(1)))
+        if achados:
+            num = min(achados)[1]
+            break
+    if rotulo.startswith("Cl.") and rotulo.strip() == "Cl.":
+        return ("Cl. " + num).strip() if num else t[:18]
+    return f"{rotulo} · {num}" if num and num not in rotulo else rotulo

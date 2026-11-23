@@ -14,6 +14,7 @@ Base → Acessos), o tema (escuro ou claro) e o `/saude`. A cadeira saiu em 12/1
 | `nexus/casca/__init__.py` | `/` (Início, só com as torres do setor, e o cartão "Versão no ar"), `/tema` (troca sem JavaScript), `/saude` (`{"commit", "ok"}` e, com um commit esperando a vez de subir, `"espera"`) e o contexto dos templates (menu pelo setor, `setor`, `tema`) |
 | `nexus/casca/versao.py` + `templates/atualizacoes.html` | o cartão "Versão no ar" do Início (a hora do commit, o commit, desde quando está no ar e o commit que espera a vez de subir) e a aba Atualizações (`/?aba=atualizacoes`, só novidade, correção e desempenho, um mês por vez, por dia, com os cartões de commits por pessoa ao lado); seção "Versão no ar e Atualizações" abaixo |
 | `nexus/casca/sugestoes.py` + `templates/sugestoes.html` | a aba Sugestões (`/?aba=sugestoes`): o formulário de todos e a lista do administrador, o livro `nexus_sugestoes` e os anexos no disco; seção "Sugestões no Início" abaixo |
+| `nexus/casca/relatos_app.py` | os relatos do App de Campo nas Sugestões recebidas: lê e responde pelo servidor do App (o App é a fonte; nada no banco); seção "Relatos do App de Campo nas Sugestões" abaixo |
 | `nexus/casca/presos.py` | os pedidos presos: o que cada pedido esperava quando o Nexus parou de responder, no log (o cartão do Início saiu em 13/10; seção "Pedidos presos" abaixo) |
 | `nexus/casca/fracttal_conta.py` | o contador de pedidos ao Fracttal (31/10/2026): um gancho no `Session.send` que soma, por hora de Brasília × origem × método, os pedidos, as recusas (406/429), os erros, o pico por minuto e as esperas; e, no mesmo gancho, o porteiro (etapa 5): o Nexus até 150 pedidos por minuto, o fundo até 90; seção "Pedidos ao Fracttal" abaixo |
 | `nexus/casca/minutos_ocupados.py` | os minutos de toda hora que já têm dono no Nexus, num lugar só (31/10/2026, etapa 3 do canto central), e os de uma vez por dia (`DIARIOS`): o laço novo pede o próximo minuto livre (`proximo_livre`); bullet "Os minutos ocupados" na seção do Raio-X abaixo |
@@ -1235,6 +1236,52 @@ server".
     sai sem número: o Início é a primeira página de todos e nunca espera o banco por causa dele.
 - **Prova**: `tests/test_casca_sugestoes_24_10.py`.
 
+## Relatos do App de Campo nas Sugestões (21/11/2026)
+
+Levi, pelo chat do App de Campo: "os relatos do pessoal de campo, que é muito importante. Podia até ficar ali no início do
+Nexus". No chat do Nexus, no mesmo dia, escolheu o caminho A, "Administradores" respondem e, por fim, "na verdade pode ir
+para sugestões no início com uma tag de App de campo!" (no lugar de uma aba própria).
+
+- **De onde vem**: o canal "Reportar problema ou melhoria" do App (rota `app/feedback` do servidor do App, tabela
+  `appfeedback`). O App é a FONTE do relato e do ciclo (aberto → respondido → resolvido, que só o autor encerra, ou
+  reaberto). **O Nexus não grava nada no banco**: o relato é texto livre com o nome do técnico, e a API do banco tem
+  leitura aberta (regra 8 de `nexus/dados/CLAUDE.md`). Um livro `relatos_app_campo` com o texto aberto foi descartado por
+  isso; o com o texto cifrado (caminho B) também, porque daria ao App a chave do cofre do Nexus e faria o status ter dois
+  donos.
+- **O contrato** (versão 1, no topo de `casca/relatos_app.py`; o App serve, o Nexus lê; mudou num lado, muda no outro no
+  mesmo trabalho): `GET <URL>` com `X-Nexus-Chave` → `{"versao": 1, "relatos": [...]}` (id, tipo, texto, tela, status,
+  criado_em, autor {nome, email, papel, funcao}, versao_app, aparelho, mensagens [{texto, lado grid|campo, por, em}]);
+  `POST <URL>/<id>/responder` com `{"resposta_id", "texto", "por": {"nome", "email"}}`. O `resposta_id` (`r` + 11
+  hexadecimais) segura o 2º envio. Recusa do App com `{"erro": "..."}`, que vira o aviso da tela (400, 401, 404 e o 503
+  do App sem a chave dele; a resposta com menos de 5 caracteres nem sai do Nexus). O lado do App é a v367 (21/11/2026).
+- **A chave** (tela Base → Chaves do Nexus, que vence o `.env`): `NEXUS_APP_RELATOS_CHAVE` (32 caracteres ou mais, a
+  mesma do App Setting `NEXUS_RELATOS_CHAVE` do servidor do App; colada pelo Levi em 22/11/2026 00:10). O endereço
+  (`NEXUS_APP_RELATOS_URL`, padrão `https://gridco-campo-mw.azurewebsites.net/api/app/nexus/relatos`) só pelo `.env`:
+  saiu da tela em 22/11/2026 (Levi: "se o 'Relatos do App de Campo (endereço)' não é para usar então tira da tela!"). **Sem a chave o Nexus nem chama o App** e o
+  administrador lê o porquê no alto das Sugestões recebidas.
+- **Onde aparece**: nas Sugestões recebidas, só para o administrador (o mesmo que lê as sugestões), na mesma linha-cartão,
+  com a etiqueta **"App de campo"** no lugar do setor (na cor da marca; o filtro Setor e o Por setor ganham "App de campo"
+  como um setor). A linha: a data, "Técnico - Tipo: a 1ª linha do texto", as respostas da Grid, a etiqueta e o status do
+  App (Aberto e Reaberto esperam a Grid; Resolvido vai para o fim, como a Concluída). Aberto: papel, função, e-mail, tela,
+  versão do App, aparelho, o texto e as mensagens na ordem (a do técnico, escrita no App ao reabrir, com o fio neutro).
+  **Não há troca de status pelo Nexus**: "Só quem relatou encerra, pelo App".
+- **O filtro Tipo de demanda** (21/11/2026, Levi, vendo a lista: "nas sugestões deve dar para filtrar o Tipo de
+  demanda Nexus/App de campo!"): o 1º dos filtros das recebidas, com "Nexus" (a sugestão escrita aqui) e "App de
+  campo" (o relato), cada um com a conta e só quando tem algum (`casca._contar_por_origem`). Cada linha leva
+  `data-sug-origem` (nexus|app), e o script da página filtra junto com o Setor e o Quem solicitou; o Por setor conta só
+  o que passa no tipo e na pessoa escolhidos.
+- **A resposta**: `POST /?aba=sugestoes&acao=responder_app` (só administrador; outro site e formulário vencido não
+  mandam). Vai ao App, que a grava como a do Admin/Supervisor de lá; o técnico lê em "Meus relatos". Pede o login
+  (Microsoft ou Fracttal): a resposta vai ao técnico com o nome de quem respondeu, e a senha de administrador não diz quem
+  é. O App fora ou que recusa vira aviso ("A resposta não foi enviada: ..."), nunca um 500. Depois de responder a cópia
+  vence e a lista é relida.
+- **O número da aba Sugestões** do administrador soma os relatos que esperam a Grid (aberto e reaberto). Sai da cópia de 1
+  minuto; velha, a releitura vai por trás (o Início nunca espera o App).
+- **O sino do topo** ficou de fora nesta 1ª versão (21/11/2026: outras conversas mexiam nele no mesmo dia; o número da aba
+  já avisa).
+- Prova: `tests/test_casca_relatos_app_21_11.py` (App falso: lista, etiqueta, mensagens, resolvido no fim, contrato
+  errado, App fora, resposta com a chave e o id, sem login, outro site, recusas 401/404/409/500, contador, chaves).
+
 ## Um cabeçalho só: quem entrou no topo do Nexus (13/10/2026)
 
 Levi, com o print do topo do OS Creator dentro do Nexus: "Quero que essa visão de cabeçalho ao lado de sair vá para o
@@ -1254,6 +1301,36 @@ que é uma tela dentro de uma tela!".
   JavaScript abre e fecha no clique; com ele, fecha ao clicar fora, no Esc, e o sino e o menu da conta não ficam abertos
   juntos. No celular: linha 1 a marca e o Menu, linha 2 o sino e o avatar (numa linha só, a 375 px, o "Nexus" da marca
   entrava por baixo do Menu).
+- **As notificações do topo, dois botões** (21/11/2026, Levi: "Una o 1 e o 3. E transforme o ícone em um sino [...] quando
+  a pessoa passar o mouse, vai explicar o que chega nessa notificação" e "no ícone do OS Creator aparecesse também um
+  texto explicando ao passar o mouse"):
+  1. o **sino** (`ph-bell`, `<details class="sino-topo sino-dem">`, aria-label "Notificações: N"): as demandas e as
+     contestações (`_sino_demandas`), o Fora da programação (`_sino_fora`) e, desde a 2ª rodada do mesmo dia ("a caixa
+     de entrada tem que ser no sino"), os pedidos ao setor, as menções nas conversas e as usinas novas da Sala de controle
+     (de `_sino`).
+     O número é a soma; aparece quando uma das partes existe (o administrador pela senha só com pedido, menção ou usina
+     nova). O "Marcar como lida" do Fora segue pelo mesmo script (`data-lidas` só quando há a parte do Fora);
+  2. o **botão do OS Creator, só com as OS** ("A do OS Creator tem que ser focada apenas em OS mesmo"): os avisos das OS
+     da pessoa (`_sino`: concluída pelo técnico, pausada, criada para ela, solicitação que virou OS), cada um em TRÊS
+     linhas desde 22/11/2026 (o `aviso_nt(..., tres=a)`: a OS e o que aconteceu com a hora à direita, quem e o status, o
+     ativo e a atividade; regras `.nt-l1`, `.nt-l2`, `.nt-l3`, `.nt-hora`, `.nt-st--*`; `nexus/comando/CLAUDE.md`); o número é só o deles; o
+     ícone é o capacete (`ph-hard-hat`, "Talvez um capacete"), e não mais o do OS Creator do menu.
+  O que chega em cada um aparece ao passar o mouse, EM LISTA ("passar o mouse eu quero em formato de lista"): a
+  `.sino-dica` dentro do botão ("O que chega aqui" e um item por tipo de aviso; nexus.css), no lugar do `title` do
+  navegador (demorava, saía cortado e não faz lista); some com a caixa aberta e na tela de toque.
+  **As duas caixas são LISTAS, como as do GitHub e do Facebook** (21/11/2026, Levi, vendo os títulos com contagem, as
+  etiquetas e um "Abrir" ao lado de cada parte: "ficou muito feio. É melhor quando a pessoa tiver passando o mouse em
+  cima da notificação aparecer as ações [...] pensar como um garçom mesmo. Ó, chegou isso daqui pra ti. Clicou em cima.
+  Tchau"): o macro `aviso_nt` (base.html) faz cada aviso UMA linha — o ícone do tipo (demanda, pedido, menção,
+  contestação, Fora, Sala de controle; nas OS, executada, para você, solicitação, cancelada), o que é e, embaixo, de onde
+  veio. Vermelho só no ícone do atrasado, do vencido e do cancelado. Sem título por parte, sem etiqueta, sem botão
+  fixo: as ações (`.nt-acoes`: "Responder", "Ver a conversa", "Ver na Sala", "Ver no Fora da programação", o ✓ de
+  marcar como lida) aparecem ao passar o mouse pela linha (na tela de toque, à vista). O clique na linha abre; o aviso
+  que se marca como lido (o das OS e o do Fora, `li[data-nt-lida]`) já sai como lido no clique (o "garçom": o script
+  manda o formulário dele por fetch com keepalive). No alto, "Notificações" / "Avisos das OS" e o "Marcar todas como
+  lidas" (só quando há o que marcar); no pé do sino, "Ver tudo na Caixa de entrada". As regras do CSS são `.nt-caixa
+  .nt-*`: a `.sino-caixa li a` antiga vencia a `.nt-a` sozinha e empilhava o ícone em cima do texto.
+  No celular: o sino na coluna 2, o OS Creator na 3 e o avatar na 4.
 - **A ação da tela no topo:** o bloco `topo_acoes`, antes do sino. Hoje só o "Modo TV" do Painel NOC
   (`performance/moldura.html`); no celular ele some.
 - **O OS Creator dentro do Nexus sem o topo dele:** a ponte (`torres/oscreator/ponte.py`, `_MARCA_NO_NEXUS`) marca com
@@ -1397,6 +1474,10 @@ conferências moram em `nexus/auth/microsoft.py`; a ida, a volta e a sessão, no
 
 ## Regras que já custaram caro
 
+- **Variável da casca com nome próprio** (22/11/2026): um `{% set x = ... %}` no `base.html` passa por cima da variável `x`
+  que a view manda à tela. O sino de 21/11 criou `n_fora` (as tarefas do Fora da programação) e Base > Acessos > Pessoas e
+  setores perdeu o "(N fora do Fracttal)", que usa o mesmo nome. Virou `n_fora_sino`: o que a casca define leva o nome da
+  parte dela (`sino`, `menu`, `topo`). `tests/test_base_pessoas_fora_fracttal_17_11.py` pegou.
 - **Rota nova só nos caminhos que o Caddy manda ao Nexus** (13/10/2026, "Atualizações não carrega"): no servidor o
   Caddy divide por caminho (DEPLOY.md, 5b) e só a raiz exata, `/t/*`, `/entrar`, `/sair`, `/saude`, `/tema`, `/os/*` e
   `/static/*` (menos os três da plataforma) chegam ao Nexus. A aba Atualizações nasceu em `/atualizacoes`: abria nos testes

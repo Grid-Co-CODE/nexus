@@ -252,7 +252,8 @@ def test_o_sino_nao_mostra_os_insights_sem_dono(app, banco, limpo, motor_dublado
     html = _aberta(_cliente(app), "/t/comando/insights")
     sino = html.split('class="sino-topo"', 1)[1].split("</details>", 1)[0]
     assert "sino-n" not in sino and "a OS 16702 voltou" not in sino and "sem dono" not in sino
-    assert "Nada novo para você." in sino and "/t/comando/caixa-de-entrada" in sino
+    # o botão do OS Creator é só das OS desde 21/11/2026; a Caixa de entrada é o sino
+    assert "Nenhum aviso das suas OS." in sino and 'class="ph ph-hard-hat"' in html
 
 
 def test_sem_a_copia_do_motor_o_topo_abre_sem_o_sino(app, logado, monkeypatch):

@@ -166,16 +166,29 @@ def mwp(v) -> float | None:
     return x if x > 0 else None
 
 
-def insights_por_usina(insights: list[dict] | None, est: dict, nome_para_uid: dict) -> dict[int, int] | None:
+def uid_do_insight(i: dict, nome_para_uid: dict, uids: set | None = None):
+    """A usina do insight: o `usina_id` que a regra gravou, quando ele está no cadastro (`uids`); sem ele, o nome sem
+    acento e sem caixa (19/11/2026: só pelo nome, o homônimo do cadastro levava o insight para a usina errada)."""
+    try:
+        uid = int(float(i.get("usina_id"))) if i.get("usina_id") not in (None, "") else None
+    except (TypeError, ValueError):
+        uid = None
+    if uid is not None and (uids is None or uid in uids):
+        return uid
+    return nome_para_uid.get(_norm(i.get("usina")))
+
+
+def insights_por_usina(insights: list[dict] | None, est: dict, nome_para_uid: dict, uids: set | None = None) -> dict[int, int] | None:
     """{usina_id: os insights que não foram concluídos}. O insight guarda o nome da usina (o do cadastro, ou o código
-    quando o cadastro não deu nome): liga pelo nome sem acento e sem caixa. None = o motor ainda não calculou."""
+    quando o cadastro não deu nome) e, desde 19/11/2026, o id quando a regra sabe: liga pelo id e, sem ele, pelo nome sem
+    acento e sem caixa (`uid_do_insight`). None = o motor ainda não calculou."""
     if insights is None:
         return None
     out: dict[int, int] = {}
     for i in insights:
         if ((est.get(i.get("id")) or {}).get("evento")) == "concluiu":
             continue
-        uid = nome_para_uid.get(_norm(i.get("usina")))
+        uid = uid_do_insight(i, nome_para_uid, uids)
         if uid:
             out[uid] = out.get(uid, 0) + 1
     return out

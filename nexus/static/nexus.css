@@ -414,6 +414,14 @@ a{color:inherit}
   border-radius:0 var(--raio-md) var(--raio-md) 0}
 .sug-resposta-cab{margin:0;font-size:12px;color:var(--mudo)}
 .sug-resposta-texto{margin:4px 0 0;font-size:13.5px;line-height:1.5;color:var(--tinta);white-space:pre-wrap;overflow-wrap:anywhere}
+/* os relatos do App de Campo nas Sugestões (21/11/2026, Levi: "pode ir para sugestões no início com uma tag de App de
+   campo!"): a etiqueta na cor da marca, no lugar do setor (o status segue o semáforo); a mensagem do técnico, escrita
+   no App ao reabrir, com o fio neutro, e a da Grid com o verde de sempre */
+.sug-lista .sug-cab > .sug-tag-app,.sug-tag-app{color:var(--verde-texto);background:var(--verde-suave)}
+.sug-app-meta{margin:0 0 4px;font-size:12.5px}
+.sug-resposta--campo{border-left-color:var(--linha-forte)}
+.sug-app-dono{margin:10px 0 0;font-size:12px}
+.sug-relatos-off{margin:0 0 10px}
 .sug-responder{display:grid;gap:6px;margin-top:14px;max-width:640px}
 .sug-responder .gc-campo{width:100%;box-sizing:border-box;resize:vertical;font-family:var(--font-sans)}
 .sug-responder .gc-btn{justify-self:start}
@@ -701,15 +709,14 @@ mark.menu-achado{background:none;color:var(--tinta);font-weight:700;text-decorat
   /* Linha 1: marca + Menu. Linha 2: o sino e o avatar da conta, à direita (desde 03/11/2026 o Setor, o Tema e o Sair
      moram no menu da conta). Numa linha só a marca não cabe com o sino a 375 px: o "Nexus" entrava por baixo do Menu
      (visto no navegador). */
-  .topo{height:auto;display:grid;grid-template-columns:minmax(0,1fr) auto auto auto auto;padding:10px 16px;gap:10px}
+  .topo{height:auto;display:grid;grid-template-columns:minmax(0,1fr) auto auto auto;padding:10px 16px;gap:10px}
   .topo-espaco{grid-column:1;grid-row:2}
-  /* o sininho das demandas (12/11/2026) antes do botão do OS Creator e o aviso do Fora da programação (16/11/2026)
-     depois dele; sem eles (o administrador pela senha, o setor que nenhum motivo cita), a coluna fica vazia */
+  /* o sino das notificações do setor (as demandas, as contestações e o Fora da programação num só desde 21/11/2026)
+     antes do botão do OS Creator; sem ele (o administrador pela senha), a coluna fica vazia */
   .sino-topo.sino-dem{grid-column:2;grid-row:2}
   .sino-topo{grid-column:3;grid-row:2}
-  .sino-topo.sino-fora{grid-column:4;grid-row:2}
-  .conta-topo{grid-column:5;grid-row:2}
-  .botao-menu{display:inline-flex;grid-column:2 / 6;grid-row:1;justify-self:end}
+  .conta-topo{grid-column:4;grid-row:2}
+  .botao-menu{display:inline-flex;grid-column:2 / 5;grid-row:1;justify-self:end}
   /* No celular o menu já fica atrás do botão Menu; o trilho recolhido não se aplica. */
   .recolhe-menu{display:none}
   .menu-recolhido .menu{width:auto}
@@ -780,6 +787,22 @@ mark.menu-achado{background:none;color:var(--tinta);font-weight:700;text-decorat
 
 /* o sino dos insights no topo (03/11/2026): o número de sem dono, vermelho com crítico; a lista curta por cima da tela */
 .sino-topo{position:relative}
+/* o que chega em cada notificação, ao passar o mouse, em LISTA (21/11/2026, Levi: "quando a pessoa passar o mouse, vai
+   explicar o que chega nessa notificação", "no ícone do OS Creator aparecesse também um texto explicando" e "passar o
+   mouse eu quero em formato de lista"): a `.sino-dica` dentro do botão, numa caixa embaixo dele, no lugar do title do
+   navegador (demorava, saía cortado e não fazia lista); some com a caixa aberta e na tela de toque */
+.sino-dica{position:absolute;right:0;top:calc(100% + 10px);z-index:41;display:block;width:max-content;max-width:320px;
+  padding:10px 12px;border:1px solid var(--linha-forte);border-radius:8px;background:var(--superficie);color:var(--tinta);
+  box-shadow:0 8px 24px var(--sombra);font:400 12.5px/1.45 var(--font-sans);text-align:left;white-space:normal;
+  opacity:0;visibility:hidden;pointer-events:none;transition:opacity .12s ease .3s}
+.sino-dica-t{display:block;margin:0 0 6px;font-weight:600}
+.sino-dica-i{display:block;position:relative;padding-left:14px;color:var(--tinta-2)}
+.sino-dica-i + .sino-dica-i{margin-top:3px}
+.sino-dica-i::before{content:"";position:absolute;left:2px;top:.62em;width:5px;height:5px;border-radius:50%;background:var(--mudo)}
+.sino-bt:hover .sino-dica,.sino-bt:focus-visible .sino-dica{opacity:1;visibility:visible}
+.sino-topo[open] .sino-dica{display:none}
+@media (prefers-reduced-motion:reduce){.sino-dica{transition:none}}
+@media (hover:none){.sino-dica{display:none}}
 .sino-bt{position:relative;list-style:none;cursor:pointer}
 .sino-bt::-webkit-details-marker{display:none}
 .sino-bt .ph{font-size:18px}
@@ -789,6 +812,7 @@ mark.menu-achado{background:none;color:var(--tinta);font-weight:700;text-decorat
 .sino-caixa{position:absolute;right:0;top:calc(100% + 10px);z-index:40;width:min(420px,calc(100vw - 32px));background:var(--superficie);
   border:1px solid var(--linha-forte);border-radius:var(--raio-md);box-shadow:0 12px 32px var(--sombra);padding:14px 16px;color:var(--tinta)}
 .sino-t{margin:0 0 8px;font-size:13.5px}
+
 .sino-caixa ul{list-style:none;margin:0 0 12px;padding:0;display:grid;gap:2px;max-height:360px;overflow:auto}
 .sino-caixa li a{display:block;padding:8px;border-radius:6px;color:var(--tinta);text-decoration:none;font-size:13px;line-height:1.4}
 .sino-caixa li a:hover,.sino-caixa li a:focus-visible{background:var(--superficie-2)}
@@ -814,6 +838,63 @@ mark.menu-achado{background:none;color:var(--tinta);font-weight:700;text-decorat
 .sino-lida:hover,.sino-lida:focus-visible{color:var(--tinta);background:var(--superficie-2)}
 .sino-lidas{display:flex;justify-content:flex-end;margin:-8px 0 12px}
 @media (max-width:640px){.sino-caixa{position:fixed;left:16px;right:16px;top:64px;width:auto}}
+/* as notificações em lista, como as do GitHub e do Facebook (21/11/2026, Levi: "ficou muito feio. É melhor quando a
+   pessoa tiver passando o mouse em cima da notificação aparecer as ações [...] pensar como um garçom"): uma linha por
+   aviso (o ícone do tipo, o que é, de onde veio), sem título por parte nem etiqueta; as ações aparecem ao passar o mouse
+   por cima da linha, à direita, e na tela de toque ficam à vista. Vermelho só no ícone do atrasado/vencido/cancelado */
+.sino-caixa.nt-caixa{padding:0;overflow:hidden}
+.nt-caixa .nt-cab{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px 10px;border-bottom:1px solid var(--linha)}
+.nt-caixa .nt-cab b{font:600 14px/20px var(--font-sans);color:var(--tinta)}
+.nt-caixa .nt-cab form{margin:0}
+.nt-caixa .nt-todas{border:0;background:none;padding:3px 6px;margin:-3px -6px -3px 0;border-radius:4px;font:500 12px/16px var(--font-sans);
+  color:var(--mudo);cursor:pointer}
+.nt-caixa .nt-todas:hover,.nt-caixa .nt-todas:focus-visible{color:var(--tinta);background:var(--superficie-2)}
+.nt-caixa .nt-lista{list-style:none;margin:0;padding:4px 0;max-height:min(440px,70vh);overflow:auto;scrollbar-width:thin;
+  scrollbar-color:var(--rolagem) transparent}
+.nt-caixa .nt{position:relative;display:flex;align-items:center}
+.nt-caixa .nt:hover,.nt-caixa .nt:focus-within{background:var(--superficie-2)}
+.nt-caixa .nt-a{flex:1;min-width:0;display:flex;gap:10px;align-items:flex-start;padding:9px 14px;border-radius:0;color:var(--tinta);text-decoration:none}
+.nt-caixa .nt-a:focus-visible{outline:2px solid var(--foco);outline-offset:-2px}
+.nt-caixa .nt-ic{flex:none;display:grid;place-items:center;width:30px;height:30px;border-radius:50%;background:var(--superficie-3);
+  color:var(--tinta-2);font-size:15px}
+.nt-caixa .nt--critico .nt-ic{color:var(--critico);background:var(--critico-suave)}
+.nt-caixa .nt-txt{min-width:0;display:grid;gap:1px}
+.nt-caixa .nt-t{font:500 13px/18px var(--font-sans);color:var(--tinta);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;
+  overflow:hidden}
+.nt-caixa .nt-m{font-size:12px;line-height:16px;color:var(--mudo);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* os Avisos das OS em três linhas (22/11/2026, Levi: "OS número, traço, e aí o que aconteceu [...] ao lado [...] a data e a
+   hora [...] o ativo [...] vira uma terceira linha"): a OS e o que aconteceu com a hora à direita; quem e o status, com a
+   cor e a palavra; o ativo e a atividade. Nenhuma linha quebra: o que passa vira reticências, e a hora sempre aparece */
+.nt-caixa .nt-txt3{flex:1}
+.nt-caixa .nt-l1{display:flex;align-items:baseline;gap:10px;min-width:0}
+.nt-caixa .nt-l1 .nt-t{flex:1;min-width:0;display:block;white-space:nowrap;text-overflow:ellipsis}
+.nt-caixa .nt-os{font-weight:600}
+.nt-caixa .nt-hora{flex:none;font-size:11.5px;line-height:16px;color:var(--mudo);font-variant-numeric:tabular-nums}
+.nt-caixa .nt-l2,.nt-caixa .nt-l3{font-size:12px;line-height:16px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.nt-caixa .nt-l2{color:var(--tinta-2)}
+.nt-caixa .nt-l3{color:var(--mudo)}
+.nt-caixa .nt-l3 b{font-weight:600;color:var(--tinta-2)}
+.nt-caixa .nt-st{font-weight:600}
+.nt-caixa .nt-st--alerta{color:var(--alerta)}
+.nt-caixa .nt-st--ok{color:var(--ok)}
+.nt-caixa .nt-st--critico{color:var(--critico)}
+.nt-caixa .nt-acoes{position:absolute;right:10px;top:50%;transform:translateY(-50%);display:flex;gap:4px;align-items:center;
+  padding-left:14px;background:linear-gradient(to right,transparent,var(--superficie-2) 14px);opacity:0;pointer-events:none}
+.nt-caixa .nt:hover .nt-acoes,.nt-caixa .nt:focus-within .nt-acoes{opacity:1;pointer-events:auto}
+.nt-caixa .nt-acoes:empty{display:none}
+.nt-caixa .nt-acoes form{margin:0}
+.nt-caixa .nt-acao{display:inline-flex;align-items:center;gap:4px;padding:4px 9px;border:1px solid var(--linha-forte);border-radius:6px;
+  background:var(--superficie);color:var(--tinta);font:500 12px/16px var(--font-sans);text-decoration:none;cursor:pointer;
+  white-space:nowrap}
+.nt-caixa .nt-acao:hover,.nt-caixa .nt-acao:focus-visible{border-color:var(--verde);color:var(--verde-texto)}
+.nt-caixa .nt-acao--ic{padding:4px 6px;font-size:14px}
+.nt-caixa .nt-mais a{display:block;padding:7px 14px 9px 54px;font-size:12px;color:var(--mudo);text-decoration:none}
+.nt-caixa .nt-mais a:hover{color:var(--tinta)}
+.nt-caixa .nt-vazio{margin:0;padding:24px 14px;text-align:center;color:var(--mudo);font-size:13px}
+.nt-caixa .nt-pe{display:block;padding:10px 14px;border-top:1px solid var(--linha);text-align:center;font:600 12.5px/16px var(--font-sans);
+  color:var(--verde-texto);text-decoration:none}
+.nt-caixa .nt-pe:hover,.nt-caixa .nt-pe:focus-visible{background:var(--superficie-2)}
+@media (hover:none){.nt-caixa .nt-acoes{position:static;transform:none;opacity:1;pointer-events:auto;background:none;padding:0 10px 0 0}}
 
 /* a Paleta Nexus (04/11/2026, só administradores; casca/paleta_tokens.py): as amostras levam a cor do token como valor de estilo */
 .pal{max-width:1180px}

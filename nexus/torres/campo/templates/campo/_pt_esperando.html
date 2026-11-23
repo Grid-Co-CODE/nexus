@@ -123,7 +123,7 @@
           <figure class="pt-ass">
             <figcaption>Aprovação</figcaption>
             <div class="pt-ass-quadro pt-ass-quadro--vazio"><span class="mudo">Aguardando o De acordo de quem pode assinar.</span></div>
-            <span class="det pt-quem">Você assina com o seu login do Fracttal (o mesmo do OS Creator).</span>
+            <span class="det pt-quem">Você assina com a conta com que entrou.</span>
           </figure>
         </div>
         <form class="pt-det-acoes" method="post" action="{{ raiz }}/os/_nexus/pt/{{ p.numero|urlencode }}/decidir">
@@ -171,8 +171,8 @@
     (quemAssina || (quemAssina = fetch(nexusRota('/os/_nexus/quem'), {credentials: 'same-origin'}).then(function (r) { return r.json(); })))
       .then(function (q) {
         if (q.sessao_encerrada && window.nexusEntrarDeNovo) { window.nexusEntrarDeNovo(q.entrar); return; }
-        el.textContent = q.email ? ('Assinando como ' + q.nome + ', pelo login do Fracttal.')
-                                 : 'Para decidir, entre com o seu login do Fracttal (o mesmo do OS Creator).';
+        el.textContent = q.email ? ('Assinando como ' + q.nome + '.')
+                                 : 'Para decidir, entre com a sua conta Microsoft.';
       }).catch(function () {});
   }
   // clicar na linha abre o detalhe da PT logo abaixo; o link da OS continua indo para a aprovação

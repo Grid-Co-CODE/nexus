@@ -16,6 +16,9 @@
      publica; o livro de antes, sem elas, segue pelo mês ("outubro de 2026") #}
   {% set c = rotulo(atual) %}
   {% set g = atual.regua %}
+  {# a parcela do inventário do almoxarifado (App v368, 22/11/2026: 50 pontos por almoxarifado contado no mês, já no
+     total): a coluna só aparece no ciclo em que alguém a tem; sem ela, tarefas + rondas + bônus não fechavam o total #}
+  {% set com_inv = (atual.classificacao + atual.fora)|selectattr('inventario_pts')|list|length > 0 %}
   {# o "fora do ciclo" do App, explicado pela régua que ele publicou no mês #}
   {# a regra é a do App (confirmada pela sessão dele em 18/10/2026): vale a primeira que pegar #}
   {% set dica_fora = 'Fora do ciclo: fica sem posição na classificação ' ~ c.de ~ ' quem tem menos de '
@@ -41,7 +44,7 @@
     hora em hora, e o Nexus não recalcula{% if lido %} (lido pelo Nexus às {{ lido }}){% endif %}.{% if dias_nos_dois %}
     {{ dias_nos_dois }}{% endif %}</p>
     <dl class="gc-explica-termos">
-      {{ termo('Total') }}<dd>A soma que define a posição: pontos de tarefas + pontos de rondas + bônus. No empate, fica na
+      {{ termo('Total') }}<dd>A soma que define a posição: pontos de tarefas + pontos de rondas + bônus{% if com_inv %} + inventário{% endif %}. No empate, fica na
         frente quem tem mais tarefas contadas.</dd>
       {{ termo('Tarefas') }}<dd>Em cima, quantas tarefas a pessoa registrou no mês; embaixo, os pontos e quantas contam. Cada
         tarefa vale a nota menos 60 (nota 100 = 40 pontos), se a nota chegou ao piso{% if g.get('piso') is not none %}
@@ -55,6 +58,9 @@
         {% if g.get('bonus_prog') is not none %}+{{ g.bonus_prog }}% com a programação da semana completa{% else %}um
         tanto com a programação da semana completa{% endif %}{% if g.get('bonus_prev') is not none %} e até
         +{{ g.bonus_prev }}% pelas preventivas feitas na própria semana{% endif %}.</dd>
+      {% if com_inv %}{{ termo('Inventário') }}<dd>Contar o inventário do almoxarifado pela Ronda vale 50 pontos por
+        almoxarifado, uma vez por mês do calendário, para quem enviou a contagem; soma por fora do teto das rondas e dos
+        bônus (vale desde 20/11/2026). Recontagem pedida pelo PCM tira os 50 até a recontagem ser enviada.</dd>{% endif %}
       {{ termo('Nota média') }}<dd>A média das notas (de 0 a 100) de todas as tarefas que ele registrou no mês.</dd>
       {{ termo('Cumprimento') }}<dd>Concluídas ÷ programadas, só nos dias já vencidos; embaixo, quantas de quantas.</dd>
       {{ termo('Pontualidade') }}<dd>Das OS da programação dele, em quantas ele começou a execução até 30 minutos depois do
@@ -130,7 +136,7 @@
         <span class="rk-nome">{{ p.tecnico or 'Sem nome no cadastro do App' }}</span>
         <span class="rk-reg">{{ p.regiao or 'sem região' }}</span>
         <span class="rk-pts">{{ pts(p.total) }} <small>pts</small></span>
-        <span class="rk-det">{{ pts(p.tarefas_pts) }} de tarefas · {{ pts(p.rondas_pts) }} de rondas · {{ pts(p.bonus) }} de bônus</span>
+        <span class="rk-det">{{ pts(p.tarefas_pts) }} de tarefas · {{ pts(p.rondas_pts) }} de rondas · {{ pts(p.bonus) }} de bônus{% if p.inventario_pts %} · {{ pts(p.inventario_pts) }} de inventário{% endif %}</span>
         {# o e-mail no pódio (Fillipe Figueiró, 03/11/2026): o pódio vira pagamento, e o RH paga pelo e-mail, não pelo nome #}
         {% if p.email %}<span class="rk-email">{{ p.email }}</span>{% endif %}
       </div>
@@ -151,7 +157,7 @@
   <div class="cn-tab"><table>
     {# a região vai embaixo do nome e devolvidas e anuladas numa coluna só: com 13 colunas, a 1.400 px a última saía da
        tela e o nome quebrava em três linhas (visto no navegador em 13/10/2026) #}
-    <thead><tr><th>Posição</th><th>Técnico</th><th>Total</th><th>Tarefas</th><th>Rondas</th><th>Bônus</th>
+    <thead><tr><th>Posição</th><th>Técnico</th><th>Total</th><th>Tarefas</th><th>Rondas</th><th>Bônus</th>{% if com_inv %}<th>Inventário</th>{% endif %}
       <th>Nota média</th><th>Cumprimento</th><th>Pontualidade</th><th>Sequência</th><th>Devolvidas · anuladas</th></tr></thead>
     <tbody>
     {% for p in classificacao %}{% set abre = p.devolvidas or p.anuladas or p.abaixo_do_piso %}
@@ -162,15 +168,15 @@
            abaixo vir os pontos"; os pontos em cima pareciam "280 rondas" e "2.000 tarefas" no mês) #}
         <td>{{ p.tarefas }}<span class="det">{{ pts(p.tarefas_pts) }} pts · {{ p.contadas }} conta{{ 'm' if p.contadas != 1 }}</span></td>
         <td>{{ p.rondas }}<span class="det">{{ pts(p.rondas_pts) }} pts{% if p.rondas_no_teto %} · no teto{% endif %}</span></td>
-        <td>{{ pts(p.bonus) }}</td>
+        <td>{{ pts(p.bonus) }}</td>{% if com_inv %}<td>{{ pts(p.inventario_pts) }}</td>{% endif %}
         <td>{{ p.nota_media if p.nota_media is not none else '—' }}</td>
         <td>{{ pct(p.cumprimento) }}<span class="det">{{ p.concluido }} de {{ p.programado }} programada{{ 's' if p.programado != 1 }}</span></td>
         <td>{{ pct(p.pontualidade) }}</td>
         <td>{{ p.sequencia }} dia{{ 's' if p.sequencia != 1 }}</td>
         <td>{{ p.devolvidas }} · {{ p.anuladas }}{% if abre %} <i class="ph ph-caret-down rk-seta" aria-hidden="true"></i>{% endif %}</td></tr>
-      {% if abre %}{{ lista_do_app(p, 11) }}{% endif %}
+      {% if abre %}{{ lista_do_app(p, 12 if com_inv else 11) }}{% endif %}
     {% else %}
-      <tr><td colspan="11" class="cn-vazio">Ninguém classificado {{ 'nesta região ' if regiao }}{{ c.em }} ainda.</td></tr>
+      <tr><td colspan="{{ 12 if com_inv else 11 }}" class="cn-vazio">Ninguém classificado {{ 'nesta região ' if regiao }}{{ c.em }} ainda.</td></tr>
     {% endfor %}
     </tbody></table></div>
 

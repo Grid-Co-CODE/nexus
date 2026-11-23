@@ -95,10 +95,16 @@ def test_o_sino_mostra_o_aviso_abre_o_card_e_marcar_como_lida_tira(app, banco, l
     c = _cliente_de(app, PESSOA)
     html = c.get("/").get_data(as_text=True)
     sino = _sino(html)
-    assert "1 aviso das suas OS" in sino and "OS 18374 concluída pelo técnico" in sino and "Marcar como lida" in sino
+    assert 'aria-label="Avisos das OS: 1"' in sino and "Marcar como lida" in sino
+    # três linhas (22/11/2026): a OS e o que aconteceu com a hora ao lado; quem executou e o status; a atividade
+    assert '<b class="nt-os">OS 18374</b> — Concluída pelo técnico' in sino and 'class="nt-hora"' in sino
+    assert 'Executada por Técnico Exemplo · <span class="nt-st nt-st--alerta">Em verificação</span>' in sino
+    assert 'class="nt-l3">Recomposição de String<' in sino
     assert "/os/_nexus/card/101?status=Em%20Verifica" in sino and "window.NexusOsCard" in html
     botao = sino.split("</summary>", 1)[0]                                # o botão leva o ícone do OS Creator, não o sino
-    assert 'class="ph ph-clipboard-text"' in botao and "ph-bell" not in botao
+    # o capacete desde 21/11/2026 (Levi: "a gente pode até mudar esse símbolo [...] Talvez um capacete"); o sino é das
+    # notificações do setor
+    assert 'class="ph ph-hard-hat"' in botao and "ph-bell" not in botao
     aid = re.search(r'name="aviso" value="([^"]+)"', sino).group(1)
     assert sino.count(f'action="{LIDA}"') == 2 and "/avisos/lida" not in html       # a lida e a "todas", na rota que existe
     r = c.post(LIDA, data={"aviso": aid, "voltar": "/t/comando/caixa-de-entrada"})
@@ -115,7 +121,9 @@ def test_o_sino_marca_como_lida_sem_recarregar_a_tela(app, banco, limpo, lista, 
     e o formulário sem JavaScript segue voltando para a tela (o teste acima)."""
     c = _cliente_de(app, PESSOA)
     html = c.get("/").get_data(as_text=True)
-    assert "'Accept': 'application/json'" in html and 'class="sino-t sino-t-avisos" data-n="1"' in _sino(html)
+    assert "'Accept': 'application/json'" in html and 'class="sino-lidas" data-n="1"' in _sino(html)
+    # o "garçom" (21/11/2026): o clique no aviso que se marca já o manda como lido, pelo mesmo formulário
+    assert "li[data-nt-lida]" in html and "data-nt-lida" in _sino(html)
     aid = re.search(r'name="aviso" value="([^"]+)"', _sino(html)).group(1)
     r = c.post(LIDA, data={"aviso": aid, "voltar": "/"}, headers={"Accept": "application/json"})
     assert r.status_code == 200 and r.get_json() == {"ok": True, "lidos": 1}
@@ -130,7 +138,7 @@ def test_o_sino_marca_como_lida_sem_recarregar_a_tela(app, banco, limpo, lista, 
 def test_marcar_todas_como_lidas_e_o_id_que_nao_e_de_aviso(app, banco, limpo, lista, avisos_limpos):
     lista.linhas.append(Reg(106, "18379", "Limpeza", "Técnico Exemplo", 3, _fim(2)))
     c = _cliente_de(app, PESSOA)
-    assert "2 avisos das suas OS" in _sino(c.get("/").get_data(as_text=True))
+    assert 'aria-label="Avisos das OS: 2"' in _sino(c.get("/").get_data(as_text=True))
     c.post(LIDA, data={"todos": "1", "voltar": "/"})
     assert sorted(l["aviso_id"].split(":")[1] for l in banco.linhas(AV.LIVRO, AV.ABA)) == ["101", "106"]
     c.post(LIDA, data={"aviso": "<script>", "voltar": "https://outro.exemplo"})

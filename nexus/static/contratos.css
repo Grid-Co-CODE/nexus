@@ -101,6 +101,9 @@
 .ctr-tab tr.rg-det td{background:var(--barra);padding-top:4px}
 .ctr .nome{font-weight:600}
 .ctr .sub{display:block;color:var(--mudo);font-size:11.5px;margin-top:2px}
+/* a célula com o texto miúdo (os contratos da regra, o que o contrato diz): o .sub é display:block e, numa <td>, tirava
+   a célula da linha da tabela e a jogava para baixo (Levi, 19/11/2026: a coluna Contratos "quebrando a linha") */
+.ctr-tab td.ctr-quais{color:var(--mudo);font-size:11.5px}
 .ctr .antes{display:block;color:var(--mudo);font-size:12px;margin-top:3px}
 .ctr .antes s{color:var(--fraco);text-decoration-color:var(--linha-forte)}
 .ctr .vazio-c{color:var(--fraco)}
@@ -193,9 +196,23 @@
 .ctr-dlg-botoes .ctr-retirar{margin-left:auto}
 .ctr-toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:var(--superficie-3);border:1px solid var(--linha-forte);padding:10px 16px;border-radius:8px;font-size:12.5px;z-index:60;box-shadow:0 10px 30px var(--sombra)}
 
-/* o retorno da Ana Barros (18/11/2026): a etiqueta do código, a estrela da prioritária, o subgrupo por tema, os
+/* o retorno da gestora que pediu a visão do contrato (18/11/2026): a etiqueta do código, a estrela da prioritária, o subgrupo por tema, os
    comentários, o mês do calendário e o check de entregue */
 .ctr-tag{display:inline-block;margin-left:5px;padding:0 6px;border-radius:5px;background:var(--superficie-3);color:var(--tinta-2);font:600 10.5px/17px var(--font-mono);vertical-align:1px}
+/* a etiqueta curta da cláusula (Levi, 19/11/2026: "uma tagzinha [...] da cláusula do contrato"); a inteira fica na dica */
+.ctr-cl{display:inline-block;padding:0 6px;border-radius:5px;background:var(--superficie-3);color:var(--tinta-2);font:600 11px/18px var(--font-mono);white-space:nowrap;cursor:help}
+/* o setor numa tabela de regras (Atendimento, Entregáveis, Metas): a linha grossa e neutra abre o setor; cor só para estado
+   (Levi, 19/11/2026: "botar uma linha grossa, branca ou alguma cor diferente, para poder separar os setores") */
+.ctr-tab tr.ctr-setor td{padding:14px 12px 6px;border-top:2px solid var(--tinta-2);border-bottom:1px solid var(--linha);font:600 12.5px/1.2 var(--font-sans);color:var(--tinta)}
+.ctr-tab tr.ctr-setor:first-child td{padding-top:9px;border-top:0}
+.ctr-tab tr.ctr-setor .mudo{font-weight:400;margin-left:4px}
+/* o título que abre e fecha o bloco (Entregáveis: o pedido da área de Contratos, 19/11/2026) */
+.ctr-dobra{display:inline-flex;align-items:baseline;gap:8px;border:0;background:transparent;padding:0;cursor:pointer;font:inherit;color:inherit;text-align:left}
+.ctr-dobra .ph{font-size:13px;color:var(--mudo);align-self:center}
+.ctr-dobra:hover .ph{color:var(--tinta)}
+/* os pontos: o número da aba é vermelho quando há atenção, amarelo quando só divergência; em Todos, as duas contagens */
+.ctr-abas a b.b-alerta{color:var(--alerta)}
+.ctr-pts{text-decoration:none}
 .ctr-estrela{border:0;background:transparent;color:var(--mudo);cursor:pointer;padding:0 6px 0 0;font-size:15px;vertical-align:-2px}
 .ctr-estrela:hover,.ctr-estrela[aria-pressed="true"],.ctr-estrela-fixa{color:var(--alerta)}
 .ctr-estrela-fixa{margin-right:6px;font-size:14px}
@@ -219,5 +236,13 @@
 .ctr-ev .ph{font-size:11px}
 
 @media (max-width:1100px){.ctr-grade{grid-template-columns:minmax(0,1fr)}}
+/* os pontos no celular: o tipo e o Resolver na 1ª linha, o ponto e a origem embaixo, sem a tabela espremida */
+@media (max-width:640px){.ctr-tab-pontos thead{display:none}
+  .ctr-tab-pontos tr.ctr-ponto-l{display:grid;grid-template-columns:1fr auto;border-bottom:1px solid var(--linha)}
+  .ctr-tab-pontos tr.ctr-ponto-l td{border-bottom:0;padding:5px 12px}
+  .ctr-tab-pontos tr.ctr-ponto-l td:nth-child(1){grid-column:1;grid-row:1;padding-top:10px}
+  .ctr-tab-pontos tr.ctr-ponto-l td:nth-child(4){grid-column:2;grid-row:1;padding-top:8px}
+  .ctr-tab-pontos tr.ctr-ponto-l td:nth-child(2),.ctr-tab-pontos tr.ctr-ponto-l td:nth-child(3){grid-column:1 / -1}
+  .ctr-tab-pontos tr.ctr-ponto-l td:nth-child(3){padding-bottom:10px}}
 @media (max-width:640px){.ctr-campos{grid-template-columns:1fr}.ctr-hist > li{grid-template-columns:1fr}.ctr-resumo-dl{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media (prefers-reduced-motion:reduce){.ctr *{transition:none!important}}
