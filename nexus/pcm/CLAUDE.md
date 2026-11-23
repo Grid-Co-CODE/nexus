@@ -754,7 +754,14 @@ Fracttal aceita de verdade: `...-passo0.md`. Cada parte tem a seção dela abaix
 2. **Inventário** (`/t/pcm/pecas/inventario`): a lista das contagens, com o estado de cada uma pelos eventos do livro. Abrir uma
    é a contagem nas quatro etapas (Contagem, Aprovação, Gravação, Auditoria; a seção da aba Inventário, "O visual"); o Sistema
    (lido NA HORA no Fracttal), o Δ, a situação e os seis grupos chegam pela ponte (`GET /os/_nexus/inventario/<id>/lote`), com o
-   botão "Gravar N alterações".
+   botão "Gravar N alterações". **Sem nada que mexa no estoque, "Concluir sem alteração"** (23/11/2026; o PCM: "quando a usina
+   não tem [...] ele não me deixa salvar, gravar zero alterações"; o "Gravar 0 alterações" vinha desligado e a contagem ficava
+   para sempre a revisar): `POST /os/_nexus/inventario/<id>/concluir` (`gravacao.concluir`) confere o lote de agora como o
+   Gravar (o saldo lido na hora no login de quem conclui, o N e a assinatura que a tela mostrou) e grava UM `contagem_concluida`
+   no livro do inventário; nada vai ao Fracttal. Recusa a contagem com peça que mexe, com curadoria por decidir (o botão vem
+   desligado: concluída, a curadoria sumiria sem ninguém decidir) e a que já foi para a gravação. A contagem fica `concluida`
+   ("Concluída sem alteração"), conta como a gravada (`DA_GRAVACAO`: não se revisa, não é substituída e vale como a última
+   contagem do almoxarifado). Prova: `tests/test_pcm_inventario_concluir_23_11.py`.
 3. **Revisão:** tirar uma peça do lote, corrigir o número, pedir a recontagem só das peças marcadas (desde 30/10/2026: elas
    saem deste lote e o resto da contagem segue), a da contagem inteira ou, desde 16/11/2026, **cancelar a contagem** (o PCM:
    "colocar um botão no inventário de cancelar auditoria"; caso real: o mesmo técnico contou de novo, no mesmo mês, o
@@ -1020,7 +1027,8 @@ o que não tem contagem na lista: o cartão das recontagens o usa) e o que o App
 - **Os estados** (`ESTADOS`): `nova` (nenhum evento que mude o estado), `revisada` (`peca_tirada`, `numero_corrigido` ou
   `recontagem_item_pedida`: a recontagem só de algumas peças não mata a contagem), `recontagem_pedida` (a da contagem inteira),
   `substituida`, `gravando`, `gravada`, `gravada_com_conflitos` e, desde 16/11/2026, `cancelada` (`contagem_cancelada`, o
-  Cancelar do PCM; morta como a recusada, em `MORTAS`). **O lote é o conjunto de `id_item` dos
+  Cancelar do PCM; morta como a recusada, em `MORTAS`) e, desde 23/11/2026, `concluida` (`contagem_concluida`, o Concluir sem
+  alteração; conta como a gravada, em `DA_GRAVACAO`). **O lote é o conjunto de `id_item` dos
   eventos `aprovada`: a gravação (`gravacao.py`) grava UM `aprovada` por peça do lote.** Sem as peças a leitura não sabe o que falta e
   fica em `gravando`; só vira `gravada` quando toda peça do lote tem `peca_gravada`, e `gravada_com_conflitos` quando alguma tem
   `conflito` no lugar. O `erro` não encerra a peça. O `gravando` daqui é "aprovada e sem o fim nos eventos"; a gravação refina

@@ -39,11 +39,12 @@ from .gravacao import TAMANHO_LOTE
 
 ROTULO_ESTADO = {"nova": "Nova", "revisada": "Revisada", "recontagem_pedida": "Recontagem pedida", "substituida": "Substituída",
                  "gravando": "Gravando", "gravada": "Gravada", "gravada_com_conflitos": "Gravada com conflitos",
-                 "cancelada": "Cancelada"}
+                 "cancelada": "Cancelada", "concluida": "Concluída sem alteração"}
 # o selo do estado da contagem (a lista e a contagem aberta): espera o PCM em azul, gravando em âmbar, gravada em verde, com
 # conflito em vermelho; a recusada, a substituída e a cancelada, neutras (não há o que fazer nelas)
 TOM_ESTADO = {"nova": "info", "revisada": "info", "recontagem_pedida": "neutro", "substituida": "neutro", "gravando": "alerta",
-              "gravada": "ok", "gravada_com_conflitos": "critico", "cancelada": "neutro"}
+              "gravada": "ok", "gravada_com_conflitos": "critico", "cancelada": "neutro",
+              "concluida": "ok"}
 ROTULO_SITUACAO = {"para_cima": "Para cima", "para_baixo": "Para baixo", "zerar": "Zerar", "sem_alteracao": "Sem alteração",
                    "nao_tocada": "Não será tocada", "curadoria": "Curadoria"}
 # os seis grupos da confirmação, na ordem das `contas.SITUACOES`: (título, o que acontece com a peça nele)
@@ -247,7 +248,7 @@ def resumo(cfg) -> dict | None:
         ultimas: dict[str, tuple] = {}
         for c in cs:
             # a recontagem gravada também conta (é uma contagem real daquelas peças); a que ainda está gravando, não
-            if c["estado"] not in ("gravada", "gravada_com_conflitos") or not c["id_almox"]:
+            if c["estado"] not in ("gravada", "gravada_com_conflitos", "concluida") or not c["id_almox"]:
                 continue
             try:
                 quando = instante(c["contada_em"])
@@ -295,7 +296,7 @@ ROTULO_EVENTO = {"contagem_recebida": "Contagem recebida", "aprovada": "Aprovada
                  "transferencia_vinculo": "Peça vinculada para a transferência", "transferencia_saida": "Transferência: saída",
                  "transferencia_entrada": "Transferência: entrada", "transferencia_falha": "Transferência não feita",
                  "transferencia_travada": "Transferência sem resposta (confira no Fracttal)",
-                 "contagem_cancelada": "Contagem cancelada"}
+                 "contagem_cancelada": "Contagem cancelada", "contagem_concluida": "Contagem concluída sem alteração"}
 # o selo de cada evento, pelas quatro famílias do mockup do Spare Parts (Levi, 27/10/2026): a gravação no Fracttal em verde, a
 # curadoria em âmbar, a aprovação e a revisão em azul, o conflito e o erro em vermelho. A cor só reforça a palavra (o rótulo)
 SELO_EVENTO = {"peca_gravada": "ok", "regua_gravada": "ok", "curadoria": "alerta", "conflito": "critico", "erro": "critico",

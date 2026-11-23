@@ -643,16 +643,19 @@
     // o botão de gravar chega DENTRO do pedaço da ponte (o N e a assinatura são do lote que ele mostra): o clique é ouvido no
     // documento. Confirma, manda o N e a assinatura (se o lote mudou desde então, o servidor recusa) à ponte /os/_nexus (o
     // cookie do Fracttal só vai para /os) e recarrega: a página passa a mostrar o andamento
+    // o Concluir sem alteração (23/11/2026) vai pelo mesmo caminho: o lote sem peça que mexe é dado por feito, sem ir ao
+    // Fracttal, e a página recarrega mostrando a contagem concluída
     document.addEventListener('click', function (ev) {
-      var b = ev.target.closest('[data-gravar]');
+      var b = ev.target.closest('[data-gravar], [data-concluir]');
       if (!b || b.disabled) return;
+      var concluir = !b.dataset.gravar;
       var erro = cx.querySelector('[data-gravar-erro]');
       function mostrar(m) { if (erro) { erro.textContent = m || ''; erro.hidden = !m; } }
       // a pergunta vem com o botão (o N é o do lote que ele mostra)
       if (!window.confirm(b.dataset.confirmar)) return;
       b.disabled = true;
       mostrar('');
-      fetch((window.nexusRota || String)(b.dataset.gravar), {method: 'POST', credentials: 'same-origin',
+      fetch((window.nexusRota || String)(b.dataset.gravar || b.dataset.concluir), {method: 'POST', credentials: 'same-origin',
              headers: {'Content-Type': 'application/json'}, body: JSON.stringify({n: Number(b.dataset.n), assinatura: b.dataset.assinatura})})
         .then(function (r) {
           return r.json().catch(function () { return {}; }).then(function (j) { return {ok: r.ok && j.ok, j: j}; });
@@ -661,12 +664,12 @@
           if (r.ok) {
             // a página volta na etapa Gravação (o endereço podia estar em #aprovacao, que venceria o estado da contagem)
             try { sessionStorage.removeItem(guardado); } catch (e) {}
-            history.replaceState(history.state, '', location.pathname + location.search + '#gravacao');
+            history.replaceState(history.state, '', location.pathname + location.search + (concluir ? '' : '#gravacao'));
             location.reload();
             return;
           }
           b.disabled = false;
-          mostrar(r.j.erro || 'Não consegui começar a gravação agora: tente de novo.');
+          mostrar(r.j.erro || (concluir ? 'Não consegui concluir agora: tente de novo.' : 'Não consegui começar a gravação agora: tente de novo.'));
           entrarDeNovo(r.j);
         })
         .catch(function () { b.disabled = false; mostrar('Não consegui falar com o servidor: tente de novo.'); });

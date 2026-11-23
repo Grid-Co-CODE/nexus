@@ -93,7 +93,11 @@ TIPOS_EVENTO = ("contagem_recebida", "aprovada", "peca_gravada", "conflito", "er
                 # a contagem cancelada pelo PCM (16/11/2026, o PCM: "colocar um botão no inventário de cancelar auditoria"): a
                 # repetida que o técnico mandou de novo no mês. Morta como a recusada, mas sem pedido ao técnico: o App não a
                 # lê como pedido, só deixa de contá-la como a que atende uma recontagem
-                "contagem_cancelada")
+                "contagem_cancelada",
+                # a contagem concluída sem alteração (23/11/2026, o PCM: "salvar mesmo com a usina zerada"): nenhuma peça do
+                # lote mexe no estoque, e o PCM a dá por feita. Nada vai ao Fracttal; conta como a última contagem do
+                # almoxarifado, como a gravada
+                "contagem_concluida")
 # os eventos que levam o motivo ao técnico: o App mostra o pedido de recontagem (a da peça e a da contagem inteira); a peça
 # tirada e o número corrigido não voltam ao técnico
 TIPOS_MOTIVO_TECNICO = ("recontagem_pedida", "recontagem_item_pedida")

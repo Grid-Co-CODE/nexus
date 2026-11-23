@@ -19,6 +19,7 @@ O que a leitura pede dos eventos que a gravação (Task 7) escreve, e o que ela 
 | `peca_tirada`, `numero_corrigido` ou `recontagem_item_pedida` (a recontagem só de algumas peças) | `revisada` |
 | `recontagem_pedida` | `recontagem_pedida` (nunca se aprova) |
 | `contagem_cancelada` (16/11/2026: a repetida, cancelada pelo PCM; o técnico não recebe pedido) | `cancelada` (nunca se aprova) |
+| `contagem_concluida` (23/11/2026: nenhuma peça do lote mexe no estoque, e o PCM a deu por feita; nada foi ao Fracttal) | `concluida` (conta como a gravada) |
 | `substituida` (ou a conta das `contas.substituidas`) | `substituida` |
 | `aprovada`, e o lote ainda sem o fim | `gravando` |
 | `aprovada` e `peca_gravada` de todas as peças do lote | `gravada` |
@@ -47,10 +48,10 @@ from . import avariados, contas
 from .estoque import instante
 
 ESTADOS = ("nova", "revisada", "recontagem_pedida", "substituida", "gravando", "gravada", "gravada_com_conflitos",
-           "cancelada")
-# os estados de quem já foi aprovado: a gravação começou (ou acabou). Contam como "gravada" para a substituição, que não
-# desfaz o que já está no Fracttal
-DA_GRAVACAO = ("gravando", "gravada", "gravada_com_conflitos")
+           "cancelada", "concluida")
+# os estados de quem já foi aprovado: a gravação começou (ou acabou), ou a contagem foi concluída sem alteração (23/11/2026:
+# nada a gravar, e o PCM a deu por feita). Contam como "gravada" para a substituição, que não desfaz o que já está no Fracttal
+DA_GRAVACAO = ("gravando", "gravada", "gravada_com_conflitos", "concluida")
 # a contagem que já não está viva: não substitui ninguém e ninguém a substitui
 MORTAS = ("recontagem_pedida", "substituida", "cancelada")
 # a contagem que o PCM ainda revisa (e aprova): as outras não têm o que revisar
@@ -196,6 +197,8 @@ def estado_dos_eventos(eventos: list[dict]) -> str:
     tipos = {e.get("tipo") for e in eventos}
     if tipos & {"aprovada", "peca_gravada", "conflito"}:
         return _estado_da_gravacao(eventos)
+    if "contagem_concluida" in tipos:
+        return "concluida"
     if "contagem_cancelada" in tipos:
         return "cancelada"
     if "recontagem_pedida" in tipos:
@@ -276,6 +279,8 @@ def _conta_as_linhas(linhas: list[dict], curadoria: dict) -> tuple[int, int, int
 def _motivo_nao_aprovavel(c: dict, agora: datetime) -> str:
     """Por que a contagem não se aprova (vazio se se aprova). A ordem: o que já aconteceu com ela, o que o App mandou de
     errado, e por fim a janela do "Contada em"."""
+    if c["estado"] == "concluida":
+        return "concluída sem alteração"
     if c["estado"] in DA_GRAVACAO:
         return "já gravada"
     if c["estado"] == "substituida":

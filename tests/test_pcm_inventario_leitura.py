@@ -70,7 +70,8 @@ def inv(app, banco, tmp_path, monkeypatch):  # noqa: F811
 # ── o estado de cada contagem, pelos eventos ─────────────────────────────────────────────────────────────────────────────
 def test_o_contrato_dos_estados():
     assert L.ESTADOS == ("nova", "revisada", "recontagem_pedida", "substituida", "gravando", "gravada",
-                         "gravada_com_conflitos", "cancelada")         # a cancelada pelo PCM, 16/11/2026
+                         "gravada_com_conflitos", "cancelada",          # a cancelada pelo PCM, 16/11/2026
+                         "concluida")                                      # a concluída sem alteração, 23/11/2026
 
 
 def test_estados_pelos_eventos(app, inv):
