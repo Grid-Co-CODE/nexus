@@ -1092,6 +1092,52 @@ def aprovar(cfg, contagem_id: str, estoque, aprovador: dict, n_visto=None, assin
 
 
 def _aprovar(cfg, contagem_id, estoque, aprovador, n_visto, assinatura_vista, leitura, **opcoes) -> dict:
+    c, itens, curadoria = _lote_de_agora(cfg, contagem_id, estoque, n_visto, assinatura_vista, leitura)
+    return iniciar(cfg, c, itens, estoque, aprovador, curadoria=curadoria, **opcoes)
+
+
+NADA_A_CONCLUIR = ("Esta contagem tem peças que mexem no estoque: grave as alterações (concluir sem gravar deixaria o "
+                   "Fracttal sem o que foi contado). Nada foi registrado.")
+CURADORIA_A_DECIDIR = ("Esta contagem tem peças na curadoria (o achado fora do catálogo, o genérico por identificar, a "
+                       "avariada sem cadastro): decida a curadoria antes de concluir. Nada foi registrado.")
+
+
+def concluir(cfg, contagem_id: str, estoque, aprovador: dict, n_visto=None, assinatura_vista=None) -> dict:
+    """O "Concluir sem alteração" (23/11/2026; o PCM: "quando a usina não tem [...] ele não me deixa salvar, gravar zero
+    alterações"): a contagem em que nenhuma peça mexe no estoque ficava para sempre "a revisar". Confere o lote de agora como o
+    Gravar (o saldo lido na hora, com o login de quem conclui; o N e a assinatura que a tela mostrou) e grava UM evento
+    `contagem_concluida` no livro do inventário. Nada vai ao Fracttal. Recusa (nada registrado): o lote com peça que mexe
+    (`NADA_A_CONCLUIR`), a curadoria por decidir (ela sumiria sem ninguém decidir), o lote que mudou, a contagem que já não se
+    aprova (a concluída inclusive) e a que já foi para a gravação."""
+    from . import leitura
+    if not aprovador or not aprovador.get("pessoa_hmac"):
+        raise Recusada(SEM_PESSOA)
+    if n_visto is None or not isinstance(assinatura_vista, str) or not assinatura_vista.strip():
+        raise Recusada("A tela não mandou o lote que mostrou: recarregue a página. Nada foi registrado.", 400)
+    with travas.CONTAGEM.de(A._txt(contagem_id)):
+        c, itens, _ = _lote_de_agora(cfg, contagem_id, estoque, n_visto, assinatura_vista, leitura)
+        if any(i["id_item"] and not i["tirada"] and i["situacao"] in contas.MEXEM for i in itens):
+            raise Recusada(NADA_A_CONCLUIR, 409)
+        if any(i["situacao"] == "curadoria" for i in itens):
+            raise Recusada(CURADORIA_A_DECIDIR, 409)
+        if existe(cfg, contagem_id):
+            raise Recusada("Esta contagem já foi para a gravação: nada foi registrado.", 409)
+        e = {"tipo": "contagem_concluida", "contagem_id": c["contagem_id"], "id_almoxarifado": c["id_almox"],
+             "pessoa_hmac": aprovador["pessoa_hmac"]}
+        if aprovador.get("pessoa_id") is not None:
+            e["pessoa_id"] = aprovador["pessoa_id"]
+        if c.get("usina_id"):                   # a usina vai com a linhagem (de-para do Fracttal), ou nenhuma das duas
+            e["usina_id"], e["usina_ligada_por"] = c["usina_id"], c["usina_ligada_por"]
+        try:
+            F.acrescentar(cfg, F.ABA_EVENTO, [e])
+        except ValueError as ex:      # o livro não aceita a linha: nada foi registrado
+            raise Recusada(f"O livro do inventário não aceitou: {ex}", 400) from None
+    return {"estado": "concluida"}
+
+
+def _lote_de_agora(cfg, contagem_id, estoque, n_visto, assinatura_vista, leitura) -> tuple:
+    """(a contagem, os itens do lote com o saldo lido agora, a curadoria) conferidos contra o que a tela mostrou: o Gravar e o
+    Concluir sem alteração partem do mesmo lote. `Recusada` se a contagem não se aprova ou se o lote mudou."""
     try:
         F.ler(cfg, forcar=True)
         # o livro do App também relido agora, sem a cópia de 5 min: a contagem mais nova que acabou de chegar substitui esta
@@ -1121,7 +1167,7 @@ def _aprovar(cfg, contagem_id, estoque, aprovador, n_visto, assinatura_vista, le
         visto = -1
     if visto != n or assinatura_vista.strip() != assinatura(itens):
         raise Recusada(MUDOU)
-    return iniciar(cfg, c, itens, estoque, aprovador, curadoria=curadoria, **opcoes)
+    return c, itens, curadoria
 
 
 # ── encerrar ─────────────────────────────────────────────────────────────────────────────────────────────────────────────

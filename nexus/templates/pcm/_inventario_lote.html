@@ -128,16 +128,27 @@
   <div class="inv-confirma-pe">
     <p class="inv-confirma-resumo">{% if n_gravar %}<b>{{ n_gravar }} {{ 'alteração' if n_gravar == 1 else 'alterações' }}</b> em {{ n_lotes }} {{ 'lote' if n_lotes == 1 else 'lotes' }} de até 50{% else %}<b>Nenhuma alteração</b> a gravar{% endif %}.
       {% for g in grupos if g.id == 'nao_tocada' %}{{ g.n }} {{ 'peça não será tocada' if g.n == 1 else 'peças não serão tocadas' }}{% endfor %}{% for g in grupos if g.id == 'curadoria' %} e {{ g.n }} {{ 'fica' if g.n == 1 else 'ficam' }} na curadoria{% endfor %}.
-      A gravação vai no seu login do Fracttal e, enquanto cada lote grava (cerca de 1 minuto), o almoxarifado fica travado para
-      entradas, saídas e pedidos de compra.</p>
+      {% if n_gravar %}A gravação vai no seu login do Fracttal e, enquanto cada lote grava (cerca de 1 minuto), o almoxarifado fica travado para
+      entradas, saídas e pedidos de compra.{% else %}Concluir dá a contagem por feita sem ir ao Fracttal: ela sai da lista a revisar e
+      conta como a última contagem deste almoxarifado.{% endif %}</p>
     <div class="inv-rodape">
       {% if pode and c.aprovavel %}<button type="button" class="gc-btn gc-btn--ui gc-btn--contorno" data-voltar-tabela>Voltar à tabela</button>{% endif %}
       {# o N e a assinatura são do lote que ESTE pedaço mostra (o Sistema lido agora): o gravar os confere contra o saldo lido de
          novo, e recusa se o lote mudou. O clique é ouvido pela página (o script dela), porque este HTML chega por fetch #}
       {% if pode and c.aprovavel and n_gravar %}
       <button type="button" class="gc-btn gc-btn--ui gc-btn--primario" data-gravar="{{ raiz }}/os/_nexus/inventario/{{ c.contagem_id|urlencode }}/gravar" data-n="{{ n_gravar }}" data-assinatura="{{ assinatura }}" data-confirmar="Gravar {{ n_gravar }} {{ 'alteração' if n_gravar == 1 else 'alterações' }} no Fracttal, no seu login? Enquanto cada lote de 50 grava, o almoxarifado fica travado para entradas e saídas.">Gravar {{ n_gravar }} {{ 'alteração' if n_gravar == 1 else 'alterações' }}</button>
+      {% elif pode and c.aprovavel %}
+      {# nenhuma peça mexe no estoque (23/11/2026, o PCM: "salvar mesmo com a usina zerada"): o Concluir sem alteração dá a
+         contagem por feita sem ir ao Fracttal (`gravacao.concluir`), com o mesmo N e a mesma assinatura do lote que este pedaço
+         mostra. A curadoria por decidir segura: concluída, ela sumiria sem ninguém decidir #}
+      {% set n_cur = (grupos|selectattr('id', 'equalto', 'curadoria')|map(attribute='n')|first) or 0 %}
+      {% if n_cur %}
+      <button type="button" class="gc-btn gc-btn--ui gc-btn--primario" disabled title="decida a curadoria antes de concluir">Concluir sem alteração</button>
       {% else %}
-      <button type="button" class="gc-btn gc-btn--ui gc-btn--primario" disabled title="{% if not n_gravar %}nada a gravar: nenhuma peça mexe no estoque{% else %}só o setor PCM grava{% endif %}">Gravar {{ n_gravar }} {{ 'alteração' if n_gravar == 1 else 'alterações' }}</button>
+      <button type="button" class="gc-btn gc-btn--ui gc-btn--primario" data-concluir="{{ raiz }}/os/_nexus/inventario/{{ c.contagem_id|urlencode }}/concluir" data-n="0" data-assinatura="{{ assinatura }}" data-confirmar="Concluir esta contagem sem alteração? Nada vai ao Fracttal, e ela sai da lista a revisar.">Concluir sem alteração</button>
+      {% endif %}
+      {% else %}
+      <button type="button" class="gc-btn gc-btn--ui gc-btn--primario" disabled title="só o setor PCM grava">Gravar {{ n_gravar }} {{ 'alteração' if n_gravar == 1 else 'alterações' }}</button>
       {% endif %}
     </div>
   </div>

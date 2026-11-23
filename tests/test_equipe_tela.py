@@ -53,13 +53,22 @@ PONTO = {NA_USINA: ((-16.605173, -49.187654), 3, False),           # 0,8 km da A
 NOME = {NA_USINA: "Naira Teste", ANDANDO: "Andre Teste", FORA: "Fabio Teste", SEM_SINAL: "Sinara Teste",
         SEM_PERMISSAO: "Pietra Teste", SEM_POSICAO: "Paulo Teste", FORA_DO_PILOTO: "Otavio Teste"}
 PILOTO = (NA_USINA, ANDANDO, FORA, SEM_SINAL, SEM_PERMISSAO, SEM_POSICAO)
-# a estrutura de O&M de 10/2026, como o cadastro a modela (`visao._Base`): a equipe é de uma região de campo, e o
-# supervisor do técnico é o Supervisor de Campo da região da equipe dele. A Oeste só tem o técnico fora do piloto
+# a equipe é de uma região de campo, mas as regiões não têm supervisor (como no cadastro desde que saíram da Base, em
+# 13/11/2026): o supervisor do técnico é o Responsável O&M das usinas da equipe dele (23/11/2026). A Oeste só tem o
+# técnico fora do piloto
 CENTRO, LESTE, OESTE = 10, 11, 12
 EQUIPE = {CENTRO: "Equipe Centro Teste", LESTE: "Equipe Leste Teste", OESTE: "Equipe Oeste Teste"}
 SUP_CENTRO, SUP_LESTE, SUP_OESTE = 30, 31, 32
 NOME_SUP = {SUP_CENTRO: "Sergio Teste", SUP_LESTE: "Silvia Teste", SUP_OESTE: "Sandro Teste"}
 REGIAO = {CENTRO: (1, SUP_CENTRO), LESTE: (2, SUP_LESTE), OESTE: (3, SUP_OESTE)}       # equipe: (região, supervisor)
+# as usinas do cadastro: a Alfa e a Bravo (com coordenada) são da Centro; a Charlie e a Delta, sem coordenada, só ligam a
+# Leste e a Oeste aos Responsáveis O&M delas
+USINA_C, USINA_D = 17, 18
+USINAS_CADASTRO = [{"usina_id": u, "nome": n, "status": "OPERAÇÃO", "equipe_id": e, "responsavel_om_id": r}
+                   for u, n, e, r in ((USINA_A, "Usina Alfa Teste", CENTRO, SUP_CENTRO),
+                                      (USINA_B, "Usina Bravo Teste", CENTRO, SUP_CENTRO),
+                                      (USINA_C, "Usina Charlie Teste", LESTE, SUP_LESTE),
+                                      (USINA_D, "Usina Delta Teste", OESTE, SUP_OESTE))]
 EQUIPE_DE = {NA_USINA: CENTRO, ANDANDO: CENTRO, FORA: CENTRO, SEM_SINAL: CENTRO, SEM_PERMISSAO: LESTE,
              SEM_POSICAO: LESTE, FORA_DO_PILOTO: OESTE}
 # quem olha o mapa
@@ -105,9 +114,8 @@ def banco(app, tmp_path, monkeypatch, relogio):
     _aba(api, "cadastro_nexus", "equipes", [{"equipe_id": e, "nome": n, "regiao_campo_id": REGIAO[e][0]}
                                             for e, n in EQUIPE.items()])
     _aba(api, "cadastro_nexus", "regioes_campo", [{"regiao_campo_id": r, "nome": f"Região {r} Teste",
-                                                   "supervisor_campo_id": s, "ordem": r} for r, s in REGIAO.values()])
-    _aba(api, "cadastro_nexus", "usinas", [{"usina_id": u, "nome": n, "status": "OPERAÇÃO", "equipe_id": 10}
-                                           for u, n in NOME_USINA.items()])
+                                                   "supervisor_campo_id": None, "ordem": r} for r, _s in REGIAO.values()])
+    _aba(api, "cadastro_nexus", "usinas", USINAS_CADASTRO)
     _aba(api, LIVRO_PILOTO, ABA_PILOTO, [_decisao(p) for p in PILOTO])
     app.config.update(GRIDCO_DB_API="http://pg.falso", NEXUS_CHAVE_CADASTRO=CHAVE_CADASTRO,
                       NEXUS_DADOS=str(tmp_path / "dados"), NEXUS_PESSOA_HMAC=CHAVE_HMAC, GRIDCO_SQL_TOKEN="token-teste",
@@ -414,16 +422,19 @@ def _no_painel(html):
     return {pid for pid, nome in NOME.items() if nome in lado}
 
 
-def test_os_filtros_listam_so_o_supervisor_e_a_equipe_de_quem_esta_no_piloto(cliente, pontos, setor):
-    """Levi, 08/11/2026: "Opção de filtrar por supervisor ou equipe". As opções são as de quem o mapa mostra (técnico de
-    campo ativo E no piloto), com o nome do cadastro: o supervisor (o Supervisor de Campo da região da equipe) e a equipe
-    que só têm o técnico de fora do piloto não entram."""
+def test_o_filtro_lista_todos_os_supervisores_e_as_equipes_de_quem_esta_no_piloto(cliente, pontos, setor):
+    """Levi, 08/11/2026: "Opção de filtrar por supervisor ou equipe". O supervisor: TODOS os Responsáveis O&M das usinas
+    do cadastro (23/11/2026, Levi: "lista todos os supervisores no filtro", para o supervisor cujo time ainda não
+    instalou o Nexus Field ver os 0% dele na barra; e "Responsável O&M da usina", porque as regiões não têm supervisor);
+    o da Oeste só tem o técnico de fora do piloto e entra. A equipe segue sendo só a de quem o mapa mostra (técnico de
+    campo ativo E no piloto)."""
     _, html = _html(_entrar(cliente, EMAIL[PCM]))
-    assert _opcoes(html, "supervisor") == [("", "Todos os supervisores"), (str(SUP_CENTRO), NOME_SUP[SUP_CENTRO]),
+    assert _opcoes(html, "supervisor") == [("", "Todos os supervisores"), (str(SUP_OESTE), NOME_SUP[SUP_OESTE]),
+                                           (str(SUP_CENTRO), NOME_SUP[SUP_CENTRO]),
                                            (str(SUP_LESTE), NOME_SUP[SUP_LESTE])]
     assert _opcoes(html, "equipe") == [("", "Todas as equipes"), (str(CENTRO), EQUIPE[CENTRO]),
                                        (str(LESTE), EQUIPE[LESTE])]
-    assert NOME_SUP[SUP_OESTE] not in html and EQUIPE[OESTE] not in html
+    assert EQUIPE[OESTE] not in html
     # sem JavaScript, o botão Filtrar; com ele, a troca do select já envia (o mesmo da Visão do cliente)
     form = re.search(r'<form class="cn-filtros eq-filtros"[^>]*>(.*?)</form>', html, flags=re.S)
     assert 'method="get"' in form.group(0) and form.group(1).count('onchange="this.form.submit()"') == 2
@@ -458,10 +469,10 @@ def test_o_filtro_estreita_o_mapa_a_lista_e_o_resumo(cliente, pontos, setor):
     assert _no_painel(html) == set() and "Nenhum técnico com o Nexus Field neste filtro." in html
 
 
-@pytest.mark.parametrize("pedido", [{"supervisor": 999}, {"equipe": 999}, {"supervisor": SUP_OESTE}, {"equipe": OESTE},
+@pytest.mark.parametrize("pedido", [{"supervisor": 999}, {"equipe": 999}, {"equipe": OESTE},
                                     {"supervisor": "x"}, {"equipe": "²"}, {"supervisor": "1" * 5000},
                                     {"equipe": "", "supervisor": ""}],
-                         ids=["sup_999", "eq_999", "sup_fora_do_piloto", "eq_fora_do_piloto", "letra", "sobrescrito",
+                         ids=["sup_999", "eq_999", "eq_fora_do_piloto", "letra", "sobrescrito",
                               "5000_algarismos", "vazios"])
 def test_id_desconhecido_no_filtro_mostra_todos_sem_erro(cliente, pontos, setor, pedido):
     """O id que não está nas opções (não existe, é de quem está fora do piloto, ou vem torto) não filtra: a tela mostra
@@ -469,6 +480,14 @@ def test_id_desconhecido_no_filtro_mostra_todos_sem_erro(cliente, pontos, setor,
     st, html = _html(_entrar(cliente, EMAIL[PCM]), query_string={**pedido, **TECNICOS})
     assert st == 200 and _no_painel(html) == set(PILOTO)
     assert " selected>" not in html.split('class="cn-filtros eq-filtros"', 1)[1].split("</form>", 1)[0]
+
+
+def test_o_supervisor_sem_ninguem_no_mapa_filtra_e_a_tela_diz(cliente, pontos, setor):
+    """O supervisor da Oeste (só o técnico de fora do piloto) entra no filtro desde 23/11/2026: escolhido, ele vale, o
+    mapa fica sem ninguém e a tela diz."""
+    st, html = _html(_entrar(cliente, EMAIL[PCM]), query_string={"supervisor": SUP_OESTE, **TECNICOS})
+    assert st == 200 and _no_painel(html) == set() and "Nenhum técnico com o Nexus Field neste filtro." in html
+    assert f'<option value="{SUP_OESTE}" selected>' in html
 
 
 # ── o Abrir rota ─────────────────────────────────────────────────────────────────────────────────────────────────────

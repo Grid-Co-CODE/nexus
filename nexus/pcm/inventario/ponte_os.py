@@ -495,6 +495,35 @@ def gravar(contagem_id):
     return jsonify(ok=True, mensagem="Gravação começada: acompanhe o andamento nesta página.", estado=d)
 
 
+@bp.route("/<contagem_id>/concluir", methods=["POST"])
+def concluir(contagem_id):
+    """O "Concluir sem alteração" (23/11/2026): a contagem em que nenhuma peça mexe no estoque é dada por feita, sem ir ao
+    Fracttal (`gravacao.concluir`). Mora na ponte como o Gravar: confere o lote com o saldo lido agora, no login do Fracttal
+    de quem conclui (o cookie só chega em /os)."""
+    from ...dados import fato_inventario as F
+    from . import gravacao as G
+    from . import revisao as R
+    recusa = _barrar()
+    if recusa:
+        return recusa
+    cfg = current_app.config
+    pessoa = R.pessoa(cfg, _email())
+    if pessoa is None:
+        return jsonify(ok=False, erro=G.SEM_PESSOA), 409
+    est, recusa = _estoque_da_pessoa(_de_volta(contagem_id))
+    if recusa:
+        return recusa
+    corpo = request.get_json(silent=True)
+    corpo = corpo if isinstance(corpo, dict) else {}
+    try:
+        d = G.concluir(cfg, contagem_id, est, pessoa, n_visto=corpo.get("n"), assinatura_vista=corpo.get("assinatura"))
+    except E.SemLogin:
+        return _sem_login(contagem_id)
+    except F.Recusada as ex:
+        return _recusa(ex)
+    return jsonify(ok=True, mensagem="Contagem concluída sem alteração: nada foi ao Fracttal.", estado=d)
+
+
 def _da_contagem(contagem_id):
     """A gravação desta contagem existe e se lê? A resposta de recusa (404 sem gravação; 409 com o controle ilegível, e não
     "só quem aprovou", que ninguém sabe), ou None."""

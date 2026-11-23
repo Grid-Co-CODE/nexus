@@ -78,6 +78,7 @@ RESUMO = {
     "decisao_atribuicao_pcm": "Quem cobre cada usina: os técnicos que o PCM põe e tira",
     "decisao_admin_app": "Quem administra o App de Campo, escolhido no Nexus",
     "decisao_almox_usina": "Cada marcação do PCM sobre o almoxarifado de uma usina",
+    "declaracao_almox_usina_app": "O que o técnico disse no App sobre o almoxarifado da usina",
     "saldo_almox": "O saldo de cada peça em cada almoxarifado, a cada varredura diária",
     "ciclo_varredura": "Cada varredura do almoxarifado: se leu tudo e se valeu",
     "peca_lancada": "Cada peça que o técnico lançou (ou tentou lançar) pelo App numa OS",
@@ -314,6 +315,9 @@ PARA_QUE = {
                            "outra usina do mesmo cliente ou como tendo o próprio, ou tira a marcação. O App de Campo segue a "
                            "marcação de hoje: o técnico conta o almoxarifado da dona, a usina sem almoxarifado deixa de ser "
                            "cobrada no inventário.",
+    "declaracao_almox_usina_app": "Guarda cada vez que um técnico diz no App de Campo que a usina não tem almoxarifado ou "
+                                  "que usa o de outra usina do mesmo cliente. Não muda nada sozinha: aparece para o PCM "
+                                  "no Inventário, que confirma ou marca a usina como tendo o próprio.",
     "decisao_admin_app": "Guarda cada vez que um administrador do Nexus põe ou tira alguém dos administradores do App de "
                          "Campo, na aba de Base → Acessos: uma ficha do cadastro, uma pessoa de Pessoas e setores ou um "
                          "e-mail da Grid digitado (o avulso). O App lê esta lista de 5 em 5 minutos e reconhece a pessoa "

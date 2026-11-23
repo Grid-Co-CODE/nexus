@@ -92,6 +92,43 @@ def situacao(tem_chave: bool, registro: dict | None) -> dict:
     return {"pronto": True, "tom": "ok", "texto": "Celular pronto"}
 
 
+def adesao(tecnicos: dict, *, com_app: set, com_chave: set, fora: set, de, chave=None) -> dict:
+    """A barra do Nexus Field no Mapa de equipe (23/11/2026). O Levi: "vai pegar todos os técnicos, todo o time de campo
+    e vai estar contando quais deles já estão com o Nexus Field instalado e com todas as autorizações e quais não
+    estão". `tecnicos` = {pessoa_id: {"nome", "equipe"}} (os técnicos de campo ativos do filtro, sem a pessoa de
+    teste); `com_app` = quem o livro do App diz que instalou; `com_chave` = quem tem a chave do aparelho; `fora` = quem
+    o administrador tirou da coleta; `de` = o registro do celular (`Celulares.de`).
+
+    Cada técnico cai num grupo só: **pronto** (`situacao` diz "Celular pronto"), **falta** (instalou: a chave, o livro
+    ou os ajustes que o celular já mandou, mas falta liberar algo; o texto diz o quê) ou **sem_app** (nada disso).
+    Quem está só no livro do App não tem chave nem ajustes: o texto diz se a coleta está parada pelo administrador (a
+    chave só sai com a coleta ligada) ou se o celular ainda não se registrou. `pct` = pronto sobre o total, inteiro;
+    None sem técnico."""
+    chave = chave or (lambda s: str(s).casefold())
+    grupos = {"pronto": [], "falta": [], "sem_app": []}
+    for pid, t in tecnicos.items():
+        reg = de(pid)
+        item = {"pid": pid, "nome": t["nome"], "equipe": t.get("equipe") or ""}
+        if pid not in com_chave and reg is None:
+            if pid not in com_app:
+                grupos["sem_app"].append({**item, "texto": "Não instalou o Nexus Field"})
+                continue
+            texto = ("Instalou, mas a coleta está parada pelo administrador" if pid in fora
+                     else "Instalou, mas o celular ainda não se registrou no Nexus")
+            grupos["falta"].append({**item, "texto": texto})
+            continue
+        s = situacao(pid in com_chave, reg)
+        grupos["pronto" if s["pronto"] else "falta"].append({**item, "texto": s["texto"]})
+    for lista in grupos.values():
+        lista.sort(key=lambda i: chave(i["nome"]))
+    total = len(tecnicos)
+    n = {k: len(v) for k, v in grupos.items()}
+    return {**grupos, "total": total, "n_pronto": n["pronto"], "n_falta": n["falta"], "n_sem": n["sem_app"],
+            "n_instalou": n["pronto"] + n["falta"],
+            "pct": round(100 * n["pronto"] / total) if total else None,
+            "pct_instalou": round(100 * (n["pronto"] + n["falta"]) / total) if total else None}
+
+
 class Celulares:
     """{pessoa_id: {"ajustes": dict | None, "desde": instante UTC}} na memória e no disco (cifrado)."""
 

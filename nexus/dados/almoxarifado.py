@@ -78,6 +78,16 @@ COLUNAS_CONTAGENS = ("ID da contagem", "Enviada em", "Contada em", "ID do almoxa
 TIPOS_CONTAGEM = ("item", "identificar", "fora_do_catalogo", "avariado")
 # o que o técnico escreve quando a peça não tem o dado (fabricante, modelo ou número de série): não é vazio, é "não tem"
 NA = "n/a"
+
+# A declaração do técnico sobre o almoxarifado da usina (23/11/2026; o contrato fechado com o App de Campo no mesmo dia): o
+# técnico diz no App que a usina "não tem almoxarifado" ou "compartilha o da usina X", e o PCM confirma (ou marca Próprio)
+# no Nexus. A declaração não muda nada sozinha: não tira a cobrança do App nem dá pontos (Levi, 23/11/2026). 1 linha = 1
+# declaração, só acrescenta; "Usina" e "Usina dona" são o nome do local no Fracttal (o mesmo do nexus_almoxarifado_usinas);
+# o técnico só pelo HMAC. Lida por `nexus/pcm/almox_declaracoes.py`
+LIVRO_DECLARACOES, ABA_DECLARACOES = "almoxarifado_declaracoes_app_campo", "Declaracoes"
+COLUNAS_DECLARACOES = ("ID da declaração", "Declarada em", "Hora do celular", "Usina", "Situação", "Usina dona",
+                       "Técnico (HMAC)", "ID da contagem", "ID do almoxarifado", "Observação", "Versão do App")
+SITUACOES_DECLARADAS = ("sem_almoxarifado", "compartilha")
 # os rótulos da coluna "Fotos dos dados", na ordem em que a tela mostra
 ROTULOS_FOTOS_DOS_DADOS = ("fabricante", "modelo", "serie")
 

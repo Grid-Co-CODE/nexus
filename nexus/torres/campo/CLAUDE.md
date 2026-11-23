@@ -1908,6 +1908,36 @@ e não foram feitas.
   as cores do Agora (simuladas no navegador: a bancada não tem o Andamento), o satélite (Campinas no zoom 13) e o
   celular (375 px, sem rolagem de lado), e o tema claro.
 
+### A barra do Nexus Field (23/11/2026)
+
+**Para que serve.** Gestão de quem do time de campo já está com o Nexus Field pronto. O Levi: "eu queria que tivesse uma
+barra aqui embaixo já. Do mapa que vai estar contando o percentual de técnicos [...] quais deles já estão com o Nexus
+Field instalado e com todas as autorizações e quais não estão [...] uma visão que só os administradores veem.
+Administradores e supervisores responsáveis de usina."
+
+**Onde e o quê.** Logo abaixo do mapa, só no Técnicos (o Usinas e o vídeo wall não a têm), antes do bloco da Coleta do
+Nexus Field. Mostra o percentual com o celular pronto, "N de M técnicos de campo", quantos instalaram, a barra no semáforo
+(verde pronto, âmbar instalou e falta liberar, vermelho não instalou) e, fechado, "Ver quem é quem", com o que falta de
+cada um nas palavras do Piloto (`celulares.situacao`).
+
+**As regras (escolhas do Levi, 23/11/2026, por pergunta):**
+- **Quem conta:** todo técnico de campo ativo do cadastro (`pessoas_de_campo`, a mesma lista do mapa), coletado ou não; a
+  pessoa de teste fica fora.
+- **Quem vê** (`equipe_tela._ve_adesao`): o administrador e o supervisor, que no cadastro de hoje é o Responsável O&M de
+  uma usina (`usinas.responsavel_om_id`; as regiões, que tinham o Supervisor de Campo, estão sem supervisor desde
+  13/11/2026), achado pelo e-mail exato da ficha (`pessoa_do_email`). COS, PCM e Performance veem o mapa e não a barra;
+  o coordenador de campo não entrou.
+- **Segue o filtro** de supervisor e equipe do mapa ("neste filtro" no texto).
+- **Os três grupos** (`celulares.adesao`): **pronto** = "Celular pronto"; **instalou, falta liberar** = tem a chave do
+  aparelho, está no livro do App (`aparelhos_nexus_field_app_campo`) ou o celular já mandou os ajustes, e algo falta (o
+  "Falta:", a versão antiga, o termo não aceito; quem só está no livro do App aparece como "ainda não se registrou no
+  Nexus", ou "coleta parada pelo administrador" se ele a tirou); **não instalou** = nada disso.
+- O livro do App fora não derruba a barra: ela conta pelas chaves e pelos ajustes e diz que o livro não veio
+  (`Servico.com_app`).
+
+Prova: `tests/test_equipe_adesao_field_23_11.py`. Na bancada (`perc_bancada.py`, 10 técnicos falsos): 2 de 10 prontos
+(20%), 5 faltando, 3 sem o app.
+
 ### O vídeo wall (12/11/2026)
 
 Levi, com o mockup do COS ("COS · Ocorrências abertas · Usinas com problema agora"): "Prepare um modo vídeo wall que apareça
@@ -2059,14 +2089,18 @@ O Levi viu a tela na bancada: "Gostei bastante! ... inclua também essas melhori
 
 - **Filtro por supervisor e por equipe** ("Opção de filtrar por supervisor ou equipe"). Dois selects no alto
   (`?supervisor=<pessoa_id>&equipe=<equipe_id>`, só algarismos, até 12), que enviam na troca (sem JavaScript, o botão
-  Filtrar, como o cliente da Visão do cliente). **As opções são só de quem o mapa mostra** (técnico de campo ativo E no
-  piloto), com o nome do cadastro: a equipe de `cadastro_nexus · equipes`; o supervisor decifrado da ficha. **O supervisor
-  do técnico é o Supervisor de Campo da região da equipe dele** (`equipes.regiao_campo_id` → `regioes_campo.
-  supervisor_campo_id`, `_supervisor_da_equipe`): é como o cadastro modela desde a estrutura de O&M de 10/2026
-  (`visao._Base`); o `supervisor_id` da ficha saiu das telas (na prática era o Gestor de contrato). Equipe sem região ou com a
-  vaga aberta: o técnico não entra em supervisor nenhum. O filtro vale para os pontos, as listas, o resumo e o painel do
+  Filtrar, como o cliente da Visão do cliente). **O supervisor lista TODOS os Responsáveis O&M das usinas do cadastro**
+  (23/11/2026, Levi: "lista todos os supervisores no filtro": até ali só os de quem estava no piloto, e o supervisor cujo
+  time ainda não instalou o Nexus Field não via os 0% dele na barra do Nexus Field); **a equipe lista só as de quem o mapa
+  mostra** (técnico de campo ativo E no piloto). Os nomes são os do cadastro: a equipe de `cadastro_nexus · equipes`; o
+  supervisor decifrado da ficha. **Os supervisores do técnico são os Responsáveis O&M das usinas da equipe dele**
+  (`usinas.equipe_id` + `usinas.responsavel_om_id`, `_supervisores_por_equipe`; escolha do Levi em 23/11/2026,
+  "Responsável O&M da usina"). Até 23/11 era o Supervisor de Campo da região da equipe (`regioes_campo.
+  supervisor_campo_id`), mas as Regiões saíram da Base em 13/11/2026 e as 8 do cadastro estão sem supervisor: o filtro de
+  produção estava vazio. Medido em 23/11/2026: 9 Responsáveis O&M; das 80 equipes com técnico, 78 têm um só, 1 tem dois
+  (o técnico aparece nos dois) e 1 nenhum (só no "Todos"; 1 técnico). O filtro vale para os pontos, as listas, o resumo e o painel do
   escolhido (o técnico de fora do filtro não abre), e vai junto em todo link de técnico e no "Ver todos". **O id que não está
-  nas opções (não existe, é de quem está fora do piloto, vem torto) não filtra: mostra todos, sem erro.** Os dois juntos
+  nas opções (não existe, a equipe de quem está fora do piloto, vem torto) não filtra: mostra todos, sem erro.** Os dois juntos
   valem juntos (sem ninguém, a tela diz "Nenhum técnico do piloto neste filtro."). Não filtra o controle do piloto (é quem
   o administrador põe e tira da coleta) nem as usinas do Abrir rota (o técnico pode ir à usina de outra equipe; estreitar
   seria regra nova, a perguntar ao Levi).

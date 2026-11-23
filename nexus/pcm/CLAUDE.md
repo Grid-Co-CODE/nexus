@@ -597,6 +597,21 @@ PCM"; a prévia com os dados reais foi aprovada no mesmo dia. Desenho e plano: `
     deixa marcar. A falha fica guardada 20 s, e a gravação que não confirma diz "pode ter gravado: confira".
   - **Na tela:** filtros de cliente e de situação (a marcação volta ao filtro), cartões que cabem em 375 px, o selo da situação, a
     dona e de quem a usina é dona.
+  - **A declaração do técnico** (23/11/2026; o PCM: "quando o técnico botar que não tem almoxarifado, mostra aqui para mim no
+    inventário" e "botar que a usina é compartilhada e qual usina ela compartilha" no App). O App grava no livro
+    `almoxarifado_declaracoes_app_campo · Declaracoes` (o contrato de 11 colunas em `nexus/dados/almoxarifado.py`, fechado com o
+    App no mesmo dia e registrado no catálogo antes da 1ª gravação). Decisões do Levi (23/11/2026): a declaração NÃO tira a
+    cobrança do App nem dá pontos; quem decide é o PCM. O Inventário mostra o cartão "Declarações dos técnicos"
+    (`almox_declaracoes.pendentes`): a última de cada usina enquanto o PCM não decidiu nada daquela usina depois dela e a marcação
+    de hoje não é já a declarada; o Confirmar e o "Tem almoxarifado próprio" são a marcação desta aba (`marcar`, com as regras),
+    que volta ao Inventário (`voltar=inventario`). A que não se confirma como veio (usina ou dona fora da lista, dona de outro
+    cliente, cadeia) mostra o porquê e o "Marcar de outro jeito". Prova: `tests/test_pcm_almox_declaracoes_23_11.py`.
+  - **A lista das usinas para o App** (23/11/2026; o Levi: "O Nexus publica"): a 3ª aba do livro, `dim_usina_cliente`
+    (`usina_id`, `usina` = o nome do local no Fracttal, `cliente_id`, `grupo_cliente`), de onde o App tira a dona do
+    "compartilha" que o técnico declara. Duas usinas com o mesmo `grupo_cliente` são do mesmo cliente pela regra da dona
+    (`lista_para_o_app`): o cliente do cadastro; sem ele, o das outras usinas do mesmo 1º nó do local no Fracttal (quando é um
+    só); sem nenhum, o próprio nó. Vai junto de cada marcação; quando o cadastro mudou depois da última, a tela avisa e o botão
+    "Atualizar a lista do App" (`POST /t/pcm/pecas/usinas/lista`, quem pode programar) a grava sem marcação nem decisão.
   - **Provar:** `tests/test_pcm_almox_usinas.py` (o contrato, o catálogo e o radar, marcar e desmarcar, as recusas, quem pode, o
     outro site, a tela, o livro que não se lê e o banco falso; da revisão: o nome dos Técnicos por usina, o nome que não
     congela, a fora da lista, a regra sobre o livro relido, o Nada mudou e o leitor conferido). Na cópia de prova,
@@ -754,7 +769,14 @@ Fracttal aceita de verdade: `...-passo0.md`. Cada parte tem a seção dela abaix
 2. **Inventário** (`/t/pcm/pecas/inventario`): a lista das contagens, com o estado de cada uma pelos eventos do livro. Abrir uma
    é a contagem nas quatro etapas (Contagem, Aprovação, Gravação, Auditoria; a seção da aba Inventário, "O visual"); o Sistema
    (lido NA HORA no Fracttal), o Δ, a situação e os seis grupos chegam pela ponte (`GET /os/_nexus/inventario/<id>/lote`), com o
-   botão "Gravar N alterações".
+   botão "Gravar N alterações". **Sem nada que mexa no estoque, "Concluir sem alteração"** (23/11/2026; o PCM: "quando a usina
+   não tem [...] ele não me deixa salvar, gravar zero alterações"; o "Gravar 0 alterações" vinha desligado e a contagem ficava
+   para sempre a revisar): `POST /os/_nexus/inventario/<id>/concluir` (`gravacao.concluir`) confere o lote de agora como o
+   Gravar (o saldo lido na hora no login de quem conclui, o N e a assinatura que a tela mostrou) e grava UM `contagem_concluida`
+   no livro do inventário; nada vai ao Fracttal. Recusa a contagem com peça que mexe, com curadoria por decidir (o botão vem
+   desligado: concluída, a curadoria sumiria sem ninguém decidir) e a que já foi para a gravação. A contagem fica `concluida`
+   ("Concluída sem alteração"), conta como a gravada (`DA_GRAVACAO`: não se revisa, não é substituída e vale como a última
+   contagem do almoxarifado). Prova: `tests/test_pcm_inventario_concluir_23_11.py`.
 3. **Revisão:** tirar uma peça do lote, corrigir o número, pedir a recontagem só das peças marcadas (desde 30/10/2026: elas
    saem deste lote e o resto da contagem segue), a da contagem inteira ou, desde 16/11/2026, **cancelar a contagem** (o PCM:
    "colocar um botão no inventário de cancelar auditoria"; caso real: o mesmo técnico contou de novo, no mesmo mês, o
@@ -1020,7 +1042,8 @@ o que não tem contagem na lista: o cartão das recontagens o usa) e o que o App
 - **Os estados** (`ESTADOS`): `nova` (nenhum evento que mude o estado), `revisada` (`peca_tirada`, `numero_corrigido` ou
   `recontagem_item_pedida`: a recontagem só de algumas peças não mata a contagem), `recontagem_pedida` (a da contagem inteira),
   `substituida`, `gravando`, `gravada`, `gravada_com_conflitos` e, desde 16/11/2026, `cancelada` (`contagem_cancelada`, o
-  Cancelar do PCM; morta como a recusada, em `MORTAS`). **O lote é o conjunto de `id_item` dos
+  Cancelar do PCM; morta como a recusada, em `MORTAS`) e, desde 23/11/2026, `concluida` (`contagem_concluida`, o Concluir sem
+  alteração; conta como a gravada, em `DA_GRAVACAO`). **O lote é o conjunto de `id_item` dos
   eventos `aprovada`: a gravação (`gravacao.py`) grava UM `aprovada` por peça do lote.** Sem as peças a leitura não sabe o que falta e
   fica em `gravando`; só vira `gravada` quando toda peça do lote tem `peca_gravada`, e `gravada_com_conflitos` quando alguma tem
   `conflito` no lugar. O `erro` não encerra a peça. O `gravando` daqui é "aprovada e sem o fim nos eventos"; a gravação refina

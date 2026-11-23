@@ -1391,6 +1391,10 @@ details.inv-card:not([open])>summary{border-bottom:0}
 .inv-quando{font-family:var(--font-mono);font-size:12px;color:var(--tinta-2);white-space:nowrap}
 .inv-mudanca{font-family:var(--font-mono);font-size:12.5px;white-space:nowrap}
 .inv-t-acao{width:1%;text-align:right}
+/* as declarações dos técnicos (23/11/2026): o Confirmar, o Próprio e o link para marcar de outro jeito, um embaixo do outro */
+.inv-decl-acoes form{margin:0 0 6px}
+.inv-decl-acoes .gc-btn{width:100%;justify-content:center;white-space:nowrap}
+.inv-decl-acoes .inv-abrir{display:block;white-space:nowrap}
 .inv-btn-p{padding:5px 12px;font-size:12px}
 .inv-tirada .alm-v{color:var(--mudo)}
 /* a recontagem só das marcadas (30/10/2026, item 4 das melhorias): a caixa de cada peça marcável na Aprovação e a barra do
@@ -1544,6 +1548,11 @@ details.inv-card:not([open])>summary{border-bottom:0}
   .inv-filtros{flex-basis:100%;margin:0}
   .inv-filtros .gc-campo{max-width:none}
   .alm-t.inv-t tr{margin:8px 10px}
+  /* as declarações (23/11/2026): o texto quebra dentro do cartão, e as ações vão para a linha de baixo, lado a lado */
+  .inv-decl .alm-v{white-space:normal;overflow-wrap:anywhere}
+  .alm-t td.inv-decl-acoes{flex-wrap:wrap;justify-content:flex-start;gap:6px;padding-top:8px}
+  .inv-decl-acoes form{margin:0}
+  .inv-decl-acoes .gc-btn{width:auto}
   .inv-t td{padding:4px 0}
   .inv-t-acao{width:auto}
   .alm-t td.inv-t-acao::before{content:none}
