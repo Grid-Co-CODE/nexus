@@ -473,9 +473,15 @@ fora: eles não estão no cadastro (decisão do Levi). A aba do time administrat
 este painel é da operação (a Segurança, 13/11/2026: "precisamos ter um controle à parte para o time ADM"); o time ADM
 não está no cadastro de Colaboradores Operação, e o controle dele depende do Levi pôr essas pessoas no cadastro.
 
-**A tela.** A lista: a faixa de situação (Ativos, Desligados, Todos), os filtros (vínculo, cargo, região de campo,
-documentação: com pendência, em dia, sem registro) e a coluna Documentação (o que venceu, falta, espera assinatura ou
-vence em breve). O nome abre a ficha (`/t/hseq/colaboradores/<pessoa_id>`): cada item com a situação, a data, a validade
+**A tela.** A lista (18/11/2026, a Segurança: "NOME | CARGO | EQUIPE | PENDÊNCIAS"): a faixa de situação (Ativos,
+Desligados, Todos), os filtros (vínculo, cargo, região de campo, documentação: com pendência, em dia, sem registro; a
+ordem: nome ou mais pendências primeiro) e quatro colunas. O status é a bolinha ao lado do nome, com a palavra no title e
+no aria-label: "VERMELHO - possui pendências, não tem status definido; VERDE - não possui pendências"; sem nada
+registrado também é vermelho (não dá para dizer que está em dia) e o desligado é cinza. A coluna Pendências,
+centralizada, descreve cada uma em poucas palavras ("ASO vencido", "Ficha de EPI pendente assinar", "NR-35 vence em
+12 d"; `documentacao.CURTO`), da mais grave para a menos, em vermelho (vencido, faltando) ou amarelo (o que espera); até
+4 por pessoa (`MAX_PENDENCIAS_NA_LISTA`), o resto em "+N na ficha", para a linha não crescer: na planilha real há quem
+tenha 8 a 10 itens faltando. O nome abre a ficha (`/t/hseq/colaboradores/<pessoa_id>`): cada item com a situação, a data, a validade
 e quando foi registrado; quem é da Segurança registra em cada linha, sempre com login de pessoa.
 
 **Como provar.** `python -m pytest -q tests/test_hseq_colaboradores.py tests/test_hseq_documentacao.py` (a leitura do

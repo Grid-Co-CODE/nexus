@@ -284,3 +284,10 @@
   .col-ficha .col-reg select{flex:1 1 100%}
   .col-ficha .col-reg .col-data{flex:1 1 auto}
 }
+/* a lista de Colaboradores (18/11/2026): o status é a bolinha ao lado do nome (a palavra no title e no aria-label) e
+   as pendências, centralizadas, com o número em negrito de cada tipo; a cor da bolinha é a das pendências */
+.col-nome{display:inline-flex;align-items:center;gap:8px}
+.col-ponto{flex:0 0 auto;width:9px;height:9px;border-radius:50%;background:var(--mudo)}
+.col-ponto--ok{background:var(--ok)}
+.col-ponto--critico{background:var(--critico)}
+.col-pend-lista{display:inline-flex;flex-direction:column;align-items:center;gap:2px;line-height:1.35}

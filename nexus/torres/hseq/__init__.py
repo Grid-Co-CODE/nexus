@@ -730,6 +730,8 @@ def epi():
 
 
 # a documentação de cada pessoa (06/11/2026): o filtro da lista, pelo resumo da pessoa (`documentacao.resumo`)
+# quantas pendências a lista descreve por pessoa (18/11/2026); o resto vira "+N na ficha", para a linha não crescer
+MAX_PENDENCIAS_NA_LISTA = 4
 FILTROS_DOC = {"pendencia": "Com pendência", "em_dia": "Em dia", "sem_registro": "Sem registro"}
 
 
@@ -755,6 +757,10 @@ def colaboradores():
     fl = {c: request.args.get(c, "").strip() for c in ("vinculo", "cargo", "regiao")}
     fdoc = request.args.get("doc", "") if request.args.get("doc", "") in FILTROS_DOC else ""
     q = request.args.get("q", "").strip().lower()
+    # a ordem (13/11/2026): pelo nome, ou quem tem mais pendências primeiro (desempata o mais grave, depois o nome)
+    ordem = "pendencias" if request.args.get("ordem") == "pendencias" else ""
+    if ordem:
+        todas = sorted(todas, key=lambda x: (-x["doc"]["pendencias"], x["doc"]["tom"] != "critico"))
     base = [x for x in todas if all(not v or x[c] == v for c, v in fl.items()) and _doc_passa(x, fdoc)
             and (not q or q in " ".join(str(x.get(c) or "") for c in ("nome", "cargo", "equipe", "regiao")).lower())]
     return render_template(
@@ -763,7 +769,7 @@ def colaboradores():
         contagem=COL.contar(base), lista=[x for x in base if COL.na_situacao(x, sit)], limite=LIMITE_LINHAS,
         vinculos=COL.opcoes(todas, "vinculo"), cargos=COL.opcoes(todas, "cargo"), regioes=COL.opcoes(todas, "regiao"),
         sem_status=COL.SEM_STATUS, fdoc=fdoc, filtros_doc=FILTROS_DOC, estados=DOC.ESTADOS, doc_erro=doc["erro"],
-        pendencias=DOC.PENDENCIAS,
+        pendencias=DOC.PENDENCIAS, ordem=ordem, max_pend=MAX_PENDENCIAS_NA_LISTA,
         pode=_pode(), ok=request.args.get("ok", ""), erro=request.args.get("erro", ""))
 
 

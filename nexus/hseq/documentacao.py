@@ -208,13 +208,33 @@ def ficha(registros: dict | None, hoje: date) -> list[dict]:
     return out
 
 
+# a pendência em poucas palavras, depois do nome do item (18/11/2026, a Segurança: "descrever de forma resumida o que é,
+# ex.: ASO vencido, Ficha de EPI pendente assinar")
+CURTO = {"vencido": "vencido", "falta": "faltando", "pendente_assinatura": "pendente assinar",
+         "solicitado": "solicitado", "em_andamento": "em andamento", "vence_logo": "vence em {dias} d"}
+
+
+def pendencia_curta(x: dict) -> str:
+    """ "ASO vencido", "Ficha de EPI pendente assinar", "NR-35 vence em 12 d" de uma linha de `ficha`."""
+    return f"{x['item'].rotulo} {CURTO[x['estado']].format(dias=x.get('dias'))}"
+
+
 def resumo(registros: dict | None, hoje: date) -> dict:
-    """{estado: quantos} de UMA pessoa e o pior estado (o primeiro de `ESTADOS` que ela tem, fora o sem registro)."""
+    """{estado: quantos} de UMA pessoa, o pior estado (o primeiro de `ESTADOS` que ela tem, fora o sem registro) e a
+    lista das pendências em poucas palavras, da mais grave para a menos grave (`itens`: [(texto, tom)])."""
     c = {e: 0 for e in ESTADOS}
-    for x in ficha(registros, hoje):
+    linhas = ficha(registros, hoje)
+    for x in linhas:
         c[x["estado"]] += 1
+    rank = {e: i for i, e in enumerate(PENDENCIAS)}
+    itens = [(pendencia_curta(x), ESTADOS[x["estado"]][1])
+             for x in sorted((x for x in linhas if x["estado"] in rank), key=lambda x: rank[x["estado"]])]
     pior = next((e for e in PENDENCIAS if c[e]), "valido" if c["valido"] else "sem_registro")
-    return {"contagem": c, "pior": pior, "pendencias": sum(c[e] for e in PENDENCIAS),
+    pend = sum(c[e] for e in PENDENCIAS)
+    # o tom do total (13/11/2026, a Segurança: "mostre a quantidade de pendências que tem em cada colaborador"): vermelho
+    # se há algo vencido ou faltando, amarelo se só há o que espera (assinatura, curso, prazo), verde se nada pende
+    tom = "critico" if c["vencido"] or c["falta"] else ("alerta" if pend else "ok")
+    return {"contagem": c, "pior": pior, "pendencias": pend, "tom": tom, "itens": itens,
             "registrados": len(ITENS) - c["sem_registro"]}
 
 
