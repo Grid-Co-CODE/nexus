@@ -499,18 +499,28 @@ os PDFs) e em `nexus/campo` (`visao.pts`, `pt_fracttal`, `decisao_pt`): a regra 
   `quem` com o prefixo (`{{ raiz }}` e `nexusRota`), e a volta depois da decisão sai do `na_raiz` (o `volta` do
   formulário vem sem o prefixo; `nexus/torres/campo/CLAUDE.md`, "Debaixo do /nexus"). Os redirecionamentos da torre
   (Extintores, relatório) também passam pelo `na_raiz`: regra das torres em `nexus/torres/CLAUDE.md`.
-- **Título:** "Permissões de trabalho e Análise Preliminar de Risco" (no menu, "APR e PT").
-- **Só por responsável, e os filtros de cliente, usina e responsável** (24/10/2026, Levi: "Tire por equipe e por região
-  de campo e deixe apenas por responsável"; "Em tabela tire a coluna região e coloque a coluna responsável"; "Tire o
-  filtro de região e gestor de contrato e região do brasil. Quero filtro para cliente, usina e responsável com contador
-  para cada! Quero os mesmos filtros no histórico!"). A aba Esperando abre no Por responsável (o mesmo
-  `visao.pt_por_responsavel` da Central; uma linha por Responsável UFV desde 16/11/2026, quando a Central virou tabela
-  por linhas; a linha leva à tabela dele) ou na Tabela, que leva a coluna Responsável no
-  lugar da região (`coluna_responsavel`: o pedaço é o mesmo da Central, que segue com a região). Os filtros
-  (`FILTROS_PT`: Cliente, Usina, Responsável UFV) vão em cascata, cada opção com quantas PT tem com os outros filtros
-  ("Thopen (12)"), nas duas abas; a busca fica (o número da OS acha a PT: a TST procurou a da OS 16866 no Fracttal, onde
-  só vai o PDF da APR). Os endereços de antes (por equipe, região ou gestor, `regiao`, `regiao_campo`, `gestor`) caem no
-  Por responsável e não filtram.
+- **Título:** "APR e PT", o mesmo do menu (23/11/2026: o longo estourava a caixa do "!").
+- **Só a tabela, enxuta, e os números no "!"** (23/11/2026, Levi: "esses KPIs aí são inúteis. Essa informação lateral
+  aí ... pode estar tudo dentro da exclamação. E eu acho que a tabela dá para dar uma enxugada"; "Esse APR do dia tal aí
+  tá matando"; "tire a visão por responsável e deixe só a tabela"). Saíram os cartões de números, o frescor ao lado e o
+  Por responsável; o "!" diz quantas esperam, quantas paradas, quando foi lido, de onde vem e quem pode dar o De acordo.
+  A tabela das que esperam tem 7 colunas: Espera (o chip e o "desde"), OS (a tarefa embaixo só quando não é a APR do
+  dia), Usina (o equipamento embaixo), Responsável UFV (a equipe embaixo), Técnico, APR (quantas NÃO, ou "ok") e o
+  Assinar com o PDF da APR; no celular cada linha vira um cartão (`pt-enxuta`, `static/campo.css`). Os endereços de
+  antes (`modo=responsaveis`, `regiao`, `regiao_campo`, `gestor`) caem na tabela e não filtram.
+- **Os filtros, no padrão do Histórico de OS do OS Creator** (23/11/2026, Levi: "quero os filtros no estilo de filtro do
+  histórico de OS do OS creator! mesma funcionalidade de lógica!"): o `static/filtros-os.js` monta o botão Filtros, o
+  painel com as listas digitáveis de marcar, o Aplicar, as etiquetas com o × e o Limpar tudo, sobre as
+  `<select multiple>` de `FILTROS_PT` (Cliente, Usina, Responsável UFV). Cada filtro aceita vários valores
+  (`?usina=A&usina=B` soma as PT das duas), em cascata, cada opção com quantas PT tem com os outros filtros
+  ("Thopen (12)"; a marcada fica, mesmo com 0), nas três abas. O link de um valor só (a Mesa da Segurança manda
+  `?responsavel=`) continua valendo. A busca fica fora do painel (o número da OS acha a PT: a TST procurou a da OS 16866
+  no Fracttal, onde só vai o PDF da APR).
+- **A usina certa** (23/11/2026, Levi: "Que porra de usina é transformador 1?"; "Tá vindo com o nome do cliente e o
+  estado também"): a PT que o App não liga a uma usina do cadastro ganha a da OS (`nexus_os · fato_tarefa_os`, o
+  `usina_id` e o site do Fracttal, `visao._usina_pela_os`), e o texto cru perde o cliente e a UF
+  (`visao.nome_da_usina_crua`: "Thopen · Thopen - Pharmas - PR" vira "Pharmas"). Medido em 23/11: 4 das 22 esperando
+  sem usina; 2 resolvidas pela OS, as 2 de uma usina que ainda não está ligada em Base → Ligações.
 - **A aba Sem APR ou PT** (a TST, 24/10/2026: "preciso de uma visibilidade de atividades realizadas sem APR e sem PT";
   os dois botões com espaço dos filtros e da tabela, `pt-sem-seg`, 26/10: "esses botões muito colados";
   `nexus/hseq/apr.py`; sem o `fato_tarefa_os` a aba diz "Não li a aba Sem APR ou PT" em vez de sair vazia, que parecia "nenhuma OS sem APR", auditoria de 08/11/2026): do livro `apr_app_campo · APR` que o App publica desde a v298 do servidor (no catálogo antes da
@@ -530,11 +540,11 @@ os PDFs) e em `nexus/campo` (`visao.pts`, `pt_fracttal`, `decisao_pt`): a regra 
   saiu o período 7/30/90 dias): `POR_PAGINA_PT`, `?pag=`, com "1–20 de N" e as páginas em volta da atual; leva a coluna
   Responsável depois da Usina. Medido no banco real em 24/10: 598 decididas, 74 KB a página; com 13 colunas a tabela
   passa ~130 px da caixa a 1440 px e rola dentro dela (com 12 já passava 18).
-- **Colunas PT e APR** no lugar do "PDF", cada uma com o Baixar dela: a PT é o PDF que o App anexa no De acordo
+- **Colunas PT e APR no Histórico** no lugar do "PDF", cada uma com o Baixar dela: a PT é o PDF que o App anexa no De acordo
   ("Permissão de Trabalho <número>"; PT negada não tem); a APR é o PDF que o App anexa desde a v251 ("APR OS 15223
   09-10-2026 07h42", + " v2" no Novo risco da APR do dia), e na OS com mais de uma APR vale a de horário mais perto da
   criação da PT (`pt_fracttal.apr_pdf`, rota `/t/campo/pt/<número>/apr.pdf`). Na aba Esperando a PT ainda não tem PDF
-  (sai no De acordo); a APR já tem.
+  (sai no De acordo); a APR já tem, no "PDF da APR" ao lado do Assinar.
 - **A APR do dia** (11/10/2026, Levi: "Por qual motivo algumas tarefas aparece como 'APR do dia'?"): a PT da APR por OS
   e dia chega do App sem tarefa nem ativo; a tela mostra as tarefas da OS no dia e os equipamentos, pelas tarefas do
   Fracttal (regra e fonte em `nexus/torres/campo/CLAUDE.md`, "A PT da APR do dia").
@@ -544,8 +554,8 @@ os PDFs) e em `nexus/campo` (`visao.pts`, `pt_fracttal`, `decisao_pt`): a regra 
   login de quem olha, carregada ao abrir; desde 26/10/2026 a da APR feita no App sai do PDF dela, sem login; a da
   aprovação, esperando) e a decisão ali mesmo (De acordo / Não autorizo
   com o motivo, Ver PT, Baixar APR), que volta para a lista com os filtros dela. É o mesmo pedaço da Central de atenção
-  > Permissões de trabalho (`campo/_pt_esperando.html`); desde 19/10/2026 a Central e, desde 24/10, esta tela só
-  pedem dele o Por responsável (o modo `responsaveis`) e a tabela.
+  > Permissões de trabalho (`campo/_pt_esperando.html`); a Central pede dele o Por responsável (o modo
+  `responsaveis`) e a tabela; esta tela, desde 23/11/2026, só a tabela.
 - **Quem pode dar o De acordo** (Levi, 09/10): o Supervisor de Campo da região da usina (com a vaga aberta, o
   Coordenador de Campo), o gestor de contrato da usina, quem é do COS e um administrador do Nexus
   (`decisao_pt.aprovadores` / `pode_decidir`, conferido no servidor; quem não pode recebe a recusa dizendo quem pode).

@@ -50,8 +50,10 @@ def _com_cos(banco):
 
 def test_a_tela_mora_em_seguranca_com_o_titulo_novo_e_as_colunas_pt_e_apr(banco, logado):
     html = logado.get("/t/hseq/apr-pt?modo=tabela").get_data(as_text=True)
-    assert "<h1 class=\"cn-titulo\">Permissões de trabalho e Análise Preliminar de Risco</h1>" in html
-    assert "<th>PT</th><th>APR</th>" in html and 'href="/t/campo/pt/PT-1/apr.pdf"' in html
+    # o título curto do menu desde 23/11/2026; na tabela das que esperam, o PDF da APR na linha (a PT só tem PDF
+    # depois do De acordo, no histórico)
+    assert "<h1 class=\"cn-titulo\">APR e PT</h1>" in html
+    assert "<th>APR</th>" in html and 'href="/t/campo/pt/PT-1/apr.pdf"' in html
     hist = logado.get("/t/hseq/apr-pt?aba=historico").get_data(as_text=True)
     assert 'href="/t/campo/pt/PT-3/pdf"' in hist and 'href="/t/campo/pt/PT-3/apr.pdf"' in hist
     assert hist.count(">Baixar</a>") == 2                                   # a PT-3 decidida: PT e APR

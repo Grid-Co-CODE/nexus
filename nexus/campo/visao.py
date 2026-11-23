@@ -1455,6 +1455,40 @@ def _norm_txt(s) -> str:
 
 
 # ── Permissões de trabalho ───────────────────────────────────────────────────────────────────────────────────────
+_UF_NO_FIM = re.compile(r"^[A-Z]{2}$")
+
+
+def nome_da_usina_crua(texto) -> str:
+    """O nome da usina sem o cliente e o estado, quando o cadastro não a tem: "Thopen · Thopen - Pharmas - PR" e
+    "Thopen - Pharmas - PR" viram "Pharmas" (Levi, 23/11/2026: "Tá vindo com o nome do cliente e o estado também. Sem
+    sentido nenhum, tem que vir só o nome da usina mesmo"). Texto fora do padrão "Cliente - Usina - UF" fica como está."""
+    s = str(texto or "").strip()
+    if " · " in s:
+        s = s.split(" · ")[-1].strip()
+    partes = [p.strip() for p in s.split(" - ")]
+    if len(partes) >= 3 and _UF_NO_FIM.match(partes[-1]):
+        return " - ".join(partes[1:-1])
+    return s
+
+
+def _usina_pela_os() -> dict:
+    """{número da OS: (usina_id ou None, o local do Fracttal)} pelo `nexus_os · fato_tarefa_os`: a usina da PT que o
+    livro do App não liga. Caso de 23/11/2026: o App escreveu "Transformador 1" (o equipamento) no campo Usina de uma
+    PT da Iramaia II e deixou vazio o de uma PT de Cedro 1; a OS das duas no Fracttal diz a usina. Sem o livro, {}."""
+    out = {}
+    try:
+        for t in _livro("nexus_os", "fato_tarefa_os"):
+            os_ = D._txt(t.get("os"))
+            if not os_:
+                continue
+            uid, site = D._id(t.get("usina_id")), D._txt(t.get("site_fracttal"))
+            if os_ not in out or (uid and not out[os_][0]):
+                out[os_] = (uid, site)
+    except Exception:       # noqa: BLE001 — sem o fato das tarefas, a PT fica com o que o App escreveu
+        return {}
+    return out
+
+
 def pts() -> leitura.Leitura:
     """Todas as PT, pelo fato conformado (`fato_pt`, passo 4 de 08/10/2026): 1 linha = 1 PT × ativo (o App decide por
     linha), a mesma contagem de antes (linha do livro). Do fato: a PT, a usina (`usina_id`), a situação (o domínio de
@@ -1470,6 +1504,8 @@ def pts() -> leitura.Leitura:
         f = _fato("pt", b)
         cru = {FR.chave(D._txt(r.get("Número")), D._txt(r.get("Código do ativo"))): r for r in _livro(*C.ORIGEM_PT)}
         nomes = b.nomes({D._id(x.get(c)) for x in f["linhas"] for c in ("solicitante_pessoa_id", "decisor_pessoa_id")})
+        # a PT que o App não ligou a uma usina do cadastro ganha a usina da OS dela no Fracttal (23/11/2026)
+        pela_os = _usina_pela_os() if any(not D._id(x.get("usina_id")) for x in f["linhas"]) else {}
         out = []
         for x in f["linhas"]:
             r = cru.get(D._txt(x.get("pt_linha_id"))) or {}
@@ -1477,8 +1513,11 @@ def pts() -> leitura.Leitura:
             # situação fora do domínio (o App escreveu uma nova): o fato fica vazio; a tela mostra a palavra do App
             sit = D._txt(x.get("situacao")) or str(r.get("Situação") or "").strip() or "aguardando"
             uid = D._id(x.get("usina_id"))
+            uid_os, site_os = pela_os.get(D._txt(x.get("os")), (None, "")) if not uid else (None, "")
+            uid = uid or uid_os
             out.append({"numero": D._txt(x.get("pt")), "os": D._txt(x.get("os")) or None, "tarefa": r.get("Tarefa") or "",
-                        "usina_id": uid, **b.onde(uid, r.get("Usina")), "ativo": r.get("Ativo") or "",
+                        "usina_id": uid, **b.onde(uid, nome_da_usina_crua(site_os or r.get("Usina"))),
+                        "ativo": r.get("Ativo") or "",
                         "codigo": D._txt(x.get("codigo_ativo")),
                         "solicitante": nomes.get(D._id(x.get("solicitante_pessoa_id")))
                         or _nome(quem, x.get("solicitante_hmac")), "situacao": sit,
