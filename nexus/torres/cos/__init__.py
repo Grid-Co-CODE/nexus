@@ -25,6 +25,7 @@ from flask import Response, abort, current_app, jsonify, redirect, render_templa
 from ...auth import setor_telas as ST
 from ...cadastro import setor_ids as SID
 from ...cos import acionamentos as AC
+from ...cos import prazos as PZ
 from ...cos import andamento as AND
 from ...cos import desempenho as DE
 from ...cos import ficha as FI
@@ -72,6 +73,12 @@ TORRE = Torre(
         Tela("console", "Console",
              "O que está aberto agora, e o que eu faço em cada ocorrência?",
              "Ronda COS (o Console, dentro do Nexus)", do_setor=SID.COS),
+        # 23/11/2026 (o dono: "Pode seguir com os relógios. Prazos de 15 minutos" e "Andamento calcula, Nexus mostra"): os
+        # relógios de prazo do Andamento — o alarme do SCADA sem ocorrência, o equipamento que voltou e não foi
+        # normalizado, a ocorrência registrada sem o card ao cliente. Quem escala por WhatsApp é o Andamento; aqui só lê.
+        Tela("prazos", "Relógios de prazo",
+             "O que está com o prazo de 15 min correndo ou vencido agora, e quanto saiu no prazo?",
+             "Andamento da Ronda COS (os relógios de prazo e o escalonamento)", do_setor=SID.COS),
         Tela("conferencia-os", "Conferência de OS",
              "As OS do COS estão com a hora certa no Fracttal, e o que falta para finalizar?",
              "Ronda COS (a Conferência de OS, dentro do Nexus)", do_setor=SID.COS),
@@ -131,7 +138,7 @@ TORRE = Torre(
 # A ordem do menu (12/11/2026, a reorganização do COS pelo dono): o que se usa no turno (Monitoramento, Passagem de turno,
 # Ronda, Parede), a consulta (Ocorrências) e os indicadores (Mesa, Desempenho, Prazos da R04, Religamentos, Acionamentos).
 # O Acompanhamento segue o 1º: o cartão do COS no Início leva à 1ª tela pronta, e é ele (`test_casca_inicio`).
-_ORDEM_DO_MENU = ("acompanhamento", "console", "monitoramento", "conferencia-os", "turno", "ronda", "eventos", "normalizacoes", "mesa", "desempenho",
+_ORDEM_DO_MENU = ("acompanhamento", "console", "monitoramento", "conferencia-os", "prazos", "turno", "ronda", "eventos", "normalizacoes", "mesa", "desempenho",
                   "ocorrencias", "religamentos", "acionamentos", "os-abertas")
 TORRE.telas.sort(key=lambda t: _ORDEM_DO_MENU.index(t.id) if t.id in _ORDEM_DO_MENU else len(_ORDEM_DO_MENU))
 
@@ -352,6 +359,27 @@ def acionamentos():
         "cos/acionamentos.html", torre=TORRE, tela=TORRE.tela("acionamentos"), ligada=fonte.ligada, p=p,
         erro_cadastro=erro_cadastro, erro_clientes=erro_clientes if fonte.ligada else "", cliente=cliente, uf=uf,
         busca=busca, com_chave=bool(chave), confianca=AC.CONFIANCA, lido=_lido(leituras), url=_url)
+
+
+@bp.route("/prazos")
+def prazos():
+    """Relógios de prazo (23/11/2026): o que está com o prazo de 15 min correndo ou vencido agora, e quanto saiu no
+    prazo. O Andamento calcula e escala; aqui só lê (nexus/cos/prazos.py)."""
+    cfg = current_app.config
+    fonte = AND.fonte(cfg)
+    clientes, erro_clientes = AND.clientes(cfg)
+    cliente = request.args.get("cliente", "")
+    if cliente not in clientes:
+        cliente = clientes[0] if clientes else ""
+    dias = PZ.dias_pedidos(request.args.get("dias"))
+    leitura = AND.ler_prazos(cfg, cliente, dias) if cliente else AND.Leitura("", None, erro=erro_clientes or (
+        "" if not fonte.ligada else "o Andamento não informou nenhum cliente"))
+    if not fonte.ligada:
+        leitura.erro = ""
+    return render_template(
+        "cos/prazos.html", torre=TORRE, tela=TORRE.tela("prazos"), ligada=fonte.ligada, clientes=clientes,
+        cliente=cliente, leitura=leitura, p=PZ.painel(leitura), dias=dias, dias_opcoes=PZ.DIAS_OPCOES,
+        lido=_lido([leitura]), url=_url)
 
 
 # ── Passagem de turno (26/10/2026) ───────────────────────────────────────────────────────────────────────────────────
