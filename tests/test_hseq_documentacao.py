@@ -190,3 +190,54 @@ def test_so_a_seguranca_registra_e_sempre_com_login_de_pessoa(livro, app, client
         s.update(logado=True, admin=True)
     r = cliente.post("/t/hseq/colaboradores/1/item", data={"item": "rg", "situacao": "valido", "data": ""})
     assert "erro=" in r.headers["Location"] and not livro.exists()
+
+
+def test_a_lista_descreve_as_pendencias_e_ordena_por_elas(livro, tst):
+    """A Segurança: "a quantidade de pendências que tem em cada colaborador" (13/11/2026); "NOME | CARGO | EQUIPE |
+    PENDÊNCIAS", o status numa bolinha ao lado do nome, "VERMELHO - possui pendências, não tem status definido; VERDE -
+    não possui pendências" e a pendência "de forma resumida: ASO vencido, Ficha de EPI pendente assinar" (18/11/2026)."""
+    tst.post("/t/hseq/colaboradores/planilha", data={"acao": "gravar", "arquivo": (io.BytesIO(_planilha()), "a.xlsx")},
+             content_type="multipart/form-data")
+
+    def linhas(html):
+        assert "<th>Nome</th><th>Cargo</th><th>Equipe</th><th>Pendências</th>" in html
+        corpo = html.split("<tbody>")[1].split("</tbody>")[0]
+        out = []
+        for tr in re.findall(r"<tr>(.*?)</tr>", corpo, re.S):
+            nome = re.search(r'<a href="[^"]+">([^<]+)</a>', tr).group(1)
+            ponto = re.search(r'col-ponto--(\w+)" role="img" aria-label="([^"]+)"', tr).groups()
+            pend = re.search(r'<td class="col-pend">(.*?)</td>', tr, re.S).group(1)
+            out.append((nome, ponto, re.findall(r'<span class="cn-t-(\w+)">([^<]+)</span>', pend)))
+        return out
+    por_nome = linhas(tst.get("/t/hseq/colaboradores?situacao=todos").get_data(as_text=True))
+    assert por_nome == [
+        ("Ana Exemplo Rocha", ("neutro", "Desligado"), [("critico", "CPF (documento) faltando")]),
+        ("Bruna Ficticia Lima", ("critico", "Com pendências"),
+         [("critico", "NR-10 básico vencido"), ("alerta", "Anuência NR-10 pendente assinar")]),
+        ("Caio Teste Prado", ("critico", "Com pendências"),
+         [("critico", "ASO faltando"), ("critico", "CPF (documento) faltando"),
+          ("alerta", "NR-10 básico pendente assinar"), ("alerta", "NR-35 solicitado")])]
+    html = tst.get("/t/hseq/colaboradores?situacao=todos&ordem=pendencias").get_data(as_text=True)
+    assert [n for n, _p, _l in linhas(html)] == ["Caio Teste Prado", "Bruna Ficticia Lima", "Ana Exemplo Rocha"]
+    assert 'value="pendencias" selected' in html
+
+
+def test_bolinha_verde_so_sem_pendencia_e_o_resto_na_ficha(livro, tst, app):
+    with app.test_request_context():
+        DOC.carregar_planilha(app.config, [(1, i.id, "valido", date(2026, 6, 1) if i.tipo == "realizacao" else (
+            date(2030, 1, 1) if i.tipo == "validade" else None)) for i in DOC.ITENS], {"email": "tst@exemplo.test",
+                                                                                          "nome": "TST"}, True)
+    html = tst.get("/t/hseq/colaboradores").get_data(as_text=True)
+    linha = html.split("Bruna Ficticia Lima")[0].rsplit("<tr>", 1)[1]
+    assert 'col-ponto--ok" role="img" aria-label="Em dia"' in linha
+    # mais de 4 pendências: a lista descreve 4 e o resto vira "+N na ficha"
+    sete = {i: {"situacao": "falta", "data": None} for i in ("aso", "nr10", "nr35", "rg", "ctps", "cnh", "ficha_epi")}
+    r = DOC.resumo(sete, HOJE)
+    assert r["pendencias"] == 7 and r["itens"][0] == ("ASO faltando", "critico")
+    from nexus.torres.hseq import MAX_PENDENCIAS_NA_LISTA
+    assert MAX_PENDENCIAS_NA_LISTA == 4
+    item = DOC.POR_ID["aso"]
+    assert DOC.pendencia_curta({"item": item, "estado": "vence_logo", "dias": 12}) == "ASO vence em 12 d"
+    r = DOC.resumo({"anuencia_nr10": {"situacao": "pendente_assinatura", "data": None}}, HOJE)
+    assert (r["pendencias"], r["tom"], r["itens"]) == (1, "alerta", [("Anuência NR-10 pendente assinar", "alerta")])
+    assert DOC.resumo({"rg": {"situacao": "valido", "data": None}}, HOJE)["tom"] == "ok"

@@ -14,8 +14,9 @@
   <div class="cn-cab">
     <div><p class="gc-eyebrow">{{ torre.nome }}</p><div class="gc-titulo-explica"><h1 class="cn-titulo">{{ tela.nome }}</h1>
     {% call explica('De onde vem', 'As pessoas vêm do cadastro do Nexus (Pessoas → Colaboradores Operação). Para incluir, corrigir ou desligar alguém, use o cadastro. A documentação de segurança (ASO, NRs, integrações, anuências e documentos) é registrada aqui, na ficha de cada pessoa, ou carregada da planilha da Segurança.', termos=True) %}
-    {{ termo('Ativo', 'ok') }}<dd>O status de contratação da ficha é Ativo, ou está vazio (a mesma régua do Campo).</dd>
-    {{ termo('Desligado', 'neutro') }}<dd>O status de contratação da ficha é Desligado. A ficha continua no cadastro e aparece no filtro Desligados.</dd>
+    {{ termo('Bolinha verde', 'ok') }}<dd>Ao lado do nome: nenhuma pendência na documentação.</dd>
+    {{ termo('Bolinha vermelha', 'critico') }}<dd>Tem pendência, não tem documentação registrada ou a ficha está sem status de contratação no cadastro.</dd>
+    {{ termo('Desligado', 'neutro') }}<dd>Bolinha cinza. O status de contratação da ficha é Desligado. A ficha continua no cadastro e aparece no filtro Desligados.</dd>
     {{ termo('Região de campo') }}<dd>A região da equipe da pessoa, na estrutura de O&amp;M.</dd>
     {{ termo('Vencido', 'critico') }}<dd>A validade passou: a do ASO e da CNH é a data registrada; a das NRs 10, 10 SEP e 35 é a data de realização mais 2 anos.</dd>
     {{ termo('Pendente', 'alerta') }}<dd>Pendente assinatura, solicitado, em andamento (o curso ainda não terminou) ou vence em até 30 dias.</dd>
@@ -48,6 +49,10 @@
     <select class="gc-campo" id="col-doc" name="doc" onchange="this.form.submit()">
       <option value="">Todas</option>{% for k, v in filtros_doc.items() %}<option value="{{ k }}"{% if k == fdoc %} selected{% endif %}>{{ v }}</option>{% endfor %}
     </select></label>
+    <label class="ext-filtro"><span class="gc-rotulo">Ordem</span>
+    <select class="gc-campo" id="col-ordem" name="ordem" onchange="this.form.submit()">
+      <option value="">Nome</option><option value="pendencias"{% if ordem == 'pendencias' %} selected{% endif %}>Mais pendências primeiro</option>
+    </select></label>
     <input class="gc-campo" type="search" name="q" value="{{ q }}" placeholder="nome, cargo ou equipe" aria-label="Buscar">
     {% if request.args.get('situacao') %}<input type="hidden" name="situacao" value="{{ situacao }}">{% endif %}
   </form>
@@ -61,16 +66,18 @@
   </div>
 
   <div class="cn-tab cn-tab--compacta ext-tab"><table>
-    <thead><tr><th>Nome</th><th>Vínculo</th><th>Cargo</th><th>Equipe</th><th>Status</th><th>Documentação</th></tr></thead>
+    {# a ordem das colunas (18/11/2026, a Segurança: "NOME | CARGO | EQUIPE | PENDÊNCIAS") e a bolinha ao lado do nome:
+       "VERMELHO - possui pendências, não tem status definido; VERDE - não possui pendências". Sem nada registrado também
+       é vermelho (não dá para dizer que está em dia); o desligado fica cinza. A palavra vai no title e no aria-label, e a
+       legenda no "!" do título #}
+    <thead><tr><th>Nome</th><th>Cargo</th><th>Equipe</th><th>Pendências</th></tr></thead>
     <tbody>
-    {% for x in lista[:limite] %}
-      <tr><td class="ext-usina"><span class="ext-par"><a href="{{ url_for('.colaborador', pessoa_id=x.pessoa_id) }}">{{ x.nome }}</a>{% if not x.com_nome %}<span class="det cn-t-info">sem nome legível</span>{% endif %}</span></td>
-        <td>{{ x.vinculo or '—' }}</td>
+    {% for x in lista[:limite] %}{% set r = x.doc %}{% if x.desligado %}{% set st, st_txt = 'neutro', 'Desligado' %}{% elif x.status == sem_status %}{% set st, st_txt = 'critico', 'Sem status no cadastro' %}{% elif not r.registrados %}{% set st, st_txt = 'critico', 'Sem documentação registrada' %}{% elif r.pendencias %}{% set st, st_txt = 'critico', 'Com pendências' %}{% else %}{% set st, st_txt = 'ok', 'Em dia' %}{% endif %}
+      <tr><td class="ext-usina"><span class="col-nome"><span class="col-ponto col-ponto--{{ st }}" role="img" aria-label="{{ st_txt }}" title="{{ st_txt }}"></span><span class="ext-par"><a href="{{ url_for('.colaborador', pessoa_id=x.pessoa_id) }}">{{ x.nome }}</a>{% if not x.com_nome %}<span class="det cn-t-info">sem nome legível</span>{% endif %}</span></span></td>
         <td>{{ x.cargo or '—' }}</td>
         <td><span class="ext-par"><span>{{ x.equipe or '—' }}</span>{% if x.regiao %}<span class="det">{{ x.regiao }}</span>{% endif %}</span></td>
-        <td>{% if x.desligado %}<span class="cn-st cn-t-neutro">Desligado</span>{% elif x.status == sem_status %}<span class="cn-st cn-t-info">{{ sem_status }}</span>{% else %}<span class="cn-st cn-t-ok">{{ x.status }}</span>{% endif %}</td>
-        <td>{% set r = x.doc %}{% if not r.registrados %}<span class="cn-t-neutro">sem registro</span>{% elif not r.pendencias %}<span class="cn-st cn-t-ok">Em dia</span>{% else %}<span class="ext-par">{% for e in pendencias %}{% if r.contagem[e] %}<span class="cn-t-{{ estados[e][1] }}"><b>{{ r.contagem[e] }}</b> {{ estados[e][0]|lower }}</span>{% endif %}{% endfor %}</span>{% endif %}</td></tr>
-    {% else %}<tr><td colspan="6" class="mudo">Nenhum colaborador com esses filtros.</td></tr>{% endfor %}
+        <td class="col-pend">{% if not r.registrados %}<span class="cn-t-neutro">sem registro</span>{% elif not r.pendencias %}<span class="cn-st cn-t-ok">Em dia</span>{% else %}<span class="col-pend-lista">{% for t, tom in r.itens[:max_pend] %}<span class="cn-t-{{ tom }}">{{ t }}</span>{% endfor %}{% if r.itens|length > max_pend %}<a class="mudo" href="{{ url_for('.colaborador', pessoa_id=x.pessoa_id) }}">+{{ r.itens|length - max_pend }} na ficha</a>{% endif %}</span>{% endif %}</td></tr>
+    {% else %}<tr><td colspan="4" class="mudo">Nenhum colaborador com esses filtros.</td></tr>{% endfor %}
     </tbody>
   </table></div>
   {% if lista|length > limite %}<p class="mudo">Mostrando {{ limite }} de {{ lista|length }}: use os filtros ou a busca para afunilar.</p>{% endif %}

@@ -75,8 +75,16 @@ def test_tela_abre_nos_ativos_e_mostra_os_desligados_no_filtro(pessoas, logado):
     assert "Ativos 3 na operação" in texto and "Desligados 1 continuam no cadastro" in texto and "Todos 4" in texto
     assert 'class="gc-explica-caixa"' in html and "De onde vem" in html     # a explicação no "!" do título
     assert "000.000.000-00" not in html
-    so = _linhas(logado.get("/t/hseq/colaboradores?situacao=desligados").get_data(as_text=True))
-    assert len(so) == 1 and "Ana Exemplo Rocha" in so[0] and "Desligado" in so[0]
+    # a bolinha (18/11/2026): sem status no cadastro é vermelha; sem nada registrado também
+    caio = html.split("Caio Teste Prado")[0].rsplit("<tr>", 1)[1]
+    assert 'col-ponto--critico" role="img" aria-label="Sem status no cadastro"' in caio
+    bruna = html.split("Bruna Ficticia Lima")[0].rsplit("<tr>", 1)[1]
+    assert 'col-ponto--critico" role="img" aria-label="Sem documentação registrada"' in bruna
+    html_d = logado.get("/t/hseq/colaboradores?situacao=desligados").get_data(as_text=True)
+    so = _linhas(html_d)
+    # o status virou a bolinha ao lado do nome (18/11/2026): o desligado é cinza, com a palavra no aria-label
+    assert len(so) == 1 and "Ana Exemplo Rocha" in so[0]
+    assert 'class="col-ponto col-ponto--neutro" role="img" aria-label="Desligado"' in html_d
     todos = _linhas(logado.get("/t/hseq/colaboradores?situacao=todos").get_data(as_text=True))
     assert len(todos) == 4
 
