@@ -354,6 +354,43 @@ def _quem_ve() -> dict:
     return {"pode": False, "aviso": f"{regra} {onde}"}
 
 
+def _ve_adesao(srv, b) -> bool:
+    """Quem vê a barra do Nexus Field (23/11/2026, Levi: "uma visão que só os administradores veem. Administradores e
+    supervisores responsáveis de usina"; a escolha dele: o administrador, o Supervisor de Campo de uma região e o
+    Responsável O&M de uma usina, pelo cadastro). O resto de quem vê o mapa (COS, PCM, Performance) não a vê. Quem é a
+    pessoa sai do e-mail exato da ficha (`pessoa_do_email`, a regra do mapa); sem ler, não vê."""
+    if session.get("via") == "cliente":
+        return False
+    if session.get("admin"):
+        return True
+    email, _nome = _usuario()
+    if not email:
+        return False
+    try:
+        pid = srv.pessoa_do_email(email)
+    except Exception as e:      # noqa: BLE001 — sem saber quem é, a barra não aparece (o mapa segue)
+        _log.warning("equipe: não consegui saber quem abriu, para a barra do Nexus Field (%s)", type(e).__name__)
+        return False
+    if pid is None:
+        return False
+    supervisores = {r.get("supervisor_id") for r in b.regiao.values()}
+    responsaveis = {visao.D._id(u.get("responsavel_om_id")) for u in b.por_id.values()
+                    if str(u.get("excluido") or "").strip().lower() != "sim"}
+    return pid in (supervisores | responsaveis) - {None}
+
+
+def _adesao(srv, b, tecnicos: dict, filtro: dict, piloto) -> dict:
+    """A barra do Nexus Field (23/11/2026): os técnicos de campo ativos do filtro do mapa (a pessoa de teste fica
+    fora), cada um pronto, faltando liberar ou sem o app (`celulares.adesao`)."""
+    vistos = {pid: {"nome": t["nome"], "equipe": b.nome_equipe.get(t["equipe_id"]) or ""}
+              for pid, t in tecnicos.items() if not t.get("teste") and _no_filtro(b, t, filtro)}
+    com_app, livro_lido = srv.com_app()
+    a = CE.adesao(vistos, com_app=com_app, com_chave=srv.com_chave(), fora=set(getattr(piloto, "fora", ()) or ()),
+                  de=srv.celulares.de, chave=chave_texto)
+    a["livro_lido"] = livro_lido
+    return a
+
+
 def _texto(status: int, texto: str) -> Response:
     r = Response(texto, status=status, mimetype="text/plain")
     r.headers["Cache-Control"] = "no-store"
@@ -1103,6 +1140,7 @@ def equipe():
     if tv:
         return _tela_tv(b, coords, nomes_usina, mapa_js, filtro, agora)
     admin = bool(session.get("admin"))
+    adesao = _adesao(srv, b, tecnicos, filtro, piloto) if _ve_adesao(srv, b) else None
     todos = []
     if admin:
         # o "Celular pronto" (10/11/2026): de quem está no piloto, pelos ajustes que o celular manda
@@ -1126,7 +1164,7 @@ def equipe():
         "eventos": eventos, "eventos_resumo": EV.resumo(eventos), "painel_ev": sel is None and painel == "eventos",
         "destino_sel": _destino_atual(eventos, sel["pid"]) if sel else "",
         "form_perc": _form_do_percurso(sel, agora, periodo) if sel else None,
-        "avisos": avisos, "admin": admin, "todos": todos,
+        "avisos": avisos, "admin": admin, "todos": todos, "adesao": adesao,
         "no_piloto": sum(1 for t in todos if t["no_piloto"] and not t["teste"]),
         # quem o administrador pode pôr no piloto como pessoa de teste (09/11/2026): só para ele
         "pessoas_teste": _pessoas_para_teste(b, tecnicos) if admin else [],

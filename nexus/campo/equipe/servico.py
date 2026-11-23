@@ -331,6 +331,20 @@ class Servico:
             log.warning("equipe: não li quem instalou o Nexus Field (%s); vale o piloto", type(e).__name__)
         return Piloto(AP.coletados(piloto, com_app, piloto.fora), getattr(piloto, "teste", ()), piloto.fora)
 
+    def com_app(self) -> tuple[set, bool]:
+        """(quem o livro do App diz que instalou o Nexus Field, se ele foi lido), para a barra do Nexus Field do mapa
+        (23/11/2026). O livro fora não derruba a tela: a barra conta pelas chaves e pelos ajustes, e diz que o livro
+        não veio."""
+        try:
+            return set(self._com_app.valor(_agora().timestamp())), True
+        except Exception as e:          # noqa: BLE001
+            log.warning("equipe: não li quem instalou o Nexus Field para a barra (%s)", type(e).__name__)
+            return set(), False
+
+    def com_chave(self) -> set:
+        """Quem tem a chave do aparelho ativa (antes de lidas as chaves, ninguém)."""
+        return set(self.chaveiro.pessoas()) if self._chaves_lidas else set()
+
     def coleta_vale(self, pessoa_id, agora: datetime) -> bool:
         """Técnico de campo ativo E coletado (com o app ou posto pelo administrador, e não tirado). Os coletados vêm
         antes: quem está fora nem custa a leitura do cadastro. `AindaLendo` (a 1ª leitura em curso noutro pedido) e

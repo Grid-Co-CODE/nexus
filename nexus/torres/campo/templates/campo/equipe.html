@@ -399,6 +399,45 @@
     </aside>
   </div>
 
+  {% if adesao is defined and adesao and not usinas %}
+  {# a barra do Nexus Field (23/11/2026, Levi: "uma barra aqui embaixo já. Do mapa que vai estar contando o percentual de
+     técnicos [...] quais deles já estão com o Nexus Field instalado e com todas as autorizações e quais não estão").
+     Só o administrador, o supervisor de campo e o Responsável O&M (`_ve_adesao`); segue o filtro do mapa. O número e a
+     barra na frente, quem é quem fechado #}
+  {% set a = adesao %}
+  <section class="eq-adesao" aria-labelledby="eq-ad-titulo">
+    <div class="eq-ad-cab">
+      <h2 id="eq-ad-titulo">Nexus Field no time de campo</h2>
+      {% if a.total %}<p class="eq-ad-num"><b>{{ a.pct }}%</b> com o celular pronto<span>{{ a.n_pronto }} de {{ a.total }} técnicos de campo{{ ' neste filtro' if filtro.tem }} · {{ a.n_instalou }} instalaram ({{ a.pct_instalou }}%)</span></p>{% endif %}
+    </div>
+    {% if a.total %}
+    <div class="eq-ad-barra" role="img" aria-label="{{ a.n_pronto }} com o celular pronto, {{ a.n_falta }} instalaram e falta liberar, {{ a.n_sem }} não instalaram">
+      {%- for k, n in (('ok', a.n_pronto), ('alerta', a.n_falta), ('critico', a.n_sem)) if n %}<span class="eq-ad-seg eq-ad-seg--{{ k }}" style="flex-grow:{{ n }}"></span>{% endfor -%}
+    </div>
+    <ul class="eq-ad-leg">
+      <li class="eq-ad-leg--ok">Celular pronto <b>{{ a.n_pronto }}</b></li>
+      <li class="eq-ad-leg--alerta">Instalou, falta liberar <b>{{ a.n_falta }}</b></li>
+      <li class="eq-ad-leg--critico">Não instalou <b>{{ a.n_sem }}</b></li>
+    </ul>
+    <details class="eq-ad-quem"><summary>Ver quem é quem</summary>
+      <div class="eq-ad-cols">
+        {% for titulo, lista, tom in (('Falta liberar', a.falta, 'alerta'), ('Não instalou', a.sem_app, 'critico'), ('Celular pronto', a.pronto, 'ok')) if lista %}
+        <div class="eq-ad-grupo eq-ad-grupo--{{ tom }}"><h3>{{ titulo }} <span>{{ lista|length }}</span></h3>
+          <ul>{% for t in lista %}
+            <li><span class="eq-lin"><b>{{ t.nome }}</b><small>{{ t.equipe or 'sem equipe' }}</small></span>{% if tom == 'alerta' %}<span class="cn-pill cn-alerta eq-celular">{{ t.texto }}</span>{% endif %}</li>{% endfor %}
+          </ul>
+        </div>
+        {% endfor %}
+      </div>
+    </details>
+    {% else %}
+    <p class="eq-vazio">Nenhum técnico de campo ativo{{ ' neste filtro' if filtro.tem }}.</p>
+    {% endif %}
+    {% if not a.livro_lido %}<p class="eq-nota">O livro do App com quem instalou não veio agora: a conta vai pelas chaves dos aparelhos e pelos ajustes que os celulares mandaram.</p>{% endif %}
+    <p class="eq-nota">Celular pronto: o termo novo aceito, a localização precisa, o "Permitir o tempo todo", a bateria sem restrição, a notificação e, no Xiaomi, o Início automático. Esta barra é vista só por administradores, supervisores de campo e responsáveis O&amp;M.</p>
+  </section>
+  {% endif %}
+
   {% if admin and not usinas %}
   {# a coleta (só administradores). Desde 17/11/2026 (Levi: "Quero que os técnicos que apareçam no mapa sejam os mesmos
      que instalaram o app e não só os que botei no piloto!") o Nexus Field coleta quem instalou o app; aqui se para a

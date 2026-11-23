@@ -1908,6 +1908,35 @@ e não foram feitas.
   as cores do Agora (simuladas no navegador: a bancada não tem o Andamento), o satélite (Campinas no zoom 13) e o
   celular (375 px, sem rolagem de lado), e o tema claro.
 
+### A barra do Nexus Field (23/11/2026)
+
+**Para que serve.** Gestão de quem do time de campo já está com o Nexus Field pronto. O Levi: "eu queria que tivesse uma
+barra aqui embaixo já. Do mapa que vai estar contando o percentual de técnicos [...] quais deles já estão com o Nexus
+Field instalado e com todas as autorizações e quais não estão [...] uma visão que só os administradores veem.
+Administradores e supervisores responsáveis de usina."
+
+**Onde e o quê.** Logo abaixo do mapa, só no Técnicos (o Usinas e o vídeo wall não a têm), antes do bloco da Coleta do
+Nexus Field. Mostra o percentual com o celular pronto, "N de M técnicos de campo", quantos instalaram, a barra no semáforo
+(verde pronto, âmbar instalou e falta liberar, vermelho não instalou) e, fechado, "Ver quem é quem", com o que falta de
+cada um nas palavras do Piloto (`celulares.situacao`).
+
+**As regras (escolhas do Levi, 23/11/2026, por pergunta):**
+- **Quem conta:** todo técnico de campo ativo do cadastro (`pessoas_de_campo`, a mesma lista do mapa), coletado ou não; a
+  pessoa de teste fica fora.
+- **Quem vê** (`equipe_tela._ve_adesao`): o administrador, o Supervisor de Campo de uma região (`regioes_campo.
+  supervisor_campo_id`) e o Responsável O&M de uma usina (`usinas.responsavel_om_id`), achados pelo e-mail exato da
+  ficha (`pessoa_do_email`). COS, PCM e Performance veem o mapa e não a barra; o coordenador de campo não entrou.
+- **Segue o filtro** de supervisor e equipe do mapa ("neste filtro" no texto).
+- **Os três grupos** (`celulares.adesao`): **pronto** = "Celular pronto"; **instalou, falta liberar** = tem a chave do
+  aparelho, está no livro do App (`aparelhos_nexus_field_app_campo`) ou o celular já mandou os ajustes, e algo falta (o
+  "Falta:", a versão antiga, o termo não aceito; quem só está no livro do App aparece como "ainda não se registrou no
+  Nexus", ou "coleta parada pelo administrador" se ele a tirou); **não instalou** = nada disso.
+- O livro do App fora não derruba a barra: ela conta pelas chaves e pelos ajustes e diz que o livro não veio
+  (`Servico.com_app`).
+
+Prova: `tests/test_equipe_adesao_field_23_11.py`. Na bancada (`perc_bancada.py`, 10 técnicos falsos): 2 de 10 prontos
+(20%), 5 faltando, 3 sem o app.
+
 ### O vídeo wall (12/11/2026)
 
 Levi, com o mockup do COS ("COS · Ocorrências abertas · Usinas com problema agora"): "Prepare um modo vídeo wall que apareça
