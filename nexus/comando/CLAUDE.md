@@ -1146,6 +1146,16 @@ estavam as strings do Inversor 5 e do Inversor 7, que saíram às 06:50.
   "Inversor 1.7 e mais 1", e a IA não achou o segundo.
 - **O nome do inversor muda de fonte para fonte:** a fonte das strings diz "Inversor 5"; o Fracttal diz "Inversor 1.5".
   O dossiê avisa a IA disso.
+- **O histórico do mês** (23/11/2026, a Performance, na Rodrigues 2: "strings e tracker não mostra o histórico, só o que
+  está em aberto no momento"; o Levi escolheu o mês inteiro): o cartão ganha, fechado, "Histórico do mês (N)", com TODAS
+  as ocorrências do mês, as que voltaram e as abertas, da mais nova para a mais velha, com a volta e a perda
+  (`strings_trackers(...)["historico"]`). O "agora" segue em cima, como antes. A tela Strings e trackers da plataforma
+  passou a abrir com o mês inteiro no mesmo dia. Prova: `tests/test_comando_prontuario_strings_historico_23_11.py`.
+- **O diagnóstico do dia é feito às 00:25 com o livro daquela hora.** Em 23/11 o da Rodrigues II dizia "8 strings fora
+  desde 12/11": a rodada das 09:50 da plataforma fechou o episódio (faltou a leitura de 22/11), e a Sala e o cartão já
+  não mostravam nada. Na rodada das 09:50 sobravam de 12/11 só a Ipv22 dos inversores 2.1 e 2.2, zerada desde a
+  recomposição daquele dia porque a string mudou de entrada (o 8 da madrugada não foi reconstituído; detalhe e conserto
+  no `plataforma/CLAUDE.md` do repositório da plataforma, "Strings e trackers no desenho da Sala de controle").
 
 ### OS, pausa e chamados pelo que pesam (16/11/2026, Levi, na Marabá 200)
 

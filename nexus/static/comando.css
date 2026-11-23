@@ -680,6 +680,11 @@ a.ins-titulo:hover{color:var(--verde-texto)}
 .pu-st-inv{font-weight:600;color:var(--tinta);font-size:12.5px}
 .pu-st-trk{display:inline-block;padding:1px 8px;border-radius:var(--raio-tag);background:var(--superficie-2);color:var(--tinta-2);
   font-size:12px}
+/* o histórico do mês no cartão Strings e trackers (23/11/2026): fechado, no tom do "mais N" das pendências */
+.pu-st-hist > summary{display:inline-block;margin-top:8px;list-style:none;cursor:pointer;font:600 12.5px/1.4 var(--font-sans);color:var(--verde-texto)}
+.pu-st-hist > summary::-webkit-details-marker{display:none}
+.pu-st-hist[open] > summary{color:var(--mudo)}
+.pu-st-hist .pu-ni{margin-top:6px}
 .pu-st-trk--cronico{background:var(--alerta-suave);color:var(--alerta)}
 .pu-tab{width:100%;border-collapse:collapse;font-size:12.5px}
 .pu-tab th{padding:6px 10px 6px 0;text-align:left;font:600 11px/14px var(--font-sans);color:var(--mudo);white-space:nowrap;border-bottom:1px solid var(--linha)}

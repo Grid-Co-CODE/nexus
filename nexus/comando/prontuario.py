@@ -837,8 +837,11 @@ def _quando(v) -> str:
 
 def strings_trackers(ep: dict | None, hoje: date) -> dict | None:
     """{"inversores": [{inversor, strings, n, desde, perda}] (as strings fora agora, por inversor), "trackers": [{tracker,
-    desde, cronico}] (os parados agora), "mes": {strings, inversores, trackers, perda}, "resumo": {tom, txt}}. None = a
-    fonte não abriu. `ep` = {"strings": [episódios], "trackers": [episódios]} da usina, do mês corrente e do anterior."""
+    desde, cronico}] (os parados agora), "mes": {strings, inversores, trackers, perda}, "historico": [{tipo, nome, saiu,
+    voltou, aberta, perda}] (TODAS as ocorrências do mês, as que voltaram e as abertas, da mais nova para a mais velha),
+    "resumo": {tom, txt}}. None = a fonte não abriu. `ep` = {"strings": [episódios], "trackers": [episódios]} da usina, do
+    mês corrente e do anterior. O histórico (23/11/2026, a Performance, na Rodrigues 2: "strings e tracker não mostra o
+    histórico, só o que está em aberto no momento"): o Levi escolheu mostrar o mês inteiro."""
     if ep is None:
         return None
     mes = f"{hoje:%Y-%m}"
@@ -873,6 +876,12 @@ def strings_trackers(ep: dict | None, hoje: date) -> dict | None:
     trk.sort(key=lambda t: (not t["cronico"], t["tracker"]))
     do_mes_s = [e for e in ep.get("strings") or [] if str(e.get("mes") or "") == mes]
     do_mes_t = [e for e in ep.get("trackers") or [] if str(e.get("mes") or "") == mes]
+    hist = [("string", f"{e.get('inversor') or 'inversor sem nome'} · {e.get('string') or 'string sem nome'}", e, e.get("saiu"))
+            for e in do_mes_s] + [("tracker", str(e.get("tracker") or ""), e, e.get("parou")) for e in do_mes_t]
+    hist.sort(key=lambda h: (str(h[3] or ""), h[1]), reverse=True)
+    historico = [{"tipo": tipo, "nome": nome, "saiu": _quando(str(saiu or "")), "aberta": str(e.get("situacao") or "") == "em aberto",
+                  "voltou": "" if str(e.get("situacao") or "") == "em aberto" else _quando(str(e.get("voltou") or "")),
+                  "perda": num(_float(e.get("perda_kwh")) or 0.0) + " kWh"} for tipo, nome, e, saiu in hist]
     perda = sum(_float(e.get("perda_kwh")) or 0.0 for e in do_mes_s + do_mes_t)
     n_str = sum(x["n"] for x in inversores)
     partes = ([f"{n_str} {'string fora' if n_str == 1 else 'strings fora'} em {len(inversores)} "
@@ -881,6 +890,7 @@ def strings_trackers(ep: dict | None, hoje: date) -> dict | None:
     return {"inversores": inversores, "trackers": trk,
             "mes": {"strings": len(do_mes_s), "inversores": len({str(e.get("inversor") or "") for e in do_mes_s}),
                     "trackers": len(do_mes_t), "perda": num(perda) + " kWh"},
+            "historico": historico,
             "resumo": {"tom": "alerta" if partes else "ok", "txt": " · ".join(partes) if partes else "Nenhuma string fora nem tracker parado agora"}}
 
 
