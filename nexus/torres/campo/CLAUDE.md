@@ -2088,14 +2088,17 @@ O Levi viu a tela na bancada: "Gostei bastante! ... inclua também essas melhori
 
 - **Filtro por supervisor e por equipe** ("Opção de filtrar por supervisor ou equipe"). Dois selects no alto
   (`?supervisor=<pessoa_id>&equipe=<equipe_id>`, só algarismos, até 12), que enviam na troca (sem JavaScript, o botão
-  Filtrar, como o cliente da Visão do cliente). **As opções são só de quem o mapa mostra** (técnico de campo ativo E no
-  piloto), com o nome do cadastro: a equipe de `cadastro_nexus · equipes`; o supervisor decifrado da ficha. **O supervisor
+  Filtrar, como o cliente da Visão do cliente). **O supervisor lista TODOS os Supervisores de Campo das regiões do
+  cadastro** (23/11/2026, Levi: "lista todos os supervisores no filtro": até ali só os de quem estava no piloto, e o
+  supervisor cujo time ainda não instalou o Nexus Field não via os 0% dele na barra do Nexus Field); **a equipe lista só
+  as de quem o mapa mostra** (técnico de campo ativo E no piloto). Os nomes são os do cadastro: a equipe de
+  `cadastro_nexus · equipes`; o supervisor decifrado da ficha. **O supervisor
   do técnico é o Supervisor de Campo da região da equipe dele** (`equipes.regiao_campo_id` → `regioes_campo.
   supervisor_campo_id`, `_supervisor_da_equipe`): é como o cadastro modela desde a estrutura de O&M de 10/2026
   (`visao._Base`); o `supervisor_id` da ficha saiu das telas (na prática era o Gestor de contrato). Equipe sem região ou com a
   vaga aberta: o técnico não entra em supervisor nenhum. O filtro vale para os pontos, as listas, o resumo e o painel do
   escolhido (o técnico de fora do filtro não abre), e vai junto em todo link de técnico e no "Ver todos". **O id que não está
-  nas opções (não existe, é de quem está fora do piloto, vem torto) não filtra: mostra todos, sem erro.** Os dois juntos
+  nas opções (não existe, a equipe de quem está fora do piloto, vem torto) não filtra: mostra todos, sem erro.** Os dois juntos
   valem juntos (sem ninguém, a tela diz "Nenhum técnico do piloto neste filtro."). Não filtra o controle do piloto (é quem
   o administrador põe e tira da coleta) nem as usinas do Abrir rota (o técnico pode ir à usina de outra equipe; estreitar
   seria regra nova, a perguntar ao Levi).

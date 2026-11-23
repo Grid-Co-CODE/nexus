@@ -98,7 +98,7 @@
        filtro e o clima de agora). Abre em outra aba: é a tela que vai para a TV #}
     {% if mapa_js and not usinas and not erro and filtro is defined %}<a class="gc-btn gc-btn--contorno eq-tv-bt" data-eq-videowall href="{{ url_for('torre_campo.equipe', tv=1, **filtro.q) }}" target="_blank" rel="noopener" title="Abre o mapa em tela cheia para o vídeo wall, com as ocorrências abertas do COS ao lado"><i class="ph ph-monitor" aria-hidden="true"></i>Vídeo wall</a>{% endif %}
     {% if not usinas and not erro and filtro is defined %}
-    {# o filtro por supervisor e por equipe (Levi, 08/11/2026): as opções são de quem está no piloto; a troca do select já
+    {# o filtro por supervisor e por equipe (Levi, 08/11/2026): todos os supervisores das regiões (23/11/2026) e as equipes de quem está no piloto; a troca do select já
        envia (sem JavaScript, o botão), e o filtro vai junto em todo link de técnico #}
     <form class="cn-filtros eq-filtros" method="get" action="{{ url_for('torre_campo.equipe') }}" data-fs>
       <label class="gc-rotulo" for="eq-supervisor">Supervisor</label>

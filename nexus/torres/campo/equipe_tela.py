@@ -766,13 +766,15 @@ def _supervisor_da_equipe(b, equipe_id):
 
 def _filtro(b, tecnicos: dict, piloto) -> dict:
     """O filtro por supervisor e por equipe (Levi, 08/11/2026: "Opção de filtrar por supervisor ou equipe"), pela URL
-    (`?supervisor=<pessoa_id>&equipe=<equipe_id>`). As opções são só as de quem o mapa mostra (técnico de campo ativo E
-    no piloto), com o nome do cadastro (o da pessoa decifrado da ficha; o da equipe, de `cadastro_nexus · equipes`). O
-    id que não está nas opções (o que não existe, o de quem está fora do piloto, o torto) não filtra: a tela mostra
-    todos, sem erro. Os dois juntos valem juntos. Devolve {"supervisor", "equipe" (o id escolhido ou None), "opcoes_*"
+    (`?supervisor=<pessoa_id>&equipe=<equipe_id>`). O supervisor: TODOS os Supervisores de Campo das regiões do cadastro
+    (23/11/2026, Levi: "lista todos os supervisores no filtro"; até ali só os de quem estava no piloto, e o supervisor
+    cujo time ainda não instalou o Nexus Field não conseguia ver os 0% dele na barra do Nexus Field). A equipe: só as de
+    quem o mapa mostra (técnico de campo ativo E no piloto). Os nomes são os do cadastro (o da pessoa decifrado da
+    ficha; o da equipe, de `cadastro_nexus · equipes`). O id que não está nas opções (o que não existe, a equipe de
+    quem está fora do piloto, o torto) não filtra: a tela mostra todos, sem erro. Os dois juntos valem juntos. Devolve {"supervisor", "equipe" (o id escolhido ou None), "opcoes_*"
     [(id, nome)], "q" (o que vai em todo link da tela, para o clique no técnico não perder o filtro)}."""
     no_mapa = [t for pid, t in tecnicos.items() if pid in piloto]
-    sups = {s for s in (_supervisor_da_equipe(b, t["equipe_id"]) for t in no_mapa) if s}
+    sups = {r["supervisor_id"] for r in b.regiao.values() if r.get("supervisor_id")}
     nomes = b.nomes(sups)
     opcoes_sup = sorted(((s, nomes.get(s) or f"Supervisor {s}") for s in sups), key=lambda x: chave_texto(x[1]))
     opcoes_eq = sorted(((e, b.nome_equipe.get(e) or f"Equipe {e}") for e in {t["equipe_id"] for t in no_mapa} if e),

@@ -414,16 +414,18 @@ def _no_painel(html):
     return {pid for pid, nome in NOME.items() if nome in lado}
 
 
-def test_os_filtros_listam_so_o_supervisor_e_a_equipe_de_quem_esta_no_piloto(cliente, pontos, setor):
-    """Levi, 08/11/2026: "Opção de filtrar por supervisor ou equipe". As opções são as de quem o mapa mostra (técnico de
-    campo ativo E no piloto), com o nome do cadastro: o supervisor (o Supervisor de Campo da região da equipe) e a equipe
-    que só têm o técnico de fora do piloto não entram."""
+def test_o_filtro_lista_todos_os_supervisores_e_as_equipes_de_quem_esta_no_piloto(cliente, pontos, setor):
+    """Levi, 08/11/2026: "Opção de filtrar por supervisor ou equipe". O supervisor: TODOS os Supervisores de Campo das
+    regiões do cadastro (23/11/2026, Levi: "lista todos os supervisores no filtro", para o supervisor cujo time ainda não
+    instalou o Nexus Field ver os 0% dele na barra); a Oeste só tem o técnico de fora do piloto e o supervisor dela
+    entra. A equipe segue sendo só a de quem o mapa mostra (técnico de campo ativo E no piloto)."""
     _, html = _html(_entrar(cliente, EMAIL[PCM]))
-    assert _opcoes(html, "supervisor") == [("", "Todos os supervisores"), (str(SUP_CENTRO), NOME_SUP[SUP_CENTRO]),
+    assert _opcoes(html, "supervisor") == [("", "Todos os supervisores"), (str(SUP_OESTE), NOME_SUP[SUP_OESTE]),
+                                           (str(SUP_CENTRO), NOME_SUP[SUP_CENTRO]),
                                            (str(SUP_LESTE), NOME_SUP[SUP_LESTE])]
     assert _opcoes(html, "equipe") == [("", "Todas as equipes"), (str(CENTRO), EQUIPE[CENTRO]),
                                        (str(LESTE), EQUIPE[LESTE])]
-    assert NOME_SUP[SUP_OESTE] not in html and EQUIPE[OESTE] not in html
+    assert EQUIPE[OESTE] not in html
     # sem JavaScript, o botão Filtrar; com ele, a troca do select já envia (o mesmo da Visão do cliente)
     form = re.search(r'<form class="cn-filtros eq-filtros"[^>]*>(.*?)</form>', html, flags=re.S)
     assert 'method="get"' in form.group(0) and form.group(1).count('onchange="this.form.submit()"') == 2
@@ -458,10 +460,10 @@ def test_o_filtro_estreita_o_mapa_a_lista_e_o_resumo(cliente, pontos, setor):
     assert _no_painel(html) == set() and "Nenhum técnico com o Nexus Field neste filtro." in html
 
 
-@pytest.mark.parametrize("pedido", [{"supervisor": 999}, {"equipe": 999}, {"supervisor": SUP_OESTE}, {"equipe": OESTE},
+@pytest.mark.parametrize("pedido", [{"supervisor": 999}, {"equipe": 999}, {"equipe": OESTE},
                                     {"supervisor": "x"}, {"equipe": "²"}, {"supervisor": "1" * 5000},
                                     {"equipe": "", "supervisor": ""}],
-                         ids=["sup_999", "eq_999", "sup_fora_do_piloto", "eq_fora_do_piloto", "letra", "sobrescrito",
+                         ids=["sup_999", "eq_999", "eq_fora_do_piloto", "letra", "sobrescrito",
                               "5000_algarismos", "vazios"])
 def test_id_desconhecido_no_filtro_mostra_todos_sem_erro(cliente, pontos, setor, pedido):
     """O id que não está nas opções (não existe, é de quem está fora do piloto, ou vem torto) não filtra: a tela mostra
@@ -469,6 +471,14 @@ def test_id_desconhecido_no_filtro_mostra_todos_sem_erro(cliente, pontos, setor,
     st, html = _html(_entrar(cliente, EMAIL[PCM]), query_string={**pedido, **TECNICOS})
     assert st == 200 and _no_painel(html) == set(PILOTO)
     assert " selected>" not in html.split('class="cn-filtros eq-filtros"', 1)[1].split("</form>", 1)[0]
+
+
+def test_o_supervisor_sem_ninguem_no_mapa_filtra_e_a_tela_diz(cliente, pontos, setor):
+    """O supervisor da Oeste (só o técnico de fora do piloto) entra no filtro desde 23/11/2026: escolhido, ele vale, o
+    mapa fica sem ninguém e a tela diz."""
+    st, html = _html(_entrar(cliente, EMAIL[PCM]), query_string={"supervisor": SUP_OESTE, **TECNICOS})
+    assert st == 200 and _no_painel(html) == set() and "Nenhum técnico com o Nexus Field neste filtro." in html
+    assert f'<option value="{SUP_OESTE}" selected>' in html
 
 
 # ── o Abrir rota ─────────────────────────────────────────────────────────────────────────────────────────────────────
