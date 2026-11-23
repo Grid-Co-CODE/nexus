@@ -142,6 +142,11 @@ caso que criou cada uma (as três primeiras são decisões do Levi no mesmo dia)
   SUN2000-330KTL-H1" → "SUN2000-250KTL-H1"; "250 kW / 275 kVA" → "250"; "575 Wp" → "575" NÃO é resumo), é marcado na
   prévia para a pessoa decidir a coluna. Em 15/10: 48 marcas (fabricante dos módulos 11, concessionária 10, modelo do
   inversor 9...).
+- **"Supervisor de contrato" = o Gestor de contrato da ficha** (23/11/2026, Levi: "pode ligar, chama de Gestor de
+  contrato"): a coluna do CSV liga ao `gestor_contrato` pelo nome contido, como o Responsável O&M, e quem não tem ficha
+  ganha uma com o vínculo "Gestor de contrato" (`VINCULO_DA_REF`). Até então a coluna ficava de fora e o gestor seguia
+  o da importação do .xlsx de 07/10: no CSV de 23/11, 188 de 258 usinas tinham outro supervisor de contrato, e dois
+  supervisores de campo ainda apareciam como gestores. Célula vazia não apaga (6 usinas sem supervisor no CSV de 23/11).
 - Link do mapa que não é endereço (11 usinas com coordenada em graus no lugar do link) fica de fora, listado.
 - As 19 colunas sem campo no Nexus (Mobilizado?, Impeditivo, Próximo passo, Pessoas a contratar, os kits...) ficam de
   fora e a prévia as lista.
