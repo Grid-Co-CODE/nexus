@@ -83,23 +83,29 @@
   <a href="{{ url(f=None) }}"{% if not f %} aria-current="page"{% endif %}>Todas <b>{{ total }}</b></a>
   {% for s, (rot, cor) in status.items() %}<a href="{{ url(f=s) }}"{% if s == f %} aria-current="page"{% endif %}><span class="cn-st cn-t-{{ cor }}">{{ rot }}</span> <b>{{ contagem.get(s, 0) }}</b></a>{% endfor %}
 </div>
-<div class="cn-tab"><table class="cn-expande">
-  <thead><tr><th>OS</th><th>Tarefa</th><th>Usina</th><th>Equipamento</th><th>Equipe</th><th>{{ 'Responsável' if coluna_responsavel else 'Região' }}</th><th>Técnico</th><th>Respostas NÃO</th><th>Espera</th><th>PT</th><th>APR</th></tr></thead>
+{# a tabela enxuta (23/11/2026, Levi: "a tabela dá para dar uma enxugada na informação, melhorar a visualização ...
+   Esse APR do dia tal aí tá matando"): 7 colunas. A espera primeiro, com o desde; o equipamento embaixo da usina, a
+   equipe embaixo do responsável, a tarefa embaixo da OS só quando não é a APR do dia (o dia já está no "desde"); na
+   APR, as respostas NÃO; Assinar abre o card de assinar da linha #}
+<div class="cn-tab"><table class="cn-expande pt-enxuta">
+  <thead><tr><th>Espera</th><th>OS</th><th>Usina</th><th>{{ 'Responsável UFV' if coluna_responsavel else 'Região' }}</th><th>Técnico</th><th>APR</th><th aria-label="Ações"></th></tr></thead>
   <tbody>
   {% for p in lista %}
-    <tr class="cn-linha" tabindex="0" aria-expanded="false"><td class="m">{{ os_link(p) }}</td><td>{{ p.tarefa[:70] }}{% if p.apr_dia %}<span class="det">APR do dia {{ p.apr_dia }}</span>{% endif %}</td>
-      <td>{{ p.usina }}</td><td>{{ equipamento(p) }}</td><td>{{ p.equipe or '—' }}</td><td>{% if coluna_responsavel %}{{ p.responsavel or sem_responsavel }}{% else %}{{ p.regiao_br or '—' }}{% endif %}</td>
-      <td>{{ p.solicitante or '—' }}</td><td>{{ p.respostas_nao or '—' }}</td>
-      <td><span class="cn-st cn-t-{{ 'critico' if p.parada else 'alerta' }}">{{ idade_min(p.idade_min) }}</span></td>
-      <td><span class="mudo" title="O PDF da PT sai no De acordo">—</span></td>
-      <td><a class="cn-link" href="{{ url_for('torre_campo.pt_apr_pdf', numero=p.numero) }}" title="O PDF da APR que o App anexou na tarefa do Fracttal">Baixar</a></td></tr>
+    <tr class="cn-linha" tabindex="0" aria-expanded="false">
+      <td class="pt-espera"><span class="cn-st cn-t-{{ 'critico' if p.parada else 'alerta' }}">{{ idade_min(p.idade_min) }}</span>{% if p.criada %}<span class="det">desde {{ p.criada.strftime('%d/%m %H:%M') }}</span>{% endif %}</td>
+      <td class="m">{{ os_link(p) }}{% if p.tarefa and not p.apr_dia and not p.tarefa.startswith('APR do dia') %}<span class="det">{{ p.tarefa[:60] }}</span>{% endif %}</td>
+      <td>{{ p.usina or '—' }}{% if p.ativo or p.codigo %}<span class="det">{{ p.ativo or p.codigo }}</span>{% endif %}</td>
+      <td>{% if coluna_responsavel %}{% if p.responsavel %}{{ p.responsavel }}{% else %}<span class="mudo">sem responsável</span>{% endif %}{% else %}{{ p.regiao_br or '—' }}{% endif %}{% if p.equipe %}<span class="det">{{ p.equipe }}</span>{% endif %}</td>
+      <td>{{ p.solicitante or '—' }}</td>
+      <td>{% if p.respostas_nao %}<span class="cn-t-critico pt-nao">{{ p.respostas_nao }} NÃO</span>{% else %}<span class="mudo">ok</span>{% endif %}</td>
+      <td class="pt-acoes"><a class="gc-btn gc-btn--primario pt-assinar" href="{{ url_for('torre_campo.pt_assinar', numero=p.numero, ativo=p.codigo or '') }}">Assinar</a><a class="cn-link" href="{{ url_for('torre_campo.pt_apr_pdf', numero=p.numero) }}" title="O PDF da APR que o App anexou na tarefa do Fracttal">PDF da APR</a></td></tr>
     {# o detalhe da PT esperando (Levi, 09/10/2026: "estou achando o atual muito cru, precisamos trazer a informação da
        assinatura e a opção de aprovar logo de cara"): o que a PT diz, quem pode assinar, a assinatura do técnico na
        APR (do Fracttal, pelo login de quem olha, carregada ao abrir) e a decisão ali mesmo, que volta para esta tela #}
-    <tr class="cn-detalhe" hidden><td colspan="11">
+    <tr class="cn-detalhe" hidden><td colspan="7">
       <div class="pt-det">
         <div class="pt-det-cab">
-          <div><span class="m pt-num">{{ p.numero }}</span> · OS {{ p.os or '—' }} · {{ p.tarefa or '—' }}{% if p.ativo or p.codigo %} — {{ p.ativo or p.codigo }}{% endif %}
+          <div><span class="m pt-num">{{ p.numero }}</span> · OS {{ p.os or '—' }} · {{ 'APR do dia' if p.apr_dia or (p.tarefa or '').startswith('APR do dia') else (p.tarefa or '—') }}{% if p.ativo or p.codigo %} — {{ p.ativo or p.codigo }}{% endif %}
             <span class="det">{{ p.solicitante or 'técnico não identificado' }} · {{ p.equipe or 'sem equipe' }} · {{ p.usina }}{% if p.uf %} · {{ p.uf }}{% endif %}{% if p.codigo %} · {{ p.codigo }}{% endif %}{% if p.criada %} · aberta {{ p.criada.strftime('%d/%m %H:%M') }}{% endif %}</span></div>
           <span class="cn-st cn-t-{{ 'critico' if p.parada else 'alerta' }}">Aguardando · há {{ idade_min(p.idade_min) }}</span>
         </div>
@@ -140,7 +146,7 @@
           decisão do Nexus</b>: até a versão que lê, quem libera o técnico no campo é o De acordo dado pelo App.</p>
       </div>
     </td></tr>
-  {% else %}<tr><td colspan="11" class="mudo">Nenhuma PT esperando o De acordo com esses filtros.</td></tr>{% endfor %}
+  {% else %}<tr><td colspan="7" class="mudo">Nenhuma PT esperando o De acordo com esses filtros.</td></tr>{% endfor %}
   </tbody></table></div>
 <script>
   // a assinatura do técnico na APR vem do Fracttal pelo login de quem olha (cookie só em /os): carrega ao abrir a PT,

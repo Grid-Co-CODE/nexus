@@ -42,29 +42,30 @@
   <div class="cn-cab">
     <div><p class="gc-eyebrow">{{ torre.nome }}</p><div class="gc-titulo-explica"><h1 class="cn-titulo">{{ titulo or tela.nome }}</h1>
       {% call explica('Entenda esta tela') %}
+        {# os números e a hora da leitura moram aqui desde 23/11/2026 (Levi: "esses KPIs aí são inúteis. Essa
+           informação lateral pode estar tudo dentro da exclamação") #}
+        {% set r = d.get('resumo') or {} %}
+        <p><b>Agora:</b> {{ r.get('aguardando', 0) }} esperando o De acordo, {{ r.get('paradas', 0) }} paradas há mais de 2 h;
+          a mais antiga espera há {{ '—' if r.get('mais_antiga_min') is none else idade_min(r.get('mais_antiga_min')) }}.
+          A espera típica até a decisão é de {{ '—' if r.get('espera_mediana_min') is none else idade_min(r.get('espera_mediana_min')) }}
+          (mediana), e {{ r.get('com_nao', 0) }} APRs tiveram resposta NÃO. O livro de PT do App foi lido às {{ lido }}.</p>
+        {% include 'campo/_aviso_fato.html' %}
         {% if aba == 'sem' %}<p>{% if tipo == 'pt' %}<b>Como entra:</b> a APR de pré-execução feita no App com uma das 5 atividades críticas marcada (altura, escada, telhados, químicos, eletricidade energizada), que pede PT, e sem o número de PT ligado a ela. A APR ainda não medida (as de antes da versão 298 são lidas aos poucos) não entra.{% else %}<b>Como entra:</b> a tarefa fechada pelo App, de OS criada desde 10/10/2026, sem nenhuma APR da OS até o dia do serviço (a hora do celular, não a chegada ao servidor). A APR vale para a atividade: a tarefa pausada e retomada em outro dia não pede outra, como no App. A OS criada antes de 10/10 fica fora (pode ter a APR por tarefa de antes do registro). A régua não olha o técnico.{% endif %}</p>{% endif %}
-        <p><b>De onde vem.</b> As PT são as que o App grava no banco do Nexus, de hora em hora. A pessoa vem do
-    App como código do e-mail; o nome (resumido) sai do cadastro do App, na hora. Equipe, região de campo (com o
-    Supervisor de Campo), gestor de contrato e técnicos vêm do cadastro do Nexus. Clique na linha para ver o detalhe; a OS em verde abre a PT para aprovar.
-    <br><b>PT e APR:</b> os PDFs que o App anexou na tarefa do Fracttal (a PT no De acordo, com a assinatura do técnico
-    e a de quem aceitou; a APR desde a v251 do App); o Nexus busca no Fracttal na hora do clique. PT não autorizada não
-    tem PDF. <b>Quem pode dar o De acordo:</b> o Supervisor de Campo da região da usina (com a vaga aberta, o
-    Coordenador), o gestor de contrato da usina, quem é do COS (o vínculo COS no cadastro de pessoas) e um administrador.</p>
+        <p><b>Como ler.</b> <span class="gc-ponto gc-ponto--critico">Vermelho</span>: parada há mais de 2 h.
+          <span class="gc-ponto gc-ponto--alerta">Amarelo</span>: esperando há menos. Na coluna APR, quantas respostas NÃO
+          ela teve. Clique na linha para ver o detalhe; Assinar abre o card de assinatura.</p>
+        <p><b>De onde vem.</b> As PT que o App grava no banco do Nexus. A usina é a do cadastro; quando o App não a liga,
+          vale a da OS no Fracttal. Equipe, responsável, região de campo e gestor de contrato vêm do cadastro do Nexus. Os
+          PDFs da PT e da APR são os que o App anexou na tarefa do Fracttal.</p>
+        <p><b>Quem pode dar o De acordo:</b> o Responsável UFV, o Supervisor de Campo da região (com a vaga aberta, o
+          Coordenador) e o gestor de contrato da usina; o COS de sexta 18h a segunda 6h e nos feriados; ou um
+          administrador. Quem pediu a PT não a decide. Assina-se com a conta com que se entrou no Nexus.</p>
       {% endcall %}</div><p class="cn-pergunta">{{ tela.pergunta }}</p></div>
-    <div class="cn-frescor">livro de PT do App<br><b>lido às {{ lido }}</b>{% include 'campo/_aviso_fato.html' %}</div>
   </div>
   {% if leitura.erro %}<div class="cn-erro" role="alert"><b>{{ leitura.erro }}.</b></div>{% endif %}
   {% if aviso %}<div class="cn-erro" role="alert"><b>{{ aviso }}</b></div>{% endif %}
   {% if gravada %}<div class="cn-certo" role="status"><b>Decisão da {{ gravada }} salva no banco.</b> O técnico vê quando o App aplicar a decisão.</div>{% endif %}
   {% include 'campo/_aviso_estrutura.html' %}
-  {% set r = d.get('resumo') or {} %}
-  <div class="cn-numeros">
-    <span><span class="gc-rotulo">Aguardando</span><span class="v{% if r.get('aguardando') %} ruim{% endif %}">{{ r.get('aguardando', 0) }}</span><span class="d">o De acordo do supervisor</span></span>
-    <span><span class="gc-rotulo">Paradas há mais de 2 h</span><span class="v">{{ r.get('paradas', 0) }}</span><span class="d">das que aguardam</span></span>
-    <span><span class="gc-rotulo">Mais antiga</span><span class="v">{{ '—' if r.get('mais_antiga_min') is none else idade_min(r.get('mais_antiga_min')) }}</span><span class="d">esperando</span></span>
-    <span><span class="gc-rotulo">Espera típica</span><span class="v">{{ '—' if r.get('espera_mediana_min') is none else idade_min(r.get('espera_mediana_min')) }}</span><span class="d">até a decisão (mediana)</span></span>
-    <span><span class="gc-rotulo">Com resposta NÃO</span><span class="v">{{ r.get('com_nao', 0) }}</span><span class="d">na APR</span></span>
-  </div>
 
   <nav class="cn-abas" aria-label="Abas">
     <a href="{{ url(aba=None, sit=None, dias=None) }}"{% if aba == 'esperando' %} aria-current="page"{% endif %}>Esperando o De acordo<i>{{ (d.get('aguardando') or [])|length }}</i></a>
@@ -72,27 +73,26 @@
     <a href="{{ url(aba='sem', modo=None, sit=None, f=None, pag=None) }}"{% if aba == 'sem' %} aria-current="page"{% endif %}>Sem APR ou PT</a>
   </nav>
 
-  <form class="cn-filtros" method="get">
-    {% if aba == 'esperando' %}
-    <div class="cn-seg" aria-label="Visão">
-      <a href="{{ url(modo=None) }}"{% if modo == 'responsaveis' %} aria-current="page"{% endif %}>Por responsável</a>
-      <a href="{{ url(modo='tabela') }}"{% if modo == 'tabela' %} aria-current="page"{% endif %}>Tabela</a>
-    </div>
-    {% else %}
+  {# os filtros no padrão do Histórico de OS do OS Creator (23/11/2026, Levi: "quero os filtros no estilo de filtro do
+     histórico de OS do OS creator! mesma funcionalidade de lógica!"): o static/filtros-os.js monta a barra, o painel com
+     as listas digitáveis de marcar, o Aplicar, as etiquetas e o Limpar tudo com as <select multiple> daqui #}
+  <form class="cn-filtros" method="get" data-fo>
+    {# só a tabela desde 23/11/2026 (Levi: "tire a visão por responsável e deixe só a tabela") #}
+    {% if aba != 'esperando' %}
     <input type="hidden" name="aba" value="{{ aba }}">
     {% if aba == 'sem' %}<input type="hidden" name="tipo" value="{{ tipo }}">{% endif %}
     {% endif %}
-    {# cliente, usina e Responsável UFV, em cascata, cada opção com quantas PT tem com os outros filtros (o rótulo e a
-       caixa juntos, como em Extintores) #}
+    <input type="search" name="q" value="{{ q }}" placeholder="Buscar OS, usina, equipamento ou técnico" aria-label="Buscar" autocomplete="off">
+    {# cliente, usina e Responsável UFV, em cascata, cada opção com quantas PT tem com os outros filtros #}
     {% for campo, rotulo in filtros_pt %}
     <label class="cn-filtro-par"><span class="gc-rotulo">{{ rotulo }}</span>
-    <select class="gc-campo" id="pt-{{ campo }}" name="{{ campo }}" onchange="this.form.submit()">
-      <option value="">Todos</option>{% for v, n in opcoes[campo] %}<option value="{{ v }}"{% if v == fl[campo] %} selected{% endif %}>{{ v }} ({{ n }})</option>{% endfor %}
+    <select class="gc-campo" id="pt-{{ campo }}" name="{{ campo }}" multiple data-todos="Todos">
+      {% for v, n in opcoes[campo] %}<option value="{{ v }}"{% if v in fl[campo] %} selected{% endif %}>{{ v }} ({{ n }})</option>{% endfor %}
     </select></label>
     {% endfor %}
-    <input class="gc-campo" type="search" name="q" value="{{ q }}" placeholder="OS, tarefa, usina, equipamento ou técnico" aria-label="Buscar">
     {% for k in ('modo', 'sit', 'f') %}{% if request.args.get(k) %}<input type="hidden" name="{{ k }}" value="{{ request.args.get(k) }}">{% endif %}{% endfor %}
   </form>
+  <script src="{{ url_for('static', filename='filtros-os.js') }}"></script>
 
   {% if aba == 'esperando' %}
   {% include 'campo/_pt_esperando.html' %}

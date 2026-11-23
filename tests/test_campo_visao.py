@@ -195,6 +195,24 @@ def test_pt_fila_da_mais_antiga_nome_resumido_e_local(banco):
     assert d["historico"][0]["espera_min"] == 60
 
 
+def test_a_pt_sem_usina_ligada_ganha_a_da_os_e_o_nome_sem_cliente(banco):
+    """Caso de 23/11/2026: o App escreveu "Transformador 1" (o equipamento) no campo Usina de uma PT, e "Thopen · Thopen -
+    Pharmas - PR" no de outra. A primeira ganha a usina da OS no Fracttal (`nexus_os · fato_tarefa_os`); a segunda, sem
+    usina no cadastro, fica só com o nome da usina, sem o cliente e o estado (Levi: "tem que vir só o nome da usina")."""
+    equipamento = dict(_pt("PT-7", 3), **{"OS": "701", "Código do ativo": "", "Usina": "Transformador 1", "Ativo": ""})
+    sem_cadastro = dict(_pt("PT-8", 2), **{"OS": "702", "Código do ativo": "", "Usina": "Thopen · Thopen - Pharmas - PR",
+                                           "Ativo": ""})
+    _aba(banco, "pt_app_campo", "PT", [equipamento, sem_cadastro])
+    _aba(banco, "nexus_os", "fato_tarefa_os", [{"fracttal_tarefa_id": 1, "os": "701", "usina_id": 1,
+                                                "site_fracttal": "Thopen - Altair 1 - SP"}])
+    visao.limpar()
+    d = {p["numero"]: p for p in visao.pts().dados["aguardando"]}
+    assert (d["PT-7"]["usina"], d["PT-7"]["usina_id"]) == ("Altair", 1)
+    assert d["PT-8"]["usina"] == "Pharmas" and not d["PT-8"]["usina_id"]
+    assert visao.nome_da_usina_crua("Greenyellow - Cedro 1 - CE") == "Cedro 1"
+    assert visao.nome_da_usina_crua("Transformador 1") == "Transformador 1"     # fora do padrão, fica como está
+
+
 def test_central_em_tres_visoes(banco):
     d = visao.atencao(14).dados
     pend = {p["usina"]: p for p in d["pendentes"]}
@@ -274,23 +292,21 @@ def test_central_abre_por_responsavel_e_a_equipe_e_filtro(banco, logado):
     assert 'id="cn-regiao"' not in html and 'id="cn-uf"' not in html
     html = logado.get("/t/campo/atencao?vista=pt").get_data(as_text=True)
     assert ">PT esperando</th>" in html
-def test_a_tela_de_pt_e_so_por_responsavel_com_os_filtros_de_cliente_usina_e_responsavel(banco, logado):
-    """Levi, 24/10/2026: "Tire por equipe e por região de campo e deixe apenas por responsável"; "Tire o filtro de região
-    e gestor de contrato e região do brasil. Quero filtro para cliente, usina e responsável com contador para cada!"."""
+def test_a_tela_de_pt_e_so_a_tabela_com_os_filtros_de_cliente_usina_e_responsavel(banco, logado):
+    """Levi, 23/11/2026: "tire a visão por responsável e deixe só a tabela"; 24/10/2026: "Tire o filtro de região e
+    gestor de contrato e região do brasil. Quero filtro para cliente, usina e responsável com contador para cada!"."""
     import re as _re
     html = logado.get("/t/hseq/apr-pt").get_data(as_text=True)
-    assert 'aria-current="page">Por responsável</a>' in html and ">Tabela</a>" in html
-    assert ">Por equipe</a>" not in html and ">Por região de campo</a>" not in html
-    # (uma linha por responsável desde 16/11/2026: as 2 PT, 1 parada há mais de 2 h)
-    assert '<td class="n"><b>2</b></td>' in html and '<span class="cn-min-st cn-min-st--critico">1</span>' in html
+    assert ">Por responsável</a>" not in html and ">Tabela</a>" not in html and 'class="cn-resp-tab"' not in html
+    assert 'table class="cn-expande pt-enxuta"' in html and html.count('class="cn-link cn-os"') == 2
     for antigo in ('id="cn-regiao"', 'id="cn-regiao-campo"', 'id="cn-gestor"'):
         assert antigo not in html
     assert _re.findall(r'<select class="gc-campo" id="pt-(\w+)" name="(\w+)"', html) == [
         ("cliente", "cliente"), ("usina", "usina"), ("responsavel", "responsavel")]
     assert '<option value="Thopen">Thopen (2)</option>' in html and '<option value="Altair">Altair (2)</option>' in html
-    # o endereço de antes (por região, por gestor, a equipe) cai no Por responsável e não filtra
+    # o endereço de antes (por região, por gestor, a equipe) cai na tabela e não filtra
     antigo = logado.get("/t/hseq/apr-pt?modo=regioes&regiao_campo=Sul+01&gestor=Ciclano+Chefe").get_data(as_text=True)
-    assert 'aria-current="page">Por responsável</a>' in antigo and '<td class="n"><b>2</b></td>' in antigo
+    assert antigo.count('class="cn-link cn-os"') == 2
 
 
 def test_tela_de_pt_tabela_com_o_responsavel_e_historico(banco, logado):
@@ -303,14 +319,16 @@ def test_tela_de_pt_tabela_com_o_responsavel_e_historico(banco, logado):
         logado.get("/t/campo/atencao?vista=pt&modo=tabela").get_data(as_text=True))
     html = logado.get("/t/hseq/apr-pt?modo=tabela").get_data(as_text=True)
     assert html.count('class="cn-link cn-os"') == 2 and ">700<" in html                    # PT-1 e PT-2, pela OS
-    # 09/10/2026: a PT e a APR em colunas (Levi: "invés de PDF e baixar terá uma coluna de PT e APR")
-    cab = ("<th>OS</th><th>Tarefa</th><th>Usina</th><th>Equipamento</th><th>Equipe</th><th>Responsável</th>"
-           "<th>Técnico</th><th>Respostas NÃO</th><th>Espera</th><th>PT</th><th>APR</th>")
+    # a tabela enxuta (23/11/2026, Levi: "a tabela dá para dar uma enxugada"): 7 colunas, o Assinar e o PDF da APR
+    cab = "<th>Espera</th><th>OS</th><th>Usina</th><th>Responsável UFV</th><th>Técnico</th><th>APR</th>"
     assert cab in html and "<th>Estado</th>" not in html and "/t/campo/pt/PT-1/apr.pdf" in html
+    assert 'href="/t/campo/pt/PT-1/assinar?ativo=THPN-ALT100-INVR1">Assinar</a>' in html
     assert 'class="cn-detalhe" hidden' in html and "Atividades críticas" in html and "Eletricidade" in html
     assert "Inversor 1" in html and "THPN-ALT100-INVR1" in html
     # a Central segue com a região na tabela (o pedaço é o mesmo; só a APR e PT pede o responsável)
     assert "<th>Região</th>" in logado.get("/t/campo/atencao?vista=pt&modo=tabela").get_data(as_text=True)
+    # sem os cartões de números: eles foram para o "!" (Levi: "esses KPIs aí são inúteis")
+    assert 'class="cn-numeros"' not in html and "esperando o De acordo, 1 paradas há mais de 2 h" in html
     html = logado.get("/t/hseq/apr-pt?cliente=Outro+Cliente&modo=tabela").get_data(as_text=True)
     assert "Nenhuma PT esperando o De acordo com esses filtros" in html
     html = logado.get("/t/hseq/apr-pt?aba=historico").get_data(as_text=True)
@@ -319,13 +337,22 @@ def test_tela_de_pt_tabela_com_o_responsavel_e_historico(banco, logado):
     assert "<th>Usina</th><th>Responsável</th>" in html and 'name="dias"' not in html     # sem o período: tudo
 
 
-def test_o_cartao_do_responsavel_leva_a_tabela_dele(banco, logado):
-    html = logado.get("/t/hseq/apr-pt").get_data(as_text=True)
-    i = html.index('<a class="cn-resp-nome"')
-    href = html[i:html.index(">", i)].split('href="')[1].split('"')[0].replace("&amp;", "&")
-    assert href.startswith("?modo=tabela&responsavel=")
-    tabela = logado.get("/t/hseq/apr-pt" + href).get_data(as_text=True)
-    assert tabela.count('class="cn-link cn-os"') == 2
+def test_o_filtro_da_usina_filtra_a_tabela(banco, logado):
+    """O endereço com o filtro (o link da Mesa da Segurança leva o responsável) filtra a tabela, a única visão desde
+    23/11/2026."""
+    html = logado.get("/t/hseq/apr-pt?usina=Altair").get_data(as_text=True)
+    assert html.count('class="cn-link cn-os"') == 2 and '<option value="Altair" selected>' in html
+    assert "Nenhuma PT esperando" in logado.get("/t/hseq/apr-pt?usina=Outra").get_data(as_text=True)
+
+
+def test_os_filtros_da_pt_aceitam_varios_valores_como_o_historico_de_os(banco, logado):
+    """Levi, 23/11/2026: "quero os filtros no estilo de filtro do histórico de OS do OS creator! mesma funcionalidade de
+    lógica!": cada filtro é uma lista de marcar (o static/filtros-os.js), e dois valores somam as PT dos dois."""
+    html = logado.get("/t/hseq/apr-pt?usina=Altair&usina=Outra").get_data(as_text=True)
+    assert html.count('class="cn-link cn-os"') == 2
+    assert '<option value="Altair" selected>' in html and '<option value="Outra" selected>Outra (0)</option>' in html
+    assert "data-fo" in html and 'name="usina" multiple data-todos="Todos"' in html and "filtros-os.js" in html
+    assert 'onchange="this.form.submit()"' not in html
 
 
 class _FracttalPT:

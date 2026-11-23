@@ -22,7 +22,7 @@ def test_a_pt_foi_para_seguranca(logado):
     r = logado.get("/t/campo/pt?aba=historico&dias=7")
     assert r.status_code == 302 and r.headers["Location"].endswith("/t/hseq/apr-pt?aba=historico&dias=7")
     html = logado.get("/t/hseq/apr-pt").get_data(as_text=True)
-    assert "Permissões de trabalho e Análise Preliminar de Risco" in html and "Segurança · HSEQ" in html
+    assert "<h1 class=\"cn-titulo\">APR e PT</h1>" in html and "Segurança · HSEQ" in html
 
 
 def test_zeladoria_e_triagem_sairam_e_o_endereco_leva_ao_lugar_novo(logado):

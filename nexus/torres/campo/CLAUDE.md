@@ -616,18 +616,23 @@ As constantes ficam no topo do arquivo; cada função diz a regra no docstring.
   nele), sem nenhuma as abertas no dia, sem nenhuma todas; o equipamento sai do colchete do nome da tarefa ("[Cabine 2] -
   ..."; no "[Grid Co.] - MPM - X", o X). Fonte: o `gestao_pcm.json` da Gestão PCM (`pcm/fonte.ler_gestao`, o mesmo cache),
   porque 25 das 29 OS eram do fim de semana, fora da programação. A linha mostra a 1ª tarefa (+ quantas mais), os
-  equipamentos e "APR do dia dd/mm" embaixo; o detalhe lista as tarefas com o estado. OS que ainda não chegou ao arquivo
+  equipamentos embaixo (desde 23/11/2026 sem o "APR do dia dd/mm" na linha: "tá matando", Levi); o detalhe lista as
+  tarefas com o estado. OS que ainda não chegou ao arquivo
   fica como o App mandou, com o dia marcado. Levi, 11/10: "aparece como 'APR do dia'? sendo que está ligado a atividade de
   um ativo no fractal".
 - **"Esperando o De acordo" é a MESMA tela da Central > Permissões de trabalho** (Levi, 05/10): as duas incluem
-  `templates/campo/_pt_esperando.html` (desde 24/10/2026 as duas só pedem o Por responsável, uma linha por pessoa
-  desde 16/11/2026, e a tabela; a da
-  APR e PT leva a coluna Responsável no lugar da região, `coluna_responsavel`; tabela com a OS em verde,
-  Equipamento, Espera no fim e a linha que abre o detalhe). Mudou uma, mudou a outra (os testes conferem as duas).
+  `templates/campo/_pt_esperando.html` (a Central pede o Por responsável, uma linha por pessoa desde 16/11/2026, e a
+  tabela; a APR e PT, desde 23/11/2026, só a tabela, com a coluna Responsável UFV no lugar da região,
+  `coluna_responsavel`). A tabela é a enxuta de 23/11/2026 (`pt-enxuta`, 7 colunas: Espera, OS, Usina com o
+  equipamento, Região ou Responsável com a equipe, Técnico, APR com as NÃO, e o Assinar com o PDF da APR; a linha abre o
+  detalhe). Mudou uma, mudou a outra (os testes conferem as duas).
+- **A usina da PT pela OS** (23/11/2026): a PT que o App não liga a uma usina do cadastro ganha a da OS no
+  `nexus_os · fato_tarefa_os` (`visao._usina_pela_os`, lido só quando falta), e o texto cru perde o cliente e a UF
+  (`visao.nome_da_usina_crua`). Caso: "Transformador 1" e "Thopen · Thopen - Pharmas - PR" na coluna Usina.
 - **Tela de PT** (Levi, 05/10; desde 24/10/2026 a regra está em `nexus/torres/hseq/CLAUDE.md`, "APR e PT"): abas
-  "Esperando o De acordo" (cartões por responsável ou tabela) e "Histórico" (todas as decididas, de 20 em 20, por
-  situação; só tabela). Filtros de cliente, usina e Responsável UFV com a conta de cada opção, nas duas abas; o cartão
-  leva à tabela do responsável. Na tabela: só o número da OS, em verde Grid, no lugar do número da PT (abre a aprovação); Equipamento no
+  "Esperando o De acordo" e "Histórico" (todas as decididas, de 20 em 20, por situação), só em tabela desde
+  23/11/2026. Filtros de cliente, usina e Responsável UFV, de vários valores, no padrão do Histórico de OS
+  (`static/filtros-os.js`), com a conta de cada opção, nas abas. Na tabela: só o número da OS, em verde Grid, no lugar do número da PT (abre a aprovação); Equipamento no
   lugar do Estado; Espera na última coluna; clicar na linha abre o detalhe (PT, equipamento, equipe, região de campo
   com o Supervisor de Campo, gestor de contrato,
   atividades críticas com sim/não/NA, respostas NÃO, 1º aviso, decisão e motivo). O cartão inteiro leva à tabela

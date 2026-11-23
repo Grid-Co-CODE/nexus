@@ -952,8 +952,8 @@ POR_PAGINA_PT = 20          # o histórico inteiro, de 20 em 20 ("para não pesa
 
 
 def _opcoes_pt(linhas, fl: dict, passa) -> dict:
-    """{filtro: [(valor, quantas PT)]}: o que existe com os OUTROS filtros aplicados, com a conta de cada um; a escolhida
-    fica mesmo sem resultado (com 0) e o "Sem responsável" por último."""
+    """{filtro: [(valor, quantas PT)]}: o que existe com os OUTROS filtros aplicados, com a conta de cada um; as
+    escolhidas ficam mesmo sem resultado (com 0) e o "Sem responsável" por último. `fl` = {filtro: [valores]}."""
     out = {}
     for campo, _rot in FILTROS_PT:
         n = {}
@@ -962,8 +962,8 @@ def _opcoes_pt(linhas, fl: dict, passa) -> dict:
                 v = _valor_central(x, campo)
                 if v:
                     n[v] = n.get(v, 0) + 1
-        if fl[campo] and fl[campo] not in n:
-            n[fl[campo]] = 0
+        for v in fl[campo]:
+            n.setdefault(v, 0)
         out[campo] = sorted(n.items(), key=lambda kv: (kv[0] == visao.SEM_RESPONSAVEL, kv[0].lower()))
     return out
 
@@ -981,17 +981,21 @@ def pagina_pt():
     e a decisão), e o histórico das decididas, com o PDF da PT e o da APR em colunas (Levi, 09/10). Desde 24/10/2026
     (Levi: "Tire por equipe e por região de campo e deixe apenas por responsável"; "Em tabela tire a coluna região e
     coloque a coluna responsável"; os filtros de cliente, usina e responsável com contador, os mesmos no histórico; "Em
-    histórico quero todo o período mostrando de 20 em 20 para não pesar tanto")."""
+    histórico quero todo o período mostrando de 20 em 20 para não pesar tanto"). Desde 23/11/2026 só a tabela, enxuta
+    (Levi: "tire a visão por responsável e deixe só a tabela"; "esses KPIs aí são inúteis": os números foram para o
+    "!"; "Esse APR do dia tal aí tá matando"), com o título curto do menu, APR e PT."""
     leitura = visao.pts()
     d = leitura.dados
     aba = request.args.get("aba") if request.args.get("aba") in ("historico", "sem") else "esperando"
-    fl = {c: request.args.get(c, "").strip() for c, _rot in FILTROS_PT}
+    # vários valores por filtro (23/11/2026, o padrão do Histórico de OS: `static/filtros-os.js`); o link de um valor só
+    # (a Mesa da Segurança manda ?responsavel=...) continua valendo
+    fl = {c: [v.strip() for v in request.args.getlist(c) if v.strip()] for c, _rot in FILTROS_PT}
     sit, q = request.args.get("sit", ""), request.args.get("q", "").strip().lower()
-    modo = "tabela" if request.args.get("modo") == "tabela" or aba == "historico" else "responsaveis"
+    modo = "tabela"
     campos = ("os", "numero", "tarefa", "usina", "ativo", "codigo", "equipe", "solicitante", "decidida_por", "tecnico")
 
     def passa(x, menos=None):
-        return (all(not v or c == menos or _valor_central(x, c) == v for c, v in fl.items())
+        return (all(not v or c == menos or _valor_central(x, c) in v for c, v in fl.items())
                 and (not q or q in " ".join(str(x.get(c) or "") for c in campos).lower()))
     aguardando = com_quem_assina([p for p in d.get("aguardando") or [] if passa(p)])
     # a aba Esperando é a MESMA da Central de atenção > Permissões de trabalho (Levi, 05/10)
@@ -1023,7 +1027,7 @@ def pagina_pt():
     # parecia "nenhuma OS sem APR")
     erro_sem = lida.erro if aba == "sem" else ""
     return render_template("campo/pt.html", **_comum(
-        "pt", leitura, torre=torre, tela=tela, titulo="Permissões de trabalho e Análise Preliminar de Risco",
+        "pt", leitura, torre=torre, tela=tela, titulo="APR e PT",
         aviso=session.pop("pt_aviso", "") or (f"Não li a aba Sem APR ou PT: {erro_sem}." if erro_sem else ""), gravada=session.pop("pt_gravada", ""),
         aba=aba, modo=modo, aguardando=aguardando, n_hist=len(historico), contagem_hist=contagem, sit=sit,
         tipo=tipo, sem=sem[(pag - 1) * POR_PAGINA_PT:pag * POR_PAGINA_PT], n_sem=len(sem), livro_apr=livro_apr,
