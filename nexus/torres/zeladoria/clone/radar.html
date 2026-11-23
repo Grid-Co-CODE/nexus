@@ -9066,7 +9066,22 @@ function bindEventsLinhaDoTempo(app){
   app.querySelectorAll('[data-tl-item]').forEach(function(b){ b.addEventListener('click', function(){ var k = b.getAttribute('data-tl-item'); if (b.classList.contains('tl-barra')) { ui.tlReal = k; render(); } else onClicarItemLinhaDoTempo(k); }); });
   app.querySelectorAll('[data-tl-resumo-item]').forEach(function(b){ b.addEventListener('click', function(){ ui.tlReal = b.getAttribute('data-tl-resumo-item'); render(); }); });
   var bn = document.getElementById('btn-tl-novo-item'); if (bn) bn.addEventListener('click', function(){ openNovaOSContrato(null, null); });
-  var bpdf = document.getElementById('btn-tl-exportar-pdf'); if (bpdf) bpdf.addEventListener('click', exportarCronogramaPdf);
+  var bpdf = document.getElementById('btn-tl-exportar-pdf'); if (bpdf) bpdf.addEventListener('click', function(){ ui.tlPdfOpcoes = { fornecedores: true, clientes: true }; render(); });
+  ['btn-tl-pdf-fechar', 'btn-tl-pdf-cancelar'].forEach(function(id){ var el = document.getElementById(id); if (el) el.addEventListener('click', function(){ ui.tlPdfOpcoes = null; render(); }); });
+  ['fornecedores', 'clientes'].forEach(function(k){ var el = document.getElementById('tl-pdf-' + k); if (el) el.addEventListener('change', function(){ ui.tlPdfOpcoes[k] = el.checked; render(); }); });
+  var bpdfg = document.getElementById('btn-tl-pdf-gerar'); if (bpdfg) bpdfg.addEventListener('click', function(){ var op = ui.tlPdfOpcoes; ui.tlPdfOpcoes = null; render(); exportarCronogramaPdf(op); });
+}
+/* "Exportar PDF" com opção de esconder fornecedores e/ou clientes (pedido do Analista, 2026-11-23):
+   pra adaptar o PDF a quem vai receber — por ex. mandar pro cliente sem expor o fornecedor, ou o
+   contrário. Default: os dois aparecem (igual era antes de existir a opção). */
+function modalTlExportarPdf(){
+  if (!ui.tlPdfOpcoes) return '';
+  var O = ui.tlPdfOpcoes;
+  return '<div class="overlay open" id="overlay-tl-pdf"><div class="modal" style="max-width:420px;"><div class="modal-head"><h3>Exportar PDF do cronograma</h3><button class="modal-close" id="btn-tl-pdf-fechar">&times;</button></div><div class="modal-body">' +
+    '<p class="cell-muted" style="font-size:12px;margin:0 0 10px;">Usa os filtros e o período da tela. Escolha o que entra no PDF — dá pra adaptar conforme quem vai receber.</p>' +
+    '<label style="display:flex;align-items:center;gap:8px;font-size:13px;margin-bottom:8px;"><input type="checkbox" id="tl-pdf-fornecedores" style="width:auto;"' + (O.fornecedores !== false ? ' checked' : '') + '> Nome dos fornecedores</label>' +
+    '<label style="display:flex;align-items:center;gap:8px;font-size:13px;margin-bottom:8px;"><input type="checkbox" id="tl-pdf-clientes" style="width:auto;"' + (O.clientes !== false ? ' checked' : '') + '> Nome dos clientes</label>' +
+    '<div class="modal-actions"><button class="btn btn-ghost" id="btn-tl-pdf-cancelar">Cancelar</button><button class="btn btn-primary" id="btn-tl-pdf-gerar">Gerar PDF</button></div></div></div></div>';
 }
 
 /* ---------- Importação do Cronograma (Resumo Zeladoria, aba "Cronograma") ---------- */
@@ -13476,8 +13491,10 @@ function bindEventsAprovLote(app){
    ("Salvar como PDF"). Se o navegador bloquear a aba, baixa o .html, que imprime igual. */
 var _tlExportDados = null;
 var MESES_PT = ['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
-function htmlExportCronograma(){
+function htmlExportCronograma(opcoes){
   var D = _tlExportDados; if (!D) return null;
+  opcoes = opcoes || {};
+  var mostraForn = opcoes.fornecedores !== false, mostraCli = opcoes.clientes !== false;
   var ini = D.ini, dias = D.dias, semanas = D.semanas, hojeOff = analiseDiasEntre(ini, hoje()), critMapa = mapaCriticidadePorUsina();
   var porUsina = {}, ordem = [];
   D.itens.forEach(function(i){
@@ -13488,7 +13505,7 @@ function htmlExportCronograma(){
   ordem.sort(function(a, b){ var ia = porUsina[a].itens.reduce(function(m, x){ return x.inicio < m ? x.inicio : m; }, '9999'), ib = porUsina[b].itens.reduce(function(m, x){ return x.inicio < m ? x.inicio : m; }, '9999'); return ia.localeCompare(ib) || porUsina[a].nome.localeCompare(porUsina[b].nome, 'pt-BR'); });
   var clientes = {}; ordem.forEach(function(k){ var u = porUsina[k].usina; if (u && u.cliente) clientes[u.cliente] = true; });
   var cls = Object.keys(clientes);
-  var titulo = 'Cronograma de Zeladoria — ' + (cls.length === 1 ? 'Usinas ' + cls[0] : 'Usinas');
+  var titulo = 'Cronograma de Zeladoria — ' + (mostraCli && cls.length === 1 ? 'Usinas ' + cls[0] : 'Usinas');
   var dMin = null, dMax = null;
   D.itens.forEach(function(i){ var a = i.inicio < ini ? ini : i.inicio, b = i.fim > D.fim ? D.fim : i.fim; if (!dMin || a < dMin) dMin = a; if (!dMax || b > dMax) dMax = b; });
   var mesesTxt = '';
@@ -13506,7 +13523,7 @@ function htmlExportCronograma(){
       g.forEach(function(i){ faixas.push([i]); });
     });
     var h = Math.max(1, faixas.length) * 19 + 8;
-    var html = '<div class="lin" style="height:' + h + 'px;"><div class="nome"><b>' + esc(L.nome) + '</b> <span class="uf">' + esc(u && u.uf ? u.uf : '') + '</span>' + chip('V', cr ? cr.vegetacao : null) + chip('S', cr ? cr.sujidade : null) + '</div><div class="area">';
+    var html = '<div class="lin" style="height:' + h + 'px;"><div class="nome"><b>' + esc(L.nome) + '</b>' + (mostraCli && u && u.cliente ? ' <span class="uf">· ' + esc(u.cliente) + '</span>' : '') + ' <span class="uf">' + esc(u && u.uf ? u.uf : '') + '</span>' + chip('V', cr ? cr.vegetacao : null) + chip('S', cr ? cr.sujidade : null) + '</div><div class="area">';
     for (var w = 1; w < semanas; w++) html += '<div class="vgrid" style="left:' + (w / semanas * 100) + '%"></div>';
     if (hojeOff >= 0 && hojeOff < dias) html += '<div class="hoje" style="left:' + pct(hojeOff) + '%"></div>';
     faixas.forEach(function(itens, fi){
@@ -13532,6 +13549,7 @@ function htmlExportCronograma(){
         if (priA == null) return;
         var datas = (i.partes && i.partes.length ? i.partes : [[i.planIni, i.planFim]]).map(function(t){ var x = fmtDate(t[0]).slice(0, 5), y = fmtDate(t[1]).slice(0, 5); return x === y ? x : x + '–' + y; }).join(' · ');
         if (i.realIni) datas += ' · real ' + fmtDate(i.realIni).slice(0, 5) + (i.realFim ? '–' + fmtDate(i.realFim).slice(0, 5) : ' – em andamento');
+        if (mostraForn && i.fonteLabel) datas += ' · ' + i.fonteLabel;
         var dir = pct(ultB) < 78;
         html += '<div class="dt' + (i.atrasado ? ' atr' : '') + '" style="top:' + (top + 1) + 'px;' + (dir ? 'left:calc(' + pct(ultB) + '% + 6px);' : 'right:calc(' + (100 - pct(priA)) + '% + 6px);') + '">' + esc(datas) + '</div>';
       });
@@ -13564,8 +13582,8 @@ function htmlExportCronograma(){
   }).join('');
   return { html: '<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>' + esc(titulo) + '</title><style>' + css + '</style></head><body>' + corpo + '<script>window.onload=function(){setTimeout(function(){window.print();},300);};<\/script></body></html>', titulo: titulo, paginas: paginas.length, usinas: ordem.length };
 }
-function exportarCronogramaPdf(){
-  var r = htmlExportCronograma();
+function exportarCronogramaPdf(opcoes){
+  var r = htmlExportCronograma(opcoes);
   if (!r) { showToast('Abra o cronograma antes de exportar.'); return; }
   var w = null;
   try { w = window.open('', '_blank'); } catch (e) { w = null; }
@@ -13670,12 +13688,12 @@ function bindEventsPlanejadoAndamento(app){
    e manda para a Lixeira (o serviço ligado não é apagado). Tabela radar_fornecedores.ordens_servico. */
 function linhaParaOrdemServico(r){
   return { id: r.id, numero: r.numero, usinaId: r.usina_id, usinaTexto: r.usina_texto, servico: r.servico, data: r.data, fornecedor: r.fornecedor_texto, status: r.status || 'aberta',
-    concluidaEm: r.concluida_em, justificativa: r.justificativa, vinculo: r.vinculo, vinculoManual: !!r.vinculo_manual, observacao: r.observacao, fracttal: r.fracttal || null,
+    concluidaEm: r.concluida_em, justificativa: r.justificativa, vinculo: r.vinculo, vinculoManual: !!r.vinculo_manual, observacao: r.observacao, tipoVistoria: r.tipo_vistoria || null, fracttal: r.fracttal || null,
     excluido: !!r.excluido, excluidoEm: r.excluido_em, excluidoPor: r.excluido_por, criadoEm: r.criado_em, criadoPor: r.criado_por, atualizadoEm: r.atualizado_em, atualizadoPor: r.atualizado_por };
 }
 function ordemServicoParaLinha(o){
   return { id: o.id, numero: o.numero, usina_id: o.usinaId || null, usina_texto: o.usinaTexto || null, servico: o.servico || null, data: o.data || null, fornecedor_texto: o.fornecedor || null,
-    status: o.status || 'aberta', concluida_em: o.concluidaEm || null, justificativa: o.justificativa || null, vinculo: o.vinculo || null, vinculo_manual: !!o.vinculoManual, observacao: o.observacao || null, fracttal: o.fracttal || null,
+    status: o.status || 'aberta', concluida_em: o.concluidaEm || null, justificativa: o.justificativa || null, vinculo: o.vinculo || null, vinculo_manual: !!o.vinculoManual, observacao: o.observacao || null, tipo_vistoria: o.tipoVistoria || null, fracttal: o.fracttal || null,
     excluido: !!o.excluido, excluido_em: o.excluidoEm || null, excluido_por: o.excluidoPor || null, criado_em: o.criadoEm || undefined, criado_por: o.criadoPor || null,
     atualizado_em: o.atualizadoEm || null, atualizado_por: o.atualizadoPor || null };
 }
@@ -13964,6 +13982,9 @@ function descricaoVinculoOS(it){
    PCM também precisa finalizar no Fracttal. Só vale para OS concluída aqui: finalizada (status 3) /
    falta (ainda aberta ou em revisão lá) / cancelada / não conferida / não encontrada. */
 var OS_FINALIZACAO = { finalizada: 'Finalizada no Fracttal', falta: 'Falta finalizar no Fracttal', cancelada: 'Cancelada no Fracttal', naoConferida: 'Ainda não conferida no Fracttal', naoEncontrada: 'Não encontrada no Fracttal' };
+/* Tipo de vistoria (pedido do Analista, 2026-11-18): o Fracttal passou a dividir a OS em inicial/final.
+   Só as OS novas (e as que forem editadas) ganham essa informação; as antigas ficam sem tipo ("juntas"). */
+var OS_TIPO_VISTORIA = { inicial: 'Vistoria inicial', final: 'Vistoria final' };
 /* técnico responsável pela OS no Fracttal (quem cobrar); null = OS ainda não conferida */
 function osTecnicoOS(o){ var fr = o.fracttal; return fr && fr.encontrada ? (fr.tecnico || 'sem técnico no Fracttal') : null; }
 function osFinalizacaoFracttal(o, st){
@@ -13977,8 +13998,10 @@ function osCardHtml(o, st){
   var u = o.usinaId ? usinaById(o.usinaId) : null;
   var html = '<div class="card" data-os-card="' + esc(o.id) + '" style="padding:10px 12px;margin-bottom:8px;' + (st.col === 'sem' ? 'border-left:3px solid var(--critical);' : '') + '">';
   html += '<div style="display:flex;justify-content:space-between;gap:6px;align-items:baseline;"><b style="font-size:13px;">OS ' + esc(o.numero) + '</b><span class="cell-muted mono" style="font-size:11px;">' + fmtDate(o.data) + '</span></div>';
+  if (OS_TIPO_VISTORIA[o.tipoVistoria]) html += '<div style="margin-top:3px;"><span class="pill ' + (o.tipoVistoria === 'final' ? 'pill-good' : 'pill-info') + '" style="font-size:10.5px;">' + esc(OS_TIPO_VISTORIA[o.tipoVistoria]) + '</span></div>';
   html += '<div style="font-weight:600;font-size:12.5px;margin-top:2px;">' + esc(u ? u.usina : (o.usinaTexto || '—')) + ' <span class="cell-muted" style="font-weight:400;font-size:11px;">' + esc(u ? ((u.uf || '') + (u.cliente ? ' · ' + u.cliente : '')) : 'usina não encontrada') + '</span></div>';
   html += '<div style="font-size:12px;">' + esc(nomeServicoCurto(o.servico || '')) + ' · <span class="cell-muted">' + esc(o.fornecedor || '—') + '</span></div>';
+  if (o.observacao) html += '<div class="cell-muted" style="font-size:11px;margin-top:2px;line-height:1.35;">' + esc(o.observacao) + '</div>';
   var fr = o.fracttal, tec = osTecnicoOS(o);
   if (fr && fr.encontrada) html += '<div data-os-tecnico style="font-size:12px;margin-top:3px;">Técnico: <b>' + esc(tec) + '</b></div><div class="cell-muted" data-os-fr-info style="font-size:11px;margin-top:1px;">' + esc((fr.aberta_em ? 'aberta ' + fmtDate(fr.aberta_em) : '') + (OS_FR_STATUS[fr.status] ? (fr.aberta_em ? ' · ' : '') + OS_FR_STATUS[fr.status] + ' no Fracttal' : '')) + '</div>';
   var fin = osFinalizacaoFracttal(o, st);
@@ -14154,6 +14177,7 @@ function modalOSEditar(){
     '<div class="field"><label for="ose-usina">Usina *</label><select id="ose-usina"><option value="">— escolha —</option>' + opUsinas + '</select></div>' +
     '<div class="field-row"><div class="field"><label for="ose-servico">Serviço *</label><select id="ose-servico">' + opServ + '</select></div><div class="field"><label for="ose-fornecedor">Empresa / equipe</label><input id="ose-fornecedor" value="' + esc(o ? o.fornecedor || '' : '') + '"></div></div>' +
     (o ? '<div class="field"><label for="ose-vinculo">Serviço ligado</label><select id="ose-vinculo">' + opV + '</select></div>' : '') +
+    '<div class="field"><label for="ose-tipo-vistoria">Tipo de vistoria</label><select id="ose-tipo-vistoria"><option value=""' + (!o || !o.tipoVistoria ? ' selected' : '') + '>— não informado —</option><option value="inicial"' + (o && o.tipoVistoria === 'inicial' ? ' selected' : '') + '>Vistoria inicial</option><option value="final"' + (o && o.tipoVistoria === 'final' ? ' selected' : '') + '>Vistoria final</option></select></div>' +
     '<div class="field"><label for="ose-justificativa">Justificativa (se não tiver serviço)</label><input id="ose-justificativa" value="' + esc(o ? o.justificativa || '' : '') + '"></div>' +
     '<div class="field"><label for="ose-obs">Observação</label><input id="ose-obs" value="' + esc(o ? o.observacao || '' : '') + '"></div>' +
     '<div class="modal-actions"><button class="btn btn-ghost" id="btn-ose-cancelar">Cancelar</button><button class="btn btn-primary" id="btn-ose-salvar">Salvar</button></div></div></div></div>';
@@ -14167,7 +14191,8 @@ function onSalvarOSEditar(){
   if (dup) { showToast('Já existe a OS ' + numero + '.'); return; }
   var u = usinaById(usinaId), agora = new Date().toISOString();
   var dados = { numero: numero, data: data, usinaId: usinaId, usinaTexto: u ? u.usina : null, servico: servico, fornecedor: document.getElementById('ose-fornecedor').value.trim() || null,
-    justificativa: document.getElementById('ose-justificativa').value.trim() || null, observacao: document.getElementById('ose-obs').value.trim() || null, atualizadoEm: agora, atualizadoPor: whoami() };
+    justificativa: document.getElementById('ose-justificativa').value.trim() || null, observacao: document.getElementById('ose-obs').value.trim() || null,
+    tipoVistoria: document.getElementById('ose-tipo-vistoria').value || null, atualizadoEm: agora, atualizadoPor: whoami() };
   var selV = document.getElementById('ose-vinculo');
   if (o) {
     var mudouAlvo = o.usinaId !== usinaId || o.servico !== servico;
@@ -14540,6 +14565,7 @@ function renderShell(){
   html += modalFotosRonda();
   html += modalPlanejado();
   html += modalImportCrono();
+  html += modalTlExportarPdf();
   html += painelMotivoCronoHtml();
   html += modalDuplicarParcela();
   html += modalHistoricoFinanceiro();
