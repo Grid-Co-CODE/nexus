@@ -84,7 +84,8 @@ def test_o_livro_e_o_contrato_com_o_app():
 def test_o_catalogo_conhece_o_livro():
     """PRIORIDADE 0: o livro entra no catálogo antes da 1ª gravação, e o radar da Governança o reconhece."""
     lv = catalogo.LIVRO_POR_NOME[AU.LIVRO]
-    assert lv.abas == (AU.ABA, AU.ABA_DECISAO) and lv.so_cresce == (AU.ABA_DECISAO,) and not lv.no_banco
+    # a lista das usinas por cliente para o App (23/11/2026, test_pcm_almox_declaracoes_23_11.py) é a 3ª aba
+    assert lv.abas == (AU.ABA, AU.ABA_DECISAO, AU.ABA_LISTA) and lv.so_cresce == (AU.ABA_DECISAO,) and not lv.no_banco
     assert all(catalogo.aba_segue_a_regra(a) for a in lv.abas)
     abas = {(AU.LIVRO, a): {"id": 900 + i, "row_count": 1, "visibility": "visible"} for i, a in enumerate(lv.abas)}
     c = radar.classificar(abas)

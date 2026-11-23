@@ -28,6 +28,10 @@
 {% include "pcm/_almox_abas.html" %}
 {% if aviso %}<div class="{{ 'cn-certo' if aviso.ok else 'cn-erro cn-aviso' }}" role="status"><span><b>{{ aviso.texto }}</b></span></div>{% endif %}
 {% if d.erro_livro %}<div class="cn-erro cn-aviso" role="status"><span><b>{{ d.erro_livro }}</b> A marcação fica parada até o livro ser lido.</span></div>{% endif %}
+{# a lista das usinas por cliente que o App lê para o "compartilha" que o técnico declara (23/11/2026): vai junto de cada
+   marcação; quando o cadastro mudou depois da última, o aviso e o botão #}
+{% if d.lista_velha and pode and not d.erro_livro %}<div class="cn-erro cn-aviso" role="status"><span><b>A lista das usinas que o App mostra no "compartilha" não é a de hoje</b> (o cadastro mudou desde a última marcação).</span>
+  <form method="post" action="{{ raiz }}/t/pcm/pecas/usinas/lista"><button type="submit" class="gc-btn gc-btn--ui gc-btn--contorno">Atualizar a lista do App</button></form></div>{% endif %}
 {% if not d.almox_lido %}<p class="alm-det au-aviso">Os almoxarifados do Fracttal não foram lidos agora (a varredura do App): a coluna "No Fracttal" volta quando ela chegar.</p>{% endif %}
 
 {% if d.livro_lido %}

@@ -70,6 +70,25 @@ def usinas_com_fracttal(b) -> dict:
     return out
 
 
+def lista_para_o_app(usinas: dict) -> list[dict]:
+    """A lista das usinas por cliente que o App lê (`AU.ABA_LISTA`, 23/11/2026; o Levi: "O Nexus publica"), de onde ele tira a
+    dona do "compartilha" que o técnico declara. O `grupo_cliente` segue a regra da dona (`mesmo_cliente`): o cliente do
+    cadastro ("cliente:<id>"); sem ele, o cliente do cadastro das outras usinas do mesmo 1º nó do local no Fracttal, quando
+    é um só; e, sem nenhum, o próprio nó ("local:<nó sem acento>"). A dona que o técnico escolhe o PCM ainda confere ao
+    confirmar (`conferir`): a lista só ajuda a escolher."""
+    por_no: dict[str, set] = {}
+    for u in usinas.values():
+        if u.get("cliente_id"):
+            por_no.setdefault(_norm(cliente_do_local(u["local"])), set()).add(u["cliente_id"])
+    out = []
+    for u in usinas.values():
+        no = _norm(cliente_do_local(u["local"]))
+        cid = u.get("cliente_id") or (next(iter(por_no[no])) if len(por_no.get(no) or ()) == 1 else None)
+        out.append({"usina_id": u["id"], "usina": u["local"], "cliente_id": u.get("cliente_id"),
+                    "grupo_cliente": f"cliente:{cid}" if cid else f"local:{no}"})
+    return AU.lista_norm(out)
+
+
 def fora_da_lista(b, usinas: dict, marcadas: dict) -> list[dict]:
     """As usinas marcadas no livro que saíram da lista (a revisão, I2): excluídas do cadastro, sem o local no Fracttal no de-para
     ou fora do cadastro. Seguem no livro que o App lê, com o nome de antes, e contam na regra sem cadeia: a tela as mostra à
@@ -184,7 +203,9 @@ def montar(cfg, args, b=None) -> dict:
     clientes = sorted({u["cliente"] or cliente_do_local(u["local"]) for u in usinas.values()} - {""}, key=_norm)
     contas = {s: sum(1 for uid in usinas if (marcadas.get(uid) or {}).get("situacao") == s) for s in AU.SITUACOES}
     contas[SEM_MARCACAO] = sum(1 for uid in usinas if uid not in marcadas)
-    return {"linhas": linhas, "n_usinas": len(usinas), "clientes": clientes, "filtro": {"cliente": f_cliente, "situacao": f_sit},
+    # a lista das usinas que o App mostra no "compartilha" (23/11/2026) está velha? (o cadastro mudou desde a última marcação)
+    lista_velha = bool(usinas) and est.get("lido_em") is not None and est.get("lista", []) != lista_para_o_app(usinas)
+    return {"lista_velha": lista_velha, "linhas": linhas, "n_usinas": len(usinas), "clientes": clientes, "filtro": {"cliente": f_cliente, "situacao": f_sit},
             "filtro_situacao": FILTRO_SITUACAO, "contas": contas, "almox_lido": almox_lido, "erro_livro": est["erro"],
             "livro_lido": est.get("lido_em") is not None, "fora": fora_da_lista(b, usinas, marcadas), "rotulo": ROTULO}
 
@@ -257,7 +278,7 @@ def marcar(cfg, usinas: dict, uid: int, situacao: str, dona_id: int | None, pess
         nova = AU.linha(uid, u["local"], situacao, dona.get("id"), dona.get("local", ""), pessoa_hmac)
         return nova, uid, AU.decisao(uid, situacao, dona.get("id"), dona.get("cliente_por", ""), pessoa_hmac)
     try:
-        AU.trocar(cfg, mudar, nomes={x: v["local"] for x, v in usinas.items()})
+        AU.trocar(cfg, mudar, nomes={x: v["local"] for x, v in usinas.items()}, lista=lista_para_o_app(usinas))
     except AU.Recusada as ex:
         if str(ex) == AU.NADA_MUDOU:
             raise AU.Recusada(f"Nada mudou: {feito['u']['nome']} já está marcada assim. Nada foi gravado.") from None
@@ -310,6 +331,27 @@ def registrar(bp) -> None:
             session["pcm_almox_usinas_aviso"] = {"texto": texto, "ok": True}
         except (AU.Recusada, ValueError) as ex:
             session["pcm_almox_usinas_aviso"] = {"texto": str(ex), "ok": False}
+        # a confirmação da declaração do técnico (23/11/2026) volta ao Inventário, com o aviso lá
+        if f.get("voltar") == "inventario":
+            session["pcm_inventario_aviso"] = session.pop("pcm_almox_usinas_aviso", None)
+            return redirect(na_raiz("/t/pcm/pecas/inventario"), code=303)
         filtro = {"cliente": _txt(f.get("cliente")), "situacao": _txt(f.get("filtro_situacao"))}
         query = urlencode({k: v for k, v in filtro.items() if v})
         return redirect(na_raiz(TELA + (f"?{query}" if query else "") + (f"#u-{uid}" if uid else "")), code=303)
+
+    @bp.route("/pecas/usinas/lista", methods=["POST"], endpoint="almox_usinas_lista")
+    def almox_usinas_lista():
+        """Publica a lista das usinas por cliente para o App (23/11/2026) quando o cadastro mudou desde a última marcação: a
+        tela avisa e mostra o botão. Quem pode programar; outro site, 403. Não grava marcação nem decisão."""
+        if telas._de_outro_site():
+            abort(403)
+        if not telas.pode_programar():
+            abort(403)
+        from ..campo import visao
+        try:
+            n = AU.publicar_lista(current_app.config, lista_para_o_app(usinas_com_fracttal(visao._Base())))
+            texto, ok = f"Lista do App atualizada: {n} usinas, com o cliente de cada uma.", True
+        except AU.Recusada as ex:
+            texto, ok = ("A lista do App já estava em dia." if str(ex) == AU.NADA_MUDOU else str(ex)), str(ex) == AU.NADA_MUDOU
+        session["pcm_almox_usinas_aviso"] = {"texto": texto, "ok": ok}
+        return redirect(na_raiz(TELA), code=303)

@@ -37,11 +37,17 @@ from .dominios import SITUACAO_ALMOX_USINA
 
 LIVRO, NOME_LIVRO = "nexus_almoxarifado_usinas", "Nexus · almoxarifado de cada usina (PCM)"
 ABA, ABA_DECISAO = "dim_almoxarifado_usina", "fato_decisao_almox_usina"
-ABAS = (ABA, ABA_DECISAO)
+# a lista das usinas por cliente (23/11/2026, o Levi: "O Nexus publica"): de onde o App tira a dona do "compartilha" que o
+# técnico declara. 1 linha = 1 usina da lista da tela (cadastro com o local no Fracttal); duas usinas com o mesmo
+# `grupo_cliente` são do mesmo cliente pela regra da dona (`nexus/pcm/almox_usinas.lista_para_o_app`). Troca a cada marcação
+# e pelo botão da tela quando o cadastro muda (não só cresce)
+ABA_LISTA = "dim_usina_cliente"
+ABAS = (ABA, ABA_DECISAO, ABA_LISTA)
 # o contrato com o App (v343, fechado em 12/11/2026): estas colunas, nesta ordem. Coluna nova só no FIM
 CAB = ("usina_id", "usina", "situacao", "usina_dona_id", "usina_dona", "atualizado_em", "pessoa_hmac")
 CAB_DECISAO = ("decidida_em", "data_id", "usina_id", "situacao", "usina_dona_id", "cliente_por", "pessoa_hmac")
-CABS = {ABA: CAB, ABA_DECISAO: CAB_DECISAO}
+CAB_LISTA = ("usina_id", "usina", "cliente_id", "grupo_cliente")
+CABS = {ABA: CAB, ABA_DECISAO: CAB_DECISAO, ABA_LISTA: CAB_LISTA}
 SITUACOES = SITUACAO_ALMOX_USINA
 COMPARTILHA = "compartilha"
 DESMARCADA = "desmarcada"                    # só na decisão: a linha da dimensão saiu
@@ -145,8 +151,21 @@ def _vigentes(dim: list[dict]) -> dict:
     return out
 
 
+def lista_norm(linhas) -> list[dict]:
+    """A lista das usinas para o App (`ABA_LISTA`) na forma de comparar e de gravar: o ID e o cliente como inteiro, os textos
+    com espaço único, em ordem de usina. A linha sem `usina_id` ou sem o nome não entra."""
+    out = []
+    for l in linhas or []:
+        uid, usina = _int(l.get("usina_id")), _txt(l.get("usina"))
+        if uid and usina:
+            out.append({"usina_id": uid, "usina": usina, "cliente_id": _int(l.get("cliente_id")),
+                        "grupo_cliente": _txt(l.get("grupo_cliente"))})
+    return sorted(out, key=lambda x: x["usina_id"])
+
+
 def ler(cfg, forcar: bool = False) -> dict:
-    """{"marcadas": {usina_id: linha}, "decisoes": [...], "erro", "lido_em"}, guardado por 1 minuto. A leitura que falha devolve
+    """{"marcadas": {usina_id: linha}, "decisoes": [...], "lista": [a lista das usinas para o App], "erro", "lido_em"},
+    guardado por 1 minuto. A leitura que falha devolve
     a última boa com `velha` e o erro; sem nenhuma, nada marcado, o erro e `lido_em` None (a tela não mostra número pela
     metade nem deixa gravar). A falha fica guardada `FALHA_TTL_S` (a revisão, M3: com o banco pendurado, cada abertura
     esperava os 60 s de cada pedido), e a leitura lenta não põe o livro velho por cima do que uma gravação acabou de guardar."""
@@ -156,7 +175,8 @@ def ler(cfg, forcar: bool = False) -> dict:
         return g
     f = _FALHAS.get(chave)
     if f and not forcar and time.time() - f["quando"] < FALHA_TTL_S:
-        return dict(g, erro=f["erro"], velha=True) if g else {"marcadas": {}, "decisoes": [], "erro": f["erro"], "lido_em": None}
+        return dict(g, erro=f["erro"], velha=True) if g else {"marcadas": {}, "decisoes": [], "lista": [], "erro": f["erro"],
+                                                              "lido_em": None}
     antes = _GERACAO[0]
     try:
         cru = _ler_cru(cfg)
@@ -165,9 +185,10 @@ def ler(cfg, forcar: bool = False) -> dict:
         _FALHAS[chave] = {"erro": erro, "quando": time.time()}
         if g:
             return dict(g, erro=erro, velha=True)
-        return {"marcadas": {}, "decisoes": [], "erro": erro, "lido_em": None}
+        return {"marcadas": {}, "decisoes": [], "lista": [], "erro": erro, "lido_em": None}
     _FALHAS.pop(chave, None)
-    novo = {"marcadas": _vigentes(cru[ABA]), "decisoes": cru[ABA_DECISAO], "erro": "", "lido_em": time.time()}
+    novo = {"marcadas": _vigentes(cru[ABA]), "decisoes": cru[ABA_DECISAO], "lista": lista_norm(cru[ABA_LISTA]), "erro": "",
+            "lido_em": time.time()}
     with _TRAVA_CACHE:
         if _GERACAO[0] == antes or chave not in _CACHE:
             _CACHE[chave] = novo
@@ -226,14 +247,16 @@ def decisao(usina_id, situacao, dona_id=None, cliente_por="", pessoa_hmac="", ag
             "pessoa_hmac": _hmac(pessoa_hmac)}
 
 
-def trocar(cfg, mudar, nomes: dict | None = None) -> dict:
+def trocar(cfg, mudar, nomes: dict | None = None, lista: list | None = None) -> dict:
     """Uma marcação: relê o livro AGORA (sob a trava: a troca é integral), chama `mudar(marcadas)` com as linhas vigentes
     ({usina_id: linha}), que devolve (a nova linha da usina, ou None para desmarcar; a usina; a decisão, ou None quando a
     marcação é a mesma) ou levanta `Recusada` com o porquê (as regras da tela), e grava as duas abas. `nomes` ({usina_id: o
     nome do local no Fracttal de agora}) renova o `usina` e o `usina_dona` de TODAS as linhas (a revisão de 12/11/2026, I1: o
     nome não congela); a usina que não está em `nomes` (perdeu o de-para) segue com o nome de antes. Sem decisão e sem nome a
     renovar: `Recusada` "Nada mudou" (nada é gravado). Devolve as marcadas de agora. `Recusada` também quando o banco não
-    deixa reler (nada foi gravado) ou quando a gravação não confere (pode ter gravado: a tela manda conferir)."""
+    deixa reler (nada foi gravado) ou quando a gravação não confere (pode ter gravado: a tela manda conferir). `lista`
+    (23/11/2026): a lista das usinas para o App de agora (`ABA_LISTA`), que vai junto; None a mantém. `mudar` None: só a
+    lista (`publicar_lista`)."""
     _conferir_destino(cfg)
     with _TRAVA:
         try:
@@ -243,20 +266,24 @@ def trocar(cfg, mudar, nomes: dict | None = None) -> dict:
                            "apagar o que já está lá.") from ex
         marcadas = _vigentes(cru[ABA])
         antes = {uid: dict(l) for uid, l in marcadas.items()}
-        nova, uid, dec = mudar({k: dict(v) for k, v in marcadas.items()})
-        if nova is None:
-            marcadas.pop(uid, None)
-        else:
-            marcadas[uid] = dict(nova)
+        lista_antes = lista_norm(cru[ABA_LISTA])
+        lista_nova = lista_antes if lista is None else lista_norm(lista)
+        dec = None
+        if mudar is not None:
+            nova, uid, dec = mudar({k: dict(v) for k, v in marcadas.items()})
+            if nova is None:
+                marcadas.pop(uid, None)
+            else:
+                marcadas[uid] = dict(nova)
         for l in marcadas.values():
             if (nomes or {}).get(l["usina_id"]):
                 l["usina"] = nomes[l["usina_id"]]
             if l.get("usina_dona_id") and (nomes or {}).get(l["usina_dona_id"]):
                 l["usina_dona"] = nomes[l["usina_dona_id"]]
-        if dec is None and marcadas == antes:
+        if dec is None and marcadas == antes and lista_nova == lista_antes:
             raise Recusada(NADA_MUDOU)
         cru = {ABA: sorted(marcadas.values(), key=lambda l: l["usina_id"]),
-               ABA_DECISAO: cru[ABA_DECISAO] + ([dec] if dec else [])}
+               ABA_DECISAO: cru[ABA_DECISAO] + ([dec] if dec else []), ABA_LISTA: lista_nova}
         try:
             _gravar_cru(cfg, cru)
         except Recusada:
@@ -267,7 +294,15 @@ def trocar(cfg, mudar, nomes: dict | None = None) -> dict:
                            "antes de repetir.") from ex
         _GERACAO[0] += 1
         chave = str(_arquivo_local(cfg) or "banco")
-        g = {"marcadas": _vigentes(cru[ABA]), "decisoes": cru[ABA_DECISAO], "erro": "", "lido_em": time.time()}
+        g = {"marcadas": _vigentes(cru[ABA]), "decisoes": cru[ABA_DECISAO], "lista": lista_nova, "erro": "",
+             "lido_em": time.time()}
         _CACHE[chave] = g
         _FALHAS.pop(chave, None)
         return g["marcadas"]
+
+
+def publicar_lista(cfg, lista: list) -> int:
+    """Grava só a lista das usinas para o App (o botão da tela quando o cadastro mudou): nenhuma marcação nem decisão.
+    `Recusada` NADA_MUDOU quando o livro já tem esta lista. Quantas usinas foram."""
+    trocar(cfg, None, lista=lista)
+    return len(lista_norm(lista))

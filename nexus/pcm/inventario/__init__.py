@@ -45,8 +45,12 @@ def registrar(bp) -> None:
     @bp.route("/pecas/inventario", endpoint="inventario")
     def inventario():
         # a gravação parada com o almoxarifado travado no Fracttal avisa também aqui (quem aprovou talvez nem abra a contagem)
+        # as declarações dos técnicos sobre o almoxarifado da usina, a confirmar (23/11/2026, `almox_declaracoes`): o Confirmar
+        # e o Próprio vão à marcação de Usinas e almoxarifados, que volta aqui com o aviso
+        from .. import almox_declaracoes as DC
         return render_template("pcm/inventario.html", **R.montar_lista(current_app.config),
-                               travadas=G.travadas(current_app.config))
+                               travadas=G.travadas(current_app.config), declaracoes=DC.pendentes(current_app.config),
+                               pode_marcar_usina=pode_programar(), aviso_usina=session.pop("pcm_inventario_aviso", None))
 
     @bp.route("/pecas/inventario/auditoria", endpoint="inventario_auditoria")
     def inventario_auditoria():

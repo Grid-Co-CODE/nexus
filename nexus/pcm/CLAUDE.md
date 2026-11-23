@@ -597,6 +597,21 @@ PCM"; a prévia com os dados reais foi aprovada no mesmo dia. Desenho e plano: `
     deixa marcar. A falha fica guardada 20 s, e a gravação que não confirma diz "pode ter gravado: confira".
   - **Na tela:** filtros de cliente e de situação (a marcação volta ao filtro), cartões que cabem em 375 px, o selo da situação, a
     dona e de quem a usina é dona.
+  - **A declaração do técnico** (23/11/2026; o PCM: "quando o técnico botar que não tem almoxarifado, mostra aqui para mim no
+    inventário" e "botar que a usina é compartilhada e qual usina ela compartilha" no App). O App grava no livro
+    `almoxarifado_declaracoes_app_campo · Declaracoes` (o contrato de 11 colunas em `nexus/dados/almoxarifado.py`, fechado com o
+    App no mesmo dia e registrado no catálogo antes da 1ª gravação). Decisões do Levi (23/11/2026): a declaração NÃO tira a
+    cobrança do App nem dá pontos; quem decide é o PCM. O Inventário mostra o cartão "Declarações dos técnicos"
+    (`almox_declaracoes.pendentes`): a última de cada usina enquanto o PCM não decidiu nada daquela usina depois dela e a marcação
+    de hoje não é já a declarada; o Confirmar e o "Tem almoxarifado próprio" são a marcação desta aba (`marcar`, com as regras),
+    que volta ao Inventário (`voltar=inventario`). A que não se confirma como veio (usina ou dona fora da lista, dona de outro
+    cliente, cadeia) mostra o porquê e o "Marcar de outro jeito". Prova: `tests/test_pcm_almox_declaracoes_23_11.py`.
+  - **A lista das usinas para o App** (23/11/2026; o Levi: "O Nexus publica"): a 3ª aba do livro, `dim_usina_cliente`
+    (`usina_id`, `usina` = o nome do local no Fracttal, `cliente_id`, `grupo_cliente`), de onde o App tira a dona do
+    "compartilha" que o técnico declara. Duas usinas com o mesmo `grupo_cliente` são do mesmo cliente pela regra da dona
+    (`lista_para_o_app`): o cliente do cadastro; sem ele, o das outras usinas do mesmo 1º nó do local no Fracttal (quando é um
+    só); sem nenhum, o próprio nó. Vai junto de cada marcação; quando o cadastro mudou depois da última, a tela avisa e o botão
+    "Atualizar a lista do App" (`POST /t/pcm/pecas/usinas/lista`, quem pode programar) a grava sem marcação nem decisão.
   - **Provar:** `tests/test_pcm_almox_usinas.py` (o contrato, o catálogo e o radar, marcar e desmarcar, as recusas, quem pode, o
     outro site, a tela, o livro que não se lê e o banco falso; da revisão: o nome dos Técnicos por usina, o nome que não
     congela, a fora da lista, a regra sobre o livro relido, o Nada mudou e o leitor conferido). Na cópia de prova,

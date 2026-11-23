@@ -104,6 +104,37 @@
 </table>
 </div>
 {% endmacro %}
+{# as declarações dos técnicos sobre o almoxarifado da usina (23/11/2026, nexus/pcm/almox_declaracoes.py): o técnico diz no
+   App que a usina não tem almoxarifado ou compartilha o de outra; nada muda até o PCM confirmar (a marcação de Usinas e
+   almoxarifados) ou marcar Próprio. A que não se confirma como veio diz o porquê #}
+{% if aviso_usina %}<div class="{{ 'cn-certo' if aviso_usina.ok else 'cn-erro cn-aviso' }}" role="status"><span><b>{{ aviso_usina.texto }}</b></span></div>{% endif %}
+{% if declaracoes and declaracoes.erro %}<div class="cn-erro cn-aviso" role="status">{{ declaracoes.erro }}</div>{% endif %}
+{% if declaracoes and declaracoes.itens %}
+<section class="inv-card" aria-label="Declarações dos técnicos" data-declaracoes>
+  <div class="inv-card-cab">
+    <h3>Declarações dos técnicos ({{ declaracoes.itens|length }} a confirmar)</h3>
+    <span class="inv-card-nota">O técnico disse no App como é o almoxarifado da usina. Nada muda até o PCM confirmar: o App segue cobrando o inventário.</span>
+  </div>
+  <div class="inv-tw"><table class="alm-t inv-t inv-decl">
+    <thead><tr><th>Usina</th><th>O técnico disse</th><th>Quando</th><th>Observação</th>{% if pode_marcar_usina %}<th></th>{% endif %}</tr></thead>
+    <tbody>
+    {% for x in declaracoes.itens %}
+    <tr>
+      <td data-r="Usina"><span class="alm-v">{{ x.usina }}</span></td>
+      <td data-r="O técnico disse"><span class="alm-v"><span class="inv-selo inv-selo--{{ x.tom }}">{{ x.rotulo }}</span>{% if x.dona %} <span class="alm-det">usa o almoxarifado de {{ x.dona }}</span>{% endif %}{% if x.problema %}<span class="alm-det alm-ruim">{{ x.problema }}</span>{% endif %}</span></td>
+      <td data-r="Quando"><span class="alm-v">{{ x.quando_txt }}<span class="alm-det">{{ x.tecnico }}</span></span></td>
+      <td data-r="Observação"><span class="alm-v">{{ x.observacao or '—' }}</span></td>
+      {% if pode_marcar_usina %}<td class="inv-t-acao inv-decl-acoes">
+        {% if x.confirmavel %}<form method="post" action="{{ raiz }}/t/pcm/pecas/usinas/marcar"><input type="hidden" name="usina" value="{{ x.usina_id }}"><input type="hidden" name="situacao" value="{{ x.situacao }}"><input type="hidden" name="dona" value="{{ x.dona_id or '' }}"><input type="hidden" name="voltar" value="inventario"><button type="submit" class="gc-btn gc-btn--ui gc-btn--primario">Confirmar</button></form>{% endif %}
+        {% if x.usina_id %}<form method="post" action="{{ raiz }}/t/pcm/pecas/usinas/marcar"><input type="hidden" name="usina" value="{{ x.usina_id }}"><input type="hidden" name="situacao" value="proprio"><input type="hidden" name="voltar" value="inventario"><button type="submit" class="gc-btn gc-btn--ui gc-btn--contorno">Tem almoxarifado próprio</button></form>
+        <a class="inv-abrir" href="{{ raiz }}/t/pcm/pecas/usinas#u-{{ x.usina_id }}">Marcar de outro jeito</a>{% endif %}
+      </td>{% endif %}
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+</section>
+{% endif %}
 {% if recontagens %}
 <section class="inv-card" aria-label="Recontagens pedidas" data-recontagens>
   <div class="inv-card-cab">

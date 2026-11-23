@@ -1046,6 +1046,26 @@ FATOS = (
                     "descrição e a foto da peça fora do catálogo ficam só no livro do App. O motivo do PCM (texto livre) "
                     "vai só em dados_cifrados; a pessoa como pessoa_id e pessoa_hmac (24 hexadecimais), nunca nome nem "
                     "e-mail"),
+    # a declaração do técnico sobre o almoxarifado da usina (23/11/2026; o PCM: "quando o técnico botar que não tem
+    # almoxarifado, mostra aqui para mim no inventário"): o App grava, o PCM confirma no Inventário. Registrado ANTES de o App
+    # publicar (o contrato fechado com o App de Campo no mesmo dia): o livro novo não pode aparecer como "novo" no radar
+    Fato("declaracao_almox_usina_app", "Declaração do técnico sobre o almoxarifado da usina", "pcm",
+         f"{almoxarifado.LIVRO_DECLARACOES} · {almoxarifado.ABA_DECLARACOES}",
+         "1 linha = 1 declaração de 1 técnico no App de que a usina não tem almoxarifado ou compartilha o de outra usina "
+         "do mesmo cliente; vale a última de cada usina",
+         _d(data=("cod", "Declarada em (a hora do servidor do App, UTC; Hora do celular, a do aparelho)"),
+            usina=("nome", "Usina e Usina dona (o nome do local no Fracttal, o mesmo do nexus_almoxarifado_usinas)"),
+            pessoa=("hmac", "Técnico (HMAC)")),
+         tipo="sem_medida", chave=("ID da declaração",),
+         fontes=(f"{almoxarifado.LIVRO_DECLARACOES} · {almoxarifado.ABA_DECLARACOES}",),
+         janela_origem="o App é a fonte (só acrescenta)",
+         observacao="colunas ID da declaração, Declarada em, Hora do celular, Usina, Situação (sem_almoxarifado ou "
+                    "compartilha), Usina dona (só no compartilha), Técnico (HMAC), ID da contagem e ID do almoxarifado (de "
+                    "onde saiu, quando saiu de uma contagem), Observação (até 300 caracteres) e Versão do App. A declaração "
+                    "não muda nada sozinha (Levi, 23/11/2026): não tira a cobrança do App nem dá pontos; o PCM confirma ou "
+                    "marca Próprio em Usinas e almoxarifados (o fato decisao_almox_usina), e a que o PCM decidiu depois sai "
+                    "da lista do Inventário. A dona o App escolhe na dim_usina_cliente do nexus_almoxarifado_usinas. Sem "
+                    "nome nem e-mail (o técnico só pelo HMAC)"),
     # o almoxarifado de cada usina (12/11/2026; o PCM: "Algumas usinas não tem almoxarifado ou compartilham os almoxarifados";
     # o Levi: "Passa para o cadastro do nexus"): a dimensão `dim_almoxarifado_usina` é o contrato com o App (a usina marcada), e
     # este é o histórico das marcações, como o das decisões de setor
