@@ -27,7 +27,7 @@
 <div class="campo-nativa">
   <div class="cn-cab">
     <div><p class="gc-eyebrow">{{ torre.nome }}</p><div class="gc-titulo-explica"><h1 class="cn-titulo">{{ tela.nome }}</h1>
-    {% call explica('Como cada usina entra', 'A ronda diária pergunta "' ~ pergunta ~ '" (Sim ou Não, com foto). O Não também vai por e-mail à TST pelo App, na hora. As respostas vêm do checklist que o App manda junto com as rondas (desde 28/09/2026); as fotos, dos anexos da OS da ronda no Fracttal.', termos=True) %}
+    {% call explica('Como cada usina entra', 'A ronda diária pergunta "' ~ pergunta ~ '" (Sim ou Não, com foto). O Não também vai por e-mail à TST pelo App, na hora. As respostas vêm do checklist que o App manda junto com as rondas (desde 28/09/2026); as fotos, dos anexos da OS da ronda no Fracttal. Na tabela, os três pontos da usina exportam o cliente dela ou a própria usina em PDF ou em planilha, com os filtros da tela.', termos=True) %}
     {{ termo('Sem luvas', 'critico') }}<dd>A última ronda respondeu Não; o "desde" é o primeiro Não da sequência até ela.</dd>
     {{ termo('Sem verificação', 'info') }}<dd>Nenhuma resposta há {{ dias_sem }} dias ou mais, ou nunca (a mesma régua da ronda pendente).</dd>
     {{ termo('Com luvas', 'ok') }}<dd>A última ronda respondeu Sim.</dd>
@@ -93,8 +93,12 @@
     {% else %}<p class="mudo">Nenhuma usina com esses filtros.</p>{% endfor %}
   </div>
   {% else %}
-  <div class="cn-tab cn-tab--compacta ext-tab"><table>
-    <thead><tr><th>Situação</th><th>Usina</th><th>Luvas isolantes</th><th>Última verificação</th><th>Últimas rondas</th><th>Fotos da ronda</th></tr></thead>
+  {# os três pontos da linha (23/11/2026, a Segurança: "crie a opção de baixar relatório por cliente, no mesmo modelo e
+     opções dos Extintores"): a tabela é por usina, então os três pontos da usina dão o relatório do cliente dela e o da
+     usina, em PDF e em planilha, com os filtros da tela e o da faixa. O menu é um só, no fim da tabela, como nos
+     Extintores (o clique o leva para a linha e põe nele os endereços dela) #}
+  <div class="cn-tab cn-tab--compacta ext-tab epi-tab"><table>
+    <thead><tr><th>Situação</th><th>Usina</th><th>Luvas isolantes</th><th>Última verificação</th><th>Últimas rondas</th><th>Fotos da ronda</th><th aria-label="Relatórios"></th></tr></thead>
     <tbody>
     {% for x in lista[:limite] %}{% set s = situacoes[x.situacao] %}{% set u = x.ultima %}
       <tr><td><span class="cn-st cn-t-{{ s[1] }}">{{ s[0] }}</span></td>
@@ -102,12 +106,47 @@
         <td>{% if u %}<span class="ext-par"><span class="{{ 'cn-t-critico' if u.luvas is false else 'cn-t-ok' }}"><b>{{ 'Não' if u.luvas is false else 'Sim' }}</b></span>{% if x.desde %}<span class="det cn-t-critico">desde {{ x.desde.strftime('%d/%m') }} · há {{ tempo((d.hoje - x.desde).days) }}</span>{% endif %}</span>{% else %}<span class="cn-t-info">nunca verificada</span>{% endif %}</td>
         <td>{% if u %}<span class="ext-par"><span class="m">{{ u.dia.strftime('%d/%m/%Y') }}</span><span class="det{{ ' cn-t-info' if x.dias >= dias_sem }}">{{ 'hoje' if x.dias == 0 else 'há ' ~ tempo(x.dias) }}</span>{% if u.tecnico %}<span class="det">{{ u.tecnico }}</span>{% endif %}</span>{% else %}<span class="cn-t-neutro">—</span>{% endif %}</td>
         <td>{% if x.historico %}<span class="ext-par"><span class="epi-hist" role="img" aria-label="Últimas {{ x.historico|length }} rondas: {% for v in x.historico %}{{ v.dia.strftime('%d/%m') }} {{ 'Não' if v.luvas is false else 'Sim' }}{{ ', ' if not loop.last }}{% endfor %}">{% for v in x.historico %}<i class="{{ 'nao' if v.luvas is false else 'sim' }}" title="{{ v.dia.strftime('%d/%m') }}: {{ 'Não' if v.luvas is false else 'Sim' }}{% if v.tecnico %} ({{ v.tecnico }}){% endif %}"></i>{% endfor %}</span>{% if x.nao %}<span class="det cn-t-critico">{{ x.nao }} Não em {{ x.verificacoes }}</span>{% else %}<span class="det">{{ plural(x.verificacoes, 'resposta', 'respostas') }}</span>{% endif %}</span>{% else %}<span class="cn-t-neutro">—</span>{% endif %}</td>
-        <td>{% if u and u.os %}<button type="button" class="cn-bt-fotos" aria-expanded="false" data-url="{{ url_for('torre_campo.ronda_fotos_os', os_=u.os|int) }}" title="As fotos da ronda de {{ u.dia.strftime('%d/%m') }} (a das luvas fica em Infraestrutura)">Fotos</button>{% elif u %}<span class="mudo" title="Ronda sem OS: as fotos ficam só no App">—</span>{% else %}<span class="mudo">—</span>{% endif %}</td></tr>
-      {% if u and u.os %}<tr class="cn-fotos-linha" hidden><td colspan="6"></td></tr>{% endif %}
-    {% else %}<tr><td colspan="6" class="mudo">Nenhuma usina com esses filtros.</td></tr>{% endfor %}
+        <td>{% if u and u.os %}<button type="button" class="cn-bt-fotos" aria-expanded="false" data-url="{{ url_for('torre_campo.ronda_fotos_os', os_=u.os|int) }}" title="As fotos da ronda de {{ u.dia.strftime('%d/%m') }} (a das luvas fica em Infraestrutura)">Fotos</button>{% elif u %}<span class="mudo" title="Ronda sem OS: as fotos ficam só no App">—</span>{% else %}<span class="mudo">—</span>{% endif %}</td>
+        {% set cli, us = args_relatorio(x) %}<td><button class="hs-tres" aria-label="Relatórios" data-cliente="{{ x.cliente or '' }}" data-cli="{{ cli }}" data-us="{{ us }}">&#8943;</button></td></tr>
+      {% if u and u.os %}<tr class="cn-fotos-linha" hidden><td colspan="7"></td></tr>{% endif %}
+    {% else %}<tr><td colspan="7" class="mudo">Nenhuma usina com esses filtros.</td></tr>{% endfor %}
     </tbody>
   </table></div>
   {% if lista|length > limite %}<p class="mudo">Mostrando {{ limite }} de {{ lista|length }}: use os filtros ou a busca para afunilar.</p>{% endif %}
+  {# o menu dos três pontos, um só #}
+  <div class="hs-menu" id="hs-menu" role="menu" hidden>
+    <div class="hs-menu-cli"><a role="menuitem" data-tipo="cli-pdf" href="#">Exportar PDF do cliente</a><a role="menuitem" data-tipo="cli-xls" href="#">Exportar planilha do cliente</a><hr></div>
+    <a role="menuitem" data-tipo="us-pdf" href="#">Exportar PDF da usina</a><a role="menuitem" data-tipo="us-xls" href="#">Exportar planilha da usina</a>
+  </div>
+  <script>
+    // os três pontos: o menu vai para a linha clicada com os endereços dela; a usina sem cliente no cadastro só tem o
+    // da usina. Clicar fora ou Esc fecha
+    (function () {
+      var menu = document.getElementById('hs-menu'), dono = null;
+      if (!menu) return;
+      document.querySelectorAll('.epi-tab .hs-tres').forEach(function (b) { b.type = 'button'; b.setAttribute('aria-haspopup', 'menu'); b.setAttribute('aria-expanded', 'false'); });
+      function fecha() { if (!menu.hidden) { menu.hidden = true; if (dono) dono.setAttribute('aria-expanded', 'false'); dono = null; } }
+      function rota(tipo, args) { return nexusRota('/t/hseq/epi/relatorio.' + tipo) + (args ? '?' + args : ''); }
+      function abre(b) {
+        var cli = menu.querySelector('.hs-menu-cli');
+        cli.hidden = !b.dataset.cli;
+        menu.querySelector('[data-tipo=cli-pdf]').href = rota('pdf', b.dataset.cli);
+        menu.querySelector('[data-tipo=cli-xls]').href = rota('xlsx', b.dataset.cli);
+        menu.querySelector('[data-tipo=cli-pdf]').textContent = 'Exportar PDF do cliente ' + b.dataset.cliente;
+        menu.querySelector('[data-tipo=cli-xls]').textContent = 'Exportar planilha do cliente ' + b.dataset.cliente;
+        menu.querySelector('[data-tipo=us-pdf]').href = rota('pdf', b.dataset.us);
+        menu.querySelector('[data-tipo=us-xls]').href = rota('xlsx', b.dataset.us);
+        b.parentNode.appendChild(menu); menu.hidden = false; dono = b; b.setAttribute('aria-expanded', 'true');
+      }
+      document.addEventListener('click', function (ev) {
+        var b = ev.target.closest('.epi-tab .hs-tres');
+        if (b) { ev.stopPropagation(); if (dono === b) fecha(); else { fecha(); abre(b); } return; }
+        if (ev.target.closest('#hs-menu a')) { fecha(); return; }
+        if (!ev.target.closest('#hs-menu')) fecha();
+      }, true);
+      document.addEventListener('keydown', function (ev) { if (ev.key === 'Escape') fecha(); });
+    })();
+  </script>
   {% include 'campo/_ronda_fotos_caixa.html' %}
   {% endif %}
   {% endif %}

@@ -291,3 +291,8 @@
 .col-ponto--ok{background:var(--ok)}
 .col-ponto--critico{background:var(--critico)}
 .col-pend-lista{display:inline-flex;flex-direction:column;align-items:center;gap:2px;line-height:1.35}
+/* os três pontos da tabela do EPI (23/11/2026): o relatório do cliente e o da usina, o mesmo botão e o mesmo menu dos
+   Extintores; aparecem ao passar o mouse na linha (no celular, sempre) */
+.epi-tab td:last-child{position:relative;width:44px}
+.epi-tab tr:hover .hs-tres,.epi-tab tr:focus-within .hs-tres{opacity:1}
+.hs-menu-cli[hidden]{display:none}

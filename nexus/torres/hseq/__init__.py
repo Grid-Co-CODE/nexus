@@ -30,6 +30,7 @@ from ...hseq import fotos as FOT
 from ...hseq import info_extintor as INFO
 from ...hseq import planilha as PLA
 from ...hseq import relatorio as REL
+from ...hseq import relatorio_epi as REL_EPI
 from ..campo import _lido, _url
 from ...cadastro import setor_ids as SID
 from ..modelo import Tela, Torre
@@ -697,15 +698,10 @@ def apr_pt():
     return pagina_pt()
 
 
-@bp.route("/epi")
-def epi():
-    """EPI e EPC (Levi, 09/10/2026: "criasse um campo de EPI / EPC começando apenas por EPI, puxando as luvas das rondas
-    diárias"): as luvas isolantes de cada usina pela última ronda, em cartões por Responsável O&M da usina, com as
-    usinas dele (24/10/2026: "tem que ser por responsável da usina, aí mostra as usinas"; até ali, por região de campo e
-    por gestor de contrato) e em tabela. Filtros: região do Brasil, cliente, responsável UFV e busca; ninguém abre
-    filtrado pelo login. A faixa de números filtra a tabela."""
-    if setor_telas.visao_de_cliente():
-        return _epi_do_cliente()
+def _epi_filtrado():
+    """As luvas com os filtros da tela (região do Brasil, cliente, responsável UFV, busca) e o da faixa (`f`): a tela e o
+    relatório (`_do_relatorio_epi`) usam o mesmo recorte. Devolve (leitura, dados, todas, base, f); `base` ainda sem o
+    `f`, que a faixa conta por cima dela."""
     leitura = EPI.luvas()
     d = leitura.dados
     regiao, cliente = request.args.get("regiao", ""), request.args.get("cliente", "")
@@ -716,6 +712,67 @@ def epi():
             and (not cliente or x.get("cliente") == cliente) and (not resp or EPI.responsavel(x) == resp)
             and (not q or q in " ".join(str(x.get(c) or "") for c in ("usina", "cidade", "equipe")).lower())]
     f = request.args.get("f") if request.args.get("f") in EPI.SITUACOES else ""
+    return leitura, d, todas, base, f
+
+
+def _do_relatorio_epi():
+    """O recorte do relatório do EPI (a Segurança, 23/11/2026: "crie a opção de baixar relatório por cliente, no mesmo
+    modelo e opções dos Extintores"): os filtros da tela e o da faixa, como no `_do_relatorio` dos extintores, com o
+    `cliente` da linha (o relatório do cliente) e, no da usina, o `usina_id` (o nome sozinho não separa as duas
+    "Linhares 1"; a usina sem ID no cadastro vai pelo nome com o cliente). None sem as rondas (a rota volta à tela)."""
+    leitura, d, _todas, base, f = _epi_filtrado()
+    if leitura.erro:
+        return None
+    uid, usina = request.args.get("usina_id", ""), request.args.get("usina", "")
+    lista = [x for x in base if (not f or x["situacao"] == f)
+             and (not uid or str(x.get("usina_id") or "") == uid)
+             and (uid or not usina or (x["usina"] == usina and not x.get("usina_id")))]
+    fl = {"cliente": request.args.get("cliente", ""), "resp": request.args.get("responsavel", "").strip()}
+    filtros_tela = [f"{rot}: {v}" for rot, v in (
+        ("Usina", lista[0]["usina"] if (uid or usina) and lista else usina), ("Cliente", fl["cliente"]),
+        ("Região do Brasil", request.args.get("regiao", "")), ("Responsável UFV", fl["resp"]),
+        ("Situação", EPI.SITUACOES[f][0] if f else ""), ("Busca", request.args.get("q", "").strip())) if v]
+    hoje = d.get("hoje") or visao._agora().date()
+    quem = (_slug(lista[0]["usina"] if lista else usina) if uid or usina
+            else _slug(fl["cliente"]) if fl["cliente"] else "todas")
+    return {"lista": lista, "filtros_tela": filtros_tela, "hoje": hoje, "nome": f"epi-luvas-{quem}-{hoje:%Y-%m-%d}",
+            "gerado_em": visao._agora().strftime("%d/%m/%Y %H:%M")}
+
+
+@bp.route("/epi/relatorio.pdf")
+def epi_relatorio():
+    """O relatório do EPI em PDF, do cliente ou da usina da linha (os três pontos da tabela), sempre como anexo."""
+    r = _do_relatorio_epi()
+    if r is None:
+        return redirect(na_raiz("/t/hseq/epi"))
+    pdf = REL_EPI.gerar_pdf(r["lista"], filtros_tela=r["filtros_tela"], hoje=r["hoje"], gerado_em=r["gerado_em"],
+                            logo=str(current_app.static_folder) + "/grid-h-branco.png")
+    return Response(pdf, mimetype="application/pdf",
+                    headers={"Content-Disposition": f'attachment; filename="{r["nome"]}.pdf"'})
+
+
+@bp.route("/epi/relatorio.xlsx")
+def epi_planilha():
+    """O mesmo relatório do EPI em Excel (o mesmo recorte do PDF), sempre como anexo."""
+    r = _do_relatorio_epi()
+    if r is None:
+        return redirect(na_raiz("/t/hseq/epi"))
+    xlsx = REL_EPI.gerar_xlsx(r["lista"], filtros_tela=r["filtros_tela"], hoje=r["hoje"], gerado_em=r["gerado_em"])
+    return Response(xlsx, mimetype=PLA.MIME, headers={"Content-Disposition": f'attachment; filename="{r["nome"]}.xlsx"'})
+
+
+@bp.route("/epi")
+def epi():
+    """EPI e EPC (Levi, 09/10/2026: "criasse um campo de EPI / EPC começando apenas por EPI, puxando as luvas das rondas
+    diárias"): as luvas isolantes de cada usina pela última ronda, em cartões por Responsável O&M da usina, com as
+    usinas dele (24/10/2026: "tem que ser por responsável da usina, aí mostra as usinas"; até ali, por região de campo e
+    por gestor de contrato) e em tabela. Filtros: região do Brasil, cliente, responsável UFV e busca; ninguém abre
+    filtrado pelo login. A faixa de números filtra a tabela."""
+    if setor_telas.visao_de_cliente():
+        return _epi_do_cliente()
+    leitura, d, todas, base, f = _epi_filtrado()
+    regiao, cliente = request.args.get("regiao", ""), request.args.get("cliente", "")
+    resp = request.args.get("responsavel", "").strip()
     modo = "tabela" if request.args.get("modo") == "tabela" or f else "responsaveis"
     responsaveis = sorted({EPI.responsavel(x) for x in todas} | ({resp} if resp else set()),
                           key=lambda r: (r == visao.SEM_RESPONSAVEL, r.lower()))
@@ -726,7 +783,18 @@ def epi():
         q=request.args.get("q", ""), contagem=EPI.contar(base),
         lista=[x for x in base if not f or x["situacao"] == f], limite=LIMITE_LINHAS,
         cartoes=EPI.por_responsavel(base, d.get("times") or {}), situacoes=EPI.SITUACOES, tempo=EXT.tempo,
-        dias_sem=EPI.DIAS_SEM_VERIFICAR, pergunta=EPI.PERGUNTA)
+        dias_sem=EPI.DIAS_SEM_VERIFICAR, pergunta=EPI.PERGUNTA, args_relatorio=_args_relatorio_epi)
+
+
+def _args_relatorio_epi(x) -> tuple[str, str]:
+    """Os endereços dos três pontos da linha da usina no EPI: (o do cliente dela, o da usina), cada um com os filtros da
+    tela e o da faixa. A usina sem cliente no cadastro não tem o do cliente (o vazio filtraria todas); a usina vai pelo
+    `usina_id` e, sem ele, pelo nome."""
+    fl = {k: request.args.get(k) for k in ("regiao", "cliente", "responsavel", "q", "f") if request.args.get(k)}
+    cli = urlencode({**fl, "cliente": x["cliente"]}) if x.get("cliente") else ""
+    us = {**fl, "cliente": x.get("cliente") or None}
+    us.update({"usina_id": x["usina_id"]} if x.get("usina_id") else {"usina": x["usina"]})
+    return cli, urlencode({k: v for k, v in us.items() if v})
 
 
 # a documentação de cada pessoa (06/11/2026): o filtro da lista, pelo resumo da pessoa (`documentacao.resumo`)
