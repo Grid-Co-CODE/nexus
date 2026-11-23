@@ -93,7 +93,35 @@ def test_checklist_sem_a_pergunta_das_luvas_a_tela_avisa(banco, logado):
     assert "Nenhuma ronda respondeu a pergunta das luvas" in logado.get("/t/hseq/epi").get_data(as_text=True)
 
 
-def test_tres_pontos_da_usina_baixam_o_relatorio_do_cliente_e_da_usina(luvas, logado):
+@pytest.fixture
+def anexos(monkeypatch):
+    """Os anexos das OS no Fracttal, sem rede: {OS: [anexo]} (OS fora do dicionário: sem anexo; valor Exception: o
+    Fracttal recusando). A foto baixada é um PNG pequeno de verdade, para o PDF abrir."""
+    import io
+
+    from PIL import Image as PILImage
+
+    from nexus.campo import nota_fracttal, ronda_fotos
+    png = io.BytesIO()
+    PILImage.new("RGB", (60, 80), (40, 120, 60)).save(png, format="PNG")
+    por_os, pedidos = {}, []
+
+    def ler(os_, ler=None):
+        from flask import has_app_context
+        assert has_app_context()        # a credencial do Fracttal sai do app: a thread sem o contexto não a acha
+        pedidos.append(str(os_))
+        v = por_os.get(str(os_), [])
+        if isinstance(v, Exception):
+            raise v
+        return v
+    monkeypatch.setattr(nota_fracttal, "anexos_da_os", ler)
+    monkeypatch.setattr(ronda_fotos, "_baixar", lambda url: png.getvalue())
+    ronda_fotos.limpar()
+    yield por_os, pedidos
+    ronda_fotos.limpar()
+
+
+def test_tres_pontos_da_usina_baixam_o_relatorio_do_cliente_e_da_usina(luvas, logado, anexos):
     """A Segurança, 23/11/2026: "na aba EPI e EPC, crie a opção de baixar relatório por cliente, no mesmo modelo e
     opções dos Extintores". A tabela é por usina: os três pontos da usina dão o relatório do cliente dela e o da usina,
     em PDF e em planilha, com os filtros da tela e o da faixa."""
@@ -123,3 +151,38 @@ def test_tres_pontos_da_usina_baixam_o_relatorio_do_cliente_e_da_usina(luvas, lo
     pdf = logado.get("/t/hseq/epi/relatorio.pdf?cliente=Thopen&usina_id=1")
     assert pdf.status_code == 200 and pdf.mimetype == "application/pdf" and pdf.data.startswith(b"%PDF")
     assert 'filename="epi-luvas-altair-' in pdf.headers["Content-Disposition"]
+
+
+def test_o_relatorio_leva_a_foto_das_luvas_da_ultima_ronda(luvas, logado, anexos):
+    """A Segurança, 23/11/2026: "como eu faço para que as últimas imagens sejam anexadas no relatório?". A foto das
+    luvas é o anexo "As luvas isolantes estão disponíveis? — <resposta>" da OS da última ronda (Altair, OS 500), lido
+    pela credencial da empresa; a ronda sem OS (Brodowski 1) e a usina nunca verificada (Coração 1) dizem o porquê."""
+    import io
+
+    from openpyxl import load_workbook
+    por_os, pedidos = anexos
+    por_os["500"] = [{"description": "Sujidade dos módulos — 2", "value": "https://s3/a.jpg?x=1"},
+                     {"description": "As luvas isolantes estão disponíveis? — Não", "value": "https://s3/luvas.png?x=1"}]
+
+    def coluna(url):
+        wb = load_workbook(io.BytesIO(logado.get(url).data))
+        linhas = list(wb["Usinas"].iter_rows(values_only=True))
+        i = next(r for r in linhas if r and r[0] == "Cliente").index("Foto das luvas")
+        return {r[1]: r[i] for r in linhas if r and r[0] in ("Thopen", "Outro")}
+    todas = coluna("/t/hseq/epi/relatorio.xlsx")
+    assert todas["Altair"] == "Sim" and todas["Brodowski 1"] == "ronda sem OS"
+    assert todas.get("Coração 1") in (None, "nunca verificada")
+    assert pedidos == ["500"]                               # só a OS da última ronda vai ao Fracttal
+    pdf = logado.get("/t/hseq/epi/relatorio.pdf?cliente=Thopen&usina_id=1")
+    assert pdf.status_code == 200
+    com_foto = pdf.data.count(b"/Subtype /Image")           # o logo do cabeçalho também é imagem
+    # a OS sem a foto das luvas e o Fracttal recusando: o relatório sai assim mesmo, com o porquê
+    por_os["500"] = por_os["500"][:1]
+    from nexus.campo import ronda_fotos
+    ronda_fotos.limpar()
+    assert coluna("/t/hseq/epi/relatorio.xlsx")["Altair"] == "Não anexada"
+    por_os["500"] = RuntimeError("429")
+    ronda_fotos.limpar()
+    assert coluna("/t/hseq/epi/relatorio.xlsx")["Altair"] == "não lida"
+    sem = logado.get("/t/hseq/epi/relatorio.pdf?cliente=Thopen&usina_id=1")
+    assert sem.status_code == 200 and sem.data.count(b"/Subtype /Image") == com_foto - 1

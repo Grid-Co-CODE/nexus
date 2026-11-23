@@ -741,12 +741,14 @@ def _do_relatorio_epi():
 
 @bp.route("/epi/relatorio.pdf")
 def epi_relatorio():
-    """O relatório do EPI em PDF, do cliente ou da usina da linha (os três pontos da tabela), sempre como anexo."""
+    """O relatório do EPI em PDF, do cliente ou da usina da linha (os três pontos da tabela), sempre como anexo, com a
+    foto das luvas da última ronda de cada usina (anexo da OS no Fracttal, `relatorio_epi.fotos_das_luvas`)."""
     r = _do_relatorio_epi()
     if r is None:
         return redirect(na_raiz("/t/hseq/epi"))
     pdf = REL_EPI.gerar_pdf(r["lista"], filtros_tela=r["filtros_tela"], hoje=r["hoje"], gerado_em=r["gerado_em"],
-                            logo=str(current_app.static_folder) + "/grid-h-branco.png")
+                            logo=str(current_app.static_folder) + "/grid-h-branco.png",
+                            fotos=REL_EPI.fotos_das_luvas(r["lista"]))
     return Response(pdf, mimetype="application/pdf",
                     headers={"Content-Disposition": f'attachment; filename="{r["nome"]}.pdf"'})
 
@@ -757,7 +759,8 @@ def epi_planilha():
     r = _do_relatorio_epi()
     if r is None:
         return redirect(na_raiz("/t/hseq/epi"))
-    xlsx = REL_EPI.gerar_xlsx(r["lista"], filtros_tela=r["filtros_tela"], hoje=r["hoje"], gerado_em=r["gerado_em"])
+    xlsx = REL_EPI.gerar_xlsx(r["lista"], filtros_tela=r["filtros_tela"], hoje=r["hoje"], gerado_em=r["gerado_em"],
+                              fotos=REL_EPI.fotos_das_luvas(r["lista"], com_imagem=False))
     return Response(xlsx, mimetype=PLA.MIME, headers={"Content-Disposition": f'attachment; filename="{r["nome"]}.xlsx"'})
 
 

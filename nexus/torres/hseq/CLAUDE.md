@@ -429,14 +429,25 @@ cliente vazio filtraria todas). O recorte é o da tela (`_epi_filtrado`, o mesmo
 `cliente` da linha ou, no da usina, o `usina_id` (sem ID no cadastro, o nome; `_args_relatorio_epi` monta os endereços).
 PDF: o resumo com os quatro números e a tabela (situação, usina com cliente e responsável, a última resposta com o
 "desde", a última verificação com quem fez e a OS, as 8 últimas respostas), o cabeçalho e as cores do relatório dos
-extintores. **Sem fotos**: as das luvas são anexos da OS da ronda no Fracttal, que o Nexus só lê com o login de quem
-olha; o relatório leva o número da OS. Excel: aba "Usinas" (uma linha por usina, na ordem da tela) e aba "Respostas"
-(as 8 últimas de cada usina), a data como data, sem cor nem fórmula. Sempre como anexo
+extintores. Excel: aba "Usinas" (uma linha por usina, na ordem da tela) e aba "Respostas" (as 8 últimas de cada
+usina), a data como data, sem cor nem fórmula. Sempre como anexo
 (`epi-luvas-<cliente ou usina>-<hoje>`).
+
+**A foto das luvas no relatório** (23/11/2026, a Segurança: "como eu faço para que as últimas imagens sejam anexadas no
+relatório?"; `relatorio_epi.fotos_das_luvas`). O PDF ganha a coluna "Foto da última ronda": a foto que o App anexa na
+OS da última ronda da usina, com a descrição "As luvas isolantes estão disponíveis? — <resposta>", em miniatura de
+240 px (34 mm no PDF). A planilha ganha a coluna "Foto das luvas" (Sim, Não anexada, ronda sem OS, nunca verificada,
+não lida), sem baixar a imagem. O Nexus lê os anexos pela credencial da empresa, pelo `nexus.campo.ronda_fotos` do botão
+Fotos (a lista guardada 20 min, a miniatura em memória e em disco), sem o login de quem baixa: até 23/11 este `.md`
+dizia o contrário, e o relatório saía sem foto. **O custo:** um pedido à API por usina com OS na última ronda (4 por
+segundo saem do Nexus, a cota de 200 por minuto é da empresa); o relatório de um cliente com 80 usinas leva uns 20 s
+na 1ª vez e sai da memória nos 20 min seguintes. O Fracttal que recusa (429) ou falha deixa a usina "foto não lida" e
+o relatório sai assim mesmo; ronda sem OS não tem foto no Fracttal.
 
 **Como provar.** `python -m pytest -q tests/test_hseq_epi.py` (a resposta pelo texto, a situação por usina, o Sim antigo,
 os cartões por responsável com as usinas, os filtros, a tabela com o botão de fotos, o aviso quando a pergunta some, e os
-três pontos com o relatório do cliente e da usina, com o filtro da faixa).
+três pontos com o relatório do cliente e da usina, com o filtro da faixa, e a foto das luvas: só a OS da última ronda vai
+ao Fracttal, a imagem no PDF, e a foto não anexada e o Fracttal recusando sem derrubar o relatório).
 
 ## A versão do cliente de Extintores e EPI e EPC (10/11/2026)
 
