@@ -109,7 +109,12 @@ def _ler_cru(cfg) -> dict:
     if cfg.get("TESTING"):
         return {a: [] for a in ABAS}
     base, sessao = _banco(cfg)
-    return livros.ler_conferido(base, sessao, LIVRO, ABAS)
+    # a conferência é só das duas abas de 12/11/2026: o livro do servidor nasceu sem a lista das usinas (23/11/2026), e a
+    # leitura conferida recusa o livro sem uma aba declarada (no ar, logo depois de subir, a tela parou em "Marcação não
+    # lida"). A lista é derivada do cadastro: sem ela, vale vazia, e a 1ª gravação a cria
+    cru = livros.ler_conferido(base, sessao, LIVRO, (ABA, ABA_DECISAO))
+    cru[ABA_LISTA] = livros.ler(base, sessao, LIVRO, ABA_LISTA)
+    return cru
 
 
 def _conferir_destino(cfg) -> None:

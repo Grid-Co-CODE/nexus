@@ -152,3 +152,24 @@ def test_o_inventario_mostra_e_o_confirmar_volta_para_ele(au, banco, monkeypatch
     assert r.status_code == 303 and r.headers["Location"].endswith(INVENTARIO)
     assert AU.ler(au.config, forcar=True)["marcadas"][2]["situacao"] == "compartilha"
     assert "Declarações dos técnicos" not in c.get(INVENTARIO).get_data(as_text=True)
+
+
+def test_o_livro_de_antes_sem_a_aba_da_lista_se_le(app, banco):  # noqa: F811
+    """O livro do servidor nasceu em 12/11/2026 com duas abas: a lista das usinas (23/11/2026) ainda não existe nele. A leitura
+    conferida recusava o livro sem uma aba declarada, e a tela parava com "Marcação não lida" (o que aconteceu no ar logo
+    depois de subir). A lista é derivada do cadastro: sem ela, vale vazia, e a 1ª gravação a cria."""
+    _aba(banco, AU.LIVRO, AU.ABA, [{"usina_id": 3, "usina": "Cliente Beta - Usina Tres - PI", "situacao": "sem_almoxarifado",
+                                   "usina_dona_id": None, "usina_dona": None, "atualizado_em": "2026-11-12T12:00:00Z",
+                                   "pessoa_hmac": None}])
+    _aba(banco, AU.LIVRO, AU.ABA_DECISAO, [{"decidida_em": "2026-11-12T12:00:00Z", "data_id": 20261112, "usina_id": 3,
+                                            "situacao": "sem_almoxarifado", "usina_dona_id": None, "cliente_por": None,
+                                            "pessoa_hmac": None}])
+    AU.limpar()
+    app.config["TESTING"] = False
+    try:
+        with app.app_context():
+            est = AU.ler(app.config, forcar=True)
+    finally:
+        app.config["TESTING"] = True
+        AU.limpar()
+    assert est["erro"] == "" and 3 in est["marcadas"] and est["lista"] == []
