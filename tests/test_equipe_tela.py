@@ -53,13 +53,22 @@ PONTO = {NA_USINA: ((-16.605173, -49.187654), 3, False),           # 0,8 km da A
 NOME = {NA_USINA: "Naira Teste", ANDANDO: "Andre Teste", FORA: "Fabio Teste", SEM_SINAL: "Sinara Teste",
         SEM_PERMISSAO: "Pietra Teste", SEM_POSICAO: "Paulo Teste", FORA_DO_PILOTO: "Otavio Teste"}
 PILOTO = (NA_USINA, ANDANDO, FORA, SEM_SINAL, SEM_PERMISSAO, SEM_POSICAO)
-# a estrutura de O&M de 10/2026, como o cadastro a modela (`visao._Base`): a equipe é de uma região de campo, e o
-# supervisor do técnico é o Supervisor de Campo da região da equipe dele. A Oeste só tem o técnico fora do piloto
+# a equipe é de uma região de campo, mas as regiões não têm supervisor (como no cadastro desde que saíram da Base, em
+# 13/11/2026): o supervisor do técnico é o Responsável O&M das usinas da equipe dele (23/11/2026). A Oeste só tem o
+# técnico fora do piloto
 CENTRO, LESTE, OESTE = 10, 11, 12
 EQUIPE = {CENTRO: "Equipe Centro Teste", LESTE: "Equipe Leste Teste", OESTE: "Equipe Oeste Teste"}
 SUP_CENTRO, SUP_LESTE, SUP_OESTE = 30, 31, 32
 NOME_SUP = {SUP_CENTRO: "Sergio Teste", SUP_LESTE: "Silvia Teste", SUP_OESTE: "Sandro Teste"}
 REGIAO = {CENTRO: (1, SUP_CENTRO), LESTE: (2, SUP_LESTE), OESTE: (3, SUP_OESTE)}       # equipe: (região, supervisor)
+# as usinas do cadastro: a Alfa e a Bravo (com coordenada) são da Centro; a Charlie e a Delta, sem coordenada, só ligam a
+# Leste e a Oeste aos Responsáveis O&M delas
+USINA_C, USINA_D = 17, 18
+USINAS_CADASTRO = [{"usina_id": u, "nome": n, "status": "OPERAÇÃO", "equipe_id": e, "responsavel_om_id": r}
+                   for u, n, e, r in ((USINA_A, "Usina Alfa Teste", CENTRO, SUP_CENTRO),
+                                      (USINA_B, "Usina Bravo Teste", CENTRO, SUP_CENTRO),
+                                      (USINA_C, "Usina Charlie Teste", LESTE, SUP_LESTE),
+                                      (USINA_D, "Usina Delta Teste", OESTE, SUP_OESTE))]
 EQUIPE_DE = {NA_USINA: CENTRO, ANDANDO: CENTRO, FORA: CENTRO, SEM_SINAL: CENTRO, SEM_PERMISSAO: LESTE,
              SEM_POSICAO: LESTE, FORA_DO_PILOTO: OESTE}
 # quem olha o mapa
@@ -105,9 +114,8 @@ def banco(app, tmp_path, monkeypatch, relogio):
     _aba(api, "cadastro_nexus", "equipes", [{"equipe_id": e, "nome": n, "regiao_campo_id": REGIAO[e][0]}
                                             for e, n in EQUIPE.items()])
     _aba(api, "cadastro_nexus", "regioes_campo", [{"regiao_campo_id": r, "nome": f"Região {r} Teste",
-                                                   "supervisor_campo_id": s, "ordem": r} for r, s in REGIAO.values()])
-    _aba(api, "cadastro_nexus", "usinas", [{"usina_id": u, "nome": n, "status": "OPERAÇÃO", "equipe_id": 10}
-                                           for u, n in NOME_USINA.items()])
+                                                   "supervisor_campo_id": None, "ordem": r} for r, _s in REGIAO.values()])
+    _aba(api, "cadastro_nexus", "usinas", USINAS_CADASTRO)
     _aba(api, LIVRO_PILOTO, ABA_PILOTO, [_decisao(p) for p in PILOTO])
     app.config.update(GRIDCO_DB_API="http://pg.falso", NEXUS_CHAVE_CADASTRO=CHAVE_CADASTRO,
                       NEXUS_DADOS=str(tmp_path / "dados"), NEXUS_PESSOA_HMAC=CHAVE_HMAC, GRIDCO_SQL_TOKEN="token-teste",
@@ -415,10 +423,11 @@ def _no_painel(html):
 
 
 def test_o_filtro_lista_todos_os_supervisores_e_as_equipes_de_quem_esta_no_piloto(cliente, pontos, setor):
-    """Levi, 08/11/2026: "Opção de filtrar por supervisor ou equipe". O supervisor: TODOS os Supervisores de Campo das
-    regiões do cadastro (23/11/2026, Levi: "lista todos os supervisores no filtro", para o supervisor cujo time ainda não
-    instalou o Nexus Field ver os 0% dele na barra); a Oeste só tem o técnico de fora do piloto e o supervisor dela
-    entra. A equipe segue sendo só a de quem o mapa mostra (técnico de campo ativo E no piloto)."""
+    """Levi, 08/11/2026: "Opção de filtrar por supervisor ou equipe". O supervisor: TODOS os Responsáveis O&M das usinas
+    do cadastro (23/11/2026, Levi: "lista todos os supervisores no filtro", para o supervisor cujo time ainda não
+    instalou o Nexus Field ver os 0% dele na barra; e "Responsável O&M da usina", porque as regiões não têm supervisor);
+    o da Oeste só tem o técnico de fora do piloto e entra. A equipe segue sendo só a de quem o mapa mostra (técnico de
+    campo ativo E no piloto)."""
     _, html = _html(_entrar(cliente, EMAIL[PCM]))
     assert _opcoes(html, "supervisor") == [("", "Todos os supervisores"), (str(SUP_OESTE), NOME_SUP[SUP_OESTE]),
                                            (str(SUP_CENTRO), NOME_SUP[SUP_CENTRO]),

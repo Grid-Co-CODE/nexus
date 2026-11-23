@@ -356,8 +356,9 @@ def _quem_ve() -> dict:
 
 def _ve_adesao(srv, b) -> bool:
     """Quem vê a barra do Nexus Field (23/11/2026, Levi: "uma visão que só os administradores veem. Administradores e
-    supervisores responsáveis de usina"; a escolha dele: o administrador, o Supervisor de Campo de uma região e o
-    Responsável O&M de uma usina, pelo cadastro). O resto de quem vê o mapa (COS, PCM, Performance) não a vê. Quem é a
+    supervisores responsáveis de usina"; a escolha dele: o administrador e o supervisor, que no cadastro de hoje é o
+    Responsável O&M de uma usina: as regiões, que tinham o Supervisor de Campo, estão sem supervisor desde 13/11/2026).
+    O resto de quem vê o mapa (COS, PCM, Performance) não a vê. Quem é a
     pessoa sai do e-mail exato da ficha (`pessoa_do_email`, a regra do mapa); sem ler, não vê."""
     if session.get("via") == "cliente":
         return False
@@ -373,10 +374,7 @@ def _ve_adesao(srv, b) -> bool:
         return False
     if pid is None:
         return False
-    supervisores = {r.get("supervisor_id") for r in b.regiao.values()}
-    responsaveis = {visao.D._id(u.get("responsavel_om_id")) for u in b.por_id.values()
-                    if str(u.get("excluido") or "").strip().lower() != "sim"}
-    return pid in (supervisores | responsaveis) - {None}
+    return any(pid in s for s in _supervisores_por_equipe(b).values())
 
 
 def _adesao(srv, b, tecnicos: dict, filtro: dict, piloto) -> dict:
@@ -755,26 +753,35 @@ def _eventos_do_dia(srv, linhas: list, coords: dict, nomes_usina: dict, filtro: 
     return out
 
 
-def _supervisor_da_equipe(b, equipe_id):
-    """O Supervisor de Campo da região de campo da equipe (`equipes.regiao_campo_id` -> `regioes_campo.
-    supervisor_campo_id`), ou None (equipe sem região, vaga aberta). É assim que o cadastro diz quem lidera o técnico
-    desde a estrutura de O&M de 10/2026 (`visao._Base`): o `supervisor_id` da ficha da pessoa saiu das telas, porque na
-    prática era o Gestor de contrato."""
-    r = b.regiao.get(b.regiao_da_equipe.get(equipe_id))
-    return r["supervisor_id"] if r else None
+def _supervisores_por_equipe(b) -> dict:
+    """{equipe_id: {pessoa_id}}: os supervisores de cada equipe são os Responsáveis O&M das usinas dela
+    (`usinas.equipe_id` + `usinas.responsavel_om_id`, a usina excluída fora). Até 23/11/2026 era o Supervisor de Campo
+    da região da equipe, mas as Regiões de campo saíram da Base em 13/11/2026 (Levi: "Não vamos mais usar") e as 8 do
+    cadastro estão sem supervisor: o filtro de produção ficou vazio. O Levi escolheu o Responsável O&M ("Responsável O&M
+    da usina"). Medido em 23/11/2026: das 80 equipes com técnico, 78 têm um Responsável O&M só, 1 tem dois (aparece nos
+    dois) e 1 nenhum (só no "Todos"); 9 Responsáveis O&M."""
+    out: dict = {}
+    for u in b.por_id.values():
+        if str(u.get("excluido") or "").strip().lower() == "sim":
+            continue
+        e, r = visao.D._id(u.get("equipe_id")), visao.D._id(u.get("responsavel_om_id"))
+        if e and r:
+            out.setdefault(e, set()).add(r)
+    return out
 
 
 def _filtro(b, tecnicos: dict, piloto) -> dict:
     """O filtro por supervisor e por equipe (Levi, 08/11/2026: "Opção de filtrar por supervisor ou equipe"), pela URL
-    (`?supervisor=<pessoa_id>&equipe=<equipe_id>`). O supervisor: TODOS os Supervisores de Campo das regiões do cadastro
-    (23/11/2026, Levi: "lista todos os supervisores no filtro"; até ali só os de quem estava no piloto, e o supervisor
-    cujo time ainda não instalou o Nexus Field não conseguia ver os 0% dele na barra do Nexus Field). A equipe: só as de
+    (`?supervisor=<pessoa_id>&equipe=<equipe_id>`). O supervisor: TODOS os Responsáveis O&M das usinas do cadastro
+    (`_supervisores_por_equipe`; 23/11/2026, Levi: "lista todos os supervisores no filtro"; até ali só os de quem estava
+    no piloto, e o supervisor cujo time ainda não instalou o Nexus Field não conseguia ver os 0% dele na barra). A equipe: só as de
     quem o mapa mostra (técnico de campo ativo E no piloto). Os nomes são os do cadastro (o da pessoa decifrado da
     ficha; o da equipe, de `cadastro_nexus · equipes`). O id que não está nas opções (o que não existe, a equipe de
     quem está fora do piloto, o torto) não filtra: a tela mostra todos, sem erro. Os dois juntos valem juntos. Devolve {"supervisor", "equipe" (o id escolhido ou None), "opcoes_*"
     [(id, nome)], "q" (o que vai em todo link da tela, para o clique no técnico não perder o filtro)}."""
     no_mapa = [t for pid, t in tecnicos.items() if pid in piloto]
-    sups = {r["supervisor_id"] for r in b.regiao.values() if r.get("supervisor_id")}
+    sup_de = _supervisores_por_equipe(b)
+    sups = set().union(*sup_de.values()) if sup_de else set()
     nomes = b.nomes(sups)
     opcoes_sup = sorted(((s, nomes.get(s) or f"Supervisor {s}") for s in sups), key=lambda x: chave_texto(x[1]))
     opcoes_eq = sorted(((e, b.nome_equipe.get(e) or f"Equipe {e}") for e in {t["equipe_id"] for t in no_mapa} if e),
@@ -784,14 +791,14 @@ def _filtro(b, tecnicos: dict, piloto) -> dict:
         pedido = str(request.args.get(nome) or "").strip()
         return int(pedido) if _ID.fullmatch(pedido) and int(pedido) in {i for i, _n in opcoes} else None
     f = {"supervisor": escolha("supervisor", opcoes_sup), "equipe": escolha("equipe", opcoes_eq),
-         "opcoes_supervisor": opcoes_sup, "opcoes_equipe": opcoes_eq}
+         "opcoes_supervisor": opcoes_sup, "opcoes_equipe": opcoes_eq, "sup_de": sup_de}
     f["q"] = {k: f[k] for k in ("supervisor", "equipe") if f[k] is not None}
     return f
 
 
 def _no_filtro(b, t: dict, f: dict) -> bool:
     return ((f["equipe"] is None or t["equipe_id"] == f["equipe"])
-            and (f["supervisor"] is None or _supervisor_da_equipe(b, t["equipe_id"]) == f["supervisor"]))
+            and (f["supervisor"] is None or f["supervisor"] in f["sup_de"].get(t["equipe_id"], ())))
 
 
 # o que diz qual tela está aberta: o botão Incluir clima troca só o clima e guarda o resto

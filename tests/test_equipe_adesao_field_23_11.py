@@ -15,8 +15,8 @@ import re
 import pytest
 from test_equipe_tela import (ADMIN, AGORA, ANDANDO, CENTRO, CHAVE_CADASTRO, EMAIL, EQUIPE_DE, FORA,  # noqa: F401
                               FORA_DO_PILOTO, LESTE, NA_USINA, NOME, NOME_SUP, NOME_USINA, PCM, SEM_PERMISSAO,
-                              SEM_POSICAO, SEM_SINAL, SUP_CENTRO, SUP_LESTE, TECNICOS, USINA_B, _entrar, _ficha, _html,
-                              banco, pontos, relogio, setor)
+                              SEM_POSICAO, SEM_SINAL, SUP_CENTRO, SUP_LESTE, SUP_OESTE, TECNICOS, USINA_B,
+                              USINAS_CADASTRO, _entrar, _ficha, _html, banco, pontos, relogio, setor)
 
 from nexus.cadastro import setor_ids as SID
 from nexus.campo import visao
@@ -60,7 +60,7 @@ EMAIL_SUP, EMAIL_RESP = "supervisor.centro@gridco.com.br", "responsavel.om@gridc
 
 @pytest.fixture
 def quadro(app, banco, pontos, setor, monkeypatch):  # noqa: F811
-    """O supervisor da Centro e o Responsável O&M da Usina Bravo com e-mail (os dois no setor deles, para abrirem o
+    """O supervisor da Centro (Responsável O&M da Usina Alfa) e a Responsável O&M da Usina Bravo com e-mail (os dois no setor deles, para abrirem o
     mapa), e os celulares: um pronto, um faltando a bateria, um na versão antiga, um com a chave e sem ajustes, um só no
     livro do App e dois sem nada."""
     fichas = [_ficha(pid, nome, equipe_id=EQUIPE_DE[pid]) for pid, nome in NOME.items()]
@@ -68,11 +68,11 @@ def quadro(app, banco, pontos, setor, monkeypatch):  # noqa: F811
                _ficha(ADMIN, "Administradora Teste", EMAIL[ADMIN], vinculo="Colaborador"),
                _ficha(SUP_CENTRO, NOME_SUP[SUP_CENTRO], EMAIL_SUP, vinculo="Colaborador", equipe_id=None),
                _ficha(SUP_LESTE, NOME_SUP[SUP_LESTE], vinculo="Colaborador", equipe_id=None),
+               _ficha(SUP_OESTE, NOME_SUP[SUP_OESTE], vinculo="Colaborador", equipe_id=None),
                _ficha(RESP, "Rita Teste", EMAIL_RESP, vinculo="Colaborador", equipe_id=None)]
     _linhas(banco, "cadastro_nexus", "pessoas", fichas)
-    _linhas(banco, "cadastro_nexus", "usinas", [{"usina_id": u, "nome": n, "status": "OPERAÇÃO", "equipe_id": 10,
-                                                 "responsavel_om_id": RESP if u == USINA_B else None}
-                                                for u, n in NOME_USINA.items()])
+    _linhas(banco, "cadastro_nexus", "usinas", [{**u, "responsavel_om_id": RESP} if u["usina_id"] == USINA_B else u
+                                                for u in USINAS_CADASTRO])
     visao.limpar()
     setor[EMAIL_SUP] = {"id": SID.SUPERVISAO_CAMPO, "nome": "Supervisão Campo"}
     setor[EMAIL_RESP] = {"id": SID.RESPONSAVEL_UFV, "nome": "Responsáveis UFV"}
