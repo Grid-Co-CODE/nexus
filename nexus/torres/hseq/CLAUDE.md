@@ -1,7 +1,7 @@
 # CLAUDE.md — Segurança · HSEQ
 
 Torre do menu "Segurança · HSEQ". Telas vivas: a **Mesa da Segurança** (a primeira, 24/10/2026), **Extintores** (com o
-relatório de cada cliente e usina em PDF e Excel), **EPI e EPC**, **APR e PT** (09/10/2026) e **Colaboradores** (05/11/2026, as pessoas do cadastro e a documentação de segurança de cada uma). Riscos da semana, DSS e
+relatório de cada cliente e usina em PDF e Excel), **EPI e EPC** (com o mesmo relatório, desde 23/11/2026), **APR e PT** (09/10/2026) e **Colaboradores** (05/11/2026, as pessoas do cadastro e a documentação de segurança de cada uma). Riscos da semana, DSS e
 Incidentes ainda são placeholder (a view com a mesma rota vence a genérica). As contas moram em `nexus/hseq/`; a view e o
 template, aqui.
 
@@ -420,8 +420,23 @@ respostas (quadradinho verde = Sim, vermelho = Não) e quantos Não.
 **Números de 09/10/2026** (banco real): 240 respostas de 28/09 a 09/10 (188 Sim, 52 Não); 128 usinas mobilizadas, **18
 sem luvas**, 34 sem verificação, 76 com luvas.
 
+**O relatório do cliente e da usina, em PDF e em Excel** (23/11/2026, a Segurança: "crie a opção de baixar relatório
+por cliente, no mesmo modelo e opções dos Extintores"; `nexus/hseq/relatorio_epi.py`, rotas `/t/hseq/epi/relatorio.pdf`
+e `.xlsx`). A tabela é uma linha por usina, sem o agrupamento por cliente dos Extintores; por isso os **três pontos da
+linha da usina** (a última coluna, o mesmo botão e o mesmo menu único dos Extintores) dão quatro opções: PDF e planilha
+do cliente dela, PDF e planilha da usina (a escolha da Segurança). A usina sem cliente no cadastro só tem as da usina (o
+cliente vazio filtraria todas). O recorte é o da tela (`_epi_filtrado`, o mesmo da tabela, mais o `f` da faixa) com o
+`cliente` da linha ou, no da usina, o `usina_id` (sem ID no cadastro, o nome; `_args_relatorio_epi` monta os endereços).
+PDF: o resumo com os quatro números e a tabela (situação, usina com cliente e responsável, a última resposta com o
+"desde", a última verificação com quem fez e a OS, as 8 últimas respostas), o cabeçalho e as cores do relatório dos
+extintores. **Sem fotos**: as das luvas são anexos da OS da ronda no Fracttal, que o Nexus só lê com o login de quem
+olha; o relatório leva o número da OS. Excel: aba "Usinas" (uma linha por usina, na ordem da tela) e aba "Respostas"
+(as 8 últimas de cada usina), a data como data, sem cor nem fórmula. Sempre como anexo
+(`epi-luvas-<cliente ou usina>-<hoje>`).
+
 **Como provar.** `python -m pytest -q tests/test_hseq_epi.py` (a resposta pelo texto, a situação por usina, o Sim antigo,
-os cartões por responsável com as usinas, os filtros, a tabela com o botão de fotos, o aviso quando a pergunta some).
+os cartões por responsável com as usinas, os filtros, a tabela com o botão de fotos, o aviso quando a pergunta some, e os
+três pontos com o relatório do cliente e da usina, com o filtro da faixa).
 
 ## A versão do cliente de Extintores e EPI e EPC (10/11/2026)
 

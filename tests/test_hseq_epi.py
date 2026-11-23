@@ -91,3 +91,35 @@ def test_checklist_sem_a_pergunta_das_luvas_a_tela_avisa(banco, logado):
     _aba(banco, "rondas_app_campo", "OS de ronda", [_ronda(_dia(1), **{"Checklist da ronda": "Computador: Ligado"})])
     visao.limpar()
     assert "Nenhuma ronda respondeu a pergunta das luvas" in logado.get("/t/hseq/epi").get_data(as_text=True)
+
+
+def test_tres_pontos_da_usina_baixam_o_relatorio_do_cliente_e_da_usina(luvas, logado):
+    """A Segurança, 23/11/2026: "na aba EPI e EPC, crie a opção de baixar relatório por cliente, no mesmo modelo e
+    opções dos Extintores". A tabela é por usina: os três pontos da usina dão o relatório do cliente dela e o da usina,
+    em PDF e em planilha, com os filtros da tela e o da faixa."""
+    import io
+
+    from openpyxl import load_workbook
+    html = logado.get("/t/hseq/epi?modo=tabela&regiao=Sudeste").get_data(as_text=True)
+    assert '<th aria-label="Relatórios"></th>' in html and 'id="hs-menu"' in html
+    bt = dict(re.findall(r'data-(cliente|cli|us)="([^"]*)"', html.split("Altair</span>")[1].split("</tr>")[0]))
+    assert bt == {"cliente": "Thopen", "cli": "regiao=Sudeste&amp;cliente=Thopen",
+                  "us": "regiao=Sudeste&amp;cliente=Thopen&amp;usina_id=1"}
+    assert "Exportar PDF do cliente" in html and "Exportar planilha da usina" in html
+    # o do cliente: só as usinas dele (Altair e Brodowski 1, da Thopen; Coração 1 é de outro cliente)
+    r = logado.get("/t/hseq/epi/relatorio.xlsx?cliente=Thopen")
+    assert r.status_code == 200 and 'attachment; filename="epi-luvas-thopen-' in r.headers["Content-Disposition"]
+    wb = load_workbook(io.BytesIO(r.data))
+    usinas = [l for l in wb["Usinas"].iter_rows(values_only=True) if l[0] == "Thopen"]
+    assert [(l[1], l[6], l[7]) for l in usinas] == [("Altair", "Sem luvas", "Não"), ("Brodowski 1", "Com luvas", "Sim")]
+    assert "Filtros: Cliente: Thopen" in [c for (c, *_r) in wb["Usinas"].iter_rows(values_only=True) if c]
+    assert [(l[1], l[3]) for l in wb["Respostas"].iter_rows(values_only=True) if l[0] == "Thopen"] == [
+        ("Altair", "Não"), ("Altair", "Sim"), ("Brodowski 1", "Sim")]
+    # o da faixa vale junto (só os sem luvas) e o da usina vai pelo ID
+    so = load_workbook(io.BytesIO(logado.get("/t/hseq/epi/relatorio.xlsx?cliente=Thopen&f=sem_luvas").data))
+    assert [l[1] for l in so["Usinas"].iter_rows(values_only=True) if l[0] == "Thopen"] == ["Altair"]
+    us = load_workbook(io.BytesIO(logado.get("/t/hseq/epi/relatorio.xlsx?cliente=Thopen&usina_id=2").data))
+    assert [l[1] for l in us["Usinas"].iter_rows(values_only=True) if l[0] == "Thopen"] == ["Brodowski 1"]
+    pdf = logado.get("/t/hseq/epi/relatorio.pdf?cliente=Thopen&usina_id=1")
+    assert pdf.status_code == 200 and pdf.mimetype == "application/pdf" and pdf.data.startswith(b"%PDF")
+    assert 'filename="epi-luvas-altair-' in pdf.headers["Content-Disposition"]
