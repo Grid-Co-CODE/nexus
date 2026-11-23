@@ -27,7 +27,7 @@
 <div class="campo-nativa">
   <div class="cn-cab">
     <div><p class="gc-eyebrow">{{ torre.nome }}</p><div class="gc-titulo-explica"><h1 class="cn-titulo">{{ tela.nome }}</h1>
-    {% call explica('Como cada usina entra', 'A ronda diária pergunta "' ~ pergunta ~ '" (Sim ou Não, com foto). O Não também vai por e-mail à TST pelo App, na hora. As respostas vêm do checklist que o App manda junto com as rondas (desde 28/09/2026); as fotos, dos anexos da OS da ronda no Fracttal. Na tabela, os três pontos da usina exportam o cliente dela ou a própria usina em PDF ou em planilha, com os filtros da tela.', termos=True) %}
+    {% call explica('Como cada usina entra', 'A ronda diária pergunta "' ~ pergunta ~ '" (Sim ou Não, com foto). O Não também vai por e-mail à TST pelo App, na hora. As respostas vêm do checklist que o App manda junto com as rondas (desde 28/09/2026); as fotos, dos anexos da OS da ronda no Fracttal. Na tabela, os três pontos da usina exportam o cliente dela ou a própria usina em PDF ou em planilha, com os filtros da tela; o PDF leva a foto das luvas da última ronda de cada usina.', termos=True) %}
     {{ termo('Sem luvas', 'critico') }}<dd>A última ronda respondeu Não; o "desde" é o primeiro Não da sequência até ela.</dd>
     {{ termo('Sem verificação', 'info') }}<dd>Nenhuma resposta há {{ dias_sem }} dias ou mais, ou nunca (a mesma régua da ronda pendente).</dd>
     {{ termo('Com luvas', 'ok') }}<dd>A última ronda respondeu Sim.</dd>
