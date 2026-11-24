@@ -6,6 +6,7 @@ As rotas ficam debaixo de `/t/comando/caixa-de-entrada/demandas/...`: herdam a p
 todos (`de_todos`); debaixo de `/t/comando/demandas/` o portão por setor não acharia a tela e barraria quem só tem a Caixa.
 Fica num módulo à parte, importado no fim do `__init__` da torre (como as Ocorrências e a Visão do cliente do Campo).
 """
+import re
 from datetime import datetime, timedelta, timezone
 
 from flask import abort, current_app, jsonify, redirect, render_template, request, send_file, session
@@ -214,6 +215,24 @@ def _no_chamado(folio: str, tipo: str, texto: str, did: str = "") -> str:
 # da Caixa de entrada dentro do chamado. "Quando a pessoa escolhe supervisor de campo, já puxa automaticamente o
 # supervisor de campo daquela usina"; a usina e a OS vão vinculadas sozinhas, do chamado; o tema "Acompanhamento de
 # chamado", de 3 dias úteis, já vem escolhido. A demanda é a de sempre (o mesmo livro, os mesmos passos, a mesma Caixa).
+_RESERVA = re.compile(r"(Supervisor|Respons[aá]vel) \d+")    # o nome de reserva do cadastro, sem a chave
+
+
+def _supervisor_da_usina(b, uid) -> str:
+    """O nome de quem a Nova demanda do chamado já traz em "Para quem" (a tela acha a pessoa na Supervisão Campo pelo
+    nome; sem achar, fica em branco). Primeiro o Supervisor de Campo da região da usina; sem ele, o Responsável O&M da
+    usina (os supervisores de antes). Medido em 24/11/2026: as 8 regiões de campo do cadastro estão com a vaga de
+    supervisor aberta, e só pela região nenhum chamado trazia ninguém; pelo responsável, 74 das 144 usinas trazem uma
+    pessoa da Supervisão Campo. Nome de reserva do cadastro ("Supervisor 92", sem a chave) não vale."""
+    from ...campo import visao
+    r = b.info_regiao(b.regiao_da_usina(uid))
+    for nome in ((r["supervisor"] if r.get("supervisor_id") else ""), b.responsavel_da_usina(uid)):
+        nome = (nome or "").strip()
+        if nome and nome not in (visao.VAGA, visao.SEM_RESPONSAVEL) and not _RESERVA.fullmatch(nome):
+            return nome
+    return ""
+
+
 def contexto_do_chamado(folio: int) -> dict:
     """O bloco "Demandas do chamado" do Raio X e a Nova demanda dele: os setores e os temas (para as listas digitáveis),
     a usina e a OS do chamado, o supervisor de campo da usina (o nome: a tela acha a pessoa na lista de quem tem setor) e
@@ -276,8 +295,7 @@ def contexto_do_chamado(folio: int) -> dict:
         if uid:
             b = visao._Base()
             out["usina"] = (uid, (b.por_id.get(uid) or {}).get("nome") or f"usina {uid}")
-            r = b.info_regiao(b.regiao_da_usina(uid))
-            out["supervisor"] = r["supervisor"] if r.get("supervisor_id") else ""
+            out["supervisor"] = _supervisor_da_usina(b, uid)
     except Exception:            # noqa: BLE001 — sem a usina, a demanda vai sem ela e sem a OS
         current_app.logger.exception("demandas do chamado: a usina da OS %s não saiu", folio)
     return out

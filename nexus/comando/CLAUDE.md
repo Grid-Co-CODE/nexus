@@ -442,8 +442,9 @@ do chamado:
   recebeu (Responder e finalizar, Pedir informação, Colocar em análise) e para quem pediu (Enviar a informação,
   Concluir, Devolver). O passo vai à rota de sempre com `?chamado=<nº>` e volta ao chamado com ela aberta
   (`?dm=<id>#dm-<id>`); quem não é parte vê quem responde e quem conclui, e o link "Ver na Caixa de entrada";
-- já vêm escolhidos o setor **Supervisão Campo**, **o supervisor de campo da usina** (a região de campo da usina no
-  cadastro; a tela acha a pessoa na lista de quem tem setor pelo nome: o curto do cadastro dentro do completo do Fracttal)
+- já vêm escolhidos o setor **Supervisão Campo**, **o supervisor de campo da usina** (o Supervisor de Campo da região da
+  usina no cadastro e, com a vaga aberta, o Responsável O&M da usina: em 24/11/2026 as 8 regiões estavam sem supervisor e
+  nenhum chamado trazia ninguém; pelo responsável, 74 das 144 usinas; `_supervisor_da_usina`; a tela acha a pessoa na lista de quem tem setor pelo nome: o curto do cadastro dentro do completo do Fracttal)
   e o tema **"Acompanhamento de chamado"** (3 dias úteis, um tema padrão novo da Supervisão Campo, `TEMA_DO_CHAMADO`);
   a usina e a OS vão do chamado, fixas (a usina pelo retrato das OS abertas, `usina_da_os`);
 - as listas são as digitáveis do Nexus (`lista-sugestoes.js`), Setor e Para quem lado a lado e do mesmo tamanho, o

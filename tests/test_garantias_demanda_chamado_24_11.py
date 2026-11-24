@@ -116,3 +116,27 @@ def test_a_demanda_abre_no_chamado_e_o_passo_volta_a_ele(app, cena, monkeypatch)
     r = ju.post(d["passo_url"], data={"codigo": cod_ju, "acao": "respondeu", "texto": "Ok", "aba": "para",
                                       "novo_id": D.novo_id("e")})
     assert "&erro=" in r.headers["Location"] and "/t/engenharia/equipe/os/18421" in r.headers["Location"]
+
+
+def test_o_supervisor_vem_da_regiao_e_sem_ele_do_responsavel(app, cena, monkeypatch):
+    """24/11/2026, medido no banco: as regiões de campo estão com a vaga de supervisor aberta e nenhum chamado trazia
+    ninguém em "Para quem". Primeiro o Supervisor de Campo da região; sem ele, o Responsável O&M da usina; nome de
+    reserva do cadastro ("Responsável 7", sem a chave) não vale."""
+    from nexus.campo import visao
+    from nexus.torres.comando.demandas_tela import contexto_do_chamado
+    _tema_do_chamado(app, monkeypatch)
+
+    def sup(os_n):
+        with app.test_request_context():
+            from flask import session
+            session.update(logado=True, usuario=dict(JU))
+            return contexto_do_chamado(os_n)["supervisor"]
+    regiao = sup(18421)                                   # Altair: a Sudeste 03 tem o Supervisor de Campo 92
+    assert regiao and regiao != visao.VAGA
+    monkeypatch.setattr(visao._Base, "responsavel_da_usina", lambda self, uid: "Pessoa Responsavel Teste")
+    assert sup(18421) == regiao                           # a região vem antes
+    assert sup(18500) == "Pessoa Responsavel Teste"       # Coração 1: a Sul 01 está com a vaga aberta
+    monkeypatch.setattr(visao._Base, "responsavel_da_usina", lambda self, uid: "Responsável 7")
+    assert sup(18500) == ""
+    monkeypatch.setattr(visao._Base, "responsavel_da_usina", lambda self, uid: visao.SEM_RESPONSAVEL)
+    assert sup(18500) == ""
