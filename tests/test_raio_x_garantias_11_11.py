@@ -119,3 +119,33 @@ def test_as_escritas_vao_as_rotas_do_chamado():
     for rota in ("'/status'", "'/ticket'", "'/obs'", "'/finalizar'", "'/obs/' + encodeURIComponent(id) + '/' + tipo"):
         assert rota in js, rota
     assert "credentials: 'same-origin'" in js and "e.login" in js
+
+
+def test_as_demandas_do_chamado_no_raio_x(pagina, cliente, monkeypatch):
+    """24/11/2026 (o mockup aprovado): o bloco Demandas do chamado, com a Nova demanda (Setor e Para quem lado a lado, as
+    listas digitáveis do Nexus, o Sugerido na linha do Tema, a usina e a OS fixas) e o 2º número com as demandas abertas."""
+    from nexus.torres.comando import demandas_tela as DT
+    C.limpar()
+    _obs_de_mentira(monkeypatch)
+    estado = {"aberta": True, "rotulo": "Em análise", "tom": "alerta", "prazo": None, "situacao": "em_analise"}
+    cx = {"falta": [], "erro": "", "tem_login": True, "codigo": "cod", "novo_id": "d00000000001", "folio": 16502,
+          "usina": (1, "Usina Teste 1"), "supervisor": "Supervisora Teste", "setor_sugerido": "2", "tema_padrao": "m1",
+          "setores": [("2", "Supervisão Campo")], "temas": [{"tema_id": "m1", "setor": "2", "nome": "Acompanhamento de chamado (3 dias úteis)"}],
+          "demandas": [{"demanda_id": "d1", "titulo": "Foto da etiqueta", "de_nome": "Analista Teste", "para_nome": "Supervisora Teste",
+                        "para_setor_nome": "Supervisão Campo", "tema_nome": "Acompanhamento de chamado", "passos": [],
+                        "pendente": "Resposta até qui, 26/11", "estado": estado, "selo": ("Falta", "2 dias", "alerta"),
+                        "caixa": "/t/comando/caixa-de-entrada?d=d1#demandas"}],
+          "abertas": 1, "proximo": "qui, 26/11", "acao": "/t/comando/caixa-de-entrada/demandas/nova?chamado=16502",
+          "pessoas_url": "/t/comando/caixa-de-entrada/demandas/pessoas",
+          "anexo": {"aceitos": ".pdf, .png", "max_mb": 5, "max_arquivos": 5, "max_total": 15}, "limites": {"titulo": 120, "texto": 2000}}
+    monkeypatch.setattr(DT, "contexto_do_chamado", lambda folio: cx)
+    html = _como(cliente, ANA).get(URL_OS + "?de=garantias").get_data(as_text=True)
+    assert '<h2 id="dm-ch-t">Demandas do chamado</h2>' in html and "Foto da etiqueta" in html
+    assert 'href="/t/comando/caixa-de-entrada?d=d1#demandas"' in html and "Resposta até qui, 26/11" in html
+    assert html.count("data-dm-ch-abrir") == 2                         # o botão no alto e o do bloco
+    assert 'action="/t/comando/caixa-de-entrada/demandas/nova?chamado=16502"' in html
+    assert 'data-lista="dm-ch-setores"' in html and 'data-dm-ch-t="pessoa"' in html and 'data-dm-ch-t="tema"' in html
+    grade = html.split('class="eg-dm-grade"', 1)[1]
+    assert grade.index('data-dm-ch-t="setor"') < grade.index('data-dm-ch-t="pessoa"') < grade.index("data-dm-ch-sug")
+    assert 'name="usinas" value="1"' in html and 'name="os" value="16502"' in html and "Usina Teste 1" in html
+    assert "lista-sugestoes.js" in html and ">Demandas</div>" in html and "1 aberta" in html

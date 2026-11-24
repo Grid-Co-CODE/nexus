@@ -258,6 +258,34 @@ def avisos_do_sino(meu_hmac: str, meu_setor: int | None, hoje: date | None = Non
     return av
 
 
+def por_os(hoje: date | None = None) -> dict:
+    """{nº da OS: {"abertas", "vencidas", "respondidas", "prazo"}} das demandas que citam a OS na abertura, pela cópia
+    (sem esperar o banco; sem cópia, {}). É o selo do cartão do quadro de Garantias (24/11/2026): a situação e o prazo
+    da demanda do chamado, sem decifrar nada."""
+    lido = copia()
+    if not lido:
+        return {}
+    hoje = hoje or datetime.now(_BRT).date()
+    eventos: dict[str, list[dict]] = {}
+    for e in lido["eventos"]:
+        eventos.setdefault(_txt(e.get("demanda_id")), []).append(e)
+    out: dict[int, dict] = {}
+    for l in lido["demandas"]:
+        did, os_n = _txt(l.get("demanda_id")), _int(l.get("os"))
+        if not os_n or not ID_DEMANDA.fullmatch(did):
+            continue
+        e = R.estado(l, passos_validos(l, eventos.get(did, [])), _int(l.get("prazo_dias_uteis")) or 0, hoje)
+        c = out.setdefault(os_n, {"abertas": 0, "vencidas": 0, "respondidas": 0, "prazo": None})
+        if e["aberta"]:
+            c["abertas"] += 1
+            c["vencidas"] += 1 if e["vencida"] else 0
+            if e["prazo"] and (c["prazo"] is None or e["prazo"] < c["prazo"]):
+                c["prazo"] = e["prazo"]
+        elif e["situacao"] in ("finalizada", "concluida"):
+            c["respondidas"] += 1
+    return out
+
+
 # ── os temas do setor ────────────────────────────────────────────────────────────────────────────────────────────────
 def _temas_de(linhas: list[dict], cofre) -> dict[str, dict]:
     """{tema_id: a última versão}, com o nome decifrado."""
@@ -392,6 +420,20 @@ def os_das_usinas(usina_ids) -> list[dict]:
             por[n] = {"os": n, "usina_id": uid, "tipo": _txt(t.get("tipo_tarefa")).replace("_", " "),
                       "status": _txt(t.get("status_os"))}
     return sorted(por.values(), key=lambda o: -o["os"])
+
+
+def usina_da_os(os_n) -> int | None:
+    """A usina de uma OS pelo retrato do Fracttal no banco (`nexus_os · fato_tarefa_os`), ou None (a OS fora do retrato:
+    concluída, cancelada ou ainda não lida). É a usina que a Nova demanda do chamado de Garantias leva (24/11/2026)."""
+    from ..campo import visao
+    from ..dados import fato_tarefa_os as FT
+    alvo = _int(os_n)
+    if not alvo:
+        return None
+    for t in visao._livro(FT.LIVRO, FT.ABA):
+        if _int(t.get("os")) == alvo and _int(t.get("usina_id")):
+            return _int(t.get("usina_id"))
+    return None
 
 
 # ── os anexos (a regra das Sugestões) ────────────────────────────────────────────────────────────────────────────────

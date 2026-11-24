@@ -27,7 +27,10 @@
   <div class="k-cab"><span class="k-os">OS {{ c.folio }}</span>{% if c.tempo_curto %}<span class="tag u-{{ c.urg }}">{{ c.tempo_curto }}</span>{% endif %}</div>
   <div class="k-tit">{{ titulo }}</div>
   {% if onde %}<div class="k-onde">{{ onde }}</div>{% endif %}
-  {% if c.marca or c.tipo or c.inspecao or c.ticket or c.status_ch %}<div class="k-etq">
+  {% set dm = (demandas or {}).get(c.folio) %}
+  {% if c.marca or c.tipo or c.inspecao or c.ticket or c.status_ch or dm %}<div class="k-etq">
+    {#- a demanda do chamado (24/11/2026): aberta, com o prazo, ou respondida #}
+    {%- if dm %}<span class="k-chip k-dm k-dm-{{ dm.tom }}">{{ dm.texto }}</span>{% endif %}
     {%- if c.status_ch %}<span class="k-chip k-st">{{ c.status_ch }}</span>{% endif %}
     {%- if c.marca %}<span class="k-chip k-forn">{{ c.marca }}</span>{% endif %}
     {%- if c.tipo %}<span class="k-chip">{{ c.tipo }}</span>{% endif %}

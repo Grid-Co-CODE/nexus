@@ -147,6 +147,10 @@ body.cham .ac-filtros .fl-painel:focus-visible{outline:none}
 .k-av0{--av:#7fb8ff}.k-av1{--av:#4fd1c5}.k-av2{--av:#e88fb4}.k-av3{--av:#c7cede}   /* acomp_web.cor_avatar */
 .k-quem{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .k-fora{color:var(--am-t)}
+/* a demanda do chamado no cartão (24/11/2026): aberta em âmbar, vencida em vermelho, respondida em verde */
+.k-chip.k-dm-am{color:var(--am-t);border-color:var(--am-t)}
+.k-chip.k-dm-rd{color:var(--rd-t);border-color:var(--rd-t)}
+.k-chip.k-dm-ok{color:var(--ok-t);border-color:var(--ok-t)}
 .card .dono{font-size:11.5px;color:var(--am-t)}
 .tag{display:inline-block;font:700 10px/1.4 var(--font);letter-spacing:.05em;text-transform:uppercase;border-radius:5px;
   padding:2px 7px;white-space:nowrap}

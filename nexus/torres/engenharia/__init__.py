@@ -1125,10 +1125,30 @@ def _chamado_no_raiox(o: dict) -> dict:
     try:
         ch = ponte.modulo_do_clone("os_web.acomp_raiox").blocos(o["os"], o, ticket=_ticket_da_os(o["os"]))
         ch["pode_obs"] = bool(ponte.obs_chamados().get("pode"))
-        return ch
     except Exception as e:      # noqa: BLE001 — o chamado que não monta não derruba a página da OS
         logging.warning("Raio X: o chamado da OS %s não montou (%s: %s)", o.get("os"), type(e).__name__, str(e)[:160])
         return {"erro": type(e).__name__}
+    # as demandas do chamado (24/11/2026): a Nova demanda da Caixa de entrada dentro do chamado, para o supervisor de
+    # campo da usina (ver `torres/comando/demandas_tela.contexto_do_chamado`)
+    try:
+        from ..comando.demandas_tela import contexto_do_chamado
+        ch["demandas"] = contexto_do_chamado(int(o["os"]))
+    except Exception as e:      # noqa: BLE001 — sem as demandas, o resto do chamado abre igual
+        logging.warning("Raio X: as demandas da OS %s não abriram (%s)", o.get("os"), type(e).__name__)
+        ch["demandas"] = {"erro": type(e).__name__, "demandas": []}
+    return ch
+
+
+def _kpi_das_demandas(ch: dict) -> dict | None:
+    """O 2º número do Raio X na OS de chamado: as demandas abertas e o prazo mais perto (o mockup de 24/11/2026)."""
+    dm = ch.get("demandas") or {}
+    if dm.get("falta") or dm.get("erro"):
+        return None
+    n = dm.get("abertas") or 0
+    valor = "Nenhuma aberta" if not n else ("1 aberta" if n == 1 else f"{n} abertas")
+    nota = [("a mais perto vence ", False), (dm["proximo"], True)] if dm.get("proximo") else \
+        [(f"{len(dm.get('demandas') or [])} no total", False)]
+    return {"rotulo": "Demandas", "valor": valor, "grav": "alerta" if n else "", "nota": nota}
 
 
 def _kpi_do_chamado(ch: dict) -> dict:
@@ -1215,6 +1235,9 @@ def _pagina_da_os(folio: int, tela_id: str):
         chamado = _chamado_no_raiox(o)
         if not chamado.get("erro"):
             kpis[0] = _kpi_do_chamado(chamado)
+            kd = _kpi_das_demandas(chamado)
+            if kd:
+                kpis[1] = kd
     # a cadeia do Raio X da OS (11/11/2026): as OS incluídas à mão, depois das filhas
     from ...engenharia import cadeia_os as C
     incluidas, erro_cadeia = C.do_banco(o["wid"])

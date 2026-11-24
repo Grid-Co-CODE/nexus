@@ -12,7 +12,7 @@
    à direita o que ela LÊ (a nota da OS, a resposta do técnico nas filhas, os comentários). O "Solicitar OS" fica no
    lugar do "Abrir a OS". #}
 {% from "_explica.html" import explica %}
-{% from "engenharia/_chamado.html" import esquerda as ch_esq, direita as ch_dir %}
+{% from "engenharia/_chamado.html" import esquerda as ch_esq, direita as ch_dir, nova_demanda as ch_nova %}
 {% macro tag(texto, cor) %}<span class="eg-tag eg-tag--{{ cor }}">{{ texto }}</span>{% endmacro %}
 {# a seta do PDF de cada OS da cadeia, a mesma da cadeia do chamado da Garantia (o PDF que o Fracttal junta, com as fotos) #}
 {% macro seta_pdf(folio, wid='') -%}
@@ -49,7 +49,7 @@
       <p class="eg-ac-titulo"><a class="eg-ac-num" href="{{ ('/os/os/' ~ o.wid)|na_raiz }}" data-os-card data-wid="{{ o.wid }}" data-folio="{{ o.os }}" data-status="{{ o.status or '' }}" title="Abrir o card da OS {{ o.os }}">OS {{ o.os }}</a> <span>{{ (o.ativos|length ~ ' ativos') if o.ativos|length > 1 else (o.ativo or o.codigo) }}</span></p>
       <p class="eg-ac-sub">{{ topo.local }}{% if o.tipo %} · <b>{{ o.tipo }}</b>{% endif %}{% if o.status %} · {{ o.status }} no Fracttal{% endif %}</p>
     </div>
-    <div class="eg-ac-acoes">{% if ch_ok and chamado.aberto %}<button type="button" class="eg-ac-btn eg-ac-btn--o eg-ac-btn--perigo" data-ch-finalizar title="Encerra a atividade e conclui a OS {{ o.os }} no Fracttal">Finalizar chamado</button>{% endif %}<a class="eg-ac-btn eg-ac-btn--o" href="{{ solicitar_url|na_raiz }}" title="A Nova solicitação com o ativo desta OS e ela como OS pai">Solicitar OS</a><a class="eg-ac-btn eg-ac-btn--o" href="{{ criar_url|na_raiz }}" title="O Criar OS do zero com o ativo desta OS, ela como OS pai e as subtarefas Descreva a atividade realizada e Ficou alguma pendência">Criar OS</a></div>
+    <div class="eg-ac-acoes">{% if ch_ok and chamado.demandas and not chamado.demandas.falta and not chamado.demandas.erro %}<button type="button" class="eg-ac-btn eg-ac-btn--o" data-dm-ch-abrir{% if not chamado.demandas.tem_login %} disabled title="Para pedir, entre com a sua conta da Grid"{% endif %}>Nova demanda</button>{% endif %}{% if ch_ok and chamado.aberto %}<button type="button" class="eg-ac-btn eg-ac-btn--o eg-ac-btn--perigo" data-ch-finalizar title="Encerra a atividade e conclui a OS {{ o.os }} no Fracttal">Finalizar chamado</button>{% endif %}<a class="eg-ac-btn eg-ac-btn--o" href="{{ solicitar_url|na_raiz }}" title="A Nova solicitação com o ativo desta OS e ela como OS pai">Solicitar OS</a><a class="eg-ac-btn eg-ac-btn--o" href="{{ criar_url|na_raiz }}" title="O Criar OS do zero com o ativo desta OS, ela como OS pai e as subtarefas Descreva a atividade realizada e Ficou alguma pendência">Criar OS</a></div>
   </div>
   {% if ch_ok %}<p class="eg-os-msg" data-ch-msg-topo role="status" hidden></p>{% endif %}
   {% if msg_ok %}<p class="eg-os-aviso eg-os-aviso--ok" role="status">{{ msg_ok }}</p>{% endif %}
@@ -319,6 +319,8 @@
 </div>
 {% if o %}{% include "oscreator/card_os_abrir.html" %}
 <script src="{{ url_for('static', filename='engenharia-os.js') }}"></script>
+{% if chamado and not chamado.erro and chamado.demandas %}{{ ch_nova(chamado, o) }}
+<script src="{{ url_for('static', filename='lista-sugestoes.js') }}"></script>{% endif %}
 {% if chamado and not chamado.erro %}<div hidden data-ch-raiz data-folio="{{ o.os }}" data-wid="{{ o.wid }}" data-ativo="{{ chamado.c.code }}" data-base="{{ ('/os/api/acomp/' ~ o.os)|na_raiz }}" data-login="{{ login_fracttal }}"></div>
 <script src="{{ url_for('static', filename='engenharia-chamado.js') }}"></script>{% endif %}
 <script>

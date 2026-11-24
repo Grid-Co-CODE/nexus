@@ -3173,6 +3173,12 @@ fundo que nem quando vamos criar OS." O menu e a janela são da plataforma (Moni
   cliente, o relatório (um PDF; dois clientes, um .zip) e a planilha; a 375 px a página não rola para o lado e a caixa
   dos avisos fica na tela.
 
+## Garantias: o selo da demanda do chamado (24/11/2026)
+- O cartão do chamado com demanda (a Nova demanda que sai do Raio X do chamado para o supervisor da usina) mostra a
+  situação: "Demanda aberta · vence dd/mm" em âmbar, "vencida" em vermelho, "Demanda respondida" em verde. Quem conta é o
+  Nexus (`ponte.demandas_chamados`, pela cópia das demandas do sininho, sem esperar o banco), que põe no pedido do quadro
+  `os_web.demandas_chamados` (`rotas_acomp.DEMANDAS`); o OS Creator sozinho não mostra nada.
+
 ## A Inspeção nasce Corretiva no OS Creator Web (18/11/2026)
 - **A regra** (Levi: "para as próximas OSs de inspeção ... configure para o tipo de tarefa nascer como corretiva, o resto do
   passado já se foi"): toda OS avulsa que pediria o tipo Inspeção nasce Corretiva (`api.tipo_que_nasce`, chamada pelo

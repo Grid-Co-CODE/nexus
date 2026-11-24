@@ -35,8 +35,75 @@
 </section>{% endif %}
 {% endmacro %}
 
+{# As demandas do chamado (24/11/2026; o mockup aprovado: "Boa, gostei"): a Nova demanda da Caixa de entrada dentro do
+   chamado, com a usina e a OS do chamado vinculadas sozinhas, o supervisor de campo da usina e o tema "Acompanhamento de
+   chamado" já escolhidos; a lista mostra as demandas que citam esta OS e leva cada uma à Caixa, onde os passos moram. #}
+{% macro demandas(ch, o) %}{% set dm = ch.demandas %}
+<section class="eg-bloco" id="demandas" aria-labelledby="dm-ch-t">
+  <div class="eg-bloco-h"><h2 id="dm-ch-t">Demandas do chamado</h2>{% if dm.demandas %}<span class="n">{{ dm.demandas|length }}</span>{% endif %}
+    {% if not dm.falta and not dm.erro %}<button type="button" class="eg-ac-btn eg-ac-btn--g eg-ac-btn--p eg-dm-nova-bt" data-dm-ch-abrir{% if not dm.tem_login %} disabled title="Para pedir, entre com a sua conta da Grid"{% endif %}>Nova demanda</button>{% endif %}</div>
+  {% if dm.falta %}<p class="eg-dica">As demandas não gravam neste servidor (falta {{ dm.falta|join(', ') }}).</p>
+  {% elif dm.erro %}<p class="eg-dica">Não consegui ler as demandas agora ({{ dm.erro }}). Recarregue em instantes.</p>
+  {% else %}
+  <p class="eg-dica">O pedido ao supervisor de campo (ou a outro setor) sai daqui, cai na Caixa de entrada da pessoa com o prazo do tema, e a resposta volta para o chamado. Não vai para o relatório ao cliente.</p>
+  {% if dm.demandas %}<ul class="eg-dm-lista">
+    {% for d in dm.demandas %}{% set e = d.estado %}{% set s = d.selo %}
+    <li class="eg-dm"><a class="eg-dm-linha" href="{{ d.caixa }}" title="Abrir a demanda na Caixa de entrada">
+      {% if s and s[0] %}<span class="gc-status gc-status--{{ s[2] or 'neutro' }}">{{ s[0] }}{% if s[1] %} {{ s[1] }}{% endif %}</span>{% endif %}
+      <span class="eg-dm-tit"><b>{{ d.titulo or '(sem o texto)' }}</b><span>{{ d.de_nome or 'Alguém' }} → {{ d.para_nome or 'uma pessoa' }}{% if d.para_setor_nome %} · {{ d.para_setor_nome }}{% endif %}{% if d.tema_nome %} · {{ d.tema_nome }}{% endif %}</span>
+        {% if d.passos %}{% set u = d.passos[-1] %}<span class="eg-dm-ult">{{ u.nome or 'Alguém' }} {{ u.rotulo }}{% if u.texto %}: {{ u.texto }}{% endif %} · {{ u.quando_txt }}</span>{% endif %}
+        {% if d.pendente %}<span class="eg-dm-ult">{{ d.pendente }}</span>{% endif %}</span>
+      <span class="gc-status gc-status--{{ e.tom }}">{{ e.rotulo }}</span></a></li>
+    {% endfor %}
+  </ul>
+  {% else %}<p class="eg-vazio-l">Nenhuma demanda ainda.</p>{% endif %}
+  {% endif %}
+</section>
+{% endmacro %}
+
+{# A janela da Nova demanda do chamado: as listas digitáveis do Nexus (`lista-sugestoes.js`), o texto escolhido vira o
+   valor escondido (`engenharia-chamado.js`); Setor e Para quem lado a lado, do mesmo tamanho; o "Sugerido" na linha do
+   Tema (24/11/2026, Levi: "Tudo que tem a lista dê para digitar ... estilo grid, estilo Nexus. Esse sugerido aí pode
+   estar na mesma linha do tema"). A usina e a OS vão do chamado, fixas. #}
+{% macro nova_demanda(ch, o) %}{% set dm = ch.demandas %}
+{% if not dm.falta and not dm.erro %}
+<script type="application/json" id="dm-ch-setores">{{ dm.setores|map(attribute=1)|list|tojson }}</script>
+<script type="application/json" id="dm-ch-dados">{{ {"setores": dm.setores, "temas": dm.temas, "sugerido": dm.setor_sugerido, "supervisor": dm.supervisor, "tema_padrao": dm.tema_padrao, "pessoas_url": dm.pessoas_url}|tojson }}</script>
+<div class="eg-dm-veu" data-dm-ch hidden>
+  <form class="eg-dm-dlg" role="dialog" aria-modal="true" aria-labelledby="dm-ch-dlg-t" method="post" action="{{ dm.acao }}" enctype="multipart/form-data" data-dm-ch-form>
+    <div class="eg-dm-dlg-t" id="dm-ch-dlg-t">Nova demanda · chamado OS {{ o.os }}</div>
+    <p class="eg-dica">A mesma Nova demanda da Caixa de entrada, já com o chamado: confira, escreva o que precisa e envie.</p>
+    <input type="hidden" name="codigo" value="{{ dm.codigo }}"><input type="hidden" name="novo_id" value="{{ dm.novo_id }}">
+    <input type="hidden" name="para_setor_id" data-dm-ch-v="setor"><input type="hidden" name="para_hmac" data-dm-ch-v="pessoa">
+    <input type="hidden" name="tema_id" data-dm-ch-v="tema">
+    {% if dm.usina %}<input type="hidden" name="usinas" value="{{ dm.usina[0] }}"><input type="hidden" name="os" value="{{ o.os }}">{% endif %}
+    <div class="eg-dm-grade">
+      <label class="eg-dm-campo"><span class="gc-rotulo">Setor</span>
+        <input class="gc-campo" data-lista="dm-ch-setores" data-dm-ch-t="setor" placeholder="Digite ou escolha" autocomplete="off" required></label>
+      <label class="eg-dm-campo"><span class="gc-rotulo">Para quem</span>
+        <input class="gc-campo" data-lista="dm-ch-pessoas-vazio" data-dm-ch-t="pessoa" placeholder="Escolha o setor primeiro" autocomplete="off" required></label>
+      <label class="eg-dm-campo eg-dm-largo"><span class="gc-rotulo">Tema <span class="eg-dm-sug" data-dm-ch-sug hidden></span></span>
+        <input class="gc-campo" data-lista="dm-ch-temas-vazio" data-dm-ch-t="tema" placeholder="Escolha o setor primeiro" autocomplete="off" required></label>
+      <label class="eg-dm-campo eg-dm-largo"><span class="gc-rotulo">Título</span>
+        <input class="gc-campo" name="titulo" maxlength="{{ dm.limites.titulo }}" required placeholder="Em poucas palavras" autocomplete="off"></label>
+      <label class="eg-dm-campo eg-dm-largo"><span class="gc-rotulo">Descrição</span>
+        <textarea class="gc-campo" name="descricao" rows="4" maxlength="{{ dm.limites.texto }}" required placeholder="O que você precisa, e por quê"></textarea></label>
+      <div class="eg-dm-campo"><span class="gc-rotulo">Usina</span><span class="eg-dm-fixo">{{ dm.usina[1] if dm.usina else 'sem usina (a OS não está no retrato das abertas)' }}</span></div>
+      <div class="eg-dm-campo"><span class="gc-rotulo">OS vinculada</span><span class="eg-dm-fixo">{{ o.os if dm.usina else 'sem OS' }}{% if dm.usina %} (este chamado){% endif %}</span></div>
+      <label class="eg-dm-campo eg-dm-largo"><span class="gc-rotulo">Anexos (opcional)</span>
+        <input class="gc-campo" name="anexos" type="file" multiple accept="{{ dm.anexo.aceitos|replace(' ', '') }}">
+        <span class="eg-dica">Até {{ dm.anexo.max_arquivos }} arquivos, {{ dm.anexo.max_mb }} MB cada e {{ dm.anexo.max_total }} MB juntos.</span></label>
+    </div>
+    <p class="eg-os-msg eg-os-msg--ruim" role="alert" data-dm-ch-msg hidden></p>
+    <div class="eg-dlg-bts"><button type="button" class="eg-ac-btn eg-ac-btn--o" data-dm-ch-fechar>Cancelar</button><button type="submit" class="eg-ac-btn eg-ac-btn--g">Enviar demanda</button></div>
+  </form>
+</div>
+{% endif %}
+{% endmacro %}
+
 {% macro direita(ch, o) %}
 {% set c, n = ch.c, ch.n %}
+{% if ch.demandas %}{{ demandas(ch, o) }}{% endif %}
 <section class="eg-bloco">
   <div class="eg-bloco-h"><h2>Para abrir o ticket</h2><span class="n">{{ n.campos|length }} campos</span>
     {% if n.campos %}<button type="button" class="eg-ac-btn eg-ac-btn--o eg-ac-btn--p" data-ch-copiar="{{ ch.copiar }}">Copiar tudo</button>{% endif %}</div>

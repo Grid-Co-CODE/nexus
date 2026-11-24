@@ -432,6 +432,22 @@ escolher o setor chamados, mas no back-end entender que é um setor de performan
   - a OS fica na mesma linha;
   - sem JavaScript, a lista fica aberta.
 
+**A demanda do chamado de Garantias (24/11/2026).** A equipe de chamados pediu "um chatzinho com os supervisores" dentro
+do chamado (no lugar do Teams, onde cinco chamados se misturavam no mesmo canal); o Levi recusou o chat solto ("como é que
+a pessoa vai mandar? ... Tem que ter a opção de direcionar ... nova demanda") e aprovou no mockup a Nova demanda dentro
+do chamado:
+- o Raio X da OS de chamado tem o bloco **Demandas do chamado** (as demandas que citam a OS, cada uma levando à Caixa,
+  onde os passos moram) e a **Nova demanda** (`demandas_tela.contexto_do_chamado`); o Enviar vai à rota de sempre com
+  `?chamado=<nº>` e volta ao Raio X com o aviso;
+- já vêm escolhidos o setor **Supervisão Campo**, **o supervisor de campo da usina** (a região de campo da usina no
+  cadastro; a tela acha a pessoa na lista de quem tem setor pelo nome: o curto do cadastro dentro do completo do Fracttal)
+  e o tema **"Acompanhamento de chamado"** (3 dias úteis, um tema padrão novo da Supervisão Campo, `TEMA_DO_CHAMADO`);
+  a usina e a OS vão do chamado, fixas (a usina pelo retrato das OS abertas, `usina_da_os`);
+- as listas são as digitáveis do Nexus (`lista-sugestoes.js`), Setor e Para quem lado a lado e do mesmo tamanho, o
+  "Sugerido" na linha do Tema (Levi: "Tudo que tem a lista dê para digitar ... estilo grid, estilo Nexus");
+- o cartão do quadro de Garantias diz a situação (`por_os`, pela cópia do sininho): aberta com o prazo, vencida ou
+  respondida. Prova: `tests/test_garantias_demanda_chamado_24_11.py` e `tests/test_raio_x_garantias_11_11.py`.
+
 **As regras (todas do Levi):**
 - A pessoa e o setor de quem recebe são obrigatórios; um setor só por demanda ("Esquece essa parte de indicar mais de um
   setor"). O setor vê o que todo mundo dele recebe (a aba "Do meu setor", com o filtro por pessoa e por tema).

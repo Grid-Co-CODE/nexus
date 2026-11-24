@@ -557,6 +557,27 @@ OBS_CHAMADOS = "os_web.obs_chamados"
 SETOR_OBS_GARANTIAS = SID.PERFORMANCE
 # a equipe de chamados pela tela do Garantias (16/11/2026): só o administrador do Nexus troca (`rotas_acomp.ADMIN_NEXUS`)
 ADMIN_NEXUS = "os_web.admin_nexus"
+# as demandas do chamado (24/11/2026): {nº da OS: {"texto", "tom"}} para o selo do cartão do quadro de Garantias
+# (`rotas_acomp.DEMANDAS`), da cópia das demandas do sininho (sem esperar o banco); sem ela, nada aparece
+DEMANDAS_CHAMADOS = "os_web.demandas_chamados"
+
+
+def demandas_chamados() -> dict:
+    try:
+        from ...comando import demandas as D
+        out = {}
+        for os_n, c in D.por_os().items():
+            if c["abertas"]:
+                n = c["abertas"]
+                texto = ("Demanda aberta" if n == 1 else f"{n} demandas abertas") + (
+                    " · vencida" if c["vencidas"] else (f" · vence {c['prazo'].strftime('%d/%m')}" if c["prazo"] else ""))
+                out[str(os_n)] = {"texto": texto, "tom": "am" if not c["vencidas"] else "rd"}
+            elif c["respondidas"]:
+                out[str(os_n)] = {"texto": "Demanda respondida", "tom": "ok"}
+        return out
+    except Exception:                                   # noqa: BLE001 — o quadro abre sem o selo
+        logging.warning("Garantias: as demandas dos chamados não vieram", exc_info=True)
+        return {}
 _ROTA_OBS = re.compile(r"chamados/acompanhamento/\d+|api/acomp/\d+/obs/[^/]+/(?:editar|excluir)")
 # o "Retornar para responsável" do card (10/11/2026): só esta rota lê o cadastro, e só quando alguém pergunta ou aperta
 _ROTA_RETORNAR = re.compile(r"api/os/\d+/retornar")
@@ -667,6 +688,8 @@ def encaminhar(resto: str):
         environ[PAGINA_DA_OS] = pagina_da_os()  # a OS abre a página da OS da Engenharia (ver `pagina_da_os`)
     if resto == "chamados/acompanhamento":      # o quadro de Garantias abre o Raio X da OS (11/11/2026)
         environ[PAGINA_DA_OS] = pagina_da_os()
+    if resto == "chamados/acompanhamento":
+        environ[DEMANDAS_CHAMADOS] = demandas_chamados()     # o selo da demanda nos cartões (24/11/2026)
     if resto in ("chamados/acompanhamento", "api/acomp/equipe"):
         environ[ADMIN_NEXUS] = bool(session.get("admin"))     # a equipe de chamados pela tela (`rotas_acomp.api_equipe`)
     if _ROTA_RETORNAR.fullmatch(resto):         # quem retorna a OS em verificação para o responsável (retornar_os.py)
