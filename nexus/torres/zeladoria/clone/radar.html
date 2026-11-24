@@ -855,6 +855,15 @@ function linkSeguroHtml(url, texto, titulo){
   if (!ok) return esc(url || '—');
   return '<a href="' + esc(url) + '" target="_blank" rel="noopener noreferrer"' + (titulo ? ' title="' + esc(titulo) + '"' : '') + ' style="color:var(--accent-strong);text-decoration:none;">' + esc(texto) + '</a>';
 }
+/* Link direto pro WhatsApp a partir do telefone cadastrado (pedido do Analista, 2026-11-24): o
+   número vem de digitação livre, então aqui só limpa pra ficar só dígito e assume Brasil (+55)
+   quando vier sem DDI — é como quase todo mundo digita o telefone aqui. */
+function linkWhatsAppHtml(telefone){
+  var digitos = String(telefone || '').replace(/\D/g, '');
+  if (!digitos) return esc(telefone || '—');
+  if (digitos.length <= 11) digitos = '55' + digitos;
+  return linkSeguroHtml('https://wa.me/' + digitos, telefone, 'Abrir conversa no WhatsApp');
+}
 function initials(name){ if(!name) return '?'; var p = name.trim().split(/\s+/); return ((p[0]||'')[0]||'') + ((p[1]||'')[0]||''); }
 function hashColor(str){ var h=0; for(var i=0;i<str.length;i++){ h = (h*31 + str.charCodeAt(i)) >>> 0; } return AVATAR_COLORS[h % AVATAR_COLORS.length]; }
 function avatar(name){ return '<span class="avatar" style="background:' + hashColor(name||'?') + '">' + esc(initials(name).toUpperCase()) + '</span>'; }
@@ -2075,7 +2084,7 @@ function fornCard(f){
     '<span class="pill pill-neutral">' + esc(tipoFornecedor(f)) + '</span>' +
     (notaMedia !== null ? '<span class="pill ' + notaClasse(notaMedia) + '">' + notaMedia.toFixed(1) + '</span>' : '') +
     (!primarizado && docs.length ? '<span class="cell-muted" style="font-size:11.5px;">' + docs.length + ' documento(s)' + (vencendo ? ' · ' + vencendo + ' vencendo em 30 dias' : '') + '</span>' : '') + '</div>';
-  html += '<div class="meta"><b>Contato:</b> ' + esc(f.contato || '—') + (f.telefone ? ' · ' + esc(f.telefone) : '') + '</div>';
+  html += '<div class="meta"><b>Contato:</b> ' + esc(f.contato || '—') + (f.telefone ? ' · ' + linkWhatsAppHtml(f.telefone) : '') + '</div>';
   html += '<div class="meta"><b>Estado:</b> ' + esc(f.estado) + '</div>';
   html += '<div class="meta"><b>Usinas:</b> ' + esc(f.usinas) + '</div>';
   html += '<div class="meta"><b>Serviços:</b> ' + esc(f.servicos) + '</div>';
@@ -2137,7 +2146,7 @@ function renderColaboradores(){
     html += '<tr data-colab-toggle="' + col.id + '" style="cursor:pointer;">';
     html += '<td class="cell-muted" style="width:16px;">' + (expandido ? '▾' : '▸') + '</td>';
     html += '<td style="font-weight:600;">' + esc(col.nome) + '</td>';
-    html += '<td class="cell-muted">' + esc(col.telefone || '—') + '</td>';
+    html += '<td class="cell-muted">' + linkWhatsAppHtml(col.telefone) + '</td>';
     html += '<td>' + esc(col.papel || 'Colaborador') + '</td>';
     html += '<td style="min-width:220px;">';
     html += '<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:4px;">';
