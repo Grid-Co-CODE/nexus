@@ -198,6 +198,14 @@ de 4.989 px com 40 linhas de validação (uma por item, cinco campos cada). Fico
   inversores com o MESMO furo nos mesmos dias (mesmas cores, mesma validação, mesma marcação) viram uma linha**: em
   novembro, 500 linhas de inversor viraram 75; a Crateús, de 40 para 2 de inversor (o painel caiu para 1.297 px). As
   funções do modelo da validação (`setConf`, `setDays`, `setObs`, a sincronização) não mudaram.
+- **Que motivo vale para que item** (`MOT[].ap`, só na tela; o servidor, `furos_conf.MOTIVOS`, aceita qualquer motivo
+  em qualquer item): "sem sensor de IPOA" só no IPOA, "sem sensor de GHI" só no GHI, "zero real" só na geração; o resto
+  vale para todos. **"Equipamento inoperante" vale também para a ETM desde 24/11/2026** (Levi, na Ipixuna 1: "tento
+  justificar ETM POA e GHI e algo trava!" — a tela recusava, "2 itens não aceitam esse motivo", porque a regra veio da
+  ferramenta da analista como só de inversor; a estação quebrada é equipamento inoperante). A ETM inoperante entra no
+  filtro "Com equipamento inoperante", e a recusa que sobrar diz QUAIS itens ficaram marcados. Prova:
+  `tests/test_coletas_furos_r01.py::test_a_etm_aceita_equipamento_inoperante` e a bancada (a Ipixuna 1 com o IPOA e o
+  GHI "validado · inoperante", cinza, e fora do "Furo pendente").
 
 **O desenho de 24/11/2026** (Levi, na Nova Xavantina 1: "está vindo umas informações que dão falso negativo"). Só a
 tela (`static/coletas-furos.js`, `.css` e o template); a conta do R01 não mudou. Medido antes com o banco e o CSV do COS
