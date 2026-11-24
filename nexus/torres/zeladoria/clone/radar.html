@@ -13991,6 +13991,15 @@ function descricaoVinculoOS(it){
    PCM também precisa finalizar no Fracttal. Só vale para OS concluída aqui: finalizada (status 3) /
    falta (ainda aberta ou em revisão lá) / cancelada / não conferida / não encontrada. */
 var OS_FINALIZACAO = { finalizada: 'Finalizada no Fracttal', falta: 'Falta finalizar no Fracttal', cancelada: 'Cancelada no Fracttal', naoConferida: 'Ainda não conferida no Fracttal', naoEncontrada: 'Não encontrada no Fracttal' };
+/* Tipo de vistoria (pedido do Analista, 2026-11-18 e 2026-11-24): o banco do Nexus ainda não tem uma
+   coluna própria pra isso (tentamos e travou o salvamento de toda OS, revertido em 2026-11-24), então
+   por enquanto é escrito no começo da própria Observação ("Vistoria inicial" / "Vistoria final", com
+   ou sem o resto da nota depois) e o card detecta e mostra como selo, igual antes. */
+var OS_VISTORIA_OBS_RE = /^\s*vistoria\s+(inicial|final)\s*[:\-–]?\s*/i;
+function osVistoriaDaObservacao(obs){
+  var m = OS_VISTORIA_OBS_RE.exec(obs || ''); if (!m) return null;
+  return { tipo: m[1].toLowerCase(), resto: obs.slice(m[0].length).trim() };
+}
 /* técnico responsável pela OS no Fracttal (quem cobrar); null = OS ainda não conferida */
 function osTecnicoOS(o){ var fr = o.fracttal; return fr && fr.encontrada ? (fr.tecnico || 'sem técnico no Fracttal') : null; }
 function osFinalizacaoFracttal(o, st){
@@ -14006,7 +14015,10 @@ function osCardHtml(o, st){
   html += '<div style="display:flex;justify-content:space-between;gap:6px;align-items:baseline;"><b style="font-size:13px;">OS ' + esc(o.numero) + '</b><span class="cell-muted mono" style="font-size:11px;">' + fmtDate(o.data) + '</span></div>';
   html += '<div style="font-weight:600;font-size:12.5px;margin-top:2px;">' + esc(u ? u.usina : (o.usinaTexto || '—')) + ' <span class="cell-muted" style="font-weight:400;font-size:11px;">' + esc(u ? ((u.uf || '') + (u.cliente ? ' · ' + u.cliente : '')) : 'usina não encontrada') + '</span></div>';
   html += '<div style="font-size:12px;">' + esc(nomeServicoCurto(o.servico || '')) + ' · <span class="cell-muted">' + esc(o.fornecedor || '—') + '</span></div>';
-  if (o.observacao) html += '<div class="cell-muted" style="font-size:11px;margin-top:2px;line-height:1.35;">' + esc(o.observacao) + '</div>';
+  var vis = osVistoriaDaObservacao(o.observacao);
+  if (vis) html += '<div style="margin-top:3px;"><span class="pill ' + (vis.tipo === 'final' ? 'pill-good' : 'pill-info') + '" style="font-size:10.5px;">Vistoria ' + vis.tipo + '</span></div>';
+  var obsResto = vis ? vis.resto : (o.observacao || '');
+  if (obsResto) html += '<div class="cell-muted" style="font-size:11px;margin-top:2px;line-height:1.35;">' + esc(obsResto) + '</div>';
   var fr = o.fracttal, tec = osTecnicoOS(o);
   if (fr && fr.encontrada) html += '<div data-os-tecnico style="font-size:12px;margin-top:3px;">Técnico: <b>' + esc(tec) + '</b></div><div class="cell-muted" data-os-fr-info style="font-size:11px;margin-top:1px;">' + esc((fr.aberta_em ? 'aberta ' + fmtDate(fr.aberta_em) : '') + (OS_FR_STATUS[fr.status] ? (fr.aberta_em ? ' · ' : '') + OS_FR_STATUS[fr.status] + ' no Fracttal' : '')) + '</div>';
   var fin = osFinalizacaoFracttal(o, st);
