@@ -18,6 +18,7 @@ from ...dados.telas import registrar_governanca
 from ..modelo import Tela, Torre
 from ..moldura import registrar_molduras
 from .acessos_clientes_tela import registrar_acessos_clientes
+from .emails_tela import registrar_emails
 from .mapa_base_tela import registrar_mapa_base
 
 TORRE = Torre(
@@ -105,6 +106,12 @@ TORRE = Torre(
         Tela("mapa-base", "Mapa base",
              "O mapa do Brasil do Mapa de equipe está no servidor?",
              "O arquivo PMTiles do Brasil (OpenStreetMap, recorte do Protomaps) na pasta de dados do servidor; só administrador"),
+        # E-mails automáticos (24/11/2026): o que o App de Campo manda sozinho por e-mail, para quem e se saiu; só
+        # administrador (Levi: "Só admin"). 1ª fase só lê os livros email_app_campo; a edição vem pelo livro
+        # nexus_email_controle. A view: nexus/torres/base/emails_tela.py; as regras: nexus/campo/emails_app.py
+        Tela("emails-automaticos", "E-mails automáticos",
+             "Que e-mail o App manda sozinho, para quem, e saiu?",
+             "Os livros email_app_campo (Tipos e Todos os envios) que o App de Campo publica; só administrador"),
         Tela("ia", "Nexus IA",
              "O que a IA leu e sugeriu, e quanto custou?",
              "API do Claude (a definir)"),
@@ -133,6 +140,7 @@ registrar_acessos(bp)
 registrar_chaves(bp)
 registrar_acessos_clientes(bp, TORRE)   # /t/base/acessos-clientes: as contas do Dashboard Thopen (12/11/2026)
 registrar_mapa_base(bp)     # /t/base/mapa-base: a subida do mapa do Brasil do Mapa de equipe (11/11/2026)
+registrar_emails(bp)        # /t/base/emails-automaticos: os e-mails automáticos do App de Campo (24/11/2026)
 registrar_raio_x(bp)        # /t/base/raio-x: o que o processo faz agora (14/10/2026), só administrador, fora do menu
 # as abas das Chaves das fontes: a página da plataforma, a do Nexus e, desde 13/11/2026, a moldura das Fontes do tempo
 # real (uma tela vizinha: a moldura dela mostra as mesmas abas, com a dona = chaves-fontes)
