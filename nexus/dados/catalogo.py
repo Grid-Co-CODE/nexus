@@ -589,6 +589,34 @@ FATOS = (
                     "(só o código e o texto curto, sem e-mail nem nome) e Situação (enviado, pendente, vencido ou sem "
                     "e-mail); o que não saiu até a segunda seguinte vira vencido. Até o App publicar, o livro não "
                     "existe (e nada sai enquanto o tenant barrar o Microsoft Graph do App)"),
+    # os e-mails automáticos do App (24/11/2026, Levi: "Gostaria de poder controlar esses e-mails automáticos [...] que
+    # estivesse no Nexus"; contrato com a sessão do App, v380): cada envio que o App publica e a regra que o Nexus escreve.
+    # Os dois livros do App são PRÓPRIOS (a troca integral do App apagaria uma aba nova no email_app_campo). Tela: Base ›
+    # E-mails automáticos (nexus/campo/emails_app.py, emails_controle.py)
+    Fato("envio_email_app", "Envio de e-mail automático do App", "base",
+         "email_todos_envios_app_campo · Todos os envios",
+         "1 linha = 1 destinatário de 1 envio (o ID é <quando>|<8 hex>|<n>: o que vem antes do último | é o envio)",
+         _d(data=("cod", "Quando (ISO, UTC)"),
+            pessoa=("hmac", "Destinatário (HMAC): o _pessoa_hmac do App, o mesmo código do cadastro; a caixa do COS "
+                            "também vem como código")),
+         tipo="sem_medida", chave=("ID",), fontes=("email_todos_envios_app_campo · Todos os envios",),
+         janela_origem="30 dias (App), o mais novo primeiro",
+         observacao="quem publica é o App (v380), de hora em hora aos :25, troca integral; livro vazio não sobe (nasce no "
+                    "1º envio depois da v380). Colunas: ID, Tipo, Referência, Destinatário (HMAC), Papel (a cópia como "
+                    "\"cópia\"), Quando, Via, Situação (enviado, falhou, desligado ou teste), Tentativas (vazia) e Erro. "
+                    "Nenhum e-mail na Referência nem no Erro (vira \"(e-mail)\"). O semanal da Segurança segue também "
+                    "no email_app_campo · Envios (o fato envio_email_seguranca)"),
+    Fato("regra_email_app", "Regra dos e-mails automáticos do App", "base", "nexus_email_controle · fato_email_regra",
+         "1 linha = 1 mudança da regra de 1 tipo de e-mail (o estado inteiro do tipo depois dela); vale, por tipo, a "
+         "válida de alterado_em mais recente, no empate a de baixo",
+         _d(data=("cod", "alterado_em (ISO, UTC, com segundos)"), pessoa=("hmac", "alterado_por (quem mudou)")),
+         tipo="sem_medida", chave=("tipo", "alterado_em"), fontes=("nexus_email_controle · fato_email_regra",),
+         janela_origem="o Nexus é a fonte (só acrescenta: o histórico de quem mudou o quê são as próprias linhas)",
+         observacao="escrita em Base › E-mails automáticos, só por administrador (nexus/campo/emails_controle.py); o App "
+                    "relê a cada 5 min e, sem nenhuma linha válida, segue o App Setting. Os destinatários só cifrados "
+                    "(AES-256-GCM, chave HKDF sem sal da NEXUS_PESSOA_HMAC, info nexus:email:controle/v1, dado associado "
+                    "nexus/email-controle/<tipo>); a linha assinada (HMAC da mesma chave, rótulo nexus:email:controle). "
+                    "O motivo vai em claro e a tela recusa e-mail e nome nele"),
     Fato("decisao", "Decisão do painel", "campo", "decisoes_app_campo · Decisões",
          "1 linha = 1 decisão, tratamento ou devolução",
          _d(data=("cod", "Quando"), usina=("nome", "Usina (só Central de atenção)"), pessoa=("hmac", "3 papéis"),
@@ -1997,6 +2025,13 @@ LIVROS = (
           "1 minuto e a gravação relê o banco antes (troca o livro inteiro); a leitura que não acha a aba do livro que "
           "existe não vira \"vazio\" (livros.abas_conferidas)",
           so_cresce=True),
+    # o controle dos e-mails automáticos do App (24/11/2026): a regra que o Nexus escreve e o App relê de 5 em 5 min. Livro
+    # só dele: um livro trocado inteiro com outras abas apagaria o histórico das regras
+    Livro("nexus_email_controle", ("fato_email_regra",), "a cada mudança em Base › E-mails automáticos",
+          "nexus/campo/emails_controle.py, pela tela Base › E-mails automáticos", False,
+          "registrado em 24/11/2026 antes de existir: nasce com a 1ª regra publicada. A gravação relê o banco antes "
+          "(troca o livro inteiro, sob trava) e confere a linha nova pela conta do App",
+          so_cresce=True),
     # a conferência das ligações (12/11/2026, Levi: "Quero uma análise das relações de dados e se as bases estão sendo
     # lincadas da maneira correta"): o ID gravado existe na dimensão? a chave do fato se repete? Uma vez por dia
     Livro("nexus_conferencia", ("qualidade", "atualizacao"), "1 vez por dia, na volta da carga de hora em hora",
@@ -2198,6 +2233,10 @@ CONHECIDAS = (
               "no outro os números tinham mudado): 1 linha = usina do 5080 × dia de um mês fechado, o número que o "
               "dashboard mostrava na hora de fechar; o 5080 grava no dia 10 do mês seguinte (outubro/2026 fechado na "
               "mão em 13/11) e lê dali, no lugar de qualquer conta (thopen/disp_fechamento.py da plataforma)"),
+    Conhecida("email_tipos_app_campo", ("Tipos",), "apoio",
+              "o catálogo dos e-mails automáticos do App (v380, 24/11/2026): uma linha por tipo, com o destino padrão "
+              "como PAPEL, se está ligado, de onde vem a regra (Nexus ou App Setting), o modo e os números de 7 dias; "
+              "o App publica de hora em hora aos :25. Base › E-mails automáticos lê"),
     Conhecida("organizacao_app_campo", ("Atribuicoes",), "apoio",
               "a foto das atribuições do App de Campo (usina × pessoa em HMAC × papel), publicada pelo App para o PCM "
               "comparar na tela Técnicos por usina antes de o App passar a ler o nexus_pcm_atribuicoes (17/10/2026); "

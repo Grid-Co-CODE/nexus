@@ -87,6 +87,9 @@ OPCIONAIS = ("NEXUS_CHAVE_CADASTRO", "NEXUS_ARMAZEM_LOCAL",
              "NEXUS_HSEQ_EMAIL_AUTO",
              # a curadoria do Acompanhamento do PCM num arquivo (só na cópia de prova; no servidor ela vem do banco)
              "NEXUS_PCM_CURADORIA_ARQUIVO",
+             # o controle dos e-mails automáticos do App num arquivo (só na cópia de prova, para publicar a regra pela
+             # tela sem gravar no banco; no servidor ela vai ao nexus_email_controle). nexus/campo/emails_controle.py
+             "NEXUS_EMAIL_CONTROLE_ARQUIVO",
              # o caminho em que o Nexus é servido (09/10/2026, "a partir de segunda quero o Nexus como link principal"):
              # /nexus no servidor (app.gridco.com.br/nexus); vazio = a raiz, o PC e a fase 4. Ver nexus/prefixo.py
              "NEXUS_PREFIXO",

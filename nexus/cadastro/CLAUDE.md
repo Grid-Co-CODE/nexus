@@ -426,6 +426,78 @@ cadastrando?" ("Pede"). O caso: um técnico do piloto da localização ficou num
   instalou".
 Prova: `tests/test_base_acessos_nexus_field.py`.
 
+## E-mails automáticos (24/11/2026; `/t/base/emails-automaticos`, `torres/base/emails_tela.py`, `campo/emails_app.py`, `campo/emails_controle.py`)
+
+Levi, pela sessão do App: "Gostaria de poder controlar esses e-mails automáticos ou ter pelo menos um controle! E gostaria
+que estivesse no Nexus"; aqui: "Só admin". O App de Campo manda pelo Microsoft Graph (naoresponda@) sete tipos:
+`pt_aviso`, `luvas_tst`, `auditoria_diaria`, `seguranca_semanal`, `seguranca_relato`, `encaminhamento` e `avulso` (o
+envio de teste do `email_avulso.json`). Até 24/11 os destinatários eram só App Settings do Azure.
+
+**A tela** (só administrador): uma linha por tipo (nome, quando sai, o PAPEL que recebe, ligado, modo, de onde vem a
+regra, último envio, enviados, falhas e barrados em 7 dias, e "regra nova a confirmar" enquanto o App não publicar os
+Tipos com a hora da regra). O clique abre o tipo: a regra que vale, o formulário, as Mudanças (tiradas das próprias
+linhas do livro: quem, o que mudou, quem entrou e saiu da lista, o motivo; a linha que não confere aparece como "Não
+vale") e os envios de 30 dias com a pessoa pelo nome (o código HMAC do livro trocado pelo nome do Registro mestre, do
+Fracttal, do cadastro do App ou, para a caixa das regras, o próprio e-mail; o código nunca vai à tela).
+
+**O contrato com o App** (fechado em 24/11/2026 com a sessão "App de campo sub"; a sessão Nexus de Base e Comando aceitou
+com 5 ajustes: o Envios intocado, nenhum e-mail aberto, regra só por acréscimo, o formato da cifra e da assinatura, o
+motivo em claro). O lado do App está no ar desde a v380 (24/11, 12:45). O texto do App:
+`CONTRATO_email_controle_nexus.md` na pasta App_Campo do PCM.
+- **O que o App publica**, de hora em hora aos :25, troca integral, em DOIS LIVROS PRÓPRIOS (a única mudança da v380 sobre
+  o combinado: o `sync-xlsx` troca o livro inteiro, e uma aba nova no `email_app_campo` apagaria o "Envios" a cada
+  publicação): `email_tipos_app_campo · Tipos` (Tipo, Nome, Gatilho, Destino padrão = o papel, Ligado sim/não, De onde
+  vem a regra Nexus/App Setting, Modo, Enviados 7d em ENVIOS, Falhas 7d, Último envio e Regra do Nexus em, ISO UTC) e
+  `email_todos_envios_app_campo · Todos os envios` (1 linha = 1 destinatário de 1 envio, 30 dias: ID `<quando>|<8
+  hex>|<n>`, Tipo, Referência, Destinatário (HMAC), Papel, a cópia como "cópia", Quando, Via, Situação enviado | falhou |
+  desligado | teste, Tentativas vazia, Erro sem e-mail). O Todos os envios nasce no 1º envio depois da v380 (livro vazio
+  não sobe). O `email_app_campo · Envios` (o semanal, que a Segurança lê) segue igual, e a tela o usa enquanto o Todos os
+  envios não existir. Catálogo: `envio_email_app` (fato) e `email_tipos_app_campo` (conhecida, apoio).
+- **O que o Nexus escreve**: `nexus_email_controle · fato_email_regra` (fato `regra_email_app`, livro `so_cresce`),
+  SÓ ACRÉSCIMO, 1 linha = 1 mudança com o estado inteiro do tipo: tipo, ligado ("sim"/"não"), modo (normal/teste),
+  destinatarios, substitui_padrao ("sim"/"não"; "não" com lista vazia), alterado_por (HMAC do e-mail de quem mudou; vazio
+  pela senha de administrador), alterado_em (ISO UTC com segundos, "2026-11-24T16:05:28Z"), motivo, assinatura. Vale,
+  por tipo, a válida de `alterado_em` mais recente; no empate, a de baixo. Sem nenhuma válida, o App Setting.
+- **A cifra da lista**: AES-256-GCM, chave HKDF-SHA256 SEM sal de 32 bytes da NEXUS_PESSOA_HMAC (os bytes UTF-8 do texto),
+  info `nexus:email:controle/v1` (`cifra.aead_derivada`), dado associado `nexus/email-controle/<tipo>`, valor "cf1:" +
+  base64url sem "=" do nonce de 12 bytes com a cifra e a tag (`cifra.cifrar_com`). O texto aberto é a lista JSON dos
+  e-mails, minúsculos, sem repetição; vazio = lista vazia. A cifra de um tipo copiada para outro não abre.
+- **A assinatura**: chave = HMAC-SHA256(NEXUS_PESSOA_HMAC, "nexus:email:controle"); assinatura = HMAC-SHA256(chave,
+  "tipo|ligado|modo|destinatarios|substitui_padrao|alterado_em"), hex minúsculo, com o `destinatarios` como gravado.
+- **A linha que não vale no App**: assinatura errada, cifra que não abre, ligado, modo ou substitui fora do domínio, tipo
+  fora dos 7. O App relê a cada 5 min (a leitura que falha mantém a última boa: o controle nunca segura um aviso) e diz
+  no `/health` (`emailControle`: as regras sem e-mail, `lidas`, `invalidas`, `lido_em`).
+- **Como o App aplica**: desligado não manda e grava "desligado"; teste COM lista manda só à lista, sem cópia, com
+  "[Teste] " no assunto (teste SEM lista funciona como normal, por isso a tela exige a lista); normal com lista soma ao
+  padrão sem repetir ou, com `substitui_padrao` "sim", manda só à lista, sem cópia. Lista vazia não muda nada.
+
+**As regras da edição** (`emails_controle.publicar`; nada grava quando recusa):
+- Só administrador; POST só da própria página (`de_outro_site`) e com o código do formulário da sessão.
+- Sem a NEXUS_PESSOA_HMAC nada grava (a linha iria sem assinatura e o App a descartaria), nem com a leitura do livro
+  falhando (a gravação troca o livro inteiro, relido sob trava antes).
+- Motivo obrigatório (8 a 200 letras), em claro: recusado com e-mail ou com o nome de uma pessoa do cadastro ou do
+  Fracttal (o nome inteiro ou o primeiro e o último).
+- Destinatário: pessoa do cadastro ou do Fracttal pelo nome (a lista de sugestões) ou caixa digitada só de
+  @gridco.com.br / @gridco.com; até 30. Modo teste exige a lista.
+- Desligar `pt_aviso`, `seguranca_semanal` ou `seguranca_relato` (`emails_app.CRITICOS`) pede a confirmação, que diz quem
+  deixa de saber (`QUEM_DEIXA_DE_SABER`).
+- A mesma regra de novo não grava ("Nada mudou"); a lista em outra ordem é a mesma. "Voltar ao padrão do App" publica
+  ligado, normal e lista vazia (o livro não apaga linha).
+- A linha nova vence também pela hora: no mesmo segundo da anterior, sai um segundo depois. Depois de gravar, a própria
+  linha é conferida pela conta de leitura.
+- **Quem edita: administrador.** Gestor também é pergunta aberta ao Levi (24/11/2026).
+
+**Prova**: `tests/test_base_emails_controle.py` (a linha do Nexus conferida pela conta do App reescrita no teste, sem
+nada do Nexus; a linha do teste do App aberta no Nexus; o empate; as recusas; o histórico; a tela publicando, recusando
+outro site e o teste sem lista, a confirmação do crítico, só administrador; o catálogo) e
+`tests/test_base_emails_automaticos.py` (a leitura: a conta por envio, os números do Tipos sem o Todos os envios, o
+"a confirmar", o semanal de reserva). Em 24/11/2026, além disso, as funções do App tiradas do `function_app.py` da v380
+(`_email_regras`, `_email_controle`) rodaram sobre linhas do Nexus: com a chave real, a linha publicada pela tela na
+cópia de prova deu `lidas 1, invalidas 0` e o PT em teste só para a lista, com "[Teste]". Na cópia de prova a regra vai
+para um arquivo (`NEXUS_EMAIL_CONTROLE_ARQUIVO`); sem ele, a trava da cópia barra a gravação no banco. Depois de publicar
+no servidor: o `/health` do App (`https://gridco-campo-mw.azurewebsites.net/api/health`, `emailControle`) tem de mostrar
+a regra, com `lidas` > 0 e `invalidas` 0, em até 5 minutos.
+
 ## Equipamentos das usinas (`estrutura_usina.py`, `telas_equipamentos.py`, `/t/base/equipamentos`; 13/10/2026)
 
 > Desde 05/11/2026 o guia "Como funciona" e a dica do (!) antigo ficam juntos na exclamação amarela do título (`explica`, `_explica.html`); o guia deixou de ser uma seção do painel vazio.

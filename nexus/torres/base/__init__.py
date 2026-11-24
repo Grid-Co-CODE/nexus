@@ -107,11 +107,13 @@ TORRE = Torre(
              "O mapa do Brasil do Mapa de equipe está no servidor?",
              "O arquivo PMTiles do Brasil (OpenStreetMap, recorte do Protomaps) na pasta de dados do servidor; só administrador"),
         # E-mails automáticos (24/11/2026): o que o App de Campo manda sozinho por e-mail, para quem e se saiu; só
-        # administrador (Levi: "Só admin"). 1ª fase só lê os livros email_app_campo; a edição vem pelo livro
-        # nexus_email_controle. A view: nexus/torres/base/emails_tela.py; as regras: nexus/campo/emails_app.py
+        # administrador (Levi: "Só admin"). Lê os livros que o App publica (email_tipos_app_campo e
+        # email_todos_envios_app_campo) e escreve a regra no nexus_email_controle. A view: nexus/torres/base/emails_tela.py;
+        # as regras: nexus/campo/emails_app.py (a leitura) e emails_controle.py (a regra)
         Tela("emails-automaticos", "E-mails automáticos",
-             "Que e-mail o App manda sozinho, para quem, e saiu?",
-             "Os livros email_app_campo (Tipos e Todos os envios) que o App de Campo publica; só administrador"),
+             "Que e-mail o App manda sozinho, para quem, e saiu? Ligar, desligar, modo teste e destinatários",
+             "Os livros Tipos e Todos os envios que o App de Campo publica e o controle nexus_email_controle; só "
+             "administrador"),
         Tela("ia", "Nexus IA",
              "O que a IA leu e sugeriu, e quanto custou?",
              "API do Claude (a definir)"),

@@ -2829,44 +2829,13 @@ relógio da conta do App só congela trocando `datetime.datetime` no módulo `da
 outra); e com `TESTING` ligado o `credencial()` do Fracttal só olha a credencial de teste. O receptor do
 `template_rendered` precisa de `weak=False` (o blinker guarda referência fraca e a lambda some).
 
-## E-mails automáticos do App (24/11/2026; `nexus/campo/emails_app.py`, Base › E-mails automáticos)
+## E-mails automáticos do App (24/11/2026)
 
-Levi, pela sessão do App: "Gostaria de poder controlar esses e-mails automáticos ou ter pelo menos um controle! E
-gostaria que estivesse no Nexus". O App manda pelo Microsoft Graph (naoresponda@) seis tipos: pt_aviso (PT aguardando
-assinatura, e o lembrete aos 30 min), luvas_tst, auditoria_diaria (07:15, com PDF), seguranca_semanal (segunda), 
-seguranca_relato (acidente ou incêndio) e encaminhamento. Os destinatários estão nas configurações do App no Azure.
-
-**A tela** (`/t/base/emails-automaticos`, `torres/base/emails_tela.py`, `templates/emails_automaticos.html`): SÓ
-ADMINISTRADOR (Levi: "Só admin"). Uma linha por tipo (o que é, quando sai, para quem, ligado, último envio, enviados e
-falhas em 7 dias); o clique abre o histórico de 30 dias (quando, para quem, referência, situação, tentativas, erro). A
-pessoa aparece pelo nome do cadastro do App ou da ficha do Registro mestre com e-mail; o livro guarda só o código.
-Sem o livro, os tipos aparecem com "—" (sem dado não se inventa). **1ª fase: só lê.**
-
-**O contrato com o App** (fechado em 24/11/2026 com a sessão "App de campo sub"; quem faz o lado do App é ela):
-- O App publica, de hora em hora: `email_app_campo · Tipos` (uma linha por tipo: Tipo, Nome, Gatilho, Destino padrão
-  como PAPEL e nunca o endereço, Ligado, De onde vem a regra, Enviados 7d, Falhas 7d, Último envio) e
-  `email_app_campo · Todos os envios` (grão 1 envio, 30 dias: ID, Tipo, Referência sem nome de pessoa, Destinatário = o
-  código HMAC da pessoa ou "caixa:COS"/"caixa:TST", Papel, Quando em ISO UTC, Via, Situação, Tentativas, Erro só com o
-  código e o texto curto). A API do banco lê sem login: nenhum e-mail aberto em nenhuma das abas.
-- A aba de antes, `email_app_campo · Envios` (o semanal da Segurança; o fato `envio_email_seguranca` e a tela da
-  Segurança dependem dela), NÃO muda. Enquanto a aba nova não existir, a tela mostra o semanal por ela. A data dela é a
-  coluna **"Enviado em"** (ISO UTC), e não "Enviado em (UTC)", como estava no catálogo: na 1ª prévia a tela mostrava 0
-  envios em 7 dias com 8 enviados na W48.
-- O controle (a 2ª fase, a edição): o Nexus publica `nexus_email_controle · fato_email_regra`, SÓ ACRÉSCIMO (1 linha =
-  1 mudança); vale, por tipo, a de `alterado_em` mais recente com assinatura válida; sem nenhuma, o App Setting. Campos:
-  tipo, ligado (sim/não), modo (normal/teste), destinatarios (a lista JSON de e-mails em minúsculas, sem repetição,
-  CIFRADA com `aead_derivada(NEXUS_PESSOA_HMAC, b"nexus:email:controle/v1")`, HKDF-SHA256 sem sal, AAD
-  "nexus/email-controle/<tipo>", formato "cf1:"), substitui_padrao (sim/não), alterado_por (HMAC), alterado_em (ISO UTC
-  com segundos), motivo (em claro, sem e-mail nem nome) e assinatura (HMAC-SHA256 com a chave HMAC(NEXUS_PESSOA_HMAC,
-  b"nexus:email:controle") sobre "tipo|ligado|modo|destinatarios|substitui_padrao|alterado_em", hex minúsculo). O
-  histórico (de → para) sai das linhas seguidas do próprio livro. O App lê a cada 5 min; tipo desligado grava
-  "desligado" no envio; modo teste manda só à lista, com "[Teste]" no assunto.
-- Na edição: só administrador, motivo obrigatório, e desligar pt_aviso, seguranca_semanal ou seguranca_relato pede uma
-  confirmação a mais (`emails_app.CRITICOS`: a TST ou o supervisor deixa de saber).
-
-**Prova:** `tests/test_base_emails_automaticos.py` (a conta de 7 dias, o semanal sem a aba nova, o histórico com o nome
-e a caixa sem o código, só administrador). Com o livro real (24/11/2026): o semanal saiu em W46 (8), W47 (7) e W48 (8,
-23/11 07:06); W44 e W45 vencidas (6 cada), da época da trava de teste.
+A tela é da Base (Base › E-mails automáticos, só administrador) e o código mora em `nexus/campo/emails_app.py` (a
+leitura dos livros do App) e `nexus/campo/emails_controle.py` (a regra que o Nexus escreve). O contrato com o App, as
+regras e a prova: `nexus/cadastro/CLAUDE.md`, seção "E-mails automáticos". Daqui, só o que toca o Campo: o
+`email_app_campo · Envios` (o semanal da Segurança, que a tela da Segurança lê) NÃO muda; os dois livros novos do App são
+próprios (`email_tipos_app_campo`, `email_todos_envios_app_campo`).
 
 ## Guia do App de Campo (21-22/11/2026; `nexus/campo/guia_app.py`, `guia_tela.py`, `campo/guia_app.html`)
 
