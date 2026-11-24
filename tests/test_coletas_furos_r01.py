@@ -523,3 +523,16 @@ def test_a_tela_separa_o_bd_pesa_o_cliente_e_da_o_alcance_da_comunicacao(furos):
     assert "PC.v = ps.filter(function (p) { return p.src === BD; });" in js and 'lista("fonte"' not in js
     html = furos.get("/t/performance/coletas/furos-de-coleta").get_data(as_text=True)
     assert 'id="fr-bds"' in html and 'id="fr-cli-titulo"' in html
+
+
+def test_a_etm_aceita_equipamento_inoperante():
+    """24/11/2026, Levi, na Ipixuna 1: "tento justificar ETM POA e GHI e algo trava!" — marcou o IPOA e o GHI e escolheu
+    "Equipamento inoperante, fora de operação"; a tela recusou ("2 itens não aceitam esse motivo e ficaram marcados"),
+    porque o motivo valia só para inversor (regra trazida da ferramenta da analista em 16/11; o servidor aceita qualquer
+    motivo para qualquer item). A estação quebrada é equipamento inoperante: vale para o IPOA e o GHI também, entra no
+    filtro "Com equipamento inoperante", e a recusa que sobrar diz QUAIS itens ficaram marcados."""
+    raiz = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    js = open(os.path.join(raiz, "nexus", "static", "coletas-furos.js"), encoding="utf-8").read()
+    assert '{ k: "fora_op", l: "Equipamento inoperante, fora de operação (fica sinalizado)", ap: "both" }' in js
+    assert 'var inop = p.eqs.filter(function (e) { return /[vxzp]/.test(e.st) && hasReason(getEntry(p, e.nome), "fora_op"); })' in js
+    assert "recusadosN.push(t.nome)" in js and 'recusadosN.join(", ")' in js

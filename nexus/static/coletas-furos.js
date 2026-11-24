@@ -31,7 +31,9 @@
     { k: "sem_ipoa", l: "Usina sem sensor de IPOA (esperado)", ap: "ipoa" },
     { k: "sem_ghi", l: "Usina sem sensor de GHI (esperado)", ap: "ghi" },
     { k: "coleta_alt", l: "O dado vem de outra fonte (esperado)", ap: "both" },
-    { k: "fora_op", l: "Equipamento inoperante, fora de operação (fica sinalizado)", ap: "inv" },
+    // "both" desde 24/11/2026 (Levi, na Ipixuna 1: "tento justificar ETM POA e GHI e algo trava!"): a estação quebrada
+    // também é equipamento inoperante; o "inv" veio da ferramenta da analista, e o servidor sempre aceitou
+    { k: "fora_op", l: "Equipamento inoperante, fora de operação (fica sinalizado)", ap: "both" },
     { k: "nao_mob", l: "Usina não mobilizada, fora de operação", ap: "both" },
     { k: "os", l: "Parada com OS ou manutenção programada", ap: "both" },
     { k: "zero_real", l: "Zero real (geração confirmada, não é furo)", ap: "inv" },
@@ -306,7 +308,7 @@
     if (ufv) items.push(ufv);
     tmp.forEach(function (x) { if (x.idx.length) items.push(mkIt(x.e, x.i, x.e.nome, tipoOf(x.e.nome), x.idx, x.zi)); });
     var pend = items.filter(function (t) { return !t.ok; }), done = items.filter(function (t) { return t.ok; });
-    var inop = p.eqs.filter(function (e) { return isGen(e) && /[vxzp]/.test(e.st) && hasReason(getEntry(p, e.nome), "fora_op"); }).map(function (e) { return e.nome; });
+    var inop = p.eqs.filter(function (e) { return /[vxzp]/.test(e.st) && hasReason(getEntry(p, e.nome), "fora_op"); }).map(function (e) { return e.nome; });
     var cp = items.reduce(function (a, t) { return a + t.pi.length * (t.w || 1); }, 0);
     var empty = p.eqs.every(function (e) { return e.st.split("").every(function (c) { return "vxdwe".indexOf(c) >= 0; }); });
     var ex = p.eqs.reduce(function (a, e) { return a + (e.st.split("e").length - 1); }, 0);
@@ -858,12 +860,12 @@
   // validar o que está marcado: o item com TODOS os dias de furo marcados recebe o motivo do item inteiro (e a vigência
   // escolhida); o marcado em parte, só os dias (neste mês), como o "Só alguns dias" da tela da analista
   function validarMarcados(p, m, id, mot, vig, obs, tirar) {
-    var feitos = 0, recusados = 0, mo = MOT.filter(function (x) { return x.k === mot; })[0];
+    var feitos = 0, recusados = 0, recusadosN = [], mo = MOT.filter(function (x) { return x.k === mot; })[0];
     mudar(function () {
       m.items.forEach(function (t) {
         var s = SEL[id + "|" + t.nome] || {}, dias = Object.keys(s).map(Number);
         if (!dias.length) return;
-        if (!tirar && mot && mo.ap !== "both" && mo.ap !== apOf(t.tipo)) { recusados++; return; }
+        if (!tirar && mot && mo.ap !== "both" && mo.ap !== apOf(t.tipo)) { recusados++; recusadosN.push(t.nome); return; }
         var gap = t.idx.map(function (k) { return p.days[k]; }), todos = gap.every(function (d) { return s[d]; });
         if (tirar) { if (todos) setConf(p, t.nome, ""); else setDays(p, t.nome, gap, dias, ""); }
         else if (mot) { if (todos) setConf(p, t.nome, mot, vig); else setDays(p, t.nome, gap, dias, mot); }
@@ -873,7 +875,8 @@
       });
     });
     delete BARRA[id];
-    if (recusados) recado(recusados + (recusados === 1 ? " item não aceita" : " itens não aceitam") + " esse motivo e " + (recusados === 1 ? "ficou marcado" : "ficaram marcados") + ": " + MOTL[mot] + ".", true);
+    // a recusa diz QUAIS itens ficaram marcados (24/11/2026: "2 itens não aceitam" não dizia quais)
+    if (recusados) recado(recusadosN.join(", ") + (recusados === 1 ? " não aceita" : " não aceitam") + " “" + MOTL[mot] + "” e " + (recusados === 1 ? "ficou marcado" : "ficaram marcados") + ": escolha outro motivo para " + (recusados === 1 ? "ele" : "eles") + ".", true);
     else if (!tirar && !mot) recado("Comentário gravado em " + feitos + (feitos === 1 ? " item" : " itens") + ". A situação não muda.");
   }
   function aoClicar(e) {
