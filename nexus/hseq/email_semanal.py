@@ -373,6 +373,11 @@ def ligado(cfg) -> bool:
 def ligar(app):
     """O laço: a cada 10 min, da segunda depois das 07:00 em diante, publica a semana (uma vez). Só onde `ligado`. Quem chama é o
     servir.py (o servidor), nunca o create_app nem o app.py: teste não fala com a rede."""
+    # a foto diária dos extintores (24/11/2026) liga aqui, ANTES do retorno antecipado: o servir.py (do Levi, fora da
+    # área da Segurança) só chama este `ligar`, e a foto tem chave própria (NEXUS_HSEQ_EXT_FOTO_AUTO); com o e-mail
+    # desligado (NEXUS_HSEQ_EMAIL_AUTO=0) a foto segue gravando
+    from . import extintores_historico
+    extintores_historico.ligar(app)
     if _LACO["thread"] is not None or not ligado(app.config):
         return
 

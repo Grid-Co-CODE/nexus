@@ -1,7 +1,7 @@
 # CLAUDE.md — Segurança · HSEQ
 
 Torre do menu "Segurança · HSEQ". Telas vivas: a **Mesa da Segurança** (a primeira, 24/10/2026), **Extintores** (com o
-relatório de cada cliente e usina em PDF e Excel), **EPI e EPC** (com o mesmo relatório, desde 23/11/2026), **APR e PT** (09/10/2026) e **Colaboradores** (05/11/2026, as pessoas do cadastro e a documentação de segurança de cada uma). Riscos da semana, DSS e
+relatório de cada cliente e usina em PDF e Excel, e a foto diária dos fora do em dia desde 24/11/2026), **EPI e EPC** (com o mesmo relatório, desde 23/11/2026), **APR e PT** (09/10/2026) e **Colaboradores** (05/11/2026, as pessoas do cadastro e a documentação de segurança de cada uma). Riscos da semana, DSS e
 Incidentes ainda são placeholder (a view com a mesma rota vence a genérica). As contas moram em `nexus/hseq/`; a view e o
 template, aqui.
 
@@ -388,6 +388,35 @@ extintor é excluído e vai para um histórico de extintores excluídos com o mo
 Prova: `tests/test_hseq_decisoes.py` (as regras da volta e da ronda pendente, quem pode, a assinatura, o Aceitar e o
 histórico, o botão direito com o motivo, a ronda da usina, a edição e a régua dela, a senha de administrador, o filtro
 de Status, o catálogo).
+
+**A foto diária dos extintores** (24/11/2026, a entrega 1 do mockup de Extintores aprovado pela Segurança: "hoje o Nexus
+só guarda a última conferência de cada extintor, então não dá para saber o que estava vencido num dia passado";
+`nexus/hseq/extintores_historico.py`, livro `nexus_hseq_extintores_historico`, no `catalogo.py` antes da 1ª gravação).
+Ainda sem tela: a entrega 3 ("O que mudou nos atrasados") lê daqui.
+- **O que entra:** os extintores que NÃO estão em dia (atrasado, perto de vencer, sem validade, sem atualização), pela
+  MESMA conta da tela, com as exclusões e as edições da Segurança (`decisoes.separar`) e sem os não reconhecidos. Só o
+  `usina_id`, o código, a situação, o que venceu (recarga ou hidrostático) e o sem atualização: nada de pessoa nem de
+  cliente.
+- **Só as mudanças, com a foto completa no 1º dia de cada mês** (a escolha da Segurança, 24/11/2026). Medido no banco
+  real no mesmo dia: 516 extintores fora do em dia; a foto inteira todo dia daria ~188 mil linhas e 4,4 MB por ano, e o
+  `livros.publicar` regrava e relê o livro inteiro a cada gravação. Com as mudanças: ~4 por dia só pelo tempo (a
+  validade que vence, a conferência que passa dos 30 dias; até 162 num dia de virada de mês) mais as conferências
+  (~550 por mês em out e nov), 14 a 25 mil linhas por ano com as 12 completas. `fato_extintor_dia` leva `tipo`
+  (`completa` ou `mudanca`); a mudança que tira o extintor da lista diz `em_dia` (ficou em dia) ou `fora` (saiu da
+  tela: excluído, não reconhecido, fora do livro do App). A situação de um dia = a completa mais perto antes dele + as
+  mudanças até ele (`estado_em`). No dia da completa, o estado montado pelas mudanças se compara com a foto: se não
+  bate, o log diz quantos divergiram (só o número) e vale a completa.
+- **Dia sem foto é lacuna:** o `fato_foto_dia` tem uma linha por dia gravado (`dias_gravados`); o dia que não está lá
+  (a API fora o dia inteiro) a tela mostra como lacuna, sem inventar.
+- **Quando:** a 1ª volta do laço depois das 06:00 de Brasília grava o dia, uma vez (o dia que já está no `fato_foto_dia`
+  não volta); leitura que falha (o livro do App, as decisões, a conta guardada de outro dia) não grava, e a volta
+  seguinte tenta de novo. O laço (`ligar`, a cada 10 min, `fracttal_conta.de_fundo`) é chamado no início do
+  `email_semanal.ligar`, ANTES do retorno antecipado dele: o servir.py, que é do Levi, só chama esse. Chave própria:
+  `NEXUS_HSEQ_EXT_FOTO_AUTO=0` desliga; não liga onde `NEXUS_CAMPO_AQUECER=0` (o PC). Nos testes, o livro é o arquivo de
+  `NEXUS_HSEQ_EXTINTORES_HISTORICO_ARQUIVO`.
+Prova: `tests/test_hseq_extintores_historico.py` (uma vez por dia e só depois das 06:00, só os fora do em dia e nada
+pessoal, as exclusões, a leitura que falha, as mudanças e o dia reconstruído, a completa do dia 1 com a conferência, quem
+liga e a chave, o catálogo; 3 mutações pegas).
 
 **Pendências.** O App gravar a edição no cadastro dele (`fato_edicao_extintor`). A cobrança mensal por usina (ronda de extintor feita ou não no mês) e o painel da TST (confirmação dos
 extintores novos) são do App; entram aqui quando houver o livro e o pedido.

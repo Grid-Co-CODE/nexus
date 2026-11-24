@@ -97,6 +97,35 @@ FATOS = (
                     "e na CNH) e quem registrou só cifrados (dados_cifrados, o Cofre do cadastro): o ASO é dado de "
                     "saúde e a API tem leitura aberta. A validade das NRs sai da periodicidade da norma, na tela. A "
                     "planilha só grava o que muda o último registro da pessoa"),
+    # a foto diária dos extintores fora do em dia (24/11/2026, o mockup de Extintores aprovado pela Segurança: "hoje o
+    # Nexus só guarda a última conferência de cada extintor, então não dá para saber o que estava vencido num dia
+    # passado"): o Nexus é a FONTE. Só as mudanças, com a foto completa no 1º dia do mês (a escolha da Segurança depois
+    # da medida: 516 linhas por dia, ~188 mil por ano, se cada dia fosse uma foto inteira). Registrado antes da 1ª gravação
+    Fato("extintor_dia", "Extintor fora do em dia, por dia (foto diária)", "hseq",
+         "nexus_hseq_extintores_historico · fato_extintor_dia",
+         "1 linha = 1 extintor num dia: na foto completa (tipo completa, no 1º dia de cada mês), cada extintor fora do "
+         "em dia; nos outros dias (tipo mudanca), só o que entrou, saiu ou mudou de situação desde o dia anterior",
+         _d(data=("id", "data_id (o dia de Brasília da foto)"),
+            usina=("id", "usina_id (vazio para extintor de usina fora do cadastro)"),
+            equipamento=("prop", "codigo: o código do extintor (cadastro próprio do App, fora do Fracttal)")),
+         tipo="sem_medida", chave=("data_id", "codigo"),
+         fontes=("extintores_app_campo · Extintores", "nexus_hseq_extintores · fato_exclusao_extintor",
+                 "nexus_hseq_extintores · fato_edicao_extintor"),
+         janela_origem="o Nexus é a fonte (só acrescenta, uma vez por dia depois das 06:00)",
+         observacao="situacao (domínio): atrasado, perto, sem_validade, em_dia; na mudança também fora (saiu da tela: "
+                    "excluído, não reconhecido ou fora do livro do App). sem_atualizacao sim/não soma às outras, como "
+                    "na tela. venceu: recarga ou hidrostático, no atrasado. A situação de um dia = a completa mais "
+                    "perto antes dele + as mudanças até ele; é a mesma conta da tela, com as exclusões e as edições da "
+                    "Segurança. Sem pessoa nem cliente"),
+    Fato("foto_extintores_dia", "Dia com a foto dos extintores", "hseq",
+         "nexus_hseq_extintores_historico · fato_foto_dia",
+         "1 linha = 1 dia em que a foto dos extintores foi gravada, com os totais",
+         _d(data=("id", "data_id (o dia de Brasília da foto)")),
+         tipo="sem_medida", chave=("data_id",),
+         fontes=("nexus_hseq_extintores_historico · fato_extintor_dia",),
+         janela_origem="o Nexus é a fonte (só acrescenta, uma vez por dia)",
+         observacao="completa sim/não; extintores (os da tela), fora_do_em_dia e linhas (as gravadas no dia). Dia sem "
+                    "esta linha é dia sem foto (a API fora o dia inteiro): a tela mostra a lacuna, sem inventar"),
 )
 
 LIVROS = (
@@ -119,6 +148,12 @@ LIVROS = (
           "registrado em 06/11/2026 antes de existir: nasce com o 1º registro. A gravação relê o banco antes e troca o "
           "livro inteiro",
           so_cresce=True),
+    Livro("nexus_hseq_extintores_historico", ("fato_extintor_dia", "fato_foto_dia"),
+          "uma vez por dia, depois das 06:00, no servidor (NEXUS_HSEQ_EXT_FOTO_AUTO=0 desliga)",
+          "nexus/hseq/extintores_historico.py, pelo laço do e-mail semanal da Segurança", False,
+          "registrado em 24/11/2026 antes de existir: nasce com a 1ª foto (completa). Só as mudanças, com a foto "
+          "completa no 1º dia de cada mês; a gravação relê o banco antes e troca o livro inteiro",
+          so_cresce=True),
 )
 
 RESUMO = {
@@ -127,6 +162,8 @@ RESUMO = {
     "edicao_extintor": "As edições que a Segurança fez no cadastro dos extintores",
     "email_pendencias_seguranca": "O e-mail semanal das pendências da Segurança, por destinatário",
     "documentacao_colaborador": "A documentação de segurança de cada colaborador (ASO, NRs)",
+    "extintor_dia": "Os extintores fora do em dia, dia a dia, pelas mudanças",
+    "foto_extintores_dia": "Os dias em que a foto dos extintores foi gravada",
 }
 
 PARA_QUE = {
@@ -147,4 +184,9 @@ PARA_QUE = {
                                 "registrada pela Segurança na tela Colaboradores ou carregada da planilha dela. A tela "
                                 "mostra o que venceu, o que falta e o que espera assinatura. A situação e a data vão "
                                 "cifradas.",
+    "extintor_dia": "Guarda, dia a dia, os extintores que não estão em dia (atrasados, perto de vencer, sem validade e "
+                    "sem atualização), com a mesma conta da tela Extintores. Grava a foto inteira no 1º dia do mês e, "
+                    "nos outros dias, só o que mudou. É o histórico para ver o que venceu e o que foi resolvido.",
+    "foto_extintores_dia": "Guarda cada dia em que a foto dos extintores foi gravada, com quantos estavam fora do em "
+                           "dia. O dia que não está aqui ficou sem foto, e a tela mostra a lacuna em vez de inventar.",
 }
