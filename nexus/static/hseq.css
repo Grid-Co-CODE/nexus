@@ -296,3 +296,31 @@
 .epi-tab td:last-child{position:relative;width:44px}
 .epi-tab tr:hover .hs-tres,.epi-tab tr:focus-within .hs-tres{opacity:1}
 .hs-menu-cli[hidden]{display:none}
+
+/* Incidentes (24/11/2026): os relatos de segurança do App. O texto livre guarda as quebras de linha que o técnico
+   escreveu; as fotos em miniatura, que abrem inteiras numa aba; no celular cada relato vira um cartão (como a APR e PT) */
+.inc-tab td{vertical-align:top}
+.inc-tab .inc-quando{white-space:nowrap}
+.inc-texto{white-space:pre-line;margin:0 0 14px;font-size:14px;line-height:21px;color:var(--tinta)}
+.inc-fotos{display:flex;flex-wrap:wrap;gap:10px}
+.inc-fotos img{display:block;width:160px;height:120px;object-fit:cover;border-radius:8px;border:1px solid var(--linha-forte);
+  background:var(--superficie-2)}
+@media (max-width:720px){
+  .cn-tab table.inc-tab{min-width:0}
+  .inc-tab thead{display:none}
+  .inc-tab,.inc-tab tbody,.inc-tab tr.cn-linha,.inc-tab tr.cn-linha td{display:block;width:auto}
+  .inc-tab tr.cn-linha{display:grid;grid-template-columns:1fr auto;gap:2px 12px;padding:12px 4px;border-bottom:1px solid var(--linha)}
+  .inc-tab tr.cn-linha td{padding:0;border:0;text-align:left}
+  .inc-tab tr.cn-linha td:nth-child(2){grid-column:1;grid-row:1}
+  .inc-tab tr.cn-linha td.inc-quando{grid-column:2;grid-row:1;text-align:right}
+  .inc-tab tr.cn-linha td:nth-child(n+3){grid-column:1/3}
+  .inc-tab tr.cn-linha td:nth-child(4)::before{content:"Responsável: ";color:var(--tinta-2)}
+  .inc-tab tr.cn-linha td:nth-child(5)::before{content:"Pessoas: ";color:var(--tinta-2)}
+  .inc-tab tr.cn-linha td:nth-child(6)::before{content:"Relatado por: ";color:var(--tinta-2)}
+  .inc-tab tr.cn-linha td:nth-child(7)::before{content:"Aviso à TST: ";color:var(--tinta-2)}
+  /* a linha aberta pinta o cartão inteiro, não cada célula (no grid, o fundo por célula deixava as frestas) */
+  .inc-tab tr.cn-linha[aria-expanded="true"]{background:var(--superficie-2)}
+  .inc-tab tr.cn-linha[aria-expanded="true"] td{background:transparent}
+  .inc-fotos a{flex:0 0 calc(50% - 5px)}
+  .inc-fotos img{width:100%;height:auto;aspect-ratio:4/3}
+}

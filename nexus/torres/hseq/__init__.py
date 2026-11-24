@@ -10,11 +10,16 @@ A Segurança decide ali os não reconhecidos (aceitar ou pedir nova ronda) e a q
 usina, com as usinas dele, e os filtros são a região do Brasil, o cliente, o responsável UFV e a busca: saíram a região
 de campo e o gestor de contrato, e com eles o filtro que vinha do login.
 
+Incidentes (24/11/2026) lê os relatos de segurança do App de Campo no servidor do App (`nexus/hseq/relatos_seguranca.py`),
+sem gravar nada no banco.
+
 As outras telas ainda caem no placeholder da casca (view com a mesma rota vence a genérica). Leia o CLAUDE.md desta
 pasta antes de mexer.
 """
 import re
 import unicodedata
+
+from datetime import datetime
 
 from urllib.parse import urlencode
 
@@ -79,9 +84,10 @@ TORRE = Torre(
         Tela("dss", "DSS",
              "Todos os clusters fizeram o DSS?",
              "Registros de DSS"),
+        # os relatos de segurança do App de Campo desde 24/11/2026 (o botão vermelho da v376; relatos_seguranca.py)
         Tela("incidentes", "Incidentes",
-             "Que quase acidente ou desvio ainda está sem ação?",
-             "Registros de incidentes"),
+             "Que acidente, incidente ou condição insegura o campo relatou, e o que foi feito na hora?",
+             "Relatos de segurança do App de Campo"),
     ],
 )
 
@@ -921,3 +927,86 @@ def colaboradores_planilha():
     return render_template(
         "hseq/colaboradores_planilha.html", torre=TORRE, tela=TORRE.tela("colaboradores"), res=res, gravar=gravar,
         gravados=gravados, mudariam=mudariam, erro=erro, nome_arquivo=(arq.filename if arq else ""))
+
+
+# ── Incidentes (24/11/2026): os relatos de segurança do App de Campo ────────────────────────────────────────────────
+# Levi, no chat do App (23/11/2026): "a pessoa vai lá no início, consegue relatar [...] entrará na parte de segurança do
+# Nexus". O App é a fonte (o botão vermelho da v376); o Nexus lê a lista e as fotos no servidor do App, de servidor para
+# servidor, e não grava nada (`nexus/hseq/relatos_seguranca.py`, o contrato v1).
+FILTROS_INC = (("tipo", "Tipo"), ("cliente", "Cliente"), ("usina", "Usina"), ("responsavel", "Responsável UFV"))
+BUSCA_INC = ("tipo_rotulo", "usina", "usina_fonte", "cliente", "o_que_aconteceu", "acao_imediata", "autor", "papel")
+
+
+def _ligar_usinas(relatos) -> list:
+    """Cada relato com a usina do cadastro, o cliente e o Responsável UFV, pelo nome do local no Fracttal que o App
+    escreve (o de-para "Fracttal · Classificação 1", o mesmo da APR e PT). Sem ligação: o nome do App sem o cliente e a
+    UF, e o "sem responsável"."""
+    from ...campo import regras_app
+    try:
+        por_nome = (visao.usinas_do_fracttal().dados or {}).get("por_nome") or {}
+    except Exception:            # noqa: BLE001 — sem o cadastro, a usina fica como o App escreveu
+        por_nome = {}
+    out = []
+    for r in relatos:
+        o = por_nome.get(regras_app._norm(r["usina_fonte"])) if r["usina_fonte"] else None
+        out.append({**r, "usina": (o or {}).get("usina") or visao.nome_da_usina_crua(r["usina_fonte"]) or "",
+                    "usina_id": (o or {}).get("usina_id"), "cliente": (o or {}).get("cliente") or "",
+                    "responsavel": (o or {}).get("responsavel") or visao.SEM_RESPONSAVEL, "ligada": bool(o)})
+    return out
+
+
+def _valor_inc(x, campo) -> str:
+    return x["tipo_rotulo"] if campo == "tipo" else str(x.get(campo) or "")
+
+
+@bp.route("/incidentes")
+def incidentes():
+    """Incidentes: os relatos de segurança que o campo faz pelo App (acidente, incidente, incêndio, condição insegura,
+    EPI e EPC), do mais novo para o mais antigo, com os filtros no padrão do Histórico de OS (vários valores por filtro,
+    em cascata, cada opção com a conta) e a linha que abre o relato com as fotos."""
+    from ...hseq import relatos_seguranca as RS
+    lido = RS.ler()
+    relatos = _ligar_usinas(lido["relatos"])
+    fl = {c: [v.strip() for v in request.args.getlist(c) if v.strip()] for c, _rot in FILTROS_INC}
+    q = request.args.get("q", "").strip().lower()
+
+    def passa(x, menos=None):
+        return (all(not v or c == menos or _valor_inc(x, c) in v for c, v in fl.items())
+                and (not q or q in " ".join(str(x.get(c) or "") for c in BUSCA_INC).lower()))
+    opcoes = {}
+    for campo, _rot in FILTROS_INC:
+        n = {}
+        for x in relatos:
+            if passa(x, campo) and _valor_inc(x, campo):
+                n[_valor_inc(x, campo)] = n.get(_valor_inc(x, campo), 0) + 1
+        for v in fl[campo]:
+            n.setdefault(v, 0)
+        # o Tipo na ordem da gravidade (a do App: acidente e incêndio primeiro); os outros em ordem alfabética
+        ordem = {rot: i for i, (rot, _tom) in enumerate(RS.TIPOS.values())} if campo == "tipo" else {}
+        opcoes[campo] = sorted(n.items(), key=lambda kv: (kv[0] == visao.SEM_RESPONSAVEL, ordem.get(kv[0], 99),
+                                                         kv[0].lower()))
+    lista = [x for x in relatos if passa(x)]
+    contagem = {t: sum(1 for x in relatos if x["tipo"] == t) for t in RS.TIPOS}
+    return render_template(
+        "hseq/incidentes.html", torre=TORRE, tela=TORRE.tela("incidentes"), lido=lido, lista=lista, total=len(relatos),
+        fl=fl, q=request.args.get("q", ""), filtros=FILTROS_INC, opcoes=opcoes, tipos=RS.TIPOS, contagem=contagem,
+        pendentes=sum(1 for x in relatos if x["aviso"] == "pendente"),
+        sem_ligacao=sorted({x["usina_fonte"] for x in relatos if x["usina_fonte"] and not x["ligada"]}),
+        lido_as=(datetime.fromtimestamp(lido["lido_em"]).strftime("%H:%M") if lido.get("lido_em") else ""),
+        sem_responsavel=visao.SEM_RESPONSAVEL)
+
+
+@bp.route("/incidentes/<rid>/foto/<int:n>")
+def incidente_foto(rid, n):
+    """A foto `n` do relato, lida no App na hora (a chave e o endereço do App não vão ao navegador). 404 quando o relato
+    ou a foto não existem; 502 quando o App não responde."""
+    from ...hseq import relatos_seguranca as RS
+    try:
+        f = RS.foto(rid, n)
+    except Exception:            # noqa: BLE001 — o App fora ou recusando: a imagem só não aparece
+        abort(502)
+    if not f:
+        abort(404)
+    dados, tipo = f
+    return Response(dados, mimetype=tipo, headers={"Cache-Control": "private, max-age=600",
+                                                    "X-Content-Type-Options": "nosniff"})
