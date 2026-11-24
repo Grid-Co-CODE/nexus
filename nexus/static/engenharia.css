@@ -1010,4 +1010,4 @@ dl.eg-ac-dados dd.eg-resp{display:flex;align-items:center;justify-content:flex-e
 .eg-dm-sug{margin-left:8px;font-weight:500;text-transform:none;letter-spacing:0;color:var(--verde-texto)}
 .eg-dm-fixo{display:block;padding:8px 10px;border:1px solid var(--linha);border-radius:8px;background:var(--superficie-2);
   color:var(--tinta-2);font-size:13px;line-height:1.4}
-@media (max-width:600px){.eg-dm-grade{grid-template-columns:1fr}}
+@media (max-width:640px){.eg-dm-grade{grid-template-columns:1fr}}

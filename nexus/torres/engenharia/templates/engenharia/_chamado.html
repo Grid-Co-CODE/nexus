@@ -69,37 +69,37 @@
             </ol>
             </div>
           {% if d.eu_recebo and sit in ('nova', 'em_analise', 'devolvida') %}
-          <form method="post" action="{{ d.passo_url }}" class="eg-dm-form">
+          <form method="post" action="{{ d.passo_url|na_raiz }}" class="eg-dm-form">
             <input type="hidden" name="codigo" value="{{ dm.codigo }}"><input type="hidden" name="aba" value="para"><input type="hidden" name="novo_id" value="{{ dm.novo_evento() }}">
             <textarea class="gc-campo" name="texto" rows="2" maxlength="{{ dm.passo_max }}" required aria-label="Sua resposta, ou a sua pergunta para quem pediu" placeholder="Escreva a resposta, ou a pergunta para quem pediu"></textarea>
             <div class="eg-dm-bts"><button class="eg-ac-btn eg-ac-btn--g eg-ac-btn--p" type="submit" name="acao" value="respondeu">Responder e finalizar</button>
               <button class="eg-ac-btn eg-ac-btn--o eg-ac-btn--p" type="submit" name="acao" value="pediu_informacao">Pedir informação</button>
               {% if sit in ('nova', 'devolvida') %}<button class="eg-ac-btn eg-ac-btn--o eg-ac-btn--p" type="submit" form="dm-ea-{{ d.demanda_id }}" name="acao" value="em_analise">Colocar em análise</button>{% endif %}</div>
           </form>
-          {% if sit in ('nova', 'devolvida') %}<form id="dm-ea-{{ d.demanda_id }}" method="post" action="{{ d.passo_url }}" hidden>
+          {% if sit in ('nova', 'devolvida') %}<form id="dm-ea-{{ d.demanda_id }}" method="post" action="{{ d.passo_url|na_raiz }}" hidden>
             <input type="hidden" name="codigo" value="{{ dm.codigo }}"><input type="hidden" name="aba" value="para"><input type="hidden" name="novo_id" value="{{ dm.novo_evento() }}"></form>{% endif %}
           <p class="eg-dica">Pedir informação pausa o prazo até quem pediu responder.</p>
           {% elif d.eu_pedi and sit == 'aguardando' %}
-          <form method="post" action="{{ d.passo_url }}" class="eg-dm-form">
+          <form method="post" action="{{ d.passo_url|na_raiz }}" class="eg-dm-form">
             <input type="hidden" name="codigo" value="{{ dm.codigo }}"><input type="hidden" name="aba" value="pedi"><input type="hidden" name="novo_id" value="{{ dm.novo_evento() }}">
             <textarea class="gc-campo" name="texto" rows="2" maxlength="{{ dm.passo_max }}" required aria-label="A informação que foi pedida" placeholder="A informação que foi pedida"></textarea>
             <div class="eg-dm-bts"><button class="eg-ac-btn eg-ac-btn--g eg-ac-btn--p" type="submit" name="acao" value="informou">Enviar a informação</button></div>
           </form>
           <p class="eg-dica">O prazo volta a correr quando você enviar.</p>
           {% elif d.eu_pedi and sit == 'finalizada' %}
-          <form method="post" action="{{ d.passo_url }}" class="eg-dm-form">
+          <form method="post" action="{{ d.passo_url|na_raiz }}" class="eg-dm-form">
             <input type="hidden" name="codigo" value="{{ dm.codigo }}"><input type="hidden" name="aba" value="pedi"><input type="hidden" name="novo_id" value="{{ dm.novo_evento() }}">
             <textarea class="gc-campo" name="texto" rows="2" maxlength="{{ dm.passo_max }}" required aria-label="Justificativa para devolver" placeholder="Se a resposta não resolveu, o que ficou faltando (para devolver)"></textarea>
             <div class="eg-dm-bts"><button class="eg-ac-btn eg-ac-btn--g eg-ac-btn--p" type="submit" form="dm-cc-{{ d.demanda_id }}" name="acao" value="concluiu">Concluir</button>
               <button class="eg-ac-btn eg-ac-btn--o eg-ac-btn--p" type="submit" name="acao" value="devolveu">Devolver com justificativa</button></div>
           </form>
-          <form id="dm-cc-{{ d.demanda_id }}" method="post" action="{{ d.passo_url }}" hidden>
+          <form id="dm-cc-{{ d.demanda_id }}" method="post" action="{{ d.passo_url|na_raiz }}" hidden>
             <input type="hidden" name="codigo" value="{{ dm.codigo }}"><input type="hidden" name="aba" value="pedi"><input type="hidden" name="novo_id" value="{{ dm.novo_evento() }}"></form>
           <p class="eg-dica">Sem o seu ok nem a devolução em {{ dm.sozinha_dias }} dias úteis, conclui sozinha.</p>
           {% elif sit != 'concluida' %}
           <p class="eg-dica">Quem responde é {{ d.para_nome or 'quem recebeu' }}; quem conclui é {{ d.de_nome or 'quem pediu' }}.</p>
           {% endif %}
-          <a class="eg-dm-caixa" href="{{ d.caixa }}">Ver na Caixa de entrada</a>
+          <a class="eg-dm-caixa" href="{{ d.caixa|na_raiz }}">Ver na Caixa de entrada</a>
         </div>
       </div>
     </details>
@@ -119,7 +119,7 @@
 <script type="application/json" id="dm-ch-setores">{{ dm.setores|map(attribute=1)|list|tojson }}</script>
 <script type="application/json" id="dm-ch-dados">{{ {"setores": dm.setores, "temas": dm.temas, "sugerido": dm.setor_sugerido, "supervisor": dm.supervisor, "tema_padrao": dm.tema_padrao, "pessoas_url": dm.pessoas_url}|tojson }}</script>
 <div class="eg-dm-veu" data-dm-ch hidden>
-  <form class="eg-dm-dlg" role="dialog" aria-modal="true" aria-labelledby="dm-ch-dlg-t" method="post" action="{{ dm.acao }}" enctype="multipart/form-data" data-dm-ch-form>
+  <form class="eg-dm-dlg" role="dialog" aria-modal="true" aria-labelledby="dm-ch-dlg-t" method="post" action="{{ dm.acao|na_raiz }}" enctype="multipart/form-data" data-dm-ch-form>
     <div class="eg-dm-dlg-t" id="dm-ch-dlg-t">Nova demanda · chamado OS {{ o.os }}</div>
     <p class="eg-dica">A mesma Nova demanda da Caixa de entrada, já com o chamado: confira, escreva o que precisa e envie.</p>
     <input type="hidden" name="codigo" value="{{ dm.codigo }}"><input type="hidden" name="novo_id" value="{{ dm.novo_id }}">
