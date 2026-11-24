@@ -86,3 +86,33 @@ def test_o_cartao_do_garantias_mostra_a_demanda(tela):
     assert '<span class="k-chip k-dm k-dm-am">Demanda aberta · vence 26/11</span>' in html
     assert '<span class="k-chip k-dm k-dm-ok">Demanda respondida</span>' in html
     assert "k-dm" not in c.get("/os/chamados/acompanhamento").get_data(as_text=True)     # o OS Creator sozinho
+
+
+def test_a_demanda_abre_no_chamado_e_o_passo_volta_a_ele(app, cena, monkeypatch):
+    """O clique na demanda abre na própria linha do chamado (a descrição, o andamento e os botões de quem recebeu); o passo
+    dado dali volta ao chamado, com ela aberta, e o mesmo passo vale na Caixa de entrada."""
+    from nexus.torres.comando.demandas_tela import contexto_do_chamado
+    padrao = _tema_do_chamado(app, monkeypatch)
+    with app.test_request_context():
+        D.abrir(_form(cena, para_hmac=_h(ANA["email"]), para_setor_id="2", tema_id=padrao, titulo="Foto da etiqueta",
+                      novo_id="d00000000031"), [], JU)
+    D.limpar()
+    with app.test_request_context("/?dm=d00000000031"):
+        from flask import session
+        session.update(logado=True, usuario=dict(ANA))
+        cx = contexto_do_chamado(18421)
+    d = cx["demandas"][0]
+    assert d["eu_recebo"] and not d["eu_pedi"] and d["aberta_agora"]
+    assert d["passo_url"].endswith(f"{CAIXA}/demandas/d00000000031/passo?chamado=18421")
+    ana = _cliente(app, ANA)
+    cod = _codigo(ana.get(CAIXA).get_data(as_text=True))
+    r = ana.post(d["passo_url"], data={"codigo": cod, "acao": "em_analise", "aba": "para", "novo_id": D.novo_id("e")})
+    loc = r.headers["Location"]
+    assert r.status_code == 303 and "/t/engenharia/equipe/os/18421?de=garantias&ok=Feito" in loc
+    assert "dm=d00000000031" in loc and loc.endswith("#dm-d00000000031")
+    # quem não recebeu volta ao chamado com o motivo, sem gravar
+    ju = _cliente(app, JU)
+    cod_ju = _codigo(ju.get(CAIXA).get_data(as_text=True))
+    r = ju.post(d["passo_url"], data={"codigo": cod_ju, "acao": "respondeu", "texto": "Ok", "aba": "para",
+                                      "novo_id": D.novo_id("e")})
+    assert "&erro=" in r.headers["Location"] and "/t/engenharia/equipe/os/18421" in r.headers["Location"]

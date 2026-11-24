@@ -436,9 +436,12 @@ escolher o setor chamados, mas no back-end entender que é um setor de performan
 do chamado (no lugar do Teams, onde cinco chamados se misturavam no mesmo canal); o Levi recusou o chat solto ("como é que
 a pessoa vai mandar? ... Tem que ter a opção de direcionar ... nova demanda") e aprovou no mockup a Nova demanda dentro
 do chamado:
-- o Raio X da OS de chamado tem o bloco **Demandas do chamado** (as demandas que citam a OS, cada uma levando à Caixa,
-  onde os passos moram) e a **Nova demanda** (`demandas_tela.contexto_do_chamado`); o Enviar vai à rota de sempre com
-  `?chamado=<nº>` e volta ao Raio X com o aviso;
+- o Raio X da OS de chamado tem o bloco **Demandas do chamado** (as demandas que citam a OS) e a **Nova demanda**
+  (`demandas_tela.contexto_do_chamado`); o Enviar vai à rota de sempre com `?chamado=<nº>` e volta ao Raio X com o aviso;
+- o clique na demanda abre na própria linha do chamado: a descrição, o andamento e os mesmos botões da Caixa para quem
+  recebeu (Responder e finalizar, Pedir informação, Colocar em análise) e para quem pediu (Enviar a informação,
+  Concluir, Devolver). O passo vai à rota de sempre com `?chamado=<nº>` e volta ao chamado com ela aberta
+  (`?dm=<id>#dm-<id>`); quem não é parte vê quem responde e quem conclui, e o link "Ver na Caixa de entrada";
 - já vêm escolhidos o setor **Supervisão Campo**, **o supervisor de campo da usina** (a região de campo da usina no
   cadastro; a tela acha a pessoa na lista de quem tem setor pelo nome: o curto do cadastro dentro do completo do Fracttal)
   e o tema **"Acompanhamento de chamado"** (3 dias úteis, um tema padrão novo da Supervisão Campo, `TEMA_DO_CHAMADO`);

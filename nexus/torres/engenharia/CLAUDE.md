@@ -514,8 +514,9 @@ resposta de "Descreva a atividade realizada" da OS filha. Desenho em
     delas (a atividade do 1º comentário, quem edita e exclui, o Finalizar que encerra a atividade);
   - as **Demandas do chamado** (24/11/2026), no alto da coluna da direita, e a **Nova demanda** (também no alto da
     página): a demanda da Caixa de entrada dentro do chamado, com o supervisor de campo da usina, o tema "Acompanhamento
-    de chamado", a usina e a OS já escolhidos; o 2º número vira "Demandas" (as abertas e o prazo mais perto). Ver o
-    CLAUDE.md do Comando;
+    de chamado", a usina e a OS já escolhidos; o 2º número vira "Demandas" (as abertas e o prazo mais perto). O clique
+    na demanda abre ali mesmo (`<details>`): a descrição, o andamento e os botões de quem recebeu ou de quem pediu, que
+    voltam ao chamado com ela aberta (Levi, 24/11: "E quando clica, acontece o quê?"). Ver o CLAUDE.md do Comando;
   - o chamado que não monta (o clone fora) diz o motivo no alto e a página abre com o Status e prioridade de sempre; o banco
     dos chamados fora não derruba a página (vale só o `de`).
 - **Quem mexe:** o setor Engenharia e o administrador, com login de pessoa; os demais leem, sem formulários.

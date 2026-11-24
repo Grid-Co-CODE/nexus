@@ -198,10 +198,14 @@ def demanda_nova():
     return redirect(destino, code=303)
 
 
-def _no_chamado(folio: str, tipo: str, texto: str) -> str:
-    """O Raio X do chamado de Garantias, com o aviso na página (o `?ok=`/`?erro=` que ele mostra) e no bloco das demandas."""
+def _no_chamado(folio: str, tipo: str, texto: str, did: str = "") -> str:
+    """O Raio X do chamado de Garantias, com o aviso na página (o `?ok=`/`?erro=` que ele mostra) e no bloco das demandas;
+    com a demanda (`did`), ela volta aberta."""
     from urllib.parse import urlencode
-    return na_raiz(f"/t/engenharia/equipe/os/{folio}") + "?" + urlencode({"de": "garantias", tipo: texto}) + "#demandas"
+    q = {"de": "garantias", tipo: texto}
+    if did:
+        q["dm"] = did
+    return na_raiz(f"/t/engenharia/equipe/os/{folio}") + "?" + urlencode(q) + (f"#dm-{did}" if did else "#demandas")
 
 
 # ── a demanda que sai do chamado de Garantias (24/11/2026) ──────────────────────────────────────────────────────────
@@ -236,7 +240,11 @@ def contexto_do_chamado(folio: int) -> dict:
     except Exception as ex:      # noqa: BLE001 — o banco fora: o bloco diz, o chamado abre igual
         current_app.logger.exception("demandas do chamado: a lista não abriu")
         return dict(out, erro=type(ex).__name__)
-    doc = [dict(d, pendente=_pendente(d), caixa=na_raiz(CAIXA) + f"?d={d['demanda_id']}#demandas")
+    meu, aberta = _meu_hmac(), request.args.get("dm") or ""
+    doc = [dict(d, pendente=_pendente(d), caixa=na_raiz(CAIXA) + f"?d={d['demanda_id']}#demandas",
+                eu_recebo=bool(meu) and d["para_hmac"] == meu, eu_pedi=bool(meu) and d["de_hmac"] == meu,
+                aberta_agora=d["demanda_id"] == aberta,
+                passo_url=na_raiz(f"{CAIXA}/demandas/{d['demanda_id']}/passo?chamado={int(folio)}"))
            for d in lst if int(folio) in (d.get("oss") or [])]
     abertas = [d for d in doc if d["estado"]["aberta"]]
     prox = min((d["estado"]["prazo"] for d in abertas if d["estado"]["prazo"]), default=None)
@@ -254,6 +262,7 @@ def contexto_do_chamado(folio: int) -> dict:
         setores.setdefault(valor, t["area"] or nome_setor.get(sid) or f"Setor {sid}")
     padrao = TP.codigo(SID.SUPERVISAO_CAMPO, *TP.TEMA_DO_CHAMADO)
     out.update(demandas=doc, abertas=len(abertas), proximo=dia_txt(prox) if prox else "",
+               novo_evento=lambda: D.novo_id("e"), sozinha_dias=R.CONCLUI_SOZINHA_DIAS, passo_max=D.PASSO_MAX,
                setores=sorted(setores.items(), key=lambda kv: kv[1].lower()),
                temas=[{"tema_id": t["tema_id"], "setor": (f"{t['setor_id']}:{t['area']}" if t.get("area")
                                                           else str(t["setor_id"])),
@@ -278,7 +287,12 @@ def contexto_do_chamado(folio: int) -> dict:
 def demanda_passo(demanda_id):
     """Um passo da demanda: o botão diz qual (`acao`); o texto vai junto quando o passo pede."""
     aba = request.form.get("aba") or "para"
-    destino = _volta(aba, demanda_id)
+    # vindo do chamado de Garantias (24/11/2026): volta ao Raio X do chamado, com a demanda aberta e o aviso na página
+    ch = request.args.get("chamado", "")
+    ch = ch if ch.isdigit() else ""
+    did = demanda_id if D.ID_DEMANDA.fullmatch(demanda_id or "") else ""
+    destino = (_no_chamado(ch, "erro", "O formulário venceu: abra o chamado de novo. Nada foi gravado.", did) if ch
+               else _volta(aba, demanda_id))
     venceu = _form_venceu(destino)
     if venceu:
         return venceu
@@ -286,11 +300,19 @@ def demanda_passo(demanda_id):
     try:
         os_n = request.form.get("os", type=int)
         D.registrar(demanda_id, acao, request.form.get("texto") or "", _usuario(), request.form.get("novo_id"), os=os_n)
-        session[_AVISO] = ("ok", f"Feito: {D.ROTULO_PASSO.get(acao, acao)}" + (f", com a OS {os_n} atrelada." if os_n else "."))
+        feito = f"Feito: {D.ROTULO_PASSO.get(acao, acao)}" + (f", com a OS {os_n} atrelada." if os_n else ".")
+        if ch:
+            return redirect(_no_chamado(ch, "ok", feito, did), code=303)
+        session[_AVISO] = ("ok", feito)
     except D.Recusada as ex:
+        if ch:
+            return redirect(_no_chamado(ch, "erro", f"{ex}. Nada foi gravado.", did), code=303)
         session[_AVISO] = ("erro", f"{ex}. Nada foi gravado.")
     except Exception as ex:      # noqa: BLE001
         current_app.logger.exception("passo da demanda não gravado")
+        if ch:
+            return redirect(_no_chamado(ch, "erro", f"Não consegui gravar agora ({type(ex).__name__}). Nada foi gravado.",
+                                        did), code=303)
         session[_AVISO] = ("erro", f"Não consegui gravar agora ({type(ex).__name__}). Nada foi gravado.")
     return redirect(destino, code=303)
 

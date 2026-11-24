@@ -46,16 +46,65 @@
   {% elif dm.erro %}<p class="eg-dica">Não consegui ler as demandas agora ({{ dm.erro }}). Recarregue em instantes.</p>
   {% else %}
   <p class="eg-dica">O pedido ao supervisor de campo (ou a outro setor) sai daqui, cai na Caixa de entrada da pessoa com o prazo do tema, e a resposta volta para o chamado. Não vai para o relatório ao cliente.</p>
-  {% if dm.demandas %}<ul class="eg-dm-lista">
-    {% for d in dm.demandas %}{% set e = d.estado %}{% set s = d.selo %}
-    <li class="eg-dm"><a class="eg-dm-linha" href="{{ d.caixa }}" title="Abrir a demanda na Caixa de entrada">
-      {% if s and s[0] %}<span class="gc-status gc-status--{{ s[2] or 'neutro' }}">{{ s[0] }}{% if s[1] %} {{ s[1] }}{% endif %}</span>{% endif %}
-      <span class="eg-dm-tit"><b>{{ d.titulo or '(sem o texto)' }}</b><span>{{ d.de_nome or 'Alguém' }} → {{ d.para_nome or 'uma pessoa' }}{% if d.para_setor_nome %} · {{ d.para_setor_nome }}{% endif %}{% if d.tema_nome %} · {{ d.tema_nome }}{% endif %}</span>
-        {% if d.passos %}{% set u = d.passos[-1] %}<span class="eg-dm-ult">{{ u.nome or 'Alguém' }} {{ u.rotulo }}{% if u.texto %}: {{ u.texto }}{% endif %} · {{ u.quando_txt }}</span>{% endif %}
-        {% if d.pendente %}<span class="eg-dm-ult">{{ d.pendente }}</span>{% endif %}</span>
-      <span class="gc-status gc-status--{{ e.tom }}">{{ e.rotulo }}</span></a></li>
+  {% if dm.demandas %}<div class="eg-dm-lista">
+    {#- cada demanda abre na própria linha (o mockup aprovado em 24/11/2026): a descrição, o andamento e os botões de quem
+        pediu e de quem recebeu, os mesmos da Caixa de entrada; o passo volta a este chamado, com ela aberta #}
+    {% for d in dm.demandas %}{% set e = d.estado %}{% set s = d.selo %}{% set sit = e.situacao %}
+    <details class="eg-dm" id="dm-{{ d.demanda_id }}"{% if d.aberta_agora %} open{% endif %}>
+      <summary class="eg-dm-linha">
+        {% if s and s[0] %}<span class="gc-status gc-status--{{ s[2] or 'neutro' }}">{{ s[0] }}{% if s[1] %} {{ s[1] }}{% endif %}</span>{% endif %}
+        <span class="eg-dm-tit"><b>{{ d.titulo or '(sem o texto)' }}</b><span>{{ d.de_nome or 'Alguém' }} → {{ d.para_nome or 'uma pessoa' }}{% if d.para_setor_nome %} · {{ d.para_setor_nome }}{% endif %}{% if d.tema_nome %} · {{ d.tema_nome }}{% endif %}</span>
+          {% if d.passos %}{% set u = d.passos[-1] %}<span class="eg-dm-ult">{{ u.nome or 'Alguém' }} {{ u.rotulo }}{% if u.texto %}: {{ u.texto }}{% endif %} · {{ u.quando_txt }}</span>{% endif %}</span>
+        <span class="gc-status gc-status--{{ e.tom }}">{{ e.rotulo }}</span>
+      </summary>
+      <div class="eg-dm-corpo">
+        <div class="eg-dm-esq">
+          {% if d.descricao %}<p class="eg-dm-texto">{{ d.descricao }}</p>{% endif %}
+          {% if d.anexos %}<ul class="eg-dm-anexos">{% for a in d.anexos %}<li><a href="{{ ('/t/comando/caixa-de-entrada/demandas/' ~ d.demanda_id ~ '/anexo/' ~ a.n)|na_raiz }}" target="_blank" rel="noopener">{{ a.nome }}</a></li>{% endfor %}</ul>{% endif %}
+          <div class="eg-dm-andamento"><p class="eg-ac-lbl">Andamento</p>
+            <ol class="eg-dm-tempo">
+            <li>Aberta por {{ d.de_nome or 'alguém' }} <small>{{ d.aberta_txt }}</small></li>
+            {% for p in d.passos %}<li>{{ p.nome or 'Alguém' }} {{ p.rotulo }} <small>{{ p.quando_txt }}</small>{% if p.texto %}<q>{{ p.texto }}</q>{% endif %}</li>{% endfor %}
+            {% if d.pendente %}<li class="eg-dm-falta">{{ d.pendente }}</li>{% endif %}
+            </ol>
+            </div>
+          {% if d.eu_recebo and sit in ('nova', 'em_analise', 'devolvida') %}
+          <form method="post" action="{{ d.passo_url }}" class="eg-dm-form">
+            <input type="hidden" name="codigo" value="{{ dm.codigo }}"><input type="hidden" name="aba" value="para"><input type="hidden" name="novo_id" value="{{ dm.novo_evento() }}">
+            <textarea class="gc-campo" name="texto" rows="2" maxlength="{{ dm.passo_max }}" required aria-label="Sua resposta, ou a sua pergunta para quem pediu" placeholder="Escreva a resposta, ou a pergunta para quem pediu"></textarea>
+            <div class="eg-dm-bts"><button class="eg-ac-btn eg-ac-btn--g eg-ac-btn--p" type="submit" name="acao" value="respondeu">Responder e finalizar</button>
+              <button class="eg-ac-btn eg-ac-btn--o eg-ac-btn--p" type="submit" name="acao" value="pediu_informacao">Pedir informação</button>
+              {% if sit in ('nova', 'devolvida') %}<button class="eg-ac-btn eg-ac-btn--o eg-ac-btn--p" type="submit" form="dm-ea-{{ d.demanda_id }}" name="acao" value="em_analise">Colocar em análise</button>{% endif %}</div>
+          </form>
+          {% if sit in ('nova', 'devolvida') %}<form id="dm-ea-{{ d.demanda_id }}" method="post" action="{{ d.passo_url }}" hidden>
+            <input type="hidden" name="codigo" value="{{ dm.codigo }}"><input type="hidden" name="aba" value="para"><input type="hidden" name="novo_id" value="{{ dm.novo_evento() }}"></form>{% endif %}
+          <p class="eg-dica">Pedir informação pausa o prazo até quem pediu responder.</p>
+          {% elif d.eu_pedi and sit == 'aguardando' %}
+          <form method="post" action="{{ d.passo_url }}" class="eg-dm-form">
+            <input type="hidden" name="codigo" value="{{ dm.codigo }}"><input type="hidden" name="aba" value="pedi"><input type="hidden" name="novo_id" value="{{ dm.novo_evento() }}">
+            <textarea class="gc-campo" name="texto" rows="2" maxlength="{{ dm.passo_max }}" required aria-label="A informação que foi pedida" placeholder="A informação que foi pedida"></textarea>
+            <div class="eg-dm-bts"><button class="eg-ac-btn eg-ac-btn--g eg-ac-btn--p" type="submit" name="acao" value="informou">Enviar a informação</button></div>
+          </form>
+          <p class="eg-dica">O prazo volta a correr quando você enviar.</p>
+          {% elif d.eu_pedi and sit == 'finalizada' %}
+          <form method="post" action="{{ d.passo_url }}" class="eg-dm-form">
+            <input type="hidden" name="codigo" value="{{ dm.codigo }}"><input type="hidden" name="aba" value="pedi"><input type="hidden" name="novo_id" value="{{ dm.novo_evento() }}">
+            <textarea class="gc-campo" name="texto" rows="2" maxlength="{{ dm.passo_max }}" required aria-label="Justificativa para devolver" placeholder="Se a resposta não resolveu, o que ficou faltando (para devolver)"></textarea>
+            <div class="eg-dm-bts"><button class="eg-ac-btn eg-ac-btn--g eg-ac-btn--p" type="submit" form="dm-cc-{{ d.demanda_id }}" name="acao" value="concluiu">Concluir</button>
+              <button class="eg-ac-btn eg-ac-btn--o eg-ac-btn--p" type="submit" name="acao" value="devolveu">Devolver com justificativa</button></div>
+          </form>
+          <form id="dm-cc-{{ d.demanda_id }}" method="post" action="{{ d.passo_url }}" hidden>
+            <input type="hidden" name="codigo" value="{{ dm.codigo }}"><input type="hidden" name="aba" value="pedi"><input type="hidden" name="novo_id" value="{{ dm.novo_evento() }}"></form>
+          <p class="eg-dica">Sem o seu ok nem a devolução em {{ dm.sozinha_dias }} dias úteis, conclui sozinha.</p>
+          {% elif sit != 'concluida' %}
+          <p class="eg-dica">Quem responde é {{ d.para_nome or 'quem recebeu' }}; quem conclui é {{ d.de_nome or 'quem pediu' }}.</p>
+          {% endif %}
+          <a class="eg-dm-caixa" href="{{ d.caixa }}">Ver na Caixa de entrada</a>
+        </div>
+      </div>
+    </details>
     {% endfor %}
-  </ul>
+  </div>
   {% else %}<p class="eg-vazio-l">Nenhuma demanda ainda.</p>{% endif %}
   {% endif %}
 </section>

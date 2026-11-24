@@ -134,14 +134,22 @@ def test_as_demandas_do_chamado_no_raio_x(pagina, cliente, monkeypatch):
           "demandas": [{"demanda_id": "d1", "titulo": "Foto da etiqueta", "de_nome": "Analista Teste", "para_nome": "Supervisora Teste",
                         "para_setor_nome": "Supervisão Campo", "tema_nome": "Acompanhamento de chamado", "passos": [],
                         "pendente": "Resposta até qui, 26/11", "estado": estado, "selo": ("Falta", "2 dias", "alerta"),
-                        "caixa": "/t/comando/caixa-de-entrada?d=d1#demandas"}],
+                        "caixa": "/t/comando/caixa-de-entrada?d=d1#demandas", "descricao": "Preciso da foto da etiqueta.",
+                        "aberta_txt": "24/11 10:05", "eu_recebo": True, "eu_pedi": False, "aberta_agora": True,
+                        "passo_url": "/t/comando/caixa-de-entrada/demandas/d1/passo?chamado=16502"}],
           "abertas": 1, "proximo": "qui, 26/11", "acao": "/t/comando/caixa-de-entrada/demandas/nova?chamado=16502",
-          "pessoas_url": "/t/comando/caixa-de-entrada/demandas/pessoas",
+          "pessoas_url": "/t/comando/caixa-de-entrada/demandas/pessoas", "novo_evento": lambda: "e00000000001",
+          "sozinha_dias": 3, "passo_max": 2000,
           "anexo": {"aceitos": ".pdf, .png", "max_mb": 5, "max_arquivos": 5, "max_total": 15}, "limites": {"titulo": 120, "texto": 2000}}
     monkeypatch.setattr(DT, "contexto_do_chamado", lambda folio: cx)
     html = _como(cliente, ANA).get(URL_OS + "?de=garantias").get_data(as_text=True)
     assert '<h2 id="dm-ch-t">Demandas do chamado</h2>' in html and "Foto da etiqueta" in html
     assert 'href="/t/comando/caixa-de-entrada?d=d1#demandas"' in html and "Resposta até qui, 26/11" in html
+    # o clique abre a demanda na própria linha: a descrição, o andamento e os botões de quem recebeu, com a volta ao chamado
+    assert '<details class="eg-dm" id="dm-d1" open>' in html and "Preciso da foto da etiqueta." in html
+    assert html.count('action="/t/comando/caixa-de-entrada/demandas/d1/passo?chamado=16502"') == 1   # em análise: sem o Colocar em análise
+    assert 'value="respondeu">Responder e finalizar' in html and 'value="pediu_informacao">Pedir informação' in html
+    assert 'value="concluiu"' not in html and "Aberta por Analista Teste" in html
     assert html.count("data-dm-ch-abrir") == 2                         # o botão no alto e o do bloco
     assert 'action="/t/comando/caixa-de-entrada/demandas/nova?chamado=16502"' in html
     assert 'data-lista="dm-ch-setores"' in html and 'data-dm-ch-t="pessoa"' in html and 'data-dm-ch-t="tema"' in html
