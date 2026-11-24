@@ -545,6 +545,26 @@ MPS do semestre, MPA do ano, nova usina e saída de contrato...), e a página HT
 que nunca recebeu marca (vazio desde 17/08). **Não montar por enquanto** (Levi, 11/10/2026: "Não acho que valha a pena
 montar essa torre agora, vou falar com o time de PCM"): a tela segue placeholder no menu até ele decidir.
 
+## OS fora do App (`fora_do_app.py`, `templates/pcm/fora_do_app.html`, `/t/pcm/os-fora-do-app`; 24/11/2026)
+
+Levi, 24/11/2026, no chat do App de Campo: "Eu quero uma lista de todos os técnicos que estão fazendo OS pelo computador" (um
+técnico fechou 11 de 11 OS direto no Fracttal, sem abrir o App em duas semanas); aprovou a medição fixa por semana e mandou a
+tela para cá. Decisões dele no mesmo dia: fica no PCM, logo depois do Acompanhamento PCM no menu; mostra só os técnicos de
+campo, com o "Mostrar todos"; veem o PCM e a Supervisão Campo (`do_setor`) e os administradores.
+- **A medição é do App** (v381; contrato em `app-campo-docs/_propostas/v381-fonte/contrato_fora_do_app_nexus.md`): `GET
+  <base>/app/nexus/fora-do-app?semanas=8` com a chave das Sugestões (`NEXUS_APP_RELATOS_CHAVE`). Concluída = tarefa em status 2
+  ou 3 no Fracttal com o fim na semana; pelo App = a OS de que o App fechou alguma tarefa, ou a de ronda; fora = o resto (o
+  computador e o app do Fracttal não se separam). O App mede de madrugada e refaz a semana corrente e a anterior. Campo novo
+  ou outro formato se pede ao chat do App de Campo.
+- **O Nexus não guarda a medição:** lê a rota numa cópia de 10 minutos, na memória, como as Sugestões e os relatos de
+  segurança (o dado é do App, e a tela só mostra). A versão do contrato que não é a 1 vira erro na tela, não número.
+- **Técnico de campo** = quem tem usina hoje nos Técnicos por usina (papel executa), casado pelo código do e-mail
+  (`codigo_da_pessoa`); quem vem do App sem e-mail só aparece no "Mostrar todos". Sem ler os Técnicos por usina, mostra todos
+  e diz.
+- **Na tela:** a semana (a mais nova por padrão), os totais dos técnicos de campo, a lista pelos que mais fecham fora (o %
+  em vermelho a partir de 50, laranja a partir de 20), a semana anterior ao lado e, em cada um, as OS fora com o link do
+  card da OS. Prova: `tests/test_pcm_fora_do_app_24_11.py` (o App de mentira).
+
 ## Almoxarifado (`almoxarifado.py`, `templates/pcm/almoxarifado.html`, `/t/pcm/pecas`; 25/10/2026)
 
 Levi, 25/10/2026: "No fractall temos almoxarifado, gostaria de uma visão para a gestão desse almoxarifado na parte de

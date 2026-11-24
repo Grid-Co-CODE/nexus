@@ -14,7 +14,7 @@ O Acompanhamento (14/10/2026, Levi, com o pacote do painel de acompanhamento do 
 PCM essa visão de acompanhamento. O design quero alá Nexus [...] mas as estruturas quero sim que mantenha!"): as abas
 MPA, MPS, Radar de Backlog, Mapa e One Page, com as fontes do Nexus (`nexus/pcm/acompanhamento`), do setor PCM.
 """
-from ...pcm import acompanhamento, almox_usinas, almoxarifado, inventario
+from ...pcm import acompanhamento, almox_usinas, almoxarifado, fora_do_app, inventario
 from ...pcm.inventario import curadoria as inventario_curadoria
 from ...pcm.inventario import ponte_os as inventario_ponte
 from ...pcm.inventario import regua as inventario_regua
@@ -68,6 +68,13 @@ TORRE = Torre(
              "Que MPA ou MPS está travada, que OS envelhece no backlog e onde está a carga de cada time?",
              "Fracttal (pela Gestão PCM), programação semanal, Gerencial, cadastro e a curadoria do PCM",
              do_setor=SID.PCM),
+        # quem fecha OS fora do App de Campo, por semana (24/11/2026, Levi: "Eu quero uma lista de todos os técnicos que estão
+        # fazendo OS pelo computador"): a medição é do App (v381), a tela é daqui (nexus/pcm/fora_do_app.py). Junto do
+        # Acompanhamento; veem o PCM e a Supervisão Campo, que cobra o técnico (decisões do Levi no mesmo dia)
+        Tela("os-fora-do-app", "OS fora do App",
+             "Que técnico fecha OS fora do App de Campo, e isso melhorou desde a semana passada?",
+             "A medição semanal do App de Campo (o Fracttal e os fechamentos feitos pelo App)",
+             do_setor=(SID.PCM, SID.SUPERVISAO_CAMPO)),
         Tela("gestao", "Gestão PCM",
              "Quanto do plano de manutenção está feito por usina, e que MPA ou MPS está envelhecendo?",
              "gestao_pcm.json do painel PCM (e a planilha da Gerencial, cifrada)"),
@@ -92,6 +99,7 @@ bp = TORRE.criar_blueprint(__name__)
 registrar_pcm(bp)
 # o Acompanhamento do PCM (nexus/pcm/acompanhamento)
 acompanhamento.registrar(bp)
+fora_do_app.registrar(bp)
 # o Almoxarifado (nexus/pcm/almoxarifado.py)
 almoxarifado.registrar(bp)
 # a aba Inventário do Almoxarifado, as contagens do App que o PCM revisa (nexus/pcm/inventario)
