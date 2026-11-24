@@ -7,12 +7,22 @@
 (function () {
   var toast = document.getElementById('eq-toast'), relogio = null;
   function avisar(texto, ok) {
+    /* ok = 'alerta': o aviso fica até a pessoa fechar. O "Salvo" verde de 5 s passou batido na Petrolina 2 (23/11/2026):
+       a chave seguia com a aba, a Sala não mudou e ninguém viu por quê. */
+    var tom = ok === 'alerta' ? 'alerta' : (ok ? 'ok' : 'erro');
     toast.textContent = texto;
-    toast.className = 'fr-toast fr-toast--' + (ok ? 'ok' : 'erro');
+    if (tom === 'alerta') {
+      var fecha = document.createElement('span');
+      fecha.className = 'fr-toast-fecha';
+      fecha.textContent = ' Clique para fechar.';
+      toast.appendChild(fecha);
+    }
+    toast.className = 'fr-toast fr-toast--' + tom;
     toast.hidden = false;
     clearTimeout(relogio);
-    relogio = setTimeout(function () { toast.hidden = true; }, ok ? 5000 : 10000);
+    if (tom !== 'alerta') relogio = setTimeout(function () { toast.hidden = true; }, ok ? 5000 : 10000);
   }
+  toast.addEventListener('click', function () { if (toast.classList.contains('fr-toast--alerta')) toast.hidden = true; });
   function semAcento(s) { return String(s == null ? '' : s).normalize('NFKD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/\s+/g, ' ').trim(); }
 
   /* a lista: filtra enquanto se digita (o Enter ainda filtra no servidor) */
@@ -55,7 +65,7 @@
 
   var D = JSON.parse(dados.textContent);
   var podeGravar = raiz.getAttribute('data-pode-gravar') === '1';
-  var st = null, base = '', seq = 0, cmpAberta = null, chavesAbertas = false;
+  var st = null, base = '', seq = 0, cmpAberta = null, chavesAbertas = false, FORA = [];
   /* O Equipamento Supervisório pela fonte (17/11/2026). Levi, na Rio do Peixe I e II: "esse ligar aí só aparece que não
      está ligado no tempo real e não deixa a pessoa fazer uma ligação real"; "esse na fonte é a mesma coisa que
      equipamento supervisório. A diferença é que um é digitado, o outro não. O na fonte eu acho que seria a leitura da
@@ -175,7 +185,10 @@
         var n = st.inversores.filter(function (x) { return x.chave === ch.supervisorio_id; }).length;
         var ab = (D.aba || {})[ch.chave], ph = (ab && ab.usina) || D.nome_registro || '';
         var cmp = (D.comparacao || {})[ch.supervisorio_id];
-        h += '<tr><td><span class="gc-dado">' + esc(ch.chave) + '</span></td>' +
+        // a chave que o último Salvar disse seguir com a aba (FORA), enquanto não for marcada
+        var fora = !ch.substitui_aba && FORA.indexOf(ch.chave) >= 0;
+        h += '<tr' + (fora ? ' class="eq-chave-fora" title="A plataforma segue lendo esta chave da aba Equipamentos: marque No lugar da aba e salve"' : '') +
+          '><td><span class="gc-dado">' + esc(ch.chave) + '</span></td>' +
           '<td class="eq-w-exib">' + campo('chave', i, 'usina_exibicao', ch.usina_exibicao, ' maxlength="120" placeholder="' + esc(ph) + '" aria-label="Nome de exibição da chave ' + esc(ch.chave) + '"') + '</td>' +
           '<td class="eq-centro"><input type="radio" name="eq-principal" data-tipo="chave" data-i="' + i + '" data-campo="principal"' + (ch.principal ? ' checked' : '') + ro + ' aria-label="Chave da usina: ' + esc(ch.chave) + '"></td>' +
           '<td class="num">' + n + '</td>' +
@@ -541,7 +554,7 @@
     avisar(nc || ni ? 'kWp preenchido em ' + nc + ' cabine(s) e ' + ni + ' inversor(es). Confira e salve.' : 'Nada para distribuir: não há kWp vazio com base para calcular.', !!(nc || ni));
   }
   function salvar(botao) {
-    var antes = JSON.parse(base).chaves;
+    var antes = JSON.parse(base).chaves, alerta = false;
     var novas = st.chaves.filter(function (ch) {
       var b = antes.filter(function (x) { return x.supervisorio_id === ch.supervisorio_id; })[0];
       return ch.substitui_aba && !(b && b.substitui_aba);
@@ -560,18 +573,22 @@
           .then(function (j) {
             if (!j.ok) { avisar(j.erro || 'Não gravou.', false); return null; }
             if (j.comparacao) D.comparacao = j.comparacao;
+            // a chave que segue com a aba: a seção das chaves abre (desde 17/11 ela abre fechada) e a linha fica marcada
+            FORA = j.fora_da_aba || [];
+            alerta = FORA.length > 0;
+            if (alerta) chavesAbertas = true;
             carregar(j.editor);
             return j.aviso || 'Salvo.';
           })
       : Promise.resolve(''))
       .then(function (aviso) {
         if (aviso === null) { botao.disabled = false; return; }
-        if (!ligacoes.length) { botao.disabled = false; avisar(aviso, true); return; }
+        if (!ligacoes.length) { botao.disabled = false; avisar(aviso, alerta ? 'alerta' : true); return; }
         return gravarLigacoes(ligacoes).then(function (n) {
           LIGA = {};
           botao.disabled = false;
           desenhar();
-          avisar((aviso ? aviso + ' ' : '') + n + (n === 1 ? ' ligação gravada' : ' ligações gravadas') + ' na plataforma: o tempo real usa a partir da próxima leitura da fonte.', true);
+          avisar((aviso ? aviso + ' ' : '') + n + (n === 1 ? ' ligação gravada' : ' ligações gravadas') + ' na plataforma: o tempo real usa a partir da próxima leitura da fonte.', alerta ? 'alerta' : true);
           document.dispatchEvent(new CustomEvent('eq-fontes-reler'));
         }, function (ex) {
           botao.disabled = false;

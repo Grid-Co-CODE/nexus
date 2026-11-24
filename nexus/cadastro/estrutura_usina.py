@@ -586,6 +586,18 @@ def comparar_usina(u: dict, info_u: dict | None, aba_chaves: dict) -> dict:
     return out
 
 
+def fora_da_aba(u: dict, cmp: dict) -> list[str]:
+    """As chaves da usina que os leitores (plataforma, gêmeo, Ligações) ainda leem da aba Equipamentos, com inversor no
+    Nexus e diferentes da aba (ou sem comparação: a aba não se leu): o que está salvo nelas não chega lá. A Petrolina 2
+    (23/11/2026): 12 strings por inversor salvas no Nexus, a Sala de controle seguiu com as 13 da aba, e o Salvar só
+    disse "Salvo". A chave sem inversor no Nexus fica fora (o Salvar não mexeu nela), e a igual à aba também (os leitores
+    já veem o mesmo)."""
+    com_inv = {i["supervisorio_id"] for i in u["inversores"]}
+    return [s["usina_supervisorio"] for s in u["supervisorios"]
+            if not s["substitui_aba"] and s["supervisorio_id"] in com_inv
+            and not (cmp.get(s["supervisorio_id"]) or {}).get("iguais")]
+
+
 # ── a aba Equipamentos (referência) e os ativos do Fracttal ──────────────────────────────────────────────────────────
 def _tipo_linha(equip) -> str:
     e = D._txt(equip)

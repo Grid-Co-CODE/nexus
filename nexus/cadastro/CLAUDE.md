@@ -708,6 +708,16 @@ de entender para você, quando eu for fazer não vou entender nada".
   mudou. A UFV e as UG saem na chave da usina, com "Usina Supervisório" vazia quando a chave é o próprio nome de
   exibição (como 103 das 146 UFV da aba); o inversor sai sempre com a chave e com "Inversor " na frente se o nome não
   começar assim (os leitores só contam o que começa). Inversor sem chave não sai.
+- **O Salvar avisa a chave que segue com a aba (24/11/2026).** Caso: a Petrolina 2 (23/11), 12 strings por inversor
+  salvas no Nexus, a Sala de controle seguiu com as 13 da aba, porque a chave PEII não estava marcada; o Salvar disse só
+  "Salvo" (verde, 5 s), e a caixa "No lugar da aba" fica na seção Usina Supervisório, que abre fechada desde 17/11. Agora
+  o `/salvar` devolve `fora_da_aba` (`estrutura_usina.fora_da_aba`): as chaves NÃO marcadas, com inversor no Nexus e
+  diferentes da aba (ou sem comparação, quando a aba não se leu); a chave sem inversor no Nexus e a igual à aba ficam
+  fora (o Salvar não mexeu nela / os leitores já veem o mesmo). Com alguma, o aviso ganha "Atenção: a plataforma (Sala de
+  controle, tempo real), o gêmeo e as Ligações seguem lendo a aba Equipamentos em “X”...", e a tela: aviso amarelo que
+  fica até a pessoa clicar (`avisar(..., 'alerta')`), a seção Usina Supervisório aberta e a linha da chave marcada
+  (`eq-chave-fora`) até ela ser marcada. Só avisa; marcar segue decisão da pessoa. Prova:
+  `tests/test_base_equipamentos.py::test_o_salvar_avisa_quando_a_chave_salva_segue_com_a_aba` e `..._a_tela_mostra_o_aviso...`.
 - **Os leitores trocam as linhas das chaves da visão** (tiram da aba as de UFV, UG e inversor dessas chaves, pela chave
   efetiva "Usina Supervisório" ou, sem ela, "Usina", e põem as da visão; o resto segue da aba): a **plataforma**
   (`plataforma/estrutura_nexus.py`: o cadastro, o mapa do "Usina Fractall" e a disponibilidade; relê sozinha quando a

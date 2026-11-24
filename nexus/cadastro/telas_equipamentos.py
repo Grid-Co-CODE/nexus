@@ -471,8 +471,16 @@ def _salvar(srv):
     if r.get("visao_mudou"):
         aviso += f" A visão no formato da aba foi refeita ({r['visao_linhas']} linhas): os leitores pegam no próximo minuto."
     aba = E.aba_equipamentos(base, sessao)
-    return jsonify(ok=True, aviso=aviso, resumo=r["resumo"], editor=editor_dados(r["usina"]),
-                   comparacao=E.comparar_usina(r["usina"], info.get(uid), aba["chaves"]) if not aba.get("erro") else {})
+    cmp = E.comparar_usina(r["usina"], info.get(uid), aba["chaves"]) if not aba.get("erro") else {}
+    # a chave salva que a plataforma ainda lê da aba (24/11/2026, a Petrolina 2: o "Salvo" verde e a Sala sem mudar)
+    fora = E.fora_da_aba(r["usina"], cmp)
+    if fora:
+        nomes = " e ".join(", ".join(f"“{c}”" for c in fora).rsplit(", ", 1))
+        aviso += (f" Atenção: a plataforma (Sala de controle, tempo real), o gêmeo e as Ligações seguem lendo a aba "
+                  f"Equipamentos em {nomes}, e não o que está salvo aqui. Para passar a valer lá, marque “No lugar da "
+                  "aba: Sim” em Usina Supervisório e salve de novo.")
+    return jsonify(ok=True, aviso=aviso, resumo=r["resumo"], editor=editor_dados(r["usina"]), comparacao=cmp,
+                   fora_da_aba=fora)
 
 
 def _ativos():
