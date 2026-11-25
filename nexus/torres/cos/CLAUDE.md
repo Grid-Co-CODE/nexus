@@ -286,6 +286,14 @@ referência curta citada: CAB2 → Cabine 2); várias no mesmo dia, uma por linh
 `registros` e `os` dizendo quais. A normalizada sem relato não entra (o dia fica sem comentário do Nexus, e a
 Plataforma usa a linha dela). O nome da coluna não é "comentario": é nome proibido na governança (`PROIBIDAS`, texto
 pessoal), e o relato não é texto pessoal. Mexe em `nexus/dados/` (catálogo e `explica.py`): o pedido sai da área do COS.
+**Quem ganha o comentário** (`entra_no_comentario`): a Aparecida (ADT100) desde sempre; as outras usinas, a ocorrência
+que começou a partir de 10/11/2026; e **as usinas da operação assistida da Thopen** (`COMENTARIOS_DA_ASSISTIDA`, 25/11/2026,
+o dono: "todas as usinas de operação assistida precisam ficar prontas pra subir pra performance"), a partir de 01/11,
+porque a assistida só passou a ser registrada na Ronda COS em 21/11 e as de 01 a 20/11 entram depois, pelo retroativo do
+grupo dela (a 1ª leva, de 24/11: Cambé 01/11, Pacaembu 04, 07 e 16/11). Medido em 25/11: só essas três de antes de 10/11
+passam a entrar. ⚠ A linha só chega à Plataforma com a usina ligada (`usina_id`): Pacaembu (Areia Branca), Nova Iguaçu,
+Rondonópolis, Monte Aprazível, Aparecida do Taboado 3 e Sol Maior não estão no Registro mestre, e as chaves delas no
+de-para estão ignoradas desde 04/10 ("fora da operação da Grid"). Prova: `tests/test_cos_normalizacoes_banco.py`.
 
 - **De onde:** `GET <Andamento>/api/normalizacoes?desde=&limite=` (contrato `versao: 1`, a mesma chave `X-Nexus-Chave`). A
   API é **incremental**: devolve `cursor` e `mais`. O Nexus guarda em memória (`nexus/cos/normalizacoes.py`) desde o

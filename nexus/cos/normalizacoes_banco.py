@@ -88,6 +88,16 @@ ABA_COMENTARIOS = "fato_comentario_dia"
 # repetição). Mudar o corte, ou voltar com as abertas, só com o OK do dono.
 COMENTARIOS_DESDE_SEMPRE = frozenset({"ADT100"})
 COMENTARIOS_DAS_OUTRAS_DESDE = datetime(2026, 11, 10, tzinfo=timezone(timedelta(hours=-3)))
+# A OPERAÇÃO ASSISTIDA DA THOPEN (25/11/2026, o dono: "todas as usinas de operação assistida precisam ficar prontas pra
+# subir pra performance"). Até 21/11 a assistida não era registrada na Ronda COS; as ocorrências de 01 a 20/11 entram
+# DEPOIS, pelo retroativo do grupo da assistida (a 1ª leva em 24/11: Cambé 01/11, Pacaembu 04, 07 e 16/11). As de antes
+# de 10/11 ficariam fora pelo corte de cima, e a Plataforma não tem linha própria nenhuma desses dias (sem OS). Por isso
+# estas usinas ganham o comentário das ocorrências que começaram a partir de 01/11. A lista é a da Ronda COS
+# (`FORA_DO_ESCOPO_DE_OEM`) mais Cambé, Sapopema e Segredo, que eram da assistida em 01/11. Medido em 25/11: no banco,
+# só as três do retroativo de 24/11 passam a entrar; nenhuma outra linha muda.
+COMENTARIOS_DA_ASSISTIDA = frozenset({"THPN-ARA100", "THPN-ROP100", "THPN-SOM100", "THPN-ADT300", "THPN-PCB100",
+                                      "THPN-MPZ100", "THPN-NVI100", "THPN-CMB100", "THPN-SPM100", "THPN-SGD100"})
+COMENTARIOS_DA_ASSISTIDA_DESDE = datetime(2026, 11, 1, tzinfo=timezone(timedelta(hours=-3)))
 TIPO_COMENTARIOS = "snapshot_acumulado"
 GRAO_COMENTARIOS = ("1 linha = 1 usina (o código do Fracttal) × 1 dia de Brasília em que uma ocorrência da Ronda COS "
                     "tocou o horário de sol (06h às 18h)")
@@ -432,12 +442,18 @@ def _do_banco_antes(linhas_banco, desde_id: int) -> list:
 
 def entra_no_comentario(linha) -> bool:
     """A linha do fato (CAB) entra no comentário do dia? A da Aparecida (`COMENTARIOS_DESDE_SEMPRE`), sempre; a das
-    outras usinas, só a ocorrência que começou a partir de `COMENTARIOS_DAS_OUTRAS_DESDE` (10/11/2026)."""
+    usinas da operação assistida (`COMENTARIOS_DA_ASSISTIDA`), a ocorrência que começou a partir de 01/11/2026; a das
+    outras usinas, só a que começou a partir de `COMENTARIOS_DAS_OUTRAS_DESDE` (10/11/2026)."""
     r = dict(zip(CAB, linha))
-    if str(r.get("usina_codigo") or "") in COMENTARIOS_DESDE_SEMPRE:
+    cod = str(r.get("usina_codigo") or "")
+    if cod in COMENTARIOS_DESDE_SEMPRE:
         return True
     ini = AND.instante(r.get("inicio"))
-    return ini is not None and ini >= COMENTARIOS_DAS_OUTRAS_DESDE
+    if ini is None:
+        return False
+    if EQ.canon(cod) in COMENTARIOS_DA_ASSISTIDA:
+        return ini >= COMENTARIOS_DA_ASSISTIDA_DESDE
+    return ini >= COMENTARIOS_DAS_OUTRAS_DESDE
 
 
 def _base(config) -> str:

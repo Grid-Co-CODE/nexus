@@ -439,6 +439,37 @@ def test_entra_no_comentario_pelo_inicio_da_ocorrencia():
     assert not NB.entra_no_comentario(linha(usina_codigo="TSTE-AAA100", inicio=""))
 
 
+def test_a_operacao_assistida_entra_desde_01_11():
+    """25/11/2026, o dono: "todas as usinas de operação assistida precisam ficar prontas pra subir pra performance". O
+    retroativo da assistida (Cambé 01/11, Pacaembu 04 e 07/11) começou antes do corte de 10/11: estas usinas entram
+    desde 01/11; antes disso, e as outras usinas, como estavam."""
+    linha = lambda **kw: [kw.get(c, "") for c in NB.CAB]
+    assert NB.COMENTARIOS_DA_ASSISTIDA_DESDE.isoformat() == "2026-11-01T00:00:00-03:00"
+    assert {"THPN-PCB100", "THPN-CMB100", "THPN-NVI100", "THPN-ADT300"} <= NB.COMENTARIOS_DA_ASSISTIDA
+    assert NB.entra_no_comentario(linha(usina_codigo="THPN-PCB100", inicio="2026-11-04T02:22:00-03:00"))
+    assert NB.entra_no_comentario(linha(usina_codigo="THPN-CMB100", inicio="2026-11-01T17:08:00-03:00"))
+    assert NB.entra_no_comentario(linha(usina_codigo=" thpn-pcb100", inicio="2026-11-07T15:46:00-03:00"))
+    # antes de 01/11 a assistida fica fora (31/10 23:30 em Brasília); sem início, também
+    assert not NB.entra_no_comentario(linha(usina_codigo="THPN-PCB100", inicio="2026-10-31T23:30:00-03:00"))
+    assert not NB.entra_no_comentario(linha(usina_codigo="THPN-ARA100", inicio="2026-10-21T17:00:00-03:00"))
+    assert not NB.entra_no_comentario(linha(usina_codigo="THPN-PCB100", inicio=""))
+    # controle: uma usina de O&M no mesmo 04/11 continua fora (o corte de 10/11 dela não mudou)
+    assert not NB.entra_no_comentario(linha(usina_codigo="THPN-MNG100", inicio="2026-11-04T02:22:00-03:00"))
+
+
+def test_a_gravacao_leva_o_comentario_da_assistida_de_antes_de_10_11(app, banco):
+    """A ocorrência da assistida de 04/11 (o retroativo) vira linha do comentário do dia; a de O&M do mesmo dia, não."""
+    rel_pcb = "Usina desligada de 04/11 às 02:22 a 04/11 às 12:00 (9 h 38 min). Causa: atuação da proteção de frequência (81)."
+    with app.app_context():
+        NB.publicar(app.config, banco, agora=AGORA, forcar=True,
+                    leitura=_leitura([_n("r1", usina_codigo="THPN-PCB100", relato_cliente=rel_pcb,
+                                         inicio="2026-11-04T02:22:00-03:00", normalizado_em="2026-11-04T12:00:00-03:00"),
+                                      _n("r2", usina_codigo="THPN-MNG100", relato_cliente=REL,
+                                         inicio="2026-11-04T02:22:00-03:00", normalizado_em="2026-11-04T12:00:00-03:00")]))
+    gravadas = banco.linhas(NB.LIVRO, NB.ABA_COMENTARIOS)
+    assert [(g["usina_codigo"], g["dia"], g["relato_do_dia"]) for g in gravadas] == [("THPN-PCB100", "2026-11-04", rel_pcb)]
+
+
 def test_a_gravacao_leva_o_comentario_do_dia(app, banco, monkeypatch):
     monkeypatch.setattr(NB, "COMENTARIOS_DESDE_SEMPRE", frozenset({"TSTE-AAA100"}))
     with app.app_context():
