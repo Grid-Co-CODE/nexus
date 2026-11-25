@@ -318,4 +318,167 @@ def test_a_linha_do_tempo_diz_o_status_de_cada_os_e_o_finalizar_diz_que_nada_mud
     from test_engenharia_acompanhamento import ANA, _como
     html = _como(cliente, ANA).get("/t/performance/etm").get_data(as_text=True)
     assert "'— ' + o.status" in html and "'Criada no Fracttal: '" in html and "'Concluída no Fracttal: '" in html
-    assert "nada muda lá (nem o status, nem a data fim)" in html and 'id="etm-us-fim-lista"' in html
+    assert "nada muda no Fracttal (nem o status, nem a data fim)" in html and 'id="etm-us-fim-lista"' in html and 'id="etm-us-conc"' in html
+
+
+# ── concluir no Fracttal, tarefa por tarefa, antes de finalizar (25/11/2026) ─────────────────────────────────────────
+class _ApiFalsa:
+    """O `api` do clone do OS Creator dublado: as tarefas da OS, o checklist, o registro de execução e a conclusão."""
+    class SessionExpired(Exception):
+        pass
+
+    def __init__(self, tarefas, faltam=None, recusa=None):
+        self.tarefas, self.faltam, self.recusa = tarefas, faltam or {}, recusa
+        self.feito, self.concluida = [], False
+
+    def get_os_detalhes(self, wid):
+        return {"tarefas": [dict(t) for t in self.tarefas]}
+
+    def subtarefas_da_tarefa(self, tid):
+        return [{"id_form_item": 1, "obrigatorio": True, "descricao": d, "valor": ""} for d in self.faltam.get(tid, [])]
+
+    def registrar_execucao(self, tid, ini, fim, note=""):
+        if self.recusa == tid:
+            raise RuntimeError("recusado pelo Fracttal")
+        self.feito.append((tid, ini, fim))
+        for t in self.tarefas:
+            if t["id"] == tid:
+                t["inicio"], t["fim"] = ini.isoformat(), fim.isoformat()
+        return {"ok": True, "confirmado": True}
+
+    def concluir_os_checado(self, wid):
+        self.concluida = True
+        return {"ok": True, "data_fim": {}}
+
+
+class _Regra:
+    @staticmethod
+    def rotulos_tarefas(ts):
+        return {t["id"]: t.get("titulo") or "Tarefa" for t in ts}
+
+    @staticmethod
+    def faltando_obrigatorias(campos, valores):
+        return [c["descricao"] for c in campos if c.get("obrigatorio") and not c.get("valor")]
+
+    @staticmethod
+    def tarefas_sem_fim(ts):
+        return [t.get("titulo") for t in ts or [] if not str(t.get("fim") or "").strip()]
+
+
+@pytest.fixture
+def concluir(app, monkeypatch):
+    """A rota com o REST, a sessão do Fracttal e o clone do OS Creator dublados; a OS 7 aberta, criada em 20/11 15:00 UTC."""
+    import contextlib
+    import sys
+    import types
+
+    from nexus.auth import setor_telas as ST
+    from nexus.engenharia import etm_marcas as M
+    from nexus.engenharia import os_acompanhamento as O
+    from nexus.engenharia import os_equipe
+    from nexus.torres import engenharia as TE
+    from nexus.torres.oscreator import etm_concluir as EC
+    estado = {"status": "Em Processo", "marcas": [], "comentarios": []}
+    monkeypatch.setattr(os_equipe, "ler_os", lambda f: {"wid": 777, "os": str(f), "status": estado["status"],
+                                                        "codigo": "ALF100-ESTM1", "criada_iso": "2026-11-20T15:00:00+00:00",
+                                                        "ativos": [], "usina": U})
+    monkeypatch.setattr(EC, "sessao_do_os", lambda app: {"jwt": "j", "conta": {"email": "ana.lima@gridco.com.br"}})
+    monkeypatch.setattr(EC, "clone", lambda app: None)
+    monkeypatch.setattr(EC, "_primeiro_comentario", lambda wid: None)
+    monkeypatch.setattr(E, "reler_os", lambda f: True)
+    monkeypatch.setattr(M, "marcar", lambda *a, **k: estado["marcas"].append(a[1]) or {"aviso": "ok"})
+    monkeypatch.setattr(O, "registrar_comentario", lambda os_, texto, *a, **k: estado["comentarios"].append(texto))
+    monkeypatch.setattr(ST, "acesso", lambda: {"tudo": False, "telas": {"performance/etm"},
+                                               "setor": {"id": SID.PERFORMANCE, "nome": "Performance"}, "erro": ""})
+    monkeypatch.setattr(TE, "_na_etm", lambda o: o)
+    monkeypatch.setattr(TE, "_os_para_gravar", lambda o: {"wid": 777, "folio": o["os"], "codigo": "ALF100-ESTM1"})
+
+    def instalar(api):
+        sessao = types.SimpleNamespace(contexto=lambda jwt, email: contextlib.nullcontext())
+        monkeypatch.setitem(sys.modules, "api", api)
+        monkeypatch.setitem(sys.modules, "os_web", types.SimpleNamespace(os_acoes_web=_Regra, sessao=sessao))
+        monkeypatch.setitem(sys.modules, "os_web.os_acoes_web", _Regra)
+        monkeypatch.setitem(sys.modules, "os_web.sessao", sessao)
+        return api
+    estado["instalar"] = instalar
+    return estado
+
+
+URL_CONC = "/os/_nexus/etm/os/777/concluir"
+PRONTO = {"comentario": "x", "folio": "7"}
+
+
+def test_concluir_le_as_tarefas_com_o_inicio_sugerido_e_o_checklist(concluir, cliente):
+    from test_engenharia_acompanhamento import ANA, _como
+    concluir["instalar"](_ApiFalsa([{"id": 1, "titulo": "Limpar o piranômetro", "inicio": "", "fim": ""},
+                                     {"id": 2, "titulo": "Trocar o cabo", "inicio": "2026-11-21T13:00:00Z", "fim": ""},
+                                     {"id": 3, "titulo": "Conferir", "inicio": "2026-11-21T13:00:00Z",
+                                      "fim": "2026-11-21T14:00:00Z"}], faltam={2: ["Foto do cabo"]}))
+    j = _como(cliente, ANA).get(URL_CONC, query_string={"folio": "7"}).get_json()
+    t = {x["id"]: x for x in j["tarefas"]}
+    # sem início na tarefa e sem comentário: a criação da OS (20/11 15:00 UTC = 12:00 em Brasília)
+    assert t[1]["sugerido"] == "2026-11-20T12:00" and t[1]["inicio"] == "" and j["origem_inicio"] == "a criação da OS"
+    assert t[2]["inicio"] == "2026-11-21T10:00" and t[2]["faltam"] == ["Foto do cabo"]
+    assert t[3]["feita"] is True and t[3]["fim"] == "21/11/2026 11:00"
+
+
+def test_concluir_fecha_cada_tarefa_e_so_depois_conclui_e_finaliza(concluir, cliente):
+    from test_engenharia_acompanhamento import ANA, SAME, _como
+    api = concluir["instalar"](_ApiFalsa([{"id": 1, "titulo": "Limpar", "inicio": "", "fim": ""},
+                                          {"id": 2, "titulo": "Cabo", "inicio": "2026-11-21T13:00:00Z", "fim": ""}]))
+    corpo = {"folio": "7", "comentario": "Piranômetro limpo e cabo trocado",
+             "tarefas": [{"id": 1, "inicio": "2026-11-21T08:00", "fim": "2026-11-21T09:30"}, {"id": 2, "fim": "2026-11-21T11:00"}]}
+    r = _como(cliente, ANA).post(URL_CONC, json=corpo, headers=SAME)
+    assert r.status_code == 200 and r.get_json()["ok"] is True and "concluída no Fracttal" in r.get_json()["mensagem"]
+    assert [x[0] for x in api.feito] == [1, 2] and api.concluida is True
+    assert api.feito[1][1].isoformat().startswith("2026-11-21T13:00")             # o início que a tarefa já tinha fica
+    assert concluir["marcas"] == ["finalizado"]
+    assert concluir["comentarios"] == ["Finalizado pela Performance: Piranômetro limpo e cabo trocado"]
+
+
+@pytest.mark.parametrize("corpo, trecho", [
+    ({"comentario": "", "tarefas": [{"id": 1, "inicio": "2026-11-21T08:00", "fim": "2026-11-21T09:00"}]}, "obrigatório"),
+    ({"comentario": "x", "tarefas": [{"id": 1, "inicio": "2026-11-21T08:00"}]}, "falta a data fim"),
+    ({"comentario": "x", "tarefas": [{"id": 1, "inicio": "2026-11-21T08:00", "fim": "2026-11-21T07:00"}]}, "anterior ao início"),
+    ({"comentario": "x", "tarefas": [{"id": 1, "inicio": "2026-11-21T08:00", "fim": "2099-01-01T07:00"}]}, "no futuro"),
+    ({"comentario": "x", "tarefas": [{"id": 1, "inicio": "2026-10-01T08:00", "fim": "2026-11-21T09:00"}]}, "anterior à criação"),
+])
+def test_concluir_confere_tudo_antes_de_escrever(concluir, cliente, corpo, trecho):
+    from test_engenharia_acompanhamento import ANA, SAME, _como
+    api = concluir["instalar"](_ApiFalsa([{"id": 1, "titulo": "Limpar", "inicio": "", "fim": ""}]))
+    r = _como(cliente, ANA).post(URL_CONC, json=dict(corpo, folio="7"), headers=SAME)
+    assert r.status_code == 400 and trecho in r.get_json()["erro"]
+    assert api.feito == [] and api.concluida is False and concluir["marcas"] == []
+
+
+def test_concluir_nao_conclui_com_checklist_obrigatorio_em_branco(concluir, cliente):
+    from test_engenharia_acompanhamento import ANA, SAME, _como
+    api = concluir["instalar"](_ApiFalsa([{"id": 1, "titulo": "Limpar", "inicio": "", "fim": ""}], faltam={1: ["Foto"]}))
+    r = _como(cliente, ANA).post(URL_CONC, json=dict(PRONTO, tarefas=[{"id": 1, "inicio": "2026-11-21T08:00",
+                                                                       "fim": "2026-11-21T09:00"}]), headers=SAME)
+    assert r.status_code == 400 and "checklist" in r.get_json()["erro"] and api.feito == [] and not api.concluida
+
+
+def test_a_tarefa_recusada_para_tudo_e_a_os_nao_e_concluida(concluir, cliente):
+    from test_engenharia_acompanhamento import ANA, SAME, _como
+    api = concluir["instalar"](_ApiFalsa([{"id": 1, "titulo": "Limpar", "inicio": "", "fim": ""},
+                                          {"id": 2, "titulo": "Cabo", "inicio": "", "fim": ""}], recusa=2))
+    datas = {"inicio": "2026-11-21T08:00", "fim": "2026-11-21T09:00"}
+    r = _como(cliente, ANA).post(URL_CONC, json=dict(PRONTO, tarefas=[dict(datas, id=1), dict(datas, id=2)]), headers=SAME)
+    j = r.get_json()
+    assert r.status_code == 502 and "Cabo" in j["erro"] and "NÃO foi concluída" in j["erro"]
+    assert [x[0] for x in api.feito] == [1] and api.concluida is False and concluir["marcas"] == []
+
+
+def test_concluir_recusa_a_os_ja_concluida_e_quem_nao_e_da_performance(concluir, cliente, monkeypatch):
+    from test_engenharia_acompanhamento import ANA, BETO, SAME, _como
+
+    from nexus.auth import setor_telas as ST
+    concluir["instalar"](_ApiFalsa([{"id": 1, "titulo": "Limpar", "inicio": "", "fim": ""}]))
+    concluir["status"] = "Concluída"
+    r = _como(cliente, ANA).get(URL_CONC, query_string={"folio": "7"})
+    assert r.status_code == 409 and "já está concluída" in r.get_json()["erro"]
+    monkeypatch.setattr(ST, "acesso", lambda: {"tudo": False, "telas": {"performance/etm"},
+                                               "setor": {"id": SID.ENGENHARIA, "nome": "Engenharia"}, "erro": ""})
+    r = _como(cliente, BETO).post(URL_CONC, json=dict(PRONTO, tarefas=[]), headers=SAME)
+    assert r.status_code == 403

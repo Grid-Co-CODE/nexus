@@ -1965,3 +1965,8 @@ def engenharia_os_coment_editar(wid: int, cid: str):
 @bp_raiz.route("/os/_nexus/engenharia/os/<int:wid>/comentario/<cid>/apagar", methods=["POST"])
 def engenharia_os_coment_apagar(wid: int, cid: str):
     return _mudar_comentario_da_os(wid, cid, editar=False)
+
+
+# concluir a OS de ETM no Fracttal antes de finalizar pela Performance (25/11/2026): as rotas em etm_concluir.py, no mesmo
+# blueprint, porque rodam na sessão do Fracttal de quem conclui (como o comentário que vai à nota da OS, acima)
+from . import etm_concluir  # noqa: E402,F401

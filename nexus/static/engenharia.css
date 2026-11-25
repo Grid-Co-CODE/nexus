@@ -1093,3 +1093,20 @@ a.etm-tl-dem:hover{text-decoration:underline}
 .etm-tl-tag{font-size:11px;color:var(--mudo);text-transform:uppercase;letter-spacing:.04em}
 .etm-tl-t{margin:4px 0 0;font-size:13px;line-height:1.45;color:var(--tinta);white-space:pre-wrap;overflow-wrap:break-word}
 .etm-tl-m{display:block;margin-top:3px;font-size:12px;color:var(--mudo)}
+
+/* o Finalizar com as abertas no Fracttal (25/11/2026): a conclusão tarefa por tarefa, dentro da caixa do Finalizar */
+.etm-fim-bloco{display:flex;flex-direction:column;gap:6px;padding-top:10px;border-top:1px solid var(--linha)}
+.etm-fim-bloco h4{margin:0;font:700 12px/1.3 var(--font-sans);color:var(--tinta);text-transform:uppercase;letter-spacing:.04em}
+.etm-conc-lista{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.etm-conc{padding:8px 10px;border-radius:10px;border:1px solid var(--linha);background:var(--superficie)}
+.etm-conc-cab{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px}
+.etm-conc-tit{min-width:0;font-size:12.5px;color:var(--tinta-2)}
+.etm-conc-corpo{display:flex;flex-direction:column;gap:8px;margin-top:8px}
+.etm-conc-corpo[hidden]{display:none}
+.etm-conc-t{display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:end;gap:6px 10px;padding:6px 0;border-top:1px dashed var(--linha)}
+.etm-conc-nome{font-size:12.5px;font-weight:600;color:var(--tinta);overflow-wrap:break-word}
+.etm-conc-c{display:flex;flex-direction:column;gap:3px}
+.etm-conc-ok{font-size:12px;color:var(--ok)}
+.etm-conc-falta{grid-column:1/-1;font-size:12px;color:var(--critico)}
+@media (max-width:640px){.etm-conc-t{grid-template-columns:minmax(0,1fr)}}
+

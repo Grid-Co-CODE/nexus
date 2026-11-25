@@ -151,11 +151,24 @@
       <button type="button" class="gc-btn gc-btn--contorno" id="etm-us-hist"><i class="ph ph-clock-counter-clockwise" aria-hidden="true"></i>Todas as OS</button>
     </div>
     {% if pode %}<form class="etm-chat-novo etm-us-fim" id="etm-us-fim" hidden>
-      <p class="etm-fim-o-que">Encerra o acompanhamento da Performance destas OS, que já estão concluídas no Fracttal: nada muda lá (nem o status, nem a data fim).</p>
-      <ul class="etm-fim-lista" id="etm-us-fim-lista"></ul>
       <label class="gc-rotulo" for="etm-us-fim-txt" id="etm-us-fim-rot">Comentário do Finalizar (obrigatório)</label>
       <textarea class="gc-campo eg-tl-obs" id="etm-us-fim-txt" rows="3" maxlength="2000" required placeholder="O que foi feito ou visto na ETM: fica na linha do tempo, com o seu nome"></textarea>
-      <div class="etm-chat-acoes"><button type="submit" class="gc-btn gc-btn--primario" id="etm-us-fim-ok">Finalizar</button><button type="button" class="etm-lnk" id="etm-us-fim-nao">Cancelar</button></div>
+      <div class="etm-fim-bloco" id="etm-us-fim-a">
+        <h4>Já concluídas no Fracttal</h4>
+        <p class="etm-fim-o-que">Saem só do acompanhamento da Performance: nada muda no Fracttal (nem o status, nem a data fim).</p>
+        <ul class="etm-fim-lista" id="etm-us-fim-lista"></ul>
+        <div class="etm-chat-acoes"><button type="submit" class="gc-btn gc-btn--primario" id="etm-us-fim-ok">Finalizar</button></div>
+      </div>
+      {# as abertas no Fracttal (25/11/2026, Levi: "para essas que a gente for finalizar pela performance e não tiver o S
+         concluído ainda, a gente pode fazer esse trabalho de concluir [...] a data fim de tarefa de um por um [...] não pode
+         concluir sem terminar a tarefa"): o Concluir lê as tarefas na sessão do Fracttal da pessoa e pede a data fim de
+         cada uma (`nexus/torres/oscreator/etm_concluir.py`) #}
+      <div class="etm-fim-bloco" id="etm-us-fim-b">
+        <h4>Abertas no Fracttal</h4>
+        <p class="etm-fim-o-que">Concluir fecha cada tarefa com a data fim que você puser, conclui a OS no Fracttal e finaliza pela Performance.</p>
+        <ul class="etm-conc-lista" id="etm-us-conc"></ul>
+      </div>
+      <div class="etm-chat-acoes"><button type="button" class="etm-lnk" id="etm-us-fim-nao">Cancelar</button></div>
     </form>{% endif %}
     <p class="eg-pdf-msg" id="etm-us-msg" role="status" hidden></p>
     {# comentar nas OS da usina sem abrir cada uma (24/11/2026): o mesmo caminho da página da OS (a ponte do OS Creator, que
@@ -634,11 +647,11 @@
       plural(todas.length, 'OS', 'OS') + ' no Fracttal', abertas == null ? '' : plural(abertas.length, 'aberta', 'abertas') + ' para a Performance',
       t && abertas && abertas.length ? 'a mais antiga: ' + t.txt : ''].filter(Boolean).join(' · ');
     if (usFin) {
-      var n = D.sem_marcas ? 0 : paraFinalizar(todas).length;
+      var n = D.sem_marcas ? 0 : paraFinalizar(todas).length + abertasFracttal(todas).length;
       usFin.disabled = enviando || !n;
       usFin.querySelector('span').textContent = 'Finalizar pela Performance' + (n ? ' (' + n + ')' : '');
-      usFin.title = n ? 'Marca as ' + n + ' OS finalizadas no Fracttal (sem diagnóstico nem o finalizado) como Finalizado pela Performance'
-        : 'Nenhuma OS fechada no Fracttal esperando a Performance nesta usina';
+      usFin.title = n ? 'As OS que a Performance acompanha: as concluídas no Fracttal saem do acompanhamento; as abertas lá são concluídas antes, tarefa por tarefa'
+        : 'Nenhuma OS esperando a Performance nesta usina';
     }
   }
   function abrirUsina(nome, botao) {
@@ -678,19 +691,116 @@
   // o Finalizar pela Performance pede o comentário (25/11/2026, Levi: "deve ser obrigatório, eu coloco um comentário"): o
   // botão abre a caixa; o comentário vai para cada OS finalizada e fica na linha do tempo, com quem finalizou
   var usFim = document.getElementById('etm-us-fim'), usFimTxt = document.getElementById('etm-us-fim-txt');
+  // as OS abertas no Fracttal que a Performance ainda acompanha: o Finalizar delas conclui lá antes (25/11/2026)
+  function abertasFracttal(lista) {
+    return lista.filter(function (o) { return (o.coluna === 'nao_iniciada' || o.coluna === 'em_andamento') && !o.finalizado && !o.diagnostico && o.wid; });
+  }
+  function brDia(d) { return d ? d.slice(8, 10) + '/' + d.slice(5, 7) + '/' + d.slice(0, 4) : ''; }
   if (usFin) usFin.addEventListener('click', function () {
-    var n = paraFinalizar(osDaUsina(usNome)).length;
-    if (!n || enviando) return;
-    document.getElementById('etm-us-fim-rot').textContent = 'Comentário do Finalizar das ' + plural(n, 'OS', 'OS') + ' (obrigatório)';
-    var br = function (d) { return d ? d.slice(8, 10) + '/' + d.slice(5, 7) + '/' + d.slice(0, 4) : ''; };
-    preencher(document.getElementById('etm-us-fim-lista'), paraFinalizar(osDaUsina(usNome)).map(function (o) {
+    var todas = osDaUsina(usNome), a = paraFinalizar(todas), b = abertasFracttal(todas);
+    if ((!a.length && !b.length) || enviando) return;
+    document.getElementById('etm-us-fim-a').hidden = !a.length;
+    document.getElementById('etm-us-fim-ok').textContent = 'Finalizar ' + plural(a.length, 'OS concluída', 'OS concluídas');
+    preencher(document.getElementById('etm-us-fim-lista'), a.map(function (o) {
       var li = el('li'); li.appendChild(el('b', null, 'OS ' + o.os));
-      li.appendChild(document.createTextNode(' — ' + (o.status || 'Concluída') + ' no Fracttal' + (o.fim_dia ? ', data fim ' + br(o.fim_dia) : '') + ' · ' + (o.titulo || '')));
+      li.appendChild(document.createTextNode(' — ' + (o.status || 'Concluída') + ' no Fracttal' + (o.fim_dia ? ', data fim ' + brDia(o.fim_dia) : '') + ' · ' + (o.titulo || '')));
       return li;
     }));
-    document.getElementById('etm-us-fim-ok').textContent = 'Finalizar ' + plural(n, 'OS', 'OS');
+    document.getElementById('etm-us-fim-b').hidden = !b.length;
+    preencher(document.getElementById('etm-us-conc'), b.map(linhaConcluir));
     usFim.hidden = false; usFimTxt.focus();
   });
+  function urlConcluir(o) { return nexusRota('/os/_nexus/etm/os/' + encodeURIComponent(o.wid) + '/concluir'); }
+  function comJson(r) { return r.json().catch(function () { return {}; }).then(function (j) { return {r: r, j: j}; }); }
+  function agoraCampo() {
+    var d = new Date(), p = function (n) { return (n < 10 ? '0' : '') + n; };
+    return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + 'T' + p(d.getHours()) + ':' + p(d.getMinutes());
+  }
+  function textoErro(x) {
+    var p = el('p', 'eg-os-msg eg-os-msg--ruim', x.j.erro || ('HTTP ' + x.r.status));
+    if (x.j.login) { var a = el('a', '', 'Entrar pelo Fracttal'); a.href = x.j.login; p.appendChild(document.createTextNode(' ')); p.appendChild(a); }
+    return p;
+  }
+  function linhaConcluir(o) {
+    var li = el('li', 'etm-conc'), cab = el('div', 'etm-conc-cab');
+    var tit = el('span', 'etm-conc-tit'); tit.appendChild(el('b', null, 'OS ' + o.os));
+    tit.appendChild(document.createTextNode(' — ' + (o.status || 'Em Processo') + ' no Fracttal · ' + (o.titulo || '')));
+    var bt = el('button', 'gc-btn gc-btn--contorno', 'Concluir no Fracttal'); bt.type = 'button';
+    cab.appendChild(tit); cab.appendChild(bt); li.appendChild(cab);
+    var corpo = el('div', 'etm-conc-corpo'); corpo.hidden = true; li.appendChild(corpo);
+    bt.addEventListener('click', function () {
+      if (!corpo.hidden) { corpo.hidden = true; return; }
+      corpo.hidden = false; carregarTarefas(o, corpo);
+    });
+    return li;
+  }
+  // as tarefas da OS, lidas no Fracttal na sessão da pessoa: o início (o da tarefa, senão o sugerido) e o fim obrigatório
+  // de cada uma que ainda não tem fim; o checklist obrigatório sem resposta trava o Concluir
+  function carregarTarefas(o, corpo) {
+    preencher(corpo, [el('p', 'eg-dica', 'Lendo as tarefas no Fracttal…')]);
+    fetch(urlConcluir(o) + '?folio=' + encodeURIComponent(o.os), {credentials: 'same-origin', headers: {'Accept': 'application/json'}})
+      .then(comJson)
+      .then(function (x) {
+        if (!x.r.ok) { preencher(corpo, [textoErro(x)]); return; }
+        var itens = [el('p', 'eg-dica', 'A data fim de cada tarefa é obrigatória. Sem início no Fracttal, o sugerido vem de ' + x.j.origem_inicio + ' (pode mudar).')];
+        var trava = false;
+        x.j.tarefas.forEach(function (t) {
+          var row = el('div', 'etm-conc-t'); row.dataset.id = t.id;
+          row.appendChild(el('span', 'etm-conc-nome', t.rotulo));
+          if (t.feita) { row.appendChild(el('span', 'etm-conc-ok', 'já tem fim no Fracttal (' + t.fim + ')')); itens.push(row); return; }
+          var c1 = el('label', 'etm-conc-c'); c1.appendChild(el('span', 'gc-rotulo', 'Início'));
+          var ini = el('input', 'gc-campo'); ini.type = 'datetime-local'; ini.value = t.inicio || t.sugerido; ini.dataset.k = 'inicio';
+          if (t.inicio) { ini.readOnly = true; ini.title = 'O início que a tarefa já tem no Fracttal'; }
+          c1.appendChild(ini); row.appendChild(c1);
+          var c2 = el('label', 'etm-conc-c'); c2.appendChild(el('span', 'gc-rotulo', 'Fim (obrigatório)'));
+          var fim = el('input', 'gc-campo'); fim.type = 'datetime-local'; fim.required = true; fim.dataset.k = 'fim'; fim.max = agoraCampo();
+          c2.appendChild(fim); row.appendChild(c2);
+          if (t.faltam.length) {
+            trava = true;
+            row.appendChild(el('span', 'etm-conc-falta', 'Checklist obrigatório sem resposta: ' + t.faltam.slice(0, 3).join(', ') + '. Responda na página da OS antes.'));
+          }
+          itens.push(row);
+        });
+        var acoes = el('div', 'etm-chat-acoes'), msg = el('p', 'eg-pdf-msg'); msg.hidden = true;
+        var ok = el('button', 'gc-btn gc-btn--primario', 'Concluir a OS ' + o.os + ' e finalizar'); ok.type = 'button'; ok.disabled = trava;
+        var link = el('a', 'etm-lnk', 'Abrir a OS'); link.href = paginaOs(o);
+        acoes.appendChild(ok); acoes.appendChild(link);
+        itens.push(acoes); itens.push(msg);
+        preencher(corpo, itens);
+        ok.addEventListener('click', function () { concluirNoFracttal(o, corpo, ok, msg); });
+      })
+      .catch(function () { preencher(corpo, [el('p', 'eg-os-msg eg-os-msg--ruim', 'Não consegui falar com o Nexus. Tente de novo.')]); });
+  }
+  function concluirNoFracttal(o, corpo, ok, msg) {
+    var texto = usFimTxt.value.trim(), daUsina = usNome;
+    function diz(txt, ruim, x) {
+      msg.replaceChildren(document.createTextNode(txt));
+      if (x && x.j && x.j.login) { var a = el('a', '', 'Entrar pelo Fracttal'); a.href = x.j.login; msg.appendChild(document.createTextNode(' ')); msg.appendChild(a); }
+      msg.hidden = false; msg.classList.toggle('eg-os-msg--ruim', !!ruim);
+    }
+    if (!texto) { diz('Escreva o comentário do Finalizar, lá em cima: ele é obrigatório.', true); usFimTxt.focus(); return; }
+    var tarefas = [], falta = '';
+    corpo.querySelectorAll('.etm-conc-t').forEach(function (row) {
+      var i = row.querySelector('[data-k="inicio"]'), f = row.querySelector('[data-k="fim"]');
+      if (!f) return;
+      if (!f.value && !falta) falta = row.querySelector('.etm-conc-nome').textContent;
+      tarefas.push({id: row.dataset.id, inicio: i ? i.value : '', fim: f.value});
+    });
+    if (falta) { diz('Falta a data fim da tarefa "' + falta + '".', true); return; }
+    if (!confirm('Concluir a OS ' + o.os + ' no Fracttal? Cada tarefa fecha com a data fim que você pôs e a OS fica concluída lá. Não dá para desfazer pelo Nexus.')) return;
+    ok.disabled = true; diz('Concluindo no Fracttal…');
+    fetch(urlConcluir(o), {method: 'POST', credentials: 'same-origin', headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
+                           body: JSON.stringify({folio: String(o.os), comentario: texto, tarefas: tarefas})})
+      .then(comJson)
+      .then(function (x) {
+        if (!x.r.ok) { ok.disabled = false; diz(x.j.erro || ('HTTP ' + x.r.status), true, x); return; }
+        o.coluna = 'finalizada'; o.status = 'Concluída'; o.finalizado = true; o.eng_fim_dia = D.hoje; o.fim_dia = D.hoje;
+        usFimTxt.value = ''; usFim.hidden = true;
+        desenha(); cabUsina(daUsina);
+        if (!usGav.hidden && usNome === daUsina) { dizerUs(x.j.mensagem || ('OS ' + o.os + ' concluída.')); lerComentarios(daUsina); }
+      })
+      .catch(function () { ok.disabled = false; diz('Não consegui falar com o Nexus: confira a OS no Fracttal antes de tentar de novo.', true); });
+  }
   if (usFim) {
     document.getElementById('etm-us-fim-nao').addEventListener('click', function () { usFim.hidden = true; usFin.focus(); });
     usFim.addEventListener('submit', function (ev) {

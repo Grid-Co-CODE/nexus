@@ -202,6 +202,17 @@ Garantias e as ETMs). O endereço antigo `/t/engenharia/etm/...` responde 308 pa
   mesmo. Concluir no Fracttal daqui (com a data fim da atividade, para não sujar o dado do PCM) é outra decisão, em aberto.
 - **O status de cada OS na linha do tempo** ("OS 123 — Concluída", na cor do status), e "Criada no Fracttal" / "Concluída
   no Fracttal" no lugar de "Aberta" / "Finalizada" (Levi: "tem OS que tem no início ele finalizada, aberta").
+- **Concluir no Fracttal as abertas lá** (25/11/2026, Levi: "para essas que a gente for finalizar pela performance e não
+  tiver o S concluído ainda, a gente pode fazer esse trabalho de concluir [...] a data fim de tarefa de um por um [...] não
+  pode concluir sem terminar a tarefa"): o Finalizar da gaveta mostra também as OS abertas no Fracttal, cada uma com o
+  Concluir no Fracttal, que lê as tarefas na sessão do Fracttal da pessoa e pede a data fim de cada uma (o início: o da
+  tarefa; sem ele, o 1º comentário da OS no Nexus; sem comentário, a criação da OS; editável). A rota é
+  `nexus/torres/oscreator/etm_concluir.py` (`/os/_nexus/etm/os/<id>/concluir`, no blueprint da ponte), com as funções do
+  card do OS Creator (`registrar_execucao`, `concluir_os_checado`); confere tudo antes de escrever (quem pode, o
+  comentário, o checklist obrigatório respondido, fim depois do início, não no futuro, início não antes da criação), fecha
+  as tarefas uma a uma, relê e só conclui sem nenhuma tarefa sem fim; a recusa no meio para tudo e diz qual (a OS não é
+  concluída). Concluída lá, finaliza pela Performance com o comentário. Prova: `tests/test_performance_etm.py` (o `api`
+  dublado: as travas, a ordem e a parada no meio).
 - **O seletor Por ETM | Por OS** (Levi: "por que que esse botão de ETMs e OS, ele é tão pequeno e feio"): o segmentado do
   Nexus do tamanho dos botões da tela (34 px), com o ícone e a conta de cada visão; `.etm-ab-modo` no `engenharia.css`.
 - **Prova:** `tests/test_performance_etm.py` (a cópia, a OS relida, os endereços antigos, o menu, a gaveta, a Nova demanda

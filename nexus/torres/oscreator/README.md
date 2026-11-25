@@ -3485,3 +3485,10 @@ quatro fabricantes (três com cara de pessoa).
   --termos <json fora do repositório>` e `RESERVADO` no `CANAL`. O canal digitado no Controle de fornecedores vai para a
   aba `chamado_modelos` em claro, como sempre foi: endereço de e-mail não se digita ali.
 - Prova: `tests/test_oscreator_canal_reservado_19_11.py`.
+
+## Concluir a OS de ETM pela tela ETMs (25/11/2026)
+
+`etm_concluir.py` (rota `/os/_nexus/etm/os/<id>/concluir`, no `bp_raiz` da ponte): a Performance conclui no Fracttal a OS
+de ETM ainda aberta lá, na sessão do Fracttal da pessoa, fechando cada tarefa com a data fim que ela põe
+(`registrar_execucao`) e só então `concluir_os_checado`. Regras no CLAUDE.md da torre Performance, seção "ETMs".
+
