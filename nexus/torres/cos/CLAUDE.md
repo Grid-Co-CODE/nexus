@@ -286,12 +286,14 @@ referência curta citada: CAB2 → Cabine 2); várias no mesmo dia, uma por linh
 `registros` e `os` dizendo quais. A normalizada sem relato não entra (o dia fica sem comentário do Nexus, e a
 Plataforma usa a linha dela). O nome da coluna não é "comentario": é nome proibido na governança (`PROIBIDAS`, texto
 pessoal), e o relato não é texto pessoal. Mexe em `nexus/dados/` (catálogo e `explica.py`): o pedido sai da área do COS.
-**Quem ganha o comentário** (`entra_no_comentario`): a Aparecida (ADT100) desde sempre; as outras usinas, a ocorrência
-que começou a partir de 10/11/2026; e **as usinas da operação assistida da Thopen** (`COMENTARIOS_DA_ASSISTIDA`, 25/11/2026,
-o dono: "todas as usinas de operação assistida precisam ficar prontas pra subir pra performance"), a partir de 01/11,
-porque a assistida só passou a ser registrada na Ronda COS em 21/11 e as de 01 a 20/11 entram depois, pelo retroativo do
-grupo dela (a 1ª leva, de 24/11: Cambé 01/11, Pacaembu 04, 07 e 16/11). Medido em 25/11: só essas três de antes de 10/11
-passam a entrar. ⚠ A linha só chega à Plataforma com a usina ligada (`usina_id`): Pacaembu (Areia Branca), Nova Iguaçu,
+**Quem ganha o comentário** (`entra_no_comentario`, 25/11/2026 à tarde): **todas as usinas, em todo dia a partir de
+01/10/2026** (`COMENTARIOS_DESDE`, o começo da memória), de toda ocorrência normalizada que tocou o sol do dia, também a
+que começou antes (a 16956 de Ribeirão Cascalheiras, de 09/09 a 12/11, leva o relato em 01/10 e a continuação depois).
+Antes era a Aparecida (ADT100) desde sempre, as outras usinas só com a ocorrência que começou a partir de 10/11 e a
+operação assistida a partir de 01/11. O relatório de outubro da Thopen saiu com o comentário em branco (Pharma II,
+Santana do Ipanema) ou errado (Inhapi: "Desligamento Cabine 2" no que a Ronda COS tem como QGBT 2 e SKID 2), porque sem a
+linha do Nexus a Plataforma monta o comentário sozinha, e só do desligamento. O dono: "Sim, subir hoje". Medido em 25/11:
+1.092 dias novos (842 de outubro e 250 de 01 a 09/11), em 81 usinas. ⚠ A linha só chega à Plataforma com a usina ligada (`usina_id`): Pacaembu (Areia Branca), Nova Iguaçu,
 Rondonópolis, Monte Aprazível, Aparecida do Taboado 3 e Sol Maior não estão no Registro mestre, e as chaves delas no
 de-para estão ignoradas desde 04/10 ("fora da operação da Grid"). Prova: `tests/test_cos_normalizacoes_banco.py`.
 

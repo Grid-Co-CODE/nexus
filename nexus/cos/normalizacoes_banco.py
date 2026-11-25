@@ -81,23 +81,19 @@ CAB_ABERTA = ("registro", "os", "cliente", "usina_codigo", "usina_id", "usina_li
 ABA_COMENTARIOS = "fato_comentario_dia"
 # QUEM GANHA O COMENTÁRIO. 09/11/2026: só a Aparecida do Taboado — o dono, ao ver na Plataforma as abertas antigas
 # repetidas em todo dia da Mandaguaçu: "VOLTA TUDO AO NORMAL URGENTE" e "deixe somente as de aparecida do taboado".
-# 10/11/2026: TODAS AS USINAS, com o texto do Haiku que a Ronda COS passou a mandar no `relato_cliente` (o dono aprovou
-# as simulações e escolheu: todas, automático, de hoje em diante). As outras usinas só com as ocorrências que COMEÇARAM
-# a partir de `COMENTARIOS_DAS_OUTRAS_DESDE`: os dias de antes delas continuam sem linha, e a Plataforma usa a linha
-# dela, como estava. A Aparecida continua desde o começo da memória. As ABERTAS seguem fora de todas (era delas a
-# repetição). Mudar o corte, ou voltar com as abertas, só com o OK do dono.
-COMENTARIOS_DESDE_SEMPRE = frozenset({"ADT100"})
-COMENTARIOS_DAS_OUTRAS_DESDE = datetime(2026, 11, 10, tzinfo=timezone(timedelta(hours=-3)))
-# A OPERAÇÃO ASSISTIDA DA THOPEN (25/11/2026, o dono: "todas as usinas de operação assistida precisam ficar prontas pra
-# subir pra performance"). Até 21/11 a assistida não era registrada na Ronda COS; as ocorrências de 01 a 20/11 entram
-# DEPOIS, pelo retroativo do grupo da assistida (a 1ª leva em 24/11: Cambé 01/11, Pacaembu 04, 07 e 16/11). As de antes
-# de 10/11 ficariam fora pelo corte de cima, e a Plataforma não tem linha própria nenhuma desses dias (sem OS). Por isso
-# estas usinas ganham o comentário das ocorrências que começaram a partir de 01/11. A lista é a da Ronda COS
-# (`FORA_DO_ESCOPO_DE_OEM`) mais Cambé, Sapopema e Segredo, que eram da assistida em 01/11. Medido em 25/11: no banco,
-# só as três do retroativo de 24/11 passam a entrar; nenhuma outra linha muda.
-COMENTARIOS_DA_ASSISTIDA = frozenset({"THPN-ARA100", "THPN-ROP100", "THPN-SOM100", "THPN-ADT300", "THPN-PCB100",
-                                      "THPN-MPZ100", "THPN-NVI100", "THPN-CMB100", "THPN-SPM100", "THPN-SGD100"})
-COMENTARIOS_DA_ASSISTIDA_DESDE = datetime(2026, 11, 1, tzinfo=timezone(timedelta(hours=-3)))
+# 10/11/2026: todas as usinas, só com as ocorrências que começaram a partir de 10/11 (o texto do Haiku aprovado, "de hoje
+# em diante"). 25/11/2026, de manhã: as usinas da operação assistida a partir de 01/11 (o retroativo do grupo dela).
+# 25/11/2026, à tarde: TODAS AS USINAS DESDE 01/10, PELO DIA. A Thopen cobrou o relatório de outubro com dias de
+# disponibilidade baixa e o comentário em branco (Pharma II, Santana do Ipanema) ou errado (Inhapi: "Desligamento Cabine
+# 2" no que a Ronda COS tem como QGBT 2 e SKID 2). Sem a linha do Nexus, a Plataforma monta o comentário sozinha, só com o
+# tipo, as horas, a proteção e a OS, e só do desligamento: a falha de comunicação e o cadastro retroativo ficavam sem
+# texto. O dono ("Sim, subir hoje"): o texto da Ronda COS vai para todo dia a partir de 01/10 (o começo da memória,
+# `NO.PRIMEIRO_MES`) de toda ocorrência normalizada que tocou o sol desse dia, também da que começou antes (a 16956 de
+# Ribeirão Cascalheiras, de 09/09 a 12/11, leva o relato em 01/10 e a continuação nos dias seguintes). Medido em 25/11
+# no banco da Thopen: 1.092 dias novos (842 de outubro e 250 de 01 a 09/11), em 81 usinas; dos 229 dias de outubro em
+# que a Thopen deu menos de 100% sem parada nossa, 91 passam a ter texto. A Aparecida e a assistida deixam de ser
+# exceção. As ABERTAS seguem fora (era delas a repetição). Mudar o corte, ou voltar com as abertas, só com o OK do dono.
+COMENTARIOS_DESDE = datetime(2026, 10, 1, tzinfo=timezone(timedelta(hours=-3)))
 TIPO_COMENTARIOS = "snapshot_acumulado"
 GRAO_COMENTARIOS = ("1 linha = 1 usina (o código do Fracttal) × 1 dia de Brasília em que uma ocorrência da Ronda COS "
                     "tocou o horário de sol (06h às 18h)")
@@ -441,19 +437,14 @@ def _do_banco_antes(linhas_banco, desde_id: int) -> list:
 
 
 def entra_no_comentario(linha) -> bool:
-    """A linha do fato (CAB) entra no comentário do dia? A da Aparecida (`COMENTARIOS_DESDE_SEMPRE`), sempre; a das
-    usinas da operação assistida (`COMENTARIOS_DA_ASSISTIDA`), a ocorrência que começou a partir de 01/11/2026; a das
-    outras usinas, só a que começou a partir de `COMENTARIOS_DAS_OUTRAS_DESDE` (10/11/2026)."""
+    """A linha do fato (CAB) entra no comentário do dia? A de qualquer usina que ainda toca um dia a partir de
+    `COMENTARIOS_DESDE` (01/10/2026): pela volta e, sem ela, pelo início. Sem início não entra. Os dias de antes do corte
+    saem pelo `desde` de `comentarios_do_dia` (ver `publicar`)."""
     r = dict(zip(CAB, linha))
-    cod = str(r.get("usina_codigo") or "")
-    if cod in COMENTARIOS_DESDE_SEMPRE:
-        return True
-    ini = AND.instante(r.get("inicio"))
-    if ini is None:
+    if AND.instante(r.get("inicio")) is None:
         return False
-    if EQ.canon(cod) in COMENTARIOS_DA_ASSISTIDA:
-        return ini >= COMENTARIOS_DA_ASSISTIDA_DESDE
-    return ini >= COMENTARIOS_DAS_OUTRAS_DESDE
+    quando = AND.instante(r.get("normalizado_em")) or AND.instante(r.get("inicio"))
+    return quando >= COMENTARIOS_DESDE
 
 
 def _base(config) -> str:
@@ -529,7 +520,8 @@ def publicar(config, sessao=None, *, agora=None, forcar=False, leitura=None, abe
         # a fotografia não veio: o retrato de antes fica, com a hora dele (o livro é trocado inteiro a cada gravação)
         ab = [[r.get(c, "") for c in CAB_ABERTA] for r in livros.ler(base, s, LIVRO, ABA_ABERTAS) if r.get("registro")]
         ab_em = next((str(r.get("abertas_em") or "") for r in livros.ler(base, s, LIVRO, "atualizacao")), "")
-    comentarios = comentarios_do_dia([l for l in todas if entra_no_comentario(l)], [], agora, desde)
+    comentarios = comentarios_do_dia([l for l in todas if entra_no_comentario(l)], [], agora,
+                                     max(desde, COMENTARIOS_DESDE))
     rel["comentarios_dias"] = len(comentarios)
     atu = [agora.isoformat(timespec="seconds"), len(todas), desde.date().isoformat(), rel["ligadas"] + sum(
         1 for l in antes if l[5]), ab_em, len(ab)]
