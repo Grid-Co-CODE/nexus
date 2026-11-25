@@ -14,7 +14,7 @@ você fizer vai ficar fácil de entender para você, quando eu for fazer não vo
 a tela ordena as opções (as parecidas primeiro, com o porquê escrito) e quem escolhe é a pessoa; o "Trazer da aba"
 preenche um rascunho, e só o Salvar grava.
 
-Só administrador (o Registro mestre e a gravação no banco). Os POST são da própria página (`_de_outro_site`, a régua da
+O administrador e, desde 25/11/2026, o setor Performance (`pode_abrir`; a tela virou "Metas e equipamentos"). Os POST são da própria página (`_de_outro_site`, a régua da
 moldura e da aba Pessoas e setores (Base → Acessos)); o Salvar da estrutura vai por fetch com JSON e devolve o estado novo (os IDs novos),
 sem recarregar (a lista de inversores de uma usina grande passa de 40 linhas: recarregar perdia a rolagem).
 """
@@ -36,7 +36,7 @@ from . import banco as B
 from . import estrutura_usina as E
 from . import ligacoes as L
 from . import depara_fontes as DF
-from .telas import _quem, _tela
+from .telas import SemCadastro, _quem, servico
 from ..dados.conexao import banco as _banco
 from ..auth.sessao import email_da_sessao as _meu_email
 from ..auth.origem import de_outro_site as _de_outro_site
@@ -606,7 +606,7 @@ def _ativos():
 # O "Modo de-para" do tempo real e a Base · De-para de equipamentos (telas da plataforma de Performance, abertas dentro do
 # Nexus pela porta única, na MESMA origem) leem e gravam a estrutura por aqui. O livro é do Nexus: a troca integral sob
 # a trava deste processo não aceita um segundo escritor, então a plataforma manda só o remendo e o Nexus calcula o kWp
-# com o Registro mestre DESTA máquina (o mesmo que a tela Equipamentos mostra). Só administrador (`_tela`), só da mesma
+# com o Registro mestre DESTA máquina (o mesmo que a tela Equipamentos mostra). Quem abre a tela (`pode_abrir`), só da mesma
 # origem (`_de_outro_site`, inclusive o GET: é a rota que o fetch da página chama), JSON nos dois sentidos. O formato é o
 # contrato com a plataforma: `nexus/cadastro/CLAUDE.md`, seção "De-para do tempo real".
 def _recusa_json(motivo: str, status: int, usina_id=None, usina_supervisorio: str = ""):
@@ -799,65 +799,100 @@ def _passe_ligar():
     return r
 
 
+TELA = "base/equipamentos"
+
+
+def pode_abrir() -> bool:
+    """Quem abre (e grava) Metas e equipamentos: o administrador e, desde 25/11/2026, quem tem a tela liberada no setor
+    (`setor_telas.acesso`): o dono é o setor Performance (`Tela.do_setor`), e Base → Acessos pode marcá-la para outro.
+    Levi, 25/11/2026: "Expõe as 43 usinas de fora para o time de Performance" e "a pessoa clica, ela vai poder ver as
+    metas das usinas, vai poder ver os equipamentos das usinas e vai poder fazer o de para ali". Até ali, só administrador
+    (o `_tela` do cadastro). O portão por setor desligado não abre para quem não é administrador (sem setor, sem tela)."""
+    if session.get("admin"):
+        return True
+    from ..auth import setor_telas as ST
+    ac = ST.acesso()
+    return bool(ac.get("setor")) and TELA in (ac.get("telas") or set())
+
+
+def _tela_aberta(titulo):
+    """O `_tela` do cadastro (cadastro ligado; sem a chave, a tela diz o que falta) com o portão de `pode_abrir`."""
+    from functools import wraps
+
+    def deco(fn):
+        @wraps(fn)
+        def envolta(*a, **k):
+            if not pode_abrir():
+                return render_template("cadastro/sem_permissao.html", titulo=titulo,
+                                       email=(session.get("usuario") or {}).get("email", "")), 403
+            try:
+                srv = servico()
+            except SemCadastro as e:
+                return render_template("cadastro/sem_chave.html", titulo=titulo, motivo=str(e))
+            return fn(srv, *a, **k)
+        return envolta
+    return deco
+
+
 def registrar_equipamentos(bp) -> None:
     """Pendura a tela na torre Base (`/t/base/equipamentos`), vencendo o placeholder, e as ações dela."""
     bp.record_once(lambda estado: _virar_ao_subir(estado.app))
     @bp.route("/equipamentos")
-    @_tela(TITULO)
+    @_tela_aberta(TITULO)
     def equipamentos(srv):
         return render_template("cadastro/equipamentos.html", **contexto(srv, current_app.config, request.args))
 
     @bp.route("/equipamentos/fracttal", methods=["POST"])
-    @_tela(TITULO)
+    @_tela_aberta(TITULO)
     def equipamentos_fracttal(srv):
         return _ligar_fracttal(srv)
 
     @bp.route("/equipamentos/chave", methods=["POST"])
-    @_tela(TITULO)
+    @_tela_aberta(TITULO)
     def equipamentos_chave(srv):
         return _chave(srv)
 
     @bp.route("/equipamentos/visao", methods=["POST"])
-    @_tela(TITULO)
+    @_tela_aberta(TITULO)
     def equipamentos_visao(srv):
         return _visao(srv)
 
     @bp.route("/equipamentos/ligar-aba", methods=["POST"])
-    @_tela(TITULO)
+    @_tela_aberta(TITULO)
     def equipamentos_ligar_aba(srv):
         return _ligar_aba(srv)
 
     @bp.route("/equipamentos/salvar", methods=["POST"])
-    @_tela(TITULO)
+    @_tela_aberta(TITULO)
     def equipamentos_salvar(srv):
         return _salvar(srv)
 
     @bp.route("/equipamentos/ativos")
-    @_tela(TITULO)
-    def equipamentos_ativos(srv):  # noqa: ARG001 — o decorador garante administrador e cadastro
+    @_tela_aberta(TITULO)
+    def equipamentos_ativos(srv):  # noqa: ARG001 — o decorador garante o acesso e o cadastro
         return _ativos()
 
     @bp.route("/equipamentos/depara/estado")
-    @_tela(TITULO)
+    @_tela_aberta(TITULO)
     def equipamentos_depara_estado(srv):
         return _depara_estado(srv)
 
     @bp.route("/equipamentos/depara/salvar", methods=["POST"])
-    @_tela(TITULO)
+    @_tela_aberta(TITULO)
     def equipamentos_depara_salvar(srv):
         return _depara_salvar(srv)
 
     @bp.route("/equipamentos/fontes")
-    @_tela(TITULO)
+    @_tela_aberta(TITULO)
     def equipamentos_fontes(srv):
         return _fontes_json(srv)
 
     @bp.route("/equipamentos/fontes/janela")
-    @_tela(TITULO)
-    def equipamentos_fontes_janela(srv):  # noqa: ARG001 — o decorador garante administrador
+    @_tela_aberta(TITULO)
+    def equipamentos_fontes_janela(srv):  # noqa: ARG001 — o decorador garante o acesso
         return _janela_depara()
 
     @bp.route("/equipamentos/fontes/passe", methods=["POST"])
-    @_tela(TITULO)
-    def equipamentos_fontes_passe(srv):  # noqa: ARG001 — o decorador garante administrador
+    @_tela_aberta(TITULO)
+    def equipamentos_fontes_passe(srv):  # noqa: ARG001 — o decorador garante o acesso
         return _passe_ligar()

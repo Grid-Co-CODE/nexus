@@ -514,6 +514,32 @@ a regra, com `lidas` > 0 e `invalidas` 0, em até 5 minutos.
 
 ## Equipamentos das usinas (`estrutura_usina.py`, `telas_equipamentos.py`, `/t/base/equipamentos`; 13/10/2026)
 
+### Metas e equipamentos, do setor Performance (25/11/2026)
+
+Levi: "Expõe as 43 usinas de fora para o time de Performance!"; "equipamento das usinas e metas. Eu gostaria que fossem um
+só, escrito metas e equipamentos. E a pessoa clica, ela vai poder ver as metas das usinas, vai poder ver os equipamentos
+das usinas e vai poder fazer o de para ali [...] o que a gente atualizar no de para vai atualizar na sala de controle.
+Essa é a regra."
+
+- **Um item no menu**, "Metas e equipamentos" (a `Tela("equipamentos")` renomeada; o endereço é o mesmo). As Metas das
+  usinas (`/t/base/metas`) ficam por dentro (`dentro_de`), e as duas páginas têm as mesmas abas em cima
+  (`cadastro/_metas_equip_abas.html`): "Equipamentos das usinas e de-para" | "Metas das usinas". O de-para segue dentro
+  dos Equipamentos (as Fontes de dados e o Equipamento Supervisório da tabela dos inversores, desde 17/11/2026).
+- **Quem abre e grava**: o administrador e quem tem a tela liberada no setor (`telas_equipamentos.pode_abrir`): o dono é
+  o setor Performance (`do_setor`), e Base → Acessos pode marcá-la para outro setor. Até 25/11/2026 era só administrador
+  (o `_tela` do cadastro, que segue valendo nas outras telas da Base). Portão por setor desligado não abre para quem não é
+  administrador. A ficha do Registro mestre e o "De-para completo" da plataforma seguem só do administrador (o link da
+  ficha some para os outros).
+- **As usinas de fora, à vista do time**: o bloco "Vale pelo Nexus na Sala" (aberto quando há pendência) diz "N de M
+  usinas · X ainda pela aba Equipamentos: o que falta em cada uma", com até três motivos por usina e o link que abre a
+  usina. Em 25/11/2026: 82 de 125 pelo Nexus, 43 pela aba.
+- **A regra do de-para na Sala**: o Salvar da usina grava a estrutura e, com a usina pronta (só diferença que o de-para
+  corrige, kWp da UFV a menos de 5% da aba, todas as chaves da aba no Nexus), marca a usina inteira "no lugar da aba"
+  (`valer_prontas`); a plataforma relê a visão em ~60 s e a Sala de controle passa a mostrar o que se salvou aqui. A usina
+  que não fica pronta segue com a aba, e o aviso do Salvar diz o que falta (é a lista do bloco de cima).
+- Prova: `tests/test_base_metas_e_equipamentos_25_11.py` (o item do menu, as abas, o setor Performance abrindo e o Salvar
+  dele valendo na Sala, outro setor e o portão desligado de fora).
+
 > Desde 05/11/2026 o guia "Como funciona" e a dica do (!) antigo ficam juntos na exclamação amarela do título (`explica`, `_explica.html`); o guia deixou de ser uma seção do painel vazio.
 
 ### Enxuta e numa tela só (17/11/2026)

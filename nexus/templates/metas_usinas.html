@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% from "_explica.html" import explica, termo %}
-{% block titulo %}{{ tela.nome }}{% endblock %}
+{% block titulo %}Metas das usinas · Metas e equipamentos{% endblock %}
 {# Base › Metas das usinas (protótipo de 25/11/2026; veio da Performance no mesmo dia). Levi: "a ideia seria a gente anexar
    esses PVSys e já preencher automático na meta"; e, vendo o protótipo: "metas das usinas tem que estar na parte de base",
    "é mais fácil ter um botão de editar" (no lugar das caixas abertas com o valor miúdo embaixo), a legenda da meta de hoje
@@ -8,8 +8,8 @@
    Registro mestre. A view: nexus/torres/base/metas_tela.py; a regra: nexus/performance/metas_pvsyst.py. #}
 {% block conteudo %}
 <link rel="stylesheet" href="{{ url_for('static', filename='metas.css') }}">
-<p class="gc-eyebrow">{{ torre.nome }} · protótipo</p>
-<div class="gc-titulo-explica"><h1 class="titulo-pagina">{{ tela.nome }}</h1>
+<p class="gc-eyebrow">{{ torre.nome }} · Metas e equipamentos · protótipo</p>
+<div class="gc-titulo-explica"><h1 class="titulo-pagina">Metas e equipamentos</h1>
 {% call explica('Como funciona', termos=True) %}
   {{ termo('Para que serve') }}<dd>A meta de cada mês das usinas do Registro mestre que não são da Thopen (a Thopen manda a
     própria meta, que já está no banco): a energia esperada (P50, P90, P75), o PR e a irradiação prevista.</dd>
@@ -25,6 +25,7 @@
   {{ termo('Protótipo', 'alerta') }}<dd>Salva no Nexus. A Sala de controle e o Gerencial seguem com a Info Mensal até a validação.</dd>
 {% endcall %}</div>
 
+{% with aba='metas' %}{% include "cadastro/_metas_equip_abas.html" %}{% endwith %}
 {% if erro_cadastro %}<p class="aviso">O Registro mestre não abriu ({{ erro_cadastro }}): sem ele não há usinas para escolher.</p>{% endif %}
 <div class="mt-barra">
   <label class="mt-campo-usina"><span class="gc-rotulo">Usina</span>
