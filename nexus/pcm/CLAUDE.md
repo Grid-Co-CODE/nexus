@@ -1,7 +1,9 @@
 # CLAUDE.md — PCM (programação semanal e Gestão PCM)
 
 A programação semanal do PCM dentro do Nexus. O desenho e as etapas estão em
-`docs/superpowers/specs/2026-09-30-pcm-no-nexus-design.md`; leia antes de mexer. A tela Gestão PCM (acompanhamento das
+`docs/superpowers/specs/2026-09-30-pcm-no-nexus-design.md`; leia antes de mexer. A lógica inteira em poucas páginas
+(quem roda o quê e quando, o motor, as marcas que os relatórios leem e as duas contas de confiabilidade) está em
+`LOGICA.md`, desta pasta. A tela Gestão PCM (acompanhamento das
 manutenções) tem seção própria abaixo.
 
 **Toda mudança na programação chega aos relatórios do PCM** (Levi, 24/11/2026: "Todas as mudanças que a gente fizer na
