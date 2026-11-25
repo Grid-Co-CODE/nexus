@@ -15,7 +15,9 @@ from pathlib import Path
 import pytest
 
 RAIZ = Path(__file__).resolve().parent.parent / "nexus"
-TELAS = ("atencao", "equipe", "responsaveis", "aprovacao", "ranking")       # a Ocorrências saiu em 15/11/2026
+# a Ocorrências saiu em 15/11/2026; a Aprovação de OS passou ao padrão do Histórico de OS (filtros-os.js) em 25/11/2026
+# (test_campo_aprovacao_tipo_etiqueta_25_11.py)
+TELAS = ("atencao", "equipe", "responsaveis", "ranking")
 
 
 @pytest.mark.parametrize("tela", TELAS)

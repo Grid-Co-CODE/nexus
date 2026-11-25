@@ -219,14 +219,16 @@ def _papeis(d, linhas, regiao_campo, gestor) -> dict:
 
 
 def _url(**mudar) -> str:
-    """O endereço desta tela com os filtros de agora, trocando só o que se pede (None tira o filtro)."""
-    args = {k: v for k, v in request.args.items() if v}
+    """O endereço desta tela com os filtros de agora, trocando só o que se pede (None tira o filtro). O filtro de marcar
+    (`?tipo=a&tipo=b`, a Aprovação de OS desde 25/11/2026) leva todos os valores: com o `items()` de antes só ia o 1º."""
+    args = {k: [v for v in vs if v] for k, vs in request.args.lists()}
+    args = {k: vs for k, vs in args.items() if vs}
     for k, v in mudar.items():
         if v in (None, ""):
             args.pop(k, None)
         else:
-            args[k] = v
-    return "?" + urlencode(args) if args else "?"
+            args[k] = [v]
+    return "?" + urlencode(args, doseq=True) if args else "?"
 
 
 def _dia_curto(iso) -> str:
@@ -1836,10 +1838,38 @@ def _csv_do_quadro(oss) -> Response:
                     headers={"Content-Disposition": 'attachment; filename="aprovacao-os.csv"'})
 
 
+def _rotulo_fx(v) -> str:
+    """O texto de um tipo de tarefa ou de uma etiqueta do Fracttal, como ele vem (a etiqueta pode vir como texto ou como
+    {"description": ...}), sem os espaços das pontas."""
+    if isinstance(v, dict):
+        v = v.get("description")
+    return " ".join(str(v or "").split())
+
+
+def _tipos_e_etiquetas(todas_os) -> None:
+    """Põe em cada OS os tipos de tarefa e as etiquetas dela, das linhas do Fracttal que a fila já guarda
+    (`regras_app._FILA_CACHE`, as mesmas que o pré-filtro lê): nenhum pedido novo ao Fracttal. O tipo é o
+    `tasks_log_task_type_main` de cada tarefa ("Handover", "MPA - ...", "Religamento Remoto"); a etiqueta, o `labels`
+    (quem pediu: "PERFORMANCE", "COS", "ENGENHARIA"...)."""
+    cruas: dict = {}
+    for w in regras_app._FILA_CACHE.get("linhas") or ():
+        cruas.setdefault(str(w.get("id_work_order") or ""), []).append(w)
+    for o in todas_os:
+        ws = cruas.get(str(o.get("id_wo") or ""), [])
+        o["tipos"] = sorted({_rotulo_fx(w.get("tasks_log_task_type_main")) for w in ws} - {""}, key=_sem_acento)
+        o["etiquetas"] = sorted({_rotulo_fx(x) for w in ws for x in (w.get("labels") or ())} - {""}, key=_sem_acento)
+
+
 def _aprovacao_recorte() -> dict:
     """A fila da Aprovação no recorte do endereço: o responsável, a usina, o técnico, o cliente e a busca (todos no
-    servidor desde 15/11/2026: com 30 cartões por seção, o filtro na página só enxergaria os 30), e o quadro dela."""
+    servidor desde 15/11/2026: com 30 cartões por seção, o filtro na página só enxergaria os 30), e o quadro dela.
+    O tipo de tarefa e a etiqueta (25/11/2026, o Otávio, pelo Levi: "Tipo por Handouver, MPA/MPS [...] e também de quem
+    solicitou, por exemplo: Performance, COS etc ---> Para esse sei que o pessoal usa uma etiqueta") são de marcar, como
+    no Histórico de OS: `?tipo=` e `?etiqueta=` repetidos; a OS entra se alguma tarefa dela tem um dos marcados,
+    comparados sem acento e sem caixa."""
     usina_id = visao.D._id(request.args.get("usina"))
+    tipos = [t for t in (str(x).strip() for x in request.args.getlist("tipo")) if t]
+    etiquetas = [e for e in (str(x).strip() for x in request.args.getlist("etiqueta")) if e]
     tecnico = str(request.args.get("tecnico") or "").strip()
     cliente = str(request.args.get("cliente") or "").strip()
     busca = str(request.args.get("q") or "").strip()
@@ -1852,9 +1882,15 @@ def _aprovacao_recorte() -> dict:
     leitura = campo_aprovacao.fila_toda(campo_aprovacao.FILA_INTEIRA)
     todas = _com_cadastro((leitura.dados or {}).get("linhas") or [], mapa)
     todas_os = _por_os(todas)
+    _tipos_e_etiquetas(todas_os)
     termo = _sem_acento(busca)
+    tipos_n, etiquetas_n = {_sem_acento(t) for t in tipos}, {_sem_acento(e) for e in etiquetas}
 
     def cabe(o):
+        if tipos_n and not tipos_n & {_sem_acento(t) for t in o["tipos"]}:
+            return False
+        if etiquetas_n and not etiquetas_n & {_sem_acento(e) for e in o["etiquetas"]}:
+            return False
         if responsavel and o["responsavel_cad"] != responsavel or usina_id and o["usina_id_cad"] != usina_id:
             return False
         if tecnico and tecnico not in o["tecnicos"] or cliente and o["cliente_cad"] != cliente:
@@ -1864,7 +1900,17 @@ def _aprovacao_recorte() -> dict:
                                                            o["responsavel_cad"], *o["tecnicos"]]))
     oss = [o for o in todas_os if cabe(o)]
     return {"usina_id": usina_id, "tecnico": tecnico, "cliente": cliente, "busca": busca, "responsavel": responsavel,
+            "tipos": tipos, "etiquetas": etiquetas,
             "mapa": mapa, "leitura": leitura, "todas_os": todas_os, "oss": oss, "q": _quadro(oss)}
+
+
+def _opcoes_marcar(todas_os, campo: str, marcados: list) -> list:
+    """As opções de uma lista de marcar (o tipo, a etiqueta): o que a fila inteira tem, mais o marcado que ela não tem
+    (para ele seguir à vista e poder ser tirado), sem repetir pela grafia, em ordem sem acento."""
+    vistos = {}
+    for v in [x for o in todas_os for x in o[campo]] + list(marcados):
+        vistos.setdefault(_sem_acento(v), v)
+    return sorted(vistos.values(), key=_sem_acento)
 
 
 def _ctx_cartao(responsavel) -> dict:
@@ -1914,6 +1960,9 @@ def aprovacao():
         usina_id=r["usina_id"], opcoes_usina=opcoes_usina, usina_nome=dict(opcoes_usina).get(r["usina_id"], ""),
         tecnico=r["tecnico"],
         opcoes_tecnico=sorted(({t for o in todas_os for t in o["tecnicos"]} | ({r["tecnico"]} if r["tecnico"] else set())) - {"—"}),
+        opcoes_tipo=_opcoes_marcar(todas_os, "tipos", r["tipos"]), tipos_marcados={_sem_acento(t) for t in r["tipos"]},
+        opcoes_etiqueta=_opcoes_marcar(todas_os, "etiquetas", r["etiquetas"]),
+        etiquetas_marcadas={_sem_acento(e) for e in r["etiquetas"]}, sem_acento=_sem_acento,
         horas_tarde=prefiltro.parametros(current_app.config)["horas_tarde"], **_ctx_cartao(r["responsavel"])))
 
 

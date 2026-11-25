@@ -1123,7 +1123,8 @@ formulário, sem enviar); `data-fo-fora` deixa a `<select>` na barra; `data-padr
 `data-fo-some` marca o que o padrão substitui (o "Filtrar", o "Limpar os filtros" antigo), que some pelo CSS. O corpo
 trocado depois (o Monitoramento do COS) é montado de novo sozinho. Sem o script, a tela segue com as `<select>` à vista.
 
-**Quem já usa:** o Comando > Usinas e as seis telas do COS com filtro. As outras torres ainda estão no "cartão suspenso"
+**Quem já usa:** o Comando > Usinas, as seis telas do COS com filtro e a Aprovação de OS da Usinas 360° (25/11/2026,
+com o Tipo de tarefa e a Etiqueta de marcar). As outras torres ainda estão no "cartão suspenso"
 de 10/11 (`campo-filtros.js`, `rd-*`, a Usinas 360°) ou nas `<select>` soltas: entram neste padrão trocando o `data-fs`
 por `data-fo`, tela a tela. Prova: `tests/test_filtros_os.py`.
 

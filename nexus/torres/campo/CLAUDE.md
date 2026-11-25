@@ -2695,6 +2695,19 @@ Aprovação e Triagem usam a lógica do App copiada, não refeita, para o númer
       Todos (o responsável do login cortaria a usina de outro); a usina sem OS na fila abre vazia, com o nome do cadastro
       na lista. O nome repetido na lista leva o cliente (em produção há duas "Linhares 1": a da Axis, id 27, e a da
       Thopen, id 96). O total diz o recorte ("na Usina X", "executadas por Y"). Prova: `test_campo_aprovacao_filtros_15_11.py`.
+    - **Tipo de tarefa e Etiqueta, e a barra no padrão do Histórico de OS (25/11/2026**, o Otávio, pelo Levi: "Tipo por
+      Handouver, MPA/MPS [...] e também de quem solicitou, por exemplo: Performance, COS etc ---> Para esse sei que o
+      pessoal usa uma etiqueta"; o Levi: "no estilo histórico de os do os creator web, com o mesmo estilo e
+      funcionalidade"). O formulário passou do cartão suspenso (`data-fs`, `campo-filtros.js`) ao componente do Histórico
+      (`data-fo`, `static/filtros-os.js`, regra em `nexus/casca/CLAUDE.md`): a busca na barra, o painel com as listas
+      digitáveis, o Aplicar e as etiquetas. Os dois filtros novos são **de marcar** (`<select multiple>`, `?tipo=` e
+      `?etiqueta=` repetidos), no servidor como os outros: a OS entra se ALGUMA tarefa dela tem um dos tipos marcados
+      (e uma das etiquetas), comparados sem acento e sem caixa. O tipo é o `tasks_log_task_type_main` e a etiqueta o
+      `labels` das linhas do Fracttal que a fila já guarda (`regras_app._FILA_CACHE`, as do pré-filtro;
+      `_tipos_e_etiquetas`): **nenhum pedido novo ao Fracttal**. As opções são o que a fila inteira tem, na grafia do
+      Fracttal. A OS com a etiqueta PERFORMANCE ou CHAMADOS segue "Fora do pré-filtro" (a regra de 04/11): o filtro só a
+      acha lá. O `_url` da torre passou a levar todos os valores de um filtro de marcar (o CSV levava só o 1º). Prova:
+      `test_campo_aprovacao_tipo_etiqueta_25_11.py`.
     - **As fotos citadas aparecem na barra lateral (16/11/2026**, Levi: "Aprovação de OS quando tiver algo que cita
       Fotos tem que carregar as fotos!"): em cada fato que cita foto (foto tarde, repetida, que não abriu, GPS longe), a
       miniatura de cada uma (`loading="lazy"`) com o nome embaixo, que segue abrindo o card; a miniatura abre a foto
