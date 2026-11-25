@@ -98,6 +98,7 @@
           {% if m.finalizado %}<form method="post" action="{{ url_for('torre_performance.etm_os_marcar', folio=o.os) }}"><input type="hidden" name="evento" value="finalizado"><input type="hidden" name="ligado" value="não"><button type="submit" class="eg-ac-btn eg-ac-btn--o eg-ac-btn--p">Reabrir para a Performance</button></form>
           {% else %}<details class="etm-fim-os"><summary class="eg-ac-btn eg-ac-btn--o eg-ac-btn--p">Finalizar pela Performance</summary>
             <form method="post" action="{{ url_for('torre_performance.etm_os_marcar', folio=o.os) }}" class="etm-fim-form"><input type="hidden" name="evento" value="finalizado"><input type="hidden" name="ligado" value="sim">
+              <span class="eg-dica">Encerra o acompanhamento da Performance; nada muda no Fracttal (nem o status{% if o.status %}, hoje {{ o.status }}{% endif %}, nem a data fim).</span>
               <textarea class="eg-tl-obs" name="comentario" rows="3" maxlength="2000" required aria-label="Comentário do Finalizar (obrigatório)" placeholder="Comentário obrigatório: o que foi feito ou visto na ETM"></textarea>
               <button type="submit" class="eg-ac-btn eg-ac-btn--g">Finalizar</button></form></details>{% endif %}
         </div>

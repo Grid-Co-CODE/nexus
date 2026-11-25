@@ -213,6 +213,12 @@ Garantias e as ETMs). O endereço antigo `/t/engenharia/etm/...` responde 308 pa
   marcações (`eng_por`). A linha do tempo não se perde: a gaveta lê TODAS as OS de ETM da usina na cópia do Fracttal (as
   fechadas também), os comentários e as demandas, que não se apagam; quando a ETM falha de novo e a usina volta às
   Estações em Aberto, o clique traz a história inteira (e pelo Histórico, mesmo sem OS aberta).
+- **O Finalizar não conclui a OS no Fracttal** (Levi, 25/11/2026: "finalizar 2 OS, eu estou concluindo 2 OS?"): é a
+  marcação da Performance (a OS sai das abertas para ela); o status e a data fim no Fracttal não mudam. O lote da gaveta só
+  pega as que já estão concluídas lá, e a caixa lista cada uma com o status e a data fim do Fracttal; a página da OS diz o
+  mesmo. Concluir no Fracttal daqui (com a data fim da atividade, para não sujar o dado do PCM) é outra decisão, em aberto.
+- **O status de cada OS na linha do tempo** ("OS 123 — Concluída", na cor do status), e "Criada no Fracttal" / "Concluída
+  no Fracttal" no lugar de "Aberta" / "Finalizada" (Levi: "tem OS que tem no início ele finalizada, aberta").
 - **O seletor Por ETM | Por OS** (Levi: "por que que esse botão de ETMs e OS, ele é tão pequeno e feio"): o segmentado do
   Nexus do tamanho dos botões da tela (34 px), com o ícone e a conta de cada visão; `.etm-ab-modo` no `engenharia.css`.
 - **Prova:** `tests/test_performance_etm.py` (a cópia, a OS relida, os endereços antigos, o menu, a gaveta, a Nova demanda

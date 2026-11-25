@@ -309,3 +309,13 @@ def test_o_chat_da_usina_traz_as_demandas(tela_perf, cliente, monkeypatch):
     assert j["demandas"] == [{"id": "d1", "titulo": "x", "iso": ""}] and j["erro_demandas"] == ""
     html = _como(cliente, ANA).get("/t/performance/etm").get_data(as_text=True)
     assert "demandas = x.j.demandas || []" in html and "'Demanda · '" in html
+
+
+
+def test_a_linha_do_tempo_diz_o_status_de_cada_os_e_o_finalizar_diz_que_nada_muda_no_fracttal(tela_perf, cliente):
+    # Levi, 25/11/2026: "do lado do número da OS, poderia ter um traço e o status daquela OS" e "quando eu venho finalizar
+    # pela performance, finalizar 2 OS, eu estou concluindo 2 OS?"
+    from test_engenharia_acompanhamento import ANA, _como
+    html = _como(cliente, ANA).get("/t/performance/etm").get_data(as_text=True)
+    assert "'— ' + o.status" in html and "'Criada no Fracttal: '" in html and "'Concluída no Fracttal: '" in html
+    assert "nada muda lá (nem o status, nem a data fim)" in html and 'id="etm-us-fim-lista"' in html
