@@ -173,28 +173,30 @@
   function desenhar() {
     var s = somas(), h = '', ro = podeGravar ? '' : ' disabled';
     /* chaves */
+    // a coluna "Vale na Sala" é só leitura desde 24/11/2026: quem passa a usina a valer pelo Nexus é a conferência do
+    // servidor (a usina inteira, pela regra do de-para), no abrir da tela e a cada Salvar
     var noLugar = st.chaves.filter(function (ch) { return ch.substitui_aba; }).length;
     h += '<div class="eq-ed-sec"><button type="button" class="eq-ed-cab eq-ed-recolhe" data-acao="ver-chaves" aria-expanded="' + chavesAbertas + '"><h3>Usina Supervisório <span class="eq-n">' + st.chaves.length +
-      (st.chaves.length ? ' · no lugar da aba: ' + noLugar : '') + '</span></h3><i class="ph ph-caret-' + (chavesAbertas ? 'up' : 'down') + '" aria-hidden="true"></i></button>';
+      (st.chaves.length ? ' · valem pelo Nexus: ' + noLugar : '') + '</span></h3><i class="ph ph-caret-' + (chavesAbertas ? 'up' : 'down') + '" aria-hidden="true"></i></button>';
     if (!st.chaves.length) h += '<p class="eq-vazio">Nenhuma chave ligada: ligue uma fonte ou uma chave acima antes de montar os inversores.</p>';
     else if (chavesAbertas) {
       h += '<div class="cad-rolagem"><table class="cad-tabela eq-tab eq-tab-chaves"><thead><tr><th>Usina Supervisório</th><th>Usina (exibição)</th>' +
         '<th title="A linha da usina (UFV) e as das cabines saem nesta chave">Chave da usina</th><th class="num">Inversores</th>' +
-        '<th>Full O&amp;M</th><th>String Box</th><th title="A plataforma, o gêmeo, as Ligações e o coletor (quando ligado) leem esta chave do Nexus">No lugar da aba</th><th>Diferença com a aba</th></tr></thead><tbody>';
+        '<th>Full O&amp;M</th><th>String Box</th><th title="Sim: a Sala de controle, o tempo real, o gêmeo e as Ligações leem esta chave do Nexus. Não: ainda da aba Equipamentos (o aviso do Salvar diz por quê)">Vale na Sala</th><th>Diferença com a aba</th></tr></thead><tbody>';
       st.chaves.forEach(function (ch, i) {
         var n = st.inversores.filter(function (x) { return x.chave === ch.supervisorio_id; }).length;
         var ab = (D.aba || {})[ch.chave], ph = (ab && ab.usina) || D.nome_registro || '';
         var cmp = (D.comparacao || {})[ch.supervisorio_id];
         // a chave que o último Salvar disse seguir com a aba (FORA), enquanto não for marcada
         var fora = !ch.substitui_aba && FORA.indexOf(ch.chave) >= 0;
-        h += '<tr' + (fora ? ' class="eq-chave-fora" title="A plataforma segue lendo esta chave da aba Equipamentos: marque No lugar da aba e salve"' : '') +
+        h += '<tr' + (fora ? ' class="eq-chave-fora" title="A Sala de controle segue lendo esta chave da aba Equipamentos: o aviso do Salvar diz o que falta para a usina valer pelo Nexus"' : '') +
           '><td><span class="gc-dado">' + esc(ch.chave) + '</span></td>' +
           '<td class="eq-w-exib">' + campo('chave', i, 'usina_exibicao', ch.usina_exibicao, ' maxlength="120" placeholder="' + esc(ph) + '" aria-label="Nome de exibição da chave ' + esc(ch.chave) + '"') + '</td>' +
           '<td class="eq-centro"><input type="radio" name="eq-principal" data-tipo="chave" data-i="' + i + '" data-campo="principal"' + (ch.principal ? ' checked' : '') + ro + ' aria-label="Chave da usina: ' + esc(ch.chave) + '"></td>' +
           '<td class="num">' + n + '</td>' +
           '<td><label class="eq-marca"><input type="checkbox" data-tipo="chave" data-i="' + i + '" data-campo="full_om"' + (ch.full_om ? ' checked' : '') + ro + '> Sim</label></td>' +
           '<td><label class="eq-marca"><input type="checkbox" data-tipo="chave" data-i="' + i + '" data-campo="string_box"' + (ch.string_box ? ' checked' : '') + ro + '> Sim</label></td>' +
-          '<td><label class="eq-marca"><input type="checkbox" data-tipo="chave" data-i="' + i + '" data-campo="substitui_aba"' + (ch.substitui_aba ? ' checked' : '') + ro + '> Sim</label></td>' +
+          '<td>' + (ch.substitui_aba ? '<span class="gc-status gc-status--ok">Sim</span>' : '<span class="gc-status gc-status--neutro">Não</span>') + '</td>' +
           '<td>' + htmlCmp(ch, cmp) + '</td></tr>';
         if (cmpAberta === ch.supervisorio_id && cmp && cmp.dif && cmp.dif.length) {
           h += '<tr class="eq-cmp-linha"><td colspan="8"><ul class="eq-cmp-lista">' + cmp.dif.map(function (t) { return '<li>' + esc(t) + '</li>'; }).join('') + '</ul></td></tr>';
@@ -414,7 +416,7 @@
     var a = L.alvoDo(x, f), pre = comNome ? '<small class="mudo eq-liga-fonte">' + esc(f.fonte_nome) + '</small>' : '';
     if (!a) {
       return '<span class="eq-liga">' + pre + '<span class="mudo" title="A plataforma lê o cadastro desta chave da aba Equipamentos, e a aba não tem “' + esc(x.nome) +
-        '”. Salve e marque a chave “No lugar da aba” para a plataforma conhecê-lo; aí ele se liga aqui.">fora do cadastro da plataforma</span></span>';
+        '”. Salve: quando a usina valer pelo Nexus, a plataforma passa a conhecê-lo, e aí ele se liga aqui.">fora do cadastro da plataforma</span></span>';
     }
     var ef = L.efetiva(f, LIGA[f.chave]), meus = ef.porAlvo[a.nome] || [], sel = meus[0] || '';
     var mudou = !!(LIGA[f.chave] && Object.prototype.hasOwnProperty.call(LIGA[f.chave], a.nome));
@@ -554,14 +556,7 @@
     avisar(nc || ni ? 'kWp preenchido em ' + nc + ' cabine(s) e ' + ni + ' inversor(es). Confira e salve.' : 'Nada para distribuir: não há kWp vazio com base para calcular.', !!(nc || ni));
   }
   function salvar(botao) {
-    var antes = JSON.parse(base).chaves, alerta = false;
-    var novas = st.chaves.filter(function (ch) {
-      var b = antes.filter(function (x) { return x.supervisorio_id === ch.supervisorio_id; })[0];
-      return ch.substitui_aba && !(b && b.substitui_aba);
-    });
-    var comDif = novas.filter(function (ch) { var c = (D.comparacao || {})[ch.supervisorio_id]; return !c || !c.iguais; });
-    if (comDif.length && !window.confirm('Com o Salvar, ' + comDif.map(function (ch) { return ch.chave; }).join(', ') +
-        ' passa' + (comDif.length > 1 ? 'm' : '') + ' a ser lida' + (comDif.length > 1 ? 's' : '') + ' do Nexus, e não da aba, e a coluna "Diferença com a aba" mostra diferenças (do que está salvo). Salvar mesmo assim?')) return;
+    var alerta = false;
     var corpo = {usina_id: D.usina_id, selo: D.selo, chaves: st.chaves, cabines: st.cabines, inversores: st.inversores};
     var estrutura = JSON.stringify(st) !== base, ligacoes = pedidosLiga();
     botao.disabled = true;

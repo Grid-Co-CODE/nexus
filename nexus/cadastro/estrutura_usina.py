@@ -61,7 +61,7 @@ import re
 import threading
 import time
 import unicodedata
-from collections import Counter
+from collections import Counter, defaultdict
 from datetime import datetime, timezone
 
 from ..dados import dominios as DOM
@@ -928,6 +928,10 @@ def salvar_usina(usina_id: int, dados: dict, selo_tela: str, cfg, base, sessao, 
         mudou = 0
         for sid, novo in chaves.items():
             s = minhas.get(sid)
+            # a tela não desmarca (24/11/2026): quem passa a usina a valer pelo Nexus é a conferência (`valer_prontas`),
+            # e a tela aberta antes dela ainda mandaria "não" e tiraria a usina da Sala no meio do Salvar
+            if s and s["substitui_aba"] and not novo.get("substitui_aba"):
+                novo = dict(novo, substitui_aba=True)
             if s and any(s[k] != v for k, v in novo.items()):
                 s.update(novo, alterado_em=agora, alterado_por_hmac=quem)
                 mudou += 1
@@ -991,6 +995,83 @@ def republicar_visao(cfg, base, sessao, info: dict, quem_email: str = "") -> dic
     grava só se ela mudou."""
     return _gravar(lambda est, agora, quem: {"log": "conferiu a visão no formato da aba"}, cfg, base, sessao,
                    quem_email, info)
+
+
+# ── o Nexus como fonte única: a usina pronta passa a valer sozinha (24/11/2026) ──────────────────────────────────────
+# Levi: "A ideia é usarmos só o do Nexus [...] deixar as coisas o mais simples possíveis dentro do Nexus"; e, com a
+# simulação na mesa (125 usinas: 50 iguais à aba, 37 só com a regra do de-para, 38 com outra diferença), "OK" para a
+# virada das prontas. Até aqui a chave só valia nos leitores (plataforma/Sala de controle, gêmeo, Ligações) se alguém
+# marcasse "No lugar da aba", e a marca ficava escondida nas chaves recolhidas: a Petrolina 2 (23/11) salvou 13 → 12
+# strings e a Sala seguiu com 13. Agora quem marca é o Nexus, pela MESMA regra do de-para (`_marcar`: a usina inteira,
+# só diferença da regra; a que não passa fica com a aba e o aviso diz por quê), no abrir da tela e a cada Salvar.
+def valer_prontas(cfg, base, sessao, *, info: dict, aba_chaves: dict | None, usinas=None, quem_email: str = "") -> dict:
+    """Marca no lugar da aba toda usina que já pode (`_marcar`, sem pedido: todas as chaves dela que seguem com a aba,
+    conferidas juntas) e grava num só `_gravar` (a visão refeita com `info`). `usinas` = só estas (o Salvar de uma usina);
+    None = todas. A já marcada nunca volta por aqui (a visão do começo é a de agora: nada mudou nela). -> {mudancas,
+    marcadas: [usina_id], pendentes: {usina_id: [motivos]}, visao_mudou, visao_linhas}. Sem a aba lida, nada se marca."""
+    if aba_chaves is None:
+        return {"mudancas": 0, "marcadas": [], "pendentes": {}, "visao_mudou": False, "visao_linhas": None}
+    info = info or {}
+
+    def mudar(est, agora, quem):
+        conta = {"n": 0}
+
+        def muda(x, **campos):
+            if x is not None and any(x.get(k) != v for k, v in campos.items()):
+                x.update(campos, alterado_em=agora, alterado_por_hmac=quem)
+                conta["n"] += 1
+        alvo = sorted({s["usina_id"] for s in est["supervisorios"] if not s["excluido"] and not s["substitui_aba"]
+                       and s["usina_id"] in info and (usinas is None or s["usina_id"] in usinas)})
+        pendentes = defaultdict(list)
+        # a usina cujo kWp no Registro mestre foge do da aba segura para conferir (a regra levaria o do Registro à Sala, e o
+        # PR e a geração específica mudariam junto): na simulação de 24/11/2026, Diamantino 6.629,6 → 3.284,4 (metade),
+        # Linhares 1 1.009 → 3.222,6, Cambé −15% e as duas Araçoiaba da Serra trocadas entre si
+        for uid in list(alvo):
+            kr, ka = (info.get(uid) or {}).get("kwp"), _kwp_ufv_na_aba(est, uid, aba_chaves)
+            if kr and ka and abs(kr - ka) / ka > KWP_USINA_TOLERANCIA:
+                alvo.remove(uid)
+                pendentes[uid].append(
+                    f"A usina não vale pelo Nexus porque: o kWp da usina é {_kw(ka)} na aba e {_kw(kr)} no Registro mestre "
+                    f"({(kr - ka) / ka * 100:+.0f}%), e a Sala passaria a usar o do Registro: confira o Registro mestre. "
+                    "A estrutura ficou gravada no Nexus")
+        visao_antes = {uid: visao_da_usina(da_usina(est, uid), info.get(uid), todas=True) for uid in alvo}
+        avisos = []
+        marcacao = _marcar(est, alvo, {}, {}, info, aba_chaves, muda, avisos, visao_antes)
+        marcadas = sorted({m["usina_id"] for m in marcacao if m["marcada"]})
+        for a in avisos:
+            if a["tipo"] == "nao_marcada" and a["usina_supervisorio"]:
+                pendentes[a["usina_id"]].append(a["texto"])
+        return {"mudancas": conta["n"], "marcadas": marcadas, "pendentes": dict(pendentes),
+                "log": f"{len(marcadas)} usina(s) passaram a valer pelo Nexus, {len(pendentes)} seguem com a aba"}
+    return _gravar(mudar, cfg, base, sessao, quem_email, info)
+
+
+KWP_USINA_TOLERANCIA = 0.05
+
+
+def _kwp_ufv_na_aba(est: dict, uid: int, aba_chaves: dict | None):
+    """O kWp da linha UFV da usina na aba (a da chave que a tem), ou None."""
+    for s in est["supervisorios"]:
+        if s["usina_id"] == uid and not s["excluido"]:
+            v = ((aba_chaves or {}).get(s["usina_supervisorio"]) or {}).get("ufv_kwp")
+            if v:
+                return v
+    return None
+
+
+def vale_pelo_nexus(est: dict, aba_chaves: dict | None) -> dict:
+    """{usina_id: True se toda chave da usina que leva algo aos leitores vale no lugar da aba} das usinas com chave no
+    Nexus. "Leva algo" = o mesmo critério do `_marcar`: a chave da usina (UFV e cabines), ou com inversor no Nexus ou na
+    aba; a chave vazia dos dois lados não conta (nada dela chega aos leitores)."""
+    com_inv = {i["supervisorio_id"] for i in est["inversores"] if not i["excluido"]}
+    out = {}
+    for s in est["supervisorios"]:
+        if s["excluido"] or not s["usina_id"]:
+            continue
+        conta = s["principal"] or s["supervisorio_id"] in com_inv or bool(
+            ((aba_chaves or {}).get(s["usina_supervisorio"]) or {}).get("inversores"))
+        out[s["usina_id"]] = out.get(s["usina_id"], True) and (bool(s["substitui_aba"]) or not conta)
+    return out
 
 # ── Ligar pela aba Equipamentos (13/10/2026) ───────────────────────────────────────────────────────────────────────────
 # Levi: "Em "Equipamentos da Usinas" ligue automaticamente pelos dados que temos na aba equipamenetos do BD_Performance!"

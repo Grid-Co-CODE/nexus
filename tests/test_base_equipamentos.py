@@ -538,13 +538,13 @@ def test_a_tela_mostra_a_comparacao_e_o_salvar_devolve_a_nova(cli, banco):
                              "equipamento_supervisorio": f"INVERSOR0{n}", "potencia_kwp": 250, "strings_esperadas_qtd": 20}
                             for n in (1, 2)]}
     j = cli.post("/t/base/equipamentos/salvar", json=corpo, headers=JSON_).get_json()
-    assert j["ok"] and "visão no formato da aba foi refeita" in j["aviso"]
+    assert j["ok"] and "Vale pelo Nexus na Sala de controle" in j["aviso"]
     c = j["comparacao"][str(ch["supervisorio_id"])]
     assert any("linha da usina" in t for t in c["dif"])           # a UFV fica na "Brodowski" na aba
     assert not any("INVERSOR0" in t for t in c["dif"])              # os dois inversores agora batem
     assert len(banco.linhas(E.LIVRO, E.ABA_VISAO)) == 4             # UFV, UG 01 e os 2 inversores
     html = cli.get("/t/base/equipamentos?usina=1").get_data(as_text=True)
-    assert "no lugar da aba" in html and "Refazer a visão" in html
+    assert "Vale pelo Nexus na Sala" in html and "Refazer a visão" in html
     r = cli.post("/t/base/equipamentos/visao", data={"usina": 1})
     assert "já estava em dia" in cli.get(r.headers["Location"]).get_data(as_text=True)
 
@@ -568,8 +568,10 @@ def test_o_salvar_avisa_quando_a_chave_salva_segue_com_a_aba(cli, banco):
     # só a chave com inversor no Nexus: a "Brodowski 2 (91)" não tem nada montado aqui, o Salvar não mexeu nela
     assert j["ok"] and j["fora_da_aba"] == ["Brodowski 1 (90)"]
     assert j["aviso"].startswith("Salvo: ")
-    assert ("seguem lendo a aba Equipamentos em “Brodowski 1 (90)”" in j["aviso"] and "Sala de controle" in j["aviso"]
-            and "“No lugar da aba: Sim”" in j["aviso"])
+    # desde 24/11/2026 o Salvar confere sozinho se a usina pode valer pelo Nexus: aqui não pode (a "Brodowski 2 (91)" tem
+    # inversores na aba e nenhum no Nexus), e o aviso diz o porquê
+    assert ("ainda vale pela aba Equipamentos na Sala de controle" in j["aviso"] and "porque:" in j["aviso"]
+            and j["pendentes"])
     # marcada, o mesmo Salvar não avisa mais
     ed = j["editor"]
     chaves = [dict(c, substitui_aba=c["chave"] == "Brodowski 1 (90)") for c in ed["chaves"]]

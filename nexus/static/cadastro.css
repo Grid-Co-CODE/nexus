@@ -973,6 +973,11 @@ details.ace-mais>summary:focus-visible{outline:2px solid var(--foco);outline-off
 .eq-pagina .cad-topo .fr-acoes{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .eq-pagina .eq-form-inline{margin:0}
 .eq-ref--alto{margin:0 0 12px}
+/* a virada para o Nexus como fonte única (24/11/2026): quantas usinas valem pelo Nexus e o que falta nas outras */
+.eq-virada>summary{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.eq-virada>summary b{font-size:15px}
+.eq-virada-erro{color:var(--critico);margin:8px 0}
+.eq-virada-fora{margin:10px 0 0;font-size:13px;line-height:19px;color:var(--tinta-2)}
 /* os filtros na lateral: a busca em cima, o botão embaixo e o painel dentro da coluna (não por cima da usina aberta) */
 .eq-filtros.fo-barra{flex-direction:column;align-items:stretch;gap:8px}   /* o filtros-os.js faz do próprio formulário a barra */
 .eq-filtros .fo-busca{flex:none;max-width:none;width:100%}

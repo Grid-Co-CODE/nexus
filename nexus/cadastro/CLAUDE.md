@@ -711,22 +711,31 @@ de entender para você, quando eu for fazer não vou entender nada".
   no `dim_supervisorio`: o **nome de exibição** (`usina_exibicao`, o "Usina" da aba: nasce dela ao ligar e no Trazer da
   aba; vazio = o do Registro mestre), a **chave da usina** (`principal`, uma por usina: a 1ª ligada; o Trazer da aba a
   passa para a chave que tem a UFV na aba; desligá-la passa para a 1ª das que ficam) e a marca **no lugar da aba**
-  (`substitui_aba`, nasce desmarcada: marcar é decisão). As marcadas saem numa **visão no formato da aba**
+  (`substitui_aba`, nasce desmarcada; desde 24/11/2026 quem marca é o Nexus, abaixo). As marcadas saem numa **visão no formato da aba**
   (`aba_equipamentos`: as colunas da aba, com os IDs no fim), refeita a cada gravação da tela com o que ela sabe do
   Registro mestre e das Ligações (`info`: nome, cliente, potência real/contratual, 1º nome do Fracttal); só regrava se
   mudou. A UFV e as UG saem na chave da usina, com "Usina Supervisório" vazia quando a chave é o próprio nome de
   exibição (como 103 das 146 UFV da aba); o inversor sai sempre com a chave e com "Inversor " na frente se o nome não
   começar assim (os leitores só contam o que começa). Inversor sem chave não sai.
-- **O Salvar avisa a chave que segue com a aba (24/11/2026).** Caso: a Petrolina 2 (23/11), 12 strings por inversor
-  salvas no Nexus, a Sala de controle seguiu com as 13 da aba, porque a chave PEII não estava marcada; o Salvar disse só
-  "Salvo" (verde, 5 s), e a caixa "No lugar da aba" fica na seção Usina Supervisório, que abre fechada desde 17/11. Agora
-  o `/salvar` devolve `fora_da_aba` (`estrutura_usina.fora_da_aba`): as chaves NÃO marcadas, com inversor no Nexus e
-  diferentes da aba (ou sem comparação, quando a aba não se leu); a chave sem inversor no Nexus e a igual à aba ficam
-  fora (o Salvar não mexeu nela / os leitores já veem o mesmo). Com alguma, o aviso ganha "Atenção: a plataforma (Sala de
-  controle, tempo real), o gêmeo e as Ligações seguem lendo a aba Equipamentos em “X”...", e a tela: aviso amarelo que
-  fica até a pessoa clicar (`avisar(..., 'alerta')`), a seção Usina Supervisório aberta e a linha da chave marcada
-  (`eq-chave-fora`) até ela ser marcada. Só avisa; marcar segue decisão da pessoa. Prova:
-  `tests/test_base_equipamentos.py::test_o_salvar_avisa_quando_a_chave_salva_segue_com_a_aba` e `..._a_tela_mostra_o_aviso...`.
+- **O Nexus é a fonte única: a usina pronta passa a valer sozinha (24/11/2026; Levi: "A ideia é usarmos só o do Nexus
+  [...] o mais simples possível dentro do Nexus"; "OK" para a virada).** Caso: a Petrolina 2 (23/11) salvou 13 → 12
+  strings e a Sala de controle seguiu com 13, porque a marca "No lugar da aba" ficava escondida nas chaves recolhidas.
+  A caixa saiu da tela (a coluna virou "Vale na Sala", só leitura) e a pergunta do de-para das fontes também. Quem marca
+  é `estrutura_usina.valer_prontas`: a MESMA regra do de-para (`_marcar`: a usina inteira, só diferença da regra; a que
+  não passa fica com a aba), mais uma trava: **o kWp da usina no Registro mestre a mais de 5% do da aba segura a usina**
+  (`KWP_USINA_TOLERANCIA`; a Sala passaria a usar o do Registro, e o PR mudaria junto: Diamantino pela metade, Linhares 1
+  ×3, Cambé −15%, as Araçoiaba da Serra trocadas). Roda (1) ~2 min depois de o Nexus subir (`_virar_ao_subir`, pelo
+  `record_once` da torre Base; não há outra rotina que rode sozinha), (2) em fundo ao abrir a tela, no máximo a cada 10
+  min, e (3) no Salvar da Base, só a usina salva, na hora. O `salvar_usina` nunca desmarca pelo que a tela manda (a tela
+  aberta antes da conferência mandaria "não"). O Salvar diz "Vale pelo Nexus na Sala..." ou "ainda vale pela aba ...
+  porque: ...", e o bloco do alto da tela conta "Vale pelo Nexus na Sala: N de M usinas", lista as que seguem com a aba
+  com o motivo e as chaves da aba que o Nexus nem tem. A medida a seco de 24/11/2026 (o banco real, o Registro e as
+  Ligações do PC, com o código novo): 23 → 82 usinas valendo pelo Nexus (59 viram), 43 seguem com a aba (cabines, nome
+  no Fracttal, usinas agrupadas, as 5 do kWp); o que a Sala vê mudar nas 59: strings em 25 inversores (a Petrolina 2),
+  o kWp da usina pelo Registro em 19 (até −2,9%, Assis) e o "N de Inversores" da UFV em 12. Prova:
+  `tests/test_base_equipamentos_depara.py` (o Salvar que vira, o que segue com a aba e por quê, a tela velha que não
+  desmarca, a conferência de todas sem regravar, o kWp longe do Registro). O passo seguinte é acertar as 43 e as chaves
+  que faltam até a aba não ser mais lida.
 - **Os leitores trocam as linhas das chaves da visão** (tiram da aba as de UFV, UG e inversor dessas chaves, pela chave
   efetiva "Usina Supervisório" ou, sem ela, "Usina", e põem as da visão; o resto segue da aba): a **plataforma**
   (`plataforma/estrutura_nexus.py`: o cadastro, o mapa do "Usina Fractall" e a disponibilidade; relê sozinha quando a
