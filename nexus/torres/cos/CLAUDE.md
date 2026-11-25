@@ -448,7 +448,8 @@ Ignora esse monitoramento que já existe no nexus" (a Performance › Tempo real
   nova (`fresca`): um número parado não infla o total. `kw` nulo é "—", nunca zero.
 - **A curva** (`monitoramento.curva`): das 05h às 19h, no mesmo eixo para todas; a escala vai de zero ao máximo da
   própria usina (a plataforma não guarda o kWp, e um teto inventado mentiria); onde falta amostra a linha quebra, sem
-  ponte. O SunOP não grava série: a usina dele vem "sem curva". Uma série por linha, sem legenda; o traço é o
+  ponte. A série do SunOP é gravada pela Ronda COS desde 13/11/2026 (`SUNOP-<código>`); a planta ainda sem amostra vem
+  "sem curva". Uma série por linha, sem legenda; o traço é o
   `--verde-texto` (3:1 de contraste nos dois temas, pelo validador do dataviz). A dica do mouse mostra o kW de cada horário
   (`static/cos/monitoramento.js`).
 - **Ao vivo:** a página pede `?parcial=1` a cada 30 s pelo `nexusPedir` e troca só o corpo (`_monitoramento_corpo.html`),
@@ -464,6 +465,24 @@ Ignora esse monitoramento que já existe no nexus" (a Performance › Tempo real
   também na tela normal). Clicar no cartão abre a janela dos inversores (`cos/_inversores.html`,
   `static/cos/inversores.js`): a curva da usina e a de cada inversor, o estado de cada um ao vivo de 3 em 3 s, e "aberto
   no COS" no inversor com ocorrência (`MO.abertas_de_inversor`). **Quem lê, desde 12/11/2026 à tarde, é o SERVIDOR do Nexus** (o dono: "o monitoramento do nexus ainda não ta igual do prototipo, corrija"): a janela pede `/t/cos/monitoramento/ronda-api/scada/monitoramento` e `.../scada/curva/<loggers>?dia=`, os mesmos caminhos da API da Ronda COS, e a rota `monitoramento_ronda_api` lê o Andamento (`/api/nexus/geracao/scada` e `/scada-curva`, a chave de máquina) com `AND.ler_ao_vivo`: 2 s de cópia para o ao vivo (60 s para a curva) e um pedido só por leitura no ar, então dez pessoas com a janela aberta são uma leitura a cada 2 s. Sem login da Ronda COS; o portão de setores dá a rota a quem vê o Monitoramento (ela mora debaixo dele). Com `NEXUS_COS_API_URL`, o navegador volta a ler a API direto, com o login da pessoa.
+- **O SunOP na janela e a contagem dele** (25/11/2026, o print do dono da aba Athon: "0 de N inversores" nos dez cartões
+  e a janela sem gráfico). A contagem era o `CALC.InvsDisponivel` do portal, que vem ZERADO nas dez plantas (medido: a
+  Capitão Poço com os 14 inversores gerando); a Ronda COS passou a contar os inversores que responderam, no mesmo sentido
+  do SCADA. A janela, que parava num aviso para o SunOP, lê os inversores pela rota `sunop/monitoramento` (o Andamento
+  `/api/nexus/geracao/sunop`, 15 s de cópia, `AND.TTL_SUNOP_AO_VIVO_S`; o portal é lido uma vez por minuto lá) e a curva
+  de cada um pelo `scada/curva/SUNOP-<código>` de sempre. O laço do SunOP é de 20 s e só roda com cartão do SunOP na tela;
+  `vivo` é a frota JUNTA (SCADA e SunOP), então a grade (a marca de inversor desligado, o "N/N inversores") e a janela
+  tratam as duas igual. O estado do inversor do SunOP vem pronto da Ronda COS: em 0 kW com a usina gerando é "desligado";
+  em 0 kW com alarme no portal, "em falha". O SunOP não guarda as strings: o detalhe mostra só a curva do inversor, e a
+  janela nem pede o histórico delas. O dia e o zoom valem para ele (a série gravada).
+- **Curva ou barras** (25/11/2026, o pedido do cliente: escolher entre a curva de hoje e as barras, "para comparar o
+  desempenho dos inversores"): o seletor "Curva de hoje | Barras por inversor" fica no alto da tela normal
+  (`[data-cos-vista-sel]`, fora do corpo trocado a cada 30 s; só com o ao vivo dos inversores, `cos_api`). A escolha vai
+  no `<html data-cos-vista>` (o CSS esconde a curva e a linha do máximo, ou as barras) e no `localStorage`
+  (`nexus.cos.monitoramento.vista`), por pessoa; quem nunca escolheu fica na curva, e o videowall também. As barras são
+  desenhadas no navegador a partir da leitura ao vivo (`barrasDaUsina`, `desenharBarras` no `inversores.js`): uma por
+  inversor, na ordem da usina, o kW de agora (ou a fração da nominal quando todos a têm), a cor do estado e a linha
+  tracejada da mediana dos que estão gerando, sem limiar inventado. Testes no node: `test_cos_inversores_js.py`.
 - **O detalhe de um inversor** (13/11/2026, o dono: "clicar num inversor e ver o gráfico individual desse inversor,
   junto com o gráfico das strings dele, individual ou em grupo, por exemplo por MPPT"): na janela da usina, o inversor é
   botão e troca o corpo pelo detalhe (`.cos-inv-det` no `cos/_inversores.html`; "Voltar à usina" e o Esc voltam, com o

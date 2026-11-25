@@ -689,10 +689,13 @@ def monitoramento_ronda_api(caminho):
     """Os inversores ao vivo: `scada/monitoramento` (os cartões do SCADA com os inversores, 2 s de cópia),
     `scada/curva/<loggers>?dia=` (a curva com a série de cada inversor, 60 s) e, desde 13/11/2026,
     `scada/entradas/<logger>/<modbus>?dia=` (as strings e os MPPT de um inversor no dia, 60 s). Dia que já passou: 1 h
-    de cópia. O resto, 404. Só lê."""
+    de cópia. Desde 25/11/2026, `sunop/monitoramento`: as plantas do SunOP com os inversores (15 s de cópia; o portal é
+    lido uma vez por minuto na Ronda COS), e a curva delas pelo mesmo `scada/curva/SUNOP-<código>`. O resto, 404. Só lê."""
     cfg = current_app.config
     if caminho == "scada/monitoramento":
         dados, erro = AND.ler_ao_vivo(cfg, "/api/nexus/geracao/scada", AND.TTL_AO_VIVO_S)
+    elif caminho == "sunop/monitoramento":
+        dados, erro = AND.ler_ao_vivo(cfg, "/api/nexus/geracao/sunop", AND.TTL_SUNOP_AO_VIVO_S)
     elif m := _CURVA_DOS_INVERSORES.fullmatch(caminho):
         dia, passado = _dia_pedido()
         q = urlencode({"ids": m.group(1), **({"dia": dia} if dia else {})})

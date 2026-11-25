@@ -48,3 +48,25 @@
 /* a busca ao digitar (13/11/2026, static/cos/monitoramento.js): o cartão, o item da "Atenção agora" e a seção que ficam
    fora do filtro somem — o `display` dos cartões venceria o `hidden` sozinho */
 .cos-mon-u[hidden], .cos-mon-at-i[hidden], .cos-mon-cliente[hidden], .cos-mon-atencao[hidden] { display: none !important; }
+
+/* CURVA OU BARRAS (25/11/2026): o cliente pediu ver as usinas em barras, uma por inversor, para comparar quem gera menos
+   que os vizinhos. A escolha mora no <html data-cos-vista> (static/cos/inversores.js) e no localStorage, por pessoa. */
+.cos-mon-vista{margin-bottom:6px}
+.cos-mon-vista[hidden]{display:none}
+.cos-mon-vista button{font:600 12.5px/18px var(--font-sans);color:var(--mudo);background:none;border:0;padding:6px 12px;border-radius:7px;
+  white-space:nowrap;cursor:pointer}
+.cos-mon-vista button:hover{color:var(--tinta)}
+.cos-mon-vista button:focus-visible{outline:2px solid var(--foco);outline-offset:1px}
+.cos-mon-vista button[aria-pressed="true"]{background:var(--verde);color:var(--sobre-verde)}
+.cos-barras-bloco{display:none}
+html[data-cos-vista="barras"] .cos-mon-u .cos-barras-bloco{display:flex;flex-direction:column;gap:4px}
+html[data-cos-vista="barras"] .cos-mon-u .cos-curva,
+html[data-cos-vista="barras"] .cos-mon-u .cos-curva-det,
+html[data-cos-vista="barras"] .cos-mon-u .cos-mon-semcurva{display:none}
+.cos-barras{display:block;width:100%;height:58px;margin-top:4px}
+.cos-barra--ok{fill:var(--verde-texto)}
+.cos-barra--fora{fill:var(--critico)}
+.cos-barra--semcom{fill:var(--alerta)}
+.cos-barra--sem{fill:none;stroke:var(--linha-forte);stroke-width:1;vector-effect:non-scaling-stroke}
+.cos-barras-mediana{stroke:var(--tinta-2);stroke-width:1;stroke-dasharray:4 3;vector-effect:non-scaling-stroke}
+.cos-barras-vazio{display:flex;align-items:center;height:58px;margin-top:4px}
