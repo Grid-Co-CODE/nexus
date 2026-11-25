@@ -15,13 +15,15 @@ sobre o `8d84669`, a MPM da última semana do mês pelos dias livres; antes, `bf
 | `gerar_bd_via_api.py` | lê as ordens e tarefas do Fracttal |
 | `fora_da_programacao.py` | lê o `Fora_da_programacao.json` do Nexus (16/10/2026): o que fica fora da programação |
 
-Conferido pelo hash (SHA-256 da cópia com CRLF):
+O `gerar_bd_via_api.py` é o do `31aa38f` (09/11/2026: o 406/429 do Fracttal é limite da empresa, não endereço
+errado, e não troca de base), trazido em 24/11/2026 pela conferência das cópias (`nexus/pcm/copias_pcm.py`),
+que o achou atrás do PCM. Conferido pelo hash (SHA-256 da cópia com CRLF):
 
 | Arquivo | Hash |
 |---|---|
 | `programacao_v7.py` | `8a58e515e534…` |
 | `fonte_bd_api.py` | `b81d2c394d67…` |
-| `gerar_bd_via_api.py` | `6c580738ab5e…` |
+| `gerar_bd_via_api.py` | `9ba396a7874d…` (do `31aa38f`, 09/11/2026) |
 | `fora_da_programacao.py` | `91f9a81140c0…` |
 
 ## Por que uma cópia, e não um motor novo

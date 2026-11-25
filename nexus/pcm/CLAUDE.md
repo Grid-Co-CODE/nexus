@@ -4,6 +4,13 @@ A programação semanal do PCM dentro do Nexus. O desenho e as etapas estão em
 `docs/superpowers/specs/2026-09-30-pcm-no-nexus-design.md`; leia antes de mexer. A tela Gestão PCM (acompanhamento das
 manutenções) tem seção própria abaixo.
 
+**Toda mudança na programação chega aos relatórios do PCM** (Levi, 24/11/2026: "Todas as mudanças que a gente fizer na
+programação semanal e tudo mais, tem que se refletir nos relatórios do PCM também. A gente tem que garantir que isso
+seja feito"). Regra nova do motor ou do robô entra como MARCA no dado (`foraDoPlano`, `bo`, o status), que todos os
+relatórios leem, nunca como conta solta num só deles; e o que o Nexus tem de cópia do PCM (o motor, o executivo) é
+conferido contra o PCM de agora pelo `copias_pcm.py`, que avisa na tela até a cópia ser atualizada. Mexeu no motor ou
+num relatório do PCM? Atualize a cópia daqui no mesmo trabalho.
+
 **Regra de ouro:** o sistema atual segue no ar e intocado até o Nexus bater número a número com ele. Isso vale para o
 gerador no PC do programador do PCM, o robô do GitHub, o painel pcm.gridco.com.br e o `banco_dados.json` que o App de Campo lê.
 **A troca (Levi, 09/10/2026: "semana que vem já quero full nexus sem falta"):** a partir da W43 o Nexus gera E publica.
@@ -64,6 +71,7 @@ escolhida de cada semana e os números: `nexus/dados/CLAUDE.md`.
 | `telas.py` | as telas, penduradas na torre PCM: cada rota é uma função no alto do módulo (testável sozinha), e o `registrar_pcm(bp)` só as liga ao bp da torre, com o mesmo endereço e endpoint (08/11/2026: eram 25 funções dentro dele) |
 | `relatorios/` | **os quatro relatórios do PCM** na Central de emissão (14/10/2026): diário, recuperação da tarde, fechamento da semana e alerta da programação, cópia do Python do PCM, com a emissão automática nos horários de lá; regras e prova no `relatorios/CLAUDE.md` |
 | `relatorio_exec/` | **o Relatório executivo do PCM** na Central de emissão (14/10/2026): Interno Grid, Cliente e Abertura da Semana, CÓPIA do `js/relatorio_exec.js` do painel (hash conferido no teste), com o gestao_pcm.json, o banco_dados.json e o confiabilidade.json servidos ao lado e a Gerencial aberta pelo servidor (`NEXUS_PCM_MPAS_SENHA`, o "MPA/MPS atrasadas"); na estrutura de toda a Central (os tipos no bloco "Relatório Gerencial PCM", o período e o escopo na coluna, a folha à direita); regras e como atualizar no `relatorio_exec/CLAUDE.md` |
+| `copias_pcm.py` | a **conferência das cópias do PCM** (24/11/2026): a cada 6 h, por trás, compara o motor e o executivo daqui com os arquivos do PCM de agora (o repositório público) e diz quais ficaram atrás; o Gerar a semana e o executivo avisam. Sem conferência (rede fora), não avisa nada. Prova: `tests/test_pcm_copias.py` |
 | `acompanhamento/` | **o Acompanhamento do PCM** (14/10/2026, PCM → Acompanhamento PCM): as cinco abas do painel de acompanhamento do PCM O&M (MPA, MPS, Radar de Backlog, Mapa e One Page) com as estruturas de lá e o desenho do Nexus, montadas com as fontes que o Nexus já usa (Gestão PCM, banco_dados, Gerencial, cadastro) e a curadoria da reunião de PCM no livro `nexus_pcm_curadoria` (cifrado); a coordenada da usina não sai do servidor; regras e prova no `acompanhamento/CLAUDE.md` |
 | `motivos.py` | **os motivos das tarefas e a lista do backoffice** (16/10/2026, seção abaixo): o livro `nexus_pcm_motivos` (cadastro, marcas, backoffice; cifrado), o `Fora_da_programacao.json` da rodada e do repositório do PCM |
 | `atribuicoes.py` | **os técnicos por usina** (17/10/2026, seção abaixo): o livro `nexus_pcm_atribuicoes` (decisões que só acrescentam, vale a última de cada usina × pessoa × papel; apoio com datas; cada linha assinada para o App) |

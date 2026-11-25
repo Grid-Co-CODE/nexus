@@ -23,6 +23,7 @@ from . import gestao_confiab as GC, observacoes as O
 from ..cadastro import setor_ids as SID
 from . import atribuicoes as AT, tecnicos_usina as TU
 from . import fama_quadro as FQ
+from . import copias_pcm as CP
 from . import nota_os as NO, publicar as PB, quadro as Q, semana as S
 from ..auth import setor_telas as ST
 from ..prefixo import na_raiz
@@ -131,6 +132,8 @@ def _ctx_gerar(cfg, rodada=None, erro=None, semana=None, ok=None) -> dict:
     # as rodadas que têm a planilha para baixar (19/10/2026: "tem que ter a opção de baixar!")
     com_planilha = {u["id"] for u in ultimas + ([sel] if sel else []) if geracao.planilha(cfg, u.get("id") or "")}
     return {"conf": geracao.conferir(cfg, semana), "ultimas": ultimas, "sel": sel, "com_planilha": com_planilha,
+            # o motor daqui atrás do do PCM (24/11/2026): a semana gerada aqui pode sair diferente da do robô
+            "copias_pcm": CP.diferentes(cfg, "motor"),
             "admin": bool(session.get("admin")), "pode": pode_programar(), "app_sel": app_sel,
             "pode_publicar": bool(sel) and not PB.motivos_para_nao_publicar(cfg, sel["id"]),
             "log": geracao.log(cfg, sel["id"], 40) if sel else "", "semana_sugerida": semana,

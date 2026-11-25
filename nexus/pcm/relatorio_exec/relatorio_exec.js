@@ -115,8 +115,26 @@ const rexFin = t => String(t.estado || '') === 'Finalizada';
 const rexAbertaViva = t => t.aberta && String(t.osStatus || '') !== 'Finalizados';
 const rexRange = (v, a, b) => { const d = String(v || '').slice(0, 10); return d >= a && d <= b; };
 
+// OS do backoffice (Responsável da OS no Fracttal = alguém de backoffice.py):
+// o robô marca a tarefa com "bo": true no gestao_pcm.json. Não é trabalho de
+// campo, então sai de TODAS as contas dos relatórios — planejadas, fora do plano,
+// backlog, listas (09/11/2026, caso das 40 Administrativas da Athon na S44).
+// O conjunto de OS vale também para as linhas do banco_dados (os_id) e para os
+// pendentes, que não têm a marca. Refeito quando o GESTAO_DB é recarregado.
+let REX_BO = { db: null, os: new Set() };
+function rexBoOS() {
+  const db = (typeof GESTAO_DB !== 'undefined') ? GESTAO_DB : null;
+  if (REX_BO.db !== db) {
+    const s = new Set();
+    ((db && db.tarefas) || []).forEach(t => { if (t.bo) s.add(String(t.os)); });
+    REX_BO = { db: db, os: s };
+  }
+  return REX_BO.os;
+}
+
 function rexEscopoFiltro(t) {
   if (/^\s*teste\s*$/i.test(String(t.tipo || ''))) return false;   // cadastro de teste: nunca conta
+  if (t.bo || rexBoOS().has(String(t.os != null ? t.os : t.os_id))) return false;   // backoffice
   // opção do modal: preventivas CRIADAS dentro do período (ex.: MPMs do mês
   // seguinte lançadas antes da semana delas) saem de todas as contas — 02/10
   if (REX.semPrevNovas && rexGrupoBd(t.tipo) === 'Preventivas'
@@ -217,7 +235,9 @@ function rexSemanas(bd) {
     rows.forEach(r => {
       const feito = rexFinBd(r.status);
       const gk = rexGrupoBd(r.tipo);
-      if (String(r.dataCriacao || '').slice(0, 19) >= corte) {   // nasceu depois do plano
+      // Preventiva NUNCA é "fora do plano" (decisão do PCM, 16/11/2026): ela vem do
+      // calendário do PCM 52 Semanas; criada depois do corte continua contando no plano.
+      if (gk !== 'Preventivas' && String(r.dataCriacao || '').slice(0, 19) >= corte) {   // nasceu depois do plano
         const o = NP[gk] || (NP[gk] = { p: 0, f: 0 });
         o.p++; npT++;
         if (feito) { o.f++; npF++; }
@@ -259,6 +279,13 @@ function rexSemanas(bd) {
       const criSem = rexRange(t.criacao, corte.slice(0, 10), dom) && !fimAntes
         && rexRange(t.dataProg, seg, dom);
       if (!criSem && !fimSem) return;
+      if (g === 'Preventivas') {   // preventiva fora da planilha conta no PLANO (16/11/2026)
+        const gp = G[g] || (G[g] = { p: 0, f: 0 });
+        gp.p++; plan++;
+        if (fimSem) { gp.f++; fin++; }
+        dim(GC, t.cliente, true, fimSem); dim(GR, rexClu(t.cluster), true, fimSem);
+        return;
+      }
       const o = NP[g] || (NP[g] = { p: 0, f: 0 });
       o.p++; npT++;
       if (fimSem) { o.f++; npF++; }
@@ -648,6 +675,7 @@ async function rexGerar() {
     h += '<div class="rex-nota">Plano = a planilha da Programação da semana; tarefa criada DEPOIS do fechamento do plano '
       + '(momento em que a planilha foi gerada) conta como não planejada, mesmo quando encaixada nela · executado = tarefa Finalizada · '
       + 'não planejada = criada após o fechamento E programada para a própria semana, ou executada sem estar na planilha (até domingo) · '
+      + 'preventivas contam sempre no plano (vêm do PCM 52 Semanas), mesmo quando entram depois do fechamento ou fora da planilha · '
       + 'preventiva mede cumprimento do plano; corretiva mede resposta à demanda.</div></section>';
   }
 

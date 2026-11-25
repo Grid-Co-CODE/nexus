@@ -34,8 +34,41 @@ def feriados(lista) -> list[tuple]:
     return out
 
 
+def _os(v) -> str:
+    s = str(v if v is not None else "").strip()
+    return s[:-2] if s.endswith(".0") else s
+
+
+def os_do_backoffice(gestao) -> set[str]:
+    """As OS do backoffice: as tarefas da Gestão PCM com a marca "bo", que o robô do PCM grava pelo responsável da OS no
+    Fracttal (a lista do Nexus, PCM → Gerar a semana → Backoffice). A mesma conta do relatório executivo (`rexBoOS`)."""
+    return {_os(t.get("os")) for t in (gestao or {}).get("tarefas") or [] if t.get("bo")}
+
+
+def sem_backoffice(bd: dict, gestao: dict) -> tuple[dict, dict]:
+    """A programação e a Gestão PCM sem as OS do backoffice, em cópias (o que o `fonte` lê é a cópia de 5 min de todos).
+
+    Por quê (reunião do PCM, 24/11/2026): "as pessoas do backoffice não devem aparecer no relatório". O executivo do
+    painel tira essas OS desde 09/11 (o caso das 40 Administrativas da Athon na S44, que derrubavam a resposta ao
+    imprevisto); os quatro daqui não tiravam. A OS sai de tudo: das linhas e das pendentes de cada semana e das tarefas."""
+    bo = os_do_backoffice(gestao)
+    if not bo:
+        return bd, gestao
+    g = dict(gestao, tarefas=[t for t in gestao.get("tarefas") or []
+                              if not t.get("bo") and _os(t.get("os")) not in bo])
+    semanas = []
+    for w in bd.get("semanas") or []:
+        w = dict(w)
+        for k in ("rows", "pendentes"):
+            if isinstance(w.get(k), list):
+                w[k] = [r for r in w[k] if _os(r.get("os_id", r.get("os"))) not in bo]
+        semanas.append(w)
+    return (dict(bd, semanas=semanas) if "semanas" in bd else bd), g
+
+
 def montar(bd, gestao, gerencial=None, engenharia=None, operacoes=None, feriados_json=None) -> dict:
-    return {"bd": bd or {}, "gestao": gestao or {}, "gerencial": gerencial or dict(VAZIOS["gerencial"]),
+    bd, gestao = sem_backoffice(bd or {}, gestao or {})
+    return {"bd": bd, "gestao": gestao, "gerencial": gerencial or dict(VAZIOS["gerencial"]),
             "engenharia": engenharia or dict(VAZIOS["engenharia"]), "operacoes": operacoes or dict(VAZIOS["operacoes"]),
             "feriados": feriados(feriados_json), "recorte": None}
 

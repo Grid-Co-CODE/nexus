@@ -25,6 +25,7 @@ iguais por construção. Regras, como atualizar e a prova: CLAUDE.md desta pasta
 import gzip
 import hashlib
 import json
+import re
 import threading
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
@@ -32,12 +33,13 @@ from urllib.parse import urlencode
 
 from flask import Response, abort, current_app, redirect, render_template, request, url_for
 
+from .. import copias_pcm as CP
 from .. import fonte
 
 AQUI = Path(__file__).resolve().parent
-ORIGEM = "fillipefigueiro-source/gridco-pcm-data, main e6cdab4 (14/10/2026)"
+ORIGEM = "fillipefigueiro-source/gridco-pcm-data, main 1065897 (16/11/2026)"
 COPIAS = {
-    "relatorio_exec.js": "3bc2d0a9f672acdeec23cf3e77e2a01e29787be988e31dcb76d3aac55b3ba84e",
+    "relatorio_exec.js": "f0bbc8026a326edb2e0c39b9554e1267199f70f1fba4b50fee031909c04980df",
     "relatorio_exec.css": "6c9bb88b6a1160558d7f0a7ee63f27b6ff0bcebdc59f892c54e0c0d6164061b7",
     "gpv_cel.css": "c4a49f0a7d8139add1ebb97bf8f8160a24d9a8f4dc1c8457bdabd7166b0c9e1a",   # css/preventivas.css 86-92
     # os trechos do js/app.js e do js/preventivas.js que o relatório usa (as faixas de linha estão no próprio arquivo)
@@ -74,6 +76,16 @@ _TRAVA = threading.Lock()
 def ler_copia(nome: str) -> bytes:
     """O arquivo como está na pasta, com o fim de linha normalizado (o git do Windows põe CRLF ao tirar do repositório)."""
     return (AQUI / nome).read_bytes().replace(b"\r\n", b"\n")
+
+
+# A cópia em disco é a do PCM com UMA troca (24/11/2026): o repositório do Nexus é público e nome de colega não entra,
+# e o comentário do PCM que diz quem decidiu ("decisão do <nome>, 16/11/2026") vira o papel. A conferência das cópias
+# (`copias_pcm`) aplica a mesma troca ao arquivo do PCM antes de comparar.
+_QUEM_DECIDIU = re.compile(r"decisão d[oa] [A-ZÀ-Ý][\wÀ-ÿ]*(?=,)")
+
+
+def para_a_copia(texto: str) -> str:
+    return _QUEM_DECIDIU.sub("decisão do PCM", texto)
 
 
 def hash_da_copia(nome: str) -> str:
@@ -230,7 +242,8 @@ def registrar(bp, torre, lado) -> None:
                                base=f"/t/{torre.id}{base}", folha_url=endereco,
                                aba_url=f"{endereco}&aba=1&tema={tema_do_pedido()}" if endereco else "",
                                dica=_dica(p) if endereco else "", erro=erro,
-                               erro_fonte="" if g.dados else (g.erro or "sem dado"))
+                               erro_fonte="" if g.dados else (g.erro or "sem dado"),
+                               copias_pcm=CP.diferentes(current_app.config, "relatorio_exec"))
 
     def painel():
         tema = "claro" if request.args.get("tema") == "claro" else "escuro"
