@@ -456,6 +456,73 @@
     return so.length ? so : lista;
   }
 
+  // ── O SUNOP NA JANELA (25/11/2026) ───────────────────────────────────────────────────────────────────────────────
+  // O print do dono da aba Athon: a janela de uma usina do SunOP não mostrava gráfico nenhum. A Ronda COS grava a série
+  // do SunOP desde 13/11 com o id `SUNOP-<código>` (o inversor é `SUNOP-<código>:<n>`), e desde 25/11 manda os inversores
+  // de agora (`/sunop/monitoramento`, lidos do portal uma vez por minuto). O que muda para ele: o ritmo (20 s, não 3 s), as
+  // frases (o portal não é "o coletor") e o detalhe (o SunOP não guarda o histórico das strings).
+  function ehDoSunop(x) {
+    if (!x) { return false; }
+    return x.fonte === "SUNOP" || /^sunop-/i.test(String(x.pid || "")) || /^SUNOP-/i.test(String(x.usina_id || x.id || ""));
+  }
+
+  // ── AS BARRAS POR INVERSOR (25/11/2026) ─────────────────────────────────────────────────────────────────────────
+  // O cliente pediu poder ver as usinas em barras para comparar os inversores: uma barra por inversor, o kW de agora, na
+  // ordem da usina, e a linha tracejada da MEDIANA dos que estão gerando — quem fica bem abaixo dela gera menos que os
+  // vizinhos. Quando todo inversor com medida tem a potência nominal, a barra é a fração da nominal (inversores de
+  // tamanhos diferentes na mesma usina); sem ela, o kW. A cor é a do estado que a Ronda COS manda (desligado ou em falha,
+  // sem comunicação); sem medida, a barra fica só no contorno. Nenhum limiar inventado aqui: a régua é a mediana à vista.
+  function medianaDe(vals) {
+    var v = vals.slice().sort(function (a, b) { return a - b; }), n = v.length;
+    if (!n) { return null; }
+    return n % 2 ? v[(n - 1) / 2] : (v[n / 2 - 1] + v[n / 2]) / 2;
+  }
+  function barrasDaUsina(c) {
+    var invs = (c && c.inversores) || [];
+    var comMedida = invs.filter(function (i) { return num(i.pac) != null; });
+    var porNominal = comMedida.length > 0 && comMedida.every(function (i) { return num(i.capacidade) != null && i.capacidade > 0; });
+    var vals = invs.map(function (i) { var p = num(i.pac); return p == null ? null : (porNominal ? p / i.capacidade : p); });
+    var topo = 0;
+    vals.forEach(function (v) { if (v != null && v > topo) { topo = v; } });
+    var gerando = [];
+    invs.forEach(function (i, k) {
+      if (vals[k] != null && (i.veredito ? i.veredito === "GERANDO" : vals[k] > 0)) { gerando.push(vals[k]); }
+    });
+    var med = medianaDe(gerando), menor = -1;
+    var barras = invs.map(function (i, k) {
+      var e = ESTADO[i.veredito], grupo = e && e.grupo, v = vals[k];
+      if (v != null && (menor < 0 || v < vals[menor])) { menor = k; }
+      return {
+        id: i.id, nome: nomeDoInversor(i), kw: num(i.pac), rotulo: e ? e.rotulo : null,
+        fracao: v == null || topo <= 0 ? 0 : Math.max(0, Math.min(1, v / topo)),
+        pct: porNominal && v != null ? Math.round(v * 100) : null,
+        tom: v == null ? "sem" : grupo === "fora" ? "fora" : grupo === "semcom" ? "semcom" : "ok"
+      };
+    });
+    return {
+      barras: barras, porNominal: porNominal,
+      mediana: med == null || topo <= 0 ? null : Math.max(0, Math.min(1, med / topo)),
+      medianaKw: med != null && !porNominal ? med : null, medianaPct: med != null && porNominal ? Math.round(med * 100) : null,
+      menor: menor >= 0 && gerando.length ? barras[menor] : null, gerando: gerando.length
+    };
+  }
+  // O texto de baixo das barras: a régua e quem ficou mais baixo (só com a usina gerando: de noite, todo mundo é zero)
+  function resumoDasBarras(b, gerandoUsina) {
+    if (!b.barras.length) { return "sem a leitura dos inversores agora"; }
+    if (!gerandoUsina || !b.gerando) { return b.barras.length + " inversores · nenhum gerando agora"; }
+    var med = b.porNominal ? "mediana " + b.medianaPct + "% da nominal" : "mediana " + kw(b.medianaKw);
+    var m = b.menor;
+    return med + (m ? " · menor: " + m.nome + ", " + (b.porNominal ? m.pct + "%" : kw(m.kw)) : "");
+  }
+  // A escolha da pessoa (curva ou barras), lembrada neste navegador; quem nunca escolheu fica na curva
+  var CHAVE_DA_VISTA = "nexus.cos.monitoramento.vista";
+  function vistaGuardada(armazem) {
+    try { var v = armazem && armazem.getItem(CHAVE_DA_VISTA); return v === "barras" ? "barras" : "curva"; } catch (e) { return "curva"; }
+  }
+  function guardarVista(armazem, v) {
+    try { if (armazem) { armazem.setItem(CHAVE_DA_VISTA, v === "barras" ? "barras" : "curva"); } } catch (e) { /* sem armazenamento: vale até recarregar */ }
+  }
+
   raiz.NexusCosInversores = { comBuracos: comBuracos, limiarDeBuraco: limiarDeBuraco, horaDaLeitura: horaDaLeitura, usinaDoLink: usinaDoLink, nomeDaString: nomeDaString, vistaDasEntradas: vistaDasEntradas, entradasDoInversor: entradasDoInversor,
     anotarPontaEnt: anotarPontaEnt, pontaEnt: pontaEnt, limparPontaEnt: limparPontaEnt, corDaEntrada: corDaEntrada,
     estiloDaCor: estiloDaCor, N_CORES: N_CORES, PONTA_MAX: PONTA_MAX, marcasDoEixo: marcasDoEixo, DIAS_ATRAS: DIAS_ATRAS, diaTexto: diaTexto, diaMenos: diaMenos, diaCurto: diaCurto,
@@ -464,7 +531,9 @@
     novoTrecho: novoTrecho, seguirPonta: seguirPonta, recortar: recortar, maximoNoTrecho: maximoNoTrecho, textoDoTrecho: textoDoTrecho,
     faixaDoTrecho: faixaDoTrecho, escalaJusta: escalaJusta, limitarFaixa: limitarFaixa, caixaDoArraste: caixaDoArraste,
     LIMIAR_Y_PX: LIMIAR_Y_PX, LIMIAR_X_PX: LIMIAR_X_PX, maisPerto: maisPerto, visiveis: visiveis,
-    releSemMedicao: releSemMedicao, releDesequilibrio: releDesequilibrio, releFaseDoCodigo: releFaseDoCodigo, releDisjuntor: releDisjuntor };
+    releSemMedicao: releSemMedicao, releDesequilibrio: releDesequilibrio, releFaseDoCodigo: releFaseDoCodigo, releDisjuntor: releDisjuntor,
+    ehDoSunop: ehDoSunop, barrasDaUsina: barrasDaUsina, resumoDasBarras: resumoDasBarras, medianaDe: medianaDe,
+    vistaGuardada: vistaGuardada, guardarVista: guardarVista, CHAVE_DA_VISTA: CHAVE_DA_VISTA };
   if (typeof document === "undefined") { return; }       // no node (o teste), só as contas
 
   // ── a API: o login (no final, o passe do Nexus em CFG.sessao; no protótipo, o da Ronda COS deste navegador) ───────
@@ -910,7 +979,7 @@
       if (n.semcom) { partes.push(n.semcom + " sem comunicação"); }
       escrever(st, "className", marca === "fora" ? "st st--inv" : marca === "semcom" ? "st st--semresp" : "st st--normal");
       escrever(st, "textContent", partes.length ? partes.join(" · ") + " · " + (n.total - n.fora - n.semcom) + "/" + n.total : n.total + "/" + n.total + " inversores");
-      escrever(st, "title", "Estado de cada inversor no SCADA, ao vivo");
+      escrever(st, "title", ehDoSunop(c) ? "Estado de cada inversor no SunOP (o portal é lido a cada minuto)" : "Estado de cada inversor no SCADA, ao vivo");
     });
     var num = document.getElementById("cos-mon-inv");      // o número da faixa da tela normal
     if (num) {
@@ -919,10 +988,103 @@
       if (v) { escrever(v, "textContent", String(fora)); v.classList.toggle("ruim", fora > 0); }
       if (s2) { escrever(s2, "textContent", String(semcom)); }
     }
+    desenharTodasAsBarras(mapa);
+  }
+
+  // ── AS BARRAS NA GRADE (25/11/2026): o seletor "Curva de hoje | Barras por inversor" e o desenho ──────────────────
+  // A escolha mora no <html data-cos-vista> (o CSS esconde a curva ou as barras) e no localStorage, por pessoa. O seletor
+  // só existe na tela normal (`[data-cos-vista-sel]`, cos/monitoramento.html): o videowall continua na curva.
+  var seletorDaVista = document.querySelector("[data-cos-vista-sel]");
+  var vista = seletorDaVista ? vistaGuardada(raiz.localStorage) : "curva";
+  function aplicarVista(v) {
+    vista = v === "barras" ? "barras" : "curva";
+    if (seletorDaVista) {
+      document.documentElement.setAttribute("data-cos-vista", vista);
+      seletorDaVista.querySelectorAll("[data-vista]").forEach(function (b) { b.setAttribute("aria-pressed", String(b.getAttribute("data-vista") === vista)); });
+    }
+  }
+  function desenharTodasAsBarras(mapa) {
+    if (vista !== "barras") { return; }
+    document.querySelectorAll(".cos-mon-u[data-gid]").forEach(function (art) {
+      if (art.hidden || art.closest("[hidden]")) { return; }
+      desenharBarras(art, mapa[art.getAttribute("data-gid")]);
+    });
+  }
+  function desenharBarras(art, c) {
+    var bloco = art.querySelector(".cos-barras-bloco");
+    if (!bloco) {
+      bloco = document.createElement("div"); bloco.className = "cos-barras-bloco";
+      var pe = art.querySelector(".cos-mon-u-pe");
+      if (pe) { art.insertBefore(bloco, pe); } else { art.appendChild(bloco); }
+    }
+    var b = barrasDaUsina(c), gerando = !!(c && c.situacao && c.situacao.chave === "GERANDO");
+    var sig = JSON.stringify([b.barras, b.mediana, gerando]);
+    if (bloco._sig === sig) { return; }
+    bloco._sig = sig; bloco.textContent = "";
+    var det = document.createElement("span"); det.className = "det cos-barras-det";
+    if (!b.barras.length) {
+      det.className = "det cos-barras-vazio";
+      det.textContent = c ? "sem a leitura dos inversores agora" : (vivo ? "esta usina não veio na leitura dos inversores agora" : "lendo os inversores…");
+      bloco.appendChild(det); return;
+    }
+    var n = b.barras.length, W = n * 10, H = 100;
+    var svg = el("svg", { class: "cos-barras", viewBox: "0 0 " + W + " " + H, preserveAspectRatio: "none", role: "img",
+      "aria-label": "Inversores agora de " + ((art.querySelector(".n") || {}).textContent || "esta usina") + ": " + n + " barras; " + resumoDasBarras(b, gerando) }, null);
+    el("line", { class: "cos-curva-base", x1: 0, y1: H, x2: W, y2: H }, svg);
+    b.barras.forEach(function (x, k) {
+      var h = x.tom === "sem" ? 4 : Math.max(1.5, x.fracao * (H - 2));
+      var r = el("rect", { class: "cos-barra cos-barra--" + x.tom, x: k * 10 + 1, y: H - h, width: 8, height: h }, svg);
+      var t = el("title", {}, r);
+      t.textContent = x.nome + " · " + (x.kw == null ? "sem medida" : kw(x.kw)) + (x.pct != null ? " (" + x.pct + "% da nominal)" : "") + (x.rotulo ? " · " + x.rotulo : "");
+    });
+    if (b.mediana != null && gerando) {
+      var y = H - b.mediana * (H - 2);
+      el("line", { class: "cos-barras-mediana", x1: 0, y1: y, x2: W, y2: y }, svg);
+    }
+    bloco.appendChild(svg);
+    det.textContent = resumoDasBarras(b, gerando);
+    bloco.appendChild(det);
+  }
+  if (seletorDaVista) {
+    aplicarVista(vista);
+    seletorDaVista.hidden = false;
+    seletorDaVista.addEventListener("click", function (ev) {
+      var bt = ev.target.closest && ev.target.closest("[data-vista]");
+      if (!bt) { return; }
+      aplicarVista(bt.getAttribute("data-vista"));
+      guardarVista(raiz.localStorage, vista);
+      desenharTodasAsBarras(mapaVivo);
+    });
   }
 
   // ── o laço de 3 s (o mesmo ritmo do Monitoramento da Ronda COS); um só, mesmo com a aba indo e voltando ──────────
+  // `vivo` é a frota JUNTA (25/11/2026): os cartões do SCADA (`vivoScada`, de 3 em 3 s) e os do SunOP (`vivoSunop`, de 20
+  // em 20 s, só com cartão do SunOP na tela). Quem lê `vivo`/`mapaVivo` acha as duas fontes do mesmo jeito.
   var vivo = null, mapaVivo = {}, vivoEm = 0, laco = null, falhas = 0, voando = false, aberta = null;
+  var vivoScada = null, vivoSunop = null, sunopEm = 0, lacoSunop = null, falhasSunop = 0, voandoSunop = false, SUNOP_MS = 20000;
+  function juntarVivo() {
+    vivo = vivoScada || vivoSunop ? { cartoes: [].concat((vivoScada && vivoScada.cartoes) || [], (vivoSunop && vivoSunop.cartoes) || []) } : null;
+    mapaVivo = mapaDosCartoes(vivo);
+  }
+  function temSunopNaTela() { return !!document.querySelector('[data-gid^="sunop-"]'); }
+  function proximoSunop(ms) { clearTimeout(lacoSunop); lacoSunop = setTimeout(lerSunop, ms); }
+  function lerSunop() {
+    if (voandoSunop) { return; }
+    if (document.hidden || !temSunopNaTela()) { proximoSunop(SUNOP_MS); return; }
+    voandoSunop = true;
+    pedir("/sunop/monitoramento").then(function (m) {
+      voandoSunop = false; falhasSunop = 0;
+      proximoSunop(SUNOP_MS);
+      vivoSunop = m && Array.isArray(m.cartoes) ? m : { cartoes: [] }; sunopEm = Date.now();
+      juntarVivo();
+      try { aplicarNaGrade(vivo, sunopEm); } catch (e) { console.error("inversores: a grade (SunOP)", e); }
+      try { if (aberta && ehDoSunop(mapaVivo[aberta.getAttribute("data-gid")])) { aoVivoNaJanela(); } } catch (e) { console.error("inversores: a janela (SunOP)", e); }
+    }, function (e) {
+      voandoSunop = false; falhasSunop++;
+      // a rota ainda não existe (Nexus antes do Andamento) ou o login venceu: tenta de novo devagar, sem nota própria
+      proximoSunop(Math.min(5 * 60000, SUNOP_MS * Math.pow(2, falhasSunop)));
+    });
+  }
   function rotuloLido() {                                // "SCADA ao vivo · hh:mm:ss": no frescor da tela, ou no canto do videowall
     var r = document.getElementById("cos-inv-vivo");
     if (r) { return r; }
@@ -940,8 +1102,8 @@
     pedir("/scada/monitoramento?entradas=separadas").then(function (m) {
       voando = false; falhas = 0;
       proximo(VIVO_MS);                                 // o próximo já marcado: um erro de desenho não para o laço
-      vivo = m; mapaVivo = mapaDosCartoes(m); vivoEm = Date.now();
-      try { aplicarNaGrade(m, vivoEm); } catch (e) { console.error("inversores: a grade", e); }
+      vivoScada = m; vivoEm = Date.now(); juntarVivo();
+      try { aplicarNaGrade(vivo, vivoEm); } catch (e) { console.error("inversores: a grade", e); }
       try { if (aberta) { aoVivoNaJanela(); } } catch (e) { console.error("inversores: a janela", e); }
       escrever(rotuloLido(), "textContent", "SCADA ao vivo · " + hhmmss(vivoEm));
       var nota = document.getElementById("cos-inv-nota"); if (nota) { nota.remove(); }
@@ -965,11 +1127,13 @@
     }
     document.body.appendChild(n);
   }
-  document.addEventListener("visibilitychange", function () { if (!document.hidden) { proximo(0); } });
+  document.addEventListener("visibilitychange", function () { if (!document.hidden) { proximo(0); proximoSunop(0); } });
   var corpoGrade = document.getElementById("cos-tv-corpo") || document.getElementById("cos-mon-corpo");
   if (corpoGrade && window.MutationObserver) {
     // a grade inteira é trocada pelo servidor a cada 30 s: a leitura ao vivo volta por cima na hora
-    new MutationObserver(function () { if (vivo) { try { aplicarNaGrade(vivo, vivoEm); } catch (e) { console.error(e); } } })
+    new MutationObserver(function () {
+      try { if (vivo) { aplicarNaGrade(vivo, vivoEm); } else { desenharTodasAsBarras({}); } } catch (e) { console.error(e); }
+    })
       .observe(corpoGrade, { childList: true });
   }
 
@@ -1076,7 +1240,8 @@
   }
   function nomeDoInversor(i) { return i.nome || ("Inversor " + i.modbus_id); }
   function motivoDoEstado(i, e) {
-    return i.veredito === "FALHA" ? (i.descricao_falha || i.estado) : (e.grupo === "semcom" ? "não responde ao SCADA: pode estar gerando" : (e.grupo ? i.estado : ""));
+    if (e.grupo === "semcom") { return ehDoSunop(i) ? "o portal SunOP acusa falha de comunicação: pode estar gerando" : "não responde ao SCADA: pode estar gerando"; }
+    return i.veredito === "FALHA" ? (i.descricao_falha || i.estado) : (e.grupo ? i.estado : "");
   }
 
   // o relé de proteção na ficha: ver `montarCardRele` (refeita 18/11/2026). Só aparece se a usina tem relé.
@@ -1332,6 +1497,7 @@
         // detalhe abre, o gráfico das strings já vem com o gravado (o dono: "eu preciso do gráfico do dia em tempo real")
         var antesHist = null;
         var preCarregarHist = function () {
+          if (ehDoSunop(i)) { return; }                    // o SunOP não tem histórico de strings (25/11/2026)
           clearTimeout(antesHist);
           antesHist = setTimeout(function () { lerHistorico(id, diaEscolhido).catch(function () {}); }, 150);
         };
@@ -1372,7 +1538,7 @@
     (cv.inversores || []).forEach(function (s) { var id = s.usina_id + ":" + s.modbus_id; porId[id] = hoje ? comPonta(serie(s.pontos), "i:" + id) : serie(s.pontos); });
     if (invAberto) { detalhe(c, porId); return; }           // a usina fica montada por baixo, sem redesenhar
     escrever(partes.kw, "textContent", kw(c.pac_total_kw));
-    escrever(partes.resumo, "textContent", c.inversores_online + " de " + c.inversores_total + " inversores respondendo · " + (c.situacao ? c.situacao.texto : ""));
+    escrever(partes.resumo, "textContent", (c.inversores_online != null ? c.inversores_online : "—") + " de " + c.inversores_total + " inversores respondendo · " + (c.situacao ? c.situacao.texto : ""));
     var conta = {}, chips = [];
     (c.inversores || []).forEach(function (i) { conta[i.veredito] = (conta[i.veredito] || 0) + 1; });
     Object.keys(conta).sort(function (a, b) { return (ORDEM[a] || 9) - (ORDEM[b] || 9); }).forEach(function (v) { chips.push(v + conta[v]); });
@@ -1387,7 +1553,7 @@
     // a escala comum dos inversores, pelo que se vê no trecho do zoom (o de agora entra só se agora está à vista)
     var eInv = escalaDe(invs.map(function (i) { return porId[i.id] || []; }), 2, hoje && agoraVisivel() ? invs.map(function (i) { return i.pac; }) : []);
     escrever(partes.tituloU, "textContent", "A usina " + quando);
-    escrever(partes.detU, "textContent", (hoje ? "a curva gravada de 5 em 5 min e a ponta ao vivo, de 3 em 3 s" : "a curva gravada de 5 em 5 min") +
+    escrever(partes.detU, "textContent", (hoje ? "a curva gravada de 5 em 5 min e a ponta ao vivo, " + (ehDoSunop(c) ? "a cada leitura do portal (1 min)" : "de 3 em 3 s") : "a curva gravada de 5 em 5 min") +
       " · passe o mouse (ou use as setas) para ler a hora; arraste para aproximar (uma caixa aproxima também o valor; duplo clique volta)");
     escrever(partes.thMax, "textContent", "Máximo " + quando);
     escrever(partes.thEnergia, "textContent", "Energia " + quando);
@@ -1565,7 +1731,8 @@
         var foco = detCorpo.contains(document.activeElement);
         detCorpo.textContent = "";
         var av = document.createElement("p"); av.className = "cos-inv-aviso";
-        av.textContent = "Este inversor não veio na leitura do SCADA agora. A janela tenta de novo a cada 3 segundos.";
+        av.textContent = ehDoSunop(c) ? "Este inversor não veio na leitura do SunOP agora. A janela tenta de novo a cada 20 segundos."
+          : "Este inversor não veio na leitura do SCADA agora. A janela tenta de novo a cada 3 segundos.";
         detCorpo.appendChild(av); det = { falta: true };
         if (foco) { detTitulo.focus({ preventScroll: true }); }
       }
@@ -1649,7 +1816,8 @@
       // nem MPPT nem string nesta leitura: o Sungrow do pacote 2026.09.23, que não lê os dois (e não é a noite), ou o
       // inversor que não responde agora
       var p = document.createElement("p"); p.className = "cos-inv-ent-vazio";
-      p.textContent = "O coletor não lê MPPT nem string deste inversor agora: fica a curva dele, acima.";
+      p.textContent = ehDoSunop(i) ? "O SunOP não manda MPPT nem string deste inversor nesta leitura: fica a curva dele, acima."
+        : "O coletor não lê MPPT nem string deste inversor agora: fica a curva dele, acima.";
       det.ent.appendChild(p); escrever(det.nota, "textContent", ""); return;
     }
     var tetoMppt = Math.max.apply(null, [1].concat(v.mppts.map(function (m) { return m.corrente || 0; })));
@@ -1714,6 +1882,14 @@
     return ent.tipo + "|" + ent.lista.map(function (e) { return e.chave + "@" + (e.grupo || "-"); }).join(",");
   }
   function desenharEntradasDoDia(i, hoje, dia) {
+    if (ehDoSunop(i)) {
+      // 25/11/2026: a Ronda COS não grava as strings do SunOP (a `scada_entradas` é só do coletor): nada a pedir
+      escrever(det.stTit, "textContent", "As strings " + (hoje ? "hoje" : "em " + diaCurto(dia)));
+      escrever(det.stAviso, "textContent", "O SunOP não guarda o histórico das strings: fica a curva do inversor, acima.");
+      escrever(det.stDet, "textContent", "");
+      det.modos.hidden = true; det.chips.hidden = true; det.sg.textContent = ""; det.montado = "";
+      return;
+    }
     var id = i.id, k = chaveHist(id, dia), g = historicos[k], hist = g ? g.h : null;
     var falhou = !!(falhouHist[k] && Date.now() - falhouHist[k] < 30000);
     if ((!g || (hoje && Date.now() - g.em > CURVA_MS)) && !pedidosHist[k] && !falhou) {
@@ -1876,16 +2052,17 @@
   }
 
   function aoVivoNaJanela() {
-    if (!aberta || !vivo || aberta._sunop) { return; }
+    if (!aberta || !vivo) { return; }
     var gid = aberta.getAttribute("data-gid"), c = mapaVivo[gid];
     if (!c) {
-      aviso("Esta usina não veio no monitoramento do SCADA agora. A janela tenta de novo a cada 3 segundos.");
+      aviso(aberta._sunop ? "Esta usina não veio na leitura do SunOP agora. A janela tenta de novo a cada 20 segundos."
+        : "Esta usina não veio no monitoramento do SCADA agora. A janela tenta de novo a cada 3 segundos.");
       return;
     }
     // a curva DO DIA ESCOLHIDO (13/11/2026): guardada por usina e dia; trocar o dia não deixa a de outro dia na tela
     var dia = diaEscolhido, hoje = ehHoje(), guardada = curvas[chaveDaCurva(gid, dia)];
     curva = guardada ? guardada.cv : null; curvaEm = guardada ? guardada.em : 0;
-    var lidoEm = horaDaLeitura(c, vivoEm);                 // a hora da leitura, não a do pedido
+    var lidoEm = horaDaLeitura(c, ehDoSunop(c) ? sunopEm : vivoEm);   // a hora da leitura, não a do pedido
     (c.inversores || []).forEach(function (i) { anotarPonta("i:" + i.id, i.pac, lidoEm); });
     // a ponta das entradas de hoje: cada leitura de 3 s, só desta usina (outra usina limpa); leitura velha não entra
     if (pontasDe !== gid) { limparPontaEnt(); pontasDe = gid; }
@@ -1897,7 +2074,7 @@
     // o zoom que contém agora acompanha a ponta ao vivo (em hoje); o de um trecho do passado fica parado
     if (zoom && zoom.segue) { zoom = seguirPonta(zoom, minutoDeAgora()); mostrarZoom(); }
     atualizar(c, curva);
-    escrever(lido, "textContent", "ao vivo · " + hhmmss(vivoEm) + (!curva ? " · lendo a curva do dia…"
+    escrever(lido, "textContent", (ehDoSunop(c) ? "SunOP · lido às " + hhmmss(lidoEm) : "ao vivo · " + hhmmss(vivoEm)) + (!curva ? " · lendo a curva do dia…"
       : hoje ? " · curva gravada lida às " + hhmmss(curvaEm) : " · curva gravada de " + diaCurto(dia)));
     // a de hoje é relida de 5 em 5 min; a de um dia que passou não muda, e fica com a primeira leitura
     if (!curva || (hoje && Date.now() - curvaEm > CURVA_MS)) {
@@ -1971,19 +2148,16 @@
     var lendo = document.createElement("p"); lendo.className = "mudo"; lendo.textContent = "Lendo os inversores na Ronda COS…"; corpo.appendChild(lendo);
     if (typeof dlg.showModal === "function") { if (!dlg.open) { dlg.showModal(); } } else { dlg.setAttribute("open", ""); }
     art._sunop = art.getAttribute("data-fonte") === "SunOP" || String(gid).indexOf("sunop-") === 0;
-    if (diasEl) { diasEl.hidden = art._sunop; mostrarDia(); }   // o SunOP não tem série gravada: não há dia a escolher
-    if (zoomEl) { zoomEl.hidden = art._sunop; mostrarZoom(); }
-    if (art._sunop) {
-      // 13/11/2026: a Ronda COS passou a gravar a curva do SunOP (a cada 5 min, com o buraco do portal preenchido pela
-      // média de 15 min). O cartão já desenha a curva da usina; o inversor a inversor nesta janela é a próxima etapa.
-      aviso("Usina do SunOP: a curva da usina está no cartão, gravada a cada 5 min desde 13/11. A curva de cada inversor nesta janela ainda não está disponível para o SunOP.");
-      return;
-    }
+    // 25/11/2026: o SunOP tem a série gravada desde 13/11 (`SUNOP-<código>`), então o dia e o zoom valem para ele também
+    if (diasEl) { diasEl.hidden = false; mostrarDia(); }
+    if (zoomEl) { zoomEl.hidden = false; mostrarZoom(); }
     if (vivo && mapaVivo[gid]) { aoVivoNaJanela(); return; }
     var pedidoEm = Date.now();
-    pedir("/scada/monitoramento?entradas=separadas").then(function (m) {
+    // o SunOP pelo caminho dele (`/sunop/monitoramento`, 25/11/2026); o SCADA pelo de sempre
+    pedir(art._sunop ? "/sunop/monitoramento" : "/scada/monitoramento?entradas=separadas").then(function (m) {
       if (!aberta || aberta.getAttribute("data-gid") !== gid) { return; }      // a janela já mudou de usina
-      if (pedidoEm > vivoEm) { vivo = m; mapaVivo = mapaDosCartoes(m); vivoEm = Date.now(); }
+      if (art._sunop) { if (pedidoEm > sunopEm) { vivoSunop = m; sunopEm = Date.now(); juntarVivo(); } }
+      else if (pedidoEm > vivoEm) { vivoScada = m; vivoEm = Date.now(); juntarVivo(); }
       aoVivoNaJanela();
     }).catch(function (e) {
       if (!aberta || aberta.getAttribute("data-gid") !== gid) { return; }
@@ -2072,6 +2246,7 @@
     abrirPeloLink();
   }
   lerVivo();
+  lerSunop();
 
   // ── O LINK QUE ABRE UMA USINA (13/11/2026) ──────────────────────────────────────────────────────────────────────
   // O "Ver" do aviso de falha do Console embutido traz `?usina=<id do cartão>` (o mesmo `data-gid`): a janela daquela
