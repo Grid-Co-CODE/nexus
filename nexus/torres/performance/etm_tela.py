@@ -15,6 +15,7 @@ responde 308 para cá (`torre_engenharia.etm_mudou`), e a marca que o setor tinh
 "performance/etm" (`setor_telas.RENOMEADAS`).
 """
 import collections
+import logging
 from datetime import datetime, timedelta, timezone
 
 from flask import abort, jsonify, redirect, render_template, request, session, url_for
@@ -46,6 +47,9 @@ def _os_do_planner(o: dict, m: dict | None, n_coment: int | None = None) -> dict
             "criada_dia": "-".join(reversed(criada[:10].split("/"))) if criada else "", "fim_dia": o.get("fim_iso") or "",
             # a hora da criação, para a linha do tempo da usina (25/11/2026)
             "criada_iso": o.get("criada_iso") or "",
+            # quem encerrou pela Performance (o finalizado ou o diagnóstico mais novo), para a linha do tempo
+            "eng_por": next((e.get("nome") or "" for e in (m.get("eventos") or [])
+                             if e.get("evento") in ("finalizado", "diagnostico")), ""),
             "etiquetas": o["etiquetas"], "n_tarefas": len(o.get("tarefas") or []),
             "diagnostico": M.nome(M.DIAGNOSTICOS, m.get("diagnostico_id")) or None,
             "status_pos": M.nome(M.STATUS_POS, m.get("status_pos_id")) or None,
@@ -82,6 +86,36 @@ def faixa_etm(oss: list[dict], hoje, sem_marcas: bool = False, sem_leitura: bool
         {"rotulo": f"Finalizadas em {JANELA_CONCLUIDAS} dias", "valor": fechadas, "grav": "",
          "nota": [("no Fracttal", False)]},
     ]
+
+
+# o comentário obrigatório do Finalizar pela Performance (25/11/2026, Levi: "deve ser obrigatório, eu coloco um comentário
+# [...] na linha do tempo [...] vai ter lá, finalizado por tal pessoa, e aí o comentário [...] caso aquela ETM venha dar
+# falha de novo, quando eu for clicar vai aparecer a linha do tempo inteira dela"): vai para o livro dos comentários da OS
+# (`nexus_engenharia_os`, o mesmo do Chat da usina, que não se apaga com a OS fechada) com este começo, e a linha do tempo
+# o mostra como "Finalizada pela Performance", com quem e o texto. Fica no Nexus: a OS fechada no Fracttal não aceita nota
+COMENTARIO_FIM = "Finalizado pela Performance: "
+NOTA_FIM = "o comentário do Finalizar fica no Nexus"
+
+
+def texto_do_fim(texto) -> str:
+    """O comentário do Finalizar, conferido ANTES de marcar (nada se marca sem ele)."""
+    from ...engenharia import os_acompanhamento as O
+    if not str(texto or "").strip():
+        raise O.Recusada("O comentário é obrigatório para finalizar: escreva o que foi feito ou visto na ETM")
+    return O.texto_do_comentario(texto)
+
+
+def comentar_fim(oss: list[dict], texto: str, pode: bool) -> list[str]:
+    """O comentário do Finalizar em cada OS finalizada; devolve as OS em que não gravou (o resto gravou)."""
+    from ...engenharia import os_acompanhamento as O
+    falhas = []
+    for o in oss:
+        try:
+            O.registrar_comentario(o, COMENTARIO_FIM + texto, session.get("usuario"), pode, NOTA_FIM)
+        except Exception:       # noqa: BLE001 — a marcação já foi: diz quais ficaram sem o comentário
+            logging.exception("ETMs: o comentário do Finalizar da OS %s não gravou", o.get("folio"))
+            falhas.append(str(o.get("folio")))
+    return falhas
 
 
 LOTE_MAX = 500          # OS num Finalizar em lote (a usina com mais OS de ETM tinha dezenas em 26/10/2026)
@@ -150,7 +184,7 @@ def etm():
         status=list(os_equipe.STATUS_OS.values()), hoje=hoje.isoformat(),
         admin=bool(session.get("admin")),           # o painel do histórico do app de ETM (uma vez, só o administrador)
         lido=hora(d["lido"]), erro_hora=hora(d.get("erro_em")).replace("às ", "").replace("em ", ""),
-        aviso_releia=aviso_releia, pode_comentar=_quem_pode_na_os()[0],
+        aviso_releia=aviso_releia, pode_comentar=_quem_pode_na_os()[0], comentario_fim=COMENTARIO_FIM,
         # a volta da Nova demanda (`demandas_tela.demanda_nova`, ?etm=1): o aviso dela na tela
         aviso_ok=(request.args.get("ok") or "")[:300], aviso_erro=(request.args.get("erro") or "")[:300])
 
@@ -178,20 +212,28 @@ def etm_finalizar():
     if not d["lido"]:               # a cópia vazia depois de subir: "fora" diria que nenhuma está mais finalizada
         ETM.pedir_releitura()
         return jsonify({"erro": LENDO_ETM}), 503
+    from ...engenharia import os_acompanhamento as O
+    if not pode:                    # quem não finaliza ouve isso antes do "falta o comentário"
+        return jsonify({"erro": "Só quem é da Performance ou administrador finaliza as OS de ETM"}), 403
+    try:
+        texto = texto_do_fim(corpo.get("comentario"))
+    except O.Recusada as e:
+        return jsonify({"erro": str(e)}), 400
     usina = corpo["usina"]
     pedidas = list(dict.fromkeys(str(x).strip() for x in corpo["os"] if str(x).strip()))
     alvo = {str(o["os"]): o for o in d["os"]
             if o.get("usina") == usina and o.get("coluna_etm") == "finalizada" and o.get("wid")}
     fora = [f for f in pedidas if f not in alvo]
+    gravar = [_os_para_gravar(_na_etm(alvo[f])) for f in pedidas if f in alvo]
     try:
-        r = M.finalizar_lote([_os_para_gravar(_na_etm(alvo[f])) for f in pedidas if f in alvo],
-                             session.get("usuario"), pode)
+        r = M.finalizar_lote(gravar, session.get("usuario"), pode)
     except M.Recusada as e:
         return jsonify({"erro": str(e)}), 403
     except Exception as e:      # noqa: BLE001 — banco fora: nada mudou (a trava recusa antes de gravar)
         logging.exception("ETMs: o finalizar em lote da usina não gravou")
         return jsonify({"erro": FALHOU_BANCO.format(type(e).__name__)}), 502
-    return jsonify({"feitas": r["feitas"], "ja": r["ja"], "fora": fora})
+    sem = comentar_fim([g for g in gravar if str(g.get("folio")) in set(r["feitas"])], texto, pode) if r["feitas"] else []
+    return jsonify({"feitas": r["feitas"], "ja": r["ja"], "fora": fora, "sem_comentario": sem})
 
 
 @bp.route("/etm/usina/comentarios")
@@ -266,6 +308,16 @@ def etm_os_marcar(folio: int):
             raise M.Recusada(f"Não achei a OS {folio} no Fracttal")
         osg, quem, f = _os_para_gravar(_na_etm(o)), session.get("usuario"), request.form
         ev = f.get("evento")
+        if ev == "finalizado" and f.get("ligado") == "sim":
+            from ...engenharia import os_acompanhamento as O
+            try:
+                texto = texto_do_fim(f.get("comentario"))
+            except O.Recusada as e:
+                raise M.Recusada(str(e))
+            aviso = M.marcar(osg, ev, True, quem, pode)["aviso"]
+            sem = comentar_fim([osg], texto, pode)
+            q = {"ok": "Salvo: " + aviso + ("." if not sem else "; o comentário não gravou, comente de novo na OS.")}
+            return redirect(volta + "?" + urlencode(q), 303)
         if ev in ("etiqueta", "acompanhamento", "finalizado"):
             lig = f.get("ligado") == "sim"
             avisos = [M.marcar(osg, ev, (f.get("valor"), lig) if ev == "etiqueta" else lig, quem, pode)["aviso"]]

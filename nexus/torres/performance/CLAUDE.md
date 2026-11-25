@@ -203,6 +203,18 @@ Garantias e as ETMs). O endereço antigo `/t/engenharia/etm/...` responde 308 pa
   OS). Na gaveta (vêm junto do `/etm/usina/comentarios`): quem pediu → para quem, o tema, a situação, o último passo e o
   link para a Caixa. Na página da OS de ETM (`_pagina_da_os`): as que citam aquela OS, na linha do tempo dela. O banco das
   demandas fora não derruba nenhuma das duas: a gaveta diz.
+- **O Finalizar pede o comentário** (25/11/2026, Levi: "deve ser obrigatório, eu coloco um comentário [...] na linha do
+  tempo [...] vai ter lá, finalizado por tal pessoa, e aí o comentário [...] caso aquela ETM venha dar falha de novo [...]
+  vai aparecer a linha do tempo inteira dela"): na gaveta (o lote) e na página da OS (o `<details>` do Finalizar), sem o
+  texto nada se marca (`etm_tela.texto_do_fim`, conferido depois de quem pode). Marcado o finalizado, o texto vai para o
+  livro dos comentários de cada OS (`nexus_engenharia_os`) começando por `COMENTARIO_FIM` ("Finalizado pela Performance: "),
+  só no Nexus (a OS fechada no Fracttal não aceita nota). A linha do tempo da gaveta mostra "Finalizada pela Performance
+  por <pessoa>" com o texto, uma vez para as OS finalizadas juntas; a finalização de antes, sem comentário, diz quem pelas
+  marcações (`eng_por`). A linha do tempo não se perde: a gaveta lê TODAS as OS de ETM da usina na cópia do Fracttal (as
+  fechadas também), os comentários e as demandas, que não se apagam; quando a ETM falha de novo e a usina volta às
+  Estações em Aberto, o clique traz a história inteira (e pelo Histórico, mesmo sem OS aberta).
+- **O seletor Por ETM | Por OS** (Levi: "por que que esse botão de ETMs e OS, ele é tão pequeno e feio"): o segmentado do
+  Nexus do tamanho dos botões da tela (34 px), com o ícone e a conta de cada visão; `.etm-ab-modo` no `engenharia.css`.
 - **Prova:** `tests/test_performance_etm.py` (a cópia, a OS relida, os endereços antigos, o menu, a gaveta, a Nova demanda
   e o JS no node) e os de antes, `tests/test_engenharia_etm*.py`. Bancada local: scratchpad `bancada_etm.py` (OS inventadas).
 - **Depois:** a regra (`nexus/engenharia/etm*.py`) ainda mora na pasta da Engenharia, que tem a trava de PR do programador

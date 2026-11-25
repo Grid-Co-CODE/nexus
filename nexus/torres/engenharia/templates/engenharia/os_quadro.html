@@ -93,7 +93,13 @@
           <div class="etm-chips">{% for i, n in etm.etiquetas %}{% set on = i in m.etiquetas %}<form method="post" action="{{ url_for('torre_performance.etm_os_marcar', folio=o.os) }}"><input type="hidden" name="evento" value="etiqueta"><input type="hidden" name="valor" value="{{ i }}"><input type="hidden" name="ligado" value="{{ 'não' if on else 'sim' }}"><button type="submit" class="etm-chip" aria-pressed="{{ 'true' if on else 'false' }}">{{ n }}</button></form>{% endfor %}</div></div>
         <div class="etm-botoes">
           <form method="post" action="{{ url_for('torre_performance.etm_os_marcar', folio=o.os) }}"><input type="hidden" name="evento" value="acompanhamento"><input type="hidden" name="ligado" value="{{ 'não' if m.acompanhamento else 'sim' }}"><button type="submit" class="eg-ac-btn eg-ac-btn--o eg-ac-btn--p">{{ 'Tirar do acompanhamento' if m.acompanhamento else 'Pôr em acompanhamento' }}</button></form>
-          <form method="post" action="{{ url_for('torre_performance.etm_os_marcar', folio=o.os) }}"><input type="hidden" name="evento" value="finalizado"><input type="hidden" name="ligado" value="{{ 'não' if m.finalizado else 'sim' }}"><button type="submit" class="eg-ac-btn eg-ac-btn--o eg-ac-btn--p">{{ 'Reabrir para a Performance' if m.finalizado else 'Finalizar pela Performance' }}</button></form>
+          {# o Finalizar pede o comentário (25/11/2026, Levi: "deve ser obrigatório, eu coloco um comentário"): ele fica na
+             linha do tempo da OS e da usina, com quem finalizou; reabrir não pede #}
+          {% if m.finalizado %}<form method="post" action="{{ url_for('torre_performance.etm_os_marcar', folio=o.os) }}"><input type="hidden" name="evento" value="finalizado"><input type="hidden" name="ligado" value="não"><button type="submit" class="eg-ac-btn eg-ac-btn--o eg-ac-btn--p">Reabrir para a Performance</button></form>
+          {% else %}<details class="etm-fim-os"><summary class="eg-ac-btn eg-ac-btn--o eg-ac-btn--p">Finalizar pela Performance</summary>
+            <form method="post" action="{{ url_for('torre_performance.etm_os_marcar', folio=o.os) }}" class="etm-fim-form"><input type="hidden" name="evento" value="finalizado"><input type="hidden" name="ligado" value="sim">
+              <textarea class="eg-tl-obs" name="comentario" rows="3" maxlength="2000" required aria-label="Comentário do Finalizar (obrigatório)" placeholder="Comentário obrigatório: o que foi feito ou visto na ETM"></textarea>
+              <button type="submit" class="eg-ac-btn eg-ac-btn--g">Finalizar</button></form></details>{% endif %}
         </div>
         <p class="eg-dica">Fica no Nexus com o seu nome, a data e a hora, e entra na linha do tempo. A OS sai das abertas para a Performance com o diagnóstico ou o finalizado.</p>
         {% else %}

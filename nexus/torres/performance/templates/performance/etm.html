@@ -84,7 +84,7 @@
          a gaveta dela (a linha do tempo, o comentário, a Nova demanda e o Finalizar); fechar a gaveta volta aos cartões #}
       <section class="etm-painel" id="etm-p-abertas" aria-label="Estações em Aberto" hidden>
         <div class="etm-sec-cab"><h2 class="etm-sec-tit">Estações em Aberto</h2><span class="etm-sec-n" id="etm-ab-n"></span>
-          <div class="cn-seg etm-ab-modo" role="group" aria-label="Ver por"><button type="button" data-modo="etms" aria-pressed="true">ETMs</button><button type="button" data-modo="os" aria-pressed="false">OS</button></div></div>
+          <div class="etm-ab-modo" role="group" aria-label="Ver por"><button type="button" data-modo="etms" aria-pressed="true"><i class="ph ph-squares-four" aria-hidden="true"></i>Por ETM<b id="etm-modo-n-etms"></b></button><button type="button" data-modo="os" aria-pressed="false"><i class="ph ph-kanban" aria-hidden="true"></i>Por OS<b id="etm-modo-n-os"></b></button></div></div>
         <div id="etm-ab-etms">
           <div class="etm-usinas" id="etm-ab-grade"></div>
           <div class="etm-sec-cab etm-sec-cab--2"><h2 class="etm-sec-tit">Estações em Acompanhamento</h2><span class="etm-sec-n" id="etm-ac-n"></span></div>
@@ -150,6 +150,11 @@
       {% if pode %}<button type="button" class="gc-btn gc-btn--contorno" id="etm-us-fin"><i class="ph ph-check-circle" aria-hidden="true"></i><span>Finalizar pela Performance</span></button>{% endif %}
       <button type="button" class="gc-btn gc-btn--contorno" id="etm-us-hist"><i class="ph ph-clock-counter-clockwise" aria-hidden="true"></i>Todas as OS</button>
     </div>
+    {% if pode %}<form class="etm-chat-novo etm-us-fim" id="etm-us-fim" hidden>
+      <label class="gc-rotulo" for="etm-us-fim-txt" id="etm-us-fim-rot">Comentário do Finalizar (obrigatório)</label>
+      <textarea class="gc-campo eg-tl-obs" id="etm-us-fim-txt" rows="3" maxlength="2000" required placeholder="O que foi feito ou visto na ETM: fica na linha do tempo, com o seu nome"></textarea>
+      <div class="etm-chat-acoes"><button type="submit" class="gc-btn gc-btn--primario" id="etm-us-fim-ok">Finalizar</button><button type="button" class="etm-lnk" id="etm-us-fim-nao">Cancelar</button></div>
+    </form>{% endif %}
     <p class="eg-pdf-msg" id="etm-us-msg" role="status" hidden></p>
     {# comentar nas OS da usina sem abrir cada uma (24/11/2026): o mesmo caminho da página da OS (a ponte do OS Creator, que
        põe na nota da OS na sessão do Fracttal da pessoa e guarda no Nexus); quem não comenta na página da OS não vê #}
@@ -586,6 +591,8 @@
     var lab = Object.keys(ab).map(function (k) { return ab[k]; }).sort(porNome);
     var lac = Object.keys(ac).map(function (k) { return ac[k]; }).sort(porNome);
     abN.textContent = plural(lab.length, 'estação', 'estações') + ' · ' + lista.length + ' OS em aberto';
+    document.getElementById('etm-modo-n-etms').textContent = lab.length;
+    document.getElementById('etm-modo-n-os').textContent = lista.length;
     if (vista.abModo === 'os') {
       abOs.replaceChildren(lista.length ? quadroDe(lista, colunasCom(lista, false))
                                         : el('p', 'kb-vazio', 'Nenhuma OS aberta para a Performance com estes filtros.'));
@@ -635,7 +642,7 @@
   function abrirUsina(nome, botao) {
     if (!nome) return;
     usNome = nome; usDe = botao || null; vista.aberta = nome; guardar();
-    cabUsina(nome); dizerUs('');
+    cabUsina(nome); dizerUs(''); if (usFim) { usFim.hidden = true; usFimTxt.value = ''; }
     if (novo) {
       var lista = osParaComentar(nome), sel = document.getElementById('etm-chat-os');
       preencher(sel, lista.map(function (o) {
@@ -666,29 +673,47 @@
     vista.aba = 'historico'; vista.cliente = u ? u.cliente : ''; vista.usina = nome;
     hBusca.value = ''; trocaHash(); desenha(); subir();
   });
+  // o Finalizar pela Performance pede o comentário (25/11/2026, Levi: "deve ser obrigatório, eu coloco um comentário"): o
+  // botão abre a caixa; o comentário vai para cada OS finalizada e fica na linha do tempo, com quem finalizou
+  var usFim = document.getElementById('etm-us-fim'), usFimTxt = document.getElementById('etm-us-fim-txt');
   if (usFin) usFin.addEventListener('click', function () {
-    var daUsina = usNome, alvos = paraFinalizar(osDaUsina(daUsina)), n = alvos.length;
+    var n = paraFinalizar(osDaUsina(usNome)).length;
     if (!n || enviando) return;
-    if (!confirm('Marcar ' + (n === 1 ? 'a OS finalizada' : 'as ' + n + ' OS finalizadas') + ' no Fracttal desta usina como "Finalizado pela Performance"?')) return;
-    enviando = true; usFin.disabled = true; dizerUs('Gravando…');
-    // a resposta só fala na usina do pedido: quem já abriu outra não lê o aviso no lugar errado
-    var dizerDaUsina = function (texto) { if (!usGav.hidden && usNome === daUsina) dizerUs(texto); };
-    fetch(nexusRota('/t/performance/etm/finalizar'), {method: 'POST', credentials: 'same-origin',
-          headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
-          body: JSON.stringify({usina: daUsina, os: alvos.map(function (o) { return o.os; })})})
-      .then(function (r) { return r.json().then(function (j) { return {r: r, j: j}; }); })
-      .then(function (x) {
-        enviando = false;
-        if (!x.r.ok) { desenha(); cabUsina(daUsina); dizerDaUsina(x.j.erro || ('HTTP ' + x.r.status)); return; }
-        var feitas = {}; x.j.feitas.forEach(function (f) { feitas[f] = true; });
-        D.oss.forEach(function (o) { if (feitas[o.os]) o.finalizado = true; });
-        var nf = x.j.feitas.length, partes = [nf + (nf === 1 ? ' OS finalizada' : ' OS finalizadas') + ' pela Performance'];
-        if (x.j.ja.length) partes.push(x.j.ja.length + ' já tinha' + (x.j.ja.length === 1 ? '' : 'm') + ' o diagnóstico ou o finalizado (recarregue para ver)');
-        if (x.j.fora.length) partes.push(x.j.fora.length + (x.j.fora.length === 1 ? ' não está mais finalizada' : ' não estão mais finalizadas') + ' no Fracttal (recarregue para ver)');
-        desenha(); cabUsina(daUsina); desenhaTl(); dizerDaUsina(partes.join('; ') + '.');
-      })
-      .catch(function () { enviando = false; desenha(); cabUsina(daUsina); dizerDaUsina('Não consegui falar com o Nexus. Tente de novo.'); });
+    document.getElementById('etm-us-fim-rot').textContent = 'Comentário do Finalizar das ' + plural(n, 'OS', 'OS') + ' (obrigatório)';
+    document.getElementById('etm-us-fim-ok').textContent = 'Finalizar ' + plural(n, 'OS', 'OS');
+    usFim.hidden = false; usFimTxt.focus();
   });
+  if (usFim) {
+    document.getElementById('etm-us-fim-nao').addEventListener('click', function () { usFim.hidden = true; usFin.focus(); });
+    usFim.addEventListener('submit', function (ev) {
+      ev.preventDefault();
+      var daUsina = usNome, alvos = paraFinalizar(osDaUsina(daUsina)), texto = usFimTxt.value.trim();
+      if (!alvos.length || enviando) return;
+      if (!texto) { dizerUs('Escreva o comentário: ele é obrigatório para finalizar.'); usFimTxt.focus(); return; }
+      enviando = true; usFin.disabled = true; document.getElementById('etm-us-fim-ok').disabled = true; dizerUs('Gravando…');
+      // a resposta só fala na usina do pedido: quem já abriu outra não lê o aviso no lugar errado
+      var dizerDaUsina = function (t) { if (!usGav.hidden && usNome === daUsina) dizerUs(t); };
+      var fim = function () { enviando = false; document.getElementById('etm-us-fim-ok').disabled = false; };
+      fetch(nexusRota('/t/performance/etm/finalizar'), {method: 'POST', credentials: 'same-origin',
+            headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
+            body: JSON.stringify({usina: daUsina, os: alvos.map(function (o) { return o.os; }), comentario: texto})})
+        .then(function (r) { return r.json().then(function (j) { return {r: r, j: j}; }); })
+        .then(function (x) {
+          fim();
+          if (!x.r.ok) { desenha(); cabUsina(daUsina); dizerDaUsina(x.j.erro || ('HTTP ' + x.r.status)); return; }
+          var feitas = {}; x.j.feitas.forEach(function (f) { feitas[f] = true; });
+          D.oss.forEach(function (o) { if (feitas[o.os]) { o.finalizado = true; o.eng_fim_dia = D.hoje; } });
+          var nf = x.j.feitas.length, partes = [nf + (nf === 1 ? ' OS finalizada' : ' OS finalizadas') + ' pela Performance'];
+          if (x.j.ja.length) partes.push(x.j.ja.length + ' já tinha' + (x.j.ja.length === 1 ? '' : 'm') + ' o diagnóstico ou o finalizado (recarregue para ver)');
+          if (x.j.fora.length) partes.push(x.j.fora.length + (x.j.fora.length === 1 ? ' não está mais finalizada' : ' não estão mais finalizadas') + ' no Fracttal (recarregue para ver)');
+          if ((x.j.sem_comentario || []).length) partes.push('o comentário não gravou nas OS ' + x.j.sem_comentario.join(', ') + ': comente de novo nelas');
+          usFimTxt.value = ''; usFim.hidden = true;
+          desenha(); cabUsina(daUsina); dizerDaUsina(partes.join('; ') + '.');
+          if (usNome === daUsina) lerComentarios(daUsina);
+        })
+        .catch(function () { fim(); desenha(); cabUsina(daUsina); dizerDaUsina('Não consegui falar com o Nexus. Tente de novo.'); });
+    });
+  }
 
   // a linha do tempo da usina, em ordem cronológica, a mais nova primeiro: a OS aberta, a finalizada no Fracttal, a
   // encerrada pela Performance e os comentários (Levi: "ver como é que está o histórico de OS em linha do tempo, em
@@ -702,17 +727,27 @@
     var d = new Date(ms), p = function (n) { return (n < 10 ? '0' : '') + n; };
     return p(d.getDate()) + '/' + p(d.getMonth() + 1) + '/' + d.getFullYear() + (soDia ? '' : ' ' + p(d.getHours()) + ':' + p(d.getMinutes()));
   }
+  var FIM = {{ comentario_fim|tojson }};
   function eventos(nome) {
-    var ev = [];
+    var ev = [], comFim = {}, juntos = {};
+    (comentarios || []).forEach(function (c) { if (c.texto.indexOf(FIM) === 0) comFim[c.os] = true; });
     osDaUsina(nome).forEach(function (o) {
       var tit = o.titulo || '(sem título)';
       ev.push({ms: quando(o.criada_iso || o.criada_dia), dia: !o.criada_iso, tipo: 'aberta', o: o, txt: 'Aberta: ' + tit,
                meta: [o.tipo, o.responsavel ? 'com ' + o.responsavel : '', o.status].filter(Boolean).join(' · ')});
       if (o.coluna === 'finalizada' && o.fim_dia) ev.push({ms: quando(o.fim_dia), dia: true, tipo: 'fim', o: o, txt: 'Finalizada no Fracttal: ' + tit});
-      if (o.eng_fim_dia) ev.push({ms: quando(o.eng_fim_dia) - 1, dia: true, tipo: 'perf', o: o, txt: 'Encerrada pela Performance: ' + tit,
-                                  meta: [o.diagnostico ? 'Diagnóstico: ' + o.diagnostico : '', o.status_pos ? 'Status pós-OS: ' + o.status_pos : ''].filter(Boolean).join(' · ')});
+      if (o.eng_fim_dia && !comFim[o.os]) ev.push({ms: quando(o.eng_fim_dia) - 1, dia: true, tipo: 'perf', o: o, txt: 'Encerrada pela Performance: ' + tit,
+                                  meta: [o.eng_por ? 'por ' + o.eng_por : '', o.diagnostico ? 'Diagnóstico: ' + o.diagnostico : '', o.status_pos ? 'Status pós-OS: ' + o.status_pos : ''].filter(Boolean).join(' · ')});
     });
-    (comentarios || []).forEach(function (c) { ev.push({ms: quando(c.iso), dia: false, tipo: 'coment', o: c, txt: c.texto, meta: c.nome}); });
+    (comentarios || []).forEach(function (c) {
+      if (c.texto.indexOf(FIM) !== 0) { ev.push({ms: quando(c.iso), dia: false, tipo: 'coment', o: c, txt: c.texto, meta: c.nome}); return; }
+      // o Finalizar de várias OS de uma vez grava o mesmo comentário em cada uma: um evento só, com as OS juntas
+      var k = c.nome + '|' + c.texto + '|' + (c.iso || '').slice(0, 16), j = juntos[k];
+      if (j) { j.oss.push(c.os); return; }
+      j = juntos[k] = {ms: quando(c.iso), dia: false, tipo: 'perf', o: c, oss: [c.os], fim: true,
+                       txt: c.texto.slice(FIM.length), meta: 'Finalizada pela Performance por ' + (c.nome || 'alguém')};
+      ev.push(j);
+    });
     // as demandas da Caixa de entrada que citam uma OS de ETM da usina ou a usina (Levi: "Tem que aparecer [...] Na linha
     // do tempo"): quem pediu, para quem, o tema, a situação e o último passo; o clique leva à Caixa
     demandas.forEach(function (d) {
@@ -728,7 +763,9 @@
       var li = el('li', 'etm-tl-i etm-tl-i--' + e.tipo);
       var cab = el('div', 'etm-tl-cab');
       cab.appendChild(el('span', 'etm-tl-q', dataTxt(e.ms, e.dia)));
-      if (e.o) { var a = el('a', 'etm-tl-os', 'OS ' + e.o.os); a.href = paginaOs(e.o); cab.appendChild(a); }
+      if (e.oss && e.oss.length > 1) e.oss.forEach(function (n) { var x = el('a', 'etm-tl-os', 'OS ' + n); x.href = paginaOs({os: n}); cab.appendChild(x); });
+      else if (e.o) { var a = el('a', 'etm-tl-os', 'OS ' + e.o.os); a.href = paginaOs(e.o); cab.appendChild(a); }
+      if (e.fim) cab.appendChild(el('span', 'etm-tl-tag etm-tl-fim', 'Finalizada'));
       if (e.tipo === 'coment') cab.appendChild(el('span', 'etm-tl-tag', 'Comentário'));
       if (e.d) { var dl = el('a', 'etm-tl-tag etm-tl-dem', 'Demanda · ' + (e.d.aberta ? 'aberta' : 'fechada')); dl.href = e.d.caixa; dl.title = 'Abrir a demanda na Caixa de entrada'; cab.appendChild(dl); }
       li.appendChild(cab);

@@ -1042,7 +1042,26 @@ dl.eg-ac-dados dd.eg-resp{display:flex;align-items:center;justify-content:flex-e
 .etm-periodo-l{display:flex;gap:6px}
 .etm-periodo-l .gc-campo{min-width:0}
 .etm-fl-pe{display:flex;align-items:center;justify-content:flex-end;gap:14px;margin-top:14px;padding-top:12px;border-top:1px solid var(--linha)}
-.etm-ab-modo{margin-left:auto}
+/* o seletor Por ETM | Por OS (25/11/2026, Levi: "esse botão de ETMs e OS [...] tão pequeno e feio"): o segmentado do Nexus,
+   do tamanho dos botões da tela, com o ícone e a conta de cada visão */
+.etm-ab-modo{margin-left:auto;display:inline-flex;gap:2px;padding:3px;border-radius:10px;border:1px solid var(--linha-forte);background:var(--superficie-2)}
+.etm-ab-modo button{display:inline-flex;align-items:center;gap:7px;min-height:34px;padding:0 16px;border:0;border-radius:8px;background:transparent;
+  color:var(--tinta-2);font:600 13.5px/1 var(--font-sans);cursor:pointer;transition:background-color .15s,color .15s}
+.etm-ab-modo button .ph{font-size:16px}
+.etm-ab-modo button b{min-width:22px;padding:2px 7px;border-radius:999px;background:var(--superficie);color:var(--tinta-2);font:700 11.5px/1.3 var(--font-sans);font-variant-numeric:tabular-nums}
+.etm-ab-modo button:empty b,.etm-ab-modo button b:empty{display:none}
+.etm-ab-modo button:hover{color:var(--tinta)}
+.etm-ab-modo button[aria-pressed="true"]{background:var(--verde);color:var(--sobre-verde)}
+.etm-ab-modo button[aria-pressed="true"] b{background:var(--sobre-verde);color:var(--verde)}
+.etm-ab-modo button:focus-visible{outline:2px solid var(--foco);outline-offset:1px}
+@media (prefers-reduced-motion:reduce){.etm-ab-modo button{transition:none}}
+.etm-sec-cab{align-items:center}
+.etm-tl-fim{color:var(--ok)}
+.etm-fim-os{display:inline-block}
+.etm-fim-os>summary{list-style:none;cursor:pointer}
+.etm-fim-os>summary::-webkit-details-marker{display:none}
+.etm-fim-os[open]{display:block;width:100%}
+.etm-fim-form{display:flex;flex-direction:column;gap:8px;margin-top:8px}
 /* a gaveta da usina: maior que a padrão, com as ações, o comentário e a linha do tempo */
 .etm-us{width:min(720px,100vw)}
 .etm-us-acoes{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0 4px}

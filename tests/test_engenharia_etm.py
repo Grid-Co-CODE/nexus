@@ -478,7 +478,8 @@ def test_a_os_da_etm_tem_o_painel_das_marcacoes(pagina_etm, cliente):
     assert all(f">{n}</option>" in p for n in ("Falha de Equipamento", "Falha de Comunicação", "Sujidade", "Outro"))
     assert all(f">{n}</option>" in p for n in ("Chamado de Garantia", "Alinhamento com o Cliente", "Regularizado"))
     assert all(f'aria-pressed="false">{n}</button>' in p for n in ("OS em campo", "Stand By", "Validação Final"))
-    assert ">Pôr em acompanhamento</button>" in p and ">Finalizar pela Performance</button>" in p
+    assert ">Pôr em acompanhamento</button>" in p and ">Finalizar pela Performance</summary>" in p
+    assert 'name="comentario"' in p and "required" in p.split('name="comentario"', 1)[1].split(">", 1)[0]
     assert "<h2>Status e prioridade</h2>" not in html                    # o painel da ETM no lugar dele
     assert re.search(r'class="eg-ac-volta" href="/t/performance/etm">← ETMs</a>', html)
     rot = re.findall(r'<div class="lbl">([^<]+)</div>', html.split('class="eg-ac-kpis"', 1)[1].split("</section>", 1)[0])
@@ -494,7 +495,10 @@ def test_marcar_grava_e_volta_com_o_aviso(pagina_etm, cliente):
     assert r.status_code == 303 and r.headers["Location"].split("?", 1)[0].endswith(URL_OS) and "ok=" in r.headers["Location"]
     c.post(URL_OS + "/marcar", data={"evento": "etiqueta", "valor": "2", "ligado": "sim"}, headers=SAME)
     c.post(URL_OS + "/marcar", data={"evento": "acompanhamento", "ligado": "sim"}, headers=SAME)
-    c.post(URL_OS + "/marcar", data={"evento": "finalizado", "ligado": "sim"}, headers=SAME)
+    # o Finalizar sem o comentário é recusado e não marca nada (25/11/2026, Levi: "deve ser obrigatório")
+    r = c.post(URL_OS + "/marcar", data={"evento": "finalizado", "ligado": "sim"}, headers=SAME)
+    assert "erro=O+coment" in r.headers["Location"] and not M.estado(M.ler(forcar=True)["eventos"])["60003"].get("finalizado")
+    c.post(URL_OS + "/marcar", data={"evento": "finalizado", "ligado": "sim", "comentario": "Sensor limpo"}, headers=SAME)
     e = M.estado(M.ler(forcar=True)["eventos"])["60003"]
     assert (e["diagnostico_id"], e["status_pos_id"], e["etiquetas"], e["acompanhamento"], e["finalizado"]) == \
            (2, 1, {2}, True, True)
@@ -710,7 +714,7 @@ def test_finalizar_pela_engenharia_em_lote(lote, cliente, monkeypatch):
     real = M._publicar
     monkeypatch.setattr(M, "_publicar", lambda eventos: (gravacoes.append(len(eventos)), real(eventos)))
     c = _como(cliente, ANA)
-    r = c.post(URL_FIN, json={"usina": U, "os": ["3", "5", "1", "99"]}, headers=SAME)
+    r = c.post(URL_FIN, json={"usina": U, "os": ["3", "5", "1", "99"], "comentario": "Sensores limpos"}, headers=SAME)
     j = r.get_json()
     assert r.status_code == 200 and sorted(j["feitas"]) == ["3", "5"] and sorted(j["fora"]) == ["1", "99"]
     assert len(gravacoes) == 1
@@ -718,7 +722,7 @@ def test_finalizar_pela_engenharia_em_lote(lote, cliente, monkeypatch):
     assert e["50003"]["finalizado"] is True and e["50005"]["finalizado"] is True and "50001" not in e
     assert {x["usina_id"] for x in M._reler()["eventos"]} == {7}
     # de novo: já estão finalizadas, nada a gravar
-    j = c.post(URL_FIN, json={"usina": U, "os": ["3"]}, headers=SAME).get_json()
+    j = c.post(URL_FIN, json={"usina": U, "os": ["3"], "comentario": "ok"}, headers=SAME).get_json()
     assert j["feitas"] == [] and j["ja"] == ["3"] and len(gravacoes) == 1
 
 
@@ -727,7 +731,7 @@ def test_finalizar_em_lote_pula_a_que_tem_diagnostico(lote, cliente):
 
     from nexus.engenharia import etm_marcas as M
     M.marcar({"wid": 50003, "folio": "3", "codigo": "ALF100-ESTM1"}, "diagnostico", 1, ANA, True)
-    j = _como(cliente, ANA).post(URL_FIN, json={"usina": U, "os": ["3", "5"]}, headers=SAME).get_json()
+    j = _como(cliente, ANA).post(URL_FIN, json={"usina": U, "os": ["3", "5"], "comentario": "ok"}, headers=SAME).get_json()
     assert j["feitas"] == ["5"] and j["ja"] == ["3"]
 
 
@@ -741,7 +745,7 @@ def test_finalizar_em_lote_so_quem_e_da_engenharia_e_do_proprio_site(lote, clien
     # desde 24/11/2026 quem finaliza é a Performance: a Engenharia, com a tela marcada, lê e não grava
     monkeypatch.setattr(ST, "acesso", lambda: {"tudo": False, "telas": {"performance/etm"},
                                                "setor": {"id": SID.ENGENHARIA, "nome": "Engenharia"}, "erro": ""})
-    r = _como(cliente, BETO).post(URL_FIN, json={"usina": U, "os": ["3"]}, headers=SAME)
+    r = _como(cliente, BETO).post(URL_FIN, json={"usina": U, "os": ["3"], "comentario": "ok"}, headers=SAME)
     assert r.status_code == 403 and "Performance" in r.get_json()["erro"]
     assert M._reler()["eventos"] == []
 
@@ -813,7 +817,7 @@ def test_sem_leitura_do_fracttal_finalizar_e_chat_dizem_que_estao_lendo(tela, cl
     from nexus.engenharia import etm_marcas as M
     monkeypatch.setattr(E, "dados", lambda: {"os": [], "usinas": {}, "lido": 0.0, "lendo": True, "erro": ""})
     c = _como(cliente, ANA)
-    r = c.post(URL_FIN, json={"usina": U, "os": ["3"]}, headers=SAME)
+    r = c.post(URL_FIN, json={"usina": U, "os": ["3"], "comentario": "ok"}, headers=SAME)
     assert r.status_code == 503 and "Lendo" in r.get_json()["erro"]
     r = c.get(URL_CHAT, query_string={"usina": U})
     assert r.status_code == 503 and "Lendo" in r.get_json()["erro"]
@@ -906,3 +910,23 @@ def test_a_demanda_que_cita_a_os_entra_na_linha_do_tempo_da_os(pagina_etm, clien
     html = _como(cliente, ANA).get(URL_OS).get_data(as_text=True)
     assert pedidas == [{"17003"}]
     assert "Demanda para Caio Reis: Conferir o piranômetro (Aberta) · Caio Reis respondeu" in html and "Ana Lima · 25/11 07:00" in html
+
+
+def test_o_finalizar_em_lote_pede_o_comentario_e_ele_fica_na_linha_do_tempo(lote, cliente):
+    # Levi, 25/11/2026: "deve ser obrigatório, eu coloco um comentário [...] na linha do tempo [...] vai ter lá, finalizado
+    # por tal pessoa, e aí o comentário [...] Não é para se perder essa linha do tempo"
+    from test_engenharia_acompanhamento import ANA, SAME, _como
+
+    from nexus.engenharia import etm_marcas as M
+    from nexus.torres.performance import etm_tela
+    c = _como(cliente, ANA)
+    r = c.post(URL_FIN, json={"usina": U, "os": ["3"], "comentario": "   "}, headers=SAME)
+    assert r.status_code == 400 and "obrigatório" in r.get_json()["erro"] and M._reler()["eventos"] == []
+    j = c.post(URL_FIN, json={"usina": U, "os": ["3", "5"], "comentario": "Sensores limpos e cabo trocado"}, headers=SAME).get_json()
+    assert sorted(j["feitas"]) == ["3", "5"] and j["sem_comentario"] == []
+    chat = c.get(URL_CHAT, query_string={"usina": U}).get_json()
+    fins = [x for x in chat["comentarios"] if x["texto"].startswith(etm_tela.COMENTARIO_FIM)]
+    assert sorted(x["os"] for x in fins) == ["3", "5"] and all(x["nome"] == "Ana Lima" for x in fins)
+    assert fins[0]["texto"] == etm_tela.COMENTARIO_FIM + "Sensores limpos e cabo trocado"
+    html = c.get(URL_TELA).get_data(as_text=True)
+    assert '"Finalizado pela Performance: "' in html and "'Finalizada pela Performance por '" in html
