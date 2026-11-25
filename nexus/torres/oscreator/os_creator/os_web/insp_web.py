@@ -16,7 +16,7 @@ from __future__ import annotations
 import datetime as dt
 
 import chamado_insp_spec as ci
-from chamado_garantia.regras import TIPOS_ORIGEM
+from chamado_garantia.regras import TIPO_TAREFA, TIPO_TAREFA_ACOMPANHAMENTO
 
 from .tradicional_web import BRT, agora_brt, data_brt
 
@@ -38,28 +38,32 @@ ERRO_ATIVO = "Escolha o ativo."
 ERRO_MARCA = "Escolha a marca do ativo."
 ERRO_RESP = "Escolha o responsável em campo."
 
-# A OS PAI DO CHAMADO É A DE ORIGEM (25/11/2026, Levi: "Está tendo casos de OS de inspeção gerando outras OS de inspeção na
-# parte de chamados"). O "Abrir chamado" do card da OS (10/11/2026) aparecia em TODA OS, e a Inspeção virava pai de outra
+# A OS PAI DO CHAMADO NA WEB. De manhã (25/11/2026, Levi: "Está tendo casos de OS de inspeção gerando outras OS de inspeção
+# na parte de chamados") o "Abrir chamado" do card da OS (10/11/2026) aparecia em TODA OS, e a Inspeção virava pai de outra
 # Inspeção: uma inspeção de tracker ganhou três filhas Inspeção em dois dias (duas canceladas), uma de inversor ganhou
-# outra no mesmo dia, e uma corretiva de tracker ganhou duas cadeias de chamado com 4 dias entre elas. O App só abre
-# chamado de corretiva, corretiva emergencial e religamento (`chamado_garantia.TIPOS_ORIGEM`, conferido de novo no
-# /chamado/criar dele) e não abre outro no ativo com chamado em aberto (a v361); a web segue as mesmas duas regras: o
-# botão só aparece na OS de origem, a OS pai de outro tipo é recusada (ao escolher e ao criar) e o ativo com chamado em
-# aberto não ganha outro (`chamado_aberto.py`).
-_ORIGEM = {t.lower() for t in TIPOS_ORIGEM}
+# outra no mesmo dia. A web passou a seguir a regra do App (só corretiva, corretiva emergencial e religamento,
+# `chamado_garantia.TIPOS_ORIGEM`). À tarde o Levi abriu de novo, só no OS Creator: "muitas vezes dados levantados de OS
+# de preventiva ou de outro tipo, às vezes é visto que vai precisar abrir chamado [...] Pelo menos pelo OS Creator. E aí
+# pelo App de campo continua sendo como está. No OS Creator pode ser um pouquinho mais flexível, porque vai ter a análise
+# do back-office". Então na web a OS pai é QUALQUER OS menos as da própria cadeia do chamado, a Inspeção e a
+# Administrativa (o caso da manhã); o App segue com o `TIPOS_ORIGEM`. A outra trava fica: o ativo com chamado em aberto
+# não ganha outro (`chamado_aberto.py`).
+_CADEIA = {TIPO_TAREFA.lower(), TIPO_TAREFA_ACOMPANHAMENTO.lower()}
 
 
 def pai_de_origem(tipo) -> bool:
-    """A OS com este tipo de tarefa pode ser a OS pai de um chamado? A OS com tarefas de tipos diferentes vem como
-    "A / B" (`_meta_tarefa_por_os`) e vale se uma delas for de origem."""
-    return any(t.strip().lower() in _ORIGEM for t in str(tipo or "").split("/"))
+    """A OS com este tipo de tarefa pode ser a OS pai de um chamado (e mostra o "Abrir chamado")? Qualquer tipo menos a
+    Inspeção e a Administrativa do chamado. A OS com tarefas de tipos diferentes vem como "A / B" (`_meta_tarefa_por_os`)
+    e vale se uma delas não for da cadeia; a OS sem o tipo lido vale (a análise é do back-office)."""
+    tipos = [t.strip().lower() for t in str(tipo or "").split("/") if t.strip()]
+    return not tipos or any(t not in _CADEIA for t in tipos)
 
 
 def erro_pai(tipo, folio=None) -> str:
-    """O recado da OS pai que não é de origem (ao escolher pelo nº ou pelas Últimas OS, e na criação)."""
+    """O recado da OS pai que é da cadeia do chamado (ao escolher pelo nº ou pelas Últimas OS, e na criação)."""
     qual = ("A OS %s" % folio) if folio else "A OS pai escolhida"
-    return ("%s é %s. A OS pai do chamado é a corretiva, a corretiva emergencial ou o religamento em que a falha "
-            "apareceu: escolha essa OS ou crie sem OS pai." % (qual, tipo or "de outro tipo"))
+    return ("%s é %s, que já é do chamado. A OS pai é a OS em que a falha apareceu (corretiva, preventiva ou outra): "
+            "escolha essa OS ou crie sem OS pai." % (qual, tipo or "do chamado"))
 
 
 def erro_chamado_aberto(ab: dict) -> str:
