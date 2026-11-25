@@ -7,7 +7,9 @@ from test_oscreator_solic_pcm import WEB, api  # noqa: F401
 
 
 def test_o_abrir_chamado_no_canto_esquerdo_do_rodape(monkeypatch):
-    monkeypatch.setattr(api, "_rpc_call", Fracttal([_tarefa(1)], [_item(1, 1)]).rpc)
+    t = _tarefa(1)
+    t["tasks_types_main_description"] = "Corretiva"     # desde 25/11/2026 o botão só aparece na OS de origem
+    monkeypatch.setattr(api, "_rpc_call", Fracttal([t], [_item(1, 1)]).rpc)
     h = _card()
     rodape = h[h.index('<footer class="det-foot">'):h.index("</footer>")]
     link = '<a class="det-b ambar det-chamado" href="/os/chamados/inspecao?pai=15900"'

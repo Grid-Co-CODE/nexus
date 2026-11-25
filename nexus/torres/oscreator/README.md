@@ -1220,7 +1220,8 @@ adicionar anexos como PDFS e fotos. E quando o PCM gere uma OS pela fila de PCM 
   (a Clonagem segue no menu). O "Abrir chamado" saiu junto e **voltou em 10/11/2026** (Levi: "Quero que no card da OS do
   histórico de OS do OS Creator tenha um botão de 'Abri Chamado' no extremo esquerdo lá em baixo"): o 1º do rodapé, leva à
   Inspeção de chamados com `?pai=<nº>`, e a tela carrega o ativo, a data do incidente e o responsável daquela OS; as abas do
-  OS Creator o abrem na aba de Chamados. No mesmo trabalho, o "ATIVOS (N)" do topo do card deixou de passar da tela a 375 px
+  OS Creator o abrem na aba de Chamados. **Desde 25/11/2026 só na OS de origem** (seção "A OS pai do chamado é a de
+  origem"). No mesmo trabalho, o "ATIVOS (N)" do topo do card deixou de passar da tela a 375 px
   (a linha inteira no celular, e o nome do ativo quebra).
 - **Os anexos do card** (a pergunta do Levi): `.mp4` e PDF entram em "documentos", com "Abrir" (o vídeo toca e o PDF abre
   no navegador) e "Baixar" (a rota renova o link do Fracttal); o "Baixar todos" os põe no .zip.
@@ -3492,3 +3493,22 @@ quatro fabricantes (três com cara de pessoa).
 de ETM ainda aberta lá, na sessão do Fracttal da pessoa, fechando cada tarefa com a data fim que ela põe
 (`registrar_execucao`) e só então `concluir_os_checado`. Regras no CLAUDE.md da torre Performance, seção "ETMs".
 
+## A OS pai do chamado é a de origem, e o ativo com chamado aberto não ganha outro (25/11/2026)
+- **O caso** (Levi: "Está tendo casos de OS de inspeção gerando outras OS de inspeção na parte de chamados"): o "Abrir
+  chamado" do card (10/11/2026) aparecia em TODA OS, e a Inspeção de chamados aceitava qualquer OS do ativo como pai (as
+  "Últimas OS" trazem a inspeção anterior em cima). Assim, uma inspeção de tracker ganhou três filhas Inspeção em dois dias
+  (duas canceladas), uma de inversor ganhou outra no mesmo dia, e uma corretiva de tracker ganhou duas cadeias de chamado
+  (inspeção e administrativa) com 4 dias entre elas. Nenhuma veio do App: o `/chamado/criar` dele confere a origem de novo,
+  e a ronda cria sem OS pai.
+- **As regras, as do App:** (1) a OS pai é de origem, corretiva, corretiva emergencial, religamento ou religamento remoto
+  (`chamado_garantia.TIPOS_ORIGEM`, por `insp_web.pai_de_origem`; a OS de tarefas de tipos diferentes vale se uma for): o
+  "Abrir chamado" só aparece nela (`pode_chamado` do `os_detalhe`), a OS pai de outro tipo é recusada ao escolher
+  (`/os/api/insp/pai`, o recado no lugar da OS pai) e de novo ao criar (`/os/api/insp/criar`, o tipo lido pelo
+  `_meta_tarefa_por_os`, porque o corpo chega de fora); (2) o ativo com chamado em aberto não ganha outro (409 com a inspeção
+  e a administrativa dele), pela mesma foto que o App lê na v333 e na v361, o livro `nexus_chamados_abertos`
+  (`os_web/chamado_aberto.py`, 1 min de memória). Sem OS pai segue valendo (a data do incidente é a escolhida).
+- **Sem a leitura, cria como antes:** o tipo da OS pai que não veio, ou a foto que não abriu (banco fora), não trava a
+  equipe de chamados; é a regra do App na OS ("não li" não cala a pergunta). O recado fica no log.
+- **O que não muda:** a criação pelo App, a administrativa da Inspeção realizada e a inspeção sem OS pai.
+- **Como provar:** `tests/test_oscreator_chamado_pai_origem_25_11.py` (e o `test_oscreator_card_abrir_chamado_10_11.py`, com a
+  OS de origem).

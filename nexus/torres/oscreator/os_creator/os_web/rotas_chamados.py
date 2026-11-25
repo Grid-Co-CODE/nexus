@@ -17,6 +17,7 @@ from flask import Blueprint, jsonify, redirect, render_template, request, url_fo
 import api
 import chamado_modelos_store as modelos
 
+from . import chamado_aberto
 from . import insp_web as iw
 from . import lista_central
 from . import rotas
@@ -136,6 +137,8 @@ def api_pai():
         return jsonify({"erro": "não consegui ler essa OS: %s" % e}), 502
     if not d:
         return jsonify({"erro": "OS não encontrada — confira o número."}), 404
+    if d.get("tipo") and not iw.pai_de_origem(d.get("tipo")):     # a Inspeção não é pai de chamado (25/11/2026)
+        return jsonify({"erro": iw.erro_pai(d.get("tipo"), folio)}), 400
     try:
         pessoas = rotas.responsaveis_fracttal()
     except Exception:                                   # noqa: BLE001 — sem a lista, herda só a data
@@ -154,6 +157,18 @@ def api_criar():
     kwargs, erro = iw.validar_criar(request.get_json(silent=True) or {}, _cat())
     if erro:
         return jsonify({"erro": erro}), 400
+    # as duas travas do App (25/11/2026, `insp_web.pai_de_origem`): a OS pai é de origem (conferida de novo aqui, porque o
+    # corpo chega de fora) e o ativo não tem chamado em aberto. Sem ler o tipo da OS pai ou a foto dos chamados, cria
+    # como antes (o "não li" do App também não cala a pergunta)
+    pai = kwargs.get("id_parent")
+    if pai:
+        meta = api._meta_tarefa_por_os([pai]) or {}
+        tipo = ((meta.get(pai) or meta.get(str(pai)) or {}).get("tipo_tarefa") or "")
+        if tipo and not iw.pai_de_origem(tipo):
+            return jsonify({"erro": iw.erro_pai(tipo)}), 400
+    ab = chamado_aberto.do_ativo((kwargs.get("asset") or {}).get("code"))
+    if ab:
+        return jsonify({"erro": iw.erro_chamado_aberto(ab)}), 409
     try:
         r = api.create_inspecao_chamado(**kwargs)
     except Exception as e:                              # noqa: BLE001

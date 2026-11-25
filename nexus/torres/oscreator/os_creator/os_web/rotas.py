@@ -1201,5 +1201,7 @@ def os_detalhe(wid, folio=None):
         return render_template("erro.html", conta=_conta(), aba="hist", mensagem=msg), 404
     status = request.args.get("status") or ""
     template = "os_detalhe_conteudo.html" if parcial else "os_detalhe.html"
+    from .insp_web import pai_de_origem      # o "Abrir chamado" só na OS de origem (25/11/2026)
     return render_template(template, conta=_conta(), aba="hist", d=det, wid=wid, status=status, parcial=parcial,
-                           status_cor=STATUS_COR.get(status), fmt=api.fmt_data_br, duracao=api.duracao_os)
+                           status_cor=STATUS_COR.get(status), fmt=api.fmt_data_br, duracao=api.duracao_os,
+                           pode_chamado=pai_de_origem(det.get("tipo")))
