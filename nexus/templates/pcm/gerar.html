@@ -25,9 +25,9 @@
 {% endif %}
 {# o motor daqui atrás do do PCM (24/11/2026, `pcm/copias_pcm.py`) #}
 {% if copias_pcm %}
-<div class="pcm-aviso pcm-aviso--alerta"><i class="ph ph-git-diff"></i><div><strong>O PCM mudou o motor depois da cópia do
-  Nexus</strong> ({{ copias_pcm|map(attribute='do_pcm')|join(', ') }}): a semana gerada aqui pode sair diferente da do robô do
-  PCM até a cópia ser atualizada (o caminho está no README do motor).</div></div>
+<div class="pcm-aviso pcm-aviso--alerta"><i class="ph ph-git-diff"></i><div><strong>O motor do Nexus está diferente do
+  motor do PCM</strong> ({{ copias_pcm|map(attribute='do_pcm')|join(', ') }}): a semana gerada aqui pode sair diferente da
+  gerada pelo PCM até as duas cópias voltarem a ser iguais (o caminho está no README do motor).</div></div>
 {% endif %}
 {% if ok %}
 <div class="pcm-aviso pcm-aviso--ok"><i class="ph ph-check-circle"></i><div><strong>{{ ok }}</strong></div></div>

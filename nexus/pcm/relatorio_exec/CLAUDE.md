@@ -64,8 +64,8 @@ disponível para o cliente, é só para a organização mesmo!", e por isso ela 
 ## Como atualizar quando o PCM mudar o relatório
 
 Quem avisa que o PCM mudou é a **conferência das cópias** (`nexus/pcm/copias_pcm.py`, 24/11/2026): a cada 6 h ela
-compara cada arquivo daqui com o do PCM de agora e, se algum ficou atrás, a tela do executivo diz "O PCM mudou o
-relatório depois da cópia do Nexus". Caso que a criou: o JS ficou de 14/10 a 24/11 sem o backoffice e a regra da
+compara cada arquivo daqui com o do PCM de agora e, se algum ficou diferente (para trás ou para a frente), a tela do
+executivo diz "O relatório do Nexus está diferente do relatório do PCM". Caso que a criou: o JS ficou de 14/10 a 24/11 sem o backoffice e a regra da
 preventiva, e a W47 da Athon dava 55% aqui e 57% no painel (PA Leste 01, uma preventiva fora da planilha). A outra
 diferença daquele print (MA Leste 01, PA Norte 01) era só o horário do dado: o painel estava aberto desde a manhã.
 

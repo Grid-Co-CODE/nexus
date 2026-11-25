@@ -21,10 +21,27 @@ que o achou atrás do PCM. Conferido pelo hash (SHA-256 da cópia com CRLF):
 
 | Arquivo | Hash |
 |---|---|
-| `programacao_v7.py` | `8a58e515e534…` |
+| `programacao_v7.py` | `f3c1a5972956…` (24/11/2026: a coleta no dia e o `--semana`) |
 | `fonte_bd_api.py` | `b81d2c394d67…` |
 | `gerar_bd_via_api.py` | `9ba396a7874d…` (do `31aa38f`, 09/11/2026) |
 | `fora_da_programacao.py` | `91f9a81140c0…` |
+
+## A coleta de geração no dia da data programada e o `--semana` (24/11/2026)
+
+Reunião do PCM: quem programa escolhe o dia da coleta de dados de geração pela presença do time na usina, em geral
+no começo do mês, para coletar o mês anterior; o motor escolhia o dia sem olhar a data e adiantava a coleta (a W49
+começa na segunda 30/11). Agora a tarefa com "coleta" e "geração" no texto (`eh_coleta_de_geracao`; fora a coleta
+de óleo e a "coleta e análise de dados", que só em 8% cai no começo do mês) e com a Data Programada de segunda a
+sexta da semana (`_dia_da_coleta`) cai nesse dia, nunca antes: dia cheio, forçada com [EXCEDE HH]; feriado, o próximo
+dia útil da semana; sem ele, pendência (entra na próxima como atrasada, pelo carry-over). A atrasada e a de sábado não
+prendem dia. O pin das observações da OS vence. Prova: a W41 real, pela foto de 02/10, com o motor de antes e o novo
+(`gerar_semana_foto --semana 2026-W41 --foto ... --contra`): as 48 coletas da semana no dia programado, nenhuma antes,
+21 forçadas (todas com data na segunda), 26 outras tarefas empurradas para depois pela coleta e 8 a menos nas
+pendências; e `tests/test_pcm_motor_coleta.py`.
+
+No mesmo commit, o `--semana`: o laço lia o próprio "--semana" como valor, a leitura falhava e o motor gerava SEMPRE
+a semana da próxima segunda, qualquer que fosse a pedida (a W41 pela foto saía a de 30/11). Agora vale o argumento
+seguinte. Na geração de todo dia (a próxima semana) nada muda.
 
 ## Por que uma cópia, e não um motor novo
 

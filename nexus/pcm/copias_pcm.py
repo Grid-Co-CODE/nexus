@@ -124,6 +124,7 @@ def estado(config) -> dict | None:
 
 
 def diferentes(config, parte: str) -> list[dict]:
-    """As cópias de uma parte ("relatorio_exec" ou "motor") que ficaram atrás do PCM; vazio sem conferência."""
+    """As cópias de uma parte ("relatorio_exec" ou "motor") diferentes das do PCM (para trás, ou para a frente quando o
+    Nexus sobe antes do PCM); vazio sem conferência."""
     r = estado(config) or {}
     return [d for d in r.get("diferentes") or [] if d.get("parte") == parte]

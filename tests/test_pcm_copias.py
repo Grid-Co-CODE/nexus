@@ -80,13 +80,13 @@ def test_toda_copia_do_pcm_esta_na_conferencia():
 
 
 def test_o_aviso_nas_duas_telas(app, logado, dados_pcm):  # noqa: F811
-    assert "O PCM mudou" not in logado.get(URL).get_data(as_text=True)
+    assert "está diferente do relatório do PCM" not in logado.get(URL).get_data(as_text=True)
     app.config["NEXUS_PCM_COPIAS_TESTE"] = {"diferentes": [
         {"copia": "relatorio_exec/relatorio_exec.js", "do_pcm": "js/relatorio_exec.js", "parte": "relatorio_exec"},
         {"copia": "motor/programacao_v7.py", "do_pcm": "programacao_v7.py", "parte": "motor"}]}
     html = logado.get(URL).get_data(as_text=True)
-    assert "O PCM mudou o relatório depois da cópia do Nexus" in html and "js/relatorio_exec.js" in html
+    assert "O relatório do Nexus está diferente do relatório do PCM" in html and "js/relatorio_exec.js" in html
     assert "programacao_v7.py" not in html            # o motor avisa na tela dele, não aqui
     html = logado.get("/t/pcm/gerar").get_data(as_text=True)
-    assert "O PCM mudou o motor depois da cópia" in html and "programacao_v7.py" in html
+    assert "O motor do Nexus está diferente do" in html and "programacao_v7.py" in html
     assert "js/relatorio_exec.js" not in html

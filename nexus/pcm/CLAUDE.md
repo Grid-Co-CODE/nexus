@@ -2349,8 +2349,9 @@ Antes de ligar a `NEXUS_FAMA_APP`: os técnicos das usinas da FAMA com o "execut
   `status.json` (`fama`) e numa linha do log, só com contagens; a tela Gerar mostra cada motivo das que ficaram fora.
 - **Achados da prova com o motor de verdade (11/11/2026):** com a duração vazia, a preventiva da FAMA sem sigla e sem par
   na Lista de Prioridades saía com `dur_h` NaN e a rodada inteira quebrava (`alloc_diurno`): por isso 1,5 h, o último
-  recurso do próprio motor (`_estimate_h_sem_fracttal`). O motor gera sempre a semana da próxima segunda: o `--semana` da
-  linha de comando não pega nele (ele lê o próprio "--semana" como valor) e o Nexus tira o `PCM_WEEK_FORCE` do ambiente.
+  recurso do próprio motor (`_estimate_h_sem_fracttal`). Até 24/11/2026 o motor gerava sempre a semana da próxima segunda (o
+  `--semana` lia o próprio "--semana" como valor); corrigido no motor (README dele), e o Nexus segue tirando o
+  `PCM_WEEK_FORCE` do ambiente.
 - **O que segue aberto na fase 2** (da revisão de 11/11/2026; o resto foi feito em 13/11):
   - a vencida segue a regra do Fracttal (`_fila_elegivel`): a corretiva volta sempre; a preventiva, pela sigla (MPS e
     MPA sempre; MPM só no mês da semana); a preventiva da FAMA sem periodicidade no título, vencida, fica fora (13 das 91
