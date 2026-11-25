@@ -7,7 +7,7 @@
    desenho). Texto de terceiros (INMET, nome do cadastro) só entra por {{ }} (escapado), nunca por |safe. #}
 <meta http-equiv="refresh" content="{{ v.recarrega_em }}">
 <div class="cl">
-  <p class="cl-voltar"><a href="{{ url_for('torre_performance.clima', cliente=(v.cliente_filtro or None)) }}">Voltar para {{ tela.nome }}</a></p>
+  <p class="cl-voltar"><a href="{{ url_for('torre_campo.clima', cliente=(v.cliente_filtro or None)) }}">Voltar para {{ tela.nome }}</a></p>
 
   {% if v.erro_cadastro %}
   <div class="cl-aviso" role="alert">Cadastro indisponível: {{ v.erro_cadastro }}</div>

@@ -10,7 +10,6 @@ from datetime import datetime
 from flask import Response, current_app, jsonify, redirect, render_template, request
 
 from ...performance import ponte
-from ...performance.clima import fontes as F
 from ...prefixo import na_raiz
 from ...cadastro import setor_ids as SID
 from ..modelo import Tela, Torre
@@ -45,6 +44,12 @@ TORRE = Torre(
         Tela("strings-trackers", "Strings e trackers",
              "Quais strings e trackers estão perdendo energia?",
              "Plataforma de Performance e o livro nexus_falhas no banco (as OS vinculadas a cada falha)"),
+        # as ETMs (24/11/2026, Levi: "a parte de ETM agora vem para performance"): a tela que era da Engenharia, com as
+        # OS das estações meteorológicas; do setor Performance (quem age nelas). As rotas em etm_tela.py
+        Tela("etm", "ETMs",
+             "Quais estações meteorológicas têm OS aberta, com quem e há quanto tempo?",
+             "OS de ETM do Fracttal (cópia em disco, relida por trás) e as marcações da Performance (banco)",
+             do_setor=SID.PERFORMANCE),
         Tela("gerencial", "Visão gerencial",
              "O mês fecha dentro da meta de PR e geração?",
              "Plataforma de Performance (BD_Performance e BD_Thopen)"),
@@ -96,17 +101,8 @@ TORRE = Torre(
              "a fonte de cada usina pela plataforma (hoje a API PV, conta principal); passa pela mesma montagem da "
              "conversão e sai como planilha para colar",
              dentro_de="coletas", do_setor=SID.PERFORMANCE),
-        # O nome de cada fonte por extenso, de fontes.NOMES (Levi, 09/10/2026: "Quero as fontes por extenso também, não só sigla")
-        Tela("clima", "Clima e risco",
-             f"Onde há aviso do {F.extenso('inmet')}, foco de queimada ou risco de fogo perto das usinas?",
-             f"avisos do {F.extenso('inmet')}; focos e risco de fogo do {F.extenso('inpe')}; cruzados com as coordenadas do "
-             "cadastro; só leitura"),
-        # O id tem barra de propósito: o endereço é /t/performance/clima/mapa, filho da lista (o placeholder `/<tela_id>` não
-        # casa com barra, e a view própria é a única que responde ali).
-        Tela("clima/mapa", "Mapa de risco",
-             "Onde, no mapa do Brasil, estão as usinas que pedem ação por aviso, foco ou risco de fogo?",
-             f"contorno dos estados do {F.extenso('ibge')}; avisos do {F.extenso('inmet')}; focos e risco de fogo do "
-             f"{F.extenso('inpe')}; com a posição das usinas do cadastro; só leitura"),
+        # Clima e risco foi para a Usinas 360° e o Mapa de risco saiu em 24/11/2026 (Levi: "clima e risco vai para usinas 360.
+        # Mapa de risco pode tirar. Já está tudo lá na parte de mapa de equipe"); os endereços antigos, em mapa_tela.py
     ],
 )
 
@@ -240,13 +236,13 @@ def plataforma(caminho: str):
 
 # Clima e risco (06/10/2026): alertas públicos por usina. A rota mora em clima_tela.py, importada aqui no fim porque precisa
 # do `bp` e da `TORRE` definidos acima; a regra mora em nexus/performance/clima/.
-from . import clima_tela  # noqa: E402,F401
-# Mapa de risco (07/10/2026): a mesma leitura do Clima e risco, num mapa do Brasil (/t/performance/clima/mapa).
+# Os endereços antigos do Clima e risco (foi para a Usinas 360°) e do Mapa de risco (saiu), em 24/11/2026.
 from . import mapa_tela  # noqa: E402,F401
 from . import coletas_tela  # noqa: E402,F401
 from . import furos_tela  # noqa: E402,F401
 from . import sala_tela  # noqa: E402,F401
 from . import limitacoes_tela  # noqa: E402,F401
+from . import etm_tela  # noqa: E402,F401
 
 
 # ── Quadro da equipe (04/11/2026) ───────────────────────────────────────────────────────────────────────────────────

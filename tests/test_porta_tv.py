@@ -78,13 +78,6 @@ def test_sem_a_chave_nao_ha_botao():
     assert "Performance ainda não ligada neste servidor" in h and _botao_tv(h) is None
 
 
-def test_o_mapa_de_risco_continua_com_o_modo_tv_dele(mundo):
-    """O Mapa já tinha o botão (mapa.html, `data-acao="tv"`): nada muda nele."""
-    h = pagina(mundo)
-    assert re.search(r'<a class="gc-btn gc-btn--contorno" data-acao="tv" href="/t/performance/clima/mapa\?[^"]*tv=1[^"]*">'
-                     r'Modo TV</a>', h)
-
-
 # ── o ?tv=1 ──────────────────────────────────────────────────────────────────────────────────────────────────────────
 @pytest.mark.parametrize("prefixo", ["", PREFIXO])
 def test_o_modo_tv_sai_sem_a_casca_e_com_a_moldura(prefixo):
@@ -271,6 +264,3 @@ def test_com_o_token_do_fracttal_vencido_a_tv_vai_ao_login_e_volta_para_ela(monk
         assert j["entrar"].startswith(f"{prefixo}/entrar?") and "motivo=venceu" in j["entrar"]
 
 
-# o Mapa de risco precisa do mundo de mentira dele (cadastro e leituras prontas, sem rede)
-from test_torre_performance_mapa import pagina  # noqa: E402
-from test_torre_performance_mapa_tv import leituras, mundo  # noqa: E402,F401

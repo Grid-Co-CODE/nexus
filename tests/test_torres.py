@@ -54,9 +54,9 @@ def test_menu_abre_a_torre_atual():
 def test_menu_so_com_as_telas_do_setor():
     """Base → Acessos (12/10/2026): só as telas liberadas; torre sem nenhuma some; None = tudo (o administrador)."""
     torres = descobrir_torres()
-    menu = montar_menu(torres, None, liberadas={"pcm/quadro", "cos/mesa", "performance/clima/mapa"})
+    menu = montar_menu(torres, None, liberadas={"pcm/quadro", "cos/mesa", "performance/etm"})
     assert [m["id"] for m in menu] == ["cos", "pcm", "performance"]
-    assert [[s["id"] for s in m["telas"]] for m in menu] == [["mesa"], ["quadro"], ["clima/mapa"]]
+    assert [[s["id"] for s in m["telas"]] for m in menu] == [["mesa"], ["quadro"], ["etm"]]
     assert montar_menu(torres, None, liberadas=set()) == []
     assert len(montar_menu(torres, None, liberadas=None)) == len(torres)
 

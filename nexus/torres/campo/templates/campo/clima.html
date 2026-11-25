@@ -16,7 +16,7 @@
         <tbody>
           {% for c in linhas %}
           <tr class="cl-lin{% if regiao %} cl-lin--regiao{% endif %}">
-            <th scope="row" class="cl-col-usina"><span class="cl-nome"><a class="cl-link" href="{{ url_for('torre_performance.usina_clima', usina_id=c.id, cliente=(v.cliente or None)) }}">{{ c.nome }}</a></span><span class="cl-onde">{{ c.onde }}</span></th>
+            <th scope="row" class="cl-col-usina"><span class="cl-nome"><a class="cl-link" href="{{ url_for('torre_campo.usina_clima', usina_id=c.id, cliente=(v.cliente or None)) }}">{{ c.nome }}</a></span><span class="cl-onde">{{ c.onde }}</span></th>
             <td class="cl-col-porque">{{ c.por_que }}</td>
             {# uma pílula por evento, no nível mais alto, com a janela de todos os avisos dele; quando vale cada nível fica no balão
                (09/10/2026: a mesma "Baixa umidade" em dois níveis eram duas pílulas iguais) #}
@@ -121,7 +121,7 @@
       </form>
       {% endif %}
       {# o mapa é a outra visão do mesmo dado (Levi, 06/10/2026: "o mapa será complementar"); ele leva de volta à lista #}
-      <a class="gc-btn gc-btn--contorno" href="{{ url_for('torre_performance.mapa_de_risco') }}">Ver no mapa</a>
+      <a class="gc-btn gc-btn--contorno" href="{{ url_for('torre_campo.equipe', ver='usinas', clima='1') }}">Ver no Mapa de equipe</a>
       <span class="cl-atualizada">atualizada às {{ v.atualizada }}</span>
     </div>
   </header>
@@ -156,7 +156,7 @@
       {% set m = c.motivos[0] %}
       <article class="cl-usina">
         <div class="cl-usina-cab">
-          <div class="cl-usina-id"><h3 class="cl-nome"><a class="cl-link" href="{{ url_for('torre_performance.usina_clima', usina_id=c.id, cliente=(v.cliente or None)) }}">{{ c.nome }}</a></h3><span class="cl-onde">{{ c.onde }}</span></div>
+          <div class="cl-usina-id"><h3 class="cl-nome"><a class="cl-link" href="{{ url_for('torre_campo.usina_clima', usina_id=c.id, cliente=(v.cliente or None)) }}">{{ c.nome }}</a></h3><span class="cl-onde">{{ c.onde }}</span></div>
           <span class="cl-pill cl-pill--agir">{{ m.pill }}</span>
         </div>
         <p class="cl-principal">{{ m.principal }}</p>
@@ -215,9 +215,9 @@
     <div class="cl-secao-cab">
       <h2 class="cl-h2" id="cl-atencao">Atenção{% if v.n_atencao %} <span class="cl-h2-sub">· {{ v.n_atencao }} {{ "usina" if v.n_atencao == 1 else "usinas" }}{% if v.atencao_resumida %}, as {{ v.limite_atencao }} primeiras{% endif %}</span>{% endif %}</h2>
       {% if v.atencao_resumida %}
-      <a class="cl-ver" href="{{ url_for('torre_performance.clima', cliente=(v.cliente or None), todas=1, _anchor='cl-atencao') }}">Ver todas ({{ v.n_atencao }})</a>
+      <a class="cl-ver" href="{{ url_for('torre_campo.clima', cliente=(v.cliente or None), todas=1, _anchor='cl-atencao') }}">Ver todas ({{ v.n_atencao }})</a>
       {% elif v.n_atencao > v.limite_atencao %}
-      <a class="cl-ver" href="{{ url_for('torre_performance.clima', cliente=(v.cliente or None), _anchor='cl-atencao') }}">Ver só as {{ v.limite_atencao }} primeiras</a>
+      <a class="cl-ver" href="{{ url_for('torre_campo.clima', cliente=(v.cliente or None), _anchor='cl-atencao') }}">Ver só as {{ v.limite_atencao }} primeiras</a>
       {% endif %}
     </div>
     {% if v.atencao_linhas %}

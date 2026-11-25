@@ -22,7 +22,24 @@ pessoas dos setores, sem acento nem caixa.
 
 A cópia vale 5 min e é relida por trás enquanto a tela é usada (o mesmo do `os_equipe`); a leitura que falha guarda a
 anterior e diz. Nada vai para o banco.
+
+A CÓPIA EM DISCO (24/11/2026, Levi, quando a tela passou para a Performance: "Não está salvando na tela as ETMs que
+carregaram. Então, toda vez que sai e volta, lê o fractal tudo de novo e dá uma recusa de leitura do fractal. Tem que ver
+como é que o OS Creator está fazendo com a parte de histórico para a gente copiar essa técnica"). A cópia morava só na
+memória, e o servidor reinicia a cada push na `main` (~10 vezes por dia útil): a 1ª pessoa depois de cada reinício esperava
+as 15 páginas do Fracttal na hora, e no meio das leituras de subida dos outros (o porteiro, a cota de 200/min da empresa)
+o Fracttal recusava, e a tela ficava vazia com o erro. A técnica é a do OS Creator (`os_central` e `os_disco`) e a das OS de
+falha (`os_falhas`): a cópia vai para `<pasta de dados>/performance/etm.json.gz` depois de cada leitura que deu certo
+(trocada de uma vez: rascunho ao lado e `os.replace`), a subida lê o disco sem pedido nenhum ao Fracttal e a idade é a de
+verdade (a cópia de 3 min atrás não é relida só porque o processo é novo). Com cópia, a tela nunca espera o Fracttal: relê
+por trás e, se ele recusar, mostra a cópia com a hora dela. A OS que a pessoa acabou de mexer (a volta da página da OS
+depois de trocar o responsável) entra sozinha, num pedido só (`reler_os`), como a ação do OS Creator entra na lista dele.
+É cache do Fracttal, com texto de OS e nomes: não vai ao banco nem ao git. Arquivo de outro formato ou ilegível é ignorado.
 """
+import gzip
+import json
+import logging
+import os
 import threading
 import time
 from datetime import datetime, timedelta, timezone
@@ -52,8 +69,78 @@ SEM_USINA = "Usina não identificada"
 UFS = frozenset("AC AL AP AM BA CE DF ES GO MA MT MS MG PA PB PR PE PI RJ RN RS RO RR SC SP SE TO".split())
 # "etms" = {código da ETM: a usina dela no Fracttal}; "usinas" = {usina: quantas ETMs} (o Histórico lista por elas)
 _EST = {"ts": 0.0, "os": [], "etms": {}, "usinas": {}, "lendo": False, "erro": "", "erro_em": 0.0, "usado": 0.0,
-        "erro_setores": ""}
+        "erro_setores": "", "setores": {}, "carregado": False, "disco": ""}
 _TRAVA = threading.Lock()
+_TRAVA_DISCO = threading.Lock()
+FORMATO = 1                     # o formato da cópia em disco; outro número = arquivo de outra versão do código, ignorado
+ARQUIVO = ("performance", "etm.json.gz")
+
+
+def _arquivo():
+    """O arquivo da cópia (`<pasta de dados>/performance/etm.json.gz`); None fora de um app ou no teste sem pasta própria
+    (aí a cópia fica só na memória, como sempre foi)."""
+    from flask import current_app, has_app_context
+    if not has_app_context():
+        return None
+    from ..cadastro.ligacoes import pasta_dados
+    try:
+        return pasta_dados(current_app.config).joinpath(*ARQUIVO)
+    except RuntimeError:
+        return None
+
+
+def _carregar():
+    """A cópia do disco, uma vez por processo, antes da 1ª decisão de reler: com a idade de verdade (o `ts` gravado), o
+    reinício do deploy não relê a cópia de minutos atrás. A memória que já tem leitura não é trocada pelo disco."""
+    if _EST["carregado"]:
+        return
+    arq = _arquivo()
+    if arq is None:
+        return
+    with _TRAVA_DISCO:
+        if _EST["carregado"]:
+            return
+        _EST["carregado"] = True
+        if _EST["ts"]:
+            return
+        try:
+            d = json.loads(gzip.decompress(arq.read_bytes()).decode("utf-8"))
+        except FileNotFoundError:
+            _EST["disco"] = "sem cópia ainda"
+            return
+        except (OSError, ValueError, EOFError) as e:
+            _EST["disco"] = f"cópia ilegível ({type(e).__name__}), ignorada"
+            return
+        if not isinstance(d, dict) or d.get("formato") != FORMATO or not isinstance(d.get("os"), list):
+            _EST["disco"] = "cópia de outro formato, ignorada"
+            return
+        _EST.update(os=d["os"], etms=d.get("etms") or {}, usinas=d.get("usinas") or {}, ts=float(d.get("ts") or 0),
+                    erro_setores=d.get("erro_setores") or "", setores=d.get("setores") or {},
+                    disco="lida do disco")
+
+
+def _gravar():
+    """A cópia vai ao disco de uma vez (rascunho ao lado + `os.replace`): o reinício no meio nunca lê meio arquivo. A falha
+    do disco só vai ao log (a tela segue com a memória)."""
+    arq = _arquivo()
+    if arq is None or not _EST["ts"]:
+        return
+    corpo = {"formato": FORMATO, "ts": _EST["ts"], "os": _EST["os"], "etms": _EST["etms"], "usinas": _EST["usinas"],
+             "erro_setores": _EST["erro_setores"], "setores": _EST["setores"]}
+    with _TRAVA_DISCO:
+        tmp = arq.with_name(f"{arq.name}.{os.getpid()}.{threading.get_ident()}.tmp")
+        try:
+            arq.parent.mkdir(parents=True, exist_ok=True)
+            tmp.write_bytes(gzip.compress(json.dumps(corpo, ensure_ascii=False).encode("utf-8"), 6))
+            os.replace(tmp, arq)
+            _EST["disco"] = "gravada"
+        except OSError as e:
+            logging.warning("ETMs: não gravei a cópia em disco (%s)", e)
+            _EST["disco"] = f"não gravou ({type(e).__name__})"
+            try:
+                tmp.unlink()
+            except OSError:
+                pass
 
 
 def _ler_fracttal(path):
@@ -212,7 +299,8 @@ def _reler(app):
             for u in etms.values():
                 usinas[u] = usinas.get(u, 0) + 1
             _EST.update(os=oss, etms=etms, usinas=usinas, ts=time.time(), erro="", erro_em=0.0,
-                        erro_setores=erro_setores)
+                        erro_setores=erro_setores, setores=setores)
+            _gravar()
     except Exception as e:      # noqa: BLE001 — 429 ou rede: fica a leitura anterior, e a tela diz
         _EST.update(erro=str(e)[:200], erro_em=time.time())
     finally:
@@ -220,7 +308,15 @@ def _reler(app):
 
 
 def pedir_releitura(app=None, esperar=False, forcar=False):
-    """Relê se a cópia tem mais de 5 min (`forcar`: mais de 5 s). Sem cópia nenhuma, `esperar` lê na hora."""
+    """Relê se a cópia tem mais de 5 min (`forcar`: mais de 5 s). Sem cópia nenhuma, `esperar` lê na hora; com cópia (a da
+    memória ou a do disco), a leitura vai sempre por trás e a tela mostra a cópia."""
+    if app is not None:
+        with app.app_context():
+            _carregar()
+    else:
+        _carregar()
+    if _EST["ts"]:
+        esperar = False
     if time.time() - _EST["ts"] < (FORCAR_S if forcar else VALIDADE_S):
         return
     with _TRAVA:
@@ -265,17 +361,46 @@ def manter_quente(app):
     threading.Thread(target=laco, daemon=True, name="nexus-etm-quente").start()
 
 
+def reler_os(folio) -> bool:
+    """A OS que a pessoa acabou de mexer (a volta da página da OS depois de trocar o responsável, `?releia=<nº>`): só ela,
+    lida agora num pedido (o do clique, no porteiro), entra na cópia no lugar da de antes, e a cópia vai ao disco. A OS que
+    deixou de ser da tela sai. Sem cópia nenhuma, nada (a leitura inteira é que enche a tela). False quando não trocou."""
+    _carregar()
+    if not _EST["etms"]:
+        return False
+    f = str(int(folio))
+    linhas = [w for w in os_equipe._paginas_ate(f"work_orders?wo_folio={f}") if str(w.get("wo_folio")) == f]
+    if not linhas:
+        return False
+    from flask import current_app
+    setores = _EST["setores"] or _setores(current_app)[0]
+    novas = montar(linhas, set(_EST["etms"]), setores, datetime.now(BRT).date())
+    velhas = list(_EST["os"])
+    i = next((k for k, o in enumerate(velhas) if str(o.get("os")) == f), None)
+    if i is None:
+        velhas += novas
+    else:
+        velhas[i:i + 1] = novas
+    _EST["os"] = velhas
+    _gravar()
+    return True
+
+
 def dados() -> dict:
+    _carregar()
     return {"os": list(_EST["os"]), "usinas": dict(_EST["usinas"]), "lido": _EST["ts"], "lendo": _EST["lendo"],
-            "erro": _EST["erro"], "erro_setores": _EST["erro_setores"]}
+            "erro": _EST["erro"], "erro_em": _EST["erro_em"], "erro_setores": _EST["erro_setores"],
+            "disco": _EST["disco"]}
 
 
 def eh_etm(codigo) -> bool | None:
     """O código é de uma ETM? None sem leitura nenhuma (não se chuta)."""
+    _carregar()
     if not _EST["etms"]:
         return None
     return _limpo(codigo) in _EST["etms"]
 
 
 def limpar():
-    _EST.update(ts=0.0, os=[], etms={}, usinas={}, lendo=False, erro="", erro_em=0.0, usado=0.0, erro_setores="")
+    _EST.update(ts=0.0, os=[], etms={}, usinas={}, lendo=False, erro="", erro_em=0.0, usado=0.0, erro_setores="",
+                setores={}, carregado=False, disco="")

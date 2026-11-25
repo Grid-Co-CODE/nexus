@@ -273,7 +273,7 @@ def ufs_da_vista(v: Vista) -> tuple:
 
 # ── o que a tela desenha ─────────────────────────────────────────────────────────────────────────────────────────────
 
-URL_USINA = "/t/performance/clima/usina/{}"          # a página da usina (a tela principal a serve; o mapa só aponta para ela)
+URL_USINA = "/t/campo/clima/usina/{}"          # a página da usina (a tela principal a serve; o mapa só aponta para ela)
 NX = "nx"                                            # nível de quem ficaria "Sem alerta" mas teve fonte sem leitura
 ROTULO_NX = "Sem leitura completa"
 ORDEM_DE_DESENHO = {NX: 0, A.SEM_ALERTA: 1, A.REGIAO: 2, A.ATENCAO: 3, A.AGIR: 4}     # o que pede ação por último: fica por cima

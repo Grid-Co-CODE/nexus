@@ -33,7 +33,7 @@ navegador fala com cada sistema.
   | base · `fontes-tempo-real` (só admin, 11/10/2026) | `/admin/tempo-real`: quais usinas de cada fonte entram no tempo real |
   | base · `de-para-equipamentos` (só admin, 11/10/2026) | `/admin/de-para`: como cada usina de cada fonte se liga ao cadastro, e o editor (ponte pelo id, nome de cada inversor) |
 
-  Os ids que já existiam no menu não mudaram (viraram endereço). Clima e risco e Mapa de risco são do Nexus e ficam fora.
+  Os ids que já existiam no menu não mudaram (viraram endereço). Clima e risco (hoje na Usinas 360°) e as ETMs são do Nexus e ficam fora.
   **Abas numa tela de moldura (14/10/2026):** `registrar_molduras(..., abas={tela: {"primeira", "outras"}})` põe a tela da
   plataforma como 1ª aba e páginas do Nexus ao lado (`?aba=<id>`), com as mesmas abas no topo (`gc-subabas`). Hoje só as
   Chaves das fontes: "Fontes da Performance" (o /tokens) e "Nexus" (as Chaves do Nexus, `nexus/auth/chaves.py`).
@@ -320,7 +320,8 @@ plataforma local — mesmo número do card nos dois no mesmo minuto.
 
 ## Clima e risco (06/10/2026): alertas públicos por usina, só leitura
 
-Aba Performance → Clima e risco (`/t/performance/clima`). O Levi trouxe o pacote `gridco_meteo` (referência, fora do
+Usinas 360° → Clima e risco (`/t/campo/clima`; até 24/11/2026 na Performance, em `/t/performance/clima`, que responde
+308). O Levi trouxe o pacote `gridco_meteo` (referência, fora do
 repositório) e escolheu (06/10) começar pelos **alertas**: avisos do INMET, focos de queimada do INPE e risco de fogo do
 INPE, todos públicos e de uso livre. A tela cruza isso com as usinas em operação do cadastro e se atualiza sozinha
 (recarrega a cada 60 s; o que vai à rede é decidido pelo cache, não pela recarga). A **página de cada usina**
@@ -565,7 +566,9 @@ coordenadas de referência, só leitura): 25 usinas dentro de algum aviso, 1 com
 1,6 s e 0,7 MB por dia de risco. Mudou o leitor do GeoTIFF? Confira as tiles contra o Pillow (monte um mini-TIFF de uma faixa
 com `int32` no lugar de `double`: os bytes são os mesmos) antes de confiar.
 
-## Mapa de risco (07/10/2026): o Clima e risco num mapa do Brasil, só leitura
+## Mapa de risco (07/10/2026): o Clima e risco num mapa do Brasil, só leitura (A TELA SAIU EM 24/11/2026)
+
+**A tela saiu em 24/11/2026** (Levi: "Mapa de risco pode tirar. Já está tudo lá na parte de mapa de equipe"): `/t/performance/clima/mapa` leva ao Mapa de equipe com as usinas e o clima (`/t/campo/equipe?ver=usinas&clima=1`), e a tela, o modo TV, os `_mapa_*.html` e o `clima-mapa.js/.css` foram apagados. O que segue valendo abaixo é o **modelo** (`clima/mapa.py`: a projeção, as camadas, os níveis, a URL da usina, agora `/t/campo/clima/usina/<id>`), que o Mapa de equipe lê; o resto (o template, o JS, o modo TV) é histórico.
 
 Aba Performance → Mapa de risco (`/t/performance/clima/mapa`, filha da lista; o cabeçalho tem "Ver a lista" e "Modo TV", e o da lista tem "Ver no mapa"). Pedido do Levi
 (07/10), como tela à parte: a lista segue sendo a leitura detalhada, o mapa mostra ONDE. **Não é outra conta:**

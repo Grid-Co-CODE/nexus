@@ -1076,7 +1076,7 @@ def _trava_da_os(folio) -> threading.Lock:
 
 
 # a página da OS de onde veio o comentário (a do Quadro da equipe ou a da tela ETMs): o login do Fracttal volta para ela
-_PAGINA_DA_OS = re.compile(r"^/t/engenharia/(equipe|etm)/os/\d+$")
+_PAGINA_DA_OS = re.compile(r"^/t/(engenharia/equipe|engenharia/etm|performance/etm)/os/\d+$|^/t/performance/etm$")
 
 
 class _NotaIncompleta(RuntimeError):
@@ -1311,7 +1311,7 @@ def engenharia_etm_historico():
         jwt = str(s.get("jwt") or "")
         if not jwt:
             login = na_raiz("/os/login") + "?next=" + quote(
-                "/os/_nexus/card/voltar?" + urlencode({"de": "/t/engenharia/etm"}, safe="/"), safe="")
+                "/os/_nexus/card/voltar?" + urlencode({"de": "/t/performance/etm"}, safe="/"), safe="")
             return jsonify({"erro": "Para a nota das OS em aberto, entre pelo Fracttal.", "login": login}), 401
         email = str((s.get("conta") or {}).get("email") or "")
         return jsonify(H.iniciar_importacao(app, lambda o, linhas: _nota_do_historico(app, jwt, email, o, linhas))), 202

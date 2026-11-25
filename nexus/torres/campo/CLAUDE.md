@@ -2114,8 +2114,8 @@ O Levi viu a tela na bancada: "Gostei bastante! ... inclua também essas melhori
   no mapa"). `?ver=usinas` é o MESMO mapa do Técnicos (`situacao.desenho` sem ponto de técnico), com as usinas em
   operação do cadastro em destaque (`eq-u--dest`, o nome e o "cliente · UF" na dica) e a lista delas no painel ao lado.
   De 08/11 a 10/11/2026 este botão trazia a tela inteira do Mapa de risco da Performance para dentro desta (o pedido de
-  08/11: "quando clica em usinas aparece os alertas das UFVs"); o clima passou ao botão Incluir clima, abaixo, e a tela
-  inteira segue em Performance → Clima e risco → Mapa de risco. `?ver=tecnicos` (o padrão; qualquer outro valor também)
+  08/11: "quando clica em usinas aparece os alertas das UFVs"); o clima passou ao botão Incluir clima, abaixo (desde 24/11/2026 o Mapa de risco da Performance saiu, e o endereço
+  dele abre aqui com `?ver=usinas&clima=1`). `?ver=tecnicos` (o padrão; qualquer outro valor também)
   é a tela de sempre. **Nada de técnico no Usinas**: o serviço das posições nem sobe, o filtro de supervisor e equipe e
   o piloto somem, e a abertura **não grava "abriu_mapa"** na trilha da LGPD: não há dado pessoal ali. Sem o clima pedido
   a página nem vai às fontes do clima. Quem vê é o mesmo `_quem_ve` dos cinco setores e dos administradores, conferido
@@ -2870,3 +2870,14 @@ alto, a separação por tema e o texto curto, "para quem tem pouco tempo, porém
 
 Levi: "limitação de potência quero na parte de performance". A tela é `/t/performance/limitacoes`; a regra continua em
 `nexus/campo/limitacoes.py`. Tudo em `nexus/torres/performance/CLAUDE.md`, seção "Limitações de potência".
+
+## Clima e risco (veio da Performance em 24/11/2026)
+
+Levi, 24/11/2026: "clima e risco vai para usinas 360. Mapa de risco pode tirar. Já está tudo lá na parte de mapa de equipe".
+A lista e a página da usina (`/t/campo/clima`, `/t/campo/clima/usina/<id>`) moram em `clima_tela.py` e
+`templates/campo/clima.html` e `clima_usina.html`, logo depois do Mapa de equipe no menu; a regra segue em
+`nexus/performance/clima/` (a mesma que o Incluir clima do Mapa de equipe lê) e o que vale para ela está no
+`nexus/performance/CLAUDE.md`, seção "Clima e risco". O "Ver no Mapa de equipe" da lista abre `/t/campo/equipe?ver=usinas&clima=1`
+(o Mapa de risco saiu). Os endereços antigos `/t/performance/clima/...` respondem 308 (`torres/performance/mapa_tela.py`) e a
+marca de "performance/clima" vale para "campo/clima" (`setor_telas.RENOMEADAS`). Prova: `tests/test_torre_performance_clima*.py`
+e `tests/test_performance_etm.py` (os endereços antigos e o menu).

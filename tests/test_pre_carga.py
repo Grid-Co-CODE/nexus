@@ -42,7 +42,7 @@ def _estado(app) -> dict:
 
 def test_abre_so_o_que_pode_e_na_ordem_do_menu(app):
     a = PC.aqueciveis(app)
-    assert {"cos/mesa", "pcm/quadro", "campo/responsaveis", "campo/rondas", "performance/clima", "base/governanca"} <= set(a)
+    assert {"cos/mesa", "pcm/quadro", "campo/responsaveis", "campo/rondas", "campo/clima", "base/governanca"} <= set(a)
     assert not set(a) & PC.FORA                                                   # as que leem o Fracttal ao abrir
     assert not [t for t in a if t.startswith("os/")]                              # o OS Creator
     assert "performance/gerencial" not in a and "performance/tempo-real" not in a  # as molduras da plataforma

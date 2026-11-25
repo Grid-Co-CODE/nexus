@@ -43,8 +43,10 @@ PAUSA_S = 0.3
 # as telas que leem o Fracttal ao abrir: medido em 12/10/2026 abrindo as 85 telas com o Fracttal bloqueado, só estas
 # tentaram. Tela nova que lê o Fracttal ao abrir entra aqui (nexus/torres/CLAUDE.md).
 # o Quadro da equipe da Performance (04/11/2026) lê o Fracttal ao abrir sem cópia, como o da Engenharia
+# As ETMs (24/11/2026, vieram da Engenharia para a Performance) leem o Fracttal e, abertas, ficam 2 h relendo por trás
+# (`etm.marcar_uso`): a pré-carga de cada setor as deixaria relendo sem ninguém olhar; a cópia em disco já as abre rápido
 FORA = frozenset({"engenharia/mesa", "engenharia/confiabilidade", "engenharia/equipe", "campo/aprovacao",
-                  "performance/equipe"})
+                  "performance/equipe", "performance/etm"})
 # as telas que a pré-carga nunca abre por OUTRO motivo que não o Fracttal: abrir a tela já é um fato que fica gravado. O
 # Mapa de equipe (08/11/2026) põe cada abertura na trilha da LGPD (quem abriu a posição de quem): aquecido aqui, com a
 # sessão interna de administrador, ele subiria o serviço e gravaria um "abriu_mapa" que ninguém abriu, a cada volta e a

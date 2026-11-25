@@ -6,9 +6,9 @@ from ferramentas.exportar_estatico import PROIBIDOS, exportar
 
 def test_vitrine_sem_login_sem_dado_e_com_links_do_pages(tmp_path):
     n = exportar(tmp_path, "/nexus")
-    # `t/**`: o id de uma tela pode ter barra (Mapa de risco, /t/performance/clima/mapa), e a página dela fica um nível abaixo.
+    # `t/**`: o id de uma tela pode ter barra (a Recoleta pelas fontes, /t/performance/coletas/recoleta), e a página dela fica um nível abaixo.
     assert n == 1 + sum(1 for _ in tmp_path.glob("t/**/index.html"))
-    assert (tmp_path / "t" / "performance" / "clima" / "mapa" / "index.html").is_file()
+    assert (tmp_path / "t" / "performance" / "coletas" / "recoleta" / "index.html").is_file()
     for pagina in tmp_path.rglob("*.html"):
         html = pagina.read_text(encoding="utf-8")
         assert '/cadeira"' not in html and 'href="/sair"' not in html, pagina      # a troca de cadeira saiu (12/10)

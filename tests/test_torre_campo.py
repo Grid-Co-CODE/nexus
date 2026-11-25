@@ -8,7 +8,8 @@ from nexus.torres import descobrir_torres
 # o Ranking de pontos (13/10/2026) também é nosso: lê o livro ranking_app_campo que o App publica; o Mapa de equipe
 # (08/11/2026) lê as posições do Nexus Field
 NOSSAS = ("responsaveis", "usinas", "cliente", "equipe", "atencao", "aprovacao", "rondas", "zeladoria", "triagem",
-          "ranking", "guia-app")     # a "usinas" veio do Comando em 16/11/2026; o Guia do App de Campo, 21/11/2026
+          "ranking", "guia-app", "clima")     # a "usinas" veio do Comando em 16/11/2026; o Guia do App de Campo, 21/11/2026; o Clima e
+#                                       risco, da Performance em 24/11/2026
 
 
 def _campo():

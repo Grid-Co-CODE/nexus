@@ -1,4 +1,4 @@
-"""Torre Performance -> Clima e risco: a tela /t/performance/clima (06/10/2026; leitura rápida em 07/10/2026).
+"""Torre Performance -> Clima e risco: a tela /t/campo/clima (06/10/2026; leitura rápida em 07/10/2026).
 
 O mundo inventado (usinas, aviso, foco, risco, relógio e fixtures) mora em `clima_mundo.py`: é o mesmo da página da usina."""
 import re
@@ -61,7 +61,7 @@ def quadrados(html):
 
 def test_exige_login(mundo):
     _, _, app = mundo
-    assert app.test_client().get("/t/performance/clima").status_code == 302
+    assert app.test_client().get("/t/campo/clima").status_code == 302
 
 
 def test_a_tela_responde_com_titulo_pergunta_e_atualiza_sozinha(mundo):
@@ -77,12 +77,13 @@ def test_a_lista_leva_ao_mapa_de_risco(mundo):
     ao mapa como o mapa já leva de volta à lista."""
     c, _, _ = mundo
     html = pagina(c)
-    assert re.search(r'<a class="gc-btn[^"]*" href="/t/performance/clima/mapa">Ver no mapa</a>', html)
+    # o Mapa de risco saiu em 24/11/2026: o mapa das usinas é o do Mapa de equipe, no botão Usinas
+    assert re.search(r'<a class="gc-btn[^"]*" href="/t/campo/equipe\?ver=usinas&amp;clima=1">Ver no Mapa de equipe</a>', html)
 
 
 def test_a_tela_aparece_como_pronta_no_menu(mundo):
     c, _, _ = mundo
-    assert 'href="/t/performance/clima" class="com-conteudo"' in pagina(c, "/")
+    assert 'href="/t/campo/clima" class="com-conteudo"' in pagina(c, "/")
 
 
 def test_a_ordem_das_secoes_e_a_do_desenho_aprovado(mundo):
@@ -348,8 +349,8 @@ def test_uma_so_leitura_da_rede_por_fonte_mesmo_com_varias_visitas(mundo):
     pagina(c)
     n = len(sessao.pedidos)
     pagina(c)
-    pagina(c, "/t/performance/clima?cliente=Cliente X")                    # o filtro não muda o conjunto de pontos do risco
-    pagina(c, "/t/performance/clima?todas=1")                              # nem a lista inteira
+    pagina(c, "/t/campo/clima?cliente=Cliente X")                    # o filtro não muda o conjunto de pontos do risco
+    pagina(c, "/t/campo/clima?todas=1")                              # nem a lista inteira
     assert len(sessao.pedidos) == n
 
 
@@ -366,15 +367,15 @@ def test_rodape_com_as_fontes_e_a_atribuicao(mundo):
 def test_cada_cartao_e_cada_linha_levam_a_pagina_da_usina(mundo):
     c, _, _ = mundo
     html = pagina(c)
-    assert 'href="/t/performance/clima/usina/1"' in cartoes(html)["Usina Alfa"]
-    assert 'href="/t/performance/clima/usina/3"' in linhas(html)["Usina Gama"]
-    assert 'href="/t/performance/clima/usina/2"' in linhas(html)["Usina Beta"]
+    assert 'href="/t/campo/clima/usina/1"' in cartoes(html)["Usina Alfa"]
+    assert 'href="/t/campo/clima/usina/3"' in linhas(html)["Usina Gama"]
+    assert 'href="/t/campo/clima/usina/2"' in linhas(html)["Usina Beta"]
 
 
 def test_o_link_da_usina_guarda_o_filtro_de_cliente(mundo):
     c, _, _ = mundo
     html = pagina(c, cliente="Cliente Y")
-    assert 'href="/t/performance/clima/usina/3?cliente=Cliente+Y"' in linhas(html)["Usina Gama"]
+    assert 'href="/t/campo/clima/usina/3?cliente=Cliente+Y"' in linhas(html)["Usina Gama"]
 
 
 def test_a_tela_principal_nunca_chama_a_nasa(mundo_usina):
@@ -424,7 +425,7 @@ def test_matriz_com_25_usinas_mostra_as_20_primeiras_e_o_link_para_ver_todas(mun
     assert len(linhas_atencao(html)) == 20 and list(linhas_atencao(html))[0] == "Usina 01" and list(linhas_atencao(html))[-1] == "Usina 20"
     t = texto(html)
     assert "25 usinas, as 20 primeiras" in t and "Ver todas (25)" in t
-    assert 'href="/t/performance/clima?todas=1#cl-atencao"' in html
+    assert 'href="/t/campo/clima?todas=1#cl-atencao"' in html
 
 
 def test_com_todas_a_matriz_mostra_as_25_e_oferece_voltar(mundo25):
@@ -433,13 +434,13 @@ def test_com_todas_a_matriz_mostra_as_25_e_oferece_voltar(mundo25):
     assert len(linhas_atencao(html)) == 25 and list(linhas_atencao(html))[-1] == "Usina 25"
     t = texto(html)
     assert "25 usinas" in t and "25 usinas, as 20 primeiras" not in t and "Ver todas" not in t and "Ver só as 20 primeiras" in t
-    assert 'href="/t/performance/clima#cl-atencao"' in html
+    assert 'href="/t/campo/clima#cl-atencao"' in html
 
 
 def test_ver_todas_guarda_o_filtro_de_cliente(mundo25):
     c, _, _ = mundo25
     html = pagina(c, cliente="Cliente X")
-    assert 'href="/t/performance/clima?cliente=Cliente+X&amp;todas=1#cl-atencao"' in html
+    assert 'href="/t/campo/clima?cliente=Cliente+X&amp;todas=1#cl-atencao"' in html
 
 
 def test_com_20_usinas_ou_menos_nao_ha_link_nem_corte(mundo):
@@ -489,7 +490,7 @@ def test_375_px_nenhuma_largura_fixa_passa_da_tela_do_celular(mundo):
 # ── sem cadastro ─────────────────────────────────────────────────────────────────────────────────────────────────────
 
 def test_sem_cadastro_a_tela_responde_e_diz_o_que_falta(app, logado):
-    r = logado.get("/t/performance/clima")
+    r = logado.get("/t/campo/clima")
     assert r.status_code == 200
     t = texto(r.get_data(as_text=True))
     assert "Clima e risco" in t and "Cadastro indisponível" in t and "NEXUS_CHAVE_CADASTRO" in t
@@ -505,7 +506,7 @@ def test_cadastro_sem_usina_com_coordenada_diz_isso(tmp_path, monkeypatch):
         servico().aplicar_carga(Carga(entidades={"usinas": [u("1", "Usina Sozinha", "", None)]}, listas={"status_usina": ["OPERAÇÃO"]}))
     cl = app.test_client()
     cl.post("/entrar", data={"senha": SENHA_TESTE})
-    t = texto(cl.get("/t/performance/clima").get_data(as_text=True))
+    t = texto(cl.get("/t/campo/clima").get_data(as_text=True))
     assert "Nenhuma usina em operação com coordenada" in t and "Usina Sozinha" in t
 
 

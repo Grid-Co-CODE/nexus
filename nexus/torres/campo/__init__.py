@@ -31,6 +31,7 @@ from ...campo import painel_relatorio as campo_relatorio
 from ...campo import regras_app, visao
 from ...campo import decisao_pt, pt_fracttal, ronda_avulsa, ronda_checklist, ronda_fotos
 from ...cadastro import setor_ids as SID
+from ...performance.clima import fontes as _FONTES
 from ..modelo import Tela, Torre
 from ...prefixo import na_raiz, raiz
 from .papel import papel_da_sessao
@@ -79,6 +80,13 @@ TORRE = Torre(
         Tela("equipe", "Mapa de equipe", "Onde está cada técnico de campo agora, e qual a rota dele até uma usina?",
              "Posições do Nexus Field (o diário do dia e os livros nexus_equipe_*) + cadastro do Nexus",
              do_setor=(SID.PCM, SID.COS, SID.PERFORMANCE, SID.SUPERVISAO_CAMPO, SID.RESPONSAVEL_UFV)),
+        # o Clima e risco veio da Performance em 24/11/2026 (Levi: "clima e risco vai para usinas 360. Mapa de risco pode
+        # tirar. Já está tudo lá na parte de mapa de equipe"): a lista e a página da usina, em clima_tela.py; o mapa das
+        # usinas com os alertas é o do Mapa de equipe, no botão Usinas. O nome de cada fonte por extenso, de fontes.NOMES
+        Tela("clima", "Clima e risco",
+             f"Onde há aviso do {_FONTES.extenso('inmet')}, foco de queimada ou risco de fogo perto das usinas?",
+             f"avisos do {_FONTES.extenso('inmet')}; focos e risco de fogo do {_FONTES.extenso('inpe')}; cruzados com as "
+             "coordenadas do cadastro; só leitura"),
         Tela("atencao", "Central de atenção",
              "O que no campo pede ação agora: usina sem ronda, PT parada, ronda sem OS?", FONTE_APP),
         Tela("aprovacao", "Aprovação de OS",
@@ -2108,3 +2116,5 @@ from . import cliente_tela  # noqa: E402,F401
 from . import equipe_tela  # noqa: E402,F401
 # o Guia do App de Campo (21/11/2026), em guia_tela.py
 from . import guia_tela  # noqa: E402,F401
+# o Clima e risco (veio da Performance em 24/11/2026), em clima_tela.py
+from . import clima_tela  # noqa: E402,F401

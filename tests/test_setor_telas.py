@@ -100,14 +100,14 @@ def test_o_setor_de_cada_codigo_e_a_ultima_decisao_da_pessoa():
 
 
 def test_o_caminho_segue_a_tela_a_torre_e_o_os_creator(app):
-    telas = {"cos/mesa", "performance/clima/mapa"}
+    telas = {"cos/mesa", "performance/coletas/recoleta"}
     with app.test_request_context("/"):
         assert ST.pode("/t/cos/mesa", telas) and not ST.pode("/t/cos/ocorrencias", telas)
         assert ST.pode("/t/cos/mesa/dados.json", telas)                  # a sub-rota da tela segue a tela
         assert ST.pode("/t/cos/qualquer-dado", telas)                    # o resto da torre: quem tem uma tela dela
         assert not ST.pode("/t/pcm/qualquer-dado", telas)
-        assert ST.pode("/t/performance/clima/mapa", telas)               # o id com barra: a mais longa que casa
-        assert not ST.pode("/t/performance/clima", telas)
+        assert ST.pode("/t/performance/coletas/recoleta", telas)         # o id com barra: a mais longa que casa
+        assert not ST.pode("/t/performance/coletas", telas)
         assert not ST.pode("/os/", telas) and ST.pode("/os/", telas | {"os/inicio"})   # o OS Creator é a torre OS
         assert ST.pode("/os/_nexus/card/1", telas)                       # as ações do Campo e do HSEQ, não
         assert ST.pode("/", telas) and ST.pode("/tema", telas)
@@ -276,7 +276,7 @@ def test_a_secao_mostra_os_setores_e_a_arvore_do_menu(app, setores, logado):
     # cliente, 09/11/2026) não se marca para um setor da Grid
     assert html.count('<input type="checkbox" name="tela"') + html.count('<input type="checkbox" data-do-setor')         == sum(len([s for s in t.telas if not s.so_do_cliente]) for t in app.extensions["nexus_torres"])
     assert "Todo setor vê esta tela sem marcar" in html
-    assert 'value="performance/clima/mapa"' in html and 'value="cos/mesa"' in html
+    assert 'value="performance/coletas/recoleta"' in html and 'value="cos/mesa"' in html
     adm = logado.get(URL + f"?setor={ADMINISTRADOR}").get_data(as_text=True)                  # o setor "Administrador": caixas
     assert 'id="ace-matriz"' in adm and '<input type="hidden" name="setor" value="8">' in adm
     assert "Cadeira" not in html

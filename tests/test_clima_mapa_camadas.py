@@ -258,9 +258,9 @@ def test_cada_usina_aponta_para_a_pagina_dela_com_o_id_escapado(leituras):
     tudo_instalado(leituras)
     m = montar(cadastro=cadastro(usina("1", "A", ALFA), usina("a/b c?x=1#y", "B", BETA), usina("12ª", "C", GAMA)))
     hrefs = {u["nome"]: u["href"] for u in m["usinas"]}
-    assert hrefs["A"] == "/t/performance/clima/usina/1"
-    assert hrefs["B"] == "/t/performance/clima/usina/a%2Fb%20c%3Fx%3D1%23y"
-    assert hrefs["C"] == "/t/performance/clima/usina/12%C2%AA"
+    assert hrefs["A"] == "/t/campo/clima/usina/1"
+    assert hrefs["B"] == "/t/campo/clima/usina/a%2Fb%20c%3Fx%3D1%23y"
+    assert hrefs["C"] == "/t/campo/clima/usina/12%C2%AA"
 
 
 def test_o_titulo_diz_nome_cliente_nivel_e_o_motivo(leituras):
