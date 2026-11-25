@@ -94,7 +94,8 @@ def test_a_performance_ve_os_tres_relatorios_sem_marcar_nada(app, setores):
             == {f"relatorios/{t}" for t in RELATORIOS} | {"comando/caixa-de-entrada", "comando/contratos",
                                                           "performance/equipe", "campo/equipe",
                                                           "performance/coletas/recoleta", "performance/limitacoes",
-                                                          "performance/etm"}
+                                                          "performance/etm",
+                                                          "performance/metas"}      # as Metas das usinas (25/11/2026)
         # a Recoleta pelas fontes é do setor Performance desde 17/11/2026 (Levi: "so quem e do setor Performance")
         # e as Limitações de potência, desde 19/11/2026 (mudaram para a Performance e ganharam a tela de painel)
         # a Caixa é de todos (03/11); o Quadro da equipe da Performance (04/11); o Mapa de equipe (08/11/2026) é dos
