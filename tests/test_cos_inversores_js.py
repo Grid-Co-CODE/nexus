@@ -137,7 +137,10 @@ def test_os_pedidos_sao_os_tres_caminhos_do_repasse_do_nexus():
     # as strings de AGORA vêm na resposta de 3 s do monitoramento; desde 13/11/2026 o histórico do dia vem do terceiro
     # caminho (`scada/entradas/<logger>/<modbus>?dia=`), e a curva leva o `?dia=`. Nada além do que o servidor repassa
     texto = JS.read_text(encoding="utf-8")
-    assert set(re.findall(r'pedir\("([^"]+)"', texto)) == {"/scada/monitoramento?entradas=separadas", "/scada/curva/", "/scada/entradas/"}
+    # desde 25/11/2026, também os inversores do SunOP (`/sunop/monitoramento`), na janela e no laço de 20 s
+    assert set(re.findall(r'pedir\("([^"]+)"', texto)) == {"/scada/monitoramento?entradas=separadas", "/scada/curva/",
+                                                          "/scada/entradas/", "/sunop/monitoramento"}
+    assert 'pedir(art._sunop ? "/sunop/monitoramento" : "/scada/monitoramento?entradas=separadas")' in texto
     assert "fetch(" in texto and texto.count("fetch(") == 3      # o refresh do login, o pedido direto e o pela porta
 
 
@@ -449,3 +452,145 @@ def test_rele_desequilibrio_entre_fases():
 def test_rele_fase_do_codigo_e_disjuntor():
     r = rodar("console.log(JSON.stringify([['67B', '59N', '81', '27A', '86'].map(N.releFaseDoCodigo), [1, 0, null].map(N.releDisjuntor)]))")
     assert r == [["fase B", "neutro", "", "fase A", ""], ["Fechado", "Aberto", "Sem leitura"]]
+
+
+# --- o SunOP na janela e as barras por inversor (25/11/2026) -------------------------------------------------------------
+# O print do dono da aba Athon: "0 de N inversores" nos dez cartões e a janela sem gráfico. E o pedido do cliente: ver as
+# usinas em barras, uma por inversor, para enxergar quem gera menos que os vizinhos. Ids fictícios.
+
+def inv(n, pac, veredito="GERANDO", capacidade=None, usina="EXA01"):
+    return {"id": f"{usina}:{n}", "modbus_id": n, "nome": f"INV{n:02d}", "pac": pac, "veredito": veredito, "capacidade": capacidade}
+
+
+def barras(c):
+    return rodar("process.stdout.write(JSON.stringify(N.barrasDaUsina(JSON.parse(A[0]))));", json.dumps(c))
+
+
+def resumo(b, gerando):
+    return rodar("process.stdout.write(JSON.stringify(N.resumoDasBarras(JSON.parse(A[0]), A[1] === 'sim')));",
+                 json.dumps(b), "sim" if gerando else "nao")
+
+
+def test_o_sunop_se_reconhece_pelo_cartao_e_pelo_inversor():
+    r = rodar("process.stdout.write(JSON.stringify(JSON.parse(A[0]).map(function (x) { return N.ehDoSunop(x); })));", json.dumps([
+        {"pid": "sunop-exa100"}, {"fonte": "SUNOP"}, {"id": "SUNOP-EXA100:7"}, {"usina_id": "SUNOP-EXA100"},
+        {"pid": "scada-exa01"}, {"id": "EXA01:7"}, None]))
+    assert r == [True, True, True, True, False, False, False]
+
+
+def test_as_barras_na_ordem_da_usina_com_a_mediana_dos_que_geram():
+    c = {"situacao": {"chave": "GERANDO"}, "inversores": [inv(1, 200), inv(2, 0, "DESLIGADO"), inv(3, 180), inv(4, 190),
+                                                            inv(5, None, "SEM_COMUNICACAO")]}
+    b = barras(c)
+    assert [x["nome"] for x in b["barras"]] == ["INV01", "INV02", "INV03", "INV04", "INV05"]   # a ordem da usina
+    assert [x["tom"] for x in b["barras"]] == ["ok", "fora", "ok", "ok", "sem"]
+    assert [x["fracao"] for x in b["barras"]] == [1, 0, 0.9, 0.95, 0]
+    # a mediana é só dos que geram (200, 180, 190): 190, e o menor com medida é o desligado
+    assert b["medianaKw"] == 190 and b["mediana"] == 0.95 and b["menor"]["nome"] == "INV02" and not b["porNominal"]
+    assert resumo(b, True) == "mediana 190 kW · menor: INV02, 0 kW"
+
+
+def test_com_a_nominal_de_todos_a_barra_e_a_fracao_da_nominal():
+    # dois tamanhos na mesma usina: o de 125 kW a 120 kW gera, proporcionalmente, mais que o de 250 a 200
+    c = {"situacao": {"chave": "GERANDO"}, "inversores": [inv(1, 200, capacidade=250), inv(2, 120, capacidade=125)]}
+    b = barras(c)
+    assert b["porNominal"] and [x["pct"] for x in b["barras"]] == [80, 96] and b["barras"][1]["fracao"] == 1
+    assert resumo(b, True) == "mediana 88% da nominal · menor: INV01, 80%"
+    # um só sem a nominal: volta ao kW, para não misturar as duas réguas
+    c["inversores"].append(inv(3, 100))
+    b = barras(c)
+    assert not b["porNominal"] and [x["pct"] for x in b["barras"]] == [None, None, None] and b["barras"][0]["fracao"] == 1
+
+
+def test_sem_inversor_ou_de_noite_as_barras_nao_afirmam_nada():
+    b = barras({"inversores": []})
+    assert b["barras"] == [] and b["mediana"] is None and b["menor"] is None
+    assert resumo(b, True) == "sem a leitura dos inversores agora"
+    noite = barras({"situacao": {"chave": "STANDBY"}, "inversores": [inv(1, 0, "STANDBY"), inv(2, 0, "STANDBY")]})
+    assert noite["mediana"] is None and noite["menor"] is None and noite["gerando"] == 0
+    assert resumo(noite, False) == "2 inversores · nenhum gerando agora"
+
+
+def test_a_vista_guardada_comeca_na_curva_e_lembra_as_barras():
+    script = """
+      var mem = {}; var arm = { getItem: function (k) { return k in mem ? mem[k] : null; }, setItem: function (k, v) { mem[k] = String(v); } };
+      var quebrado = { getItem: function () { throw new Error('bloqueado'); }, setItem: function () { throw new Error('bloqueado'); } };
+      var r = [N.vistaGuardada(arm)];
+      N.guardarVista(arm, "barras"); r.push(N.vistaGuardada(arm), mem[N.CHAVE_DA_VISTA]);
+      N.guardarVista(arm, "qualquer"); r.push(N.vistaGuardada(arm));
+      N.guardarVista(quebrado, "barras"); r.push(N.vistaGuardada(quebrado), N.vistaGuardada(null));
+      process.stdout.write(JSON.stringify(r));
+    """
+    assert rodar(script) == ["curva", "barras", "barras", "curva", "curva", "curva"]
+
+
+def test_a_janela_do_sunop_nao_para_mais_no_aviso_e_nao_pede_o_historico_das_strings():
+    texto = JS.read_text(encoding="utf-8")
+    assert "A curva de cada inversor nesta janela ainda não está disponível para o SunOP" not in texto
+    assert "aberta._sunop) { return; }" not in texto
+    corpo = texto[texto.index("function desenharEntradasDoDia(i, hoje, dia) {"):]
+    corpo = corpo[: corpo.index("lerHistorico(")]
+    assert "if (ehDoSunop(i)) {" in corpo and "return;" in corpo          # volta antes de pedir o histórico
+    pre = texto[texto.index("var preCarregarHist = function () {"):]
+    assert pre.index("if (ehDoSunop(i)) { return; }") < pre.index("lerHistorico(")
+
+
+# --- as barras na JANELA da usina (25/11/2026) --------------------------------------------------------------------------
+# O dono, com a janela da Altair 5 aberta: "aqui tinha que ter a visualização em barra também". O bloco "Cada inversor"
+# ganha Curvas | Barras (a mesma escolha do alto da tela) e, nas barras, o kW de agora ou a energia do trecho, pela curva
+# gravada de 5 em 5 min.
+
+def test_a_energia_do_trecho_pela_curva_gravada_de_5_em_5_min():
+    # 360 = 06:00; três baldes de 120 kW (15 min = 30 kWh), um buraco (None) e um ponto fora do trecho
+    pts = [[360, 120], [365, 120], [370, None], [375, 120], [600, 999]]
+    r = rodar("var p = JSON.parse(A[0]); process.stdout.write(JSON.stringify([N.energiaDaSerie(p, 300, 420), "
+              "N.energiaDaSerie(p, 0, 300), N.energiaDaSerie([], 300, 420)]));", json.dumps(pts))
+    assert r == [30, None, None]
+
+
+def test_as_barras_de_energia_sem_o_estado_de_um_dia_que_passou():
+    c = {"situacao": {"chave": "STANDBY"}, "inversores": [inv(1, 0, "DESLIGADO"), inv(2, 0, "STANDBY"), inv(3, None, "SEM_COMUNICACAO")]}
+    valores = {"EXA01:1": 800.0, "EXA01:2": 400.0, "EXA01:3": None}
+    b = rodar("process.stdout.write(JSON.stringify(N.barrasDaUsina(JSON.parse(A[0]), { valores: JSON.parse(A[1]), semEstado: true })));",
+              json.dumps(c), json.dumps(valores))
+    # a cor de agora não vale num dia que passou; quem não tem curva gravada fica só no contorno
+    assert [x["tom"] for x in b["barras"]] == ["ok", "ok", "sem"] and [x["rotulo"] for x in b["barras"]] == [None, None, None]
+    assert b["energia"] and [x["fracao"] for x in b["barras"]] == [1, 0.5, 0]
+    # a mediana é de quem gerou energia, qualquer que seja o estado de agora
+    assert b["medianaBruta"] == 600 and b["menor"]["nome"] == "INV02" and b["gerando"] == 2
+    assert resumo(b, False) == "mediana 600 kWh · menor: INV02, 400 kWh"
+
+
+def test_a_energia_com_a_nominal_de_todos_vira_kwh_por_kw():
+    c = {"inversores": [inv(1, 0, capacidade=250), inv(2, 0, capacidade=125)]}
+    valores = {"EXA01:1": 1000.0, "EXA01:2": 600.0}
+    r = rodar("var b = N.barrasDaUsina(JSON.parse(A[0]), { valores: JSON.parse(A[1]) });"
+              "process.stdout.write(JSON.stringify([b.porNominal, b.barras.map(function (x) { return x.porKw; }), "
+              "N.valorDaBarra(b, b.barras[1]), N.textoDaMediana(b)]));", json.dumps(c), json.dumps(valores))
+    # o de 125 kW, com 600 kWh, rendeu 4,8 kWh por kW contra 4 do de 250: a barra dele é a mais alta
+    assert r == [True, [4, 4.8], "4,8 kWh/kW (600 kWh)", "4,4 kWh/kW"]
+
+
+def test_a_janela_tem_curvas_ou_barras_e_nao_desenha_as_curvas_escondidas():
+    texto = JS.read_text(encoding="utf-8")
+    montar = texto[texto.index("function montar(c) {"):]
+    montar = montar[: montar.index("\n  }\n")]
+    assert '[["curva", "Curvas"], ["barras", "Barras"]]' in montar and "trocarVista(par[0])" in montar
+    assert '[["agora", "Agora (kW)"], ["energia", "Energia do trecho"]]' in montar
+    atualizar = texto[texto.index("function atualizar(c, cv) {"):]
+    atualizar = atualizar[: atualizar.index("\n  }\n")]
+    assert 'emBarras = vista === "barras"' in atualizar and "if (!emBarras) grafico(p.graf" in atualizar
+    assert "energiaDaSerie(serie(s.pontos), tr.de, tr.ate)" in atualizar     # a gravada, nunca a ponta ao vivo
+    assert 'metrica = hoje ? metricaBarras : "energia"' in atualizar         # num dia que passou, só a energia
+    # a janela troca a vista da tela inteira (um localStorage só), e a coluna abre o inversor
+    troca = texto[texto.index("function trocarVista(v) {"):]
+    assert troca.index("guardarVista(raiz.localStorage, vista)") < troca.index("desenharTodasAsBarras(mapaVivo)")
+    barras = texto[texto.index("function graficoDeBarras(host, b, o) {"):]
+    assert "abrirInversor(x.id)" in barras[: barras.index("\n  }\n")]
+
+
+def test_o_css_das_barras_da_janela_so_com_tokens():
+    css = (JS.parent / "inversores.css").read_text(encoding="utf-8")
+    bloco = css[css.index("CURVAS OU BARRAS NA JANELA"):]
+    assert ".cos-inv-grade[hidden]" in bloco and ".cos-inv-barra--fora{fill:var(--critico)}" in bloco
+    assert not re.search(r"#[0-9a-fA-F]{3,6}\b|rgba?\(", bloco)

@@ -256,3 +256,23 @@ p.cos-inv-mppt-cab{font-weight:600;letter-spacing:.04em;text-transform:uppercase
 .cos-rele-chips.muda, .cos-rele-fases.muda, .cos-rele-cartao.muda { opacity: .45; }
 @container (max-width: 640px) { .cos-rele-faixa { grid-template-columns: 1fr 1fr; } .cos-rele-faixa .cos-rele-dj, .cos-rele-faixa .cos-rele-prot--atuou { grid-column: 1 / -1; } }
 @container (max-width: 300px) { .cos-rele-faixa { grid-template-columns: 1fr; } }
+
+/* CURVAS OU BARRAS NA JANELA (25/11/2026, o dono: "aqui tinha que ter a visualização em barra também"): o seletor do
+   bloco "Cada inversor" (a mesma escolha do alto da tela) e o gráfico de barras, uma coluna por inversor. Só tokens. */
+.cos-inv-vista{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:0 0 10px}
+.cos-inv-vista .gc-chip{padding:4px 12px}
+.cos-inv-vista .gc-chip:disabled{cursor:not-allowed;color:var(--mudo);background:transparent;border-style:dashed}
+.cos-inv-vista-metrica{display:inline-flex;flex-wrap:wrap;gap:6px;margin-left:6px;padding-left:12px;border-left:1px solid var(--linha)}
+.cos-inv-vista-metrica[hidden],.cos-inv-barras[hidden],.cos-inv-grade[hidden]{display:none}
+.cos-inv-barras{overflow-x:auto}
+.cos-inv-barras-svg{display:block}
+.cos-inv-barra--ok{fill:var(--verde-texto)}
+.cos-inv-barra--fora{fill:var(--critico)}
+.cos-inv-barra--semcom{fill:var(--alerta)}
+.cos-inv-barra--sem{fill:none;stroke:var(--linha-forte);stroke-width:1}
+.cos-inv-barra-alvo{fill:transparent;cursor:pointer}
+.cos-inv-barra-g:hover .cos-inv-barra{opacity:.75}
+.cos-inv-barras-mediana{stroke:var(--tinta-2);stroke-width:1;stroke-dasharray:5 4}
+.cos-inv-barras-val{fill:var(--tinta-2);font:600 10.5px var(--font-sans);font-variant-numeric:tabular-nums;pointer-events:none}
+.cos-inv-barras-rot{fill:var(--mudo);font:400 10.5px var(--font-sans);pointer-events:none}
+.cos-inv-barras .d{margin:6px 0 0;color:var(--mudo);font-size:12px}

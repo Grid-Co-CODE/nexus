@@ -588,8 +588,9 @@ def ler_geracao(config) -> Leitura:
 
 
 def ler_curvas(config) -> Leitura:
-    """As curvas do dia de todas as usinas com logger, de PASSO_DAS_CURVAS_MIN em PASSO_DAS_CURVAS_MIN minutos (a média das
-    janelas de 5 min gravadas). O SunOP não grava série: a usina dele vem sem curva (`tem_curva` falso)."""
+    """As curvas do dia de todas as usinas com logger e do SunOP, de PASSO_DAS_CURVAS_MIN em PASSO_DAS_CURVAS_MIN minutos (a
+    média das janelas de 5 min gravadas). A Ronda COS grava a série do SunOP desde 13/11/2026; a planta ainda sem amostra
+    vem sem curva (`tem_curva` falso)."""
     return _ler_geracao(config, "curvas", f"/api/nexus/geracao/curvas?passo={PASSO_DAS_CURVAS_MIN}", validar_curvas,
                         TTL_CURVAS_S, TIMEOUT_CURVAS_S)
 
@@ -600,6 +601,9 @@ def ler_curvas(config) -> Leitura:
 # NADA da cópia vencida servida na hora (`_com_copia`): a cópia vale `TTL_AO_VIVO_S` e a mesma leitura serve a todos
 # (um pedido só por leitura no ar). A curva dos inversores muda de 5 em 5 min: 60 s de cópia.
 TTL_AO_VIVO_S = 2.0
+# 25/11/2026, os inversores do SunOP na mesma janela: a Ronda COS lê o portal uma vez por minuto (o cache de 60 s por
+# planta), então 15 s de cópia aqui não atrasam nada e poupam o Andamento dos pedidos de 20 em 20 s de cada pessoa.
+TTL_SUNOP_AO_VIVO_S = 15.0
 TTL_CURVA_INVERSORES_S = 60.0
 # 13/11/2026, o dia escolhido na janela da usina: o histórico das strings de hoje muda de 5 em 5 min (60 s de cópia,
 # como a curva); o de um dia que já passou não muda mais, e a mesma leitura serve uma hora.
