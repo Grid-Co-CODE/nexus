@@ -310,8 +310,9 @@ def test_grava_as_abertas_e_na_falha_da_fotografia_o_retrato_de_antes_fica(app, 
     with app.app_context():
         rel = NB.publicar(app.config, banco, agora=AGORA, forcar=True, leitura=_leitura([_n("r1")]),
                           abertas_lidas=(ab[0], "2026-10-29T15:21:00-03:00", ab[1]))
-    # a aberta desde 12/07 NÃO vira comentário (09/11/2026: repetida em todo dia, o dono mandou tirar), nem na usina liberada
-    assert rel["gravado"] == {NB.ABA: 1, NB.ABA_ABERTAS: 1, NB.ABA_COMENTARIOS: 0, "atualizacao": 1}
+    # a aberta desde 12/07 é desligamento de inversor: para a geração, então vira comentário em todo dia de sol de 01/10
+    # (o começo do corte) até agora, 29/10 (25/11/2026, nível 1)
+    assert rel["gravado"] == {NB.ABA: 1, NB.ABA_ABERTAS: 1, NB.ABA_COMENTARIOS: 29, "atualizacao": 1}
     a = banco.linhas(NB.LIVRO, "atualizacao")[0]
     assert (a["abertas_em"], a["abertas_qtd"]) == ("2026-10-29T15:21:00-03:00", 1)
     with app.app_context():
@@ -405,6 +406,56 @@ def test_a_aberta_em_atendimento_com_o_equipamento_citado():
     assert list(d) == ["2026-11-08", "2026-11-09"]
     assert d["2026-11-08"]["relato_do_dia"] == "Cabine 2 desligada desde 08/11 às 10:15, em atendimento pelo COS."
     assert d["2026-11-09"]["relato_do_dia"] == "Continuação: Cabine 2 desligada desde 08/11 às 10:15, em atendimento pelo COS."
+
+
+def _aberta_linha(registro, **kw):
+    a = dict.fromkeys(NB.CAB_ABERTA, "")
+    a.update(registro=registro, cliente="THOPEN", usina_codigo="TSTE-AAA100", usina_id=1,
+             inicio="2026-10-27T09:00:00-03:00", **kw)
+    return [a[c] for c in NB.CAB_ABERTA]
+
+
+def test_so_a_aberta_que_para_a_geracao_entra_no_comentario():
+    """25/11/2026, o dono ("Sim, nível 1"): entra o desligamento (pelo código da API ou pelo rótulo), a atuação de
+    proteção e a "geração parou?" = sim; a falha de comunicação, a string, o ventilador, o tracker e a sem tipo ficam
+    fora (era delas a repetição da Mandaguaçu em 09/11)."""
+    entra = NB.aberta_entra_no_comentario
+    assert entra(_aberta_linha("a1", tipo_falha="DESLIGAMENTO_INVERSOR"))
+    assert entra(_aberta_linha("a2", tipo_falha="DESLIGAMENTO_DE_SKID"))
+    assert entra(_aberta_linha("a3", tipo_falha="ATUACAO_PROTECAO"))
+    assert entra(_aberta_linha("a4", tipo_falha="INVERSOR_FALHA_STRING", geracao_parou=1))
+    assert entra(_aberta_linha("a5", tipo_falha="INVERSOR_FALHA_STRING", geracao_parou="1.0"))
+    for tipo, gp in (("FALHA_COMUNICACAO", ""), ("FALHA_COMUNICACAO", 0), ("INVERSOR_FALHA_STRING", 0),
+                     ("ANORMALIDADE_VENTILADOR", ""), ("TRACKER_PARADO", 0), ("", 0), ("INVERSOR_OFFLINE", "")):
+        assert not entra(_aberta_linha("x", tipo_falha=tipo, geracao_parou=gp)), (tipo, gp)
+
+
+def test_a_aberta_so_da_api_ganha_o_nome_do_equipamento_pela_tag():
+    """A aberta que só a API traz não tem o nome citado pelo COS: o "Inversor 2.7" sai da tag do Fracttal."""
+    a = dict(zip(NB.CAB_ABERTA, _aberta_linha("a1", tipo_falha="DESLIGAMENTO_INVERSOR",
+                                              equipamentos_codigos="THPN-STR100-INVR2.7")))
+    assert NB._evento_aberto(a) == "Inversor 2.7 desligado"
+    a = dict(zip(NB.CAB_ABERTA, _aberta_linha("a2", tipo_falha="DESLIGAMENTO_DE_INVERSOR",
+                                              equipamentos_codigos="STR100-INVR2.7;STR100-INVR2.8")))
+    assert NB._evento_aberto(a) == "Inversor 2.7 e Inversor 2.8 desligados"
+    a = dict(zip(NB.CAB_ABERTA, _aberta_linha("a3", tipo_falha="DESLIGAMENTO_USINA", equipamentos_codigos="TSTE-AAA100")))
+    assert NB._evento_aberto(a) == "Usina desligada"
+
+
+def test_a_gravacao_leva_a_aberta_que_para_e_deixa_a_de_comunicacao(app, banco):
+    """Na gravação: a de desligamento de inversor ganha uma linha por dia de sol (o 1º com o evento, os outros com a
+    continuação); a falha de comunicação aberta no mesmo dia não aparece."""
+    ab = [_aberta_linha("a1", tipo_falha="DESLIGAMENTO_INVERSOR", equipamentos_codigos="TSTE-AAA100-INVR2.7"),
+          _aberta_linha("a2", tipo_falha="FALHA_COMUNICACAO", geracao_parou=0)]
+    with app.app_context():
+        rel = NB.publicar(app.config, banco, agora=AGORA, forcar=True, leitura=_leitura([_n("r1")]),
+                          abertas_lidas=(ab, "2026-10-29T15:21:00-03:00", {}))
+    gravadas = banco.linhas(NB.LIVRO, NB.ABA_COMENTARIOS)
+    assert [(g["dia"], g["registros"]) for g in gravadas] == [("2026-10-27", "a1"), ("2026-10-28", "a1"),
+                                                              ("2026-10-29", "a1")]
+    assert gravadas[0]["relato_do_dia"] == "Inversor 2.7 desligado desde 27/10 às 09:00, em atendimento pelo COS."
+    assert gravadas[2]["relato_do_dia"].startswith("Continuação: Inversor 2.7 desligado desde 27/10")
+    assert rel["comentarios_dias"] == 3
 
 
 def test_o_comentario_do_dia_todas_as_usinas_desde_01_10_pelo_dia(app, banco):

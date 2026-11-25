@@ -92,8 +92,16 @@ ABA_COMENTARIOS = "fato_comentario_dia"
 # Ribeirão Cascalheiras, de 09/09 a 12/11, leva o relato em 01/10 e a continuação nos dias seguintes). Medido em 25/11
 # no banco da Thopen: 1.092 dias novos (842 de outubro e 250 de 01 a 09/11), em 81 usinas; dos 229 dias de outubro em
 # que a Thopen deu menos de 100% sem parada nossa, 91 passam a ter texto. A Aparecida e a assistida deixam de ser
-# exceção. As ABERTAS seguem fora (era delas a repetição). Mudar o corte, ou voltar com as abertas, só com o OK do dono.
+# exceção. Mudar o corte só com o OK do dono.
 COMENTARIOS_DESDE = datetime(2026, 10, 1, tzinfo=timezone(timedelta(hours=-3)))
+# AS ABERTAS (25/11/2026, o dono: "esses 'Só ocorrência aberta' deveriam estar presentes nos comentários, não? já que
+# impacta na disponibilidade" e, entre os dois níveis medidos, "Sim, nível 1"). Desde 09/11 nenhuma aberta entrava: as
+# pendências antigas sem efeito na geração (string, ventilador, tracker, estação, relé, umidade) saíam repetidas em todo
+# dia da Mandaguaçu. Agora entra só a aberta que PARA A GERAÇÃO (`aberta_entra_no_comentario`): desligamento de usina,
+# cabine, SKID, QGBT ou inversor, atuação de proteção, falta da concessionária, ou a "geração parou?" = sim. A falha de
+# comunicação aberta (nível 2, a Mandaguaçu desde fevereiro) segue fora. Medido em 25/11: 15 das 72 abertas da Thopen,
+# 258 dias de 01/10 até hoje. Voltar com as outras abertas só com o OK do dono.
+TIPOS_ABERTA_QUE_PARA = frozenset({"ATUACAO_PROTECAO", "FALHA_CONCESSIONARIA"})
 TIPO_COMENTARIOS = "snapshot_acumulado"
 GRAO_COMENTARIOS = ("1 linha = 1 usina (o código do Fracttal) × 1 dia de Brasília em que uma ocorrência da Ronda COS "
                     "tocou o horário de sol (06h às 18h)")
@@ -339,11 +347,36 @@ _CITADO = ((re.compile(r"^CAB(\d+)$"), "Cabine {}"), (re.compile(r"^INV(.+)$"), 
            (re.compile(r"^SKID(\d+)$"), "SKID {}"), (re.compile(r"^QGBT(\d*)$"), "QGBT {}"))
 
 
-def _evento_aberto(r: dict) -> str:
-    """"Cabine 2 desligada" pela referência curta que o COS citou (CAB2); sem ela, o tipo ("Cabine desligada")."""
+def _citados_dos_codigos(codigos) -> list:
+    """As referências curtas pelas tags do Fracttal ("...-INVR2.7" → INV2.7, "...-CABN2" → CAB2): a aberta que só a API
+    das normalizações traz não tem os nomes que o COS citou, só as tags (25/11/2026)."""
+    out = []
+    for c in str(codigos or "").split(";"):
+        m = re.search(r"-(INVR|CABN|SKID|QGBT)(\d+(?:\.\d+)?)$", c.strip().upper())
+        if m:
+            ref = {"INVR": "INV", "CABN": "CAB"}.get(m.group(1), m.group(1)) + m.group(2)
+            if ref not in out:
+                out.append(ref)
+    return out
+
+
+def aberta_entra_no_comentario(linha) -> bool:
+    """A aberta (CAB_ABERTA) entra no comentário do dia? Só a que para a geração (25/11/2026, nível 1): desligamento
+    (o código da API, ou o que veio do rótulo, "DESLIGAMENTO_DE_SKID"), atuação de proteção, falta da concessionária, ou
+    a "geração parou?" = sim. Falha de comunicação, string, ventilador, tracker e a sem tipo ficam fora."""
+    r = dict(zip(CAB_ABERTA, linha))
     tipo = str(r.get("tipo_falha") or "").upper()
+    parou = str(r.get("geracao_parou")).strip().split(".")[0] in ("1", "True", "true")
+    return tipo.startswith("DESLIGAMENTO") or tipo in TIPOS_ABERTA_QUE_PARA or parou
+
+
+def _evento_aberto(r: dict) -> str:
+    """"Cabine 2 desligada" pela referência curta que o COS citou (CAB2) ou, sem ela, pela tag ("...-CABN2"); sem as
+    duas, o tipo ("Cabine desligada"). O tipo que veio do rótulo ("DESLIGAMENTO_DE_INVERSOR") vale como o código."""
+    tipo = re.sub(r"^DESLIGAMENTO_DE_", "DESLIGAMENTO_", str(r.get("tipo_falha") or "").upper())
     base = _EVENTO_ABERTO.get(tipo, "Ocorrência")
-    citados = [c for c in str(r.get("equipamentos_citados") or "").split(";") if c]
+    citados = ([c for c in str(r.get("equipamentos_citados") or "").split(";") if c]
+               or _citados_dos_codigos(r.get("equipamentos_codigos")))
     if tipo in _PARTES and citados:
         nomes = []
         for c in citados:
@@ -520,7 +553,8 @@ def publicar(config, sessao=None, *, agora=None, forcar=False, leitura=None, abe
         # a fotografia não veio: o retrato de antes fica, com a hora dele (o livro é trocado inteiro a cada gravação)
         ab = [[r.get(c, "") for c in CAB_ABERTA] for r in livros.ler(base, s, LIVRO, ABA_ABERTAS) if r.get("registro")]
         ab_em = next((str(r.get("abertas_em") or "") for r in livros.ler(base, s, LIVRO, "atualizacao")), "")
-    comentarios = comentarios_do_dia([l for l in todas if entra_no_comentario(l)], [], agora,
+    comentarios = comentarios_do_dia([l for l in todas if entra_no_comentario(l)],
+                                     [l for l in ab if aberta_entra_no_comentario(l)], agora,
                                      max(desde, COMENTARIOS_DESDE))
     rel["comentarios_dias"] = len(comentarios)
     atu = [agora.isoformat(timespec="seconds"), len(todas), desde.date().isoformat(), rel["ligadas"] + sum(

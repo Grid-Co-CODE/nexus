@@ -296,6 +296,12 @@ linha do Nexus a Plataforma monta o comentário sozinha, e só do desligamento. 
 1.092 dias novos (842 de outubro e 250 de 01 a 09/11), em 81 usinas. ⚠ A linha só chega à Plataforma com a usina ligada (`usina_id`): Pacaembu (Areia Branca), Nova Iguaçu,
 Rondonópolis, Monte Aprazível, Aparecida do Taboado 3 e Sol Maior não estão no Registro mestre, e as chaves delas no
 de-para estão ignoradas desde 04/10 ("fora da operação da Grid"). Prova: `tests/test_cos_normalizacoes_banco.py`.
+**A aberta no comentário** (`aberta_entra_no_comentario`, 25/11/2026, o dono: "Sim, nível 1"): entra só a aberta que
+para a geração (desligamento de usina, cabine, SKID, QGBT ou inversor; atuação de proteção; falta da concessionária; ou a
+"geração parou?" = sim), como "Inversor 2.7 desligado desde 12/07 às 06:00, em atendimento pelo COS." (o nome sai do que
+o COS citou ou, sem isso, da tag: `_citados_dos_codigos`). A falha de comunicação, a string, o ventilador, o tracker, a
+estação, o relé e a sem tipo ficam fora: foi a repetição delas na Mandaguaçu que tirou as abertas em 09/11. Medido em
+25/11: 15 das 72 abertas da Thopen, 258 dias. Normalizada, a linha da aberta dá lugar ao relato.
 
 - **De onde:** `GET <Andamento>/api/normalizacoes?desde=&limite=` (contrato `versao: 1`, a mesma chave `X-Nexus-Chave`). A
   API é **incremental**: devolve `cursor` e `mais`. O Nexus guarda em memória (`nexus/cos/normalizacoes.py`) desde o
