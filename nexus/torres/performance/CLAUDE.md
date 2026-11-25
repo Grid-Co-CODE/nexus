@@ -197,6 +197,12 @@ Garantias e as ETMs). O endereço antigo `/t/engenharia/etm/...` responde 308 pa
     `etm_tela.TEMA_DA_ETM`), a usina do Nexus e as OS que dá para vincular (as abertas de ETM que o retrato das OS,
     `fato_tarefa_os`, tem: a Caixa recusa OS fora da usina). As listas são as digitáveis do Nexus (`lista-sugestoes.js`). O
     Enviar vai à rota de sempre com `?etm=1` e volta para cá com o aviso (`demandas_tela._no_chamado("etm", ...)`).
+- **As demandas na linha do tempo** (25/11/2026, Levi: "Quando eu criar uma nova demanda, vai aparecer também na linha do
+  tempo? Tem que aparecer [...] Na linha do tempo da OS"): `etm_tela.demandas_das` pega as demandas da Caixa de entrada que
+  citam uma OS de ETM da usina (o `oss` da demanda: a da abertura e as das mensagens) ou a usina do Nexus (pelo retrato das
+  OS). Na gaveta (vêm junto do `/etm/usina/comentarios`): quem pediu → para quem, o tema, a situação, o último passo e o
+  link para a Caixa. Na página da OS de ETM (`_pagina_da_os`): as que citam aquela OS, na linha do tempo dela. O banco das
+  demandas fora não derruba nenhuma das duas: a gaveta diz.
 - **Prova:** `tests/test_performance_etm.py` (a cópia, a OS relida, os endereços antigos, o menu, a gaveta, a Nova demanda
   e o JS no node) e os de antes, `tests/test_engenharia_etm*.py`. Bancada local: scratchpad `bancada_etm.py` (OS inventadas).
 - **Depois:** a regra (`nexus/engenharia/etm*.py`) ainda mora na pasta da Engenharia, que tem a trava de PR do programador

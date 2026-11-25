@@ -274,3 +274,38 @@ def test_a_demanda_da_etm_volta_para_a_tela_com_o_aviso(app):
     with app.test_request_context("/"):
         u = DT._no_chamado("etm", "ok", "Demanda enviada.")
     assert u.startswith("/t/performance/etm?") and "ok=Demanda+enviada." in u and u.endswith("#abertas")
+
+
+# ── as demandas na linha do tempo (25/11/2026) ───────────────────────────────────────────────────────────────────────
+def _demanda(did, oss, usinas=(), titulo="Conferir o piranômetro"):
+    return {"demanda_id": did, "titulo": titulo, "de_nome": "Ana Lima", "para_nome": "Caio Reis", "tema_nome": "Verificação de ativo",
+            "estado": {"rotulo": "Aberta", "tom": "alerta", "aberta": True}, "registrado_em": "2026-11-25T10:00:00+00:00",
+            "aberta_txt": "25/11 07:00", "oss": list(oss), "usinas": [(u, "Usina") for u in usinas],
+            "passos": [{"nome": "Caio Reis", "rotulo": "respondeu", "texto": "vou ver amanhã", "quando_txt": "25/11 08:00"}]}
+
+
+def test_as_demandas_que_citam_a_os_ou_a_usina_entram_na_linha_do_tempo(app, monkeypatch):
+    from nexus.comando import demandas as D
+    from nexus.torres.performance import etm_tela
+    monkeypatch.setattr(D, "faltam_chaves", lambda: [])
+    monkeypatch.setattr(D, "ler", lambda: {})
+    monkeypatch.setattr(D, "lista", lambda hoje, lido: [_demanda("d1", [3]), _demanda("d2", [], usinas=[42]),
+                                                        _demanda("d3", [99]), _demanda("d4", [], usinas=[7])])
+    with app.test_request_context("/"):
+        ds = etm_tela.demandas_das({"1", "3"}, 42)
+    assert [d["id"] for d in ds] == ["d1", "d2"] and ds[0]["os"] == "3" and ds[1]["os"] == ""
+    assert ds[0]["ultimo"] == "Caio Reis respondeu: vou ver amanhã · 25/11 08:00" and ds[0]["caixa"].endswith("?d=d1#demandas")
+
+
+def test_o_chat_da_usina_traz_as_demandas(tela_perf, cliente, monkeypatch):
+    from test_engenharia_acompanhamento import ANA, _como
+
+    from nexus.engenharia import os_acompanhamento as O
+    from nexus.torres.performance import etm_tela
+    monkeypatch.setattr(O, "ler", lambda: {"lido_em": "agora", "eventos": []})
+    monkeypatch.setattr(etm_tela, "_usina_no_retrato", lambda folios: (42, set()))
+    monkeypatch.setattr(etm_tela, "demandas_das", lambda folios, uid: [{"id": "d1", "titulo": "x", "iso": ""}] if uid == 42 else [])
+    j = _como(cliente, ANA).get("/t/performance/etm/usina/comentarios", query_string={"usina": U}).get_json()
+    assert j["demandas"] == [{"id": "d1", "titulo": "x", "iso": ""}] and j["erro_demandas"] == ""
+    html = _como(cliente, ANA).get("/t/performance/etm").get_data(as_text=True)
+    assert "demandas = x.j.demandas || []" in html and "'Demanda · '" in html

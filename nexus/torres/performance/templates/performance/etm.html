@@ -609,7 +609,7 @@
   var usMsg = document.getElementById('etm-us-msg'), usFin = document.getElementById('etm-us-fin');
   var tl = document.getElementById('etm-tl'), chatStatus = document.getElementById('etm-chat-status');
   var novo = document.getElementById('etm-chat-novo');
-  var usDe = null, usNome = '', comentarios = null;
+  var usDe = null, usNome = '', comentarios = null, demandas = [];
   function dizerUs(texto) { usMsg.textContent = texto || ''; usMsg.hidden = !texto; }
   function osDaUsina(nome) { return D.oss.filter(function (o) { return o.usina === nome; }); }
   // as OS fechadas no Fracttal que esperam a Performance (o que o Finalizar em lote marca)
@@ -646,7 +646,7 @@
       document.getElementById('etm-chat-msg').hidden = true;
     }
     usVeu.hidden = false; usGav.hidden = false; usGav.scrollTop = 0; usGav.querySelector('.eg-gav-fechar').focus();
-    comentarios = null; desenhaTl(); lerComentarios(nome);
+    comentarios = null; demandas = []; desenhaTl(); lerComentarios(nome);
   }
   // fechar a gaveta volta para os cartões, onde estavam (Levi: "eu não consigo voltar para os quadradinhos da ATM")
   function fecharUsina(semFoco) {
@@ -713,6 +713,12 @@
                                   meta: [o.diagnostico ? 'Diagnóstico: ' + o.diagnostico : '', o.status_pos ? 'Status pós-OS: ' + o.status_pos : ''].filter(Boolean).join(' · ')});
     });
     (comentarios || []).forEach(function (c) { ev.push({ms: quando(c.iso), dia: false, tipo: 'coment', o: c, txt: c.texto, meta: c.nome}); });
+    // as demandas da Caixa de entrada que citam uma OS de ETM da usina ou a usina (Levi: "Tem que aparecer [...] Na linha
+    // do tempo"): quem pediu, para quem, o tema, a situação e o último passo; o clique leva à Caixa
+    demandas.forEach(function (d) {
+      ev.push({ms: quando(d.iso), dia: false, tipo: 'demanda', o: d.os ? {os: d.os} : null, d: d, txt: d.titulo,
+               meta: [d.de + ' → ' + (d.para || 'alguém'), d.tema, d.situacao, d.ultimo].filter(Boolean).join(' · ')});
+    });
     return ev.sort(function (a, b) { return (isNaN(b.ms) ? 0 : b.ms) - (isNaN(a.ms) ? 0 : a.ms); });
   }
   function desenhaTl() {
@@ -722,8 +728,9 @@
       var li = el('li', 'etm-tl-i etm-tl-i--' + e.tipo);
       var cab = el('div', 'etm-tl-cab');
       cab.appendChild(el('span', 'etm-tl-q', dataTxt(e.ms, e.dia)));
-      var a = el('a', 'etm-tl-os', 'OS ' + e.o.os); a.href = paginaOs(e.o); cab.appendChild(a);
+      if (e.o) { var a = el('a', 'etm-tl-os', 'OS ' + e.o.os); a.href = paginaOs(e.o); cab.appendChild(a); }
       if (e.tipo === 'coment') cab.appendChild(el('span', 'etm-tl-tag', 'Comentário'));
+      if (e.d) { var dl = el('a', 'etm-tl-tag etm-tl-dem', 'Demanda · ' + (e.d.aberta ? 'aberta' : 'fechada')); dl.href = e.d.caixa; dl.title = 'Abrir a demanda na Caixa de entrada'; cab.appendChild(dl); }
       li.appendChild(cab);
       li.appendChild(el('p', 'etm-tl-t', e.txt));
       if (e.meta) li.appendChild(el('span', 'etm-tl-m', e.meta));
@@ -738,10 +745,12 @@
       .then(function (x) {
         if (usNome !== nome || usGav.hidden) return;
         if (!x.r.ok) { chatStatus.textContent = (x.j.erro || ('HTTP ' + x.r.status)) + ' A linha do tempo mostra só as OS.'; return; }
-        comentarios = x.j.comentarios || [];
-        var il = x.j.ilegiveis || 0;
+        comentarios = x.j.comentarios || []; demandas = x.j.demandas || [];
+        var il = x.j.ilegiveis || 0, avisos = [];
         // a cifra de outra chave (ou sem a chave do cofre): a gaveta diz por que não mostra
-        chatStatus.textContent = il ? plural(il, 'comentário não abriu', 'comentários não abriram') + ': a chave do cofre deste Nexus não abre a cifra deles.' : '';
+        if (il) avisos.push(plural(il, 'comentário não abriu', 'comentários não abriram') + ': a chave do cofre deste Nexus não abre a cifra deles.');
+        if (x.j.erro_demandas) avisos.push('As demandas não vieram agora (' + x.j.erro_demandas + ').');
+        chatStatus.textContent = avisos.join(' ');
         desenhaTl();
       })
       .catch(function () { if (usNome === nome) chatStatus.textContent = 'Não consegui ler os comentários agora. A linha do tempo mostra só as OS.'; });

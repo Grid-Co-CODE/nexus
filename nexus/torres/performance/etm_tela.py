@@ -225,7 +225,18 @@ def etm_usina_comentarios():
                          "quando": ev["quando_txt"], "texto": ev["texto"],
                          "iso": ev["quando"].isoformat() if ev["quando"] else ""}))
     out.sort(key=lambda x: x[0], reverse=True)
-    return jsonify({"usina": usina, "comentarios": [c for _, c in out], "ilegiveis": ilegiveis})
+    # as demandas da usina (25/11/2026): as que citam uma OS de ETM dela ou a usina do Nexus (pelo retrato das OS)
+    dem, erro_dem = [], ""
+    try:
+        folios = {int(o["os"]) for o in oss.values() if str(o.get("os")).isdigit()}
+        uid, _ = _usina_no_retrato(folios)
+        dem = demandas_das(folios, uid)
+    except Exception as e:      # noqa: BLE001 — o banco das demandas fora: a gaveta diz, os comentários seguem
+        import logging
+        logging.exception("ETMs: as demandas da usina %s não vieram", usina)
+        erro_dem = type(e).__name__
+    return jsonify({"usina": usina, "comentarios": [c for _, c in out], "ilegiveis": ilegiveis, "demandas": dem,
+                    "erro_demandas": erro_dem})
 
 
 @bp.route("/etm/os/<int:folio>")
@@ -360,3 +371,36 @@ def etm_usina_demanda():
         "temas": [{"tema_id": t["tema_id"], "nome": f"{t['nome']} ({dia(t['prazo_dias_uteis'])})"} for t in temas],
         "tema_padrao": next((t["tema_id"] for t in temas if t["nome"] == TEMA_DA_ETM), ""),
         "limites": {"titulo": D.TITULO_MAX, "texto": D.TEXTO_MAX}})
+
+
+# ── as demandas na linha do tempo (25/11/2026) ───────────────────────────────────────────────────────────────────────
+# Levi, 25/11/2026: "Quando eu criar uma nova demanda, vai aparecer também na linha do tempo? Tem que aparecer [...] Na
+# linha do tempo da OS". Entram as demandas da Caixa de entrada que citam uma OS de ETM da usina (a da abertura ou a de uma
+# mensagem, o `oss` da demanda) ou a usina do Nexus; cada uma com quem pediu, para quem, o tema, a situação e o último
+# passo, e o link para a Caixa, onde a conversa mora. Sem as chaves das demandas ou com o banco fora, não entram (e quem
+# chama diz).
+def demandas_das(folios, usina_id=None) -> list[dict]:
+    """As demandas que citam alguma das OS (`folios`) ou a usina (`usina_id`), a mais nova primeiro."""
+    from ...comando import demandas as D
+    from ...prefixo import na_raiz
+    if D.faltam_chaves():
+        return []
+    alvo = {int(f) for f in folios if str(f).isdigit()}
+    hoje = datetime.now(BRT).date()
+    out = []
+    for d in D.lista(hoje, D.ler()):
+        oss = set(d.get("oss") or [])
+        if not (oss & alvo or (usina_id and any(u == usina_id for u, _ in d.get("usinas") or []))):
+            continue
+        q = d.get("registrado_em") or ""
+        u = (d.get("passos") or [None])[-1]
+        out.append({"id": d["demanda_id"], "titulo": d.get("titulo") or "(sem o texto)", "de": d.get("de_nome") or "",
+                    "para": d.get("para_nome") or "", "tema": d.get("tema_nome") or "",
+                    "situacao": (d.get("estado") or {}).get("rotulo") or "", "tom": (d.get("estado") or {}).get("tom") or "",
+                    "aberta": bool((d.get("estado") or {}).get("aberta")), "iso": q,
+                    "quando": d.get("aberta_txt") or "", "os": next((str(n) for n in d.get("oss") or [] if n in alvo), ""),
+                    "ultimo": (f"{u['nome'] or 'Alguém'} {u['rotulo']}" + (f": {u['texto']}" if u.get("texto") else "")
+                               + (f" · {u['quando_txt']}" if u.get("quando_txt") else "")) if u else "",
+                    "caixa": na_raiz("/t/comando/caixa-de-entrada") + f"?d={d['demanda_id']}#demandas"})
+    return sorted(out, key=lambda x: x["iso"], reverse=True)
+

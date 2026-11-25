@@ -892,3 +892,17 @@ def test_cada_os_em_andamento_diz_se_esta_em_verificacao(tela, cliente):
             assert o["fase"] == "", o["os"]
     assert any(o["fase"] for o in d["oss"])
 
+
+
+def test_a_demanda_que_cita_a_os_entra_na_linha_do_tempo_da_os(pagina_etm, cliente, monkeypatch):
+    # Levi, 25/11/2026: "Quando eu criar uma nova demanda, vai aparecer também na linha do tempo? [...] Na linha do tempo da OS"
+    from test_engenharia_acompanhamento import ANA, _como
+
+    from nexus.torres.performance import etm_tela
+    pedidas = []
+    monkeypatch.setattr(etm_tela, "demandas_das", lambda folios, uid=None: pedidas.append(set(folios)) or [
+        {"titulo": "Conferir o piranômetro", "para": "Caio Reis", "situacao": "Aberta", "ultimo": "Caio Reis respondeu",
+         "de": "Ana Lima", "quando": "25/11 07:00", "iso": "2026-11-25T10:00:00+00:00"}])
+    html = _como(cliente, ANA).get(URL_OS).get_data(as_text=True)
+    assert pedidas == [{"17003"}]
+    assert "Demanda para Caio Reis: Conferir o piranômetro (Aberta) · Caio Reis respondeu" in html and "Ana Lima · 25/11 07:00" in html

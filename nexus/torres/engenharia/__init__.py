@@ -1222,6 +1222,17 @@ def _pagina_da_os(folio: int, tela_id: str):
         # as marcações entram na linha do tempo, junto do que a Engenharia comentou
         linha = list(est.get("eventos") or []) + [dict(e, evento="marca", texto="", rotulo=_rotulo_da_marca(e))
                                                   for e in marcas.get("eventos") or []]
+        # as demandas da Caixa de entrada que citam esta OS (25/11/2026, Levi: "Tem que aparecer [...] Na linha do tempo
+        # da OS"), com quem pediu, para quem, a situação e o último passo; o banco fora não derruba a página
+        try:
+            from ..performance.etm_tela import demandas_das
+            for d in demandas_das({o["os"]}):
+                q = datetime.fromisoformat(d["iso"].replace("Z", "+00:00")) if d["iso"] else None
+                linha.append({"evento": "demanda", "texto": "", "quando": q, "quando_txt": d["quando"], "nome": d["de"],
+                              "rotulo": f"Demanda para {d['para'] or 'alguém'}: {d['titulo']} ({d['situacao']})"
+                                        + (f" · {d['ultimo']}" if d["ultimo"] else "")})
+        except Exception:       # noqa: BLE001
+            logging.exception("OS de ETM %s: as demandas não vieram para a linha do tempo", folio)
         linha.sort(key=lambda e: e.get("quando") or datetime.min.replace(tzinfo=timezone.utc), reverse=True)
         # a marcação também é atualização (revisão final de 26/10/2026: a pílula dizia "sem atualização" com a
         # marcação de hoje e o número da Última atualização dizendo "hoje")
