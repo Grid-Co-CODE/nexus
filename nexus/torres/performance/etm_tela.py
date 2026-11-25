@@ -44,6 +44,8 @@ def _os_do_planner(o: dict, m: dict | None, n_coment: int | None = None) -> dict
                     if o["coluna_etm"] == "em_andamento" else "",
             # o dia de Brasília da criação e o do fim: o "OS ativa entre" do app compara dias
             "criada_dia": "-".join(reversed(criada[:10].split("/"))) if criada else "", "fim_dia": o.get("fim_iso") or "",
+            # a hora da criação, para a linha do tempo da usina (25/11/2026)
+            "criada_iso": o.get("criada_iso") or "",
             "etiquetas": o["etiquetas"], "n_tarefas": len(o.get("tarefas") or []),
             "diagnostico": M.nome(M.DIAGNOSTICOS, m.get("diagnostico_id")) or None,
             "status_pos": M.nome(M.STATUS_POS, m.get("status_pos_id")) or None,
@@ -148,7 +150,9 @@ def etm():
         status=list(os_equipe.STATUS_OS.values()), hoje=hoje.isoformat(),
         admin=bool(session.get("admin")),           # o painel do histórico do app de ETM (uma vez, só o administrador)
         lido=hora(d["lido"]), erro_hora=hora(d.get("erro_em")).replace("às ", "").replace("em ", ""),
-        aviso_releia=aviso_releia, pode_comentar=_quem_pode_na_os()[0])
+        aviso_releia=aviso_releia, pode_comentar=_quem_pode_na_os()[0],
+        # a volta da Nova demanda (`demandas_tela.demanda_nova`, ?etm=1): o aviso dela na tela
+        aviso_ok=(request.args.get("ok") or "")[:300], aviso_erro=(request.args.get("erro") or "")[:300])
 
 
 @bp.route("/etm/finalizar", methods=["POST"])
@@ -218,7 +222,8 @@ def etm_usina_comentarios():
                 continue
             out.append((ev["quando"] or datetime.min.replace(tzinfo=timezone.utc),
                         {"os": str(o["os"]), "titulo": o.get("titulo") or "", "nome": ev["nome"] or "alguém",
-                         "quando": ev["quando_txt"], "texto": ev["texto"]}))
+                         "quando": ev["quando_txt"], "texto": ev["texto"],
+                         "iso": ev["quando"].isoformat() if ev["quando"] else ""}))
     out.sort(key=lambda x: x[0], reverse=True)
     return jsonify({"usina": usina, "comentarios": [c for _, c in out], "ilegiveis": ilegiveis})
 
@@ -283,3 +288,75 @@ def etm_os_marcar(folio: int):
     except Exception as e:      # noqa: BLE001 — banco ou Fracttal fora: nada mudou (a trava recusa antes de gravar)
         logging.exception("ETMs: a marcação da OS %s não gravou", folio)
         return redirect(volta + "?" + urlencode({"erro": FALHOU_BANCO.format(type(e).__name__)}), 303)
+
+
+# ── a Nova demanda da ETM (25/11/2026) ───────────────────────────────────────────────────────────────────────────────
+# Levi, 25/11/2026: "poder criar demanda [...] alguém da performance poder passar para outra pessoa da performance". É a
+# demanda da Caixa de entrada (o mesmo livro, os mesmos passos, o sininho), como a do chamado de Garantias
+# (`demandas_tela.contexto_do_chamado`): o setor Performance fixo, o tema "Verificação de ativo" já escolhido, a usina pela
+# OS aberta de ETM no retrato das OS (`fato_tarefa_os`) e só as OS que o retrato tem (a Caixa recusa a OS fora da usina).
+# A janela pede isto no clique, para a tela não pagar a leitura do retrato a cada abertura.
+TEMA_DA_ETM = "Verificação de ativo"
+
+
+def _usina_no_retrato(folios: set) -> tuple:
+    """(usina_id do Nexus, {nº das OS que o retrato tem}) das OS de ETM abertas de uma usina; (None, set()) fora dele."""
+    from ...campo import visao
+    from ...dados import fato_tarefa_os as FT
+    uid, achadas = None, set()
+    for t in visao._livro(FT.LIVRO, FT.ABA):
+        try:
+            n, u = int(t.get("os") or 0), int(t.get("usina_id") or 0)
+        except (TypeError, ValueError):
+            continue
+        if n in folios and u:
+            uid = uid or u
+            if u == uid:
+                achadas.add(n)
+    return uid, achadas
+
+
+@bp.route("/etm/usina/demanda")
+def etm_usina_demanda():
+    """O que a janela da Nova demanda da usina precisa: a chave do formulário, as pessoas do setor Performance (menos quem
+    pede), os temas da Performance (sem os da área Chamados), a usina do Nexus e as OS abertas que dá para vincular."""
+    from ...cadastro import setor_ids as SID
+    from ...comando import demandas as D
+    from ...engenharia import etm as ETM
+    from ...prefixo import na_raiz
+    from ..comando import _codigo, _meu_hmac
+    usina = request.args.get("usina") or ""
+    falta = D.faltam_chaves()
+    if falta:
+        return jsonify({"erro": "As demandas não gravam neste servidor (falta " + ", ".join(falta) + ")."}), 503
+    meu = _meu_hmac()
+    if not meu:
+        return jsonify({"erro": "Para pedir, entre com a sua conta da Grid (Microsoft ou Fracttal)."}), 403
+    d = ETM.dados()
+    abertas = sorted((o for o in d["os"] if o.get("usina") == usina and o.get("coluna_etm") in ("nao_iniciada", "em_andamento")),
+                     key=lambda o: o.get("criada_iso") or "", reverse=True)
+    try:
+        temas = [t for t in D.temas(SID.PERFORMANCE) if not t.get("area")]
+        pessoas = [p for p in D.pessoas_com_setor() if p["setor_id"] == SID.PERFORMANCE and p["hmac"] != meu]
+        uid, no_retrato = _usina_no_retrato({int(o["os"]) for o in abertas if str(o.get("os")).isdigit()})
+    except Exception as e:      # noqa: BLE001 — o banco fora: a janela diz, nada é enviado
+        import logging
+        logging.exception("ETMs: a Nova demanda da usina %s não abriu", usina)
+        return jsonify({"erro": f"Não consegui ler o banco agora ({type(e).__name__}). Tente de novo em instantes."}), 503
+    nome_usina = ""
+    if uid:
+        try:
+            from ...campo import visao
+            nome_usina = (visao._Base().por_id.get(uid) or {}).get("nome") or ""
+        except Exception:       # noqa: BLE001 — sem o nome do cadastro, vai o do Fracttal
+            nome_usina = ""
+    dia = lambda n: f"{n} {'dia útil' if n == 1 else 'dias úteis'}"   # noqa: E731
+    return jsonify({
+        "codigo": _codigo(), "novo_id": D.novo_id("d"), "setor_id": str(SID.PERFORMANCE),
+        "acao": na_raiz("/t/comando/caixa-de-entrada/demandas/nova?etm=1"),
+        "usina": [uid, nome_usina or ETM.usina_curta(usina)] if uid else None,
+        "oss": [{"os": str(o["os"]), "titulo": o.get("titulo") or ""} for o in abertas if int(o["os"]) in no_retrato],
+        "pessoas": [{"hmac": p["hmac"], "nome": p["nome"]} for p in sorted(pessoas, key=lambda p: p["nome"].lower())],
+        "temas": [{"tema_id": t["tema_id"], "nome": f"{t['nome']} ({dia(t['prazo_dias_uteis'])})"} for t in temas],
+        "tema_padrao": next((t["tema_id"] for t in temas if t["nome"] == TEMA_DA_ETM), ""),
+        "limites": {"titulo": D.TITULO_MAX, "texto": D.TEXTO_MAX}})

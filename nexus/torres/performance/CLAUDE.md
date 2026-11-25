@@ -152,8 +152,30 @@ Garantias e as ETMs). O endereço antigo `/t/engenharia/etm/...` responde 308 pa
   `nexus_engenharia_os`; OS fechada fica só no Nexus, e a resposta diz). Quem não comenta na página da OS
   (`_quem_pode_na_os`) lê o chat sem a caixa. O `de` do login do Fracttal pode ser `/t/performance/etm`
   (`oscreator/ponte._PAGINA_DA_OS`).
-- **Prova:** `tests/test_performance_etm.py` (a cópia, a OS relida, os endereços antigos, o menu, o chat e o JS no node) e
-  os de antes, `tests/test_engenharia_etm*.py`.
+- **A 2ª rodada (25/11/2026, no print das Estações em Aberto)**, o que vale hoje no lugar do que diz abaixo:
+  - **os filtros** no modelo do Histórico de OS do OS Creator (Levi: "padronizar ali com os filtros do histórico de OS do OS
+    Creator [...] o filtro que você expande"): a barra com a busca, o botão Filtros (com quantos estão aplicados) e as
+    etiquetas dos aplicados (o × tira aquele); o painel suspenso com os seletores e o período, o Aplicar fecha e o × (ou o
+    Esc) desfaz o que mudou desde que abriu. A coluna da esquerda, o "Mostrando N OS" e os textos de ajuda saíram (Levi:
+    "essa porcaria só pesa os olhos"; "ninguém vai ler"), o rodapé do Planner também;
+  - **as Estações em Aberto em duas visões** (Levi: "a visão das várias OSs [...] e a visão em si das ATMs"): **ETMs**, os
+    cartões enxutos (o nome numa linha que só quebra entre palavras, o cliente e as OS na 2ª, o tempo em aberto embaixo;
+    antes o selo ao lado espremia o nome letra a letra) com as em acompanhamento abaixo; **OS**, o quadro das OS abertas
+    para a Performance. A visão fica guardada (`vista.abModo`);
+  - **a gaveta da usina** (Levi: "quando eu clico no quadrado da ATM, ele filtra direto e eu não consigo voltar"): o clique
+    no cartão abre a gaveta; fechar (×, Esc, o véu) volta aos cartões. Nela: o cabeçalho (ETMs, OS, abertas, a mais antiga),
+    **Nova demanda**, **Finalizar pela Performance** e **Todas as OS** (o Histórico da usina), a caixa **Comentar na OS** e a
+    **linha do tempo** em ordem cronológica, a mais nova primeiro: a OS aberta, a finalizada no Fracttal, a encerrada pela
+    Performance e os comentários (o `iso` do comentário vem do `/etm/usina/comentarios`). O Chat da usina do Histórico abre
+    a mesma gaveta; quem volta (da OS, da demanda, o F5) com ela aberta a vê abrir de novo;
+  - **a Nova demanda** (Levi: "alguém da performance poder passar para outra pessoa da performance"): a da Caixa de
+    entrada, como a do chamado de Garantias; `/etm/usina/demanda` dá a chave do formulário, as pessoas do setor Performance
+    (menos quem pede), os temas da Performance sem os da área Chamados ("Verificação de ativo" já escolhido,
+    `etm_tela.TEMA_DA_ETM`), a usina do Nexus e as OS que dá para vincular (as abertas de ETM que o retrato das OS,
+    `fato_tarefa_os`, tem: a Caixa recusa OS fora da usina). As listas são as digitáveis do Nexus (`lista-sugestoes.js`). O
+    Enviar vai à rota de sempre com `?etm=1` e volta para cá com o aviso (`demandas_tela._no_chamado("etm", ...)`).
+- **Prova:** `tests/test_performance_etm.py` (a cópia, a OS relida, os endereços antigos, o menu, a gaveta, a Nova demanda
+  e o JS no node) e os de antes, `tests/test_engenharia_etm*.py`. Bancada local: scratchpad `bancada_etm.py` (OS inventadas).
 - **Depois:** a regra (`nexus/engenharia/etm*.py`) ainda mora na pasta da Engenharia, que tem a trava de PR do programador
   da área: mudar de pasta quando a Performance for mexer nela de novo.
 

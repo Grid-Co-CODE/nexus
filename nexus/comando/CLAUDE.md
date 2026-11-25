@@ -452,6 +452,11 @@ do chamado:
 - o cartão do quadro de Garantias diz a situação (`por_os`, pela cópia do sininho): aberta com o prazo, vencida ou
   respondida. Prova: `tests/test_garantias_demanda_chamado_24_11.py` e `tests/test_raio_x_garantias_11_11.py`.
 
+**A demanda da ETM (25/11/2026).** A gaveta da usina das ETMs (Performance) tem a Nova demanda, para a Performance passar
+a outra pessoa da Performance (Levi). Mesmo caminho da do chamado: o formulário vai a `demandas/nova?etm=1` e
+`_no_chamado("etm", ...)` volta à tela ETMs com o aviso. O que a janela traz pronto mora em
+`nexus/torres/performance/etm_tela.py` (`etm_usina_demanda`); ver o CLAUDE.md da torre Performance, seção "ETMs".
+
 **As regras (todas do Levi):**
 - A pessoa e o setor de quem recebe são obrigatórios; um setor só por demanda ("Esquece essa parte de indicar mais de um
   setor"). O setor vê o que todo mundo dele recebe (a aba "Do meu setor", com o filtro por pessoa e por tema).

@@ -152,8 +152,12 @@ def demanda_nova():
     # vinda do chamado de Garantias (24/11/2026): volta ao Raio X do chamado, com o aviso na própria página
     ch = request.args.get("chamado", "")
     ch = ch if ch.isdigit() else ""
+    # vinda da usina das ETMs (25/11/2026): volta à tela ETMs, com o aviso nela; pelo mesmo caminho da do chamado
+    if not ch and request.args.get("etm") == "1":
+        ch = "etm"
     destino = (na_raiz(f"/t/comando/conversa/usina/{jan}/janela?aba=pedir") if jan else
-               _no_chamado(ch, "erro", "O formulário venceu: abra o chamado de novo. Nada foi enviado.") if ch else
+               _no_chamado(ch, "erro", f"O formulário venceu: abra {'a usina' if ch == 'etm' else 'o chamado'} de novo. "
+                                       "Nada foi enviado.") if ch else
                _volta("pedi"))
     # o tamanho ANTES de ler o corpo (o `_form_venceu` lê o formulário): o pedido maior que o teto não chega a ocupar a
     # memória nem o disco, e o sem tamanho declarado para no teto (a regra das Sugestões; revisão de 12/11/2026)
@@ -178,7 +182,8 @@ def demanda_nova():
         d = D.abrir(form, arquivos, _usuario())
         if ch:
             return redirect(_no_chamado(ch, "ok", "Demanda enviada: quem recebeu é avisado no sininho e a vê na Caixa de "
-                                                  "entrada; a resposta volta para este chamado."), code=303)
+                                                  "entrada" + ("." if ch == "etm" else "; a resposta volta para este chamado.")),
+                            code=303)
         if jan:
             session[_AVISO] = ("ok", "Demanda enviada. Quem recebeu é avisado no sininho; ela está aqui e em \"Que eu "
                                      "pedi\", na Caixa de entrada.")
@@ -201,8 +206,11 @@ def demanda_nova():
 
 def _no_chamado(folio: str, tipo: str, texto: str, did: str = "") -> str:
     """O Raio X do chamado de Garantias, com o aviso na página (o `?ok=`/`?erro=` que ele mostra) e no bloco das demandas;
-    com a demanda (`did`), ela volta aberta."""
+    com a demanda (`did`), ela volta aberta. `folio` "etm": a tela ETMs da Performance (a Nova demanda da usina, 25/11/2026),
+    com o mesmo aviso."""
     from urllib.parse import urlencode
+    if folio == "etm":
+        return na_raiz("/t/performance/etm") + "?" + urlencode({tipo: texto}) + "#abertas"
     q = {"de": "garantias", tipo: texto}
     if did:
         q["dm"] = did

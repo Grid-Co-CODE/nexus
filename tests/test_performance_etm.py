@@ -176,7 +176,12 @@ def test_a_tela_abre_nas_estacoes_em_aberto_com_o_chat_e_a_caixa_de_comentar(tel
     html = _como(cliente, ANA).get("/t/performance/etm").get_data(as_text=True)
     d = json.loads(html.split('<script type="application/json" id="etm-dados">', 1)[1].split("</script>", 1)[0])
     assert all(o["wid"] for o in d["oss"]) and d["pode"] is True
-    assert 'id="etm-ab-chat"' in html and 'id="etm-chat-novo"' in html and 'id="etm-chat-os"' in html
+    # as duas visões (ETMs e OS) e a gaveta da usina com a linha do tempo, a caixa de comentar e a Nova demanda
+    assert 'data-modo="etms"' in html and 'data-modo="os"' in html and 'id="etm-ab-os"' in html
+    assert 'id="etm-us"' in html and 'id="etm-tl"' in html and 'id="etm-chat-novo"' in html and 'id="etm-chat-os"' in html
+    assert 'id="etm-us-dem"' in html and 'id="etm-dm-form"' in html and "lista-sugestoes.js" in html
+    # os textos de ajuda saíram (Levi: "ninguém vai ler essa porcaria")
+    assert "etm-lado-nota" not in html and "O tempo em aberto é o da OS mais antiga" not in html and "kb-rodape" not in html
     assert "nexusRota('/os/_nexus/engenharia/os/' + encodeURIComponent(o.wid) + '/comentar')" in html
     assert "Finalizar pela Performance" in html and "Finalizar pela Engenharia" not in html
     # a cópia de 2 h atrás com a releitura recusada: a tela mostra a cópia e diz, sem o aviso grande de "sem leitura"
@@ -190,7 +195,7 @@ def test_quem_nao_comenta_na_os_nao_ve_a_caixa(tela_perf, cliente, monkeypatch):
     monkeypatch.setattr(ST, "acesso", lambda: {"tudo": False, "telas": {"campo/usinas"},
                                                "setor": {"id": SID.COS, "nome": "COS"}, "erro": ""})
     html = _como(cliente, BETO).get("/t/performance/etm").get_data(as_text=True)
-    assert 'id="etm-chat-novo"' not in html and 'id="etm-ab-chat"' in html       # o chat se lê; comentar, não
+    assert 'id="etm-chat-novo"' not in html and 'id="etm-tl"' in html            # a linha do tempo se lê; comentar, não
 
 
 def test_a_volta_da_os_rele_so_ela(tela_perf, cliente, monkeypatch):
@@ -225,3 +230,47 @@ def test_os_scripts_da_tela_compilam_no_node(tela_perf, cliente, tmp_path):
         arq.write_text(s, encoding="utf-8")
         r = subprocess.run([node, "--check", str(arq)], capture_output=True, text=True)
         assert r.returncode == 0, r.stderr
+
+
+# ── a Nova demanda da usina (25/11/2026) ─────────────────────────────────────────────────────────────────────────────
+def test_a_nova_demanda_da_usina_traz_a_performance_o_tema_e_a_os_do_retrato(tela_perf, cliente, monkeypatch):
+    from test_engenharia_acompanhamento import ANA, _como
+
+    from nexus.comando import demandas as D
+    from nexus.torres import comando as TC
+    from nexus.torres.performance import etm_tela
+    monkeypatch.setattr(D, "faltam_chaves", lambda: [])
+    monkeypatch.setattr(TC, "_meu_hmac", lambda: "h-ana")
+    monkeypatch.setattr(TC, "_codigo", lambda: "cod-1")
+    monkeypatch.setattr(D, "temas", lambda sid=None, so_ativos=True: [
+        {"tema_id": "t1", "nome": "Verificação de ativo", "prazo_dias_uteis": 3, "setor_id": SID.PERFORMANCE, "area": ""},
+        {"tema_id": "t2", "nome": "Acompanhamento de chamado", "prazo_dias_uteis": 2, "setor_id": SID.PERFORMANCE,
+         "area": "Chamados"}])
+    monkeypatch.setattr(D, "pessoas_com_setor", lambda: [
+        {"hmac": "h-ana", "nome": "Ana Lima", "setor_id": SID.PERFORMANCE},
+        {"hmac": "h-caio", "nome": "Caio Reis", "setor_id": SID.PERFORMANCE},
+        {"hmac": "h-dora", "nome": "Dora Melo", "setor_id": SID.COS}])
+    monkeypatch.setattr(etm_tela, "_usina_no_retrato", lambda folios: (42, {1}))
+    j = _como(cliente, ANA).get("/t/performance/etm/usina/demanda", query_string={"usina": U}).get_json()
+    assert j["setor_id"] == str(SID.PERFORMANCE) and j["usina"][0] == 42 and j["acao"].endswith("/demandas/nova?etm=1")
+    assert [p["nome"] for p in j["pessoas"]] == ["Caio Reis"]                     # só a Performance, sem quem pede
+    assert [t["tema_id"] for t in j["temas"]] == ["t1"] and j["tema_padrao"] == "t1"   # sem os temas da área Chamados
+    assert [o["os"] for o in j["oss"]] == ["1"]                                    # só a aberta que o retrato tem
+
+
+def test_a_nova_demanda_sem_login_da_pessoa_diz(tela_perf, cliente, monkeypatch):
+    from test_engenharia_acompanhamento import ANA, _como
+
+    from nexus.comando import demandas as D
+    from nexus.torres import comando as TC
+    monkeypatch.setattr(D, "faltam_chaves", lambda: [])
+    monkeypatch.setattr(TC, "_meu_hmac", lambda: "")
+    r = _como(cliente, ANA).get("/t/performance/etm/usina/demanda", query_string={"usina": U})
+    assert r.status_code == 403 and "conta da Grid" in r.get_json()["erro"]
+
+
+def test_a_demanda_da_etm_volta_para_a_tela_com_o_aviso(app):
+    from nexus.torres.comando import demandas_tela as DT
+    with app.test_request_context("/"):
+        u = DT._no_chamado("etm", "ok", "Demanda enviada.")
+    assert u.startswith("/t/performance/etm?") and "ok=Demanda+enviada." in u and u.endswith("#abertas")

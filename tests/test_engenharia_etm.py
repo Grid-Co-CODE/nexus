@@ -321,12 +321,14 @@ def test_os_filtros_do_planner_no_padrao_do_nexus(tela, cliente):
     defs = html.split("var FILTROS = [", 1)[1].split("];", 1)[0]
     chaves = [x.split("'")[1] for x in defs.split("k: ")[1:]]
     assert chaves == ["cliente", "usina", "trabalho", "status", "criado_por", "responsavel"]
-    # a coluna de filtros à esquerda (Levi: "tem um espaço livre do lado esquerdo que está sendo mau utilizado")
-    assert html.index('class="etm-lado"') < html.index('class="kb-quadro"')
+    # desde 25/11/2026 os filtros ficam numa barra em cima, com o painel suspenso do Histórico de OS do OS Creator (Levi:
+    # "padronizar ali com os filtros do histórico de OS do OS Creator [...] o filtro que você expande"), e a coluna saiu
+    assert 'class="etm-lado"' not in html and html.index('id="etm-barra"') < html.index('class="kb-quadro"')
+    assert 'id="etm-fl-painel"' in html and 'id="etm-fl-ok"' in html and 'id="etm-fl-chips"' in html
     assert "l: 'Status da OS'" in defs and "l: 'Tipo de trabalho'" in defs
     assert "etm-ms-painel" in html and "'Selecionar todos'" in html
-    # a caixa marcada filtra na hora: sem Aplicar nem Cancelar
-    assert "'Aplicar'" not in html and "'Cancelar'" not in html and "addEventListener('change'" in html
+    # a caixa marcada filtra na hora; o Aplicar do painel fecha com o que está marcado e o × desfaz
+    assert "addEventListener('change'" in html and "fecharFiltros(true)" in html
     # a coluna Em andamento filtra o que está em andamento e o que está em verificação (Levi, 09/11/2026: "ao invés de
     # 'OS em campo', 'Stand By' e 'Validação Final' quero filtros do que está em andamento e o que está em verificação")
     assert 'data-fase="andamento"' in html and 'data-fase="verificacao"' in html and "data-etiqueta=" not in html
@@ -666,8 +668,9 @@ def test_as_abas_do_app_planner_historico_estacoes_em_aberto_e_fechamentos(tela,
            ["Estações em Aberto", "Planner", "Histórico", "Fechamentos"]
     for painel in ("planner", "historico", "abertas", "fechamentos"):
         assert f'id="etm-p-{painel}"' in html
-    # o Chat da usina e o Finalizar pela Performance do app
-    assert "Chat da usina" in html and "Finalizar pela Performance" in html and "Ver histórico desta usina" in html
+    # a gaveta da usina (25/11/2026): a linha do tempo, o Finalizar pela Performance, a Nova demanda e o Chat do Histórico
+    assert 'id="etm-us"' in html and "Linha do tempo" in html and "Finalizar pela Performance" in html
+    assert "Nova demanda" in html and "Chat da usina" in html
     # os Fechamentos do app: por semana, pela data de fechamento no Fracttal ou pela Engenharia
     assert 'data-visao="fracttal"' in html and 'data-visao="engenharia"' in html
     assert "Fechamento no Fracttal" in html and "Fechamento pela Performance" in html

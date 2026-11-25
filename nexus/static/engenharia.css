@@ -651,8 +651,7 @@ dl.eg-ac-dados dd.eg-resp{display:flex;align-items:center;justify-content:flex-e
 
 /* ── os filtros da tela ETMs (26/10/2026, Levi: "deixe no nível do nexus!" e "tem um espaço livre do lado esquerdo"):
    a coluna à esquerda e o seletor do Acompanhamento PCM (pcm-acomp.css), com os mesmos tokens ── */
-.etm-app{display:grid;grid-template-columns:268px minmax(0,1fr);gap:20px;align-items:start;margin-top:20px}
-@media (max-width:1100px){.etm-app{grid-template-columns:minmax(0,1fr)}}
+.etm-app{display:flex;flex-direction:column;gap:14px;margin-top:16px}
 .etm-lado{position:sticky;top:calc(var(--topo) + 12px);max-height:calc(100vh - var(--topo) - 24px);overflow:auto;
   background:var(--superficie);border:1px solid var(--linha);border-radius:var(--raio-md);padding:14px;display:flex;
   flex-direction:column;gap:12px}
@@ -711,13 +710,13 @@ dl.eg-ac-dados dd.eg-resp{display:flex;align-items:center;justify-content:flex-e
 .etm-sec-tit{margin:0;font:700 16px/1.3 var(--font-sans);color:var(--tinta)}
 .etm-sec-n{font-size:12.5px;color:var(--mudo)}
 .etm-sec-dica{margin:0 0 12px;font-size:12.5px;line-height:1.5;color:var(--mudo);max-width:80ch}
-.etm-usinas{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px}
+.etm-usinas{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px}
 .etm-usina{display:flex;flex-direction:column;align-items:stretch;gap:4px;text-align:left;padding:12px 14px;border-radius:12px;
   background:var(--superficie);border:1px solid var(--linha);color:var(--tinta);font:inherit;cursor:pointer}
 .etm-usina:hover{border-color:var(--verde)}
 .etm-usina:focus-visible{outline:2px solid var(--foco);outline-offset:2px}
 .etm-usina-l1{display:flex;align-items:flex-start;justify-content:space-between;gap:8px}
-.etm-usina-nome{font:700 14px/1.3 var(--font-sans);color:var(--tinta);min-width:0;overflow-wrap:anywhere}
+.etm-usina-nome{font:700 13.5px/1.3 var(--font-sans);color:var(--tinta);min-width:0;overflow-wrap:break-word}
 .etm-usina-cli{font-size:12px;color:var(--mudo)}
 .etm-usina-n{font-size:12.5px;color:var(--tinta-2)}
 .etm-volta{display:inline-flex;align-items:center;gap:6px;background:transparent;border:0;padding:0;margin:0 0 10px;
@@ -1017,3 +1016,50 @@ dl.eg-ac-dados dd.eg-resp{display:flex;align-items:center;justify-content:flex-e
 .eg-dm-fixo{display:block;padding:8px 10px;border:1px solid var(--linha);border-radius:8px;background:var(--superficie-2);
   color:var(--tinta-2);font-size:13px;line-height:1.4}
 @media (max-width:640px){.eg-dm-grade{grid-template-columns:1fr}}
+
+/* ── as ETMs na Performance, rodada 2 (25/11/2026) ───────────────────────────────────────────────────────────────── */
+/* o cartão da usina enxuto (Levi: "o nome das usinas está quebrando [...] muito espaço em aberto nesses cards") */
+.etm .etm-usina{gap:3px;padding:9px 12px;align-items:flex-start}
+.etm .etm-usina .eg-tag{margin-top:3px}
+/* a barra dos filtros no modelo do Histórico de OS do OS Creator: a busca, o Filtros e as etiquetas; o painel suspenso */
+.etm-barra{position:relative;display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.etm-barra .etm-busca-campo{flex:0 1 320px;min-width:200px}
+.etm-fl-bt{display:inline-flex;align-items:center;gap:6px}
+.etm-fl-n{display:inline-grid;place-items:center;min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:var(--verde);color:var(--fundo);font:700 11px/1 var(--font-sans)}
+.etm-fl-n[hidden]{display:none}
+.etm-fl-chips{display:flex;flex-wrap:wrap;gap:6px;min-width:0}
+.etm-fl-chip{display:inline-flex;align-items:center;gap:4px;max-width:340px;padding:3px 4px 3px 10px;border-radius:999px;border:1px solid var(--linha-forte);background:var(--superficie-2);font-size:12px;color:var(--tinta-2)}
+.etm-fl-chip>span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.etm-fl-chip-x{border:0;background:none;color:var(--mudo);font-size:15px;line-height:1;cursor:pointer;padding:0 4px}
+.etm-fl-chip-x:hover{color:var(--tinta)}
+.etm-fl-painel{position:absolute;top:calc(100% + 6px);left:0;z-index:30;width:min(860px,100%);box-sizing:border-box;padding:14px 16px;border-radius:var(--raio-md);border:1px solid var(--linha-forte);background:var(--superficie);box-shadow:0 12px 32px var(--sombra)}
+.etm-fl-painel[hidden]{display:none}
+.etm-fl-cab{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.etm-fl-cab h3{margin:0;font:700 13px/1.2 var(--font-sans);color:var(--tinta)}
+.etm-fl-x{border:0;background:none;color:var(--mudo);font-size:20px;line-height:1;cursor:pointer}
+.etm-fl-grade{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px 12px}
+.etm-fl-grade .etm-filtros{display:contents}
+.etm-periodo-l{display:flex;gap:6px}
+.etm-periodo-l .gc-campo{min-width:0}
+.etm-fl-pe{display:flex;align-items:center;justify-content:flex-end;gap:14px;margin-top:14px;padding-top:12px;border-top:1px solid var(--linha)}
+.etm-ab-modo{margin-left:auto}
+/* a gaveta da usina: maior que a padrão, com as ações, o comentário e a linha do tempo */
+.etm-us{width:min(720px,100vw)}
+.etm-us-acoes{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0 4px}
+.etm-us-acoes .gc-btn{display:inline-flex;align-items:center;gap:6px}
+.etm-us-acoes .gc-btn:disabled{opacity:.45;cursor:default}
+.etm-chat-l{display:flex;flex-direction:column;gap:5px}
+.etm-tl{list-style:none;margin:6px 0 0;padding:0 0 0 14px;border-left:2px solid var(--linha);display:flex;flex-direction:column;gap:10px}
+.etm-tl-i{position:relative;padding:8px 10px;border-radius:10px;background:var(--superficie-2);border:1px solid var(--linha)}
+.etm-tl-i::before{content:"";position:absolute;left:-21px;top:13px;width:10px;height:10px;border-radius:50%;background:var(--mudo);border:2px solid var(--superficie)}
+.etm-tl-i--aberta::before{background:var(--alerta)}
+.etm-tl-i--fim::before{background:var(--info)}
+.etm-tl-i--perf::before{background:var(--ok)}
+.etm-tl-i--coment::before{background:var(--verde)}
+.etm-tl-cab{display:flex;flex-wrap:wrap;align-items:baseline;gap:8px}
+.etm-tl-q{font:600 12px/1.3 var(--font-sans);color:var(--mudo)}
+.etm-tl-os{font:700 12.5px var(--font-sans);color:var(--verde-texto);text-decoration:none}
+.etm-tl-os:hover{text-decoration:underline}
+.etm-tl-tag{font-size:11px;color:var(--mudo);text-transform:uppercase;letter-spacing:.04em}
+.etm-tl-t{margin:4px 0 0;font-size:13px;line-height:1.45;color:var(--tinta);white-space:pre-wrap;overflow-wrap:break-word}
+.etm-tl-m{display:block;margin-top:3px;font-size:12px;color:var(--mudo)}
