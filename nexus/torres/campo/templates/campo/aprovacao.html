@@ -97,7 +97,7 @@
       {% for e in opcoes_etiqueta %}<option value="{{ e }}"{% if sem_acento(e) in etiquetas_marcadas %} selected{% endif %}>{{ e }}</option>{% endfor %}
     </select></span>
     <span class="apq-filtro"><label class="gc-rotulo" for="apq-busca">Buscar</label>
-    <input class="gc-campo apq-busca" id="apq-busca" type="search" name="q" value="{{ busca }}" data-apq-busca placeholder="OS, UFV ou técnico" autocomplete="off"></span>
+    <input class="gc-campo apq-busca" id="apq-busca" type="search" name="q" value="{{ busca }}" data-apq-busca placeholder="OS, UFV, técnico ou tarefa" autocomplete="off"></span>
     <a class="cn-link cn-barra-fonte" href="{{ url(csv='1') }}" data-apq-csv>Exportar CSV</a>
   </form>
   {# os filtros no padrão do Histórico de OS (25/11/2026, Levi: "no estilo histórico de os do os creator web, com o mesmo

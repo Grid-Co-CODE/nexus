@@ -77,3 +77,42 @@ def test_a_barra_e_a_do_historico_de_os_e_o_csv_leva_os_marcados(quadro, fila_re
     # a rota dos cartões (o Ver mais e a busca) recorta igual
     j = logado.get("/t/campo/aprovacao/cartoes?responsavel=*&tipo=Handover").get_json()
     assert "15088" in str(j) and "15102" not in str(j) and "16001" not in str(j)
+
+
+def _preventivas(fila_resp):  # noqa: F811
+    """15102 e 16001 viram Preventiva, com o plano no nome da tarefa (como no Fracttal: o tipo é "Preventiva" e o MPA, o
+    MPS, o MPM... vêm no nome); 15002 tem "Limpar" no nome (o "mpa" no meio da palavra)."""
+    _marcar(fila_resp)
+    for w in fila_resp.linhas:
+        texto = {"15102": "MPA - Limpeza dos módulos", "16001": "MPS - Inspeção termográfica",
+                 "15002": "Limpar o quadro de proteção"}.get(str(w["wo_folio"]))
+        if texto:
+            w["tasks_description"] = texto
+        if str(w["wo_folio"]) in ("15102", "16001"):
+            w["tasks_log_task_type_main"] = "Preventiva"
+
+
+def test_mpa_e_mps_vem_do_nome_da_tarefa_da_preventiva(quadro, fila_resp, logado):  # noqa: F811
+    """Levi, 25/11/2026, testando: "pesquisei por MPA e não filtrou nada". No Fracttal o tipo é "Preventiva" e o plano
+    (MPM, MPT, MPQ, MPS, MPA) vem no nome da tarefa; a escolha dele: "No Tipo e na busca". O Tipo de tarefa ganha
+    "Preventiva MPA", "Preventiva MPS"... (o código como palavra inteira no nome da tarefa da Preventiva)."""
+    _preventivas(fila_resp)
+    html = logado.get("/t/campo/aprovacao?responsavel=*&tipo=Preventiva+MPA").get_data(as_text=True)
+    assert _folios(html) == ["15102"]
+    f = _form(html)
+    opcoes = re.findall(r'<option value="([^"]*)"', f.split('name="tipo"', 1)[1].split("</select>", 1)[0])
+    assert "Preventiva MPA" in opcoes and "Preventiva MPS" in opcoes and "Preventiva" not in opcoes
+    dois = logado.get("/t/campo/aprovacao?responsavel=*&tipo=Preventiva+MPA&tipo=Preventiva+MPS").get_data(as_text=True)
+    assert sorted(_folios(dois)) == ["15102", "16001"]
+
+
+def test_a_busca_acha_o_nome_da_tarefa_no_comeco_da_palavra(quadro, fila_resp, logado):  # noqa: F811
+    _preventivas(fila_resp)
+    # "MPA" acha a 15102 pelo nome da tarefa, e não a 15002 ("Limpar": o "mpa" no meio da palavra)
+    assert _folios(logado.get("/t/campo/aprovacao?responsavel=*&q=MPA").get_data(as_text=True)) == ["15102"]
+    assert _folios(logado.get("/t/campo/aprovacao?responsavel=*&q=termografica").get_data(as_text=True)) == ["16001"]
+    # a rota dos cartões (a busca enquanto se digita) acha igual
+    j = logado.get("/t/campo/aprovacao/cartoes?responsavel=*&q=mps").get_json()
+    assert "16001" in str(j) and "15102" not in str(j)
+    # o que já se achava segue: o número da OS no meio
+    assert _folios(logado.get("/t/campo/aprovacao?responsavel=*&q=508").get_data(as_text=True)) == ["15088"]

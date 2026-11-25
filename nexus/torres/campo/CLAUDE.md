@@ -2706,7 +2706,13 @@ Aprovação e Triagem usam a lógica do App copiada, não refeita, para o númer
       `labels` das linhas do Fracttal que a fila já guarda (`regras_app._FILA_CACHE`, as do pré-filtro;
       `_tipos_e_etiquetas`): **nenhum pedido novo ao Fracttal**. As opções são o que a fila inteira tem, na grafia do
       Fracttal. A OS com a etiqueta PERFORMANCE ou CHAMADOS segue "Fora do pré-filtro" (a regra de 04/11): o filtro só a
-      acha lá. O `_url` da torre passou a levar todos os valores de um filtro de marcar (o CSV levava só o 1º). Prova:
+      acha lá. O `_url` da torre passou a levar todos os valores de um filtro de marcar (o CSV levava só o 1º). **O plano
+      da preventiva** (o Levi, testando no mesmo dia: "pesquisei por MPA e não filtrou nada"; escolha dele, "No Tipo e na
+      busca"): no Fracttal o tipo é só "Preventiva" (221 OS na fila de 25/11/2026) e o MPM, MPT, MPQ, MPS e MPA vêm no
+      nome da tarefa. O Tipo de tarefa mostra "Preventiva MPA", "Preventiva MPS"... (o código `MP` + uma letra como palavra
+      inteira no nome; sem código, "Preventiva"; `_tipo_da_tarefa`), e a busca passou a procurar também o nome das
+      tarefas, no começo de uma palavra ("MPA" acha "MPA - Limpeza" e não "Limpar"). A OS com Etiqueta PERFORMANCE ou
+      CHAMADOS conta zero no total do quadro (ela fica no "Fora do pré-filtro", que não entra na conta). Prova:
       `test_campo_aprovacao_tipo_etiqueta_25_11.py`.
     - **As fotos citadas aparecem na barra lateral (16/11/2026**, Levi: "Aprovação de OS quando tiver algo que cita
       Fotos tem que carregar as fotos!"): em cada fato que cita foto (foto tarde, repetida, que não abriu, GPS longe), a

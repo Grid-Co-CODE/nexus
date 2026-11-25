@@ -1846,6 +1846,28 @@ def _rotulo_fx(v) -> str:
     return " ".join(str(v or "").split())
 
 
+# o plano da preventiva no nome da tarefa (25/11/2026): MPM, MPT, MPQ, MPS, MPA... como palavra inteira, em maiúsculas
+_PLANO_PREVENTIVA = re.compile(r"(?<![A-Za-z0-9])(MP[A-Z])(?![A-Za-z0-9])")
+
+
+def _tipo_da_tarefa(w) -> str:
+    """O tipo da tarefa para o filtro: o do Fracttal (`tasks_log_task_type_main`) e, na Preventiva, o plano que vem no nome
+    da tarefa ("Preventiva MPA"). O Levi, 25/11/2026, testando: "pesquisei por MPA e não filtrou nada"; no Fracttal o
+    tipo é só "Preventiva" (221 OS na fila de 25/11) e o MPM, MPT, MPQ, MPS e MPA estão no nome da tarefa. A escolha
+    dele: "No Tipo e na busca". A preventiva sem código no nome fica "Preventiva"."""
+    tipo = _rotulo_fx(w.get("tasks_log_task_type_main"))
+    if _sem_acento(tipo) == "preventiva":
+        m = _PLANO_PREVENTIVA.search(regras_app._txt_tarefa(w))
+        if m:
+            return f"{tipo} {m.group(1)}"
+    return tipo
+
+
+def _no_comeco_de_palavra(termo: str, texto: str) -> bool:
+    """O termo (sem acento, sem caixa) começando uma palavra do texto: "mpa" acha "MPA - Limpeza" e não "Limpar"."""
+    return bool(termo) and re.search(r"(?<![a-z0-9])" + re.escape(termo), texto) is not None
+
+
 def _tipos_e_etiquetas(todas_os) -> None:
     """Põe em cada OS os tipos de tarefa e as etiquetas dela, das linhas do Fracttal que a fila já guarda
     (`regras_app._FILA_CACHE`, as mesmas que o pré-filtro lê): nenhum pedido novo ao Fracttal. O tipo é o
@@ -1856,7 +1878,9 @@ def _tipos_e_etiquetas(todas_os) -> None:
         cruas.setdefault(str(w.get("id_work_order") or ""), []).append(w)
     for o in todas_os:
         ws = cruas.get(str(o.get("id_wo") or ""), [])
-        o["tipos"] = sorted({_rotulo_fx(w.get("tasks_log_task_type_main")) for w in ws} - {""}, key=_sem_acento)
+        o["tipos"] = sorted({_tipo_da_tarefa(w) for w in ws} - {""}, key=_sem_acento)
+        # o nome de cada tarefa, para a busca (25/11/2026: "pesquisei por MPA e não filtrou nada")
+        o["textos_tarefas"] = [_sem_acento(regras_app._txt_tarefa(w)) for w in ws]
         o["etiquetas"] = sorted({_rotulo_fx(x) for w in ws for x in (w.get("labels") or ())} - {""}, key=_sem_acento)
 
 
@@ -1895,9 +1919,11 @@ def _aprovacao_recorte() -> dict:
             return False
         if tecnico and tecnico not in o["tecnicos"] or cliente and o["cliente_cad"] != cliente:
             return False
-        # a busca de antes (a OS, a usina, o cliente, o responsável e os técnicos, sem acento), agora no servidor
+        # a busca de antes (a OS, a usina, o cliente, o responsável e os técnicos, sem acento), agora no servidor; e,
+        # desde 25/11/2026, o nome das tarefas, no começo de uma palavra (o "MPA" do plano, sem achar o "Limpar")
         return not termo or termo in _sem_acento(" ".join([str(o["os"]), o["usina_cad"], o["cliente_cad"],
-                                                           o["responsavel_cad"], *o["tecnicos"]]))
+                                                           o["responsavel_cad"], *o["tecnicos"]])) \
+            or any(_no_comeco_de_palavra(termo, t) for t in o["textos_tarefas"])
     oss = [o for o in todas_os if cabe(o)]
     return {"usina_id": usina_id, "tecnico": tecnico, "cliente": cliente, "busca": busca, "responsavel": responsavel,
             "tipos": tipos, "etiquetas": etiquetas,
