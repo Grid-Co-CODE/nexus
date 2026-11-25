@@ -494,7 +494,7 @@ motivo em claro). O lado do App está no ar desde a v380 (24/11, 12:45). O texto
   ligado, normal e lista vazia (o livro não apaga linha).
 - A linha nova vence também pela hora: no mesmo segundo da anterior, sai um segundo depois. Depois de gravar, a própria
   linha é conferida pela conta de leitura.
-- **Quem edita: administrador.** Gestor também é pergunta aberta ao Levi (24/11/2026).
+- **Quem edita: só administrador** (Levi, 25/11/2026: "Só administrador edita a regra"; o gestor não edita).
 
 **Prova**: `tests/test_base_emails_controle.py` (a linha do Nexus conferida pela conta do App reescrita no teste, sem
 nada do Nexus; a linha do teste do App aberta no Nexus; o empate; as recusas; o histórico; a tela publicando, recusando
