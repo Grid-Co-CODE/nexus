@@ -1876,8 +1876,11 @@ def _tipos_e_etiquetas(todas_os) -> None:
     cruas: dict = {}
     for w in regras_app._FILA_CACHE.get("linhas") or ():
         cruas.setdefault(str(w.get("id_work_order") or ""), []).append(w)
+    # o setor de quem criou (25/11/2026): a última conta de quem é de cada setor, a mesma que acha o COS, sem ler nada
+    cos = campo_verif.cos_guardado()
     for o in todas_os:
         ws = cruas.get(str(o.get("id_wo") or ""), [])
+        o["criado_por"] = sorted({campo_verif.setor_do_criador(w, cos) for w in ws} - {""}, key=_sem_acento)
         o["tipos"] = sorted({_tipo_da_tarefa(w) for w in ws} - {""}, key=_sem_acento)
         # o nome de cada tarefa, para a busca (25/11/2026: "pesquisei por MPA e não filtrou nada")
         o["textos_tarefas"] = [_sem_acento(regras_app._txt_tarefa(w)) for w in ws]
@@ -1894,6 +1897,8 @@ def _aprovacao_recorte() -> dict:
     usina_id = visao.D._id(request.args.get("usina"))
     tipos = [t for t in (str(x).strip() for x in request.args.getlist("tipo")) if t]
     etiquetas = [e for e in (str(x).strip() for x in request.args.getlist("etiqueta")) if e]
+    # quem criou a OS, pelo setor dele no Nexus (25/11/2026, Levi: "criado por, aí bota entre parênteses setor")
+    criados = [c for c in (str(x).strip() for x in request.args.getlist("criado")) if c]
     tecnico = str(request.args.get("tecnico") or "").strip()
     cliente = str(request.args.get("cliente") or "").strip()
     busca = str(request.args.get("q") or "").strip()
@@ -1909,8 +1914,11 @@ def _aprovacao_recorte() -> dict:
     _tipos_e_etiquetas(todas_os)
     termo = _sem_acento(busca)
     tipos_n, etiquetas_n = {_sem_acento(t) for t in tipos}, {_sem_acento(e) for e in etiquetas}
+    criados_n = {_sem_acento(c) for c in criados}
 
     def cabe(o):
+        if criados_n and not criados_n & {_sem_acento(c) for c in o["criado_por"]}:
+            return False
         if tipos_n and not tipos_n & {_sem_acento(t) for t in o["tipos"]}:
             return False
         if etiquetas_n and not etiquetas_n & {_sem_acento(e) for e in o["etiquetas"]}:
@@ -1926,7 +1934,7 @@ def _aprovacao_recorte() -> dict:
             or any(_no_comeco_de_palavra(termo, t) for t in o["textos_tarefas"])
     oss = [o for o in todas_os if cabe(o)]
     return {"usina_id": usina_id, "tecnico": tecnico, "cliente": cliente, "busca": busca, "responsavel": responsavel,
-            "tipos": tipos, "etiquetas": etiquetas,
+            "tipos": tipos, "etiquetas": etiquetas, "criados": criados,
             "mapa": mapa, "leitura": leitura, "todas_os": todas_os, "oss": oss, "q": _quadro(oss)}
 
 
@@ -1989,6 +1997,8 @@ def aprovacao():
         opcoes_tipo=_opcoes_marcar(todas_os, "tipos", r["tipos"]), tipos_marcados={_sem_acento(t) for t in r["tipos"]},
         opcoes_etiqueta=_opcoes_marcar(todas_os, "etiquetas", r["etiquetas"]),
         etiquetas_marcadas={_sem_acento(e) for e in r["etiquetas"]}, sem_acento=_sem_acento,
+        opcoes_criado=_opcoes_marcar(todas_os, "criado_por", r["criados"]),
+        criados_marcados={_sem_acento(c) for c in r["criados"]},
         horas_tarde=prefiltro.parametros(current_app.config)["horas_tarde"], **_ctx_cartao(r["responsavel"])))
 
 

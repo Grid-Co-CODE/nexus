@@ -2712,8 +2712,13 @@ Aprovação e Triagem usam a lógica do App copiada, não refeita, para o númer
       nome da tarefa. O Tipo de tarefa mostra "Preventiva MPA", "Preventiva MPS"... (o código `MP` + uma letra como palavra
       inteira no nome; sem código, "Preventiva"; `_tipo_da_tarefa`), e a busca passou a procurar também o nome das
       tarefas, no começo de uma palavra ("MPA" acha "MPA - Limpeza" e não "Limpar"). A OS com Etiqueta PERFORMANCE ou
-      CHAMADOS conta zero no total do quadro (ela fica no "Fora do pré-filtro", que não entra na conta). Prova:
-      `test_campo_aprovacao_tipo_etiqueta_25_11.py`.
+      CHAMADOS conta zero no total do quadro (ela fica no "Fora do pré-filtro", que não entra na conta). **Criado por
+      (setor)** (o Levi, no mesmo dia: "criado por, aí bota entre parênteses setor, aí performance, engenharia, chamados e
+      assim por diante"; o COS do Otávio não é etiqueta no Fracttal): lista de marcar `?criado=` com o setor de quem criou
+      a OS (`code_create_by`, e sem ele o `created_by`) no livro `nexus_setores`. Sai da mesma conta que acha o COS
+      (`verificacao.criadores_cos`, feita pela leitura de fundo e guardada 10 min; ela passou a guardar o setor de toda
+      pessoa com setor, `setor_por_codigo`/`setor_por_nome`, e `setor_do_criador` lê): a visita não lê nada. Quem criou
+      sem setor no Nexus não entra em opção nenhuma. Prova: `test_campo_aprovacao_tipo_etiqueta_25_11.py`.
     - **As fotos citadas aparecem na barra lateral (16/11/2026**, Levi: "Aprovação de OS quando tiver algo que cita
       Fotos tem que carregar as fotos!"): em cada fato que cita foto (foto tarde, repetida, que não abriu, GPS longe), a
       miniatura de cada uma (`loading="lazy"`) com o nome embaixo, que segue abrindo o card; a miniatura abre a foto

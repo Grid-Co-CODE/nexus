@@ -116,3 +116,63 @@ def test_a_busca_acha_o_nome_da_tarefa_no_comeco_da_palavra(quadro, fila_resp, l
     assert "16001" in str(j) and "15102" not in str(j)
     # o que já se achava segue: o número da OS no meio
     assert _folios(logado.get("/t/campo/aprovacao?responsavel=*&q=508").get_data(as_text=True)) == ["15088"]
+
+
+
+def test_o_setor_de_quem_criou_sai_do_setor_e_do_pessoal(monkeypatch):
+    """A conta de quem é do COS (`verificacao.criadores_cos`, a da leitura de fundo) passa a dizer o setor de TODO criador:
+    a última decisão de cada pessoa no livro `nexus_setores`, pelo código e pelo nome no Fracttal."""
+    from nexus.cadastro import setores as S
+    from nexus.campo import verificacao as V
+    V.limpar()
+    monkeypatch.setattr(S, "ler", lambda base, sessao: {
+        "setores": [{"setor_id": 5, "nome": "COS", "excluido": False}, {"setor_id": 2, "nome": "PCM", "excluido": False},
+                    {"setor_id": 7, "nome": "Performance", "excluido": False},
+                    {"setor_id": 9, "nome": "Antigo", "excluido": True}],
+        "decisoes": [{"fracttal_id": 10, "setor_id": 5, "decidida_em": "2026-10-01"},
+                     {"fracttal_id": 11, "setor_id": 5, "decidida_em": "2026-10-01"},
+                     {"fracttal_id": 11, "setor_id": 2, "decidida_em": "2026-10-02"},      # saiu do COS depois
+                     {"fracttal_id": 12, "setor_id": 2, "decidida_em": "2026-10-01"},
+                     {"fracttal_id": 13, "setor_id": 7, "decidida_em": "2026-10-01"},
+                     {"fracttal_id": 14, "setor_id": 9, "decidida_em": "2026-10-01"}], "erro": ""})   # setor excluído
+    pessoal = {"pessoas": [{"id": 10, "nome": "Fulana Prado"}, {"id": 11, "nome": "Ciclano Araújo"},
+                           {"id": 12, "nome": "Beltrano Souza"}, {"id": 13, "nome": "Paula Lima"},
+                           {"id": 14, "nome": "Velho Setor"}],
+               "codigos": {10: "fulanap", 11: "CICLANOA", 13: "perf1"}, "erro": ""}
+    c = V.criadores_cos("http://banco", None, lambda: pessoal)
+    assert c["nomes"] == {"FULANA PRADO"} and c["codigos"] == {"FULANAP"}          # o COS de sempre, igual
+    assert c["setor_por_codigo"] == {"FULANAP": "COS", "CICLANOA": "PCM", "PERF1": "Performance"}
+    assert c["setor_por_nome"] == {"FULANA PRADO": "COS", "CICLANO ARAUJO": "PCM", "BELTRANO SOUZA": "PCM",
+                                   "PAULA LIMA": "Performance"}
+    assert V.setor_do_criador({"code_create_by": "perf1", "created_by": "Outro"}, c) == "Performance"
+    assert V.setor_do_criador({"created_by": "Beltrano Souza"}, c) == "PCM"
+    assert V.setor_do_criador({"created_by": "Velho Setor"}, c) == "" and V.setor_do_criador({"created_by": "X"}, c) == ""
+    assert V.setor_do_criador({"created_by": "Beltrano Souza"}, None) == ""
+    V.limpar()
+
+
+def test_criado_por_setor(quadro, fila_resp, logado):  # noqa: F811
+    """O Otávio pediu "COS" entre quem solicitou, mas no Fracttal o COS não é etiqueta. O Levi, 25/11/2026: "Pode incluir
+    criada por setores, né? Então, tipo assim, criado por, aí bota entre parênteses setor, aí performance, engenharia,
+    chamados e assim por diante". A lista de marcar "Criado por (setor)": o setor de quem criou a OS no Fracttal."""
+    import time
+
+    from test_campo_aprovacao_supervisor import _tarefa
+
+    from nexus.campo import verificacao
+    _marcar(fila_resp)
+    fila_resp.linhas.append({**_tarefa(17002, 1, "SP 01"), "code_create_by": "c7"})
+    for w in fila_resp.linhas:
+        if str(w["wo_folio"]) == "15102":
+            w["created_by"] = "Pedro Performance"
+    verificacao._COS.update(t=time.time(), v={"codigos": {"C7"}, "nomes": set(), "pessoas": 1, "erro": "",
+                                              "setor_por_codigo": {"C7": "COS"},
+                                              "setor_por_nome": {"PEDRO PERFORMANCE": "Performance"}})
+    html = logado.get("/t/campo/aprovacao?responsavel=*&criado=COS").get_data(as_text=True)
+    assert _folios(html) == ["17002"]
+    f = _form(html)
+    assert re.search(r'<select[^>]*name="criado"[^>]*multiple', f) and "Criado por (setor)" in f
+    assert '<option value="COS" selected>COS</option>' in f and '<option value="Performance">Performance</option>' in f
+    junto = logado.get("/t/campo/aprovacao?responsavel=*&criado=COS&criado=Performance").get_data(as_text=True)
+    assert sorted(_folios(junto)) == ["15102", "17002"]
+    verificacao.limpar()

@@ -96,6 +96,12 @@
     <select class="gc-campo" id="apq-etiqueta" name="etiqueta" multiple>
       {% for e in opcoes_etiqueta %}<option value="{{ e }}"{% if sem_acento(e) in etiquetas_marcadas %} selected{% endif %}>{{ e }}</option>{% endfor %}
     </select></span>
+    {# quem criou a OS, pelo setor dele no Nexus (25/11/2026, Levi: "criado por, aí bota entre parênteses setor, aí
+       performance, engenharia, chamados e assim por diante"): o COS, que não é etiqueta no Fracttal, entra por aqui #}
+    <span class="apq-filtro"><label class="gc-rotulo" for="apq-criado">Criado por (setor)</label>
+    <select class="gc-campo" id="apq-criado" name="criado" multiple>
+      {% for c in opcoes_criado %}<option value="{{ c }}"{% if sem_acento(c) in criados_marcados %} selected{% endif %}>{{ c }}</option>{% endfor %}
+    </select></span>
     <span class="apq-filtro"><label class="gc-rotulo" for="apq-busca">Buscar</label>
     <input class="gc-campo apq-busca" id="apq-busca" type="search" name="q" value="{{ busca }}" data-apq-busca placeholder="OS, UFV, técnico ou tarefa" autocomplete="off"></span>
     <a class="cn-link cn-barra-fonte" href="{{ url(csv='1') }}" data-apq-csv>Exportar CSV</a>
