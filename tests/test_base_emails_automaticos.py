@@ -77,6 +77,22 @@ def test_sem_o_livro_dos_envios_valem_os_numeros_do_tipos():
     assert EA.montar(tipos, None, None, AGORA, regras)["tipos"][2]["pendente"] is False
 
 
+def test_o_grafico_conta_envios_por_dia_de_brasilia():
+    """O gráfico dos cartões (25/11/2026, Levi: "Tô sentindo falta de uma coisa mais visual"): 30 dias, o de hoje por
+    último, em ENVIOS (a PT para duas pessoas é uma coluna de 1) e no dia de Brasília: a falha das 02:00 UTC de 23/11 é
+    das 23:00 de 22/11."""
+    t = {x["tipo"]: x for x in EA.montar(TIPOS, TODOS, SEMANAL, AGORA)["tipos"]}
+    dias = t["pt_aviso"]["dias"]
+    assert len(dias) == 30 and str(dias[-1]["dia"]) == "2026-11-24" and str(dias[0]["dia"]) == "2026-10-26"
+    por = {str(x["dia"]): x for x in dias}
+    assert (por["2026-11-24"]["enviado"], por["2026-11-24"]["total"]) == (1, 1)
+    assert (por["2026-11-22"]["falhou"], por["2026-11-23"]["total"]) == (1, 0)
+    assert por["2026-11-01"]["enviado"] == 1 and sum(x["total"] for x in dias) == 3
+    assert {str(x["dia"]): x["barrado"] for x in t["luvas_tst"]["dias"]}["2026-11-20"] == 1
+    # sem o livro que conta o tipo, o gráfico não sai (não é "nenhum envio")
+    assert {x["tipo"]: x for x in EA.montar(None, None, SEMANAL, AGORA)["tipos"]}["pt_aviso"]["dias"] is None
+
+
 @pytest.fixture
 def com_livros(monkeypatch):
     from nexus.torres.base import emails_tela as ET
@@ -100,7 +116,11 @@ def test_a_tela_lista_os_tipos_e_abre_o_historico(app, com_livros):
     html = c.get("/t/base/emails-automaticos").get_data(as_text=True)
     assert "PT aguardando assinatura" in html and "/t/base/emails-automaticos/pt_aviso" in html
     assert "1 enviado " in html and "1 falha" in html and "Desligado" in html and "1 barrado" in html
+    # os cartões: o gráfico de cada tipo com a dica de cada dia, e a legenda das situações
+    assert 'data-tip="24/11: 1 enviado"' in html and 'data-tip="22/11: 1 falha"' in html
+    assert 'data-tip="20/11: 1 barrado"' in html and "Barrado (desligado)" in html
     h = c.get("/t/base/emails-automaticos/pt_aviso").get_data(as_text=True)
     assert "Fulana Prado" in h and "Caixa COS" in h and "503 Graph" in h and "abc123" not in h
+    assert 'tabindex="0" aria-label="22/11: 1 falha"' in h                        # na página do tipo, dia a dia pelo teclado
     assert "24/11 08:00" in h                                                      # 11:00 UTC = 08:00 de Brasília
     assert c.get("/t/base/emails-automaticos/nao_existe").status_code == 404

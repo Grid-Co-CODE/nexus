@@ -19,6 +19,28 @@
   raiz.BaseEmails = { emailDoTexto: emailDoTexto };
   if (typeof document === "undefined") return;
 
+  // a dica de cada dia do gráfico (mouse e teclado): o dia e os envios por situação, do data-tip da coluna
+  var tip = null;
+  function mostrar(el) {
+    if (!tip) { tip = document.createElement("div"); tip.className = "em-tip"; tip.setAttribute("aria-hidden", "true"); document.body.appendChild(tip); }
+    tip.textContent = el.getAttribute("data-tip");
+    tip.hidden = false;
+    var r = el.getBoundingClientRect(), w = tip.offsetWidth, h = tip.offsetHeight;
+    var x = Math.min(Math.max(8, r.left + r.width / 2 - w / 2), window.innerWidth - w - 8);
+    var y = r.top - h - 6;
+    tip.style.left = x + "px";
+    tip.style.top = (y < 8 ? r.bottom + 6 : y) + "px";
+  }
+  function esconder() { if (tip) tip.hidden = true; }
+  ["mouseover", "focusin"].forEach(function (ev) {
+    document.addEventListener(ev, function (e) {
+      var el = e.target.closest && e.target.closest(".em-dia[data-tip]");
+      if (el) mostrar(el); else if (ev === "mouseover") esconder();
+    });
+  });
+  document.addEventListener("focusout", esconder);
+  window.addEventListener("scroll", esconder, true);
+
   var form = document.querySelector("[data-em-form]");
   if (!form) return;
   var lista = form.querySelector("[data-em-dest]");

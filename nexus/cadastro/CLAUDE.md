@@ -433,11 +433,20 @@ que estivesse no Nexus"; aqui: "Só admin". O App de Campo manda pelo Microsoft 
 `pt_aviso`, `luvas_tst`, `auditoria_diaria`, `seguranca_semanal`, `seguranca_relato`, `encaminhamento` e `avulso` (o
 envio de teste do `email_avulso.json`). Até 24/11 os destinatários eram só App Settings do Azure.
 
-**A tela** (só administrador): uma linha por tipo (nome, quando sai, o PAPEL que recebe, ligado, modo, de onde vem a
-regra, último envio, enviados, falhas e barrados em 7 dias, e "regra nova a confirmar" enquanto o App não publicar os
-Tipos com a hora da regra). O clique abre o tipo: a regra que vale, o formulário, as Mudanças (tiradas das próprias
-linhas do livro: quem, o que mudou, quem entrou e saiu da lista, o motivo; a linha que não confere aparece como "Não
-vale") e os envios de 30 dias com a pessoa pelo nome (o código HMAC do livro trocado pelo nome do Registro mestre, do
+**A tela** (só administrador): no alto, os números (ligados de 7 e quantos em teste, enviados e falhas em 7 dias, as
+regras do Nexus e as a confirmar); embaixo, UM CARTÃO por tipo (25/11/2026, Levi: "Tô sentindo falta de uma coisa mais
+visual"): o nome, ligado e teste, o Quando → Para (o PAPEL que recebe), o gráfico dos envios por dia em 30 dias, os
+números de 7 dias, o último envio e a nota (e-mail de segurança, de onde vem a regra, "regra nova a confirmar" enquanto o
+App não publicar os Tipos com a hora da regra). **O gráfico** (`emails_app.por_dia`): uma coluna por dia de Brasília,
+contada em ENVIOS (o aviso para três pessoas é 1, no dia da 1ª linha dele), empilhada pela situação nas cores do
+semáforo (enviado `--ok-cheio`, teste `--info-cheio`, falha `--critico-cheio`, barrado `--mudo`; a ordem passou no
+validador do dataviz nos dois temas, e o contraste baixo no claro é compensado pela legenda, a dica e a tabela); a escala
+é a do próprio tipo (o avulso e o aviso de PT têm volumes muito diferentes) e o teto diz o máximo por dia. Sem o livro
+que conta o tipo, o cartão diz que o App ainda não publica os envios, sem gráfico (não é "nenhum envio"). A dica do
+mouse (`base-emails.js`) diz o dia e as situações; no cartão, que é um link, as colunas ficam fora do teclado, e na
+página do tipo o gráfico grande passa dia a dia. O clique abre o tipo: a regra que vale, o formulário, as Mudanças
+(tiradas das próprias linhas do livro: quem, o que mudou, quem entrou e saiu da lista, o motivo; a linha que não
+confere aparece como "Não vale"), o gráfico grande e os envios de 30 dias com a pessoa pelo nome (o código HMAC do livro trocado pelo nome do Registro mestre, do
 Fracttal, do cadastro do App ou, para a caixa das regras, o próprio e-mail; o código nunca vai à tela).
 
 **O contrato com o App** (fechado em 24/11/2026 com a sessão "App de campo sub"; a sessão Nexus de Base e Comando aceitou

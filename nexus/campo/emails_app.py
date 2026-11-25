@@ -145,6 +145,45 @@ def _conta(es: list[dict]) -> tuple[int, int, int]:
     return env, fal, des
 
 
+BRT = timezone(timedelta(hours=-3))      # o dia do gráfico é o de Brasília (o envio das 22h UTC-3 é do dia dele)
+GRUPOS = ("enviado", "teste", "falhou", "barrado")
+
+
+def _grupo(sits: set) -> str:
+    """A situação de UM envio (com todas as linhas dele): falha vence, depois o barrado, o teste e o enviado."""
+    if sits & FALHAS:
+        return "falhou"
+    if sits == {"desligado"}:
+        return "barrado"
+    if "teste" in sits:
+        return "teste"
+    if "enviado" in sits:
+        return "enviado"
+    return ""
+
+
+def por_dia(es: list[dict], agora: datetime, dias: int = HISTORICO_DIAS) -> list[dict]:
+    """Os envios de um tipo por dia de Brasília, do mais antigo ao de hoje (sempre `dias` dias, o dia sem envio com
+    zero): [{dia, enviado, teste, falhou, barrado, total}]. Conta ENVIOS, como os números da lista (um aviso para três
+    pessoas é um); o envio cai no dia da 1ª linha dele. Pendente não entra (ainda não é envio)."""
+    hoje = agora.astimezone(BRT).date()
+    inicio = hoje - timedelta(days=dias - 1)
+    sits: dict[str, set] = {}
+    quando: dict[str, datetime] = {}
+    for e in es:
+        if not e["quando"]:
+            continue
+        sits.setdefault(e["envio"], set()).add(e["situacao"])
+        if e["envio"] not in quando or e["quando"] < quando[e["envio"]]:
+            quando[e["envio"]] = e["quando"]
+    linhas = {inicio + timedelta(days=n): dict.fromkeys(GRUPOS, 0) for n in range(dias)}
+    for envio, s in sits.items():
+        g, d = _grupo(s), quando[envio].astimezone(BRT).date()
+        if g and d in linhas:
+            linhas[d][g] += 1
+    return [dict(v, dia=d, total=sum(v.values())) for d, v in linhas.items()]
+
+
 def montar(tipos: list[dict] | None, todos: list[dict] | None, semanal: list[dict] | None, agora: datetime,
            regras: dict | None = None) -> dict:
     """A lista da tela: {tipos: [{tipo, nome, gatilho, destino, ligado, origem, modo, regra_em, critico, enviados,
@@ -183,7 +222,9 @@ def montar(tipos: list[dict] | None, todos: list[dict] | None, semanal: list[dic
                     "origem": _t(a.get("De onde vem a regra")), "modo": _t(a.get("Modo")).lower(),
                     "regra_em": regra_em, "critico": tipo in CRITICOS, "enviados": env, "falhas": fal,
                     "desligados": des, "ultimo": ult, "ultima_situacao": ultimo["situacao"] if ultimo else "",
-                    "regra": rg, "pendente": pendente})
+                    "regra": rg, "pendente": pendente,
+                    # o gráfico de 30 dias só com o livro que conta este tipo (None = o App ainda não diz)
+                    "dias": por_dia(es, agora) if sabe else None})
     return {"tipos": out, "fonte": fonte, "tem_tipos": bool(do_app)}
 
 

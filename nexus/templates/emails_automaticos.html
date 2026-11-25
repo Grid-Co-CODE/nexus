@@ -2,6 +2,33 @@
 {% block titulo %}E-mails automáticos{% endblock %}
 {% block conteudo %}
 {% from "_explica.html" import explica %}
+{# o gráfico dos envios por dia (30 dias, em ENVIOS): uma coluna por dia, empilhada pela situação; a escala é a do próprio
+   tipo (o avulso e o aviso de PT têm volumes muito diferentes). O "data-tip" é a dica do mouse e do teclado. #}
+{% macro grafico(dias, grande=False) %}
+{%- set mx = dias|map(attribute='total')|max -%}
+<div class="em-graf{% if grande %} em-graf--grande{% endif %}" role="group" aria-label="Envios por dia nos últimos {{ dias|length }} dias: {{ dias|sum(attribute='total') }} no total">
+  <div class="em-graf-teto"><span>{% if mx %}{{ mx }} por dia{% else %}nenhum envio{% endif %}</span></div>
+  <div class="em-colunas">
+  {%- for x in dias %}
+    {%- set partes = [] %}
+    {%- for g, rot in (('enviado', 'enviado'), ('teste', 'em teste'), ('falhou', 'falha'), ('barrado', 'barrado')) %}{% if x[g] %}{% set _ = partes.append(x[g] ~ ' ' ~ (rot if x[g] == 1 or g == 'teste' else ('enviados' if g == 'enviado' else ('falhas' if g == 'falhou' else 'barrados')))) %}{% endif %}{% endfor %}
+    {%- set tip = x.dia.strftime('%d/%m') ~ ': ' ~ (partes|join(', ') if partes else 'nenhum envio') %}
+    <span class="em-dia" data-tip="{{ tip }}"{% if grande %} tabindex="0" aria-label="{{ tip }}"{% else %} aria-hidden="true"{% endif %}>
+      {%- if x.total %}<span class="em-pilha" style="height:{{ (x.total * 100 / mx)|round(1) }}%">
+        {%- for g in ('barrado', 'falhou', 'teste', 'enviado') %}{% if x[g] %}<i class="em-s em-s--{{ g }}" style="flex-grow:{{ x[g] }}"></i>{% endif %}{% endfor -%}
+      </span>{% endif -%}
+    </span>
+  {%- endfor %}
+  </div>
+  <div class="em-graf-eixo"><span>{{ dias[0].dia.strftime('%d/%m') }}</span><span>hoje</span></div>
+</div>
+{%- endmacro %}
+{% macro legenda() %}
+<ul class="em-legenda" aria-label="Legenda do gráfico">
+  <li><i class="em-s em-s--enviado"></i>Enviado</li><li><i class="em-s em-s--teste"></i>Em teste</li>
+  <li><i class="em-s em-s--falhou"></i>Falha</li><li><i class="em-s em-s--barrado"></i>Barrado (desligado)</li>
+</ul>
+{%- endmacro %}
 {# Base › E-mails automáticos (24/11/2026; nexus/torres/base/emails_tela.py; a leitura em nexus/campo/emails_app.py e a
    regra em nexus/campo/emails_controle.py): o que o App de Campo manda sozinho por e-mail, para quem, se saiu, e o
    controle de cada tipo (ligar e desligar, modo teste, destinatários), só administrador. #}
@@ -22,6 +49,9 @@
           Lista vazia não muda nada.</p>
           <p><b>Como se conta.</b> Enviados e falhas contam envios, não destinatários: um aviso para três pessoas é um
           envio. Os números são dos últimos {{ dias }} dias.</p>
+          <p><b>Como ler o gráfico.</b> Cada coluna é um dia (de Brasília), dos últimos 30 até hoje, com os envios
+          empilhados pela situação: enviado, em teste, falha e barrado (o e-mail estava desligado). A altura é a do
+          próprio e-mail: o número no alto é o máximo num dia. Passe o mouse num dia para ver as contas.</p>
         {% endcall %}
       </div>
       <p class="cn-pergunta">{% if t %}{{ t.gatilho }} · Padrão do App: {{ t.destino }}{% else %}Que e-mail o App manda sozinho, para quem, e saiu?{% endif %}</p></div>
@@ -105,6 +135,7 @@
   {% else %}<p class="cn-vazio">Nenhuma mudança deste e-mail pelo Nexus.</p>{% endif %}
 
   <h2 class="ins-sub">Envios dos últimos {{ historico_dias }} dias</h2>
+  {% if t.dias %}<div class="em-graf-caixa">{{ legenda() }}{{ grafico(t.dias, grande=True) }}</div>{% endif %}
   {% if envios %}
   <div class="cn-tab"><table>
     <thead><tr><th class="em-esq">Quando</th><th class="em-esq">Para quem</th><th class="em-esq">Referência</th><th>Situação</th><th class="em-esq">Erro</th></tr></thead>
@@ -119,17 +150,32 @@
   {% else %}<p class="cn-vazio">{% if d.fonte == 'todos' or (d.fonte == 'semanal' and t.tipo == 'seguranca_semanal') %}Nenhum envio deste e-mail nos últimos {{ historico_dias }} dias.{% else %}O App ainda não publicou os envios deste e-mail.{% endif %}</p>{% endif %}
 
   {% else %}
-  <ul class="em-lista">
+  {% set comnum = d.tipos|selectattr('enviados', 'ne', none)|list %}
+  <div class="gc-numeros em-numeros">
+    <div><div class="r">Ligados</div><div class="v gc-num">{% if d.tem_tipos %}{{ d.tipos|selectattr('ligado')|list|length }}<small> de {{ d.tipos|length }}</small>{% else %}—{% endif %}</div>
+      <div class="d">{% if d.tem_tipos %}{{ d.tipos|selectattr('modo', 'eq', 'teste')|list|length }} em teste{% else %}o App ainda não diz{% endif %}</div></div>
+    <div><div class="r">Enviados em {{ dias }} dias</div><div class="v gc-num">{{ comnum|sum(attribute='enviados') if comnum else '—' }}</div><div class="d">envios, não pessoas</div></div>
+    <div><div class="r">Falhas em {{ dias }} dias</div><div class="v gc-num{% if comnum|sum(attribute='falhas') %} ruim{% endif %}">{{ comnum|sum(attribute='falhas') if comnum else '—' }}</div><div class="d">{% if comnum|sum(attribute='falhas') %}o App tenta de novo{% else %}nenhuma{% endif %}</div></div>
+    <div><div class="r">Regras do Nexus</div><div class="v gc-num">{{ d.tipos|selectattr('regra')|list|length }}</div><div class="d">{% if d.tipos|selectattr('pendente')|list %}{{ d.tipos|selectattr('pendente')|list|length }} a confirmar pelo App{% else %}as outras seguem o App{% endif %}</div></div>
+  </div>
+  <div class="em-cab-cartoes"><h2 class="ui-kicker">Os e-mails · envios por dia em {{ historico_dias }} dias</h2>{{ legenda() }}</div>
+  <ul class="em-cartoes">
     {% for x in d.tipos %}
-    <li><a class="em-linha" href="{{ raiz }}/t/base/emails-automaticos/{{ x.tipo }}">
-      <span class="em-nome"><b>{{ x.nome }}</b><small>{{ x.gatilho }}</small></span>
-      <span class="em-para"><small>Para</small>{{ x.destino }}</span>
-      <span class="em-estado">{% if x.ligado is none %}<span class="mudo">—</span>{% elif x.ligado %}<span class="cn-pill cn-ok">Ligado</span>{% else %}<span class="cn-pill cn-alerta">Desligado</span>{% endif %}
-        {%- set partes = [] %}{% if x.modo %}{% set _ = partes.append('Teste' if x.modo == 'teste' else 'Normal') %}{% endif %}{% if x.origem %}{% set _ = partes.append(x.origem) %}{% endif %}
-        {% if partes or x.pendente %}<small>{{ partes|join(' · ') }}{% if x.pendente %}{% if partes %} · {% endif %}<b class="atencao">regra nova a confirmar</b>{% endif %}</small>{% endif %}</span>
-      <span class="em-num"><small>Último</small>{{ hora(x.ultimo) }}</span>
-      <span class="em-num"><small>{{ dias }} dias</small>{% if x.enviados is none %}<span class="mudo">—</span>{% else %}{{ x.enviados }} {{ 'enviado' if x.enviados == 1 else 'enviados' }}{% if x.falhas %} · <b class="ruim">{{ x.falhas }} {{ 'falha' if x.falhas == 1 else 'falhas' }}</b>{% endif %}{% if x.desligados %} · {{ x.desligados }} {{ 'barrado' if x.desligados == 1 else 'barrados' }}{% endif %}{% endif %}</span>
-      <i class="ph ph-caret-right em-seta" aria-hidden="true"></i>
+    <li><a class="em-cartao{% if x.ligado == false %} em-cartao--desligado{% endif %}" href="{{ raiz }}/t/base/emails-automaticos/{{ x.tipo }}">
+      <span class="em-cartao-cab"><b>{{ x.nome }}</b>
+        <span class="em-pills">{% if x.ligado is none %}<span class="mudo">—</span>{% elif x.ligado %}<span class="cn-pill cn-ok">Ligado</span>{% else %}<span class="cn-pill cn-alerta">Desligado</span>{% endif %}{% if x.modo == 'teste' %}<span class="cn-pill em-sit em-sit--info">Teste</span>{% endif %}</span></span>
+      <span class="em-fluxo">
+        <span><i class="ph ph-lightning" aria-hidden="true"></i><span><small>Quando</small>{{ x.gatilho }}</span></span>
+        <i class="ph ph-arrow-right em-fluxo-seta" aria-hidden="true"></i>
+        <span><i class="ph ph-users" aria-hidden="true"></i><span><small>Para</small>{{ x.destino }}</span></span>
+      </span>
+      {% if x.dias %}{{ grafico(x.dias) }}{% else %}<span class="em-graf-sem">O App ainda não publica os envios deste e-mail.</span>{% endif %}
+      <span class="em-cartao-pe">
+        <span class="gc-num">{% if x.enviados is none %}<span class="mudo">—</span>{% else %}{{ x.enviados }} {{ 'enviado' if x.enviados == 1 else 'enviados' }} em {{ dias }} dias{% if x.falhas %} · <b class="ruim">{{ x.falhas }} {{ 'falha' if x.falhas == 1 else 'falhas' }}</b>{% endif %}{% if x.desligados %} · {{ x.desligados }} {{ 'barrado' if x.desligados == 1 else 'barrados' }}{% endif %}{% endif %}</span>
+        <span class="mudo">Último: {{ hora(x.ultimo) }}</span>
+      </span>
+      {%- set partes = [] %}{% if x.regra %}{% set _ = partes.append('regra do Nexus') %}{% elif x.origem %}{% set _ = partes.append('regra: ' ~ x.origem) %}{% endif %}
+      {% if partes or x.pendente or x.critico %}<span class="em-cartao-nota">{% if x.critico %}<span>e-mail de segurança</span>{% endif %}{% for p in partes %}<span>{{ p }}</span>{% endfor %}{% if x.pendente %}<b class="atencao">regra nova a confirmar</b>{% endif %}</span>{% endif %}
     </a></li>
     {% endfor %}
   </ul>
@@ -137,19 +183,53 @@
   {% endif %}
 </div>
 <style>
-  /* Base › E-mails automáticos (24/11/2026): uma linha por tipo, como as listas do Nexus; cor só para o estado */
-  .em-lista{list-style:none;margin:18px 0 0;padding:0;border-top:1px solid var(--linha)}
-  .em-lista > li{border-bottom:1px solid var(--linha)}
-  .em-linha{display:grid;grid-template-columns:minmax(0,2.2fr) minmax(0,1.8fr) 150px 96px 190px 16px;gap:14px;align-items:center;
-    padding:12px 8px;color:inherit;text-decoration:none}
-  .em-linha:hover,.em-linha:focus-visible{background:var(--superficie)}
-  .em-linha:focus-visible{outline:2px solid var(--foco);outline-offset:-2px}
-  .em-nome,.em-estado{display:grid;gap:2px;min-width:0;justify-items:start}
-  .em-nome b{font:600 14px/19px var(--font-sans);color:var(--tinta)}
-  .em-nome small,.em-para small,.em-num small,.em-estado small{font-size:12px;line-height:16px;color:var(--mudo)}
-  .em-para,.em-num{display:grid;gap:2px;font-size:13px;color:var(--tinta-2);min-width:0}
-  .em-num{font-variant-numeric:tabular-nums}
-  .em-seta{color:var(--mudo)}
+  /* Base › E-mails automáticos (24/11/2026; cartões em 25/11, Levi: "Tô sentindo falta de uma coisa mais visual"): um
+     cartão por tipo, com quando sai, para quem e o gráfico dos envios por dia; cor só para a situação */
+  .em-numeros .v small{font-size:15px;font-weight:500;color:var(--mudo)}
+  .em-numeros .v.ruim{color:var(--critico)}
+  .em-cab-cartoes{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px 16px;margin:8px 0 12px}
+  .em-cab-cartoes .ui-kicker{margin:0}
+  .em-legenda{list-style:none;display:flex;flex-wrap:wrap;gap:6px 14px;margin:0;padding:0;font-size:12px;color:var(--tinta-2)}
+  .em-legenda li{display:flex;align-items:center;gap:6px}
+  .em-legenda .em-s{width:10px;height:10px;border-radius:3px;flex:none}
+  .em-cartoes{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:14px}
+  .em-cartao{display:grid;gap:12px;height:100%;box-sizing:border-box;padding:16px;background:var(--superficie);
+    border:1px solid var(--linha);border-radius:var(--raio-md);color:inherit;text-decoration:none}
+  .em-cartao:hover{border-color:var(--linha-forte);background:var(--superficie-2)}
+  .em-cartao:focus-visible{outline:2px solid var(--foco);outline-offset:2px}
+  .em-cartao--desligado{border-left:3px solid var(--alerta-cheio)}
+  .em-cartao-cab{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+  .em-cartao-cab b{font:600 15px/20px var(--font-sans);color:var(--tinta)}
+  .em-pills{display:flex;gap:6px;flex:none}
+  .em-fluxo{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);gap:8px;align-items:start;font-size:13px;
+    line-height:18px;color:var(--tinta-2)}
+  .em-fluxo > span{display:flex;gap:8px;min-width:0}
+  .em-fluxo > span > .ph{color:var(--verde-texto);font-size:17px;margin-top:1px;flex:none}
+  .em-fluxo small{display:block;font-size:11px;line-height:14px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;
+    color:var(--mudo)}
+  .em-fluxo-seta{color:var(--mudo);margin-top:14px}
+  .em-graf{display:grid;gap:4px}
+  .em-graf-teto,.em-graf-eixo{display:flex;justify-content:space-between;font-size:11px;line-height:14px;color:var(--mudo)}
+  .em-colunas{display:flex;align-items:flex-end;gap:2px;height:56px;border-bottom:1px solid var(--linha-forte)}
+  .em-graf--grande .em-colunas{height:140px;gap:4px}
+  .em-dia{flex:1 1 0;min-width:0;height:100%;display:flex;align-items:flex-end;border-radius:4px 4px 0 0;outline-offset:1px}
+  .em-dia:hover,.em-dia:focus-visible{background:var(--superficie-3)}
+  .em-dia:focus-visible{outline:2px solid var(--foco)}
+  .em-pilha{display:flex;flex-direction:column;gap:2px;width:100%;min-height:4px;border-radius:4px 4px 0 0;overflow:hidden}
+  .em-s{display:block;min-height:2px}
+  .em-s--enviado{background:var(--ok-cheio)}
+  .em-s--teste{background:var(--info-cheio)}
+  .em-s--falhou{background:var(--critico-cheio)}
+  .em-s--barrado{background:var(--mudo)}
+  .em-graf-sem{display:block;padding:18px 0;font-size:12.5px;color:var(--mudo);border-bottom:1px solid var(--linha)}
+  .em-graf-caixa{display:grid;gap:10px;margin:6px 0 16px;padding:14px 16px;background:var(--superficie);
+    border:1px solid var(--linha);border-radius:var(--raio-md)}
+  .em-cartao-pe{display:flex;flex-wrap:wrap;justify-content:space-between;gap:4px 12px;font-size:12.5px;color:var(--tinta-2)}
+  .em-cartao-nota{display:flex;flex-wrap:wrap;gap:4px 10px;font-size:12px;color:var(--mudo)}
+  .em-cartao-nota > span + span::before{content:"·";margin-right:10px}
+  .em-tip{position:fixed;z-index:60;pointer-events:none;padding:6px 9px;font-size:12px;line-height:16px;color:var(--tinta);
+    background:var(--superficie-3);border:1px solid var(--linha-forte);border-radius:var(--raio-tag);white-space:nowrap}
+  .ruim{color:var(--critico)}
   .em-pe{margin:12px 0 0;font-size:12.5px}
   .em-volta{margin:14px 0 0;font-size:13px}
   .em-resumo{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));margin:14px 0 0;border-top:1px solid var(--linha);
@@ -159,8 +239,8 @@
   .em-resumo dt{font-size:12px;color:var(--mudo)}
   .em-resumo dd{margin:3px 0 0;font:600 18px/24px var(--font-sans)}
   .em-resumo dd small{display:block;font:400 12px/16px var(--font-sans);color:var(--mudo)}
-  .em-resumo dd.ruim,.em-lista .ruim{color:var(--critico)}
-  .em-lista .atencao{color:var(--alerta);font-weight:600}
+  .em-resumo dd.ruim{color:var(--critico)}
+  .atencao{color:var(--alerta);font-weight:600}
   .cn-tab td.em-esq,.cn-tab th.em-esq{text-align:left}
   .cn-tab .det{display:block;font-size:12px;color:var(--mudo)}
   .em-sit--ok{color:var(--ok);background:var(--ok-suave)}
@@ -188,13 +268,10 @@
     border-radius:var(--raio-controle);background:var(--critico-suave);color:var(--tinta);font-size:13.5px}
   .em-critico input{margin-top:3px;accent-color:var(--critico)}
   .em-acoes{display:flex;flex-wrap:wrap;gap:10px}
-  @media (max-width:900px){
-    .em-linha{grid-template-columns:minmax(0,1fr) 16px;gap:8px}
-    .em-linha > span{grid-column:1}
-    .em-seta{grid-column:2;grid-row:1 / span 5;align-self:center}
-    .em-para,.em-num{grid-template-columns:72px minmax(0,1fr);gap:8px}
-  }
   @media (max-width:640px){
+    .em-cartoes{grid-template-columns:minmax(0,1fr)}
+    .em-fluxo{grid-template-columns:minmax(0,1fr)}
+    .em-fluxo-seta{display:none}
     .em-add{flex-direction:column}
     .em-resumo > div{border-left:0;padding-left:0}
   }
