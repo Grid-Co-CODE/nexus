@@ -94,7 +94,9 @@ def _sem_rpc(monkeypatch):
 
 def test_botao_pede_os_novos_por_tras(cli, monkeypatch):
     AC.trocar(LOTE, "rpc", lido_em=time.time() - 3600)
-    leitor = LeitorFalso().ligar()
+    # 3 s de leitura, e não 1,5: a prova é a resposta voltar com a leitura ainda viva; na suíte inteira, com a máquina
+    # carregada, o pedido passou de 1,5 s uma vez (25/11/2026) sem nada estar errado
+    leitor = LeitorFalso(demora=3.0).ligar()
     baixou = _sem_rpc(monkeypatch)
 
     # OS Creator -> Ativos: volta na hora (antes da leitura dos novos acabar), sem o RPC, dizendo de quando é a lista
