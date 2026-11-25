@@ -213,6 +213,33 @@ Garantias e as ETMs). O endereço antigo `/t/engenharia/etm/...` responde 308 pa
   as tarefas uma a uma, relê e só conclui sem nenhuma tarefa sem fim; a recusa no meio para tudo e diz qual (a OS não é
   concluída). Concluída lá, finaliza pela Performance com o comentário. Prova: `tests/test_performance_etm.py` (o `api`
   dublado: as travas, a ordem e a parada no meio).
+- **A conferência automática pelos dados diários do PG** (25/11/2026, `nexus/performance/etm_conferencia.py`; Levi: "Bata
+  com os dados que a gente tem, os dados diários, no PG [...] se o PR não está abaixo de 50 ou [...] acima de 100. E se o
+  IPOA não está abaixo do GHI. Aí se passar [...] dá como finalizado pela performance. E aí a gente vai ter a visão só das
+  ETMs com problema mesmo"; nas escolhas: 5 dias, a regra no período, o IPOA "até 8%" abaixo do GHI, a sem dado fica):
+  - **quem**: a OS concluída no Fracttal (coluna Finalizadas) e ainda aberta para a Performance (sem o finalizado nem o
+    diagnóstico);
+  - **os dias**: os 5 mais recentes com PR publicado, IPOA e GHI acima de zero, depois do dia da conclusão e antes de hoje
+    (até 30 dias para trás). O PR é o PR diário que a plataforma publica (`nexus_performance · fato_desempenho_usina_dia`,
+    o do Painel NOC), ligado à usina pelo nome (`campo.responsaveis.Nomes`); o IPOA e o GHI são os das abas da usina no
+    `bd_thopen` e no `bd_performance` (o de-para `BD_Thopen · aba` / `BD_Performance · aba`), o IPOA do SENSOR ("IPOA
+    (kWh/m²) ETM"; sem ela, "IPOA (kWh/m²)"), nunca o "DEF", que é o escolhido para a conta e pode não ser o da ETM;
+  - **passa** com o PR médio dos 5 dias entre 50% e 100% e o IPOA somado de pelo menos 92% do GHI somado. Passou: vira
+    "Finalizado pela Performance" sozinho (o livro `nexus_engenharia_etm`, `origem` = "conferencia", quem = "Nexus
+    (conferência automática)") com o comentário dos números na linha do tempo ("Finalizado pela Performance: conferência
+    automática [...] PR médio 76,9% e IPOA 114% do GHI em 5 dias (18/11 a 22/11)"). No Fracttal nada muda;
+  - **fica nas Estações em Aberto**, com o selo no cartão da usina (o pior das OS dela) e no da OS: **reprovou** (vermelho,
+    "Dados: PR médio 31,0% (abaixo de 50%)"), **sem dado no PG** (amarelo; o título diz o que falta: sem PR publicado, sem
+    IPOA, sem GHI, a usina sem aba ou que não liga) e **aguardando N de 5 dias** (cinza: concluída há menos de 5 dias mais
+    2 de atraso da coleta). A OS ainda aberta no Fracttal segue como sempre, sem selo;
+  - **quando**: de meia em meia hora, por trás (o laço da subida, depois de 3 min; e a visita da tela, se a última tem mais
+    de meia hora); o resultado fica em `<pasta de dados>/performance/etm_conferencia.json` e a subida o lê. Fora dos testes
+    (`NEXUS_ETM_CONFERENCIA` liga num teste);
+  - **ensaio com os dados reais** (25/11/2026, as 139 usinas com aba no BD, como se a OS tivesse sido concluída há 30 dias):
+    62 passariam, 16 reprovam (Indaiatuba com o IPOA a 65% do GHI, Caxambu 1 com PR de 19%) e 61 ficam sem dado (30 delas
+    por não terem GHI no BD; 24 sem PR publicado: Faro, Elis, as do Ceará). Achado: a Canarana 2 passa com o IPOA a 656% do
+    GHI (o GHI dela está quebrado); a regra não tem teto para o IPOA acima do GHI;
+  - prova: `tests/test_performance_etm_conferencia_25_11.py`.
 - **O seletor Por ETM | Por OS** (Levi: "por que que esse botão de ETMs e OS, ele é tão pequeno e feio"): o segmentado do
   Nexus do tamanho dos botões da tela (34 px), com o ícone e a conta de cada visão; `.etm-ab-modo` no `engenharia.css`.
 - **Prova:** `tests/test_performance_etm.py` (a cópia, a OS relida, os endereços antigos, o menu, a gaveta, a Nova demanda

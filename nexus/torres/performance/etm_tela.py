@@ -54,7 +54,18 @@ def _os_do_planner(o: dict, m: dict | None, n_coment: int | None = None) -> dict
             "diagnostico": M.nome(M.DIAGNOSTICOS, m.get("diagnostico_id")) or None,
             "status_pos": M.nome(M.STATUS_POS, m.get("status_pos_id")) or None,
             "etiquetas_eng": [M.nome(M.ETIQUETAS, i) for i in sorted(m.get("etiquetas") or ())],
-            "acompanhamento": bool(m.get("acompanhamento")), "finalizado": bool(m.get("finalizado"))}
+            "acompanhamento": bool(m.get("acompanhamento")), "finalizado": bool(m.get("finalizado")),
+            # a conferência automática pelos dados diários do PG (25/11/2026, `performance/etm_conferencia.py`): o que
+            # reprovou, o sem dado e o que espera os 5 dias (a ok vira finalizada sozinha e sai das abertas)
+            "conf": _conf(o, m)}
+
+
+def _conf(o: dict, m: dict) -> dict | None:
+    from ...performance import etm_conferencia as C
+    r = C.resultado(o.get("wid"))
+    if not r or m.get("finalizado") or m.get("diagnostico_id") or o.get("coluna_etm") != "finalizada":
+        return None
+    return {"estado": r.get("estado"), "curto": r.get("curto") or "", "texto": r.get("texto") or ""}
 
 
 def faixa_etm(oss: list[dict], hoje, sem_marcas: bool = False, sem_leitura: bool = False) -> list[dict]:
@@ -143,6 +154,9 @@ def etm():
     from ...engenharia import os_acompanhamento as O
     import logging
     ETM.marcar_uso()                # relida por trás nas próximas 2 h (`etm.manter_quente`)
+    from flask import current_app
+    from ...performance import etm_conferencia as C
+    C.pedir(current_app._get_current_object())       # a conferência pelos dados do PG, por trás (meia em meia hora)
     # a volta da OS depois de trocar o responsável relê só aquela OS, num pedido (24/11/2026: a tela inteira são 15, e a
     # volta de cada OS relia tudo na hora e esbarrava na cota); o Fracttal que recusa deixa a cópia como estava, e a tela diz
     releia, aviso_releia = str(request.args.get("releia") or ""), ""
@@ -456,3 +470,12 @@ def demandas_das(folios, usina_id=None) -> list[dict]:
                     "caixa": na_raiz("/t/comando/caixa-de-entrada") + f"?d={d['demanda_id']}#demandas"})
     return sorted(out, key=lambda x: x["iso"], reverse=True)
 
+
+# a conferência automática das OS de ETM pelos dados diários do PG (25/11/2026): a guardada em disco na subida e a rodada
+# de meia em meia hora (fora dos testes), `performance/etm_conferencia.py`
+def _ligar_conferencia(estado):
+    from ...performance import etm_conferencia as C
+    C.ligar(estado.app)
+
+
+bp.record_once(_ligar_conferencia)

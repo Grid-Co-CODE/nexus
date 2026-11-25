@@ -455,7 +455,9 @@ FATOS = (
          observacao="os_id é o id da OS no Fracttal e os_folio o nº; valor_id aponta dim_diagnostico_etm, "
                     "dim_status_pos_etm ou dim_etiqueta_etm do mesmo livro (as listas do app de ETM) e 0 limpa; "
                     "ligado liga ou desliga a etiqueta, o acompanhamento e o finalizado. O estado de agora é o do último "
-                    "evento de cada tipo. origem diz de onde veio (nexus ou app_etm) e origem_id a chave de lá. Quem só "
+                    "evento de cada tipo. origem diz de onde veio (nexus, app_etm ou conferencia: o finalizado que a "
+                    "conferência automática pelos dados diários do PG grava desde 25/11/2026, sem pessoa_hmac) e "
+                    "origem_id a chave de lá. Quem só "
                     "cifrado (Cofre, a chave do cadastro). Só acrescenta: nada se edita nem se apaga"),
     # o FMEA e a causa raiz dos ativos da Confiabilidade (Levi, 29/10/2026: "Tem que ter emitir FEMEA emitir causa raiz
     # do pcm.gridco.com.br use como referência e implemente"). O Nexus é a FONTE; registrado antes da 1ª gravação

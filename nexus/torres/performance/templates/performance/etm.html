@@ -477,6 +477,18 @@
   }
   function paginaOs(o) { return nexusRota('/t/performance/etm/os/') + encodeURIComponent(o.os); }
   function selo(texto, cor) { return el('span', 'eg-tag eg-tag--' + cor, texto); }
+  // a conferência automática pelos dados diários do PG (25/11/2026; a regra em performance/etm_conferencia.py): o que
+  // reprovou em vermelho, o sem dado em amarelo, o que espera os 5 dias em cinza; a ok já saiu (finalizada sozinha)
+  var CONF_COR = {falha: 'critico', sem_dado: 'alerta', aguardando: 'neutro'};
+  var CONF_PESO = {falha: 3, sem_dado: 2, aguardando: 1};
+  function seloConf(cf) {
+    if (!cf || !CONF_COR[cf.estado]) return null;
+    var t = selo(cf.estado === 'falha' ? 'Dados: ' + cf.curto : cf.curto.charAt(0).toUpperCase() + cf.curto.slice(1),
+                 CONF_COR[cf.estado]);
+    t.title = cf.texto;
+    t.classList.add('etm-conf');
+    return t;
+  }
   function corTrab(t) { return t === 'engenharia' ? 'info' : t === 'chamados' ? 'verde' : 'neutro'; }
   function cartao(o, prazo) {
     var c = el('article', 'kb-card kb-card--' + COR[o.coluna]);
@@ -495,6 +507,8 @@
     if (o.status_pos) s.appendChild(selo(o.status_pos, 'neutro'));
     if (o.acompanhamento) s.appendChild(selo('Em acompanhamento', 'alerta'));
     if (o.finalizado) s.appendChild(selo('Finalizado pela Performance', 'ok'));
+    var sc = seloConf(o.conf);
+    if (sc) s.appendChild(sc);
     c.appendChild(s);
     c.appendChild(el('p', 'kb-onde', [o.codigo, nomeUsina(o.usina)].filter(Boolean).join(' · ')));
     if (o.etiquetas_eng.length || o.etiquetas.length) {
@@ -597,8 +611,9 @@
       if (!passa(o)) return;
       if (abertaEng(o)) {
         lista.push(o);
-        var u = ab[o.usina] || (ab[o.usina] = {nome: o.usina, n: 0, antiga: ''});
+        var u = ab[o.usina] || (ab[o.usina] = {nome: o.usina, n: 0, antiga: '', conf: null});
         u.n++;
+        if (o.conf && CONF_PESO[o.conf.estado] > (u.conf ? CONF_PESO[u.conf.estado] : 0)) u.conf = o.conf;
         if (o.criada_dia && (!u.antiga || o.criada_dia < u.antiga)) u.antiga = o.criada_dia;
       }
       if (o.acompanhamento) { var a = ac[o.usina] || (ac[o.usina] = {nome: o.usina, n: 0}); a.n++; }
@@ -616,7 +631,10 @@
     acN.textContent = plural(lac.length, 'estação', 'estações');
     preencher(abGrade, lab.length ? lab.map(function (u) {
       var t = tempoEmAberto(u.antiga);
-      return cartaoUsina(u.nome, plural(u.n, 'OS', 'OS'), t ? selo(t.txt, t.dias >= 7 ? 'alerta' : 'neutro') : null);
+      var c = cartaoUsina(u.nome, plural(u.n, 'OS', 'OS'), t ? selo(t.txt, t.dias >= 7 ? 'alerta' : 'neutro') : null);
+      var sc = seloConf(u.conf);
+      if (sc) c.appendChild(sc);
+      return c;
     }) : [el('p', 'kb-vazio', 'Nenhuma estação com OS aberta para a Performance com estes filtros.')]);
     preencher(acGrade, lac.length ? lac.map(function (u) {
       return cartaoUsina(u.nome, plural(u.n, 'OS em acompanhamento', 'OS em acompanhamento'), null);
