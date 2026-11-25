@@ -93,19 +93,20 @@
       if (usis.size && !usis.has(d.usina)) return false;
       if (tips.size && !tips.has(d.tipo)) return false;
       if (!q) return true;
-      return [d.id, d.cliente, d.usina, d.ativo, d.descricao_full || d.descricao, d.status, d.os_folio]
+      return [d.id, d.criado_por, d.cliente, d.usina, d.ativo, d.descricao_full || d.descricao, d.status, d.os_folio]
         .some(function (c) { return String(c == null ? '' : c).toLowerCase().indexOf(q) >= 0; });
     });
     corpo.innerHTML = filtradas.map(function (d, i) {
       return '<tr><td><button type="button" class="spc-hist-n" data-ficha="' + i + '" title="Clique para ver a solicitação">'
-        + esc(d.id) + '</button></td><td>' + esc(d.cliente) + '</td><td>' + esc(d.usina) + '</td>'
+        + esc(d.id) + '</button></td><td class="spc-hist-quem">' + esc(d.criado_por || '—') + '</td>'
+        + '<td>' + esc(d.cliente) + '</td><td>' + esc(d.usina) + '</td>'
         + '<td class="spc-hist-ativo" title="' + esc(d.ativo) + '">' + esc(d.ativo || '—') + '</td>'
         + '<td class="spc-hist-desc" title="' + esc(d.descricao_full || d.descricao) + '">' + esc(d.descricao) + '</td>'
         + '<td class="spc-hist-data">' + esc(d.data) + '</td><td>' + (d.status ? pill(d.status, d.cor) : '') + '</td>'
         + '<td class="spc-hist-osc">' + (d.os_folio && d.id_work_order
           ? '<button type="button" class="spc-hist-os" data-os="' + esc(d.id_work_order) + '" title="Clique para ver a OS">' + esc(d.os_folio) + '</button>'
-          : esc(d.os_folio || '—')) + '</td></tr>';
-    }).join('') || '<tr class="vazio"><td colspan="8">Nenhuma solicitação com esses filtros.</td></tr>';
+          : esc(d.os_folio || '—')) + '</td><td class="spc-hist-data">' + esc(d.os_criada || '—') + '</td></tr>';
+    }).join('') || '<tr class="vazio"><td colspan="10">Nenhuma solicitação com esses filtros.</td></tr>';
     var comOs = filtradas.filter(function (d) { return d.os_folio; }).length;
     rodape.textContent = filtradas.length + ' solicitação(ões) no período · ' + comOs + ' com OS ligada'
       + (filtradas.length !== linhas.length ? '  ·  ' + linhas.length + ' no total' : '');
@@ -125,10 +126,12 @@
 
   // ── exportar (steps/exportar.py: ; e BOM, que o Excel em português abre sem perguntar nada) ──
   function exportar() {
-    var cab = ['Nº', 'Cliente', 'Usina', 'Ativo', 'Descrição', 'Criada em', 'Status', 'OS ligada', 'Criado por'];
+    var cab = ['Nº', 'Criado por', 'Cliente', 'Usina', 'Ativo', 'Descrição', 'Solicitada em', 'Status', 'OS gerada',
+               'OS criada em'];
     var cel = function (v) { v = String(v == null ? '' : v); return /[;"\r\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; };
     var txt = [cab].concat(filtradas.map(function (d) {
-      return [d.id, d.cliente, d.usina, d.ativo, d.descricao_full || d.descricao, d.data, d.status, d.os_folio, d.criado_por];
+      return [d.id, d.criado_por, d.cliente, d.usina, d.ativo, d.descricao_full || d.descricao, d.data, d.status, d.os_folio,
+              d.os_criada];
     })).map(function (l) { return l.map(cel).join(';'); }).join('\r\n');
     var a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob(['﻿' + txt], {type: 'text/csv;charset=utf-8'}));
@@ -169,7 +172,8 @@
     $('hs_f_t').textContent = 'Solicitação ' + d.id;
     $('hs_f_st').innerHTML = d.status ? pill(d.status, d.cor) : '';
     $('hs_f_ativo').textContent = d.ativo || '—';
-    $('hs_f_meta').innerHTML = [['Cliente', d.cliente], ['Usina', d.usina], ['Criada em', d.data], ['Criado por', d.criado_por]]
+    $('hs_f_meta').innerHTML = [['Cliente', d.cliente], ['Usina', d.usina], ['Solicitada em', d.data], ['Criado por', d.criado_por],
+                                ['OS criada em', d.os_criada]]
       .map(function (p) { return '<div><dt>' + esc(p[0]) + '</dt><dd>' + esc(p[1] || '—') + '</dd></div>'; }).join('');
     $('hs_f_os').disabled = !d.id_work_order;
     $('hs_f_os_n').textContent = d.os_folio ? 'OS ' + d.os_folio : '—';

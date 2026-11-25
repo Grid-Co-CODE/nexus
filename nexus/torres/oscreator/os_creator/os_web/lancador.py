@@ -24,10 +24,11 @@ CONSULTA = [
     {"chave": "ativos", "icone": "rack", "titulo": "Ativos", "href": "/os/ativos",
      "sub": "Todo o catálogo do Fracttal: a busca, o histórico de cada ativo e os atalhos para criar a OS dele."},
     {"chave": "hist", "icone": "history", "titulo": "Histórico de OS", "href": "/os/historico",
-     "sub": "As suas, as da equipe e as do COS, com filtro por período, etiqueta, status e quem criou.",
+     "sub": "As suas, as da equipe, as do COS e as solicitações, com filtro por período, etiqueta, status e quem criou.",
      "portas": [{"rotulo": "Histórico geral", "href": "/os/historico?modo=criadas"},
                 {"rotulo": "Atribuídas a mim", "href": "/os/historico?modo=atribuidas"},
-                {"rotulo": "Visão COS", "href": "/os/historico?modo=cos"}]},
+                {"rotulo": "Visão COS", "href": "/os/historico?modo=cos"},
+                {"rotulo": "Solicitações", "href": "/os/solicitacao/historico"}]},
 ]
 
 # o rótulo curto de cada plano da Performance no card do setor (o título inteiro não cabe numa pílula)

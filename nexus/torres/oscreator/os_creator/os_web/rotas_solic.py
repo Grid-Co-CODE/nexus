@@ -562,6 +562,28 @@ def api_observacao(id_code):
 
 
 # ── histórico ────────────────────────────────────────────────────────────────────────────────
+def _com_a_data_da_os(linhas: list) -> list:
+    """A data em que a OS gerada foi criada (Levi, 25/11/2026: "qual foi a OS gerada, quando a OS foi criada"), da lista
+    central de OS, pelo id da OS e, sem ele, pelo nº: nada vai ao Fracttal. A OS que a lista não tem (mais velha que a
+    janela dela, ou a lista ainda sem leitura) fica sem a data."""
+    try:
+        import os_central
+        lista = os_central.atual()
+    except Exception:                                    # noqa: BLE001 — sem a lista central: a coluna fica vazia
+        lista = None
+    for l in linhas:
+        rec = None
+        if lista is not None:
+            try:
+                rec = lista.por_id.get(int(l.get("id_work_order")))
+            except (TypeError, ValueError):
+                rec = None
+            if rec is None and l.get("os_folio"):
+                rec = lista.por_folio.get(str(l["os_folio"]))
+        l["os_criada"] = sw.data_br(rec.data) if rec is not None and rec.data else ""
+    return linhas
+
+
 @bp.route("/solicitacao/historico")
 @exige_sessao
 def historico():
@@ -572,7 +594,8 @@ def historico():
     lista = _lista(request.args.get("atualizar") == "1")
     hoje = dt.datetime.now(sw.BRT).date()
     return render_template("solic_hist.html", conta=_conta(), aba="solic", nav="hist", nav_pcm=sw.NAV_PCM,
-                           linhas=[sw.linha_hist(s) for s in lista], busca=(request.args.get("busca") or "").strip(),
+                           linhas=_com_a_data_da_os([sw.linha_hist(s) for s in lista]),
+                           busca=(request.args.get("busca") or "").strip(),
                            de=(hoje - dt.timedelta(days=30)).isoformat(), ate=hoje.isoformat())
 
 
@@ -582,7 +605,7 @@ def api_historico():
     """A lista do Histórico de novo do Fracttal, sem recarregar a página: o "↻" e a atualização de 15 em 15 minutos do
     app (`_auto_refresh`) mantêm os filtros que a pessoa marcou."""
     _indice_ativos()
-    return jsonify({"linhas": [sw.linha_hist(s) for s in _lista(True)]})
+    return jsonify({"linhas": _com_a_data_da_os([sw.linha_hist(s) for s in _lista(True)])})
 
 
 @bp.route("/api/solic/<id_code>/anexos")

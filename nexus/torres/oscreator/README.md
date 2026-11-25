@@ -3373,6 +3373,18 @@ dia, "quero que dê para editar o tipo de tarefa também!".
   Inspeção" e a OS 18625 nasceu com o tipo Inspeção, lido de volta; o padrão voltou e a OS foi cancelada. A 1ª gravação
   depois da coluna `tipo_tarefa` regravou o livro com ela, sem recusa.
 
+## As solicitações pelo Histórico de OS (25/11/2026)
+
+Levi: "faz na parte do histórico ter o mesmo caminho. E aí vai ter acesso ao histórico de solicitação, que eu acho que tá
+meio escondido para os supervisores". O Histórico de solicitações (`/os/solicitacao/historico`) já era aberto a todos (a
+Área do Solicitante; só a Fila e os Temas são do PCM), mas só se chegava a ele pela barra do PCM. Agora ele é a 4ª visão do
+Histórico de OS ("Solicitações", um link com a cara do botão, `.fl-seg a` no os.css), a página dele abre com a mesma barra
+de visões para voltar, e o cartão do Histórico de OS no Início tem o atalho. A tabela ganhou as colunas que ele pediu ("quem
+criou [...] qual foi a OS gerada, quando a OS foi criada"): Criado por, Solicitada em, OS gerada e OS criada em, esta da
+lista central de OS (`rotas_solic._com_a_data_da_os`, pelo id da OS e, sem ele, pelo nº; nada vai ao Fracttal; a OS mais
+velha que a janela da lista fica sem a data). O Exportar segue as mesmas colunas. Prova:
+`tests/test_oscreator_solic_no_historico_25_11.py`.
+
 ## A sessão que cai no meio da tela (24/11/2026)
 
 Levi: os supervisores preenchiam a OS, a solicitação ou a OS avulsa e, ao finalizar, "aparece lá o login, para eles fazerem

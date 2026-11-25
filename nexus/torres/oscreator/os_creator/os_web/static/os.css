@@ -649,6 +649,12 @@ body.os-sem-topo .os-recolher svg{transform:rotate(180deg)}
   font-size:13px;white-space:nowrap;cursor:pointer}
 .fl-seg button:hover{color:var(--fl-txt)}
 .fl-seg button.on{background:var(--fl-azul);color:var(--fl-sobre-azul)}
+/* a visão que é outra página (as Solicitações, 25/11/2026): um link com a cara do botão */
+.fl-seg a{display:inline-flex;align-items:center;height:28px;padding:0 12px;border-radius:7px;color:var(--fl-mudo);font-size:13px;
+  white-space:nowrap;text-decoration:none}
+.fl-seg a:hover{color:var(--fl-txt)}
+.fl-seg a.on{background:var(--fl-azul);color:var(--fl-sobre-azul)}
+.fl-seg a:focus-visible{outline:2px solid var(--fl-azul);outline-offset:2px}
 .fl-campo{position:relative;display:flex;align-items:center;gap:8px;height:36px;padding:0 12px;border-radius:10px;
   background:var(--fl-campo);border:1px solid var(--fl-campo-borda);color:var(--fl-mudo);font-size:13px;white-space:nowrap;min-width:0}
 .fl-campo:hover{border-color:var(--fl-campo-borda-hover)}
