@@ -3,9 +3,29 @@
 // filtro e a troca de usina (o `_checked`); "Carregar planos" (get_plans_for_assets + as contagens); a família do plano
 // reordena a tabela com plano no topo; cada linha mostra o plano da família (o "[Grid Co.]" de saída), as subtarefas, a
 // data/hora e o TEMPO (seta de 30 em 30 min); a programação em massa; "Sem plano de tarefas"; observação, Requerido
-// por e OS pai; e a confirmação antes de criar UMA OS com cada ativo como tarefa. Aviso fica na página, nunca em janela.
+// por e OS pai; e a confirmação antes de criar UMA OS com cada LINHA como tarefa (o ativo com dois planos do mesmo tipo,
+// o Diurno e o Noturno, vira duas linhas desde 25/11/2026: `grupoDoAtivo`). Aviso fica na página, nunca em janela.
 (function () {
   'use strict';
+  const cmp = (x, y) => (x < y ? -1 : (x > y ? 1 : 0));    // a ordem do Python (ponto de código), não a do idioma
+
+  // Os planos de UM ativo na tela, já filtrados por família, tipo de plano e turno → {ps, gi, grupo}: `ps` por nome (o
+  // combo), `gi` o de saída (o primeiro com "grid" no nome, o [Grid Co.]; senão o primeiro: pcm_web.plano_padrao) e
+  // `grupo`, as TAREFAS do ativo, uma linha cada (25/11/2026, Levi, pelo chat do PCM: "Em MPA tem algumas tarefas que são 2
+  // tarefas para o mesmo ativo [...] quando tiver mais de uma tarefa no mesmo ativo, ele duplica aquele ativo e aí só muda
+  // a nomenclatura da tarefa"). O grupo é o de saída e os outros do MESMO tipo e da MESMA família dele: o Inversor (Diurno)
+  // e o (Noturno) do [Grid Co.] são duas tarefas; o [Axis] do mesmo ativo é outra opção do combo, não uma 3ª tarefa.
+  function grupoDoAtivo(planos) {
+    const ps = (planos || []).slice().sort((x, y) => cmp(String(x.description || '').toLowerCase(), String(y.description || '').toLowerCase()));
+    let gi = ps.findIndex((p) => String(p.description || '').toLowerCase().includes('grid'));
+    if (gi < 0) gi = 0;
+    const base = ps[gi];
+    const grupo = !base ? [] : [base].concat(ps.filter((p, i) => i !== gi && p.family === base.family && p.tipo === base.tipo));
+    return {ps: ps, gi: gi, grupo: grupo};
+  }
+  globalThis.OsPcmTarefas = {grupoDoAtivo: grupoDoAtivo};  // as contas, para o teste no node
+  if (typeof document === 'undefined') return;
+
   const root = document.getElementById('pcm');
   if (!root) return;
   const $ = (id) => document.getElementById(id);
@@ -13,7 +33,6 @@
   const enc = encodeURIComponent;
   const apiErro = (j, r) => (j && j.erro) ? (j.login ? j.erro + ' Entre de novo em /os/login.' : j.erro) : ('HTTP ' + r.status);
   const p2 = (n) => (n < 10 ? '0' : '') + n;
-  const cmp = (x, y) => (x < y ? -1 : (x > y ? 1 : 0));    // a ordem do Python (ponto de código), não a do idioma
   const HOJE = root.dataset.hoje;
   const SEL = '— selecione —';                                // steps/pcm.py::_SEL
   const DUR_PADRAO = 900;                                     // api.duracao_do_plano(padrao=900): 15 min até ler o plano
@@ -37,8 +56,13 @@
   let loadedFor = new Set();          // _loaded_for: os ativos cujos planos já foram carregados
   const subt = {};                    // _subt: id_task -> nº de subtarefas (cache da tela)
   const durPlano = {};                // id_task -> segundos: a duração do plano, que chega junto da contagem
-  const dtByAsset = {};               // _dt_by_asset: a data de cada ativo sobrevive à troca de família
+  // a data e o tempo são POR LINHA (desde 25/11/2026, as duas tarefas do mesmo ativo): a chave é o id do ativo na 1ª linha
+  // dele e "id|n" na n-ésima tarefa (`chave`), e a 1ª segue como era
+  const dtByAsset = {};               // _dt_by_asset: a data de cada linha sobrevive à troca de família
   const durByAsset = {};              // _dur_by_asset: só o tempo que a PESSOA mexeu; ausente = vale o do plano
+  const extraOff = new Set();         // as 2ª, 3ª... tarefas que a pessoa desmarcou ("id|n"); de saída vão todas
+  const chave = (aid, slot) => (slot ? aid + '|' + slot : aid);
+  const chaveDe = (tr) => chave(Number(tr.dataset.id), Number(tr.dataset.slot || 0));
   let semPlano = false;               // _sem_plano
   let pessoas = [];                   // a lista do "Requerido por"
   let ultimaData = bulkDate.value || HOJE;
@@ -102,7 +126,8 @@
   function temPlano(aid, f) {                                // _has_plan: só conta o ativo já carregado
     return aid != null && loadedFor.has(aid) && planosDe(aid, f).length > 0;
   }
-  const linhaDe = (aid) => tbody.querySelector('tr[data-id="' + aid + '"]');
+  const linhaDe = (aid) => tbody.querySelector('tr[data-id="' + aid + '"]:not([data-slot])');   // a 1ª linha do ativo
+  const extrasDe = (aid) => tbody.querySelectorAll('tr[data-id="' + aid + '"][data-slot]');      // as das outras tarefas
   const dim = (t) => '<span class="pcm-dim">' + esc(t) + '</span>';
 
   function refresh() {                                       // _refresh: filtra, ordena e redesenha tudo
@@ -121,38 +146,57 @@
     updLabel();
   }
 
+  // o ativo e, logo abaixo, uma linha para cada outra tarefa dele (grupoDoAtivo); todas as linhas do ativo que tem mais de
+  // uma tarefa ficam de fundo laranja claro (Levi, 25/11/2026: "Tem 2 inversor no ponto 2, então vai pintar os dois")
   function linhaHtml(a) {
-    const c = celulas(a);
-    return '<tr data-id="' + esc(a.id) + '"' + (c.sem ? ' class="sem"' : '') + '><td class="c-ativo"><label class="pcm-chk">'
-      + '<input type="checkbox" class="chk"' + (checked.has(a.id) ? ' checked' : '') + '><span>' + esc(a.label || a.code || '?') + '</span></label></td>'
+    return [0].concat(slotsExtras(a.id)).map((s) => trHtml(a, s)).join('');
+  }
+  // as linhas das outras tarefas: só do ativo marcado, com os planos carregados e fora do "Sem plano de tarefas"
+  function slotsExtras(aid) {
+    if (semPlano || !checked.has(aid) || !loadedFor.has(aid)) return [];
+    const n = grupoDoAtivo(planosDe(aid, fam())).grupo.length;
+    return Array.from({length: Math.max(0, n - 1)}, (_, i) => i + 1);
+  }
+  function trHtml(a, slot) {
+    const c = celulas(a, slot), marcada = slot ? !extraOff.has(chave(a.id, slot)) : checked.has(a.id);
+    const cls = (c.sem ? 'sem' : '') + (slot || slotsExtras(a.id).length ? ' dupla' : '');
+    return '<tr data-id="' + esc(a.id) + '"' + (slot ? ' data-slot="' + slot + '" title="Outra tarefa do mesmo ativo (outro plano)"' : '')
+      + (cls.trim() ? ' class="' + cls.trim() + '"' : '') + '><td class="c-ativo"><label class="pcm-chk">'
+      + '<input type="checkbox" class="chk"' + (marcada ? ' checked' : '') + '><span>' + esc(a.label || a.code || '?') + '</span></label></td>'
       + '<td class="c-plano">' + c.c1 + '</td><td class="c-subt">' + c.c2 + '</td><td class="c-dt">' + c.c3 + '</td><td class="c-tempo">' + c.c4 + '</td></tr>';
   }
 
-  function fillRow(aid) {                                    // _fill_row de UMA linha (o check da pessoa não é redesenhado)
+  // _fill_row de UM ativo (o check da pessoa não é redesenhado): a 1ª linha e, de novo, as das outras tarefas dele
+  function fillRow(aid) {
     const tr = linhaDe(aid), a = linhas.find((x) => x.id === aid);
     if (!tr || !a) return;
-    const c = celulas(a), td = tr.children;
+    extrasDe(aid).forEach((x) => x.remove());
+    const c = celulas(a, 0), td = tr.children, slots = slotsExtras(aid);
     tr.classList.toggle('sem', !!c.sem);
+    tr.classList.toggle('dupla', slots.length > 0);         // a 1ª linha também, enquanto o ativo tem mais de uma tarefa
     td[1].innerHTML = c.c1; td[2].innerHTML = c.c2; td[3].innerHTML = c.c3; td[4].innerHTML = c.c4;
+    const extras = slots.map((s) => trHtml(a, s)).join('');
+    if (extras) tr.insertAdjacentHTML('afterend', extras);
   }
 
-  // Plano (combo) + nº de subtarefas + data + tempo de UMA linha, conforme o modo, a família e se o ativo está marcado
-  function celulas(a) {
-    const aid = a.id;
+  // Plano (combo) + nº de subtarefas + data + tempo de UMA linha, conforme o modo, a família e se o ativo está marcado;
+  // `slot` > 0 é a linha da outra tarefa do ativo, que abre no plano dela e se desmarca sozinha
+  function celulas(a, slot) {
+    const aid = a.id, k = chave(aid, slot);
     if (!checked.has(aid)) return {c1: dim('—'), c2: '', c3: dim('—'), c4: ''};
     if (semPlano) {                                          // ativo marcado = tarefa com a subtarefa 'Procedimento'
       return {c1: '<span class="pcm-dim pcm-pre">' + esc('Procedimento  (sem plano de tarefas)') + '</span>', c2: '1', c3: dataHtml(aid), c4: ''};
     }
     if (!loadedFor.has(aid)) return {c1: dim('clique em “Carregar planos”'), c2: '', c3: dim('—'), c4: ''};
-    const ps = planosDe(aid, fam()).slice().sort((x, y) => cmp(String(x.description || '').toLowerCase(), String(y.description || '').toLowerCase()));
+    const g = grupoDoAtivo(planosDe(aid, fam())), ps = g.ps;
     if (!ps.length) return {sem: true, c1: esc(comFiltro() ? '— sem plano neste filtro —' : '— sem plano nesta família —'), c2: '—', c3: '—', c4: ''};
-    // tem plano(s): o combo abre no primeiro com "grid" no nome (o [Grid Co.]), senão no primeiro — pcm_web.plano_padrao
-    let gi = ps.findIndex((p) => String(p.description || '').toLowerCase().includes('grid'));
-    if (gi < 0) gi = 0;
-    const c1 = '<select class="plano" data-osb="nativo">' + ps.map((p, i) => '<option value="' + esc(p.id_task) + '"'
-      + (i === gi ? ' selected' : '') + '>' + esc(p.description || '?') + '</option>').join('') + '</select>';
-    const idt = ps[gi].id_task;
-    return {c1: c1, c2: contagemHtml(idt), c3: dataHtml(aid), c4: tempoHtml(aid, idt)};
+    // a 1ª linha abre no plano de saída (o [Grid Co.]); a da outra tarefa, no plano dela
+    const plano = g.grupo[slot] || g.grupo[0];
+    if (slot && extraOff.has(k)) return {c1: dim(plano.description || '?'), c2: '', c3: dim('—'), c4: ''};
+    const c1 = '<select class="plano" data-osb="nativo">' + ps.map((p) => '<option value="' + esc(p.id_task) + '"'
+      + (p === plano ? ' selected' : '') + '>' + esc(p.description || '?') + '</option>').join('') + '</select>';
+    const idt = plano.id_task;
+    return {c1: c1, c2: contagemHtml(idt), c3: dataHtml(k, aid), c4: tempoHtml(k, idt)};
   }
 
   function contagemHtml(idt) {                               // _set_count_cell
@@ -162,11 +206,11 @@
     return esc(n);
   }
 
-  // _add_date_editor: a data vale POR ATIVO (a tabela é redesenhada a cada troca de família); a primeira vez, a data da
-  // programação em massa às 08:00
-  function dataHtml(aid) {
-    if (!dtByAsset[aid]) dtByAsset[aid] = (bulkDate.value || ultimaData || HOJE) + 'T08:00';
-    return '<input type="datetime-local" class="dt" value="' + esc(dtByAsset[aid]) + '" autocomplete="off">';
+  // _add_date_editor: a data vale POR LINHA (a tabela é redesenhada a cada troca de família); a primeira vez, a data da
+  // programação em massa às 08:00, e a da outra tarefa do ativo começa na da 1ª linha dele (`base`)
+  function dataHtml(k, base) {
+    if (!dtByAsset[k]) dtByAsset[k] = (base != null && base !== k && dtByAsset[base]) || ((bulkDate.value || ultimaData || HOJE) + 'T08:00');
+    return '<input type="datetime-local" class="dt" value="' + esc(dtByAsset[k]) + '" autocomplete="off">';
   }
 
   // ── o tempo da tarefa (o _TempoTarefa): HH:mm, começando no que o PLANO diz; a seta anda de 30 em 30 min ──
@@ -188,9 +232,9 @@
     if ((passos > 0 && novo < m) || (passos < 0 && novo > m)) novo = m;
     return novo;
   }
-  const segTempo = (aid, idt) => durByAsset[aid] || durPlano[idt] || DUR_PADRAO;   // `_dur_by_asset.get(aid) or duracao_do_plano`
-  function tempoHtml(aid, idt) {
-    return '<span class="pcm-tempo" title="' + esc(DICA_TEMPO) + '"><input type="text" class="tp" value="' + hhmm(minutosDe(segTempo(aid, idt)))
+  const segTempo = (k, idt) => durByAsset[k] || durPlano[idt] || DUR_PADRAO;   // `_dur_by_asset.get(aid) or duracao_do_plano`, por linha
+  function tempoHtml(k, idt) {
+    return '<span class="pcm-tempo" title="' + esc(DICA_TEMPO) + '"><input type="text" class="tp" value="' + hhmm(minutosDe(segTempo(k, idt)))
       + '" inputmode="numeric" maxlength="5" autocomplete="off" aria-label="Tempo da tarefa (HH:mm)"><span class="tp-setas">'
       + '<button type="button" class="tp-b" data-passo="1" tabindex="-1" aria-label="Mais 30 minutos">' + SVG_CIMA + '</button>'
       + '<button type="button" class="tp-b" data-passo="-1" tabindex="-1" aria-label="Menos 30 minutos">' + SVG_BAIXO + '</button></span></span>';
@@ -198,17 +242,17 @@
   function planoDaLinha(tr) { const cb = tr && tr.querySelector('select.plano'); return cb && cb.value ? Number(cb.value) : null; }
   // o tempo que a linha mostra quando ninguém mexeu nele: o do plano que o combo mostra agora
   function pintarTempo(tr) {
-    const inp = tr && tr.querySelector('input.tp'), aid = tr && Number(tr.dataset.id);
-    if (!inp || durByAsset[aid] != null || document.activeElement === inp) return;
-    inp.value = hhmm(minutosDe(segTempo(aid, planoDaLinha(tr))));
+    const inp = tr && tr.querySelector('input.tp'), k = tr && chaveDe(tr);
+    if (!inp || durByAsset[k] != null || document.activeElement === inp) return;
+    inp.value = hhmm(minutosDe(segTempo(k, planoDaLinha(tr))));
   }
   function andar(inp, passos) {
-    const tr = inp.closest('tr'), aid = Number(tr.dataset.id);
+    const tr = inp.closest('tr'), k = chaveDe(tr);
     const m = lerTempo(inp.value);
-    const atual = m == null ? minutosDe(segTempo(aid, planoDaLinha(tr))) : m;
+    const atual = m == null ? minutosDe(segTempo(k, planoDaLinha(tr))) : m;
     const novo = passoTempo(atual, passos);
     inp.value = hhmm(novo);
-    if (novo !== atual) durByAsset[aid] = novo * 60;        // o timeChanged do app só vem quando o tempo muda
+    if (novo !== atual) durByAsset[k] = novo * 60;          // o timeChanged do app só vem quando o tempo muda
   }
 
   // ── contagem de subtarefas (_fetch_counts_visiveis / _set_counts / _counts_err) ──
@@ -256,10 +300,11 @@
       return;
     }
     const com = linhas.filter((a) => checked.has(a.id) && planoDaLinha(linhaDe(a.id)) != null).length;
-    const sem = semPlanoRows().length;
+    const sem = semPlanoRows().length, tarefas = linhasQueViramTarefa().length;
     let msg = esc(checked.size + ' marcado(s)');
     if (loadedFor.size) {
       msg += ' · ' + com + ' com plano';
+      if (tarefas > com) msg += ' · ' + tarefas + ' tarefa(s)';   // o ativo com duas tarefas conta duas
       if (sem) msg += ' · <span class="pcm-red">' + sem + (comFiltro() ? ' SEM plano neste filtro' : ' SEM plano nesta família') + '</span>';
     }
     selLbl.innerHTML = msg;
@@ -269,27 +314,33 @@
   tbody.addEventListener('change', (ev) => {
     const tr = ev.target.closest('tr[data-id]');
     if (!tr) return;
-    const aid = Number(tr.dataset.id), el = ev.target;
-    if (el.classList.contains('chk')) {                      // _on_item
+    const aid = Number(tr.dataset.id), slot = Number(tr.dataset.slot || 0), k = chave(aid, slot), el = ev.target;
+    if (el.classList.contains('chk') && slot) {              // a outra tarefa do ativo: só ela entra ou sai
+      if (el.checked) extraOff.delete(k); else extraOff.add(k);
+      const a = linhas.find((x) => x.id === aid);
+      if (a) tr.outerHTML = trHtml(a, slot);
+      fetchCounts(); updLabel();
+    } else if (el.classList.contains('chk')) {               // _on_item
       if (el.checked) checked.add(aid); else checked.delete(aid);
+      [...extraOff].forEach((x) => { if (x.startsWith(aid + '|')) extraOff.delete(x); });   // marcar de novo traz todas
       fillRow(aid); fetchCounts(); updLabel();
     } else if (el.classList.contains('plano')) {             // _on_combo
       tr.children[2].innerHTML = contagemHtml(Number(el.value));
       pintarTempo(tr);
       fetchCounts();
     } else if (el.classList.contains('dt')) {
-      if (el.value) dtByAsset[aid] = el.value; else el.value = dtByAsset[aid] || '';   // o QDateTimeEdit nunca fica vazio
+      if (el.value) dtByAsset[k] = el.value; else el.value = dtByAsset[k] || '';   // o QDateTimeEdit nunca fica vazio
     } else if (el.classList.contains('tp')) {
       const m = lerTempo(el.value);                          // digitar é livre; o que não é horário volta ao que era
-      el.value = m == null ? hhmm(minutosDe(segTempo(aid, planoDaLinha(tr)))) : hhmm(m);
+      el.value = m == null ? hhmm(minutosDe(segTempo(k, planoDaLinha(tr)))) : hhmm(m);
     }
   });
   tbody.addEventListener('input', (ev) => {
     const tr = ev.target.closest('tr[data-id]');
     if (!tr) return;
-    const aid = Number(tr.dataset.id), el = ev.target;
-    if (el.classList.contains('dt') && el.value) dtByAsset[aid] = el.value;
-    if (el.classList.contains('tp')) { const m = lerTempo(el.value); if (m != null) durByAsset[aid] = m * 60; }
+    const k = chaveDe(tr), el = ev.target;
+    if (el.classList.contains('dt') && el.value) dtByAsset[k] = el.value;
+    if (el.classList.contains('tp')) { const m = lerTempo(el.value); if (m != null) durByAsset[k] = m * 60; }
   });
   tbody.addEventListener('keydown', (ev) => {
     if (!ev.target.classList.contains('tp')) return;
@@ -304,6 +355,7 @@
   // ── marcar (_marcar_todos / _marcar_com_plano): só as linhas da tabela; marcado fora dela continua marcado ──
   function marcarTodos(marcar) {
     linhas.forEach((a) => { if (marcar) checked.add(a.id); else checked.delete(a.id); });
+    extraOff.clear();                                        // as outras tarefas voltam marcadas com o ativo
     fillPlanos();
   }
   bAll.onclick = () => marcarTodos(true);
@@ -312,6 +364,7 @@
     if (!loadedFor.size) { hint.textContent = 'Carregue os planos primeiro (marque os ativos → Carregar planos).'; return; }
     const f = fam();
     linhas.forEach((a) => { if (temPlano(a.id, f)) checked.add(a.id); else checked.delete(a.id); });
+    extraOff.clear();
     fillPlanos();
   };
 
@@ -359,9 +412,9 @@
   // ── data/hora em massa (_set_todas_data / _set_todas_hora / _avancar_mes): nas linhas que têm data ──
   function editores(fn) {
     tbody.querySelectorAll('tr[data-id] input.dt').forEach((inp) => {
-      const aid = Number(inp.closest('tr').dataset.id), v = inp.value || dtByAsset[aid];
+      const k = chaveDe(inp.closest('tr')), v = inp.value || dtByAsset[k];
       if (!v) return;
-      inp.value = dtByAsset[aid] = fn(v);
+      inp.value = dtByAsset[k] = fn(v);
     });
   }
   // QDateTime.addMonths(1): o mesmo dia no mês seguinte; se o dia não existe lá (31/01), o último dia do mês (28/02)
@@ -449,7 +502,22 @@
     res.scrollIntoView({behavior: 'smooth', block: 'nearest'});
   }
   // a data de cada linha que vai virar tarefa: o campo da linha (é o que a pessoa vê)
-  function dataDaLinha(aid) { const inp = linhaDe(aid) && linhaDe(aid).querySelector('input.dt'); return inp ? inp.value : null; }
+  function dataDaTr(tr) { const inp = tr && tr.querySelector('input.dt'); return inp ? inp.value : null; }
+  function dataDaLinha(aid) { return dataDaTr(linhaDe(aid)); }
+
+  // as linhas MARCADAS com plano, na ordem da tela: a 1ª de cada ativo e, embaixo, as das outras tarefas dele que
+  // continuam marcadas (a desmarcada não tem combo, então não tem plano)
+  function linhasQueViramTarefa() {
+    const out = [];
+    linhas.forEach((a) => {
+      if (!checked.has(a.id)) return;
+      const tr = linhaDe(a.id);
+      if (!tr || planoDaLinha(tr) == null) return;
+      out.push(tr);
+      extrasDe(a.id).forEach((x) => { if (!extraOff.has(chaveDe(x)) && planoDaLinha(x) != null) out.push(x); });
+    });
+    return out;
+  }
 
   btn.onclick = () => { if (semPlano) criarSemPlano(); else criar(); };
 
@@ -470,25 +538,39 @@
   }
 
   function criar() {
-    const sel = [], sem = [];
+    const sel = [], sem = [], vistos = new Set(), repetidos = [];
+    // uma seleção por LINHA marcada (25/11/2026): o ativo com duas tarefas manda duas, cada uma com o seu plano, data e tempo
+    linhasQueViramTarefa().forEach((tr) => {
+      const aid = Number(tr.dataset.id), idt = planoDaLinha(tr), k = chaveDe(tr);
+      if (vistos.has(aid + ':' + idt)) {                     // o mesmo plano em duas linhas do mesmo ativo: a mesma tarefa duas vezes
+        const a = linhas.find((x) => x.id === aid);
+        repetidos.push((a && (a.label || a.code)) || '?');
+      }
+      vistos.add(aid + ':' + idt);
+      sel.push({asset_id: aid, id_task: idt, event_date: dataDaTr(tr),
+                duracao: durByAsset[k] != null ? durByAsset[k] : null});   // o tempo da linha; null = o do plano
+    });
     linhas.forEach((a) => {
-      if (!checked.has(a.id)) return;
-      const idt = planoDaLinha(linhaDe(a.id));
-      if (idt) {
-        sel.push({asset_id: a.id, id_task: idt, event_date: dataDaLinha(a.id),
-                  duracao: durByAsset[a.id] != null ? durByAsset[a.id] : null});   // o tempo da linha; null = o do plano
-      } else if (loadedFor.has(a.id)) sem.push(a.label || a.code || '?');
+      if (checked.has(a.id) && loadedFor.has(a.id) && planoDaLinha(linhaDe(a.id)) == null) sem.push(a.label || a.code || '?');
     });
     if (!sel.length) { mostrar('Carregue os planos e marque ao menos um ativo com plano.', true); return; }
+    if (repetidos.length) {
+      mostrar('O mesmo plano está em duas linhas do mesmo ativo (escolha outro plano ou desmarque uma delas):\n- '
+              + repetidos.slice(0, 10).join('\n- '), true);
+      return;
+    }
     const p = pessoa();
     if (!p || !p.id_personnel) { mostrar('Escolha o responsável.', true); return; }
     if (sel.some((s) => !s.event_date)) { mostrar('Data inválida.', true); return; }
+    const nAtivos = new Set(sel.map((s) => s.asset_id)).size;
     let aviso = '';
     if (sem.length) aviso = '\n\nFicam de FORA (sem plano nesta família):\n- ' + sem.slice(0, 10).join('\n- ') + (sem.length > 10 ? '\n- …' : '');
     const semCarga = linhas.filter((a) => checked.has(a.id) && !loadedFor.has(a.id));
     if (semCarga.length) aviso += '\n\nFicam de FORA (marcados depois de carregar os planos — clique em “Carregar planos” de novo):\n- ' + lista(semCarga);
     aviso += avisoEscondidos();
-    if (!confirm('Vou criar UMA OS com ' + sel.length + ' tarefa(s) — uma por ativo marcado.' + aviso + '\n\nContinuar?')) return;
+    const cada = nAtivos === sel.length ? ' — uma por ativo marcado.'
+      : ' — uma por linha marcada (' + (sel.length - nAtivos) + ' a mais nos ativos com mais de uma tarefa).';
+    if (!confirm('Vou criar UMA OS com ' + sel.length + ' tarefa(s)' + cada + aviso + '\n\nContinuar?')) return;
     enviar({sem_plano: false, selecoes: sel, responsavel: {id_personnel: p.id_personnel, name: p.name},
             descricao: '', note: obs.value.trim(), id_parent: idParent()}, sel.length);
   }

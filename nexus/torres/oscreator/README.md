@@ -1173,6 +1173,33 @@ de tarefas" desliga os dois, como a família. O servidor só manda o `tipo` e o 
 Prova: `tests/test_oscreator_pcm_tipo_turno.py`; na bancada (o clone sozinho, Fracttal falso, 6 ativos e 8 planos
 inventados), no navegador: os filtros, a contagem de subtarefas que acompanha, o "Só com plano" e 375 px sem rolagem.
 
+## OS por plano de tarefas: o ativo com duas tarefas vira duas linhas (25/11/2026)
+
+Levi, pelo chat do PCM: "Em MPA tem algumas tarefas que são 2 tarefas para o mesmo ativo [...] quando tiver mais de uma
+tarefa no mesmo ativo, ele duplica aquele ativo e aí só muda a nomenclatura da tarefa. E pode mudar a cor também, pode
+deixar um laranja de fundo, só para mostrar, um laranja bem claro mesmo". O caso (lido no ar em 25/11, só leitura, em 4
+usinas): 68 ativos com o par Diurno + Noturno no [Grid Co.] da família MPA (Inversor, QGBT, Transformador, Cabine de
+Medição); o [Axis] tem Diurna, Noturna e "apenas termografia". A tela criava só o plano do combo.
+- **Quais planos viram linha** (`pcm.js`, `grupoDoAtivo`): o de saída (o 1º com "grid" no nome, senão o 1º por nome) e os
+  outros do MESMO tipo de plano e da MESMA família dele, já com os filtros de família, tipo e turno aplicados. Tipos
+  diferentes do mesmo ativo ([Axis] e [Grid Co.]) seguem como opções do combo, não como tarefas a mais. Com o turno Diurna
+  sai uma linha só, como antes.
+- **A linha a mais** é o mesmo ativo, embaixo dele, com o combo aberto no plano dela, a data (de saída a da 1ª linha) e o
+  tempo próprios. As linhas do ativo com mais de uma tarefa, a 1ª e as a mais, ficam de fundo laranja claro (no mesmo dia:
+  "Tem 2 inversor no ponto 2, então vai pintar os dois"; `tr.dupla`, a variável `--pcm-dupla` do `pcm.css`, com o valor de
+  cada tema).
+  Ela tem check: desmarcada, mostra o nome do plano apagado e não vai. Marcar de novo o ativo, "Selecionar todos" ou "Só
+  com plano" trazem todas de volta. Só aparece com o ativo marcado e os planos carregados, e nunca no "Sem plano de tarefas".
+- **A data e o tempo são por linha:** a chave é o id do ativo na 1ª linha (a de antes) e "id|n" na n-ésima
+  (`chave`/`chaveDe`); a programação em massa vale para todas as linhas.
+- **Criar** manda uma seleção por linha marcada (`linhasQueViramTarefa`); o mesmo plano em duas linhas do mesmo ativo é
+  recusado na tela, para não sair a mesma tarefa duas vezes. O servidor e o motor já aceitavam o mesmo ativo duas vezes
+  (`montar_criacao`, `create_planned_os_multi`: uma tarefa por seleção, juntas numa OS). A contagem diz "N tarefa(s)"
+  quando passa do número de ativos, e a confirmação diz "uma por linha marcada".
+Prova: `tests/test_oscreator_pcm_duas_tarefas_25_11.py` (o grupo no node, o servidor e o motor com o mesmo ativo duas
+vezes); na bancada (o clone sozinho, Fracttal falso), no navegador: as linhas, desmarcar uma, o tempo e a data por linha, o
+turno Diurna, o Criar com 6 seleções, os dois temas e 375 px.
+
 ## Nova solicitação e Criar OS: os ativos do cliente numa leitura só, e a Engenharia de 10 em 10 (28/10/2026)
 
 Levi: "Em solicitação > PCM, quando pesquisa o cliente carrega, quando pesquiso a usina carrega novamente. na minha cabeça
