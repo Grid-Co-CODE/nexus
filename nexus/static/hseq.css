@@ -305,7 +305,8 @@
 .inc-fotos{display:flex;flex-wrap:wrap;gap:10px}
 .inc-fotos img{display:block;width:160px;height:120px;object-fit:cover;border-radius:8px;border:1px solid var(--linha-forte);
   background:var(--superficie-2)}
-@media (max-width:720px){
+/* 820 (DESIGN.md, seção 4), e não 720: a mesma da APR e PT (campo.css) */
+@media (max-width:820px){
   .cn-tab table.inc-tab{min-width:0}
   .inc-tab thead{display:none}
   .inc-tab,.inc-tab tbody,.inc-tab tr.cn-linha,.inc-tab tr.cn-linha td{display:block;width:auto}

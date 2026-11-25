@@ -2454,7 +2454,8 @@ tr.rd-linha--ativa td{background:var(--verde-suave)}
 .pt-enxuta .pt-acoes{white-space:nowrap;text-align:right}
 .pt-enxuta .pt-acoes .cn-link{margin-left:12px;font-size:13px}
 .pt-enxuta .pt-assinar{padding:6px 14px;font-size:13px}
-@media (max-width:720px){
+/* 820 (DESIGN.md, seção 4: a do menu que vira botão), e não 720: abaixo dela as 7 colunas já não cabem */
+@media (max-width:820px){
   .cn-tab table.pt-enxuta{min-width:0}
   .pt-enxuta thead{display:none}
   .pt-enxuta,.pt-enxuta tbody,.pt-enxuta tr.cn-linha,.pt-enxuta tr.cn-linha td{display:block;width:auto}

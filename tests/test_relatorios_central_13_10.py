@@ -107,7 +107,8 @@ def test_a_performance_ve_os_tres_relatorios_sem_marcar_nada(app, setores):
         assert ST.das_do_setor(SID.PCM) == ({f"relatorios/pcm-{t}" for t in ("diario", "tarde", "semanal", "alerta", "executivo")}
                                           | {"pcm/acompanhamento", "pcm/gerar", "pcm/quadro", "pcm/fora-da-programacao",
                                              "pcm/tecnicos-por-usina", "pcm/pecas", "comando/caixa-de-entrada", "comando/contratos",
-                                             "campo/equipe"})
+                                             "campo/equipe",
+                                             "pcm/os-fora-do-app"})      # a OS fora do App (24/11/2026), do PCM
         # o Gerar e o Quadro têm dois donos: o PCM e os supervisores (Levi, 16/10/2026: "tanto PCM quanto supervisores!
         # Vou criar um setor de Responsáveis UFV"), pelo setor_id (04/11/2026: pelo nome, o "Responsável UFV" do banco não
         # casava com o "Responsáveis UFV" do código)
