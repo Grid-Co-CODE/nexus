@@ -25,12 +25,16 @@ QUENTES = {"cos/mesa", "cos/ocorrencias", "pcm/quadro", "campo/rondas", "relator
            # e as do setor Performance: a Coletas (11/11/2026; abrir já começa a conta dos furos que venceu) e as Limitações
            # de potência (19/11/2026); a Recoleta pelas fontes, que só leva à Coletas, fica fora (`PC.SEM_PRE_CARGA`)
            "performance/coletas", "performance/limitacoes",
-           "performance/metas"}  # e as Metas das usinas (25/11/2026), que só leem ao abrir
+           # e Metas e equipamentos da Base, com a aba Metas (25/11/2026: as Metas vieram da Performance), que só leem
+           "base/equipamentos", "base/metas"}
 
 
 @pytest.fixture
-def ligada(app, setores, logado):
+def ligada(app, setores, logado, tmp_path):
     """O setor Performance (1) com telas de todo tipo, e a pré-carga ligada (na hora, sem thread)."""
+    # a pasta de dados do teste: a Metas e equipamentos da Base (do setor Performance desde 25/11/2026) lê as Ligações, e
+    # o teste sem pasta própria recusa a de verdade (`ligacoes.pasta_dados`)
+    app.config["NEXUS_DADOS"] = str(tmp_path)
     assert _salvar(logado, SID.PERFORMANCE, TELAS).status_code == 303
     app.config["NEXUS_PRE_CARGA"] = "1"
     app.extensions.pop("nexus_pre_carga", None)
@@ -56,15 +60,15 @@ def test_o_primeiro_clique_de_quem_tem_setor_aquece_as_telas_dele(ligada):
     e = _estado(ligada)
     assert set(e["aquecida_em"]) == QUENTES
     assert all(status == 200 for status, _ in e["ultimo"].values())
-    assert e["ultima_volta"]["telas"] == 10 and not e["ultima_volta"]["erros"] and not e["trabalhando"]
+    assert e["ultima_volta"]["telas"] == 11 and not e["ultima_volta"]["erros"] and not e["trabalhando"]
     # a 1ª tela de cada torre primeiro (onde o cartão do Início leva), depois o resto na ordem do menu (a Usinas 360°,
     # id `campo`, logo abaixo de Comando desde 05/11/2026)
     # 12/11/2026: a Prévia do contrato foi para o Comando (a torre Contratos e clientes saiu do menu): deixou de ser a 1ª
     # tela de uma torre e entra no resto do Comando
     # as Limitações de potência são a 1ª da torre Performance que a Ana tem (19/11/2026), e a Coletas vem no resto
     assert list(e["ultimo"]) == ["comando/caixa-de-entrada", "campo/rondas", "cos/mesa", "pcm/quadro", "performance/limitacoes",
-                                 "relatorios/central", "comando/contratos", "cos/ocorrencias", "performance/metas",
-                                 "performance/coletas"]
+                                 "relatorios/central", "base/equipamentos", "comando/contratos", "cos/ocorrencias",
+                                 "performance/coletas", "base/metas"]
 
 
 def test_uma_vez_por_minuto_e_so_o_que_esfriou(ligada):
@@ -153,7 +157,7 @@ def test_a_volta_fica_no_resumo_e_saiu_de_acessos(ligada, logado):
     assert PC.resumo(ligada)["volta"] is None
     _como(ligada, ANA).get("/")
     v = PC.resumo(ligada)["volta"]
-    assert v and v["telas"] == 10 and not v["erros"]
+    assert v and v["telas"] == 11 and not v["erros"]
     assert "Pré-carga" not in logado.get(URL).get_data(as_text=True)
 
 
