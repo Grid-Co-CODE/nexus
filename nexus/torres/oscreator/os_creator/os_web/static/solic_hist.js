@@ -99,8 +99,8 @@
     corpo.innerHTML = filtradas.map(function (d, i) {
       return '<tr><td><button type="button" class="spc-hist-n" data-ficha="' + i + '" title="Clique para ver a solicitação">'
         + esc(d.id) + '</button></td><td class="spc-hist-quem">' + esc(d.criado_por || '—') + '</td>'
-        + '<td>' + esc(d.cliente) + '</td><td>' + esc(d.usina) + '</td>'
-        + '<td class="spc-hist-ativo" title="' + esc(d.ativo) + '">' + esc(d.ativo || '—') + '</td>'
+        + '<td>' + esc(d.cliente) + '</td><td class="spc-hist-usina" title="' + esc(d.usina) + '">' + esc(d.usina_curta || d.usina) + '</td>'
+        + '<td class="spc-hist-ativo" title="' + esc(d.ativo) + '">' + esc(d.ativo_resumo || d.ativo || '—') + '</td>'
         + '<td class="spc-hist-desc" title="' + esc(d.descricao_full || d.descricao) + '">' + esc(d.descricao) + '</td>'
         + '<td class="spc-hist-data">' + esc(d.data) + '</td><td>' + (d.status ? pill(d.status, d.cor) : '') + '</td>'
         + '<td class="spc-hist-osc">' + (d.os_folio && d.id_work_order
@@ -130,8 +130,8 @@
                'OS criada em'];
     var cel = function (v) { v = String(v == null ? '' : v); return /[;"\r\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; };
     var txt = [cab].concat(filtradas.map(function (d) {
-      return [d.id, d.criado_por, d.cliente, d.usina, d.ativo, d.descricao_full || d.descricao, d.data, d.status, d.os_folio,
-              d.os_criada];
+      return [d.id, d.criado_por, d.cliente, d.usina_curta || d.usina, d.ativo_resumo || d.ativo, d.descricao_full || d.descricao,
+              d.data, d.status, d.os_folio, d.os_criada];
     })).map(function (l) { return l.map(cel).join(';'); }).join('\r\n');
     var a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob(['﻿' + txt], {type: 'text/csv;charset=utf-8'}));

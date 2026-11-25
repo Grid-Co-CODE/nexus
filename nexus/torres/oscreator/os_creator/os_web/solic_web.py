@@ -531,10 +531,30 @@ ST_VIVO = {"Aberta": "#F5A623", "Aprovada": "#4A9EF5", "OS em processo": "#4A9EF
 NAO_CANCELAVEL = {"Cancelada", "Rejeitada", "Concluída", "OS concluída", "Resolvida com OS", "Resolvida sem OS"}
 
 
+def _usina_curta(nome) -> str:
+    from ativos_central import usina_curta
+    return usina_curta(str(nome or "")) if nome and nome != "—" else (nome or "—")
+
+
+def ativo_resumido(ativo) -> str:
+    """O ativo do Histórico de solicitações como se fala dele (Levi, 25/11/2026: "Quando for o inversor, vai ser inversor X.
+    Quando for track, vai ser track X. Não precisa do fabricante. E quando for usina, vai ser o nome da usina. Sem estado,
+    sem endereço"): a regra do Histórico de OS (`ativo_curto.curto`: até o número, sem marca, sem o código entre chaves e
+    sem o endereço), com "Estrutura Trackers N" como "Tracker N" e o ativo que é a própria usina ("Cliente - Usina - UF",
+    com o endereço depois da vírgula) como o nome dela."""
+    t = str(ativo or "").split("{")[0].strip()
+    partes = [p.strip() for p in t.split(",")[0].split(" - ") if p.strip()]
+    if len(partes) >= 3 and len(partes[-1]) == 2 and partes[-1].isalpha():
+        return _usina_curta(" - ".join(partes))
+    return re.sub(r"^(?:Estrutura\s+)?Trackers?\b", "Tracker", nomes.curto(t), flags=re.I)
+
+
 def linha_hist(s: dict) -> dict:
     """Uma linha do Histórico (`HistoricoSolic._aplica`) e a ficha dela (`SolicitacaoDialog`)."""
     st = s.get("status") or ""
     return {"id": s.get("id_code"), "cliente": s.get("cliente") or "—", "usina": s.get("usina") or "—",
+            # o que a tabela mostra (25/11/2026): a usina sem o cliente e o estado, e o ativo resumido
+            "usina_curta": _usina_curta(s.get("usina")), "ativo_resumo": ativo_resumido(s.get("ativo")),
             "ativo": s.get("ativo") or "", "ativo_curto": s.get("_ativo") or "", "tipo": s.get("tipo") or "—",
             "descricao": s.get("descricao") or "—", "descricao_full": s.get("descricao_full") or "",
             "observacao": s.get("observacao") or "", "criado_por": s.get("criado_por") or "",
