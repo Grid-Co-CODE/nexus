@@ -477,42 +477,76 @@
     if (!n) { return null; }
     return n % 2 ? v[(n - 1) / 2] : (v[n / 2 - 1] + v[n / 2]) / 2;
   }
-  function barrasDaUsina(c) {
-    var invs = (c && c.inversores) || [];
-    var comMedida = invs.filter(function (i) { return num(i.pac) != null; });
+  // `o.valores` (25/11/2026, as barras da JANELA da usina): no lugar do kW de agora, um valor por inversor (id -> número),
+  // hoje a ENERGIA do trecho pela curva gravada (`energiaDaSerie`), e `o.semEstado` tira a cor do estado de agora (num dia
+  // que passou ela não vale). Com a nominal de todos, a energia vira kWh por kW de nominal, como o kW vira a fração dela.
+  function barrasDaUsina(c, o) {
+    o = o || {};
+    var invs = (c && c.inversores) || [], energia = !!o.valores;
+    var base = function (i) { return energia ? num(o.valores[i.id]) : num(i.pac); };
+    var comMedida = invs.filter(function (i) { return base(i) != null; });
     var porNominal = comMedida.length > 0 && comMedida.every(function (i) { return num(i.capacidade) != null && i.capacidade > 0; });
-    var vals = invs.map(function (i) { var p = num(i.pac); return p == null ? null : (porNominal ? p / i.capacidade : p); });
+    var vals = invs.map(function (i) { var p = base(i); return p == null ? null : (porNominal ? p / i.capacidade : p); });
     var topo = 0;
     vals.forEach(function (v) { if (v != null && v > topo) { topo = v; } });
     var gerando = [];
     invs.forEach(function (i, k) {
-      if (vals[k] != null && (i.veredito ? i.veredito === "GERANDO" : vals[k] > 0)) { gerando.push(vals[k]); }
+      if (vals[k] != null && (energia || !i.veredito ? vals[k] > 0 : i.veredito === "GERANDO")) { gerando.push(vals[k]); }
     });
     var med = medianaDe(gerando), menor = -1;
     var barras = invs.map(function (i, k) {
       var e = ESTADO[i.veredito], grupo = e && e.grupo, v = vals[k];
       if (v != null && (menor < 0 || v < vals[menor])) { menor = k; }
       return {
-        id: i.id, nome: nomeDoInversor(i), kw: num(i.pac), rotulo: e ? e.rotulo : null,
+        id: i.id, nome: nomeDoInversor(i), kw: num(i.pac), valor: base(i), rotulo: e && !o.semEstado ? e.rotulo : null,
         fracao: v == null || topo <= 0 ? 0 : Math.max(0, Math.min(1, v / topo)),
-        pct: porNominal && v != null ? Math.round(v * 100) : null,
-        tom: v == null ? "sem" : grupo === "fora" ? "fora" : grupo === "semcom" ? "semcom" : "ok"
+        pct: porNominal && v != null && !energia ? Math.round(v * 100) : null,
+        porKw: porNominal && v != null && energia ? v : null,
+        tom: v == null ? "sem" : o.semEstado ? "ok" : grupo === "fora" ? "fora" : grupo === "semcom" ? "semcom" : "ok"
       };
     });
     return {
-      barras: barras, porNominal: porNominal,
-      mediana: med == null || topo <= 0 ? null : Math.max(0, Math.min(1, med / topo)),
-      medianaKw: med != null && !porNominal ? med : null, medianaPct: med != null && porNominal ? Math.round(med * 100) : null,
+      barras: barras, porNominal: porNominal, energia: energia, topo: topo,
+      mediana: med == null || topo <= 0 ? null : Math.max(0, Math.min(1, med / topo)), medianaBruta: med,
+      medianaKw: med != null && !porNominal && !energia ? med : null, medianaPct: med != null && porNominal && !energia ? Math.round(med * 100) : null,
       menor: menor >= 0 && gerando.length ? barras[menor] : null, gerando: gerando.length
     };
+  }
+  // a energia em kWh (MWh a partir de mil), e o kWh por kW de nominal com uma casa
+  function kwh(v) {
+    if (v == null || isNaN(v)) { return "—"; }
+    return v >= 1000 ? fmtMW.format(v / 1000) + " MWh" : fmtKW.format(v) + " kWh";
+  }
+  // o valor de uma barra como a tela o escreve (o kW, a % da nominal, o kWh ou o kWh por kW)
+  function valorDaBarra(b, x) {
+    if (x.valor == null) { return "sem medida"; }
+    if (b.energia) { return b.porNominal ? fmtAte1.format(x.porKw) + " kWh/kW (" + kwh(x.valor) + ")" : kwh(x.valor); }
+    return b.porNominal ? x.pct + "% (" + kw(x.kw) + ")" : kw(x.kw);
+  }
+  // a mediana como a tela a escreve, na mesma régua das barras
+  function textoDaMediana(b) {
+    if (b.medianaBruta == null) { return ""; }
+    if (b.energia) { return b.porNominal ? fmtAte1.format(b.medianaBruta) + " kWh/kW" : kwh(b.medianaBruta); }
+    return b.porNominal ? b.medianaPct + "% da nominal" : kw(b.medianaKw);
   }
   // O texto de baixo das barras: a régua e quem ficou mais baixo (só com a usina gerando: de noite, todo mundo é zero)
   function resumoDasBarras(b, gerandoUsina) {
     if (!b.barras.length) { return "sem a leitura dos inversores agora"; }
-    if (!gerandoUsina || !b.gerando) { return b.barras.length + " inversores · nenhum gerando agora"; }
-    var med = b.porNominal ? "mediana " + b.medianaPct + "% da nominal" : "mediana " + kw(b.medianaKw);
+    if (b.energia) {
+      if (!b.gerando) { return b.barras.length + " inversores · nenhuma energia gravada neste trecho"; }
+    } else if (!gerandoUsina || !b.gerando) { return b.barras.length + " inversores · nenhum gerando agora"; }
     var m = b.menor;
-    return med + (m ? " · menor: " + m.nome + ", " + (b.porNominal ? m.pct + "%" : kw(m.kw)) : "");
+    var deM = !m ? "" : b.energia ? (b.porNominal ? fmtAte1.format(m.porKw) + " kWh/kW" : kwh(m.valor)) : (b.porNominal ? m.pct + "%" : kw(m.kw));
+    return "mediana " + textoDaMediana(b) + (m ? " · menor: " + m.nome + ", " + deM : "");
+  }
+  // A energia de um inversor num trecho do dia, pela curva GRAVADA (de 5 em 5 min: cada ponto vale 5 min daquele kW).
+  // Só a gravada: a ponta ao vivo, de 3 em 3 s, contaria o mesmo trecho várias vezes. `null` = nenhum ponto no trecho.
+  function energiaDaSerie(pts, de, ate) {
+    var e = null;
+    (pts || []).forEach(function (p) {
+      if (p[1] != null && p[0] >= de && p[0] < ate) { e = (e || 0) + p[1] * 5 / 60; }
+    });
+    return e;
   }
   // A escolha da pessoa (curva ou barras), lembrada neste navegador; quem nunca escolheu fica na curva
   var CHAVE_DA_VISTA = "nexus.cos.monitoramento.vista";
@@ -533,6 +567,7 @@
     LIMIAR_Y_PX: LIMIAR_Y_PX, LIMIAR_X_PX: LIMIAR_X_PX, maisPerto: maisPerto, visiveis: visiveis,
     releSemMedicao: releSemMedicao, releDesequilibrio: releDesequilibrio, releFaseDoCodigo: releFaseDoCodigo, releDisjuntor: releDisjuntor,
     ehDoSunop: ehDoSunop, barrasDaUsina: barrasDaUsina, resumoDasBarras: resumoDasBarras, medianaDe: medianaDe,
+    energiaDaSerie: energiaDaSerie, valorDaBarra: valorDaBarra, textoDaMediana: textoDaMediana, kwh: kwh,
     vistaGuardada: vistaGuardada, guardarVista: guardarVista, CHAVE_DA_VISTA: CHAVE_DA_VISTA };
   if (typeof document === "undefined") { return; }       // no node (o teste), só as contas
 
@@ -1149,6 +1184,8 @@
   var detCorpo = detEl && detEl.querySelector(".cos-inv-det-corpo"), detTitulo = detEl && detEl.querySelector(".cos-inv-det-titulo");
   var detSub = detEl && detEl.querySelector(".cos-inv-det-sub");
   var invAberto = null, det = null, modo = "", destaques = {}, pontasDe = null;    // pontasDe: a usina da ponta das entradas
+  // as barras da janela (25/11/2026): o que se compara, o kW de agora ou a energia do trecho; vale até recarregar
+  var metricaBarras = "agora";
   // o dia escolhido na janela (13/11/2026): "" é hoje (com a ponta ao vivo); um dia que passou não tem ponta, e a
   // releitura de 3 s não mexe nos gráficos dele (o estado de agora e as barras de agora continuam ao vivo)
   var diaEscolhido = "";
@@ -1479,7 +1516,31 @@
     var bu = bloco("A usina hoje", ""); partes.tituloU = bu._titulo; partes.detU = bu._detalhe;
     partes.gu = document.createElement("div"); partes.gu.className = "cos-inv-graf"; bu.appendChild(partes.gu); frag.appendChild(bu);
     var bi = bloco("Cada inversor", ""); partes.escala = bi._detalhe;
+    // CURVAS OU BARRAS NA JANELA (25/11/2026, o dono com a janela da Altair 5 aberta: "aqui tinha que ter a visualização em
+    // barra também"): a MESMA escolha do seletor do alto da tela (um localStorage só) e, nas barras, o que se compara: o kW
+    // de agora ou a energia do trecho do gráfico (o dia inteiro, ou o do zoom), pela curva gravada
+    var sel = document.createElement("div"); sel.className = "cos-inv-vista";
+    sel.setAttribute("role", "group"); sel.setAttribute("aria-label", "Como ver os inversores");
+    partes.btVista = {}; partes.btMetrica = {};
+    [["curva", "Curvas"], ["barras", "Barras"]].forEach(function (par) {
+      var b = document.createElement("button"); b.type = "button"; b.className = "gc-chip"; b.textContent = par[1];
+      b.setAttribute("aria-pressed", "false");
+      b.addEventListener("click", function () { trocarVista(par[0]); });
+      partes.btVista[par[0]] = b; sel.appendChild(b);
+    });
+    partes.selMetrica = document.createElement("span"); partes.selMetrica.className = "cos-inv-vista-metrica";
+    partes.selMetrica.setAttribute("role", "group"); partes.selMetrica.setAttribute("aria-label", "O que as barras comparam");
+    [["agora", "Agora (kW)"], ["energia", "Energia do trecho"]].forEach(function (par) {
+      var b = document.createElement("button"); b.type = "button"; b.className = "gc-chip"; b.textContent = par[1];
+      b.setAttribute("aria-pressed", "false");
+      b.addEventListener("click", function () { metricaBarras = par[0]; if (aberta && vivo) { aoVivoNaJanela(); } });
+      partes.btMetrica[par[0]] = b; partes.selMetrica.appendChild(b);
+    });
+    sel.appendChild(partes.selMetrica);
+    bi.appendChild(sel);
+    partes.barras = document.createElement("div"); partes.barras.className = "cos-inv-barras"; partes.barras.hidden = true; bi.appendChild(partes.barras);
     var grade = document.createElement("div"); grade.className = "cos-inv-grade"; bi.appendChild(grade); frag.appendChild(bi);
+    partes.grade = grade;
     ordenados(c).forEach(function (i) {
       var p = {}, id = i.id, nome = nomeDoInversor(i);
       p.art = document.createElement("article");
@@ -1557,7 +1618,22 @@
       " · passe o mouse (ou use as setas) para ler a hora; arraste para aproximar (uma caixa aproxima também o valor; duplo clique volta)");
     escrever(partes.thMax, "textContent", "Máximo " + quando);
     escrever(partes.thEnergia, "textContent", "Energia " + quando);
-    escrever(partes.escala, "textContent", cv === SEM_CURVA ? "lendo a curva gravada do dia… os pontos ao vivo já aparecem"
+    var emBarras = vista === "barras", metrica = hoje ? metricaBarras : "energia";
+    escrever(partes.grade, "hidden", emBarras); escrever(partes.barras, "hidden", !emBarras); escrever(partes.selMetrica, "hidden", !emBarras);
+    Object.keys(partes.btVista).forEach(function (k) {
+      var v = String(k === (emBarras ? "barras" : "curva"));
+      if (partes.btVista[k].getAttribute("aria-pressed") !== v) { partes.btVista[k].setAttribute("aria-pressed", v); }
+    });
+    Object.keys(partes.btMetrica).forEach(function (k) {
+      var v = String(k === metrica);
+      if (partes.btMetrica[k].getAttribute("aria-pressed") !== v) { partes.btMetrica[k].setAttribute("aria-pressed", v); }
+    });
+    escrever(partes.btMetrica.agora, "disabled", !hoje);                // num dia que passou não há "agora"
+    escrever(partes.btMetrica.agora, "title", hoje ? "O kW de cada inversor agora, ao vivo" : "Num dia que passou não há leitura de agora: só a energia");
+    escrever(partes.escala, "textContent", emBarras
+      ? (metrica === "energia" ? "a energia de cada inversor em " + textoDoTrecho(zoom) + (hoje ? " (até agora)" : "") + ", pela curva gravada de 5 em 5 min" : "o kW de cada inversor agora") +
+        " · a linha tracejada é a mediana dos que geraram: quem fica abaixo dela gera menos que os vizinhos" + (detEl ? " · clique numa barra para abrir o inversor" : "")
+      : cv === SEM_CURVA ? "lendo a curva gravada do dia… os pontos ao vivo já aparecem"
       : "todos na mesma escala (" + rotuloDaEscala(faixasY.inversores || eInv, "kW") + "): quem gera menos fica visivelmente mais baixo" + (detEl ? " · clique num inversor para ver a curva dele e as strings" : ""));
     // as larguras lidas antes de desenhar (um layout só, e não um por gráfico)
     var larguraUsina = partes.gu.clientWidth, larguras = {};
@@ -1580,8 +1656,9 @@
         p.estado.appendChild(pilula(grupo ? e.tom : (e.grupo ? "neutro" : e.tom), e.rotulo));
         if (motivo) { var mo = document.createElement("span"); mo.className = "cos-inv-motivo"; mo.textContent = motivo; p.estado.appendChild(mo); }
       }
-      // a cor do estado (desligado, sem comunicação) é de AGORA: num dia que passou, a linha fica na cor de sempre
-      grafico(p.graf, [{ pts: porId[i.id] || [] }], { h: 78, min: eInv.min, max: eInv.max, escala: "inversores", grupo: hoje ? grupo : "", vivo: hoje, semAgora: !hoje, nome: nomeDoInversor(i),
+      // a cor do estado (desligado, sem comunicação) é de AGORA: num dia que passou, a linha fica na cor de sempre. Nas
+      // barras a grade está escondida: o gráfico de cada inversor não é desenhado (largura zero, e ninguém o vê)
+      if (!emBarras) grafico(p.graf, [{ pts: porId[i.id] || [] }], { h: 78, min: eInv.min, max: eInv.max, escala: "inversores", grupo: hoje ? grupo : "", vivo: hoje, semAgora: !hoje, nome: nomeDoInversor(i),
         rotulo: "Curva " + quando + " de " + (i.nome || i.modbus_id),
         aoMarcar: function (pt, min) {
           if (min == null) { kwAgora(); return; }
@@ -1593,6 +1670,16 @@
       linhas.push([nomeDoInversor(i), e.rotulo, kw(i.pac), mx ? kw(mx[1]) + " às " + hhmm(mx[0]) : "—",
         hoje && i.geracao_dia != null ? fmtKW.format(i.geracao_dia) + " kWh" : "—"]);
     });
+    if (emBarras) {
+      var b = null;
+      if (metrica === "energia") {
+        var tr = trechoAtual(), valores = {};
+        (cv.inversores || []).forEach(function (s) { valores[s.usina_id + ":" + s.modbus_id] = energiaDaSerie(serie(s.pontos), tr.de, tr.ate); });
+        if (cv !== SEM_CURVA) { b = barrasDaUsina(c, { valores: valores, semEstado: !hoje }); }
+      } else { b = barrasDaUsina(c); }
+      graficoDeBarras(partes.barras, b, { gerando: gerando, carregando: metrica === "energia" && cv === SEM_CURVA,
+        nome: (aberta.querySelector(".n") || {}).textContent || "esta usina" });
+    }
     var sigTab = JSON.stringify(linhas);
     if (partes.tbody._sig !== sigTab) {
       partes.tbody._sig = sigTab; partes.tbody.textContent = "";
@@ -1604,6 +1691,69 @@
     }
     if (partes.reles && c.reles) { partes.reles.forEach(function (card, idx) { if (c.reles[idx]) { atualizarUmRele(card, c.reles[idx]); } }); }
     if (cruzEm != null) { marcarTodos(cruzEm, null, null, null); }      // a cruz fica onde estava
+  }
+
+  // A janela troca a vista da tela inteira (a mesma escolha do seletor do alto, um localStorage só)
+  function trocarVista(v) {
+    aplicarVista(v); guardarVista(raiz.localStorage, vista);
+    desenharTodasAsBarras(mapaVivo);
+    if (aberta && vivo) { aoVivoNaJanela(); }
+  }
+  // AS BARRAS DA JANELA (25/11/2026): uma coluna por inversor, na ordem da usina, com o eixo na unidade do que se compara
+  // (kW, % da nominal, kWh ou kWh por kW), o nome embaixo, o valor em cima quando cabe e a mediana tracejada. A coluna
+  // inteira é o alvo do clique, que abre o inversor (o teclado abre pela tabela ou pela vista de curvas).
+  function rotuloDoEixoDasBarras(b, v) {
+    if (b.energia) { return b.porNominal ? fmtAte1.format(v) + " kWh/kW" : kwh(v); }
+    return b.porNominal ? Math.round(v * 100) + "%" : kw(v);
+  }
+  function graficoDeBarras(host, b, o) {
+    var w = Math.max(240, host.clientWidth || 600);
+    var sig = JSON.stringify([w, b && b.barras, b && b.mediana, o.gerando, o.carregando]);
+    if (host._sig === sig) { return; }
+    host._sig = sig; host.textContent = "";
+    if (!b || !b.barras.length) {
+      var vazio = document.createElement("p"); vazio.className = "mudo";
+      vazio.textContent = o.carregando ? "lendo a curva gravada do dia…" : "sem a leitura dos inversores agora";
+      host.appendChild(vazio); return;
+    }
+    var n = b.barras.length, maxNome = 0;
+    b.barras.forEach(function (x) { maxNome = Math.max(maxNome, String(x.nome).length); });
+    var ml = 60, mr = 10, mt = 20, iw = w - ml - mr, passo = iw / n;
+    var gira = maxNome * 6.2 > passo - 4;                 // o nome que não cabe na largura da coluna vai inclinado
+    var mb = gira ? Math.min(96, 14 + maxNome * 5.2) : 28, h = 200 + mb, ih = h - mt - mb;
+    var teto = tetoBonito(b.topo > 0 ? b.topo : 1, 4), bw = Math.max(2, Math.min(44, passo * 0.68));
+    var y = function (v) { return mt + ih - Math.max(0, Math.min(1, v / teto)) * ih; };
+    var svg = el("svg", { viewBox: "0 0 " + w + " " + h, width: w, height: h, class: "pg cos-inv-barras-svg", role: "img",
+      "aria-label": "Barras dos inversores de " + o.nome + ": " + resumoDasBarras(b, o.gerando) }, null);
+    var grade = el("g", { class: "pg-grade" }, svg), eixo = el("g", { class: "pg-eixo" }, svg);
+    for (var k = 0; k <= 4; k++) {
+      var v = teto * k / 4, yy = Math.round(y(v)) + 0.5;
+      el("line", { x1: ml, y1: yy, x2: w - mr, y2: yy }, grade);
+      el("text", { x: ml - 6, y: yy + 4, "text-anchor": "end" }, eixo).textContent = rotuloDoEixoDasBarras(b, v);
+    }
+    b.barras.forEach(function (x, k) {
+      var x0 = ml + k * passo, cx = x0 + passo / 2, g = el("g", { class: "cos-inv-barra-g" }, svg);
+      var sem = x.tom === "sem", alt = sem ? 4 : Math.max(1.5, mt + ih - y(x.fracao * b.topo));
+      el("rect", { class: "cos-inv-barra cos-inv-barra--" + x.tom, x: cx - bw / 2, y: mt + ih - alt, width: bw, height: alt }, g);
+      if (bw >= 26 && x.valor != null) {
+        el("text", { class: "cos-inv-barras-val", x: cx, y: mt + ih - alt - 4, "text-anchor": "middle" }, g).textContent =
+          b.energia ? (b.porNominal ? fmtAte1.format(x.porKw) : fmtKW.format(x.valor)) : (b.porNominal ? x.pct + "%" : fmtKW.format(x.kw));
+      }
+      var tn = el("text", { class: "cos-inv-barras-rot", x: cx, y: mt + ih + 14, "text-anchor": gira ? "end" : "middle" }, g);
+      if (gira) { tn.setAttribute("transform", "rotate(-55 " + cx + " " + (mt + ih + 10) + ")"); }
+      tn.textContent = x.nome;
+      var alvo = el("rect", { class: "cos-inv-barra-alvo", x: x0, y: mt, width: passo, height: ih + mb }, g);
+      el("title", {}, alvo).textContent = x.nome + " · " + valorDaBarra(b, x) + (x.rotulo ? " · " + x.rotulo : "");
+      if (detEl) { alvo.addEventListener("click", function () { abrirInversor(x.id); }); }
+    });
+    el("line", { class: "pg-base", x1: ml, y1: mt + ih + 0.5, x2: w - mr, y2: mt + ih + 0.5 }, svg);
+    if (b.mediana != null && (b.energia || o.gerando)) {
+      var ym = y(b.medianaBruta), lm = el("g", {}, svg);
+      el("line", { class: "cos-inv-barras-mediana", x1: ml, y1: ym, x2: w - mr, y2: ym }, lm);
+      el("text", { class: "cos-inv-barras-val", x: w - mr, y: ym - 4, "text-anchor": "end" }, lm).textContent = "mediana " + textoDaMediana(b);
+    }
+    host.appendChild(svg);
+    var d = document.createElement("p"); d.className = "d"; d.textContent = resumoDasBarras(b, o.gerando); host.appendChild(d);
   }
 
   // ── 3. o DETALHE de um inversor (13/11/2026) ────────────────────────────────────────────────────────────────────

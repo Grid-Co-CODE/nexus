@@ -533,3 +533,64 @@ def test_a_janela_do_sunop_nao_para_mais_no_aviso_e_nao_pede_o_historico_das_str
     assert "if (ehDoSunop(i)) {" in corpo and "return;" in corpo          # volta antes de pedir o histórico
     pre = texto[texto.index("var preCarregarHist = function () {"):]
     assert pre.index("if (ehDoSunop(i)) { return; }") < pre.index("lerHistorico(")
+
+
+# --- as barras na JANELA da usina (25/11/2026) --------------------------------------------------------------------------
+# O dono, com a janela da Altair 5 aberta: "aqui tinha que ter a visualização em barra também". O bloco "Cada inversor"
+# ganha Curvas | Barras (a mesma escolha do alto da tela) e, nas barras, o kW de agora ou a energia do trecho, pela curva
+# gravada de 5 em 5 min.
+
+def test_a_energia_do_trecho_pela_curva_gravada_de_5_em_5_min():
+    # 360 = 06:00; três baldes de 120 kW (15 min = 30 kWh), um buraco (None) e um ponto fora do trecho
+    pts = [[360, 120], [365, 120], [370, None], [375, 120], [600, 999]]
+    r = rodar("var p = JSON.parse(A[0]); process.stdout.write(JSON.stringify([N.energiaDaSerie(p, 300, 420), "
+              "N.energiaDaSerie(p, 0, 300), N.energiaDaSerie([], 300, 420)]));", json.dumps(pts))
+    assert r == [30, None, None]
+
+
+def test_as_barras_de_energia_sem_o_estado_de_um_dia_que_passou():
+    c = {"situacao": {"chave": "STANDBY"}, "inversores": [inv(1, 0, "DESLIGADO"), inv(2, 0, "STANDBY"), inv(3, None, "SEM_COMUNICACAO")]}
+    valores = {"EXA01:1": 800.0, "EXA01:2": 400.0, "EXA01:3": None}
+    b = rodar("process.stdout.write(JSON.stringify(N.barrasDaUsina(JSON.parse(A[0]), { valores: JSON.parse(A[1]), semEstado: true })));",
+              json.dumps(c), json.dumps(valores))
+    # a cor de agora não vale num dia que passou; quem não tem curva gravada fica só no contorno
+    assert [x["tom"] for x in b["barras"]] == ["ok", "ok", "sem"] and [x["rotulo"] for x in b["barras"]] == [None, None, None]
+    assert b["energia"] and [x["fracao"] for x in b["barras"]] == [1, 0.5, 0]
+    # a mediana é de quem gerou energia, qualquer que seja o estado de agora
+    assert b["medianaBruta"] == 600 and b["menor"]["nome"] == "INV02" and b["gerando"] == 2
+    assert resumo(b, False) == "mediana 600 kWh · menor: INV02, 400 kWh"
+
+
+def test_a_energia_com_a_nominal_de_todos_vira_kwh_por_kw():
+    c = {"inversores": [inv(1, 0, capacidade=250), inv(2, 0, capacidade=125)]}
+    valores = {"EXA01:1": 1000.0, "EXA01:2": 600.0}
+    r = rodar("var b = N.barrasDaUsina(JSON.parse(A[0]), { valores: JSON.parse(A[1]) });"
+              "process.stdout.write(JSON.stringify([b.porNominal, b.barras.map(function (x) { return x.porKw; }), "
+              "N.valorDaBarra(b, b.barras[1]), N.textoDaMediana(b)]));", json.dumps(c), json.dumps(valores))
+    # o de 125 kW, com 600 kWh, rendeu 4,8 kWh por kW contra 4 do de 250: a barra dele é a mais alta
+    assert r == [True, [4, 4.8], "4,8 kWh/kW (600 kWh)", "4,4 kWh/kW"]
+
+
+def test_a_janela_tem_curvas_ou_barras_e_nao_desenha_as_curvas_escondidas():
+    texto = JS.read_text(encoding="utf-8")
+    montar = texto[texto.index("function montar(c) {"):]
+    montar = montar[: montar.index("\n  }\n")]
+    assert '[["curva", "Curvas"], ["barras", "Barras"]]' in montar and "trocarVista(par[0])" in montar
+    assert '[["agora", "Agora (kW)"], ["energia", "Energia do trecho"]]' in montar
+    atualizar = texto[texto.index("function atualizar(c, cv) {"):]
+    atualizar = atualizar[: atualizar.index("\n  }\n")]
+    assert 'emBarras = vista === "barras"' in atualizar and "if (!emBarras) grafico(p.graf" in atualizar
+    assert "energiaDaSerie(serie(s.pontos), tr.de, tr.ate)" in atualizar     # a gravada, nunca a ponta ao vivo
+    assert 'metrica = hoje ? metricaBarras : "energia"' in atualizar         # num dia que passou, só a energia
+    # a janela troca a vista da tela inteira (um localStorage só), e a coluna abre o inversor
+    troca = texto[texto.index("function trocarVista(v) {"):]
+    assert troca.index("guardarVista(raiz.localStorage, vista)") < troca.index("desenharTodasAsBarras(mapaVivo)")
+    barras = texto[texto.index("function graficoDeBarras(host, b, o) {"):]
+    assert "abrirInversor(x.id)" in barras[: barras.index("\n  }\n")]
+
+
+def test_o_css_das_barras_da_janela_so_com_tokens():
+    css = (JS.parent / "inversores.css").read_text(encoding="utf-8")
+    bloco = css[css.index("CURVAS OU BARRAS NA JANELA"):]
+    assert ".cos-inv-grade[hidden]" in bloco and ".cos-inv-barra--fora{fill:var(--critico)}" in bloco
+    assert not re.search(r"#[0-9a-fA-F]{3,6}\b|rgba?\(", bloco)

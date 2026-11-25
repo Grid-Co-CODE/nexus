@@ -483,6 +483,13 @@ Ignora esse monitoramento que já existe no nexus" (a Performance › Tempo real
   desenhadas no navegador a partir da leitura ao vivo (`barrasDaUsina`, `desenharBarras` no `inversores.js`): uma por
   inversor, na ordem da usina, o kW de agora (ou a fração da nominal quando todos a têm), a cor do estado e a linha
   tracejada da mediana dos que estão gerando, sem limiar inventado. Testes no node: `test_cos_inversores_js.py`.
+  **Na janela da usina também** (25/11/2026, o dono com a janela da Altair 5 aberta: "aqui tinha que ter a visualização em
+  barra também"): o bloco "Cada inversor" tem Curvas | Barras, a MESMA escolha do alto da tela (trocar na janela troca a
+  tela). Nas barras, um gráfico grande com uma coluna por inversor na ordem da usina, o eixo na unidade do que se compara e
+  a mediana tracejada; o clique na coluna abre o inversor. O que se compara: **Agora (kW)**, ao vivo, ou **Energia do
+  trecho** (`energiaDaSerie`: a curva GRAVADA de 5 em 5 min, cada ponto vale 5 min, nunca a ponta de 3 s), no dia inteiro
+  ou no trecho do zoom; num dia que passou, só a energia e sem a cor do estado de agora. Com a nominal de todos, a energia
+  vira kWh por kW. Nas barras, as curvas de cada inversor não são desenhadas (a grade está escondida).
 - **O detalhe de um inversor** (13/11/2026, o dono: "clicar num inversor e ver o gráfico individual desse inversor,
   junto com o gráfico das strings dele, individual ou em grupo, por exemplo por MPPT"): na janela da usina, o inversor é
   botão e troca o corpo pelo detalhe (`.cos-inv-det` no `cos/_inversores.html`; "Voltar à usina" e o Esc voltam, com o
