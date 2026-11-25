@@ -1,0 +1,8 @@
+{# O histórico das tratativas de um cliente ou de uma usina, do mais novo para o mais velho: o pedaço que a caixa das
+   tratativas da tela de Extintores busca ao abrir (`extintores_tratativas`). #}
+{% from 'hseq/_trat_icones.html' import icone %}
+{% if erro %}<p class="cn-t-critico">Não consegui ler as tratativas agora ({{ erro }}).</p>{% endif %}
+{% if ts %}<ul class="hs-trat-lista">{% for t in ts %}
+  <li><span class="m hs-trat-dia">{{ t.dia.strftime('%d/%m/%Y') if t.dia else '—' }}</span><span class="hs-trat-o-que">{{ icone(t.tipo) }}<span><b>{{ t.tipo_txt }}</b>{% if t.escopo == 'usina' and por_usina %} · {{ nomes.get(t.usina_id, 'usina ' ~ t.usina_id) }}{% elif t.escopo == 'cliente' %} · cliente inteiro{% endif %}{% if t.obs %}<span class="det">{{ t.obs }}</span>{% endif %}{% if t.quem %}<span class="det">por {{ t.quem }}</span>{% endif %}</span></span></li>
+{% endfor %}</ul>
+{% elif not erro %}<p class="mudo">Nenhuma tratativa registrada.</p>{% endif %}

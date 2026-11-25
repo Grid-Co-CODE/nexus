@@ -172,7 +172,6 @@
 .ext-tab .hs-qtd{font-size:15px;font-variant-numeric:tabular-nums}
 .hs-status{display:inline-flex;flex-direction:column;align-items:flex-start;gap:3px;min-width:120px;text-align:left}
 .hs-status .cn-st{white-space:nowrap}
-.ext-clientes th:nth-child(8),.ext-clientes td:nth-child(8){text-align:left}
 /* a nova ronda pedida, na linha da usina */
 .hs-ronda{display:block;margin:2px 0 0 13px;font-size:11.5px;color:var(--info);white-space:normal}
 .hs-menu-nota{display:block;padding:8px 10px;font-size:12px;color:var(--mudo)}
@@ -296,3 +295,70 @@
 .epi-tab td:last-child{position:relative;width:44px}
 .epi-tab tr:hover .hs-tres,.epi-tab tr:focus-within .hs-tres{opacity:1}
 .hs-menu-cli[hidden]{display:none}
+/* a tabela por cliente nova (24/11/2026, o mockup aprovado pela Segurança): a bolinha da situação mais grave, a Última
+   inspeção, o Status centrado e a Evolução (a última tratativa, quantas e os links) */
+.hs-bola{display:inline-block;width:11px;height:11px;border-radius:50%;background:var(--mudo);vertical-align:middle}
+.hs-bola--critico{background:var(--critico)}
+.hs-bola--alerta{background:var(--alerta)}
+.hs-bola--info{background:var(--info)}
+.hs-bola--ok{background:var(--ok)}
+.hs-clientes th.hs-esq,.hs-clientes td.hs-esq{text-align:left}
+.hs-clientes td:first-child{width:36px}
+.hs-clientes .hs-status{align-items:center;text-align:center}
+.hs-us-resp{white-space:normal}
+/* no cliente e na usina, as partes uma embaixo da outra (o mockup: "N usinas" e "Responsável UFV · Equipe" embaixo do
+   nome; o "há N dias" embaixo da data), não lado a lado como nas linhas do extintor */
+.hs-clientes > tbody > tr.cn-linha > td > .ext-par > *{display:block}
+.hs-clientes > tbody > tr.cn-linha > td > .ext-par > * + *{margin-left:0;margin-top:2px}
+.hs-clientes > tbody > tr.cn-linha > td.ext-usina > .ext-par > * + *{margin-left:13px}
+.hs-evol{display:flex;flex-direction:column;align-items:flex-start;gap:3px;min-width:260px;max-width:340px;white-space:normal;text-align:left}
+.hs-evol-ult{display:flex;align-items:flex-start;gap:6px}
+.hs-evol-ult .det{display:inline}
+.hs-trat-ic{flex:0 0 auto;margin-top:2px;color:var(--mudo)}
+.hs-evol-acoes{font-size:11.5px;color:var(--mudo)}
+.hs-link{padding:0;border:0;background:none;color:var(--verde);font:inherit;text-decoration:underline;cursor:pointer}
+.hs-link:focus-visible{outline:2px solid var(--verde);outline-offset:2px}
+/* a caixa das tratativas: os tipos em chips, a data e o "vale para" lado a lado, o histórico embaixo */
+.hs-trat{width:min(520px,calc(100vw - 32px))}
+.hs-chips{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 12px;padding:0;border:0}
+.hs-chips legend{margin-bottom:6px;padding:0}
+.hs-chip{position:relative}
+.hs-chip input{position:absolute;opacity:0;inset:0;margin:0;cursor:pointer}
+.hs-chip span{display:inline-block;padding:4px 10px;border:1px solid var(--linha);border-radius:999px;font-size:12px;color:var(--tinta-2)}
+.hs-chip input:checked + span{border-color:var(--verde);color:var(--verde)}
+.hs-chip input:focus-visible + span{outline:2px solid var(--verde);outline-offset:2px}
+.hs-trat-linha{display:grid;grid-template-columns:130px minmax(0,1fr);gap:10px}
+.hs-trat-form label{display:flex;flex-direction:column;gap:4px;margin-bottom:10px}
+.hs-trat-form textarea{resize:vertical}
+.hs-trat-hist{margin-top:10px;padding-top:8px;border-top:1px solid var(--linha);max-height:260px;overflow:auto}
+.hs-trat-lista{margin:0;padding:0;list-style:none;font-size:12.5px}
+.hs-trat-lista li{display:flex;gap:10px;padding:5px 0}
+.hs-trat-dia{flex:0 0 82px;color:var(--mudo)}
+.hs-trat-o-que{display:flex;gap:6px;align-items:flex-start}
+.hs-trat-o-que .det{display:block}
+@media (max-width:480px){.hs-trat-linha{grid-template-columns:minmax(0,1fr)}}
+/* no celular cada linha do cliente e da usina vira um cartão, como na ficha do colaborador; os extintores da usina
+   seguem na tabela deles, que rola dentro da caixa */
+@media (max-width:640px){
+  .cn-tab table.hs-clientes{min-width:0}
+  .hs-clientes,.hs-clientes > tbody{display:block}
+  .hs-clientes > thead{display:none}
+  .hs-clientes > tbody > tr.cn-linha{display:grid;grid-template-columns:18px minmax(0,1fr) 36px;gap:4px 8px;padding:10px 12px;
+    border-top:1px solid var(--linha)}
+  .hs-clientes > tbody > tr[hidden]{display:none}
+  .hs-clientes > tbody > tr.cn-linha > td{display:block;padding:0;border:0;text-align:left;white-space:normal}
+  .hs-clientes.cn-expande > tbody > tr.cn-linha > td{background:none}
+  .hs-clientes.cn-expande > tbody > tr.cn-linha[aria-expanded="true"]{background:var(--superficie-2)}
+  .hs-clientes > tbody > tr.cn-linha > td:first-child{grid-row:1;grid-column:1;width:auto;padding-top:4px}
+  .hs-clientes > tbody > tr.cn-linha > td.ext-usina{grid-row:1;grid-column:2;padding-left:0}
+  .hs-clientes > tbody > tr.cn-linha > td.hs-acoes{grid-row:1;grid-column:3;width:auto}
+  .hs-clientes > tbody > tr.cn-linha > td[data-r]:not(:first-child):not(.ext-usina){grid-column:2 / 4;display:flex;gap:10px;align-items:baseline}
+  .hs-clientes > tbody > tr.cn-linha > td[data-r]:not(:first-child):not(.ext-usina)::before{content:attr(data-r);flex:0 0 92px;
+    font-size:12px;color:var(--mudo)}
+  .hs-clientes > tbody > tr.ext-us{padding-left:24px}
+  .hs-clientes .hs-status{align-items:flex-start;text-align:left;min-width:0}
+  .hs-clientes .hs-evol{min-width:0}
+  .hs-clientes > tbody > tr.cn-detalhe{display:block}
+  .hs-clientes > tbody > tr.cn-detalhe[hidden]{display:none}
+  .hs-clientes > tbody > tr.cn-detalhe > td{display:block;overflow-x:auto}
+}

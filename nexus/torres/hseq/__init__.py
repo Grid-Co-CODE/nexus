@@ -31,6 +31,7 @@ from ...hseq import info_extintor as INFO
 from ...hseq import planilha as PLA
 from ...hseq import relatorio as REL
 from ...hseq import relatorio_epi as REL_EPI
+from ...hseq import tratativas as TRAT
 from ..campo import _lido, _url
 from ...cadastro import setor_ids as SID
 from ..modelo import Tela, Torre
@@ -181,6 +182,21 @@ def _rondas(est, todas, seguem) -> dict:
         if x.get("usina_id"):
             por_usina.setdefault(x["usina_id"], []).append(x)
     return DEC.rondas_pendentes(est, por_usina, EXT.recebidas().dados or {})
+
+
+def _evolucao(grupos) -> str:
+    """Põe em cada cliente e usina da tabela a Evolução (`evol`: a última tratativa e quantas; o mockup aprovado pela
+    Segurança, 24/11/2026). No cliente, a mais nova entre as do cliente inteiro e as das usinas dele; na usina, a mais nova
+    que vale para ela, contando as do cliente inteiro. Devolve o erro de leitura do livro (a tela diz)."""
+    est = TRAT.ler(current_app.config)
+    todas = TRAT.lista(current_app.config, est)
+    for c in grupos:
+        uids = {u["usina_id"] for u in c["usinas"] if u.get("usina_id")}
+        c["evol"] = TRAT.resumo([t for t in todas if (c.get("cliente_id") and t["cliente_id"] == c["cliente_id"])
+                                 or (t["escopo"] == "usina" and t["usina_id"] in uids)])
+        for u in c["usinas"]:
+            u["evol"] = TRAT.resumo(TRAT.da_usina(todas, u.get("usina_id"), u.get("cliente_id")))
+    return est.get("erro") or ""
 
 
 def _historico(d, fl) -> list[dict]:
@@ -446,12 +462,15 @@ def extintores():
     lista = EXT.ordenar(_lista(base, f), f if f in EXT.FILTROS else "")
     est = _decisoes()
     nrs = nao_rec if f in ("", NR) else []
+    grupos = EXT.por_cliente(lista, nrs) if modo == "tabela" and ver == "cliente" else []
+    trat_erro = _evolucao(grupos) if grupos else ""
     return render_template(
         "hseq/extintores.html", torre=TORRE, tela=TORRE.tela("extintores"), leitura=leitura, d=d, lido=_lido(leitura),
         url=_url_ext, f=f, modo=modo, ver=ver, fl=fl, filtros_ext=FILTROS_EXT, status_opcoes=STATUS,
         q=request.args.get("q", ""), contagem=EXT.contar(base), lista=lista, limite=LIMITE_LINHAS,
         # os não reconhecidos vão para a usina deles na tabela (é lá que a Segurança decide)
-        grupos=EXT.por_cliente(lista, nrs) if modo == "tabela" and ver == "cliente" else [],
+        grupos=grupos, trat_erro=trat_erro, tipos_trat=TRAT.TIPOS, obs_max=TRAT.OBS_MAX,
+        hoje_txt=visao._agora().strftime("%d/%m/%Y"),
         nr_lista=nrs if ver == "extintor" and f == NR else [],
         historico=_historico(d, fl) if modo == "excluidos" else [], n_excluidos=len(fl["excluidos"]),
         pode=_pode(), rondas=_rondas(est, todas, fl["seguem"]), decisoes_erro=est.get("erro"),
@@ -547,6 +566,61 @@ def extintores_editar():
         return (DEC.editar(current_app.config, extintor=x, valores=valores, obs=form.get("obs", ""),
                            usuario=session.get("usuario"), pode=_pode()), x.get("cliente") or EXT.SEM_CLIENTE, x["usina"])
     return _decidir(fazer)
+
+
+@bp.route("/extintores/tratativa", methods=["POST"])
+def extintores_tratativa():
+    """Registra uma tratativa (o mockup aprovado pela Segurança, 24/11/2026): o que foi feito, o dia (hoje por padrão,
+    nunca no futuro) e para quem vale, o cliente inteiro (`c:<cliente_id>`) ou uma usina dele (`u:<usina_id>`). O cliente
+    e a usina são conferidos com a tela de agora; quem pode é quem decide nos extintores."""
+    def fazer(form):
+        d = EXT.extintores().dados or {}
+        todas, seguem, _ = DEC.separar(d.get("extintores") or [], d.get("nao_reconhecidos") or [], _decisoes())
+        tipo_alvo, _sep, ident = form.get("alvo", "").partition(":")
+        try:
+            num = int(ident)
+        except ValueError:
+            num = 0
+        if tipo_alvo == "u":
+            x = next((x for x in todas + seguem if x.get("usina_id") == num), None)
+            if x is None:
+                raise TRAT.Recusada("Esta usina não está mais na tela: atualize a página.")
+            texto = TRAT.registrar(current_app.config, escopo="usina", cliente_id=x.get("cliente_id"), usina_id=num,
+                                   tipo=form.get("tipo", ""), dia=form.get("dia", ""), obs=form.get("obs", ""),
+                                   usuario=session.get("usuario"), pode=_pode())
+            return texto, x.get("cliente") or EXT.SEM_CLIENTE, ""
+        x = next((x for x in todas + seguem if num and x.get("cliente_id") == num), None)
+        if tipo_alvo != "c" or x is None:
+            raise TRAT.Recusada("Escolha para quem vale: o cliente inteiro ou uma usina dele.")
+        return (TRAT.registrar(current_app.config, escopo="cliente", cliente_id=num, usina_id=None,
+                               tipo=form.get("tipo", ""), dia=form.get("dia", ""), obs=form.get("obs", ""),
+                               usuario=session.get("usuario"), pode=_pode()), x.get("cliente") or EXT.SEM_CLIENTE, "")
+    return _decidir(fazer)
+
+
+@bp.route("/extintores/tratativas")
+def extintores_tratativas():
+    """O histórico das tratativas de um cliente (`cliente_id`, com as das usinas dele) ou de uma usina (`usina_id`, com
+    as do cliente inteiro; o grupo sem cliente manda as `usinas`), do mais novo para o mais velho: o pedaço que a caixa das tratativas busca ao abrir (a página
+    leva só a última de cada linha)."""
+    def num(k):
+        try:
+            return int(request.args.get(k) or 0) or None
+        except ValueError:
+            return None
+    cid, uid = num("cliente_id"), num("usina_id")
+    est = TRAT.ler(current_app.config)
+    todas = TRAT.lista(current_app.config, est)
+    d = EXT.extintores().dados or {}
+    nomes = {x["usina_id"]: x["usina"] for x in (d.get("extintores") or []) + (d.get("nao_reconhecidos") or [])
+             if x.get("usina_id")}
+    if uid:
+        ts = TRAT.da_usina(todas, uid, cid)
+    else:
+        # o grupo "Sem cliente" não tem ID: valem as das usinas dele (`usinas`, os IDs separados por vírgula)
+        uids = {int(u) for u in request.args.get("usinas", "").split(",") if u.strip().isdigit()}
+        ts = [t for t in todas if (cid and t["cliente_id"] == cid) or (t["escopo"] == "usina" and t["usina_id"] in uids)]
+    return render_template("hseq/_tratativas.html", ts=ts, nomes=nomes, erro=est.get("erro") or "", por_usina=not uid)
 
 
 @bp.route("/extintores/opcoes")

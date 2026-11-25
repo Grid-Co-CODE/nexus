@@ -359,12 +359,12 @@ def test_a_tabela_abre_por_cliente_e_o_cliente_abre_as_usinas(com_cadastro, loga
     assert 'href="?ver=extintor#tabela"' in html and "Por usina e dia" not in html
     # UMA tabela: a linha do cliente e as das usinas nas mesmas colunas (aninhadas, não cabiam a 1440 px)
     cab = _texto(html[html.index("<thead>"):html.index("</thead>")])
-    # a última coluna é a dos três pontos, sem nome (Levi, 24/10/2026: "tira esse nome ações de uma coluna que não existe")
-    # o Status no lugar do "Status da TST" (24/10/2026, 2ª rodada); Responsável e Técnicos só com um cliente aberto
-    assert cab == ("Situação Última conferência Cliente e usina Responsável Técnicos Quantidade de extintores "
-                   "Recarga mais próxima Status")
-    assert '<th aria-label="Ações"></th>' in html and 'class="cn-expande ext-clientes hs-fechada"' in html
-    assert html.count('<th class="hs-col-aberta">') == 3
+    # a última coluna é a dos três pontos, sem nome (Levi, 24/10/2026: "tira esse nome ações de uma coluna que não existe").
+    # A tabela nova (24/11/2026, o mockup aprovado pela Segurança): a bolinha sem título, a Última inspeção e a Evolução;
+    # saíram da linha o Responsável, os Técnicos e a Recarga mais próxima
+    assert cab == "Cliente e usina Qtd. de extintores Última inspeção Status Evolução"
+    assert '<th aria-label="Ações"></th>' in html and '<th aria-label="Situação"></th>' in html
+    assert "hs-col-aberta" not in _tabela(html) and "Recarga mais próxima" not in html
     # 3 clientes (Thopen, Outro Cliente e "Sem cliente", a Irecê 2 fora do cadastro) e 4 usinas, tudo fechado
     assert html.count('<tr class="cn-linha ext-cli"') == 3 and html.count('<tr class="cn-linha ext-us"') == 4
     assert len(re.findall(r'<tr class="cn-linha ext-us"[^>]* hidden>', html)) == 4
@@ -374,19 +374,26 @@ def test_a_tabela_abre_por_cliente_e_o_cliente_abre_as_usinas(com_cadastro, loga
                      "Thopen - Irecê 2 - BA"]
     thopen = _abre(html, "<b>Thopen</b>")
     # a quantidade é só o total; o Status, uma linha por situação ("A ideia é ficar algo bem mais visual")
-    assert thopen.startswith("Atrasado Thopen 2 usinas 1 com extintor atrasado 6 02/2026 venceu há 7 meses "
-                             "2 atrasados 1 perto de vencer 2 sem validade 1 em dia")
+    # a Última inspeção do cliente é a MAIS ANTIGA das usinas dele: a Brodowski 1 nunca foi conferida
+    assert thopen.startswith("Thopen 2 usinas 1 com extintor atrasado 6 nunca conferida "
+                             "2 atrasados 1 perto de vencer 2 sem validade 1 em dia Nenhuma tratativa")
     assert "Crítico" not in thopen and "hs-barra" not in html           # a barra de cores saiu (24/10, 3ª rodada)
-    assert '<span class="hs-empilha"><span class="ext-par"><span class="m">02/2026</span>' in html
-    # a usina, uma linha só: a última conferência é a mais recente, com o responsável e os técnicos (um embaixo do outro)
-    alt = _abre(html, "</span>Altair</td>")
-    assert alt.startswith("Atrasado 05/10/2026 há 4 d · App Altair Supervisora Campo Eletricista Beta Técnico Alfa 5 "
-                          "02/2026 venceu há 7 meses 2 atrasados 1 perto de vencer 1 sem validade 1 em dia")
-    assert '<span class="ext-tecs"><span>Eletricista Beta</span><span>Técnico Alfa</span></span>' in html
+    # a bolinha é a situação mais grave, a palavra no aria-label
+    assert '<span class="hs-bola hs-bola--critico" role="img" aria-label="Atrasado"' in html
+    # a usina, uma linha só: a última inspeção é a mais recente dos extintores dela; o responsável e a equipe embaixo do
+    # nome, e os técnicos no title dessa linha
+    alt = _abre(html, "</span>Altair</span>")
+    assert alt.startswith("Altair Supervisora Campo · SP Norte 01 5 05/10/2026 há 4 dias "
+                          "2 atrasados 1 perto de vencer 1 sem validade 1 em dia Nenhuma tratativa")
+    assert 'title="Técnicos: Eletricista Beta, Técnico Alfa">Supervisora Campo · SP Norte 01</span>' in html
     # o apoio agendado para 20/10 ainda não conta; a usina fora do cadastro não tem responsável nem técnico
-    assert "Brodowski 1 Supervisora Campo sem técnico" in _abre(html, "</span>Brodowski 1</td>")
-    assert "Coração 1 Coordenador Campo Técnico Gama" in _abre(html, "</span>Coração 1</td>")
-    assert "Thopen - Irecê 2 - BA sem responsável sem técnico" in _abre(html, "</span>Thopen - Irecê 2 - BA</td>")
+    assert '<span class="det hs-us-resp">Supervisora Campo · SP Norte 01</span>' in html     # Brodowski 1, sem técnico
+    assert 'title="Técnicos: Técnico Gama">Coordenador Campo · SC Oeste 01</span>' in html
+    # passados os 30 dias do "sem atualização", a Última inspeção fica azul
+    cor = _abre(html, "</span>Coração 1</span>")
+    assert "01/03/2026 há 222 dias" in cor and '<span class="ext-par cn-t-info"><span class="m">01/03/2026</span>' in html
+    assert "Thopen - Irecê 2 - BA sem responsável · Sem equipe 1 08/10/2026 ontem" in _abre(
+        html, "</span>Thopen - Irecê 2 - BA</span>")
     # os extintores NÃO vêm na página (19/10/2026): a usina os busca ao abrir, de todos os dias, com a conferência de
     # cada um e sem repetir a usina
     assert _linhas(html) == [] and "ext-sub cn-fotos-grupo" not in html
@@ -397,12 +404,12 @@ def test_a_tabela_abre_por_cliente_e_o_cliente_abre_as_usinas(com_cadastro, loga
     # o filtro da faixa vale para o agrupamento: só os atrasados entram na conta
     atr = logado.get("/t/hseq/extintores?f=atrasado").get_data(as_text=True)
     assert atr.count('<tr class="cn-linha') == 4                          # Thopen › Altair e Outro Cliente › Coração 1
-    assert "Altair Supervisora Campo Eletricista Beta Técnico Alfa 2 02/2026 venceu há 7 meses 2 atrasados" in _abre(
-        atr, "</span>Altair</td>")
+    assert _abre(atr, "</span>Altair</span>").startswith("Altair Supervisora Campo · SP Norte 01 2 ")
+    assert "2 atrasados" in _abre(atr, "</span>Altair</span>")
     # com o cliente escolhido, o cliente já abre; com a usina, a usina também
     cli = logado.get("/t/hseq/extintores?cliente=Thopen").get_data(as_text=True)
     assert _tabela(cli).count('aria-expanded="true"') == 1 and cli.count('<tr class="cn-linha ext-us"') == 2
-    assert 'class="cn-expande ext-clientes"' in cli                     # com o cliente aberto, as colunas aparecem
+    assert 'class="cn-expande ext-clientes hs-clientes"' in cli
     assert not re.search(r'<tr class="cn-linha ext-us"[^>]* hidden>', cli) and len(re.findall(r'<tr class="cn-detalhe" data-cli="1" hidden', cli)) == 2
     # com a usina (uma só), os extintores dela já vêm na página
     us = logado.get("/t/hseq/extintores?usina=Altair").get_data(as_text=True)
@@ -412,7 +419,7 @@ def test_a_tabela_abre_por_cliente_e_o_cliente_abre_as_usinas(com_cadastro, loga
 
 def _pedaco(cliente, html, usina):
     """O pedaço que a linha da usina busca ao abrir (o data-url da linha de detalhe dela)."""
-    i = html.index(f"</span>{usina}</td>")
+    i = html.index(f"</span>{usina}</span>")
     url = re.search(r'data-url="([^"]+)"', html[i:]).group(1).replace("&amp;", "&")
     r = cliente.get(url)
     assert r.status_code == 200
@@ -425,11 +432,10 @@ def test_a_pagina_leva_so_o_resumo_e_a_usina_busca_os_extintores_ao_abrir(com_ca
     carregar"). A página leva só o cliente e a usina, com todos os campos de hoje; os extintores vêm por usina."""
     html = logado.get("/t/hseq/extintores").get_data(as_text=True)
     assert _linhas(html) == [] and not re.search(r"<img[^>]+src=", html.split('id="tabela"')[1])
-    # a linha da usina segue com os campos de antes: situação, conferência, usina, responsável, técnicos, quantidade,
-    # recarga, status da TST e o relatório
-    assert _abre(html, "</span>Altair</td>").startswith(
-        "Atrasado 05/10/2026 há 4 d · App Altair Supervisora Campo Eletricista Beta Técnico Alfa 3 "
-        "08/2026 venceu há 39 d 1 atrasado 1 perto de vencer 1 em dia")
+    # a linha da usina, a da tabela nova (24/11/2026): a usina com o responsável e a equipe, a quantidade, a última
+    # inspeção, o status e a evolução
+    assert _abre(html, "</span>Altair</span>").startswith(
+        "Altair Supervisora Campo · SP Norte 01 3 05/10/2026 há 4 dias 1 atrasado 1 perto de vencer 1 em dia")
     # o pedaço: só os extintores daquela usina (e do cliente dela), com os filtros da tela e o da faixa
     sub = _pedaco(logado, html, "Altair")
     assert _linhas(sub) == ["ALT100-INFC1-PPCI-EXT01", "ALT100-INFC1-PPCI-EXT02", "ALT100-INFC1-PPCI-EXT03"]
@@ -453,13 +459,14 @@ def test_com_800_extintores_a_pagina_fica_abaixo_de_200_kb(com_livro, logado):
 
 
 def test_sem_ler_os_tecnicos_a_coluna_diz_que_nao_leu(com_cadastro, logado, monkeypatch):
-    """A lista do PCM fora do ar: "não lido", e não "sem técnico" (seria dizer que a usina não tem técnico)."""
+    """A lista do PCM fora do ar: a tela avisa, e nenhuma usina ganha técnico nem "sem técnico" (seria dizer que a usina
+    não tem técnico)."""
     monkeypatch.setattr(ATR, "ler", lambda cfg, forcar=False: {"decisoes": [], "erro": "ConnectionError: x",
                                                                  "lido_em": None})
     visao.limpar()
     html = logado.get("/t/hseq/extintores").get_data(as_text=True)
     assert "Os técnicos de cada usina não foram lidos agora." in html
-    assert "não lido" in _abre(html, "</span>Altair</td>") and "sem técnico" not in html
+    assert 'title="Técnicos:' not in html and "sem técnico" not in html
 
 
 # ── o relatório em PDF (Levi, 09/10, com as observações da TST) ──────────────────────────────────────────────────
@@ -588,7 +595,7 @@ def test_o_pdf_de_cada_cliente_traz_as_usinas_dele(com_livro, logado):
     dele (todas as usinas do cliente, com os filtros da tela)."""
     html = logado.get("/t/hseq/extintores").get_data(as_text=True)
     cab = _texto(html[html.index("<thead>"):html.index("</thead>")])
-    assert cab.endswith("Status")
+    assert cab.endswith("Evolução")
     clientes = _baixar(html, de="cliente")
     assert len(clientes) == 3                                       # Thopen, Outro Cliente e Sem cliente
     th = next(h for h in clientes if "cliente=Thopen" in h)
@@ -828,7 +835,8 @@ def test_a_linha_do_nao_reconhecido_leva_a_tabela_filtrada_na_usina(com_nao_reco
     assert _linhas(tab) == ["ALT100-INFC1-PPCI-EXT02", "ALT100-INFC1-PPCI-EXT01", "ALT100-INFC1-PPCI-EXT03"]
     assert tab.count('<tr class="hs-nr">') == 1
     # no total da usina e no Status, à parte das situações
-    assert "3 08/2026 venceu há 39 d 1 atrasado 1 em dia 1 não reconhecido" in _abre(us, "</span>Altair</td>")
+    alt = _abre(us, "</span>Altair</span>")
+    assert "SP Norte 01 3 " in alt and "1 atrasado 1 em dia 1 não reconhecido" in alt
     assert _linhas(_caixa(us)) == ["ALT100-INFC1-PPCI-EXT02"]
 
 
