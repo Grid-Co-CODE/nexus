@@ -23,6 +23,24 @@
   <div class="em-graf-eixo"><span>{{ dias[0].dia.strftime('%d/%m') }}</span><span>hoje</span></div>
 </div>
 {%- endmacro %}
+{% macro cartao(x) %}
+    <li><a class="em-cartao{% if x.ligado == false %} em-cartao--desligado{% endif %}" href="{{ raiz }}/t/base/emails-automaticos/{{ x.tipo }}">
+      <span class="em-cartao-cab"><b>{{ x.nome }}</b>
+        <span class="em-pills">{% if x.ligado is none %}<span class="mudo">—</span>{% elif x.ligado %}<span class="cn-pill cn-ok">Ligado</span>{% else %}<span class="cn-pill cn-alerta">Desligado</span>{% endif %}{% if x.modo == 'teste' %}<span class="cn-pill em-sit em-sit--info">Teste</span>{% endif %}</span></span>
+      <span class="em-fluxo">
+        <span><i class="ph ph-lightning" aria-hidden="true"></i><span><small>Quando</small>{{ x.gatilho }}</span></span>
+        <i class="ph ph-arrow-right em-fluxo-seta" aria-hidden="true"></i>
+        <span><i class="ph ph-users" aria-hidden="true"></i><span><small>Para</small>{{ x.destino }}</span></span>
+      </span>
+      {% if x.dias %}{{ grafico(x.dias) }}{% else %}<span class="em-graf-sem">{{ 'O Nexus ainda não mandou este e-mail.' if x.nexus else 'O App ainda não publica os envios deste e-mail.' }}</span>{% endif %}
+      <span class="em-cartao-pe">
+        <span class="gc-num">{% if x.enviados is none %}<span class="mudo">—</span>{% else %}{{ x.enviados }} {{ 'enviado' if x.enviados == 1 else 'enviados' }} em {{ dias }} dias{% if x.falhas %} · <b class="ruim">{{ x.falhas }} {{ 'falha' if x.falhas == 1 else 'falhas' }}</b>{% endif %}{% if x.desligados %} · {{ x.desligados }} {{ 'barrado' if x.desligados == 1 else 'barrados' }}{% endif %}{% endif %}</span>
+        <span class="mudo">Último: {{ hora(x.ultimo) }}</span>
+      </span>
+      {%- set partes = [] %}{% if x.criado %}{% set _ = partes.append('criado pela tela') %}{% endif %}{% if x.tipo.startswith('nx_app_') %}{% set _ = partes.append('espera o App de Campo entregar o evento') %}{% endif %}{% if x.regra %}{% set _ = partes.append('regra do Nexus') %}{% elif x.origem %}{% set _ = partes.append('regra: ' ~ x.origem) %}{% endif %}
+      {% if partes or x.pendente or x.critico %}<span class="em-cartao-nota">{% if x.critico %}<span>e-mail de segurança</span>{% endif %}{% for p in partes %}<span>{{ p }}</span>{% endfor %}{% if x.pendente %}<b class="atencao">regra nova a confirmar</b>{% endif %}</span>{% endif %}
+    </a></li>
+{%- endmacro %}
 {% macro legenda() %}
 <ul class="em-legenda" aria-label="Legenda do gráfico">
   <li><i class="em-s em-s--enviado"></i>Enviado</li><li><i class="em-s em-s--teste"></i>Em teste</li>
@@ -49,12 +67,16 @@
           Lista vazia não muda nada.</p>
           <p><b>Como se conta.</b> Enviados e falhas contam envios, não destinatários: um aviso para três pessoas é um
           envio. Os números são dos últimos {{ dias }} dias.</p>
+          <p><b>Do Nexus.</b> Desde 25/11/2026 o próprio Nexus também manda e-mail, pela mesma caixa e com a mesma
+          credencial do App: o de teste, os criados aqui (Novo e-mail: o texto, o que o Nexus já calcula, para quem pelo papel
+          no Registro mestre e a agenda) e, aos poucos, os do App. O e-mail novo nasce desligado: veja a prévia e ligue na
+          Regra. Só o servidor envia.</p>
           <p><b>Como ler o gráfico.</b> Cada coluna é um dia (de Brasília), dos últimos 30 até hoje, com os envios
           empilhados pela situação: enviado, em teste, falha e barrado (o e-mail estava desligado). A altura é a do
           próprio e-mail: o número no alto é o máximo num dia. Passe o mouse num dia para ver as contas.</p>
         {% endcall %}
       </div>
-      <p class="cn-pergunta">{% if t %}{{ t.gatilho }} · Padrão do App: {{ t.destino }}{% else %}Que e-mail o App manda sozinho, para quem, e saiu?{% endif %}</p></div>
+      <p class="cn-pergunta">{% if t %}{{ t.gatilho }} · Padrão {{ 'do Nexus' if t.nexus else 'do App' }}: {{ t.destino }}{% else %}Que e-mail o App manda sozinho, para quem, e saiu?{% endif %}</p></div>
   </div>
 
   {% if aviso %}<div class="cn-erro cn-ok-aviso" role="status">{{ aviso }}</div>{% endif %}
@@ -66,14 +88,40 @@
   {% if t %}
   <p class="em-volta"><a class="cn-link" href="{{ raiz }}/t/base/emails-automaticos"><i class="ph ph-arrow-left" aria-hidden="true"></i> Todos os e-mails</a></p>
   <dl class="em-resumo">
-    <div><dt>No App agora</dt><dd>{% if t.ligado is none %}<span class="mudo">o App ainda não diz</span>{% elif t.ligado %}<span class="cn-pill cn-ok">Ligado</span>{% else %}<span class="cn-pill cn-alerta">Desligado</span>{% endif %}{% if t.modo == 'teste' %} <span class="cn-pill em-sit em-sit--info">Teste</span>{% endif %}{% if t.origem %}<small>regra: {{ t.origem }}</small>{% endif %}</dd></div>
+    <div><dt>{{ 'No Nexus agora' if t.nexus else 'No App agora' }}</dt><dd>{% if t.ligado is none %}<span class="mudo">o App ainda não diz</span>{% elif t.ligado %}<span class="cn-pill cn-ok">Ligado</span>{% else %}<span class="cn-pill cn-alerta">Desligado</span>{% endif %}{% if t.modo == 'teste' %} <span class="cn-pill em-sit em-sit--info">Teste</span>{% endif %}{% if t.origem %}<small>regra: {{ t.origem }}</small>{% endif %}</dd></div>
     <div><dt>Enviados em {{ dias }} dias</dt><dd class="gc-num">{{ t.enviados if t.enviados is not none else '—' }}</dd></div>
     <div><dt>Falhas em {{ dias }} dias</dt><dd class="gc-num{% if t.falhas %} ruim{% endif %}">{{ t.falhas if t.falhas is not none else '—' }}</dd></div>
     <div><dt>Último envio</dt><dd>{{ hora(t.ultimo) }}</dd></div>
   </dl>
 
-  <h2 class="ins-sub">Regra do Nexus</h2>
-  <p class="em-efeito">{% if t.regra %}Vale desde {{ hora(t.regra.alterado_em) }}: <b>{{ efeito(t.regra) }}</b>.{% if t.pendente %} <span class="cn-pill em-sit em-sit--alerta">o App ainda não confirmou</span>{% endif %}{% else %}Sem regra do Nexus: o App segue as configurações dele.{% endif %}</p>
+  {% if t.tipo == 'nx_teste' %}
+  <h2 class="ins-sub">Mandar um teste</h2>
+  <form class="em-form em-form--curto" method="post" action="{{ raiz }}/t/base/emails-automaticos/nx_teste/mandar">
+    <input type="hidden" name="codigo" value="{{ codigo }}">
+    <label class="em-grupo"><span class="gc-rotulo">Para</span>
+      <input class="gc-campo" type="email" name="para" required value="{{ meu_email }}" placeholder="um e-mail da Grid"></label>
+    <div class="em-acoes"><button class="gc-btn gc-btn--primario" type="submit">Mandar o teste</button></div>
+  </form>
+  {% elif modelo %}
+  <h2 class="ins-sub">O e-mail</h2>
+  <dl class="em-modelo">
+    <div><dt>Assunto</dt><dd>{{ modelo.assunto }}</dd></div>
+    <div><dt>Quando</dt><dd>{{ t.gatilho }}</dd></div>
+    <div><dt>Como sai</dt><dd>{{ 'Um por Responsável UFV, com as usinas dele' if modelo.envio == 'por_responsavel' else 'Um e-mail só' }}{% if modelo.pular_vazio %} · quem não tem pendência não recebe{% endif %}</dd></div>
+    <div><dt>Para</dt><dd>{{ t.destino }}</dd></div>
+  </dl>
+  <div class="em-acoes em-acoes--modelo">
+    <a class="gc-btn gc-btn--primario" href="{{ raiz }}/t/base/emails-automaticos/{{ t.tipo }}/previa">Ver a prévia</a>
+    <a class="gc-btn gc-btn--contorno" href="{{ raiz }}/t/base/emails-automaticos/{{ t.tipo }}/editar">Editar</a>
+    <form method="post" action="{{ raiz }}/t/base/emails-automaticos/{{ t.tipo }}/mandar-agora" data-em-confirma="Mandar este e-mail agora, para todos? A regra vale: desligado não sai.">
+      <input type="hidden" name="codigo" value="{{ codigo }}"><button class="gc-btn gc-btn--contorno" type="submit">Mandar agora</button></form>
+    <form method="post" action="{{ raiz }}/t/base/emails-automaticos/{{ t.tipo }}/excluir" data-em-confirma="Excluir este e-mail? Ele não sai mais; o que já saiu continua no registro.">
+      <input type="hidden" name="codigo" value="{{ codigo }}"><button class="gc-btn gc-btn--fantasma" type="submit">Excluir</button></form>
+  </div>
+  {% endif %}
+
+  <h2 class="ins-sub">{{ 'Regra' if t.nexus else 'Regra do Nexus' }}</h2>
+  <p class="em-efeito">{% if t.regra %}Vale desde {{ hora(t.regra.alterado_em) }}: <b>{{ efeito(t.regra, quem) }}</b>.{% if t.pendente and not t.nexus %} <span class="cn-pill em-sit em-sit--alerta">o App ainda não confirmou</span>{% endif %}{% else %}{{ 'Sem regra: vale o destino padrão do e-mail.' if t.nexus else 'Sem regra do Nexus: o App segue as configurações dele.' }}{% endif %}</p>
   {% if erro_form %}<div class="cn-erro" role="alert">{{ erro_form }}</div>{% endif %}
   {% if sem_chave %}<div class="cn-erro" role="alert">Este Nexus não tem a NEXUS_PESSOA_HMAC: a regra iria sem assinatura e o App a descartaria. A edição fica fechada.</div>
   {% else %}
@@ -87,7 +135,7 @@
     <fieldset class="em-grupo"><legend class="gc-rotulo">Modo</legend>
       <label class="gc-chip"><input type="radio" name="modo" value="normal"{% if form.modo != 'teste' %} checked{% endif %}> Normal</label>
       <label class="gc-chip"><input type="radio" name="modo" value="teste"{% if form.modo == 'teste' %} checked{% endif %}> Teste</label>
-      <p class="gc-ajuda" data-em-ajuda-teste>No teste, o e-mail vai só para a lista abaixo, sem cópia e com "[Teste]" no assunto. Sem lista o App manda para todos: a lista é obrigatória.</p>
+      <p class="gc-ajuda" data-em-ajuda-teste>No teste, o e-mail vai só para a lista abaixo, sem cópia e com "[Teste]" no assunto. Sem lista {{ quem }} manda para todos: a lista é obrigatória.</p>
     </fieldset>
     <div class="em-grupo"><span class="gc-rotulo">Destinatários a mais</span>
       <ul class="em-dest" data-em-dest>
@@ -103,7 +151,7 @@
       <p class="gc-ajuda">Pessoas do cadastro e do Fracttal pelo nome; caixa digitada, só e-mail da Grid.</p>
     </div>
     <fieldset class="em-grupo" data-em-substitui><legend class="gc-rotulo">Com a lista, no modo normal</legend>
-      <label class="gc-chip"><input type="radio" name="substitui" value="nao"{% if not form.substitui %} checked{% endif %}> Somar ao padrão do App</label>
+      <label class="gc-chip"><input type="radio" name="substitui" value="nao"{% if not form.substitui %} checked{% endif %}> Somar ao padrão {{ 'do Nexus' if t.nexus else 'do App' }}</label>
       <label class="gc-chip"><input type="radio" name="substitui" value="sim"{% if form.substitui %} checked{% endif %}> Substituir o padrão</label>
     </fieldset>
     <label class="em-grupo"><span class="gc-rotulo">Motivo da mudança</span>
@@ -128,7 +176,7 @@
     <thead><tr><th class="em-esq">Quando</th><th class="em-esq">Quem</th><th class="em-esq">O que mudou</th><th class="em-esq">Motivo</th></tr></thead>
     <tbody>{% for m in mudancas %}
       <tr><td class="em-esq gc-num">{{ hora(m.quando) }}</td><td class="em-esq">{{ m.quem }}</td>
-        <td class="em-esq">{% if not m.vale %}<span class="cn-pill em-sit em-sit--critico">Não vale</span> <span class="mudo">{{ m.porque }}: o App ignora esta linha</span>{% else %}{{ m.mudou|join(' · ') }}{% for e in m.entrou %}<span class="det">entrou {{ por_email.get(e) or e }}</span>{% endfor %}{% for e in m.saiu %}<span class="det">saiu {{ por_email.get(e) or e }}</span>{% endfor %}{% endif %}</td>
+        <td class="em-esq">{% if not m.vale %}<span class="cn-pill em-sit em-sit--critico">Não vale</span> <span class="mudo">{{ m.porque }}: {{ quem }} ignora esta linha</span>{% else %}{{ m.mudou|join(' · ') }}{% for e in m.entrou %}<span class="det">entrou {{ por_email.get(e) or e }}</span>{% endfor %}{% for e in m.saiu %}<span class="det">saiu {{ por_email.get(e) or e }}</span>{% endfor %}{% endif %}</td>
         <td class="em-esq mudo">{{ m.motivo }}</td></tr>
     {% endfor %}</tbody>
   </table></div>
@@ -147,7 +195,7 @@
         <td class="em-esq mudo">{{ e.erro or '' }}</td></tr>
     {% endfor %}</tbody>
   </table></div>
-  {% else %}<p class="cn-vazio">{% if d.fonte == 'todos' or (d.fonte == 'semanal' and t.tipo == 'seguranca_semanal') %}Nenhum envio deste e-mail nos últimos {{ historico_dias }} dias.{% else %}O App ainda não publicou os envios deste e-mail.{% endif %}</p>{% endif %}
+  {% else %}<p class="cn-vazio">{% if t.nexus or d.fonte == 'todos' or (d.fonte == 'semanal' and t.tipo == 'seguranca_semanal') %}Nenhum envio deste e-mail nos últimos {{ historico_dias }} dias.{% elif t.nexus %}O Nexus ainda não mandou este e-mail.{% else %}O App ainda não publicou os envios deste e-mail.{% endif %}</p>{% endif %}
 
   {% else %}
   {% set comnum = d.tipos|selectattr('enviados', 'ne', none)|list %}
@@ -160,26 +208,21 @@
   </div>
   <div class="em-cab-cartoes"><h2 class="ui-kicker">Os e-mails · envios por dia em {{ historico_dias }} dias</h2>{{ legenda() }}</div>
   <ul class="em-cartoes">
-    {% for x in d.tipos %}
-    <li><a class="em-cartao{% if x.ligado == false %} em-cartao--desligado{% endif %}" href="{{ raiz }}/t/base/emails-automaticos/{{ x.tipo }}">
-      <span class="em-cartao-cab"><b>{{ x.nome }}</b>
-        <span class="em-pills">{% if x.ligado is none %}<span class="mudo">—</span>{% elif x.ligado %}<span class="cn-pill cn-ok">Ligado</span>{% else %}<span class="cn-pill cn-alerta">Desligado</span>{% endif %}{% if x.modo == 'teste' %}<span class="cn-pill em-sit em-sit--info">Teste</span>{% endif %}</span></span>
-      <span class="em-fluxo">
-        <span><i class="ph ph-lightning" aria-hidden="true"></i><span><small>Quando</small>{{ x.gatilho }}</span></span>
-        <i class="ph ph-arrow-right em-fluxo-seta" aria-hidden="true"></i>
-        <span><i class="ph ph-users" aria-hidden="true"></i><span><small>Para</small>{{ x.destino }}</span></span>
-      </span>
-      {% if x.dias %}{{ grafico(x.dias) }}{% else %}<span class="em-graf-sem">O App ainda não publica os envios deste e-mail.</span>{% endif %}
-      <span class="em-cartao-pe">
-        <span class="gc-num">{% if x.enviados is none %}<span class="mudo">—</span>{% else %}{{ x.enviados }} {{ 'enviado' if x.enviados == 1 else 'enviados' }} em {{ dias }} dias{% if x.falhas %} · <b class="ruim">{{ x.falhas }} {{ 'falha' if x.falhas == 1 else 'falhas' }}</b>{% endif %}{% if x.desligados %} · {{ x.desligados }} {{ 'barrado' if x.desligados == 1 else 'barrados' }}{% endif %}{% endif %}</span>
-        <span class="mudo">Último: {{ hora(x.ultimo) }}</span>
-      </span>
-      {%- set partes = [] %}{% if x.regra %}{% set _ = partes.append('regra do Nexus') %}{% elif x.origem %}{% set _ = partes.append('regra: ' ~ x.origem) %}{% endif %}
-      {% if partes or x.pendente or x.critico %}<span class="em-cartao-nota">{% if x.critico %}<span>e-mail de segurança</span>{% endif %}{% for p in partes %}<span>{{ p }}</span>{% endfor %}{% if x.pendente %}<b class="atencao">regra nova a confirmar</b>{% endif %}</span>{% endif %}
-    </a></li>
-    {% endfor %}
+    {% for x in d.tipos %}{{ cartao(x) }}{% endfor %}
   </ul>
   <p class="mudo em-pe">"—" é o que o App ainda não diz. Clique num e-mail para ver os envios e mudar a regra.</p>
+
+  <div class="em-cab-cartoes em-cab-nexus"><h2 class="ui-kicker">Do Nexus · os e-mails que o próprio Nexus manda</h2>
+    <a class="gc-btn gc-btn--primario" href="{{ raiz }}/t/base/emails-automaticos/novo"><i class="ph ph-plus" aria-hidden="true"></i> Novo e-mail</a></div>
+  {% set e = nx_estado %}
+  {% if e.prova %}<div class="cn-erro cn-aviso" role="status">Cópia de prova: os e-mails do Nexus viram arquivos nesta máquina, nada sai.</div>
+  {% elif e.faltam %}<div class="cn-erro cn-aviso" role="status"><b>O Nexus ainda não tem como mandar e-mail:</b> falta {{ e.faltam|join(', ') }}. Cole em <a class="cn-link" href="{{ raiz }}/t/base/chaves-fontes">Base › Chaves das fontes</a> (aba Nexus, "E-mail do Nexus"), as mesmas do App de Campo.</div>
+  {% elif not e.nesta %}<div class="cn-erro cn-aviso" role="status">Esta máquina não envia os e-mails do Nexus (só o servidor envia: "E-mail do Nexus: enviar nesta máquina", em Base › Chaves das fontes). A lista mostra o que o servidor registrou.</div>
+  {% else %}<p class="mudo em-estado-envio">O Nexus envia por esta máquina{% if e.fila %} · {{ e.fila }} na fila{% endif %}{% if e.ultima.quando %} · última rodada {{ hora(e.ultima.quando) }}{% endif %}.</p>{% endif %}
+  {% if erro_ctl_nx %}<div class="cn-erro" role="alert">Não li as regras dos e-mails do Nexus agora ({{ erro_ctl_nx }}).</div>{% endif %}
+  <ul class="em-cartoes">
+    {% for x in nx.tipos %}{{ cartao(x) }}{% endfor %}
+  </ul>
   {% endif %}
 </div>
 <style>
@@ -230,6 +273,14 @@
   .em-tip{position:fixed;z-index:60;pointer-events:none;padding:6px 9px;font-size:12px;line-height:16px;color:var(--tinta);
     background:var(--superficie-3);border:1px solid var(--linha-forte);border-radius:var(--raio-tag);white-space:nowrap}
   .ruim{color:var(--critico)}
+  .em-cab-nexus{margin-top:28px}
+  .em-estado-envio{margin:0 0 12px;font-size:12.5px}
+  .em-form--curto{max-width:520px}
+  .em-modelo{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px 18px;margin:8px 0 12px}
+  .em-modelo dt{font-size:12px;color:var(--mudo)}
+  .em-modelo dd{margin:2px 0 0;font-size:13.5px;color:var(--tinta)}
+  .em-acoes--modelo{margin:0 0 18px}
+  .em-acoes--modelo form{margin:0}
   .em-pe{margin:12px 0 0;font-size:12.5px}
   .em-volta{margin:14px 0 0;font-size:13px}
   .em-resumo{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));margin:14px 0 0;border-top:1px solid var(--linha);

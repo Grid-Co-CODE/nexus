@@ -185,7 +185,7 @@ def por_dia(es: list[dict], agora: datetime, dias: int = HISTORICO_DIAS) -> list
 
 
 def montar(tipos: list[dict] | None, todos: list[dict] | None, semanal: list[dict] | None, agora: datetime,
-           regras: dict | None = None) -> dict:
+           regras: dict | None = None, catalogo=CATALOGO, criticos=CRITICOS) -> dict:
     """A lista da tela: {tipos: [{tipo, nome, gatilho, destino, ligado, origem, modo, regra_em, critico, enviados,
     falhas, desligados, ultimo, ultima_situacao, regra, pendente}], fonte, tem_tipos}. `ligado` None = o Nexus ainda não
     sabe (o App não publicou os Tipos). Os números são dos últimos `DIAS` dias, contados por envio; sem o livro dos
@@ -198,8 +198,9 @@ def montar(tipos: list[dict] | None, todos: list[dict] | None, semanal: list[dic
     for e in lista:
         por_tipo.setdefault(e["tipo"], []).append(e)
     do_app = {_t(r.get("Tipo")): r for r in tipos or [] if _t(r.get("Tipo"))}
-    ordem = [c[0] for c in CATALOGO] + [t for t in do_app if t not in {c[0] for c in CATALOGO}]
-    padrao = {c[0]: c for c in CATALOGO}
+    # os e-mails do Nexus (25/11/2026) passam pela mesma conta, com o catálogo vazio: os tipos vêm todos em `tipos`
+    ordem = [c[0] for c in catalogo] + [t for t in do_app if t not in {c[0] for c in catalogo}]
+    padrao = {c[0]: c for c in catalogo}
     regras = regras or {}
     out = []
     for tipo in ordem:
@@ -220,7 +221,7 @@ def montar(tipos: list[dict] | None, todos: list[dict] | None, semanal: list[dic
         out.append({"tipo": tipo, "nome": _t(a.get("Nome")) or c[1], "gatilho": _t(a.get("Gatilho")) or c[2],
                     "destino": _t(a.get("Destino padrão")) or c[3], "ligado": _sim(a.get("Ligado")) if a else None,
                     "origem": _t(a.get("De onde vem a regra")), "modo": _t(a.get("Modo")).lower(),
-                    "regra_em": regra_em, "critico": tipo in CRITICOS, "enviados": env, "falhas": fal,
+                    "regra_em": regra_em, "critico": tipo in criticos, "enviados": env, "falhas": fal,
                     "desligados": des, "ultimo": ult, "ultima_situacao": ultimo["situacao"] if ultimo else "",
                     "regra": rg, "pendente": pendente,
                     # o gráfico de 30 dias só com o livro que conta este tipo (None = o App ainda não diz)

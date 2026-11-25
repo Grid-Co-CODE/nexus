@@ -41,6 +41,13 @@
   document.addEventListener("focusout", esconder);
   window.addEventListener("scroll", esconder, true);
 
+  // o que não se desfaz (mandar agora para todos, excluir um e-mail do Nexus) pede a confirmação do texto do formulário
+  document.addEventListener("submit", function (ev) {
+    var f = ev.target;
+    var txt = f && f.getAttribute && f.getAttribute("data-em-confirma");
+    if (txt && !window.confirm(txt)) ev.preventDefault();
+  });
+
   var form = document.querySelector("[data-em-form]");
   if (!form) return;
   var lista = form.querySelector("[data-em-dest]");

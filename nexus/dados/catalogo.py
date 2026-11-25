@@ -617,6 +617,35 @@ FATOS = (
                     "(AES-256-GCM, chave HKDF sem sal da NEXUS_PESSOA_HMAC, info nexus:email:controle/v1, dado associado "
                     "nexus/email-controle/<tipo>); a linha assinada (HMAC da mesma chave, rótulo nexus:email:controle). "
                     "O motivo vai em claro e a tela recusa e-mail e nome nele"),
+    # os e-mails que o PRÓPRIO Nexus manda (25/11/2026, nexus/emails/; Levi: "a informação do app de campo tem que
+    # chegar para o Nexus e o Nexus passa essa informação para os e-mails")
+    Fato("envio_email_nexus", "Envio de e-mail do Nexus", "base", "nexus_email_envios · fato_envio_email",
+         "1 linha = 1 destinatário de 1 envio (o ID é <quando>|<8 hex>|<n>: o que vem antes do último | é o envio)",
+         _d(data=("cod", "Quando (ISO, UTC)"),
+            pessoa=("hmac", "Destinatário (HMAC): o mesmo código do App e do cadastro (codigo_da_pessoa)")),
+         tipo="sem_medida", chave=("ID",), fontes=("nexus_email_envios · fato_envio_email",),
+         janela_origem="35 dias, do diário da máquina que envia (o servidor)",
+         observacao="quem publica é a fila dos e-mails do Nexus (nexus/emails/registro.py), a cada 5 min quando muda, "
+                    "troca integral; o mesmo desenho do Todos os envios do App (ID, Tipo, Referência, Destinatário "
+                    "(HMAC), Papel, Cópia, Quando, Via, Situação enviado | teste | desligado | falhou, Tentativas, Erro "
+                    "sem e-mail), para a tela de E-mails automáticos ler os dois do mesmo jeito. Nenhum e-mail no livro"),
+    Fato("regra_email_nexus", "Regra dos e-mails do Nexus", "base", "nexus_email_regras · fato_email_regra",
+         "1 linha = 1 mudança da regra de 1 tipo de e-mail do Nexus (o estado inteiro do tipo depois dela); vale, por "
+         "tipo, a válida de alterado_em mais recente",
+         _d(data=("cod", "alterado_em (ISO, UTC, com segundos)"), pessoa=("hmac", "alterado_por (quem mudou)")),
+         tipo="sem_medida", chave=("tipo", "alterado_em"), fontes=("nexus_email_regras · fato_email_regra",),
+         janela_origem="o Nexus é a fonte (só acrescenta)",
+         observacao="o mesmo formato, a mesma cifra e a mesma assinatura do regra_email_app (emails_controle.NEXUS), "
+                    "num livro à parte porque o App descarta linha de tipo que ele não conhece; os tipos são os nx_..."),
+    Fato("modelo_email_nexus", "E-mail criado na tela", "base", "nexus_email_modelos · fato_email_modelo",
+         "1 linha = 1 versão de 1 e-mail criado em Base › E-mails automáticos › Novo e-mail; vale a mais nova de "
+         "cada modelo_id (excluido = sim tira)",
+         _d(data=("cod", "alterado_em (ISO, UTC, com segundos)"), pessoa=("hmac", "alterado_por (quem mudou)")),
+         tipo="sem_medida", chave=("modelo_id", "alterado_em"), fontes=("nexus_email_modelos · fato_email_modelo",),
+         janela_origem="o Nexus é a fonte (só acrescenta)",
+         observacao="o modelo inteiro (nome, assunto, texto, fontes, para quem, agenda) só cifrado (AES-256-GCM, chave "
+                    "HKDF da NEXUS_PESSOA_HMAC, info nexus:email:modelo/v1, dado associado nexus/email-modelo/<id>): o "
+                    "texto livre pode citar alguém e a lista pode ter e-mails. nexus/emails/modelos.py"),
     Fato("decisao", "Decisão do painel", "campo", "decisoes_app_campo · Decisões",
          "1 linha = 1 decisão, tratamento ou devolução",
          _d(data=("cod", "Quando"), usina=("nome", "Usina (só Central de atenção)"), pessoa=("hmac", "3 papéis"),
@@ -2032,6 +2061,17 @@ LIVROS = (
           "registrado em 24/11/2026 antes de existir: nasce com a 1ª regra publicada. A gravação relê o banco antes "
           "(troca o livro inteiro, sob trava) e confere a linha nova pela conta do App",
           so_cresce=True),
+    Livro("nexus_email_regras", ("fato_email_regra",), "a cada mudança da regra de um e-mail do Nexus",
+          "nexus/campo/emails_controle.py (alvo NEXUS), pela tela Base › E-mails automáticos", False,
+          "registrado em 25/11/2026 antes de existir: nasce com a 1ª regra de um e-mail do Nexus (o e-mail criado na "
+          "tela nasce com a regra \"desligado\")", so_cresce=True),
+    Livro("nexus_email_modelos", ("fato_email_modelo",), "a cada e-mail criado, editado ou excluído na tela",
+          "nexus/emails/modelos.py, pela tela Base › E-mails automáticos › Novo e-mail", False,
+          "registrado em 25/11/2026 antes de existir; o modelo vai cifrado", so_cresce=True),
+    Livro("nexus_email_envios", ("fato_envio_email",), "a cada 5 min, quando a fila dos e-mails do Nexus mandou algo",
+          "nexus/emails/registro.py (o laço da fila, só na máquina que envia)", False,
+          "registrado em 25/11/2026 antes de existir: nasce no 1º e-mail que o Nexus mandar. Guarda 35 dias (troca "
+          "integral, encolhe de propósito: não é so_cresce)"),
     # a conferência das ligações (12/11/2026, Levi: "Quero uma análise das relações de dados e se as bases estão sendo
     # lincadas da maneira correta"): o ID gravado existe na dimensão? a chave do fato se repete? Uma vez por dia
     Livro("nexus_conferencia", ("qualidade", "atualizacao"), "1 vez por dia, na volta da carga de hora em hora",

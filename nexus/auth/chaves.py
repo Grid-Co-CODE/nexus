@@ -173,6 +173,47 @@ def _conferir_guid(rotulo: str):
     return conferir
 
 
+def _conferir_email_segredo(valor: str) -> str:
+    """O segredo do registro que envia (25/11/2026, `nexus/emails/envio.py`): pede o token ao Entra ID com o diretório e o
+    ID já gravados, sem mandar e-mail. Recusado pelo Entra ID não grava; sem o diretório e o ID, não há contra o que
+    conferir, e a tela pede para gravá-los antes."""
+    if len(valor) < 20 or any(c.isspace() for c in valor):
+        raise Recusada("O segredo do aplicativo é um texto longo, sem espaço: nada foi gravado.")
+    from ..emails import envio
+    tenant, cliente = valor_ou_vazio("NEXUS_EMAIL_TENANT_ID"), valor_ou_vazio("NEXUS_EMAIL_CLIENT_ID")
+    if not (tenant and cliente):
+        raise Recusada("Grave antes o diretório e o ID do aplicativo do e-mail do Nexus: sem eles não há como conferir "
+                       "o segredo. Nada foi gravado.")
+    try:
+        envio.pedir_token(tenant, cliente, valor)
+    except envio.EnvioErro as ex:
+        raise Recusada(f"O Microsoft 365 recusou o segredo ({ex}): nada foi gravado.") from None
+    return "o Microsoft 365 aceitou o segredo (o Nexus pode pedir licença de enviar)"
+
+
+def _conferir_email_remetente(valor: str) -> str:
+    """A caixa que envia: um e-mail da Grid (o Mail.Send de aplicativo deixaria mandar como qualquer caixa do diretório;
+    fora da Grid o Graph recusaria, e a tela pega o engano antes)."""
+    v = valor.strip().lower()
+    if not re.fullmatch(r"[a-z0-9._%+-]+@gridco\.com(\.br)?", v):
+        raise Recusada("A caixa que envia é um e-mail da Grid (@gridco.com.br), como o MAIL_FROM do App de Campo: nada "
+                       "foi gravado.")
+    return f"os e-mails do Nexus saem de {v}"
+
+
+def _conferir_email_enviar(valor: str) -> str:
+    if valor not in ("1", "0"):
+        raise Recusada("E-mail do Nexus, enviar nesta máquina: use 1 (liga) ou 0 (desliga): nada foi gravado.")
+    return "1: esta máquina envia os e-mails do Nexus" if valor == "1" else "0: esta máquina não envia"
+
+
+def valor_ou_vazio(nome: str) -> str:
+    try:
+        return valor(nome) or ""
+    except Exception:        # noqa: BLE001 — fora de um pedido (sem current_app): sem a chave
+        return ""
+
+
 def _conferir_grava(valor: str) -> str:
     """O NEXUS_EQUIPE_GRAVA (09/11/2026): só "1" (o Mapa de equipe grava nesta máquina) ou "0" (não grava). A tela não
     mostra o valor de nenhuma chave; o aviso de gravar diz qual ficou, e a tela do Mapa de equipe mostra ao administrador
@@ -369,6 +410,50 @@ CHAVES = {
         "dica": "a chave criada em platform.claude.com, em API Keys (começa com sk-ant-)",
         "grupo": "ia",
         "conferir": _conferir_anthropic,
+    },
+    # o envio de e-mail pelo próprio Nexus (25/11/2026, nexus/emails/envio.py; Levi: "a informação do app de campo tem
+    # que chegar para o Nexus e o Nexus passa essa informação para os e-mails"; "É só a gente usar a mesma credencial"):
+    # as mesmas do registro do App de Campo no Entra ID (Mail.Send de aplicativo, consentido em 25/08), coladas aqui
+    # pelo administrador. O segredo trocado no App tem de ser trocado aqui também: a tela de e-mails avisa a recusa
+    "NEXUS_EMAIL_TENANT_ID": {
+        "nome": "E-mail do Nexus: diretório da Grid Co. no Entra ID",
+        "para": "o Nexus mandar e-mail pelo Microsoft 365 (o mesmo diretório do registro do App de Campo)",
+        "arquivo": "",
+        "dica": "o TENANT das variáveis de ambiente do App de Campo (gridco-campo-mw), um GUID de 8-4-4-4-12 caracteres",
+        "conferir": _conferir_guid("Diretório da Grid Co."),
+    },
+    "NEXUS_EMAIL_CLIENT_ID": {
+        "nome": "E-mail do Nexus: ID do aplicativo que envia",
+        "para": "o Nexus mandar e-mail pelo Microsoft 365, com a permissão Mail.Send do registro do App de Campo",
+        "arquivo": "",
+        "dica": "o CLIENT das variáveis de ambiente do App de Campo (gridco-campo-mw), um GUID",
+        "conferir": _conferir_guid("ID do aplicativo"),
+    },
+    "NEXUS_EMAIL_CLIENT_SECRET": {
+        "nome": "E-mail do Nexus: segredo do aplicativo",
+        "para": "o Nexus pedir ao Microsoft 365 a licença de enviar. Ao gravar, o Nexus confere com o diretório e o ID "
+                "acima se o segredo abre, sem mandar e-mail nenhum",
+        "arquivo": "",
+        "dica": "o GRAPH_CLIENT_SECRET das variáveis de ambiente do App de Campo (grave antes o diretório e o ID)",
+        "conferir": _conferir_email_segredo,
+    },
+    "NEXUS_EMAIL_REMETENTE": {
+        "nome": "E-mail do Nexus: caixa que envia",
+        "para": "a caixa de onde os e-mails do Nexus saem (a mesma do App de Campo)",
+        "arquivo": "",
+        "dica": "o MAIL_FROM das variáveis de ambiente do App de Campo (a naoresponda@)",
+        "conferir": _conferir_email_remetente,
+    },
+    # uma máquina só manda (25/11/2026): o Nexus do PC do Levi e o do servidor rodam o mesmo código, e os dois mandariam
+    # cada e-mail duas vezes. Ligado só no servidor, como a gravação do Mapa de equipe
+    "NEXUS_EMAIL_ENVIAR": {
+        "nome": "E-mail do Nexus: enviar nesta máquina",
+        "para": "ligar (1) ou desligar (0) o envio dos e-mails do Nexus NESTA máquina. Uma máquina só (o servidor): o PC e "
+                "o servidor nunca enviam juntos, senão cada e-mail sai duas vezes",
+        "arquivo": "",
+        "dica": "1 para ligar, 0 para desligar; Apagar volta ao .env (sem ele, desligado)",
+        "conferir": _conferir_email_enviar,
+        "escolha": (("1", "1 · esta máquina envia os e-mails do Nexus"), ("0", "0 · não envia")),
     },
     # o OpenRouter (14/11/2026): 3 vagas, na ordem do rodízio; a da tela vence a do .env (nexus/comando/ia.py, `vagas`)
     "OPENROUTER_API_KEY": dict(_VAGA_OPENROUTER, nome="OpenRouter: chave 1 (a primeira a ser usada)",

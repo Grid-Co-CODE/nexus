@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block titulo %}Prévia · {{ m.nome }}{% endblock %}
+{% block conteudo %}
+{% from "_explica.html" import explica %}
+{# A prévia de um e-mail do Nexus (25/11/2026; nexus/torres/base/emails_modelos_tela.py): as mensagens que sairiam
+   agora, uma por vez, com quem recebe pelo nome e o e-mail como chega no Outlook (numa moldura sem script). #}
+<link rel="stylesheet" href="{{ url_for('static', filename='campo.css') }}">
+<div class="campo-nativa em-tela">
+  <div class="cn-cab">
+    <div><p class="gc-eyebrow">Base · E-mails automáticos · Prévia</p>
+      <div class="gc-titulo-explica"><h1 class="cn-titulo">{{ m.nome }}</h1>
+        {% call explica('Entenda a prévia') %}
+          <p><b>O que é.</b> O que sairia se o e-mail fosse mandado agora, com os dados de agora. Nada foi mandado nem gravado.
+          Quem recebe aparece pelo nome do cadastro; o e-mail embaixo é exatamente o que chega.</p>
+          <p><b>Como conferir.</b> Passe pelas mensagens (uma por Responsável UFV, quando ele sai assim) e mande uma para você,
+          para ver no Outlook. Estando certo, volte ao e-mail e ligue na Regra.</p>
+        {% endcall %}
+      </div>
+      <p class="cn-pergunta">{{ msgs|length }} mensagem(ns) sairia(m) agora.</p></div>
+  </div>
+  <p class="em-volta"><a class="cn-link" href="{{ raiz }}/t/base/emails-automaticos/{{ modelo_id }}"><i class="ph ph-arrow-left" aria-hidden="true"></i> Voltar ao e-mail</a></p>
+  {% for a in avisos %}<div class="cn-erro cn-aviso" role="status">{{ a }}</div>{% endfor %}
+  {% if msg %}
+  <div class="em-prev-cab">
+    <nav class="em-prev-nav" aria-label="Mensagens">
+      {% if g > 0 %}<a class="gc-btn gc-btn--contorno" href="?g={{ g - 1 }}">Anterior</a>{% endif %}
+      <span class="gc-num">{{ g + 1 }} de {{ msgs|length }}</span>
+      {% if g + 1 < msgs|length %}<a class="gc-btn gc-btn--contorno" href="?g={{ g + 1 }}">Próxima</a>{% endif %}
+    </nav>
+    <form class="em-prev-mim" method="post" action="{{ raiz }}/t/base/emails-automaticos/{{ modelo_id }}/previa-para-mim">
+      <input type="hidden" name="codigo" value="{{ codigo }}"><input type="hidden" name="g" value="{{ g }}">
+      <input class="gc-campo" type="email" name="para" required value="{{ meu_email }}" aria-label="Mandar a prévia para">
+      <button class="gc-btn gc-btn--primario" type="submit">Mandar esta para mim</button>
+    </form>
+  </div>
+  <dl class="em-prev-quem">
+    <div><dt>Assunto</dt><dd>{{ msg.assunto }}</dd></div>
+    <div><dt>Para</dt><dd>{% for d in msg.para %}<span>{{ por_email.get(d.email) or d.email }}<small>{{ d.papel }}</small></span>{% endfor %}</dd></div>
+    {% if msg.cc %}<div><dt>Em cópia</dt><dd>{% for d in msg.cc %}<span>{{ por_email.get(d.email) or d.email }}<small>{{ d.papel }}</small></span>{% endfor %}</dd></div>{% endif %}
+  </dl>
+  <iframe class="em-prev-email" title="O e-mail como chega" sandbox="" srcdoc="{{ msg.html }}"></iframe>
+  {% else %}
+  <p class="cn-vazio">Nenhuma mensagem sairia agora{% if m.pular_vazio %} (quem não tem pendência não recebe){% endif %}.</p>
+  {% endif %}
+</div>
+<style>
+  /* a prévia (25/11/2026): o e-mail numa moldura branca, como no Outlook (o e-mail é papel branco nos dois temas) */
+  .em-volta{margin:14px 0 0;font-size:13px}
+  .em-prev-cab{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:10px;margin:14px 0 10px}
+  .em-prev-nav{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--tinta-2)}
+  .em-prev-mim{display:flex;flex-wrap:wrap;gap:8px}
+  .em-prev-mim .gc-campo{min-width:0;width:260px;max-width:100%}
+  .em-prev-quem{display:grid;gap:8px;margin:0 0 12px}
+  .em-prev-quem dt{font-size:12px;color:var(--mudo)}
+  .em-prev-quem dd{margin:2px 0 0;display:flex;flex-wrap:wrap;gap:6px 14px;font-size:13.5px;color:var(--tinta)}
+  .em-prev-quem dd span{display:grid}
+  .em-prev-quem small{font-size:11.5px;color:var(--mudo)}
+  .em-prev-email{display:block;width:100%;height:760px;border:1px solid var(--linha);border-radius:var(--raio-md);
+    background:var(--papel)}
+  @media (max-width:640px){
+    .em-prev-email{height:620px}
+  }
+</style>
+{% endblock %}

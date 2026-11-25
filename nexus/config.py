@@ -90,6 +90,10 @@ OPCIONAIS = ("NEXUS_CHAVE_CADASTRO", "NEXUS_ARMAZEM_LOCAL",
              # o controle dos e-mails automáticos do App num arquivo (só na cópia de prova, para publicar a regra pela
              # tela sem gravar no banco; no servidor ela vai ao nexus_email_controle). nexus/campo/emails_controle.py
              "NEXUS_EMAIL_CONTROLE_ARQUIVO",
+             # o envio de e-mail pelo próprio Nexus (25/11/2026, nexus/emails): as chaves também pela tela de Chaves;
+             # a SAIDA_PASTA (cópia de prova) grava o e-mail num arquivo em vez de mandar
+             "NEXUS_EMAIL_TENANT_ID", "NEXUS_EMAIL_CLIENT_ID", "NEXUS_EMAIL_CLIENT_SECRET", "NEXUS_EMAIL_REMETENTE",
+             "NEXUS_EMAIL_SAIDA_PASTA", "NEXUS_EMAIL_ENVIOS_ARQUIVO", "NEXUS_EMAIL_ENVIAR",
              # o caminho em que o Nexus é servido (09/10/2026, "a partir de segunda quero o Nexus como link principal"):
              # /nexus no servidor (app.gridco.com.br/nexus); vazio = a raiz, o PC e a fase 4. Ver nexus/prefixo.py
              "NEXUS_PREFIXO",

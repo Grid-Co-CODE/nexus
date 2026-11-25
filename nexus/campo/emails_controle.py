@@ -51,6 +51,33 @@ _TRAVA = threading.Lock()
 _CACHE: dict = {}
 
 
+class Alvo:
+    """De quem é a regra (25/11/2026): a do App de Campo (o livro do contrato com o App, os 7 tipos dele) ou a dos e-mails
+    que o próprio Nexus manda (livro à parte, os tipos "nx_..." de `nexus/emails/tipos.py`). Mesmo formato, mesma cifra e
+    mesma assinatura: uma conta só para os dois. Livro à parte porque o App descarta (e conta como inválida) a linha de
+    tipo que ele não conhece."""
+
+    def __init__(self, chave: str, livro: str, nome: str, aba: str, tipos, quem: str):
+        self.chave, self.livro, self.nome, self.aba, self._tipos, self.quem = chave, livro, nome, aba, tipos, quem
+
+    def tipos(self) -> tuple:
+        return tuple(self._tipos() if callable(self._tipos) else self._tipos)
+
+
+def _tipos_do_nexus() -> tuple:
+    from ..emails import tipos
+    return tipos.ids()
+
+
+APP = Alvo("app", LIVRO, NOME_LIVRO, ABA, TIPOS, "o App")
+NEXUS = Alvo("nexus", "nexus_email_regras", "Nexus · regras dos e-mails que o Nexus manda", ABA, _tipos_do_nexus,
+             "o Nexus")
+
+
+def alvo_do_tipo(tipo: str) -> Alvo:
+    return NEXUS if str(tipo or "").startswith("nx_") else APP
+
+
 class Recusada(ValueError):
     """Nada foi gravado; o texto diz por quê, para a tela."""
 
@@ -127,12 +154,13 @@ def normalizar_lista(xs) -> list[str]:
     return out
 
 
-def conferir(linha: dict, chave_base: str) -> tuple[bool, str, list[str]]:
+def conferir(linha: dict, chave_base: str, alvo: Alvo | None = None) -> tuple[bool, str, list[str]]:
     """(vale, o motivo de não valer, a lista aberta). As regras do App, na mesma ordem."""
+    alvo = alvo or APP
     tipo, ligado, modo = _txt(linha.get("tipo")), _txt(linha.get("ligado")).lower(), _txt(linha.get("modo")).lower()
     sub, em = _txt(linha.get("substitui_padrao")).lower(), _txt(linha.get("alterado_em"))
-    if tipo not in TIPOS:
-        return False, "tipo que o App não conhece", []
+    if tipo not in alvo.tipos():
+        return False, f"tipo que {alvo.quem} não conhece", []
     if ligado not in ("sim", "não", "nao") or modo not in MODOS or sub not in ("sim", "não", "nao", ""):
         return False, "valor fora do domínio", []
     if not em:
@@ -153,11 +181,11 @@ def regra_da_linha(linha: dict, lista: list[str]) -> dict:
             "alterado_por": _txt(linha.get("alterado_por")), "motivo": _txt(linha.get("motivo"))}
 
 
-def vigentes(linhas: list[dict], chave_base: str) -> dict:
+def vigentes(linhas: list[dict], chave_base: str, alvo: Alvo | None = None) -> dict:
     """{tipo: regra} das que valem, pela régua do App: a válida de `alterado_em` mais recente, no empate a de baixo."""
     melhor = {}
     for ln in linhas:
-        ok, _m, lista = conferir(ln, chave_base)
+        ok, _m, lista = conferir(ln, chave_base, alvo)
         if not ok:
             continue
         r = regra_da_linha(ln, lista)
@@ -166,31 +194,32 @@ def vigentes(linhas: list[dict], chave_base: str) -> dict:
     return melhor
 
 
-def efeito(regra: dict | None) -> str:
-    """O que o App faz com a regra, numa frase (a régua `_email_controle` da v380)."""
+def efeito(regra: dict | None, quem: str = "o App") -> str:
+    """O que quem manda faz com a regra, numa frase (a régua `_email_controle` da v380, a mesma da fila do Nexus)."""
     if not regra:
-        return "segue o App Setting (sem regra do Nexus)"
+        return ("segue o App Setting (sem regra do Nexus)" if quem == "o App"
+                else "segue o destino padrão do e-mail (sem regra)")
     if not regra["ligado"]:
-        return "desligado: o App não manda e registra \"desligado\""
+        return f"desligado: {quem} não manda e registra \"desligado\""
     n = len(regra["destinatarios"])
     if regra["modo"] == "teste" and n:
         return f"teste: só para a lista ({n}), sem cópia, com \"[Teste]\" no assunto"
     if not n:
-        return "ligado, para o destino padrão do App"
+        return "ligado, para o destino padrão" + (" do App" if quem == "o App" else "")
     if regra["substitui"]:
         return f"ligado, só para a lista ({n}), sem cópia"
     return f"ligado, para o destino padrão mais a lista ({n})"
 
 
 # ── o histórico: as próprias linhas ────────────────────────────────────────────────────────────────────────────
-def historico(linhas: list[dict], chave_base: str, tipo: str | None = None) -> list[dict]:
+def historico(linhas: list[dict], chave_base: str, tipo: str | None = None, alvo: Alvo | None = None) -> list[dict]:
     """As mudanças, da mais nova à mais antiga: {quando, tipo, quem_hmac, motivo, vale, porque, regra, mudou: [textos],
     entrou, saiu}. O "de → para" é contra a válida anterior do mesmo tipo (a inválida não muda nada no App)."""
     out, anterior = [], {}
     ordem = sorted(enumerate(linhas), key=lambda t: (_txt(t[1].get("alterado_em")), t[0]))
     for _i, ln in ordem:
         t = _txt(ln.get("tipo"))
-        ok, porque, lista = conferir(ln, chave_base)
+        ok, porque, lista = conferir(ln, chave_base, alvo)
         r = regra_da_linha(ln, lista)
         mudou, entrou, saiu = [], [], []
         if ok:
@@ -222,7 +251,12 @@ def _arquivo_local(cfg) -> Path | None:
     return Path(p) if p else None
 
 
-def _ler_cru(cfg) -> list[dict]:
+def _chave_arquivo(alvo: Alvo) -> str:
+    # o arquivo da cópia de prova guarda os dois: a regra do App na chave de sempre, a do Nexus noutra
+    return alvo.aba if alvo is APP else f"{alvo.chave}:{alvo.aba}"
+
+
+def _ler_cru(cfg, alvo: Alvo | None = None) -> list[dict]:
     """As linhas, lidas agora. Livro que ainda não existe = vazio; erro de leitura sobe, e a listagem que não traz a aba
     do livro que existe também (`livros.abas_conferidas`). Teste sem o arquivo nunca vai à rede."""
     loc = _arquivo_local(cfg)
@@ -231,25 +265,31 @@ def _ler_cru(cfg) -> list[dict]:
             d = json.loads(loc.read_text(encoding="utf-8"))
         except FileNotFoundError:
             d = {}
-        return [dict(x) for x in d.get(ABA) or []]
+        return [dict(x) for x in d.get(_chave_arquivo(alvo or APP)) or []]
     if cfg.get("TESTING"):
         return []
+    alvo = alvo or APP
     from ..dados.conexao import banco_de
     base, sessao = banco_de(cfg)
-    a = livros.abas_conferidas(base, sessao, LIVRO, (ABA,))
+    a = livros.abas_conferidas(base, sessao, alvo.livro, (alvo.aba,))
     return list(livros._linhas(base, sessao, a[ABA])) if ABA in a else []
 
 
-def _gravar_cru(cfg, linhas: list[dict]) -> None:
+def _gravar_cru(cfg, linhas: list[dict], alvo: Alvo | None = None) -> None:
     """Troca o livro inteiro (a API não acrescenta linha) e confere: `livros.publicar` relê e compara a contagem, e o
     catálogo o declara `so_cresce` (a gravação que encolheria é recusada). Na cópia de prova, o arquivo."""
     corpo = [[(None if x.get(c) in ("", None) else x.get(c)) for c in CAB] for x in linhas]
+    alvo = alvo or APP
     loc = _arquivo_local(cfg)
     if loc is not None:
         loc.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            d = json.loads(loc.read_text(encoding="utf-8"))
+        except FileNotFoundError:
+            d = {}
+        d[_chave_arquivo(alvo)] = [dict(zip(CAB, l)) for l in corpo]
         tmp = loc.with_suffix(".tmp")
-        tmp.write_text(json.dumps({ABA: [dict(zip(CAB, l)) for l in corpo]}, ensure_ascii=False, indent=1),
-                       encoding="utf-8")
+        tmp.write_text(json.dumps(d, ensure_ascii=False, indent=1), encoding="utf-8")
         tmp.replace(loc)
         return
     token = cfg.get("GRIDCO_SQL_TOKEN")
@@ -257,18 +297,19 @@ def _gravar_cru(cfg, linhas: list[dict]) -> None:
         raise Recusada("Este Nexus não tem a chave de gravação do banco (GRIDCO_SQL_TOKEN): nada foi gravado.")
     from ..dados.conexao import banco_de
     base, sessao = banco_de(cfg)
-    livros.publicar(LIVRO, NOME_LIVRO, {ABA: (list(CAB), corpo)}, base=base, token=token, sessao=sessao)
+    livros.publicar(alvo.livro, alvo.nome, {alvo.aba: (list(CAB), corpo)}, base=base, token=token, sessao=sessao)
 
 
-def ler(cfg, forcar: bool = False) -> dict:
+def ler(cfg, forcar: bool = False, alvo: Alvo | None = None) -> dict:
     """{"linhas", "erro", "lido_em"}, guardado 1 minuto. Leitura que falha devolve a última boa com o erro; sem nenhuma,
     vazio com o erro (a tela não deixa gravar sem saber o que há no livro)."""
-    chave = str(_arquivo_local(cfg) or "banco")
+    alvo = alvo or APP
+    chave = (str(_arquivo_local(cfg) or "banco"), alvo.chave)
     g = _CACHE.get(chave)
     if g and not forcar and time.time() - g["lido_em"] < TTL_S:
         return g
     try:
-        linhas = _ler_cru(cfg)
+        linhas = _ler_cru(cfg, alvo)
     except Exception as ex:      # noqa: BLE001 — banco fora, rede: a tela diz e não deixa gravar
         erro = f"{type(ex).__name__}"
         return dict(g, erro=erro, velha=True) if g else {"linhas": [], "erro": erro, "lido_em": None}
@@ -344,15 +385,16 @@ def montar_linha(*, tipo: str, ligado: bool, modo: str, destinatarios: list[str]
 
 
 def publicar(cfg, *, tipo: str, ligado: bool, modo: str, destinatarios, substitui: bool, motivo, quem_hmac: str,
-             nomes=(), conhecidos=(), confirmou_critico: bool = False, criticos=()) -> dict:
+             nomes=(), conhecidos=(), confirmou_critico: bool = False, criticos=(), alvo: Alvo | None = None) -> dict:
     """Acrescenta UMA linha (a mudança) e grava o livro. {"linha", "regra", "mudou"}; `Recusada` quando não vale.
     Nada se grava sem a NEXUS_PESSOA_HMAC (o App descartaria a linha), sem ler o livro antes, nem igual à que vale."""
     chave = _base(cfg.get("NEXUS_PESSOA_HMAC"))
     if not chave:
         raise Recusada("Este Nexus não tem a NEXUS_PESSOA_HMAC: a regra iria sem assinatura e o App a descartaria. Nada "
                        "foi gravado.")
-    if tipo not in TIPOS:
-        raise Recusada("Tipo de e-mail que o App não conhece: nada foi gravado.")
+    alvo = alvo or alvo_do_tipo(tipo)
+    if tipo not in alvo.tipos():
+        raise Recusada(f"Tipo de e-mail que {alvo.quem} não conhece: nada foi gravado.")
     modo = str(modo or "").strip().lower()
     if modo not in MODOS:
         raise Recusada("Modo que o App não conhece: nada foi gravado.")
@@ -363,12 +405,12 @@ def publicar(cfg, *, tipo: str, ligado: bool, modo: str, destinatarios, substitu
                        "normal. Nada foi gravado.")
     m = conferir_motivo(motivo, nomes)
     with _TRAVA:
-        est = ler(cfg, forcar=True)
+        est = ler(cfg, forcar=True, alvo=alvo)
         if est["erro"]:
             raise Recusada(f"Não consegui ler o livro do controle agora ({est['erro']}): nada foi gravado, para não "
                            "apagar o que já está lá.")
         linhas = list(est["linhas"])
-        atual = vigentes(linhas, chave).get(tipo)
+        atual = vigentes(linhas, chave, alvo).get(tipo)
         if not ligado and tipo in criticos and not confirmou_critico and (atual is None or atual["ligado"]):
             raise Recusada("Desligar este e-mail pede a confirmação: marque que quem recebe deixa de saber.")
         nova = {"ligado": bool(ligado), "modo": modo, "destinatarios": lista,
@@ -384,9 +426,9 @@ def publicar(cfg, *, tipo: str, ligado: bool, modo: str, destinatarios, substitu
             em = _um_segundo_depois(ultimo if re.fullmatch(r"\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ", ultimo) else em)
         ln = montar_linha(tipo=tipo, ligado=ligado, modo=modo, destinatarios=lista, substitui=nova["substitui"],
                           quem_hmac=quem_hmac, motivo=m, chave_base=chave, alterado_em=em)
-        _gravar_cru(cfg, linhas + [ln])
+        _gravar_cru(cfg, linhas + [ln], alvo)
         limpar()
-        ok, porque, aberta = conferir(ln, chave)
+        ok, porque, aberta = conferir(ln, chave, alvo)
         if not ok or aberta != lista:          # a ida e a volta, na própria máquina: nunca deveria acontecer
             raise Recusada(f"A linha gravada não confere ({porque or 'a lista mudou'}): avise o responsável do Nexus.")
         return {"linha": ln, "regra": regra_da_linha(ln, lista), "mudou": True}

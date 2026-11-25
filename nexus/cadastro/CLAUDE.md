@@ -496,6 +496,11 @@ motivo em claro). O lado do App está no ar desde a v380 (24/11, 12:45). O texto
   linha é conferida pela conta de leitura.
 - **Quem edita: só administrador** (Levi, 25/11/2026: "Só administrador edita a regra"; o gestor não edita).
 
+**Os e-mails que o próprio Nexus manda** (25/11/2026; Levi: "a informação do app de campo tem que chegar para o Nexus e o
+Nexus passa essa informação para os e-mails"): a seção "Do Nexus" da mesma tela, com o teste, os e-mails criados na tela
+(Novo e-mail, a prévia, o "Mandar agora") e os avisos que o App vai entregar ao Nexus. A regra deles mora noutro livro
+(`nexus_email_regras`), no mesmo formato. O caminho inteiro: `nexus/emails/CLAUDE.md`.
+
 **Prova**: `tests/test_base_emails_controle.py` (a linha do Nexus conferida pela conta do App reescrita no teste, sem
 nada do Nexus; a linha do teste do App aberta no Nexus; o empate; as recusas; o histórico; a tela publicando, recusando
 outro site e o teste sem lista, a confirmação do crítico, só administrador; o catálogo) e

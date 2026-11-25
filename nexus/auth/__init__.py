@@ -49,13 +49,15 @@ log = logging.getLogger(__name__)
 # `nexus/pcm/motivos_app.conferir`, `nexus/pcm/inventario/fotos_app.receber`); só elas passam sem login, e só por POST.
 # O Mapa de equipe (08/11/2026, `nexus/torres/campo/equipe_tela.py`): o registro do aparelho vale o ID token da Microsoft
 # conferido pela assinatura; as posições e a revogação, a chave do aparelho.
+# O evento do App de Campo para os e-mails do Nexus (25/11/2026, `nexus/emails/evento_app.py`): vale a assinatura do
+# App, como a marca do técnico.
 # O SSO da zeladoria (12/11/2026, `nexus/sso/api.py`): o site dele fica fora do Nexus e fala com a API pelo passe da
 # Gestão (tirado do login do Nexus no `sso.voltar`, que não é público) ou, sem passe, como o fornecedor, que só envia
 # (a regra do anônimo do RLS do Supabase, com limite por IP); os arquivos abrem só com o link assinado
 ROTAS_PUBLICAS = {"auth.entrar", "casca.saude", "static", "torre_hseq.extintores_foto_receber",
                   "torre_hseq.extintores_info_receber", "torre_pcm.motivo_do_app", "torre_pcm.inventario_foto_receber",
                   "torre_zeladoria.cronograma_api", "torre_campo.equipe_aparelho", "torre_campo.equipe_posicoes",
-                  "torre_campo.equipe_revogar",
+                  "torre_campo.equipe_revogar", "torre_base.emails_evento_app",
                   "sso.preflight", "sso.eu", "sso.ler", "sso.gravar", "sso.progresso", "sso.arquivo_enviar",
                   "sso.funcao_upload", "sso.funcao_assinatura", "sso.arquivo_abrir", "sso.video"}
 
