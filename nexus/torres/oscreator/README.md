@@ -3372,6 +3372,20 @@ dia, "quero que dê para editar o tipo de tarefa também!".
   Inspeção" e a OS 18625 nasceu com o tipo Inspeção, lido de volta; o padrão voltou e a OS foi cancelada. A 1ª gravação
   depois da coluna `tipo_tarefa` regravou o livro com ela, sem recusa.
 
+## A sessão que cai no meio da tela (24/11/2026)
+
+Levi: os supervisores preenchiam a OS, a solicitação ou a OS avulsa e, ao finalizar, "aparece lá o login, para eles fazerem
+o login, eles perdem tudo"; "tem que sempre aparecer um pop-up em cima, ó, faça o login. E aí ele loga, e ele não perde o
+que ele fez". A sessão do Fracttal cai porque o token vence ou por fora (o Fracttal aceita UMA sessão por conta: o site ou
+o celular derrubam a do Nexus). **`static/relogin.js`** (no `base.html`, sem defer, em toda tela menos o login) embrulha o
+`fetch`: o pedido a `/os/...` que volta com o 401 `{"login": true}` (ou desviado ao Entrar do Nexus ou ao `/os/login`) abre
+o pop-up de login da casca do Nexus (`nexus/static/reentrar.js`, a janela de cima; sem ela, o desta página) e espera.
+Entrou: a LEITURA (GET) é refeita e a tela nem fica sabendo; o ENVIO não é refeito (nunca duas OS, a regra do carga.js) e
+a tela recebe, no lugar do erro, "Você entrou de novo. Clique outra vez para enviar: o que você preencheu continua na
+tela." (409, `relogou`). "Agora não": a resposta de antes, como sempre. O `/os/login` responde em JSON ao pop-up, e o
+`/os/api/sessao` confere o "já entrei em outra aba". Sem a palavra `"/os` entre aspas no relogin.js: debaixo do prefixo a
+ponte a reescreveria e a raiz sairia vazia. Prova: `tests/test_reentrar_popup_24_11.py`.
+
 ## Pedir com IA (15/11/2026)
 
 Levi: a pessoa diz "eu quero uma OS de tal coisa, em tal ativo, de tal cliente", e a Nova solicitação já vem preenchida,

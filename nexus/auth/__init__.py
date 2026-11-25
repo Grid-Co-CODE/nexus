@@ -31,7 +31,7 @@ import time
 from collections import defaultdict, deque
 from urllib.parse import urlsplit
 
-from flask import (Blueprint, current_app, jsonify, make_response, redirect, render_template, request, session,
+from flask import (Blueprint, current_app, g, jsonify, make_response, redirect, render_template, request, session,
                    url_for)
 from itsdangerous import URLSafeTimedSerializer
 
@@ -664,15 +664,18 @@ def entrar():
         return _entrar_cliente(destino, ip)
     pelo_fracttal = request.form.get("email") is not None
     if _erros_na_janela(("ip", ip)) >= TETO_POR_IP:
-        return _tela_entrar(erro=TEXTO_IP_TRANCADO, email=(request.form.get("email") or "").strip(),
-                            destino=destino, admin=not pelo_fracttal), 429
+        r = _tela_entrar(erro=TEXTO_IP_TRANCADO, email=(request.form.get("email") or "").strip(),
+                         destino=destino, admin=not pelo_fracttal), 429
+        return _em_json(r) if pelo_fracttal and _pede_json() else r
 
     if pelo_fracttal:
         if microsoft.ligado(current_app.config):
             # a porta é a Microsoft ("só aceitando quem é da grid"): recusa também o POST feito sem a tela, porque o
             # Fracttal tem conta de gente de fora da Grid. Nada vai ao Fracttal, e não conta como senha errada
-            return _tela_entrar(erro=TEXTO_FRACTTAL_FORA, destino=destino), 403
-        return _entrar_fracttal(destino)
+            r = _tela_entrar(erro=TEXTO_FRACTTAL_FORA, destino=destino), 403
+        else:
+            r = _entrar_fracttal(destino)
+        return _em_json(r) if _pede_json() else r
 
     # a senha de administrador: contador próprio, por IP
     chave = ("admin", ip)
@@ -739,12 +742,32 @@ def _entrar_cliente(destino: str, ip: str):
     return _sem_a_sessao_velha_da_raiz(resp)
 
 
+def _pede_json() -> bool:
+    """O pop-up de login (static/reentrar.js, 24/11/2026) entra pelo mesmo Entrar e pede a resposta em JSON."""
+    return "application/json" in (request.headers.get("Accept") or "")
+
+
+def _em_json(resp):
+    """O Entrar pelo Fracttal respondido ao pop-up de login (24/11/2026, Levi: os supervisores preenchiam a OS, a sessão
+    caía, "aparece lá o login [...] eles perdem tudo"; "tem que sempre aparecer um pop-up em cima [...] ele loga, e ele
+    não perde o que ele fez"): {"ok": true} com os MESMOS cookies da entrada de sempre (a sessão do Nexus, a do OS Creator e
+    o navegador conhecido), ou {"ok": false, "erro"} com o mesmo status. As travas e os contadores são os do Entrar: o
+    pop-up não é uma porta a mais."""
+    if isinstance(resp, tuple):
+        return jsonify({"ok": False, "erro": g.get("erro_entrar") or "Não deu para entrar."}), resp[1]
+    out = jsonify({"ok": True})
+    for c in resp.headers.getlist("Set-Cookie"):
+        out.headers.add("Set-Cookie", c)
+    return out
+
+
 def _tela_entrar(**contexto):
     """A página do Entrar. Com a porta única ligada, ela encerra a sessão do passe que estiver aberta na plataforma neste
     navegador (`plataforma_sair`, revisão de 10/10/2026): num PC compartilhado (a sala do NOC), A não clica em Sair, a
     sessão dele no Nexus vence e B entra; a de A na plataforma valia mais 12 h, e todo acesso direto à plataforma
     (favorito, aba aberta) seguia como A, com o e-mail de A no diário. Sem a chave, a página de sempre."""
     cfg = current_app.config
+    g.erro_entrar = contexto.get("erro")            # o pop-up de login lê o erro daqui (`_em_json`)
     return render_template("entrar.html", plataforma_sair=_plataforma_para_sair(), ms=microsoft.ligado(cfg),
                            ms_dominios=", ".join("@" + d for d in microsoft.dominios(cfg)), lembrado=lembrado(),
                            **contexto)

@@ -126,7 +126,8 @@
       .catch(function () { return {ok: false, j: {erro: "Sem conexão com o servidor."}}; })
       .then(function (x) {
         clearInterval(relogio);
-        if (!x.ok || x.j.erro) { fim(); dizer('<span class="sia-erro">' + esc(x.j.erro || "Não deu certo.") + "</span>"); return; }
+        // a sessão caiu e a pessoa entrou de novo pelo pop-up (relogin.js, 24/11/2026): é um aviso, não um erro
+        if (!x.ok || x.j.erro) { fim(); dizer('<span class="' + (x.j.relogou ? "sia-aviso" : "sia-erro") + '">' + esc(x.j.erro || "Não deu certo.") + "</span>"); return; }
         var f = x.j;
         dizer('<span class="sia-pensando">preenchendo a tela<span class="sia-cursor"></span></span>');
         return Promise.resolve(tela.preencher(f)).then(function () {

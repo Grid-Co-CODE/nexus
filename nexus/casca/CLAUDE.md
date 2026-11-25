@@ -1474,6 +1474,14 @@ conferências moram em `nexus/auth/microsoft.py`; a ida, a volta e a sessão, no
 
 ## Regras que já custaram caro
 
+- **A sessão que cai abre o pop-up de login, e a janela não vai mais ao Entrar** (24/11/2026, Levi: os supervisores
+  preenchiam a OS no OS Creator e, ao finalizar, "aparece lá o login [...] eles perdem tudo"; "tem que sempre aparecer um
+  pop-up em cima"). O `nexusEntrarDeNovo` da casca (a conferência de 5 em 5 minutos e ao voltar à aba, e as telas que
+  recebem o 401) chama o `nexusReentrar` (`static/reentrar.js`): e-mail (já preenchido) e senha do Fracttal por cima da
+  tela, pelo Entrar de sempre em JSON (`_em_json`: as mesmas travas e os mesmos cookies, a sessão do OS Creator junto), ou
+  pelo `/os/login` quando só o OS Creator caiu; com a Microsoft ligada, o Entrar numa aba nova e o "já entrei". O de antes
+  ficou em `nexusIrAoEntrar`. O OS Creator pede o mesmo pop-up pela janela de cima (`os_web/static/relogin.js`, README do
+  OS Creator). A TV (Painel NOC, Mapa de equipe) segue indo ao Entrar: não tem o que perder. `tests/test_reentrar_popup_24_11.py`.
 - **Variável da casca com nome próprio** (22/11/2026): um `{% set x = ... %}` no `base.html` passa por cima da variável `x`
   que a view manda à tela. O sino de 21/11 criou `n_fora` (as tarefas do Fora da programação) e Base > Acessos > Pessoas e
   setores perdeu o "(N fora do Fracttal)", que usa o mesmo nome. Virou `n_fora_sino`: o que a casca define leva o nome da
