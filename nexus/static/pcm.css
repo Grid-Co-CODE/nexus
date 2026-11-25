@@ -1166,6 +1166,11 @@ details.pgc-clu--sem{border-style:dashed}
 .tu-tec form{display:inline;margin:0}
 .tu-tec button{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;padding:0;border:0;
   border-radius:50%;background:transparent;color:var(--mudo);cursor:pointer;opacity:.7}
+/* o × de tirar só no passar do mouse ou com o foco (24/11/2026, Levi: "esse X aí, ele só aparecesse quando passasse o mouse
+   por cima. Acho que ele aparecendo toda hora ficou muito feio"); na tela de toque, que não tem o passar do mouse, fica */
+.tu-tec form button{opacity:0;transition:opacity .12s}
+.tu-tec:hover form button, .tu-tec:focus-within form button{opacity:1}
+@media (hover:none){.tu-tec form button{opacity:.7}}
 .tu-tec button:hover{color:var(--critico);background:var(--critico-suave);opacity:1}
 .tu-ev-l{display:block;white-space:nowrap}
 .tu-ev-l .m{color:var(--mudo)}
@@ -1191,6 +1196,43 @@ details.pgc-clu--sem{border-style:dashed}
 .tu-hist li{display:flex;flex-direction:column;gap:2px;padding:10px 0;border-top:1px solid var(--linha);font-size:13px;color:var(--tinta-2)}
 .tu-hist li:first-child{border-top:0}
 .tu-hist-quando{font:600 11.5px/16px var(--font-sans);color:var(--mudo)}
+/* a revisão de 24/11/2026 (Levi): a tabela de cara nova (a usina com o cliente e a equipe embaixo, alinhada à esquerda, sem
+   largura mínima de 1080 px), a linha do técnico que abre a janela das usinas, o Histórico no modelo do Histórico de OS
+   (filtros-os.js) e a Comparação com o App por grupo */
+.tu-nova{min-width:0}
+.tu-nova th,.cn-tab .tu-nova td{text-align:left}
+.tu-nova .tu-tecs{align-items:flex-start}
+.tu-escolhe{cursor:pointer}
+.tu-escolhe:hover td{background:var(--superficie-2)}
+.tu-escolhe-dica{color:var(--verde)}
+.tu-us-form{display:flex;flex-direction:column;gap:8px}
+.tu-us-lista{max-height:48vh;overflow-y:auto;border:1px solid var(--linha);border-radius:var(--raio-md)}
+.tu-us-grupo{margin:0;padding:0 0 6px;border:0;border-top:1px solid var(--linha)}
+.tu-us-grupo:first-child{border-top:0}
+.tu-us-grupo legend{display:block;width:100%;padding:6px 10px;background:var(--superficie-2);font:700 11px/14px var(--font-sans);
+  letter-spacing:.05em;text-transform:uppercase;color:var(--mudo)}
+.tu-us-item{display:flex;align-items:center;gap:8px;padding:5px 10px;font-size:13px;color:var(--tinta);cursor:pointer}
+.tu-us-item:hover{background:var(--superficie-2)}
+.tu-hist-tudo{display:inline-block;margin-top:8px;font-size:12.5px}
+.tu-hist-filtros{margin:6px 0 10px}
+.tu-hf-busca .gc-campo{min-width:240px}
+.tu-hist-resumo{display:flex;gap:12px;align-items:baseline;margin:6px 0;font-size:13px}
+.tu-obs{display:block;margin-top:3px;font-size:12px;color:var(--tinta-2)}
+.tu-app-intro{margin:6px 0 12px;font-size:13px;color:var(--mudo)}
+.tu-app-grupos{display:flex;flex-direction:column;gap:10px}
+.tu-app-g{border:1px solid var(--linha);border-radius:var(--raio-md);background:var(--superficie)}
+.tu-app-g summary{display:flex;align-items:center;gap:14px;padding:12px 14px;cursor:pointer;list-style:none}
+.tu-app-g summary::-webkit-details-marker{display:none}
+.tu-app-g summary .ph{margin-left:auto;color:var(--mudo);transition:transform .15s}
+.tu-app-g[open] summary .ph{transform:rotate(180deg)}
+.tu-app-n{min-width:44px;font:700 22px/1 var(--font-sans);text-align:center}
+.tu-app-g--critico .tu-app-n{color:var(--critico)}
+.tu-app-g--alerta .tu-app-n{color:var(--alerta)}
+.tu-app-g--info .tu-app-n{color:var(--info)}
+.tu-app-g--neutro .tu-app-n{color:var(--mudo)}
+.tu-app-t{display:flex;flex-direction:column;gap:2px;font-size:13px;color:var(--tinta-2)}
+.tu-app-t b{font-size:14px;color:var(--tinta)}
+.tu-app-g .cn-tab{margin:0 14px 12px}
 
 /* ── Almoxarifado (25/10/2026, a prévia aprovada pelo Levi): o saldo de cada peça em cada almoxarifado do Fracttal. A
    faixa de números é a kb-kpis da casa (engenharia.css), com 6 números; a barra do saldo é a parte do mínimo que o

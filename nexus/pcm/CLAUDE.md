@@ -415,13 +415,23 @@ depois tiramos 100% do site de gestão". Desenho: `docs/superpowers/specs/2026-1
   linhas `responsavel` de hora em hora, e o novo põe o certo de volta (a briga de nomes: cerca de 10 linhas por hora
   num livro que só cresce, e o App trocando o nome da usina a cada volta).
 - **A tela** (PCM → Técnicos por usina), no estilo da tela de PT do Campo (Levi, 17/10: "quero que a tabela seja no
-  mesmo estilo de PT e APR"; usa o `campo.css`): os números do topo (usinas, sem técnico, pessoas de campo, apoios,
-  com aviso), as abas Por usina, Por técnico e, com a foto do App, Comparação com o App (outra página: as duas
-  primeiras trocam na própria página só onde a seção delas está; na Comparação o link navega, 18/10/2026, o Levi
-  clicava em Por usina ali e a tela não voltava; `tests/test_pcm_tecnicos_js.py`), os chips das situações (com
-  técnico, sem técnico, com aviso) e a linha que abre o detalhe com o histórico e o "Pôr técnico" (Levi, 17/10, 2ª
-  rodada: a coluna Cliente antes da Usina, sem a Região de campo; os técnicos um embaixo do outro, sem borda; sem o
-  botão "Técnico" na célula). Veem os setores PCM e
+  mesmo estilo de PT e APR"; usa o `campo.css`): as abas Por usina, Por técnico, Histórico e, com a foto do App,
+  Comparação com o App (as duas primeiras trocam na própria página só onde a seção delas está; Histórico e Comparação
+  são outra página e o link navega, 18/10/2026, o Levi clicava em Por usina ali e a tela não voltava;
+  `tests/test_pcm_tecnicos_js.py`), os chips das situações (com técnico, sem técnico, com aviso) e a linha que abre o
+  detalhe (o "Em campo (30 dias)", o "Pôr técnico" e o "Ver no Histórico"). **A revisão de 24/11/2026** (Levi; prova em
+  `tests/test_pcm_tecnicos_revisao_24_11.py`): os números grandes do topo saíram ("os KPIs podem sumir", repetiam os
+  chips); o "lido às" vai no "!"; a tabela com a usina e, embaixo, o cliente e a equipe, sem a coluna Cliente e sem a
+  coluna Em campo ("Não precisa ficar aparecendo toda hora", ficou no detalhe); o X de tirar o técnico só aparece ao
+  passar o mouse (ou no foco do teclado; no toque, meio apagado); **no Por técnico, o clique na linha abre a janela das
+  usinas** (as em operação e as que ele já tem, com busca): o Salvar (`/usinas-do-tecnico`,
+  `tecnicos_usina.pedidos_do_tecnico`) grava num `decidir_varias` só, dentro da trava, as novas como fixo e o tirar das
+  desmarcadas; a que continua marcada não muda (o apoio guarda as datas); usina fora do cadastro recusa tudo. **O
+  Histórico** (`?ver=historico`, `historico_geral`) é TODAS as decisões de todas as usinas, no modelo A do Histórico de
+  OS (`filtros-os.js`: busca, De, Até, ação, cliente, usina, técnico, quem decidiu e origem, em seleção múltipla; os
+  mesmos filtros pelo endereço, no servidor). **A Comparação com o App** vem por grupo (`GRUPOS_APP`: sem código, sem
+  nome do Fracttal, usina que o App não reconhece, pessoa que o App não reconhece, só no App, só no Nexus), cada um com
+  o que fazer e a lista, no lugar da lista única de antes ("é só uma lista gigante"). Veem os setores PCM e
   Responsáveis UFV; põe e tira quem `pode_programar`; a **carga inicial** (só administrador, só com o livro vazio) é a
   regra da equipe do App aplicada ao cadastro do Nexus, só nas usinas EM OPERAÇÃO (cada pessoa de campo recebe as
   usinas em operação com o mesmo `equipe_id`; medido em 17/10: a regra dava 53 de 227 usinas fora de operação). Ao lado de cada usina, sem gravar nada: quem rondou
@@ -436,8 +446,8 @@ depois tiramos 100% do site de gestão". Desenho: `docs/superpowers/specs/2026-1
   lida do FIM (a semana em curso está entre as do arquivo do robô, no fim do fato) e a evidência guardada por 10 min:
   3,3 s fria, 0,02 a 0,06 s quente. Visão por técnico. Sem o
   cadastro do banco, a tela abre com o aviso e nada grava.
-- **O Reenviar tudo ao App** (05/11/2026, quem `pode_programar`, como o Reenviar de uma usina): a faixa âmbar abaixo dos
-  números diz quantas ligações, de quantas usinas, têm o nome do Fracttal ou o código da pessoa mudado; o botão
+- **O Reenviar tudo ao App** (05/11/2026, quem `pode_programar`, como o Reenviar de uma usina): a faixa âmbar acima das
+  abas diz quantas ligações, de quantas usinas, têm o nome do Fracttal ou o código da pessoa mudado; o botão
   confirma e reemite todas num `decidir_varias` só (uma gravação do livro, origem `reemissao`), com as regras de
   sempre (`tecnicos_usina._reemissoes`, a mesma conta do de uma usina: só as que mudaram, só usina do cadastro, e sem o
   nome ou o código de hoje vai o gravado). **A conta é conferida dentro da trava** (revisão de 05/11/2026): os dois
