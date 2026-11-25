@@ -20,6 +20,7 @@ from ..moldura import registrar_molduras
 from .acessos_clientes_tela import registrar_acessos_clientes
 from .emails_tela import registrar_emails
 from .mapa_base_tela import registrar_mapa_base
+from .metas_tela import registrar_metas
 
 TORRE = Torre(
     id="base",
@@ -45,6 +46,14 @@ TORRE = Torre(
              "Que nome a usina tem no Fracttal e no supervisório, e quais cabines, inversores e strings ela tem?",
              "Registro mestre, as Ligações (Fracttal) e o livro nexus_estrutura_usina; a aba Equipamentos só como "
              "referência; só administrador"),
+        # Metas das usinas (protótipo de 25/11/2026; veio da Performance no mesmo dia, Levi: "metas das usinas tem que estar
+        # na parte de base [...] Na performance a gente vai focar na performance em si"): a meta de cada mês de cada usina
+        # do Registro mestre que não é da Thopen, pelo PDF do PVsyst, digitada ou colada do Excel, com o registro das
+        # edições. A view: nexus/torres/base/metas_tela.py; a regra: nexus/performance/metas_pvsyst.py
+        Tela("metas", "Metas das usinas",
+             "Qual a meta de cada mês de cada usina (P50, P90, P75, PR e irradiação), e de onde ela veio?",
+             "Registro mestre; o PDF do PVsyst anexado ou a meta digitada/colada (salva no Nexus, com o registro das "
+             "edições); a Info Mensal do BD_Performance para a usina que ainda não tem"),
         # "Regiões de campo" saiu em 13/11/2026 (Levi: "Exclua a parte de região de campos. Não vamos mais usar."): o
         # endereço /t/base/regioes-campo leva às Equipes (nexus/cadastro/telas.py); o dado das regiões fica no cadastro
         # "Listas" saiu em 11/10/2026 (Levi: "pode tirar listas pois a governança faz mais sentido"): o endereço
@@ -142,6 +151,7 @@ registrar_acessos(bp)
 registrar_chaves(bp)
 registrar_acessos_clientes(bp, TORRE)   # /t/base/acessos-clientes: as contas do Dashboard Thopen (12/11/2026)
 registrar_mapa_base(bp)     # /t/base/mapa-base: a subida do mapa do Brasil do Mapa de equipe (11/11/2026)
+registrar_metas(bp, TORRE)  # /t/base/metas: as metas das usinas pelo PVsyst (25/11/2026, protótipo)
 registrar_emails(bp)        # /t/base/emails-automaticos: os e-mails automáticos do App de Campo (24/11/2026)
 registrar_raio_x(bp)        # /t/base/raio-x: o que o processo faz agora (14/10/2026), só administrador, fora do menu
 # as abas das Chaves das fontes: a página da plataforma, a do Nexus e, desde 13/11/2026, a moldura das Fontes do tempo

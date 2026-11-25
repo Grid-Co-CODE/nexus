@@ -86,7 +86,10 @@ RENOMEADAS = {"performance/relatorio": "relatorios/relatorio",
               "engenharia/etm": "performance/etm",
               # 24/11/2026: o Clima e risco foi para a Usinas 360° (Levi: "clima e risco vai para usinas 360"); o Mapa de
               # risco saiu sem tela nova (o mapa é o do Mapa de equipe, que tem os setores dele)
-              "performance/clima": "campo/clima"}
+              "performance/clima": "campo/clima",
+              # 25/11/2026: as Metas das usinas foram para a Base (Levi: "metas das usinas tem que estar na parte de
+              # base"); o endereço antigo responde 308 (nexus/torres/performance, `metas_mudou`)
+              "performance/metas": "base/metas"}
 # A torre que saiu do menu e só guarda os endereços antigos (nexus/torres/contratos: cada um responde um
 # redirecionamento para a tela nova). O portão deixa passar: sem isto, quem não é administrador recebia a recusa no
 # endereço salvo, em vez de chegar à tela nova, que tem o portão dela.

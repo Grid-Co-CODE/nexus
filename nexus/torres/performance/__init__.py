@@ -64,15 +64,8 @@ TORRE = Torre(
              "Que inversores estão com a potência limitada agora, quanto isso retém e o que vai para o expurgo?",
              "Cadastro do time no banco do Nexus (nexus_limitacao_inversor) + inversores do Fracttal",
              do_setor=SID.PERFORMANCE),
-        # Metas das usinas (protótipo de 25/11/2026; Levi: "a ideia seria a gente anexar esses PVSys e já preencher automático
-        # na meta"): anexa o PDF do PVsyst, digita ou cola do Excel; a meta mês a mês ao lado da Info Mensal de hoje, com
-        # o registro das edições. As rotas em metas_tela.py, a regra em nexus/performance/metas_pvsyst.py. A Thopen manda
-        # a própria meta (no banco) e fica fora da lista
-        Tela("metas", "Metas das usinas",
-             "Qual a meta de cada mês desta usina pelo PVsyst, e quanto ela difere da que está na Info Mensal?",
-             "o PDF do PVsyst que a pessoa anexa, ou a meta digitada/colada; a Info Mensal e a Info Geral do "
-             "BD_Performance, no banco",
-             do_setor=SID.PERFORMANCE),
+        # Metas das usinas saiu daqui para a Base em 25/11/2026, horas depois de nascer (Levi: "metas das usinas tem que
+        # estar na parte de base"): /t/performance/metas responde 308 para /t/base/metas (`metas_mudou`, no fim)
         # O Criador de relatório e o Relatório semanal foram para Relatórios → Central de emissão em 13/10/2026 (Levi:
         # "Sai da parte de Performance!"); os endereços antigos levam para lá (`_relatorio_mudou`, abaixo)
         Tela("gemeo", "Gêmeo digital",
@@ -252,7 +245,6 @@ from . import furos_tela  # noqa: E402,F401
 from . import sala_tela  # noqa: E402,F401
 from . import limitacoes_tela  # noqa: E402,F401
 from . import etm_tela  # noqa: E402,F401
-from . import metas_tela  # noqa: E402,F401
 
 
 # ── Quadro da equipe (04/11/2026) ───────────────────────────────────────────────────────────────────────────────────
@@ -292,3 +284,12 @@ def equipe():
         faltam=d["faltam"], erro=d["erro"], colunas=Q.COLUNAS, erro_eng="",
         hoje=hoje.isoformat(), piso_concluidas=piso, janela=ENG.JANELA_CONCLUIDAS, dias_faixa=ENG.DIAS_FAIXA,
         lido=datetime.fromtimestamp(d["lido"], brt).strftime("%H:%M") if d["lido"] else "—")
+
+
+@bp.route("/metas", defaults={"resto": ""}, methods=("GET", "POST"))
+@bp.route("/metas/<path:resto>", methods=("GET", "POST"))
+def metas_mudou(resto):
+    """O endereço das Metas das usinas na Performance (25/11/2026, de 01:40 até a ida para a Base no mesmo dia): 308 para
+    o mesmo caminho em /t/base/metas (308 para um POST de aba aberta chegar como POST)."""
+    consulta = request.query_string.decode("latin-1")
+    return redirect(na_raiz("/t/base/metas" + ("/" + resto if resto else "")) + ("?" + consulta if consulta else ""), 308)

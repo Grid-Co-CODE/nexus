@@ -119,28 +119,11 @@ outros: o cálculo na nota do contrato e o cruzamento com a planilha de tickets)
 - Sem banco, a tela abre e diz o que faltou. Prova: `tests/test_campo_limitacoes_19_11.py` (banco de mentira). Bancada
   local com dado de mentira: `limitacoes_bancada.py` no scratchpad da conversa (porta 5107).
 
-## Metas das usinas (protótipo de 25/11/2026; `metas_tela.py`, `nexus/performance/metas_pvsyst.py`, `performance/metas.html`)
+## Metas das usinas: foi para a Base (25/11/2026)
 
-Levi, 24/11/2026: "É por eles [os PVsyst] que a gente preenche as metas [...] das usinas que não são da Thopen [...] a
-ideia seria a gente anexar esses PVSys e já preencher automático na meta"; e, vendo o protótipo (25/11): editar com o
-registro das edições, entrada manual, "que nem no Excel, a pessoa pegar e colar", e "todas as colunas [...] centralizadas,
-horizontal e verticalmente".
-
-- **De onde vem**: o PDF do PVsyst (pypdf), a tabela "Balances and main results" e o resumo P50/P70/P90. Energia em kWh ou
-  MWh (Iramaia II vem em kWh, Gravatá em MWh): tudo vira kWh. Conferências: soma dos 12 meses = linha do ano = P50 do resumo.
-- **A conta** (o formato da aba Info Mensal): P50 = E_Grid; P90 = P50 × (P90 ÷ P50 do ano); P75 = P50 − (P50 − P90) ×
-  0,6745 ÷ 1,2816; PR do mês; IPOA = GlobInc; GHI = GlobHor. Ano 1 do PVsyst, sem degradação. Sem P90 no relatório, P90 e
-  P75 ficam vazios (não se inventa).
-- **A grade**: 12 meses × 6 campos, cada célula um campo de texto (pt-BR, PR em %). Colar com tabulação/quebra espalha para
-  a direita e para baixo a partir da célula; texto que não é número fica como estava e é dito. Célula editada ganha borda
-  (contra o que se abriu). Embaixo, em cinza, a meta de hoje da Info Mensal (meta, NÃO o realizado), com a diferença acima
-  de 2%. A Info Mensal e a Info Geral são lidas uma vez e guardadas 10 min (`meta_atual`).
-- **Salvar**: o P50 é obrigatório nos 12 meses; kWp do PVsyst > 5% diferente do da Info Geral pede confirmação. Cada Salvar
-  entra no registro: quem, quando, origem ("PVsyst", "PVsyst editado", "manual") e cada valor de quanto para quanto.
-- **Onde fica**: `<pasta de dados>/metas_pvsyst/metas.json` + `pdf/<sha>.pdf`, uma meta por usina. NÃO é livro do banco
-  (livro é para sempre: o formato espera a validação), e a Sala de controle e o Gerencial seguem com a Info Mensal até lá.
-- **Fora**: usinas da Thopen (a Thopen manda a própria meta no banco).
-- Prova: `tests/test_performance_metas_pvsyst_25_11.py` (relatório inventado; o texto do PDF é dublado na rota).
+Nasceu aqui às 01:40 de 25/11/2026 e foi para a Base no mesmo dia (Levi: "metas das usinas tem que estar na parte de
+base [...] Na performance a gente vai focar na performance em si"). `/t/performance/metas...` responde 308 para
+`/t/base/metas...` (`metas_mudou`, no fim do `__init__`). A seção mora em `nexus/cadastro/CLAUDE.md`.
 
 ## ETMs (24/11/2026, vieram da Engenharia; a tela é de 26/10/2026)
 

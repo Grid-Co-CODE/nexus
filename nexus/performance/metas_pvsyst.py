@@ -18,7 +18,8 @@ O que este módulo faz, sem rede e sem gravar no banco:
   colar"): 12 linhas, o P50 obrigatório, o PR em % vira fração; o que mudou, valor a valor;
 - `guardar`/`salvas`: o protótipo guarda na pasta de dados do Nexus (o PDF, o que se leu, a meta e o registro de cada
   Salvar: quem, quando, de onde — "PVsyst", "PVsyst editado" ou "manual" — e cada valor de quanto para quanto), NÃO num
-  livro do banco (livro é para sempre: o formato fica para depois da validação). Uma meta por usina. A Sala e o
+  livro do banco (livro é para sempre: o formato fica para depois da validação). Uma meta por usina do Registro
+  mestre e ano (a tela mora na Base, `nexus/torres/base/metas_tela.py`). A Sala e o
   Gerencial seguem com a Info Mensal até lá;
 - `meta_atual`/`meta_de_hoje`: a meta que a Info Mensal tem hoje, só para comparar na tela (é meta, não o realizado),
   lida uma vez e guardada 10 min.
@@ -202,7 +203,7 @@ def meta_do_pvsyst(lido: dict) -> list[dict]:
 
 # ── a usina: sugestão pelo nome do projeto e do arquivo ───────────────────────────────────────────────────────────────
 def sugerir_usina(lido: dict, nome_arquivo: str, usinas: list[str]) -> tuple[str, float]:
-    """A usina da meta (os nomes da Info Mensal) mais parecida com o projeto e o nome do arquivo, e a nota (0 a 1).
+    """A usina da meta (os nomes do Registro mestre) mais parecida com o projeto e o nome do arquivo, e a nota (0 a 1).
     Abaixo de 0,6 a tela não escolhe: a pessoa escolhe."""
     def limpo(s):
         return re.sub(r"\b(ufv|usina|anexo|vi|pvsyst|pdf)\b", " ", norm(s)).strip()
@@ -252,14 +253,26 @@ def _arquivo_salvas(raiz) -> str:
     return os.path.join(_pasta(raiz), "metas.json")
 
 
+def chave_meta(usina_id, ano) -> str:
+    """A chave da meta salva: a usina do Registro mestre (o id) e o ano ("12|2027")."""
+    return f"{usina_id}|{int(ano or 0)}"
+
+
 def salvas(raiz) -> dict:
-    """{usina: {...}} das metas salvas pelo PVsyst (a última de cada usina vale; as anteriores ficam no histórico)."""
+    """{"<usina_id>|<ano>": {...}}: a meta salva de cada usina do Registro mestre, por ano (a última vale; o que mudou
+    fica em `edicoes`). O 1º formato (25/11/2026, 01:40 a ~10h, por nome da Info Mensal e sem o id) é lido com o nome no
+    lugar do id: aparece na lista, sem o Abrir, e nada dele se perde no próximo Salvar."""
     try:
         with open(_arquivo_salvas(raiz), encoding="utf-8") as f:
             d = json.load(f)
-        return d if isinstance(d, dict) else {}
     except (OSError, ValueError):
         return {}
+    if not isinstance(d, dict):
+        return {}
+    if d.get("versao") == 2:
+        return d.get("metas") or {}
+    return {chave_meta(v["usina"], v.get("ano")): dict(v, usina_id="") for v in d.values()
+            if isinstance(v, dict) and v.get("usina")}
 
 
 CAMPOS = ("p50_mwh", "p90_mwh", "p75_mwh", "pr", "ipoa_kwh_m2", "ghi_kwh_m2")
@@ -319,35 +332,40 @@ def descrever(m: dict) -> str:
     return f"{_MES_CURTO[m['mes']] if 1 <= (m.get('mes') or 0) <= 12 else m.get('mes')} · {nome} {f(m.get('de'))} → {f(m.get('para'))}"
 
 
-def guardar(raiz, usina: str, ano: int, meta: list[dict], quem: str, *, sha: str = "", nome_arquivo: str = "",
-            lido: dict | None = None) -> dict:
-    """Salva a meta da usina. Cada Salvar vira uma entrada no registro das edições (quem, quando, de onde e o que mudou
-    contra a meta salva antes; na 1ª vez, contra o PVsyst). A origem: "PVsyst", "PVsyst editado" ou "manual"."""
+def guardar(raiz, usina_id: str, usina: str, ano: int, meta: list[dict], quem: str, *, sha: str = "",
+            nome_arquivo: str = "", lido: dict | None = None, antes: list[dict] | None = None) -> dict:
+    """Salva a meta da usina no ano. Cada Salvar vira uma entrada no registro das edições: quem, quando, de onde e o que
+    mudou contra a meta salva antes; na 1ª vez, contra a meta que a tela mostrava (`antes`: a da Info Mensal) ou, sem ela,
+    contra o PVsyst. A origem: "PVsyst", "PVsyst editado", "Info Mensal" (a da aba, salva sem mexer) ou "manual"."""
     d = salvas(raiz)
-    anterior = d.get(usina) or {}
+    k = chave_meta(usina_id, ano)
+    anterior = d.get(k) or {}
     do_pvsyst = meta_do_pvsyst(lido) if lido else (anterior.get("meta_pvsyst") if sha and sha == anterior.get("sha") else None)
-    base = anterior.get("meta") or do_pvsyst
-    feitas = mudancas(base, meta)
+    tem_antes = bool(antes) and any(x.get("p50_mwh") is not None for x in antes)
+    feitas = mudancas(anterior.get("meta") or (antes if tem_antes else None) or do_pvsyst, meta)
     if do_pvsyst:
         origem = "PVsyst" if not mudancas(do_pvsyst, meta) else "PVsyst editado"
+    elif anterior.get("origem") == "Info Mensal" and not feitas or not anterior and tem_antes and not feitas:
+        origem = "Info Mensal"
     else:
         origem = "manual"
     agora = datetime.now(_BRT).strftime("%d/%m/%Y %H:%M")
     reg = dict(anterior)
-    reg.update({"usina": usina, "ano": ano, "meta": meta, "origem": origem, "salvo_em": agora, "salvo_por": quem})
+    reg.update({"usina_id": usina_id, "usina": usina, "ano": int(ano), "meta": meta, "origem": origem, "salvo_em": agora,
+                "salvo_por": quem})
     if lido:
         reg.update({"sha": sha, "arquivo": nome_arquivo, "projeto": lido.get("projeto"), "kwp": lido.get("kwp"),
                     "versao": lido.get("versao"), "simulado_em": lido.get("simulado_em"), "pr_ano": lido.get("pr_ano"),
                     "energia_ano_kwh": lido.get("energia_ano_kwh"), "meta_pvsyst": do_pvsyst})
     elif not do_pvsyst:
-        for k in ("sha", "arquivo", "projeto", "kwp", "versao", "simulado_em", "pr_ano", "energia_ano_kwh", "meta_pvsyst"):
-            reg.pop(k, None)
-    reg["edicoes"] = (anterior.get("edicoes") or []) + [{"quando": agora, "quem": quem, "origem": origem, "ano": ano,
+        for c in ("sha", "arquivo", "projeto", "kwp", "versao", "simulado_em", "pr_ano", "energia_ano_kwh", "meta_pvsyst"):
+            reg.pop(c, None)
+    reg["edicoes"] = (anterior.get("edicoes") or []) + [{"quando": agora, "quem": quem, "origem": origem, "ano": int(ano),
                                                          "arquivo": nome_arquivo if lido else "", "mudancas": feitas}]
-    d[usina] = reg
+    d[k] = reg
     caminho = _arquivo_salvas(raiz)
     with open(caminho + ".tmp", "w", encoding="utf-8") as f:
-        json.dump(d, f, ensure_ascii=False, indent=1)
+        json.dump({"versao": 2, "metas": d}, f, ensure_ascii=False, indent=1)
     os.replace(caminho + ".tmp", caminho)
     return reg
 
@@ -358,36 +376,46 @@ TTL_META_S = 600
 
 
 def meta_atual(base, sessao) -> dict:
-    """{"mensal": {usina: {"AAAA-MM": linha}}, "geral": {usina: {kwp, cliente}}, "usinas": [não Thopen], "erro"} da Info
-    Mensal e da Info Geral do banco, guardado 10 min. A Thopen fica fora da lista: ela manda a própria meta."""
+    """{"mensal": {nome da Usina: {"AAAA-MM": linha}}, "lido_em", "erro"} da aba Info Mensal do banco, guardado 10 min."""
     c = _CACHE.get("meta")
     if c and time.time() - c["lido_em"] < TTL_META_S:
         return c
     from ..dados import livros
     try:
         a = livros.abas(base, sessao, "bd_performance")
-        mensal, geral = {}, {}
+        mensal = {}
         for x in livros._linhas(base, sessao, a["Info Mensal"]) if "Info Mensal" in a else []:
             u, mes = str(x.get("Usina") or "").strip(), str(x.get("Mês") or "")[:7]
             if u and re.fullmatch(r"\d{4}-\d{2}", mes):
                 mensal.setdefault(u, {})[mes] = x
-        for x in livros._linhas(base, sessao, a["Info Geral"]) if "Info Geral" in a else []:
-            u = str(x.get("Usina") or "").strip()
-            if not u:
-                continue
-            kwp = next((_num(v) for k, v in x.items() if "potenc" in norm(k) and "kwp" in norm(k) and _num(v)), None)
-            geral[u] = {"kwp": kwp, "cliente": str(x.get("Cliente") or "").strip()}
-        def cliente(u):
-            return (geral.get(u) or {}).get("cliente") or next((str(r.get("Cliente") or "") for r in mensal.get(u, {}).values()), "")
-        usinas = sorted((u for u in set(mensal) | set(geral) if "thopen" not in norm(cliente(u))), key=norm)
-        c = {"mensal": mensal, "geral": geral, "usinas": usinas, "clientes": {u: cliente(u) for u in usinas},
-             "lido_em": time.time(), "erro": ""}
-    except Exception as ex:      # noqa: BLE001 — sem a meta de hoje, a tela compara com nada e diz
+        c = {"mensal": mensal, "lido_em": time.time(), "erro": ""}
+    except Exception as ex:      # noqa: BLE001 — sem a meta de hoje, a tela segue com a salva no Nexus e diz
         erro = f"{type(ex).__name__}: {str(ex)[:160]}"
-        return dict(c, erro=erro) if c else {"mensal": {}, "geral": {}, "usinas": [], "clientes": {}, "lido_em": None,
-                                            "erro": erro}
+        return dict(c, erro=erro) if c else {"mensal": {}, "lido_em": None, "erro": erro}
     _CACHE["meta"] = c
     return c
+
+
+_ROMANOS = {"i": "1", "ii": "2", "iii": "3", "iv": "4", "v": "5", "vi": "6"}
+
+
+def chave_nome(s) -> str:
+    """O nome para casar a usina do Registro mestre com a linha da Info Mensal: sem acento, caixa e pontuação, e o romano
+    como número ("Gravatá II" = "Gravata 2", "Ibirapuã I" = "Ibirapua 1")."""
+    return " ".join(_ROMANOS.get(p, p) for p in norm(s).split())
+
+
+def linha_da_info_mensal(nome: str, exibicoes, mensal: dict) -> str:
+    """O nome da Usina na Info Mensal para uma usina do Registro mestre: o mesmo nome (`chave_nome`) ou, sem ele, o nome
+    que a usina tem em Base > Equipamentos (a "Usina" das chaves dela, `nexus_estrutura_usina`), se for um só. "" = a
+    Info Mensal não tem a usina. Medido em 25/11/2026: das 164 usinas que não são da Thopen, 23 casam pelo nome e 27
+    pelos Equipamentos (Ibirapuã 1 = "Ibirapuã I", Matões 100 = "MTS100"); as outras não têm meta na aba."""
+    k = chave_nome(nome)
+    for u in sorted(mensal):
+        if chave_nome(u) == k:
+            return u
+    ex = sorted({e for e in (exibicoes or ()) if e in mensal})
+    return ex[0] if len(ex) == 1 else ""
 
 
 def meta_de_hoje(mensal_usina: dict, ano: int) -> list[dict]:

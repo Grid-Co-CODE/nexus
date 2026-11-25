@@ -99,28 +99,46 @@ def test_a_meta_editavel_valida_os_12_meses_e_o_pr_em_porcento():
 
 def test_guardar_registra_cada_edicao_e_a_origem(tmp_path):
     """Cada Salvar fica no registro: quem, de onde, e cada valor de quanto para quanto. A origem é "PVsyst" enquanto a
-    meta é a do PDF, "PVsyst editado" quando se mexeu nela, "manual" sem PDF."""
+    meta é a do PDF, "PVsyst editado" quando se mexeu nela, "Info Mensal" salva sem mexer, "manual" no resto. A chave é
+    a usina do Registro mestre (o id) e o ano."""
     l = M.ler_texto(relatorio())
     sha = M.guardar_pdf(tmp_path, b"%PDF-1.4 teste")
     assert M.ler_pdf_guardado(tmp_path, sha) == b"%PDF-1.4 teste" and M.ler_pdf_guardado(tmp_path, "../x") is None
     pv = M.meta_do_pvsyst(l)
-    r = M.guardar(tmp_path, "Teste Solar II", 2027, pv, "Analista", sha=sha, nome_arquivo="a.pdf", lido=l)
+    r = M.guardar(tmp_path, "7", "Teste Solar II", 2027, pv, "Analista", sha=sha, nome_arquivo="a.pdf", lido=l)
     assert r["origem"] == "PVsyst" and r["edicoes"][0]["mudancas"] == [] and r["arquivo"] == "a.pdf"
     editada = [dict(x) for x in pv]
     editada[0]["p50_mwh"] = 0.2
-    r = M.guardar(tmp_path, "Teste Solar II", 2027, editada, "Analista", sha=sha)      # o mesmo PDF, sem reler
+    r = M.guardar(tmp_path, "7", "Teste Solar II", 2027, editada, "Analista", sha=sha)      # o mesmo PDF, sem reler
     assert r["origem"] == "PVsyst editado" and len(r["edicoes"]) == 2
     assert r["edicoes"][1]["mudancas"] == [{"mes": 1, "campo": "p50_mwh", "de": 0.1, "para": 0.2}]
     assert M.descrever({"mes": 3, "campo": "p50_mwh", "de": 576.23, "para": 1700.5}) == "mar · P50 576,2 → 1.700,5"
     assert M.descrever({"mes": 1, "campo": "pr", "de": 0.727, "para": None}) == "jan · PR 72,7% → vazio"
-    manual = M.validar_meta([{"p50_mwh": 50} for _ in range(12)])
-    r = M.guardar(tmp_path, "Outra", 2027, manual, "Analista")
-    assert r["origem"] == "manual" and "sha" not in r and len(r["edicoes"][0]["mudancas"]) == 12
-    assert sorted(M.salvas(tmp_path)) == ["Outra", "Teste Solar II"]
+    info = M.validar_meta([{"p50_mwh": 50, "pr": 0.8} for _ in range(12)])
+    r = M.guardar(tmp_path, "8", "Outra", 2027, info, "Analista", antes=info)           # a da Info Mensal, sem mexer
+    assert r["origem"] == "Info Mensal" and r["edicoes"][0]["mudancas"] == [] and "sha" not in r
+    outra = [dict(x) for x in info]
+    outra[5]["pr"] = 0.81
+    r = M.guardar(tmp_path, "8", "Outra", 2026, outra, "Analista", antes=info)          # outro ano: outra meta
+    assert r["origem"] == "manual" and r["edicoes"][0]["mudancas"] == [{"mes": 6, "campo": "pr", "de": 0.8, "para": 0.81}]
+    assert sorted(M.salvas(tmp_path)) == ["7|2027", "8|2026", "8|2027"]
 
 
-def test_a_meta_de_hoje_da_info_mensal_para_comparar():
-    """É a meta que está na aba Info Mensal (meta, não o realizado); o PR em % vira fração como o do PVsyst."""
+def test_o_formato_de_antes_continua_lido(tmp_path):
+    """As poucas horas do 1º formato (por nome, sem o id): a meta aparece na lista e não se perde no próximo Salvar."""
+    import json
+    pasta = tmp_path / "metas_pvsyst"
+    pasta.mkdir()
+    (pasta / "metas.json").write_text(json.dumps({"Iramaia II": {"usina": "Iramaia II", "ano": 2027, "meta": []}}),
+                                      encoding="utf-8")
+    assert M.salvas(tmp_path)["Iramaia II|2027"]["usina_id"] == ""
+    M.guardar(tmp_path, "9", "Nova", 2027, M.validar_meta([{"p50_mwh": 1} for _ in range(12)]), "Analista")
+    assert sorted(M.salvas(tmp_path)) == ["9|2027", "Iramaia II|2027"]
+
+
+def test_a_meta_de_hoje_da_info_mensal_e_o_casamento_com_o_registro_mestre():
+    """É a meta que está na aba Info Mensal (meta, não o realizado); o PR em % vira fração como o do PVsyst. A usina do
+    Registro mestre acha a linha dela pelo nome (romano = número) ou pelo nome dela em Base > Equipamentos."""
     hoje = {"2027-01": {"P50 (MWh)": 0.12, "P90": 0.1, "PR Previsto 1° Ano (%)": 0.82, "IPOA Previsto": 190,
                         "GHI Previsto": 150},
             "2027-02": {"P50 (MWh)": "0,11", "PR Previsto 1° Ano (%)": 81.5}}
@@ -129,45 +147,113 @@ def test_a_meta_de_hoje_da_info_mensal_para_comparar():
                     "ghi_kwh_m2": 150.0}
     assert c[1]["p50_mwh"] == 0.11 and c[1]["pr"] == pytest.approx(0.815) and c[2]["p50_mwh"] is None
     assert len(c) == 12
+    mensal = {"Gravatá II": {}, "Ibirapuã I": {}, "MTS100": {}, "Sete Lagoas": {}}
+    assert M.linha_da_info_mensal("Gravata 2", None, mensal) == "Gravatá II"
+    assert M.linha_da_info_mensal("Ibirapuã 1", {"Ibirapuã I"}, mensal) == "Ibirapuã I"
+    assert M.linha_da_info_mensal("Matões 100", {"MTS100"}, mensal) == "MTS100"
+    assert M.linha_da_info_mensal("Matões 100", {"MTS100", "Sete Lagoas"}, mensal) == ""      # duas: não escolhe
+    assert M.linha_da_info_mensal("Sem Meta", None, mensal) == ""
 
 
-def test_a_tela_le_o_pdf_edita_e_salva_na_pasta_de_dados(app, logado, tmp_path, monkeypatch):
-    """O caminho da tela sem banco (a meta de hoje fica vazia, com o erro) e com o texto do PDF dublado."""
-    app.config["NEXUS_DADOS"] = str(tmp_path)
+# ── a tela, na Base, com o Registro mestre e a Info Mensal de mentira ───────────────────────────────────────────────
+INFO = [{"Usina": "Teste Solar II", "Cliente": "Aurora", "Mês": f"2027-{m:02d}-01", "P50 (MWh)": 0.12, "P90": 0.1,
+         "P75": 0.11, "PR Previsto 1° Ano (%)": 0.82, "IPOA Previsto": 190, "GHI Previsto": 150} for m in range(1, 13)]
+H = {"Sec-Fetch-Site": "same-origin"}
+
+
+@pytest.fixture
+def cli_metas(tmp_path, monkeypatch):
+    from pg_falso import ApiPGFalsa
+    from test_campo_visao import _aba
+    from conftest import SENHA_TESTE
+    from nexus import create_app
+    from nexus.cadastro.cifra import gerar_chave
+    from nexus.cadastro.servico import Carga
+    M._CACHE.clear()
+    api = ApiPGFalsa()
+    _aba(api, "bd_performance", "Info Mensal", INFO)
+    app = create_app({"NEXUS_SECRET_KEY": "chave-de-teste", "NEXUS_SENHA_ADMIN": SENHA_TESTE,
+                      "NEXUS_CHAVE_CADASTRO": gerar_chave(), "NEXUS_ARMAZEM_LOCAL": str(tmp_path / "cadastro.json"),
+                      "NEXUS_DADOS": str(tmp_path / "dados")})
+    app.config.update({"TESTING": True, "SESSION_COOKIE_SECURE": False, "GRIDCO_DB_API": "http://pg.falso",
+                       "GRIDCO_SQL_TOKEN": "token-de-teste"})
+    app.extensions["nexus_dados_sessao"] = api
     monkeypatch.setattr(M, "texto_do_pdf", lambda dados: relatorio())
-    h = {"Sec-Fetch-Site": "same-origin"}
-    assert "Metas das usinas" in logado.get("/t/performance/metas").get_data(as_text=True)
-    j = logado.post("/t/performance/metas/ler", data={"arquivo": (io.BytesIO(b"%PDF-1.4 x"), "teste.pdf")},
-                    content_type="multipart/form-data", headers=h).get_json()
-    assert j["ok"] and j["lido"]["projeto"] == "UFV Teste Solar II" and len(j["meta"]) == 12 and j["erro_meta"]
-    assert j["origem"] == "PVsyst" and len(j["hoje"]) == 12
-    nao = logado.post("/t/performance/metas/ler", data={"arquivo": (io.BytesIO(b"texto"), "teste.txt")},
-                      content_type="multipart/form-data", headers=h).get_json()
+    from nexus.cadastro.telas import servico
+    with app.app_context():
+        servico().aplicar_carga(Carga(
+            entidades={
+                "clientes": [{"id": "1", "ordem": 1, "valores": {"nome": "Thopen"}},
+                             {"id": "2", "ordem": 2, "valores": {"nome": "Aurora"}}],
+                "usinas": [
+                    {"id": "1", "ordem": 1, "valores": {"nome": "Da Thopen", "cliente": "1", "status": "OPERAÇÃO"}},
+                    {"id": "2", "ordem": 2, "valores": {"nome": "Teste Solar 2", "cliente": "2", "status": "OPERAÇÃO",
+                                                         "potencia_real": 1.0}},
+                    {"id": "3", "ordem": 3, "valores": {"nome": "Sem Meta", "cliente": "2", "status": "A MOBILIZAR"}},
+                ]},
+            listas={"status_usina": ["OPERAÇÃO", "A MOBILIZAR"]}))
+    c = app.test_client()
+    assert c.post("/entrar", data={"senha": SENHA_TESTE}).status_code == 302
+    yield c
+    M._CACHE.clear()
+
+
+def test_a_tela_mora_na_base_com_as_usinas_do_registro_mestre(cli_metas):
+    """Levi, 25/11/2026: "metas das usinas tem que estar na parte de base"; "essas usinas [...] são de acordo com o
+    registro mestre". A Thopen fica fora (manda a própria meta); o endereço da Performance leva à Base."""
+    c = cli_metas
+    html = c.get("/t/base/metas").get_data(as_text=True)
+    assert "Metas das usinas" in html and 'list="mt-lista-usinas"' in html          # a usina se digita
+    assert 'value="Teste Solar 2"' in html and 'value="Sem Meta"' in html and "Da Thopen" not in html
+    r = c.get("/t/performance/metas?x=1")
+    assert r.status_code == 308 and r.headers["Location"].endswith("/t/base/metas?x=1")
+    assert c.post("/t/performance/metas/salvar", json={}, headers=H).status_code == 308
+
+
+def test_abrir_traz_a_meta_da_info_mensal_e_salvar_registra(cli_metas):
+    c = cli_metas
+    a = c.post("/t/base/metas/abrir", json={"usina_id": "2", "ano": 2027}, headers=H).get_json()
+    assert a["ok"] and a["de_onde"] == "info_mensal" and a["linha_info"] == "Teste Solar II" and a["kwp"] == 1000.0
+    assert a["atual"][0]["p50_mwh"] == 0.12 and a["atual"][0]["pr"] == 0.82 and 2027 in a["anos"]
+    vazia = c.post("/t/base/metas/abrir", json={"usina_id": "3"}, headers=H).get_json()
+    assert vazia["de_onde"] == "" and vazia["atual"][0]["p50_mwh"] is None
+    assert c.post("/t/base/metas/abrir", json={"usina_id": "1"}, headers=H).status_code == 400     # a da Thopen não
+    # editar um PR (em %) e salvar: o registro compara com a Info Mensal que a tela mostrava
+    meta = [dict(x) for x in a["atual"]]
+    meta[2]["pr"] = 75
+    r = c.post("/t/base/metas/salvar", json={"usina_id": "2", "ano": 2027, "meta": meta}, headers=H).get_json()
+    assert r["ok"] and r["salvo"]["origem"] == "manual" and "1 valor mudado" in r["aviso"]
+    assert r["salvo"]["edicoes"][0]["mudancas"] == [{"mes": 3, "campo": "pr", "de": 0.82, "para": 0.75}]
+    b = c.post("/t/base/metas/abrir", json={"usina_id": "2", "ano": 2027}, headers=H).get_json()
+    assert b["de_onde"] == "nexus" and b["atual"][2]["pr"] == 0.75 and b["salva"]["edicoes"] == 1
+    assert c.post("/t/base/metas/salvar", json={"usina_id": "2", "ano": 2027}, headers=H).status_code == 400
+    assert c.post("/t/base/metas/salvar", json={"usina_id": "9", "ano": 2027, "meta": meta}, headers=H).status_code == 400
+    html = c.get("/t/base/metas").get_data(as_text=True)
+    assert 'data-abrir="2"' in html and "mar · PR 82,0% → 75,0%" in html
+    assert c.post("/t/base/metas/salvar", json={}, headers={"Sec-Fetch-Site": "cross-site"}).status_code == 403
+
+
+def test_o_pvsyst_acha_a_usina_e_vem_para_editar(cli_metas, monkeypatch):
+    c = cli_metas
+    j = c.post("/t/base/metas/ler", data={"arquivo": (io.BytesIO(b"%PDF-1.4 x"), "Anexo VI - PVSyst UFV Teste Solar II.pdf")},
+               content_type="multipart/form-data", headers=H).get_json()
+    assert j["ok"] and j["usina_id"] == "2" and j["pvsyst"]["lido"]["projeto"] == "UFV Teste Solar II"
+    assert len(j["pvsyst"]["meta"]) == 12 and j["atual"][0]["p50_mwh"] == 0.12          # a de agora, para marcar o que muda
+    # o projeto claro vence a usina que estava aberta; sem projeto que case, fica a aberta
+    k = c.post("/t/base/metas/ler", data={"arquivo": (io.BytesIO(b"%PDF-1.4 x"), "x.pdf"), "usina_id": "3"},
+               content_type="multipart/form-data", headers=H).get_json()
+    assert k["usina_id"] == "2"
+    monkeypatch.setattr(M, "texto_do_pdf", lambda dados: relatorio().replace("UFV Teste Solar II", "Projeto Qualquer"))
+    k = c.post("/t/base/metas/ler", data={"arquivo": (io.BytesIO(b"%PDF-1.4 x"), "x.pdf"), "usina_id": "3"},
+               content_type="multipart/form-data", headers=H).get_json()
+    assert k["usina_id"] == "3"
+    monkeypatch.setattr(M, "texto_do_pdf", lambda dados: relatorio())
+    nao = c.post("/t/base/metas/ler", data={"arquivo": (io.BytesIO(b"texto"), "teste.txt")},
+                 content_type="multipart/form-data", headers=H).get_json()
     assert not nao["ok"] and "não é um PDF" in nao["erro"]
-    # sem a meta de hoje no banco, não há usina para escolher: o Salvar recusa
-    r = logado.post("/t/performance/metas/salvar", json={"sha": j["sha"], "usina": "Teste Solar II", "ano": 2027,
-                                                         "meta": j["meta"]}, headers=h)
-    assert r.status_code == 400
-    monkeypatch.setattr(M, "meta_atual", lambda base, sessao: {"mensal": {"Teste Solar II": {}}, "geral": {},
-                                                                "usinas": ["Teste Solar II"], "clientes": {}, "erro": ""})
-    from nexus.torres.performance import metas_tela
-    monkeypatch.setattr(metas_tela, "banco", lambda: ("http://pg.falso", None))
-    # sem a meta (ou com 11 meses) não salva
-    assert logado.post("/t/performance/metas/salvar", json={"usina": "Teste Solar II", "ano": 2027}, headers=h).status_code == 400
-    editada = [dict(x) for x in j["meta"]]
-    editada[2]["pr"] = 75          # o PR digitado em %
-    r = logado.post("/t/performance/metas/salvar", json={"sha": j["sha"], "usina": "Teste Solar II", "ano": 2027,
-                                                         "arquivo": "teste.pdf", "meta": editada}, headers=h).get_json()
-    assert r["ok"] and r["salvo"]["origem"] == "PVsyst editado" and "1 valor mudado" in r["aviso"]
-    assert M.salvas(tmp_path)["Teste Solar II"]["meta"][2]["pr"] == 0.75
-    # abrir de novo traz a meta salva para editar; uma usina sem meta abre em branco (à mão)
-    a = logado.post("/t/performance/metas/abrir", json={"usina": "Teste Solar II"}, headers=h).get_json()
-    assert a["ok"] and a["meta"][2]["pr"] == 0.75 and a["sha"] == j["sha"] and a["edicoes"] == 1 and a["ano"] == 2027
-    b = logado.post("/t/performance/metas/abrir", json={"usina": "Outra"}, headers=h).get_json()
-    assert b["origem"] == "manual" and b["meta"][0]["p50_mwh"] is None
-    assert logado.post("/t/performance/metas/hoje", json={"usina": "Teste Solar II", "ano": 2026}, headers=h).get_json()["ano"] == 2026
-    assert logado.get(f"/t/performance/metas/pdf/{j['sha']}").data == b"%PDF-1.4 x"
-    assert "Abrir" in logado.get("/t/performance/metas").get_data(as_text=True)
-    # pedido de outro site não lê nem salva
-    assert logado.post("/t/performance/metas/ler", headers={"Sec-Fetch-Site": "cross-site"}).status_code == 403
-    assert logado.post("/t/performance/metas/salvar", json={}, headers={"Sec-Fetch-Site": "cross-site"}).status_code == 403
+    r = c.post("/t/base/metas/salvar", json={"usina_id": "2", "ano": 2027, "meta": j["pvsyst"]["meta"],
+                                             "sha": j["pvsyst"]["sha"], "arquivo": "a.pdf"}, headers=H).get_json()
+    assert r["ok"] and r["salvo"]["origem"] == "PVsyst" and r["salvo"]["projeto"] == "UFV Teste Solar II"
+    assert len(r["salvo"]["edicoes"][0]["mudancas"]) > 0                     # contra a Info Mensal que estava
+    assert c.get(f"/t/base/metas/pdf/{j['pvsyst']['sha']}").data == b"%PDF-1.4 x"
+    assert c.post("/t/base/metas/ler", headers={"Sec-Fetch-Site": "cross-site"}).status_code == 403

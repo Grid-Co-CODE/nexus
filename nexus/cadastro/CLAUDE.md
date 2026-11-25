@@ -2,7 +2,7 @@
 
 O registro mestre do Nexus: usinas, clientes, pessoas, equipes, regiões de campo e listas, com os mesmos dados do
 BD_Operações (a região de campo vem da estrutura de O&M de 10/2026), mas editáveis numa tela. As telas ficam nas torres
-Base (Registro mestre, Clientes, Equipes, Equipamentos das usinas, Qualidade do cadastro) e Pessoas
+Base (Registro mestre, Clientes, Equipes, Equipamentos das usinas, Metas das usinas, Qualidade do cadastro) e Pessoas
 (Colaboradores Operação). A tela Importar do Excel saiu em 14/10/2026 (Levi: "Tire 'Importar do Excel' do módulo base"):
 `/t/base/importar` leva ao Registro mestre, sem importar nada; a importação segue por comando (abaixo). Desde 15/10/2026 o
 BD_Operações novo exporta CSV, e o Registro mestre tem **Atualizar pelo CSV** (`importar_csv.py`, seção própria abaixo).
@@ -997,6 +997,38 @@ de entender para você, quando eu for fazer não vou entender nada".
   236 strings, potência fechando com a real, os 10 ativos pelo nome, salvar duas vezes = "Nada mudou") e Ipixuna do
   Pará 1 à mão (chave digitada, 2 cabines, 8 inversores gerados, distribuir fechando 6.804 kWp, nome repetido recusado),
   no celular sem rolagem lateral e no tema claro.
+
+## Metas das usinas (protótipo de 25/11/2026; `/t/base/metas`, `torres/base/metas_tela.py`, `performance/metas_pvsyst.py`)
+
+Levi, 24/11/2026: "É por eles [os PVsyst] que a gente preenche as metas [...] das usinas que não são da Thopen [...] a
+ideia seria a gente anexar esses PVSys e já preencher automático na meta". Nasceu na Performance e veio para a Base no
+mesmo dia ("metas das usinas tem que estar na parte de base"); `/t/performance/metas...` responde 308 para cá.
+
+- **As usinas são as do Registro mestre** (Levi: "essas usinas [...] são de acordo com o registro mestre"), menos as da
+  Thopen (a Thopen manda a própria meta, no banco): 164 em 25/11/2026. A lista se DIGITA (`<input list>` + `<datalist>`,
+  regra de ouro do Levi: "Sempre que for fazer [...] um filtro, ele tem que ser digitável"); o ano também. Nome repetido
+  entre clientes ganha o cliente no rótulo. O kWp da conferência é o do Registro mestre (o real; sem ele, o contratual).
+- **A meta de agora** (o que a tabela mostra, em valores limpos): a salva no Nexus para a usina e o ano; sem ela, a da aba
+  Info Mensal do BD_Performance; sem as duas, vazia. A linha da Info Mensal casa pelo nome (`chave_nome`: sem acento,
+  romano = número) ou, sem ele, pelo nome da usina em Base > Equipamentos (a "Usina" das chaves dela), se for um só. Medido
+  em 25/11/2026: 23 pelo nome, 27 pelos Equipamentos (Ibirapuã 1 = "Ibirapuã I", Matões 100 = "MTS100"); as outras 114 não
+  têm meta na aba (Faro, Elis, as que vão mobilizar). A tela diz a linha quando o nome difere. Lida uma vez, 10 min.
+- **Editar** abre as células, do tamanho do número (Levi, vendo as caixas abertas com o valor miúdo embaixo: "é mais fácil
+  ter um botão de editar"). Digita-se em pt-BR, PR em %; colar do Excel (tabulação/quebra) espalha para a direita e para
+  baixo; texto que não é número fica como estava e é dito. O que muda contra a meta de agora fica com borda (e "Antes: X"
+  no título) e conta "N valores a salvar". Cancelar volta à meta de agora.
+- **Anexar PVsyst**: lê "Balances and main results" e o resumo P50/P70/P90 (kWh ou MWh: Iramaia II vem em kWh, Gravatá em
+  MWh) e abre a tabela já para editar. A usina é a do projeto/arquivo quando clara (o PDF da Iramaia anexado com outra
+  usina aberta vai para a Iramaia, e a tela diz); sem ela, a que estava aberta. A conta: P50 = E_Grid; P90 = P50 × (P90 ÷
+  P50 do ano); P75 = P50 − (P50 − P90) × 0,6745 ÷ 1,2816; PR do mês; IPOA = GlobInc; GHI = GlobHor (ano 1, sem degradação;
+  sem P90 no relatório, P90 e P75 vazios). kWp do PVsyst > 5% fora do Registro mestre pede confirmação no Salvar.
+- **Salvar**: o P50 é obrigatório nos 12 meses. Cada Salvar entra no registro: quem, quando, origem ("PVsyst", "PVsyst
+  editado", "Info Mensal" salva sem mexer, "manual") e cada valor de quanto para quanto; na 1ª vez, contra a meta que a
+  tela mostrava (a da Info Mensal). A lista "Metas salvas" mostra o registro legível ("mar · PR 82,0% → 75,0%").
+- **Onde fica**: `<pasta de dados>/metas_pvsyst/metas.json` (`{"versao": 2, "metas": {"<usina_id>|<ano>": ...}}`) +
+  `pdf/<sha>.pdf`. O 1º formato (por nome, das 01:40 à ida para a Base) é lido sem o Abrir e não se perde. NÃO é livro
+  do banco (livro é para sempre: o formato espera a validação); a Sala de controle e o Gerencial seguem com a Info Mensal.
+- Prova: `tests/test_performance_metas_pvsyst_25_11.py` (Registro mestre e Info Mensal de mentira; o texto do PDF dublado).
 
 ## As listas montadas uma vez por versão (`telas._lista`, `cadastro/_lista_linhas.html`; 19/10/2026)
 
