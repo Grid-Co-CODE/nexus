@@ -86,7 +86,7 @@ Os sinais dos 30 dias (crítico, atenção, monitorar) são só dela. Ela é viv
 
 - **O Controle Semanal** (`controle_semanal.py`) roda num PC e grava a planilha no OneDrive, com a coluna "Observações
   do time". Para sair do PC: virar uma tela do Nexus com as mesmas abas, e as observações no banco. A reunião pediu
-  usar a planilha como base de ideias para os insights do PCM.
+  usar a planilha como base de ideias para os insights do PCM: feito em 25/11/2026 (PCM → Insights do PCM, cinco cartões).
 - **O e-mail manual de atualização da confiabilidade** pode parar quando o passo diário estiver no ar, conferido pelo
   `geradoEm` do `confiabilidade.json`.
 - **A Gerencial (`mpas.json`)** continua sem publicador automático.

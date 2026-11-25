@@ -14,7 +14,7 @@ O Acompanhamento (14/10/2026, Levi, com o pacote do painel de acompanhamento do 
 PCM essa visão de acompanhamento. O design quero alá Nexus [...] mas as estruturas quero sim que mantenha!"): as abas
 MPA, MPS, Radar de Backlog, Mapa e One Page, com as fontes do Nexus (`nexus/pcm/acompanhamento`), do setor PCM.
 """
-from ...pcm import acompanhamento, almox_usinas, almoxarifado, fora_do_app, inventario
+from ...pcm import acompanhamento, almox_usinas, almoxarifado, fora_do_app, insights_pcm, inventario
 from ...pcm.inventario import curadoria as inventario_curadoria
 from ...pcm.inventario import ponte_os as inventario_ponte
 from ...pcm.inventario import regua as inventario_regua
@@ -54,9 +54,11 @@ TORRE = Torre(
              "Quem cobre cada usina, e quem pode rondar ali no App?",
              "O cadastro do Nexus, as rondas e a programação; as decisões do PCM nesta tela",
              do_setor=(SID.PCM, SID.RESPONSAVEL_UFV)),
+        # o que pede ação agora, em cinco frases (25/11/2026; a base de ideias é a planilha "PCM - Controle Semanal" do time,
+        # pedida na reunião do PCM de 24/11; nexus/pcm/insights_pcm.py)
         Tela("insights", "Insights do PCM",
-             "Onde a aderência cai e que tarefa já rolou várias vezes?",
-             "banco_dados.json do painel PCM"),
+             "O que pede ação agora no PCM?",
+             "A Gestão PCM e a programação da semana, com as regras da planilha de controle semanal do PCM"),
         Tela("tarefas", "Tarefas e OS",
              "Qual é a lista consolidada de OS e tarefas da semana?",
              "banco_dados.json do painel PCM"),
@@ -100,6 +102,8 @@ registrar_pcm(bp)
 # o Acompanhamento do PCM (nexus/pcm/acompanhamento)
 acompanhamento.registrar(bp)
 fora_do_app.registrar(bp)
+# os Insights do PCM (nexus/pcm/insights_pcm.py)
+insights_pcm.registrar(bp)
 # o Almoxarifado (nexus/pcm/almoxarifado.py)
 almoxarifado.registrar(bp)
 # a aba Inventário do Almoxarifado, as contagens do App que o PCM revisa (nexus/pcm/inventario)

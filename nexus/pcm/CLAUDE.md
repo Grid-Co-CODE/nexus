@@ -74,6 +74,7 @@ escolhida de cada semana e os números: `nexus/dados/CLAUDE.md`.
 | `relatorios/` | **os quatro relatórios do PCM** na Central de emissão (14/10/2026): diário, recuperação da tarde, fechamento da semana e alerta da programação, cópia do Python do PCM, com a emissão automática nos horários de lá; regras e prova no `relatorios/CLAUDE.md` |
 | `relatorio_exec/` | **o Relatório executivo do PCM** na Central de emissão (14/10/2026): Interno Grid, Cliente e Abertura da Semana, CÓPIA do `js/relatorio_exec.js` do painel (hash conferido no teste), com o gestao_pcm.json, o banco_dados.json e o confiabilidade.json servidos ao lado e a Gerencial aberta pelo servidor (`NEXUS_PCM_MPAS_SENHA`, o "MPA/MPS atrasadas"); na estrutura de toda a Central (os tipos no bloco "Relatório Gerencial PCM", o período e o escopo na coluna, a folha à direita); regras e como atualizar no `relatorio_exec/CLAUDE.md` |
 | `copias_pcm.py` | a **conferência das cópias do PCM** (24/11/2026): a cada 6 h, por trás, compara o motor e o executivo daqui com os arquivos do PCM de agora (o repositório público) e diz quais ficaram atrás; o Gerar a semana e o executivo avisam. Sem conferência (rede fora), não avisa nada. Prova: `tests/test_pcm_copias.py` |
+| `insights_pcm.py` | **Insights do PCM** (`/t/pcm/insights`, 25/11/2026): o que pede ação agora, em cinco frases (religamento aberto há mais de 7 dias, MPM do mês vencida, handover vencido, OS parada pela conta do Radar de Backlog e OS que rolou 5 semanas ou mais), com as regras da planilha de controle semanal do PCM e a lista curta no cartão; o que já mora noutra tela não se repete. Ver a seção "Insights do PCM" |
 | `acompanhamento/` | **o Acompanhamento do PCM** (14/10/2026, PCM → Acompanhamento PCM): as cinco abas do painel de acompanhamento do PCM O&M (MPA, MPS, Radar de Backlog, Mapa e One Page) com as estruturas de lá e o desenho do Nexus, montadas com as fontes que o Nexus já usa (Gestão PCM, banco_dados, Gerencial, cadastro) e a curadoria da reunião de PCM no livro `nexus_pcm_curadoria` (cifrado); a coordenada da usina não sai do servidor; regras e prova no `acompanhamento/CLAUDE.md` |
 | `motivos.py` | **os motivos das tarefas e a lista do backoffice** (16/10/2026, seção abaixo): o livro `nexus_pcm_motivos` (cadastro, marcas, backoffice; cifrado), o `Fora_da_programacao.json` da rodada e do repositório do PCM |
 | `atribuicoes.py` | **os técnicos por usina** (17/10/2026, seção abaixo): o livro `nexus_pcm_atribuicoes` (decisões que só acrescentam, vale a última de cada usina × pessoa × papel; apoio com datas; cada linha assinada para o App) |
@@ -83,6 +84,25 @@ escolhida de cada semana e os números: `nexus/dados/CLAUDE.md`.
 | `tecnicos_usina.py` | a visão da tela Técnicos por usina: o cadastro do banco, o nome da usina que vai ao App (`_fracttal`), a evidência de campo (rondas, fechamentos, programação), os avisos, os filtros em cascata, a carga inicial pela regra da equipe, a reemissão (de uma usina e o Reenviar tudo) e a comparação com a foto do App |
 | `inventario/` | **o inventário do almoxarifado** (26/10/2026, em construção): `estoque.py` é o adaptador do estoque do Fracttal, a única porta de leitura e gravação de saldo, régua e peça; `contas.py` são as contas (situações, contado efetivo, substituição, janela de aprovação; puro); `leitura.py` lê as contagens do App e o estado de cada uma pelos eventos; `revisao.py` é a aba Inventário (a lista, a contagem aberta com o Sistema × Contado × Δ e a revisão do PCM), com as rotas em `__init__.py`; `gravacao.py` grava o lote aprovado no Fracttal em segundo plano, por sessão de ajuste; `regua.py` é a régua de mínimo e máximo e `curadoria.py` o fora do catálogo (com `fotos_app.py`, a rota assinada que recebe as fotos do App); a auditoria é o `revisao.montar_auditoria`; `ponte_os.py` é a ponte com o login do Fracttal (as rotas de `/os/_nexus/inventario`, a ÚNICA porta de tudo o que lê ou grava no Fracttal: o lote, gravar, continuar, encerrar, a régua acordada, cadastrar a peça); o livro `nexus_almoxarifado_inventario` (eventos, régua e curadoria) é o `nexus/dados/fato_inventario.py`. As seções abaixo |
 | `motor/` | **cópia idêntica** do motor do PCM: **não edite** (mudança de regra entra no repositório do PCM e é copiada; veja o `README.md` de lá); hoje a do `4b0d9ee` (13/11/2026: a corretiva não é mais forçada acima dos 70% do dia e a tarefa cortada pela capacidade não some; antes, a do `cb8239c`, 23/10/2026: a MPM da última semana do mês vai para os dias livres antes de ser forçada no dia da usina) |
+
+## Insights do PCM (`insights_pcm.py`, `templates/pcm/insights.html`; 25/11/2026)
+
+A base de ideias é a planilha "PCM - Controle Semanal" do time (`controle_semanal.py` do PCM, num PC), pedida na reunião
+do PCM de 24/11. O desenho é do Levi: "Menos é mais. Vamos tentar ser diretos e ter informações bem direcionadas, fáceis
+de leitura. Não precisa ficar enchendo de KPI. Se a informação se repete, a gente mantém só uma informação."
+- **Cinco cartões, uma frase cada** (a palavra do nível, o número, o pior caso e a lista que abre no cartão): religamento
+  aberto há mais de 7 dias (Agir), MPM do mês vencida e aberta, usina com handover vencido, OS parada e OS que rolou 5
+  semanas ou mais (Atenção). Sem nada, o cartão diz "Em dia".
+- **Um número só no Nexus:** a OS parada é a conta do Radar de Backlog (`acompanhamento.dados.backlog`, mais de 25 dias, e
+  a lista fica lá) e a rolagem a do Acompanhamento (`rolagens`). Ficam fora porque já moram noutra tela: MPA/MPS
+  atrasadas, o backlog detalhado, a carga por supervisor e as usinas que pedem atenção; o Resumo e o Plano por tipo da
+  planilha são KPI; o Plano de Ação Drone é outro assunto.
+- **As regras dos três novos são as da planilha:** aberta = tarefa aberta de OS fora de Finalizados e Verificação; dias =
+  o `dias` da Gestão PCM (atraso contra a data programada); usina de teste e OS do backoffice (`bo`) fora. Conferido em
+  25/11 contra a planilha de 24/11: 90 religamentos abertos (o pior, 77 dias), 12 usinas com handover, 13 rolagens.
+- **As observações do time** (a coluna amarela da planilha) vão na conversa da OS: cada OS do cartão leva a
+  `/t/comando/conversa/os/<OS>`.
+- Provar: `tests/test_pcm_insights.py` e a tela numa cópia de prova (1366 e 375 px).
 
 ## O nome do cliente é o do cadastro do Nexus (`clientes.py`; 18/10/2026)
 
