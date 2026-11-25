@@ -14,6 +14,13 @@ A regra mora em `nexus/performance/`; aqui ficam as rotas e os templates. As mol
 
 Strings e trackers grava no banco do Nexus (20/10/2026, o Vincular OS): a OS ligada a cada falha de string ou tracker vai ao livro `nexus_falhas · fato_decisao_vinculo_os`, gravado e lido pela própria plataforma. O Nexus só o cataloga: grão, colunas e regras em `nexus/dados/CLAUDE.md` ("Vínculo de OS às falhas").
 
+**Análise das usinas** (25/11/2026; o dono: "aquela nova visão que vai substituir painel NOC, histórico de PR,
+disponibilidade, vai trazer os expurgos" e "a gente vai chamar de análise das usinas"): tela da Plataforma de Performance
+na moldura (`/painel/analise-das-usinas`), a PRIMEIRA do menu da Performance. O mapa da porta única ganhou a linha nos dois
+lados no mesmo trabalho (`nexus/performance/porta.py` e `plataforma/porta_nexus.py`; a assinatura é `d2a503b1c6507325`,
+18 telas). O desenho, as regras e as entregas estão no repositório da plataforma, em `docs/analise-das-usinas.md`.
+O Painel NOC e a Disponibilidade seguem no menu até o OK dele para a troca.
+
 **Sala de controle** (16/11/2026; o dono: "uma visão parecida com essa para performance", a partir do Control room de um
 portal de fora): mais uma tela da Plataforma de Performance na moldura (`/painel/sala-de-controle`), logo depois do Tempo
 real no menu. A fonte do tempo real na lateral, o que falta acompanhar na frente, e a usina com as strings, os trackers e a

@@ -28,6 +28,7 @@ performance|noc|/painel||
 performance|diagnostico|/painel/usina/<id>||
 performance|strings-trackers|/painel/falhas||
 performance|sala-de-controle|/painel/sala-de-controle||
+performance|analise-das-usinas|/painel/analise-das-usinas||
 performance|gerencial|/gerencial||
 performance|disponibilidade|/gerencial/disponibilidade||
 relatorios|relatorio|/relatorio||
@@ -40,7 +41,7 @@ cos|acompanhamento|/cos||
 base|chaves-fontes|/tokens||admin
 base|fontes-tempo-real|/admin/tempo-real||admin
 base|de-para-equipamentos|/admin/de-para||admin"""
-ASSINATURA_DA_PLATAFORMA = "db2b2cf9380d2b67"
+ASSINATURA_DA_PLATAFORMA = "d2a503b1c6507325"
 
 
 def _decodificar(passe: str) -> tuple[dict, bytes, bytes]:
@@ -54,13 +55,13 @@ def _decodificar(passe: str) -> tuple[dict, bytes, bytes]:
 def test_o_mapa_e_o_mesmo_da_plataforma():
     assert porta.texto_canonico_do_mapa() == TEXTO_DA_PLATAFORMA
     assert porta.assinatura_do_mapa() == ASSINATURA_DA_PLATAFORMA
-    assert len(porta.MAPA) == 17 and len({(t.torre, t.tela) for t in porta.MAPA}) == 17
+    assert len(porta.MAPA) == 18 and len({(t.torre, t.tela) for t in porta.MAPA}) == 18
 
 
 @pytest.mark.parametrize("caminho, tela", [
     ("/tempo-real", "tempo-real"), ("/tempo-real/pv", "tempo-real"), ("/monitor", "tempo-real"),
     ("/monitor?fonte=pv&embed=1", "tempo-real"), ("/painel", "noc"), ("/painel/usina/297410", "diagnostico"),
-    ("/painel/usina/abc?fonte=pg&nome=Usina%20X", "diagnostico"), ("/painel/falhas", "strings-trackers"),
+    ("/painel/usina/abc?fonte=pg&nome=Usina%20X", "diagnostico"), ("/painel/falhas", "strings-trackers"), ("/painel/analise-das-usinas", "analise-das-usinas"),
     ("/gerencial", "gerencial"), ("/gerencial/disponibilidade", "disponibilidade"), ("/relatorio", "relatorio"),
     ("/relatorio/semanal", "relatorio-semanal"), ("/relatorio/potencia-ativa", "potencia-ativa"), ("/gemeo/", "gemeo"), ("/gemeo/usina/12", "gemeo"),
     ("/ronda/monitor", "monitor-ronda"), ("/painel/comentarios", "comentarios"), ("/cos", "acompanhamento"),
