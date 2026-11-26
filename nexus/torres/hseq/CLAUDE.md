@@ -1,7 +1,7 @@
 # CLAUDE.md — Segurança · HSEQ
 
 Torre do menu "Segurança · HSEQ". Telas vivas: a **Mesa da Segurança** (a primeira, 24/10/2026), **Extintores** (com o
-relatório de cada cliente e usina em PDF e Excel, e a foto diária dos fora do em dia desde 24/11/2026), **EPI e EPC** (com o mesmo relatório, desde 23/11/2026), **APR e PT** (09/10/2026), **Colaboradores** (05/11/2026, as pessoas do cadastro e a documentação de segurança de cada uma) e **Incidentes** (24/11/2026, os relatos de segurança do App de Campo). Riscos da semana e DSS
+relatório de cada cliente e usina em PDF e Excel, a foto diária dos fora do em dia e as tratativas, desde 24/11/2026), **EPI e EPC** (com o mesmo relatório, desde 23/11/2026), **APR e PT** (09/10/2026), **Colaboradores** (05/11/2026, as pessoas do cadastro e a documentação de segurança de cada uma) e **Incidentes** (24/11/2026, os relatos de segurança do App de Campo). Riscos da semana e DSS
 ainda são placeholder (a view com a mesma rota vence a genérica). As contas moram em `nexus/hseq/`; a view e o
 template, aqui.
 
@@ -176,22 +176,26 @@ deles, a Tabela (o padrão) ou os cartões **Por responsável**.
 - **Agrupar por Cliente** (o padrão; Levi, 18/10: "Quero agrupado por Cliente, abrindo o cliente terá as usinas desse
   cliente. É importante ter a coluna do responsável desse usina e o ou os técnicos da usina!";
   `extintores.por_cliente`) e **por Extintor** (`ver=extintor`: o mais grave primeiro; no filtro "sem atualização", a
-  conferência mais antiga primeiro). Colunas: Situação, Última conferência, Cliente e usina, Responsável, Técnicos,
-  Quantidade de extintores (só o total, centrada), Recarga mais próxima (a vencida há mais tempo ou, sem vencida, a
-  próxima; a data em cima e o "venceu há" embaixo, centrados: "como as linhas são grossas da para botar"), **Status**
-  e os três pontos. O Status (24/10/2026, no lugar do "Status da TST": "vai quebrar o texto a cada assuntos (...) A
-  ideia é ficar algo bem mais visual") é uma linha por situação com a cor dela (a barra das proporções em cima saiu no
-  mesmo dia: "Tira essa barra de cores da coluna de status"; "116 atrasados", "40 perto de vencer", "77 sem validade",
-  "335 em dia", "13 não reconhecidos"). **Última conferência, Responsável e Técnicos só aparecem com um cliente
-  aberto** (Levi: "não precisa das colunas responsável e técnico na primeira visão, só ao clicar na linha"; e "a coluna
-  de última conferência (...) também só deve aparecer no drill down"): a tabela leva `hs-fechada` enquanto nenhum
-  cliente está aberto (as colunas `hs-col-aberta` somem), e o clique a tira. A linha do cliente abre as usinas dele **na mesma tabela**
+  conferência mais antiga primeiro). **As colunas desde 24/11/2026** (o mockup aprovado pela Segurança; antes eram
+  Situação, Última conferência, Responsável, Técnicos e Recarga mais próxima, as três do meio só com o cliente aberto):
+  a **bolinha** da situação mais grave (sem título; a palavra no `aria-label`; a mesma régua e a mesma cor da Situação),
+  **Cliente e usina** (no cliente, a seta e "N usinas" embaixo; na usina, recuada, "Responsável UFV · Equipe" embaixo
+  em letra pequena e os técnicos no `title` dessa linha), **Qtd. de extintores**, **Última inspeção** (a data e "hoje",
+  "ontem" ou "há N dias" embaixo, azul passados os 30 dias do "sem atualização"; na USINA a conferência mais recente dos
+  extintores dela, no CLIENTE a MAIS ANTIGA entre as usinas dele, para não esconder usina parada, e a usina nunca
+  conferida é a mais antiga), **Status** (centrado), **Evolução** (as tratativas, abaixo) e os três pontos. A recarga
+  de cada extintor segue na tabela dele, que não mudou. O Status (24/10/2026, no lugar do "Status da TST": "vai
+  quebrar o texto a cada assuntos (...) A ideia é ficar algo bem mais visual") é uma linha por situação com a cor dela,
+  só as que não são zero ("116 atrasados", "40 perto de vencer", "77 sem validade", "335 em dia", "13 não
+  reconhecidos"). No celular (até 640 px) cada linha do cliente e da usina vira um cartão, com o rótulo de cada
+  campo, como na ficha do colaborador. A linha do cliente abre as usinas dele **na mesma tabela**
   (UMA linha por usina, `por_usina`: a última conferência é a mais recente dos extintores dela), e a usina abre os
   extintores numa tabela menor, cada um com a conferência dele. Ordem: o mais grave primeiro, depois a recarga mais
   próxima; "Sem cliente" por último. Com o filtro de cliente o cliente já abre; com o de usina, a usina também.
 - **Os técnicos** vêm da tela Técnicos por usina do PCM (`extintores.tecnicos_por_usina`, livro `nexus_pcm_atribuicoes`:
   quem vê e ronda a usina no App, um embaixo do outro; o apoio agendado para depois de hoje ainda não conta). Lista que
-  não foi lida: a coluna diz "não lido" e a tela avisa, e nunca "sem técnico". Medido em 18/10: 174 usinas com técnico,
+  não foi lida: a tela avisa, e a usina não ganha técnico nem "sem técnico" (desde 24/11/2026 eles vão no `title`
+  da linha do responsável). Medido em 18/10: 174 usinas com técnico,
   68 com dois.
 - **A página é leve: o resumo vem nela, os extintores só ao abrir a usina e a foto só no clique** (19/10/2026). O
   Raio-X do servidor às 17:15 pegou a tela 21 s montando a página (o servidor é um notebook que também roda o banco, e
@@ -388,6 +392,32 @@ extintor é excluído e vai para um histórico de extintores excluídos com o mo
 Prova: `tests/test_hseq_decisoes.py` (as regras da volta e da ronda pendente, quem pode, a assinatura, o Aceitar e o
 histórico, o botão direito com o motivo, a ronda da usina, a edição e a régua dela, a senha de administrador, o filtro
 de Status, o catálogo).
+
+**As tratativas** (24/11/2026, a entrega 2 do mockup aprovado pela Segurança; `nexus/hseq/tratativas.py`, livro
+`nexus_hseq_extintores_tratativas`, no `catalogo.py` antes da 1ª gravação). O que a Segurança fez com o cliente ou a
+usina que tem extintor vencido: Cliente notificado por e-mail, Recarga agendada, OS de recarga aberta, Troca realizada,
+Aguardando cliente ou Outro (este pede a observação).
+- **Num livro só delas**, não numa aba do `nexus_hseq_extintores` como pedia o mockup (a Segurança, 25/11/2026): o App de
+  Campo lê o livro das decisões a cada 5 min, e o código dele não está aqui para confirmar que ignora uma aba nova.
+- **Para quem vale:** o cliente inteiro grava o `cliente_id` do cadastro (`usinas.cliente_id`, que a linha do extintor
+  passou a levar, `extintores.linha`), numa linha só e nunca o nome; a usina grava o `usina_id` e o `cliente_id` dela.
+  O grupo "Sem cliente" só registra por usina.
+- **Qual aparece na linha** (`_evolucao` na torre): no cliente, a mais nova entre as do cliente inteiro e as das usinas
+  dele; na usina, a mais nova que vale para ela, contando as do cliente inteiro. A mais nova é pelo dia da tratativa e,
+  no mesmo dia, pela hora em que foi gravada. A linha diz o tipo (com um ícone desenhado: o mockup usava emoji, que o
+  Nexus não usa), o dia, "N tratativas · última por <quem>" e os links Ver histórico e Registrar; sem nenhuma,
+  "Nenhuma tratativa" em vermelho.
+- **A caixa** (uma só na página, `#hs-trat`): os tipos em chips, a data em dd/mm/aaaa (hoje por padrão, recusada no
+  futuro, no navegador e no servidor, pelo relógio da tela), "Vale para" (o cliente inteiro com as N usinas, ou uma
+  delas, montado das linhas da tabela) e a observação (até 300 letras); embaixo, o histórico do mais novo para o mais
+  velho, que vem do Nexus ao abrir (`extintores_tratativas`; a página leva só a última de cada linha).
+- **Quem registra:** quem decide nos extintores (o administrador e o setor Segurança, `decisoes.pode_decidir`), com
+  login de pessoa, e o pedido de outro site é 403. Os outros veem a Evolução e o histórico, sem o Registrar. Quem
+  registrou e a observação vão só cifrados (o Cofre), a linha vai assinada (rótulo `nexus:hseq:tratativas`).
+Prova: `tests/test_hseq_tratativas.py` (o cliente pelo ID e nada em claro, o que não grava, quem pode, a mais nova de
+cada linha, o histórico, quem só vê, a caixa, o catálogo) e os de Extintores com a tabela nova. Conferido no navegador
+em 25/11/2026 com os dados dos testes (fictícios): a 1440 px a tabela tem 1.178 px, e a 375 px a página não passa da
+largura.
 
 **A foto diária dos extintores** (24/11/2026, a entrega 1 do mockup de Extintores aprovado pela Segurança: "hoje o Nexus
 só guarda a última conferência de cada extintor, então não dá para saber o que estava vencido num dia passado";

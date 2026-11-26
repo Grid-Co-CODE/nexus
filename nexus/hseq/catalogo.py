@@ -126,6 +126,23 @@ FATOS = (
          janela_origem="o Nexus é a fonte (só acrescenta, uma vez por dia)",
          observacao="completa sim/não; extintores (os da tela), fora_do_em_dia e linhas (as gravadas no dia). Dia sem "
                     "esta linha é dia sem foto (a API fora o dia inteiro): a tela mostra a lacuna, sem inventar"),
+    # as tratativas dos extintores (24/11/2026, o mockup de Extintores aprovado pela Segurança, entrega 2): o que a
+    # Segurança fez com o cliente ou a usina que tem extintor vencido. Num livro só delas (25/11/2026: o App de Campo lê o
+    # das decisões, e não deu para confirmar no código dele que ignora uma aba nova). Registrado antes da 1ª gravação
+    Fato("tratativa_extintor", "Tratativa da Segurança sobre os extintores", "hseq",
+         "nexus_hseq_extintores_tratativas · fato_tratativa_extintor",
+         "1 linha = 1 tratativa da Segurança, que vale para o cliente inteiro ou para uma usina dele",
+         _d(data=("id", "data_id (o dia da tratativa, que a pessoa escolhe; nunca no futuro)"),
+            usina=("id", "usina_id (no escopo usina; vazio no escopo cliente)"),
+            cliente=("id", "cliente_id (o cliente do cadastro, nos dois escopos; nunca o nome)"),
+            pessoa=("hmac", "decidida_por_hmac (quem registrou; o nome só cifrado)")),
+         tipo="sem_medida", chave=("decidida_em", "escopo", "cliente_id", "usina_id"),
+         fontes=("nexus_hseq_extintores_tratativas · fato_tratativa_extintor",),
+         janela_origem="o Nexus é a fonte (só acrescenta)",
+         observacao="escopo (domínio): cliente ou usina. tipo (domínio): email, recarga_agendada, os_recarga, troca, "
+                    "aguardando ou outro. Quem registrou e a observação (até 300 letras) só cifrados (dados_cifrados, "
+                    "regra 8). Assinada (assinatura, HMAC com a chave derivada da NEXUS_PESSOA_HMAC, rótulo "
+                    "nexus:hseq:tratativas)"),
 )
 
 LIVROS = (
@@ -154,6 +171,12 @@ LIVROS = (
           "registrado em 24/11/2026 antes de existir: nasce com a 1ª foto (completa). Só as mudanças, com a foto "
           "completa no 1º dia de cada mês; a gravação relê o banco antes e troca o livro inteiro",
           so_cresce=True),
+    Livro("nexus_hseq_extintores_tratativas", ("fato_tratativa_extintor",),
+          "a cada tratativa registrada na tela de Extintores",
+          "nexus/hseq/tratativas.py, pela tela Extintores da Segurança", False,
+          "registrado em 25/11/2026 antes de existir: nasce com a 1ª tratativa. A tela lê com cache de 1 minuto e a "
+          "gravação relê o banco antes e troca o livro inteiro",
+          so_cresce=True),
 )
 
 RESUMO = {
@@ -164,6 +187,7 @@ RESUMO = {
     "documentacao_colaborador": "A documentação de segurança de cada colaborador (ASO, NRs)",
     "extintor_dia": "Os extintores fora do em dia, dia a dia, pelas mudanças",
     "foto_extintores_dia": "Os dias em que a foto dos extintores foi gravada",
+    "tratativa_extintor": "O que a Segurança fez com os extintores vencidos de cada cliente",
 }
 
 PARA_QUE = {
@@ -189,4 +213,8 @@ PARA_QUE = {
                     "nos outros dias, só o que mudou. É o histórico para ver o que venceu e o que foi resolvido.",
     "foto_extintores_dia": "Guarda cada dia em que a foto dos extintores foi gravada, com quantos estavam fora do em "
                            "dia. O dia que não está aqui ficou sem foto, e a tela mostra a lacuna em vez de inventar.",
+    "tratativa_extintor": "Guarda cada tratativa que a Segurança registra sobre os extintores de um cliente ou de uma "
+                          "usina (cliente notificado, recarga agendada, OS de recarga aberta, troca realizada, "
+                          "aguardando o cliente). A tela Extintores mostra a última e o histórico. Quem registrou e a "
+                          "observação vão cifrados.",
 }

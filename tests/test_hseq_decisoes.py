@@ -195,7 +195,7 @@ def test_pedir_nova_ronda_e_da_usina_inteira(com_nao_reconhecido, livro, tst, mo
     assert (linha["usina_id"], linha["usina_app"]) == (1, "Thopen - Altair 1 - SP")    # o nome que o App usa
     assert re.fullmatch(r"[0-9a-f]{64}", linha["assinatura"])
     depois = tst.get("/t/hseq/extintores?cliente=Thopen&usina=Altair").get_data(as_text=True)
-    assert "nova ronda pedida em 09/10 · 0 de 3 refeitos" in _abre(depois, "Altair<span")
+    assert "nova ronda pedida em 09/10 · 0 de 3 refeitos" in _abre(depois, "</span>Altair</span>")
     assert 'data-ronda="1" data-ronda-em="09/10"' in depois
     # a equipe refaz: duas chegam às 11h (14h UTC) e uma antes do pedido; depois, a terceira
     conf = [{"Código": f"ALT100-INFC1-PPCI-EXT0{n}", "Mês": "2026-10", "Usina": "Thopen - Altair 1 - SP",
@@ -204,7 +204,7 @@ def test_pedir_nova_ronda_e_da_usina_inteira(com_nao_reconhecido, livro, tst, mo
     _aba(com_nao_reconhecido, EXT.LIVRO_CONF, EXT.ABA_CONF, conf)
     visao.limpar()
     meio = tst.get("/t/hseq/extintores?cliente=Thopen&usina=Altair").get_data(as_text=True)
-    assert "2 de 3 refeitos" in _abre(meio, "Altair<span")
+    assert "2 de 3 refeitos" in _abre(meio, "</span>Altair</span>")
     conf[2]["Recebida em"] = "2026-10-09T14:05:00.000Z"
     _aba(com_nao_reconhecido, EXT.LIVRO_CONF, EXT.ABA_CONF, conf)
     visao.limpar()

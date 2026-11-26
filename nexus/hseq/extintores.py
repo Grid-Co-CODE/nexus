@@ -49,6 +49,7 @@ from datetime import date
 from flask import current_app
 
 from ..campo import leitura, visao
+from ..dados import fatos as D
 from ..dados import livros
 
 LIVRO = "extintores_app_campo"
@@ -240,7 +241,10 @@ def linha(x: dict, b, quem: dict, hoje: date) -> dict:
     uid, _como = b.lig.usina(usina, _txt(x.get("Ativo")) or _txt(x.get("Código da usina")))
     sit = situacao(x, hoje)
     nr = nao_reconhecido(x, sit["conferencia"])
-    return {"codigo": codigo, "ext": codigo.rsplit("-", 1)[-1], "usina_id": uid, **b.onde(uid, usina),
+    # o ID do cliente da usina (as tratativas do "cliente inteiro" gravam o ID, nunca o nome: 24/11/2026)
+    cid = D._id((b.por_id.get(uid) or {}).get("cliente_id")) if uid else None
+    return {"codigo": codigo, "ext": codigo.rsplit("-", 1)[-1], "usina_id": uid, "cliente_id": cid,
+            **b.onde(uid, usina),
             "usina_fonte": usina, "tipo": _txt(x.get("Tipo de ativo")), "ativo": _txt(x.get("Ativo")),
             "local": _txt(x.get("Local")), "posicao": _txt(x.get("Posição")), "classe": _txt(x.get("Classe")),
             "peso": _num(x.get("Peso (kg)")), "carga": _txt(x.get("Carga")).upper().replace(" ", "_"),
@@ -427,6 +431,7 @@ def por_usina(lista, nao_reconhecidos=()) -> list[dict]:
         s = g.get(chave_usina(x))
         if s is None:
             s = g[chave_usina(x)] = {"usina": x["usina"], "usina_id": x.get("usina_id"), "chave": chave_usina(x),
+                                     "cliente_id": x.get("cliente_id"),
                                      **{c: valor_do_filtro(x, c) for c in SEM_VALOR},
                                      "tecnicos": x.get("tecnicos") or [], "extintores": [], "nao_reconhecidos": []}
         return s
@@ -458,6 +463,12 @@ def por_cliente(lista, nao_reconhecidos=()) -> list[dict]:
         s["n_usinas"] = len(s["usinas"])
         s["nao_reconhecidos_qtd"] = sum(len(u["nao_reconhecidos"]) for u in s["usinas"])
         s["usinas_atrasado"] = sum(1 for u in s["usinas"] if u["atrasado"])
+        s["cliente_id"] = next((u["cliente_id"] for u in s["usinas"] if u.get("cliente_id")), None)
+        # a Última inspeção do cliente é a MAIS ANTIGA entre as usinas dele (o mockup de 24/11/2026: "para não esconder
+        # usina parada"); a usina nunca conferida é a mais antiga de todas
+        velha = min(s["usinas"], key=lambda u: (u["conferencia"] is not None, u["conferencia"] or date.min))
+        s.update(conferencia=velha["conferencia"], dias_conferencia=velha["dias_conferencia"],
+                 sem_atualizacao=velha["sem_atualizacao"])
     return sorted(g.values(), key=lambda s: (s["cliente"] == SEM_CLIENTE, *_gravidade(s), s["cliente"]))
 
 

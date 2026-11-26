@@ -48,6 +48,15 @@
 {% macro acoes(args, g=none) %}{% set rp = rondas.get(g.usina_id) if g and g.usina_id else none %}<button class="hs-tres" aria-label="Ações" data-args="{{ args|urlencode }}"{% if g and pode and g.usina_id %} data-ronda="{{ g.usina_id }}"{% if rp %} data-ronda-em="{{ rp.decidida_em[8:10] }}/{{ rp.decidida_em[5:7] }}"{% endif %}{% endif %}>&#8943;</button>{% endmacro %}
 {# os técnicos da usina (a tela Técnicos por usina do PCM), um embaixo do outro, como lá #}
 {% macro tecnicos(g) %}{% if d.get('tecnicos_erro') %}<span class="cn-t-neutro" title="A lista de técnicos por usina do PCM não foi lida agora">não lido</span>{% elif g.tecnicos %}<span class="ext-tecs">{% for n in g.tecnicos %}<span>{{ n }}</span>{% endfor %}</span>{% else %}<span class="cn-t-neutro">sem técnico</span>{% endif %}{% endmacro %}
+{# A TABELA POR CLIENTE NOVA (24/11/2026, o mockup aprovado pela Segurança): a bolinha da situação mais grave, a Última
+   inspeção (no cliente, a MAIS ANTIGA das usinas dele, para não esconder usina parada; azul passados os 30 dias da régua
+   do "sem atualização") e a Evolução (a última tratativa, quantas e quem registrou, com o Ver histórico e o Registrar).
+   Saíram da linha do cliente e da usina o Responsável, os Técnicos e a Recarga mais próxima: o responsável e a equipe
+   vão embaixo do nome da usina (os técnicos no title), e a recarga de cada extintor está na tabela dele #}
+{% from 'hseq/_trat_icones.html' import icone %}
+{% macro bola(g) %}{% set s = situacoes.get(g.situacao, ('Não reconhecido', 'alerta')) %}<span class="hs-bola hs-bola--{{ s[1] }}" role="img" aria-label="{{ s[0] }}"></span>{% endmacro %}
+{% macro inspecao(g) %}{% if g.conferencia %}{% set n = g.dias_conferencia %}<span class="ext-par{{ ' cn-t-info' if n > sem_atualizacao_dias }}"><span class="m">{{ g.conferencia.strftime('%d/%m/%Y') }}</span><span class="det{{ ' cn-t-info' if n > sem_atualizacao_dias }}">{{ 'hoje' if n == 0 else 'ontem' if n == 1 else 'há ' ~ n ~ ' dias' }}</span></span>{% else %}<span class="cn-t-info">nunca conferida</span>{% endif %}{% endmacro %}
+{% macro evolucao(e) %}<div class="hs-evol">{% if e %}{% set t = e.ultima %}<span class="hs-evol-ult">{{ icone(t.tipo) }}<span><b>{{ t.tipo_txt }}</b> <span class="det">· {{ t.dia.strftime('%d/%m/%Y') if t.dia else '' }}</span></span></span><span class="det">{{ e.n }} tratativa{{ 's' if e.n != 1 }}{% if t.quem %} · última por {{ t.quem }}{% endif %}</span>{% else %}<span class="cn-t-critico">Nenhuma tratativa</span>{% endif %}{% if e or pode %}<span class="hs-evol-acoes">{% if e %}<button class="hs-link hs-trat-abre" data-acao="ver">Ver histórico</button>{% endif %}{% if e and pode %} · {% endif %}{% if pode %}<button class="hs-link hs-trat-abre" data-acao="registrar">Registrar</button>{% endif %}</span>{% endif %}</div>{% endmacro %}
 {% set pronto = not leitura.erro and d.get('aba_existe') and not d.get('colunas_faltando') %}
 <div class="campo-nativa">
   <div class="cn-cab">
@@ -61,7 +70,10 @@
       {{ termo('Sem atualização', 'info') }}<dd>A última conferência (no App ou, antes dele, no Forms da TST) foi há mais de {{ sem_atualizacao_dias }} dias, ou nunca houve. Soma-se às outras, por isso os números da faixa não fecham o total.</dd>
       {{ termo('Não reconhecido', 'alerta') }}<dd>A equipe marcou na ronda do App que não achou o extintor na usina. Sai das contas; na usina, a Segurança aceita (o extintor é excluído, com o motivo Não reconhecido em campo) ou pede uma nova ronda da usina inteira.</dd>
       {{ termo('Status') }}<dd>Quantos extintores do cliente ou da usina estão em cada situação, um por linha, com a cor dela. Na linha do extintor, o status da TST: a regra da planilha de controle da TST, a mesma do App, que olha também a carga e os 9 itens do checklist.</dd>
-      {{ termo('Última conferência, responsável e técnicos') }}<dd>Aparecem ao abrir um cliente. O responsável (Responsável UFV) é o Responsável O&amp;M da ficha da usina; os técnicos são os da tela Técnicos por usina do PCM.</dd>
+      {{ termo('Bolinha') }}<dd>A situação mais grave do cliente ou da usina, na cor dela (vermelho atrasado, amarelo perto de vencer, cinza sem validade, verde em dia).</dd>
+      {{ termo('Última inspeção') }}<dd>Na usina, a conferência mais recente dos extintores dela; no cliente, a MAIS ANTIGA entre as usinas dele, para não esconder usina parada. Fica azul passados {{ sem_atualizacao_dias }} dias.</dd>
+      {{ termo('Responsável e equipe') }}<dd>Embaixo do nome da usina: o Responsável O&amp;M da ficha da usina e a equipe. Os técnicos (da tela Técnicos por usina do PCM) aparecem ao passar o mouse nessa linha.</dd>
+      {{ termo('Evolução') }}<dd>A última tratativa da Segurança (o que foi feito e quando), quantas há e quem registrou a última. No cliente, a mais nova entre as do cliente inteiro e as das usinas dele; na usina, a mais nova que vale para ela, contando as do cliente inteiro. "Ver histórico" abre todas; "Registrar" grava uma nova.</dd>
     {% endcall %}
     </div><p class="cn-pergunta">{{ tela.pergunta }}</p></div>
     <div class="cn-frescor">ronda de extintores do App + cadastro do Nexus<br><b>lido às {{ lido }}</b>{% if d.get('publicado_em') %} · livro gravado em {{ d.publicado_em }}{% endif %}</div>
@@ -196,20 +208,21 @@
      com um cliente aberto (Levi, 24/10/2026: "não precisa das colunas responsável e técnico na primeira visão, só ao
      clicar na linha deve aparecer essas colunas"; e "a coluna de última conferência (...) também só deve aparecer no
      drill down"). Cada linha vai numa linha só do HTML (o recuo entre as células pesava ~20 KB) #}
-  <div class="cn-tab cn-tab--compacta ext-tab"><table class="cn-expande ext-clientes{% if not abre_cliente %} hs-fechada{% endif %}">
-    <thead><tr><th>Situação</th><th class="hs-col-aberta">Última conferência</th><th>Cliente e usina</th><th class="hs-col-aberta">Responsável</th><th class="hs-col-aberta">Técnicos</th><th>Quantidade de extintores</th><th>Recarga mais próxima</th><th>Status</th><th aria-label="Ações"></th></tr></thead>
+  {% if trat_erro %}<div class="cn-erro cn-aviso" role="status"><b>Não consegui ler as tratativas agora.</b> A coluna Evolução pode estar incompleta; recarregue em instantes.</div>{% endif %}
+  <div class="cn-tab cn-tab--compacta ext-tab"><table class="cn-expande ext-clientes hs-clientes">
+    <thead><tr><th aria-label="Situação"></th><th>Cliente e usina</th><th>Qtd. de extintores</th><th>Última inspeção</th><th>Status</th><th>Evolução</th><th aria-label="Ações"></th></tr></thead>
     <tbody>
     {% for c in grupos %}{% set s = situacoes.get(c.situacao, ('Não reconhecido', 'alerta')) %}{% set n = loop.index %}
-      <tr class="cn-linha ext-cli" data-cli="{{ n }}" tabindex="0" aria-expanded="{{ 'true' if abre_cliente else 'false' }}" title="Ver as usinas do cliente"><td><span class="cn-st cn-t-{{ s[1] }}">{{ s[0] }}</span></td><td class="hs-col-aberta"></td><td class="ext-usina"><span class="ext-par"><span><span class="ext-seta" aria-hidden="true"></span><b>{{ c.cliente }}</b></span><span class="det">{{ plural(c.n_usinas, 'usina', 'usinas') }}</span>{% if c.usinas_atrasado %}<span class="det cn-t-critico">{{ c.usinas_atrasado }} com extintor atrasado</span>{% endif %}</span></td><td class="hs-col-aberta"></td><td class="hs-col-aberta"></td><td><b class="hs-qtd">{{ c.qtd + nnr(c)|int }}</b></td><td>{{ recarga(c) }}</td><td>{{ status(c) }}</td><td>{{ acoes(dict(filtros_url, cliente=c.cliente)) }}</td></tr>
+      <tr class="cn-linha ext-cli" data-cli="{{ n }}" data-cid="{{ c.cliente_id or '' }}" data-nome="{{ c.cliente }}" tabindex="0" aria-expanded="{{ 'true' if abre_cliente else 'false' }}" title="Ver as usinas do cliente"><td>{{ bola(c) }}</td><td class="ext-usina"><span class="ext-par"><span><span class="ext-seta" aria-hidden="true"></span><b>{{ c.cliente }}</b></span><span class="det">{{ plural(c.n_usinas, 'usina', 'usinas') }}</span>{% if c.usinas_atrasado %}<span class="det cn-t-critico">{{ c.usinas_atrasado }} com extintor atrasado</span>{% endif %}</span></td><td><b class="hs-qtd">{{ c.qtd + nnr(c)|int }}</b></td><td>{{ inspecao(c) }}</td><td>{{ status(c) }}</td><td>{{ evolucao(c.evol) }}</td><td>{{ acoes(dict(filtros_url, cliente=c.cliente)) }}</td></tr>
       {% for g in c.usinas %}{% set su = situacoes.get(g.situacao, ('Não reconhecido', 'alerta')) %}{% set tot = g.qtd + g.nao_reconhecidos|length %}{% set rp = rondas.get(g.usina_id) if g.usina_id else none %}
-      <tr class="cn-linha ext-us" data-cli="{{ n }}" tabindex="0" aria-expanded="{{ 'true' if abre_usina else 'false' }}" title="Ver {{ 'o extintor' if tot == 1 else 'os ' ~ tot ~ ' extintores' }}"{% if not abre_cliente %} hidden{% endif %}><td><span class="cn-st cn-t-{{ su[1] }}">{{ su[0] }}</span></td><td class="hs-col-aberta">{{ conferencia(g) }}</td><td class="ext-usina ext-us-nome"><span class="ext-seta" aria-hidden="true"></span>{{ g.usina }}{% if rp %}<span class="hs-ronda" title="A ronda é do zero: o pedido sai quando todos os extintores da usina forem conferidos de novo (ou marcados como não reconhecidos) depois dele">nova ronda pedida em {{ rp.decidida_em[8:10] }}/{{ rp.decidida_em[5:7] }} · {{ rp.feitos }} de {{ rp.total }} refeitos</span>{% endif %}</td><td class="ext-esq hs-col-aberta">{% if g.responsavel == sem_responsavel %}<span class="cn-t-neutro">sem responsável</span>{% else %}{{ g.responsavel }}{% endif %}</td><td class="ext-esq hs-col-aberta">{{ tecnicos(g) }}</td><td><b class="hs-qtd">{{ tot }}</b></td><td>{{ recarga(g) }}</td><td>{{ status(g) }}</td><td>{{ acoes(dict(filtros_url, cliente=g.cliente, usina=g.usina), g) }}</td></tr>
+      <tr class="cn-linha ext-us" data-cli="{{ n }}" data-uid="{{ g.usina_id or '' }}" data-cid="{{ g.cliente_id or '' }}" data-nome="{{ g.usina }}" tabindex="0" aria-expanded="{{ 'true' if abre_usina else 'false' }}" title="Ver {{ 'o extintor' if tot == 1 else 'os ' ~ tot ~ ' extintores' }}"{% if not abre_cliente %} hidden{% endif %}><td>{{ bola(g) }}</td><td class="ext-usina ext-us-nome"><span class="ext-par"><span><span class="ext-seta" aria-hidden="true"></span>{{ g.usina }}</span><span class="det hs-us-resp"{% if g.tecnicos %} title="Técnicos: {{ g.tecnicos|join(', ') }}"{% endif %}>{{ 'sem responsável' if g.responsavel == sem_responsavel else g.responsavel }} · {{ g.equipe }}</span>{% if rp %}<span class="hs-ronda" title="A ronda é do zero: o pedido sai quando todos os extintores da usina forem conferidos de novo (ou marcados como não reconhecidos) depois dele">nova ronda pedida em {{ rp.decidida_em[8:10] }}/{{ rp.decidida_em[5:7] }} · {{ rp.feitos }} de {{ rp.total }} refeitos</span>{% endif %}</span></td><td><b class="hs-qtd">{{ tot }}</b></td><td>{{ inspecao(g) }}</td><td>{{ status(g) }}</td><td>{{ evolucao(g.evol) }}</td><td>{{ acoes(dict(filtros_url, cliente=g.cliente, usina=g.usina), g) }}</td></tr>
       {# os extintores da usina só vêm quando ela abre (19/10/2026: com todos na página, escondidos, eram 897 KB e o
          servidor levava 21 s montando); com o filtro de usina (o clique num não reconhecido) já vêm na página #}
-      <tr class="cn-detalhe" data-cli="{{ n }}"{% if not abre_usina %} hidden data-url="{{ url_for('torre_hseq.extintores_usina', **dict(filtros_url, cliente=g.cliente, usina=g.usina)) }}"{% endif %}><td colspan="9">
+      <tr class="cn-detalhe" data-cli="{{ n }}"{% if not abre_usina %} hidden data-url="{{ url_for('torre_hseq.extintores_usina', **dict(filtros_url, cliente=g.cliente, usina=g.usina)) }}"{% endif %}><td colspan="7">
         {% if abre_usina %}{{ tabela_usina(g.extintores, g.nao_reconhecidos) }}{% else %}<span class="mudo">Carregando {{ 'o extintor' if tot == 1 else 'os ' ~ tot ~ ' extintores' }}...</span>{% endif %}
       </td></tr>
       {% endfor %}
-    {% else %}<tr><td colspan="9" class="mudo">Nenhum extintor com esses filtros.</td></tr>{% endfor %}
+    {% else %}<tr><td colspan="7" class="mudo">Nenhum extintor com esses filtros.</td></tr>{% endfor %}
     </tbody>
   </table></div>
   {# o menu dos três pontos, um só: o clique o leva para a linha e põe os endereços dela #}
@@ -217,6 +230,28 @@
     <a role="menuitem" data-tipo="pdf" href="#">Exportar PDF</a><a role="menuitem" data-tipo="xls" href="#">Exportar planilha</a>
     {% if pode %}<div class="hs-menu-seg"><hr><button type="button" role="menuitem" class="hs-pedir-ronda">Pedir nova ronda</button><span class="hs-menu-nota" hidden></span></div>{% endif %}
   </div>
+  {# a caixa das tratativas (o mockup aprovado pela Segurança, 24/11/2026), uma só: o "Ver histórico" e o "Registrar" de
+     cada linha a abrem com o cliente ou a usina dela. Os tipos em chips, a data (hoje, nunca no futuro), para quem vale (o
+     cliente inteiro ou uma usina dele) e a observação; embaixo, o histórico, que vem do Nexus ao abrir. Quem não é da
+     Segurança vê só o histórico #}
+  <dialog class="hs-dialogo hs-trat" id="hs-trat" aria-labelledby="hs-trat-t">
+    <h2 id="hs-trat-t">Tratativas</h2>
+    {% if pode %}<form method="post" action="{{ url_for('torre_hseq.extintores_tratativa') }}" class="hs-trat-form">
+      <fieldset class="hs-chips"><legend class="gc-rotulo">O que foi feito</legend>
+        {% for k, rot in tipos_trat.items() %}<label class="hs-chip"><input type="radio" name="tipo" value="{{ k }}" required{% if loop.first %} checked{% endif %}><span>{{ rot }}</span></label>{% endfor %}
+      </fieldset>
+      <div class="hs-trat-linha">
+        <label><span class="gc-rotulo">Data</span><input class="gc-campo" name="dia" value="{{ hoje_txt }}" data-hoje="{{ hoje_txt }}" placeholder="dd/mm/aaaa" pattern="[0-9]{2}/[0-9]{2}/[0-9]{4}" inputmode="numeric" maxlength="10" required></label>
+        <label class="hs-trat-alvo"><span class="gc-rotulo">Vale para</span><select class="gc-campo" name="alvo" required></select></label>
+      </div>
+      <label><span class="gc-rotulo">Observação</span><textarea class="gc-campo" name="obs" maxlength="{{ obs_max }}" rows="2" placeholder="Ex.: enviado o relatório de extintores vencidos ao contato do contrato"></textarea></label>
+      <p class="hs-dlg-nota hs-trat-aviso" hidden></p>
+      <div class="hs-dlg-botoes"><button type="button" class="gc-btn gc-btn--ui gc-btn--contorno hs-cancelar">Cancelar</button>
+        <button type="submit" class="gc-btn gc-btn--ui gc-btn--primario">Registrar tratativa</button></div>
+    </form>{% endif %}
+    <div class="hs-trat-hist" aria-live="polite"></div>
+    {% if not pode %}<div class="hs-dlg-botoes"><button type="button" class="gc-btn gc-btn--ui gc-btn--contorno hs-cancelar">Fechar</button></div>{% endif %}
+  </dialog>
   {% else %}
   <div class="cn-tab cn-tab--compacta ext-tab cn-fotos-grupo"><table>
     <thead><tr><th>Situação</th><th>Última conferência</th><th>Usina</th><th>Extintor</th><th>Local</th><th>Recarga</th><th>Hidrostático</th><th>Status da TST</th></tr></thead>
@@ -342,6 +377,51 @@
             d.querySelector('.hs-info-texto').textContent = j.ok ? j.texto : 'A última ronda tem informação adicional, mas o texto ainda não chegou do App de Campo.';
             d.showModal();
           }).catch(function () { avisa('Não consegui buscar a informação adicional agora.'); });
+      });
+    })();
+    // a caixa das tratativas: o "Ver histórico" e o "Registrar" da linha a abrem com o cliente (e as usinas dele, as
+    // linhas logo abaixo) ou a usina; o histórico vem do Nexus ao abrir. A data é dd/mm/aaaa e não pode ser no futuro
+    (function () {
+      var dlg = document.getElementById('hs-trat');
+      if (!dlg) return;
+      var form = dlg.querySelector('form'), hist = dlg.querySelector('.hs-trat-hist');
+      function opcao(sel, valor, texto) { var o = document.createElement('option'); o.value = valor; o.textContent = texto; sel.appendChild(o); }
+      document.addEventListener('click', function (ev) {
+        var b = ev.target.closest('.hs-trat-abre');
+        if (!b) return;
+        ev.stopPropagation();
+        var tr = b.closest('tr'), tbody = tr.closest('tbody'), cli = tr.dataset.cli;
+        var cliente = tbody.querySelector('tr.ext-cli[data-cli="' + cli + '"]');
+        var usinas = Array.prototype.slice.call(tbody.querySelectorAll('tr.ext-us[data-cli="' + cli + '"]')).filter(function (u) { return u.dataset.uid; });
+        var naUsina = tr.classList.contains('ext-us');
+        dlg.querySelector('h2').textContent = 'Tratativas · ' + (naUsina ? tr.dataset.nome : cliente.dataset.nome);
+        if (form) {
+          var sel = form.elements.alvo;
+          sel.textContent = '';
+          if (cliente.dataset.cid) opcao(sel, 'c:' + cliente.dataset.cid, 'Cliente inteiro (' + usinas.length + (usinas.length === 1 ? ' usina)' : ' usinas)'));
+          usinas.forEach(function (u) { opcao(sel, 'u:' + u.dataset.uid, u.dataset.nome); });
+          sel.value = naUsina ? 'u:' + tr.dataset.uid : (cliente.dataset.cid ? 'c:' + cliente.dataset.cid : (usinas[0] ? 'u:' + usinas[0].dataset.uid : ''));
+          form.elements.dia.value = form.elements.dia.dataset.hoje;
+          form.elements.obs.value = '';
+          form.querySelector('.hs-trat-aviso').hidden = true;
+        }
+        var q = naUsina ? 'usina_id=' + encodeURIComponent(tr.dataset.uid) + '&cliente_id=' + encodeURIComponent(tr.dataset.cid || '')
+          : 'cliente_id=' + encodeURIComponent(cliente.dataset.cid || '') + '&usinas=' + usinas.map(function (u) { return u.dataset.uid; }).join(',');
+        hist.innerHTML = '<p class="mudo">Carregando o histórico...</p>';
+        fetch(nexusRota('/t/hseq/extintores/tratativas') + '?' + q, {credentials: 'same-origin'})
+          .then(function (r) { if (!r.ok) throw new Error(r.status); return r.text(); })
+          .then(function (h) { hist.innerHTML = h; })
+          .catch(function () { hist.innerHTML = '<p class="cn-t-critico">Não consegui buscar o histórico agora.</p>'; });
+        dlg.showModal();
+        if (form && b.dataset.acao === 'registrar') form.querySelector('input[name=tipo]:checked').focus();
+        else hist.scrollIntoView({block: 'nearest'});
+      }, true);
+      if (form) form.addEventListener('submit', function (ev) {
+        var v = form.elements.dia.value.trim(), m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(v), aviso = form.querySelector('.hs-trat-aviso');
+        var h = form.elements.dia.dataset.hoje.split('/');
+        var erro = !m ? 'A data vai como dd/mm/aaaa.'
+          : (m[3] + m[2] + m[1] > h[2] + h[1] + h[0]) ? 'A tratativa não pode ter data no futuro.' : '';
+        if (erro) { ev.preventDefault(); aviso.textContent = erro; aviso.hidden = false; form.elements.dia.focus(); }
       });
     })();
     // a caixa dos não reconhecidos lembra se a pessoa a recolheu (só neste navegador; sem armazenamento, abre)
