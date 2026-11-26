@@ -1629,12 +1629,17 @@ coleta vale para quem instalou o app** (Levi: "Quero que os técnicos que apare�
 app e não só os que botei no piloto!").
 - **Coletados** (`aparelhos.coletados`, `servico.coletados`): o piloto, mais quem tem o app, menos quem o administrador
   tirou (a última decisão dele é sair, `piloto_fora`); depois, a mesma conferência de técnico de campo ativo.
-- **"Tem o app"** são duas fontes:
+- **"Tem o app"** são três fontes:
   - a chave do aparelho ativa;
+  - o próprio pedido da chave, quando vem de dentro do Nexus Field (o `app` `NexusField/...` no corpo;
+    `coleta_vale(..., pelo_app=True)`, 26/11/2026). Caso que criou: o livro do App só sai de hora em hora, e quem
+    instalava e abria pela primeira vez recebia `coleta: false`; a casca só pergunta de novo 6 h depois, e sem a chave
+    não vinham o termo, a trava nem a coleta (cinco técnicos assim em 26/11). O Levi: "a gente não está mais no modo
+    piloto [...] Tem que receber a chave, né?";
   - o livro do App `aparelhos_nexus_field_app_campo · Aparelhos` (`campo/field_aparelhos.py`, o mesmo da coluna Nexus
     Field de Base > Acessos), casado pelo código do e-mail de cada ficha (`_ler_com_app`, cópia de 5 min).
 - Sem o livro do App (fora ou sem a `NEXUS_PESSOA_HMAC`), vale o piloto e as chaves: a coleta nunca para por isso.
-- O registro do celular usa a mesma regra: quem instalou ganha a chave e a coleta no próximo registro.
+- O registro do celular usa a mesma regra: quem abre o Nexus Field ganha a chave e a coleta já na primeira abertura.
 - **Na tela**, o bloco do administrador virou "Coleta do Nexus Field", com os botões "Parar a coleta" e "Ligar a coleta":
   - parar grava a saída no livro do piloto;
   - ligar serve a quem ainda não aparece como instalado e à pessoa de teste.

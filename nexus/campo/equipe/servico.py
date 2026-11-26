@@ -345,12 +345,19 @@ class Servico:
         """Quem tem a chave do aparelho ativa (antes de lidas as chaves, ninguém)."""
         return set(self.chaveiro.pessoas()) if self._chaves_lidas else set()
 
-    def coleta_vale(self, pessoa_id, agora: datetime) -> bool:
+    def coleta_vale(self, pessoa_id, agora: datetime, pelo_app: bool = False) -> bool:
         """Técnico de campo ativo E coletado (com o app ou posto pelo administrador, e não tirado). Os coletados vêm
         antes: quem está fora nem custa a leitura do cadastro. `AindaLendo` (a 1ª leitura em curso noutro pedido) e
-        `BancoFora` (sem leitura boa) sobem: 503 na rota."""
+        `BancoFora` (sem leitura boa) sobem: 503 na rota.
+
+        `pelo_app`: o pedido veio de dentro do Nexus Field (o registro da chave com o app no corpo), e isso já prova que
+        a pessoa tem o app, sem esperar o livro do App, que só sai de hora em hora. Caso que criou (26/11/2026): quem
+        instalava e abria pela primeira vez recebia coleta false, e a casca só pergunta de novo 6 h depois; sem a chave
+        não vinham o termo, a trava nem a coleta. Quem o administrador parou segue parado."""
         ts = agora.timestamp()
         piloto = self.coletados(self._piloto.valor(ts))
+        if pelo_app and pessoa_id not in piloto and pessoa_id not in piloto.fora:
+            piloto = Piloto(set(piloto) | {pessoa_id}, piloto.teste, piloto.fora)
         if pessoa_id not in piloto:
             return False
         teste = getattr(piloto, "teste", frozenset())

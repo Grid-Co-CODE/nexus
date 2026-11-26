@@ -192,7 +192,8 @@ def _registro():
         # "não sei quem é / quem está no piloto" (o banco sem leitura boa) é 503, nunca o coleta false que pararia o
         # celular até a próxima abertura do App (revisão final de 08/11/2026)
         pid = srv.pessoa_do_email(email)
-        vale = pid is not None and srv.coleta_vale(pid, agora)
+        # de dentro do Nexus Field (o app no corpo) já vale como ter o app, antes do livro do App (26/11/2026)
+        vale = pid is not None and srv.coleta_vale(pid, agora, pelo_app=app.startswith("NexusField/"))
     except S.AindaLendo:
         raise _Recusa(503, TEXTO_LENDO) from None
     except S.BancoFora as e:

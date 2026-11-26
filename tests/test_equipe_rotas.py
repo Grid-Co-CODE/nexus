@@ -239,13 +239,39 @@ def test_registro_do_tecnico_do_piloto_devolve_a_chave(app, cliente, banco, ms):
     assert ev[0]["chave_hash"] == hashlib.sha256(chave.encode()).hexdigest() and chave not in str(ev)
 
 
-def test_registro_fora_do_piloto_devolve_coleta_false(app, cliente, banco, ms):
-    # fora do piloto; no piloto mas não é técnico de campo; no piloto mas desligado; e-mail que o cadastro não conhece
-    for token in ("token:" + EMAIL[FORA_DO_PILOTO], "token:" + EMAIL[SUPERVISORA], "token:" + EMAIL[DESLIGADO],
-                  "token:ninguem.aqui@gridco.com.br"):
+def test_registro_de_quem_nao_e_tecnico_de_campo_ativo_devolve_coleta_false(app, cliente, banco, ms):
+    # no piloto mas não é técnico de campo; no piloto mas desligado; e-mail que o cadastro não conhece; e o técnico fora
+    # do piloto que não chama de dentro do Nexus Field (sem o app no corpo)
+    for token in ("token:" + EMAIL[SUPERVISORA], "token:" + EMAIL[DESLIGADO], "token:ninguem.aqui@gridco.com.br"):
         r = _registrar(cliente, token=token)
         assert r.status_code == 200 and r.get_json() == {"coleta": False}, token
+    r = _registrar(cliente, token="token:" + EMAIL[FORA_DO_PILOTO], app="")
+    assert r.status_code == 200 and r.get_json() == {"coleta": False}
     assert S.do_app(app).chaveiro.eventos_novos() == []                    # ninguém recebeu chave
+
+
+def test_o_tecnico_que_abre_o_nexus_field_pela_primeira_vez_recebe_a_chave_na_hora(app, cliente, banco, ms):
+    """26/11/2026: técnicos instalaram o Nexus Field e abriram uma vez; o Nexus respondeu coleta false porque o livro do
+    App (quem instalou) só sai de hora em hora, e a casca só pergunta de novo 6 h depois. Sem a chave não vinham o
+    termo, a trava nem a coleta. O Levi: "a gente não está mais no modo piloto [...] Tem que receber a chave, né?". O
+    pedido que vem de dentro do Nexus Field (o app no corpo) já é a prova de que a pessoa tem o app."""
+    r = _registrar(cliente, token="token:" + EMAIL[FORA_DO_PILOTO])         # fora do piloto e fora do livro do App
+    assert r.status_code == 200 and r.get_json()["coleta"] is True and r.get_json()["chave"]
+    chave = r.get_json()["chave"]
+    # a coleta segue nos lotes seguintes: a chave ativa conta como ter o app
+    assert _posicoes(cliente, chave, [_ponto(1)], aparelho="aparelho-1").get_json() == {"aceitos": 1, "coleta": True}
+    # só o técnico de campo ativo: a supervisora e o desligado seguem fora, mesmo de dentro do Nexus Field
+    assert _registrar(cliente, token="token:" + EMAIL[SUPERVISORA]).get_json() == {"coleta": False}
+    assert _registrar(cliente, token="token:" + EMAIL[DESLIGADO]).get_json() == {"coleta": False}
+
+
+def test_quem_o_administrador_parou_nao_recebe_a_chave_nem_de_dentro_do_nexus_field(app, cliente, banco, ms):
+    _aba(banco, LIVRO_PILOTO, ABA_PILOTO, PILOTO + [_decisao(FORA_DO_PILOTO, "não", "2026-11-08T12:00:00Z")])
+    visao.limpar()
+    S.do_app(app).esquecer_piloto()
+    r = _registrar(cliente, token="token:" + EMAIL[FORA_DO_PILOTO])
+    assert r.status_code == 200 and r.get_json() == {"coleta": False}
+    assert S.do_app(app).chaveiro.eventos_novos() == []
 
 
 
