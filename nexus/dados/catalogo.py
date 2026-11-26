@@ -459,6 +459,22 @@ FATOS = (
                     "conferência automática pelos dados diários do PG grava desde 25/11/2026, sem pessoa_hmac) e "
                     "origem_id a chave de lá. Quem só "
                     "cifrado (Cofre, a chave do cadastro). Só acrescenta: nada se edita nem se apaga"),
+    # o comentário avulso na ETM da usina, sem OS (Levi, 26/11/2026: "Não precisa ser OS alguma, mas é bom ter esse
+    # comentário avulso [...] Para a gente ter um acompanhamento")
+    Fato("comentario_etm_usina", "O comentário avulso da Performance na ETM de uma usina", "performance",
+         "nexus_performance_etm · fato_comentario_etm_usina",
+         "1 linha = 1 comentário avulso (sem OS) da Performance na ETM de 1 usina, na gaveta da usina da tela "
+         "Performance › ETMs",
+         _d(data=("id", "data_id (o dia de Brasília do comentário)"),
+            usina=("id", "usina_id (pelas OS de ETM da usina; usina_ligada_por) e usina_chave (sha1 do nome da usina "
+                         "na tela ETMs)"),
+            pessoa=("cod", "pessoa_hmac (quem comentou)")),
+         tipo="sem_medida", chave=("id",), fontes=("nexus_performance_etm · fato_comentario_etm_usina",),
+         janela_origem="o Nexus é a fonte",
+         observacao="usina_chave é o sha1 do nome com que a tela ETMs mostra a usina (o do Fracttal), sem caixa nem "
+                    "espaço repetido: é por ela que a gaveta acha os comentários; usina_id vazio quando as OS de ETM da "
+                    "usina não ligam ao cadastro. Quem e o texto só cifrados (Cofre, a chave do cadastro). Só acrescenta: "
+                    "nada se edita nem se apaga"),
     # o FMEA e a causa raiz dos ativos da Confiabilidade (Levi, 29/10/2026: "Tem que ter emitir FEMEA emitir causa raiz
     # do pcm.gridco.com.br use como referência e implemente"). O Nexus é a FONTE; registrado antes da 1ª gravação
     Fato("relatorio_falha", "FMEA e causa raiz da Engenharia", "engenharia",
@@ -1793,6 +1809,11 @@ LIVROS = (
           "nexus/engenharia/etm_marcas.py, pela OS de ETM da tela ETMs", False,
           "registrado em 26/10/2026 antes da 1ª gravação (regra 10): nasce na 1ª marcação. As quatro abas vão juntas a "
           "cada gravação, sobre o livro relido do banco; as três dim são as listas fixas do código",
+          so_cresce=True),
+    Livro("nexus_performance_etm", ("fato_comentario_etm_usina",),
+          "a cada comentário avulso na gaveta da usina da tela Performance › ETMs",
+          "nexus/performance/etm_comentarios.py, pela gaveta da usina da tela ETMs", False,
+          "registrado em 26/11/2026 antes da 1ª gravação (regra 10): nasce no 1º comentário avulso",
           so_cresce=True),
     Livro("nexus_engenharia_relatorios", ("fato_relatorio_falha",),
           "a cada FMEA ou causa raiz emitido (e a cada nova revisão) pela Engenharia",

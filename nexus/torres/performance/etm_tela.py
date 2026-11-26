@@ -280,6 +280,18 @@ def etm_usina_comentarios():
                         {"os": str(o["os"]), "titulo": o.get("titulo") or "", "nome": ev["nome"] or "alguém",
                          "quando": ev["quando_txt"], "texto": ev["texto"],
                          "iso": ev["quando"].isoformat() if ev["quando"] else ""}))
+    # o comentário avulso da usina, sem OS (26/11/2026, `etm_comentarios`): na mesma linha do tempo, sem o nº da OS; o
+    # livro dele fora não tira os das OS da gaveta, só avisa
+    from ...performance import etm_comentarios as EC
+    lu, erro_avulsos = EC.ler(), ""
+    if lu.get("lido_em"):
+        avulsos, il = EC.da_usina(lu["eventos"], usina)
+        ilegiveis += il
+        for c in avulsos:
+            q = datetime.fromisoformat(c["iso"]) if c["iso"] else datetime.min.replace(tzinfo=timezone.utc)
+            out.append((q, dict(c, os="", titulo="", usina=True)))
+    else:
+        erro_avulsos = (lu.get("erro") or "sem leitura").split(":")[0]
     out.sort(key=lambda x: x[0], reverse=True)
     # as demandas da usina (25/11/2026): as que citam uma OS de ETM dela ou a usina do Nexus (pelo retrato das OS)
     dem, erro_dem = [], ""
@@ -292,7 +304,46 @@ def etm_usina_comentarios():
         logging.exception("ETMs: as demandas da usina %s não vieram", usina)
         erro_dem = type(e).__name__
     return jsonify({"usina": usina, "comentarios": [c for _, c in out], "ilegiveis": ilegiveis, "demandas": dem,
-                    "erro_demandas": erro_dem})
+                    "erro_demandas": erro_dem, "erro_avulsos": erro_avulsos})
+
+
+@bp.route("/etm/usina/comentar", methods=["POST"])
+def etm_usina_comentar():
+    """O comentário avulso na ETM da usina, sem OS (Levi, 26/11/2026: "Não precisa ser OS alguma, mas é bom ter esse
+    comentário avulso [...] Para a gente ter um acompanhamento"): {"usina" (o nome da tela), "texto"}. Fica no Nexus (livro
+    `nexus_performance_etm`), com o nome de quem escreveu e a hora; não vai a nota nenhuma do Fracttal. Comenta quem
+    comenta nas OS da tela (`_quem_pode_na_os`)."""
+    from ...auth.origem import de_outro_site as _de_outro_site
+    from ...engenharia import etm as ETM
+    from ...performance import etm_comentarios as EC
+    if _de_outro_site():
+        abort(403)
+    corpo = request.get_json(silent=True)
+    if not (isinstance(corpo, dict) and isinstance(corpo.get("usina"), str) and corpo["usina"].strip()):
+        return jsonify({"erro": "Pedido sem a usina"}), 400
+    d = ETM.dados()
+    if not d["lido"]:               # a cópia vazia depois de subir: não dá para conferir a usina
+        ETM.pedir_releitura()
+        return jsonify({"erro": LENDO_ETM}), 503
+    usina = corpo["usina"]
+    oss = [o for o in d["os"] if o.get("usina") == usina]
+    if usina not in (d.get("usinas") or {}) and not oss:
+        return jsonify({"erro": "Esta usina não está nas ETMs da tela; recarregue a página"}), 400
+    pode, _meu = _quem_pode_na_os()
+    uid = None
+    try:
+        uid, _ = _usina_no_retrato({int(o["os"]) for o in oss if str(o.get("os")).isdigit()})
+    except Exception:           # noqa: BLE001 — o retrato fora: o comentário vai só pela chave do nome (usina_id vazio)
+        logging.exception("ETMs: a usina %s não ligou ao cadastro para o comentário avulso", usina)
+    try:
+        EC.comentar({"nome": usina, "usina_id": uid, "usina_ligada_por": "OS de ETM da usina" if uid else None},
+                    corpo.get("texto"), session.get("usuario"), pode)
+    except EC.Recusada as e:
+        return jsonify({"erro": str(e)}), 403 if not pode else 400
+    except Exception as e:      # noqa: BLE001 — banco fora: nada gravou (a trava recusa antes de trocar o livro)
+        logging.exception("ETMs: o comentário avulso da usina não gravou")
+        return jsonify({"erro": FALHOU_BANCO.format(type(e).__name__)}), 502
+    return jsonify({"ok": True, "mensagem": "Comentário salvo na linha do tempo da usina."})
 
 
 @bp.route("/etm/os/<int:folio>")

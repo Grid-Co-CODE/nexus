@@ -48,6 +48,7 @@ RESUMO = {
     "acompanhamento_os": "O status, a prioridade e os comentários da Engenharia em cada OS",
     "os_na_cadeia": "As OS que alguém incluiu à mão na cadeia do Raio X de uma OS",
     "marcacao_etm": "O diagnóstico e as marcações da Engenharia em cada OS de ETM",
+    "comentario_etm_usina": "O comentário avulso da Performance na ETM de uma usina, sem OS",
     "relatorio_falha": "Cada FMEA e cada causa raiz emitidos pela Engenharia, com as revisões",
     "contestacao_cliente": "O que o cliente contestou no Dashboard Thopen, por setor",
     "decisao": "O que o painel do App decidiu: aprovar, tratar ou devolver",
@@ -241,6 +242,9 @@ PARA_QUE = {
                          "e cada comentário, com o dia e a hora; o comentário vai também para a nota da OS no "
                          "Fracttal. Serve para saber em que pé está cada OS da Engenharia, quais pararam e, com o "
                          "tempo, quanto cada etapa leva por tipo de ativo e usina. Quem e o texto vão cifrados.",
+    "comentario_etm_usina": "Guarda o comentário que a Performance escreve na ETM de uma usina sem ligar a OS nenhuma, na "
+                            "gaveta da usina da tela ETMs: o acompanhamento da estação (o que se viu, o que se combinou "
+                            "com o cliente) com quem escreveu e quando.",
     "marcacao_etm": "Guarda o que a Engenharia marca em cada OS das Estações Meteorológicas na tela ETMs: o diagnóstico "
                     "(falha de equipamento, de comunicação, sujidade ou outro), o status pós-OS (chamado de garantia, "
                     "alinhamento com o cliente ou regularizado), as etiquetas, o acompanhamento e o finalizado pela "

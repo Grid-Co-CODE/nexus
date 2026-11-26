@@ -172,13 +172,15 @@
     </form>{% endif %}
     <p class="eg-pdf-msg" id="etm-us-msg" role="status" hidden></p>
     {# comentar nas OS da usina sem abrir cada uma (24/11/2026): o mesmo caminho da página da OS (a ponte do OS Creator, que
-       põe na nota da OS na sessão do Fracttal da pessoa e guarda no Nexus); quem não comenta na página da OS não vê #}
+       põe na nota da OS na sessão do Fracttal da pessoa e guarda no Nexus); quem não comenta na página da OS não vê. E o
+       comentário AVULSO da usina, sem OS (26/11/2026, Levi: "Não precisa ser OS alguma, mas é bom ter esse comentário
+       avulso [...] Para a gente ter um acompanhamento"): a 1ª opção, fica só no Nexus (`etm_comentarios`) #}
     {% if pode_comentar %}<form class="etm-chat-novo" id="etm-chat-novo" hidden>
-      <div class="etm-chat-l"><label class="gc-rotulo" for="etm-chat-os">Comentar na OS</label>
+      <div class="etm-chat-l"><label class="gc-rotulo" for="etm-chat-os">Comentar em</label>
         <select class="gc-campo" id="etm-chat-os"></select></div>
       <textarea class="gc-campo eg-tl-obs" id="etm-chat-texto" rows="2" maxlength="2000" aria-label="Comentário" placeholder="O que foi visto, o que falta, quem vai…"></textarea>
       <div class="etm-chat-acoes"><button type="submit" class="gc-btn gc-btn--primario" id="etm-chat-enviar">Comentar</button>
-        <span class="eg-dica">Vai para a nota da OS no Fracttal, com o seu nome e a hora.</span></div>
+        <span class="eg-dica" id="etm-chat-dica">Fica na linha do tempo da usina, com o seu nome e a hora.</span></div>
       <p class="eg-pdf-msg" id="etm-chat-msg" role="status" hidden></p>
     </form>{% endif %}
     <h3>Linha do tempo</h3>
@@ -678,11 +680,13 @@
     cabUsina(nome); dizerUs(''); if (usFim) { usFim.hidden = true; usFimTxt.value = ''; }
     if (novo) {
       var lista = osParaComentar(nome), sel = document.getElementById('etm-chat-os');
-      preencher(sel, lista.map(function (o) {
+      var avulso = el('option', '', 'A usina (sem OS)'); avulso.value = AVULSO;
+      preencher(sel, [avulso].concat(lista.map(function (o) {
         var op = el('option', '', 'OS ' + o.os + ' · ' + (o.titulo || '(sem título)').slice(0, 70) + (abertaEng(o) && !D.sem_marcas ? ' (aberta)' : ' (' + (o.status || 'Fracttal') + ')'));
         op.value = o.os; return op;
-      }));
-      novo.hidden = !lista.length;
+      })));
+      sel.value = AVULSO; dicaChat();
+      novo.hidden = false;
       document.getElementById('etm-chat-msg').hidden = true;
     }
     usVeu.hidden = false; usGav.hidden = false; usGav.scrollTop = 0; usGav.querySelector('.eg-gav-fechar').focus();
@@ -866,7 +870,7 @@
   var FIM = {{ comentario_fim|tojson }};
   function eventos(nome) {
     var ev = [], comFim = {}, juntos = {};
-    (comentarios || []).forEach(function (c) { if (c.texto.indexOf(FIM) === 0) comFim[c.os] = true; });
+    (comentarios || []).forEach(function (c) { if (!c.usina && c.texto.indexOf(FIM) === 0) comFim[c.os] = true; });
     osDaUsina(nome).forEach(function (o) {
       var tit = o.titulo || '(sem título)';
       ev.push({ms: quando(o.criada_iso || o.criada_dia), dia: !o.criada_iso, tipo: 'aberta', o: o, txt: 'Criada no Fracttal: ' + tit,
@@ -876,7 +880,7 @@
                                   meta: [o.eng_por ? 'por ' + o.eng_por : '', o.diagnostico ? 'Diagnóstico: ' + o.diagnostico : '', o.status_pos ? 'Status pós-OS: ' + o.status_pos : ''].filter(Boolean).join(' · ')});
     });
     (comentarios || []).forEach(function (c) {
-      if (c.texto.indexOf(FIM) !== 0) { ev.push({ms: quando(c.iso), dia: false, tipo: 'coment', o: c, txt: c.texto, meta: c.nome}); return; }
+      if (c.usina || c.texto.indexOf(FIM) !== 0) { ev.push({ms: quando(c.iso), dia: false, tipo: 'coment', o: c.usina ? null : c, avulso: !!c.usina, txt: c.texto, meta: c.nome}); return; }
       // o Finalizar de várias OS de uma vez grava o mesmo comentário em cada uma: um evento só, com as OS juntas
       var k = c.nome + '|' + c.texto + '|' + (c.iso || '').slice(0, 16), j = juntos[k];
       if (j) { j.oss.push(c.os); return; }
@@ -910,7 +914,7 @@
       if (e.oss && e.oss.length > 1) e.oss.forEach(function (n) { cab.appendChild(linkOs(n)); });
       else if (e.o) cab.appendChild(linkOs(e.o.os));
       if (e.fim) cab.appendChild(el('span', 'etm-tl-tag etm-tl-fim', 'Finalizada'));
-      if (e.tipo === 'coment') cab.appendChild(el('span', 'etm-tl-tag', 'Comentário'));
+      if (e.tipo === 'coment') cab.appendChild(el('span', 'etm-tl-tag', e.avulso ? 'Comentário da usina' : 'Comentário'));
       if (e.d) { var dl = el('a', 'etm-tl-tag etm-tl-dem', 'Demanda · ' + (e.d.aberta ? 'aberta' : 'fechada')); dl.href = e.d.caixa; dl.title = 'Abrir a demanda na Caixa de entrada'; cab.appendChild(dl); }
       li.appendChild(cab);
       li.appendChild(el('p', 'etm-tl-t', e.txt));
@@ -931,6 +935,7 @@
         // a cifra de outra chave (ou sem a chave do cofre): a gaveta diz por que não mostra
         if (il) avisos.push(plural(il, 'comentário não abriu', 'comentários não abriram') + ': a chave do cofre deste Nexus não abre a cifra deles.');
         if (x.j.erro_demandas) avisos.push('As demandas não vieram agora (' + x.j.erro_demandas + ').');
+        if (x.j.erro_avulsos) avisos.push('Os comentários da usina (sem OS) não vieram agora (' + x.j.erro_avulsos + ').');
         chatStatus.textContent = avisos.join(' ');
         desenhaTl();
       })
@@ -938,6 +943,14 @@
   }
   // a caixa de comentar lista as OS da usina: as abertas para a Performance primeiro, depois as outras em aberto no
   // Fracttal e o resto (sem as canceladas)
+  // o comentário avulso da usina (a 1ª opção da caixa) e a dica de para onde vai cada um
+  var AVULSO = 'usina';
+  function dicaChat() {
+    var d = document.getElementById('etm-chat-dica'), sel = document.getElementById('etm-chat-os');
+    if (d && sel) d.textContent = sel.value === AVULSO ? 'Fica na linha do tempo da usina, com o seu nome e a hora (não vai a nenhuma OS).'
+      : 'Vai para a nota da OS no Fracttal, com o seu nome e a hora.';
+  }
+  if (novo) document.getElementById('etm-chat-os').addEventListener('change', dicaChat);
   function osParaComentar(nome) {
     var peso = function (o) { return D.sem_marcas ? 1 : abertaEng(o) ? 0 : (o.coluna === 'nao_iniciada' || o.coluna === 'em_andamento') ? 1 : 2; };
     return D.oss.filter(function (o) { return o.usina === nome && o.wid && o.coluna !== 'cancelada'; })
@@ -953,8 +966,21 @@
       if (link) { var a = el('a', '', 'Entrar pelo Fracttal'); a.href = link; msg.appendChild(document.createTextNode(' ')); msg.appendChild(a); }
       msg.hidden = !txt; msg.classList.toggle('eg-os-msg--ruim', !!ruim);
     }
-    if (!o) { diz('Escolha a OS do comentário.', true); return; }
     if (!texto) { diz('Escreva o comentário antes de enviar.', true); ta.focus(); return; }
+    if (sel.value === AVULSO) {             // o avulso da usina: fica no Nexus, sem OS
+      btn.disabled = true; diz('Salvando na linha do tempo da usina…');
+      fetch(nexusRota('/t/performance/etm/usina/comentar'), {method: 'POST', credentials: 'same-origin',
+            headers: {'Content-Type': 'application/json', 'Accept': 'application/json'}, body: JSON.stringify({usina: nome, texto: texto})})
+        .then(function (r) { return r.json().catch(function () { return {}; }).then(function (j) { return {r: r, j: j}; }); })
+        .then(function (x) {
+          btn.disabled = false;
+          if (x.r.ok && x.j.ok) { ta.value = ''; diz(x.j.mensagem || 'Comentário salvo.'); if (usNome === nome && !usGav.hidden) lerComentarios(nome); return; }
+          diz(x.j.erro || ('O Nexus não gravou (HTTP ' + x.r.status + '). Nada mudou; tente de novo.'), true);
+        })
+        .catch(function () { btn.disabled = false; diz('Não consegui falar com o Nexus. Tente de novo.', true); });
+      return;
+    }
+    if (!o) { diz('Escolha a OS do comentário.', true); return; }
     btn.disabled = true; diz('Salvando na nota da OS ' + o.os + '…');
     fetch(nexusRota('/os/_nexus/engenharia/os/' + encodeURIComponent(o.wid) + '/comentar'), {method: 'POST', credentials: 'same-origin',
           headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
