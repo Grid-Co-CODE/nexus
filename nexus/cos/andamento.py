@@ -647,6 +647,52 @@ def ler_ao_vivo(config, caminho: str, ttl: float) -> tuple[dict | None, str]:
     return r
 
 
+# ── O nome de campo do inversor (26/11/2026): o primeiro repasse do Nexus que ESCREVE ─────────────────────────────────
+# O operador renomeia o inversor e corrige o S/N no detalhe da janela do Monitoramento; quem grava é a API da Ronda COS
+# (`/geracao/inversor-campo*` lá), pelo Andamento (`/api/nexus/inversor-campo*`). Diferente da leitura, a RECUSA tem corpo:
+# a API diz em palavras por que não gravou ("já existe um INV3 nesta usina", 409) e a tela mostra essa frase. Por isso
+# `_enviar` devolve (status, corpo) em vez de levantar `FonteErro` no 4xx.
+TIMEOUT_INVERSOR_CAMPO_S = 20.0
+
+
+def _enviar(f: Fonte, metodo: str, caminho: str, corpo: dict | None = None) -> tuple[int, dict]:
+    dados = None if corpo is None else json.dumps(corpo).encode("utf-8")
+    cab = {"X-Nexus-Chave": f.chave, "User-Agent": "Nexus-GridCo/1 (cos)", "Accept": "application/json"}
+    if dados is not None:
+        cab["Content-Type"] = "application/json"
+    req = urllib.request.Request(f.url + caminho, data=dados, method=metodo, headers=cab)
+    try:
+        with urllib.request.urlopen(req, timeout=TIMEOUT_INVERSOR_CAMPO_S) as r:  # noqa: S310 — endereço do .env
+            d = json.loads(r.read().decode("utf-8"))
+            return r.status, d if isinstance(d, dict) else {"erro": "o Andamento respondeu algo que não é um objeto"}
+    except urllib.error.HTTPError as ex:
+        try:
+            d = json.loads(ex.read().decode("utf-8"))
+        except (ValueError, OSError):
+            d = None
+        return ex.code, d if isinstance(d, dict) else {"erro": f"o Andamento respondeu {ex.code}"}
+    except (urllib.error.URLError, TimeoutError, OSError) as ex:
+        return 503, {"erro": f"o Andamento não respondeu ({type(ex).__name__})"}
+    except ValueError:
+        return 503, {"erro": "o Andamento respondeu algo que não é JSON"}
+
+
+def pedir_inversor_campo(config, metodo: str, caminho: str, corpo: dict | None = None) -> tuple[int, dict]:
+    """(status, corpo) de uma rota do nome de campo, com a frase da recusa. Sem a fonte ligada, 503 com o motivo."""
+    f = fonte(config)
+    if not f.ligada:
+        return 503, {"erro": "a fonte do Andamento não está ligada neste servidor"}
+    return _enviar(f, metodo, caminho, corpo)
+
+
+def esquecer_ao_vivo(config, caminho: str) -> None:
+    """Tira da cópia do ao vivo um caminho: depois de gravar um nome, a leitura seguinte dos cartões já vem com ele (a
+    API vence a montagem dela; sem isto, os 2 s da cópia daqui mostrariam o nome antigo)."""
+    f = fonte(config)
+    with _ao_vivo_trava:
+        _ao_vivo.pop((f.url, caminho), None)
+
+
 def limpar_cache() -> None:
     with _trava:
         _cache.clear()
