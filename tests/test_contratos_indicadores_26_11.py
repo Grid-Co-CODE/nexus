@@ -155,7 +155,7 @@ def test_a_tela_dos_indicadores(cliente):
     js = r.get_data(as_text=True)
     r.close()
     for t in ('["indicadores", "Indicadores"]', "function rIndicadores(c)", "indicadores.json?cliente=", "function fatoAniv(c)",
-              '"Só KPIs"', '"Só manutenções"', "data-ind-ano", "data-ind-usina", "sem dado no banco", "Últimos 12 meses", "ind-cinco"):
+              '"Só KPIs"', '"Só manutenções"', "data-ind-ano", "data-ind-usina", "sem dado no banco", "Últimos 12 meses", "ind-cinco", "data-cel", "function abrirGaveta(c, cel)", "data-os-abrir", "NexusOsCard"):
         assert t in js, t
 
 
@@ -171,3 +171,45 @@ def test_o_pr_acima_de_100_e_leitura_errada_e_os_cartoes_do_alto():
     assert [b["tom"] for b in r["pr_barras"][:4]] == ["vazio", "alerta", "ok", "futuro"]       # out/26: 76,8 contra 78
     assert r["pr_abaixo"] == ["out/26"] and r["disp_sem_expurgo"] == "98,0"   # out/26 96,9 e nov/26 99,0, sem o expurgo
     assert r["prev_tom"]["MPM"] == "alerta" and r["pior"] == {"usina": "Zeta 1", "fora": 2}
+
+
+def test_a_gaveta_da_celula_explica_com_as_os(carga, cliente, relogio, monkeypatch):  # noqa: F811
+    """A célula clicada abre a gaveta (Levi, 26/11/2026: "aparecesse a confirmação da resposta no card lateral [...] qual é
+    a OS [...] A OS clicável"): as OS do mês com o estado e o id do card, o PR usina a usina com a meta."""
+    from types import SimpleNamespace
+
+    from nexus.campo import responsaveis as R
+    from nexus.campo import visao
+    from nexus.pcm import fonte as PF
+    from nexus.torres.comando import gerencial_tela as GT
+    adm = _como(cliente, "admin@gridco.com.br", admin=True)
+    g = {"meses": [{"id": "2026-11"}, {"id": "2026-10"}], "avisos": [],
+         "clientes": [{"cliente": "SOLAR ALFA", "usinas": [{"uid": 7, "usina": "Zeta 1", "mwp": 2.0,
+                                                           "meses": {"2026-10": {"pr": 80.0, "pr_prev": 79.0, "disp": 97.0}},
+                                                           "com_expurgo": {"2026-10": {"disp": 98.5}}, "score": {}}]}]}
+    monkeypatch.setattr(GT, "dados_gerencial_sem_esperar", lambda: g)
+    monkeypatch.setattr(visao, "_Base", lambda: None)
+
+    class Nomes:
+        def __init__(self, b):
+            pass
+
+        def usina(self, nome, fracttal="", codigo=""):
+            return (7, "nome") if nome == "Zeta 1" else (None, None)
+    monkeypatch.setattr(R, "Nomes", Nomes)
+    tarefas = [{"tarefa": "MPM - Preventiva mensal", "dataProg": "2026-10-10", "estado": "Finalizada", "os": "123", "idWO": 999,
+                "dataFinal": "2026-10-11", "usina": "Zeta 1"},
+               {"tarefa": "MPM - Preventiva mensal", "dataProg": "2026-10-20", "estado": "Em Processo", "os": "124", "idWO": 1000, "usina": "Zeta 1"},
+               {"tarefa": "MPM - Preventiva mensal", "dataProg": "2026-10-20", "estado": "Finalizada", "os": "125", "usina": "Outra"}]
+    monkeypatch.setattr(PF, "ler_gestao_sem_esperar", lambda cfg: SimpleNamespace(dados={"tarefas": tarefas}))
+    q = {"cliente": "Solar Alfa", "uid": "7", "linha": "MPM", "mes": "2026-10"}
+    d = adm.get("/t/comando/contratos/indicadores/celula.json", query_string=q).get_json()
+    assert [o["os"] for o in d["os"]] == ["124", "123"]                        # a aberta primeiro; a da outra usina não entra
+    assert d["os"][1]["id"] == 999 and d["os"][1]["final"] == "2026-10-11"
+    assert {n["rot"]: n["val"] for n in d["numeros"]} == {"OS": "2", "Tarefas feitas": "1", "Tarefas planejadas": "2", "Tarefas abertas": "1"}
+    d = adm.get("/t/comando/contratos/indicadores/celula.json", query_string=dict(q, uid="t", linha="disp", mes="acum")).get_json()
+    assert d["usinas"][0]["val"] == "98,5%" and "sem o expurgo 97,0%" in d["usinas"][0]["extra"]
+    assert any("Antes de 10/2026" in x for x in d["textos"])
+    assert adm.get("/t/comando/contratos/indicadores/celula.json", query_string=dict(q, linha="nada")).status_code == 404
+    assert adm.get("/t/comando/contratos/indicadores/celula.json", query_string=dict(q, uid="8")).status_code == 404
+    assert adm.get("/t/comando/contratos/indicadores/celula.json", query_string=dict(q, mes="2020-01")).status_code == 404

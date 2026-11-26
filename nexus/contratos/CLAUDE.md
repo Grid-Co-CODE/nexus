@@ -164,6 +164,16 @@ com asterisco no mês que teve expurgo, sem cor sem meta.
   esquerda. O cartão das preventivas e serviços é de cinco colunas iguais, o nome em cima e o valor embaixo, sem texto (a
   explicação na dica). O mês em curso não pinta de vermelho a preventiva ainda não feita; o nome do indicador fica preso à
   esquerda quando a tabela rola de lado.
+- **A gaveta da célula** (Levi, 26/11/2026: "esses botões coloridos aí fossem clicáveis e aparecesse a confirmação da
+  resposta no card lateral [...] qual é a OS e tudo mais. A OS clicável para eu conseguir abrir o card da OS"): toda célula
+  (da usina ou do contrato inteiro, de um mês ou do acumulado) é um botão que abre uma gaveta à direita, deslizando (o
+  desenho da gaveta da Engenharia; sem animação para quem pede movimento reduzido), pela
+  `/t/comando/contratos/indicadores/celula.json?cliente=&ano=&uid=&linha=&mes=` (uid `t` = o contrato; mes `acum` = a
+  janela). MPM, MPS e MPA: as OS do mês, uma vez cada, com as tarefas dentro (o PCM conta TAREFA a tarefa: uma OS de MPM
+  traz a cabine, o inversor, a segurança…), quantas feitas, e a OS abre o card do Fracttal (`NexusOsCard.abrir`, pelo id;
+  sem id, pelo número). Supressão e lavagem: os serviços com a data. PR e disponibilidade: usina a usina, com a meta, o
+  número sem o expurgo e o texto do expurgo (o mesmo da nota da Visão gerencial). Toda gaveta diz de onde vem.
+- **A legenda** são amostras do mesmo tamanho, com o valor no meio, em colunas iguais.
 - **O PR acima de 100% é leitura errada** (`indicadores.PR_MAX`, a régua da Visão gerencial): na prévia de 26/11/2026,
   uma usina da Thopen com PR de mais de 1.000% fazia o PR do contrato dar 730,5%. A célula diz "s/d" com a dica.
 - **Os buracos, medidos em 26/11/2026:** o "s/d" de PR e disponibilidade são os meses antes de 10/2026 (o banco não

@@ -287,6 +287,146 @@ def contratos_indicadores():
     return resp
 
 
+# ── a gaveta da célula (26/11/2026) ────────────────────────────────────────────────────────────────────────────────
+# Levi, vendo a aba no ar: "esses botões coloridos aí fossem clicáveis e aparecesse a confirmação da resposta no card
+# lateral [...] ia explicar o dado, qual é a OS e tudo mais. A OS clicável para eu conseguir abrir o card da OS". Cada
+# célula (usina ou o contrato inteiro, uma linha, um mês ou o acumulado) se explica: as OS do PCM com o estado e as
+# datas, os serviços de zeladoria com a data, o PR e a disponibilidade com a meta, o expurgo e a conta. Só lê: as fontes
+# são as mesmas da aba, nas cópias que já estão na memória.
+_ROT_LINHA = {"MPM": "MPM", "MPS": "MPS", "MPA": "MPA", "rocada": "Supressão vegetal", "lavagem": "Lavagem de módulos",
+              "pr": "PR", "disp": "Disponibilidade expurgada"}
+
+
+def _br(v, casas=1):
+    return "—" if v is None else f"{float(v):.{casas}f}".replace(".", ",")
+
+
+@bp.route("/contratos/indicadores/celula.json")
+def contratos_indicadores_celula():
+    """`?cliente=&ano=&uid=&linha=&mes=`: uid "t" = o contrato inteiro; mes "acum" = a janela toda."""
+    from flask import current_app
+
+    from ...campo import responsaveis as R
+    from ...campo import visao
+    from ...comando.gerencial import chave_cliente
+    from ...contratos import controle as K
+    from ...contratos import indicadores as I
+    from .gerencial_tela import dados_gerencial_sem_esperar
+    _so_interno()
+    cliente, linha, mes = request.args.get("cliente", ""), request.args.get("linha", ""), request.args.get("mes", "")
+    n = request.args.get("ano", type=int)
+    uid_txt = request.args.get("uid", "")
+    if linha not in _ROT_LINHA:
+        abort(404)
+    hoje = visao._agora().date()
+    base = _base()
+    vis = E.visao(base, E.aplicar(base, E.abrir(E.ler_banco())), hoje, [], None, False)
+    c = next((x for x in vis["contratos"] if x["cliente"] == cliente), None)
+    if not c:
+        abort(404)
+    ano = K.ano_contratual(K._d(c.get("inicio")), hoje, n) if n else I.ultimos_12_meses(hoje)
+    if not ano:
+        abort(404)
+    meses = I.meses_do_ano(ano)
+    ids = [m["id"] for m in meses] if mes == "acum" else [mes]
+    if any(i not in {m["id"] for m in meses} for i in ids):
+        abort(404)
+    rot_mes = "a janela toda (" + meses[0]["rot"] + " a " + meses[-1]["rot"] + ")" if mes == "acum" else next(m["rot"] for m in meses if m["id"] == mes)
+    g = dados_gerencial_sem_esperar() or {}
+    cg = next((x for x in g.get("clientes") or [] if chave_cliente(x.get("cliente")) == chave_cliente(cliente)), None) or {}
+    usinas = {u.get("uid"): u for u in cg.get("usinas") or []}
+    if uid_txt == "t":
+        alvo, nome_alvo = set(usinas), f"{cliente} (contrato inteiro)"
+    else:
+        try:
+            uid = int(uid_txt)
+        except ValueError:
+            abort(404)
+        if uid not in usinas:
+            abort(404)
+        alvo, nome_alvo = {uid}, usinas[uid].get("usina")
+    out = {"ok": True, "titulo": f"{_ROT_LINHA[linha]} · {nome_alvo} · {rot_mes}", "os": [], "servicos": [], "numeros": [],
+           "usinas": [], "textos": [], "fonte": ""}
+    nomes = R.Nomes(visao._Base())
+    memo: dict = {}
+
+    def uid_de(nome):
+        if nome not in memo:
+            memo[nome] = nomes.usina(nome, fracttal=nome)[0]
+        return memo[nome]
+
+    if linha in ("MPM", "MPS", "MPA"):
+        from ...pcm import fonte as PF
+        from ...pcm import gestao as PG
+        lei = PF.ler_gestao_sem_esperar(current_app.config)
+        for tr in ((lei.dados or {}).get("tarefas") or []) if lei else []:
+            sm = PG.classificar(tr)
+            if not sm or sm[0] != linha or sm[1] not in ids:
+                continue
+            u = uid_de(tr.get("usina"))
+            if u not in alvo:
+                continue
+            out["os"].append({"os": str(tr.get("os") or ""), "id": tr.get("idWO"), "tarefa": PG.curto(tr.get("tarefa")) if hasattr(PG, "curto") else str(tr.get("tarefa") or ""),
+                              "estado": str(tr.get("estado") or ""), "prog": str(tr.get("dataProg") or "")[:10],
+                              "final": str(tr.get("dataFinal") or "")[:10], "usina": (usinas.get(u) or {}).get("usina") or ""})
+        feitas = sum(1 for o in out["os"] if o["estado"] == "Finalizada")
+        out["os"].sort(key=lambda o: (o["estado"] == "Finalizada", o["prog"], o["usina"]))
+        # o PCM conta TAREFA a tarefa (uma OS de MPM traz a cabine, o inversor, a segurança…); a gaveta agrupa por OS
+        out["numeros"] = [{"rot": "OS", "val": str(len({o["os"] for o in out["os"]}))}, {"rot": "Tarefas feitas", "val": str(feitas)},
+                          {"rot": "Tarefas planejadas", "val": str(len(out["os"]))}, {"rot": "Tarefas abertas", "val": str(len(out["os"]) - feitas)}]
+        out["fonte"] = (f"As tarefas do PCM (o arquivo do ano do Fracttal): a {linha} conta no mês da Data Programada, e "
+                        "feita é a Finalizada. A OS abre o card do Fracttal.")
+        if lei is None:
+            out["textos"].append("As tarefas do PCM ainda estão chegando: abra de novo em instantes.")
+    elif linha in ("rocada", "lavagem"):
+        from ...zeladoria import leitura
+        est = leitura.estado(current_app.config)
+        ln = next((x for x in est["abas"].get("cronograma_publico", []) if str(x.get("id")) == "cronograma"), None)
+        for u in ((ln or {}).get("dados") or {}).get("usinas") or []:
+            uu = nomes.usina(u.get("usina"))[0]
+            if uu not in alvo:
+                continue
+            for h in u.get("historico") or []:
+                d = str(h.get("data") or "")[:10]
+                if h.get("servico") in I.SERVICOS[linha] and d and d[:7] in ids:
+                    out["servicos"].append({"data": d, "servico": h.get("servico"), "usina": (usinas.get(uu) or {}).get("usina") or ""})
+        out["servicos"].sort(key=lambda s: (s["data"], s["usina"]))
+        out["numeros"] = [{"rot": "Feitas", "val": str(len(out["servicos"]))}]
+        out["fonte"] = ("O histórico do cronograma do Radar da Zeladoria (roçagem e poda química são a supressão vegetal; "
+                        "limpeza de módulos, a lavagem). O mínimo do ano vem do contrato da zeladoria de cada UFV.")
+    else:
+        mt = I.metas(c, (vis.get("fichas") or {}).get(cliente))
+        meta = (mt["pr"] if linha == "pr" else mt["disp"]) or {}
+        for u in sorted((usinas[x] for x in alvo), key=lambda x: -(x.get("mwp") or 0)):
+            for mid in ids:
+                mm = (u.get("meses") or {}).get(mid) or {}
+                ex = (u.get("com_expurgo") or {}).get(mid) or {}
+                if linha == "pr":
+                    v = mm.get("pr")
+                    v = v if v is not None and 0 < v <= I.PR_MAX else None
+                    extra = (f"meta da Performance {_br(mm.get('pr_prev'))}% · geração {_br(mm.get('prod_kwh'), 0)} kWh de "
+                             f"{_br(mm.get('meta_kwh'), 0)} kWh previstos") if mm else ""
+                else:
+                    v = ex.get("disp") if ex.get("disp") is not None else mm.get("disp")
+                    extra = f"sem o expurgo {_br(mm.get('disp'))}%" if mm.get("disp") is not None else ""
+                    item = next((i for i in ((u.get("score") or {}).get(mid) or {}).get("itens") or [] if i.get("nome") == "Disponibilidade"), None)
+                    if item and item.get("expurgo") and uid_txt != "t":
+                        out["textos"].append(f"{next(m['rot'] for m in meses if m['id'] == mid)}: {item['expurgo']}")
+                if v is None and not mm:
+                    continue
+                out["usinas"].append({"usina": u.get("usina"), "mes": next(m["rot"] for m in meses if m["id"] == mid),
+                                      "val": _br(v) + "%" if v is not None else "s/d", "tom": I.tom_kpi(v, meta.get("pct")), "extra": extra})
+        out["numeros"] = [{"rot": "Meta do contrato", "val": (_br(meta["pct"]) + "%") if meta.get("pct") is not None else "sem meta"}]
+        out["fonte"] = ("A Visão gerencial: o PR e a meta do mês que a Performance publica (desde 10/2026) e a disponibilidade "
+                        "do Fracttal e do COS, com o expurgo do contrato (a queda da rede e a limitação imposta). "
+                        "Meta: " + (meta.get("origem") or "o contrato não traz") + ".")
+        if any(i < "2026-10" for i in ids):
+            out["textos"].append("Antes de 10/2026 o banco não tem o PR nem a disponibilidade por mês: esses meses ficam sem dado.")
+    resp = jsonify(out)
+    resp.headers["Cache-Control"] = "no-store"
+    return resp
+
+
 @bp.route("/contratos/historico.json")
 def contratos_historico():
     """O histórico de um cliente: cada mudança com quem, quando, o que era e o que ficou, o motivo e a prova."""

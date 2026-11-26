@@ -136,7 +136,7 @@ def montar(contrato: dict, ficha: dict | None, ano: dict, usinas: list[dict], pc
             tom = "critico"
         else:
             tom = ""
-        return {"txt": f"{f}/{t}", "tom": tom, "dica": f"{f} feitas de {t} planejadas"}
+        return {"txt": f"{f}/{t}", "tom": tom, "dica": f"{f} tarefas feitas de {t} planejadas (o PCM conta tarefa a tarefa); clique para ver as OS"}
 
     out_us, tot_prev, tot_zel = [], {s: {} for s in SIGLAS}, {"rocada": {}, "lavagem": {}}
     pr_mes_contrato, disp_mes_contrato = {m["id"]: [] for m in ms}, {m["id"]: [] for m in ms}

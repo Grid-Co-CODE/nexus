@@ -758,17 +758,19 @@
     }
     return IND[ch];
   }
-  function celInd(x, ac) {
+  // a célula é um botão: o clique abre a gaveta que explica o dado (Levi, 26/11/2026: "esses botões coloridos aí fossem
+  // clicáveis e aparecesse a confirmação da resposta no card lateral [...] qual é a OS e tudo mais")
+  function celInd(x, ac, cel) {
     if (!x) return "<td></td>";
     var vazio = x.txt === "—" || x.txt === "s/d";
-    return '<td class="r' + (ac ? " ind-ac" : " ind-m") + '">' + (x.txt === "" ? "" : '<span class="ind' + (x.tom ? " t-" + x.tom : "") + (vazio ? " ind-vazio" : "") + '"' +
-      (x.dica ? ' title="' + esc(x.dica) + '"' : "") + ">" + esc(x.txt) + "</span>") + "</td>";
+    return '<td class="r' + (ac ? " ind-ac" : " ind-m") + '">' + (x.txt === "" ? "" : '<button type="button" class="ind' + (x.tom ? " t-" + x.tom : "") + (vazio ? " ind-vazio" : "") + '"' +
+      (cel ? ' data-cel="' + esc(cel) + '"' : "") + (x.dica ? ' title="' + esc(x.dica) + '"' : "") + ">" + esc(x.txt) + "</button>") + "</td>";
   }
-  function linhasInd(d, linhas) {
+  function linhasInd(d, linhas, uid) {
     return linhas.filter(function (l) { return indVisao === "completa" || (indVisao === "kpis" ? l.grupo === "kpi" : l.grupo === "manut"); }).map(function (l) {
       var sub = l.sub || SUB_IND[l.id] || "";
       return '<tr class="ind-l"><td class="ind-nome">' + esc(l.nome === "Disponibilidade expurgada" ? "Disp. expurgada" : l.nome) + (sub ? " <small>" + esc(sub) + "</small>" : "") + "</td>" +
-        d.meses.map(function (m) { return celInd(l.cels[m.id], false); }).join("") + celInd(l.acum, true) + "</tr>";
+        d.meses.map(function (m) { return celInd(l.cels[m.id], false, uid + "|" + l.id + "|" + m.id); }).join("") + celInd(l.acum, true, uid + "|" + l.id + "|acum") + "</tr>";
     }).join("");
   }
   function pctTxt(v) { return String(v).replace(".", ","); }
@@ -832,22 +834,89 @@
       '<th class="r ind-ac">Acum.<small>feitas / plano ou mín.</small></th></tr></thead><tbody>';
     // o cliente primeiro: o contrato inteiro (Levi: "Antes da usina, é bom mostrar também o cliente")
     h += '<tr class="ind-usina ind-total"><td colspan="' + ncol + '"><b>' + esc(c.cliente) + "</b> <span class=\"mudo\">contrato inteiro · " + d.usinas.length + (d.usinas.length === 1 ? " usina" : " usinas") +
-      (mwp ? " · " + pctTxt(Math.round(mwp * 10) / 10) + " MWp" : "") + "</span></td></tr>" + linhasInd(d, d.total || []);
+      (mwp ? " · " + pctTxt(Math.round(mwp * 10) / 10) + " MWp" : "") + "</span></td></tr>" + linhasInd(d, d.total || [], "t");
     var mostrar = d.usinas.filter(function (u) { return ab[u.uid] !== undefined || indMais[ch]; }), resto = d.usinas.filter(function (u) { return ab[u.uid] === undefined && !indMais[ch]; });
     mostrar.forEach(function (u) {
       var aberta = !!ab[u.uid];
       h += '<tr class="ind-usina"><td colspan="' + ncol + '"><button type="button" data-ind-usina="' + u.uid + '" aria-expanded="' + aberta + '"><i class="ph ph-caret-' + (aberta ? "down" : "right") + '" aria-hidden="true"></i><b>' + esc(u.usina) + "</b>" +
         (u.mwp ? ' <span class="mudo">' + pctTxt(u.mwp) + " MWp</span>" : "") +
         (u.fora ? ' <span class="ctr-pill t-critico" title="meses com preventiva não feita, PR ou disponibilidade abaixo da meta">' + u.fora + (u.fora === 1 ? " mês fora do plano ou da meta" : " meses fora do plano ou da meta") + "</span>" : "") + "</button></td></tr>";
-      if (aberta) h += linhasInd(d, u.linhas);
+      if (aberta) h += linhasInd(d, u.linhas, u.uid);
     });
     if (resto.length) h += '<tr class="ind-mais"><td colspan="' + ncol + '"><button type="button" data-ind-mais><i class="ph ph-caret-down" aria-hidden="true"></i>Mais ' + resto.length + (resto.length === 1 ? " usina" : " usinas") + ": " +
       esc(resto.map(function (u) { return u.usina; }).slice(0, 12).join(", ") + (resto.length > 12 ? " e mais " + (resto.length - 12) : "")) + "</button></td></tr>";
     h += "</tbody></table></div>";
-    h += '<div class="ctr-legenda ind-legenda"><span><span class="ind t-ok">1/1</span> feita no mês</span><span><span class="ind t-critico">0/1</span> não feita</span><span><span class="ind ind-vazio">—</span> sem plano no mês</span>' +
-      '<span><span class="ind t-ok">12/09</span> serviço feito, data</span><span><span class="ind t-alerta">3/4</span> feitas / mínimo do contrato</span><span><span class="ind t-ok">82,1</span> na meta</span>' +
-      '<span><span class="ind t-alerta">77,4</span> até 2 pontos abaixo</span><span><span class="ind t-critico">71,0</span> abaixo</span><span><span class="ind t-info">98,9*</span> com expurgo no mês</span>' +
-      '<span><span class="ind ind-vazio">s/d</span> sem dado no banco (antes de 10/2026, ou não publicado)</span><span class="ind-dica-dir">Passe o mouse na célula: o número por extenso e a meta.</span></div>';
+    // a legenda: cada amostra do mesmo tamanho, com o valor no meio (Levi: "os valores centralizados [...] tá meio frouxo")
+    var LEG = [["t-ok", "1/1", "feita no mês"], ["t-critico", "0/1", "não feita"], ["ind-vazio", "—", "sem plano no mês"], ["t-ok", "12/09", "serviço feito, data"],
+      ["t-alerta", "3/4", "feitas / mínimo do contrato"], ["t-ok", "82,1", "na meta"], ["t-alerta", "77,4", "até 2 pontos abaixo"], ["t-critico", "71,0", "abaixo da meta"],
+      ["t-info", "98,9*", "com expurgo no mês"], ["ind-vazio", "s/d", "sem dado no banco"]];
+    h += '<div class="ind-legenda">' + LEG.map(function (x) { return '<span><i class="ind ' + x[0] + '">' + esc(x[1]) + "</i>" + esc(x[2]) + "</span>"; }).join("") +
+      '<span class="ind-dica-dir">Clique na célula: a gaveta explica o dado, com as OS.</span></div>';
+    return h;
+  }
+
+  /* ── a gaveta da célula (26/11/2026): desliza da direita e explica o dado; a OS abre o card do Fracttal ───────── */
+  var gav = null;
+  function gaveta() {
+    if (gav) return gav;
+    var veu = document.createElement("div"); veu.className = "ctr-veu"; veu.hidden = true;
+    var el = document.createElement("aside"); el.className = "ctr-gaveta ctr"; el.hidden = true; el.setAttribute("role", "dialog"); el.setAttribute("aria-modal", "true"); el.setAttribute("aria-labelledby", "ctr-gav-t");
+    document.body.appendChild(veu); document.body.appendChild(el);
+    veu.addEventListener("click", fecharGaveta);
+    el.addEventListener("click", function (e) {
+      var b;
+      if (e.target.closest("[data-gav-fechar]")) { fecharGaveta(); return; }
+      if ((b = e.target.closest("[data-os-abrir]"))) {
+        var id = b.getAttribute("data-os-abrir"), folio = b.getAttribute("data-os-folio"), st = b.getAttribute("data-os-status") || "";
+        if (window.NexusOsCard) { if (id) window.NexusOsCard.abrir(id, {status: st, folio: folio}); else window.NexusOsCard.abrirFolio(folio, {status: st}); }
+      }
+    });
+    gav = {veu: veu, el: el};
+    return gav;
+  }
+  function fecharGaveta() {
+    if (!gav || gav.el.hidden) return;
+    gav.el.classList.remove("aberta"); gav.veu.classList.remove("aberta");
+    setTimeout(function () { gav.el.hidden = true; gav.veu.hidden = true; }, 220);
+  }
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape" && gav && !gav.el.hidden && !document.querySelector(".os-moldura, iframe.os-card")) fecharGaveta(); });
+  function abrirGaveta(c, cel) {
+    var g = gaveta(), p = cel.split("|");
+    g.el.innerHTML = '<button type="button" class="ctr-gav-fechar" data-gav-fechar aria-label="Fechar">×</button><p class="mudo" style="padding:30px 0">Lendo o dado…</p>';
+    g.veu.hidden = false; g.el.hidden = false;
+    requestAnimationFrame(function () { g.el.classList.add("aberta"); g.veu.classList.add("aberta"); });
+    pedir(CAMINHO + "indicadores/celula.json?cliente=" + encodeURIComponent(c.cliente) + (estado.indAno ? "&ano=" + estado.indAno : "") +
+      "&uid=" + encodeURIComponent(p[0]) + "&linha=" + encodeURIComponent(p[1]) + "&mes=" + encodeURIComponent(p[2])).then(function (d) {
+      g.el.innerHTML = conteudoGaveta(d);
+    }).catch(function (e) { g.el.innerHTML = '<button type="button" class="ctr-gav-fechar" data-gav-fechar aria-label="Fechar">×</button><p class="c-critico" style="padding:30px 0">Não li o dado: ' + esc((e && e.message) || "") + "</p>"; });
+  }
+  function conteudoGaveta(d) {
+    var h = '<button type="button" class="ctr-gav-fechar" data-gav-fechar aria-label="Fechar">×</button><div class="ctr-gav-cab"><h2 id="ctr-gav-t">' + esc(d.titulo) + "</h2></div>";
+    if ((d.numeros || []).length) h += '<div class="ctr-gav-kpis">' + d.numeros.map(function (n) { return '<div><span class="v">' + esc(n.val) + '</span><span class="n">' + esc(n.rot) + "</span></div>"; }).join("") + "</div>";
+    if ((d.os || []).length) {
+      // a OS uma vez, com as tarefas dentro: o PCM conta tarefa a tarefa (uma MPM tem a cabine, o inversor, a segurança…)
+      var porOs = {}, ordem = [];
+      d.os.forEach(function (o) {
+        var k = o.os || ("s" + ordem.length);
+        if (!porOs[k]) { porOs[k] = {os: o.os, id: o.id, usina: o.usina, prog: o.prog, tarefas: [], feitas: 0}; ordem.push(k); }
+        var g = porOs[k]; g.tarefas.push(o); if (o.estado === "Finalizada") g.feitas += 1; if (!g.id && o.id) g.id = o.id;
+      });
+      h += "<h3>As OS (" + ordem.length + ")</h3><ul class=\"ctr-gav-lista\">" + ordem.slice(0, 200).map(function (k) {
+        var g = porOs[k], tudo = g.feitas === g.tarefas.length, st = tudo ? "Finalizada" : g.tarefas[0].estado;
+        return '<li class="ctr-gav-osl"><button type="button" class="ctr-gav-os" data-os-abrir="' + esc(g.id || "") + '" data-os-folio="' + esc(g.os) + '" data-os-status="' + esc(st) + '" title="Abrir o card da OS">' + esc(g.os || "s/nº") + "</button>" +
+          '<span class="ctr-gav-txt"><b>' + esc(g.usina) + (g.prog ? " · programada " + dBR(g.prog) : "") + "</b>" +
+          "<details><summary>" + g.tarefas.length + (g.tarefas.length === 1 ? " tarefa" : " tarefas") + "</summary><ul>" + g.tarefas.map(function (o) {
+            return "<li>" + esc(o.tarefa) + ' <span class="mudo">· ' + esc(o.estado || "—") + (o.final ? " em " + dBR(o.final) : "") + "</span></li>"; }).join("") + "</ul></details></span>" +
+          '<span class="ctr-pill ' + (tudo ? "t-ok" : g.feitas ? "t-alerta" : "t-critico") + '" title="tarefas feitas / tarefas da OS">' + g.feitas + "/" + g.tarefas.length + "</span></li>";
+      }).join("") + "</ul>" + (ordem.length > 200 ? '<p class="mudo">E mais ' + (ordem.length - 200) + " OS.</p>" : "");
+    } else if (/MPM|MPS|MPA/.test(d.titulo)) h += '<p class="mudo">Nenhuma OS planejada neste mês.</p>';
+    if ((d.servicos || []).length) h += "<h3>Os serviços (" + d.servicos.length + ")</h3><ul class=\"ctr-gav-lista\">" + d.servicos.map(function (s) {
+      return '<li><span class="ctr-gav-data">' + dBR(s.data) + '</span><span class="ctr-gav-txt"><b>' + esc(s.servico) + "</b><small>" + esc(s.usina) + "</small></span></li>"; }).join("") + "</ul>";
+    else if (/Supressão|Lavagem/.test(d.titulo)) h += '<p class="mudo">Nenhum serviço feito neste período.</p>';
+    if ((d.usinas || []).length) h += "<h3>Usina a usina</h3><ul class=\"ctr-gav-lista\">" + d.usinas.map(function (u) {
+      return '<li><span class="ind' + (u.tom ? " t-" + u.tom : "") + '">' + esc(u.val) + '</span><span class="ctr-gav-txt"><b>' + esc(u.usina) + " · " + esc(u.mes) + "</b>" + (u.extra ? "<small>" + esc(u.extra) + "</small>" : "") + "</span></li>"; }).join("") + "</ul>";
+    if ((d.textos || []).length) h += "<h3>O que mais conta</h3>" + d.textos.map(function (x) { return '<p class="ctr-gav-p">' + esc(x) + "</p>"; }).join("");
+    if (d.fonte) h += '<h3>De onde vem</h3><p class="ctr-gav-p mudo">' + esc(d.fonte) + "</p>";
     return h;
   }
 
@@ -999,6 +1068,7 @@
       leve(cAtual, "regra", b.getAttribute("data-prior").split(","), "alteracao", {prioritaria: on ? "sim" : "nao"}, on ? "Marcada como prioritária." : "Tirada das prioritárias."); return; }
     if ((b = e.target.closest("[data-subgrupo]"))) { var tk = b.getAttribute("data-subgrupo"); estado.temas[tk] = !estado.temas[tk]; render(); return; }
     if ((b = e.target.closest("[data-tirar-com]"))) { if (window.confirm("Tirar este comentário? Ele fica no histórico.")) leve(cAtual, "comentario", [b.getAttribute("data-tirar-com")], "retirada", {}, "Comentário tirado."); return; }
+    if ((b = e.target.closest("[data-cel]"))) { abrirGaveta(R.contratos[estado.ct], b.getAttribute("data-cel")); return; }
     if ((b = e.target.closest("[data-ind-ano-abrir]"))) { indAnoAberto = !indAnoAberto; render(); return; }
     if ((b = e.target.closest("[data-ind-ano]"))) { estado.indAno = +b.getAttribute("data-ind-ano") || null; indAnoAberto = false; render(); return; }
     if ((b = e.target.closest("[data-ind-mais]"))) { var cM = R.contratos[estado.ct], dM = IND[cM.cliente + "|" + (estado.indAno || "")] || {}; indMais[cM.cliente + "|" + ((dM.ano || {}).n)] = true; render(); return; }
