@@ -2378,15 +2378,32 @@ supervisor pode assinar, ao assinar ele vê também se tem mais alguma aberta pa
 - **Os itens NÃO**: a coluna `Itens NÃO` no fim do `pt_app_campo` (pedida ao App em 30/10: os títulos dos itens
   respondidos NÃO, separados por "; ", sem texto livre; `visao.pts` → `itens_nao`). Sem ela, a contagem
   (`Respostas NÃO`), como antes.
-- **A decisão é a de sempre** (`/os/_nexus/pt/<n>/decidir`, o login do Fracttal do OS Creator): o formulário leva
-  `volta` (o card, sem o prefixo) e `card=1`; sem o login do Fracttal, o script troca os botões por "Entrar com o
-  Fracttal para assinar", e o login volta ao card (`assinatura._login(..., card=True)`, `voltar?...&card=1`). O Não
-  autorizo pede o motivo antes (o 1º clique abre a caixa).
+- **A decisão é a de sempre** (`/os/_nexus/pt/<n>/decidir`, com a pessoa da entrada do Nexus desde 20/11/2026): o
+  formulário leva `volta` (o card, sem o prefixo) e `card=1`. O Não autorizo pede o motivo antes (o 1º clique abre a
+  caixa).
+- **O De acordo pede a assinatura desenhada** (26/11/2026, Levi, depois de saber que um operador do COS "só clica e já
+  aprova direto": "o certo é ter a assinatura do técnico e a assinatura dele"; "todas as PTs têm que pedir assinatura").
+  Até a v364 o painel do Azure exigia o desenho; desde que a decisão veio para o Nexus, o PDF levava só o nome. O card
+  tem o quadro (dedo, caneta ou mouse; papel claro nos dois temas) e o De acordo só sai com ele assinado
+  (`assinatura_png`, `campo/pt_desenho.py`): o Nexus guarda a imagem cifrada no disco (`<dados>/pt_assinaturas/`, a
+  chave do cadastro, o número e o código do ativo de contexto; nunca no banco, que tem leitura aberta) e, com
+  `NEXUS_PT_ASSINATURA_APP=1`, a manda ao App antes de gravar a decisão (`POST <base>/app/nexus/pt/<n>/assinatura-
+  aprovador`, contrato v1 proposto ao App em 26/11; o App recusou ou não respondeu = nada grava). O App a desenha no
+  quadro "Aprovação" do PDF. As outras telas que decidiam (o detalhe da APR e PT, a tela da PT e a Visão do
+  responsável) levam ao card pelo "Assinar o De acordo"; o Não autorizo segue nelas. Prova:
+  `tests/test_campo_pt_desenho.py`.
+- **A PT no sino do topo** (26/11/2026, Levi: "além de receber o e-mail, ele também tem que receber notificação no
+  Nexus"): as linhas que a pessoa do login pode decidir agora (`decisao_pt.assinaveis`, sem o administrador por ser
+  administrador), a parada há mais de 2 h em vermelho, o clique no card de assinar (`campo/pt_sino.py`,
+  `casca._pts_do_sino`). A conta decifra o cadastro (cerca de 1 s por pessoa com as 68 PTs de 26/11): fica numa cópia
+  de 90 s por pessoa e se refaz por trás. Prova: `tests/test_campo_pt_sino.py`.
 - **Quem pode** é conferido com a pessoa da sessão do Nexus (a conta Microsoft; o e-mail é o mesmo do Fracttal, que o
-  portão de setor já usa), e o `decidir` confere de novo com a do Fracttal. Quem não pode lê o porquê, sem botão; quem
-  o Nexus não acha no cadastro lê também que falta o e-mail na ficha. Medido em 30/10: 6 dos 7 Responsáveis UFV sem
-  e-mail na ficha, achados pelo nome (o do e-mail, fulano.souza@); os 5 que o App passou a avisar na v314 são achados e
-  estão no setor Supervisão Campo, que abre o card.
+  portão de setor já usa). Quem não pode lê o porquê, sem botão; quem o Nexus não acha no cadastro lê também que falta o
+  e-mail na ficha. **A ficha do Responsável UFV precisa do e-mail** (o do Fracttal): sem ele o Nexus não gera o código
+  da pessoa, o laço de hora em hora (`pcm/responsaveis.py`) não a põe no livro de atribuições e o App manda o aviso da
+  PT a quem estava antes ou ao COS. Caso de 26/11/2026: duas fichas de responsáveis (57 usinas) sem e-mail, criadas no
+  servidor; o e-mail foi posto na ficha DO SERVIDOR e publicado pelo "Publicar no banco" de lá (publicar do PC apagaria
+  as duas, que o cadastro do PC não tem).
 - **Depois** (assinada, decidida antes ou sem permissão): "Outras PTs esperando nas suas usinas", da mais antiga para a
   mais nova, cada uma no próprio card (`decisao_pt.assinaveis`: as linhas esperando que a pessoa pode decidir, sem as
   que o Nexus já decidiu, menos a que o App recusou). Sem nenhuma: "Nenhuma outra PT esperando nas suas usinas".

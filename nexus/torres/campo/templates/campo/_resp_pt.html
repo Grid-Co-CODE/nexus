@@ -63,7 +63,8 @@
       <label class="gc-rotulo" for="cr-motivo">Motivo <span class="mudo">(obrigatório para Não autorizo; o técnico lê)</span></label>
       <textarea class="gc-campo" id="cr-motivo" name="motivo" rows="3" maxlength="400"></textarea>
       <div class="cn-botoes">
-        <button class="gc-btn gc-btn--primario" type="submit" name="decisao" value="de_acordo">De acordo</button>
+        {# o De acordo pede a assinatura desenhada desde 26/11/2026: ele mora no card de assinar, com o quadro (campo/pt_desenho.py); aqui fica o Não autorizo, que pede o motivo #}
+        <a class="gc-btn gc-btn--primario" href="{{ url_for('torre_campo.pt_assinar', numero=p.numero, ativo=p.codigo or '') }}">Assinar o De acordo</a>
         <button class="gc-btn gc-btn--contorno cn-btn-negar" type="submit" name="decisao" value="negada">Não autorizo</button>
       </div>
     </form>

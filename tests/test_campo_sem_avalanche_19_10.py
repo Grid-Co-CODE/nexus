@@ -7,6 +7,7 @@ mesmo servidor), e o Desempenho esperando a listagem dele. Três causas, três p
 3. as páginas do banco lidas em paralelo têm teto pelo processo inteiro, e não por conta. Banco falso: nada vai à rede."""
 import threading
 import time
+from test_campo_visao import ASSINATURA_PNG  # noqa: E402  (a assinatura de teste do De acordo)
 
 from test_campo_ronda_avulsa import _form, tecnico  # noqa: F401  (tecnico é fixture)
 from test_campo_visao import _aba, _entrar_no_fracttal, _jwt, banco  # noqa: F401  (banco é fixture)
@@ -115,7 +116,7 @@ def test_decidir_uma_pt_nao_zera_as_outras_telas(app, banco, logado):
     antes = dict(visao._CACHE)
     assert ("visao_pt",) in antes and ("visao_rondas",) in antes
     _entrar_no_fracttal(app, logado, _jwt())
-    r = logado.post("/os/_nexus/pt/PT-1/decidir", data={"decisao": "de_acordo"})
+    r = logado.post("/os/_nexus/pt/PT-1/decidir", data={"decisao": "de_acordo", "assinatura_png": ASSINATURA_PNG})
     assert r.status_code == 302 and "nexus_pt_decisoes" in banco.workbooks           # a decisão foi gravada
     # a conta das PT foi refeita com o livro do App de agora; as outras telas seguem com as mesmas cópias
     assert visao._CACHE[("visao_pt",)] is not antes[("visao_pt",)]

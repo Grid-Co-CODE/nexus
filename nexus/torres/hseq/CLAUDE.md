@@ -665,7 +665,9 @@ os PDFs) e em `nexus/campo` (`visao.pts`, `pt_fracttal`, `decisao_pt`): a regra 
   aprovação, esperando) e a decisão ali mesmo (De acordo / Não autorizo
   com o motivo, Ver PT, Baixar APR), que volta para a lista com os filtros dela. É o mesmo pedaço da Central de atenção
   > Permissões de trabalho (`campo/_pt_esperando.html`); a Central pede dele o Por responsável (o modo
-  `responsaveis`) e a tabela; esta tela, desde 23/11/2026, só a tabela.
+  `responsaveis`) e a tabela; esta tela, desde 23/11/2026, só a tabela. Desde 26/11/2026 o De acordo do detalhe leva ao
+  card de assinar, que pede a assinatura desenhada (regra em `nexus/torres/campo/CLAUDE.md`, "O card de assinar a PT");
+  o Não autorizo segue no detalhe.
 - **Quem pode dar o De acordo** (Levi, 09/10): o Supervisor de Campo da região da usina (com a vaga aberta, o
   Coordenador de Campo), o gestor de contrato da usina, quem é do COS e um administrador do Nexus
   (`decisao_pt.aprovadores` / `pode_decidir`, conferido no servidor; quem não pode recebe a recusa dizendo quem pode).

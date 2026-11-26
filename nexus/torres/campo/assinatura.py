@@ -221,7 +221,8 @@ def decidir(numero):
     try:
         decisao_pt.decidir(numero, request.form.get("decisao", ""), request.form.get("motivo", ""), q["email"],
                            q.get("nome", ""), bool(session.get("admin")), codigo=codigo,
-                           login="Nexus (conta Microsoft)" if q.get("via") == "microsoft" else "Nexus")
+                           login="Nexus (conta Microsoft)" if q.get("via") == "microsoft" else "Nexus",
+                           desenho=request.form.get("assinatura_png"))
     except decisao_pt.Recusada as e:
         session["pt_aviso"] = f"{numero}: {e}" if volta != tela else str(e)
         return redirect(volta)

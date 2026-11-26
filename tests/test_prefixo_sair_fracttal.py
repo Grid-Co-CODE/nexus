@@ -14,6 +14,7 @@ prefixo; aqui se prova, com o Caddy cortando o /nexus como no servidor de hoje:
 import base64
 import json
 import time
+from test_campo_visao import ASSINATURA_PNG  # noqa: E402  (a assinatura de teste do De acordo)
 
 import pytest
 from werkzeug.test import Client
@@ -102,7 +103,7 @@ def test_token_vencido_volta_ao_login_com_o_next_como_o_navegador_ve(app, monkey
 
 def test_jwt_vencido_na_decisao_da_pt_volta_para_a_lista_debaixo_do_prefixo(app, monkeypatch):
     cli = _pelo_fracttal(app, monkeypatch, exp_jwt=-60)
-    r = cli.post(PREFIXO + "/os/_nexus/pt/PT-1/decidir", data={"decisao": "de_acordo", "volta": "/t/hseq/apr-pt?aba=esperando"},
+    r = cli.post(PREFIXO + "/os/_nexus/pt/PT-1/decidir", data={"decisao": "de_acordo", "assinatura_png": ASSINATURA_PNG, "volta": "/t/hseq/apr-pt?aba=esperando"},
                  headers={"Sec-Fetch-Dest": "document"})
     assert r.status_code == 302
     assert r.headers["Location"] == "/nexus/entrar?next=/nexus/t/hseq/apr-pt?aba%3Desperando&motivo=venceu"
@@ -120,7 +121,7 @@ def test_a_decisao_gravada_volta_a_tela_de_onde_saiu_debaixo_do_prefixo(app, mon
     cli = _pelo_fracttal(app, monkeypatch)
     monkeypatch.setattr(assinatura, "quem_assina", lambda: {"email": "pessoa@exemplo.test", "nome": "Pessoa"})
     monkeypatch.setattr(decisao_pt, "decidir", lambda *a, **k: None)
-    r = cli.post(PREFIXO + "/os/_nexus/pt/PT-1/decidir", data={"decisao": "de_acordo", "volta": volta})
+    r = cli.post(PREFIXO + "/os/_nexus/pt/PT-1/decidir", data={"decisao": "de_acordo", "assinatura_png": ASSINATURA_PNG, "volta": volta})
     assert r.status_code == 302 and r.headers["Location"] == esperado
 
 

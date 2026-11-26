@@ -1608,6 +1608,14 @@ button.pn-it:hover{background:var(--superficie-2)}
 .pa-nao li::marker{color:var(--alerta);font-weight:600}
 .pa-decisao,.pa-outras{margin-top:20px;border-top:1px solid var(--linha)}
 .pa-quem{margin:4px 0 12px;font-size:13.5px;color:var(--tinta-2)}
+/* o quadro da assinatura desenhada do De acordo (26/11/2026): papel claro nos dois temas, a tinta na cor do papel (o
+   script lê o `color` do quadro), sem rolar a página enquanto se assina */
+.pa-assina{margin:4px 0 14px}
+.pa-assina-cab{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:6px}
+.pa-limpar{background:none;border:0;padding:0;cursor:pointer;font-size:13px}
+.pa-quadro{display:block;width:100%;height:auto;aspect-ratio:3/1;border-radius:8px;border:1px solid var(--linha-forte);
+  background:var(--papel);color:var(--papel-tinta);touch-action:none;cursor:crosshair}
+.pa-assina-erro{margin:6px 0 0;font-size:13px;font-weight:600}
 .pa-motivo{margin-bottom:12px}
 .pa-motivo textarea{width:100%;box-sizing:border-box}
 .pa-botoes{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:6px}

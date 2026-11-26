@@ -7,6 +7,7 @@ import json
 import re
 import time
 from pathlib import Path
+from test_campo_visao import ASSINATURA_PNG  # noqa: E402  (a assinatura de teste do De acordo)
 
 import pytest
 
@@ -127,7 +128,7 @@ def test_o_card_mostra_a_pt_e_a_assinatura_volta_ao_card_com_as_outras(app, com_
     assert "Outras PTs esperando" not in html                       # a lista vem depois de assinar
     # só com a entrada do Nexus, sem o login do Fracttal (20/11/2026): grava, volta ao card com o aviso e as outras PTs
     # das usinas dele (a PT-2, da Altair)
-    r = c.post("/os/_nexus/pt/PT-1/decidir", data={"decisao": "de_acordo", "codigo": "THPN-ALT100-INVR1",
+    r = c.post("/os/_nexus/pt/PT-1/decidir", data={"decisao": "de_acordo", "assinatura_png": ASSINATURA_PNG, "codigo": "THPN-ALT100-INVR1",
                                                    "volta": CARD_PT1, "card": "1"})
     assert r.headers["Location"] == CARD_PT1
     linhas = com_responsavel.linhas("nexus_pt_decisoes", "fato_decisao_pt")
@@ -213,7 +214,7 @@ def test_a_decisao_passa_atras_do_proxy_que_troca_o_host(app, com_responsavel, m
         s["logado"], s["admin"], s["via"], s["ms_ate"] = True, False, "microsoft", time.time() + 3600
         s["usuario"] = {"email": RESP, "nome": "Responsável Exemplo", "perfil": ""}
     _entrar_no_fracttal(app, c, _jwt(email=RESP), RESP, "Responsável Exemplo")
-    form = {"decisao": "de_acordo", "codigo": "THPN-ALT100-INVR1", "volta": CARD_PT1, "card": "1"}
+    form = {"decisao": "de_acordo", "assinatura_png": ASSINATURA_PNG, "codigo": "THPN-ALT100-INVR1", "volta": CARD_PT1, "card": "1"}
     # a camada da T.I.: o navegador fala com app.gridco.com.br, e o Nexus recebe outro Host (o pedido chega com os
     # cookies; só o Host muda no caminho)
     original = app.wsgi_app

@@ -610,7 +610,8 @@ def _sino():
         l_conv, _l_est, l_ped = CV.copias()
         avisos = _avisos_do_sino()
         perf = _perf_do_sino()
-        if (not g or not g.dados) and not l_conv and not l_ped and not avisos and not perf:
+        pts = _pts_do_sino()
+        if (not g or not g.dados) and not l_conv and not l_ped and not avisos and not perf and not pts:
             return None
         torres = MO.torres_da_pessoa()
         todos = (g.dados.get("insights") or []) if g and g.dados else []
@@ -637,12 +638,30 @@ def _sino():
         # vão para o sino das notificações do setor (base.html)
         # o novo da Sala de controle da Performance conta por USINA (16/11/2026): contar cada string encheria o número
         n_perf = perf["n_usinas"] if perf else 0
-        return {"n": len(mencoes) + len(pedidos) + len(avisos) + n_perf, "criticos": sum(1 for p in pedidos if p["atrasado"]),
+        pts = pts or []
+        return {"n": len(mencoes) + len(pedidos) + len(avisos) + n_perf + len(pts),
+                "criticos": sum(1 for p in pedidos if p["atrasado"]) + sum(1 for p in pts if p["parada"]),
                 "mencoes": mencoes[:6], "n_mencoes": len(mencoes), "pedidos": pedidos[:6], "n_pedidos": len(pedidos),
                 "avisos": avisos[:8], "n_avisos": len(avisos),
-                "perf": (perf or {}).get("usinas", [])[:6], "n_perf": n_perf}
+                "perf": (perf or {}).get("usinas", [])[:6], "n_perf": n_perf,
+                "pts": pts[:6], "n_pts": len(pts)}
     except Exception:            # noqa: BLE001 — o sino nunca derruba uma página
         current_app.logger.exception("sino dos insights")
+        return None
+
+
+def _pts_do_sino() -> list | None:
+    """As PTs esperando o De acordo de quem entrou e pode assiná-las (26/11/2026, Levi: "além de receber o e-mail, ele
+    também tem que receber notificação no Nexus"; `campo/pt_sino.py`). Só com a pessoa do login (a senha de
+    administrador não diz quem é); da cópia de 90 s, refeita por trás."""
+    email = str((session.get("usuario") or {}).get("email") or "").strip()
+    if not email:
+        return None
+    try:
+        from ..campo import pt_sino as PS
+        return PS.para_o_sino(email, str((session.get("usuario") or {}).get("nome") or ""))
+    except Exception:            # noqa: BLE001 — o sino nunca derruba uma página
+        current_app.logger.exception("PTs do sino")
         return None
 
 

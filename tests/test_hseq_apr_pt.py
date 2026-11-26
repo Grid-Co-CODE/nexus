@@ -7,6 +7,7 @@ import base64
 import json
 import time
 from datetime import datetime
+from test_campo_visao import ASSINATURA_PNG  # noqa: E402  (a assinatura de teste do De acordo)
 
 import pytest
 from test_campo_visao import CHAVE_CADASTRO, _aba, _pessoas, _pt, banco  # noqa: F401  (banco é fixture)
@@ -93,18 +94,18 @@ def test_quem_pode_dar_o_de_acordo(banco, app, monkeypatch):
 def test_quem_nao_pode_e_recusado_e_quem_pode_decide_pela_lista(banco, app, cliente):
     _nexus(cliente)
     _fracttal(app, cliente, "sup@exemplo.test", "Fulano Sem Papel")
-    r = cliente.post("/os/_nexus/pt/PT-1/decidir", data={"decisao": "de_acordo", "volta": "/t/hseq/apr-pt?modo=tabela"})
+    r = cliente.post("/os/_nexus/pt/PT-1/decidir", data={"decisao": "de_acordo", "assinatura_png": ASSINATURA_PNG, "volta": "/t/hseq/apr-pt?modo=tabela"})
     assert r.status_code == 302 and r.headers["Location"] == "/t/hseq/apr-pt?modo=tabela"
     html = cliente.get("/t/hseq/apr-pt?modo=tabela").get_data(as_text=True)
     assert "PT-1: Quem pode dar o De acordo nesta PT" in html and "nexus_pt_decisoes" not in banco.workbooks
     _fracttal(app, cliente, "beltrano@exemplo.test", "Beltrano Supervisor")
-    r = cliente.post("/os/_nexus/pt/PT-1/decidir", data={"decisao": "de_acordo", "volta": "/t/hseq/apr-pt?modo=tabela"})
+    r = cliente.post("/os/_nexus/pt/PT-1/decidir", data={"decisao": "de_acordo", "assinatura_png": ASSINATURA_PNG, "volta": "/t/hseq/apr-pt?modo=tabela"})
     assert r.headers["Location"] == "/t/hseq/apr-pt?modo=tabela"
     assert "Decisão da PT-1 salva no banco" in cliente.get("/t/hseq/apr-pt?modo=tabela").get_data(as_text=True)
     assert decisao_pt.da_pt("PT-1")["decisao"] == "de_acordo"
     # a volta só vale para o próprio Nexus
     _fracttal(app, cliente, "beltrano@exemplo.test", "Beltrano Supervisor")
-    r = cliente.post("/os/_nexus/pt/PT-2/decidir", data={"decisao": "de_acordo", "volta": "https://outro.site/x"})
+    r = cliente.post("/os/_nexus/pt/PT-2/decidir", data={"decisao": "de_acordo", "assinatura_png": ASSINATURA_PNG, "volta": "https://outro.site/x"})
     assert r.headers["Location"].endswith("/t/campo/pt/PT-2?gravada=1")
 
 

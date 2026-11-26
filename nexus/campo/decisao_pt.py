@@ -277,15 +277,26 @@ def _linha(numero, codigo) -> tuple[dict, int]:
 
 
 def decidir(numero, decisao: str, motivo: str, email: str, nome: str = "", admin: bool = False,
-            codigo=None, login: str = "Nexus") -> dict:
+            codigo=None, login: str = "Nexus", desenho=None) -> dict:
     """Grava a decisão sobre UMA linha da PT (`codigo`: o código do ativo dela; ver `_linha`) e confere no banco.
     Recusa: decisão inválida, negar sem motivo, quem não pode decidir esta PT (`pode_decidir`, quem a pediu inclusive),
     PT ou linha que não existe, que já não está aguardando no livro do App ou que já tem decisão do Nexus (o primeiro que
     decide vale, como no App). O que o App descartaria e já se sabe na hora (a linha, quem pediu, a 1ª decisão) é
-    recusado aqui, antes de gravar; os 7 dias e o painel que decide no meio, só o App vê (ver o topo)."""
+    recusado aqui, antes de gravar; os 7 dias e o painel que decide no meio, só o App vê (ver o topo).
+
+    O De acordo pede a assinatura desenhada (`desenho`, o PNG do quadro do card; 26/11/2026, Levi: "todas as PTs têm
+    que pedir assinatura"): guardada cifrada no disco e, com o envio ligado, mandada ao App antes de gravar a decisão
+    (`pt_desenho`). O Não autorizo pede o motivo."""
+    from . import pt_desenho as PDz
     cfg = current_app.config
     if decisao not in DECISOES:
         raise Recusada("A decisão precisa ser De acordo ou Não autorizo.")
+    png = None
+    if decisao == "de_acordo":
+        try:
+            png = PDz.png_do_formulario(desenho)
+        except PDz.Recusada as e:
+            raise Recusada(str(e)) from None
     motivo = mascarar(motivo)
     if decisao == "negada" and len(motivo) < 3:
         raise Recusada("Escreva o motivo: é o que o técnico lê quando a PT não é autorizada.")
@@ -313,6 +324,14 @@ def decidir(numero, decisao: str, motivo: str, email: str, nome: str = "", admin
         if ja and not recusada_pelo_app(p, ja):
             raise Recusada(f"{qual} já tem decisão gravada pelo Nexus.")
         agora = datetime.now(timezone.utc)
+        if png is not None:
+            # o App recebe a assinatura antes da decisão: o De acordo do Nexus nunca chega a ele sem o desenho
+            try:
+                if PDz.envio_ligado(cfg):
+                    PDz.enviar_ao_app(p["numero"], cod, png, quem)
+                PDz.guardar(cfg, p["numero"], cod, png, quem, agora.strftime("%Y-%m-%dT%H:%M:%SZ"))
+            except PDz.Recusada as e:
+                raise Recusada(str(e)) from None
         nova = {"decidida_em": agora.strftime("%Y-%m-%dT%H:%M:%SZ"),
                 "data_id": int(agora.astimezone(_BRT).strftime("%Y%m%d")), "pt": p["numero"], "os": str(p["os"] or ""),
                 "usina_id": p["usina_id"], "decisao": decisao, "motivo": motivo, "decidida_por_hmac": quem,

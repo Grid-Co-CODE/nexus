@@ -5,6 +5,7 @@ senha de administrador não depende do Fracttal: só o "sair" a encerra."""
 import base64
 import json
 import time
+from test_campo_visao import ASSINATURA_PNG  # noqa: E402  (a assinatura de teste do De acordo)
 
 import pytest
 from flask import Flask, jsonify, redirect, session
@@ -94,7 +95,7 @@ def test_sem_o_jwt_no_cookie_do_os_creator_a_sessao_do_nexus_acaba(app, cliente)
 def test_jwt_vencido_no_cookie_do_os_creator_e_a_decisao_da_pt_volta_para_a_lista(app, cliente):
     _pelo_fracttal(cliente)
     _cookie_os(app, cliente, _jwt(exp_s=-60))
-    r = cliente.post("/os/_nexus/pt/PT-1/decidir", data={"decisao": "de_acordo", "volta": "/t/hseq/apr-pt?aba=esperando"},
+    r = cliente.post("/os/_nexus/pt/PT-1/decidir", data={"decisao": "de_acordo", "assinatura_png": ASSINATURA_PNG, "volta": "/t/hseq/apr-pt?aba=esperando"},
                      headers={"Sec-Fetch-Dest": "document"})
     assert r.status_code == 302
     assert r.headers["Location"] == "/entrar?next=/t/hseq/apr-pt?aba%3Desperando&motivo=venceu"

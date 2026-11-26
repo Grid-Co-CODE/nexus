@@ -88,6 +88,16 @@
         <input type="hidden" name="volta" value="{{ volta }}">
         <input type="hidden" name="card" value="1">
         <p class="pa-quem" data-pa-quem="{{ url_for('campo_assinatura.quem') }}">Você assina com a conta com que entrou.</p>
+        {# a assinatura desenhada (26/11/2026, Levi: "o certo é ter a assinatura do técnico e a assinatura dele"; "todas as
+           PTs têm que pedir assinatura"): o De acordo só sai com o quadro assinado; o PNG vai no `assinatura_png`
+           (campo/pt_desenho.py). O Não autorizo não pede: pede o motivo #}
+        <div class="pa-assina" data-pa-assina>
+          <div class="pa-assina-cab"><span class="gc-rotulo" id="pa-assina-rot">Sua assinatura <span class="mudo">(vai no PDF da PT, ao lado da do técnico)</span></span>
+            <button type="button" class="cn-link pa-limpar" data-pa-limpar>Limpar</button></div>
+          <canvas class="pa-quadro" width="600" height="200" role="img" aria-labelledby="pa-assina-rot" data-pa-quadro></canvas>
+          <p class="pa-assina-erro cn-t-critico" data-pa-assina-erro hidden>Assine no quadro antes de dar o De acordo.</p>
+          <input type="hidden" name="assinatura_png" value="" data-pa-png>
+        </div>
         <div class="pa-motivo" hidden>
           <label class="gc-rotulo" for="pa-motivo">Motivo do Não autorizo <span class="mudo">(o técnico lê)</span></label>
           <textarea class="gc-campo" id="pa-motivo" name="motivo" rows="3" maxlength="400"></textarea>
@@ -112,7 +122,35 @@
             quem.textContent = 'Para assinar, entre com a sua conta Microsoft.';
             acordo.hidden = true; negar.hidden = true;
           }).catch(function () {});
-          acordo.addEventListener('click', function () { motivo.required = false; });
+          // o quadro de assinatura: dedo, caneta ou mouse (pointer events); a tinta é a cor do papel (token), o fundo
+          // do PNG fica transparente para o PDF
+          var quadro = f.querySelector('[data-pa-quadro]'), png = f.querySelector('[data-pa-png]');
+          var erroAss = f.querySelector('[data-pa-assina-erro]'), ctx = quadro.getContext('2d'), riscou = false, ultimo = null;
+          ctx.lineWidth = 3; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+          ctx.strokeStyle = getComputedStyle(quadro).color;
+          function ponto(ev) {
+            var r = quadro.getBoundingClientRect();
+            return {x: (ev.clientX - r.left) * quadro.width / r.width, y: (ev.clientY - r.top) * quadro.height / r.height};
+          }
+          quadro.addEventListener('pointerdown', function (ev) {
+            ev.preventDefault(); quadro.setPointerCapture(ev.pointerId); ultimo = ponto(ev);
+            ctx.beginPath(); ctx.arc(ultimo.x, ultimo.y, 1.2, 0, 2 * Math.PI); ctx.fillStyle = ctx.strokeStyle; ctx.fill();
+            riscou = true; erroAss.hidden = true;
+          });
+          quadro.addEventListener('pointermove', function (ev) {
+            if (!ultimo) { return; }
+            var p = ponto(ev);
+            ctx.beginPath(); ctx.moveTo(ultimo.x, ultimo.y); ctx.lineTo(p.x, p.y); ctx.stroke(); ultimo = p;
+          });
+          ['pointerup', 'pointercancel', 'pointerleave'].forEach(function (t) { quadro.addEventListener(t, function () { ultimo = null; }); });
+          f.querySelector('[data-pa-limpar]').addEventListener('click', function () {
+            ctx.clearRect(0, 0, quadro.width, quadro.height); riscou = false; png.value = '';
+          });
+          acordo.addEventListener('click', function (ev) {
+            motivo.required = false;
+            if (!riscou) { ev.preventDefault(); erroAss.hidden = false; quadro.scrollIntoView({block: 'center'}); return; }
+            png.value = quadro.toDataURL('image/png');
+          });
           negar.addEventListener('click', function (ev) {
             if (caixa.hidden) {
               ev.preventDefault();
