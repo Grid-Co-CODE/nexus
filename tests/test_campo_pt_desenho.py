@@ -125,3 +125,10 @@ def test_o_png_do_formulario():
     with pytest.raises(PDz.Recusada):           # PNG vazio (o quadro sem traço) é pequeno demais
         PDz.png_do_formulario("data:image/png;base64," + base64.b64encode(PDz.PNG + b"0" * 20).decode())
     assert PDz.png_do_formulario(ASSINATURA_PNG).startswith(PDz.PNG)
+
+
+def test_o_interruptor_do_envio_chega_pela_configuracao(monkeypatch):
+    """Só os nomes de `config.OPCIONAIS` entram na configuração: sem ele na lista, o "1" do .env do servidor não ligaria o
+    envio ao App."""
+    from nexus import config
+    assert "NEXUS_PT_ASSINATURA_APP" in config.OPCIONAIS

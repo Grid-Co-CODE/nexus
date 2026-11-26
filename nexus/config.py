@@ -62,6 +62,9 @@ OPCIONAIS = ("NEXUS_CHAVE_CADASTRO", "NEXUS_ARMAZEM_LOCAL",
              # Nexus manda ao servidor do App (a mesma do App Setting de lá; também pela tela Base → Chaves do Nexus, que
              # vence o .env) e, se mudar, o endereço da rota (só aqui). Sem a chave os relatos não aparecem
              "NEXUS_APP_RELATOS_CHAVE", "NEXUS_APP_RELATOS_URL",
+             # a assinatura desenhada do De acordo da PT vai ao App antes da decisão (26/11/2026, campo/pt_desenho.py):
+             # "1" liga, quando a rota do App estiver no ar; sem ela, o desenho é exigido e guardado só no Nexus
+             "NEXUS_PT_ASSINATURA_APP",
              # login pelo Fracttal (06/10/2026): e-mails (separados por vírgula) que entram como admin (o Cadastro)
              "NEXUS_ADMINS",
              # Entrar com a Microsoft da Grid Co. (14/10/2026, nexus/auth/microsoft.py): as QUATRO primeiras ligam a porta
